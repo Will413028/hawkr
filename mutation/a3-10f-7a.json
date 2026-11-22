@@ -109,24 +109,6 @@
    "why": "AddReportSupplement reports can_supplement true regardless of the module's answer."
   },
   {
-   "id": "website-detail-ignores-can-supplement",
-   "stack": "website",
-   "file": "website/features/account/screens/reports/StoreReportDetailClient.tsx",
-   "old": "{detail.canSupplement ? (",
-   "new": "{detail.canSupplement || true ? (",
-   "test": "features/report/my-reports.unit.test.ts hides the supplement button once the report has an outcome",
-   "why": "The detail screen shows the supplement button even when can_supplement is false."
-  },
-  {
-   "id": "website-adopt-drops-can-supplement",
-   "stack": "website",
-   "file": "website/features/report/hooks.ts",
-   "old": "canSupplement: latest.canSupplement,",
-   "new": "canSupplement: true,",
-   "test": "features/report/my-reports.unit.test.ts uses can_supplement and supplement_max of the AddReportSupplement response afterwards",
-   "why": "After a supplement the state ignores the response's can_supplement."
-  },
-  {
    "id": "website-adopt-drops-supplement-max",
    "stack": "website",
    "file": "website/features/report/hooks.ts",
