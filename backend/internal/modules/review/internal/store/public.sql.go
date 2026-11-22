@@ -366,7 +366,8 @@ SELECT
     COUNT(*) FILTER (WHERE r.rating = 4)::bigint       AS rating_4_count,
     COUNT(*) FILTER (WHERE r.rating = 3)::bigint       AS rating_3_count,
     COUNT(*) FILTER (WHERE r.rating = 2)::bigint       AS rating_2_count,
-    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count
+    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count,
+    COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM review.review_images AS ri WHERE ri.review_id = r.id))::bigint AS with_images_count
 FROM review.reviews AS r
 WHERE r.product_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
@@ -374,13 +375,14 @@ WHERE r.product_id = $1
 `
 
 type ProductStatsRow struct {
-	TotalCount   int64
-	AvgRating    float64
-	Rating5Count int64
-	Rating4Count int64
-	Rating3Count int64
-	Rating2Count int64
-	Rating1Count int64
+	TotalCount      int64
+	AvgRating       float64
+	Rating5Count    int64
+	Rating4Count    int64
+	Rating3Count    int64
+	Rating2Count    int64
+	Rating1Count    int64
+	WithImagesCount int64
 }
 
 func (q *Queries) ProductStats(ctx context.Context, productID int64) (ProductStatsRow, error) {
@@ -394,6 +396,7 @@ func (q *Queries) ProductStats(ctx context.Context, productID int64) (ProductSta
 		&i.Rating3Count,
 		&i.Rating2Count,
 		&i.Rating1Count,
+		&i.WithImagesCount,
 	)
 	return i, err
 }

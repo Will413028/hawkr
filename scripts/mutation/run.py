@@ -216,7 +216,7 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
     if stack == "website":
         argv = ["pnpm", "exec", *package_script(repo, "website", "test:file"), head]
         if rest:
-            argv += ["-t", rest]
+            argv += [f"-t={rest}"]
         return Command(argv, repo / "website", env, stack)
     app = stack[len(FLUTTER_PREFIX):]
     argv = ["bash", "scripts/ci-flutter-test.sh", "--no-pub", head]

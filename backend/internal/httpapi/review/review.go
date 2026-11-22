@@ -132,8 +132,8 @@ func ratingOf(r *int32) int {
 }
 
 // respond 把一頁評價組成列表回應：作者顯示資料補上，有下一頁時帶 page token。
-func respond[T any](ctx context.Context, p *presenter, page review.Page, scope string, withOrder bool, build func([]*pb.Review, string) *T) (*connect.Response[T], error) {
-	reviews, err := p.toReviews(ctx, page.Reviews, withOrder)
+func respond[T any](ctx context.Context, p *presenter, page review.Page, scope string, withOrder bool, viewer int64, build func([]*pb.Review, string) *T) (*connect.Response[T], error) {
+	reviews, err := p.toReviews(ctx, page.Reviews, withOrder, viewer)
 	if err != nil {
 		return nil, err
 	}
@@ -171,8 +171,8 @@ func (p *presenter) failure(err error) error {
 	return rpc.WithFieldPaths(err, reviewPaths)
 }
 
-// toReviews 把一頁評價轉成回應：作者名稱與頭像以一次批次查詢補上；withOrder 為真時帶訂單編號與訂單項目 ID（只有作者本人與店家自己的視圖）。
-func (p *presenter) toReviews(ctx context.Context, in []review.Review, withOrder bool) ([]*pb.Review, error) {
+// toReviews 把一頁評價轉成回應：viewer 是觀看者的買家 ID（訪客與店家視圖是 0），評價是他寫的 is_mine 為真；作者名稱與頭像以一次批次查詢補上；withOrder 為真時帶訂單編號與訂單項目 ID（只有作者本人與店家自己的視圖）。
+func (p *presenter) toReviews(ctx context.Context, in []review.Review, withOrder bool, viewer int64) ([]*pb.Review, error) {
 	ids := make([]int64, 0, len(in))
 	seen := make(map[int64]bool, len(in))
 	for _, r := range in {
@@ -193,7 +193,7 @@ func (p *presenter) toReviews(ctx context.Context, in []review.Review, withOrder
 	}
 	out := make([]*pb.Review, len(in))
 	for i, r := range in {
-		v, err := p.toReview(r, displays[r.BuyerID], withOrder)
+		v, err := p.toReview(r, displays[r.BuyerID], withOrder, viewer)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +202,7 @@ func (p *presenter) toReviews(ctx context.Context, in []review.Review, withOrder
 	return out, nil
 }
 
-func (p *presenter) toReview(r review.Review, d buyer.Display, withOrder bool) (*pb.Review, error) {
+func (p *presenter) toReview(r review.Review, d buyer.Display, withOrder bool, viewer int64) (*pb.Review, error) {
 	out := &pb.Review{
 		Id:         r.ID.String(),
 		ProductId:  rpc.FormatID(r.ProductID),
@@ -213,6 +213,7 @@ func (p *presenter) toReview(r review.Review, d buyer.Display, withOrder bool) (
 		Price:      r.Price,
 		CreateTime: timestamppb.New(r.CreatedAt),
 		Author:     &pb.ReviewAuthor{},
+		IsMine:     viewer > 0 && r.BuyerID == viewer,
 	}
 	for _, img := range r.Images {
 		im, err := p.image(img.ObjectKey)

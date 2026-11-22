@@ -13,10 +13,14 @@
       "GENDER_OTHER": "其他"
     },
     "Profile": {
+      "deleted_name": "已刪除帳號",
       "gender_unset": "尚未設定"
     }
   },
   "chat": {
+    "Message": {
+      "unsupported_kind": "不支援的訊息"
+    },
     "Preview": {
       "erased": "此訊息已被移除",
       "hidden": "此訊息已被隱藏",
@@ -70,6 +74,17 @@
     },
     "unknown": "未知"
   },
+  "crm": {
+    "CustomerSort": {
+      "CUSTOMER_SORT_FIRST_ORDER_TIME": "首購時間",
+      "CUSTOMER_SORT_ORDER_COUNT": "訂單數",
+      "CUSTOMER_SORT_TOTAL_SPENT": "消費金額"
+    },
+    "CustomerType": {
+      "CUSTOMER_TYPE_NORMAL": "一般客戶",
+      "CUSTOMER_TYPE_VIP": "VIP"
+    }
+  },
   "moderation": {
     "CommunityReport": {
       "outcome_unset": "審核中"
@@ -99,6 +114,18 @@
     "RequirementCollection": {
       "REQUIREMENT_COLLECTION_PLATFORM": "平台收件（內嵌元件）",
       "REQUIREMENT_COLLECTION_PROVIDER": "金流商收件（託管頁面）"
+    }
+  },
+  "review": {
+    "Review": {
+      "rating_label_1": "非常不滿意",
+      "rating_label_2": "不滿意",
+      "rating_label_3": "一般",
+      "rating_label_4": "滿意",
+      "rating_label_5": "非常滿意"
+    },
+    "ReviewAuthor": {
+      "anonymous_name": "匿名會員"
     }
   },
   "seller": {

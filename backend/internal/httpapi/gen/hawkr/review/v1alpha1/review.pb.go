@@ -165,7 +165,9 @@ type Review struct {
 	// 訂單編號。只有作者本人（CreateReview、ListMyReviews）與店家自己讀自己店的評價（ListOwnStoreReviews、ReplyReview）的回應才設，公開讀取不設。
 	OrderNo *string `protobuf:"bytes,13,opt,name=order_no,json=orderNo,proto3,oneof" json:"order_no,omitempty"`
 	// 訂單項目 ID，設定的條件同 order_no。
-	OrderItemId   *string `protobuf:"bytes,14,opt,name=order_item_id,json=orderItemId,proto3,oneof" json:"order_item_id,omitempty"`
+	OrderItemId *string `protobuf:"bytes,14,opt,name=order_item_id,json=orderItemId,proto3,oneof" json:"order_item_id,omitempty"`
+	// 這則評價是不是觀看者（登入的買家）自己寫的；訪客與店家的視圖是 false。依觀看者而定，所以帶憑證的公開讀取已是 private, no-store（見檔頭）。
+	IsMine        bool `protobuf:"varint,15,opt,name=is_mine,json=isMine,proto3" json:"is_mine,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -296,6 +298,13 @@ func (x *Review) GetOrderItemId() string {
 		return *x.OrderItemId
 	}
 	return ""
+}
+
+func (x *Review) GetIsMine() bool {
+	if x != nil {
+		return x.IsMine
+	}
+	return false
 }
 
 type ListProductReviewsRequest struct {
@@ -772,9 +781,11 @@ type GetProductReviewStatsResponse struct {
 	// 平均星等，四捨五入到小數第二位；沒有評價是 0。
 	Average float64 `protobuf:"fixed64,2,opt,name=average,proto3" json:"average,omitempty"`
 	// 1 到 5 星各一項，沒有評價的星等是 0；與店家統計同形。
-	Distribution  []*RatingCount `protobuf:"bytes,3,rep,name=distribution,proto3" json:"distribution,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Distribution []*RatingCount `protobuf:"bytes,3,rep,name=distribution,proto3" json:"distribution,omitempty"`
+	// 公開可讀且帶圖的評價數；同 count 不依觀看者過濾、不套封鎖，所以可以多於帶 with_images 的列表（列表套觀看者的封鎖）。
+	WithImagesCount int32 `protobuf:"varint,4,opt,name=with_images_count,json=withImagesCount,proto3" json:"with_images_count,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *GetProductReviewStatsResponse) Reset() {
@@ -826,6 +837,13 @@ func (x *GetProductReviewStatsResponse) GetDistribution() []*RatingCount {
 		return x.Distribution
 	}
 	return nil
+}
+
+func (x *GetProductReviewStatsResponse) GetWithImagesCount() int32 {
+	if x != nil {
+		return x.WithImagesCount
+	}
+	return 0
 }
 
 type GetReviewRequest struct {
@@ -1387,7 +1405,7 @@ const file_hawkr_review_v1alpha1_review_proto_rawDesc = "" +
 	"\vReviewReply\x12\x1d\n" +
 	"\acontent\x18\x01 \x01(\tB\x03\xe0A\x03R\acontent\x12>\n" +
 	"\n" +
-	"reply_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\treplyTime\"\x99\x05\n" +
+	"reply_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\treplyTime\"\xb7\x05\n" +
 	"\x06Review\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\"\n" +
 	"\n" +
@@ -1406,7 +1424,8 @@ const file_hawkr_review_v1alpha1_review_proto_rawDesc = "" +
 	"\x05reply\x18\v \x01(\v2\".hawkr.review.v1alpha1.ReviewReplyB\x03\xe0A\x03H\x00R\x05reply\x88\x01\x01\x12@\n" +
 	"\x06author\x18\f \x01(\v2#.hawkr.review.v1alpha1.ReviewAuthorB\x03\xe0A\x03R\x06author\x12#\n" +
 	"\border_no\x18\r \x01(\tB\x03\xe0A\x03H\x01R\aorderNo\x88\x01\x01\x12,\n" +
-	"\rorder_item_id\x18\x0e \x01(\tB\x03\xe0A\x03H\x02R\vorderItemId\x88\x01\x01B\b\n" +
+	"\rorder_item_id\x18\x0e \x01(\tB\x03\xe0A\x03H\x02R\vorderItemId\x88\x01\x01\x12\x1c\n" +
+	"\ais_mine\x18\x0f \x01(\bB\x03\xe0A\x03R\x06isMineB\b\n" +
 	"\x06_replyB\v\n" +
 	"\t_order_noB\x10\n" +
 	"\x0e_order_item_id\"\xc4\x01\n" +
@@ -1446,11 +1465,12 @@ const file_hawkr_review_v1alpha1_review_proto_rawDesc = "" +
 	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"B\n" +
 	"\x1cGetProductReviewStatsRequest\x12\"\n" +
 	"\n" +
-	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x97\x01\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\xc3\x01\n" +
 	"\x1dGetProductReviewStatsResponse\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\x05R\x05count\x12\x18\n" +
 	"\aaverage\x18\x02 \x01(\x01R\aaverage\x12F\n" +
-	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"4\n" +
+	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\x12*\n" +
+	"\x11with_images_count\x18\x04 \x01(\x05R\x0fwithImagesCount\"4\n" +
 	"\x10GetReviewRequest\x12 \n" +
 	"\treview_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breviewId\"J\n" +
 	"\x11GetReviewResponse\x125\n" +

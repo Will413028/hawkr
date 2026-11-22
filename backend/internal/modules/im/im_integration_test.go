@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -837,5 +838,35 @@ func TestMessageForReportReturnsTombstonesForHiddenContext(t *testing.T) {
 	}
 	if c := byID[visibleImage.ID]; c.Hidden || c.Erased || c.Text != "" || c.AssetID != media.AssetFor("vis") {
 		t.Fatalf("未隱藏的圖片要帶 AssetID：%+v", c)
+	}
+}
+
+// 店家依買家取對話：只回自己店與該買家的對話；別家店的買家、買家方、不存在的買家都是同一個 not_found；預覽與未讀同 ListConversations。
+func TestStoreConversationByBuyerIsScopedToTheCallersStore(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.say(t, f.buyerParty(b1), s1, "hi")
+	f.say(t, f.buyerParty(b2), s2, "other store")
+
+	c, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, s1), b1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ID != f.conversation(t, b1, s1) || c.BuyerID != b1 || c.StoreID != s1 || c.Unread != 1 || c.LastSeq != 1 {
+		t.Fatalf("對話：%+v", c)
+	}
+	page, err := f.m.ListConversations(ctx, f.storeParty(t, s1), nil, 10)
+	if err != nil || len(page.Items) != 1 || !reflect.DeepEqual(page.Items[0], c) {
+		t.Fatalf("與列表同形：%+v %v", page, err)
+	}
+	for name, call := range map[string]func() error{
+		"別家店的買家": func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, s1), b2); return err },
+		"不存在的買家": func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.storeParty(t, s1), 999); return err },
+		"買家方":    func() error { _, err := f.m.StoreConversationByBuyer(ctx, f.buyerParty(b1), b1); return err },
+	} {
+		if err := call(); kindOf(err) != apperr.KindNotFound {
+			t.Errorf("%s：%v", name, err)
+		}
 	}
 }

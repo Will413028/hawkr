@@ -31,6 +31,12 @@ service ChatAppService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
+  // GetStoreConversationByBuyer 取呼叫者此刻的店與某位買家的對話（一對買家與店家只有一個對話）。呼叫者沒有店、店家關閉之後沒有權限、
+  // 買家不存在或兩者之間沒有對話，一律回 not_found，不區分原因。內容的組裝同 ListStoreConversations（不因封鎖隱藏對話，已刪除的買家標示 deleted）。
+  rpc GetStoreConversationByBuyer(GetStoreConversationByBuyerRequest) returns (GetStoreConversationByBuyerResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
   // ListMessages 列出對話裡的訊息。預設與 before_seq 是 seq 由大到小（新的在前），before_seq 只列 seq 小於它的訊息；
   // after_seq 給斷線補洞，只列 seq 大於它的訊息，seq 由小到大（舊的在前）。before_seq 與 after_seq 不能同時給。
   // 呼叫者不是對話的任一方，與對話不存在一律回 not_found，不區分原因。已隱藏或已抹除的訊息是墓碑，不帶內容。
@@ -142,18 +148,18 @@ message Preview {
 // ChatBuyer 是店家的對話裡的買家：名稱與頭像在讀取時由 buyer 補；帳號已刪除時 deleted 為真，沒有名稱與頭像。
 message ChatBuyer {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  // 買家的暱稱；沒有設定或已刪除時不設。
+  // 買家的暱稱；沒有設定或已刪除時不設。deleted 為真時 client 顯示文案目錄的 buyer.Profile.deleted_name。
   optional string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
   hawkr.common.v1alpha1.Image avatar = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   bool deleted = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
-// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations）設 buyer。
+// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations、GetStoreConversationByBuyer）設 buyer。
 message Conversation {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 對方的店家卡片；只有買家版有。店家從沒公開過時不設（同 StoreCard 的可見性規則），client 顯示「店家」。
   hawkr.common.v1alpha1.StoreCard store = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 對方的買家；只有店家版有。
+  // 對方的買家；只有店家版（ListStoreConversations、GetStoreConversationByBuyer）有。
   ChatBuyer buyer = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 呼叫者這一方的未讀訊息數。
   int64 unread_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
@@ -193,6 +199,14 @@ message ListStoreConversationsRequest {
 message ListStoreConversationsResponse {
   repeated Conversation conversations = 1;
   string next_page_token = 2;
+}
+
+message GetStoreConversationByBuyerRequest {
+  string buyer_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStoreConversationByBuyerResponse {
+  Conversation conversation = 1;
 }
 
 message ListMessagesRequest {

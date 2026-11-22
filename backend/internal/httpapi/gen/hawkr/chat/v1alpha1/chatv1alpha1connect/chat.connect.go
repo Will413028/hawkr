@@ -49,6 +49,9 @@ const (
 	// ChatAppServiceListStoreConversationsProcedure is the fully-qualified name of the ChatAppService's
 	// ListStoreConversations RPC.
 	ChatAppServiceListStoreConversationsProcedure = "/hawkr.chat.v1alpha1.ChatAppService/ListStoreConversations"
+	// ChatAppServiceGetStoreConversationByBuyerProcedure is the fully-qualified name of the
+	// ChatAppService's GetStoreConversationByBuyer RPC.
+	ChatAppServiceGetStoreConversationByBuyerProcedure = "/hawkr.chat.v1alpha1.ChatAppService/GetStoreConversationByBuyer"
 	// ChatAppServiceListMessagesProcedure is the fully-qualified name of the ChatAppService's
 	// ListMessages RPC.
 	ChatAppServiceListMessagesProcedure = "/hawkr.chat.v1alpha1.ChatAppService/ListMessages"
@@ -96,6 +99,9 @@ type ChatAppServiceClient interface {
 	ListConversations(context.Context, *connect.Request[v1alpha1.ListConversationsRequest]) (*connect.Response[v1alpha1.ListConversationsResponse], error)
 	// ListStoreConversations 列出呼叫者此刻的店的對話，規則同 ListConversations。呼叫者沒有店回 not_found；店家關閉之後沒有權限，回 not_found。
 	ListStoreConversations(context.Context, *connect.Request[v1alpha1.ListStoreConversationsRequest]) (*connect.Response[v1alpha1.ListStoreConversationsResponse], error)
+	// GetStoreConversationByBuyer 取呼叫者此刻的店與某位買家的對話（一對買家與店家只有一個對話）。呼叫者沒有店、店家關閉之後沒有權限、
+	// 買家不存在或兩者之間沒有對話，一律回 not_found，不區分原因。內容的組裝同 ListStoreConversations（不因封鎖隱藏對話，已刪除的買家標示 deleted）。
+	GetStoreConversationByBuyer(context.Context, *connect.Request[v1alpha1.GetStoreConversationByBuyerRequest]) (*connect.Response[v1alpha1.GetStoreConversationByBuyerResponse], error)
 	// ListMessages 列出對話裡的訊息。預設與 before_seq 是 seq 由大到小（新的在前），before_seq 只列 seq 小於它的訊息；
 	// after_seq 給斷線補洞，只列 seq 大於它的訊息，seq 由小到大（舊的在前）。before_seq 與 after_seq 不能同時給。
 	// 呼叫者不是對話的任一方，與對話不存在一律回 not_found，不區分原因。已隱藏或已抹除的訊息是墓碑，不帶內容。
@@ -156,6 +162,13 @@ func NewChatAppServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			httpClient,
 			baseURL+ChatAppServiceListStoreConversationsProcedure,
 			connect.WithSchema(chatAppServiceMethods.ByName("ListStoreConversations")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getStoreConversationByBuyer: connect.NewClient[v1alpha1.GetStoreConversationByBuyerRequest, v1alpha1.GetStoreConversationByBuyerResponse](
+			httpClient,
+			baseURL+ChatAppServiceGetStoreConversationByBuyerProcedure,
+			connect.WithSchema(chatAppServiceMethods.ByName("GetStoreConversationByBuyer")),
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
@@ -247,21 +260,22 @@ func NewChatAppServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 
 // chatAppServiceClient implements ChatAppServiceClient.
 type chatAppServiceClient struct {
-	listConversations      *connect.Client[v1alpha1.ListConversationsRequest, v1alpha1.ListConversationsResponse]
-	listStoreConversations *connect.Client[v1alpha1.ListStoreConversationsRequest, v1alpha1.ListStoreConversationsResponse]
-	listMessages           *connect.Client[v1alpha1.ListMessagesRequest, v1alpha1.ListMessagesResponse]
-	sendMessage            *connect.Client[v1alpha1.SendMessageRequest, v1alpha1.SendMessageResponse]
-	sendMessageToStore     *connect.Client[v1alpha1.SendMessageToStoreRequest, v1alpha1.SendMessageToStoreResponse]
-	sendMessageToBuyer     *connect.Client[v1alpha1.SendMessageToBuyerRequest, v1alpha1.SendMessageToBuyerResponse]
-	markConversationRead   *connect.Client[v1alpha1.MarkConversationReadRequest, v1alpha1.MarkConversationReadResponse]
-	markAllRead            *connect.Client[v1alpha1.MarkAllReadRequest, v1alpha1.MarkAllReadResponse]
-	markAllStoreRead       *connect.Client[v1alpha1.MarkAllStoreReadRequest, v1alpha1.MarkAllStoreReadResponse]
-	getUnreadCount         *connect.Client[v1alpha1.GetUnreadCountRequest, v1alpha1.GetUnreadCountResponse]
-	getStoreUnreadCount    *connect.Client[v1alpha1.GetStoreUnreadCountRequest, v1alpha1.GetStoreUnreadCountResponse]
-	getPresence            *connect.Client[v1alpha1.GetPresenceRequest, v1alpha1.GetPresenceResponse]
-	getStorePresence       *connect.Client[v1alpha1.GetStorePresenceRequest, v1alpha1.GetStorePresenceResponse]
-	streamEvents           *connect.Client[v1alpha1.StreamEventsRequest, v1alpha1.StreamEventsResponse]
-	streamStoreEvents      *connect.Client[v1alpha1.StreamStoreEventsRequest, v1alpha1.StreamStoreEventsResponse]
+	listConversations           *connect.Client[v1alpha1.ListConversationsRequest, v1alpha1.ListConversationsResponse]
+	listStoreConversations      *connect.Client[v1alpha1.ListStoreConversationsRequest, v1alpha1.ListStoreConversationsResponse]
+	getStoreConversationByBuyer *connect.Client[v1alpha1.GetStoreConversationByBuyerRequest, v1alpha1.GetStoreConversationByBuyerResponse]
+	listMessages                *connect.Client[v1alpha1.ListMessagesRequest, v1alpha1.ListMessagesResponse]
+	sendMessage                 *connect.Client[v1alpha1.SendMessageRequest, v1alpha1.SendMessageResponse]
+	sendMessageToStore          *connect.Client[v1alpha1.SendMessageToStoreRequest, v1alpha1.SendMessageToStoreResponse]
+	sendMessageToBuyer          *connect.Client[v1alpha1.SendMessageToBuyerRequest, v1alpha1.SendMessageToBuyerResponse]
+	markConversationRead        *connect.Client[v1alpha1.MarkConversationReadRequest, v1alpha1.MarkConversationReadResponse]
+	markAllRead                 *connect.Client[v1alpha1.MarkAllReadRequest, v1alpha1.MarkAllReadResponse]
+	markAllStoreRead            *connect.Client[v1alpha1.MarkAllStoreReadRequest, v1alpha1.MarkAllStoreReadResponse]
+	getUnreadCount              *connect.Client[v1alpha1.GetUnreadCountRequest, v1alpha1.GetUnreadCountResponse]
+	getStoreUnreadCount         *connect.Client[v1alpha1.GetStoreUnreadCountRequest, v1alpha1.GetStoreUnreadCountResponse]
+	getPresence                 *connect.Client[v1alpha1.GetPresenceRequest, v1alpha1.GetPresenceResponse]
+	getStorePresence            *connect.Client[v1alpha1.GetStorePresenceRequest, v1alpha1.GetStorePresenceResponse]
+	streamEvents                *connect.Client[v1alpha1.StreamEventsRequest, v1alpha1.StreamEventsResponse]
+	streamStoreEvents           *connect.Client[v1alpha1.StreamStoreEventsRequest, v1alpha1.StreamStoreEventsResponse]
 }
 
 // ListConversations calls hawkr.chat.v1alpha1.ChatAppService.ListConversations.
@@ -272,6 +286,11 @@ func (c *chatAppServiceClient) ListConversations(ctx context.Context, req *conne
 // ListStoreConversations calls hawkr.chat.v1alpha1.ChatAppService.ListStoreConversations.
 func (c *chatAppServiceClient) ListStoreConversations(ctx context.Context, req *connect.Request[v1alpha1.ListStoreConversationsRequest]) (*connect.Response[v1alpha1.ListStoreConversationsResponse], error) {
 	return c.listStoreConversations.CallUnary(ctx, req)
+}
+
+// GetStoreConversationByBuyer calls hawkr.chat.v1alpha1.ChatAppService.GetStoreConversationByBuyer.
+func (c *chatAppServiceClient) GetStoreConversationByBuyer(ctx context.Context, req *connect.Request[v1alpha1.GetStoreConversationByBuyerRequest]) (*connect.Response[v1alpha1.GetStoreConversationByBuyerResponse], error) {
+	return c.getStoreConversationByBuyer.CallUnary(ctx, req)
 }
 
 // ListMessages calls hawkr.chat.v1alpha1.ChatAppService.ListMessages.
@@ -345,6 +364,9 @@ type ChatAppServiceHandler interface {
 	ListConversations(context.Context, *connect.Request[v1alpha1.ListConversationsRequest]) (*connect.Response[v1alpha1.ListConversationsResponse], error)
 	// ListStoreConversations 列出呼叫者此刻的店的對話，規則同 ListConversations。呼叫者沒有店回 not_found；店家關閉之後沒有權限，回 not_found。
 	ListStoreConversations(context.Context, *connect.Request[v1alpha1.ListStoreConversationsRequest]) (*connect.Response[v1alpha1.ListStoreConversationsResponse], error)
+	// GetStoreConversationByBuyer 取呼叫者此刻的店與某位買家的對話（一對買家與店家只有一個對話）。呼叫者沒有店、店家關閉之後沒有權限、
+	// 買家不存在或兩者之間沒有對話，一律回 not_found，不區分原因。內容的組裝同 ListStoreConversations（不因封鎖隱藏對話，已刪除的買家標示 deleted）。
+	GetStoreConversationByBuyer(context.Context, *connect.Request[v1alpha1.GetStoreConversationByBuyerRequest]) (*connect.Response[v1alpha1.GetStoreConversationByBuyerResponse], error)
 	// ListMessages 列出對話裡的訊息。預設與 before_seq 是 seq 由大到小（新的在前），before_seq 只列 seq 小於它的訊息；
 	// after_seq 給斷線補洞，只列 seq 大於它的訊息，seq 由小到大（舊的在前）。before_seq 與 after_seq 不能同時給。
 	// 呼叫者不是對話的任一方，與對話不存在一律回 not_found，不區分原因。已隱藏或已抹除的訊息是墓碑，不帶內容。
@@ -401,6 +423,13 @@ func NewChatAppServiceHandler(svc ChatAppServiceHandler, opts ...connect.Handler
 		ChatAppServiceListStoreConversationsProcedure,
 		svc.ListStoreConversations,
 		connect.WithSchema(chatAppServiceMethods.ByName("ListStoreConversations")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatAppServiceGetStoreConversationByBuyerHandler := connect.NewUnaryHandler(
+		ChatAppServiceGetStoreConversationByBuyerProcedure,
+		svc.GetStoreConversationByBuyer,
+		connect.WithSchema(chatAppServiceMethods.ByName("GetStoreConversationByBuyer")),
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
@@ -493,6 +522,8 @@ func NewChatAppServiceHandler(svc ChatAppServiceHandler, opts ...connect.Handler
 			chatAppServiceListConversationsHandler.ServeHTTP(w, r)
 		case ChatAppServiceListStoreConversationsProcedure:
 			chatAppServiceListStoreConversationsHandler.ServeHTTP(w, r)
+		case ChatAppServiceGetStoreConversationByBuyerProcedure:
+			chatAppServiceGetStoreConversationByBuyerHandler.ServeHTTP(w, r)
 		case ChatAppServiceListMessagesProcedure:
 			chatAppServiceListMessagesHandler.ServeHTTP(w, r)
 		case ChatAppServiceSendMessageProcedure:
@@ -534,6 +565,10 @@ func (UnimplementedChatAppServiceHandler) ListConversations(context.Context, *co
 
 func (UnimplementedChatAppServiceHandler) ListStoreConversations(context.Context, *connect.Request[v1alpha1.ListStoreConversationsRequest]) (*connect.Response[v1alpha1.ListStoreConversationsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.chat.v1alpha1.ChatAppService.ListStoreConversations is not implemented"))
+}
+
+func (UnimplementedChatAppServiceHandler) GetStoreConversationByBuyer(context.Context, *connect.Request[v1alpha1.GetStoreConversationByBuyerRequest]) (*connect.Response[v1alpha1.GetStoreConversationByBuyerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.chat.v1alpha1.ChatAppService.GetStoreConversationByBuyer is not implemented"))
 }
 
 func (UnimplementedChatAppServiceHandler) ListMessages(context.Context, *connect.Request[v1alpha1.ListMessagesRequest]) (*connect.Response[v1alpha1.ListMessagesResponse], error) {
