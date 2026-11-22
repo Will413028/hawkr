@@ -1,0 +1,103 @@
+{
+ "mutants": [
+  {
+   "id": "product-stats-ignores-hide",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "new": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "Product stats stop applying the platform-hide predicate, so hidden reviews are counted while the public list omits them."
+  },
+  {
+   "id": "product-stats-ignores-inactive-author",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "new": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n`",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "Product stats stop applying the inactive-author predicate, so reviews of deleting accounts are counted."
+  },
+  {
+   "id": "product-stats-drops-product-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "new": "WHERE r.product_id <> $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "Product stats count other products' reviews instead of this one."
+  },
+  {
+   "id": "product-stats-average-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/read/read.go",
+   "old": "model.ProductStats{\n\t\tCount: r.TotalCount, Average: r.AvgRating,",
+   "new": "model.ProductStats{\n\t\tCount: r.TotalCount,",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The module returns the count but no average."
+  },
+  {
+   "id": "handler-product-stats-average-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}",
+   "new": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Distribution: ratingCounts(s.Distribution)}",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer$",
+   "why": "The handler drops the average from the response."
+  },
+  {
+   "id": "handler-product-stats-error-swallowed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "s, err := h.reads.ProductStats(ctx, productID)\n\tif err != nil {\n\t\treturn nil, h.failure(err)\n\t}",
+   "new": "s, err := h.reads.ProductStats(ctx, productID)\n\t_ = err",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsRejectsBadIDAndMapsModuleFailure$",
+   "why": "A module failure is turned into count 0 instead of an error."
+  },
+  {
+   "id": "handler-product-stats-id-unvalidated",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "productID, err := rpc.ParseID(\"product_id\", req.Msg.GetProductId())\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\ts, err := h.reads.ProductStats",
+   "new": "productID, _ := rpc.ParseID(\"product_id\", req.Msg.GetProductId())\n\tvar err error\n\ts, err := h.reads.ProductStats",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsRejectsBadIDAndMapsModuleFailure$",
+   "why": "A malformed product id reaches the module."
+  },
+  {
+   "id": "product-stats-distribution-1-star-ignores-predicate",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "new": "    (SELECT COUNT(*) FROM review.reviews AS x WHERE x.product_id = $1 AND x.rating = 1)::bigint AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The 1-star bucket counts the platform-hidden review that the public list omits."
+  },
+  {
+   "id": "product-stats-distribution-2-star-ignores-predicate",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "    COUNT(*) FILTER (WHERE r.rating = 2)::bigint       AS rating_2_count,\n    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "new": "    (SELECT COUNT(*) FROM review.reviews AS x WHERE x.product_id = $1 AND x.rating = 2)::bigint AS rating_2_count,\n    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count\nFROM review.reviews AS r\nWHERE r.product_id = $1",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The 2-star bucket counts the review whose author is leaving, which the public list omits."
+  },
+  {
+   "id": "product-stats-distribution-buckets-swapped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/read/read.go",
+   "old": "Distribution: [5]int64{r.Rating1Count, r.Rating2Count, r.Rating3Count, r.Rating4Count, r.Rating5Count},\n\t}, err\n}\n\n// StoreStats",
+   "new": "Distribution: [5]int64{r.Rating5Count, r.Rating4Count, r.Rating3Count, r.Rating2Count, r.Rating1Count},\n\t}, err\n}\n\n// StoreStats",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The product distribution is returned in reverse star order."
+  },
+  {
+   "id": "handler-product-stats-drops-distribution",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}",
+   "new": "&pb.GetProductReviewStatsResponse{Count: statCount(s.Count), Average: s.Average}",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer$",
+   "why": "The handler omits the distribution from the product response."
+  }
+ ]
+}

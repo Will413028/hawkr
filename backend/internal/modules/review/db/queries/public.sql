@@ -84,7 +84,12 @@ WHERE r.id = sqlc.arg(id)
 -- name: ProductStats :one
 SELECT
     COUNT(*)::bigint                                   AS total_count,
-    ROUND(COALESCE(AVG(r.rating), 0)::numeric, 2)::float8 AS avg_rating
+    ROUND(COALESCE(AVG(r.rating), 0)::numeric, 2)::float8 AS avg_rating,
+    COUNT(*) FILTER (WHERE r.rating = 5)::bigint       AS rating_5_count,
+    COUNT(*) FILTER (WHERE r.rating = 4)::bigint       AS rating_4_count,
+    COUNT(*) FILTER (WHERE r.rating = 3)::bigint       AS rating_3_count,
+    COUNT(*) FILTER (WHERE r.rating = 2)::bigint       AS rating_2_count,
+    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count
 FROM review.reviews AS r
 WHERE r.product_id = sqlc.arg(product_id)
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)

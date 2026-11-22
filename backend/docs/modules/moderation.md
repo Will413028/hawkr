@@ -41,7 +41,7 @@
 
 ## 4. 檢舉結果的推導
 
-檢舉不存結果：`Case` 回傳的每筆檢舉的結果由所屬案件的決定推導：案件進行中是 `PENDING`，`VIOLATION` 與 `NO_VIOLATION` 照案件。不沿用 seller 的逐筆 outcome。
+檢舉不存結果：`Case` 回傳的每筆檢舉的結果由所屬案件的決定推導：案件進行中不設值（契約的 `outcome` 是 optional，`REPORT_OUTCOME_PENDING` 已刪並保留號碼與名稱），`VIOLATION` 與 `NO_VIOLATION` 照案件。不沿用 seller 的逐筆 outcome。
 
 ## 5. 快照保留期
 

@@ -130,7 +130,7 @@ func TestListMyStoreReportsReadsTheCurrentStoresReportsOnly(t *testing.T) {
 	id1, id2, msg := uuid.UUID{1}, uuid.UUID{2}, uuid.UUID{3}
 	r := &fakeReports{page: moderation.ReportPage{
 		Items: []moderation.ReportItem{{
-			Report: moderation.Report{ID: id1, Category: policy.Harassment, Description: "辱罵", CreatedAt: at, Outcome: moderation.OutcomePending},
+			Report: moderation.Report{ID: id1, Category: policy.Harassment, Description: "辱罵", CreatedAt: at, Outcome: moderation.OutcomeNone},
 			Target: moderation.Target{Kind: moderation.TargetChatMessage, ContentID: msg},
 		}},
 		Next: &moderation.ReportCursor{CreatedAt: at, ID: id2},

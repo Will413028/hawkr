@@ -1,4 +1,5 @@
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
+import type { CommunityReport } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type {
 	CreateReportResponse,
 	GetMyReportResponse,
@@ -9,6 +10,8 @@ import { SELLER_CREATE_REPORT_REQUEST_CATEGORY } from "@hawkr/ui-text/accepted";
 import type { UiMessage } from "@hawkr/ui-text/format";
 import {
 	commonPolicyCategory,
+	moderationCommunityReportOutcomeUnset,
+	moderationReportOutcome,
 	sellerReportOutcome,
 	sellerStoreReportOutcomeUnset,
 } from "@hawkr/ui-text/keys";
@@ -85,6 +88,15 @@ export function storeReportOutcomeMessage(
 	return report.outcome === undefined
 		? sellerStoreReportOutcomeUnset()
 		: sellerReportOutcome(report.outcome);
+}
+
+/** 社群檢舉的結果文字：沒設結果是「審核中」，設了照目錄；目錄沒有文字的值回 undefined。 */
+export function communityReportOutcomeMessage(
+	report: Pick<CommunityReport, "outcome">,
+): UiMessage | undefined {
+	return report.outcome === undefined
+		? moderationCommunityReportOutcomeUnset()
+		: moderationReportOutcome(report.outcome);
 }
 
 /** 佐證在檢舉本身的張數：不屬於任何補充說明的那些。 */

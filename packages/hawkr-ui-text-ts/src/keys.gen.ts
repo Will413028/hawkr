@@ -13,6 +13,7 @@ import type { UiMessage } from "./message";
 export type { DefaultErrorText, UiMessage } from "./message";
 
 export type UiTextKey =
+	| "admin.moderation.CaseReport.outcome_unset"
 	| "buyer.Gender.GENDER_FEMALE"
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
@@ -57,8 +58,8 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "moderation.CommunityReport.outcome_unset"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
-	| "moderation.ReportOutcome.REPORT_OUTCOME_PENDING"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE"
@@ -225,6 +226,11 @@ export const SELLER_MEASURE_REQUEST_KIND_NAME: Readonly<Record<number, string>> 
 	2: "MEASURE_REQUEST_KIND_REMEDIATION",
 };
 
+/** admin.moderation.CaseReport.outcome_unset */
+export function adminModerationCaseReportOutcomeUnset(): UiMessage {
+	return { key: "admin.moderation.CaseReport.outcome_unset" };
+}
+
 const BUYER_GENDER: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "buyer.Gender.GENDER_MALE",
 	2: "buyer.Gender.GENDER_FEMALE",
@@ -332,8 +338,12 @@ export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
 }
 
+/** moderation.CommunityReport.outcome_unset */
+export function moderationCommunityReportOutcomeUnset(): UiMessage {
+	return { key: "moderation.CommunityReport.outcome_unset" };
+}
+
 const MODERATION_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "moderation.ReportOutcome.REPORT_OUTCOME_PENDING",
 	2: "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION",
 	3: "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION",
 };

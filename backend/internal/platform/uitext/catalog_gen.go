@@ -5,6 +5,17 @@ package uitext
 
 import "strconv"
 
+// AdminModerationCaseReportOutcomeUnset 是 admin.moderation.CaseReport.outcome_unset 的文案。
+func (t Text) AdminModerationCaseReportOutcomeUnset() string {
+	if t.staff {
+		return "處理中"
+	}
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
+}
+
 // BuyerGender 是 buyer.Gender 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) BuyerGender(v string) (string, bool) {
@@ -190,13 +201,19 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// ModerationCommunityReportOutcomeUnset 是 moderation.CommunityReport.outcome_unset 的文案。
+func (t Text) ModerationCommunityReportOutcomeUnset() string {
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
+}
+
 // ModerationReportOutcome 是 moderation.ReportOutcome 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) ModerationReportOutcome(v string) (string, bool) {
 	if t.staff {
 		switch v {
-		case "PENDING":
-			return "處理中", true
 		case "VIOLATION":
 			return "認定違規", true
 		case "NO_VIOLATION":
@@ -206,8 +223,6 @@ func (t Text) ModerationReportOutcome(v string) (string, bool) {
 	}
 	if t.Locale() == EN {
 		switch v {
-		case "PENDING":
-			return "Under review", true
 		case "VIOLATION":
 			return "Resolved (violation)", true
 		case "NO_VIOLATION":
@@ -215,8 +230,6 @@ func (t Text) ModerationReportOutcome(v string) (string, bool) {
 		}
 	}
 	switch v {
-	case "PENDING":
-		return "審核中", true
 	case "VIOLATION":
 		return "已處理（違規）", true
 	case "NO_VIOLATION":

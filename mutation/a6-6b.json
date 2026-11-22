@@ -1,0 +1,121 @@
+{
+ "mutants": [
+  {
+   "id": "reverse-allowed-on-non-hide",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-decide.ts",
+   "old": "kase.action === CaseAction.HIDE &&\n\t\t",
+   "new": "\n\t\t",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 處置不是隱藏的案件沒有按鈕",
+   "why": "The reverse button is offered for closed cases whose action is not HIDE."
+  },
+  {
+   "id": "reverse-allowed-after-reversal",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-decide.ts",
+   "old": "\t\t!kase.reversal\n",
+   "new": "\t\ttrue\n",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 已撤銷",
+   "why": "The reverse button stays visible after the hide was already reversed."
+  },
+  {
+   "id": "reverse-blank-reason-accepted",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-decide.ts",
+   "old": "if (trimmed.length === 0) return \"請填寫撤銷原因。\";",
+   "new": "",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 空白原因不送出",
+   "why": "A whitespace-only reverse reason is sent to the server."
+  },
+  {
+   "id": "reverse-reason-over-500-accepted",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-decide.ts",
+   "old": "if (goTrimmedRuneCount(trimmed) > REASON_MAX_LENGTH) {\n\t\treturn `撤銷原因",
+   "new": "if (false) {\n\t\treturn `撤銷原因",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 超過 500 字不送出",
+   "why": "A reverse reason over 500 characters is sent to the server."
+  },
+  {
+   "id": "reverse-server-text-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
+   "old": "setReverseError(result.text);\n\t\t\treturn;",
+   "new": "setReverseError(\"\");\n\t\t\treturn;",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts FAILED_PRECONDITION 但案件仍可撤銷時",
+   "why": "On FAILED_PRECONDITION the dialog no longer shows the server text."
+  },
+  {
+   "id": "chat-hidden-body-shown",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-snapshot.ts",
+   "old": "if (message.hidden) {",
+   "new": "if (false) {",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 聊天前後文依序顯示",
+   "why": "A hidden chat context message is shown with its body instead of a tombstone."
+  },
+  {
+   "id": "chat-erased-body-shown",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-snapshot.ts",
+   "old": "if (message.erased) {",
+   "new": "if (false) {",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 聊天前後文依序顯示",
+   "why": "An erased chat context message is shown with its body instead of a tombstone."
+  },
+  {
+   "id": "review-reply-body-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-snapshot.ts",
+   "old": "{ label: \"店家回覆（上下文）\", value: dash(content.value.replyBody) },",
+   "new": "",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 評價顯示評分",
+   "why": "The review snapshot omits the store reply context."
+  },
+  {
+   "id": "snapshot-section-hidden",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
+   "old": "{snapshot === undefined ? (",
+   "new": "{true ? (",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 快照：評價顯示評分",
+   "why": "The snapshot section always claims there is no snapshot."
+  },
+  {
+   "id": "reverse-precondition-no-refetch",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
+   "old": "if (result.code === Code.FailedPrecondition) {",
+   "new": "if (false) {",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts FAILED_PRECONDITION 顯示伺服器文字、重讀案件",
+   "why": "After FAILED_PRECONDITION the case is not refetched, so the reverse button and dialog stay."
+  },
+  {
+   "id": "reverse-error-kept-on-reopen",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
+   "old": "\tconst openReverse = () => {\n\t\tsetReverseReason(\"\");\n\t\tsetReverseError(null);\n\t\tsetReverseOpen(true);\n\t};\n\tconst closeReverse = () => {\n\t\tsetReverseOpen(false);\n\t\tsetReverseReason(\"\");\n\t\tsetReverseError(null);\n\t};",
+   "new": "\tconst openReverse = () => {\n\t\tsetReverseOpen(true);\n\t};\n\tconst closeReverse = () => {\n\t\tsetReverseOpen(false);\n\t};",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 關閉再開啟時",
+   "why": "Neither openReverse nor closeReverse clears the reason and error, so they survive closing and reopening the dialog. Clearing in only one of the two is an equivalent mutant because each path is covered by the other."
+  },
+  {
+   "id": "chat-reported-line-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-snapshot.ts",
+   "old": "const all = [...lines, { line: reported, seq: chat.seq }];",
+   "new": "const all = [...lines];",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 被檢舉的那一則依 seq 排進前後文並標記",
+   "why": "The reported chat message is missing from the context timeline."
+  },
+  {
+   "id": "chat-context-send-time-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-snapshot.ts",
+   "old": "time: timeText(message.sendTime),",
+   "new": "time: \"-\",",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 被檢舉的那一則依 seq 排進前後文並標記",
+   "why": "Context lines no longer show their send time."
+  }
+ ]
+}

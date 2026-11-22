@@ -401,7 +401,7 @@ func TestGetCaseAndNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	if res.Msg.GetCase().GetId() != w.postOpen || res.Msg.GetCase().GetState() != adminpb.CaseState_CASE_STATE_OPEN || res.Msg.GetCase().GetEtag() == "" ||
-		len(res.Msg.GetReports()) != 1 || res.Msg.GetReports()[0].GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING {
+		len(res.Msg.GetReports()) != 1 || res.Msg.GetReports()[0].Outcome != nil {
 		t.Fatalf("response = %+v", res.Msg)
 	}
 	_, err = s.admin.GetCase(t.Context(), connect.NewRequest(&adminpb.GetCaseRequest{Id: uuid.New().String()}))

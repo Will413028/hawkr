@@ -119,7 +119,7 @@ const (
 	ActionWarn          = model.ActionWarn
 	ActionBan           = model.ActionBan
 	ActionTakedown      = model.ActionTakedown
-	OutcomePending      = model.OutcomePending
+	OutcomeNone         = model.OutcomeNone
 	OutcomeViolation    = model.OutcomeViolation
 	OutcomeNoViolation  = model.OutcomeNoViolation
 	CaseOpen            = model.CaseOpen

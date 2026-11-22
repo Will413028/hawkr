@@ -1,5 +1,9 @@
 {
   "default": {
+    "admin.moderation.CaseReport.outcome_unset": {
+      "message": "審核中",
+      "description": "案件內的檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
+    },
     "buyer.Gender.GENDER_FEMALE": {
       "message": "女性",
       "description": "Gender 是買家自填的性別。（值 GENDER_FEMALE）"
@@ -176,13 +180,13 @@
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
     },
+    "moderation.CommunityReport.outcome_unset": {
+      "message": "審核中",
+      "description": "檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
+    },
     "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "已處理（不違規）",
       "description": "案件認定不違規。"
-    },
-    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "審核中",
-      "description": "案件還在處理中。"
     },
     "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
       "message": "已處理（違規）",
@@ -876,13 +880,13 @@
     }
   },
   "staff": {
+    "admin.moderation.CaseReport.outcome_unset": {
+      "message": "處理中",
+      "description": "案件內的檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。\n受眾：後台員工"
+    },
     "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "認定不違規",
       "description": "案件認定不違規。\n受眾：後台員工"
-    },
-    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "處理中",
-      "description": "案件還在處理中。\n受眾：後台員工"
     },
     "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
       "message": "認定違規",

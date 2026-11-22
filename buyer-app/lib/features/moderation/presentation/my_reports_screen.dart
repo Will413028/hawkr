@@ -134,7 +134,7 @@ class MyReportsScreen extends ConsumerWidget {
     );
     final outcome = store
         ? storeReportOutcomeText(r.store, locale)
-        : r.community.outcome.uiText(locale);
+        : communityReportOutcomeText(r.community, locale);
     final category = r.category.uiText(locale);
     final card = Ink(
       padding: EdgeInsets.all(16.w),

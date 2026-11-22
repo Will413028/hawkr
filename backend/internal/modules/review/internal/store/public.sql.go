@@ -361,7 +361,12 @@ func (q *Queries) ListStoreReviewsForViewer(ctx context.Context, arg ListStoreRe
 const productStats = `-- name: ProductStats :one
 SELECT
     COUNT(*)::bigint                                   AS total_count,
-    ROUND(COALESCE(AVG(r.rating), 0)::numeric, 2)::float8 AS avg_rating
+    ROUND(COALESCE(AVG(r.rating), 0)::numeric, 2)::float8 AS avg_rating,
+    COUNT(*) FILTER (WHERE r.rating = 5)::bigint       AS rating_5_count,
+    COUNT(*) FILTER (WHERE r.rating = 4)::bigint       AS rating_4_count,
+    COUNT(*) FILTER (WHERE r.rating = 3)::bigint       AS rating_3_count,
+    COUNT(*) FILTER (WHERE r.rating = 2)::bigint       AS rating_2_count,
+    COUNT(*) FILTER (WHERE r.rating = 1)::bigint       AS rating_1_count
 FROM review.reviews AS r
 WHERE r.product_id = $1
   AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)
@@ -369,14 +374,27 @@ WHERE r.product_id = $1
 `
 
 type ProductStatsRow struct {
-	TotalCount int64
-	AvgRating  float64
+	TotalCount   int64
+	AvgRating    float64
+	Rating5Count int64
+	Rating4Count int64
+	Rating3Count int64
+	Rating2Count int64
+	Rating1Count int64
 }
 
 func (q *Queries) ProductStats(ctx context.Context, productID int64) (ProductStatsRow, error) {
 	row := q.db.QueryRow(ctx, productStats, productID)
 	var i ProductStatsRow
-	err := row.Scan(&i.TotalCount, &i.AvgRating)
+	err := row.Scan(
+		&i.TotalCount,
+		&i.AvgRating,
+		&i.Rating5Count,
+		&i.Rating4Count,
+		&i.Rating3Count,
+		&i.Rating2Count,
+		&i.Rating1Count,
+	)
 	return i, err
 }
 

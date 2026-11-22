@@ -191,7 +191,7 @@ void main() {
     expect(find.text('貼文'), findsOneWidget);
     expect(find.text('好店'), findsOneWidget);
     expect(find.text('店家寄來廣告'), findsOneWidget);
-    expect(find.text('審核中'), findsWidgets);
+    expect(find.text('審核中'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('my-report-store-r1')), findsOneWidget);
     expect(find.byKey(const ValueKey('my-report-store-c1')), findsNothing);
   });

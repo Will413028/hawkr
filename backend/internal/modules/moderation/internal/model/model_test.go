@@ -82,7 +82,7 @@ func TestOutcomeIsDerivedFromTheCaseDecision(t *testing.T) {
 	for name, c := range map[string]struct {
 		decision *string
 		want     Outcome
-	}{"進行中": {nil, OutcomePending}, "違規": {&v, OutcomeViolation}, "不違規": {&n, OutcomeNoViolation}} {
+	}{"進行中": {nil, OutcomeNone}, "違規": {&v, OutcomeViolation}, "不違規": {&n, OutcomeNoViolation}} {
 		if got := OutcomeOf(c.decision); got != c.want {
 			t.Errorf("%s：%s，預期 %s", name, got, c.want)
 		}
