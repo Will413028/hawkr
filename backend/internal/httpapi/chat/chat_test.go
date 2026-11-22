@@ -40,13 +40,15 @@ var (
 
 // fakeReads 記下每個讀取收到的 Party 與參數；ConversationParties 回真實的雙方 ID，身分由 handler 的推導決定。
 type fakeReads struct {
-	parties    im.ConversationParties
-	partiesErr error
-	convPage   im.ConversationPage
-	msgPage    im.MessagePage
-	unread     int64
-	presence   []im.PresenceState
-	err        error
+	parties      im.ConversationParties
+	partiesErr   error
+	convPage     im.ConversationPage
+	conversation im.Conversation
+	byBuyer      int64
+	msgPage      im.MessagePage
+	unread       int64
+	presence     []im.PresenceState
+	err          error
 
 	calls     []string
 	party     im.Party
@@ -61,6 +63,11 @@ type fakeReads struct {
 func (f *fakeReads) ListConversations(_ context.Context, p im.Party, after *im.Cursor, size int32) (im.ConversationPage, error) {
 	f.calls, f.party, f.after, f.size = append(f.calls, "ListConversations"), p, after, size
 	return f.convPage, f.err
+}
+
+func (f *fakeReads) StoreConversationByBuyer(_ context.Context, p im.Party, buyerID int64) (im.Conversation, error) {
+	f.calls, f.party, f.byBuyer = append(f.calls, "StoreConversationByBuyer"), p, buyerID
+	return f.conversation, f.err
 }
 
 func (f *fakeReads) ListMessages(_ context.Context, id uuid.UUID, p im.Party, before int64, size int32) (im.MessagePage, error) {
@@ -419,6 +426,10 @@ func TestStoreVersionsWithoutAStoreAreNotFoundAndNeverReachTheModule(t *testing.
 	e := newEnv(t, nil)
 	ctx := signedIn()
 	calls := map[string]func() error{
+		"GetStoreConversationByBuyer": func() error {
+			_, err := e.app.GetStoreConversationByBuyer(ctx, connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: "5"}))
+			return err
+		},
 		"ListStoreConversations": func() error {
 			_, err := e.app.ListStoreConversations(ctx, connect.NewRequest(&pb.ListStoreConversationsRequest{}))
 			return err
@@ -951,7 +962,7 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 	if err := checkDeclarations(declarations, svc); err != nil {
 		t.Fatal(err)
 	}
-	if svc.Methods().Len() != 15 || len(declarations) != 15 {
+	if svc.Methods().Len() != 16 || len(declarations) != 16 {
 		t.Fatalf("方法 %d、宣告 %d", svc.Methods().Len(), len(declarations))
 	}
 	for procedure := range declarations {
@@ -994,7 +1005,7 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 // 能力宣告與模組實際檢查的一致：店家送出要 CapChatSend，讀取類要 CapChatRead，買家專屬的方法全部豁免。
 func TestDeclaredCapabilitiesMatchWhatTheModuleChecks(t *testing.T) {
 	want := map[string]seller.Capability{
-		"ListStoreConversations": seller.CapChatRead, "MarkAllStoreRead": seller.CapChatRead, "GetStoreUnreadCount": seller.CapChatRead,
+		"ListStoreConversations": seller.CapChatRead, "GetStoreConversationByBuyer": seller.CapChatRead, "MarkAllStoreRead": seller.CapChatRead, "GetStoreUnreadCount": seller.CapChatRead,
 		"GetStorePresence": seller.CapChatRead, "StreamStoreEvents": seller.CapChatRead, "ListMessages": seller.CapChatRead, "MarkConversationRead": seller.CapChatRead,
 		"SendMessageToBuyer": seller.CapChatSend, "SendMessage": seller.CapChatSend,
 	}
@@ -1026,5 +1037,68 @@ func TestConstructorsRequireTheirDependencies(t *testing.T) {
 	}
 	if _, err := NewApp(&fakeReads{}, &fakeWrites{}, &fakeStreams{}, nil, &fakeBuyers{}, &fakeStores{}, images(t), log); err == nil {
 		t.Error("需要 Reauthenticator")
+	}
+}
+
+func TestGetStoreConversationByBuyerDerivesTheStoreFromTheCallerAndAssemblesTheBuyer(t *testing.T) {
+	e := newEnv(t, ownStore())
+	name := "阿美"
+	e.buyers.displays = []buyer.Display{{BuyerID: 5, DisplayName: &name}}
+	e.reads.conversation = sampleConversation(1, callerStoreID, 5)
+	resp, err := e.app.GetStoreConversationByBuyer(signedIn(), connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: "5"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertStoreParty(t, e.reads.party)
+	if e.reads.byBuyer != 5 {
+		t.Errorf("buyer = %d", e.reads.byBuyer)
+	}
+	if b := resp.Msg.GetConversation().GetBuyer(); b.GetId() != "5" || b.GetName() != "阿美" || b.GetDeleted() || resp.Msg.GetConversation().Store != nil {
+		t.Errorf("買家：%v", resp.Msg)
+	}
+}
+
+func TestGetStoreConversationByBuyerMarksADeletedBuyer(t *testing.T) {
+	e := newEnv(t, ownStore())
+	e.buyers.displays = []buyer.Display{{BuyerID: 6, Deleted: true}}
+	e.reads.conversation = sampleConversation(1, callerStoreID, 6)
+	resp, err := e.app.GetStoreConversationByBuyer(signedIn(), connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: "6"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := resp.Msg.GetConversation().GetBuyer(); !b.GetDeleted() || b.Name != nil || b.Avatar != nil {
+		t.Errorf("已刪除的買家：%v", b)
+	}
+}
+
+func TestGetStoreConversationByBuyerValidatesTheBuyerIDAndMapsModuleNotFound(t *testing.T) {
+	e := newEnv(t, ownStore())
+	for _, bad := range []string{"", "abc", "0", "-3"} {
+		_, err := e.app.GetStoreConversationByBuyer(signedIn(), connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: bad}))
+		if codeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("buyer_id %q：%v", bad, err)
+		}
+	}
+	if len(e.reads.calls) != 0 {
+		t.Errorf("驗證失敗不得呼叫模組：%v", e.reads.calls)
+	}
+	e.reads.err = apperr.NotFound("沒有對話")
+	if _, err := e.app.GetStoreConversationByBuyer(signedIn(), connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: "5"})); codeOf(err) != connect.CodeNotFound {
+		t.Errorf("沒有對話：%v", err)
+	}
+	req := func(e *env) error {
+		_, err := e.app.GetStoreConversationByBuyer(signedIn(), connect.NewRequest(&pb.GetStoreConversationByBuyerRequest{BuyerId: "5"}))
+		return err
+	}
+	noStore := newEnv(t, nil)
+	closed := newEnv(t, ownStore())
+	closed.reads.err = apperr.NotFound("店家已關閉的模組句")
+	missing := newEnv(t, ownStore())
+	missing.reads.err = apperr.NotFound("另一句")
+	want := req(missing)
+	for name, err := range map[string]error{"沒有店": req(noStore), "店家關閉": req(closed)} {
+		if codeOf(err) != connect.CodeNotFound || err.Error() != want.Error() || reasonOf(err) != reasonOf(want) {
+			t.Errorf("%s 必須與沒有對話相同：%v vs %v", name, err, want)
+		}
 	}
 }

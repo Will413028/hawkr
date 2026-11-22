@@ -215,6 +215,11 @@ func (m *Module) ListConversations(ctx context.Context, p Party, after *Cursor, 
 	return m.read.ListConversations(ctx, p, after, size)
 }
 
+// StoreConversationByBuyer 是店家方與某位買家的對話；沒有對話回 NotFound。p 必須是店家方。
+func (m *Module) StoreConversationByBuyer(ctx context.Context, p Party, buyerID int64) (Conversation, error) {
+	return m.read.StoreConversationByBuyer(ctx, p, buyerID)
+}
+
 // ListMessages 是對話裡 seq 小於 beforeSeq 的訊息（新的在前；beforeSeq 為 0 從最新開始）。對話不屬於呼叫者回 NotFound。
 func (m *Module) ListMessages(ctx context.Context, conversationID uuid.UUID, p Party, beforeSeq int64, size int32) (MessagePage, error) {
 	return m.read.ListMessages(ctx, conversationID, p, beforeSeq, size)

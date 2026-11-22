@@ -106,7 +106,7 @@ func (h *App) GetReview(ctx context.Context, req *connect.Request[pb.GetReviewRe
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	reviews, err := h.toReviews(ctx, []review.Review{r}, false)
+	reviews, err := h.toReviews(ctx, []review.Review{r}, false, viewer)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ func (h *App) ReplyReview(ctx context.Context, req *connect.Request[pb.ReplyRevi
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	reviews, err := h.toReviews(ctx, []review.Review{r}, true)
+	reviews, err := h.toReviews(ctx, []review.Review{r}, true, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (h *App) CreateReview(ctx context.Context, req *connect.Request[pb.CreateRe
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	reviews, err := h.toReviews(ctx, []review.Review{r}, true)
+	reviews, err := h.toReviews(ctx, []review.Review{r}, true, buyerID)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (h *App) ListMyReviews(ctx context.Context, req *connect.Request[pb.ListMyR
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	return respond(ctx, h.presenter, page, scope, true, func(r []*pb.Review, token string) *pb.ListMyReviewsResponse {
+	return respond(ctx, h.presenter, page, scope, true, buyerID, func(r []*pb.Review, token string) *pb.ListMyReviewsResponse {
 		return &pb.ListMyReviewsResponse{Reviews: r, NextPageToken: token}
 	})
 }
@@ -203,7 +203,7 @@ func (h *App) ListOwnStoreReviews(ctx context.Context, req *connect.Request[pb.L
 	if err != nil {
 		return nil, h.failure(err)
 	}
-	return respond(ctx, h.presenter, page, scope, true, func(r []*pb.Review, token string) *pb.ListOwnStoreReviewsResponse {
+	return respond(ctx, h.presenter, page, scope, true, 0, func(r []*pb.Review, token string) *pb.ListOwnStoreReviewsResponse {
 		return &pb.ListOwnStoreReviewsResponse{Reviews: r, NextPageToken: token}
 	})
 }

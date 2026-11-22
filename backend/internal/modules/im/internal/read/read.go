@@ -105,6 +105,24 @@ func (s *Service) ListConversations(ctx context.Context, p model.Party, after *m
 	return page, nil
 }
 
+// StoreConversationByBuyer 是店家方與某位買家的對話；兩者之間沒有對話回 NotFound（同其他找不到對話的 NotFound）。呼叫者必須是店家方。
+func (s *Service) StoreConversationByBuyer(ctx context.Context, p model.Party, buyerID int64) (model.Conversation, error) {
+	if err := p.Authorize(); err != nil {
+		return model.Conversation{}, err
+	}
+	if p.Kind != model.PartyStore {
+		return model.Conversation{}, apperr.NotFound("%s", text.ImConversationNotFound(uitext.LocaleFrom(ctx)))
+	}
+	r, err := s.q(ctx).GetConversationStoreBuyer(ctx, store.GetConversationStoreBuyerParams{StoreID: p.Store.StoreID, BuyerID: buyerID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Conversation{}, apperr.NotFound("%s", text.ImConversationNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.Conversation{}, err
+	}
+	return conversation(r.ID, r.BuyerID, r.StoreID, r.LastSeq, r.ReadSeq, r.LastMessageAt, r.SenderKind, r.MessageType, r.Content, r.ErasedAt, r.Hidden, r.PeerReadSeq), nil
+}
+
 func conversation(id uuid.UUID, buyerID, storeID, lastSeq, readSeq int64, at time.Time, senderKind, msgType string, content *string, erasedAt *time.Time, hidden bool, peerReadSeq int64) model.Conversation {
 	return model.Conversation{
 		ID: id, BuyerID: buyerID, StoreID: storeID, LastSeq: lastSeq, Unread: lastSeq - readSeq, LastMessageAt: at,

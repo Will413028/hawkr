@@ -514,10 +514,164 @@ export const e = (k: E) => (k === E.WARNING ? OUT : "");
 	});
 });
 
+describe("規則 E：next-intl 查詢", () => {
+	const useT = `import { useTranslations } from "next-intl"; import { getTranslations } from "next-intl/server";`;
+	const pre = `${PRE} ${useT}`;
+
+	it("t(…)、t.rich／markup／raw、await getTranslations、直接呼叫工廠都算", () => {
+		expect(
+			scan(
+				`export function f(k: E) {
+	const t = useTranslations("a");
+	return k === E.WARNING ? t("w") : "";
+}`,
+				pre,
+			),
+		).toEqual(["ternary:WARNING@3"]);
+		for (const call of ['t.rich("w")', 't.markup("w")', 't.raw("w")']) {
+			expect(
+				scan(
+					`export function f(k: E) {
+	const t = useTranslations("a");
+	if (k === E.WARNING) { return ${call}; }
+	return null;
+}`,
+					pre,
+				),
+			).toEqual(["if:WARNING@3"]);
+		}
+		expect(
+			scan(
+				`export async function f(k: E) {
+	const t = await getTranslations("a");
+	switch (k) { case E.WARNING: return t("w"); }
+}`,
+				pre,
+			),
+		).toEqual(["case:WARNING@3"]);
+		expect(
+			scan(
+				`export function f(k: E) {
+	return k === E.WARNING ? useTranslations("a")("w") : "";
+}`,
+				pre,
+			),
+		).toEqual(["ternary:WARNING@2"]);
+	});
+
+	it("createTranslator 與別名 import 命中；非 next-intl 來源的同名函式不命中", () => {
+		const body = `export function f(k: E) {
+	const t = TR({ locale: "en", messages: {} });
+	return k === E.WARNING ? t("w") : "";
+}`;
+		expect(
+			scan(body, `${PRE} import { createTranslator as TR } from "next-intl";`),
+		).toEqual(["ternary:WARNING@3"]);
+		expect(
+			scan(
+				body.replace("TR(", "useTranslations("),
+				`${PRE} import { useTranslations } from "next-intl";`,
+			),
+		).toEqual(["ternary:WARNING@3"]);
+		expect(
+			scan(
+				body.replace("TR(", "useTranslations("),
+				`${PRE} import { useTranslations as TR } from "next-intl/server";`,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				body.replace("TR(", "useTranslations("),
+				`${PRE} import { useTranslations } from "./my-i18n";`,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				body.replace("TR(", "createTranslator("),
+				`${PRE} import { createTranslator } from "other-lib";`,
+			),
+		).toEqual([]);
+	});
+
+	it("namespace import 的 I.useTranslations/getTranslations/createTranslator 命中；其他來源或遮蔽不命中", () => {
+		const body = `export function f(k: E) {
+	const t = I.useTranslations("a");
+	return k === E.WARNING ? t("w") : "";
+}`;
+		for (const [fn, mod] of [
+			["useTranslations", "next-intl"],
+			["getTranslations", "next-intl/server"],
+			["createTranslator", "next-intl"],
+		] as const)
+			expect(
+				scan(
+					body.replace("useTranslations", fn),
+					`${PRE} import * as I from "${mod}";`,
+				),
+			).toEqual(["ternary:WARNING@3"]);
+		expect(
+			scan(
+				body
+					.replace('I.useTranslations("a")', 'await I.getTranslations("a")')
+					.replace("function f", "async function f"),
+				`${PRE} import * as I from "next-intl/server";`,
+			),
+		).toEqual(["ternary:WARNING@3"]);
+		expect(scan(body, `${PRE} import * as I from "other-lib";`)).toEqual([]);
+		expect(
+			scan(
+				body.replace("(k: E)", "(k: E, I: any)"),
+				`${PRE} import * as I from "next-intl";`,
+			),
+		).toEqual([]);
+	});
+
+	it("非 translator 的 t、非受管 enum、遮蔽的 t 不算", () => {
+		expect(
+			scan(
+				`const t = (s: string) => s;
+export function f(k: E) { return k === E.WARNING ? t("w") : ""; }`,
+				pre,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				`export function f(k: E, t: (s: string) => string) {
+	return k === E.WARNING ? t("w") : "";
+}
+const t = useTranslations("a");`,
+				pre,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				`export function f(k: E) {
+	const t = useTranslations("a");
+	return [1].map((t: (s: string) => string) => (k === E.WARNING ? t("w") : ""));
+}`,
+				pre,
+			),
+		).toEqual([]);
+		expect(single).toBeDefined();
+		const e = single;
+		expect(e?.tsModule).toBeTruthy();
+		expect(e?.tsName).toBeTruthy();
+		if (!e?.tsModule || !e.tsName) return;
+		const hits = scanSource(
+			"a.ts",
+			`import { ${e.tsName} as S } from "${e.tsModule}"; ${useT} export function f(k: S) { const t = useTranslations("a"); return k === S.X ? t("w") : ""; }`,
+			manifest,
+		);
+		expect(forbidden(hits, manifest)).toEqual([]);
+	});
+});
+
 describe("manifest 與回報", () => {
 	it("單端 enum：任何形式都不失敗；只有對應表（case、key、pair）進 report", () => {
 		expect(single).toBeDefined();
 		const e = single;
+		expect(e?.tsModule).toBeTruthy();
+		expect(e?.tsName).toBeTruthy();
 		if (!e?.tsModule || !e.tsName) return;
 		const pre = `import { ${e.tsName} as S } from "${e.tsModule}";`;
 		const src = (body: string) =>

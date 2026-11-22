@@ -1,0 +1,121 @@
+{
+ "mutants": [
+  {
+   "id": "over-needs-two",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (cur > base)\n\t\t\t\tover.push",
+   "new": "if (cur > base + 1)\n\t\t\t\tover.push",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 新檔任何一筆都失敗",
+   "why": "超過 baseline 要加兩筆以上才算：新檔的一筆與既有檔加一都不再失敗"
+  },
+  {
+   "id": "new-file-treated-as-baseline",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "const b = baseline[file] ?? {};",
+   "new": "const b = baseline[file] ?? c;",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 新檔任何一筆都失敗",
+   "why": "baseline 沒有的新檔拿自己當 baseline：新檔一筆也過"
+  },
+  {
+   "id": "under-not-reported",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "else if (cur < base)",
+   "new": "else if (cur < base && false)",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 次數減少失敗並要求 --update",
+   "why": "次數少於 baseline 不再失敗：baseline 不會收緊"
+  },
+  {
+   "id": "update-allows-per-literal-increase",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "return { ok: increases.length === 0, increases };",
+   "new": "return { ok: true, increases };",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 新檔帶新句子或複製既有句子（全域增加）拒絕",
+   "why": "--update 拿掉每個字面值的全域次數守門：新檔帶新句子或複製既有句子也放行"
+  },
+  {
+   "id": "update-increase-needs-two",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (to > from) increases.push",
+   "new": "if (to > from + 1) increases.push",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 新增一筆拒絕並列出增加的字面值",
+   "why": "--update 的增加要兩筆以上才算：新增一筆被放行"
+  },
+  {
+   "id": "jsx-text-not-collected",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "} else if (ts.isJsxText(n)) {",
+   "new": "} else if (ts.isJsxText(n) && false) {",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 字串、無插值樣板、屬性字串、JSX 文字都算",
+   "why": "JSX 文字不收"
+  },
+  {
+   "id": "template-expression-not-collected",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "} else if (ts.isTemplateExpression(n)) {",
+   "new": "} else if (ts.isTemplateExpression(n) && false) {",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 樣板字串的各段合併成一筆",
+   "why": "有插值的樣板字串不收"
+  },
+  {
+   "id": "delegated-not-excluded",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "path.startsWith(\"app/(delegated)/\")",
+   "new": "path.startsWith(\"app/(delegated-x)/\")",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 代行工作區、測試、生成檔不算",
+   "why": "代行工作區不再排除"
+  },
+  {
+   "id": "init-allowed-when-baseline-exists",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (baseline !== null) {\n\t\t\treturn {\n\t\t\t\tcode: 1,\n\t\t\t\tlines: [\"拒絕 --init",
+   "new": "if (baseline === undefined) {\n\t\t\treturn {\n\t\t\t\tcode: 1,\n\t\t\t\tlines: [\"拒絕 --init",
+   "test": "scripts/check-hardcoded-han.unit.test.ts init 模式：baseline 已存在時拒絕且不寫檔",
+   "why": "--init 守門拿掉：baseline 已存在時還能重建，等於繞過 ratchet"
+  },
+  {
+   "id": "unknown-arg-accepted",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "return { error: `未知參數 ${first}` };",
+   "new": "return { mode: \"check\" };",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 未知參數、--init 與 --update 同時、缺路徑都報錯",
+   "why": "未知參數被當成檢查模式：打錯 --update 也綠"
+  },
+  {
+   "id": "init-with-update-accepted",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (second !== undefined)\n\t\t\treturn {",
+   "new": "if (second !== undefined && false)\n\t\t\treturn {",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 未知參數、--init 與 --update 同時、缺路徑都報錯",
+   "why": "--init 與 --update 同時出現不報錯"
+  },
+  {
+   "id": "against-never-fails",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (increases.length > 0) {\n\t\treturn {\n\t\t\tcode: 1,\n\t\t\tlines: [\n\t\t\t\t\"baseline 不得",
+   "new": "if (increases.length < 0) {\n\t\treturn {\n\t\t\tcode: 1,\n\t\t\tlines: [\n\t\t\t\t\"baseline 不得",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 任一字面值全域次數變大（含新句子、次數加一）失敗",
+   "why": "--check-baseline-against 的比較拿掉：baseline 在 PR 中變大也綠"
+  },
+  {
+   "id": "global-increase-gte",
+   "stack": "website",
+   "file": "website/scripts/check-hardcoded-han.ts",
+   "old": "if (to > from) increases.push",
+   "new": "if (to >= from) increases.push",
+   "test": "scripts/check-hardcoded-han.unit.test.ts 相同、減少、檔案之間搬移都通過",
+   "why": "全域次數比較放寬成 >=：沒變也算增加，--check-baseline-against 與 --update 對相同內容誤報"
+  }
+ ]
+}
