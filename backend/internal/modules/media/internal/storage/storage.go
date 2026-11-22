@@ -1,4 +1,4 @@
-// Package storage 是 media 模組的物件儲存 port、S3 相容 adapter（R2、MinIO）與測試用的記憶體 fake。
+// Package storage 是 media 模組的物件儲存 port、S3 相容 adapter（R2、Garage 等 S3 相容服務）與測試用的記憶體 fake。
 //
 // 建構不到有效實作時回傳錯誤，不退回 fake：缺設定要讓程式在啟動時就失敗。
 package storage

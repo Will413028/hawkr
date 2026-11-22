@@ -62,7 +62,7 @@ type (
 	ProcessResult = upload.ProcessResult
 	// GCResult 是一輪 GC 的結果。
 	GCResult = reclaim.Result
-	// ObjectStore 是模組需要的物件儲存；組裝點由 R2 或 MinIO 的實作提供，測試用記憶體 fake。
+	// ObjectStore 是模組需要的物件儲存；組裝點由 R2 或 S3 相容替身（Garage）的實作提供，測試用記憶體 fake。
 	ObjectStore = storage.Store
 )
 

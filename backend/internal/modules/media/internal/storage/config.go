@@ -14,7 +14,7 @@ type Backend string
 const (
 	// BackendR2 連 Cloudflare R2（`https://<account>.r2.cloudflarestorage.com`）。
 	BackendR2 Backend = "r2"
-	// BackendS3Compat 連自訂 endpoint 的 S3 相容服務（CI 與本機的 MinIO），用 path-style。
+	// BackendS3Compat 連自訂 endpoint 的 S3 相容服務（CI 與本機的 Garage），用 path-style。
 	BackendS3Compat Backend = "s3compat"
 )
 

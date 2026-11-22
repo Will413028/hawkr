@@ -37,7 +37,7 @@ func New(cfg Config) (*S3, error) {
 		Credentials: aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
 			return creds, nil
 		}),
-		// 只在操作要求時才算 checksum：預簽網址除 Content-MD5 外不多綁 x-amz-checksum-*，R2 與 MinIO 行為一致。
+		// 只在操作要求時才算 checksum：預簽網址除 Content-MD5 外不多綁 x-amz-checksum-*，R2 已實測；S3 相容替身由整合測試驗證。
 		RequestChecksumCalculation: aws.RequestChecksumCalculationWhenRequired,
 		ResponseChecksumValidation: aws.ResponseChecksumValidationWhenRequired,
 	})
