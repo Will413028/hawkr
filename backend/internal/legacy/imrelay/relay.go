@@ -8,8 +8,8 @@
 // （wire 型別都還是 string）。其他欄位的值與身分空間不變：receiver_id 收件人是買家時送 buyer_id、
 // 是店家時送店家的 account_id。
 //
-// 這個 package 只在測試中啟用：舊 im-service 仍是聊天唯一的寫入者與發送者，cmd/hawkr 不訂閱事件也不登記 worker
-// （同一時間只能有一個生效的 producer）；舊路由移除時才接上。notification 搬進單體後刪除。
+// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job。只有單體的 im 送出的訊息才發 im.MessageSent；舊 im-service 的聊天路由
+// 還在（buyer-app 聊天尚未改接），它的訊息由它自己發 chat.message.sent，兩邊的訊息不重疊。notification 搬進單體後刪除。
 package imrelay
 
 import (

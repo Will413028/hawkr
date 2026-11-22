@@ -2,7 +2,7 @@
 
 ## 職責
 
-店家對買家的客戶管理：分類（`NORMAL`／`VIP`）、標籤、客戶列表與詳情、`VIPStatuses`；以及消費統計（`total_spent`、`order_count`）的過渡投影，與買家刪帳、店家退場的資料清除。給 httpapi（A6-5 的 `SellerCrmService`）與 buyer 的會員卡列表使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3-design.md`；A6-3b 尚無對外入口，`cmd/hawkr` 除登記 migration 外尚未接線（consumer、worker、訂閱者、`VIPStatuses` 的切換都在 A6-6e）。
+店家對買家的客戶管理：分類（`NORMAL`／`VIP`）、標籤、客戶列表與詳情、`VIPStatuses`；以及消費統計（`total_spent`、`order_count`）的過渡投影，與買家刪帳、店家退場的資料清除。給 httpapi（A6-5 的 `SellerCrmService`）與 buyer 的會員卡列表使用。行為規格：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3-design.md`；`cmd/hawkr` 在 A6-6e 接上訂閱者、worker、legacy consumer 與 `VIPStatuses`。
 
 ## 擁有的資料
 

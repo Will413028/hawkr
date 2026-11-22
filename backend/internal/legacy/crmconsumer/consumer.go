@@ -1,6 +1,6 @@
 // Package crmconsumer 把舊 Java 服務的 order.completed 與 aftersales.refund.completed 事件接到 crm 模組的消費統計投影（過渡：ordering 搬進單體後退場）。
 // RabbitMQ handler 只解碼與驗證，然後排一個 River job 並 ack；worker 呼叫 crm 模組（退款先在 tx 外向舊訂單服務解析店家與買家）。
-// 只在測試啟用：並行期的單一生效者是舊 crm-service，單體的 consumer 在 A6-6e 刪 CRM 路由的同一變更才接（不在 cmd/hawkr 呼叫）。
+// cmd/hawkr 的 worker 登記 job 並跑 Run（A6-6e 刪 CRM 路由的同一個變更接上）；舊 crm-service 另有自己的 queue，兩邊各收一份。
 package crmconsumer
 
 import (

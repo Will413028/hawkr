@@ -43,8 +43,7 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	adminNoAuth.Use(middleware.StripDelegationReservedHeaders())
 
 	// 負責微服務路由（payment, media, product, order, cart）
-	pubProducts := registerProductRoutes(public, app, admin, h)
-	registerReviewRoutes(pubProducts, app, h)
+	registerProductRoutes(public, app, admin, h)
 	registerPaymentRoutes(app, admin, h)
 	registerOrderRoutes(app, admin, h)
 	registerCheckoutRoutes(app, h)
@@ -73,7 +72,6 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerAfterSalesRoutes(app, r, h)
 	registerChatRoutes(app, h)
 	registerAdminNonManagedRoutes(app, admin, h)
-	registerCRMRoutes(app, h)
 	registerAIRoutes(app, admin, h)
 	registerProcurementQuoteRoutes(app, h)
 	registerVendorPortalRoutes(public, h)

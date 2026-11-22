@@ -19,8 +19,6 @@ func registerSellerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
 	pubSellers.Use(middleware.OptionalJWTAuth())
 	{
 		pubSellers.GET("/:id/products", h.GetSellerProducts)
-		pubSellers.GET("/:id/reviews", h.GetPublicSellerReviews)
-		pubSellers.GET("/:id/reviews/stats", h.GetPublicSellerReviewStats)
 	}
 
 	// ------------------------------------------
@@ -31,11 +29,6 @@ func registerSellerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
 	sellerMgmt := app.Group(SellersPath)
 	sellerMgmt.Use(middleware.JWTAuth())
 	{
-		// 訂單商品評論（賣家查看＋公開回覆＝經營）
-		sellerHandle(sellerMgmt, "GET", "/me/reviews", authz.CapMarketing, h.GetSellerOrderReviews)
-		sellerHandle(sellerMgmt, "GET", "/me/reviews/stats", authz.CapMarketing, h.GetSellerOrderReviewStats)
-		sellerHandle(sellerMgmt, "POST", SellerReviewReply, authz.CapMarketing, h.ReplyReview)
-
 		// 通知偏好設定（設定自己收不收通知，非經營行為 → 白名單）
 		sellerHandle(sellerMgmt, "GET", "/me/notification-preferences", authz.CapNotification, h.GetNotificationPreferences)
 		sellerHandle(sellerMgmt, "PUT", "/me/notification-preferences", authz.CapNotification, h.UpdateNotificationPreference)

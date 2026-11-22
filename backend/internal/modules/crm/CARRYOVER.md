@@ -2,7 +2,7 @@
 
 <!-- 決策紀錄：不放進 AGENTS.md，因為 AGENTS.md 每次在這個目錄工作都會載入。模組現行的規則寫在 AGENTS.md。 -->
 
-來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3-design.md` §12 與 §0.4，Will 的決定 A6-D2（黑名單）、A6-D8（只顯示暱稱與訂單統計）、A6-D18（W1–W5）。本檔對應 A6-3b（模組、`legacy/crmconsumer`）；Connect 與 handler 在 A6-5，consumer、worker、訂閱者與 `VIPStatuses` 的接線在 A6-6e。
+來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3-design.md` §12 與 §0.4，Will 的決定 A6-D2（黑名單）、A6-D8（只顯示暱稱與訂單統計）、A6-D18（W1–W5）。本檔對應 A6-3b（模組、`legacy/crmconsumer`）；Connect 與 handler 在 A6-5，consumer、worker、訂閱者與 `VIPStatuses` 已在 A6-6e 接線。
 
 ## 沿用盤點
 
@@ -48,7 +48,7 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 - 儲存的代碼（`customer_type`、清除 job 的 `party_kind`）是 UPPER_SNAKE（`NORMAL`、`VIP`、`BUYER`、`STORE`）。
 - 沒有 `blocklist`；沒有客戶列表的關鍵字搜尋；詳情沒有電話、Email、地址、優惠券數。
 - 退款不建客戶列；同一單號的第二個 `order.completed`（換了 `event_id`）不重複累加。
-- `legacy/crmservice`（只有 `VIPStatuses`）與 `services/crm-service` 不動：並行期單一生效者是舊服務，切換與刪除在 A6-6e。
+- `legacy/crmservice` 已在 A6-6e 刪除（`httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`）；`services/crm-service` 目錄與 compose 項目不動，隨後續退場步驟刪除。
 
 ## A6-3c 停用身分改由擁有者守門的沿用盤點
 
