@@ -39,6 +39,16 @@ abstract final class ReviewPublicService {
     hawkrreviewv1alpha1review.GetStoreReviewStatsResponse.new,
     idempotency: connect.Idempotency.noSideEffects,
   );
+
+  /// GetProductReviewStats 是商品的評價統計：公開可讀的評價數與平均（與 ListProductReviews 同一個公開述詞：沒有未還原的平台隱藏、作者仍在營運中）。
+  /// 統計不依觀看者過濾，不套封鎖。商品沒有評價（或商品不存在）是 count 0、average 0，不是 not_found。
+  static const getProductReviewStats = connect.Spec(
+    '/$name/GetProductReviewStats',
+    connect.StreamType.unary,
+    hawkrreviewv1alpha1review.GetProductReviewStatsRequest.new,
+    hawkrreviewv1alpha1review.GetProductReviewStatsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
 }
 /// ReviewAppService 是登入者的評價。評價是買家與店家共用的資源（買家寫、店家回）：CreateReview 與 ListMyReviews 是買家；
 /// ListOwnStoreReviews 的店家身分由伺服器從 session 推導（呼叫者此刻的店），ReplyReview 的店家由評價所屬的店推導，請求都不帶 store_id。

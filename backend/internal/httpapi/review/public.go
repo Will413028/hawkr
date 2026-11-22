@@ -99,3 +99,15 @@ func (h *Public) GetStoreReviewStats(ctx context.Context, req *connect.Request[p
 	}
 	return connect.NewResponse(out), nil
 }
+
+func (h *Public) GetProductReviewStats(ctx context.Context, req *connect.Request[pb.GetProductReviewStatsRequest]) (*connect.Response[pb.GetProductReviewStatsResponse], error) {
+	productID, err := rpc.ParseID("product_id", req.Msg.GetProductId())
+	if err != nil {
+		return nil, err
+	}
+	s, err := h.reads.ProductStats(ctx, productID)
+	if err != nil {
+		return nil, h.failure(err)
+	}
+	return connect.NewResponse(&pb.GetProductReviewStatsResponse{Count: s.Count, Average: s.Average}), nil
+}

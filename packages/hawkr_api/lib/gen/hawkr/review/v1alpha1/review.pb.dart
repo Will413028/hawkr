@@ -983,6 +983,148 @@ class GetStoreReviewStatsResponse extends $pb.GeneratedMessage {
   $pb.PbList<RatingCount> get distribution => $_getList(2);
 }
 
+class GetProductReviewStatsRequest extends $pb.GeneratedMessage {
+  factory GetProductReviewStatsRequest({
+    $core.String? productId,
+  }) {
+    final result = GetProductReviewStatsRequest._();
+    if (productId != null) result.productId = productId;
+    return result;
+  }
+
+  GetProductReviewStatsRequest._();
+
+  factory GetProductReviewStatsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetProductReviewStatsRequest()..mergeFromBuffer(data, registry);
+  factory GetProductReviewStatsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetProductReviewStatsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetProductReviewStatsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.review.v1alpha1'),
+      createEmptyInstance: GetProductReviewStatsRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'productId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetProductReviewStatsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetProductReviewStatsRequest copyWith(
+          void Function(GetProductReviewStatsRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetProductReviewStatsRequest))
+          as GetProductReviewStatsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetProductReviewStatsRequest() / GetProductReviewStatsRequest.new instead')
+  static GetProductReviewStatsRequest create() =>
+      GetProductReviewStatsRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetProductReviewStatsRequest._();
+  @$core.override
+  GetProductReviewStatsRequest createEmptyInstance() =>
+      GetProductReviewStatsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetProductReviewStatsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetProductReviewStatsRequest>(
+          GetProductReviewStatsRequest.$_createMessage);
+  static GetProductReviewStatsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get productId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set productId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProductId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProductId() => $_clearField(1);
+}
+
+class GetProductReviewStatsResponse extends $pb.GeneratedMessage {
+  factory GetProductReviewStatsResponse({
+    $fixnum.Int64? count,
+    $core.double? average,
+  }) {
+    final result = GetProductReviewStatsResponse._();
+    if (count != null) result.count = count;
+    if (average != null) result.average = average;
+    return result;
+  }
+
+  GetProductReviewStatsResponse._();
+
+  factory GetProductReviewStatsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetProductReviewStatsResponse()..mergeFromBuffer(data, registry);
+  factory GetProductReviewStatsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetProductReviewStatsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetProductReviewStatsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.review.v1alpha1'),
+      createEmptyInstance: GetProductReviewStatsResponse.$_createMessage)
+    ..aInt64(1, _omitFieldNames ? '' : 'count')
+    ..aD(2, _omitFieldNames ? '' : 'average')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetProductReviewStatsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetProductReviewStatsResponse copyWith(
+          void Function(GetProductReviewStatsResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetProductReviewStatsResponse))
+          as GetProductReviewStatsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetProductReviewStatsResponse() / GetProductReviewStatsResponse.new instead')
+  static GetProductReviewStatsResponse create() =>
+      GetProductReviewStatsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetProductReviewStatsResponse._();
+  @$core.override
+  GetProductReviewStatsResponse createEmptyInstance() =>
+      GetProductReviewStatsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetProductReviewStatsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetProductReviewStatsResponse>(
+          GetProductReviewStatsResponse.$_createMessage);
+  static GetProductReviewStatsResponse? _defaultInstance;
+
+  /// 公開可讀的評價數。
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get count => $_getI64(0);
+  @$pb.TagNumber(1)
+  set count($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCount() => $_clearField(1);
+
+  /// 平均星等，四捨五入到小數第二位；沒有評價是 0。
+  @$pb.TagNumber(2)
+  $core.double get average => $_getN(1);
+  @$pb.TagNumber(2)
+  set average($core.double value) => $_setDouble(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAverage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAverage() => $_clearField(2);
+}
+
 class GetReviewRequest extends $pb.GeneratedMessage {
   factory GetReviewRequest({
     $core.String? reviewId,
@@ -1754,6 +1896,13 @@ class ReviewPublicServiceApi {
           $pb.ClientContext? ctx, GetStoreReviewStatsRequest request) =>
       _client.invoke<GetStoreReviewStatsResponse>(ctx, 'ReviewPublicService',
           'GetStoreReviewStats', request, GetStoreReviewStatsResponse());
+
+  /// GetProductReviewStats 是商品的評價統計：公開可讀的評價數與平均（與 ListProductReviews 同一個公開述詞：沒有未還原的平台隱藏、作者仍在營運中）。
+  /// 統計不依觀看者過濾，不套封鎖。商品沒有評價（或商品不存在）是 count 0、average 0，不是 not_found。
+  $async.Future<GetProductReviewStatsResponse> getProductReviewStats(
+          $pb.ClientContext? ctx, GetProductReviewStatsRequest request) =>
+      _client.invoke<GetProductReviewStatsResponse>(ctx, 'ReviewPublicService',
+          'GetProductReviewStats', request, GetProductReviewStatsResponse());
 }
 
 /// ReviewAppService 是登入者的評價。評價是買家與店家共用的資源（買家寫、店家回）：CreateReview 與 ListMyReviews 是買家；

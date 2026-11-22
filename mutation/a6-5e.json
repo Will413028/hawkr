@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "product-stats-ignores-hide",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "new": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "Product stats stop applying the platform-hide predicate, so hidden reviews are counted while the public list omits them."
+  },
+  {
+   "id": "product-stats-ignores-inactive-author",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "new": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n`",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "Product stats stop applying the inactive-author predicate, so reviews of deleting accounts are counted."
+  },
+  {
+   "id": "product-stats-drops-product-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/public.sql.go",
+   "old": "WHERE r.product_id = $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "new": "WHERE r.product_id <> $1\n  AND NOT EXISTS (SELECT 1 FROM review.hides AS h WHERE h.review_id = r.id AND h.restored_at IS NULL)\n  AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id)\n`",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "Product stats count other products' reviews instead of this one."
+  },
+  {
+   "id": "product-stats-average-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/read/read.go",
+   "old": "model.ProductStats{Count: r.TotalCount, Average: r.AvgRating}",
+   "new": "model.ProductStats{Count: r.TotalCount}",
+   "test": "internal/modules/review ^TestProductStatsExcludeWhatThePublicListExcludes$",
+   "why": "The module returns the count but no average."
+  },
+  {
+   "id": "handler-product-stats-average-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "&pb.GetProductReviewStatsResponse{Count: s.Count, Average: s.Average}",
+   "new": "&pb.GetProductReviewStatsResponse{Count: s.Count}",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsReturnsCountAndAverageWithoutReadingTheViewer$",
+   "why": "The handler drops the average from the response."
+  },
+  {
+   "id": "handler-product-stats-error-swallowed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "s, err := h.reads.ProductStats(ctx, productID)\n\tif err != nil {\n\t\treturn nil, h.failure(err)\n\t}",
+   "new": "s, err := h.reads.ProductStats(ctx, productID)\n\t_ = err",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsRejectsBadIDAndMapsModuleFailure$",
+   "why": "A module failure is turned into count 0 instead of an error."
+  },
+  {
+   "id": "handler-product-stats-id-unvalidated",
+   "stack": "go",
+   "file": "backend/internal/httpapi/review/public.go",
+   "old": "productID, err := rpc.ParseID(\"product_id\", req.Msg.GetProductId())\n\tif err != nil {\n\t\treturn nil, err\n\t}\n\ts, err := h.reads.ProductStats",
+   "new": "productID, _ := rpc.ParseID(\"product_id\", req.Msg.GetProductId())\n\tvar err error\n\ts, err := h.reads.ProductStats",
+   "test": "internal/httpapi/review ^TestGetProductReviewStatsRejectsBadIDAndMapsModuleFailure$",
+   "why": "A malformed product id reaches the module."
+  }
+ ]
+}

@@ -721,6 +721,104 @@ func (x *GetStoreReviewStatsResponse) GetDistribution() []*RatingCount {
 	return nil
 }
 
+type GetProductReviewStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductReviewStatsRequest) Reset() {
+	*x = GetProductReviewStatsRequest{}
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductReviewStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductReviewStatsRequest) ProtoMessage() {}
+
+func (x *GetProductReviewStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductReviewStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetProductReviewStatsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetProductReviewStatsRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+type GetProductReviewStatsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 公開可讀的評價數。
+	Count int64 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	// 平均星等，四捨五入到小數第二位；沒有評價是 0。
+	Average       float64 `protobuf:"fixed64,2,opt,name=average,proto3" json:"average,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductReviewStatsResponse) Reset() {
+	*x = GetProductReviewStatsResponse{}
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductReviewStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductReviewStatsResponse) ProtoMessage() {}
+
+func (x *GetProductReviewStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductReviewStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetProductReviewStatsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetProductReviewStatsResponse) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *GetProductReviewStatsResponse) GetAverage() float64 {
+	if x != nil {
+		return x.Average
+	}
+	return 0
+}
+
 type GetReviewRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ReviewId      string                 `protobuf:"bytes,1,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
@@ -730,7 +828,7 @@ type GetReviewRequest struct {
 
 func (x *GetReviewRequest) Reset() {
 	*x = GetReviewRequest{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[10]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +840,7 @@ func (x *GetReviewRequest) String() string {
 func (*GetReviewRequest) ProtoMessage() {}
 
 func (x *GetReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[10]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -755,7 +853,7 @@ func (x *GetReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewRequest.ProtoReflect.Descriptor instead.
 func (*GetReviewRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{10}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetReviewRequest) GetReviewId() string {
@@ -774,7 +872,7 @@ type GetReviewResponse struct {
 
 func (x *GetReviewResponse) Reset() {
 	*x = GetReviewResponse{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[11]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -786,7 +884,7 @@ func (x *GetReviewResponse) String() string {
 func (*GetReviewResponse) ProtoMessage() {}
 
 func (x *GetReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[11]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -799,7 +897,7 @@ func (x *GetReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewResponse.ProtoReflect.Descriptor instead.
 func (*GetReviewResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{11}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetReviewResponse) GetReview() *Review {
@@ -820,7 +918,7 @@ type ReplyReviewRequest struct {
 
 func (x *ReplyReviewRequest) Reset() {
 	*x = ReplyReviewRequest{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[12]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -832,7 +930,7 @@ func (x *ReplyReviewRequest) String() string {
 func (*ReplyReviewRequest) ProtoMessage() {}
 
 func (x *ReplyReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[12]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -845,7 +943,7 @@ func (x *ReplyReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplyReviewRequest.ProtoReflect.Descriptor instead.
 func (*ReplyReviewRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{12}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ReplyReviewRequest) GetReviewId() string {
@@ -871,7 +969,7 @@ type ReplyReviewResponse struct {
 
 func (x *ReplyReviewResponse) Reset() {
 	*x = ReplyReviewResponse{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[13]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -883,7 +981,7 @@ func (x *ReplyReviewResponse) String() string {
 func (*ReplyReviewResponse) ProtoMessage() {}
 
 func (x *ReplyReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[13]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -896,7 +994,7 @@ func (x *ReplyReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplyReviewResponse.ProtoReflect.Descriptor instead.
 func (*ReplyReviewResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{13}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ReplyReviewResponse) GetReview() *Review {
@@ -924,7 +1022,7 @@ type CreateReviewRequest struct {
 
 func (x *CreateReviewRequest) Reset() {
 	*x = CreateReviewRequest{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[14]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -936,7 +1034,7 @@ func (x *CreateReviewRequest) String() string {
 func (*CreateReviewRequest) ProtoMessage() {}
 
 func (x *CreateReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[14]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -949,7 +1047,7 @@ func (x *CreateReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReviewRequest.ProtoReflect.Descriptor instead.
 func (*CreateReviewRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{14}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CreateReviewRequest) GetOrderNo() string {
@@ -996,7 +1094,7 @@ type CreateReviewResponse struct {
 
 func (x *CreateReviewResponse) Reset() {
 	*x = CreateReviewResponse{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[15]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1008,7 +1106,7 @@ func (x *CreateReviewResponse) String() string {
 func (*CreateReviewResponse) ProtoMessage() {}
 
 func (x *CreateReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[15]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1021,7 +1119,7 @@ func (x *CreateReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReviewResponse.ProtoReflect.Descriptor instead.
 func (*CreateReviewResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{15}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CreateReviewResponse) GetReview() *Review {
@@ -1044,7 +1142,7 @@ type ListMyReviewsRequest struct {
 
 func (x *ListMyReviewsRequest) Reset() {
 	*x = ListMyReviewsRequest{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[16]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1056,7 +1154,7 @@ func (x *ListMyReviewsRequest) String() string {
 func (*ListMyReviewsRequest) ProtoMessage() {}
 
 func (x *ListMyReviewsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[16]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1069,7 +1167,7 @@ func (x *ListMyReviewsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReviewsRequest.ProtoReflect.Descriptor instead.
 func (*ListMyReviewsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{16}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListMyReviewsRequest) GetPageSize() int32 {
@@ -1103,7 +1201,7 @@ type ListMyReviewsResponse struct {
 
 func (x *ListMyReviewsResponse) Reset() {
 	*x = ListMyReviewsResponse{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[17]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1115,7 +1213,7 @@ func (x *ListMyReviewsResponse) String() string {
 func (*ListMyReviewsResponse) ProtoMessage() {}
 
 func (x *ListMyReviewsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[17]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1128,7 +1226,7 @@ func (x *ListMyReviewsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMyReviewsResponse.ProtoReflect.Descriptor instead.
 func (*ListMyReviewsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{17}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ListMyReviewsResponse) GetReviews() []*Review {
@@ -1160,7 +1258,7 @@ type ListOwnStoreReviewsRequest struct {
 
 func (x *ListOwnStoreReviewsRequest) Reset() {
 	*x = ListOwnStoreReviewsRequest{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[18]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1172,7 +1270,7 @@ func (x *ListOwnStoreReviewsRequest) String() string {
 func (*ListOwnStoreReviewsRequest) ProtoMessage() {}
 
 func (x *ListOwnStoreReviewsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[18]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1185,7 +1283,7 @@ func (x *ListOwnStoreReviewsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOwnStoreReviewsRequest.ProtoReflect.Descriptor instead.
 func (*ListOwnStoreReviewsRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{18}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListOwnStoreReviewsRequest) GetPageSize() int32 {
@@ -1226,7 +1324,7 @@ type ListOwnStoreReviewsResponse struct {
 
 func (x *ListOwnStoreReviewsResponse) Reset() {
 	*x = ListOwnStoreReviewsResponse{}
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[19]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1238,7 +1336,7 @@ func (x *ListOwnStoreReviewsResponse) String() string {
 func (*ListOwnStoreReviewsResponse) ProtoMessage() {}
 
 func (x *ListOwnStoreReviewsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[19]
+	mi := &file_hawkr_review_v1alpha1_review_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1251,7 +1349,7 @@ func (x *ListOwnStoreReviewsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListOwnStoreReviewsResponse.ProtoReflect.Descriptor instead.
 func (*ListOwnStoreReviewsResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{19}
+	return file_hawkr_review_v1alpha1_review_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ListOwnStoreReviewsResponse) GetReviews() []*Review {
@@ -1336,7 +1434,13 @@ const file_hawkr_review_v1alpha1_review_proto_rawDesc = "" +
 	"\x1bGetStoreReviewStatsResponse\x12\x14\n" +
 	"\x05count\x18\x01 \x01(\x03R\x05count\x12\x18\n" +
 	"\aaverage\x18\x02 \x01(\x01R\aaverage\x12F\n" +
-	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"4\n" +
+	"\fdistribution\x18\x03 \x03(\v2\".hawkr.review.v1alpha1.RatingCountR\fdistribution\"B\n" +
+	"\x1cGetProductReviewStatsRequest\x12\"\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"O\n" +
+	"\x1dGetProductReviewStatsResponse\x12\x14\n" +
+	"\x05count\x18\x01 \x01(\x03R\x05count\x12\x18\n" +
+	"\aaverage\x18\x02 \x01(\x01R\aaverage\"4\n" +
 	"\x10GetReviewRequest\x12 \n" +
 	"\treview_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breviewId\"J\n" +
 	"\x11GetReviewResponse\x125\n" +
@@ -1373,11 +1477,12 @@ const file_hawkr_review_v1alpha1_review_proto_rawDesc = "" +
 	"\a_rating\"~\n" +
 	"\x1bListOwnStoreReviewsResponse\x127\n" +
 	"\areviews\x18\x01 \x03(\v2\x1d.hawkr.review.v1alpha1.ReviewR\areviews\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\x93\x03\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\x9d\x04\n" +
 	"\x13ReviewPublicService\x12~\n" +
 	"\x12ListProductReviews\x120.hawkr.review.v1alpha1.ListProductReviewsRequest\x1a1.hawkr.review.v1alpha1.ListProductReviewsResponse\"\x03\x90\x02\x01\x12x\n" +
 	"\x10ListStoreReviews\x12..hawkr.review.v1alpha1.ListStoreReviewsRequest\x1a/.hawkr.review.v1alpha1.ListStoreReviewsResponse\"\x03\x90\x02\x01\x12\x81\x01\n" +
-	"\x13GetStoreReviewStats\x121.hawkr.review.v1alpha1.GetStoreReviewStatsRequest\x1a2.hawkr.review.v1alpha1.GetStoreReviewStatsResponse\"\x03\x90\x02\x012\xc0\x04\n" +
+	"\x13GetStoreReviewStats\x121.hawkr.review.v1alpha1.GetStoreReviewStatsRequest\x1a2.hawkr.review.v1alpha1.GetStoreReviewStatsResponse\"\x03\x90\x02\x01\x12\x87\x01\n" +
+	"\x15GetProductReviewStats\x123.hawkr.review.v1alpha1.GetProductReviewStatsRequest\x1a4.hawkr.review.v1alpha1.GetProductReviewStatsResponse\"\x03\x90\x02\x012\xc0\x04\n" +
 	"\x10ReviewAppService\x12c\n" +
 	"\tGetReview\x12'.hawkr.review.v1alpha1.GetReviewRequest\x1a(.hawkr.review.v1alpha1.GetReviewResponse\"\x03\x90\x02\x01\x12i\n" +
 	"\vReplyReview\x12).hawkr.review.v1alpha1.ReplyReviewRequest\x1a*.hawkr.review.v1alpha1.ReplyReviewResponse\"\x03\x90\x02\x02\x12g\n" +
@@ -1398,37 +1503,39 @@ func file_hawkr_review_v1alpha1_review_proto_rawDescGZIP() []byte {
 	return file_hawkr_review_v1alpha1_review_proto_rawDescData
 }
 
-var file_hawkr_review_v1alpha1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_hawkr_review_v1alpha1_review_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_hawkr_review_v1alpha1_review_proto_goTypes = []any{
-	(*ReviewAuthor)(nil),                // 0: hawkr.review.v1alpha1.ReviewAuthor
-	(*ReviewReply)(nil),                 // 1: hawkr.review.v1alpha1.ReviewReply
-	(*Review)(nil),                      // 2: hawkr.review.v1alpha1.Review
-	(*ListProductReviewsRequest)(nil),   // 3: hawkr.review.v1alpha1.ListProductReviewsRequest
-	(*ListProductReviewsResponse)(nil),  // 4: hawkr.review.v1alpha1.ListProductReviewsResponse
-	(*ListStoreReviewsRequest)(nil),     // 5: hawkr.review.v1alpha1.ListStoreReviewsRequest
-	(*ListStoreReviewsResponse)(nil),    // 6: hawkr.review.v1alpha1.ListStoreReviewsResponse
-	(*GetStoreReviewStatsRequest)(nil),  // 7: hawkr.review.v1alpha1.GetStoreReviewStatsRequest
-	(*RatingCount)(nil),                 // 8: hawkr.review.v1alpha1.RatingCount
-	(*GetStoreReviewStatsResponse)(nil), // 9: hawkr.review.v1alpha1.GetStoreReviewStatsResponse
-	(*GetReviewRequest)(nil),            // 10: hawkr.review.v1alpha1.GetReviewRequest
-	(*GetReviewResponse)(nil),           // 11: hawkr.review.v1alpha1.GetReviewResponse
-	(*ReplyReviewRequest)(nil),          // 12: hawkr.review.v1alpha1.ReplyReviewRequest
-	(*ReplyReviewResponse)(nil),         // 13: hawkr.review.v1alpha1.ReplyReviewResponse
-	(*CreateReviewRequest)(nil),         // 14: hawkr.review.v1alpha1.CreateReviewRequest
-	(*CreateReviewResponse)(nil),        // 15: hawkr.review.v1alpha1.CreateReviewResponse
-	(*ListMyReviewsRequest)(nil),        // 16: hawkr.review.v1alpha1.ListMyReviewsRequest
-	(*ListMyReviewsResponse)(nil),       // 17: hawkr.review.v1alpha1.ListMyReviewsResponse
-	(*ListOwnStoreReviewsRequest)(nil),  // 18: hawkr.review.v1alpha1.ListOwnStoreReviewsRequest
-	(*ListOwnStoreReviewsResponse)(nil), // 19: hawkr.review.v1alpha1.ListOwnStoreReviewsResponse
-	(*v1alpha1.Image)(nil),              // 20: hawkr.common.v1alpha1.Image
-	(*timestamppb.Timestamp)(nil),       // 21: google.protobuf.Timestamp
+	(*ReviewAuthor)(nil),                  // 0: hawkr.review.v1alpha1.ReviewAuthor
+	(*ReviewReply)(nil),                   // 1: hawkr.review.v1alpha1.ReviewReply
+	(*Review)(nil),                        // 2: hawkr.review.v1alpha1.Review
+	(*ListProductReviewsRequest)(nil),     // 3: hawkr.review.v1alpha1.ListProductReviewsRequest
+	(*ListProductReviewsResponse)(nil),    // 4: hawkr.review.v1alpha1.ListProductReviewsResponse
+	(*ListStoreReviewsRequest)(nil),       // 5: hawkr.review.v1alpha1.ListStoreReviewsRequest
+	(*ListStoreReviewsResponse)(nil),      // 6: hawkr.review.v1alpha1.ListStoreReviewsResponse
+	(*GetStoreReviewStatsRequest)(nil),    // 7: hawkr.review.v1alpha1.GetStoreReviewStatsRequest
+	(*RatingCount)(nil),                   // 8: hawkr.review.v1alpha1.RatingCount
+	(*GetStoreReviewStatsResponse)(nil),   // 9: hawkr.review.v1alpha1.GetStoreReviewStatsResponse
+	(*GetProductReviewStatsRequest)(nil),  // 10: hawkr.review.v1alpha1.GetProductReviewStatsRequest
+	(*GetProductReviewStatsResponse)(nil), // 11: hawkr.review.v1alpha1.GetProductReviewStatsResponse
+	(*GetReviewRequest)(nil),              // 12: hawkr.review.v1alpha1.GetReviewRequest
+	(*GetReviewResponse)(nil),             // 13: hawkr.review.v1alpha1.GetReviewResponse
+	(*ReplyReviewRequest)(nil),            // 14: hawkr.review.v1alpha1.ReplyReviewRequest
+	(*ReplyReviewResponse)(nil),           // 15: hawkr.review.v1alpha1.ReplyReviewResponse
+	(*CreateReviewRequest)(nil),           // 16: hawkr.review.v1alpha1.CreateReviewRequest
+	(*CreateReviewResponse)(nil),          // 17: hawkr.review.v1alpha1.CreateReviewResponse
+	(*ListMyReviewsRequest)(nil),          // 18: hawkr.review.v1alpha1.ListMyReviewsRequest
+	(*ListMyReviewsResponse)(nil),         // 19: hawkr.review.v1alpha1.ListMyReviewsResponse
+	(*ListOwnStoreReviewsRequest)(nil),    // 20: hawkr.review.v1alpha1.ListOwnStoreReviewsRequest
+	(*ListOwnStoreReviewsResponse)(nil),   // 21: hawkr.review.v1alpha1.ListOwnStoreReviewsResponse
+	(*v1alpha1.Image)(nil),                // 22: hawkr.common.v1alpha1.Image
+	(*timestamppb.Timestamp)(nil),         // 23: google.protobuf.Timestamp
 }
 var file_hawkr_review_v1alpha1_review_proto_depIdxs = []int32{
-	20, // 0: hawkr.review.v1alpha1.ReviewAuthor.avatar:type_name -> hawkr.common.v1alpha1.Image
-	21, // 1: hawkr.review.v1alpha1.ReviewReply.reply_time:type_name -> google.protobuf.Timestamp
-	20, // 2: hawkr.review.v1alpha1.Review.images:type_name -> hawkr.common.v1alpha1.Image
-	20, // 3: hawkr.review.v1alpha1.Review.item_image:type_name -> hawkr.common.v1alpha1.Image
-	21, // 4: hawkr.review.v1alpha1.Review.create_time:type_name -> google.protobuf.Timestamp
+	22, // 0: hawkr.review.v1alpha1.ReviewAuthor.avatar:type_name -> hawkr.common.v1alpha1.Image
+	23, // 1: hawkr.review.v1alpha1.ReviewReply.reply_time:type_name -> google.protobuf.Timestamp
+	22, // 2: hawkr.review.v1alpha1.Review.images:type_name -> hawkr.common.v1alpha1.Image
+	22, // 3: hawkr.review.v1alpha1.Review.item_image:type_name -> hawkr.common.v1alpha1.Image
+	23, // 4: hawkr.review.v1alpha1.Review.create_time:type_name -> google.protobuf.Timestamp
 	1,  // 5: hawkr.review.v1alpha1.Review.reply:type_name -> hawkr.review.v1alpha1.ReviewReply
 	0,  // 6: hawkr.review.v1alpha1.Review.author:type_name -> hawkr.review.v1alpha1.ReviewAuthor
 	2,  // 7: hawkr.review.v1alpha1.ListProductReviewsResponse.reviews:type_name -> hawkr.review.v1alpha1.Review
@@ -1442,21 +1549,23 @@ var file_hawkr_review_v1alpha1_review_proto_depIdxs = []int32{
 	3,  // 15: hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews:input_type -> hawkr.review.v1alpha1.ListProductReviewsRequest
 	5,  // 16: hawkr.review.v1alpha1.ReviewPublicService.ListStoreReviews:input_type -> hawkr.review.v1alpha1.ListStoreReviewsRequest
 	7,  // 17: hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats:input_type -> hawkr.review.v1alpha1.GetStoreReviewStatsRequest
-	10, // 18: hawkr.review.v1alpha1.ReviewAppService.GetReview:input_type -> hawkr.review.v1alpha1.GetReviewRequest
-	12, // 19: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:input_type -> hawkr.review.v1alpha1.ReplyReviewRequest
-	14, // 20: hawkr.review.v1alpha1.ReviewAppService.CreateReview:input_type -> hawkr.review.v1alpha1.CreateReviewRequest
-	16, // 21: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:input_type -> hawkr.review.v1alpha1.ListMyReviewsRequest
-	18, // 22: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:input_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsRequest
-	4,  // 23: hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews:output_type -> hawkr.review.v1alpha1.ListProductReviewsResponse
-	6,  // 24: hawkr.review.v1alpha1.ReviewPublicService.ListStoreReviews:output_type -> hawkr.review.v1alpha1.ListStoreReviewsResponse
-	9,  // 25: hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats:output_type -> hawkr.review.v1alpha1.GetStoreReviewStatsResponse
-	11, // 26: hawkr.review.v1alpha1.ReviewAppService.GetReview:output_type -> hawkr.review.v1alpha1.GetReviewResponse
-	13, // 27: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:output_type -> hawkr.review.v1alpha1.ReplyReviewResponse
-	15, // 28: hawkr.review.v1alpha1.ReviewAppService.CreateReview:output_type -> hawkr.review.v1alpha1.CreateReviewResponse
-	17, // 29: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:output_type -> hawkr.review.v1alpha1.ListMyReviewsResponse
-	19, // 30: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:output_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsResponse
-	23, // [23:31] is the sub-list for method output_type
-	15, // [15:23] is the sub-list for method input_type
+	10, // 18: hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats:input_type -> hawkr.review.v1alpha1.GetProductReviewStatsRequest
+	12, // 19: hawkr.review.v1alpha1.ReviewAppService.GetReview:input_type -> hawkr.review.v1alpha1.GetReviewRequest
+	14, // 20: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:input_type -> hawkr.review.v1alpha1.ReplyReviewRequest
+	16, // 21: hawkr.review.v1alpha1.ReviewAppService.CreateReview:input_type -> hawkr.review.v1alpha1.CreateReviewRequest
+	18, // 22: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:input_type -> hawkr.review.v1alpha1.ListMyReviewsRequest
+	20, // 23: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:input_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsRequest
+	4,  // 24: hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews:output_type -> hawkr.review.v1alpha1.ListProductReviewsResponse
+	6,  // 25: hawkr.review.v1alpha1.ReviewPublicService.ListStoreReviews:output_type -> hawkr.review.v1alpha1.ListStoreReviewsResponse
+	9,  // 26: hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats:output_type -> hawkr.review.v1alpha1.GetStoreReviewStatsResponse
+	11, // 27: hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats:output_type -> hawkr.review.v1alpha1.GetProductReviewStatsResponse
+	13, // 28: hawkr.review.v1alpha1.ReviewAppService.GetReview:output_type -> hawkr.review.v1alpha1.GetReviewResponse
+	15, // 29: hawkr.review.v1alpha1.ReviewAppService.ReplyReview:output_type -> hawkr.review.v1alpha1.ReplyReviewResponse
+	17, // 30: hawkr.review.v1alpha1.ReviewAppService.CreateReview:output_type -> hawkr.review.v1alpha1.CreateReviewResponse
+	19, // 31: hawkr.review.v1alpha1.ReviewAppService.ListMyReviews:output_type -> hawkr.review.v1alpha1.ListMyReviewsResponse
+	21, // 32: hawkr.review.v1alpha1.ReviewAppService.ListOwnStoreReviews:output_type -> hawkr.review.v1alpha1.ListOwnStoreReviewsResponse
+	24, // [24:33] is the sub-list for method output_type
+	15, // [15:24] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
 	15, // [15:15] is the sub-list for extension extendee
 	0,  // [0:15] is the sub-list for field type_name
@@ -1471,15 +1580,15 @@ func file_hawkr_review_v1alpha1_review_proto_init() {
 	file_hawkr_review_v1alpha1_review_proto_msgTypes[2].OneofWrappers = []any{}
 	file_hawkr_review_v1alpha1_review_proto_msgTypes[3].OneofWrappers = []any{}
 	file_hawkr_review_v1alpha1_review_proto_msgTypes[5].OneofWrappers = []any{}
-	file_hawkr_review_v1alpha1_review_proto_msgTypes[16].OneofWrappers = []any{}
 	file_hawkr_review_v1alpha1_review_proto_msgTypes[18].OneofWrappers = []any{}
+	file_hawkr_review_v1alpha1_review_proto_msgTypes[20].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_review_v1alpha1_review_proto_rawDesc), len(file_hawkr_review_v1alpha1_review_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
