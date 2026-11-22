@@ -173,6 +173,11 @@ service InvoiceService {
 
     // seller 模組與 ADM 查賣家是否已具備開票能力（薄查詢，供其他服務判斷）。
     rpc GetSellerInvoiceCapabilitySimple(GetSellerInvoiceCapabilitySimpleRequest) returns (GetSellerInvoiceCapabilitySimpleResponse);
+
+    // 單體（platform/bizcalendar，假日資料的擁有者）推送行事曆鏡像：帶入涵蓋區間與區間內的假日，
+    // 同一交易內整段覆蓋鏡像與涵蓋區間。任何一個日期不合就整批拒絕、不改鏡像。冪等：同一批重送結果相同。
+    // 這支 RPC 與單體的推送隨 A5（invoice 搬進單體）刪除。
+    rpc ReplaceBusinessDayMirror(ReplaceBusinessDayMirrorRequest) returns (ReplaceBusinessDayMirrorResponse);
 }
 
 // ==================== 共用子 message ====================
@@ -1849,4 +1854,19 @@ message GetSellerInvoiceCapabilitySimpleResponse {
     int32 code = 1;
     string message = 2;
     GetSellerInvoiceCapabilitySimpleData data = 3;
+}
+
+// ReplaceBusinessDayMirror — 單體在每次匯入假日行事曆成功後與每天一次的對帳呼叫。
+message ReplaceBusinessDayMirrorRequest {
+    string covered_from = 1;             // 涵蓋區間起日（含），台北日 YYYY-MM-DD
+    string covered_to = 2;               // 涵蓋區間迄日（含），台北日 YYYY-MM-DD；必須 >= covered_from
+    repeated string holiday_dates = 3;   // 區間內放假的日期 YYYY-MM-DD，必須都落在 [covered_from, covered_to]；重複的日期視為一天
+}
+message ReplaceBusinessDayMirrorData {
+    string holiday_count = 1;            // 寫入的假日天數（去重後）
+}
+message ReplaceBusinessDayMirrorResponse {
+    int32 code = 1;
+    string message = 2;
+    ReplaceBusinessDayMirrorData data = 3;
 }
