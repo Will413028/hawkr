@@ -61,6 +61,8 @@ dependencies:
   # 共用文案目錄（由 backend/internal/platform/uitext 生成），與另一支 App 共用。
   hawkr_ui_text:
     path: ../packages/hawkr_ui_text
+  # ARB 生成碼用；釘 flutter_localizations 要求的版本（與 hawkr_ui_text 相同）。
+  intl: 0.20.3
   dio: ^5.4.0
   sentry_flutter: ^9.25.0
   sentry_dio: ^9.25.0
@@ -140,6 +142,7 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  generate: true
 
   assets:
     - assets/brand/

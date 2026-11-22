@@ -1,0 +1,7 @@
+{
+  "@@locale": "zh",
+  "languageName": "繁體中文",
+  "@languageName": {
+    "description": "This language's own name, shown in a language picker. Never translated: each locale spells its own name."
+  }
+}

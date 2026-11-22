@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show SemanticsHandle;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
+import 'package:hawkr_ui_text/hawkr_ui_text.dart' show UiLocale;
+import '../core/l10n/ui_locale.dart';
 import '../core/layout/app_media_query_policy.dart';
+import '../l10n/gen/app_localizations.dart';
 import '../core/layout/app_text_size.dart';
 import '../features/cart/presentation/cart_typography.dart';
 import '../core/theme/app_colors.dart';
@@ -116,6 +119,9 @@ class _BuyerComponentCatalogAppState extends State<BuyerComponentCatalogApp> {
         title: 'Hawkr · 買家元件庫',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
+        locale: UiLocale.zhTW.flutterLocale,
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         builder: (context, child) => MediaQuery(
           data: AppMediaQueryPolicy.apply(
             MediaQuery.of(
