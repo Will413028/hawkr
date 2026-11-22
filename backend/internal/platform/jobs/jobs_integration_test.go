@@ -178,7 +178,7 @@ func TestCancelJobReportsTheStateAfterCancelling(t *testing.T) {
 	var state rivertype.JobState
 	if err := d.InTx(context.Background(), func(ctx context.Context) error {
 		var err error
-		state, err = c.CancelJob(ctx, id)
+		state, _, err = c.CancelJob(ctx, id)
 		return err
 	}); err != nil {
 		t.Fatal(err)
@@ -188,22 +188,22 @@ func TestCancelJobReportsTheStateAfterCancelling(t *testing.T) {
 	}
 }
 
-func TestCancelJobTreatsAMissingJobRowAsCancelled(t *testing.T) {
+func TestCancelJobReportsAMissingJobRowAsNotFound(t *testing.T) {
 	t.Parallel()
 	d := migrated(t)
 	c, err := jobs.NewInsertOnly(d)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var state rivertype.JobState
+	var found bool
 	if err := d.InTx(context.Background(), func(ctx context.Context) error {
 		var err error
-		state, err = c.CancelJob(ctx, 987654321)
+		_, found, err = c.CancelJob(ctx, 987654321)
 		return err
 	}); err != nil {
 		t.Fatalf("job 列不存在不該是錯誤：%v", err)
 	}
-	if state != rivertype.JobStateCancelled {
-		t.Fatalf("job 列不存在的狀態 = %s，預期 cancelled", state)
+	if found {
+		t.Fatal("job 列不存在 found 應為 false")
 	}
 }

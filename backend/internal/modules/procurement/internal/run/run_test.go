@@ -6,12 +6,15 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -241,5 +244,42 @@ func TestAcceptedPayloadCarriesTheConversationID(t *testing.T) {
 	}
 	if _, has := read(nil)["conversationId"]; has {
 		t.Fatal("沒有對話時不寫 conversationId")
+	}
+}
+
+func TestRunLockingPathsGoThroughTheOrderedLockHelpers(t *testing.T) {
+	read := func(name string) string {
+		b, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	for _, name := range []string{"cancel.go", "dispatch.go", "submit.go"} {
+		if strings.Contains(read(name), ".LockRun(") {
+			t.Errorf("%s 不得直接鎖 run，要經 Ledger.lockRun（鎖順序：提問的 run、中斷、回答的 run）", name)
+		}
+	}
+	rec := read("reconcile.go")
+	ask, lock := strings.Index(rec, "Ledger.lockAskingOf("), strings.Index(rec, ".LockActiveRun(")
+	if ask < 0 || lock < 0 || ask > lock {
+		t.Error("reconcileOne 要先 lockAskingOf 再 LockActiveRun")
+	}
+	for _, name := range []string{"cancel.go", "dispatch.go", "submit.go"} {
+		if !strings.Contains(read(name), "Ledger.lockRun(") {
+			t.Errorf("%s 沒有經 lockRun 鎖 run", name)
+		}
+	}
+}
+
+func TestLockErrMapsAMissingRowToNotFound(t *testing.T) {
+	if apperr.KindOf(lockErr(pgx.ErrNoRows, "鎖提問的 run")) != apperr.KindNotFound {
+		t.Fatal("ErrNoRows 要對應 NOT_FOUND")
+	}
+	if claimed, err := claimResult(lockErr(pgx.ErrNoRows, "鎖被回答的中斷")); claimed || err != nil {
+		t.Fatalf("NOT_FOUND 要讓領取略過：%v %v", claimed, err)
+	}
+	if apperr.KindOf(lockErr(errors.New("boom"), "x")) == apperr.KindNotFound {
+		t.Fatal("其他錯誤不是 NOT_FOUND")
 	}
 }

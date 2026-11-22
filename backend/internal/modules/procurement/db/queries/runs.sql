@@ -52,12 +52,11 @@ SELECT * FROM procurement.agent_runs
 WHERE id = @id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 FOR UPDATE SKIP LOCKED;
 
--- name: LockWaitingRunIDs :many
--- 同一個買家、同一個需求裡等待輸入的 run（每個需求最多一筆 PENDING 中斷的索引也是以需求為單位）；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
+-- name: ListWaitingRunIDs :many
+-- 同一個買家、同一個需求裡等待輸入的 run（每個需求最多一筆 PENDING 中斷的索引也是以需求為單位）；不鎖：呼叫端依全域鎖順序（提問的 run、中斷、回答的 run）逐個鎖並重讀狀態。
 SELECT id FROM procurement.agent_runs
 WHERE buyer_id = @buyer_id AND request_id = @request_id AND status = 'WAITING_FOR_INPUT'
-ORDER BY id
-FOR UPDATE;
+ORDER BY id;
 
 -- name: LockInProgressAnswerRuns :many
 -- 回答 @run_id 的中斷、還在進行中（排隊或執行中）的回答 run；提問的 run 被取消或被取代時一併要求取消它們。

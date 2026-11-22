@@ -358,8 +358,8 @@ func TestCancelRequestsCancellationAndCancelsTheJobInOneTransaction(t *testing.T
 
 type failingCancelJobs struct{ recordingJobs }
 
-func (*failingCancelJobs) CancelJob(context.Context, int64) (rivertype.JobState, error) {
-	return "", errors.New("river 取消失敗")
+func (*failingCancelJobs) CancelJob(context.Context, int64) (rivertype.JobState, bool, error) {
+	return "", false, errors.New("river 取消失敗")
 }
 
 func TestCancelRollsBackTheTransitionWhenTheJobCannotBeCancelled(t *testing.T) {

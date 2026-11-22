@@ -431,6 +431,38 @@ func (q *Queries) ListRunEventsAfter(ctx context.Context, arg ListRunEventsAfter
 	return items, nil
 }
 
+const listWaitingRunIDs = `-- name: ListWaitingRunIDs :many
+SELECT id FROM procurement.agent_runs
+WHERE buyer_id = $1 AND request_id = $2 AND status = 'WAITING_FOR_INPUT'
+ORDER BY id
+`
+
+type ListWaitingRunIDsParams struct {
+	BuyerID   int64
+	RequestID uuid.UUID
+}
+
+// 同一個買家、同一個需求裡等待輸入的 run（每個需求最多一筆 PENDING 中斷的索引也是以需求為單位）；不鎖：呼叫端依全域鎖順序（提問的 run、中斷、回答的 run）逐個鎖並重讀狀態。
+func (q *Queries) ListWaitingRunIDs(ctx context.Context, arg ListWaitingRunIDsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listWaitingRunIDs, arg.BuyerID, arg.RequestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockActiveRun = `-- name: LockActiveRun :one
 SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
 WHERE id = $1 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
@@ -577,39 +609,6 @@ func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRu
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const lockWaitingRunIDs = `-- name: LockWaitingRunIDs :many
-SELECT id FROM procurement.agent_runs
-WHERE buyer_id = $1 AND request_id = $2 AND status = 'WAITING_FOR_INPUT'
-ORDER BY id
-FOR UPDATE
-`
-
-type LockWaitingRunIDsParams struct {
-	BuyerID   int64
-	RequestID uuid.UUID
-}
-
-// 同一個買家、同一個需求裡等待輸入的 run（每個需求最多一筆 PENDING 中斷的索引也是以需求為單位）；鎖住它們，讓新的一輪在同一個 transaction 內把它們取消。
-func (q *Queries) LockWaitingRunIDs(ctx context.Context, arg LockWaitingRunIDsParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, lockWaitingRunIDs, arg.BuyerID, arg.RequestID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const nextRunSeq = `-- name: NextRunSeq :one

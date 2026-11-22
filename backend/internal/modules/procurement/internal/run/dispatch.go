@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -98,12 +97,12 @@ func settleOutcome(status, runType string, jobCtxErr error) outcome {
 // settleFailure 在 executor 失敗後收斂 run；已在終態或已被刪除什麼都不做。
 func (d Dispatcher) settleFailure(ctx context.Context, run store.ProcurementAgentRun, jobCtxErr error) error {
 	return d.DB.InTx(ctx, func(ctx context.Context) error {
-		cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)
-		if errors.Is(err, pgx.ErrNoRows) {
+		cur, err := d.Ledger.lockRun(ctx, run.ID)
+		if apperr.KindOf(err) == apperr.KindNotFound {
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("run：讀取 run：%w", err)
+			return err
 		}
 		err = d.Ledger.converge(ctx, run.ID, settleOutcome(cur.Status, run.RunType, jobCtxErr))
 		if errors.Is(err, ErrRunTerminal) {

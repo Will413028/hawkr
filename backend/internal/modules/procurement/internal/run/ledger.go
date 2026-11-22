@@ -154,28 +154,48 @@ func (l Ledger) commitTransition(ctx context.Context, runID uuid.UUID, to, failu
 	return out, err
 }
 
-// lockAskingOf 在 run 是回答 run 時先鎖提問的 run 與被回答的中斷：全域鎖順序是提問的 run、中斷、回答的 run（取消、取代與 Resume 相同），
-// 回答的提交點若先鎖自己的列再鎖提問的 run，會與取消互相等待。run 不存在或不是回答 run 時什麼都不鎖。
+// lockAskingOf 在 run 是回答 run 時先鎖提問的 run 與被回答的中斷：全域鎖順序是提問的 run、中斷、回答的 run，
+// 每條會鎖回答 run 的路徑（回答的提交點、取消、取代、settleFailure、reconciler）都先經這裡或 lockRun，否則兩條路徑互相等待。
+// run、提問的 run 或中斷已被刪除回 NOT_FOUND（與刪除後的轉換同一個結果）；不是回答 run 時只讀不鎖。
 func (l Ledger) lockAskingOf(ctx context.Context, runID uuid.UUID) error {
 	q := store.New(l.DB.Conn(ctx))
 	r, err := q.GetRun(ctx, runID)
-	if errors.Is(err, pgx.ErrNoRows) || err == nil && r.InterruptID == nil {
-		return nil
-	}
 	if err != nil {
-		return fmt.Errorf("run：讀取 run：%w", err)
+		return lockErr(err, "讀取 run")
+	}
+	if r.InterruptID == nil {
+		return nil
 	}
 	irq, err := q.GetInterrupt(ctx, *r.InterruptID)
 	if err != nil {
-		return fmt.Errorf("run：讀取被回答的中斷：%w", err)
+		return lockErr(err, "讀取被回答的中斷")
 	}
 	if _, err := q.LockRun(ctx, irq.RunID); err != nil {
-		return fmt.Errorf("run：鎖提問的 run：%w", err)
+		return lockErr(err, "鎖提問的 run")
 	}
 	if _, err := q.LockInterrupt(ctx, irq.ID); err != nil {
-		return fmt.Errorf("run：鎖被回答的中斷：%w", err)
+		return lockErr(err, "鎖被回答的中斷")
 	}
 	return nil
+}
+
+// lockRun 依全域鎖順序鎖住 run（先 lockAskingOf 再鎖它自己）並回傳鎖住的列；不存在回 NOT_FOUND。
+func (l Ledger) lockRun(ctx context.Context, runID uuid.UUID) (store.ProcurementAgentRun, error) {
+	if err := l.lockAskingOf(ctx, runID); err != nil {
+		return store.ProcurementAgentRun{}, err
+	}
+	r, err := store.New(l.DB.Conn(ctx)).LockRun(ctx, runID)
+	if err != nil {
+		return store.ProcurementAgentRun{}, lockErr(err, "鎖 run")
+	}
+	return r, nil
+}
+
+func lockErr(err error, what string) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.NotFound("找不到這個 run")
+	}
+	return fmt.Errorf("run：%s：%w", what, err)
 }
 
 func (l Ledger) transition(ctx context.Context, runID uuid.UUID, to, failureReason string, from []string) (store.ProcurementAgentRun, error) {

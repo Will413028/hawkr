@@ -2,10 +2,8 @@ package run
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river/rivertype"
 	"uuid"
 
@@ -40,24 +38,22 @@ type CancelOutcome struct {
 func (c Canceller) Cancel(ctx context.Context, buyerID int64, runID uuid.UUID) (CancelOutcome, error) {
 	var out CancelOutcome
 	err := c.DB.InTx(ctx, func(ctx context.Context) error {
-		r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)
-		if errors.Is(err, pgx.ErrNoRows) || err == nil && r.BuyerID != buyerID {
-			return apperr.NotFound("找不到這個 run")
-		}
+		r, err := c.Ledger.lockRun(ctx, runID)
 		if err != nil {
-			return fmt.Errorf("run：讀取 run：%w", err)
+			return err
+		}
+		if r.BuyerID != buyerID {
+			return apperr.NotFound("找不到這個 run")
 		}
 		switch r.Status {
 		case StatusCancelled:
 			out = CancelOutcome{Status: r.Status, Disposition: DispositionAlreadyCancelled}
-		case StatusCancelRequested:
-			out = CancelOutcome{Status: r.Status, Disposition: DispositionRequested}
 		case StatusWaitingForInput:
 			if err := cancelWaiting(ctx, c.DB, c.Ledger, c.Jobs, r.ID); err != nil {
 				return err
 			}
 			out = CancelOutcome{Status: StatusCancelled, Disposition: DispositionRequested}
-		case StatusQueued, StatusRunning:
+		case StatusQueued, StatusRunning, StatusCancelRequested:
 			return c.request(ctx, r, &out)
 		default:
 			out = CancelOutcome{Status: r.Status, Disposition: DispositionAlreadyTerminal}
@@ -76,18 +72,31 @@ func (c Canceller) request(ctx context.Context, r store.ProcurementAgentRun, out
 	return nil
 }
 
-// requestCancel 要求取消一個排隊或執行中的 run（呼叫端已鎖它）：轉 CANCEL_REQUESTED 並取消 River job，同一個 transaction；
-// job 已被 River 直接取消（沒有 executor 會領它）的直接轉 CANCELLED。回傳命令之後 run 的狀態。
+// requestCancel 要求取消一個排隊、執行中或已要求取消的 run（呼叫端已鎖它）：轉 CANCEL_REQUESTED 並取消 River job，同一個 transaction；
+// job 已被 River 直接取消（沒有 executor 會領它）的直接轉 CANCELLED；job 列已不存在的照 reconciler 收斂（A9-D22、A9-D23(3)）：
+// 排隊或執行中是 FAILED／WORKER_LOST 並退額度，已要求取消的是 CANCELLED 不退額度。回傳命令之後 run 的狀態。
 func requestCancel(ctx context.Context, l Ledger, jobs JobQueue, r store.ProcurementAgentRun) (string, error) {
 	if r.JobID == nil {
 		return "", fmt.Errorf("run：%s 沒有 job，無法取消", r.ID)
 	}
-	if _, err := l.Transition(ctx, r.ID, StatusCancelRequested, ""); err != nil {
-		return "", err
-	}
-	state, err := jobs.CancelJob(ctx, *r.JobID)
+	state, found, err := jobs.CancelJob(ctx, *r.JobID)
 	if err != nil {
 		return "", err
+	}
+	if !found {
+		o := decide(r, "", false)
+		if err := l.converge(ctx, r.ID, o); err != nil {
+			return "", err
+		}
+		if o.action == actionCancel {
+			return StatusCancelled, nil
+		}
+		return StatusFailed, nil
+	}
+	if r.Status != StatusCancelRequested {
+		if _, err := l.Transition(ctx, r.ID, StatusCancelRequested, ""); err != nil {
+			return "", err
+		}
 	}
 	if jobCancelledBeforeStart(state) {
 		if _, err := l.Transition(ctx, r.ID, StatusCancelled, ""); err != nil {

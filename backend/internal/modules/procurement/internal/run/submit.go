@@ -30,10 +30,10 @@ func (RunArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{MaxAttempts: 1}
 }
 
-// JobQueue 是 run 需要的 River 操作：排入並取回 job id、取消 job 並回傳取消之後 job 的狀態。ctx 裡有 transaction 時都在該 transaction 內執行。
+// JobQueue 是 run 需要的 River 操作：排入並取回 job id、取消 job 並回傳取消之後 job 的狀態（job 列已不存在時 found 為 false）。ctx 裡有 transaction 時都在該 transaction 內執行。
 type JobQueue interface {
 	EnqueueJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (jobID int64, err error)
-	CancelJob(ctx context.Context, jobID int64) (rivertype.JobState, error)
+	CancelJob(ctx context.Context, jobID int64) (state rivertype.JobState, found bool, err error)
 }
 
 // 每位買家的上限（A9-D24(6)）。進行中指 QUEUED、RUNNING、CANCEL_REQUESTED：有 job 在跑或將要跑，佔 LLM 與 worker 的資源；
@@ -77,7 +77,8 @@ type SubmitInput struct {
 	PeriodEnd       time.Time
 }
 
-// Submitter 是送出路徑：同一個 transaction 內冪等建 run、檢查買家上限、TURN 扣一次額度、自動取消同對話等待輸入的舊 run（A9-D23）、寫輸入與第一個事件、排入 job 並記下 job id。
+// Submitter 是送出路徑：同一個 transaction 內冪等建 run、檢查買家上限、TURN 扣一次額度、寫輸入與第一個事件、排入 job 並記下 job id。
+// 只有 TURN 會取代同一個需求（request_id）裡等待輸入的 run（A9-D23(2)）：把它們與它們的 PENDING 中斷轉 CANCELLED，並要求取消進行中的回答 run；其餘類型不動它們。
 type Submitter struct {
 	DB     *db.DB
 	Ledger Ledger
@@ -128,8 +129,10 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (uuid.UUID, error
 				return fmt.Errorf("run：扣額度：%w", err)
 			}
 		}
-		if err := s.cancelSuperseded(ctx, q, in.BuyerID, in.RequestID); err != nil {
-			return err
+		if in.RunType == RunTypeTurn {
+			if err := s.cancelSuperseded(ctx, q, in.BuyerID, in.RequestID); err != nil {
+				return err
+			}
 		}
 		return s.start(ctx, q, id, in.Message, in.ConversationID, now)
 	})
@@ -204,12 +207,20 @@ func (s Submitter) start(ctx context.Context, q *store.Queries, id uuid.UUID, me
 }
 
 // cancelSuperseded 把同一個需求裡等待輸入的 run 轉 CANCELLED（不退額度，它的 PENDING 中斷與進行中的回答 run 一併取消）：新的一輪取代它，之後不會再有人回答。
+// 只有 TURN 取代（A9-D23(2)）；逐個依全域鎖順序鎖住並重讀狀態，已被別處收斂的略過。
 func (s Submitter) cancelSuperseded(ctx context.Context, q *store.Queries, buyerID int64, requestID uuid.UUID) error {
-	ids, err := q.LockWaitingRunIDs(ctx, store.LockWaitingRunIDsParams{BuyerID: buyerID, RequestID: requestID})
+	ids, err := q.ListWaitingRunIDs(ctx, store.ListWaitingRunIDsParams{BuyerID: buyerID, RequestID: requestID})
 	if err != nil {
 		return fmt.Errorf("run：列出等待輸入的 run：%w", err)
 	}
 	return cancelAll(ctx, ids, func(ctx context.Context, id uuid.UUID) error {
+		r, err := s.Ledger.lockRun(ctx, id)
+		if apperr.KindOf(err) == apperr.KindNotFound || err == nil && r.Status != StatusWaitingForInput {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
 		return cancelWaiting(ctx, s.DB, s.Ledger, s.Jobs, id)
 	})
 }

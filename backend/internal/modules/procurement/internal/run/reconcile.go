@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
@@ -162,6 +163,12 @@ func reconcileEach(ctx context.Context, tx txRunner, ids []uuid.UUID, process fu
 }
 
 func (r Reconciler) reconcileOne(ctx context.Context, states JobStates, id uuid.UUID) (action, error) {
+	if err := r.Ledger.lockAskingOf(ctx, id); err != nil {
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			return actionSkip, nil
+		}
+		return actionSkip, err
+	}
 	row, err := store.New(r.DB.Conn(ctx)).LockActiveRun(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return actionSkip, nil

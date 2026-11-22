@@ -5,7 +5,8 @@
   "old": "func ChargesQuota(runType string) bool { return runType == RunTypeTurn }",
   "new": "func ChargesQuota(runType string) bool { return true }",
   "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/internal/run/ -run '^TestOnlyTurnRunsChargeQuota$'",
-  "expect": "TestOnlyTurnRunsChargeQuota"
+  "expect": "TestOnlyTurnRunsChargeQuota",
+  "note": "schema CHECK agent_runs_quota_check（quota_period_start 只屬於 TURN）由整合斷言 TestRunsTableTiesTheQuotaPeriodToTurnRuns 守住：測試用 migrations 建庫，改已提交的 migration 只會被 atlas.sum 擋下，不是有意義的 mutation（同 3b-2a 的做法）"
  },
  {
   "id": "P1b",
@@ -168,14 +169,6 @@
   "expect": "TestPerRequestInProgressCheckComesBeforeTheBuyerWideLimit (integration)"
  },
  {
-  "id": "P22",
-  "file": "backend/internal/modules/procurement/db/migrations/20261121165341_procurement_run_quota_check.sql",
-  "old": "CHECK ((run_type = 'TURN'::text) = (quota_period_start IS NOT NULL))",
-  "new": "CHECK (true)",
-  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestRunsTableTiesTheQuotaPeriodToTurnRuns$'",
-  "expect": "TestRunsTableTiesTheQuotaPeriodToTurnRuns (integration)"
- },
- {
   "id": "P23",
   "file": "backend/internal/modules/procurement/internal/run/interrupt.go",
   "old": "\t\tif r.Status != StatusRunning {\n",
@@ -196,8 +189,8 @@
   "file": "backend/internal/platform/jobs/jobs.go",
   "old": "\tif errors.Is(err, river.ErrNotFound) {\n",
   "new": "\tif false {\n",
-  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/platform/jobs/ -run '^TestCancelJobTreatsAMissingJobRowAsCancelled$'",
-  "expect": "TestCancelJobTreatsAMissingJobRowAsCancelled (integration)"
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/platform/jobs/ -run '^TestCancelJobReportsAMissingJobRowAsNotFound$'",
+  "expect": "TestCancelJobReportsAMissingJobRowAsNotFound (integration)"
  },
  {
   "id": "P26",
@@ -206,5 +199,93 @@
   "new": "\tfor _, a := range answers[:0] {\n",
   "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun$'",
   "expect": "TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun (integration)"
+ },
+ {
+  "id": "P27",
+  "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+  "old": "r, err := c.Ledger.lockRun(ctx, runID)",
+  "new": "r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)",
+  "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/internal/run/ -run '^TestRunLockingPathsGoThroughTheOrderedLockHelpers$'",
+  "expect": "TestRunLockingPathsGoThroughTheOrderedLockHelpers"
+ },
+ {
+  "id": "P27b",
+  "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+  "old": "r, err := c.Ledger.lockRun(ctx, runID)",
+  "new": "r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerCommitRacingWithEveryLockingPathNeitherDeadlocksNorSplitsState$/cancel_answer'",
+  "expect": "TestAnswerCommitRacingWithEveryLockingPath.../cancel_answer (integration)"
+ },
+ {
+  "id": "P28",
+  "file": "backend/internal/modules/procurement/internal/run/dispatch.go",
+  "old": "cur, err := d.Ledger.lockRun(ctx, run.ID)",
+  "new": "cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerCommitRacingWithEveryLockingPathNeitherDeadlocksNorSplitsState$/settle_failure'",
+  "expect": "TestAnswerCommitRacingWithEveryLockingPath.../settle_failure (integration)"
+ },
+ {
+  "id": "P29",
+  "file": "backend/internal/modules/procurement/internal/run/reconcile.go",
+  "old": "if err := r.Ledger.lockAskingOf(ctx, id); err != nil {",
+  "new": "if err := error(nil); err != nil {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestAnswerCommitRacingWithEveryLockingPathNeitherDeadlocksNorSplitsState$/reconcile'",
+  "expect": "TestAnswerCommitRacingWithEveryLockingPath.../reconcile (integration)"
+ },
+ {
+  "id": "P29b",
+  "file": "backend/internal/modules/procurement/internal/run/reconcile.go",
+  "old": "if err := r.Ledger.lockAskingOf(ctx, id); err != nil {",
+  "new": "if err := error(nil); err != nil {",
+  "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/internal/run/ -run '^TestRunLockingPathsGoThroughTheOrderedLockHelpers$'",
+  "expect": "TestRunLockingPathsGoThroughTheOrderedLockHelpers"
+ },
+ {
+  "id": "P30",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "func lockErr(err error, what string) error {\n\tif errors.Is(err, pgx.ErrNoRows) {",
+  "new": "func lockErr(err error, what string) error {\n\tif false {",
+  "cmd": "GOWORK=off go test -count=1 ./internal/modules/procurement/internal/run/ -run '^TestLockErrMapsAMissingRowToNotFound$'",
+  "expect": "TestLockErrMapsAMissingRowToNotFound"
+ },
+ {
+  "id": "P30b",
+  "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+  "old": "func lockErr(err error, what string) error {\n\tif errors.Is(err, pgx.ErrNoRows) {",
+  "new": "func lockErr(err error, what string) error {\n\tif false {",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^(TestDispatcherSkipsAnAnswerRunWhoseAskingRunIsGone|TestLockingAnAnswerRunWhoseAskingRunIsGoneIsNotFound)$'",
+  "expect": "TestLockingAnAnswerRunWhoseAskingRunIsGoneIsNotFound (integration)"
+ },
+ {
+  "id": "P31",
+  "file": "backend/internal/modules/procurement/internal/run/submit.go",
+  "old": "\t\tif in.RunType == RunTypeTurn {\n",
+  "new": "\t\tif true {\n",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestOnlyTurnSubmitSupersedesWaitingRuns$'",
+  "expect": "TestOnlyTurnSubmitSupersedesWaitingRuns (integration)"
+ },
+ {
+  "id": "P32",
+  "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+  "old": "\tif !found {\n",
+  "new": "\tif false {\n",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler$'",
+  "expect": "TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler (integration)"
+ },
+ {
+  "id": "P33",
+  "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+  "old": "case StatusQueued, StatusRunning, StatusCancelRequested:",
+  "new": "case StatusQueued, StatusRunning:",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler$'",
+  "expect": "TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler/cancel_requested (integration)"
+ },
+ {
+  "id": "P34",
+  "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+  "old": "o := decide(r, \"\", false)",
+  "new": "o := decide(store.ProcurementAgentRun{Status: StatusQueued}, \"\", false)",
+  "cmd": "GOWORK=off go test -count=1 -tags integration ./internal/modules/procurement/internal/run/ -run '^TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler$'",
+  "expect": "TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler/cancel_requested (integration)"
  }
 ]
