@@ -1,3 +1,4 @@
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -15,14 +16,15 @@ import 'package:path/path.dart' as p;
 import '../../../core/codemeta/code_meta.dart';
 import '../../../core/codemeta/code_meta_display.dart';
 import '../../../core/exceptions/app_exception.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../customer/data/customer_model.dart';
 import '../../customer/data/customer_repository.dart';
 import '../data/coupon_model.dart';
-import '../data/coupon_repository.dart';
 import 'coupon_controller.dart';
+import 'widgets/customer_picker_sheet.dart';
 import 'widgets/date_picker_card.dart';
 import 'widgets/form_card.dart';
 import 'widgets/preview_card.dart';
@@ -86,14 +88,11 @@ class CouponEditorScreen extends HookConsumerWidget {
 
     // Target user state
     final targetUserType = useState('全部會員');
-    final phoneSearchCtrl = useTextEditingController();
     final selectedUsers = useState<List<Map<String, String>>>([]);
-    final isLookingUp = useState(false);
-    final lookupError = useState<String?>(null);
 
     // TAG 標籤狀態
     final allTags = useState<List<CustomerTag>>([]);
-    final selectedTagIds = useState<Set<int>>({});
+    final selectedTagIds = useState<Set<String>>({});
     final tagCustomers = useState<List<Customer>>([]);
     final tagLoading = useState(false);
 
@@ -272,58 +271,23 @@ class CouponEditorScreen extends HookConsumerWidget {
       }
     }
 
-    Future<void> onAddUser() async {
-      final searchText = phoneSearchCtrl.text.trim();
-      if (searchText.isEmpty) {
-        FloatingToast.error(context, '請輸入手機號碼');
-        return;
-      }
-      if (isLookingUp.value) return;
-
-      // Check for duplicates
-      final alreadyAdded = selectedUsers.value.any(
-        (u) => u['accountId'] == searchText || u['phone'] == searchText,
+    Future<void> onPickUsers() async {
+      final picked = await showCouponCustomerPicker(
+        context,
+        excludedIds: {
+          for (final u in selectedUsers.value) u['accountId'] ?? '',
+        },
       );
-      if (alreadyAdded) {
-        FloatingToast.error(context, '該用戶已添加');
-        return;
-      }
-
-      isLookingUp.value = true;
-      lookupError.value = null;
-      try {
-        final repo = ref.read(couponRepositoryProvider);
-        final result = await repo.lookupByPhone(searchText);
-
-        if (!context.mounted) return;
-
-        // 用 uid 做去重
-        final alreadyExists = selectedUsers.value.any(
-          (u) => u['accountId'] == result.uid,
-        );
-        if (alreadyExists) {
-          FloatingToast.error(context, '該用戶已添加');
-          return;
-        }
-
-        selectedUsers.value = [
-          ...selectedUsers.value,
+      if (picked == null || picked.isEmpty || !context.mounted) return;
+      selectedUsers.value = [
+        ...selectedUsers.value,
+        for (final c in picked)
           {
-            'name': result.buyerName.isNotEmpty ? result.buyerName : '用戶',
-            'accountId': result.uid,
-            'phone': result.phone,
-            'avatarUrl': result.avatarUrl ?? '',
+            'name': c.displayName,
+            'accountId': c.id,
+            'avatarUrl': c.avatarUrl ?? '',
           },
-        ];
-        phoneSearchCtrl.clear();
-        lookupError.value = null;
-      } on AppException catch (e) {
-        lookupError.value = e.message;
-      } catch (_) {
-        lookupError.value = '查詢失敗，請稍後再試';
-      } finally {
-        isLookingUp.value = false;
-      }
+      ];
     }
 
     // Touch formVersion to stay reactive
@@ -455,11 +419,8 @@ class CouponEditorScreen extends HookConsumerWidget {
                             // Specify user card（僅指定會員時顯示）
                             if (targetUserType.value == '指定會員') ...[
                               CouponSpecifyUserCard(
-                                phoneSearchCtrl: phoneSearchCtrl,
                                 selectedUsers: selectedUsers.value,
-                                isLoading: isLookingUp.value,
-                                errorMessage: lookupError.value,
-                                onAddUser: onAddUser,
+                                onPickUsers: onPickUsers,
                                 onRemoveUser: (index) {
                                   final list = [...selectedUsers.value];
                                   list.removeAt(index);
@@ -482,18 +443,29 @@ class CouponEditorScreen extends HookConsumerWidget {
                                   try {
                                     final tags = await ref
                                         .read(customerRepositoryProvider)
-                                        .getSellerTags();
+                                        .listTags();
                                     allTags.value = tags;
-                                  } catch (_) {}
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      FloatingToast.error(
+                                        context,
+                                        errorText(
+                                          e,
+                                          defaults: ref.read(
+                                            defaultErrorTextProvider,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
                                   tagLoading.value = false;
                                 },
                                 onTagToggled: (tagId) async {
-                                  final newSet = Set<int>.from(
-                                    selectedTagIds.value,
-                                  );
-                                  newSet.contains(tagId)
-                                      ? newSet.remove(tagId)
-                                      : newSet.add(tagId);
+                                  // 發券對象一次只依一個標籤篩選（CRM 的 `tag_id` 是單一標籤）。
+                                  final newSet =
+                                      selectedTagIds.value.contains(tagId)
+                                      ? <String>{}
+                                      : {tagId};
                                   selectedTagIds.value = newSet;
                                   if (newSet.isEmpty) {
                                     tagCustomers.value = [];
@@ -503,11 +475,19 @@ class CouponEditorScreen extends HookConsumerWidget {
                                   try {
                                     tagCustomers.value = await ref
                                         .read(customerRepositoryProvider)
-                                        .getCustomers(
-                                          tagId: newSet.first,
-                                          pageSize: 100,
-                                        );
-                                  } catch (_) {
+                                        .listAllCustomersWithTag(newSet.first);
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      FloatingToast.error(
+                                        context,
+                                        errorText(
+                                          e,
+                                          defaults: ref.read(
+                                            defaultErrorTextProvider,
+                                          ),
+                                        ),
+                                      );
+                                    }
                                     tagCustomers.value = [];
                                   }
                                   tagLoading.value = false;

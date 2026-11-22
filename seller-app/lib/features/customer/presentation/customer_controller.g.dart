@@ -42,7 +42,7 @@ final class CustomerFilterNotifierProvider
 }
 
 String _$customerFilterNotifierHash() =>
-    r'94becf719d4470d9dc89211441d30afc17242ae7';
+    r'e89be7e72daf293ee652a8a30135bba017ffceaf';
 
 abstract class _$CustomerFilterNotifier extends $Notifier<CustomerFilter> {
   CustomerFilter build();
@@ -62,22 +62,16 @@ abstract class _$CustomerFilterNotifier extends $Notifier<CustomerFilter> {
   }
 }
 
-@ProviderFor(customerListNotifier)
-final customerListProvider = CustomerListNotifierProvider._();
+@ProviderFor(CustomerList)
+final customerListProvider = CustomerListProvider._();
 
-final class CustomerListNotifierProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Customer>>,
-          List<Customer>,
-          FutureOr<List<Customer>>
-        >
-    with $FutureModifier<List<Customer>>, $FutureProvider<List<Customer>> {
-  CustomerListNotifierProvider._()
+final class CustomerListProvider
+    extends $AsyncNotifierProvider<CustomerList, CustomerListState> {
+  CustomerListProvider._()
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: _noRetry,
         name: r'customerListProvider',
         isAutoDispose: true,
         dependencies: null,
@@ -85,47 +79,57 @@ final class CustomerListNotifierProvider
       );
 
   @override
-  String debugGetCreateSourceHash() => _$customerListNotifierHash();
+  String debugGetCreateSourceHash() => _$customerListHash();
 
   @$internal
   @override
-  $FutureProviderElement<List<Customer>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
+  CustomerList create() => CustomerList();
+}
 
+String _$customerListHash() => r'e1d20cfd4a23d1dae8107bc09b31facdf109ef33';
+
+abstract class _$CustomerList extends $AsyncNotifier<CustomerListState> {
+  FutureOr<CustomerListState> build();
+  @$mustCallSuper
   @override
-  FutureOr<List<Customer>> create(Ref ref) {
-    return customerListNotifier(ref);
+  void runBuild() {
+    final ref =
+        this.ref as $Ref<AsyncValue<CustomerListState>, CustomerListState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<CustomerListState>, CustomerListState>,
+              AsyncValue<CustomerListState>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
   }
 }
 
-String _$customerListNotifierHash() =>
-    r'47eb4487042189df9415b3f51e679f17bfead52b';
+/// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
 
 @ProviderFor(customerOrders)
 final customerOrdersProvider = CustomerOrdersFamily._();
 
+/// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
+
 final class CustomerOrdersProvider
     extends
         $FunctionalProvider<
-          AsyncValue<
-            ({List<OrderRecord> orders, List<SpendingRecord> spending})
-          >,
-          ({List<OrderRecord> orders, List<SpendingRecord> spending}),
-          FutureOr<({List<OrderRecord> orders, List<SpendingRecord> spending})>
+          AsyncValue<List<OrderRecord>>,
+          List<OrderRecord>,
+          FutureOr<List<OrderRecord>>
         >
     with
-        $FutureModifier<
-          ({List<OrderRecord> orders, List<SpendingRecord> spending})
-        >,
-        $FutureProvider<
-          ({List<OrderRecord> orders, List<SpendingRecord> spending})
-        > {
+        $FutureModifier<List<OrderRecord>>,
+        $FutureProvider<List<OrderRecord>> {
+  /// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
   CustomerOrdersProvider._({
     required CustomerOrdersFamily super.from,
     required String super.argument,
   }) : super(
-         retry: null,
+         retry: _noRetry,
          name: r'customerOrdersProvider',
          isAutoDispose: true,
          dependencies: null,
@@ -144,15 +148,12 @@ final class CustomerOrdersProvider
 
   @$internal
   @override
-  $FutureProviderElement<
-    ({List<OrderRecord> orders, List<SpendingRecord> spending})
-  >
-  $createElement($ProviderPointer pointer) => $FutureProviderElement(pointer);
+  $FutureProviderElement<List<OrderRecord>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<({List<OrderRecord> orders, List<SpendingRecord> spending})> create(
-    Ref ref,
-  ) {
+  FutureOr<List<OrderRecord>> create(Ref ref) {
     final argument = this.argument as String;
     return customerOrders(ref, argument);
   }
@@ -168,180 +169,28 @@ final class CustomerOrdersProvider
   }
 }
 
-String _$customerOrdersHash() => r'4e949b1c3d9563359bff323cd9483558545a422b';
+String _$customerOrdersHash() => r'491cd219b9d2b950adae74ef4c5664d9a2a5b646';
+
+/// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
 
 final class CustomerOrdersFamily extends $Family
-    with
-        $FunctionalFamilyOverride<
-          FutureOr<({List<OrderRecord> orders, List<SpendingRecord> spending})>,
-          String
-        > {
+    with $FunctionalFamilyOverride<FutureOr<List<OrderRecord>>, String> {
   CustomerOrdersFamily._()
     : super(
-        retry: null,
+        retry: _noRetry,
         name: r'customerOrdersProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  CustomerOrdersProvider call(String customerId) =>
-      CustomerOrdersProvider._(argument: customerId, from: this);
+  /// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
+
+  CustomerOrdersProvider call(String buyerId) =>
+      CustomerOrdersProvider._(argument: buyerId, from: this);
 
   @override
   String toString() => r'customerOrdersProvider';
-}
-
-@ProviderFor(customerCoupons)
-final customerCouponsProvider = CustomerCouponsFamily._();
-
-final class CustomerCouponsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<Coupon>>,
-          List<Coupon>,
-          FutureOr<List<Coupon>>
-        >
-    with $FutureModifier<List<Coupon>>, $FutureProvider<List<Coupon>> {
-  CustomerCouponsProvider._({
-    required CustomerCouponsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'customerCouponsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$customerCouponsHash();
-
-  @override
-  String toString() {
-    return r'customerCouponsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<Coupon>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<Coupon>> create(Ref ref) {
-    final argument = this.argument as String;
-    return customerCoupons(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is CustomerCouponsProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$customerCouponsHash() => r'62b4175f5820c20dc3902beae68b5eac294f56c7';
-
-final class CustomerCouponsFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<Coupon>>, String> {
-  CustomerCouponsFamily._()
-    : super(
-        retry: null,
-        name: r'customerCouponsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  CustomerCouponsProvider call(String customerId) =>
-      CustomerCouponsProvider._(argument: customerId, from: this);
-
-  @override
-  String toString() => r'customerCouponsProvider';
-}
-
-@ProviderFor(customerTags)
-final customerTagsProvider = CustomerTagsFamily._();
-
-final class CustomerTagsProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<CustomerTag>>,
-          List<CustomerTag>,
-          FutureOr<List<CustomerTag>>
-        >
-    with
-        $FutureModifier<List<CustomerTag>>,
-        $FutureProvider<List<CustomerTag>> {
-  CustomerTagsProvider._({
-    required CustomerTagsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'customerTagsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$customerTagsHash();
-
-  @override
-  String toString() {
-    return r'customerTagsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<CustomerTag>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<CustomerTag>> create(Ref ref) {
-    final argument = this.argument as String;
-    return customerTags(ref, argument);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is CustomerTagsProvider && other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$customerTagsHash() => r'b86cc038bba580031be69368103aba96517e7185';
-
-final class CustomerTagsFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<CustomerTag>>, String> {
-  CustomerTagsFamily._()
-    : super(
-        retry: null,
-        name: r'customerTagsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  CustomerTagsProvider call(String buyerId) =>
-      CustomerTagsProvider._(argument: buyerId, from: this);
-
-  @override
-  String toString() => r'customerTagsProvider';
 }
 
 @ProviderFor(sellerTags)
@@ -361,7 +210,7 @@ final class SellerTagsProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: _noRetry,
         name: r'sellerTagsProvider',
         isAutoDispose: true,
         dependencies: null,
@@ -383,4 +232,4 @@ final class SellerTagsProvider
   }
 }
 
-String _$sellerTagsHash() => r'6983b72b11b70c077ca71c5aed00e539cbd739b1';
+String _$sellerTagsHash() => r'78a0c708375b19d7b0f29f0179cbc3c401156640';

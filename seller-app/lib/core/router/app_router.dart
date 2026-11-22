@@ -27,7 +27,7 @@ import '../../features/customer/data/customer_repository.dart';
 import '../../features/customer/presentation/customer_detail_screen.dart';
 import '../../features/customer/presentation/customer_management_screen.dart';
 import '../../features/customer/presentation/customer_order_detail_screen.dart';
-import '../../features/customer/presentation/customer_spending_history_screen.dart';
+import '../../features/customer/presentation/customer_orders_screen.dart';
 import '../../features/customer/presentation/subscriber_list_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/notification/presentation/notification_settings_screen.dart';
@@ -109,7 +109,7 @@ class CustomerRoutes {
   static const customers = '/customers';
   static const subscribers = '/subscribers';
   static const detail = '/customer/detail';
-  static const spendingHistory = '/customer/spending-history';
+  static const orders = '/customer/orders';
   static const orderDetail = '/customer/order-detail';
 }
 
@@ -334,9 +334,8 @@ OrderSummary? _orderSummaryFromRouteState(GoRouterState state) {
 
 final _routeCustomerProvider = FutureProvider.autoDispose
     .family<Customer?, String>(
-      (ref, accountId) => ref
-          .read(customerRepositoryProvider)
-          .getCustomerByAccountId(accountId),
+      (ref, accountId) =>
+          ref.read(customerRepositoryProvider).getCustomer(accountId),
     );
 
 final _routeCouponProvider = FutureProvider.autoDispose.family<Coupon, String>((
@@ -589,28 +588,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: CustomerRoutes.spendingHistory,
+        path: CustomerRoutes.orders,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
           final extra = _extractExtraMap(state);
           final customerId = _extraMapValue<String>(extra, 'customerId');
           final customerName = _extraMapValue<String>(extra, 'customerName');
           if (customerId == null || customerName == null) {
-            return _invalidRouteData('顧客消費紀錄');
+            return _invalidRouteData('顧客訂單');
           }
-          return CustomerSpendingHistoryScreen(
-            customerName: customerName,
+          return CustomerOrdersScreen(
             customerId: customerId,
-            customerPhone: _extraMapValue<String>(extra, 'customerPhone') ?? '',
-            totalSpent: _extraMapValue<int>(extra, 'totalSpent') ?? 0,
-            totalRefund: _extraMapValue<int>(extra, 'totalRefund') ?? 0,
-            records:
-                _extraMapValue<List<SpendingRecord>>(extra, 'records') ??
-                const [],
-            orders:
-                _extraMapValue<List<OrderRecord>>(extra, 'orders') ?? const [],
-            coupons: _extraMapValue<List<Coupon>>(extra, 'coupons') ?? const [],
-            initialTab: _extractExtraValueWithDefault(state, 'initialTab', 0),
+            customerName: customerName,
           );
         },
       ),

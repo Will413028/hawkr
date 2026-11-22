@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as seller;
 import 'package:hawkr_api/images.dart';
@@ -12,13 +12,12 @@ import 'package:hawkr_seller/features/customer/data/subscriber_model.dart';
 import 'package:hawkr_seller/features/customer/data/subscriber_remote_service.dart';
 import 'package:hawkr_seller/features/customer/data/subscriber_repository.dart';
 import 'package:hawkr_seller/features/customer/presentation/subscriber_list_controller.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 void main() {
   test(
-    'repository maps BuyerCard fields with one request per page and no REST',
+    'repository maps BuyerCard fields with one request per page and no per-row customer lookup',
     () async {
       final requests = <seller.ListMyFollowersRequest>[];
       final service = SubscriberRemoteService(
@@ -48,16 +47,16 @@ void main() {
           }).build(),
         ),
       );
-      final restPaths = <String>[];
+      final customerCalls = <String>[];
       final repository = RemoteSubscriberRepository(
         remoteService: service,
-        customerRepository: _FakeCustomerRepository(restPaths),
+        customerRepository: _FakeCustomerRepository(customerCalls),
       );
 
       final page = await repository.loadSubscribers(size: 20);
 
       expect(requests, hasLength(1));
-      expect(restPaths, isEmpty, reason: 'no per-row metadata request');
+      expect(customerCalls, isEmpty, reason: 'no per-row metadata request');
       expect(page.nextPageToken, 'cursor-2');
       final [named, deleted] = page.subscribers;
       expect(named.buyerId, '1');
@@ -168,28 +167,20 @@ void main() {
   });
 }
 
-class _RecordingAdapter implements HttpClientAdapter {
-  _RecordingAdapter(this.paths);
-
-  final List<String> paths;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    paths.add(options.path);
-    return ResponseBody.fromString('{"code":0,"data":{}}', 200);
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
 class _FakeCustomerRepository extends CustomerRepository {
-  _FakeCustomerRepository(List<String> paths)
-    : super(Dio()..httpClientAdapter = _RecordingAdapter(paths));
+  _FakeCustomerRepository(this.calls)
+    : super(
+        CrmAppServiceClient(FakeTransportBuilder().build()),
+        storeId: () => '1',
+      );
+
+  final List<String> calls;
+
+  @override
+  Future<Customer?> getCustomer(String buyerId) async {
+    calls.add(buyerId);
+    return null;
+  }
 }
 
 class _FakeSubscriberRepository implements SubscriberRepository {
@@ -209,7 +200,7 @@ class _FakeSubscriberRepository implements SubscriberRepository {
   @override
   Future<Customer?> resolveCustomer(String accountId) async {
     resolvedAccountIds.add(accountId);
-    return Customer(id: 'customer-$accountId', name: '測試買家', phone: '');
+    return Customer(id: 'customer-$accountId', name: '測試買家');
   }
 }
 

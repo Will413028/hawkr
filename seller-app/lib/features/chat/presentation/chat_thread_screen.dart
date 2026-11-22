@@ -347,7 +347,7 @@ class ChatThreadScreen extends HookConsumerWidget {
         // 買家頭像從顧客 API 取得，非賣家 API
         final customer = await ref
             .read(customerRepositoryProvider)
-            .getCustomerByAccountId(pid);
+            .getCustomer(pid);
         if (customer != null) {
           final rawUrl = customer.avatarUrl?.toString() ?? '';
           final url = rawUrl.isNotEmpty
@@ -378,7 +378,7 @@ class ChatThreadScreen extends HookConsumerWidget {
       try {
         final customer = await ref
             .read(customerRepositoryProvider)
-            .getCustomerByAccountId(pid);
+            .getCustomer(pid);
         if (customer != null && customer.name.isNotEmpty && context.mounted) {
           peerName.value = customer.name;
         }

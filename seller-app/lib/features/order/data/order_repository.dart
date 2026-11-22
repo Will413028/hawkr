@@ -25,6 +25,7 @@ class OrderRepository with ApiRequestHelper {
     int page = 1,
     int pageSize = 10,
     String? status,
+    String? buyerId,
   }) async {
     HKLog.logD(
       '[OrderRepository] fetchMatchedOrders page=$page pageSize=$pageSize status=$status',
@@ -36,6 +37,7 @@ class OrderRepository with ApiRequestHelper {
         'page': '$page',
         'page_size': '$pageSize',
         'status': ?status,
+        'buyer_id': ?buyerId,
       },
     );
     HKLog.logD(
