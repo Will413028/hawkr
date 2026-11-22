@@ -1096,6 +1096,39 @@ func (q *Queries) SupplementCount(ctx context.Context, reportID uuid.UUID) (int3
 	return column_1, err
 }
 
+const supplementCounts = `-- name: SupplementCounts :many
+SELECT report_id, count(*)::int AS supplement_count
+FROM seller.report_supplements
+WHERE report_id = ANY($1::uuid[])
+GROUP BY report_id
+`
+
+type SupplementCountsRow struct {
+	ReportID        uuid.UUID
+	SupplementCount int32
+}
+
+// 這些通報各有幾則補充（沒有補充的通報不出現在結果）；檢舉人的清單用它補上每筆的補充數。
+func (q *Queries) SupplementCounts(ctx context.Context, reportIds []uuid.UUID) ([]SupplementCountsRow, error) {
+	rows, err := q.db.Query(ctx, supplementCounts, reportIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SupplementCountsRow{}
+	for rows.Next() {
+		var i SupplementCountsRow
+		if err := rows.Scan(&i.ReportID, &i.SupplementCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const triageReport = `-- name: TriageReport :one
 UPDATE seller.reports r
 SET case_id = $1::uuid,

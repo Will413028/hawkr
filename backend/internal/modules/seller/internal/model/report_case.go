@@ -211,7 +211,7 @@ func SupplementBlockOf(hasOutcome bool, supplementCount int) SupplementBlock {
 	return SupplementAllowed
 }
 
-// SupplementBlock 回這筆通報此刻的補充可用性；SupplementCount 必須已載入（清單與單筆讀取都會載入）。
+// SupplementBlock 回這筆通報此刻的補充可用性；SupplementCount 必須已載入；檢舉人路徑回傳的 Report（BuyerReports、單筆讀取、Submit 併入與 AddSupplement）都已帶入，新建的通報是 0。
 func (r Report) SupplementBlock() SupplementBlock {
 	return SupplementBlockOf(r.Outcome != nil, r.SupplementCount)
 }

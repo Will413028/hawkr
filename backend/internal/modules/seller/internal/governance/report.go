@@ -152,6 +152,11 @@ func (s *Service) supplement(ctx context.Context, q *store.Queries, locked store
 		return model.SubmitReportResult{}, err
 	}
 	report := toReport(row)
+	count, err := q.SupplementCount(ctx, locked.ID)
+	if err != nil {
+		return model.SubmitReportResult{}, err
+	}
+	report.SupplementCount = int(count)
 	return model.SubmitReportResult{ReportID: locked.ID, Supplemented: true, Report: &report, Notice: text.ReportDuplicateSupplemented(uitext.LocaleFrom(ctx))}, nil
 }
 
@@ -422,16 +427,34 @@ func (s *Service) BuyerReports(ctx context.Context, in model.BuyerReportListInpu
 	if in.After != nil {
 		params.AfterCreatedAt, params.AfterID = &in.After.CreatedAt, &in.After.ID
 	}
-	rows, err := store.New(s.d.DB.Conn(ctx)).BuyerReports(ctx, params)
+	q := store.New(s.d.DB.Conn(ctx))
+	rows, err := q.BuyerReports(ctx, params)
 	if err != nil {
 		return model.ReportPage{}, err
 	}
+	more := len(rows) > int(size)
+	if more {
+		rows = rows[:size]
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID
+	}
+	counts, err := q.SupplementCounts(ctx, ids)
+	if err != nil {
+		return model.ReportPage{}, err
+	}
+	byReport := make(map[uuid.UUID]int, len(counts))
+	for _, c := range counts {
+		byReport[c.ReportID] = int(c.SupplementCount)
+	}
 	page := model.ReportPage{Items: make([]model.Report, 0, len(rows))}
 	for _, row := range rows {
-		page.Items = append(page.Items, toReport(row))
+		r := toReport(row)
+		r.SupplementCount = byReport[row.ID]
+		page.Items = append(page.Items, r)
 	}
-	if len(page.Items) > int(size) {
-		page.Items = page.Items[:size]
+	if more {
 		last := page.Items[size-1]
 		page.Next = &model.ReportCursor{CreatedAt: last.CreatedAt, ID: last.ID}
 	}
