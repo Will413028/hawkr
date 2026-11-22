@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"sync"
+	"testing"
 	"time"
 )
 
@@ -33,18 +34,23 @@ func (t *fakeTimer) Stop() {
 	t.clk.mu.Lock()
 	defer t.clk.mu.Unlock()
 	t.armed = false
+	t.clk.stopped = true
+	t.clk.cond.Broadcast()
 }
 
-// fakeClock 以建立時的時長辨識計時器（測試把三個時長設成互不相同）。
+// fakeClock 以建立時的時長辨識計時器（測試把三個時長設成互不相同）。runStream 只在返回時 Stop 計時器，所以 stopped 為真表示它已返回，
+// 這時還在等計時器被武裝的 fire、await 立刻讓測試失敗，而不是永遠等下去。
 type fakeClock struct {
-	mu     sync.Mutex
-	cond   *sync.Cond
-	now    time.Time
-	timers map[time.Duration]*fakeTimer
+	t       testing.TB
+	stopped bool
+	mu      sync.Mutex
+	cond    *sync.Cond
+	now     time.Time
+	timers  map[time.Duration]*fakeTimer
 }
 
-func newFakeClock() *fakeClock {
-	c := &fakeClock{now: time.Now(), timers: map[time.Duration]*fakeTimer{}}
+func newFakeClock(t testing.TB) *fakeClock {
+	c := &fakeClock{t: t, now: time.Now(), timers: map[time.Duration]*fakeTimer{}}
 	c.cond = sync.NewCond(&c.mu)
 	return c
 }
@@ -71,6 +77,9 @@ func (c *fakeClock) fire(name time.Duration, arms int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for c.timers[name] == nil || c.timers[name].arms < arms || !c.timers[name].armed {
+		if c.stopped {
+			c.t.Fatalf("runStream 提早結束，計時器 %v 不會再被武裝（第 %d 次）", name, arms)
+		}
 		c.cond.Wait()
 	}
 	t := c.timers[name]
@@ -84,6 +93,9 @@ func (c *fakeClock) await(name time.Duration, arms int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for c.timers[name] == nil || c.timers[name].arms < arms {
+		if c.stopped {
+			c.t.Fatalf("runStream 提早結束，計時器 %v 不會再被武裝（第 %d 次）", name, arms)
+		}
 		c.cond.Wait()
 	}
 }

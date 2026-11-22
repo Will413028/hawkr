@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 	"uuid"
@@ -120,9 +121,14 @@ func (f *fakeWrites) MarkAllRead(_ context.Context, p im.Party) error {
 type fakeBuyers struct {
 	displays []buyer.Display
 	batches  [][]int64
+	// swapped 非 0 時，同一個帳號對到這個買家，模擬換了身分。
+	swapped atomic.Int64
 }
 
 func (f *fakeBuyers) CurrentBuyerID(_ context.Context, accountID int64) (int64, error) {
+	if id := f.swapped.Load(); id != 0 {
+		return id, nil
+	}
 	if accountID != callerAccount {
 		return 0, apperr.NotFound("no buyer")
 	}
@@ -704,6 +710,29 @@ func TestListMessagesBeforeAndAfterSeqAreMutuallyExclusiveAndRouteToTheRightModu
 	zero := int64(0)
 	if _, err := e.app.ListMessages(signedIn(), connect.NewRequest(&pb.ListMessagesRequest{ConversationId: cid, AfterSeq: &zero})); err != nil || e.reads.calls[len(e.reads.calls)-1] != "MessagesAfter" {
 		t.Errorf("after_seq=0 是有效的補洞起點：%v %v", err, e.reads.calls)
+	}
+}
+
+// 明確給 before_seq 為 0 是「seq 小於 0」的空頁，不是從最新開始；不設才是從最新開始。
+func TestListMessagesExplicitZeroBeforeSeqIsNotTheLatestPage(t *testing.T) {
+	e := newEnv(t, ownStore())
+	cid := convID.String()
+	if _, err := e.app.ListMessages(signedIn(), connect.NewRequest(&pb.ListMessagesRequest{ConversationId: cid})); err != nil || e.reads.beforeSeq != 0 {
+		t.Fatalf("沒設 before_seq 要從最新開始（模組收到 0）：%v %d", err, e.reads.beforeSeq)
+	}
+	zero := int64(0)
+	if _, err := e.app.ListMessages(signedIn(), connect.NewRequest(&pb.ListMessagesRequest{ConversationId: cid, BeforeSeq: &zero})); err != nil || e.reads.beforeSeq == 0 {
+		t.Fatalf("before_seq=0 不得以 0 交給模組（0 在模組是從最新開始）：%v %d", err, e.reads.beforeSeq)
+	}
+}
+
+func TestNewAppRejectsMissingReadsAndWrites(t *testing.T) {
+	log := slog.New(slog.DiscardHandler)
+	if _, err := NewApp(nil, &fakeWrites{}, &fakeStreams{}, &fakeAuth{}, &fakeBuyers{}, &fakeStores{}, images(t), log); err == nil {
+		t.Error("缺 Reads 要啟動失敗")
+	}
+	if _, err := NewApp(&fakeReads{}, nil, &fakeStreams{}, &fakeAuth{}, &fakeBuyers{}, &fakeStores{}, images(t), log); err == nil {
+		t.Error("缺 Writes 要啟動失敗")
 	}
 }
 

@@ -388,6 +388,17 @@ func TestBlockAuthorByMessageBlocksTheConversationsStoreForTheBuyerSide(t *testi
 	}
 }
 
+func TestBlockAuthorByMessageBlocksAConversationStoreWithoutAStoreCard(t *testing.T) {
+	e := newBlockEnv(t)
+	e.m.changed = true
+	e.msgs.err = nil
+	e.msgs.parties = im.ConversationParties{BuyerID: callerBuyerID, StoreID: 20}
+	resp, err := e.h.BlockAuthor(e.ctx, connect.NewRequest(messageRef()))
+	if err != nil || !resp.Msg.GetChanged() || len(e.m.blockedStores) != 1 || e.m.blockedStores[0] != [2]int64{callerBuyerID, 20} {
+		t.Fatalf("沒有店家卡片的對話店仍可經 message_id 封鎖：%v %v %+v", resp, err, e.m.blockedStores)
+	}
+}
+
 func TestBlockAuthorByMessageOfAConversationTheCallerIsNotInIsNotFoundLikeAMissingMessage(t *testing.T) {
 	e := newBlockEnv(t, card(20, seller.CardOpen))
 	e.msgs.err = nil

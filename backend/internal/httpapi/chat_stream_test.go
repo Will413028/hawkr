@@ -74,7 +74,7 @@ func asAccount(next http.Handler) http.Handler {
 // 假的來源在測試確認收到上一個 frame 之前不產生下一個事件。任何一層把回應緩衝起來，client 收不到 header 或 frame（ADR 2026-11-22 的義務）。
 func TestChatStreamIsNotBufferedThroughTheFullMiddlewareChain(t *testing.T) {
 	gate := make(chan im.Event)
-	app, err := httpchat.NewApp(nil, nil, gatedStreams{gatedSub{gate}}, chatAuth{}, chatBuyers{}, chatStores{}, mustImages(t), slog.New(slog.DiscardHandler))
+	app, err := httpchat.NewApp(&im.Module{}, &im.Module{}, gatedStreams{gatedSub{gate}}, chatAuth{}, chatBuyers{}, chatStores{}, mustImages(t), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

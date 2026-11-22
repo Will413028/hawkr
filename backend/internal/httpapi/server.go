@@ -187,6 +187,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	if deps.IM == nil {
 		return nil, fmt.Errorf("httpapi：ChatAppService 需要 IM")
 	}
+	if deps.Identity == nil {
+		return nil, fmt.Errorf("httpapi：ChatAppService 串流的重新驗證需要 Identity")
+	}
 	if deps.Moderation == nil {
 		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
 	}

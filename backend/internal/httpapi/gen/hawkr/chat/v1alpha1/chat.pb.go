@@ -808,7 +808,7 @@ type ListMessagesRequest struct {
 	ConversationId string                 `protobuf:"bytes,1,opt,name=conversation_id,json=conversationId,proto3" json:"conversation_id,omitempty"`
 	// 預設 20，上限 100。
 	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// 只列 seq 小於它的訊息（新的在前）；不設是從最新開始。不能與 after_seq 同時給。
+	// 只列 seq 小於它的訊息（新的在前）；不設是從最新開始，明確給 0 是空頁（序號從 1 起，沒有 seq 小於 0 的訊息）。不能與 after_seq 同時給。
 	BeforeSeq *int64 `protobuf:"varint,3,opt,name=before_seq,json=beforeSeq,proto3,oneof" json:"before_seq,omitempty"`
 	// 只列 seq 大於它的訊息（舊的在前），給斷線補洞。不能與 before_seq 同時給。
 	AfterSeq      *int64 `protobuf:"varint,4,opt,name=after_seq,json=afterSeq,proto3,oneof" json:"after_seq,omitempty"`

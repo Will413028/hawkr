@@ -133,7 +133,7 @@ class ErrorReason extends $pb.ProtobufEnum {
       ErrorReason._(19, _omitEnumNames ? '' : 'SELF_MESSAGE_NOT_ALLOWED');
 
   /// 這家店已停業，無法傳送訊息（搭配 failed_precondition）：店家狀態是已關閉；等待刪除的店仍可聊天。client 顯示 LocalizedMessage，輸入框改為唯讀。
-  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer、StreamStoreEvents（店家串流重新驗證時店已不在或換了一家）。
   static const ErrorReason STORE_CLOSED =
       ErrorReason._(20, _omitEnumNames ? '' : 'STORE_CLOSED');
 

@@ -43,7 +43,12 @@ func (h *App) BlockAuthor(ctx context.Context, req *connect.Request[pb.BlockAuth
 	case social.ActorBuyer:
 		changed, err = h.m.BlockBuyer(ctx, buyerID, author.Author.ID)
 	case social.ActorStore:
-		changed, err = h.blockStore(ctx, buyerID, author.Author.ID)
+		if req.Msg.GetMessageId() != "" {
+			// 對話的店已由對話歸屬證明存在；店家卡片不設的對話（從未公開的店也能傳訊給買家）照樣可以封鎖。
+			changed, err = h.blockKnownStore(ctx, buyerID, author.Author.ID)
+		} else {
+			changed, err = h.blockStore(ctx, buyerID, author.Author.ID)
+		}
 	default:
 		return nil, apperr.NotFound("找不到這則內容")
 	}
@@ -79,6 +84,11 @@ func (h *App) blockStore(ctx context.Context, buyerID, storeID int64) (bool, err
 	if cards[storeID] == nil {
 		return false, apperr.NotFound("找不到店家")
 	}
+	return h.blockKnownStore(ctx, buyerID, storeID)
+}
+
+// blockKnownStore 是已確認店存在之後的封鎖：經跨身分規則擋下封鎖自己的店，再交給 buyer 模組。
+func (h *App) blockKnownStore(ctx context.Context, buyerID, storeID int64) (bool, error) {
 	if err := h.blocking.Identities.RejectSamePerson(ctx, buyerID, storeID); err != nil {
 		return false, err
 	}

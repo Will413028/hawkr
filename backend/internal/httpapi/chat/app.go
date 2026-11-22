@@ -46,6 +46,10 @@ func newApp(table map[string]declaration, reads Reads, writes Writes, streams St
 	switch {
 	case log == nil:
 		return nil, fmt.Errorf("httpapi/chat：需要 logger")
+	case reads == nil:
+		return nil, fmt.Errorf("httpapi/chat：需要 Reads")
+	case writes == nil:
+		return nil, fmt.Errorf("httpapi/chat：需要 Writes")
 	case streams == nil:
 		return nil, fmt.Errorf("httpapi/chat：需要 Streams")
 	case auth == nil:
@@ -141,7 +145,7 @@ func (h *App) ListMessages(ctx context.Context, req *connect.Request[pb.ListMess
 	if msg.AfterSeq != nil {
 		page, err = h.reads.MessagesAfter(ctx, id, p, *msg.AfterSeq, size)
 	} else {
-		page, err = h.reads.ListMessages(ctx, id, p, msg.GetBeforeSeq(), size)
+		page, err = h.reads.ListMessages(ctx, id, p, beforeSeq(msg), size)
 	}
 	if err != nil {
 		return nil, h.failure(err, nil)
@@ -151,6 +155,15 @@ func (h *App) ListMessages(ctx context.Context, req *connect.Request[pb.ListMess
 		return nil, err
 	}
 	return connect.NewResponse(&pb.ListMessagesResponse{Messages: items, HasMore: page.HasMore, PeerReadSeq: page.PeerReadSeq}), nil
+}
+
+// beforeSeq 是交給模組的 before_seq（模組以 0 表示從最新開始）：沒設是 0；明確給 0 是「seq 小於 0」，序號從 1 起所以沒有訊息，
+// 以 1 表示（同樣沒有 seq 小於 1 的訊息），仍回真正的 peer_read_seq。
+func beforeSeq(msg *pb.ListMessagesRequest) int64 {
+	if msg.BeforeSeq == nil {
+		return 0
+	}
+	return max(*msg.BeforeSeq, 1)
 }
 
 // sendInput 解析送出的共同欄位：request_id 必填 UUIDv4（模組另驗），內容恰好是文字或圖片其中一個。

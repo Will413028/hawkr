@@ -199,7 +199,7 @@ message ListMessagesRequest {
   string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
   // 預設 20，上限 100。
   int32 page_size = 2;
-  // 只列 seq 小於它的訊息（新的在前）；不設是從最新開始。不能與 after_seq 同時給。
+  // 只列 seq 小於它的訊息（新的在前）；不設是從最新開始，明確給 0 是空頁（序號從 1 起，沒有 seq 小於 0 的訊息）。不能與 after_seq 同時給。
   optional int64 before_seq = 3;
   // 只列 seq 大於它的訊息（舊的在前），給斷線補洞。不能與 before_seq 同時給。
   optional int64 after_seq = 4;

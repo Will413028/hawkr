@@ -1017,7 +1017,7 @@ class ListMessagesRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearPageSize() => $_clearField(2);
 
-  /// 只列 seq 小於它的訊息（新的在前）；不設是從最新開始。不能與 after_seq 同時給。
+  /// 只列 seq 小於它的訊息（新的在前）；不設是從最新開始，明確給 0 是空頁（序號從 1 起，沒有 seq 小於 0 的訊息）。不能與 after_seq 同時給。
   @$pb.TagNumber(3)
   $fixnum.Int64 get beforeSeq => $_getI64(2);
   @$pb.TagNumber(3)

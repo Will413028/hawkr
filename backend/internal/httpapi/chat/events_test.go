@@ -109,7 +109,7 @@ type streamEnv struct {
 func newStreamEnv(t *testing.T, store *seller.Store) *streamEnv {
 	t.Helper()
 	e := newEnv(t, store)
-	se := &streamEnv{env: e, streams: &fakeStreams{sub: newFakeSub()}, auth: &fakeAuth{}, clk: newFakeClock()}
+	se := &streamEnv{env: e, streams: &fakeStreams{sub: newFakeSub()}, auth: &fakeAuth{}, clk: newFakeClock(t)}
 	var err error
 	if e.app, err = NewApp(e.reads, e.writes, se.streams, se.auth, e.buyers, e.stores, images(t), slog.New(slog.DiscardHandler)); err != nil {
 		t.Fatal(err)
@@ -427,4 +427,19 @@ func TestStreamGuardStoreGoneEndsWithStoreClosed(t *testing.T) {
 	if err := st.Err(); connect.CodeOf(err) != connect.CodeFailedPrecondition || reasonFromClient(err) != "STORE_CLOSED" {
 		t.Fatalf("= %v（reason %q）", err, reasonFromClient(err))
 	}
+}
+
+func TestStreamGuardBuyerIdentityChangedEndsUnauthenticated(t *testing.T) {
+	se := newStreamEnv(t, ownStore())
+	se.push(t, im.Event{Kind: im.EventReady})
+	st := se.openBuyer(t, nil)
+	recv(t, st)
+	se.buyers.swapped.Store(71)
+	se.clk.fire(chkTimer, 1)
+	for st.Receive() {
+	}
+	if err := st.Err(); connect.CodeOf(err) != connect.CodeUnauthenticated || reasonFromClient(err) == "STORE_CLOSED" {
+		t.Fatalf("買家身分對不上要 unauthenticated：%v（reason %q）", err, reasonFromClient(err))
+	}
+	waitClosed(t, se.streams.sub)
 }

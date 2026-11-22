@@ -37,7 +37,9 @@ type streamHarness struct {
 	log       *callLog
 	guardRuns chan struct{}
 	done      chan error
-	cancel    context.CancelFunc
+	// finished 在 runStream 返回後關閉：等待來源或 Guard 的 helper 據此在 runStream 提早結束時立刻失敗，而不是等到逾時。
+	finished chan struct{}
+	cancel   context.CancelFunc
 }
 
 type callLog struct {
@@ -60,7 +62,7 @@ func (c *callLog) all() []string {
 // startStream 跑一條 runStream；guard 依序回 guards 的結果（用完回 nil），mod 可改 spec。
 func startStream(t *testing.T, guards []error, mod func(*streamSpec[string], *streamHarness)) *streamHarness {
 	t.Helper()
-	h := &streamHarness{t: t, clk: newFakeClock(), src: newFakeSource(), frames: make(chan string, 64), log: &callLog{}, guardRuns: make(chan struct{}, 64), done: make(chan error, 1)}
+	h := &streamHarness{t: t, clk: newFakeClock(t), src: newFakeSource(), frames: make(chan string, 64), log: &callLog{}, guardRuns: make(chan struct{}, 64), done: make(chan error, 1), finished: make(chan struct{})}
 	var gm sync.Mutex
 	spec := streamSpec[string]{
 		Config: testStreamConfig(), Clock: h.clk.clock(), Jitter: func() float64 { return 0.5 },
@@ -85,7 +87,11 @@ func startStream(t *testing.T, guards []error, mod func(*streamSpec[string], *st
 	}
 	var ctx context.Context
 	ctx, h.cancel = context.WithCancel(t.Context())
-	go func() { h.done <- runStream(ctx, spec) }()
+	go func() {
+		err := runStream(ctx, spec)
+		close(h.finished)
+		h.done <- err
+	}()
 	t.Cleanup(h.cancel)
 	return h
 }
@@ -94,6 +100,8 @@ func (h *streamHarness) push(ev string, err error) {
 	h.t.Helper()
 	select {
 	case h.src.results <- fakeResult{ev, err}:
+	case <-h.finished:
+		h.t.Fatal("runStream 提早結束，來源的結果沒有被取走")
 	case <-time.After(5 * time.Second): // 只防測試卡死，不是行為的閾值
 		h.t.Fatal("來源的結果沒有被 runStream 取走")
 	}
@@ -103,6 +111,12 @@ func (h *streamHarness) awaitGuard() {
 	h.t.Helper()
 	select {
 	case <-h.guardRuns:
+	case <-h.finished:
+		select {
+		case <-h.guardRuns:
+		default:
+			h.t.Fatal("runStream 在 Guard 被呼叫之前就結束了")
+		}
 	case <-time.After(5 * time.Second): // 只防測試卡死
 		h.t.Fatal("Guard 沒有被呼叫")
 	}

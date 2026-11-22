@@ -194,7 +194,7 @@ export enum ErrorReason {
 
   /**
    * 這家店已停業，無法傳送訊息（搭配 failed_precondition）：店家狀態是已關閉；等待刪除的店仍可聊天。client 顯示 LocalizedMessage，輸入框改為唯讀。
-   * ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+   * ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer、StreamStoreEvents（店家串流重新驗證時店已不在或換了一家）。
    *
    * @generated from enum value: STORE_CLOSED = 20;
    */

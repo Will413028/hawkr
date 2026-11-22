@@ -9,7 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// streamConfig 是串流傳輸的常數。全部是估計值，不是量測值（step-2b-design.md 的常數段）；5c 驗收含經 web host 反代與 Cloudflare 的實測。
+// streamConfig 是串流傳輸的常數。全部是估計值，不是量測值（step-2b-design.md 的常數段）；經 web host 反代與 Cloudflare 的實際行為需另行實測。
 type streamConfig struct {
 	// HeartbeatEvery：來源閒置這麼久就寫一個 Heartbeat（每次寫出任何 frame 後重新計時）。與三端 client 舊 WebSocket 的 15 秒相同，
 	// client 的「30 秒沒有任何 frame 判定半開」容忍錯過一個心跳（step-2b-design.md §5.2）。

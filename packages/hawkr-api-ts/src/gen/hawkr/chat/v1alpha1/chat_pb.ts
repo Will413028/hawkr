@@ -385,7 +385,7 @@ export type ListMessagesRequest = Message$1<"hawkr.chat.v1alpha1.ListMessagesReq
   pageSize: number;
 
   /**
-   * 只列 seq 小於它的訊息（新的在前）；不設是從最新開始。不能與 after_seq 同時給。
+   * 只列 seq 小於它的訊息（新的在前）；不設是從最新開始，明確給 0 是空頁（序號從 1 起，沒有 seq 小於 0 的訊息）。不能與 after_seq 同時給。
    *
    * @generated from field: optional int64 before_seq = 3;
    */

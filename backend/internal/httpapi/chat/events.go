@@ -127,8 +127,8 @@ func (h *App) toEvent(ev im.Event, info streamInfo) (*pb.ChatEvent, error) {
 const guardTimeout = 10 * time.Second
 
 // guard 回傳重新驗證的函式：以請求帶的 token 重新驗證 session（與入口同一個 Authenticate；帳號必須還是原來那個），再用 reparty 重讀身分，
-// 成功後交給 Subscription.Revalidate。session 失效、帳號刪除是 unauthenticated；身分讀取的暫時錯誤原樣回（算暫時失敗）。
-func (h *App) guard(header http.Header, accountID int64, sub Subscription, reparty func(context.Context, int64) (im.Party, error), same func(im.Party) bool) func(context.Context) error {
+// 成功後交給 Subscription.Revalidate。session 失效、帳號刪除、買家身分對不上是 unauthenticated，店家的店沒了或換了是 Ended（EndLostEligibility）；身分讀取的暫時錯誤原樣回（算暫時失敗）。
+func (h *App) guard(header http.Header, accountID int64, kind im.PartyKind, sub Subscription, reparty func(context.Context, int64) (im.Party, error), same func(im.Party) bool) func(context.Context) error {
 	return func(ctx context.Context) error {
 		ctx, cancel := context.WithTimeout(ctx, guardTimeout)
 		defer cancel()
@@ -148,8 +148,12 @@ func (h *App) guard(header http.Header, accountID int64, sub Subscription, repar
 		case err == nil && same(p):
 			return sub.Revalidate(ctx, p)
 		case err == nil, apperr.KindOf(err) == apperr.KindNotFound:
-			// 店沒了或換成另一家：這條串流的店已不再有效，與關店同一個結果。
-			return &im.Ended{Reason: im.EndLostEligibility}
+			if kind == im.PartyStore {
+				// 店沒了或換成另一家：這條串流的店已不再有效，與關店同一個結果。
+				return &im.Ended{Reason: im.EndLostEligibility}
+			}
+			// 買家身分對不上屬於 session 或帳號層的失效。
+			return apperr.Unauthenticated("需要登入")
 		}
 		return err
 	}
@@ -185,7 +189,7 @@ func (h *App) serveStream(ctx context.Context, header http.Header, rawCursors ma
 	return runStream(ctx, streamSpec[im.Event]{
 		Config: h.stream, Clock: h.clock, Jitter: h.jitter,
 		Next: sub.Next, Close: sub.Close, Classify: classifyEnd,
-		Guard:            h.guard(header, acct.ID, sub, reparty, same),
+		Guard:            h.guard(header, acct.ID, p.Kind, sub, reparty, same),
 		SetWriteDeadline: setDeadline,
 		Write: func(ev im.Event, info streamInfo) error {
 			f, err := h.toEvent(ev, info)
