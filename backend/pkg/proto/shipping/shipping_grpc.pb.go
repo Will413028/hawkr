@@ -49,11 +49,7 @@ const (
 	ShippingService_LookupShippingFee_FullMethodName                  = "/hawkr.shipping.ShippingService/LookupShippingFee"
 	ShippingService_CalculateShippingOptions_FullMethodName           = "/hawkr.shipping.ShippingService/CalculateShippingOptions"
 	ShippingService_ValidateProductShipping_FullMethodName            = "/hawkr.shipping.ShippingService/ValidateProductShipping"
-	ShippingService_ImportHolidays_FullMethodName                     = "/hawkr.shipping.ShippingService/ImportHolidays"
-	ShippingService_ImportHolidaysFromContent_FullMethodName          = "/hawkr.shipping.ShippingService/ImportHolidaysFromContent"
-	ShippingService_GetHolidayCoverage_FullMethodName                 = "/hawkr.shipping.ShippingService/GetHolidayCoverage"
 	ShippingService_ListBusinessDays_FullMethodName                   = "/hawkr.shipping.ShippingService/ListBusinessDays"
-	ShippingService_GetHolidaysInternal_FullMethodName                = "/hawkr.shipping.ShippingService/GetHolidaysInternal"
 	ShippingService_CreateReturnCvsShipment_FullMethodName            = "/hawkr.shipping.ShippingService/CreateReturnCvsShipment"
 	ShippingService_CreateReturnHomeShipment_FullMethodName           = "/hawkr.shipping.ShippingService/CreateReturnHomeShipment"
 	ShippingService_GetSellerReturnConfig_FullMethodName              = "/hawkr.shipping.ShippingService/GetSellerReturnConfig"
@@ -141,20 +137,8 @@ type ShippingServiceClient interface {
 	CalculateShippingOptions(ctx context.Context, in *CalculateShippingOptionsRequest, opts ...grpc.CallOption) (*CalculateShippingOptionsResponse, error)
 	// 驗證商品配送方式合法性（商品建立/更新時，Product Service 呼叫）
 	ValidateProductShipping(ctx context.Context, in *ValidateProductShippingRequest, opts ...grpc.CallOption) (*ValidateProductShippingResponse, error)
-	// 匯入假日（Admin，傳入政府 CSV URL）
-	ImportHolidays(ctx context.Context, in *ImportHolidaysRequest, opts ...grpc.CallOption) (*ImportHolidaysResponse, error)
-	// 匯入假日（Admin，上傳 CSV 檔案內容，顯式年份）
-	ImportHolidaysFromContent(ctx context.Context, in *ImportHolidaysFromContentRequest, opts ...grpc.CallOption) (*ImportHolidaysResponse, error)
-	// 查詢假日覆蓋現況（Admin，各年度覆蓋狀態）
-	GetHolidayCoverage(ctx context.Context, in *GetHolidayCoverageRequest, opts ...grpc.CallOption) (*GetHolidayCoverageResponse, error)
 	// 查詢可出貨工作天（App，前台日曆元件用）
 	ListBusinessDays(ctx context.Context, in *ListBusinessDaysRequest, opts ...grpc.CallOption) (*ListBusinessDaysResponse, error)
-	// 取一段日期區間內的國定假日（服務間，invoice-service 的行事曆鏡像每日同步用）。
-	//
-	// 與上面三支的差別：ListBusinessDays 回的是「未來 7 個可出貨日」（前台日曆），
-	// GetHolidayCoverage 回的是「各年度覆蓋狀態」（ADM 儀表），兩者都給不出
-	// 「[from, to] 這段區間裡有哪些假日」——而那正是工作天曆算式唯一需要的東西。
-	GetHolidaysInternal(ctx context.Context, in *GetHolidaysInternalRequest, opts ...grpc.CallOption) (*GetHolidaysInternalResponse, error)
 	// 超商 C2C 退貨（交貨便角色對調：買家=寄件人，賣家=收件人）
 	CreateReturnCvsShipment(ctx context.Context, in *CreateReturnCvsShipmentRequest, opts ...grpc.CallOption) (*CreateReturnShipmentResponse, error)
 	// 宅配退貨
@@ -509,50 +493,10 @@ func (c *shippingServiceClient) ValidateProductShipping(ctx context.Context, in 
 	return out, nil
 }
 
-func (c *shippingServiceClient) ImportHolidays(ctx context.Context, in *ImportHolidaysRequest, opts ...grpc.CallOption) (*ImportHolidaysResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ImportHolidaysResponse)
-	err := c.cc.Invoke(ctx, ShippingService_ImportHolidays_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shippingServiceClient) ImportHolidaysFromContent(ctx context.Context, in *ImportHolidaysFromContentRequest, opts ...grpc.CallOption) (*ImportHolidaysResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ImportHolidaysResponse)
-	err := c.cc.Invoke(ctx, ShippingService_ImportHolidaysFromContent_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shippingServiceClient) GetHolidayCoverage(ctx context.Context, in *GetHolidayCoverageRequest, opts ...grpc.CallOption) (*GetHolidayCoverageResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetHolidayCoverageResponse)
-	err := c.cc.Invoke(ctx, ShippingService_GetHolidayCoverage_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *shippingServiceClient) ListBusinessDays(ctx context.Context, in *ListBusinessDaysRequest, opts ...grpc.CallOption) (*ListBusinessDaysResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListBusinessDaysResponse)
 	err := c.cc.Invoke(ctx, ShippingService_ListBusinessDays_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shippingServiceClient) GetHolidaysInternal(ctx context.Context, in *GetHolidaysInternalRequest, opts ...grpc.CallOption) (*GetHolidaysInternalResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetHolidaysInternalResponse)
-	err := c.cc.Invoke(ctx, ShippingService_GetHolidaysInternal_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -833,20 +777,8 @@ type ShippingServiceServer interface {
 	CalculateShippingOptions(context.Context, *CalculateShippingOptionsRequest) (*CalculateShippingOptionsResponse, error)
 	// 驗證商品配送方式合法性（商品建立/更新時，Product Service 呼叫）
 	ValidateProductShipping(context.Context, *ValidateProductShippingRequest) (*ValidateProductShippingResponse, error)
-	// 匯入假日（Admin，傳入政府 CSV URL）
-	ImportHolidays(context.Context, *ImportHolidaysRequest) (*ImportHolidaysResponse, error)
-	// 匯入假日（Admin，上傳 CSV 檔案內容，顯式年份）
-	ImportHolidaysFromContent(context.Context, *ImportHolidaysFromContentRequest) (*ImportHolidaysResponse, error)
-	// 查詢假日覆蓋現況（Admin，各年度覆蓋狀態）
-	GetHolidayCoverage(context.Context, *GetHolidayCoverageRequest) (*GetHolidayCoverageResponse, error)
 	// 查詢可出貨工作天（App，前台日曆元件用）
 	ListBusinessDays(context.Context, *ListBusinessDaysRequest) (*ListBusinessDaysResponse, error)
-	// 取一段日期區間內的國定假日（服務間，invoice-service 的行事曆鏡像每日同步用）。
-	//
-	// 與上面三支的差別：ListBusinessDays 回的是「未來 7 個可出貨日」（前台日曆），
-	// GetHolidayCoverage 回的是「各年度覆蓋狀態」（ADM 儀表），兩者都給不出
-	// 「[from, to] 這段區間裡有哪些假日」——而那正是工作天曆算式唯一需要的東西。
-	GetHolidaysInternal(context.Context, *GetHolidaysInternalRequest) (*GetHolidaysInternalResponse, error)
 	// 超商 C2C 退貨（交貨便角色對調：買家=寄件人，賣家=收件人）
 	CreateReturnCvsShipment(context.Context, *CreateReturnCvsShipmentRequest) (*CreateReturnShipmentResponse, error)
 	// 宅配退貨
@@ -991,20 +923,8 @@ func (UnimplementedShippingServiceServer) CalculateShippingOptions(context.Conte
 func (UnimplementedShippingServiceServer) ValidateProductShipping(context.Context, *ValidateProductShippingRequest) (*ValidateProductShippingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateProductShipping not implemented")
 }
-func (UnimplementedShippingServiceServer) ImportHolidays(context.Context, *ImportHolidaysRequest) (*ImportHolidaysResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ImportHolidays not implemented")
-}
-func (UnimplementedShippingServiceServer) ImportHolidaysFromContent(context.Context, *ImportHolidaysFromContentRequest) (*ImportHolidaysResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ImportHolidaysFromContent not implemented")
-}
-func (UnimplementedShippingServiceServer) GetHolidayCoverage(context.Context, *GetHolidayCoverageRequest) (*GetHolidayCoverageResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetHolidayCoverage not implemented")
-}
 func (UnimplementedShippingServiceServer) ListBusinessDays(context.Context, *ListBusinessDaysRequest) (*ListBusinessDaysResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListBusinessDays not implemented")
-}
-func (UnimplementedShippingServiceServer) GetHolidaysInternal(context.Context, *GetHolidaysInternalRequest) (*GetHolidaysInternalResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetHolidaysInternal not implemented")
 }
 func (UnimplementedShippingServiceServer) CreateReturnCvsShipment(context.Context, *CreateReturnCvsShipmentRequest) (*CreateReturnShipmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateReturnCvsShipment not implemented")
@@ -1630,60 +1550,6 @@ func _ShippingService_ValidateProductShipping_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ShippingService_ImportHolidays_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ImportHolidaysRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShippingServiceServer).ImportHolidays(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ShippingService_ImportHolidays_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShippingServiceServer).ImportHolidays(ctx, req.(*ImportHolidaysRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ShippingService_ImportHolidaysFromContent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ImportHolidaysFromContentRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShippingServiceServer).ImportHolidaysFromContent(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ShippingService_ImportHolidaysFromContent_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShippingServiceServer).ImportHolidaysFromContent(ctx, req.(*ImportHolidaysFromContentRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ShippingService_GetHolidayCoverage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetHolidayCoverageRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShippingServiceServer).GetHolidayCoverage(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ShippingService_GetHolidayCoverage_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShippingServiceServer).GetHolidayCoverage(ctx, req.(*GetHolidayCoverageRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _ShippingService_ListBusinessDays_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListBusinessDaysRequest)
 	if err := dec(in); err != nil {
@@ -1698,24 +1564,6 @@ func _ShippingService_ListBusinessDays_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ShippingServiceServer).ListBusinessDays(ctx, req.(*ListBusinessDaysRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ShippingService_GetHolidaysInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetHolidaysInternalRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShippingServiceServer).GetHolidaysInternal(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ShippingService_GetHolidaysInternal_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShippingServiceServer).GetHolidaysInternal(ctx, req.(*GetHolidaysInternalRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2226,24 +2074,8 @@ var ShippingService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ShippingService_ValidateProductShipping_Handler,
 		},
 		{
-			MethodName: "ImportHolidays",
-			Handler:    _ShippingService_ImportHolidays_Handler,
-		},
-		{
-			MethodName: "ImportHolidaysFromContent",
-			Handler:    _ShippingService_ImportHolidaysFromContent_Handler,
-		},
-		{
-			MethodName: "GetHolidayCoverage",
-			Handler:    _ShippingService_GetHolidayCoverage_Handler,
-		},
-		{
 			MethodName: "ListBusinessDays",
 			Handler:    _ShippingService_ListBusinessDays_Handler,
-		},
-		{
-			MethodName: "GetHolidaysInternal",
-			Handler:    _ShippingService_GetHolidaysInternal_Handler,
 		},
 		{
 			MethodName: "CreateReturnCvsShipment",

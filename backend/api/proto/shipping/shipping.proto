@@ -118,24 +118,8 @@ service ShippingService {
 
     // ==================== 假日管理 ====================
 
-    // 匯入假日（Admin，傳入政府 CSV URL）
-    rpc ImportHolidays(ImportHolidaysRequest) returns (ImportHolidaysResponse);
-
-    // 匯入假日（Admin，上傳 CSV 檔案內容，顯式年份）
-    rpc ImportHolidaysFromContent(ImportHolidaysFromContentRequest) returns (ImportHolidaysResponse);
-
-    // 查詢假日覆蓋現況（Admin，各年度覆蓋狀態）
-    rpc GetHolidayCoverage(GetHolidayCoverageRequest) returns (GetHolidayCoverageResponse);
-
     // 查詢可出貨工作天（App，前台日曆元件用）
     rpc ListBusinessDays(ListBusinessDaysRequest) returns (ListBusinessDaysResponse);
-
-    // 取一段日期區間內的國定假日（服務間，invoice-service 的行事曆鏡像每日同步用）。
-    //
-    // 與上面三支的差別：ListBusinessDays 回的是「未來 7 個可出貨日」（前台日曆），
-    // GetHolidayCoverage 回的是「各年度覆蓋狀態」（ADM 儀表），兩者都給不出
-    // 「[from, to] 這段區間裡有哪些假日」——而那正是工作天曆算式唯一需要的東西。
-    rpc GetHolidaysInternal(GetHolidaysInternalRequest) returns (GetHolidaysInternalResponse);
 
     // ==================== 退貨物流（AfterSales Service 呼叫）====================
 
@@ -883,51 +867,6 @@ message BuyerStorePickupView {
 
 // ==================== 假日管理 ====================
 
-message ImportHolidaysRequest {
-    int64 admin_account_id = 1;         // Gateway JWT 注入（E.5.5 例外）
-    string csv_url = 2;                 // 政府 CSV 下載 URL
-}
-
-message ImportHolidaysResponse {
-    int32 code = 1;
-    string message = 2;
-    ImportHolidaysData data = 3;
-}
-
-message ImportHolidaysData {
-    string year = 1;                    // 匯入年份
-    string imported_count = 2;          // 匯入筆數
-    string deleted_count = 3;           // 刪除舊資料筆數
-}
-
-message ImportHolidaysFromContentRequest {
-    int64 admin_account_id = 1;         // Gateway JWT 注入（E.5.5 例外）
-    string year = 2;                    // 顯式指定年份（前端可控，string）
-    string csv_content = 3;             // CSV 檔案文字內容（前端 FileReader 讀取）
-}
-// Response 重用 ImportHolidaysResponse / ImportHolidaysData
-
-message GetHolidayCoverageRequest {
-    int64 admin_account_id = 1;         // Gateway JWT 注入（E.5.5 例外）
-}
-
-message GetHolidayCoverageResponse {
-    int32 code = 1;
-    string message = 2;
-    HolidayCoverageData data = 3;
-}
-
-message HolidayCoverageData {
-    repeated HolidayYearCoverage years = 1;
-    string coverage_days = 2;           // 距耗盡天數（與 §8 metric 同源公式）；空表 "-1"
-}
-
-message HolidayYearCoverage {
-    string year = 1;                    // 年份
-    string count = 2;                   // 該年筆數
-    string max_holiday_date = 3;        // 該年最大假日日期（YYYY-MM-DD）
-}
-
 message ListBusinessDaysRequest {
     int64 account_id = 1;              // Gateway JWT 注入（E.5.5 例外）
 }
@@ -941,17 +880,6 @@ message ListBusinessDaysResponse {
 message BusinessDay {
     string date = 1;                    // ISO 8601 日期（YYYY-MM-DD）
     string day_of_week = 2;            // 星期幾（一/二/三/四/五）
-}
-
-message GetHolidaysInternalRequest {
-    string from_date = 1;              // ISO 8601 日期（YYYY-MM-DD），閉區間
-    string to_date = 2;                // ISO 8601 日期（YYYY-MM-DD），閉區間
-}
-
-message GetHolidaysInternalResponse {
-    int32 code = 1;
-    string message = 2;
-    repeated string holiday_dates = 3; // ISO 8601 日期，升冪；區間內沒有假日時為空陣列
 }
 
 // ==================== 超商確認出貨 ====================
