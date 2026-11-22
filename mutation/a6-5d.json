@@ -251,6 +251,15 @@
    "new": "\tcrmv1alpha1connect.CrmAppServiceDeleteTagProcedure:         seller.CapContentContract,",
    "test": "internal/httpapi/crm ^TestDeclarationsMatchTheModuleChecks$",
    "why": "DeleteTag is declared with a suspension-tolerant capability while the module blocks it under suspension; the declarations and module checks drift apart."
+  },
+  {
+   "id": "crm-write-lock-not-closed-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/crm/internal/write/write.go",
+   "old": "\tif err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {",
+   "new": "\tif err := error(nil); err != nil {",
+   "test": "internal/modules/crm ^TestCustomerWriteWaitsForBuyerClosureAndWritesNothing$",
+   "why": "Customer-level writes no longer take the buyer guard lock, so a buyer closure committing concurrently does not wait for the write and the write is not rejected."
   }
  ]
 }
