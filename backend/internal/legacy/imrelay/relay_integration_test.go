@@ -104,7 +104,7 @@ func (l *live) count(t *testing.T, sql string, args ...any) int64 {
 
 func (l *live) buyerSays(t *testing.T, text string) im.Message {
 	t.Helper()
-	m, err := l.module.Send(context.Background(), im.SendInput{Sender: im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, CounterpartID: storeID, Type: im.TypeText, Text: text})
+	m, err := l.module.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, CounterpartID: storeID, Type: im.TypeText, Text: text})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestSendEnqueuesExactlyOneRelayJobAndRollsBackWithTheMessage(t *testing.T) 
 	}
 
 	events.Subscribe(l.bus, func(context.Context, im.MessageSent) error { return errors.New("subscriber failed") })
-	_, err := l.module.Send(context.Background(), im.SendInput{Sender: im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, CounterpartID: storeID, Type: im.TypeText, Text: "rolled back"})
+	_, err := l.module.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, CounterpartID: storeID, Type: im.TypeText, Text: "rolled back"})
 	if err == nil {
 		t.Fatal("訂閱者失敗時送出要失敗")
 	}

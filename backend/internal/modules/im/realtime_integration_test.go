@@ -26,7 +26,7 @@ func TestNotifyIsDeliveredOnlyAfterCommit(t *testing.T) {
 	ctx := context.Background()
 	raw := f.listenRaw(t)
 	err := f.db.InTx(ctx, func(ctx context.Context) error {
-		if _, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "rolled back"}); err != nil {
+		if _, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "rolled back"}); err != nil {
 			return err
 		}
 		return errRollback
@@ -38,7 +38,7 @@ func TestNotifyIsDeliveredOnlyAfterCommit(t *testing.T) {
 		t.Fatalf("回滾後有 %d 則訊息", got)
 	}
 	if err := f.db.InTx(ctx, func(ctx context.Context) error {
-		_, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "committed"})
+		_, err := f.m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "committed"})
 		return err
 	}); err != nil {
 		t.Fatal(err)

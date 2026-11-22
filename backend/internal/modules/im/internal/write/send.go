@@ -3,6 +3,7 @@ package write
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 	"uuid"
@@ -30,9 +31,27 @@ type target struct {
 	store   seller.Store
 }
 
-// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
+// maxSendAttempts 是同一個 RequestID 被並行請求搶先寫入時，整個送出重來的上限。
+const maxSendAttempts = 4
+
+// errRetry 表示同一個 (對話, 寄件方, RequestID) 已被並行的請求寫入：這次 transaction 整個回滾（含 AllocateSeq 推進的 seq），重來後由重送判定回第一則。
+var errRetry = errors.New("im：並行競爭，重來")
+
+// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 重送判定（同一個 RequestID 回第一則）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
 // transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
+// 並行的同一個 RequestID 以 messages 的唯一鍵為最終保證：輸家的 transaction 回滾後重來，重讀第一則。
 func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
+	for range maxSendAttempts {
+		out, err := s.send(ctx, in)
+		if errors.Is(err, errRetry) {
+			continue
+		}
+		return out, err
+	}
+	return model.Message{}, fmt.Errorf("im：送出連續 %d 次遇到並行競爭", maxSendAttempts)
+}
+
+func (s *Service) send(ctx context.Context, in model.SendInput) (model.Message, error) {
 	l := uitext.LocaleFrom(ctx)
 	body, err := s.checkInput(l, &in)
 	if err != nil {
@@ -41,6 +60,9 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	t, buyerAccount, err := s.resolve(ctx, l, in)
 	if err != nil {
 		return model.Message{}, err
+	}
+	if first, found, err := s.replay(ctx, l, in, t, body); err != nil || found {
+		return first, err
 	}
 	if err := s.guard(ctx, l, in.Sender, t, body); err != nil {
 		return model.Message{}, err
@@ -85,13 +107,16 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		}
 		now := seq.LastMessageAt.UTC()
 		msgID := s.d.NewID()
-		p := store.InsertMessageParams{ID: msgID, ConversationID: seq.ID, Seq: seq.LastSeq, SenderKind: string(sender), MessageType: string(in.Type), Now: now}
+		p := store.InsertMessageParams{ID: msgID, ConversationID: seq.ID, Seq: seq.LastSeq, SenderKind: string(sender), RequestID: in.RequestID, MessageType: string(in.Type), Now: now}
 		if in.Type == model.TypeText {
 			p.Content = &body
 		} else {
 			p.ImageAssetID, p.ImageObjectKey = &asset.ID, &asset.ObjectKey
 		}
 		row, err := q.InsertMessage(ctx, p)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errRetry
+		}
 		if err != nil {
 			return err
 		}
@@ -116,6 +141,32 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		return nil
 	})
 	return out, err
+}
+
+// replay 是送出冪等的重送判定：同一個 (對話, 寄件方, RequestID) 已有訊息時回傳第一次寫入的那則（found 為真），不配 seq、不通知、不發事件、不碰圖片；
+// 內容不同（Type 不同，或文字訊息正規化後的文字不同）回 InvalidInput 指向 RequestID。圖片訊息只比 Type（staged token 在第一次已被消耗）。
+// 對話還不存在時沒有列，照常往下走。判定在對話解析與授權之後、守門之前：已送出的訊息不因之後才發生的封鎖或停權而重送失敗。
+func (s *Service) replay(ctx context.Context, l uitext.Locale, in model.SendInput, t target, body string) (model.Message, bool, error) {
+	row, err := s.q(ctx).MessageByRequest(ctx, store.MessageByRequestParams{
+		BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(in.Sender.Kind), RequestID: in.RequestID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Message{}, false, nil
+	}
+	if err != nil {
+		return model.Message{}, false, err
+	}
+	same := row.MessageType == string(in.Type)
+	if same && in.Type == model.TypeText {
+		same = row.Content != nil && *row.Content == body
+	}
+	if !same {
+		return model.Message{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.ImRequestIdReused(l))
+	}
+	return rows.Message(rows.MessageRow{
+		ID: row.ID, ConversationID: row.ConversationID, Seq: row.Seq, SenderKind: row.SenderKind, MessageType: row.MessageType,
+		Content: row.Content, ImageAssetID: row.ImageAssetID, ImageObjectKey: row.ImageObjectKey, CreatedAt: row.CreatedAt, ErasedAt: row.ErasedAt,
+	}), true, nil
 }
 
 // closedGuardError 把兩個守門的 NotFound（已關閉、已退場或不存在）翻成原有的訊息與 reason：寄件人那一方先翻（寄件人已停用），
@@ -153,6 +204,9 @@ func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, erro
 	if !in.Sender.Kind.Valid() || in.Sender.ID() <= 0 || (in.Sender.Kind == model.PartyStore && in.Sender.Store == nil) {
 		return "", errors.New("im：寄件人身分不完整")
 	}
+	if !validRequestID(in.RequestID) {
+		return "", apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.ImRequestIdInvalid(l))
+	}
 	switch in.Type {
 	case model.TypeText:
 		if !utf8.ValidString(in.Text) || strings.ContainsRune(in.Text, 0) {
@@ -174,6 +228,11 @@ func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, erro
 		return "", nil
 	}
 	return "", apperr.InvalidInputOn([]string{"Type"}, "%s", text.ImTypeUnsupported(l))
+}
+
+// validRequestID 只接受 UUIDv4（版本位 4、variant 10）；零值與其他版本一律無效。
+func validRequestID(id uuid.UUID) bool {
+	return id[6]>>4 == 4 && id[8]>>6 == 0b10
 }
 
 func unavailable(l uitext.Locale, cause error) error {

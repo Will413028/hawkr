@@ -302,3 +302,28 @@ func (s *Service) MessageForReport(ctx context.Context, messageID uuid.UUID, rep
 	}
 	return out, nil
 }
+
+// ConversationParties 回傳對話的雙方（歸屬事實）；對話不存在回 NotFound。不套可見性、不鎖列、不開 transaction（加入呼叫方的）。
+// 給 httpapi 從呼叫者的身分推導自己是對話的哪一方用：呼叫端必須把「兩邊都不是呼叫者」當 NotFound 回給 client，不得把歸屬回給 client。
+func (s *Service) ConversationParties(ctx context.Context, conversationID uuid.UUID) (model.ConversationParties, error) {
+	r, err := s.q(ctx).ConversationParties(ctx, conversationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ConversationParties{}, apperr.NotFound("%s", text.ImConversationNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.ConversationParties{}, err
+	}
+	return model.ConversationParties{ConversationID: r.ConversationID, BuyerID: r.BuyerID, StoreID: r.StoreID}, nil
+}
+
+// MessageParties 回傳訊息所屬對話的雙方；訊息不存在回 NotFound。語意與限制同 ConversationParties，隱藏與抹除的訊息照樣回歸屬。
+func (s *Service) MessageParties(ctx context.Context, messageID uuid.UUID) (model.ConversationParties, error) {
+	r, err := s.q(ctx).MessageParties(ctx, messageID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ConversationParties{}, apperr.NotFound("%s", text.ImMessageNotFound(uitext.LocaleFrom(ctx)))
+	}
+	if err != nil {
+		return model.ConversationParties{}, err
+	}
+	return model.ConversationParties{ConversationID: r.ConversationID, BuyerID: r.BuyerID, StoreID: r.StoreID}, nil
+}

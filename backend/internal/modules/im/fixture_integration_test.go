@@ -315,7 +315,7 @@ func (f *fixture) storeParty(t *testing.T, id int64) im.Party {
 // say 以對方的 ID 送出文字（首則訊息或既有對話都是這條路徑：對話由 (buyer_id, store_id) 決定）。
 func (f *fixture) say(t *testing.T, from im.Party, counterpart int64, text string) im.Message {
 	t.Helper()
-	m, err := f.m.Send(context.Background(), im.SendInput{Sender: from, CounterpartID: counterpart, Type: im.TypeText, Text: text})
+	m, err := f.m.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: from, CounterpartID: counterpart, Type: im.TypeText, Text: text})
 	if err != nil {
 		t.Fatalf("send %q: %v", text, err)
 	}

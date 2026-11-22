@@ -17,6 +17,51 @@
    "new": "",
    "test": "internal/httpapi ^TestHTTPAPIDepsLiteralsSetEveryRequiredField$",
    "why": "The new-module characterization template omits the required Stats in its httpapi.Deps literal, so every generated module would fail at runtime."
+  },
+  {
+   "id": "im-send-replay-never-found",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "err != nil || found {",
+   "new": "err != nil || found && false {",
+   "test": "internal/modules/im ^TestResendReturnsTheFirstMessageWithoutSideEffects$",
+   "why": "Send treats every request as new, so a resend no longer returns the first message and the conflict path never finds it."
+  },
+  {
+   "id": "im-send-replay-skips-content-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\tif !same {",
+   "new": "\tif false && !same {",
+   "test": "internal/modules/im ^TestResendWithDifferentContentIsRejected$",
+   "why": "A resend with the same request_id but different content is no longer rejected with InvalidInput on RequestID."
+  },
+  {
+   "id": "im-send-replay-lookup-ignores-sender-kind",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/store/messages.sql.go",
+   "old": "m.sender_kind = $3 AND m.request_id = $4",
+   "new": "$3::text IS NOT NULL AND m.request_id = $4",
+   "test": "internal/modules/im ^TestSameRequestIDFromBothSidesCreatesTwoMessages$",
+   "why": "The resend lookup stops keying on the sender side, so the store's message with the buyer's request_id is treated as a resend of the buyer's message."
+  },
+  {
+   "id": "im-messages-request-unique-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/db/migrations/20261122054023_im_message_request_id.sql",
+   "old": ", ADD CONSTRAINT \"messages_request_key\" UNIQUE (\"conversation_id\", \"sender_kind\", \"request_id\")",
+   "new": "",
+   "test": "internal/modules/im ^TestConcurrentSameRequestIDWritesOnce$",
+   "why": "Without the UNIQUE key the final guarantee for concurrent identical request_ids is gone."
+  },
+  {
+   "id": "im-conversation-parties-swapped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/read/read.go",
+   "old": "BuyerID: r.BuyerID, StoreID: r.StoreID}, nil\n}\n\n// MessageParties 回傳",
+   "new": "BuyerID: r.StoreID, StoreID: r.BuyerID}, nil\n}\n\n// MessageParties 回傳",
+   "test": "internal/modules/im ^TestPartiesReadsOwnershipOnly$",
+   "why": "ConversationParties returns the buyer and store the wrong way round."
   }
  ]
 }

@@ -16,7 +16,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與 `Orders`、`Buyers`、`Stores` port。
 - `internal/write`（送出、已讀、隱藏、還原）、`internal/read`（列表、訊息、未讀、relay 讀取）、`internal/rows`（列轉對外型別、墓碑與預覽推導）、`internal/mediaref`（媒體引用同步）、`internal/live`（即時通道：通知、LISTEN 連線、Hub、訂閱者、存活標記與其清理 job）、`internal/purge`（刪帳與退場的訂閱者邏輯、抹除 job 與保底掃描）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
-- 寫入的鎖順序見 `internal/write/AGENTS.md`。
+- 寫入的鎖順序與送出冪等見 `internal/write/AGENTS.md`。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 - 訂單由 `Orders` port 取（`cmd/hawkr/im.go` 以 `legacy/orderservice` 實作，ordering 搬進單體後換）；`Buyers`、`Stores` 傳 `*buyer.Module`、`*seller.Module`。
 
@@ -34,7 +34,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 - LISTEN 連線必須是直連或 session 模式的 Postgres，不能經 transaction pooling：`Deps.ListenConnConfig` 指向專用連線，nil 時以主連線池的設定另開，不從池借；不在執行期偵測。
 - Hub 的 `partyKey` 含 kind；扇出只合併待處理訊號、永不阻塞，超過上限回 `Resync`。每個 Party 的全域並行串流上限在 `Subscribe` 的 transaction 內以 advisory lock 數 `presence_streams`，寫入失敗讓 `Subscribe` 失敗。
 - `presence_streams.expires_at` 與 `conversations.last_message_at` 只由資料庫時鐘產生與比較（查詢參數沒有時間型別）。在線狀態沒有最後上線時間，以共有對話授權，任一方向封鎖回離線。
-- 串流只讀：停權與封鎖不結束串流，只有關店由 `Subscription.Revalidate` 結束；heartbeat、壽命、寫入 deadline、重驗節奏屬串流傳輸 helper，不在模組。
+- 串流只讀：停權與封鎖不結束串流，只有關店由 `Subscription.Revalidate` 結束；傳輸 helper 不在模組（見「不負責」）。
 
 ## 不負責
 

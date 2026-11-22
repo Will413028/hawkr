@@ -200,6 +200,15 @@ type SendInput struct {
 	Type           MessageType
 	Text           string
 	StagedToken    string
+	// RequestID 是送出的冪等鍵（必填、UUIDv4）：同一個 (對話, 寄件方, RequestID) 重送回第一次寫入的那則訊息，內容不同回 InvalidInput。
+	RequestID uuid.UUID
+}
+
+// ConversationParties 是一個對話的雙方（歸屬事實）。
+type ConversationParties struct {
+	ConversationID uuid.UUID
+	BuyerID        int64
+	StoreID        int64
 }
 
 // RelayMessage 是 relay 組推播 payload 要的原始資料：不套可見性，Hidden、Erased 與 ReceiverInactive（收件人身分已刪除或退場）讓呼叫端決定要不要送。

@@ -129,6 +129,24 @@ func (q *Queries) AllocateSeq(ctx context.Context, arg AllocateSeqParams) (Alloc
 	return i, err
 }
 
+const conversationParties = `-- name: ConversationParties :one
+SELECT id AS conversation_id, buyer_id, store_id FROM im.conversations WHERE id = $1
+`
+
+type ConversationPartiesRow struct {
+	ConversationID uuid.UUID
+	BuyerID        int64
+	StoreID        int64
+}
+
+// 對話的雙方（歸屬）：不鎖列。
+func (q *Queries) ConversationParties(ctx context.Context, id uuid.UUID) (ConversationPartiesRow, error) {
+	row := q.db.QueryRow(ctx, conversationParties, id)
+	var i ConversationPartiesRow
+	err := row.Scan(&i.ConversationID, &i.BuyerID, &i.StoreID)
+	return i, err
+}
+
 const databaseNow = `-- name: DatabaseNow :one
 SELECT clock_timestamp()::timestamptz
 `

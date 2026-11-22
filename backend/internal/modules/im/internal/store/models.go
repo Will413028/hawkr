@@ -65,6 +65,7 @@ type ImMessage struct {
 	ConversationID uuid.UUID
 	Seq            int64
 	SenderKind     string
+	RequestID      uuid.UUID
 	MessageType    string
 	Content        *string
 	ImageAssetID   *string

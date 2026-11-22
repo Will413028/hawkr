@@ -127,7 +127,7 @@ func (f *fixture) sender(kind model.PartyKind) model.Party {
 }
 
 func (f *fixture) input(kind model.PartyKind) model.SendInput {
-	in := model.SendInput{Sender: f.sender(kind), Type: model.TypeText, Text: "你好"}
+	in := model.SendInput{Sender: f.sender(kind), Type: model.TypeText, Text: "你好", RequestID: uuid.NewV4()}
 	if kind == model.PartyBuyer {
 		in.CounterpartID = storeID
 	} else {
@@ -402,5 +402,40 @@ func TestInputValidation(t *testing.T) {
 	in.Sender = model.Party{}
 	if _, err := f.s.checkInput("zh-TW", &in); err == nil {
 		t.Fatal("空的寄件人要回錯誤")
+	}
+}
+
+// RequestID 必填而且必須是 UUIDv4：零值、其他版本、其他 variant 都回 InvalidInput 指向 RequestID。
+func TestCheckInputRequestID(t *testing.T) {
+	v7 := uuid.NewV7()
+	badVariant := uuid.NewV4()
+	badVariant[8] = 0x00
+	cases := []struct {
+		name string
+		id   uuid.UUID
+		ok   bool
+	}{
+		{"v4", uuid.NewV4(), true},
+		{"零值", uuid.UUID{}, false},
+		{"v7", v7, false},
+		{"variant 不是 RFC 9562", badVariant, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFixture()
+			in := f.input(model.PartyBuyer)
+			in.RequestID = c.id
+			_, err := f.s.checkInput("zh-TW", &in)
+			if c.ok {
+				if err != nil {
+					t.Fatalf("v4 應通過，實際 %v", err)
+				}
+				return
+			}
+			var ae *apperr.Error
+			if apperr.KindOf(err) != apperr.KindInvalidInput || !errors.As(err, &ae) || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "RequestID" {
+				t.Fatalf("要回 InvalidInput 指向 RequestID，實際 %v", err)
+			}
+		})
 	}
 }
