@@ -24,6 +24,31 @@ export function canDecide(kase: Case): boolean {
 	return kase.state === CaseState.OPEN;
 }
 
+export const REVERSE_FAILED_TEXT =
+	"撤銷失敗，案件沒有變動；請確認網路狀態後再試一次。";
+export const REVERSE_PRECONDITION_TEXT =
+	"無法撤銷：案件可能已撤銷過、處置不是隱藏，或內容的隱藏是別的案件造成的。請重新整理頁面確認案件狀態。";
+
+/** 只有已結案、處置是隱藏、還沒撤銷過的案件能撤銷隱藏。 */
+export function canReverse(kase: Case): boolean {
+	return (
+		kase.state === CaseState.CLOSED &&
+		kase.decision === CaseDecision.VIOLATION &&
+		kase.action === CaseAction.HIDE &&
+		!kase.reversal
+	);
+}
+
+/** 撤銷原因的檢查，與伺服器一致：去除首尾空白後 1 到 500 個字元。 */
+export function validateReverseReason(reason: string): string | undefined {
+	const trimmed = trimGoSpace(reason);
+	if (trimmed.length === 0) return "請填寫撤銷原因。";
+	if (goTrimmedRuneCount(trimmed) > REASON_MAX_LENGTH) {
+		return `撤銷原因最多 ${REASON_MAX_LENGTH} 字。`;
+	}
+	return undefined;
+}
+
 export const TAKEDOWN_NO_STORE_TEXT =
 	"案件沒有內容快照的店家（快照已過保留期或內容不是店家寫的），無法建立下架措施。";
 

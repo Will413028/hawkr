@@ -1,6 +1,7 @@
 "use client";
 
 import { timestampDate, timestampMs } from "@bufbuild/protobuf/wkt";
+import { Code } from "@connectrpc/connect";
 import { useMutation, useQuery } from "@connectrpc/connect-query";
 import {
 	CaseDecision,
@@ -14,8 +15,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Field, Section } from "@/app/admin/governance/DetailBits";
+import { GovernanceNoticeBanner } from "@/app/admin/merchants/[id]/GovernanceNotice";
 import { measureStateBadge } from "@/app/admin/merchants/[id]/measure";
-import { Button, StatusBadge, useToast } from "@/components/UI";
+import { Button, Dialog, StatusBadge, useToast } from "@/components/UI";
 import { type ConflictText, runAction } from "@/lib/connect-action";
 import { connectErrorText } from "@/lib/error-text";
 import { formatDateTimeShort } from "@/lib/format";
@@ -23,8 +25,14 @@ import { policyCategoryText } from "@/lib/policy-category";
 import {
 	CASE_CONFLICT_TEXT,
 	canDecide,
+	canReverse,
 	DECIDE_FAILED_TEXT,
+	REASON_MAX_LENGTH,
+	REVERSE_FAILED_TEXT,
+	REVERSE_PRECONDITION_TEXT,
+	validateReverseReason,
 } from "../../case-decide";
+import { snapshotView } from "../../case-snapshot";
 import {
 	caseActionText,
 	caseDecisionText,
@@ -55,8 +63,15 @@ export default function ModerationCaseDetailPage() {
 	const queryClient = useQueryClient();
 	const { showToast } = useToast();
 	const [dialog, setDialog] = useState(false);
+	const [reverseOpen, setReverseOpen] = useState(false);
+	const [reverseReason, setReverseReason] = useState("");
+	const [reverseError, setReverseError] = useState<string | null>(null);
+	const [reversing, setReversing] = useState(false);
 	const detail = useQuery(ModerationAdminService.method.getCase, { id });
 	const decide = useMutation(ModerationAdminService.method.decideCase, {
+		onSuccess: () => queryClient.invalidateQueries(),
+	});
+	const reverse = useMutation(ModerationAdminService.method.reverseHide, {
 		onSuccess: () => queryClient.invalidateQueries(),
 	});
 	const kase = detail.data?.case;
@@ -133,6 +148,40 @@ export default function ModerationCaseDetailPage() {
 		setDialog(false);
 	};
 
+	const submitReverse = async () => {
+		if (reversing) return;
+		const invalid = validateReverseReason(reverseReason);
+		if (invalid) {
+			setReverseError(invalid);
+			return;
+		}
+		setReverseError(null);
+		setReversing(true);
+		const result = await runAction(
+			() => reverse.mutateAsync({ id, reason: reverseReason }),
+			{
+				reload: async () => {
+					await detail.refetch();
+				},
+				fallback: REVERSE_FAILED_TEXT,
+				conflictText,
+			},
+		);
+		setReversing(false);
+		if (!result.ok) {
+			setReverseError(
+				result.code === Code.FailedPrecondition
+					? REVERSE_PRECONDITION_TEXT
+					: result.text,
+			);
+			return;
+		}
+		setReverseOpen(false);
+		setReverseReason("");
+	};
+	const snapshot = detail.data?.snapshot;
+	const snapshotRows = snapshotView(snapshot);
+
 	return (
 		<div className="certification-detail-page">
 			<div className="detail-header">
@@ -160,6 +209,14 @@ export default function ModerationCaseDetailPage() {
 				</div>
 			)}
 
+			{canReverse(kase) && (
+				<div className="header-actions" style={{ display: "flex", gap: 16 }}>
+					<Button variant="outline" onClick={() => setReverseOpen(true)}>
+						撤銷隱藏
+					</Button>
+				</div>
+			)}
+
 			<Section id="moderation-case-summary" icon="folder" title="案件">
 				<div className="info-grid">
 					<Field label="對象種類">
@@ -181,9 +238,57 @@ export default function ModerationCaseDetailPage() {
 							)}
 							<Field label="結案的管理員">{kase.decidedBy || "-"}</Field>
 							<Field label="結案時間">{timeText(kase.resolveTime)}</Field>
+							{kase.reversal && (
+								<>
+									<Field label="隱藏已撤銷於">
+										{timeText(kase.reversal.reverseTime)}
+									</Field>
+									<Field label="撤銷的管理員">
+										{kase.reversal.reversedBy || "-"}
+									</Field>
+									<Field label="撤銷原因">{kase.reversal.reason || "-"}</Field>
+								</>
+							)}
 						</>
 					)}
 				</div>
+			</Section>
+
+			<Section
+				id="moderation-case-snapshot"
+				icon="description"
+				title="被檢舉內容"
+			>
+				{snapshot === undefined ? (
+					<p>沒有內容快照（結案滿保留期後已清除）。</p>
+				) : snapshotRows === undefined ? (
+					<p>內容種類無法辨識。</p>
+				) : (
+					<>
+						<p className="adm-operation-field-note">
+							{snapshotRows.title}・檢舉當下的版本
+						</p>
+						<div className="info-grid">
+							{snapshotRows.fields.map((field) => (
+								<Field key={field.label} label={field.label}>
+									{field.value}
+								</Field>
+							))}
+						</div>
+						{snapshotRows.context.length > 0 && (
+							<>
+								<p className="adm-operation-field-note">前後文</p>
+								<ul className="adm-operation-list">
+									{snapshotRows.context.map((line) => (
+										<li key={line.seq} data-tombstone={line.tombstone}>
+											#{line.seq}・{line.text}
+										</li>
+									))}
+								</ul>
+							</>
+						)}
+					</>
+				)}
 			</Section>
 
 			{measureId && (
@@ -229,6 +334,57 @@ export default function ModerationCaseDetailPage() {
 					</ul>
 				)}
 			</Section>
+
+			{reverseOpen && canReverse(kase) && (
+				<Dialog
+					title="撤銷隱藏"
+					closeLabel="關閉"
+					onClose={() => setReverseOpen(false)}
+					busy={reversing}
+					footer={
+						<>
+							<Button
+								variant="outline"
+								onClick={() => setReverseOpen(false)}
+								disabled={reversing}
+							>
+								取消
+							</Button>
+							<Button
+								variant="primary"
+								onClick={submitReverse}
+								disabled={reversing}
+							>
+								{reversing ? "送出中…" : "確認撤銷"}
+							</Button>
+						</>
+					}
+				>
+					<p className="adm-operation-field-note">
+						內容會恢復顯示；案件的決定不變，撤銷只能做一次。
+					</p>
+					<label className="form-label" htmlFor="moderation-reverse-reason">
+						撤銷原因 <span className="required">*</span>
+					</label>
+					<textarea
+						id="moderation-reverse-reason"
+						className="form-textarea"
+						rows={3}
+						value={reverseReason}
+						disabled={reversing}
+						onChange={(e) => {
+							setReverseReason(e.target.value);
+							setReverseError(null);
+						}}
+					/>
+					<p className="adm-operation-field-note">
+						最多 {REASON_MAX_LENGTH} 字。
+					</p>
+					<GovernanceNoticeBanner
+						notice={reverseError ? { tone: "error", text: reverseError } : null}
+					/>
+				</Dialog>
+			)}
 
 			{dialog && canDecide(kase) && (
 				<DecideModerationCaseDialog
