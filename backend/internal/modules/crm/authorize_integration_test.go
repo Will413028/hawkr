@@ -39,8 +39,14 @@ func TestSuspendedStoreIsRejectedByTheModuleForWritesAndReads(t *testing.T) {
 	wantDenied("ListTags", errOnly(f.m.ListTags(ctx, storeA)))
 	wantDenied("GetCustomer", errOnly(f.m.GetCustomer(ctx, storeA, buyer1)))
 	wantDenied("ListCustomers", errOnly(f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeA, Sort: crm.SortTotalSpent})))
-	if got := f.tagNames(storeA); len(got) != 1 || got[0] != "舊" {
-		t.Errorf("被擋的寫入改了標籤：%v", got)
+	if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1", storeA); n != 1 {
+		t.Errorf("被擋的寫入改了標籤數量：%d", n)
+	}
+	if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1 AND name = '舊'", storeA); n != 1 {
+		t.Error("被擋的寫入改了標籤名稱")
+	}
+	if n := f.scalar("SELECT count(*) FROM crm.customer_tags WHERE store_id = $1 AND buyer_id = $2", storeA, buyer1); n != 1 {
+		t.Errorf("被擋的寫入改了客戶的標籤：%d", n)
 	}
 	if n := f.scalar("SELECT count(*) FROM crm.customers WHERE store_id = $1 AND customer_type = 'VIP'", storeA); n != 0 {
 		t.Error("被擋的寫入改了分類")

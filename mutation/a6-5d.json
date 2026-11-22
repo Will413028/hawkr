@@ -175,7 +175,7 @@
    "id": "crm-read-authorize-dropped",
    "stack": "go-integration",
    "file": "backend/internal/modules/crm/internal/read/read.go",
-   "old": "\tif err := s.authorize(ctx, storeID); err != nil {\n\t\treturn nil, err\n\t}\n\trs, err := s.q(ctx).ListTags(ctx, storeID)",
+   "old": "\tif err := s.authorize(ctx, storeID, tagNotFound); err != nil {\n\t\treturn nil, err\n\t}\n\trs, err := s.q(ctx).ListTags(ctx, storeID)",
    "new": "\trs, err := s.q(ctx).ListTags(ctx, storeID)",
    "test": "internal/modules/crm ^TestSuspendedStoreIsRejectedByTheModuleForWritesAndReads$",
    "why": "ListTags reads a suspended store without checking the seller capability."
@@ -217,13 +217,13 @@
    "why": "The whitelist input for GetCustomerResponse no longer matches the real descriptor, so the CD8 assertion on the walked descriptor must report the mismatch."
   },
   {
-   "id": "crm-write-lock-not-closed-dropped",
+   "id": "crm-write-buyer-not-found-not-mapped",
    "stack": "go-integration",
    "file": "backend/internal/modules/crm/internal/write/write.go",
-   "old": "\tif err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {",
-   "new": "\tif err := error(nil); err != nil {",
+   "old": "\t\tif apperr.KindOf(err) == apperr.KindNotFound {\n\t\t\treturn customerNotFound(ctx)\n\t\t}\n\t\treturn err\n\t}\n\treturn s.lockStore(ctx, storeID, customerNotFound)",
+   "new": "\t\treturn err\n\t}\n\treturn s.lockStore(ctx, storeID, customerNotFound)",
    "test": "internal/modules/crm ^TestInactiveBuyerIsInvisibleAndReadOnlyToSellers$",
-   "why": "The module no longer checks the buyer's visibility before writing, so a write to a deleted buyer's customer commits (or fails later) instead of returning not_found with nothing written."
+   "why": "A closed or missing buyer surfaces the buyer module's raw not_found instead of the CRM CUSTOMER_NOT_FOUND reason."
   },
   {
    "id": "crm-read-store-not-found-swallowed",
@@ -239,7 +239,7 @@
    "stack": "go",
    "file": "backend/internal/httpapi/crm/crm.go",
    "old": "\t\treturn nil, err\n\t}\n\treturn out[0], nil",
-   "new": "\t\treturn nil, err\n\t}\n\tif out[0].GetDisplay().GetDeleted() {\n\t\treturn nil, h.failure(crm.CustomerNotFound(ctx), noFieldPaths)\n\t}\n\treturn out[0], nil",
+   "new": "\t\treturn nil, err\n\t}\n\tif out[0].GetDisplay().GetDeleted() {\n\t\treturn nil, h.failure(apperr.NotFound(\"%s\", \"customer\"), noFieldPaths)\n\t}\n\treturn out[0], nil",
    "test": "internal/httpapi/crm ^TestDeletedDisplayOnlyMapsToDisplayDeleted$",
    "why": "The handler judges visibility again after the module committed the write; visibility belongs to the module."
   },
