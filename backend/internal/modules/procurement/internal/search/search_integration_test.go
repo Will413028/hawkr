@@ -393,7 +393,10 @@ func TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidate
 	t.Cleanup(func() {
 		releaseHeld()
 		select {
-		case <-dispatched:
+		case err := <-dispatched:
+			if err != nil {
+				t.Logf("搜尋提交在清理時回傳錯誤：%v", err)
+			}
 		case <-time.After(5 * time.Second):
 		}
 	})
