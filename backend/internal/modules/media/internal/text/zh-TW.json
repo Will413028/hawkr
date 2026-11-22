@@ -1,0 +1,53 @@
+{
+  "default": {
+    "media.asset_unavailable": {
+      "message": "這筆上傳的資產已不可用",
+      "description": "資產不是 ACTIVE（例如已被擁有者刪除）。"
+    },
+    "media.upload_content_type_unsupported": {
+      "message": "不支援的圖片型別，只接受 JPEG、PNG、WebP、GIF",
+      "description": "宣告的內容型別不在圖片白名單內，或格式不合法。"
+    },
+    "media.upload_expired": {
+      "message": "這筆上傳已過期",
+      "description": "暫存上傳已過期或已被清除。"
+    },
+    "media.upload_md5_invalid": {
+      "message": "上傳的 MD5 必須是 16 位元組的 base64",
+      "description": "宣告的 MD5 不是 16 位元組的 base64。"
+    },
+    "media.upload_not_found": {
+      "message": "找不到這筆上傳",
+      "description": "token 不存在或不屬於呼叫者；兩者同一句，不洩漏 token 是否存在。"
+    },
+    "media.upload_not_ready": {
+      "message": "這筆上傳還沒處理完成",
+      "description": "上傳尚未到可確認的狀態。"
+    },
+    "media.upload_processing": {
+      "message": "這筆上傳正在被處理",
+      "description": "上傳正在處理中。"
+    },
+    "media.upload_rejected": {
+      "message": "這筆上傳被拒絕，不能確認",
+      "description": "處理時被拒絕的上傳不能確認。"
+    },
+    "media.upload_size_too_large": {
+      "message": "上傳的大小超過上限 {max} 位元組",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "宣告的上傳大小超過公開上傳上限。"
+    },
+    "media.upload_size_zero": {
+      "message": "上傳的大小必須大於零",
+      "description": "宣告的上傳大小為零或負數。"
+    },
+    "media.uploader_invalid": {
+      "message": "上傳者不合法",
+      "description": "上傳者身分缺失或不合法。"
+    }
+  }
+}

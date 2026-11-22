@@ -147,7 +147,7 @@ func TestPresignedPutSignsExactlyTheBoundHeaders(t *testing.T) {
 		if q.Get("X-Amz-Signature") == "" || q.Get("X-Amz-Expires") != "600" {
 			t.Errorf("query: %v", q)
 		}
-		if p.Headers["If-None-Match"] != "*" || p.Headers["Content-Length"] != "2000" ||
+		if p.Headers["If-None-Match"] != "*" || p.Headers["Content-Length"] != "" ||
 			p.Headers["Content-Type"] != "image/png" || p.Headers["Content-MD5"] == "" {
 			t.Errorf("headers: %v", p.Headers)
 		}

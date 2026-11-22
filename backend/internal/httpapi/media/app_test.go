@@ -138,7 +138,7 @@ func TestOnlyAnAccountCanCall(t *testing.T) {
 
 func TestBeginUploadPassesTheDeclarationAndReturnsTheSignedUpload(t *testing.T) {
 	exp := time.Date(2026, 11, 23, 1, 2, 3, 0, time.UTC)
-	f := &fakeUploads{beginRes: media.BeginResult{ID: uuid.New(), Token: "tok", URL: "https://s.example/tmp/a", Headers: map[string]string{"Content-Type": "image/png", "Content-MD5": "m", "Content-Length": "10"}, ExpiresAt: exp}}
+	f := &fakeUploads{beginRes: media.BeginResult{ID: uuid.New(), Token: "tok", URL: "https://s.example/tmp/a", Headers: map[string]string{"Content-Type": "image/png", "Content-MD5": "m"}, ExpiresAt: exp}}
 	e := newEnv(t, newApp(f))
 	resp, err := e.client.BeginUpload(t.Context(), signedIn(&pb.BeginUploadRequest{Size: 1234, ContentType: "image/png", Md5: "m"}))
 	if err != nil {
@@ -150,11 +150,6 @@ func TestBeginUploadPassesTheDeclarationAndReturnsTheSignedUpload(t *testing.T) 
 	m := resp.Msg
 	if m.GetStagedToken() != "tok" || m.GetUploadUrl() != "https://s.example/tmp/a" || m.GetUploadHeaders()["Content-MD5"] != "m" || m.GetUploadHeaders()["Content-Type"] != "image/png" || !m.GetExpireTime().AsTime().Equal(exp) {
 		t.Fatalf("回應：%v", m)
-	}
-	for k := range m.GetUploadHeaders() {
-		if strings.EqualFold(k, "Content-Length") {
-			t.Fatalf("upload_headers 不該含 Content-Length：%v", m.GetUploadHeaders())
-		}
 	}
 }
 

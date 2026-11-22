@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -70,10 +69,9 @@ func validatePresign(in PresignPutInput) error {
 
 func presignHeaders(in PresignPutInput) map[string]string {
 	return map[string]string{
-		"Content-Length": strconv.FormatInt(in.ContentLength, 10),
-		"Content-Type":   in.ContentType,
-		"Content-MD5":    in.ContentMD5,
-		"If-None-Match":  "*",
+		"Content-Type":  in.ContentType,
+		"Content-MD5":   in.ContentMD5,
+		"If-None-Match": "*",
 	}
 }
 

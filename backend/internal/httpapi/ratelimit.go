@@ -39,8 +39,8 @@ var (
 	tierPostView = rateTier{name: "post-view", visitor: 120, ssr: 2400, ci: 60}
 )
 
-// tierBeginUpload 是 MediaAppService.BeginUpload 的額度：每次都發預簽網址並寫一筆暫存列，額度同 tierProductView（以帳號計；一次發文或換頭像
-// 只用一次，批次上傳的使用者也在額度內）。
+// tierBeginUpload 是 MediaAppService.BeginUpload 的額度：每次都發預簽網址並寫一筆暫存列，額度與 tierProductView 的 visitor 相同（每個登入帳號每分鐘 120 次；
+// ssr 與 ci 不設，因為只有登入帳號會呼叫）。一次發文或換頭像只用一次，批次上傳的使用者也在額度內。
 var tierBeginUpload = rateTier{name: "begin-upload", visitor: 120}
 
 // tierAppLogin 是 App 原生登入的兩個公開 procedure（IssueAppLoginNonce、ExchangeIdToken）的額度，兩者共用同一個計數器，以來源 IP 計數（沒有登入的

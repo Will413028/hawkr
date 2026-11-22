@@ -25,7 +25,8 @@ const MaxPresignExpiry = 7 * 24 * time.Hour
 // Store 是 media 需要的物件儲存操作。所有呼叫都不得放在 DB transaction 內。
 type Store interface {
 	// PresignPut 產生預簽 PUT。簽章綁確切的 Content-Length、Content-Type、Content-MD5 與 If-None-Match: *，
-	// client 必須原樣送出回傳的 Headers。
+	// client 必須原樣送出回傳的 Headers。Headers 不含 Content-Length：它由 body 的實際長度決定（瀏覽器與多數 HTTP 客戶端不允許自行設定），
+	// body 長度必須等於 ContentLength。
 	PresignPut(ctx context.Context, in PresignPutInput) (PresignedPut, error)
 	// Get 串流讀取物件，呼叫方負責關閉。不存在回 ErrNotFound。
 	Get(ctx context.Context, key string) (io.ReadCloser, error)

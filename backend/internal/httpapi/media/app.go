@@ -7,7 +7,6 @@ package media
 
 import (
 	"context"
-	"strings"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -62,16 +61,10 @@ func (h *App) BeginUpload(ctx context.Context, req *connect.Request[pb.BeginUplo
 	if err != nil {
 		return nil, err
 	}
-	headers := make(map[string]string, len(res.Headers))
-	for k, v := range res.Headers {
-		if !strings.EqualFold(k, "Content-Length") {
-			headers[k] = v
-		}
-	}
 	return connect.NewResponse(&pb.BeginUploadResponse{
 		StagedToken:   res.Token,
 		UploadUrl:     res.URL,
-		UploadHeaders: headers,
+		UploadHeaders: res.Headers,
 		ExpireTime:    timestamppb.New(res.ExpiresAt),
 	}), nil
 }

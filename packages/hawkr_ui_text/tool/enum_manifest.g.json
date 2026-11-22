@@ -78,6 +78,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.media.v1alpha1.RejectReason",
+      "dartClass": "RejectReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.media.v1alpha1.UploadState",
+      "dartClass": "UploadState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.moderation.v1alpha1.ReportOutcome",
       "dartClass": "ReportOutcome",
       "dartLibrary": "package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart",

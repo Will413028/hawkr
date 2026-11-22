@@ -323,6 +323,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.media.v1alpha1.RejectReason",
+      "tsName": "RejectReason",
+      "tsModule": "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.media.v1alpha1.UploadState",
+      "tsName": "UploadState",
+      "tsModule": "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.moderation.v1alpha1.ReportOutcome",
       "tsName": "ReportOutcome",
       "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",

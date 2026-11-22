@@ -164,7 +164,7 @@ func md5B64(b []byte) string {
 }
 
 // sendPresigned 以純 net/http 送出預簽 PUT：header 取自簽發結果，可用 override 覆蓋個別 header；
-// Content-Length 由 body 長度決定（Go 不允許用 header 設定）。回傳 HTTP 狀態碼。
+// 簽發結果不含 Content-Length，它由 body 長度決定。回傳 HTTP 狀態碼。
 // override 的值為空字串時刪除該 header。
 func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[string]string) presignedResp {
 	t.Helper()
@@ -173,9 +173,6 @@ func sendPresigned(t *testing.T, p PresignedPut, body []byte, override map[strin
 		t.Fatal(err)
 	}
 	for k, v := range p.Headers {
-		if k == "Content-Length" {
-			continue
-		}
 		req.Header.Set(k, v)
 	}
 	for k, v := range override {

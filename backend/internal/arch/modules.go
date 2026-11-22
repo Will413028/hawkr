@@ -220,7 +220,8 @@ var InternalDependencies = map[string]InternalGraph{
 			"secure":  {},
 			"storage": {},
 			"store":   {},
-			"upload":  {"image", "model", "secure", "storage", "store"},
+			"text":    {},
+			"upload":  {"image", "model", "secure", "storage", "store", "text"},
 		},
 	},
 	"accountsuspension": {

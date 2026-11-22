@@ -1,0 +1,37 @@
+{
+  "default": {
+    "media.asset_unavailable": {
+      "message": "The asset of this upload is no longer available"
+    },
+    "media.upload_content_type_unsupported": {
+      "message": "Unsupported image type; only JPEG, PNG, WebP and GIF are accepted"
+    },
+    "media.upload_expired": {
+      "message": "This upload has expired"
+    },
+    "media.upload_md5_invalid": {
+      "message": "The upload MD5 must be base64 of 16 bytes"
+    },
+    "media.upload_not_found": {
+      "message": "Upload not found"
+    },
+    "media.upload_not_ready": {
+      "message": "This upload has not finished processing"
+    },
+    "media.upload_processing": {
+      "message": "This upload is still being processed"
+    },
+    "media.upload_rejected": {
+      "message": "This upload was rejected and cannot be confirmed"
+    },
+    "media.upload_size_too_large": {
+      "message": "The upload exceeds the limit of {max} bytes"
+    },
+    "media.upload_size_zero": {
+      "message": "The upload size must be greater than zero"
+    },
+    "media.uploader_invalid": {
+      "message": "The uploader is not valid"
+    }
+  }
+}

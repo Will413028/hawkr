@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mime"
 	"strings"
 	"time"
 	"uuid"
@@ -24,9 +25,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // Deps 是服務的依賴。
@@ -104,10 +107,7 @@ type ConfirmedAsset struct {
 	SizeBytes   int64
 }
 
-const (
-	tokenBytes        = 32
-	maxContentTypeLen = 255
-)
+const tokenBytes = 32
 
 func hashToken(token string) []byte {
 	h := sha256.Sum256([]byte(token))
@@ -126,51 +126,63 @@ func wellFormed(token string) bool {
 	return len(token) == base64.RawURLEncoding.EncodedLen(tokenBytes) && !strings.ContainsAny(token, "+/=")
 }
 
-func allowedContentType(ct string) bool {
+// normalizeContentType 解析宣告的 Content-Type：去掉參數、轉小寫、把 image/jpg 視為 image/jpeg，回傳白名單內的正規值。
+func normalizeContentType(ct string) (string, bool) {
+	mt, _, err := mime.ParseMediaType(ct)
+	if err != nil {
+		return "", false
+	}
+	if mt == "image/jpg" {
+		mt = image.JPEG.ContentType()
+	}
 	for _, f := range []image.Format{image.JPEG, image.PNG, image.WebP, image.GIF} {
-		if f.ContentType() == ct {
-			return true
+		if f.ContentType() == mt {
+			return mt, true
 		}
 	}
-	return false
+	return "", false
 }
 
-func validate(in BeginInput) error {
+func loc(ctx context.Context) uitext.Locale { return uitext.LocaleFrom(ctx) }
+
+// validate 驗證宣告並回傳 Content-Type 已正規化的輸入；簽章與回傳的 header 都用正規值。
+func validate(ctx context.Context, in BeginInput) (BeginInput, error) {
 	if in.Size <= 0 {
-		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小必須大於零")
+		return in, apperr.InvalidInputOn([]string{"size"}, "%s", text.MediaUploadSizeZero(loc(ctx)))
 	}
 	if in.Size > model.MaxPublicUploadSize {
-		return apperr.InvalidInputOn([]string{"size"}, "上傳的大小超過上限 %d 位元組", model.MaxPublicUploadSize)
+		return in, apperr.InvalidInputOn([]string{"size"}, "%s", text.MediaUploadSizeTooLarge(loc(ctx), text.MediaUploadSizeTooLargeArgs{Max: int(model.MaxPublicUploadSize)}))
 	}
-	if in.ContentType == "" || len(in.ContentType) > maxContentTypeLen || strings.ContainsAny(in.ContentType, "\r\n\x00") {
-		return apperr.InvalidInputOn([]string{"content_type"}, "上傳的型別不合法")
+	ct, ok := normalizeContentType(in.ContentType)
+	if !ok {
+		return in, apperr.InvalidInputOn([]string{"content_type"}, "%s", text.MediaUploadContentTypeUnsupported(loc(ctx)))
 	}
-	if !allowedContentType(in.ContentType) {
-		return apperr.InvalidInputOn([]string{"content_type"}, "不支援的圖片型別，只接受 JPEG、PNG、WebP、GIF")
-	}
+	in.ContentType = ct
 	sum, err := base64.StdEncoding.DecodeString(in.MD5)
 	if err != nil || len(sum) != 16 {
-		return apperr.InvalidInputOn([]string{"md5"}, "上傳的 MD5 必須是 16 位元組的 base64")
+		return in, apperr.InvalidInputOn([]string{"md5"}, "%s", text.MediaUploadMd5Invalid(loc(ctx)))
 	}
-	return nil
+	return in, nil
 }
 
-func notFound() error { return apperr.NotFound("找不到這筆上傳") }
+func notFound(ctx context.Context) error {
+	return apperr.NotFound("%s", text.MediaUploadNotFound(loc(ctx)))
+}
 
 // own 回傳 token 對應的暫存列；不存在或上傳者不符都回同一個 NotFound，不洩漏 token 是否存在。
 func (s *Service) own(ctx context.Context, uploader model.Uploader, token string) (store.MediaStagedUpload, error) {
 	if !wellFormed(token) {
-		return store.MediaStagedUpload{}, notFound()
+		return store.MediaStagedUpload{}, notFound(ctx)
 	}
 	row, err := s.q(ctx).GetUploadByTokenHash(ctx, hashToken(token))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return store.MediaStagedUpload{}, notFound()
+		return store.MediaStagedUpload{}, notFound(ctx)
 	}
 	if err != nil {
 		return store.MediaStagedUpload{}, fmt.Errorf("media：讀取暫存上傳：%w", err)
 	}
 	if row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin {
-		return store.MediaStagedUpload{}, notFound()
+		return store.MediaStagedUpload{}, notFound(ctx)
 	}
 	return row, nil
 }
@@ -181,9 +193,10 @@ func (s *Service) Begin(ctx context.Context, uploader model.Uploader, in BeginIn
 		return BeginResult{}, err
 	}
 	if uploader.ID <= 0 {
-		return BeginResult{}, apperr.InvalidInputOn([]string{"uploader"}, "上傳者不合法")
+		return BeginResult{}, apperr.InvalidInputOn([]string{"uploader"}, "%s", text.MediaUploaderInvalid(loc(ctx)))
 	}
-	if err := validate(in); err != nil {
+	in, err := validate(ctx, in)
+	if err != nil {
 		return BeginResult{}, err
 	}
 	now := s.d.Now()
@@ -228,7 +241,7 @@ func (s *Service) Complete(ctx context.Context, uploader model.Uploader, token s
 			return fmt.Errorf("media：重讀暫存上傳：%w", err)
 		}
 		if st := model.UploadState(cur.State); st == model.StatePending || st == model.StateDeleting || st == model.StateDeleted {
-			return apperr.FailedPrecondition("這筆上傳已過期")
+			return apperr.FailedPrecondition("%s", text.MediaUploadExpired(loc(ctx)))
 		}
 		return nil
 	})
@@ -267,7 +280,7 @@ func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token st
 			return ConfirmedAsset{}, fmt.Errorf("media：重讀暫存上傳：%w", err)
 		}
 		if model.UploadState(cur.State) != model.StateConfirmed {
-			return ConfirmedAsset{}, notConfirmable(cur, s.d.Now())
+			return ConfirmedAsset{}, notConfirmable(ctx, cur, s.d.Now())
 		}
 		return s.assetOf(ctx, cur, true)
 	}
@@ -286,21 +299,21 @@ func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token st
 }
 
 // notConfirmable 把「不能確認」的暫存列翻成呼叫端看得到的錯誤。
-func notConfirmable(row store.MediaStagedUpload, now time.Time) error {
+func notConfirmable(ctx context.Context, row store.MediaStagedUpload, now time.Time) error {
 	switch model.UploadState(row.State) {
 	case model.StateRejected:
-		return apperr.FailedPrecondition("這筆上傳被拒絕，不能確認")
+		return apperr.FailedPrecondition("%s", text.MediaUploadRejected(loc(ctx)))
 	case model.StateDeleting, model.StateDeleted:
-		return apperr.FailedPrecondition("這筆上傳已過期")
+		return apperr.FailedPrecondition("%s", text.MediaUploadExpired(loc(ctx)))
 	case model.StateReady:
 		if !row.ExpiresAt.After(now) {
-			return apperr.FailedPrecondition("這筆上傳已過期")
+			return apperr.FailedPrecondition("%s", text.MediaUploadExpired(loc(ctx)))
 		}
-		return apperr.FailedPrecondition("這筆上傳正在被處理")
+		return apperr.FailedPrecondition("%s", text.MediaUploadProcessing(loc(ctx)))
 	case model.StatePending, model.StateUploaded, model.StateConfirmed:
-		return apperr.FailedPrecondition("這筆上傳還沒處理完成")
+		return apperr.FailedPrecondition("%s", text.MediaUploadNotReady(loc(ctx)))
 	}
-	return apperr.FailedPrecondition("這筆上傳還沒處理完成")
+	return apperr.FailedPrecondition("%s", text.MediaUploadNotReady(loc(ctx)))
 }
 
 // assetOf 回傳暫存列所記的資產；requireActive 時資產不是 ACTIVE（例如已被擁有者刪除）回 FailedPrecondition。
@@ -313,7 +326,7 @@ func (s *Service) assetOf(ctx context.Context, row store.MediaStagedUpload, requ
 		return ConfirmedAsset{}, fmt.Errorf("media：讀取資產：%w", err)
 	}
 	if requireActive && model.AssetState(a.State) != model.AssetActive {
-		return ConfirmedAsset{}, apperr.FailedPrecondition("這筆上傳的資產已不可用")
+		return ConfirmedAsset{}, apperr.FailedPrecondition("%s", text.MediaAssetUnavailable(loc(ctx)))
 	}
 	return ConfirmedAsset{ID: a.ID, Visibility: model.Visibility(a.Visibility), ContentType: a.ContentType, SizeBytes: a.SizeBytes}, nil
 }
