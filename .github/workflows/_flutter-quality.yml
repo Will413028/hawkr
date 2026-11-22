@@ -81,12 +81,42 @@ jobs:
         run: |
           flutter pub get
           dart run tool/check_hardcoded_han.dart --baseline "../../${APP}/tool/han_baseline.json" "../../${APP}/lib"
+      - name: Guard hardcoded Han baseline is not loosened
+        id: han_baseline
+        continue-on-error: true
+        working-directory: packages/hawkr_ui_text
+        env:
+          APP: ${{ inputs.app }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            old_sha="$PR_BASE_SHA"
+          else
+            old_sha="$PUSH_BEFORE"
+          fi
+          if [ -z "$old_sha" ] || [ "$old_sha" = "0000000000000000000000000000000000000000" ]; then
+            echo "skip: no comparison commit for event $EVENT_NAME"
+            exit 0
+          fi
+          if ! git fetch --no-tags --depth=1 origin "$old_sha"; then
+            echo "skip: cannot fetch $old_sha"
+            exit 0
+          fi
+          old_file="$RUNNER_TEMP/han_baseline.old.json"
+          if ! git show "$old_sha:$APP/tool/han_baseline.json" > "$old_file"; then
+            echo "skip: $old_sha has no $APP/tool/han_baseline.json"
+            exit 0
+          fi
+          flutter pub get
+          dart run tool/check_hardcoded_han.dart --baseline "../../${APP}/tool/han_baseline.json" --check-baseline-against "$old_file"
       - name: Verify gen-l10n output is committed
         id: gen_l10n
         continue-on-error: true
         run: |
           flutter gen-l10n
-          git diff --exit-code -- lib/l10n
+          test -z "$(git status --porcelain -- lib/l10n)"
       - name: Upload dead-code report
         if: always()
         continue-on-error: true
@@ -105,6 +135,7 @@ jobs:
           steps.hygiene.outcome == 'failure' ||
           steps.enum_text.outcome == 'failure' ||
           steps.han_ratchet.outcome == 'failure' ||
+          steps.han_baseline.outcome == 'failure' ||
           steps.gen_l10n.outcome == 'failure'
         env:
           FORMAT: ${{ steps.format.outcome }}
@@ -113,6 +144,7 @@ jobs:
           HYGIENE: ${{ steps.hygiene.outcome }}
           ENUM_TEXT: ${{ steps.enum_text.outcome }}
           HAN_RATCHET: ${{ steps.han_ratchet.outcome }}
+          HAN_BASELINE: ${{ steps.han_baseline.outcome }}
           GEN_L10N: ${{ steps.gen_l10n.outcome }}
         run: |
           echo "One or more static checks failed:"
@@ -122,6 +154,7 @@ jobs:
           echo "  hygiene:     $HYGIENE"
           echo "  enum_text:   $ENUM_TEXT"
           echo "  han_ratchet: $HAN_RATCHET"
+          echo "  han_baseline: $HAN_BASELINE"
           echo "  gen_l10n:    $GEN_L10N"
           exit 1
 

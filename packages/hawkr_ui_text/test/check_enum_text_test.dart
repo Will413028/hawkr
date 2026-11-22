@@ -556,7 +556,7 @@ String j(MeasureKind k) => k == $warn ? x.t : '';
     });
   });
 
-  group('ARB 查詢（I-app-0）', () {
+  group('ARB 查詢', () {
     test('context.l10n.x、AppLocalizations.of(context).x、方法呼叫與別名都算產生文字', () {
       expect(
         scan('''

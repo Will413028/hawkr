@@ -779,14 +779,10 @@
       "無法載入選擇清單，請稍後再試": 1
     },
     "lib/features/chat/presentation/chat_preview.dart": {
-      "{}分鐘前": 1,
-      "{}天前": 1,
-      "{}小時前": 1,
       "傳送了一張卡片": 4,
       "傳送了一張商品卡片": 1,
       "傳送了一張圖片": 5,
-      "傳送了一張訂單卡片": 1,
-      "剛剛": 1
+      "傳送了一張訂單卡片": 1
     },
     "lib/features/chat/presentation/chat_send_error_dispatch.dart": {
       "內容未通過審核，請調整後再試": 1,

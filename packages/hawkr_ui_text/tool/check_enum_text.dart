@@ -30,9 +30,9 @@
 /// 不涵蓋（只做語法分析、沒有型別與資料流的極限）：包在函式、getter 裡的條件；`var` 與沒有 `final` 的變數；先把 enum 對應成
 /// 本地的值再以本地值選文字；以 enum 值當索引的 list 或 map；class 靜態欄位、跨檔的物件常數與 re-export 的常數；
 /// 第二個 client 對只有一個 client 用的 enum，以條件形式寫出值的說法（跨端檢查只比對對照表，看不到條件形式）。
-/// 這些由 code review 把關；會發佈 en 的介面另有字面值 ratchet（I-CI）。
+/// 這些由 code review 把關；會發佈 en 的介面另有字面值 ratchet（`tool/check_hardcoded_han.dart`）。
 /// 觸發：dot shorthand（`.M`）要 Dart 3.10 才能寫，任一 Dart 專案的 SDK 下限提到 3.10 以上時，以成員名
-/// （buf 強制 `ENUM_VALUE_PREFIX`，成員名對得回唯一的 enum）支援。ARB 查詢已在 I-app-0 加進「產生文字」；
+/// （buf 強制 `ENUM_VALUE_PREFIX`，成員名對得回唯一的 enum）支援。ARB 查詢算「產生文字」；
 /// 型別是 `AppLocalizations` 的參數（`Widget f(AppLocalizations l10n)`）不認得（只做語法分析，參數一律視為遮蔽）。
 ///
 /// 用法（在 packages/hawkr_ui_text）：`dart run tool/check_enum_text.dart [--report <file>] <dir>...`
@@ -506,7 +506,7 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
   }
 
   /// App 自己的 ARB 查詢（gen-l10n 生成的 `AppLocalizations`）：`AppLocalizations.of(x)`、`x.l10n`（可帶 `!`），或指到這種初始值
-  /// 的 `final`／`const`（`final l10n = context.l10n;`）。後面接成員存取或呼叫就是產生文字（I-app-0）。
+  /// 的 `final`／`const`（`final l10n = context.l10n;`）。後面接成員存取或呼叫就是產生文字。
   bool isArbAccessor(Expression e) {
     final cur = _strip(e);
     if (cur is PostfixExpression && cur.operator.type == TokenType.BANG) {

@@ -160,4 +160,50 @@ String e(int n) => '共 \$n 件，\${n + 1} 筆';
       expect(runWith(['--init']), 1);
     });
   });
+
+  group('--check-baseline-against', () {
+    late File old;
+    setUp(() => old = File('${tmp.path}/old.json'));
+
+    void put(File f, Map<String, Map<String, int>> entries) =>
+        f.writeAsStringSync(jsonEncode({'version': 1, 'entries': entries}));
+
+    int check() => run([
+      '--baseline',
+      baseline.path,
+      '--check-baseline-against',
+      old.path,
+    ]);
+
+    test('同樣或減少、檔案間搬移通過', () {
+      put(old, {
+        'lib/a.dart': {'你好': 2},
+      });
+      put(baseline, {
+        'lib/a.dart': {'你好': 1},
+        'lib/b.dart': {'你好': 1},
+      });
+      expect(check(), 0);
+    });
+
+    test('任一字面值全域總次數變大失敗，新字面值也算', () {
+      put(old, {
+        'lib/a.dart': {'你好': 1},
+      });
+      put(baseline, {
+        'lib/a.dart': {'你好': 2},
+      });
+      expect(check(), 1);
+      put(baseline, {
+        'lib/a.dart': {'你好': 1, '再見': 1},
+      });
+      expect(check(), 1);
+    });
+
+    test('缺檔與未知參數回 2', () {
+      put(baseline, {});
+      expect(check(), 2);
+      expect(run(['--baseline', baseline.path, '--bogus', lib.path]), 2);
+    });
+  });
 }

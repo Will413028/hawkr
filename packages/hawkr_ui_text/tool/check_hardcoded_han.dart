@@ -1,4 +1,4 @@
-/// 硬寫中文的 ratchet（多語系 ADR 2026-10-17-multi-locale-architecture D4 與 2026-10-22 修訂；計畫 I-CI 的 App 部分）。
+/// 硬寫中文的 ratchet（多語系 ADR 2026-10-17-multi-locale-architecture D4 與 2026-10-22 修訂）。
 ///
 /// 用 `package:analyzer` 的 `parseString`（只做語法分析，不用 regex 掃原始碼）：掃 `lib/` 底下每個 Dart 檔的字串字面值，
 /// 含漢字的記成一筆「檔案 → 字面值內容 → 次數」，不記行號（改行不影響）。字面值內容是字串的文字本身；字串插值把每個
@@ -17,6 +17,10 @@
 ///   `dart run tool/check_hardcoded_han.dart --baseline <file> <dir>`
 ///   `dart run tool/check_hardcoded_han.dart --baseline <file> --update <dir>`
 ///   `dart run tool/check_hardcoded_han.dart --baseline <file> --init <dir>`（baseline 檔不存在時建立）
+///   `dart run tool/check_hardcoded_han.dart --baseline <file> --check-baseline-against <舊 baseline>`（不掃目錄）
+///
+/// `--check-baseline-against`：目前 baseline 任一字面值的全域總次數比舊 baseline 大就失敗（檔案間搬移不算），
+/// 擋住「直接改 baseline 放寬額度」。
 /// 結束碼：0 通過、1 違規（超過、新檔、需要 `--update`、`--update` 被拒）、2 用法錯誤。
 library;
 
@@ -205,13 +209,15 @@ String encodeBaseline(HanCounts counts) {
 }
 
 const _usage =
-    '用法：check_hardcoded_han --baseline <file> [--update | --init] <dir>';
+    '用法：check_hardcoded_han --baseline <file> [--update | --init] <dir>\n'
+    '      check_hardcoded_han --baseline <file> --check-baseline-against <舊 baseline>';
 
 int run(List<String> argv) {
   final args = [...argv];
   String? baselinePath;
   var update = false;
   var init = false;
+  String? against;
   final dirs = <String>[];
   for (var i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -225,9 +231,43 @@ int run(List<String> argv) {
         update = true;
       case '--init':
         init = true;
+      case '--check-baseline-against':
+        if (i + 1 >= args.length) {
+          stderr.writeln(_usage);
+          return 2;
+        }
+        against = args[++i];
       default:
+        if (args[i].startsWith('-')) {
+          stderr.writeln('check_hardcoded_han：未知參數 ${args[i]}\n$_usage');
+          return 2;
+        }
         dirs.add(args[i]);
     }
+  }
+  if (against != null) {
+    if (baselinePath == null || dirs.isNotEmpty || update || init) {
+      stderr.writeln(_usage);
+      return 2;
+    }
+    final current = File(baselinePath);
+    final old = File(against);
+    if (!current.existsSync() || !old.existsSync()) {
+      stderr.writeln(
+        'check_hardcoded_han：找不到 baseline（$baselinePath 或 $against）',
+      );
+      return 2;
+    }
+    final loosened = globalIncreases(loadBaseline(old), loadBaseline(current));
+    if (loosened.isNotEmpty) {
+      stderr.writeln('check_hardcoded_han：baseline 比舊版放寬：');
+      for (final l in loosened) {
+        stderr.writeln('  $l');
+      }
+      return 1;
+    }
+    stdout.writeln('check_hardcoded_han：baseline 沒有比舊版放寬');
+    return 0;
   }
   if (baselinePath == null || dirs.length != 1 || (update && init)) {
     stderr.writeln(_usage);
