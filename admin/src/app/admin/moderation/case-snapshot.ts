@@ -2,7 +2,10 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import type {
 	CaseSnapshot,
 	ChatContextMessage,
+	ChatSnapshot,
 } from "@hawkr/api/gen/hawkr/admin/moderation/v1alpha1/moderation_pb";
+import { chatPreviewErased, chatPreviewHidden } from "@hawkr/ui-text/keys";
+import { formatStaff } from "@hawkr/ui-text/zh-TW";
 import { formatDateTimeShort } from "@/lib/format";
 import { unknownText } from "@/lib/ui-text";
 
@@ -20,11 +23,17 @@ export interface SnapshotView {
 
 export interface ContextLine {
 	seq: string;
+	time: string;
 	text: string;
 	tombstone: boolean;
+	/** 被檢舉的那一則（不是前後文）。 */
+	reported: boolean;
 }
 
-function when(value: Parameters<typeof timestampDate>[0] | undefined): string {
+/** 時間戳的顯示文字（台北時間，到分）；沒有時間回「-」。 */
+export function timeText(
+	value: Parameters<typeof timestampDate>[0] | undefined,
+): string {
 	return value ? formatDateTimeShort(timestampDate(value)) : "-";
 }
 
@@ -50,17 +59,22 @@ function assets(ids: readonly string[]): SnapshotField {
 /** 聊天前後文的一則：已隱藏或已抹除的是墓碑，不顯示內文與附件。 */
 export function contextLine(message: ChatContextMessage): ContextLine {
 	const sender = `${authorKindText(message.senderKind)} ${message.senderId}`;
+	const base = {
+		seq: message.seq.toString(),
+		time: timeText(message.sendTime),
+		reported: false,
+	};
 	if (message.erased) {
 		return {
-			seq: message.seq.toString(),
-			text: `${sender}：（已抹除）`,
+			...base,
+			text: `${sender}：（${formatStaff(chatPreviewErased())}）`,
 			tombstone: true,
 		};
 	}
 	if (message.hidden) {
 		return {
-			seq: message.seq.toString(),
-			text: `${sender}：（已隱藏）`,
+			...base,
+			text: `${sender}：（${formatStaff(chatPreviewHidden())}）`,
 			tombstone: true,
 		};
 	}
@@ -69,10 +83,30 @@ export function contextLine(message: ChatContextMessage): ContextLine {
 			? `（附件：${message.assetIds.join("、")}）`
 			: "";
 	return {
-		seq: message.seq.toString(),
+		...base,
 		text: `${sender}：${message.body}${attachments}`,
 		tombstone: false,
 	};
+}
+
+/** 聊天快照的時間線：前後文加上被檢舉的那一則（標記），依 seq 由小到大。 */
+function chatTimeline(chat: ChatSnapshot): ContextLine[] {
+	const attachments =
+		chat.assetIds.length > 0 ? `（附件：${chat.assetIds.join("、")}）` : "";
+	const reported: ContextLine = {
+		seq: chat.seq.toString(),
+		time: timeText(chat.authoredTime),
+		text: `${authorKindText(chat.authorKind)} ${chat.authorId}：${chat.body}${attachments}`,
+		tombstone: false,
+		reported: true,
+	};
+	const lines = chat.context.map((m) => ({
+		line: contextLine(m),
+		seq: m.seq,
+	}));
+	const all = [...lines, { line: reported, seq: chat.seq }];
+	all.sort((x, y) => (x.seq < y.seq ? -1 : x.seq > y.seq ? 1 : 0));
+	return all.map((x) => x.line);
 }
 
 /** 被檢舉內容快照的顯示列；依 oneof 種類各一份，不認得的種類回 undefined（呼叫端顯示未知）。 */
@@ -92,7 +126,7 @@ export function snapshotView(
 					},
 					{ label: "內容", value: dash(content.value.body) },
 					assets(content.value.assetIds),
-					{ label: "發表時間", value: when(content.value.authoredTime) },
+					{ label: "發表時間", value: timeText(content.value.authoredTime) },
 				],
 			};
 		case "buyer":
@@ -115,7 +149,7 @@ export function snapshotView(
 					{ label: "評分", value: content.value.rating.toString() },
 					{ label: "內容", value: dash(content.value.body) },
 					assets(content.value.assetIds),
-					{ label: "發表時間", value: when(content.value.authoredTime) },
+					{ label: "發表時間", value: timeText(content.value.authoredTime) },
 					{ label: "店家回覆（上下文）", value: dash(content.value.replyBody) },
 				],
 			};
@@ -128,7 +162,7 @@ export function snapshotView(
 					{ label: "評價", value: content.value.reviewId },
 					{ label: "評價的買家", value: content.value.reviewerId },
 					{ label: "內容", value: dash(content.value.body) },
-					{ label: "發表時間", value: when(content.value.authoredTime) },
+					{ label: "發表時間", value: timeText(content.value.authoredTime) },
 				],
 			};
 		case "chat":
@@ -143,9 +177,9 @@ export function snapshotView(
 					{ label: "序號", value: content.value.seq.toString() },
 					{ label: "內容", value: dash(content.value.body) },
 					assets(content.value.assetIds),
-					{ label: "發送時間", value: when(content.value.authoredTime) },
+					{ label: "發送時間", value: timeText(content.value.authoredTime) },
 				],
-				context: content.value.context.map(contextLine),
+				context: chatTimeline(content.value),
 			};
 		default:
 			return undefined;

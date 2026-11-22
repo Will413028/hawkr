@@ -1858,3 +1858,30 @@
 		align-items: flex-start;
 	}
 }
+
+.adm-operation-list {
+	display: grid;
+	gap: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.adm-operation-list > li {
+	padding: 10px 0;
+	border-top: 1px solid var(--hk-border);
+	font-size: 14px;
+	line-height: 1.55;
+}
+
+.adm-operation-list > li:first-child {
+	border-top: 0;
+}
+
+.adm-operation-list > li[data-tombstone="true"] {
+	color: var(--hk-muted-text);
+}
+
+.adm-operation-list > li[data-reported="true"] {
+	font-weight: 600;
+}

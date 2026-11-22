@@ -8,6 +8,7 @@ import {
 	createRouterTransport,
 	type Transport,
 } from "@connectrpc/connect";
+import { LocalizedMessageSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import {
 	CaseAction,
 	CaseDecision,
@@ -24,6 +25,7 @@ import {
 	buttonByText,
 	byId,
 	click,
+	dom,
 	maybeById,
 	mount,
 	navigation,
@@ -203,11 +205,61 @@ test("快照：聊天前後文依序顯示，已隱藏與已抹除是墓碑、�
 	await open(transport);
 	const text = bodyText();
 	assert.ok(text.includes("正常前文"));
-	assert.ok(text.includes("（已隱藏）"));
-	assert.ok(text.includes("（已抹除）"));
+	assert.ok(text.includes("（此訊息已被隱藏）"));
+	assert.ok(text.includes("（此訊息已被移除）"));
+	assert.ok(!text.includes("（已隱藏）"));
 	assert.ok(!text.includes("祕密內文"));
 	assert.ok(!text.includes("抹除內文"));
 	assert.ok(text.indexOf("#4") < text.indexOf("#6"));
+});
+
+test("快照：聊天被檢舉的那一則依 seq 排進前後文並標記，每行有發送時間", async () => {
+	const { transport } = setup(
+		() =>
+			closedHide({
+				target: { kind: ReportTargetKind.CHAT_MESSAGE, id: "m-1" },
+			}),
+		{
+			content: {
+				case: "chat",
+				value: {
+					authorKind: "BUYER",
+					authorId: "b-1",
+					body: "被檢舉的訊息",
+					conversationId: "conv-1",
+					seq: BigInt(5),
+					authoredTime: timestampFromMs(Date.UTC(2026, 10, 1, 4, 5)),
+					context: [
+						{
+							seq: BigInt(4),
+							senderKind: "STORE",
+							senderId: "7",
+							body: "前文",
+							sendTime: timestampFromMs(Date.UTC(2026, 10, 1, 4, 3)),
+						},
+						{
+							seq: BigInt(6),
+							senderKind: "STORE",
+							senderId: "7",
+							body: "後文",
+							sendTime: timestampFromMs(Date.UTC(2026, 10, 1, 4, 7)),
+						},
+					],
+				},
+			},
+		},
+	);
+	await open(transport);
+	const items = [...dom.window.document.querySelectorAll("li[data-reported]")];
+	assert.equal(items.length, 3);
+	assert.deepEqual(
+		items.map((li) => li.getAttribute("data-reported")),
+		["false", "true", "false"],
+	);
+	assert.ok(items[0]?.textContent?.includes("#4・2026/11/01 12:03"));
+	assert.ok(items[1]?.textContent?.includes("#5・2026/11/01 12:05・被檢舉"));
+	assert.ok(items[1]?.textContent?.includes("被檢舉的訊息"));
+	assert.ok(items[2]?.textContent?.includes("#6・2026/11/01 12:07"));
 });
 
 test("沒有快照：顯示已清除的說明", async () => {
@@ -255,20 +307,79 @@ test("撤銷隱藏：超過 500 字不送出", async () => {
 	assert.ok(bodyText().includes("最多 500 字"));
 });
 
-test("撤銷隱藏：FAILED_PRECONDITION 顯示專用說明並保留對話框", async () => {
-	const { transport } = setup(
-		() => closedHide(),
+function preconditionError() {
+	return new ConnectError("precondition", Code.FailedPrecondition, undefined, [
+		{
+			desc: LocalizedMessageSchema,
+			value: { locale: "zh-TW", message: "伺服器說：這個案件不能撤銷" },
+		},
+	]);
+}
+
+test("撤銷隱藏：FAILED_PRECONDITION 顯示伺服器文字、重讀案件，案件已不可撤銷時關閉對話框並以 toast 說明", async () => {
+	let reversed = false;
+	const { transport, reverses } = setup(
+		() =>
+			closedHide(
+				reversed
+					? { reversal: { reversedBy: "other", reason: "別人撤銷了" } }
+					: {},
+			),
 		undefined,
 		() => {
-			throw new ConnectError("precondition", Code.FailedPrecondition);
+			reversed = true;
+			throw preconditionError();
 		},
 	);
 	await open(transport);
 	await click("撤銷隱藏");
 	setValue(byId("moderation-reverse-reason"), "誤判");
 	await click("確認撤銷");
-	await until(() => bodyText().includes("無法撤銷"), "前置條件說明");
+	await until(() => reverses.length === 1, "ReverseHide 的請求");
+	await until(
+		() => maybeById("moderation-reverse-reason") === null,
+		"重讀後案件已撤銷，對話框關閉",
+	);
+	assert.ok(bodyText().includes("伺服器說：這個案件不能撤銷"));
+	assert.equal(buttonByText("撤銷隱藏"), undefined);
+});
+
+test("撤銷隱藏：FAILED_PRECONDITION 但案件仍可撤銷時，在對話框內顯示伺服器文字", async () => {
+	const { transport } = setup(
+		() => closedHide(),
+		undefined,
+		() => {
+			throw preconditionError();
+		},
+	);
+	await open(transport);
+	await click("撤銷隱藏");
+	setValue(byId("moderation-reverse-reason"), "誤判");
+	await click("確認撤銷");
+	await until(
+		() => bodyText().includes("伺服器說：這個案件不能撤銷"),
+		"伺服器文字",
+	);
 	assert.ok(maybeById("moderation-reverse-reason"));
+});
+
+test("撤銷隱藏：關閉再開啟時，原因與錯誤都清掉", async () => {
+	const { transport } = setup(() => closedHide());
+	await open(transport);
+	await click("撤銷隱藏");
+	setValue(byId("moderation-reverse-reason"), "   ");
+	await click("確認撤銷");
+	assert.ok(bodyText().includes("請填寫撤銷原因"));
+	await click("取消");
+	await click("撤銷隱藏");
+	assert.ok(!bodyText().includes("請填寫撤銷原因"));
+	setValue(byId("moderation-reverse-reason"), "留下的原因");
+	await click("取消");
+	await click("撤銷隱藏");
+	assert.equal(
+		(byId("moderation-reverse-reason") as HTMLTextAreaElement).value,
+		"",
+	);
 });
 
 test("已撤銷：顯示撤銷資訊，沒有撤銷按鈕", async () => {

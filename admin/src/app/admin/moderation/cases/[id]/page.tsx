@@ -1,6 +1,6 @@
 "use client";
 
-import { timestampDate, timestampMs } from "@bufbuild/protobuf/wkt";
+import { timestampMs } from "@bufbuild/protobuf/wkt";
 import { Code } from "@connectrpc/connect";
 import { useMutation, useQuery } from "@connectrpc/connect-query";
 import {
@@ -20,7 +20,6 @@ import { measureStateBadge } from "@/app/admin/merchants/[id]/measure";
 import { Button, Dialog, StatusBadge, useToast } from "@/components/UI";
 import { type ConflictText, runAction } from "@/lib/connect-action";
 import { connectErrorText } from "@/lib/error-text";
-import { formatDateTimeShort } from "@/lib/format";
 import { policyCategoryText } from "@/lib/policy-category";
 import {
 	CASE_CONFLICT_TEXT,
@@ -29,10 +28,9 @@ import {
 	DECIDE_FAILED_TEXT,
 	REASON_MAX_LENGTH,
 	REVERSE_FAILED_TEXT,
-	REVERSE_PRECONDITION_TEXT,
 	validateReverseReason,
 } from "../../case-decide";
-import { snapshotView } from "../../case-snapshot";
+import { snapshotView, timeText } from "../../case-snapshot";
 import {
 	caseActionText,
 	caseDecisionText,
@@ -47,10 +45,6 @@ import "@/styles/pages/MerchantCertificationDetail.css";
 import "@/styles/pages/DelegatedOperations.css";
 
 const conflictText: ConflictText = CASE_CONFLICT_TEXT;
-
-function timeText(value: Parameters<typeof timestampDate>[0] | undefined) {
-	return value ? formatDateTimeShort(timestampDate(value)) : "-";
-}
 
 /**
  * 社群檢舉案件詳情：案件與它的全部檢舉（舊到新）。進行中的案件可以決定（帶讀到的 etag；版本衝突時重讀）；
@@ -148,6 +142,17 @@ export default function ModerationCaseDetailPage() {
 		setDialog(false);
 	};
 
+	const openReverse = () => {
+		setReverseReason("");
+		setReverseError(null);
+		setReverseOpen(true);
+	};
+	const closeReverse = () => {
+		setReverseOpen(false);
+		setReverseReason("");
+		setReverseError(null);
+	};
+
 	const submitReverse = async () => {
 		if (reversing) return;
 		const invalid = validateReverseReason(reverseReason);
@@ -169,15 +174,18 @@ export default function ModerationCaseDetailPage() {
 		);
 		setReversing(false);
 		if (!result.ok) {
-			setReverseError(
-				result.code === Code.FailedPrecondition
-					? REVERSE_PRECONDITION_TEXT
-					: result.text,
-			);
+			if (result.code === Code.FailedPrecondition) {
+				const reloaded = await detail.refetch();
+				if (!reloaded.data?.case || !canReverse(reloaded.data.case)) {
+					closeReverse();
+					showToast(result.text, "warning");
+					return;
+				}
+			}
+			setReverseError(result.text);
 			return;
 		}
-		setReverseOpen(false);
-		setReverseReason("");
+		closeReverse();
 	};
 	const snapshot = detail.data?.snapshot;
 	const snapshotRows = snapshotView(snapshot);
@@ -211,7 +219,7 @@ export default function ModerationCaseDetailPage() {
 
 			{canReverse(kase) && (
 				<div className="header-actions" style={{ display: "flex", gap: 16 }}>
-					<Button variant="outline" onClick={() => setReverseOpen(true)}>
+					<Button variant="outline" onClick={openReverse}>
 						撤銷隱藏
 					</Button>
 				</div>
@@ -280,8 +288,13 @@ export default function ModerationCaseDetailPage() {
 								<p className="adm-operation-field-note">前後文</p>
 								<ul className="adm-operation-list">
 									{snapshotRows.context.map((line) => (
-										<li key={line.seq} data-tombstone={line.tombstone}>
-											#{line.seq}・{line.text}
+										<li
+											key={line.seq}
+											data-tombstone={line.tombstone}
+											data-reported={line.reported}
+										>
+											#{line.seq}・{line.time}・{line.reported && "被檢舉・"}
+											{line.text}
 										</li>
 									))}
 								</ul>
@@ -339,13 +352,13 @@ export default function ModerationCaseDetailPage() {
 				<Dialog
 					title="撤銷隱藏"
 					closeLabel="關閉"
-					onClose={() => setReverseOpen(false)}
+					onClose={closeReverse}
 					busy={reversing}
 					footer={
 						<>
 							<Button
 								variant="outline"
-								onClick={() => setReverseOpen(false)}
+								onClick={closeReverse}
 								disabled={reversing}
 							>
 								取消

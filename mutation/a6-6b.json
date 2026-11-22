@@ -37,13 +37,13 @@
    "why": "A reverse reason over 500 characters is sent to the server."
   },
   {
-   "id": "reverse-precondition-text-dropped",
+   "id": "reverse-server-text-dropped",
    "stack": "admin",
    "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
-   "old": "result.code === Code.FailedPrecondition",
-   "new": "false",
-   "test": "tests/moderation-case-snapshot-reverse.test.ts FAILED_PRECONDITION 顯示專用說明",
-   "why": "FAILED_PRECONDITION shows the generic server text instead of the dedicated precondition text."
+   "old": "setReverseError(result.text);\n\t\t\treturn;",
+   "new": "setReverseError(\"\");\n\t\t\treturn;",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts FAILED_PRECONDITION 但案件仍可撤銷時",
+   "why": "On FAILED_PRECONDITION the dialog no longer shows the server text."
   },
   {
    "id": "chat-hidden-body-shown",
@@ -80,6 +80,42 @@
    "new": "{true ? (",
    "test": "tests/moderation-case-snapshot-reverse.test.ts 快照：評價顯示評分",
    "why": "The snapshot section always claims there is no snapshot."
+  },
+  {
+   "id": "reverse-precondition-no-refetch",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
+   "old": "if (result.code === Code.FailedPrecondition) {",
+   "new": "if (false) {",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts FAILED_PRECONDITION 顯示伺服器文字、重讀案件",
+   "why": "After FAILED_PRECONDITION the case is not refetched, so the reverse button and dialog stay."
+  },
+  {
+   "id": "reverse-error-kept-on-reopen",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/cases/[id]/page.tsx",
+   "old": "\tconst openReverse = () => {\n\t\tsetReverseReason(\"\");\n\t\tsetReverseError(null);",
+   "new": "\tconst openReverse = () => {",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 關閉再開啟時",
+   "why": "A previous reverse error or reason survives closing and reopening the dialog."
+  },
+  {
+   "id": "chat-reported-line-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-snapshot.ts",
+   "old": "const all = [...lines, { line: reported, seq: chat.seq }];",
+   "new": "const all = [...lines];",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 被檢舉的那一則依 seq 排進前後文並標記",
+   "why": "The reported chat message is missing from the context timeline."
+  },
+  {
+   "id": "chat-context-send-time-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/case-snapshot.ts",
+   "old": "time: timeText(message.sendTime),",
+   "new": "time: \"-\",",
+   "test": "tests/moderation-case-snapshot-reverse.test.ts 被檢舉的那一則依 seq 排進前後文並標記",
+   "why": "Context lines no longer show their send time."
   }
  ]
 }
