@@ -12,7 +12,7 @@
 media 從 Java 改寫成單體內的 Go 模組時，上傳通道與暫存憑證要重新決定。約束：
 
 - external：物件儲存是 Cloudflare R2（ADR `docs/adr/2026-09-18-media-storage-r2-image-gateway.md`）。R2 不支援 HTML 表單 POST，所以沒有 POST policy 的 `content-length-range`；預簽 PUT 可以把確切的 `Content-Length`、`Content-Type`、`Content-MD5`、`If-None-Match: *` 簽進網址，不符就拒絕而且不落檔（官方文件 <https://developers.cloudflare.com/r2/api/s3/presigned-urls/> 與 sandbox bucket 實測，計畫附件 `spike.md` (e)）。
-- external：機敏檔（KYC 證件、稅籍證明、治理佐證）在 R2 上只能是 media 應用層加密的密文（ADR `2026-07-20-seller-kyc-pii-encryption-scope.md`）。
+- 自己的決定（Will 2026-11-22 確認維持）：機敏檔（公司補充文件、稅籍證明、治理與檢舉佐證、詢問回覆附件）在 R2 上只能是 media 應用層加密的密文；理由見 ADR `2026-11-22-media-secure-stream-aead.md` 脈絡段。
 - external：client 有兩個 Next.js 網站與兩支 Flutter App。website 經 Vercel 的同源反代打單體，反代路徑的請求大小上限未量測。
 - inherited：外部 provider 不在 DB transaction 內呼叫（`backend/AGENTS.md` 單體規則 5）。今天仍成立：R2 的延遲不受控，transaction 內等它會佔住連線池。
 - inherited：Java 的暫存憑證是 HS256 JWT（`StagedTokenService.java`）。理由是 Java 服務之間沒有共用的表；media 搬進單體、有自己的表之後，這個理由不成立，不當約束。

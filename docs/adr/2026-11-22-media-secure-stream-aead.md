@@ -9,10 +9,10 @@
 
 ## 脈絡
 
-機敏檔（KYC 證件、稅籍證明、治理佐證）在 R2 上只存 media 以應用層加密的密文；讀取由擁有者端點授權、記存取紀錄後代理內容（ADR `2026-10-03-media-references-owner-side.md` 2026-10-04 修訂）。約束：
+機敏檔（公司補充文件、稅籍證明、治理與檢舉佐證）在 R2 上只存 media 以應用層加密的密文；讀取由擁有者端點授權、記存取紀錄後代理內容（ADR `2026-10-03-media-references-owner-side.md` 2026-10-04 修訂）。約束：
 
 - external：檔案上限數 MB 到數十 MB；後台在瀏覽器檢視，讀取是串流。
-- external：R2 的伺服器端加密由 Cloudflare 持有金鑰，擋不住拿到 bucket 讀取權限的人，所以要應用層加密（ADR `2026-07-20-seller-kyc-pii-encryption-scope.md`）。
+- 自己的決定（Will 2026-11-22 確認維持）：機敏檔在 R2 上只存應用層密文。平台已不收證件影像（ADR `2026-11-13-seller-platform-review-and-identity-matching.md`），走機敏通道的是公司補充文件、稅籍證明、治理與檢舉佐證、詢問回覆附件；這些內容不受限制，授權書可能帶個人姓名與簽名，而 R2 的伺服器端加密由 Cloudflare 持有金鑰，擋不住拿到 bucket 讀取權限的人。原出處 ADR `2026-07-20-seller-kyc-pii-encryption-scope.md` 已被取代，不再是依據。
 - inherited：Java 用單段 AES-GCM，整檔讀進記憶體驗 tag 後回 `byte[]`，沒有 key id，不能換主密鑰（缺陷 5.7）。理由是當初檔案小、只有一把金鑰；兩點今天都不是約束，不沿用。
 - inherited：不新增 Go 依賴（根 `AGENTS.md`「依賴與供應鏈」要逐一同意）。標準庫足以實作（計畫附件 `spike.md` (a)：只用 `crypto/*`、`encoding/binary`、`io`，測試與 benchmark 已跑）。
 
