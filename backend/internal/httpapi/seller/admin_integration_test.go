@@ -18,6 +18,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
@@ -170,7 +171,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	}
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready: d.Ping, Identity: id, Seller: m, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
-		Delegation: delegation.New(delegationDeps), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
+		Delegation: delegation.New(delegationDeps), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -3438,6 +3438,7 @@ const BlockBuyerRequest$json = {
       '9': 0,
       '10': 'forumEntryId'
     },
+    {'1': 'review_id', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'reviewId'},
   ],
   '8': [
     {'1': 'source'},
@@ -3447,7 +3448,8 @@ const BlockBuyerRequest$json = {
 /// Descriptor for `BlockBuyerRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List blockBuyerRequestDescriptor = $convert.base64Decode(
     'ChFCbG9ja0J1eWVyUmVxdWVzdBIfCgpjb21tZW50X2lkGAEgASgJSABSCWNvbW1lbnRJZBImCg'
-    '5mb3J1bV9lbnRyeV9pZBgCIAEoCUgAUgxmb3J1bUVudHJ5SWRCCAoGc291cmNl');
+    '5mb3J1bV9lbnRyeV9pZBgCIAEoCUgAUgxmb3J1bUVudHJ5SWQSHQoJcmV2aWV3X2lkGAMgASgJ'
+    'SABSCHJldmlld0lkQggKBnNvdXJjZQ==');
 
 @$core.Deprecated('Use blockBuyerResponseDescriptor instead')
 const BlockBuyerResponse$json = {

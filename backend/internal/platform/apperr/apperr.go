@@ -138,6 +138,18 @@ var ReasonContactEmailRequired = newReason("CONTACT_EMAIL_REQUIRED")
 // ReasonContentTakedownActive 表示要下架的內容已經有生效中的內容下架措施；搭配 FailedPrecondition。
 var ReasonContentTakedownActive = newReason("CONTENT_TAKEDOWN_ACTIVE")
 
+// ReasonReviewAlreadyExists 表示這個訂單項目已經有評價；搭配 AlreadyExists。
+var ReasonReviewAlreadyExists = newReason("REVIEW_ALREADY_EXISTS")
+
+// ReasonOrderNotReviewable 表示訂單目前不能評價（只有已完成的訂單能評價）；搭配 FailedPrecondition。
+var ReasonOrderNotReviewable = newReason("ORDER_NOT_REVIEWABLE")
+
+// ReasonReviewWindowExpired 表示訂單已超過評價期限；搭配 FailedPrecondition。
+var ReasonReviewWindowExpired = newReason("REVIEW_WINDOW_EXPIRED")
+
+// ReasonReviewNotReplyable 表示這則評價目前不能回覆（被隱藏、作者已離開、回覆被下架）；搭配 FailedPrecondition。
+var ReasonReviewNotReplyable = newReason("REVIEW_NOT_REPLYABLE")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

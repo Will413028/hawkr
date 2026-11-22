@@ -143,6 +143,12 @@ type RelayReview struct {
 	Public bool
 }
 
+// ReviewStore 是評價所屬的店與它現在是否公開可讀（回覆的店家推導用，不套公開可讀述詞）。
+type ReviewStore struct {
+	StoreID int64
+	Public  bool
+}
+
 // Cursor 是 keyset 的位置：(created_at, id) 由大到小，之後的是比它更舊的。
 type Cursor struct {
 	CreatedAt time.Time

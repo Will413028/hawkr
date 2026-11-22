@@ -106,6 +106,27 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason CONTENT_TAKEDOWN_ACTIVE =
       ErrorReason._(14, _omitEnumNames ? '' : 'CONTENT_TAKEDOWN_ACTIVE');
 
+  /// 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。已有的評價可能已被平台隱藏，
+  /// 隱藏的評價不在 ReviewAppService.ListMyReviews 的結果中：client 顯示「已評價」並不再提供寫評價入口，不要再開寫評價，也不要依賴 ListMyReviews 找回那則評價。
+  /// ReviewAppService.CreateReview。
+  static const ErrorReason REVIEW_ALREADY_EXISTS =
+      ErrorReason._(15, _omitEnumNames ? '' : 'REVIEW_ALREADY_EXISTS');
+
+  /// 訂單目前不能評價（搭配 failed_precondition）：只有已完成的訂單能評價。client 顯示 LocalizedMessage，不提供評價入口。
+  /// ReviewAppService.CreateReview。
+  static const ErrorReason ORDER_NOT_REVIEWABLE =
+      ErrorReason._(16, _omitEnumNames ? '' : 'ORDER_NOT_REVIEWABLE');
+
+  /// 訂單已超過評價期限（搭配 failed_precondition）：訂單完成後 30 天內才能評價。client 顯示 LocalizedMessage，不再提供評價入口。
+  /// ReviewAppService.CreateReview。
+  static const ErrorReason REVIEW_WINDOW_EXPIRED =
+      ErrorReason._(17, _omitEnumNames ? '' : 'REVIEW_WINDOW_EXPIRED');
+
+  /// 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
+  /// ReviewAppService.ReplyReview。
+  static const ErrorReason REVIEW_NOT_REPLYABLE =
+      ErrorReason._(18, _omitEnumNames ? '' : 'REVIEW_NOT_REPLYABLE');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -122,10 +143,14 @@ class ErrorReason extends $pb.ProtobufEnum {
     REAUTHENTICATION_REQUIRED,
     CONTACT_EMAIL_REQUIRED,
     CONTENT_TAKEDOWN_ACTIVE,
+    REVIEW_ALREADY_EXISTS,
+    ORDER_NOT_REVIEWABLE,
+    REVIEW_WINDOW_EXPIRED,
+    REVIEW_NOT_REPLYABLE,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 14);
+      $pb.ProtobufEnum.$_initByValueList(values, 18);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

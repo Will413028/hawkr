@@ -1,13 +1,15 @@
 // Package blocks 是封鎖入口共用的 handler 規則（A7-2e，A7-D23 O4）：跨身分的「同一個人」規則、從內容參照解析被封鎖的作者，與名單的顯示資料。
 // buyer 與 seller 模組互不依賴，模組的 API 擋不了「買家封鎖自己的店」「店家封鎖店主本人的買家身分」，所以規則放在依賴兩邊的這一層。
-// A6 的聊天、評價出現第二個封鎖入口時，這個套件升成編排模組（決定簡報 §1.3）。
+// 參照有兩個擁有者（social 的留言與討論區留言、review 的評價），所以這個套件是編排解析器：依參照種類問擁有模組取得作者，封鎖仍寫在發起者的模組（buyer、seller）。
 package blocks
 
 import (
 	"context"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -47,50 +49,78 @@ func (i Identities) RejectSamePerson(ctx context.Context, buyerID, storeID int64
 	return nil
 }
 
-// Authors 是從內容參照解析作者的來源（*social.Module）：只回呼叫者讀得到的內容的作者。
+// Authors 是從社群內容參照解析作者的來源（*social.Module）：只回呼叫者讀得到的內容的作者。
 type Authors interface {
 	ContentAuthorFor(ctx context.Context, c social.Caller, t social.Target) (social.ContentAuthor, error)
 }
 
-// Sources 是封鎖入口的 handler 規則的來源（buyer 與 seller 的 App 各收一份）：內容參照解析與跨身分規則的身分來源。
+// Reviews 是從評價參照解析作者的來源（*review.Module）：GetReview 套用公開可讀述詞與觀看者的封鎖，讀不到與不存在同為 not_found。
+type Reviews interface {
+	GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (review.Review, error)
+}
+
+// Sources 是封鎖入口的 handler 規則的來源（buyer 與 seller 的 App 各收一份）：依參照種類問擁有模組取得作者（social、review），
+// 與跨身分規則的身分來源。封鎖本身仍寫在發起者的模組，這裡只解析「封鎖誰」。
 type Sources struct {
 	Authors    Authors
+	Reviews    Reviews
 	Identities Identities
 }
 
-// Complete 回報三個來源都有：內容作者解析（Authors）與跨身分規則的買家、店家身分來源（Identities.Buyers、Identities.Stores）（組裝點漏接時 NewApp 回錯誤，不讓請求才 nil panic）。
+// Complete 回報所有來源都有：社群內容作者解析（Authors）、評價作者解析（Reviews）與跨身分規則的買家、店家身分來源（Identities.Buyers、Identities.Stores）
+// （組裝點漏接時 NewApp 回錯誤，不讓請求才 nil panic）。
 func (s Sources) Complete() bool {
-	return s.Authors != nil && s.Identities.Buyers != nil && s.Identities.Stores != nil
+	return s.Authors != nil && s.Reviews != nil && s.Identities.Buyers != nil && s.Identities.Stores != nil
 }
 
-// Ref 是請求裡的內容參照：留言或討論區留言，恰好設一個。
+// Ref 是請求裡的內容參照：留言、討論區留言或評價，恰好設一個。
 type Ref struct {
 	CommentID    string
 	ForumEntryID string
+	ReviewID     string
 }
 
-// Target 解析參照；兩個都沒設或都設了回 invalid_argument，ID 格式錯誤回 invalid_argument。
-func (r Ref) Target() (social.Target, error) {
-	switch {
-	case r.CommentID != "" && r.ForumEntryID != "":
-		return social.Target{}, rpc.RequiredField("source", "comment_id 與 forum_entry_id 只能設一個")
-	case r.CommentID != "":
-		id, err := rpc.ParseUUID("comment_id", r.CommentID)
-		return social.Target{Kind: social.TargetComment, ID: id}, err
-	case r.ForumEntryID != "":
+func (r Ref) set() int {
+	n := 0
+	for _, v := range []string{r.CommentID, r.ForumEntryID, r.ReviewID} {
+		if v != "" {
+			n++
+		}
+	}
+	return n
+}
+
+// socialTarget 解析社群內容的參照；ID 格式錯誤回 invalid_argument。
+func (r Ref) socialTarget() (social.Target, error) {
+	if r.ForumEntryID != "" {
 		id, err := rpc.ParseUUID("forum_entry_id", r.ForumEntryID)
 		return social.Target{Kind: social.TargetForumEntry, ID: id}, err
 	}
-	return social.Target{}, rpc.RequiredField("source", "必須設 comment_id 或 forum_entry_id")
+	id, err := rpc.ParseUUID("comment_id", r.CommentID)
+	return social.Target{Kind: social.TargetComment, ID: id}, err
 }
 
-// ResolveAuthor 把參照解析成作者；呼叫者讀不到（不存在、刪除、隱藏、被封鎖排除、貼文不公開）一律 not_found，不區分原因。
-func ResolveAuthor(ctx context.Context, authors Authors, c social.Caller, ref Ref) (social.ContentAuthor, error) {
-	t, err := ref.Target()
-	if err != nil {
-		return social.ContentAuthor{}, err
+// ResolveAuthor 把參照解析成被封鎖的作者；兩個以上或都沒設、ID 格式錯誤回 invalid_argument。呼叫者讀不到（不存在、刪除、隱藏、被封鎖排除、貼文不公開）一律 not_found，不區分原因。
+// 呼叫者是店家（c.Store 非 nil）時以店家的讀取規則解析，否則以買家的。
+func (s Sources) ResolveAuthor(ctx context.Context, c social.Caller, ref Ref) (social.ContentAuthor, error) {
+	switch ref.set() {
+	case 0:
+		return social.ContentAuthor{}, rpc.RequiredField("source", "必須設 comment_id、forum_entry_id 或 review_id")
+	case 1:
+	default:
+		return social.ContentAuthor{}, rpc.RequiredField("source", "comment_id、forum_entry_id 與 review_id 只能設一個")
 	}
-	got, err := authors.ContentAuthorFor(ctx, c, t)
+	var got social.ContentAuthor
+	var err error
+	if ref.ReviewID != "" {
+		got, err = s.reviewAuthor(ctx, c, ref.ReviewID)
+	} else {
+		var t social.Target
+		if t, err = ref.socialTarget(); err != nil {
+			return social.ContentAuthor{}, err
+		}
+		got, err = s.Authors.ContentAuthorFor(ctx, c, t)
+	}
 	if err != nil {
 		return social.ContentAuthor{}, err
 	}
@@ -98,6 +128,30 @@ func ResolveAuthor(ctx context.Context, authors Authors, c social.Caller, ref Re
 		return social.ContentAuthor{}, apperr.NotFound("找不到這則內容")
 	}
 	return got, nil
+}
+
+// reviewAuthor 解析評價的作者：店家封鎖的是寫評價的買家；買家封鎖的是評價的回覆店家，所以評價沒有（讀得到的）回覆時沒有可封鎖的對象。
+// 讀取以公開可讀的規則（店家以訪客讀，買家帶自己的封鎖）：讀不到的評價在 GetReview 就是 not_found。
+func (s Sources) reviewAuthor(ctx context.Context, c social.Caller, rawID string) (social.ContentAuthor, error) {
+	id, err := rpc.ParseUUID("review_id", rawID)
+	if err != nil {
+		return social.ContentAuthor{}, err
+	}
+	if c.Store != nil {
+		r, err := s.Reviews.GetReview(ctx, id, 0)
+		if err != nil {
+			return social.ContentAuthor{}, err
+		}
+		return social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorBuyer, ID: r.BuyerID}, StoreID: r.StoreID}, nil
+	}
+	r, err := s.Reviews.GetReview(ctx, id, c.BuyerID)
+	if err != nil {
+		return social.ContentAuthor{}, err
+	}
+	if r.Reply == nil {
+		return social.ContentAuthor{}, nil
+	}
+	return social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorStore, ID: r.StoreID}, StoreID: r.StoreID}, nil
 }
 
 // BuyerView 是名單裡一位買家的顯示資料：Deleted 為真時沒有名稱與頭像。

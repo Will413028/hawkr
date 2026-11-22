@@ -12,6 +12,7 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -49,6 +50,17 @@ func (f *authorFake) ContentAuthorFor(_ context.Context, c social.Caller, _ soci
 	return f.author, nil
 }
 
+type reviewFake struct {
+	r         review.Review
+	err       error
+	gotViewer int64
+}
+
+func (f *reviewFake) GetReview(_ context.Context, _ uuid.UUID, viewer int64) (review.Review, error) {
+	f.gotViewer = viewer
+	return f.r, f.err
+}
+
 type accountsOf map[int64]int64
 
 func (a accountsOf) AccountIDByBuyerID(_ context.Context, id int64) (int64, error) {
@@ -73,6 +85,7 @@ type blockEnv struct {
 	m       *blockModuleFake
 	authors *authorFake
 	f       *fakeFollowers
+	reviews *reviewFake
 	ctx     context.Context
 }
 
@@ -81,17 +94,18 @@ func newBlockEnv(t *testing.T) *blockEnv {
 	name := "阿美"
 	m := &blockModuleFake{fakeModule: fakeModule{}, changed: true}
 	authors := &authorFake{}
+	reviews := &reviewFake{err: apperr.NotFound("no review")}
 	f := &fakeFollowers{displays: []buyer.Display{{BuyerID: 70, DisplayName: &name}, {BuyerID: 80, DisplayName: &name}, {BuyerID: 81, DisplayName: &name, Deleted: true}}}
 	images, err := rpc.NewImages("http://localhost:8787")
 	if err != nil {
 		t.Fatal(err)
 	}
-	src := blocks.Sources{Authors: authors, Identities: blocks.Identities{Buyers: accountsOf{70: 7, 80: 8, 81: 9}, Stores: storesOf{11: 7}}}
+	src := blocks.Sources{Authors: authors, Reviews: reviews, Identities: blocks.Identities{Buyers: accountsOf{70: 7, 80: 8, 81: 9}, Stores: storesOf{11: 7}}}
 	h, err := NewApp(m, &paymentModule{}, f, images, Dashboard{}, testStats(fakeFollowerCounts{}, fakeRatings{}), fakeLinks{}, mustWebOrigin(t), src, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &blockEnv{h: h, m: m, authors: authors, f: f, ctx: ctxWithStore(currentStore())}
+	return &blockEnv{h: h, m: m, authors: authors, f: f, reviews: reviews, ctx: ctxWithStore(currentStore())}
 }
 
 func commentRef() *pb.BlockBuyerRequest {
@@ -196,5 +210,50 @@ func TestListBlockedBuyersShowsClosedBuyersAsDeletedWithOneBatchLookup(t *testin
 	other.StoreID = 12
 	if _, err := e.h.ListBlockedBuyers(ctxWithStore(other), connect.NewRequest(&pb.ListBlockedBuyersRequest{PageToken: resp.Msg.GetNextPageToken()})); err == nil {
 		t.Fatal("別家店的 token 要被拒絕")
+	}
+}
+
+func reviewRef() *pb.BlockBuyerRequest {
+	return &pb.BlockBuyerRequest{Source: &pb.BlockBuyerRequest_ReviewId{ReviewId: uuid.UUID{9}.String()}}
+}
+
+func TestBlockBuyerByReviewBlocksTheReviewerInTheCallersStore(t *testing.T) {
+	e := newBlockEnv(t)
+	e.reviews.err = nil
+	e.reviews.r = review.Review{ID: uuid.UUID{9}, BuyerID: 80, StoreID: 11}
+	resp, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(reviewRef()))
+	if err != nil || !resp.Msg.GetChanged() {
+		t.Fatalf("%v %v", resp, err)
+	}
+	if len(e.m.blocked) != 1 || e.m.blocked[0] != [2]int64{11, 80} {
+		t.Fatalf("要以店 11 封鎖寫評價的買家 80：%+v", e.m.blocked)
+	}
+	if e.reviews.gotViewer != 0 || e.authors.got != (social.Caller{}) {
+		t.Fatalf("店家以訪客的公開規則讀評價、不問 social：觀看者 %d social %+v", e.reviews.gotViewer, e.authors.got)
+	}
+}
+
+func TestBlockBuyerByAnUnreadableReviewIsNotFound(t *testing.T) {
+	e := newBlockEnv(t)
+	if _, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(reviewRef())); apperr.KindOf(err) != apperr.KindNotFound || len(e.m.blocked) != 0 {
+		t.Fatalf("看不到的評價要 not_found、不寫入：%v %+v", err, e.m.blocked)
+	}
+}
+
+func TestBlockBuyerByAnotherStoresReviewIsNotFound(t *testing.T) {
+	e := newBlockEnv(t)
+	e.reviews.err = nil
+	e.reviews.r = review.Review{ID: uuid.UUID{9}, BuyerID: 80, StoreID: 12}
+	if _, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(reviewRef())); apperr.KindOf(err) != apperr.KindNotFound || len(e.m.blocked) != 0 {
+		t.Fatalf("別家店的評價與讀不到同一個答案：%v %+v", err, e.m.blocked)
+	}
+}
+
+func TestBlockBuyerByAReviewWrittenByTheOwnersBuyerIdentityIsRejected(t *testing.T) {
+	e := newBlockEnv(t)
+	e.reviews.err = nil
+	e.reviews.r = review.Review{ID: uuid.UUID{9}, BuyerID: 70, StoreID: 11} // 帳號 7 的買家身分，帳號 7 也擁有店 11
+	if _, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(reviewRef())); apperr.KindOf(err) != apperr.KindInvalidInput || len(e.m.blocked) != 0 {
+		t.Fatalf("店家封鎖店主本人的買家身分要 invalid_argument、不寫入：%v %+v", err, e.m.blocked)
 	}
 }

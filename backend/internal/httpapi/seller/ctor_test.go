@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
@@ -19,11 +21,14 @@ type unusedBlocking struct{}
 func (unusedBlocking) ContentAuthorFor(context.Context, social.Caller, social.Target) (social.ContentAuthor, error) {
 	panic("unused")
 }
+func (unusedBlocking) GetReview(context.Context, uuid.UUID, int64) (review.Review, error) {
+	panic("unused")
+}
 func (unusedBlocking) AccountIDByBuyerID(context.Context, int64) (int64, error) { panic("unused") }
 func (unusedBlocking) Store(context.Context, int64) (model.Store, error)        { panic("unused") }
 
 func unusedSources() blocks.Sources {
-	return blocks.Sources{Authors: unusedBlocking{}, Identities: blocks.Identities{Buyers: unusedBlocking{}, Stores: unusedBlocking{}}}
+	return blocks.Sources{Authors: unusedBlocking{}, Reviews: unusedBlocking{}, Identities: blocks.Identities{Buyers: unusedBlocking{}, Stores: unusedBlocking{}}}
 }
 
 const testWebOrigin = "https://web.example.test"

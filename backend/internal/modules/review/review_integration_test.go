@@ -325,7 +325,7 @@ func TestRD10SingleReadUsesThePublicPredicate(t *testing.T) {
 	if _, err := f.module.GetReview(ctx, r.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("隱藏的評價單筆讀取：%v", err)
 	}
-	if mine := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, nil, 50)); len(mine.Reviews) != 0 {
+	if mine := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, 0, nil, 50)); len(mine.Reviews) != 0 {
 		t.Fatalf("作者的歷史不含隱藏的（舊行為）：%d", len(mine.Reviews))
 	}
 	if _, err := f.module.GetReview(ctx, uuid.UUID{}, 0); kindOf(err) != apperr.KindNotFound {
@@ -585,5 +585,60 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 	}
 	if _, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判", SourceRef: "case-1"}); err != nil {
 		t.Fatalf("來源相符可還原：%v", err)
+	}
+}
+
+// ListMyReviews 帶 order_item_id 只回那個訂單項目的評價；不存在的項目回空；不帶時回全部。
+func TestListMyReviewsFiltersByOrderItem(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	author := f.newBuyer(t)
+	r1 := f.submit(t, author, storeID, 700, 5, "好")
+	r2 := f.submit(t, author, storeID, 701, 4, "不錯")
+
+	one := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r1.OrderItemID, nil, 50))
+	if !sameIDs(ids(one), r1.ID) {
+		t.Fatalf("帶 r1 的訂單項目只回 r1：%v", ids(one))
+	}
+	two := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r2.OrderItemID, nil, 50))
+	if !sameIDs(ids(two), r2.ID) {
+		t.Fatalf("帶 r2 的訂單項目只回 r2：%v", ids(two))
+	}
+	if none := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r2.OrderItemID+999999, nil, 50)); len(none.Reviews) != 0 {
+		t.Fatalf("不存在的訂單項目回空：%v", ids(none))
+	}
+	if all := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, 0, nil, 50)); !sameIDs(ids(all), r2.ID, r1.ID) {
+		t.Fatalf("不帶篩選回全部（新到舊）：%v", ids(all))
+	}
+}
+
+// ReviewStore 不套公開可讀述詞：隱藏與作者刪帳中的評價仍回所屬的店（Public 為 false），不存在才是 NotFound。
+func TestReviewStoreIgnoresVisibilityAndReportsIt(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	r := f.submit(t, f.newBuyer(t), storeID, 700, 5, "好")
+	got := must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r.ID))
+	if got.StoreID != storeID || !got.Public {
+		t.Fatalf("公開的評價：%+v", got)
+	}
+	hide(t, f, r.ID)
+	got = must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r.ID))
+	if got.StoreID != storeID || got.Public {
+		t.Fatalf("隱藏的評價仍回店家、Public=false：%+v", got)
+	}
+	r2 := f.submit(t, f.newBuyer(t), storeID, 700, 1, "差")
+	if err := f.buyers.BeginDeletion(ctx, r2.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+	got = must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r2.ID))
+	if got.StoreID != storeID || got.Public {
+		t.Fatalf("作者刪帳中的評價仍回店家、Public=false：%+v", got)
+	}
+	if _, err := f.module.ReviewStore(ctx, uuid.UUID{}); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("不存在：%v", err)
 	}
 }

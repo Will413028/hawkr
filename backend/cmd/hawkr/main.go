@@ -288,6 +288,7 @@ func runServe(ctx context.Context) error {
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready:      d.Ping,
 		Social:     socialModule,
+		Review:     reviewModule,
 		Moderation: moderationModule,
 		Content: content.New(content.Deps{
 			DB:     d,

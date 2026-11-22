@@ -3201,6 +3201,7 @@ type BlockAuthorRequest struct {
 	//
 	//	*BlockAuthorRequest_CommentId
 	//	*BlockAuthorRequest_ForumEntryId
+	//	*BlockAuthorRequest_ReviewId
 	Source        isBlockAuthorRequest_Source `protobuf_oneof:"source"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3261,6 +3262,15 @@ func (x *BlockAuthorRequest) GetForumEntryId() string {
 	return ""
 }
 
+func (x *BlockAuthorRequest) GetReviewId() string {
+	if x != nil {
+		if x, ok := x.Source.(*BlockAuthorRequest_ReviewId); ok {
+			return x.ReviewId
+		}
+	}
+	return ""
+}
+
 type isBlockAuthorRequest_Source interface {
 	isBlockAuthorRequest_Source()
 }
@@ -3275,9 +3285,16 @@ type BlockAuthorRequest_ForumEntryId struct {
 	ForumEntryId string `protobuf:"bytes,2,opt,name=forum_entry_id,json=forumEntryId,proto3,oneof"`
 }
 
+type BlockAuthorRequest_ReviewId struct {
+	// 評價 ID：封鎖這則評價的回覆店家（呼叫者讀得到的評價，而且有店家的回覆）。封鎖後同一個參照可能已讀不到（評價因店家被封鎖而被過濾），重試回 not_found，client 以封鎖名單為準。
+	ReviewId string `protobuf:"bytes,3,opt,name=review_id,json=reviewId,proto3,oneof"`
+}
+
 func (*BlockAuthorRequest_CommentId) isBlockAuthorRequest_Source() {}
 
 func (*BlockAuthorRequest_ForumEntryId) isBlockAuthorRequest_Source() {}
+
+func (*BlockAuthorRequest_ReviewId) isBlockAuthorRequest_Source() {}
 
 type BlockAuthorResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -4150,11 +4167,12 @@ const file_hawkr_buyer_v1alpha1_buyer_proto_rawDesc = "" +
 	"\x19UnsubscribeRestockRequest\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1c\n" +
-	"\x1aUnsubscribeRestockResponse\"g\n" +
+	"\x1aUnsubscribeRestockResponse\"\x86\x01\n" +
 	"\x12BlockAuthorRequest\x12\x1f\n" +
 	"\n" +
 	"comment_id\x18\x01 \x01(\tH\x00R\tcommentId\x12&\n" +
-	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryIdB\b\n" +
+	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryId\x12\x1d\n" +
+	"\treview_id\x18\x03 \x01(\tH\x00R\breviewIdB\b\n" +
 	"\x06source\"/\n" +
 	"\x13BlockAuthorResponse\x12\x18\n" +
 	"\achanged\x18\x01 \x01(\bR\achanged\"3\n" +
@@ -4465,6 +4483,7 @@ func file_hawkr_buyer_v1alpha1_buyer_proto_init() {
 	file_hawkr_buyer_v1alpha1_buyer_proto_msgTypes[59].OneofWrappers = []any{
 		(*BlockAuthorRequest_CommentId)(nil),
 		(*BlockAuthorRequest_ForumEntryId)(nil),
+		(*BlockAuthorRequest_ReviewId)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
