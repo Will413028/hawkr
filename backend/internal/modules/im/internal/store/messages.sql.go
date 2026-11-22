@@ -394,8 +394,11 @@ func (q *Queries) LockStoreMessageBatch(ctx context.Context, arg LockStoreMessag
 }
 
 const messageByRequest = `-- name: MessageByRequest :one
-SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.request_id, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at FROM im.messages AS m
+SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
+FROM im.messages AS m
 JOIN im.conversations AS c ON c.id = m.conversation_id
+LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
 WHERE c.buyer_id = $1 AND c.store_id = $2
   AND m.sender_kind = $3 AND m.request_id = $4
 `
@@ -407,27 +410,41 @@ type MessageByRequestParams struct {
 	RequestID  uuid.UUID
 }
 
-// 送出冪等的重送判定：這個對話、這一方、這個 request_id 第一次寫入的訊息；對話還不存在或沒有這個 request_id 時沒有列。不套可見性，不鎖列。
-func (q *Queries) MessageByRequest(ctx context.Context, arg MessageByRequestParams) (ImMessage, error) {
+type MessageByRequestRow struct {
+	ID             uuid.UUID
+	ConversationID uuid.UUID
+	Seq            int64
+	SenderKind     string
+	MessageType    string
+	Content        *string
+	ImageAssetID   *string
+	ImageObjectKey *string
+	CreatedAt      time.Time
+	ErasedAt       *time.Time
+	Hidden         bool
+}
+
+// 送出冪等的重送判定：這個對話、這一方、這個 request_id 第一次寫入的訊息；對話還不存在或沒有這個 request_id 時沒有列。隱藏的以 hidden 標出（同列表查詢的述詞），內容由呼叫端換成墓碑；不鎖列。
+func (q *Queries) MessageByRequest(ctx context.Context, arg MessageByRequestParams) (MessageByRequestRow, error) {
 	row := q.db.QueryRow(ctx, messageByRequest,
 		arg.BuyerID,
 		arg.StoreID,
 		arg.SenderKind,
 		arg.RequestID,
 	)
-	var i ImMessage
+	var i MessageByRequestRow
 	err := row.Scan(
 		&i.ID,
 		&i.ConversationID,
 		&i.Seq,
 		&i.SenderKind,
-		&i.RequestID,
 		&i.MessageType,
 		&i.Content,
 		&i.ImageAssetID,
 		&i.ImageObjectKey,
 		&i.CreatedAt,
 		&i.ErasedAt,
+		&i.Hidden,
 	)
 	return i, err
 }

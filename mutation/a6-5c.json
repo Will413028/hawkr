@@ -46,13 +46,13 @@
    "why": "The resend lookup stops keying on the sender side, so the store's message with the buyer's request_id is treated as a resend of the buyer's message."
   },
   {
-   "id": "im-messages-request-unique-dropped",
+   "id": "im-send-conflict-commits-allocated-seq",
    "stack": "go-integration",
-   "file": "backend/internal/modules/im/db/migrations/20261122054023_im_message_request_id.sql",
-   "old": ", ADD CONSTRAINT \"messages_request_key\" UNIQUE (\"conversation_id\", \"sender_kind\", \"request_id\")",
-   "new": "",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\t\t\treturn errRetry\n",
+   "new": "\t\t\treturn nil\n",
    "test": "internal/modules/im ^TestConcurrentSameRequestIDWritesOnce$",
-   "why": "Without the UNIQUE key the final guarantee for concurrent identical request_ids is gone."
+   "why": "A request_id conflict no longer rolls the transaction back: the loser commits its allocated seq and returns an empty message, so the loser's response differs from the winner's and last_seq runs ahead of the stored messages (race-dependent: needs the concurrent duplicates to collide)."
   },
   {
    "id": "im-conversation-parties-swapped",
@@ -341,6 +341,96 @@
    "new": "WHERE $1::bigint IS NOT NULL\n  AND (r.created_at, r.id) < ($2::timestamptz, $3::uuid)",
    "test": "internal/modules/moderation ^TestMyStoreReportsListsOnlyTheStoresOwnReportsPaged$",
    "why": "The store reporter list stops filtering on reporter_store_id, so other stores' and buyers' reports appear."
+  },
+  {
+   "id": "im-send-nested-conflict-retried",
+   "stack": "go",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\t\t\tif nested {\n",
+   "new": "\t\t\tif false && nested {\n",
+   "test": "internal/modules/im/internal/write ^TestRetrySendRetriesOnlyOutsideAnOuterTransaction$",
+   "why": "A Send joined to an outer transaction retries after a request_id conflict, running more SQL in a transaction the conflict did not roll back and leaving a seq gap."
+  },
+  {
+   "id": "im-send-replay-ignores-hidden",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "return rows.Message(rows.MessageRow(row)), true, nil",
+   "new": "return rows.Message(func() rows.MessageRow { r := rows.MessageRow(row); r.Hidden = false; return r }()), true, nil",
+   "test": "internal/modules/im ^TestResendOfAHiddenOrErasedMessageReturnsATombstone$",
+   "why": "A resend of a hidden message returns its content with hidden=false instead of the tombstone."
+  },
+  {
+   "id": "im-send-replay-compares-erased-content",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": " && row.ErasedAt == nil {",
+   "new": " {",
+   "test": "internal/modules/im ^TestResendOfAHiddenOrErasedMessageReturnsATombstone$",
+   "why": "A resend of an erased text message compares against the erased (empty) content and is rejected as InvalidInput instead of returning the tombstone."
+  },
+  {
+   "id": "serve-run-cancelled-only-after-shutdown",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "serveAllThen(ctx, cancel, servers...)",
+   "new": "serveAllThen(ctx, nil, servers...)",
+   "test": "cmd/hawkr ^TestServeWithRunCancelsRunBeforeShutdownWhenAServerFails$",
+   "why": "When a server fails on its own, Run's context is cancelled only after Shutdown, so open streams do not end through Run and Shutdown waits out its timeout."
+  },
+  {
+   "id": "block-author-message-requires-store-card",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyer/blocks.go",
+   "old": "\t\tif req.Msg.GetMessageId() != \"\" {\n",
+   "new": "\t\tif false {\n",
+   "test": "internal/httpapi/buyer ^TestBlockAuthorByMessageBlocksAConversationStoreWithoutAStoreCard$",
+   "why": "Blocking a conversation's store through message_id fails with not_found when the store has no StoreCard, although such a store can hold a conversation."
+  },
+  {
+   "id": "chat-list-messages-zero-before-seq-is-latest",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "return max(*msg.BeforeSeq, 1)",
+   "new": "return *msg.BeforeSeq",
+   "test": "internal/httpapi/chat ^TestListMessagesExplicitZeroBeforeSeqIsNotTheLatestPage$",
+   "why": "An explicit before_seq of 0 reaches the module as 0 and returns the latest page instead of an empty one."
+  },
+  {
+   "id": "chat-stream-buyer-identity-lost-as-store-closed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "\t\t\tif kind == im.PartyStore {\n",
+   "new": "\t\t\tif true {\n",
+   "test": "internal/httpapi/chat ^TestStreamGuardBuyerIdentityChangedEndsUnauthenticated$",
+   "why": "A buyer stream whose identity no longer matches ends as failed_precondition STORE_CLOSED, a reason the buyer contract does not have, instead of unauthenticated."
+  },
+  {
+   "id": "chat-stream-store-gone-as-unauthenticated",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/events.go",
+   "old": "\t\t\tif kind == im.PartyStore {\n",
+   "new": "\t\t\tif false {\n",
+   "test": "internal/httpapi/chat ^TestStreamGuardStoreGoneEndsWithStoreClosed$",
+   "why": "A store stream whose store is gone or replaced ends as unauthenticated instead of failed_precondition STORE_CLOSED."
+  },
+  {
+   "id": "chat-newapp-without-reads-accepted",
+   "stack": "go",
+   "file": "backend/internal/httpapi/chat/app.go",
+   "old": "\tcase reads == nil:\n",
+   "new": "\tcase false && reads == nil:\n",
+   "test": "internal/httpapi/chat ^TestNewAppRejectsMissingReadsAndWrites$",
+   "why": "A chat handler without Reads starts and fails on the first request."
+  },
+  {
+   "id": "request-id-version-check-dropped",
+   "stack": "go",
+   "file": "backend/internal/platform/requestid/requestid.go",
+   "old": "id[6]>>4 == 4 && ",
+   "new": "",
+   "test": "internal/platform/requestid ^TestIsV4$",
+   "why": "Any UUID version with a valid variant is accepted as a request_id."
   }
  ]
 }

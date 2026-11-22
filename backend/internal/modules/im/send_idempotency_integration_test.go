@@ -222,3 +222,30 @@ func TestPartiesReadsOwnershipOnly(t *testing.T) {
 		t.Fatalf("抹除後 MessageParties = %+v %v", got, err)
 	}
 }
+
+// 被隱藏或被抹除的訊息，重送也回墓碑（不帶內容、Hidden 或 Erased 標出），仍是同一個 ID 與 seq。
+func TestResendOfAHiddenOrErasedMessageReturnsATombstone(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	buyer := f.buyerParty(b1)
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeText, Text: "之後被隱藏"}
+	first, err := f.sendWith(t, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Hide(ctx, im.HideInput{MessageID: first.ID, AdminID: 1, Category: string(policy.CommunityAssessable()[0])}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.sendWith(t, in)
+	if err != nil || got.ID != first.ID || got.Seq != first.Seq || got.Text != nil || !got.Hidden {
+		t.Fatalf("隱藏後重送要回同一則的墓碑：%+v %v", got, err)
+	}
+	if err := f.m.ErasePartyMessages(ctx, im.PartyBuyer, b1); err != nil {
+		t.Fatal(err)
+	}
+	got, err = f.sendWith(t, in)
+	if err != nil || got.ID != first.ID || got.Seq != first.Seq || got.Text != nil || !got.Erased {
+		t.Fatalf("抹除後重送要回同一則的墓碑：%+v %v", got, err)
+	}
+}

@@ -19,7 +19,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/requestid"
 	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -40,10 +42,25 @@ var errRetry = errors.New("im：並行競爭，重來")
 // Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 重送判定（同一個 RequestID 回第一則）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
 // transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
 // 並行的同一個 RequestID 以 messages 的唯一鍵為最終保證：輸家的 transaction 回滾後重來，重讀第一則。
+//
+// 加入外層 transaction 時撞到同一個 RequestID 不重試：唯一鍵衝突不會回滾外層，在同一個 transaction 繼續下 SQL 違反單體規則 3，
+// 已推進的 last_seq 也會隨外層 commit 而留下空洞；這時回 errNestedConflict，呼叫方必須整個回滾後重來。
 func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
+	_, nested := db.TxFrom(ctx)
+	return retrySend(nested, func() (model.Message, error) { return s.send(ctx, in) })
+}
+
+// errNestedConflict 是加入外層 transaction 的 Send 撞到並行寫入的同一個 RequestID：這個 transaction 已不能再用，呼叫方須回滾後重來。
+var errNestedConflict = errors.New("im：外層 transaction 內遇到並行競爭，呼叫方須回滾後重來")
+
+// retrySend 重試 attempt 直到不再遇到 errRetry；nested 為真時 attempt 的 transaction 不是自己的，不能重試。
+func retrySend(nested bool, attempt func() (model.Message, error)) (model.Message, error) {
 	for range maxSendAttempts {
-		out, err := s.send(ctx, in)
+		out, err := attempt()
 		if errors.Is(err, errRetry) {
+			if nested {
+				return model.Message{}, errNestedConflict
+			}
 			continue
 		}
 		return out, err
@@ -157,16 +174,13 @@ func (s *Service) replay(ctx context.Context, l uitext.Locale, in model.SendInpu
 		return model.Message{}, false, err
 	}
 	same := row.MessageType == string(in.Type)
-	if same && in.Type == model.TypeText {
+	if same && in.Type == model.TypeText && row.ErasedAt == nil {
 		same = row.Content != nil && *row.Content == body
 	}
 	if !same {
 		return model.Message{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.ImRequestIdReused(l))
 	}
-	return rows.Message(rows.MessageRow{
-		ID: row.ID, ConversationID: row.ConversationID, Seq: row.Seq, SenderKind: row.SenderKind, MessageType: row.MessageType,
-		Content: row.Content, ImageAssetID: row.ImageAssetID, ImageObjectKey: row.ImageObjectKey, CreatedAt: row.CreatedAt, ErasedAt: row.ErasedAt,
-	}), true, nil
+	return rows.Message(rows.MessageRow(row)), true, nil
 }
 
 // closedGuardError 把兩個守門的 NotFound（已關閉、已退場或不存在）翻成原有的訊息與 reason：寄件人那一方先翻（寄件人已停用），
@@ -204,7 +218,7 @@ func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, erro
 	if !in.Sender.Kind.Valid() || in.Sender.ID() <= 0 || (in.Sender.Kind == model.PartyStore && in.Sender.Store == nil) {
 		return "", errors.New("im：寄件人身分不完整")
 	}
-	if !validRequestID(in.RequestID) {
+	if !requestid.IsV4(in.RequestID) {
 		return "", apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.ImRequestIdInvalid(l))
 	}
 	switch in.Type {
@@ -228,11 +242,6 @@ func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, erro
 		return "", nil
 	}
 	return "", apperr.InvalidInputOn([]string{"Type"}, "%s", text.ImTypeUnsupported(l))
-}
-
-// validRequestID 只接受 UUIDv4（版本位 4、variant 10）；零值與其他版本一律無效。
-func validRequestID(id uuid.UUID) bool {
-	return id[6]>>4 == 4 && id[8]>>6 == 0b10
 }
 
 func unavailable(l uitext.Locale, cause error) error {

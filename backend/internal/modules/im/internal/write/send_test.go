@@ -447,3 +447,26 @@ func TestCheckInputRequestID(t *testing.T) {
 		})
 	}
 }
+
+func TestRetrySendRetriesOnlyOutsideAnOuterTransaction(t *testing.T) {
+	calls := 0
+	conflict := func() (model.Message, error) { calls++; return model.Message{}, errRetry }
+	if _, err := retrySend(false, conflict); err == nil || errors.Is(err, errRetry) || calls != maxSendAttempts {
+		t.Fatalf("自己的 transaction 應重試到上限後回一般錯誤：calls=%d err=%v", calls, err)
+	}
+	calls = 0
+	if _, err := retrySend(true, conflict); !errors.Is(err, errNestedConflict) || calls != 1 {
+		t.Fatalf("外層 transaction 內撞鍵不得重試：calls=%d err=%v", calls, err)
+	}
+	calls = 0
+	ok := func() (model.Message, error) {
+		calls++
+		if calls < 2 {
+			return model.Message{}, errRetry
+		}
+		return model.Message{Seq: 7}, nil
+	}
+	if out, err := retrySend(false, ok); err != nil || out.Seq != 7 || calls != 2 {
+		t.Fatalf("重試後成功：calls=%d out=%+v err=%v", calls, out, err)
+	}
+}
