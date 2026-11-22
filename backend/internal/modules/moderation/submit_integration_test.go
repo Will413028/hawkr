@@ -57,7 +57,7 @@ func TestThirtyReportsShareOneOpenCaseAndOutcomesFollowTheDecision(t *testing.T)
 	for i := range 30 {
 		reporter, _ := f.newBuyer(t)
 		r := f.submit(t, reporter, commentTarget(w.comment), policy.Spam)
-		if !r.Created || r.Report.Outcome != OutcomePending {
+		if !r.Created || r.Report.Outcome != OutcomeNone {
 			t.Fatalf("第 %d 筆：%+v", i, r)
 		}
 		if i == 0 {

@@ -102,8 +102,6 @@ extension CommonStoreCardStatusUiText on hawkr_common_v1alpha1_store_card.StoreC
 
 String? _moderationReportOutcome(UiLocale l, int value) {
 return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '審核中',
-(UiLocale.en, 1) => 'Under review',
 (UiLocale.zhTW, 2) => '已處理（違規）',
 (UiLocale.en, 2) => 'Resolved (violation)',
 (UiLocale.zhTW, 3) => '已處理（不違規）',
@@ -631,6 +629,14 @@ extension SocialCommentStateUiText on hawkr_social_v1alpha1_social.CommentState 
   String? placeholder(UiLocale l) => _socialCommentStatePlaceholder(l, value);
 }
 
+/// admin.moderation.CaseReport.outcome_unset
+String adminModerationCaseReportOutcomeUnset(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '審核中',
+UiLocale.en => 'Under review',
+};
+}
+
 /// buyer.Profile.gender_unset
 String buyerProfileGenderUnset(UiLocale l) {
 return switch (l) {
@@ -695,6 +701,14 @@ _ => null,
 String commonUnknown(UiLocale l) => switch (l) {
 UiLocale.zhTW || UiLocale.en => '未知',
 };
+
+/// moderation.CommunityReport.outcome_unset
+String moderationCommunityReportOutcomeUnset(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '審核中',
+UiLocale.en => 'Under review',
+};
+}
 
 /// seller.KYCApplication.decide_time
 String sellerKYCApplicationDecideTime(UiLocale l, {required String time}) {

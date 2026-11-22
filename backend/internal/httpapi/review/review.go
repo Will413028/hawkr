@@ -33,6 +33,7 @@ type Reads interface {
 	GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int64) (review.Review, error)
 	ReviewStore(ctx context.Context, id uuid.UUID) (review.ReviewStore, error)
 	StoreStats(ctx context.Context, storeID int64) (review.StoreStats, error)
+	ProductStats(ctx context.Context, productID int64) (review.ProductStats, error)
 }
 
 // Writes 是評價的寫入來源（*review.Module）。

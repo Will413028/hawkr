@@ -129,9 +129,10 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent": EffectRead,
 
 	// ReviewPublicService：公開的 service 對停權的帳號一律以訪客執行，宣告仍標示方法的性質。
-	"/hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews":  EffectRead,
-	"/hawkr.review.v1alpha1.ReviewPublicService/ListStoreReviews":    EffectRead,
-	"/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats": EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews":    EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListStoreReviews":      EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats":   EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats": EffectRead,
 
 	// ReviewAppService
 	"/hawkr.review.v1alpha1.ReviewAppService/GetReview":           EffectRead,
@@ -139,6 +140,17 @@ var customerEffects = map[string]Effect{
 	"/hawkr.review.v1alpha1.ReviewAppService/CreateReview":        EffectWrite,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListMyReviews":       EffectRead,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListOwnStoreReviews": EffectRead,
+
+	// CrmAppService
+	"/hawkr.crm.v1alpha1.CrmAppService/ListCustomers":     EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/GetCustomer":       EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateCustomer":    EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/CreateTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/ListTags":          EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/DeleteTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/AddCustomerTags":   EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/RemoveCustomerTag": EffectWrite,
 
 	// ChatAppService
 	"/hawkr.chat.v1alpha1.ChatAppService/ListConversations":      EffectRead,

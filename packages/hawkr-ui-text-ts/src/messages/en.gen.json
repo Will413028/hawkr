@@ -1,4 +1,11 @@
 {
+  "admin": {
+    "moderation": {
+      "CaseReport": {
+        "outcome_unset": "Under review"
+      }
+    }
+  },
   "assistant": {
     "AssistantTool": {
       "ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": "Looking up the order details",
@@ -71,9 +78,11 @@
     "unknown": "未知"
   },
   "moderation": {
+    "CommunityReport": {
+      "outcome_unset": "Under review"
+    },
     "ReportOutcome": {
       "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)",
-      "REPORT_OUTCOME_PENDING": "Under review",
       "REPORT_OUTCOME_VIOLATION": "Resolved (violation)"
     },
     "ReportTargetKind": {

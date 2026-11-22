@@ -27,6 +27,8 @@ abstract class ReviewPublicServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $2.ListStoreReviewsRequest request);
   $async.Future<$2.GetStoreReviewStatsResponse> getStoreReviewStats(
       $pb.ServerContext ctx, $2.GetStoreReviewStatsRequest request);
+  $async.Future<$2.GetProductReviewStatsResponse> getProductReviewStats(
+      $pb.ServerContext ctx, $2.GetProductReviewStatsRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -36,6 +38,8 @@ abstract class ReviewPublicServiceBase extends $pb.GeneratedService {
         return $2.ListStoreReviewsRequest();
       case 'GetStoreReviewStats':
         return $2.GetStoreReviewStatsRequest();
+      case 'GetProductReviewStats':
+        return $2.GetProductReviewStatsRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -51,6 +55,9 @@ abstract class ReviewPublicServiceBase extends $pb.GeneratedService {
       case 'GetStoreReviewStats':
         return getStoreReviewStats(
             ctx, request as $2.GetStoreReviewStatsRequest);
+      case 'GetProductReviewStats':
+        return getProductReviewStats(
+            ctx, request as $2.GetProductReviewStatsRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

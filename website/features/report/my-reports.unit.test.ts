@@ -8,7 +8,6 @@ import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_cate
 import {
 	CommunityReportSchema,
 	ListMyReportsResponseSchema,
-	ReportOutcome as ModerationOutcome,
 	MyReportItemSchema,
 	ReportTargetKind,
 	ReportTargetSchema,
@@ -21,6 +20,7 @@ import {
 	StoreReportSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import {
+	moderationCommunityReportOutcomeUnset,
 	moderationReportTargetKind,
 	sellerReportOutcome,
 	sellerStoreReportOutcomeUnset,
@@ -194,7 +194,6 @@ describe("MyReportsClient", () => {
 									kind: ReportTargetKind.POST,
 									id: "post1",
 								}),
-								outcome: ModerationOutcome.PENDING,
 							}),
 						},
 					}),
@@ -217,6 +216,9 @@ describe("MyReportsClient", () => {
 		await waitFor(() => expect(screen.getByText(kind)).toBeTruthy());
 		expect(screen.getByText("店-s1")).toBeTruthy();
 		expect(screen.getByText("店家檢舉說明")).toBeTruthy();
+		expect(
+			screen.getAllByText(ut(moderationCommunityReportOutcomeUnset())),
+		).toHaveLength(2);
 		const links = screen.getAllByRole("link");
 		expect(links).toHaveLength(1);
 		expect(links[0].getAttribute("href")).toBe("/account/reports/r1");

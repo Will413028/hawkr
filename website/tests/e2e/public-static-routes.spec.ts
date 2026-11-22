@@ -5,6 +5,7 @@ import {
 	discoverPermanentRedirects,
 } from "./helpers/app-route-inventory";
 import { expectNoAxeViolations } from "./helpers/axe";
+import { captureHydrationDiagnostics } from "./helpers/hydration-diagnostics";
 import {
 	fulfillConnectError,
 	GET_SESSION_URL,
@@ -91,6 +92,7 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 	const issues: string[] = [];
 	const appOrigin = new URL(baseURL).origin;
 
+	captureHydrationDiagnostics(page);
 	page.on("pageerror", (error) => {
 		issues.push(`pageerror: ${error.stack || error.message}`);
 	});

@@ -2,7 +2,7 @@
 //
 // Source: hawkr/review/v1alpha1/review.proto
 
-// review 模組給前台的 API：商品與店家的公開評價與店家評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
+// review 模組給前台的 API：商品與店家的公開評價與商品、店家的評價統計（ReviewPublicService，未登入可讀），以及登入者的評價（ReviewAppService：買家寫評價與讀自己的評價歷史，
 // 店家回覆與讀自己店的評價）。
 //
 // ID 是不透明的字串（評價是 UUID，商品與店家是過渡期的十進位整數字串），client 不解析、不轉數字
@@ -52,6 +52,9 @@ const (
 	// ReviewPublicServiceGetStoreReviewStatsProcedure is the fully-qualified name of the
 	// ReviewPublicService's GetStoreReviewStats RPC.
 	ReviewPublicServiceGetStoreReviewStatsProcedure = "/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats"
+	// ReviewPublicServiceGetProductReviewStatsProcedure is the fully-qualified name of the
+	// ReviewPublicService's GetProductReviewStats RPC.
+	ReviewPublicServiceGetProductReviewStatsProcedure = "/hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats"
 	// ReviewAppServiceGetReviewProcedure is the fully-qualified name of the ReviewAppService's
 	// GetReview RPC.
 	ReviewAppServiceGetReviewProcedure = "/hawkr.review.v1alpha1.ReviewAppService/GetReview"
@@ -79,6 +82,9 @@ type ReviewPublicServiceClient interface {
 	ListStoreReviews(context.Context, *connect.Request[v1alpha1.ListStoreReviewsRequest]) (*connect.Response[v1alpha1.ListStoreReviewsResponse], error)
 	// GetStoreReviewStats 是店家的評價統計：公開可讀的評價數、平均與各星等的數量。統計不依觀看者過濾，公開與店家自己看到的數字相同。
 	GetStoreReviewStats(context.Context, *connect.Request[v1alpha1.GetStoreReviewStatsRequest]) (*connect.Response[v1alpha1.GetStoreReviewStatsResponse], error)
+	// GetProductReviewStats 是商品的評價統計：公開可讀的評價數與平均（與 ListProductReviews 同一個公開述詞：沒有未還原的平台隱藏、作者仍在營運中）。
+	// 統計不依觀看者過濾，不套封鎖。商品沒有評價（或商品不存在）是 count 0、average 0，不是 not_found。
+	GetProductReviewStats(context.Context, *connect.Request[v1alpha1.GetProductReviewStatsRequest]) (*connect.Response[v1alpha1.GetProductReviewStatsResponse], error)
 }
 
 // NewReviewPublicServiceClient constructs a client for the
@@ -113,14 +119,22 @@ func NewReviewPublicServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		getProductReviewStats: connect.NewClient[v1alpha1.GetProductReviewStatsRequest, v1alpha1.GetProductReviewStatsResponse](
+			httpClient,
+			baseURL+ReviewPublicServiceGetProductReviewStatsProcedure,
+			connect.WithSchema(reviewPublicServiceMethods.ByName("GetProductReviewStats")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // reviewPublicServiceClient implements ReviewPublicServiceClient.
 type reviewPublicServiceClient struct {
-	listProductReviews  *connect.Client[v1alpha1.ListProductReviewsRequest, v1alpha1.ListProductReviewsResponse]
-	listStoreReviews    *connect.Client[v1alpha1.ListStoreReviewsRequest, v1alpha1.ListStoreReviewsResponse]
-	getStoreReviewStats *connect.Client[v1alpha1.GetStoreReviewStatsRequest, v1alpha1.GetStoreReviewStatsResponse]
+	listProductReviews    *connect.Client[v1alpha1.ListProductReviewsRequest, v1alpha1.ListProductReviewsResponse]
+	listStoreReviews      *connect.Client[v1alpha1.ListStoreReviewsRequest, v1alpha1.ListStoreReviewsResponse]
+	getStoreReviewStats   *connect.Client[v1alpha1.GetStoreReviewStatsRequest, v1alpha1.GetStoreReviewStatsResponse]
+	getProductReviewStats *connect.Client[v1alpha1.GetProductReviewStatsRequest, v1alpha1.GetProductReviewStatsResponse]
 }
 
 // ListProductReviews calls hawkr.review.v1alpha1.ReviewPublicService.ListProductReviews.
@@ -138,6 +152,11 @@ func (c *reviewPublicServiceClient) GetStoreReviewStats(ctx context.Context, req
 	return c.getStoreReviewStats.CallUnary(ctx, req)
 }
 
+// GetProductReviewStats calls hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats.
+func (c *reviewPublicServiceClient) GetProductReviewStats(ctx context.Context, req *connect.Request[v1alpha1.GetProductReviewStatsRequest]) (*connect.Response[v1alpha1.GetProductReviewStatsResponse], error) {
+	return c.getProductReviewStats.CallUnary(ctx, req)
+}
+
 // ReviewPublicServiceHandler is an implementation of the hawkr.review.v1alpha1.ReviewPublicService
 // service.
 type ReviewPublicServiceHandler interface {
@@ -149,6 +168,9 @@ type ReviewPublicServiceHandler interface {
 	ListStoreReviews(context.Context, *connect.Request[v1alpha1.ListStoreReviewsRequest]) (*connect.Response[v1alpha1.ListStoreReviewsResponse], error)
 	// GetStoreReviewStats 是店家的評價統計：公開可讀的評價數、平均與各星等的數量。統計不依觀看者過濾，公開與店家自己看到的數字相同。
 	GetStoreReviewStats(context.Context, *connect.Request[v1alpha1.GetStoreReviewStatsRequest]) (*connect.Response[v1alpha1.GetStoreReviewStatsResponse], error)
+	// GetProductReviewStats 是商品的評價統計：公開可讀的評價數與平均（與 ListProductReviews 同一個公開述詞：沒有未還原的平台隱藏、作者仍在營運中）。
+	// 統計不依觀看者過濾，不套封鎖。商品沒有評價（或商品不存在）是 count 0、average 0，不是 not_found。
+	GetProductReviewStats(context.Context, *connect.Request[v1alpha1.GetProductReviewStatsRequest]) (*connect.Response[v1alpha1.GetProductReviewStatsResponse], error)
 }
 
 // NewReviewPublicServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -179,6 +201,13 @@ func NewReviewPublicServiceHandler(svc ReviewPublicServiceHandler, opts ...conne
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	reviewPublicServiceGetProductReviewStatsHandler := connect.NewUnaryHandler(
+		ReviewPublicServiceGetProductReviewStatsProcedure,
+		svc.GetProductReviewStats,
+		connect.WithSchema(reviewPublicServiceMethods.ByName("GetProductReviewStats")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.review.v1alpha1.ReviewPublicService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ReviewPublicServiceListProductReviewsProcedure:
@@ -187,6 +216,8 @@ func NewReviewPublicServiceHandler(svc ReviewPublicServiceHandler, opts ...conne
 			reviewPublicServiceListStoreReviewsHandler.ServeHTTP(w, r)
 		case ReviewPublicServiceGetStoreReviewStatsProcedure:
 			reviewPublicServiceGetStoreReviewStatsHandler.ServeHTTP(w, r)
+		case ReviewPublicServiceGetProductReviewStatsProcedure:
+			reviewPublicServiceGetProductReviewStatsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -206,6 +237,10 @@ func (UnimplementedReviewPublicServiceHandler) ListStoreReviews(context.Context,
 
 func (UnimplementedReviewPublicServiceHandler) GetStoreReviewStats(context.Context, *connect.Request[v1alpha1.GetStoreReviewStatsRequest]) (*connect.Response[v1alpha1.GetStoreReviewStatsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.review.v1alpha1.ReviewPublicService.GetStoreReviewStats is not implemented"))
+}
+
+func (UnimplementedReviewPublicServiceHandler) GetProductReviewStats(context.Context, *connect.Request[v1alpha1.GetProductReviewStatsRequest]) (*connect.Response[v1alpha1.GetProductReviewStatsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.review.v1alpha1.ReviewPublicService.GetProductReviewStats is not implemented"))
 }
 
 // ReviewAppServiceClient is a client for the hawkr.review.v1alpha1.ReviewAppService service.

@@ -112,6 +112,9 @@ jobs:
       # 壓力測試（testdb.RequireStress）只在上線前跑：要合併進 main 的 PR、main 的 push，與手動觸發。
       - name: integration test（testcontainers）
         env:
+          # 各 package 行程之間在 -race 編譯大型 package 時可能空窗超過 10 秒；Ryuk 預設 10 秒沒人連線
+          # 就會刪掉共用的 container。設成比下面 go test 的 -timeout 長，讓 Ryuk 撐到整輪結束。
+          TESTCONTAINERS_RYUK_RECONNECTION_TIMEOUT: 15m
           HAWKR_STRESS_TESTS: ${{ (github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
         run: |
           python3 scripts/integration-packages.py > "$RUNNER_TEMP/integration-packages"

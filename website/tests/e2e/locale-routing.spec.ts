@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { captureHydrationDiagnostics } from "./helpers/hydration-diagnostics";
 import { mockGuestSession } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 
@@ -127,6 +128,7 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 		const problems: string[] = [];
 		const hydration =
 			/hydrat|react\.dev\/errors\/(?:418|419|422|423|425)|Minified React error #(?:418|419|422|423|425)/i;
+		captureHydrationDiagnostics(page);
 		page.on("console", (message) => {
 			if (message.type() === "error" && hydration.test(message.text())) {
 				problems.push(message.text());

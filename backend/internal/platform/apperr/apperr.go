@@ -162,6 +162,12 @@ var ReasonChatBlocked = newReason("CHAT_BLOCKED")
 // ReasonReceiverDeleted 表示收件人（買家或店家）的帳號已刪除，無法傳送訊息；搭配 FailedPrecondition。
 var ReasonReceiverDeleted = newReason("RECEIVER_DELETED")
 
+// ReasonCrmTagNameTaken 表示同店已有同名標籤；搭配 AlreadyExists。
+var ReasonCrmTagNameTaken = newReason("CRM_TAG_NAME_TAKEN")
+
+// ReasonCrmTagLimit 表示店家或客戶的標籤數已達上限；搭配 FailedPrecondition。
+var ReasonCrmTagLimit = newReason("CRM_TAG_LIMIT")
+
 // ReasonReplayCursorExpired 表示串流（助理與採購的 server streaming）的 cursor 早於保留的事件範圍；搭配 FailedPrecondition。
 var ReasonReplayCursorExpired = newReason("REPLAY_CURSOR_EXPIRED")
 

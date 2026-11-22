@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { assistantAssistantTool, buyerGender, buyerProfileGenderUnset, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileGenderUnset, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -46,7 +46,6 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_PAUSED": 2,
 	"hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_UNSPECIFIED": 0,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": 3,
-	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_PENDING": 1,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED": 0,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION": 2,
 	"hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_BUYER": 4,
@@ -234,6 +233,9 @@ function num(enumName: string, name: string | number | undefined): number {
 export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	const p = c.params ?? {};
 	switch (c.fn) {
+	case "admin.moderation.CaseReport.outcome_unset": {
+		return adminModerationCaseReportOutcomeUnset();
+	}
 	case "assistant.AssistantTool": {
 		return assistantAssistantTool(num("hawkr.assistant.v1alpha1.AssistantTool", c.value));
 	}
@@ -266,6 +268,9 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "common.unknown": {
 		return commonUnknown();
+	}
+	case "moderation.CommunityReport.outcome_unset": {
+		return moderationCommunityReportOutcomeUnset();
 	}
 	case "moderation.ReportOutcome": {
 		return moderationReportOutcome(num("hawkr.moderation.v1alpha1.ReportOutcome", c.value));

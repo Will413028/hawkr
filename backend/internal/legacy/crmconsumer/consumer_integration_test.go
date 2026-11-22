@@ -41,6 +41,9 @@ type openGuards struct{}
 
 func (openGuards) LockNotClosed(context.Context, int64) error  { return nil }
 func (openGuards) LockNotRetired(context.Context, int64) error { return nil }
+func (openGuards) Store(context.Context, int64) (seller.Store, error) {
+	return seller.Store{}, nil
+}
 
 type env struct {
 	t   *testing.T

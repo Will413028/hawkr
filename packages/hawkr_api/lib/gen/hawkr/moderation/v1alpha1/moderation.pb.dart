@@ -787,6 +787,7 @@ class CommunityReport extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   ReportTarget ensureTarget() => $_ensure(0);
 
+  /// 案件還在處理中時不設值。
   @$pb.TagNumber(2)
   ReportOutcome get outcome => $_getN(1);
   @$pb.TagNumber(2)

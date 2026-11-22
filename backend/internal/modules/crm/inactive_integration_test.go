@@ -36,8 +36,12 @@ func TestInactiveBuyerIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	f.mustOrder("evt-2", "O2", storeA, buyer2, 100)
 	f.mustAddTags(storeA, buyer1, "舊")
 	f.mustAddTags(storeA, buyer2, "舊")
-	if err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
+	if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
+	}
+	tags, err := f.m.ListTags(ctx, storeA)
+	if err != nil || len(tags) != 1 {
+		t.Fatalf("tags=%v err=%v", tags, err)
 	}
 	f.markInactive("BUYER", buyer1)
 
@@ -58,13 +62,19 @@ func TestInactiveBuyerIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 		}
 	})
 	t.Run("SetCustomerType", func(t *testing.T) {
-		wantKind(t, f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeNormal), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeNormal)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 		if n := f.scalar("SELECT count(*) FROM crm.customers WHERE buyer_id = $1 AND customer_type = 'VIP'", buyer1); n != 1 {
 			t.Fatal("被拒的寫入改了資料")
 		}
 	})
+	t.Run("RemoveCustomerTag", func(t *testing.T) {
+		wantKind(t, errOnly(f.m.RemoveCustomerTag(ctx, storeA, buyer1, tags[0].ID)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		if n := f.scalar("SELECT count(*) FROM crm.customer_tags WHERE store_id = $1 AND buyer_id = $2", storeA, buyer1); n != 1 {
+			t.Fatalf("被拒的移除改了資料：%d 筆關聯", n)
+		}
+	})
 	t.Run("AddCustomerTags", func(t *testing.T) {
-		wantKind(t, f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"新"}), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.AddCustomerTags(ctx, storeA, buyer1, []string{"新"})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 		if got := f.tagNames(storeA); len(got) != 1 {
 			t.Fatalf("標籤 %v，被拒的寫入不該建立新標籤", got)
 		}
@@ -77,7 +87,7 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	ctx := context.Background()
 	f.mustOrder("evt-1", "O1", storeB, buyer1, 100)
 	f.mustAddTags(storeB, buyer1, "舊")
-	if err := f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeVIP); err != nil {
+	if _, err := f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
 	tags, _ := f.m.ListTags(ctx, storeB)
@@ -85,19 +95,16 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 	f.markInactive("STORE", storeB)
 
 	t.Run("ListCustomers", func(t *testing.T) {
-		page, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeB, Sort: crm.SortTotalSpent})
-		if err != nil || len(page.Customers) != 0 {
-			t.Fatalf("page=%+v err=%v，預期空", page.Customers, err)
-		}
+		_, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeB, Sort: crm.SortTotalSpent})
+		wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("GetCustomer", func(t *testing.T) {
 		_, err := f.m.GetCustomer(ctx, storeB, buyer1)
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("ListTags", func(t *testing.T) {
-		if got := f.tagNames(storeB); len(got) != 0 {
-			t.Fatalf("標籤 %v，預期空", got)
-		}
+		_, err := f.m.ListTags(ctx, storeB)
+		wantKind(t, err, apperr.KindNotFound, crm.ReasonTagNotFound)
 	})
 	t.Run("VIPStatuses", func(t *testing.T) {
 		got, err := f.m.VIPStatuses(ctx, buyer1, []int64{storeB})
@@ -106,13 +113,13 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 		}
 	})
 	t.Run("SetCustomerType", func(t *testing.T) {
-		wantKind(t, f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeNormal), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeNormal)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("RemoveCustomerTag", func(t *testing.T) {
-		wantKind(t, f.m.RemoveCustomerTag(ctx, storeB, buyer1, tagID), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.RemoveCustomerTag(ctx, storeB, buyer1, tagID)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	})
 	t.Run("AddCustomerTags", func(t *testing.T) {
-		wantKind(t, f.m.AddCustomerTags(ctx, storeB, buyer1, []string{"新"}), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+		wantKind(t, errOnly(f.m.AddCustomerTags(ctx, storeB, buyer1, []string{"新"})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 		if n := f.scalar("SELECT count(*) FROM crm.tags WHERE store_id = $1", storeB); n != 1 {
 			t.Fatalf("店 B 有 %d 個標籤，預期維持 1", n)
 		}
@@ -122,7 +129,7 @@ func TestInactiveStoreIsInvisibleAndReadOnlyToSellers(t *testing.T) {
 		wantKind(t, err, apperr.KindNotFound, crm.ReasonTagNotFound)
 	})
 	t.Run("RenameTag", func(t *testing.T) {
-		wantKind(t, f.m.RenameTag(ctx, storeB, tagID, "改"), apperr.KindNotFound, crm.ReasonTagNotFound)
+		wantKind(t, errOnly(f.m.RenameTag(ctx, storeB, tagID, "改")), apperr.KindNotFound, crm.ReasonTagNotFound)
 	})
 	t.Run("DeleteTag", func(t *testing.T) {
 		wantKind(t, f.m.DeleteTag(ctx, storeB, tagID), apperr.KindNotFound, crm.ReasonTagNotFound)

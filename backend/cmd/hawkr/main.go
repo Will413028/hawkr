@@ -253,6 +253,7 @@ func runServe(ctx context.Context) error {
 	subscribeSocialRelay(bus, jc)
 	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
+	crmModule := newCRM(d, jc, buyerModule, sellerModule, log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
@@ -292,6 +293,7 @@ func runServe(ctx context.Context) error {
 		Social:     socialModule,
 		Review:     reviewModule,
 		IM:         imModule,
+		CRM:        crmModule,
 		Moderation: moderationModule,
 		Content: content.New(content.Deps{
 			DB:     d,

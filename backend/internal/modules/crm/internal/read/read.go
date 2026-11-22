@@ -14,13 +14,22 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm/internal/text"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// Stores 是讀取的賣家能力來源（seller 公開 API）。
+type Stores interface {
+	Store(ctx context.Context, storeID int64) (seller.Store, error)
+}
+
 // Deps 是讀取路徑的依賴。
-type Deps struct{ DB *db.DB }
+type Deps struct {
+	DB     *db.DB
+	Stores Stores
+}
 
 // Service 是讀取路徑的 use case。
 type Service struct{ d Deps }
@@ -29,6 +38,27 @@ type Service struct{ d Deps }
 func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
+
+// authorize 在讀店家的客戶與標籤之前檢查賣家能力（停權時被擋，與寫入同一個能力）。店家已關閉或不存在與寫入一致回 NotFound（notFound 決定原因：
+// 客戶層讀取是 CUSTOMER_NOT_FOUND，標籤是 TAG_NOT_FOUND）；其他拒絕（停權、前置條件）原樣回傳。
+func (s *Service) authorize(ctx context.Context, storeID int64, notFound func(context.Context) error) error {
+	st, err := s.d.Stores.Store(ctx, storeID)
+	if err == nil {
+		err = seller.Authorize(st, model.RequiredCapability)
+	}
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return notFound(ctx)
+	}
+	return err
+}
+
+func customerNotFound(ctx context.Context) error {
+	return model.WithReason(apperr.NotFound("%s", text.CrmCustomerNotFound(uitext.LocaleFrom(ctx))), model.ReasonCustomerNotFound)
+}
+
+func tagNotFound(ctx context.Context) error {
+	return model.WithReason(apperr.NotFound("%s", text.CrmTagNotFound(uitext.LocaleFrom(ctx))), model.ReasonTagNotFound)
+}
 
 func pageSize(size int32) int32 {
 	switch {
@@ -64,6 +94,9 @@ func (s *Service) ListCustomers(ctx context.Context, in model.CustomerListInput)
 	}
 	if !in.Sort.Valid() {
 		return model.CustomerPage{}, fmt.Errorf("crm：未知的排序欄位 %d", in.Sort)
+	}
+	if err := s.authorize(ctx, in.StoreID, customerNotFound); err != nil {
+		return model.CustomerPage{}, err
 	}
 	var typ *string
 	if in.Type != nil {
@@ -171,10 +204,13 @@ func (s *Service) GetCustomer(ctx context.Context, storeID, buyerID int64) (mode
 	if storeID <= 0 || buyerID <= 0 {
 		return model.Customer{}, fmt.Errorf("crm：店家 %d 或買家 %d 不是正整數", storeID, buyerID)
 	}
+	if err := s.authorize(ctx, storeID, customerNotFound); err != nil {
+		return model.Customer{}, err
+	}
 	q := s.q(ctx)
 	r, err := q.GetCustomer(ctx, store.GetCustomerParams{StoreID: storeID, BuyerID: buyerID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return model.Customer{}, model.WithReason(apperr.NotFound("%s", text.CrmCustomerNotFound(uitext.LocaleFrom(ctx))), model.ReasonCustomerNotFound)
+		return model.Customer{}, customerNotFound(ctx)
 	}
 	if err != nil {
 		return model.Customer{}, err
@@ -194,6 +230,9 @@ func (s *Service) GetCustomer(ctx context.Context, storeID, buyerID int64) (mode
 func (s *Service) ListTags(ctx context.Context, storeID int64) ([]model.Tag, error) {
 	if storeID <= 0 {
 		return nil, fmt.Errorf("crm：店家 %d 不是正整數", storeID)
+	}
+	if err := s.authorize(ctx, storeID, tagNotFound); err != nil {
+		return nil, err
 	}
 	rs, err := s.q(ctx).ListTags(ctx, storeID)
 	if err != nil {

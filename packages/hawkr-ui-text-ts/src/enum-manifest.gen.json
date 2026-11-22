@@ -323,6 +323,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.crm.v1alpha1.CustomerSort",
+      "tsName": "CustomerSort",
+      "tsModule": "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.crm.v1alpha1.CustomerType",
+      "tsName": "CustomerType",
+      "tsModule": "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.identity.v1alpha1.ClientKind",
       "tsName": "ClientKind",
       "tsModule": "@hawkr/api/gen/hawkr/identity/v1alpha1/identity_pb",

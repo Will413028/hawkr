@@ -64,3 +64,11 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 | 投影遇到不存在的買家或店家（W1 (a′)） | 買家、店家列關閉與退場後仍保留，不存在只可能是壞資料 | 行為變更：原本照寫，改後跳過（不重試）；守門回 NotFound 時才多讀一次 `pub_closed_buyers()`／`pub_retired_stores()` 分辨：已關閉、已退場記 info，不存在記 error；transaction 內只記守門的結果並提交空的 transaction，分辨的讀取在 transaction 之後（非 tx 連線，查詢失敗不會中止要提交的 transaction）；分辨查詢失敗記 error 並照樣跳過（Will 2026-11-21 修訂） |
 
 觸發條件（門檻是推測，沒有量測）：(1) 店家 `retired_at` 落後於排定時點超過 1 小時（4 輪）：該店在下一輪不用 `SKIP LOCKED`、改為等待取鎖；(2) `crm.erase_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status = 'CLOSED'` 超過 10 萬列：改為 buyer 加部分索引、seller 加 `WHERE retired_at IS NOT NULL` 的索引（設計 W5 (a)）。
+
+## A6-5d 可見性與讀寫一致（fix round 2）
+
+| 照搬的機制 | 從零設計 | 結論 |
+|---|---|---|
+| handler 在寫入提交後以 `BatchDisplay.deleted` 判斷客戶不可見 | 可見性由擁有資料的模組在寫入前判斷 | 不成立；刪除 handler 檢查。寫入路徑的 `lockCustomerParties` 以 `buyer.LockNotClosed`（與 `pub_closed_buyers` 同一事實）在寫入前回 NotFound，`BatchDisplay` 只做顯示對應；`TestInactiveBuyerIsInvisibleAndReadOnlyToSellers` 驗證 NotFound 且什麼都沒寫 |
+| 讀取在店家關閉或不存在時回空頁或略過檢查，寫入回 NotFound | 讀寫同一個結論 | 改：讀取也回 NotFound（客戶層 `CUSTOMER_NOT_FOUND`，`ListTags` 為 `TAG_NOT_FOUND`）；`TestInactiveStoreIsInvisibleAndReadOnlyToSellers` 期望同步改 |
+| 停權時依 ADR D3 把收縮類方法與必要讀取放行（social 的 `CapContentContract`） | CRM 資料從不公開，停權的店家沒有東西需要收回 | 不適用（Will 2026-11-22）；九個方法全是 `CapMarketing`，停權整體被擋；ADR 修訂記一行；`TestDeclarationsMatchTheModuleChecks` 守宣告與模組一致，`TestSuspendedStoreIsRejectedByTheModuleForWritesAndReads` 守模組九個方法都擋 |
