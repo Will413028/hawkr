@@ -13,7 +13,7 @@
 // 兩個 job 並行時先讀的較晚送達，是 RD8 接受的殘留，不帶版本）。刪帳者的評價在進入刪帳的 transaction 起就不計分，
 // review.purge_author 每批刪除時發的 ReviewAggregateChanged 逐組送出重算後的聚合（A6-D12、A6-D13）。
 //
-// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job（舊 review 的 REST 路由已刪，單體是 review.created、review.hidden 唯一的 producer）。
+// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job（單體是 review.created、review.hidden 唯一的 producer）。
 // 隨 notification、catalog、ordering 搬進單體而刪除。
 package reviewrelay
 

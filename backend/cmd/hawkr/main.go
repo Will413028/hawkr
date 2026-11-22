@@ -480,7 +480,7 @@ func runWorker(ctx context.Context) error {
 	}
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
-	// 單體自己的 queue（hawkr.monolith 前綴）的 consumer：買家的訂單完成與補貨、crm 的訂單完成與退款完成（與舊 crm-service 各收一份，不搶 queue）。
+	// 單體自己的 queue（hawkr.monolith 前綴）的 consumer：買家的訂單完成與補貨、crm 的訂單完成與退款完成（單體是這兩類 crm 事件唯一的 consumer）。
 	consumerDone := make(chan struct{})
 	crmDone := make(chan struct{})
 	go func() {

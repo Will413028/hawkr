@@ -67,13 +67,13 @@ publisher **不知道有誰在聽**，也不指定 queue——它只說「我發
 
 #### 一則訊息可以進很多條 queue
 
-真實例子——`hawkr.account` 上發一則 `account.deleted`：
+真實例子——`hawkr.seller` 上發一則 `seller.suspended`：
 
 ```
-publish("hawkr.account", "account.deleted", {...})
+publish("hawkr.seller", "seller.suspended", {...})
         │
-        ├──→ im.account.deleted             （im-service：聊天記錄 PII 抹除）
-        └──→ notification.account.deleted   （notification：清通知匣 PII）
+        ├──→ coupon.seller.suspended   （coupon：停用該店優惠券）
+        └──→ order.seller.suspended    （order：處理該店訂單）
 ```
 
 **2 條 queue 各收到一份自己的複本**，各自獨立 ack、獨立重試、互不影響。這就是「同一個 exchange
@@ -141,7 +141,7 @@ binding 沒有自己的區塊，它寫在 queue 的 `bindings:` 底下（因為 
 ——每次都長一樣、每次都要寫對三四個名字。手寫 227 條不只是麻煩，是**漏一條不會有人發現**
 （plan 照樣乾淨、apply 照樣成功，只是死信沒地方去）。交給規則產生就不會漏。
 
-**代價是你不能手寫那些衍生資源**：自己加一條 `im.account.deleted.dlq` 到 YAML 裡，展開規則會再產生
+**代價是你不能手寫那些衍生資源**：自己加一條 `notification.account.deleted.dlq` 到 YAML 裡，展開規則會再產生
 一次，terraform 就會看到重複的資源。所以規則是——**凡是 `.retry` / `.dlq` 結尾的東西，一律不要自己寫**。
 （唯一的例外是**共用** DLQ，例如 `aftersales.events.dlq`——它不由任何 policy 產生，必須自己列一條裸
 queue，見下方形狀 ①。）
@@ -183,7 +183,7 @@ Python 的產物會多一個「忘記重跑 generator」的失效面。兩份的
 **② `retry:` —— Go 服務的重試框架**（`pkg/mq` 用）：
 
 ```yaml
-- name: im.account.deleted
+- name: notification.account.deleted
   retry:
     max_attempts: 3
   bindings:
@@ -191,9 +191,9 @@ Python 的產物會多一個「忘記重跑 generator」的失效面。兩份的
     key: account.deleted
 ```
 
-一條宣告展開成 **7 個資源**：queue 本身、`im.account.deleted.dlq`、兩個 **fanout**
-exchange（`im.account.deleted.retry` 讓重試不會扇出到共用同一 routing key 的其他 queue，
-`im.account.deleted.dlx` 讓死信不會流進別人的 DLQ）、以及 3 條 binding
+一條宣告展開成 **7 個資源**：queue 本身、`notification.account.deleted.dlq`、兩個 **fanout**
+exchange（`notification.account.deleted.retry` 讓重試不會扇出到共用同一 routing key 的其他 queue，
+`notification.account.deleted.dlx` 讓死信不會流進別人的 DLQ）、以及 3 條 binding
 （原本那條 + `.retry`→自己 + `.dlx`→`.dlq`）。**寫一條、動七個**——這就是本機先看 plan 的價值。
 
 ⚠️ **dead-letter 參數不要手寫**，`x-dead-letter-exchange`（＝`{queue}.dlx`）由展開注入，

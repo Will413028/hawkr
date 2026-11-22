@@ -67,24 +67,6 @@ func buyerGrandfatherResolverForTest() *buyerid.Resolver {
 	}))
 }
 
-// buyerServiceDownResolverForTest：模擬 buyer 模組基礎設施錯誤（非
-// ErrNoCurrentBuyer），驗證呼叫端走 GrpcErr（503）而非 Forbidden（403）分支。
-// noBuyerResolverForTest（ErrNoCurrentBuyer 版）定義在 resolve_buyer_test.go，共用。
-func buyerServiceDownResolverForTest() *buyerid.Resolver {
-	return buyerid.New(buyerid.GetterFunc(func(context.Context, int64) (*buyerpb.BuyerInfo, error) {
-		return nil, status.Error(codes.Unavailable, "buyer-service down")
-	}))
-}
-
-// storeServiceDownResolverForTest：模擬 seller 模組基礎設施錯誤（非
-// ErrNoCurrentStore），驗證呼叫端走 GrpcErr（503）而非 Forbidden（403）分支。
-// noStoreResolverForTest（ErrNoCurrentStore 版）定義在上方，共用。
-func storeServiceDownResolverForTest() *storeid.Resolver {
-	return storeid.New(storeid.GetterFunc(func(context.Context, int64) (int64, error) {
-		return 0, status.Error(codes.Unavailable, "seller-service down")
-	}))
-}
-
 // ==================== resolveStoreID ====================
 
 func setupResolveProbe(h *Holder) *gin.Engine {

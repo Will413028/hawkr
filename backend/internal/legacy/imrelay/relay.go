@@ -8,7 +8,7 @@
 // （wire 型別都還是 string）。其他欄位的值與身分空間不變：receiver_id 收件人是買家時送 buyer_id、
 // 是店家時送店家的 account_id。
 //
-// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job。舊 im-service 已刪除，所有聊天訊息都由單體的 im 送出。notification 搬進單體後刪除。
+// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job。單體的 im 是所有聊天訊息的唯一 producer。notification 搬進單體後刪除。
 package imrelay
 
 import (

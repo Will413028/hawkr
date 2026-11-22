@@ -15,8 +15,7 @@ import (
 
 // newIM 組裝 im 模組並訂閱買家與店家的刪除事件（單體規則 4 的原子狀態變更：同 transaction 只排抹除 job，停用的事實在 buyer、seller）。
 // serve 與 worker 都要呼叫：serve 的刪帳流程與 worker 的 CompletePending、店家退場都會發這兩個事件，worker 另外執行它的 job
-// （媒體引用同步、抹除與其保底掃描）。relay（imrelay）在這裡接上：只有單體的 im 送出訊息才發 im.MessageSent，舊 im-service 的訊息（buyer-app 的聊天
-// 還走舊路由）由它自己發 chat.message.sent，兩邊的訊息不重疊。
+// （媒體引用同步、抹除與其保底掃描）。relay（imrelay）在這裡接上：單體的 im 是 chat.message.sent 唯一的 producer。
 func newIM(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers im.Buyers, sellers im.Stores, med media.Media, orders im.Orders, log *slog.Logger) *im.Module {
 	m := im.New(im.Deps{
 		DB: d, Events: bus, Jobs: jc, Media: med, Buyers: buyers, Stores: sellers, Orders: orders,
