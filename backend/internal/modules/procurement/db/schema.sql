@@ -115,37 +115,29 @@ CREATE TABLE procurement.turns (
 CREATE UNIQUE INDEX turns_idempotency ON procurement.turns (buyer_id, client_request_id);
 CREATE INDEX turns_request ON procurement.turns (request_id, created_at DESC);
 
--- 一次候選搜尋的結果（S1）：不承載 run 的生命週期（在 runs），沒有 lease、fencing_token、policy_version。失敗後買家重送就是新的一列。
+-- 一次候選搜尋的結果（S1）：不承載 run 的生命週期（在 runs），沒有 lease、fencing_token、policy_version。冪等鍵在 run（A9-D29）；失敗後買家重送就是新的一列。
 CREATE TABLE procurement.candidate_sets (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
     request_revision_id UUID NOT NULL REFERENCES procurement.request_revisions (id) ON DELETE CASCADE,
     buyer_id BIGINT NOT NULL,
-    client_request_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT candidate_sets_buyer_check CHECK (buyer_id > 0)
 );
-CREATE UNIQUE INDEX candidate_sets_idempotency ON procurement.candidate_sets (request_revision_id, client_request_id);
 CREATE INDEX candidate_sets_request ON procurement.candidate_sets (request_id, created_at DESC);
 
--- 候選賣家：沒有店名快照（S9，名稱讀取時由 StoreCard 組裝），只收 OPEN 的店；selected 併入（S11）。自由文字（研究摘要等）不入庫（A9-D8）。
+-- 候選賣家：沒有店名快照（S9，名稱讀取時由 StoreCard 組裝），只收 OPEN 的店；selected 併入（S11）。自由文字（研究摘要等）與事實不入庫，事實讀取時由需求現行版本組出（A9-D8、A9-D29(3)）。
 CREATE TABLE procurement.candidates (
     id UUID PRIMARY KEY,
     candidate_set_id UUID NOT NULL REFERENCES procurement.candidate_sets (id) ON DELETE CASCADE,
     store_id BIGINT NOT NULL,
     source_id TEXT NOT NULL,
-    score INT NOT NULL DEFAULT 0,
     rank INT NOT NULL DEFAULT 0,
-    matched_facts JSONB NOT NULL DEFAULT '[]',
-    unverifiable_facts JSONB NOT NULL DEFAULT '[]',
-    facts_as_of TIMESTAMPTZ NOT NULL,
     selected BOOLEAN NOT NULL DEFAULT FALSE,
     selected_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT candidates_store_check CHECK (store_id > 0),
     CONSTRAINT candidates_source_check CHECK (char_length(source_id) >= 1),
-    CONSTRAINT candidates_matched_check CHECK (jsonb_typeof(matched_facts) = 'array'),
-    CONSTRAINT candidates_unverifiable_check CHECK (jsonb_typeof(unverifiable_facts) = 'array'),
     CONSTRAINT candidates_selected_check CHECK (selected = (selected_at IS NOT NULL))
 );
 CREATE UNIQUE INDEX candidates_set_store ON procurement.candidates (candidate_set_id, store_id);
@@ -443,7 +435,7 @@ CREATE TABLE procurement.agent_runs (
     CONSTRAINT agent_runs_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT agent_runs_type_check CHECK (run_type IN ('TURN', 'CANDIDATE_SEARCH', 'CLARIFICATION_RESUME', 'PUBLICATION')),
     CONSTRAINT agent_runs_status_check CHECK (status IN ('QUEUED', 'RUNNING', 'WAITING_FOR_INPUT', 'CANCEL_REQUESTED', 'SUCCEEDED', 'FAILED', 'CANCELLED')),
-    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR', 'MODEL_UNAVAILABLE')),
+    CONSTRAINT agent_runs_failure_check CHECK (failure_reason IS NULL OR failure_reason IN ('WORKER_LOST', 'SEARCH_FAILED', 'TURN_PIPELINE_ERROR', 'MODEL_UNAVAILABLE', 'ITEM_CATEGORY_UNAVAILABLE')),
     CONSTRAINT agent_runs_seq_check CHECK (last_event_seq >= 0 AND min_available_seq >= 1),
     CONSTRAINT agent_runs_interrupt_check CHECK ((run_type = 'CLARIFICATION_RESUME') = (interrupt_id IS NOT NULL)),
     CONSTRAINT agent_runs_quota_check CHECK ((run_type = 'TURN') = (quota_period_start IS NOT NULL))

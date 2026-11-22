@@ -11,6 +11,15 @@ SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id;
 UPDATE procurement.requests SET status = @status, updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND status = @from_status;
 
+-- name: SetRequestStatusFromAny :execrows
+-- 條件式轉移到 to：目前狀態在 from_statuses 之內才改（搜尋成功時來源可以是 REQUIREMENT_READY 或 MATCHING）。
+UPDATE procurement.requests SET status = @to_status, updated_at = @now
+WHERE id = @id AND buyer_id = @buyer_id AND status = ANY(@from_statuses::text[]);
+
+-- name: LockRequestForBuyer :one
+-- 鎖需求列並讀它的現行狀態；候選搜尋的提交與送出都先鎖它，與 TURN 的版本寫入串行。
+SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id FOR UPDATE;
+
 -- name: InsertRevision :execrows
 -- 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。
 INSERT INTO procurement.request_revisions (

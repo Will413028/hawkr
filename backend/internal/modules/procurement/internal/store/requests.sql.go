@@ -479,6 +479,29 @@ func (q *Queries) ListTurnsByRequest(ctx context.Context, arg ListTurnsByRequest
 	return items, nil
 }
 
+const lockRequestForBuyer = `-- name: LockRequestForBuyer :one
+SELECT id, buyer_id, status, created_at, updated_at FROM procurement.requests WHERE id = $1 AND buyer_id = $2 FOR UPDATE
+`
+
+type LockRequestForBuyerParams struct {
+	ID      uuid.UUID
+	BuyerID *int64
+}
+
+// 鎖需求列並讀它的現行狀態；候選搜尋的提交與送出都先鎖它，與 TURN 的版本寫入串行。
+func (q *Queries) LockRequestForBuyer(ctx context.Context, arg LockRequestForBuyerParams) (ProcurementRequest, error) {
+	row := q.db.QueryRow(ctx, lockRequestForBuyer, arg.ID, arg.BuyerID)
+	var i ProcurementRequest
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const nextRevisionNo = `-- name: NextRevisionNo :one
 SELECT (COALESCE(MAX(v.revision_no), 0) + 1)::int AS next_no
 FROM procurement.requests r
@@ -592,6 +615,34 @@ func (q *Queries) SetRequestStatus(ctx context.Context, arg SetRequestStatusPara
 		arg.ID,
 		arg.BuyerID,
 		arg.FromStatus,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setRequestStatusFromAny = `-- name: SetRequestStatusFromAny :execrows
+UPDATE procurement.requests SET status = $1, updated_at = $2
+WHERE id = $3 AND buyer_id = $4 AND status = ANY($5::text[])
+`
+
+type SetRequestStatusFromAnyParams struct {
+	ToStatus     string
+	Now          time.Time
+	ID           uuid.UUID
+	BuyerID      *int64
+	FromStatuses []string
+}
+
+// 條件式轉移到 to：目前狀態在 from_statuses 之內才改（搜尋成功時來源可以是 REQUIREMENT_READY 或 MATCHING）。
+func (q *Queries) SetRequestStatusFromAny(ctx context.Context, arg SetRequestStatusFromAnyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setRequestStatusFromAny,
+		arg.ToStatus,
+		arg.Now,
+		arg.ID,
+		arg.BuyerID,
+		arg.FromStatuses,
 	)
 	if err != nil {
 		return 0, err

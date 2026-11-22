@@ -156,6 +156,7 @@ const RunFailureReason$json = {
     {'1': 'RUN_FAILURE_REASON_SEARCH_FAILED', '2': 2},
     {'1': 'RUN_FAILURE_REASON_TURN_PIPELINE_ERROR', '2': 3},
     {'1': 'RUN_FAILURE_REASON_MODEL_UNAVAILABLE', '2': 5},
+    {'1': 'RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE', '2': 6},
   ],
   '4': [
     {'1': 4, '2': 4},
@@ -168,8 +169,9 @@ final $typed_data.Uint8List runFailureReasonDescriptor = $convert.base64Decode(
     'ChBSdW5GYWlsdXJlUmVhc29uEiIKHlJVTl9GQUlMVVJFX1JFQVNPTl9VTlNQRUNJRklFRBAAEi'
     'IKHlJVTl9GQUlMVVJFX1JFQVNPTl9XT1JLRVJfTE9TVBABEiQKIFJVTl9GQUlMVVJFX1JFQVNP'
     'Tl9TRUFSQ0hfRkFJTEVEEAISKgomUlVOX0ZBSUxVUkVfUkVBU09OX1RVUk5fUElQRUxJTkVfRV'
-    'JST1IQAxIoCiRSVU5fRkFJTFVSRV9SRUFTT05fTU9ERUxfVU5BVkFJTEFCTEUQBSIECAQQBCoa'
-    'UlVOX0ZBSUxVUkVfUkVBU09OX0VYUElSRUQ=');
+    'JST1IQAxIoCiRSVU5fRkFJTFVSRV9SRUFTT05fTU9ERUxfVU5BVkFJTEFCTEUQBRIwCixSVU5f'
+    'RkFJTFVSRV9SRUFTT05fSVRFTV9DQVRFR09SWV9VTkFWQUlMQUJMRRAGIgQIBBAEKhpSVU5fRk'
+    'FJTFVSRV9SRUFTT05fRVhQSVJFRA==');
 
 @$core.Deprecated('Use stepStatusDescriptor instead')
 const StepStatus$json = {
@@ -1327,7 +1329,6 @@ const Candidate$json = {
   '1': 'Candidate',
   '2': [
     {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
-    {'1': 'score', '3': 3, '4': 1, '5': 1, '10': 'score'},
     {
       '1': 'matched_facts',
       '3': 4,
@@ -1362,17 +1363,21 @@ const Candidate$json = {
       '10': 'store'
     },
   ],
+  '9': [
+    {'1': 3, '2': 4},
+  ],
+  '10': ['score'],
 };
 
 /// Descriptor for `Candidate`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List candidateDescriptor = $convert.base64Decode(
-    'CglDYW5kaWRhdGUSEwoCaWQYASABKAlCA+BBCFICaWQSFAoFc2NvcmUYAyABKAFSBXNjb3JlEk'
-    'wKDW1hdGNoZWRfZmFjdHMYBCADKAsyJy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5NYXRj'
-    'aGVkRmFjdFIMbWF0Y2hlZEZhY3RzElsKEnVudmVyaWZpYWJsZV9mYWN0cxgFIAMoCzIsLmhhd2'
-    'tyLnByb2N1cmVtZW50LnYxYWxwaGExLlVudmVyaWZpYWJsZUZhY3RSEXVudmVyaWZpYWJsZUZh'
-    'Y3RzEjkKCmZhY3RzX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUglmYW'
-    'N0c1RpbWUSGgoIc2VsZWN0ZWQYByABKAhSCHNlbGVjdGVkEjYKBXN0b3JlGAggASgLMiAuaGF3'
-    'a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZFIFc3RvcmU=');
+    'CglDYW5kaWRhdGUSEwoCaWQYASABKAlCA+BBCFICaWQSTAoNbWF0Y2hlZF9mYWN0cxgEIAMoCz'
+    'InLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLk1hdGNoZWRGYWN0UgxtYXRjaGVkRmFjdHMS'
+    'WwoSdW52ZXJpZmlhYmxlX2ZhY3RzGAUgAygLMiwuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYT'
+    'EuVW52ZXJpZmlhYmxlRmFjdFIRdW52ZXJpZmlhYmxlRmFjdHMSOQoKZmFjdHNfdGltZRgGIAEo'
+    'CzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSCWZhY3RzVGltZRIaCghzZWxlY3RlZBgHIA'
+    'EoCFIIc2VsZWN0ZWQSNgoFc3RvcmUYCCABKAsyIC5oYXdrci5jb21tb24udjFhbHBoYTEuU3Rv'
+    'cmVDYXJkUgVzdG9yZUoECAMQBFIFc2NvcmU=');
 
 @$core.Deprecated('Use startCandidateSearchRequestDescriptor instead')
 const StartCandidateSearchRequest$json = {

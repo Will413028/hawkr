@@ -118,8 +118,8 @@ func (q *Queries) GetUsage(ctx context.Context, arg GetUsageParams) (int32, erro
 }
 
 const insertRun = `-- name: InsertRun :execrows
-INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, interrupt_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, 'QUEUED', $7, $8, $9, $9)
+INSERT INTO procurement.agent_runs (id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, client_request_id, quota_period_start, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, 'QUEUED', $8, $9, $10, $10)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
 
@@ -129,6 +129,7 @@ type InsertRunParams struct {
 	RequestID        uuid.UUID
 	ConversationID   *uuid.UUID
 	InterruptID      *uuid.UUID
+	CandidateSetID   *uuid.UUID
 	RunType          string
 	ClientRequestID  uuid.UUID
 	QuotaPeriodStart *time.Time
@@ -143,6 +144,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (int64, er
 		arg.RequestID,
 		arg.ConversationID,
 		arg.InterruptID,
+		arg.CandidateSetID,
 		arg.RunType,
 		arg.ClientRequestID,
 		arg.QuotaPeriodStart,

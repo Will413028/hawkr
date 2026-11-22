@@ -30,9 +30,11 @@ const (
 	FailureSearchFailed     = "SEARCH_FAILED"
 	FailureTurnPipelineErr  = "TURN_PIPELINE_ERROR"
 	FailureModelUnavailable = "MODEL_UNAVAILABLE"
-	notifyChannel           = "procurement_run"
-	protoStatusPrefix       = "RUN_STATUS_"
-	protoFailureReasonPrefx = "RUN_FAILURE_REASON_"
+	// FailureItemCategoryUnavailable 是候選搜尋發現已確認的品項分類不再是末層（A9-D29(7)）。
+	FailureItemCategoryUnavailable = "ITEM_CATEGORY_UNAVAILABLE"
+	notifyChannel                  = "procurement_run"
+	protoStatusPrefix              = "RUN_STATUS_"
+	protoFailureReasonPrefx        = "RUN_FAILURE_REASON_"
 )
 
 // Run 的類型（與 schema 的 CHECK 相同）。只有 TURN 扣額度。
@@ -305,7 +307,7 @@ func ptr[T any](v T) *T { return &v }
 
 func knownFailureReason(r string) bool {
 	switch r {
-	case FailureWorkerLost, FailureSearchFailed, FailureTurnPipelineErr, FailureModelUnavailable:
+	case FailureWorkerLost, FailureSearchFailed, FailureTurnPipelineErr, FailureModelUnavailable, FailureItemCategoryUnavailable:
 		return true
 	}
 	return false

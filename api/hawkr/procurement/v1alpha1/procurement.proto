@@ -51,7 +51,7 @@ service BuyerProcurementAppService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // ToggleSelection 勾選或取消勾選一個候選。候選的依據已早於目前的需求版本回 ABORTED，conflictTarget 是 candidate_set。
+  // ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
   rpc ToggleSelection(ToggleSelectionRequest) returns (ToggleSelectionResponse);
 
   // SubmitAnswer 回答一個釐清問題。需求有待回覆的中斷時改用 ResumeRun，回 FAILED_PRECONDITION，
@@ -248,6 +248,8 @@ enum RunFailureReason {
   RUN_FAILURE_REASON_TURN_PIPELINE_ERROR = 3;
   // 一輪釐清時模型服務沒有給出可用答案（逾時、429、5xx 重試用盡）。買家稍後重送。
   RUN_FAILURE_REASON_MODEL_UNAVAILABLE = 5;
+  // 候選搜尋時，需求已確認的品項分類不再是末層（分類樹改過）。伺服器已清掉品項解析、需求退回釐清；client 請買家重新選品項。
+  RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE = 6;
   reserved 4;
   reserved "RUN_FAILURE_REASON_EXPIRED";
 }
@@ -624,10 +626,11 @@ message UnverifiableFact {
 message Candidate {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   // 店名不在這裡：名稱只從 store（StoreCard）讀，沒公開過的店家沒有卡片、名稱不能被讀出。
-  double score = 3;
+  reserved 3;
+  reserved "score";
   repeated MatchedFact matched_facts = 4;
   repeated UnverifiableFact unverifiable_facts = 5;
-  // 以上事實成立的時間。
+  // 這次搜尋完成的時間；事實依需求的現行版本在讀取時組出，不是入庫的快照。
   google.protobuf.Timestamp facts_time = 6;
   bool selected = 7;
   // 賣家的店家卡片。

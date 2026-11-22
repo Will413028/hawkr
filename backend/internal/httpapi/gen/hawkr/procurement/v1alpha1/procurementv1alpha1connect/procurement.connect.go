@@ -161,7 +161,7 @@ type BuyerProcurementAppServiceClient interface {
 	StartCandidateSearch(context.Context, *connect.Request[v1alpha1.StartCandidateSearchRequest]) (*connect.Response[v1alpha1.StartCandidateSearchResponse], error)
 	// GetCandidateSearch 回傳一次候選搜尋的狀態與目前的候選。
 	GetCandidateSearch(context.Context, *connect.Request[v1alpha1.GetCandidateSearchRequest]) (*connect.Response[v1alpha1.GetCandidateSearchResponse], error)
-	// ToggleSelection 勾選或取消勾選一個候選。候選的依據已早於目前的需求版本回 ABORTED，conflictTarget 是 candidate_set。
+	// ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
 	ToggleSelection(context.Context, *connect.Request[v1alpha1.ToggleSelectionRequest]) (*connect.Response[v1alpha1.ToggleSelectionResponse], error)
 	// SubmitAnswer 回答一個釐清問題。需求有待回覆的中斷時改用 ResumeRun，回 FAILED_PRECONDITION，
 	// reason 是 APPROVAL_PENDING。
@@ -536,7 +536,7 @@ type BuyerProcurementAppServiceHandler interface {
 	StartCandidateSearch(context.Context, *connect.Request[v1alpha1.StartCandidateSearchRequest]) (*connect.Response[v1alpha1.StartCandidateSearchResponse], error)
 	// GetCandidateSearch 回傳一次候選搜尋的狀態與目前的候選。
 	GetCandidateSearch(context.Context, *connect.Request[v1alpha1.GetCandidateSearchRequest]) (*connect.Response[v1alpha1.GetCandidateSearchResponse], error)
-	// ToggleSelection 勾選或取消勾選一個候選。候選的依據已早於目前的需求版本回 ABORTED，conflictTarget 是 candidate_set。
+	// ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
 	ToggleSelection(context.Context, *connect.Request[v1alpha1.ToggleSelectionRequest]) (*connect.Response[v1alpha1.ToggleSelectionResponse], error)
 	// SubmitAnswer 回答一個釐清問題。需求有待回覆的中斷時改用 ResumeRun，回 FAILED_PRECONDITION，
 	// reason 是 APPROVAL_PENDING。

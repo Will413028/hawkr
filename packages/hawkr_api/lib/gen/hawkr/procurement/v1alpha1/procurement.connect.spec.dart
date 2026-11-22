@@ -51,7 +51,7 @@ abstract final class BuyerProcurementAppService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
-  /// ToggleSelection 勾選或取消勾選一個候選。候選的依據已早於目前的需求版本回 ABORTED，conflictTarget 是 candidate_set。
+  /// ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
   static const toggleSelection = connect.Spec(
     '/$name/ToggleSelection',
     connect.StreamType.unary,

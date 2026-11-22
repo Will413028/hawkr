@@ -12,32 +12,8 @@ import (
 	"uuid"
 )
 
-const getCandidateSetByClientRequest = `-- name: GetCandidateSetByClientRequest :one
-SELECT id, request_id, request_revision_id, buyer_id, client_request_id, created_at FROM procurement.candidate_sets WHERE request_revision_id = $1 AND client_request_id = $2 AND buyer_id = $3
-`
-
-type GetCandidateSetByClientRequestParams struct {
-	RequestRevisionID uuid.UUID
-	ClientRequestID   uuid.UUID
-	BuyerID           int64
-}
-
-func (q *Queries) GetCandidateSetByClientRequest(ctx context.Context, arg GetCandidateSetByClientRequestParams) (ProcurementCandidateSet, error) {
-	row := q.db.QueryRow(ctx, getCandidateSetByClientRequest, arg.RequestRevisionID, arg.ClientRequestID, arg.BuyerID)
-	var i ProcurementCandidateSet
-	err := row.Scan(
-		&i.ID,
-		&i.RequestID,
-		&i.RequestRevisionID,
-		&i.BuyerID,
-		&i.ClientRequestID,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const getCandidateSetForBuyer = `-- name: GetCandidateSetForBuyer :one
-SELECT id, request_id, request_revision_id, buyer_id, client_request_id, created_at FROM procurement.candidate_sets WHERE id = $1 AND request_id = $2 AND buyer_id = $3
+SELECT id, request_id, request_revision_id, buyer_id, created_at FROM procurement.candidate_sets WHERE id = $1 AND request_id = $2 AND buyer_id = $3
 `
 
 type GetCandidateSetForBuyerParams struct {
@@ -54,29 +30,23 @@ func (q *Queries) GetCandidateSetForBuyer(ctx context.Context, arg GetCandidateS
 		&i.RequestID,
 		&i.RequestRevisionID,
 		&i.BuyerID,
-		&i.ClientRequestID,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const insertCandidate = `-- name: InsertCandidate :exec
-INSERT INTO procurement.candidates (
-    id, candidate_set_id, store_id, source_id, score, rank, matched_facts, unverifiable_facts, facts_as_of, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO procurement.candidates (id, candidate_set_id, store_id, source_id, rank, created_at)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertCandidateParams struct {
-	ID                uuid.UUID
-	CandidateSetID    uuid.UUID
-	StoreID           int64
-	SourceID          string
-	Score             int32
-	Rank              int32
-	MatchedFacts      []byte
-	UnverifiableFacts []byte
-	FactsAsOf         time.Time
-	Now               time.Time
+	ID             uuid.UUID
+	CandidateSetID uuid.UUID
+	StoreID        int64
+	SourceID       string
+	Rank           int32
+	Now            time.Time
 }
 
 // 沒有店名欄位（S9）；呼叫端只給 OPEN 的店。
@@ -86,20 +56,15 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 		arg.CandidateSetID,
 		arg.StoreID,
 		arg.SourceID,
-		arg.Score,
 		arg.Rank,
-		arg.MatchedFacts,
-		arg.UnverifiableFacts,
-		arg.FactsAsOf,
 		arg.Now,
 	)
 	return err
 }
 
-const insertCandidateSet = `-- name: InsertCandidateSet :execrows
-INSERT INTO procurement.candidate_sets (id, request_id, request_revision_id, buyer_id, client_request_id, created_at)
-VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (request_revision_id, client_request_id) DO NOTHING
+const insertCandidateSet = `-- name: InsertCandidateSet :exec
+INSERT INTO procurement.candidate_sets (id, request_id, request_revision_id, buyer_id, created_at)
+VALUES ($1, $2, $3, $4, $5)
 `
 
 type InsertCandidateSetParams struct {
@@ -107,28 +72,23 @@ type InsertCandidateSetParams struct {
 	RequestID         uuid.UUID
 	RequestRevisionID uuid.UUID
 	BuyerID           int64
-	ClientRequestID   uuid.UUID
 	Now               time.Time
 }
 
-// 一次搜尋一列（S1）；同一個版本與 client_request_id 已有候選集時回 0 列，呼叫端改讀既有的。
-func (q *Queries) InsertCandidateSet(ctx context.Context, arg InsertCandidateSetParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertCandidateSet,
+// 一次搜尋一列（S1）；冪等鍵在 run（A9-D29），重送由呼叫端以 run 的冪等鍵擋下，不會走到這裡。
+func (q *Queries) InsertCandidateSet(ctx context.Context, arg InsertCandidateSetParams) error {
+	_, err := q.db.Exec(ctx, insertCandidateSet,
 		arg.ID,
 		arg.RequestID,
 		arg.RequestRevisionID,
 		arg.BuyerID,
-		arg.ClientRequestID,
 		arg.Now,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+	return err
 }
 
 const listCandidates = `-- name: ListCandidates :many
-SELECT c.id, c.candidate_set_id, c.store_id, c.source_id, c.score, c.rank, c.matched_facts, c.unverifiable_facts, c.facts_as_of, c.selected, c.selected_at, c.created_at FROM procurement.candidates c
+SELECT c.id, c.candidate_set_id, c.store_id, c.source_id, c.rank, c.selected, c.selected_at, c.created_at FROM procurement.candidates c
 JOIN procurement.candidate_sets s ON s.id = c.candidate_set_id
 WHERE c.candidate_set_id = $1 AND s.buyer_id = $2
 ORDER BY c.rank, c.id
@@ -153,11 +113,7 @@ func (q *Queries) ListCandidates(ctx context.Context, arg ListCandidatesParams) 
 			&i.CandidateSetID,
 			&i.StoreID,
 			&i.SourceID,
-			&i.Score,
 			&i.Rank,
-			&i.MatchedFacts,
-			&i.UnverifiableFacts,
-			&i.FactsAsOf,
 			&i.Selected,
 			&i.SelectedAt,
 			&i.CreatedAt,

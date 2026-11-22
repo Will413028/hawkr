@@ -408,6 +408,8 @@ const (
 	RunFailureReason_RUN_FAILURE_REASON_TURN_PIPELINE_ERROR RunFailureReason = 3
 	// 一輪釐清時模型服務沒有給出可用答案（逾時、429、5xx 重試用盡）。買家稍後重送。
 	RunFailureReason_RUN_FAILURE_REASON_MODEL_UNAVAILABLE RunFailureReason = 5
+	// 候選搜尋時，需求已確認的品項分類不再是末層（分類樹改過）。伺服器已清掉品項解析、需求退回釐清；client 請買家重新選品項。
+	RunFailureReason_RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE RunFailureReason = 6
 )
 
 // Enum value maps for RunFailureReason.
@@ -418,13 +420,15 @@ var (
 		2: "RUN_FAILURE_REASON_SEARCH_FAILED",
 		3: "RUN_FAILURE_REASON_TURN_PIPELINE_ERROR",
 		5: "RUN_FAILURE_REASON_MODEL_UNAVAILABLE",
+		6: "RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE",
 	}
 	RunFailureReason_value = map[string]int32{
-		"RUN_FAILURE_REASON_UNSPECIFIED":         0,
-		"RUN_FAILURE_REASON_WORKER_LOST":         1,
-		"RUN_FAILURE_REASON_SEARCH_FAILED":       2,
-		"RUN_FAILURE_REASON_TURN_PIPELINE_ERROR": 3,
-		"RUN_FAILURE_REASON_MODEL_UNAVAILABLE":   5,
+		"RUN_FAILURE_REASON_UNSPECIFIED":               0,
+		"RUN_FAILURE_REASON_WORKER_LOST":               1,
+		"RUN_FAILURE_REASON_SEARCH_FAILED":             2,
+		"RUN_FAILURE_REASON_TURN_PIPELINE_ERROR":       3,
+		"RUN_FAILURE_REASON_MODEL_UNAVAILABLE":         5,
+		"RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE": 6,
 	}
 )
 
@@ -3019,13 +3023,11 @@ func (x *UnverifiableFact) GetReason() string {
 
 // Candidate 是一位候選賣家：只有結構化欄位，不含研究摘要、定位等自由文字。
 type Candidate struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// 店名不在這裡：名稱只從 store（StoreCard）讀，沒公開過的店家沒有卡片、名稱不能被讀出。
-	Score             float64             `protobuf:"fixed64,3,opt,name=score,proto3" json:"score,omitempty"`
-	MatchedFacts      []*MatchedFact      `protobuf:"bytes,4,rep,name=matched_facts,json=matchedFacts,proto3" json:"matched_facts,omitempty"`
-	UnverifiableFacts []*UnverifiableFact `protobuf:"bytes,5,rep,name=unverifiable_facts,json=unverifiableFacts,proto3" json:"unverifiable_facts,omitempty"`
-	// 以上事實成立的時間。
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	MatchedFacts      []*MatchedFact         `protobuf:"bytes,4,rep,name=matched_facts,json=matchedFacts,proto3" json:"matched_facts,omitempty"`
+	UnverifiableFacts []*UnverifiableFact    `protobuf:"bytes,5,rep,name=unverifiable_facts,json=unverifiableFacts,proto3" json:"unverifiable_facts,omitempty"`
+	// 這次搜尋完成的時間；事實依需求的現行版本在讀取時組出，不是入庫的快照。
 	FactsTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=facts_time,json=factsTime,proto3" json:"facts_time,omitempty"`
 	Selected  bool                   `protobuf:"varint,7,opt,name=selected,proto3" json:"selected,omitempty"`
 	// 賣家的店家卡片。
@@ -3069,13 +3071,6 @@ func (x *Candidate) GetId() string {
 		return x.Id
 	}
 	return ""
-}
-
-func (x *Candidate) GetScore() float64 {
-	if x != nil {
-		return x.Score
-	}
-	return 0
 }
 
 func (x *Candidate) GetMatchedFacts() []*MatchedFact {
@@ -8558,16 +8553,15 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x05label\x18\x02 \x01(\tR\x05label\"j\n" +
 	"\x10UnverifiableFact\x12>\n" +
 	"\bslot_key\x18\x01 \x01(\x0e2#.hawkr.procurement.v1alpha1.SlotKeyR\aslotKey\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xf0\x02\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xe7\x02\n" +
 	"\tCandidate\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x14\n" +
-	"\x05score\x18\x03 \x01(\x01R\x05score\x12L\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12L\n" +
 	"\rmatched_facts\x18\x04 \x03(\v2'.hawkr.procurement.v1alpha1.MatchedFactR\fmatchedFacts\x12[\n" +
 	"\x12unverifiable_facts\x18\x05 \x03(\v2,.hawkr.procurement.v1alpha1.UnverifiableFactR\x11unverifiableFacts\x129\n" +
 	"\n" +
 	"facts_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tfactsTime\x12\x1a\n" +
 	"\bselected\x18\a \x01(\bR\bselected\x126\n" +
-	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05store\"z\n" +
+	"\x05store\x18\b \x01(\v2 .hawkr.common.v1alpha1.StoreCardR\x05storeJ\x04\b\x03\x10\x04R\x05score\"z\n" +
 	"\x1bStartCandidateSearchRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x127\n" +
@@ -9066,13 +9060,14 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x1bRUN_STATUS_CANCEL_REQUESTED\x10\x04\x12\x18\n" +
 	"\x14RUN_STATUS_SUCCEEDED\x10\x05\x12\x15\n" +
 	"\x11RUN_STATUS_FAILED\x10\x06\x12\x18\n" +
-	"\x14RUN_STATUS_CANCELLED\x10\a\"\x04\b\b\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_RESUMED*\x12RUN_STATUS_EXPIRED*\xf8\x01\n" +
+	"\x14RUN_STATUS_CANCELLED\x10\a\"\x04\b\b\x10\b\"\x04\b\t\x10\t*\x12RUN_STATUS_RESUMED*\x12RUN_STATUS_EXPIRED*\xaa\x02\n" +
 	"\x10RunFailureReason\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eRUN_FAILURE_REASON_WORKER_LOST\x10\x01\x12$\n" +
 	" RUN_FAILURE_REASON_SEARCH_FAILED\x10\x02\x12*\n" +
 	"&RUN_FAILURE_REASON_TURN_PIPELINE_ERROR\x10\x03\x12(\n" +
-	"$RUN_FAILURE_REASON_MODEL_UNAVAILABLE\x10\x05\"\x04\b\x04\x10\x04*\x1aRUN_FAILURE_REASON_EXPIRED*\xe5\x01\n" +
+	"$RUN_FAILURE_REASON_MODEL_UNAVAILABLE\x10\x05\x120\n" +
+	",RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE\x10\x06\"\x04\b\x04\x10\x04*\x1aRUN_FAILURE_REASON_EXPIRED*\xe5\x01\n" +
 	"\n" +
 	"StepStatus\x12\x1b\n" +
 	"\x17STEP_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +

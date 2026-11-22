@@ -2499,7 +2499,6 @@ class UnverifiableFact extends $pb.GeneratedMessage {
 class Candidate extends $pb.GeneratedMessage {
   factory Candidate({
     $core.String? id,
-    $core.double? score,
     $core.Iterable<MatchedFact>? matchedFacts,
     $core.Iterable<UnverifiableFact>? unverifiableFacts,
     $1.Timestamp? factsTime,
@@ -2508,7 +2507,6 @@ class Candidate extends $pb.GeneratedMessage {
   }) {
     final result = Candidate._();
     if (id != null) result.id = id;
-    if (score != null) result.score = score;
     if (matchedFacts != null) result.matchedFacts.addAll(matchedFacts);
     if (unverifiableFacts != null)
       result.unverifiableFacts.addAll(unverifiableFacts);
@@ -2533,7 +2531,6 @@ class Candidate extends $pb.GeneratedMessage {
           _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
       createEmptyInstance: Candidate.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aD(3, _omitFieldNames ? '' : 'score')
     ..pPM<MatchedFact>(4, _omitFieldNames ? '' : 'matchedFacts',
         subBuilder: MatchedFact.$_createMessage)
     ..pPM<UnverifiableFact>(5, _omitFieldNames ? '' : 'unverifiableFacts',
@@ -2574,54 +2571,44 @@ class Candidate extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
-  /// 店名不在這裡：名稱只從 store（StoreCard）讀，沒公開過的店家沒有卡片、名稱不能被讀出。
-  @$pb.TagNumber(3)
-  $core.double get score => $_getN(1);
-  @$pb.TagNumber(3)
-  set score($core.double value) => $_setDouble(1, value);
-  @$pb.TagNumber(3)
-  $core.bool hasScore() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearScore() => $_clearField(3);
-
   @$pb.TagNumber(4)
-  $pb.PbList<MatchedFact> get matchedFacts => $_getList(2);
+  $pb.PbList<MatchedFact> get matchedFacts => $_getList(1);
 
   @$pb.TagNumber(5)
-  $pb.PbList<UnverifiableFact> get unverifiableFacts => $_getList(3);
+  $pb.PbList<UnverifiableFact> get unverifiableFacts => $_getList(2);
 
-  /// 以上事實成立的時間。
+  /// 這次搜尋完成的時間；事實依需求的現行版本在讀取時組出，不是入庫的快照。
   @$pb.TagNumber(6)
-  $1.Timestamp get factsTime => $_getN(4);
+  $1.Timestamp get factsTime => $_getN(3);
   @$pb.TagNumber(6)
   set factsTime($1.Timestamp value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasFactsTime() => $_has(4);
+  $core.bool hasFactsTime() => $_has(3);
   @$pb.TagNumber(6)
   void clearFactsTime() => $_clearField(6);
   @$pb.TagNumber(6)
-  $1.Timestamp ensureFactsTime() => $_ensure(4);
+  $1.Timestamp ensureFactsTime() => $_ensure(3);
 
   @$pb.TagNumber(7)
-  $core.bool get selected => $_getBF(5);
+  $core.bool get selected => $_getBF(4);
   @$pb.TagNumber(7)
-  set selected($core.bool value) => $_setBool(5, value);
+  set selected($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasSelected() => $_has(5);
+  $core.bool hasSelected() => $_has(4);
   @$pb.TagNumber(7)
   void clearSelected() => $_clearField(7);
 
   /// 賣家的店家卡片。
   @$pb.TagNumber(8)
-  $2.StoreCard get store => $_getN(6);
+  $2.StoreCard get store => $_getN(5);
   @$pb.TagNumber(8)
   set store($2.StoreCard value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasStore() => $_has(6);
+  $core.bool hasStore() => $_has(5);
   @$pb.TagNumber(8)
   void clearStore() => $_clearField(8);
   @$pb.TagNumber(8)
-  $2.StoreCard ensureStore() => $_ensure(6);
+  $2.StoreCard ensureStore() => $_ensure(5);
 }
 
 class StartCandidateSearchRequest extends $pb.GeneratedMessage {
@@ -10262,7 +10249,7 @@ class BuyerProcurementAppServiceApi {
           request,
           GetCandidateSearchResponse());
 
-  /// ToggleSelection 勾選或取消勾選一個候選。候選的依據已早於目前的需求版本回 ABORTED，conflictTarget 是 candidate_set。
+  /// ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
   $async.Future<ToggleSelectionResponse> toggleSelection(
           $pb.ClientContext? ctx, ToggleSelectionRequest request) =>
       _client.invoke<ToggleSelectionResponse>(ctx, 'BuyerProcurementAppService',

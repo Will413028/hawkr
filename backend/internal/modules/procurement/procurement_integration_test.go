@@ -81,11 +81,9 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 		BuyerMessage: "我要三件外套", AssistantReply: "好的", Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), OptionalStreak: 2, SkippedSlots: []string{"PACKAGING"}, ClientRequestID: id(), Now: epoch,
 	})
 	rows("InsertTurn", n, err)
-	n, err = q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: c.candidateSet, RequestID: c.request, RequestRevisionID: c.revision, BuyerID: buyerID, ClientRequestID: id(), Now: epoch})
-	rows("InsertCandidateSet", n, err)
+	must("InsertCandidateSet", q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: c.candidateSet, RequestID: c.request, RequestRevisionID: c.revision, BuyerID: buyerID, Now: epoch}))
 	must("InsertCandidate", q.InsertCandidate(ctx, store.InsertCandidateParams{
-		ID: c.candidate, CandidateSetID: c.candidateSet, StoreID: storeID, SourceID: "p1", Score: 80, Rank: 1,
-		MatchedFacts: []byte(`[{"slotKey":"ITEM","label":"外套"}]`), UnverifiableFacts: []byte("[]"), FactsAsOf: epoch, Now: epoch,
+		ID: c.candidate, CandidateSetID: c.candidateSet, StoreID: storeID, SourceID: "p1", Rank: 1, Now: epoch,
 	}))
 	must("InsertRun", func() error {
 		n, err := q.InsertRun(ctx, store.InsertRunParams{ID: c.run, BuyerID: buyerID, RequestID: c.request, ConversationID: &c.conversation, RunType: "TURN", ClientRequestID: id(), QuotaPeriodStart: &epoch, Now: epoch})
@@ -256,15 +254,8 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("GetTurnByClientRequest = %+v, %v", got, err)
 	}
 
-	set, err := q.GetCandidateSetForBuyer(ctx, store.GetCandidateSetForBuyerParams{ID: c.candidateSet, RequestID: c.request, BuyerID: c.buyer})
-	if err != nil {
+	if _, err := q.GetCandidateSetForBuyer(ctx, store.GetCandidateSetForBuyerParams{ID: c.candidateSet, RequestID: c.request, BuyerID: c.buyer}); err != nil {
 		t.Fatal(err)
-	}
-	if dup, err := q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: id(), RequestID: c.request, RequestRevisionID: c.revision, BuyerID: c.buyer, ClientRequestID: set.ClientRequestID, Now: epoch}); err != nil || dup != 0 {
-		t.Fatalf("重送的 InsertCandidateSet n=%d err=%v", dup, err)
-	}
-	if got, err := q.GetCandidateSetByClientRequest(ctx, store.GetCandidateSetByClientRequestParams{RequestRevisionID: c.revision, ClientRequestID: set.ClientRequestID, BuyerID: c.buyer}); err != nil || got.ID != c.candidateSet {
-		t.Fatalf("GetCandidateSetByClientRequest = %+v, %v", got, err)
 	}
 	if n, err := q.SetCandidateSelected(ctx, store.SetCandidateSelectedParams{Selected: true, Now: epoch, ID: c.candidate, CandidateSetID: c.candidateSet, RequestID: c.request, BuyerID: c.buyer}); err != nil || n != 1 {
 		t.Fatalf("SetCandidateSelected n=%d err=%v", n, err)
@@ -355,8 +346,8 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if _, err := q.GetRunInput(ctx, store.GetRunInputParams{RunID: c.run, BuyerID: otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("別的買家不能讀 run 輸入：%v", err)
 	}
-	if _, err := q.GetCandidateSetByClientRequest(ctx, store.GetCandidateSetByClientRequestParams{RequestRevisionID: c.revision, ClientRequestID: set.ClientRequestID, BuyerID: otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("別的買家不能用 client_request_id 讀候選集：%v", err)
+	if _, err := q.GetCandidateSetForBuyer(ctx, store.GetCandidateSetForBuyerParams{ID: c.candidateSet, RequestID: c.request, BuyerID: otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("別的買家不能讀候選集：%v", err)
 	}
 	if _, err := q.NextRevisionNo(ctx, store.NextRevisionNoParams{RequestID: c.request, BuyerID: &otherBuyer}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("別的買家取不到下一個版本號（要 ErrNoRows，不是聚合補出的 1）：%v", err)
@@ -469,7 +460,7 @@ func TestCandidatesHaveNoStoreNameColumns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"id", "candidate_set_id", "store_id", "source_id", "score", "rank", "matched_facts", "unverifiable_facts", "facts_as_of", "selected", "selected_at", "created_at"}
+	want := []string{"id", "candidate_set_id", "store_id", "source_id", "rank", "selected", "selected_at", "created_at"}
 	if !slices.Equal(cols, want) {
 		t.Fatalf("candidates 的欄位 = %v，要 %v（沒有 display_name、seller_name、logo_key、store_code、lane、prospect_id）", cols, want)
 	}

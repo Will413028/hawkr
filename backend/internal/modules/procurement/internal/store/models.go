@@ -98,18 +98,14 @@ type ProcurementBuyerShortlistEntry struct {
 }
 
 type ProcurementCandidate struct {
-	ID                uuid.UUID
-	CandidateSetID    uuid.UUID
-	StoreID           int64
-	SourceID          string
-	Score             int32
-	Rank              int32
-	MatchedFacts      []byte
-	UnverifiableFacts []byte
-	FactsAsOf         time.Time
-	Selected          bool
-	SelectedAt        *time.Time
-	CreatedAt         time.Time
+	ID             uuid.UUID
+	CandidateSetID uuid.UUID
+	StoreID        int64
+	SourceID       string
+	Rank           int32
+	Selected       bool
+	SelectedAt     *time.Time
+	CreatedAt      time.Time
 }
 
 type ProcurementCandidateSet struct {
@@ -117,7 +113,6 @@ type ProcurementCandidateSet struct {
 	RequestID         uuid.UUID
 	RequestRevisionID uuid.UUID
 	BuyerID           int64
-	ClientRequestID   uuid.UUID
 	CreatedAt         time.Time
 }
 
