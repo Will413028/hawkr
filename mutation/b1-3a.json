@@ -1,0 +1,17 @@
+{"mutants": [
+  {"id": "presign-no-content-length", "stack": "go-integration", "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tContentLength: aws.Int64(in.ContentLength),\n\t\tContentType:   aws.String(in.ContentType),\n\t\tContentMD5:",
+   "new": "\t\tContentType:   aws.String(in.ContentType),\n\t\tContentMD5:",
+   "test": "internal/modules/media/internal/storage ^TestGarageStore$/^size_mismatch$",
+   "why": "預簽時不簽 content-length：大小不符的上傳不再被 Garage 拒絕"},
+  {"id": "presign-no-content-type", "stack": "go-integration", "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tContentType:   aws.String(in.ContentType),\n\t\tContentMD5:",
+   "new": "\t\tContentMD5:",
+   "test": "internal/modules/media/internal/storage ^TestGarageStore$/^content_type_mismatch$",
+   "why": "預簽時不簽 content-type：型別不符的上傳不再被 Garage 拒絕"},
+  {"id": "presign-no-if-none-match", "stack": "go-integration", "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tIfNoneMatch:   aws.String(\"*\"),\n\t}, s3.WithPresignExpires",
+   "new": "\t}, s3.WithPresignExpires",
+   "test": "internal/modules/media/internal/storage ^TestGarageStore$/^existing_key$",
+   "why": "預簽時不簽 if-none-match：第二次寫入同一個 key 會覆蓋原物件"}
+]}
