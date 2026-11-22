@@ -10,6 +10,7 @@ import {
 	materializeDynamicRoute,
 	type PublicDynamicFixtureIds,
 } from "./helpers/dynamic-route-catalog";
+import { captureHydrationDiagnostics } from "./helpers/hydration-diagnostics";
 import { isGetSessionUrl } from "./helpers/mock-gateway";
 import { installProviderMocks } from "./helpers/mock-gsi";
 import { assertNoResidualLoading } from "./helpers/page-stability";
@@ -146,6 +147,7 @@ function isMonitoredResource(url: string): boolean {
 
 function attachRuntimeMonitors(page: Page): RuntimeIssue[] {
 	const issues: RuntimeIssue[] = [];
+	captureHydrationDiagnostics(page);
 	page.on("pageerror", (error) => {
 		issues.push({
 			kind: "pageerror",
