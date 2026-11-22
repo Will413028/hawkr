@@ -198,11 +198,17 @@
 - 驗收：`buf lint`；handler 測試涵蓋清單的每個方法；生成檔無 drift；mutation：拿掉檢舉參照的擁有者檢查，測試要失敗。
 - CD8 驗收：`SellerCrmService` 回應欄位測試證明永不回 phone、email；mutation：把聯絡欄位加回回應，測試要失敗（A6-3 設計書 §11.2）。
 
+### A6-5e 商品評價統計（A6-D24 (2)；被擋於：5b；擋 6c2 的商品評價顯示）
+
+- 範圍：review 模組加商品層級的評價數與平均分讀取（照 `StoreRatingStats` 的形狀與公開述詞），`ReviewPublicService` 加對應方法；TS／Dart 重新生成。
+- 消費端：`rg -n "StoreRatingStats|ProductRating" backend/internal api buyer-app/lib website/src`。
+- 驗收：handler 與模組測試（隱藏、下架、刪帳的評價不計入，與公開列表同一述詞）；`buf lint`、生成無 drift；mutation：統計不套公開述詞，測試要失敗。
+
 ### A6-6 client（被擋於：見下；Q1 的缺口在這裡結束）
 
-- 被擋於（Will 2026-11-22 改）：6b admin、6c buyer-app 只用評價與聊天，被 5b、5c 擋（已完成），可與 5d 並行；6a website、6d seller-app、6e gateway 用到或刪除 CRM，被 5d 擋。並行時後合併的分支重跑 `@hawkr/api`、`packages/hawkr_api` 生成，不手解生成檔衝突。
+- 被擋於（Will 2026-11-22 改）：6b admin、6c1 只用評價與聊天，被 5b、5c 擋（已完成），可與 5d 並行；6c2 另被 A6-5e 擋；6a website、6d seller-app、6e gateway 用到或刪除 CRM，被 5d 擋。並行時後合併的分支重跑 `@hawkr/api`、`packages/hawkr_api` 生成，不手解生成檔衝突。
 
-拆 6a website（測試清單＝`client-inventory.md` §7 全部檔案）、6b admin（評價、聊天檢舉的後台處理）、6c buyer-app、6d seller-app、6e gateway 與 openapi 清單（刪 33 條、`maxRESTOperations` 扣除），並把 `httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`、刪除 `internal/legacy/crmservice`（A6-D18），把 `legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go`、`cmd/hawkr/seller.go`）換成 `review.StoreRatingStats` 後刪除 `internal/legacy/reviewservice`（A6-D11）。每端：改生成 client、封鎖與檢舉入口改送參照、WebSocket 狀態機換成 streaming client、手寫預覽偵測刪除；e2e 的 `/app/chat/*` mock 一併改（採購助理 4 支 spec）。
+拆 6a website（測試清單＝`client-inventory.md` §7 全部檔案）、6b admin（評價、聊天檢舉的後台處理）、6c buyer-app（拆 **6c1** 評價、檢舉、封鎖改接 Connect，聊天整段維持舊路徑含其檢舉與封鎖，不出現半新半舊；**6c2** 聊天改串流 client、回覆引用拿掉（A6-D24）、商品評價統計改讀 A6-5e）、6d seller-app、6e gateway 與 openapi 清單（刪 33 條、`maxRESTOperations` 扣除），並把 `httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`、刪除 `internal/legacy/crmservice`（A6-D18），把 `legacy/reviewservice` 的 3 個呼叫端（`cmd/hawkr/discovery.go`、`cmd/hawkr/seller.go`）換成 `review.StoreRatingStats` 後刪除 `internal/legacy/reviewservice`（A6-D11）。每端：改生成 client、封鎖與檢舉入口改送參照、WebSocket 狀態機換成 streaming client、手寫預覽偵測刪除；e2e 的 `/app/chat/*` mock 一併改（採購助理 4 支 spec）。
 
 - 驗收：各端 CI 等價檢查；e2e 推到 CI；6e 接上 relay 與 consumer 後，以 backend-e2e-verify 擷取 `reviewrelay`、`imrelay` 的 RabbitMQ wire 與 crm consumer 的入帳；封鎖與檢舉按鈕以單體實打（backend-e2e-verify）。
 - UI：封鎖名單分頁改名或拿掉（A6-D2）先取得同意。
@@ -245,6 +251,7 @@
 | A6-D21 | A6-4 設計書 §W：W1 (a) moderation 新增 `ReverseHide`，案件維持結案，另記還原欄位與稽核紀錄，同 tx 呼叫 review／im／social 的 `Restore`；W2 (a) 店家寫的聊天訊息與評價回覆照 A7-D5′ 走 seller 內容下架，新增 `CHAT_MESSAGE`、`REVIEW_REPLY` 對象，im 讀取 join `seller.pub_content_takedowns()`；W3 (a) 檢舉人改為買家或店家二選一，只有 `CHAT_MESSAGE` 接受店家檢舉；W4 (a) `GetCase` 回應加依種類分開的快照欄位，快照 struct 改依種類分開，後台頁面在 A6-6（Will 2026-11-21） | A6-4 |
 | A6-D22 | 店家退場（`seller.StoreRetired`）時比照買家刪帳：同 transaction 訂閱者清該店以店家檢舉人身分送出的檢舉說明、冪等紀錄與每日計數列，檢舉列與檢舉人鍵保留（Will 2026-11-21） | A6-4d |
 | A6-D23 | A6-5a 設計書 W1–W4：W1 (g) 聊天依集合分買家版與店家版方法，店家由呼叫者此刻的店推導；W2 (c) 店家檢舉身分由訊息歸屬推導；W3 (a) 卡片延到 B8；W4 (a) 送出帶 `request_id` 去重；W5 (a) 刪 CRM `lookup`，優惠券從客戶名單選；W6 (a) CRM 不暴露訂單，改用店家訂單列表加買家篩選（Will 2026-11-21） | A6-5c、A6-5d、A6-6 |
+| A6-D24 | A6-6c 實作中浮現的三題：(1) 聊天「回覆引用」（舊 App 以文字前綴拼成，契約沒有）先拿掉，列入延後，要做時在契約加 `reply_to` 欄位；(2) 商品層級評價數與平均分由 review 模組新增統計方法提供（照 `StoreRatingStats`），client 不自行分頁加總（A6-5e）；(3) 評價列不提供封鎖，只留檢舉（契約只能封鎖回覆的店家）（Will 2026-11-22） | A6-5e、A6-6c |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
