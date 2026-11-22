@@ -559,6 +559,40 @@ describe("規則 E：next-intl 查詢", () => {
 		).toEqual(["ternary:WARNING@2"]);
 	});
 
+	it("createTranslator 與別名 import 命中；非 next-intl 來源的同名函式不命中", () => {
+		const body = `export function f(k: E) {
+	const t = TR({ locale: "en", messages: {} });
+	return k === E.WARNING ? t("w") : "";
+}`;
+		expect(
+			scan(body, `${PRE} import { createTranslator as TR } from "next-intl";`),
+		).toEqual(["ternary:WARNING@3"]);
+		expect(
+			scan(
+				body.replace("TR(", "useTranslations("),
+				`${PRE} import { useTranslations } from "next-intl";`,
+			),
+		).toEqual(["ternary:WARNING@3"]);
+		expect(
+			scan(
+				body.replace("TR(", "useTranslations("),
+				`${PRE} import { useTranslations as TR } from "next-intl/server";`,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				body.replace("TR(", "useTranslations("),
+				`${PRE} import { useTranslations } from "./my-i18n";`,
+			),
+		).toEqual([]);
+		expect(
+			scan(
+				body.replace("TR(", "createTranslator("),
+				`${PRE} import { createTranslator } from "other-lib";`,
+			),
+		).toEqual([]);
+	});
+
 	it("非 translator 的 t、非受管 enum、遮蔽的 t 不算", () => {
 		expect(
 			scan(
@@ -587,6 +621,8 @@ const t = useTranslations("a");`,
 		).toEqual([]);
 		expect(single).toBeDefined();
 		const e = single;
+		expect(e?.tsModule).toBeTruthy();
+		expect(e?.tsName).toBeTruthy();
 		if (!e?.tsModule || !e.tsName) return;
 		const hits = scanSource(
 			"a.ts",
@@ -601,6 +637,8 @@ describe("manifest 與回報", () => {
 	it("單端 enum：任何形式都不失敗；只有對應表（case、key、pair）進 report", () => {
 		expect(single).toBeDefined();
 		const e = single;
+		expect(e?.tsModule).toBeTruthy();
+		expect(e?.tsName).toBeTruthy();
 		if (!e?.tsModule || !e.tsName) return;
 		const pre = `import { ${e.tsName} as S } from "${e.tsModule}";`;
 		const src = (body: string) =>

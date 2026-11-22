@@ -32,8 +32,9 @@
  * class 靜態欄位的常數；第二個 client 對只有一個 client 用的 enum，以條件形式寫出值的說法（跨端檢查只比對對照表，
  * 看不到條件形式）。這些由 code review 把關；會發佈 en 的介面另有字面值 ratchet（I-CI），admin 不在 I-CI 內，
  * 所以 admin 的這些殘餘只靠 code review。
- * 產生文字也包含 next-intl 的查詢：`t(…)`、`t.rich|markup|raw(…)`，t 是 `useTranslations(…)`／`getTranslations(…)`（可 await）
- * 初始化的 const（作用域規則同上，參數同名遮住）；直接呼叫 `useTranslations(…)(…)` 也算。
+ * 產生文字也包含 next-intl 的查詢：`t(…)`、`t.rich|markup|raw(…)`，t 是從 `next-intl`／`next-intl/server` 匯入的
+ * `useTranslations`／`getTranslations`／`createTranslator`（含 `as` 別名，可 await）初始化的 const；非 next-intl 來源的同名函式不算；
+ * 參數或 hook 回傳的 t 不做型別推論（語法分析的極限，不涵蓋）（作用域規則同上，參數同名遮住）；直接呼叫 `useTranslations(…)(…)` 也算。
  * 觸發（計畫 I-app-0）：App 的 ARB 查詢要加進「產生文字」，與 I-app-0 同一刀。
  *
  * 用法：tsx tools/check-enum-text.ts [--report <file>] <dir>...
@@ -280,6 +281,27 @@ export function scanSource(
 	const locals = new Map<string, ManifestEnum>();
 	const namespaces = new Map<string, string>();
 	const importedConsts = new Set<string>();
+	// 從 next-intl 匯入的 translator 工廠的區域名稱（含 `as` 別名）；其他來源的同名函式不算。
+	const translatorFactories = new Set<string>();
+	for (const stmt of sf.statements) {
+		if (
+			ts.isImportDeclaration(stmt) &&
+			ts.isStringLiteral(stmt.moduleSpecifier) &&
+			(stmt.moduleSpecifier.text === "next-intl" ||
+				stmt.moduleSpecifier.text === "next-intl/server") &&
+			stmt.importClause?.namedBindings &&
+			ts.isNamedImports(stmt.importClause.namedBindings)
+		) {
+			for (const el of stmt.importClause.namedBindings.elements) {
+				if (
+					["useTranslations", "getTranslations", "createTranslator"].includes(
+						(el.propertyName ?? el.name).text,
+					)
+				)
+					translatorFactories.add(el.name.text);
+			}
+		}
+	}
 	for (const stmt of sf.statements) {
 		if (
 			!ts.isImportDeclaration(stmt) ||
@@ -445,15 +467,15 @@ export function scanSource(
 		);
 	};
 
-	/** 初始值是 `useTranslations(…)`／`getTranslations(…)`（可包 `await`、括號）。 */
+	/** 初始值是從 next-intl 匯入的 `useTranslations`／`getTranslations`／`createTranslator`（含別名）的呼叫（可包 `await`、括號）。 */
 	const isTranslatorFactoryCall = (e: ts.Expression): boolean => {
 		let x = stripWrappers(e);
 		while (ts.isAwaitExpression(x)) x = stripWrappers(x.expression);
 		return (
 			ts.isCallExpression(x) &&
 			ts.isIdentifier(x.expression) &&
-			(x.expression.text === "useTranslations" ||
-				x.expression.text === "getTranslations")
+			translatorFactories.has(x.expression.text) &&
+			lookupVar(x.expression) === undefined
 		);
 	};
 
