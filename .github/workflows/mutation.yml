@@ -5,7 +5,8 @@ name: mutation
 # - 只在清單、runner 或本 workflow 變動時觸發；push／PR 只跑這次事件改到的清單，
 #   runner 或 workflow 改了就全跑（它們壞了會讓所有清單的結果失真）。
 # - 清單裡用到哪些 stack 就扇出哪些 job：Go integration 要 Docker（testcontainers，ubuntu-latest 內建）、
-#   website 要 pnpm workspace、Flutter 要對應 App 的 fvm 版本。沒用到的 stack 不跑。
+#   go:<dir> 是 <dir> 這個獨立 Go 模組（Go 版本仍讀 backend/.go-version）、
+#   website 與 admin 要 pnpm workspace、Flutter 要對應 App 的 fvm 版本。沒用到的 stack 不跑。
 # - mutation 不在開發機跑（機器共用、integration 需要資料庫容器），驗收只看這個 job。
 # - 先在未改動的樹上跑一次基準，紅的基準不能證明什麼（BASELINE-FAILED）。
 
@@ -103,8 +104,15 @@ jobs:
           import json, os
           include = []
           for s in json.loads(os.environ["STACKS"]):
-              kind = "flutter" if s.startswith("flutter:") else ("website" if s == "website" else "go")
-              include.append({"stack": s, "kind": kind, "app": s.removeprefix("flutter:") if kind == "flutter" else ""})
+              if s.startswith("flutter:"):
+                  kind, app, module = "flutter", s.removeprefix("flutter:"), ""
+              elif s in ("website", "admin"):
+                  kind, app, module = "pnpm", "", ""
+              else:
+                  # go、go-integration 是 backend 單體；go:<dir>、go-integration:<dir> 是 <dir> 這個獨立模組。
+                  kind, app = "go", ""
+                  module = s.split(":", 1)[1] if ":" in s else "backend"
+              include.append({"stack": s, "kind": kind, "app": app, "module": module})
           print("matrix=" + json.dumps({"include": include}))
           PY
 
@@ -126,10 +134,10 @@ jobs:
         if: matrix.kind == 'go'
         with:
           go-version-file: backend/.go-version
-          cache-dependency-path: backend/go.sum
+          cache-dependency-path: ${{ matrix.module }}/go.sum
 
       - uses: ./.github/actions/pnpm-install
-        if: matrix.kind == 'website'
+        if: matrix.kind == 'pnpm'
 
       - name: Read Flutter version from .fvmrc
         id: fvmrc

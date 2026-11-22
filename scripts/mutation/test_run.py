@@ -161,6 +161,26 @@ class ManifestTest(Base):
             with self.subTest(payload=payload), self.assertRaises(run.ManifestError):
                 self.load(payload)
 
+    def test_new_stacks_valid(self):
+        for st in ("admin", "go:backend/services/invoice-service", "go-integration:backend/services/invoice-service"):
+            with self.subTest(stack=st):
+                self.assertEqual(self.load({"mutants": [dict(self.good, stack=st)]})[0].stack, st)
+        for st in ("go:", "go:/abs", "go:../x", "go:a//b", "go:a/./b", "go:a/", "admin:x", "gox:a"):
+            with self.subTest(stack=st), self.assertRaises(run.ManifestError):
+                self.load({"mutants": [dict(self.good, stack=st)]})
+
+    def test_validate_module_dir(self):
+        mod = self.repo / "svc" / "inv"
+        (mod / "internal").mkdir(parents=True)
+        (self.repo / "svc" / "nomod").mkdir()
+        m = self.mutant(stack="go:svc/inv", test="internal ^T$")
+        self.assertIn("go.mod", run.check_mutant(m, self.repo))
+        (mod / "go.mod").write_text("module x\n", encoding="utf-8")
+        self.assertIsNone(run.check_mutant(m, self.repo))
+        self.assertIn("go.mod", run.check_mutant(self.mutant(stack="go:svc/nomod", test="internal ^T$"), self.repo))
+        self.assertIn("go.mod", run.check_mutant(self.mutant(stack="go:svc/missing", test="internal ^T$"), self.repo))
+        self.assertIn("測試路徑不存在", run.check_mutant(self.mutant(stack="go:svc/inv", test="nope ^T$"), self.repo))
+
     def test_flutter_stack_whitelist(self):
         with self.assertRaises(run.ManifestError):
             self.load({"mutants": [dict(self.good, stack="flutter:other")]})
@@ -224,6 +244,39 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(d.argv[:3], ["dart", "analyze", "--no-fatal-warnings"])
         self.assertEqual(d.cwd, repo / "seller-app")
         self.assertIsNone(run.build_check_command("website", "a.ts", "website/a.ts", repo))
+
+    def test_module_go_commands(self):
+        repo = Path("/r")
+        mod = "backend/services/invoice-service"
+        c = run.build_command(f"go:{mod}", "internal/usecase ^TestA$", repo)
+        self.assertEqual(c.cwd, repo / mod)
+        self.assertEqual(c.env["GOWORK"], "off")
+        self.assertNotIn("integration", c.argv)
+        self.assertEqual(c.argv[-3:], ["./internal/usecase/", "-run", "^TestA$"])
+        i = run.build_command(f"go-integration:{mod}", "internal/usecase ^TestA$", repo)
+        self.assertEqual(i.argv[i.argv.index("-tags") + 1], "integration")
+        self.assertEqual(i.cwd, repo / mod)
+        b = run.build_check_command(f"go-integration:{mod}", "internal/usecase ^T$", f"{mod}/a.go", repo)
+        self.assertEqual(b.argv, ["go", "test", "-c", "-o", os.devnull, "-tags", "integration", "./internal/usecase/"])
+        self.assertEqual((b.cwd, b.env["GOWORK"]), (repo / mod, "off"))
+        self.assertEqual(run.test_file(f"go:{mod}", "internal/usecase ^T$", repo), repo / mod / "internal/usecase")
+        self.assertEqual(run.test_file("go", "p ^T$", repo), repo / "backend" / "p")
+
+    def test_admin_commands(self):
+        repo = Path("/r")
+        a = run.build_command("admin", "tests/x.test.ts my case", repo)
+        self.assertEqual(a.cwd, repo / "admin")
+        self.assertEqual(a.argv, ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test",
+                                  "--test-name-pattern", "my case", "tests/x.test.ts"])
+        self.assertEqual(run.build_command("admin", "tests/x.test.ts", repo).argv[-2:], ["--test", "tests/x.test.ts"])
+        self.assertIsNone(run.build_check_command("admin", "tests/x.test.ts", "admin/a.ts", repo))
+        self.assertEqual(run.test_file("admin", "tests/x.test.ts", repo), repo / "admin" / "tests/x.test.ts")
+
+    def test_admin_build_error(self):
+        self.assertTrue(run.has_build_error("admin", "x.ts:2:18: ERROR: Unexpected \";\"\n  name: 'TransformError'"))
+        self.assertTrue(run.has_build_error("admin", "SyntaxError: Unexpected token"))
+        self.assertFalse(run.has_build_error("admin", "AssertionError [ERR_ASSERTION]: 1 !== 2\nℹ fail 1"))
+        self.assertFalse(run.has_build_error("go:backend/services/x", "TransformError"))
 
     def test_has_build_error(self):
         self.assertTrue(run.has_build_error("website", "Error: Transform failed with 1 error"))
