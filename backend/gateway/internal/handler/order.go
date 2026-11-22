@@ -621,7 +621,7 @@ func (h *Holder) CancelOrder(c *gin.Context) {
 // 買家視角：預設，查詢自己購買的訂單
 // 賣家視角：?view=seller，查詢自己銷售的訂單（可搭配 buyer_id 篩選指定買家）
 // @Summary      查詢我的訂單列表
-// @Description  查詢當前用戶的訂單列表。預設為買家視角；傳入 view=seller 切換為賣家視角，可搭配 buyer_id 篩選指定買家的訂單
+// @Description  查詢當前用戶的訂單列表。預設為買家視角；傳入 view=seller 切換為賣家視角，可搭配 buyer_id（CRM 回的買家代理鍵）篩選指定買家的訂單
 // @Tags         訂單 (Order)
 // @Accept       json
 // @Produce      json
@@ -630,7 +630,7 @@ func (h *Holder) CancelOrder(c *gin.Context) {
 // @Param        page              query  string  false  "頁碼（預設 1）"
 // @Param        page_size         query  string  false  "每頁筆數（預設 10，最大 50）"
 // @Param        view              query  string  false  "視角：空值=買家, seller=賣家"
-// @Param        buyer_id          query  string  false  "篩選指定買家（搭配 view=seller 使用）"
+// @Param        buyer_id          query  string  false  "篩選指定買家（搭配 view=seller 使用；值是 CRM Customer.buyer_id 買家代理鍵，不是帳號代碼）"
 // @Success      200  {object}  object{code=int,data=object{records=[]OrderSummaryResponse,total=string,page=string,pageSize=string}}
 // @Failure      400  {object}  object{code=int,message=string}
 // @Failure      401  {object}  object{code=int,message=string}
@@ -654,7 +654,7 @@ func (h *Holder) GetMyOrders(c *gin.Context) {
 		if !ok {
 			return
 		}
-		buyerIDFilter, ok := h.resolveOptionalBuyerFilterQuery(c, c.DefaultQuery("buyer_id", ""))
+		buyerIDFilter, ok := parseSellerViewBuyerFilter(c, c.DefaultQuery("buyer_id", ""))
 		if !ok {
 			return
 		}
