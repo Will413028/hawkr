@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -863,8 +864,7 @@ _ChatItem _resolveItem(Map<String, dynamic> raw) {
       }
     }
     if (d != null && d.millisecondsSinceEpoch > 0) {
-      if (d.isUtc) d = d.toLocal();
-      date = formatTimeAgo(d);
+      date = formatTaipeiTimeAgo(d);
     }
   } catch (_) {}
 

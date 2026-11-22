@@ -55,11 +55,11 @@ String resolveConversationDisplayName(Map<String, dynamic> c) {
 String resolveConversationAvatarUrl(Map<String, dynamic> c) =>
     _str(c, conversationLogoUrlKey);
 
-/// 最後訊息時間。wire 是 ISO 8601 UTC（§2 時間契約），不是 epoch 數字。
+/// 最後訊息時間（時間點；顯示時走 `hawkr_api/taipei_time.dart`）。wire 是 ISO 8601 UTC（§2 時間契約），不是 epoch 數字。
 DateTime? resolveConversationLastMessageTime(Map<String, dynamic> c) {
   final parsed = DateTime.tryParse(_str(c, conversationLastMessageTimeKey));
   if (parsed == null || parsed.millisecondsSinceEpoch <= 0) return null;
-  return parsed.isUtc ? parsed.toLocal() : parsed;
+  return parsed;
 }
 
 /// 未讀數。wire 是字串（proto `string unread_count`）。

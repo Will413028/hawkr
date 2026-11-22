@@ -115,4 +115,26 @@ void main() {
       expect([t.year, t.month, t.day, t.hour, t.minute], [2026, 7, 30, 8, 30]);
     });
   });
+
+  group('taipeiCalendarDaysAgo / formatTaipeiTimeAgo', () {
+    // 2026-07-30 16:00Z is 2026-07-31 00:00 in Taipei.
+    final before = DateTime.utc(2026, 7, 30, 15, 59);
+    final after = DateTime.utc(2026, 7, 30, 16, 1);
+
+    test('counts Taipei calendar days across the UTC 16:00 boundary', () {
+      final now = DateTime.utc(2026, 7, 31, 1);
+      expect(taipeiCalendarDaysAgo(before, now: now), 1);
+      expect(taipeiCalendarDaysAgo(after, now: now), 0);
+    });
+
+    test('labels use elapsed time under a day and calendar days after', () {
+      final now = DateTime.utc(2026, 8, 1, 2);
+      expect(formatTaipeiTimeAgo(now.subtract(const Duration(seconds: 5)), now: now), '剛剛');
+      expect(formatTaipeiTimeAgo(now.subtract(const Duration(minutes: 5)), now: now), '5分鐘前');
+      expect(formatTaipeiTimeAgo(now.subtract(const Duration(hours: 5)), now: now), '5小時前');
+      expect(formatTaipeiTimeAgo(before, now: now), '2天前');
+      expect(formatTaipeiTimeAgo(DateTime.utc(2026, 7, 1), now: now), '7/1');
+      expect(formatTaipeiTimeAgo(DateTime.utc(2025, 7, 1), now: now), '2025/7/1');
+    });
+  });
 }

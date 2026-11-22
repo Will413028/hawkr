@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -480,10 +481,5 @@ String _formatTimeAgo(dynamic value) {
   };
   if (date == null) return '剛剛';
 
-  final difference = DateTime.now().difference(date);
-  if (difference.isNegative || difference.inMinutes < 1) return '剛剛';
-  if (difference.inMinutes < 60) return '${difference.inMinutes}分鐘前';
-  if (difference.inHours < 24) return '${difference.inHours}小時前';
-  if (difference.inDays < 7) return '${difference.inDays}天前';
-  return '${date.month}/${date.day}';
+  return formatTaipeiTimeAgo(date);
 }

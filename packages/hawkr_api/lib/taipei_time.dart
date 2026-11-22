@@ -43,3 +43,30 @@ extension TaipeiWallClock on DateTime {
   /// 不用 [taipei]：它對沒有時區標記的值會把裝置時區算進去。
   DateTime get taipeiWall => isUtc ? taipei : this;
 }
+
+/// [time] 與 [now] 在臺北日曆日上差幾天（同一天為 0）；只看日曆日，不看經過的小時數。
+int taipeiCalendarDaysAgo(DateTime time, {DateTime? now}) {
+  final a = time.taipei;
+  final b = (now ?? DateTime.now()).taipei;
+  return DateTime.utc(
+    b.year,
+    b.month,
+    b.day,
+  ).difference(DateTime.utc(a.year, a.month, a.day)).inDays;
+}
+
+/// 相對時間字樣：剛剛 / N分鐘前 / N小時前 / N天前 / `M/D` / `YYYY/M/D`。
+///
+/// 一小時內與一天內用經過的時間；一天以上的天數與跨年判斷一律用臺北日曆日，不看裝置時區。
+String formatTaipeiTimeAgo(DateTime time, {DateTime? now}) {
+  final current = now ?? DateTime.now();
+  final diff = current.difference(time);
+  if (diff.isNegative || diff.inSeconds < 60) return '剛剛';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}分鐘前';
+  if (diff.inHours < 24) return '${diff.inHours}小時前';
+  final days = taipeiCalendarDaysAgo(time, now: current);
+  if (days < 7) return '$days天前';
+  final t = time.taipei;
+  if (t.year == current.taipei.year) return '${t.month}/${t.day}';
+  return '${t.year}/${t.month}/${t.day}';
+}

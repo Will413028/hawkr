@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -28,18 +29,6 @@ class ChatListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
-  /// 將時間轉為相對時間文字
-  static String _formatTimeAgo(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inSeconds < 60) return '剛剛';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分鐘前';
-    if (diff.inHours < 24) return '${diff.inHours}小時前';
-    if (diff.inDays < 7) return '${diff.inDays}天前';
-    if (dt.year == now.year) return '${dt.month}/${dt.day}';
-    return '${dt.year}/${dt.month}/${dt.day}';
-  }
-
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _conversations = const [];
@@ -363,7 +352,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                       resolveConversationLastMessageTime(c);
                                   final String date = localTime == null
                                       ? ''
-                                      : _formatTimeAgo(localTime);
+                                      : formatTaipeiTimeAgo(localTime);
                                   final unread = resolveConversationUnreadCount(
                                     c,
                                   );

@@ -7,18 +7,6 @@
 // （兩者為獨立 repo 無法互相 import；長期解為抽 shared package。）
 import 'dart:convert';
 
-/// 相對時間字樣（剛剛 / N 分鐘前 / N 小時前 / N 天前 / 日期）。
-String formatTimeAgo(DateTime dt) {
-  final now = DateTime.now();
-  final diff = now.difference(dt);
-  if (diff.inSeconds < 60) return '剛剛';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}分鐘前';
-  if (diff.inHours < 24) return '${diff.inHours}小時前';
-  if (diff.inDays < 7) return '${diff.inDays}天前';
-  if (dt.year == now.year) return '${dt.month}/${dt.day}';
-  return '${dt.year}/${dt.month}/${dt.day}';
-}
-
 /// 由「最後一則訊息」內容 + 型別衍生聊天列表預覽文案。
 ///
 /// 核心不變式：任何以 `{` / `[` 開頭的結構化 payload 都不得洩漏成原文
