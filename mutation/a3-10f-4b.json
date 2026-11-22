@@ -179,6 +179,15 @@
    "new": "\t\tif cov == nil && len(holidays) > 0 {\n\t\t\tcf, ct",
    "test": "internal/repository/postgres ^TestIntegration_BusinessDay_SnapshotSingleQuery$",
    "why": "A range without holidays reports no coverage, so a covered calendar looks never pushed."
+  },
+  {
+   "id": "withtx-no-deferred-rollback",
+   "stack": "go:backend/pkg",
+   "file": "backend/pkg/database/tx_manager.go",
+   "old": "\t\tif !committed {\n\t\t\t_ = tx.Rollback(context.WithoutCancel(ctx))\n\t\t}",
+   "new": "\t\t_ = committed",
+   "test": "database ^TestWithTx_Rolls",
+   "why": "A panic or runtime.Goexit inside fn (t.Fatalf) leaves the transaction open and its pool connection held forever."
   }
  ]
 }
