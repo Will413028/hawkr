@@ -10,6 +10,7 @@ import (
 const (
 	catalogDir = "backend/internal/platform/uitext/catalog"
 	goDir      = "backend/internal/platform/uitext"
+	policyDir  = "backend/internal/platform/policy"
 	tsDir      = "packages/hawkr-ui-text-ts"
 	dartDir    = "packages/hawkr_ui_text"
 )
@@ -60,6 +61,15 @@ func (m *Model) Outputs() (map[string][]byte, error) {
 	if out[dartDir+"/tool/enum_manifest.g.json"], err = m.Manifest(true); err != nil {
 		return nil, err
 	}
+	accepted, err := m.Schema.AcceptedFields()
+	if err != nil {
+		return nil, err
+	}
+	if out[policyDir+"/accepted_gen.go"], err = EmitGoAccepted(accepted); err != nil {
+		return nil, fmt.Errorf("accepted_gen.go：%w", err)
+	}
+	out[tsDir+"/src/accepted.gen.ts"] = EmitTSAccepted(accepted)
+	out[dartDir+"/lib/src/accepted.g.dart"] = EmitDartAccepted(accepted)
 	for _, mm := range m.Modules {
 		b, err := m.EmitModule(mm)
 		if err != nil {

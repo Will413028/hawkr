@@ -1,4 +1,3 @@
-import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart';
 
 import 'report_target_type.dart' as legacy;
@@ -31,15 +30,3 @@ final class LegacyReportTarget extends ReportTarget {
   final legacy.ReportTargetType type;
   final String id;
 }
-
-/// 社群檢舉人可選的八個原因（`CommunityReporterSelectable`），順序即選單順序。
-const communityReportCategories = <PolicyCategory>[
-  PolicyCategory.POLICY_CATEGORY_SPAM,
-  PolicyCategory.POLICY_CATEGORY_HARASSMENT,
-  PolicyCategory.POLICY_CATEGORY_HATE,
-  PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT,
-  PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO,
-  PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY,
-  PolicyCategory.POLICY_CATEGORY_FRAUD,
-  PolicyCategory.POLICY_CATEGORY_OTHER,
-];

@@ -10,6 +10,7 @@ package hawkr.moderation.v1alpha1;
 import "google/api/field_behavior.proto";
 import "google/api/field_info.proto";
 import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/accepted_values.proto";
 import "hawkr/common/v1alpha1/policy_category.proto";
 import "hawkr/seller/v1alpha1/report.proto";
 
@@ -63,8 +64,18 @@ message ReportTarget {
 
 message SubmitReportRequest {
   ReportTarget target = 1 [(google.api.field_behavior) = REQUIRED];
-  // 檢舉原因：SPAM、HARASSMENT、HATE、SEXUAL_CONTENT、MISLEADING_INFO、FOOD_SAFETY、FRAUD、OTHER 其中之一。
-  hawkr.common.v1alpha1.PolicyCategory category = 2 [(google.api.field_behavior) = REQUIRED];
+  // 檢舉原因：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
+  hawkr.common.v1alpha1.PolicyCategory category = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_SPAM,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_HARASSMENT,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_HATE,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_SEXUAL_CONTENT,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_MISLEADING_INFO,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_FOOD_SAFETY,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_FRAUD,
+    (hawkr.common.v1alpha1.accepted_policy_categories) = POLICY_CATEGORY_OTHER
+  ];
   // 選填的說明，去除首尾空白後最多 500 個字元（以 Unicode 字元計）。
   string description = 3;
   // 選填，UUIDv4（AIP-155）：同一位檢舉人以同一個 request_id 重送回第一次的結果；內容不同回 invalid_argument。

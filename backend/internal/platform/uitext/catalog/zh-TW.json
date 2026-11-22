@@ -18,71 +18,71 @@
     },
     "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT": {
       "message": "仿冒商品",
-      "description": "冒用他人商標或外觀的商品本身（第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+      "description": "冒用他人商標或外觀的商品本身（第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION": {
       "message": "假認證",
-      "description": "不實的認證、檢驗或標章（第十六條第 2 款的一種）。入口：檢舉人、平台判定與認定。"
+      "description": "不實的認證、檢驗或標章（第十六條第 2 款的一種）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY": {
       "message": "食品安全",
-      "description": "有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
+      "description": "有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_FRAUD": {
       "message": "詐欺或操縱交易",
-      "description": "偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
+      "description": "偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
       "message": "騷擾或霸凌",
-      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HATE": {
       "message": "仇恨或歧視言論",
-      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_IMPERSONATION": {
       "message": "冒用或誤導交易主體",
-      "description": "冒用平台名義、未經授權的保證，或讓買家誤認交易主體（第十六條第 8 款）。入口：檢舉人、平台判定與認定。"
+      "description": "冒用平台名義、未經授權的保證，或讓買家誤認交易主體（第十六條第 8 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_IP_INFRINGEMENT": {
       "message": "侵害智慧財產權",
-      "description": "侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。入口：檢舉人、平台判定與認定。"
+      "description": "侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO": {
       "message": "不實或誤導資訊",
-      "description": "虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
+      "description": "虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_OFF_PLATFORM_TRADE": {
       "message": "繞過平台交易",
-      "description": "引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。入口：檢舉人、平台判定與認定。"
+      "description": "引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_OTHER": {
       "message": "其他",
-      "description": "檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：店家通報與社群檢舉的檢舉人；平台判定與認定不能用。"
+      "description": "檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定不能用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE": {
       "message": "干擾或濫用平台",
-      "description": "干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。入口：只有平台判定與認定。"
+      "description": "干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_PRIVACY": {
       "message": "不當使用個人資料",
-      "description": "未經授權蒐集、利用、揭露或出售買家個人資料（第十六條第 4 款）。入口：檢舉人、平台判定與認定。"
+      "description": "未經授權蒐集、利用、揭露或出售買家個人資料（第十六條第 4 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS": {
       "message": "違法或禁售商品",
-      "description": "違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+      "description": "違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT": {
       "message": "色情或性相關內容",
-      "description": "社群內容中的色情、裸露或性暴力內容（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容中的色情、裸露或性暴力內容（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "垃圾訊息",
-      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE": {
       "message": "未經許可販售",
-      "description": "依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。入口：檢舉人、平台判定與認定。"
+      "description": "依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.StoreCard.closed_store": {
       "message": "已關閉的店家",

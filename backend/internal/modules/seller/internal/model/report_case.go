@@ -187,6 +187,38 @@ func (r Report) HasUnseenSupplements() bool {
 // （rb R2 的 3b 規則）。
 func (r Report) Supporting() bool { return r.Outcome == nil || !r.Outcome.Negates() }
 
+// SupplementBlock 說明檢舉人為什麼不能再補充一筆通報；SupplementAllowed 是可以補充。
+type SupplementBlock int
+
+const (
+	// SupplementAllowed 通報還沒有結果，補充數也未達上限。
+	SupplementAllowed SupplementBlock = iota
+	// SupplementBlockedByOutcome 通報已經有結果。
+	SupplementBlockedByOutcome
+	// SupplementBlockedByLimit 補充數已達 MaxSupplements。
+	SupplementBlockedByLimit
+)
+
+// SupplementBlockOf 是補充可不可以做的唯一判斷：有結果就不能補充（先判），補充數達 MaxSupplements 也不能。
+// Report.CanSupplement、API 的 can_supplement 與 AddSupplement 的前置檢查（含去重併入的補充）都經由它。
+func SupplementBlockOf(hasOutcome bool, supplementCount int) SupplementBlock {
+	switch {
+	case hasOutcome:
+		return SupplementBlockedByOutcome
+	case supplementCount >= MaxSupplements:
+		return SupplementBlockedByLimit
+	}
+	return SupplementAllowed
+}
+
+// SupplementBlock 回這筆通報此刻的補充可用性；SupplementCount 必須已載入（清單與單筆讀取都會載入）。
+func (r Report) SupplementBlock() SupplementBlock {
+	return SupplementBlockOf(r.Outcome != nil, r.SupplementCount)
+}
+
+// CanSupplement 說明檢舉人此刻能不能補充這筆通報。
+func (r Report) CanSupplement() bool { return r.SupplementBlock() == SupplementAllowed }
+
 // ReportMove 是一次把通報移到其他案件的紀錄（append-only）。
 type ReportMove struct {
 	ReportID, FromCaseID, ToCaseID uuid.UUID

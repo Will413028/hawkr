@@ -285,3 +285,29 @@ func TestReportPathsExistInTheRequests(t *testing.T) {
 		}
 	}
 }
+
+// can_supplement 與 supplement_max 由模組的 CanSupplement 與 MaxSupplements 決定（讀取與補充的回應相同）；client 不自己推導。
+func TestReportResponsesCarryCanSupplementAndTheMax(t *testing.T) {
+	outcome := model.OutcomeInsufficient
+	reportID := uuid.NewV7()
+	for _, c := range []struct {
+		name   string
+		detail model.Report
+		want   bool
+	}{
+		{"可以補充", model.Report{ID: reportID, CreatedAt: governanceNow, SupplementCount: 1}, true},
+		{"已有結果", model.Report{ID: reportID, CreatedAt: governanceNow, Outcome: &outcome}, false},
+		{"已達上限", model.Report{ID: reportID, CreatedAt: governanceNow, SupplementCount: model.MaxSupplements}, false},
+	} {
+		m := &reportModule{detail: c.detail}
+		h := newTestReports(t, m, buyersOf{5: 500})
+		got, err := h.GetMyReport(accountCtx(5), connect.NewRequest(&pb.GetMyReportRequest{ReportId: reportID.String()}))
+		if err != nil || got.Msg.GetCanSupplement() != c.want || got.Msg.GetSupplementMax() != model.MaxSupplements {
+			t.Errorf("%s：GetMyReport can_supplement=%v max=%d err=%v，預期 %v", c.name, got.Msg.GetCanSupplement(), got.Msg.GetSupplementMax(), err, c.want)
+		}
+		added, err := h.AddReportSupplement(accountCtx(5), connect.NewRequest(&pb.AddReportSupplementRequest{ReportId: reportID.String(), Description: "補充"}))
+		if err != nil || added.Msg.GetCanSupplement() != c.want || added.Msg.GetSupplementMax() != model.MaxSupplements {
+			t.Errorf("%s：AddReportSupplement can_supplement=%v max=%d err=%v，預期 %v", c.name, added.Msg.GetCanSupplement(), added.Msg.GetSupplementMax(), err, c.want)
+		}
+	}
+}

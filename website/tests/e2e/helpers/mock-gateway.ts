@@ -1255,6 +1255,8 @@ export async function setupGatewayMocks(
 			},
 			supplements: [],
 			evidence: [],
+			canSupplement: true,
+			supplementMax: 10,
 		});
 	});
 
