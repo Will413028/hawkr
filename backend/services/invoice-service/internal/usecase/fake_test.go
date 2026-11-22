@@ -812,6 +812,11 @@ func (f *fakeBizDays) Coverage(context.Context) (*domain.BusinessDayCoverage, er
 	return &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
 }
 
+func (f *fakeBizDays) Snapshot(ctx context.Context, _, _ time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	c, err := f.Coverage(ctx)
+	return nil, c, err
+}
+
 // ---------------------------------------------------------------------------
 // M4 provider 帳號寫入面（端點 24／25／26／27／44／45／66／67）的 fake 補充
 //

@@ -73,6 +73,12 @@ func (f cBizDays) Coverage(context.Context) (*domain.BusinessDayCoverage, error)
 	return &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
 }
 
+func (f cBizDays) Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	h, _ := f.ListHolidays(ctx, from, to)
+	c, err := f.Coverage(ctx)
+	return h, c, err
+}
+
 type cComplaints struct {
 	domain.ComplaintRepository
 
@@ -951,5 +957,32 @@ func TestComplaintTransition_WritesStatusHistory(t *testing.T) {
 	// 買家可見時間軸仍要寫——兩張表用途不同，不是二選一。
 	if len(fx.repo.events[4242]) == 0 {
 		t.Fatal("invoice_complaint_events 也要寫（買家時間軸）")
+	}
+}
+
+// snapshotOnlyBizDays 的 ListHolidays、Coverage 各自讀會回互相矛盾的結果；只有 Snapshot 是一致的。
+type snapshotOnlyBizDays struct{ domain.BusinessDayRepository }
+
+func (snapshotOnlyBizDays) ListHolidays(context.Context, time.Time, time.Time) ([]time.Time, error) {
+	return nil, errors.New("must read through Snapshot")
+}
+
+func (snapshotOnlyBizDays) Coverage(context.Context) (*domain.BusinessDayCoverage, error) {
+	return nil, errors.New("must read through Snapshot")
+}
+
+func (snapshotOnlyBizDays) Snapshot(context.Context, time.Time, time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	return []time.Time{from.AddDate(0, 0, 5)}, &domain.BusinessDayCoverage{From: from, To: from.AddDate(1, 0, 0), SyncedAt: from}, nil
+}
+
+func TestLoadBusinessCalendarReadsHolidaysAndCoverageInOneSnapshot(t *testing.T) {
+	from := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	cal, err := loadBusinessCalendar(context.Background(), snapshotOnlyBizDays{}, from, from.AddDate(0, 0, 30))
+	if err != nil {
+		t.Fatalf("loadBusinessCalendar: %v", err)
+	}
+	if !cal.Covers(from, from.AddDate(0, 0, 30)) {
+		t.Fatal("the snapshot's coverage was not used")
 	}
 }

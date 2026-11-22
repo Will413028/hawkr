@@ -743,3 +743,24 @@ func newInbox(eventID, dedupKey string) domain.NewInboxEvent {
 		Now:              now,
 	}
 }
+
+func TestIntegration_BusinessDay_SnapshotReadsHolidaysAndCoverageTogether(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	repo := NewBusinessDayRepository(pool)
+	synced := time.Date(2026, 11, 22, 0, 0, 0, 0, time.UTC)
+	day := func(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
+	if _, err := repo.DeleteAll(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Insert(ctx, day(11, 24), synced); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetCoverage(ctx, day(10, 23), day(12, 31), synced); err != nil {
+		t.Fatal(err)
+	}
+	holidays, cov, err := repo.Snapshot(ctx, day(11, 1), day(11, 30))
+	if err != nil || len(holidays) != 1 || cov == nil || !cov.To.Equal(day(12, 31)) {
+		t.Fatalf("Snapshot = %v %v %v", holidays, cov, err)
+	}
+}

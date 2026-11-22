@@ -454,7 +454,7 @@ func (u *Complaint) transition(ctx context.Context, in ComplaintActionInput, t c
 // calendarAround 讀一次鏡像，組出涵蓋「倒數 ＋ 硬上限」所需區間的行事曆快照。
 //
 // 一個請求只讀一次：sla_due_at 與 remainingBusinessDays 用的是同一份快照，
-// 分兩次讀會讓兩者在鏡像剛好被 INV.gov 覆寫的那一瞬間互相矛盾。
+// 分兩次讀會讓兩者在鏡像剛好被推送覆寫的那一瞬間互相矛盾。
 func (u *Complaint) calendarAround(ctx context.Context, now time.Time) (domain.BusinessCalendar, error) {
 	return loadBusinessCalendar(ctx, u.businessDay,
 		now.AddDate(0, 0, -complaintCalendarLookbehind),
@@ -464,15 +464,15 @@ func (u *Complaint) calendarAround(ctx context.Context, now time.Time) (domain.B
 // slaDueAt 算出一件申訴的 sla_due_at（K01 建案與 K13 重開共用）。
 func (u *Complaint) slaDueAt(cal domain.BusinessCalendar, now time.Time) time.Time {
 	if !cal.Covers(now, now.AddDate(0, 0, domain.ComplaintSlaHardCapDays)) {
-		// 鏡像過期或從未同步 ⇒ 未涵蓋的日期一律視為假日、落在硬上限（偏晚）。
-		// 這裡只留一行 WARN：告警的資料面是 max(synced_at)，由 INV.gov 的
-		// invoice_business_calendar_stale 負責，不在請求路徑上重造一套。
+		// 推送的涵蓋區間沒有罩住這段期間（或從未推送）⇒ 未涵蓋的日期一律視為假日、落在硬上限（偏晚）。
+		// 這裡只留一行 WARN：告警的資料面是 invoice_business_day_coverage，
+		// 由 INV.gov 的 InvoiceBusinessDayMirrorEmpty／Stale 負責，不在請求路徑上重造一套。
 		u.logger().Warn("invoice.complaint.business_calendar_stale")
 	}
 	return cal.ComplaintSlaDueAt(now)
 }
 
-// loadBusinessCalendar 由鏡像組出一份行事曆快照。
+// loadBusinessCalendar 由鏡像組出一份行事曆快照；假日與涵蓋區間來自同一份一致的讀取（Snapshot）。
 //
 // 兩端各外擴一天：ComplaintSlaDueAt 是從「起算日的次一天」開始推的，區間切齊會讓
 // 邊界那一天的假日查不到而被當成工作天（偏早）。
@@ -480,11 +480,7 @@ func loadBusinessCalendar(ctx context.Context, repo domain.BusinessDayRepository
 	if from.After(to) {
 		from, to = to, from
 	}
-	holidays, err := repo.ListHolidays(ctx, from.AddDate(0, 0, -1), to.AddDate(0, 0, 1))
-	if err != nil {
-		return domain.BusinessCalendar{}, err
-	}
-	coverage, err := repo.Coverage(ctx)
+	holidays, coverage, err := repo.Snapshot(ctx, from.AddDate(0, 0, -1), to.AddDate(0, 0, 1))
 	if err != nil {
 		return domain.BusinessCalendar{}, err
 	}

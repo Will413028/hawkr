@@ -2181,6 +2181,9 @@ type BusinessDayRepository interface {
 	// Coverage 回 nil 代表鏡像從未被推送過：呼叫端必須把它當「今天算不出工作天」處理，
 	// 不得當成「沒有假日」（invoice_complaints.sla_due_at 是 NOT NULL）。
 	Coverage(ctx context.Context) (*BusinessDayCoverage, error)
+	// Snapshot 在同一份一致的快照裡讀出區間內的假日與涵蓋區間（Coverage 的 nil 語意相同）：
+	// 分兩次讀時，中間來一次推送就會拿到新舊混合的結果。
+	Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *BusinessDayCoverage, error)
 }
 
 // ============================================================================

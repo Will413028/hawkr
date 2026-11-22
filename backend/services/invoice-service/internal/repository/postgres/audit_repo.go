@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Will413028/hawkr/go-pkg/database"
 	"github.com/Will413028/hawkr/go-pkg/pgxutil"
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres/gen"
@@ -179,7 +180,11 @@ func (r *BusinessDayRepository) Insert(ctx context.Context, holidayDate, syncedA
 
 // ListHolidays 回區間內的假日清單。
 func (r *BusinessDayRepository) ListHolidays(ctx context.Context, from, to time.Time) ([]time.Time, error) {
-	rows, err := r.q(ctx).ListBusinessDayHolidays(ctx, gen.ListBusinessDayHolidaysParams{
+	return listHolidays(ctx, r.q(ctx), from, to)
+}
+
+func listHolidays(ctx context.Context, q *gen.Queries, from, to time.Time) ([]time.Time, error) {
+	rows, err := q.ListBusinessDayHolidays(ctx, gen.ListBusinessDayHolidaysParams{
 		FromDate: dateParam(from),
 		ToDate:   dateParam(to),
 	})
@@ -209,7 +214,11 @@ func (r *BusinessDayRepository) SetCoverage(ctx context.Context, from, to, synce
 // 回 nil 而不是零值：呼叫端必須把它當「今天算不出工作天」處理，不得當成「沒有假日」——
 // 後者會把 3 工作天 SLA 算成 3 自然日，誤判賣家違規。
 func (r *BusinessDayRepository) Coverage(ctx context.Context) (*domain.BusinessDayCoverage, error) {
-	row, err := r.q(ctx).GetBusinessDayCoverage(ctx)
+	return coverage(ctx, r.q(ctx))
+}
+
+func coverage(ctx context.Context, q *gen.Queries) (*domain.BusinessDayCoverage, error) {
+	row, err := q.GetBusinessDayCoverage(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil // 從未推送，不是錯誤
 	}
@@ -222,4 +231,34 @@ func (r *BusinessDayRepository) Coverage(ctx context.Context) (*domain.BusinessD
 		return nil, nil
 	}
 	return &domain.BusinessDayCoverage{From: *from, To: *to, SyncedAt: row.SyncedAt.Time}, nil
+}
+
+// Snapshot 在一個唯讀的 REPEATABLE READ 交易裡讀假日與涵蓋區間，兩者來自同一份快照。
+// ctx 已帶交易時沿用該交易（隔離等級由呼叫端決定）。
+func (r *BusinessDayRepository) Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	if database.TxFromContext(ctx) != nil {
+		return readSnapshot(ctx, r.q(ctx), from, to)
+	}
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	holidays, cov, err := readSnapshot(ctx, gen.New(tx), from, to)
+	if err != nil {
+		return nil, nil, err
+	}
+	return holidays, cov, tx.Commit(ctx)
+}
+
+func readSnapshot(ctx context.Context, q *gen.Queries, from, to time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	holidays, err := listHolidays(ctx, q, from, to)
+	if err != nil {
+		return nil, nil, err
+	}
+	cov, err := coverage(ctx, q)
+	if err != nil {
+		return nil, nil, err
+	}
+	return holidays, cov, nil
 }

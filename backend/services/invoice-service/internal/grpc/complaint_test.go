@@ -396,3 +396,12 @@ func xLong(n int) string {
 	}
 	return string(b)
 }
+
+func (f xBiz) Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	h, err := f.ListHolidays(ctx, from, to)
+	if err != nil {
+		return nil, nil, err
+	}
+	c, err := f.Coverage(ctx)
+	return h, c, err
+}
