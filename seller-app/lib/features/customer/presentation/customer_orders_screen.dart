@@ -12,6 +12,7 @@ import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import 'customer_controller.dart';
+import 'customer_load_more_footer.dart';
 import 'customer_order_card_widget.dart';
 
 /// 顧客的訂單：店家訂單列表以 `buyer_id` 篩選。讀取失敗與「沒有訂單」分開呈現。
@@ -57,7 +58,8 @@ class CustomerOrdersScreen extends ConsumerWidget {
             ],
           ),
         ),
-        data: (list) {
+        data: (state) {
+          final list = state.orders;
           if (list.isEmpty) {
             return const HkEmptyState(
               icon: HkIconName.box,
@@ -67,12 +69,28 @@ class CustomerOrdersScreen extends ConsumerWidget {
           }
           return ListView.separated(
             padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 32.h),
-            itemCount: list.length,
+            itemCount: list.length + (state.hasMore ? 1 : 0),
             separatorBuilder: (_, _) => SizedBox(height: 12.h),
-            itemBuilder: (_, i) => CustomerOrderCardWidget(
-              order: list[i],
-              customerName: customerName,
-            ),
+            itemBuilder: (_, i) {
+              if (i == list.length) {
+                return CustomerLoadMoreFooter(
+                  errorKey: const ValueKey('customer-orders-load-more-error'),
+                  onLoadMore: ref
+                      .read(customerOrdersProvider(customerId).notifier)
+                      .loadMore,
+                  errorMessage: state.loadMoreError == null
+                      ? null
+                      : errorText(
+                          state.loadMoreError!,
+                          defaults: ref.read(defaultErrorTextProvider),
+                        ),
+                );
+              }
+              return CustomerOrderCardWidget(
+                order: list[i],
+                customerName: customerName,
+              );
+            },
           );
         },
       ),

@@ -18,6 +18,7 @@ import 'shared/utils/keyboard_unfocus_controller.dart';
 import 'features/app_update/application/force_update_provider.dart';
 import 'features/chat/data/active_chat_gate.dart';
 import 'features/chat/data/chat_session.dart';
+import 'features/seller/data/current_store.dart';
 import 'features/notification/data/push/manager.dart';
 import 'shared/widgets/chat_bubble_icon.dart';
 import 'shared/widgets/environment_banner.dart';
@@ -71,6 +72,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           onError: (e) => HKLog.logD('[MyApp] Stream error: $e'),
           onDone: () => HKLog.logD('[MyApp] Stream done'),
         );
+    ref.listenManual(
+      sellerStoreIdProvider,
+      (prev, next) =>
+          onChatStoreIdChanged(ref.read(chatSessionProvider), prev, next),
+    );
     HKLog.logD('[MyApp] ====== Listener setup completed ======');
   }
 

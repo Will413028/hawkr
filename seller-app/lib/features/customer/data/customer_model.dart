@@ -90,7 +90,7 @@ class Customer {
   );
 }
 
-enum OrderStatus { delivering, completed, cancelled, issue }
+enum OrderStatus { pendingPayment, delivering, completed, cancelled, issue }
 
 /// 客戶詳情的訂單列（取自店家訂單列表，以 `buyer_id` 篩選）。
 class OrderRecord {

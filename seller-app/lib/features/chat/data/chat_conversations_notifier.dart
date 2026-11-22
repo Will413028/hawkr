@@ -49,8 +49,12 @@ Duration? _noAutoRetry(int retryCount, Object error) => null;
 class ChatConversations extends _$ChatConversations {
   StreamSubscription<ChatStreamEvent>? _sub;
 
+  /// 每次整個重讀（build）加一：在那之前發出的載入下一頁，結果屬於舊的列表，丟掉。
+  int _epoch = 0;
+
   @override
   Future<ChatConversationsState> build() async {
+    _epoch++;
     final session = ref.read(chatSessionProvider);
     unawaited(_sub?.cancel());
     _sub = session.events.listen(_onEvent);
@@ -76,18 +80,23 @@ class ChatConversations extends _$ChatConversations {
     }
   }
 
-  /// 重讀第一頁（背景更新）：失敗時留著畫面上已有的列。
+  /// 重讀第一頁（背景更新）：第一頁併進已載入的列（新的在前、依 id 去重），不收掉已載入的後續頁；失敗時留著畫面上已有的列。
   Future<void> refresh() async {
-    final cur = state.value;
-    if (cur == null) return;
+    if (state.value == null) return;
+    final epoch = _epoch;
     try {
       final page = await ref.read(chatRepositoryProvider).listConversations();
-      if (!ref.mounted) return;
+      final cur = state.value;
+      if (!ref.mounted || cur == null || epoch != _epoch) return;
       ref.read(chatSessionProvider).rememberConversations(page.items);
+      final ids = page.items.map((c) => c.id).toSet();
       state = AsyncData(
-        ChatConversationsState(
-          items: page.items,
-          nextPageToken: page.nextPageToken,
+        cur.copyWith(
+          items: [
+            ...page.items,
+            ...cur.items.where((c) => !ids.contains(c.id)),
+          ],
+          // 續頁的 token 以目前的為準（第一頁的 token 指向已載入的第二頁）。
         ),
       );
     } on Object {
@@ -105,22 +114,27 @@ class ChatConversations extends _$ChatConversations {
     final cur = state.value;
     if (cur == null || !cur.hasMore || cur.loadingMore) return;
     state = AsyncData(cur.copyWith(loadingMore: true, loadMoreFailed: false));
+    final epoch = _epoch;
     try {
       final page = await ref
           .read(chatRepositoryProvider)
           .listConversations(pageToken: cur.nextPageToken);
-      if (!ref.mounted) return;
+      final latest = state.value;
+      if (!ref.mounted || latest == null || epoch != _epoch) return;
       ref.read(chatSessionProvider).rememberConversations(page.items);
-      final ids = cur.items.map((c) => c.id).toSet();
+      final ids = latest.items.map((c) => c.id).toSet();
       state = AsyncData(
         ChatConversationsState(
-          items: [...cur.items, ...page.items.where((c) => ids.add(c.id))],
+          items: [...latest.items, ...page.items.where((c) => ids.add(c.id))],
           nextPageToken: page.nextPageToken,
         ),
       );
     } on Object {
-      if (!ref.mounted) return;
-      state = AsyncData(cur.copyWith(loadingMore: false, loadMoreFailed: true));
+      final latest = state.value;
+      if (!ref.mounted || latest == null || epoch != _epoch) return;
+      state = AsyncData(
+        latest.copyWith(loadingMore: false, loadMoreFailed: true),
+      );
     }
   }
 

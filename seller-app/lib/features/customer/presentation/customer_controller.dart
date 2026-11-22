@@ -139,13 +139,83 @@ class CustomerList extends _$CustomerList {
 
 // ─── 顧客詳情相關 ────────────────────────────────────────────────────────────
 
-/// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
+/// 客戶的訂單（店家訂單列表以 `buyer_id` 篩選）一頁的筆數；讀到不足一頁就是沒有下一頁。
+const customerOrdersPageSize = 50;
+
+class CustomerOrdersState {
+  const CustomerOrdersState({
+    required this.orders,
+    required this.nextPage,
+    required this.hasMore,
+    this.loadingMore = false,
+    this.loadMoreError,
+  });
+
+  final List<OrderRecord> orders;
+  final int nextPage;
+  final bool hasMore;
+  final bool loadingMore;
+
+  /// 繼續載入失敗的錯誤；已載入的訂單保留，不當成列表讀取失敗。
+  final Object? loadMoreError;
+
+  CustomerOrdersState copyWith({
+    List<OrderRecord>? orders,
+    int? nextPage,
+    bool? hasMore,
+    bool? loadingMore,
+    Object? loadMoreError,
+    bool clearError = false,
+  }) => CustomerOrdersState(
+    orders: orders ?? this.orders,
+    nextPage: nextPage ?? this.nextPage,
+    hasMore: hasMore ?? this.hasMore,
+    loadingMore: loadingMore ?? this.loadingMore,
+    loadMoreError: clearError ? null : (loadMoreError ?? this.loadMoreError),
+  );
+}
+
+/// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
 @Riverpod(retry: _noRetry)
-Future<List<OrderRecord>> customerOrders(Ref ref, String buyerId) async {
-  final orders = await ref
-      .read(orderRepositoryProvider)
-      .fetchMatchedOrders(pageSize: 50, buyerId: buyerId);
-  return orders.map(orderRecordFromSummary).toList();
+class CustomerOrders extends _$CustomerOrders {
+  @override
+  Future<CustomerOrdersState> build(String buyerId) async {
+    final page = await ref
+        .read(orderRepositoryProvider)
+        .fetchMatchedOrders(pageSize: customerOrdersPageSize, buyerId: buyerId);
+    return CustomerOrdersState(
+      orders: page.map(orderRecordFromSummary).toList(),
+      nextPage: 2,
+      hasMore: page.length >= customerOrdersPageSize,
+    );
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    state = AsyncData(current.copyWith(loadingMore: true, clearError: true));
+    try {
+      final page = await ref
+          .read(orderRepositoryProvider)
+          .fetchMatchedOrders(
+            page: current.nextPage,
+            pageSize: customerOrdersPageSize,
+            buyerId: buyerId,
+          );
+      if (!ref.mounted) return;
+      state = AsyncData(
+        current.copyWith(
+          orders: [...current.orders, ...page.map(orderRecordFromSummary)],
+          nextPage: current.nextPage + 1,
+          hasMore: page.length >= customerOrdersPageSize,
+          loadingMore: false,
+        ),
+      );
+    } catch (e) {
+      if (!ref.mounted) return;
+      state = AsyncData(current.copyWith(loadingMore: false, loadMoreError: e));
+    }
+  }
 }
 
 // ─── 商家標籤 ────────────────────────────────────────────────────────────────

@@ -240,4 +240,33 @@ void main() {
     expect(h.state.value!.messages.map((m) => m.seq), [3, 4, 5, 6]);
     expect(h.state.value!.hasMoreOlder, isFalse);
   });
+
+  test('a thread opened before the conversation exists adopts the first '
+      'incoming message of its buyer', () async {
+    repo.conversations = [];
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    repo.conversations = [_conv(id: 'c7')];
+    h.streams.last.add(messageFrame(protoMessage(1, conv: 'c7')));
+    await h.pump();
+    await h.pump();
+    final d = h.state.value!;
+    expect(d.conversationId, 'c7');
+    expect(d.messages.map((m) => m.seq), [1]);
+    expect(d.buyer?.name, '小明');
+  });
+
+  test('a message of another buyer is not adopted', () async {
+    repo.conversations = [];
+    final h = _Harness(repo);
+    await h.start();
+    await h.container.read(chatThreadProvider(h.arg).future);
+    repo.conversations = [_conv(id: 'c8', buyer: 'other')];
+    h.streams.last.add(messageFrame(protoMessage(1, conv: 'c8')));
+    await h.pump();
+    await h.pump();
+    expect(h.state.value!.conversationId, isNull);
+    expect(h.state.value!.messages, isEmpty);
+  });
 }

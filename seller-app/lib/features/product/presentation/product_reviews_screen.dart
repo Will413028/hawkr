@@ -1,3 +1,5 @@
+import 'dart:async' as async;
+
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
@@ -37,6 +39,17 @@ class ProductReviewsScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<ProductReviewsScreen> createState() =>
       _ProductReviewsScreenState();
+}
+
+/// `Future.wait` 的記錄版在任一邊失敗時丟 [ParallelWaitError]（錯誤包在 `errors` 裡）：取出第一個真正的錯誤。
+Object _firstCause(Object raw) {
+  if (raw is ParallelWaitError) {
+    final errors = raw.errors;
+    if (errors is (async.AsyncError?, async.AsyncError?)) {
+      return (errors.$1 ?? errors.$2)?.error ?? raw;
+    }
+  }
+  return raw;
 }
 
 class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
@@ -88,7 +101,9 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
         _nextPageToken = page.nextPageToken;
         _isLoading = false;
       });
-    } catch (error, stackTrace) {
+    } catch (raw, stackTrace) {
+      // 並行讀取任一邊失敗時 `.wait` 丟 ParallelWaitError：取出第一個真正的錯誤，錯誤文字才依原因顯示。
+      final error = _firstCause(raw);
       debugPrint('[ProductReviewsScreen] $error\n$stackTrace');
       if (!mounted) return;
       setState(() {
@@ -154,11 +169,12 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                   return CustomScrollView(
                     key: const ValueKey('seller-product-reviews-scroll-view'),
                     slivers: [
-                      _buildSectionSliver(
-                        horizontalPadding: gutter,
-                        topPadding: HkSpace.lg,
-                        child: _buildRatingSummaryCard(),
-                      ),
+                      if (_loadError == null)
+                        _buildSectionSliver(
+                          horizontalPadding: gutter,
+                          topPadding: HkSpace.lg,
+                          child: _buildRatingSummaryCard(),
+                        ),
                       _buildSectionSliver(
                         horizontalPadding: gutter,
                         topPadding: HkSpace.lg,

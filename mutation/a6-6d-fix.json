@@ -1,0 +1,139 @@
+{
+ "mutants": [
+  {
+   "id": "fix-store-change-restart",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_session.dart",
+   "old": "      client.start();\n    }\n  }\n\n  @override",
+   "new": "    }\n  }\n\n  @override",
+   "test": "test/features/chat/chat_session_test.dart a store appearing restarts a stream stopped for noStore",
+   "why": "A store change no longer restarts a stream stopped for noStore or storeClosed."
+  },
+  {
+   "id": "fix-dashboard-unread-ignores-stream",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/dashboard/data/dashboard_chat_unread_provider.dart",
+   "old": ".listen((_) => ref.invalidateSelf());",
+   "new": ".listen((_) {});",
+   "test": "test/features/chat/chat_session_test.dart dashboard unread re-reads when the stream reports a new total",
+   "why": "The unread badge ignores the streamed total."
+  },
+  {
+   "id": "fix-thread-no-adopt",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "          found.id != m.conversationId ||\n",
+   "new": "          false ||\n",
+   "test": "test/features/chat/chat_thread_notifier_test.dart a message of another buyer is not adopted",
+   "why": "A message of any conversation is adopted by a thread that has none."
+  },
+  {
+   "id": "fix-thread-adopt-dropped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "        unawaited(_adoptConversation(message));",
+   "new": "        break;",
+   "test": "test/features/chat/chat_thread_notifier_test.dart a thread opened before the conversation exists adopts the first incoming message of its buyer",
+   "why": "The first incoming message is dropped when the thread has no conversation yet."
+  },
+  {
+   "id": "fix-refresh-collapses-pages",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_conversations_notifier.dart",
+   "old": "          items: [\n            ...page.items,\n            ...cur.items.where((c) => !ids.contains(c.id)),\n          ],\n",
+   "new": "          items: page.items,\n",
+   "test": "test/features/chat/chat_conversations_notifier_test.dart refresh merges page 1 into the loaded pages without collapsing them",
+   "why": "Refresh replaces the loaded pages with page 1."
+  },
+  {
+   "id": "fix-loadmore-stale-after-reload",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_conversations_notifier.dart",
+   "old": "      if (!ref.mounted || latest == null || epoch != _epoch) return;\n      ref.read(chatSessionProvider).rememberConversations(page.items);\n      final ids = latest",
+   "new": "      if (!ref.mounted || latest == null) return;\n      ref.read(chatSessionProvider).rememberConversations(page.items);\n      final ids = latest",
+   "test": "test/features/chat/chat_conversations_notifier_test.dart a loadMore that finishes after reload is discarded",
+   "why": "A loadMore started before a reload still lands on the reloaded list."
+  },
+  {
+   "id": "fix-loadmore-overwrites-refresh",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_conversations_notifier.dart",
+   "old": "      final latest = state.value;\n      if (!ref.mounted || latest == null || epoch != _epoch) return;\n      ref.read(chatSessionProvider).rememberConversations(page.items);\n      final ids = latest.items",
+   "new": "      final latest = cur;\n      if (!ref.mounted || epoch != _epoch) return;\n      ref.read(chatSessionProvider).rememberConversations(page.items);\n      final ids = latest.items",
+   "test": "test/features/chat/chat_conversations_notifier_test.dart a refresh during loadMore neither loses rows nor is overwritten",
+   "why": "loadMore builds on its stale snapshot and overwrites a refresh."
+  },
+  {
+   "id": "fix-tag-toggle-applies-stale",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/coupon/presentation/tag_audience_toggle.dart",
+   "old": "    if (gen != _generation) return;\n    setCustomers(result);",
+   "new": "    setCustomers(result);",
+   "test": "test/features/coupon/tag_audience_toggle_test.dart a late result for a tag that is no longer selected is dropped",
+   "why": "A late tag result overwrites the audience of the current tag."
+  },
+  {
+   "id": "fix-tag-toggle-stale-error",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/coupon/presentation/tag_audience_toggle.dart",
+   "old": "      if (gen != _generation) return;\n      onError(e);",
+   "new": "      onError(e);",
+   "test": "test/features/coupon/tag_audience_toggle_test.dart a late error of a superseded tag is not reported",
+   "why": "A superseded tag's error is shown."
+  },
+  {
+   "id": "fix-orders-status-pending-payment",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_orders.dart",
+   "old": "    0 => OrderStatus.pendingPayment,\n",
+   "new": "",
+   "test": "test/features/customer/customer_orders_test.dart order summary maps to a record by status code",
+   "why": "Pending payment orders show as delivering."
+  },
+  {
+   "id": "fix-orders-status-abnormal",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_orders.dart",
+   "old": "    35 => OrderStatus.issue,\n",
+   "new": "",
+   "test": "test/features/customer/customer_orders_test.dart order summary maps to a record by status code",
+   "why": "Shipping-abnormal orders show as delivering."
+  },
+  {
+   "id": "fix-orders-no-paging",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_controller.dart",
+   "old": "      hasMore: page.length >= customerOrdersPageSize,\n    );\n  }\n\n  Future<void> loadMore",
+   "new": "      hasMore: false,\n    );\n  }\n\n  Future<void> loadMore",
+   "test": "test/features/customer/customer_orders_test.dart orders page past 50 with the buyer id until a short page",
+   "why": "Customer orders stop at the first page."
+  },
+  {
+   "id": "fix-orders-drops-buyer-id",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_controller.dart",
+   "old": "            pageSize: customerOrdersPageSize,\n            buyerId: buyerId,\n",
+   "new": "            pageSize: customerOrdersPageSize,\n",
+   "test": "test/features/customer/customer_orders_test.dart orders page past 50 with the buyer id until a short page",
+   "why": "Later pages omit the buyer_id filter."
+  },
+  {
+   "id": "fix-reviews-wait-error-not-unwrapped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/product/presentation/product_reviews_screen.dart",
+   "old": "      return (errors.$1 ?? errors.$2)?.error ?? raw;",
+   "new": "      return raw;",
+   "test": "test/features/product/product_reviews_screen_layout_test.dart stats failure shows the error and hides the zero-count summary",
+   "why": "The wrapped ParallelWaitError is shown instead of the cause (message differs); also keeps the summary logic."
+  },
+  {
+   "id": "fix-reviews-summary-shown-on-error",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/product/presentation/product_reviews_screen.dart",
+   "old": "                      if (_loadError == null)\n",
+   "new": "                      if (true)\n",
+   "test": "test/features/product/product_reviews_screen_layout_test.dart list failure shows the error and hides the zero-count summary",
+   "why": "The zero-count summary card shows while the load failed."
+  }
+ ]
+}

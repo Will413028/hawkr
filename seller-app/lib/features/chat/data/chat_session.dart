@@ -95,6 +95,18 @@ class ChatSession with WidgetsBindingObserver {
     _unread.add(0);
   }
 
+  /// 目前的店變了（開店、重新開張）：串流因「沒有店」或「店已關閉」停止時，以新的店重新連線。
+  /// 其他停止原因（登入失效、請求無效）與已登出（未 [start]）不動。
+  void onStoreChanged() {
+    if (!_observing) return;
+    final s = client.status;
+    if (s is! ChatStreamStopped) return;
+    if (s.reason == ChatStreamStopReason.noStore ||
+        s.reason == ChatStreamStopReason.storeClosed) {
+      client.start();
+    }
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) client.reconnectNow();
@@ -157,6 +169,12 @@ class ChatSession with WidgetsBindingObserver {
       ),
     );
   }
+}
+
+/// 店家 ID 的變化接到串流：有了新的店（開店、重新開張）才重新連線。
+/// 由 App 根（`sellerStoreIdProvider` 的監聽）呼叫；不放在 [chatSession] 內，因為它會讓 session 與店家互相依賴。
+void onChatStoreIdChanged(ChatSession session, String? previous, String? next) {
+  if (next != null && next != previous) session.onStoreChanged();
 }
 
 @Riverpod(keepAlive: true)

@@ -1,4 +1,6 @@
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_seller/core/theme/app_colors.dart';
+import '../../support/connect_errors.dart';
 import 'package:hawkr_seller/features/review/data/review_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_reviews_screen.dart';
 import 'package:hawkr_seller/shared/widgets/hk_choice_chip.dart';
@@ -6,6 +8,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
+class _FailingReviewRepository extends _FakeReviewRepository {
+  _FailingReviewRepository({this.statsError, this.listError});
+  final Object? statsError;
+  final Object? listError;
+
+  @override
+  Future<ReviewStats> productStats(String productId) async =>
+      statsError == null ? super.productStats(productId) : throw statsError!;
+
+  @override
+  Future<ReviewPage> listProductReviews(
+    String productId, {
+    String pageToken = '',
+    int? rating,
+    bool withImages = false,
+  }) async => listError == null
+      ? super.listProductReviews(productId)
+      : throw listError!;
+}
 
 class _FakeReviewRepository implements ReviewRepository {
   @override
@@ -85,4 +107,67 @@ void main() {
     expect(find.text('水果新鮮，包裝也很完整。'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  for (final (name, repo) in [
+    (
+      'stats failure',
+      _FailingReviewRepository(
+        statsError: reasonError(
+          Code.failedPrecondition,
+          'STORE_CLOSED',
+          message: '統計暫時讀不到',
+        ),
+      ),
+    ),
+    (
+      'list failure',
+      _FailingReviewRepository(
+        listError: ConnectException(Code.unavailable, 'x'),
+      ),
+    ),
+    (
+      'both failing',
+      _FailingReviewRepository(
+        statsError: ConnectException(Code.unavailable, 'x'),
+        listError: ConnectException(Code.unavailable, 'y'),
+      ),
+    ),
+  ]) {
+    testWidgets('$name shows the error and hides the zero-count summary', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [reviewRepositoryProvider.overrideWithValue(repo)],
+          child: ScreenUtilInit(
+            designSize: const Size(390, 844),
+            builder: (_, _) => const MaterialApp(
+              home: ProductReviewsScreen(
+                sellerId: '123',
+                skuId: 'sku-1',
+                productName: '範例安心蔬果箱',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('seller-product-reviews-error-state')),
+        findsOneWidget,
+      );
+      if (name == 'stats failure') {
+        expect(find.text('統計暫時讀不到'), findsOneWidget);
+      }
+      expect(
+        find.byKey(const ValueKey('seller-product-reviews-summary-card')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

@@ -23,6 +23,7 @@ import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/customer_model.dart';
 import 'customer_controller.dart';
+import 'customer_load_more_footer.dart';
 
 /// 排序選項的標籤與對應的契約排序（`CustomerSort` 不在共用文案目錄，標籤是這個畫面的控制項文字）。
 const customerSortOptions = <({String label, CustomerSort sort})>[
@@ -106,8 +107,10 @@ class CustomerManagementScreen extends ConsumerWidget {
                         itemCount: customers.length + (state.hasMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == customers.length) {
-                            return _LoadMoreFooter(
-                              state: state,
+                            return CustomerLoadMoreFooter(
+                              errorKey: const ValueKey(
+                                'seller-customers-load-more-error',
+                              ),
                               onLoadMore: ref
                                   .read(customerListProvider.notifier)
                                   .loadMore,
@@ -158,57 +161,6 @@ class CustomerManagementScreen extends ConsumerWidget {
 }
 
 /// 列表尾端：進到畫面時自動載入下一頁；失敗時顯示錯誤與重試，已載入的客戶不受影響。
-class _LoadMoreFooter extends StatefulWidget {
-  const _LoadMoreFooter({
-    required this.state,
-    required this.onLoadMore,
-    this.errorMessage,
-  });
-
-  final CustomerListState state;
-  final Future<void> Function() onLoadMore;
-  final String? errorMessage;
-
-  @override
-  State<_LoadMoreFooter> createState() => _LoadMoreFooterState();
-}
-
-class _LoadMoreFooterState extends State<_LoadMoreFooter> {
-  @override
-  void initState() {
-    super.initState();
-    if (widget.errorMessage == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) widget.onLoadMore();
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final error = widget.errorMessage;
-    if (error != null) {
-      return Padding(
-        key: const ValueKey('seller-customers-load-more-error'),
-        padding: const EdgeInsets.symmetric(vertical: HkSpace.md),
-        child: Column(
-          children: [
-            Text(error, textAlign: TextAlign.center),
-            TextButton(
-              onPressed: widget.onLoadMore,
-              child: const HkButtonLabel('重試'),
-            ),
-          ],
-        ),
-      );
-    }
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: HkSpace.md),
-      child: Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
 class _CustomerControls extends StatelessWidget {
   const _CustomerControls({
     required this.sortLabel,

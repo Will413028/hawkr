@@ -107,24 +107,15 @@ abstract class _$CustomerList extends $AsyncNotifier<CustomerListState> {
   }
 }
 
-/// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
+/// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
 
-@ProviderFor(customerOrders)
+@ProviderFor(CustomerOrders)
 final customerOrdersProvider = CustomerOrdersFamily._();
 
-/// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
-
+/// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
 final class CustomerOrdersProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<OrderRecord>>,
-          List<OrderRecord>,
-          FutureOr<List<OrderRecord>>
-        >
-    with
-        $FutureModifier<List<OrderRecord>>,
-        $FutureProvider<List<OrderRecord>> {
-  /// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
+    extends $AsyncNotifierProvider<CustomerOrders, CustomerOrdersState> {
+  /// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
   CustomerOrdersProvider._({
     required CustomerOrdersFamily super.from,
     required String super.argument,
@@ -148,15 +139,7 @@ final class CustomerOrdersProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<OrderRecord>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<OrderRecord>> create(Ref ref) {
-    final argument = this.argument as String;
-    return customerOrders(ref, argument);
-  }
+  CustomerOrders create() => CustomerOrders();
 
   @override
   bool operator ==(Object other) {
@@ -169,12 +152,19 @@ final class CustomerOrdersProvider
   }
 }
 
-String _$customerOrdersHash() => r'491cd219b9d2b950adae74ef4c5664d9a2a5b646';
+String _$customerOrdersHash() => r'4999b6e5efebfd3b971b28f32366397a290ab3c8';
 
-/// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
+/// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
 
 final class CustomerOrdersFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<OrderRecord>>, String> {
+    with
+        $ClassFamilyOverride<
+          CustomerOrders,
+          AsyncValue<CustomerOrdersState>,
+          CustomerOrdersState,
+          FutureOr<CustomerOrdersState>,
+          String
+        > {
   CustomerOrdersFamily._()
     : super(
         retry: _noRetry,
@@ -184,13 +174,37 @@ final class CustomerOrdersFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// 客戶的訂單：店家訂單列表以 `buyer_id` 篩選（最近 50 筆）。
+  /// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
 
   CustomerOrdersProvider call(String buyerId) =>
       CustomerOrdersProvider._(argument: buyerId, from: this);
 
   @override
   String toString() => r'customerOrdersProvider';
+}
+
+/// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
+
+abstract class _$CustomerOrders extends $AsyncNotifier<CustomerOrdersState> {
+  late final _$args = ref.$arg as String;
+  String get buyerId => _$args;
+
+  FutureOr<CustomerOrdersState> build(String buyerId);
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref =
+        this.ref as $Ref<AsyncValue<CustomerOrdersState>, CustomerOrdersState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<CustomerOrdersState>, CustomerOrdersState>,
+              AsyncValue<CustomerOrdersState>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, () => build(_$args));
+  }
 }
 
 @ProviderFor(sellerTags)

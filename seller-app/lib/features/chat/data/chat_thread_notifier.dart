@@ -156,7 +156,14 @@ class ChatThread extends _$ChatThread {
   void _onEvent(ChatStreamEvent e) {
     final data = state.value;
     final conv = data?.conversationId;
-    if (data == null || conv == null) return;
+    if (data == null) return;
+    if (conv == null) {
+      // 對話還不存在時開著這頁：買家（或另一台裝置）送出第一則訊息後對話才出現，認得是這個買家的就接上。
+      if (e case ChatMessageArrived(:final message)) {
+        unawaited(_adoptConversation(message));
+      }
+      return;
+    }
     switch (e) {
       case ChatMessageArrived(:final message, :final updated):
         if (message.conversationId != conv) return;
@@ -175,6 +182,41 @@ class ChatThread extends _$ChatThread {
       case ChatReady():
       case ChatUnreadChanged():
         break;
+    }
+  }
+
+  bool _adopting = false;
+
+  Future<void> _adoptConversation(ChatMessage m) async {
+    if (_adopting || arg.peerId.isEmpty) return;
+    _adopting = true;
+    try {
+      final found = await _repo.findConversation(buyerId: arg.peerId);
+      final cur = state.value;
+      if (!ref.mounted ||
+          found == null ||
+          found.id != m.conversationId ||
+          cur == null ||
+          cur.conversationId != null) {
+        return;
+      }
+      state = AsyncData(
+        ChatThreadData(
+          messages: cur.messages,
+          conversationId: found.id,
+          hasMoreOlder: cur.hasMoreOlder,
+          peerReadSeq: cur.peerReadSeq,
+          buyer: found.buyer,
+        ),
+      );
+      _applyMessage(m);
+      if (!m.fromStore) markRead();
+      _session.client.noteSeq(found.id, m.seq);
+      _checkGap(m);
+    } on Object {
+      // 認不出來就維持空對話；之後的事件會再試。
+    } finally {
+      _adopting = false;
     }
   }
 

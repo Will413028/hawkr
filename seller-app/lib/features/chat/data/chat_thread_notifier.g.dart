@@ -50,7 +50,7 @@ final class ChatThreadProvider
   }
 }
 
-String _$chatThreadHash() => r'557e7371a29f152ef3f64c21f6f4a93bbe652e60';
+String _$chatThreadHash() => r'95a6106980638fd3218a05119bf31567199b0364';
 
 final class ChatThreadFamily extends $Family
     with

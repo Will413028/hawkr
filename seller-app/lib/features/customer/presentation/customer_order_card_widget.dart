@@ -144,6 +144,7 @@ class CustomerOrderCardWidget extends StatelessWidget {
 
   static (Color, IconData) _badgeConfig(OrderStatus status) {
     return switch (status) {
+      OrderStatus.pendingPayment => (AppColors.warning, AppIcons.hourglassTop),
       OrderStatus.delivering => (
         AppColors.warning,
         AppIcons.localShippingOutlined,

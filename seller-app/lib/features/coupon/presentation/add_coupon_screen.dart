@@ -21,6 +21,7 @@ import 'coupon_controller.dart';
 import 'widgets/customer_picker_sheet.dart';
 import 'widgets/section_card.dart';
 import 'widgets/selected_users_list.dart';
+import 'tag_audience_toggle.dart';
 import 'widgets/tag_selection_card.dart';
 import 'widgets/top_bar.dart';
 
@@ -73,6 +74,22 @@ class AddCouponScreen extends HookConsumerWidget {
     final selectedTagIds = useState<Set<String>>({});
     final tagCustomers = useState<List<Customer>>([]);
     final tagLoading = useState(false);
+    final tagToggle = useMemoized(
+      () => TagAudienceToggle<Customer>(
+        fetch: (tagId) =>
+            ref.read(customerRepositoryProvider).listAllCustomersWithTag(tagId),
+        setSelected: (v) => selectedTagIds.value = v,
+        setCustomers: (v) => tagCustomers.value = v,
+        setLoading: (v) => tagLoading.value = v,
+        onError: (e) {
+          if (!context.mounted) return;
+          FloatingToast.error(
+            context,
+            errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+          );
+        },
+      ),
+    );
 
     // Selected users
     final selectedUsers = useState<List<Map<String, String>>>(() {
@@ -319,35 +336,8 @@ class AddCouponScreen extends HookConsumerWidget {
                           }
                           tagLoading.value = false;
                         },
-                        onTagToggled: (tagId) async {
-                          // 發券對象一次只依一個標籤篩選（CRM 的 `tag_id` 是單一標籤）。
-                          final newSet = selectedTagIds.value.contains(tagId)
-                              ? <String>{}
-                              : {tagId};
-                          selectedTagIds.value = newSet;
-                          if (newSet.isEmpty) {
-                            tagCustomers.value = [];
-                            return;
-                          }
-                          tagLoading.value = true;
-                          try {
-                            tagCustomers.value = await ref
-                                .read(customerRepositoryProvider)
-                                .listAllCustomersWithTag(newSet.first);
-                          } catch (e) {
-                            if (context.mounted) {
-                              FloatingToast.error(
-                                context,
-                                errorText(
-                                  e,
-                                  defaults: ref.read(defaultErrorTextProvider),
-                                ),
-                              );
-                            }
-                            tagCustomers.value = [];
-                          }
-                          tagLoading.value = false;
-                        },
+                        onTagToggled: (tagId) =>
+                            tagToggle.toggle(tagId, selectedTagIds.value),
                         onRemoveCustomer: (idx) {
                           final list = [...tagCustomers.value];
                           list.removeAt(idx);

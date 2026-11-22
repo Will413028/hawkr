@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
@@ -68,6 +70,10 @@ class FakeChatRepository extends ChatRepository {
 
   List<ChatConversation> conversations = [];
   Object? listConversationsError;
+
+  /// 設了就依 page token 回頁（第一頁的 token 是空字串）；[pageGates] 對應的 Completer 完成前該頁不回。
+  Map<String, ConversationPage>? pages;
+  final pageGates = <String, Completer<void>>{};
   Object? listOlderError;
   List<ChatMessage> history = [];
   bool hasMore = false;
@@ -86,6 +92,11 @@ class FakeChatRepository extends ChatRepository {
   Future<ConversationPage> listConversations({String pageToken = ''}) async {
     final err = listConversationsError;
     if (err != null) throw err;
+    final byToken = pages;
+    if (byToken != null) {
+      await pageGates[pageToken]?.future;
+      return byToken[pageToken]!;
+    }
     return ConversationPage(items: conversations, nextPageToken: '');
   }
 
@@ -171,8 +182,21 @@ class FakeChatRepository extends ChatRepository {
     marks.add((conversationId, uptoSeq));
   }
 
+  int unread = 0;
+
+  /// 事件串流的腳本；沒設就是一條永不出事件也不結束的串流。
+  Stream<pb.ChatEvent> Function(Map<String, int> cursors)? onStream;
+
   @override
-  Future<int> unreadCount() async => 0;
+  Stream<pb.ChatEvent> stream(Map<String, int> cursors) =>
+      onStream?.call(cursors) ?? StreamController<pb.ChatEvent>().stream;
+  int unreadReads = 0;
+
+  @override
+  Future<int> unreadCount() async {
+    unreadReads++;
+    return unread;
+  }
 
   @override
   Future<Map<String, bool>> presence(List<String> ids) async => {
