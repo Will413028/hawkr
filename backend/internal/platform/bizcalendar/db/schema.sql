@@ -14,7 +14,8 @@ CREATE TABLE bizcalendar.days (
     holiday BOOLEAN  NOT NULL,
     note    TEXT     NOT NULL DEFAULT '',
     year    SMALLINT NOT NULL,
-    CONSTRAINT days_year_check CHECK (year BETWEEN 1 AND 9999 AND year = EXTRACT(YEAR FROM day)),
-    CONSTRAINT days_note_check CHECK (note !~ '^[\u0009\u000a\u000b\u000c\u000d \u0085                 　]|[\u0009\u000a\u000b\u000c\u000d \u0085                 　]$')
+    CONSTRAINT days_year_check CHECK (year BETWEEN 1 AND 9999),
+    CONSTRAINT days_year_day_check CHECK (year = EXTRACT(YEAR FROM day)),
+    CONSTRAINT days_note_check CHECK (note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );
 CREATE INDEX days_by_year ON bizcalendar.days (year);
