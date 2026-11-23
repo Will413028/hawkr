@@ -130,6 +130,28 @@ func TestALateSuccessOfTheOldIntentAfterARepayIsRecordedAndTheNewIntentIsCancele
 	f.noViolations(t)
 }
 
+// 舊 PaymentIntent 晚到成功被採用的同一次同步裡，原本有效的新 PaymentIntent 就要排取消：不能靠之後再讀到新 PaymentIntent 的快照才補排
+// （那條路徑只在新的還是等待付款或處理中才會排）。這裡新 PaymentIntent 在 provider 那邊已是 canceled，讀它的快照不會觸發取消，
+// 取消 job 只可能來自採用舊嘗試的那一步（採用時嘗試列上新嘗試還沒結案）。
+// mutation：applyLate 的 lateAdopt 拿掉「原有效嘗試排取消」→ 沒有任何取消 job，失敗。
+func TestAdoptingTheLateSuccessOfTheOldIntentSchedulesTheNewIntentCancelInTheSameSync(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	p, oldExt, newExt := f.repay(t, "O-R2d")
+	must(t, f.fake.Settle(newExt, PaymentStateCanceled, f.now))
+	must(t, f.fake.Settle(oldExt, PaymentStateSucceeded, f.now))
+	f.receive(t, "evt_old_adopt", oldExt)
+	f.sync(t, p.ID)
+	if f.statusOf(t, "O-R2d") != PaymentSucceeded || f.effectiveExternal(t, "O-R2d") != oldExt {
+		t.Fatalf("狀態=%s 有效=%s", f.statusOf(t, "O-R2d"), f.effectiveExternal(t, "O-R2d"))
+	}
+	cancels := slices.Compact(slices.Sorted(slices.Values(f.attemptIDs(t, kindChargeCancel))))
+	newAttempt := f.attemptOf(t, newExt)
+	if len(cancels) != 1 || cancels[0] != newAttempt {
+		t.Fatalf("取消 job=%v，新嘗試=%s", cancels, newAttempt)
+	}
+}
+
 // 兩個 PaymentIntent 都成功：付款列保持第一個入帳的，第二個記成重複入帳（後台查得到、記 error log），不發第二次入帳事件，不自動退款（沒有退款列）。
 // mutation：lateOutcomeOf 把「列已入帳又成功」當成採用 → 第二筆覆蓋第一筆，失敗。
 func TestTwoSucceededIntentsAreFlaggedForTheBackOfficeAndNeverRefundedAutomatically(t *testing.T) {
@@ -233,9 +255,9 @@ func TestAnEventOfASupersededIntentIsSweptAndFullyProcessed(t *testing.T) {
 	}
 }
 
-// 建立中的列屬於別的 provider：舊 provider 的呼叫過又還在期限內不改綁（它可能已在 provider 那邊建出 PaymentIntent）；超過期限才改成目前的、舊嘗試記為被取代、新嘗試換新鍵。
-// mutation：RebindCreatingPayment 拿掉 create_called_at 的條件 → 期限內也被改綁，失敗。
-func TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrIsPastTheDeadline(t *testing.T) {
+// 建立中的列屬於別的 provider、而且呼叫過（結果不明）：目前設定的 provider 查不到舊 provider 的物件，所以不依時間改綁，進 ANOMALY（發 MoneyAnomaly、不呼叫 provider、不換鍵）。
+// mutation：create() 拿掉 CreateCalledAt 的檢查（呼叫過的列也走 rebind）且 RebindCreatingPayment 拿掉 create_called_at 的條件 → 過了查無的時刻被改綁並建出第二個 PaymentIntent，失敗。
+func TestACreatingRowOfAnotherProviderThatWasCalledGoesToAnomalyInsteadOfBeingRebound(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	ctx := context.Background()
@@ -245,17 +267,19 @@ func TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrI
 	oldKey := f.keyOf(t, "O-R4")
 	f.exec(t, "UPDATE payment.payments SET provider = 'retired_provider' WHERE order_no = 'O-R4'")
 	f.exec(t, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = $1", p.ID)
+	f.now = f.now.Add(PaymentNotFoundAfter + time.Minute)
 	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
-	if f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'") != "retired_provider" || f.keyOf(t, "O-R4") != oldKey || f.statusOf(t, "O-R4") != PaymentCreating || f.fake.Intents() != 0 {
-		t.Fatal("期限內不該改綁、不該呼叫 provider")
+	if f.statusOf(t, "O-R4") != PaymentAnomaly || f.text(t, "SELECT failure_reason FROM payment.payments WHERE order_no = 'O-R4'") != "provider_changed_after_call" {
+		t.Fatalf("狀態=%s", f.statusOf(t, "O-R4"))
 	}
-	f.now = f.now.Add(PaymentUnresolvedDeadline + time.Minute)
-	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
-	if f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'") != ChargeFakeName || f.keyOf(t, "O-R4") == oldKey || f.statusOf(t, "O-R4") != PaymentAwaitingPayment || f.fake.Intents() != 1 {
-		t.Fatalf("超過期限應改綁並建立：provider=%s 狀態=%s", f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'"), f.statusOf(t, "O-R4"))
+	if f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'") != "retired_provider" || f.keyOf(t, "O-R4") != oldKey || f.fake.Intents() != 0 || f.fake.LookupCalls() != 0 {
+		t.Fatal("不該改綁、換鍵、呼叫或查回目前的 provider")
 	}
-	if f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1", p.ID) != 2 || f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1 AND superseded_at IS NOT NULL AND provider = 'retired_provider'", p.ID) != 1 {
-		t.Fatal("舊 provider 的嘗試應記為被取代、新嘗試另寫一列")
+	if len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyPayment || f.anomalies[0].ObjectID != p.ID || !f.anomalyInTx[0] {
+		t.Fatalf("告警事件=%+v", f.anomalies)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1", p.ID) != 1 {
+		t.Fatal("不該寫新的嘗試")
 	}
 }
 

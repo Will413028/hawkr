@@ -455,7 +455,7 @@
    "stack": "go",
    "file": "backend/internal/platform/stripe/redact.go",
    "old": "if sensitiveKey(seg) {",
-   "new": "if sensitiveKey(k) {",
+   "new": "if sensitiveKey(k) && seg != \"\" {",
    "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$",
    "why": "表單遮罩只比對整個鍵、不看路徑每一層，a[b][card] 這類巢狀鍵不被遮。"
   },

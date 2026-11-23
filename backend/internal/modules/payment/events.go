@@ -9,3 +9,7 @@ type PayoutAccountChanged = model.PayoutAccountChanged
 // PaymentChanged 在付款的快照寫入、狀態與上次不同的 transaction 內發布（同一個狀態的重複讀取與重複事件不重發）：訂單一方據此得知付款成功或取消，
 // 並由它判斷訂單已不可付時發起自動退款（計畫 D5 修訂）。
 type PaymentChanged = model.PaymentChanged
+
+// MoneyAnomaly 在搬錢的物件（付款、轉帳、退款）進入 ANOMALY 的 transaction 內發布（也包含 provider 已搬錢、本地列卻不在可接收狀態的孤兒結果）：告警與後台待辦據此通知，
+// 人工核對 provider 後結案（ADR D68）。
+type MoneyAnomaly = model.MoneyAnomaly

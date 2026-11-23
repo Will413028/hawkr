@@ -29,6 +29,7 @@ func TestNextFollowsTheDecisionTable(t *testing.T) {
 		{"succeeded is not overwritten by canceled", model.PaymentSucceeded, StateCanceled, model.PaymentSucceeded, true},
 		{"succeeded is not overwritten by processing", model.PaymentSucceeded, StateProcessing, model.PaymentSucceeded, true},
 		{"the creation terminal state keeps", model.PaymentCreateFailed, StateAwaitingPayment, model.PaymentCreateFailed, true},
+		{"an anomaly keeps until a person resolves it", model.PaymentAnomaly, StateSucceeded, model.PaymentAnomaly, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -130,7 +130,7 @@ class SellerCapability extends $pb.ProtobufEnum {
       SellerCapability._(
           9, _omitEnumNames ? '' : 'SELLER_CAPABILITY_CHAT_READ');
 
-  /// 通知收件箱、偏好與裝置。
+  /// 通知收件箱、偏好與裝置（NotificationAppService 的 STORE 受眾）。在停權白名單內：停權的賣家仍要讀到停權通知。代行營運的管理員不能使用通知（走 DelegatedService 的憑證，不經此能力）。
   static const SellerCapability SELLER_CAPABILITY_NOTIFICATION =
       SellerCapability._(
           10, _omitEnumNames ? '' : 'SELLER_CAPABILITY_NOTIFICATION');

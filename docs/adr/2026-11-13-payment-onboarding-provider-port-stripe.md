@@ -183,6 +183,17 @@
 - 未採：契約與訂單全面加幣別（多幣別市集的業界做法，例如 Stripe 的 `amount`＋`currency` 成對）：改到訂單、商品與四個 client 的契約，超出 B2，台灣單一幣別上線也用不到。
 - 觸發重審：決定以 Stripe 上線或支援多幣別。
 
+### 搬錢呼叫的結果不明：三分結果、查回才收斂
+
+付款、退款、轉帳、撤回呼叫 provider 的結果只分三種：成功、確定失敗、不明。確定失敗再分可重試（provider 已拒絕、未執行，例如平台餘額不足）與終局。不變量：**換新的冪等鍵之前，必須以強一致的查回證明上一次嘗試在 provider 不存在**；時間不能把「不明」推斷成「失敗」。
+
+- 已知拒絕：換新鍵重試（Stripe 連 4xx 也保存結果，同鍵只會拿回同一個錯誤），不計結果不明的期限。
+- 不明：同一把鍵重送，直到鍵保存期的下限（Stripe 至少 24 小時）之前；之後改用查回。每次嘗試在 provider 物件寫入自己的 metadata（嘗試 ID），查回依它比對：轉帳以 `transfer_group` 列出後比對（Transfers 不在 Search API）、撤回列出該轉帳的 reversals、退款依 PaymentIntent 列出、PaymentIntent 用 retrieve 或 list，不用 Search（最終一致）。「查無」要過最短等待時間才算確定不存在，之後才可以換新鍵重建。
+- 異常：provider 與本地紀錄不符、前置條件不成立、或查回連續失敗，進 `ANOMALY`：佔住唯一性（一筆付款最多一筆有效轉帳、退款額度）、補掃不再重試、發告警；由後台人工結案，附 provider 物件 ID 為證據。
+- 取代 3a 原先「呼叫過、沒有外部 ID 超過 12 小時進終局」的做法：那個做法只在「不明的物件沒有搬錢」時安全，建立 PaymentIntent 尚可，轉帳、撤回、退款不成立；四種呼叫統一用本模型。
+- 考慮過：不明一律進「待人工核對」（每次網路抖動都要人處理，賣家撥款會卡住）；維持期限後失敗並只補文件（違反一筆付款最多一筆有效轉帳）。業界基線：Stripe 文件 Idempotent requests 與 Error handling、Airbnb 的付款系統 Orpheus（轉述：不明的結果當作可能成功）、一般的對帳例外佇列做法。
+- 決定：Will 2026-11-23（D68）。
+
 ## 後果
 
 - 本機的付款與物流端到端在付款、物流模組搬進單體前不通：`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 與物流的 `MerId` 是空值（Stripe 的 `acct_` 不是 PayUni 商店代號）。付款改走 port 時以外部帳戶 ID 取代這個接縫；物流改綠界後恢復建店與出貨（Will 2026-10-29、2026-11-12 接受）。修訂（Will 2026-11-15）：物流不改綠界，B3 改成賣家自寄主線加模擬 adapter（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），物流 `MerId` 隨 Java shipping 退場刪除。
@@ -195,7 +206,7 @@
 - 平台承擔負餘額；要上線且改變損失歸屬時重新評估內嵌元件關掉使用者驗證的決定。
 - 沿用機制與延後項的觸發條件（輪詢沒有上限、inbox 沒有終局狀態（同步讀到已關閉的帳戶已在 9g 處理：列標 `DISABLED`、原因碼 `closed`，不再輪詢，D61）、`provider` 欄位在換 provider 時舊列的去向；清理的終局已在 9g 處理）寫在 `internal/modules/payment/CARRYOVER.md` 與 `docs/modules/payment.md` §8。
 
-## 決定編號（D1–D67）
+## 決定編號（D1–D68）
 
 其他文件與程式註解引用的 `收款開通 ADR Dn` 指這裡的編號。表列的是目前狀態；被後來的決定推翻的部分已註明。
 
@@ -269,3 +280,4 @@
 | D65 | `CreatePayment` 提交後在請求內帶冪等鍵建立 PaymentIntent 回 client_secret，失敗由 job 補做、client 以 `GetPayment` 重讀（2026-11-23 修訂） | 本檔「建立付款何時回 client_secret」 |
 | D66 | 一張訂單一個 PaymentIntent；只留買家 `GetPayment` 與後台查詢，刪賣家版付款歷程 | 本檔「付款嘗試歷程」 |
 | D67 | Stripe adapter 以 USD 收付，訂單整數金額照搬成 cent；port 與資料模型不帶幣別 | 本檔「付款與轉帳的幣別」 |
+| D68 | 搬錢呼叫的結果三分；換新鍵前以強一致查回證明上一次不存在；異常進 `ANOMALY` 佔位告警、後台人工結案；取代 12 小時後進終局 | 本檔「搬錢呼叫的結果不明：三分結果、查回才收斂」 |

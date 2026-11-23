@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+// notification 模組給後台的 API：系統公告的建立與列表。前台的 API 在 hawkr.notification.v1alpha1。
+//
+// 公告是資料：建立後寫進公告表，由背景工作分開處理收件匣與推播，沒有裝置 token 的帳號也收得到收件匣那份。
+// 公告一律只寫英文：單一 title 與 body，不分語系、不依收件人的語系選擇，所有使用者看到同一份
+// （限公告，是多語系 ADR 的例外；其餘後台文字仍是 zh-TW）。公告在使用者端的分類是 NOTIFICATION_CATEGORY_ANNOUNCEMENT：
+// 收件匣一定收到，推播可在偏好關閉。
+package hawkr.admin.notification.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/notification/v1alpha1/notification.proto";
+
+// NotificationAdminService 只有管理員能呼叫。
+service NotificationAdminService {
+  // CreateAnnouncement 建立一則系統公告並排入派送。帶 request_id 時，同一個 request_id 重送回第一次的結果，內容不同回 invalid_argument。
+  // audiences 不可空、不可重複，每個值都必須是 BUYER 或 STORE。
+  rpc CreateAnnouncement(CreateAnnouncementRequest) returns (CreateAnnouncementResponse);
+
+  // ListAnnouncements 列出公告，新到舊（建立時間，再依 id 新到舊）。page_token 不透明。
+  rpc ListAnnouncements(ListAnnouncementsRequest) returns (ListAnnouncementsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// Announcement 是一則系統公告。
+message Announcement {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  repeated hawkr.notification.v1alpha1.NotificationAudience audiences = 2;
+  string title = 3;
+  string body = 4;
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 已寫進收件匣的人數；派送還在進行中時是目前為止的數字。
+  int32 inbox_count = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 派送是否已完成（收件匣與推播都處理完）。
+  bool dispatched = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message CreateAnnouncementRequest {
+  repeated hawkr.notification.v1alpha1.NotificationAudience audiences = 1 [(google.api.field_behavior) = REQUIRED];
+  // 必填；一律英文，不分語系，所有使用者看到同一份。長度上限由伺服器訂，超過回 invalid_argument。
+  string title = 2 [(google.api.field_behavior) = REQUIRED];
+  string body = 3 [(google.api.field_behavior) = REQUIRED];
+  string request_id = 4 [(google.api.field_info).format = UUID4];
+}
+
+message CreateAnnouncementResponse {
+  Announcement announcement = 1;
+}
+
+message ListAnnouncementsRequest {
+  // 預設 20，上限 50。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListAnnouncementsResponse {
+  repeated Announcement announcements = 1;
+  string next_page_token = 2;
+}

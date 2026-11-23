@@ -11,6 +11,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
 // errIncompleteSuccess 標示快照說已入帳、卻還沒有 charge 或入帳時間：provider 的資料通常稍後補齊，是暫時性的不一致，不是永久失敗（不包 ErrPermanent）。
@@ -133,6 +134,9 @@ func ptr[T any](v T) *T { return &v }
 func (s *Service) CancelAttempt(ctx context.Context, attemptID uuid.UUID) error {
 	if err := s.requireProvider(); err != nil {
 		return err
+	}
+	if _, ok := db.TxFrom(ctx); ok {
+		return errInTransaction
 	}
 	p := s.d.Provider
 	att, err := store.New(s.d.DB.Conn(ctx)).AttemptByIDOnly(ctx, attemptID)

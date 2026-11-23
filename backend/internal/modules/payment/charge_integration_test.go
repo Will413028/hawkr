@@ -64,8 +64,11 @@ type chargeFixture struct {
 	module  *Module
 	now     time.Time
 	changes []PaymentChanged
-	inTx    []bool
-	logs    bytes.Buffer
+	// anomalies 是同 transaction 內收到的 MoneyAnomaly（告警事件），anomalyInTx 記下是否真的在 transaction 內。
+	anomalies   []MoneyAnomaly
+	anomalyInTx []bool
+	inTx        []bool
+	logs        bytes.Buffer
 }
 
 func setupCharge(t *testing.T) *chargeFixture {
@@ -83,6 +86,12 @@ func setupChargeWith(t *testing.T, wrap func(*ChargeFake) ChargeProvider) *charg
 		_, ok := db.TxFrom(ctx)
 		f.changes = append(f.changes, e)
 		f.inTx = append(f.inTx, ok)
+		return nil
+	})
+	events.Subscribe(bus, func(ctx context.Context, e MoneyAnomaly) error {
+		_, ok := db.TxFrom(ctx)
+		f.anomalies = append(f.anomalies, e)
+		f.anomalyInTx = append(f.anomalyInTx, ok)
 		return nil
 	})
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
@@ -283,9 +292,11 @@ func TestAReplayAfterALostResponseRecoversTheSameIntent(t *testing.T) {
 	}
 }
 
-// 呼叫過、沒有外部 ID 超過 UnresolvedDeadline：進終局 CREATE_FAILED，鍵不再重送；掃描也不再排補做。買家再次建立時同一列換新鍵重設（仍是一張訂單一列）。
-// mutation：拿掉 create() 的期限判斷 → 超過期限仍重送，失敗。
-func TestAnUnresolvedCreatePastTheDeadlineIsTerminalAndTheKeyIsNeverReplayed(t *testing.T) {
+// 結果不明（呼叫過、沒有外部 ID）過了 ResendWindow：不再呼叫 provider（鍵不再重送），只查回；查無要滿 NotFoundAfter 才進 CREATE_FAILED，
+// 之前仍是 CREATING、同一把鍵；掃描不再排終局列的補做。買家再次建立時同一列換新鍵重設（仍是一張訂單一列）。
+// mutation：create() 在過了 ResendWindow 之後仍呼叫 CreatePayment（拿掉 inResendWindow 判斷）→ 下面的呼叫次數斷言失敗。
+// mutation：lookupCreate 拿掉 NotFoundAfter 的判斷（查無立刻 FAILED）→ 「滿等待之前仍是 CREATING」失敗。
+func TestAnUnresolvedCreateIsLookedUpPastTheResendWindowAndFailsOnlyAfterTheNotFoundWait(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	f.order("O-4", 11, 7, 100)
@@ -293,13 +304,21 @@ func TestAnUnresolvedCreatePastTheDeadlineIsTerminalAndTheKeyIsNeverReplayed(t *
 	p := f.create(t, 11, "O-4")
 	oldKey := f.keyOf(t, "O-4")
 	calls, _, _ := f.fake.Calls()
-	f.now = f.now.Add(PaymentUnresolvedDeadline + time.Minute)
+	start := f.now
+	f.now = start.Add(PaymentResendWindow + time.Minute)
+	if err := f.module.CreatePaymentIntent(context.Background(), p.ID, false); err == nil {
+		t.Fatal("查無但還沒過最短等待，job 應回錯誤稍後再查")
+	}
+	if f.statusOf(t, "O-4") != PaymentCreating || f.keyOf(t, "O-4") != oldKey || f.fake.LookupCalls() != 1 {
+		t.Fatalf("滿等待之前：%s，鍵 %s，查回 %d 次", f.statusOf(t, "O-4"), f.keyOf(t, "O-4"), f.fake.LookupCalls())
+	}
+	f.now = start.Add(PaymentNotFoundAfter + time.Minute)
 	must(t, f.module.CreatePaymentIntent(context.Background(), p.ID, false))
-	if f.statusOf(t, "O-4") != PaymentCreateFailed || f.text(t, "SELECT failure_reason FROM payment.payments WHERE order_no = 'O-4'") != "unresolved_creation" {
+	if f.statusOf(t, "O-4") != PaymentCreateFailed || f.text(t, "SELECT failure_reason FROM payment.payments WHERE order_no = 'O-4'") != "provider_not_found" {
 		t.Fatalf("終局=%s", f.statusOf(t, "O-4"))
 	}
 	if after, _, _ := f.fake.Calls(); after != calls {
-		t.Fatalf("期限之後仍重送：%d → %d 次", calls, after)
+		t.Fatalf("過了視窗仍呼叫 CreatePayment：%d → %d 次", calls, after)
 	}
 	f.jobs.mu.Lock()
 	f.jobs.args, f.jobs.opts = nil, nil
@@ -863,30 +882,6 @@ func TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow(t *testi
 	f.sync(t, p.ID)
 	if _, err := f.module.CreatePayment(context.Background(), 11, "O-F5"); apperr.KindOf(err) != apperr.KindFailedPrecondition || f.statusOf(t, "O-F5") != PaymentCanceled {
 		t.Fatalf("訂單不可付時不能重設：%v %s", err, f.statusOf(t, "O-F5"))
-	}
-}
-
-// 建立中、沒有外部 ID 的列屬於別的 provider（設定換了），舊 provider 的呼叫已超過期限：補做改成目前的 provider、換新鍵並建立，不是永遠卡在建立中（期限內不改綁見 charge_attempts_integration_test）。
-// mutation：create() 拿掉 rebind 分支、恢復「provider 不同就直接回傳」→ 列留在 CREATING，失敗。
-func TestACreatingRowOfAnotherProviderIsReboundByTheCatchUp(t *testing.T) {
-	t.Parallel()
-	f := setupCharge(t)
-	f.order("O-F6", 11, 7, 100)
-	f.fake.FailCreate(errors.New("逾時"))
-	p := f.create(t, 11, "O-F6")
-	oldKey := f.keyOf(t, "O-F6")
-	ctx := context.Background()
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.payments SET provider = 'retired_provider' WHERE order_no = 'O-F6'")
-	must(t, err)
-	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = $1", p.ID)
-	must(t, err)
-	f.now = f.now.Add(PaymentUnresolvedDeadline + time.Minute)
-	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
-	if got := f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-F6'"); got != ChargeFakeName || f.statusOf(t, "O-F6") != PaymentAwaitingPayment || f.keyOf(t, "O-F6") == oldKey {
-		t.Fatalf("provider=%s 狀態=%s", got, f.statusOf(t, "O-F6"))
-	}
-	if f.fake.Intents() != 1 {
-		t.Fatalf("PaymentIntent %d 個", f.fake.Intents())
 	}
 }
 

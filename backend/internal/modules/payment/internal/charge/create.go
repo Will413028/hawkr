@@ -11,6 +11,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
@@ -20,11 +21,19 @@ type createResult struct {
 	clientSecret string
 }
 
-// Create 是補做 job（payment.charge_create）的內容，也是請求內建立的本體：列還在建立中時，呼叫 provider 之前先記 create_called_at（獨立提交），
-// 帶列上的冪等鍵建立 PaymentIntent（請求內與 job 用同一把鍵，所以同時或先後建立都得到同一個 PaymentIntent），成功在新的 transaction 寫外部 ID 與狀態。
-// 已不在建立中的列（別的呼叫已建好）什麼都不做。呼叫過、沒有外部 ID 超過 UnresolvedDeadline 的列進終局，不再重送。provider 永久拒絕進終局 CREATE_FAILED，
-// 不回錯誤（job 完成）；暫時性失敗回錯誤由 River 重試，final 為 true 時只記警示 log 並回 nil，留給週期掃描。
+// Create 是補做 job（payment.charge_create）的內容，也是請求內建立的本體：列還在建立中時依結果三分收斂（ADR D68）。
+//   - 呼叫 provider 之前先記 create_called_at（這把鍵的第一次呼叫，獨立提交），帶列上的冪等鍵建立 PaymentIntent（請求內與 job 用同一把鍵，所以同時或先後建立都得到同一個
+//     PaymentIntent），成功在新的 transaction 寫外部 ID 與狀態。已不在建立中的列（別的呼叫已建好）什麼都不做。
+//   - provider 終局拒絕（ErrPermanent）進終局 CREATE_FAILED，不回錯誤（job 完成）；可重試拒絕（ErrRetryableRefusal）換新冪等鍵（舊嘗試被取代、新嘗試另寫一列）並回錯誤由 River 重試，不計期限。
+//   - 結果不明回錯誤，補做 job 與掃描以同一把鍵重送到 ResendWindow；之後以 FindPayment 依嘗試 ID 查回：找到就收下，查無滿 NotFoundAfter 才進 CREATE_FAILED，
+//     查回連續失敗 LookupFailureLimit 次進 ANOMALY。
+//   - provider 回的快照與列對不起來（金額不符、沒有外部 ID）進 ANOMALY（佔住這張訂單、補掃不再重試、發 MoneyAnomaly；job 完成）。
+//
+// final 為 true 時暫時性失敗只記警示 log 並回 nil，留給週期掃描。呼叫方不能在 transaction 內呼叫。
 func (s *Service) Create(ctx context.Context, paymentID uuid.UUID, final bool) error {
+	if _, ok := db.TxFrom(ctx); ok {
+		return errInTransaction
+	}
 	_, err := s.create(ctx, paymentID, callTimeout)
 	if err != nil && final {
 		s.d.Logger.WarnContext(ctx, "payment：補做建立 PaymentIntent 用完重試，留給週期掃描", "payment_id", paymentID.String(), "err", err)
@@ -50,18 +59,22 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 	}
 	now := s.d.Now().UTC()
 	if row.Provider != p.Name() {
-		// 設定換了 provider：舊 provider 的呼叫從沒送出、或已超過期限的列才改成目前的（新嘗試、換新鍵、重新起算）；呼叫過又還在期限內的列不動，等舊 provider 的結果。
+		// 設定換了 provider：只有舊 provider 的呼叫從沒送出（沒有東西可能已建在它那邊）才改成目前的（新嘗試、換新鍵、重新起算）。
+		// 呼叫過的列：同一時間只設定一個 provider，舊的已無法查回，不能證明沒有建出 PaymentIntent，所以進 ANOMALY 由人工核對，不依時間換鍵（D68）。
 		rebound, err := s.rebind(ctx, paymentID, p.Name(), now)
 		if err != nil {
 			return createResult{}, err
 		}
-		if rebound.Status != string(model.PaymentCreating) || rebound.Provider != p.Name() {
+		if rebound.Status != string(model.PaymentCreating) {
 			return createResult{row: rebound}, nil
+		}
+		if rebound.Provider != p.Name() {
+			return s.anomalyPayment(ctx, paymentID, "provider_changed_after_call", rebound.Provider)
 		}
 		row = rebound
 	}
-	if row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline {
-		return s.failCreate(ctx, paymentID, failedUnresolved)
+	if !inResendWindow(row.CreateCalledAt, now) {
+		return s.lookupCreate(ctx, row, now, timeout)
 	}
 	called, attempt, err := s.markCalled(ctx, paymentID, now)
 	if err != nil {
@@ -77,36 +90,152 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 		PaymentID: called.ID, OrderNo: called.OrderNo, StoreID: called.StoreID, Amount: called.Amount, Description: called.Description,
 		TransferGroup: called.OrderNo, IdempotencyKey: called.CreateIdempotencyKey.String(),
 	})
-	if errors.Is(err, ErrPermanent) {
+	switch classifyCall(err) {
+	case callRefused:
 		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立 PaymentIntent", "payment_id", paymentID.String(), "order_no", called.OrderNo, "err", err)
 		return s.failCreate(ctx, paymentID, failedRefused)
-	}
-	if err != nil {
+	case callRetryable:
+		if !firstCall(row.CreateCalledAt, called.CreateCalledAt, now) {
+			s.d.Logger.WarnContext(ctx, "payment：重送建立 PaymentIntent 被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "payment_id", paymentID.String(), "order_no", called.OrderNo, "err", err)
+			return createResult{}, err
+		}
+		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立 PaymentIntent、沒有執行，換新冪等鍵重試", "payment_id", paymentID.String(), "order_no", called.OrderNo, "err", err)
+		if rerr := s.rotateCreateKey(ctx, paymentID, called.CreateIdempotencyKey, now); rerr != nil {
+			return createResult{}, errors.Join(err, rerr)
+		}
 		return createResult{}, err
+	case callUnknown:
+		return createResult{}, err
+	case callSucceeded:
 	}
-	// 寫結果的 ctx 在呼叫之後才建：呼叫佔用的時間不算進寫入的上限，job 的 ctx 逾時被取消後仍要能寫入。
+	return s.acceptCreated(ctx, paymentID, attempt.ID, p.Name(), snap, startedAt)
+}
+
+// acceptCreated 把建立的結果（呼叫的回應或查回找到的）寫進列。寫結果的 ctx 在呼叫之後才建：呼叫佔用的時間不算進寫入的上限，job 的 ctx 逾時被取消後仍要能寫入。
+// 快照與列對不起來（ErrAnomaly）讓列進 ANOMALY；入帳缺 charge 或不認得的狀態是暫時性的，回錯誤由 job 重試。
+func (s *Service) acceptCreated(ctx context.Context, paymentID, attemptID uuid.UUID, provider string, snap Snapshot, startedAt time.Time) (createResult, error) {
 	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancelWrite()
 	var out createResult
-	err = s.d.DB.InTx(wctx, func(ctx context.Context) error {
-		res, err := s.applySnapshot(ctx, paymentID, attempt.ID, p.Name(), snap, startedAt)
+	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		res, err := s.applySnapshot(ctx, paymentID, attemptID, provider, snap, startedAt)
 		out.row = res.row
 		if res.written && res.row.Status == string(model.PaymentAwaitingPayment) {
 			out.clientSecret = snap.ClientSecret
 		}
 		return err
 	})
+	if errors.Is(err, ErrAnomaly) {
+		return s.anomalyPayment(ctx, paymentID, "reply_mismatch", snap.ExternalID)
+	}
 	return out, err
 }
 
-// rebind 在獨立的 transaction 把建立中、沒有外部 ID 的列改成目前的 provider（舊嘗試記為被取代、新嘗試用新的冪等鍵）；條件不成立（列已不是那樣，或舊 provider 呼叫過又還在期限內）時回目前的列。
+// lookupCreate 是過了 ResendWindow 的建立：不再呼叫 provider，只依嘗試 ID 查回。
+func (s *Service) lookupCreate(ctx context.Context, row store.PaymentPayment, now time.Time, timeout time.Duration) (createResult, error) {
+	q := store.New(s.d.DB.Conn(ctx))
+	attempt, err := q.EffectiveAttempt(ctx, row.ID)
+	if err != nil {
+		return createResult{}, fmt.Errorf("charge: 付款 %s 建立中卻沒有有效的嘗試：%w", row.ID, err)
+	}
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	startedAt := s.d.Now().UTC()
+	snap, found, err := s.d.Provider.FindPayment(callCtx, row.CreateIdempotencyKey.String())
+	if err != nil {
+		return s.createLookupFailed(ctx, row, err)
+	}
+	if row.CreateLookupFailures > 0 {
+		if err := s.inShortTx(ctx, func(ctx context.Context) error {
+			return store.New(s.d.DB.Conn(ctx)).ClearCreateLookupFailures(ctx, row.ID)
+		}); err != nil {
+			return createResult{}, err
+		}
+	}
+	if found {
+		return s.acceptCreated(ctx, row.ID, attempt.ID, s.d.Provider.Name(), snap, startedAt)
+	}
+	if now.Sub(*row.CreateCalledAt) < NotFoundAfter {
+		return createResult{}, fmt.Errorf("%w：付款 %s", errNotFoundYet, row.ID)
+	}
+	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這個 PaymentIntent，進 CREATE_FAILED", "payment_id", row.ID.String(), "order_no", row.OrderNo)
+	return s.failCreate(ctx, row.ID, failedNotFound)
+}
+
+// inShortTx 在獨立的 transaction 內做一次小寫入（呼叫之後 ctx 可能已逾時，所以用自己的上限）。
+func (s *Service) inShortTx(ctx context.Context, fn func(context.Context) error) error {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancel()
+	return s.d.DB.InTx(wctx, fn)
+}
+
+// createLookupFailed 記一次查回失敗；連續失敗到上限進 ANOMALY，否則回錯誤由 job 重試。
+func (s *Service) createLookupFailed(ctx context.Context, row store.PaymentPayment, cause error) (createResult, error) {
+	var n int32
+	err := s.inShortTx(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = store.New(s.d.DB.Conn(ctx)).BumpCreateLookupFailures(ctx, store.BumpCreateLookupFailuresParams{ID: row.ID, Now: s.d.Now().UTC()})
+		if errors.Is(err, pgx.ErrNoRows) {
+			n = 0
+			return nil
+		}
+		return err
+	})
+	if err != nil {
+		return createResult{}, errors.Join(cause, err)
+	}
+	if n >= LookupFailureLimit {
+		return s.anomalyPayment(ctx, row.ID, "lookup_failed", "")
+	}
+	return createResult{}, fmt.Errorf("charge: 付款 %s 查回失敗：%w", row.ID, cause)
+}
+
+// rotateCreateKey 在 provider 已知拒絕之後換新冪等鍵：付款列換鍵、有效嘗試記被取代、新嘗試另寫一列；已被別的呼叫換過或列已不在建立中時什麼都不做。
+func (s *Service) rotateCreateKey(ctx context.Context, paymentID, oldKey uuid.UUID, now time.Time) error {
+	return s.inShortTx(ctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		if _, err := q.RotateCreateKey(ctx, store.RotateCreateKeyParams{ID: paymentID, OldKey: oldKey, Now: now}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		if _, err := q.SupersedeEffectiveAttempt(ctx, store.SupersedeEffectiveAttemptParams{PaymentID: paymentID, Now: &now}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		return q.EnsureEffectiveAttempt(ctx, store.EnsureEffectiveAttemptParams{ID: s.d.NewID(), PaymentID: paymentID, Now: now})
+	})
+}
+
+// anomalyPayment 讓建立中、沒有外部 ID 的列進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不是那樣（別的呼叫已建好）時回目前的列。
+// 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件（failure_reason 上限 200 字）。
+func (s *Service) anomalyPayment(ctx context.Context, paymentID uuid.UUID, reason, detail string) (createResult, error) {
+	s.d.Logger.ErrorContext(ctx, "payment：建立付款進 ANOMALY，待人工核對 provider", "payment_id", paymentID.String(), "reason", reason, "external_id", detail)
+	var row store.PaymentPayment
+	err := s.inShortTx(ctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		r, err := q.AnomalyPayment(ctx, store.AnomalyPaymentParams{ID: paymentID, Reason: &reason, Now: s.d.Now().UTC()})
+		if errors.Is(err, pgx.ErrNoRows) {
+			row, err = q.PaymentByID(ctx, paymentID)
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		row = r
+		return s.publishAnomaly(ctx, model.AnomalyPayment, r.ID, r.ID, withDetail(reason, detail))
+	})
+	return createResult{row: row}, err
+}
+
+// rebind 在獨立的 transaction 把建立中、沒有外部 ID、從沒呼叫過的列改成目前的 provider（舊嘗試記為被取代、新嘗試用新的冪等鍵）；條件不成立（列已不是那樣，或已呼叫過）時回目前的列。
 func (s *Service) rebind(ctx context.Context, paymentID uuid.UUID, provider string, now time.Time) (store.PaymentPayment, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	var row store.PaymentPayment
 	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		r, err := q.RebindCreatingPayment(ctx, store.RebindCreatingPaymentParams{ID: paymentID, Provider: provider, Now: now, StaleBefore: now.Add(-UnresolvedDeadline)})
+		r, err := q.RebindCreatingPayment(ctx, store.RebindCreatingPaymentParams{ID: paymentID, Provider: provider, Now: now})
 		if errors.Is(err, pgx.ErrNoRows) {
 			r, err = q.PaymentByID(ctx, paymentID)
 			row = r
@@ -236,6 +365,11 @@ func (s *Service) writeRow(ctx context.Context, q *store.Queries, locked store.P
 		return applyResult{row: locked}, err
 	}
 	if keep {
+		if locked.Status == string(model.PaymentAnomaly) {
+			if err := s.publishAnomaly(ctx, model.AnomalyPayment, locked.ID, locked.ID, withDetail("snapshot_on_anomaly_"+string(snap.State), snap.ExternalID)); err != nil {
+				return applyResult{}, err
+			}
+		}
 		s.d.Logger.WarnContext(ctx, "payment：provider 的快照與付款列的終局狀態衝突，不覆蓋", "payment_id", locked.ID.String(), "order_no", locked.OrderNo, "status", locked.Status, "snapshot_state", string(snap.State))
 		return applyResult{row: locked, judged: true}, nil
 	}
