@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/hk_icon.dart';
 import '../../data/order_model.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 卡片右側資訊欄（買家名稱、時間、地址、配送方式）。
 /// 單號與按鈕群已搬至 [OrderBottomRow]。
@@ -18,15 +19,16 @@ class OrderInfoColumn extends ConsumerWidget {
 
   final OrderSummary order;
 
-  String _formatDate(String raw) => formatOrderInfoDate(raw);
+  String _formatDate(String raw, TaipeiDisplay t) =>
+      t.labeled(formatOrderInfoDate(raw));
 
-  String _formatShortDate(String raw) {
+  String _formatShortDate(String raw, TaipeiDisplay t) {
     if (raw.isEmpty) return '';
-    final formatted = _formatDate(raw);
+    final formatted = formatOrderInfoDate(raw);
     final match = RegExp(
       r'^\d{4}/(\d{2}/\d{2} \d{2}:\d{2})$',
     ).firstMatch(formatted);
-    return match?.group(1) ?? formatted;
+    return t.labeled(match?.group(1) ?? formatted);
   }
 
   @override
@@ -34,7 +36,7 @@ class OrderInfoColumn extends ConsumerWidget {
     final displayAddress = order.shippingAddress.isNotEmpty
         ? order.shippingAddress
         : order.address;
-    final displayTime = _formatDate(order.dateTime);
+    final displayTime = _formatDate(order.dateTime, context.taipeiDisplay);
     final shipping = shippingPresentationOf(order.shippingMethod);
     final shippingLabel =
         shipping == ShippingPresentation.cvsStorePickup &&
@@ -46,7 +48,10 @@ class OrderInfoColumn extends ConsumerWidget {
         : order.buyerName.isNotEmpty
         ? order.buyerName
         : '買家';
-    final deadlineText = _formatShortDate(order.autoCancelAt);
+    final deadlineText = _formatShortDate(
+      order.autoCancelAt,
+      context.taipeiDisplay,
+    );
     final isShipmentDeadline = order.statusCode == 10 || order.statusCode == 20;
 
     final nameStyle = AppTypography.body.copyWith(height: 24 / 14);

@@ -23,6 +23,7 @@ import '../data/account_scope.dart';
 import '../data/inquiries.dart';
 import '../data/inquiry_display.dart';
 import 'seller_inquiries_screen.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 一則詢問的內容（路由 [SellerRoutes.inquiryDetail]，以詢問 id 開啟）：平台的說明、期限、狀態；已回覆的顯示回覆的管道、時間、
 /// 內容與附件數（賣家不讀回附件）；伺服器的 `can_reply` 為真才有「回覆」入口。
@@ -94,9 +95,13 @@ class _DetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chip = inquiryStateChip(inquiry, now, context.uiLocale);
-    final deadline = inquiryDeadlineText(inquiry);
+    final deadline = inquiryDeadlineText(inquiry, context.taipeiDisplay);
     final overdue = isInquiryOverdue(inquiry, now);
-    final replyMeta = inquiryReplyMeta(inquiry, context.uiLocale);
+    final replyMeta = inquiryReplyMeta(
+      inquiry,
+      context.uiLocale,
+      context.taipeiDisplay,
+    );
     final attachments = inquiryAttachmentText(inquiry);
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: HkSpace.lg),
@@ -125,7 +130,7 @@ class _DetailBody extends StatelessWidget {
               ),
               const SizedBox(height: HkSpace.xs),
               Text(
-                inquiryMeta(inquiry, context.uiLocale),
+                inquiryMeta(inquiry, context.uiLocale, context.taipeiDisplay),
                 style: AppTypography.caption.copyWith(
                   color: AppColors.textMuted,
                 ),

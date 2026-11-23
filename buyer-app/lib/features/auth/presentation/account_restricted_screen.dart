@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hawkr_api/taipei_time.dart';
+
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -13,6 +13,7 @@ import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import 'account_deletion_flow.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 受限狀態頁「帳號受限」：列停權的日期、類別與說明，提供刪除帳號與登出。停權不登出，其餘功能照常瀏覽。
 class AccountRestrictedScreen extends ConsumerStatefulWidget {
@@ -79,7 +80,10 @@ class _AccountRestrictedScreenState
           padding: const EdgeInsets.all(HkSpace.lg),
           children: [
             if (suspendedAt != null)
-              _InfoRow(label: '停權日期', value: formatTaipeiDate(suspendedAt)),
+              _InfoRow(
+                label: '停權日期',
+                value: context.taipeiDisplay.date(suspendedAt),
+              ),
             if (category != null) _InfoRow(label: '類別', value: category),
             if (reason.isNotEmpty) _InfoRow(label: '說明', value: reason),
             const SizedBox(height: HkSpace.sm),

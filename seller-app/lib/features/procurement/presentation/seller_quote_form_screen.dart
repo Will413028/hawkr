@@ -1,5 +1,4 @@
 import 'package:hawkr_api/taipei_time.dart';
-import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -18,6 +17,7 @@ import '../data/seller_quote_model.dart';
 import 'seller_quote_controller.dart';
 import 'seller_quote_labels.dart';
 import 'seller_quote_validation.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 平台賣家的回價表單（Hawkr Agent 採購線，A14 PLATFORM 半邊）。
 ///
@@ -889,9 +889,7 @@ class _DateTimeField extends StatelessWidget {
           decoration: InputDecoration(
             labelText: label,
             errorText: error,
-            helperText: isDeviceInTaipeiOffset()
-                ? null
-                : context.l10n.taipeiTimeLabel,
+            helperText: context.taipeiDisplay.labelIfNeeded,
           ),
           child: Text(
             parsed == null ? '尚未設定' : _formatLocal(parsed),

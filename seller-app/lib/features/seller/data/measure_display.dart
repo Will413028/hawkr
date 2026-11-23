@@ -1,8 +1,8 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart'
     show LocalizedMessage;
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 措施列表的顯示文字與分組。
 ///
@@ -181,12 +181,16 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
 /// 沒有結束時間的停權寫「未定結束時間，平台定期複審」（兩端的效果句不同；App 的是目錄的 `seller.Measure.suspension_*`）。終止合作沒有預定結束時間，寫目錄的
 /// 「終止生效：{start}」，預告終止因店家關閉而結束時加「合作已於 {end} 結束」。未設的 Timestamp 讀到的是 epoch（1970），所以每一個
 /// 時間都先用 `has*()` 確認有設才顯示。
-({String text, bool active})? measureEffect(Measure measure, UiLocale l) {
+({String text, bool active})? measureEffect(
+  Measure measure,
+  UiLocale l,
+  TaipeiDisplay t,
+) {
   final end = measure.hasPeriod() && measure.period.hasEndTime()
-      ? formatTaipeiTimestamp(measure.period.endTime)
+      ? t.timestamp(measure.period.endTime)
       : '';
   final start = measure.hasPeriod() && measure.period.hasStartTime()
-      ? formatTaipeiTimestamp(measure.period.startTime)
+      ? t.timestamp(measure.period.startTime)
       : '';
   final terminated = measure.kind == MeasureKind.MEASURE_KIND_TERMINATION;
   final state = measure.state;
@@ -258,14 +262,14 @@ String? _revokeNote(RevokeReason reason, UiLocale l) => switch (reason) {
 }
 
 /// 終止合作的申覆期限（「申覆期限：2026/10/19 16:30」，臺北時間）；不是終止合作或伺服器沒給期限時是 null。
-String? appealDeadlineText(Measure measure, UiLocale l) {
+String? appealDeadlineText(Measure measure, UiLocale l, TaipeiDisplay t) {
   if (measure.kind != MeasureKind.MEASURE_KIND_TERMINATION ||
       !measure.hasAppealDeadlineTime()) {
     return null;
   }
   return sellerMeasureAppealDeadline(
     l,
-    deadline: formatTaipeiTimestamp(measure.appealDeadlineTime),
+    deadline: t.timestamp(measure.appealDeadlineTime),
   );
 }
 
@@ -274,6 +278,7 @@ String? appealDeadlineText(Measure measure, UiLocale l) {
 List<({String measureId, String text})> terminationNotices(
   Iterable<Measure> measures,
   UiLocale l,
+  TaipeiDisplay t,
 ) {
   final scheduled = [
     for (final m in measures)
@@ -289,7 +294,7 @@ List<({String measureId, String text})> terminationNotices(
         measureId: m.id,
         text: sellerMeasureTerminationNotice(
           l,
-          start: formatTaipeiTimestamp(m.period.startTime),
+          start: t.timestamp(m.period.startTime),
         ),
       ),
   ];
@@ -315,10 +320,10 @@ bool measureNeedsAttention(Measure measure) =>
 
 /// 申覆入口旁的一句說明（與 website 的 `AppealEntry` 相同）：「{原因} · 申覆期限：{時間}」，原因與期限各自可有可無，
 /// 兩者都沒有時是 null。
-String? appealNoteText(Measure measure, UiLocale l) {
+String? appealNoteText(Measure measure, UiLocale l, TaipeiDisplay t) {
   final parts = [
     appealAction(measure).reason,
-    appealDeadlineText(measure, l),
+    appealDeadlineText(measure, l, t),
   ].whereType<String>();
   return parts.isEmpty ? null : parts.join(' · ');
 }

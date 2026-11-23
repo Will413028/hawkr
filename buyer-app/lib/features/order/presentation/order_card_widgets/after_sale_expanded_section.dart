@@ -8,6 +8,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
+
 import '../../../../config/image_config.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -23,6 +24,8 @@ import '../../data/after_sale_repository.dart';
 import '../../data/after_sale_status_notifier.dart';
 import '../../data/order_model.dart';
 import '../widgets/return_logistics_timeline.dart';
+import '../../../../shared/time/taipei_display.dart';
+
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 /// 售後案件展開區塊 — 對應 Figma 10092:103928 / 10103:93051
@@ -617,7 +620,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
             ),
             SizedBox(width: AppSpacing.xs),
             Text(
-              _formatTime(c.createdAt),
+              _formatTime(c.createdAt, context.taipeiDisplay),
               style: AppTypography.meta.copyWith(
                 color: AppTypography.colorDisabled,
               ),
@@ -1003,12 +1006,14 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     }
   }
 
-  String _formatTime(String raw) {
+  String _formatTime(String raw, TaipeiDisplay t) {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final local = dt.taipeiWall;
-    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+    );
   }
 }

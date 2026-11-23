@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/customer_model.dart';
 import '../../order/presentation/shared_order_detail_screen.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 訂單細節頁面 — Figma: 6444:62660
 class CustomerOrderDetailScreen extends StatelessWidget {
@@ -20,7 +21,7 @@ class CustomerOrderDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return SharedOrderDetailScreen(
       orderId: order.orderId,
-      fallbackDateText: order.date,
+      fallbackDateText: context.taipeiDisplay.labeled(order.date),
       fallbackItemsText: order.items,
       fallbackAmount: order.amount,
     );

@@ -4,6 +4,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/measure_fixtures.dart';
+import '../../../support/taipei_display.dart';
 
 void main() {
   group('名詞取自共用文案目錄（hawkr_ui_text）', () {
@@ -54,6 +55,7 @@ void main() {
           revokeReason: reason,
         ),
         UiLocale.zhTW,
+        taipeiDeviceDisplay,
       )?.text;
       expect(effectOf(RevokeReason.REVOKE_REASON_FINDING_REVOKED), '依據的認定已撤銷');
       expect(effectOf(RevokeReason.REVOKE_REASON_SOURCE_REVOKED), '關聯的終止已撤銷');
@@ -103,7 +105,7 @@ void main() {
 
     test('預定生效：「終止生效：{period.start_time}」，不是建立時間加 30 天', () {
       final m = terminationOf(start: start, createTime: created);
-      final effect = measureEffect(m, UiLocale.zhTW);
+      final effect = measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay);
       expect(effect?.text, '終止生效：2026/11/20 12:30');
       expect(effect?.active, isFalse);
       expect(effect!.text, isNot(contains('2026/11/14')));
@@ -114,8 +116,14 @@ void main() {
         state: MeasureState.MEASURE_STATE_ACTIVE,
         start: start,
       );
-      expect(measureEffect(m, UiLocale.zhTW)?.text, '終止生效：2026/11/20 12:30');
-      expect(measureEffect(m, UiLocale.zhTW)?.active, isTrue);
+      expect(
+        measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+        '終止生效：2026/11/20 12:30',
+      );
+      expect(
+        measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.active,
+        isTrue,
+      );
     });
 
     test('預告終止因店家關閉而結束：加「合作已於 {end} 結束」；沒有結束時間只寫終止生效', () {
@@ -125,7 +133,7 @@ void main() {
         end: DateTime.utc(2026, 11, 1, 6, 15),
       );
       expect(
-        measureEffect(closed, UiLocale.zhTW)?.text,
+        measureEffect(closed, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
         '終止生效：2026/11/20 12:30，合作已於 2026/11/01 14:15 結束',
       );
       final noEnd = terminationOf(
@@ -133,7 +141,7 @@ void main() {
         start: start,
       );
       expect(
-        measureEffect(noEnd, UiLocale.zhTW)?.text,
+        measureEffect(noEnd, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
         '終止生效：2026/11/20 12:30',
       );
     });
@@ -144,7 +152,10 @@ void main() {
         revokeReason: RevokeReason.REVOKE_REASON_SOURCE_REVOKED,
         canAppeal: false,
       );
-      expect(measureEffect(m, UiLocale.zhTW)?.text, '關聯的終止已撤銷');
+      expect(
+        measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+        '關聯的終止已撤銷',
+      );
     });
 
     test('終止合作沒有生效時間（違反合約）：不顯示影響文字，也不出現 1970', () {
@@ -153,8 +164,11 @@ void main() {
         basis: MeasureBasis.MEASURE_BASIS_CONTRACT,
         state: MeasureState.MEASURE_STATE_SCHEDULED,
       );
-      expect(measureEffect(m, UiLocale.zhTW), isNull);
-      expect(terminationNotices([m], UiLocale.zhTW), isEmpty);
+      expect(measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay), isNull);
+      expect(
+        terminationNotices([m], UiLocale.zhTW, taipeiDeviceDisplay),
+        isEmpty,
+      );
     });
 
     test('生效中的終止合作 chip 是「合作已終止」（danger）；停權生效中沒有', () {
@@ -204,6 +218,7 @@ void main() {
             ],
           ),
           UiLocale.zhTW,
+          taipeiDeviceDisplay,
         ),
         '$appealAlreadyAppealedSentence · 申覆期限：2027/05/22 12:30',
       );
@@ -211,10 +226,14 @@ void main() {
         appealNoteText(
           terminationOf(appealDeadlineTime: deadline),
           UiLocale.zhTW,
+          taipeiDeviceDisplay,
         ),
         '申覆期限：2027/05/22 12:30',
       );
-      expect(appealNoteText(measureOf(), UiLocale.zhTW), isNull);
+      expect(
+        appealNoteText(measureOf(), UiLocale.zhTW, taipeiDeviceDisplay),
+        isNull,
+      );
     });
 
     test('申覆期限：只有終止合作、而且伺服器給了才顯示（臺北時間）', () {
@@ -223,14 +242,19 @@ void main() {
         appealDeadlineText(
           terminationOf(appealDeadlineTime: deadline),
           UiLocale.zhTW,
+          taipeiDeviceDisplay,
         ),
         '申覆期限：2027/05/22 12:30',
       );
-      expect(appealDeadlineText(terminationOf(), UiLocale.zhTW), isNull);
+      expect(
+        appealDeadlineText(terminationOf(), UiLocale.zhTW, taipeiDeviceDisplay),
+        isNull,
+      );
       expect(
         appealDeadlineText(
           measureOf(appealDeadlineTime: deadline),
           UiLocale.zhTW,
+          taipeiDeviceDisplay,
         ),
         isNull,
       );
@@ -242,31 +266,44 @@ void main() {
     final start = DateTime.utc(2026, 11, 20, 4, 30);
 
     test('日期等於 period.start_time，不是建立時間加 30 天', () {
-      final notices = terminationNotices([
-        terminationOf(start: start, createTime: created),
-      ], UiLocale.zhTW);
+      final notices = terminationNotices(
+        [terminationOf(start: start, createTime: created)],
+        UiLocale.zhTW,
+        taipeiDeviceDisplay,
+      );
       final text = notices.single.text;
       expect(text, '平台已通知將於 2026/11/20 12:30 終止合作。在此之前店家照常營業；如有異議，可提出申覆。');
       expect(text, isNot(contains('2026/11/14')));
     });
 
     test('沒有預定生效的終止：沒有預告；其他種類與狀態不算', () {
-      expect(terminationNotices(const [], UiLocale.zhTW), isEmpty);
       expect(
-        terminationNotices([
-          terminationOf(state: MeasureState.MEASURE_STATE_ACTIVE),
-          terminationOf(state: MeasureState.MEASURE_STATE_ENDED),
-          measureOf(state: MeasureState.MEASURE_STATE_SCHEDULED),
-        ], UiLocale.zhTW),
+        terminationNotices(const [], UiLocale.zhTW, taipeiDeviceDisplay),
+        isEmpty,
+      );
+      expect(
+        terminationNotices(
+          [
+            terminationOf(state: MeasureState.MEASURE_STATE_ACTIVE),
+            terminationOf(state: MeasureState.MEASURE_STATE_ENDED),
+            measureOf(state: MeasureState.MEASURE_STATE_SCHEDULED),
+          ],
+          UiLocale.zhTW,
+          taipeiDeviceDisplay,
+        ),
         isEmpty,
       );
     });
 
     test('多筆預定生效：每筆一則，順序照伺服器給的（不依生效時間重排）', () {
-      final notices = terminationNotices([
-        terminationOf(id: 'late', start: DateTime.utc(2026, 12, 1, 4, 30)),
-        terminationOf(id: 'early', start: start),
-      ], UiLocale.zhTW);
+      final notices = terminationNotices(
+        [
+          terminationOf(id: 'late', start: DateTime.utc(2026, 12, 1, 4, 30)),
+          terminationOf(id: 'early', start: start),
+        ],
+        UiLocale.zhTW,
+        taipeiDeviceDisplay,
+      );
       expect([for (final n in notices) n.measureId], ['late', 'early']);
       expect(notices[0].text, contains('2026/12/01 12:30'));
       expect(notices[1].text, contains('2026/11/20 12:30'));

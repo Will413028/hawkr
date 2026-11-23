@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'hk_icon.dart';
+import '../time/taipei_display.dart';
 
 /// 聊天室「選擇訂單」半屏 BottomSheet
 ///
@@ -149,6 +150,7 @@ class _OrderPickerCard extends StatelessWidget {
         : (sellerName.isNotEmpty ? '賣家：$sellerName' : '');
     final date = _formatDate(
       order['createTime']?.toString() ?? order['create_time']?.toString() ?? '',
+      context.taipeiDisplay,
     );
 
     return GestureDetector(
@@ -333,11 +335,13 @@ class _OrderPickerCard extends StatelessWidget {
     return count.isNotEmpty ? '共 $count 件商品' : '';
   }
 
-  String _formatDate(String raw) {
+  String _formatDate(String raw, TaipeiDisplay t) {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final l = dt.taipeiWall;
-    return '${l.year}/${l.month.toString().padLeft(2, '0')}/${l.day.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${l.year}/${l.month.toString().padLeft(2, '0')}/${l.day.toString().padLeft(2, '0')}',
+    );
   }
 }

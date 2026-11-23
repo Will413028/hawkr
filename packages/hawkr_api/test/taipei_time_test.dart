@@ -254,4 +254,36 @@ void main() {
       expect(isTaipeiOffset(const Duration(hours: 9)), isFalse);
     });
   });
+
+  group('withTaipeiLabel', () {
+    const label = '台北時間';
+    const text = '2026/07/30 15:05';
+
+    test('+8 offset leaves the text alone', () {
+      expect(
+        withTaipeiLabelAtOffset(text, label, const Duration(hours: 8)),
+        text,
+      );
+    });
+
+    test('non +8 offsets append the label', () {
+      for (final h in [-5, 0, 9]) {
+        expect(
+          withTaipeiLabelAtOffset(text, label, Duration(hours: h)),
+          '$text ($label)',
+        );
+      }
+    });
+
+    test('empty text stays empty for any offset', () {
+      expect(withTaipeiLabelAtOffset('', label, Duration.zero), '');
+    });
+
+    test('now injects the device offset (UTC now is offset 0)', () {
+      expect(
+        withTaipeiLabel(text, label, now: DateTime.utc(2026, 7, 30)),
+        '$text ($label)',
+      );
+    });
+  });
 }

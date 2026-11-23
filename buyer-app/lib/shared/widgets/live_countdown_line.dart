@@ -1,4 +1,5 @@
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -94,7 +95,7 @@ class _LiveCountdownLineState extends State<LiveCountdownLine> {
         ],
       );
     }
-    final remaining = dt.toLocal().difference(DateTime.now());
+    final remaining = dt.difference(DateTime.now());
     final expired = remaining.isNegative;
     final urgent = !expired && remaining < widget.urgentThreshold;
     final color = expired

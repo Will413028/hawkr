@@ -3,10 +3,12 @@ import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -51,6 +53,8 @@ import '../../../shared/widgets/oss_image.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/notification_count_badge.dart';
 import '../../ai_assistant/presentation/ai_function_menu.dart';
+import '../../../shared/time/taipei_display.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_placeholder.dart';
@@ -1353,9 +1357,9 @@ class ChatThreadScreen extends HookConsumerWidget {
                     t.year == today.year &&
                     t.month == today.month &&
                     t.day == today.day;
-                final dateStr = isToday
-                    ? timeStr
-                    : '${t.month}/${t.day} $timeStr';
+                final dateStr = context.taipeiDisplay.labeled(
+                  isToday ? timeStr : '${t.month}/${t.day} $timeStr',
+                );
                 timeSeparator = Padding(
                   padding: EdgeInsets.symmetric(vertical: 12.h),
                   child: Center(
@@ -1641,8 +1645,9 @@ class ChatThreadScreen extends HookConsumerWidget {
               final h12 = t.hour == 0
                   ? 12
                   : (t.hour > 12 ? t.hour - 12 : t.hour);
-              final timeStr =
-                  '${t.hour < 12 ? "上午" : "下午"}${h12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+              final timeStr = context.taipeiDisplay.labeled(
+                '${t.hour < 12 ? "上午" : "下午"}${h12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+              );
               final timeStatusRow = Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

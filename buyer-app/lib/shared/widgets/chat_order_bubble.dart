@@ -1,9 +1,13 @@
 import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
+
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
+import '../time/taipei_display.dart';
 
 /// 聊天訊息中的訂單卡片泡泡
 ///
@@ -76,7 +80,10 @@ class ChatOrderBubble extends StatelessWidget {
         .toString();
     final items = _itemsSummary(order);
     final name = _displayName(order);
-    final date = _fmtDate(order['createTime']?.toString() ?? '');
+    final date = _fmtDate(
+      order['createTime']?.toString() ?? '',
+      context.taipeiDisplay,
+    );
     final statusLabel = _statusLabel(status);
 
     final textColor = isSelf ? _selfText : _recvText;
@@ -291,11 +298,13 @@ class ChatOrderBubble extends StatelessWidget {
     return c.isNotEmpty ? '共 $c 件商品' : '';
   }
 
-  String _fmtDate(String raw) {
+  String _fmtDate(String raw, TaipeiDisplay t) {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final l = dt.taipeiWall;
-    return '${l.year}/${l.month.toString().padLeft(2, '0')}/${l.day.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${l.year}/${l.month.toString().padLeft(2, '0')}/${l.day.toString().padLeft(2, '0')}',
+    );
   }
 }

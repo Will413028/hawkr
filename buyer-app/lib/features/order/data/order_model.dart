@@ -214,7 +214,7 @@ extension OrderAutoCompleteX on Order {
     if (autoCompleteAt.isEmpty) return null;
     final dt = DateTime.tryParse(autoCompleteAt);
     if (dt == null) return null;
-    return dt.toLocal().difference(DateTime.now());
+    return dt.difference(DateTime.now());
   }
 
   /// 顯示用倒數文字：3 天後自動完成 / 5 小時後自動完成 / 已自動完成
@@ -238,7 +238,7 @@ extension OrderPaymentDeadlineX on Order {
     if (paymentDeadline.isEmpty) return null;
     final dt = DateTime.tryParse(paymentDeadline);
     if (dt == null) return null;
-    return dt.toLocal().difference(DateTime.now());
+    return dt.difference(DateTime.now());
   }
 
   /// 顯示用倒數文字：

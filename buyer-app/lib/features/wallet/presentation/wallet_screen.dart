@@ -26,6 +26,8 @@ import '../../member_card/presentation/member_card_controller.dart';
 import 'wallet_controller.dart';
 import 'widgets/coupon_status_tabs.dart';
 import 'widgets/wallet_coupon_ticket.dart';
+import '../../../shared/time/taipei_display.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_skeleton_shimmer.dart';
@@ -1309,7 +1311,7 @@ class _CouponTile extends StatelessWidget {
       title: normalizedTitle,
       content: content,
       rule: rule,
-      expiry: expire,
+      expiry: context.taipeiDisplay.labeled(expire),
       discountLabel: discountLabel,
       issuerLabel: issuerLabel,
       issuerAvatar: _CouponIssuerAvatar(

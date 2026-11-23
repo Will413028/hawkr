@@ -17,6 +17,7 @@ import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../shared/widgets/glass_tab_bar.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import 'customer_order_card_widget.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 顧客消費歷史頁面 — 3-tab view: 消費金額 | 訂單 | 優惠卷
 class CustomerSpendingHistoryScreen extends HookConsumerWidget {
@@ -293,7 +294,7 @@ class _SpendingTable extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _dataCell(r.date),
+                _dataCell(context.taipeiDisplay.labeled(r.date)),
                 SizedBox(width: 8.w),
                 _dataCell(r.orderId),
                 SizedBox(width: 8.w),

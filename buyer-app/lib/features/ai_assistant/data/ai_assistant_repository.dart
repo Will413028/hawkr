@@ -147,7 +147,7 @@ class AiAssistantRepository {
         final uiRole = role == 'model' ? 'assistant' : role;
         DateTime ts;
         try {
-          ts = DateTime.parse((m['timestamp'] ?? '').toString()).toLocal();
+          ts = DateTime.parse((m['timestamp'] ?? '').toString());
         } catch (_) {
           ts = DateTime.now();
         }

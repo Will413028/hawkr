@@ -13,6 +13,7 @@ import '../data/coupon_model.dart';
 import '../data/coupon_repository.dart';
 import 'coupon_card_widget.dart';
 import 'widgets/date_formatter.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 優惠券唯讀詳情頁。
 ///
@@ -188,7 +189,10 @@ class _InfoPanel extends StatelessWidget {
           ),
           _InfoRow(label: '折抵內容', value: _discountText(coupon)),
           _InfoRow(label: '使用門檻', value: _thresholdText(coupon)),
-          _InfoRow(label: '有效期間', value: _periodText(coupon)),
+          _InfoRow(
+            label: '有效期間',
+            value: _periodText(coupon, context.taipeiDisplay),
+          ),
           _InfoRow(label: '每人限領', value: _perAccountText(coupon)),
           _InfoRow(
             label: '狀態',
@@ -221,13 +225,13 @@ class _InfoPanel extends StatelessWidget {
     return '消費滿 \$$t';
   }
 
-  static String _periodText(Coupon c) {
+  static String _periodText(Coupon c, TaipeiDisplay t) {
     final start = DateFormatter.formatToYYYYMMDD(c.startAt);
     final end = DateFormatter.formatToYYYYMMDD(c.endAt);
     if (start.isEmpty && end.isEmpty) return '—';
-    if (start.isEmpty) return '至 $end';
-    if (end.isEmpty) return '$start 起';
-    return '$start ~ $end';
+    if (start.isEmpty) return t.labeled('至 $end');
+    if (end.isEmpty) return t.labeled('$start 起');
+    return t.labeled('$start ~ $end');
   }
 
   static String _perAccountText(Coupon c) {

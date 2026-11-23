@@ -10,6 +10,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../seller/data/store_card_provider.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 店家檢舉的結果文字：沒設結果是「審核中」，設了照目錄；目錄沒有文字的值回 null。
 String? storeReportOutcomeText(seller.StoreReport report, UiLocale locale) =>
@@ -25,10 +26,12 @@ String? communityReportOutcomeText(
     ? report.outcome.uiText(locale)
     : moderationCommunityReportOutcomeUnset(locale);
 
-String formatReportTime(DateTime time) {
+String formatReportTime(DateTime time, TaipeiDisplay t) {
   final local = time.taipei;
-  return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  return t.labeled(
+    '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
+    '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+  );
 }
 
 class ReportOutcomeChip extends StatelessWidget {

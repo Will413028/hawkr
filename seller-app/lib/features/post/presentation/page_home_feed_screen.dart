@@ -9,7 +9,7 @@ import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
-import 'package:hawkr_api/taipei_time.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
@@ -48,6 +48,7 @@ import '../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../shared/widgets/hk_disabled_share.dart';
 import '../../../shared/widgets/hk_disabled_with_hint.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
+import '../../../shared/time/taipei_display.dart';
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
     show SellerCapability;
@@ -334,21 +335,15 @@ class _PostPage extends HookConsumerWidget {
   final VoidCallback onDeleteTap;
   final VoidCallback? onProductTap;
 
-  String _formatDate(DateTime? d) {
-    if (d == null) return '';
-    final l = d.taipei;
-    final yyyy = l.year.toString().padLeft(4, '0');
-    final mm = l.month.toString().padLeft(2, '0');
-    final dd = l.day.toString().padLeft(2, '0');
-    return '$yyyy/$mm/$dd';
-  }
+  String _formatDate(BuildContext context, DateTime? d) =>
+      d == null ? '' : context.taipeiDisplay.date(d);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // objectKey 直接交給 OptimizedNetworkImage，由 buildImageUrl（唯一組裝入口）
     // 依 postImage 場景組顯示 URL；不要在這裡自行拼域名。
     final imageSource = post.imageUrl;
-    final dateStr = _formatDate(post.createdAt);
+    final dateStr = _formatDate(context, post.createdAt);
     final statusBadge = postStatusBadgeOf(post);
 
     final commentCtrl = useTextEditingController();
@@ -723,7 +718,7 @@ class _PostPage extends HookConsumerWidget {
                                                   if (statusBadge.scheduledAt !=
                                                       null)
                                                     Text(
-                                                      '排程於 ${formatTaipeiDateTime(statusBadge.scheduledAt!)} 發布',
+                                                      '排程於 ${context.taipeiDisplay.dateTime(statusBadge.scheduledAt!)} 發布',
                                                       key: ValueKey(
                                                         'seller-post-scheduled-${post.id}',
                                                       ),

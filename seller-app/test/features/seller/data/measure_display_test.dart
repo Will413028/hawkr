@@ -5,6 +5,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../support/measure_fixtures.dart';
+import '../../../support/taipei_display.dart';
 
 void main() {
   group('measureEffect：措施目前的影響（讀 state）', () {
@@ -16,14 +17,23 @@ void main() {
         canAppeal: false,
         period: measurePeriod(end: end),
       );
-      expect(measureEffect(revoked, UiLocale.zhTW)?.text, '已撤銷');
-      expect(measureEffect(revoked, UiLocale.zhTW)?.active, isFalse);
+      expect(
+        measureEffect(revoked, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+        '已撤銷',
+      );
+      expect(
+        measureEffect(revoked, UiLocale.zhTW, taipeiDeviceDisplay)?.active,
+        isFalse,
+      );
       final cascaded = measureOf(
         state: MeasureState.MEASURE_STATE_REVOKED,
         revokeReason: RevokeReason.REVOKE_REASON_FINDING_REVOKED,
         canAppeal: false,
       );
-      expect(measureEffect(cascaded, UiLocale.zhTW)?.text, '依據的認定已撤銷');
+      expect(
+        measureEffect(cascaded, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+        '依據的認定已撤銷',
+      );
     });
 
     test('警告：已發出，不是生效中的限制', () {
@@ -31,14 +41,26 @@ void main() {
         kind: MeasureKind.MEASURE_KIND_WARNING,
         state: MeasureState.MEASURE_STATE_ISSUED,
       );
-      expect(measureEffect(warning, UiLocale.zhTW)?.text, '已發出');
-      expect(measureEffect(warning, UiLocale.zhTW)?.active, isFalse);
+      expect(
+        measureEffect(warning, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+        '已發出',
+      );
+      expect(
+        measureEffect(warning, UiLocale.zhTW, taipeiDeviceDisplay)?.active,
+        isFalse,
+      );
     });
 
     test('停權生效中：至結束時間（臺北時間）', () {
       final m = measureOf(period: measurePeriod(end: end));
-      expect(measureEffect(m, UiLocale.zhTW)?.text, '停權中（至 2026/10/19 16:30）');
-      expect(measureEffect(m, UiLocale.zhTW)?.active, isTrue);
+      expect(
+        measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+        '停權中（至 2026/10/19 16:30）',
+      );
+      expect(
+        measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.active,
+        isTrue,
+      );
     });
 
     test('state 讀伺服器的值，不用現在時間與 end_time 比較', () {
@@ -46,35 +68,47 @@ void main() {
       final m = measureOf(
         period: measurePeriod(end: DateTime.utc(2020, 1, 1, 8)),
       );
-      expect(measureEffect(m, UiLocale.zhTW)?.text, '停權中（至 2020/01/01 16:00）');
+      expect(
+        measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+        '停權中（至 2020/01/01 16:00）',
+      );
       final ended = measureOf(
         state: MeasureState.MEASURE_STATE_ENDED,
         period: measurePeriod(end: DateTime.utc(2099, 1, 1, 8)),
       );
       expect(
-        measureEffect(ended, UiLocale.zhTW)?.text,
+        measureEffect(ended, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
         '已於 2099/01/01 16:00 結束',
       );
-      expect(measureEffect(ended, UiLocale.zhTW)?.active, isFalse);
+      expect(
+        measureEffect(ended, UiLocale.zhTW, taipeiDeviceDisplay)?.active,
+        isFalse,
+      );
     });
 
     test('沒有結束時間的生效中停權：未定結束時間，平台定期複審；不出現 1970', () {
       for (final period in [measurePeriod(start: end), null]) {
         final m = measureOf(period: period);
-        expect(measureEffect(m, UiLocale.zhTW)?.text, '停權中（未定結束時間，平台定期複審）');
-        expect(measureEffect(m, UiLocale.zhTW)?.active, isTrue);
+        expect(
+          measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.text,
+          '停權中（未定結束時間，平台定期複審）',
+        );
+        expect(
+          measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.active,
+          isTrue,
+        );
       }
     });
 
     test('停權效果句的英文來自目錄（三句）', () {
       final until = measureOf(period: measurePeriod(end: end));
       expect(
-        measureEffect(until, UiLocale.en)?.text,
+        measureEffect(until, UiLocale.en, taipeiDeviceDisplay)?.text,
         'Suspended until 2026/10/19 16:30',
       );
       final open = measureOf(period: measurePeriod(start: end));
       expect(
-        measureEffect(open, UiLocale.en)?.text,
+        measureEffect(open, UiLocale.en, taipeiDeviceDisplay)?.text,
         'Suspended (no end date; under periodic review by the platform)',
       );
       final ended = measureOf(
@@ -82,7 +116,7 @@ void main() {
         period: measurePeriod(end: end),
       );
       expect(
-        measureEffect(ended, UiLocale.en)?.text,
+        measureEffect(ended, UiLocale.en, taipeiDeviceDisplay)?.text,
         'Ended on 2026/10/19 16:30',
       );
     });
@@ -92,7 +126,7 @@ void main() {
         state: MeasureState.MEASURE_STATE_ENDED,
         period: measurePeriod(),
       );
-      expect(measureEffect(m, UiLocale.zhTW)?.text, '已結束');
+      expect(measureEffect(m, UiLocale.zhTW, taipeiDeviceDisplay)?.text, '已結束');
     });
 
     test('所有文字都不含 1970', () {
@@ -106,6 +140,7 @@ void main() {
           measureEffect(
             measureOf(state: state, period: measurePeriod()),
             UiLocale.zhTW,
+            taipeiDeviceDisplay,
           )?.text,
           isNot(contains('1970')),
         );
@@ -120,6 +155,7 @@ void main() {
             period: measurePeriod(end: end),
           ),
           UiLocale.zhTW,
+          taipeiDeviceDisplay,
         ),
         isNull,
       );

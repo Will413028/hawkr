@@ -17,6 +17,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -267,13 +268,12 @@ class _ImageOrderRepository extends OrderRepository {
   );
 }
 
-/// 下單時間的期望顯示字串。
-///
-/// 不能硬編碼：[DateFormatUtils.formatDateTime] 走 `toLocal()`，同一筆
-/// `+08:00` 的 createTime 在 UTC+8 顯示 `2026/07/16 06:38`、在 UTC 則是
-/// `2026/07/15 22:38`。硬編碼會讓測試在開發者本機過、在 CI（UTC）紅。
-/// 用與 UI 相同的函式推導期望值，驗的仍是「卡片顯示了正確格式化的下單時間」。
-final _expectedOrderTime = DateFormatUtils.formatDateTime(_order.createTime);
+/// 下單時間的期望顯示字串：臺北時間不跟裝置時區，但裝置偏移不是 +8 時 UI 會附「台北時間」，
+/// 期望值用同一個 [TaipeiDisplay]（不指定偏移，取裝置的）推導，測試在本機（+8）與 CI（UTC）都成立。
+final _expectedOrderTime = DateFormatUtils.formatDateTime(
+  _order.createTime,
+  const TaipeiDisplay(label: '台北時間'),
+);
 
 const _order = Order(
   orderSn: 'O125369895',

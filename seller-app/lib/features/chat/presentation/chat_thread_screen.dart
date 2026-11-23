@@ -41,6 +41,7 @@ import 'chat_attachment_picker.dart';
 import 'chat_card.dart';
 import 'chat_send_error_dispatch.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../../shared/time/taipei_display.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class ChatThreadScreen extends HookConsumerWidget {
@@ -1106,9 +1107,9 @@ class ChatThreadScreen extends HookConsumerWidget {
                     t.year == today.year &&
                     t.month == today.month &&
                     t.day == today.day;
-                final dateStr = isToday
-                    ? timeStr
-                    : '${t.month}/${t.day} $timeStr';
+                final dateStr = context.taipeiDisplay.labeled(
+                  isToday ? timeStr : '${t.month}/${t.day} $timeStr',
+                );
                 timeSeparator = Padding(
                   padding: EdgeInsets.symmetric(vertical: 12.h),
                   child: Center(
@@ -1138,8 +1139,9 @@ class ChatThreadScreen extends HookConsumerWidget {
               final msgH12 = msgTime.hour == 0
                   ? 12
                   : (msgTime.hour > 12 ? msgTime.hour - 12 : msgTime.hour);
-              final timeStr =
-                  '${msgTime.hour < 12 ? "上午" : "下午"}${msgH12.toString().padLeft(2, '0')}:${msgTime.minute.toString().padLeft(2, '0')}';
+              final timeStr = context.taipeiDisplay.labeled(
+                '${msgTime.hour < 12 ? "上午" : "下午"}${msgH12.toString().padLeft(2, '0')}:${msgTime.minute.toString().padLeft(2, '0')}',
+              );
 
               // 時間 + 已讀狀態（氣泡外，右側對齊）
               final timeStatusRow = Row(

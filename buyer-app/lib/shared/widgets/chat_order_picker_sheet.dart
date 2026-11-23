@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
+import '../time/taipei_display.dart';
+
 /// 聊天室「選擇訂單」半屏 BottomSheet
 ///
 /// 列出跟當前聊天對象有關的訂單，讓賣家 / 買家選一筆送出成訂單卡片。
@@ -136,7 +138,10 @@ class _OrderPickerCard extends StatelessWidget {
     final displayName = isSeller
         ? (buyerName.isNotEmpty ? '買家：$buyerName' : '')
         : (sellerName.isNotEmpty ? '賣家：$sellerName' : '');
-    final date = _formatDate(order['createTime']?.toString() ?? '');
+    final date = _formatDate(
+      order['createTime']?.toString() ?? '',
+      context.taipeiDisplay,
+    );
     final semanticLabel = [
       if (orderNo.isNotEmpty) '訂單編號 $orderNo',
       if (statusLabel.isNotEmpty) '狀態 $statusLabel',
@@ -353,11 +358,13 @@ class _OrderPickerCard extends StatelessWidget {
     return count.isNotEmpty ? '共 $count 件商品' : '';
   }
 
-  String _formatDate(String raw) {
+  String _formatDate(String raw, TaipeiDisplay t) {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final l = dt.taipeiWall;
-    return '${l.year}/${l.month.toString().padLeft(2, '0')}/${l.day.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${l.year}/${l.month.toString().padLeft(2, '0')}/${l.day.toString().padLeft(2, '0')}',
+    );
   }
 }

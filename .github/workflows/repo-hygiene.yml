@@ -46,6 +46,7 @@ jobs:
         if: always()
         run: |
           python3 -m unittest scripts/test_check_doc_paths.py
+          python3 -m unittest scripts/test_check_taipei_display.py
           python3 scripts/check-doc-paths.py
       - name: mutation runner 的單元測試
         if: always()

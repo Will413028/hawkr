@@ -16,6 +16,8 @@ import '../../data/logistics_track.dart';
 import '../../data/order_model.dart';
 import '../../data/order_repository.dart';
 import '../order_status_presentation.dart';
+import '../../../../shared/time/taipei_display.dart';
+
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 /// 一張訂單的**即時**物流狀態。
@@ -261,9 +263,15 @@ class _TrackBody extends StatelessWidget {
       if (track.recipientName.isNotEmpty)
         _InfoRow(label: '收件人', value: track.recipientName),
       if (track.statusTime.isNotEmpty)
-        _InfoRow(label: '狀態更新時間', value: _formatTime(track.statusTime)),
+        _InfoRow(
+          label: '狀態更新時間',
+          value: _formatTime(track.statusTime, context.taipeiDisplay),
+        ),
       if (track.createdAt.isNotEmpty)
-        _InfoRow(label: '物流單建立時間', value: _formatTime(track.createdAt)),
+        _InfoRow(
+          label: '物流單建立時間',
+          value: _formatTime(track.createdAt, context.taipeiDisplay),
+        ),
     ];
 
     return Column(
@@ -286,13 +294,15 @@ class _TrackBody extends StatelessWidget {
   ///
   /// ⚠️ 解析不出來時**原樣回傳**，不要回空字串：後端給了值卻顯示成空白，
   /// 會讓人以為那個欄位沒有資料。
-  static String _formatTime(String iso) {
+  static String _formatTime(String iso, TaipeiDisplay t) {
     final parsed = DateTime.tryParse(iso);
     if (parsed == null) return iso;
     final local = parsed.taipeiWall;
     String two(int n) => n.toString().padLeft(2, '0');
-    return '${local.year}/${two(local.month)}/${two(local.day)} '
-        '${two(local.hour)}:${two(local.minute)}';
+    return t.labeled(
+      '${local.year}/${two(local.month)}/${two(local.day)} '
+      '${two(local.hour)}:${two(local.minute)}',
+    );
   }
 }
 

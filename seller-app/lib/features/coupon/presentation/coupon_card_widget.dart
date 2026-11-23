@@ -9,6 +9,7 @@ import '../../../core/codemeta/code_meta_display.dart';
 import '../data/coupon_model.dart';
 import 'widgets/coupon_type_badge.dart';
 import 'widgets/date_formatter.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// Coupon card widget — white card + top-right badge + press scale animation.
 class CouponCardWidget extends StatefulWidget {
@@ -210,7 +211,7 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
                                 SizedBox(width: 5.w),
                                 Expanded(
                                   child: Text(
-                                    '有效期至 ${DateFormatter.formatToYYYYMMDD(coupon.endAt)}',
+                                    '有效期至 ${context.taipeiDisplay.labeled(DateFormatter.formatToYYYYMMDD(coupon.endAt))}',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontWeight: FontWeight.w400,

@@ -23,6 +23,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../support/connect_errors.dart';
 import '../../../support/measure_fixtures.dart';
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
 
 /// 可以按的申覆入口（`can_appeal` 為真）；反灰的入口（不能申覆，附原因）不算。
 final _enabledAppealButton = find.byWidgetPredicate(
@@ -153,16 +154,19 @@ Future<GoRouter> _pump(
   );
   addTearDown(router.dispose);
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        sessionProvider.overrideWith(_LoggedIn.new),
-        sellerClientProvider.overrideWithValue(server.client),
-        if (uploads != null)
-          privateDocumentUploaderProvider.overrideWithValue(uploads.uploader),
-      ],
-      child: ScreenUtilInit(
-        designSize: const Size(390, 844),
-        builder: (_, _) => MaterialApp.router(routerConfig: router),
+    TaipeiDisplayScope(
+      deviceOffset: const Duration(hours: 8),
+      child: ProviderScope(
+        overrides: [
+          sessionProvider.overrideWith(_LoggedIn.new),
+          sellerClientProvider.overrideWithValue(server.client),
+          if (uploads != null)
+            privateDocumentUploaderProvider.overrideWithValue(uploads.uploader),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (_, _) => MaterialApp.router(routerConfig: router),
+        ),
       ),
     ),
   );
