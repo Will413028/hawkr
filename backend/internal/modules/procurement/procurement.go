@@ -138,6 +138,7 @@ type Module struct {
 	hub        *run.Hub
 	watcher    run.Watcher
 	searcher   search.Starter
+	selector   search.Selector
 	resumer    turn.Resumer
 	snapshots  snapshot.Reader
 	convs      conversation.Service
@@ -172,6 +173,7 @@ func New(d Deps) *Module {
 	}
 	m.turns = turn.Submitter{Submitter: m.submitter, Quota: quota}
 	m.searcher = search.Starter{Submitter: m.submitter}
+	m.selector = search.Selector{DB: d.DB, Now: d.Now}
 	m.resumer = turn.Resumer{Submitter: m.submitter}
 	m.snapshots = snapshot.Reader{DB: d.DB, Ledger: ledger}
 	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
@@ -293,6 +295,15 @@ type CandidateSearchStarted = search.Started
 // 重送同一個 client_request_id 回第一次的 run 與候選集（內容不同回 INVALID_ARGUMENT）。
 func (m *Module) StartCandidateSearch(ctx context.Context, in StartCandidateSearchInput) (CandidateSearchStarted, error) {
 	return m.searcher.Start(ctx, in)
+}
+
+// ToggleSelectionInput 是勾選或取消勾選一個候選的輸入：Selected 是目標狀態。
+type ToggleSelectionInput = search.SelectInput
+
+// ToggleSelection 把一個候選設成指定的勾選狀態（目標狀態的方法，重送結果相同，不建收據）。需求不屬於買家、對話已刪除、候選集不屬於這個需求或候選不在候選集裡回 NOT_FOUND；
+// 候選集不是有效的候選集（需求不在 MATCHING，或不是最新一筆成功搜尋的候選集）回 ABORTED／VERSION_CONFLICT，conflictTarget 是 candidate_set。
+func (m *Module) ToggleSelection(ctx context.Context, in ToggleSelectionInput) error {
+	return m.selector.Select(ctx, in)
 }
 
 // ResumeRunInput 是回答一個中斷的輸入：OptionID 與 FreeText 恰一個（ClarificationResponse）。

@@ -30,6 +30,7 @@ type Module interface {
 	CancelRun(ctx context.Context, buyerID int64, runID uuid.UUID) (procurement.CancelRunOutcome, error)
 	ResumeRun(ctx context.Context, in procurement.ResumeRunInput) (procurement.ResumeRunResult, error)
 	StartCandidateSearch(ctx context.Context, in procurement.StartCandidateSearchInput) (procurement.CandidateSearchStarted, error)
+	ToggleSelection(ctx context.Context, in procurement.ToggleSelectionInput) error
 	GetRuntimeSnapshot(ctx context.Context, buyerID int64, conversationID uuid.UUID) (procurement.RuntimeSnapshot, error)
 	GetSnapshot(ctx context.Context, buyerID int64, requestID uuid.UUID) (procurement.RequestSnapshot, error)
 	GetConversationMessages(ctx context.Context, buyerID int64, conversationID uuid.UUID) (procurement.ConversationMessages, error)
@@ -238,6 +239,35 @@ func (h *App) StartCandidateSearch(ctx context.Context, req *connect.Request[pb.
 	}
 	return connect.NewResponse(&pb.StartCandidateSearchResponse{
 		RequestId: requestID.String(), RunId: out.RunID.String(), Status: status, CandidateSetId: out.CandidateSetID.String(),
+	}), nil
+}
+
+// ToggleSelection 把一個候選設成指定的勾選狀態（目標狀態的方法，重送結果相同）。
+func (h *App) ToggleSelection(ctx context.Context, req *connect.Request[pb.ToggleSelectionRequest]) (*connect.Response[pb.ToggleSelectionResponse], error) {
+	buyerID, err := h.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	msg := req.Msg
+	requestID, err := rpc.ParseUUID("request_id", msg.GetRequestId())
+	if err != nil {
+		return nil, err
+	}
+	setID, err := rpc.ParseUUID("candidate_set_id", msg.GetCandidateSetId())
+	if err != nil {
+		return nil, err
+	}
+	candidateID, err := rpc.ParseUUID("candidate_id", msg.GetCandidateId())
+	if err != nil {
+		return nil, err
+	}
+	if err := h.m.ToggleSelection(ctx, procurement.ToggleSelectionInput{
+		BuyerID: buyerID, RequestID: requestID, CandidateSetID: setID, CandidateID: candidateID, Selected: msg.GetSelected(),
+	}); err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.ToggleSelectionResponse{
+		RequestId: requestID.String(), CandidateSetId: setID.String(), CandidateId: candidateID.String(), Selected: msg.GetSelected(),
 	}), nil
 }
 
