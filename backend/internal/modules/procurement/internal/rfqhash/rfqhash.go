@@ -2,7 +2,7 @@
 // 演算法是 SHA-256 對固定欄位順序的 JSON（struct 欄位順序即輸出順序，沒有 map，所以確定），原像（preimage）以發布的 schema_version 為版本：
 // 原像包含 schemaVersion，欄位集合依版本分派，不認得的版本回錯誤。同樣的版本與輸入永遠得到同一個值，改任何一個欄位 hash 就變。
 // 新增或改變原像的欄位必須新增一個版本（新的原像型別與分派分支），不得更動既有版本的欄位集合，否則已發布的詢價 hash 會變；每個版本有 golden 測試。
-// A9-3c 的 ConfirmRfqSnapshot 以同一個函式算 payload_hash，讀取端（PublishedRfq.rfq_snapshot_hash）與它必須是同一個值。
+// ConfirmRfqSnapshot 以同一個函式算 payload_hash，讀取端（PublishedRfq.rfq_snapshot_hash）與它必須是同一個值。價格預覽、受眾與賣家可見內容的 hash 在 parts.go，規則相同。
 package rfqhash
 
 import (
