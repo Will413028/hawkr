@@ -166,6 +166,21 @@
 - 未採：只留「種子資料會違反」的刪除：操作過 KYC 或停權過種子店家的 `dev` 資料庫會在收緊約束時失敗，留下的刪除也沒有測試。
 - 未採：一句刪除都不留（計畫沒有寫理由）。
 
+**買家付款介面**（Will 2026-11-23）：web 用 Payment Element、兩支 App 用 `flutter_stripe` 的 PaymentSheet，都對平台自己的 PaymentIntent（帶 `transfer_group`、不帶 `on_behalf_of`）付款。這是 Stripe SCT 文件的標準寫法（docs.stripe.com/connect/separate-charges-and-transfers，Payment Intents＋Elements 版本）；錢包（Apple Pay、Google Pay）由 Stripe 處理，PayUni 的 Apple Pay 商家驗證刪除。代價是 client 要新增依賴（各自取得同意）、App 要處理 3DS。與開通不同（D24 讓 App 開外部瀏覽器）：開通一次性、可以跳出，付款在每張訂單的主流程上，跳出瀏覽器會掉轉換。sandbox 實測見 `backend/docs/plans/2026-11-23-b2-payment/spikes.md`。
+- 未採：三端都用 Checkout 託管頁（App 開外部瀏覽器）：不加依賴、程式最少，但付款流程跳出 App、回 App 靠回跳頁重讀。
+
+**建立付款何時回 client_secret**（Will 2026-11-23）：`CreatePayment` 在 transaction 內寫付款列與 job，提交後有上限地等 job 建好 PaymentIntent 再回 client_secret；逾時回 pending，client 以 `GetPayment` 重讀。外部呼叫仍在 transaction 外（D5 的單體規則），買家正常情況一次往返。
+- 未採：一律先回 pending、client 輪詢：最單純，但每次付款都多一段等待畫面與輪詢。
+- 未採：在請求內直接呼叫 Stripe（業界常見的同步寫法）：違反「外部呼叫不在 transaction 內、先寫 intent」，中途失敗會留下 Stripe 有、資料庫沒有的 PaymentIntent。
+
+**付款嘗試歷程**（Will 2026-11-23）：一張訂單一個 PaymentIntent，重試在同一張上（Stripe 自己保留每次嘗試）；只留買家 `GetPayment` 與後台查詢，賣家看訂單的付款狀態，刪 seller-app 的付款歷程呼叫與遮蔽個資的賣家版。
+- 未採：保留買家歷程與賣家版：歷程是 PayUni 每次重試一筆交易才需要的，賣家只需要「付了沒」。
+
+**付款與轉帳的幣別**（Will 2026-11-23）：Stripe adapter 以 USD 收款與轉帳，訂單的整數金額照搬成 cent，不做匯率；port 與資料模型不帶幣別，幣別是 adapter 的設定。事實（sandbox 實測）：US 平台以 USD 入帳，TWD 收款後轉帳幣別必須是 USD，TWD 轉帳被拒；現有契約沒有幣別欄位。理由：本檔已定 Stripe 只示範機制、台灣上線換金流商（後果段），匯率與捨入在那時不存在。代價：demo 畫面金額（NT$100）與 Stripe 端（US$1.00）不一致。
+- 未採：以 TWD 收款、轉帳依入帳的 USD 淨額按比例換算：畫面正確，但轉帳、撤回都要處理匯率與捨入，付款表要多存入帳幣別與金額。
+- 未採：契約與訂單全面加幣別（多幣別市集的業界做法，例如 Stripe 的 `amount`＋`currency` 成對）：改到訂單、商品與四個 client 的契約，超出 B2，台灣單一幣別上線也用不到。
+- 觸發重審：決定以 Stripe 上線或支援多幣別。
+
 ## 後果
 
 - 本機的付款與物流端到端在付款、物流模組搬進單體前不通：`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 與物流的 `MerId` 是空值（Stripe 的 `acct_` 不是 PayUni 商店代號）。付款改走 port 時以外部帳戶 ID 取代這個接縫；物流改綠界後恢復建店與出貨（Will 2026-10-29、2026-11-12 接受）。修訂（Will 2026-11-15）：物流不改綠界，B3 改成賣家自寄主線加模擬 adapter（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），物流 `MerId` 隨 Java shipping 退場刪除。
@@ -178,7 +193,7 @@
 - 平台承擔負餘額；要上線且改變損失歸屬時重新評估內嵌元件關掉使用者驗證的決定。
 - 沿用機制與延後項的觸發條件（輪詢沒有上限、inbox 沒有終局狀態（同步讀到已關閉的帳戶已在 9g 處理：列標 `DISABLED`、原因碼 `closed`，不再輪詢，D61）、`provider` 欄位在換 provider 時舊列的去向；清理的終局已在 9g 處理）寫在 `internal/modules/payment/CARRYOVER.md` 與 `docs/modules/payment.md` §8。
 
-## 決定編號（D1–D63）
+## 決定編號（D1–D67）
 
 其他文件與程式註解引用的 `收款開通 ADR Dn` 指這裡的編號。表列的是目前狀態；被後來的決定推翻的部分已註明。
 
@@ -248,3 +263,7 @@
 | D61 | `STRIPE_ACCOUNT_NAMESPACE` 必填並寫 `metadata.hawkr_namespace`；同步讀到已關閉的帳戶標 `DISABLED`、原因 `closed`；多帳戶關閉被 D63 推翻 | 本檔「建立外部帳戶的時點、冪等與分兩步建立」「後果」 |
 | D62 | 後台動作的紀錄放平台層 `internal/platform/adminaudit`，同一個 transaction 內寫一筆 | `2026-11-14-platform-admin-audit-log.md`；`2026-10-18-seller-governance-consolidated.md`「修訂：後台動作的紀錄放在平台層」 |
 | D63 | 結果不明的列只用同一把冪等鍵在 7 天內重送了結，不列出帳戶、不換新鍵（超過保存期的重試要確認） | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
+| D64 | 買家付款介面：web Payment Element、App `flutter_stripe` PaymentSheet；刪 Apple Pay 商家驗證 | 本檔「買家付款介面」 |
+| D65 | `CreatePayment` 有上限地等 job 建好 PaymentIntent 再回 client_secret，逾時回 pending 由 `GetPayment` 重讀 | 本檔「建立付款何時回 client_secret」 |
+| D66 | 一張訂單一個 PaymentIntent；只留買家 `GetPayment` 與後台查詢，刪賣家版付款歷程 | 本檔「付款嘗試歷程」 |
+| D67 | Stripe adapter 以 USD 收付，訂單整數金額照搬成 cent；port 與資料模型不帶幣別 | 本檔「付款與轉帳的幣別」 |
