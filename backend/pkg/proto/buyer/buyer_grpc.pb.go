@@ -44,7 +44,6 @@ const (
 	BuyerService_UnsubscribeSeller_FullMethodName              = "/hawkr.buyer.BuyerService/UnsubscribeSeller"
 	BuyerService_CheckSubscription_FullMethodName              = "/hawkr.buyer.BuyerService/CheckSubscription"
 	BuyerService_GetSubscribersList_FullMethodName             = "/hawkr.buyer.BuyerService/GetSubscribersList"
-	BuyerService_GetSubscriberDashboardStats_FullMethodName    = "/hawkr.buyer.BuyerService/GetSubscriberDashboardStats"
 	BuyerService_BatchGetSubscriberCounts_FullMethodName       = "/hawkr.buyer.BuyerService/BatchGetSubscriberCounts"
 	BuyerService_GetSavedItems_FullMethodName                  = "/hawkr.buyer.BuyerService/GetSavedItems"
 	BuyerService_GetVisitList_FullMethodName                   = "/hawkr.buyer.BuyerService/GetVisitList"
@@ -109,7 +108,6 @@ type BuyerServiceClient interface {
 	UnsubscribeSeller(ctx context.Context, in *UnsubscribeSellerRequest, opts ...grpc.CallOption) (*UnsubscribeSellerResponse, error)
 	CheckSubscription(ctx context.Context, in *CheckSubscriptionRequest, opts ...grpc.CallOption) (*CheckSubscriptionResponse, error)
 	GetSubscribersList(ctx context.Context, in *GetSubscribersListRequest, opts ...grpc.CallOption) (*SubscribersListResponse, error)
-	GetSubscriberDashboardStats(ctx context.Context, in *GetSubscriberDashboardStatsRequest, opts ...grpc.CallOption) (*SubscriberDashboardStatsResponse, error)
 	// 批次取得多個賣家的訂閱數（內部服務間呼叫）
 	BatchGetSubscriberCounts(ctx context.Context, in *BatchGetSubscriberCountsRequest, opts ...grpc.CallOption) (*BatchGetSubscriberCountsResponse, error)
 	// Saved Items（收藏中心聚合讀 API，issue #2362 Phase 1：僅涵蓋 product/seller，貼文/食譜是 non-goal）
@@ -446,16 +444,6 @@ func (c *buyerServiceClient) GetSubscribersList(ctx context.Context, in *GetSubs
 	return out, nil
 }
 
-func (c *buyerServiceClient) GetSubscriberDashboardStats(ctx context.Context, in *GetSubscriberDashboardStatsRequest, opts ...grpc.CallOption) (*SubscriberDashboardStatsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SubscriberDashboardStatsResponse)
-	err := c.cc.Invoke(ctx, BuyerService_GetSubscriberDashboardStats_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *buyerServiceClient) BatchGetSubscriberCounts(ctx context.Context, in *BatchGetSubscriberCountsRequest, opts ...grpc.CallOption) (*BatchGetSubscriberCountsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(BatchGetSubscriberCountsResponse)
@@ -707,7 +695,6 @@ type BuyerServiceServer interface {
 	UnsubscribeSeller(context.Context, *UnsubscribeSellerRequest) (*UnsubscribeSellerResponse, error)
 	CheckSubscription(context.Context, *CheckSubscriptionRequest) (*CheckSubscriptionResponse, error)
 	GetSubscribersList(context.Context, *GetSubscribersListRequest) (*SubscribersListResponse, error)
-	GetSubscriberDashboardStats(context.Context, *GetSubscriberDashboardStatsRequest) (*SubscriberDashboardStatsResponse, error)
 	// 批次取得多個賣家的訂閱數（內部服務間呼叫）
 	BatchGetSubscriberCounts(context.Context, *BatchGetSubscriberCountsRequest) (*BatchGetSubscriberCountsResponse, error)
 	// Saved Items（收藏中心聚合讀 API，issue #2362 Phase 1：僅涵蓋 product/seller，貼文/食譜是 non-goal）
@@ -868,9 +855,6 @@ func (UnimplementedBuyerServiceServer) CheckSubscription(context.Context, *Check
 }
 func (UnimplementedBuyerServiceServer) GetSubscribersList(context.Context, *GetSubscribersListRequest) (*SubscribersListResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSubscribersList not implemented")
-}
-func (UnimplementedBuyerServiceServer) GetSubscriberDashboardStats(context.Context, *GetSubscriberDashboardStatsRequest) (*SubscriberDashboardStatsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetSubscriberDashboardStats not implemented")
 }
 func (UnimplementedBuyerServiceServer) BatchGetSubscriberCounts(context.Context, *BatchGetSubscriberCountsRequest) (*BatchGetSubscriberCountsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BatchGetSubscriberCounts not implemented")
@@ -1406,24 +1390,6 @@ func _BuyerService_GetSubscribersList_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BuyerService_GetSubscriberDashboardStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetSubscriberDashboardStatsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BuyerServiceServer).GetSubscriberDashboardStats(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BuyerService_GetSubscriberDashboardStats_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BuyerServiceServer).GetSubscriberDashboardStats(ctx, req.(*GetSubscriberDashboardStatsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _BuyerService_BatchGetSubscriberCounts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BatchGetSubscriberCountsRequest)
 	if err := dec(in); err != nil {
@@ -1908,10 +1874,6 @@ var BuyerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSubscribersList",
 			Handler:    _BuyerService_GetSubscribersList_Handler,
-		},
-		{
-			MethodName: "GetSubscriberDashboardStats",
-			Handler:    _BuyerService_GetSubscriberDashboardStats_Handler,
 		},
 		{
 			MethodName: "BatchGetSubscriberCounts",

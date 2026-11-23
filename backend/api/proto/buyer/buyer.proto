@@ -47,7 +47,6 @@ service BuyerService {
     rpc UnsubscribeSeller(UnsubscribeSellerRequest) returns (UnsubscribeSellerResponse);
     rpc CheckSubscription(CheckSubscriptionRequest) returns (CheckSubscriptionResponse);
     rpc GetSubscribersList(GetSubscribersListRequest) returns (SubscribersListResponse);
-    rpc GetSubscriberDashboardStats(GetSubscriberDashboardStatsRequest) returns (SubscriberDashboardStatsResponse);
 
     // 批次取得多個賣家的訂閱數（內部服務間呼叫）
     rpc BatchGetSubscriberCounts(BatchGetSubscriberCountsRequest) returns (BatchGetSubscriberCountsResponse);
@@ -734,21 +733,6 @@ message ResolvePrincipalsResponse {
     // 請求的 ids 裡沒有存活買家列的（已關閉或不存在）。這些 id 不會出現在 principals 裡（單體的 buyer_id 與 account_id 是兩個獨立的
     // 序列，原樣回吐一定是錯的 account_id）；呼叫方以 key 不存在或出現在這裡判斷為未解析，並依用途 fail-closed 或降級。
     repeated int64 unresolved_ids = 4;
-}
-
-// ========== Subscriber Dashboard Stats ==========
-
-message GetSubscriberDashboardStatsRequest {
-    int64 store_id = 1;
-    reserved 2;
-    reserved "period_days";
-}
-
-message SubscriberDashboardStatsResponse {
-    int32 code = 1;
-    string message = 2;
-    int64 total = 3;       // 總訂閱者數
-    int32 growth_pct = 4;  // 環比百分比
 }
 
 // ========== Batch Subscriber Counts（內部服務間呼叫）==========

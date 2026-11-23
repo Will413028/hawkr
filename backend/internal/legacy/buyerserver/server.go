@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"math"
 	"strconv"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/twaddr"
-	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
 type Server struct {
@@ -271,38 +269,6 @@ func (s *Server) GetBuyerEntitlement(ctx context.Context, req *connect.Request[p
 		return connect.NewResponse(&pb.BuyerEntitlement{Code: code, Message: msg}), nil
 	}
 	return connect.NewResponse(&pb.BuyerEntitlement{PlanCode: e.PlanCode, MonthlyAnswerLimit: format(int64(e.MonthlyAnswerLimit)), PeriodStart: e.PeriodStart.UTC().Format(time.RFC3339), PeriodEnd: e.PeriodEnd.UTC().Format(time.RFC3339), Source: string(e.Source)}), nil
-}
-
-// subscriberWeeks 回傳舊儀表板的兩個時間窗：本週 [台北週日 00:00, now) 與上週 [上一個週日 00:00, 本週日 00:00)。
-func subscriberWeeks(now time.Time) (thisWeek, lastWeek buyer.TimeWindow) {
-	local := now.In(twtime.Taipei)
-	sunday := time.Date(local.Year(), local.Month(), local.Day()-int(local.Weekday()), 0, 0, 0, 0, twtime.Taipei)
-	return buyer.TimeWindow{Start: sunday, End: now}, buyer.TimeWindow{Start: sunday.AddDate(0, 0, -7), End: sunday}
-}
-
-// subscriberGrowthPct 是舊儀表板的成長率：round((本週 − 上週) / max(上週, 1) × 100)，夾在 int32 範圍內。
-func subscriberGrowthPct(thisWeek, lastWeek int64) int32 {
-	growth := math.Round(float64(thisWeek-lastWeek) / float64(max(lastWeek, 1)) * 100)
-	if growth > math.MaxInt32 {
-		growth = math.MaxInt32
-	}
-	if growth < math.MinInt32 {
-		growth = math.MinInt32
-	}
-	return int32(growth)
-}
-
-func (s *Server) GetSubscriberDashboardStats(ctx context.Context, req *connect.Request[pb.GetSubscriberDashboardStatsRequest]) (*connect.Response[pb.SubscriberDashboardStatsResponse], error) {
-	thisWeek, lastWeek := subscriberWeeks(s.now())
-	stats, err := s.buyer.SubscriberStats(ctx, req.Msg.GetStoreId(), []buyer.TimeWindow{thisWeek, lastWeek})
-	if err != nil {
-		code, msg, fatal := failure(err)
-		if fatal != nil {
-			return nil, fatal
-		}
-		return connect.NewResponse(&pb.SubscriberDashboardStatsResponse{Code: code, Message: msg}), nil
-	}
-	return connect.NewResponse(&pb.SubscriberDashboardStatsResponse{Total: stats.Total, GrowthPct: subscriberGrowthPct(stats.New[0], stats.New[1])}), nil
 }
 
 func (s *Server) BatchGetSubscriberCounts(ctx context.Context, req *connect.Request[pb.BatchGetSubscriberCountsRequest]) (*connect.Response[pb.BatchGetSubscriberCountsResponse], error) {

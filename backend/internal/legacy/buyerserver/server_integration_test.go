@@ -132,12 +132,6 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
-	t.Run("GetSubscriberDashboardStats", func(t *testing.T) {
-		r, e := s.GetSubscriberDashboardStats(ctx, connect.NewRequest(&pb.GetSubscriberDashboardStatsRequest{StoreId: 91}))
-		if e != nil || r.Msg.GetTotal() != 1 {
-			t.Fatalf("%v %v", r, e)
-		}
-	})
 	t.Run("BatchGetSubscriberCounts", func(t *testing.T) {
 		r, e := s.BatchGetSubscriberCounts(ctx, connect.NewRequest(&pb.BatchGetSubscriberCountsRequest{StoreIds: []int64{91}}))
 		if e != nil || r.Msg.GetCounts()[91] != 1 {

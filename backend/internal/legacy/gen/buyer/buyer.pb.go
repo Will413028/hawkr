@@ -5012,118 +5012,6 @@ func (x *ResolvePrincipalsResponse) GetUnresolvedIds() []int64 {
 	return nil
 }
 
-type GetSubscriberDashboardStatsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StoreId       int64                  `protobuf:"varint,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetSubscriberDashboardStatsRequest) Reset() {
-	*x = GetSubscriberDashboardStatsRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[74]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetSubscriberDashboardStatsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetSubscriberDashboardStatsRequest) ProtoMessage() {}
-
-func (x *GetSubscriberDashboardStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[74]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetSubscriberDashboardStatsRequest.ProtoReflect.Descriptor instead.
-func (*GetSubscriberDashboardStatsRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{74}
-}
-
-func (x *GetSubscriberDashboardStatsRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-type SubscriberDashboardStatsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Total         int64                  `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`                          // 總訂閱者數
-	GrowthPct     int32                  `protobuf:"varint,4,opt,name=growth_pct,json=growthPct,proto3" json:"growth_pct,omitempty"` // 環比百分比
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubscriberDashboardStatsResponse) Reset() {
-	*x = SubscriberDashboardStatsResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[75]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubscriberDashboardStatsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubscriberDashboardStatsResponse) ProtoMessage() {}
-
-func (x *SubscriberDashboardStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[75]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubscriberDashboardStatsResponse.ProtoReflect.Descriptor instead.
-func (*SubscriberDashboardStatsResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{75}
-}
-
-func (x *SubscriberDashboardStatsResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *SubscriberDashboardStatsResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *SubscriberDashboardStatsResponse) GetTotal() int64 {
-	if x != nil {
-		return x.Total
-	}
-	return 0
-}
-
-func (x *SubscriberDashboardStatsResponse) GetGrowthPct() int32 {
-	if x != nil {
-		return x.GrowthPct
-	}
-	return 0
-}
-
 type BatchGetSubscriberCountsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StoreIds      []int64                `protobuf:"varint,1,rep,packed,name=store_ids,json=storeIds,proto3" json:"store_ids,omitempty"`
@@ -5133,7 +5021,7 @@ type BatchGetSubscriberCountsRequest struct {
 
 func (x *BatchGetSubscriberCountsRequest) Reset() {
 	*x = BatchGetSubscriberCountsRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[76]
+	mi := &file_buyer_buyer_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5145,7 +5033,7 @@ func (x *BatchGetSubscriberCountsRequest) String() string {
 func (*BatchGetSubscriberCountsRequest) ProtoMessage() {}
 
 func (x *BatchGetSubscriberCountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[76]
+	mi := &file_buyer_buyer_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5158,7 +5046,7 @@ func (x *BatchGetSubscriberCountsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchGetSubscriberCountsRequest.ProtoReflect.Descriptor instead.
 func (*BatchGetSubscriberCountsRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{76}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *BatchGetSubscriberCountsRequest) GetStoreIds() []int64 {
@@ -5179,7 +5067,7 @@ type BatchGetSubscriberCountsResponse struct {
 
 func (x *BatchGetSubscriberCountsResponse) Reset() {
 	*x = BatchGetSubscriberCountsResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[77]
+	mi := &file_buyer_buyer_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5191,7 +5079,7 @@ func (x *BatchGetSubscriberCountsResponse) String() string {
 func (*BatchGetSubscriberCountsResponse) ProtoMessage() {}
 
 func (x *BatchGetSubscriberCountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[77]
+	mi := &file_buyer_buyer_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5204,7 +5092,7 @@ func (x *BatchGetSubscriberCountsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchGetSubscriberCountsResponse.ProtoReflect.Descriptor instead.
 func (*BatchGetSubscriberCountsResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{77}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *BatchGetSubscriberCountsResponse) GetCode() int32 {
@@ -5240,7 +5128,7 @@ type GetSavedItemsRequest struct {
 
 func (x *GetSavedItemsRequest) Reset() {
 	*x = GetSavedItemsRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[78]
+	mi := &file_buyer_buyer_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5252,7 +5140,7 @@ func (x *GetSavedItemsRequest) String() string {
 func (*GetSavedItemsRequest) ProtoMessage() {}
 
 func (x *GetSavedItemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[78]
+	mi := &file_buyer_buyer_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5265,7 +5153,7 @@ func (x *GetSavedItemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSavedItemsRequest.ProtoReflect.Descriptor instead.
 func (*GetSavedItemsRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{78}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *GetSavedItemsRequest) GetBuyerId() int64 {
@@ -5312,7 +5200,7 @@ type SavedItemsResponse struct {
 
 func (x *SavedItemsResponse) Reset() {
 	*x = SavedItemsResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[79]
+	mi := &file_buyer_buyer_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5324,7 +5212,7 @@ func (x *SavedItemsResponse) String() string {
 func (*SavedItemsResponse) ProtoMessage() {}
 
 func (x *SavedItemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[79]
+	mi := &file_buyer_buyer_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5337,7 +5225,7 @@ func (x *SavedItemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SavedItemsResponse.ProtoReflect.Descriptor instead.
 func (*SavedItemsResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{79}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *SavedItemsResponse) GetCode() int32 {
@@ -5399,7 +5287,7 @@ type SavedItemTab struct {
 
 func (x *SavedItemTab) Reset() {
 	*x = SavedItemTab{}
-	mi := &file_buyer_buyer_proto_msgTypes[80]
+	mi := &file_buyer_buyer_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5411,7 +5299,7 @@ func (x *SavedItemTab) String() string {
 func (*SavedItemTab) ProtoMessage() {}
 
 func (x *SavedItemTab) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[80]
+	mi := &file_buyer_buyer_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5424,7 +5312,7 @@ func (x *SavedItemTab) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SavedItemTab.ProtoReflect.Descriptor instead.
 func (*SavedItemTab) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{80}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *SavedItemTab) GetTargetType() string {
@@ -5470,7 +5358,7 @@ type SavedItem struct {
 
 func (x *SavedItem) Reset() {
 	*x = SavedItem{}
-	mi := &file_buyer_buyer_proto_msgTypes[81]
+	mi := &file_buyer_buyer_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5482,7 +5370,7 @@ func (x *SavedItem) String() string {
 func (*SavedItem) ProtoMessage() {}
 
 func (x *SavedItem) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[81]
+	mi := &file_buyer_buyer_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5495,7 +5383,7 @@ func (x *SavedItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SavedItem.ProtoReflect.Descriptor instead.
 func (*SavedItem) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{81}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *SavedItem) GetId() string {
@@ -5613,7 +5501,7 @@ type SubscribeRestockRequest struct {
 
 func (x *SubscribeRestockRequest) Reset() {
 	*x = SubscribeRestockRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[82]
+	mi := &file_buyer_buyer_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5625,7 +5513,7 @@ func (x *SubscribeRestockRequest) String() string {
 func (*SubscribeRestockRequest) ProtoMessage() {}
 
 func (x *SubscribeRestockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[82]
+	mi := &file_buyer_buyer_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5638,7 +5526,7 @@ func (x *SubscribeRestockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRestockRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRestockRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{82}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *SubscribeRestockRequest) GetBuyerId() int64 {
@@ -5668,7 +5556,7 @@ type SubscribeRestockResponse struct {
 
 func (x *SubscribeRestockResponse) Reset() {
 	*x = SubscribeRestockResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[83]
+	mi := &file_buyer_buyer_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5680,7 +5568,7 @@ func (x *SubscribeRestockResponse) String() string {
 func (*SubscribeRestockResponse) ProtoMessage() {}
 
 func (x *SubscribeRestockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[83]
+	mi := &file_buyer_buyer_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5693,7 +5581,7 @@ func (x *SubscribeRestockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRestockResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeRestockResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{83}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *SubscribeRestockResponse) GetCode() int32 {
@@ -5741,7 +5629,7 @@ type UnsubscribeRestockRequest struct {
 
 func (x *UnsubscribeRestockRequest) Reset() {
 	*x = UnsubscribeRestockRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[84]
+	mi := &file_buyer_buyer_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5753,7 +5641,7 @@ func (x *UnsubscribeRestockRequest) String() string {
 func (*UnsubscribeRestockRequest) ProtoMessage() {}
 
 func (x *UnsubscribeRestockRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[84]
+	mi := &file_buyer_buyer_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5766,7 +5654,7 @@ func (x *UnsubscribeRestockRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeRestockRequest.ProtoReflect.Descriptor instead.
 func (*UnsubscribeRestockRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{84}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *UnsubscribeRestockRequest) GetBuyerId() int64 {
@@ -5793,7 +5681,7 @@ type UnsubscribeRestockResponse struct {
 
 func (x *UnsubscribeRestockResponse) Reset() {
 	*x = UnsubscribeRestockResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[85]
+	mi := &file_buyer_buyer_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5805,7 +5693,7 @@ func (x *UnsubscribeRestockResponse) String() string {
 func (*UnsubscribeRestockResponse) ProtoMessage() {}
 
 func (x *UnsubscribeRestockResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[85]
+	mi := &file_buyer_buyer_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5818,7 +5706,7 @@ func (x *UnsubscribeRestockResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeRestockResponse.ProtoReflect.Descriptor instead.
 func (*UnsubscribeRestockResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{85}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *UnsubscribeRestockResponse) GetCode() int32 {
@@ -5846,7 +5734,7 @@ type ListRestockSubscriptionsRequest struct {
 
 func (x *ListRestockSubscriptionsRequest) Reset() {
 	*x = ListRestockSubscriptionsRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[86]
+	mi := &file_buyer_buyer_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5858,7 +5746,7 @@ func (x *ListRestockSubscriptionsRequest) String() string {
 func (*ListRestockSubscriptionsRequest) ProtoMessage() {}
 
 func (x *ListRestockSubscriptionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[86]
+	mi := &file_buyer_buyer_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5871,7 +5759,7 @@ func (x *ListRestockSubscriptionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRestockSubscriptionsRequest.ProtoReflect.Descriptor instead.
 func (*ListRestockSubscriptionsRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{86}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *ListRestockSubscriptionsRequest) GetBuyerId() int64 {
@@ -5911,7 +5799,7 @@ type RestockSubscriptionInfo struct {
 
 func (x *RestockSubscriptionInfo) Reset() {
 	*x = RestockSubscriptionInfo{}
-	mi := &file_buyer_buyer_proto_msgTypes[87]
+	mi := &file_buyer_buyer_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5923,7 +5811,7 @@ func (x *RestockSubscriptionInfo) String() string {
 func (*RestockSubscriptionInfo) ProtoMessage() {}
 
 func (x *RestockSubscriptionInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[87]
+	mi := &file_buyer_buyer_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5936,7 +5824,7 @@ func (x *RestockSubscriptionInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestockSubscriptionInfo.ProtoReflect.Descriptor instead.
 func (*RestockSubscriptionInfo) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{87}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *RestockSubscriptionInfo) GetSubscriptionId() string {
@@ -6008,7 +5896,7 @@ type ListRestockSubscriptionsResponse struct {
 
 func (x *ListRestockSubscriptionsResponse) Reset() {
 	*x = ListRestockSubscriptionsResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[88]
+	mi := &file_buyer_buyer_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6020,7 +5908,7 @@ func (x *ListRestockSubscriptionsResponse) String() string {
 func (*ListRestockSubscriptionsResponse) ProtoMessage() {}
 
 func (x *ListRestockSubscriptionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[88]
+	mi := &file_buyer_buyer_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6033,7 +5921,7 @@ func (x *ListRestockSubscriptionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRestockSubscriptionsResponse.ProtoReflect.Descriptor instead.
 func (*ListRestockSubscriptionsResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{88}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *ListRestockSubscriptionsResponse) GetCode() int32 {
@@ -6081,7 +5969,7 @@ type BatchCheckRestockSubscriptionsRequest struct {
 
 func (x *BatchCheckRestockSubscriptionsRequest) Reset() {
 	*x = BatchCheckRestockSubscriptionsRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[89]
+	mi := &file_buyer_buyer_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6093,7 +5981,7 @@ func (x *BatchCheckRestockSubscriptionsRequest) String() string {
 func (*BatchCheckRestockSubscriptionsRequest) ProtoMessage() {}
 
 func (x *BatchCheckRestockSubscriptionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[89]
+	mi := &file_buyer_buyer_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6106,7 +5994,7 @@ func (x *BatchCheckRestockSubscriptionsRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use BatchCheckRestockSubscriptionsRequest.ProtoReflect.Descriptor instead.
 func (*BatchCheckRestockSubscriptionsRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{89}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *BatchCheckRestockSubscriptionsRequest) GetBuyerId() int64 {
@@ -6134,7 +6022,7 @@ type BatchCheckRestockSubscriptionsResponse struct {
 
 func (x *BatchCheckRestockSubscriptionsResponse) Reset() {
 	*x = BatchCheckRestockSubscriptionsResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[90]
+	mi := &file_buyer_buyer_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6146,7 +6034,7 @@ func (x *BatchCheckRestockSubscriptionsResponse) String() string {
 func (*BatchCheckRestockSubscriptionsResponse) ProtoMessage() {}
 
 func (x *BatchCheckRestockSubscriptionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[90]
+	mi := &file_buyer_buyer_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6159,7 +6047,7 @@ func (x *BatchCheckRestockSubscriptionsResponse) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use BatchCheckRestockSubscriptionsResponse.ProtoReflect.Descriptor instead.
 func (*BatchCheckRestockSubscriptionsResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{90}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *BatchCheckRestockSubscriptionsResponse) GetCode() int32 {
@@ -6192,7 +6080,7 @@ type ListBuyerIDsByAccountRequest struct {
 
 func (x *ListBuyerIDsByAccountRequest) Reset() {
 	*x = ListBuyerIDsByAccountRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[91]
+	mi := &file_buyer_buyer_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6204,7 +6092,7 @@ func (x *ListBuyerIDsByAccountRequest) String() string {
 func (*ListBuyerIDsByAccountRequest) ProtoMessage() {}
 
 func (x *ListBuyerIDsByAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[91]
+	mi := &file_buyer_buyer_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6217,7 +6105,7 @@ func (x *ListBuyerIDsByAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBuyerIDsByAccountRequest.ProtoReflect.Descriptor instead.
 func (*ListBuyerIDsByAccountRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{91}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *ListBuyerIDsByAccountRequest) GetAccountId() int64 {
@@ -6238,7 +6126,7 @@ type ListBuyerIDsByAccountResponse struct {
 
 func (x *ListBuyerIDsByAccountResponse) Reset() {
 	*x = ListBuyerIDsByAccountResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[92]
+	mi := &file_buyer_buyer_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6250,7 +6138,7 @@ func (x *ListBuyerIDsByAccountResponse) String() string {
 func (*ListBuyerIDsByAccountResponse) ProtoMessage() {}
 
 func (x *ListBuyerIDsByAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[92]
+	mi := &file_buyer_buyer_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6263,7 +6151,7 @@ func (x *ListBuyerIDsByAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBuyerIDsByAccountResponse.ProtoReflect.Descriptor instead.
 func (*ListBuyerIDsByAccountResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{92}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *ListBuyerIDsByAccountResponse) GetCode() int32 {
@@ -6295,7 +6183,7 @@ type GetBuyerStatsForAdminRequest struct {
 
 func (x *GetBuyerStatsForAdminRequest) Reset() {
 	*x = GetBuyerStatsForAdminRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[93]
+	mi := &file_buyer_buyer_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6307,7 +6195,7 @@ func (x *GetBuyerStatsForAdminRequest) String() string {
 func (*GetBuyerStatsForAdminRequest) ProtoMessage() {}
 
 func (x *GetBuyerStatsForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[93]
+	mi := &file_buyer_buyer_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6320,7 +6208,7 @@ func (x *GetBuyerStatsForAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBuyerStatsForAdminRequest.ProtoReflect.Descriptor instead.
 func (*GetBuyerStatsForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{93}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{91}
 }
 
 type GetBuyerStatsForAdminResponse struct {
@@ -6334,7 +6222,7 @@ type GetBuyerStatsForAdminResponse struct {
 
 func (x *GetBuyerStatsForAdminResponse) Reset() {
 	*x = GetBuyerStatsForAdminResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[94]
+	mi := &file_buyer_buyer_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6346,7 +6234,7 @@ func (x *GetBuyerStatsForAdminResponse) String() string {
 func (*GetBuyerStatsForAdminResponse) ProtoMessage() {}
 
 func (x *GetBuyerStatsForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[94]
+	mi := &file_buyer_buyer_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6359,7 +6247,7 @@ func (x *GetBuyerStatsForAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBuyerStatsForAdminResponse.ProtoReflect.Descriptor instead.
 func (*GetBuyerStatsForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{94}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *GetBuyerStatsForAdminResponse) GetCode() int32 {
@@ -6392,7 +6280,7 @@ type AdminBuyerStats struct {
 
 func (x *AdminBuyerStats) Reset() {
 	*x = AdminBuyerStats{}
-	mi := &file_buyer_buyer_proto_msgTypes[95]
+	mi := &file_buyer_buyer_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6404,7 +6292,7 @@ func (x *AdminBuyerStats) String() string {
 func (*AdminBuyerStats) ProtoMessage() {}
 
 func (x *AdminBuyerStats) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[95]
+	mi := &file_buyer_buyer_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6417,7 +6305,7 @@ func (x *AdminBuyerStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminBuyerStats.ProtoReflect.Descriptor instead.
 func (*AdminBuyerStats) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{95}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *AdminBuyerStats) GetTotal() string {
@@ -6436,7 +6324,7 @@ type GetBuyerEntitlementRequest struct {
 
 func (x *GetBuyerEntitlementRequest) Reset() {
 	*x = GetBuyerEntitlementRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[96]
+	mi := &file_buyer_buyer_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6448,7 +6336,7 @@ func (x *GetBuyerEntitlementRequest) String() string {
 func (*GetBuyerEntitlementRequest) ProtoMessage() {}
 
 func (x *GetBuyerEntitlementRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[96]
+	mi := &file_buyer_buyer_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6461,7 +6349,7 @@ func (x *GetBuyerEntitlementRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBuyerEntitlementRequest.ProtoReflect.Descriptor instead.
 func (*GetBuyerEntitlementRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{96}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *GetBuyerEntitlementRequest) GetBuyerId() string {
@@ -6486,7 +6374,7 @@ type BuyerEntitlement struct {
 
 func (x *BuyerEntitlement) Reset() {
 	*x = BuyerEntitlement{}
-	mi := &file_buyer_buyer_proto_msgTypes[97]
+	mi := &file_buyer_buyer_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6498,7 +6386,7 @@ func (x *BuyerEntitlement) String() string {
 func (*BuyerEntitlement) ProtoMessage() {}
 
 func (x *BuyerEntitlement) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[97]
+	mi := &file_buyer_buyer_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6511,7 +6399,7 @@ func (x *BuyerEntitlement) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuyerEntitlement.ProtoReflect.Descriptor instead.
 func (*BuyerEntitlement) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{97}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *BuyerEntitlement) GetCode() int32 {
@@ -6577,7 +6465,7 @@ type AssignMembershipRequest struct {
 
 func (x *AssignMembershipRequest) Reset() {
 	*x = AssignMembershipRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[98]
+	mi := &file_buyer_buyer_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6589,7 +6477,7 @@ func (x *AssignMembershipRequest) String() string {
 func (*AssignMembershipRequest) ProtoMessage() {}
 
 func (x *AssignMembershipRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[98]
+	mi := &file_buyer_buyer_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6602,7 +6490,7 @@ func (x *AssignMembershipRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignMembershipRequest.ProtoReflect.Descriptor instead.
 func (*AssignMembershipRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{98}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *AssignMembershipRequest) GetBuyerId() string {
@@ -6655,7 +6543,7 @@ type ListMembershipPlansRequest struct {
 
 func (x *ListMembershipPlansRequest) Reset() {
 	*x = ListMembershipPlansRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[99]
+	mi := &file_buyer_buyer_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6667,7 +6555,7 @@ func (x *ListMembershipPlansRequest) String() string {
 func (*ListMembershipPlansRequest) ProtoMessage() {}
 
 func (x *ListMembershipPlansRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[99]
+	mi := &file_buyer_buyer_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6680,7 +6568,7 @@ func (x *ListMembershipPlansRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMembershipPlansRequest.ProtoReflect.Descriptor instead.
 func (*ListMembershipPlansRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{99}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{97}
 }
 
 type MembershipPlan struct {
@@ -6698,7 +6586,7 @@ type MembershipPlan struct {
 
 func (x *MembershipPlan) Reset() {
 	*x = MembershipPlan{}
-	mi := &file_buyer_buyer_proto_msgTypes[100]
+	mi := &file_buyer_buyer_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6710,7 +6598,7 @@ func (x *MembershipPlan) String() string {
 func (*MembershipPlan) ProtoMessage() {}
 
 func (x *MembershipPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[100]
+	mi := &file_buyer_buyer_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6723,7 +6611,7 @@ func (x *MembershipPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MembershipPlan.ProtoReflect.Descriptor instead.
 func (*MembershipPlan) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{100}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *MembershipPlan) GetPlanCode() string {
@@ -6786,7 +6674,7 @@ type ListMembershipPlansResponse struct {
 
 func (x *ListMembershipPlansResponse) Reset() {
 	*x = ListMembershipPlansResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[101]
+	mi := &file_buyer_buyer_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6798,7 +6686,7 @@ func (x *ListMembershipPlansResponse) String() string {
 func (*ListMembershipPlansResponse) ProtoMessage() {}
 
 func (x *ListMembershipPlansResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[101]
+	mi := &file_buyer_buyer_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6811,7 +6699,7 @@ func (x *ListMembershipPlansResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMembershipPlansResponse.ProtoReflect.Descriptor instead.
 func (*ListMembershipPlansResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{101}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *ListMembershipPlansResponse) GetCode() int32 {
@@ -6854,7 +6742,7 @@ type UpdateMembershipPlanRequest struct {
 
 func (x *UpdateMembershipPlanRequest) Reset() {
 	*x = UpdateMembershipPlanRequest{}
-	mi := &file_buyer_buyer_proto_msgTypes[102]
+	mi := &file_buyer_buyer_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6866,7 +6754,7 @@ func (x *UpdateMembershipPlanRequest) String() string {
 func (*UpdateMembershipPlanRequest) ProtoMessage() {}
 
 func (x *UpdateMembershipPlanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[102]
+	mi := &file_buyer_buyer_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6879,7 +6767,7 @@ func (x *UpdateMembershipPlanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMembershipPlanRequest.ProtoReflect.Descriptor instead.
 func (*UpdateMembershipPlanRequest) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{102}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *UpdateMembershipPlanRequest) GetPlanCode() string {
@@ -6941,7 +6829,7 @@ type UpdateMembershipPlanResponse struct {
 
 func (x *UpdateMembershipPlanResponse) Reset() {
 	*x = UpdateMembershipPlanResponse{}
-	mi := &file_buyer_buyer_proto_msgTypes[103]
+	mi := &file_buyer_buyer_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6953,7 +6841,7 @@ func (x *UpdateMembershipPlanResponse) String() string {
 func (*UpdateMembershipPlanResponse) ProtoMessage() {}
 
 func (x *UpdateMembershipPlanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_buyer_buyer_proto_msgTypes[103]
+	mi := &file_buyer_buyer_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6966,7 +6854,7 @@ func (x *UpdateMembershipPlanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateMembershipPlanResponse.ProtoReflect.Descriptor instead.
 func (*UpdateMembershipPlanResponse) Descriptor() ([]byte, []int) {
-	return file_buyer_buyer_proto_rawDescGZIP(), []int{103}
+	return file_buyer_buyer_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *UpdateMembershipPlanResponse) GetCode() int32 {
@@ -7412,15 +7300,7 @@ const file_buyer_buyer_proto_rawDesc = "" +
 	"\x0eunresolved_ids\x18\x04 \x03(\x03R\runresolvedIds\x1a=\n" +
 	"\x0fPrincipalsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x03R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"R\n" +
-	"\"GetSubscriberDashboardStatsRequest\x12\x19\n" +
-	"\bstore_id\x18\x01 \x01(\x03R\astoreIdJ\x04\b\x02\x10\x03R\vperiod_days\"\x85\x01\n" +
-	" SubscriberDashboardStatsResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
-	"\x05total\x18\x03 \x01(\x03R\x05total\x12\x1d\n" +
-	"\n" +
-	"growth_pct\x18\x04 \x01(\x05R\tgrowthPct\">\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\">\n" +
 	"\x1fBatchGetSubscriberCountsRequest\x12\x1b\n" +
 	"\tstore_ids\x18\x01 \x03(\x03R\bstoreIds\"\xde\x01\n" +
 	" BatchGetSubscriberCountsResponse\x12\x12\n" +
@@ -7581,7 +7461,7 @@ const file_buyer_buyer_proto_rawDesc = "" +
 	"\x12has_is_purchasable\x18\a \x01(\bR\x10hasIsPurchasable\"L\n" +
 	"\x1cUpdateMembershipPlanResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xa8%\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\xa9$\n" +
 	"\fBuyerService\x12Y\n" +
 	"\x0fGetBuyerProfile\x12#.hawkr.buyer.GetBuyerProfileRequest\x1a!.hawkr.buyer.BuyerProfileResponse\x12k\n" +
 	"\x18GetBuyerProfileByBuyerID\x12,.hawkr.buyer.GetBuyerProfileByBuyerIDRequest\x1a!.hawkr.buyer.BuyerProfileResponse\x12k\n" +
@@ -7609,8 +7489,7 @@ const file_buyer_buyer_proto_rawDesc = "" +
 	"\x0fSubscribeSeller\x12#.hawkr.buyer.SubscribeSellerRequest\x1a$.hawkr.buyer.SubscribeSellerResponse\x12b\n" +
 	"\x11UnsubscribeSeller\x12%.hawkr.buyer.UnsubscribeSellerRequest\x1a&.hawkr.buyer.UnsubscribeSellerResponse\x12b\n" +
 	"\x11CheckSubscription\x12%.hawkr.buyer.CheckSubscriptionRequest\x1a&.hawkr.buyer.CheckSubscriptionResponse\x12b\n" +
-	"\x12GetSubscribersList\x12&.hawkr.buyer.GetSubscribersListRequest\x1a$.hawkr.buyer.SubscribersListResponse\x12}\n" +
-	"\x1bGetSubscriberDashboardStats\x12/.hawkr.buyer.GetSubscriberDashboardStatsRequest\x1a-.hawkr.buyer.SubscriberDashboardStatsResponse\x12w\n" +
+	"\x12GetSubscribersList\x12&.hawkr.buyer.GetSubscribersListRequest\x1a$.hawkr.buyer.SubscribersListResponse\x12w\n" +
 	"\x18BatchGetSubscriberCounts\x12,.hawkr.buyer.BatchGetSubscriberCountsRequest\x1a-.hawkr.buyer.BatchGetSubscriberCountsResponse\x12S\n" +
 	"\rGetSavedItems\x12!.hawkr.buyer.GetSavedItemsRequest\x1a\x1f.hawkr.buyer.SavedItemsResponse\x12P\n" +
 	"\fGetVisitList\x12 .hawkr.buyer.GetVisitListRequest\x1a\x1e.hawkr.buyer.VisitListResponse\x12S\n" +
@@ -7647,7 +7526,7 @@ func file_buyer_buyer_proto_rawDescGZIP() []byte {
 	return file_buyer_buyer_proto_rawDescData
 }
 
-var file_buyer_buyer_proto_msgTypes = make([]protoimpl.MessageInfo, 109)
+var file_buyer_buyer_proto_msgTypes = make([]protoimpl.MessageInfo, 107)
 var file_buyer_buyer_proto_goTypes = []any{
 	(*GetBuyerProfileRequest)(nil),                 // 0: hawkr.buyer.GetBuyerProfileRequest
 	(*GetBuyerProfileByBuyerIDRequest)(nil),        // 1: hawkr.buyer.GetBuyerProfileByBuyerIDRequest
@@ -7723,41 +7602,39 @@ var file_buyer_buyer_proto_goTypes = []any{
 	(*BatchGetBuyerDisplayByBuyerIDsResponse)(nil), // 71: hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse
 	(*ResolvePrincipalsRequest)(nil),               // 72: hawkr.buyer.ResolvePrincipalsRequest
 	(*ResolvePrincipalsResponse)(nil),              // 73: hawkr.buyer.ResolvePrincipalsResponse
-	(*GetSubscriberDashboardStatsRequest)(nil),     // 74: hawkr.buyer.GetSubscriberDashboardStatsRequest
-	(*SubscriberDashboardStatsResponse)(nil),       // 75: hawkr.buyer.SubscriberDashboardStatsResponse
-	(*BatchGetSubscriberCountsRequest)(nil),        // 76: hawkr.buyer.BatchGetSubscriberCountsRequest
-	(*BatchGetSubscriberCountsResponse)(nil),       // 77: hawkr.buyer.BatchGetSubscriberCountsResponse
-	(*GetSavedItemsRequest)(nil),                   // 78: hawkr.buyer.GetSavedItemsRequest
-	(*SavedItemsResponse)(nil),                     // 79: hawkr.buyer.SavedItemsResponse
-	(*SavedItemTab)(nil),                           // 80: hawkr.buyer.SavedItemTab
-	(*SavedItem)(nil),                              // 81: hawkr.buyer.SavedItem
-	(*SubscribeRestockRequest)(nil),                // 82: hawkr.buyer.SubscribeRestockRequest
-	(*SubscribeRestockResponse)(nil),               // 83: hawkr.buyer.SubscribeRestockResponse
-	(*UnsubscribeRestockRequest)(nil),              // 84: hawkr.buyer.UnsubscribeRestockRequest
-	(*UnsubscribeRestockResponse)(nil),             // 85: hawkr.buyer.UnsubscribeRestockResponse
-	(*ListRestockSubscriptionsRequest)(nil),        // 86: hawkr.buyer.ListRestockSubscriptionsRequest
-	(*RestockSubscriptionInfo)(nil),                // 87: hawkr.buyer.RestockSubscriptionInfo
-	(*ListRestockSubscriptionsResponse)(nil),       // 88: hawkr.buyer.ListRestockSubscriptionsResponse
-	(*BatchCheckRestockSubscriptionsRequest)(nil),  // 89: hawkr.buyer.BatchCheckRestockSubscriptionsRequest
-	(*BatchCheckRestockSubscriptionsResponse)(nil), // 90: hawkr.buyer.BatchCheckRestockSubscriptionsResponse
-	(*ListBuyerIDsByAccountRequest)(nil),           // 91: hawkr.buyer.ListBuyerIDsByAccountRequest
-	(*ListBuyerIDsByAccountResponse)(nil),          // 92: hawkr.buyer.ListBuyerIDsByAccountResponse
-	(*GetBuyerStatsForAdminRequest)(nil),           // 93: hawkr.buyer.GetBuyerStatsForAdminRequest
-	(*GetBuyerStatsForAdminResponse)(nil),          // 94: hawkr.buyer.GetBuyerStatsForAdminResponse
-	(*AdminBuyerStats)(nil),                        // 95: hawkr.buyer.AdminBuyerStats
-	(*GetBuyerEntitlementRequest)(nil),             // 96: hawkr.buyer.GetBuyerEntitlementRequest
-	(*BuyerEntitlement)(nil),                       // 97: hawkr.buyer.BuyerEntitlement
-	(*AssignMembershipRequest)(nil),                // 98: hawkr.buyer.AssignMembershipRequest
-	(*ListMembershipPlansRequest)(nil),             // 99: hawkr.buyer.ListMembershipPlansRequest
-	(*MembershipPlan)(nil),                         // 100: hawkr.buyer.MembershipPlan
-	(*ListMembershipPlansResponse)(nil),            // 101: hawkr.buyer.ListMembershipPlansResponse
-	(*UpdateMembershipPlanRequest)(nil),            // 102: hawkr.buyer.UpdateMembershipPlanRequest
-	(*UpdateMembershipPlanResponse)(nil),           // 103: hawkr.buyer.UpdateMembershipPlanResponse
-	nil,                                            // 104: hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse.BuyersEntry
-	nil,                                            // 105: hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse.BuyersEntry
-	nil,                                            // 106: hawkr.buyer.ResolvePrincipalsResponse.PrincipalsEntry
-	nil,                                            // 107: hawkr.buyer.BatchGetSubscriberCountsResponse.CountsEntry
-	nil,                                            // 108: hawkr.buyer.BatchCheckRestockSubscriptionsResponse.SubscribedEntry
+	(*BatchGetSubscriberCountsRequest)(nil),        // 74: hawkr.buyer.BatchGetSubscriberCountsRequest
+	(*BatchGetSubscriberCountsResponse)(nil),       // 75: hawkr.buyer.BatchGetSubscriberCountsResponse
+	(*GetSavedItemsRequest)(nil),                   // 76: hawkr.buyer.GetSavedItemsRequest
+	(*SavedItemsResponse)(nil),                     // 77: hawkr.buyer.SavedItemsResponse
+	(*SavedItemTab)(nil),                           // 78: hawkr.buyer.SavedItemTab
+	(*SavedItem)(nil),                              // 79: hawkr.buyer.SavedItem
+	(*SubscribeRestockRequest)(nil),                // 80: hawkr.buyer.SubscribeRestockRequest
+	(*SubscribeRestockResponse)(nil),               // 81: hawkr.buyer.SubscribeRestockResponse
+	(*UnsubscribeRestockRequest)(nil),              // 82: hawkr.buyer.UnsubscribeRestockRequest
+	(*UnsubscribeRestockResponse)(nil),             // 83: hawkr.buyer.UnsubscribeRestockResponse
+	(*ListRestockSubscriptionsRequest)(nil),        // 84: hawkr.buyer.ListRestockSubscriptionsRequest
+	(*RestockSubscriptionInfo)(nil),                // 85: hawkr.buyer.RestockSubscriptionInfo
+	(*ListRestockSubscriptionsResponse)(nil),       // 86: hawkr.buyer.ListRestockSubscriptionsResponse
+	(*BatchCheckRestockSubscriptionsRequest)(nil),  // 87: hawkr.buyer.BatchCheckRestockSubscriptionsRequest
+	(*BatchCheckRestockSubscriptionsResponse)(nil), // 88: hawkr.buyer.BatchCheckRestockSubscriptionsResponse
+	(*ListBuyerIDsByAccountRequest)(nil),           // 89: hawkr.buyer.ListBuyerIDsByAccountRequest
+	(*ListBuyerIDsByAccountResponse)(nil),          // 90: hawkr.buyer.ListBuyerIDsByAccountResponse
+	(*GetBuyerStatsForAdminRequest)(nil),           // 91: hawkr.buyer.GetBuyerStatsForAdminRequest
+	(*GetBuyerStatsForAdminResponse)(nil),          // 92: hawkr.buyer.GetBuyerStatsForAdminResponse
+	(*AdminBuyerStats)(nil),                        // 93: hawkr.buyer.AdminBuyerStats
+	(*GetBuyerEntitlementRequest)(nil),             // 94: hawkr.buyer.GetBuyerEntitlementRequest
+	(*BuyerEntitlement)(nil),                       // 95: hawkr.buyer.BuyerEntitlement
+	(*AssignMembershipRequest)(nil),                // 96: hawkr.buyer.AssignMembershipRequest
+	(*ListMembershipPlansRequest)(nil),             // 97: hawkr.buyer.ListMembershipPlansRequest
+	(*MembershipPlan)(nil),                         // 98: hawkr.buyer.MembershipPlan
+	(*ListMembershipPlansResponse)(nil),            // 99: hawkr.buyer.ListMembershipPlansResponse
+	(*UpdateMembershipPlanRequest)(nil),            // 100: hawkr.buyer.UpdateMembershipPlanRequest
+	(*UpdateMembershipPlanResponse)(nil),           // 101: hawkr.buyer.UpdateMembershipPlanResponse
+	nil,                                            // 102: hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse.BuyersEntry
+	nil,                                            // 103: hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse.BuyersEntry
+	nil,                                            // 104: hawkr.buyer.ResolvePrincipalsResponse.PrincipalsEntry
+	nil,                                            // 105: hawkr.buyer.BatchGetSubscriberCountsResponse.CountsEntry
+	nil,                                            // 106: hawkr.buyer.BatchCheckRestockSubscriptionsResponse.SubscribedEntry
 }
 var file_buyer_buyer_proto_depIdxs = []int32{
 	7,   // 0: hawkr.buyer.GetBuyerProfileBatchResponse.data:type_name -> hawkr.buyer.BuyerInfo
@@ -7773,16 +7650,16 @@ var file_buyer_buyer_proto_depIdxs = []int32{
 	59,  // 10: hawkr.buyer.GetMemberCardsResponse.records:type_name -> hawkr.buyer.MemberCardItem
 	62,  // 11: hawkr.buyer.GetSpendingRecordsResponse.records:type_name -> hawkr.buyer.SpendingRecordItem
 	65,  // 12: hawkr.buyer.UpdateBuyerAvatarResponse.data:type_name -> hawkr.buyer.BuyerAvatarData
-	104, // 13: hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse.buyers:type_name -> hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse.BuyersEntry
-	105, // 14: hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse.buyers:type_name -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse.BuyersEntry
-	106, // 15: hawkr.buyer.ResolvePrincipalsResponse.principals:type_name -> hawkr.buyer.ResolvePrincipalsResponse.PrincipalsEntry
-	107, // 16: hawkr.buyer.BatchGetSubscriberCountsResponse.counts:type_name -> hawkr.buyer.BatchGetSubscriberCountsResponse.CountsEntry
-	81,  // 17: hawkr.buyer.SavedItemsResponse.data:type_name -> hawkr.buyer.SavedItem
-	80,  // 18: hawkr.buyer.SavedItemsResponse.tabs:type_name -> hawkr.buyer.SavedItemTab
-	87,  // 19: hawkr.buyer.ListRestockSubscriptionsResponse.records:type_name -> hawkr.buyer.RestockSubscriptionInfo
-	108, // 20: hawkr.buyer.BatchCheckRestockSubscriptionsResponse.subscribed:type_name -> hawkr.buyer.BatchCheckRestockSubscriptionsResponse.SubscribedEntry
-	95,  // 21: hawkr.buyer.GetBuyerStatsForAdminResponse.data:type_name -> hawkr.buyer.AdminBuyerStats
-	100, // 22: hawkr.buyer.ListMembershipPlansResponse.plans:type_name -> hawkr.buyer.MembershipPlan
+	102, // 13: hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse.buyers:type_name -> hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse.BuyersEntry
+	103, // 14: hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse.buyers:type_name -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse.BuyersEntry
+	104, // 15: hawkr.buyer.ResolvePrincipalsResponse.principals:type_name -> hawkr.buyer.ResolvePrincipalsResponse.PrincipalsEntry
+	105, // 16: hawkr.buyer.BatchGetSubscriberCountsResponse.counts:type_name -> hawkr.buyer.BatchGetSubscriberCountsResponse.CountsEntry
+	79,  // 17: hawkr.buyer.SavedItemsResponse.data:type_name -> hawkr.buyer.SavedItem
+	78,  // 18: hawkr.buyer.SavedItemsResponse.tabs:type_name -> hawkr.buyer.SavedItemTab
+	85,  // 19: hawkr.buyer.ListRestockSubscriptionsResponse.records:type_name -> hawkr.buyer.RestockSubscriptionInfo
+	106, // 20: hawkr.buyer.BatchCheckRestockSubscriptionsResponse.subscribed:type_name -> hawkr.buyer.BatchCheckRestockSubscriptionsResponse.SubscribedEntry
+	93,  // 21: hawkr.buyer.GetBuyerStatsForAdminResponse.data:type_name -> hawkr.buyer.AdminBuyerStats
+	98,  // 22: hawkr.buyer.ListMembershipPlansResponse.plans:type_name -> hawkr.buyer.MembershipPlan
 	67,  // 23: hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse.BuyersEntry.value:type_name -> hawkr.buyer.BuyerMeta
 	70,  // 24: hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse.BuyersEntry.value:type_name -> hawkr.buyer.BuyerDisplay
 	0,   // 25: hawkr.buyer.BuyerService.GetBuyerProfile:input_type -> hawkr.buyer.GetBuyerProfileRequest
@@ -7810,77 +7687,75 @@ var file_buyer_buyer_proto_depIdxs = []int32{
 	44,  // 47: hawkr.buyer.BuyerService.UnsubscribeSeller:input_type -> hawkr.buyer.UnsubscribeSellerRequest
 	46,  // 48: hawkr.buyer.BuyerService.CheckSubscription:input_type -> hawkr.buyer.CheckSubscriptionRequest
 	48,  // 49: hawkr.buyer.BuyerService.GetSubscribersList:input_type -> hawkr.buyer.GetSubscribersListRequest
-	74,  // 50: hawkr.buyer.BuyerService.GetSubscriberDashboardStats:input_type -> hawkr.buyer.GetSubscriberDashboardStatsRequest
-	76,  // 51: hawkr.buyer.BuyerService.BatchGetSubscriberCounts:input_type -> hawkr.buyer.BatchGetSubscriberCountsRequest
-	78,  // 52: hawkr.buyer.BuyerService.GetSavedItems:input_type -> hawkr.buyer.GetSavedItemsRequest
-	51,  // 53: hawkr.buyer.BuyerService.GetVisitList:input_type -> hawkr.buyer.GetVisitListRequest
-	54,  // 54: hawkr.buyer.BuyerService.RecordVisit:input_type -> hawkr.buyer.RecordVisitRequest
-	55,  // 55: hawkr.buyer.BuyerService.ClearVisitHistory:input_type -> hawkr.buyer.ClearVisitHistoryRequest
-	63,  // 56: hawkr.buyer.BuyerService.UpdateBuyerAvatar:input_type -> hawkr.buyer.UpdateBuyerAvatarRequest
-	57,  // 57: hawkr.buyer.BuyerService.GetMemberCards:input_type -> hawkr.buyer.GetMemberCardsRequest
-	60,  // 58: hawkr.buyer.BuyerService.GetSpendingRecords:input_type -> hawkr.buyer.GetSpendingRecordsRequest
-	66,  // 59: hawkr.buyer.BuyerService.BatchGetBuyerMetaByBuyerIDs:input_type -> hawkr.buyer.BatchGetBuyerMetaByBuyerIDsRequest
-	72,  // 60: hawkr.buyer.BuyerService.ResolvePrincipals:input_type -> hawkr.buyer.ResolvePrincipalsRequest
-	82,  // 61: hawkr.buyer.BuyerService.SubscribeRestock:input_type -> hawkr.buyer.SubscribeRestockRequest
-	84,  // 62: hawkr.buyer.BuyerService.UnsubscribeRestock:input_type -> hawkr.buyer.UnsubscribeRestockRequest
-	86,  // 63: hawkr.buyer.BuyerService.ListRestockSubscriptions:input_type -> hawkr.buyer.ListRestockSubscriptionsRequest
-	89,  // 64: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:input_type -> hawkr.buyer.BatchCheckRestockSubscriptionsRequest
-	91,  // 65: hawkr.buyer.BuyerService.ListBuyerIDsByAccount:input_type -> hawkr.buyer.ListBuyerIDsByAccountRequest
-	69,  // 66: hawkr.buyer.BuyerService.BatchGetBuyerDisplayByBuyerIDs:input_type -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsRequest
-	93,  // 67: hawkr.buyer.BuyerService.GetBuyerStatsForAdmin:input_type -> hawkr.buyer.GetBuyerStatsForAdminRequest
-	96,  // 68: hawkr.buyer.BuyerService.GetBuyerEntitlement:input_type -> hawkr.buyer.GetBuyerEntitlementRequest
-	98,  // 69: hawkr.buyer.BuyerService.AssignMembership:input_type -> hawkr.buyer.AssignMembershipRequest
-	99,  // 70: hawkr.buyer.BuyerService.ListMembershipPlans:input_type -> hawkr.buyer.ListMembershipPlansRequest
-	102, // 71: hawkr.buyer.BuyerService.UpdateMembershipPlan:input_type -> hawkr.buyer.UpdateMembershipPlanRequest
-	6,   // 72: hawkr.buyer.BuyerService.GetBuyerProfile:output_type -> hawkr.buyer.BuyerProfileResponse
-	6,   // 73: hawkr.buyer.BuyerService.GetBuyerProfileByBuyerID:output_type -> hawkr.buyer.BuyerProfileResponse
-	4,   // 74: hawkr.buyer.BuyerService.GetBuyerProfileBatch:output_type -> hawkr.buyer.GetBuyerProfileBatchResponse
-	6,   // 75: hawkr.buyer.BuyerService.UpdateBuyerProfile:output_type -> hawkr.buyer.BuyerProfileResponse
-	6,   // 76: hawkr.buyer.BuyerService.EnsureBuyerProfile:output_type -> hawkr.buyer.BuyerProfileResponse
-	9,   // 77: hawkr.buyer.BuyerService.GetAddressList:output_type -> hawkr.buyer.AddressListResponse
-	11,  // 78: hawkr.buyer.BuyerService.GetAddress:output_type -> hawkr.buyer.GetAddressResponse
-	16,  // 79: hawkr.buyer.BuyerService.AddAddress:output_type -> hawkr.buyer.AddressOperationResponse
-	16,  // 80: hawkr.buyer.BuyerService.UpdateAddress:output_type -> hawkr.buyer.AddressOperationResponse
-	16,  // 81: hawkr.buyer.BuyerService.DeleteAddress:output_type -> hawkr.buyer.AddressOperationResponse
-	19,  // 82: hawkr.buyer.BuyerService.SuggestAddress:output_type -> hawkr.buyer.SuggestAddressResponse
-	22,  // 83: hawkr.buyer.BuyerService.ValidateAddress:output_type -> hawkr.buyer.ValidateAddressResponse
-	24,  // 84: hawkr.buyer.BuyerService.GetFavoriteList:output_type -> hawkr.buyer.FavoriteListResponse
-	27,  // 85: hawkr.buyer.BuyerService.CheckFavorite:output_type -> hawkr.buyer.CheckFavoriteResponse
-	31,  // 86: hawkr.buyer.BuyerService.BatchCheckFavorites:output_type -> hawkr.buyer.BatchCheckFavoritesResponse
-	32,  // 87: hawkr.buyer.BuyerService.AddFavorite:output_type -> hawkr.buyer.FavoriteOperationResponse
-	32,  // 88: hawkr.buyer.BuyerService.RemoveFavorite:output_type -> hawkr.buyer.FavoriteOperationResponse
-	34,  // 89: hawkr.buyer.BuyerService.GetFavoriteCount:output_type -> hawkr.buyer.FavoriteCountResponse
-	36,  // 90: hawkr.buyer.BuyerService.ListFavoritedProductIds:output_type -> hawkr.buyer.ListFavoritedProductIdsResponse
-	38,  // 91: hawkr.buyer.BuyerService.ListSubscribedSellerIds:output_type -> hawkr.buyer.ListSubscribedSellerIdsResponse
-	40,  // 92: hawkr.buyer.BuyerService.GetSubscriptionList:output_type -> hawkr.buyer.SubscriptionListResponse
-	43,  // 93: hawkr.buyer.BuyerService.SubscribeSeller:output_type -> hawkr.buyer.SubscribeSellerResponse
-	45,  // 94: hawkr.buyer.BuyerService.UnsubscribeSeller:output_type -> hawkr.buyer.UnsubscribeSellerResponse
-	47,  // 95: hawkr.buyer.BuyerService.CheckSubscription:output_type -> hawkr.buyer.CheckSubscriptionResponse
-	49,  // 96: hawkr.buyer.BuyerService.GetSubscribersList:output_type -> hawkr.buyer.SubscribersListResponse
-	75,  // 97: hawkr.buyer.BuyerService.GetSubscriberDashboardStats:output_type -> hawkr.buyer.SubscriberDashboardStatsResponse
-	77,  // 98: hawkr.buyer.BuyerService.BatchGetSubscriberCounts:output_type -> hawkr.buyer.BatchGetSubscriberCountsResponse
-	79,  // 99: hawkr.buyer.BuyerService.GetSavedItems:output_type -> hawkr.buyer.SavedItemsResponse
-	52,  // 100: hawkr.buyer.BuyerService.GetVisitList:output_type -> hawkr.buyer.VisitListResponse
-	56,  // 101: hawkr.buyer.BuyerService.RecordVisit:output_type -> hawkr.buyer.VisitOperationResponse
-	56,  // 102: hawkr.buyer.BuyerService.ClearVisitHistory:output_type -> hawkr.buyer.VisitOperationResponse
-	64,  // 103: hawkr.buyer.BuyerService.UpdateBuyerAvatar:output_type -> hawkr.buyer.UpdateBuyerAvatarResponse
-	58,  // 104: hawkr.buyer.BuyerService.GetMemberCards:output_type -> hawkr.buyer.GetMemberCardsResponse
-	61,  // 105: hawkr.buyer.BuyerService.GetSpendingRecords:output_type -> hawkr.buyer.GetSpendingRecordsResponse
-	68,  // 106: hawkr.buyer.BuyerService.BatchGetBuyerMetaByBuyerIDs:output_type -> hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse
-	73,  // 107: hawkr.buyer.BuyerService.ResolvePrincipals:output_type -> hawkr.buyer.ResolvePrincipalsResponse
-	83,  // 108: hawkr.buyer.BuyerService.SubscribeRestock:output_type -> hawkr.buyer.SubscribeRestockResponse
-	85,  // 109: hawkr.buyer.BuyerService.UnsubscribeRestock:output_type -> hawkr.buyer.UnsubscribeRestockResponse
-	88,  // 110: hawkr.buyer.BuyerService.ListRestockSubscriptions:output_type -> hawkr.buyer.ListRestockSubscriptionsResponse
-	90,  // 111: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:output_type -> hawkr.buyer.BatchCheckRestockSubscriptionsResponse
-	92,  // 112: hawkr.buyer.BuyerService.ListBuyerIDsByAccount:output_type -> hawkr.buyer.ListBuyerIDsByAccountResponse
-	71,  // 113: hawkr.buyer.BuyerService.BatchGetBuyerDisplayByBuyerIDs:output_type -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse
-	94,  // 114: hawkr.buyer.BuyerService.GetBuyerStatsForAdmin:output_type -> hawkr.buyer.GetBuyerStatsForAdminResponse
-	97,  // 115: hawkr.buyer.BuyerService.GetBuyerEntitlement:output_type -> hawkr.buyer.BuyerEntitlement
-	97,  // 116: hawkr.buyer.BuyerService.AssignMembership:output_type -> hawkr.buyer.BuyerEntitlement
-	101, // 117: hawkr.buyer.BuyerService.ListMembershipPlans:output_type -> hawkr.buyer.ListMembershipPlansResponse
-	103, // 118: hawkr.buyer.BuyerService.UpdateMembershipPlan:output_type -> hawkr.buyer.UpdateMembershipPlanResponse
-	72,  // [72:119] is the sub-list for method output_type
-	25,  // [25:72] is the sub-list for method input_type
+	74,  // 50: hawkr.buyer.BuyerService.BatchGetSubscriberCounts:input_type -> hawkr.buyer.BatchGetSubscriberCountsRequest
+	76,  // 51: hawkr.buyer.BuyerService.GetSavedItems:input_type -> hawkr.buyer.GetSavedItemsRequest
+	51,  // 52: hawkr.buyer.BuyerService.GetVisitList:input_type -> hawkr.buyer.GetVisitListRequest
+	54,  // 53: hawkr.buyer.BuyerService.RecordVisit:input_type -> hawkr.buyer.RecordVisitRequest
+	55,  // 54: hawkr.buyer.BuyerService.ClearVisitHistory:input_type -> hawkr.buyer.ClearVisitHistoryRequest
+	63,  // 55: hawkr.buyer.BuyerService.UpdateBuyerAvatar:input_type -> hawkr.buyer.UpdateBuyerAvatarRequest
+	57,  // 56: hawkr.buyer.BuyerService.GetMemberCards:input_type -> hawkr.buyer.GetMemberCardsRequest
+	60,  // 57: hawkr.buyer.BuyerService.GetSpendingRecords:input_type -> hawkr.buyer.GetSpendingRecordsRequest
+	66,  // 58: hawkr.buyer.BuyerService.BatchGetBuyerMetaByBuyerIDs:input_type -> hawkr.buyer.BatchGetBuyerMetaByBuyerIDsRequest
+	72,  // 59: hawkr.buyer.BuyerService.ResolvePrincipals:input_type -> hawkr.buyer.ResolvePrincipalsRequest
+	80,  // 60: hawkr.buyer.BuyerService.SubscribeRestock:input_type -> hawkr.buyer.SubscribeRestockRequest
+	82,  // 61: hawkr.buyer.BuyerService.UnsubscribeRestock:input_type -> hawkr.buyer.UnsubscribeRestockRequest
+	84,  // 62: hawkr.buyer.BuyerService.ListRestockSubscriptions:input_type -> hawkr.buyer.ListRestockSubscriptionsRequest
+	87,  // 63: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:input_type -> hawkr.buyer.BatchCheckRestockSubscriptionsRequest
+	89,  // 64: hawkr.buyer.BuyerService.ListBuyerIDsByAccount:input_type -> hawkr.buyer.ListBuyerIDsByAccountRequest
+	69,  // 65: hawkr.buyer.BuyerService.BatchGetBuyerDisplayByBuyerIDs:input_type -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsRequest
+	91,  // 66: hawkr.buyer.BuyerService.GetBuyerStatsForAdmin:input_type -> hawkr.buyer.GetBuyerStatsForAdminRequest
+	94,  // 67: hawkr.buyer.BuyerService.GetBuyerEntitlement:input_type -> hawkr.buyer.GetBuyerEntitlementRequest
+	96,  // 68: hawkr.buyer.BuyerService.AssignMembership:input_type -> hawkr.buyer.AssignMembershipRequest
+	97,  // 69: hawkr.buyer.BuyerService.ListMembershipPlans:input_type -> hawkr.buyer.ListMembershipPlansRequest
+	100, // 70: hawkr.buyer.BuyerService.UpdateMembershipPlan:input_type -> hawkr.buyer.UpdateMembershipPlanRequest
+	6,   // 71: hawkr.buyer.BuyerService.GetBuyerProfile:output_type -> hawkr.buyer.BuyerProfileResponse
+	6,   // 72: hawkr.buyer.BuyerService.GetBuyerProfileByBuyerID:output_type -> hawkr.buyer.BuyerProfileResponse
+	4,   // 73: hawkr.buyer.BuyerService.GetBuyerProfileBatch:output_type -> hawkr.buyer.GetBuyerProfileBatchResponse
+	6,   // 74: hawkr.buyer.BuyerService.UpdateBuyerProfile:output_type -> hawkr.buyer.BuyerProfileResponse
+	6,   // 75: hawkr.buyer.BuyerService.EnsureBuyerProfile:output_type -> hawkr.buyer.BuyerProfileResponse
+	9,   // 76: hawkr.buyer.BuyerService.GetAddressList:output_type -> hawkr.buyer.AddressListResponse
+	11,  // 77: hawkr.buyer.BuyerService.GetAddress:output_type -> hawkr.buyer.GetAddressResponse
+	16,  // 78: hawkr.buyer.BuyerService.AddAddress:output_type -> hawkr.buyer.AddressOperationResponse
+	16,  // 79: hawkr.buyer.BuyerService.UpdateAddress:output_type -> hawkr.buyer.AddressOperationResponse
+	16,  // 80: hawkr.buyer.BuyerService.DeleteAddress:output_type -> hawkr.buyer.AddressOperationResponse
+	19,  // 81: hawkr.buyer.BuyerService.SuggestAddress:output_type -> hawkr.buyer.SuggestAddressResponse
+	22,  // 82: hawkr.buyer.BuyerService.ValidateAddress:output_type -> hawkr.buyer.ValidateAddressResponse
+	24,  // 83: hawkr.buyer.BuyerService.GetFavoriteList:output_type -> hawkr.buyer.FavoriteListResponse
+	27,  // 84: hawkr.buyer.BuyerService.CheckFavorite:output_type -> hawkr.buyer.CheckFavoriteResponse
+	31,  // 85: hawkr.buyer.BuyerService.BatchCheckFavorites:output_type -> hawkr.buyer.BatchCheckFavoritesResponse
+	32,  // 86: hawkr.buyer.BuyerService.AddFavorite:output_type -> hawkr.buyer.FavoriteOperationResponse
+	32,  // 87: hawkr.buyer.BuyerService.RemoveFavorite:output_type -> hawkr.buyer.FavoriteOperationResponse
+	34,  // 88: hawkr.buyer.BuyerService.GetFavoriteCount:output_type -> hawkr.buyer.FavoriteCountResponse
+	36,  // 89: hawkr.buyer.BuyerService.ListFavoritedProductIds:output_type -> hawkr.buyer.ListFavoritedProductIdsResponse
+	38,  // 90: hawkr.buyer.BuyerService.ListSubscribedSellerIds:output_type -> hawkr.buyer.ListSubscribedSellerIdsResponse
+	40,  // 91: hawkr.buyer.BuyerService.GetSubscriptionList:output_type -> hawkr.buyer.SubscriptionListResponse
+	43,  // 92: hawkr.buyer.BuyerService.SubscribeSeller:output_type -> hawkr.buyer.SubscribeSellerResponse
+	45,  // 93: hawkr.buyer.BuyerService.UnsubscribeSeller:output_type -> hawkr.buyer.UnsubscribeSellerResponse
+	47,  // 94: hawkr.buyer.BuyerService.CheckSubscription:output_type -> hawkr.buyer.CheckSubscriptionResponse
+	49,  // 95: hawkr.buyer.BuyerService.GetSubscribersList:output_type -> hawkr.buyer.SubscribersListResponse
+	75,  // 96: hawkr.buyer.BuyerService.BatchGetSubscriberCounts:output_type -> hawkr.buyer.BatchGetSubscriberCountsResponse
+	77,  // 97: hawkr.buyer.BuyerService.GetSavedItems:output_type -> hawkr.buyer.SavedItemsResponse
+	52,  // 98: hawkr.buyer.BuyerService.GetVisitList:output_type -> hawkr.buyer.VisitListResponse
+	56,  // 99: hawkr.buyer.BuyerService.RecordVisit:output_type -> hawkr.buyer.VisitOperationResponse
+	56,  // 100: hawkr.buyer.BuyerService.ClearVisitHistory:output_type -> hawkr.buyer.VisitOperationResponse
+	64,  // 101: hawkr.buyer.BuyerService.UpdateBuyerAvatar:output_type -> hawkr.buyer.UpdateBuyerAvatarResponse
+	58,  // 102: hawkr.buyer.BuyerService.GetMemberCards:output_type -> hawkr.buyer.GetMemberCardsResponse
+	61,  // 103: hawkr.buyer.BuyerService.GetSpendingRecords:output_type -> hawkr.buyer.GetSpendingRecordsResponse
+	68,  // 104: hawkr.buyer.BuyerService.BatchGetBuyerMetaByBuyerIDs:output_type -> hawkr.buyer.BatchGetBuyerMetaByBuyerIDsResponse
+	73,  // 105: hawkr.buyer.BuyerService.ResolvePrincipals:output_type -> hawkr.buyer.ResolvePrincipalsResponse
+	81,  // 106: hawkr.buyer.BuyerService.SubscribeRestock:output_type -> hawkr.buyer.SubscribeRestockResponse
+	83,  // 107: hawkr.buyer.BuyerService.UnsubscribeRestock:output_type -> hawkr.buyer.UnsubscribeRestockResponse
+	86,  // 108: hawkr.buyer.BuyerService.ListRestockSubscriptions:output_type -> hawkr.buyer.ListRestockSubscriptionsResponse
+	88,  // 109: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:output_type -> hawkr.buyer.BatchCheckRestockSubscriptionsResponse
+	90,  // 110: hawkr.buyer.BuyerService.ListBuyerIDsByAccount:output_type -> hawkr.buyer.ListBuyerIDsByAccountResponse
+	71,  // 111: hawkr.buyer.BuyerService.BatchGetBuyerDisplayByBuyerIDs:output_type -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse
+	92,  // 112: hawkr.buyer.BuyerService.GetBuyerStatsForAdmin:output_type -> hawkr.buyer.GetBuyerStatsForAdminResponse
+	95,  // 113: hawkr.buyer.BuyerService.GetBuyerEntitlement:output_type -> hawkr.buyer.BuyerEntitlement
+	95,  // 114: hawkr.buyer.BuyerService.AssignMembership:output_type -> hawkr.buyer.BuyerEntitlement
+	99,  // 115: hawkr.buyer.BuyerService.ListMembershipPlans:output_type -> hawkr.buyer.ListMembershipPlansResponse
+	101, // 116: hawkr.buyer.BuyerService.UpdateMembershipPlan:output_type -> hawkr.buyer.UpdateMembershipPlanResponse
+	71,  // [71:117] is the sub-list for method output_type
+	25,  // [25:71] is the sub-list for method input_type
 	25,  // [25:25] is the sub-list for extension type_name
 	25,  // [25:25] is the sub-list for extension extendee
 	0,   // [0:25] is the sub-list for field type_name
@@ -7898,7 +7773,7 @@ func file_buyer_buyer_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_buyer_buyer_proto_rawDesc), len(file_buyer_buyer_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   109,
+			NumMessages:   107,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
