@@ -155,6 +155,87 @@ func (q *Queries) ListBuyerSharedPostBatch(ctx context.Context, arg ListBuyerSha
 	return items, nil
 }
 
+const listInactiveBuyersWithSocialContent = `-- name: ListInactiveBuyersWithSocialContent :many
+SELECT ib.buyer_id FROM buyer.pub_inactive_buyers() AS ib
+WHERE ib.buyer_id > $1::bigint
+  AND (
+    EXISTS (SELECT 1 FROM social.comments c WHERE c.actor_kind = 'BUYER' AND c.actor_id = ib.buyer_id AND (c.deleted_at IS NULL OR c.body IS NOT NULL))
+    OR EXISTS (SELECT 1 FROM social.forum_entries e WHERE e.actor_kind = 'BUYER' AND e.actor_id = ib.buyer_id AND (e.deleted_at IS NULL OR e.body IS NOT NULL))
+    OR EXISTS (SELECT 1 FROM social.post_likes l WHERE l.buyer_id = ib.buyer_id)
+    OR EXISTS (SELECT 1 FROM social.post_shares s WHERE s.buyer_id = ib.buyer_id)
+    OR EXISTS (SELECT 1 FROM social.comment_likes cl WHERE cl.actor_kind = 'BUYER' AND cl.actor_id = ib.buyer_id)
+  )
+ORDER BY ib.buyer_id
+LIMIT $2
+`
+
+type ListInactiveBuyersWithSocialContentParams struct {
+	AfterID int64
+	MaxRows int32
+}
+
+// 清除的保底掃描：買家不再營運中（buyer.pub_inactive_buyers()）但清除 job 還有活要做（述詞與 PurgeBuyer 找工作的相同：未刪除的留言與討論區留言、貼文讚、分享、留言讚，
+// 以及已刪除但內文還在的留言與討論區留言），依 buyer_id 的 keyset 由小到大，最多 max_rows 位；第一頁的游標是 0。
+func (q *Queries) ListInactiveBuyersWithSocialContent(ctx context.Context, arg ListInactiveBuyersWithSocialContentParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listInactiveBuyersWithSocialContent, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var buyer_id int64
+		if err := rows.Scan(&buyer_id); err != nil {
+			return nil, err
+		}
+		items = append(items, buyer_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRetiredStoresWithSocialContent = `-- name: ListRetiredStoresWithSocialContent :many
+SELECT rs.store_id FROM seller.pub_retired_stores() AS rs
+WHERE rs.store_id > $1::bigint
+  AND (
+    EXISTS (SELECT 1 FROM social.posts p WHERE p.store_id = rs.store_id AND (p.deleted_at IS NULL OR p.image_asset_id IS NOT NULL))
+    OR EXISTS (SELECT 1 FROM social.comments c WHERE c.actor_kind = 'STORE' AND c.actor_id = rs.store_id AND c.deleted_at IS NULL)
+    OR EXISTS (SELECT 1 FROM social.forum_entries e WHERE e.deleted_at IS NULL AND (e.store_id = rs.store_id OR (e.actor_kind = 'STORE' AND e.actor_id = rs.store_id)))
+    OR EXISTS (SELECT 1 FROM social.comment_likes cl WHERE cl.actor_kind = 'STORE' AND cl.actor_id = rs.store_id)
+  )
+ORDER BY rs.store_id
+LIMIT $2
+`
+
+type ListRetiredStoresWithSocialContentParams struct {
+	AfterID int64
+	MaxRows int32
+}
+
+// 清除的保底掃描：店家已退場（seller.pub_retired_stores()）但清除 job 還有活要做（述詞與 PurgeStore 找工作的相同：未刪除或圖片引用還在的貼文、
+// 未刪除的店家身分留言、討論區留言、店家身分的留言讚），依 store_id 的 keyset 由小到大，最多 max_rows 家；第一頁的游標是 0。
+func (q *Queries) ListRetiredStoresWithSocialContent(ctx context.Context, arg ListRetiredStoresWithSocialContentParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listRetiredStoresWithSocialContent, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var store_id int64
+		if err := rows.Scan(&store_id); err != nil {
+			return nil, err
+		}
+		items = append(items, store_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockBuyerCommentBatch = `-- name: LockBuyerCommentBatch :many
 
 SELECT id, post_id, parent_id FROM social.comments

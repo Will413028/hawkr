@@ -342,7 +342,11 @@ func TestTakedownStoresTheLatestCaseSnapshot(t *testing.T) {
 func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	w := f.world(t)
+	_, ownerAccount := f.newBuyer(t)
+	f.exec(t, "INSERT INTO identity.account_roles (account_id, role) VALUES ($1, 'SELLER')", ownerAccount)
+	w := world{storeAccount: ownerAccount}
+	w.storeID, _ = f.exposableStoreOn(t, ownerAccount)
+	w.post = f.post(t, w.storeID, "貼文")
 	reporter, _ := f.newBuyer(t)
 	c := f.submit(t, reporter, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo).Case
 	var wg sync.WaitGroup
@@ -368,6 +372,12 @@ func TestTakedownAndAccountDeletionRunConcurrentlyWithoutDeadlock(t *testing.T) 
 		if err != nil && apperr.KindOf(err) == apperr.KindInternal {
 			t.Fatalf("不能有死結或內部錯誤：decide=%v delete=%v", decideErr, deleteErr)
 		}
+	}
+	if deleteErr != nil {
+		t.Fatalf("真帳號的刪帳申請要完成：%v", deleteErr)
+	}
+	if acct, err := f.identity.Account(context.Background(), w.storeAccount); err != nil || !acct.Deleted {
+		t.Fatalf("刪帳要真的發生：account=%+v err=%v", acct, err)
 	}
 	closed := mustV[CaseDetail](t)(f.module.Case(context.Background(), c.ID)).Case.ClosedAt != nil
 	measures := f.count(t, "SELECT count(*) FROM seller.measures WHERE store_id = $1 AND kind = 'CONTENT_TAKEDOWN'", w.storeID)

@@ -4,6 +4,7 @@ package social_test
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -353,4 +354,103 @@ func TestBuyerPurgeBustsTheStorePagesOfTheirForumEntries(t *testing.T) {
 			}
 		}
 	}
+}
+
+// sweptIDs 回傳排入的某一種 job 的目標 ID（buyer_id 或 store_id 欄位）。
+func (q *queue) sweptIDs(t *testing.T, kind, field string) []int64 {
+	t.Helper()
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	var out []int64
+	for _, a := range q.args {
+		if a.Kind() != kind {
+			continue
+		}
+		raw, err := json.Marshal(a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m map[string]int64
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, m[field])
+	}
+	return out
+}
+
+// 保底掃描（買家）：不再營運中又還有內容的買家補排清除 job；沒有內容的刪帳者與還在營運的買家都不排；清除完成後不再排。
+func TestSweepPurgeEnqueuesOnlyInactiveBuyersWithContentLeft(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	stuck, drained, active := f.newBuyer(t), f.newBuyer(t), f.newBuyer(t)
+	p := f.publishedPost(t, storeID, "貼文")
+	mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(stuck), social.CommentInput{PostID: p.ID, Body: "留言"}))
+	mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(active), social.CommentInput{PostID: p.ID, Body: "營運中的留言"}))
+	must(t, f.buyers.BeginDeletion(ctx, stuck.BuyerID))
+	must(t, f.buyers.BeginDeletion(ctx, drained.BuyerID))
+	f.jobs.reset()
+
+	n, err := f.module.SweepPurge(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.jobs.sweptIDs(t, "social.purge_buyer_content", "buyer_id"); n != 1 || !slices.Equal(got, []int64{stuck.BuyerID}) {
+		t.Fatalf("只補排還有內容的刪帳者：n=%d %v", n, got)
+	}
+
+	must(t, f.module.PurgeBuyerContent(ctx, stuck.BuyerID))
+	f.jobs.reset()
+	n, err = f.module.SweepPurge(ctx)
+	if err != nil || n != 0 || len(f.jobs.kinds()) != 0 {
+		t.Fatalf("清除完成後不再排：n=%d err=%v %v", n, err, f.jobs.kinds())
+	}
+}
+
+// 保底掃描（店家）：已退場又還有內容的店家補排清除 job；內容清完的退場店、還在營運但有內容的店都不排。
+func TestSweepPurgeEnqueuesOnlyRetiredStoresWithContentLeft(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	stuck, drained, active := mustStore(t, f), mustStore(t, f), mustStore(t, f)
+	for _, id := range []int64{stuck, drained, active} {
+		f.publishedPost(t, id, "貼文")
+	}
+	retire := func(id int64) {
+		must(t, f.db.InTx(ctx, func(ctx context.Context) error {
+			if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, now(), 'ACCOUNT_OWNER')", id); err != nil {
+				return err
+			}
+			_, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET status = 'CLOSED', current_closed_at = now(), retired_at = now(),
+				logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL WHERE store_id = $1`, id)
+			return err
+		}))
+	}
+	retire(stuck)
+	retire(drained)
+	must(t, f.module.PurgeStoreContent(ctx, drained))
+	f.jobs.reset()
+
+	n, err := f.module.SweepPurge(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.jobs.sweptIDs(t, "social.purge_store_content", "store_id"); n != 1 || !slices.Equal(got, []int64{stuck}) {
+		t.Fatalf("只補排還有內容的退場店家：n=%d %v", n, got)
+	}
+
+	must(t, f.module.PurgeStoreContent(ctx, stuck))
+	f.jobs.reset()
+	n, err = f.module.SweepPurge(ctx)
+	if err != nil || n != 0 || len(f.jobs.kinds()) != 0 {
+		t.Fatalf("清除完成後不再排：n=%d err=%v %v", n, err, f.jobs.kinds())
+	}
+}
+
+func mustStore(t *testing.T, f *fixture) int64 {
+	t.Helper()
+	id, _ := f.exposableStore(t)
+	return id
 }

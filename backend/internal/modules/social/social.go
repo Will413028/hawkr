@@ -619,6 +619,10 @@ func (m *Module) PurgeStoreContent(ctx context.Context, storeID int64) error {
 	return m.purge.PurgeStore(ctx, storeID)
 }
 
+// SweepPurge 補排 buyer.pub_inactive_buyers() 的買家與 seller.pub_retired_stores() 的店家中還有內容待清除的清除 job（保底掃描的內容，給 worker 與測試呼叫）；
+// 回傳檢查到的買家與店家總數。它是 social.purge_sweep job 的內容。
+func (m *Module) SweepPurge(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
+
 // CleanupViews 清掉瀏覽去重用的舊 salt 與去重列。它是 social.cleanup_views job 的內容。
 func (m *Module) CleanupViews(ctx context.Context) error { return m.purge.CleanupViews(ctx) }
 
