@@ -56,10 +56,10 @@
 | `mq/BuyerDeletedConsumerTest#validBuyerIdVoidsAndAcks`（`:46`） | 合法 `buyerId` 會呼叫 `voidAllUnusedByOwner` 並 ack | rewritten as in-process `BuyerDeleted` subscriber same-tx test; malformed-payload cases deleted because typed events cannot be malformed (step B7-4; D8) |
 | `…#missingBuyerIdAcksWithoutVoiding`（`:57`） | 缺 `buyerId` 只 ack，不作廢 | rewritten as in-process `BuyerDeleted` subscriber same-tx test; malformed-payload cases deleted because typed events cannot be malformed (step B7-4; D8) |
 | `…#zeroBuyerIdAcksWithoutVoiding`（`:68`） | `buyerId=0` 只 ack，不作廢 | rewritten as in-process `BuyerDeleted` subscriber same-tx test; malformed-payload cases deleted because typed events cannot be malformed (step B7-4; D8) |
-| `mq/SellerSuspendedConsumerTest#disableTemplatesUsesStoreIdNotAccountId`（`:38`） | 停權用 payload 的 `store_id`，不用 `accountId` | rewritten as in-process `StoreSuspended`/`StoreUnsuspended` subscriber same-tx test; payload-drop cases deleted (step B7-4; D8) |
-| `…#missingStoreIdDropsMessage`（`:49`） | 缺 `store_id` 丟棄並 ack | rewritten as in-process `StoreSuspended`/`StoreUnsuspended` subscriber same-tx test; payload-drop cases deleted (step B7-4; D8) |
-| `mq/SellerUnsuspendedConsumerTest#restoreTemplatesUsesStoreIdNotAccountId`（`:33`） | 同上，解除停權 | rewritten as in-process `StoreSuspended`/`StoreUnsuspended` subscriber same-tx test; payload-drop cases deleted (step B7-4; D8) |
-| `…#missingStoreIdDropsMessage`（`:44`） | 同上 | rewritten as in-process `StoreSuspended`/`StoreUnsuspended` subscriber same-tx test; payload-drop cases deleted (step B7-4; D8) |
+| `mq/SellerSuspendedConsumerTest#disableTemplatesUsesStoreIdNotAccountId`（`:38`） | 停權用 payload 的 `store_id`，不用 `accountId` | deleted: suspension is checked at claim/Lock via the seller port, no subscriber (step B7-2; D8 revision 2026-11-23) |
+| `…#missingStoreIdDropsMessage`（`:49`） | 缺 `store_id` 丟棄並 ack | deleted: suspension is checked at claim/Lock via the seller port, no subscriber (step B7-2; D8 revision 2026-11-23) |
+| `mq/SellerUnsuspendedConsumerTest#restoreTemplatesUsesStoreIdNotAccountId`（`:33`） | 同上，解除停權 | deleted: suspension is checked at claim/Lock via the seller port, no subscriber (step B7-2; D8 revision 2026-11-23) |
+| `…#missingStoreIdDropsMessage`（`:44`） | 同上 | deleted: suspension is checked at claim/Lock via the seller port, no subscriber (step B7-2; D8 revision 2026-11-23) |
 | `mq/dto/SellerSuspensionEventPayloadTest#fromJson_parsesStoreIdSeparatelyFromAccountId`（`:22`） | `store_id` 與 `accountId` 分開解析 | deleted: no JSON payload parsing with in-process typed events (D8) |
 | `…#fromJson_missingStoreId_returnsNull`（`:35`） | 缺 `store_id` 回 null | deleted: no JSON payload parsing with in-process typed events (D8) |
 | `service/CouponTemplateServiceRevokeTemplateTest#revokeTemplate_passesSellerIssuerTypeToMapper`（`:44`） | 收回時傳 `issuer_type=SELLER` 給 mapper | rewritten as campaign end integration test per D5 (step B7-2) |
