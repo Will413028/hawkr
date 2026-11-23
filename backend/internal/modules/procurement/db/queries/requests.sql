@@ -69,6 +69,10 @@ VALUES (@id, @buyer_id, @request_id, @now, @now);
 -- name: GetConversationForBuyer :one
 SELECT * FROM procurement.conversations WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
+-- name: GetConversationByRequest :one
+-- 一個需求最多一個對話（conversations_request 唯一）；已刪除的對話不回（呼叫端回 NOT_FOUND）。
+SELECT * FROM procurement.conversations WHERE request_id = @request_id AND buyer_id = @buyer_id AND deleted_at IS NULL;
+
 -- name: ListConversations :many
 SELECT * FROM procurement.conversations
 WHERE buyer_id = @buyer_id AND deleted_at IS NULL

@@ -47,6 +47,33 @@ func (q *Queries) GetActiveRevision(ctx context.Context, arg GetActiveRevisionPa
 	return i, err
 }
 
+const getConversationByRequest = `-- name: GetConversationByRequest :one
+SELECT id, buyer_id, request_id, title, title_source, last_message_preview, deleted_at, created_at, updated_at FROM procurement.conversations WHERE request_id = $1 AND buyer_id = $2 AND deleted_at IS NULL
+`
+
+type GetConversationByRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   int64
+}
+
+// 一個需求最多一個對話（conversations_request 唯一）；已刪除的對話不回（呼叫端回 NOT_FOUND）。
+func (q *Queries) GetConversationByRequest(ctx context.Context, arg GetConversationByRequestParams) (ProcurementConversation, error) {
+	row := q.db.QueryRow(ctx, getConversationByRequest, arg.RequestID, arg.BuyerID)
+	var i ProcurementConversation
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.Title,
+		&i.TitleSource,
+		&i.LastMessagePreview,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getConversationForBuyer = `-- name: GetConversationForBuyer :one
 SELECT id, buyer_id, request_id, title, title_source, last_message_preview, deleted_at, created_at, updated_at FROM procurement.conversations WHERE id = $1 AND buyer_id = $2 AND deleted_at IS NULL
 `

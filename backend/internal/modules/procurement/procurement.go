@@ -6,6 +6,7 @@ package procurement
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -71,8 +72,32 @@ type Deps struct {
 	LLM llm.Model
 	// Taxonomy 讀平台的分類樹（品項解析），catalog 搬進單體前由 cmd/hawkr 以 internal/legacy 的 client 轉接。
 	Taxonomy TaxonomyReader
+	// Entitlements 讀買家現在有效的方案與額度（*buyer.Module 滿足它）；SubmitTurn 需要，沒給時 SubmitTurn 回錯誤。
+	Entitlements EntitlementReader
 	// Limits 是每位買家的送出上限，零值取預設（同時進行中 2、每分鐘送出 10）。
 	Limits run.Limits
+}
+
+// EntitlementReader 是 SubmitTurn 取額度要用的 buyer 方法：每月上限與期間（*buyer.Module 滿足它）。
+type EntitlementReader interface {
+	Entitlement(ctx context.Context, buyerID int64) (buyer.Entitlement, error)
+}
+
+type quotaOf struct{ r EntitlementReader }
+
+func (q quotaOf) TurnQuota(ctx context.Context, buyerID int64) (turn.Quota, error) {
+	e, err := q.r.Entitlement(ctx, buyerID)
+	if err != nil {
+		return turn.Quota{}, err
+	}
+	return turn.Quota{Limit: e.MonthlyAnswerLimit, PeriodStart: e.PeriodStart, PeriodEnd: e.PeriodEnd}, nil
+}
+
+// noQuota 是沒給 Entitlements 時的額度來源：送出一律失敗（組裝錯誤），不當成不限額。
+type noQuota struct{}
+
+func (noQuota) TurnQuota(context.Context, int64) (turn.Quota, error) {
+	return turn.Quota{}, errors.New("procurement：SubmitTurn 需要 Deps.Entitlements")
 }
 
 // ProductSearcher 是候選搜尋的商品搜尋 port；SearchQuery、SearchPage、SearchHit 是它的輸入與輸出。
@@ -106,8 +131,10 @@ type Module struct {
 	purger     run.Purger
 	dispatcher run.Dispatcher
 	submitter  run.Submitter
+	turns      turn.Submitter
 	canceller  run.Canceller
 	hub        *run.Hub
+	watcher    run.Watcher
 	searcher   search.Starter
 	resumer    turn.Resumer
 	snapshots  snapshot.Reader
@@ -124,15 +151,22 @@ func New(d Deps) *Module {
 		panic("procurement.New：Deps.Logger 必填")
 	}
 	ledger := run.Ledger{DB: d.DB, Now: d.Now}
+	hub := run.NewHub(d.DB, run.MaxSubscriptions, d.Logger)
+	var quota turn.QuotaSource = noQuota{}
+	if d.Entitlements != nil {
+		quota = quotaOf{d.Entitlements}
+	}
 	m := &Module{
 		dispatcher: run.Dispatcher{DB: d.DB, Ledger: ledger, Executors: executors(d, ledger), Logger: d.Logger},
 		submitter:  run.Submitter{DB: d.DB, Ledger: ledger, Jobs: d.Jobs, Limits: d.Limits},
 		canceller:  run.Canceller{DB: d.DB, Ledger: ledger, Jobs: d.Jobs},
-		hub:        run.NewHub(d.DB, run.MaxSubscriptions, d.Logger),
+		hub:        hub,
+		watcher:    run.Watcher{DB: d.DB, Hub: hub, Window: WatchWindow},
 		retention:  retention.New(d.DB),
 		reconciler: run.Reconciler{DB: d.DB, Ledger: ledger, Logger: d.Logger},
 		purger:     run.Purger{DB: d.DB, Ledger: ledger},
 	}
+	m.turns = turn.Submitter{Submitter: m.submitter, Quota: quota}
 	m.searcher = search.Starter{Submitter: m.submitter}
 	m.resumer = turn.Resumer{Submitter: m.submitter}
 	m.snapshots = snapshot.Reader{DB: d.DB, Ledger: ledger}
@@ -279,10 +313,61 @@ type (
 	ClarifyQuestion     = model.ClarifyQuestion
 	QuestionOption      = model.QuestionOption
 	PublishedRfq        = model.PublishedRfq
+	// SlotKey 是需求欄位的代碼（proto enum 值名去掉 SLOT_KEY_ 前綴）。
+	SlotKey = model.SlotKey
 )
 
 // GetRuntimeSnapshot 回傳買家自己的對話的快照：訊息、目前需求的 run（新到舊最多 20 筆）、進行中的 run、待回答的中斷（含處理中）與最新的發布結果，在同一份快照內讀齊。
 // 對話不存在、已刪除或屬於別的買家回 NOT_FOUND。ctx 不可已在 transaction 內。
 func (m *Module) GetRuntimeSnapshot(ctx context.Context, buyerID int64, conversationID uuid.UUID) (RuntimeSnapshot, error) {
 	return m.snapshots.Get(ctx, buyerID, conversationID)
+}
+
+// WatchWindow 是一條 WatchRun 串流的最長時間（Vercel 外部 rewrite 的上限），到了正常結束，client 以最後的 cursor 接續。
+const WatchWindow = 100 * time.Second
+
+// SubmitTurnInput 是送出一則訊息的輸入：RequestID 為 nil 表示新建需求（連同它的對話），ClientRequestID 是冪等鍵。
+type SubmitTurnInput = turn.SubmitInput
+
+// TurnSubmitted 是送出的結果：需求、對話與這一輪的 run。
+type TurnSubmitted = turn.Submitted
+
+// SubmitTurn 受理買家的一則訊息（A9-D21）：解析或新建需求與對話、冪等建 TURN run、扣一次額度、排入 job，立即回傳；這一輪的過程與結果從 WatchRun 取得。
+// 訊息去頭尾空白後為空或超過 2000 字元回 INVALID_ARGUMENT（欄位 Message）；指定的需求不屬於買家回 NOT_FOUND；
+// 同需求進行中回 PROCUREMENT_RUN_IN_PROGRESS；買家上限回 RESOURCE_EXHAUSTED；額度用完回 RESOURCE_EXHAUSTED／AGENT_MONTHLY_QUOTA_EXCEEDED。
+// 重送同一個 ClientRequestID 回第一次的需求、對話與 run，不再扣額度。同需求等待輸入的 run 被這一輪取代（A9-D23(2)）。
+func (m *Module) SubmitTurn(ctx context.Context, in SubmitTurnInput) (TurnSubmitted, error) {
+	return m.turns.Submit(ctx, in)
+}
+
+// 取消結果（CancelRunOutcome.Disposition）。
+const (
+	CancelDispositionRequested        = run.DispositionRequested
+	CancelDispositionAlreadyCancelled = run.DispositionAlreadyCancelled
+	CancelDispositionAlreadyTerminal  = run.DispositionAlreadyTerminal
+)
+
+// CancelRunOutcome 是取消命令的結果：Status 是命令之後 run 的狀態代碼，Disposition 是 REQUESTED、ALREADY_CANCELLED 或 ALREADY_TERMINAL。
+type CancelRunOutcome = run.CancelOutcome
+
+// CancelRun 取消買家自己的 run（冪等）；不是這位買家的 run 回 NOT_FOUND。買家取消不退額度（A9-D6）。
+func (m *Module) CancelRun(ctx context.Context, buyerID int64, runID uuid.UUID) (CancelRunOutcome, error) {
+	return m.canceller.Cancel(ctx, buyerID, runID)
+}
+
+// RunEvent 是 run 事件串流上的一個事件：Cursor 是它的位置（不透明字串），Payload 是 `{"<事件名>": {...}}` 的 proto JSON
+// （WatchRunResponse 的 oneof 成員，不含 cursor 與 event_time）。
+type RunEvent struct {
+	Cursor     string
+	Payload    []byte
+	OccurredAt time.Time
+}
+
+// WatchRun 從 cursor 之後依序呼叫 send，直到送出結尾事件（finished）、WatchWindow 到期或 ctx 結束；run 不屬於買家回 NOT_FOUND，
+// cursor 格式不對回 INVALID_ARGUMENT（欄位 cursor），早於保留範圍回 REPLAY_CURSOR_EXPIRED、超前回 REPLAY_CURSOR_AHEAD。
+// 需要 RunHub 在跑（serve 程序啟動時開）。
+func (m *Module) WatchRun(ctx context.Context, buyerID int64, runID uuid.UUID, cursor string, send func(RunEvent) error) error {
+	return m.watcher.Watch(ctx, buyerID, runID, cursor, func(e run.Event) error {
+		return send(RunEvent{Cursor: run.Cursor(e.Seq), Payload: e.Payload, OccurredAt: e.OccurredAt})
+	})
 }

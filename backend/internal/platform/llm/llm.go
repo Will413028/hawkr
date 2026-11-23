@@ -164,6 +164,11 @@ func New(role Role, cfg Config, log *slog.Logger) Model {
 	return build(role, cfg, log, "")
 }
 
+// NewModel 以給定的 client 組出已開通的 Model，讓組裝測試與整合測試用替身 client 走正式的 Model 路徑；正式程式只經 New。
+func NewModel(l model.LLM, name string, provider Provider) Model {
+	return Model{llm: l, name: name, provider: provider, status: StatusEnabled}
+}
+
 func disabled(status Status) Model { return Model{llm: disabledLLM{}, status: status} }
 
 // build 是全服務唯一的 client 建構點；baseURLOverride 只給測試把 OpenAI 相容的端點指到替身 server。
