@@ -287,7 +287,7 @@ func confirmInTxAs(f *fixture, who media.Uploader, token string, want media.Visi
 	var a media.ConfirmedAsset
 	err := f.d.InTx(f.t.Context(), func(ctx context.Context) error {
 		var err error
-		a, err = f.m.Confirm(ctx, who, token, media.VisibilityPublic)
+		a, err = f.m.Confirm(ctx, who, token, want)
 		return err
 	})
 	return a, err
