@@ -97,9 +97,10 @@ BEGIN
   END IF;
 
   SELECT string_agg(r.account_id::text, ', ' ORDER BY r.account_id) INTO bad FROM identity.account_roles r JOIN seed_accounts s ON s.id = r.account_id
-  WHERE r.role = 'SELLER' AND s.seller_store_id IS NULL;
+  WHERE r.role = 'SELLER' AND (s.seller_store_id IS NULL
+    OR EXISTS (SELECT 1 FROM seller.stores st WHERE st.account_id = r.account_id AND st.status <> 'CLOSED' AND st.store_id <> s.seller_store_id));
   IF bad IS NOT NULL THEN
-    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子帳號 % 有 SELLER 角色，但種子沒有替它們開店（例如 3001 這類不該有店的帳號已開店）。請重建本機資料庫', bad;
+    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子帳號 % 有 SELLER 角色，但種子沒有替它們開店，或目前的店不是種子的店家（例如 3001 這類不該有店的帳號已開店）。請重建本機資料庫', bad;
   END IF;
 
   SELECT string_agg(d.address_id || '（買家' || d.buyer_id || '）', ', ' ORDER BY d.address_id) INTO bad FROM buyer.shipping_addresses d

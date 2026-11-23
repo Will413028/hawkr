@@ -67,8 +67,8 @@ service AccountService {
     rpc ListAccountsForAdmin(ListAccountsForAdminRequest) returns (ListAccountsForAdminResponse);
     rpc GetAccountForAdmin(GetAccountForAdminRequest) returns (GetAccountForAdminResponse);
 
-    // RemoveRole removes a single role from an account. If no roles remain,
-    // the account is fully soft-deleted (Apple revoke + Redis blacklist + MQ).
+    // RemoveRole is Unimplemented in the monolith's legacy adapter: SELLER is
+    // granted and removed only by the seller module together with the store.
     rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse);
 
     // ==================== Auth Multi-Provider (M3 cutover) ====================
@@ -301,8 +301,8 @@ message BindSellerResponse {
 
 message BindBuyerRequest {
     int64 account_id = 1;
-    // 同 BindSellerRequest.source_id；buyer 角色填 buyers.buyer_id。
-    int64 source_id = 2;
+    reserved 2;  // was: source_id (int64)
+    reserved "source_id";
 }
 
 message BindBuyerResponse {

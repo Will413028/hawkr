@@ -98,8 +98,8 @@ type AccountServiceClient interface {
 	// 狀態動作全部 key 在 account_id，且 buyers 含大量已軟刪帳號的殘留 stint。
 	ListAccountsForAdmin(ctx context.Context, in *ListAccountsForAdminRequest, opts ...grpc.CallOption) (*ListAccountsForAdminResponse, error)
 	GetAccountForAdmin(ctx context.Context, in *GetAccountForAdminRequest, opts ...grpc.CallOption) (*GetAccountForAdminResponse, error)
-	// RemoveRole removes a single role from an account. If no roles remain,
-	// the account is fully soft-deleted (Apple revoke + Redis blacklist + MQ).
+	// RemoveRole is Unimplemented in the monolith's legacy adapter: SELLER is
+	// granted and removed only by the seller module together with the store.
 	RemoveRole(ctx context.Context, in *RemoveRoleRequest, opts ...grpc.CallOption) (*RemoveRoleResponse, error)
 	// LinkConfirm consumes a tempBindToken (issued by Google/Apple OAuth on
 	// 1304 email collision) and atomically links the new (provider, sub_id)
@@ -505,8 +505,8 @@ type AccountServiceServer interface {
 	// 狀態動作全部 key 在 account_id，且 buyers 含大量已軟刪帳號的殘留 stint。
 	ListAccountsForAdmin(context.Context, *ListAccountsForAdminRequest) (*ListAccountsForAdminResponse, error)
 	GetAccountForAdmin(context.Context, *GetAccountForAdminRequest) (*GetAccountForAdminResponse, error)
-	// RemoveRole removes a single role from an account. If no roles remain,
-	// the account is fully soft-deleted (Apple revoke + Redis blacklist + MQ).
+	// RemoveRole is Unimplemented in the monolith's legacy adapter: SELLER is
+	// granted and removed only by the seller module together with the store.
 	RemoveRole(context.Context, *RemoveRoleRequest) (*RemoveRoleResponse, error)
 	// LinkConfirm consumes a tempBindToken (issued by Google/Apple OAuth on
 	// 1304 email collision) and atomically links the new (provider, sub_id)

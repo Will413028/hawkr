@@ -65,7 +65,7 @@
 - Connect 沒有視角（ADR `docs/adr/2026-10-07-connect-without-perspective.md`）；「正在看哪個工作區」是 client 的 UI 狀態，本模組不認識視角。
 - `X-Active-Role` 只有舊 REST 送：`internal/legacy/gatewayproxy` 讀它，以 `internal/legacy/accounttype.OfLoginRole` 推導 `X-Login-Role` 給舊 gateway。
 - 舊契約的 `account_type` bitmask（買家 1、賣家 2、管理員 4）只在 `internal/legacy/accounttype` 合成：存活的帳號一定有買家位元，有 `SELLER` 時加賣家位元；`X-Account-Type`、`X-Login-Role` 與 legacy `AccountService` 回傳的 `account_type` 都來自它。單體內只有角色。
-- legacy `AccountService.RemoveRole`（`internal/legacy/accountservice`，給還沒搬的服務）只移除 `SELLER`：`ROLE_BUYER` 與未指定的角色回 InvalidInput；請求沒有來源欄位（`source_id` 與 `other_role_state` 已 `reserved`）；移除不刪帳號，`account_fully_deleted` 恆為 false。
+- legacy `AccountService.RemoveRole` 與 `BindSeller`（`internal/legacy/accountservice`）回 Unimplemented，`BindBuyer` 亦同：只有 seller 模組隨店家開關授予與移除 `SELLER`，舊契約的呼叫不能繞過店家改角色。
 
 ## 7. 登入方式與 provider 設定
 

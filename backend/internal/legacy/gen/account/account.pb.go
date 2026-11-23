@@ -1528,10 +1528,8 @@ func (x *BindSellerResponse) GetSuccess() bool {
 }
 
 type BindBuyerRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	AccountId int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// 同 BindSellerRequest.source_id；buyer 角色填 buyers.buyer_id。
-	SourceId      int64 `protobuf:"varint,2,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1569,13 +1567,6 @@ func (*BindBuyerRequest) Descriptor() ([]byte, []int) {
 func (x *BindBuyerRequest) GetAccountId() int64 {
 	if x != nil {
 		return x.AccountId
-	}
-	return 0
-}
-
-func (x *BindBuyerRequest) GetSourceId() int64 {
-	if x != nil {
-		return x.SourceId
 	}
 	return 0
 }
@@ -4218,11 +4209,10 @@ const file_account_account_proto_rawDesc = "" +
 	"\x12BindSellerResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x18\n" +
-	"\asuccess\x18\x03 \x01(\bR\asuccess\"N\n" +
+	"\asuccess\x18\x03 \x01(\bR\asuccess\"B\n" +
 	"\x10BindBuyerRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\x03R\taccountId\x12\x1b\n" +
-	"\tsource_id\x18\x02 \x01(\x03R\bsourceId\"[\n" +
+	"account_id\x18\x01 \x01(\x03R\taccountIdJ\x04\b\x02\x10\x03R\tsource_id\"[\n" +
 	"\x11BindBuyerResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x18\n" +

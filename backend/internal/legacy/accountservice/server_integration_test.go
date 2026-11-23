@@ -168,19 +168,11 @@ func TestRolesAndDeletion(t *testing.T) {
 	if a, _ := f.m.Account(ctx, id); !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("角色 = %v", a.Roles)
 	}
-	// 移除最後一個角色也不刪帳號（帳號活著就是買家）。
-	r, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_SELLER}))
-	if err != nil || r.Msg.GetCode() != 0 || r.Msg.GetAccountFullyDeleted() {
-		t.Fatalf("移除賣家 = %v, %v", r, err)
+	// RemoveRole 的移除由 seller 模組隨店家關閉進行，舊契約的呼叫不實作。
+	if _, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_SELLER})); connect.CodeOf(err) != connect.CodeUnimplemented {
+		t.Fatalf("RemoveRole = %v", err)
 	}
-	// 買家不是角色：舊的 ROLE_BUYER 一律拒絕，帳號不變。
-	r, err = f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{
-		AccountId: id, Role: pb.Role_ROLE_BUYER,
-	}))
-	if err != nil || r.Msg.GetCode() != codeInvalidInput || r.Msg.GetAccountFullyDeleted() {
-		t.Fatalf("移除買家 = %v, %v", r, err)
-	}
-	if a, err := f.m.Account(ctx, id); err != nil || a.Deleted || len(a.Roles) != 0 {
+	if a, err := f.m.Account(ctx, id); err != nil || a.Deleted || !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("帳號 = %+v, %v", a, err)
 	}
 	if len(f.published) != 0 {
@@ -199,15 +191,6 @@ func TestRolesAndDeletion(t *testing.T) {
 	}
 	if err := json.Unmarshal(f.published[0].Body, &e); err != nil || e.EventType != "ACCOUNT_DELETED" || e.AccountID != id || e.EventID == "" || e.EventID != f.published[0].EventID {
 		t.Fatalf("account.deleted = %s, %v", f.published[0].Body, err)
-	}
-	// 已刪除的帳號：移除賣家冪等成功，不再發事件。
-	if r, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_SELLER})); err != nil || r.Msg.GetCode() != 0 {
-		t.Fatalf("移除已刪帳號的賣家 = %v, %v", r, err)
-	}
-
-	r, err = f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_UNSPECIFIED}))
-	if err != nil || r.Msg.GetCode() != codeInvalidInput {
-		t.Fatalf("不認得的角色 = %v, %v", r, err)
 	}
 	if len(f.published) != 1 {
 		t.Fatalf("事件 %d 則", len(f.published))
