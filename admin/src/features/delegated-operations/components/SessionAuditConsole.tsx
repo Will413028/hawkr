@@ -14,6 +14,7 @@ import {
 	sessionRevokedByText,
 } from "@/features/delegated-operations/format";
 import {
+	DELEGATED_AUDIT_ACTION_POST_FREEZE_LABELS,
 	DELEGATED_AUDIT_RESOURCE_TYPE_LABELS,
 	DELEGATED_AUDIT_RESULT_LABELS,
 	DELEGATED_SESSION_STATUS_LABELS,
@@ -51,7 +52,7 @@ const PAGE_SIZE = 20;
  *
  *  下拉的中文出自兩層，順序不可顛倒：**已載入資料裡的 `actionLabel` 優先**（那是
  *  後端逐列下發的權威值），只有「這個工作階段沒發生過的動作」才退回
- *  `DELEGATION_AUDIT_ACTION_LABEL` 鏡像 —— 篩選器必須在資料到達之前就列滿 19 個選項，
+ *  `DELEGATION_AUDIT_ACTION_LABEL` 鏡像 —— 篩選器必須在資料到達之前就列滿 20 個選項，
  *  而權威值那時還不存在（原本因此直接印 `PRODUCT_BATCH_UNPUBLISH` 這種機器名，
  *  與同頁另外兩個中文下拉自相矛盾）。稽核**列**永遠只讀 `actionLabel`。 */
 const ACTION_GROUPS: {
@@ -63,6 +64,7 @@ const ACTION_GROUPS: {
 	{ key: "product", label: "商品", prefix: "PRODUCT_" },
 	{ key: "post", label: "內容", prefix: "POST_" },
 	{ key: "order", label: "訂單", prefix: "ORDER_" },
+	{ key: "media", label: "檔案", prefix: "MEDIA_" },
 	{ key: "other", label: "其他", prefix: "" },
 ];
 
@@ -189,7 +191,10 @@ export default function SessionAuditConsole({
 		: 1;
 	// 鏡像只是引導值；只要這一頁看得到某個動作，就用它自己帶的權威中文覆蓋。
 	const actionLabels = useMemo(() => {
-		const labels: Record<string, string> = { ...DELEGATION_AUDIT_ACTION_LABEL };
+		const labels: Record<string, string> = {
+			...DELEGATION_AUDIT_ACTION_LABEL,
+			...DELEGATED_AUDIT_ACTION_POST_FREEZE_LABELS,
+		};
 		for (const entry of records) {
 			if (entry.actionLabel) labels[entry.action] = entry.actionLabel;
 		}

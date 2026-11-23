@@ -44,6 +44,7 @@ test("capability and prohibited-area policies are closed enumerations", () => {
 		"posts.write",
 		"posts.publish",
 		"orders.read",
+		"media.upload",
 	]);
 	assert.deepEqual(DELEGATED_OPERATION_PROHIBITED_AREAS, [
 		"fulfillment",

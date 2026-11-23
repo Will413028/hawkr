@@ -111,16 +111,21 @@ func (a AuditAction) RiskLevel() RiskLevel {
 	return RiskHigh
 }
 
-// ReadDenial 是五個只為了讓「被拒絕的請求」有合法動作值的動作：四個讀取，加上上傳（B1-D16：上傳不寫成功的稽核，稽核留在擁有者確認時）；
-// 它們不會成功，也不通知任何人。
+// ReadDenial 是四個只為了讓「被拒絕的讀取」有合法動作值的讀取動作；它們不會成功，也不通知任何人。
 func (a AuditAction) ReadDenial() bool {
-	return a == AuditStorefrontRead || a == AuditProductRead || a == AuditPostRead || a == AuditOrderRead || a == AuditMediaUpload
+	return a == AuditStorefrontRead || a == AuditProductRead || a == AuditPostRead || a == AuditOrderRead
 }
 
-// MayNotifySeller 回傳這個動作的稽核列能不能通知賣家：被拒絕的讀取、PII 揭露與稽核補正恆為 false（機械保證，
+// DenialOnly 是只會出現在被拒絕（FAILED）列的動作：ReadDenial 的四個讀取，加上上傳（B1-D16：上傳不寫成功的稽核，稽核留在擁有者確認時）。
+// 它們不是寫入動作、不需要操作原因、不通知任何人。
+func (a AuditAction) DenialOnly() bool {
+	return a.ReadDenial() || a == AuditMediaUpload
+}
+
+// MayNotifySeller 回傳這個動作的稽核列能不能通知賣家：被拒絕的讀取與上傳、PII 揭露與稽核補正恆為 false（機械保證，
 // 不靠 gateway 記得）。寫入類不強制任何方向：強制成 true 會藏起 gateway 漏填的情況。
 func (a AuditAction) MayNotifySeller() bool {
-	return !a.ReadDenial() && a != AuditOrderPIIReveal && a != AuditCorrection
+	return !a.DenialOnly() && a != AuditOrderPIIReveal && a != AuditCorrection
 }
 
 // AuditResult 是稽核列的結果。PENDING 是合法的終態：嘗試過、結果沒有確認。

@@ -57,13 +57,13 @@ abstract final class MediaAppService {
 /// 需要能力 media.upload（B1-D16）：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；session 沒有 media.upload 回 permission_denied；
 /// 店家此刻不可代行回 failed_precondition，只拒絕、不撤銷 session。回應一律不可快取（private, no-store）。
 /// 稽核：上傳只產生會過期的暫存，不改賣家看得到的資料，所以成功的 BeginSecureUpload 與段上傳都不寫代行稽核；稽核留在擁有者確認時的寫入。被拒絕的請求另寫一列 FAILED。
-/// 會話的上傳者是管理員本人（與 Java 一致）；不保留原始檔名。
+/// 會話的上傳者是管理員本人（與 Java 一致），並綁定被代行的那一家店：段上傳與暫存預覽（`GET /api/files/admin/secure_uploads/{staged_token}`）都要帶同一個 X-HK-Operation-Session，session 此刻有效、帶 media.upload 且屬於這位管理員；擁有者確認時 token 也只對同一家店成立。不保留原始檔名。
 abstract final class MediaDelegatedService {
   /// Fully-qualified name of the MediaDelegatedService service.
   static const name = 'hawkr.media.v1alpha1.MediaDelegatedService';
 
   /// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
-  /// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+  /// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員、在綁定的同一家店的代行 session 之下（請求帶 X-HK-Operation-Session）能續傳。
   /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
   static const beginSecureUpload = connect.Spec(
     '/$name/BeginSecureUpload',

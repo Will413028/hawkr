@@ -171,7 +171,28 @@ func notFound(ctx context.Context) error {
 	return apperr.NotFound("%s", text.MediaUploadNotFound(loc(ctx)))
 }
 
-// own 回傳 token 對應的暫存列；不存在或上傳者不符都回同一個 NotFound，不洩漏 token 是否存在。
+// delegatedStore 是要寫進暫存列的代行店家：非代行是 NULL。
+func delegatedStore(u model.Uploader) *int64 {
+	if u.Store == 0 {
+		return nil
+	}
+	return &u.Store
+}
+
+// storeOf 是暫存列綁定的代行店家，非代行是 0。
+func storeOf(row store.MediaStagedUpload) int64 {
+	if row.DelegatedStoreID == nil {
+		return 0
+	}
+	return *row.DelegatedStoreID
+}
+
+// ownedBy 是暫存列屬於這個上傳者：帳號或管理員的 ID 與種類相同，且代行店家相同（非代行兩邊都是 0）。
+func ownedBy(row store.MediaStagedUpload, u model.Uploader) bool {
+	return row.UploaderID == u.ID && row.UploaderAdmin == u.Admin && storeOf(row) == u.Store
+}
+
+// own 回傳 token 對應的暫存列；不存在或上傳者（含代行店家）不符都回同一個 NotFound，不洩漏 token 是否存在。
 func (s *Service) own(ctx context.Context, uploader model.Uploader, token string) (store.MediaStagedUpload, error) {
 	if !wellFormed(token) {
 		return store.MediaStagedUpload{}, notFound(ctx)
@@ -183,7 +204,7 @@ func (s *Service) own(ctx context.Context, uploader model.Uploader, token string
 	if err != nil {
 		return store.MediaStagedUpload{}, fmt.Errorf("media：讀取暫存上傳：%w", err)
 	}
-	if row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin {
+	if !ownedBy(row, uploader) {
 		return store.MediaStagedUpload{}, notFound(ctx)
 	}
 	return row, nil

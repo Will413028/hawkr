@@ -188,6 +188,14 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	return assemble(deps, services, fileRoutes(deps)...)
 }
 
+// mediaUploads 把還沒接上的 media（nil 指標）轉成 nil 介面，NewDelegated 的 nil 判斷才成立。
+func mediaUploads(m *media.Module) httpmedia.DelegatedUploads {
+	if m == nil {
+		return nil
+	}
+	return m
+}
+
 // fileRoute 是不經 Connect 的檔案回應（API 設計規範（Connect）§十三）：樣式含 method，掛在 /api/files/ 底下，與 Connect 同一條入口
 // 中介鏈與限流，授權由 handler 自己做。
 type fileRoute struct {
@@ -198,15 +206,19 @@ type fileRoute struct {
 	permission adminperm.Permission
 }
 
-// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的後台段上傳（B1-D16，權限 delegation.sessions.create：能開代行的管理員才能上傳）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
+// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的後台段上傳與暫存預覽（B1-D16，權限 delegation.sessions.create，另要有效的代行 session）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
 func fileRoutes(deps Deps) []fileRoute {
 	routes := sellerFileRoutes(deps)
 	if deps.Media != nil {
 		secure := httpmedia.NewSecureUploads(deps.Media, deps.Logger)
+		if deps.Delegation != nil {
+			secure.WithDelegation(deps.Delegation)
+		}
 		routes = append(routes,
 			fileRoute{pattern: httpmedia.ChunkRoute, handler: secure.Chunk()},
 			fileRoute{pattern: httpmedia.AdminChunkRoute, handler: secure.AdminChunk(), permission: adminperm.DelegationSessionsCreate},
-			fileRoute{pattern: httpmedia.PreviewRoute, handler: secure.Preview()})
+			fileRoute{pattern: httpmedia.PreviewRoute, handler: secure.Preview()},
+			fileRoute{pattern: httpmedia.AdminPreviewRoute, handler: secure.AdminPreview(), permission: adminperm.DelegationSessionsCreate})
 	}
 	return routes
 }
@@ -408,7 +420,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if err != nil {
 		return nil, err
 	}
-	add(mediav1alpha1connect.NewMediaDelegatedServiceHandler(httpmedia.NewDelegated(deps.Delegation, deps.Media, deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(mediaDelegated))...))
+	add(mediav1alpha1connect.NewMediaDelegatedServiceHandler(httpmedia.NewDelegated(deps.Delegation, mediaUploads(deps.Media), deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(mediaDelegated))...))
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}
@@ -536,7 +548,7 @@ func redactedTokenPath(path string) (string, bool) {
 			return prefix + "{redacted}", true
 		}
 	}
-	return secureUploadsPrefix + "{redacted}", true
+	return "/api/files/{redacted}", true
 }
 
 // spanName 以 procedure 命名 Connect 的請求；其他路徑只用 method，掃描器亂打的路徑不會變成大量的 span 名稱。

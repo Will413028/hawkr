@@ -55,6 +55,8 @@ CREATE TABLE media.staged_uploads (
     token_hash            BYTEA       NOT NULL,
     uploader_id           BIGINT      NOT NULL,
     uploader_admin        BOOLEAN     NOT NULL,
+    -- 代行營運開的會話（B1-D16）綁定被代行的店家：只有同一家店的代行確認或續傳；非代行是 NULL。
+    delegated_store_id    BIGINT,
     visibility            TEXT        NOT NULL,
     declared_size         BIGINT      NOT NULL,
     -- public：宣告的型別；secure：第 0 段依 magic bytes 辨認後才有，之前是 NULL（不用空字串或假值佔位）。
@@ -83,6 +85,7 @@ CREATE TABLE media.staged_uploads (
     CONSTRAINT staged_uploads_asset_fkey FOREIGN KEY (asset_id) REFERENCES media.assets (id),
     CONSTRAINT staged_uploads_token_hash_check CHECK (octet_length(token_hash) = 32),
     CONSTRAINT staged_uploads_uploader_check CHECK (uploader_id > 0),
+    CONSTRAINT staged_uploads_delegated_store_check CHECK (delegated_store_id IS NULL OR (delegated_store_id > 0 AND uploader_admin)),
     CONSTRAINT staged_uploads_visibility_check CHECK (visibility IN ('PUBLIC', 'SECURE')),
     CONSTRAINT staged_uploads_declared_size_check CHECK (declared_size > 0),
     CONSTRAINT staged_uploads_declared_content_type_check CHECK (

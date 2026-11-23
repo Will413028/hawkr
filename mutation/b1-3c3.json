@@ -40,8 +40,8 @@
       "id": "delegated-uploader-not-admin",
       "stack": "go",
       "file": "backend/internal/httpapi/media/delegated.go",
-      "old": "media.Uploader{ID: c.Session.Actor.AdminID, Admin: true}",
-      "new": "media.Uploader{ID: c.Session.Actor.AdminID}",
+      "old": "media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}",
+      "new": "media.Uploader{ID: c.Session.Actor.AdminID, Store: st.StoreID}",
       "test": "internal/httpapi/media ^TestDelegatedBeginSecureUploadUploaderIsTheAdmin$",
       "why": "會話的 Uploader 不標管理員：管理員 ID 被當成顧客帳號 ID，與同 ID 的買家混淆"
     },
@@ -49,8 +49,8 @@
       "id": "admin-chunk-uploader-not-admin",
       "stack": "go",
       "file": "backend/internal/httpapi/media/secure_files.go",
-      "old": "return media.Uploader{ID: p.ID, Admin: true}, true",
-      "new": "return media.Uploader{ID: p.ID}, true",
+      "old": "return media.Uploader{ID: p.ID, Admin: true, Store: c.Session.Target.StoreID}, true",
+      "new": "return media.Uploader{ID: p.ID, Store: c.Session.Target.StoreID}, true",
       "test": "internal/httpapi/media ^TestAdminChunkUploaderIsTheAdmin$",
       "why": "後台段上傳的 Uploader 不標管理員：續傳對不上開會話的管理員"
     },
@@ -67,8 +67,8 @@
       "id": "admin-chunk-route-no-permission",
       "stack": "go",
       "file": "backend/internal/httpapi/server.go",
-      "old": ", permission: adminperm.DelegationSessionsCreate}",
-      "new": "}",
+      "old": "secure.AdminChunk(), permission: adminperm.DelegationSessionsCreate}",
+      "new": "secure.AdminChunk()}",
       "test": "internal/httpapi ^TestAdminChunkRouteDeclaresAPermissionAndGuardsTheHandler$",
       "why": "後台段路由拿掉權限宣告：沒有權限檢查擋在 handler 之前（路由表測試紅）"
     },
@@ -80,6 +80,96 @@
       "new": "[]string{secureUploadsPrefix}",
       "test": "internal/httpapi ^TestRedactedTokenPathKeepsTheRoute$",
       "why": "token 遮罩不認後台前綴：後台段路由的 trace 路徑退化成不分路由的 {redacted}"
+    },
+    {
+      "id": "admin-preview-route-no-permission",
+      "stack": "go",
+      "file": "backend/internal/httpapi/server.go",
+      "old": "secure.AdminPreview(), permission: adminperm.DelegationSessionsCreate}",
+      "new": "secure.AdminPreview()}",
+      "test": "internal/httpapi ^TestAdminPreviewRouteDeclaresTheSamePermission$",
+      "why": "後台預覽路由拿掉權限宣告：沒有角色檢查擋在 handler 之前"
+    },
+    {
+      "id": "delegated-uploader-no-store",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/delegated.go",
+      "old": "Admin: true, Store: st.StoreID}",
+      "new": "Admin: true}",
+      "test": "internal/httpapi/media ^TestDelegatedBeginSecureUploadUploaderIsTheAdmin$",
+      "why": "開會話時沒帶被代行的店家：會話沒有綁定任何店"
+    },
+    {
+      "id": "staged-owner-ignores-store",
+      "stack": "go",
+      "file": "backend/internal/modules/media/internal/upload/upload.go",
+      "old": " && storeOf(row) == u.Store\n",
+      "new": " \n",
+      "test": "internal/modules/media/internal/upload ^TestOwnedBy_BindsDelegatedStore$",
+      "why": "擁有判斷不比對代行店家：店家 A 開的代行會話可被店家 B 的代行續傳、預覽或確認（C1）"
+    },
+    {
+      "id": "begin-does-not-record-store",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+      "old": "\t\t\tDelegatedStoreID: delegatedStore(uploader),\n",
+      "new": "",
+      "test": "internal/modules/media ^TestSecureUpload_DelegatedSessionIsBoundToItsStore$",
+      "why": "開機敏會話時不把代行店家寫進暫存列：綁定只存在記憶體，續傳與轉正放行別家的代行（C1）"
+    },
+    {
+      "id": "admin-chunk-ignores-dead-session",
+      "stack": "go",
+      "file": "backend/internal/httpapi/delegation/interceptor.go",
+      "old": "\tif err := sessions.AuthorizeDelegated(ctx, caller); err != nil {\n\t\treturn Caller{}, err\n\t}\n\treturn caller, nil",
+      "new": "\t_ = sessions.AuthorizeDelegated(ctx, caller)\n\treturn caller, nil",
+      "test": "internal/httpapi/media ^TestAdminChunkRequiresALiveDelegationSession$",
+      "why": "Authorize 不採用 AuthorizeDelegated 的拒絕：已撤銷、逾時或缺 media.upload 的 session 仍可續傳（C4）"
+    },
+    {
+      "id": "admin-chunk-any-admin-session",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "\tcase err == nil && c.Session.Actor.AdminID != p.ID:",
+      "new": "\tcase false:",
+      "test": "internal/httpapi/media ^TestAdminChunkRequiresALiveDelegationSession$",
+      "why": "不比對 session 的操作者：別的管理員拿到憑證就能續傳（C4）"
+    },
+    {
+      "id": "admin-preview-uses-customer-uploader",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "h.preview(w, r, h.adminUploader)",
+      "new": "h.preview(w, r, h.uploader)",
+      "test": "internal/httpapi/media ^TestAdminPreviewUsesTheDelegatedUploader$",
+      "why": "後台預覽沿用顧客的上傳者驗證：不檢查代行 session（C5）"
+    },
+    {
+      "id": "denial-only-excludes-media-upload",
+      "stack": "go",
+      "file": "backend/internal/modules/delegation/internal/model/delegation_audit_types.go",
+      "old": "return a.ReadDenial() || a == AuditMediaUpload",
+      "new": "return a.ReadDenial()",
+      "test": "internal/modules/delegation/internal/model ^TestMediaUploadAuditIsDenialOnly$",
+      "why": "DenialOnly 不含 MEDIA_UPLOAD：上傳動作可以寫成功列、要求操作原因並通知賣家（C6）"
+    },
+    {
+      "id": "redact-fallback-customer-prefix",
+      "stack": "go",
+      "file": "backend/internal/httpapi/server.go",
+      "old": "return \"/api/files/{redacted}\", true",
+      "new": "return secureUploadsPrefix + \"{redacted}\", true",
+      "test": "internal/httpapi ^TestRedactedTokenPathKeepsTheRoute$",
+      "why": "遮罩的後備路徑回顧客的前綴：後台的亂路徑被誤報成顧客路徑（C7）"
+    },
+    {
+      "id": "website-media-upload-chip-label",
+      "stack": "website",
+      "file": "website/features/delegated-operations/labels.ts",
+      "old": "\t\"media.upload\": \"上傳檔案\",\n",
+      "new": "",
+      "test": "features/delegated-operations/labels.unit.test.ts shows media.upload as its own chip",
+      "why": "情境列認不得 media.upload：持有該能力的代行工作區少一顆 chip（C3）"
     }
   ]
 }

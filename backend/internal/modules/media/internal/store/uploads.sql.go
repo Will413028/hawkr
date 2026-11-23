@@ -114,7 +114,7 @@ func (q *Queries) GetSecureChunk(ctx context.Context, arg GetSecureChunkParams) 
 }
 
 const getUpload = `-- name: GetUpload :one
-SELECT id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at FROM media.staged_uploads WHERE id = $1
+SELECT id, token_hash, uploader_id, uploader_admin, delegated_store_id, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at FROM media.staged_uploads WHERE id = $1
 `
 
 func (q *Queries) GetUpload(ctx context.Context, id uuid.UUID) (MediaStagedUpload, error) {
@@ -125,6 +125,7 @@ func (q *Queries) GetUpload(ctx context.Context, id uuid.UUID) (MediaStagedUploa
 		&i.TokenHash,
 		&i.UploaderID,
 		&i.UploaderAdmin,
+		&i.DelegatedStoreID,
 		&i.Visibility,
 		&i.DeclaredSize,
 		&i.DeclaredContentType,
@@ -147,7 +148,7 @@ func (q *Queries) GetUpload(ctx context.Context, id uuid.UUID) (MediaStagedUploa
 }
 
 const getUploadByTokenHash = `-- name: GetUploadByTokenHash :one
-SELECT id, token_hash, uploader_id, uploader_admin, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at FROM media.staged_uploads WHERE token_hash = $1
+SELECT id, token_hash, uploader_id, uploader_admin, delegated_store_id, visibility, declared_size, declared_content_type, declared_md5, state, reject_reason, tmp_key, final_key, asset_id, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at FROM media.staged_uploads WHERE token_hash = $1
 `
 
 func (q *Queries) GetUploadByTokenHash(ctx context.Context, tokenHash []byte) (MediaStagedUpload, error) {
@@ -158,6 +159,7 @@ func (q *Queries) GetUploadByTokenHash(ctx context.Context, tokenHash []byte) (M
 		&i.TokenHash,
 		&i.UploaderID,
 		&i.UploaderAdmin,
+		&i.DelegatedStoreID,
 		&i.Visibility,
 		&i.DeclaredSize,
 		&i.DeclaredContentType,
@@ -197,26 +199,27 @@ func (q *Queries) InsertSecureChunk(ctx context.Context, arg InsertSecureChunkPa
 
 const insertSecureUpload = `-- name: InsertSecureUpload :exec
 INSERT INTO media.staged_uploads (
-    id, token_hash, uploader_id, uploader_admin, visibility, declared_size,
+    id, token_hash, uploader_id, uploader_admin, delegated_store_id, visibility, declared_size,
     state, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at)
 VALUES (
-    $1, $2, $3, $4, 'SECURE', $5,
-    'UPLOADING', $6::uuid, $7::integer, 0, $8::text, $9,
-    $10, $11, $11)
+    $1, $2, $3, $4, $5::bigint, 'SECURE', $6,
+    'UPLOADING', $7::uuid, $8::integer, 0, $9::text, $10,
+    $11, $12, $12)
 `
 
 type InsertSecureUploadParams struct {
-	ID             uuid.UUID
-	TokenHash      []byte
-	UploaderID     int64
-	UploaderAdmin  bool
-	DeclaredSize   int64
-	PlannedAssetID uuid.UUID
-	ChunkCount     int32
-	KekID          string
-	WrappedDek     []byte
-	ExpiresAt      time.Time
-	Now            time.Time
+	ID               uuid.UUID
+	TokenHash        []byte
+	UploaderID       int64
+	UploaderAdmin    bool
+	DelegatedStoreID *int64
+	DeclaredSize     int64
+	PlannedAssetID   uuid.UUID
+	ChunkCount       int32
+	KekID            string
+	WrappedDek       []byte
+	ExpiresAt        time.Time
+	Now              time.Time
 }
 
 // 機敏分段上傳：以 UPLOADING 建列（沒有預簽，tmp_key、declared_md5、declared_content_type 與 final_key 是 NULL），
@@ -227,6 +230,7 @@ func (q *Queries) InsertSecureUpload(ctx context.Context, arg InsertSecureUpload
 		arg.TokenHash,
 		arg.UploaderID,
 		arg.UploaderAdmin,
+		arg.DelegatedStoreID,
 		arg.DeclaredSize,
 		arg.PlannedAssetID,
 		arg.ChunkCount,

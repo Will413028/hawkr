@@ -172,16 +172,26 @@ test("建立工作階段是頂層表單導覽，不是 fetch，也不在瀏覽�
  * 更是從頭到尾只讀 `actionLabel`。
  */
 test("CodeMeta 鏡像的動作鍵集合與封閉值域完全相等", async () => {
-	const [{ DELEGATION_AUDIT_ACTION_LABEL }, { DELEGATED_AUDIT_ACTIONS }] =
-		await Promise.all([
-			import("../src/lib/codemeta"),
-			import("../src/features/delegated-operations/governance"),
-		]);
+	const [
+		{ DELEGATION_AUDIT_ACTION_LABEL },
+		{ DELEGATED_AUDIT_ACTIONS },
+		{ DELEGATED_AUDIT_ACTION_POST_FREEZE_LABELS },
+	] = await Promise.all([
+		import("../src/lib/codemeta"),
+		import("../src/features/delegated-operations/governance"),
+		import("../src/features/delegated-operations/labels"),
+	]);
 	assert.deepEqual(
-		Object.keys(DELEGATION_AUDIT_ACTION_LABEL).sort(),
+		[
+			...Object.keys(DELEGATION_AUDIT_ACTION_LABEL),
+			...Object.keys(DELEGATED_AUDIT_ACTION_POST_FREEZE_LABELS),
+		].sort(),
 		[...DELEGATED_AUDIT_ACTIONS].sort(),
 	);
-	for (const [action, label] of Object.entries(DELEGATION_AUDIT_ACTION_LABEL)) {
+	for (const [action, label] of Object.entries({
+		...DELEGATION_AUDIT_ACTION_LABEL,
+		...DELEGATED_AUDIT_ACTION_POST_FREEZE_LABELS,
+	})) {
 		assert.notEqual(label, action, `${action} 沒有中文標籤`);
 		assert.doesNotMatch(label, /[A-Z]{2,}_/u, `${action} 的標籤看起來仍是常數`);
 	}

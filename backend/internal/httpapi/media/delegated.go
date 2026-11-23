@@ -50,22 +50,15 @@ type Delegated struct {
 
 var _ mediav1alpha1connect.MediaDelegatedServiceHandler = (*Delegated)(nil)
 
-// NewDelegated 建立 handler；m 為 nil 時（media 還沒接上）授權過後回 unavailable。
-func NewDelegated(runner DelegationReader, m *media.Module, log *slog.Logger) *Delegated {
-	if m == nil {
-		return newDelegated(runner, nil, log)
-	}
-	return newDelegated(runner, m, log)
-}
-
-func newDelegated(runner DelegationReader, uploads DelegatedUploads, log *slog.Logger) *Delegated {
+// NewDelegated 建立 handler；uploads 為 nil 介面時（media 還沒接上，由呼叫方明確傳 nil，不是裝著 nil 指標的介面）授權過後回 unavailable。
+func NewDelegated(runner DelegationReader, uploads DelegatedUploads, log *slog.Logger) *Delegated {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
 	return &Delegated{runner: runner, uploads: uploads, log: log}
 }
 
-// BeginSecureUpload 以代行 session 的管理員為上傳者開會話（B1-D16）：Uploader 是 {ID: 管理員, Admin: true}，段上傳走後台路由，只有這位管理員能續傳。
+// BeginSecureUpload 以代行 session 的管理員為上傳者開會話（B1-D16）：Uploader 是 {ID: 管理員, Admin: true, Store: 被代行的店家}，會話綁定那家店；段上傳與預覽走後台路由，只有這位管理員在同一家店的代行 session 之下能續傳，擁有者確認時也要帶同一家店。
 // 成功不寫代行稽核；缺 media.upload 或店家不可代行由 DelegatedRead 拒絕並寫 FAILED。
 func (h *Delegated) BeginSecureUpload(ctx context.Context, req *connect.Request[pb.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[pb.MediaDelegatedServiceBeginSecureUploadResponse], error) {
 	c, err := httpdelegation.CallerFrom(ctx)
@@ -73,12 +66,12 @@ func (h *Delegated) BeginSecureUpload(ctx context.Context, req *connect.Request[
 		return nil, err
 	}
 	var res media.SecureBeginResult
-	err = h.runner.DelegatedRead(ctx, c, func(ctx context.Context, _ seller.Store) error {
+	err = h.runner.DelegatedRead(ctx, c, func(ctx context.Context, st seller.Store) error {
 		if h.uploads == nil {
 			return rpc.Error(connect.CodeUnavailable, "media 模組尚未接上")
 		}
 		var err error
-		res, err = h.uploads.BeginSecureUpload(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Admin: true}, req.Msg.GetSize())
+		res, err = h.uploads.BeginSecureUpload(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}, req.Msg.GetSize())
 		return err
 	})
 	if errors.Is(err, media.ErrNoKeyring) {

@@ -53,6 +53,7 @@ const catalogPayload = {
 		},
 		// 九值中唯一「唯讀卻是 high」的一項：每次揭露都落一列 PII 稽核。
 		{ value: "orders.read", risk: "high", dependsOn: [] },
+		{ value: "media.upload", risk: "low", dependsOn: [] },
 	],
 };
 
@@ -82,7 +83,7 @@ const authorizationPayload = {
 
 test("能力目錄解析成功並保留後端順序與風險等級", () => {
 	assert.ok(catalog);
-	assert.equal(catalog.capabilities.length, 9);
+	assert.equal(catalog.capabilities.length, 10);
 	assert.deepEqual(
 		catalog.capabilities.map((descriptor) => descriptor.value),
 		[
@@ -95,6 +96,7 @@ test("能力目錄解析成功並保留後端順序與風險等級", () => {
 			"posts.write",
 			"posts.publish",
 			"orders.read",
+			"media.upload",
 		],
 	);
 	assert.equal(

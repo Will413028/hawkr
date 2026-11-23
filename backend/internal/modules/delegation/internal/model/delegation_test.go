@@ -150,7 +150,7 @@ func TestEveryDenialIsClassified(t *testing.T) {
 
 // MEDIA_UPLOAD 只為了讓被拒絕的上傳有合法動作值（B1-D16：上傳成功不寫稽核）：不能寫成功列、不通知賣家、不要求操作原因。
 func TestMediaUploadAuditIsDenialOnly(t *testing.T) {
-	if !AuditMediaUpload.Known() || !AuditMediaUpload.ReadDenial() || AuditMediaUpload.MayNotifySeller() || AuditMediaUpload.RiskLevel() != RiskLow {
+	if !AuditMediaUpload.Known() || !AuditMediaUpload.DenialOnly() || AuditMediaUpload.ReadDenial() || AuditMediaUpload.MayNotifySeller() || AuditMediaUpload.RiskLevel() != RiskLow {
 		t.Fatalf("MEDIA_UPLOAD 規則不符：known=%v denial=%v notify=%v risk=%v", AuditMediaUpload.Known(), AuditMediaUpload.ReadDenial(), AuditMediaUpload.MayNotifySeller(), AuditMediaUpload.RiskLevel())
 	}
 	if !ResourceMedia.Valid() || !CapabilityMediaUpload.Valid() {

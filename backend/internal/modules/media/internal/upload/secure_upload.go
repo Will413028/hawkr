@@ -140,7 +140,8 @@ func (s *Service) BeginSecureUpload(ctx context.Context, uploader model.Uploader
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		return s.q(ctx).InsertSecureUpload(ctx, store.InsertSecureUploadParams{
 			ID: uploadID, TokenHash: hashToken(token), UploaderID: uploader.ID, UploaderAdmin: uploader.Admin,
-			DeclaredSize: size, PlannedAssetID: assetID, ChunkCount: i32(count), KekID: kekID, WrappedDek: wrapped,
+			DelegatedStoreID: delegatedStore(uploader),
+			DeclaredSize:     size, PlannedAssetID: assetID, ChunkCount: i32(count), KekID: kekID, WrappedDek: wrapped,
 			ExpiresAt: expiresAt, Now: now,
 		})
 	})

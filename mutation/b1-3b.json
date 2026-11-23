@@ -31,7 +31,7 @@
    "id": "own-no-uploader-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/upload.go",
-   "old": "if row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin {",
+   "old": "if !ownedBy(row, uploader) {",
    "new": "if false && (row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin) {",
    "test": "internal/httpapi/media ^TestAnotherUsersTokenIsNotFoundOnCompleteAndGet$",
    "why": "拿掉上傳者檢查：別人的 staged token 能讀狀態與完成上傳"

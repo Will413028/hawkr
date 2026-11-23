@@ -35,6 +35,7 @@ type MediaStagedUpload struct {
 	TokenHash           []byte
 	UploaderID          int64
 	UploaderAdmin       bool
+	DelegatedStoreID    *int64
 	Visibility          string
 	DeclaredSize        int64
 	DeclaredContentType *string

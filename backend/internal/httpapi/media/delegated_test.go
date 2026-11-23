@@ -45,6 +45,10 @@ func (f *fakeSessions) ResolveDelegation(_ context.Context, c string, _ bool) (m
 }
 
 func (f *fakeSessions) AuthorizeDelegated(_ context.Context, c moddelegation.DelegatedCaller) error {
+	if c.Session.Status != moddelegation.DelegationActive {
+		f.denied = append(f.denied, c.Method)
+		return apperr.PermissionDenied("代行工作階段已不可用")
+	}
 	if !slices.Contains(c.Session.Capabilities, c.Method.Capability) {
 		f.denied = append(f.denied, c.Method)
 		return apperr.PermissionDenied("此工作階段未取得執行該操作的能力")
@@ -98,7 +102,7 @@ func newDelegatedEnv(t *testing.T, caps ...moddelegation.Capability) *delegatedE
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := newDelegated(r, b, nil)
+	h := NewDelegated(r, b, nil)
 	path, handler := mediav1alpha1connect.NewMediaDelegatedServiceHandler(h, connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler)), in))
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
@@ -140,14 +144,14 @@ func TestDelegatedBeginSecureUploadWithoutCredentialIsUnauthenticated(t *testing
 	}
 }
 
-// 會話的上傳者是管理員（{ID: 代行的管理員, Admin: true}），不是店家或其他人；回應帶 token、段大小與段總數。
+// 會話的上傳者是管理員（{ID: 代行的管理員, Admin: true}）並綁定被代行的店家（Store），不是店家或其他人；回應帶 token、段大小與段總數。
 func TestDelegatedBeginSecureUploadUploaderIsTheAdmin(t *testing.T) {
 	e := newDelegatedEnv(t, moddelegation.CapabilityMediaUpload)
 	res, err := begin(e, "cred", 4096)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if e.begin.who != (media.Uploader{ID: delegatedAdminID, Admin: true}) || e.begin.size != 4096 {
+	if e.begin.who != (media.Uploader{ID: delegatedAdminID, Admin: true, Store: delegatedStoreID}) || e.begin.size != 4096 {
 		t.Fatalf("模組收到 uploader=%+v size=%d", e.begin.who, e.begin.size)
 	}
 	if res.Msg.GetStagedToken() != "tok" || res.Msg.GetChunkSize() != media.SecureChunkSize || res.Msg.GetChunkCount() != 3 || res.Msg.GetExpireTime() == nil {

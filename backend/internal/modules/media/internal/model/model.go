@@ -20,6 +20,9 @@ var ErrStagedTokenRejected = errors.New("media：staged token 不可用")
 type Uploader struct {
 	ID    int64
 	Admin bool
+	// Store 是代行營運時被代行的店家 ID（B1-D16），非代行是 0。機敏分段上傳開會話時記下，之後 token 的每個動作（續傳、預覽、轉正）都要帶同一個值，
+	// 所以代行店家 A 開的會話不能被店家 B 的代行確認；非代行的 token 也不能被帶 Store 的呼叫者使用。
+	Store int64
 }
 
 // Ref 是引用資產的業務列：Type 是本套件的 RefType 常數，ID 是該列的主鍵。

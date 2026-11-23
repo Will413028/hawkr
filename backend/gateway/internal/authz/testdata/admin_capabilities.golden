@@ -7,3 +7,4 @@ posts.read
 posts.write
 posts.publish
 orders.read
+media.upload

@@ -60,7 +60,7 @@ func TestRedactedTokenPathKeepsTheRoute(t *testing.T) {
 		"/api/files/admin/secure_uploads/T":                "/api/files/admin/secure_uploads/{token}",
 		"/api/files/admin/secure_uploads/T/chunks/0/extra": "/api/files/admin/secure_uploads/{redacted}",
 		"/api/files/secure_uploads/T/other":                "/api/files/secure_uploads/{redacted}",
-		"/api//files/admin/secure_uploads/T":               "/api/files/secure_uploads/{redacted}",
+		"/api//files/admin/secure_uploads/T":               "/api/files/{redacted}",
 		"/api/files/admin/secure_uploads//T/chunks/0":      "/api/files/admin/secure_uploads/{redacted}",
 	} {
 		if got, ok := redactedTokenPath(in); !ok || got != want {

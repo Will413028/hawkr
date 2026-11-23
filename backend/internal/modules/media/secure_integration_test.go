@@ -1316,3 +1316,36 @@ func TestCollectGarbage_RemovesTheSecureChunkRowsOfAnExpiredSession(t *testing.T
 		t.Fatalf("會話回收後剩下 %d 筆段記錄", got)
 	}
 }
+
+// 代行會話綁定被代行的店家（B1-D16）：同一個管理員換一家店、或不帶店家，續傳與轉正都像 token 不存在；同一家店才成立。
+func TestSecureUpload_DelegatedSessionIsBoundToItsStore(t *testing.T) {
+	f := setup(t)
+	admin := media.Uploader{ID: 41, Admin: true, Store: 5}
+	data := pdfOf(100)[:100]
+	b := beginSecure(t, f, admin, len(data))
+	for name, who := range map[string]media.Uploader{
+		"other-store": {ID: 41, Admin: true, Store: 6},
+		"no-store":    {ID: 41, Admin: true},
+	} {
+		if _, err := putChunk(f, who, b.Token, 0, data); apperr.KindOf(err) != apperr.KindNotFound {
+			t.Errorf("%s 續傳：err = %v，預期 NotFound", name, err)
+		}
+	}
+	if _, err := putChunk(f, admin, b.Token, 0, data); err != nil {
+		t.Fatalf("同一家店續傳：%v", err)
+	}
+	for name, who := range map[string]media.Uploader{
+		"other-store": {ID: 41, Admin: true, Store: 6},
+		"no-store":    {ID: 41, Admin: true},
+	} {
+		if _, err := confirmInTx(f, who, b.Token); err == nil {
+			t.Errorf("%s 轉正：預期被拒絕", name)
+		}
+	}
+	confirmSecure(t, f, admin, b.Token)
+
+	plain := beginSecure(t, f, media.Uploader{ID: 41, Admin: true}, len(data))
+	if _, err := putChunk(f, admin, plain.Token, 0, data); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Errorf("非代行的 token 帶店家續傳：err = %v，預期 NotFound", err)
+	}
+}

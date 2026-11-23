@@ -92,20 +92,30 @@ func (i *interceptor) enter(ctx context.Context, procedure string, header http.H
 	if !ok {
 		return ctx, fmt.Errorf("httpapi/delegation：%s 沒有能力宣告", procedure)
 	}
-	credential := header.Get(OperationSessionHeader)
-	s, err := i.sessions.ResolveDelegation(ctx, credential, false)
+	caller, err := Authorize(ctx, i.sessions, i.logger, procedure, method, header)
 	if err != nil {
-		if apperr.KindOf(err) == apperr.KindUnauthenticated {
-			i.logger.WarnContext(ctx, "代行憑證解析不到 session", "security_event", "delegation_credential_unresolved",
-				"procedure", procedure, "credential_present", credential != "", "trace_id", rpc.TraceID(ctx), "user_agent", header.Get("User-Agent"))
-		}
-		return ctx, err
-	}
-	caller := Caller{Session: s, Method: method, CorrelationID: rpc.TraceID(ctx), UserAgent: header.Get("User-Agent")}
-	if err := i.sessions.AuthorizeDelegated(ctx, caller); err != nil {
 		return ctx, err
 	}
 	return context.WithValue(ctx, callerKey{}, caller), nil
+}
+
+// Authorize 是 interceptor 與不經 Connect 的代行路由（後台檔案端點）共用的授權：讀 X-HK-Operation-Session，解析 session（解析不到回 unauthenticated 並記安全 log），
+// 再以 AuthorizeDelegated 檢查 session 此刻 ACTIVE 並帶有 method 的能力，被拒絕時寫一列 FAILED 稽核。procedure 只用在 log 與稽核的來源標示。
+func Authorize(ctx context.Context, sessions Sessions, logger *slog.Logger, procedure string, method moddelegation.DelegatedMethod, header http.Header) (Caller, error) {
+	credential := header.Get(OperationSessionHeader)
+	s, err := sessions.ResolveDelegation(ctx, credential, false)
+	if err != nil {
+		if apperr.KindOf(err) == apperr.KindUnauthenticated {
+			logger.WarnContext(ctx, "代行憑證解析不到 session", "security_event", "delegation_credential_unresolved",
+				"procedure", procedure, "credential_present", credential != "", "trace_id", rpc.TraceID(ctx), "user_agent", header.Get("User-Agent"))
+		}
+		return Caller{}, err
+	}
+	caller := Caller{Session: s, Method: method, CorrelationID: rpc.TraceID(ctx), UserAgent: header.Get("User-Agent")}
+	if err := sessions.AuthorizeDelegated(ctx, caller); err != nil {
+		return Caller{}, err
+	}
+	return caller, nil
 }
 
 func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {

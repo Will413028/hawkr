@@ -13,7 +13,7 @@
    "id": "confirm-skips-uploader-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/upload.go",
-   "old": "if row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin {",
+   "old": "if !ownedBy(row, uploader) {",
    "new": "if false && (row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin) {",
    "test": "internal/modules/media ^TestConfirm_RejectsNonUploader$",
    "why": "Confirm no longer compares the caller with the uploader, so anyone holding the token can confirm"

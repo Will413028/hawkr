@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -28,6 +30,8 @@ const (
 	AdminChunkRoute = "PUT /api/files/admin/secure_uploads/{token}/chunks/{index}"
 	// PreviewRoute 是確認前暫存預覽端點的 ServeMux 樣式。
 	PreviewRoute = "GET /api/files/secure_uploads/{token}"
+	// AdminPreviewRoute 是代行營運的暫存預覽端點（B1-D16）：只有開會話的管理員、在同一個代行 session 之下能看。
+	AdminPreviewRoute = "GET /api/files/admin/secure_uploads/{token}"
 
 	// NextIndexHeader 是 index 不符（409）時帶回下一個要送的段序號的回應 header。
 	NextIndexHeader = "Hawkr-Next-Index"
@@ -50,6 +54,8 @@ type SecureUploads struct {
 	m           SecureFiles
 	log         *slog.Logger
 	readTimeout time.Duration
+	// sessions 是後台路由驗代行 session 的來源（*delegation.Module）；nil 時後台路由一律 503。
+	sessions httpdelegation.Sessions
 }
 
 // NewSecureUploads 建立端點的 handler。
@@ -60,17 +66,31 @@ func NewSecureUploads(m SecureFiles, log *slog.Logger) *SecureUploads {
 	return &SecureUploads{m: m, log: log, readTimeout: ChunkReadTimeout}
 }
 
+// WithDelegation 接上後台路由驗代行 session 的來源。
+func (h *SecureUploads) WithDelegation(sessions httpdelegation.Sessions) *SecureUploads {
+	h.sessions = sessions
+	return h
+}
+
 // Chunk 回 PUT 的 handler。
 func (h *SecureUploads) Chunk() http.Handler { return http.HandlerFunc(h.putChunk) }
 
 // AdminChunk 回後台 PUT 的 handler：段請求的語意與 Chunk 完全相同（時限、大小上限、409 與 Hawkr-Next-Index、錯誤分類），只有上傳者不同：
-// 呼叫者是管理員，Uploader 是 {ID: 管理員 ID, Admin: true}，會話只有開它的管理員能續傳。
+// 呼叫者是管理員，Uploader 是 {ID: 管理員 ID, Admin: true, Store: 代行店家}，會話只有開它的管理員、在綁定的同一家店的代行 session 之下能續傳
+// （請求要帶 X-HK-Operation-Session，session 此刻 ACTIVE、帶 media.upload、操作者是這位管理員，見 adminUploader）。
 func (h *SecureUploads) AdminChunk() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.adminUploader) })
 }
 
 // Preview 回 GET 的 handler。
-func (h *SecureUploads) Preview() http.Handler { return http.HandlerFunc(h.getPreview) }
+func (h *SecureUploads) Preview() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.preview(w, r, h.uploader) })
+}
+
+// AdminPreview 回後台 GET 預覽的 handler：預覽語意與 Preview 相同，上傳者的驗證與 AdminChunk 相同。
+func (h *SecureUploads) AdminPreview() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.preview(w, r, h.adminUploader) })
+}
 
 // uploader 設好機敏回應的 header 並取出呼叫的顧客帳號；沒有登入 401、不是顧客帳號 403。
 func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.Uploader, bool) {
@@ -88,7 +108,9 @@ func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.
 	return media.Uploader{ID: p.ID}, true
 }
 
-// adminUploader 設好機敏回應的 header 並取出呼叫的管理員；沒有登入 401、不是管理員 403（角色是否允許由 adminauth.GuardFile 先擋）。
+// adminUploader 設好機敏回應的 header 並取出呼叫的管理員與他的代行店家：沒有登入 401、不是管理員 403（角色是否允許由 adminauth.GuardFile 先擋）；
+// 再以 X-HK-Operation-Session 的代行 session 授權（與 MediaDelegatedService 同一個 httpdelegation.Authorize，被拒絕寫 FAILED 稽核）：缺憑證 401，
+// session 已撤銷、逾時、沒有 media.upload 或操作者不是這位管理員 403。店家只來自 session，所以續傳與預覽只對開會話的那家店成立。
 func (h *SecureUploads) adminUploader(w http.ResponseWriter, r *http.Request) (media.Uploader, bool) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -100,9 +122,36 @@ func (h *SecureUploads) adminUploader(w http.ResponseWriter, r *http.Request) (m
 	case p.Kind != identity.PrincipalAdmin:
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return media.Uploader{}, false
+	case h.sessions == nil:
+		http.Error(w, "unavailable", http.StatusServiceUnavailable)
+		return media.Uploader{}, false
 	}
-	return media.Uploader{ID: p.ID, Admin: true}, true
+	c, err := httpdelegation.Authorize(r.Context(), h.sessions, h.log, r.Pattern, adminUploadMethod, r.Header)
+	switch {
+	case err == nil && c.Session.Actor.AdminID != p.ID:
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return media.Uploader{}, false
+	case err == nil:
+		return media.Uploader{ID: p.ID, Admin: true, Store: c.Session.Target.StoreID}, true
+	}
+	switch apperr.KindOf(err) {
+	case apperr.KindUnauthenticated:
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+	case apperr.KindPermissionDenied:
+		http.Error(w, "forbidden", http.StatusForbidden)
+	case apperr.KindInternal, apperr.KindInvalidInput, apperr.KindNotFound, apperr.KindVersionConflict, apperr.KindAlreadyExists,
+		apperr.KindFailedPrecondition, apperr.KindUnavailable, apperr.KindResourceExhausted:
+		h.log.ErrorContext(r.Context(), "media：後台上傳驗證代行 session 失敗", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	default:
+		h.log.ErrorContext(r.Context(), "media：後台上傳驗證代行 session 失敗", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+	return media.Uploader{}, false
 }
+
+// adminUploadMethod 是後台路由要的代行宣告：與 BeginSecureUpload 同一份（能力 media.upload、被拒絕的稽核動作與資源）。
+var adminUploadMethod = DelegatedDeclaration.Methods[mediav1alpha1connect.MediaDelegatedServiceBeginSecureUploadProcedure]
 
 func (h *SecureUploads) putChunk(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.uploader) }
 
@@ -136,8 +185,8 @@ func (h *SecureUploads) chunk(w http.ResponseWriter, r *http.Request, who func(h
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *SecureUploads) getPreview(w http.ResponseWriter, r *http.Request) {
-	u, ok := h.uploader(w, r)
+func (h *SecureUploads) preview(w http.ResponseWriter, r *http.Request, who func(http.ResponseWriter, *http.Request) (media.Uploader, bool)) {
+	u, ok := who(w, r)
 	if !ok {
 		return
 	}

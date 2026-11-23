@@ -238,7 +238,7 @@ func (UnimplementedMediaAppServiceHandler) BeginSecureUpload(context.Context, *c
 // service.
 type MediaDelegatedServiceClient interface {
 	// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
-	// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+	// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員、在綁定的同一家店的代行 session 之下（請求帶 X-HK-Operation-Session）能續傳。
 	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
 	BeginSecureUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse], error)
 }
@@ -277,7 +277,7 @@ func (c *mediaDelegatedServiceClient) BeginSecureUpload(ctx context.Context, req
 // hawkr.media.v1alpha1.MediaDelegatedService service.
 type MediaDelegatedServiceHandler interface {
 	// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
-	// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+	// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員、在綁定的同一家店的代行 session 之下（請求帶 X-HK-Operation-Session）能續傳。
 	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
 	BeginSecureUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse], error)
 }

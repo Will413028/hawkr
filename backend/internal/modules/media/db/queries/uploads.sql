@@ -11,10 +11,10 @@ VALUES (
 -- 機敏分段上傳：以 UPLOADING 建列（沒有預簽，tmp_key、declared_md5、declared_content_type 與 final_key 是 NULL），
 -- 預配資產 ID、段總數、next_index 0 與包好的 DEK。
 INSERT INTO media.staged_uploads (
-    id, token_hash, uploader_id, uploader_admin, visibility, declared_size,
+    id, token_hash, uploader_id, uploader_admin, delegated_store_id, visibility, declared_size,
     state, planned_asset_id, chunk_count, next_index, kek_id, wrapped_dek, expires_at, created_at, updated_at)
 VALUES (
-    sqlc.arg(id), sqlc.arg(token_hash), sqlc.arg(uploader_id), sqlc.arg(uploader_admin), 'SECURE', sqlc.arg(declared_size),
+    sqlc.arg(id), sqlc.arg(token_hash), sqlc.arg(uploader_id), sqlc.arg(uploader_admin), sqlc.narg(delegated_store_id)::bigint, 'SECURE', sqlc.arg(declared_size),
     'UPLOADING', sqlc.arg(planned_asset_id)::uuid, sqlc.arg(chunk_count)::integer, 0, sqlc.arg(kek_id)::text, sqlc.arg(wrapped_dek),
     sqlc.arg(expires_at), sqlc.arg(now), sqlc.arg(now));
 

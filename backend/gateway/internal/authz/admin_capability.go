@@ -13,10 +13,10 @@ package authz
 // accidentally declared an admin token no longer panics at boot, which silently
 // weakens the deny-by-default guarantee 46 號 built.
 //
-// The nine values are a closed enumeration. Adding one is a governance-level change
+// The ten values are a closed enumeration. Adding one is a governance-level change
 // (§8.1.0): Go constants, the golden file and both DB CHECKs move together, and the
 // G2 gate (scripts/check-delegation-capability-closure.py) turns the PR red if only
-// some of them do. None of the nine represents a fulfilment or money capability —
+// some of them do. None of the ten represents a fulfilment or money capability —
 // that is the D2 leg of the four mechanical guarantees, and it is why the list is
 // closed rather than open.
 //
@@ -25,7 +25,7 @@ package authz
 // business code.
 type AdminCapability string
 
-// The nine capabilities, in §6.1.1 declaration order.
+// The ten capabilities, in §6.1.1 declaration order.
 const (
 	// AdminCapStorefrontRead — 查看店面內容（low）。唯讀，不落稽核 action。
 	AdminCapStorefrontRead AdminCapability = "storefront.read"
@@ -46,14 +46,16 @@ const (
 	// AdminCapOrdersRead — 查看訂單（high）。九值中唯一「唯讀但必落稽核」者
 	// （ORDER_PII_REVEAL），例外由 order-service 自行斷言 audit_log_id 非空承擔。
 	AdminCapOrdersRead AdminCapability = "orders.read"
+	// AdminCapMediaUpload — 上傳機敏檔案（low，B1-D16）。由單體的 MediaDelegatedService 與後台段上傳端點檢查；
+	// 上傳只產生會過期的暫存，不讓檔案生效，掛上時仍由擁有者的寫入能力把關。這個 gateway 沒有任何路由宣告它，
+	// 列在這裡是為了能被授權（授權建立與能力目錄都以本表為準）。
+	AdminCapMediaUpload AdminCapability = "media.upload"
 )
 
 // AllAdminCapabilities lists every delegated capability. Order matches the §6.1.1
 // table so the golden file reads the same way.
 //
-// 媒體上傳刻意不在其中，也不新增第十個（§6.1.13）：上傳只在 media 自己的表插一列、
-// 不碰 target store 的業務狀態；真正需要授權的是「把圖掛上去」，已由
-// storefront.write / products.write / posts.write 各自守住。
+// 第十個 media.upload 由 B1-D16 新增（取代 §6.1.13 的「媒體上傳不另設能力」）：只有商品或貼文寫入權的管理員會因此上傳不了。
 var AllAdminCapabilities = []AdminCapability{
 	AdminCapStorefrontRead,
 	AdminCapStorefrontWrite,
@@ -64,6 +66,7 @@ var AllAdminCapabilities = []AdminCapability{
 	AdminCapPostsWrite,
 	AdminCapPostsPublish,
 	AdminCapOrdersRead,
+	AdminCapMediaUpload,
 }
 
 // IsKnownAdmin reports whether cap is one of the nine delegated capability tokens.
@@ -109,6 +112,7 @@ var adminCapabilityDependencies = map[AdminCapability][]AdminCapability{
 	AdminCapPostsWrite:      {AdminCapPostsRead},
 	AdminCapPostsPublish:    {AdminCapPostsRead, AdminCapPostsWrite},
 	AdminCapOrdersRead:      {},
+	AdminCapMediaUpload:     {},
 }
 
 // Risk levels for the授權 UI。三值封閉：low / medium / high。
@@ -133,6 +137,7 @@ var adminCapabilityRisks = map[AdminCapability]string{
 	AdminCapPostsWrite:      AdminCapRiskMedium,
 	AdminCapPostsPublish:    AdminCapRiskHigh,
 	AdminCapOrdersRead:      AdminCapRiskHigh,
+	AdminCapMediaUpload:     AdminCapRiskLow,
 }
 
 // AdminCapabilityDependsOn 回傳 cap 的直接依賴（未知 token 回空 slice，不回 nil：

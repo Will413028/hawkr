@@ -68,3 +68,16 @@ func TestAdminChunkRouteDeclaresAPermissionAndGuardsTheHandler(t *testing.T) {
 		}
 	}
 }
+
+// 後台的暫存預覽路由（B1-D16）宣告與段路由相同的權限。
+func TestAdminPreviewRouteDeclaresTheSamePermission(t *testing.T) {
+	for _, r := range fileRoutes(Deps{Media: &media.Module{}}) {
+		if r.pattern == httpmedia.AdminPreviewRoute {
+			if r.permission != adminperm.DelegationSessionsCreate {
+				t.Fatalf("後台預覽路由的權限 %q，預期 %q", r.permission, adminperm.DelegationSessionsCreate)
+			}
+			return
+		}
+	}
+	t.Fatalf("檔案路由表沒有 %s", httpmedia.AdminPreviewRoute)
+}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -93,6 +94,33 @@ func TestSecureChunkCountAndLength(t *testing.T) {
 		}
 		if total != tc.size {
 			t.Errorf("size=%d：各段加起來 %d", tc.size, total)
+		}
+	}
+}
+
+func TestOwnedBy_BindsDelegatedStore(t *testing.T) {
+	admin := model.Uploader{ID: 7, Admin: true}
+	delegated := func(store int64) model.Uploader { return model.Uploader{ID: 7, Admin: true, Store: store} }
+	row := func(u model.Uploader) store.MediaStagedUpload {
+		return store.MediaStagedUpload{UploaderID: u.ID, UploaderAdmin: u.Admin, DelegatedStoreID: delegatedStore(u)}
+	}
+	cases := []struct {
+		name string
+		row  store.MediaStagedUpload
+		who  model.Uploader
+		want bool
+	}{
+		{"same delegated store", row(delegated(5)), delegated(5), true},
+		{"other delegated store", row(delegated(5)), delegated(6), false},
+		{"delegated row, no store", row(delegated(5)), admin, false},
+		{"plain row, with store", row(admin), delegated(5), false},
+		{"plain row, plain admin", row(admin), admin, true},
+		{"other admin", row(delegated(5)), model.Uploader{ID: 8, Admin: true, Store: 5}, false},
+		{"account with same id", row(delegated(5)), model.Uploader{ID: 7, Store: 5}, false},
+	}
+	for _, c := range cases {
+		if got := ownedBy(c.row, c.who); got != c.want {
+			t.Errorf("%s：ownedBy = %v，預期 %v", c.name, got, c.want)
 		}
 	}
 }

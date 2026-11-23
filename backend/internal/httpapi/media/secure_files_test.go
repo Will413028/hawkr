@@ -15,7 +15,9 @@ import (
 	"testing"
 	"time"
 
+	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	moddelegation "github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -99,6 +101,9 @@ func do(t *testing.T, method, url, who string, body io.Reader, length int64) rep
 	}
 	if who != "" {
 		req.Header.Set("X-Test-Who", who)
+	}
+	if who == "admin" {
+		req.Header.Set(httpdelegation.OperationSessionHeader, "cred")
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -392,10 +397,27 @@ func (e errReader) Read([]byte) (int, error) { return 0, e.err }
 
 func adminSecureServer(t *testing.T, f *fakeSecure, timeout time.Duration) *httptest.Server {
 	t.Helper()
+	return adminSecureServerWith(t, f, timeout, adminSessions())
+}
+
+// adminSessions 是後台路由預設的代行 session：憑證 "cred" 是管理員 7 在店家 5 上的 ACTIVE session，帶 media.upload。
+func adminSessions() *fakeSessions {
+	return &fakeSessions{sessions: map[string]moddelegation.DelegationSession{
+		"cred": {ID: 9, Status: moddelegation.DelegationActive, Capabilities: []moddelegation.Capability{moddelegation.CapabilityMediaUpload},
+			Actor: moddelegation.DelegationActor{AdminID: 7}, Target: moddelegation.DelegationTarget{StoreID: 5}},
+	}}
+}
+
+func adminSecureServerWith(t *testing.T, f *fakeSecure, timeout time.Duration, sessions httpdelegation.Sessions) *httptest.Server {
+	t.Helper()
 	h := NewSecureUploads(f, nil)
+	if sessions != nil {
+		h.WithDelegation(sessions)
+	}
 	h.readTimeout = timeout
 	mux := http.NewServeMux()
 	mux.Handle(AdminChunkRoute, h.AdminChunk())
+	mux.Handle(AdminPreviewRoute, h.AdminPreview())
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Header.Get("X-Test-Who") {
 		case "account":
@@ -417,7 +439,7 @@ func TestAdminChunkUploaderIsTheAdmin(t *testing.T) {
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("狀態 %d，預期 204", resp.StatusCode)
 	}
-	if !f.chunkWho.Admin || f.chunkWho.ID != 7 || f.chunkToken != "tok" || f.chunkIndex != 2 || f.chunkLen != 5 || f.chunkRead != 5 {
+	if f.chunkWho != (media.Uploader{ID: 7, Admin: true, Store: 5}) || f.chunkToken != "tok" || f.chunkIndex != 2 || f.chunkLen != 5 || f.chunkRead != 5 {
 		t.Fatalf("模組收到 %+v", f)
 	}
 	if h := resp.Header.Get("Cache-Control"); h != "private, no-store" {
@@ -453,5 +475,91 @@ func TestAdminChunkSharesTheChunkSemantics(t *testing.T) {
 	go func() { _, _ = pw.Write([]byte("ab")) }()
 	if resp := do(t, http.MethodPut, srv.URL+url, "admin", pr, 10); resp.StatusCode != http.StatusRequestTimeout {
 		t.Errorf("慢速 body 回 %d，預期 408", resp.StatusCode)
+	}
+}
+
+func adminPut(t *testing.T, srv *httptest.Server, cred string) reply {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL+"/api/files/admin/secure_uploads/tok/chunks/0", strings.NewReader("a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Test-Who", "admin")
+	if cred != "" {
+		req.Header.Set(httpdelegation.OperationSessionHeader, cred)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return reply{StatusCode: resp.StatusCode, Header: resp.Header}
+}
+
+// 後台段上傳要有效的代行 session：缺憑證與無效憑證 401；已撤銷、已逾時、被移除 media.upload 的 session，或操作者不是這位管理員 403；模組都沒被呼叫，被拒絕的 session 記下稽核宣告。
+func TestAdminChunkRequiresALiveDelegationSession(t *testing.T) {
+	mutate := func(f func(s *moddelegation.DelegationSession)) *fakeSessions {
+		fs := adminSessions()
+		s := fs.sessions["cred"]
+		f(&s)
+		fs.sessions["cred"] = s
+		return fs
+	}
+	for name, tc := range map[string]struct {
+		sessions *fakeSessions
+		cred     string
+		want     int
+		denied   int
+	}{
+		"缺憑證":  {adminSessions(), "", http.StatusUnauthorized, 0},
+		"無效憑證": {adminSessions(), "bad", http.StatusUnauthorized, 0},
+		"已撤銷":  {mutate(func(s *moddelegation.DelegationSession) { s.Status = moddelegation.DelegationRevoked }), "cred", http.StatusForbidden, 1},
+		"已逾時":  {mutate(func(s *moddelegation.DelegationSession) { s.Status = moddelegation.DelegationExpired }), "cred", http.StatusForbidden, 1},
+		"移除了 media.upload": {mutate(func(s *moddelegation.DelegationSession) {
+			s.Capabilities = []moddelegation.Capability{moddelegation.CapabilityStorefrontWrite}
+		}), "cred", http.StatusForbidden, 1},
+		"session 屬於另一位管理員": {mutate(func(s *moddelegation.DelegationSession) { s.Actor.AdminID = 8 }), "cred", http.StatusForbidden, 0},
+		"有效":               {adminSessions(), "cred", http.StatusNoContent, 0},
+	} {
+		f := &fakeSecure{}
+		resp := adminPut(t, adminSecureServerWith(t, f, time.Minute, tc.sessions), tc.cred)
+		called := f.chunkToken != ""
+		if resp.StatusCode != tc.want || called != (tc.want == http.StatusNoContent) || len(tc.sessions.denied) != tc.denied {
+			t.Errorf("%s：狀態 %d、模組被呼叫 %v、稽核宣告 %d，預期 %d、%v、%d", name, resp.StatusCode, called, len(tc.sessions.denied), tc.want, tc.want == http.StatusNoContent, tc.denied)
+		}
+		if tc.denied == 1 && len(tc.sessions.denied) == 1 && tc.sessions.denied[0].Action != moddelegation.AuditMediaUpload {
+			t.Errorf("%s：稽核動作 %q", name, tc.sessions.denied[0].Action)
+		}
+	}
+	if resp := adminPut(t, adminSecureServerWith(t, &fakeSecure{}, time.Minute, nil), "cred"); resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("沒有接上 delegation：%d，預期 503", resp.StatusCode)
+	}
+}
+
+// 後台預覽：上傳者同為管理員加代行店家；沒有有效 session 一律被擋；顧客帳號 403。
+func TestAdminPreviewUsesTheDelegatedUploader(t *testing.T) {
+	f := &fakeSecure{preview: "%PDF-1.4 hi"}
+	srv := adminSecureServer(t, f, time.Minute)
+	resp := do(t, http.MethodGet, srv.URL+"/api/files/admin/secure_uploads/tok", "admin", nil, 0)
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != "application/pdf" || resp.Header.Get("Cache-Control") != "private, no-store" {
+		t.Fatalf("預覽 %d %q", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	if f.previewWho != (media.Uploader{ID: 7, Admin: true, Store: 5}) {
+		t.Fatalf("模組收到 %+v", f.previewWho)
+	}
+	f = &fakeSecure{preview: "x"}
+	srv = adminSecureServerWith(t, f, time.Minute, func() *fakeSessions {
+		fs := adminSessions()
+		s := fs.sessions["cred"]
+		s.Status = moddelegation.DelegationRevoked
+		fs.sessions["cred"] = s
+		return fs
+	}())
+	if resp := do(t, http.MethodGet, srv.URL+"/api/files/admin/secure_uploads/tok", "admin", nil, 0); resp.StatusCode != http.StatusForbidden || f.previewWho != (media.Uploader{}) {
+		t.Errorf("撤銷後預覽 %d、模組被呼叫 %+v", resp.StatusCode, f.previewWho)
+	}
+	srv = adminSecureServer(t, &fakeSecure{}, time.Minute)
+	if resp := do(t, http.MethodGet, srv.URL+"/api/files/admin/secure_uploads/tok", "account", nil, 0); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("顧客帳號預覽 %d，預期 403", resp.StatusCode)
 	}
 }

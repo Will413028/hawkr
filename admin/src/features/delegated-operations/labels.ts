@@ -23,6 +23,7 @@ export const DELEGATED_OPERATION_CAPABILITY_LABELS: Record<
 	"posts.write": "編輯貼文",
 	"posts.publish": "發布與下架貼文",
 	"orders.read": "查看訂單（唯讀）",
+	"media.upload": "上傳檔案",
 };
 
 /**
@@ -106,6 +107,7 @@ export const DELEGATED_AUDIT_RESOURCE_TYPE_LABELS: Record<
 	product: "商品",
 	post: "內容",
 	order: "訂單",
+	media: "檔案",
 };
 
 /**
@@ -202,3 +204,12 @@ export function delegatedOperationStateCopy(state: DelegatedOperationState): {
 			};
 	}
 }
+
+/**
+ * CodeMeta 凍結之後新增的稽核動作的引導中文（動作篩選下拉在資料到達前用，資料到達後以 `actionLabel` 覆蓋）。
+ * `MEDIA_UPLOAD` 只出現在被拒絕的列：上傳成功不寫代行稽核（B1-D16）。
+ */
+export const DELEGATED_AUDIT_ACTION_POST_FREEZE_LABELS: Record<string, string> =
+	{
+		MEDIA_UPLOAD: "上傳檔案（被拒絕）",
+	};

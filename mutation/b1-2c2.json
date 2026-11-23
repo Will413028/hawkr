@@ -49,7 +49,7 @@
       "id": "staged-secure-read-skips-uploader-check",
       "stack": "go-integration",
       "file": "backend/internal/modules/media/internal/upload/upload.go",
-      "old": "if row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin {",
+      "old": "if !ownedBy(row, uploader) {",
       "new": "if false {",
       "test": "internal/modules/media ^TestReadStagedSecure_OnlyTheUploaderCanPreviewBeforeConfirm$",
       "why": "ReadStagedSecure no longer compares the caller with the uploader, so anyone holding the token can preview the file"
