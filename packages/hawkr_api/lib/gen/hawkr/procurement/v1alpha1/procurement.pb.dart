@@ -3622,7 +3622,6 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
     $core.String? requestId,
     $core.String? expectedRevisionId,
     $core.String? clientRequestId,
-    $core.String? deliveryCity,
     BuyerRequestedRange? buyerRequestedRange,
   }) {
     final result = PreviewRfqPriceRequest._();
@@ -3630,7 +3629,6 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
     if (expectedRevisionId != null)
       result.expectedRevisionId = expectedRevisionId;
     if (clientRequestId != null) result.clientRequestId = clientRequestId;
-    if (deliveryCity != null) result.deliveryCity = deliveryCity;
     if (buyerRequestedRange != null)
       result.buyerRequestedRange = buyerRequestedRange;
     return result;
@@ -3653,8 +3651,7 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'expectedRevisionId')
     ..aOS(3, _omitFieldNames ? '' : 'clientRequestId')
-    ..aOS(4, _omitFieldNames ? '' : 'deliveryCity')
-    ..aOM<BuyerRequestedRange>(5, _omitFieldNames ? '' : 'buyerRequestedRange',
+    ..aOM<BuyerRequestedRange>(4, _omitFieldNames ? '' : 'buyerRequestedRange',
         subBuilder: BuyerRequestedRange.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -3710,24 +3707,15 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
   void clearClientRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.String get deliveryCity => $_getSZ(3);
+  BuyerRequestedRange get buyerRequestedRange => $_getN(3);
   @$pb.TagNumber(4)
-  set deliveryCity($core.String value) => $_setString(3, value);
+  set buyerRequestedRange(BuyerRequestedRange value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasDeliveryCity() => $_has(3);
+  $core.bool hasBuyerRequestedRange() => $_has(3);
   @$pb.TagNumber(4)
-  void clearDeliveryCity() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  BuyerRequestedRange get buyerRequestedRange => $_getN(4);
-  @$pb.TagNumber(5)
-  set buyerRequestedRange(BuyerRequestedRange value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasBuyerRequestedRange() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearBuyerRequestedRange() => $_clearField(5);
-  @$pb.TagNumber(5)
-  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(4);
+  void clearBuyerRequestedRange() => $_clearField(4);
+  @$pb.TagNumber(4)
+  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(3);
 }
 
 class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
@@ -3812,6 +3800,7 @@ class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(1);
 
+  /// 這份預覽的 hash（SHA-256 小寫十六進位），原樣帶進 ConfirmRfqSnapshotRequest.payload_hash。
   @$pb.TagNumber(4)
   $core.String get payloadHash => $_getSZ(2);
   @$pb.TagNumber(4)
@@ -3938,6 +3927,7 @@ class ConfirmRfqSnapshotRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearPricePreviewId() => $_clearField(4);
 
+  /// 預覽回應的 payload_hash。
   @$pb.TagNumber(6)
   $core.String get payloadHash => $_getSZ(4);
   @$pb.TagNumber(6)
@@ -10124,13 +10114,17 @@ class BuyerProcurementAppServiceApi {
 
   /// PreviewRfqPrice 依買家預期的單價範圍與需求數量，算出詢價總額區間並存成預覽（有效 15 分鐘）。
   /// 買家沒有給合法的範圍（下界與上界是正整數、下界不大於上界）回 INVALID_ARGUMENT；
-  /// 需求已有數量與單位卻算不出總額回 FAILED_PRECONDITION。
+  /// 需求還沒有單位（算不出計價基準）回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY；
+  /// 需求已有數量與單位卻算不出總額（溢位）回 FAILED_PRECONDITION，沒有 reason。
+  /// 讀到的需求版本不是現行版本回 ABORTED，conflictTarget 是 request_revision；需求不屬於呼叫者回 NOT_FOUND。
   $async.Future<PreviewRfqPriceResponse> previewRfqPrice(
           $pb.ClientContext? ctx, PreviewRfqPriceRequest request) =>
       _client.invoke<PreviewRfqPriceResponse>(ctx, 'BuyerProcurementAppService',
           'PreviewRfqPrice', request, PreviewRfqPriceResponse());
 
-  /// ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照。預覽或需求版本過時回 ABORTED。
+  /// ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照（有效 24 小時）。需求版本過時回 ABORTED，conflictTarget 是 request_revision；
+  /// 預覽屬於別的需求、對應的不是現行版本、已過期或 payload_hash 與預覽不符回 ABORTED，conflictTarget 是 price_preview；
+  /// 預覽不屬於呼叫者回 NOT_FOUND；buyer_note 超過 500 字回 INVALID_ARGUMENT。
   $async.Future<ConfirmRfqSnapshotResponse> confirmRfqSnapshot(
           $pb.ClientContext? ctx, ConfirmRfqSnapshotRequest request) =>
       _client.invoke<ConfirmRfqSnapshotResponse>(
@@ -10140,7 +10134,11 @@ class BuyerProcurementAppServiceApi {
           request,
           ConfirmRfqSnapshotResponse());
 
-  /// PreviewRfqPublication 依確認快照編出要發給賣家的內容並建立不可變的發布核准，不發布、不通知。
+  /// PreviewRfqPublication 依確認快照編出要發給賣家的內容並建立不可變的發布核准（有效 24 小時），不發布、不通知。
+  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；快照屬於別的需求或對應的不是現行版本回 ABORTED，conflictTarget 是 rfq_snapshot；
+  /// 指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
+  /// 確認快照、候選集不屬於呼叫者回 NOT_FOUND；受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、回價期限不是合法日期回 INVALID_ARGUMENT。
+  /// 公開池的收件人在發布時決定，預覽的 recipient_count 是 0。
   $async.Future<PreviewRfqPublicationResponse> previewRfqPublication(
           $pb.ClientContext? ctx, PreviewRfqPublicationRequest request) =>
       _client.invoke<PreviewRfqPublicationResponse>(
@@ -10150,7 +10148,10 @@ class BuyerProcurementAppServiceApi {
           request,
           PreviewRfqPublicationResponse());
 
-  /// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到。
+  /// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
+  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本，
+  /// 或 payload_hash 與核准的內容不符回 ABORTED，conflictTarget 是 publication_approval；核准不屬於呼叫者回 NOT_FOUND。
+  /// 重送同一個 client_request_id 回第一次的發布（replayed 為 true），內容不同回 INVALID_ARGUMENT。
   $async.Future<ExecuteRfqPublicationResponse> executeRfqPublication(
           $pb.ClientContext? ctx, ExecuteRfqPublicationRequest request) =>
       _client.invoke<ExecuteRfqPublicationResponse>(

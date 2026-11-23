@@ -276,8 +276,6 @@ const (
 	RunType_RUN_TYPE_CANDIDATE_SEARCH RunType = 2
 	// 回覆中斷之後接續的一輪。
 	RunType_RUN_TYPE_CLARIFICATION_RESUME RunType = 3
-	// 詢價發布。
-	RunType_RUN_TYPE_PUBLICATION RunType = 4
 )
 
 // Enum value maps for RunType.
@@ -287,14 +285,12 @@ var (
 		1: "RUN_TYPE_TURN",
 		2: "RUN_TYPE_CANDIDATE_SEARCH",
 		3: "RUN_TYPE_CLARIFICATION_RESUME",
-		4: "RUN_TYPE_PUBLICATION",
 	}
 	RunType_value = map[string]int32{
 		"RUN_TYPE_UNSPECIFIED":          0,
 		"RUN_TYPE_TURN":                 1,
 		"RUN_TYPE_CANDIDATE_SEARCH":     2,
 		"RUN_TYPE_CLARIFICATION_RESUME": 3,
-		"RUN_TYPE_PUBLICATION":          4,
 	}
 )
 
@@ -3821,8 +3817,7 @@ type PreviewRfqPriceRequest struct {
 	RequestId           string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	ExpectedRevisionId  string                 `protobuf:"bytes,2,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
 	ClientRequestId     string                 `protobuf:"bytes,3,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
-	DeliveryCity        string                 `protobuf:"bytes,4,opt,name=delivery_city,json=deliveryCity,proto3" json:"delivery_city,omitempty"`
-	BuyerRequestedRange *BuyerRequestedRange   `protobuf:"bytes,5,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
+	BuyerRequestedRange *BuyerRequestedRange   `protobuf:"bytes,4,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -3878,13 +3873,6 @@ func (x *PreviewRfqPriceRequest) GetClientRequestId() string {
 	return ""
 }
 
-func (x *PreviewRfqPriceRequest) GetDeliveryCity() string {
-	if x != nil {
-		return x.DeliveryCity
-	}
-	return ""
-}
-
 func (x *PreviewRfqPriceRequest) GetBuyerRequestedRange() *BuyerRequestedRange {
 	if x != nil {
 		return x.BuyerRequestedRange
@@ -3896,7 +3884,8 @@ type PreviewRfqPriceResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	PricePreviewId      string                 `protobuf:"bytes,1,opt,name=price_preview_id,json=pricePreviewId,proto3" json:"price_preview_id,omitempty"`
 	BuyerRequestedRange *BuyerRequestedRange   `protobuf:"bytes,3,opt,name=buyer_requested_range,json=buyerRequestedRange,proto3" json:"buyer_requested_range,omitempty"`
-	PayloadHash         string                 `protobuf:"bytes,4,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
+	// 這份預覽的 hash（SHA-256 小寫十六進位），原樣帶進 ConfirmRfqSnapshotRequest.payload_hash。
+	PayloadHash string `protobuf:"bytes,4,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
 	// 需求沒有填數量時不設；不回 0，也不把單價當總額。
 	QuoteTotalRange *QuoteTotalRange `protobuf:"bytes,5,opt,name=quote_total_range,json=quoteTotalRange,proto3,oneof" json:"quote_total_range,omitempty"`
 	unknownFields   protoimpl.UnknownFields
@@ -3967,7 +3956,8 @@ type ConfirmRfqSnapshotRequest struct {
 	ClientRequestId    string                 `protobuf:"bytes,2,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
 	ExpectedRevisionId string                 `protobuf:"bytes,3,opt,name=expected_revision_id,json=expectedRevisionId,proto3" json:"expected_revision_id,omitempty"`
 	PricePreviewId     string                 `protobuf:"bytes,4,opt,name=price_preview_id,json=pricePreviewId,proto3" json:"price_preview_id,omitempty"`
-	PayloadHash        string                 `protobuf:"bytes,6,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
+	// 預覽回應的 payload_hash。
+	PayloadHash string `protobuf:"bytes,6,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
 	// 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
 	BuyerNote     string `protobuf:"bytes,7,opt,name=buyer_note,json=buyerNote,proto3" json:"buyer_note,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -8521,14 +8511,13 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x12lower_bound_amount\x18\x01 \x01(\x03R\x10lowerBoundAmount\x12,\n" +
 	"\x12upper_bound_amount\x18\x02 \x01(\x03R\x10upperBoundAmount\x12\x1a\n" +
 	"\bquantity\x18\x03 \x01(\x05R\bquantity\x12#\n" +
-	"\rquantity_unit\x18\x04 \x01(\tR\fquantityUnit\"\xbb\x02\n" +
+	"\rquantity_unit\x18\x04 \x01(\tR\fquantityUnit\"\x96\x02\n" +
 	"\x16PreviewRfqPriceRequest\x12\"\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\x03\xe0A\x02R\trequestId\x125\n" +
 	"\x14expected_revision_id\x18\x02 \x01(\tB\x03\xe0A\x02R\x12expectedRevisionId\x127\n" +
-	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\x12#\n" +
-	"\rdelivery_city\x18\x04 \x01(\tR\fdeliveryCity\x12h\n" +
-	"\x15buyer_requested_range\x18\x05 \x01(\v2/.hawkr.procurement.v1alpha1.BuyerRequestedRangeB\x03\xe0A\x02R\x13buyerRequestedRange\"\xce\x02\n" +
+	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\x12h\n" +
+	"\x15buyer_requested_range\x18\x04 \x01(\v2/.hawkr.procurement.v1alpha1.BuyerRequestedRangeB\x03\xe0A\x02R\x13buyerRequestedRange\"\xce\x02\n" +
 	"\x17PreviewRfqPriceResponse\x12(\n" +
 	"\x10price_preview_id\x18\x01 \x01(\tR\x0epricePreviewId\x12c\n" +
 	"\x15buyer_requested_range\x18\x03 \x01(\v2/.hawkr.procurement.v1alpha1.BuyerRequestedRangeR\x13buyerRequestedRange\x12!\n" +
@@ -8935,13 +8924,12 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x1aREQUEST_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19REQUEST_STATUS_CLARIFYING\x10\x01\x12$\n" +
 	" REQUEST_STATUS_REQUIREMENT_READY\x10\x02\x12\x1b\n" +
-	"\x17REQUEST_STATUS_MATCHING\x10\x03*\x92\x01\n" +
+	"\x17REQUEST_STATUS_MATCHING\x10\x03*x\n" +
 	"\aRunType\x12\x18\n" +
 	"\x14RUN_TYPE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rRUN_TYPE_TURN\x10\x01\x12\x1d\n" +
 	"\x19RUN_TYPE_CANDIDATE_SEARCH\x10\x02\x12!\n" +
-	"\x1dRUN_TYPE_CLARIFICATION_RESUME\x10\x03\x12\x18\n" +
-	"\x14RUN_TYPE_PUBLICATION\x10\x04*\x98\x02\n" +
+	"\x1dRUN_TYPE_CLARIFICATION_RESUME\x10\x03*\x98\x02\n" +
 	"\tRunStatus\x12\x1a\n" +
 	"\x16RUN_STATUS_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11RUN_STATUS_QUEUED\x10\x01\x12\x16\n" +

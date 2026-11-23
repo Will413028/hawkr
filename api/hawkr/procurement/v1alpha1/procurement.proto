@@ -64,16 +64,27 @@ service BuyerProcurementAppService {
 
   // PreviewRfqPrice 依買家預期的單價範圍與需求數量，算出詢價總額區間並存成預覽（有效 15 分鐘）。
   // 買家沒有給合法的範圍（下界與上界是正整數、下界不大於上界）回 INVALID_ARGUMENT；
-  // 需求已有數量與單位卻算不出總額回 FAILED_PRECONDITION。
+  // 需求還沒有單位（算不出計價基準）回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY；
+  // 需求已有數量與單位卻算不出總額（溢位）回 FAILED_PRECONDITION，沒有 reason。
+  // 讀到的需求版本不是現行版本回 ABORTED，conflictTarget 是 request_revision；需求不屬於呼叫者回 NOT_FOUND。
   rpc PreviewRfqPrice(PreviewRfqPriceRequest) returns (PreviewRfqPriceResponse);
 
-  // ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照。預覽或需求版本過時回 ABORTED。
+  // ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照（有效 24 小時）。需求版本過時回 ABORTED，conflictTarget 是 request_revision；
+  // 預覽屬於別的需求、對應的不是現行版本、已過期或 payload_hash 與預覽不符回 ABORTED，conflictTarget 是 price_preview；
+  // 預覽不屬於呼叫者回 NOT_FOUND；buyer_note 超過 500 字回 INVALID_ARGUMENT。
   rpc ConfirmRfqSnapshot(ConfirmRfqSnapshotRequest) returns (ConfirmRfqSnapshotResponse);
 
-  // PreviewRfqPublication 依確認快照編出要發給賣家的內容並建立不可變的發布核准，不發布、不通知。
+  // PreviewRfqPublication 依確認快照編出要發給賣家的內容並建立不可變的發布核准（有效 24 小時），不發布、不通知。
+  // 需求版本過時回 ABORTED，conflictTarget 是 request_revision；快照屬於別的需求或對應的不是現行版本回 ABORTED，conflictTarget 是 rfq_snapshot；
+  // 指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
+  // 確認快照、候選集不屬於呼叫者回 NOT_FOUND；受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、回價期限不是合法日期回 INVALID_ARGUMENT。
+  // 公開池的收件人在發布時決定，預覽的 recipient_count 是 0。
   rpc PreviewRfqPublication(PreviewRfqPublicationRequest) returns (PreviewRfqPublicationResponse);
 
-  // ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到。
+  // ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
+  // 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本，
+  // 或 payload_hash 與核准的內容不符回 ABORTED，conflictTarget 是 publication_approval；核准不屬於呼叫者回 NOT_FOUND。
+  // 重送同一個 client_request_id 回第一次的發布（replayed 為 true），內容不同回 INVALID_ARGUMENT。
   rpc ExecuteRfqPublication(ExecuteRfqPublicationRequest) returns (ExecuteRfqPublicationResponse);
 
   // ListConversations 列出買家的對話，最近更新的在前。
@@ -216,8 +227,6 @@ enum RunType {
   RUN_TYPE_CANDIDATE_SEARCH = 2;
   // 回覆中斷之後接續的一輪。
   RUN_TYPE_CLARIFICATION_RESUME = 3;
-  // 詢價發布。
-  RUN_TYPE_PUBLICATION = 4;
 }
 
 // RunStatus 是 run 的狀態。
@@ -745,8 +754,7 @@ message PreviewRfqPriceRequest {
     (google.api.field_behavior) = REQUIRED,
     (google.api.field_info).format = UUID4
   ];
-  string delivery_city = 4;
-  BuyerRequestedRange buyer_requested_range = 5 [(google.api.field_behavior) = REQUIRED];
+  BuyerRequestedRange buyer_requested_range = 4 [(google.api.field_behavior) = REQUIRED];
 }
 
 message PreviewRfqPriceResponse {
@@ -754,6 +762,7 @@ message PreviewRfqPriceResponse {
   reserved 2;
   reserved "version";
   BuyerRequestedRange buyer_requested_range = 3;
+  // 這份預覽的 hash（SHA-256 小寫十六進位），原樣帶進 ConfirmRfqSnapshotRequest.payload_hash。
   string payload_hash = 4;
   // 需求沒有填數量時不設；不回 0，也不把單價當總額。
   optional QuoteTotalRange quote_total_range = 5;
@@ -769,6 +778,7 @@ message ConfirmRfqSnapshotRequest {
   string price_preview_id = 4 [(google.api.field_behavior) = REQUIRED];
   reserved 5;
   reserved "price_preview_version";
+  // 預覽回應的 payload_hash。
   string payload_hash = 6 [(google.api.field_behavior) = REQUIRED];
   // 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
   string buyer_note = 7;

@@ -108,7 +108,6 @@ const RunType$json = {
     {'1': 'RUN_TYPE_TURN', '2': 1},
     {'1': 'RUN_TYPE_CANDIDATE_SEARCH', '2': 2},
     {'1': 'RUN_TYPE_CLARIFICATION_RESUME', '2': 3},
-    {'1': 'RUN_TYPE_PUBLICATION', '2': 4},
   ],
 };
 
@@ -116,7 +115,7 @@ const RunType$json = {
 final $typed_data.Uint8List runTypeDescriptor = $convert.base64Decode(
     'CgdSdW5UeXBlEhgKFFJVTl9UWVBFX1VOU1BFQ0lGSUVEEAASEQoNUlVOX1RZUEVfVFVSThABEh'
     '0KGVJVTl9UWVBFX0NBTkRJREFURV9TRUFSQ0gQAhIhCh1SVU5fVFlQRV9DTEFSSUZJQ0FUSU9O'
-    'X1JFU1VNRRADEhgKFFJVTl9UWVBFX1BVQkxJQ0FUSU9OEAQ=');
+    'X1JFU1VNRRAD');
 
 @$core.Deprecated('Use runStatusDescriptor instead')
 const RunStatus$json = {
@@ -1712,10 +1711,9 @@ const PreviewRfqPriceRequest$json = {
       '8': {},
       '10': 'clientRequestId'
     },
-    {'1': 'delivery_city', '3': 4, '4': 1, '5': 9, '10': 'deliveryCity'},
     {
       '1': 'buyer_requested_range',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 11,
       '6': '.hawkr.procurement.v1alpha1.BuyerRequestedRange',
@@ -1730,9 +1728,9 @@ final $typed_data.Uint8List previewRfqPriceRequestDescriptor = $convert.base64De
     'ChZQcmV2aWV3UmZxUHJpY2VSZXF1ZXN0EiIKCnJlcXVlc3RfaWQYASABKAlCA+BBAlIJcmVxdW'
     'VzdElkEjUKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAIgASgJQgPgQQJSEmV4cGVjdGVkUmV2aXNp'
     'b25JZBI3ChFjbGllbnRfcmVxdWVzdF9pZBgDIAEoCUIL4EEC4ozP1wgCCAFSD2NsaWVudFJlcX'
-    'Vlc3RJZBIjCg1kZWxpdmVyeV9jaXR5GAQgASgJUgxkZWxpdmVyeUNpdHkSaAoVYnV5ZXJfcmVx'
-    'dWVzdGVkX3JhbmdlGAUgASgLMi8uaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuQnV5ZXJSZX'
-    'F1ZXN0ZWRSYW5nZUID4EECUhNidXllclJlcXVlc3RlZFJhbmdl');
+    'Vlc3RJZBJoChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYBCABKAsyLy5oYXdrci5wcm9jdXJlbWVu'
+    'dC52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlQgPgQQJSE2J1eWVyUmVxdWVzdGVkUmFuZ2'
+    'U=');
 
 @$core.Deprecated('Use previewRfqPriceResponseDescriptor instead')
 const PreviewRfqPriceResponse$json = {
