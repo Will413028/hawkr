@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-11-15-fulfillment-seller-managed-shipping.md`（賣家自行出貨，平台不收也不負擔運費，物流財務結算已整體刪除）；原為 accepted |
 | 日期 | 2026-09-11 |
 | 影響範圍 | payment-service 帳本 schema |
 | 路徑基準 | `backend/` |
@@ -91,7 +91,7 @@ CONSTRAINT chk_ledgtxn_model_type CHECK (
   ⇒ 🔴 **`txn_type` 的歸屬看「這個動作在哪個商流下發生」，不看「它是誰引入的」。**
   ⚠️ 判準：**那兩個 txn_type 在兩個商流下的分錄科目對不同** ⇒ 它們是同名的兩種分錄，
   不是同一種。科目對由 `ledger_transactions.commerce_model` 決定，逐條見
-  [70 §3.8](/backend/docs/詳細設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md)。
+  70 §3.8（設計書已刪除）。
 
 - **後果**：
   1. 守恆式 `Σ(DEBIT) = Σ(CREDIT)` 與 `trg_ledger_balanced` **維持單一實作**，不需要第二份
