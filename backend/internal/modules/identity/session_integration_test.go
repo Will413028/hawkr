@@ -541,13 +541,13 @@ func TestSessionReadsAccountStatusAndRolesOnEveryRequest(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	res := f.loginAs(t, googleAlice, ClientWeb)
-	if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: res.AccountID, Role: RoleSeller, SourceID: ptr[int64](1)}); err != nil {
+	if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: res.AccountID, Role: RoleSeller}); err != nil {
 		t.Fatal(err)
 	}
 	if a := f.authenticated(t, res.Token); len(a.Principal.Roles) != 1 || a.Principal.Roles[0] != RoleSeller {
 		t.Fatalf("授予角色後 = %+v", a)
 	}
-	if err := f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: res.AccountID, Role: RoleSeller, SourceID: ptr[int64](1)}); err != nil {
+	if err := f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: res.AccountID, Role: RoleSeller}); err != nil {
 		t.Fatal(err)
 	}
 	if a := f.authenticated(t, res.Token); len(a.Principal.Roles) != 0 {

@@ -77,7 +77,7 @@ if [ -n "${MONOLITH_DATABASE_URL:-}" ]; then
   MAKE_ARGS+=("DATABASE_URL=${MONOLITH_DATABASE_URL}")
 fi
 
-# 前提檢查（fail fast，在 01 之前）：種子帳號（9、4、2001、2002、3001）若擁有種子店家以外的未關閉店家，種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id；
+# 前提檢查（fail fast，在 01 之前）：種子帳號（9、4、2001、2002、3001）若擁有種子店家以外的未關閉店家，種子店家寫入會撞上一帳號一家店；
 # 種子帳號有刪帳申請也不能繼續。這裡擋下，不寫任何資料，也不自動刪店。
 echo -n -e "${BLUE}[前提檢查]${NC} make dev-seed-check..."
 if output=$(make -C "$BACKEND_DIR" dev-seed-check ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"} 2>&1); then

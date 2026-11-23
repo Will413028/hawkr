@@ -151,7 +151,7 @@ func deref(s *string) string {
 	return *s
 }
 
-// GrantRole 授予角色。SourceID 是授予它的業務身分（store_id）；已有同角色時改指到它。
+// GrantRole 授予角色；已有同角色時不變。
 func (m *Service) GrantRole(ctx context.Context, in model.GrantRoleInput) error {
 	if err := knownRole(in.Role); err != nil {
 		return err
@@ -165,8 +165,8 @@ func (m *Service) GrantRole(ctx context.Context, in model.GrantRoleInput) error 
 		if a.DeletionPendingAt != nil {
 			return apperr.FailedPrecondition("帳號正在刪除中，不能再授予角色")
 		}
-		if _, err := q.GrantAccountRole(ctx, store.GrantAccountRoleParams{
-			AccountID: in.AccountID, Role: string(in.Role), SourceID: in.SourceID, Now: m.d.Now(),
+		if err := q.GrantAccountRole(ctx, store.GrantAccountRoleParams{
+			AccountID: in.AccountID, Role: string(in.Role), Now: m.d.Now(),
 		}); err != nil {
 			return fmt.Errorf("identity：授予角色：%w", err)
 		}
@@ -233,12 +233,8 @@ func (m *Service) RemoveRole(ctx context.Context, in model.RemoveRoleInput) erro
 		} else if err != nil {
 			return err
 		}
-		r, err := q.RevokeAccountRole(ctx, store.RevokeAccountRoleParams{AccountID: in.AccountID, Role: string(in.Role), SourceID: in.SourceID})
-		if err != nil {
+		if err := q.RevokeAccountRole(ctx, store.RevokeAccountRoleParams{AccountID: in.AccountID, Role: string(in.Role)}); err != nil {
 			return fmt.Errorf("identity：移除角色：%w", err)
-		}
-		if !r.Revoked && r.HadRole {
-			m.d.Logger.InfoContext(ctx, "identity：角色屬於較新的來源，不移除", "account_id", in.AccountID, "role", in.Role)
 		}
 		return nil
 	})

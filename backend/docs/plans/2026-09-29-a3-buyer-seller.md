@@ -480,6 +480,11 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
         - 已跑：本機 gofmt、`make lint-monolith`、vet、各模組 go test、生成無 drift、Java compile、seller-app 與 website 檢查、mutation `--validate`；CI（`0b14e202`）49 個 job 中 46 過。審查：`/code-review` 第 1 輪 findings 5（blocking 0）：fixed 3、recorded 2（黑貓地址驗證隨功能移除；刪除的告警在單體沒有對應指標）、raised 0、rejected 0。未跑：mutation（此步只刪除，無新行為測試）。
         - 已接受的紅（Will 2026-11-23，皆為 dev 原本就紅）：`TestEveryServiceInTheContractIsMounted`（imageai、procurement 待 A9 掛上）、backend monolith 的 CodeMeta 生成物 drift（待另行處理）。
       - [ ] **11c 其餘清理**：D9 gate（compose 的 `TGOS_BASE_URL`、`MEDIA_BASE_URL`）、公司時期未完成項（#2777、#2805、#2806、#3189、D5 outbound client 的遮罩）、identity 拿掉 `source_id` 柵欄與 `RoleState`、改寫設計書 28。
+        - 盤點與決定（2026-11-23，dev `05ce7d4c`）：
+          - D9 gate：compose 已無 `TGOS_BASE_URL`（隨 11b 刪除），`MEDIA_BASE_URL` 改為必填無預設；ADR 寫的 CI 黑名單 gate 從未建出（`rg -il denylist scripts .github/workflows backend/scripts` 無結果）。**不建，修 ADR**（Will 2026-11-23）：`docs/adr/2026-09-24-go-modular-monolith.md` D9 段改寫為目前做法與理由。
+          - #2777（KYC 暫存 token 在取消、換類型、刪帳號時未釋放）：照原範圍查 `seller/internal/kyc` 後修，附回歸測試。#3189：成因已由 closing 同 transaction 呼叫 identity 消除，隨下一項的柵欄移除結案。#2806：**結案，被 Stripe ADR（`docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`）取代**；#2805 與 outbound client 遮罩：**移交主計畫 B2／Stripe 整合**（Will 2026-11-23）。
+          - identity 拿掉 `source_id` 柵欄：新 migration 刪欄位、刪柵欄查詢與 `SourceID`（model、account、onboarding、closing、legacy accountservice `sourceOf`、devseed 註解）；proto `account.proto` 的 `source_id` 與 `OtherRoleState` **刪除並 `reserved` 號碼與名稱**（Will 2026-11-23）；`RoleState` 已無 Go 使用。更新 `identity/CARRYOVER.md`、`backend/docs/modules/identity.md` §3。
+          - 設計書 28：已在 6d（`a5ff7323`）刪除，本項只剩修 `public-read-backend-inventory.md` 的三處引用，與 ADR `2026-09-18-product-view-stats-ownership-and-storage.md` 範圍裡的 `services/seller-service/` 改指 `seller/internal/views`。
       - [ ] **11d 收尾核對**：盤點去向無空格、完成定義逐項核對、獨立設計審查、延後項搬回主清單。
 
 **驗收（兩段各自）：** unit 與跑在自己 schema 的 integration 測試；盤點的缺陷各有回歸測試；`buf lint`、`make connect`、handler 測試、`TestEveryServiceInTheContractIsMounted`；compose 環境中 Java 對單體的 legacy 呼叫與事件跑通；四個 client 的 CI；`check-migration-inventory.py --assume-gone <服務>`。

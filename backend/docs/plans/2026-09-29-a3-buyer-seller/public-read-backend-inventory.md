@@ -9,7 +9,7 @@
 - `step10-decision-brief.md:190`：被取代的路由列為 `/public/sellers/{id}`、`/stats`、`/rating`、`/recommended`、`/marketplace`、`/products/:id/view`；UI 同意項 B6、B11、B19。
 - 計畫:202（10b D5）＋ `step10b-decision-brief.md:162`：沒有消費者的治理路由 `POST /app/violation_reports`、`GET /app/violation_reports/me`、`POST /public/food_safety_reports`、`GET /public/sellers/:id/violations/public`「留到 10d（B6 的 Connect 入口在那一刀）」。
 - 計畫:153 B6（店面頁與商品頁「檢舉商家」用 `CreateReport`；website 匿名食安通報用 `SubmitFoodSafetyReport`）、:158 B11（卡片依狀態）、:166 B19（拿掉「已認證」徽章）、:164 照 SSOT 處理：「匿名瀏覽只給未登入者送 `RecordProductView`」「`PublicStore` 補 `seo_title`、`seo_description`」（**這一項已被 local/10e 的 ADR `2026-10-09-store-seo-platform-generated` 推翻**，見 §6）。
-- 步驟 11（計畫:299）：刪 seller-service 與它在 `api/proto` 的 proto、盤點 CSV 的去向、改寫設計書 28、buyerserver `GetSubscriberDashboardStats`。K24（`step10c-decision-brief.md:49`）：只刪路由的 commit 不動 `rpc-servers.csv`；刪 gateway wrapper 時刪 `rpc-calls.csv` 的 gateway 列（10c 第 5 刀 `af1b0dcc7` 的先例：`GetProductViewStats` 的 gateway 列刪了、`rpc-servers.csv` 那列不動）；被刪 handler 是最後呼叫者的 seller-service RPC 留到步驟 11。
+- 步驟 11（計畫:299）：刪 seller-service 與它在 `api/proto` 的 proto、盤點 CSV 的去向、buyerserver `GetSubscriberDashboardStats`。K24（`step10c-decision-brief.md:49`）：只刪路由的 commit 不動 `rpc-servers.csv`；刪 gateway wrapper 時刪 `rpc-calls.csv` 的 gateway 列（10c 第 5 刀 `af1b0dcc7` 的先例：`GetProductViewStats` 的 gateway 列刪了、`rpc-servers.csv` 那列不動）；被刪 handler 是最後呼叫者的 seller-service RPC 留到步驟 11。
 
 不在 10d（`/public/sellers/*` 底下但屬於別的模組，留著）：`/:id/products`（catalog，B）、`/:id/reviews`、`/:id/reviews/stats`（review，A6）、`/:id/posts`、`/:id/forum`、`/forum/:id/replies`（social，A7）。
 
@@ -83,7 +83,7 @@
 | `DiscoveryPublicService.SuggestRecommendedSellers` | `api/hawkr/discovery/v1alpha1/discovery.proto:18` | `H/discovery/public.go` | `server.go:256,260` | 匿名 | `tierPublic` | GET 快取 | `H/discovery/public_test.go`（8 個）、`public_services_test.go:96` |
 | `SellerReportPublicService.SubmitFoodSafetyReport`、`SellerReportAppService.CreateReport`/`ListMyReports` | `report.proto:13-31` | — | `server.go:279` | 公開／登入 | `tierReportSubmit` | — | （8g，不在本盤點細查） |
 
-去重：`RecordProductView` 刻意不去重（設計書 28 算總次數；`M/seller/CARRYOVER.md:224`，重新評估觸發：瀏覽數進排行或計費、或部署 CDN／bot management）。登入買家走 buyer `ProductViewed` → `cmd/hawkr/seller_events.go:20` `IngestProductView`（event_id 冪等）。
+去重：`RecordProductView` 刻意不去重（算總次數，不去重；`M/seller/CARRYOVER.md:224`，重新評估觸發：瀏覽數進排行或計費、或部署 CDN／bot management）。登入買家走 buyer `ProductViewed` → `cmd/hawkr/seller_events.go:20` `IngestProductView`（event_id 冪等）。
 
 ### 2.2 REST → Connect 欄位對照
 
@@ -173,7 +173,7 @@
 - `scripts/legacy-endpoints-baseline.json`、`website/tests/e2e/helpers/mock-gateway.ts`
 - website 店面：`features/sellers/storefront/metadata.ts`、`lib/seo/metadata.ts`、`lib/api/index.ts`、`lib/query/keys.ts`
 - 文件：計畫 `2026-09-29-a3-buyer-seller.md`、設計書 32、48、ADR `2026-10-18-seller-governance-consolidated.md`
-- 10e 不動 `rpc-*.csv`、設計書 28／53／02／65。
+- 10e 不動 `rpc-*.csv`、設計書 53／02／65。
 
 ## 7. 指令
 

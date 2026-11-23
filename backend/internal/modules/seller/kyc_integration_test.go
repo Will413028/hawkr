@@ -804,6 +804,31 @@ func TestKYCSwitchingSellerTypeClearsTheOtherTypesFields(t *testing.T) {
 	}
 }
 
+// 換成個人賣家時公司文件一併清掉，全部記成退場並由同步 job 解除引用。
+func TestKYCSwitchingToIndividualRetiresTheCompanyDocuments(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, _ := f.open(t)
+	in := companyDraft(accountID, taxIDOne)
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+	d := f.savedDraft(t, in)
+	ref := media.Ref{Type: media.RefTypeCertification, ID: d.ID.String()}
+	f.syncMedia(t, ref)
+	if got := f.media.Referenced(ref); len(got) != 2 {
+		t.Fatalf("references=%v", got)
+	}
+	ind, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, SellerType: individual()})
+	must(t, err)
+	if len(ind.Documents) != 0 {
+		t.Fatalf("documents=%+v", ind.Documents)
+	}
+	f.syncMedia(t, ref)
+	if got := f.media.Referenced(ref); len(got) != 0 {
+		t.Fatalf("換成個人之後應該全部解除：%v", got)
+	}
+}
+
 func TestKYCInputValidation(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

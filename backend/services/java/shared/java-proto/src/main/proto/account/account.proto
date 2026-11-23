@@ -67,8 +67,8 @@ service AccountService {
     rpc ListAccountsForAdmin(ListAccountsForAdminRequest) returns (ListAccountsForAdminResponse);
     rpc GetAccountForAdmin(GetAccountForAdminRequest) returns (GetAccountForAdminResponse);
 
-    // RemoveRole removes a single role from an account. If no roles remain,
-    // the account is fully soft-deleted (Apple revoke + Redis blacklist + MQ).
+    // RemoveRole is Unimplemented in the monolith's legacy adapter: SELLER is
+    // granted and removed only by the seller module together with the store.
     rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse);
 
     // ==================== Auth Multi-Provider (M3 cutover) ====================
@@ -289,12 +289,8 @@ message CheckPhoneResponse {
 
 message BindSellerRequest {
     int64 account_id = 1;
-    reserved 2, 3;  // was: seller_id (int64), merchant_id (string)
-    // source_id 是「造成這次授予的那個實體」——seller 角色填 sellers.store_id
-    // （該次入駐的 stint surrogate）。identity 模組把它記在 account_roles 上，
-    // 之後的撤銷必須指名同一個 source_id 才會生效（見 RemoveRoleRequest.source_id）。
-    // 0 = 未歸因（identity 模組內部授予）：這種授予任何撤銷都撤得掉。
-    int64 source_id = 4;
+    reserved 2, 3, 4;  // was: seller_id (int64), merchant_id (string), source_id (int64)
+    reserved "seller_id", "merchant_id", "source_id";
 }
 
 message BindSellerResponse {
@@ -305,8 +301,8 @@ message BindSellerResponse {
 
 message BindBuyerRequest {
     int64 account_id = 1;
-    // 同 BindSellerRequest.source_id；buyer 角色填 buyers.buyer_id。
-    int64 source_id = 2;
+    reserved 2;  // was: source_id (int64)
+    reserved "source_id";
 }
 
 message BindBuyerResponse {
@@ -434,37 +430,17 @@ enum Role {
     ROLE_SELLER      = 2;
 }
 
-// 呼叫方對「帳號另一個角色是否還活著」的判定結果。
-// 未帶 / 查詢失敗一律是 UNKNOWN，identity 模組據此 fail-closed 不 cascade。
-enum OtherRoleState {
-    OTHER_ROLE_STATE_UNKNOWN = 0;
-    OTHER_ROLE_STATE_ACTIVE  = 1;
-    OTHER_ROLE_STATE_ABSENT  = 2;
-}
-
 message RemoveRoleRequest {
+    reserved 3, 4;  // was: other_role_state (OtherRoleState), source_id (int64)
+    reserved "other_role_state", "source_id";
     int64 account_id = 1;
     Role  role       = 2;
-    OtherRoleState other_role_state = 3;
-    // source_id 是「授權這次撤銷的那個實體」——seller 角色填被關閉的
-    // sellers.store_id。撤銷只在當前授予正是由同一個 source_id 造成時才生效：
-    //
-    //   UPDATE account_roles ... WHERE revoked_at IS NULL
-    //     AND (source_id IS NULL OR source_id = @source_id)
-    //
-    // 這道柵欄存在的理由是撤銷會延遲執行（非同步的 job 重試
-    // 退避最長數小時），期間帳號可能已經重新入駐並取得一筆**較新**的授予。沒有
-    // 柵欄時，過期的撤銷會蓋掉那筆合法授予，受害者變成「有店、無角色」且無自癒
-    // 路徑。柵欄比對就在那一句 UPDATE 裡，不存在 check-then-act 的競態窗口。
-    //
-    // 0 = 不指名來源：只撤得掉 source_id IS NULL 的未歸因授予。
-    int64 source_id = 4;
 }
 
 message RemoveRoleResponse {
     int32  code                  = 1;
     string message               = 2;
-    bool   account_fully_deleted = 3;  // true 表示這次移除導致整 account inactive
+    bool   account_fully_deleted = 3;  // 從不設值：RemoveRole 回 Unimplemented
 }
 
 // ==================== Auth Multi-Provider Messages (M3) ====================

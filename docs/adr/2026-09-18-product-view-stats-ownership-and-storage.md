@@ -4,7 +4,7 @@
 |---|---|
 | 狀態 | accepted；A3b 7c（Will 2026-10-02）修訂儲存形式：歸 seller 不變，改成只追加的原始事件加上背景彙總成每日桶 `(store_id, 台北日期)`，儀表板只讀彙總。本檔否決累計計數器的理由是「做不了時段」，日桶下不成立；商品層級與平台細分仍是非目標（計畫 `2026-09-29-a3-buyer-seller.md` 7c 的決定） |
 | 日期 | 2026-09-18 |
-| 影響範圍 | `services/seller-service/`、`services/java/product-service/`、賣家 Dashboard |
+| 影響範圍 | `backend/internal/modules/seller/internal/views`、`services/java/product-service/`、賣家 Dashboard |
 | 路徑基準 | `backend/` |
 
 ## 脈絡

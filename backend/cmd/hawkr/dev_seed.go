@@ -5,7 +5,7 @@ import "github.com/Will413028/hawkr/backend/internal/modules/seller"
 // 本機開發的種子店家（明文）：dev-seed 以執行中的 KYC 金鑰加密後寫入，種子檔不含密文。識別欄位用明顯是假的值。
 //
 // store_id 與 store_code 固定：infra/seed-data 的 04、05、06 寫死 store_id（Java 的資料庫），06 的 mer_id 是 HAWK 加 store_code，
-// 01 的 account_roles 以 store_id 為 SELLER 的 source_id。account_id 與 store_id 刻意不同值（9、4 是帳號，store_id 取 1009、1004），
+// account_id 與 store_id 刻意不同值（9、4 是帳號，store_id 取 1009、1004），
 // 互換 ID 的缺陷才藏不住（同 01 的 buyer_id 規則）。logo 是固定、明顯是種子的 key 與 asset ID，不經 media。
 const (
 	devSeedStoreA, devSeedStoreB = 1009, 1004
