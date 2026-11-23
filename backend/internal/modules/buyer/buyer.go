@@ -178,9 +178,6 @@ type UpdatePlanInput = model.UpdatePlanInput
 // Entitlement 有效方案、額度與期間。
 type Entitlement = model.Entitlement
 
-// AssignMembershipInput 帶 request_id 的人工會員指派輸入。
-type AssignMembershipInput = model.AssignMembershipInput
-
 const (
 	// Active 存活中的買家身分。
 	Active = model.Active
@@ -423,14 +420,9 @@ func (module *Module) FanOut(ctx context.Context, input FanOutInput) (bool, erro
 	return module.restock.FanOut(ctx, input)
 }
 
-// Entitlement 讀取有效權益；沒有有效指派時以 stint 錨點計算免費週期。
+// Entitlement 讀取有效權益：免費方案，額度週期以 stint 錨點計算。
 func (module *Module) Entitlement(ctx context.Context, buyerID int64) (Entitlement, error) {
 	return module.membership.Entitlement(ctx, buyerID)
-}
-
-// AssignMembership 指派會員；相同 request_id 必須具有相同內容。
-func (module *Module) AssignMembership(ctx context.Context, input AssignMembershipInput) (Entitlement, error) {
-	return module.membership.AssignMembership(ctx, input)
 }
 
 // ListPlans 列出全部會員方案。
@@ -492,34 +484,11 @@ func (module *Module) PeriodicJobs() []*river.PeriodicJob {
 	return append(module.deletion.PeriodicJobs(), mediaref.PeriodicJobs()...)
 }
 
-// MembershipSource 會員授予來源。
-type MembershipSource = model.MembershipSource
-
-// MembershipStatus 會員指派現況或歷史狀態。
-type MembershipStatus = model.MembershipStatus
-
-const (
-	// MembershipAdmin 由管理員指派會員。
-	MembershipAdmin = model.MembershipAdmin
-	// MembershipSystemDefault 系統提供的預設免費權益。
-	MembershipSystemDefault = model.MembershipSystemDefault
-	// MembershipActive 目前生效的會員指派。
-	MembershipActive = model.MembershipActive
-	// MembershipSuperseded 已被替代的歷史會員指派。
-	MembershipSuperseded = model.MembershipSuperseded
-)
-
 // StatusValues 回傳全部合法值，供 CHECK 與契約驗證。
 func StatusValues() []Status { return model.StatusValues() }
 
 // GenderValues 回傳全部合法值，供 CHECK 與契約驗證。
 func GenderValues() []Gender { return model.GenderValues() }
-
-// MembershipSourceValues 回傳全部合法值，供 CHECK 與契約驗證。
-func MembershipSourceValues() []MembershipSource { return model.MembershipSourceValues() }
-
-// MembershipStatusValues 回傳全部合法值，供 CHECK 與契約驗證。
-func MembershipStatusValues() []MembershipStatus { return model.MembershipStatusValues() }
 
 // MaxBatchSize 是批次 ID 查詢的輸入上限。
 const MaxBatchSize = model.MaxBatchSize

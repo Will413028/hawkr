@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorites`、`seller_subscriptions`、`blocked_buyers`、`blocked_stores`、`visit_history`、`restock_subscriptions`、`membership_plans`、`memberships`、媒體同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。讀取模型：清單只回 ID 與時間，CLOSED 不曝露 PII（規格 §9）。
+schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorites`、`seller_subscriptions`、`blocked_buyers`、`blocked_stores`、`visit_history`、`restock_subscriptions`、`membership_plans`、媒體同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。讀取模型：清單只回 ID 與時間，CLOSED 不曝露 PII（規格 §9）。
 
 ## 發布的讀取介面
 
@@ -34,7 +34,7 @@ schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorit
 - 地址最多一個 default，上限 `model.MaxAddresses`。守門：DB partial UNIQUE、`TestAddressDefaultsAndOwnership`、`TestAddressCap`。規格：§4。
 - 買家封鎖與店封鎖分兩張表；封鎖買家依 buyer_id 升冪鎖兩列。守門：`TestBuyerAndStoreBlocksWithTheSameIDAreIndependent`、`TestMutualBlocksDoNotDeadlock`、`TestBlockingAClosedBuyerFails`。規格：§6。
 - 補貨 `FanOut` 批次有界，發生時間不得為零。守門：`TestRestockBatchesAndRollback`、`TestFanOutRejectsZeroOccurrenceTime`。規格：§7。
-- 會員每買家最多一個 ACTIVE，`request_id` 全域 UNIQUE；來源與狀態有 CHECK。守門：DB UNIQUE、`TestMembershipIdempotency`、`TestEnumChecksMatchGo`。規格：§8。
+- 每個買家的權益都是 `free` 方案，額度週期以 stint 建立時間為錨點逐月滾動，沒有指派入口與指派表。守門：`TestEntitlementIsFreePlanWithRollingPeriod`、`TestEnumChecksMatchGo`。規格：§8。
 - 公開 ID 為正數、批次不超過 `MaxBatchSize`，在存取資料庫前檢查。守門：`TestInvalidIDsRejectedBeforeDatabaseAccess`、`TestBatchBoundariesRejectedBeforeDatabaseAccess`。規格：§9。
 
 ## 不負責
