@@ -87,6 +87,15 @@ func TestToggleSelectionOnASetWhoseSearchHasNotSucceededIsAborted(t *testing.T) 
 	pending := f.mustStart()
 	must(t, f.toggle(buyer, set, c.ID, true))
 	wantConflictTarget(t, f.toggle(buyer, pending.CandidateSetID, uuid.NewV7(), true), "candidate_set")
+
+	// 需求在 MATCHING 而且從沒有成功的搜尋（直接寫資料庫）：只剩「最新成功搜尋」的檢查能擋。
+	g := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
+	started := g.mustStart()
+	b := buyer
+	if n, err := store.New(g.d.Conn(context.Background())).SetRequestStatus(context.Background(), store.SetRequestStatusParams{Status: "MATCHING", Now: now, ID: g.request, BuyerID: &b, FromStatus: "REQUIREMENT_READY"}); err != nil || n != 1 {
+		t.Fatalf("改成 MATCHING n=%d err=%v", n, err)
+	}
+	wantConflictTarget(t, g.toggle(buyer, started.CandidateSetID, uuid.NewV7(), true), "candidate_set")
 }
 
 func TestToggleSelectionIsAbortedOnceTheRequestLeavesMatching(t *testing.T) {
