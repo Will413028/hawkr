@@ -104,3 +104,12 @@ type PaymentChanged struct {
 	PaidAt    *time.Time
 	LastError string
 }
+
+// ExcessPaid 是一次重複入帳：同一張訂單的付款已經以另一個 PaymentIntent 入帳，這個舊 PaymentIntent 也扣到了款。payment 不自動退款（D5 修訂），給後台與訂單一方處理。
+type ExcessPaid struct {
+	AttemptID         uuid.UUID
+	PaymentID         uuid.UUID
+	Provider          string
+	ExternalPaymentID string
+	ExcessPaidAt      time.Time
+}

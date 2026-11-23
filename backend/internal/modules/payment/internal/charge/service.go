@@ -24,8 +24,9 @@ const (
 	// callTimeout 是 job 內單次呼叫 provider 的上限；requestCallTimeout 是請求內建立 PaymentIntent 的上限（逾時回 pending，補做 job 接手）。
 	callTimeout        = 20 * time.Second
 	requestCallTimeout = 10 * time.Second
-	// createJobDelay 是建立付款時補做 job 延後多久才跑：請求內呼叫的上限再加一點餘裕，請求內的建立正常結束之前補做不會開始。
-	createJobDelay = requestCallTimeout + 5*time.Second
+	// createJobDelay 是建立付款時補做 job 延後多久才跑：請求內的全部上限（記呼叫時刻的寫入、provider 呼叫、寫結果的寫入各自的上限）再加一點餘裕，
+	// 請求內的建立最慢也在它之前結束，補做不會與請求搶同一把冪等鍵。
+	createJobDelay = writeTimeout + requestCallTimeout + writeTimeout + 5*time.Second
 	// descriptionMax 是付款說明的字數上限（以 rune 計，與 payments_description_check 相同）。
 	descriptionMax = 200
 	// writeTimeout 是寫結果的 transaction 的上限（job 的 ctx 逾時被取消後仍要能寫入）。
@@ -154,9 +155,7 @@ func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPaym
 		q := store.New(s.d.DB.Conn(ctx))
 		now := s.d.Now().UTC()
 		if order.Payable && order.Amount > 0 {
-			if _, err := q.InsertPayment(ctx, store.InsertPaymentParams{
-				ID: s.d.NewID(), OrderNo: order.OrderNo, StoreID: order.StoreID, BuyerID: order.BuyerID, Amount: order.Amount, Provider: s.d.Provider.Name(), Now: now,
-			}); err != nil {
+			if _, err := q.InsertPayment(ctx, newPaymentParams(s.d.NewID(), order, s.d.Provider.Name(), now)); err != nil {
 				return err
 			}
 		}
@@ -175,6 +174,9 @@ func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPaym
 			return err
 		}
 		if row.Status == string(model.PaymentCreateFailed) || row.Status == string(model.PaymentCanceled) {
+			if _, err := q.SupersedeEffectiveAttempt(ctx, store.SupersedeEffectiveAttemptParams{PaymentID: row.ID, Now: &now}); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
 			row, err = q.ResetPayment(ctx, store.ResetPaymentParams{
 				ID: row.ID, StoreID: order.StoreID, BuyerID: order.BuyerID, Amount: order.Amount, Provider: s.d.Provider.Name(), Description: paymentDescription(order), Now: now,
 			})
@@ -186,6 +188,9 @@ func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPaym
 			return apperr.FailedPrecondition("訂單內容在付款建立之後變動了")
 		}
 		if row.Status == string(model.PaymentCreating) {
+			if err := q.EnsureEffectiveAttempt(ctx, store.EnsureEffectiveAttemptParams{ID: s.d.NewID(), PaymentID: row.ID, Now: now}); err != nil {
+				return err
+			}
 			return enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))
 		}
 		return nil

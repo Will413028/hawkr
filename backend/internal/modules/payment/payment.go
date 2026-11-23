@@ -424,6 +424,19 @@ func (m *Module) SyncPayment(ctx context.Context, paymentID uuid.UUID) (again bo
 	return m.charges.Sync(ctx, paymentID)
 }
 
+// CancelPaymentAttempt 是取消舊 PaymentIntent 的 job（payment.charge_cancel）的內容，給 worker 與測試呼叫：只取消已被取代、還沒結案的嘗試。
+func (m *Module) CancelPaymentAttempt(ctx context.Context, attemptID uuid.UUID) error {
+	return m.charges.CancelAttempt(ctx, attemptID)
+}
+
+// ExcessPaid 是一次重複入帳：同一張訂單已經以另一個 PaymentIntent 入帳，這個舊 PaymentIntent 也扣到了款（不自動退款）。
+type ExcessPaid = model.ExcessPaid
+
+// ExcessPaidPayments 列出重複入帳（後台查詢）；afterID 是上一頁最後一筆的 AttemptID，第一頁傳零值。
+func (m *Module) ExcessPaidPayments(ctx context.Context, afterID uuid.UUID, limit int32) ([]ExcessPaid, error) {
+	return m.charges.ExcessPaid(ctx, afterID, limit)
+}
+
 // SweepPayments 是付款的定期掃描（payment.charge_sweep）的內容，給 worker 與測試呼叫；回傳排入補做與同步的付款數。
 func (m *Module) SweepPayments(ctx context.Context) (created, synced int, err error) {
 	return m.charges.Sweep(ctx)

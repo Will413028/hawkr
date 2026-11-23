@@ -83,13 +83,13 @@ CREATE INDEX accounts_unresolved ON payment.accounts (store_id) WHERE external_a
 CREATE INDEX accounts_purge_blocked ON payment.accounts (purge_blocked_at) WHERE purge_blocked_at IS NOT NULL;
 
 -- 付款：買家對一張訂單的一次收款（一個 PaymentIntent；計畫 2026-11-23-b2-payment 的 D7、D8、D9）。實體，主鍵 UUIDv7（應用層產生，不設 DEFAULT，row-identity ADR D1）；
--- order_no 是訂單的人看的編號，UNIQUE：一張訂單一列、一個 PaymentIntent，重試在同一個 PaymentIntent 上（D8；唯一索引 payments_order 是這條規則的守門）。
+-- order_no 是訂單的人看的編號，UNIQUE：一張訂單一列、同時只有一個有效的 PaymentIntent，重試在同一列上（D8；唯一索引 payments_order 守「一張訂單一列」，每次嘗試的 PaymentIntent 留在 payment_attempts）。
 -- 一筆付款只對一家店（store_id；轉帳的 transfer_group 與金額依它）。amount 是整數，不帶幣別（D9：幣別由 adapter 的設定決定）。不建跨 schema 的 FK：
 -- store_id、buyer_id 與 order_no 是組裝點注入的訂單 port 在建立當下回的事實，寫成快照。
 -- 建立付款分兩段（規則 5）：請求內的 transaction 只寫「建立中」的列（CREATING，沒有外部 ID）並排補做 job，提交之後在 transaction 外帶 create_idempotency_key
 -- 呼叫 provider；成功就在新的 transaction 寫外部 ID 與狀態，失敗或逾時留 CREATING，補做 job 與週期掃描以同一把鍵重送。create_called_at 是第一次呼叫 provider
 -- 之前寫入的時刻（NULL 表示從沒呼叫過）：「呼叫過、沒有外部 ID」是結果不明，期限內以同一把鍵重送取回，超過期限進終局 CREATE_FAILED（failure_reason）；
--- 鍵不再重送。CREATE_FAILED 的列在買家再次建立同一張訂單的付款時換新鍵重設回 CREATING（原本的 PaymentIntent 從沒交到 client 手上，不會被付款）。
+-- 鍵不再重送。CREATE_FAILED 與 CANCELED 的列在買家再次建立同一張訂單的付款時換新鍵重設回 CREATING（舊嘗試記 superseded_at，新嘗試另寫一列 payment_attempts）。
 -- status：CREATING 等建立；AWAITING_PAYMENT 已建立、等買家付款（含需要 3DS）；PROCESSING 付款處理中；SUCCEEDED 已入帳（終局，external_charge_id 是轉帳的
 -- source_transaction，paid_at 是入帳時刻）；CANCELED 已取消（取消後仍可能因競態變成 SUCCEEDED：provider 的成功一律勝出）；CREATE_FAILED 建立的終局。
 -- 狀態只由 provider 的快照推導（讀取即最新），external_charge_id 與 paid_at 只在 SUCCEEDED 有。fetched_at 是寫入快照的讀取開始時間：較早開始的讀取不覆蓋較晚的（同 accounts 的 D32）。
@@ -135,6 +135,38 @@ CREATE UNIQUE INDEX payments_order ON payment.payments (order_no);
 CREATE UNIQUE INDEX payments_external ON payment.payments (provider, external_payment_id) WHERE external_payment_id IS NOT NULL;
 CREATE INDEX payments_creating ON payment.payments (created_at) WHERE status = 'CREATING';
 CREATE INDEX payments_open ON payment.payments (id) WHERE status IN ('AWAITING_PAYMENT', 'PROCESSING');
+
+-- 付款嘗試歷程（D8 補充）：一張訂單的付款列一對多，每次建立 PaymentIntent 的嘗試一列（provider、外部 ID、冪等鍵、建立與呼叫時刻）。實體，主鍵 UUIDv7。
+-- 一張訂單同時只有一個有效的 PaymentIntent：superseded_at 為 NULL 的是有效的那一個，唯一索引 payment_attempts_effective 守它；付款列的 external_payment_id、
+-- create_idempotency_key、create_called_at 是有效嘗試的鏡像。買家在 Stripe 取消後重付時，舊嘗試記 superseded_at、新的嘗試另寫一列，舊 PaymentIntent 的外部 ID 留在這裡：
+-- 事件與同步依外部 ID 經這張表對回付款列，舊 PaymentIntent 晚到的成功不會因為付款列已換新 ID 而找不到。
+-- state 是這個 PaymentIntent 最近一次讀到的 provider 狀態（NULL 表示還沒讀過），fetched_at 是寫入它的讀取開始時間（較早開始的讀取不覆蓋較晚的）。
+-- 舊嘗試晚到成功時，付款列還沒入帳就把它換成有效的嘗試（記成功並發事件，新的嘗試排取消）；付款列已經以另一個 PaymentIntent 入帳時，這一列記 excess_paid_at
+-- （重複入帳：同一張訂單有兩個 PaymentIntent 都扣到款，不自動退款，由訂單一方發起退款或後台處理；索引 payment_attempts_excess 給後台查）。
+CREATE TABLE payment.payment_attempts (
+    id                  UUID        PRIMARY KEY,
+    payment_id          UUID        NOT NULL REFERENCES payment.payments (id),
+    provider            TEXT        NOT NULL,
+    external_payment_id TEXT,
+    idempotency_key     UUID        NOT NULL,
+    called_at           TIMESTAMPTZ,
+    state               TEXT,
+    fetched_at          TIMESTAMPTZ,
+    superseded_at       TIMESTAMPTZ,
+    excess_paid_at      TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL,
+    CONSTRAINT payment_attempts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
+    CONSTRAINT payment_attempts_external_id_check CHECK (external_payment_id IS NULL OR (char_length(external_payment_id) >= 1 AND char_length(external_payment_id) <= 255)),
+    CONSTRAINT payment_attempts_state_check CHECK (state IS NULL OR state IN ('AWAITING_PAYMENT', 'PROCESSING', 'SUCCEEDED', 'CANCELED')),
+    CONSTRAINT payment_attempts_called_check CHECK (external_payment_id IS NULL OR called_at IS NOT NULL),
+    CONSTRAINT payment_attempts_state_external_check CHECK (state IS NULL OR external_payment_id IS NOT NULL),
+    CONSTRAINT payment_attempts_excess_check CHECK (excess_paid_at IS NULL OR (state = 'SUCCEEDED' AND superseded_at IS NOT NULL))
+);
+CREATE UNIQUE INDEX payment_attempts_effective ON payment.payment_attempts (payment_id) WHERE superseded_at IS NULL;
+CREATE UNIQUE INDEX payment_attempts_external ON payment.payment_attempts (provider, external_payment_id) WHERE external_payment_id IS NOT NULL;
+CREATE UNIQUE INDEX payment_attempts_key ON payment.payment_attempts (idempotency_key);
+CREATE INDEX payment_attempts_payment ON payment.payment_attempts (payment_id);
+CREATE INDEX payment_attempts_excess ON payment.payment_attempts (excess_paid_at) WHERE excess_paid_at IS NOT NULL;
 
 -- 轉帳：訂單完成後平台把這筆付款的款項轉給賣家（separate charges and transfers，D1、D6；3b 實作 use case，這裡先設計狀態機與唯一性）。
 -- 一筆付款最多一筆有效轉帳：唯一索引 transfers_active_payment 只涵蓋 PENDING 與 SUCCEEDED（FAILED 不佔，失敗後可以重建）。amount 是轉給賣家的整數金額

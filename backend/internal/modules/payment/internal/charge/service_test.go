@@ -32,8 +32,8 @@ func TestEnqueueCreateAtDelaysTheJobOnlyWhenAskedTo(t *testing.T) {
 	if len(rec.opts) != 2 || !rec.opts[0].ScheduledAt.Equal(at) || !rec.opts[1].ScheduledAt.IsZero() {
 		t.Fatalf("ScheduledAt=%v", rec.opts)
 	}
-	if createJobDelay <= requestCallTimeout {
-		t.Fatalf("補做的延後 %v 必須長於請求內的呼叫上限 %v", createJobDelay, requestCallTimeout)
+	if createJobDelay <= requestCallTimeout+2*writeTimeout {
+		t.Fatalf("補做的延後 %v 必須長於請求內的全部上限（記呼叫時刻、呼叫 provider、寫結果）%v", createJobDelay, requestCallTimeout+2*writeTimeout)
 	}
 }
 

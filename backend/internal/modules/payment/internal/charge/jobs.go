@@ -56,6 +56,23 @@ func enqueueSync(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
 	return jc.Enqueue(ctx, args, &opts)
 }
 
+// CancelArgs 是取消舊 PaymentIntent 的 job，以嘗試 ID 為唯一鍵：舊 PaymentIntent 晚到成功、付款列已經入帳時，另一個還沒結案的 PaymentIntent 由它取消（transaction 外呼叫 provider）。
+type CancelArgs struct {
+	AttemptID uuid.UUID `json:"attempt_id" river:"unique"`
+}
+
+// Kind 是 River 的 job 種類。
+func (CancelArgs) Kind() string { return "payment.charge_cancel" }
+
+// InsertOpts 是取消 job 的排入選項。
+func (CancelArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
+
+func enqueueCancel(ctx context.Context, jc jobs.Enqueuer, attemptID uuid.UUID) error {
+	args := CancelArgs{AttemptID: attemptID}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
 // SweepArgs 是定期的掃描：補排閒置的建立與未結案付款的同步，以及有舊的未處理事件的付款的同步。
 type SweepArgs struct{}
 
@@ -111,6 +128,19 @@ func (w *syncWorker) Work(ctx context.Context, job *river.Job[SyncArgs]) error {
 // Timeout 是一次同步的時間上限。
 func (w *syncWorker) Timeout(*river.Job[SyncArgs]) time.Duration { return jobTimeout }
 
+type cancelWorker struct {
+	river.WorkerDefaults[CancelArgs]
+	service *Service
+}
+
+// Work 執行一次取消：provider 的永久拒絕取消 job、不重試。
+func (w *cancelWorker) Work(ctx context.Context, job *river.Job[CancelArgs]) error {
+	return jobError(w.service.CancelAttempt(ctx, job.Args.AttemptID))
+}
+
+// Timeout 是一次取消的時間上限。
+func (w *cancelWorker) Timeout(*river.Job[CancelArgs]) time.Duration { return jobTimeout }
+
 type sweepWorker struct {
 	river.WorkerDefaults[SweepArgs]
 	service *Service
@@ -129,6 +159,7 @@ func (w *sweepWorker) Timeout(*river.Job[SweepArgs]) time.Duration { return 5 * 
 func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &createWorker{service: s})
 	river.AddWorker(workers, &syncWorker{service: s})
+	river.AddWorker(workers, &cancelWorker{service: s})
 	river.AddWorker(workers, &sweepWorker{service: s})
 }
 
@@ -144,6 +175,7 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 // Sweep 是付款自己的補掃（D63 的分工同收款帳戶：platform 只重派沒有派送成功的 inbox 列），每個付款在自己的 transaction 內排入一個 job：
 //   - 建立：還在建立中、閒置超過 createIdle 的列補排補做 job（呼叫過、沒有外部 ID 的列在 UnresolvedDeadline 內以同一把鍵重送，超過由補做 job 進終局）；
 //   - 狀態：已建立、未結案、超過 readIdle 沒讀過的列補排同步（掉了 webhook 的保底）；
+//   - 舊嘗試：被取代、還沒結案又超過 readIdle 沒讀過的舊 PaymentIntent 所屬的付款補排同步；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的付款補排同步（任何狀態）。
 //
 // 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次）。沒有設定 provider 時什麼都不做。
@@ -177,6 +209,23 @@ func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 	after = uuid.Nil()
 	for {
 		ids, err := store.New(s.d.DB.Conn(ctx)).PollablePaymentIDs(ctx, store.PollablePaymentIDsParams{ReadBefore: &readBefore, AfterID: after, Batch: sweepBatch})
+		if err != nil {
+			return created, synced, err
+		}
+		for _, id := range ids {
+			if err := queue(enqueueSync, id); err != nil {
+				return created, synced, err
+			}
+			synced++
+			after = id
+		}
+		if len(ids) < sweepBatch {
+			break
+		}
+	}
+	after = uuid.Nil()
+	for {
+		ids, err := store.New(s.d.DB.Conn(ctx)).StaleAttemptPaymentIDs(ctx, store.StaleAttemptPaymentIDsParams{ReadBefore: readBefore, AfterID: after, Batch: sweepBatch})
 		if err != nil {
 			return created, synced, err
 		}

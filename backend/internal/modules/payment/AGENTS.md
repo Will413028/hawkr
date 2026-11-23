@@ -10,7 +10,7 @@
 
 schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。
 
-付款三表 `payments`、`transfers`、`refunds`（UUIDv7 主鍵）。
+付款四表 `payments`、`payment_attempts`、`transfers`、`refunds`（UUIDv7 主鍵）。
 
 管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；`Deps.Audit` 必填）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`、httpapi `TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller`。view 與函式在 `db/objects.sql`。webhook inbox 由 platform 擁有（D29）。
 

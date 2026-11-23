@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
@@ -14,28 +13,46 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 )
 
-// Sync 是同步 job（payment.charge_sync）的內容：在 transaction 外重讀 PaymentIntent（不信事件內容），在 transaction 內推導狀態寫入、狀態改變時發布 PaymentChanged，
-// 並經 platform inbox 把這個 PaymentIntent 在讀取開始前收到的事件整批標為已處理（事件只是「重讀」的訊號，handler 不標記，由涵蓋它的同步標記）。
-// 同步可能和別的同步或建立並行：寫入只在這次的讀取開始時間不早於已存的 fetched_at 時進行，讀取過期（較新的讀取已寫入並標記）的這次不標記，仍以唯讀的 RoutePending 回答 again；
+// Sync 是同步 job（payment.charge_sync）的內容：在 transaction 外重讀這筆付款的 PaymentIntent（不信事件內容；有效的嘗試一定讀，被取代的舊嘗試在還沒結案、
+// 或有未處理的事件時也讀，舊 PaymentIntent 晚到的成功才處理得到），在 transaction 內推導狀態寫入、狀態改變時發布 PaymentChanged，
+// 並經 platform inbox 把每個 PaymentIntent 在讀取開始前收到的事件整批標為已處理（事件只是「重讀」的訊號，handler 不標記，由涵蓋它的同步標記）。
+// 同步可能和別的同步或建立並行：寫入只在這次的讀取開始時間不早於嘗試列已存的 fetched_at 時進行，讀取過期（較新的讀取已寫入並標記）的這次不標記，仍以唯讀的 RoutePending 回答 again；
 // 判斷過的快照一律標記，包括與列的終局狀態衝突而保留列的（否則事件永遠未處理，job 每 2 秒 snooze 一次）。
-// 沒有外部 ID（還在建立中）的列什麼都不做，由建立 job 負責。again 為 true 表示讀取期間又收到事件：呼叫方稍後再跑一輪。
-// 快照與列對不起來回 ErrAnomaly（永久，job 取消，記 error log，列不動，讀取開始前的事件標記已處理）；不認得的狀態回一般錯誤，由 River 重試。
+// 沒有外部 ID（還在建立中）的嘗試什麼都不做，由建立 job 負責。again 為 true 表示讀取期間又收到事件：呼叫方稍後再跑一輪。
+// 快照與列對不起來回 ErrAnomaly（永久，job 取消，記 error log，列不動，讀取開始前的事件標記已處理）；入帳卻還沒有 charge 的暫時性快照與不認得的狀態回一般錯誤，
+// 由 River 重試，事件保持未處理（掃描會重排）。
 func (s *Service) Sync(ctx context.Context, paymentID uuid.UUID) (again bool, err error) {
 	if s.d.Provider == nil {
 		return false, nil
 	}
 	p := s.d.Provider
-	row, err := store.New(s.d.DB.Conn(ctx)).PaymentByID(ctx, paymentID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
+	attempts, err := store.New(s.d.DB.Conn(ctx)).AttemptsOfPayment(ctx, store.AttemptsOfPaymentParams{PaymentID: paymentID, Provider: p.Name()})
 	if err != nil {
 		return false, err
 	}
-	if row.ExternalPaymentID == nil || row.Provider != p.Name() {
-		return false, nil
+	var errs []error
+	for _, att := range attempts {
+		if att.SupersededAt != nil && attemptClosed(att.State) {
+			pending, err := s.d.Inbox.RoutePending(ctx, p.Name(), *att.ExternalPaymentID)
+			if err != nil {
+				return false, err
+			}
+			if !pending {
+				continue
+			}
+		}
+		more, err := s.syncAttempt(ctx, p, paymentID, att)
+		again = again || more
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
-	external := *row.ExternalPaymentID
+	return again, errors.Join(errs...)
+}
+
+// syncAttempt 重讀一個嘗試的 PaymentIntent 並寫入。
+func (s *Service) syncAttempt(ctx context.Context, p Provider, paymentID uuid.UUID, att store.PaymentPaymentAttempt) (again bool, err error) {
+	external := *att.ExternalPaymentID
 	startedAt := s.d.Now().UTC()
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
@@ -46,7 +63,7 @@ func (s *Service) Sync(ctx context.Context, paymentID uuid.UUID) (again bool, er
 	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancelWrite()
 	err = s.d.DB.InTx(wctx, func(ctx context.Context) error {
-		res, err := s.applySnapshot(ctx, paymentID, snap, startedAt)
+		res, err := s.applySnapshot(ctx, paymentID, att.ID, p.Name(), snap, startedAt)
 		if err != nil {
 			return err
 		}
@@ -64,6 +81,9 @@ func (s *Service) Sync(ctx context.Context, paymentID uuid.UUID) (again bool, er
 		if merr := s.markEventsProcessed(ctx, p.Name(), external, startedAt); merr != nil {
 			return false, errors.Join(err, merr)
 		}
+	}
+	if errors.Is(err, errIncompleteSuccess) {
+		s.d.Logger.WarnContext(ctx, "payment：入帳的快照還沒有 charge 或入帳時間，稍後重讀（事件保持未處理）", "payment_id", paymentID.String(), "external_payment_id", external)
 	}
 	return again, err
 }

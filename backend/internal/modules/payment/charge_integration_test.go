@@ -726,7 +726,7 @@ VALUES ($1, $2, $3, 50, $4, $5, now(), now())`, uuid.NewV7(), p.ID, key, status,
 	}
 }
 
-// 外部 ID 在 provider 已回傳的每個狀態都存得下來（F1）：退款 REFUNDING（provider 回了 ID 但還在處理）與建立之後才失敗的 FAILED、轉帳建立之後才失敗的 FAILED；
+// 外部 ID 在 provider 已回傳的每個狀態都存得下來：退款 REFUNDING（provider 回了 ID 但還在處理）與建立之後才失敗的 FAILED、轉帳建立之後才失敗的 FAILED；
 // 入帳（SUCCEEDED）一定要有 ID；還沒呼叫 provider 的狀態不能有 ID；有 ID 一定要有呼叫時刻。
 // mutation：把 refunds_succeeded_check 改回「(status = 'SUCCEEDED') = (external_refund_id IS NOT NULL)」→ REFUNDING 帶 ID 的列寫不進去，失敗。
 func TestTheSchemaStoresTheExternalIDOfEveryStateThatHasOne(t *testing.T) {
@@ -770,7 +770,7 @@ VALUES ($1, $2, 7, 100, 'acct_1', $3::text, $4::text, CASE WHEN $4::text IS NOT 
 	must(t, insertTransfer("SUCCEEDED", ptr("tr_s")))
 }
 
-// 已判斷過的快照一律標記事件已處理（F3）：入帳的列收到非入帳的快照（保留列、記警示）之後，涵蓋它的事件被標記，同步不再要求重跑一輪（job 不再每 2 秒 snooze）。
+// 已判斷過的快照一律標記事件已處理：入帳的列收到非入帳的快照（保留列、記警示）之後，涵蓋它的事件被標記，同步不再要求重跑一輪（job 不再每 2 秒 snooze）。
 // mutation：sync.go 的 `if res.judged` 改回 `if res.written` → 事件永遠未處理、again 為 true，失敗。
 func TestASnapshotThatKeepsTheSucceededRowStillMarksItsEventsProcessed(t *testing.T) {
 	t.Parallel()
@@ -790,7 +790,7 @@ func TestASnapshotThatKeepsTheSucceededRowStillMarksItsEventsProcessed(t *testin
 	}
 }
 
-// 補做 job 排在請求內呼叫的上限之後（F4）：建立付款時排入的補做帶 ScheduledAt，晚於「現在加請求內的呼叫上限」；掃描排的（列已閒置）立刻執行。
+// 補做 job 排在請求內呼叫的上限之後：建立付款時排入的補做帶 ScheduledAt，晚於「現在加請求內的呼叫上限」；掃描排的（列已閒置）立刻執行。
 // mutation：ensureRow 的 enqueueCreateAt 改回 enqueueCreate → ScheduledAt 是零值，失敗。
 func TestTheCatchUpJobIsScheduledAfterTheInRequestCallTimeout(t *testing.T) {
 	t.Parallel()
@@ -814,7 +814,7 @@ func TestTheCatchUpJobIsScheduledAfterTheInRequestCallTimeout(t *testing.T) {
 	}
 }
 
-// 補做 job 先於請求寫入（F4）：請求結束時列已是 AWAITING_PAYMENT、請求自己的快照被較新的讀取擋下，回應仍要帶 client_secret（改走讀取路徑向 provider 取）。
+// 補做 job 先於請求寫入：請求結束時列已是 AWAITING_PAYMENT、請求自己的快照被較新的讀取擋下，回應仍要帶 client_secret（改走讀取路徑向 provider 取）。
 // mutation：createInRequest 拿掉「列是 AWAITING_PAYMENT 卻沒有 secret 就 view」→ ClientSecret 是空的，失敗。
 func TestACatchUpJobThatWritesFirstStillLetsTheRequestReturnTheSecret(t *testing.T) {
 	t.Parallel()
@@ -837,7 +837,7 @@ func TestACatchUpJobThatWritesFirstStillLetsTheRequestReturnTheSecret(t *testing
 	f.noViolations(t)
 }
 
-// 已取消的付款、訂單仍可付（F5）：同一列換新冪等鍵、清掉舊的外部 ID、建出新的 PaymentIntent（仍是一張訂單一列、一次只有一個有效的 PaymentIntent）。
+// 已取消的付款、訂單仍可付：同一列換新冪等鍵、清掉舊的外部 ID、建出新的 PaymentIntent（仍是一張訂單一列、一次只有一個有效的 PaymentIntent）。
 // mutation：ensureRow 的重設條件拿掉 `|| row.Status == string(model.PaymentCanceled)` → 取消的列沿用舊 PaymentIntent，失敗。
 func TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow(t *testing.T) {
 	t.Parallel()
@@ -866,7 +866,7 @@ func TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow(t *testi
 	}
 }
 
-// 建立中、沒有外部 ID 的列屬於別的 provider（設定換了）（F6）：補做改成目前的 provider、換新鍵並建立，不是永遠卡在建立中。
+// 建立中、沒有外部 ID 的列屬於別的 provider（設定換了），舊 provider 的呼叫已超過期限：補做改成目前的 provider、換新鍵並建立，不是永遠卡在建立中（期限內不改綁見 charge_attempts_integration_test）。
 // mutation：create() 拿掉 rebind 分支、恢復「provider 不同就直接回傳」→ 列留在 CREATING，失敗。
 func TestACreatingRowOfAnotherProviderIsReboundByTheCatchUp(t *testing.T) {
 	t.Parallel()
@@ -878,6 +878,9 @@ func TestACreatingRowOfAnotherProviderIsReboundByTheCatchUp(t *testing.T) {
 	ctx := context.Background()
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.payments SET provider = 'retired_provider' WHERE order_no = 'O-F6'")
 	must(t, err)
+	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = $1", p.ID)
+	must(t, err)
+	f.now = f.now.Add(PaymentUnresolvedDeadline + time.Minute)
 	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
 	if got := f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-F6'"); got != ChargeFakeName || f.statusOf(t, "O-F6") != PaymentAwaitingPayment || f.keyOf(t, "O-F6") == oldKey {
 		t.Fatalf("provider=%s 狀態=%s", got, f.statusOf(t, "O-F6"))
@@ -887,7 +890,7 @@ func TestACreatingRowOfAnotherProviderIsReboundByTheCatchUp(t *testing.T) {
 	}
 }
 
-// 判定 anomaly 之後標記事件已處理（F7）：已經告警、列不動；事件不再留在 inbox 讓掃描一直重排。
+// 判定 anomaly 之後標記事件已處理：已經告警、列不動；事件不再留在 inbox 讓掃描一直重排。
 // mutation：Sync 拿掉 ErrAnomaly 分支裡的 markEventsProcessed → 事件仍未處理，失敗。
 func TestAnAnomalyMarksItsEventsProcessedAndLeavesTheRowAlone(t *testing.T) {
 	t.Parallel()
@@ -905,7 +908,7 @@ func TestAnAnomalyMarksItsEventsProcessedAndLeavesTheRowAlone(t *testing.T) {
 	}
 }
 
-// 付款說明存在列上、送 provider，冪等重送時不變（F8）：訂單改名之後補做仍送建立當時的說明；沒有商品名稱時用訂單編號；超過上限截斷。
+// 付款說明存在列上、送 provider，冪等重送時不變：訂單改名之後補做仍送建立當時的說明；沒有商品名稱時用訂單編號；超過上限截斷。
 // mutation：create() 的 CreateInput.Description 改回 called.OrderNo → 送出的是訂單編號，失敗。
 func TestThePaymentDescriptionIsStoredAndSentUnchangedOnReplay(t *testing.T) {
 	t.Parallel()

@@ -56,6 +56,20 @@ type PaymentPayment struct {
 	UpdatedAt            time.Time
 }
 
+type PaymentPaymentAttempt struct {
+	ID                uuid.UUID
+	PaymentID         uuid.UUID
+	Provider          string
+	ExternalPaymentID *string
+	IdempotencyKey    uuid.UUID
+	CalledAt          *time.Time
+	State             *string
+	FetchedAt         *time.Time
+	SupersededAt      *time.Time
+	ExcessPaidAt      *time.Time
+	CreatedAt         time.Time
+}
+
 type PaymentRefund struct {
 	ID                     uuid.UUID
 	PaymentID              uuid.UUID

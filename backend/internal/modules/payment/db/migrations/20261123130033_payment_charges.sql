@@ -121,3 +121,35 @@ CREATE TABLE "payment"."transfers" (
 CREATE UNIQUE INDEX "transfers_active_payment" ON "payment"."transfers" ("payment_id") WHERE (status = ANY (ARRAY['PENDING'::text, 'SUCCEEDED'::text]));
 -- Create index "transfers_external" to table: "transfers"
 CREATE UNIQUE INDEX "transfers_external" ON "payment"."transfers" ("external_transfer_id") WHERE (external_transfer_id IS NOT NULL);
+-- Create "payment_attempts" table
+CREATE TABLE "payment"."payment_attempts" (
+  "id" uuid NOT NULL,
+  "payment_id" uuid NOT NULL,
+  "provider" text NOT NULL,
+  "external_payment_id" text NULL,
+  "idempotency_key" uuid NOT NULL,
+  "called_at" timestamptz NULL,
+  "state" text NULL,
+  "fetched_at" timestamptz NULL,
+  "superseded_at" timestamptz NULL,
+  "excess_paid_at" timestamptz NULL,
+  "created_at" timestamptz NOT NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "payment_attempts_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "payment"."payments" ("id") ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT "payment_attempts_called_check" CHECK ((external_payment_id IS NULL) OR (called_at IS NOT NULL)),
+  CONSTRAINT "payment_attempts_excess_check" CHECK ((excess_paid_at IS NULL) OR ((state = 'SUCCEEDED'::text) AND (superseded_at IS NOT NULL))),
+  CONSTRAINT "payment_attempts_external_id_check" CHECK ((external_payment_id IS NULL) OR ((char_length(external_payment_id) >= 1) AND (char_length(external_payment_id) <= 255))),
+  CONSTRAINT "payment_attempts_provider_check" CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'::text),
+  CONSTRAINT "payment_attempts_state_check" CHECK ((state IS NULL) OR (state = ANY (ARRAY['AWAITING_PAYMENT'::text, 'PROCESSING'::text, 'SUCCEEDED'::text, 'CANCELED'::text]))),
+  CONSTRAINT "payment_attempts_state_external_check" CHECK ((state IS NULL) OR (external_payment_id IS NOT NULL))
+);
+-- Create index "payment_attempts_effective" to table: "payment_attempts"
+CREATE UNIQUE INDEX "payment_attempts_effective" ON "payment"."payment_attempts" ("payment_id") WHERE (superseded_at IS NULL);
+-- Create index "payment_attempts_excess" to table: "payment_attempts"
+CREATE INDEX "payment_attempts_excess" ON "payment"."payment_attempts" ("excess_paid_at") WHERE (excess_paid_at IS NOT NULL);
+-- Create index "payment_attempts_external" to table: "payment_attempts"
+CREATE UNIQUE INDEX "payment_attempts_external" ON "payment"."payment_attempts" ("provider", "external_payment_id") WHERE (external_payment_id IS NOT NULL);
+-- Create index "payment_attempts_key" to table: "payment_attempts"
+CREATE UNIQUE INDEX "payment_attempts_key" ON "payment"."payment_attempts" ("idempotency_key");
+-- Create index "payment_attempts_payment" to table: "payment_attempts"
+CREATE INDEX "payment_attempts_payment" ON "payment"."payment_attempts" ("payment_id");
