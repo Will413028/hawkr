@@ -188,6 +188,27 @@ func (m *Service) LockAccount(ctx context.Context, id int64) error {
 	return err
 }
 
+// ShareLockAccount 在呼叫者的 transaction 內以共享鎖鎖住存活的帳號，讓帳號列在 commit 之前不會被刪除或改動；
+// 給只需要「收件帳號在寫入完成前不被刪」而不改帳號的讀者，多個讀者不互相等待（要改帳號的呼叫者用 LockAccount）。
+// 帳號已刪除時不鎖（墓碑不再改變）並回 deleted=true，從未存在時回 NotFound。
+func (m *Service) ShareLockAccount(ctx context.Context, id int64) (deleted bool, err error) {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return false, errors.New("identity：ShareLockAccount 必須在 transaction 內呼叫")
+	}
+	_, err = m.q(ctx).ShareLockLiveAccount(ctx, id)
+	if err == nil {
+		return false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return false, fmt.Errorf("identity：共享鎖定帳號：%w", err)
+	}
+	a, err := m.Account(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	return a.Deleted, nil
+}
+
 // lockLiveAccount 鎖住存活的帳號；不存在或已刪除時回 NotFound。
 func lockLiveAccount(ctx context.Context, q *store.Queries, id int64) (store.IdentityAccount, error) {
 	a, err := q.LockLiveAccount(ctx, id)

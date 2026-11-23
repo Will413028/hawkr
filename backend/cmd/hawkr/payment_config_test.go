@@ -105,3 +105,38 @@ func TestStripePaymentConfig(t *testing.T) {
 		t.Errorf("有金鑰沒有 webhook 密鑰：%v", err)
 	}
 }
+
+func readChargeStripeWith(env map[string]string) (chargeStripeConfig, bool, error) {
+	e := config.FromMap(env)
+	cfg, ok := readChargeStripeConfig(e, slog.New(slog.DiscardHandler))
+	return cfg, ok, e.Err()
+}
+
+func readChargeWith(env map[string]string) (payment.ChargeProvider, error) {
+	e := config.FromMap(env)
+	p := readCharge(e, slog.New(slog.DiscardHandler))
+	return p, e.Err()
+}
+
+// 付款事件是另一個 event destination，簽章密鑰獨立設定：沒有它、或與收款帳戶的相同都讓啟動失敗；沒有設定付款時行為與收款開通一致（nil、不算錯誤）。
+func TestChargeProviderConfigHasItsOwnWebhookSecret(t *testing.T) {
+	if p, err := readChargeWith(nil); p != nil || err != nil {
+		t.Errorf("沒有設定：%v %v", p, err)
+	}
+	if _, err := readChargeWith(map[string]string{"PAYMENT_CHARGE_PROVIDER": "unsupported"}); err == nil || !strings.Contains(err.Error(), "PAYMENT_CHARGE_PROVIDER") {
+		t.Errorf("不認得的 provider：%v", err)
+	}
+	if _, ok, err := readChargeStripeWith(map[string]string{"STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_WEBHOOK_SECRET": "whsec_a"}); ok || err == nil || !strings.Contains(err.Error(), "STRIPE_PAYMENT_WEBHOOK_SECRET") {
+		t.Errorf("付款沒有自己的密鑰（只有收款帳戶的）必須讓啟動失敗：%v %v", ok, err)
+	}
+	if _, ok, err := readChargeStripeWith(map[string]string{"STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_WEBHOOK_SECRET": "whsec_a", "STRIPE_PAYMENT_WEBHOOK_SECRET": "whsec_a"}); ok || err == nil || !strings.Contains(err.Error(), "不能與") {
+		t.Errorf("兩個 destination 共用密鑰必須讓啟動失敗：%v %v", ok, err)
+	}
+	cfg, ok, err := readChargeStripeWith(map[string]string{"STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_WEBHOOK_SECRET": "whsec_a", "STRIPE_PAYMENT_WEBHOOK_SECRET": "whsec_p"})
+	if err != nil || !ok || cfg.WebhookSecret != "whsec_p" || cfg.SecretKey != "sk_test_x" {
+		t.Errorf("完整設定：%+v %v %v", cfg, ok, err)
+	}
+	if _, ok, err := readChargeStripeWith(map[string]string{"STRIPE_PAYMENT_WEBHOOK_SECRET": "whsec_p"}); ok || err != nil {
+		t.Errorf("缺金鑰要等於沒有 provider：%v %v", ok, err)
+	}
+}

@@ -262,6 +262,18 @@ func (q *Queries) SetSelfEnteredEmail(ctx context.Context, arg SetSelfEnteredEma
 	return result.RowsAffected(), nil
 }
 
+const shareLockLiveAccount = `-- name: ShareLockLiveAccount :one
+SELECT id FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR SHARE
+`
+
+// 共享鎖住存活的帳號：只要求帳號列在 transaction commit 之前不被刪除或改動，不擋其他讀者的共享鎖（給只讀取帳號狀態、不改帳號的呼叫者）。
+func (q *Queries) ShareLockLiveAccount(ctx context.Context, id int64) (int64, error) {
+	row := q.db.QueryRow(ctx, shareLockLiveAccount, id)
+	var id_2 int64
+	err := row.Scan(&id_2)
+	return id_2, err
+}
+
 const suspendAccount = `-- name: SuspendAccount :execrows
 UPDATE identity.accounts
 SET suspended_at = $1::timestamptz, updated_at = $1::timestamptz

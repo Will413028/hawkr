@@ -354,6 +354,7 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 	h = withCookieCSRF(cookieCSRFOrigins(deps.WebOrigin, deps.Origins), h)
 	h = csrf.Handler(h)
 	h = withPaymentWebhook(deps.Payment, deps.Logger, h)
+	h = withChargeWebhook(deps.Payment, deps.Logger, h)
 	return withTracing(deps.Tracer, h), nil
 }
 
@@ -361,6 +362,14 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 func withPaymentWebhook(events httppayment.Events, log *slog.Logger, next http.Handler) http.Handler {
 	root := http.NewServeMux()
 	root.Handle(httppayment.WebhookRoute, httppayment.NewWebhook(events, log))
+	root.Handle("/", next)
+	return root
+}
+
+// withChargeWebhook 在 next 之外掛上付款事件的 webhook（獨立的路由與簽章密鑰）；理由同 withPaymentWebhook。
+func withChargeWebhook(events httppayment.ChargeEvents, log *slog.Logger, next http.Handler) http.Handler {
+	root := http.NewServeMux()
+	root.Handle(httppayment.ChargeWebhookRoute, httppayment.NewChargeWebhook(events, log))
 	root.Handle("/", next)
 	return root
 }

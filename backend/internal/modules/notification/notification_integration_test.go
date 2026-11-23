@@ -54,7 +54,7 @@ func wantConstraint(t *testing.T, err error, code, name string) {
 func newIntent(t *testing.T, d *db.DB, key string) uuid.UUID {
 	t.Helper()
 	id := uuid.NewV7()
-	mustExec(t, d, `INSERT INTO notification.intents (id, type, idempotency_key, params, created_at) VALUES ($1, 'account_suspended', $2, '{}', $3)`, id, key, epoch)
+	mustExec(t, d, `INSERT INTO notification.intents (id, type, idempotency_key, params, occurred_at, created_at) VALUES ($1, 'account_suspended', $2, '{}', $3, $3)`, id, key, epoch)
 	return id
 }
 
@@ -63,7 +63,7 @@ func TestIntentIdempotencyKeyIsUnique(t *testing.T) {
 	t.Parallel()
 	d := setup(t)
 	newIntent(t, d, "account_suspended:x")
-	err := exec(t, d, `INSERT INTO notification.intents (id, type, idempotency_key, params, created_at) VALUES ($1, 'account_suspended', 'account_suspended:x', '{}', $2)`, uuid.NewV7(), epoch)
+	err := exec(t, d, `INSERT INTO notification.intents (id, type, idempotency_key, params, occurred_at, created_at) VALUES ($1, 'account_suspended', 'account_suspended:x', '{}', $2, $2)`, uuid.NewV7(), epoch)
 	wantConstraint(t, err, "23505", "intents_idempotency_key_key")
 }
 
@@ -90,10 +90,9 @@ func TestDeliveryIsUniquePerIntentRecipientAndChannel(t *testing.T) {
 func TestRecipientShapeIsEnforced(t *testing.T) {
 	t.Parallel()
 	d := setup(t)
-	intent := newIntent(t, d, "k")
 	insert := func(audience string, storeID *int64) error {
-		return exec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, intent_id, created_at, updated_at)
-			VALUES ($1, 7, $2, $3, 'account_suspended', '{}', $4, $5, $5)`, uuid.NewV7(), audience, storeID, intent, epoch)
+		return exec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, occurred_at, created_at, updated_at)
+			VALUES ($1, 7, $2, $3, 'account_suspended', '{}', $4, $4, $4)`, uuid.NewV7(), audience, storeID, epoch)
 	}
 	store := int64(9)
 	if err := insert("BUYER", nil); err != nil {
@@ -111,10 +110,9 @@ func TestRecipientShapeIsEnforced(t *testing.T) {
 func TestUnreadAggregationKeyIsUniquePerRecipient(t *testing.T) {
 	t.Parallel()
 	d := setup(t)
-	intent := newIntent(t, d, "k")
 	insert := func(account int64) error {
-		return exec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, intent_id, created_at, updated_at)
-			VALUES ($1, $2, 'BUYER', 'account_suspended', '{}', 'like:1', $3, $4, $4)`, uuid.NewV7(), account, intent, epoch)
+		return exec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, occurred_at, created_at, updated_at)
+			VALUES ($1, $2, 'BUYER', 'account_suspended', '{}', 'like:1', $3, $3, $3)`, uuid.NewV7(), account, epoch)
 	}
 	if err := insert(7); err != nil {
 		t.Fatal(err)
@@ -138,21 +136,34 @@ func TestDeviceTokenIsBoundToOneAccount(t *testing.T) {
 	wantConstraint(t, exec(t, d, `INSERT INTO notification.device_tokens (token, account_id, app, last_registered_at) VALUES ('t2', 7, 'WEB', $1)`, epoch), "23514", "device_tokens_app_check")
 }
 
-// 意圖先被清除（依 created_at 掃）時，收件匣列留著：它的保留期從 updated_at（最後一次合併）起算，不隨來源意圖消失；intent_id 設為 NULL。
-func TestDeletingTheIntentKeepsTheInboxItem(t *testing.T) {
+// 意圖先被清除（依 created_at 掃）時，收件匣列留著：它的保留期從 updated_at（最後一次合併）起算，不隨來源意圖消失；只有連結跟著刪。
+// 收件匣列先被清除時，連結跟著刪。
+func TestIntentLinksFollowEitherSideButNeverDeleteTheInboxItem(t *testing.T) {
 	t.Parallel()
 	d := setup(t)
 	intent := newIntent(t, d, "k")
 	item := uuid.NewV7()
-	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, intent_id, created_at, updated_at)
-		VALUES ($1, 7, 'BUYER', 'account_suspended', '{}', 'like:1', $2, $3, $3)`, item, intent, epoch)
-	mustExec(t, d, `DELETE FROM notification.intents WHERE id = $1`, intent)
-	var intentID *uuid.UUID
-	if err := d.Pool().QueryRow(context.Background(), `SELECT intent_id FROM notification.inbox_items WHERE id = $1`, item).Scan(&intentID); err != nil {
-		t.Fatalf("收件匣列應該還在：%v", err)
+	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, occurred_at, created_at, updated_at)
+		VALUES ($1, 7, 'BUYER', 'account_suspended', '{}', 'like:1', $2, $2, $2)`, item, epoch)
+	mustExec(t, d, `INSERT INTO notification.inbox_item_intents (intent_id, inbox_item_id) VALUES ($1, $2)`, intent, item)
+	wantConstraint(t, exec(t, d, `INSERT INTO notification.inbox_item_intents (intent_id, inbox_item_id) VALUES ($1, $2)`, intent, item), "23505", "inbox_item_intents_pkey")
+
+	count := func(q string, args ...any) int {
+		var n int
+		if err := d.Pool().QueryRow(context.Background(), q, args...).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
 	}
-	if intentID != nil {
-		t.Errorf("intent_id = %v，預期 NULL", *intentID)
+	mustExec(t, d, `DELETE FROM notification.intents WHERE id = $1`, intent)
+	if count(`SELECT count(*) FROM notification.inbox_items WHERE id = $1`, item) != 1 || count(`SELECT count(*) FROM notification.inbox_item_intents`) != 0 {
+		t.Fatal("意圖被清除後，收件匣列要留著、連結要刪掉")
+	}
+	intent2 := newIntent(t, d, "k2")
+	mustExec(t, d, `INSERT INTO notification.inbox_item_intents (intent_id, inbox_item_id) VALUES ($1, $2)`, intent2, item)
+	mustExec(t, d, `DELETE FROM notification.inbox_items WHERE id = $1`, item)
+	if count(`SELECT count(*) FROM notification.inbox_item_intents`) != 0 || count(`SELECT count(*) FROM notification.intents WHERE id = $1`, intent2) != 1 {
+		t.Fatal("收件匣列被清除後，連結要刪掉、意圖要留著")
 	}
 }
 
@@ -162,8 +173,8 @@ func TestTwoStoresOfOneAccountAreSeparateRecipients(t *testing.T) {
 	d := setup(t)
 	intent := newIntent(t, d, "k")
 	insertItem := func(store int64) error {
-		return exec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, intent_id, created_at, updated_at)
-			VALUES ($1, 7, 'STORE', $2, 'account_suspended', '{}', 'follow:1', $3, $4, $4)`, uuid.NewV7(), store, intent, epoch)
+		return exec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, occurred_at, created_at, updated_at)
+			VALUES ($1, 7, 'STORE', $2, 'account_suspended', '{}', 'follow:1', $3, $3, $3)`, uuid.NewV7(), store, epoch)
 	}
 	if err := insertItem(9); err != nil {
 		t.Fatal(err)
@@ -196,9 +207,8 @@ func TestTwoStoresOfOneAccountAreSeparateRecipients(t *testing.T) {
 func TestBuyerAndStoreIdentitiesOfOneAccountDoNotCollide(t *testing.T) {
 	t.Parallel()
 	d := setup(t)
-	intent := newIntent(t, d, "k")
-	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, intent_id, created_at, updated_at)
-		VALUES ($1, 7, 'BUYER', 'account_suspended', '{}', 'k:1', $2, $3, $3)`, uuid.NewV7(), intent, epoch)
-	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, intent_id, created_at, updated_at)
-		VALUES ($1, 7, 'STORE', 9, 'account_suspended', '{}', 'k:1', $2, $3, $3)`, uuid.NewV7(), intent, epoch)
+	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, occurred_at, created_at, updated_at)
+		VALUES ($1, 7, 'BUYER', 'account_suspended', '{}', 'k:1', $2, $2, $2)`, uuid.NewV7(), epoch)
+	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, occurred_at, created_at, updated_at)
+		VALUES ($1, 7, 'STORE', 9, 'account_suspended', '{}', 'k:1', $2, $2, $2)`, uuid.NewV7(), epoch)
 }

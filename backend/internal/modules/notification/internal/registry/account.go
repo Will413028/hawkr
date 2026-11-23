@@ -12,6 +12,7 @@ import (
 
 // AccountSuspendedParams 是 account_suspended 的參數快照，欄位取自 accountsuspension.Suspended。
 type AccountSuspendedParams struct {
+	AccountID    int64           `json:"account_id"`
 	SuspensionID uuid.UUID       `json:"suspension_id"`
 	Category     policy.Category `json:"category"`
 	SuspendedAt  time.Time       `json:"suspended_at"`
@@ -19,6 +20,7 @@ type AccountSuspendedParams struct {
 
 // AccountUnsuspendedParams 是 account_unsuspended 的參數快照，欄位取自 accountsuspension.Unsuspended。
 type AccountUnsuspendedParams struct {
+	AccountID    int64     `json:"account_id"`
 	SuspensionID uuid.UUID `json:"suspension_id"`
 	ReleasedAt   time.Time `json:"released_at"`
 }
@@ -38,6 +40,8 @@ var accountSuspended = Define(Definition[AccountSuspendedParams]{
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelEmail},
 	IdempotencySource: "accountsuspension.Suspended.SuspensionID",
 	IdempotencyKey:    func(p AccountSuspendedParams) string { return p.SuspensionID.String() },
+	OccurredAt:        func(p AccountSuspendedParams) time.Time { return p.SuspendedAt },
+	Recipient:         func(p AccountSuspendedParams) Recipient { return Recipient{AccountID: p.AccountID} },
 	Text: func(l uitext.Locale, p AccountSuspendedParams) (Content, error) {
 		reason, err := categoryLabel(l, p.Category)
 		if err != nil {
@@ -49,7 +53,7 @@ var accountSuspended = Define(Definition[AccountSuspendedParams]{
 			Fragments: []uitext.Message{reason},
 		}, nil
 	},
-	Example: AccountSuspendedParams{SuspensionID: exampleSuspensionID, Category: policy.Spam, SuspendedAt: exampleAt},
+	Example: AccountSuspendedParams{AccountID: 42, SuspensionID: exampleSuspensionID, Category: policy.Spam, SuspendedAt: exampleAt},
 })
 
 var accountUnsuspended = Define(Definition[AccountUnsuspendedParams]{
@@ -60,11 +64,13 @@ var accountUnsuspended = Define(Definition[AccountUnsuspendedParams]{
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelEmail},
 	IdempotencySource: "accountsuspension.Unsuspended.SuspensionID",
 	IdempotencyKey:    func(p AccountUnsuspendedParams) string { return p.SuspensionID.String() },
+	OccurredAt:        func(p AccountUnsuspendedParams) time.Time { return p.ReleasedAt },
+	Recipient:         func(p AccountUnsuspendedParams) Recipient { return Recipient{AccountID: p.AccountID} },
 	Text: func(l uitext.Locale, p AccountUnsuspendedParams) (Content, error) {
 		return Content{
 			Title: text.AccountUnsuspendedTitle(l),
 			Body:  text.AccountUnsuspendedBody(l, text.AccountUnsuspendedBodyArgs{Time: uitext.FormatDateTime(l, p.ReleasedAt)}),
 		}, nil
 	},
-	Example: AccountUnsuspendedParams{SuspensionID: exampleSuspensionID, ReleasedAt: exampleAt},
+	Example: AccountUnsuspendedParams{AccountID: 42, SuspensionID: exampleSuspensionID, ReleasedAt: exampleAt},
 })

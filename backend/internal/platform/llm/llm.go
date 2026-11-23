@@ -40,6 +40,8 @@ const (
 	// DeepSeekFlash 與 DeepSeekV4Pro 是 DeepSeek 已驗過的模型名。
 	DeepSeekFlash = "deepseek-flash"
 	DeepSeekV4Pro = "deepseek-v4-pro"
+	// GeminiImage 是修圖用的圖片模型，只有 ImageAI 角色能用，ImageAI 也只能用圖片模型。
+	GeminiImage = "gemini-2.5-flash-image"
 
 	deepSeekBaseURL = "https://api.deepseek.com"
 )
@@ -52,6 +54,8 @@ const (
 	Assistant Role = "assistant"
 	// Procurement 是採購對話與抽取，登記表內的任一模型。
 	Procurement Role = "procurement"
+	// ImageAI 是賣家的 AI 修圖，只能用 Gemini 的圖片模型；它的 client 是 ImageModel，不是 ADK 的 model.LLM。
+	ImageAI Role = "imageai"
 )
 
 // Status 說明一個 Model 為什麼開通或停用。
@@ -71,6 +75,8 @@ var ErrDisabled = apperr.Unavailable("AI 助理尚未開通，請稍後再試")
 type modelSpec struct {
 	provider Provider
 	baseURL  string
+	// image 是圖片模型：只給 ImageAI 角色，其他角色不得選它。
+	image bool
 	// options 是這個模型專屬的 RequestOption；逐筆列出，讓哪個模型需要哪個 quirk 可讀。
 	options func() []option.RequestOption
 }
@@ -86,6 +92,7 @@ func deepSeekOptions() []option.RequestOption {
 
 var registry = map[string]modelSpec{
 	DefaultModel:  {provider: Gemini},
+	GeminiImage:   {provider: Gemini, image: true},
 	DeepSeekFlash: {provider: DeepSeek, baseURL: deepSeekBaseURL, options: deepSeekOptions},
 	DeepSeekV4Pro: {provider: DeepSeek, baseURL: deepSeekBaseURL, options: deepSeekOptions},
 }
@@ -93,6 +100,21 @@ var registry = map[string]modelSpec{
 var roleProviders = map[Role][]Provider{
 	Assistant:   {Gemini},
 	Procurement: {Gemini, DeepSeek},
+	ImageAI:     {Gemini},
+}
+
+// roleDefaults 是各用途沒設定模型名時的預設；沒有列的用途取 DefaultModel。
+var roleDefaults = map[Role]string{ImageAI: GeminiImage}
+
+func defaultModel(role Role) string {
+	if name, ok := roleDefaults[role]; ok {
+		return name
+	}
+	return DefaultModel
+}
+
+func roleAccepts(role Role, spec modelSpec) bool {
+	return slices.Contains(roleProviders[role], spec.provider) && spec.image == (role == ImageAI)
 }
 
 // KnownModels 回傳登記表的模型名（已排序）。
@@ -113,7 +135,7 @@ type Config struct {
 	Models map[Role]string
 }
 
-// ReadConfig 讀 GEMINI_API_KEY、DEEPSEEK_API_KEY、LLM_ASSISTANT_MODEL、LLM_PROCUREMENT_MODEL；全部選填。
+// ReadConfig 讀 GEMINI_API_KEY、DEEPSEEK_API_KEY、LLM_ASSISTANT_MODEL、LLM_PROCUREMENT_MODEL、LLM_IMAGEAI_MODEL；全部選填。
 func ReadConfig(e *config.Env) Config {
 	return Config{
 		GeminiAPIKey:   e.StringOr("GEMINI_API_KEY", ""),
@@ -121,6 +143,7 @@ func ReadConfig(e *config.Env) Config {
 		Models: map[Role]string{
 			Assistant:   e.StringOr("LLM_ASSISTANT_MODEL", ""),
 			Procurement: e.StringOr("LLM_PROCUREMENT_MODEL", ""),
+			ImageAI:     e.StringOr("LLM_IMAGEAI_MODEL", ""),
 		},
 	}
 }
@@ -173,25 +196,13 @@ func disabled(status Status) Model { return Model{llm: disabledLLM{}, status: st
 
 // build 是全服務唯一的 client 建構點；baseURLOverride 只給測試把 OpenAI 相容的端點指到替身 server。
 func build(role Role, cfg Config, log *slog.Logger, baseURLOverride string) Model {
-	name := cfg.Models[role]
-	if name == "" {
-		name = DefaultModel
-	}
-	spec, known := registry[name]
-	if !known || !slices.Contains(roleProviders[role], spec.provider) {
-		log.Error("LLM 模型不在這個用途可用的登記表內，已停用",
-			"role", role, "model", name, "known_models", KnownModels())
+	if role == ImageAI {
+		log.Error("ImageAI 角色沒有 ADK model，請用 NewImage，已停用", "role", role)
 		return disabled(StatusMisconfigured)
 	}
-	key := cfg.apiKey(spec.provider)
-	if key == "" {
-		if name == DefaultModel && cfg.Models[role] == "" {
-			log.Warn("LLM 尚未開通：沒有 API key", "role", role, "missing_key", keyName(spec.provider))
-			return disabled(StatusNotConfigured)
-		}
-		log.Error("LLM 指定的 provider 缺 API key，已停用",
-			"role", role, "model", name, "missing_key", keyName(spec.provider))
-		return disabled(StatusMisconfigured)
+	name, spec, key, status := resolve(role, cfg, log)
+	if status != StatusEnabled {
+		return disabled(status)
 	}
 	llm, err := newClient(name, spec, key, baseURLOverride)
 	if err != nil {
@@ -200,6 +211,31 @@ func build(role Role, cfg Config, log *slog.Logger, baseURLOverride string) Mode
 	}
 	log.Info("LLM 已開通", "role", role, "model", name, "provider", spec.provider)
 	return Model{llm: llm, name: name, provider: spec.provider, status: StatusEnabled}
+}
+
+// resolve 決定 role 用哪個模型與金鑰；status 不是 StatusEnabled 時其餘回傳值無意義。
+func resolve(role Role, cfg Config, log *slog.Logger) (name string, spec modelSpec, key string, status Status) {
+	name = cfg.Models[role]
+	if name == "" {
+		name = defaultModel(role)
+	}
+	spec, known := registry[name]
+	if !known || !roleAccepts(role, spec) {
+		log.Error("LLM 模型不在這個用途可用的登記表內，已停用",
+			"role", role, "model", name, "known_models", KnownModels())
+		return "", modelSpec{}, "", StatusMisconfigured
+	}
+	key = cfg.apiKey(spec.provider)
+	if key == "" {
+		if name == defaultModel(role) && cfg.Models[role] == "" {
+			log.Warn("LLM 尚未開通：沒有 API key", "role", role, "missing_key", keyName(spec.provider))
+			return "", modelSpec{}, "", StatusNotConfigured
+		}
+		log.Error("LLM 指定的 provider 缺 API key，已停用",
+			"role", role, "model", name, "missing_key", keyName(spec.provider))
+		return "", modelSpec{}, "", StatusMisconfigured
+	}
+	return name, spec, key, StatusEnabled
 }
 
 func newClient(name string, spec modelSpec, apiKey, baseURLOverride string) (model.LLM, error) {

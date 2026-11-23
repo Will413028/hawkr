@@ -29,20 +29,22 @@ service ImageAiAdminService {
 
   rpc UpdateAiStyle(UpdateAiStyleRequest) returns (UpdateAiStyleResponse);
 
-  // DeleteAiStyle 刪除風格，並釋放它的縮圖。
+  // DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
+  // 先把另一個風格的 default_style 設成 true。
   rpc DeleteAiStyle(DeleteAiStyleRequest) returns (DeleteAiStyleResponse);
 
   // GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
+  // 店家不存在回 not_found。
   rpc GetAiQuota(GetAiQuotaRequest) returns (GetAiQuotaResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
   // UpdateAiQuota 為一家店個別設定每週額度。額度以店家為 key，沒有 Create：還沒有個別設定時（custom 為 false），
   // 不帶 etag 的呼叫建立它；已經有個別設定卻沒帶 etag 回 ALREADY_EXISTS（VERSION_CONFLICT）；
-  // 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。
+  // 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。店家不存在回 not_found。
   rpc UpdateAiQuota(UpdateAiQuotaRequest) returns (UpdateAiQuotaResponse);
 
-  // DeleteAiQuota 刪除一家店的個別設定，回到預設額度。沒有個別設定時回 NOT_FOUND。
+  // DeleteAiQuota 刪除一家店的個別設定，回到預設額度。店家不存在或沒有個別設定時回 NOT_FOUND。
   rpc DeleteAiQuota(DeleteAiQuotaRequest) returns (DeleteAiQuotaResponse);
 }
 
@@ -56,14 +58,15 @@ message AiStyle {
   ];
   // 顯示用的名稱。
   string label = 3 [(google.api.field_behavior) = REQUIRED];
-  // 套用這個風格時送給模型的提示詞。
+  // 套用這個風格時送給模型的提示詞；去掉頭尾空白後至少 1 個、最多 500 個字元（以 Unicode 字元計）。
   string prompt = 4 [(google.api.field_behavior) = REQUIRED];
   hawkr.common.v1alpha1.Image thumbnail = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 換成剛上傳的縮圖；空字串表示沿用目前的圖。建立時必填。
   string thumbnail_staged_token = 6 [(google.api.field_behavior) = INPUT_ONLY];
   // 顯示順序，小的在前。
   int32 display_order = 7;
-  // 是否為該用途的預設風格；同一個用途只有一個預設。
+  // 是否為該用途的預設風格；同一個用途只有一個預設。只能設成 true（原本的預設自動取消）；
+  // 設成 false 回 invalid_argument，換預設只能把另一個風格設成 true。
   bool default_style = 8;
   // 停用的風格前台看不到。
   bool enabled = 9;
@@ -85,7 +88,7 @@ message AiQuota {
     (google.api.field_behavior) = IDENTIFIER,
     (google.api.field_behavior) = IMMUTABLE
   ];
-  // 每週可修圖的次數上限。
+  // 每週可修圖的次數上限，0 到 1000。
   int32 weekly_limit = 2 [(google.api.field_behavior) = REQUIRED];
   // 本週已使用的次數。
   int32 weekly_usage = 3 [(google.api.field_behavior) = OUTPUT_ONLY];

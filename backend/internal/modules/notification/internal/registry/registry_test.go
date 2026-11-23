@@ -1,6 +1,8 @@
 package registry
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -8,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -68,6 +71,8 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 			Channels:          []model.Channel{model.ChannelInbox},
 			IdempotencySource: "test.Event.ID",
 			IdempotencyKey:    func(p params) string { return "x" },
+			OccurredAt:        func(params) time.Time { return time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC) },
+			Recipient:         func(p params) Recipient { return Recipient{AccountID: p.ID} },
 			Text:              textIn,
 			Example:           params{ID: 1},
 		}
@@ -87,6 +92,13 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 		"聚合鍵出現在未宣告可聚合":     func(d *Definition[params]) { d.AggregationKey = func(params) string { return "k" } },
 		"宣告可聚合卻沒有聚合鍵":      func(d *Definition[params]) { d.Aggregatable = true },
 		"名稱不是 lower_snake": func(d *Definition[params]) { d.Name = "Broken-Type" },
+		"沒有事件時間來源":         func(d *Definition[params]) { d.OccurredAt = nil },
+		"事件時間是空的":          func(d *Definition[params]) { d.OccurredAt = func(params) time.Time { return time.Time{} } },
+		"沒有收件人解析":          func(d *Definition[params]) { d.Recipient = nil },
+		"BUYER 帶 StoreID": func(d *Definition[params]) {
+			d.Recipient = func(params) Recipient { return Recipient{AccountID: 1, StoreID: 9} }
+		},
+		"STORE 沒有 StoreID": func(d *Definition[params]) { d.Audience = model.AudienceStore; d.Category = model.CategoryOrder },
 		"沒有文案":             func(d *Definition[params]) { d.Text = nil },
 		"分類不屬於受眾":          func(d *Definition[params]) { d.Category = model.CategoryShipmentAnomaly },
 		"en 退回中文": func(d *Definition[params]) {
@@ -94,9 +106,6 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 		},
 		"標題與內文語系不一致": func(d *Definition[params]) {
 			d.Text = func(l uitext.Locale, _ params) (Content, error) { return mixed(l), nil }
-		},
-		"冪等鍵超過 200 字元": func(d *Definition[params]) {
-			d.IdempotencyKey = func(params) string { return strings.Repeat("x", 200) }
 		},
 	}
 	for name, mutate := range cases {
@@ -241,25 +250,71 @@ func TestThirdPartyFieldGuard(t *testing.T) {
 	}
 }
 
-// 冪等鍵不得超過 db/schema.sql 的 CHECK（200）：太長的來源身分在註冊表就是錯誤，而不是寫入時才被 CHECK 擋下。
-func TestIdempotencyKeyLengthIsBounded(t *testing.T) {
+// 冪等鍵與聚合鍵不得超過 db/schema.sql 的 CHECK（200）：太長的來源身分改存「型別名稱:sha256」，決定性且不失敗。
+func TestLongKeysAreHashedToFit(t *testing.T) {
 	type params struct{ K string }
-	def := func(k string) Entry {
-		return Define(Definition[params]{IdempotencySource: "x", IdempotencyKey: func(p params) string { return p.K }, Name: "t"})
+	e := Define(Definition[params]{
+		IdempotencySource: "x", IdempotencyKey: func(p params) string { return p.K }, Name: "t",
+		Aggregatable: true, AggregationKey: func(p params) string { return p.K },
+		Recipient: func(params) Recipient { return Recipient{AccountID: 1} }, Audience: model.AudienceBuyer,
+	})
+	raw := func(k string) json.RawMessage { return json.RawMessage(`{"K":"` + k + `"}`) }
+	exact := strings.Repeat("a", MaxIdempotencyKeyLen-len("t:"))
+	if k, err := e.IdempotencyKey(raw(exact)); err != nil || k != "t:"+exact {
+		t.Errorf("剛好 200 字元要原樣保留：%d、%v", len(k), err)
 	}
-	e := def("")
-	long := strings.Repeat("a", MaxIdempotencyKeyLen-len("t:")+1)
-	if _, err := e.IdempotencyKey(json.RawMessage(`{"K":"` + long + `"}`)); err == nil {
-		t.Error("201 字元的冪等鍵要回錯誤")
+	long := strings.Repeat("b", 250)
+	sum := sha256.Sum256([]byte(long))
+	want := "t:" + hex.EncodeToString(sum[:])
+	k, err := e.IdempotencyKey(raw(long))
+	if err != nil || k != want || len(k) > MaxIdempotencyKeyLen {
+		t.Errorf("250 字元的冪等鍵 = %q、%v，應該是 %q", k, err, want)
 	}
-	if k, err := e.IdempotencyKey(json.RawMessage(`{"K":"` + long[1:] + `"}`)); err != nil || len(k) != MaxIdempotencyKeyLen {
-		t.Errorf("剛好 200 字元要通過：%d、%v", len(k), err)
+	if k2, _ := e.IdempotencyKey(raw(long)); k2 != k {
+		t.Error("雜湊鍵不是決定性的")
+	}
+	if other, _ := e.IdempotencyKey(raw(long + "c")); other == k {
+		t.Error("不同來源不該得到同一個雜湊鍵")
+	}
+	r, err := e.Resolve(raw(long))
+	if err != nil || r.AggregationKey != want {
+		t.Errorf("250 字元的聚合鍵 = %q、%v，應該是 %q", r.AggregationKey, err, want)
 	}
 	for _, e := range All() {
 		raw, _, _ := e.ExampleParams()
 		if k, err := e.IdempotencyKey(raw); err != nil || len(k) > MaxIdempotencyKeyLen {
 			t.Errorf("%s 的範例冪等鍵長度 %d（%v）", e.Spec().Name, len(k), err)
 		}
+	}
+}
+
+// 聚合鍵加型別名稱前綴：兩個型別的同名鍵存成不同的值，不會合併成同一列（Resolve 與 Render 一致）。
+func TestAggregationKeysAreNamespacedByType(t *testing.T) {
+	type params struct{ K string }
+	def := func(name string) Entry {
+		return Define(Definition[params]{
+			Name: name, Audience: model.AudienceBuyer, Aggregatable: true,
+			AggregationKey: func(p params) string { return p.K },
+			Recipient:      func(params) Recipient { return Recipient{AccountID: 1} },
+			Text: func(l uitext.Locale, _ params) (Content, error) {
+				return Content{Title: uitext.Message{Text: "t", Locale: l}, Body: uitext.Message{Text: "b", Locale: l}}, nil
+			},
+		})
+	}
+	raw := json.RawMessage(`{"K":"post-7"}`)
+	a, err := def("type_a").Resolve(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := def("type_b").Resolve(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.AggregationKey != "type_a:post-7" || b.AggregationKey != "type_b:post-7" || a.AggregationKey == b.AggregationKey {
+		t.Errorf("聚合鍵 = %q、%q", a.AggregationKey, b.AggregationKey)
+	}
+	if r, err := def("type_a").Render(uitext.ZhTW, raw); err != nil || r.AggregationKey != a.AggregationKey {
+		t.Errorf("Render 的聚合鍵 = %q、%v，應該與 Resolve 一致", r.AggregationKey, err)
 	}
 }
 

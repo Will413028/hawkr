@@ -170,11 +170,14 @@ func (x *AiStyle) GetDisplayOrder() int32 {
 
 type TransformImageRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 原圖的內容。
+	// 原圖的內容，bytes 上限 2 MiB，client 先縮圖；超過回 invalid_argument，BadRequest 帶出這個欄位的 field violation。
+	// 服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
+	// 這是只做運算、不保存的暫態圖片，所以 inline；要保存的檔案走 media 的 presigned 上傳。
 	ImageData []byte `protobuf:"bytes,1,opt,name=image_data,json=imageData,proto3" json:"image_data,omitempty"`
 	// 原圖的格式，例如 image/jpeg、image/png。
 	MimeType string `protobuf:"bytes,2,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	// 修圖提示詞，通常取自 AiStyle.prompt 或 ListAiStylesResponse.default_prompt。
+	// 修圖提示詞，通常取自 AiStyle.prompt 或 ListAiStylesResponse.default_prompt。去掉頭尾空白後至少 1 個、
+	// 最多 500 個字元（以 Unicode 字元計，不是 byte）。
 	Prompt        string `protobuf:"bytes,3,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -348,7 +351,7 @@ func (x *ListAiStylesRequest) GetCategory() AiStyleCategory {
 
 type ListAiStylesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 沒有選風格時使用的提示詞。
+	// 沒有選風格時使用的提示詞，取自這個用途的預設風格。
 	DefaultPrompt string `protobuf:"bytes,1,opt,name=default_prompt,json=defaultPrompt,proto3" json:"default_prompt,omitempty"`
 	// 本週已使用的次數與上限（呼叫者的店家）。
 	WeeklyUsage int32 `protobuf:"varint,2,opt,name=weekly_usage,json=weeklyUsage,proto3" json:"weekly_usage,omitempty"`

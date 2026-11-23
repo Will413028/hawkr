@@ -1,0 +1,76 @@
+{
+ "mutants": [
+  {
+   "id": "intent-idempotency-conflict-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/intake.sql.go",
+   "old": "ON CONFLICT ON CONSTRAINT intents_idempotency_key_key DO NOTHING\nRETURNING id",
+   "new": "RETURNING id",
+   "test": "internal/modules/notification ^TestSameEventTwiceMakesOneIntentAndOneInboxRow$",
+   "why": "The intent insert no longer ignores a repeated idempotency key, so the same event delivered twice is not absorbed into one intent."
+  },
+  {
+   "id": "self-skip-compares-store-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "slices.Contains(resolved.ActorAccounts, resolved.Recipient.AccountID)",
+   "new": "slices.Contains(resolved.ActorAccounts, resolved.Recipient.StoreID)",
+   "test": "internal/modules/notification ^TestSelfNotificationIsSkipped$",
+   "why": "Self-skip compares the actor account with the store id instead of the recipient account id."
+  },
+  {
+   "id": "aggregation-upsert-plain-insert",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/intake.sql.go",
+   "old": "ON CONFLICT (account_id, audience, store_id, aggregation_key) WHERE aggregation_key IS NOT NULL AND read_at IS NULL\nDO UPDATE SET\n    params = CASE WHEN EXCLUDED.occurred_at >= notification.inbox_items.occurred_at THEN EXCLUDED.params ELSE notification.inbox_items.params END,\n    occurred_at = GREATEST(notification.inbox_items.occurred_at, EXCLUDED.occurred_at),\n    actor_account_ids = ARRAY(SELECT DISTINCT a FROM unnest(notification.inbox_items.actor_account_ids || EXCLUDED.actor_account_ids) AS a ORDER BY a),\n    updated_at = GREATEST(notification.inbox_items.updated_at, EXCLUDED.updated_at)\nRETURNING id",
+   "new": "RETURNING id",
+   "test": "internal/modules/notification ^TestUnreadNotificationsWithTheSameAggregationKeyMerge$",
+   "why": "The inbox write becomes a plain insert, so a second unread notification with the same aggregation key no longer merges into the existing row."
+  },
+  {
+   "id": "deleted-account-check-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "if deleted {",
+   "new": "if deleted && false {",
+   "test": "internal/modules/notification ^TestIntentArrivingAfterAccountDeletionWritesNothing$",
+   "why": "The worker no longer stops when the recipient account is already deleted, so an intent arriving after deletion still writes inbox and delivery rows."
+  },
+  {
+   "id": "aggregation-key-without-type-prefix",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/registry.go",
+   "old": "return scopedKey(e.d.Name, k)\n}\n\nfunc (e *entry[P]) ExampleParams",
+   "new": "return k\n}\n\nfunc (e *entry[P]) ExampleParams",
+   "test": "internal/modules/notification/internal/registry ^TestAggregationKeysAreNamespacedByType$",
+   "why": "The stored aggregation key drops the type prefix, so two types with the same raw key can merge into one inbox row."
+  },
+  {
+   "id": "merge-always-overwrites-params",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/intake.sql.go",
+   "old": "params = CASE WHEN EXCLUDED.occurred_at >= notification.inbox_items.occurred_at THEN EXCLUDED.params ELSE notification.inbox_items.params END,",
+   "new": "params = EXCLUDED.params,",
+   "test": "internal/modules/notification ^TestMergeKeepsTheParamsOfTheNewerEventRegardlessOfProcessingOrder$",
+   "why": "A merge overwrites params in job-processing order, so an older event processed last replaces the newer event's params."
+  },
+  {
+   "id": "existence-check-ignores-link-table",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/intake.sql.go",
+   "old": "SELECT EXISTS (\n    SELECT 1 FROM notification.inbox_item_intents WHERE intent_id = $1\n) AS linked",
+   "new": "SELECT false AND EXISTS (\n    SELECT 1 FROM notification.inbox_item_intents WHERE intent_id = $1\n) AS linked",
+   "test": "internal/modules/notification ^TestRetryOfAMergedIntentDoesNotCreateARowAfterTheRowWasRead$",
+   "why": "The retry check no longer consults the intent link table, so re-running a merged intent after its row was read creates a duplicate row."
+  },
+  {
+   "id": "deliver-job-not-enqueued",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {\n\t\t\t\treturn fmt.Errorf(\"排入渠道 job：%w\", err)\n\t\t\t}",
+   "new": "_ = id",
+   "test": "internal/modules/notification ^TestDeliveryChannelsEachGetARecordAndAJobInTheSameTransaction$",
+   "why": "A delivery record is written without its channel job, so A8-3 would have nothing to run."
+  }
+ ]
+}

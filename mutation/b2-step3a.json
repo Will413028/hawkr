@@ -1,0 +1,301 @@
+{
+ "mutants": [
+  {
+   "id": "create-inside-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\t\tif row.Status == string(model.PaymentCreating) {\n\t\t\tif err := q.EnsureEffectiveAttempt(",
+   "new": "\t\tif row.Status == string(model.PaymentCreating) {\n\t\t\t_, _ = s.d.Provider.CreatePayment(ctx, CreateInput{PaymentID: row.ID, OrderNo: row.OrderNo, StoreID: row.StoreID, Amount: row.Amount, Description: row.Description, TransferGroup: row.OrderNo, IdempotencyKey: row.CreateIdempotencyKey.String()})\n\t\t\tif err := q.EnsureEffectiveAttempt(",
+   "test": "internal/modules/payment ^TestCreatePaymentCreatesTheIntentAfterCommitOutsideTheTransactionWithTheStoredKey$",
+   "why": "寫付款列的 transaction 內呼叫 provider：fake 的 Violations 記下 transaction 內與沒有 deadline 的呼叫。"
+  },
+  {
+   "id": "no-retry-job-on-failure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\t\t\treturn enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))\n",
+   "new": "\t\t\treturn nil\n",
+   "test": "internal/modules/payment ^TestCreatePaymentWhenTheProviderFailsReturnsPendingAndTheJobRetriesWithTheSameKey$",
+   "why": "寫列的 transaction 不排補做 job：provider 失敗回 pending 之後沒有人以同一把鍵補做。"
+  },
+  {
+   "id": "handler-trusts-event-content",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\n\treturn enqueueSync(ctx, s.d.Jobs, row.ID)\n}\n",
+   "new": "\n\tif _, claimed, ok := strings.Cut(string(e.Payload), \"|\"); ok && claimed == \"succeeded\" {\n\t\tatts, _ := store.New(s.d.DB.Conn(ctx)).AttemptsOfPayment(ctx, store.AttemptsOfPaymentParams{PaymentID: row.ID, Provider: e.Provider})\n\t\tif len(atts) > 0 {\n\t\t\t_, err := s.applySnapshot(ctx, row.ID, atts[0].ID, e.Provider, Snapshot{ExternalID: e.RouteKey, State: StateSucceeded, Amount: row.Amount, ChargeID: \"ch_forged\", PaidAt: s.d.Now().UTC()}, s.d.Now().UTC())\n\t\t\treturn err\n\t\t}\n\t}\n\treturn enqueueSync(ctx, s.d.Jobs, row.ID)\n}\n",
+   "test": "internal/modules/payment ^TestTheEventHandlerNeverTrustsTheEventContent$",
+   "why": "inbox handler 依事件宣稱的狀態直接寫入、不排同步重讀：偽造的入帳事件會把付款改成 SUCCEEDED。"
+  },
+  {
+   "id": "inbox-event-dedupe-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/inbox/inbox.go",
+   "old": "\nON CONFLICT (provider, event_id) DO NOTHING`",
+   "new": "`",
+   "test": "internal/modules/payment ^TestADuplicatePaymentEventIsRecordedOnceAndPublishesOnce$",
+   "why": "inbox 寫入拿掉 (provider, event_id) 的去重：同一個事件收第二次時寫入失敗、不再只處理一次。"
+  },
+  {
+   "id": "publish-on-every-write",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if next != model.PaymentStatus(locked.Status) {",
+   "new": "if true {",
+   "test": "internal/modules/payment ^TestADuplicatePaymentEventIsRecordedOnceAndPublishesOnce$",
+   "why": "同步寫入後不論狀態有沒有改變都發 PaymentChanged：重複同步重發事件。"
+  },
+  {
+   "id": "one-intent-per-order-index-not-unique",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "old": "CREATE UNIQUE INDEX \"payments_order\"",
+   "new": "CREATE INDEX \"payments_order\"",
+   "test": "internal/modules/payment ^TestASecondCreatePaymentForTheSameOrderProducesNoSecondIntent$",
+   "why": "payments_order 不是唯一索引：ON CONFLICT (order_no) 沒有可對應的唯一索引，同一張訂單的第二次建立失敗，不再沿用同一列。"
+  },
+  {
+   "id": "one-intent-per-order-on-conflict-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/payments.sql.go",
+   "old": "ON CONFLICT (order_no) DO NOTHING",
+   "new": "",
+   "test": "internal/modules/payment ^TestASecondCreatePaymentForTheSameOrderProducesNoSecondIntent$",
+   "why": "寫付款列拿掉 ON CONFLICT (order_no) DO NOTHING：同一張訂單第二次建立撞唯一鍵，沒有沿用既有的列。"
+  },
+  {
+   "id": "unresolved-deadline-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline {",
+   "new": "if false && row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline {",
+   "test": "internal/modules/payment ^TestAnUnresolvedCreatePastTheDeadlineIsTerminalAndTheKeyIsNeverReplayed$",
+   "why": "拿掉結果不明的期限：超過冪等鍵保存期仍以同一把鍵重送。"
+  },
+  {
+   "id": "replay-uses-a-fresh-key",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "IdempotencyKey: called.CreateIdempotencyKey.String(),",
+   "new": "IdempotencyKey: uuid.NewV4().String(),",
+   "test": "internal/modules/payment ^TestAReplayAfterALostResponseRecoversTheSameIntent$",
+   "why": "補做換新冪等鍵：回應遺失之後建出第二個 PaymentIntent。"
+  },
+  {
+   "id": "amount-mismatch-accepted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if snap.Amount != locked.Amount {",
+   "new": "if false && snap.Amount != locked.Amount {",
+   "test": "internal/modules/payment ^TestASnapshotThatDisagreesWithTheRowIsNeverWritten$",
+   "why": "不檢查 provider 的金額與列上的金額：不一致的快照被寫入。"
+  },
+  {
+   "id": "sync-does-not-mark-events-processed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/sync.go",
+   "old": "\t\tif res.judged {",
+   "new": "\t\tif false && res.judged {",
+   "test": "internal/modules/payment ^TestADuplicatePaymentEventIsRecordedOnceAndPublishesOnce$",
+   "why": "同步寫入後不把讀取開始前收到的事件標為已處理：事件永遠留在 inbox 等補掃。"
+  },
+  {
+   "id": "get-payment-leaks-other-buyers",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": " || (err == nil && row.BuyerID != buyerID)",
+   "new": "",
+   "test": "internal/modules/payment ^TestGetPaymentReturnsTheSecretOnlyWhileAwaitingAndOnlyToTheOwner$",
+   "why": "GetPayment 不檢查付款屬於呼叫者：他人的付款與 client_secret 讀得到。"
+  },
+  {
+   "id": "create-ignores-order-owner",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "order.OrderNo != orderNo || order.BuyerID != buyerID",
+   "new": "order.OrderNo != orderNo",
+   "test": "internal/modules/payment ^TestCreatePaymentRefusesWhatTheOrderOrTheCallerDoesNotAllow$",
+   "why": "建立付款不檢查訂單屬於呼叫者：他人的訂單可以替它建立付款。"
+  },
+  {
+   "id": "order-refusal-skipped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\tif !order.Payable {\n\t\treturn apperr.FailedPrecondition(\"訂單目前不能付款\")\n\t}\n",
+   "new": "",
+   "test": "internal/modules/payment ^TestCreatePaymentRefusesWhatTheOrderOrTheCallerDoesNotAllow$",
+   "why": "不檢查訂單是否可付：已取消或過期的訂單也建立付款。"
+  },
+  {
+   "id": "succeeded-can-be-overwritten",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/status.go",
+   "old": "\tcase model.PaymentSucceeded:\n\t\treturn cur, snap.State != StateSucceeded, nil\n",
+   "new": "\tcase model.PaymentSucceeded:\n",
+   "test": "internal/modules/payment/internal/charge ^TestNextFollowsTheDecisionTable$",
+   "why": "入帳之後的快照可以改狀態：Next 不再把 SUCCEEDED 當終局。"
+  },
+  {
+   "id": "succeeded-overwritten-integration",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/status.go",
+   "old": "\tcase model.PaymentSucceeded:\n\t\treturn cur, snap.State != StateSucceeded, nil\n",
+   "new": "\tcase model.PaymentSucceeded:\n",
+   "test": "internal/modules/payment ^TestSucceededIsNeverOverwrittenAndALateSuccessBeatsACancel$",
+   "why": "同上，整合層：已入帳的付款被後來讀到的取消或等待快照覆蓋。"
+  },
+  {
+   "id": "active-transfer-index-not-unique",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "old": "CREATE UNIQUE INDEX \"transfers_active_payment\"",
+   "new": "CREATE INDEX \"transfers_active_payment\"",
+   "test": "internal/modules/payment ^TestTheSchemaGuardsTheTransferAndRefundInvariants$",
+   "why": "transfers_active_payment 不是唯一索引：一筆付款可以有兩筆有效轉帳。"
+  },
+  {
+   "id": "refund-request-key-not-unique",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "old": "CREATE UNIQUE INDEX \"refunds_request\"",
+   "new": "CREATE INDEX \"refunds_request\"",
+   "test": "internal/modules/payment ^TestTheSchemaGuardsTheTransferAndRefundInvariants$",
+   "why": "refunds_request 不是唯一索引：同一把退款冪等鍵可以寫兩列。"
+  },
+  {
+   "id": "refund-external-id-only-when-succeeded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "old": "CHECK ((external_refund_id IS NULL) OR (status = ANY (ARRAY['REFUNDING'::text, 'SUCCEEDED'::text, 'FAILED'::text]))),",
+   "new": "CHECK ((external_refund_id IS NULL) OR (status = 'SUCCEEDED'::text)),",
+   "test": "internal/modules/payment ^TestTheSchemaStoresTheExternalIDOfEveryStateThatHasOne$",
+   "why": "外部 ID 只允許在 SUCCEEDED：provider 已回 ID 但還在處理的 REFUNDING 與建立後才失敗的 FAILED 存不了 ID，只能靠冪等鍵（24 小時）重查。"
+  },
+  {
+   "id": "kept-snapshot-not-marked-processed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/sync.go",
+   "old": "\t\tif res.judged {",
+   "new": "\t\tif res.written {",
+   "test": "internal/modules/payment ^TestASnapshotThatKeepsTheSucceededRowStillMarksItsEventsProcessed$",
+   "why": "列已入帳、快照不是入帳（保留列）時事件不標記已處理：同步每次都回 again，job 每 2 秒 snooze 永遠重跑。"
+  },
+  {
+   "id": "catch-up-job-not-delayed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\t\t\treturn enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))\n",
+   "new": "\t\t\treturn enqueueCreate(ctx, s.d.Jobs, row.ID)\n",
+   "test": "internal/modules/payment ^TestTheCatchUpJobIsScheduledAfterTheInRequestCallTimeout$",
+   "why": "補做 job 提交後立刻可跑，與請求內的建立搶同一把冪等鍵。"
+  },
+  {
+   "id": "request-secret-not-recovered",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\tif res.clientSecret == \"\" && res.row.Status == string(model.PaymentAwaitingPayment) {",
+   "new": "\tif false && res.clientSecret == \"\" && res.row.Status == string(model.PaymentAwaitingPayment) {",
+   "test": "internal/modules/payment ^TestACatchUpJobThatWritesFirstStillLetsTheRequestReturnTheSecret$",
+   "why": "補做 job 先寫入時請求回 AWAITING_PAYMENT 但 client_secret 是空的。"
+  },
+  {
+   "id": "canceled-payment-not-reset",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "row.Status == string(model.PaymentCreateFailed) || row.Status == string(model.PaymentCanceled) {",
+   "new": "row.Status == string(model.PaymentCreateFailed) {",
+   "test": "internal/modules/payment ^TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow$",
+   "why": "CANCELED 的列在訂單仍可付時沿用已取消的 PaymentIntent，買家無法再付。"
+  },
+  {
+   "id": "new-payment-without-description",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/attempt.go",
+   "old": "\t\tDescription: paymentDescription(order), Now: now,\n",
+   "new": "\t\tNow: now,\n",
+   "test": "internal/modules/payment/internal/charge ^TestNewPaymentParamsCarryTheDescription$",
+   "why": "R2-1：新建付款寫列的參數不帶說明，payments_description_check 擋下每一筆新付款。"
+  },
+  {
+   "id": "new-payment-without-description-integration",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/attempt.go",
+   "old": "\t\tDescription: paymentDescription(order), Now: now,\n",
+   "new": "\t\tNow: now,\n",
+   "test": "internal/modules/payment ^TestANewPaymentIsWrittenWithItsDescriptionAndItsFirstAttempt$",
+   "why": "R2-1：同上，integration 看到新付款建不起來。"
+  },
+  {
+   "id": "event-lookup-ignores-attempt-history",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/payments.sql.go",
+   "old": "JOIN payment.payment_attempts a ON a.payment_id = p.id\nWHERE a.provider = $1 AND a.external_payment_id = $2\n",
+   "new": "JOIN payment.payment_attempts a ON a.payment_id = p.id\nWHERE a.provider = $1 AND a.external_payment_id = $2 AND a.superseded_at IS NULL\n",
+   "test": "internal/modules/payment ^TestALateSuccessOfTheOldIntentAfterARepayIsRecordedAndTheNewIntentIsCanceled$",
+   "why": "R2-2：事件只對得到有效嘗試的外部 ID：舊 PaymentIntent 晚到的成功找不到付款列、被丟棄。"
+  },
+  {
+   "id": "late-success-excess-adopted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/attempt.go",
+   "old": "\tcase snap == StateSucceeded && row == model.PaymentSucceeded:\n\t\treturn lateExcess\n",
+   "new": "\tcase snap == StateSucceeded && row == model.PaymentSucceeded:\n\t\treturn lateAdopt\n",
+   "test": "internal/modules/payment ^TestTwoSucceededIntentsAreFlaggedForTheBackOfficeAndNeverRefundedAutomatically$",
+   "why": "R2-2：付款列已入帳時舊 PaymentIntent 的第二筆成功也被採用：付款列被第二筆覆蓋、沒有標記重複入帳。"
+  },
+  {
+   "id": "late-success-new-intent-not-canceled",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/attempt.go",
+   "old": "\t\tif hadPrev && prev.ExternalPaymentID != nil && !attemptClosed(prev.State) {\n",
+   "new": "\t\tif false && hadPrev && prev.ExternalPaymentID != nil && !attemptClosed(prev.State) {\n",
+   "test": "internal/modules/payment ^TestALateSuccessOfTheOldIntentAfterARepayIsRecordedAndTheNewIntentIsCanceled$",
+   "why": "R2-2：舊 PaymentIntent 晚到成功之後，原本有效的新 PaymentIntent 沒有排取消，買家還能再付一次。"
+  },
+  {
+   "id": "sweep-ignores-superseded-event-routes",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/payments.sql.go",
+   "old": "FROM payment.payment_attempts a\nWHERE a.provider = $1 AND a.external_payment_id = ANY($2::text[])\n",
+   "new": "FROM payment.payment_attempts a\nWHERE a.provider = $1 AND a.superseded_at IS NULL AND a.external_payment_id = ANY($2::text[])\n",
+   "test": "internal/modules/payment ^TestAnEventOfASupersededIntentIsSweptAndFullyProcessed$",
+   "why": "R2-2：掃描為舊 PaymentIntent 的未處理事件排不出同步，事件永遠留在 inbox。"
+  },
+  {
+   "id": "superseded-attempt-writes-the-row",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "\tif stored.SupersededAt != nil {\n",
+   "new": "\tif false && stored.SupersededAt != nil {\n",
+   "test": "internal/modules/payment ^TestAnOldIntentSyncNeverWritesItsIDBackOntoAResetRow$",
+   "why": "R2-3：被取代的舊嘗試也寫付款列：舊 PaymentIntent 的同步把舊外部 ID 與狀態寫回剛重設的列。"
+  },
+  {
+   "id": "rebind-ignores-the-old-call",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/payments.sql.go",
+   "old": "\n  AND (create_called_at IS NULL OR create_called_at < $4::timestamptz)",
+   "new": "\n  AND $4::timestamptz IS NOT NULL",
+   "test": "internal/modules/payment ^TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrIsPastTheDeadline$",
+   "why": "R2-4：呼叫過又還在期限內的別的 provider 的列也被改綁，舊 provider 已建出的 PaymentIntent 變成第二個。"
+  },
+  {
+   "id": "snapshot-provider-not-compared",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "\tif att.Provider != provider {\n",
+   "new": "\tif false && att.Provider != provider {\n",
+   "test": "internal/modules/payment ^TestASnapshotForAnAttemptOfAnotherProviderIsDiscarded$",
+   "why": "R2-4：不比對回快照的 provider 與嘗試登記的 provider：A provider 的外部 ID 被寫到標成 B 的列。"
+  },
+  {
+   "id": "incomplete-success-is-an-anomaly",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/attempt.go",
+   "old": "\t\treturn errIncompleteSuccess\n",
+   "new": "\t\treturn fmt.Errorf(\"%w：入帳沒有 charge\", ErrAnomaly)\n",
+   "test": "internal/modules/payment ^TestAnIncompleteSuccessSnapshotKeepsItsEventsUnprocessedUntilItIsComplete$",
+   "why": "R2-5：入帳缺 charge 的暫時性快照當成 anomaly：事件被標記已處理、job 被取消，provider 補齊之後不會再讀。"
+  }
+ ]
+}

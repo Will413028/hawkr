@@ -14,19 +14,39 @@ import (
 // WebhookRoute 是 Stripe webhook 的入口；簽章就是驗證，所以掛在 Connect、身分與 CSRF 中介層之外。
 const WebhookRoute = "POST /webhooks/stripe"
 
-// maxWebhookBytes 是 webhook 本文的上限；thin event 只有幾百 bytes。
-const maxWebhookBytes = 64 << 10
+// ChargeWebhookRoute 是付款事件（PaymentIntent、退款、轉帳）的 webhook 入口：一個 Stripe event destination 一個 endpoint 一把簽章密鑰，付款的 snapshot destination
+// 與收款帳戶的 thin destination 分開（spikes.md「event destination」），所以不與 WebhookRoute 共用路由；一樣掛在 Connect、身分與 CSRF 中介層之外。
+const ChargeWebhookRoute = "POST /webhooks/stripe-payments"
+
+const (
+	// maxAccountWebhookBytes 是收款帳戶 webhook 本文的上限：thin event 只有事件資訊（幾百 bytes）。
+	maxAccountWebhookBytes = 64 << 10
+	// maxChargeWebhookBytes 是付款 webhook 本文的上限：snapshot event 內含完整物件（testdata 的 PaymentIntent 約 2 KB），物件最大的變數是 metadata
+	// （Stripe 上限 50 個 key、每個 value 500 字元，約 25 KB）與帳單資訊，所以取 256 KiB：約是已知最大內容的 5 倍以上，仍擋得住灌爆記憶體的本文。
+	maxChargeWebhookBytes = 256 << 10
+)
+
+// Webhook 是一個 webhook 入口的設定：label 是 log 裡的名稱（區分哪個 destination），maxBytes 是本文上限。
+type Webhook struct {
+	Label    string
+	MaxBytes int64
+}
 
 // Events 是 webhook 入口需要的模組方法：驗簽、同一個 transaction 寫 platform inbox 並排入派送 job（commit 之後才回 2xx）。
 type Events interface {
 	ReceiveEvent(ctx context.Context, header http.Header, body []byte) error
 }
 
-// NewWebhook 回傳 webhook 入口。接受、重送與不處理的事件回 204；簽章或格式不合回 400；沒有設定 provider 回 503（provider 稍後重送）；
-// 其他失敗回 500。
+// NewWebhook 回傳收款帳戶的 webhook 入口，規則見 Handler。
 func NewWebhook(events Events, log *slog.Logger) http.Handler {
+	return Webhook{Label: "收款帳戶 webhook", MaxBytes: maxAccountWebhookBytes}.Handler(events, log)
+}
+
+// Handler 回傳 webhook 入口。接受、重送與不處理的事件回 204；簽章或格式不合回 400；本文超過上限回 413；沒有設定 provider 回 503（provider 稍後重送）；
+// 其他失敗回 500。
+func (c Webhook) Handler(events Events, log *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxWebhookBytes))
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, c.MaxBytes))
 		if err != nil {
 			var tooLarge *http.MaxBytesError
 			if errors.As(err, &tooLarge) {
@@ -45,8 +65,24 @@ func NewWebhook(events Events, log *slog.Logger) http.Handler {
 		case apperr.KindOf(err) == apperr.KindFailedPrecondition:
 			http.Error(w, "payment provider not configured", http.StatusServiceUnavailable)
 		default:
-			log.ErrorContext(r.Context(), "收款 webhook 處理失敗", "err", err)
+			log.ErrorContext(r.Context(), c.Label+" 處理失敗", "err", err)
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
 	})
+}
+
+// ChargeEvents 是付款 webhook 入口需要的模組方法：驗簽、同一個 transaction 寫 platform inbox 並排入派送 job（commit 之後才回 2xx）。
+type ChargeEvents interface {
+	ReceivePaymentEvent(ctx context.Context, header http.Header, body []byte) error
+}
+
+type chargeEvents struct{ e ChargeEvents }
+
+func (c chargeEvents) ReceiveEvent(ctx context.Context, header http.Header, body []byte) error {
+	return c.e.ReceivePaymentEvent(ctx, header, body)
+}
+
+// NewChargeWebhook 回傳付款 webhook 入口，回應規則同 Webhook.Handler；log 標籤與本文上限是付款自己的（snapshot event，見 maxChargeWebhookBytes）。
+func NewChargeWebhook(events ChargeEvents, log *slog.Logger) http.Handler {
+	return Webhook{Label: "付款 webhook", MaxBytes: maxChargeWebhookBytes}.Handler(chargeEvents{events}, log)
 }
