@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	notificationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	socialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -49,6 +50,12 @@ var procedureTiers = map[string]rateTier{
 	socialconnect.SocialPublicServiceRecordPostViewProcedure:         tierPostView,
 	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure: tierAppLogin,
 	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:    tierAppLogin,
+}
+
+// rateExempt 是不計數的 procedure：通知串流是長連線，client 斷線重連時不該被每分鐘的額度擋下（舊 gateway 的 SSE 同樣豁免）；
+// 它的濫用由每個帳號同時開著的串流上限擋（notification 模組）。
+var rateExempt = map[string]bool{
+	notificationconnect.NotificationAppServiceWatchNotificationsProcedure: true,
 }
 
 // tierOf 決定 Connect procedure 的級別：procedureTiers 列出的用自己的級別，其餘依 service 的使用者類別。
@@ -158,6 +165,10 @@ func (l *rateLimiter) allowAll(reqs ...rateRequest) (bool, time.Duration) {
 // resource_exhausted（帶 RetryInfo），不記。
 func withRateLimit(l *rateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if rateExempt[r.URL.Path] {
+			next.ServeHTTP(w, r)
+			return
+		}
 		subject := rpc.SubjectFrom(r.Context())
 		tier := tierOf(r.URL.Path)
 		if ok, wait := l.allowAll(rateRequest{key: tier.name + "|" + subject, limit: tier.limit(subject), window: rateWindow}); !ok {

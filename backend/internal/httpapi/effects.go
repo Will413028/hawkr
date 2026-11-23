@@ -197,6 +197,19 @@ var customerEffects = map[string]Effect{
 	"/hawkr.chat.v1alpha1.ChatAppService/StreamEvents":      EffectRead,
 	"/hawkr.chat.v1alpha1.ChatAppService/StreamStoreEvents": EffectRead,
 
+	// NotificationAppService：讀取停權的帳號也可以（要讀得到停權通知）；已讀、刪除、偏好與註冊 token 是寫入；註銷 token 是收斂動作
+	// （停權者登出與刪帳號時要能停止收到推播，同 SignOut），停權時也必須能做。串流只讀。
+	"/hawkr.notification.v1alpha1.NotificationAppService/ListInboxItems":               EffectRead,
+	"/hawkr.notification.v1alpha1.NotificationAppService/GetUnreadCount":               EffectRead,
+	"/hawkr.notification.v1alpha1.NotificationAppService/MarkInboxItemRead":            EffectWrite,
+	"/hawkr.notification.v1alpha1.NotificationAppService/MarkAllInboxItemsRead":        EffectWrite,
+	"/hawkr.notification.v1alpha1.NotificationAppService/BatchDeleteInboxItems":        EffectWrite,
+	"/hawkr.notification.v1alpha1.NotificationAppService/GetNotificationPreferences":   EffectRead,
+	"/hawkr.notification.v1alpha1.NotificationAppService/UpdateNotificationPreference": EffectWrite,
+	"/hawkr.notification.v1alpha1.NotificationAppService/RegisterDeviceToken":          EffectWrite,
+	"/hawkr.notification.v1alpha1.NotificationAppService/DeleteDeviceToken":            EffectSelfService,
+	"/hawkr.notification.v1alpha1.NotificationAppService/WatchNotifications":           EffectRead,
+
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":        EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerReportAppService/GetMyReport":         EffectRead,

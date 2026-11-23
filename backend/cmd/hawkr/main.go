@@ -257,7 +257,8 @@ func runServe(ctx context.Context) error {
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
-	subscribeNotification(bus, newNotification(d, id, buyerModule, sellerModule, jc, log))
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, log)
+	subscribeNotification(bus, notificationModule)
 	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
 		p, ok := rpc.PrincipalFrom(ctx)
@@ -293,6 +294,8 @@ func runServe(ctx context.Context) error {
 		IM:          imModule,
 		CRM:         crmModule,
 		Moderation:  moderationModule,
+
+		Notification: notificationModule,
 		Content: content.New(content.Deps{
 			DB:     d,
 			Social: socialModule,

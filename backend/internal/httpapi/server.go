@@ -52,6 +52,7 @@ import (
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/imageai/v1alpha1/imageaiv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/review/v1alpha1/reviewv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
@@ -59,6 +60,7 @@ import (
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
 	httpimageai "github.com/Will413028/hawkr/backend/internal/httpapi/imageai"
 	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
+	httpnotification "github.com/Will413028/hawkr/backend/internal/httpapi/notification"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	httpreview "github.com/Will413028/hawkr/backend/internal/httpapi/review"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
@@ -76,6 +78,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -121,6 +124,8 @@ type Deps struct {
 	CRM *crm.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
+	// Notification 是登入帳號的通知收件匣、偏好與裝置 token（NotificationAppService）。
+	Notification *notification.Module
 	// Assistant 是買家助理（AssistantAppService）。
 	Assistant *assistant.Module
 	// Procurement 是買家採購（BuyerProcurementAppService）。
@@ -218,6 +223,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Moderation == nil {
 		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
+	}
+	if deps.Notification == nil {
+		return nil, fmt.Errorf("httpapi：NotificationAppService 需要 Notification")
 	}
 	if deps.Assistant == nil {
 		return nil, fmt.Errorf("httpapi：AssistantAppService 需要 Assistant")
@@ -408,6 +416,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(moderationv1alpha1connect.NewModerationAppServiceHandler(moderationApp, opts...))
+	notificationApp, err := httpnotification.NewApp(deps.Notification, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(notificationv1alpha1connect.NewNotificationAppServiceHandler(notificationApp, opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	notificationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 )
@@ -194,5 +195,29 @@ func TestRateLimitDenialNegotiatesTheLocale(t *testing.T) {
 	}
 	if rec.Code != http.StatusTooManyRequests || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
 		t.Fatalf("429 = %d，Vary = %v", rec.Code, rec.Header().Values("Vary"))
+	}
+}
+
+// 通知串流是長連線，斷線重連不計入額度；同一個 service 的其他方法照常限流。
+func TestNotificationStreamIsExemptFromTheRateLimit(t *testing.T) {
+	t.Parallel()
+	l := newRateLimiter(func() time.Time { return time.Date(2026, 11, 24, 0, 0, 0, 0, time.UTC) })
+	h := withRateLimit(l, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	call := func(path string) int {
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader("{}"))
+		r.Header.Set("Content-Type", "application/json")
+		return do(h, r).Code
+	}
+	for range tierDefault.visitor * 3 {
+		if code := call(notificationconnect.NotificationAppServiceWatchNotificationsProcedure); code != http.StatusOK {
+			t.Fatalf("串流被限流：%d", code)
+		}
+	}
+	limited := false
+	for range tierDefault.visitor + 1 {
+		limited = call(notificationconnect.NotificationAppServiceListInboxItemsProcedure) == http.StatusTooManyRequests
+	}
+	if !limited {
+		t.Fatal("同一個 service 的其他方法仍要限流")
 	}
 }
