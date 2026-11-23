@@ -189,20 +189,15 @@ class RunType extends $pb.ProtobufEnum {
   static const RunType RUN_TYPE_CLARIFICATION_RESUME =
       RunType._(3, _omitEnumNames ? '' : 'RUN_TYPE_CLARIFICATION_RESUME');
 
-  /// 詢價發布。
-  static const RunType RUN_TYPE_PUBLICATION =
-      RunType._(4, _omitEnumNames ? '' : 'RUN_TYPE_PUBLICATION');
-
   static const $core.List<RunType> values = <RunType>[
     RUN_TYPE_UNSPECIFIED,
     RUN_TYPE_TURN,
     RUN_TYPE_CANDIDATE_SEARCH,
     RUN_TYPE_CLARIFICATION_RESUME,
-    RUN_TYPE_PUBLICATION,
   ];
 
   static final $core.List<RunType?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static RunType? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

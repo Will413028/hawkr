@@ -25,7 +25,7 @@
 - CLARIFICATION_RESUME executor（`turn.AnswerExecutor`，只需要分類樹，不呼叫模型）：`ApplyAnswer` 套用到中斷 payload；解析成功寫 `source = ANSWER` 的新版本（存 `item_resolution_category_id`）與輪次（買家訊息是選項標籤或文字原文），經 TURN 的 commit 到 SUCCEEDED 或新的中斷；答案被拒（`OutcomeInvalid`）run 以 `ANSWER_REJECTED` 失敗，中斷維持 PENDING、不還原；不扣額度。TURN 與回答 run 共用的 commit 在 transaction 開頭先 `Ledger.LockAskingOf`，回答 run 的鎖順序因此是提問的 run、中斷、回答的 run。
 - 中斷（`Ledger.Interrupt`）：同一個 transaction 寫 `turn_result` 事件（可省）、把 RUNNING 的 run 轉 WAITING_FOR_INPUT（回答 run 在此提交所答的中斷）、再新增 PENDING 的 CLARIFICATION 中斷（payload 是接續的唯一狀態）。`agent_run_interrupts.request_id` 加部分唯一索引，每個需求最多一筆 PENDING。狀態 PENDING／RESOLVED（回答成功）／CANCELLED（提問的 run 被取消或被同需求的新一輪 TURN 取代，同交易轉，不佔索引；正在回答它的 run 在同交易要求取消，同 CancelRun 的路徑：CANCEL_REQUESTED 並取消 job，job 已死直接 CANCELLED）；`closed_at` 是離開 PENDING 的時間。讀取只認 WAITING_FOR_INPUT 的 run 的 PENDING 中斷（`OpenInterruptForRun`、`OpenInterruptForRequest`），並回 `Processing`：有回答它的 run 在 QUEUED、RUNNING 或 CANCEL_REQUESTED 時為真（讀取模型呈現「處理中」，否則「等回答」）。
 - 執行者登記：`Dispatcher.Executors` 依 run 類型登記；領到沒有登記執行者的類型，記 log 並依該類型的 pipeline 失敗收斂（TURN 退額度，其餘不退），不留在 RUNNING 等 reconciler。接線：`cmd/hawkr` 的 `addProcurementWorkers`（worker 角色）登記執行 run 的 worker、reconciler 與清除；`startProcurementHub`（serve 角色）啟動共用 LISTEN；兩個角色的 `newProcurement` 都給 job client。
-- BuyerDeleted：先刪 `agent_runs WHERE buyer_id`（輸入、事件、interrupt 隨 CASCADE），再把其他表的 `buyer_id` 設 NULL；`agent_runs.buyer_id` 維持 NOT NULL，`publication_id` 為 `ON DELETE SET NULL`。
+- BuyerDeleted：先刪 `agent_runs WHERE buyer_id`（輸入、事件、interrupt 隨 CASCADE），再把其他表的 `buyer_id` 設 NULL；`agent_runs.buyer_id` 維持 NOT NULL（A9-D31 Q3：發布不建 run，`agent_runs` 沒有 `publication_id`）。
 
 ## 3. TURN 執行（A9-3b-2c）
 
@@ -54,7 +54,7 @@
 - 訊息：每一輪（`turns`，依時間）拆成買家與助理兩則，空的不出；買家訊息的 ID 是該輪的 `client_request_id`，助理訊息的 ID 是輪次 ID（等於 `turn_result.message_id`）；回答中斷的一輪，買家訊息是答案（選項標籤或文字）。`steps` 不填。
 - `runs`：目前需求的 run，新到舊，最多 20 筆，不分頁；`last_cursor` 是 `last_event_seq` 的 cursor；`terminal` 依狀態。`active_run_id`：需求目前 QUEUED、RUNNING 或 CANCEL_REQUESTED 的最新一個 run（等待輸入的 run 不算），沒有時不填。
 - `open_confirmation`：`OpenInterruptForRequest` 的 PENDING 中斷，問題取自 payload 的 `question`，`processing` 為真代表有回答它的 run 進行中。
-- `published_rfq`：需求最新一次發布（`published_at` 新到舊）的 ID、版本、時間、受眾數（核准凍結的受眾列數，公開池 0）、邀請數與確認快照 ID；`rfq_snapshot_hash` 目前不填（沒有發布的寫入者，hash 的重算函式隨 A9-3c 的發布一起定義）。
+- `published_rfq`：需求最新一次發布（`published_at` 新到舊）的 ID、版本、時間、受眾數（核准凍結的受眾列數，公開池 0）、邀請數與 `seller_facing_hash`；`seller_facing_hash` 由發布的核准與它凍結的需求版本以 `rfq.SellerFacingHash` 重算，與 `ExecuteRfqPublicationResponse.seller_facing_payload_hash` 同值（A9-D35）。
 
 ## 6. SubmitTurn（A9-3b-2f，A9-D13、D24、D26）
 
@@ -67,7 +67,7 @@
 
 ## 7. 讀取與對話管理（A9-3b-3a，A9-D31 Q7–Q9）
 
-- `GetSnapshot(buyerID, requestID)`（`snapshot.Reader.GetByRequest`）以需求為鍵：現行版本的欄位（`slots.FromRevision`）、`MissingRequired`、run、進行中的 run、待回答的中斷與最新的發布結果。需求不存在、不屬於買家，或它的對話已被買家刪除回 NOT_FOUND（契約沒寫刪除對話後需求能否由 request_id 讀取，這裡取較保守的 NOT_FOUND）。`PublishedRfq.RfqSnapshotHash` 與 `GetRuntimeSnapshot` 相同，由 `internal/rfqhash` 對確認快照、它確認的需求版本與價格預覽重算（SHA-256 對固定欄位順序的 JSON）；3c 的 `ConfirmRfqSnapshot` 必須以同一個函式算 `payload_hash`。
+- `GetSnapshot(buyerID, requestID)`（`snapshot.Reader.GetByRequest`）以需求為鍵：現行版本的欄位（`slots.FromRevision`）、`MissingRequired`、run、進行中的 run、待回答的中斷與最新的發布結果。需求不存在、不屬於買家，或它的對話已被買家刪除回 NOT_FOUND（契約沒寫刪除對話後需求能否由 request_id 讀取，這裡取較保守的 NOT_FOUND）。`PublishedRfq.SellerFacingHash` 與 `GetRuntimeSnapshot` 相同，由發布的核准與它凍結的需求版本重算（`rfq.SellerFacingHash`，SHA-256 對固定欄位順序的 JSON），與發布預覽、執行回的是同一個值。
 - `GetConversationMessages` 與 `GetRuntimeSnapshot` 的訊息同源（`snapshot.messagesOf`）。
 - `ListConversations`：keyset `(updated_at DESC, id DESC)`，走索引 `conversations_buyer_active`；`page_size` 0 是 20、超過 50 以 50 計、負數與壞 `page_token` 回 INVALID_ARGUMENT（欄位 `page_size`、`page_token`）；token 是 `(updated_at 微秒, id)` 的 base64url JSON，不透明。
 - `RenameConversation`：去頭尾空白後 1 到 40 字元、不含 `\n`、`\r`，否則 INVALID_ARGUMENT（欄位 `title`）；DB 的 `conversations_title_check` 同為 40。目標狀態的方法，不建收據。
@@ -81,3 +81,15 @@
 - 重送回放 `turns.turn_result`，位元組與第一次相同；同一個 `client_request_id` 內容不同（需求、來源、回答、欄位（`turns.command_slot`）、讀到的版本任一不同，或鍵已被 run 用掉）回 INVALID_ARGUMENT（`client_request_id`）。
 - SubmitAnswer 的欄位：ITEM（文字，須唯一對到一個末層分類，否則 INVALID_ARGUMENT `free_text`）、QUANTITY（數字文字與單位選項至少一個；缺的一邊現況要已有）、PACKAGING、BUDGET_PER_UNIT（整數文字）、DELIVERY_CITY（選項或文字）、DELIVERY_DATE（文字）。選項只認 `planner.BuildFor` 的白名單；略過只給可略過的欄位（PACKAGING、BUDGET_PER_UNIT），記進 `turns.skipped_slots`；值被 `slots.Apply` 拒絕不是錯誤，記在 `TurnResult.rejected`。
 - Rewind 的欄位同上（UNIT 視同 QUANTITY）。新版本內容同目標版，問題是倒回那一格（`planner.BuildFor`），連續選填計數歸零；需求狀態依 `nextStatus`：MATCHING 時品項解析變了才退回。
+
+## 9. 詢價發布鏈（A9-3b-3c，A9-D31 Q3–Q6，A9-D35）
+
+詢價鏈是「可改的草稿（需求現行版本）＋唯一一個不可變、會到期、只能執行一次的發布核准」。沒有確認快照與價格預覽（A9-D35 刪 `ConfirmRfqSnapshot`、`confirmed_rfq_snapshots`、`price_previews`）。
+
+- 三支方法（`internal/rfq`）。寫入的兩支（發布預覽、執行）各自一個 transaction，依序鎖現行版本與需求列（順序同 `turn.Direct`）；`PreviewRfqPrice` 是純計算，在唯讀快照內讀、不鎖、不寫。三支共同的檢查（`settle`）依序是：需求不屬於本人或對話已刪除 NOT_FOUND；讀到的需求版本不是現行版本 ABORTED／`VERSION_CONFLICT`（`conflictTarget` 是 `request_revision`）；需求狀態不是 `REQUIREMENT_READY` 或 `MATCHING`（與 `search.Start` 同一個判斷，`search.Searchable`）FAILED_PRECONDITION／`REQUIREMENT_NOT_READY`。狀態改變不產生新版本，所以預覽與執行都要查。輸入檢查（區間、補充說明長度、受眾形狀、期限是合法日期）先於任何讀取與鎖，所以輸入錯誤不會被過時的版本蓋掉。
+- `PreviewRfqPrice`：區間下界與上界是正整數且下界不大於上界（INVALID_ARGUMENT）；需求沒有單位（算不出計價基準）FAILED_PRECONDITION／`REQUIREMENT_NOT_READY`；GRAM 以每 1000 計價，其餘每 1；有數量時總額 = 單價 × 數量 ÷ 計價基準四捨五入到元，溢位 FAILED_PRECONDITION（無 reason）；沒有數量不設總額。標 `NO_SIDE_EFFECTS`，沒有冪等鍵、沒有到期。
+- `PreviewRfqPublication`：輸入是需求現行版本、買家的單價區間與補充說明（去頭尾空白，上限 500 字元）、受眾與回價期限。先驗輸入，再先看冪等鍵（核准上 `(buyer_id, client_request_id)`，命中就回第一次的核准，先於需要讀取的檢查；內容含需求、讀到的版本、區間、補充說明、模式、期限、候選集 ID 與受眾，不同回 INVALID_ARGUMENT（`client_request_id`）），然後：回價期限早於今天（營業時區，`twtime.Day`，台北）INVALID_ARGUMENT（`ResponseDeadline`，期限就是今天不算過）；版本與狀態檢查；需求沒有單位 `REQUIREMENT_NOT_READY`。指定對象：候選集不屬於本人的這張需求 NOT_FOUND；不是有效的候選集（同 `ToggleSelection`，`search.IsEffective`）`VERSION_CONFLICT`（`candidate_set`）；候選不在候選集裡 INVALID_ARGUMENT（`selected_candidate_ids[i]`）；受眾依選擇順序凍結店家 ID。公開池政策是 `WISH_POOL_ALL_ACTIVE_SELLERS_V1`／1，預覽沒有收件人（`recipient_count` 0），收件人與封鎖檢查在 A9-3c（A9-D29(5)）。核准存單價區間、補充說明、回價期限、模式、政策與（指定對象時）`candidate_set_id`；賣家可見內容（`compile.go` 的 `assemble`）由核准的這些欄位加上它對應的不可變需求版本組出，兩個 hash 由此重算。
+- 核准的有效期：`ApprovalTTL`（24 小時）。核准在 `expires_at` 之前有效，等於 `expires_at` 的那一刻起已過期（`ClaimApprovalForExecute` 是 `expires_at > now`，`TestExecuteApprovalExpiryBoundary` 鎖住邊界）；planner 讀「未過期的待執行核准」也是同一個邊界。
+- `ExecuteRfqPublication`：重送（鍵已有發布）先於其餘檢查，回第一次的發布（`replayed`），不再建邀請與事件；內容含需求、核准、`approval_version`（存在發布上）、讀到的版本與 `payload_hash`，不同回 INVALID_ARGUMENT（`client_request_id`）。其後：版本與狀態檢查；核准不屬於本人 NOT_FOUND；核准是別的需求的、`ClaimApprovalForExecute` 的 CAS（PENDING、版本、有效期）沒命中、核准凍的需求版本已不是現行版本、核准的回價期限已早於今天（營業時區，執行時再查一次）、`payload_hash` 不等於重算的賣家可見內容 hash、指定對象的受眾名單是空的，都回 `VERSION_CONFLICT`（`publication_approval`）；指定對象的 `candidate_set_id` 已不是有效的候選集（`search.IsEffective` 重驗，A9-D35 推翻 A9-D29(4) 的「候選集不存進核准」）回 `VERSION_CONFLICT`（`candidate_set`）。公開池沒有候選集，不做這項檢查。任何一個拒絕都整筆 rollback，核准維持 PENDING（領取一起還原）。成功時同一個 transaction 寫發布（不建 run）、依受眾順序寫 QUEUED 的邀請、把核准標 SUCCEEDED、發 `RfqPublished` 事件（含每個邀請）；任何一步失敗全部還原。`procurement.New` 要求 `Deps.Events`，沒給 panic。
+- planner 的詢價階段（`turn.loadPrior`）讀需求最新的、未過期的 PENDING 核准：對應現行版本且這一輪沒有改內容是「待核准」（`PUBLICATION_APPROVAL_REQUIRED`），有核准但對應的不是現行版本或內容變了是「過期」（`RFQ_RECONFIRM_REQUIRED`），沒有是無。「已試算」階段（`PRICE_PREVIEW_AVAILABLE`）刪除：試算不再存，沒有可以讀的訊號。
+- hash（`internal/rfqhash`）：SHA-256 對固定欄位順序的 JSON，原像含 `schemaVersion`（`rfq_publication_approvals.schema_version`、`rfq_publications.schema_version`），欄位集合依版本分派，不認得的版本回錯誤；受眾、賣家可見內容各一個原像型別。賣家可見內容的 hash 是 `AcceptSellerQuote` 比對的對象（`expected_seller_facing_hash`，3b-3d 實作），原像涵蓋賣家看到的全部欄位，`TestEverySellerFacingFieldChangesTheHash` 與 `TestAssembledSellerHashCoversEveryApprovalAndRevisionField` 守住（ADR `2026-11-23-seller-facing-hash-supersedes-snapshot-hash`）。

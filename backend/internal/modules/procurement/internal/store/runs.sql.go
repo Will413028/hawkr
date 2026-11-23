@@ -98,7 +98,7 @@ func (q *Queries) ExpireRunEvents(ctx context.Context, arg ExpireRunEventsParams
 }
 
 const getInProgressRunForRequest = `-- name: GetInProgressRunForRequest :one
-SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
 WHERE request_id = $1 AND buyer_id = $2 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 ORDER BY created_at DESC, id DESC
 LIMIT 1
@@ -120,7 +120,6 @@ func (q *Queries) GetInProgressRunForRequest(ctx context.Context, arg GetInProgr
 		&i.ConversationID,
 		&i.InterruptID,
 		&i.CandidateSetID,
-		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,
@@ -282,7 +281,7 @@ func (q *Queries) GetOpenInterruptForRun(ctx context.Context, arg GetOpenInterru
 }
 
 const getRun = `-- name: GetRun :one
-SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1
 `
 
 func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun, error) {
@@ -295,7 +294,6 @@ func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun
 		&i.ConversationID,
 		&i.InterruptID,
 		&i.CandidateSetID,
-		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,
@@ -314,7 +312,7 @@ func (q *Queries) GetRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun
 }
 
 const getRunByIdempotencyKey = `-- name: GetRunByIdempotencyKey :one
-SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetRunByIdempotencyKeyParams struct {
@@ -332,7 +330,6 @@ func (q *Queries) GetRunByIdempotencyKey(ctx context.Context, arg GetRunByIdempo
 		&i.ConversationID,
 		&i.InterruptID,
 		&i.CandidateSetID,
-		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,
@@ -473,7 +470,7 @@ func (q *Queries) ListRunEventsAfter(ctx context.Context, arg ListRunEventsAfter
 }
 
 const listRunsByRequest = `-- name: ListRunsByRequest :many
-SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
 WHERE request_id = $1 AND buyer_id = $2
 ORDER BY created_at DESC, id DESC
 LIMIT $3::int
@@ -502,7 +499,6 @@ func (q *Queries) ListRunsByRequest(ctx context.Context, arg ListRunsByRequestPa
 			&i.ConversationID,
 			&i.InterruptID,
 			&i.CandidateSetID,
-			&i.PublicationID,
 			&i.RunType,
 			&i.Status,
 			&i.FailureReason,
@@ -592,7 +588,7 @@ func (q *Queries) ListWaitingRunIDs(ctx context.Context, arg ListWaitingRunIDsPa
 }
 
 const lockActiveRun = `-- name: LockActiveRun :one
-SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs
 WHERE id = $1 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 FOR UPDATE SKIP LOCKED
 `
@@ -608,7 +604,6 @@ func (q *Queries) LockActiveRun(ctx context.Context, id uuid.UUID) (ProcurementA
 		&i.ConversationID,
 		&i.InterruptID,
 		&i.CandidateSetID,
-		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,
@@ -637,7 +632,7 @@ func (q *Queries) LockBuyerSubmits(ctx context.Context, buyerID int64) error {
 }
 
 const lockInProgressAnswerRuns = `-- name: LockInProgressAnswerRuns :many
-SELECT a.id, a.buyer_id, a.request_id, a.conversation_id, a.interrupt_id, a.candidate_set_id, a.publication_id, a.run_type, a.status, a.failure_reason, a.result_revision_id, a.last_event_seq, a.min_available_seq, a.client_request_id, a.job_id, a.quota_period_start, a.created_at, a.started_at, a.completed_at, a.updated_at FROM procurement.agent_runs a
+SELECT a.id, a.buyer_id, a.request_id, a.conversation_id, a.interrupt_id, a.candidate_set_id, a.run_type, a.status, a.failure_reason, a.result_revision_id, a.last_event_seq, a.min_available_seq, a.client_request_id, a.job_id, a.quota_period_start, a.created_at, a.started_at, a.completed_at, a.updated_at FROM procurement.agent_runs a
 JOIN procurement.agent_run_interrupts i ON i.id = a.interrupt_id
 WHERE i.run_id = $1 AND a.status IN ('QUEUED', 'RUNNING')
 ORDER BY a.id
@@ -661,7 +656,6 @@ func (q *Queries) LockInProgressAnswerRuns(ctx context.Context, runID uuid.UUID)
 			&i.ConversationID,
 			&i.InterruptID,
 			&i.CandidateSetID,
-			&i.PublicationID,
 			&i.RunType,
 			&i.Status,
 			&i.FailureReason,
@@ -708,7 +702,7 @@ func (q *Queries) LockInterrupt(ctx context.Context, id uuid.UUID) (ProcurementA
 }
 
 const lockRun = `-- name: LockRun :one
-SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 FOR UPDATE
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRun, error) {
@@ -721,7 +715,6 @@ func (q *Queries) LockRun(ctx context.Context, id uuid.UUID) (ProcurementAgentRu
 		&i.ConversationID,
 		&i.InterruptID,
 		&i.CandidateSetID,
-		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,
@@ -846,7 +839,7 @@ SET status = $1,
     completed_at = CASE WHEN $4::boolean THEN $3::timestamptz ELSE completed_at END,
     updated_at = $3::timestamptz
 WHERE id = $5 AND status = ANY($6::text[])
-RETURNING id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at
+RETURNING id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at
 `
 
 type TransitionRunParams struct {
@@ -876,7 +869,6 @@ func (q *Queries) TransitionRun(ctx context.Context, arg TransitionRunParams) (P
 		&i.ConversationID,
 		&i.InterruptID,
 		&i.CandidateSetID,
-		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,

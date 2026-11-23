@@ -14,16 +14,10 @@ DELETE FROM procurement.candidate_sets WHERE buyer_id = @buyer_id;
 DELETE FROM procurement.buyer_shortlist_entries WHERE request_id IN (SELECT id FROM procurement.requests WHERE buyer_id = @buyer_id);
 
 -- name: DeleteUnpublishedBuyerRequests :execrows
--- 沒有發布過的需求整張刪除（連帶 revision、輪次、預覽、快照、核准，都是 ON DELETE CASCADE）。
+-- 沒有發布過的需求整張刪除（連帶 revision、輪次、核准，都是 ON DELETE CASCADE）。
 DELETE FROM procurement.requests r
 WHERE r.buyer_id = @buyer_id
   AND NOT EXISTS (SELECT 1 FROM procurement.rfq_publications p WHERE p.request_id = r.id);
-
--- name: AnonymizeBuyerPricePreviews :execrows
-UPDATE procurement.price_previews SET buyer_id = NULL WHERE buyer_id = @buyer_id;
-
--- name: AnonymizeBuyerSnapshots :execrows
-UPDATE procurement.confirmed_rfq_snapshots SET buyer_id = NULL WHERE buyer_id = @buyer_id;
 
 -- name: AnonymizeBuyerApprovals :execrows
 UPDATE procurement.rfq_publication_approvals SET buyer_id = NULL WHERE buyer_id = @buyer_id;

@@ -51,11 +51,11 @@ func (s Selector) Select(ctx context.Context, in SelectInput) error {
 		} else if err != nil {
 			return fmt.Errorf("search：讀取候選集：%w", err)
 		}
-		latest, err := q.GetLatestSucceededSearchSet(ctx, store.GetLatestSucceededSearchSetParams{RequestID: in.RequestID, BuyerID: in.BuyerID})
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("search：讀取最新的候選集：%w", err)
+		effective, err := IsEffective(ctx, q, req, in.BuyerID, in.CandidateSetID)
+		if err != nil {
+			return err
 		}
-		if req.Status != statusMatching || err != nil || *latest != in.CandidateSetID {
+		if !effective {
 			return apperr.VersionConflict("這個候選集已不是有效的候選集，請重新載入").WithMetadata("conflictTarget", "candidate_set")
 		}
 		n, err := q.SetCandidateSelected(ctx, store.SetCandidateSelectedParams{
@@ -69,4 +69,17 @@ func (s Selector) Select(ctx context.Context, in SelectInput) error {
 		}
 		return nil
 	})
+}
+
+// IsEffective 回傳 setID 是否是需求現行有效的候選集（A9-D29(4)）：需求在 MATCHING，而且它是最新一筆成功搜尋的候選集。
+// req 必須是呼叫端已鎖住的需求列，判斷才與搜尋的提交串行。
+func IsEffective(ctx context.Context, q *store.Queries, req store.ProcurementRequest, buyerID int64, setID uuid.UUID) (bool, error) {
+	latest, err := q.GetLatestSucceededSearchSet(ctx, store.GetLatestSucceededSearchSetParams{RequestID: req.ID, BuyerID: buyerID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("search：讀取最新的候選集：%w", err)
+	}
+	return req.Status == statusMatching && latest != nil && *latest == setID, nil
 }

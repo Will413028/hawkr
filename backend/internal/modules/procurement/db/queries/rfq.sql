@@ -1,41 +1,18 @@
--- name: InsertPricePreview :execrows
-INSERT INTO procurement.price_previews (
-    id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, basis_quantity, basis_unit,
-    total_lower_amount, total_upper_amount, total_quantity, total_unit, client_request_id, expires_at, created_at)
-VALUES (
-    @id, @buyer_id, @request_id, @request_revision_id, @range_lower_amount, @range_upper_amount, @basis_quantity, @basis_unit,
-    @total_lower_amount, @total_upper_amount, @total_quantity, @total_unit, @client_request_id, @expires_at, @now)
-ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
-
--- name: GetPricePreview :one
-SELECT * FROM procurement.price_previews WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
-
--- name: GetPricePreviewByClientRequest :one
-SELECT * FROM procurement.price_previews WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
-
--- name: InsertConfirmedSnapshot :execrows
-INSERT INTO procurement.confirmed_rfq_snapshots (
-    id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at)
-VALUES (@id, @buyer_id, @request_id, @request_revision_id, @price_preview_id, @buyer_note, @client_request_id, @expires_at, @now)
-ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
-
--- name: GetConfirmedSnapshot :one
-SELECT * FROM procurement.confirmed_rfq_snapshots WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
-
--- name: GetConfirmedSnapshotByClientRequest :one
-SELECT * FROM procurement.confirmed_rfq_snapshots WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
-
 -- name: InsertApproval :execrows
 INSERT INTO procurement.rfq_publication_approvals (
-    id, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, response_deadline, audience_mode,
-    audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
+    id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline,
+    audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
 VALUES (
-    @id, @buyer_id, @request_id, @request_revision_id, @confirmed_rfq_snapshot_id, @response_deadline, @audience_mode,
-    @audience_policy_id, @audience_policy_version, 'PENDING', @schema_version, @client_request_id, @now, @expires_at, @now, @now)
+    @id, @buyer_id, @request_id, @request_revision_id, @range_lower_amount, @range_upper_amount, @buyer_note, @candidate_set_id, @response_deadline,
+    @audience_mode, @audience_policy_id, @audience_policy_version, 'PENDING', @schema_version, @client_request_id, @now, @expires_at, @now, @now)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetApproval :one
 SELECT * FROM procurement.rfq_publication_approvals WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
+
+-- name: GetApprovalForBuyer :one
+-- 只依擁有者查（不收斂到需求）：核准屬於買家的另一張需求與核准不存在要分得開（前者是過時，後者是 NOT_FOUND）。
+SELECT * FROM procurement.rfq_publication_approvals WHERE id = @id AND buyer_id = @buyer_id;
 
 -- name: GetApprovalByClientRequest :one
 SELECT * FROM procurement.rfq_publication_approvals WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
@@ -65,8 +42,8 @@ ORDER BY r.position;
 
 -- name: InsertPublication :execrows
 INSERT INTO procurement.rfq_publications (
-    id, buyer_id, request_id, request_revision_id, approval_id, schema_version, client_request_id, published_at, created_at, updated_at)
-VALUES (@id, @buyer_id, @request_id, @request_revision_id, @approval_id, @schema_version, @client_request_id, @now, @now, @now)
+    id, buyer_id, request_id, request_revision_id, approval_id, approval_version, schema_version, client_request_id, published_at, created_at, updated_at)
+VALUES (@id, @buyer_id, @request_id, @request_revision_id, @approval_id, @approval_version, @schema_version, @client_request_id, @now, @now, @now)
 ON CONFLICT DO NOTHING;
 
 -- name: GetPublication :one
@@ -105,11 +82,11 @@ SELECT * FROM procurement.seller_responses WHERE publication_id = @publication_i
 -- 冪等鍵相同也回 0 列，呼叫端用 GetAcceptanceByClientRequest 區分。
 INSERT INTO procurement.buyer_quote_acceptances (
     id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash,
-    confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price,
+    seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price,
     client_request_id, accepted_at, created_at, updated_at)
 VALUES (
     @id, @buyer_id, @request_id, @publication_id, @seller_response_id, @seller_response_version, @seller_response_payload_hash,
-    @confirmed_rfq_payload_hash, @store_id, @currency, @goods_amount, @shipping_amount, @tax_amount, @accepted_deal_price,
+    @seller_facing_hash, @store_id, @currency, @goods_amount, @shipping_amount, @tax_amount, @accepted_deal_price,
     @client_request_id, @now, @now, @now)
 ON CONFLICT DO NOTHING;
 
@@ -131,21 +108,15 @@ UPDATE procurement.buyer_quote_acceptances
 SET state = 'ORDER_FAILED', order_provisioning_state = 'ORDER_FAILED', order_failure_reason = @reason, updated_at = @now
 WHERE id = @id AND order_provisioning_state = 'CREATING_ORDER';
 
--- name: GetLatestPricePreviewForRevision :one
--- 該版本最新、尚未過期的價格預覽；沒有回 ErrNoRows。
-SELECT * FROM procurement.price_previews
-WHERE request_id = @request_id AND request_revision_id = @request_revision_id AND buyer_id = @buyer_id AND expires_at > @now
-ORDER BY created_at DESC, id DESC LIMIT 1;
-
--- name: GetLatestConfirmedSnapshotByRequest :one
--- 需求最新的確認快照（不論對應哪一版）；沒有回 ErrNoRows。
-SELECT * FROM procurement.confirmed_rfq_snapshots
-WHERE request_id = @request_id AND buyer_id = @buyer_id
+-- name: GetLatestPendingApprovalByRequest :one
+-- 需求最新的、尚未過期的待執行核准（不論對應哪一版）；沒有回 ErrNoRows。planner 用它判斷詢價階段（A9-D35）。
+SELECT * FROM procurement.rfq_publication_approvals
+WHERE request_id = @request_id AND buyer_id = @buyer_id AND state = 'PENDING' AND expires_at > @now::timestamptz
 ORDER BY created_at DESC, id DESC LIMIT 1;
 
 -- name: GetLatestPublicationByRequest :one
--- 需求最新一次的發布，連同核准的快照 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0），以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
-SELECT p.id, p.version, p.published_at, p.schema_version, a.confirmed_rfq_snapshot_id,
+-- 需求最新一次的發布，連同核准的 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0），以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
+SELECT p.id, p.version, p.published_at, p.schema_version, a.id AS approval_id,
     (SELECT count(*) FROM procurement.rfq_publication_approval_recipients r WHERE r.approval_id = a.id)::int AS recipient_count,
     (SELECT count(*) FROM procurement.rfq_publication_invites i WHERE i.publication_id = p.id)::int AS queued_count
 FROM procurement.rfq_publications p

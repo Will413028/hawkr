@@ -76,13 +76,12 @@ type QuestionOption struct {
 	Label    string
 }
 
-// PublishedRfq 是需求最新一次的發布結果。RfqSnapshotHash 是確認快照的 hash，由 rfqhash 從不可變的列重算（A9-D31 Q5）。
+// PublishedRfq 是需求最新一次的發布結果。SellerFacingHash 是賣家實際收到的內容的 hash，由發布的核准與不可變的需求版本重算（A9-D35）。
 type PublishedRfq struct {
-	PublicationID          uuid.UUID
-	Version                int32
-	PublishTime            time.Time
-	RecipientCount         int32
-	QueuedCount            int32
-	ConfirmedRfqSnapshotID uuid.UUID
-	RfqSnapshotHash        string
+	PublicationID    uuid.UUID
+	Version          int32
+	PublishTime      time.Time
+	RecipientCount   int32
+	QueuedCount      int32
+	SellerFacingHash string
 }

@@ -8,11 +8,11 @@
 
 ## 擁有的資料
 
-schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `modules()`。23 張業務表：
+schema `procurement`（`db/schema.sql`），登記在 `cmd/hawkr/modules.go` 的 `modules()`。20 張業務表：
 
 - 需求：`requests`、`request_revisions`、`conversations`、`turns`。
 - 候選：`candidate_sets`、`candidates`。
-- 詢價：`price_previews`、`confirmed_rfq_snapshots`、`rfq_publication_approvals` 與 `_recipients`、`rfq_publications`、`_invites`。
+- 詢價：`rfq_publication_approvals` 與 `_recipients`、`rfq_publications`、`_invites`。
 - 賣家回價與接受：`seller_responses`、`seller_response_versions`、`_drafts`、`buyer_shortlist_entries`、`buyer_quote_acceptances`。
 - run：`agent_runs`、`_inputs`、`_events`、`_interrupts`。額度：`usage`。
 

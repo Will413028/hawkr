@@ -37,8 +37,6 @@ abstract class BuyerProcurementAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $4.RewindRequest request);
   $async.Future<$4.PreviewRfqPriceResponse> previewRfqPrice(
       $pb.ServerContext ctx, $4.PreviewRfqPriceRequest request);
-  $async.Future<$4.ConfirmRfqSnapshotResponse> confirmRfqSnapshot(
-      $pb.ServerContext ctx, $4.ConfirmRfqSnapshotRequest request);
   $async.Future<$4.PreviewRfqPublicationResponse> previewRfqPublication(
       $pb.ServerContext ctx, $4.PreviewRfqPublicationRequest request);
   $async.Future<$4.ExecuteRfqPublicationResponse> executeRfqPublication(
@@ -86,8 +84,6 @@ abstract class BuyerProcurementAppServiceBase extends $pb.GeneratedService {
         return $4.RewindRequest();
       case 'PreviewRfqPrice':
         return $4.PreviewRfqPriceRequest();
-      case 'ConfirmRfqSnapshot':
-        return $4.ConfirmRfqSnapshotRequest();
       case 'PreviewRfqPublication':
         return $4.PreviewRfqPublicationRequest();
       case 'ExecuteRfqPublication':
@@ -141,8 +137,6 @@ abstract class BuyerProcurementAppServiceBase extends $pb.GeneratedService {
         return rewind(ctx, request as $4.RewindRequest);
       case 'PreviewRfqPrice':
         return previewRfqPrice(ctx, request as $4.PreviewRfqPriceRequest);
-      case 'ConfirmRfqSnapshot':
-        return confirmRfqSnapshot(ctx, request as $4.ConfirmRfqSnapshotRequest);
       case 'PreviewRfqPublication':
         return previewRfqPublication(
             ctx, request as $4.PreviewRfqPublicationRequest);

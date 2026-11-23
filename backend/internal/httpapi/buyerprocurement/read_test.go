@@ -111,7 +111,7 @@ func TestGetSnapshotMapsEveryFieldAndRejectsUnspecified(t *testing.T) {
 		MissingRequired: []procurement.SlotKey{"UNIT"},
 		Runs:            []procurement.RunSummary{{RunID: ownedRun, RunType: "TURN", Status: "RUNNING", LastCursor: "2"}},
 		ActiveRunID:     &active,
-		PublishedRfq:    &procurement.PublishedRfq{PublicationID: ownedRun, Version: 1, PublishTime: now, ConfirmedRfqSnapshotID: ownedRun, RfqSnapshotHash: "abc"},
+		PublishedRfq:    &procurement.PublishedRfq{PublicationID: ownedRun, Version: 1, PublishTime: now, SellerFacingHash: "abc"},
 	}}
 	c := setup(t, m)
 	res, err := c.GetSnapshot(t.Context(), as(connect.NewRequest(&pb.GetSnapshotRequest{RequestId: ownedRun.String()}), accountID))
@@ -125,7 +125,7 @@ func TestGetSnapshotMapsEveryFieldAndRejectsUnspecified(t *testing.T) {
 		s.GetSlots().GetItemResolution().GetKind() != pb.ItemResolutionKind_ITEM_RESOLUTION_KIND_CATEGORY_CONFIRMED ||
 		len(s.GetMissingRequired()) != 1 || s.GetMissingRequired()[0] != pb.SlotKey_SLOT_KEY_UNIT ||
 		s.GetActiveRunId() != active.String() || s.GetRuns()[0].GetStatus() != pb.RunStatus_RUN_STATUS_RUNNING ||
-		s.GetPublishedRfq().GetRfqSnapshotHash() != "abc" || s.GetOpenConfirmation() != nil {
+		s.GetPublishedRfq().GetSellerFacingHash() != "abc" || s.GetOpenConfirmation() != nil {
 		t.Fatalf("快照 = %v", s)
 	}
 	m.requestSnapshot.Status = ""

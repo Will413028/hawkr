@@ -433,9 +433,9 @@ func ReplyAdjustedWarning(l uitext.Locale, a ReplyAdjustedWarningArgs) uitext.Me
 func ReplyApprovalComplete(l uitext.Locale) uitext.Message {
 	switch l {
 	case uitext.EN:
-		return uitext.Message{Text: "The RFQ snapshot is confirmed.", Locale: uitext.EN}
+		return uitext.Message{Text: "The request preview is ready.", Locale: uitext.EN}
 	}
-	return uitext.Message{Text: "RFQ 快照已經確認好了。", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "詢價預覽已經準備好了。", Locale: uitext.ZhTW}
 }
 
 // ReplyApprovalRationale 是模組句子 reply.approval.rationale；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
@@ -479,24 +479,6 @@ func ReplyCorrectionUpdated(l uitext.Locale, a ReplyCorrectionUpdatedArgs) uitex
 	return uitext.Message{Text: "已經幫你更新：" + a.Facts, Locale: uitext.ZhTW}
 }
 
-// ReplyPricePreviewContext 是模組句子 reply.price_preview.context；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func ReplyPricePreviewContext(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "A market reference price is available.", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "已經有市場參考價可以看了。", Locale: uitext.ZhTW}
-}
-
-// ReplyPricePreviewNext 是模組句子 reply.price_preview.next；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func ReplyPricePreviewNext(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Would you like to confirm the price range you want to ask for first?", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "要不要先確認一下希望詢價區間？", Locale: uitext.ZhTW}
-}
-
 // ReplyReconfirmNext 是模組句子 reply.reconfirm.next；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReplyReconfirmNext(l uitext.Locale) uitext.Message {
 	switch l {
@@ -510,9 +492,9 @@ func ReplyReconfirmNext(l uitext.Locale) uitext.Message {
 func ReplyReconfirmWarning(l uitext.Locale) uitext.Message {
 	switch l {
 	case uitext.EN:
-		return uitext.Message{Text: "Your request changed, so the RFQ snapshot you confirmed earlier is out of date.", Locale: uitext.EN}
+		return uitext.Message{Text: "Your request changed, so the earlier request preview is out of date.", Locale: uitext.EN}
 	}
-	return uitext.Message{Text: "需求內容有更新，之前確認的 RFQ 快照已經過期。", Locale: uitext.ZhTW}
+	return uitext.Message{Text: "需求內容有更新，之前的詢價預覽已經過期。", Locale: uitext.ZhTW}
 }
 
 // ReplyRejectedNext 是模組句子 reply.rejected.next；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

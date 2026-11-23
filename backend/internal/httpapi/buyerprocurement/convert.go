@@ -184,8 +184,7 @@ func publishedToProto(p *procurement.PublishedRfq) *pb.PublishedRfq {
 	}
 	return &pb.PublishedRfq{
 		PublicationId: p.PublicationID.String(), Version: fmt.Sprint(p.Version), PublishTime: timestamppb.New(p.PublishTime),
-		RecipientCount: p.RecipientCount, QueuedCount: p.QueuedCount, ConfirmedRfqSnapshotId: p.ConfirmedRfqSnapshotID.String(),
-		RfqSnapshotHash: p.RfqSnapshotHash,
+		RecipientCount: p.RecipientCount, QueuedCount: p.QueuedCount, SellerFacingHash: p.SellerFacingHash,
 	}
 }
 

@@ -223,18 +223,17 @@ func TestDecideParity(t *testing.T) {
 			Next: ready(), Recorded: rec(slots.Item, apple)}, RequestBasicsReady},
 		{"ready with a follow-up question", Input{Next: ready(), Question: opt}, AckAndAskOptional},
 		{"ready, nothing to ask", Input{Next: ready()}, RequestBasicsReady},
-		{"price preview available", Input{Next: ready(), PricePreviewAvailable: true}, PricePreviewAvailable},
-		{"rfq stale", Input{Next: ready(), PricePreviewAvailable: true, Rfq: RfqStale}, RfqReconfirmRequired},
-		{"rfq confirmed selects approval, not a separate confirmed act", Input{Next: ready(), PricePreviewAvailable: true, Rfq: RfqConfirmed}, PublicationApprovalRequired},
+		{"rfq stale", Input{Next: ready(), Rfq: RfqStale}, RfqReconfirmRequired},
+		{"rfq confirmed selects approval, not a separate confirmed act", Input{Next: ready(), Rfq: RfqConfirmed}, PublicationApprovalRequired},
 		{"correction beats not-ready", Input{
 			Current: slots.Set{Item: &apple}, Next: withItem(slots.Set{Item: &apple}, &fuji), Recorded: rec(slots.Item, fuji)}, CorrectionApplied},
-		{"question beats price preview", Input{Next: ready(), PricePreviewAvailable: true, Question: opt}, AckAndAskOptional},
+		{"question beats nothing to ask", Input{Next: ready(), Question: opt}, AckAndAskOptional},
 		{"disambiguation beats not-ready", Input{Next: slots.Set{}, Question: disamb}, ItemNeedsDisambiguation},
 		{"rejected beats disambiguation", Input{Rejected: []slots.Rejection{{Key: slots.Unit}}, Question: disamb}, InputRejected},
 		{"corrected beats disambiguation", Input{Current: slots.Set{Item: &apple}, Next: ready(), Recorded: rec(slots.Item, "蘋果"), Question: disamb}, CorrectionApplied},
 		{"disambiguation with a ready request", Input{Next: ready(), Question: disamb}, ItemNeedsDisambiguation},
 		{"stale rfq beats an optional question", Input{Next: ready(), Rfq: RfqStale, Question: opt}, RfqReconfirmRequired},
-		{"confirmed rfq beats price preview", Input{Next: ready(), Rfq: RfqConfirmed, PricePreviewAvailable: true}, PublicationApprovalRequired},
+		{"confirmed rfq beats an optional question", Input{Next: ready(), Rfq: RfqConfirmed, Question: opt}, PublicationApprovalRequired},
 	}
 	reached := map[Act]bool{}
 	for _, c := range cases {
