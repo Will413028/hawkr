@@ -228,3 +228,71 @@ func TestNilLoggerIsSilent(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestQueryStringIsRedactedByKey(t *testing.T) {
+	logs := roundTrip(t, "GET", "/v1/x?email=plain-mail-value&client_secret=plain-cs-value&limit=3", "", "", 200, `{}`)
+	mustNotContain(t, logs, "plain-mail-value", "plain-cs-value")
+	mustContain(t, logs, "limit=3")
+}
+
+func TestAttestationContainerAndIPFieldsAreRedacted(t *testing.T) {
+	logs := roundTrip(t, "POST", "/v2/core/accounts/acct_1", "application/json",
+		`{"identity":{"attestations":{"terms_of_service":{"account":{"ip":"plain-ip-value","user_agent":"plain-ua-value","date":"plain-date-value"}}}}}`,
+		200, `{"x":{"ip":"plain-ip-resp","user_agent":"plain-ua-resp"}}`)
+	mustNotContain(t, logs, "plain-ip-value", "plain-ua-value", "plain-date-value", "plain-ip-resp", "plain-ua-resp")
+}
+
+func TestJSONObjectKeysAreScrubbed(t *testing.T) {
+	logs := roundTrip(t, "POST", "/v1/x", "application/json", `{"owner@example.com":"v","sk_test_KEYASNAME":"v"}`, 200, `{}`)
+	mustNotContain(t, logs, "owner@example.com", "sk_test_KEYASNAME")
+}
+
+func TestRequestWithoutGetBodyIsSentIntactAndBodyIsNotLogged(t *testing.T) {
+	lg, buf := capture()
+	var sent []byte
+	hc := &http.Client{Transport: recorder{next: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		sent, _ = io.ReadAll(r.Body)
+		return &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("{}"))}, nil
+	}), log: lg}}
+	req, _ := http.NewRequestWithContext(context.Background(), "POST", "http://stripe.invalid/v1/x", io.NopCloser(strings.NewReader("note=plain-note-value")))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if req.GetBody != nil {
+		t.Fatal("測試前提：GetBody 應為 nil")
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if string(sent) != "note=plain-note-value" {
+		t.Fatalf("送出的本文被改動：%q", sent)
+	}
+	mustContain(t, buf.String(), "request_body=[unavailable]")
+	mustNotContain(t, buf.String(), "plain-note-value")
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) { return 0, errors.New("boom sk_test_READFAIL") }
+
+func TestResponseReadFailureAndOversizeAreLogged(t *testing.T) {
+	for name, body := range map[string]io.Reader{
+		"read-error": failingReader{},
+		"oversize":   strings.NewReader(strings.Repeat("a", maxResponseBytes+1)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			lg, buf := capture()
+			hc := &http.Client{Transport: recorder{next: roundTripFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 502, Header: http.Header{}, Body: io.NopCloser(body)}, nil
+			}), log: lg}}
+			req, _ := http.NewRequestWithContext(context.Background(), "GET", "http://stripe.invalid/v1/x", nil)
+			req.Header.Set("Idempotency-Key", "idem-rf")
+			if resp, err := hc.Do(req); err == nil {
+				_ = resp.Body.Close()
+				t.Fatal("預期錯誤")
+			}
+			mustContain(t, buf.String(), "stripe response unreadable", "status=502", "method=GET", "idempotency_key=idem-rf")
+			mustNotContain(t, buf.String(), "sk_test_READFAIL")
+		})
+	}
+}

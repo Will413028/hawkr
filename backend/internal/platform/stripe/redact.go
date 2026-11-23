@@ -67,12 +67,15 @@ var (
 		"person",
 		"billing_details",
 		"shipping",
+		"attestations",
 	}
 	identityKeys = []string{
 		"dob",
 		"id_number",
 		"ssn_last_4",
 		"tax_id",
+		"ip",
+		"user_agent",
 	}
 	// 名稱以這些結尾的欄位一律遮（client_secret、contact_email、receipt_email、first_name、given_name 等），所以這些全名不必再列在上面。
 	sensitiveSuffixes = []string{
@@ -159,7 +162,7 @@ func redactValue(v any) any {
 				out[k] = redacted
 				continue
 			}
-			out[k] = redactValue(val)
+			out[scrub(k)] = redactValue(val)
 		}
 		return out
 	case []any:

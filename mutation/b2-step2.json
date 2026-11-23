@@ -463,8 +463,8 @@
    "id": "json-no-object-recursion",
    "stack": "go",
    "file": "backend/internal/platform/stripe/redact.go",
-   "old": "out[k] = redactValue(val)\n\t\t}\n\t\treturn out\n\tcase []any:",
-   "new": "out[k] = val\n\t\t}\n\t\treturn out\n\tcase []any:",
+   "old": "out[scrub(k)] = redactValue(val)\n\t\t}\n\t\treturn out\n\tcase []any:",
+   "new": "out[scrub(k)] = val\n\t\t}\n\t\treturn out\n\tcase []any:",
    "test": "internal/platform/stripe ^TestUnknownFieldsInsideAPIIdentityContainerAreRedactedWithoutBeingListed$",
    "why": "JSON 遮罩不遞迴進物件，巢狀值不被遮。"
   },
@@ -508,10 +508,109 @@
    "id": "error-message-unscrubbed",
    "stack": "go",
    "file": "backend/internal/platform/stripe/client.go",
-   "old": "slog.String(\"error\", scrub(err.Error()))",
-   "new": "slog.String(\"error\", err.Error())",
+   "old": "slog.String(\"error\", scrub(err.Error())))...)\n\t\treturn nil, err",
+   "new": "slog.String(\"error\", err.Error()))...)\n\t\treturn nil, err",
    "test": "internal/platform/stripe ^TestTransportErrorsAreLoggedWithoutLeakingTheRequestBody$",
    "why": "傳輸錯誤訊息不經值比對就記錄。"
+  },
+  {
+   "id": "key-ip",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"ip\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^ip$",
+   "why": "redact.go 的 identity 遮罩表拿掉 ip，表單與 JSON 的 ip 值會進記錄。"
+  },
+  {
+   "id": "key-user_agent",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"user_agent\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^user_agent$",
+   "why": "redact.go 的 identity 遮罩表拿掉 user_agent，值會進記錄。"
+  },
+  {
+   "id": "key-attestations",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"attestations\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^attestations$",
+   "why": "個資容器表拿掉 attestations，聲明底下的欄位會進記錄。"
+  },
+  {
+   "id": "attestations-ip-ua-unredacted",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"ip\",\n\t\t\"user_agent\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$",
+   "why": "ip 與 user_agent 同時拿掉。"
+  },
+  {
+   "id": "json-keys-unscrubbed",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "out[scrub(k)] = redactValue(val)",
+   "new": "out[k] = redactValue(val)",
+   "test": "internal/platform/stripe ^TestJSONObjectKeysAreScrubbed$",
+   "why": "JSON 物件鍵不經值比對，信箱或密鑰當鍵名時進記錄。"
+  },
+  {
+   "id": "query-unredacted",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "redactForm(req.URL.RawQuery)",
+   "new": "req.URL.RawQuery",
+   "test": "internal/platform/stripe ^TestQueryStringIsRedactedByKey$",
+   "why": "查詢字串原樣記錄，email 與 client_secret 參數進 log。"
+  },
+  {
+   "id": "no-getbody-marker-dropped",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "} else if body == nil && req.Body != nil && req.Body != http.NoBody && req.GetBody == nil {",
+   "new": "} else if false {",
+   "test": "internal/platform/stripe ^TestRequestWithoutGetBodyIsSentIntactAndBodyIsNotLogged$",
+   "why": "沒有 GetBody 時不再標示本文不可用。"
+  },
+  {
+   "id": "no-getbody-body-consumed",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\treturn nil\n}\n\n// call",
+   "new": "\tb, _ := io.ReadAll(req.Body)\n\treq.Body = io.NopCloser(strings.NewReader(\"\"))\n\treturn b\n}\n\n// call",
+   "test": "internal/platform/stripe ^TestRequestWithoutGetBodyIsSentIntactAndBodyIsNotLogged$",
+   "why": "沒有 GetBody 時仍讀走 req.Body，送出的請求本文被改動。"
+  },
+  {
+   "id": "read-failure-unlogged",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\t\tr.logReadFailure(req, reqBody, start, resp.StatusCode, err)\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestResponseReadFailureAndOversizeAreLogged$/^read-error$",
+   "why": "回應讀取失敗時不寫記錄。"
+  },
+  {
+   "id": "oversize-unlogged",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\t\tr.logReadFailure(req, reqBody, start, resp.StatusCode, errors.New(\"response too large\"))\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestResponseReadFailureAndOversizeAreLogged$/^oversize$",
+   "why": "回應過大時不寫記錄。"
+  },
+  {
+   "id": "read-failure-error-unscrubbed",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "slog.String(\"error\", scrub(err.Error())))...)\n}\n\nfunc (r recorder) requestAttrs",
+   "new": "slog.String(\"error\", err.Error()))...)\n}\n\nfunc (r recorder) requestAttrs",
+   "test": "internal/platform/stripe ^TestResponseReadFailureAndOversizeAreLogged$/^read-error$",
+   "why": "讀取失敗的錯誤訊息不經值比對。"
   }
  ]
 }

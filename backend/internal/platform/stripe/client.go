@@ -223,9 +223,11 @@ func (r recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	_ = resp.Body.Close()
 	if err != nil {
+		r.logReadFailure(req, reqBody, start, resp.StatusCode, err)
 		return nil, fmt.Errorf("stripe：讀回應失敗：%w", err)
 	}
 	if len(data) > maxResponseBytes {
+		r.logReadFailure(req, reqBody, start, resp.StatusCode, errors.New("response too large"))
 		return nil, fmt.Errorf("stripe：回應超過 %d bytes", maxResponseBytes)
 	}
 	resp.Body = io.NopCloser(bytes.NewReader(data))
@@ -247,6 +249,11 @@ func (r recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
+func (r recorder) logReadFailure(req *http.Request, reqBody []byte, start time.Time, status int, err error) {
+	r.log.LogAttrs(req.Context(), slog.LevelWarn, "stripe response unreadable", append(r.requestAttrs(req, reqBody, start),
+		slog.Int("status", status), slog.String("error", scrub(err.Error())))...)
+}
+
 func (r recorder) requestAttrs(req *http.Request, body []byte, start time.Time) []slog.Attr {
 	attrs := []slog.Attr{
 		slog.String("method", req.Method),
@@ -259,11 +266,13 @@ func (r recorder) requestAttrs(req *http.Request, body []byte, start time.Time) 
 	}
 	if b := redactBody(req.Header.Get("Content-Type"), body); b != "" {
 		attrs = append(attrs, slog.String("request_body", b))
+	} else if body == nil && req.Body != nil && req.Body != http.NoBody && req.GetBody == nil {
+		attrs = append(attrs, slog.String("request_body", "[unavailable]"))
 	}
 	return attrs
 }
 
-// requestBody 取出請求本文供記錄，並確保傳輸層仍讀得到完整本文。
+// requestBody 經 GetBody 取一份副本供記錄（上限 maxResponseBytes），不動到 req.Body；沒有 GetBody 就不記本文，避免為了記錄改動要送出的請求。
 func requestBody(req *http.Request) []byte {
 	if req.Body == nil || req.Body == http.NoBody {
 		return nil
@@ -277,13 +286,7 @@ func requestBody(req *http.Request) []byte {
 		b, _ := io.ReadAll(io.LimitReader(rc, maxResponseBytes))
 		return b
 	}
-	b, err := io.ReadAll(req.Body)
-	_ = req.Body.Close()
-	req.Body = io.NopCloser(bytes.NewReader(b))
-	if err != nil {
-		return nil
-	}
-	return b
+	return nil
 }
 
 // call 在總上限 timeout 內執行一次 SDK 呼叫：429 依 Retry-After（沒有就指數退避）等待後重送，最多 maxAttempts 次；
