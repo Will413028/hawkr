@@ -13,8 +13,8 @@
       "id": "chunk-no-max-bytes-reader",
       "stack": "go",
       "file": "backend/internal/httpapi/media/secure_files.go",
-      "old": "body := http.MaxBytesReader(w, r.Body, media.SecureChunkSize)",
-      "new": "body := r.Body",
+      "old": "body := &originReader{r: http.MaxBytesReader(w, r.Body, media.SecureChunkSize)}",
+      "new": "body := &originReader{r: r.Body}",
       "test": "internal/httpapi/media ^TestChunkOverSegmentSizeIsRejected$",
       "why": "拿掉段大小的 body 上限：超過段大小的請求被模組整份讀完，不回 413"
     },
