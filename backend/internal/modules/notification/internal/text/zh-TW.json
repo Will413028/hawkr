@@ -1,0 +1,33 @@
+{
+  "default": {
+    "account_suspended.body": {
+      "message": "你的帳號已於 {time} 因「{reason}」被停權，部分功能受到限制。",
+      "params": {
+        "reason": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "收件匣與推播的內文：帳號被停權（account_suspended 型別）。time 是停權時間（台北時間，到分鐘），reason 是政策分類的顯示文字。"
+    },
+    "account_suspended.title": {
+      "message": "帳號已被停權",
+      "description": "收件匣與推播的標題：帳號被停權（account_suspended 型別）。"
+    },
+    "account_unsuspended.body": {
+      "message": "你的帳號已於 {time} 解除停權，可以正常使用。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "收件匣與推播的內文：帳號解除停權（account_unsuspended 型別）。time 是解除時間（台北時間，到分鐘）。"
+    },
+    "account_unsuspended.title": {
+      "message": "帳號已解除停權",
+      "description": "收件匣與推播的標題：帳號解除停權（account_unsuspended 型別）。"
+    }
+  }
+}
