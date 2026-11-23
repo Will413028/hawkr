@@ -45,7 +45,7 @@ INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
 SELECT u.id, 'CONFIRMED', u.asset_id, $1
 FROM media.staged_uploads AS u
 WHERE u.id = $2 AND u.state = 'READY' AND u.expires_at > $1
-ON CONFLICT (upload_id) DO NOTHING
+ON CONFLICT DO NOTHING
 RETURNING asset_id
 `
 
@@ -55,7 +55,7 @@ type ClaimUploadParams struct {
 }
 
 // 擁有者確認（B1-D25）：READY 且未過期的暫存列認領為 CONFIRMED，只新增一列、不更新任何既有列。與 GC 的 ReclaimUpload 搶同一個唯一鍵 upload_id，
-// 輸的一方沒有列（pgx.ErrNoRows）；同一個鍵被另一個還沒提交的 transaction 插入時會等它結束。回傳認領的資產 ID。
+// 輸的一方沒有列（pgx.ErrNoRows）；ON CONFLICT 不指定目標：upload_id 與 asset_id 兩個唯一鍵都要吸收，並行確認同一個 token 才不會撞 upload_claims_asset_key 而回 23505；同一個鍵被另一個還沒提交的 transaction 插入時會等它結束。回傳認領的資產 ID。
 func (q *Queries) ClaimUpload(ctx context.Context, arg ClaimUploadParams) (*uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, claimUpload, arg.Now, arg.ID)
 	var asset_id *uuid.UUID
@@ -662,7 +662,7 @@ FROM media.staged_uploads AS u
 WHERE u.id = $2
   AND ((u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= $1)
     OR (u.state = 'UPLOADED' AND u.expires_at <= $3))
-ON CONFLICT (upload_id) DO NOTHING
+ON CONFLICT DO NOTHING
 RETURNING upload_id
 `
 

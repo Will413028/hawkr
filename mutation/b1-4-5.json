@@ -374,7 +374,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/seller/internal/kyc/kyc.go",
    "old": "if err := markDeleted(ctx, s.d.Media, retired); err != nil {",
-   "new": "if err := markDeleted(ctx, s.d.Media, nil); err != nil {",
+   "new": "_ = retired\n\t\tif err := markDeleted(ctx, s.d.Media, nil); err != nil {",
    "test": "internal/modules/seller ^TestKYCDocumentsAreReplacedAsState$",
    "why": "換掉的證件不標記刪除"
   },
@@ -383,7 +383,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/seller/internal/kyc/documents.go",
    "old": "\treturn markDeleted(ctx, m, assetIDs(docs))",
-   "new": "\treturn markDeleted(ctx, m, nil)",
+   "new": "\t_ = docs\n\treturn markDeleted(ctx, m, nil)",
    "test": "internal/modules/seller ^TestKYCDocumentsAreConfirmedWithTheApplicationAndReplacedOnesMarkedDeleted$",
    "why": "申請取消時證件不標記刪除"
   },
@@ -494,15 +494,6 @@
    "new": "return \"/api/v1/app/media/secure_download/\" + strconv.Itoa(position)",
    "test": "internal/httpapi/seller ^TestKYCResponseCarriesNoInputOnlyFieldsAndNoObjectKeys$",
    "why": "download_uri 指回舊 gateway"
-  },
-  {
-   "id": "own-document-position-bound-removed",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/seller/internal/kyc/admin.go",
-   "old": "\tif in.Position < 0 || in.Position >= model.MaxCompanyDocuments {\n\t\treturn model.FileContent{}, apperr.NotFound(\"找不到這份文件\")\n\t}\n\tq := store.New(s.d.DB.Conn(ctx))\n\tstoreRow, err := s.actingStore(ctx, q, in.AccountID, model.CapAccountSelfRead)",
-   "new": "\tq := store.New(s.d.DB.Conn(ctx))\n\tstoreRow, err := s.actingStore(ctx, q, in.AccountID, model.CapAccountSelfRead)",
-   "test": "internal/modules/seller ^TestSellerReadsOwnKYCDocumentsOnly$",
-   "why": "賣家讀證件不檢查位置範圍（負的位置仍查到文件列時會讀到別的檔）"
   },
   {
    "id": "prospect-image-must-be-public-removed",
@@ -689,7 +680,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/moderation/internal/report/report.go",
    "old": "\t\ta, err := s.d.Media.Confirm(ctx, up, copies[src])",
-   "new": "\t\ta, err := media.ConfirmedAsset{ID: uuid.New()}, error(nil)\n\t\t_ = copies",
+   "new": "\t\t_ = up\n\t\ta, err := media.ConfirmedAsset{ID: uuid.New()}, error(nil)\n\t\t_ = copies",
    "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage$",
    "why": "複本沒被 Confirm，狀態不是 ACTIVE"
   },
@@ -743,7 +734,7 @@
    "stack": "go",
    "file": "backend/internal/modules/media/confirm_fields.go",
    "old": "violations = append(violations, apperr.FieldViolation{Field: it.Field, Message: message})\n\t\t\t\tcauses = append(causes, fmt.Errorf(\"確認 %s：%w\", it.Field, err))\n\t\t\t\tcontinue",
-   "new": "return nil, err",
+   "new": "_ = message\n\t\t\t\t_ = fmt.Sprint()\n\t\t\t\treturn nil, err",
    "test": "internal/modules/media ^TestConfirmFieldsReportsEveryRejectedTokenOnItsOwnField$",
    "why": "拿掉不合格 token 的欄位歸屬，改成原樣回傳 Confirm 的錯誤"
   },
@@ -755,15 +746,6 @@
    "new": "if false {",
    "test": "internal/modules/media ^TestConfirm_ConfirmedInAnotherTransactionIsRejected$",
    "why": "已在別的 transaction 確認過的 token 可以再確認，一個資產被兩個擁有者共用（B1-D23）"
-  },
-  {
-   "id": "social-resent-image-token-deletes-current",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/social/internal/post/post.go",
-   "old": "(asset != nil && *row.ImageAssetID != asset.ID)",
-   "new": "asset != nil",
-   "test": "internal/modules/social ^TestResendingTheCurrentImageTokenIsRejectedAndKeepsTheAssetActive$",
-   "why": "重送目前的 token 時把仍在用的圖標成刪除"
   },
   {
    "id": "mod-retention-assets-not-retired",

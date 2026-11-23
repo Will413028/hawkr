@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"uuid"
@@ -57,13 +58,30 @@ func (queue *queue) Enqueue(ctx context.Context, first river.JobArgs, opts *rive
 	return nil
 }
 
+type markDeletedFailer struct {
+	*media.Module
+	fail *atomic.Bool
+}
+
+func (m *markDeletedFailer) MarkDeleted(ctx context.Context, ids []uuid.UUID) error {
+	if err := m.Module.MarkDeleted(ctx, ids); err != nil {
+		return err
+	}
+	if m.fail.Load() {
+		return errors.New("mark deleted failed after insert")
+	}
+	return nil
+}
+
 type fixture struct {
 	database *db.DB
 	module   *Module
 	bus      *events.Bus
 	jobs     *queue
-	media    *media.Module
-	now      time.Time
+	// failMarkDeleted 讓 MarkDeleted 在真的寫入請求之後回錯，模擬同一個 transaction 的後段失敗（B1-D25：MarkDeleted 只 INSERT，不排 job）。
+	failMarkDeleted atomic.Bool
+	media           *media.Module
+	now             time.Time
 }
 
 func setup(t *testing.T) *fixture {
@@ -87,7 +105,7 @@ func setup(t *testing.T) *fixture {
 	fixture.module = New(Deps{
 		DB:             database,
 		Events:         fixture.bus,
-		Media:          fixture.media,
+		Media:          &markDeletedFailer{Module: fixture.media, fail: &fixture.failMarkDeleted},
 		Now:            func() time.Time { return fixture.now },
 		NicknameNumber: func() int { return 42 },
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),

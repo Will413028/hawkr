@@ -150,6 +150,13 @@ func TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage(t *testing.T) {
 	if len(owned) != 1 || owned[0] == source {
 		t.Fatalf("快照要擁有一份不同於來源的複本：來源 %v，快照的圖片 %v", source, owned)
 	}
+	var content string
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT content::text FROM moderation.case_snapshots WHERE id = $1", snap).Scan(&content); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(content, owned[0].String()) || strings.Contains(content, source.String()) {
+		t.Fatalf("快照內容的圖片參照要換成複本 %v、不留來源 %v：%s", owned[0], source, content)
+	}
 	if st := f.assetState(t, owned[0]); st != "ACTIVE" {
 		t.Fatalf("複本在送出的 transaction 內確認，狀態 %s，預期 ACTIVE", st)
 	}

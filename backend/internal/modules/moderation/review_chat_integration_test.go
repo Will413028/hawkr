@@ -27,6 +27,9 @@ import (
 const reverseAction = "/test/ReverseHide"
 
 // reviewBy 讓買家對店家寫一則評價（訂單由替身提供，已完成一天）。
+// ctxAsset 是 seedChat 的圖片訊息引用的資產（UUID）。
+const ctxAsset = "01a20787-39c1-7c33-a3c2-ae797cae0a54"
+
 func (f *fixture) reviewBy(t *testing.T, b buyer.Profile, storeID int64, rating int, content string, tokens ...string) review.Review {
 	t.Helper()
 	n := f.next() + 1000
@@ -54,7 +57,7 @@ func (f *fixture) buyerProfile(t *testing.T) buyer.Profile {
 	return p
 }
 
-// seedChat 直接寫一個對話與 n 則訊息（seq 1..n，單數是買家寄、雙數是店家寄，文字是 m<seq>）；imageSeq 大於 0 的那一則改成圖片訊息（資產 ctx-asset）。
+// seedChat 直接寫一個對話與 n 則訊息（seq 1..n，單數是買家寄、雙數是店家寄，文字是 m<seq>）；imageSeq 大於 0 的那一則改成圖片訊息（資產 ctxAsset）。
 func (f *fixture) seedChat(t *testing.T, buyerID, storeID int64, n, imageSeq int) (conv uuid.UUID, ids map[int64]uuid.UUID) {
 	t.Helper()
 	conv = uuid.NewV7()
@@ -72,7 +75,7 @@ func (f *fixture) seedChat(t *testing.T, buyerID, storeID int64, n, imageSeq int
 		at := base.Add(time.Duration(seq) * time.Second)
 		if seq == int64(imageSeq) {
 			f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, image_asset_id, image_object_key, created_at)
-				VALUES ($1, $2, $3, $4, 'IMAGE', 'ctx-asset', 'chat/ctx.jpg', $5)`, id, conv, seq, kind, at)
+				VALUES ($1, $2, $3, $4, 'IMAGE', '01a20787-39c1-7c33-a3c2-ae797cae0a54', 'chat/ctx.jpg', $5)`, id, conv, seq, kind, at)
 			continue
 		}
 		f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at) VALUES ($1, $2, $3, $4, 'TEXT', $5, $6)`,
@@ -140,7 +143,7 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 	storeID, _ := f.exposableStore(t)
 	author := f.buyerProfile(t)
 	reporter, _ := f.newBuyer(t)
-	r := f.reviewBy(t, author, storeID, 2, "不好吃", "p1")
+	r := f.reviewBy(t, author, storeID, 2, "不好吃", f.stage(t))
 	if len(r.Images) != 1 {
 		t.Fatalf("評價要有一張圖：%+v", r.Images)
 	}
@@ -306,7 +309,7 @@ func TestChatReportFreezesFiveBeforeAndAfterWithTombstones(t *testing.T) {
 				t.Fatalf("被隱藏的前文要是墓碑：%+v", m)
 			}
 		case 9:
-			if m.Type != "IMAGE" || len(m.MediaRefs) != 1 || m.MediaRefs[0] != "ctx-asset" {
+			if m.Type != "IMAGE" || len(m.MediaRefs) != 1 || m.MediaRefs[0] != ctxAsset {
 				t.Fatalf("圖片訊息：%+v", m)
 			}
 		default:
@@ -325,7 +328,7 @@ func TestChatReportFreezesFiveBeforeAndAfterWithTombstones(t *testing.T) {
 	if strings.Contains(raw, `"m3"`) {
 		t.Fatal("被隱藏的訊息內容不得寫進證據快照")
 	}
-	if n := f.count(t, "SELECT count(*) FROM moderation.case_snapshots WHERE case_id = $1 AND 'ctx-asset' = ANY(asset_ids)", res.Case.ID); n != 1 {
+	if n := f.count(t, "SELECT count(*) FROM moderation.case_snapshots WHERE case_id = $1 AND '01a20787-39c1-7c33-a3c2-ae797cae0a54' = ANY(asset_ids)", res.Case.ID); n != 1 {
 		t.Fatal("前後文的圖片也要被證據保全")
 	}
 

@@ -674,7 +674,7 @@ func TestBannerScheduleCheckMatchesTheGoRule(t *testing.T) {
 		}
 		_, err := f.db.Pool().Exec(context.Background(),
 			`INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, preview_image_asset_id, popup_image_asset_id, action_type, start_date, end_date)
-			 VALUES ($1, '排程', 'k', 'k', 'a', 'a', 'POPUP', $2, $3)`, uuid.NewV7(), start, end)
+			 VALUES ($1, '排程', 'k', 'k', $4, $4, 'POPUP', $2, $3)`, uuid.NewV7(), start, end, uuid.NewV7())
 		if err != nil && !strings.Contains(err.Error(), "banners_schedule_check") {
 			t.Fatalf("結束減開始 = %v：%v", end.Sub(start), err)
 		}
@@ -698,7 +698,7 @@ func TestBannerPostTargetMustBeCanonicalInTheDatabase(t *testing.T) {
 	} {
 		_, err := f.db.Pool().Exec(context.Background(),
 			`INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, preview_image_asset_id, popup_image_asset_id, action_type, action_target)
-			 VALUES ($1, '貼文', 'k', 'k', 'a', 'a', 'POST', $2)`, uuid.NewV7(), target)
+			 VALUES ($1, '貼文', 'k', 'k', $3, $3, 'POST', $2)`, uuid.NewV7(), target, uuid.NewV7())
 		if wantOK && err != nil {
 			t.Errorf("標準形式 %q 被拒絕：%v", target, err)
 		}

@@ -282,12 +282,12 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 		t.Fatalf("accesses=%d", n)
 	}
 
-	// 有權限的管理員直接讀得到（不需要先顯示全文）；圖片的標頭固定；寫一列紀錄。
+	// 有權限的管理員直接讀得到（不需要先顯示全文）；標頭固定（內容是 PDF，型別由 media 依內容判定）；寫一列紀錄。
 	code, header, body := f.documentGET(t, f.adminToken, doc(app, "0"))
 	if code != 200 || body != "%PDF-1.4 doc0-bytes" {
 		t.Fatalf("code=%d body=%q", code, body)
 	}
-	for k, v := range map[string]string{"Content-Type": "image/jpeg", "Cache-Control": "private, no-store", "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff"} {
+	for k, v := range map[string]string{"Content-Type": "application/pdf", "Cache-Control": "private, no-store", "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff"} {
 		if header.Get(k) != v {
 			t.Fatalf("%s = %q，要 %q", k, header.Get(k), v)
 		}

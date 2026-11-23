@@ -880,6 +880,23 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 			t.Fatal("Confirm 持有未提交的認領期間 GC 動到這一列")
 		}
 	})
+
+	t.Run("a READY upload that already carries a RECLAIMED claim reports expired, not already used", func(t *testing.T) {
+		res := ready(t, f, owner)
+		_, _, asset := uploadKeys(t, f, res.ID)
+		if _, err := f.d.Pool().Exec(t.Context(),
+			`INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at) VALUES ($1, 'RECLAIMED', $2, now())`, res.ID, asset); err != nil {
+			t.Fatal(err)
+		}
+		err := f.d.InTx(t.Context(), func(ctx context.Context) error {
+			_, err := confirmer.Confirm(ctx, owner, res.Token)
+			return err
+		})
+		wantKind(t, err, apperr.KindFailedPrecondition)
+		if errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+			t.Fatal("RECLAIMED 認領該回「已過期」，不是「已在別的 transaction 確認」")
+		}
+	})
 }
 
 // ==================== GetUpload ====================

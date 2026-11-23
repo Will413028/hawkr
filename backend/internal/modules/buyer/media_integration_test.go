@@ -83,7 +83,7 @@ func TestFirstAvatarMarksNothingDeleted(t *testing.T) {
 	}
 }
 
-// 寫入回滾：換圖在 MarkDeleted 排 job 失敗而整筆回滾時，新資產仍是暫存、舊資產仍有效、業務列不變。
+// 寫入回滾：換圖在 MarkDeleted 寫入請求後失敗而整筆回滾時，新資產仍是暫存、舊資產仍有效、業務列不變。
 func TestRolledBackAvatarWriteLeavesTheNewAssetStaged(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -93,11 +93,11 @@ func TestRolledBackAvatarWriteLeavesTheNewAssetStaged(t *testing.T) {
 	must(t, err)
 	secondToken, second := stageAvatar(t, f, p.AccountID)
 
-	f.jobs.fail = true
+	f.failMarkDeleted.Store(true)
 	if _, err := setAvatar(t, f, cur, secondToken); err == nil {
-		t.Fatal("排 job 失敗應讓換圖回滾")
+		t.Fatal("MarkDeleted 失敗應讓換圖回滾")
 	}
-	f.jobs.fail = false
+	f.failMarkDeleted.Store(false)
 
 	if got := assetState(t, f, second); got != "STAGED" {
 		t.Fatalf("回滾後新資產 state=%s，預期 STAGED", got)

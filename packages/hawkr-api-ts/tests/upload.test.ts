@@ -158,10 +158,15 @@ describe("uploadPublicFile", () => {
 
 	it("times out while the state stays PENDING", async () => {
 		const { client } = publicClient([{ state: UploadState.PENDING }]);
+		let sleeps = 0;
 		await expect(
 			uploadPublicFile(client, file, {
 				put: async () => ok(),
-				sleep: noSleep,
+				// 逾時判斷失效時輪詢永不結束：超過預期的輪數就丟錯，讓測試失敗而不是卡住。
+				sleep: async () => {
+					sleeps += 1;
+					if (sleeps > 10) throw new Error("poll did not time out");
+				},
 				pollIntervalMs: 10,
 				pollTimeoutMs: 30,
 			}),
