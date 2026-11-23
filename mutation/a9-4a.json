@@ -1,8 +1,8 @@
 {"mutants": [
   {"id": "imageai-consume-without-limit-predicate", "stack": "go-integration", "file": "backend/internal/modules/imageai/internal/store/usage.sql.go",
-   "old": "imageai.usage.period_start = EXCLUDED.period_start AND imageai.usage.used < $4::int", "new": "imageai.usage.period_start = EXCLUDED.period_start",
+   "old": "OR imageai.usage.used < $4::int", "new": "OR true",
    "test": "internal/modules/imageai ^TestConcurrentConsumesOnTheLastUnitSucceedExactlyOnce$",
-   "why": "拿掉 ConsumeUsage 同一週的 used < 上限謂詞：用完額度仍繼續累加，最後一格同時扣會多個成功"},
+   "why": "拿掉 ConsumeUsage 的 used < 上限謂詞：用完額度仍繼續累加，最後一格同時扣會多個成功"},
   {"id": "imageai-refund-is-noop", "stack": "go-integration", "file": "backend/internal/modules/imageai/internal/quota/quota.go",
    "old": "\tdefer cancel()\n\tn, err := store.New(s.db.Pool()).RefundUsage(", "new": "\tdefer cancel()\n\tif true {\n\t\treturn nil\n\t}\n\tn, err := store.New(s.db.Pool()).RefundUsage(",
    "test": "internal/modules/imageai ^TestRefundGivesBackOneUnitAndNeverGoesBelowZero$",

@@ -1,4 +1,4 @@
-// Package quota 是每家店每週的修圖額度：一列計數器加條件 UPDATE（A9-D9）。
+// Package quota 是每家店每週的修圖額度：每店一列計數器加條件 UPSERT（A9-D9）：新的一週重設為 1，同一週只在 used 小於上限時加一。
 package quota
 
 import (
@@ -61,7 +61,7 @@ func (s *Service) Consume(ctx context.Context, storeID int64) (model.Usage, erro
 		return u, err
 	}
 	u.Limit = limit
-	used, err := store.New(s.db.Conn(ctx)).ConsumeUsage(ctx, store.ConsumeUsageParams{StoreID: storeID, PeriodStart: start, Now: now, QuotaLimit: limit})
+	row, err := store.New(s.db.Conn(ctx)).ConsumeUsage(ctx, store.ConsumeUsageParams{StoreID: storeID, PeriodStart: start, Now: now, QuotaLimit: limit})
 	if errors.Is(err, pgx.ErrNoRows) {
 		u.Used = limit
 		return u, model.ErrQuotaExhausted
@@ -69,7 +69,9 @@ func (s *Service) Consume(ctx context.Context, storeID int64) (model.Usage, erro
 	if err != nil {
 		return u, fmt.Errorf("quota：扣店家 %d 的額度：%w", storeID, err)
 	}
-	u.Used = used
+	u.Used = row.Used
+	u.PeriodStart = row.PeriodStart
+	u.ResetTime = NextWeekStart(row.PeriodStart)
 	return u, nil
 }
 

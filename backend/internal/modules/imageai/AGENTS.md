@@ -24,7 +24,7 @@ schema `imageai`：`styles`（風格，UUIDv7）、`quotas`（個別額度）、
 
 模組只 import 依賴表允許的模組根套件：`internal/arch` 的依賴方向測試守門。
 
-- 扣額度只有一個條件 UPDATE（`WHERE used < limit`），外部呼叫在額度的 transaction 之外；失敗退回（在呼叫端 transaction 之外，沒有可退回 `ErrNothingToRefund`），扣後程序終止不退是已知限制（A9-D38）。
+- 扣額度只有一個每店條件 UPSERT（新的一週重設為 1；同一週只在 `used < limit` 時加一，`period_start` 不往回移），外部呼叫在額度的 transaction 之外；失敗退回（在呼叫端 transaction 之外，沒有可退回 `ErrNothingToRefund`），扣後程序終止不退是已知限制（A9-D38）。
 - 每個用途恆有一筆啟用的預設風格（migration seed，CHECK 擋停用預設）；`prompt` 1 到 500 字元。
 - 模型只經 `internal/platform/llm` 建構；模組內不得出現 Gemini 端點字串（`internal/arch` 守門）。
 - 預設額度 10、後台上限 1000 是模組常數，同時修圖上限讀 `IMAGEAI_MAX_CONCURRENT`；數字與理由在 `backend/docs/modules/imageai.md`。

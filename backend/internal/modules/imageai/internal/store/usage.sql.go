@@ -14,12 +14,12 @@ const consumeUsage = `-- name: ConsumeUsage :one
 INSERT INTO imageai.usage (store_id, period_start, used, updated_at)
 SELECT $1, $2, 1, $3::timestamptz WHERE $4::int > 0
 ON CONFLICT (store_id) DO UPDATE
-SET period_start = EXCLUDED.period_start,
+SET period_start = GREATEST(imageai.usage.period_start, EXCLUDED.period_start),
     used = CASE WHEN imageai.usage.period_start < EXCLUDED.period_start THEN 1 ELSE imageai.usage.used + 1 END,
     updated_at = EXCLUDED.updated_at
 WHERE imageai.usage.period_start < EXCLUDED.period_start
-   OR (imageai.usage.period_start = EXCLUDED.period_start AND imageai.usage.used < $4::int)
-RETURNING used
+   OR imageai.usage.used < $4::int
+RETURNING used, period_start
 `
 
 type ConsumeUsageParams struct {
@@ -29,17 +29,22 @@ type ConsumeUsageParams struct {
 	QuotaLimit  int32
 }
 
-// 每店一列計數器加條件 UPSERT（A9-D9）：同一週 used 達上限、或列屬於更新的一週時不更新、回 0 列（呼叫端拒絕）；列屬於較舊的一週時重設為 1；沒有列時先建。
-func (q *Queries) ConsumeUsage(ctx context.Context, arg ConsumeUsageParams) (int32, error) {
+type ConsumeUsageRow struct {
+	Used        int32
+	PeriodStart time.Time
+}
+
+// 每店一列計數器加条件 UPSERT（A9-D9）：列属于较舊的一週時重設為 1；同一週或列屬於較新的一週（pod 時鐘偏差）時只在 used 小於上限才加一，period_start 不往回移，達上限回 0 列（呼叫端拒絕）；沒有列時先建。回傳實際計數的那一週。
+func (q *Queries) ConsumeUsage(ctx context.Context, arg ConsumeUsageParams) (ConsumeUsageRow, error) {
 	row := q.db.QueryRow(ctx, consumeUsage,
 		arg.StoreID,
 		arg.PeriodStart,
 		arg.Now,
 		arg.QuotaLimit,
 	)
-	var used int32
-	err := row.Scan(&used)
-	return used, err
+	var i ConsumeUsageRow
+	err := row.Scan(&i.Used, &i.PeriodStart)
+	return i, err
 }
 
 const getUsage = `-- name: GetUsage :one

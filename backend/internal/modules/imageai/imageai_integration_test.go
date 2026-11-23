@@ -281,3 +281,31 @@ func imageaiWeekOf(t time.Time) time.Time {
 	d := twtime.Midnight(t)
 	return time.Date(d.Year(), d.Month(), d.Day()-(int(d.Weekday())+6)%7, 0, 0, 0, 0, twtime.Taipei)
 }
+
+func TestConsumeCountsAgainstANewerExistingPeriodWithoutMovingItBackwards(t *testing.T) {
+	t.Parallel()
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "imageai", Dir: imageai.Migrations()}))
+	ctx := context.Background()
+	now := wednesday.AddDate(0, 0, 7)
+	m := imageai.New(imageai.Deps{DB: d, Now: func() time.Time { return now }})
+	setLimit(t, d, 50, 2)
+	if _, err := m.ConsumeQuota(ctx, 50); err != nil {
+		t.Fatal(err)
+	}
+	newer := imageaiWeekOf(now)
+	now = wednesday
+	u, err := m.ConsumeQuota(ctx, 50)
+	if err != nil || u.Used != 2 || !u.PeriodStart.Equal(newer) {
+		t.Fatalf("時鐘較慢的 pod 要累加到較新的那週：%+v %v", u, err)
+	}
+	if _, err := m.ConsumeQuota(ctx, 50); !errors.Is(err, imageai.ErrQuotaExhausted) {
+		t.Fatalf("較新的那週用完要拒絕：%v", err)
+	}
+	var start time.Time
+	if err := d.Pool().QueryRow(ctx, `SELECT period_start FROM imageai.usage WHERE store_id = 50`).Scan(&start); err != nil || !start.Equal(newer) {
+		t.Fatalf("period_start 不得往回移：%v err = %v", start, err)
+	}
+	if err := m.RefundQuota(ctx, 50, u.PeriodStart); err != nil || used(t, d, 50) != 1 {
+		t.Fatalf("用回傳的週退款：%v used = %d", err, used(t, d, 50))
+	}
+}
