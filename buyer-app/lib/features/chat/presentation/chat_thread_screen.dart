@@ -75,7 +75,7 @@ class _Row {
             !message!.erased;
 
   String get key =>
-      message != null ? 'm${message!.seq}' : 'p$pending.requestId';
+      message != null ? 'm${message!.seq}' : 'p${pending!.requestId}';
 }
 
 Widget _buildInlineImage(String url) {
