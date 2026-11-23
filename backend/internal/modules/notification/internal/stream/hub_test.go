@@ -169,3 +169,35 @@ func TestSubscribeValidatesAudienceAndStore(t *testing.T) {
 		}
 	}
 }
+
+// 讀取內容失敗時，已取走的收件匣標記與提示放回去，下一次 Next 重讀並帶出提示；第一則（連線建立）也一樣。
+// mutation：Next 讀取失敗不呼叫 restoreInbox → 重試時沒有訊號（逾時）或提示遺失，失敗。
+func TestFailedReadKeepsTheDirtyMarkAndHints(t *testing.T) {
+	fail := true
+	h := newHub(func(ctx context.Context, key Key, storeID int64) (Inbox, error) {
+		if fail {
+			return Inbox{}, errors.New("db down")
+		}
+		return fakeRead(ctx, key, storeID)
+	}, 8)
+	s := subscribe(t, h, buyer(1), 0)
+	if _, err := s.Next(context.Background()); err == nil {
+		t.Fatal("第一則讀取失敗應回錯誤")
+	}
+	fail = false
+	if ev := next(t, s); ev.Inbox == nil {
+		t.Fatalf("重試應再送第一則：%+v", ev)
+	}
+	h.InboxChanged(buyer(1), 0, model.StateHintOrder)
+	fail = true
+	if _, err := s.Next(context.Background()); err == nil {
+		t.Fatal("讀取失敗應回錯誤")
+	}
+	h.InboxChanged(buyer(1), 0, model.StateHintAfterSale)
+	fail = false
+	ev := next(t, s)
+	if ev.Inbox == nil || !slices.Equal(ev.Inbox.Hints, []model.StateHint{model.StateHintOrder, model.StateHintAfterSale}) {
+		t.Fatalf("失敗前取走的提示不該遺失，期間新來的也要合併：%+v", ev)
+	}
+	wantNone(t, s)
+}

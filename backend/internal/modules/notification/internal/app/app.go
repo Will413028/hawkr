@@ -27,11 +27,18 @@ type Registry interface {
 	Lookup(name string) (registry.Entry, bool)
 }
 
+// Signals 是已讀與刪除通知串流訂閱者的出口（根套件以 stream.NotifyInbox 實作）。
+// 在改動收件匣的同一個 transaction 內呼叫（pg_notify 在 commit 後才送達，rollback 不送）；nil 表示不通知（沒有串流的組裝）。
+type Signals interface {
+	InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint) error
+}
+
 // Deps 是 Service 的依賴。
 type Deps struct {
 	DB       *db.DB
 	Accounts Accounts
 	Registry Registry
+	Signals  Signals
 	Now      func() time.Time
 	Logger   *slog.Logger
 }
@@ -85,4 +92,16 @@ func (s *Service) ValidateAudience(ctx context.Context, a model.Audience) error 
 		return apperr.InvalidInputOn([]string{"Audience"}, "%s", text.AudienceInvalid(uitext.LocaleFrom(ctx)))
 	}
 	return nil
+}
+
+// inboxChanged 在 ctx 帶的 transaction 內通知收件人的串流訂閱者（未讀數變了）；沒有串流的組裝（Signals 為 nil）不通知。
+func (s *Service) inboxChanged(ctx context.Context, accountID int64, audience string, storeID *int64) error {
+	if s.d.Signals == nil {
+		return nil
+	}
+	var sid int64
+	if storeID != nil {
+		sid = *storeID
+	}
+	return s.d.Signals.InboxChanged(ctx, accountID, model.Audience(audience), sid, model.StateHintNone)
 }

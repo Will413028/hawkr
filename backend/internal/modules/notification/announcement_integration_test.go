@@ -620,7 +620,7 @@ func TestInboxSkipsABrokenRowButFailsOnALoadError(t *testing.T) {
 // mutation：fanout.go 的 writeInbox 不呼叫 Signals.InboxChanged → 訂閱者收不到公告的訊號，逾時失敗。
 func TestAnnouncementFanOutSignalsTheRecipientsStream(t *testing.T) {
 	f := setupAnnounce(t, 0)
-	hub := stream.NewHub(inboxReader(f.inbox), slog.New(slog.DiscardHandler))
+	hub := stream.NewHub(inboxReader(f.inbox), slog.New(slog.DiscardHandler), time.Now)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- hub.Run(ctx, stream.DialPG(f.db.Pool().Config().ConnConfig)) }()

@@ -36,7 +36,7 @@ ORDER BY updated_at DESC, id DESC LIMIT 1;
 -- 只有擁有者（帳號）能標；已讀的列保留原本的已讀時間。不存在與不是擁有者都是 0 列（pgx.ErrNoRows），呼叫端不區分。
 UPDATE notification.inbox_items SET read_at = COALESCE(read_at, sqlc.arg(now)::timestamptz)
 WHERE id = sqlc.arg(id) AND account_id = sqlc.arg(account_id)
-RETURNING id;
+RETURNING id, audience, store_id;
 
 -- name: MarkAllInboxItemsRead :execrows
 UPDATE notification.inbox_items SET read_at = sqlc.arg(now)::timestamptz
@@ -45,9 +45,10 @@ WHERE account_id = sqlc.arg(account_id) AND audience = sqlc.arg(audience)
   AND type = ANY(sqlc.arg(types)::text[])
   AND read_at IS NULL;
 
--- name: DeleteInboxItems :execrows
--- 只刪擁有者（帳號）的列；呼叫端比較刪除筆數與 ids 的數量，不符就回滾（全有或全無）。
-DELETE FROM notification.inbox_items WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND account_id = sqlc.arg(account_id);
+-- name: DeleteInboxItems :many
+-- 只刪擁有者（帳號）的列，回傳被刪列的受眾與店（串流訊號的收件人）；呼叫端比較刪除筆數與 ids 的數量，不符就回滾（全有或全無）。
+DELETE FROM notification.inbox_items WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND account_id = sqlc.arg(account_id)
+RETURNING audience, store_id;
 
 -- name: PreferenceOverridesForRecipient :many
 SELECT category, channel, enabled FROM notification.preference_overrides

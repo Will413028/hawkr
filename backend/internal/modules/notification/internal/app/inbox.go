@@ -195,29 +195,40 @@ func (s *Service) LatestInboxItemID(ctx context.Context, r Recipient) (*uuid.UUI
 }
 
 // MarkRead 把帳號的一則通知標成已讀；已讀的不改已讀時間。不存在與不是帳號的回同一個 not_found。
+// 同一個 transaction 內通知該通知收件人的串流訂閱者。
 func (s *Service) MarkRead(ctx context.Context, accountID int64, id uuid.UUID) error {
 	now := s.d.Now()
-	_, err := store.New(s.d.DB.Conn(ctx)).MarkInboxItemRead(ctx, store.MarkInboxItemReadParams{Now: now, ID: id, AccountID: accountID})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return notFound(ctx)
-	}
-	if err != nil {
-		return fmt.Errorf("標記已讀：%w", err)
-	}
-	return nil
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		row, err := store.New(s.d.DB.Conn(ctx)).MarkInboxItemRead(ctx, store.MarkInboxItemReadParams{Now: now, ID: id, AccountID: accountID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return notFound(ctx)
+		}
+		if err != nil {
+			return fmt.Errorf("標記已讀：%w", err)
+		}
+		return s.inboxChanged(ctx, accountID, row.Audience, row.StoreID)
+	})
 }
 
-// MarkAllRead 把收件人的全部未讀通知標成已讀，回傳這次改成已讀的筆數。
+// MarkAllRead 把收件人的全部未讀通知標成已讀，回傳這次改成已讀的筆數；同一個 transaction 內通知收件人的串流訂閱者。
 func (s *Service) MarkAllRead(ctx context.Context, r Recipient) (int64, error) {
 	if err := r.validate(); err != nil {
 		return 0, err
 	}
-	n, err := store.New(s.d.DB.Conn(ctx)).MarkAllInboxItemsRead(ctx, store.MarkAllInboxItemsReadParams{
-		Now: s.d.Now(), AccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(),
-		Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil),
+	var n int64
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		n, err = store.New(s.d.DB.Conn(ctx)).MarkAllInboxItemsRead(ctx, store.MarkAllInboxItemsReadParams{
+			Now: s.d.Now(), AccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(),
+			Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil),
+		})
+		if err != nil {
+			return fmt.Errorf("全部標成已讀：%w", err)
+		}
+		return s.inboxChanged(ctx, r.AccountID, string(r.Audience), r.storeID())
 	})
 	if err != nil {
-		return 0, fmt.Errorf("全部標成已讀：%w", err)
+		return 0, err
 	}
 	return n, nil
 }
@@ -236,12 +247,30 @@ func (s *Service) BatchDelete(ctx context.Context, accountID int64, ids []uuid.U
 		return apperr.InvalidInputOn([]string{"Ids"}, "%s", text.InboxItemBatchInvalid(uitext.LocaleFrom(ctx)))
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		n, err := store.New(s.d.DB.Conn(ctx)).DeleteInboxItems(ctx, store.DeleteInboxItemsParams{Ids: ids, AccountID: accountID})
+		rows, err := store.New(s.d.DB.Conn(ctx)).DeleteInboxItems(ctx, store.DeleteInboxItemsParams{Ids: ids, AccountID: accountID})
 		if err != nil {
 			return fmt.Errorf("刪除收件匣：%w", err)
 		}
-		if n != int64(len(ids)) {
+		if len(rows) != len(ids) {
 			return notFound(ctx)
+		}
+		type recipient struct {
+			audience string
+			storeID  int64
+		}
+		seen := make(map[recipient]struct{}, len(rows))
+		for _, row := range rows {
+			k := recipient{audience: row.Audience}
+			if row.StoreID != nil {
+				k.storeID = *row.StoreID
+			}
+			if _, ok := seen[k]; ok {
+				continue
+			}
+			seen[k] = struct{}{}
+			if err := s.inboxChanged(ctx, accountID, row.Audience, row.StoreID); err != nil {
+				return err
+			}
 		}
 		return nil
 	})

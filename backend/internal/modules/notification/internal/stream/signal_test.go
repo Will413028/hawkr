@@ -95,6 +95,7 @@ func (c *fakeConn) Close(context.Context) { c.once.Do(func() { close(c.closed) }
 
 func TestRunDeliversNotificationsAndResyncsOnReconnect(t *testing.T) {
 	h := newHub(fakeRead, 8)
+	h.now = time.Now
 	h.backoffBase, h.backoffMax = time.Millisecond, 2*time.Millisecond
 	conns := make(chan *fakeConn, 2)
 	dial := func(context.Context) (Conn, error) {
@@ -140,5 +141,61 @@ func TestRunDeliversNotificationsAndResyncsOnReconnect(t *testing.T) {
 	}
 	if _, err := h.Subscribe(buyer(1), 0); !errors.Is(err, ErrClosed) {
 		t.Fatalf("Run 結束後不再接受訂閱：%v", err)
+	}
+}
+
+// runFlapping 讓每條連線連上後經過 uptime（假時鐘）就斷線，dials 次後取消 ctx，回傳每次重連前的等待。
+func runFlapping(t *testing.T, uptime time.Duration, dials int) []time.Duration {
+	t.Helper()
+	h := newHub(fakeRead, 8)
+	h.backoffBase, h.backoffMax = time.Second, 8*time.Second
+	h.jitter = func() float64 { return 1 }
+	var clock time.Time
+	h.now = func() time.Time { return clock }
+	var sleeps []time.Duration
+	h.sleep = func(_ context.Context, d time.Duration) { sleeps = append(sleeps, d) }
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	n := 0
+	dial := func(context.Context) (Conn, error) {
+		n++
+		if n > dials {
+			cancel()
+			return nil, ctx.Err()
+		}
+		return &flapConn{advance: func() { clock = clock.Add(uptime) }}, nil
+	}
+	if err := h.Run(ctx, dial); err != nil {
+		t.Fatal(err)
+	}
+	return sleeps
+}
+
+type flapConn struct{ advance func() }
+
+func (c *flapConn) Listen(context.Context) error { return nil }
+func (c *flapConn) Wait(context.Context) (string, error) {
+	c.advance()
+	return "", errors.New("connection reset")
+}
+func (c *flapConn) Close(context.Context) {}
+
+// 連上就斷的連線退避遞增到上限，不會每次都從頭等（否則每次重連的重讀訊號約每秒數次）。
+// mutation：Run 連線成功就重設退避 → 第二次起的等待不遞增，失敗。
+func TestRunBackoffKeepsGrowingWhileTheConnectionFlaps(t *testing.T) {
+	got := runFlapping(t, time.Millisecond, 5)
+	want := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 8 * time.Second}
+	if !slices.Equal(got, want) {
+		t.Fatalf("等待 = %v，預期 %v", got, want)
+	}
+}
+
+// 連線穩定維持夠久之後斷線，退避回到起點。
+// mutation：stableAfter 檢查拿掉 → 穩定的連線也不重設，等待遞增，失敗。
+func TestRunBackoffResetsAfterAStableConnection(t *testing.T) {
+	got := runFlapping(t, stableAfter, 4)
+	want := []time.Duration{time.Second, time.Second, time.Second, time.Second}
+	if !slices.Equal(got, want) {
+		t.Fatalf("等待 = %v，預期 %v", got, want)
 	}
 }

@@ -50,8 +50,12 @@ func (p *pgConn) Wait(ctx context.Context) (string, error) {
 
 func (p *pgConn) Close(ctx context.Context) { _ = p.c.Close(ctx) }
 
+// stableAfter 是連線要維持多久才算穩定（估計值，不是量測值）：連上就斷的連線不重設退避，否則壞掉的連線每次重連都從頭等，
+// 每次重連的完整重讀訊號（resync）會讓所有訂閱者各讀一次資料庫，約每秒數次。
+const stableAfter = 10 * time.Second
+
 // Run 持有這個行程唯一的 LISTEN 連線，把通知扇出給本行程的訂閱者，直到 ctx 結束（回 nil 或 ctx 的錯誤）。
-// 只有 serve 角色跑它（串流在那裡）；worker 只發通知。連線斷掉以指數退避重連；每次連線成功（含第一次）對所有本地訂閱者發一次完整重讀訊號：
+// 只有 serve 角色跑它（串流在那裡）；worker 只發通知。連線斷掉以指數退避重連（連線維持 stableAfter 以上才重設退避，連上就斷的連續遞增到 backoffMax）；每次連線成功（含第一次）對所有本地訂閱者發一次完整重讀訊號：
 // 斷線期間的通知不會補送，訂閱者以重讀列表為準。
 func (h *Hub) Run(ctx context.Context, dial Dial) error {
 	defer h.shutdown()
@@ -66,6 +70,10 @@ func (h *Hub) Run(ctx context.Context, dial Dial) error {
 	if jitter == nil {
 		jitter = rand.Float64
 	}
+	now, sleep := h.now, h.sleep
+	if sleep == nil {
+		sleep = sleepCtx
+	}
 	wait := base
 	for ctx.Err() == nil {
 		c, err := h.connect(ctx, dial)
@@ -75,25 +83,32 @@ func (h *Hub) Run(ctx context.Context, dial Dial) error {
 			}
 			h.logger().Warn("notification：監聽連線失敗，稍後重連", "error", err, "retry_in", wait)
 		} else {
-			wait = base
 			h.resync()
 			h.markListening()
+			upSince := now()
 			err = h.pump(ctx, c)
 			c.Close(context.WithoutCancel(ctx))
 			if ctx.Err() != nil {
 				break
 			}
+			if now().Sub(upSince) >= stableAfter {
+				wait = base
+			}
 			h.logger().Warn("notification：監聽連線中斷，稍後重連", "error", err, "retry_in", wait)
 		}
-		t := time.NewTimer(time.Duration(float64(wait) * (0.5 + 0.5*jitter())))
-		select {
-		case <-ctx.Done():
-			t.Stop()
-		case <-t.C:
-		}
+		sleep(ctx, time.Duration(float64(wait)*(0.5+0.5*jitter())))
 		wait = min(wait*2, maxWait)
 	}
 	return nil
+}
+
+func sleepCtx(ctx context.Context, d time.Duration) {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+	}
 }
 
 func (h *Hub) connect(ctx context.Context, dial Dial) (Conn, error) {

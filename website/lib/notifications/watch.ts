@@ -3,15 +3,19 @@
  *
  * 串流的生命週期（見 notification.proto）：連線建立後第一個 frame 是 inbox 訊號，之後每有變化再送；訊號只表示「該重讀了」，
  * 不帶內容、沒有續傳游標、沒有心跳。所以：
- * - 每次重連後的第一個 frame 發 `reconnected`：斷線期間的訊號可能遺漏，訂閱者要整批重讀。第一次連線不發。
+ * - 每次重連後的第一個 frame 發 `reconnected`，`afterAbnormalEnd` 說明上一條怎麼結束的：斷線期間的訊號可能遺漏，上一條是錯誤結束的，訂閱者要整批重讀；
+ *   上一條是壽命到期正常結束的（立刻重連，空窗是毫秒），不必重讀，重連後的第一則 inbox 訊號已涵蓋收件匣。第一次連線不發。
  * - 伺服器到了壽命正常結束（沒有錯誤）：立刻重連，不算失敗；沒收到任何 frame 就結束則當失敗走 backoff（避免熱迴圈）。
  * - 網路錯誤與 `unavailable`：full-jitter backoff 重連，連續失敗 `MAX_ATTEMPTS` 次後停下（`unavailable`），等 focus／online 的 `resume()`；
  *   瀏覽器離線時停在 `offline`，同樣等 `resume()`。
- * - `unauthenticated`、`permission_denied`、`not_found`（STORE 沒有店）、`resource_exhausted`（串流太多）、`failed_precondition`：
+ * - `resource_exhausted`（同帳號串流太多，或開串流太頻繁）：可重試，伺服器帶 RetryInfo 就等那麼久，沒有就 full-jitter backoff；
+ *   跟網路錯誤共用連續失敗上限，用盡後等 `resume()`，不會永久停住。
+ * - `unauthenticated`、`permission_denied`、`not_found`（STORE 沒有店）、`failed_precondition`：
  *   不重連，狀態是 `unavailable`（登入失效由 transport 發 AUTH_EXPIRED_EVENT）。
  */
 
 import { Code, ConnectError } from "@connectrpc/connect";
+import { factsFromError } from "@hawkr/api/connect/errors";
 import {
 	type NotificationAudience,
 	SellerWorkspaceChange,
@@ -33,7 +37,7 @@ export type NotificationSignal =
 			hints: number[];
 	  }
 	| { type: "sellerWorkspace"; change: "order" | "afterSale" }
-	| { type: "reconnected" };
+	| { type: "reconnected"; afterAbnormalEnd: boolean };
 
 export type OpenWatch = (
 	audience: NotificationAudience,
@@ -60,7 +64,6 @@ function isTerminal(code: Code): boolean {
 		code === Code.Unauthenticated ||
 		code === Code.PermissionDenied ||
 		code === Code.NotFound ||
-		code === Code.ResourceExhausted ||
 		code === Code.FailedPrecondition
 	);
 }
@@ -120,9 +123,10 @@ export function watchNotifications(
 	type Outcome =
 		| { kind: "ended"; gotFrame: boolean }
 		| { kind: "terminal" }
-		| { kind: "error"; gotFrame: boolean };
+		| { kind: "error"; gotFrame: boolean; retryDelayMs?: number };
 
 	let everConnected = false;
+	let lastEndAbnormal = false;
 	const runOnce = async (): Promise<Outcome> => {
 		const ac = new AbortController();
 		abort = ac;
@@ -132,7 +136,11 @@ export function watchNotifications(
 				if (!gotFrame) {
 					gotFrame = true;
 					setStatus("connected");
-					if (everConnected) onSignal({ type: "reconnected" });
+					if (everConnected)
+						onSignal({
+							type: "reconnected",
+							afterAbnormalEnd: lastEndAbnormal,
+						});
 					everConnected = true;
 				}
 				const e = res.event;
@@ -155,8 +163,16 @@ export function watchNotifications(
 			return { kind: "ended", gotFrame };
 		} catch (err) {
 			if (stopped) return { kind: "ended", gotFrame };
-			if (isTerminal(ConnectError.from(err).code)) return { kind: "terminal" };
-			return { kind: "error", gotFrame };
+			const e = ConnectError.from(err);
+			if (isTerminal(e.code)) return { kind: "terminal" };
+			return {
+				kind: "error",
+				gotFrame,
+				retryDelayMs:
+					e.code === Code.ResourceExhausted
+						? factsFromError(e).retryDelayMs
+						: undefined,
+			};
 		} finally {
 			abort = null;
 		}
@@ -168,6 +184,7 @@ export function watchNotifications(
 			setStatus("connecting");
 			const outcome = await runOnce();
 			if (stopped) return;
+			lastEndAbnormal = !(outcome.kind === "ended" && outcome.gotFrame);
 			if (outcome.kind === "terminal") {
 				setStatus("unavailable");
 				return;
@@ -191,7 +208,9 @@ export function watchNotifications(
 				continue;
 			}
 			const ceiling = Math.min(BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1));
-			await sleep(Math.floor(random() * ceiling));
+			const serverDelay =
+				outcome.kind === "error" ? outcome.retryDelayMs : undefined;
+			await sleep(serverDelay ?? Math.floor(random() * ceiling));
 		}
 	};
 	void loop();

@@ -81,8 +81,8 @@ type Module struct {
 func New(d Deps) *Module { return newModule(d, registry.Registry{}) }
 
 func newModule(d Deps, reg app.Registry) *Module {
-	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Now: d.Now, Logger: d.Logger})
-	hub := stream.NewHub(inboxReader(appSvc), d.Logger)
+	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger})
+	hub := stream.NewHub(inboxReader(appSvc), d.Logger, d.Now)
 	return &Module{
 		intake: intake.New(intake.Deps{
 			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Signals: dbSignals{d.DB}, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
@@ -142,6 +142,9 @@ const (
 
 // MaxStreamsPerAccount 是每個帳號同時開著的通知串流上限。
 const MaxStreamsPerAccount = stream.MaxPerAccount
+
+// ErrClosed 是串流所屬的服務正在關閉：Watch 與 Watcher.Next 回這個錯誤時，client 應依 backoff 重連。
+var ErrClosed = stream.ErrClosed
 
 // Watcher 是一條通知串流的訂閱：Next 阻塞到下一則訊號（ctx 取消或訂閱關閉時回錯誤），Close 釋出（一定要呼叫）。
 type Watcher interface {

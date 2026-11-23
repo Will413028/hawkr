@@ -1,4 +1,7 @@
+import { create } from "@bufbuild/protobuf";
+import { DurationSchema } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
+import { RetryInfoSchema } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import {
 	NotificationAudience,
 	SellerWorkspaceChange,
@@ -29,6 +32,8 @@ const workspace = (change: SellerWorkspaceChange) =>
 type Script = Array<{
 	frames?: WatchNotificationsResponse[];
 	error?: Code;
+	/** error 帶的 RetryInfo（毫秒）。 */
+	retryMs?: number;
 	/** 送完 frames 之後不結束，等 abort。 */
 	hold?: boolean;
 }>;
@@ -43,7 +48,21 @@ function harness(script: Script, opts: { online?: () => boolean } = {}) {
 		const step = script[opens++] ?? { hold: true };
 		audiences.push(audience);
 		for (const f of step.frames ?? []) yield f;
-		if (step.error !== undefined) throw new ConnectError("x", step.error);
+		if (step.error !== undefined) {
+			const err = new ConnectError("x", step.error);
+			if (step.retryMs !== undefined) {
+				err.details.push({
+					desc: RetryInfoSchema,
+					value: create(RetryInfoSchema, {
+						retryDelay: create(DurationSchema, {
+							seconds: BigInt(Math.floor(step.retryMs / 1000)),
+							nanos: (step.retryMs % 1000) * 1e6,
+						}),
+					}),
+				});
+			}
+			throw err;
+		}
 		if (step.hold) {
 			await new Promise<void>((_, reject) =>
 				signal.addEventListener("abort", () =>
@@ -122,13 +141,16 @@ describe("watchNotifications", () => {
 			"reconnected",
 			"inbox",
 		]);
+		expect(h.signals[1]).toEqual({
+			type: "reconnected",
+			afterAbnormalEnd: false,
+		});
 		h.handle.stop();
 	});
 
 	it("終止型 code 不重連，狀態是 unavailable", async () => {
 		for (const code of [
 			Code.NotFound,
-			Code.ResourceExhausted,
 			Code.Unauthenticated,
 			Code.PermissionDenied,
 			Code.FailedPrecondition,
@@ -138,6 +160,43 @@ describe("watchNotifications", () => {
 			expect(h.opens()).toBe(1);
 			expect(h.statuses.at(-1)).toBe("unavailable");
 		}
+	});
+
+	it("resource_exhausted 可重試：有 RetryInfo 就等那麼久，沒有就 backoff，之後能連上", async () => {
+		const h = harness([
+			{ error: Code.ResourceExhausted, retryMs: 5000 },
+			{ error: Code.ResourceExhausted },
+			{ frames: [inbox(0)], hold: true },
+		]);
+		await h.flush();
+		expect(h.statuses.at(-1)).not.toBe("unavailable");
+		expect(h.timers).toHaveLength(1);
+		expect(h.timers[0]?.ms).toBe(5000);
+		h.timers[0]?.fn();
+		await h.flush();
+		expect(h.timers).toHaveLength(2);
+		expect(h.timers[1]?.ms).toBe(Math.floor(0.5 * 2000));
+		h.timers[1]?.fn();
+		await h.flush();
+		expect(h.opens()).toBe(3);
+		expect(h.statuses.at(-1)).toBe("connected");
+		h.handle.stop();
+	});
+
+	it("錯誤結束後重連的 reconnected 標記 afterAbnormalEnd", async () => {
+		const h = harness([
+			{ frames: [inbox(0)] },
+			{ error: Code.Unavailable },
+			{ frames: [inbox(1)], hold: true },
+		]);
+		await h.flush();
+		h.timers[0]?.fn();
+		await h.flush();
+		const flags = h.signals.flatMap((s) =>
+			s.type === "reconnected" ? [s.afterAbnormalEnd] : [],
+		);
+		expect(flags).toEqual([true]);
+		h.handle.stop();
 	});
 
 	it("unavailable 以 backoff 重連，連續失敗用盡後停在 unavailable 並等 resume", async () => {

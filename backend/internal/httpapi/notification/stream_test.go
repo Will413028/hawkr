@@ -43,6 +43,7 @@ type watcher struct {
 	events chan notification.StreamEvent
 	once   sync.Once
 	done   chan struct{}
+	fail   chan struct{}
 }
 
 func (w *watcher) Next(ctx context.Context) (notification.StreamEvent, error) {
@@ -53,6 +54,8 @@ func (w *watcher) Next(ctx context.Context) (notification.StreamEvent, error) {
 		return notification.StreamEvent{}, ctx.Err()
 	case <-w.done:
 		return notification.StreamEvent{}, errors.New("closed")
+	case <-w.fail:
+		return notification.StreamEvent{}, notification.ErrClosed
 	}
 }
 
@@ -113,7 +116,7 @@ func watch(t *testing.T, c notificationv1alpha1connect.NotificationAppServiceCli
 }
 
 func newFake() *fakeStreams {
-	return &fakeStreams{watcher: &watcher{events: make(chan notification.StreamEvent, 8), done: make(chan struct{})}}
+	return &fakeStreams{watcher: &watcher{events: make(chan notification.StreamEvent, 8), done: make(chan struct{}), fail: make(chan struct{})}}
 }
 
 func TestWatchMapsInboxAndSellerWorkspaceSignals(t *testing.T) {
@@ -255,4 +258,35 @@ func TestWatchEndsCleanlyAtTheLifetimeAndReleasesTheSubscription(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("串流結束後應關閉訂閱")
 	}
+}
+
+func TestWatchMapsHubShutdownToUnavailable(t *testing.T) {
+	t.Run("on Next", func(t *testing.T) {
+		fs := newFake()
+		close(fs.watcher.fail)
+		c := setupStream(t, fs, time.Minute)
+		st, err := watch(t, c, account, pb.NotificationAudience_NOTIFICATION_AUDIENCE_BUYER)
+		if err == nil {
+			defer func() { _ = st.Close() }()
+			st.Receive()
+			err = st.Err()
+		}
+		if got := connect.CodeOf(err); got != connect.CodeUnavailable {
+			t.Fatalf("code = %v，要 unavailable：%v", got, err)
+		}
+	})
+	t.Run("on Watch", func(t *testing.T) {
+		fs := newFake()
+		fs.err = notification.ErrClosed
+		c := setupStream(t, fs, time.Minute)
+		st, err := watch(t, c, account, pb.NotificationAudience_NOTIFICATION_AUDIENCE_BUYER)
+		if err == nil {
+			defer func() { _ = st.Close() }()
+			st.Receive()
+			err = st.Err()
+		}
+		if got := connect.CodeOf(err); got != connect.CodeUnavailable {
+			t.Fatalf("code = %v，要 unavailable：%v", got, err)
+		}
+	})
 }

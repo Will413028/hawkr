@@ -64,8 +64,11 @@ type Hub struct {
 
 	backoffBase, backoffMax time.Duration
 	jitter                  func() float64
-	listening               chan struct{}
-	listenOnce              sync.Once
+	// now 與 sleep 讓測試不用真的等；nil 是真實時間。
+	now        func() time.Time
+	sleep      func(ctx context.Context, d time.Duration)
+	listening  chan struct{}
+	listenOnce sync.Once
 
 	mu        sync.Mutex
 	down      bool
@@ -74,10 +77,11 @@ type Hub struct {
 	byAccount map[int64]int
 }
 
-// NewHub 建立 hub；read 讀訊號的內容（未讀數與最新一則，由模組根以 app 用例提供）。
-func NewHub(read func(ctx context.Context, key Key, storeID int64) (Inbox, error), log *slog.Logger) *Hub {
+// NewHub 建立 hub；read 讀訊號的內容（未讀數與最新一則，由模組根以 app 用例提供）；now 是模組注入的時鐘（LISTEN 連線穩定多久的判斷用）。
+func NewHub(read func(ctx context.Context, key Key, storeID int64) (Inbox, error), log *slog.Logger, now func() time.Time) *Hub {
 	h := newHub(read, MaxPerAccount)
 	h.log = log
+	h.now = now
 	return h
 }
 
@@ -221,6 +225,7 @@ func (s *Subscription) Next(ctx context.Context) (Event, error) {
 			s.mu.Unlock()
 			in, err := s.hub.read(ctx, s.key, s.storeID)
 			if err != nil {
+				s.restoreInbox(hints)
 				return Event{}, err
 			}
 			in.Hints = hints
@@ -236,6 +241,18 @@ func (s *Subscription) Next(ctx context.Context) (Event, error) {
 		case <-ctx.Done():
 			return Event{}, ctx.Err()
 		case <-s.wake:
+		}
+	}
+}
+
+// restoreInbox 在讀取內容失敗時把已取走的收件匣標記放回去：下一次 Next 重讀，這次合併的提示不遺失（與期間新來的提示取聯集）。
+func (s *Subscription) restoreInbox(hints []model.StateHint) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inboxDirty = true
+	for _, h := range hints {
+		if !slices.Contains(s.hints, h) {
+			s.hints = append(s.hints, h)
 		}
 	}
 }

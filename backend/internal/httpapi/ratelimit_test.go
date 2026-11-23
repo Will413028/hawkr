@@ -199,9 +199,9 @@ func TestRateLimitDenialNegotiatesTheLocale(t *testing.T) {
 	}
 }
 
-// WatchNotifications 只豁免登入的顧客帳號（a:）：訪客、管理員與其他方法照級別計數。
-// mutation：exemptFromEntryLimit 拿掉 a: 前綴檢查 → 訪客的串流請求不受限，失敗。
-func TestWatchNotificationsIsExemptOnlyForAccountSubjects(t *testing.T) {
+// WatchNotifications 有自己的額度與計數器：一般的重連不受影響，開了就中止的迴圈在 tierWatch.visitor 次後被擋，且不擠掉同帳號其他呼叫的額度。
+// mutation：WatchNotifications 從 procedureTiers 拿掉 → 落回 tierDefault（300），串流在 121 次時不會被擋，失敗。
+func TestWatchNotificationsHasItsOwnGenerousLimit(t *testing.T) {
 	t.Parallel()
 	watch := notificationconnect.NotificationAppServiceWatchNotificationsProcedure
 	other := notificationconnect.NotificationAppServiceGetUnreadCountProcedure
@@ -211,24 +211,19 @@ func TestWatchNotificationsIsExemptOnlyForAccountSubjects(t *testing.T) {
 		h.ServeHTTP(rec, r)
 		return rec.Code
 	}
-	for _, tc := range []struct {
-		name, procedure, subject string
-		limited                  bool
-	}{
-		{"帳號的串流不計額度", watch, "a:7", false},
-		{"訪客的串流照級別計數", watch, "v:192.0.2.9", true},
-		{"管理員的串流照級別計數", watch, "m:1", true},
-		{"帳號的其他方法照級別計數", other, "a:7", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			h := withRateLimit(newRateLimiter(func() time.Time { return entryNow }), http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
-			var last int
-			for range tierDefault.visitor + 1 {
-				last = call(h, tc.procedure, tc.subject)
-			}
-			if limited := last == http.StatusTooManyRequests; limited != tc.limited {
-				t.Fatalf("第 %d 次 = %d，被限流 = %v，預期 %v", tierDefault.visitor+1, last, limited, tc.limited)
-			}
-		})
+	h := withRateLimit(newRateLimiter(func() time.Time { return entryNow }), http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for i := range tierWatch.visitor {
+		if got := call(h, watch, "a:7"); got != http.StatusOK {
+			t.Fatalf("第 %d 次開串流 = %d，額度內要放行", i+1, got)
+		}
+	}
+	if got := call(h, watch, "a:7"); got != http.StatusTooManyRequests {
+		t.Fatalf("第 %d 次開串流 = %d，要被擋", tierWatch.visitor+1, got)
+	}
+	if got := call(h, other, "a:7"); got != http.StatusOK {
+		t.Fatalf("串流額度用完後同帳號的其他呼叫 = %d，不該被擠掉", got)
+	}
+	if got := call(h, watch, "a:8"); got != http.StatusOK {
+		t.Fatalf("別的帳號的串流 = %d，不該被擋", got)
 	}
 }

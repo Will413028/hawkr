@@ -10,6 +10,7 @@ import (
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // streamLifetime 是一條串流的最長壽命（估計值，不是量測值）：session 被撤銷或店家換了，最慢這麼久後連線結束、client 重連時重新驗證。
@@ -26,7 +27,7 @@ func (h *App) WatchNotifications(ctx context.Context, req *connect.Request[pb.Wa
 	params := notification.WatchParams{AccountID: r.AccountID, Audience: r.Audience, StoreID: r.StoreID}
 	sub, err := h.notifications.Watch(params)
 	if err != nil {
-		return err
+		return classifyEnd(err)
 	}
 	defer sub.Close()
 	ctx, cancel := context.WithTimeout(ctx, h.lifetime())
@@ -37,7 +38,7 @@ func (h *App) WatchNotifications(ctx context.Context, req *connect.Request[pb.Wa
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				return nil
 			}
-			return err
+			return classifyEnd(err)
 		}
 		out, err := toResponse(ev)
 		if err != nil {
@@ -47,6 +48,14 @@ func (h *App) WatchNotifications(ctx context.Context, req *connect.Request[pb.Wa
 			return err
 		}
 	}
+}
+
+// classifyEnd 把模組結束串流的原因對到對外的錯誤：服務關閉是 unavailable（client 依 backoff 重連），其餘原樣回傳。
+func classifyEnd(err error) error {
+	if errors.Is(err, notification.ErrClosed) {
+		return apperr.WithCause(apperr.Unavailable("服務重新啟動中，請稍後重連"), err)
+	}
+	return err
 }
 
 func toResponse(ev notification.StreamEvent) (*pb.WatchNotificationsResponse, error) {

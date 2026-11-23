@@ -81,8 +81,9 @@ func (q *Queries) DeleteDeviceToken(ctx context.Context, arg DeleteDeviceTokenPa
 	return err
 }
 
-const deleteInboxItems = `-- name: DeleteInboxItems :execrows
+const deleteInboxItems = `-- name: DeleteInboxItems :many
 DELETE FROM notification.inbox_items WHERE id = ANY($1::uuid[]) AND account_id = $2
+RETURNING audience, store_id
 `
 
 type DeleteInboxItemsParams struct {
@@ -90,13 +91,30 @@ type DeleteInboxItemsParams struct {
 	AccountID int64
 }
 
-// 只刪擁有者（帳號）的列；呼叫端比較刪除筆數與 ids 的數量，不符就回滾（全有或全無）。
-func (q *Queries) DeleteInboxItems(ctx context.Context, arg DeleteInboxItemsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteInboxItems, arg.Ids, arg.AccountID)
+type DeleteInboxItemsRow struct {
+	Audience string
+	StoreID  *int64
+}
+
+// 只刪擁有者（帳號）的列，回傳被刪列的受眾與店（串流訊號的收件人）；呼叫端比較刪除筆數與 ids 的數量，不符就回滾（全有或全無）。
+func (q *Queries) DeleteInboxItems(ctx context.Context, arg DeleteInboxItemsParams) ([]DeleteInboxItemsRow, error) {
+	rows, err := q.db.Query(ctx, deleteInboxItems, arg.Ids, arg.AccountID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	var items []DeleteInboxItemsRow
+	for rows.Next() {
+		var i DeleteInboxItemsRow
+		if err := rows.Scan(&i.Audience, &i.StoreID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const deletePreferenceOverride = `-- name: DeletePreferenceOverride :exec
@@ -248,7 +266,7 @@ func (q *Queries) MarkAllInboxItemsRead(ctx context.Context, arg MarkAllInboxIte
 const markInboxItemRead = `-- name: MarkInboxItemRead :one
 UPDATE notification.inbox_items SET read_at = COALESCE(read_at, $1::timestamptz)
 WHERE id = $2 AND account_id = $3
-RETURNING id
+RETURNING id, audience, store_id
 `
 
 type MarkInboxItemReadParams struct {
@@ -257,12 +275,18 @@ type MarkInboxItemReadParams struct {
 	AccountID int64
 }
 
+type MarkInboxItemReadRow struct {
+	ID       uuid.UUID
+	Audience string
+	StoreID  *int64
+}
+
 // 只有擁有者（帳號）能標；已讀的列保留原本的已讀時間。不存在與不是擁有者都是 0 列（pgx.ErrNoRows），呼叫端不區分。
-func (q *Queries) MarkInboxItemRead(ctx context.Context, arg MarkInboxItemReadParams) (uuid.UUID, error) {
+func (q *Queries) MarkInboxItemRead(ctx context.Context, arg MarkInboxItemReadParams) (MarkInboxItemReadRow, error) {
 	row := q.db.QueryRow(ctx, markInboxItemRead, arg.Now, arg.ID, arg.AccountID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	var i MarkInboxItemReadRow
+	err := row.Scan(&i.ID, &i.Audience, &i.StoreID)
+	return i, err
 }
 
 const preferenceOverridesForRecipient = `-- name: PreferenceOverridesForRecipient :many

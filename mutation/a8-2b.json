@@ -76,8 +76,8 @@
    "id": "batch-delete-partial",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/app/inbox.go",
-   "old": "if n != int64(len(ids)) {",
-   "new": "if n == 0 {",
+   "old": "if len(rows) != len(ids) {",
+   "new": "if len(rows) == 0 {",
    "test": "internal/httpapi/notification ^TestBatchDeleteInboxItemsIsAllOrNothing$",
    "why": "刪除不是全有或全無：混了別人的或不存在的 ID 時其餘的照刪"
   },
@@ -130,8 +130,8 @@
    "id": "app-ignores-injected-registry",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/notification.go",
-   "old": "Registry: reg, Now: d.Now, Logger: d.Logger}",
-   "new": "Registry: registry.Registry{}, Now: d.Now, Logger: d.Logger}",
+   "old": "Registry: reg, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger}",
+   "new": "Registry: registry.Registry{}, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger}",
    "test": "internal/modules/notification ^TestListInboxUsesTheInjectedRegistry$",
    "why": "收件匣用寫死的正式註冊表，不用注入的"
   },

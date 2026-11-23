@@ -86,7 +86,8 @@ export function useSellerWorkspaceRealtime(
 					timerRef.current = null;
 					invalidateWorkspace();
 				}, SELLER_WORKSPACE_DEBOUNCE_MS);
-			} else if (signal.type === "reconnected") {
+			} else if (signal.type === "reconnected" && signal.afterAbnormalEnd) {
+				// 壽命到期的正常結束（立刻重連）不必重讀；錯誤結束的斷線期間可能漏訊號。
 				clearTimer();
 				invalidateWorkspace();
 			}

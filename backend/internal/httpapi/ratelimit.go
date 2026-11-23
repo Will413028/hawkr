@@ -3,7 +3,6 @@ package httpapi
 import (
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -45,24 +44,19 @@ var (
 // 猜 ID token 的程式；共用位址的人也在額度內。SSR 與 CI 的身分沒有加倍：App 的請求不經它們。
 var tierAppLogin = rateTier{name: "app-login", visitor: 30}
 
+// tierWatch 是 WatchNotifications（長連線串流）的額度：每個身分每分鐘 120 次開串流。正常的重連是每條連線每 15 分鐘壽命到期一次、加上網路中斷與
+// 分頁開關，遠低於這個數；開了就中止的迴圈（壞掉的 client 或腳本）會被擋。它是自己的計數器，重連不會擠掉同一個帳號其他呼叫的 tierDefault 額度。
+// 同時開著的連線數另由模組的每帳號串流上限管（resource_exhausted）。額度以來源身分計，訪客、SSR 與 CI 的串流請求同樣計數。
+var tierWatch = rateTier{name: "watch", visitor: 120}
+
 // procedureTiers 是需要自己額度的 procedure；其餘依 service 的使用者類別。
 var procedureTiers = map[string]rateTier{
 	sellerconnect.SellerPublicServiceRecordProductViewProcedure:      tierProductView,
 	socialconnect.SocialPublicServiceRecordPostViewProcedure:         tierPostView,
 	identityconnect.IdentityPublicServiceIssueAppLoginNonceProcedure: tierAppLogin,
 	identityconnect.IdentityPublicServiceExchangeIdTokenProcedure:    tierAppLogin,
-}
 
-// accountExemptProcedures 是登入的顧客帳號不計入口額度的 procedure：長連線的串流。連線壽命到期、網路中斷與多個分頁都會重連，重連的請求若和帳號的其他呼叫共用
-// 同一個計數器，會互相擠掉額度；同時連線數由模組的每帳號串流上限管（resource_exhausted）。只豁免帳號身分（subject 的 a: 前綴，由有效 session 判定）：
-// 訪客（v:）、SSR、CI 與管理員照原級別計數，沒登入的請求也過不了 handler 的身分檢查。
-var accountExemptProcedures = map[string]struct{}{
-	notificationconnect.NotificationAppServiceWatchNotificationsProcedure: {},
-}
-
-func exemptFromEntryLimit(procedure, subject string) bool {
-	_, ok := accountExemptProcedures[procedure]
-	return ok && strings.HasPrefix(subject, "a:")
+	notificationconnect.NotificationAppServiceWatchNotificationsProcedure: tierWatch,
 }
 
 // tierOf 決定 Connect procedure 的級別：procedureTiers 列出的用自己的級別，其餘依 service 的使用者類別。
@@ -173,10 +167,6 @@ func (l *rateLimiter) allowAll(reqs ...rateRequest) (bool, time.Duration) {
 func withRateLimit(l *rateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		subject := rpc.SubjectFrom(r.Context())
-		if exemptFromEntryLimit(r.URL.Path, subject) {
-			next.ServeHTTP(w, r)
-			return
-		}
 		tier := tierOf(r.URL.Path)
 		if ok, wait := l.allowAll(rateRequest{key: tier.name + "|" + subject, limit: tier.limit(subject), window: rateWindow}); !ok {
 			_ = connect.NewErrorWriter().Write(w, r, rpc.NegotiatedRetryLater(w, r, wait))

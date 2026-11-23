@@ -58,7 +58,8 @@ const FAMILIES_PER_INVALIDATION = 6;
 const signal = (s: NotificationSignal) => mocks.watches.at(-1)?.onSignal(s);
 const workspaceEvent = () =>
 	signal({ type: "sellerWorkspace", change: "order" });
-const reconnected = () => signal({ type: "reconnected" });
+const reconnected = (afterAbnormalEnd = true) =>
+	signal({ type: "reconnected", afterAbnormalEnd });
 
 describe("useSellerWorkspaceRealtime", () => {
 	beforeEach(() => {
@@ -151,6 +152,15 @@ describe("useSellerWorkspaceRealtime", () => {
 		expect(mocks.invalidateQueries).toHaveBeenCalledTimes(
 			FAMILIES_PER_INVALIDATION,
 		);
+	});
+
+	it("壽命到期的正常結束後重連不失效（只有錯誤結束後才整批重讀）", () => {
+		render(React.createElement(Subscriber));
+		act(() => {
+			reconnected(false);
+			vi.advanceTimersByTime(SELLER_WORKSPACE_DEBOUNCE_MS * 2);
+		});
+		expect(mocks.invalidateQueries).not.toHaveBeenCalled();
 	});
 
 	it("卸載後不再回應事件，也不會留下 timer", () => {

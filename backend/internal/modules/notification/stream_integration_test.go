@@ -247,3 +247,75 @@ func TestStreamSignalCountsOnlyRegisteredTypesLikeUnreadCount(t *testing.T) {
 		t.Fatalf("訊號應與 UnreadCount（%d）一致，只算註冊的型別，最新一則是 %s：%+v", unread, registered, ev.Inbox)
 	}
 }
+
+// 已讀、全部已讀、刪除改變未讀數，同一個 transaction 內 pg_notify：同收件人的其他訂閱者收到帶新未讀數的訊號，別的受眾與別的帳號不受影響。
+// mutation：app.MarkRead、MarkAllRead、BatchDelete 各自拿掉 inboxChanged 呼叫 → 對應的 subtest 收不到訊號，失敗。
+func TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers(t *testing.T) {
+	f := setupIntake(t)
+	listen(t, f.module)
+	acct := f.newAccount(t)
+	other := f.newAccount(t)
+	for _, id := range []string{"e1", "e2", "e3"} {
+		f.accept(t, "test_like", likeParams{AccountID: acct, EventID: id, PostID: "p" + id, ActorID: other})
+	}
+	f.accept(t, "test_store_note", storeNoteParams{AccountID: acct, StoreID: 7, EventID: "s1"})
+	f.run(t)
+	var ids []uuid.UUID
+	rows, err := f.db.Pool().Query(context.Background(), `SELECT id FROM notification.inbox_items WHERE account_id = $1 AND audience = 'BUYER' ORDER BY id`, acct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if len(ids) != 3 {
+		t.Fatalf("買家收件匣應有 3 則：%d", len(ids))
+	}
+	buyerSub := watch(t, f, WatchParams{AccountID: acct, Audience: AudienceBuyer})
+	storeSub := watch(t, f, WatchParams{AccountID: acct, Audience: AudienceStore, StoreID: 7})
+	otherSub := watch(t, f, WatchParams{AccountID: other, Audience: AudienceBuyer})
+	if ev := nextEvent(t, buyerSub); ev.Inbox == nil || ev.Inbox.UnreadCount != 3 {
+		t.Fatalf("連線建立時未讀應是 3：%+v", ev)
+	}
+	nextEvent(t, storeSub)
+	nextEvent(t, otherSub)
+	ctx := context.Background()
+	wantUnread := func(t *testing.T, want int32) {
+		t.Helper()
+		if ev := nextEvent(t, buyerSub); ev.Inbox == nil || ev.Inbox.UnreadCount != want {
+			t.Fatalf("買家串流的未讀數應是 %d：%+v", want, ev)
+		}
+		noEvent(t, storeSub)
+		noEvent(t, otherSub)
+	}
+
+	t.Run("mark one read", func(t *testing.T) {
+		if err := f.module.MarkInboxItemRead(ctx, acct, ids[0]); err != nil {
+			t.Fatal(err)
+		}
+		wantUnread(t, 2)
+	})
+	t.Run("batch delete", func(t *testing.T) {
+		if err := f.module.BatchDeleteInboxItems(ctx, acct, []uuid.UUID{ids[1]}); err != nil {
+			t.Fatal(err)
+		}
+		wantUnread(t, 1)
+	})
+	t.Run("mark all read", func(t *testing.T) {
+		if _, err := f.module.MarkAllInboxItemsRead(ctx, Recipient{AccountID: acct, Audience: AudienceBuyer}); err != nil {
+			t.Fatal(err)
+		}
+		wantUnread(t, 0)
+	})
+	t.Run("a rolled back batch delete signals nothing", func(t *testing.T) {
+		if err := f.module.BatchDeleteInboxItems(ctx, acct, []uuid.UUID{ids[2], uuid.New()}); err == nil {
+			t.Fatal("有不存在的 ID 應整批失敗")
+		}
+		noEvent(t, buyerSub)
+	})
+}
