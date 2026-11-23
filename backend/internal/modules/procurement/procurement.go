@@ -17,6 +17,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/candidate"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/conversation"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/extract"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
@@ -28,6 +29,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/llm"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -138,6 +140,8 @@ type Module struct {
 	searcher   search.Starter
 	resumer    turn.Resumer
 	snapshots  snapshot.Reader
+	convs      conversation.Service
+	candidates search.Reader
 }
 
 // New 建立模組。
@@ -170,6 +174,8 @@ func New(d Deps) *Module {
 	m.searcher = search.Starter{Submitter: m.submitter}
 	m.resumer = turn.Resumer{Submitter: m.submitter}
 	m.snapshots = snapshot.Reader{DB: d.DB, Ledger: ledger}
+	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
+	m.candidates = search.Reader{DB: d.DB}
 	return m
 }
 
@@ -370,4 +376,56 @@ func (m *Module) WatchRun(ctx context.Context, buyerID int64, runID uuid.UUID, c
 	return m.watcher.Watch(ctx, buyerID, runID, cursor, func(e run.Event) error {
 		return send(RunEvent{Cursor: run.Cursor(e.Seq), Payload: e.Payload, OccurredAt: e.OccurredAt})
 	})
+}
+
+// 讀取模型與對話管理的型別。
+type (
+	RequestSnapshot      = model.RequestSnapshot
+	RequirementSlots     = model.RequirementSlots
+	ItemResolution       = model.ItemResolution
+	ConversationSummary  = model.ConversationSummary
+	ConversationPage     = model.ConversationPage
+	ConversationMessages = model.ConversationMessages
+	CandidateSearch      = model.CandidateSearch
+	Candidate            = model.Candidate
+	MatchedFact          = model.MatchedFact
+	UnverifiableFact     = model.UnverifiableFact
+)
+
+// MaxConversationTitleRunes 是對話標題的長度上限（字元數）。
+const MaxConversationTitleRunes = conversation.MaxTitleRunes
+
+// GetSnapshot 回傳買家自己的需求的快照（以需求為鍵）：現行版本的欄位、缺漏的必填欄位、品項消歧卡的分類名稱、run、待回答的中斷與最新的發布結果
+// （含由確認快照重算的 hash）。需求不存在、不屬於買家或它的對話已被刪除回 NOT_FOUND。ctx 不可已在 transaction 內。
+func (m *Module) GetSnapshot(ctx context.Context, buyerID int64, requestID uuid.UUID) (RequestSnapshot, error) {
+	return m.snapshots.GetByRequest(ctx, buyerID, requestID)
+}
+
+// GetConversationMessages 回傳買家自己的對話的訊息（由舊到新）、需求狀態與標題；對話不存在、已刪除或不是買家的回 NOT_FOUND。ctx 不可已在 transaction 內。
+func (m *Module) GetConversationMessages(ctx context.Context, buyerID int64, conversationID uuid.UUID) (ConversationMessages, error) {
+	return m.snapshots.Messages(ctx, buyerID, conversationID)
+}
+
+// ListConversations 回傳買家自己未刪除的對話，依 (updated_at, id) 由新到舊的一頁（keyset）。pageSize 為 0 是 20、超過 50 以 50 計、負數回
+// INVALID_ARGUMENT（欄位 page_size）；pageToken 不是上一頁發出的 token 回 INVALID_ARGUMENT（欄位 page_token）；NextPageToken 為空字串是最後一頁。
+func (m *Module) ListConversations(ctx context.Context, buyerID int64, pageSize int32, pageToken string) (ConversationPage, error) {
+	return m.convs.List(ctx, buyerID, pageSize, pageToken)
+}
+
+// RenameConversation 改對話標題（目標狀態的方法，重送結果相同）。標題去頭尾空白後為空、超過 MaxConversationTitleRunes 個字元或含換行回
+// INVALID_ARGUMENT（欄位 title）；對話不存在、已刪除或不是買家的回 NOT_FOUND。
+func (m *Module) RenameConversation(ctx context.Context, buyerID int64, conversationID uuid.UUID, title string) error {
+	return m.convs.Rename(ctx, buyerID, conversationID, title)
+}
+
+// DeleteConversation 刪除對話，同一個 transaction 取消它需求還沒結束的 run（走 CancelRun 的路徑，買家取消不退額度）；已發布的詢價不受影響。
+// 已刪除的重送回成功；不存在或不是買家的回 NOT_FOUND。
+func (m *Module) DeleteConversation(ctx context.Context, buyerID int64, conversationID uuid.UUID) error {
+	return m.convs.Delete(ctx, buyerID, conversationID)
+}
+
+// GetCandidateSearch 回傳買家自己的候選搜尋 run 的狀態與結果。run 不存在、不是買家的、不是 CANDIDATE_SEARCH 或不屬於這個需求回 NOT_FOUND；
+// 只有 SUCCEEDED 有候選（事實依需求現行版本與 locale 讀取時組出），FAILED 帶失敗原因代碼。ctx 不可已在 transaction 內。
+func (m *Module) GetCandidateSearch(ctx context.Context, buyerID int64, requestID, runID uuid.UUID, locale uitext.Locale) (CandidateSearch, error) {
+	return m.candidates.Get(ctx, buyerID, requestID, runID, locale)
 }

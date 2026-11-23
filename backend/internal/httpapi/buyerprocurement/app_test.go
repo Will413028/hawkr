@@ -20,7 +20,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 const (
@@ -52,6 +54,17 @@ type fakeModule struct {
 	events    []procurement.RunEvent
 	snapshot  procurement.RuntimeSnapshot
 	outcome   procurement.CancelRunOutcome
+
+	requestSnapshot procurement.RequestSnapshot
+	messages        procurement.ConversationMessages
+	page            procurement.ConversationPage
+	search          procurement.CandidateSearch
+	pageSizes       []int32
+	pageTokens      []string
+	renamed         []string
+	deleted         int
+	listErr         error
+	renameErr       error
 }
 
 func (f *fakeModule) SubmitTurn(_ context.Context, in procurement.SubmitTurnInput) (procurement.TurnSubmitted, error) {
@@ -102,9 +115,28 @@ func (f *fakeModule) GetRuntimeSnapshot(_ context.Context, buyer int64, conv uui
 	return f.snapshot, nil
 }
 
+// cardStub 給每家店一張有名字的卡片，但店 404 沒有卡片（從沒公開過）。
+type cardStub struct{}
+
+func (cardStub) StoreCards(_ context.Context, ids []int64) ([]seller.StoreCard, error) {
+	var out []seller.StoreCard
+	for _, id := range ids {
+		if id == 404 {
+			continue
+		}
+		name := fmt.Sprintf("店%d", id)
+		out = append(out, seller.StoreCard{StoreID: id, StoreCode: id + 1000, Name: &name, Status: seller.CardOpen})
+	}
+	return out, nil
+}
+
 func setup(t *testing.T, m Module) procurementv1alpha1connect.BuyerProcurementAppServiceClient {
 	t.Helper()
-	app := NewApp(m, buyerLookup{}, slog.New(slog.DiscardHandler))
+	images, err := rpc.NewImages("https://media.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(m, buyerLookup{}, cardStub{}, images, slog.New(slog.DiscardHandler))
 	path, h := procurementv1alpha1connect.NewBuyerProcurementAppServiceHandler(app, connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -412,6 +444,8 @@ func TestFieldPathsExistInTheRequestMessages(t *testing.T) {
 		"search": {searchPaths, rpc.CheckFieldPaths((&pb.StartCandidateSearchRequest{}).ProtoReflect().Descriptor(), searchPaths)},
 		"resume": {resumePaths, rpc.CheckFieldPaths((&pb.ResumeRunRequest{}).ProtoReflect().Descriptor(), resumePaths)},
 		"watch":  {watchPaths, rpc.CheckFieldPaths((&pb.WatchRunRequest{}).ProtoReflect().Descriptor(), watchPaths)},
+		"list":   {listPaths, rpc.CheckFieldPaths((&pb.ListConversationsRequest{}).ProtoReflect().Descriptor(), listPaths)},
+		"rename": {renamePaths, rpc.CheckFieldPaths((&pb.RenameConversationRequest{}).ProtoReflect().Descriptor(), renamePaths)},
 	} {
 		if len(tc.miss) != 0 {
 			t.Errorf("%s：請求訊息沒有這些路徑：%v", name, tc.miss)
@@ -429,4 +463,53 @@ func TestSubmitTurnAcceptsAServerIssuedUUIDv7RequestID(t *testing.T) {
 	if len(m.submitted) != 1 || m.submitted[0].RequestID == nil || *m.submitted[0].RequestID != id {
 		t.Fatalf("模組收到 %+v，要帶 request_id %s", m.submitted, id)
 	}
+}
+
+func owned(buyer int64, id uuid.UUID, what string) error {
+	if buyer != buyerID || id != ownedRun {
+		return apperr.NotFound("找不到這個%s", what)
+	}
+	return nil
+}
+
+func (f *fakeModule) GetSnapshot(_ context.Context, buyer int64, id uuid.UUID) (procurement.RequestSnapshot, error) {
+	if err := owned(buyer, id, "需求"); err != nil {
+		return procurement.RequestSnapshot{}, err
+	}
+	return f.requestSnapshot, nil
+}
+
+func (f *fakeModule) GetConversationMessages(_ context.Context, buyer int64, id uuid.UUID) (procurement.ConversationMessages, error) {
+	if err := owned(buyer, id, "對話"); err != nil {
+		return procurement.ConversationMessages{}, err
+	}
+	return f.messages, nil
+}
+
+func (f *fakeModule) ListConversations(_ context.Context, _ int64, size int32, token string) (procurement.ConversationPage, error) {
+	f.pageSizes, f.pageTokens = append(f.pageSizes, size), append(f.pageTokens, token)
+	return f.page, f.listErr
+}
+
+func (f *fakeModule) RenameConversation(_ context.Context, buyer int64, id uuid.UUID, title string) error {
+	if err := owned(buyer, id, "對話"); err != nil {
+		return err
+	}
+	f.renamed = append(f.renamed, title)
+	return f.renameErr
+}
+
+func (f *fakeModule) DeleteConversation(_ context.Context, buyer int64, id uuid.UUID) error {
+	if err := owned(buyer, id, "對話"); err != nil {
+		return err
+	}
+	f.deleted++
+	return nil
+}
+
+func (f *fakeModule) GetCandidateSearch(_ context.Context, buyer int64, request, run uuid.UUID, _ uitext.Locale) (procurement.CandidateSearch, error) {
+	if buyer != buyerID || request != ownedRun || run != ownedRun {
+		return procurement.CandidateSearch{}, apperr.NotFound("找不到這次候選搜尋")
+	}
+	return f.search, nil
 }

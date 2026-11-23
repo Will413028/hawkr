@@ -172,3 +172,9 @@ SELECT * FROM procurement.agent_runs
 WHERE request_id = @request_id AND buyer_id = @buyer_id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')
 ORDER BY created_at DESC, id DESC
 LIMIT 1;
+
+-- name: ListUnfinishedRunIDsByRequest :many
+-- 需求還沒結束的 run（含等待輸入的），依 id 升序；不鎖：呼叫端逐個依全域鎖順序鎖並重讀狀態（刪除對話時全部取消）。
+SELECT id FROM procurement.agent_runs
+WHERE request_id = @request_id AND buyer_id = @buyer_id AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED', 'WAITING_FOR_INPUT')
+ORDER BY id;

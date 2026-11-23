@@ -100,6 +100,33 @@ func (q *Queries) GetConversationForBuyer(ctx context.Context, arg GetConversati
 	return i, err
 }
 
+const getConversationIncludingDeleted = `-- name: GetConversationIncludingDeleted :one
+SELECT id, buyer_id, request_id, title, title_source, last_message_preview, deleted_at, created_at, updated_at FROM procurement.conversations WHERE id = $1 AND buyer_id = $2
+`
+
+type GetConversationIncludingDeletedParams struct {
+	ID      uuid.UUID
+	BuyerID int64
+}
+
+// 只用來分辨「自己的、已刪除」與「不存在或不是自己的」：刪除重送回成功，後者回 NOT_FOUND。
+func (q *Queries) GetConversationIncludingDeleted(ctx context.Context, arg GetConversationIncludingDeletedParams) (ProcurementConversation, error) {
+	row := q.db.QueryRow(ctx, getConversationIncludingDeleted, arg.ID, arg.BuyerID)
+	var i ProcurementConversation
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.Title,
+		&i.TitleSource,
+		&i.LastMessagePreview,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getLatestTurnByRequest = `-- name: GetLatestTurnByRequest :one
 SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1
 `
@@ -385,6 +412,56 @@ type ListConversationsParams struct {
 
 func (q *Queries) ListConversations(ctx context.Context, arg ListConversationsParams) ([]ProcurementConversation, error) {
 	rows, err := q.db.Query(ctx, listConversations, arg.BuyerID, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProcurementConversation{}
+	for rows.Next() {
+		var i ProcurementConversation
+		if err := rows.Scan(
+			&i.ID,
+			&i.BuyerID,
+			&i.RequestID,
+			&i.Title,
+			&i.TitleSource,
+			&i.LastMessagePreview,
+			&i.DeletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listConversationsAfter = `-- name: ListConversationsAfter :many
+SELECT id, buyer_id, request_id, title, title_source, last_message_preview, deleted_at, created_at, updated_at FROM procurement.conversations
+WHERE buyer_id = $1 AND deleted_at IS NULL AND (updated_at, id) < ($2::timestamptz, $3::uuid)
+ORDER BY updated_at DESC, id DESC
+LIMIT $4
+`
+
+type ListConversationsAfterParams struct {
+	BuyerID        int64
+	AfterUpdatedAt time.Time
+	AfterID        uuid.UUID
+	PageSize       int32
+}
+
+// 第一頁之後的頁：keyset (updated_at DESC, id DESC)，走索引 conversations_buyer_active；游標是上一頁最後一列的 (updated_at, id)。
+func (q *Queries) ListConversationsAfter(ctx context.Context, arg ListConversationsAfterParams) ([]ProcurementConversation, error) {
+	rows, err := q.db.Query(ctx, listConversationsAfter,
+		arg.BuyerID,
+		arg.AfterUpdatedAt,
+		arg.AfterID,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}

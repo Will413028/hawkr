@@ -2,8 +2,12 @@ package buyerprocurement
 
 import (
 	"fmt"
+	"time"
 
+	"google.golang.org/genproto/googleapis/type/date"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
@@ -87,7 +91,25 @@ func snapshotToProto(s procurement.RuntimeSnapshot) (*pb.GetRuntimeSnapshotRespo
 	out := &pb.GetRuntimeSnapshotResponse{
 		ConversationId: s.ConversationID.String(), RequestId: s.RequestID.String(), Status: status, Title: s.Title,
 	}
-	for _, m := range s.Messages {
+	if out.Messages, err = messagesToProto(s.Messages); err != nil {
+		return nil, err
+	}
+	if out.Runs, err = runsToProto(s.Runs); err != nil {
+		return nil, err
+	}
+	if s.ActiveRunID != nil {
+		out.ActiveRunId = s.ActiveRunID.String()
+	}
+	if out.OpenConfirmation, err = confirmationToProto(s.OpenConfirmation); err != nil {
+		return nil, err
+	}
+	out.PublishedRfq = publishedToProto(s.PublishedRfq)
+	return out, nil
+}
+
+func messagesToProto(in []procurement.ConversationMessage) ([]*pb.ConversationMessage, error) {
+	var out []*pb.ConversationMessage
+	for _, m := range in {
 		role, err := roleToProto(m.Role)
 		if err != nil {
 			return nil, err
@@ -100,9 +122,14 @@ func snapshotToProto(s procurement.RuntimeSnapshot) (*pb.GetRuntimeSnapshotRespo
 			}
 			msg.RecordedThisTurn = append(msg.RecordedThisTurn, &pb.RecordedField{Key: k, Label: f.Label, Value: f.Value})
 		}
-		out.Messages = append(out.Messages, msg)
+		out = append(out, msg)
 	}
-	for _, r := range s.Runs {
+	return out, nil
+}
+
+func runsToProto(in []procurement.RunSummary) ([]*pb.RunSummary, error) {
+	var out []*pb.RunSummary
+	for _, r := range in {
 		st, err := runStatusToProto(r.Status)
 		if err != nil {
 			return nil, err
@@ -111,34 +138,143 @@ func snapshotToProto(s procurement.RuntimeSnapshot) (*pb.GetRuntimeSnapshotRespo
 		if err != nil {
 			return nil, err
 		}
-		out.Runs = append(out.Runs, &pb.RunSummary{RunId: r.RunID.String(), RunType: rt, Status: st, LastCursor: r.LastCursor, Terminal: r.Terminal})
+		out = append(out, &pb.RunSummary{RunId: r.RunID.String(), RunType: rt, Status: st, LastCursor: r.LastCursor, Terminal: r.Terminal})
+	}
+	return out, nil
+}
+
+func confirmationToProto(c *procurement.OpenConfirmation) (*pb.OpenConfirmation, error) {
+	if c == nil {
+		return nil, nil
+	}
+	kind, err := interruptKindToProto(c.Kind)
+	if err != nil {
+		return nil, err
+	}
+	key, err := slotKeyToProto(c.Question.SlotKey)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.OpenConfirmation{
+		InterruptId: c.InterruptID.String(), Kind: kind, Processing: c.Processing,
+		Question: &pb.ClarifyQuestion{
+			SlotKey: key, Prompt: c.Question.Prompt, Options: optionsToProto(c.Question.Options), UnitOptions: optionsToProto(c.Question.UnitOptions),
+			AllowFreeText: c.Question.AllowFreeText, CanSkip: c.Question.CanSkip,
+		},
+	}, nil
+}
+
+func publishedToProto(p *procurement.PublishedRfq) *pb.PublishedRfq {
+	if p == nil {
+		return nil
+	}
+	return &pb.PublishedRfq{
+		PublicationId: p.PublicationID.String(), Version: fmt.Sprint(p.Version), PublishTime: timestamppb.New(p.PublishTime),
+		RecipientCount: p.RecipientCount, QueuedCount: p.QueuedCount, ConfirmedRfqSnapshotId: p.ConfirmedRfqSnapshotID.String(),
+		RfqSnapshotHash: p.RfqSnapshotHash,
+	}
+}
+
+func timestampOf(t time.Time) *timestamppb.Timestamp { return timestamppb.New(t) }
+
+func itemResolutionKindToProto(code string) (pb.ItemResolutionKind, error) {
+	v, ok := pb.ItemResolutionKind_value["ITEM_RESOLUTION_KIND_"+code]
+	if !ok || v == int32(pb.ItemResolutionKind_ITEM_RESOLUTION_KIND_UNSPECIFIED) {
+		return 0, fmt.Errorf("buyerprocurement：品項解析種類 %q 沒有對應的 ItemResolutionKind", code)
+	}
+	return pb.ItemResolutionKind(v), nil
+}
+
+func failureReasonToProto(code string) (pb.RunFailureReason, error) {
+	v, ok := pb.RunFailureReason_value["RUN_FAILURE_REASON_"+code]
+	if !ok || v == int32(pb.RunFailureReason_RUN_FAILURE_REASON_UNSPECIFIED) {
+		return 0, fmt.Errorf("buyerprocurement：失敗原因 %q 沒有對應的 RunFailureReason", code)
+	}
+	return pb.RunFailureReason(v), nil
+}
+
+func slotsToProto(s procurement.RequirementSlots) (*pb.Slots, error) {
+	out := &pb.Slots{
+		Item: s.Item, Quantity: s.Quantity, Unit: s.Unit, Packaging: s.Packaging, BudgetPerUnit: s.BudgetPerUnit,
+		DeliveryCity: s.DeliveryCity, ExactMatchRequired: s.ExactMatchRequired,
+	}
+	if d := s.DeliveryDate; d != nil {
+		out.DeliveryDate = &date.Date{Year: int32(d.Year()), Month: int32(d.Month()), Day: int32(d.Day())} //nolint:gosec // time.Time 的日曆欄位在 Date 的範圍內
+	}
+	if r := s.ItemResolution; r != nil {
+		kind, err := itemResolutionKindToProto(r.Kind)
+		if err != nil {
+			return nil, err
+		}
+		out.ItemResolution = &pb.ItemResolution{Kind: kind, Label: r.Label, DisplayValue: r.DisplayValue}
+	}
+	return out, nil
+}
+
+func requestSnapshotToProto(s procurement.RequestSnapshot) (*pb.GetSnapshotResponse, error) {
+	status, err := requestStatusToProto(s.Status)
+	if err != nil {
+		return nil, err
+	}
+	sl, err := slotsToProto(s.Slots)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.GetSnapshotResponse{RequestId: s.RequestID.String(), RevisionId: s.RevisionID.String(), Status: status, Slots: sl}
+	for _, k := range s.MissingRequired {
+		key, err := slotKeyToProto(k)
+		if err != nil {
+			return nil, err
+		}
+		out.MissingRequired = append(out.MissingRequired, key)
+	}
+	if len(s.ItemDisambiguation) > 0 {
+		out.ItemDisambiguation = &pb.ItemDisambiguation{}
+		for _, label := range s.ItemDisambiguation {
+			out.ItemDisambiguation.Candidates = append(out.ItemDisambiguation.Candidates, &pb.ItemDisambiguationOption{Label: label})
+		}
+	}
+	if out.Runs, err = runsToProto(s.Runs); err != nil {
+		return nil, err
 	}
 	if s.ActiveRunID != nil {
 		out.ActiveRunId = s.ActiveRunID.String()
 	}
-	if c := s.OpenConfirmation; c != nil {
-		kind, err := interruptKindToProto(c.Kind)
-		if err != nil {
+	if out.OpenConfirmation, err = confirmationToProto(s.OpenConfirmation); err != nil {
+		return nil, err
+	}
+	out.PublishedRfq = publishedToProto(s.PublishedRfq)
+	return out, nil
+}
+
+func candidateSearchToProto(s procurement.CandidateSearch, cards map[int64]*commonpb.StoreCard) (*pb.GetCandidateSearchResponse, error) {
+	status, err := runStatusToProto(s.Status)
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.GetCandidateSearchResponse{RequestId: s.RequestID.String(), RunId: s.RunID.String(), CandidateSetId: s.CandidateSetID.String(), Status: status}
+	if s.FailureReason != "" {
+		if out.FailureReason, err = failureReasonToProto(s.FailureReason); err != nil {
 			return nil, err
-		}
-		key, err := slotKeyToProto(c.Question.SlotKey)
-		if err != nil {
-			return nil, err
-		}
-		out.OpenConfirmation = &pb.OpenConfirmation{
-			InterruptId: c.InterruptID.String(), Kind: kind, Processing: c.Processing,
-			Question: &pb.ClarifyQuestion{
-				SlotKey: key, Prompt: c.Question.Prompt, Options: optionsToProto(c.Question.Options), UnitOptions: optionsToProto(c.Question.UnitOptions),
-				AllowFreeText: c.Question.AllowFreeText, CanSkip: c.Question.CanSkip,
-			},
 		}
 	}
-	if p := s.PublishedRfq; p != nil {
-		out.PublishedRfq = &pb.PublishedRfq{
-			PublicationId: p.PublicationID.String(), Version: fmt.Sprint(p.Version), PublishTime: timestamppb.New(p.PublishTime),
-			RecipientCount: p.RecipientCount, QueuedCount: p.QueuedCount, ConfirmedRfqSnapshotId: p.ConfirmedRfqSnapshotID.String(),
-			RfqSnapshotHash: p.RfqSnapshotHash,
+	for _, c := range s.Candidates {
+		cand := &pb.Candidate{Id: c.ID.String(), FactsTime: timestamppb.New(c.FactsAsOf), Selected: c.Selected, Store: cards[c.StoreID]}
+		for _, f := range c.MatchedFacts {
+			k, err := slotKeyToProto(f.SlotKey)
+			if err != nil {
+				return nil, err
+			}
+			cand.MatchedFacts = append(cand.MatchedFacts, &pb.MatchedFact{SlotKey: k, Label: f.Label})
 		}
+		for _, f := range c.UnverifiableFacts {
+			k, err := slotKeyToProto(f.SlotKey)
+			if err != nil {
+				return nil, err
+			}
+			cand.UnverifiableFacts = append(cand.UnverifiableFacts, &pb.UnverifiableFact{SlotKey: k, Reason: f.Reason})
+		}
+		out.Candidates = append(out.Candidates, cand)
 	}
 	return out, nil
 }

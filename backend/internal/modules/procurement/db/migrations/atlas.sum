@@ -1,4 +1,4 @@
-h1:2SxqerqUdOET+VGjn0YryJK9mc64q9I4TzPWFJ0ZhKI=
+h1:ylm/ddU5k+Hk561W8OfhnPauWFVXlK80cCS97JM8rs0=
 20261121020526_procurement_schema.sql h1:4b7iMy5vWcgTh3b/6mcHgpMKKYiu4IlZRsz0bTxOgiA=
 20261121050422_procurement_run_lifecycle.sql h1:I4ieRXRo48BLbf15Mayok7JxbgdDDg5wjAmsmACUlms=
 20261121121937_procurement_turn_optional_progress.sql h1:I8kh61q0KdMqUkXaPgFzO6AEAyPiqxd51Nq4p7/lBYQ=
@@ -8,3 +8,4 @@ h1:2SxqerqUdOET+VGjn0YryJK9mc64q9I4TzPWFJ0ZhKI=
 20261122035831_procurement_turn_executor.sql h1:sv4aTJEhOillNV/JX3JRBBzQO0A2YlYt+VUxrUUWt2E=
 20261122161911_procurement_candidate_search.sql h1:vK2+NufEymzEoIA3Vj91wqcvH02aFbdMYLJRhaK5H+U=
 20261122191655_procurement_answer_option.sql h1:i2Y2b3pR55gzlieyC9OadUS4n6o9zdBqaOvqmhJ3ooQ=
+20261123024034_procurement_conversation_title_40.sql h1:Pf+9dm5a/jIqaNYIHVMzQ/ku6w4n+qPXolaw8JkmA7A=

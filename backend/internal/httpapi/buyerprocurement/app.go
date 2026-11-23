@@ -1,7 +1,7 @@
 // Package buyerprocurement 實作買家採購 Connect API（BuyerProcurementAppService）的傳輸：請求驗證、錯誤與欄位路徑對應、
 // 事件與讀取模型轉成 proto。送出、取消、串流、搜尋、接續與快照的規則都在 modules/procurement，這裡不重做。
 //
-// 目前只有 run 相關的 6 支（A9-3b-2f）；其餘方法由內嵌的 Unimplemented 回 unimplemented，掛載隨 A9-3b-3（A9-D13）。
+// 目前有 run 相關的 6 支（A9-3b-2f）與讀取、對話管理的 6 支（A9-3b-3a）；其餘方法由內嵌的 Unimplemented 回 unimplemented，掛載隨 A9-3b-3（A9-D13）。
 package buyerprocurement
 
 import (
@@ -18,6 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/requestid"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -30,6 +31,17 @@ type Module interface {
 	ResumeRun(ctx context.Context, in procurement.ResumeRunInput) (procurement.ResumeRunResult, error)
 	StartCandidateSearch(ctx context.Context, in procurement.StartCandidateSearchInput) (procurement.CandidateSearchStarted, error)
 	GetRuntimeSnapshot(ctx context.Context, buyerID int64, conversationID uuid.UUID) (procurement.RuntimeSnapshot, error)
+	GetSnapshot(ctx context.Context, buyerID int64, requestID uuid.UUID) (procurement.RequestSnapshot, error)
+	GetConversationMessages(ctx context.Context, buyerID int64, conversationID uuid.UUID) (procurement.ConversationMessages, error)
+	ListConversations(ctx context.Context, buyerID int64, pageSize int32, pageToken string) (procurement.ConversationPage, error)
+	RenameConversation(ctx context.Context, buyerID int64, conversationID uuid.UUID, title string) error
+	DeleteConversation(ctx context.Context, buyerID int64, conversationID uuid.UUID) error
+	GetCandidateSearch(ctx context.Context, buyerID int64, requestID, runID uuid.UUID, locale uitext.Locale) (procurement.CandidateSearch, error)
+}
+
+// StoreCards 讀候選賣家的店家卡片（*seller.Module 滿足它）：從沒公開過與不存在的店不在回傳裡；一次最多 seller.MaxBatchSize 個。
+type StoreCards interface {
+	StoreCards(ctx context.Context, storeIDs []int64) ([]seller.StoreCard, error)
 }
 
 // App 是 BuyerProcurementAppService 的 handler。
@@ -37,17 +49,19 @@ type App struct {
 	procurementv1alpha1connect.UnimplementedBuyerProcurementAppServiceHandler
 	m      Module
 	buyers rpc.BuyerLookup
+	cards  StoreCards
+	images rpc.Images
 	log    *slog.Logger
 }
 
 var _ procurementv1alpha1connect.BuyerProcurementAppServiceHandler = (*App)(nil)
 
-// NewApp 建立 handler；buyers 把登入的帳號對到買家（*buyer.Module）。
-func NewApp(m Module, buyers rpc.BuyerLookup, log *slog.Logger) *App {
+// NewApp 建立 handler；buyers 把登入的帳號對到買家（*buyer.Module），cards 與 images 組候選賣家的店家卡片。
+func NewApp(m Module, buyers rpc.BuyerLookup, cards StoreCards, images rpc.Images, log *slog.Logger) *App {
 	if log == nil {
 		log = slog.New(slog.DiscardHandler)
 	}
-	return &App{m: m, buyers: buyers, log: log}
+	return &App{m: m, buyers: buyers, cards: cards, images: images, log: log}
 }
 
 func (h *App) caller(ctx context.Context) (int64, error) { return rpc.AccountBuyerID(ctx, h.buyers) }
