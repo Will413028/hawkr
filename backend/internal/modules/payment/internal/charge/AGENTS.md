@@ -1,6 +1,6 @@
 # payment/internal/charge
 
-付款：provider 中立的 port、付款列與嘗試歷程、建立、同步與補掃、付款事件的 inbox handler。計畫：`backend/docs/plans/2026-11-23-b2-payment.md` 步驟 3a；3b、3c、3d 接在這個套件上（schema 與 port 已含）。
+付款：provider 中立的 port、付款列與嘗試歷程、建立、同步與補掃、付款事件的 inbox handler。計畫：`backend/docs/plans/2026-11-23-b2-payment.md` 步驟 3a；3b、3c、3d 接在這個套件上。
 
 ## 不變量
 
@@ -16,5 +16,7 @@
 - provider 名稱與收款帳戶不同，webhook 路由（`POST /webhooks/stripe-payments`）、簽章密鑰（`STRIPE_PAYMENT_WEBHOOK_SECRET`）、本文上限與 log 標籤都獨立。守門：`TestAChargeProviderNamedLikeTheAccountProviderPanicsAtAssembly`。
 - 補掃：閒置的建立中列、久未讀的未結案付款、被取代又未結案的舊嘗試、有舊的未處理事件的付款（含舊 ID）。守門：`TestSweepQueuesIdleCreatesStaleReadsAndOldUnprocessedEvents`、`TestAnEventOfASupersededIntentIsSweptAndFullyProcessed`。
 - client_secret 不存，`GetPayment` 在等待付款時向 provider 讀；只回自己的付款。守門：`TestGetPaymentReturnsTheSecretOnlyWhileAwaitingAndOnlyToTheOwner`。
+- 轉帳（3b）：transaction 只寫 PENDING 列與 job，一筆付款一筆有效轉帳靠 `transfers_active_payment`。守門：`TestADuplicateTransferRequestReturnsTheExistingActiveTransfer`。
+- 撤回：同一個 transaction 累加 `reversed_amount`。守門：`TestAReversalUpdatesTheReversedAmountAndTheRefundStatusTogether`。
 - schema 守轉帳與退款的不變量（3b、3c 使用）。守門：`TestTheSchemaGuardsTheTransferAndRefundInvariants`；狀態型別與 CHECK 逐項相同：`TestStatusTypesMatchTheSchemaChecks`、`TestAttemptStatesMatchTheSchemaCheck`。
 - 不負責：訂單狀態與自動退款的判斷（訂單一方，D5 修訂）；逾期付款的取消 use case（步驟 4 的 `ClosePaymentByOrderNo`）。

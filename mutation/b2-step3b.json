@@ -1,0 +1,148 @@
+{
+ "mutants": [
+  {
+   "id": "transfer-active-index-not-unique",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "old": "CREATE UNIQUE INDEX \"transfers_active_payment\"",
+   "new": "CREATE INDEX \"transfers_active_payment\"",
+   "test": "internal/modules/payment ^TestADuplicateTransferRequestReturnsTheExistingActiveTransfer$",
+   "why": "transfers_active_payment 不是唯一索引：INSERT 的 ON CONFLICT (payment_id) 沒有可對應的唯一索引，第二次請求失敗，不再回傳同一筆有效轉帳。"
+  },
+  {
+   "id": "transfer-insufficient-funds-terminal",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\tif errors.Is(err, ErrPermanent) {\n\t\ts.d.Logger.WarnContext(ctx, \"payment：provider 永久拒絕建立轉帳\"",
+   "new": "\tif err != nil {\n\t\ts.d.Logger.WarnContext(ctx, \"payment：provider 永久拒絕建立轉帳\"",
+   "test": "internal/modules/payment ^TestPlatformInsufficientFundsKeepsTheTransferPendingAndALaterRetrySucceeds$",
+   "why": "任何錯誤都進終局：平台餘額不足（一般錯誤）讓轉帳變 FAILED，不再重試。"
+  },
+  {
+   "id": "transfer-call-inside-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\t\tif n == 1 {\n\t\t\t\tt, err := q.ActiveTransferByPayment(ctx, pay.ID)",
+   "new": "\t\t\tif n == 1 {\n\t\t\t\t_, _ = s.d.Provider.CreateTransfer(ctx, TransferInput{Amount: amount, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: destination, TransferGroup: pay.OrderNo, IdempotencyKey: s.d.NewID().String()})\n\t\t\t\tt, err := q.ActiveTransferByPayment(ctx, pay.ID)",
+   "test": "internal/modules/payment ^TestRequestTransferWritesThePendingRowAndTheJobWithoutCallingTheProvider$",
+   "why": "寫轉帳列的 transaction 內呼叫 provider：請求內就有 CreateTransfer 呼叫，fake 的 Violations 也記下 transaction 內的呼叫。"
+  },
+  {
+   "id": "reversal-skips-reversed-amount",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "\t\t_, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: applied.ReversalAmount, Now: s.d.Now().UTC()})\n\t\treturn err",
+   "new": "\t\t_ = applied\n\t\treturn nil",
+   "test": "internal/modules/payment ^TestAReversalUpdatesTheReversedAmountAndTheRefundStatusTogether$",
+   "why": "撤回成功只推進退款狀態、不累加轉帳的 reversed_amount：reversed_amount 仍是 0。"
+  },
+  {
+   "id": "transfer-amount-ignores-refunds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\treturn pay.Amount - refunded, *acct.ExternalAccountID, nil",
+   "new": "\treturn pay.Amount, *acct.ExternalAccountID, nil",
+   "test": "internal/modules/payment ^TestRequestTransferWritesThePendingRowAndTheJobWithoutCallingTheProvider$",
+   "why": "轉帳金額不扣非失敗退款：付款 100、退款 30 時轉帳是 100，不是 70。"
+  },
+  {
+   "id": "transfer-fully-refunded-not-refused",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\tif pay.Amount-refunded <= 0 {",
+   "new": "\tif pay.Amount-refunded < 0 {",
+   "test": "internal/modules/payment ^TestRequestTransferRefusesWhatCannotBeTransferred$",
+   "why": "全額退款的付款可轉金額為 0：不再被拒絕，寫轉帳列違反 amount > 0 的 CHECK，回的不是 FailedPrecondition。"
+  },
+  {
+   "id": "transfer-ignores-inactive-account",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "(!acct.TransfersActive || acct.ExternalAccountID == nil)",
+   "new": "acct.ExternalAccountID == nil",
+   "test": "internal/modules/payment ^TestRequestTransferRefusesWhatCannotBeTransferred$",
+   "why": "不看帳戶是否開通轉帳：store 8 的未開通帳戶（有外部 ID）也寫出轉帳列。"
+  },
+  {
+   "id": "transfer-ignores-unpaid-payment",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\tif pay.Status != string(model.PaymentSucceeded) {",
+   "new": "\tif false {",
+   "test": "internal/modules/payment ^TestRequestTransferRefusesWhatCannotBeTransferred$",
+   "why": "不看付款是否入帳：還在等付款的 T-3a（帳戶已開通）也寫出轉帳列。"
+  },
+  {
+   "id": "transfer-duplicate-enqueues-job-again",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\t\tif n == 1 {",
+   "new": "\t\t\tif n >= 0 {",
+   "test": "internal/modules/payment ^TestADuplicateTransferRequestReturnsTheExistingActiveTransfer$",
+   "why": "重複請求（沒有寫新列）也排 job：同一筆轉帳排了兩個 job。"
+  },
+  {
+   "id": "transfer-unresolved-deadline-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\tif row.CalledAt != nil && now.Sub(*row.CalledAt) > UnresolvedDeadline {",
+   "new": "\tif false {",
+   "test": "internal/modules/payment ^TestAnUnresolvedTransferIsReplayedWithinTheDeadlineAndTerminalPastIt$",
+   "why": "拿掉轉帳的期限判斷：超過 UnresolvedDeadline 仍以同一把鍵重送，不進終局 FAILED。"
+  },
+  {
+   "id": "transfer-called-at-not-marked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\tcalled, err := s.markTransferCalled(ctx, transferID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
+   "new": "\tcalled := &row",
+   "test": "internal/modules/payment ^TestAnUnresolvedTransferIsReplayedWithinTheDeadlineAndTerminalPastIt$",
+   "why": "呼叫 provider 之前不記 called_at：結果不明的列沒有起算時刻，期限不成立，不進終局。"
+  },
+  {
+   "id": "reversal-unresolved-deadline-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "\tif ref.ReversalCalledAt != nil && now.Sub(*ref.ReversalCalledAt) > UnresolvedDeadline {",
+   "new": "\tif false {",
+   "test": "internal/modules/payment ^TestAReversalTerminalStatesLeaveTheTransferUntouched$",
+   "why": "拿掉撤回的期限判斷：超過期限仍重送，退款不進終局 FAILED。"
+  },
+  {
+   "id": "reversal-called-at-not-marked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "\tcalled, err := s.markReversalCalled(ctx, refundID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
+   "new": "\tcalled := &ref",
+   "test": "internal/modules/payment ^TestAReversalTerminalStatesLeaveTheTransferUntouched$",
+   "why": "呼叫 provider 之前不記 reversal_called_at：結果不明的撤回沒有起算時刻，期限不成立。"
+  },
+  {
+   "id": "reversal-over-remaining-not-checked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "ref.ReversalAmount > tr.Amount-tr.ReversedAmount",
+   "new": "false",
+   "test": "internal/modules/payment ^TestAReversalThatCannotMatchTheTransferIsAnAnomalyAndCallsNothing$",
+   "why": "不檢查撤回額度是否超過轉帳剩餘可撤額度：超額的撤回照樣呼叫 provider。"
+  },
+  {
+   "id": "sweep-skips-pending-transfers",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/jobs.go",
+   "old": "PendingTransferIDsParams{IdleBefore: createBefore",
+   "new": "PendingTransferIDsParams{IdleBefore: time.Time{}",
+   "test": "internal/modules/payment ^TestTheSweepRequeuesIdlePendingTransfersAndReversingRefunds$",
+   "why": "掃描不補排閒置的 PENDING 轉帳：門檻改成零時刻，沒有列符合。"
+  },
+  {
+   "id": "sweep-skips-reversing-refunds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/jobs.go",
+   "old": "ReversingRefundIDsParams{IdleBefore: createBefore",
+   "new": "ReversingRefundIDsParams{IdleBefore: time.Time{}",
+   "test": "internal/modules/payment ^TestTheSweepRequeuesIdlePendingTransfersAndReversingRefunds$",
+   "why": "掃描不補排閒置的 REVERSING 退款：門檻改成零時刻，沒有列符合。"
+  }
+ ]
+}

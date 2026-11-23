@@ -48,6 +48,19 @@ func TransferStatusValues() []TransferStatus {
 	return []TransferStatus{TransferPending, TransferSucceeded, TransferFailed}
 }
 
+// Transfer 是付款轉給賣家的轉帳（transfers 的對外視圖）；ReversedAmount 是累計已撤回的額度。
+type Transfer struct {
+	ID             uuid.UUID
+	PaymentID      uuid.UUID
+	StoreID        int64
+	Amount         int64
+	ReversedAmount int64
+	Status         TransferStatus
+	// FailureReason 只在 TransferFailed 有值。
+	FailureReason string
+	CreatedAt     time.Time
+}
+
 // RefundStatus 是退款的狀態（refunds_status_check；3c 使用）。
 type RefundStatus string
 

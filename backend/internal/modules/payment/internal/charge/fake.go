@@ -69,7 +69,14 @@ type Fake struct {
 	reversals    map[string]ReversalSnapshot
 	reversalKeys map[string]string
 	reversalErrs []error
-	violations   []string
+	// transferLost 與 reversalLost 是「已建立、回應遺失」的錯誤佇列；transferCalls 與 reversalCalls 計呼叫次數（失敗的也算）。
+	transferSeen  []string
+	reversalSeen  []string
+	transferLost  []error
+	reversalLost  []error
+	transferCalls int
+	reversalCalls int
+	violations    []string
 }
 
 // NewFake 建立 Fake。
@@ -129,6 +136,55 @@ func (f *Fake) FailReversal(errs ...error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	push(&f.reversalErrs, errs)
+}
+
+// FailTransferAfterCreate 讓接下來的 CreateTransfer 依序在轉帳已建立之後回這些錯誤（回應遺失，呼叫方沒有拿到 ID；排完就成功），用來造「呼叫過、結果不明」。
+func (f *Fake) FailTransferAfterCreate(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	push(&f.transferLost, errs)
+}
+
+// FailReversalAfterCreate 見 FailTransferAfterCreate，對象是 ReverseTransfer。
+func (f *Fake) FailReversalAfterCreate(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	push(&f.reversalLost, errs)
+}
+
+// TransferCalls 回傳 CreateTransfer 的呼叫次數（失敗的呼叫也算）。
+func (f *Fake) TransferCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.transferCalls
+}
+
+// ReversalCalls 回傳 ReverseTransfer 的呼叫次數（失敗的呼叫也算）。
+func (f *Fake) ReversalCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reversalCalls
+}
+
+// TransferKeys 回傳每次 CreateTransfer 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) TransferKeys() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.transferSeen...)
+}
+
+// ReversalKeys 回傳每次 ReverseTransfer 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) ReversalKeys() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.reversalSeen...)
+}
+
+// Transfers 回傳 provider 那邊已建立的轉帳數（同一把鍵只算一筆）。
+func (f *Fake) Transfers() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.transfers)
 }
 
 // Settle 讓 PaymentIntent 變成這個狀態（模擬買家付款、取消或需要驗證）；入帳時帶上 charge 與入帳時間。
@@ -368,11 +424,13 @@ func (f *Fake) CreateTransfer(ctx context.Context, in TransferInput) (TransferSn
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.check(ctx, "CreateTransfer")
+	f.transferCalls++
+	f.transferSeen = append(f.transferSeen, in.IdempotencyKey)
 	if err := pop(&f.transferErrs); err != nil {
 		return TransferSnapshot{}, err
 	}
 	if id, ok := f.transferKeys[in.IdempotencyKey]; ok {
-		return f.transfers[id].snap, nil
+		return f.transfers[id].snap, pop(&f.transferLost)
 	}
 	if in.Amount <= 0 || in.SourceChargeID == "" || in.DestinationAccountID == "" {
 		return TransferSnapshot{}, fmt.Errorf("%w：轉帳的金額、來源與去向必填", ErrPermanent)
@@ -381,6 +439,9 @@ func (f *Fake) CreateTransfer(ctx context.Context, in TransferInput) (TransferSn
 	id := fmt.Sprintf("fake_tr_%d", f.next)
 	snap := TransferSnapshot{ExternalID: id, Amount: in.Amount}
 	f.transfers[id], f.transferKeys[in.IdempotencyKey] = &fakeTransfer{in: in, snap: snap}, id
+	if err := pop(&f.transferLost); err != nil {
+		return TransferSnapshot{}, err
+	}
 	return snap, nil
 }
 
@@ -389,11 +450,13 @@ func (f *Fake) ReverseTransfer(ctx context.Context, in ReversalInput) (ReversalS
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.check(ctx, "ReverseTransfer")
+	f.reversalCalls++
+	f.reversalSeen = append(f.reversalSeen, in.IdempotencyKey)
 	if err := pop(&f.reversalErrs); err != nil {
 		return ReversalSnapshot{}, err
 	}
 	if id, ok := f.reversalKeys[in.IdempotencyKey]; ok {
-		return f.reversals[id], nil
+		return f.reversals[id], pop(&f.reversalLost)
 	}
 	tr, ok := f.transfers[in.ExternalTransferID]
 	if !ok || in.Amount <= 0 || in.Amount > tr.snap.Amount-tr.snap.ReversedAmount {
@@ -404,6 +467,9 @@ func (f *Fake) ReverseTransfer(ctx context.Context, in ReversalInput) (ReversalS
 	tr.snap.ReversedAmount += in.Amount
 	snap := ReversalSnapshot{ExternalID: id, Amount: in.Amount}
 	f.reversals[id], f.reversalKeys[in.IdempotencyKey] = snap, id
+	if err := pop(&f.reversalLost); err != nil {
+		return ReversalSnapshot{}, err
+	}
 	return snap, nil
 }
 

@@ -380,6 +380,25 @@ const (
 	PaymentCreateFailed    = model.PaymentCreateFailed
 )
 
+// ChargeReversalInput 與 ChargeReversalSnapshot 是撤回轉帳的 port 型別（測試包裝 provider 用）。
+type (
+	ChargeReversalInput    = charge.ReversalInput
+	ChargeReversalSnapshot = charge.ReversalSnapshot
+)
+
+// PaymentTransfer 是付款轉給賣家的轉帳。
+type PaymentTransfer = model.Transfer
+
+// PaymentTransferStatus 是轉帳的狀態。
+type PaymentTransferStatus = model.TransferStatus
+
+// 轉帳的狀態。
+const (
+	TransferPending   = model.TransferPending
+	TransferSucceeded = model.TransferSucceeded
+	TransferFailed    = model.TransferFailed
+)
+
 // ErrChargePermanent 標示付款 provider 重試也不會成功的失敗。
 var ErrChargePermanent = charge.ErrPermanent
 
@@ -440,4 +459,27 @@ func (m *Module) ExcessPaidPayments(ctx context.Context, afterID uuid.UUID, limi
 // SweepPayments 是付款的定期掃描（payment.charge_sweep）的內容，給 worker 與測試呼叫；回傳排入補做與同步的付款數。
 func (m *Module) SweepPayments(ctx context.Context) (created, synced int, err error) {
 	return m.charges.Sweep(ctx)
+}
+
+// RequestPaymentTransfer 是訂單完成後把這筆付款轉給賣家的入口（D6，步驟 4 的 GrantPayment 呼叫）：一個 transaction 內鎖付款列、確認已入帳，
+// 寫 PENDING 轉帳（金額是付款扣掉非失敗退款，賣家收款帳戶必須已開通）並排入轉帳 job；provider 在 transaction 外由 job 呼叫。
+// 已有有效轉帳時回傳它（冪等）；付款不存在回 NotFound，付款未入帳、帳戶未開通或沒有可轉金額回 FailedPrecondition。呼叫方不能在 transaction 內呼叫。
+func (m *Module) RequestPaymentTransfer(ctx context.Context, orderNo string) (PaymentTransfer, error) {
+	return m.charges.RequestTransfer(ctx, orderNo)
+}
+
+// CreatePaymentTransfer 是轉帳 job（payment.transfer_create）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時暫時性失敗只記警示 log，留給週期掃描。
+func (m *Module) CreatePaymentTransfer(ctx context.Context, transferID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Transfer(ctx, transferID, finalAttempt)
+}
+
+// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：撤回 REVERSING 退款的 reversal_amount，
+// 成功後同一個 transaction 累加轉帳的 reversed_amount 並把退款推進到 REVERSED。
+func (m *Module) ReversePaymentTransfer(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Reverse(ctx, refundID, finalAttempt)
+}
+
+// EnqueueRefundReversal 排入退款的撤回 job：3c 的退款 use case 在寫下 REVERSING 退款列的同一個 transaction 內呼叫。
+func (m *Module) EnqueueRefundReversal(ctx context.Context, refundID uuid.UUID) error {
+	return m.charges.EnqueueReversal(ctx, refundID)
 }
