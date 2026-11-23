@@ -49,8 +49,8 @@
       "id": "delegated-chunk-uploader-not-admin",
       "stack": "go",
       "file": "backend/internal/httpapi/media/secure_files.go",
-      "old": "return media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: c.Session.Target.StoreID}, touch, true",
-      "new": "return media.Uploader{ID: c.Session.Actor.AdminID, Store: c.Session.Target.StoreID}, touch, true",
+      "old": "u = media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}",
+      "new": "u = media.Uploader{ID: c.Session.Actor.AdminID, Store: st.StoreID}",
       "test": "internal/httpapi/media ^TestDelegatedChunkUploaderComesFromTheSession$",
       "why": "代行段上傳的 Uploader 不標管理員：續傳對不上開會話的管理員"
     },
@@ -130,8 +130,8 @@
       "id": "delegated-chunk-ignores-session-store",
       "stack": "go",
       "file": "backend/internal/httpapi/media/secure_files.go",
-      "old": "Admin: true, Store: c.Session.Target.StoreID}, touch, true",
-      "new": "Admin: true}, touch, true",
+      "old": "Admin: true, Store: st.StoreID}\n\t\t\treturn nil",
+      "new": "Admin: true}\n\t\t\t_ = st\n\t\t\treturn nil",
       "test": "internal/httpapi/media ^TestDelegatedChunkUploaderComesFromTheSession$",
       "why": "代行段上傳的 Uploader 不帶 session 的店家：續傳對不上綁定的那家店（C1）"
     },
