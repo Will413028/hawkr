@@ -27,7 +27,7 @@
 - **寄件地址**：主計畫 A8 段「identity 接 Clerk `user.updated` webhook」已失效：Clerk 已移除（`identity/db/migrations/20261030171858_drop_clerk_user_id.sql`，ADR `2026-10-30-identity-self-hosted-federated-login.md`），identity 在每次登入以 provider 回報的 email 更新寄件地址，`identity.ContactEmail`（`identity.go:255`）只把 `ContactEmailVerified` 當寄件地址。A8 與發票寄送都用它。已確認【量：讀碼】。
 - **沒有 Apple 登入**：通知 ADR 決策 8 的 Apple 私密轉寄網域登記不做。已確認。
 - **取貨簡訊的前提已消失**：B3 改賣家自寄、刪超商取貨（主計畫 B3 段）；通知 ADR 決策 9 的取貨簡訊候選失效。已確認。
-- **外部前置（只有 Will 能做）**：新的 Firebase 專案、Postmark 帳號與交易信子網域（SPF、DKIM、DMARC）。只擋 A8-3 的真實 provider 驗收與 A8-6 的真機驗收；其他步驟用替身。未完成。
+- **外部前置（只有 Will 能做）**：新的 Firebase 專案（擋 A8-3 的真實推播與 A8-6 的真機驗收）；Resend 新帳號（不得用舊公司的）與交易信子網域（SPF、DKIM、DMARC）。Will 目前沒有網域（2026-11-23），真實寄信延後到買網域；其他步驟用替身。未完成。
 - **單體是單一行程**（ADR `2026-11-19-ai-service-monolith-scope.md`）：串流 hub 用記憶體即可。已確認。
 - **一個帳號最多一家現行店、沒有店員**（ADR `2026-06-29-identity-defer-store-entity.md`）：店家受眾的收件人解析集中一處。仍成立。
 - **工具鏈**（預設，可推翻）：照根目錄 `AGENTS.md`。
@@ -61,7 +61,7 @@
 
 ## 範圍
 
-- 做：模組本體與資料模型；Connect API（收件匣、未讀數、已讀、刪除、偏好、裝置 token、串流、後台公告）；推播（FCM）與 email（Postmark）adapter 和替身；單體模組事件的訂閱；主計畫 A8 段列的治理、KYC、收款帳戶、停權、檢舉結果通知；投遞重送手段與 runbook；未觸達率查詢；四端改 Connect；刪舊服務與橋。
+- 做：模組本體與資料模型；Connect API（收件匣、未讀數、已讀、刪除、偏好、裝置 token、串流、後台公告）；推播（FCM）與 email（Resend）adapter 和替身；單體模組事件的訂閱；主計畫 A8 段列的治理、KYC、收款帳戶、停權、檢舉結果通知；投遞重送手段與 runbook；未觸達率查詢；四端改 Connect；刪舊服務與橋。
 - 不做：
   - `internal/legacy` 的 RabbitMQ 通知 consumer（100% 重工，`baseline-brief.md` §1(a)；Will 2026-11-23）。
   - 行銷 email、SMS、LINE、Web Push（通知 ADR 決策 9）；取貨簡訊（前提隨 B3 消失）。
@@ -71,6 +71,7 @@
   - 舊資料搬移（不在線）。
 - 延後：
   - 還沒搬的服務的通知型別。觸發：各發送端搬進單體（B2–B10、A5、A9），由「模組完成的定義」新增條目承接。
+  - 真實寄信驗收（Resend 帳號、交易信子網域的 SPF、DKIM、DMARC，寄一封到測試信箱）。觸發：Will 買網域。
   - 食安事件通知近 6 個月購買者。觸發：B8。
   - SMS、LINE、Web Push 重新評估。觸發：未觸達率連續 4 週超過 10%（通知 ADR 待辦）。
 
@@ -103,15 +104,15 @@
 
 - [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1、D3 逐列表；真實 provider 驗收另擋於 Will 的帳號）
   - 範圍：
-    - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Postmark adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 寫 suppression）；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字。
+    - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Resend adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 寫 suppression）；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字。
     - token：登入 upsert 改綁、登出刪、帳號停權（`accountsuspension.Suspended`）與刪帳號（`identity.AccountDeleted`）時由同 transaction 的同步訂閱者刪列，加進 A8-1 結構測試的白名單、每日 job 刪 60 天未更新的 token；店家停權不動。
     - 重送：依投遞紀錄重排永久失敗的手段與 runbook；未觸達查詢：近 N 天交易必要型別沒有任何渠道送達的數量（後台唯讀）。
     - 依 D3 的裁決表為單體事件定義型別並訂閱：social（留言、讚、追蹤的店發文；讚用聚合鍵）、buyer 的追蹤店家（`cmd/hawkr/buyer_events.go:20` 現經 `buyerrelay`；用聚合鍵）、review、im（離線推播）、seller（檢舉收到與結果、seller 新增公開事件 `CaseInquiryCreated`（`seller/events.go`，在 `CreateCaseInquiry` 的同一個 transaction 發布）、措施與治理、KYC 審核結果）、payment `PayoutAccountChanged`（含首次啟用時間、補件期限欄位與期限前提醒）、accountsuspension 停權與解除、delegation 代行完成、procurement `RfqPublished`。moderation 新增事件（消費者此時出現）：內容被隱藏、作者收到警告、案件結案（帶每位檢舉人帳號），在處置的同一個 transaction 發布。`ReportReceived` 的確認信：意圖參數只放 report 參照，worker 執行時向 seller 讀地址。
     - 刪除 `socialrelay`、`imrelay`、`reviewrelay` 的 notification 一半、`delegationservice/events.go` 的通知 wire、`sellerrelay` 對 notification 的部分、`buyerrelay` 的追蹤與 `product.viewed` wire、相關 wire／golden 測試、`pkg/mq` social 常數。
   - 消費端：`rg -n "socialrelay|imrelay|reviewrelay|sellerrelay|buyerrelay|delegationservice" backend/`；`rg -n "CreateCaseInquiry" backend/internal`；`rg -n "hawkr\.(content|im|review|delegation)" backend/ --type go`。
   - 不能動：各模組事件型別的既有欄位（只加不改）；`reviewrelay` 給 Java product 評分聚合的那一半（A6 延後項）。
-  - 驗收：測試證明每個被訂閱的事件都有對應型別、每個型別都有訂閱或明列為公告；integration（替身）：暫時性錯誤重試後只送一次、永久性錯誤不重試、Unregistered 停用 token、BUYER 受眾不推 seller App、停權與刪帳號後 token 在同一個 transaction 消失、60 天未更新的 token 被清、suppression 名單內不寄、確認信地址不在任何 job 參數裡、每個型別一個「事件 → 收件匣」案例、封鎖雙方不送；relay 刪除後 `rg` 0 hit。mutation：永久錯誤改暫時 → 測試紅；拿掉受眾 App 過濾 → 測試紅；拿掉封鎖略過 → A7-3 測試紅；移除一個訂閱 → 覆蓋測試紅。真實 provider：Will 帳號就緒後各送一則到測試裝置與信箱，結果貼進度表。
-  - 需要人做的事：Firebase 專案、Postmark 帳號、交易信子網域 DNS（Will）。
+  - 驗收：測試證明每個被訂閱的事件都有對應型別、每個型別都有訂閱或明列為公告；integration（替身）：暫時性錯誤重試後只送一次、永久性錯誤不重試、Unregistered 停用 token、BUYER 受眾不推 seller App、停權與刪帳號後 token 在同一個 transaction 消失、60 天未更新的 token 被清、suppression 名單內不寄、確認信地址不在任何 job 參數裡、每個型別一個「事件 → 收件匣」案例、封鎖雙方不送；relay 刪除後 `rg` 0 hit。mutation：永久錯誤改暫時 → 測試紅；拿掉受眾 App 過濾 → 測試紅；拿掉封鎖略過 → A7-3 測試紅；移除一個訂閱 → 覆蓋測試紅。真實 provider：Firebase 就緒後送一則推播到測試裝置，結果貼進度表；真實寄信見「延後」。
+  - 需要人做的事：Firebase 專案（Will）。
   - 完成後的狀態：單體模組的通知改由新模組送。
 
 - [x] **A8-4 主計畫承接條目**（被擋於：無；可與 A8-1 並行）
@@ -170,7 +171,7 @@
 | D5 取貨簡訊 | 刪除（B3 賣家自寄） | 已決 2026-11-23，Will |
 | D6 收件匣回應 | 伺服器組字＋8–10 個呈現分類 enum（不是每型別一個值）；A8-0 的 U8 發現互動分支時重議 | 已決 2026-11-23，Will |
 | D7 Android | 一起收；token 記 `last_registered_at`，60 天未更新清除 | 已決 2026-11-23，Will |
-| D8 寄信服務 | Postmark＋交易信專用子網域 | 已決 2026-11-23，Will |
+| D8 寄信服務 | Resend（免費額度足夠、不需審核）＋交易信專用子網域；adapter 介面不綁 provider。真實寄信等買網域 | 已決 2026-11-23，Will |
 | D9 代行者讀店家通知 | 不能 | 已決 2026-11-23，Will |
 | D10 投遞模型 | 來源 tx 只排意圖 job，worker 展開；投遞紀錄保留為唯一帳本 | 已決 2026-11-23，Will |
 | D11 串流內容 | 只傳失效訊號，不做續傳游標 | 已決 2026-11-23，Will |
