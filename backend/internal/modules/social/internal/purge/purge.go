@@ -27,6 +27,12 @@ import (
 // batchSize 是每一批處理的列數。
 const batchSize = 200
 
+// sweepBatch 是保底掃描每頁最多補排的買家數或店家數。
+const sweepBatch = 100
+
+// SweepInterval 是保底掃描的間隔。
+const SweepInterval = 15 * time.Minute
+
 // Deps 是清除的依賴。
 type Deps struct {
 	DB    *db.DB
@@ -74,6 +80,19 @@ func (PurgeStoreContentArgs) InsertOpts() river.InsertOpts {
 	return jobs.UniqueByArgs(10)
 }
 
+// SweepArgs 是清除的保底掃描。
+type SweepArgs struct{}
+
+// Kind 是 River 的 job 種類。
+func (SweepArgs) Kind() string { return "social.purge_sweep" }
+
+// InsertOpts 以 SweepInterval 為唯一性的時間窗：同一個週期內的排程與重啟合併，窗過了就能再排。
+func (SweepArgs) InsertOpts() river.InsertOpts {
+	o := jobs.SweepOpts(SweepInterval)
+	o.MaxAttempts = 1
+	return o
+}
+
 // CleanupViewsArgs 清掉瀏覽去重用的舊資料。
 type CleanupViewsArgs struct{}
 
@@ -95,6 +114,49 @@ func EnqueueBuyer(ctx context.Context, jc jobs.Enqueuer, buyerID int64) error {
 func EnqueueStore(ctx context.Context, jc jobs.Enqueuer, storeID int64) error {
 	opts := PurgeStoreContentArgs{}.InsertOpts()
 	return jc.Enqueue(ctx, PurgeStoreContentArgs{StoreID: storeID}, &opts)
+}
+
+// Sweep 是清除的保底：job 用完 MaxAttempts 被丟棄後，買家已不營運（pub_inactive_buyers）或店家已退場（pub_retired_stores）又還有清除 job 找得到的內容；
+// 買家與店家各以 ID 的游標逐頁（每頁 sweepBatch 個、每頁一個 transaction）走完全部，同一個對象還沒開始的 job 由唯一鍵合併；
+// 每頁固定上限，前面的對象一直失敗也不會餓死後面的。回傳這次檢查到的買家與店家總數。
+func (s *Service) Sweep(ctx context.Context) (int, error) {
+	buyers, err := sweepPages(ctx, s, func(q *store.Queries, after int64) ([]int64, error) {
+		return q.ListInactiveBuyersWithSocialContent(ctx, store.ListInactiveBuyersWithSocialContentParams{AfterID: after, MaxRows: sweepBatch})
+	}, func(ctx context.Context, id int64) error { return EnqueueBuyer(ctx, s.d.Jobs, id) })
+	if err != nil {
+		return buyers, err
+	}
+	stores, err := sweepPages(ctx, s, func(q *store.Queries, after int64) ([]int64, error) {
+		return q.ListRetiredStoresWithSocialContent(ctx, store.ListRetiredStoresWithSocialContentParams{AfterID: after, MaxRows: sweepBatch})
+	}, func(ctx context.Context, id int64) error { return EnqueueStore(ctx, s.d.Jobs, id) })
+	return buyers + stores, err
+}
+
+func sweepPages(ctx context.Context, s *Service, list func(*store.Queries, int64) ([]int64, error), enqueue func(context.Context, int64) error) (int, error) {
+	total, after := 0, int64(0)
+	for {
+		var ids []int64
+		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+			var err error
+			if ids, err = list(s.q(ctx), after); err != nil {
+				return err
+			}
+			for _, id := range ids {
+				if err := enqueue(ctx, id); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return total, err
+		}
+		total += len(ids)
+		if len(ids) < sweepBatch {
+			return total, nil
+		}
+		after = ids[len(ids)-1]
+	}
 }
 
 // batch 收集一批清除影響到的對象：touch 是這一批的 trigger 會寫的 stats 列（貼文、父留言、父討論區留言）；likedComments 是只有讚數變的留言
@@ -382,6 +444,20 @@ func (w *purgeStoreWorker) Work(ctx context.Context, job *river.Job[PurgeStoreCo
 }
 func (w *purgeStoreWorker) Timeout(*river.Job[PurgeStoreContentArgs]) time.Duration { return time.Hour }
 
+type sweepWorker struct {
+	river.WorkerDefaults[SweepArgs]
+	svc *Service
+}
+
+// Work 執行保底掃描。
+func (w *sweepWorker) Work(ctx context.Context, _ *river.Job[SweepArgs]) error {
+	_, err := w.svc.Sweep(ctx)
+	return err
+}
+
+// Timeout 是一次掃描的時間上限。
+func (w *sweepWorker) Timeout(*river.Job[SweepArgs]) time.Duration { return time.Minute }
+
 type cleanupWorker struct {
 	river.WorkerDefaults[CleanupViewsArgs]
 	svc *Service
@@ -397,13 +473,21 @@ func AddWorkers(workers *river.Workers, s *Service) {
 	river.AddWorker(workers, &purgeBuyerWorker{svc: s})
 	river.AddWorker(workers, &purgeStoreWorker{svc: s})
 	river.AddWorker(workers, &cleanupWorker{svc: s})
+	river.AddWorker(workers, &sweepWorker{svc: s})
 }
 
-// PeriodicJobs 是每日清理瀏覽去重資料（啟動時也跑一次）。
+// PeriodicJobs 是每日清理瀏覽去重資料與每 SweepInterval 的清除保底掃描（啟動時都跑一次）。
 func PeriodicJobs() []*river.PeriodicJob {
-	return []*river.PeriodicJob{river.NewPeriodicJob(
-		river.PeriodicInterval(24*time.Hour),
-		func() (river.JobArgs, *river.InsertOpts) { return CleanupViewsArgs{}, nil },
-		&river.PeriodicJobOpts{ID: "social.cleanup_views", RunOnStart: true},
-	)}
+	return []*river.PeriodicJob{
+		river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) { return CleanupViewsArgs{}, nil },
+			&river.PeriodicJobOpts{ID: "social.cleanup_views", RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(SweepInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
+			&river.PeriodicJobOpts{ID: "social.purge_sweep", RunOnStart: true},
+		),
+	}
 }

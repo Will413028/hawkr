@@ -1,0 +1,31 @@
+{
+ "mutants": [
+  {
+   "id": "sweep-skips-retired-stores",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/purge/purge.go",
+   "old": "func(ctx context.Context, id int64) error { return EnqueueStore(ctx, s.d.Jobs, id) }",
+   "new": "func(ctx context.Context, id int64) error { return nil }",
+   "test": "internal/modules/social ^TestSweepPurgeEnqueuesOnlyRetiredStoresWithContentLeft$",
+   "why": "保底掃描不再為退場店家補排清除 job"
+  },
+  {
+   "id": "sweep-ignores-buyer-content-predicate",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/store/purge.sql.go",
+   "old": "c.actor_kind = 'BUYER' AND c.actor_id = ib.buyer_id AND (c.deleted_at IS NULL OR c.body IS NOT NULL))",
+   "new": "true)",
+   "test": "internal/modules/social ^TestSweepPurgeEnqueuesOnlyInactiveBuyersWithContentLeft$",
+   "why": "買家沒有內容也被補排：述詞不再是清除 job 找工作的條件"
+  },
+  {
+   "id": "sweep-ignores-retirement",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/store/purge.sql.go",
+   "old": "FROM seller.pub_retired_stores() AS rs",
+   "new": "FROM seller.stores AS rs",
+   "test": "internal/modules/social ^TestSweepPurgeEnqueuesOnlyRetiredStoresWithContentLeft$",
+   "why": "還在營運的店家有內容也被補排：不再限定已退場"
+  }
+ ]
+}
