@@ -7,7 +7,6 @@ package store
 import (
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"uuid"
 )
 
@@ -44,10 +43,15 @@ type NotificationInboxItem struct {
 	Params          []byte
 	AggregationKey  *string
 	ActorAccountIds []int64
-	IntentID        pgtype.UUID
+	OccurredAt      time.Time
 	ReadAt          *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+type NotificationInboxItemIntent struct {
+	IntentID    uuid.UUID
+	InboxItemID uuid.UUID
 }
 
 type NotificationIntent struct {
@@ -55,6 +59,7 @@ type NotificationIntent struct {
 	Type           string
 	IdempotencyKey string
 	Params         []byte
+	OccurredAt     time.Time
 	CreatedAt      time.Time
 }
 

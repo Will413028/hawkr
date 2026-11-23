@@ -13,10 +13,8 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
@@ -25,10 +23,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// Accounts 是 worker 對 identity 的需求：鎖住存活的帳號列，並讀它是否已刪除。identity.Module 實作它。
+// Accounts 是 worker 對 identity 的需求：以共享鎖鎖住存活的帳號列（commit 前不會被刪），並回報帳號是否已刪除。identity.Module 實作它。
 type Accounts interface {
-	LockAccount(ctx context.Context, id int64) error
-	Account(ctx context.Context, id int64) (identity.Account, error)
+	ShareLockAccount(ctx context.Context, id int64) (deleted bool, err error)
 }
 
 // Registry 是型別註冊表；正式組裝用 registry 套件的 Lookup，測試可以換成帶測試型別的版本。
@@ -61,6 +58,15 @@ type ProcessArgs struct {
 // Kind 是 River 的 job 種類。
 func (ProcessArgs) Kind() string { return "notification.process_intent" }
 
+// DeliverArgs 是一筆投遞紀錄（推播或 email）的渠道 job；以投遞紀錄 ID 唯一。A8-3 把渠道 adapter 接進這個 job，這一步它不送出、
+// 不改紀錄（紀錄留在 PENDING）。
+type DeliverArgs struct {
+	DeliveryID uuid.UUID `json:"delivery_id"`
+}
+
+// Kind 是 River 的 job 種類。
+func (DeliverArgs) Kind() string { return "notification.deliver" }
+
 // Accept 在 ctx 的 transaction 內登記一個意圖並排入 job：意圖冪等鍵是事件來源身分（型別名稱加來源身分），已存在時什麼都不排。
 // 這是同步訂閱者唯一做的事。
 func (s *Service) Accept(ctx context.Context, typeName string, params any) error {
@@ -76,8 +82,14 @@ func (s *Service) Accept(ctx context.Context, typeName string, params any) error
 	if err != nil {
 		return err
 	}
+	occurredAt, err := e.OccurredAt(raw)
+	if err != nil {
+		return err
+	}
 	id := s.d.NewID()
-	_, err = store.New(s.d.DB.Conn(ctx)).InsertIntent(ctx, store.InsertIntentParams{ID: id, Type: typeName, IdempotencyKey: key, Params: raw, CreatedAt: s.d.Now()})
+	_, err = store.New(s.d.DB.Conn(ctx)).InsertIntent(ctx, store.InsertIntentParams{
+		ID: id, Type: typeName, IdempotencyKey: key, Params: raw, OccurredAt: occurredAt, CreatedAt: s.d.Now(),
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -88,7 +100,8 @@ func (s *Service) Accept(ctx context.Context, typeName string, params any) error
 }
 
 // Process 展開一個意圖。意圖已被清除、收件帳號不存在或已刪除、收件人就是 actor 時什麼都不寫（回 nil）；意圖型別或快照壞掉是永久錯誤（取消，不重試）。
-// 重試安全：收件匣列以 intent_id 判斷已寫過，聚合合併取 actor 聯集，投遞紀錄有 (意圖, 收件人, 渠道) 唯一鍵。
+// 重試安全：意圖與收件匣列的連結（inbox_item_intents）判斷已寫過，聚合合併取 actor 聯集且只讓較新的事件換參數，
+// 投遞紀錄有 (意圖, 收件人, 渠道) 唯一鍵、已存在時不重複排渠道 job。
 func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	intent, err := store.New(s.d.DB.Conn(ctx)).IntentByID(ctx, intentID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -99,33 +112,45 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	}
 	e, ok := s.d.Registry.Lookup(intent.Type)
 	if !ok {
-		return river.JobCancel(fmt.Errorf("通知型別 %q 沒有註冊", intent.Type))
+		err := fmt.Errorf("通知型別 %q 沒有註冊", intent.Type)
+		s.log().WarnContext(ctx, "通知意圖的型別沒有註冊，取消 job", "intent_id", intent.ID, "type", intent.Type)
+		return river.JobCancel(err)
 	}
 	resolved, err := e.Resolve(intent.Params)
 	if err != nil {
+		s.log().WarnContext(ctx, "通知意圖的參數快照無法解析，取消 job", "intent_id", intent.ID, "type", intent.Type, "error", err)
 		return river.JobCancel(err)
 	}
 	if slices.Contains(resolved.ActorAccounts, resolved.Recipient.AccountID) {
-		return nil // 自己觸發的事不通知自己；比的是帳號，不是店或買家 ID。
+		// 自己觸發的事不通知自己；比的是帳號，不是店或買家 ID。
+		s.log().InfoContext(ctx, "收件人就是 actor，略過通知", "intent_id", intent.ID, "type", intent.Type)
+		return nil
 	}
 	spec := e.Spec()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		// 鎖順序：identity 帳號列最先，notification 的列最後（platform/lockorder）。帳號已刪除時不鎖、也不寫，消除「檢查後才 commit 刪除」的競態。
-		if err := s.d.Accounts.LockAccount(ctx, resolved.Recipient.AccountID); err != nil {
+		// 鎖順序：identity 帳號列最先，notification 的列最後（platform/lockorder）。以共享鎖鎖住收件帳號直到 commit：
+		// 只需要帳號不在寫入途中被刪、不改帳號，所以用共享鎖：多個 worker 不互相等待；帳號已刪除時不寫。
+		deleted, err := s.d.Accounts.ShareLockAccount(ctx, resolved.Recipient.AccountID)
+		if err != nil {
 			if apperr.KindOf(err) == apperr.KindNotFound {
+				s.log().WarnContext(ctx, "收件帳號不存在，略過通知", "intent_id", intent.ID, "type", intent.Type)
 				return nil
 			}
 			return fmt.Errorf("鎖定收件帳號：%w", err)
 		}
-		acct, err := s.d.Accounts.Account(ctx, resolved.Recipient.AccountID)
-		if err != nil {
-			return fmt.Errorf("讀取收件帳號：%w", err)
-		}
-		if acct.Deleted {
+		if deleted {
+			s.log().InfoContext(ctx, "收件帳號已刪除，略過通知", "intent_id", intent.ID, "type", intent.Type)
 			return nil
 		}
 		return s.deliver(ctx, intent, spec, resolved)
 	})
+}
+
+func (s *Service) log() *slog.Logger {
+	if s.d.Logger != nil {
+		return s.d.Logger
+	}
+	return slog.Default()
 }
 
 func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, spec registry.Spec, r registry.Resolved) error {
@@ -159,13 +184,20 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 			continue
 		}
 		if model.DeliveryChannel(ch) {
-			// 投遞紀錄是推播與 email 的唯一帳本；A8-3 的 adapter 從 PENDING 的列取件。這一步沒有排渠道 job，列留在 PENDING。
-			err = q.InsertDelivery(ctx, store.InsertDeliveryParams{
+			// 投遞紀錄是推播與 email 的唯一帳本；每筆新紀錄在同一個 transaction 排一個渠道 job（A8-3 把 adapter 接進它，這一步 job 不送出）。
+			// 紀錄已存在（重試）時 job 已隨第一次的 transaction 排過，不再排。
+			id, err := q.InsertDelivery(ctx, store.InsertDeliveryParams{
 				ID: s.d.NewID(), IntentID: intent.ID, AccountID: r.Recipient.AccountID, Audience: string(spec.Audience),
 				StoreID: storeID, Channel: string(ch), Now: now,
 			})
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
 			if err != nil {
 				return fmt.Errorf("寫入投遞紀錄：%w", err)
+			}
+			if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {
+				return fmt.Errorf("排入渠道 job：%w", err)
 			}
 			continue
 		}
@@ -177,13 +209,11 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 }
 
 func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store.NotificationIntent, spec registry.Spec, r registry.Resolved, storeID *int64, now time.Time) error {
-	written, err := q.InboxItemExistsForIntent(ctx, store.InboxItemExistsForIntentParams{
-		IntentID: pgtype.UUID{Bytes: intent.ID, Valid: true}, AccountID: r.Recipient.AccountID, Audience: string(spec.Audience), StoreID: storeID,
-	})
+	linked, err := q.InboxItemIntentLinked(ctx, intent.ID)
 	if err != nil {
-		return fmt.Errorf("檢查收件匣列：%w", err)
+		return fmt.Errorf("檢查收件匣連結：%w", err)
 	}
-	if written {
+	if linked {
 		return nil
 	}
 	var aggKey *string
@@ -194,13 +224,15 @@ func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store
 	if actors == nil {
 		actors = []int64{}
 	}
-	err = q.UpsertInboxItem(ctx, store.UpsertInboxItemParams{
+	itemID, err := q.UpsertInboxItem(ctx, store.UpsertInboxItemParams{
 		ID: s.d.NewID(), AccountID: r.Recipient.AccountID, Audience: string(spec.Audience), StoreID: storeID, Type: intent.Type,
-		Params: intent.Params, AggregationKey: aggKey, ActorAccountIds: actors,
-		IntentID: pgtype.UUID{Bytes: intent.ID, Valid: true}, Now: now,
+		Params: intent.Params, AggregationKey: aggKey, ActorAccountIds: actors, OccurredAt: intent.OccurredAt, Now: now,
 	})
 	if err != nil {
 		return fmt.Errorf("寫入收件匣：%w", err)
+	}
+	if err := q.LinkInboxItemIntent(ctx, store.LinkInboxItemIntentParams{IntentID: intent.ID, InboxItemID: itemID}); err != nil {
+		return fmt.Errorf("寫入收件匣連結：%w", err)
 	}
 	return nil
 }

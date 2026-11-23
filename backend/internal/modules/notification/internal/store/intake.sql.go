@@ -9,42 +9,28 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"uuid"
 )
 
-const inboxItemExistsForIntent = `-- name: InboxItemExistsForIntent :one
+const inboxItemIntentLinked = `-- name: InboxItemIntentLinked :one
 SELECT EXISTS (
-    SELECT 1 FROM notification.inbox_items
-    WHERE intent_id = $1 AND account_id = $2 AND audience = $3
-      AND store_id IS NOT DISTINCT FROM $4::bigint
-) AS written
+    SELECT 1 FROM notification.inbox_item_intents WHERE intent_id = $1
+) AS linked
 `
 
-type InboxItemExistsForIntentParams struct {
-	IntentID  pgtype.UUID
-	AccountID int64
-	Audience  string
-	StoreID   *int64
+// 這個意圖已經寫進或合併進某一列收件匣（worker 重試時略過）。判斷只看連結表：合併進去的列之後被讀過也不會讓重試再建一列。
+func (q *Queries) InboxItemIntentLinked(ctx context.Context, intentID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, inboxItemIntentLinked, intentID)
+	var linked bool
+	err := row.Scan(&linked)
+	return linked, err
 }
 
-// 同一個意圖對同一個收件人已經寫過收件匣列（worker 重試時略過）。聚合合併進既有列的意圖不帶 intent_id，重試時再合併一次是冪等的（actor 取聯集）。
-func (q *Queries) InboxItemExistsForIntent(ctx context.Context, arg InboxItemExistsForIntentParams) (bool, error) {
-	row := q.db.QueryRow(ctx, inboxItemExistsForIntent,
-		arg.IntentID,
-		arg.AccountID,
-		arg.Audience,
-		arg.StoreID,
-	)
-	var written bool
-	err := row.Scan(&written)
-	return written, err
-}
-
-const insertDelivery = `-- name: InsertDelivery :exec
+const insertDelivery = `-- name: InsertDelivery :one
 INSERT INTO notification.deliveries (id, intent_id, account_id, audience, store_id, channel, status, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, 'PENDING', $7, $7)
 ON CONFLICT ON CONSTRAINT deliveries_recipient_channel_key DO NOTHING
+RETURNING id
 `
 
 type InsertDeliveryParams struct {
@@ -57,9 +43,9 @@ type InsertDeliveryParams struct {
 	Now       time.Time
 }
 
-// 投遞紀錄是推播與 email 的唯一帳本；(意圖, 收件人, 渠道) 已存在時不重複建立。status 一律從 PENDING 開始。
-func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) error {
-	_, err := q.db.Exec(ctx, insertDelivery,
+// 投遞紀錄是推播與 email 的唯一帳本；(意圖, 收件人, 渠道) 已存在時不重複建立（回 0 列，pgx.ErrNoRows，呼叫端不再排渠道 job）。status 一律從 PENDING 開始。
+func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertDelivery,
 		arg.ID,
 		arg.IntentID,
 		arg.AccountID,
@@ -68,12 +54,14 @@ func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) 
 		arg.Channel,
 		arg.Now,
 	)
-	return err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertIntent = `-- name: InsertIntent :one
-INSERT INTO notification.intents (id, type, idempotency_key, params, created_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO notification.intents (id, type, idempotency_key, params, occurred_at, created_at)
+VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT ON CONSTRAINT intents_idempotency_key_key DO NOTHING
 RETURNING id
 `
@@ -83,6 +71,7 @@ type InsertIntentParams struct {
 	Type           string
 	IdempotencyKey string
 	Params         []byte
+	OccurredAt     time.Time
 	CreatedAt      time.Time
 }
 
@@ -93,6 +82,7 @@ func (q *Queries) InsertIntent(ctx context.Context, arg InsertIntentParams) (uui
 		arg.Type,
 		arg.IdempotencyKey,
 		arg.Params,
+		arg.OccurredAt,
 		arg.CreatedAt,
 	)
 	var id uuid.UUID
@@ -101,7 +91,7 @@ func (q *Queries) InsertIntent(ctx context.Context, arg InsertIntentParams) (uui
 }
 
 const intentByID = `-- name: IntentByID :one
-SELECT id, type, idempotency_key, params, created_at FROM notification.intents WHERE id = $1
+SELECT id, type, idempotency_key, params, occurred_at, created_at FROM notification.intents WHERE id = $1
 `
 
 func (q *Queries) IntentByID(ctx context.Context, id uuid.UUID) (NotificationIntent, error) {
@@ -112,9 +102,27 @@ func (q *Queries) IntentByID(ctx context.Context, id uuid.UUID) (NotificationInt
 		&i.Type,
 		&i.IdempotencyKey,
 		&i.Params,
+		&i.OccurredAt,
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const linkInboxItemIntent = `-- name: LinkInboxItemIntent :exec
+INSERT INTO notification.inbox_item_intents (intent_id, inbox_item_id)
+VALUES ($1, $2)
+ON CONFLICT (intent_id) DO NOTHING
+`
+
+type LinkInboxItemIntentParams struct {
+	IntentID    uuid.UUID
+	InboxItemID uuid.UUID
+}
+
+// 記下意圖寫進了哪一列（與寫收件匣列同一個 transaction）。
+func (q *Queries) LinkInboxItemIntent(ctx context.Context, arg LinkInboxItemIntentParams) error {
+	_, err := q.db.Exec(ctx, linkInboxItemIntent, arg.IntentID, arg.InboxItemID)
+	return err
 }
 
 const preferenceOverrides = `-- name: PreferenceOverrides :many
@@ -154,15 +162,17 @@ func (q *Queries) PreferenceOverrides(ctx context.Context, arg PreferenceOverrid
 	return items, nil
 }
 
-const upsertInboxItem = `-- name: UpsertInboxItem :exec
-INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, actor_account_ids, intent_id, created_at, updated_at)
+const upsertInboxItem = `-- name: UpsertInboxItem :one
+INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, actor_account_ids, occurred_at, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
         $8::bigint[], $9, $10, $10)
 ON CONFLICT (account_id, audience, store_id, aggregation_key) WHERE aggregation_key IS NOT NULL AND read_at IS NULL
 DO UPDATE SET
-    params = EXCLUDED.params,
+    params = CASE WHEN EXCLUDED.occurred_at >= notification.inbox_items.occurred_at THEN EXCLUDED.params ELSE notification.inbox_items.params END,
+    occurred_at = GREATEST(notification.inbox_items.occurred_at, EXCLUDED.occurred_at),
     actor_account_ids = ARRAY(SELECT DISTINCT a FROM unnest(notification.inbox_items.actor_account_ids || EXCLUDED.actor_account_ids) AS a ORDER BY a),
     updated_at = GREATEST(notification.inbox_items.updated_at, EXCLUDED.updated_at)
+RETURNING id
 `
 
 type UpsertInboxItemParams struct {
@@ -174,14 +184,15 @@ type UpsertInboxItemParams struct {
 	Params          []byte
 	AggregationKey  *string
 	ActorAccountIds []int64
-	IntentID        pgtype.UUID
+	OccurredAt      time.Time
 	Now             time.Time
 }
 
-// 寫收件匣列。有聚合鍵時，同一個收件人（含 store_id）已有未讀的同鍵列就合併進去（參數換成最新、actor 取聯集、updated_at 往前推）；
+// 寫收件匣列並回傳實際落地的列 ID（新列或合併進去的既有列）。有聚合鍵時，同一個收件人（含 store_id）已有未讀的同鍵列就合併進去：
+// 只有來源事件不早於該列目前事件（occurred_at >=）時參數才換成新的，所以 job 的處理順序不影響結果；actor 一律取聯集、updated_at 往前推。
 // 沒有聚合鍵（NULL）或已讀的列不會衝突，另開新列。
-func (q *Queries) UpsertInboxItem(ctx context.Context, arg UpsertInboxItemParams) error {
-	_, err := q.db.Exec(ctx, upsertInboxItem,
+func (q *Queries) UpsertInboxItem(ctx context.Context, arg UpsertInboxItemParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, upsertInboxItem,
 		arg.ID,
 		arg.AccountID,
 		arg.Audience,
@@ -190,8 +201,10 @@ func (q *Queries) UpsertInboxItem(ctx context.Context, arg UpsertInboxItemParams
 		arg.Params,
 		arg.AggregationKey,
 		arg.ActorAccountIds,
-		arg.IntentID,
+		arg.OccurredAt,
 		arg.Now,
 	)
-	return err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }

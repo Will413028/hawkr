@@ -286,6 +286,13 @@ func (m *Module) LockAccount(ctx context.Context, id int64) error {
 	return m.account.LockAccount(ctx, id)
 }
 
+// ShareLockAccount 在呼叫者的 transaction 內以共享鎖（FOR SHARE）鎖住存活的帳號，讓帳號列在 commit 之前不被刪除或改動；
+// 給只需要「帳號在寫入完成前仍存在」而不改帳號的讀者（例如把通知寫給收件帳號），多個讀者不互相等待。帳號已刪除時不鎖並回
+// deleted=true，從未存在時回 NotFound。要改帳號的呼叫者用 LockAccount。
+func (m *Module) ShareLockAccount(ctx context.Context, id int64) (deleted bool, err error) {
+	return m.account.ShareLockAccount(ctx, id)
+}
+
 // SuspendAccount 永久停權帳號：停權紀錄、suspended_at 與刪除該帳號全部 session 在同一個 transaction。已停權時不寫第二筆紀錄，
 // 回傳原本的紀錄與 created=false。只由 accountsuspension 呼叫（internal/arch 的 TestSuspensionEntriesAreOnlyCalledByAccountsuspension）：
 // 擁有商店的帳號不能停權的檢查在那裡，這裡不查。類別不是政策分類回 InvalidInput，帳號不存在或已刪除回 NotFound。

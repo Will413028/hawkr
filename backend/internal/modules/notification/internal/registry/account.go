@@ -40,6 +40,7 @@ var accountSuspended = Define(Definition[AccountSuspendedParams]{
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelEmail},
 	IdempotencySource: "accountsuspension.Suspended.SuspensionID",
 	IdempotencyKey:    func(p AccountSuspendedParams) string { return p.SuspensionID.String() },
+	OccurredAt:        func(p AccountSuspendedParams) time.Time { return p.SuspendedAt },
 	Recipient:         func(p AccountSuspendedParams) Recipient { return Recipient{AccountID: p.AccountID} },
 	Text: func(l uitext.Locale, p AccountSuspendedParams) (Content, error) {
 		reason, err := categoryLabel(l, p.Category)
@@ -63,6 +64,7 @@ var accountUnsuspended = Define(Definition[AccountUnsuspendedParams]{
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelEmail},
 	IdempotencySource: "accountsuspension.Unsuspended.SuspensionID",
 	IdempotencyKey:    func(p AccountUnsuspendedParams) string { return p.SuspensionID.String() },
+	OccurredAt:        func(p AccountUnsuspendedParams) time.Time { return p.ReleasedAt },
 	Recipient:         func(p AccountUnsuspendedParams) Recipient { return Recipient{AccountID: p.AccountID} },
 	Text: func(l uitext.Locale, p AccountUnsuspendedParams) (Content, error) {
 		return Content{
