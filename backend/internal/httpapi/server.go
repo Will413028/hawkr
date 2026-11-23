@@ -322,7 +322,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
-	add(mediav1alpha1connect.NewMediaAppServiceHandler(httpmedia.NewApp(deps.Media), opts...))
+	add(mediav1alpha1connect.NewMediaAppServiceHandler(httpmedia.NewApp(deps.Media, deps.Logger), opts...))
 	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer), opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
@@ -515,15 +515,17 @@ const secureUploadsPrefix = "/api/files/secure_uploads/"
 // redactedTokenPath 把機敏上傳端點路徑裡的暫存 token 換成 {token}；不是這類路徑回 false。token 是持有即可預覽
 // 的憑據，不進 trace。
 func redactedTokenPath(path string) (string, bool) {
-	rest, ok := strings.CutPrefix(path, secureUploadsPrefix)
-	if !ok {
+	if !strings.Contains(path, "secure_uploads") {
 		return "", false
 	}
-	_, tail, _ := strings.Cut(rest, "/")
-	if tail == "" {
-		return secureUploadsPrefix + "{token}", true
+	if rest, ok := strings.CutPrefix(path, secureUploadsPrefix); ok {
+		_, tail, _ := strings.Cut(rest, "/")
+		if idx, isChunk := strings.CutPrefix(tail, "chunks/"); tail == "" || isChunk && idx != "" && !strings.Contains(idx, "/") {
+			return secureUploadsPrefix + "{token}" + strings.TrimSuffix("/"+tail, "/"), true
+		}
+		return secureUploadsPrefix + "{redacted}", true
 	}
-	return secureUploadsPrefix + "{token}/" + tail, true
+	return "/api/files/secure_uploads/{redacted}", true
 }
 
 // spanName 以 procedure 命名 Connect 的請求；其他路徑只用 method，掃描器亂打的路徑不會變成大量的 span 名稱。

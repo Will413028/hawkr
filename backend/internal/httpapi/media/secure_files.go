@@ -6,12 +6,10 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -104,7 +102,7 @@ func (h *SecureUploads) putChunk(w http.ResponseWriter, r *http.Request) {
 	if err := http.NewResponseController(w).SetReadDeadline(time.Now().Add(h.readTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		h.log.WarnContext(r.Context(), "media：設定段 body 的讀取時限失敗", "error", err)
 	}
-	body := http.MaxBytesReader(w, r.Body, media.SecureChunkSize)
+	body := &originReader{r: http.MaxBytesReader(w, r.Body, media.SecureChunkSize)}
 	if _, err := h.m.PutSecureChunk(r.Context(), u, r.PathValue("token"), index, body, r.ContentLength); err != nil {
 		h.failure(w, r, err)
 		return
@@ -125,7 +123,7 @@ func (h *SecureUploads) getPreview(w http.ResponseWriter, r *http.Request) {
 	defer func() { _ = rc.Close() }()
 	br := bufio.NewReader(rc)
 	head, err := br.Peek(512)
-	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, bufio.ErrBufferFull) {
+	if err != nil && !errors.Is(err, io.EOF) {
 		h.failure(w, r, err)
 		return
 	}
@@ -151,7 +149,7 @@ func (h *SecureUploads) failure(w http.ResponseWriter, r *http.Request, err erro
 	case errors.Is(err, os.ErrDeadlineExceeded):
 		http.Error(w, "request timeout", http.StatusRequestTimeout)
 		return
-	case isClientAbort(err):
+	case isClientAbort(r, err):
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	case errors.Is(err, media.ErrNoKeyring):
@@ -197,10 +195,27 @@ func (h *SecureUploads) failure(w http.ResponseWriter, r *http.Request, err erro
 	}
 }
 
-// isClientAbort 判斷錯誤是 client 中途斷線或取消（不是伺服器的錯，不記 error）。
-func isClientAbort(err error) bool {
-	return errors.Is(err, context.Canceled) || errors.Is(err, io.ErrUnexpectedEOF) ||
-		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || errors.Is(err, net.ErrClosed)
+// bodyReadError 標記錯誤來自讀請求 body。
+type bodyReadError struct{ err error }
+
+func (e *bodyReadError) Error() string { return e.err.Error() }
+func (e *bodyReadError) Unwrap() error { return e.err }
+
+// originReader 把讀 body 的錯誤標成 bodyReadError，讓 failure 分辨 client 斷線與儲存或資料庫的失敗。
+type originReader struct{ r io.Reader }
+
+func (o *originReader) Read(p []byte) (int, error) {
+	n, err := o.r.Read(p)
+	if err != nil && err != io.EOF {
+		err = &bodyReadError{err: err}
+	}
+	return n, err
+}
+
+// isClientAbort 判斷是 client 中途斷線或取消（不是伺服器的錯，不記 error）：請求的 context 已結束，或錯誤出自讀 body。
+func isClientAbort(r *http.Request, err error) bool {
+	var be *bodyReadError
+	return r.Context().Err() != nil || errors.As(err, &be)
 }
 
 // safeContentType 只放行圖片與 PDF 的型別，其餘（含 SVG）一律當不透明的二進位。

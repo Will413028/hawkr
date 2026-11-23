@@ -16,6 +16,8 @@ func TestTracingRedactsSecureUploadToken(t *testing.T) {
 	for _, path := range []string{
 		"/api/files/secure_uploads/" + token + "/chunks/0?x=1",
 		"/api/files/secure_uploads/" + token,
+		"/api/files/secure_uploads//" + token + "/chunks/0",
+		"/api//files/secure_uploads/" + token,
 	} {
 		rec := tracetest.NewSpanRecorder()
 		tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))

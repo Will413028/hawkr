@@ -67,7 +67,7 @@ func start(t *testing.T) *stack {
 	clk := &clock{t: time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC)}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	m := media.New(media.Deps{DB: d, Jobs: jc, Store: media.NewMemoryStore(), NewID: uuid.NewV7, Now: clk.Now, Logger: log})
-	path, handler := mediav1alpha1connect.NewMediaAppServiceHandler(httpmedia.NewApp(m), connect.WithInterceptors(rpc.NewInterceptor(log)))
+	path, handler := mediav1alpha1connect.NewMediaAppServiceHandler(httpmedia.NewApp(m, log), connect.WithInterceptors(rpc.NewInterceptor(log)))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		switch id := req.Header.Get("X-Test-Account"); {

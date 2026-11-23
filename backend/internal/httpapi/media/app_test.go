@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 	"uuid"
@@ -102,7 +103,7 @@ const token = "x"
 
 func TestMediaAppRequiresALogin(t *testing.T) {
 	f := &fakeUploads{}
-	e := newEnv(t, newApp(f))
+	e := newEnv(t, newApp(f, nil))
 	methods := pb.File_hawkr_media_v1alpha1_media_proto.Services().ByName("MediaAppService").Methods()
 	if methods.Len() != 4 {
 		t.Fatalf("MediaAppService 有 %d 支方法，預期 4", methods.Len())
@@ -130,7 +131,7 @@ func TestMediaAppRequiresALogin(t *testing.T) {
 
 func TestOnlyAnAccountCanCall(t *testing.T) {
 	f := &fakeUploads{}
-	e := newEnv(t, newApp(f))
+	e := newEnv(t, newApp(f, nil))
 	ctx := t.Context()
 	_, err1 := e.client.BeginUpload(ctx, asAdmin(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "x"}))
 	_, err2 := e.client.CompleteUpload(ctx, asAdmin(&pb.CompleteUploadRequest{StagedToken: token}))
@@ -149,7 +150,7 @@ func TestOnlyAnAccountCanCall(t *testing.T) {
 func TestBeginUploadPassesTheDeclarationAndReturnsTheSignedUpload(t *testing.T) {
 	exp := time.Date(2026, 11, 23, 1, 2, 3, 0, time.UTC)
 	f := &fakeUploads{beginRes: media.BeginResult{ID: uuid.New(), Token: "tok", URL: "https://s.example/tmp/a", Headers: map[string]string{"Content-Type": "image/png", "Content-MD5": "m"}, ExpiresAt: exp}}
-	e := newEnv(t, newApp(f))
+	e := newEnv(t, newApp(f, nil))
 	resp, err := e.client.BeginUpload(t.Context(), signedIn(&pb.BeginUploadRequest{Size: 1234, ContentType: "image/png", Md5: "m"}))
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +174,7 @@ func TestModuleErrorsAreMapped(t *testing.T) {
 		"FailedPrecondition": {apperr.FailedPrecondition("這筆上傳已過期"), connect.CodeFailedPrecondition},
 	}
 	for name, c := range cases {
-		e := newEnv(t, newApp(&fakeUploads{err: c.err}))
+		e := newEnv(t, newApp(&fakeUploads{err: c.err}, nil))
 		ctx := t.Context()
 		_, err1 := e.client.BeginUpload(ctx, signedIn(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "m"}))
 		_, err2 := e.client.CompleteUpload(ctx, signedIn(&pb.CompleteUploadRequest{StagedToken: token}))
@@ -200,7 +201,7 @@ func TestModuleErrorsAreMapped(t *testing.T) {
 }
 
 func TestExpiredCompleteIsFailedPreconditionNotNotFound(t *testing.T) {
-	e := newEnv(t, newApp(&fakeUploads{err: apperr.FailedPrecondition("這筆上傳已過期")}))
+	e := newEnv(t, newApp(&fakeUploads{err: apperr.FailedPrecondition("這筆上傳已過期")}, nil))
 	_, err := e.client.CompleteUpload(t.Context(), signedIn(&pb.CompleteUploadRequest{StagedToken: token}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("過期：%v", err)
@@ -210,7 +211,7 @@ func TestExpiredCompleteIsFailedPreconditionNotNotFound(t *testing.T) {
 func TestGetUploadReportsRejectionAsStateAndReasonNotAnError(t *testing.T) {
 	exp := time.Date(2026, 11, 23, 1, 2, 3, 0, time.UTC)
 	f := &fakeUploads{status: media.UploadStatus{State: media.UploadRejected, RejectReason: media.RejectUnrecognizedFormat, ExpiresAt: exp}}
-	e := newEnv(t, newApp(f))
+	e := newEnv(t, newApp(f, nil))
 	resp, err := e.client.GetUpload(t.Context(), signedIn(&pb.GetUploadRequest{StagedToken: "tok"}))
 	if err != nil {
 		t.Fatal(err)
@@ -237,7 +238,7 @@ func TestEnumsMatchTheModuleValues(t *testing.T) {
 }
 
 func TestWithoutAModuleEveryMethodIsUnavailable(t *testing.T) {
-	e := newEnv(t, NewApp((*media.Module)(nil)))
+	e := newEnv(t, NewApp((*media.Module)(nil), nil))
 	ctx := t.Context()
 	_, err1 := e.client.BeginUpload(ctx, signedIn(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "m"}))
 	_, err2 := e.client.CompleteUpload(ctx, signedIn(&pb.CompleteUploadRequest{StagedToken: token}))
@@ -253,7 +254,7 @@ func TestWithoutAModuleEveryMethodIsUnavailable(t *testing.T) {
 func TestBeginUploadOverTheLimitIsInvalidArgumentAndIssuesNoURL(t *testing.T) {
 	store := media.NewMemoryStore()
 	m := media.New(media.Deps{DB: &db.DB{}, Jobs: noJobs{}, Store: store, NewID: uuid.NewV7, Now: time.Now})
-	e := newEnv(t, NewApp(m))
+	e := newEnv(t, NewApp(m, nil))
 	resp, err := e.client.BeginUpload(t.Context(), signedIn(&pb.BeginUploadRequest{Size: media.MaxPublicUploadSize + 1, ContentType: "image/png", Md5: "1B2M2Y8AsgTpgAmY7PhCfg=="}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("超過上限：%v", err)
@@ -282,7 +283,7 @@ func TestBeginUploadOverTheLimitIsInvalidArgumentAndIssuesNoURL(t *testing.T) {
 func TestBeginSecureUploadReturnsChunkPlan(t *testing.T) {
 	exp := time.Date(2026, 11, 23, 1, 2, 3, 0, time.UTC)
 	f := &fakeUploads{secureRes: media.SecureBeginResult{Token: "tok", ChunkSize: media.SecureChunkSize, ChunkCount: 3, ExpiresAt: exp}}
-	e := newEnv(t, newApp(f))
+	e := newEnv(t, newApp(f, nil))
 	resp, err := e.client.BeginSecureUpload(t.Context(), signedIn(&pb.BeginSecureUploadRequest{Size: 9_000_000}))
 	if err != nil {
 		t.Fatal(err)
@@ -297,7 +298,7 @@ func TestBeginSecureUploadReturnsChunkPlan(t *testing.T) {
 }
 
 func TestBeginSecureUploadWithoutModuleIsUnavailable(t *testing.T) {
-	e := newEnv(t, NewApp(nil))
+	e := newEnv(t, NewApp(nil, nil))
 	_, err := e.client.BeginSecureUpload(t.Context(), signedIn(&pb.BeginSecureUploadRequest{Size: 1}))
 	if connect.CodeOf(err) != connect.CodeUnavailable {
 		t.Fatalf("回 %v，預期 unavailable", err)
@@ -305,9 +306,28 @@ func TestBeginSecureUploadWithoutModuleIsUnavailable(t *testing.T) {
 }
 
 func TestBeginSecureUploadWithoutKeyringIsUnavailable(t *testing.T) {
-	e := newEnv(t, newApp(&fakeUploads{err: media.ErrNoKeyring}))
+	sink := &errSink{}
+	e := newEnv(t, newApp(&fakeUploads{err: media.ErrNoKeyring}, slog.New(sink)))
 	_, err := e.client.BeginSecureUpload(t.Context(), signedIn(&pb.BeginSecureUploadRequest{Size: 1}))
 	if connect.CodeOf(err) != connect.CodeUnavailable {
 		t.Fatalf("回 %v，預期 unavailable", err)
 	}
+	if strings.Contains(err.Error(), "KEK") {
+		t.Errorf("錯誤訊息洩漏設定細節：%v", err)
+	}
+	if sink.n.Load() == 0 {
+		t.Error("沒有 error 層級的 log")
+	}
 }
+
+type errSink struct{ n atomic.Int32 }
+
+func (l *errSink) Enabled(context.Context, slog.Level) bool { return true }
+func (l *errSink) Handle(_ context.Context, r slog.Record) error {
+	if r.Level >= slog.LevelError {
+		l.n.Add(1)
+	}
+	return nil
+}
+func (l *errSink) WithAttrs([]slog.Attr) slog.Handler { return l }
+func (l *errSink) WithGroup(string) slog.Handler      { return l }

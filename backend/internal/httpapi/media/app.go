@@ -8,6 +8,7 @@ package media
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -16,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // Uploads 是暫存上傳的來源（*media.Module）。
@@ -29,19 +31,25 @@ type Uploads interface {
 // App 實作 MediaAppService。
 type App struct {
 	uploads Uploads
+	log     *slog.Logger
 }
 
 var _ mediav1alpha1connect.MediaAppServiceHandler = (*App)(nil)
 
 // NewApp 建立 handler；m 為 nil 時每個方法回 unavailable。
-func NewApp(m *media.Module) *App {
+func NewApp(m *media.Module, log *slog.Logger) *App {
 	if m == nil {
-		return &App{}
+		return newApp(nil, log)
 	}
-	return newApp(m)
+	return newApp(m, log)
 }
 
-func newApp(uploads Uploads) *App { return &App{uploads: uploads} }
+func newApp(uploads Uploads, log *slog.Logger) *App {
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+	return &App{uploads: uploads, log: log}
+}
 
 func (h *App) uploader(ctx context.Context) (media.Uploader, Uploads, error) {
 	p, err := rpc.RequireAccount(ctx)
@@ -106,7 +114,8 @@ func (h *App) BeginSecureUpload(ctx context.Context, req *connect.Request[pb.Beg
 	}
 	res, err := uploads.BeginSecureUpload(ctx, u, req.Msg.GetSize())
 	if errors.Is(err, media.ErrNoKeyring) {
-		return nil, rpc.Error(connect.CodeUnavailable, "機敏上傳需要 KEK 但模組沒有設定")
+		h.log.ErrorContext(ctx, "media：機敏上傳需要 KEK 但模組沒有設定", "error", err)
+		return nil, apperr.Unavailable("服務暫時無法使用")
 	}
 	if err != nil {
 		return nil, err

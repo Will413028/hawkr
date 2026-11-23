@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -202,24 +203,57 @@ func (l *logSink) Handle(_ context.Context, r slog.Record) error {
 func (l *logSink) WithAttrs([]slog.Attr) slog.Handler { return l }
 func (l *logSink) WithGroup(string) slog.Handler      { return l }
 
+func chunkRequest(body io.Reader) *http.Request {
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/x", body)
+	req.ContentLength = 4
+	req.SetPathValue("token", "tok")
+	req.SetPathValue("index", "0")
+	return req.WithContext(rpc.WithPrincipal(req.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: 7}))
+}
+
+// 錯誤出自讀 body（client 斷線）：400，不記 error。
 func TestChunkClientAbortIs400WithoutErrorLog(t *testing.T) {
 	for _, err := range []error{
 		context.Canceled,
 		io.ErrUnexpectedEOF,
 		syscall.ECONNRESET,
-		fmt.Errorf("讀段：%w", context.Canceled),
+		syscall.EPIPE,
+		net.ErrClosed,
 	} {
 		sink := &logSink{}
-		h := NewSecureUploads(&fakeSecure{chunkErr: err}, slog.New(sink)).Chunk()
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/x", strings.NewReader("a"))
-		req.SetPathValue("token", "tok")
-		req.SetPathValue("index", "0")
-		req = req.WithContext(rpc.WithPrincipal(req.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: 7}))
+		h := NewSecureUploads(&fakeSecure{}, slog.New(sink)).Chunk()
 		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
+		h.ServeHTTP(rec, chunkRequest(io.MultiReader(strings.NewReader("ab"), errReader{err: err})))
 		if rec.Code != http.StatusBadRequest || sink.n != 0 {
 			t.Errorf("%v：狀態 %d、error log %d 筆，預期 400 與 0 筆", err, rec.Code, sink.n)
 		}
+	}
+}
+
+// 儲存寫入的 EPIPE（不是讀 body）是伺服器的錯：500 並記 error。
+func TestChunkStorageWriteErrorIs500WithErrorLog(t *testing.T) {
+	for _, err := range []error{syscall.EPIPE, syscall.ECONNRESET, io.ErrUnexpectedEOF, net.ErrClosed} {
+		sink := &logSink{}
+		h := NewSecureUploads(&fakeSecure{chunkErr: fmt.Errorf("寫暫存：%w", err)}, slog.New(sink)).Chunk()
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, chunkRequest(strings.NewReader("abcd")))
+		if rec.Code != http.StatusInternalServerError || sink.n != 1 {
+			t.Errorf("%v：狀態 %d、error log %d 筆，預期 500 與 1 筆", err, rec.Code, sink.n)
+		}
+	}
+}
+
+// 預覽沒有 body：儲存的 ECONNRESET 是伺服器的錯，500 並記 error。
+func TestPreviewStorageResetIs500WithErrorLog(t *testing.T) {
+	sink := &logSink{}
+	h := NewSecureUploads(&fakeSecure{previewErr: fmt.Errorf("讀暫存：%w", syscall.ECONNRESET)}, slog.New(sink)).Preview()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/x", nil)
+	req.SetPathValue("token", "tok")
+	req = req.WithContext(rpc.WithPrincipal(req.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: 7}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusInternalServerError || sink.n != 1 {
+		t.Errorf("狀態 %d、error log %d 筆，預期 500 與 1 筆", rec.Code, sink.n)
 	}
 }
 
@@ -341,9 +375,12 @@ func TestPreviewMidStreamFailureAbortsResponse(t *testing.T) {
 	req.Header.Set("X-Test-Who", "account")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return
+		t.Fatalf("Do 應成功（header 已送出）：%v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("狀態 %d，預期 200", resp.StatusCode)
+	}
 	if _, err := io.ReadAll(resp.Body); err == nil {
 		t.Fatal("中途失敗的預期連線被中止，卻讀到完整回應")
 	}
