@@ -61,12 +61,12 @@ type identity struct {
 	AccountType int32
 	LoginRole   int32
 	Business    *calleridentity.Identity
-	// SellerCapabilities 是單體（seller 模組）推導的現任店家能力；沒有店家（含 ws-ticket 與訪客）時為空，requireSeller 因此一律拒絕。
+	// SellerCapabilities 是單體（seller 模組）推導的現任店家能力；沒有店家（含訪客）時為空，requireSeller 因此一律拒絕。
 	SellerCapabilities []authz.Capability
 }
 
 // newIdentity 建立 identity，丟掉帳號沒有的 active role（見 sanitizeActiveRole）。每個身分進入 gateway 的地方
-// （身分 header、ws-ticket）都經過這裡，新的來源不會漏掉這道檢查。
+// （身分 header）都經過這裡，新的來源不會漏掉這道檢查。
 func newIdentity(accountID int64, accountType, loginRole int32) *identity {
 	return &identity{
 		AccountID:   accountID,
@@ -195,7 +195,7 @@ func OptionalJWTAuth() gin.HandlerFunc {
 	}
 }
 
-// authenticate 是 JWTAuth 與 ChatWSAuth（沒有 ticket 時）共用的認證：成功時套用身分並回傳 true，否則回 401、
+// authenticate 是 JWTAuth 的認證：成功時套用身分並回傳 true，否則回 401、
 // 中斷請求並回傳 false。
 func authenticate(c *gin.Context) bool {
 	id, err := identityFromHeaders(c.Request.Header)
@@ -270,8 +270,8 @@ func RoleInSet(role, accountType int32) bool {
 // Anything outside {1,2} (0, 3=the accountType bitmask for "both", 4=admin, 7,
 // negatives) is not a buyer/seller view and lands there too.
 //
-// 單體送來的 X-Login-Role 已經限制在帳號的角色內；ws-ticket 的 active role 則是簽發當下的狀態，可能早於角色的
-// 移除。兩者都經 newIdentity 走這一道，gateway 不會把帳號沒有的角色往下游傳。
+// 單體送來的 X-Login-Role 已經限制在帳號的角色內，
+// 且都經 newIdentity 走這一道，gateway 不會把帳號沒有的角色往下游傳。
 func sanitizeActiveRole(role, accountType int32) int32 {
 	if RoleInSet(role, accountType) {
 		return role
@@ -284,7 +284,7 @@ func sanitizeActiveRole(role, accountType int32) int32 {
 // X-Login-Role by notification inbox, chat, IM), NOT an authorization input.
 //
 //  1. for a single-role account, the unambiguous role;
-//  2. otherwise the resolved role (單體解析 X-Active-Role 後的 X-Login-Role，或 ws-ticket 的 active role), held
+//  2. otherwise the resolved role (單體解析 X-Active-Role 後的 X-Login-Role), held
 //     to the account's role set (sanitizeActiveRole). 0 means "no active role" — downstream consumers keep their
 //     existing handling for that case.
 func pickActiveRole(accountType, resolved int32) int32 {

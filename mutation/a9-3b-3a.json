@@ -1,0 +1,256 @@
+{
+ "mutants": [
+  {
+   "id": "keyset-condition-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": "AND (updated_at, id) < ($2::timestamptz, $3::uuid)",
+   "new": "AND ($2::timestamptz IS NOT NULL AND $3::uuid IS NOT NULL)",
+   "test": "internal/modules/procurement ^TestListConversationsTokenPagingHasNoGapsOrDuplicatesEvenWithEqualUpdatedAt$",
+   "why": "第二頁起不再排除已看過的列：翻頁重複，永遠翻不完"
+  },
+  {
+   "id": "keyset-id-tiebreak-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": "AND (updated_at, id) < ($2::timestamptz, $3::uuid)",
+   "new": "AND updated_at < $2::timestamptz AND $3::uuid IS NOT NULL",
+   "test": "internal/modules/procurement ^TestListConversationsTokenPagingHasNoGapsOrDuplicatesEvenWithEqualUpdatedAt$",
+   "why": "keyset 少了 id 的次序：相同 updated_at 的列在頁界被跳過"
+  },
+  {
+   "id": "list-after-buyer-id-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": "WHERE buyer_id = $1 AND deleted_at IS NULL AND (updated_at, id)",
+   "new": "WHERE $1::bigint > 0 AND deleted_at IS NULL AND (updated_at, id)",
+   "test": "internal/modules/procurement ^TestListConversationsTokenPagingHasNoGapsOrDuplicatesEvenWithEqualUpdatedAt$",
+   "why": "翻頁的查詢不看 buyer_id：帶出別的買家的對話"
+  },
+  {
+   "id": "list-first-page-buyer-id-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": "WHERE buyer_id = $1 AND deleted_at IS NULL\nORDER BY updated_at DESC, id DESC\nLIMIT $2",
+   "new": "WHERE $1::bigint > 0 AND deleted_at IS NULL\nORDER BY updated_at DESC, id DESC\nLIMIT $2",
+   "test": "internal/modules/procurement ^TestListConversationsPageSizeRules$",
+   "why": "第一頁的查詢不看 buyer_id：帶出別的買家的對話"
+  },
+  {
+   "id": "page-size-default-changed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "pageSize = DefaultPageSize",
+   "new": "pageSize = 10",
+   "test": "internal/modules/procurement ^TestListConversationsPageSizeRules$",
+   "why": "page_size 0 不再是 20"
+  },
+  {
+   "id": "page-size-cap-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "pageSize = MaxPageSize",
+   "new": "pageSize = 1000",
+   "test": "internal/modules/procurement ^TestListConversationsPageSizeRules$",
+   "why": "page_size 超過 50 不再以 50 計"
+  },
+  {
+   "id": "page-size-negative-accepted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "case pageSize < 0:",
+   "new": "case pageSize < -1000000:",
+   "test": "internal/modules/procurement ^TestListConversationsPageSizeRules$",
+   "why": "負數的 page_size 不再回 INVALID_ARGUMENT"
+  },
+  {
+   "id": "bad-token-accepted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "if !ok {",
+   "new": "if false && !ok {",
+   "test": "internal/modules/procurement ^TestListConversationsPageSizeRules$",
+   "why": "壞的 page_token 被當成有效（回空頁而不是 INVALID_ARGUMENT）"
+  },
+  {
+   "id": "delete-repeat-not-ok",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "if conv.DeletedAt != nil {\n\t\t\treturn nil\n\t\t}",
+   "new": "if conv.DeletedAt != nil {\n\t\t\treturn apperr.NotFound(\"找不到這個對話\")\n\t\t}",
+   "test": "internal/modules/procurement ^TestDeleteConversationCancelsRunsIsIdempotentAndKeepsPublishedRfqs$",
+   "why": "已刪除的對話重送刪除回 NOT_FOUND，不是成功"
+  },
+  {
+   "id": "delete-skips-run-cancel",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "if err := s.Canceller.CancelAllOfRequest(ctx, buyerID, conv.RequestID); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/procurement ^(TestDeleteConversationCancelsRunsIsIdempotentAndKeepsPublishedRfqs|TestDeleteConversationCancelsAWaitingRunAndItsInterrupt)$",
+   "why": "刪除對話不取消進行中與等待輸入的 run"
+  },
+  {
+   "id": "delete-waiting-runs-not-listed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/runs.sql.go",
+   "old": "status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED', 'WAITING_FOR_INPUT')",
+   "new": "status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED')",
+   "test": "internal/modules/procurement ^TestDeleteConversationCancelsAWaitingRunAndItsInterrupt$",
+   "why": "刪除對話漏掉等待輸入的 run，它的 PENDING 中斷留著"
+  },
+  {
+   "id": "delete-owner-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": "FROM procurement.conversations WHERE id = $1 AND buyer_id = $2\n`\n\ntype GetConversationIncludingDeletedParams",
+   "new": "FROM procurement.conversations WHERE id = $1 AND $2::bigint > 0\n`\n\ntype GetConversationIncludingDeletedParams",
+   "test": "internal/modules/procurement ^TestReadMethodsAreNotFoundForAnotherBuyerOrUnknownIDs$",
+   "why": "刪除不檢查對話屬於呼叫的買家"
+  },
+  {
+   "id": "title-limit-off-by-one",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "utf8.RuneCountInString(t) > MaxTitleRunes",
+   "new": "utf8.RuneCountInString(t) > MaxTitleRunes+1",
+   "test": "internal/modules/procurement ^TestRenameConversationTitleRules$",
+   "why": "標題上限放寬成 41 字"
+  },
+  {
+   "id": "title-newline-allowed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "func isLineBreakOrControl(r rune) bool { return unicode.IsControl(r) || r == '\\u2028' || r == '\\u2029' }",
+   "new": "func isLineBreakOrControl(r rune) bool { return unicode.IsControl(r) && false }",
+   "test": "internal/modules/procurement ^TestRenameConversationTitleRules$",
+   "why": "標題可以含換行"
+  },
+  {
+   "id": "title-blank-allowed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "t == \"\" ||",
+   "new": "false ||",
+   "test": "internal/modules/procurement ^TestRenameConversationTitleRules$",
+   "why": "空白的標題被接受"
+  },
+  {
+   "id": "title-db-check-loosened",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/db/migrations/20261123024034_procurement_conversation_title_40.sql",
+   "old": "(char_length(title) <= 40)",
+   "new": "(char_length(title) <= 200)",
+   "test": "internal/modules/procurement ^TestDatabaseRejectsATitleOver40RunesAndKeepsTheWhitespaceCheck$",
+   "why": "資料表的 CHECK 沒有收緊到 40"
+  },
+  {
+   "id": "candidate-run-type-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/read.go",
+   "old": "r.RunType != run.RunTypeCandidateSearch || r.RequestID != requestID",
+   "new": "r.RequestID != requestID",
+   "test": "internal/modules/procurement ^TestGetCandidateSearchHasThreeShapes$",
+   "why": "不是 CANDIDATE_SEARCH 的 run 也能讀"
+  },
+  {
+   "id": "candidate-request-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/read.go",
+   "old": "r.RunType != run.RunTypeCandidateSearch || r.RequestID != requestID",
+   "new": "r.RunType != run.RunTypeCandidateSearch",
+   "test": "internal/modules/procurement ^TestGetCandidateSearchHasThreeShapes$",
+   "why": "run 不屬於請求的需求也能讀"
+  },
+  {
+   "id": "candidate-failure-reason-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/read.go",
+   "old": "out.FailureReason = *r.FailureReason",
+   "new": "out.FailureReason = \"SEARCH_FAILED\"",
+   "test": "internal/modules/procurement ^TestGetCandidateSearchHasThreeShapes$",
+   "why": "FAILED 的失敗原因不是 run 的真實原因"
+  },
+  {
+   "id": "candidate-facts-time-wrong",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/read.go",
+   "old": "FactsAsOf: *r.CompletedAt",
+   "new": "FactsAsOf: r.CreatedAt",
+   "test": "internal/modules/procurement ^TestGetCandidateSearchHasThreeShapes$",
+   "why": "facts_time 不是搜尋完成的時間"
+  },
+  {
+   "id": "snapshot-hash-ignores-note",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
+   "old": "BuyerNote: snap.BuyerNote,",
+   "new": "BuyerNote: \"\",",
+   "test": "internal/modules/procurement ^TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash$",
+   "why": "重算的 hash 少了買家備註"
+  },
+  {
+   "id": "candidate-store-card-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/convert.go",
+   "old": "Store: card}",
+   "new": "Store: func() *commonpb.StoreCard { _ = card; return nil }()}",
+   "test": "internal/httpapi/buyerprocurement ^TestGetCandidateSearchAssemblesStoreCardsAndFacts$",
+   "why": "候選不帶 StoreCard"
+  },
+  {
+   "id": "start-search-ignores-deleted-conversation",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/start.go",
+   "old": "RequestID: in.RequestID, BuyerID: in.BuyerID}); errors.Is(err, pgx.ErrNoRows) {\n\t\treturn apperr.NotFound(\"找不到這個需求\")",
+   "new": "RequestID: in.RequestID, BuyerID: in.BuyerID}); false && errors.Is(err, pgx.ErrNoRows) {\n\t\treturn apperr.NotFound(\"找不到這個需求\")",
+   "test": "internal/modules/procurement/internal/search ^TestStartIsNotFoundOnceTheConversationIsDeleted$",
+   "why": "對話刪除後仍可開始候選搜尋"
+  },
+  {
+   "id": "candidate-search-read-ignores-deleted-conversation",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/read.go",
+   "old": "BuyerID: buyerID}); errors.Is(err, pgx.ErrNoRows) {\n\t\treturn model.CandidateSearch{}, notFound()",
+   "new": "BuyerID: buyerID}); false && errors.Is(err, pgx.ErrNoRows) {\n\t\treturn model.CandidateSearch{}, notFound()",
+   "test": "internal/modules/procurement/internal/search ^TestGetCandidateSearchIsNotFoundOnceTheConversationIsDeleted$",
+   "why": "對話刪除後仍讀得到候選搜尋結果"
+  },
+  {
+   "id": "rfqhash-schema-version-out-of-preimage",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfqhash/rfqhash.go",
+   "old": "SchemaVersion          string  `json:\"schemaVersion\"`",
+   "new": "SchemaVersion          string  `json:\"-\"`",
+   "test": "internal/modules/procurement/internal/rfqhash ^TestSnapshotIsDeterministicAndPinned$",
+   "why": "原像不含 schema_version：hash 不再綁版本"
+  },
+  {
+   "id": "title-accepts-line-separator",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "unicode.IsControl(r) || r == '\\u2028' || r == '\\u2029'",
+   "new": "unicode.IsControl(r) && r < ' '",
+   "test": "internal/modules/procurement/internal/conversation ^TestValidTitleRejectsEveryLineBreakAndControlRune$",
+   "why": "標題只擋 \\n \\r：U+2028、U+0085 等混進標題"
+  },
+  {
+   "id": "candidate-without-store-card-is-silent",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/convert.go",
+   "old": "if !ok {\n\t\t\treturn nil, fmt.Errorf(\"buyerprocurement：候選 %s 的店 %d 沒有店家卡片（搜尋只收曾公開過的店）\", c.ID, c.StoreID)\n\t\t}",
+   "new": "_ = ok",
+   "test": "internal/httpapi/buyerprocurement ^TestGetCandidateSearchAssemblesStoreCardsAndFacts$",
+   "why": "缺店家卡片的候選被靜默回 store 為空"
+  },
+  {
+   "id": "token-lower-bound-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "if t.UpdatedAt < minTokenMicro {",
+   "new": "if t.UpdatedAt < -1<<63 {",
+   "test": "internal/modules/procurement/internal/conversation ^TestDecodeTokenRoundTripsAndRejectsTimestampsOutsideTimestamptzRange$",
+   "why": "低於 timestamptz 下界的 token 被接受，送進查詢變成 INTERNAL"
+  }
+ ]
+}

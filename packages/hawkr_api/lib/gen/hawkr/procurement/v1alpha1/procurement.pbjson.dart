@@ -698,39 +698,6 @@ final $typed_data.Uint8List slotsDescriptor = $convert.base64Decode(
     'R5QhAKDl9kZWxpdmVyeV9kYXRlQhcKFV9leGFjdF9tYXRjaF9yZXF1aXJlZEISChBfaXRlbV9y'
     'ZXNvbHV0aW9u');
 
-@$core.Deprecated('Use itemDisambiguationOptionDescriptor instead')
-const ItemDisambiguationOption$json = {
-  '1': 'ItemDisambiguationOption',
-  '2': [
-    {'1': 'label', '3': 1, '4': 1, '5': 9, '10': 'label'},
-  ],
-};
-
-/// Descriptor for `ItemDisambiguationOption`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List itemDisambiguationOptionDescriptor =
-    $convert.base64Decode(
-        'ChhJdGVtRGlzYW1iaWd1YXRpb25PcHRpb24SFAoFbGFiZWwYASABKAlSBWxhYmVs');
-
-@$core.Deprecated('Use itemDisambiguationDescriptor instead')
-const ItemDisambiguation$json = {
-  '1': 'ItemDisambiguation',
-  '2': [
-    {
-      '1': 'candidates',
-      '3': 1,
-      '4': 3,
-      '5': 11,
-      '6': '.hawkr.procurement.v1alpha1.ItemDisambiguationOption',
-      '10': 'candidates'
-    },
-  ],
-};
-
-/// Descriptor for `ItemDisambiguation`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List itemDisambiguationDescriptor = $convert.base64Decode(
-    'ChJJdGVtRGlzYW1iaWd1YXRpb24SVAoKY2FuZGlkYXRlcxgBIAMoCzI0Lmhhd2tyLnByb2N1cm'
-    'VtZW50LnYxYWxwaGExLkl0ZW1EaXNhbWJpZ3VhdGlvbk9wdGlvblIKY2FuZGlkYXRlcw==');
-
 @$core.Deprecated('Use blockDescriptor instead')
 const Block$json = {
   '1': 'Block',
@@ -1223,16 +1190,6 @@ const GetSnapshotResponse$json = {
       '10': 'missingRequired'
     },
     {
-      '1': 'item_disambiguation',
-      '3': 6,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.procurement.v1alpha1.ItemDisambiguation',
-      '9': 0,
-      '10': 'itemDisambiguation',
-      '17': true
-    },
-    {
       '1': 'runs',
       '3': 7,
       '4': 3,
@@ -1247,7 +1204,7 @@ const GetSnapshotResponse$json = {
       '4': 1,
       '5': 11,
       '6': '.hawkr.procurement.v1alpha1.OpenConfirmation',
-      '9': 1,
+      '9': 0,
       '10': 'openConfirmation',
       '17': true
     },
@@ -1257,16 +1214,19 @@ const GetSnapshotResponse$json = {
       '4': 1,
       '5': 11,
       '6': '.hawkr.procurement.v1alpha1.PublishedRfq',
-      '9': 2,
+      '9': 1,
       '10': 'publishedRfq',
       '17': true
     },
   ],
   '8': [
-    {'1': '_item_disambiguation'},
     {'1': '_open_confirmation'},
     {'1': '_published_rfq'},
   ],
+  '9': [
+    {'1': 6, '2': 7},
+  ],
+  '10': ['item_disambiguation'],
 };
 
 /// Descriptor for `GetSnapshotResponse`. Decode as a `google.protobuf.DescriptorProto`.
@@ -1276,15 +1236,13 @@ final $typed_data.Uint8List getSnapshotResponseDescriptor = $convert.base64Decod
     'cm9jdXJlbWVudC52MWFscGhhMS5SZXF1ZXN0U3RhdHVzUgZzdGF0dXMSNwoFc2xvdHMYBCABKA'
     'syIS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5TbG90c1IFc2xvdHMSTgoQbWlzc2luZ19y'
     'ZXF1aXJlZBgFIAMoDjIjLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlNsb3RLZXlSD21pc3'
-    'NpbmdSZXF1aXJlZBJkChNpdGVtX2Rpc2FtYmlndWF0aW9uGAYgASgLMi4uaGF3a3IucHJvY3Vy'
-    'ZW1lbnQudjFhbHBoYTEuSXRlbURpc2FtYmlndWF0aW9uSABSEml0ZW1EaXNhbWJpZ3VhdGlvbo'
-    'gBARI6CgRydW5zGAcgAygLMiYuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUnVuU3VtbWFy'
-    'eVIEcnVucxIiCg1hY3RpdmVfcnVuX2lkGAggASgJUgthY3RpdmVSdW5JZBJeChFvcGVuX2Nvbm'
-    'Zpcm1hdGlvbhgJIAEoCzIsLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLk9wZW5Db25maXJt'
-    'YXRpb25IAVIQb3BlbkNvbmZpcm1hdGlvbogBARJSCg1wdWJsaXNoZWRfcmZxGAogASgLMiguaG'
-    'F3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUHVibGlzaGVkUmZxSAJSDHB1Ymxpc2hlZFJmcYgB'
-    'AUIWChRfaXRlbV9kaXNhbWJpZ3VhdGlvbkIUChJfb3Blbl9jb25maXJtYXRpb25CEAoOX3B1Ym'
-    'xpc2hlZF9yZnE=');
+    'NpbmdSZXF1aXJlZBI6CgRydW5zGAcgAygLMiYuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEu'
+    'UnVuU3VtbWFyeVIEcnVucxIiCg1hY3RpdmVfcnVuX2lkGAggASgJUgthY3RpdmVSdW5JZBJeCh'
+    'FvcGVuX2NvbmZpcm1hdGlvbhgJIAEoCzIsLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLk9w'
+    'ZW5Db25maXJtYXRpb25IAFIQb3BlbkNvbmZpcm1hdGlvbogBARJSCg1wdWJsaXNoZWRfcmZxGA'
+    'ogASgLMiguaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUHVibGlzaGVkUmZxSAFSDHB1Ymxp'
+    'c2hlZFJmcYgBAUIUChJfb3Blbl9jb25maXJtYXRpb25CEAoOX3B1Ymxpc2hlZF9yZnFKBAgGEA'
+    'dSE2l0ZW1fZGlzYW1iaWd1YXRpb24=');
 
 @$core.Deprecated('Use matchedFactDescriptor instead')
 const MatchedFact$json = {
@@ -4227,9 +4185,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.procurement.v1alpha1.Slots': Slots$json,
   '.google.type.Date': $0.Date$json,
   '.hawkr.procurement.v1alpha1.ItemResolution': ItemResolution$json,
-  '.hawkr.procurement.v1alpha1.ItemDisambiguation': ItemDisambiguation$json,
-  '.hawkr.procurement.v1alpha1.ItemDisambiguationOption':
-      ItemDisambiguationOption$json,
   '.hawkr.procurement.v1alpha1.RunSummary': RunSummary$json,
   '.hawkr.procurement.v1alpha1.OpenConfirmation': OpenConfirmation$json,
   '.hawkr.procurement.v1alpha1.ClarifyQuestion': ClarifyQuestion$json,

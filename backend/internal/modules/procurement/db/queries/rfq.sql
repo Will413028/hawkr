@@ -144,8 +144,8 @@ WHERE request_id = @request_id AND buyer_id = @buyer_id
 ORDER BY created_at DESC, id DESC LIMIT 1;
 
 -- name: GetLatestPublicationByRequest :one
--- 需求最新一次的發布，連同核准的快照 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
-SELECT p.id, p.version, p.published_at, a.confirmed_rfq_snapshot_id,
+-- 需求最新一次的發布，連同核准的快照 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0），以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
+SELECT p.id, p.version, p.published_at, p.schema_version, a.confirmed_rfq_snapshot_id,
     (SELECT count(*) FROM procurement.rfq_publication_approval_recipients r WHERE r.approval_id = a.id)::int AS recipient_count,
     (SELECT count(*) FROM procurement.rfq_publication_invites i WHERE i.publication_id = p.id)::int AS queued_count
 FROM procurement.rfq_publications p

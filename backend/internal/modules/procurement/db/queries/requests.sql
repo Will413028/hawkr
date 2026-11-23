@@ -79,6 +79,17 @@ WHERE buyer_id = @buyer_id AND deleted_at IS NULL
 ORDER BY updated_at DESC, id DESC
 LIMIT @page_size;
 
+-- name: ListConversationsAfter :many
+-- 第一頁之後的頁：keyset (updated_at DESC, id DESC)，走索引 conversations_buyer_active；游標是上一頁最後一列的 (updated_at, id)。
+SELECT * FROM procurement.conversations
+WHERE buyer_id = @buyer_id AND deleted_at IS NULL AND (updated_at, id) < (@after_updated_at::timestamptz, @after_id::uuid)
+ORDER BY updated_at DESC, id DESC
+LIMIT @page_size;
+
+-- name: GetConversationIncludingDeleted :one
+-- 只用來分辨「自己的、已刪除」與「不存在或不是自己的」：刪除重送回成功，後者回 NOT_FOUND。
+SELECT * FROM procurement.conversations WHERE id = @id AND buyer_id = @buyer_id;
+
 -- name: RenameConversation :execrows
 -- 目標狀態的方法（S4）：重送結果相同，不建收據。
 UPDATE procurement.conversations SET title = @title, title_source = 'USER', updated_at = @now

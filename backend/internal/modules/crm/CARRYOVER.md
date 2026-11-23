@@ -72,3 +72,11 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 | handler 在寫入提交後以 `BatchDisplay.deleted` 判斷客戶不可見 | 可見性由擁有資料的模組在寫入前判斷 | 不成立；刪除 handler 檢查。寫入路徑的 `lockCustomerParties` 以 `buyer.LockNotClosed`（與 `pub_closed_buyers` 同一事實）在寫入前回 NotFound，`BatchDisplay` 只做顯示對應；`TestInactiveBuyerIsInvisibleAndReadOnlyToSellers` 驗證 NotFound 且什麼都沒寫 |
 | 讀取在店家關閉或不存在時回空頁或略過檢查，寫入回 NotFound | 讀寫同一個結論 | 改：讀取也回 NotFound（客戶層 `CUSTOMER_NOT_FOUND`，`ListTags` 為 `TAG_NOT_FOUND`）；`TestInactiveStoreIsInvisibleAndReadOnlyToSellers` 期望同步改 |
 | 停權時依 ADR D3 把收縮類方法與必要讀取放行（social 的 `CapContentContract`） | CRM 資料從不公開，停權的店家沒有東西需要收回 | 不適用（Will 2026-11-22）；九個方法全是 `CapMarketing`，停權整體被擋；ADR 修訂記一行；`TestDeclarationsMatchTheModuleChecks` 守宣告與模組一致，`TestSuspendedStoreIsRejectedByTheModuleForWritesAndReads` 守模組九個方法都擋 |
+
+## 公司時期未完成項
+
+舊公司 repo 的 issue 只有一行標題，內文取不到。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| #3367：crm 用模糊搜尋解析訂單、找不到就無限重試；改成直接呼叫後重新設計解析方式 | 已重新設計，單體沒有模糊搜尋：`order.completed` 的 payload 本身帶 `order_no`、`buyer_id`、`store_id`，consumer 驗證後原樣排 job，投影不需要解析訂單；退款事件沒有帶店與買家，worker 以單號直接呼叫舊訂單服務 `OrderParties` 精確解析，訂單不存在是 permanent（`JobCancel`，不重試），其他錯誤由 River 重試，輸入無效或買賣雙方不符也取消。重試上限：這兩個 job 的排入選項沒設 `MaxAttempts`（`crmconsumer` 只設唯一鍵），沒有查到 river client 另設，所以是 River 的預設值（25 次，採自 `seller/CARRYOVER.md` 對 River 預設的描述，沒有在 river 原始碼確認）；沒有無限重試。ordering 搬進單體時兩條路徑都退場，改讀 ordering 的 `pub_*`（計畫「延後」） | `internal/legacy/crmconsumer/consumer.go:84-110`（`OrderCompleted` 只驗證欄位）、`:117-122`（worker 呼叫 `RecordOrderCompleted`）、`:127-131`（`cancelIfHopeless`）、`:214-227`（退款：`OrderParties` 精確解析，`ErrOrderNotFound` → `river.JobCancel`）；`:69-72`（`InsertOpts` 無 `MaxAttempts`）；舊碼的搜尋是 `94796248:backend/services/crm-service/internal/usecase/crm.go` 的關鍵字客戶搜尋（單體已無，見「與 crm-service 的差異」），舊碼沒有找到「模糊解析訂單」的程式，只靠標題判斷 |

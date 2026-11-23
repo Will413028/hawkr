@@ -100,7 +100,6 @@ const publicNamespace = "/api/v1/public"
 // same-source-IP callback bursts — under a per-IP request limit.
 var exemptExact = map[string]struct{}{
 	"/api/v1/health":                   {}, // liveness probe
-	"/api/v1/app/chat/ws":              {}, // IM WebSocket upgrade
 	"/api/v1/app/notifications/stream": {}, // notification SSE
 	"/webhook/payuni/notify":           {}, // PayUni server-to-server callback
 	"/payment/return":                  {}, // PayUni return (GET + POST)

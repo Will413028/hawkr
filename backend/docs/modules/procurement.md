@@ -64,3 +64,12 @@
 - 有 `RequestID`：需求不存在、屬於別的買家或需求沒有（未刪除的）對話都回 NOT_FOUND。
 - 額度：transaction 內先取買家的送出鎖（`LockBuyerSubmits`）、解析需求與對話（含重送偵測），非重送才讀買家模組的有效權益（`Deps.Entitlements`，沒給時 SubmitTurn 回內部錯誤，不當成不限額；重送不讀，所以買家關閉或權益讀取失敗時重送仍回放），然後經 `run.Submitter` 建 run、扣一次額度、排入 job；額度用完、買家上限、同需求進行中依 `run.Submitter.Submit`。
 - 重送同一個 `ClientRequestID`：回第一次的需求、對話與 run，不再建需求、不再扣額度；沒指定 `RequestID` 時沿用第一次的，指定了別的需求或內容不同回 INVALID_ARGUMENT（指定的需求不存在、不屬於買家或沒有對話則回 NOT_FOUND，先於內容比對）；重送時對話已被刪除回 NOT_FOUND（與非重送路徑一致）。
+
+## 7. 讀取與對話管理（A9-3b-3a，A9-D31 Q7–Q9）
+
+- `GetSnapshot(buyerID, requestID)`（`snapshot.Reader.GetByRequest`）以需求為鍵：現行版本的欄位（`slots.FromRevision`）、`MissingRequired`、run、進行中的 run、待回答的中斷與最新的發布結果。需求不存在、不屬於買家，或它的對話已被買家刪除回 NOT_FOUND（契約沒寫刪除對話後需求能否由 request_id 讀取，這裡取較保守的 NOT_FOUND）。`PublishedRfq.RfqSnapshotHash` 與 `GetRuntimeSnapshot` 相同，由 `internal/rfqhash` 對確認快照、它確認的需求版本與價格預覽重算（SHA-256 對固定欄位順序的 JSON）；3c 的 `ConfirmRfqSnapshot` 必須以同一個函式算 `payload_hash`。
+- `GetConversationMessages` 與 `GetRuntimeSnapshot` 的訊息同源（`snapshot.messagesOf`）。
+- `ListConversations`：keyset `(updated_at DESC, id DESC)`，走索引 `conversations_buyer_active`；`page_size` 0 是 20、超過 50 以 50 計、負數與壞 `page_token` 回 INVALID_ARGUMENT（欄位 `page_size`、`page_token`）；token 是 `(updated_at 微秒, id)` 的 base64url JSON，不透明。
+- `RenameConversation`：去頭尾空白後 1 到 40 字元、不含 `\n`、`\r`，否則 INVALID_ARGUMENT（欄位 `title`）；DB 的 `conversations_title_check` 同為 40。目標狀態的方法，不建收據。
+- `DeleteConversation`：同一個 transaction 依序取買家送出鎖、`Canceller.CancelAllOfRequest`（需求還沒結束的 run，含等待輸入的，逐個走 `CancelRun` 的路徑，買家取消不退額度）、軟刪除對話；已發布的詢價與接受單不動。已刪除的重送回成功，不存在或不是本人回 NOT_FOUND。
+- `GetCandidateSearch(buyerID, requestID, runID, locale)`（`search.Reader`）：run 不存在、不是本人、不是 CANDIDATE_SEARCH 或不屬於該需求回 NOT_FOUND。候選集在建 run 時就建好，所以每個狀態都有 `CandidateSetID`；只有 SUCCEEDED 有候選（事實由需求現行版本讀取時組出，`FactsAsOf` 是 run 完成的時間），FAILED 帶失敗原因，其餘狀態只回狀態。店家卡片在 httpapi 組（`seller.Module.StoreCards`）；沒公開過的店沒有卡片，候選照列、不設 `store`。

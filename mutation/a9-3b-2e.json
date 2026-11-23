@@ -166,8 +166,8 @@
    "id": "snapshot-active",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
-   "old": "out.ActiveRunID = &active.ID",
-   "new": "out.ActiveRunID = nil\n\t\t_ = active",
+   "old": "out.active = &active.ID",
+   "new": "out.active = nil\n\t\t_ = active",
    "test": "internal/modules/procurement ^TestGetRuntimeSnapshotMirrorsTheConversation$",
    "why": "active_run_id 不填"
   },

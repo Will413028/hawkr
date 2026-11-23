@@ -13,7 +13,7 @@ import (
 
 // requireSeller 依帳號角色與入口提供的能力集合（X-Seller-Capabilities，seller 模組推導）檢查能力：只看 cap 是不是
 // 集合的成員，不自己從停權或生命週期推導。拒絕時，現任店家停權中回 9240，其餘（例如等待刪除）回 403。沒有能力集合
-// （沒有店家、ws-ticket）一律拒絕。
+// （沒有店家）一律拒絕。
 func requireSeller(cap authz.Capability) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if middleware.SkipRoleCheck {
