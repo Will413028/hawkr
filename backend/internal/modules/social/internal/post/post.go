@@ -454,8 +454,15 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 				return err
 			}
 		}
-		if row.ImageAssetID != nil && (in.ClearImage || (asset != nil && *row.ImageAssetID != asset.ID)) {
-			if err := s.d.Media.MarkDeleted(ctx, []uuid.UUID{*row.ImageAssetID}); err != nil {
+		kept := row.ImageAssetID
+		if in.ClearImage {
+			kept = nil
+		}
+		if asset != nil {
+			kept = &asset.ID
+		}
+		if retired := media.RetiredAssets(media.AssetIDs(row.ImageAssetID), media.AssetIDs(kept)); len(retired) > 0 {
+			if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {
 				return err
 			}
 		}
