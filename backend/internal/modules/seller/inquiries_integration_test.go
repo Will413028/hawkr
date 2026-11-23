@@ -890,9 +890,9 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 		{"回覆與撤回同時存在", "case_inquiries_terminal_check", valid(replyColumns+withdrawColumns, ", 'x', 'PHONE', now(), now(), 1, now(), 1, 'ADMIN'")},
 		{"同一個案件第二筆還沒結束的詢問", "case_inquiries_one_open", insert(busy.ID, other.StoreID, 1, "now() + interval '1 day'", "", "")},
 		// 附件：位置、資產、外鍵與主鍵。
-		{"附件位置超過 4", "case_inquiry_reply_evidence_position_check", fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 5, 'a', 'k')", repliedInquiry.ID)},
-		{"附件的資產是空字串", "case_inquiry_reply_evidence_asset_check", fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 4, '', 'k')", repliedInquiry.ID)},
-		{"附件掛在不存在的詢問", "case_inquiry_reply_evidence_inquiry_id_fkey", "INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES (uuidv7(), 0, 'a', 'k')"},
+		{"附件位置超過 4", "case_inquiry_reply_evidence_position_check", fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 5, '019c0000-0000-7000-8000-0000000000a1', 'k')", repliedInquiry.ID)},
+		{"附件的 object key 是空字串", "case_inquiry_reply_evidence_asset_check", fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 4, '019c0000-0000-7000-8000-0000000000a1', '')", repliedInquiry.ID)},
+		{"附件掛在不存在的詢問", "case_inquiry_reply_evidence_inquiry_id_fkey", "INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES (uuidv7(), 0, '019c0000-0000-7000-8000-0000000000a1', 'k')"},
 		// 讀取紀錄：擁有者剛好一個，附件要存在。
 		{"讀取紀錄沒有擁有者", "evidence_accesses_owner_check", "INSERT INTO seller.evidence_accesses (access_id, position, admin_id, accessed_at) VALUES (uuidv7(), 0, 1, now())"},
 		{"讀取紀錄指向不存在的附件", "evidence_accesses_inquiry_fkey", fmt.Sprintf("INSERT INTO seller.evidence_accesses (access_id, inquiry_id, position, admin_id, accessed_at) VALUES (uuidv7(), '%s', 4, 1, now())", repliedInquiry.ID)},
@@ -900,7 +900,7 @@ func TestCaseInquirySchemaConstraints(t *testing.T) {
 		f.wantViolates(t, v.name, v.constraint, v.sql)
 	}
 	// 附件的主鍵：同一筆詢問同一個位置不能重複（已有位置 0）。
-	_, err = f.db.Conn(ctx).Exec(ctx, fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 0, 'a', 'k')", repliedInquiry.ID))
+	_, err = f.db.Conn(ctx).Exec(ctx, fmt.Sprintf("INSERT INTO seller.case_inquiry_reply_evidence (inquiry_id, position, asset_id, object_key) VALUES ('%s', 0, '019c0000-0000-7000-8000-0000000000a1', 'k')", repliedInquiry.ID))
 	var pg *pgconn.PgError
 	if !errors.As(err, &pg) || pg.ConstraintName != "case_inquiry_reply_evidence_pkey" {
 		t.Errorf("附件位置重複要被主鍵擋下：%v", err)

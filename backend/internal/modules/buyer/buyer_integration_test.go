@@ -495,7 +495,7 @@ func TestMembershipIdempotency(t *testing.T) {
 	}
 }
 
-func TestEventAndJobFailureRollBack(t *testing.T) {
+func TestEventFailuresRollBack(t *testing.T) {
 	t.Parallel()
 	fixture := setup(t)
 	ctx := context.Background()
@@ -507,14 +507,14 @@ func TestEventAndJobFailureRollBack(t *testing.T) {
 	if count(t, fixture, "SELECT count(*) FROM buyer.favorites") != 0 {
 		t.Fatal("favorite survived event failure")
 	}
-	fixture.jobs.fail = true
+	events.Subscribe(fixture.bus, func(context.Context, BuyerDeleted) error { return errors.New("reject close event") })
 	if err := fixture.module.CloseForDeletion(ctx, buyer.BuyerID); err == nil {
-		t.Fatal("job rejection lost")
+		t.Fatal("close event rejection lost")
 	}
 	buyer, err := fixture.module.Profile(ctx, 1)
 	must(t, err)
 	if buyer.Status != Active {
-		t.Fatal("close survived job failure")
+		t.Fatal("close survived event failure")
 	}
 }
 

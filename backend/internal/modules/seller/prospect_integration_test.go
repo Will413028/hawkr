@@ -1778,8 +1778,10 @@ func TestArchiveAndMergeClearImageSourceURLs(t *testing.T) {
 	ctx := context.Background()
 	withSources := func(name string) Prospect {
 		p := f.newProspect(t, name, nil)
+		logoToken, _ := f.stageProspectImage(t)
+		coverToken, _ := f.stageProspectImage(t)
 		p, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin,
-			Logo: &ProspectImageUpload{StagedToken: name + "-l", SourceURL: "https://source.example/l"}, Cover: &ProspectImageUpload{StagedToken: name + "-c", SourceURL: "https://source.example/c"}})
+			Logo: &ProspectImageUpload{StagedToken: logoToken, SourceURL: "https://source.example/l"}, Cover: &ProspectImageUpload{StagedToken: coverToken, SourceURL: "https://source.example/c"}})
 		must(t, err)
 		if p.LogoSourceURL == nil || p.CoverSourceURL == nil {
 			t.Fatalf("setup: %+v", p)

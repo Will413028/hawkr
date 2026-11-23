@@ -2176,11 +2176,11 @@ func TestReportSchemaConstraints(t *testing.T) {
 		{"通報掛到別家店的案件", "reports_case_fkey", "UPDATE seller.reports SET case_id = '" + foreignID + "', assessed_category = 'FRAUD', triaged_at = now(), triaged_by_admin_id = 1 WHERE id = '" + report0 + "'"},
 		{"平台判定類別和案件的不同", "reports_case_fkey", "UPDATE seller.reports SET assessed_category = 'COUNTERFEIT' WHERE id = '" + report0 + "'"},
 		{"分案時間早於建立", "reports_triage_check", "UPDATE seller.reports SET triaged_at = created_at - interval '1 day' WHERE id = '" + report0 + "'"},
-		{"佐證的位置是負的", "report_evidence_position_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 0, -1, 'a', 'k')"},
-		{"一次送出的佐證超過 5 張（位置 5）", "report_evidence_position_check", fmt.Sprintf("INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('%s', 0, %d, 'a', 'k')", report0, model.MaxEvidence)},
-		{"補充的佐證沒有指向補充", "report_evidence_supplement_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 1, 0, 'a', 'k')"},
-		{"補充的佐證指向的補充不是這一次送出", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report0 + "', 2, 0, id, 'a', 'k' FROM seller.report_supplements WHERE report_id = '" + report0 + "'"},
-		{"佐證的補充屬於別的通報", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report1 + "', 1, 0, id, 'a', 'k' FROM (SELECT id FROM seller.report_supplements LIMIT 1) x"},
+		{"佐證的位置是負的", "report_evidence_position_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 0, -1, '019c0000-0000-7000-8000-0000000000a1', 'k')"},
+		{"一次送出的佐證超過 5 張（位置 5）", "report_evidence_position_check", fmt.Sprintf("INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('%s', 0, %d, '019c0000-0000-7000-8000-0000000000a1', 'k')", report0, model.MaxEvidence)},
+		{"補充的佐證沒有指向補充", "report_evidence_supplement_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 1, 0, '019c0000-0000-7000-8000-0000000000a1', 'k')"},
+		{"補充的佐證指向的補充不是這一次送出", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report0 + "', 2, 0, id, '019c0000-0000-7000-8000-0000000000a1', 'k' FROM seller.report_supplements WHERE report_id = '" + report0 + "'"},
+		{"佐證的補充屬於別的通報", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report1 + "', 1, 0, id, '019c0000-0000-7000-8000-0000000000a1', 'k' FROM (SELECT id FROM seller.report_supplements LIMIT 1) x"},
 		{"補充超過 10 則", "report_supplements_seq_check", fmt.Sprintf("INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '%s', %d, 'x', now())", report0, model.MaxSupplements+1)},
 		{"同一筆通報的補充序號重複", "report_supplements_report_seq_key", "INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '" + report0 + "', 1, 'x', now())"},
 		{"補充是空的", "report_supplements_description_check", "INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '" + report0 + "', 2, '', now())"},
@@ -2215,17 +2215,17 @@ func TestReportSchemaConstraints(t *testing.T) {
 	}
 	// 每次送出各自編號：原通報（第 0 次）與第 1 則補充各接受次內位置 0 到 4，同一次送出的同一個位置不能重複。
 	for _, e := range []struct{ seq, position int }{{0, 0}, {0, model.MaxEvidence - 1}} {
-		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, $2, $3, 'a', 'k')", members[0].ID, e.seq, e.position); err != nil {
+		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, $2, $3, '019c0000-0000-7000-8000-0000000000a1', 'k')", members[0].ID, e.seq, e.position); err != nil {
 			t.Errorf("第 %d 次送出的位置 %d 的佐證要接受：%v", e.seq, e.position, err)
 		}
 	}
 	for _, position := range []int{0, model.MaxEvidence - 1} {
-		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT report_id, seq, $2, id, 'a', 'k' FROM seller.report_supplements WHERE report_id = $1 AND seq = 1", members[0].ID, position); err != nil {
+		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT report_id, seq, $2, id, '019c0000-0000-7000-8000-0000000000a1', 'k' FROM seller.report_supplements WHERE report_id = $1 AND seq = 1", members[0].ID, position); err != nil {
 			t.Errorf("補充的位置 %d 的佐證要接受：%v", position, err)
 		}
 	}
 	// 同一次送出的同一個位置不能重複（主鍵有 evidence_accesses 的外鍵依賴，wantViolates 的「拿掉再試」做不了，這裡只比對被擋下的約束）。
-	_, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, 0, 0, 'a', 'k')", members[0].ID)
+	_, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, 0, 0, '019c0000-0000-7000-8000-0000000000a1', 'k')", members[0].ID)
 	var pg *pgconn.PgError
 	if !errors.As(err, &pg) || pg.ConstraintName != "report_evidence_pkey" {
 		t.Errorf("同一次送出的同一個位置要被 report_evidence_pkey 擋下：%v", err)

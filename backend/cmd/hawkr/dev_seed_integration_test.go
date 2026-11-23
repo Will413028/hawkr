@@ -22,10 +22,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// setSellerEnv 設定組裝 seller 的子命令（openSeller）必填的依賴：三個服務位址（惰性連線，子命令不呼叫它們）與 KYC 金鑰。
+// setSellerEnv 設定組裝 seller 的子命令（openSeller）必填的依賴：media 的儲存設定與金鑰環（物件儲存惰性連線，子命令不碰物件）、兩個服務位址（惰性連線，子命令不呼叫它們）與 KYC 金鑰。
 func setSellerEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("MEDIA_SERVICE_ADDR", "127.0.0.1:1")
+	setMediaEnv(t, "dev1:ZGV2LW9ubHktbWVkaWEta2VrLTAwMDAwMDAwMDAwMDA=")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("KYC_HASH_KEYS", "test1:dGVzdC1reWMtaGFzaC1obWFjLWtleS0wMDAwMDAwMDE=")

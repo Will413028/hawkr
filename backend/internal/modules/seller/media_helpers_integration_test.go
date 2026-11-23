@@ -58,6 +58,13 @@ func (f *fixture) stagePublic(t *testing.T, uploader media.Uploader) (string, uu
 	return put.Token, f.assetIDOfToken(t, put.Token)
 }
 
+// logoToken 以 accountID 放一張公開圖片，回傳可當 LogoToken 的 token。
+func (f *fixture) logoToken(t *testing.T, accountID int64) string {
+	t.Helper()
+	token, _ := f.stagePublic(t, media.Uploader{ID: accountID})
+	return token
+}
+
 // stageSecure 以 uploader 放一份機敏檔（data 要是 PDF 或圖片），回傳可 Confirm 的 token 與資產 ID。
 func (f *fixture) stageSecure(t *testing.T, uploader media.Uploader, data []byte) (string, uuid.UUID) {
 	t.Helper()

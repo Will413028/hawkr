@@ -41,7 +41,7 @@ func (f *adminFixture) submittedKYC(t *testing.T, name string) (int64, seller.St
 	return accountID, s, submitted
 }
 
-// submittedCompanyKYC 為一家新店建立並送出一份帶兩張公司補充文件的企業賣家申請；文件放進 media 的替身（內容是 "doc<位置>-bytes"）。
+// submittedCompanyKYC 為一家新店建立並送出一份帶兩張公司補充文件的企業賣家申請；文件放進 media 的替身（內容是 "%PDF-1.4 doc<位置>-bytes"）。
 func (f *adminFixture) submittedCompanyKYC(t *testing.T, name, taxID string) (int64, seller.Store, seller.KYCApplication) {
 	t.Helper()
 	accountID, s := f.newSeller(t, name)
@@ -284,7 +284,7 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 
 	// 有權限的管理員直接讀得到（不需要先顯示全文）；圖片的標頭固定；寫一列紀錄。
 	code, header, body := f.documentGET(t, f.adminToken, doc(app, "0"))
-	if code != 200 || body != "doc0-bytes" {
+	if code != 200 || body != "%PDF-1.4 doc0-bytes" {
 		t.Fatalf("code=%d body=%q", code, body)
 	}
 	for k, v := range map[string]string{"Content-Type": "image/jpeg", "Cache-Control": "private, no-store", "Content-Disposition": "inline", "X-Content-Type-Options": "nosniff"} {
@@ -296,7 +296,7 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 		t.Fatalf("每次讀取各一列：%d", n)
 	}
 	// 另一位有權限的管理員讀同一張：各寫各的一列；同一位再讀一次也是新的一列。
-	if code, _, body := f.documentGET(t, f.otherAdminToken, doc(app, "1")); code != 200 || body != "doc1-bytes" {
+	if code, _, body := f.documentGET(t, f.otherAdminToken, doc(app, "1")); code != 200 || body != "%PDF-1.4 doc1-bytes" {
 		t.Fatalf("另一位管理員：code=%d body=%q", code, body)
 	}
 	if code, _, _ := f.documentGET(t, f.adminToken, doc(app, "0")); code != 200 {

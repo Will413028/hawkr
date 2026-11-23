@@ -277,7 +277,7 @@ func (f *fixture) exposableStoreOnIdentityAccount(t *testing.T) (storeID, accoun
 func (f *fixture) exposableStoreOn(t *testing.T, accountID int64) (storeID, _ int64) {
 	t.Helper()
 	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $2, '測試店', 'logo/k', 'logo-asset', '63000010', $3, $3)`, accountID, accountID, f.clock())
+		VALUES ($1, $2, '測試店', 'logo/k', uuidv7(), '63000010', $3, $3)`, accountID, accountID, f.clock())
 	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}

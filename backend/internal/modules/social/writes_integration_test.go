@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -453,7 +454,8 @@ func TestPostImageReplacementConfirmsTheNewAssetAndMarksTheOldDeleted(t *testing
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
 	st := f.store(t, storeID)
-	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ImageToken: "first", Publish: true}, nil))
+	// 草稿：已發布的貼文必須有 1 張照片，不能清掉圖。
+	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ImageToken: "first"}, nil))
 	first := f.postAsset(t, p.ID)
 	if got := f.assetState(t, first); got != "ACTIVE" {
 		t.Fatalf("新增後 state=%s，預期 ACTIVE", got)
@@ -478,8 +480,8 @@ func TestPostImageReplacementConfirmsTheNewAssetAndMarksTheOldDeleted(t *testing
 	}
 }
 
-// 重送沒變的 token（確認回同一個資產）不能把目前的圖標成刪除。
-func TestResendingTheCurrentImageTokenKeepsTheAssetActive(t *testing.T) {
+// 已確認過的 token 不能再用（B1-D23：只在同一個 transaction 內冪等）：client 不重送沒變的 token；重送被拒絕，目前的圖仍是 ACTIVE、貼文不變。
+func TestResendingTheCurrentImageTokenIsRejectedAndKeepsTheAssetActive(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -487,9 +489,15 @@ func TestResendingTheCurrentImageTokenKeepsTheAssetActive(t *testing.T) {
 	st := f.store(t, storeID)
 	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ImageToken: "same", Publish: true}, nil))
 	current := f.postAsset(t, p.ID)
-	mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("y"), ImageToken: "same"}, nil))
+	_, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("y"), ImageToken: "same"}, nil)
+	if kindOf(err) != apperr.KindInvalidInput || !errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+		t.Fatalf("重送已確認的 token：%v，預期被拒絕（原因是 failed_precondition）", err)
+	}
 	if got := f.assetState(t, current); got != "ACTIVE" {
 		t.Fatalf("重送同一個 token 之後目前的圖 state=%s，預期仍是 ACTIVE", got)
+	}
+	if after := f.postAsset(t, p.ID); after != current {
+		t.Fatalf("被拒絕的更新改了貼文的圖：%s -> %s", current, after)
 	}
 }
 

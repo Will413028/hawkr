@@ -193,7 +193,7 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	t.Setenv("SMS_SENDER", "log")
 	// 連線在第一次送出時才建立；這個測試不送事件。
 	t.Setenv("RABBITMQ_URL", "amqp://guest:guest@127.0.0.1:1/")
-	t.Setenv("MEDIA_SERVICE_ADDR", "127.0.0.1:1")
+	setMediaEnv(t, "dev1:ZGV2LW9ubHktbWVkaWEta2VrLTAwMDAwMDAwMDAwMDA=")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("REVIEW_SERVICE_ADDR", "127.0.0.1:1")

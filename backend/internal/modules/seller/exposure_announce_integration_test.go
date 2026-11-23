@@ -189,7 +189,7 @@ func TestAnExposureEventFailureRollsBackTheWriteAndTheAnnouncement(t *testing.T)
 	events.Subscribe(f.bus, func(context.Context, StoreExposureChanged) error { return boom })
 	cur, err := f.module.Store(ctx, s.StoreID)
 	must(t, err)
-	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
+	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: f.logoToken(t, accountID), UploaderID: accountID})
 	if !errors.Is(err, boom) {
 		t.Fatalf("err=%v", err)
 	}

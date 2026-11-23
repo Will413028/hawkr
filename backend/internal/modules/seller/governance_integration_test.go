@@ -364,7 +364,6 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	buyer := media.Uploader{ID: buyerAccount}
 	e1Token, e1 := f.stageSecure(t, buyer, evidencePDF("e1"))
 	e2Token, e2 := f.stageSecure(t, buyer, evidencePDF("e2"))
-	e3Token, e3 := f.stageSecure(t, buyer, evidencePDF("e3"))
 	first, err := f.module.SubmitReport(ctx, SubmitReportInput{
 		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.Fraud, Description: "原本的內容", EvidenceTokens: []string{e1Token, e2Token},
 	})
@@ -373,6 +372,8 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	caseBefore := f.caseOf(t, *c.CaseID)
 	f.jobs.args = nil
 	f.now = f.now.Add(time.Hour)
+	// 暫存有存活期限：時間走過一小時之後才放，補充送出時才還沒過期。
+	e3Token, e3 := f.stageSecure(t, buyer, evidencePDF("e3"))
 	second, err := f.module.SubmitReport(ctx, SubmitReportInput{
 		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.Fraud, Description: "  補充：又看到一次  ", EvidenceTokens: []string{e3Token},
 	})

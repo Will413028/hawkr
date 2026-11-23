@@ -288,17 +288,20 @@ func TestUpdateBannerKeepsItsCurrentImages(t *testing.T) {
 	}
 }
 
-// media 拒絕確認 staged token 時，media 給使用者的錯誤原樣回傳，banner 不寫入。
+// media 拒絕確認 staged token 時，欄位錯誤指向該 token、訊息用 media 給使用者的文字，media 原本的錯誤留在 cause，banner 不寫入。
 func TestMediaRejectionOfAnImageSurfacesUnchanged(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	in := bannerInput()
 	in.PopupImageToken = "gone1"
 	_, err := f.m.CreateBanner(context.Background(), adminID, in)
-	wantKind(t, err, apperr.KindFailedPrecondition)
+	wantKind(t, err, apperr.KindInvalidInput)
 	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Message != "圖片已失效，請重新上傳" {
+	if !errors.As(err, &ae) || ae.Message != "圖片已失效，請重新上傳" || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "PopupImageToken" {
 		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(err.Error(), "failed_precondition") {
+		t.Fatalf("media 原本的錯誤不在 cause：%v", err)
 	}
 }
 
