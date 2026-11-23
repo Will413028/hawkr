@@ -132,11 +132,20 @@ func TestListPaginatesByIdentityCreationTimeThenIDWithoutDuplicatesOrGaps(t *tes
 	in := f.listIn()
 	in.PageSize = 3
 	pages := 0
+	maxPages := (len(want)+int(in.PageSize)-1)/int(in.PageSize) + 2
+	seen := map[uuid.UUID]bool{}
 	for {
 		page, err := f.service().List(t.Context(), in)
 		must(t, err)
 		pages++
+		if pages > maxPages {
+			t.Fatalf("翻頁超過 %d 頁仍有下一頁，已取得 %v", maxPages, got)
+		}
 		for _, r := range page.Responses {
+			if seen[r.ID] {
+				t.Fatalf("第 %d 頁出現重複的回價 %v", pages, r.ID)
+			}
+			seen[r.ID] = true
 			got = append(got, r.ID)
 		}
 		if page.NextPageToken == "" {
