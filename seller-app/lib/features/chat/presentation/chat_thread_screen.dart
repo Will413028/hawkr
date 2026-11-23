@@ -28,8 +28,7 @@ import '../../../shared/widgets/optimized_image.dart';
 import '../../dashboard/data/dashboard_chat_unread_provider.dart';
 import '../../report/presentation/widgets/block_actions.dart';
 import '../../report/presentation/widgets/report_sheet.dart';
-import '../../seller/data/current_store.dart';
-import '../../seller/data/seller_repository.dart';
+import '../../media/data/media_repository.dart';
 import '../data/active_chat_gate.dart';
 import '../data/chat_model.dart';
 import '../data/chat_repository.dart';
@@ -179,29 +178,15 @@ class ChatThreadScreen extends HookConsumerWidget {
         if (picked == null) return;
         final bytes = await picked.readAsBytes();
         if (bytes.isEmpty) return;
-        final mid = ref.read(sellerStoreIdProvider);
-        if (mid == null) {
-          if (context.mounted) {
-            FloatingToast.error(context, '無法取得商家ID，請重新登入後再試');
-          }
-          return;
-        }
         sending.value = true;
-        final (ext, mime) = ImageFormatDetector.detect(bytes);
+        final (ext, _) = ImageFormatDetector.detect(bytes);
         final upload = await ref
-            .read(sellerRepositoryProvider)
-            .uploadMedia(
-              sellerId: mid,
+            .read(mediaRepositoryProvider)
+            .uploadWithSession(
               bytes: bytes,
               filename: 'chat_${DateTime.now().millisecondsSinceEpoch}.$ext',
-              mimeType: mime,
             );
-        final stagedToken = upload['data']?['stagedToken']?.toString();
-        if (stagedToken == null || stagedToken.isEmpty) {
-          throw StateError(
-            upload['message']?.toString() ?? 'upload returned no staged token',
-          );
-        }
+        final stagedToken = upload.stagedToken;
         await notifier.sendImage(stagedToken);
       } on Object catch (e) {
         HKLog.logD('[ChatThread] image send error: $e');
