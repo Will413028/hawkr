@@ -368,10 +368,10 @@ MediaService,BatchGetAssetMetadata,media-service,
 MediaService,ImportDownloadAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 MediaService,FinalizeImportAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 MediaService,BindStagedAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
-MembershipBillingService,CreateMembershipSubscription,payment-service,
-MembershipBillingService,SuspendMembershipSubscription,payment-service,
-MembershipBillingService,RestartMembershipSubscription,payment-service,
-MembershipBillingService,EndMembershipSubscription,payment-service,
+MembershipBillingService,CreateMembershipSubscription,payment-service,removed: 會員計費流程從未上線（provider adapter 一律 UNSUPPORTED），proto 沒有這個 service，V17 已 drop 表，程式已刪（B2 盤點 §2a #30-33）
+MembershipBillingService,SuspendMembershipSubscription,payment-service,removed: 會員計費流程從未上線（provider adapter 一律 UNSUPPORTED），proto 沒有這個 service，V17 已 drop 表，程式已刪（B2 盤點 §2a #30-33）
+MembershipBillingService,RestartMembershipSubscription,payment-service,removed: 會員計費流程從未上線（provider adapter 一律 UNSUPPORTED），proto 沒有這個 service，V17 已 drop 表，程式已刪（B2 盤點 §2a #30-33）
+MembershipBillingService,EndMembershipSubscription,payment-service,removed: 會員計費流程從未上線（provider adapter 一律 UNSUPPORTED），proto 沒有這個 service，V17 已 drop 表，程式已刪（B2 盤點 §2a #30-33）
 NotificationService,GetNotificationPreferences,notification-service,
 NotificationService,UpdateNotificationPreference,notification-service,
 NotificationService,RegisterDeviceToken,notification-service,
@@ -422,35 +422,35 @@ OrderService,ListAbnormalOrdersForAdmin,order-service,
 OrderService,GetOrderInvoiceSnapshotInternal,order-service,
 OrderService,ReviseOrderInvoiceSnapshotInternal,order-service,
 OrderService,GetUberQuoteForCheckout,order-service,
-PaymentService,CreatePayment,payment-service,
-PaymentService,GetPayment,payment-service,
-PaymentService,GetPaymentHistory,payment-service,
-PaymentService,GetSellerPaymentHistory,payment-service,
-PaymentService,GetPublicPaymentStatus,payment-service,
-PaymentService,SyncPaymentStatus,payment-service,
-PaymentService,ClosePayment,payment-service,
-PaymentService,ClosePaymentByOrderNo,payment-service,
-PaymentService,GetActivePaymentStatusByOrderNo,payment-service,
-PaymentService,CreateRefund,payment-service,
-PaymentService,GetRefund,payment-service,
-PaymentService,GetRefundsByTradeNo,payment-service,
-PaymentService,GetPaymentReturnPage,payment-service,
-PaymentService,GetPaymentRedirectForm,payment-service,
-PaymentService,GrantPayment,payment-service,
-PaymentService,GetRefundPageUrl,payment-service,
-PaymentService,BatchGetProviderStatusByOrderIds,payment-service,
-PaymentService,BatchGetRefundProviderStatusByCaseIds,payment-service,
-PaymentService,BatchGetRefundProviderStatusByOrderIds,payment-service,
-PaymentService,HandlePaymentPageReturn,payment-service,
-PaymentService,DecryptPayUniResult,payment-service,
-PaymentService,ValidateApplePayMerchant,payment-service,
-PaymentService,AckAtmRefundAccepted,payment-service,
-PaymentService,ListPaymentTransactionsForAdmin,payment-service,
-PaymentService,GetPaymentTransactionForAdmin,payment-service,
-PaymentService,ListRefundsForAdmin,payment-service,
-PaymentService,GetRefundForAdmin,payment-service,
-PaymentService,ListGrantsForAdmin,payment-service,
-PaymentService,GetPaymentFactsInternal,payment-service,
+PaymentService,CreatePayment,payment-service,http: 買家 Connect PaymentService.CreatePayment（B2 步驟 5），經 payment 模組 API 與 provider port 建 Stripe PaymentIntent（transfer_group）；過渡期不經 legacy
+PaymentService,GetPayment,payment-service,http: 買家 Connect PaymentService.GetPayment（buyer 歸屬檢查，他人回 NOT_FOUND）
+PaymentService,GetPaymentHistory,payment-service,http: 買家 Connect 付款嘗試歷程（B2 步驟 5；預設保留，單一 PaymentIntent 下是否仍需多次嘗試歷程見盤點 Open items）
+PaymentService,GetSellerPaymentHistory,payment-service,http: 賣家付款歷程唯讀 Connect（跨店 NOT_FOUND、遮蔽 buyer PII；B2 步驟 5；預設保留，seller-app 仍呼叫）
+PaymentService,GetPublicPaymentStatus,payment-service,removed: gateway 只有 client 包裝、沒有任何 handler 呼叫（盤點 §2a #5）
+PaymentService,SyncPaymentStatus,payment-service,http: 買家 Connect PaymentService.SyncPaymentStatus（B2 步驟 5）：讀本地狀態並排 job 重讀 PaymentIntent，外部呼叫不在 transaction 內
+PaymentService,ClosePayment,payment-service,removed: 無 client 呼叫者；取消未完成付款由 ClosePaymentByOrderNo 的模組 API 承接
+PaymentService,ClosePaymentByOrderNo,payment-service,api: payment 模組 API 取消未完成 PaymentIntent（排 job 呼叫 Stripe）；過渡期由 internal/legacy/paymentserver 給 Java order（B2 步驟 4）
+PaymentService,GetActivePaymentStatusByOrderNo,payment-service,api: payment 模組 API 讀付款列；過渡期由 internal/legacy/paymentserver 給 Java order（B2 步驟 4）
+PaymentService,CreateRefund,payment-service,api: payment 模組 API RequestRefund（寫退款列加 River job，D4 並行退款、累計上限、呼叫端冪等鍵）；過渡期由 internal/legacy/paymentserver 給 aftersales 與 order（B2 步驟 4）
+PaymentService,GetRefund,payment-service,api: payment 模組 API 讀退款列；過渡期由 internal/legacy/paymentserver 給 aftersales（B2 步驟 4）
+PaymentService,GetRefundsByTradeNo,payment-service,removed: 外部無呼叫者（gateway REST 無 client），模組內以付款查退款
+PaymentService,GetPaymentReturnPage,payment-service,removed: PayUni 專屬（B2 計畫前提），Stripe 以 return_url、webhook inbox 取代
+PaymentService,GetPaymentRedirectForm,payment-service,removed: PayUni 專屬（B2 計畫前提），Stripe 以 return_url、webhook inbox 取代
+PaymentService,GrantPayment,payment-service,api: payment 模組 API 寫轉帳列並排 job（D1 separate charges and transfers、D6，Transfer 帶 source_transaction）；過渡期由 internal/legacy/paymentserver 給 Java order GrantPaymentWorker，B8 改 in-process（B2 步驟 4）
+PaymentService,GetRefundPageUrl,payment-service,removed: PayUni ATM 頁面版退款專屬，連同 aftersales 呼叫端刪除（B2 步驟 4）
+PaymentService,BatchGetProviderStatusByOrderIds,payment-service,api: payment 模組 API 批次讀付款列；過渡期由 internal/legacy/paymentserver 給 Java order（B2 步驟 4）
+PaymentService,BatchGetRefundProviderStatusByCaseIds,payment-service,api: payment 模組 API 批次讀退款列；過渡期由 internal/legacy/paymentserver 給 aftersales（B2 步驟 4）
+PaymentService,BatchGetRefundProviderStatusByOrderIds,payment-service,api: payment 模組 API 批次讀退款列；過渡期由 internal/legacy/paymentserver 給 Java order（B2 步驟 4）
+PaymentService,HandlePaymentPageReturn,payment-service,removed: PayUni 專屬（B2 計畫前提），Stripe 以 return_url、webhook inbox 取代
+PaymentService,DecryptPayUniResult,payment-service,removed: PayUni 專屬（aftersales 解密 ATM 結果），連同呼叫端刪除（B2 步驟 4）
+PaymentService,ValidateApplePayMerchant,payment-service,removed: Apple Pay merchant validation 由 Stripe 處理（D3 兩案皆刪）
+PaymentService,AckAtmRefundAccepted,payment-service,removed: PayUni ATM 退款受理專屬（Stripe 沒有台灣 ATM），連同呼叫端刪除（B2 步驟 4）
+PaymentService,ListPaymentTransactionsForAdmin,payment-service,http: admin Connect admin.payment ListPayments（宣告權限，B2 步驟 5）
+PaymentService,GetPaymentTransactionForAdmin,payment-service,http: admin Connect admin.payment GetPayment（B2 步驟 5）
+PaymentService,ListRefundsForAdmin,payment-service,http: admin Connect admin.payment ListRefunds（B2 步驟 5）
+PaymentService,GetRefundForAdmin,payment-service,http: admin Connect admin.payment GetRefund（B2 步驟 5）
+PaymentService,ListGrantsForAdmin,payment-service,http: admin Connect admin.payment ListTransfers（撥款頁改為轉帳列表，B2 步驟 5）
+PaymentService,GetPaymentFactsInternal,payment-service,api: payment 模組 API PaymentFacts；過渡期由 internal/legacy/paymentserver 給 invoice-service（B2 步驟 4）
 PricebookService,GetMarketOverview,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，執行計畫 2026-10-27-ecommerce-scope-cut 已刪除）
 PricebookService,CreateMarketWatchTarget,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，執行計畫 2026-10-27-ecommerce-scope-cut 已刪除）
 PricebookService,DeleteMarketWatchTarget,pricebook-service,removed: 行情、預測與產地地圖不在一般電商範圍，pricebook-service 整個刪除（ADR 2026-10-27-general-ecommerce-scope-cut，執行計畫 2026-10-27-ecommerce-scope-cut 已刪除）
