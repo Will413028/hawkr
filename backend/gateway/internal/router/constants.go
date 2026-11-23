@@ -58,9 +58,7 @@ const (
 	SellerCitiesSummaryPath = "/seller-cities/summary" // 商家註冊所在地完整聚合
 	ProductID               = "/:id"
 	ProductBrief            = "/:id/brief"
-	ProductReviews          = "/:id/reviews"
 	ProductSkus             = "/:id/skus"
-	ProductRating           = "/:id/rating"
 	ProductRelated          = "/:id/related"
 
 	// Aliases with 's' suffix for compatibility

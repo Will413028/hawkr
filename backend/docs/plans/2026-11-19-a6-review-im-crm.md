@@ -79,6 +79,10 @@
 - CRM 投影改讀 ordering 的 `pub_*`。觸發：ordering 搬遷。
 - notification 消費 review、im 事件、刪 relay。觸發：A8。
 - 先評價、後全額退款的評價不計分（A6-D7 (a)）。觸發：ordering 搬遷。
+- im「進行中訂單」改用精確查詢（現在以雙方間最近的訂單狀態 10–40 組出，A6-D14 W1 (c)）。觸發：ordering 搬遷（B8）。
+- 聊天「回覆引用」：契約加 `reply_to` 欄位，三端接上（A6-D24 (1)）。觸發：產品要恢復回覆引用時，或任一 client 重新出現以文字前綴拼引用的需求。
+- seller-app 回覆評價與全部已讀兩個畫面（A6-D26 (4)，未接畫面的方法已刪）。觸發：做這兩個畫面時。
+- `api/proto/review` 與 `pkg/proto/review` 保留：唯一 Go 引用方是舊 seller-service 的 review client。觸發：刪除 seller-service（A3 收尾）時一起刪。
 
 ## 既有缺陷（處置）
 
@@ -219,7 +223,17 @@
 - UI：封鎖名單分頁改名或拿掉（A6-D2）先取得同意。
 - 6a 必做：website 公開店面評價第 2 頁之後遇到伺服器錯誤顯示成空清單（`fetchSellerReviews` 的 softFail，A3 步驟 10d 第 6 刀 design-review 記下）；改讀 review 模組的 Connect 時，讀取失敗要和「沒有評價」分開呈現，附一個讀取失敗時不顯示空清單的測試。
 
-### A6-7 收尾（被擋於：A6-6）
+### A6-7a 媒體引用同步抽成 platform（A6-D27；被擋於：無；擋 A6-7 收尾）
+
+- 範圍：`mediaref` 的 7 份複本（buyer、content、im、moderation、review、seller、social）改用 `internal/platform` 的泛型同步 worker；各模組只留引用類型與 store 的接線。前例：`platform/jobs` 的 `UniqueByArgs`／`SweepOpts` 收齊 14 處（A6-3c1）。
+- 消費端：`rg -l 'mediaref' backend/internal backend/cmd`。
+- 不能動的部分：各模組的 media 呼叫在 DB transaction 外、引用列在模組自己的 schema（單體規則 5）；River job 種類名稱與唯一性。
+- 驗收：build、vet（含 integration tag）、`go test -race`、`make lint-monolith`、CI integration；mutation：破壞泛型 worker 的同步／釋放各一，7 個模組的 integration 測試要變紅；`rg -c` 證明模組內不再有重複的同步迴圈。
+- 停止條件：7 份之間有語意差異（不只是型別）時停下列給 Will。
+
+### A6-7 收尾（被擋於：A6-6、A6-7a）
+
+- 特性測試豁免（A6-D27）：舊三個服務已在 A6-6e 刪除，REST 那一側無法再跑；單體端由各模組的 integration 測試與 A6-6e 的 backend-e2e-verify 涵蓋。
 
 - 刪三個舊服務、`pkg/blocklist`、`pkg/moderation`（`internal/platform/textfilter` 成為唯一詞典）、`api/proto/{review,im,crm}`、`pkg/proto` 對應目錄、compose 與 CI 相關設定。
 - 需要人做的事（已知）：A6-D2 的 UI 同意、兩支 App 的真機登入驗證。
@@ -259,6 +273,7 @@
 | A6-D24 | A6-6c 實作中浮現的三題：(1) 聊天「回覆引用」（舊 App 以文字前綴拼成，契約沒有）先拿掉，列入延後，要做時在契約加 `reply_to` 欄位；(2) 商品層級評價數與平均分由 review 模組新增統計方法提供（照 `StoreRatingStats`），client 不自行分頁加總（A6-5e）；(3) 評價列不提供封鎖，只留檢舉（契約只能封鎖回覆的店家）（Will 2026-11-22） | A6-5e、A6-6c |
 | A6-D25 | client 切換與 A6-6e 同批進 dev：6a website、6c buyer-app、6d seller-app 各自完成並開 PR 跑 CI，但合併到整合分支 `a6-clients`（從 dev 開，定期 merge dev），與 6e（接上 relay、consumer、評分讀取換 review 模組、刪路由）一起以單一 PR 進 dev；理由：並行期單一生效者，任一 client 先切會讓資料分在單體與舊服務兩邊，提前接 crm consumer 會與舊 crm-service 搶 queue。6b admin 與後端步驟（5d、5e）不受影響，照常進 dev（Will 2026-11-22） | A6-6a、6c、6d、6e |
 | A6-D26 | 6a、6c、6d 實作中浮現的題目：(1) 契約造成的 UI 變動全部同意（CRM 拿掉搜尋、電話、Email、優惠券數；排序改「依首購時間」；CRM 用「載入更多」；聊天拿掉附加按鈕；賣家客戶訂單卡少星等列）；(2) website 加評價檢舉、聊天訊息檢舉與封鎖入口，照 App 流程；(3) 契約補缺口於 A6-5f：商品統計加附圖筆數、店家版「依買家取對話」、文案目錄補客戶類型、排序、不支援的訊息種類、已刪除買家與匿名評價者名稱、評分文字；(4) seller-app 回覆評價與全部已讀的未接畫面方法先刪，列延後（觸發：做這兩個畫面時）（Will 2026-11-23） | A6-5f、A6-6a、6c、6d |
+| A6-D27 | A6-7 收尾浮現的兩題：(1) `mediaref` 的 7 份複本現在抽成 platform 的泛型同步 worker，排成 A6-7a，不記成刻意重複；(2) 完成定義的特性測試在 A6 豁免：比對的舊 REST 一側已刪，補做只會重複現有 integration 測試（Will 2026-11-23） | A6-7a、A6-7 |
 | A6-D14 | A6-2a 設計書 §10 W1–W6 全照建議：「進行中」＝雙方間訂單狀態 10–40，以現有 RPC 組出、不改 Java，B8 換精確查詢（W1 (c)）；停權賣家的例外用同一定義（W2）；店家等待刪除仍可聊，只有關閉才擋（W3）；買家抹除等 `BuyerDeleted`（W4 (ii)，前提等待刪除的買家仍能登入，2a1 開工確認）；店家可主動開啟對話（W5）；2a 不支援卡片訊息，形狀在 A6-5 以伺服器參照定（W6 (b)）（Will 2026-11-20） | A6-2a1、A6-5 |
 
 ## 基線
@@ -305,3 +320,5 @@
 | A6-6c buyer-app | 完成，待整批進 dev（PR #431 → `a6-clients`）：6c1 評價、檢舉、封鎖、伺服器篩選與統計；6c2 聊天改串流 | CI 全部 job 通過（mutation 180 個全 KILLED，含修正後重跑）；`/code-review` 6c1 findings 10 (blocking 0) fixed 7、依 A6-D25 解決 1、5e 後修 2；6c2 findings 10 (blocking 0) fixed 9、fixnum 經 Will 同意 1 | 換帳號徽章、前景才標已讀、列表重取的畫面接線沒有 widget 測試 |
 | A6-6d seller-app | 完成，待整批進 dev（PR #433 → `a6-clients`）：評價、店家版聊天串流、CRM 改 Connect；依買家取對話；目錄文字 | CI 全部 job 通過（含 mutation）；`/code-review` 1 輪 findings 10 (blocking 0) fixed 10 | — |
 | A6-6e gateway、接線與舊服務退場 | 完成，待整批進 dev（PR #435 → `a6-clients`）：刪 33 條 REST 與 handler；`cmd/hawkr` 接上 reviewrelay、imrelay、crm consumer；刪 `legacy/crmservice`、`legacy/reviewservice`、review/crm/im 舊服務、compose、CI 路徑、MQ queue、告警 | CI 全部 job 通過（含 integration、mutation）；backend-e2e-verify 7 情境本機通過（Will 2026-11-23 授權本機起 stack；證據：review.created／hidden、chat.message.sent wire，crm 入帳與重送不重複，封鎖檢舉入庫，舊 queue 不存在，RabbitMQ 重啟後重連）；`/code-review` 1 輪 findings 9 (blocking 0) fixed 7、依 A6-D25 解決 1、延後 1 | Java order-service 以假服務代替（Java 端只對照程式碼）；relay 端重連未測；長期 broker 上舊 queue 刪除未驗；review proto 保留到刪 seller-service（延後） |
+| A6-7a 媒體引用同步抽成 platform | 未開始（A6-D27） | — | — |
+| A6-7 收尾 | 進行中（2026-11-23）：#436 合併後 dev CI 只有既有兩個 Go 失敗與 seller-app 評價／預覽頁窄螢幕溢位（A6 回歸，UTC 時區下日期加「臺北時間」標籤，已修）；刪 `pkg/blocklist`、`pkg/moderation`；`check-inventory.py` ok（mutation 2 個在附件複本抓到）；events／replicas 去向、CodeMeta 擁有者、公司時期未完成項（review、crm `CARRYOVER.md`）補齊；imrelay 預覽句改取共用目錄；gateway 死碼與 buyer-app README；完成前 design-review 1 輪 findings 4 (blocking 0)：fixed 2、raised 1（mediaref → A6-D27、A6-7a）、recorded 1（延後項對齊，已併入延後清單）、rejected 0；完成定義核對：特性測試豁免（A6-D27），D9 gate 不適用（腳本已於 7fb87b1d 刪除） | 本機 build、vet（含 integration tag）、`make lint-monolith`、imrelay／platform／arch 測試、gateway 測試、seller-app 該測試檔（`TZ=UTC`） | 推 CI 待看（含 mutation `a6-7-closing.json` 3 個）；延後項搬回主計畫與需要人做的事待 A6-7a 完成後收 |

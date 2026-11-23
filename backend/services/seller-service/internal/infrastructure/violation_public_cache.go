@@ -22,7 +22,7 @@ const (
 	publicViolationCacheKeyFmt = "seller:violations:public:%d"
 )
 
-// Prometheus metrics 對齊 B-135 pkg/blocklist 的命名 pattern。
+// Prometheus metrics。
 var (
 	publicViolationCacheHit = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "seller_violation_public_cache_hit_total",

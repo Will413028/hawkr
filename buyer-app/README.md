@@ -149,8 +149,9 @@ lib/
 #### 商品
 - `GET /public/products` - 商品列表 (分頁)
 - `GET /public/products/{id}` - 商品詳情
-- `GET /public/products/{id}/reviews` - 商品評論
+- Connect `hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews` - 商品評論
 - `GET /public/products/{id}/rating` - 商品評分
+- Connect `hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats` - 商品評分統計
 - `GET /public/search/products` - 搜尋商品
 - `GET /public/search/suggest` - 搜尋建議
 
@@ -180,10 +181,11 @@ lib/
 - `GET /app/coupons` - 優惠券列表
 
 #### 聊天
-- `GET /app/chat/conversations` - 對話列表
-- `GET /app/chat/history/{targetId}` - 聊天紀錄
-- `POST /app/chat/messages` - 發送訊息
-- WebSocket: `wss://{host}/app/chat/ws`
+Connect 服務 `hawkr.chat.v1alpha1.ChatAppService`（契約在 `api/hawkr/chat/v1alpha1/chat.proto`）：
+- `ListConversations` - 對話列表
+- `ListMessages` - 聊天紀錄
+- `SendMessage` - 發送訊息
+- `StreamEvents` - 即時事件（server streaming，取代舊的 WebSocket）
 
 #### 裝置推播
 - `POST /app/devices` - 註冊裝置
@@ -282,14 +284,14 @@ flutter build ios --release --flavor prod --dart-define-from-file=config/dart-de
   - 收藏: `/fan/favorites` → `/app/buyers/me/favorites`
   - 瀏覽紀錄: `/visit/*` → `/app/buyers/me/history`
   - 通知: `/v1/notifications/*` → `/app/buyers/me/notifications/*`
-  - 聊天: `/v1/app/chat/*` → `/app/chat/*`
+  - 聊天: `/v1/app/chat/*` → Connect `hawkr.chat.v1alpha1.ChatAppService`
   - 社群: `/blog/*` → `/public/posts/*`
   - 留言板: `/message/*` → `/app/sellers/forum`
   - 裝置: `/v1/devices/*` → `/app/devices`
   - Banner: `/v1/banners` → `/public/banners`
   - 分類: `/v1/public/categories/*` → `/public/categories/*`
   - 地址: `/v1/app/buyers/me/addresses` → `/app/buyers/me/addresses`
-  - 評論: `/v1/reviews/*` → `/app/reviews`, `/public/products/*/reviews`
+  - 評論: `/v1/reviews/*` → Connect `hawkr.review.v1alpha1.ReviewAppService`、`ReviewPublicService`
 - UI 對齊設計稿 (個人資料設定、我的收藏頁)
 - 加入延遲骨架屏載入 (300ms 後才顯示 skeleton)
 - 修復缺失的 asset 圖片
