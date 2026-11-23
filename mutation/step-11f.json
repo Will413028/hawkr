@@ -1,0 +1,157 @@
+{
+ "mutants": [
+  {
+   "id": "buyer-wall-clock-getter-public",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "extension _TaipeiWallClock on DateTime {",
+   "new": "extension TaipeiWallClock on DateTime {\n  DateTime get taipei => _taipei;\n}\n\nextension _TaipeiWallClock on DateTime {",
+   "test": "test/architecture/taipei_display_guard_test.dart wall-clock accessors of hawkr_api do not compile in an app",
+   "why": "hawkr_api exposes `.taipei` to apps again, so an app can hand-assemble a Taipei wall-clock string and the probe compiles."
+  },
+  {
+   "id": "buyer-label-if-needed-ignores-offset",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "String? get labelIfNeeded => isTaipeiOffset(_offset) ? null : label;",
+   "new": "String? get labelIfNeeded => label;",
+   "test": "test/shared/time/taipei_display_test.dart device offset +8: no label",
+   "why": "The offset judgement is removed from the shared TaipeiDisplay, so a +8 device still gets the helper label."
+  },
+  {
+   "id": "buyer-labeled-skips-label",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "String labeled(String formatted) =>\n      withTaipeiLabelAtOffset(formatted, label, _offset);",
+   "new": "String labeled(String formatted) => formatted;",
+   "test": "test/shared/time/taipei_display_test.dart device offset not +8: every Taipei time carries the label",
+   "why": "The shared TaipeiDisplay stops appending the label, so non +8 devices see an unlabeled Taipei time."
+  },
+  {
+   "id": "seller-wall-clock-getter-public",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "extension _TaipeiWallClock on DateTime {",
+   "new": "extension TaipeiWallClock on DateTime {\n  DateTime get taipei => _taipei;\n}\n\nextension _TaipeiWallClock on DateTime {",
+   "test": "test/architecture/taipei_display_guard_test.dart wall-clock accessors of hawkr_api do not compile in an app",
+   "why": "hawkr_api exposes `.taipei` to apps again, so an app can hand-assemble a Taipei wall-clock string and the probe compiles."
+  },
+  {
+   "id": "seller-label-if-needed-ignores-offset",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "String? get labelIfNeeded => isTaipeiOffset(_offset) ? null : label;",
+   "new": "String? get labelIfNeeded => label;",
+   "test": "test/shared/time/taipei_display_test.dart device offset +8: no label",
+   "why": "The offset judgement is removed from the shared TaipeiDisplay, so a +8 device still gets the helper label."
+  },
+  {
+   "id": "seller-labeled-skips-label",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "String labeled(String formatted) =>\n      withTaipeiLabelAtOffset(formatted, label, _offset);",
+   "new": "String labeled(String formatted) => formatted;",
+   "test": "test/shared/time/taipei_display_test.dart device offset not +8: every Taipei time carries the label",
+   "why": "The shared TaipeiDisplay stops appending the label, so non +8 devices see an unlabeled Taipei time."
+  },
+  {
+   "id": "seller-bare-seconds-read-as-iso",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "  if (RegExp(r'^\\d{10}$').hasMatch(text)) {",
+   "new": "  if (false) {",
+   "test": "test/features/order/presentation/order_card_widgets/order_info_column_date_test.dart a bare 10-digit seconds string is epoch, not a year-171238 date",
+   "why": "Digit-only strings go back to DateTime.tryParse, so a 10-digit seconds string is no longer read as epoch."
+  },
+  {
+   "id": "seller-coupon-empty-start-unlabeled",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/coupon/presentation/coupon_detail_screen.dart",
+   "old": "      raw == null ||\n      raw.isEmpty ||\n",
+   "new": "      raw == null ||\n",
+   "test": "test/features/coupon/date_formatter_test.dart couponPeriodText：startAt 是空字串視同沒有，仍附臺北時間標籤",
+   "why": "An empty startAt counts as unparsed again, so the period loses the Taipei label."
+  },
+  {
+   "id": "seller-customer-order-date-raw",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_order_card_widget.dart",
+   "old": "context.taipeiDisplay.formatIso(order.date)",
+   "new": "context.taipeiDisplay.labeled(order.date)",
+   "test": "test/features/customer/customer_order_card_date_test.dart the wire time string is shown as a Taipei time, labeled",
+   "why": "The customer order card shows the raw wire time string again instead of the formatted Taipei time."
+  },
+  {
+   "id": "buyer-is-taipei-offset-always-true",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "bool isTaipeiOffset(Duration offset) => offset == _taipeiUtcOffset;",
+   "new": "bool isTaipeiOffset(Duration offset) => true;",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart only +8 is Taipei",
+   "why": "Every device offset is judged to be Taipei, so non +8 devices lose the label."
+  },
+  {
+   "id": "buyer-taipei-utc-offset-nine",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "const Duration _taipeiUtcOffset = Duration(hours: 8);",
+   "new": "const Duration _taipeiUtcOffset = Duration(hours: 9);",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart picked wall fields convert back to the instant",
+   "why": "The fixed Taipei offset is wrong, so picked wall fields convert to the wrong instant."
+  },
+  {
+   "id": "buyer-separator-day-boundary-ignored",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "t.year == today.year && t.month == today.month && t.day == today.day;",
+   "new": "t.year == today.year && t.month == today.month;",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else month/day",
+   "why": "The separator treats any day of the same month as today, so yesterday shows the time only."
+  },
+  {
+   "id": "buyer-embedded-epoch-default-on",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "  if (!embeddedEpoch) return null;\n",
+   "new": "",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart digit runs of other lengths and text with digits are null",
+   "why": "Digits embedded in text are parsed as Unix time at every call site again."
+  },
+  {
+   "id": "seller-is-taipei-offset-always-true",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "bool isTaipeiOffset(Duration offset) => offset == _taipeiUtcOffset;",
+   "new": "bool isTaipeiOffset(Duration offset) => true;",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart only +8 is Taipei",
+   "why": "Every device offset is judged to be Taipei, so non +8 devices lose the label."
+  },
+  {
+   "id": "seller-taipei-utc-offset-nine",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "const Duration _taipeiUtcOffset = Duration(hours: 8);",
+   "new": "const Duration _taipeiUtcOffset = Duration(hours: 9);",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart picked wall fields convert back to the instant",
+   "why": "The fixed Taipei offset is wrong, so picked wall fields convert to the wrong instant."
+  },
+  {
+   "id": "seller-separator-day-boundary-ignored",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "t.year == today.year && t.month == today.month && t.day == today.day;",
+   "new": "t.year == today.year && t.month == today.month;",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else month/day",
+   "why": "The separator treats any day of the same month as today, so yesterday shows the time only."
+  },
+  {
+   "id": "seller-embedded-epoch-default-on",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "  if (!embeddedEpoch) return null;\n",
+   "new": "",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart digit runs of other lengths and text with digits are null",
+   "why": "Digits embedded in text are parsed as Unix time at every call site again."
+  }
+ ]
+}

@@ -1,5 +1,4 @@
 import 'package:hawkr_seller/shared/time/taipei_display.dart';
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -859,14 +858,7 @@ int _resolvedStatusCode(OrderSummary? order, Map<String, dynamic>? raw) {
 
 String _displayOrderDateTime(String raw, TaipeiDisplay t) {
   if (raw.trim().isEmpty) return '—';
-  final parsed = DateTime.tryParse(raw.trim());
-  if (parsed == null) return raw;
-  final local = parsed.taipeiWall;
-  String pad(int value) => value.toString().padLeft(2, '0');
-  return t.labeled(
-    '${local.year}/${pad(local.month)}/${pad(local.day)} '
-    '${pad(local.hour)}:${pad(local.minute)}',
-  );
+  return t.formatIso(raw);
 }
 
 String _stringValue(dynamic value) {
@@ -1005,13 +997,7 @@ String _paymentMethodLabel(String method) {
 }
 
 String _formatDateTime(String raw, TaipeiDisplay t) {
-  if (raw.isEmpty) return '';
-  final dt = DateTime.tryParse(raw);
-  if (dt == null) return raw;
-  final local = dt.taipeiWall;
-  return t.labeled(
-    '${local.year}年${local.month.toString().padLeft(2, '0')}月${local.day.toString().padLeft(2, '0')}日 ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
-  );
+  return t.formatIso(raw, TaipeiFormat.cjkDateTime);
 }
 
 String _fmt(int number) {

@@ -20,4 +20,13 @@ void main() {
     expect(tryFormatOrderInfoDate(''), isNull);
     expect(formatOrderInfoDate('soon'), 'soon');
   });
+
+  test('a bare 10-digit seconds string is epoch, not a year-171238 date', () {
+    expect(formatOrderInfoDate('1785429000'), '2026/07/31 00:30');
+    expect(formatOrderInfoDate('1785429000000'), '2026/07/31 00:30');
+  });
+
+  test('slash dates parse as Taipei wall clock', () {
+    expect(formatOrderInfoDate('2026/07/31 00:30'), '2026/07/31 00:30');
+  });
 }

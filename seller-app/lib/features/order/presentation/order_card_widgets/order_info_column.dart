@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -212,21 +211,5 @@ String formatOrderInfoDate(String raw) => tryFormatOrderInfoDate(raw) ?? raw;
 
 /// 解析失敗回 null；空字串回 null（沒有日期可顯示）。
 String? tryFormatOrderInfoDate(String raw) {
-  if (raw.isEmpty) return null;
-  DateTime? dt = DateTime.tryParse(raw);
-  if (dt == null) {
-    final m = RegExp(r'\d{10,13}').firstMatch(raw);
-    if (m != null) {
-      final n = int.tryParse(m.group(0)!);
-      if (n != null) {
-        dt = (m.group(0)!.length >= 13)
-            ? DateTime.fromMillisecondsSinceEpoch(n, isUtc: true)
-            : DateTime.fromMillisecondsSinceEpoch(n * 1000, isUtc: true);
-      }
-    }
-  }
-  if (dt == null) return null;
-  final local = dt.taipeiWall;
-  String pad(int v) => v.toString().padLeft(2, '0');
-  return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';
+  return TaipeiDisplay.plainIso(raw, null, true);
 }

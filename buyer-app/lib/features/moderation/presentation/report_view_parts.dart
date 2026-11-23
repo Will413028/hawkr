@@ -27,11 +27,7 @@ String? communityReportOutcomeText(
     : moderationCommunityReportOutcomeUnset(locale);
 
 String formatReportTime(DateTime time, TaipeiDisplay t) {
-  final local = time.taipei;
-  return t.labeled(
-    '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-    '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
-  );
+  return t.dateTime(time);
 }
 
 class ReportOutcomeChip extends StatelessWidget {

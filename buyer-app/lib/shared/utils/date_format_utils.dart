@@ -12,13 +12,6 @@ class DateFormatUtils {
   /// 回傳格式範例：2026/04/10 16:30
   /// 若解析失敗則原樣回傳，空字串直接回傳空
   static String formatDateTime(String raw, TaipeiDisplay t) {
-    if (raw.isEmpty) return '';
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    final local = dt.taipeiWall;
-    return t.labeled(
-      '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
-    );
+    return t.formatIso(raw);
   }
 }

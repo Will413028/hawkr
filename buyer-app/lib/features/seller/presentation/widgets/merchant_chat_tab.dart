@@ -450,7 +450,7 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
       node: n,
       onReply: () => _setReplyTarget(n),
       formatTimeAgo: (time) =>
-          context.taipeiDisplay.timeAgo(context.l10n, time),
+          context.taipeiDisplay.timeAgoIn(context.l10n, time),
       onEdit: _onEditComment,
       onDelete: _onDeleteComment,
       onReportOrBlock: _onReportOrBlock,

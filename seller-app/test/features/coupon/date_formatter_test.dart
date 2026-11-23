@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_seller/features/coupon/data/coupon_model.dart';
+import 'package:hawkr_seller/features/coupon/presentation/coupon_detail_screen.dart';
 import 'package:hawkr_seller/features/coupon/presentation/widgets/date_formatter.dart';
+import '../../support/taipei_display.dart';
 
 void main() {
   test('formatToYYYYMMDD：UTC 16:00 後是臺北隔天（不跟著裝置時區）', () {
@@ -32,5 +35,33 @@ void main() {
     expect(DateFormatter.tryFormatToYYYYMMDD(null), isNull);
     expect(DateFormatter.formatToYYYYMMDD('not a date'), 'not a date');
     expect(DateFormatter.formatToYYYYMMDD(null), '');
+  });
+
+  test('couponPeriodText：startAt 是空字串視同沒有，仍附臺北時間標籤', () {
+    const end = '2026-07-30T17:00:00Z';
+    expect(
+      couponPeriodText(
+        const Coupon(templateId: 't', startAt: '', endAt: end),
+        foreignDeviceDisplay,
+      ),
+      '至 2026/07/31 (台北時間)',
+    );
+    expect(
+      couponPeriodText(
+        const Coupon(templateId: 't', startAt: '', endAt: end),
+        taipeiDeviceDisplay,
+      ),
+      '至 2026/07/31',
+    );
+  });
+
+  test('couponPeriodText：解析不了的日期原樣顯示、不附標籤', () {
+    expect(
+      couponPeriodText(
+        const Coupon(templateId: 't', endAt: 'soon'),
+        foreignDeviceDisplay,
+      ),
+      '至 soon',
+    );
   });
 }

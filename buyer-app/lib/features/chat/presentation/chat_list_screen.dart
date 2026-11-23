@@ -318,7 +318,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                     lastMessage: _previewOf(c, locale),
                                     date: time == null
                                         ? ''
-                                        : context.taipeiDisplay.timeAgo(
+                                        : context.taipeiDisplay.timeAgoIn(
                                             context.l10n,
                                             time,
                                           ),

@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -295,14 +294,7 @@ class _TrackBody extends StatelessWidget {
   /// ⚠️ 解析不出來時**原樣回傳**，不要回空字串：後端給了值卻顯示成空白，
   /// 會讓人以為那個欄位沒有資料。
   static String _formatTime(String iso, TaipeiDisplay t) {
-    final parsed = DateTime.tryParse(iso);
-    if (parsed == null) return iso;
-    final local = parsed.taipeiWall;
-    String two(int n) => n.toString().padLeft(2, '0');
-    return t.labeled(
-      '${local.year}/${two(local.month)}/${two(local.day)} '
-      '${two(local.hour)}:${two(local.minute)}',
-    );
+    return t.formatIso(iso);
   }
 }
 

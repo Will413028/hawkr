@@ -225,19 +225,8 @@ class _InfoPanel extends StatelessWidget {
     return '消費滿 \$$t';
   }
 
-  static String _periodText(Coupon c, TaipeiDisplay t) {
-    final start = DateFormatter.formatToYYYYMMDD(c.startAt);
-    final end = DateFormatter.formatToYYYYMMDD(c.endAt);
-    final parsed =
-        (c.startAt == null ||
-            DateFormatter.tryFormatToYYYYMMDD(c.startAt) != null) &&
-        (c.endAt == null || DateFormatter.tryFormatToYYYYMMDD(c.endAt) != null);
-    String wrap(String text) => parsed ? t.labeled(text) : text;
-    if (start.isEmpty && end.isEmpty) return '—';
-    if (start.isEmpty) return wrap('至 $end');
-    if (end.isEmpty) return wrap('$start 起');
-    return wrap('$start ~ $end');
-  }
+  static String _periodText(Coupon c, TaipeiDisplay t) =>
+      couponPeriodText(c, t);
 
   static String _perAccountText(Coupon c) {
     final n = int.tryParse(c.usageLimitPerAccount ?? '');
@@ -302,4 +291,21 @@ class _InfoRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 有效期間文字；起訖都解析得出來（或沒有）才附臺北時間標籤，空字串視同沒有。
+@visibleForTesting
+String couponPeriodText(Coupon c, TaipeiDisplay t) {
+  final start = DateFormatter.formatToYYYYMMDD(c.startAt);
+  final end = DateFormatter.formatToYYYYMMDD(c.endAt);
+  bool absentOrParsed(String? raw) =>
+      raw == null ||
+      raw.isEmpty ||
+      DateFormatter.tryFormatToYYYYMMDD(raw) != null;
+  final parsed = absentOrParsed(c.startAt) && absentOrParsed(c.endAt);
+  String wrap(String text) => parsed ? t.labeled(text) : text;
+  if (start.isEmpty && end.isEmpty) return '—';
+  if (start.isEmpty) return wrap('至 $end');
+  if (end.isEmpty) return wrap('$start 起');
+  return wrap('$start ~ $end');
 }

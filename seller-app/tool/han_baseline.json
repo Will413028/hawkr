@@ -661,8 +661,6 @@
     "lib/features/ai_assistant/presentation/ai_assistant_screen.dart": {
       "AI 服務中・訂單、出貨與金流": 1,
       "AI 營運助手": 1,
-      "上午": 1,
-      "下午": 1,
       "售後": 1,
       "售後服務": 1,
       "待出貨": 1,
@@ -1821,7 +1819,6 @@
       "選取照片失敗：{}": 2
     },
     "lib/features/order/presentation/shared_order_detail_screen.dart": {
-      "{}年{}月{}日 {}:{}": 1,
       "交易編號 {}": 1,
       "交易總覽": 1,
       "付款 {}": 1,

@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
@@ -1461,14 +1460,7 @@ String _returnProgressText(AfterSaleCase c) {
 }
 
 String _formatDateTime(String raw, TaipeiDisplay t) {
-  if (raw.isEmpty) return '';
-  final dt = DateTime.tryParse(raw);
-  if (dt == null) return raw;
-  final local = dt.taipeiWall;
-  return t.labeled(
-    '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-    '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
-  );
+  return t.formatIso(raw);
 }
 
 extension _OrderDetailStringX on String {

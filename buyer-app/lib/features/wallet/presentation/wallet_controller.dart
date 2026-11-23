@@ -126,22 +126,18 @@ final class WalletCouponCardState {
 
   /// [expire] 是解析成功的臺北日期（顯示時要附標籤）；解析失敗的原樣字串不是。
   static bool _expiryParses(String? raw) {
-    final value = raw?.trim() ?? '';
-    return value.isNotEmpty && DateTime.tryParse(value) != null;
+    return TaipeiDisplay.plainIso(raw ?? '') != null;
   }
 
   static String _expiryLabel(String? raw) {
     final value = raw?.trim() ?? '';
     if (value.isEmpty) return '';
-    try {
-      final date = DateTime.parse(value).taipeiWall;
-      return '有效期至 ${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-    } on FormatException {
-      final fallback = value.length >= 10
-          ? value.substring(0, 10).replaceAll('-', '/')
-          : value;
-      return '有效期至 $fallback';
-    }
+    final date =
+        TaipeiDisplay.plainIso(value, TaipeiFormat.date) ??
+        (value.length >= 10
+            ? value.substring(0, 10).replaceAll('-', '/')
+            : value);
+    return '有效期至 $date';
   }
 
   /// 規則說明只由 wire 真的有的欄位組：`thresholdAmount` / `discountAmount` /
