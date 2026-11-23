@@ -9,6 +9,7 @@ import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/utils/amount_utils.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/time/taipei_display.dart';
 
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -128,7 +129,6 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
         final date = _tryFormatDate(createdAt);
         records.add({
           'date': date ?? createdAt,
-          'dateIsTime': date != null,
           'orderId': _truncateOrderId(orderId),
           'amount': amount,
           'refund': refund,
@@ -276,9 +276,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
                   ),
                   SizedBox(height: 16.h),
                   // 表格標題
-                  _buildTableHeader(),
-                  // 表格內容
-                  ..._buildTableRows(),
+                  SpendingHistoryTable(records: _records),
                 ],
               ),
             ),
@@ -356,8 +354,34 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
       ),
     );
   }
+}
 
-  Widget _buildTableHeader() {
+/// 消費紀錄表格；裝置偏移不是 +8 時在表格上方附一行台北時間說明。
+class SpendingHistoryTable extends StatelessWidget {
+  const SpendingHistoryTable({super.key, required this.records});
+
+  final List<Map<String, dynamic>> records;
+
+  @override
+  Widget build(BuildContext context) {
+    final showNote = context.taipeiDisplay.labelIfNeeded != null;
+    return Column(
+      children: [
+        if (showNote)
+          Padding(
+            padding: EdgeInsets.only(bottom: 4.h),
+            child: Text(
+              context.l10n.taipeiTimeTableNote,
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
+            ),
+          ),
+        _buildTableHeader(context),
+        ..._buildTableRows(context),
+      ],
+    );
+  }
+
+  Widget _buildTableHeader(BuildContext context) {
     final textStyle = TextStyle(
       color: AppColors.textPrimary,
       fontSize: 14,
@@ -407,8 +431,8 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
     );
   }
 
-  List<Widget> _buildTableRows() {
-    if (_records.isEmpty) {
+  List<Widget> _buildTableRows(BuildContext context) {
+    if (records.isEmpty) {
       return [
         Padding(
           padding: EdgeInsets.all(24.w),
@@ -424,7 +448,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
 
     final textStyle = TextStyle(color: AppColors.textPrimary, fontSize: 14);
 
-    return _records.map((record) {
+    return records.map((record) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 12.w),
         child: Row(
@@ -432,9 +456,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
             Expanded(
               flex: 1,
               child: Text(
-                record['dateIsTime'] == true
-                    ? context.taipeiDisplay.labeled(record['date'] ?? '')
-                    : record['date'] ?? '',
+                record['date'] ?? '',
                 textAlign: TextAlign.center,
                 style: textStyle,
               ),

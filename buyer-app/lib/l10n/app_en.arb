@@ -8,6 +8,7 @@
   "timeAgoMonthDay": "{month}/{day}",
   "timeAgoFullDate": "{year}/{month}/{day}",
   "taipeiTimeLabel": "Taipei time",
+  "taipeiTimeTableNote": "Times are in Taipei time",
   "viewedJustNow": "Viewed just now",
   "viewedMinutes": "{count, plural, =1{Viewed 1 minute ago} other{Viewed {count} minutes ago}}",
   "viewedHours": "{count, plural, =1{Viewed 1 hour ago} other{Viewed {count} hours ago}}",
