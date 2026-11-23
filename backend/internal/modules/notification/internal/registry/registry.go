@@ -55,6 +55,8 @@ type Definition[P any] struct {
 	IdempotencySource string
 	// IdempotencyKey 由參數取出事件來源身分；Entry.IdempotencyKey 會加上型別名稱前綴，所以不同型別不會互撞。
 	IdempotencyKey func(P) string
+	// Recipient 由參數取出收件人：帳號 ID（事件來源身分之外，事件的對象帳號也要進參數快照），STORE 受眾另帶 StoreID；BUYER 受眾的 StoreID 一定是 0。
+	Recipient func(P) Recipient
 	// Aggregatable 宣告型別可聚合（D12：讚、追蹤）；為 true 才可以有 AggregationKey，而且一定要有。
 	Aggregatable   bool
 	AggregationKey func(P) string
@@ -68,6 +70,19 @@ type Definition[P any] struct {
 	ImageKey func(P) string
 	// Example 是固定輸出測試與註冊表自檢用的範例參數。
 	Example P
+}
+
+// Recipient 是型別從參數取出的收件人：(帳號, 受眾) 的帳號與 STORE 受眾的店。受眾本身是型別的屬性（Spec.Audience）。
+type Recipient struct {
+	AccountID int64
+	StoreID   int64
+}
+
+// Resolved 是參數快照裡與投遞有關的事實（不含文字）：worker 用它解析收件人、聚合與略過自己。
+type Resolved struct {
+	Recipient      Recipient
+	AggregationKey string
+	ActorAccounts  []int64
 }
 
 // Spec 是型別的靜態屬性（不含參數相關的函式）。
@@ -102,6 +117,8 @@ type Entry interface {
 	// IdempotencyKey 回傳意圖的冪等鍵：型別名稱加事件來源身分。
 	IdempotencyKey(params json.RawMessage) (string, error)
 	Render(l uitext.Locale, params json.RawMessage) (Rendered, error)
+	// Resolve 由參數快照取出收件人、聚合鍵與 actor，不組字。
+	Resolve(params json.RawMessage) (Resolved, error)
 	// ExampleParams 回傳範例參數的 JSON 與解碼後的值（自檢與固定輸出測試用）。
 	ExampleParams() (json.RawMessage, any, error)
 	// validate 檢查型別定義本身；回傳全部違規。
@@ -191,6 +208,36 @@ func (e *entry[P]) render(l uitext.Locale, p P) (Rendered, error) {
 	return r, nil
 }
 
+func (e *entry[P]) Resolve(params json.RawMessage) (Resolved, error) {
+	p, err := e.decode(params)
+	if err != nil {
+		return Resolved{}, err
+	}
+	return e.resolve(p)
+}
+
+func (e *entry[P]) resolve(p P) (Resolved, error) {
+	d := e.d
+	if d.Recipient == nil {
+		return Resolved{}, fmt.Errorf("通知型別 %s 沒有收件人解析", d.Name)
+	}
+	r := d.Recipient(p)
+	if r.AccountID <= 0 {
+		return Resolved{}, fmt.Errorf("通知型別 %s 的參數沒有收件帳號", d.Name)
+	}
+	if (d.Audience == model.AudienceStore) != (r.StoreID > 0) || r.StoreID < 0 {
+		return Resolved{}, fmt.Errorf("通知型別 %s：受眾 %s 的收件人 StoreID 是 %d（STORE 一定有、BUYER 一定沒有）", d.Name, d.Audience, r.StoreID)
+	}
+	out := Resolved{Recipient: r}
+	if d.AggregationKey != nil {
+		out.AggregationKey = d.AggregationKey(p)
+	}
+	if d.Actors != nil {
+		out.ActorAccounts = d.Actors(p)
+	}
+	return out, nil
+}
+
 func (e *entry[P]) ExampleParams() (json.RawMessage, any, error) {
 	raw, err := json.Marshal(e.d.Example)
 	return raw, e.d.Example, err
@@ -237,6 +284,9 @@ func (e *entry[P]) validate() []error {
 	} else if _, err := e.idempotencyKey(d.Example); err != nil {
 		bad("範例參數取不出冪等鍵：%v", err)
 	}
+	if _, err := e.resolve(d.Example); err != nil {
+		bad("範例參數解析不出收件人：%v", err)
+	}
 	if d.Aggregatable != (d.AggregationKey != nil) {
 		bad("聚合鍵只能在宣告可聚合的型別，而且可聚合的型別一定要有聚合鍵（Aggregatable=%v、AggregationKey 有值=%v）", d.Aggregatable, d.AggregationKey != nil)
 	} else if d.AggregationKey != nil && d.AggregationKey(d.Example) == "" {
@@ -278,3 +328,9 @@ func Lookup(name string) (Entry, bool) {
 	}
 	return nil, false
 }
+
+// Registry 是正式的型別註冊表（All、Lookup 的方法形式，給需要注入註冊表的呼叫端）。
+type Registry struct{}
+
+// Lookup 依名稱找型別。
+func (Registry) Lookup(name string) (Entry, bool) { return Lookup(name) }

@@ -68,6 +68,7 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 			Channels:          []model.Channel{model.ChannelInbox},
 			IdempotencySource: "test.Event.ID",
 			IdempotencyKey:    func(p params) string { return "x" },
+			Recipient:         func(p params) Recipient { return Recipient{AccountID: p.ID} },
 			Text:              textIn,
 			Example:           params{ID: 1},
 		}
@@ -87,6 +88,11 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 		"聚合鍵出現在未宣告可聚合":     func(d *Definition[params]) { d.AggregationKey = func(params) string { return "k" } },
 		"宣告可聚合卻沒有聚合鍵":      func(d *Definition[params]) { d.Aggregatable = true },
 		"名稱不是 lower_snake": func(d *Definition[params]) { d.Name = "Broken-Type" },
+		"沒有收件人解析":          func(d *Definition[params]) { d.Recipient = nil },
+		"BUYER 帶 StoreID": func(d *Definition[params]) {
+			d.Recipient = func(params) Recipient { return Recipient{AccountID: 1, StoreID: 9} }
+		},
+		"STORE 沒有 StoreID": func(d *Definition[params]) { d.Audience = model.AudienceStore; d.Category = model.CategoryOrder },
 		"沒有文案":             func(d *Definition[params]) { d.Text = nil },
 		"分類不屬於受眾":          func(d *Definition[params]) { d.Category = model.CategoryShipmentAnomaly },
 		"en 退回中文": func(d *Definition[params]) {

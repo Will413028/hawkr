@@ -2,7 +2,7 @@
 
 ## 職責
 
-站內通知的收件匣、偏好、裝置 token、投遞紀錄與通知型別註冊表，取代 `services/notification-service`（遷移計畫 A8）。來源模組在自己的 transaction 內只排一個通知意圖 job；worker 解析收件人、套偏好、寫收件匣與投遞紀錄。範圍是資料模型與型別註冊表；對外方法、訂閱者與 job 隨 A8-1b 之後的步驟加入。行為規格的唯一來源是 `backend/docs/plans/2026-11-23-a8-notification.md`（D0–D16）與 ADR `docs/adr/2026-10-05-notification-module.md`。
+站內通知的收件匣、偏好、裝置 token、投遞紀錄與通知型別註冊表，取代 `services/notification-service`（遷移計畫 A8）。來源模組在自己的 transaction 內只排一個通知意圖 job；worker 解析收件人、套偏好、寫收件匣與投遞紀錄。已建的有資料模型、型別註冊表與意圖管線（A8-1b）；對外讀寫方法、保留期與個資清除、渠道 adapter 隨之後的步驟加入。行為規格的唯一來源是 `backend/docs/plans/2026-11-23-a8-notification.md`（D0–D16）與 ADR `docs/adr/2026-10-05-notification-module.md`。
 
 ## 擁有的資料
 
@@ -14,10 +14,11 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 
 ## 模組內部結構
 
-- 根套件只保留 `Module`、`New`、`Migrations`；A8-1b 起放訂閱者與 job 的組裝。
+- 根套件只保留 `Module`、`New`、`Migrations`、訂閱者入口（`OnSuspended`、`OnUnsuspended`）與 `AddWorkers`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建，serve 與 worker 都訂閱）。
+- `internal/intake`：意圖管線。`subscribers.go` 的同步訂閱者只呼叫 `Accept`（在來源 transaction 內插 `intents` 列並排 `notification.process_intent` job；冪等鍵撞到就什麼都不排）；`Process`（worker）在 transaction 外讀意圖、解析收件人（`registry.Entry.Resolve`）、略過 actor 是收件人自己的意圖，再開 transaction：先 `identity.LockAccount` 鎖收件帳號列、確認未刪除（已刪除或不存在就什麼都不寫），再套偏好、寫收件匣與投遞紀錄。
 - `internal/model`：受眾、渠道、偏好分類（D4）、呈現分類（D6）、狀態重讀提示與「不可關」規則。
 - `internal/registry`：型別註冊表。每個型別一個 `Definition[P]`（typed 參數、受眾、分類、渠道、冪等鍵、聚合鍵、actor、文案、深連結、圖片），`Define` 變成 `Entry`；沒有資料表、沒有執行期反射，反射只出現在自檢測試。
-- `internal/text`：zh-TW、en 文案（`make uitext` 生成 `text_gen.go`）；`internal/store` 是 sqlc 套件（第一支 query 隨 A8-1b）。
+- `internal/text`：zh-TW、en 文案（`make uitext` 生成 `text_gen.go`）；`internal/store` 是 sqlc 套件（`db/queries/intake.sql`）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 不變量
@@ -28,6 +29,9 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 - 每個型別在 zh-TW、en 有固定輸出。en 沒有執行期退回 zh-TW：型別能組出的每個值在 en 都要有文字，文字的語系取自組出來的文字（`Rendered.Locale`），各部分不一致即錯誤，冪等鍵不得超過 200 字元。守門：`TestGoldenRendering`、`TestGoldenIdempotencyKeys`、`TestEveryRenderableValueHasEnglishText`、`TestRenderRejectsMixedLocales`、`TestIdempotencyKeyLengthIsBounded`。
 - 收件人是 `(account_id, 受眾, store_id)`，BUYER 沒有 store_id、STORE 一定有；投遞冪等鍵是 (意圖, 帳號, 受眾, store_id, 渠道)（NULLS NOT DISTINCT），未讀聚合鍵也含 store_id，同帳號先後的兩間店是兩個收件人。收件匣列的 `intent_id` 在意圖被清除時設為 NULL，列不跟著刪。守門：`inbox_items_store_check`、`deliveries_recipient_channel_key`、`inbox_items_unread_aggregation`。
 - 依賴方向：notification 依賴來源模組的公開事件型別與讀取 API，來源模組不 import notification。守門：`internal/arch` 的依賴表（notification 列只含已在單體、會訂閱或讀取的模組）。
+
+- 意圖冪等鍵＝型別名稱＋事件來源身分（`intents` UNIQUE 加 `ON CONFLICT`）；同步訂閱者只准呼叫 `intake.Accept`，`Accept` 只准插意圖列與排 job（A8-3 的 token 刪除訂閱者登記在 `tokenPurgeSubscribers`）。守門：`TestSameEventTwiceMakesOneIntentAndOneInboxRow`、`TestSynchronousSubscribersOnlyAccept`。
+- worker 先鎖 identity 帳號列（`identity.LockAccount`）再寫 notification 的列，已刪除的帳號不寫；投遞紀錄是推播與 email 的唯一帳本，這一步只建 `PENDING`，沒有排渠道 job。偏好、自我略過、聚合與收件人解析的細節在 `CARRYOVER.md` 的「意圖管線」。
 
 ## 不負責
 

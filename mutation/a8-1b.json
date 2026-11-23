@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "intent-idempotency-conflict-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/intake.sql.go",
+   "old": "ON CONFLICT ON CONSTRAINT intents_idempotency_key_key DO NOTHING\nRETURNING id",
+   "new": "RETURNING id",
+   "test": "internal/modules/notification ^TestSameEventTwiceMakesOneIntentAndOneInboxRow$",
+   "why": "The intent insert no longer ignores a repeated idempotency key, so the same event delivered twice is not absorbed into one intent."
+  },
+  {
+   "id": "self-skip-compares-store-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "slices.Contains(resolved.ActorAccounts, resolved.Recipient.AccountID)",
+   "new": "slices.Contains(resolved.ActorAccounts, resolved.Recipient.StoreID)",
+   "test": "internal/modules/notification ^TestSelfNotificationIsSkipped$",
+   "why": "Self-skip compares the actor account with the store id instead of the recipient account id."
+  },
+  {
+   "id": "aggregation-upsert-plain-insert",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/intake.sql.go",
+   "old": "ON CONFLICT (account_id, audience, store_id, aggregation_key) WHERE aggregation_key IS NOT NULL AND read_at IS NULL\nDO UPDATE SET\n    params = EXCLUDED.params,\n    actor_account_ids = ARRAY(SELECT DISTINCT a FROM unnest(notification.inbox_items.actor_account_ids || EXCLUDED.actor_account_ids) AS a ORDER BY a),\n    updated_at = GREATEST(notification.inbox_items.updated_at, EXCLUDED.updated_at)\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestUnreadNotificationsWithTheSameAggregationKeyMerge$",
+   "why": "The inbox write becomes a plain insert, so a second unread notification with the same aggregation key no longer merges into the existing row."
+  },
+  {
+   "id": "deleted-account-check-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "if acct.Deleted {",
+   "new": "if acct.Deleted && false {",
+   "test": "internal/modules/notification ^TestIntentArrivingAfterAccountDeletionWritesNothing$",
+   "why": "The worker no longer stops when the recipient account is already deleted, so an intent arriving after deletion still writes inbox and delivery rows."
+  }
+ ]
+}

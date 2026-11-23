@@ -201,7 +201,7 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 |---|---|---|---|---|
 | A8-0 基線與事實查核 | 完成 | 基線見文末；`event-adjudication.md`、`fact-checks.md`、`inventory.md` 去向；`python3 backend/docs/plans/2026-11-23-a8-notification/check_dispositions.py` → 0 個空格（填表前 243 個） |  | 本次 |
 | A8-1a 骨架、schema、註冊表 | 完成 | 本機：gofmt、lint-monolith（0 issues）、vet integration、notification／arch／cmd／uitext unit -race、mutation --validate；開工與完成前設計審查、code-review＋合約審查兩輪（findings 13，blocking 1 已修） ；CI `d049c19ab`：notification integration ok、ui-text generated diff、mutation、其餘 16 個 workflow 綠 | backend monolith 紅只因既有的 `httpapi TestEveryServiceInTheContractIsMounted`（imageai、procurement 未掛，A9 範圍；`6298a02b1` 起已紅） | `fe89c9128`..`9075c1bc1` |
-| A8-1b 意圖管線 | 未開始 | | | |
+| A8-1b 意圖管線 | 程式完成待驗收 | 本機：gofmt、lint-monolith、vet integration、notification／arch／platform／cmd unit -race、mutation --validate | integration 與 mutation（`mutation/a8-1b.json`）待 CI；code-review 待做 | 本次 |
 | A8-1c 保留期與個資清除 | 未開始 | | | |
 | A8-2 Connect API 與串流 | 未開始 | | | |
 | A8-3 渠道與事件訂閱 | 未開始 | | | |

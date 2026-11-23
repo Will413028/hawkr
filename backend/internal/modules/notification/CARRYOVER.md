@@ -108,6 +108,16 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 |---|---|---|---|---|
 | gateway 對 notification-service 的 16 支 gRPC 與一條 SSE（`inventory.md` §1，含錯誤吞掉的呼叫與跨身分的串流） | 四個 client 要讀寫收件匣、偏好、token 與公告 | 不成立：舊 REST、手寫 client 與 gRPC 呼叫隨 A8-7 刪除；缺陷 #8、#11、#17、#18、#19 在舊傳輸層 | Connect service 加生成的 client，錯誤用 `ErrorReason`，分頁 cursor，串流只傳失效訊號 | 全部在 A8-2 重新設計，本步驟不新增對外方法；`inventory.md` §1 的去向欄為準 |
 
+## 意圖管線（A8-1b）
+
+- 意圖冪等鍵＝型別名稱＋事件來源身分，由 `intents_idempotency_key_key` 與 `InsertIntent` 的 `ON CONFLICT` 保證；同一事件投遞兩次只有一個意圖、一個 job。守門：`TestSameEventTwiceMakesOneIntentAndOneInboxRow`。
+- 同步訂閱者只准呼叫 `Accept`，`Accept` 只准插意圖列與排 job；A8-3 的裝置 token 同步刪除訂閱者要登記在 `subscribers_test.go` 的 `tokenPurgeSubscribers`（現在是空的）。守門：`TestSynchronousSubscribersOnlyAccept`、`TestAcceptOnlyInsertsTheIntentAndEnqueues`。
+- 寫收件匣與投遞紀錄的 transaction 先鎖 identity 帳號列（`identity.LockAccount`，`FOR UPDATE`）、再碰 notification 的列（`platform/lockorder`）；帳號已刪除的意圖不寫任何列。守門：`TestIntentArrivingAfterAccountDeletionWritesNothing` 與 integration 測試的 lockorder checker。
+- 偏好：不可關（`model.Disableable`）的渠道忽略覆寫列；可關的看覆寫列，沒有列就是預設開。自我略過比的是帳號（actor 帳號 ID 與收件帳號 ID），不是店或買家 ID。守門：`TestPreferencesDisableOnlyDisableableCategories`、`TestSelfNotificationIsSkipped`。
+- 收件匣的聚合：有聚合鍵的型別，同一個收件人（含 store_id）未讀的同鍵列合併（參數換最新、actor 取聯集），已讀之後另開一列；worker 重試靠 `intent_id` 判斷已寫過。守門：`TestUnreadNotificationsWithTheSameAggregationKeyMerge`。
+- 收件人由型別的 `Recipient(參數)` 取出：事件的對象帳號與（STORE 受眾的）店 ID 在建立意圖時就寫進參數快照，worker 不再向 seller 讀「帳號目前的店」（事件發生當下的店才是收件人，之後換店不會改道）；`registry.Validate` 要求 STORE 一定有 store_id、BUYER 一定沒有。
+- 投遞紀錄是推播與 email 的唯一帳本：worker 只建 `PENDING` 的列（偏好關掉的渠道不建），沒有排渠道 job；A8-3 的 adapter 從 `PENDING` 的列取件並更新狀態，不另開第二份狀態。
+
 ## 與 舊服務的差異
 
 資料沒有搬移（系統從未上線），schema 是新的 baseline。對外看得到或 schema 上的差異：
