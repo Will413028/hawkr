@@ -56,4 +56,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get taipeiTimeLabel => '台北時間';
+
+  @override
+  String get taipeiTimeTableNote => '時間為台北時間';
 }

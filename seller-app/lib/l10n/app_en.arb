@@ -7,5 +7,6 @@
   "timeAgoDays": "{count, plural, =1{1 day ago} other{{count} days ago}}",
   "timeAgoMonthDay": "{month}/{day}",
   "timeAgoFullDate": "{year}/{month}/{day}",
-  "taipeiTimeLabel": "Taipei time"
+  "taipeiTimeLabel": "Taipei time",
+  "taipeiTimeTableNote": "Times are in Taipei time"
 }

@@ -17,6 +17,7 @@ import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../shared/widgets/glass_tab_bar.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import 'customer_order_card_widget.dart';
+import '../../../l10n/l10n.dart';
 import '../../../shared/time/taipei_display.dart';
 
 /// 顧客消費歷史頁面 — 3-tab view: 消費金額 | 訂單 | 優惠卷
@@ -117,7 +118,7 @@ class _SpendingTab extends StatelessWidget {
         children: [
           _SummaryCard(totalSpent: totalSpent, totalRefund: totalRefund),
           SizedBox(height: 20.h),
-          _SpendingTable(records: validRecords),
+          SpendingTable(records: validRecords),
         ],
       ),
     );
@@ -242,17 +243,32 @@ class _SummaryCard extends StatelessWidget {
 /// Figma: header bg primary 50% rounded-10 py-8
 /// Headers: 16sp Bold #565656 center, w-92 each, vertical dividers
 /// Data rows: gap-5, px-11 py-6, 16sp Regular #565656 center, w-92 each
-class _SpendingTable extends StatelessWidget {
+class SpendingTable extends StatelessWidget {
   final List<SpendingRecord> records;
 
-  const _SpendingTable({required this.records});
+  const SpendingTable({super.key, required this.records});
 
   static const _headers = ['日期', '訂單編號', '消費金額', '退回'];
 
   @override
   Widget build(BuildContext context) {
+    final note = context.taipeiDisplay.labelIfNeeded == null
+        ? null
+        : context.l10n.taipeiTimeTableNote;
     return Column(
       children: [
+        if (note != null)
+          Padding(
+            padding: EdgeInsets.only(bottom: 4.h),
+            child: Text(
+              note,
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: AppColors.textPrimary,
+                height: 1.5,
+              ),
+            ),
+          ),
         // Header row
         Container(
           decoration: BoxDecoration(
@@ -272,7 +288,7 @@ class _SpendingTable extends StatelessWidget {
                   SizedBox(
                     width: 92.w,
                     child: Text(
-                      i == 0 ? context.taipeiDisplay.labeled(h) : h,
+                      h,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16.sp,

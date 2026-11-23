@@ -65,5 +65,9 @@
   "taipeiTimeLabel": "台北時間",
   "@taipeiTimeLabel": {
     "description": "Marks a displayed time as Taipei time when the device time zone offset is not +8."
+  },
+  "taipeiTimeTableNote": "時間為台北時間",
+  "@taipeiTimeTableNote": {
+    "description": "Caption above a table of times, shown when the device time zone offset is not +8."
   }
 }

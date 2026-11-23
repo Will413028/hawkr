@@ -59,4 +59,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taipeiTimeLabel => 'Taipei time';
+
+  @override
+  String get taipeiTimeTableNote => 'Times are in Taipei time';
 }

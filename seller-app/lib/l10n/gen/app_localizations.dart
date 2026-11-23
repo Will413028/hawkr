@@ -145,6 +145,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'台北時間'**
   String get taipeiTimeLabel;
+
+  /// Caption above a table of times, shown when the device time zone offset is not +8.
+  ///
+  /// In zh, this message translates to:
+  /// **'時間為台北時間'**
+  String get taipeiTimeTableNote;
 }
 
 class _AppLocalizationsDelegate
