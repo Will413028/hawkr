@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -231,6 +232,15 @@ func TestAvatarAndTextInOneUpdate(t *testing.T) {
 	if updated.Version != p.Version+2 {
 		// text update bumps version by 1, avatar update bumps version by 1 in the same transaction
 		t.Fatalf("expected version %d, got %d", p.Version+2, updated.Version)
+	}
+	ds, err := f.module.BatchDisplay(ctx, []int64{p.BuyerID})
+	must(t, err)
+	var stored uuid.UUID
+	if err := f.database.Conn(ctx).QueryRow(ctx, "SELECT avatar_asset_id FROM buyer.buyers WHERE buyer_id = $1", p.BuyerID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if len(ds) != 1 || ds[0].AvatarAssetID == nil || *ds[0].AvatarAssetID != stored {
+		t.Fatalf("BatchDisplay avatar asset = %v, want %v", ds, stored)
 	}
 }
 

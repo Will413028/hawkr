@@ -106,7 +106,7 @@ type Profile = model.Profile
 // DisplayName 空字串不合法；Phone/Gender/City/Job 空字串、BirthDate 零值清除該欄。
 type UpdateProfileInput = model.UpdateProfileInput
 
-// Display 顯示資料；CLOSED stint 回 Deleted 且名稱與頭像為 nil。
+// Display 顯示資料；CLOSED stint 回 Deleted 且名稱、頭像與頭像資產 ID 為 nil。
 type Display = model.Display
 
 // Address 買家擁有的收貨地址。

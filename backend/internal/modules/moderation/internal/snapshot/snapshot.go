@@ -50,10 +50,12 @@ type ReviewReply struct {
 	AuthoredAt time.Time `json:"authored_at,omitzero"`
 }
 
-// Buyer 是被檢舉買家的公開檔案。
+// Buyer 是被檢舉買家的公開檔案。AvatarAssetID 是頭像的 media 資產：檢舉當下是買家的頭像資產，快照建好之後是 moderation 自己的複本
+// （與其他證據圖片同一條保全路徑）；Avatar 是同一個資產的 object key，沒有頭像兩者都是空字串。
 type Buyer struct {
-	DisplayName string `json:"display_name"`
-	Avatar      string `json:"avatar"`
+	DisplayName   string `json:"display_name"`
+	Avatar        string `json:"avatar"`
+	AvatarAssetID string `json:"avatar_asset_id,omitempty"`
 }
 
 // Review 是評價的快照：作者永遠是買家；SubjectStoreID 是評價所屬的店家（上下文，不是作者，所以不放在 StoreOf 看的欄位）；ReplyBody 是店家回覆，當作上下文。
@@ -123,12 +125,16 @@ func (c Content) StoreID() int64 {
 	return 0
 }
 
-// AssetIDs 回傳快照引用的全部圖片資產（證據保全）：被檢舉內容的圖片，聊天加上前後文的圖片；排序去重。
+// AssetIDs 回傳快照引用的全部圖片資產（證據保全）：被檢舉內容的圖片（買家是頭像），聊天加上前後文的圖片；排序去重。
 func (c Content) AssetIDs() []string {
 	var refs []string
 	switch {
 	case c.Social != nil:
 		refs = c.Social.MediaRefs
+	case c.Buyer != nil:
+		if c.Buyer.AvatarAssetID != "" {
+			refs = []string{c.Buyer.AvatarAssetID}
+		}
 	case c.Review != nil:
 		refs = c.Review.MediaRefs
 	case c.Chat != nil:
@@ -178,6 +184,18 @@ func (c Content) Validate() error {
 	return nil
 }
 
+// WithObjectKeys 回傳頭像的 object key 依資產 ID 換成 keyOf 對應值的內容（頭像複本確認之後，快照記複本的 key）：keyOf 沒有的資產維持原樣；不修改傳入的內容。
+func (c Content) WithObjectKeys(keyOf map[string]string) Content {
+	if c.Buyer != nil {
+		if key, ok := keyOf[c.Buyer.AvatarAssetID]; ok {
+			b := *c.Buyer
+			b.Avatar = key
+			c.Buyer = &b
+		}
+	}
+	return c
+}
+
 // ReplaceAssets 回傳把圖片資產 ID 依 to 換掉的內容（證據快照改引用自己的複本）：to 沒有的 ID 維持原樣；不修改傳入的內容。
 func (c Content) ReplaceAssets(to map[string]string) Content {
 	swap := func(in []string) []string {
@@ -197,6 +215,11 @@ func (c Content) ReplaceAssets(to map[string]string) Content {
 		s := *c.Social
 		s.MediaRefs = swap(s.MediaRefs)
 		c.Social = &s
+	}
+	if c.Buyer != nil && c.Buyer.AvatarAssetID != "" {
+		b := *c.Buyer
+		b.AvatarAssetID = swap([]string{b.AvatarAssetID})[0]
+		c.Buyer = &b
 	}
 	if c.Review != nil {
 		r := *c.Review
@@ -241,7 +264,7 @@ func Normalize(c Content) Content {
 	}
 	if c.Buyer != nil {
 		b := *c.Buyer
-		b.DisplayName, b.Avatar = trimtext.Trim(b.DisplayName), trimtext.Trim(b.Avatar)
+		b.DisplayName, b.Avatar, b.AvatarAssetID = trimtext.Trim(b.DisplayName), trimtext.Trim(b.Avatar), trimtext.Trim(b.AvatarAssetID)
 		c.Buyer = &b
 	}
 	if c.Review != nil {

@@ -63,8 +63,9 @@ func TestBuyerProfileFieldsAreHashed(t *testing.T) {
 	a := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小明", Avatar: "k1"}}
 	b := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小明", Avatar: "k2"}}
 	c := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小華", Avatar: "k1"}}
+	d := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小明", Avatar: "k1", AvatarAssetID: "asset"}}
 	_, ha := Encode(a)
-	for name, x := range map[string]Content{"頭像": b, "名稱": c} {
+	for name, x := range map[string]Content{"頭像": b, "名稱": c, "頭像資產": d} {
 		if _, h := Encode(x); h == ha {
 			t.Errorf("%s 不同，雜湊不能相同", name)
 		}
@@ -319,5 +320,22 @@ func TestReplaceAssetsLeavesUnmappedIDsAndOtherKindsAlone(t *testing.T) {
 	buyer := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a"}}
 	if got := buyer.ReplaceAssets(map[string]string{"a": "z"}); got.Buyer == nil || got.Buyer.DisplayName != "a" {
 		t.Fatalf("買家內容不變：%+v", got)
+	}
+}
+
+func TestBuyerAvatarIsAnEvidenceAssetThatIsSwappedForTheCopy(t *testing.T) {
+	orig := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a", Avatar: "avatar/old.jpg", AvatarAssetID: "src"}}
+	if got := orig.AssetIDs(); !slices.Equal(got, []string{"src"}) {
+		t.Fatalf("頭像是證據圖片：%v", got)
+	}
+	got := orig.ReplaceAssets(map[string]string{"src": "copy"}).WithObjectKeys(map[string]string{"copy": "public/copy.jpg"})
+	if got.Buyer.AvatarAssetID != "copy" || got.Buyer.Avatar != "public/copy.jpg" || got.Buyer.DisplayName != "a" {
+		t.Fatalf("頭像要換成複本的資產與 key：%+v", got.Buyer)
+	}
+	if orig.Buyer.AvatarAssetID != "src" || orig.Buyer.Avatar != "avatar/old.jpg" {
+		t.Fatalf("原內容被改動：%+v", orig.Buyer)
+	}
+	if none := (Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a"}}); len(none.AssetIDs()) != 0 {
+		t.Fatalf("沒有頭像就沒有證據圖片：%v", none.AssetIDs())
 	}
 }

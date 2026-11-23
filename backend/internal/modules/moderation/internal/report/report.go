@@ -215,6 +215,7 @@ func (s *Service) ownCopies(ctx context.Context, in model.SubmitInput, content s
 		return snapshot.Content{}, nil, err
 	}
 	to := make(map[string]string, len(sources))
+	keys := make(map[string]string, len(sources))
 	owned := make([]uuid.UUID, 0, len(sources))
 	for _, src := range sources {
 		a, err := s.d.Media.Confirm(ctx, up, copies[src], media.VisibilityPublic)
@@ -222,10 +223,11 @@ func (s *Service) ownCopies(ctx context.Context, in model.SubmitInput, content s
 			return snapshot.Content{}, nil, fmt.Errorf("moderation：確認證據圖片 %s 的複本：%w", src, err)
 		}
 		to[src] = a.ID.String()
+		keys[a.ID.String()] = a.ObjectKey
 		owned = append(owned, a.ID)
 	}
 	slices.SortFunc(owned, func(a, b uuid.UUID) int { return bytes.Compare(a[:], b[:]) })
-	return content.ReplaceAssets(to), owned, nil
+	return content.ReplaceAssets(to).WithObjectKeys(keys), owned, nil
 }
 
 // lockReporter 以 FOR KEY SHARE 鎖檢舉人的擁有者列：買家尚未關閉（刪除中放行）、店家尚未退場；否則回檢舉人專屬的 NotFound。
@@ -627,6 +629,9 @@ func (s *Service) freezeBuyer(ctx context.Context, in model.SubmitInput) (snapsh
 	}
 	if displays[0].Avatar != nil {
 		c.Avatar = *displays[0].Avatar
+	}
+	if displays[0].AvatarAssetID != nil {
+		c.AvatarAssetID = displays[0].AvatarAssetID.String()
 	}
 	return snapshot.Content{Kind: model.TargetBuyer, Buyer: &c}, nil
 }

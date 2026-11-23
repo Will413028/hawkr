@@ -44,6 +44,33 @@
    "new": "return media.ConfirmFields(ctx, m, uploader, items, media.VisibilityPublic)",
    "test": "internal/modules/seller/internal/model ^TestConfirmAllReportsEveryRejectedItemAndStopsOnOtherErrors$",
    "why": "ConfirmAll 把機敏檔欄位當成公開確認"
+  },
+  {
+   "id": "snapshot-buyer-avatar-is-evidence-asset",
+   "stack": "go",
+   "file": "backend/internal/modules/moderation/internal/snapshot/snapshot.go",
+   "old": "if c.Buyer.AvatarAssetID != \"\" {\n\t\t\trefs = []string{c.Buyer.AvatarAssetID}\n\t\t}",
+   "new": "_ = c.Buyer",
+   "test": "internal/modules/moderation/internal/snapshot ^TestBuyerAvatarIsAnEvidenceAssetThatIsSwappedForTheCopy$",
+   "why": "頭像不再列入證據保全的資產"
+  },
+  {
+   "id": "snapshot-buyer-avatar-swapped-for-copy",
+   "stack": "go",
+   "file": "backend/internal/modules/moderation/internal/snapshot/snapshot.go",
+   "old": "b.AvatarAssetID = swap([]string{b.AvatarAssetID})[0]",
+   "new": "b.AvatarAssetID = b.AvatarAssetID",
+   "test": "internal/modules/moderation/internal/report ^TestOwnCopiesPreservesTheBuyerAvatarLikeAnyOtherEvidenceImage$",
+   "why": "快照仍引用買家的頭像資產而不是自己的複本"
+  },
+  {
+   "id": "report-freeze-buyer-carries-avatar-asset",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/report/report.go",
+   "old": "c.AvatarAssetID = displays[0].AvatarAssetID.String()",
+   "new": "_ = displays[0].AvatarAssetID",
+   "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnCopyOfTheReportedBuyersAvatar$",
+   "why": "凍結買家時不帶頭像資產 ID，頭像沒被複製"
   }
  ]
 }

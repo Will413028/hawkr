@@ -14,17 +14,18 @@ import (
 )
 
 const batchDisplay = `-- name: BatchDisplay :many
-SELECT buyer_id, display_name, avatar, (status = 'CLOSED')::boolean AS deleted
+SELECT buyer_id, display_name, avatar, avatar_asset_id, (status = 'CLOSED')::boolean AS deleted
 FROM buyer.buyers
 WHERE buyer_id = ANY($1::bigint[])
 ORDER BY buyer_id
 `
 
 type BatchDisplayRow struct {
-	BuyerID     int64
-	DisplayName *string
-	Avatar      *string
-	Deleted     bool
+	BuyerID       int64
+	DisplayName   *string
+	Avatar        *string
+	AvatarAssetID *uuid.UUID
+	Deleted       bool
 }
 
 // 回傳原始 nullable 個資與 Deleted；模組對已關閉 stint 隱藏個資。
@@ -41,6 +42,7 @@ func (q *Queries) BatchDisplay(ctx context.Context, dollar_1 []int64) ([]BatchDi
 			&i.BuyerID,
 			&i.DisplayName,
 			&i.Avatar,
+			&i.AvatarAssetID,
 			&i.Deleted,
 		); err != nil {
 			return nil, err

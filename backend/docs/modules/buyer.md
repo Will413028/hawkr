@@ -71,7 +71,7 @@
 
 ## 9. 讀取模型與輸入邊界
 
-- 清單只回 ID 與時間。`BatchDisplay` 對 CLOSED 回 `Deleted=true`、名稱與頭像為 nil；`BatchMeta` 與單筆 profile 不曝露 CLOSED 的 PII。
+- 清單只回 ID 與時間。`BatchDisplay` 對 CLOSED 回 `Deleted=true`、名稱、頭像與頭像資產 ID 為 nil；`BatchMeta` 與單筆 profile 不曝露 CLOSED 的 PII。
 - `ResolvePrincipals` 只回存活 stint；CLOSED 與未知 ID 不在 map，legacy adapter 由差集產生 `unresolved_ids`。`BuyerIDsByAccount` 最多回一個（含已關閉）。
 - 墓碑文字由 client（Connect 卡片的 `deleted`）與 legacy adapter 呈現，模組不存或回傳墓碑字串。
 - 公開 ID 必須為正數；批次 ID 上限 `MaxBatchSize`（100），空批次允許，只在模組檢查（handler 只解析 ID）；清單上限 100。檢查在存取資料庫之前。

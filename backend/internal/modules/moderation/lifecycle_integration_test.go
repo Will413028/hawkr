@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -167,6 +168,62 @@ func TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage(t *testing.T) {
 	}
 	if st := f.assetState(t, owned[0]); st != "ACTIVE" {
 		t.Fatalf("擁有者刪圖之後快照的複本狀態 %s，預期仍是 ACTIVE", st)
+	}
+
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
+	f.advance(SnapshotRetention + time.Hour)
+	if n := mustV[int64](t)(f.module.PurgeSnapshots(ctx)); n != 1 {
+		t.Fatalf("刪了 %d 份快照", n)
+	}
+	if st := f.assetState(t, owned[0]); st == "ACTIVE" {
+		t.Fatalf("快照過保留期被刪除之後複本要被標記刪除，狀態 %s", st)
+	}
+}
+
+// 被檢舉買家的頭像與其他證據圖片同一條保全路徑：快照擁有自己的複本，買家換頭像之後複本仍是 ACTIVE，快照過保留期才標記刪除。
+func TestASnapshotKeepsItsOwnCopyOfTheReportedBuyersAvatar(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	target, targetAccount := f.newBuyer(t)
+	p, err := f.buyer.Profile(ctx, targetAccount)
+	must(t, err)
+	token := f.stage(t)
+	_, err = f.buyer.UpdateProfile(ctx, buyer.UpdateProfileInput{BuyerID: target, ExpectedVersion: p.Version, AvatarStagedToken: &token})
+	must(t, err)
+	var source uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT avatar_asset_id FROM buyer.buyers WHERE buyer_id = $1", target).Scan(&source); err != nil {
+		t.Fatal(err)
+	}
+
+	reporter, _ := f.newBuyer(t)
+	r := f.submit(t, reporter, Target{Kind: TargetBuyer, BuyerID: target}, policy.Spam)
+	snap := *r.Report.SnapshotID
+	var owned []uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT asset_ids FROM moderation.case_snapshots WHERE id = $1", snap).Scan(&owned); err != nil {
+		t.Fatal(err)
+	}
+	if len(owned) != 1 || owned[0] == source {
+		t.Fatalf("快照要擁有一份不同於買家頭像的複本：頭像 %v，快照的圖片 %v", source, owned)
+	}
+	var content string
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT content::text FROM moderation.case_snapshots WHERE id = $1", snap).Scan(&content); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(content, owned[0].String()) || strings.Contains(content, source.String()) {
+		t.Fatalf("快照內容的頭像資產要換成複本 %v、不留來源 %v：%s", owned[0], source, content)
+	}
+
+	p, err = f.buyer.Profile(ctx, targetAccount)
+	must(t, err)
+	next := f.stage(t)
+	_, err = f.buyer.UpdateProfile(ctx, buyer.UpdateProfileInput{BuyerID: target, ExpectedVersion: p.Version, AvatarStagedToken: &next})
+	must(t, err)
+	if st := f.assetState(t, source); st == "ACTIVE" {
+		t.Fatal("買家換頭像之後來源頭像要被標記刪除")
+	}
+	if st := f.assetState(t, owned[0]); st != "ACTIVE" {
+		t.Fatalf("買家換頭像之後快照的複本狀態 %s，預期仍是 ACTIVE", st)
 	}
 
 	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))

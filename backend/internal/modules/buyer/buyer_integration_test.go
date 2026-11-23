@@ -207,7 +207,7 @@ func TestAccountCreatedCreatesTheOnlyBuyer(t *testing.T) {
 	}
 	ds, err := fixture.module.BatchDisplay(ctx, []int64{buyer.BuyerID})
 	must(t, err)
-	if len(ds) != 1 || ds[0].DisplayName != nil || ds[0].Avatar != nil || !ds[0].Deleted {
+	if len(ds) != 1 || ds[0].DisplayName != nil || ds[0].Avatar != nil || ds[0].AvatarAssetID != nil || !ds[0].Deleted {
 		t.Fatal(ds)
 	}
 }

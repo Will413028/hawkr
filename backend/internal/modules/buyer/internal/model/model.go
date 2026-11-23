@@ -99,10 +99,12 @@ type UpdateProfileInput struct {
 	AvatarStagedToken *string
 }
 
-// Display 顯示資料；CLOSED stint 回 Deleted 且名稱與頭像為 nil。
+// Display 顯示資料；CLOSED stint 回 Deleted 且名稱、頭像與頭像資產 ID 為 nil。AvatarAssetID 是頭像的 media 資產（與 Avatar 成對），
+// 給需要保全頭像檔案的呼叫方（檢舉快照複製頭像）。
 type Display struct {
 	BuyerID             int64
 	DisplayName, Avatar *string
+	AvatarAssetID       *uuid.UUID
 	Deleted             bool
 }
 

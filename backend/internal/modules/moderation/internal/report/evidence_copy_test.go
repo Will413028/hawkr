@@ -19,6 +19,7 @@ type fakeMedia struct {
 	uploaders []media.Uploader
 	copyErr   error
 	confirms  map[string]uuid.UUID
+	keys      map[uuid.UUID]string
 }
 
 func (f *fakeMedia) CopyPublic(_ context.Context, u media.Uploader, src uuid.UUID) (media.PutPublicResult, error) {
@@ -37,7 +38,7 @@ func (f *fakeMedia) Confirm(_ context.Context, u media.Uploader, token string, _
 	if !ok {
 		id = uuid.NewV7()
 	}
-	return media.ConfirmedAsset{ID: id}, nil
+	return media.ConfirmedAsset{ID: id, ObjectKey: f.keys[id]}, nil
 }
 
 func testService(m Media) *Service {
@@ -90,6 +91,27 @@ func TestOwnCopiesConfirmsEveryCopyAndSwapsTheReferences(t *testing.T) {
 		if u != (media.Uploader{ID: 109}) {
 			t.Fatalf("上傳者 = %+v，預期店家檢舉人本人", u)
 		}
+	}
+}
+
+func TestOwnCopiesPreservesTheBuyerAvatarLikeAnyOtherEvidenceImage(t *testing.T) {
+	src, copyID := uuid.NewV7(), uuid.NewV7()
+	m := &fakeMedia{confirms: map[string]uuid.UUID{"tok-a": copyID}, keys: map[uuid.UUID]string{copyID: "public/copy.jpg"}}
+	s := testService(m)
+	content := snapshot.Content{Kind: model.TargetBuyer, Buyer: &snapshot.Buyer{DisplayName: "小明", Avatar: "avatar/old.jpg", AvatarAssetID: src.String()}}
+	sources := content.AssetIDs()
+	if !slices.Equal(sources, []string{src.String()}) {
+		t.Fatalf("頭像要進證據保全：%v", sources)
+	}
+	got, owned, err := s.ownCopies(t.Context(), model.SubmitInput{ReporterBuyerID: 5}, content, sources, map[string]string{src.String(): "tok-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Buyer.AvatarAssetID != copyID.String() || got.Buyer.Avatar != "public/copy.jpg" || !slices.Equal(owned, []uuid.UUID{copyID}) {
+		t.Fatalf("buyer = %+v owned = %v", got.Buyer, owned)
+	}
+	if content.Buyer.AvatarAssetID != src.String() {
+		t.Fatalf("傳入的內容被改動：%+v", content.Buyer)
 	}
 }
 

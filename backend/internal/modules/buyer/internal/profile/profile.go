@@ -165,12 +165,14 @@ func (service *Service) BatchDisplay(ctx context.Context, ids []int64) ([]model.
 		if row.Deleted {
 			row.DisplayName = nil
 			row.Avatar = nil
+			row.AvatarAssetID = nil
 		}
 		result = append(result, model.Display{
-			BuyerID:     row.BuyerID,
-			DisplayName: row.DisplayName,
-			Avatar:      row.Avatar,
-			Deleted:     row.Deleted,
+			BuyerID:       row.BuyerID,
+			DisplayName:   row.DisplayName,
+			Avatar:        row.Avatar,
+			AvatarAssetID: row.AvatarAssetID,
+			Deleted:       row.Deleted,
 		})
 	}
 	return result, err
