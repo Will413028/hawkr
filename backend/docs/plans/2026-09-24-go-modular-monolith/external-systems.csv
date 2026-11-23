@@ -33,5 +33,4 @@ media-service,Cloudflare R2 (S3 API; sole storage backend),services/java/media-s
 product-service,MOA open data (organic / traceability / CAS certification lookup),services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/GovCertificationService.java
 product-service,hawkr web on-demand revalidate (first-party Next.js; not third-party),services/java/product-service/src/main/java/io/github/will413028/hawkr/product/service/ProductRevalidationService.java
 workers/image-gateway,Cloudflare R2 + Cloudflare Images bindings (edge worker; not a merge candidate),workers/image-gateway/README.md
-workers/hawkr-apple-pay-domain,Apple Pay domain verification file (served to Apple; edge worker),workers/hawkr-apple-pay-domain/README.md
 serverless/egress-proxy,Mitake SMS + TGOS upstreams (fixed Taiwan egress IP relay on GCP Cloud Run),serverless/egress-proxy/README.md
