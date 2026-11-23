@@ -59,7 +59,7 @@
       "stack": "go",
       "file": "backend/internal/httpapi/media/secure_files.go",
       "old": "\tif touch != nil {\n\t\ttouch()\n\t}\n\tw.WriteHeader(http.StatusNoContent)",
-      "new": "\tw.WriteHeader(http.StatusNoContent)",
+      "new": "\t_ = touch\n\tw.WriteHeader(http.StatusNoContent)",
       "test": "internal/httpapi/media ^TestDelegatedChunkUploaderComesFromTheSession$",
       "why": "成功的段上傳不順延代行 session 的閒置逾時：長上傳進行中 session 因閒置而過期"
     },

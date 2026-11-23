@@ -271,7 +271,7 @@ func TestPreflightDenials(t *testing.T) {
 	f.storeFn = downFn
 	p := preflight(outsider, testStore)
 	wantDenied(p, DenialAdminNotAllowlisted)
-	if p.TargetKnown || p.Target.StoreID != testStore || len(p.Capabilities) != 9 {
+	if p.TargetKnown || p.Target.StoreID != testStore || len(p.Capabilities) != 10 {
 		t.Fatalf("還沒讀到店家 = %+v", p)
 	}
 	// 讀不到店家不是拒絕。
