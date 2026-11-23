@@ -6,16 +6,14 @@ import (
 	"context"
 	"errors"
 	"os"
-	"strconv"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -49,27 +47,19 @@ func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.Insert
 	return nil
 }
 
-// 關店可逆：logo 與封面連同 media 的引用留著（不記成退場、不排入同步），到個資清理才釋放（purge 的測試）。
-func TestCloseKeepsTheImagesAndTheirMediaReferences(t *testing.T) {
+// 關店可逆：logo 與封面（key 與 asset ID）留著，不動 media、不排入任何 job，到個資清理才釋放（purge 的測試）。
+func TestCloseKeepsTheImagesAndTheirAssets(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "seller", Dir: os.DirFS("../../db/migrations")}))
 	const accountID = 900
+	logoAsset, coverAsset := uuid.NewV7(), uuid.NewV7()
 	var storeID int64
 	if err := d.Conn(ctx).QueryRow(ctx, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, cover_key, cover_asset_id, created_at, updated_at)
-		VALUES (2600000001, $1, '小店', 'logo', 'logo-asset', 'cover', 'cover-asset', now(), now()) RETURNING store_id`, accountID).Scan(&storeID); err != nil {
+		VALUES (2600000001, $1, '小店', 'logo', $2, 'cover', $3, now(), now()) RETURNING store_id`, accountID, logoAsset, coverAsset).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := d.Conn(ctx).Exec(ctx, "INSERT INTO seller.store_exposures (store_id) VALUES ($1)", storeID); err != nil {
-		t.Fatal(err)
-	}
-	fake := media.NewFake()
-	logoRef := mediaref.StoreRef(media.RefTypeSellerLogo, storeID)
-	coverRef := mediaref.StoreRef(media.RefTypeSellerCover, storeID)
-	if err := fake.Link(ctx, logoRef, []string{"logo-asset"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := fake.Link(ctx, coverRef, []string{"cover-asset"}); err != nil {
 		t.Fatal(err)
 	}
 	jobs := &queue{}
@@ -82,21 +72,11 @@ func TestCloseKeepsTheImagesAndTheirMediaReferences(t *testing.T) {
 	if closed.Status != "CLOSED" || closed.LogoKey == nil || closed.CoverKey == nil {
 		t.Fatalf("關店之後 logo 與封面仍在：%+v", closed)
 	}
-	for _, a := range jobs.args {
-		if _, ok := a.(mediaref.SyncArgs); ok {
-			t.Fatalf("關店不該排入 media 引用的同步：%+v", a)
-		}
+	var gotLogo, gotCover *uuid.UUID
+	if err := d.Conn(ctx).QueryRow(ctx, "SELECT logo_asset_id, cover_asset_id FROM seller.stores WHERE store_id = $1", storeID).Scan(&gotLogo, &gotCover); err != nil {
+		t.Fatal(err)
 	}
-	syncer := mediaref.NewSyncer(d, fake, jobs, time.Now, nil)
-	for _, ref := range []media.Ref{logoRef, coverRef} {
-		if _, err := syncer.Sync(ctx, ref); err != nil {
-			t.Fatal(err)
-		}
-		if got := fake.Referenced(ref); len(got) != 1 {
-			t.Fatalf("%s 的引用 %v：關店之後同步仍指著業務列目前的資產", ref.Type, got)
-		}
-	}
-	if want := strconv.FormatInt(storeID, 10); logoRef.ID != want {
-		t.Fatalf("ref_id=%s want store_id %s", logoRef.ID, want)
+	if gotLogo == nil || *gotLogo != logoAsset || gotCover == nil || *gotCover != coverAsset {
+		t.Fatalf("關店不該動圖片的資產：logo=%v cover=%v", gotLogo, gotCover)
 	}
 }

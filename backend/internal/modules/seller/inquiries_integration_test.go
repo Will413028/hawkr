@@ -3,6 +3,7 @@
 package seller_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -49,11 +50,12 @@ func (f *fixture) mustInquire(t *testing.T, caseID uuid.UUID) CreateCaseInquiryR
 	return r
 }
 
-// reply 記下回覆（管理員 22），收到的時間是 receivedAt。
-func (f *fixture) reply(t *testing.T, inquiryID uuid.UUID, receivedAt time.Time, tokens ...string) (RecordCaseInquiryReplyResult, error) {
+// reply 記下回覆（管理員 22），收到的時間是 receivedAt；每個 name 放一份機敏附件（內容是 evidencePDF(name)，上傳者是管理員）。
+func (f *fixture) reply(t *testing.T, inquiryID uuid.UUID, receivedAt time.Time, names ...string) (RecordCaseInquiryReplyResult, error) {
 	t.Helper()
 	return f.module.RecordCaseInquiryReply(context.Background(), RecordCaseInquiryReplyInput{
-		InquiryID: inquiryID, AdminID: inquiryRecorder, Channel: InquiryChannelPhone, ReceivedAt: receivedAt, Body: "賣家電話回覆：已附上進貨單", EvidenceTokens: tokens,
+		InquiryID: inquiryID, AdminID: inquiryRecorder, Channel: InquiryChannelPhone, ReceivedAt: receivedAt, Body: "賣家電話回覆：已附上進貨單",
+		EvidenceTokens: f.evidence(t, media.Uploader{ID: inquiryRecorder, Admin: true}, names...),
 	})
 }
 
@@ -390,19 +392,20 @@ func TestRecordInquiryReply(t *testing.T) {
 		t.Fatalf("被拒絕的回覆寫入了：%+v", got)
 	}
 
-	// 附件必須是機敏檔：media 回報不是機敏就在寫入之前被拒絕，指到那一張。
-	f.media.NotSecure = true
-	_, err = f.reply(t, i.ID, f.now, "plain")
+	// 附件必須是機敏檔：公開的圖片在寫入的 transaction 內被拒絕，指到那一張，資產仍是暫存。
+	plainToken, plainAsset := f.stagePublic(t, media.Uploader{ID: inquiryRecorder, Admin: true})
+	_, err = f.module.RecordCaseInquiryReply(ctx, RecordCaseInquiryReplyInput{
+		InquiryID: i.ID, AdminID: inquiryRecorder, Channel: InquiryChannelPhone, ReceivedAt: f.now, Body: "x", EvidenceTokens: []string{plainToken},
+	})
 	if fields := invalidFields(t, err); !slices.Equal(fields, []string{"EvidenceTokens[0]"}) {
 		t.Fatalf("非機敏的附件：%v", err)
 	}
-	f.media.NotSecure = false
+	f.wantAsset(t, plainAsset, "STAGED")
 	if f.inquiriesOf(t, c.ID)[0].State() != InquiryStateOpen {
 		t.Fatal("被拒絕的附件讓詢問結束了")
 	}
 
 	before := f.caseOf(t, c.ID)
-	uploaders := len(f.media.uploaders)
 	got, err := f.reply(t, i.ID, f.now.Add(-30*time.Minute), "doc1", "doc2")
 	must(t, err)
 	r := got.Inquiry
@@ -414,22 +417,12 @@ func TestRecordInquiryReply(t *testing.T) {
 	if got.Case.Version != before.Version+1 || !got.Case.UpdatedAt.Equal(f.now) || got.Case.AwaitingSeller() || !got.Case.Open() {
 		t.Fatalf("case=%+v", got.Case.Case)
 	}
-	// 附件以管理員的身分轉正（Admin: true）、ref type 是治理佐證。
-	newUploaders := f.media.uploaders[uploaders:]
-	if len(newUploaders) != 2 || newUploaders[0] != (media.Uploader{ID: inquiryRecorder, Admin: true}) || newUploaders[1] != (media.Uploader{ID: inquiryRecorder, Admin: true}) {
-		t.Fatalf("uploaders=%+v", newUploaders)
-	}
-	if last := f.media.finalized[len(f.media.finalized)-2:]; last[0] != media.RefTypeGovernanceEvidence || last[1] != media.RefTypeGovernanceEvidence {
-		t.Fatalf("ref type=%v", last)
+	// 附件以管理員的身分確認（Admin: true；media 只讓上傳者本人確認），兩份都是有效的資產。
+	if n := f.count(t, "SELECT count(*) FROM seller.case_inquiry_reply_evidence e JOIN media.assets a ON a.id = e.asset_id WHERE e.inquiry_id = $1 AND a.state = 'ACTIVE'", i.ID); n != 2 {
+		t.Fatalf("有效的附件資產=%d", n)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.case_inquiry_reply_evidence WHERE inquiry_id = $1", i.ID); n != 2 {
 		t.Fatalf("附件列=%d", n)
-	}
-	// 引用登記在詢問 ID（同步之後 media 看得到兩個資產）。
-	ref := media.Ref{Type: media.RefTypeGovernanceEvidence, ID: i.ID.String()}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); len(got) != 2 {
-		t.Fatalf("引用=%v", got)
 	}
 
 	// 重送：回原本那一則，不寫入、不動版本、不比較內容。
@@ -645,12 +638,8 @@ func TestInquiryEvidenceReadIsRecordedBeforeTheRead(t *testing.T) {
 	_, s := f.open(t)
 	c := f.foodCase(t, s.StoreID)
 	i := f.mustInquire(t, c.ID).Inquiry
-	got, err := f.reply(t, i.ID, f.now, "m0", "m1")
+	_, err := f.reply(t, i.ID, f.now, "m0", "m1")
 	must(t, err)
-	ref := media.Ref{Type: media.RefTypeGovernanceEvidence, ID: i.ID.String()}
-	for n, e := range got.Inquiry.Reply.Evidence {
-		f.media.PutSecure(e.ObjectKey, ref, media.SecureAsset{Data: []byte(fmt.Sprintf("m%d", n)), ContentType: "application/pdf"})
-	}
 	for name, in := range map[string]ReadEvidenceInput{
 		"位置沒有附件":     {AdminID: 9, Kind: EvidenceInquiry, RefID: i.ID, Position: 2},
 		"負的位置":       {AdminID: 9, Kind: EvidenceInquiry, RefID: i.ID, Position: -1},
@@ -669,7 +658,7 @@ func TestInquiryEvidenceReadIsRecordedBeforeTheRead(t *testing.T) {
 	}
 	read, err := f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceInquiry, RefID: i.ID, Position: 1})
 	must(t, err)
-	if string(read.Data) != "m1" || read.ContentType != "application/pdf" {
+	if !bytes.Equal(read.Data, evidencePDF("m1")) || read.ContentType != "application/pdf" {
 		t.Fatalf("read=%q %s", read.Data, read.ContentType)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.evidence_accesses WHERE inquiry_id = $1 AND report_id IS NULL AND request_id IS NULL AND position = 1 AND admin_id = 9 AND accessed_at = $2", i.ID, f.now); n != 1 {

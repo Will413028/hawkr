@@ -1,0 +1,832 @@
+{
+ "mutants": [
+  {
+   "id": "upload-skip-put-headers",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "headers: { ...begin.uploadHeaders },",
+   "new": "headers: {},",
+   "test": "tests/upload.test.ts begins, PUTs with the response headers",
+   "why": "不帶回應指定的標頭"
+  },
+  {
+   "id": "upload-409-no-advance-check",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "next === index ||",
+   "new": "false ||",
+   "test": "tests/upload.test.ts fails on a 409 that does not advance",
+   "why": "409 未前進仍續傳會無窮迴圈"
+  },
+  {
+   "id": "upload-no-503-retry",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "res.status === 503 || res.status === 408",
+   "new": "res.status === 408",
+   "test": "tests/upload.test.ts retries a 503 then succeeds",
+   "why": "503 不重試"
+  },
+  {
+   "id": "upload-delegated-path",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "DELEGATED_SECURE_CHUNK_PATH = \"/api/files/delegated/secure_uploads\"",
+   "new": "DELEGATED_SECURE_CHUNK_PATH = \"/api/files/secure_uploads\"",
+   "test": "tests/upload.test.ts uses the delegated endpoint",
+   "why": "代行走錯端點"
+  },
+  {
+   "id": "upload-md5-order",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "view.getUint32(off + i * 4, true)",
+   "new": "view.getUint32(off + i * 4, false)",
+   "test": "tests/upload.test.ts matches node crypto",
+   "why": "MD5 位元組序錯"
+  },
+  {
+   "id": "upload-poll-no-timeout",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "if (waited >= timeout) {",
+   "new": "if (false) {",
+   "test": "tests/upload.test.ts times out while the state stays PENDING",
+   "why": "輪詢不逾時"
+  },
+  {
+   "id": "l2-md5-header",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "md5: base64.encode(crypto.md5.convert(bytes).bytes),",
+   "new": "md5: '',",
+   "test": "test/upload_test.dart uploadImage PUT 帶 MD5",
+   "why": "BeginUpload 不帶 MD5"
+  },
+  {
+   "id": "l2-put-headers",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "Map<String, String>.of(begin.uploadHeaders),",
+   "new": "<String, String>{},",
+   "test": "test/upload_test.dart uploadImage PUT 帶 MD5",
+   "why": "PUT 不帶回應指定標頭"
+  },
+  {
+   "id": "l2-rejected",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "throw UploadRejected(",
+   "new": "throw UploadFailure('x'); UploadRejected(",
+   "test": "test/upload_test.dart REJECTED 丟 UploadRejected",
+   "why": "REJECTED 不回報原因"
+  },
+  {
+   "id": "l2-poll-retry",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "      await sleep(pollInterval);\n      continue;",
+   "new": "      rethrow;",
+   "test": "test/upload_test.dart 輪詢遇到暫時錯誤",
+   "why": "輪詢暫時錯誤直接失敗"
+  },
+  {
+   "id": "l2-storage-status",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "if (put.status < 200 || put.status >= 300) {",
+   "new": "if (false) {",
+   "test": "test/upload_test.dart 儲存空間 PUT 非 2xx",
+   "why": "儲存空間失敗仍 Complete"
+  },
+  {
+   "id": "l2-409-resume",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "      index = next;\n      attempt = 0;\n      continue;\n    }\n    final transient",
+   "new": "      index++;\n      attempt = 0;\n      continue;\n    }\n    final transient",
+   "test": "test/upload_test.dart 409 依 Hawkr-Next-Index",
+   "why": "409 不依伺服器序號續傳"
+  },
+  {
+   "id": "l2-409-range",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "next > count ||",
+   "new": "next > count + 100 ||",
+   "test": "test/upload_test.dart 409 沒有合法序號",
+   "why": "409 序號超出範圍不拒"
+  },
+  {
+   "id": "l2-4xx-noretry",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "status == null || status == 408 || status == 429 || status >= 500;",
+   "new": "true;",
+   "test": "test/upload_test.dart 4xx 不重送",
+   "why": "4xx 也重送"
+  },
+  {
+   "id": "l2-last-chunk",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "final end = start + size < bytes.length ? start + size : bytes.length;",
+   "new": "final end = start + size;",
+   "test": "test/upload_test.dart 依序送每段",
+   "why": "最後一段不是餘數"
+  },
+  {
+   "id": "admin-secure-chunk-path",
+   "stack": "admin",
+   "file": "admin/src/services/media-upload.ts",
+   "old": "chunkPath: \"/api/bff/api/files/secure_uploads\"",
+   "new": "chunkPath: \"/api/files/secure_uploads\"",
+   "test": "tests/media-upload.test.ts 機敏檔：BeginSecureUpload 後把分段 PUT 到 BFF 的段端點，不經預簽網址",
+   "why": "機敏段改打非 BFF 路徑"
+  },
+  {
+   "id": "admin-reject-not-thrown",
+   "stack": "admin",
+   "file": "admin/src/services/media-upload.ts",
+   "old": "if (outcome.state === \"rejected\")",
+   "new": "if (false as boolean)",
+   "test": "tests/media-upload.test.ts 被拒收：丟 MediaRejectedError，訊息是目錄的原因句",
+   "why": "拒收不再丟錯"
+  },
+  {
+   "id": "admin-secure-branch-dropped",
+   "stack": "admin",
+   "file": "admin/src/services/media-upload.ts",
+   "old": "if (options.isSecure)",
+   "new": "if (false as boolean)",
+   "test": "tests/media-upload.test.ts 機敏檔：BeginSecureUpload 後把分段 PUT 到 BFF 的段端點，不經預簽網址",
+   "why": "機敏檔改走公開上傳"
+  },
+  {
+   "id": "admin-failure-text-always-fallback",
+   "stack": "admin",
+   "file": "admin/src/services/media-upload.ts",
+   "old": "caught instanceof MediaRejectedError ? caught.message : fallback",
+   "new": "fallback",
+   "test": "tests/media-upload.test.ts uploadFailureText：拒收顯示原因句，其餘用固定句",
+   "why": "拒收原因句不顯示"
+  },
+  {
+   "id": "seller-private-bearer",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/media/data/media_repository.dart",
+   "old": "headers: () => {'Authorization': 'Bearer $token'},",
+   "new": "headers: () => {},",
+   "test": "test/features/media/media_repository_upload_test.dart private upload sends chunks with the Bearer session token",
+   "why": "機敏分段上傳不帶 Bearer"
+  },
+  {
+   "id": "seller-private-no-token",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/media/data/media_repository.dart",
+   "old": "if (token == null || token.isEmpty) {\n        throw const UnauthorizedException(",
+   "new": "if (false) {\n        throw const UnauthorizedException(",
+   "test": "test/features/media/media_repository_upload_test.dart private upload without a session token fails before any request",
+   "why": "沒有 session token 仍送出機敏上傳"
+  },
+  {
+   "id": "seller-reject-text",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/media/data/media_repository.dart",
+   "old": "reason.uiText(_locale()) ?? '上傳失敗，請稍後再試'",
+   "new": "'上傳失敗，請稍後再試'",
+   "test": "test/features/media/media_repository_upload_test.dart REJECTED shows the catalog text of the reason",
+   "why": "拒絕原因文字不再取自共用文案目錄"
+  },
+  {
+   "id": "seller-staged-token",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/media/data/media_repository.dart",
+   "old": "return MediaUploadResult(stagedToken: token, size: finalBytes.length);",
+   "new": "return MediaUploadResult(stagedToken: '', size: finalBytes.length);",
+   "test": "test/features/media/media_repository_upload_test.dart public image upload returns the READY staged token",
+   "why": "公開圖片上傳沒回 READY 的 staged token"
+  },
+  {
+   "id": "buyer-reject-text",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/media/data/media_repository.dart",
+   "old": "e.reason.uiText(_locale()) ?? '圖片上傳失敗'",
+   "new": "'圖片上傳失敗'",
+   "test": "test/features/media/media_repository_test.dart REJECTED surfaces the catalog text of the reason",
+   "why": "拒絕原因文字不再取自共用文案目錄"
+  },
+  {
+   "id": "buyer-staged-token",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/media/data/media_repository.dart",
+   "old": "return UploadResult(stagedToken: token);",
+   "new": "return const UploadResult(stagedToken: '');",
+   "test": "test/features/media/media_repository_test.dart uploadImage returns the READY staged token",
+   "why": "買家圖片上傳沒回 staged token"
+  },
+  {
+   "id": "b1-4-l6-media-route-resurrected",
+   "stack": "go-gateway",
+   "file": "backend/gateway/internal/router/routes.go",
+   "old": "\tregisterCartRoutes(public, app, h)\n",
+   "new": "\tregisterCartRoutes(public, app, h)\n\tapp.GET(\"/media/secure_download/:asset_id\", func(c *gin.Context) {})\n",
+   "test": "internal/router ^TestAppMediaRoutesAreGone$",
+   "why": "重新掛回 app 端 media 路由，守門測試要紅"
+  },
+  {
+   "id": "b1-4-l6-whitelist-drop-handoff",
+   "stack": "go-gateway",
+   "file": "backend/gateway/internal/router/seller_route_assert.go",
+   "old": "\t\"POST \" + adminPrefix + \"/delegated-operations/handoff/redeem\",\n",
+   "new": "",
+   "test": "internal/router ^TestDelegatedRouteInventory$",
+   "why": "白名單少一條，數量與雙向比對要紅"
+  },
+  {
+   "id": "b1-4-l6-openapi-op-cap",
+   "stack": "go-gateway",
+   "file": "backend/gateway/internal/router/openapi_coverage_test.go",
+   "old": "maxRESTOperations = 375",
+   "new": "maxRESTOperations = 377",
+   "test": "internal/router ^TestEveryRouteIsInOpenAPISpec$",
+   "why": "端點數上限放寬，鎖低點的斷言要紅"
+  },
+  {
+   "id": "b1-4-l6-upload-body-tier",
+   "stack": "go-gateway",
+   "file": "backend/gateway/internal/middleware/body_guard.go",
+   "old": "{uploadMaxBodyBytes, uploadReadDeadline}",
+   "new": "{defaultMaxBodyBytes, uploadReadDeadline}",
+   "test": "internal/middleware ^TestBodyGuard_UploadRouteGetsLargerLimit$",
+   "why": "圖片轉換路由回到預設大小上限"
+  },
+  {
+   "id": "b1-4-l6-activity-flag",
+   "stack": "go-gateway",
+   "file": "backend/gateway/internal/router/delegated_capability.go",
+   "old": "middleware.RegisterDelegatedRoute(method, full)\n\tg.Handle(method, relPath, requireDelegated(cap, deps), h)",
+   "new": "g.Handle(method, relPath, requireDelegated(cap, deps), h)",
+   "test": "internal/router ^TestDelegatedRoutesAreAllRateLimitRegistered$",
+   "why": "delegatedHandle 不登錄限流判定"
+  },
+  {
+   "id": "b1-5a-buyer-replace-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/profile/profile.go",
+   "old": "if current.AvatarAssetID != nil && *current.AvatarAssetID != asset.ID {",
+   "new": "if false && current.AvatarAssetID != nil && *current.AvatarAssetID != asset.ID {",
+   "test": "internal/modules/buyer ^TestReplacingTheAvatarConfirmsTheNewAssetAndMarksTheOldDeleted$",
+   "why": "換頭像不再把被換掉的資產 MarkDeleted"
+  },
+  {
+   "id": "b1-5a-buyer-markdeleted-error-swallowed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/profile/profile.go",
+   "old": "if err := service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID}); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}",
+   "new": "_ = service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID})",
+   "test": "internal/modules/buyer ^TestRolledBackAvatarWriteLeavesTheNewAssetStaged$",
+   "why": "MarkDeleted 失敗不再讓換圖整筆回滾，新資產被確認卻沒有刪掉舊的"
+  },
+  {
+   "id": "b1-5a-buyer-confirm-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/profile/profile.go",
+   "old": "media.ConfirmField(ctx, service.deps.Media, media.Uploader",
+   "new": "media.ConfirmField(context.Background(), service.deps.Media, media.Uploader",
+   "test": "internal/modules/buyer ^TestFirstAvatarMarksNothingDeleted$",
+   "why": "Confirm 脫離寫入的 transaction（media 拒絕：ErrNoTransaction）"
+  },
+  {
+   "id": "b1-5a-buyer-secure-avatar-allowed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/profile/profile.go",
+   "old": "return media.RequireVisibility(ctx, media.VisibilityPublic, a)",
+   "new": "return \"\"",
+   "test": "internal/modules/buyer ^TestSecureAssetCannotBeTheAvatar$",
+   "why": "機敏資產可以被當成公開頭像"
+  },
+  {
+   "id": "b1-5a-buyer-close-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/deletion/deletion.go",
+   "old": "return service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID})",
+   "new": "return nil",
+   "test": "internal/modules/buyer ^TestClosingTheBuyerMarksTheAvatarDeleted$",
+   "why": "關閉買家不再釋放頭像資產"
+  },
+  {
+   "id": "b1-5a-media-confirmed-asset-no-object-key",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "ConfirmedAsset{ID: a.ID, ObjectKey: a.ObjectKey, Visibility:",
+   "new": "ConfirmedAsset{ID: a.ID, Visibility:",
+   "test": "internal/modules/buyer ^TestAvatarAndTextInOneUpdate$",
+   "why": "Confirm 不回 object key，頭像列存空字串"
+  },
+  {
+   "id": "b1-5a-image-animated-webp-limit-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if f == WebP && pages > 1 && (w > MaxAnimatedWebPDimension || h > MaxAnimatedWebPDimension) {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestAnimatedWebPSideOverEncoderLimitIsRejectedFromTheHeader$",
+   "why": "動態 WebP 超過 16383 不再於標頭階段拒收"
+  },
+  {
+   "id": "b1-5a-image-animated-webp-limit-off-by-one",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "(w > MaxAnimatedWebPDimension || h > MaxAnimatedWebPDimension)",
+   "new": "(w >= MaxAnimatedWebPDimension || h >= MaxAnimatedWebPDimension)",
+   "test": "internal/modules/media/internal/image ^TestAnimatedWebPSideOverEncoderLimitIsRejectedFromTheHeader$",
+   "why": "邊界 16383 本身被誤拒"
+  },
+  {
+   "id": "profile-old-image-not-deleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/profile/profile.go",
+   "old": "if len(retired) > 0 {",
+   "new": "if false {",
+   "test": "internal/modules/seller ^TestProfileAndImagesAreWrittenInOneVersionedTransaction$",
+   "why": "換圖時被換掉的舊圖不再 MarkDeleted"
+  },
+  {
+   "id": "profile-image-must-be-public-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/profile/profile.go",
+   "old": "return media.RequireVisibility(ctx, media.VisibilityPublic, a)",
+   "new": "return \"\"",
+   "test": "internal/modules/seller ^TestStoreImagesMustBePublicAssets$",
+   "why": "logo 與封面接受機敏資產"
+  },
+  {
+   "id": "kyc-document-must-be-secure-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/kyc/documents.go",
+   "old": "return media.RequireVisibility(ctx, media.VisibilitySecure, a)",
+   "new": "return \"\"",
+   "test": "internal/modules/seller ^TestKYCDocumentsMustBeSecureAssets$",
+   "why": "證件接受公開資產"
+  },
+  {
+   "id": "kyc-replaced-document-not-deleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/kyc/kyc.go",
+   "old": "if err := markDeleted(ctx, s.d.Media, retired); err != nil {",
+   "new": "if err := markDeleted(ctx, s.d.Media, nil); err != nil {",
+   "test": "internal/modules/seller ^TestKYCDocumentsAreReplacedAsState$",
+   "why": "換掉的證件不標記刪除"
+  },
+  {
+   "id": "kyc-cancel-keeps-documents",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/kyc/documents.go",
+   "old": "\treturn markDeleted(ctx, m, assetIDs(docs))",
+   "new": "\treturn markDeleted(ctx, m, nil)",
+   "test": "internal/modules/seller ^TestKYCDocumentsAreConfirmedWithTheApplicationAndReplacedOnesMarkedDeleted$",
+   "why": "申請取消時證件不標記刪除"
+  },
+  {
+   "id": "purge-keeps-store-images",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/purge/purge.go",
+   "old": "if err := s.d.Media.MarkDeleted(ctx, released); err != nil {",
+   "new": "if err := s.d.Media.MarkDeleted(ctx, nil); err != nil {",
+   "test": "internal/modules/seller ^TestCloseKeepsTheImagesUntilThePurgeReleasesThem$",
+   "why": "個資清理時 logo 與封面不標記刪除"
+  },
+  {
+   "id": "purge-keeps-kyc-documents",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/purge/purge.go",
+   "old": "if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {",
+   "new": "if err := s.d.Media.MarkDeleted(ctx, nil); err != nil {",
+   "test": "internal/modules/seller ^TestPurgeClearsEveryPersonalColumn$",
+   "why": "個資清理時證件不標記刪除"
+  },
+  {
+   "id": "prospect-archive-keeps-images",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/prospect/images.go",
+   "old": "\treturn s.d.Media.MarkDeleted(ctx, retired)",
+   "new": "\treturn nil",
+   "test": "internal/modules/seller ^TestArchiveAndMergeMarkImagesDeleted$",
+   "why": "封存與合併時業者圖片不標記刪除"
+  },
+  {
+   "id": "prospect-replaced-image-not-deleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/prospect/prospect.go",
+   "old": "if len(retired) > 0 {",
+   "new": "if false {",
+   "test": "internal/modules/seller ^TestProspectImagesAreConfirmedWithTheProspectAndUseVersion$",
+   "why": "業者換圖時舊圖不標記刪除"
+  },
+  {
+   "id": "evidence-must-be-secure-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/model/evidence.go",
+   "old": "return media.RequireVisibility(ctx, media.VisibilitySecure, a)",
+   "new": "return \"\"",
+   "test": "internal/modules/seller ^TestEvidenceMustBeSecureAssets$",
+   "why": "佐證接受公開資產"
+  },
+  {
+   "id": "read-secure-missing-not-classified",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/model/media.go",
+   "old": "\t\treturn FileContent{}, ErrFileMissing",
+   "new": "\t\treturn FileContent{}, err",
+   "test": "internal/modules/seller ^TestKYCDocumentReadFailuresAreDistinguished$",
+   "why": "media 說沒有時不分類成 ErrFileMissing"
+  },
+  {
+   "id": "read-secure-content-type-not-sniffed",
+   "stack": "go",
+   "file": "backend/internal/modules/seller/internal/model/media.go",
+   "old": "ContentType: http.DetectContentType(data[:min(len(data), secureSniffLen)])",
+   "new": "ContentType: \"application/octet-stream\"",
+   "test": "internal/modules/seller/internal/model ^TestReadSecureSniffsTheTypeAndClassifiesFailures$",
+   "why": "機敏檔的型別不再由內容辨認"
+  },
+  {
+   "id": "confirm-all-stops-reporting-all",
+   "stack": "go",
+   "file": "backend/internal/modules/media/confirm_fields.go",
+   "old": "\t\t\t\tcauses = append(causes, fmt.Errorf(\"確認 %s：%w\", it.Field, err))\n\t\t\t\tcontinue",
+   "new": "\t\t\t\tcauses = append(causes, fmt.Errorf(\"確認 %s：%w\", it.Field, err))\n\t\t\t\tbreak",
+   "test": "internal/modules/seller/internal/model ^TestConfirmAllReportsEveryRejectedItemAndStopsOnOtherErrors$",
+   "why": "第一個被拒絕的 token 之後就不再確認其他的"
+  },
+  {
+   "id": "own-document-account-check-removed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/kyc_document.go",
+   "old": "\tcase p.Kind != identity.PrincipalAccount:",
+   "new": "\tcase false && p.Kind != identity.PrincipalAccount:",
+   "test": "internal/httpapi/seller ^TestOwnDocumentEndpointAuthorizesAccountsAndMapsErrorsWithoutLeaking$",
+   "why": "賣家證件端點放行管理員"
+  },
+  {
+   "id": "own-document-cacheable",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/kyc_document.go",
+   "old": "\tw.Header().Set(\"Cache-Control\", \"private, no-store\")\n",
+   "new": "",
+   "test": "internal/httpapi/seller ^TestOwnDocumentEndpointAuthorizesAccountsAndMapsErrorsWithoutLeaking$",
+   "why": "賣家證件端點的回應可被快取"
+  },
+  {
+   "id": "own-document-position-from-account",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/kyc_document.go",
+   "old": "Position: position})",
+   "new": "Position: 0})",
+   "test": "internal/httpapi/seller ^TestOwnDocumentEndpointAuthorizesAccountsAndMapsErrorsWithoutLeaking$",
+   "why": "端點忽略路徑裡的位置"
+  },
+  {
+   "id": "own-document-uri-old-gateway",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/kyc_document.go",
+   "old": "return \"/api/files/seller/kyc/\" + strconv.Itoa(position)",
+   "new": "return \"/api/v1/app/media/secure_download/\" + strconv.Itoa(position)",
+   "test": "internal/httpapi/seller ^TestKYCResponseCarriesNoInputOnlyFieldsAndNoObjectKeys$",
+   "why": "download_uri 指回舊 gateway"
+  },
+  {
+   "id": "own-document-position-bound-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/kyc/admin.go",
+   "old": "\tif in.Position < 0 || in.Position >= model.MaxCompanyDocuments {\n\t\treturn model.FileContent{}, apperr.NotFound(\"找不到這份文件\")\n\t}\n\tq := store.New(s.d.DB.Conn(ctx))\n\tstoreRow, err := s.actingStore(ctx, q, in.AccountID, model.CapAccountSelfRead)",
+   "new": "\tq := store.New(s.d.DB.Conn(ctx))\n\tstoreRow, err := s.actingStore(ctx, q, in.AccountID, model.CapAccountSelfRead)",
+   "test": "internal/modules/seller ^TestSellerReadsOwnKYCDocumentsOnly$",
+   "why": "賣家讀證件不檢查位置範圍（負的位置仍查到文件列時會讀到別的檔）"
+  },
+  {
+   "id": "prospect-image-must-be-public-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/prospect/images.go",
+   "old": "return media.RequireVisibility(ctx, media.VisibilityPublic, a)",
+   "new": "return \"\"",
+   "test": "internal/modules/seller ^TestProspectImagesMustBePublicAssets$",
+   "why": "業者圖片接受機敏資產"
+  },
+  {
+   "id": "content-replace-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/content/internal/banner/banner.go",
+   "old": "\t\treturn m.d.Media.MarkDeleted(ctx, retired)",
+   "new": "\t\t_ = retired\n\t\treturn nil",
+   "test": "internal/modules/content ^TestReplacingABannerImageConfirmsTheNewAssetAndMarksTheOldDeleted$",
+   "why": "換圖不再把被換掉的資產標記刪除"
+  },
+  {
+   "id": "content-delete-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/content/internal/banner/banner.go",
+   "old": "\t\treturn m.d.Media.MarkDeleted(ctx, images.Retired([]uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}, nil))",
+   "new": "\t\t_ = old\n\t\treturn nil",
+   "test": "internal/modules/content ^TestDeletingABannerMarksBothImagesDeleted$",
+   "why": "刪除 banner 不再標記兩張圖刪除"
+  },
+  {
+   "id": "content-confirm-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/content/internal/images/images.go",
+   "old": "media.ConfirmField(ctx, m.Media, adminUploader(adminID)",
+   "new": "media.ConfirmField(context.Background(), m.Media, adminUploader(adminID)",
+   "test": "internal/modules/content ^TestRolledBackBannerWriteLeavesTheNewAssetStaged$",
+   "why": "Confirm 移到擁有者的 transaction 之外"
+  },
+  {
+   "id": "content-retired-ignores-shared-asset",
+   "stack": "go",
+   "file": "backend/internal/modules/content/internal/images/images.go",
+   "old": "if !slices.Contains(after, a) && !slices.Contains(out, a) {",
+   "new": "if !slices.Contains(out, a) {",
+   "test": "internal/modules/content/internal/images ^TestRetiredIsASetDifferenceAcrossAllSlotsOfTheRef$",
+   "why": "退場不再扣掉仍被別的位置指著的資產"
+  },
+  {
+   "id": "im-erase-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/purge/purge.go",
+   "old": "\t\tif err := s.d.Media.MarkDeleted(ctx, assets); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "\t\t_ = assets",
+   "test": "internal/modules/im ^TestImageMessageConfirmsTheAssetAndEraseMarksItDeleted$",
+   "why": "抹除圖片訊息不再標記圖刪除"
+  },
+  {
+   "id": "im-confirm-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: uploader}",
+   "new": "media.ConfirmField(context.Background(), s.d.Media, media.Uploader{ID: uploader}",
+   "test": "internal/modules/im ^TestRolledBackImageSendLeavesTheAssetStaged$",
+   "why": "Confirm 移到送出的 transaction 之外"
+  },
+  {
+   "id": "review-purge-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/purge/purge.go",
+   "old": "\t\tif err := s.d.Media.MarkDeleted(ctx, assets); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "\t\t_ = assets",
+   "test": "internal/modules/review ^TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable$",
+   "why": "刪帳清除評價不再標記附圖刪除"
+  },
+  {
+   "id": "review-confirm-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/write/write.go",
+   "old": "media.ConfirmFields(ctx, s.d.Media, uploader, items",
+   "new": "media.ConfirmFields(context.Background(), s.d.Media, uploader, items",
+   "test": "internal/modules/review ^TestRolledBackSubmitLeavesTheImagesStaged$",
+   "why": "Confirm 移到提交的 transaction 之外"
+  },
+  {
+   "id": "social-update-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/post/post.go",
+   "old": "s.d.Media.MarkDeleted(ctx, []uuid.UUID{*row.ImageAssetID})",
+   "new": "error(nil)",
+   "test": "internal/modules/social ^TestPostImageReplacementConfirmsTheNewAssetAndMarksTheOldDeleted$",
+   "why": "換圖或清掉圖不再標記舊資產刪除"
+  },
+  {
+   "id": "social-purge-no-markdeleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/purge/purge.go",
+   "old": "s.d.Media.MarkDeleted(ctx, assets)",
+   "new": "error(nil)",
+   "test": "internal/modules/social ^TestStoreRetirementEnqueuesAnIdempotentPurge$",
+   "why": "店家退場清除不再標記貼文圖刪除"
+  },
+  {
+   "id": "social-confirm-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/post/post.go",
+   "old": "media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: st.AccountID}",
+   "new": "media.ConfirmField(context.Background(), s.d.Media, media.Uploader{ID: st.AccountID}",
+   "test": "internal/modules/social ^TestRolledBackPostImageReplacementLeavesTheNewAssetStaged$",
+   "why": "Confirm 移到寫入貼文的 transaction 之外"
+  },
+  {
+   "id": "deleg-pub-uploader-not-admin",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/delegated.go",
+   "old": "return fn(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID})",
+   "new": "return fn(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Admin: true})",
+   "test": "internal/httpapi/media ^TestDelegatedPublicUploadUploaderIsTheAdminOnTheStore$",
+   "why": "uploader 不綁被代行的店"
+  },
+  {
+   "id": "deleg-pub-complete-skips-module",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/delegated.go",
+   "old": "return h.uploads.CompleteUpload(ctx, u, req.Msg.GetStagedToken())",
+   "new": "return nil",
+   "test": "internal/httpapi/media ^TestDelegatedPublicUploadUploaderIsTheAdminOnTheStore$",
+   "why": "CompleteUpload 不呼叫模組"
+  },
+  {
+   "id": "deleg-pub-getupload-drops-reject-reason",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/delegated.go",
+   "old": "\tif st.RejectReason != \"\" {\n\t\tr := rpc.EnumToProto[pb.RejectReason](st.RejectReason)\n\t\tout.RejectReason = &r\n\t}\n\treturn connect.NewResponse(out), nil\n}\n",
+   "new": "\treturn connect.NewResponse(out), nil\n}\n",
+   "test": "internal/httpapi/media ^TestDelegatedPublicUploadUploaderIsTheAdminOnTheStore$",
+   "why": "GetUpload 不回拒絕原因"
+  },
+  {
+   "id": "deleg-pub-begin-declaration-missing",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/delegated.go",
+   "old": "mediav1alpha1connect.MediaDelegatedServiceBeginUploadProcedure:       mediaUploadMethod,\n",
+   "new": "",
+   "test": "internal/httpapi/media ^TestDelegatedPublicUploadUploaderIsTheAdminOnTheStore$",
+   "why": "BeginUpload 少了代行宣告（interceptor 建立失敗或放行）"
+  },
+  {
+   "id": "deleg-pub-capability-wrong",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/delegated.go",
+   "old": "Capability: moddelegation.CapabilityMediaUpload,\n\tAction:     moddelegation.AuditMediaUpload,\n\tResource:   moddelegation.ResourceMedia,\n}\n\n// DelegatedDeclaration",
+   "new": "Capability: moddelegation.CapabilityPostsWrite,\n\tAction:     moddelegation.AuditMediaUpload,\n\tResource:   moddelegation.ResourceMedia,\n}\n\n// DelegatedDeclaration",
+   "test": "internal/httpapi/media ^TestDelegatedPublicUploadWithoutTheCapabilityIsDenied$",
+   "why": "公開上傳不要求 media.upload"
+  },
+  {
+   "id": "deleg-ts-pub-uses-wrong-token",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "\tawait ops.complete(begin.stagedToken, opts.signal);",
+   "new": "\tawait ops.complete(\"\", opts.signal);",
+   "test": "tests/upload.test.ts runs begin, PUT, complete and polls through the delegated service",
+   "why": "complete 不帶 staged token"
+  },
+  {
+   "id": "mod-snapshot-keeps-source-asset",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/report/report.go",
+   "old": "\t\tto[src] = a.ID.String()\n",
+   "new": "\t\tto[src] = src\n\t\t_ = a\n",
+   "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage$",
+   "why": "快照內容仍指向來源圖片而不是 moderation 確認的複本"
+  },
+  {
+   "id": "mod-snapshot-owned-not-recorded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/report/report.go",
+   "old": "\t\towned = append(owned, a.ID)\n",
+   "new": "\t\t_ = a\n",
+   "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage$",
+   "why": "asset_ids 沒記下複本"
+  },
+  {
+   "id": "mod-snapshot-copy-not-confirmed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/report/report.go",
+   "old": "\t\ta, err := s.d.Media.Confirm(ctx, up, copies[src])",
+   "new": "\t\ta, err := media.ConfirmedAsset{ID: uuid.New()}, error(nil)\n\t\t_ = copies",
+   "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage$",
+   "why": "複本沒被 Confirm，狀態不是 ACTIVE"
+  },
+  {
+   "id": "dart-upload-md5-empty",
+   "stack": "dart-package:hawkr_api",
+   "file": "packages/hawkr_api/lib/upload.dart",
+   "old": "md5: base64.encode(crypto.md5.convert(bytes).bytes),",
+   "new": "md5: base64.encode(crypto.md5.convert(<int>[]).bytes),",
+   "test": "test/upload_test.dart PUT 帶 MD5 與回應標頭，輪詢到 READY 回 token",
+   "why": "MD5 不再來自實際位元組"
+  },
+  {
+   "id": "seller-reject-text-dropped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/media/data/media_repository.dart",
+   "old": "throw UploadRejectedException(message: _rejectText(e.reason));",
+   "new": "throw UploadRejectedException(message: '');",
+   "test": "test/features/media/media_repository_upload_test.dart REJECTED shows the catalog text of the reason",
+   "why": "拒絕原因文字不再顯示"
+  },
+  {
+   "id": "buyer-preview-no-data-uri",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/media/data/local_image_preview.dart",
+   "old": "'data:image/jpeg;base64,${base64Encode(compression.bytes)}'",
+   "new": "'data:image/jpeg;base64,'",
+   "test": "test/features/media/local_image_preview_test.dart local file becomes an inline data URI with the file bytes",
+   "why": "預覽不含檔案位元組"
+  },
+  {
+   "id": "r5w-reject-text-dropped",
+   "stack": "website",
+   "file": "website/lib/media/upload.ts",
+   "old": "throw new Error(rejectText(outcome.reason));",
+   "new": "throw new Error(String(outcome.reason));",
+   "test": "lib/media/__tests__/upload.unit.test.ts throws the RejectReason catalog text when the upload is rejected",
+   "why": "拒絕時的錯誤句不再來自 ui-text 的 RejectReason 文字"
+  },
+  {
+   "id": "r5w-preview-not-local",
+   "stack": "website",
+   "file": "website/lib/media/upload.ts",
+   "old": "previewUrl: URL.createObjectURL(uploadFile),",
+   "new": "previewUrl: outcome.stagedToken,",
+   "test": "lib/media/__tests__/upload.unit.test.ts uploads the bytes through MediaAppService and previews from a local object URL",
+   "why": "previewUrl 不再取自本機 object URL"
+  },
+  {
+   "id": "confirm-fields-drops-field-attribution",
+   "stack": "go",
+   "file": "backend/internal/modules/media/confirm_fields.go",
+   "old": "violations = append(violations, apperr.FieldViolation{Field: it.Field, Message: message})\n\t\t\t\tcauses = append(causes, fmt.Errorf(\"確認 %s：%w\", it.Field, err))\n\t\t\t\tcontinue",
+   "new": "return nil, err",
+   "test": "internal/modules/media ^TestConfirmFieldsReportsEveryRejectedTokenOnItsOwnField$",
+   "why": "拿掉不合格 token 的欄位歸屬，改成原樣回傳 Confirm 的錯誤"
+  },
+  {
+   "id": "media-confirm-cross-tx-allowed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if !here {",
+   "new": "if false {",
+   "test": "internal/modules/media ^TestConfirm_ConfirmedInAnotherTransactionIsRejected$",
+   "why": "已在別的 transaction 確認過的 token 可以再確認，一個資產被兩個擁有者共用（B1-D23）"
+  },
+  {
+   "id": "social-resent-image-token-deletes-current",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/post/post.go",
+   "old": "(asset != nil && *row.ImageAssetID != asset.ID)",
+   "new": "asset != nil",
+   "test": "internal/modules/social ^TestResendingTheCurrentImageTokenKeepsTheAssetActive$",
+   "why": "重送目前的 token 時把仍在用的圖標成刪除"
+  },
+  {
+   "id": "mod-retention-assets-not-retired",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/moderation/internal/retention/retention.go",
+   "old": "return s.retireAssets(ctx, owned)",
+   "new": "return nil",
+   "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage$",
+   "why": "快照過保留期被刪除後，它擁有的複本永遠不被標記刪除"
+  },
+  {
+   "id": "mod-retention-retire-skips-dedupe-media-call",
+   "stack": "go",
+   "file": "backend/internal/modules/moderation/internal/retention/retention.go",
+   "old": "if len(assets) == 0 {\n\t\treturn nil\n\t}",
+   "new": "",
+   "test": "internal/modules/moderation/internal/retention ^TestRetireAssetsMarksEveryOwnedCopyOnceAndSkipsMediaWhenEmpty$",
+   "why": "沒有資產也呼叫 media"
+  },
+  {
+   "id": "upload-put-sends-credentials",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "credentials: \"omit\",",
+   "new": "credentials: \"same-origin\",",
+   "test": "tests/upload.test.ts sends the presigned PUT without credentials or referrer",
+   "why": "預簽 PUT 帶 cookie 給跨來源的物件儲存"
+  },
+  {
+   "id": "upload-put-no-timeout",
+   "stack": "ts-package:hawkr-api-ts",
+   "file": "packages/hawkr-api-ts/src/connect/upload.ts",
+   "old": "signal: req.signal ? AbortSignal.any([req.signal, timeout]) : timeout,",
+   "new": "signal: req.signal,",
+   "test": "tests/upload.test.ts sends the presigned PUT without credentials or referrer",
+   "why": "預簽 PUT 沒有逾時"
+  },
+  {
+   "id": "kyc-document-ref-string-compare",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/kyc/documents.go",
+   "old": "return d.AssetID == refID })",
+   "new": "return d.AssetID.String() == ref.AssetID && refID == refID })",
+   "test": "internal/modules/seller ^TestKYCDocumentsAreReplacedAsState$",
+   "why": "文件參照改回字串比對，大寫 UUID 被拒"
+  },
+  {
+   "id": "social-post-no-replay-after-confirm-race",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/social/internal/post/post.go",
+   "old": "if err != nil && in.RequestID != nil && errors.Is(err, media.ErrUploadAlreadyConfirmed) {",
+   "new": "if false {",
+   "test": "internal/modules/social ^TestPostRequestIDConcurrentRetriesWithImageCreateOnePost$",
+   "why": "並行重送輸家的 Confirm 回已確認，不再 replay 就回錯誤"
+  },
+  {
+   "id": "confirm-fields-drops-already-confirmed-marker",
+   "stack": "go",
+   "file": "backend/internal/modules/media/confirm_fields.go",
+   "old": "\tif elsewhere {",
+   "new": "\tif false {",
+   "test": "internal/modules/media ^TestConfirmFieldsKeepsTheAlreadyConfirmedMarker$",
+   "why": "ConfirmFields 把已確認轉成欄位錯誤時丟掉標記"
+  }
+ ]
+}

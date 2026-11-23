@@ -31,21 +31,12 @@ func TestGenericAdminSecureMediaRoutesAreGone(t *testing.T) {
 	}
 }
 
-// app 端的機敏下載與預覽（只有上傳者本人）不在 8f-1 的範圍，必須還在。
-func TestAppSecureMediaRoutesStillMounted(t *testing.T) {
+// 機敏檔案的上傳、下載與預覽已搬到單體的 Connect 與 /api/files；gateway 不得再有 app 端 media 路由。
+func TestAppMediaRoutesAreGone(t *testing.T) {
 	r := buildFullRouter(t)
-	want := map[string]bool{
-		"GET " + appPrefix + "/media/secure_download/:asset_id":  false,
-		"GET " + appPrefix + "/media/secure_preview/:session_id": false,
-	}
 	for _, ri := range r.Routes() {
-		if _, ok := want[ri.Method+" "+ri.Path]; ok {
-			want[ri.Method+" "+ri.Path] = true
-		}
-	}
-	for k, ok := range want {
-		if !ok {
-			t.Errorf("app 端路由不見了：%s", k)
+		if strings.HasPrefix(ri.Path, appPrefix+"/media/") {
+			t.Errorf("app 端 media 路由復活了：%s %s", ri.Method, ri.Path)
 		}
 	}
 }

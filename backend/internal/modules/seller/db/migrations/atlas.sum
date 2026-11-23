@@ -1,4 +1,4 @@
-h1:JilJWuuixQkXrRTIHLcbB5aLYQEaTRagfMXaCdMWmJE=
+h1:1ZTs5D6Gji2PsrWutO54gqK0bjicGfrYcZgcAxKEPQw=
 20261001160141_seller_core.sql h1:hVkQ8Wo6S5BLgzr4nFSGS/1EZpRX9mHqRwpxmIP3Yeg=
 20261002120004_seller_governance.sql h1:Dj/zGg4clK5U8YBsKn+TWnE5ZizigjU9/s7EXXHuc+g=
 20261002133159_seller_kyc.sql h1:QiN6KkqvCU/lwdw0B66YQniBEGnAhojvTYHQJ8lOqlc=
@@ -77,3 +77,4 @@ h1:JilJWuuixQkXrRTIHLcbB5aLYQEaTRagfMXaCdMWmJE=
 20261121022434_seller_pub_retired_stores.sql h1:Ue9G9VuICPCNu1Nl34mIfWhAqdJPI5yuyVmjkG22LSc=
 20261121101416_seller_content_kinds_chat_review_reply.sql h1:4jmYVXnYidi+vYJ2nwvdo3AWbIx/zRQ0Cpzai/t7si8=
 20261121120000_seller_pub_content_takedowns_enforced_filter.sql h1:GdBBzP/RbSwvghEUCPMFQizPfgAE5F7CO6X1bLVkwIs=
+20261123041016_seller_media_port.sql h1:OpX8uGqZnUIve9uIdFJZbBcUvxQYn/CDUx6FMjEcBEQ=

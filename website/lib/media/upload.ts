@@ -1,41 +1,33 @@
 /**
- * Three-step signed-URL image upload, mirroring the backend's
- * /app/media/upload_sessions flow used by mobile.
+ * 公開圖片上傳：呼叫 `@hawkr/api/connect/upload` 的流程（BeginUpload、預簽 PUT、CompleteUpload、GetUpload 輪詢）。
  *
- *   1. POST /app/media/upload_sessions
- *      → { sessionId, uploadUrl }   (presigned PUT, no auth header on it)
- *   2. PUT <uploadUrl>  body: file binary  Content-Type: <file.type>
- *   3. POST /app/media/upload_sessions/{sessionId}/complete
- *      → { previewUrl, stagedToken }
+ * 賣家與買家走 `MediaAppService`（同源 session cookie）；代行營運走 `/adm/api/media/upload_sessions*` 的 BFF，
+ * 由它帶代行憑證轉給 `MediaDelegatedService`。預簽 PUT 用 XHR 回報上傳進度。
  *
- * `previewUrl` is the permanent CDN URL to render in <img> for display.
- * `stagedToken` is a short-lived token accepted by endpoints that take staged
- * uploads — the product gallery sends `stagedToken` (not previewUrl) for each
- * image; see lib/media/resolve-staged-images.ts.
- *
- * Step 2 uses XHR (not fetch) so we can stream upload progress back to the
- * UI — fetch() does not expose upload progress events in the browser.
+ * `previewUrl` 是選取檔案的本機 object URL：伺服器在實體確定前不給預覽網址，畫面照舊能先顯示縮圖。
+ * `stagedToken` 是交給擁有者端點（商品圖庫等）的短期憑證，見 lib/media/resolve-staged-images.ts。
+ * 被拒絕（REJECTED）丟出的錯誤訊息是 `@hawkr/ui-text` 的 RejectReason 文字。
  */
 
-import { authedFetch } from "@/lib/api/client";
+import { createClient } from "@connectrpc/connect";
+import {
+	type DelegatedPublicUploadClient,
+	type PublicUploadClient,
+	type PutTransport,
+	uploadDelegatedPublicFile,
+	uploadPublicFile,
+} from "@hawkr/api/connect/upload";
+import { MediaAppService } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb";
+import { createUiText, type Translate } from "@hawkr/ui-text/format";
+import { commonUnknown, mediaRejectReason } from "@hawkr/ui-text/keys";
+import { createTranslator } from "next-intl";
 import type { RepoFetcher } from "@/lib/api/delegated";
-import { buildImageUrl } from "@/lib/media/cdn";
-
-interface CreateUploadSessionOutput {
-	sessionId: string;
-	uploadUrl: string;
-	expiresIn: string;
-	isSecure: boolean;
-}
-
-interface CompleteUploadSessionOutput {
-	previewUrl: string;
-	stagedToken: string;
-}
+import { authedTransport } from "@/lib/connect/transport";
+import { activeLocale } from "@/lib/intl/active-locale";
+import { messagesFor } from "@/lib/intl/config";
 
 export interface UploadedAsset {
-	/** Preview/display URL for <img>. NOTE: product gallery sends `stagedToken`,
-	 *  not this URL — see lib/media/resolve-staged-images.ts. */
+	/** 選取檔案的本機 object URL，供 <img> 顯示；不是伺服器網址，也不要送給後端。 */
 	previewUrl: string;
 	/** Short-lived token for endpoints that accept staged uploads (product gallery). */
 	stagedToken: string;
@@ -56,12 +48,7 @@ export interface UploadImageOptions {
 	compress?: boolean;
 }
 
-/**
- * 媒體上傳資料層的介面（56 號 §4.5 L1053；設計書 L1053 漏列了這一支）。
- *
- * 三步中只有 ①③ 打後端（代行走 `/adm/api/media/upload_sessions*`，§6.1.13），
- * ② 的 `PUT <uploadUrl>` 是直送物件儲存的預簽網址，兩條路徑一模一樣。
- */
+/** 媒體上傳資料層的介面。 */
 export interface MediaUploadRepo {
 	uploadImageFile(
 		file: File,
@@ -71,23 +58,45 @@ export interface MediaUploadRepo {
 }
 
 export interface MediaUploadRepoOptions {
-	/** 資源根。賣家 `/app/media/upload_sessions`。 */
+	/** 代行 BFF 的資源根（`/media/upload_sessions`）；只在傳入 fetcher 時使用。 */
 	root?: string;
 }
 
+type PublicUploader = (
+	file: File,
+	onProgress?: (ratio: number) => void,
+) => ReturnType<typeof uploadPublicFile>;
+
+/**
+ * 不帶 fetcher 是賣家與買家路徑（`MediaAppService`）；帶 fetcher（代行的 `delegatedFetch`）時三步都走 BFF 路徑。
+ */
 export function createMediaUploadRepo(
-	fetcher: RepoFetcher,
+	fetcher?: RepoFetcher,
 	options: MediaUploadRepoOptions = {},
 ): MediaUploadRepo {
-	const root = options.root ?? "/app/media/upload_sessions";
+	const upload: PublicUploader = fetcher
+		? (file, onProgress) =>
+				uploadDelegatedPublicFile(
+					delegatedUploadClient(
+						fetcher,
+						options.root ?? "/media/upload_sessions",
+					),
+					file,
+					{ onProgress, put: xhrPut },
+				)
+		: (file, onProgress) =>
+				uploadPublicFile(appUploadClient(), file, {
+					onProgress,
+					put: xhrPut,
+				});
 	return {
 		uploadImageFile: (file, onProgress, uploadOptions) =>
-			uploadImageFileWith(fetcher, root, file, onProgress, uploadOptions),
+			uploadImageFileWith(upload, file, onProgress, uploadOptions),
 	};
 }
 
 /** 賣家路徑的預設實例；具名匯出 `uploadImageFile` 經由它。 */
-export const mediaUploadRepo = createMediaUploadRepo(authedFetch);
+export const mediaUploadRepo = createMediaUploadRepo();
 
 export const uploadImageFile: MediaUploadRepo["uploadImageFile"] = (
 	file,
@@ -95,9 +104,98 @@ export const uploadImageFile: MediaUploadRepo["uploadImageFile"] = (
 	options,
 ) => mediaUploadRepo.uploadImageFile(file, onProgress, options);
 
-async function uploadImageFileWith(
+function appUploadClient(): PublicUploadClient {
+	return createClient(MediaAppService, authedTransport());
+}
+
+interface BeginWire {
+	stagedToken: string;
+	uploadUrl: string;
+	uploadHeaders: Record<string, string>;
+}
+
+interface GetWire {
+	state: number;
+	rejectReason: number | null;
+}
+
+function delegatedUploadClient(
 	fetcher: RepoFetcher,
 	root: string,
+): DelegatedPublicUploadClient {
+	const token = (stagedToken: string) => encodeURIComponent(stagedToken);
+	const client = {
+		beginUpload: async (req: {
+			size: bigint;
+			contentType: string;
+			md5: string;
+		}) => {
+			const env = await fetcher<BeginWire>(root, {
+				method: "POST",
+				json: {
+					size: String(req.size),
+					contentType: req.contentType,
+					md5: req.md5,
+				},
+			});
+			if (!env.data?.stagedToken || !env.data.uploadUrl) {
+				throw new Error("建立上傳工作階段失敗");
+			}
+			return env.data;
+		},
+		completeUpload: async (req: { stagedToken: string }) => {
+			await fetcher(`${root}/${token(req.stagedToken)}/complete`, {
+				method: "POST",
+			});
+			return {};
+		},
+		getUpload: async (req: { stagedToken: string }) => {
+			const env = await fetcher<GetWire>(`${root}/${token(req.stagedToken)}`);
+			if (!env.data) throw new Error("上傳狀態回應缺少內容");
+			return {
+				state: env.data.state,
+				rejectReason: env.data.rejectReason ?? undefined,
+			};
+		},
+	};
+	return client as unknown as DelegatedPublicUploadClient;
+}
+
+const xhrPut: PutTransport = (req) =>
+	new Promise((resolve, reject) => {
+		const xhr = new XMLHttpRequest();
+		xhr.open("PUT", req.url);
+		for (const [k, v] of Object.entries(req.headers))
+			xhr.setRequestHeader(k, v);
+		xhr.upload.onprogress = (e) => {
+			if (!req.onProgress || !e.lengthComputable) return;
+			req.onProgress(e.loaded / e.total);
+		};
+		xhr.onload = () =>
+			resolve({
+				status: xhr.status,
+				headers: { get: (name) => xhr.getResponseHeader(name) },
+			});
+		xhr.onerror = () => reject(new Error("上傳失敗（網路錯誤）"));
+		xhr.onabort = () => reject(new Error("上傳已取消"));
+		req.signal?.addEventListener("abort", () => xhr.abort());
+		xhr.send(req.body);
+	});
+
+function rejectText(reason: number): string {
+	const locale = activeLocale();
+	const ut = createUiText(
+		createTranslator({
+			locale,
+			messages: messagesFor(locale),
+			namespace: "uitext",
+		}) as unknown as Translate,
+	);
+	return ut(mediaRejectReason(reason) ?? commonUnknown());
+}
+
+async function uploadImageFileWith(
+	upload: PublicUploader,
 	file: File,
 	onProgress?: (ratio: number) => void,
 	options?: UploadImageOptions,
@@ -112,42 +210,13 @@ async function uploadImageFileWith(
 			`檔案太大（${formatBytes(uploadFile.size)}），請壓縮到 10 MB 以下再試`,
 		);
 	}
-
-	const sessionEnv = await fetcher<CreateUploadSessionOutput>(root, {
-		method: "POST",
-		json: {
-			contentType: uploadFile.type,
-			fileSize: String(uploadFile.size),
-			filename: uploadFile.name,
-		},
-	});
-	const session = sessionEnv.data;
-	if (!session?.sessionId || !session.uploadUrl) {
-		throw new Error("建立上傳工作階段失敗");
-	}
-	await putWithProgress(
-		session.uploadUrl,
-		uploadFile,
-		uploadFile.type,
-		onProgress,
-	);
-
-	const completeEnv = await fetcher<CompleteUploadSessionOutput>(
-		`${root}/${encodeURIComponent(session.sessionId)}/complete`,
-		{ method: "POST" },
-	);
-	const completed = completeEnv.data;
-	// 同時要求 stagedToken：缺它時 fail-fast，避免下游（商品 gallery）把缺 token
-	// 的新上傳圖誤判成既有圖而下載重傳。後端契約本就保證兩者皆回。
-	if (!completed?.previewUrl || !completed.stagedToken) {
-		throw new Error("上傳完成回應缺少 previewUrl 或 stagedToken");
+	const outcome = await upload(uploadFile, onProgress);
+	if (outcome.state === "rejected") {
+		throw new Error(rejectText(outcome.reason));
 	}
 	return {
-		// Several uploaders render this value before the owning entity is
-		// finalized/refetched. Normalize at the API boundary so the preview is
-		// always built on the configured media origin.
-		previewUrl: buildImageUrl(completed.previewUrl, "original"),
-		stagedToken: completed.stagedToken,
+		previewUrl: URL.createObjectURL(uploadFile),
+		stagedToken: outcome.stagedToken,
 	};
 }
 
@@ -270,33 +339,6 @@ function withImageExtension(filename: string, contentType: string): string {
 	return /\.[^./\\]+$/.test(baseName)
 		? baseName.replace(/\.[^./\\]+$/, extension)
 		: `${baseName}${extension}`;
-}
-
-function putWithProgress(
-	url: string,
-	file: File,
-	contentType: string,
-	onProgress?: (ratio: number) => void,
-): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const xhr = new XMLHttpRequest();
-		xhr.open("PUT", url);
-		if (contentType) xhr.setRequestHeader("Content-Type", contentType);
-		xhr.upload.onprogress = (e) => {
-			if (!onProgress || !e.lengthComputable) return;
-			onProgress(e.loaded / e.total);
-		};
-		xhr.onload = () => {
-			if (xhr.status >= 200 && xhr.status < 300) {
-				resolve();
-			} else {
-				reject(new Error(`上傳失敗（HTTP ${xhr.status}）`));
-			}
-		};
-		xhr.onerror = () => reject(new Error("上傳失敗（網路錯誤）"));
-		xhr.onabort = () => reject(new Error("上傳已取消"));
-		xhr.send(file);
-	});
 }
 
 function formatBytes(n: number): string {

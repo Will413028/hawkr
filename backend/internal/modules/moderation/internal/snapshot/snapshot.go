@@ -178,6 +178,43 @@ func (c Content) Validate() error {
 	return nil
 }
 
+// ReplaceAssets 回傳把圖片資產 ID 依 to 換掉的內容（證據快照改引用自己的複本）：to 沒有的 ID 維持原樣；不修改傳入的內容。
+func (c Content) ReplaceAssets(to map[string]string) Content {
+	swap := func(in []string) []string {
+		if in == nil {
+			return nil
+		}
+		out := make([]string, len(in))
+		for i, id := range in {
+			if v, ok := to[id]; ok {
+				id = v
+			}
+			out[i] = id
+		}
+		return out
+	}
+	if c.Social != nil {
+		s := *c.Social
+		s.MediaRefs = swap(s.MediaRefs)
+		c.Social = &s
+	}
+	if c.Review != nil {
+		r := *c.Review
+		r.MediaRefs = swap(r.MediaRefs)
+		c.Review = &r
+	}
+	if c.Chat != nil {
+		ch := *c.Chat
+		ch.MediaRefs = swap(ch.MediaRefs)
+		ch.Context = slices.Clone(ch.Context)
+		for i := range ch.Context {
+			ch.Context[i].MediaRefs = swap(ch.Context[i].MediaRefs)
+		}
+		c.Chat = &ch
+	}
+	return c
+}
+
 func body(s string) string {
 	return trimtext.Trim(strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n"))
 }

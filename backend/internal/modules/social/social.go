@@ -18,14 +18,12 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/actor"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/comment"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/engage"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/forum"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/hashtag"
-	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/post"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/purge"
@@ -74,7 +72,8 @@ var (
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	Media  media.Media
+	// Media 是 media 模組（*media.Module）：貼文圖在寫入的 transaction 內 Confirm，被換掉、清掉或終態的資產 MarkDeleted。
+	Media  model.Media
 	Jobs   jobs.Enqueuer
 	Buyers Buyers
 	Stores Stores
@@ -226,17 +225,16 @@ func SanctionKindValues() []SanctionKind { return model.SanctionKindValues() }
 
 // Module 是 social 模組。
 type Module struct {
-	post      *post.Service
-	comment   *comment.Service
-	forum     *forum.Service
-	engage    *engage.Service
-	sanction  *sanction.Service
-	stats     *stats.Service
-	purge     *purge.Service
-	mediaSync *media.RefSyncer
-	jobs      jobs.Enqueuer
-	cancel    schedule.Canceler
-	now       func() time.Time
+	post     *post.Service
+	comment  *comment.Service
+	forum    *forum.Service
+	engage   *engage.Service
+	sanction *sanction.Service
+	stats    *stats.Service
+	purge    *purge.Service
+	jobs     jobs.Enqueuer
+	cancel   schedule.Canceler
+	now      func() time.Time
 }
 
 // New 建立模組。
@@ -264,16 +262,15 @@ func New(d Deps) *Module {
 			DB: d.DB, Media: d.Media, Jobs: d.Jobs, Events: d.Events, Products: d.Products, Cache: cache, Cancel: cancel, Authorizers: authorizers,
 			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
-		comment:   comment.New(comment.Deps{DB: d.DB, Events: d.Events, Actors: actors, NewID: d.NewID, Now: d.Now}),
-		forum:     forum.New(forum.Deps{DB: d.DB, Actors: actors, NewID: d.NewID, Now: d.Now}),
-		engage:    engage.New(engage.Deps{DB: d.DB, Events: d.Events, Actors: actors, Now: d.Now}),
-		sanction:  sanction.New(sanction.Deps{DB: d.DB, Cache: cache, NewID: d.NewID, Now: d.Now}),
-		stats:     st,
-		purge:     purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Stats: st, Cache: cache, Cancel: cancel, Now: d.Now}),
-		mediaSync: mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),
-		jobs:      d.Jobs,
-		cancel:    cancel,
-		now:       d.Now,
+		comment:  comment.New(comment.Deps{DB: d.DB, Events: d.Events, Actors: actors, NewID: d.NewID, Now: d.Now}),
+		forum:    forum.New(forum.Deps{DB: d.DB, Actors: actors, NewID: d.NewID, Now: d.Now}),
+		engage:   engage.New(engage.Deps{DB: d.DB, Events: d.Events, Actors: actors, Now: d.Now}),
+		sanction: sanction.New(sanction.Deps{DB: d.DB, Cache: cache, NewID: d.NewID, Now: d.Now}),
+		stats:    st,
+		purge:    purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Media: d.Media, Stats: st, Cache: cache, Cancel: cancel, Now: d.Now}),
+		jobs:     d.Jobs,
+		cancel:   cancel,
+		now:      d.Now,
 	}
 }
 
@@ -678,26 +675,14 @@ func (m *Module) OnStoreRetired(ctx context.Context, e seller.StoreRetired) erro
 	return purge.EnqueueStore(ctx, m.jobs, e.StoreID)
 }
 
-// SyncMedia 同步一個 media ref（貼文圖，ref_id 是貼文的 UUID）的引用：Link 貼文目前的圖，Unlink 退場的圖。它是 social.media_sync job
-// 的內容，給 worker 與測試呼叫；回傳是否要再跑一輪。
-func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult, error) {
-	return m.mediaSync.Sync(ctx, ref)
-}
-
-// SweepMedia 執行 media 引用的保底掃描；回傳補排的 ref 數。它是 social.media_sweep job 的內容。
-func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
-
-// AddWorkers 登記本模組的 River worker：media 引用、清除、瀏覽資料清理、每日對帳與排程發布。
+// AddWorkers 登記本模組的 River worker：清除、瀏覽資料清理、每日對帳與排程發布。
 func (m *Module) AddWorkers(workers *river.Workers) {
-	mediaref.AddWorkers(workers, m.mediaSync)
 	purge.AddWorkers(workers, m.purge)
 	stats.AddWorkers(workers, m.stats)
 	post.AddWorkers(workers, m.post)
 }
 
-// PeriodicJobs 回傳週期 job：media 引用的保底掃描、瀏覽資料清理、每日對帳。
+// PeriodicJobs 回傳週期 job：瀏覽資料清理、每日對帳。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
-	out := mediaref.PeriodicJobs()
-	out = append(out, purge.PeriodicJobs()...)
-	return append(out, stats.PeriodicJobs()...)
+	return append(purge.PeriodicJobs(), stats.PeriodicJobs()...)
 }

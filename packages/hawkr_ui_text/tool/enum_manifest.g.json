@@ -81,7 +81,7 @@
       "name": "hawkr.media.v1alpha1.RejectReason",
       "dartClass": "RejectReason",
       "dartLibrary": "package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

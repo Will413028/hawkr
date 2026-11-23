@@ -574,3 +574,15 @@ func (q *Queries) RewrapUpload(ctx context.Context, arg RewrapUploadParams) (int
 	}
 	return result.RowsAffected(), nil
 }
+
+const uploadConfirmedInThisTx = `-- name: UploadConfirmedInThisTx :one
+SELECT (xmin = pg_current_xact_id()::xid)::boolean AS confirmed_here FROM media.staged_uploads WHERE id = $1
+`
+
+// 這筆暫存列是不是被目前的 transaction 轉成 CONFIRMED 的（列的 xmin 是最後寫入它的 transaction）；Confirm 重入只在同一個 transaction 內冪等（B1-D23）。
+func (q *Queries) UploadConfirmedInThisTx(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, uploadConfirmedInThisTx, id)
+	var confirmed_here bool
+	err := row.Scan(&confirmed_here)
+	return confirmed_here, err
+}

@@ -3,9 +3,12 @@
 package buyer_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
-	"fmt"
+	goimage "image"
+	"image/png"
 	"io"
 	"log/slog"
 	"regexp"
@@ -59,31 +62,69 @@ type fixture struct {
 	module   *Module
 	bus      *events.Bus
 	jobs     *queue
-	media    *media.Fake
+	media    *media.Module
 	now      time.Time
 }
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	database := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "buyer", Dir: Migrations()}))
+	database := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "media", Dir: media.Migrations()}, migrate.Module{Name: "buyer", Dir: Migrations()}))
 	fixture := &fixture{
 		database: database,
 		bus:      events.NewBus(),
 		jobs:     &queue{},
 		now:      time.Date(2026, 1, 31, 12, 0, 0, 0, time.UTC),
 	}
-	fixture.media = media.NewFake()
-	fixture.media.Key = func(_, token string) string { return "avatar/" + token }
+	fixture.media = media.New(media.Deps{
+		DB:      database,
+		Jobs:    fixture.jobs,
+		Store:   media.NewMemoryStore(),
+		Keyring: testKeyring(t),
+		NewID:   uuid.NewV7,
+		Now:     func() time.Time { return fixture.now },
+		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
 	fixture.module = New(Deps{
 		DB:             database,
 		Events:         fixture.bus,
-		Jobs:           fixture.jobs,
 		Media:          fixture.media,
 		Now:            func() time.Time { return fixture.now },
 		NicknameNumber: func() int { return 42 },
 		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return fixture
+}
+
+func testKeyring(t *testing.T) *media.Keyring {
+	t.Helper()
+	ring, err := media.ParseKeyring("k1:" + base64.StdEncoding.EncodeToString(make([]byte, 32)))
+	must(t, err)
+	return ring
+}
+
+func pngBytes(t *testing.T) []byte {
+	t.Helper()
+	var body bytes.Buffer
+	must(t, png.Encode(&body, goimage.NewNRGBA(goimage.Rect(0, 0, 4, 4))))
+	return body.Bytes()
+}
+
+// stageAvatar 以 accountID 為上傳者放一張公開 PNG，回傳可 Confirm 的 token 與資產 ID。
+func stageAvatar(t *testing.T, fixture *fixture, accountID int64) (string, uuid.UUID) {
+	t.Helper()
+	put, err := fixture.media.PutPublic(context.Background(), media.Uploader{ID: accountID}, bytes.NewReader(pngBytes(t)))
+	must(t, err)
+	var assetID uuid.UUID
+	must(t, fixture.database.Conn(context.Background()).QueryRow(context.Background(),
+		"SELECT asset_id FROM media.staged_uploads WHERE token_hash = sha256($1::bytea)", put.Token).Scan(&assetID))
+	return put.Token, assetID
+}
+
+func assetState(t *testing.T, fixture *fixture, assetID uuid.UUID) string {
+	t.Helper()
+	var state string
+	must(t, fixture.database.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id=$1", assetID).Scan(&state))
+	return state
 }
 
 func must(t *testing.T, err error) {
@@ -242,8 +283,8 @@ func TestDeletionLifecycle(t *testing.T) {
 	if count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE buyer_id=$1", buyer.BuyerID) != 0 {
 		t.Fatal("restock active after close")
 	}
-	if len(fixture.jobs.args) != 1 || fixture.jobs.args[0].Kind() != "buyer.media_sync" {
-		t.Fatal(fixture.jobs.args)
+	if len(fixture.jobs.args) != 0 {
+		t.Fatalf("沒有頭像的買家關閉不得排任何 job：%v", fixture.jobs.args)
 	}
 	secondBuyer := profile(t, fixture, 8)
 	must(t, fixture.module.CloseForDeletion(ctx, secondBuyer.BuyerID))
@@ -452,47 +493,6 @@ func TestMembershipIdempotency(t *testing.T) {
 	if ent.PlanCode != "free" || ent.PeriodStart.Day() != 28 {
 		t.Fatal(ent)
 	}
-}
-
-func TestAvatarOrder(t *testing.T) {
-	t.Parallel()
-	fixture := setup(t)
-	ctx := context.Background()
-	buyer := profile(t, fixture, 98)
-	token := "staged"
-	updated, err := fixture.module.UpdateProfile(ctx, UpdateProfileInput{
-		BuyerID:           buyer.BuyerID,
-		ExpectedVersion:   buyer.Version,
-		AvatarStagedToken: &token,
-	})
-	must(t, err)
-	if updated.Avatar == nil || *updated.Avatar != "avatar/staged" {
-		t.Fatal(updated)
-	}
-	if len(fixture.jobs.args) != 1 || fixture.jobs.args[0].Kind() != "buyer.media_sync" {
-		t.Fatalf("reference registration must be a sync job: %v", fixture.jobs.args)
-	}
-	ref := media.Ref{Type: media.RefTypeBuyerAvatar, ID: fmt.Sprint(buyer.BuyerID)}
-	if got := fixture.media.Referenced(ref); len(got) != 0 {
-		t.Fatalf("a write must not create references: %v", got)
-	}
-	if _, err := fixture.module.SyncMedia(ctx, ref); err != nil {
-		t.Fatal(err)
-	}
-	if got := fixture.media.Referenced(ref); fmt.Sprint(got) != "[asset-staged]" {
-		t.Fatalf("references after sync = %v", got)
-	}
-	must(t, fixture.database.InTx(ctx, func(ctx context.Context) error {
-		_, err := fixture.module.UpdateProfile(ctx, UpdateProfileInput{
-			BuyerID:           buyer.BuyerID,
-			ExpectedVersion:   updated.Version,
-			AvatarStagedToken: &token,
-		})
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition {
-			t.Fatalf("nested avatar=%v", err)
-		}
-		return nil
-	}))
 }
 
 func TestEventAndJobFailureRollBack(t *testing.T) {

@@ -1,47 +1,18 @@
 /**
- * Two-step secure upload for sensitive documents (KYC ID card, bank
- * statements, business registration certs, etc.).
- *
- * Mirrors `hawkr_seller/lib/features/media/data/media_repository.dart`
- * (`uploadPrivateDocument`):
- *
- *   1. POST /app/media/upload_sessions  body: { isSecure: true, ... }
- *      → { sessionId, expiresIn, ... }
- *   2. PUT  /app/media/secure_upload/{sessionId}  body: file bytes
- *      → { stagedToken }
- *
- * Differs from the public flow (`lib/media/upload.ts`):
- *   - The PUT goes directly to the gateway with the same-origin session cookie
- *     (`__Host-hk_session`), NOT a presigned OSS URL — the gateway
- *     server-side encrypts before persisting.
- *   - There's no "complete" call — the secure PUT itself returns the
- *     stagedToken in its response body.
- *   - No public `previewUrl` is exposed; the caller only gets a token to
- *     pass into the certification submit body.
- *
- * Caller passes the token as a `staged_token` of the certification request
- * (company supplementary documents). Backend resolves the token to the
- * encrypted asset at submit time.
+ * 機敏文件（KYC 證件、佐證檔等）的分段上傳：`@hawkr/api/connect/upload` 的 BeginSecureUpload，之後依伺服器給的
+ * 段大小依序 PUT 到單體的 `/api/files/secure_uploads/{token}/chunks/{index}`（同源 session cookie，伺服器端加密後才落地）。
+ * 沒有公開預覽網址；呼叫端只拿到 token，在送出認證或申覆時交給擁有者的 API。
  */
 
-import { authedFetch } from "@/lib/api/client";
-import { env } from "@/lib/config/env";
-
-interface CreateSecureSessionOutput {
-	sessionId: string;
-	expiresIn?: string;
-	objectKey?: string;
-	isSecure?: boolean;
-}
-
-interface SecurePutOutput {
-	stagedToken: string;
-}
+import { createClient } from "@connectrpc/connect";
+import { uploadSecureFile } from "@hawkr/api/connect/upload";
+import { MediaAppService } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb";
+import { authedTransport } from "@/lib/connect/transport";
 
 export interface SecureUploadResult {
 	/** Short-lived token to pass into submit/save payloads (`*_staged_token`). */
 	stagedToken: string;
-	/** Server-side reference (sessionId). Useful for retries / debugging. */
+	/** 與 stagedToken 相同，除錯時對照用。 */
 	referenceId: string;
 }
 
@@ -50,7 +21,7 @@ const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 
 export async function uploadSecureDocument(
 	file: File,
-	docType: string,
+	_docType: string,
 	onProgress?: (ratio: number) => void,
 ): Promise<SecureUploadResult> {
 	if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
@@ -61,77 +32,11 @@ export async function uploadSecureDocument(
 			`檔案太大（${formatBytes(file.size)}），請壓縮到 10 MB 以下再試`,
 		);
 	}
-
-	const sessionEnv = await authedFetch<CreateSecureSessionOutput>(
-		"/app/media/upload_sessions",
-		{
-			method: "POST",
-			json: {
-				isSecure: true,
-				docType,
-				contentType: file.type,
-				fileSize: String(file.size),
-				filename: file.name,
-			},
-		},
-	);
-	const session = sessionEnv.data;
-	if (!session?.sessionId) {
-		throw new Error("建立安全上傳工作階段失敗");
-	}
-
-	// Step 2: PUT raw bytes directly to the gateway (NOT a presigned URL —
-	// the server needs to see the body to encrypt at rest).
-	const stagedToken = await putSecure(
-		`/app/media/secure_upload/${encodeURIComponent(session.sessionId)}`,
-		file,
+	const client = createClient(MediaAppService, authedTransport());
+	const { stagedToken } = await uploadSecureFile(client, file, {
 		onProgress,
-	);
-
-	return { stagedToken, referenceId: session.sessionId };
-}
-
-/**
- * PUT raw bytes directly to the gateway with the same-origin session cookie
- * (XHR for upload progress, which fetch cannot report).
- */
-async function putSecure(
-	gatewayPath: string,
-	file: File,
-	onProgress?: (ratio: number) => void,
-): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const xhr = new XMLHttpRequest();
-		xhr.open("PUT", `${env.apiBaseUrl}${gatewayPath}`);
-		xhr.withCredentials = true;
-		xhr.setRequestHeader("Content-Type", file.type);
-		xhr.upload.onprogress = (e) => {
-			if (!onProgress || !e.lengthComputable) return;
-			onProgress(e.loaded / e.total);
-		};
-		xhr.onload = () => {
-			if (xhr.status >= 200 && xhr.status < 300) {
-				try {
-					const body = JSON.parse(xhr.responseText) as {
-						data?: SecurePutOutput;
-					};
-					const token = body.data?.stagedToken;
-					if (!token) {
-						reject(new Error("安全上傳完成但未取得 stagedToken"));
-						return;
-					}
-					resolve(token);
-				} catch {
-					reject(new Error("安全上傳回應解析失敗"));
-				}
-			} else {
-				reject(new Error(`安全上傳失敗（HTTP ${xhr.status}）`));
-			}
-		};
-		xhr.onerror = () => reject(new Error("安全上傳失敗（網路錯誤）"));
-		xhr.onabort = () => reject(new Error("安全上傳已取消"));
-		xhr.send(file);
 	});
+	return { stagedToken, referenceId: stagedToken };
 }
 
 function formatBytes(n: number): string {

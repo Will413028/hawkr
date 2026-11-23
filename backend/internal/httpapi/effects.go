@@ -101,6 +101,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.media.v1alpha1.MediaAppService/BeginSecureUpload": EffectWrite,
 	// MediaDelegatedService：憑證是代行 session，不讀帳號；宣告仍要誠實標示方法的性質。
 	"/hawkr.media.v1alpha1.MediaDelegatedService/BeginSecureUpload": EffectWrite,
+	"/hawkr.media.v1alpha1.MediaDelegatedService/BeginUpload":       EffectWrite,
+	"/hawkr.media.v1alpha1.MediaDelegatedService/CompleteUpload":    EffectWrite,
+	"/hawkr.media.v1alpha1.MediaDelegatedService/GetUpload":         EffectRead,
 
 	// SocialAppService
 	"/hawkr.social.v1alpha1.SocialAppService/SharePost":             EffectWrite,

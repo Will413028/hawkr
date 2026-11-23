@@ -70,7 +70,9 @@ class OssImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final String url;
 
-    if (scene != null) {
+    if (isInlineImageData(imageSource)) {
+      url = imageSource.trim();
+    } else if (scene != null) {
       // 配置表模式：使用集中管理的場景 preset
       url = ImageConfig.urlFor(imageSource, scene!);
     } else {

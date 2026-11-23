@@ -5,6 +5,7 @@ package im_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -617,42 +617,70 @@ func TestSweepReachesPartiesBeyondOneBatch(t *testing.T) {
 	}
 }
 
-// ID8：圖片訊息送出時排媒體同步；抹除圖片訊息後，退場資產有紀錄、媒體同步 job 有再排。
-func TestImageMessagesSyncAndRetireOnErase(t *testing.T) {
+// 圖片訊息送出時在同一個 transaction 內 Confirm；抹除圖片訊息時把圖標為刪除。
+func TestImageMessageConfirmsTheAssetAndEraseMarksItDeleted(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	m, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: "tok1"})
-	if err != nil || m.Image == nil || m.Image.AssetID != media.AssetFor("tok1") {
+	token, asset := f.stage(t, 1000+b1)
+	m, err := f.m.Send(ctx, im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token})
+	if err != nil || m.Image == nil || m.Image.AssetID != asset {
 		t.Fatalf("%+v %v", m, err)
 	}
-	if got := f.jobs.count("im.media_sync"); got != 1 {
-		t.Fatalf("送出時排 1 個同步 job：%d", got)
-	}
-	if res, err := f.m.SyncMedia(ctx, media.Ref{Type: media.RefTypeChatMessage, ID: m.ID.String()}); err != nil {
-		t.Fatalf("%+v %v", res, err)
-	}
-	if !f.media.HasRef(media.Ref{Type: media.RefTypeChatMessage, ID: m.ID.String()}, m.Image.AssetID) {
-		t.Fatal("同步後 media 要有這個引用")
+	if got := f.assetState(t, asset); got != "ACTIVE" {
+		t.Fatalf("送出後資產 state=%s，預期 ACTIVE", got)
 	}
 	f.buyerDeleted(t, b1)
 	if err := f.m.ErasePartyMessages(ctx, im.PartyBuyer, b1); err != nil {
 		t.Fatal(err)
 	}
-	if n := f.scalar(t, "SELECT count(*) FROM im.retired_assets WHERE ref_id = $1 AND asset_id = $2", m.ID.String(), m.Image.AssetID); n != 1 {
-		t.Fatalf("退場資產紀錄 %d 筆", n)
-	}
-	if got := f.jobs.count("im.media_sync"); got != 2 {
-		t.Fatalf("抹除要再排同步 job：%d", got)
-	}
-	if res, err := f.m.SyncMedia(ctx, media.Ref{Type: media.RefTypeChatMessage, ID: m.ID.String()}); err != nil {
-		t.Fatalf("%+v %v", res, err)
-	}
-	if f.media.HasRef(media.Ref{Type: media.RefTypeChatMessage, ID: m.ID.String()}, m.Image.AssetID) {
-		t.Fatal("抹除後同步要解除引用")
+	if got := f.assetState(t, asset); got != "DELETING" {
+		t.Fatalf("抹除後資產 state=%s，預期 DELETING", got)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM im.messages WHERE image_asset_id IS NOT NULL"); n != 0 {
 		t.Fatalf("抹除後圖片欄位要清空：%d", n)
+	}
+}
+
+// 回滾：送出的 transaction 在 Confirm 之後失敗，沒有訊息、圖片仍是暫存，同一個 token 重送成功。
+func TestRolledBackImageSendLeavesTheAssetStaged(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	token, asset := f.stage(t, 1000+b1)
+	fail := true
+	events.Subscribe(f.bus, func(context.Context, im.MessageSent) error {
+		if fail {
+			return errors.New("boom")
+		}
+		return nil
+	})
+	in := im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token}
+	if _, err := f.m.Send(ctx, in); err == nil {
+		t.Fatal("訂閱者失敗應讓送出回滾")
+	}
+	if got := f.assetState(t, asset); got != "STAGED" {
+		t.Fatalf("回滾後資產 state=%s，預期 STAGED", got)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 0 {
+		t.Fatalf("回滾後不得有訊息：%d", n)
+	}
+	fail = false
+	if _, err := f.m.Send(ctx, in); err != nil {
+		t.Fatalf("回滾後同一個 token 重送應成功：%v", err)
+	}
+}
+
+// 別人的 token 不能確認：回錯誤，沒有訊息，資產維持暫存。
+func TestImageSendRefusesATokenStagedByAnotherAccount(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	token, asset := f.stage(t, 1000+b2)
+	if _, err := f.m.Send(context.Background(), im.SendInput{Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token}); err == nil {
+		t.Fatal("別的帳號的 token 應被拒絕")
+	}
+	if got := f.assetState(t, asset); got != "STAGED" {
+		t.Fatalf("state=%s，預期 STAGED", got)
 	}
 }
 
@@ -801,11 +829,13 @@ func TestMessageForReportReturnsTombstonesForHiddenContext(t *testing.T) {
 	buyerSide := f.buyerParty(b1)
 	visibleText := f.say(t, buyerSide, s1, "可見的文字")
 	hiddenText := f.say(t, buyerSide, s1, "被隱藏的文字")
-	hiddenImage, err := f.m.Send(ctx, im.SendInput{Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: "hid"})
+	hidToken, _ := f.stage(t, 1000+b1)
+	hiddenImage, err := f.m.Send(ctx, im.SendInput{Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: hidToken})
 	if err != nil {
 		t.Fatal(err)
 	}
-	visibleImage, err := f.m.Send(ctx, im.SendInput{Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: "vis"})
+	visToken, visAsset := f.stage(t, 1000+b1)
+	visibleImage, err := f.m.Send(ctx, im.SendInput{Sender: buyerSide, CounterpartID: s1, Type: im.TypeImage, StagedToken: visToken})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -835,7 +865,7 @@ func TestMessageForReportReturnsTombstonesForHiddenContext(t *testing.T) {
 	if c := byID[visibleText.ID]; c.Hidden || c.Erased || c.Text != "可見的文字" || c.AssetID != "" {
 		t.Fatalf("未隱藏的文字要帶內容：%+v", c)
 	}
-	if c := byID[visibleImage.ID]; c.Hidden || c.Erased || c.Text != "" || c.AssetID != media.AssetFor("vis") {
+	if c := byID[visibleImage.ID]; c.Hidden || c.Erased || c.Text != "" || c.AssetID != visAsset.String() {
 		t.Fatalf("未隱藏的圖片要帶 AssetID：%+v", c)
 	}
 }

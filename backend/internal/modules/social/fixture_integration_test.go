@@ -5,8 +5,11 @@ package social_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	goimage "image"
+	"image/png"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -33,6 +36,54 @@ import (
 var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
+
+// autoMedia 讓測試以任意字串當 staged token：第一次 Confirm 某個 (上傳者, 字串) 時，才以該上傳者在真的 media 模組放一張公開 PNG
+// 並以它的真 token 確認；之後同一個字串回同一個資產。Confirm 本身（轉換、上傳者核對、transaction 語意）是真的 media 模組。
+type autoMedia struct {
+	*media.Module
+	mu     sync.Mutex
+	tokens map[string]string
+}
+
+func (m *autoMedia) Confirm(ctx context.Context, u media.Uploader, token string) (media.ConfirmedAsset, error) {
+	key := fmt.Sprintf("%d/%s", u.ID, token)
+	m.mu.Lock()
+	real, ok := m.tokens[key]
+	if !ok {
+		var body bytes.Buffer
+		if err := png.Encode(&body, goimage.NewNRGBA(goimage.Rect(0, 0, 4, 4))); err != nil {
+			m.mu.Unlock()
+			return media.ConfirmedAsset{}, err
+		}
+		put, err := m.PutPublic(context.Background(), u, &body)
+		if err != nil {
+			m.mu.Unlock()
+			return media.ConfirmedAsset{}, err
+		}
+		real = put.Token
+		m.tokens[key] = real
+	}
+	m.mu.Unlock()
+	return m.Module.Confirm(ctx, u, real)
+}
+
+func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	var state string
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id=$1", id).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	return state
+}
+
+func (f *fixture) postAsset(t *testing.T, postID uuid.UUID) uuid.UUID {
+	t.Helper()
+	var id uuid.UUID
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT image_asset_id FROM social.posts WHERE id=$1", postID).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
 
 // queue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type queue struct {
@@ -172,7 +223,8 @@ type fixture struct {
 	sellers  *seller.Reader
 	bus      *events.Bus
 	jobs     *queue
-	media    *media.Fake
+	media    *media.Module
+	posts    *autoMedia
 	products *products
 	deleg    *scheduleAuth
 	events   *eventLog
@@ -216,21 +268,27 @@ func (f *fixture) advance(d time.Duration) {
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "social", Dir: social.Migrations()},
 	))
 	f := &fixture{
-		db: database, bus: events.NewBus(), jobs: &queue{}, media: media.NewFake(),
+		db: database, bus: events.NewBus(), jobs: &queue{},
 		products: &products{owner: map[int64]int64{}}, deleg: &scheduleAuth{}, events: &eventLog{},
 		now: time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC),
 	}
-	f.media.Key = func(_, token string) string { return "post/" + token + ".jpg" }
 	logger := slog.New(slog.NewTextHandler(&f.logs, nil))
-	f.buyers = buyer.New(buyer.Deps{DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Now: f.clock, Logger: logger})
+	ring, err := media.ParseKeyring("k1:" + base64.StdEncoding.EncodeToString(make([]byte, 32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.media = media.New(media.Deps{DB: database, Jobs: f.jobs, Store: media.NewMemoryStore(), Keyring: ring, NewID: uuid.NewV7, Now: f.clock, Logger: logger})
+	f.posts = &autoMedia{Module: f.media, tokens: map[string]string{}}
+	f.buyers = buyer.New(buyer.Deps{DB: database, Events: f.bus, Media: f.media, Now: f.clock, Logger: logger})
 	f.sellers = seller.NewReader(database, f.clock)
 	f.module = social.New(social.Deps{
-		DB: database, Events: f.bus, Media: f.media, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, StoreBlocks: storeBlocksFromTable{database}, Products: f.products,
+		DB: database, Events: f.bus, Media: f.posts, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, StoreBlocks: storeBlocksFromTable{database}, Products: f.products,
 		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: f.deleg},
 		NewID:               uuid.NewV7, Now: f.clock, Logger: logger,
 	})
@@ -280,7 +338,7 @@ func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
 	accountID = f.next()
 	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $2, '測試店', 'logo/k', 'logo-asset', '63000010', $3, $3)`, accountID, accountID, f.clock())
+		VALUES ($1, $2, '測試店', 'logo/k', $4, '63000010', $3, $3)`, accountID, accountID, f.clock(), uuid.NewV7())
 	storeID = f.scalar(t, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID)
 	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())

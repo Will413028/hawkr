@@ -22,7 +22,13 @@ TIMEOUT_SECONDS = 15 * 60
 FRAMEWORK_TIMEOUT_SECONDS = TIMEOUT_SECONDS + 5 * 60
 REQUIRED = ("id", "stack", "file", "old", "new", "test", "why")
 FLUTTER_PREFIX = "flutter:"
-FIXED_STACKS = ("go-integration", "go", "website", "flutter:buyer-app", "flutter:seller-app")
+TS_PACKAGE_PREFIX = "ts-package:"
+DART_PACKAGE_PREFIX = "dart-package:"
+FIXED_STACKS = (
+    "go-integration", "go", "go-gateway", "website", "admin",
+    "flutter:buyer-app", "flutter:seller-app",
+    "ts-package:hawkr-api-ts", "dart-package:hawkr_api",
+)
 
 KILLED = "KILLED"
 SURVIVED = "SURVIVED"
@@ -73,9 +79,9 @@ FLUTTER_BUILD_ERROR = re.compile(r"Compilation failed|^\S+:\d+:\d+: Error: ", re
 def has_build_error(stack: str, output: str) -> bool:
     """測試指令失敗時，輸出是否帶有 mutant 本身壞掉的明確標記（轉換、語法或編譯錯誤）。
     沒有標記的失敗（含沒有測試摘要）一律當作測試擋下。"""
-    if stack == "website":
+    if stack == "website" or stack == "admin" or stack.startswith(TS_PACKAGE_PREFIX):
         return WEBSITE_BUILD_ERROR.search(output) is not None
-    if stack.startswith(FLUTTER_PREFIX):
+    if stack.startswith(FLUTTER_PREFIX) or stack.startswith(DART_PACKAGE_PREFIX):
         return FLUTTER_BUILD_ERROR.search(output) is not None
     return False
 
@@ -124,10 +130,17 @@ def split_selector(selector: str) -> tuple[str, str]:
     return parts[0], (parts[1] if len(parts) > 1 else "")
 
 
+GO_CWD = {"go-gateway": "backend/gateway"}
+
+
+def package_dir(stack: str, repo: Path = REPO) -> Path:
+    return repo / "packages" / stack.split(":", 1)[1]
+
+
 def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
     head, rest = split_selector(selector)
     env = dict(os.environ)
-    if stack in ("go-integration", "go"):
+    if stack in ("go-integration", "go", "go-gateway"):
         if not rest:
             raise ManifestError("go 選擇器必須是「<套件> <regex>」")
         argv = ["go", "test", "-count=1", "-vet=off", "-timeout", f"{FRAMEWORK_TIMEOUT_SECONDS}s"]
@@ -135,7 +148,23 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
             argv += ["-tags", "integration"]
         argv += [f"./{head.strip('/')}/", "-run", rest]
         env["GOWORK"] = "off"
-        return Command(argv, repo / "backend", env, stack)
+        return Command(argv, repo / GO_CWD.get(stack, "backend"), env, stack)
+    if stack == "admin":
+        argv = ["node", "--import", "tsx", "--import", "./tests/setup/env.mjs", "--test"]
+        if rest:
+            argv += ["--test-name-pattern", re.sub(r"[.*+?^${}()|\[\]\\]", r"\\\g<0>", rest)]
+        argv.append(head)
+        return Command(argv, repo / "admin", env, stack)
+    if stack.startswith(TS_PACKAGE_PREFIX):
+        argv = ["pnpm", "exec", "vitest", "run", head]
+        if rest:
+            argv += ["-t", rest]
+        return Command(argv, package_dir(stack, repo), env, stack)
+    if stack.startswith(DART_PACKAGE_PREFIX):
+        argv = ["dart", "test", head]
+        if rest:
+            argv += ["--plain-name", rest]
+        return Command(argv, package_dir(stack, repo), env, stack)
     if stack == "website":
         argv = ["pnpm", "exec", "vitest", "run", "--project", "unit", head]
         if rest:
@@ -151,14 +180,19 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
 def build_check_command(stack: str, selector: str, file: str, repo: Path = REPO) -> Command | None:
     """變更後先確認還編譯得過；website 沒有便宜的逐 mutant 編譯，改看測試輸出（ran_no_tests）。"""
     env = dict(os.environ)
-    if stack in ("go-integration", "go"):
+    if stack in ("go-integration", "go", "go-gateway"):
         head, _ = split_selector(selector)
         argv = ["go", "test", "-c", "-o", os.devnull]
         if stack == "go-integration":
             argv += ["-tags", "integration"]
         argv.append(f"./{head.strip('/')}/")
         env["GOWORK"] = "off"
-        return Command(argv, repo / "backend", env, stack)
+        return Command(argv, repo / GO_CWD.get(stack, "backend"), env, stack)
+    if stack.startswith(DART_PACKAGE_PREFIX):
+        pkg = package_dir(stack, repo)
+        if not inside(pkg, repo / file):
+            return None
+        return Command(["dart", "analyze", "--no-fatal-warnings", str(repo / file)], pkg, env, stack)
     if stack.startswith(FLUTTER_PREFIX):
         app = stack[len(FLUTTER_PREFIX):]
         if not inside(repo / app, repo / file):
@@ -169,10 +203,14 @@ def build_check_command(stack: str, selector: str, file: str, repo: Path = REPO)
 
 def test_file(stack: str, selector: str, repo: Path = REPO) -> Path:
     head, _ = split_selector(selector)
-    if stack in ("go-integration", "go"):
-        return repo / "backend" / head
+    if stack in ("go-integration", "go", "go-gateway"):
+        return repo / GO_CWD.get(stack, "backend") / head
     if stack == "website":
         return repo / "website" / head
+    if stack == "admin":
+        return repo / "admin" / head
+    if stack.startswith((TS_PACKAGE_PREFIX, DART_PACKAGE_PREFIX)):
+        return package_dir(stack, repo) / head
     return repo / stack[len(FLUTTER_PREFIX):] / head
 
 

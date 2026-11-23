@@ -97,6 +97,28 @@ type fakeBegin struct {
 	who  media.Uploader
 	size int64
 	err  error
+
+	in    media.BeginInput
+	token string
+	state media.UploadStatus
+}
+
+func (f *fakeBegin) BeginUpload(_ context.Context, u media.Uploader, in media.BeginInput) (media.BeginResult, error) {
+	f.who, f.in = u, in
+	if f.err != nil {
+		return media.BeginResult{}, f.err
+	}
+	return media.BeginResult{Token: "pub", URL: "https://store.example/put", Headers: map[string]string{"Content-MD5": in.MD5}, ExpiresAt: time.Date(2026, 11, 24, 0, 0, 0, 0, time.UTC)}, nil
+}
+
+func (f *fakeBegin) CompleteUpload(_ context.Context, u media.Uploader, token string) error {
+	f.who, f.token = u, token
+	return f.err
+}
+
+func (f *fakeBegin) GetUpload(_ context.Context, u media.Uploader, token string) (media.UploadStatus, error) {
+	f.who, f.token = u, token
+	return f.state, f.err
 }
 
 func (f *fakeBegin) BeginSecureUpload(_ context.Context, u media.Uploader, size int64) (media.SecureBeginResult, error) {
@@ -221,5 +243,95 @@ func TestDelegatedBeginSecureUploadWithoutModuleIsUnavailable(t *testing.T) {
 	_, err = mediav1alpha1connect.NewMediaDelegatedServiceClient(srv.Client(), srv.URL).BeginSecureUpload(context.Background(), req)
 	if connect.CodeOf(err) != connect.CodeUnavailable {
 		t.Fatalf("err = %v，預期 unavailable", err)
+	}
+}
+
+func withCred[T any](m *T, c *connect.Request[T]) *connect.Request[T] {
+	c.Header().Set(httpdelegation.OperationSessionHeader, "cred")
+	return c
+}
+
+func TestDelegatedPublicUploadUploaderIsTheAdminOnTheStore(t *testing.T) {
+	e := newDelegatedEnv(t, moddelegation.CapabilityMediaUpload)
+	want := media.Uploader{ID: delegatedAdminID, Admin: true, Store: delegatedStoreID}
+	ctx := context.Background()
+
+	bres, err := e.client.BeginUpload(ctx, withCred(nil, connect.NewRequest(&pb.MediaDelegatedServiceBeginUploadRequest{Size: 10, ContentType: "image/png", Md5: "AAAAAAAAAAAAAAAAAAAAAA=="})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.begin.who != want || e.begin.in.Size != 10 || e.begin.in.ContentType != "image/png" || e.begin.in.MD5 != "AAAAAAAAAAAAAAAAAAAAAA==" {
+		t.Fatalf("BeginUpload：uploader=%+v in=%+v", e.begin.who, e.begin.in)
+	}
+	if bres.Msg.GetStagedToken() != "pub" || bres.Msg.GetUploadUrl() != "https://store.example/put" || bres.Msg.GetUploadHeaders()["Content-MD5"] == "" || bres.Msg.GetExpireTime() == nil {
+		t.Fatalf("回應 = %v", bres.Msg)
+	}
+
+	e.begin.who = media.Uploader{}
+	if _, err := e.client.CompleteUpload(ctx, withCred(nil, connect.NewRequest(&pb.MediaDelegatedServiceCompleteUploadRequest{StagedToken: "t1"}))); err != nil {
+		t.Fatal(err)
+	}
+	if e.begin.who != want || e.begin.token != "t1" {
+		t.Fatalf("CompleteUpload：uploader=%+v token=%q", e.begin.who, e.begin.token)
+	}
+
+	e.begin.who = media.Uploader{}
+	e.begin.state = media.UploadStatus{State: "REJECTED", RejectReason: "SIZE_MISMATCH", ExpiresAt: time.Date(2026, 11, 24, 0, 0, 0, 0, time.UTC)}
+	gres, err := e.client.GetUpload(ctx, withCred(nil, connect.NewRequest(&pb.MediaDelegatedServiceGetUploadRequest{StagedToken: "t2"})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.begin.who != want || e.begin.token != "t2" {
+		t.Fatalf("GetUpload：uploader=%+v token=%q", e.begin.who, e.begin.token)
+	}
+	if gres.Msg.GetState() != pb.UploadState_UPLOAD_STATE_REJECTED || gres.Msg.RejectReason == nil || gres.Msg.GetRejectReason() != pb.RejectReason_REJECT_REASON_SIZE_MISMATCH || gres.Msg.GetExpireTime() == nil {
+		t.Fatalf("回應 = %v", gres.Msg)
+	}
+	if len(e.sessions.denied) != 0 {
+		t.Fatalf("放行的請求不該被拒絕：%+v", e.sessions.denied)
+	}
+}
+
+func TestDelegatedPublicUploadWithoutTheCapabilityIsDenied(t *testing.T) {
+	e := newDelegatedEnv(t, moddelegation.CapabilityPostsWrite)
+	ctx := context.Background()
+	calls := map[string]func() error{
+		"BeginUpload": func() error {
+			_, err := e.client.BeginUpload(ctx, withCred(nil, connect.NewRequest(&pb.MediaDelegatedServiceBeginUploadRequest{Size: 1})))
+			return err
+		},
+		"CompleteUpload": func() error {
+			_, err := e.client.CompleteUpload(ctx, withCred(nil, connect.NewRequest(&pb.MediaDelegatedServiceCompleteUploadRequest{StagedToken: "t"})))
+			return err
+		},
+		"GetUpload": func() error {
+			_, err := e.client.GetUpload(ctx, withCred(nil, connect.NewRequest(&pb.MediaDelegatedServiceGetUploadRequest{StagedToken: "t"})))
+			return err
+		},
+	}
+	for name, call := range calls {
+		if connect.CodeOf(call()) != connect.CodePermissionDenied {
+			t.Errorf("%s 缺能力要 permission_denied", name)
+		}
+	}
+	if e.runner.reads != 0 || e.begin.token != "" || e.begin.in.Size != 0 {
+		t.Fatalf("被拒絕的請求不該進模組：%+v", e.begin)
+	}
+}
+
+func TestDelegatedPublicUploadWithoutCredentialIsUnauthenticated(t *testing.T) {
+	e := newDelegatedEnv(t, moddelegation.CapabilityMediaUpload)
+	_, err := e.client.GetUpload(context.Background(), connect.NewRequest(&pb.MediaDelegatedServiceGetUploadRequest{StagedToken: "t"}))
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestDelegatedPublicUploadModuleErrorsPassThrough(t *testing.T) {
+	e := newDelegatedEnv(t, moddelegation.CapabilityMediaUpload)
+	e.begin.err = apperr.NotFound("暫存不存在")
+	_, err := e.client.CompleteUpload(context.Background(), withCred(nil, connect.NewRequest(&pb.MediaDelegatedServiceCompleteUploadRequest{StagedToken: "x"})))
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		t.Fatalf("err = %v", err)
 	}
 }

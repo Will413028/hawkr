@@ -220,8 +220,20 @@ db-init: db-init-local
 # （Makefile 的賦值優先），別的專案 export 的 DATABASE_URL 不會被帶進來。
 INFRA_COMPOSE := docker compose -f docker-compose-infra.yml
 DATABASE_URL = postgres://dbadmin:Hawkr2024Admin@localhost:5432/hawkr?sslmode=disable
-# 遷移計畫 B1 之前，media 還是 Java 的 media-service（./dev.sh 的 compose 起在 9937）
-MEDIA_SERVICE_ADDR = localhost:9937
+# media 的物件儲存（MEDIA_STORAGE 是 r2 或 s3compat，各自的設定見 internal/modules/media/internal/storage/config.go）：
+# 本機預設指向 docker-compose-infra.yml 的 Garage（B1-D24），key 與 bucket 由 make infra-up 之後的 scripts/garage-init.sh 建立；
+# 要連別的儲存就在環境變數或命令列覆寫。
+MEDIA_STORAGE ?= s3compat
+MEDIA_S3_ENDPOINT ?= http://localhost:3900
+MEDIA_S3_REGION ?= garage
+MEDIA_S3_BUCKET ?= media-local
+# 本機 Garage 的 key 與 KEK 由 scripts/garage-init.sh 產生在 .dev/（gitignored、chmod 600），環境變數有設就以環境變數為準。
+MEDIA_GARAGE_ENV_FILE ?= $(CURDIR)/.dev/garage.env
+MEDIA_KEKS_FILE ?= $(CURDIR)/.dev/media-keks
+MEDIA_S3_ACCESS_KEY_ID ?= $(shell sed -n 's/^MEDIA_S3_ACCESS_KEY_ID=//p' '$(MEDIA_GARAGE_ENV_FILE)' 2>/dev/null)
+MEDIA_S3_SECRET_ACCESS_KEY ?= $(shell sed -n 's/^MEDIA_S3_SECRET_ACCESS_KEY=//p' '$(MEDIA_GARAGE_ENV_FILE)' 2>/dev/null)
+# 機敏資產的 KEK 金鑰環（只給本機開發用，格式 id:base64 的 32 位元組；正式環境放部署設定，不進版控）。
+MEDIA_KEKS ?= $(shell cat '$(MEDIA_KEKS_FILE)' 2>/dev/null)
 # 對外圖片的網域：本機的 image gateway（workers/image-gateway 的 wrangler dev，預設聽 8787）
 MEDIA_ORIGIN = http://localhost:8787
 # 網站的網域：API 回給 client 的網站網址（入駐文件）由它組成絕對網址；本機是 website 的 dev server
@@ -245,7 +257,9 @@ KYC_HASH_KEYS ?= dev1:ZGV2LW9ubHkta3ljLWhhc2gtaG1hYy1rZXktMDAwMDE=
 PAYMENT_PROVIDER ?= fake
 # 本機開發的 dev token 的金鑰（make dev-key 產生，不進版控）。與 Access 正式設定互斥。
 DEV_AUTH_KEY_FILE ?= $(CURDIR)/.dev/dev-auth.pem
-MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_SERVICE_ADDR='$(MEDIA_SERVICE_ADDR)' MEDIA_ORIGIN='$(MEDIA_ORIGIN)' PUBLIC_WEB_ORIGIN='$(PUBLIC_WEB_ORIGIN)' \
+MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_STORAGE='$(MEDIA_STORAGE)' MEDIA_S3_ENDPOINT='$(MEDIA_S3_ENDPOINT)' MEDIA_S3_REGION='$(MEDIA_S3_REGION)' \
+	MEDIA_S3_BUCKET='$(MEDIA_S3_BUCKET)' MEDIA_S3_ACCESS_KEY_ID='$(MEDIA_S3_ACCESS_KEY_ID)' MEDIA_S3_SECRET_ACCESS_KEY='$(MEDIA_S3_SECRET_ACCESS_KEY)' \
+	MEDIA_KEKS='$(MEDIA_KEKS)' MEDIA_ORIGIN='$(MEDIA_ORIGIN)' PUBLIC_WEB_ORIGIN='$(PUBLIC_WEB_ORIGIN)' \
 	GATEWAY_URL='$(GATEWAY_URL)' \
 	CORS_ALLOWED_ORIGINS='$(CORS_ALLOWED_ORIGINS)' \
 	DEV_AUTH_KEY_FILE='$(DEV_AUTH_KEY_FILE)' LEGACY_GRPC_ADDR='$(LEGACY_GRPC_ADDR)' \
@@ -258,6 +272,7 @@ MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_SERVICE_ADDR='$(M
 # 起 Postgres、Redis、RabbitMQ、OTel collector，等到 healthcheck 通過
 infra-up:
 	$(INFRA_COMPOSE) up -d --wait
+	MEDIA_S3_BUCKET='$(MEDIA_S3_BUCKET)' MEDIA_GARAGE_ENV_FILE='$(MEDIA_GARAGE_ENV_FILE)' MEDIA_KEKS_FILE='$(MEDIA_KEKS_FILE)' bash scripts/garage-init.sh
 
 infra-down:
 	$(INFRA_COMPOSE) down

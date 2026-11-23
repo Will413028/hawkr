@@ -613,16 +613,12 @@ class ChatThreadScreen extends HookConsumerWidget {
               mimeType: mime,
             );
         final stagedToken = upload['data']?['stagedToken']?.toString();
-        final previewUrl =
-            upload['data']?['previewUrl']?.toString() ??
-            upload['data']?['url']?.toString() ??
-            upload['url']?.toString();
         if (stagedToken == null || stagedToken.isEmpty) {
-          throw Exception('上傳失敗，未取得 stagedToken');
+          throw Exception(upload['message'] ?? '上傳失敗，未取得 stagedToken');
         }
 
         HKLog.logD(
-          '[ChatThread] 🖼️ 送出圖片: stagedToken=${stagedToken.substring(0, math.min(50, stagedToken.length))}..., previewUrl=$previewUrl',
+          '[ChatThread] 🖼️ 送出圖片: stagedToken=${stagedToken.substring(0, math.min(50, stagedToken.length))}...',
         );
         // notifier.send 以 stagedToken 為 optimistic + wire 內容；圖片的顯示 URL
         // 須由後端產生，故送出後 refetchAndReplace 重抓，把 staged token bubble

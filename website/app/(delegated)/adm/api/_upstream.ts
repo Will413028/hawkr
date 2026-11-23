@@ -1,3 +1,4 @@
+import type { DescService } from "@bufbuild/protobuf";
 import {
 	type Client,
 	Code,
@@ -245,41 +246,47 @@ export function targetStoreIdOf(data: unknown): string | null {
  * 失敗依 Connect code 對回瀏覽器已認得的業務碼（見 `connectFailure`）。逾時與連不上丟
  * `DelegatedUpstreamUnavailableError`，與 REST 同樣讓前端走「結果不明」。
  */
-export async function callDelegatedConnect(request: {
+export async function callDelegatedConnect<
+	S extends DescService = typeof SocialDelegatedService,
+>(request: {
+	/** 要呼叫的代行 service；預設是 `SocialDelegatedService`。 */
+	service?: S;
 	/** 用 client 發出一個 unary 呼叫並把回應整形成瀏覽器看到的 `data`；`headers` 與 `timeoutMs` 由這裡填。 */
 	call: (
-		client: Client<typeof SocialDelegatedService>,
+		client: Client<S>,
 		options: { headers: Headers; timeoutMs: number },
 	) => Promise<unknown>;
 	timeout: DelegatedUpstreamTimeout;
 	credential: string;
 	/**
-	 * 工作區路由的 `:storeId`。Connect 請求沒有 store_id（目標是 session 綁定的店），所以在送出之前先讀 session 的綁定店比對：
+	 * 工作區路由的 `:storeId`；不傳（上傳這類店家由 session 決定、不帶店的呼叫）就不做綁定店比對。Connect 請求沒有 store_id（目標是 session 綁定的店），所以在送出之前先讀 session 的綁定店比對：
 	 * 不符回 403／9262 且不打 Connect（一個停在別家店頁面的分頁不能寫到現在綁定的這一家）；讀不到綁定店（session 已結束、
 	 * 回應不認得）一律不送，原樣回 session 讀取的失敗。
 	 */
-	storeId: string;
+	storeId?: string;
 	visitorIp?: string | null;
 }): Promise<DelegatedUpstreamResult> {
-	const current = await callDelegatedUpstream({
-		method: "GET",
-		path: "/admin/delegated-operations/current",
-		timeout: "session",
-		credential: request.credential,
-		visitorIp: request.visitorIp,
-	});
-	if (!current.ok) return current;
-	if (targetStoreIdOf(current.data) !== request.storeId) {
-		return {
-			ok: false,
-			status: 403,
-			code: 9262,
-			data: null,
-			traceId: current.traceId,
-		};
+	if (request.storeId !== undefined) {
+		const current = await callDelegatedUpstream({
+			method: "GET",
+			path: "/admin/delegated-operations/current",
+			timeout: "session",
+			credential: request.credential,
+			visitorIp: request.visitorIp,
+		});
+		if (!current.ok) return current;
+		if (targetStoreIdOf(current.data) !== request.storeId) {
+			return {
+				ok: false,
+				status: 403,
+				code: 9262,
+				data: null,
+				traceId: current.traceId,
+			};
+		}
 	}
 	const client = createClient(
-		SocialDelegatedService,
+		(request.service ?? SocialDelegatedService) as S,
 		publicTransport({
 			// 代行工作區只有 zh-TW（app/(delegated)）。
 			locale: "zh-TW",

@@ -728,6 +728,332 @@ func (x *MediaDelegatedServiceBeginSecureUploadResponse) GetExpireTime() *timest
 	return nil
 }
 
+// MediaDelegatedServiceBeginUploadRequest 與 BeginUploadRequest 的欄位與意義相同；沒有 store_id：店家由代行 session 決定。
+type MediaDelegatedServiceBeginUploadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 檔案的位元組數；必須大於零且不超過伺服器的上限。
+	Size int64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+	// 檔案的 MIME 型別，只能是 image/jpeg、image/png、image/webp、image/gif。
+	ContentType string `protobuf:"bytes,2,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	// 檔案內容 MD5 的標準 base64（16 位元組）。
+	Md5           string `protobuf:"bytes,3,opt,name=md5,proto3" json:"md5,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MediaDelegatedServiceBeginUploadRequest) Reset() {
+	*x = MediaDelegatedServiceBeginUploadRequest{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MediaDelegatedServiceBeginUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MediaDelegatedServiceBeginUploadRequest) ProtoMessage() {}
+
+func (x *MediaDelegatedServiceBeginUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MediaDelegatedServiceBeginUploadRequest.ProtoReflect.Descriptor instead.
+func (*MediaDelegatedServiceBeginUploadRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *MediaDelegatedServiceBeginUploadRequest) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+func (x *MediaDelegatedServiceBeginUploadRequest) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *MediaDelegatedServiceBeginUploadRequest) GetMd5() string {
+	if x != nil {
+		return x.Md5
+	}
+	return ""
+}
+
+// MediaDelegatedServiceBeginUploadResponse 與 BeginUploadResponse 的欄位與意義相同。
+type MediaDelegatedServiceBeginUploadResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 不透明的憑證，交給 CompleteUpload、GetUpload 與擁有者的 API；只出現這一次。
+	StagedToken string `protobuf:"bytes,1,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"`
+	// 預簽的 PUT 網址。
+	UploadUrl string `protobuf:"bytes,2,opt,name=upload_url,json=uploadUrl,proto3" json:"upload_url,omitempty"`
+	// PUT 時必須原樣帶上的請求標頭；不含 Content-Length。
+	UploadHeaders map[string]string `protobuf:"bytes,3,rep,name=upload_headers,json=uploadHeaders,proto3" json:"upload_headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// 暫存的到期時間。
+	ExpireTime    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MediaDelegatedServiceBeginUploadResponse) Reset() {
+	*x = MediaDelegatedServiceBeginUploadResponse{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MediaDelegatedServiceBeginUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MediaDelegatedServiceBeginUploadResponse) ProtoMessage() {}
+
+func (x *MediaDelegatedServiceBeginUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MediaDelegatedServiceBeginUploadResponse.ProtoReflect.Descriptor instead.
+func (*MediaDelegatedServiceBeginUploadResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MediaDelegatedServiceBeginUploadResponse) GetStagedToken() string {
+	if x != nil {
+		return x.StagedToken
+	}
+	return ""
+}
+
+func (x *MediaDelegatedServiceBeginUploadResponse) GetUploadUrl() string {
+	if x != nil {
+		return x.UploadUrl
+	}
+	return ""
+}
+
+func (x *MediaDelegatedServiceBeginUploadResponse) GetUploadHeaders() map[string]string {
+	if x != nil {
+		return x.UploadHeaders
+	}
+	return nil
+}
+
+func (x *MediaDelegatedServiceBeginUploadResponse) GetExpireTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpireTime
+	}
+	return nil
+}
+
+type MediaDelegatedServiceCompleteUploadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// BeginUpload 回傳的 staged token。
+	StagedToken   string `protobuf:"bytes,1,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MediaDelegatedServiceCompleteUploadRequest) Reset() {
+	*x = MediaDelegatedServiceCompleteUploadRequest{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MediaDelegatedServiceCompleteUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MediaDelegatedServiceCompleteUploadRequest) ProtoMessage() {}
+
+func (x *MediaDelegatedServiceCompleteUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MediaDelegatedServiceCompleteUploadRequest.ProtoReflect.Descriptor instead.
+func (*MediaDelegatedServiceCompleteUploadRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *MediaDelegatedServiceCompleteUploadRequest) GetStagedToken() string {
+	if x != nil {
+		return x.StagedToken
+	}
+	return ""
+}
+
+type MediaDelegatedServiceCompleteUploadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MediaDelegatedServiceCompleteUploadResponse) Reset() {
+	*x = MediaDelegatedServiceCompleteUploadResponse{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MediaDelegatedServiceCompleteUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MediaDelegatedServiceCompleteUploadResponse) ProtoMessage() {}
+
+func (x *MediaDelegatedServiceCompleteUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MediaDelegatedServiceCompleteUploadResponse.ProtoReflect.Descriptor instead.
+func (*MediaDelegatedServiceCompleteUploadResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{13}
+}
+
+type MediaDelegatedServiceGetUploadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// BeginUpload 回傳的 staged token。
+	StagedToken   string `protobuf:"bytes,1,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MediaDelegatedServiceGetUploadRequest) Reset() {
+	*x = MediaDelegatedServiceGetUploadRequest{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MediaDelegatedServiceGetUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MediaDelegatedServiceGetUploadRequest) ProtoMessage() {}
+
+func (x *MediaDelegatedServiceGetUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MediaDelegatedServiceGetUploadRequest.ProtoReflect.Descriptor instead.
+func (*MediaDelegatedServiceGetUploadRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *MediaDelegatedServiceGetUploadRequest) GetStagedToken() string {
+	if x != nil {
+		return x.StagedToken
+	}
+	return ""
+}
+
+// MediaDelegatedServiceGetUploadResponse 與 GetUploadResponse 的欄位與意義相同。
+type MediaDelegatedServiceGetUploadResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	State UploadState            `protobuf:"varint,1,opt,name=state,proto3,enum=hawkr.media.v1alpha1.UploadState" json:"state,omitempty"`
+	// 只在 state 是 REJECTED 時設值。
+	RejectReason *RejectReason `protobuf:"varint,2,opt,name=reject_reason,json=rejectReason,proto3,enum=hawkr.media.v1alpha1.RejectReason,oneof" json:"reject_reason,omitempty"`
+	// 暫存的到期時間。
+	ExpireTime    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MediaDelegatedServiceGetUploadResponse) Reset() {
+	*x = MediaDelegatedServiceGetUploadResponse{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MediaDelegatedServiceGetUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MediaDelegatedServiceGetUploadResponse) ProtoMessage() {}
+
+func (x *MediaDelegatedServiceGetUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MediaDelegatedServiceGetUploadResponse.ProtoReflect.Descriptor instead.
+func (*MediaDelegatedServiceGetUploadResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *MediaDelegatedServiceGetUploadResponse) GetState() UploadState {
+	if x != nil {
+		return x.State
+	}
+	return UploadState_UPLOAD_STATE_UNSPECIFIED
+}
+
+func (x *MediaDelegatedServiceGetUploadResponse) GetRejectReason() RejectReason {
+	if x != nil && x.RejectReason != nil {
+		return *x.RejectReason
+	}
+	return RejectReason_REJECT_REASON_UNSPECIFIED
+}
+
+func (x *MediaDelegatedServiceGetUploadResponse) GetExpireTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpireTime
+	}
+	return nil
+}
+
 var File_hawkr_media_v1alpha1_media_proto protoreflect.FileDescriptor
 
 const file_hawkr_media_v1alpha1_media_proto_rawDesc = "" +
@@ -777,7 +1103,32 @@ const file_hawkr_media_v1alpha1_media_proto_rawDesc = "" +
 	"\vchunk_count\x18\x03 \x01(\x05B\x03\xe0A\x03R\n" +
 	"chunkCount\x12@\n" +
 	"\vexpire_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"expireTime*\xe4\x01\n" +
+	"expireTime\"\x81\x01\n" +
+	"'MediaDelegatedServiceBeginUploadRequest\x12\x17\n" +
+	"\x04size\x18\x01 \x01(\x03B\x03\xe0A\x02R\x04size\x12&\n" +
+	"\fcontent_type\x18\x02 \x01(\tB\x03\xe0A\x02R\vcontentType\x12\x15\n" +
+	"\x03md5\x18\x03 \x01(\tB\x03\xe0A\x02R\x03md5\"\xf9\x02\n" +
+	"(MediaDelegatedServiceBeginUploadResponse\x12&\n" +
+	"\fstaged_token\x18\x01 \x01(\tB\x03\xe0A\x03R\vstagedToken\x12\"\n" +
+	"\n" +
+	"upload_url\x18\x02 \x01(\tB\x03\xe0A\x03R\tuploadUrl\x12}\n" +
+	"\x0eupload_headers\x18\x03 \x03(\v2Q.hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse.UploadHeadersEntryB\x03\xe0A\x03R\ruploadHeaders\x12@\n" +
+	"\vexpire_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"expireTime\x1a@\n" +
+	"\x12UploadHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"T\n" +
+	"*MediaDelegatedServiceCompleteUploadRequest\x12&\n" +
+	"\fstaged_token\x18\x01 \x01(\tB\x03\xe0A\x02R\vstagedToken\"-\n" +
+	"+MediaDelegatedServiceCompleteUploadResponse\"O\n" +
+	"%MediaDelegatedServiceGetUploadRequest\x12&\n" +
+	"\fstaged_token\x18\x01 \x01(\tB\x03\xe0A\x02R\vstagedToken\"\x8d\x02\n" +
+	"&MediaDelegatedServiceGetUploadResponse\x12<\n" +
+	"\x05state\x18\x01 \x01(\x0e2!.hawkr.media.v1alpha1.UploadStateB\x03\xe0A\x03R\x05state\x12Q\n" +
+	"\rreject_reason\x18\x02 \x01(\x0e2\".hawkr.media.v1alpha1.RejectReasonB\x03\xe0A\x03H\x00R\frejectReason\x88\x01\x01\x12@\n" +
+	"\vexpire_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"expireTimeB\x10\n" +
+	"\x0e_reject_reason*\xe4\x01\n" +
 	"\vUploadState\x12\x1c\n" +
 	"\x18UPLOAD_STATE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14UPLOAD_STATE_PENDING\x10\x01\x12\x19\n" +
@@ -798,8 +1149,11 @@ const file_hawkr_media_v1alpha1_media_proto_rawDesc = "" +
 	"\vBeginUpload\x12(.hawkr.media.v1alpha1.BeginUploadRequest\x1a).hawkr.media.v1alpha1.BeginUploadResponse\x12p\n" +
 	"\x0eCompleteUpload\x12+.hawkr.media.v1alpha1.CompleteUploadRequest\x1a,.hawkr.media.v1alpha1.CompleteUploadResponse\"\x03\x90\x02\x02\x12\\\n" +
 	"\tGetUpload\x12&.hawkr.media.v1alpha1.GetUploadRequest\x1a'.hawkr.media.v1alpha1.GetUploadResponse\x12t\n" +
-	"\x11BeginSecureUpload\x12..hawkr.media.v1alpha1.BeginSecureUploadRequest\x1a/.hawkr.media.v1alpha1.BeginSecureUploadResponse2\xb8\x01\n" +
-	"\x15MediaDelegatedService\x12\x9e\x01\n" +
+	"\x11BeginSecureUpload\x12..hawkr.media.v1alpha1.BeginSecureUploadRequest\x1a/.hawkr.media.v1alpha1.BeginSecureUploadResponse2\xed\x04\n" +
+	"\x15MediaDelegatedService\x12\x8c\x01\n" +
+	"\vBeginUpload\x12=.hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadRequest\x1a>.hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse\x12\x9a\x01\n" +
+	"\x0eCompleteUpload\x12@.hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadRequest\x1aA.hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadResponse\"\x03\x90\x02\x02\x12\x86\x01\n" +
+	"\tGetUpload\x12;.hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadRequest\x1a<.hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse\x12\x9e\x01\n" +
 	"\x11BeginSecureUpload\x12C.hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest\x1aD.hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponseB\xf5\x01\n" +
 	"\x18com.hawkr.media.v1alpha1B\n" +
 	"MediaProtoP\x01Z[github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1;mediav1alpha1\xa2\x02\x03HMX\xaa\x02\x14Hawkr.Media.V1alpha1\xca\x02\x14Hawkr\\Media\\V1alpha1\xe2\x02 Hawkr\\Media\\V1alpha1\\GPBMetadata\xea\x02\x16Hawkr::Media::V1alpha1b\x06proto3"
@@ -817,7 +1171,7 @@ func file_hawkr_media_v1alpha1_media_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_media_v1alpha1_media_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_hawkr_media_v1alpha1_media_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_hawkr_media_v1alpha1_media_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_hawkr_media_v1alpha1_media_proto_goTypes = []any{
 	(UploadState)(0),                                       // 0: hawkr.media.v1alpha1.UploadState
 	(RejectReason)(0),                                      // 1: hawkr.media.v1alpha1.RejectReason
@@ -831,32 +1185,50 @@ var file_hawkr_media_v1alpha1_media_proto_goTypes = []any{
 	(*BeginSecureUploadResponse)(nil),                      // 9: hawkr.media.v1alpha1.BeginSecureUploadResponse
 	(*MediaDelegatedServiceBeginSecureUploadRequest)(nil),  // 10: hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest
 	(*MediaDelegatedServiceBeginSecureUploadResponse)(nil), // 11: hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse
-	nil,                           // 12: hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
-	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
+	(*MediaDelegatedServiceBeginUploadRequest)(nil),        // 12: hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadRequest
+	(*MediaDelegatedServiceBeginUploadResponse)(nil),       // 13: hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse
+	(*MediaDelegatedServiceCompleteUploadRequest)(nil),     // 14: hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadRequest
+	(*MediaDelegatedServiceCompleteUploadResponse)(nil),    // 15: hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadResponse
+	(*MediaDelegatedServiceGetUploadRequest)(nil),          // 16: hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadRequest
+	(*MediaDelegatedServiceGetUploadResponse)(nil),         // 17: hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse
+	nil,                           // 18: hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
+	nil,                           // 19: hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse.UploadHeadersEntry
+	(*timestamppb.Timestamp)(nil), // 20: google.protobuf.Timestamp
 }
 var file_hawkr_media_v1alpha1_media_proto_depIdxs = []int32{
-	12, // 0: hawkr.media.v1alpha1.BeginUploadResponse.upload_headers:type_name -> hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
-	13, // 1: hawkr.media.v1alpha1.BeginUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	18, // 0: hawkr.media.v1alpha1.BeginUploadResponse.upload_headers:type_name -> hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
+	20, // 1: hawkr.media.v1alpha1.BeginUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
 	0,  // 2: hawkr.media.v1alpha1.GetUploadResponse.state:type_name -> hawkr.media.v1alpha1.UploadState
 	1,  // 3: hawkr.media.v1alpha1.GetUploadResponse.reject_reason:type_name -> hawkr.media.v1alpha1.RejectReason
-	13, // 4: hawkr.media.v1alpha1.GetUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
-	13, // 5: hawkr.media.v1alpha1.BeginSecureUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
-	13, // 6: hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
-	2,  // 7: hawkr.media.v1alpha1.MediaAppService.BeginUpload:input_type -> hawkr.media.v1alpha1.BeginUploadRequest
-	4,  // 8: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:input_type -> hawkr.media.v1alpha1.CompleteUploadRequest
-	6,  // 9: hawkr.media.v1alpha1.MediaAppService.GetUpload:input_type -> hawkr.media.v1alpha1.GetUploadRequest
-	8,  // 10: hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload:input_type -> hawkr.media.v1alpha1.BeginSecureUploadRequest
-	10, // 11: hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload:input_type -> hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest
-	3,  // 12: hawkr.media.v1alpha1.MediaAppService.BeginUpload:output_type -> hawkr.media.v1alpha1.BeginUploadResponse
-	5,  // 13: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:output_type -> hawkr.media.v1alpha1.CompleteUploadResponse
-	7,  // 14: hawkr.media.v1alpha1.MediaAppService.GetUpload:output_type -> hawkr.media.v1alpha1.GetUploadResponse
-	9,  // 15: hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload:output_type -> hawkr.media.v1alpha1.BeginSecureUploadResponse
-	11, // 16: hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload:output_type -> hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	20, // 4: hawkr.media.v1alpha1.GetUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	20, // 5: hawkr.media.v1alpha1.BeginSecureUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	20, // 6: hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	19, // 7: hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse.upload_headers:type_name -> hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse.UploadHeadersEntry
+	20, // 8: hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	0,  // 9: hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse.state:type_name -> hawkr.media.v1alpha1.UploadState
+	1,  // 10: hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse.reject_reason:type_name -> hawkr.media.v1alpha1.RejectReason
+	20, // 11: hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	2,  // 12: hawkr.media.v1alpha1.MediaAppService.BeginUpload:input_type -> hawkr.media.v1alpha1.BeginUploadRequest
+	4,  // 13: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:input_type -> hawkr.media.v1alpha1.CompleteUploadRequest
+	6,  // 14: hawkr.media.v1alpha1.MediaAppService.GetUpload:input_type -> hawkr.media.v1alpha1.GetUploadRequest
+	8,  // 15: hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload:input_type -> hawkr.media.v1alpha1.BeginSecureUploadRequest
+	12, // 16: hawkr.media.v1alpha1.MediaDelegatedService.BeginUpload:input_type -> hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadRequest
+	14, // 17: hawkr.media.v1alpha1.MediaDelegatedService.CompleteUpload:input_type -> hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadRequest
+	16, // 18: hawkr.media.v1alpha1.MediaDelegatedService.GetUpload:input_type -> hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadRequest
+	10, // 19: hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload:input_type -> hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest
+	3,  // 20: hawkr.media.v1alpha1.MediaAppService.BeginUpload:output_type -> hawkr.media.v1alpha1.BeginUploadResponse
+	5,  // 21: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:output_type -> hawkr.media.v1alpha1.CompleteUploadResponse
+	7,  // 22: hawkr.media.v1alpha1.MediaAppService.GetUpload:output_type -> hawkr.media.v1alpha1.GetUploadResponse
+	9,  // 23: hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload:output_type -> hawkr.media.v1alpha1.BeginSecureUploadResponse
+	13, // 24: hawkr.media.v1alpha1.MediaDelegatedService.BeginUpload:output_type -> hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse
+	15, // 25: hawkr.media.v1alpha1.MediaDelegatedService.CompleteUpload:output_type -> hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadResponse
+	17, // 26: hawkr.media.v1alpha1.MediaDelegatedService.GetUpload:output_type -> hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse
+	11, // 27: hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload:output_type -> hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse
+	20, // [20:28] is the sub-list for method output_type
+	12, // [12:20] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_media_v1alpha1_media_proto_init() }
@@ -865,13 +1237,14 @@ func file_hawkr_media_v1alpha1_media_proto_init() {
 		return
 	}
 	file_hawkr_media_v1alpha1_media_proto_msgTypes[5].OneofWrappers = []any{}
+	file_hawkr_media_v1alpha1_media_proto_msgTypes[15].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_media_v1alpha1_media_proto_rawDesc), len(file_hawkr_media_v1alpha1_media_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   11,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

@@ -67,12 +67,26 @@ abstract class MediaAppServiceBase extends $pb.GeneratedService {
 }
 
 abstract class MediaDelegatedServiceBase extends $pb.GeneratedService {
+  $async.Future<$1.MediaDelegatedServiceBeginUploadResponse> beginUpload(
+      $pb.ServerContext ctx,
+      $1.MediaDelegatedServiceBeginUploadRequest request);
+  $async.Future<$1.MediaDelegatedServiceCompleteUploadResponse> completeUpload(
+      $pb.ServerContext ctx,
+      $1.MediaDelegatedServiceCompleteUploadRequest request);
+  $async.Future<$1.MediaDelegatedServiceGetUploadResponse> getUpload(
+      $pb.ServerContext ctx, $1.MediaDelegatedServiceGetUploadRequest request);
   $async.Future<$1.MediaDelegatedServiceBeginSecureUploadResponse>
       beginSecureUpload($pb.ServerContext ctx,
           $1.MediaDelegatedServiceBeginSecureUploadRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
+      case 'BeginUpload':
+        return $1.MediaDelegatedServiceBeginUploadRequest();
+      case 'CompleteUpload':
+        return $1.MediaDelegatedServiceCompleteUploadRequest();
+      case 'GetUpload':
+        return $1.MediaDelegatedServiceGetUploadRequest();
       case 'BeginSecureUpload':
         return $1.MediaDelegatedServiceBeginSecureUploadRequest();
       default:
@@ -83,6 +97,15 @@ abstract class MediaDelegatedServiceBase extends $pb.GeneratedService {
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx,
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
+      case 'BeginUpload':
+        return beginUpload(
+            ctx, request as $1.MediaDelegatedServiceBeginUploadRequest);
+      case 'CompleteUpload':
+        return completeUpload(
+            ctx, request as $1.MediaDelegatedServiceCompleteUploadRequest);
+      case 'GetUpload':
+        return getUpload(
+            ctx, request as $1.MediaDelegatedServiceGetUploadRequest);
       case 'BeginSecureUpload':
         return beginSecureUpload(
             ctx, request as $1.MediaDelegatedServiceBeginSecureUploadRequest);

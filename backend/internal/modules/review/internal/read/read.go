@@ -206,7 +206,7 @@ func (s *Service) ReviewForReport(ctx context.Context, id uuid.UUID, viewerBuyer
 		AssetIDs: make([]string, len(r.Images)), CreatedAt: r.CreatedAt, Reply: r.Reply,
 	}
 	for i, im := range r.Images {
-		out.AssetIDs[i] = im.AssetID
+		out.AssetIDs[i] = im.AssetID.String()
 	}
 	return out, nil
 }

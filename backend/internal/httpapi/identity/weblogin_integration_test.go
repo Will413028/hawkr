@@ -47,7 +47,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -242,10 +241,6 @@ func setupWeb(t *testing.T) *webFixture {
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
 	))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -254,7 +249,7 @@ func setupWeb(t *testing.T) *webFixture {
 	bus := events.NewBus()
 	clock := &testClock{t: time.Now()}
 	m := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: clock.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: jc, Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Social: noSchedules{}, Now: time.Now, Logger: log})
 

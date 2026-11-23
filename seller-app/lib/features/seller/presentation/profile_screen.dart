@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/exceptions/app_exception.dart';
 import '../../../core/router/tab_refresh_provider.dart';
 import '../../../core/session/my_store.dart';
 import '../../../core/theme/hk_tokens.dart';
@@ -369,7 +370,7 @@ class ProfileScreen extends HookConsumerWidget {
             .read(mediaRepositoryProvider)
             .uploadAvatar(bytes: bytes);
         final token = result.stagedToken;
-        if (token == null || token.isEmpty) {
+        if (token.isEmpty) {
           if (context.mounted) FloatingToast.error(context, '上傳失敗，請稍後再試');
           return;
         }
@@ -380,7 +381,12 @@ class ProfileScreen extends HookConsumerWidget {
         );
       } catch (e, stack) {
         HKLog.logE('[Profile] Avatar upload exception: $e\n$stack');
-        if (context.mounted) FloatingToast.error(context, '上傳頭像失敗，請稍後再試');
+        if (context.mounted) {
+          FloatingToast.error(
+            context,
+            e is UploadRejectedException ? e.message : '上傳頭像失敗，請稍後再試',
+          );
+        }
       } finally {
         if (context.mounted) isUploadingAvatar.value = false;
       }
@@ -405,7 +411,7 @@ class ProfileScreen extends HookConsumerWidget {
               compress: true,
             );
         final token = result.stagedToken;
-        if (token == null || token.isEmpty) {
+        if (token.isEmpty) {
           if (context.mounted) FloatingToast.error(context, '背景圖片上傳失敗');
           return;
         }
@@ -416,7 +422,12 @@ class ProfileScreen extends HookConsumerWidget {
         );
       } catch (e, stack) {
         HKLog.logE('[Profile] Cover upload error: $e\n$stack');
-        if (context.mounted) FloatingToast.error(context, '背景圖片上傳失敗');
+        if (context.mounted) {
+          FloatingToast.error(
+            context,
+            e is UploadRejectedException ? e.message : '背景圖片上傳失敗',
+          );
+        }
       }
     }
 

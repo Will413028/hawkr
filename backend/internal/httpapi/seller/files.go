@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -41,20 +40,12 @@ func writeFile(w http.ResponseWriter, content model.FileContent) {
 	_, _ = w.Write(content.Data)
 }
 
-// retryAfterSeconds 是檔案的 media 引用還沒同步完時，請 client 多久之後重試（同步 job 的退避在秒到分鐘之間）。
-const retryAfterSeconds = 30
-
-// fileFailure 把模組的錯誤轉成 HTTP 狀態，不帶任何細節：沒有授權一律 403（不洩漏資源存在與否），查無 404；引用還沒同步完 503
-// 加 Retry-After（warn）；media 說不是機敏資產、或我們有這份檔案而 media 說沒有（引用已同步），是資料不一致，404 加 error log
+// fileFailure 把模組的錯誤轉成 HTTP 狀態，不帶任何細節：沒有授權一律 403（不洩漏資源存在與否），查無 404；
+// media 說不是機敏資產、或我們有這份檔案而 media 說沒有，是資料不一致，404 加 error log
 // （要人處理，不是 client 能解的）；暫時性的問題 503；其餘（含沒有分類的錯誤）500 並記 error。
 // what 是記 log 用的檔案名稱。
 func fileFailure(w http.ResponseWriter, r *http.Request, log *slog.Logger, err error, what string) {
 	switch {
-	case errors.Is(err, model.ErrFileNotSynced):
-		log.WarnContext(r.Context(), "seller："+what+"的 media 引用還沒同步完", "error", err)
-		w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
-		http.Error(w, "unavailable", http.StatusServiceUnavailable)
-		return
 	case errors.Is(err, media.ErrNotSecure), errors.Is(err, model.ErrFileMissing):
 		log.ErrorContext(r.Context(), "seller："+what+"在 media 讀不到，資料不一致", "error", err)
 		http.Error(w, "not found", http.StatusNotFound)

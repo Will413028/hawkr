@@ -1,3 +1,4 @@
+import type { DescService } from "@bufbuild/protobuf";
 import type { Client } from "@connectrpc/connect";
 import type { SocialDelegatedService } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import {
@@ -48,8 +49,8 @@ const POST_ID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const ORDER_NO_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
-/** 媒體 upload session（UUID 或 TSID，兩種都可能）。 */
-const MEDIA_SESSION_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+/** 公開圖片上傳的 staged token（不透明字串，路徑段只放安全字元）。 */
+const STAGED_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{1,1024}$/;
 
 const SECURE_UPLOAD_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 const CHUNK_INDEX_PATTERN = /^(?:0|[1-9]\d{0,5})$/;
@@ -81,8 +82,8 @@ export function orderNoSegment(value: string): string {
 	return segment(value, ORDER_NO_PATTERN);
 }
 
-export function mediaSessionSegment(value: string): string {
-	return segment(value, MEDIA_SESSION_PATTERN);
+export function stagedTokenSegment(value: string): string {
+	return segment(value, STAGED_TOKEN_PATTERN);
 }
 
 /** 機敏上傳暫存 token（單體以 base64url 產生）。 */
@@ -262,23 +263,29 @@ export interface DelegatedConnectInput {
 }
 
 /** 一次 Connect 呼叫：送出請求並把回應整形成瀏覽器看到的 `data`。 */
-type DelegatedConnectCall = (
-	client: Client<typeof SocialDelegatedService>,
+type DelegatedConnectCall<
+	S extends DescService = typeof SocialDelegatedService,
+> = (
+	client: Client<S>,
 	options: { headers: Headers; timeoutMs: number },
 ) => Promise<unknown>;
 
-export interface DelegatedConnectSpec {
+export interface DelegatedConnectSpec<
+	S extends DescService = typeof SocialDelegatedService,
+> {
+	/** 要呼叫的代行 service；預設是 `SocialDelegatedService`。 */
+	service?: S;
 	method: "GET" | "POST" | "PATCH";
 	timeout: DelegatedUpstreamTimeout;
 	/** 路由的 `:storeId`（已過 `numericSegment`）；轉送點在送出前驗它就是 session 綁定的店。 */
-	storeId: string;
+	storeId?: string;
 	/** 與 REST 版相同：未列入的 query key 一律 400。 */
 	query?: readonly string[];
 	/**
 	 * 依輸入組出 Connect 呼叫；輸入不合法就丟 `DelegatedRequestRejectedError`（在送出之前，回 400）。
 	 * 呼叫的 `headers`／`timeoutMs` 由轉送點給。
 	 */
-	build: (input: DelegatedConnectInput) => DelegatedConnectCall;
+	build: (input: DelegatedConnectInput) => DelegatedConnectCall<S>;
 }
 
 const IDEMPOTENCY_HEX = /^(?:adm-)?([0-9a-f]{32})$/;
@@ -302,13 +309,15 @@ function requestIdFromIdempotencyKey(key: string | null): string | null {
  * 之後經 `_upstream.ts` 的 `callDelegatedConnect` 打單體的 `SocialDelegatedService`，憑證放
  * `X-HK-Operation-Session`。一支 route 對一個 Connect 方法，不做 catch-all。
  */
-export async function forwardDelegatedConnect(
+export async function forwardDelegatedConnect<
+	S extends DescService = typeof SocialDelegatedService,
+>(
 	request: Request,
-	source: DelegatedConnectSpec | (() => DelegatedConnectSpec),
+	source: DelegatedConnectSpec<S> | (() => DelegatedConnectSpec<S>),
 ): Promise<Response> {
-	let spec: DelegatedConnectSpec;
+	let spec: DelegatedConnectSpec<S>;
 	let credential: string | null;
-	let call: DelegatedConnectCall;
+	let call: DelegatedConnectCall<S>;
 	try {
 		spec = typeof source === "function" ? source() : source;
 		assertDelegatedBrowserRequest(request);
@@ -333,7 +342,8 @@ export async function forwardDelegatedConnect(
 	}
 
 	try {
-		const result = await callDelegatedConnect({
+		const result = await callDelegatedConnect<S>({
+			service: spec.service,
 			call,
 			timeout: spec.timeout,
 			credential,

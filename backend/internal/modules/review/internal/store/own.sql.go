@@ -141,7 +141,7 @@ VALUES ($1, $2, $3, $4)
 type InsertReviewImageParams struct {
 	ReviewID  uuid.UUID
 	Position  int16
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }
 

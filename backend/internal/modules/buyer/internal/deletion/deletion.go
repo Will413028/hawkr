@@ -6,19 +6,17 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// Deps 是刪除流程需要的資料庫、事件與背景工作。
+// Deps 是刪除流程需要的資料庫、事件與 media。
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	Jobs   jobs.Enqueuer
+	Media  model.Media
 	Now    func() time.Time
 }
 
@@ -129,7 +127,7 @@ func (service *Service) close(ctx context.Context, queries *store.Queries, curre
 	if err := queries.CancelRestock(ctx, current.BuyerID); err != nil {
 		return err
 	}
-	if err := service.retireAvatar(ctx, queries, current, now); err != nil {
+	if err := service.retireAvatar(ctx, current); err != nil {
 		return err
 	}
 	return events.Publish(ctx, service.deps.Events, model.BuyerDeleted{
@@ -140,13 +138,12 @@ func (service *Service) close(ctx context.Context, queries *store.Queries, curre
 	})
 }
 
-// retireAvatar 關閉時把目前的頭像記成退場（終態：關閉的買家沒有目前的資產），引用由同步 job 解除。
-func (service *Service) retireAvatar(ctx context.Context, queries *store.Queries, current store.BuyerBuyer, now time.Time) error {
-	var retired []string
-	if current.AvatarAssetID != nil {
-		retired = append(retired, *current.AvatarAssetID)
+// retireAvatar 關閉是頭像的終態：在關閉的 transaction 內把目前的頭像標記刪除（實體刪除由 media 的 job 做）。
+func (service *Service) retireAvatar(ctx context.Context, current store.BuyerBuyer) error {
+	if current.AvatarAssetID == nil {
+		return nil
 	}
-	return mediaref.Changed(ctx, queries, service.deps.Jobs, now, mediaref.AvatarRef(current.BuyerID), retired...)
+	return service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID})
 }
 
 // CleanupPII 清理已關閉超過 30 天的 stint，按 buyer_id 分批處理至沒有可清理資料。

@@ -52,7 +52,7 @@ type GetMessageForRelayRow struct {
 	SenderKind       string
 	MessageType      string
 	Content          *string
-	ImageAssetID     *string
+	ImageAssetID     *uuid.UUID
 	ImageObjectKey   *string
 	CreatedAt        time.Time
 	ErasedAt         *time.Time
@@ -99,7 +99,7 @@ type InsertMessageParams struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	Now            time.Time
 }
@@ -205,7 +205,7 @@ type ListMessagesAfterRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
@@ -269,7 +269,7 @@ type ListMessagesBeforeRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
@@ -325,7 +325,7 @@ type LockBuyerMessageBatchParams struct {
 
 type LockBuyerMessageBatchRow struct {
 	ID           uuid.UUID
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 }
 
 // 抹除的一批：依 id 升序鎖住這個買家身分寄出、還沒抹除的訊息（重跑時只剩沒抹的）。
@@ -365,7 +365,7 @@ type LockStoreMessageBatchParams struct {
 
 type LockStoreMessageBatchRow struct {
 	ID           uuid.UUID
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 }
 
 func (q *Queries) LockStoreMessageBatch(ctx context.Context, arg LockStoreMessageBatchParams) ([]LockStoreMessageBatchRow, error) {
@@ -414,7 +414,7 @@ type MessagesForReportRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
 	BuyerID        int64

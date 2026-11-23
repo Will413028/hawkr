@@ -1,0 +1,66 @@
+package model
+
+import (
+	"context"
+	"errors"
+	"io"
+	"net/http"
+	"slices"
+	"uuid"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+)
+
+// Media 是 seller 對 media 的依賴：寫入的 transaction 內 Confirm 新資產，被換掉或終態的資產 MarkDeleted（治理佐證從不 MarkDeleted）；
+// 機敏檔案（KYC 證件、治理佐證）用 ReadSecure 讀。Confirm 與 MarkDeleted 的 ctx 必須帶 transaction。
+type Media interface {
+	Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error)
+	MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error
+	ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error)
+}
+
+// secureSniffLen 是辨認機敏檔型別讀的位元組數（http.DetectContentType 只看前 512 位元組）。
+const secureSniffLen = 512
+
+// ReadSecure 讀一份機敏檔（KYC 證件、治理佐證）的明文：呼叫方在 transaction 內寫好讀取紀錄並 commit 之後，在 transaction 外呼叫這裡。
+// media 回的是明文串流、沒有型別，型別由內容的 magic bytes 辨認（media 只收 PDF 與圖片）。media 說不是機敏資產（media.ErrNotSecure，
+// 資料或設定錯）原樣回錯誤；NotFound 是我們有這份檔而 media 說沒有，資料不一致，要人處理（ErrFileMissing）。
+func ReadSecure(ctx context.Context, m Media, assetID uuid.UUID) (FileContent, error) {
+	body, err := m.ReadSecure(ctx, assetID)
+	if err != nil {
+		if errors.Is(err, media.ErrNotSecure) || apperr.KindOf(err) != apperr.KindNotFound {
+			return FileContent{}, err
+		}
+		return FileContent{}, ErrFileMissing
+	}
+	defer func() { _ = body.Close() }()
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return FileContent{}, err
+	}
+	return FileContent{Data: data, ContentType: http.DetectContentType(data[:min(len(data), secureSniffLen)])}, nil
+}
+
+// ConfirmItem 是請求裡一個要確認的 staged token，Field 是它在輸入的欄位名（清單元素帶索引）。
+type ConfirmItem = media.ConfirmItem
+
+// ConfirmAll 在寫入的 transaction 內依序確認 items 的 staged token，一次回報所有不合格的（語意見 media.ConfirmFields）。
+func ConfirmAll(ctx context.Context, m Media, uploader media.Uploader, items []ConfirmItem, check func(i int, a media.ConfirmedAsset) string) ([]media.ConfirmedAsset, error) {
+	return media.ConfirmFields(ctx, m, uploader, items, check)
+}
+
+// RetiredAssets 列出退場的資產：寫入之前所有位置的資產減去寫入之後所有位置的資產（集合差，去重）。同一列的多個位置可以指著同一個資產，
+// 所以不能逐位置比對：重送沒變的 token 或只換掉其中一個位置時，仍被指著的資產不退場。
+func RetiredAssets(before, after []*uuid.UUID) []uuid.UUID {
+	var out []uuid.UUID
+	for _, b := range before {
+		if b == nil || slices.Contains(out, *b) {
+			continue
+		}
+		if !slices.ContainsFunc(after, func(a *uuid.UUID) bool { return a != nil && *a == *b }) {
+			out = append(out, *b)
+		}
+	}
+	return out
+}

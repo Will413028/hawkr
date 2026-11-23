@@ -60,6 +60,7 @@ test("a rewrite destination and the route handler target agree for every prefix"
 		["/api/connect/hawkr.v1.Svc/Method", connectProxyTarget],
 		["/api/auth/google/start", authProxyTarget],
 		["/api/files/secure_uploads/x/chunks/0", filesProxyTarget],
+		["/api/files/seller/kyc/3", filesProxyTarget],
 		["/api/v1/public/products", apiProxyTarget],
 	] as const;
 	for (const [path, target] of requests) {

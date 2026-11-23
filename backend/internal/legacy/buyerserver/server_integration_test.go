@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -29,13 +28,9 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	db := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "buyer", Dir: buyer.Migrations()}))
-	queue, err := jobs.NewInsertOnly(db)
-	if err != nil {
-		t.Fatal(err)
-	}
 	bus := events.NewBus()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	b := buyer.New(buyer.Deps{DB: db, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	b := buyer.New(buyer.Deps{DB: db, Events: bus, Now: time.Now, Logger: log})
 	var accountID int64
 	if err := db.Pool().QueryRow(ctx, "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
 		t.Fatal(err)

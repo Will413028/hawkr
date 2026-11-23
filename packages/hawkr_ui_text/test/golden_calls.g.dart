@@ -7,6 +7,7 @@ import 'package:connectrpc/connect.dart' show Code;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart' as hawkr_media_v1alpha1_media;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
@@ -41,6 +42,12 @@ const _enumNumber = <String, int>{
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_OPEN': 1,
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_PAUSED': 2,
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_UNSPECIFIED': 0,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH': 3,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_EXPIRED': 5,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_PROCESSING_FAILED': 4,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_SIZE_MISMATCH': 2,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT': 1,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION': 3,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_PENDING': 1,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED': 0,
@@ -225,6 +232,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'media.RejectReason':
+      return hawkr_media_v1alpha1_media.RejectReason.valueOf(_n('hawkr.media.v1alpha1.RejectReason', value))!.uiText(l);
     case 'moderation.ReportOutcome':
       return hawkr_moderation_v1alpha1_moderation.ReportOutcome.valueOf(_n('hawkr.moderation.v1alpha1.ReportOutcome', value))!.uiText(l);
     case 'moderation.ReportTargetKind':

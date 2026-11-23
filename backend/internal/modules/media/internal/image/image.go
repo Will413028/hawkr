@@ -101,6 +101,9 @@ type Limits struct {
 	MaxDimension int
 }
 
+// MaxAnimatedWebPDimension 是動態 WebP 單邊像素的編碼上限（WebP 格式的 14 位元尺寸欄位）；超過的輸入在標頭階段永久拒收，不進編碼。
+const MaxAnimatedWebPDimension = 16383
+
 // ErrInvalidLimits 表示 Limits 有非正的欄位：零值會讓每個輸入都被當成超過上限，那是設定錯誤，不是輸入的問題。
 var ErrInvalidLimits = errors.New("image: limits must be positive")
 
@@ -146,7 +149,7 @@ func sanitize(ctx context.Context, d []byte, lim Limits, fail func(stage string)
 
 	pages := max(img.Pages(), 1)
 	animated := pages > 1
-	if err := checkPixels(img.Width(), pageHeight(img, pages), pages, lim); err != nil {
+	if err := checkPixels(img.Width(), pageHeight(img, pages), pages, f, lim); err != nil {
 		return Result{}, err
 	}
 	if err := live(ctx); err != nil {
@@ -247,12 +250,15 @@ func pageHeight(img *vips.Image, pages int) int {
 }
 
 // checkPixels 以標頭的尺寸檢查：每格像素與（動態時）影格數乘每格像素。尺寸是 int，先以 int64 相乘避免溢位。
-func checkPixels(w, h, pages int, lim Limits) error {
+func checkPixels(w, h, pages int, f Format, lim Limits) error {
 	if w <= 0 || h <= 0 {
 		return fmt.Errorf("%w: empty dimensions", ErrMalformed)
 	}
 	if w > lim.MaxDimension || h > lim.MaxDimension {
 		return fmt.Errorf("%w: %dx%d exceeds %d per side", ErrTooLarge, w, h, lim.MaxDimension)
+	}
+	if f == WebP && pages > 1 && (w > MaxAnimatedWebPDimension || h > MaxAnimatedWebPDimension) {
+		return fmt.Errorf("%w: animated WebP %dx%d exceeds %d per side", ErrTooLarge, w, h, MaxAnimatedWebPDimension)
 	}
 	frame := int64(w) * int64(h)
 	if frame > lim.FramePixels {

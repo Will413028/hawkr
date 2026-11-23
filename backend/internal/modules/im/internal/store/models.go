@@ -52,14 +52,6 @@ type ImHide struct {
 	RestoreReason  *string
 }
 
-type ImMediaRefSync struct {
-	RefType   string
-	RefID     string
-	Seq       int64
-	SyncedSeq int64
-	UpdatedAt time.Time
-}
-
 type ImMessage struct {
 	ID             uuid.UUID
 	ConversationID uuid.UUID
@@ -67,7 +59,7 @@ type ImMessage struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
@@ -78,14 +70,6 @@ type ImPresenceStream struct {
 	Kind      string
 	PartyID   int64
 	ExpiresAt time.Time
-}
-
-type ImRetiredAsset struct {
-	RefType    string
-	RefID      string
-	AssetID    string
-	RetiredAt  time.Time
-	UnlinkedAt *time.Time
 }
 
 type SellerPubContentTakedown struct {

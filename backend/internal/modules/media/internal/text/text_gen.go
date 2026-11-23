@@ -27,6 +27,24 @@ func MediaAssetUnavailable(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "這筆上傳的資產已不可用", Locale: uitext.ZhTW}
 }
 
+// MediaConfirmSomeUnusable 是模組句子 media.confirm_some_unusable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaConfirmSomeUnusable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Some images cannot be used; please upload them again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有圖片無法使用，請重新上傳", Locale: uitext.ZhTW}
+}
+
+// MediaImageRequired 是模組句子 media.image_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaImageRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Please upload an image", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "請上傳圖片", Locale: uitext.ZhTW}
+}
+
 // MediaImageUnusable 是模組句子 media.image_unusable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func MediaImageUnusable(l uitext.Locale) uitext.Message {
 	switch l {
@@ -160,6 +178,15 @@ func MediaSecureSizeOutOfRange(l uitext.Locale, a MediaSecureSizeOutOfRangeArgs)
 	return uitext.Message{Text: "機敏上傳的大小必須在 1 到 " + strconv.Itoa(a.Max) + " 位元組之間", Locale: uitext.ZhTW}
 }
 
+// MediaUploadAlreadyUsed 是模組句子 media.upload_already_used；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaUploadAlreadyUsed(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This upload has already been used; please upload it again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆上傳已經被使用過，請重新上傳", Locale: uitext.ZhTW}
+}
+
 // MediaUploadContentTypeUnsupported 是模組句子 media.upload_content_type_unsupported；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func MediaUploadContentTypeUnsupported(l uitext.Locale) uitext.Message {
 	switch l {
@@ -253,4 +280,22 @@ func MediaUploaderInvalid(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "The uploader is not valid", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "上傳者不合法", Locale: uitext.ZhTW}
+}
+
+// MediaVisibilityPublicRequired 是模組句子 media.visibility_public_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaVisibilityPublicRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This image must be a public image", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這張圖片必須是公開圖片", Locale: uitext.ZhTW}
+}
+
+// MediaVisibilitySecureRequired 是模組句子 media.visibility_secure_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaVisibilitySecureRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This file must be uploaded as a secure file; please upload it again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這個檔案必須以機敏上傳，請重新上傳", Locale: uitext.ZhTW}
 }

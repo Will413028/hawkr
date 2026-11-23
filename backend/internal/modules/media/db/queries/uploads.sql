@@ -118,3 +118,7 @@ LIMIT sqlc.arg(max_rows);
 -- name: MarkUploadDeleted :execrows
 UPDATE media.staged_uploads SET state = 'DELETED', updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND state = 'DELETING';
+
+-- name: UploadConfirmedInThisTx :one
+-- 這筆暫存列是不是被目前的 transaction 轉成 CONFIRMED 的（列的 xmin 是最後寫入它的 transaction）；Confirm 重入只在同一個 transaction 內冪等（B1-D23）。
+SELECT (xmin = pg_current_xact_id()::xid)::boolean AS confirmed_here FROM media.staged_uploads WHERE id = sqlc.arg(id);

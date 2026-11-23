@@ -212,7 +212,7 @@ func foodSafetyReport() model.AdminReport {
 	r := model.Report{
 		ID: uuid.NewV7(), StoreID: 12, Category: policy.FoodSafety, Description: "吃了不舒服", Version: 4,
 		ReporterBuyerID: 500, CreatedAt: governanceNow, UpdatedAt: governanceNow,
-		Evidence: []model.Evidence{{AssetID: "asset-secret-1", ObjectKey: "secure/governance/k1"}, {AssetID: "asset-secret-2", ObjectKey: "secure/governance/k2"}},
+		Evidence: []model.Evidence{{AssetID: secretAssets[0], ObjectKey: "secure/governance/k1"}, {AssetID: secretAssets[1], ObjectKey: "secure/governance/k2"}},
 		// 分案期限由模組的讀取路徑填入（seller.review_report_triage）；emitter 只轉換。
 		TriageDeadline: &model.Deadline{Start: governanceNow, Due: governanceNow.Add(4 * time.Hour)},
 	}
@@ -244,7 +244,7 @@ func riskMeasureFixture() model.Measure {
 		},
 		Requests: []model.MeasureRequest{{
 			ID: uuid.NewV7(), Kind: model.RequestKindAppeal, State: model.RequestPending, Reason: "已改善", SubmittedAt: governanceNow, Revision: 1,
-			Evidence: []model.Evidence{{AssetID: "asset-secret-3", ObjectKey: "secure/governance/k3"}},
+			Evidence: []model.Evidence{{AssetID: secretAssets[2], ObjectKey: "secure/governance/k3"}},
 		}},
 	}
 }
@@ -315,7 +315,7 @@ func TestGovernanceResponsesCarryEvidenceOnlyAsViewURIs(t *testing.T) {
 		t.Fatalf("revisions=%v", pm)
 	}
 	for _, raw := range []string{protojson.Format(got.Msg), protojson.Format(v.Msg)} {
-		if strings.Contains(raw, "asset-secret") || strings.Contains(raw, "secure/governance") {
+		if leaksSecretAsset(raw) || strings.Contains(raw, "secure/governance") {
 			t.Fatalf("回應不得帶佐證的 asset ID 或 object key：%s", raw)
 		}
 	}
@@ -402,7 +402,7 @@ func TestAdminMeasureCarriesTheRemediationRequests(t *testing.T) {
 	reason := "佐證不足"
 	m.Requests = []model.MeasureRequest{
 		{ID: uuid.NewV7(), Kind: model.RequestKindRemediation, State: model.RequestPending, Reason: "第四次", SubmittedAt: governanceNow, Revision: 2,
-			Evidence: []model.Evidence{{AssetID: "asset-secret-4", ObjectKey: "secure/governance/k4"}}},
+			Evidence: []model.Evidence{{AssetID: secretAssets[3], ObjectKey: "secure/governance/k4"}}},
 		{ID: uuid.NewV7(), Kind: model.RequestKindRemediation, State: model.RequestClosed, Reason: "第三次", SubmittedAt: governanceNow.Add(-2 * time.Hour), CloseCause: &ended,
 			DecidedAt: &rejectedAt},
 		{ID: uuid.NewV7(), Kind: model.RequestKindRemediation, State: model.RequestClosed, Reason: "第二次", SubmittedAt: governanceNow.Add(-3 * time.Hour), CloseCause: &revoked,
@@ -430,7 +430,7 @@ func TestAdminMeasureCarriesTheRemediationRequests(t *testing.T) {
 		t.Fatalf("待處理的補正：可裁定、不能結束、沒有冷卻：%v", out)
 	}
 	for _, text := range []string{protojson.Format(out)} {
-		if strings.Contains(text, "asset-secret") || strings.Contains(text, "secure/governance") {
+		if leaksSecretAsset(text) || strings.Contains(text, "secure/governance") {
 			t.Fatalf("回應不得帶佐證的 asset ID 或 object key：%s", text)
 		}
 	}
@@ -783,7 +783,7 @@ func serveEvidence(m *evidenceModule, log *slog.Logger, ctx context.Context, pat
 }
 
 // 佐證端點：只給管理員；兩條路由各自對應通報與措施上的請求；格式不對的 ID 與位置不呼叫模組；錯誤只有 HTTP 狀態，與證件端點同一套對應
-// （同步還沒結算 503 加 Retry-After，資料不一致 404 加 error log）。
+// （資料不一致 404 加 error log）。
 func TestEvidenceEndpointsAuthorizeAdminsAndMapErrorsWithoutLeaking(t *testing.T) {
 	report, request := uuid.NewV7(), uuid.NewV7()
 	reportPath := "/api/files/admin/seller/reports/" + report.String() + "/evidence/1"
@@ -822,11 +822,10 @@ func TestEvidenceEndpointsAuthorizeAdminsAndMapErrorsWithoutLeaking(t *testing.T
 		retryAfter bool
 		level      string
 	}{
-		"not synced yet":     {fmt.Errorf("x：%w", model.ErrFileNotSynced), 503, true, "WARN"},
-		"synced but missing": {fmt.Errorf("x：%w", model.ErrFileMissing), 404, false, "ERROR"},
-		"not secure":         {fmt.Errorf("x：%w", media.ErrNotSecure), 404, false, "ERROR"},
-		"not found":          {apperr.NotFound("找不到這張佐證"), 404, false, ""},
-		"media down":         {errors.New("secret internal detail"), 500, false, "ERROR"},
+		"missing in media": {fmt.Errorf("x：%w", model.ErrFileMissing), 404, false, "ERROR"},
+		"not secure":       {fmt.Errorf("x：%w", media.ErrNotSecure), 404, false, "ERROR"},
+		"not found":        {apperr.NotFound("找不到這張佐證"), 404, false, ""},
+		"media down":       {errors.New("secret internal detail"), 500, false, "ERROR"},
 	} {
 		var logs strings.Builder
 		rec := serveEvidence(&evidenceModule{err: c.err}, slog.New(slog.NewTextHandler(&logs, nil)), adminCtx(42), appealPath)

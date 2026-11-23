@@ -171,18 +171,6 @@ const (
 	CartsMerge       = "/merge"
 )
 
-// ==================== Media（/public/media + /app/media）====================
-
-const (
-	MediaPath           = "/media"
-	MediaUploadSessions = "/upload_sessions"
-	MediaUploadComplete = "/upload_sessions/:id/complete"
-	MediaFinalize       = "/finalize"
-	MediaSecureUpload   = "/secure_upload/:id"
-	MediaSecureDownload = "/secure_download/:asset_id"
-	MediaSecurePreview  = "/secure_preview/:session_id"
-)
-
 // ==================== 結帳（/app/checkout）====================
 
 const (
@@ -567,7 +555,6 @@ const (
 	ServicePayment    = "payment"
 	ServiceShipping   = "shipping"
 	ServiceAftersales = "aftersales"
-	ServiceMedia      = "media"
 	ServiceCart       = "cart"
 	ServiceCoupon     = "coupon"
 	// ServiceInvoice 指向 invoice-service 的檔案串流面（INVOICE_SERVICE_FILE_PORT

@@ -160,12 +160,6 @@ var services = map[string]ServiceConfig{
 		Port:   getEnvOrDefault("AFTERSALES_SERVICE_PORT", "9922"),
 		Prefix: "",
 	},
-	"media": {
-		Name:   "media-service",
-		Host:   getEnvOrDefault("MEDIA_SERVICE_HOST", "127.0.0.1"),
-		Port:   getEnvOrDefault("MEDIA_SERVICE_PORT", "9936"),
-		Prefix: "",
-	},
 	"shipping": {
 		Name:   "shipping-service",
 		Host:   getEnvOrDefault("SHIPPING_SERVICE_HOST", "127.0.0.1"),

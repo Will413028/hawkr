@@ -6,7 +6,10 @@ import 'package:hawkr_seller/features/media/data/media_repository.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/upload.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -134,7 +137,14 @@ ProviderContainer _containerWith(MediaRepository mediaRepository) {
 }
 
 class _RecordingMediaRepository extends MediaRepository {
-  _RecordingMediaRepository() : super(Dio());
+  _RecordingMediaRepository()
+    : super(
+        client: MediaAppServiceClient(FakeTransportBuilder().build()),
+        http: IoUploadHttp(),
+        filesBase: Uri.parse('https://example.test'),
+        sessionToken: () async => null,
+        locale: () => UiLocale.zhTW,
+      );
 
   bool? lastCompress;
 
@@ -145,11 +155,7 @@ class _RecordingMediaRepository extends MediaRepository {
     bool compress = true,
   }) async {
     lastCompress = compress;
-    return const MediaUploadResult(
-      objectKey: 'public/post/animated.gif',
-      size: 6,
-      stagedToken: 'staged-token',
-    );
+    return const MediaUploadResult(size: 6, stagedToken: 'staged-token');
   }
 }
 

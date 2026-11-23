@@ -820,6 +820,505 @@ class MediaDelegatedServiceBeginSecureUploadResponse
   $0.Timestamp ensureExpireTime() => $_ensure(3);
 }
 
+/// MediaDelegatedServiceBeginUploadRequest 與 BeginUploadRequest 的欄位與意義相同；沒有 store_id：店家由代行 session 決定。
+class MediaDelegatedServiceBeginUploadRequest extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceBeginUploadRequest({
+    $fixnum.Int64? size,
+    $core.String? contentType,
+    $core.String? md5,
+  }) {
+    final result = MediaDelegatedServiceBeginUploadRequest._();
+    if (size != null) result.size = size;
+    if (contentType != null) result.contentType = contentType;
+    if (md5 != null) result.md5 = md5;
+    return result;
+  }
+
+  MediaDelegatedServiceBeginUploadRequest._();
+
+  factory MediaDelegatedServiceBeginUploadRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginUploadRequest()
+        ..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceBeginUploadRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginUploadRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceBeginUploadRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceBeginUploadRequest.$_createMessage)
+    ..aInt64(1, _omitFieldNames ? '' : 'size')
+    ..aOS(2, _omitFieldNames ? '' : 'contentType')
+    ..aOS(3, _omitFieldNames ? '' : 'md5')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginUploadRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginUploadRequest copyWith(
+          void Function(MediaDelegatedServiceBeginUploadRequest) updates) =>
+      super.copyWith((message) =>
+              updates(message as MediaDelegatedServiceBeginUploadRequest))
+          as MediaDelegatedServiceBeginUploadRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceBeginUploadRequest() / MediaDelegatedServiceBeginUploadRequest.new instead')
+  static MediaDelegatedServiceBeginUploadRequest create() =>
+      MediaDelegatedServiceBeginUploadRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceBeginUploadRequest._();
+  @$core.override
+  MediaDelegatedServiceBeginUploadRequest createEmptyInstance() =>
+      MediaDelegatedServiceBeginUploadRequest._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceBeginUploadRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceBeginUploadRequest>(
+          MediaDelegatedServiceBeginUploadRequest.$_createMessage);
+  static MediaDelegatedServiceBeginUploadRequest? _defaultInstance;
+
+  /// 檔案的位元組數；必須大於零且不超過伺服器的上限。
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get size => $_getI64(0);
+  @$pb.TagNumber(1)
+  set size($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSize() => $_clearField(1);
+
+  /// 檔案的 MIME 型別，只能是 image/jpeg、image/png、image/webp、image/gif。
+  @$pb.TagNumber(2)
+  $core.String get contentType => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set contentType($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasContentType() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearContentType() => $_clearField(2);
+
+  /// 檔案內容 MD5 的標準 base64（16 位元組）。
+  @$pb.TagNumber(3)
+  $core.String get md5 => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set md5($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMd5() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMd5() => $_clearField(3);
+}
+
+/// MediaDelegatedServiceBeginUploadResponse 與 BeginUploadResponse 的欄位與意義相同。
+class MediaDelegatedServiceBeginUploadResponse extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceBeginUploadResponse({
+    $core.String? stagedToken,
+    $core.String? uploadUrl,
+    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? uploadHeaders,
+    $0.Timestamp? expireTime,
+  }) {
+    final result = MediaDelegatedServiceBeginUploadResponse._();
+    if (stagedToken != null) result.stagedToken = stagedToken;
+    if (uploadUrl != null) result.uploadUrl = uploadUrl;
+    if (uploadHeaders != null) result.uploadHeaders.addEntries(uploadHeaders);
+    if (expireTime != null) result.expireTime = expireTime;
+    return result;
+  }
+
+  MediaDelegatedServiceBeginUploadResponse._();
+
+  factory MediaDelegatedServiceBeginUploadResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginUploadResponse()
+        ..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceBeginUploadResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginUploadResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceBeginUploadResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceBeginUploadResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'stagedToken')
+    ..aOS(2, _omitFieldNames ? '' : 'uploadUrl')
+    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'uploadHeaders',
+        entryClassName:
+            'MediaDelegatedServiceBeginUploadResponse.UploadHeadersEntry',
+        keyFieldType: $pb.PbFieldType.OS,
+        valueFieldType: $pb.PbFieldType.OS,
+        packageName: const $pb.PackageName('hawkr.media.v1alpha1'))
+    ..aOM<$0.Timestamp>(4, _omitFieldNames ? '' : 'expireTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginUploadResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginUploadResponse copyWith(
+          void Function(MediaDelegatedServiceBeginUploadResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as MediaDelegatedServiceBeginUploadResponse))
+          as MediaDelegatedServiceBeginUploadResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceBeginUploadResponse() / MediaDelegatedServiceBeginUploadResponse.new instead')
+  static MediaDelegatedServiceBeginUploadResponse create() =>
+      MediaDelegatedServiceBeginUploadResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceBeginUploadResponse._();
+  @$core.override
+  MediaDelegatedServiceBeginUploadResponse createEmptyInstance() =>
+      MediaDelegatedServiceBeginUploadResponse._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceBeginUploadResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceBeginUploadResponse>(
+          MediaDelegatedServiceBeginUploadResponse.$_createMessage);
+  static MediaDelegatedServiceBeginUploadResponse? _defaultInstance;
+
+  /// 不透明的憑證，交給 CompleteUpload、GetUpload 與擁有者的 API；只出現這一次。
+  @$pb.TagNumber(1)
+  $core.String get stagedToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set stagedToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStagedToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStagedToken() => $_clearField(1);
+
+  /// 預簽的 PUT 網址。
+  @$pb.TagNumber(2)
+  $core.String get uploadUrl => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set uploadUrl($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUploadUrl() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUploadUrl() => $_clearField(2);
+
+  /// PUT 時必須原樣帶上的請求標頭；不含 Content-Length。
+  @$pb.TagNumber(3)
+  $pb.PbMap<$core.String, $core.String> get uploadHeaders => $_getMap(2);
+
+  /// 暫存的到期時間。
+  @$pb.TagNumber(4)
+  $0.Timestamp get expireTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set expireTime($0.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExpireTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExpireTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $0.Timestamp ensureExpireTime() => $_ensure(3);
+}
+
+class MediaDelegatedServiceCompleteUploadRequest extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceCompleteUploadRequest({
+    $core.String? stagedToken,
+  }) {
+    final result = MediaDelegatedServiceCompleteUploadRequest._();
+    if (stagedToken != null) result.stagedToken = stagedToken;
+    return result;
+  }
+
+  MediaDelegatedServiceCompleteUploadRequest._();
+
+  factory MediaDelegatedServiceCompleteUploadRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceCompleteUploadRequest()
+        ..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceCompleteUploadRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceCompleteUploadRequest()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceCompleteUploadRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceCompleteUploadRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'stagedToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceCompleteUploadRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceCompleteUploadRequest copyWith(
+          void Function(MediaDelegatedServiceCompleteUploadRequest) updates) =>
+      super.copyWith((message) =>
+              updates(message as MediaDelegatedServiceCompleteUploadRequest))
+          as MediaDelegatedServiceCompleteUploadRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceCompleteUploadRequest() / MediaDelegatedServiceCompleteUploadRequest.new instead')
+  static MediaDelegatedServiceCompleteUploadRequest create() =>
+      MediaDelegatedServiceCompleteUploadRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceCompleteUploadRequest._();
+  @$core.override
+  MediaDelegatedServiceCompleteUploadRequest createEmptyInstance() =>
+      MediaDelegatedServiceCompleteUploadRequest._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceCompleteUploadRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceCompleteUploadRequest>(
+          MediaDelegatedServiceCompleteUploadRequest.$_createMessage);
+  static MediaDelegatedServiceCompleteUploadRequest? _defaultInstance;
+
+  /// BeginUpload 回傳的 staged token。
+  @$pb.TagNumber(1)
+  $core.String get stagedToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set stagedToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStagedToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStagedToken() => $_clearField(1);
+}
+
+class MediaDelegatedServiceCompleteUploadResponse extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceCompleteUploadResponse() =>
+      MediaDelegatedServiceCompleteUploadResponse._();
+
+  MediaDelegatedServiceCompleteUploadResponse._();
+
+  factory MediaDelegatedServiceCompleteUploadResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceCompleteUploadResponse()
+        ..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceCompleteUploadResponse.fromJson(
+          $core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceCompleteUploadResponse()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceCompleteUploadResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceCompleteUploadResponse.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceCompleteUploadResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceCompleteUploadResponse copyWith(
+          void Function(MediaDelegatedServiceCompleteUploadResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as MediaDelegatedServiceCompleteUploadResponse))
+          as MediaDelegatedServiceCompleteUploadResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceCompleteUploadResponse() / MediaDelegatedServiceCompleteUploadResponse.new instead')
+  static MediaDelegatedServiceCompleteUploadResponse create() =>
+      MediaDelegatedServiceCompleteUploadResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceCompleteUploadResponse._();
+  @$core.override
+  MediaDelegatedServiceCompleteUploadResponse createEmptyInstance() =>
+      MediaDelegatedServiceCompleteUploadResponse._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceCompleteUploadResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceCompleteUploadResponse>(
+          MediaDelegatedServiceCompleteUploadResponse.$_createMessage);
+  static MediaDelegatedServiceCompleteUploadResponse? _defaultInstance;
+}
+
+class MediaDelegatedServiceGetUploadRequest extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceGetUploadRequest({
+    $core.String? stagedToken,
+  }) {
+    final result = MediaDelegatedServiceGetUploadRequest._();
+    if (stagedToken != null) result.stagedToken = stagedToken;
+    return result;
+  }
+
+  MediaDelegatedServiceGetUploadRequest._();
+
+  factory MediaDelegatedServiceGetUploadRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceGetUploadRequest()..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceGetUploadRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceGetUploadRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceGetUploadRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceGetUploadRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'stagedToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceGetUploadRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceGetUploadRequest copyWith(
+          void Function(MediaDelegatedServiceGetUploadRequest) updates) =>
+      super.copyWith((message) =>
+              updates(message as MediaDelegatedServiceGetUploadRequest))
+          as MediaDelegatedServiceGetUploadRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceGetUploadRequest() / MediaDelegatedServiceGetUploadRequest.new instead')
+  static MediaDelegatedServiceGetUploadRequest create() =>
+      MediaDelegatedServiceGetUploadRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceGetUploadRequest._();
+  @$core.override
+  MediaDelegatedServiceGetUploadRequest createEmptyInstance() =>
+      MediaDelegatedServiceGetUploadRequest._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceGetUploadRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceGetUploadRequest>(
+          MediaDelegatedServiceGetUploadRequest.$_createMessage);
+  static MediaDelegatedServiceGetUploadRequest? _defaultInstance;
+
+  /// BeginUpload 回傳的 staged token。
+  @$pb.TagNumber(1)
+  $core.String get stagedToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set stagedToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStagedToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStagedToken() => $_clearField(1);
+}
+
+/// MediaDelegatedServiceGetUploadResponse 與 GetUploadResponse 的欄位與意義相同。
+class MediaDelegatedServiceGetUploadResponse extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceGetUploadResponse({
+    UploadState? state,
+    RejectReason? rejectReason,
+    $0.Timestamp? expireTime,
+  }) {
+    final result = MediaDelegatedServiceGetUploadResponse._();
+    if (state != null) result.state = state;
+    if (rejectReason != null) result.rejectReason = rejectReason;
+    if (expireTime != null) result.expireTime = expireTime;
+    return result;
+  }
+
+  MediaDelegatedServiceGetUploadResponse._();
+
+  factory MediaDelegatedServiceGetUploadResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceGetUploadResponse()..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceGetUploadResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceGetUploadResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceGetUploadResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceGetUploadResponse.$_createMessage)
+    ..aE<UploadState>(1, _omitFieldNames ? '' : 'state',
+        enumValues: UploadState.values)
+    ..aE<RejectReason>(2, _omitFieldNames ? '' : 'rejectReason',
+        enumValues: RejectReason.values)
+    ..aOM<$0.Timestamp>(3, _omitFieldNames ? '' : 'expireTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceGetUploadResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceGetUploadResponse copyWith(
+          void Function(MediaDelegatedServiceGetUploadResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as MediaDelegatedServiceGetUploadResponse))
+          as MediaDelegatedServiceGetUploadResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceGetUploadResponse() / MediaDelegatedServiceGetUploadResponse.new instead')
+  static MediaDelegatedServiceGetUploadResponse create() =>
+      MediaDelegatedServiceGetUploadResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceGetUploadResponse._();
+  @$core.override
+  MediaDelegatedServiceGetUploadResponse createEmptyInstance() =>
+      MediaDelegatedServiceGetUploadResponse._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceGetUploadResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceGetUploadResponse>(
+          MediaDelegatedServiceGetUploadResponse.$_createMessage);
+  static MediaDelegatedServiceGetUploadResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  UploadState get state => $_getN(0);
+  @$pb.TagNumber(1)
+  set state(UploadState value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasState() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearState() => $_clearField(1);
+
+  /// 只在 state 是 REJECTED 時設值。
+  @$pb.TagNumber(2)
+  RejectReason get rejectReason => $_getN(1);
+  @$pb.TagNumber(2)
+  set rejectReason(RejectReason value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRejectReason() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRejectReason() => $_clearField(2);
+
+  /// 暫存的到期時間。
+  @$pb.TagNumber(3)
+  $0.Timestamp get expireTime => $_getN(2);
+  @$pb.TagNumber(3)
+  set expireTime($0.Timestamp value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExpireTime() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpireTime() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $0.Timestamp ensureExpireTime() => $_ensure(2);
+}
+
 /// MediaAppService 是登入的買家與賣家上傳公開圖片；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 class MediaAppServiceApi {
   final $pb.RpcClient _client;
@@ -870,6 +1369,43 @@ class MediaDelegatedServiceApi {
   final $pb.RpcClient _client;
 
   MediaDelegatedServiceApi(this._client);
+
+  /// BeginUpload 為代行店家宣告要上傳的公開圖片，回傳與 MediaAppService.BeginUpload 相同的預簽 PUT 網址、標頭與 staged token（B1-D21）。
+  /// 上傳者是代行 session 的管理員並綁定被代行的店；staged token 只有同一家店的有效代行 session 能續用。
+  /// 錯誤與 MediaAppService.BeginUpload 相同（size、content_type、md5 不合法回 invalid_argument）。需要能力 media.upload。
+  $async.Future<MediaDelegatedServiceBeginUploadResponse> beginUpload(
+          $pb.ClientContext? ctx,
+          MediaDelegatedServiceBeginUploadRequest request) =>
+      _client.invoke<MediaDelegatedServiceBeginUploadResponse>(
+          ctx,
+          'MediaDelegatedService',
+          'BeginUpload',
+          request,
+          MediaDelegatedServiceBeginUploadResponse());
+
+  /// CompleteUpload 在 client 把檔案 PUT 完之後呼叫，語意同 MediaAppService.CompleteUpload（可重送）。
+  /// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）；暫存已過期回 failed_precondition。需要能力 media.upload。
+  $async.Future<MediaDelegatedServiceCompleteUploadResponse> completeUpload(
+          $pb.ClientContext? ctx,
+          MediaDelegatedServiceCompleteUploadRequest request) =>
+      _client.invoke<MediaDelegatedServiceCompleteUploadResponse>(
+          ctx,
+          'MediaDelegatedService',
+          'CompleteUpload',
+          request,
+          MediaDelegatedServiceCompleteUploadResponse());
+
+  /// GetUpload 讀暫存的處理狀態，語意同 MediaAppService.GetUpload（staged token 是憑證，不標 NO_SIDE_EFFECTS）。
+  /// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）。需要能力 media.upload。
+  $async.Future<MediaDelegatedServiceGetUploadResponse> getUpload(
+          $pb.ClientContext? ctx,
+          MediaDelegatedServiceGetUploadRequest request) =>
+      _client.invoke<MediaDelegatedServiceGetUploadResponse>(
+          ctx,
+          'MediaDelegatedService',
+          'GetUpload',
+          request,
+          MediaDelegatedServiceGetUploadResponse());
 
   /// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
   /// 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。

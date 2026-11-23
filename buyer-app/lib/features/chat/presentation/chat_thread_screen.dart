@@ -14,6 +14,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../media/data/local_image_preview.dart';
 import '../../media/data/media_repository.dart';
 import '../../order/data/order_repository.dart';
 import '../../seller/data/seller_repository.dart';
@@ -1205,20 +1206,22 @@ class ChatThreadScreen extends HookConsumerWidget {
         final uploadResult = await ref
             .read(mediaRepositoryProvider)
             .uploadImage(file: file);
+        final preview = await localImagePreviewDataUri(file);
         final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
         final notifier = ref.read(chatThreadProvider(arg).notifier);
-        animatedIds.value.add(tempId);
-        // 樂觀氣泡先用 previewUrl 顯示。
-        notifier.addOptimistic(
-          ChatMessage(
-            id: tempId,
-            senderId: '',
-            receiverId: merchantId,
-            messageContent: uploadResult.previewUrl,
-            messageType: 'image',
-            timestamp: DateTime.now(),
-          ),
-        );
+        if (preview.isNotEmpty) {
+          animatedIds.value.add(tempId);
+          notifier.addOptimistic(
+            ChatMessage(
+              id: tempId,
+              senderId: '',
+              receiverId: merchantId,
+              messageContent: preview,
+              messageType: 'image',
+              timestamp: DateTime.now(),
+            ),
+          );
+        }
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (scrollCtrl.hasClients) {
             scrollCtrl.animateTo(
@@ -1242,8 +1245,7 @@ class ChatThreadScreen extends HookConsumerWidget {
           if (hasReal) {
             notifier.confirmOptimistic(tempId, realId);
           }
-          // 用 server 回傳的 CDN URL 替換 previewUrl（tmp 已被刪除）。
-          if (cdnUrl.isNotEmpty && cdnUrl != uploadResult.previewUrl) {
+          if (cdnUrl.isNotEmpty) {
             final swapId = hasReal ? realId : tempId;
             notifier.removeOptimistic(swapId);
             notifier.addOptimistic(

@@ -8,8 +8,8 @@
 // transaction 記下 prospect_distinct_pairs 再寫入。合併把輸家的聯絡方式併入贏家、配對改掛贏家，輸家封存。統編是權威識別碼，
 // 在未封存（進行中或已入駐）的業者之間由資料庫保證唯一。名稱相同與比對鍵相同的配對都只交給人判斷（建立前的比對與疑似重複清單），永不自動合併。
 //
-// 寫入以整列的 version 做樂觀鎖（文字、聯絡方式與圖片共用）。品牌圖片的 media 引用以 prospect_id 登記，釋放一律經收斂 job
-// （封存與合併把圖片欄位清成 NULL，job 讀列、只保留目前那一張），與店家的 logo、封面同一種做法。
+// 寫入以整列的 version 做樂觀鎖（文字、聯絡方式與圖片共用）。品牌圖片在寫入的 transaction 內 Confirm，被換掉的圖與封存、合併清掉的圖
+// 在同一個 transaction 內 MarkDeleted，與店家的 logo、封面同一種做法。
 package prospect
 
 import (
@@ -19,18 +19,16 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
@@ -39,8 +37,7 @@ import (
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	Jobs   jobs.Enqueuer
-	Media  media.Media
+	Media  model.Media
 	Now    func() time.Time
 }
 
@@ -381,9 +378,8 @@ func planUpdate(ctx context.Context, q *store.Queries, row store.SellerProspect,
 // 改變時新的比對鍵與其他未封存業者相同、而且沒有標記為不是同一家，回 PROSPECT_MATCH_FOUND（ConfirmedDistinct 涵蓋全部相符的
 // 業者時才寫入，並在同一個 transaction 記下配對）；統編被別的未封存業者持有回 FailedPrecondition（reason PROSPECT_TAX_ID_HELD）。
 //
-// Logo、Cover 非 nil 時換圖：先在 transaction 外轉正（不建立引用；轉正前先做所有不需寫入的判斷：狀態、版本、驗證、統編、聯絡方式
-// 的比對，被拒絕的請求不消耗 staged token），再於同一個版本條件的 transaction 內寫入文字、聯絡方式與圖片的 key 與 asset ID、把被換掉的
-// 圖記成退場並排入引用的同步（mediaref）；已退場的圖不能寫回。換圖時必須在 transaction 外呼叫。
+// Logo、Cover 非 nil 時換圖：先做所有不需寫入的判斷（狀態、版本、驗證、統編、聯絡方式的比對，被拒絕的請求不消耗 staged token），
+// 再於同一個版本條件的 transaction 內 Confirm 新圖、寫入文字、聯絡方式與圖片的 key 與 asset ID，並把被換掉的圖 MarkDeleted；任何一步失敗整筆回滾。
 func (s *Service) Update(ctx context.Context, in model.UpdateProspectInput) (model.Prospect, error) {
 	if err := model.Positive(in.ProspectID, in.AdminID); err != nil {
 		return model.Prospect{}, err
@@ -409,7 +405,7 @@ func (s *Service) Update(ctx context.Context, in model.UpdateProspectInput) (mod
 		}
 		contacts = &normalized
 	}
-	uploads, err := s.finalizeUploads(ctx, in, contacts, categories)
+	uploads, err := parseUploads(in)
 	if err != nil {
 		return model.Prospect{}, err
 	}
@@ -428,10 +424,8 @@ func (s *Service) Update(ctx context.Context, in model.UpdateProspectInput) (mod
 			out, err = load(ctx, q, locked)
 			return err
 		}
-		for _, u := range uploads {
-			if err := mediaref.Reject(ctx, q, mediaref.ProspectRef(u.kind.refType, in.ProspectID), media.SyncCandidate{Field: u.kind.field + ".StagedToken", AssetID: u.asset.ID}); err != nil {
-				return err
-			}
+		if err := s.confirmUploads(ctx, in.AdminID, uploads); err != nil {
+			return err
 		}
 		fields, now := plan.fields, s.d.Now().UTC()
 		params := store.UpdateProspectParams{
@@ -468,13 +462,14 @@ func (s *Service) Update(ctx context.Context, in model.UpdateProspectInput) (mod
 		if err := confirmDistinct(ctx, q, locked.ProspectID, in.AdminID, now, plan.confirmed); err != nil {
 			return err
 		}
-		for _, u := range uploads {
-			var retired []string
-			if old := u.kind.assetOf(locked); old != nil && *old != u.asset.ID {
-				retired = append(retired, *old)
-			}
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.ProspectRef(u.kind.refType, in.ProspectID), retired...); err != nil {
-				return err
+		if len(uploads) > 0 {
+			retired := model.RetiredAssets(
+				[]*uuid.UUID{logoKind.assetOf(locked), coverKind.assetOf(locked)},
+				[]*uuid.UUID{logoKind.assetOf(updated), coverKind.assetOf(updated)})
+			if len(retired) > 0 {
+				if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {
+					return err
+				}
 			}
 		}
 		out, err = load(ctx, q, updated)

@@ -326,7 +326,7 @@
       "name": "hawkr.media.v1alpha1.RejectReason",
       "tsName": "RejectReason",
       "tsModule": "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

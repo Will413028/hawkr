@@ -38,7 +38,7 @@ Future<String?> uploadShipmentPhoto(
       );
   if (!context.mounted) return null;
   final token = mediaResult.stagedToken;
-  return (token != null && token.isNotEmpty) ? token : null;
+  return token.isNotEmpty ? token : null;
 }
 
 // ── 計算 progressStage（0~3） ──────────────────────────────────────────────

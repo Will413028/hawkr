@@ -12,18 +12,15 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/images"
-	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/validation"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/store"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 )
 
@@ -42,8 +39,7 @@ var _ Social = (*social.Module)(nil)
 type Deps struct {
 	DB     *db.DB
 	Social Social
-	Media  media.Media
-	Jobs   jobs.Enqueuer
+	Media  model.Media
 	NewID  func() uuid.UUID
 	Now    func() time.Time
 }
@@ -276,20 +272,15 @@ func (m *Service) CreateBanner(ctx context.Context, adminID int64, in model.Bann
 		}
 	}
 	id := m.d.NewID()
-	ref := mediaref.BannerRef(id)
-	resolved, err := m.images.Resolve(ctx, adminID, ref.Type,
-		images.NewSlot("PreviewImageToken", "預覽圖", in.PreviewImageToken, ""), images.NewSlot("PopupImageToken", "彈窗圖", in.PopupImageToken, ""))
-	if err != nil {
-		return model.Banner{}, err
-	}
 	action := normalizeAction(in.Action)
 	var row store.ContentBanner
 	err = m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
-		if err := mediaref.Reject(ctx, q, ref, images.NewCandidates(resolved...)...); err != nil {
+		resolved, err := m.images.Confirm(ctx, adminID,
+			images.NewSlot("PreviewImageToken", in.PreviewImageToken, ""), images.NewSlot("PopupImageToken", in.PopupImageToken, ""))
+		if err != nil {
 			return err
 		}
-		var err error
 		row, err = q.InsertBanner(ctx, store.InsertBannerParams{
 			ID:                  id,
 			Title:               in.Title,
@@ -303,13 +294,13 @@ func (m *Service) CreateBanner(ctx context.Context, adminID int64, in model.Bann
 			IsActive:            in.IsActive,
 			StartDate:           in.StartsAt,
 			EndDate:             in.EndsAt,
-			PreviewImageAssetID: resolved[0].Asset.ID,
-			PopupImageAssetID:   resolved[1].Asset.ID,
+			PreviewImageAssetID: *resolved[0].AssetID,
+			PopupImageAssetID:   *resolved[1].AssetID,
 		})
 		if err != nil {
 			return fmt.Errorf("content：新增 banner：%w", err)
 		}
-		return mediaref.Changed(ctx, q, m.d.Jobs, m.d.Now().UTC(), ref)
+		return nil
 	})
 	if err != nil {
 		return model.Banner{}, err
@@ -354,11 +345,11 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 			return model.Banner{}, err
 		}
 	}
-	ref := mediaref.BannerRef(input.ID)
-	resolved, err := m.images.Resolve(ctx, input.AdminID, ref.Type,
-		images.NewSlot("PreviewImageToken", "預覽圖", input.Banner.PreviewImageToken, cur.PreviewImageKey),
-		images.NewSlot("PopupImageToken", "彈窗圖", input.Banner.PopupImageToken, cur.PopupImageKey))
-	if err != nil {
+	slots := []images.Slot{
+		images.NewSlot("PreviewImageToken", input.Banner.PreviewImageToken, cur.PreviewImageKey),
+		images.NewSlot("PopupImageToken", input.Banner.PopupImageToken, cur.PopupImageKey),
+	}
+	if err := images.Require(ctx, slots...); err != nil {
 		return model.Banner{}, err
 	}
 	action := normalizeAction(input.Banner.Action)
@@ -372,7 +363,8 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 		if err != nil {
 			return fmt.Errorf("content：鎖定 banner %s：%w", input.ID, err)
 		}
-		if err := mediaref.Reject(ctx, q, ref, images.NewCandidates(resolved...)...); err != nil {
+		resolved, err := m.images.Confirm(ctx, input.AdminID, slots...)
+		if err != nil {
 			return err
 		}
 		row, err = q.UpdateBanner(ctx, store.UpdateBannerParams{
@@ -388,8 +380,8 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 			IsActive:            input.Banner.IsActive,
 			StartDate:           input.Banner.StartsAt,
 			EndDate:             input.Banner.EndsAt,
-			PreviewImageAssetID: resolved[0].AssetPtr(),
-			PopupImageAssetID:   resolved[1].AssetPtr(),
+			PreviewImageAssetID: resolved[0].AssetID,
+			PopupImageAssetID:   resolved[1].AssetID,
 			ExpectedVersion:     input.Version,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -398,12 +390,12 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 		if err != nil {
 			return fmt.Errorf("content：修改 banner %s：%w", input.ID, err)
 		}
-		if len(images.NewAssetIDs(resolved...)) == 0 {
+		if !images.HasNew(resolved...) {
 			return nil
 		}
-		before := []string{old.PreviewImageAssetID, old.PopupImageAssetID}
+		before := []uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}
 		retired := images.Retired(before, images.After(before, resolved...))
-		return mediaref.Changed(ctx, q, m.d.Jobs, m.d.Now().UTC(), ref, retired...)
+		return m.d.Media.MarkDeleted(ctx, retired)
 	})
 	if err != nil {
 		return model.Banner{}, err
@@ -411,7 +403,7 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 	return toBanner(row), nil
 }
 
-// DeleteBanner 刪除 banner，並把它的圖記成退場、排入引用的同步（終態：沒有列的 ref 沒有目前的資產）。version 為 0 表示
+// DeleteBanner 刪除 banner，並在同一個 transaction 內把它的圖標記刪除（終態：沒有列就沒有目前的資產）。version 為 0 表示
 // 不檢查版本；不為 0 時必須與目前的相符。
 func (m *Service) DeleteBanner(ctx context.Context, id uuid.UUID, version int64) error {
 	return m.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -430,8 +422,7 @@ func (m *Service) DeleteBanner(ctx context.Context, id uuid.UUID, version int64)
 		if n == 0 {
 			return m.bannerWriteMissed(ctx, id)
 		}
-		retired := images.Retired([]string{old.PreviewImageAssetID, old.PopupImageAssetID}, nil)
-		return mediaref.Changed(ctx, q, m.d.Jobs, m.d.Now().UTC(), mediaref.BannerRef(id), retired...)
+		return m.d.Media.MarkDeleted(ctx, images.Retired([]uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}, nil))
 	})
 }
 

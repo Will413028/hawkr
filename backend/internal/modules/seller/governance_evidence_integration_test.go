@@ -3,6 +3,7 @@
 package seller_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -16,20 +17,17 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// reportWithEvidence 建立一筆附 n 張佐證的通報（登入的買家），佐證的內容放進 media 的替身。
-func (f *fixture) reportWithEvidence(t *testing.T, storeID, ownerAccountID int64, tokens ...string) Report {
+// reportWithEvidence 建立一筆附佐證的通報（登入的買家）：每個 name 放一份機敏佐證（內容是 evidencePDF(name)）。
+func (f *fixture) reportWithEvidence(t *testing.T, storeID, ownerAccountID int64, names ...string) Report {
 	t.Helper()
 	f.everExposed(t, storeID)
+	// 檢舉人（上傳者）的帳號不能是店家自己的帳號：不能檢舉自己的店。
+	reporter := ownerAccountID + 1000
 	r, err := f.module.SubmitReport(context.Background(), SubmitReportInput{
-		// 檢舉人（上傳者）的帳號不能是店家自己的帳號：不能檢舉自己的店。
-		StoreID: storeID, ReporterBuyerID: 5, AccountID: ownerAccountID + 1000, Category: policy.FoodSafety,
-		Description: "附圖", EvidenceTokens: tokens,
+		StoreID: storeID, ReporterBuyerID: 5, AccountID: reporter, Category: policy.FoodSafety,
+		Description: "附圖", EvidenceTokens: f.evidence(t, media.Uploader{ID: reporter}, names...),
 	})
 	must(t, err)
-	ref := media.Ref{Type: media.RefTypeGovernanceEvidence, ID: r.Report.ID.String()}
-	for i, e := range r.Report.Evidence {
-		f.media.PutSecure(e.ObjectKey, ref, media.SecureAsset{Data: []byte(tokens[i]), ContentType: "image/jpeg"})
-	}
 	return *r.Report
 }
 
@@ -41,34 +39,35 @@ func (f *fixture) appealable(t *testing.T) (int64, Store, Measure) {
 	return accountID, s, f.violate(t, s.StoreID, SeverityHigh, MeasureSuspension, &ends)
 }
 
-// appeal 以賣家讀到的版本對措施提出申覆。
-func (f *fixture) appeal(t *testing.T, accountID int64, m Measure, reason string, tokens ...string) Measure {
+// appeal 以賣家讀到的版本對措施提出申覆；每個 name 放一份機敏佐證（內容是 evidencePDF(name)）。
+func (f *fixture) appeal(t *testing.T, accountID int64, m Measure, reason string, names ...string) Measure {
 	t.Helper()
 	got, err := f.module.SubmitAppeal(context.Background(), SubmitAppealInput{
-		AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: reason, EvidenceTokens: tokens,
+		AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: reason, EvidenceTokens: f.evidence(t, media.Uploader{ID: accountID}, names...),
 	})
 	must(t, err)
 	return got
 }
 
-// 佐證必須是機敏上傳（Will 2026-10-04，8g）：media 回報 is_secure=false 的轉正在寫入之前就被拒絕（invalid_argument，欄位是
-// 那一張 EvidenceTokens[i]），通報與申覆都不寫入。
+// 佐證必須是機敏上傳（Will 2026-10-04，8g）：公開的圖片在寫入的 transaction 內就被拒絕（invalid_argument，欄位是
+// 那一張 EvidenceTokens[i]），通報與申覆都整筆回滾、不寫入，公開資產仍是暫存。
 func TestEvidenceMustBeSecureAssets(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s, m := f.appealable(t)
 	f.everExposed(t, s.StoreID)
-	f.media.NotSecure = true
+	reportToken, reportAsset := f.stagePublic(t, media.Uploader{ID: accountID + 1000})
+	appealToken, appealAsset := f.stagePublic(t, media.Uploader{ID: accountID})
 	_, err := f.module.SubmitReport(ctx, SubmitReportInput{
 		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: accountID + 1000, Category: policy.Fraud, Description: "附圖",
-		EvidenceTokens: []string{"p1"},
+		EvidenceTokens: []string{reportToken},
 	})
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) == 0 || ae.FieldViolations()[0].Field != "EvidenceTokens[0]" {
 		t.Fatalf("report：%v", err)
 	}
-	if _, err := f.module.SubmitAppeal(ctx, SubmitAppealInput{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "已改善", EvidenceTokens: []string{"p2"}}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.SubmitAppeal(ctx, SubmitAppealInput{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "已改善", EvidenceTokens: []string{appealToken}}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("appeal：%v", err)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != 0 {
@@ -77,10 +76,13 @@ func TestEvidenceMustBeSecureAssets(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_requests"); n != 0 {
 		t.Fatalf("被拒絕的申訴不能留下：%d", n)
 	}
-	f.media.NotSecure = false
-	if _, err := f.module.SubmitAppeal(ctx, SubmitAppealInput{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "已改善", EvidenceTokens: []string{"p2"}}); err != nil {
+	f.wantAsset(t, reportAsset, "STAGED")
+	f.wantAsset(t, appealAsset, "STAGED")
+	secure, secureAsset := f.stageSecure(t, media.Uploader{ID: accountID}, evidencePDF("p2"))
+	if _, err := f.module.SubmitAppeal(ctx, SubmitAppealInput{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "已改善", EvidenceTokens: []string{secure}}); err != nil {
 		t.Fatalf("機敏的佐證可以送：%v", err)
 	}
+	f.wantAsset(t, secureAsset, "ACTIVE")
 }
 
 // 佐證的讀取：先寫讀取紀錄（誰、哪一張、實際送出的 asset ID），commit 之後才讀 media；通報以通報 ID、申覆以請求 ID 定址，位置
@@ -94,8 +96,6 @@ func TestEvidenceReadIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	f.appeal(t, accountID, m, "已改善", "a0")
 	appealed := f.measureOf(t, m.ID)
 	request := appealed.Appeal().ID
-	f.media.PutSecure(appealed.Appeal().Evidence[0].ObjectKey, media.Ref{Type: media.RefTypeGovernanceEvidence, ID: request.String()},
-		media.SecureAsset{Data: []byte("a0"), ContentType: "application/pdf"})
 
 	for name, in := range map[string]ReadEvidenceInput{
 		"位置沒有佐證":     {AdminID: 9, Kind: EvidenceReport, RefID: report.ID, Position: 2},
@@ -117,12 +117,12 @@ func TestEvidenceReadIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 
 	got, err := f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceReport, RefID: report.ID, Position: 1})
 	must(t, err)
-	if string(got.Data) != "r1" || got.ContentType != "image/jpeg" {
+	if !bytes.Equal(got.Data, evidencePDF("r1")) || got.ContentType != "application/pdf" {
 		t.Fatalf("report evidence=%q %s", got.Data, got.ContentType)
 	}
 	got, err = f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 11, Kind: EvidenceRequest, RefID: request, Position: 0})
 	must(t, err)
-	if string(got.Data) != "a0" || got.ContentType != "application/pdf" {
+	if !bytes.Equal(got.Data, evidencePDF("a0")) || got.ContentType != "application/pdf" {
 		t.Fatalf("appeal evidence=%q %s", got.Data, got.ContentType)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.evidence_accesses WHERE report_id = $1 AND request_id IS NULL AND position = 1 AND admin_id = 9 AND accessed_at = $2",
@@ -145,18 +145,18 @@ func TestEvidenceReadIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	must(t, err)
 
 	// media 讀失敗：紀錄還在，錯誤原樣交回。
-	f.media.FailReadSecure = errors.New("media down")
+	f.media.setFailRead(errors.New("media down"))
 	if _, err := f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceReport, RefID: report.ID, Position: 0}); err == nil {
 		t.Fatal("media 失敗要回錯誤")
 	}
-	f.media.FailReadSecure = nil
+	f.media.setFailRead(nil)
 	if n := f.count(t, "SELECT count(*) FROM seller.evidence_accesses"); n != 3 {
 		t.Fatalf("accesses=%d", n)
 	}
 }
 
-// media 讀不到佐證的三種結果（與 KYC 證件相同）：引用的同步還沒結算（ErrFileNotSynced）、同步過了卻讀不到（資料不一致，
-// ErrFileMissing）、不是機敏資產（media.ErrNotSecure 原樣）。三種都先寫了讀取紀錄。
+// media 讀不到佐證的結果（與 KYC 證件相同）：我們有這份檔而 media 說沒有（資料不一致，ErrFileMissing）、不是機敏資產
+// （media.ErrNotSecure 原樣）。都先寫了讀取紀錄。
 func TestEvidenceReadFailuresAreDistinguished(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -165,25 +165,26 @@ func TestEvidenceReadFailuresAreDistinguished(t *testing.T) {
 	f.everExposed(t, s.StoreID)
 	r, err := f.module.SubmitReport(ctx, SubmitReportInput{
 		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: accountID + 1000, Category: policy.Fraud, Description: "附圖",
-		EvidenceTokens: []string{"x0"},
+		EvidenceTokens: f.evidence(t, media.Uploader{ID: accountID + 1000}, "x0"),
 	})
 	must(t, err)
 	read := func() error {
 		_, err := f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceReport, RefID: r.ReportID, Position: 0})
 		return err
 	}
-	if err := read(); !errors.Is(err, ErrFileNotSynced) || errors.Is(err, ErrFileMissing) {
-		t.Fatalf("同步還沒結算：%v", err)
+	if err := read(); err != nil {
+		t.Fatalf("正常讀取：%v", err)
 	}
-	f.syncMedia(t, media.Ref{Type: media.RefTypeGovernanceEvidence, ID: r.ReportID.String()})
-	if err := read(); !errors.Is(err, ErrFileMissing) || errors.Is(err, ErrFileNotSynced) {
-		t.Fatalf("同步過了還讀不到：%v", err)
+	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE media.assets SET state = 'DELETING' WHERE id = (SELECT asset_id FROM seller.report_evidence WHERE report_id = $1)", r.ReportID)
+	must(t, err)
+	if err := read(); !errors.Is(err, ErrFileMissing) {
+		t.Fatalf("media 說沒有：%v", err)
 	}
-	f.media.FailReadSecure = media.ErrNotSecure
+	f.media.setFailRead(media.ErrNotSecure)
 	if err := read(); !errors.Is(err, media.ErrNotSecure) || errors.Is(err, ErrFileMissing) || apperr.KindOf(err) == apperr.KindNotFound {
 		t.Fatalf("不是機敏資產：%v", err)
 	}
-	f.media.FailReadSecure = nil
+	f.media.setFailRead(nil)
 	if n := f.count(t, "SELECT count(*) FROM seller.evidence_accesses"); n != 3 {
 		t.Fatalf("三次嘗試都要有紀錄：%d", n)
 	}

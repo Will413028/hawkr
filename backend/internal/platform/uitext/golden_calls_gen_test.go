@@ -52,6 +52,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "media.RejectReason":
+		return t.MediaRejectReason(goldenEnum(c.Value, "REJECT_REASON_"))
 	case "moderation.ReportOutcome":
 		return t.ModerationReportOutcome(goldenEnum(c.Value, "REPORT_OUTCOME_"))
 	case "moderation.ReportTargetKind":

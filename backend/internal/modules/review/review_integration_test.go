@@ -15,9 +15,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 // 每條 RD 一個回歸測試（step-1-design.md §8）；這些測試只跑在 CI（真 Postgres）。RD4 的刪帳與 purge 在 A6-1c。
@@ -250,21 +250,27 @@ func TestRD7AtMostFourImages(t *testing.T) {
 	storeID := f.exposableStore(t)
 	b := f.newBuyer(t)
 	it := f.order(b, storeID, 700)
-	_, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{"a", "b", "c", "d", "e"}})
+	tokens, assets := f.stage(t, b, 5)
+	_, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: tokens})
 	if kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("5 個 token 要被擋：%v", err)
 	}
 	if n := f.scalar(t, "SELECT count(*) FROM review.reviews"); n != 0 {
 		t.Fatalf("被擋的提交不留評價：%d", n)
 	}
-	r := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{"a", "b", "c", "d"}}))
-	if len(r.Images) != 4 || r.Images[0].AssetID != media.AssetFor("a") || r.Images[3].ObjectKey != "review/d.jpg" {
+	if got := f.assetState(t, assets[0]); got != "STAGED" {
+		t.Fatalf("被擋的提交不得確認圖片：%s", got)
+	}
+	r := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: tokens[:4]}))
+	if len(r.Images) != 4 || r.Images[0].AssetID != assets[0] || r.Images[3].AssetID != assets[3] {
 		t.Fatalf("四張圖依序存下：%+v", r.Images)
 	}
-	if f.jobs.count("review.media_sync") != 1 {
-		t.Fatalf("提交排一個媒體同步 job：%v", f.jobs.kinds())
+	for _, a := range assets[:4] {
+		if got := f.assetState(t, a); got != "ACTIVE" {
+			t.Fatalf("提交後資產 state=%s，預期 ACTIVE", got)
+		}
 	}
-	_, err = f.db.Conn(ctx).Exec(ctx, "INSERT INTO review.review_images (review_id, position, asset_id, object_key) VALUES ($1, 4, 'x', 'y')", r.ID)
+	_, err = f.db.Conn(ctx).Exec(ctx, "INSERT INTO review.review_images (review_id, position, asset_id, object_key) VALUES ($1, 4, $2, 'y')", r.ID, uuid.NewV7())
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != "23514" || pgErr.ConstraintName != "review_images_position_check" {
 		t.Fatalf("第 5 張圖要被 CHECK 擋下：%v", err)
@@ -471,7 +477,8 @@ func TestListFiltersAndKeysetAcrossTimestamps(t *testing.T) {
 	storeID := f.exposableStore(t)
 	b := f.newBuyer(t)
 	it := f.order(b, storeID, 700)
-	withImg := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 2, StagedTokens: []string{"p1"}}))
+	oneToken, _ := f.stage(t, b, 1)
+	withImg := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 2, StagedTokens: oneToken}))
 	f.advance(time.Minute)
 	plain := f.submit(t, f.newBuyer(t), storeID, 700, 5, "")
 
@@ -498,11 +505,12 @@ func TestReviewImageAssetIsUniquePerReview(t *testing.T) {
 	storeID := f.exposableStore(t)
 	b := f.newBuyer(t)
 	it := f.order(b, storeID, 700)
-	_, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{"a", "a"}})
+	tokens, _ := f.stage(t, b, 1)
+	_, err := f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{tokens[0], tokens[0]}})
 	if kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("重複 token 要被擋：%v", err)
 	}
-	r := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{"a"}}))
+	r := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: tokens}))
 	_, err = f.db.Conn(ctx).Exec(ctx, "INSERT INTO review.review_images (review_id, position, asset_id, object_key) VALUES ($1, 1, $2, 'y')", r.ID, r.Images[0].AssetID)
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != "23505" || pgErr.ConstraintName != "review_images_asset_key" {
@@ -585,5 +593,55 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 	}
 	if _, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判", SourceRef: "case-1"}); err != nil {
 		t.Fatalf("來源相符可還原：%v", err)
+	}
+}
+
+// 回滾：提交的 transaction 在 Confirm 之後失敗，沒有評價、附圖仍是暫存，同一組 token 重送成功。
+func TestRolledBackSubmitLeavesTheImagesStaged(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	b := f.newBuyer(t)
+	it := f.order(b, storeID, 700)
+	tokens, assets := f.stage(t, b, 2)
+	fail := true
+	events.Subscribe(f.bus, func(context.Context, review.ReviewCreated) error {
+		if fail {
+			return errors.New("boom")
+		}
+		return nil
+	})
+	in := review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: tokens}
+	if _, err := f.module.Submit(ctx, in); err == nil {
+		t.Fatal("訂閱者失敗應讓提交回滾")
+	}
+	for _, a := range assets {
+		if got := f.assetState(t, a); got != "STAGED" {
+			t.Fatalf("回滾後資產 state=%s，預期 STAGED", got)
+		}
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM review.reviews"); n != 0 {
+		t.Fatalf("回滾後不得有評價：%d", n)
+	}
+	fail = false
+	if _, err := f.module.Submit(ctx, in); err != nil {
+		t.Fatalf("回滾後同一組 token 重送應成功：%v", err)
+	}
+}
+
+// 別人的 token 不能確認：回錯誤，沒有評價，資產維持暫存。
+func TestSubmitRefusesATokenStagedByAnotherAccount(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	storeID := f.exposableStore(t)
+	b, other := f.newBuyer(t), f.newBuyer(t)
+	it := f.order(b, storeID, 700)
+	tokens, assets := f.stage(t, other, 1)
+	if _, err := f.module.Submit(context.Background(), review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: tokens}); err == nil {
+		t.Fatal("別的帳號的 token 應被拒絕")
+	}
+	if got := f.assetState(t, assets[0]); got != "STAGED" {
+		t.Fatalf("state=%s，預期 STAGED", got)
 	}
 }

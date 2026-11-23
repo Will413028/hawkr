@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 	"unicode/utf8"
 
@@ -18,6 +19,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
@@ -37,6 +39,10 @@ import (
 
 // maxAttempts 是遇到並行競爭（案件在掛上檢舉前被結掉、同一位檢舉人並行重送）時整個 transaction 重來的上限。
 const maxAttempts = 4
+
+// maxCopyRounds 是證據圖片複製的輪數上限：圖片要在 transaction 外複製，所以 transaction 發現要建新快照、而複本還沒備好時回滾，複製完再重來；
+// 內容在兩輪之間又換了圖片才會多一輪。
+const maxCopyRounds = 3
 
 var errRetry = errors.New("moderation：並行競爭，重來")
 
@@ -58,21 +64,35 @@ type Deps struct {
 	IM     Chats
 	Seller *seller.Module
 	Buyer  *buyer.Module
-	Holds  Holds
+	Media  Media
 	NewID  func() uuid.UUID
 	Now    func() time.Time
 }
 
-// Holds 登記快照引用的圖片資產（A7-D21 證據保全）；必須在呼叫方的 transaction 內。
-type Holds interface {
-	Hold(ctx context.Context, snapshotID uuid.UUID, now time.Time, assetIDs []string) error
+// Media 是證據快照對 media 的依賴（B1-D20）：圖片在 transaction 外複製成新資產，在建快照的 transaction 內 Confirm；擁有者的流程沒有 MarkDeleted，
+// 快照的複本只由保留期清理在快照過期時刪除（retention）。
+type Media interface {
+	CopyPublic(ctx context.Context, uploader media.Uploader, sourceID uuid.UUID) (media.PutPublicResult, error)
+	Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error)
 }
 
+// needCopies 讓 transaction 回滾：要建新快照，而這些來源圖片還沒有複本。
+type needCopies struct{ sources []string }
+
+func (needCopies) Error() string { return "moderation：快照的圖片還沒有複本" }
+
 // Service 是檢舉送出的 use case。
-type Service struct{ d Deps }
+type Service struct {
+	d         Deps
+	accountOf func(ctx context.Context, in model.SubmitInput) (int64, error)
+}
 
 // New 建立服務。
-func New(d Deps) *Service { return &Service{d: d} }
+func New(d Deps) *Service {
+	s := &Service{d: d}
+	s.accountOf = s.reporterAccountID
+	return s
+}
 
 // Validate 檢查輸入的形狀並正規化說明（去頭尾空白）；不查資料庫。
 func Validate(ctx context.Context, in model.SubmitInput) (model.SubmitInput, error) {
@@ -107,19 +127,105 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 	if err != nil {
 		return model.SubmitResult{}, err
 	}
-	for range maxAttempts {
+	copies := map[string]string{}
+	for attempts, rounds := 0, 0; attempts < maxAttempts; {
 		var out model.SubmitResult
 		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 			var err error
-			out, err = s.attempt(ctx, in)
+			out, err = s.attempt(ctx, in, copies)
 			return err
 		})
-		if errors.Is(err, errRetry) {
-			continue
+		var need needCopies
+		switch {
+		case errors.As(err, &need):
+			if rounds++; rounds > maxCopyRounds {
+				return model.SubmitResult{}, fmt.Errorf("moderation：送出檢舉連續 %d 輪複製證據圖片，內容仍在變動", maxCopyRounds)
+			}
+			if err := s.copySources(ctx, in, need.sources, copies); err != nil {
+				if apperr.KindOf(err) != apperr.KindNotFound {
+					return model.SubmitResult{}, err
+				}
+				attempts++
+			}
+		case errors.Is(err, errRetry):
+			attempts++
+		default:
+			return out, err
 		}
-		return out, err
 	}
 	return model.SubmitResult{}, fmt.Errorf("moderation：送出檢舉連續 %d 次遇到並行競爭", maxAttempts)
+}
+
+// uploader 是複本在 media 的上傳者：檢舉人本人的帳號 ID（買家由 stint 解析、店家取店家的帳號），複製與 Confirm 用同一個值。
+func (s *Service) uploader(ctx context.Context, in model.SubmitInput) (media.Uploader, error) {
+	accountID, err := s.accountOf(ctx, in)
+	if err != nil {
+		return media.Uploader{}, err
+	}
+	return media.Uploader{ID: accountID}, nil
+}
+
+func (s *Service) reporterAccountID(ctx context.Context, in model.SubmitInput) (int64, error) {
+	if in.ReporterStoreID > 0 {
+		st, err := s.d.Seller.Store(ctx, in.ReporterStoreID)
+		if err != nil {
+			return 0, err
+		}
+		return st.AccountID, nil
+	}
+	return s.d.Buyer.AccountIDByBuyerID(ctx, in.ReporterBuyerID)
+}
+
+// copySources 在 transaction 外把來源圖片各複製一份，token 記進 copies。來源已經不是已確認的資產（內容在檢舉當下被換掉或刪除）時回 NotFound，由呼叫方重來、重新凍結內容。
+func (s *Service) copySources(ctx context.Context, in model.SubmitInput, sources []string, copies map[string]string) error {
+	up, err := s.uploader(ctx, in)
+	if err != nil {
+		return err
+	}
+	for _, src := range sources {
+		if _, ok := copies[src]; ok {
+			continue
+		}
+		id, err := uuid.Parse(src)
+		if err != nil {
+			return fmt.Errorf("moderation：快照的圖片資產 ID %q 不是 UUID：%w", src, err)
+		}
+		res, err := s.d.Media.CopyPublic(ctx, up, id)
+		if err != nil {
+			return err
+		}
+		copies[src] = res.Token
+	}
+	return nil
+}
+
+// ownCopies 在建快照的 transaction 內把每張來源圖片的複本 Confirm 成 moderation 自己的資產，回傳換掉圖片參照的內容與複本的 ID；複本還沒備好回 needCopies。
+func (s *Service) ownCopies(ctx context.Context, in model.SubmitInput, content snapshot.Content, sources []string, copies map[string]string) (snapshot.Content, []uuid.UUID, error) {
+	var missing []string
+	for _, src := range sources {
+		if _, ok := copies[src]; !ok {
+			missing = append(missing, src)
+		}
+	}
+	if len(missing) > 0 {
+		return snapshot.Content{}, nil, needCopies{sources: missing}
+	}
+	up, err := s.uploader(ctx, in)
+	if err != nil {
+		return snapshot.Content{}, nil, err
+	}
+	to := make(map[string]string, len(sources))
+	owned := make([]uuid.UUID, 0, len(sources))
+	for _, src := range sources {
+		a, err := s.d.Media.Confirm(ctx, up, copies[src])
+		if err != nil {
+			return snapshot.Content{}, nil, fmt.Errorf("moderation：確認證據圖片 %s 的複本：%w", src, err)
+		}
+		to[src] = a.ID.String()
+		owned = append(owned, a.ID)
+	}
+	slices.SortFunc(owned, func(a, b uuid.UUID) int { return bytes.Compare(a[:], b[:]) })
+	return content.ReplaceAssets(to), owned, nil
 }
 
 // lockReporter 以 FOR KEY SHARE 鎖檢舉人的擁有者列：買家尚未關閉（刪除中放行）、店家尚未退場；否則回檢舉人專屬的 NotFound。
@@ -136,7 +242,7 @@ func (s *Service) lockReporter(ctx context.Context, in model.SubmitInput) error 
 	return err
 }
 
-func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.SubmitResult, error) {
+func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[string]string) (model.SubmitResult, error) {
 	// 檢舉人的擁有者守門鎖先於 moderation 的任何列（buyer、seller 先於 moderation）：關閉或退場的訂閱者清檢舉人資料時，並行的送出與轉移在擁有者列上序列化。
 	// 必要條件：店家檢舉人已退場時，新檢舉在凍結內容（CapChatRead）已回 NotFound，鎖要擋的是凍結之前就返回、卻會寫 report_requests 的路徑（併入進行中案件的 recordRequest）與重送；買家檢舉人沒有這道前置擋，鎖是唯一的守門。
 	if err := s.lockReporter(ctx, in); err != nil {
@@ -176,7 +282,7 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 	if err != nil {
 		return model.SubmitResult{}, err
 	}
-	body, sum := snapshot.Encode(content)
+	_, sum := snapshot.Encode(content)
 	now := s.d.Now().UTC()
 
 	if _, err := s.bump(ctx, q, in, now); errors.Is(err, pgx.ErrNoRows) {
@@ -202,19 +308,36 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput) (model.Subm
 		}
 	}
 
+	stored, owned := content, []uuid.UUID{}
+	if sources := content.AssetIDs(); len(sources) > 0 {
+		// 同一案同一份內容（雜湊取自檢舉當下的內容）已有快照就沿用它，不再複製圖片；要建新快照才複製。
+		_, err := q.SnapshotIDByHash(ctx, store.SnapshotIDByHashParams{CaseID: c.ID, ContentSha256: sum[:]})
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			if stored, owned, err = s.ownCopies(ctx, in, content, sources, copies); err != nil {
+				return model.SubmitResult{}, err
+			}
+		case err != nil:
+			return model.SubmitResult{}, fmt.Errorf("moderation：查既有的快照：%w", err)
+		}
+	}
+	body, _ := snapshot.Encode(stored)
+
 	snapshotID := s.d.NewID()
 	n, err := q.InsertSnapshot(ctx, store.InsertSnapshotParams{
-		ID: snapshotID, CaseID: c.ID, ContentSha256: sum[:], Content: body, AssetIds: content.AssetIDs(), CapturedAt: now,
+		ID: snapshotID, CaseID: c.ID, ContentSha256: sum[:], Content: body, AssetIds: owned, CapturedAt: now,
 	})
 	if err != nil {
 		return model.SubmitResult{}, fmt.Errorf("moderation：寫入快照：%w", err)
 	}
-	if n == 1 {
-		if err := s.d.Holds.Hold(ctx, snapshotID, now, content.AssetIDs()); err != nil {
-			return model.SubmitResult{}, err
+	if n == 0 && len(owned) > 0 {
+		// 並行的另一筆檢舉搶先建了同一份快照：這一輪確認的複本沒有任何列指著，整輪回滾（複本回到未確認，由 media 回收），重來時沿用對方的快照。
+		return model.SubmitResult{}, errRetry
+	}
+	if n == 0 {
+		if snapshotID, err = q.SnapshotIDByHash(ctx, store.SnapshotIDByHashParams{CaseID: c.ID, ContentSha256: sum[:]}); err != nil {
+			return model.SubmitResult{}, fmt.Errorf("moderation：讀取快照：%w", err)
 		}
-	} else if snapshotID, err = q.SnapshotIDByHash(ctx, store.SnapshotIDByHashParams{CaseID: c.ID, ContentSha256: sum[:]}); err != nil {
-		return model.SubmitResult{}, fmt.Errorf("moderation：讀取快照：%w", err)
 	}
 	var desc *string
 	if in.Description != "" {

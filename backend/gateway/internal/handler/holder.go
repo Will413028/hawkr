@@ -18,7 +18,6 @@ type Holder struct {
 	Product       *grpcclient.ProductClient
 	Order         *grpcclient.OrderClient
 	Payment       *grpcclient.PaymentClient
-	Media         *grpcclient.MediaClient
 	Cart          *grpcclient.CartClient
 	IM            *grpcclient.IMClient
 	Notification  *grpcclient.NotificationClient

@@ -17,7 +17,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -328,7 +327,7 @@ func rowJSON(t *testing.T, d *db.DB, query string, args ...any) string {
 }
 
 // 重跑 dev-seed 是 idempotent 的 upsert：種子店家留下已解除的停權、改過資料之後回到 fixture 而且可曝光，公告版本只增不減（全量重新公告之後嚴格變大，在途的
-// 舊事件版本較低，Java 才會正確丟棄）；種子以外的店家（帳號在種子區間之外，經開店路徑取得 SELLER）、它的公告列、SELLER 角色與 media ref 列
+// 舊事件版本較低，Java 才會正確丟棄）；種子以外的店家（帳號在種子區間之外，經開店路徑取得 SELLER）、它的公告列、SELLER 角色
 // 原封不動；IDENTITY 序號不倒退。
 func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.T) {
 	ctx := context.Background()
@@ -347,19 +346,16 @@ func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.
 	newAccount(t, d, 50001)
 	userStore := openStore(t, 50001, "使用者的店")
 	// 種子店家被使用過：留下已撤銷的停權措施與已結束的期間、改了店名與地址（沒有生效中的生命週期狀態：那些種子會拒絕，見
-	// TestDevSeedRefusesLifecycleStateItWouldHaveToRevert）、有使用者排進來的 media ref 列。
+	// TestDevSeedRefusesLifecycleStateItWouldHaveToRevert）。
 	insertRiskSuspension(t, d, ids[0], true)
 	exec(`INSERT INTO seller.suspension_periods (store_id, started_at, ended_at) VALUES ($1, now() - interval '2 hours', now() - interval '1 hour')`, ids[0])
 	exec(`UPDATE seller.stores SET store_name = '被改過', town_code = '63000050', prize = '獎', version = version + 1 WHERE store_id = $1`, ids[1])
-	exec(`INSERT INTO seller.media_ref_sync (ref_type, ref_id, seq, synced_seq, updated_at) VALUES ('SELLER_LOGO', $1, 3, 3, now())`, strconv.FormatInt(ids[0], 10))
-	exec(`INSERT INTO seller.retired_assets (ref_type, ref_id, asset_id, retired_at) VALUES ('SELLER_LOGO', $1, 'old-asset', now())`, strconv.FormatInt(ids[0], 10))
 	if err := runReannounceExposures(ctx, nil, new(bytes.Buffer)); err != nil {
 		t.Fatal(err)
 	}
 	before := exposureVersions(t, d)
 	userBefore := rowJSON(t, d, `SELECT to_jsonb(s)::text FROM seller.stores s WHERE store_id = $1`, userStore)
 	roleBefore := rowJSON(t, d, `SELECT to_jsonb(r)::text FROM identity.account_roles r WHERE account_id = 50001`)
-	refBefore := rowJSON(t, d, `SELECT (SELECT to_jsonb(m)::text FROM seller.media_ref_sync m LIMIT 1) || (SELECT to_jsonb(r)::text FROM seller.retired_assets r LIMIT 1)`)
 	var seqBefore int64
 	if err := d.Pool().QueryRow(ctx, `SELECT last_value FROM pg_sequences WHERE schemaname = 'seller' AND sequencename = 'stores_store_id_seq'`).Scan(&seqBefore); err != nil {
 		t.Fatal(err)
@@ -414,9 +410,6 @@ func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.
 	}
 	if now := rowJSON(t, d, `SELECT to_jsonb(r)::text FROM identity.account_roles r WHERE account_id = 50001`); now != roleBefore {
 		t.Errorf("使用者的 SELLER 角色被改動：%s → %s", roleBefore, now)
-	}
-	if now := rowJSON(t, d, `SELECT (SELECT to_jsonb(m)::text FROM seller.media_ref_sync m LIMIT 1) || (SELECT to_jsonb(r)::text FROM seller.retired_assets r LIMIT 1)`); now != refBefore {
-		t.Errorf("media ref 列被改動：%s → %s", refBefore, now)
 	}
 	if n := count(t, d, `SELECT count(*) FROM seller.stores`); n != 3 {
 		t.Errorf("seller.stores 有 %d 列，want 2 家種子加 1 家使用者的店", n)
@@ -568,7 +561,7 @@ func insertViolationMeasure(t *testing.T, d *db.DB, storeID int64, id, kind stri
 	if withAppeal {
 		exec(`INSERT INTO seller.measure_requests (id, measure_id, kind, state, reason, revision, submitted_at, basis)
 			SELECT $1::uuid, $1::uuid, 'APPEAL', 'PENDING', 'r', 1, now(), basis FROM seller.measures WHERE id = $1`, id)
-		exec(`INSERT INTO seller.measure_request_evidence (request_id, position, asset_id, object_key) VALUES ($1, 0, 'appeal-asset-1', 'secure/a1')`, id)
+		exec(`INSERT INTO seller.measure_request_evidence (request_id, position, asset_id, object_key) VALUES ($1, 0, '00000000-0000-7000-8000-0000000000c1', 'secure/a1')`, id)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
@@ -726,54 +719,22 @@ func TestDevSeedPublishesTheProfileChangedEventWhenItRestoresTheProfile(t *testi
 	}
 }
 
-// 種子刪掉的 KYC 證件、通報與申訴的佐證圖片，先經模組的退場機制記成 retired_assets 並遞增 ref 的 seq（排同步 job），media 的引用才釋放；
-// 業務列照樣被刪、種子不留孤兒。
-func TestDevSeedRetiresTheAssetsOfTheEvidenceItDeletes(t *testing.T) {
+// 種子刪掉的 KYC 證件，它的 media 資產在同一個 transaction 內 MarkDeleted（media 對不存在的資產不動作）；通報與申訴的佐證沒有刪除路徑，
+// 資產不 MarkDeleted。業務列照樣被刪。
+func TestDevSeedDeletesTheEvidenceRowsItOwns(t *testing.T) {
 	d := devSeedEnv(t)
 	seedOK(t)
 	id := devSeedStores()[0].StoreID
 	app := rowJSON(t, d, `SELECT application_id::text FROM seller.kyc_applications WHERE store_id = $1`, id)
-	mustExec(t, d, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ($1, 0, 'kyc-asset-1', 'secure/k1')`, app)
+	mustExec(t, d, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ($1, 0, '00000000-0000-7000-8000-0000000000c2', 'secure/k1')`, app)
 	mustExec(t, d, `INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at)
 		VALUES ('00000000-0000-7000-8000-0000000000a1', $1, 'OTHER', 'd', 7, now(), now())`, id)
-	mustExec(t, d, `INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('00000000-0000-7000-8000-0000000000a1', 0, 0, 'report-asset-1', 'secure/r1')`)
+	mustExec(t, d, `INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('00000000-0000-7000-8000-0000000000a1', 0, 0, '00000000-0000-7000-8000-0000000000c3', 'secure/r1')`)
 	insertViolationMeasure(t, d, id, "00000000-0000-7000-8000-0000000000b1", "WARNING", true)
 	seedOK(t)
-	for _, tc := range []struct{ refType, refID, asset string }{
-		{media.RefTypeCertification, app, "kyc-asset-1"},
-		{media.RefTypeGovernanceEvidence, "00000000-0000-7000-8000-0000000000a1", "report-asset-1"},
-		{media.RefTypeGovernanceEvidence, "00000000-0000-7000-8000-0000000000b1", "appeal-asset-1"},
-	} {
-		if n := count(t, d, `SELECT count(*) FROM seller.retired_assets WHERE ref_type = $1 AND ref_id = $2 AND asset_id = $3 AND unlinked_at IS NULL`, tc.refType, tc.refID, tc.asset); n != 1 {
-			t.Errorf("%s/%s 的資產 %s 沒有記成退場", tc.refType, tc.refID, tc.asset)
-		}
-		if n := count(t, d, `SELECT count(*) FROM seller.media_ref_sync WHERE ref_type = $1 AND ref_id = $2 AND seq > synced_seq`, tc.refType, tc.refID); n != 1 {
-			t.Errorf("%s/%s 的 ref 沒有排入同步（seq 沒有遞增）", tc.refType, tc.refID)
-		}
-	}
-	if n := count(t, d, `SELECT (SELECT count(*) FROM seller.report_evidence) + (SELECT count(*) FROM seller.measure_request_evidence) + (SELECT count(*) FROM seller.reports) + (SELECT count(*) FROM seller.violations)
-		+ (SELECT count(*) FROM seller.measures) + (SELECT count(*) FROM seller.measure_requests) + (SELECT count(*) FROM seller.measure_revisions) + (SELECT count(*) FROM seller.governance_notes) + (SELECT count(*) FROM seller.measure_findings) + (SELECT count(*) FROM seller.kyc_documents)`); n != 0 {
-		t.Errorf("使用痕跡沒有刪乾淨：%d 列", n)
-	}
-	if n := count(t, d, `SELECT count(*) FROM river.river_job WHERE kind = 'seller.media_sync'`); n < 3 {
-		t.Errorf("seller.media_sync job 有 %d 個，want 至少 3 個（每個 ref 一個）", n)
-	}
-}
-
-// 已經退場的資產不能重新成為目前的 logo（current 與 retired 不相交）：店家沒有 logo 時補 fixture 的，fixture 的資產 ID 若已在 logo ref 的退場名單，換一個沒用過的。
-func TestDevSeedLogoNeverReusesARetiredAsset(t *testing.T) {
-	d := devSeedEnv(t)
-	seedOK(t)
-	st := devSeedStores()[0]
-	mustExec(t, d, `UPDATE seller.stores SET logo_key = NULL, logo_asset_id = NULL WHERE store_id = $1`, st.StoreID)
-	mustExec(t, d, `INSERT INTO seller.retired_assets (ref_type, ref_id, asset_id, retired_at) VALUES ($1, $2, $3, now())`, media.RefTypeSellerLogo, strconv.FormatInt(st.StoreID, 10), st.LogoAssetID)
-	seedOK(t)
-	got := rowJSON(t, d, `SELECT logo_asset_id FROM seller.stores WHERE store_id = $1`, st.StoreID)
-	if got == st.LogoAssetID || got == "" {
-		t.Fatalf("logo 資產 = %q，不該重用已退場的 %q", got, st.LogoAssetID)
-	}
-	if n := count(t, d, `SELECT count(*) FROM seller.stores s JOIN seller.retired_assets r ON r.ref_type = $1 AND r.ref_id = s.store_id::text AND r.asset_id = s.logo_asset_id`, media.RefTypeSellerLogo); n != 0 {
-		t.Errorf("%d 家店的目前 logo 在退場名單裡", n)
+	if n := count(t, d, `SELECT (SELECT count(*) FROM seller.kyc_documents WHERE asset_id IN ('00000000-0000-7000-8000-0000000000c1', '00000000-0000-7000-8000-0000000000c2', '00000000-0000-7000-8000-0000000000c3'))
+		+ (SELECT count(*) FROM seller.report_evidence) + (SELECT count(*) FROM seller.measure_request_evidence)`); n != 0 {
+		t.Errorf("種子的證件與佐證列沒有刪乾淨：%d 列", n)
 	}
 }
 

@@ -69,7 +69,7 @@ func inquiryFixture(state model.InquiryState) model.AdminInquiry {
 	case model.InquiryStateReplied:
 		i.Reply = &model.InquiryReply{
 			Body: "已附上", Channel: model.InquiryChannelMessaging, ReceivedAt: governanceNow.Add(time.Hour), RecordedAt: governanceNow.Add(2 * time.Hour), RecordedByAdminID: 8,
-			Evidence: []model.Evidence{{AssetID: "asset-secret-1", ObjectKey: "key-secret-1", Position: 0}, {AssetID: "asset-secret-2", ObjectKey: "key-secret-2", Position: 1}},
+			Evidence: []model.Evidence{{AssetID: secretAssets[0], ObjectKey: "key-secret-1", Position: 0}, {AssetID: secretAssets[1], ObjectKey: "key-secret-2", Position: 1}},
 		}
 	case model.InquiryStateWithdrawn:
 		i.Withdrawn = &model.InquiryWithdrawal{At: governanceNow.Add(time.Hour), AdminID: 9, Cause: model.InquiryWithdrawCaseClosed}
@@ -127,7 +127,7 @@ func TestCaseInquiryCarriesStateDueAndAvailabilityWithoutReasons(t *testing.T) {
 			t.Errorf("evidence[%d]=%v，預期 %s", n, e, want)
 		}
 	}
-	if raw := protojson.Format(replied); strings.Contains(raw, "asset-secret") || strings.Contains(raw, "key-secret") {
+	if raw := protojson.Format(replied); leaksSecretAsset(raw) || strings.Contains(raw, "key-secret") {
 		t.Fatalf("附件的 asset ID 與 object key 不得出現在回應：%s", raw)
 	}
 	withdrawn := toCaseInquiry(inquiryFixture(model.InquiryStateWithdrawn))

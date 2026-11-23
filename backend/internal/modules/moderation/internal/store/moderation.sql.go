@@ -66,24 +66,6 @@ func (q *Queries) BumpDailyCount(ctx context.Context, arg BumpDailyCountParams) 
 	return submitted, err
 }
 
-const bumpRefSeq = `-- name: BumpRefSeq :exec
-INSERT INTO moderation.media_ref_sync (ref_type, ref_id, updated_at)
-VALUES ($1, $2, $3)
-ON CONFLICT (ref_type, ref_id) DO UPDATE SET seq = moderation.media_ref_sync.seq + 1, updated_at = EXCLUDED.updated_at
-`
-
-type BumpRefSeqParams struct {
-	RefType string
-	RefID   string
-	Now     time.Time
-}
-
-// ref 的資產改變了：遞增版本（沒有列時建立）並記下變動時間。與同步 job 的結算比對同一列，互相等待。
-func (q *Queries) BumpRefSeq(ctx context.Context, arg BumpRefSeqParams) error {
-	_, err := q.db.Exec(ctx, bumpRefSeq, arg.RefType, arg.RefID, arg.Now)
-	return err
-}
-
 const bumpStoreDailyCount = `-- name: BumpStoreDailyCount :one
 INSERT INTO moderation.reporter_daily_counts AS c (reporter_store_id, day, submitted)
 VALUES ($1, $2, 1)
@@ -257,17 +239,29 @@ func (q *Queries) DeleteReporterRequests(ctx context.Context, reporterBuyerID *i
 	return result.RowsAffected(), nil
 }
 
-const deleteSnapshots = `-- name: DeleteSnapshots :execrows
-DELETE FROM moderation.case_snapshots WHERE id = ANY($1::uuid[])
+const deleteSnapshots = `-- name: DeleteSnapshots :many
+DELETE FROM moderation.case_snapshots WHERE id = ANY($1::uuid[]) RETURNING asset_ids
 `
 
-// 刪快照，檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
-func (q *Queries) DeleteSnapshots(ctx context.Context, ids []uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSnapshots, ids)
+// 刪快照並回傳各自擁有的圖片資產（呼叫方在同一個 transaction 內 MarkDeleted）；檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
+func (q *Queries) DeleteSnapshots(ctx context.Context, ids []uuid.UUID) ([][]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, deleteSnapshots, ids)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := [][]uuid.UUID{}
+	for rows.Next() {
+		var asset_ids []uuid.UUID
+		if err := rows.Scan(&asset_ids); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_ids)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const deleteStoreReporterDailyCount = `-- name: DeleteStoreReporterDailyCount :execrows
@@ -335,7 +329,7 @@ func (q *Queries) ExistingOpenReport(ctx context.Context, arg ExistingOpenReport
 }
 
 const expiredSnapshotsBatch = `-- name: ExpiredSnapshotsBatch :many
-SELECT s.id, s.asset_ids FROM moderation.case_snapshots s
+SELECT s.id FROM moderation.case_snapshots s
 JOIN moderation.cases c ON c.id = s.case_id
 WHERE c.closed_at IS NOT NULL AND c.closed_at < $1
 ORDER BY s.id
@@ -348,25 +342,20 @@ type ExpiredSnapshotsBatchParams struct {
 	MaxRows int32
 }
 
-type ExpiredSnapshotsBatchRow struct {
-	ID       uuid.UUID
-	AssetIds []string
-}
-
-// 結案早於 cutoff 的案件的快照（與它們引用的資產）：鎖住這些列，同一個 transaction 內釋放資產引用再刪除。
-func (q *Queries) ExpiredSnapshotsBatch(ctx context.Context, arg ExpiredSnapshotsBatchParams) ([]ExpiredSnapshotsBatchRow, error) {
+// 結案早於 cutoff 的案件的快照：鎖住這些列，同一個 transaction 內刪除。
+func (q *Queries) ExpiredSnapshotsBatch(ctx context.Context, arg ExpiredSnapshotsBatchParams) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, expiredSnapshotsBatch, arg.Cutoff, arg.MaxRows)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ExpiredSnapshotsBatchRow{}
+	items := []uuid.UUID{}
 	for rows.Next() {
-		var i ExpiredSnapshotsBatchRow
-		if err := rows.Scan(&i.ID, &i.AssetIds); err != nil {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -399,26 +388,6 @@ func (q *Queries) GetCase(ctx context.Context, id uuid.UUID) (ModerationCase, er
 		&i.ReverseReason,
 	)
 	return i, err
-}
-
-const healingRetired = `-- name: HealingRetired :one
-SELECT EXISTS (
-    SELECT 1 FROM moderation.retired_assets
-    WHERE ref_type = $1 AND ref_id = $2 AND unlinked_at >= $3
-)
-`
-
-type HealingRetiredParams struct {
-	RefType    string
-	RefID      string
-	HealBefore *time.Time
-}
-
-func (q *Queries) HealingRetired(ctx context.Context, arg HealingRetiredParams) (bool, error) {
-	row := q.db.QueryRow(ctx, healingRetired, arg.RefType, arg.RefID, arg.HealBefore)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
 }
 
 const insertBuyerCase = `-- name: InsertBuyerCase :one
@@ -576,7 +545,7 @@ func (q *Queries) InsertReportRequest(ctx context.Context, arg InsertReportReque
 
 const insertSnapshot = `-- name: InsertSnapshot :execrows
 INSERT INTO moderation.case_snapshots (id, case_id, content_sha256, content, asset_ids, captured_at)
-VALUES ($1, $2, $3, $4, $5::text[], $6)
+VALUES ($1, $2, $3, $4, $5::uuid[], $6)
 ON CONFLICT (case_id, content_sha256) DO NOTHING
 `
 
@@ -585,7 +554,7 @@ type InsertSnapshotParams struct {
 	CaseID        uuid.UUID
 	ContentSha256 []byte
 	Content       string
-	AssetIds      []string
+	AssetIds      []uuid.UUID
 	CapturedAt    time.Time
 }
 
@@ -893,29 +862,6 @@ func (q *Queries) ListReportsOfReporter(ctx context.Context, arg ListReportsOfRe
 	return items, nil
 }
 
-const markUnlinked = `-- name: MarkUnlinked :exec
-UPDATE moderation.retired_assets
-SET unlinked_at = COALESCE(unlinked_at, $1)
-WHERE ref_type = $2 AND ref_id = $3 AND asset_id = ANY($4::text[])
-`
-
-type MarkUnlinkedParams struct {
-	Now      *time.Time
-	RefType  string
-	RefID    string
-	AssetIds []string
-}
-
-func (q *Queries) MarkUnlinked(ctx context.Context, arg MarkUnlinkedParams) error {
-	_, err := q.db.Exec(ctx, markUnlinked,
-		arg.Now,
-		arg.RefType,
-		arg.RefID,
-		arg.AssetIds,
-	)
-	return err
-}
-
 const openCaseByTarget = `-- name: OpenCaseByTarget :one
 SELECT id, target_kind, content_id, buyer_id, version, opened_at, decision, decision_category, decision_action, decided_by_admin_id, closed_at, measure_id, reversed_at, reversed_by_admin_id, reverse_reason FROM moderation.cases
 WHERE target_kind = $1 AND closed_at IS NULL
@@ -984,38 +930,6 @@ func (q *Queries) OpenReportCountsOfPosts(ctx context.Context, postIds []uuid.UU
 		return nil, err
 	}
 	return items, nil
-}
-
-const purgeRetired = `-- name: PurgeRetired :exec
-DELETE FROM moderation.retired_assets
-WHERE unlinked_at < $1 AND retired_at < $2
-`
-
-type PurgeRetiredParams struct {
-	HealBefore   *time.Time
-	RetireBefore time.Time
-}
-
-// 清掉已經過第二次解除、而且超過 staged token 有效期的退場紀錄（整個模組）。
-func (q *Queries) PurgeRetired(ctx context.Context, arg PurgeRetiredParams) error {
-	_, err := q.db.Exec(ctx, purgeRetired, arg.HealBefore, arg.RetireBefore)
-	return err
-}
-
-const refSeq = `-- name: RefSeq :one
-SELECT seq FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2
-`
-
-type RefSeqParams struct {
-	RefType string
-	RefID   string
-}
-
-func (q *Queries) RefSeq(ctx context.Context, arg RefSeqParams) (int64, error) {
-	row := q.db.QueryRow(ctx, refSeq, arg.RefType, arg.RefID)
-	var seq int64
-	err := row.Scan(&seq)
-	return seq, err
 }
 
 const reportByRequest = `-- name: ReportByRequest :one
@@ -1186,93 +1100,6 @@ func (q *Queries) ReportsOfCase(ctx context.Context, caseID uuid.UUID) ([]Modera
 	return items, nil
 }
 
-const retireAsset = `-- name: RetireAsset :exec
-INSERT INTO moderation.retired_assets (ref_type, ref_id, asset_id, retired_at)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (ref_type, ref_id, asset_id) DO NOTHING
-`
-
-type RetireAssetParams struct {
-	RefType string
-	RefID   string
-	AssetID string
-	Now     time.Time
-}
-
-// 記下被釋放的資產；已經記過的不變。
-func (q *Queries) RetireAsset(ctx context.Context, arg RetireAssetParams) error {
-	_, err := q.db.Exec(ctx, retireAsset,
-		arg.RefType,
-		arg.RefID,
-		arg.AssetID,
-		arg.Now,
-	)
-	return err
-}
-
-const retiredAmong = `-- name: RetiredAmong :many
-SELECT asset_id FROM moderation.retired_assets
-WHERE ref_type = $1 AND ref_id = $2 AND asset_id = ANY($3::text[])
-ORDER BY asset_id
-`
-
-type RetiredAmongParams struct {
-	RefType  string
-	RefID    string
-	AssetIds []string
-}
-
-func (q *Queries) RetiredAmong(ctx context.Context, arg RetiredAmongParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, retiredAmong, arg.RefType, arg.RefID, arg.AssetIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var asset_id string
-		if err := rows.Scan(&asset_id); err != nil {
-			return nil, err
-		}
-		items = append(items, asset_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const retiredAssetIDs = `-- name: RetiredAssetIDs :many
-SELECT asset_id FROM moderation.retired_assets
-WHERE ref_type = $1 AND ref_id = $2
-ORDER BY asset_id
-`
-
-type RetiredAssetIDsParams struct {
-	RefType string
-	RefID   string
-}
-
-func (q *Queries) RetiredAssetIDs(ctx context.Context, arg RetiredAssetIDsParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, retiredAssetIDs, arg.RefType, arg.RefID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var asset_id string
-		if err := rows.Scan(&asset_id); err != nil {
-			return nil, err
-		}
-		items = append(items, asset_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const reverseCase = `-- name: ReverseCase :execrows
 UPDATE moderation.cases
 SET reversed_at = $1, reversed_by_admin_id = $2, reverse_reason = $3
@@ -1300,39 +1127,6 @@ func (q *Queries) ReverseCase(ctx context.Context, arg ReverseCaseParams) (int64
 	return result.RowsAffected(), nil
 }
 
-const settleRefSeq = `-- name: SettleRefSeq :execrows
-UPDATE moderation.media_ref_sync
-SET synced_seq = $1
-WHERE ref_type = $2 AND ref_id = $3 AND seq = $1
-`
-
-type SettleRefSeqParams struct {
-	Seq     int64
-	RefType string
-	RefID   string
-}
-
-// 只在版本還是同步讀到的那個時記下已同步；0 列表示讀取之後 ref 又改變了。
-func (q *Queries) SettleRefSeq(ctx context.Context, arg SettleRefSeqParams) (int64, error) {
-	result, err := q.db.Exec(ctx, settleRefSeq, arg.Seq, arg.RefType, arg.RefID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const snapshotAssets = `-- name: SnapshotAssets :one
-SELECT asset_ids FROM moderation.case_snapshots WHERE id = $1
-`
-
-// 快照目前引用的資產（同步 job 以它為這個 ref 目前的資產）；快照已刪除沒有列。
-func (q *Queries) SnapshotAssets(ctx context.Context, id uuid.UUID) ([]string, error) {
-	row := q.db.QueryRow(ctx, snapshotAssets, id)
-	var asset_ids []string
-	err := row.Scan(&asset_ids)
-	return asset_ids, err
-}
-
 const snapshotContent = `-- name: SnapshotContent :one
 SELECT content FROM moderation.case_snapshots WHERE id = $1
 `
@@ -1358,44 +1152,4 @@ func (q *Queries) SnapshotIDByHash(ctx context.Context, arg SnapshotIDByHashPara
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
-}
-
-const unsyncedRefs = `-- name: UnsyncedRefs :many
-SELECT ref_type, ref_id, updated_at
-FROM moderation.media_ref_sync
-WHERE synced_seq < seq AND updated_at < $1
-ORDER BY updated_at
-LIMIT $2
-`
-
-type UnsyncedRefsParams struct {
-	IdleBefore time.Time
-	MaxRows    int32
-}
-
-type UnsyncedRefsRow struct {
-	RefType   string
-	RefID     string
-	UpdatedAt time.Time
-}
-
-// 版本比已同步的新、而且最後變動早於 idle_before 的 ref，最舊的先（保底掃描補排用）。
-func (q *Queries) UnsyncedRefs(ctx context.Context, arg UnsyncedRefsParams) ([]UnsyncedRefsRow, error) {
-	rows, err := q.db.Query(ctx, unsyncedRefs, arg.IdleBefore, arg.MaxRows)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []UnsyncedRefsRow{}
-	for rows.Next() {
-		var i UnsyncedRefsRow
-		if err := rows.Scan(&i.RefType, &i.RefID, &i.UpdatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }

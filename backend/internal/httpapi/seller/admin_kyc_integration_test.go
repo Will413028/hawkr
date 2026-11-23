@@ -21,7 +21,6 @@ import (
 	adminsellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
@@ -59,8 +58,7 @@ func (f *adminFixture) submittedCompanyKYC(t *testing.T, name, taxID string) (in
 		t.Fatal(err)
 	}
 	for _, d := range submitted.Documents {
-		f.media.PutSecure(d.ObjectKey, media.Ref{Type: media.RefTypeCertification, ID: submitted.ID.String()},
-			media.SecureAsset{Data: []byte("doc" + strconv.Itoa(d.Position) + "-bytes"), ContentType: "image/jpeg"})
+		f.media.put(uuid.MustParse(d.AssetID), []byte("%PDF-1.4 doc"+strconv.Itoa(d.Position)+"-bytes"))
 	}
 	return accountID, s, submitted
 }
@@ -143,11 +141,11 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 	// 企業申請的補充文件：每張帶檢視網址與 asset_id，不帶儲存的 object key。
 	gotB := f.getKYC(t, appB.ID.String())
 	raw, _ := protojson.Marshal(gotB)
-	if len(gotB.GetDocuments()) != 2 || strings.Contains(string(raw), "7111/") {
+	if len(gotB.GetDocuments()) != 2 || strings.Contains(string(raw), "secure/") {
 		t.Fatalf("company application=%s", raw)
 	}
 	for i, d := range gotB.GetDocuments() {
-		if d.GetViewUri() != "/api/files/admin/seller/kyc_applications/"+appB.ID.String()+"/documents/"+strconv.Itoa(i) || !strings.HasPrefix(d.GetAssetId(), "asset-doc") ||
+		if d.GetViewUri() != "/api/files/admin/seller/kyc_applications/"+appB.ID.String()+"/documents/"+strconv.Itoa(i) || d.GetAssetId() != assetFor("doc"+strconv.Itoa(i)+"-乙店").String() ||
 			d.GetField() != pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS || int(d.GetPosition()) != i {
 			t.Fatalf("document=%+v", d)
 		}
@@ -225,7 +223,7 @@ func TestAdminReviewsKYCOverConnect(t *testing.T) {
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "issues[0].document_asset_id" {
 		t.Fatalf("asset on a non document: field=%q", field)
 	}
-	_, err = reject(&pb.KYCIssue{Field: pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS, DocumentAssetId: "asset-not-here", Code: pb.KYCIssueCode_KYC_ISSUE_CODE_OTHER, Message: "x"})
+	_, err = reject(&pb.KYCIssue{Field: pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS, DocumentAssetId: uuid.NewV7().String(), Code: pb.KYCIssueCode_KYC_ISSUE_CODE_OTHER, Message: "x"})
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "issues[0].document_asset_id" {
 		t.Fatalf("foreign asset: field=%q", field)
 	}
@@ -352,14 +350,14 @@ func TestKYCDocumentsNeedTheKYCReadPermissionAndEveryReadIsRecorded(t *testing.T
 	}
 	ac := listed.Msg.GetDocumentAccesses()
 	if len(ac) != 2 || listed.Msg.GetNextPageToken() == "" || ac[0].GetAdminId() != sid(f.adminID) || ac[0].GetPosition() != 0 ||
-		ac[0].GetField() != pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS || ac[0].GetAccessTime() == nil || !strings.HasPrefix(ac[0].GetAssetId(), "asset-doc0") {
+		ac[0].GetField() != pb.KYCField_KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS || ac[0].GetAccessTime() == nil || ac[0].GetAssetId() != assetFor("doc0-甲店").String() {
 		t.Fatalf("accesses=%+v token=%q", ac, listed.Msg.GetNextPageToken())
 	}
 	_, err = f.admin.ListKYCDocumentAccesses(ctx, connect.NewRequest(&adminsellerpb.ListKYCDocumentAccessesRequest{Id: "0197d1a2-0000-7000-8000-000000000000"}))
 	wantCode(t, err, connect.CodeNotFound, "")
 	var recordedAsset string
 	f.scan(t, &recordedAsset, "SELECT asset_id FROM seller.kyc_document_accesses WHERE position = 1 LIMIT 1")
-	if recordedAsset != "asset-doc1-甲店" {
+	if recordedAsset != assetFor("doc1-甲店").String() {
 		t.Fatalf("讀取紀錄記實際送出的 asset_id：%q", recordedAsset)
 	}
 	// 申請檢視不內嵌讀取紀錄。

@@ -9,6 +9,7 @@
 		"./connect/errors": "./src/connect/errors.ts",
 		"./connect/retry": "./src/connect/retry.ts",
 		"./connect/submit": "./src/connect/submit.ts",
+		"./connect/upload": "./src/connect/upload.ts",
 		"./proto/date": "./src/proto/date.ts",
 		"./proto/field-mask": "./src/proto/field-mask.ts",
 		"./text/server-text": "./src/text/server-text.ts"

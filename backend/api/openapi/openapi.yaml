@@ -63,8 +63,6 @@ tags:
   description: 基礎設施
 - name: Invoice
   description: 電子發票
-- name: Media
-  description: 媒體：檔案上傳與下載
 - name: Notification
   description: 通知：通知管理
 - name: NotificationRealtime
@@ -13288,107 +13286,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/media/upload_sessions:
-    post:
-      operationId: createUploadSession
-      summary: 建立上傳會話
-      description: 建立媒體檔案的上傳會話，取得上傳 URL
-      tags:
-      - Media
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 上傳會話請求資料
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateUploadSessionInput'
-        x-originalParamName: request
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/CreateUploadSessionOutput'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/media/upload_sessions/{id}/complete:
-    post:
-      operationId: completeUploadSession
-      summary: 完成上傳會話
-      description: 完成指定的上傳會話，取得暫存 Token 與預覽 URL
-      tags:
-      - Media
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: id
-        in: path
-        description: 上傳會話 ID
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/CompleteUploadSessionOutput'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/app/notifications:
     delete:
       operationId: deleteNotifications
@@ -16447,7 +16344,7 @@ paths:
     post:
       operationId: submitOrderItemReview
       summary: 提交訂單商品評論
-      description: 買家對已完成訂單的商品項目提交一次評論。圖片請先透過 /app/media/upload_sessions 上傳並取得 stagedToken，再傳入 staged_tokens（最多 4 個）
+      description: 買家對已完成訂單的商品項目提交一次評論。圖片請先上傳並取得 stagedToken，再傳入 staged_tokens（最多 4 個）
       tags:
       - Review
       security:
@@ -27062,13 +26959,6 @@ components:
           type: string
         responseId:
           type: string
-    CompleteUploadSessionOutput:
-      type: object
-      properties:
-        previewUrl:
-          type: string
-        stagedToken:
-          type: string
     ConfirmCvsShipmentReq:
       type: object
       properties:
@@ -27593,32 +27483,6 @@ components:
         weight:
           type: string
         widthCm:
-          type: string
-    CreateUploadSessionInput:
-      type: object
-      required:
-      - contentType
-      - fileSize
-      - filename
-      properties:
-        contentType:
-          type: string
-        fileSize:
-          type: string
-        filename:
-          type: string
-        isSecure:
-          type: boolean
-    CreateUploadSessionOutput:
-      type: object
-      properties:
-        expiresIn:
-          type: string
-        isSecure:
-          type: boolean
-        sessionId:
-          type: string
-        uploadUrl:
           type: string
     CvsLabelDataResp:
       type: object

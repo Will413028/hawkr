@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/upload"
+	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -112,6 +113,21 @@ const (
 // ParseKeyring 讀出 KEK 金鑰環：單一字串、逗號分隔的 `<kek_id>:<標準 base64 的 32 位元組>`，第一把用來寫入、全部都能讀。
 // 空字串、格式錯、長度不對或 id 重複回錯誤；組裝點（環境變數 MEDIA_KEKS，B1-5 接線）遇到錯誤要讓啟動失敗。
 func ParseKeyring(s string) (*Keyring, error) { return secure.ParseKeyring(s) }
+
+// StoreConfig 是物件儲存（R2 或 S3 相容替身）的設定。
+type StoreConfig = storage.Config
+
+// StoreConfigFromEnv 讀 MEDIA_STORAGE 與選定實作的設定；缺漏與無效值記在 e，由組裝點的 e.Err 一起回報，回傳值只有在 e.Err 為 nil 時有效。
+func StoreConfigFromEnv(e *config.Env) StoreConfig { return storage.ConfigFromEnv(e) }
+
+// OpenStore 依設定建構物件儲存；設定不完整時回錯誤，不退回 fake，也不做網路呼叫。
+func OpenStore(cfg StoreConfig) (ObjectStore, error) {
+	s, err := storage.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
 
 // Queues 回傳 worker 角色必須設定的 River queue 與併發上限，組裝點以它建 queue 設定。
 func Queues() map[string]int { return map[string]int{ProcessQueue: ProcessQueueWorkers} }
@@ -234,6 +250,12 @@ func (m *Module) Confirm(ctx context.Context, uploader Uploader, token string) (
 // MarkDeleted 是擁有者的刪除指令（B1-D9）：在擁有者的 transaction 內把已確認的資產標為刪除並排實體刪除 job。冪等。
 func (m *Module) MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error {
 	return m.reclaim.MarkDeleted(ctx, assetIDs)
+}
+
+// CopyPublic 把一份已確認的公開資產複製成新的資產，回傳與 PutPublic 同形的 token，由呼叫方之後在自己的 transaction 內 Confirm。來源只被讀取，
+// 不改狀態；來源不存在、不是已確認或是機敏資產回 NotFound。media 不認識呼叫方為什麼要複製。不得在 transaction 內呼叫。
+func (m *Module) CopyPublic(ctx context.Context, uploader Uploader, sourceID uuid.UUID) (PutPublicResult, error) {
+	return m.upload.CopyPublic(ctx, uploader, sourceID)
 }
 
 // ProcessUpload 是 media.process_upload job 的內容，給 worker 與測試呼叫。

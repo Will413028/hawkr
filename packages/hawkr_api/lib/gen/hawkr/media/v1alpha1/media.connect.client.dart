@@ -96,6 +96,64 @@ extension type MediaAppServiceClient (connect.Transport _transport) {
 /// 稽核：上傳只產生會過期的暫存，不改賣家看得到的資料，所以成功的 BeginSecureUpload 與段上傳都不寫代行稽核；稽核留在擁有者確認時的寫入。被拒絕的請求另寫一列 FAILED。
 /// 會話的上傳者是管理員本人（與 Java 一致），並綁定被代行的那一家店：段上傳與暫存預覽（`GET /api/files/delegated/secure_uploads/{staged_token}`）都只以 X-HK-Operation-Session 授權（沒有管理員 Bearer），session 此刻有效且帶 media.upload，上傳者是 session 的管理員；擁有者確認時 token 也只對同一家店成立。不保留原始檔名。
 extension type MediaDelegatedServiceClient (connect.Transport _transport) {
+  /// BeginUpload 為代行店家宣告要上傳的公開圖片，回傳與 MediaAppService.BeginUpload 相同的預簽 PUT 網址、標頭與 staged token（B1-D21）。
+  /// 上傳者是代行 session 的管理員並綁定被代行的店；staged token 只有同一家店的有效代行 session 能續用。
+  /// 錯誤與 MediaAppService.BeginUpload 相同（size、content_type、md5 不合法回 invalid_argument）。需要能力 media.upload。
+  Future<hawkrmediav1alpha1media.MediaDelegatedServiceBeginUploadResponse> beginUpload(
+    hawkrmediav1alpha1media.MediaDelegatedServiceBeginUploadRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.MediaDelegatedService.beginUpload,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// CompleteUpload 在 client 把檔案 PUT 完之後呼叫，語意同 MediaAppService.CompleteUpload（可重送）。
+  /// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）；暫存已過期回 failed_precondition。需要能力 media.upload。
+  Future<hawkrmediav1alpha1media.MediaDelegatedServiceCompleteUploadResponse> completeUpload(
+    hawkrmediav1alpha1media.MediaDelegatedServiceCompleteUploadRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.MediaDelegatedService.completeUpload,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
+  /// GetUpload 讀暫存的處理狀態，語意同 MediaAppService.GetUpload（staged token 是憑證，不標 NO_SIDE_EFFECTS）。
+  /// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）。需要能力 media.upload。
+  Future<hawkrmediav1alpha1media.MediaDelegatedServiceGetUploadResponse> getUpload(
+    hawkrmediav1alpha1media.MediaDelegatedServiceGetUploadRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.MediaDelegatedService.getUpload,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
   /// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
   /// 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。
   /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。

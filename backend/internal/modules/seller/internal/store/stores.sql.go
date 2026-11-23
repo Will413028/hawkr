@@ -423,25 +423,6 @@ func (q *Queries) ExposedStoresAfter(ctx context.Context, arg ExposedStoresAfter
 	return items, nil
 }
 
-const imageAssets = `-- name: ImageAssets :one
-SELECT logo_asset_id, cover_asset_id
-FROM seller.stores
-WHERE store_id = $1
-`
-
-type ImageAssetsRow struct {
-	LogoAssetID  *string
-	CoverAssetID *string
-}
-
-// 同步 job 讀的：店家目前的 logo、封面 asset（沒有圖時是 NULL；關店可逆，已關閉的 stint 到個資清理才釋放，欄位就是引用的來源）。
-func (q *Queries) ImageAssets(ctx context.Context, storeID int64) (ImageAssetsRow, error) {
-	row := q.db.QueryRow(ctx, imageAssets, storeID)
-	var i ImageAssetsRow
-	err := row.Scan(&i.LogoAssetID, &i.CoverAssetID)
-	return i, err
-}
-
 const latestStoreOfAccount = `-- name: LatestStoreOfAccount :one
 SELECT store_id, store_code, account_id, status, version, store_name, description, logo_key, logo_asset_id, cover_key, cover_asset_id, contact_phone, contact_name, contact_mobile, support_email, town_code, address_detail, prize, website_url, onboarding_completed, created_at, updated_at, pii_purged_at, first_exposed_at, current_closed_at, retired_at
 FROM seller.stores
@@ -967,7 +948,7 @@ RETURNING store_id, store_code, account_id, status, version, store_name, descrip
 
 type UpdateCoverParams struct {
 	CoverKey        *string
-	CoverAssetID    *string
+	CoverAssetID    *uuid.UUID
 	Now             time.Time
 	StoreID         int64
 	ExpectedVersion int64
@@ -1026,7 +1007,7 @@ RETURNING store_id, store_code, account_id, status, version, store_name, descrip
 
 type UpdateLogoParams struct {
 	LogoKey         *string
-	LogoAssetID     *string
+	LogoAssetID     *uuid.UUID
 	Now             time.Time
 	StoreID         int64
 	ExpectedVersion int64

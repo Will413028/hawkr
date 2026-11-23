@@ -3,9 +3,12 @@
 package moderation
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	stdimage "image"
+	"image/png"
 	"io"
 	"log/slog"
 	"sync"
@@ -22,7 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -55,19 +57,6 @@ func (q *testQueue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.In
 	defer q.mu.Unlock()
 	q.args = append(q.args, args)
 	return nil
-}
-
-// syncJobs 回傳排入的、屬於這個 ref 的 media 同步 job 數。
-func (q *testQueue) syncJobs(ref media.Ref) int {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	n := 0
-	for _, a := range q.args {
-		if s, ok := a.(mediaref.SyncArgs); ok && s.RefType == ref.Type && s.RefID == ref.ID {
-			n++
-		}
-	}
-	return n
 }
 
 func (*testQueue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (bool, error) {
@@ -152,7 +141,8 @@ type fixture struct {
 	deletion *accountdeletion.Module
 	suspend  *accountsuspension.Module
 	module   *Module
-	media    *media.Fake
+	media    *media.Module
+	objects  *media.MemoryStore
 	jobs     *testQueue
 	bus      *events.Bus
 	ids      atomic.Int64
@@ -176,6 +166,7 @@ func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
+		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "social", Dir: social.Migrations()},
@@ -191,26 +182,27 @@ func setup(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	q := &testQueue{}
 	f.jobs = q
-	fm := media.NewFake()
+	f.objects = media.NewMemoryStore()
+	fm := media.New(media.Deps{DB: d, Jobs: q, Store: f.objects, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	f.media = fm
-	fm.Key = func(_, token string) string { return "post/" + token + ".jpg" }
+	owner := ownerMedia{m: fm}
 	f.identity = identity.New(identity.Deps{DB: d, Events: bus, Now: f.clock, Logger: log})
-	f.buyer = buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Media: fm, Now: f.clock, Logger: log})
-	f.seller = seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: f.identity, Media: fm, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: f.clock, Logger: log,
+	f.buyer = buyer.New(buyer.Deps{DB: d, Events: bus, Now: f.clock, Logger: log})
+	f.seller = seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: f.identity, Media: owner, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: f.clock, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, f.clock), Events: bus, Jobs: q, Now: f.clock, Logger: log})})
 	f.sellerRd = seller.NewReader(d, f.clock)
 	f.social = social.New(social.Deps{
-		DB: d, Events: bus, Media: fm, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, StoreBlocks: storeBlocksFromTable{d}, Products: noProductVerifier{},
+		DB: d, Events: bus, Media: owner, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, StoreBlocks: storeBlocksFromTable{d}, Products: noProductVerifier{},
 		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error { return social.ErrScheduleDenied })},
 		NewID:               uuid.NewV7, Now: f.clock, Logger: log,
 	})
 	f.deletion = accountdeletion.New(accountdeletion.Deps{DB: d, Identity: f.identity, Buyer: f.buyer, Seller: f.seller, Orders: noOrders{}, Now: f.clock})
 	f.suspend = accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: f.identity, Seller: f.seller, Logger: log})
 	f.orders = &reviewOrders{byNo: map[string]review.OrderForReview{}}
-	f.review = review.New(review.Deps{DB: d, Events: bus, Media: fm, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, NewID: uuid.NewV7, Now: f.clock, Logger: log})
-	f.im = im.New(im.Deps{DB: d, Events: bus, Jobs: q, Media: fm, Buyers: f.buyer, Stores: chatStores{f.seller}, Orders: chatOrders{}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.review = review.New(review.Deps{DB: d, Events: bus, Media: owner, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.im = im.New(im.Deps{DB: d, Events: bus, Jobs: q, Media: owner, Buyers: f.buyer, Stores: chatStores{f.seller}, Orders: chatOrders{}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, func(context.Context, review.ReviewAggregateChanged) error { f.aggs.Add(1); return nil })
-	f.module = New(Deps{DB: d, Social: f.social, Review: f.review, IM: f.im, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, Jobs: q, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.module = New(Deps{DB: d, Social: f.social, Review: f.review, IM: f.im, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, f.buyer.OnAccountCreated)
 	events.Subscribe(bus, f.social.OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.social.OnBuyerDeleted)
@@ -303,7 +295,7 @@ func (f *fixture) post(t *testing.T, storeID int64, body string) social.Post {
 		t.Fatal(err)
 	}
 	p, err := f.social.CreatePost(context.Background(), st, social.CreatePostInput{
-		Body: body, ImageToken: fmt.Sprintf("tok-%d", f.next()), Publish: true,
+		Body: body, ImageToken: f.stage(t), Publish: true,
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -352,4 +344,52 @@ func kindOf(err error) apperr.Kind { return apperr.KindOf(err) }
 
 func identityCreated(accountID int64) identity.AccountCreated {
 	return identity.AccountCreated{AccountID: accountID, Name: "店主"}
+}
+
+// stagedUploader 是測試裡所有暫存圖片的上傳者：擁有媒體的模組（social、review、im、seller）換了各自的擁有者 ID 呼叫 Confirm，
+// ownerMedia 一律以這個上傳者確認。
+var stagedUploader = media.Uploader{ID: 1}
+
+// ownerMedia 是擁有媒體的模組的 media 替身：確認真的 media 模組裡由 stage 建立的暫存，上傳者固定是 stagedUploader。
+type ownerMedia struct{ m *media.Module }
+
+func (o ownerMedia) Confirm(ctx context.Context, _ media.Uploader, token string) (media.ConfirmedAsset, error) {
+	return o.m.Confirm(ctx, stagedUploader, token)
+}
+
+func (o ownerMedia) MarkDeleted(ctx context.Context, ids []uuid.UUID) error {
+	return o.m.MarkDeleted(ctx, ids)
+}
+
+func (o ownerMedia) ReadSecure(ctx context.Context, id uuid.UUID) (io.ReadCloser, error) {
+	return o.m.ReadSecure(ctx, id)
+}
+
+func tinyPNG(t *testing.T) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	if err := png.Encode(&b, stdimage.NewRGBA(stdimage.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+// stage 在真的 media 模組建立一筆就緒的暫存圖片並回 token。
+func (f *fixture) stage(t *testing.T) string {
+	t.Helper()
+	res, err := f.media.PutPublic(context.Background(), stagedUploader, bytes.NewReader(tinyPNG(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res.Token
+}
+
+// assetState 是資產在 media 的狀態；資產不存在時失敗。
+func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	var st string
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id = $1", id).Scan(&st); err != nil {
+		t.Fatal(err)
+	}
+	return st
 }

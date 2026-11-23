@@ -55,6 +55,15 @@ const (
 	// MediaAppServiceBeginSecureUploadProcedure is the fully-qualified name of the MediaAppService's
 	// BeginSecureUpload RPC.
 	MediaAppServiceBeginSecureUploadProcedure = "/hawkr.media.v1alpha1.MediaAppService/BeginSecureUpload"
+	// MediaDelegatedServiceBeginUploadProcedure is the fully-qualified name of the
+	// MediaDelegatedService's BeginUpload RPC.
+	MediaDelegatedServiceBeginUploadProcedure = "/hawkr.media.v1alpha1.MediaDelegatedService/BeginUpload"
+	// MediaDelegatedServiceCompleteUploadProcedure is the fully-qualified name of the
+	// MediaDelegatedService's CompleteUpload RPC.
+	MediaDelegatedServiceCompleteUploadProcedure = "/hawkr.media.v1alpha1.MediaDelegatedService/CompleteUpload"
+	// MediaDelegatedServiceGetUploadProcedure is the fully-qualified name of the
+	// MediaDelegatedService's GetUpload RPC.
+	MediaDelegatedServiceGetUploadProcedure = "/hawkr.media.v1alpha1.MediaDelegatedService/GetUpload"
 	// MediaDelegatedServiceBeginSecureUploadProcedure is the fully-qualified name of the
 	// MediaDelegatedService's BeginSecureUpload RPC.
 	MediaDelegatedServiceBeginSecureUploadProcedure = "/hawkr.media.v1alpha1.MediaDelegatedService/BeginSecureUpload"
@@ -237,6 +246,16 @@ func (UnimplementedMediaAppServiceHandler) BeginSecureUpload(context.Context, *c
 // MediaDelegatedServiceClient is a client for the hawkr.media.v1alpha1.MediaDelegatedService
 // service.
 type MediaDelegatedServiceClient interface {
+	// BeginUpload 為代行店家宣告要上傳的公開圖片，回傳與 MediaAppService.BeginUpload 相同的預簽 PUT 網址、標頭與 staged token（B1-D21）。
+	// 上傳者是代行 session 的管理員並綁定被代行的店；staged token 只有同一家店的有效代行 session 能續用。
+	// 錯誤與 MediaAppService.BeginUpload 相同（size、content_type、md5 不合法回 invalid_argument）。需要能力 media.upload。
+	BeginUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginUploadResponse], error)
+	// CompleteUpload 在 client 把檔案 PUT 完之後呼叫，語意同 MediaAppService.CompleteUpload（可重送）。
+	// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）；暫存已過期回 failed_precondition。需要能力 media.upload。
+	CompleteUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceCompleteUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceCompleteUploadResponse], error)
+	// GetUpload 讀暫存的處理狀態，語意同 MediaAppService.GetUpload（staged token 是憑證，不標 NO_SIDE_EFFECTS）。
+	// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）。需要能力 media.upload。
+	GetUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceGetUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceGetUploadResponse], error)
 	// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
 	// 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。
 	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
@@ -254,6 +273,25 @@ func NewMediaDelegatedServiceClient(httpClient connect.HTTPClient, baseURL strin
 	baseURL = strings.TrimRight(baseURL, "/")
 	mediaDelegatedServiceMethods := v1alpha1.File_hawkr_media_v1alpha1_media_proto.Services().ByName("MediaDelegatedService").Methods()
 	return &mediaDelegatedServiceClient{
+		beginUpload: connect.NewClient[v1alpha1.MediaDelegatedServiceBeginUploadRequest, v1alpha1.MediaDelegatedServiceBeginUploadResponse](
+			httpClient,
+			baseURL+MediaDelegatedServiceBeginUploadProcedure,
+			connect.WithSchema(mediaDelegatedServiceMethods.ByName("BeginUpload")),
+			connect.WithClientOptions(opts...),
+		),
+		completeUpload: connect.NewClient[v1alpha1.MediaDelegatedServiceCompleteUploadRequest, v1alpha1.MediaDelegatedServiceCompleteUploadResponse](
+			httpClient,
+			baseURL+MediaDelegatedServiceCompleteUploadProcedure,
+			connect.WithSchema(mediaDelegatedServiceMethods.ByName("CompleteUpload")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		getUpload: connect.NewClient[v1alpha1.MediaDelegatedServiceGetUploadRequest, v1alpha1.MediaDelegatedServiceGetUploadResponse](
+			httpClient,
+			baseURL+MediaDelegatedServiceGetUploadProcedure,
+			connect.WithSchema(mediaDelegatedServiceMethods.ByName("GetUpload")),
+			connect.WithClientOptions(opts...),
+		),
 		beginSecureUpload: connect.NewClient[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest, v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse](
 			httpClient,
 			baseURL+MediaDelegatedServiceBeginSecureUploadProcedure,
@@ -265,7 +303,25 @@ func NewMediaDelegatedServiceClient(httpClient connect.HTTPClient, baseURL strin
 
 // mediaDelegatedServiceClient implements MediaDelegatedServiceClient.
 type mediaDelegatedServiceClient struct {
+	beginUpload       *connect.Client[v1alpha1.MediaDelegatedServiceBeginUploadRequest, v1alpha1.MediaDelegatedServiceBeginUploadResponse]
+	completeUpload    *connect.Client[v1alpha1.MediaDelegatedServiceCompleteUploadRequest, v1alpha1.MediaDelegatedServiceCompleteUploadResponse]
+	getUpload         *connect.Client[v1alpha1.MediaDelegatedServiceGetUploadRequest, v1alpha1.MediaDelegatedServiceGetUploadResponse]
 	beginSecureUpload *connect.Client[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest, v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse]
+}
+
+// BeginUpload calls hawkr.media.v1alpha1.MediaDelegatedService.BeginUpload.
+func (c *mediaDelegatedServiceClient) BeginUpload(ctx context.Context, req *connect.Request[v1alpha1.MediaDelegatedServiceBeginUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginUploadResponse], error) {
+	return c.beginUpload.CallUnary(ctx, req)
+}
+
+// CompleteUpload calls hawkr.media.v1alpha1.MediaDelegatedService.CompleteUpload.
+func (c *mediaDelegatedServiceClient) CompleteUpload(ctx context.Context, req *connect.Request[v1alpha1.MediaDelegatedServiceCompleteUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceCompleteUploadResponse], error) {
+	return c.completeUpload.CallUnary(ctx, req)
+}
+
+// GetUpload calls hawkr.media.v1alpha1.MediaDelegatedService.GetUpload.
+func (c *mediaDelegatedServiceClient) GetUpload(ctx context.Context, req *connect.Request[v1alpha1.MediaDelegatedServiceGetUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceGetUploadResponse], error) {
+	return c.getUpload.CallUnary(ctx, req)
 }
 
 // BeginSecureUpload calls hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload.
@@ -276,6 +332,16 @@ func (c *mediaDelegatedServiceClient) BeginSecureUpload(ctx context.Context, req
 // MediaDelegatedServiceHandler is an implementation of the
 // hawkr.media.v1alpha1.MediaDelegatedService service.
 type MediaDelegatedServiceHandler interface {
+	// BeginUpload 為代行店家宣告要上傳的公開圖片，回傳與 MediaAppService.BeginUpload 相同的預簽 PUT 網址、標頭與 staged token（B1-D21）。
+	// 上傳者是代行 session 的管理員並綁定被代行的店；staged token 只有同一家店的有效代行 session 能續用。
+	// 錯誤與 MediaAppService.BeginUpload 相同（size、content_type、md5 不合法回 invalid_argument）。需要能力 media.upload。
+	BeginUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginUploadResponse], error)
+	// CompleteUpload 在 client 把檔案 PUT 完之後呼叫，語意同 MediaAppService.CompleteUpload（可重送）。
+	// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）；暫存已過期回 failed_precondition。需要能力 media.upload。
+	CompleteUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceCompleteUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceCompleteUploadResponse], error)
+	// GetUpload 讀暫存的處理狀態，語意同 MediaAppService.GetUpload（staged token 是憑證，不標 NO_SIDE_EFFECTS）。
+	// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）。需要能力 media.upload。
+	GetUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceGetUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceGetUploadResponse], error)
 	// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
 	// 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。
 	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
@@ -289,6 +355,25 @@ type MediaDelegatedServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewMediaDelegatedServiceHandler(svc MediaDelegatedServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	mediaDelegatedServiceMethods := v1alpha1.File_hawkr_media_v1alpha1_media_proto.Services().ByName("MediaDelegatedService").Methods()
+	mediaDelegatedServiceBeginUploadHandler := connect.NewUnaryHandler(
+		MediaDelegatedServiceBeginUploadProcedure,
+		svc.BeginUpload,
+		connect.WithSchema(mediaDelegatedServiceMethods.ByName("BeginUpload")),
+		connect.WithHandlerOptions(opts...),
+	)
+	mediaDelegatedServiceCompleteUploadHandler := connect.NewUnaryHandler(
+		MediaDelegatedServiceCompleteUploadProcedure,
+		svc.CompleteUpload,
+		connect.WithSchema(mediaDelegatedServiceMethods.ByName("CompleteUpload")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	mediaDelegatedServiceGetUploadHandler := connect.NewUnaryHandler(
+		MediaDelegatedServiceGetUploadProcedure,
+		svc.GetUpload,
+		connect.WithSchema(mediaDelegatedServiceMethods.ByName("GetUpload")),
+		connect.WithHandlerOptions(opts...),
+	)
 	mediaDelegatedServiceBeginSecureUploadHandler := connect.NewUnaryHandler(
 		MediaDelegatedServiceBeginSecureUploadProcedure,
 		svc.BeginSecureUpload,
@@ -297,6 +382,12 @@ func NewMediaDelegatedServiceHandler(svc MediaDelegatedServiceHandler, opts ...c
 	)
 	return "/hawkr.media.v1alpha1.MediaDelegatedService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case MediaDelegatedServiceBeginUploadProcedure:
+			mediaDelegatedServiceBeginUploadHandler.ServeHTTP(w, r)
+		case MediaDelegatedServiceCompleteUploadProcedure:
+			mediaDelegatedServiceCompleteUploadHandler.ServeHTTP(w, r)
+		case MediaDelegatedServiceGetUploadProcedure:
+			mediaDelegatedServiceGetUploadHandler.ServeHTTP(w, r)
 		case MediaDelegatedServiceBeginSecureUploadProcedure:
 			mediaDelegatedServiceBeginSecureUploadHandler.ServeHTTP(w, r)
 		default:
@@ -307,6 +398,18 @@ func NewMediaDelegatedServiceHandler(svc MediaDelegatedServiceHandler, opts ...c
 
 // UnimplementedMediaDelegatedServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedMediaDelegatedServiceHandler struct{}
+
+func (UnimplementedMediaDelegatedServiceHandler) BeginUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaDelegatedService.BeginUpload is not implemented"))
+}
+
+func (UnimplementedMediaDelegatedServiceHandler) CompleteUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceCompleteUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceCompleteUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaDelegatedService.CompleteUpload is not implemented"))
+}
+
+func (UnimplementedMediaDelegatedServiceHandler) GetUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceGetUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceGetUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaDelegatedService.GetUpload is not implemented"))
+}
 
 func (UnimplementedMediaDelegatedServiceHandler) BeginSecureUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload is not implemented"))

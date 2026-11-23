@@ -76,17 +76,21 @@ func (s *Service) PutPublic(ctx context.Context, uploader model.Uploader, body i
 	if err != nil {
 		return PublicPutResult{}, err
 	}
-	sum := md5.Sum(res.Data) //nolint:gosec // 見上
+	return s.stagePublic(ctx, uploader, res.Data, res.Format.ContentType())
+}
+
+// stagePublic 把已驗證的公開圖片位元組寫到新的 public/ key，成功後建資產列（STAGED）與 READY 的暫存列並回 token；PutPublic 與 CopyPublic 共用。
+func (s *Service) stagePublic(ctx context.Context, uploader model.Uploader, data []byte, contentType string) (PublicPutResult, error) {
+	sum := md5.Sum(data) //nolint:gosec // 暫存列的 declared_md5 欄位要求內容 MD5，不是安全用途
 	declaredMD5 := base64.StdEncoding.EncodeToString(sum[:])
 
-	contentType := res.Format.ContentType()
-	size := int64(len(res.Data))
+	size := int64(len(data))
 	now := s.d.Now()
 	uploadID, assetID, token := s.d.NewID(), s.d.NewID(), newToken()
 	tmpKey, finalKey := storage.NewKey(storage.PrefixTmp), storage.NewKey(storage.PrefixPublic)
 	expiresAt := now.Add(model.UploadTTL)
 
-	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		if err := q.InsertUpload(ctx, store.InsertUploadParams{
 			ID: uploadID, TokenHash: hashToken(token), UploaderID: uploader.ID, UploaderAdmin: uploader.Admin,
@@ -108,7 +112,7 @@ func (s *Service) PutPublic(ctx context.Context, uploader model.Uploader, body i
 		return PublicPutResult{}, fmt.Errorf("media：建立公開暫存上傳：%w", err)
 	}
 	asset := store.InsertAssetParams{ID: assetID, Visibility: string(model.VisibilityPublic), ObjectKey: finalKey, ContentType: contentType, SizeBytes: size}
-	if err := s.commitDirect(ctx, uploadID, asset, bytes.NewReader(res.Data), size, contentType); err != nil {
+	if err := s.commitDirect(ctx, uploadID, asset, bytes.NewReader(data), size, contentType); err != nil {
 		return PublicPutResult{}, err
 	}
 	return PublicPutResult{Token: token, ContentType: contentType, SizeBytes: size, ExpiresAt: expiresAt}, nil

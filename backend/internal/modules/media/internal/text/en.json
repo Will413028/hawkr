@@ -6,6 +6,12 @@
     "media.asset_unavailable": {
       "message": "The asset of this upload is no longer available"
     },
+    "media.confirm_some_unusable": {
+      "message": "Some images cannot be used; please upload them again"
+    },
+    "media.image_required": {
+      "message": "Please upload an image"
+    },
     "media.image_unusable": {
       "message": "The image cannot be used; please upload it again"
     },
@@ -42,6 +48,9 @@
     "media.secure_size_out_of_range": {
       "message": "The secure upload size must be between 1 and {max} bytes"
     },
+    "media.upload_already_used": {
+      "message": "This upload has already been used; please upload it again"
+    },
     "media.upload_content_type_unsupported": {
       "message": "Unsupported image type; only JPEG, PNG, WebP and GIF are accepted"
     },
@@ -71,6 +80,12 @@
     },
     "media.uploader_invalid": {
       "message": "The uploader is not valid"
+    },
+    "media.visibility_public_required": {
+      "message": "This image must be a public image"
+    },
+    "media.visibility_secure_required": {
+      "message": "This file must be uploaded as a secure file; please upload it again"
     }
   }
 }

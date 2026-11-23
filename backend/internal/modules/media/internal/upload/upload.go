@@ -103,7 +103,9 @@ type Status struct {
 
 // ConfirmedAsset 是 Confirm 回傳的資產：只描述這筆暫存對應的資產。
 type ConfirmedAsset struct {
-	ID          uuid.UUID
+	ID uuid.UUID
+	// ObjectKey 是公開資產的 object key（擁有者只存 key，URL 讀取時組裝）；機敏資產是前綴 secure/<資產 ID>/。
+	ObjectKey   string
 	Visibility  model.Visibility
 	ContentType string
 	SizeBytes   int64
@@ -291,8 +293,8 @@ func (s *Service) Get(ctx context.Context, uploader model.Uploader, token string
 	return st, nil
 }
 
-// Confirm 在擁有者的 transaction 內確認暫存：只接受 READY、未過期、上傳者相符的列，把暫存列與資產一起轉成確認。重入（已 CONFIRMED）
-// 回同一個資產，而且只回這筆暫存列所記的資產。與 GC 同時發生時只有一方成功。ctx 必須帶 transaction，確認才會與業務列一起提交或回滾。
+// Confirm 在擁有者的 transaction 內確認暫存：只接受 READY、未過期、上傳者相符的列，把暫存列與資產一起轉成確認。同一個 transaction 內重入（已 CONFIRMED）
+// 回同一個資產（只回這筆暫存列所記的資產）；token 已在別的 transaction 確認過回 FailedPrecondition，避免一個資產被兩個擁有者共用（B1-D23）。與 GC 同時發生時只有一方成功。ctx 必須帶 transaction，確認才會與業務列一起提交或回滾。
 func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token string) (ConfirmedAsset, error) {
 	if err := model.RequireTx(ctx); err != nil {
 		return ConfirmedAsset{}, err
@@ -312,6 +314,13 @@ func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token st
 		}
 		if model.UploadState(cur.State) != model.StateConfirmed {
 			return ConfirmedAsset{}, notConfirmable(ctx, cur, s.d.Now())
+		}
+		here, err := s.q(ctx).UploadConfirmedInThisTx(ctx, row.ID)
+		if err != nil {
+			return ConfirmedAsset{}, fmt.Errorf("media：判斷確認的 transaction：%w", err)
+		}
+		if !here {
+			return ConfirmedAsset{}, model.MarkConfirmedElsewhere(apperr.FailedPrecondition("%s", text.MediaUploadAlreadyUsed(loc(ctx))))
 		}
 		return s.assetOf(ctx, cur, true)
 	}
@@ -359,7 +368,7 @@ func (s *Service) assetOf(ctx context.Context, row store.MediaStagedUpload, requ
 	if requireActive && model.AssetState(a.State) != model.AssetActive {
 		return ConfirmedAsset{}, apperr.FailedPrecondition("%s", text.MediaAssetUnavailable(loc(ctx)))
 	}
-	return ConfirmedAsset{ID: a.ID, Visibility: model.Visibility(a.Visibility), ContentType: a.ContentType, SizeBytes: a.SizeBytes}, nil
+	return ConfirmedAsset{ID: a.ID, ObjectKey: a.ObjectKey, Visibility: model.Visibility(a.Visibility), ContentType: a.ContentType, SizeBytes: a.SizeBytes}, nil
 }
 
 // acquire 取一個名額並回傳放回的函式。wait 為 false 時滿了立即回 ResourceExhausted（client 上傳：有人可以稍後重試）；

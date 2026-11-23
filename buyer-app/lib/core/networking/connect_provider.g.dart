@@ -461,6 +461,58 @@ final class SocialAppClientProvider
 
 String _$socialAppClientHash() => r'f8da4bb52e94947a0c9f4e2619a24b9ca47673c8';
 
+/// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+
+@ProviderFor(mediaClient)
+final mediaClientProvider = MediaClientProvider._();
+
+/// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+
+final class MediaClientProvider
+    extends
+        $FunctionalProvider<
+          MediaAppServiceClient,
+          MediaAppServiceClient,
+          MediaAppServiceClient
+        >
+    with $Provider<MediaAppServiceClient> {
+  /// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+  MediaClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'mediaClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$mediaClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<MediaAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  MediaAppServiceClient create(Ref ref) {
+    return mediaClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(MediaAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<MediaAppServiceClient>(value),
+    );
+  }
+}
+
+String _$mediaClientHash() => r'473fabd3f9cced88e92e2c5f2c57cb3075ad3f1c';
+
 /// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
 
 @ProviderFor(buyerAppClient)

@@ -5,7 +5,8 @@ name: mutation
 # - 只在清單、runner 或本 workflow 變動時觸發；push／PR 只跑這次事件改到的清單，
 #   runner 或 workflow 改了就全跑（它們壞了會讓所有清單的結果失真）。
 # - 清單裡用到哪些 stack 就扇出哪些 job：Go integration 要 Docker（testcontainers，ubuntu-latest 內建）、
-#   website 要 pnpm workspace、Flutter 要對應 App 的 fvm 版本。沒用到的 stack 不跑。
+#   go-gateway 是獨立 module、website／admin／ts-package 要 pnpm workspace、Flutter 與 dart-package 要對應的 fvm 版本。
+#   沒用到的 stack 不跑。
 # - mutation 不在開發機跑（機器共用、integration 需要資料庫容器），驗收只看這個 job。
 # - 先在未改動的樹上跑一次基準，紅的基準不能證明什麼（BASELINE-FAILED）。
 
@@ -103,8 +104,17 @@ jobs:
           import json, os
           include = []
           for s in json.loads(os.environ["STACKS"]):
-              kind = "flutter" if s.startswith("flutter:") else ("website" if s == "website" else "go")
-              include.append({"stack": s, "kind": kind, "app": s.removeprefix("flutter:") if kind == "flutter" else ""})
+              if s.startswith("flutter:"):
+                  kind, app = "flutter", s.removeprefix("flutter:")
+              elif s.startswith("dart-package:"):
+                  kind, app = "dart", "packages/" + s.removeprefix("dart-package:")
+              elif s.startswith("ts-package:") or s in ("website", "admin"):
+                  kind, app = "pnpm", ""
+              elif s == "go-gateway":
+                  kind, app = "gateway", ""
+              else:
+                  kind, app = "go", ""
+              include.append({"stack": s, "kind": kind, "app": app})
           print("matrix=" + json.dumps({"include": include}))
           PY
 
@@ -131,17 +141,25 @@ jobs:
           go-version-file: backend/.go-version
           cache-dependency-path: backend/go.sum
 
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: matrix.kind == 'gateway'
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: |
+            backend/go.sum
+            backend/gateway/go.sum
+
       - uses: ./.github/actions/pnpm-install
-        if: matrix.kind == 'website'
+        if: matrix.kind == 'pnpm'
 
       - name: Read Flutter version from .fvmrc
         id: fvmrc
-        if: matrix.kind == 'flutter'
+        if: matrix.kind == 'flutter' || matrix.kind == 'dart'
         env:
           APP: ${{ matrix.app }}
         run: echo "flutter_version=$(jq -r .flutter "$APP/.fvmrc")" >> "$GITHUB_OUTPUT"
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
-        if: matrix.kind == 'flutter'
+        if: matrix.kind == 'flutter' || matrix.kind == 'dart'
         with:
           flutter-version: ${{ steps.fvmrc.outputs.flutter_version }}
           channel: stable
@@ -150,6 +168,10 @@ jobs:
         if: matrix.kind == 'flutter'
         working-directory: ${{ matrix.app }}
         run: flutter pub get
+      - name: dart pub get
+        if: matrix.kind == 'dart'
+        working-directory: ${{ matrix.app }}
+        run: dart pub get
 
       - name: 跑 mutation（${{ matrix.stack }}）
         env:

@@ -596,16 +596,34 @@ func TestConfirm_RollsBackWithTheBusinessRow(t *testing.T) {
 	}
 }
 
-func TestConfirm_ReentryReturnsSameAsset(t *testing.T) {
+func TestConfirm_ReentryInTheSameTransactionReturnsSameAsset(t *testing.T) {
+	f := setup(t)
+	res := ready(t, f, owner)
+	var first, second media.ConfirmedAsset
+	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
+		var err error
+		if first, err = f.m.Confirm(ctx, owner, res.Token); err != nil {
+			return err
+		}
+		second, err = f.m.Confirm(ctx, owner, res.Token)
+		return err
+	})
+	if err != nil || second != first {
+		t.Fatalf("同一個 transaction 內重入 = %+v, %v，預期 %+v", second, err, first)
+	}
+}
+
+func TestConfirm_ConfirmedInAnotherTransactionIsRejected(t *testing.T) {
 	f := setup(t)
 	res := ready(t, f, owner)
 	first, err := confirmInTx(f, owner, res.Token)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := confirmInTx(f, owner, res.Token)
-	if err != nil || second != first {
-		t.Fatalf("重入 = %+v, %v，預期 %+v", second, err, first)
+	_, err = confirmInTx(f, owner, res.Token)
+	wantKind(t, err, apperr.KindFailedPrecondition)
+	if got := assetState(t, f, first.ID); got != "ACTIVE" {
+		t.Fatalf("被拒的第二次確認不能動資產：%s", got)
 	}
 }
 
@@ -627,15 +645,18 @@ func TestConfirm_OnlyReturnsItsOwnAsset(t *testing.T) {
 	f := setup(t)
 	a := ready(t, f, owner)
 	b := ready(t, f, owner) // 同一個上傳者、較新的資產
-	gotA, err := confirmInTx(f, owner, a.Token)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gotB, err := confirmInTx(f, owner, b.Token)
-	if err != nil {
-		t.Fatal(err)
-	}
-	again, err := confirmInTx(f, owner, a.Token)
+	var gotA, gotB, again media.ConfirmedAsset
+	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
+		var err error
+		if gotA, err = f.m.Confirm(ctx, owner, a.Token); err != nil {
+			return err
+		}
+		if gotB, err = f.m.Confirm(ctx, owner, b.Token); err != nil {
+			return err
+		}
+		again, err = f.m.Confirm(ctx, owner, a.Token)
+		return err
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
@@ -107,8 +106,8 @@ func TestSubscribersEnqueueOnePurgeJob(t *testing.T) {
 	}
 }
 
-// RD4：purge job 刪列與圖片列、記退場資產並排媒體同步與快取失效；其他買家不動；重跑結果相同。
-func TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable(t *testing.T) {
+// RD4：purge job 刪列與圖片列、把附圖標為刪除並排快取失效；其他買家不動；重跑結果相同。
+func TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -118,9 +117,11 @@ func TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable(t *testing.T) 
 		it := f.order(b, storeID, product)
 		return must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 4, StagedTokens: tokens}))
 	}
-	withImages := submit(leaving, 700, "p1", "p2")
+	leavingTokens, leavingAssets := f.stage(t, leaving, 2)
+	stayingTokens, stayingAssets := f.stage(t, staying, 1)
+	withImages := submit(leaving, 700, leavingTokens...)
 	withoutImages := submit(leaving, 701)
-	other := submit(staying, 700, "q1")
+	other := submit(staying, 700, stayingTokens...)
 	f.requestDeletion(t, leaving)
 	f.jobs.reset()
 
@@ -139,13 +140,13 @@ func TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable(t *testing.T) 
 	if n := f.scalar(t, "SELECT count(*) FROM review.review_images WHERE review_id = $1", other.ID); n != 1 {
 		t.Fatalf("別人的附圖不動：%d", n)
 	}
-	for _, token := range []string{"p1", "p2"} {
-		if n := f.scalar(t, "SELECT count(*) FROM review.retired_assets WHERE ref_type = $1 AND ref_id = $2 AND asset_id = $3", media.RefTypeOrderReview, withImages.ID.String(), media.AssetFor(token)); n != 1 {
-			t.Fatalf("附圖 %s 記成退場：%d", token, n)
+	for _, a := range leavingAssets {
+		if got := f.assetState(t, a); got != "DELETING" {
+			t.Fatalf("刪除評價的附圖 state=%s，預期 DELETING", got)
 		}
 	}
-	if f.jobs.count("review.media_sync") != 1 {
-		t.Fatalf("有圖的那一則排一個媒體同步（沒圖的不排）：%v", f.jobs.kinds())
+	if got := f.assetState(t, stayingAssets[0]); got != "ACTIVE" {
+		t.Fatalf("別人的附圖 state=%s，預期 ACTIVE", got)
 	}
 	tags := revalidations(f.jobs)
 	if len(tags) != 1 || !slices.Contains(tags[0], revalidate.ProductTag(700)) || !slices.Contains(tags[0], revalidate.ProductTag(701)) {

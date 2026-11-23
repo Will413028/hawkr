@@ -5,7 +5,6 @@ package seller_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -32,14 +31,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -51,19 +48,6 @@ import (
 var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
-
-// stagedMedia 是 media 的替身：轉正回以 token 命名的資產。
-type stagedMedia struct{}
-
-func (stagedMedia) Finalize(_ context.Context, _ media.Uploader, token, refType string) (media.Asset, error) {
-	// "expired-" 開頭的 token 模擬 media-service 拒絕轉正（無效、過期或不屬於這個帳號）：legacy 轉接層回 InvalidInput。
-	if strings.HasPrefix(token, "expired-") {
-		return media.Asset{}, fmt.Errorf("%w：%w", media.ErrStagedTokenRejected, apperr.InvalidInput("圖片無法使用，請重新上傳"))
-	}
-	return media.Asset{ID: "asset-" + token, ObjectKey: refType + "/" + token, Secure: refType == media.RefTypeCertification || refType == media.RefTypeGovernanceEvidence}, nil
-}
-func (stagedMedia) Link(context.Context, media.Ref, []string) error   { return nil }
-func (stagedMedia) Unlink(context.Context, media.Ref, []string) error { return nil }
 
 type orders struct{ open bool }
 
@@ -158,7 +142,7 @@ func setup(t *testing.T) *fixture {
 	o := &orders{}
 	kycMAC := sealtest.MAC(t)
 	m := seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: queue, Identity: id, Media: stagedMedia{}, Orders: o, KYCMAC: kycMAC,
+		DB: d, Events: bus, Jobs: queue, Identity: id, Media: newStagedMedia(), Orders: o, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: registry, Now: time.Now, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
 	})
@@ -166,7 +150,7 @@ func setup(t *testing.T) *fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{},
 		Ready: d.Ping, Identity: id, Seller: m, Buyer: buyers, Images: images, Logger: log,
 		Deletion: &accountdeletion.Module{}, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{},
@@ -709,11 +693,6 @@ func TestCloseMyStoreIsRejectedWhileTheStoreHasOpenOrders(t *testing.T) {
 	if err != nil || closed.Msg.GetStore().GetStatus() != pb.StoreStatus_STORE_STATUS_CLOSED {
 		t.Fatalf("closed=%v err=%v", closed, err)
 	}
-}
-
-// ReadSecure 實作 media.Media；這些測試不讀機敏資產。
-func (stagedMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
 }
 
 // 措施記在舊 stint、帳號目前的 stint 繼承停權時，GetMyStore 的 suspended 仍為真，停權的內容經 ListMyMeasures(state=ACTIVE)

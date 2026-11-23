@@ -80,7 +80,7 @@ func monolith(t *testing.T) *connectDriver {
 	return newConnectDriver(srv.Client(), srv.URL, ch.Bearer(tokens))
 }
 
-// TestMonolith 對單體跑 B1-1 同一份情境（D8）：REST 對 Java 的情境與 Connect 對單體的是同一個 scenarios 清單。
+// TestMonolith 對單體跑 B1-1 的情境清單（D8）。
 func TestMonolith(t *testing.T) {
 	ch.Run[Driver](t, monolith(t), scenarios)
 }

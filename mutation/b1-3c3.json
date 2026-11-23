@@ -40,8 +40,8 @@
       "id": "delegated-uploader-not-admin",
       "stack": "go",
       "file": "backend/internal/httpapi/media/delegated.go",
-      "old": "media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}",
-      "new": "media.Uploader{ID: c.Session.Actor.AdminID, Store: st.StoreID}",
+      "old": "res, err = h.uploads.BeginSecureUpload(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}",
+      "new": "res, err = h.uploads.BeginSecureUpload(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Store: st.StoreID}",
       "test": "internal/httpapi/media ^TestDelegatedBeginSecureUploadUploaderIsTheAdmin$",
       "why": "會話的 Uploader 不標管理員：管理員 ID 被當成顧客帳號 ID，與同 ID 的買家混淆"
     },
@@ -94,8 +94,8 @@
       "id": "delegated-uploader-no-store",
       "stack": "go",
       "file": "backend/internal/httpapi/media/delegated.go",
-      "old": "Admin: true, Store: st.StoreID}",
-      "new": "Admin: true}",
+      "old": "res, err = h.uploads.BeginSecureUpload(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}",
+      "new": "res, err = h.uploads.BeginSecureUpload(ctx, media.Uploader{ID: c.Session.Actor.AdminID, Admin: true}",
       "test": "internal/httpapi/media ^TestDelegatedBeginSecureUploadUploaderIsTheAdmin$",
       "why": "開會話時沒帶被代行的店家：會話沒有綁定任何店"
     },

@@ -56,6 +56,15 @@
     },
     "unknown": "未知"
   },
+  "media": {
+    "RejectReason": {
+      "REJECT_REASON_CHECKSUM_MISMATCH": "The file was corrupted during upload. Please upload it again.",
+      "REJECT_REASON_EXPIRED": "The upload timed out. Please upload it again.",
+      "REJECT_REASON_PROCESSING_FAILED": "The file could not be processed. Try a different image.",
+      "REJECT_REASON_SIZE_MISMATCH": "The file size does not match what was declared. Please upload it again.",
+      "REJECT_REASON_UNRECOGNIZED_FORMAT": "The file format was not recognized. Use a JPEG, PNG, WebP or GIF image."
+    }
+  },
   "moderation": {
     "ReportOutcome": {
       "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)",

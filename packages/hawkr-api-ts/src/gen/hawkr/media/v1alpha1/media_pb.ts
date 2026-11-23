@@ -22,7 +22,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/media/v1alpha1/media.proto.
  */
 export const file_hawkr_media_v1alpha1_media: GenFile = /*@__PURE__*/
-  fileDesc("CiBoYXdrci9tZWRpYS92MWFscGhhMS9tZWRpYS5wcm90bxIUaGF3a3IubWVkaWEudjFhbHBoYTEiVAoSQmVnaW5VcGxvYWRSZXF1ZXN0EhEKBHNpemUYASABKANCA+BBAhIZCgxjb250ZW50X3R5cGUYAiABKAlCA+BBAhIQCgNtZDUYAyABKAlCA+BBAiKQAgoTQmVnaW5VcGxvYWRSZXNwb25zZRIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAxIXCgp1cGxvYWRfdXJsGAIgASgJQgPgQQMSWQoOdXBsb2FkX2hlYWRlcnMYAyADKAsyPC5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblVwbG9hZFJlc3BvbnNlLlVwbG9hZEhlYWRlcnNFbnRyeUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDGjQKElVwbG9hZEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjIKFUNvbXBsZXRlVXBsb2FkUmVxdWVzdBIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAiIYChZDb21wbGV0ZVVwbG9hZFJlc3BvbnNlIi0KEEdldFVwbG9hZFJlcXVlc3QSGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQIi1wEKEUdldFVwbG9hZFJlc3BvbnNlEjUKBXN0YXRlGAEgASgOMiEuaGF3a3IubWVkaWEudjFhbHBoYTEuVXBsb2FkU3RhdGVCA+BBAxJDCg1yZWplY3RfcmVhc29uGAIgASgOMiIuaGF3a3IubWVkaWEudjFhbHBoYTEuUmVqZWN0UmVhc29uQgPgQQNIAIgBARI0CgtleHBpcmVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IQCg5fcmVqZWN0X3JlYXNvbiItChhCZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QSEQoEc2l6ZRgBIAEoA0ID4EECIp8BChlCZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlEhkKDHN0YWdlZF90b2tlbhgBIAEoCUID4EEDEhcKCmNodW5rX3NpemUYAiABKAVCA+BBAxIYCgtjaHVua19jb3VudBgDIAEoBUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIkIKLU1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVxdWVzdBIRCgRzaXplGAEgASgDQgPgQQIitAEKLk1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVzcG9uc2USGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQMSFwoKY2h1bmtfc2l6ZRgCIAEoBUID4EEDEhgKC2NodW5rX2NvdW50GAMgASgFQgPgQQMSNAoLZXhwaXJlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMq5AEKC1VwbG9hZFN0YXRlEhwKGFVQTE9BRF9TVEFURV9VTlNQRUNJRklFRBAAEhgKFFVQTE9BRF9TVEFURV9QRU5ESU5HEAESGQoVVVBMT0FEX1NUQVRFX1VQTE9BREVEEAISFgoSVVBMT0FEX1NUQVRFX1JFQURZEAMSGQoVVVBMT0FEX1NUQVRFX1JFSkVDVEVEEAQSGgoWVVBMT0FEX1NUQVRFX0NPTkZJUk1FRBAFEhkKFVVQTE9BRF9TVEFURV9ERUxFVElORxAGEhgKFFVQTE9BRF9TVEFURV9ERUxFVEVEEAcq2gEKDFJlamVjdFJlYXNvbhIdChlSRUpFQ1RfUkVBU09OX1VOU1BFQ0lGSUVEEAASJQohUkVKRUNUX1JFQVNPTl9VTlJFQ09HTklaRURfRk9STUFUEAESHwobUkVKRUNUX1JFQVNPTl9TSVpFX01JU01BVENIEAISIwofUkVKRUNUX1JFQVNPTl9DSEVDS1NVTV9NSVNNQVRDSBADEiMKH1JFSkVDVF9SRUFTT05fUFJPQ0VTU0lOR19GQUlMRUQQBBIZChVSRUpFQ1RfUkVBU09OX0VYUElSRUQQBTK7AwoPTWVkaWFBcHBTZXJ2aWNlEmIKC0JlZ2luVXBsb2FkEiguaGF3a3IubWVkaWEudjFhbHBoYTEuQmVnaW5VcGxvYWRSZXF1ZXN0GikuaGF3a3IubWVkaWEudjFhbHBoYTEuQmVnaW5VcGxvYWRSZXNwb25zZRJwCg5Db21wbGV0ZVVwbG9hZBIrLmhhd2tyLm1lZGlhLnYxYWxwaGExLkNvbXBsZXRlVXBsb2FkUmVxdWVzdBosLmhhd2tyLm1lZGlhLnYxYWxwaGExLkNvbXBsZXRlVXBsb2FkUmVzcG9uc2UiA5ACAhJcCglHZXRVcGxvYWQSJi5oYXdrci5tZWRpYS52MWFscGhhMS5HZXRVcGxvYWRSZXF1ZXN0GicuaGF3a3IubWVkaWEudjFhbHBoYTEuR2V0VXBsb2FkUmVzcG9uc2USdAoRQmVnaW5TZWN1cmVVcGxvYWQSLi5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QaLy5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlMrgBChVNZWRpYURlbGVnYXRlZFNlcnZpY2USngEKEUJlZ2luU2VjdXJlVXBsb2FkEkMuaGF3a3IubWVkaWEudjFhbHBoYTEuTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5TZWN1cmVVcGxvYWRSZXF1ZXN0GkQuaGF3a3IubWVkaWEudjFhbHBoYTEuTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5TZWN1cmVVcGxvYWRSZXNwb25zZWIGcHJvdG8z", [file_google_api_field_behavior, file_google_protobuf_timestamp]);
+  fileDesc("CiBoYXdrci9tZWRpYS92MWFscGhhMS9tZWRpYS5wcm90bxIUaGF3a3IubWVkaWEudjFhbHBoYTEiVAoSQmVnaW5VcGxvYWRSZXF1ZXN0EhEKBHNpemUYASABKANCA+BBAhIZCgxjb250ZW50X3R5cGUYAiABKAlCA+BBAhIQCgNtZDUYAyABKAlCA+BBAiKQAgoTQmVnaW5VcGxvYWRSZXNwb25zZRIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAxIXCgp1cGxvYWRfdXJsGAIgASgJQgPgQQMSWQoOdXBsb2FkX2hlYWRlcnMYAyADKAsyPC5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblVwbG9hZFJlc3BvbnNlLlVwbG9hZEhlYWRlcnNFbnRyeUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDGjQKElVwbG9hZEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjIKFUNvbXBsZXRlVXBsb2FkUmVxdWVzdBIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAiIYChZDb21wbGV0ZVVwbG9hZFJlc3BvbnNlIi0KEEdldFVwbG9hZFJlcXVlc3QSGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQIi1wEKEUdldFVwbG9hZFJlc3BvbnNlEjUKBXN0YXRlGAEgASgOMiEuaGF3a3IubWVkaWEudjFhbHBoYTEuVXBsb2FkU3RhdGVCA+BBAxJDCg1yZWplY3RfcmVhc29uGAIgASgOMiIuaGF3a3IubWVkaWEudjFhbHBoYTEuUmVqZWN0UmVhc29uQgPgQQNIAIgBARI0CgtleHBpcmVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IQCg5fcmVqZWN0X3JlYXNvbiItChhCZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QSEQoEc2l6ZRgBIAEoA0ID4EECIp8BChlCZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlEhkKDHN0YWdlZF90b2tlbhgBIAEoCUID4EEDEhcKCmNodW5rX3NpemUYAiABKAVCA+BBAxIYCgtjaHVua19jb3VudBgDIAEoBUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIkIKLU1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVxdWVzdBIRCgRzaXplGAEgASgDQgPgQQIitAEKLk1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVzcG9uc2USGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQMSFwoKY2h1bmtfc2l6ZRgCIAEoBUID4EEDEhgKC2NodW5rX2NvdW50GAMgASgFQgPgQQMSNAoLZXhwaXJlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMiaQonTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5VcGxvYWRSZXF1ZXN0EhEKBHNpemUYASABKANCA+BBAhIZCgxjb250ZW50X3R5cGUYAiABKAlCA+BBAhIQCgNtZDUYAyABKAlCA+BBAiK6AgooTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5VcGxvYWRSZXNwb25zZRIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAxIXCgp1cGxvYWRfdXJsGAIgASgJQgPgQQMSbgoOdXBsb2FkX2hlYWRlcnMYAyADKAsyUS5oYXdrci5tZWRpYS52MWFscGhhMS5NZWRpYURlbGVnYXRlZFNlcnZpY2VCZWdpblVwbG9hZFJlc3BvbnNlLlVwbG9hZEhlYWRlcnNFbnRyeUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDGjQKElVwbG9hZEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIkcKKk1lZGlhRGVsZWdhdGVkU2VydmljZUNvbXBsZXRlVXBsb2FkUmVxdWVzdBIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAiItCitNZWRpYURlbGVnYXRlZFNlcnZpY2VDb21wbGV0ZVVwbG9hZFJlc3BvbnNlIkIKJU1lZGlhRGVsZWdhdGVkU2VydmljZUdldFVwbG9hZFJlcXVlc3QSGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQIi7AEKJk1lZGlhRGVsZWdhdGVkU2VydmljZUdldFVwbG9hZFJlc3BvbnNlEjUKBXN0YXRlGAEgASgOMiEuaGF3a3IubWVkaWEudjFhbHBoYTEuVXBsb2FkU3RhdGVCA+BBAxJDCg1yZWplY3RfcmVhc29uGAIgASgOMiIuaGF3a3IubWVkaWEudjFhbHBoYTEuUmVqZWN0UmVhc29uQgPgQQNIAIgBARI0CgtleHBpcmVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IQCg5fcmVqZWN0X3JlYXNvbirkAQoLVXBsb2FkU3RhdGUSHAoYVVBMT0FEX1NUQVRFX1VOU1BFQ0lGSUVEEAASGAoUVVBMT0FEX1NUQVRFX1BFTkRJTkcQARIZChVVUExPQURfU1RBVEVfVVBMT0FERUQQAhIWChJVUExPQURfU1RBVEVfUkVBRFkQAxIZChVVUExPQURfU1RBVEVfUkVKRUNURUQQBBIaChZVUExPQURfU1RBVEVfQ09ORklSTUVEEAUSGQoVVVBMT0FEX1NUQVRFX0RFTEVUSU5HEAYSGAoUVVBMT0FEX1NUQVRFX0RFTEVURUQQByraAQoMUmVqZWN0UmVhc29uEh0KGVJFSkVDVF9SRUFTT05fVU5TUEVDSUZJRUQQABIlCiFSRUpFQ1RfUkVBU09OX1VOUkVDT0dOSVpFRF9GT1JNQVQQARIfChtSRUpFQ1RfUkVBU09OX1NJWkVfTUlTTUFUQ0gQAhIjCh9SRUpFQ1RfUkVBU09OX0NIRUNLU1VNX01JU01BVENIEAMSIwofUkVKRUNUX1JFQVNPTl9QUk9DRVNTSU5HX0ZBSUxFRBAEEhkKFVJFSkVDVF9SRUFTT05fRVhQSVJFRBAFMrsDCg9NZWRpYUFwcFNlcnZpY2USYgoLQmVnaW5VcGxvYWQSKC5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblVwbG9hZFJlcXVlc3QaKS5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblVwbG9hZFJlc3BvbnNlEnAKDkNvbXBsZXRlVXBsb2FkEisuaGF3a3IubWVkaWEudjFhbHBoYTEuQ29tcGxldGVVcGxvYWRSZXF1ZXN0GiwuaGF3a3IubWVkaWEudjFhbHBoYTEuQ29tcGxldGVVcGxvYWRSZXNwb25zZSIDkAICElwKCUdldFVwbG9hZBImLmhhd2tyLm1lZGlhLnYxYWxwaGExLkdldFVwbG9hZFJlcXVlc3QaJy5oYXdrci5tZWRpYS52MWFscGhhMS5HZXRVcGxvYWRSZXNwb25zZRJ0ChFCZWdpblNlY3VyZVVwbG9hZBIuLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luU2VjdXJlVXBsb2FkUmVxdWVzdBovLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luU2VjdXJlVXBsb2FkUmVzcG9uc2Uy7QQKFU1lZGlhRGVsZWdhdGVkU2VydmljZRKMAQoLQmVnaW5VcGxvYWQSPS5oYXdrci5tZWRpYS52MWFscGhhMS5NZWRpYURlbGVnYXRlZFNlcnZpY2VCZWdpblVwbG9hZFJlcXVlc3QaPi5oYXdrci5tZWRpYS52MWFscGhhMS5NZWRpYURlbGVnYXRlZFNlcnZpY2VCZWdpblVwbG9hZFJlc3BvbnNlEpoBCg5Db21wbGV0ZVVwbG9hZBJALmhhd2tyLm1lZGlhLnYxYWxwaGExLk1lZGlhRGVsZWdhdGVkU2VydmljZUNvbXBsZXRlVXBsb2FkUmVxdWVzdBpBLmhhd2tyLm1lZGlhLnYxYWxwaGExLk1lZGlhRGVsZWdhdGVkU2VydmljZUNvbXBsZXRlVXBsb2FkUmVzcG9uc2UiA5ACAhKGAQoJR2V0VXBsb2FkEjsuaGF3a3IubWVkaWEudjFhbHBoYTEuTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlR2V0VXBsb2FkUmVxdWVzdBo8Lmhhd2tyLm1lZGlhLnYxYWxwaGExLk1lZGlhRGVsZWdhdGVkU2VydmljZUdldFVwbG9hZFJlc3BvbnNlEp4BChFCZWdpblNlY3VyZVVwbG9hZBJDLmhhd2tyLm1lZGlhLnYxYWxwaGExLk1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVxdWVzdBpELmhhd2tyLm1lZGlhLnYxYWxwaGExLk1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message hawkr.media.v1alpha1.BeginUploadRequest
@@ -303,6 +303,167 @@ export const MediaDelegatedServiceBeginSecureUploadResponseSchema: GenMessage<Me
   messageDesc(file_hawkr_media_v1alpha1_media, 9);
 
 /**
+ * MediaDelegatedServiceBeginUploadRequest 與 BeginUploadRequest 的欄位與意義相同；沒有 store_id：店家由代行 session 決定。
+ *
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadRequest
+ */
+export type MediaDelegatedServiceBeginUploadRequest = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadRequest"> & {
+  /**
+   * 檔案的位元組數；必須大於零且不超過伺服器的上限。
+   *
+   * @generated from field: int64 size = 1;
+   */
+  size: bigint;
+
+  /**
+   * 檔案的 MIME 型別，只能是 image/jpeg、image/png、image/webp、image/gif。
+   *
+   * @generated from field: string content_type = 2;
+   */
+  contentType: string;
+
+  /**
+   * 檔案內容 MD5 的標準 base64（16 位元組）。
+   *
+   * @generated from field: string md5 = 3;
+   */
+  md5: string;
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadRequest.
+ * Use `create(MediaDelegatedServiceBeginUploadRequestSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceBeginUploadRequestSchema: GenMessage<MediaDelegatedServiceBeginUploadRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 10);
+
+/**
+ * MediaDelegatedServiceBeginUploadResponse 與 BeginUploadResponse 的欄位與意義相同。
+ *
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse
+ */
+export type MediaDelegatedServiceBeginUploadResponse = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse"> & {
+  /**
+   * 不透明的憑證，交給 CompleteUpload、GetUpload 與擁有者的 API；只出現這一次。
+   *
+   * @generated from field: string staged_token = 1;
+   */
+  stagedToken: string;
+
+  /**
+   * 預簽的 PUT 網址。
+   *
+   * @generated from field: string upload_url = 2;
+   */
+  uploadUrl: string;
+
+  /**
+   * PUT 時必須原樣帶上的請求標頭；不含 Content-Length。
+   *
+   * @generated from field: map<string, string> upload_headers = 3;
+   */
+  uploadHeaders: { [key: string]: string };
+
+  /**
+   * 暫存的到期時間。
+   *
+   * @generated from field: google.protobuf.Timestamp expire_time = 4;
+   */
+  expireTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceBeginUploadResponse.
+ * Use `create(MediaDelegatedServiceBeginUploadResponseSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceBeginUploadResponseSchema: GenMessage<MediaDelegatedServiceBeginUploadResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 11);
+
+/**
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadRequest
+ */
+export type MediaDelegatedServiceCompleteUploadRequest = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadRequest"> & {
+  /**
+   * BeginUpload 回傳的 staged token。
+   *
+   * @generated from field: string staged_token = 1;
+   */
+  stagedToken: string;
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadRequest.
+ * Use `create(MediaDelegatedServiceCompleteUploadRequestSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceCompleteUploadRequestSchema: GenMessage<MediaDelegatedServiceCompleteUploadRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 12);
+
+/**
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadResponse
+ */
+export type MediaDelegatedServiceCompleteUploadResponse = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadResponse"> & {
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceCompleteUploadResponse.
+ * Use `create(MediaDelegatedServiceCompleteUploadResponseSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceCompleteUploadResponseSchema: GenMessage<MediaDelegatedServiceCompleteUploadResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 13);
+
+/**
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadRequest
+ */
+export type MediaDelegatedServiceGetUploadRequest = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadRequest"> & {
+  /**
+   * BeginUpload 回傳的 staged token。
+   *
+   * @generated from field: string staged_token = 1;
+   */
+  stagedToken: string;
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadRequest.
+ * Use `create(MediaDelegatedServiceGetUploadRequestSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceGetUploadRequestSchema: GenMessage<MediaDelegatedServiceGetUploadRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 14);
+
+/**
+ * MediaDelegatedServiceGetUploadResponse 與 GetUploadResponse 的欄位與意義相同。
+ *
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse
+ */
+export type MediaDelegatedServiceGetUploadResponse = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse"> & {
+  /**
+   * @generated from field: hawkr.media.v1alpha1.UploadState state = 1;
+   */
+  state: UploadState;
+
+  /**
+   * 只在 state 是 REJECTED 時設值。
+   *
+   * @generated from field: optional hawkr.media.v1alpha1.RejectReason reject_reason = 2;
+   */
+  rejectReason?: RejectReason | undefined;
+
+  /**
+   * 暫存的到期時間。
+   *
+   * @generated from field: google.protobuf.Timestamp expire_time = 3;
+   */
+  expireTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceGetUploadResponse.
+ * Use `create(MediaDelegatedServiceGetUploadResponseSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceGetUploadResponseSchema: GenMessage<MediaDelegatedServiceGetUploadResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 15);
+
+/**
  * UploadState 是一筆暫存上傳的狀態。client 遇到 UNSPECIFIED 或不認得的值走「未知」的呈現。
  *
  * @generated from enum hawkr.media.v1alpha1.UploadState
@@ -491,6 +652,40 @@ export const MediaAppService: GenService<{
  * @generated from service hawkr.media.v1alpha1.MediaDelegatedService
  */
 export const MediaDelegatedService: GenService<{
+  /**
+   * BeginUpload 為代行店家宣告要上傳的公開圖片，回傳與 MediaAppService.BeginUpload 相同的預簽 PUT 網址、標頭與 staged token（B1-D21）。
+   * 上傳者是代行 session 的管理員並綁定被代行的店；staged token 只有同一家店的有效代行 session 能續用。
+   * 錯誤與 MediaAppService.BeginUpload 相同（size、content_type、md5 不合法回 invalid_argument）。需要能力 media.upload。
+   *
+   * @generated from rpc hawkr.media.v1alpha1.MediaDelegatedService.BeginUpload
+   */
+  beginUpload: {
+    methodKind: "unary";
+    input: typeof MediaDelegatedServiceBeginUploadRequestSchema;
+    output: typeof MediaDelegatedServiceBeginUploadResponseSchema;
+  },
+  /**
+   * CompleteUpload 在 client 把檔案 PUT 完之後呼叫，語意同 MediaAppService.CompleteUpload（可重送）。
+   * staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）；暫存已過期回 failed_precondition。需要能力 media.upload。
+   *
+   * @generated from rpc hawkr.media.v1alpha1.MediaDelegatedService.CompleteUpload
+   */
+  completeUpload: {
+    methodKind: "unary";
+    input: typeof MediaDelegatedServiceCompleteUploadRequestSchema;
+    output: typeof MediaDelegatedServiceCompleteUploadResponseSchema;
+  },
+  /**
+   * GetUpload 讀暫存的處理狀態，語意同 MediaAppService.GetUpload（staged token 是憑證，不標 NO_SIDE_EFFECTS）。
+   * staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）。需要能力 media.upload。
+   *
+   * @generated from rpc hawkr.media.v1alpha1.MediaDelegatedService.GetUpload
+   */
+  getUpload: {
+    methodKind: "unary";
+    input: typeof MediaDelegatedServiceGetUploadRequestSchema;
+    output: typeof MediaDelegatedServiceGetUploadResponseSchema;
+  },
   /**
    * BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
    * 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。

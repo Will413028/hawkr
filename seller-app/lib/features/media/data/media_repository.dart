@@ -1,176 +1,88 @@
 import 'dart:typed_data';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
+import 'package:hawkr_api/upload.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import '../../../config/flavor.dart';
 import '../../../config/media_image.dart';
 import '../../../core/exceptions/app_exception.dart';
-import '../../../core/networking/dio_provider.dart';
+import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/connect_provider.dart';
+import '../../../core/session/auth_session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/utils/image_processing_service.dart';
 import 'media_model.dart';
 
-/// 媒體上傳 Repository（Dio-based）
-///
-/// 從 `MediaUploadService` 提取，使用 Dio provider 管理 HTTP 連線。
-/// 上傳流程：CreateSession → PUT to OSS → CompleteSession → stagedToken
+/// 媒體上傳 Repository：流程在 `hawkr_api` 的 `upload.dart`（公開圖片預簽 PUT 後輪詢 `GetUpload`，
+/// 機敏檔分段 PUT 到單體的 `/api/files/secure_uploads`）。
 class MediaRepository {
-  final Dio _dio;
+  MediaRepository({
+    required MediaAppServiceClient client,
+    required UploadHttp http,
+    required Uri filesBase,
+    required Future<String?> Function() sessionToken,
+    required UiLocale Function() locale,
+  }) : _client = client,
+       _http = http,
+       _filesBase = filesBase,
+       _sessionToken = sessionToken,
+       _locale = locale;
 
-  MediaRepository(this._dio);
+  final MediaAppServiceClient _client;
+  final UploadHttp _http;
+  final Uri _filesBase;
+  final Future<String?> Function() _sessionToken;
+  final UiLocale Function() _locale;
 
-  /// 媒體 API base path
-  static const String _mediaPath = '/api/v1/app/media';
-
-  // ============================================================
-  // Session 上傳（核心流程）
-  // ============================================================
-
-  /// 使用 Upload Session 流程上傳媒體檔案
+  /// 上傳公開圖片，回傳 READY 的 staged token。
   ///
-  /// 流程：CreateSession → PUT to OSS → CompleteSession → stagedToken
-  ///
-  /// [bytes] 檔案 bytes
-  /// [filename] 檔案名稱
-  /// [compress] 是否壓縮（預設 true）
+  /// [bytes] 檔案 bytes；[filename] 只用來判斷格式；[compress] 是否壓縮（預設 true）。
+  /// 伺服器只收 JPEG、PNG、WebP、GIF，其他格式（例如 HEIC）先經壓縮器轉成 JPEG，轉不成就丟錯。
   Future<MediaUploadResult> uploadWithSession({
     required Uint8List bytes,
     required String filename,
     bool compress = true,
   }) async {
     try {
-      final contentType = _getMimeType(filename);
-
-      // 1. 可選壓縮
-      Uint8List finalBytes = bytes;
-      if (shouldCompressForUpload(
+      var contentType = _getMimeType(filename);
+      var finalBytes = bytes;
+      final shouldCompress = shouldCompressForUpload(
         bytes: bytes,
         contentType: contentType,
         compress: compress,
-      )) {
+      );
+      if (shouldCompress || !_serverImageTypes.contains(contentType)) {
         final compressed = await ImageProcessingService.compress(bytes);
         if (compressed != null) {
           finalBytes = compressed;
+          contentType = 'image/jpeg';
         }
       }
-
-      // 2. 建立上傳會話
-      final session = await _createUploadSession(
-        filename: filename,
-        contentType: contentType,
-        fileSize: finalBytes.length,
-      );
-
-      // 3. PUT 檔案到 OSS（直連 OSS，不走 Dio interceptor）
-      await _putToOss(
-        uploadUrl: session.uploadUrl,
+      final token = await uploadImage(
+        client: _client,
+        http: _http,
         bytes: finalBytes,
         contentType: contentType,
       );
-
-      // 4. 完成會話 → 取得 stagedToken
-      final result = await _completeUploadSession(
-        sessionId: session.sessionId,
-        objectKey: session.objectKey,
-        fileSize: finalBytes.length,
-      );
-
-      HKLog.logD(
-        '[MediaRepo] Session upload success: stagedToken=${result.stagedToken != null ? "present" : "null"}, previewUrl=${result.previewUrl?.isNotEmpty == true ? "present" : "empty"}',
-      );
-      return result;
+      HKLog.logD('[MediaRepo] Upload ready: ${finalBytes.length} bytes');
+      return MediaUploadResult(stagedToken: token, size: finalBytes.length);
+    } on UploadRejected catch (e) {
+      throw UploadRejectedException(message: _rejectText(e.reason));
+    } on UploadFailure catch (e, st) {
+      HKLog.logE('[MediaRepo] Upload failed', e, st);
+      throw UnknownException(message: '上傳失敗，請稍後再試');
     } on AppException {
       rethrow;
     } catch (e, st) {
-      HKLog.logE('[MediaRepo] Session upload error', e, st);
-      throw UnknownException(message: '上傳失敗: $e');
+      HKLog.logE('[MediaRepo] Upload error', e, st);
+      throw UnknownException(message: '上傳失敗，請稍後再試');
     }
   }
 
-  /// 建立上傳會話
-  Future<UploadSession> _createUploadSession({
-    required String filename,
-    required String contentType,
-    required int fileSize,
-    bool isSecure = false,
-  }) async {
-    try {
-      final resp = await _dio.post(
-        '$_mediaPath/upload_sessions',
-        data: {
-          'filename': filename,
-          'contentType': contentType,
-          'fileSize': fileSize.toString(),
-          if (isSecure) 'isSecure': true,
-        },
-      );
-
-      final data = resp.data['data'] as Map<String, dynamic>;
-      return UploadSession.fromJson(data);
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
-  }
-
-  /// PUT 檔案到 OSS（直連 OSS presigned URL）
-  Future<void> _putToOss({
-    required String uploadUrl,
-    required Uint8List bytes,
-    required String contentType,
-  }) async {
-    try {
-      // 使用獨立 Dio 實例直連 OSS（不走 app interceptor）
-      final ossDio = Dio(
-        BaseOptions(
-          connectTimeout: const Duration(seconds: 30),
-          sendTimeout: const Duration(seconds: 120),
-          receiveTimeout: const Duration(seconds: 30),
-        ),
-      );
-
-      await ossDio.put(
-        uploadUrl,
-        data: Stream.fromIterable([bytes]),
-        options: Options(
-          headers: {
-            'Content-Type': contentType,
-            'Content-Length': bytes.length,
-          },
-        ),
-      );
-    } on DioException catch (e) {
-      throw NetworkException(message: 'OSS 上傳失敗: ${e.message}');
-    }
-  }
-
-  /// 完成上傳會話
-  Future<MediaUploadResult> _completeUploadSession({
-    required String sessionId,
-    required String objectKey,
-    required int fileSize,
-  }) async {
-    try {
-      final resp = await _dio.post(
-        '$_mediaPath/upload_sessions/$sessionId/complete',
-      );
-
-      final data = resp.data['data'] as Map<String, dynamic>;
-      final stagedToken = data['stagedToken'] as String;
-      final previewUrl = data['previewUrl'] as String? ?? '';
-
-      return MediaUploadResult(
-        url: previewUrl,
-        fileUrl: previewUrl,
-        objectKey: objectKey,
-        size: fileSize,
-        stagedToken: stagedToken,
-        previewUrl: previewUrl,
-      );
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
-  }
+  String _rejectText(RejectReason reason) =>
+      reason.uiText(_locale()) ?? '上傳失敗，請稍後再試';
 
   // ============================================================
   // 頭像上傳
@@ -257,73 +169,29 @@ class MediaRepository {
   // 私密文件上傳
   // ============================================================
 
-  /// 上傳私密文件（伺服器端加密）
-  Future<PrivateUploadResult> uploadPrivateDocument({
-    required Uint8List bytes,
-    required String docType,
-    String? filename,
-  }) async {
+  /// 上傳私密文件（伺服器端加密），回傳 staged token。
+  Future<String> uploadPrivateDocument({required Uint8List bytes}) async {
     try {
-      final actualFilename =
-          filename ?? '${docType}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final contentType = _getMimeType(actualFilename);
-
-      HKLog.logD('[MediaRepo] Uploading private document: docType=$docType');
-
-      // Step 1: 建立安全上傳會話
-      final session = await _createUploadSession(
-        filename: actualFilename,
-        contentType: contentType,
-        fileSize: bytes.length,
-        isSecure: true,
+      final token = await _sessionToken();
+      if (token == null || token.isEmpty) {
+        throw const UnauthorizedException(message: '登入已過期，請重新登入');
+      }
+      return await uploadSecure(
+        client: _client,
+        http: _http,
+        filesBase: _filesBase,
+        headers: () => {'Authorization': 'Bearer $token'},
+        bytes: bytes,
       );
-
-      // Step 2: PUT 到 secure_upload 端點
-      final resp = await _dio.put(
-        '$_mediaPath/secure_upload/${session.sessionId}',
-        data: Stream.fromIterable([bytes]),
-        options: Options(
-          headers: {
-            'Content-Type': contentType,
-            'Content-Length': bytes.length,
-          },
-        ),
-      );
-
-      final data = resp.data['data'] as Map<String, dynamic>?;
-      final stagedToken = data?['stagedToken'] as String? ?? '';
-
-      HKLog.logD(
-        '[MediaRepo] Private upload success: sessionId=${session.sessionId}',
-      );
-
-      return PrivateUploadResult(
-        referenceId: session.sessionId,
-        objectKey: session.objectKey,
-        originalSize: bytes.length,
-        docType: docType,
-        stagedToken: stagedToken,
-      );
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
+    } on UploadFailure catch (e, st) {
+      HKLog.logE('[MediaRepo] Private upload failed', e, st);
+      throw UnknownException(message: '私密文件上傳失敗，請稍後再試');
+    } on AppException {
+      rethrow;
     } catch (e, st) {
       HKLog.logE('[MediaRepo] Private upload error', e, st);
-      throw UnknownException(message: '私密文件上傳失敗: $e');
+      throw UnknownException(message: '私密文件上傳失敗，請稍後再試');
     }
-  }
-
-  // ============================================================
-  // URL 工具方法
-  // ============================================================
-
-  /// 取得私密檔案下載 URL（絕對路徑）
-  String getSecureDownloadUrl({required String assetId}) {
-    return '${F.appFlavor.gatewayHost}$_mediaPath/secure_download/$assetId';
-  }
-
-  /// 取得上傳會話預覽 URL（絕對路徑）
-  String getSecurePreviewUrl({required String sessionId}) {
-    return '${F.appFlavor.gatewayHost}$_mediaPath/secure_preview/$sessionId';
   }
 
   // ============================================================
@@ -410,12 +278,24 @@ class MediaRepository {
   }
 }
 
+const _serverImageTypes = {
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+};
+
 // ============================================================
 // Riverpod Provider
 // ============================================================
 
 /// MediaRepository Provider
 final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
-  final dio = ref.watch(dioProvider);
-  return MediaRepository(dio);
+  return MediaRepository(
+    client: ref.watch(mediaClientProvider),
+    http: IoUploadHttp(),
+    filesBase: Uri.parse(F.appFlavor.gatewayHost),
+    sessionToken: () => currentSessionToken(ref),
+    locale: () => ref.read(uiLocaleProvider),
+  );
 });

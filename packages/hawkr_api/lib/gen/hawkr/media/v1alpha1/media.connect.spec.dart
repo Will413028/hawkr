@@ -62,6 +62,35 @@ abstract final class MediaDelegatedService {
   /// Fully-qualified name of the MediaDelegatedService service.
   static const name = 'hawkr.media.v1alpha1.MediaDelegatedService';
 
+  /// BeginUpload 為代行店家宣告要上傳的公開圖片，回傳與 MediaAppService.BeginUpload 相同的預簽 PUT 網址、標頭與 staged token（B1-D21）。
+  /// 上傳者是代行 session 的管理員並綁定被代行的店；staged token 只有同一家店的有效代行 session 能續用。
+  /// 錯誤與 MediaAppService.BeginUpload 相同（size、content_type、md5 不合法回 invalid_argument）。需要能力 media.upload。
+  static const beginUpload = connect.Spec(
+    '/$name/BeginUpload',
+    connect.StreamType.unary,
+    hawkrmediav1alpha1media.MediaDelegatedServiceBeginUploadRequest.new,
+    hawkrmediav1alpha1media.MediaDelegatedServiceBeginUploadResponse.new,
+  );
+
+  /// CompleteUpload 在 client 把檔案 PUT 完之後呼叫，語意同 MediaAppService.CompleteUpload（可重送）。
+  /// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）；暫存已過期回 failed_precondition。需要能力 media.upload。
+  static const completeUpload = connect.Spec(
+    '/$name/CompleteUpload',
+    connect.StreamType.unary,
+    hawkrmediav1alpha1media.MediaDelegatedServiceCompleteUploadRequest.new,
+    hawkrmediav1alpha1media.MediaDelegatedServiceCompleteUploadResponse.new,
+    idempotency: connect.Idempotency.idempotent,
+  );
+
+  /// GetUpload 讀暫存的處理狀態，語意同 MediaAppService.GetUpload（staged token 是憑證，不標 NO_SIDE_EFFECTS）。
+  /// staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）。需要能力 media.upload。
+  static const getUpload = connect.Spec(
+    '/$name/GetUpload',
+    connect.StreamType.unary,
+    hawkrmediav1alpha1media.MediaDelegatedServiceGetUploadRequest.new,
+    hawkrmediav1alpha1media.MediaDelegatedServiceGetUploadResponse.new,
+  );
+
   /// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
   /// 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。
   /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。

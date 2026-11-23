@@ -8,6 +8,14 @@
       "message": "這筆上傳的資產已不可用",
       "description": "資產不是 ACTIVE（例如已被擁有者刪除）。"
     },
+    "media.confirm_some_unusable": {
+      "message": "有圖片無法使用，請重新上傳",
+      "description": "多個欄位的確認都不合格而各自的訊息不同時，整體錯誤的一句。"
+    },
+    "media.image_required": {
+      "message": "請上傳圖片",
+      "description": "必填的圖片位置沒有圖，也沒有現有的圖。"
+    },
     "media.image_unusable": {
       "message": "圖片無法使用，請重新上傳",
       "description": "轉正時引用的資產已退場（被換掉或刪除），要重新上傳。"
@@ -81,6 +89,10 @@
       },
       "description": "宣告的總大小不在 1 到機敏上傳上限之間。"
     },
+    "media.upload_already_used": {
+      "message": "這筆上傳已經被使用過，請重新上傳",
+      "description": "token 已在別的 transaction 確認過（Confirm 只在同一個 transaction 內冪等，B1-D23）。"
+    },
     "media.upload_content_type_unsupported": {
       "message": "不支援的圖片型別，只接受 JPEG、PNG、WebP、GIF",
       "description": "宣告的內容型別不在圖片白名單內，或格式不合法。"
@@ -125,6 +137,14 @@
     "media.uploader_invalid": {
       "message": "上傳者不合法",
       "description": "上傳者身分缺失或不合法。"
+    },
+    "media.visibility_public_required": {
+      "message": "這張圖片必須是公開圖片",
+      "description": "擁有者要求公開圖片，但上傳的是機敏檔。"
+    },
+    "media.visibility_secure_required": {
+      "message": "這個檔案必須以機敏上傳，請重新上傳",
+      "description": "擁有者要求機敏檔（證件、佐證），但上傳的是公開檔。"
     }
   }
 }

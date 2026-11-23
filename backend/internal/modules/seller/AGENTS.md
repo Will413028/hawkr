@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依子領域：店家、措施與停權、治理（通報、案件、申訴）、KYC、收款帳戶的閘門副本、商家名單、瀏覽、媒體同步與清理。表單見規格 §1。讀取模型：無。
+schema `seller`（`db/schema.sql`；view 與函式在 `db/objects.sql`），依子領域：店家、措施與停權、治理（通報、案件、申訴）、KYC、收款帳戶的閘門副本、商家名單、瀏覽與清理。圖片與證件的資產 ID 是 UUID，資產由 media 擁有（寫入的 transaction 內 `Confirm` 與 `MarkDeleted`）。表單見規格 §1。讀取模型：無。
 
 ## 發布的讀取介面
 

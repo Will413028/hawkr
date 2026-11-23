@@ -61,7 +61,7 @@
 | 41 | `scheduler/MediaGarbageCollectionJobTest.java:264` | `cleanMethodsAreWrappedInTransactionTemplate` | B1-2：`TestGC_StorageCalledOutsideTx`（transaction 邊界） | — |
 | 42 | `scheduler/MediaGarbageCollectionJobTest.java:283` | `midFlightThrowTriggersRollback` | B1-2：`TestGC_MidFlightErrorRollsBackMarkOnly`（中途失敗只回滾標記 transaction） | — |
 | 43 | `service/AssetReferenceServiceTest.java:55` | `shouldLinkSuccessfully` | — | `Link` 隨 `asset_reference` 消失；成功確認的同等行為見 `Confirm`（列 63） |
-| 44 | `service/AssetReferenceServiceTest.java:77` | `shouldBeIdempotent` | B1-2：`TestConfirm_ReentryReturnsSameAsset`（B1-D2 補充：重入回暫存列上已記的同一資產） | — |
+| 44 | `service/AssetReferenceServiceTest.java:77` | `shouldBeIdempotent` | B1-2：`TestConfirm_ReentryInTheSameTransactionReturnsSameAsset、TestConfirm_ConfirmedInAnotherTransactionIsRejected`（B1-D2 補充：重入回暫存列上已記的同一資產） | — |
 | 45 | `service/AssetReferenceServiceTest.java:98` | `shouldTolerateDuplicateAssetIds` | B1-2：`TestMarkDeleted_DuplicateIDsTolerated`（重複的資產 ID 不報錯） | — |
 | 46 | `service/AssetReferenceServiceTest.java:120` | `shouldThrowWhenRefTypeEmpty` | — | `ref_type` 隨 `asset_reference` 消失 |
 | 47 | `service/AssetReferenceServiceTest.java:129` | `shouldThrowWhenRefIdEmpty` | — | `ref_id` 隨 `asset_reference` 消失（引用只存在擁有者的資料表） |
@@ -83,7 +83,7 @@
 | 63 | `service/MediaAssetServiceTest.java:146` | `shouldFinalizeSuccessfully` | B1-2：`TestConfirm_Success`（擁有者 transaction 內確認，資產轉為已確認） | — |
 | 64 | `service/MediaAssetServiceTest.java:192` | `copiesOriginalFilenameFromSession` | B1-2：`TestConfirm_CopiesOriginalFilenameFromStaging` | — |
 | 65 | `service/MediaAssetServiceTest.java:214` | `leavesOriginalFilenameNullWhenSessionHasNone` | B1-2：`TestConfirm_LeavesFilenameNullWhenStagingHasNone` | — |
-| 66 | `service/MediaAssetServiceTest.java:236` | `shouldReturnExistingAssetWhenAlreadyFinalized` | B1-2：`TestConfirm_ReentryReturnsSameAsset`（同列 44） | — |
+| 66 | `service/MediaAssetServiceTest.java:236` | `shouldReturnExistingAssetWhenAlreadyFinalized` | B1-2：`TestConfirm_ReentryInTheSameTransactionReturnsSameAsset、TestConfirm_ConfirmedInAnotherTransactionIsRejected`（同列 44） | — |
 | 67 | `service/MediaAssetServiceTest.java:278` | `shouldThrowPermissionDeniedWhenOwnerMismatch` | B1-2：`TestConfirm_RejectsNonUploader`（mutation：`Confirm` 不比對上傳者 → 此測試紅） | — |
 | 68 | `service/MediaAssetServiceTest.java:295` | `shouldThrowInvalidArgumentWhenSessionNotFound` | B1-2：`TestConfirm_UnknownStagingNotFound` | — |
 | 69 | `service/MediaAssetServiceTest.java:312` | `shouldThrowInvalidArgumentWhenSessionExpired` | B1-2：`TestConfirm_RejectsExpiredStaging` | — |

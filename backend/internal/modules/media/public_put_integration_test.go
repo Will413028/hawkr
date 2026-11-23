@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -255,5 +256,109 @@ func TestPutPublic_StagedRowDescribesTheStoredObject(t *testing.T) {
 	sum := md5.Sum(stored) //nolint:gosec // 與列上的 declared_md5 比對，不是安全用途
 	if size != int64(len(stored)) || size != res.SizeBytes || ct != res.ContentType || md5b64 != base64.StdEncoding.EncodeToString(sum[:]) {
 		t.Fatalf("暫存列與寫入的物件不一致：size=%d type=%s md5=%s，物件 %d 位元組", size, ct, md5b64, len(stored))
+	}
+}
+
+func TestCopyPublic_ProducesAnIndependentConfirmableAssetAndLeavesTheSourceUntouched(t *testing.T) {
+	f := setup(t)
+	res, err := f.m.PutPublic(t.Context(), owner, bytes.NewReader(pngBytes(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := confirmInTx(f, owner, res.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cp, err := f.m.CopyPublic(t.Context(), other, src.ID)
+	if err != nil {
+		t.Fatalf("CopyPublic：%v", err)
+	}
+	if cp.Token == "" || cp.Token == res.Token || cp.ContentType != src.ContentType || cp.SizeBytes != src.SizeBytes {
+		t.Fatalf("複製結果不對：%+v 對來源 %+v", cp, src)
+	}
+	if _, err := confirmInTx(f, owner, cp.Token); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("別人的 token 不能確認複本：%v", err)
+	}
+	dup, err := confirmInTx(f, other, cp.Token)
+	if err != nil {
+		t.Fatalf("Confirm 複本：%v", err)
+	}
+	if dup.ID == src.ID || dup.ObjectKey == src.ObjectKey || dup.Visibility != media.VisibilityPublic {
+		t.Fatalf("複本要是獨立的公開資產：%+v 對 %+v", dup, src)
+	}
+	if !f.store.has(dup.ObjectKey) || !f.store.has(src.ObjectKey) {
+		t.Fatal("來源與複本的物件都要在儲存裡")
+	}
+	if err := f.d.InTx(t.Context(), func(ctx context.Context) error { return f.m.MarkDeleted(ctx, []uuid.UUID{src.ID}) }); err != nil {
+		t.Fatal(err)
+	}
+	if st := assetState(t, f, dup.ID); st != "ACTIVE" {
+		t.Fatalf("來源被刪除後複本狀態 = %s，預期 ACTIVE", st)
+	}
+	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if f.store.has(src.ObjectKey) || !f.store.has(dup.ObjectKey) {
+		t.Fatal("實體刪除只能刪來源的物件，複本的物件要留著")
+	}
+}
+
+func TestCopyPublic_RefusesSourcesThatAreNotActivePublicAssets(t *testing.T) {
+	f := setup(t)
+	res, err := f.m.PutPublic(t.Context(), owner, bytes.NewReader(pngBytes(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := confirmInTx(f, owner, res.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.CopyPublic(t.Context(), owner, uuid.NewV7()); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("不存在的來源：%v", err)
+	}
+	if err := f.d.InTx(t.Context(), func(ctx context.Context) error { return f.m.MarkDeleted(ctx, []uuid.UUID{src.ID}) }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.CopyPublic(t.Context(), owner, src.ID); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("已標記刪除的來源：%v", err)
+	}
+	staged, err := f.m.PutPublic(t.Context(), owner, bytes.NewReader(pngBytes(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stagedAsset uuid.UUID
+	if err := f.d.Pool().QueryRow(t.Context(), `SELECT asset_id FROM media.staged_uploads WHERE token_hash = sha256($1::bytea)`, []byte(staged.Token)).Scan(&stagedAsset); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.CopyPublic(t.Context(), owner, stagedAsset); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("尚未確認的來源：%v", err)
+	}
+}
+
+func TestCopyPublic_AnUnconfirmedCopyIsReclaimedByGC(t *testing.T) {
+	f := setup(t)
+	res, err := f.m.PutPublic(t.Context(), owner, bytes.NewReader(pngBytes(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src, err := confirmInTx(f, owner, res.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.CopyPublic(t.Context(), owner, src.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.clock.Advance(media.UploadTTL + media.StuckUploadGrace + 1)
+	if _, err := f.m.CollectGarbage(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if n := assetCount(t, f); n != 2 {
+		t.Fatalf("資產列數 = %d，預期 2（來源與已刪的複本墓碑）", n)
+	}
+	if !f.store.has(src.ObjectKey) {
+		t.Fatal("GC 不能刪來源的物件")
 	}
 }

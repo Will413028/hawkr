@@ -74,8 +74,6 @@ const (
 	EnvSellerToken  = "CHARACTERIZE_SELLER_TOKEN"
 	EnvSeller2Token = "CHARACTERIZE_SELLER2_TOKEN"
 	EnvBuyer2Token  = "CHARACTERIZE_BUYER2_TOKEN"
-	// EnvFakeMediaAddr 是舊服務與單體設定的 media-service 位址（host:port），由測試以 ServeFakeMedia 聽。
-	EnvFakeMediaAddr = "FAKE_MEDIA_ADDR"
 )
 
 // RequireEnv 讀經入口執行時的設定。這些測試只在 scripts/characterize.sh 起服務後執行（build tag gateway），

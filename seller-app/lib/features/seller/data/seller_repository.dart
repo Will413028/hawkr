@@ -35,12 +35,9 @@ class SellerRepository with ApiRequestHelper {
             bytes: Uint8List.fromList(bytes),
             filename: filename,
           );
-      final url = result.previewUrl?.isNotEmpty == true
-          ? result.previewUrl!
-          : result.url;
       return {
         'code': 0,
-        'data': {'url': url, 'stagedToken': result.stagedToken},
+        'data': {'stagedToken': result.stagedToken},
       };
     } catch (e) {
       HKLog.logD('[SellerRepo] UPLOAD error: $e');

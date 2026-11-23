@@ -15,8 +15,8 @@
 | `buyer-app/` | Flutter 買家 App | `.github/workflows/buyer-ci.yml` |
 | `seller-app/` | Flutter 賣家 App | `.github/workflows/seller-ci.yml` |
 | `api/` | 對外 API 的 Protobuf 契約（Connect） | `.github/workflows/api-contract.yml` |
-| `packages/hawkr-api-ts/` | `api/` 的 TypeScript 生成物（`src/gen`）與 Connect 執行期（錯誤分類 `connect/errors`、重試 `connect/retry`、表單送出分類 `connect/submit`）與手寫的 `proto/date`（`google.type.Date` 與 `YYYY-MM-DD`）、`proto/field-mask`（依 descriptor 檢查路徑的 update_mask）、`text/server-text`（Go `TrimSpace` 與以 rune 計長的伺服器文字規則），套件名 `@hawkr/api`，website 與 admin 共用 | `.github/workflows/api-contract.yml` |
-| `packages/hawkr_api/` | `api/` 的 Dart 生成物，兩支 App 共用 | `.github/workflows/api-contract.yml` |
+| `packages/hawkr-api-ts/` | `api/` 的 TS 生成物（`src/gen`）與 Connect 執行期（錯誤 `connect/errors`、重試 `connect/retry`、表單送出 `connect/submit`、媒體上傳 `connect/upload`：預簽 PUT、分段續傳）與手寫的 `proto/date`、`proto/field-mask`、`text/server-text`（伺服器文字規則），套件名 `@hawkr/api`，website、admin 共用 | `.github/workflows/api-contract.yml` |
+| `packages/hawkr_api/` | `api/` 的 Dart 生成物與手寫 `upload.dart`（同 `connect/upload`），兩支 App 共用 | `.github/workflows/api-contract.yml` |
 | `packages/hawkr_auth/` | Google、LINE 原生登入（`google_sign_in`、`flutter_line_sdk`；沒有 Apple 登入）換 identity 的 opaque session token，token 存 Keychain（`flutter_secure_storage`）；換發的 RPC 由 App 實作 `IdentityGateway`，套件不依賴 `hawkr_api`。兩支 App 共用 | `.github/workflows/dart-packages.yml` |
 | `packages/hawkr_app_update/` | App 版本門檻的檢查與 `app_version_utils`，兩支 App 共用；規格在 `docs/spec.md` | `.github/workflows/dart-packages.yml` |
 | `packages/hawkr_twaddr/` | 內政部 8 碼鄉鎮市區代碼表與查詢；資料檔 `lib/src/twaddr_data.g.dart` 由 `backend/internal/platform/twaddr` 的 CSV 生成，不得手改，查詢是手寫的。兩支 App 共用 | `.github/workflows/dart-packages.yml`、`.github/workflows/twaddr-generated-diff.yml` |

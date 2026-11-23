@@ -9,8 +9,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -198,7 +196,7 @@ func (s *Service) ListDocumentAccesses(ctx context.Context, in model.KYCAuditLis
 	page := model.KYCDocumentAccessPage{Items: make([]model.KYCDocumentAccess, 0, len(rows))}
 	for _, a := range rows {
 		page.Items = append(page.Items, model.KYCDocumentAccess{
-			ID: a.AccessID, AdminID: a.AdminID, Position: int(a.Position), AssetID: a.AssetID, AccessedAt: a.AccessedAt,
+			ID: a.AccessID, AdminID: a.AdminID, Position: int(a.Position), AssetID: a.AssetID.String(), AccessedAt: a.AccessedAt,
 		})
 	}
 	if hasMore {
@@ -445,7 +443,7 @@ func (s *Service) Reject(ctx context.Context, in model.RejectKYCInput) (model.KY
 // 不要理由與限時授權），這裡不再問授權；個資已清除、草稿與已取消的申請或位置沒有文件是 NotFound。
 // 順序是安全性質：（1）在 transaction 內確認文件並寫一列 append-only 的讀取紀錄（誰、哪個位置、實際送出的 asset ID、
 // 何時；不含內容），commit 之後才（2）向 media 讀圖片。紀錄寫不進去就不讀（fail closed）；讀取失敗時紀錄仍在（嘗試也是紀錄）。
-// media 的呼叫在 transaction 之外，讀不到時的三種結果見 mediaref.ReadSecure。
+// media 的呼叫在 transaction 之外，讀不到時的結果見 model.ReadSecure。
 func (s *Service) ReadDocument(ctx context.Context, in model.ReadKYCDocumentInput) (model.FileContent, error) {
 	if err := model.Positive(in.AdminID); err != nil {
 		return model.FileContent{}, err
@@ -483,7 +481,39 @@ func (s *Service) ReadDocument(ctx context.Context, in model.ReadKYCDocumentInpu
 	if err != nil {
 		return model.FileContent{}, err
 	}
-	return mediaref.ReadSecure(ctx, store.New(s.d.DB.Conn(ctx)), s.d.Media, media.Ref{Type: media.RefTypeCertification, ID: in.ApplicationID.String()}, doc.ObjectKey)
+	return model.ReadSecure(ctx, s.d.Media, doc.AssetID)
+}
+
+// ReadOwnDocument 讀帳號目前店家的申請的一張公司補充文件：授權與 Mine 相同（帳號擁有目前的店家），申請以帳號目前的店家為準；沒有申請、個資已清除
+// （已取消的申請不是目前的申請）或位置沒有文件是 NotFound。文件的資產 ID 與讀取在 media 的機敏讀取，不寫讀取紀錄（賣家讀自己的證件，稽核只針對管理員）。
+func (s *Service) ReadOwnDocument(ctx context.Context, in model.ReadOwnKYCDocumentInput) (model.FileContent, error) {
+	if err := model.Positive(in.AccountID); err != nil {
+		return model.FileContent{}, err
+	}
+	if in.Position < 0 || in.Position >= model.MaxCompanyDocuments {
+		return model.FileContent{}, apperr.NotFound("找不到這份文件")
+	}
+	q := store.New(s.d.DB.Conn(ctx))
+	storeRow, err := s.actingStore(ctx, q, in.AccountID, model.CapAccountSelfRead)
+	if err != nil {
+		return model.FileContent{}, err
+	}
+	row, err := q.CurrentKYCApplication(ctx, storeRow.StoreID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.PiiPurgedAt != nil) {
+		return model.FileContent{}, apperr.NotFound("找不到這份文件")
+	}
+	if err != nil {
+		return model.FileContent{}, err
+	}
+	docs, err := q.KYCDocuments(ctx, row.ApplicationID)
+	if err != nil {
+		return model.FileContent{}, err
+	}
+	i := slices.IndexFunc(docs, func(d store.SellerKycDocument) bool { return int(d.Position) == in.Position })
+	if i < 0 {
+		return model.FileContent{}, apperr.NotFound("找不到這份文件")
+	}
+	return model.ReadSecure(ctx, s.d.Media, docs[i].AssetID)
 }
 
 // MatchCertHolder 回報 holderName（政府證書查驗回的業者名稱）是否屬於店家目前已核准的 KYC 的公司名稱（規則在

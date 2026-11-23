@@ -34,7 +34,10 @@ import {
 	VersionConflictNotice,
 } from "@/components/connect/FormFeedback";
 import { errorMessage } from "@/lib/error-text";
-import { uploadImageToMedia } from "@/services/media-upload";
+import {
+	MediaRejectedError,
+	uploadImageToMedia,
+} from "@/services/media-upload";
 import { imageUri } from "@/utils/image";
 
 interface BannerEditorClientProps {
@@ -239,6 +242,10 @@ const BannerEditorClient: React.FC<BannerEditorClientProps> = ({ id }) => {
 		} catch (e) {
 			setUploading(false);
 			console.error("[BannerEditor] Save failed:", e);
+			if (e instanceof MediaRejectedError) {
+				setFormError(e.message);
+				return;
+			}
 			const failure = submitError(e, defaultErrorTextZhTW, method);
 			if (failure.kind === "conflict" && id) {
 				// 別人先改過：保留輸入，讀最新版本給使用者對照。

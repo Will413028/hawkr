@@ -94,7 +94,7 @@ type Orders interface {
 
 // Image 是評價的一張附圖。
 type Image struct {
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }
 

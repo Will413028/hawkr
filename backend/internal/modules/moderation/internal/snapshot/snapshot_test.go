@@ -296,3 +296,28 @@ func TestSocialAssetIDsAreSortedAndDeduplicated(t *testing.T) {
 		t.Fatalf("買家對象沒有圖片資產：%v", got)
 	}
 }
+
+func TestReplaceAssetsSwapsEveryReferenceWithoutTouchingTheOriginal(t *testing.T) {
+	to := map[string]string{"c1": "n1", "c2": "n2", "m1": "n3"}
+	orig := chat()
+	got := orig.ReplaceAssets(to)
+	if want := []string{"n1", "n2", "n3"}; !slices.Equal(got.AssetIDs(), want) {
+		t.Fatalf("換掉之後的圖片：%v，預期 %v", got.AssetIDs(), want)
+	}
+	if !slices.Equal(orig.AssetIDs(), []string{"c1", "c2", "m1"}) {
+		t.Fatalf("原內容被改動：%v", orig.AssetIDs())
+	}
+	if got.Chat.Body != orig.Chat.Body || len(got.Chat.Context) != len(orig.Chat.Context) {
+		t.Fatalf("只換圖片，其餘欄位不變：%+v", got.Chat)
+	}
+}
+
+func TestReplaceAssetsLeavesUnmappedIDsAndOtherKindsAlone(t *testing.T) {
+	if got := comment("x", "a", "b").ReplaceAssets(map[string]string{"a": "z"}).AssetIDs(); !slices.Equal(got, []string{"b", "z"}) {
+		t.Fatalf("沒對應的 ID 維持原樣：%v", got)
+	}
+	buyer := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a"}}
+	if got := buyer.ReplaceAssets(map[string]string{"a": "z"}); got.Buyer == nil || got.Buyer.DisplayName != "a" {
+		t.Fatalf("買家內容不變：%+v", got)
+	}
+}

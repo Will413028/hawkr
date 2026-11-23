@@ -11,26 +11,24 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/phone"
 )
 
 // Deps 外部依賴；clock 由組裝點注入。
 type Deps struct {
 	DB             *db.DB
-	Media          media.Media
-	Jobs           jobs.Enqueuer
+	Media          model.Media
 	Now            func() time.Time
 	NicknameNumber func() int
 	Logger         *slog.Logger
@@ -267,8 +265,8 @@ func nullableText(value string) *string {
 
 // UpdateProfile 在買家列鎖內合併提供的欄位；未提供的欄位保留原值。
 // ExpectedVersion 必填；沒有任何欄位改變、也沒有換頭像時不寫入，版本不變。
-// AvatarStagedToken 帶上傳完成的 staged token 時換頭像：先在 transaction 外預檢（版本與合併後的文字驗證）
-// 並轉正圖片，再於同一個版本條件的 transaction 內寫入文字欄位與頭像、把被換掉的頭像記成退場並排入同步（mediaref）。
+// AvatarStagedToken 帶上傳完成的 staged token 時換頭像：在同一個版本條件的 transaction 內，通過版本與合併後的文字驗證後 Confirm 新資產，
+// 寫入文字欄位與頭像，並把被換掉的資產 MarkDeleted；任何一步失敗整筆回滾，新資產仍是暫存。
 func (service *Service) UpdateProfile(ctx context.Context, input model.UpdateProfileInput) (model.Profile, error) {
 	if err := model.Positive(input.BuyerID); err != nil {
 		return model.Profile{}, err
@@ -284,28 +282,6 @@ func (service *Service) UpdateProfile(ctx context.Context, input model.UpdatePro
 		}
 		hasAvatar = true
 		avatarToken = strings.TrimSpace(*input.AvatarStagedToken)
-	}
-
-	var asset media.Asset
-	if hasAvatar {
-		if _, ok := db.TxFrom(ctx); ok {
-			return model.Profile{}, apperr.FailedPrecondition("換圖必須在 transaction 外開始")
-		}
-		current, err := service.ProfileByBuyerID(ctx, input.BuyerID)
-		if err != nil {
-			return model.Profile{}, err
-		}
-		if current.Version != input.ExpectedVersion {
-			return model.Profile{}, apperr.VersionConflict("買家資料已被修改")
-		}
-		if _, _, err := service.mergeChecked(current, input); err != nil {
-			return model.Profile{}, err
-		}
-		ref := mediaref.AvatarRef(input.BuyerID)
-		asset, err = media.FinalizeField(ctx, service.deps.Media, media.Uploader{ID: current.AccountID}, media.Field{Name: "AvatarStagedToken"}, avatarToken, ref.Type)
-		if err != nil {
-			return model.Profile{}, err
-		}
 	}
 
 	var updated store.BuyerBuyer
@@ -361,8 +337,10 @@ func (service *Service) UpdateProfile(ctx context.Context, input model.UpdatePro
 		}
 
 		if hasAvatar {
-			ref := mediaref.AvatarRef(input.BuyerID)
-			if err := mediaref.Reject(ctx, queries, ref, media.SyncCandidate{Field: "AvatarStagedToken", AssetID: asset.ID}); err != nil {
+			asset, err := media.ConfirmField(ctx, service.deps.Media, media.Uploader{ID: current.AccountID}, "AvatarStagedToken", avatarToken, func(a media.ConfirmedAsset) string {
+				return media.RequireVisibility(ctx, media.VisibilityPublic, a)
+			})
+			if err != nil {
 				return err
 			}
 			row, err = queries.UpdateAvatar(ctx, store.UpdateAvatarParams{
@@ -378,12 +356,10 @@ func (service *Service) UpdateProfile(ctx context.Context, input model.UpdatePro
 			if err != nil {
 				return err
 			}
-			var retired []string
 			if current.AvatarAssetID != nil && *current.AvatarAssetID != asset.ID {
-				retired = append(retired, *current.AvatarAssetID)
-			}
-			if err := mediaref.Changed(ctx, queries, service.deps.Jobs, now, ref, retired...); err != nil {
-				return err
+				if err := service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID}); err != nil {
+					return err
+				}
 			}
 		}
 

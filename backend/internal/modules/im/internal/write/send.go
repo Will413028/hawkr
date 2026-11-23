@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
-	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/rows"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/store"
@@ -30,8 +29,8 @@ type target struct {
 	store   seller.Store
 }
 
-// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
-// transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
+// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 守門 G1..G5（transaction 外的讀取）→ transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、Confirm 圖片、寫訊息、發 MessageSent；
+// 任何一步失敗整筆回滾，圖片仍是暫存。
 func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
 	l := uitext.LocaleFrom(ctx)
 	body, err := s.checkInput(l, &in)
@@ -46,16 +45,9 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		return model.Message{}, err
 	}
 
-	var asset media.Asset
-	if in.Type == model.TypeImage {
-		uploader := buyerAccount
-		if in.Sender.Kind == model.PartyStore {
-			uploader = t.store.AccountID
-		}
-		asset, err = media.FinalizeField(ctx, s.d.Media, media.Uploader{ID: uploader}, media.Field{Name: "StagedToken"}, in.StagedToken, media.RefTypeChatMessage)
-		if err != nil {
-			return model.Message{}, err
-		}
+	uploader := buyerAccount
+	if in.Sender.Kind == model.PartyStore {
+		uploader = t.store.AccountID
 	}
 
 	var out model.Message
@@ -89,16 +81,17 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		if in.Type == model.TypeText {
 			p.Content = &body
 		} else {
+			asset, err := media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: uploader}, "StagedToken", in.StagedToken, func(a media.ConfirmedAsset) string {
+				return media.RequireVisibility(ctx, media.VisibilityPublic, a)
+			})
+			if err != nil {
+				return err
+			}
 			p.ImageAssetID, p.ImageObjectKey = &asset.ID, &asset.ObjectKey
 		}
 		row, err := q.InsertMessage(ctx, p)
 		if err != nil {
 			return err
-		}
-		if in.Type == model.TypeImage {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.MessageRef(msgID)); err != nil {
-				return err
-			}
 		}
 		if err := events.Publish(ctx, s.d.Events, model.MessageSent{
 			EventID: s.d.NewID(), OccurredAt: now, ConversationID: seq.ID, MessageID: msgID, Seq: seq.LastSeq,

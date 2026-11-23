@@ -601,9 +601,6 @@ func TestWritesRequireAnActiveProspect(t *testing.T) {
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: archived.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: "t"}})
 	wantKind(t, err, apperr.KindFailedPrecondition)
-	if len(f.media.finalized) != 0 {
-		t.Fatalf("finalized for an archived prospect: %v", f.media.finalized)
-	}
 	_, err = f.module.ConvertProspect(ctx, ConvertProspectInput{ProspectID: p.ID, StoreID: 1, AdminID: prospectAdmin, ExpectedVersion: archived.Version})
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	_, err = f.module.Prospect(ctx, p.ID+999)
@@ -813,58 +810,50 @@ func TestMergeTaxIDAndPathCompression(t *testing.T) {
 	}
 }
 
-func (f *fixture) prospectRef(refType string, prospectID int64) media.Ref {
-	return f.storeRef(refType, prospectID)
-}
-
-func (f *fixture) syncProspectImages(t *testing.T, id int64) {
+// stageProspectImage 以管理員為上傳者放一張公開圖片。
+func (f *fixture) stageProspectImage(t *testing.T) (string, uuid.UUID) {
 	t.Helper()
-	f.syncMedia(t, f.prospectRef(media.RefTypeSellerProspectLogo, id))
-	f.syncMedia(t, f.prospectRef(media.RefTypeSellerProspectCover, id))
+	return f.stagePublic(t, media.Uploader{ID: prospectAdmin, Admin: true})
 }
 
-// 圖片併進 UpdateProspect：版本條件寫入、以 prospect_id 為 ref；換圖只有被換掉的那一張退場；文字、聯絡方式與兩張圖在同一個版本
+// 圖片併進 UpdateProspect：版本條件寫入、在同一個 transaction 內確認；換圖只有被換掉的那一張標為刪除；文字、聯絡方式與兩張圖在同一個版本
 // 條件的 transaction 內寫入，版本只加一。
-func TestProspectImagesLinkByProspectIDAndUseVersion(t *testing.T) {
+func TestProspectImagesAreConfirmedWithTheProspectAndUseVersion(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	p := f.newProspect(t, "甲", nil)
+	oneToken, one := f.stageProspectImage(t)
+	coverToken, cover := f.stageProspectImage(t)
 	updated, err := f.module.UpdateProspect(ctx, UpdateProspectInput{
 		ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, ProductSummary: ptr("芒果"),
 		Contacts: &[]ContactPoint{{Kind: ContactEmail, Value: "a@example.com", Primary: true}},
-		Logo:     &ProspectImageUpload{StagedToken: "one", SourceURL: "https://source.example/a"},
-		Cover:    &ProspectImageUpload{StagedToken: "cover"},
+		Logo:     &ProspectImageUpload{StagedToken: oneToken, SourceURL: "https://source.example/a"},
+		Cover:    &ProspectImageUpload{StagedToken: coverToken},
 	})
 	must(t, err)
-	if updated.Version != p.Version+1 || updated.LogoKey == nil || *updated.LogoKey != media.RefTypeSellerProspectLogo+"/one" || *updated.LogoSourceURL != "https://source.example/a" ||
-		updated.CoverKey == nil || *updated.CoverKey != media.RefTypeSellerProspectCover+"/cover" || updated.CoverSourceURL != nil || *updated.ProductSummary != "芒果" || len(updated.Contacts) != 1 {
+	if updated.Version != p.Version+1 || updated.LogoKey == nil || *updated.LogoKey != f.objectKey(t, one) || *updated.LogoSourceURL != "https://source.example/a" ||
+		updated.CoverKey == nil || *updated.CoverKey != f.objectKey(t, cover) || updated.CoverSourceURL != nil || *updated.ProductSummary != "芒果" || len(updated.Contacts) != 1 {
 		t.Fatalf("updated=%+v", updated)
 	}
-	if !slices.Equal(f.media.finalized, []string{media.RefTypeSellerProspectLogo, media.RefTypeSellerProspectCover}) {
-		t.Fatalf("finalized=%+v", f.media.finalized)
-	}
-	logoRef := f.prospectRef(media.RefTypeSellerProspectLogo, p.ID)
-	if got := f.media.Referenced(logoRef); len(got) != 0 {
-		t.Fatalf("寫入不得建立引用：%v", got)
-	}
-	f.syncMedia(t, logoRef)
-	if got := f.media.Referenced(logoRef); fmt.Sprint(got) != "[asset-one]" {
-		t.Fatalf("references=%v", got)
-	}
-	// 只換 logo：封面原樣保留；同步 job 登記新的、精確解除被換掉的。
-	again, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: updated.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: "two"}})
+	f.wantAsset(t, one, "ACTIVE")
+	f.wantAsset(t, cover, "ACTIVE")
+	// 只換 logo：封面原樣保留；被換掉的 logo 標為刪除。
+	twoToken, two := f.stageProspectImage(t)
+	again, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: updated.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: twoToken}})
 	must(t, err)
-	f.syncMedia(t, logoRef)
-	if got := f.media.Referenced(logoRef); fmt.Sprint(got) != "[asset-two]" || again.LogoSourceURL != nil || again.CoverKey == nil || *again.CoverKey != *updated.CoverKey {
-		t.Fatalf("references=%v again=%+v", got, again)
+	if again.LogoSourceURL != nil || again.CoverKey == nil || *again.CoverKey != *updated.CoverKey {
+		t.Fatalf("again=%+v", again)
 	}
-	// 被換掉的圖不能寫回：同一個 staged token 重新轉正會回到同一個資產。
-	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: again.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: "one"}})
+	f.wantAsset(t, two, "ACTIVE")
+	f.wantAsset(t, one, "DELETING")
+	f.wantAsset(t, cover, "ACTIVE")
+	// 被換掉的圖不能寫回：同一個 staged token 重新確認會落在已標為刪除的資產上。
+	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: again.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: oneToken}})
 	wantKind(t, err, apperr.KindInvalidInput)
 }
 
-// 來源網址選填、只收 https；空白的 token 不是圖片。這些都在轉正之前拒絕。
+// 來源網址選填、只收 https；空白的 token 不是圖片。這些都在確認之前拒絕。
 func TestProspectImageUploadValidation(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -881,18 +870,32 @@ func TestProspectImageUploadValidation(t *testing.T) {
 			t.Fatalf("%s: err=%v", name, err)
 		}
 	}
-	if len(f.media.finalized) != 0 {
-		t.Fatalf("finalized=%v", f.media.finalized)
-	}
-	got, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, Cover: &ProspectImageUpload{StagedToken: "ok", SourceURL: " https://source.example/b "}})
+	okToken, ok := f.stageProspectImage(t)
+	got, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, Cover: &ProspectImageUpload{StagedToken: okToken, SourceURL: " https://source.example/b "}})
 	must(t, err)
 	if got.CoverSourceURL == nil || *got.CoverSourceURL != "https://source.example/b" {
 		t.Fatalf("got=%+v", got)
 	}
+	f.wantAsset(t, ok, "ACTIVE")
+}
+
+// 業者圖片必須是公開圖片：機敏檔在寫入的 transaction 內被拒絕（欄位違規指到 Logo.StagedToken），整筆回滾，資產仍是暫存。
+func TestProspectImagesMustBePublicAssets(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	p := f.newProspect(t, "甲", nil)
+	token, asset := f.stageSecure(t, media.Uploader{ID: prospectAdmin, Admin: true}, evidencePDF("logo"))
+	_, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: token}})
+	wantKind(t, err, apperr.KindInvalidInput)
+	f.wantAsset(t, asset, "STAGED")
+	if got := f.prospectRow(t, p.ID); got.LogoKey != nil || got.Version != p.Version {
+		t.Fatalf("寫入了：%+v", got)
+	}
 }
 
 // 被拒絕的請求不消耗 staged token（比照店家的 TestRejectedProfileUpdateDoesNotConsumeTheStagedToken）：過期的版本、不合法的欄位、
-// 撞到比對鍵、撞到統編都在轉正之前拒絕；修正之後用同一個 token 重送成功。
+// 撞到比對鍵、撞到統編都整筆回滾，資產仍是暫存；修正之後用同一個 token 重送成功。
 func TestRejectedProspectUpdateDoesNotConsumeTheStagedToken(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -902,7 +905,8 @@ func TestRejectedProspectUpdateDoesNotConsumeTheStagedToken(t *testing.T) {
 		in.Fields.TaxID = text("12345678")
 	})
 	p := f.newProspect(t, "乙", nil)
-	logo := &ProspectImageUpload{StagedToken: "logo1"}
+	logoToken, logoAsset := f.stageProspectImage(t)
+	logo := &ProspectImageUpload{StagedToken: logoToken}
 	for name, c := range map[string]struct {
 		in   UpdateProspectInput
 		want apperr.Kind
@@ -915,8 +919,8 @@ func TestRejectedProspectUpdateDoesNotConsumeTheStagedToken(t *testing.T) {
 		c.in.ProspectID, c.in.AdminID, c.in.Logo = p.ID, prospectAdmin, logo
 		_, err := f.module.UpdateProspect(ctx, c.in)
 		wantKind(t, err, c.want)
-		if len(f.media.finalized) != 0 {
-			t.Fatalf("%s: token finalized by a rejected request: %v", name, f.media.finalized)
+		if state := f.assetState(t, logoAsset); state != "STAGED" {
+			t.Fatalf("%s: token confirmed by a rejected request: %s", name, state)
 		}
 	}
 	if got := f.prospectRow(t, p.ID); got.Version != p.Version || got.LogoKey != nil {
@@ -927,85 +931,70 @@ func TestRejectedProspectUpdateDoesNotConsumeTheStagedToken(t *testing.T) {
 		Contacts: &[]ContactPoint{{Kind: ContactEmail, Value: "Taken@example.com", Primary: true}}, ConfirmedDistinct: []int64{taken.ID},
 	})
 	must(t, err)
-	if len(f.media.finalized) != 1 || updated.LogoKey == nil || updated.Version != p.Version+1 || len(updated.Contacts) != 1 {
-		t.Fatalf("retry: finalized=%v prospect=%+v", f.media.finalized, updated)
+	f.wantAsset(t, logoAsset, "ACTIVE")
+	if updated.LogoKey == nil || updated.Version != p.Version+1 || len(updated.Contacts) != 1 {
+		t.Fatalf("retry: prospect=%+v", updated)
 	}
 }
 
-// 換圖的並行：轉正之後、寫入之前業者被別人改了，版本條件讓這次寫入衝突，什麼都不寫。
+// 換圖的並行：確認之後、寫入之前業者被別人改了，版本條件讓這次寫入衝突，整筆回滾：什麼都不寫，資產仍是暫存。
 func TestProspectImageWriteLosesToAConcurrentEdit(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	p := f.newProspect(t, "甲", nil)
-	f.media.onFinalize = func() {
-		_, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin + 1, Region: ptr("宜蘭")})
-		must(t, err)
-	}
-	_, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, ProductSummary: ptr("摘要"), Logo: &ProspectImageUpload{StagedToken: "late"}})
+	token, asset := f.stageProspectImage(t)
+	_, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin + 1, Region: ptr("宜蘭")})
+	must(t, err)
+	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, ProductSummary: ptr("摘要"), Logo: &ProspectImageUpload{StagedToken: token}})
 	wantKind(t, err, apperr.KindVersionConflict)
 	got := f.prospectRow(t, p.ID)
 	if got.Version != p.Version+1 || got.LogoKey != nil || got.ProductSummary != nil || *got.Region != "宜蘭" {
 		t.Fatalf("got=%+v", got)
 	}
+	f.wantAsset(t, asset, "STAGED")
 }
 
-// D16：封存與合併把圖片欄位清掉、同一個 transaction 把清掉的圖記成退場並排入同步；同步 job 精確解除它們。封存之後的還原
-// 不會把圖帶回來，所以被清掉的圖不會再被寫回。
-func TestArchiveAndMergeRetireImagesAndSyncUnlinksThem(t *testing.T) {
+// D16：封存與合併把圖片欄位清掉、同一個 transaction 把清掉的圖標為刪除。封存之後的還原不會把圖帶回來，所以被清掉的圖不會再被寫回。
+func TestArchiveAndMergeMarkImagesDeleted(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	withImages := func(name string) Prospect {
+	withImages := func(name string) (Prospect, []uuid.UUID, []string) {
 		p := f.newProspect(t, name, nil)
-		p, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: name + "-logo"}, Cover: &ProspectImageUpload{StagedToken: name + "-cover"}})
+		logoToken, logo := f.stageProspectImage(t)
+		coverToken, cover := f.stageProspectImage(t)
+		p, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: p.ID, ExpectedVersion: p.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: logoToken}, Cover: &ProspectImageUpload{StagedToken: coverToken}})
 		must(t, err)
-		return p
+		f.wantAsset(t, logo, "ACTIVE")
+		f.wantAsset(t, cover, "ACTIVE")
+		return p, []uuid.UUID{logo, cover}, []string{logoToken, coverToken}
 	}
-	archivedSource := withImages("封存")
-	f.syncProspectImages(t, archivedSource.ID)
-	jobsBefore := f.jobs.count("seller.media_sync")
+	archivedSource, archivedAssets, archivedTokens := withImages("封存")
 	archived, err := f.module.ArchiveProspect(ctx, ArchiveProspectInput{ProspectID: archivedSource.ID, AdminID: prospectAdmin, ExpectedVersion: archivedSource.Version})
 	must(t, err)
 	if archived.LogoKey != nil || archived.CoverKey != nil {
 		t.Fatalf("archived prospect still points at images: %+v", archived)
 	}
-	if got := f.jobs.count("seller.media_sync"); got != jobsBefore+2 {
-		t.Fatalf("archive enqueued %d sync jobs, want one per image kind", got-jobsBefore)
+	for _, id := range archivedAssets {
+		f.wantAsset(t, id, "DELETING")
 	}
-	f.syncProspectImages(t, archived.ID)
-	for _, refType := range []string{media.RefTypeSellerProspectLogo, media.RefTypeSellerProspectCover} {
-		if got := f.media.Referenced(f.prospectRef(refType, archived.ID)); len(got) != 0 {
-			t.Fatalf("%s: references=%v, want everything unlinked", refType, got)
-		}
-	}
-	// 封存、還原、換圖：目前的圖照樣被登記，舊圖不會回來。
-	newToken, oldToken := fmt.Sprintf("%s-new", "restored"), fmt.Sprintf("%s-logo", "封存")
+	// 封存、還原、換圖：新圖確認，舊圖不會回來。
+	newToken, newAsset := f.stageProspectImage(t)
 	restored, err := f.restore(t, archived.ID)
 	must(t, err)
 	changed, err := f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: archived.ID, ExpectedVersion: restored.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: newToken}})
 	must(t, err)
-	f.syncProspectImages(t, archived.ID)
-	if got := f.media.Referenced(f.prospectRef(media.RefTypeSellerProspectLogo, archived.ID)); fmt.Sprint(got) != "[asset-restored-new]" {
-		t.Fatalf("restore then change image: references=%v", got)
-	}
-	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: archived.ID, ExpectedVersion: changed.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: oldToken}})
+	f.wantAsset(t, newAsset, "ACTIVE")
+	_, err = f.module.UpdateProspect(ctx, UpdateProspectInput{ProspectID: archived.ID, ExpectedVersion: changed.Version, AdminID: prospectAdmin, Logo: &ProspectImageUpload{StagedToken: archivedTokens[0]}})
 	wantKind(t, err, apperr.KindInvalidInput)
 	// 合併的輸家一樣。
 	winner := f.newProspect(t, "贏家", nil)
-	loser := withImages("輸家")
-	f.syncProspectImages(t, loser.ID)
-	jobsBefore = f.jobs.count("seller.media_sync")
+	loser, loserAssets, _ := withImages("輸家")
 	_, err = f.module.MergeProspects(ctx, f.mergeInput(t, winner.ID, loser.ID))
 	must(t, err)
-	if got := f.jobs.count("seller.media_sync"); got != jobsBefore+2 {
-		t.Fatalf("merge enqueued %d sync jobs, want one per image kind", got-jobsBefore)
-	}
-	f.syncProspectImages(t, loser.ID)
-	for _, refType := range []string{media.RefTypeSellerProspectLogo, media.RefTypeSellerProspectCover} {
-		if got := f.media.Referenced(f.prospectRef(refType, loser.ID)); len(got) != 0 {
-			t.Fatalf("%s: references=%v, want everything unlinked", refType, got)
-		}
+	for _, id := range loserAssets {
+		f.wantAsset(t, id, "DELETING")
 	}
 	if got := f.prospectRow(t, loser.ID); got.LogoKey != nil || got.CoverKey != nil {
 		t.Fatalf("merged loser still points at images: %+v", got)

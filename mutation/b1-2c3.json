@@ -193,8 +193,8 @@
    "id": "put-public-md5-of-input-not-output",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/public_put.go",
-   "old": "md5.Sum(res.Data)",
-   "new": "md5.Sum(nil)",
+   "old": "sum := md5.Sum(data)",
+   "new": "sum := md5.Sum(nil)",
    "test": "internal/modules/media ^TestPutPublic_StagedRowDescribesTheStoredObject$",
    "why": "the staged row declares an MD5 that is not the stored object's"
   }

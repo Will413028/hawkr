@@ -40,7 +40,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/buyer/buyerconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/seller/sellerconnect"
-	"github.com/Will413028/hawkr/backend/internal/legacy/mediaservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
@@ -129,8 +128,6 @@ func runServe(ctx context.Context) error {
 	dbc := dbConfig(e)
 	// 舊服務的 gRPC 以服務間簽章認證；沒設定時不簽章，只有對方的 INTERNAL_AUTH_MODE 不是 enforcing 時能用。
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
-	// media 在遷移計畫 B1 之前還是 Java 的 media-service（gRPC）。
-	mediaCfg := mediaservice.Config{Addr: e.String("MEDIA_SERVICE_ADDR"), Secret: internalSecret}
 	// 對外圖片的網域（image gateway），client 不持有它（ADR 2026-09-25-api-image-uri-template）。
 	mediaOrigin := e.String("MEDIA_ORIGIN")
 	// 網站的網域：API 回給 client 的網站網址（入駐文件）一律是絕對網址，由 internal/httpapi 以它組成。
@@ -160,6 +157,7 @@ func runServe(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
+	mediaCfg := readMedia(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -180,7 +178,7 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	med, err := mediaservice.New(mediaCfg)
+	med, err := newMedia(mediaCfg, d, jc, log)
 	if err != nil {
 		return err
 	}
@@ -219,7 +217,7 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	buyerModule := buyer.New(buyer.Deps{
-		DB: d, Events: bus, Jobs: jc,
+		DB: d, Events: bus,
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
@@ -246,7 +244,7 @@ func runServe(ctx context.Context) error {
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
+	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, log)
 	subscribeModeration(bus, moderationModule.Retention())
 	discoveryModule := newDiscovery(d, orders, products, reviews, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
@@ -272,11 +270,11 @@ func runServe(ctx context.Context) error {
 			DB:     d,
 			Social: socialModule,
 			Media:  med,
-			Jobs:   jc,
 			NewID:  uuid.NewV7,
 			Now:    time.Now,
 			Logger: log,
 		}),
+		Media:           med,
 		Identity:        id,
 		WebLogin:        webLogin,
 		AppLogin:        appLogin,
@@ -337,7 +335,6 @@ func runWorker(ctx context.Context) error {
 	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	reviewAddr := e.String("REVIEW_SERVICE_ADDR")
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
-	mediaCfg := mediaservice.Config{Addr: e.String("MEDIA_SERVICE_ADDR"), Secret: internalSecret}
 	log := newLogger()
 	verifierCtx, stopVerifiers := context.WithCancel(context.WithoutCancel(ctx))
 	defer stopVerifiers()
@@ -345,6 +342,7 @@ func runWorker(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
+	mediaCfg := readMedia(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -382,12 +380,12 @@ func runWorker(ctx context.Context) error {
 	bus := events.NewBus()
 	subscribeBuyerEvents(bus, jc)
 	id := newIdentity(d, bus, idc, log)
-	med, err := mediaservice.New(mediaCfg)
+	med, err := newMedia(mediaCfg, d, jc, log)
 	if err != nil {
 		return err
 	}
 	buyerModule := buyer.New(buyer.Deps{
-		DB: d, Events: bus, Jobs: jc,
+		DB: d, Events: bus,
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
@@ -429,12 +427,11 @@ func runWorker(ctx context.Context) error {
 		AdvanceStore: sellerModule.AdvanceTerminations,
 		Jobs:         jc,
 	}
-	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
+	moderationModule := newModerationRetention(d, buyerModule, med, log)
 	subscribeModeration(bus, moderationModule)
-	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
-	contentModule.AddWorkers(workers)
+	med.AddWorkers(workers)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)
 	payments.AddWorkers(workers)
@@ -460,7 +457,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, imModule.PeriodicJobs()...)
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
-	periodic = append(periodic, contentModule.PeriodicJobs()...)
+	periodic = append(periodic, med.PeriodicJobs()...)
 	queues, err := workerQueues(workerConcurrency, media.Queues())
 	if err != nil {
 		return err

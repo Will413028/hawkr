@@ -4,8 +4,9 @@
 # D4）。搬遷中的模組另外起它的舊服務，同一份情境以 REST 經入口與 gateway 打舊服務、以 Connect 打單體。呼叫者的身分
 # 是以 hawkr dev-token 簽的 token（本機的暫時金鑰，不連任何外部 provider）。
 #
-# 只用 docker-compose-infra.yml 的 Postgres 與 Redis（先 make infra-up）；舊服務與單體呼叫的 media-service 是
-# 測試自己聽的假服務（characterize.ServeFakeMedia）。服務以 env -i 啟動，不讀 .env、不繼承 shell 的環境變數，
+# 只用 docker-compose-infra.yml 的 Postgres 與 Redis（先 make infra-up）；單體的 media 模組連呼叫者以環境變數
+# MEDIA_S3_ENDPOINT、MEDIA_S3_REGION、MEDIA_S3_BUCKET、MEDIA_S3_ACCESS_KEY_ID、MEDIA_S3_SECRET_ACCESS_KEY 指定的 S3 相容儲存
+# （本機與 CI 的 Garage），KEK 每次執行產生。服務以 env -i 啟動，不讀 .env、不繼承 shell 的環境變數，
 # 不會連到任何外部服務。在 backend/ 執行：
 #
 #   scripts/characterize.sh <模組>
@@ -16,7 +17,7 @@
 #
 # 舊服務：模組的 characterization 目錄有 legacy.sh 時，這支腳本 source 它，並在起 gateway 之前呼叫它定義的
 # legacy_start。legacy_start 可以用下面的 create_db、db_url、start_bg、require_free_port、clean_env 與 PGHOST、
-# PG_USER、PG_PASSWORD、LOG_DIR、FAKE_MEDIA_PORT，要做的事：
+# PG_USER、PG_PASSWORD、LOG_DIR，要做的事：
 #   - 建自己的 database、套用舊服務的 migration、起舊服務（start_bg）；
 #   - 把 gateway 連到舊服務要的設定加進 gateway_env 陣列，例如 gateway_env+=(X_SERVICE_HOST=127.0.0.1)。
 #   舊服務呼叫 account-service 與 seller-service 的 gRPC 時，連單體的 legacy listener（127.0.0.1:${LEGACY_PORT}）。
@@ -41,7 +42,6 @@ PG_PASSWORD=Hawkr2024Admin
 # 本機 compose 的 Redis 有密碼；CI 的 job services 沒有，設 CHARACTERIZE_REDIS_PASSWORD=（空）。
 REDIS_PASSWORD=${CHARACTERIZE_REDIS_PASSWORD-HawkrRedis2026}
 MONOLITH_DB=characterize_monolith
-FAKE_MEDIA_PORT=19937
 MONOLITH_PORT=18080
 LEGACY_PORT=19941
 GATEWAY_PORT=19080
@@ -105,7 +105,7 @@ require_free_port() {
   fi
 }
 
-for port in "$FAKE_MEDIA_PORT" "$MONOLITH_PORT" "$LEGACY_PORT" "$GATEWAY_PORT"; do
+for port in "$MONOLITH_PORT" "$LEGACY_PORT" "$GATEWAY_PORT"; do
   require_free_port "$port"
 done
 
@@ -129,9 +129,13 @@ DEV_AUTH_KEY_FILE="${LOG_DIR}/dev-auth.pem"
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$DEV_AUTH_KEY_FILE" 2>/dev/null
 # KYC 的比對金鑰是必填，每次執行產生新的。
 KYC_HASH_KEYS="t1:$(openssl rand -base64 32)"
+# media 的 KEK 是必填，每次執行產生新的。
+MEDIA_KEKS="k1:$(openssl rand -base64 32)"
 start_bg monolith \
   DATABASE_URL="$MONOLITH_DB_URL" HTTP_ADDR="127.0.0.1:${MONOLITH_PORT}" LEGACY_GRPC_ADDR="127.0.0.1:${LEGACY_PORT}" \
-  MEDIA_SERVICE_ADDR="127.0.0.1:${FAKE_MEDIA_PORT}" MEDIA_ORIGIN=https://media.invalid PUBLIC_WEB_ORIGIN=https://web.invalid \
+  MEDIA_STORAGE=s3compat MEDIA_S3_ENDPOINT="${MEDIA_S3_ENDPOINT:?缺 MEDIA_S3_ENDPOINT}" MEDIA_S3_REGION="${MEDIA_S3_REGION:?缺 MEDIA_S3_REGION}" \
+  MEDIA_S3_BUCKET="${MEDIA_S3_BUCKET:?缺 MEDIA_S3_BUCKET}" MEDIA_S3_ACCESS_KEY_ID="${MEDIA_S3_ACCESS_KEY_ID:?缺 MEDIA_S3_ACCESS_KEY_ID}" \
+  MEDIA_S3_SECRET_ACCESS_KEY="${MEDIA_S3_SECRET_ACCESS_KEY:?缺 MEDIA_S3_SECRET_ACCESS_KEY}" MEDIA_KEKS="$MEDIA_KEKS" MEDIA_ORIGIN=https://media.invalid PUBLIC_WEB_ORIGIN=https://web.invalid \
   GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}" \
   PRODUCT_SERVICE_ADDR=127.0.0.1:1 ORDER_SERVICE_ADDR=127.0.0.1:1 CRM_SERVICE_ADDR=127.0.0.1:1 REVIEW_SERVICE_ADDR=127.0.0.1:1 \
   CORS_ALLOWED_ORIGINS=http://localhost:3000 \
@@ -186,5 +190,4 @@ curl -fsS "http://127.0.0.1:${MONOLITH_PORT}/readyz" >/dev/null
 
 ENTRY_URL="http://127.0.0.1:${MONOLITH_PORT}" \
 CHARACTERIZE_BUYER_TOKEN="$BUYER_TOKEN" CHARACTERIZE_BUYER2_TOKEN="$BUYER2_TOKEN" CHARACTERIZE_ADMIN_TOKEN="$ADMIN_TOKEN" \
-FAKE_MEDIA_ADDR="127.0.0.1:${FAKE_MEDIA_PORT}" \
 GOWORK=off go test -count=1 -tags gateway -v "./${PKG_DIR}/"

@@ -1,18 +1,12 @@
 // Package characterization 是 media 對外 API 的特性測試（ADR 2026-09-24-go-modular-monolith D8 的第一層
 // 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
 //
-// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 media-service、Connect driver 打單體。
-// 兩種執行：
-//   - 直接打單體（monolith_integration_test.go，build tag integration，CI 跑），並以突變確認情境抓得到錯的資料
-//     （照 content 的 TestScenariosCatchWrongData 寫）。
-//   - 經本機的 gateway（gateway_test.go，build tag gateway，scripts/characterize.sh media 起服務後執行）。
-//
-// 兩個 driver 的 wire 不同，情境只看業務上的結果：ID 當成不透明的字串、錯誤只比 characterize 的分類。與舊實作
-// 刻意的差異（模組 CARRYOVER.md「與舊服務的差異」）不寫成共用的情境。media-service 刪除時，REST driver、legacy.sh
-// 與 TestLegacy 一起刪除。
+// 情境只寫一次（scenarios_test.go），透過 Driver 操作；現在只剩 Connect driver 對單體跑
+// （monolith_integration_test.go，build tag integration，CI 跑），並以突變確認情境抓得到錯的資料
+// （照 content 的 TestScenariosCatchWrongData 寫）。情境的 Variant 分支記錄與舊實作刻意的差異。
 package characterization
 
-// 兩個 driver：REST（經舊 gateway 對舊的 media-service，rest_test.go）與 Connect（對單體的 MediaAppService，connect_test.go）。
+// Driver：Connect（對單體的 MediaAppService，connect_test.go）。
 // 共用的情境只涵蓋不需要物件儲存的兩個端點（B1-D12）：機敏上傳與機敏預覽在 CI 的 Java 沒有 R2 設定時測不到，行為規格在
 // backend/docs/plans/2026-11-21-b1-media/test-map.md，由只有單體 driver 能跑的情境（monolith_scenarios_test.go）依它覆蓋。
 

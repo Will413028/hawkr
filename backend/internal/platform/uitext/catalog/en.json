@@ -36,6 +36,21 @@
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
     },
+    "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH": {
+      "message": "The file was corrupted during upload. Please upload it again."
+    },
+    "media.RejectReason.REJECT_REASON_EXPIRED": {
+      "message": "The upload timed out. Please upload it again."
+    },
+    "media.RejectReason.REJECT_REASON_PROCESSING_FAILED": {
+      "message": "The file could not be processed. Try a different image."
+    },
+    "media.RejectReason.REJECT_REASON_SIZE_MISMATCH": {
+      "message": "The file size does not match what was declared. Please upload it again."
+    },
+    "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT": {
+      "message": "The file format was not recognized. Use a JPEG, PNG, WebP or GIF image."
+    },
     "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "Resolved (no violation)"
     },

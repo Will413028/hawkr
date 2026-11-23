@@ -1,63 +1,35 @@
 # media 模組行為規格
 
-本文是單體 `media` 模組行為的唯一來源。圖片等靜態資產的轉正、引用登記與解除、機敏資產的讀取，以及擁有媒體的模組共用的引用同步。
+本文是單體 `media` 模組行為的唯一來源：公開圖片與機敏檔案的暫存上傳、處理、確認、刪除與回收，以及機敏資產的串流上傳與讀取。上傳的 wire 契約在 `api/hawkr/media/v1alpha1/`；步驟與決策在 `backend/docs/plans/2026-11-21-b1-media.md`。
 
 ## 1. 範圍與公開介面
 
-- 暫存上傳與資產生命週期已在 Go 實作（`internal/modules/media`，自己的 `media` schema 與 migration），登記在 `cmd/hawkr/modules.go` 的 `modules()`，不在 `apiOnly`。下面的 `Media` interface 與 `internal/legacy/mediaservice`（以 gRPC 呼叫 Java 的 media-service，在 `cmd/hawkr` 接線）仍是擁有者模組目前使用的轉正路徑。
-- 根套件以型別別名公開 `internal/model` 的 `Uploader`、`Ref`、`Asset`、`SecureAsset` 與 `Media` interface，並公開 `ErrNotSecure`、`ErrStagedTokenRejected`。
-- 引用同步的演算法在 `internal/refsync`，由 `media.RefSyncer`、`media.SyncChanged`、`media.SyncReject`、`media.SyncWork`、`media.SyncInsertOpts` 與 `Sync*` 型別公開。
-- 測試用的記憶體內 `Fake`（`media.NewFake`）在 `fake.go`：模擬 `UNIQUE(asset, ref_type, ref_id)` 加 ON CONFLICT DO NOTHING、精確 Unlink，並能讓逾時之後才生效的 RPC 延後執行。
+- 實作在 `internal/modules/media`，自己的 `media` schema 與 migration，登記在 `cmd/hawkr/modules.go` 的 `modules()`。組裝點（`cmd/hawkr/media.go`）提供物件儲存（`MEDIA_STORAGE`）與 KEK 金鑰環（`MEDIA_KEKS`），把 `media.Queues()`、`AddWorkers`、`PeriodicJobs` 接進 worker；缺設定或 KEK 格式錯誤時啟動失敗，不退回 fake。
+- 擁有媒體的模組（buyer、seller、content、social、review、im、moderation）直接依賴 `*media.Module` 的方法子集，不經轉接層。Java 的 media-service 與 `pkg/media` 只服務還沒搬進單體的舊服務。
+- 根套件公開 `Uploader`、`ConfirmedAsset`、`PutPublicResult` 等別名與 `ErrNotSecure`、`ErrNoTransaction`、`ErrInTransaction`、`ErrNoKeyring`；`ConfirmFields`、`ConfirmField` 是擁有者確認 token 時把不合格的 token 指到欄位錯誤的共用函式。
+- 測試用的記憶體內替身：`Fake`（`media.NewFake`，擁有者模組的 `Confirm`、`MarkDeleted`、`ReadSecure`、`CopyPublic`）與 `MemoryStore`（物件儲存）。
 - 模組內依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
-## 2. 轉正（Finalize）
+## 2. 暫存與確認
 
-- `Media.Finalize(ctx, uploader, stagedToken, refType)` 把 staged token 轉成資產，不建立引用；冪等：同一個 token 在有效期間內回傳同一個資產。
-- 上傳者（`Uploader`：`ID` 與是否為管理員）由呼叫方傳入，media 不自己反查登入者。帳號與管理員的 ID 各自發號、會同號，所以要帶上是哪一種。
-- 回報 `Asset.Secure`；證件這類擁有者要求它為真。業務列只存 `ObjectKey`，顯示用的 URL 在讀取時組裝。
-- 轉正了卻沒有任何引用的資產，由 media 的 GC 在資產建立滿 7 天後回收。
-- 呼叫方自己傳錯的參數（缺上傳者、無效的 `ref_type`、空白的 token）由 `CheckFinalizeArgs` 在送出前擋下，是未分類的程式錯誤。
-- media 拒絕某個 staged token（無效、過期、不屬於上傳者、已轉正的物件不符）時，錯誤可用 `errors.Is(err, ErrStagedTokenRejected)` 辨認，屬 InvalidInput 一類的使用者錯誤，重新上傳即可。Finalize 只在這個情況回使用者錯誤。
-- 一次轉正多個 token 的清單（`Item`、`Field`）：每個被拒絕或失敗的元素一次全部回報，欄位指向被拒絕的 token；遇到非 token 的錯誤就停止。`Field.Message` 是該欄位給使用者看的文字，空字串沿用 media 的文字。
+- client 以 `BeginUpload` 取得預簽 PUT 與只出現一次的 token（資料表只存雜湊），上傳後 `CompleteUpload`，`GetUpload` 輪詢到 `READY` 或 `REJECTED`（`RejectReason`）。機敏檔案走 `BeginSecureUpload` 與 `PutSecureChunk` 分段上傳；伺服器內部以 `PutPublic`、`PutSecure` 直接寫入，同樣得到 `READY` 的 token。
+- 擁有者在寫入業務列的 transaction 內呼叫 `Confirm(ctx, uploader, token)`：只接受 `READY`、未過期、上傳者相符的暫存，回傳 `ConfirmedAsset`（資產 UUID、object key、可見性、型別、大小）。只在同一個 transaction 內重入冪等（回同一個資產）；token 已在別的 transaction 確認過回 FailedPrecondition（B1-D23），避免一個資產被兩個擁有者共用、一方 `MarkDeleted` 弄壞另一方，所以擁有者以全部欄位的前後差集決定 `MarkDeleted`，client 不重送未變的 token。確認與業務列一起提交或回滾；回滾時暫存回到 `READY`，同一個 token 可以重送。
+- `Confirm` 回 NotFound（不存在或不屬於上傳者，兩者無法分辨）、FailedPrecondition（處理中、被拒、過期）時，擁有者以 `ConfirmFields` 轉成指向該 token 欄位的 InvalidInput，其他錯誤原樣回傳。
+- `Uploader` 由呼叫方傳入：帳號與管理員的 ID 各自發號、會同號，所以帶上 `Admin`；代行營運帶被代行的店家 `Store`，token 的每個動作都要帶同一個值。
+- 沒有被確認的暫存與資產由 GC 回收。
 
-## 3. 登記與解除（Link／Unlink）
+## 3. 刪除
 
-- `Link(ref, assetIDs)` 登記 ref 對資產的引用。冪等：已存在的引用不重複建立，可以重試。Link 不比對上傳者。
-- `Unlink(ref, assetIDs)` 只解除精確列出的資產，不碰 ref 的其他引用；沒有的引用忽略。沒有「保留名單以外全刪」。
-- Link 與 Unlink 都是單次呼叫，沒有內層重試；以服務身分簽署，不帶帳號。
-- 四個呼叫（Finalize、Link、Unlink、ReadSecure）都在 DB transaction 之外：背後是 R2 與一個會逾時的服務，交易內等它會佔住連線池。
+- 擁有者在自己的 transaction 內以 `MarkDeleted(ctx, assetIDs)` 標記不再被指著的資產（換圖、終態），media 排實體刪除 job；冪等。
+- 治理佐證只 `Confirm`，從不 `MarkDeleted`；moderation 的證據快照以 `CopyPublic` 複製成自己確認的新資產，來源被刪也不影響快照。
 
-## 4. 讀取機敏資產（ReadSecure）
+## 4. 讀取機敏資產
 
-- `ReadSecure(objectKey, ref)` 回傳機敏資產（`secure/` 前綴、已解密）的內容、`ContentType` 與顯示用檔名（media 儲存的原始檔名，舊資產是 object key 的尾段）。
-- 授權述詞是 `object_key`、`ref_type`、`ref_id` 三者與轉正當時全等；查無與越權無法分辨，都是 NotFound。
-- 資產不是機敏資產時回 `ErrNotSecure`，與 NotFound 分開；呼叫方把它當成設定或資料的錯誤。
-- 呼叫方必須先自己授權並記存取紀錄；media 只確認三元組。
+- `ReadSecure(ctx, assetID)` 回傳機敏資產（`SECURE` 且 `ACTIVE`）解密後的串流；公開資產回 `ErrNotSecure`，其餘 NotFound。
+- 授權與存取紀錄由擁有者先做（KYC 證件、治理佐證在 seller）；media 不認識業務。在 DB transaction 之外呼叫。
 
-## 5. 引用同步
+## 5. 不變式
 
-引用只由擁有該業務列的模組的同步 job 寫入。
-
-- 寫入端只做 Finalize；transaction 內寫業務列、把被換掉的資產記成退場（`SyncChanged`）、遞增 ref 的版本並排入同步 job。
-- 同步 job 呼叫 `RefSyncer`：Link 業務列目前的資產，Unlink 退場的資產；結算與完成 job 在同一個 transaction。
-- 擁有者各自以 `SyncQueries` 提供自己 schema 的 SQL（版本、退場、未同步的 ref）與目前資產的讀取。seq 協定、`SyncReject`（拒絕把已退場的資產寫回 ref，InvalidInput，須在鎖住業務列的 transaction 內呼叫）、結算與保底掃描只有 media 這一份。
-- job 以 `(ref_type, ref_id)` 去重，最多重試 `SyncMaxAttempts`（25）次；重試退避封頂（`MaxBackoff`），下一次重試不晚於 GC 寬限。
-- 重試用盡或 job 遺失，由各模組的保底掃描（`<模組>.media_sweep`）補排；排入有唯一性，重複補排安全。
-- 目前指著的資產同時是退場資產時，同步仍然 Link 目前的、略過這些資產的解除、記 error log 並完成。
-
-不變式：
-
-- 業務列指著的每個資產，在 GC 寬限（資產建立起 7 天）內會有引用。
-- 引用只由該 ref 的同步 job 寫入。
-- 解除只解除退場的資產。
-
-可觀測：同步失敗記 error log「media 引用同步失敗，會重試」（帶 `ref_type`、`ref_id`、`attempt`）。監控訊號在擁有者那一邊：各模組 `media_ref_sync` 中 `synced_seq < seq` 的最舊 `updated_at` 超過 `SyncMaxLag`（24 小時）時，保底掃描記 error log「media 引用同步落後過久」。
-
-## 6. 引用型別
-
-`ref_type.go` 的 `RefType*` 常數（AssetReferenceType）由 CodeMeta 生成（`業務類型碼.md`，`generate.sh --go-media`），不得手改。`CheckFinalizeArgs` 以這組常數為封閉集合。
-
-## 7. 已知限制
-
-- 轉正路徑目前仍是 Java 的 media-service：擁有者模組的資產與引用資料在 Java 那一側，Go 端的 `media` schema 只有暫存上傳與資產生命週期。
-- Java 沒有條件式刪除：第二次解除之後才在遠端生效的逾時 `LinkImages`（遲到超過約 15 秒），會留下一份退場資產的引用。方向是漏、不會誤刪，資產永遠不被 GC。
+- `Confirm` 與 `MarkDeleted` 必須在帶 transaction 的 ctx 內（`ErrNoTransaction`）；會碰物件儲存的呼叫不得在 transaction 內（`ErrInTransaction`）。
+- 資產由確認它的擁有者擁有；media 不記引用，也不認識 ref 型別。
+- 沒有 KEK 金鑰環時，機敏資產的上傳與讀取拒絕執行，不寫任何物件。

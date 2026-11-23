@@ -11,9 +11,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:hawkr_buyer/shared/utils/hk_log.dart';
 
 import '../../../config/image_config.dart';
+import '../../../core/exceptions/app_exception.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../media/data/media_model.dart';
 import '../../media/data/media_repository.dart';
 import '../../order/data/order_repository.dart';
 import '../../product/data/product_repository.dart';
@@ -183,7 +185,15 @@ class _OrderReviewScreenState extends ConsumerState<OrderReviewScreen> {
       if (imageFiles.isNotEmpty) {
         final mediaRepo = ref.read(mediaRepositoryProvider);
         for (final file in imageFiles) {
-          final result = await mediaRepo.uploadImage(file: file);
+          final UploadResult result;
+          try {
+            result = await mediaRepo.uploadImage(file: file);
+          } on ServerException catch (e) {
+            if (!mounted) return;
+            setState(() => _submitted[index] = false);
+            showCommonSnackBar(context, e.message);
+            return;
+          }
           stagedTokens.add(result.stagedToken);
         }
       }

@@ -30,7 +30,7 @@ type SubmitOrderItemReviewRequest struct {
 }
 
 // @Summary      提交訂單商品評論
-// @Description  買家對已完成訂單的商品項目提交一次評論。圖片請先透過 /app/media/upload_sessions 上傳並取得 stagedToken，再傳入 staged_tokens（最多 4 個）
+// @Description  買家對已完成訂單的商品項目提交一次評論。圖片請先上傳並取得 stagedToken，再傳入 staged_tokens（最多 4 個）
 // @Tags         評論 (Review)
 // @Accept       json
 // @Produce      json

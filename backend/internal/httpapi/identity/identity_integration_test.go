@@ -43,7 +43,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -77,10 +76,6 @@ func setup(t *testing.T, o options) *fixture {
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
 	))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +91,7 @@ func setup(t *testing.T, o options) *fixture {
 		Now: time.Now, Logger: log,
 	})
 	// 與正式組裝相同：buyer 在建帳的 transaction 內建立買家並授予 BUYER（cmd/hawkr 的 subscribeBuyerLifecycle）。
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: jc, Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Social: noSchedules{}, Now: time.Now, Logger: log})
 	events.Subscribe(bus, del.OnAdminRoleRevoked)

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_placeholder.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -5,6 +8,7 @@ import 'package:hawkr_api/images.dart' as api;
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../config/image_config.dart';
+import '../../config/media_image.dart' show isInlineImageData;
 
 enum AppImageLoadingStyle {
   /// 移動光帶。網頁只在「整頁骨架屏」用掃光，單張圖片不用，因此這裡僅保留給
@@ -72,6 +76,8 @@ class AppCachedImage extends StatelessWidget {
       return _buildError();
     }
 
+    if (isInlineImageData(url)) return _buildInline(url);
+
     // 當有 scene 時，URL 走 ImageConfig 處理管線
     if (scene != null && !_fromApi) {
       url = ImageConfig.urlFor(url, scene!);
@@ -112,6 +118,28 @@ class AppCachedImage extends StatelessWidget {
       image = ClipRRect(borderRadius: borderRadius!, child: image);
     }
 
+    return image;
+  }
+
+  Widget _buildInline(String dataUri) {
+    final Uint8List bytes;
+    try {
+      bytes = base64Decode(dataUri.substring(dataUri.indexOf(',') + 1));
+    } catch (_) {
+      return _buildError();
+    }
+    Widget image = Image.memory(
+      bytes,
+      width: width,
+      height: height,
+      fit: fit,
+      cacheWidth: memCacheWidth,
+      gaplessPlayback: true,
+      errorBuilder: (context, error, stack) => _buildError(),
+    );
+    if (borderRadius != null) {
+      image = ClipRRect(borderRadius: borderRadius!, child: image);
+    }
     return image;
   }
 

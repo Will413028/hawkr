@@ -123,7 +123,7 @@ type Orders interface {
 
 // Image 是圖片訊息的圖片。
 type Image struct {
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }
 

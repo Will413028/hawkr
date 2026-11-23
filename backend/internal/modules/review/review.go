@@ -14,8 +14,6 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/read"
@@ -54,7 +52,8 @@ var ErrOrderNotFound = model.ErrOrderNotFound
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	Media  media.Media
+	// Media 是 media 模組（*media.Module）：附圖在寫入的 transaction 內 Confirm，刪帳清除的評價的附圖 MarkDeleted。
+	Media  model.Media
 	Jobs   jobs.Enqueuer
 	Buyers Buyers
 	Stores Stores
@@ -113,10 +112,9 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 
 // Module 是 review 模組。
 type Module struct {
-	write     *write.Service
-	read      *read.Service
-	mediaSync *media.RefSyncer
-	purge     *purge.Service
+	write *write.Service
+	read  *read.Service
+	purge *purge.Service
 }
 
 // New 建立模組。
@@ -137,9 +135,8 @@ func New(d Deps) *Module {
 		}),
 		read: read.New(read.Deps{DB: d.DB}),
 		purge: purge.New(purge.Deps{
-			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Stores: d.Stores, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
+			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Stores: d.Stores, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
-		mediaSync: mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),
 	}
 }
 
@@ -207,14 +204,6 @@ func (m *Module) StoreRatingStats(ctx context.Context, storeIDs []int64) (map[in
 	return m.read.StoreRatingStats(ctx, storeIDs)
 }
 
-// SyncMedia 同步一個 ref 的 media 引用（job 與測試用）。
-func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult, error) {
-	return m.mediaSync.Sync(ctx, ref)
-}
-
-// SweepMedia 補排版本比已同步的新的 ref。
-func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
-
 // SweepPurge 補排 buyer.pub_inactive_buyers() 中又還有評價列的買家的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
 func (m *Module) SweepPurge(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
 
@@ -241,15 +230,14 @@ func (m *Module) ReviewForRelay(ctx context.Context, id uuid.UUID) (RelayReview,
 	return m.read.ReviewForRelay(ctx, id)
 }
 
-// AddWorkers 登記 River worker（媒體引用同步與保底掃描、刪帳清除）。由 cmd/hawkr 接上。
+// AddWorkers 登記 River worker（刪帳清除與其保底掃描）。由 cmd/hawkr 接上。
 func (m *Module) AddWorkers(workers *river.Workers) {
-	mediaref.AddWorkers(workers, m.mediaSync)
 	purge.AddWorkers(workers, m.purge)
 }
 
-// PeriodicJobs 回傳保底掃描的排程（媒體引用、刪帳清除）。
+// PeriodicJobs 回傳保底掃描的排程（刪帳清除）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
-	return append(mediaref.PeriodicJobs(), purge.PeriodicJobs()...)
+	return purge.PeriodicJobs()
 }
 
 // OnMeasureCreated 是 seller 建立內容下架措施時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：只處理店家對評價的回覆（Contents 裡種類是 REVIEW_REPLY 的對象），

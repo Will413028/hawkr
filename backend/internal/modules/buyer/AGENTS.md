@@ -2,15 +2,15 @@
 
 ## 職責
 
-買家業務身分與個人資料的擁有者：stint、profile、頭像、收貨地址、收藏、追蹤、個人封鎖、瀏覽、補貨訂閱、刪除，以及會員方案與額度週期。行為規格的唯一來源是 `backend/docs/modules/buyer.md`。
+買家業務身分與個人資料的擁有者：stint、profile、頭像、收貨地址、收藏、追蹤、個人封鎖、瀏覽、補貨訂閱、刪除，以及會員方案與額度週期。規格唯一來源 `backend/docs/modules/buyer.md`。
 
 ## 擁有的資料
 
-schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorites`、`seller_subscriptions`、`blocked_buyers`、`blocked_stores`、`visit_history`、`restock_subscriptions`、`membership_plans`、`memberships`、媒體同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。讀取模型：清單只回 ID 與時間，CLOSED 不曝露 PII（規格 §9）。
+schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorites`、`seller_subscriptions`、`blocked_buyers`、`blocked_stores`、`visit_history`、`restock_subscriptions`、`membership_plans`、`memberships`。頭像資產 ID 是 UUID（`avatar_asset_id`），資產本身由 media 擁有。讀取模型：清單只回 ID 與時間，CLOSED 不曝露 PII（規格 §9）。
 
 ## 發布的讀取介面
 
-形狀在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫 migration；消費端只能呼叫函式。改形狀等於改契約：同一次變更內更新 `pub.sql` 與所有消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意見規格 §10。
+形狀在 `db/pub.sql`，定義在 `db/objects.sql` 與手寫 migration；消費端只呼叫函式。改形狀等於改契約：同一次變更內更新 `pub.sql` 與所有消費端。守門：`TestPubContractsMatchMigrations`（cmd/hawkr）。語意見規格 §10。
 
 - `buyer.pub_inactive_buyers() RETURNS SETOF buyer.pub_inactive_buyer (buyer_id bigint)`：此刻不是營運中的買家（刪除中與已關閉），沒有時間參數。給 social 每日對帳核對複本、review 的讀取過濾，不給求值呼叫。守門：`TestInactiveBuyersAndDeletionRequestedEvent`。
 - `buyer.pub_closed_buyers() RETURNS SETOF buyer.pub_closed_buyer (buyer_id bigint)`：此刻已關閉（CLOSED）的買家，不含刪除中，沒有時間參數。給 im、crm 的讀取過濾。守門：`TestClosedBuyersAndLockNotClosed`、`TestPubClosedBuyersIsInlined`。
@@ -18,7 +18,7 @@ schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorit
 
 ## 模組內部結構
 
-根套件只組裝、別名與轉呼叫。`internal/profile`、`address`、`favorite`、`follow`、`block`、`visit`、`restock`、`membership`、`deletion` 各管自己的 use case；`mediaref` 同步頭像引用；`stint` 共用買家鎖定與狀態檢查；`model` 放型別與輸入共通規則。依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
+根套件只組裝、別名與轉呼叫。`internal/profile`、`address`、`favorite`、`follow`、`block`、`visit`、`restock`、`membership`、`deletion` 各管自己的 use case；`stint` 共用買家鎖定與狀態檢查；`model` 放型別與輸入共通規則。依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 不變量
 
@@ -30,7 +30,7 @@ schema `buyer`（`db/schema.sql`）：`buyers`、`shipping_addresses`、`favorit
 - `LockActive`（`FOR KEY SHARE`）與 `BeginDeletion`（`FOR UPDATE`）序列化。守門：`TestLockActiveSerializesWithBeginDeletion`。規格：§2。
 - 事件只在真正插入或刪除時發布。守門：`TestIdempotentEvents`。規格：§5。
 - 更新以版本條件比對，profile 在買家列鎖內合併。守門：`TestProfileVersionCAS`、`TestAddressVersionCASAndDefaultBumps`、`TestConcurrentProfilePatchesPreserveBothFields`。規格：§3。
-- 頭像引用只由 `buyer.media_sync` 寫入，已退場的頭像不能寫回，transaction 內不呼叫 media。守門：`TestRetiredAvatarCannotBeWrittenBack`、`TestSyncBetweenFinalizeAndCommitKeepsThePointedAtAsset`、DB `buyers_avatar_asset_check`。規格：§3。
+- 頭像在版本條件的 transaction 內 Confirm 新資產、MarkDeleted 被換掉的，關閉買家時 MarkDeleted 目前的；寫入回滾時新資產仍是暫存。守門：`TestReplacingTheAvatarConfirmsTheNewAssetAndMarksTheOldDeleted`、`TestRolledBackAvatarWriteLeavesTheNewAssetStaged`、`TestClosingTheBuyerMarksTheAvatarDeleted`、DB `buyers_avatar_asset_check`。規格：§3。
 - 地址最多一個 default，上限 `model.MaxAddresses`。守門：DB partial UNIQUE、`TestAddressDefaultsAndOwnership`、`TestAddressCap`。規格：§4。
 - 買家封鎖與店封鎖分兩張表；封鎖買家依 buyer_id 升冪鎖兩列。守門：`TestBuyerAndStoreBlocksWithTheSameIDAreIndependent`、`TestMutualBlocksDoNotDeadlock`、`TestBlockingAClosedBuyerFails`。規格：§6。
 - 補貨 `FanOut` 批次有界，發生時間不得為零。守門：`TestRestockBatchesAndRollback`、`TestFanOutRejectsZeroOccurrenceTime`。規格：§7。

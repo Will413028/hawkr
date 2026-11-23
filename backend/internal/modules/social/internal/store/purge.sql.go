@@ -331,7 +331,7 @@ type LockStorePostBatchParams struct {
 
 type LockStorePostBatchRow struct {
 	ID           uuid.UUID
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 }
 
 // 店家的貼文：還沒刪除的，或已經軟刪但圖片引用還在的（軟刪保留引用，退場時一起釋放）。

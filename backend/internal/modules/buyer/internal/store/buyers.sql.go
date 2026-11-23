@@ -10,26 +10,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"uuid"
 )
-
-const avatarAsset = `-- name: AvatarAsset :one
-SELECT status, avatar_asset_id
-FROM buyer.buyers
-WHERE buyer_id = $1
-`
-
-type AvatarAssetRow struct {
-	Status        string
-	AvatarAssetID *string
-}
-
-// 同步 job 讀的：買家目前的頭像 asset（沒有頭像時是 NULL）。
-func (q *Queries) AvatarAsset(ctx context.Context, buyerID int64) (AvatarAssetRow, error) {
-	row := q.db.QueryRow(ctx, avatarAsset, buyerID)
-	var i AvatarAssetRow
-	err := row.Scan(&i.Status, &i.AvatarAssetID)
-	return i, err
-}
 
 const batchDisplay = `-- name: BatchDisplay :many
 SELECT buyer_id, display_name, avatar, (status = 'CLOSED')::boolean AS deleted
@@ -514,7 +496,7 @@ RETURNING buyer_id, account_id, status, version, display_name, phone, gender, av
 
 type UpdateAvatarParams struct {
 	Avatar        *string
-	AvatarAssetID *string
+	AvatarAssetID *uuid.UUID
 	UpdatedAt     time.Time
 	BuyerID       int64
 	Version       int64

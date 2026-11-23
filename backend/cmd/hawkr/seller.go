@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
@@ -60,7 +59,7 @@ func readGCIS(e *config.Env) *gcis.Client {
 // 商家名單圖片的引用收斂、商品瀏覽事件的彙總與清理；排程的是 PeriodicJobs）。orders 是店家未結訂單的 port（自己關店用；刪帳號的
 // accountdeletion 用同一個實作），products 是商品所屬店家的 port（彙總瀏覽事件用，見 sellerProducts）。
 // 它的事件由 subscribeSellerRelay 轉成給舊服務的 RabbitMQ 訊息（sellerrelay），治理事件的通知在 A8。
-func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med media.Media, orders seller.Orders, products seller.ProductStores, kycMAC *seal.MAC, payments *payment.Module, registry *gcis.Client, log *slog.Logger) *seller.Module {
+func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med mediaPort, orders seller.Orders, products seller.ProductStores, kycMAC *seal.MAC, payments *payment.Module, registry *gcis.Client, log *slog.Logger) *seller.Module {
 	return seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: jc, Identity: id, Media: med, Orders: orders, KYCMAC: kycMAC,
 		ProductStores: products, Payment: payments, Registry: registry, Now: time.Now, Logger: log,

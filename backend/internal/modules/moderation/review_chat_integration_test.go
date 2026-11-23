@@ -151,7 +151,7 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 		t.Fatalf("評價案件的快照：%+v", snap)
 	}
 	if snap.Review.Rating != 2 || snap.Review.Body != "不好吃" || snap.Review.AuthorID != author.BuyerID || snap.Review.SubjectStoreID != storeID || snap.Review.ProductID != 77 ||
-		len(snap.Review.MediaRefs) != 1 || snap.Review.MediaRefs[0] != r.Images[0].AssetID {
+		len(snap.Review.MediaRefs) != 1 || snap.Review.MediaRefs[0] != r.Images[0].AssetID.String() {
 		t.Fatalf("快照欄位：%+v", snap.Review)
 	}
 	if snap.StoreID() != 0 {

@@ -46,6 +46,21 @@ service MediaAppService {
 // 稽核：上傳只產生會過期的暫存，不改賣家看得到的資料，所以成功的 BeginSecureUpload 與段上傳都不寫代行稽核；稽核留在擁有者確認時的寫入。被拒絕的請求另寫一列 FAILED。
 // 會話的上傳者是管理員本人（與 Java 一致），並綁定被代行的那一家店：段上傳與暫存預覽（`GET /api/files/delegated/secure_uploads/{staged_token}`）都只以 X-HK-Operation-Session 授權（沒有管理員 Bearer），session 此刻有效且帶 media.upload，上傳者是 session 的管理員；擁有者確認時 token 也只對同一家店成立。不保留原始檔名。
 service MediaDelegatedService {
+  // BeginUpload 為代行店家宣告要上傳的公開圖片，回傳與 MediaAppService.BeginUpload 相同的預簽 PUT 網址、標頭與 staged token（B1-D21）。
+  // 上傳者是代行 session 的管理員並綁定被代行的店；staged token 只有同一家店的有效代行 session 能續用。
+  // 錯誤與 MediaAppService.BeginUpload 相同（size、content_type、md5 不合法回 invalid_argument）。需要能力 media.upload。
+  rpc BeginUpload(MediaDelegatedServiceBeginUploadRequest) returns (MediaDelegatedServiceBeginUploadResponse);
+
+  // CompleteUpload 在 client 把檔案 PUT 完之後呼叫，語意同 MediaAppService.CompleteUpload（可重送）。
+  // staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）；暫存已過期回 failed_precondition。需要能力 media.upload。
+  rpc CompleteUpload(MediaDelegatedServiceCompleteUploadRequest) returns (MediaDelegatedServiceCompleteUploadResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // GetUpload 讀暫存的處理狀態，語意同 MediaAppService.GetUpload（staged token 是憑證，不標 NO_SIDE_EFFECTS）。
+  // staged token 不存在、不是這位管理員或不是這家店的回 not_found（不可區分）。需要能力 media.upload。
+  rpc GetUpload(MediaDelegatedServiceGetUploadRequest) returns (MediaDelegatedServiceGetUploadResponse);
+
   // BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
   // 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。
   // size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
@@ -159,4 +174,47 @@ message MediaDelegatedServiceBeginSecureUploadResponse {
   int32 chunk_count = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 會話的到期時間；過了之後 staged token 不能再用。
   google.protobuf.Timestamp expire_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MediaDelegatedServiceBeginUploadRequest 與 BeginUploadRequest 的欄位與意義相同；沒有 store_id：店家由代行 session 決定。
+message MediaDelegatedServiceBeginUploadRequest {
+  // 檔案的位元組數；必須大於零且不超過伺服器的上限。
+  int64 size = 1 [(google.api.field_behavior) = REQUIRED];
+  // 檔案的 MIME 型別，只能是 image/jpeg、image/png、image/webp、image/gif。
+  string content_type = 2 [(google.api.field_behavior) = REQUIRED];
+  // 檔案內容 MD5 的標準 base64（16 位元組）。
+  string md5 = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+// MediaDelegatedServiceBeginUploadResponse 與 BeginUploadResponse 的欄位與意義相同。
+message MediaDelegatedServiceBeginUploadResponse {
+  // 不透明的憑證，交給 CompleteUpload、GetUpload 與擁有者的 API；只出現這一次。
+  string staged_token = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 預簽的 PUT 網址。
+  string upload_url = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // PUT 時必須原樣帶上的請求標頭；不含 Content-Length。
+  map<string, string> upload_headers = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 暫存的到期時間。
+  google.protobuf.Timestamp expire_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message MediaDelegatedServiceCompleteUploadRequest {
+  // BeginUpload 回傳的 staged token。
+  string staged_token = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MediaDelegatedServiceCompleteUploadResponse {}
+
+message MediaDelegatedServiceGetUploadRequest {
+  // BeginUpload 回傳的 staged token。
+  string staged_token = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// MediaDelegatedServiceGetUploadResponse 與 GetUploadResponse 的欄位與意義相同。
+message MediaDelegatedServiceGetUploadResponse {
+  UploadState state = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 只在 state 是 REJECTED 時設值。
+  optional RejectReason reject_reason = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 暫存的到期時間。
+  google.protobuf.Timestamp expire_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

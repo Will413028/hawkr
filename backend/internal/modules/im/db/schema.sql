@@ -40,7 +40,7 @@ CREATE TABLE im.messages (
     sender_kind      TEXT        NOT NULL,
     message_type     TEXT        NOT NULL,
     content          TEXT,
-    image_asset_id   TEXT,
+    image_asset_id   UUID,
     image_object_key TEXT,
     created_at       TIMESTAMPTZ NOT NULL,
     erased_at        TIMESTAMPTZ,
@@ -49,7 +49,7 @@ CREATE TABLE im.messages (
     CONSTRAINT messages_sender_kind_check CHECK (sender_kind IN ('BUYER', 'STORE')),
     CONSTRAINT messages_type_check CHECK (message_type IN ('TEXT', 'IMAGE')),
     CONSTRAINT messages_content_check CHECK (content IS NULL OR (char_length(content) >= 1 AND char_length(content) <= 4096 AND content !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')),
-    CONSTRAINT messages_image_check CHECK ((image_asset_id IS NULL OR image_asset_id <> '') AND (image_object_key IS NULL OR image_object_key <> '')),
+    CONSTRAINT messages_image_check CHECK (image_object_key IS NULL OR image_object_key <> ''),
     CONSTRAINT messages_shape_check CHECK (
         (erased_at IS NULL AND (
             (message_type = 'TEXT' AND content IS NOT NULL AND image_asset_id IS NULL AND image_object_key IS NULL)
@@ -83,27 +83,6 @@ CREATE TABLE im.hides (
 );
 CREATE UNIQUE INDEX hides_active_message ON im.hides (message_id) WHERE restored_at IS NULL;
 CREATE INDEX hides_message ON im.hides (message_id, hidden_at);
-
--- media 引用的同步版本與退場資產：形狀與語意同 review、social（internal/mediaref）。ref 的列不刪除。
-CREATE TABLE im.media_ref_sync (
-    ref_type   TEXT        NOT NULL,
-    ref_id     TEXT        NOT NULL,
-    seq        BIGINT      NOT NULL DEFAULT 1,
-    synced_seq BIGINT      NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
-CREATE INDEX media_ref_sync_unsynced ON im.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
-CREATE TABLE im.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON im.retired_assets (retired_at);
 
 -- 串流的存活標記：每條訂閱一列，同時是 presence 的來源與每個 Party 並行串流數的全域計數。UNLOGGED：可重建的短暫狀態，崩潰後清空等於所有人離線。
 -- expires_at 一律由資料庫 now() 計算與比較（多個進程寫與讀，不經任何進程時鐘）；表裡沒有最後上線時間。

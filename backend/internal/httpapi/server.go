@@ -206,7 +206,7 @@ type fileRoute struct {
 	permission adminperm.Permission
 }
 
-// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的段上傳與暫存預覽（B1-D16，只以有效的代行 session 憑證授權，不是後台路由）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
+// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的段上傳與暫存預覽（B1-D16，只以有效的代行 session 憑證授權，不是後台路由）；賣家讀自己申請的補充文件（顧客 session，B1-D19）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
 func fileRoutes(deps Deps) []fileRoute {
 	routes := sellerFileRoutes(deps)
 	if deps.Media != nil {
@@ -228,6 +228,9 @@ func sellerFileRoutes(deps Deps) []fileRoute {
 		return nil
 	}
 	return []fileRoute{{
+		pattern: httpseller.OwnDocumentRoute,
+		handler: httpseller.NewOwnDocuments(deps.Seller, deps.Logger),
+	}, {
 		pattern:    httpseller.DocumentRoute,
 		handler:    httpseller.NewAdminDocuments(deps.Seller, deps.Logger),
 		permission: adminperm.SellerKYCDocumentsGet,

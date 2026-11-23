@@ -18,12 +18,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/rows"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/text"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -50,8 +48,7 @@ type Stores interface {
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	Media  media.Media
-	Jobs   jobs.Enqueuer
+	Media  model.Media
 	Buyers Buyers
 	Stores Stores
 	Orders model.Orders

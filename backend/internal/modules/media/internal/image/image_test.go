@@ -673,3 +673,21 @@ func opaqueRGBAPNG(t *testing.T, w, h int) []byte {
 	chunk("IEND", nil)
 	return out.Bytes()
 }
+
+func TestAnimatedWebPSideOverEncoderLimitIsRejectedFromTheHeader(t *testing.T) {
+	lim := image.Limits{FramePixels: 1 << 40, AnimatedPixels: 1 << 40, MaxDimension: 65500}
+	for name, d := range map[string][2]int{"width": {16384, 8}, "height": {8, 16384}} {
+		if err := image.CheckPixels(d[0], d[1], 2, image.WebP, lim); !errors.Is(err, image.ErrTooLarge) {
+			t.Errorf("%s：err = %v，預期 ErrTooLarge", name, err)
+		}
+	}
+	if err := image.CheckPixels(16383, 8, 2, image.WebP, lim); err != nil {
+		t.Errorf("16383 邊界：err = %v，預期通過", err)
+	}
+	if err := image.CheckPixels(16384, 8, 1, image.WebP, lim); err != nil {
+		t.Errorf("靜態 WebP 不受動態上限：err = %v", err)
+	}
+	if err := image.CheckPixels(16384, 8, 2, image.GIF, lim); err != nil {
+		t.Errorf("動態 GIF 不受動態 WebP 上限：err = %v", err)
+	}
+}

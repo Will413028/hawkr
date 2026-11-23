@@ -26,3 +26,8 @@ const (
 	StageFlatten = stageFlatten
 	StageEncode  = stageEncode
 )
+
+// CheckPixels 供測試直接驗證標頭階段的尺寸判定。
+func CheckPixels(w, h, pages int, f Format, lim Limits) error {
+	return checkPixels(w, h, pages, f, lim)
+}

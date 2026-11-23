@@ -4,41 +4,36 @@ import (
 	"context"
 	"net/url"
 	"strings"
-	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// 品牌圖片的 media 引用以 ref_id = prospect_id 登記（SELLER_PROSPECT_LOGO 7122、SELLER_PROSPECT_COVER 7123，不與正式店家的
-// 7103、7105 共用）。轉正在 transaction 外、不建立引用；寫入業務列的 transaction 內把被換掉的圖（以及封存、合併時清掉的圖）
-// 記成退場並排入同步（mediaref），引用只由同步 job 登記與解除。
+// 品牌圖片由 media 擁有，業務列存 object key 與資產 ID：寫入業務列的 transaction 內 Confirm 新圖，並把被換掉的圖（以及封存、合併時清掉的圖）
+// MarkDeleted。
 
 type imageKind struct {
 	field   string
-	refType string
-	assetOf func(store.SellerProspect) *string
+	assetOf func(store.SellerProspect) *uuid.UUID
 	upload  func(model.UpdateProspectInput) *model.ProspectImageUpload
 	set     func(*store.UpdateProspectParams, imageUpload)
 }
 
 var (
 	logoKind = imageKind{
-		field: "Logo", refType: media.RefTypeSellerProspectLogo,
-		assetOf: func(p store.SellerProspect) *string { return p.LogoAssetID },
+		field:   "Logo",
+		assetOf: func(p store.SellerProspect) *uuid.UUID { return p.LogoAssetID },
 		upload:  func(in model.UpdateProspectInput) *model.ProspectImageUpload { return in.Logo },
 		set: func(p *store.UpdateProspectParams, u imageUpload) {
 			p.SetLogo, p.LogoKey, p.LogoAssetID, p.LogoSourceUrl = true, &u.asset.ObjectKey, &u.asset.ID, u.sourceURL
 		},
 	}
 	coverKind = imageKind{
-		field: "Cover", refType: media.RefTypeSellerProspectCover,
-		assetOf: func(p store.SellerProspect) *string { return p.CoverAssetID },
+		field:   "Cover",
+		assetOf: func(p store.SellerProspect) *uuid.UUID { return p.CoverAssetID },
 		upload:  func(in model.UpdateProspectInput) *model.ProspectImageUpload { return in.Cover },
 		set: func(p *store.UpdateProspectParams, u imageUpload) {
 			p.SetCover, p.CoverKey, p.CoverAssetID, p.CoverSourceUrl = true, &u.asset.ObjectKey, &u.asset.ID, u.sourceURL
@@ -46,35 +41,31 @@ var (
 	}
 )
 
-// imageUpload 是一次換圖：轉正之後 asset 才有值。
+// imageUpload 是一次換圖：確認之後 asset 才有值。
 type imageUpload struct {
 	kind      imageKind
 	token     string
 	sourceURL *string
-	asset     media.Asset
+	asset     media.ConfirmedAsset
 }
 
-// retireImages 在封存或合併清掉業者的圖片欄位時，把目前的 logo 與封面記成退場並排入同步。封存之後的還原不會把圖帶回來，
+// retireImages 在封存或合併清掉業者的圖片欄位時，把目前的 logo 與封面 MarkDeleted（必須在寫入的 transaction 內）。封存之後的還原不會把圖帶回來，
 // 所以被清掉的圖不會再被寫回。
-func retireImages(ctx context.Context, q *store.Queries, enqueuer jobs.Enqueuer, now time.Time, row store.SellerProspect) error {
+func (s *Service) retireImages(ctx context.Context, row store.SellerProspect) error {
+	var retired []uuid.UUID
 	for _, kind := range []imageKind{logoKind, coverKind} {
-		var retired []string
 		if asset := kind.assetOf(row); asset != nil {
 			retired = append(retired, *asset)
 		}
-		if len(retired) == 0 {
-			continue
-		}
-		if err := mediaref.Changed(ctx, q, enqueuer, now, mediaref.ProspectRef(kind.refType, row.ProspectID), retired...); err != nil {
-			return err
-		}
 	}
-	return nil
+	if len(retired) == 0 {
+		return nil
+	}
+	return s.d.Media.MarkDeleted(ctx, retired)
 }
 
-// finalizeUploads 轉正 Update 要換的每一張圖（沒有要換的回傳空）：先驗證每個上傳（token 不可空白、來源網址）、確認不在 transaction 內，
-// 再做所有不需寫入的檢查（planUpdate），最後才轉正；被拒絕的請求不消耗 token。轉正不建立引用，所以中途失敗不需要補償。
-func (s *Service) finalizeUploads(ctx context.Context, in model.UpdateProspectInput, contacts *[]model.ContactPoint, categories []string) ([]imageUpload, error) {
+// parseUploads 驗證 Update 要換的每一張圖（沒有要換的回傳空）：token 不可空白、來源網址合法。不打 media。
+func parseUploads(in model.UpdateProspectInput) ([]imageUpload, error) {
 	var uploads []imageUpload
 	for _, kind := range []imageKind{logoKind, coverKind} {
 		up := kind.upload(in)
@@ -90,28 +81,25 @@ func (s *Service) finalizeUploads(ctx context.Context, in model.UpdateProspectIn
 		}
 		uploads = append(uploads, imageUpload{kind: kind, token: up.StagedToken, sourceURL: sourceURL})
 	}
-	if len(uploads) == 0 {
-		return nil, nil
+	return uploads, nil
+}
+
+// confirmUploads 在寫入的 transaction 內確認每一張新圖（必須是公開圖片），結果寫回 uploads。
+func (s *Service) confirmUploads(ctx context.Context, adminID int64, uploads []imageUpload) error {
+	items := make([]model.ConfirmItem, len(uploads))
+	for i, u := range uploads {
+		items[i] = model.ConfirmItem{Field: u.kind.field + ".StagedToken", Token: u.token}
 	}
-	if _, ok := db.TxFrom(ctx); ok {
-		return nil, apperr.FailedPrecondition("換圖必須在 transaction 外開始")
-	}
-	q := store.New(s.d.DB.Conn(ctx))
-	row, err := q.ProspectByID(ctx, in.ProspectID)
+	assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: adminID, Admin: true}, items, func(_ int, a media.ConfirmedAsset) string {
+		return media.RequireVisibility(ctx, media.VisibilityPublic, a)
+	})
 	if err != nil {
-		return nil, notFound(err)
-	}
-	if _, err := planUpdate(ctx, q, row, in, contacts, categories); err != nil {
-		return nil, err
+		return err
 	}
 	for i := range uploads {
-		asset, err := media.FinalizeField(ctx, s.d.Media, media.Uploader{ID: in.AdminID, Admin: true}, media.Field{Name: uploads[i].kind.field + ".StagedToken"}, uploads[i].token, uploads[i].kind.refType)
-		if err != nil {
-			return nil, err
-		}
-		uploads[i].asset = asset
+		uploads[i].asset = assets[i]
 	}
-	return uploads, nil
+	return nil
 }
 
 // normalizeSourceURL 驗證素材的來源頁面：只作稽核，必須是 https 且有主機，不超過 2048 字；沒有值是 nil。

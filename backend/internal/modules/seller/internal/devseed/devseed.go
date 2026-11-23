@@ -1,7 +1,7 @@
 // Package devseed 寫入本機開發的種子店家：固定的 store_id 與 store_code、已核准的 KYC、logo，以及
 // 開店時一併建立的公告列（version 0；由 ReannounceExposures 全量公告）。只給本機開發（cmd/hawkr 的 dev-seed）使用：它直接寫列，
 // 繞過開店、送出與審核的狀態轉移（不寫那些轉移的事件；審核紀錄只寫送出那一筆，入駐同意要綁定它）；還原 profile 時發 StoreProfileChanged（與模組自己寫 profile 同一個事件），
-// 刪掉的證據與證件經模組的退場機制釋放 media 的引用。
+// 刪掉的 KYC 證件的 media 資產在同一個 transaction 內 MarkDeleted，治理佐證的資產從不 MarkDeleted。
 //
 // 明文的 fixture 是來源：KYC 的欄位經 kyc.Service.SeedApproved（SaveDraft 同一支驗證與統編 hash）、以執行中的金鑰寫入，種子檔不含 hash。
 package devseed
@@ -16,10 +16,8 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/agreement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/kyc"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -34,7 +32,8 @@ type Store struct {
 	StoreID, StoreCode, AccountID                            int64
 	Name, Description, ContactPhone, TownCode, AddressDetail string
 	ContactName, ContactMobile, SupportEmail                 string
-	LogoKey, LogoAssetID                                     string
+	LogoKey                                                  string
+	LogoAssetID                                              uuid.UUID
 	KYC                                                      model.KYCDraftInput
 }
 
@@ -44,6 +43,7 @@ type Deps struct {
 	KYC    *kyc.Service
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
+	Media  model.Media
 	Now    func() time.Time
 }
 
@@ -52,7 +52,7 @@ type Service struct{ d Deps }
 
 // New 建立服務。
 func New(d Deps) *Service {
-	if d.DB == nil || d.KYC == nil || d.Events == nil || d.Jobs == nil || d.Now == nil {
+	if d.DB == nil || d.KYC == nil || d.Events == nil || d.Jobs == nil || d.Media == nil || d.Now == nil {
 		panic("seller/devseed: missing dependency")
 	}
 	return &Service{d: d}
@@ -62,14 +62,13 @@ func New(d Deps) *Service {
 // profile、KYC 與 logo；有下游消費者的生命週期狀態（停權措施、關店、等待刪除、刪帳申請）不是種子的資料，種子不悄悄還原它，
 // 前提檢查發現它們時拒絕執行（見 Check）。還原的方式：
 //   - 店家列 upsert：profile 與個資欄位、版本鎖回到 fixture；status 只因生命週期而變，upsert 不寫它們，只以 WHERE 保證列還在 fixture 的
-//     狀態（ACTIVE、沒有關閉紀錄），不是就整筆失敗；logo 與封面是 media 的 ref，不覆寫模組已登記的資產（見 upsertStoreSQL）；
+//     狀態（ACTIVE、沒有關閉紀錄），不是就整筆失敗；logo 與封面是 media 的資產，不覆寫模組已寫入的資產（見 upsertStoreSQL）；
 //   - profile 有變時發 StoreProfileChanged 並排入快取失效（與模組自己寫 profile 同一個事件、同一個 transaction），舊服務的快取才看得到；
 //     可曝光由最後的全量重新公告（ReannounceExposures）處理；
 //   - 公告列保留、不刪不重設：version 只增不減，全量重新公告把它加一，在途的舊事件版本較低，Java 正確丟棄；
-//   - KYC 申請、通報與案件、違規、瀏覽彙總這些「只因使用而存在」的子列，只刪這幾家店的，再以 fixture 重寫；刪掉的證件與佐證圖片先經
-//     mediaref 記成退場（同一般的換圖與關店），media 的引用才會釋放；
-//   - 先鎖店家列（與模組的寫入者同一個順序：店家、申請），才刪子列；
-//   - media_ref_sync 與 retired_assets 不刪（ref 的列刪了再建會讓 seq 從頭算，見 schema.sql 的註解）。
+//   - KYC 申請、通報與案件、違規、瀏覽彙總這些「只因使用而存在」的子列，只刪這幾家店的，再以 fixture 重寫；刪掉的 KYC 證件的 media
+//     資產先在同一個 transaction 內 MarkDeleted，治理佐證的資產不 MarkDeleted；
+//   - 先鎖店家列（與模組的寫入者同一個順序：店家、申請），才刪子列。
 //
 // 它不碰別人的資料：不在種子的店家（含 SELLER 角色）原封不動。前提不成立時拒絕執行：種子帳號若擁有種子以外的未關閉店家，種子店家寫入會撞上
 // 一帳號一家店與 SELLER 角色的 source_id，Check 在寫入之前就擋下，不自動刪店。已關閉的店家（角色已移除）不受影響。
@@ -133,29 +132,17 @@ const profileSnapshotSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.s
 // 申請列接著鎖（店家、申請的順序，同模組的寫入者）。
 const lockApplicationsSQL = `SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1) ORDER BY store_id, application_id FOR UPDATE`
 
-// 即將刪除的證件與佐證圖片（按 ref 分組）：'C' 是 KYC 證件（ref 是申請），'E' 是通報、措施上請求（申覆）與詢問回覆的佐證（ref 是通報、請求或詢問）。
-const evidenceAssetsSQL = `
-SELECT 'C', d.application_id::text, d.asset_id FROM seller.kyc_documents d
+// 即將刪除的 KYC 證件的 asset ID。治理佐證（通報、措施上請求、詢問回覆）的資產不在其中：佐證沒有刪除路徑，種子刪掉業務列也不 MarkDeleted。
+const documentAssetsSQL = `
+SELECT d.asset_id FROM seller.kyc_documents d
 WHERE d.application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))
-UNION ALL
-SELECT 'E', e.report_id::text, e.asset_id FROM seller.report_evidence e
-WHERE e.report_id IN (SELECT id FROM seller.reports WHERE store_id = ANY($1))
-UNION ALL
-SELECT 'E', a.request_id::text, a.asset_id FROM seller.measure_request_evidence a
-WHERE a.request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)))
-UNION ALL
-SELECT 'E', i.inquiry_id::text, i.asset_id FROM seller.case_inquiry_reply_evidence i
-WHERE i.inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))
-ORDER BY 1, 2, 3`
-
-const retiredAssetsSQL = `SELECT asset_id FROM seller.retired_assets WHERE ref_type = $1 AND ref_id = $2`
+`
 
 // 店家列 upsert。衝突時把 fixture 擁有的 profile 與個資欄位寫回（版本鎖加一）；first_exposed_at 是歷史事實，保留。
 // status 與 pii_purged_at 只因生命週期（關店、等待刪除、個資清理）而變，不是種子的資料：不寫，只在 WHERE 要求它們還在 fixture 的
 // 狀態（ACTIVE 的 stint 沒有目前的關店紀錄），否則 0 列、呼叫方整筆失敗（前提檢查已經先擋下，這是同一個 transaction 內的保底）。
-// logo、封面是 media 的 ref（media_ref_sync 追蹤資產的同步）：列上已有 logo 時保留，封面不動，不覆寫模組登記過的資產（覆寫而不遞增 ref 的 seq
-// 會讓 media 的引用與業務列脫節；種子本身不寫 ref 列，fixture 的 logo 是不經 media 的假資產）。沒有 logo 的列才補上 fixture 的，而且資產 ID 不能是
-// 已退場的（current 與 retired 不相交，見 freshLogoAsset）。
+// logo、封面是 media 的資產：列上已有 logo 時保留，封面不動，不覆寫模組寫入過的資產；fixture 的 logo 是不經 media 的假資產（media.MarkDeleted
+// 忽略不存在的 ID）。沒有 logo 的列才補上 fixture 的。
 const upsertStoreSQL = `
 INSERT INTO seller.stores (
     store_id, store_code, account_id, store_name, description, contact_phone, town_code, address_detail,
@@ -411,7 +398,7 @@ func (s *Service) Seed(ctx context.Context, stores []Store, seedAccountIDs []int
 			return fmt.Errorf("seller：鎖住種子店家的申請：%w", err)
 		}
 		q := store.New(conn)
-		if err := s.retireEvidence(ctx, conn, q, ids, now); err != nil {
+		if err := s.retireDocuments(ctx, conn, ids); err != nil {
 			return err
 		}
 		for _, stmt := range clearChildrenSQL {
@@ -461,44 +448,31 @@ func lockApplications(ctx context.Context, conn db.DBTX, ids []int64) error {
 	return rows.Err()
 }
 
-// retireEvidence 在刪除之前，把種子店家的 KYC 證件與通報、申覆的佐證圖片記成退場並排入同步（mediaref.Changed，與一般的換圖、關店同一個機制），
-// media 的引用才會隨業務列一起釋放。
-func (s *Service) retireEvidence(ctx context.Context, conn db.DBTX, q *store.Queries, ids []int64, now time.Time) error {
-	type key struct{ kind, id string }
-	var order []key
-	assets := map[key][]string{}
-	rows, err := conn.Query(ctx, evidenceAssetsSQL, ids)
+// retireDocuments 在刪除之前，把種子店家的 KYC 證件的 media 資產 MarkDeleted（與關店的個資清理同一個呼叫）。治理佐證的資產不動：佐證沒有刪除路徑，
+// 種子只刪業務列，不刪資產。
+func (s *Service) retireDocuments(ctx context.Context, conn db.DBTX, ids []int64) error {
+	rows, err := conn.Query(ctx, documentAssetsSQL, ids)
 	if err != nil {
-		return fmt.Errorf("seller：讀種子店家的證件與佐證：%w", err)
+		return fmt.Errorf("seller：讀種子店家的證件：%w", err)
 	}
+	var assets []uuid.UUID
 	for rows.Next() {
-		var k key
-		var asset string
-		if err := rows.Scan(&k.kind, &k.id, &asset); err != nil {
+		var asset uuid.UUID
+		if err := rows.Scan(&asset); err != nil {
 			rows.Close()
 			return err
 		}
-		if _, ok := assets[k]; !ok {
-			order = append(order, k)
-		}
-		assets[k] = append(assets[k], asset)
+		assets = append(assets, asset)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	for _, k := range order {
-		id, err := uuid.Parse(k.id)
-		if err != nil {
-			return err
-		}
-		ref := mediaref.EvidenceRef(id)
-		if k.kind == "C" {
-			ref = mediaref.CertificationRef(id)
-		}
-		if err := mediaref.Changed(ctx, q, s.d.Jobs, now, ref, assets[k]...); err != nil {
-			return fmt.Errorf("seller：退場種子店家的證件與佐證：%w", err)
-		}
+	if len(assets) == 0 {
+		return nil
+	}
+	if err := s.d.Media.MarkDeleted(ctx, assets); err != nil {
+		return fmt.Errorf("seller：刪除種子店家的證件資產：%w", err)
 	}
 	return nil
 }
@@ -528,16 +502,6 @@ func (s *Service) publishProfileChanges(ctx context.Context, conn db.DBTX, q *st
 	return nil
 }
 
-// freshLogoAsset 回傳 fixture 的 logo 資產 ID；它已經在這家店 logo ref 的退場名單裡（例如店家曾經關閉）就換一個沒用過的，
-// 讓「目前的資產」與「退場的資產」不相交（mediaref.Reject 在模組的寫入端守的同一條不變量）。
-func freshLogoAsset(base string, retired []string) string {
-	id := base
-	for n := 2; slices.Contains(retired, id); n++ {
-		id = base + "-" + strconv.Itoa(n)
-	}
-	return id
-}
-
 func validate(stores []Store) error {
 	var ids, codes, accounts []int64
 	for _, st := range stores {
@@ -548,7 +512,7 @@ func validate(stores []Store) error {
 			return fmt.Errorf("seller：種子店家 %d 的 store_id、store_code 或 account_id 重複", st.StoreID)
 		}
 		ids, codes, accounts = append(ids, st.StoreID), append(codes, st.StoreCode), append(accounts, st.AccountID)
-		if st.Name == "" || st.TownCode == "" || st.LogoKey == "" || st.LogoAssetID == "" {
+		if st.Name == "" || st.TownCode == "" || st.LogoKey == "" || st.LogoAssetID == uuid.Nil() {
 			return fmt.Errorf("seller：種子店家 %d 缺少店名、鄉鎮市區代碼或 logo（可曝光的條件）", st.StoreID)
 		}
 	}
@@ -557,13 +521,8 @@ func validate(stores []Store) error {
 
 func (s *Service) seedOne(ctx context.Context, q *store.Queries, st Store, now time.Time) error {
 	conn := s.d.DB.Conn(ctx)
-	logoRef := mediaref.StoreRef(media.RefTypeSellerLogo, st.StoreID)
-	retired, err := retiredAssets(ctx, conn, logoRef)
-	if err != nil {
-		return err
-	}
 	tag, err := conn.Exec(ctx, upsertStoreSQL, st.StoreID, st.StoreCode, st.AccountID, st.Name, st.Description, st.ContactPhone,
-		st.TownCode, st.AddressDetail, st.LogoKey, freshLogoAsset(st.LogoAssetID, retired), now,
+		st.TownCode, st.AddressDetail, st.LogoKey, st.LogoAssetID, now,
 		nullable(st.ContactName), nullable(st.ContactMobile), nullable(st.SupportEmail))
 	if err != nil {
 		return err
@@ -593,23 +552,6 @@ func current(kinds []model.AgreementKind) []model.AgreementAcceptance {
 		out = append(out, model.AgreementAcceptance{Kind: k, Version: model.CurrentAgreements[k].Version})
 	}
 	return out
-}
-
-func retiredAssets(ctx context.Context, conn db.DBTX, ref media.Ref) ([]string, error) {
-	rows, err := conn.Query(ctx, retiredAssetsSQL, ref.Type, ref.ID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []string
-	for rows.Next() {
-		var a string
-		if err := rows.Scan(&a); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
 }
 
 func nullable(s string) *string {

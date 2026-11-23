@@ -17,7 +17,7 @@ type MessageRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	CreatedAt      time.Time
 	ErasedAt       *time.Time

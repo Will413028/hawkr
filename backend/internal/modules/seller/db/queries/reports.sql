@@ -226,14 +226,6 @@ WHERE reporter_buyer_id = sqlc.arg(buyer_id)::bigint
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(page_size);
 
--- name: EvidenceAssets :many
--- 以 ref_id（通報、請求或詢問的 ID）登記的佐證中，業務列目前指著的 asset（同步 job 讀的）。
-SELECT asset_id FROM seller.report_evidence WHERE report_id = sqlc.arg(ref_id)
-UNION ALL
-SELECT asset_id FROM seller.measure_request_evidence WHERE request_id = sqlc.arg(ref_id)
-UNION ALL
-SELECT asset_id FROM seller.case_inquiry_reply_evidence WHERE inquiry_id = sqlc.arg(ref_id);
-
 -- name: InsertEvidenceAccess :exec
 -- 佐證的讀取紀錄：在讀取之前寫入；report_id 與 request_id 剛好一個，連同 position（通報的另加 submission_seq）指向那一張佐證。
 INSERT INTO seller.evidence_accesses (access_id, report_id, submission_seq, request_id, position, admin_id, accessed_at)

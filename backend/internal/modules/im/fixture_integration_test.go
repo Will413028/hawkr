@@ -3,8 +3,12 @@
 package im_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
+	goimage "image"
+	"image/png"
 	"log/slog"
 	"strings"
 	"sync"
@@ -232,7 +236,7 @@ type fixture struct {
 	m      *im.Module
 	bus    *events.Bus
 	jobs   *queue
-	media  *media.Fake
+	media  *media.Module
 	buyers *buyers
 	stores *stores
 	orders *orders
@@ -253,23 +257,28 @@ func (f *fixture) clock() time.Time {
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "im", Dir: im.Migrations()},
 	))
 	f := &fixture{
-		db: database, bus: events.NewBus(), jobs: &queue{}, media: media.NewFake(),
+		db: database, bus: events.NewBus(), jobs: &queue{},
 		buyers: &buyers{accounts: map[int64]int64{}}, stores: &stores{byID: map[int64]seller.Store{}}, orders: &orders{},
 		now: time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC),
 	}
-	f.media.Key = func(_, token string) string { return "chat/" + token + ".jpg" }
 	logger := slog.New(slog.NewTextHandler(&strings.Builder{}, nil))
+	ring, err := media.ParseKeyring("k1:" + base64.StdEncoding.EncodeToString(make([]byte, 32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.media = media.New(media.Deps{DB: database, Jobs: f.jobs, Store: media.NewMemoryStore(), Keyring: ring, NewID: uuid.NewV7, Now: f.clock, Logger: logger})
 	bus := f.bus
 	identityModule := identity.New(identity.Deps{DB: database, Events: bus, Now: f.clock, Logger: logger})
 	f.stores.owner = seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: database, Events: bus, Jobs: f.jobs, Identity: identityModule, Media: f.media, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: f.clock, Logger: logger,
 		Payment: payment.New(payment.Deps{DB: database, Audit: adminaudit.New(database, f.clock), Events: bus, Jobs: f.jobs, Now: f.clock, Logger: logger})})
 	seedParties(t, database, []int64{b1, b2, 5, 7}, []int64{s1, s2, 5, 9})
-	f.buyers.owner = buyer.New(buyer.Deps{DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Now: f.clock, Logger: logger})
+	f.buyers.owner = buyer.New(buyer.Deps{DB: database, Events: f.bus, Media: f.media, Now: f.clock, Logger: logger})
 	f.m = im.New(im.Deps{
 		DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Buyers: f.buyers, Stores: f.stores, Orders: f.orders,
 		NewID: uuid.NewV7, Now: f.clock, Logger: logger,
@@ -283,6 +292,34 @@ func setup(t *testing.T) *fixture {
 		return nil
 	})
 	return f
+}
+
+// stage 以 accountID 為上傳者放一張公開 PNG，回傳可 Confirm 的 token 與資產 ID。
+func (f *fixture) stage(t *testing.T, accountID int64) (string, uuid.UUID) {
+	t.Helper()
+	var body bytes.Buffer
+	if err := png.Encode(&body, goimage.NewNRGBA(goimage.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	put, err := f.media.PutPublic(context.Background(), media.Uploader{ID: accountID}, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id uuid.UUID
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(),
+		"SELECT asset_id FROM media.staged_uploads WHERE token_hash = sha256($1::bytea)", put.Token).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	return put.Token, id
+}
+
+func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	var state string
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id=$1", id).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	return state
 }
 
 func (f *fixture) exec(t *testing.T, sql string, args ...any) {

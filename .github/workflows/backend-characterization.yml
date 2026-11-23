@@ -5,9 +5,10 @@ name: backend characterization
 # 主計畫 2026-09-24-go-modular-monolith.md 階段 B 開工前條件）。Postgres 與 Redis 用 job 的
 # services:，Java 服務以 mvnw package 後 java -jar 起行程，不用 compose。
 #
-# 加一個舊服務（B2–B10）：在 matrix.include 加一項（module、java_pl；舊服務是 Go 就留空 java_pl），並在
+# 加一個舊服務（B2–B10）：在 plan job 的 MATRIX 加一項（module、java_pl；舊服務是 Go 就留空 java_pl），並在
 # internal/httpapi/<模組>/characterization 放情境與 legacy.sh（make new-characterization name=<模組> legacy=<服務>）。
-# media 不接物件儲存（B1-D12）；舊服務刪除時，它的 matrix 項目與 legacy.sh 一起刪除，這支 workflow 留給其他模組。
+# media 不接物件儲存（B1-D12），它的舊服務已刪除，目前沒有項目；MATRIX 為空時 characterize 整個 skipped（視為通過）。
+# 舊服務刪除時，它的 MATRIX 項目與 legacy.sh 一起刪除，這支 workflow 留給其他模組。
 
 on:
   pull_request:
@@ -40,16 +41,37 @@ defaults:
     working-directory: backend
 
 jobs:
+  plan:
+    name: 選模組
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - name: 決定要跑的舊服務
+        id: pick
+        env:
+          # 每項 {"module": "<模組>", "java_pl": "<maven -pl，Go 服務留空>"}；沒有項目就是 []。
+          MATRIX: '[]'
+        run: |
+          python3 - >> "$GITHUB_OUTPUT" <<'PY'
+          import json, os
+          items = json.loads(os.environ["MATRIX"])
+          print("matrix=" + json.dumps({"include": items}))
+          print("any=" + ("true" if items else "false"))
+          PY
+
   characterize:
     name: characterize (${{ matrix.module }})
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - module: media
-            java_pl: ':media-service'
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     services:
       # 與 docker-compose-infra.yml 同一組映像與帳密（本機專用的固定值）。
       postgres:
