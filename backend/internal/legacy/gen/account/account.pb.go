@@ -2543,7 +2543,7 @@ type RemoveRoleResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Code                int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
 	Message             string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	AccountFullyDeleted bool                   `protobuf:"varint,3,opt,name=account_fully_deleted,json=accountFullyDeleted,proto3" json:"account_fully_deleted,omitempty"` // true 表示這次移除導致整 account inactive
+	AccountFullyDeleted bool                   `protobuf:"varint,3,opt,name=account_fully_deleted,json=accountFullyDeleted,proto3" json:"account_fully_deleted,omitempty"` // 從不設值：RemoveRole 回 Unimplemented
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }

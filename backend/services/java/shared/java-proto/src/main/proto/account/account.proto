@@ -440,7 +440,7 @@ message RemoveRoleRequest {
 message RemoveRoleResponse {
     int32  code                  = 1;
     string message               = 2;
-    bool   account_fully_deleted = 3;  // true 表示這次移除導致整 account inactive
+    bool   account_fully_deleted = 3;  // 從不設值：RemoveRole 回 Unimplemented
 }
 
 // ==================== Auth Multi-Provider Messages (M3) ====================

@@ -70,7 +70,7 @@ AccountService,GetAccountInfo,account-service,api: identity.Account；舊服務�
 AccountService,GetAccountInfoBatch,account-service,api: identity.Accounts；舊服務經 internal/legacy/accountservice
 AccountService,CheckPhone,account-service,removed: 公開的手機檢查與 seller-app 的預先檢查刪除（Will 2026-09-27）
 AccountService,GetAccountByPhone,account-service,api: identity.AccountByPhone；舊服務經 internal/legacy/accountservice
-AccountService,BindSeller,account-service,api: identity.GrantRole（SELLER）；舊服務經 internal/legacy/accountservice
+AccountService,BindSeller,account-service,removed: 呼叫方 seller-service 已刪除，seller 在開店的同一個 transaction 內呼叫 identity.GrantRole（SELLER）；舊契約的 BindSeller 回 Unimplemented
 AccountService,BindBuyer,account-service,removed: 唯一的呼叫方是 buyer-service（已刪除）；買家不是角色（W5）
 AccountService,AdminLogin,account-service,removed: 管理員的密碼登入與 create-admin 刪除（Will 2026-09-27）
 AccountService,AdminGoogleLogin,account-service,http: IdentityPublicService.SignInAdmin
@@ -78,7 +78,7 @@ AccountService,SuspendAccount,account-service,api: identity.SuspendAccount（soc
 AccountService,UnsuspendAccount,account-service,removed: 唯一的呼叫方是後台的停權解除端點，已刪除（Will 2026-09-27）
 AccountService,ListAccountsForAdmin,account-service,http: IdentityAdminService.ListAccounts
 AccountService,GetAccountForAdmin,account-service,removed: 沒有 client，Will 2026-09-27
-AccountService,RemoveRole,account-service,api: identity.RemoveRole；舊服務經 internal/legacy/accountservice
+AccountService,RemoveRole,account-service,removed: 呼叫方 seller-service、buyer-service 已刪除，seller 在同一個 transaction 內呼叫 identity.RemoveRole；舊契約的 RemoveRole 回 Unimplemented
 AccountService,LinkConfirm,account-service,http: IdentityPublicService.ConfirmAccountLink
 AccountService,ListAuthProviders,account-service,removed: 綁定管理刪除，沒有 client，Will 2026-09-27
 AccountService,BindAuthProvider,account-service,removed: 綁定管理刪除，沒有 client，Will 2026-09-27
