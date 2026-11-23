@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"time"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -36,6 +37,8 @@ type Notifications interface {
 	UpdateNotificationPreference(ctx context.Context, r notification.Recipient, c notification.Category, ch notification.Channel, enabled bool) (notification.Preference, error)
 	RegisterDeviceToken(ctx context.Context, accountID int64, app notification.DeviceApp, token string) error
 	DeleteDeviceToken(ctx context.Context, accountID int64, token string) error
+	// Watch 訂閱 (帳號, 受眾) 的訊號串流；帳號同時開著的串流達上限回 resource_exhausted。
+	Watch(p notification.WatchParams) (notification.Watcher, error)
 }
 
 // Stores 是 STORE 受眾的店家來源（*seller.Module）：帳號此刻的店，只在有能力時成功。
@@ -49,6 +52,8 @@ type App struct {
 	stores        Stores
 	images        rpc.Images
 	log           *slog.Logger
+	// lifetime 是一條串流的最長壽命：到期正常結束，client 重連時重新驗證 session 與身分。
+	lifetime func() time.Duration
 }
 
 var _ notificationv1alpha1connect.NotificationAppServiceHandler = (*App)(nil)
@@ -66,7 +71,7 @@ func NewApp(notifications Notifications, stores Stores, images rpc.Images, log *
 	if err := checkDeclarations(declarations, serviceDescriptor()); err != nil {
 		return nil, err
 	}
-	return &App{notifications: notifications, stores: stores, images: images, log: log}, nil
+	return &App{notifications: notifications, stores: stores, images: images, log: log, lifetime: func() time.Duration { return streamLifetime }}, nil
 }
 
 const (

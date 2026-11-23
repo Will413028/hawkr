@@ -122,6 +122,34 @@ func (q *Queries) DeletePreferenceOverride(ctx context.Context, arg DeletePrefer
 	return err
 }
 
+const latestInboxItemID = `-- name: LatestInboxItemID :one
+SELECT id FROM notification.inbox_items
+WHERE account_id = $1 AND audience = $2
+  AND (store_id = $3::bigint OR ($3::bigint IS NULL AND store_id IS NULL))
+  AND type = ANY($4::text[])
+ORDER BY updated_at DESC, id DESC LIMIT 1
+`
+
+type LatestInboxItemIDParams struct {
+	AccountID int64
+	Audience  string
+	StoreID   *int64
+	Types     []string
+}
+
+// 串流訊號的最新一列：與 CountUnreadInboxItems 同一組篩選（受眾、店、型別），updated_at 最新（再依 id）的列；沒有列是 pgx.ErrNoRows。
+func (q *Queries) LatestInboxItemID(ctx context.Context, arg LatestInboxItemIDParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, latestInboxItemID,
+		arg.AccountID,
+		arg.Audience,
+		arg.StoreID,
+		arg.Types,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const listInboxItems = `-- name: ListInboxItems :many
 SELECT id, type, params, read_at, updated_at FROM notification.inbox_items
 WHERE account_id = $1 AND audience = $2

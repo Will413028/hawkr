@@ -11,7 +11,9 @@ import (
 	"time"
 
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	notificationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 )
 
@@ -194,5 +196,39 @@ func TestRateLimitDenialNegotiatesTheLocale(t *testing.T) {
 	}
 	if rec.Code != http.StatusTooManyRequests || !slices.Contains(rec.Header().Values("Vary"), "Accept-Language") {
 		t.Fatalf("429 = %d，Vary = %v", rec.Code, rec.Header().Values("Vary"))
+	}
+}
+
+// WatchNotifications 只豁免登入的顧客帳號（a:）：訪客、管理員與其他方法照級別計數。
+// mutation：exemptFromEntryLimit 拿掉 a: 前綴檢查 → 訪客的串流請求不受限，失敗。
+func TestWatchNotificationsIsExemptOnlyForAccountSubjects(t *testing.T) {
+	t.Parallel()
+	watch := notificationconnect.NotificationAppServiceWatchNotificationsProcedure
+	other := notificationconnect.NotificationAppServiceGetUnreadCountProcedure
+	call := func(h http.Handler, procedure, subject string) int {
+		r := httptest.NewRequestWithContext(rpc.WithSubject(t.Context(), subject), http.MethodPost, procedure, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec.Code
+	}
+	for _, tc := range []struct {
+		name, procedure, subject string
+		limited                  bool
+	}{
+		{"帳號的串流不計額度", watch, "a:7", false},
+		{"訪客的串流照級別計數", watch, "v:192.0.2.9", true},
+		{"管理員的串流照級別計數", watch, "m:1", true},
+		{"帳號的其他方法照級別計數", other, "a:7", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := withRateLimit(newRateLimiter(func() time.Time { return entryNow }), http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+			var last int
+			for range tierDefault.visitor + 1 {
+				last = call(h, tc.procedure, tc.subject)
+			}
+			if limited := last == http.StatusTooManyRequests; limited != tc.limited {
+				t.Fatalf("第 %d 次 = %d，被限流 = %v，預期 %v", tierDefault.visitor+1, last, limited, tc.limited)
+			}
+		})
 	}
 }

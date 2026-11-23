@@ -125,7 +125,7 @@ type Deps struct {
 	CRM *crm.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
-	// Notification 是通知：登入帳號的收件匣、偏好與裝置 token（NotificationAppService）與後台公告（NotificationAdminService）。
+	// Notification 是通知：登入帳號的收件匣、偏好、裝置 token 與訊號串流（NotificationAppService）與後台公告（NotificationAdminService）。
 	Notification *notification.Module
 	// Assistant 是買家助理（AssistantAppService）。
 	Assistant *assistant.Module

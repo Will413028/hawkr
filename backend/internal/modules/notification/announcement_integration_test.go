@@ -22,6 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/stream"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -153,7 +154,7 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 	dir := &testDirectory{buyers: buyers}
 	svc := announce.New(announce.Deps{
 		DB: d, Locks: intake.Locks{Accounts: id, Buyers: buyers, Stores: stores}, Directory: dir,
-		Audit: adminaudit.New(d, clock.Now), Jobs: q, Now: clock.Now, NewID: uuid.NewV7, Logger: log, Chunk: chunk,
+		Audit: adminaudit.New(d, clock.Now), Signals: dbSignals{d}, Jobs: q, Now: clock.Now, NewID: uuid.NewV7, Logger: log, Chunk: chunk,
 	})
 	inbox := app.New(app.Deps{DB: d, Accounts: id, Registry: registry.Registry{}, Now: time.Now, Logger: log})
 	return &announceFixture{db: d, identity: id, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores, clock: clock}
@@ -612,5 +613,55 @@ func TestInboxSkipsABrokenRowButFailsOnALoadError(t *testing.T) {
 	}
 	if _, err := f.inbox.ListInbox(ctx, r, nil, uitext.EN, nil, 10); err == nil {
 		t.Fatal("讀公告內容失敗應讓請求失敗，不該回一份少了通知的收件匣")
+	}
+}
+
+// 公告的收件匣寫入與串流訊號同一個 transaction：訂閱者收到的未讀數與最新一則，和 UnreadCount 同一條規則（只算註冊的型別，含 announcement）。
+// mutation：fanout.go 的 writeInbox 不呼叫 Signals.InboxChanged → 訂閱者收不到公告的訊號，逾時失敗。
+func TestAnnouncementFanOutSignalsTheRecipientsStream(t *testing.T) {
+	f := setupAnnounce(t, 0)
+	hub := stream.NewHub(inboxReader(f.inbox), slog.New(slog.DiscardHandler))
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- hub.Run(ctx, stream.DialPG(f.db.Pool().Config().ConnConfig)) }()
+	t.Cleanup(func() {
+		cancel()
+		if err := <-done; err != nil {
+			t.Errorf("Run：%v", err)
+		}
+	})
+	select {
+	case <-hub.Listening():
+	case <-time.After(5 * time.Second):
+		t.Fatal("LISTEN 連線沒有建立")
+	}
+	acct := f.newAccount(t)
+	sub, err := hub.Subscribe(stream.Key{AccountID: acct, Audience: model.AudienceBuyer}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(sub.Close)
+	next := func() stream.Event {
+		c, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		ev, err := sub.Next(c)
+		if err != nil {
+			t.Fatalf("Next：%v", err)
+		}
+		return ev
+	}
+	if ev := next(); ev.Inbox == nil || ev.Inbox.UnreadCount != 0 {
+		t.Fatalf("連線建立的第一則應是空收件匣：%+v", ev)
+	}
+
+	a := f.create(t, announce.CreateInput{Audiences: []string{"BUYER"}})
+	f.drain(t)
+	ev := next()
+	var rowID uuid.UUID
+	if err := f.db.Pool().QueryRow(context.Background(), `SELECT id FROM notification.inbox_items WHERE announcement_id = $1 AND account_id = $2`, a.ID, acct).Scan(&rowID); err != nil {
+		t.Fatal(err)
+	}
+	if ev.Inbox == nil || ev.Inbox.UnreadCount != 1 || ev.Inbox.LatestItemID == nil || *ev.Inbox.LatestItemID != rowID {
+		t.Fatalf("訂閱者應收到未讀 1 與公告列 %s：%+v", rowID, ev)
 	}
 }

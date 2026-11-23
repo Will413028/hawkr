@@ -67,7 +67,7 @@
    "id": "deliver-job-not-enqueued",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/intake/intake.go",
-   "old": "if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {\n\t\t\t\treturn fmt.Errorf(\"排入渠道 job：%w\", err)\n\t\t\t}",
+   "old": "if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {\n\t\t\t\treturn false, fmt.Errorf(\"排入渠道 job：%w\", err)\n\t\t\t}",
    "new": "_ = id",
    "test": "internal/modules/notification ^TestDeliveryChannelsEachGetARecordAndAJobInTheSameTransaction$",
    "why": "A delivery record is written without its channel job, so A8-3 would have nothing to run."

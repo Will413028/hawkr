@@ -177,6 +177,23 @@ func (s *Service) UnreadCount(ctx context.Context, r Recipient) (int64, error) {
 	return n, nil
 }
 
+// LatestInboxItemID 回傳收件人最新一則通知的 ID（與 UnreadCount 同一組篩選：只含註冊的型別）；收件匣是空的回 nil。
+func (s *Service) LatestInboxItemID(ctx context.Context, r Recipient) (*uuid.UUID, error) {
+	if err := r.validate(); err != nil {
+		return nil, err
+	}
+	id, err := store.New(s.d.DB.Conn(ctx)).LatestInboxItemID(ctx, store.LatestInboxItemIDParams{
+		AccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("讀取最新通知：%w", err)
+	}
+	return &id, nil
+}
+
 // MarkRead 把帳號的一則通知標成已讀；已讀的不改已讀時間。不存在與不是帳號的回同一個 not_found。
 func (s *Service) MarkRead(ctx context.Context, accountID int64, id uuid.UUID) error {
 	now := s.d.Now()

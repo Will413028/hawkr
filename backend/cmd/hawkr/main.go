@@ -347,7 +347,8 @@ func runServe(ctx context.Context) error {
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
 	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
 	// Run 的連線是專用的（Deps.ListenConnConfig 為 nil：以主連線池的設定另開），所以 DATABASE_URL 必須是直連或 session 模式的 Postgres，不能經 transaction pooling。
-	serveErr := serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
+	// notification 的串流 hub 同理：每個 serve 行程一條專用 LISTEN 連線（worker 只 pg_notify，不跑 Run），Deps.ListenConnConfig 同樣是 nil。
+	serveErr := serveWithRun(ctx, joinRuns(imModule.Run, notificationModule.Run), listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
 	sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	return errors.Join(serveErr, assistantModule.Shutdown(sc))
@@ -609,6 +610,32 @@ func serveWithRun(ctx context.Context, run func(context.Context) error, servers 
 	serveErr := serveAllThen(ctx, cancel, servers...)
 	cancel()
 	return errors.Join(serveErr, <-runDone)
+}
+
+// joinRuns 把多個背景元件併成一個 serveWithRun 的 run：全部同時跑；任何一個返回（ctx 結束或失敗）就取消其餘的，等全部返回後回傳合併的錯誤。
+func joinRuns(runs ...func(context.Context) error) func(context.Context) error {
+	return func(ctx context.Context) error {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		errs := make(chan error, len(runs))
+		for _, run := range runs {
+			go func() {
+				err := run(ctx)
+				if err == nil && ctx.Err() == nil {
+					err = errors.New("背景元件在 ctx 結束前返回")
+				}
+				cancel()
+				errs <- err
+			}()
+		}
+		var all []error
+		for range runs {
+			if err := <-errs; err != nil && !errors.Is(err, context.Canceled) {
+				all = append(all, err)
+			}
+		}
+		return errors.Join(all...)
+	}
 }
 
 // listening 是一個在 listener 上服務的 server。

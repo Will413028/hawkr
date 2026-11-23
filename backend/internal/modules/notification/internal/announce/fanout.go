@@ -203,6 +203,12 @@ func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnounce
 		if err := q.AddAnnouncementInboxCount(ctx, store.AddAnnouncementInboxCountParams{ID: ann.ID, Delta: int32(n)}); err != nil { //nolint:gosec // 一次只寫一列
 			return fmt.Errorf("遞增公告的收件匣人數：%w", err)
 		}
+		if s.d.Signals != nil {
+			// 與收件匣列同一個 transaction：commit 後才送達，rollback 不送；公告沒有狀態重讀提示。
+			if err := s.d.Signals.InboxChanged(ctx, r.AccountID, aud, r.StoreID, model.StateHintNone); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }

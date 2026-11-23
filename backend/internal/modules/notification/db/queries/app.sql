@@ -24,6 +24,14 @@ WHERE account_id = sqlc.arg(account_id) AND audience = sqlc.arg(audience)
   AND type = ANY(sqlc.arg(types)::text[])
   AND read_at IS NULL;
 
+-- name: LatestInboxItemID :one
+-- 串流訊號的最新一列：與 CountUnreadInboxItems 同一組篩選（受眾、店、型別），updated_at 最新（再依 id）的列；沒有列是 pgx.ErrNoRows。
+SELECT id FROM notification.inbox_items
+WHERE account_id = sqlc.arg(account_id) AND audience = sqlc.arg(audience)
+  AND (store_id = sqlc.narg(store_id)::bigint OR (sqlc.narg(store_id)::bigint IS NULL AND store_id IS NULL))
+  AND type = ANY(sqlc.arg(types)::text[])
+ORDER BY updated_at DESC, id DESC LIMIT 1;
+
 -- name: MarkInboxItemRead :one
 -- 只有擁有者（帳號）能標；已讀的列保留原本的已讀時間。不存在與不是擁有者都是 0 列（pgx.ErrNoRows），呼叫端不區分。
 UPDATE notification.inbox_items SET read_at = COALESCE(read_at, sqlc.arg(now)::timestamptz)

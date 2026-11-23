@@ -61,10 +61,12 @@ type Deps struct {
 	Locks     intake.Locks
 	Directory Directory
 	Audit     *adminaudit.Log
-	Jobs      jobs.Enqueuer
-	Now       func() time.Time
-	NewID     func() uuid.UUID
-	Logger    *slog.Logger
+	// Signals 在公告寫進收件匣的同一個 transaction 內通知串流訂閱者；nil 表示不通知（沒有串流的組裝）。
+	Signals intake.Signals
+	Jobs    jobs.Enqueuer
+	Now     func() time.Time
+	NewID   func() uuid.UUID
+	Logger  *slog.Logger
 	// Chunk 是一個派送 job 處理的收件人數上限；0 用 ChunkSize，超過 MaxChunk 以 MaxChunk 計。
 	Chunk int
 }
