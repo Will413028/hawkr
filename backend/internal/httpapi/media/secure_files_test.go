@@ -408,7 +408,7 @@ func delegatedSessions() *fakeSessions {
 	}}
 }
 
-func delegatedSecureServerWith(t *testing.T, f *fakeSecure, timeout time.Duration, sessions httpdelegation.Sessions) *httptest.Server {
+func delegatedSecureServerWith(t *testing.T, f *fakeSecure, timeout time.Duration, sessions DelegationAccess) *httptest.Server {
 	t.Helper()
 	h := NewSecureUploads(f, nil)
 	if sessions != nil {
@@ -573,5 +573,32 @@ func TestDelegatedPreviewUsesTheSessionUploader(t *testing.T) {
 	srv = delegatedSecureServer(t, &fakeSecure{}, time.Minute)
 	if resp := do(t, http.MethodGet, srv.URL+"/api/files/delegated/secure_uploads/tok", "account", nil, 0); resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("顧客帳號預覽 %d，預期 401", resp.StatusCode)
+	}
+}
+
+// 店家此刻不可代行（關店、停權、撤回代行授權；模組回 FailedPrecondition）：續傳與預覽都 403、模組沒被呼叫、恰好一列 FAILED 稽核、不順延閒置逾時。
+func TestDelegatedRoutesRejectAStoreThatIsNoLongerDelegable(t *testing.T) {
+	sessions := delegatedSessions()
+	sessions.storeErr = apperr.FailedPrecondition("此店家目前不可代行")
+	f := &fakeSecure{}
+	srv := delegatedSecureServerWith(t, f, time.Minute, sessions)
+	if resp := delegatedPut(t, srv, "cred"); resp.StatusCode != http.StatusForbidden {
+		t.Errorf("續傳 %d，預期 403", resp.StatusCode)
+	}
+	if len(sessions.denied) != 1 || sessions.denied[0].Action != moddelegation.AuditMediaUpload {
+		t.Errorf("續傳的 FAILED 稽核 %v，預期恰好一列 MEDIA_UPLOAD", sessions.denied)
+	}
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/api/files/delegated/secure_uploads/tok", nil)
+	req.Header.Set(httpdelegation.OperationSessionHeader, "cred")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("預覽 %d，預期 403", resp.StatusCode)
+	}
+	if len(sessions.denied) != 2 || f.chunkToken != "" || len(sessions.touched) != 0 {
+		t.Errorf("稽核 %d 列、模組被呼叫 %q、順延 %v，預期 2 列、未呼叫、未順延", len(sessions.denied), f.chunkToken, sessions.touched)
 	}
 }

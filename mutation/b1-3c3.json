@@ -179,6 +179,24 @@
       "new": "\tconst headers = new Headers();\n\tif (request.body !== undefined) {",
       "test": "features/delegated-operations/secure-upload-bff.unit.test.ts forwards a chunk to the monolith",
       "why": "代行檔案 BFF 不轉送 credential 標頭：單體收不到代行憑證，段上傳與預覽全數 401"
+    },
+    {
+      "id": "delegated-route-skips-store-check",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "\t\terr = h.sessions.DelegatedRead(r.Context(), c, func(_ context.Context, st seller.Store) error {\n\t\t\tu = media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}\n\t\t\treturn nil\n\t\t})",
+      "new": "\t\t_ = seller.Store{}\n\t\tu = media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: c.Session.Target.StoreID}",
+      "test": "internal/httpapi/media ^TestDelegatedRoutesRejectAStoreThatIsNoLongerDelegable$",
+      "why": "代行段上傳與預覽路由不再檢查店家此刻可不可代行：關店、停權或撤回代行授權後仍能續傳與預覽，也不寫 FAILED 稽核"
+    },
+    {
+      "id": "delegated-route-failed-precondition-500",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "case apperr.KindPermissionDenied, apperr.KindFailedPrecondition, apperr.KindNotFound:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)",
+      "new": "case apperr.KindPermissionDenied, apperr.KindNotFound:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)",
+      "test": "internal/httpapi/media ^TestDelegatedChunkRequiresALiveDelegationSession$",
+      "why": "session 已撤銷或逾時（模組回 FailedPrecondition）又被當成 500 並記 error log，而不是 403"
     }
   ]
 }

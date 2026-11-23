@@ -124,3 +124,24 @@ func TestOwnedBy_BindsDelegatedStore(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckUploader_RejectsStoreWithoutAdmin(t *testing.T) {
+	for name, tc := range map[string]struct {
+		u  model.Uploader
+		ok bool
+	}{
+		"account":             {model.Uploader{ID: 7}, true},
+		"admin":               {model.Uploader{ID: 7, Admin: true}, true},
+		"delegated admin":     {model.Uploader{ID: 7, Admin: true, Store: 5}, true},
+		"store without admin": {model.Uploader{ID: 7, Store: 5}, false},
+		"non-positive id":     {model.Uploader{ID: 0}, false},
+	} {
+		err := checkUploader(t.Context(), tc.u)
+		if (err == nil) != tc.ok {
+			t.Errorf("%s：err=%v，預期 ok=%v", name, err, tc.ok)
+		}
+		if err != nil && apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：種類 %v，預期 InvalidInput", name, apperr.KindOf(err))
+		}
+	}
+}

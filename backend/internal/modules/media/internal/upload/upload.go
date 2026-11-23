@@ -171,6 +171,14 @@ func notFound(ctx context.Context) error {
 	return apperr.NotFound("%s", text.MediaUploadNotFound(loc(ctx)))
 }
 
+// checkUploader 檢查上傳者的形狀：ID 為正；代行店家（Store 非 0）只屬於管理員，帶 Store 的非管理員是呼叫方的程式錯誤。
+func checkUploader(ctx context.Context, u model.Uploader) error {
+	if u.ID <= 0 || u.Store != 0 && !u.Admin {
+		return apperr.InvalidInputOn([]string{"uploader"}, "%s", text.MediaUploaderInvalid(loc(ctx)))
+	}
+	return nil
+}
+
 // delegatedStore 是要寫進暫存列的代行店家：非代行是 NULL。
 func delegatedStore(u model.Uploader) *int64 {
 	if u.Store == 0 {

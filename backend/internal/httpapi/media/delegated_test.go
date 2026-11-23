@@ -33,6 +33,19 @@ type fakeSessions struct {
 	sessions map[string]moddelegation.DelegationSession
 	denied   []moddelegation.DelegatedMethod
 	touched  []int64
+	// storeErr 是 DelegatedRead 的店家檢查結果（nil 是可代行）；reads 是通過檢查、實際執行 read 的次數。
+	storeErr error
+	reads    int
+}
+
+// DelegatedRead 像 delegation 模組：店家不可代行時寫一列 FAILED 稽核（記進 denied）並回模組的拒絕種類（FailedPrecondition）。
+func (f *fakeSessions) DelegatedRead(ctx context.Context, c moddelegation.DelegatedCaller, read func(context.Context, seller.Store) error) error {
+	if f.storeErr != nil {
+		f.denied = append(f.denied, c.Method)
+		return f.storeErr
+	}
+	f.reads++
+	return read(ctx, seller.Store{StoreID: c.Session.Target.StoreID})
 }
 
 func (f *fakeSessions) TouchDelegation(_ context.Context, id int64) error {
@@ -51,7 +64,7 @@ func (f *fakeSessions) ResolveDelegation(_ context.Context, c string, _ bool) (m
 func (f *fakeSessions) AuthorizeDelegated(_ context.Context, c moddelegation.DelegatedCaller) error {
 	if c.Session.Status != moddelegation.DelegationActive {
 		f.denied = append(f.denied, c.Method)
-		return apperr.PermissionDenied("代行工作階段已不可用")
+		return apperr.FailedPrecondition("代行工作階段已撤銷或逾時")
 	}
 	if !slices.Contains(c.Session.Capabilities, c.Method.Capability) {
 		f.denied = append(f.denied, c.Method)

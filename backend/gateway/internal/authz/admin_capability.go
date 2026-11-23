@@ -43,10 +43,10 @@ const (
 	AdminCapPostsWrite AdminCapability = "posts.write"
 	// AdminCapPostsPublish — 發布與下架貼文（high）。含 POST_SCHEDULE。
 	AdminCapPostsPublish AdminCapability = "posts.publish"
-	// AdminCapOrdersRead — 查看訂單（high）。九值中唯一「唯讀但必落稽核」者
+	// AdminCapOrdersRead — 查看訂單（high）。十值中唯一「唯讀但必落稽核」者
 	// （ORDER_PII_REVEAL），例外由 order-service 自行斷言 audit_log_id 非空承擔。
 	AdminCapOrdersRead AdminCapability = "orders.read"
-	// AdminCapMediaUpload — 上傳機敏檔案（low，B1-D16）。由單體的 MediaDelegatedService 與後台段上傳端點檢查；
+	// AdminCapMediaUpload — 上傳機敏檔案（low）。由單體的 MediaDelegatedService 與代行段上傳路由（/api/files/delegated/secure_uploads/**）檢查；
 	// 上傳只產生會過期的暫存，不讓檔案生效，掛上時仍由擁有者的寫入能力把關。這個 gateway 沒有任何路由宣告它，
 	// 列在這裡是為了能被授權（授權建立與能力目錄都以本表為準）。
 	AdminCapMediaUpload AdminCapability = "media.upload"
@@ -54,8 +54,6 @@ const (
 
 // AllAdminCapabilities lists every delegated capability. Order matches the §6.1.1
 // table so the golden file reads the same way.
-//
-// 第十個 media.upload 由 B1-D16 新增（取代 §6.1.13 的「媒體上傳不另設能力」）：只有商品或貼文寫入權的管理員會因此上傳不了。
 var AllAdminCapabilities = []AdminCapability{
 	AdminCapStorefrontRead,
 	AdminCapStorefrontWrite,
@@ -69,7 +67,7 @@ var AllAdminCapabilities = []AdminCapability{
 	AdminCapMediaUpload,
 }
 
-// IsKnownAdmin reports whether cap is one of the nine delegated capability tokens.
+// IsKnownAdmin reports whether cap is one of the ten delegated capability tokens.
 // The empty string is not one of them — a route that forgot to declare a capability
 // therefore fails at RegisterAdmin rather than mounting under no capability at all.
 func IsKnownAdmin(cap AdminCapability) bool {
@@ -85,11 +83,11 @@ func IsKnownAdmin(cap AdminCapability) bool {
 
 // adminCapabilityDependencies 是「授予 X 就必須同時授予哪些」的直接依賴表。
 //
-// 它與封閉九值同檔，因為兩者是同一個 SSOT 的兩半：值域說「有哪些能力」，本表說
-// 「哪些組合是自洽的」。分兩個檔就會出現「新增了第十個 capability，但沒有人被迫回答
+// 它與封閉十值同檔，因為兩者是同一個 SSOT 的兩半：值域說「有哪些能力」，本表說
+// 「哪些組合是自洽的」。分兩個檔就會出現「新增了 capability，但沒有人被迫回答
 // 它依賴什麼」——而那個漏答不會讓任何東西轉紅。
 //
-// ⚠️ 這條規則在 DB 層**不存在**：chk_sda_capabilities_closed 的九個 CASE 是去重加總
+// ⚠️ 這條規則在 DB 層**不存在**：chk_sda_capabilities_closed 的十個 CASE 是去重加總
 // （PG 的 CHECK 不能有子查詢，做不出 DISTINCT），不是依賴檢查。授權建立路徑的
 // fail-closed 保證因此完全落在 Gateway：MissingAdminCapabilityDependencies 不齊即
 // 9287，在送出 gRPC 之前。前端 hawkr-admin 的 policy.ts 另有一份同內容的表，
@@ -124,7 +122,7 @@ const (
 
 // adminCapabilityRisks 是勾選介面用來標示危險度的等級，取自 §6.1.1 的能力表。
 //
-// orders.read 是九值中唯一「唯讀卻是 high」的一項：它每一次揭露都會落一列
+// orders.read 是十值中唯一「唯讀卻是 high」的一項：它每一次揭露都會落一列
 // ORDER_PII_REVEAL 稽核，風險來自個資而不是寫入。把它按「唯讀＝low」歸類，勾選畫面
 // 就不會提醒任何人。
 var adminCapabilityRisks = map[AdminCapability]string{
@@ -157,7 +155,7 @@ func AdminCapabilityRisk(cap AdminCapability) string {
 // MissingAdminCapabilityDependencies 回傳「要讓 caps 這組能力自洽，還缺哪些」，
 // 依 AllAdminCapabilities 的宣告順序排列且去重。回空 slice ＝ 閉包完整。
 //
-// 展開的是**遞移**閉包：即使日後某個能力只宣告一層依賴，缺的那一層自己的依賴也會被
+// 展開的是**遞移**閉包：即使某個能力只宣告一層依賴，缺的那一層自己的依賴也會被
 // 一併算進來。少了這一步，「A 依賴 B、B 依賴 C」的表在只勾 A 時會回報「缺 B」，補了 B
 // 之後才發現還缺 C —— 使用者要送出兩次才知道完整答案。
 //
@@ -170,7 +168,7 @@ func MissingAdminCapabilityDependencies(caps []AdminCapability) []AdminCapabilit
 	}
 
 	missing := make(map[AdminCapability]struct{})
-	// 佇列展開遞移閉包。封閉九值且表無環，迴圈必然停止；即便日後有人寫出環，
+	// 佇列展開遞移閉包。封閉十值且表無環，迴圈必然停止；即便有人寫出環，
 	// visited 也讓它停在有限步而不是掛住一個 request。
 	queue := append([]AdminCapability(nil), caps...)
 	visited := make(map[AdminCapability]struct{}, len(caps))

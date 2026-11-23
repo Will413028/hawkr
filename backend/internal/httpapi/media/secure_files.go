@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -55,7 +56,13 @@ type SecureUploads struct {
 	log         *slog.Logger
 	readTimeout time.Duration
 	// sessions 是後台路由驗代行 session 的來源（*delegation.Module）；nil 時後台路由一律 503。
-	sessions httpdelegation.Sessions
+	sessions DelegationAccess
+}
+
+// DelegationAccess 是代行路由需要的 delegation 公開 API（*delegation.Module）：憑證解析與授權（httpdelegation.Sessions），加上店家可代行的檢查（DelegatedRead）。
+type DelegationAccess interface {
+	httpdelegation.Sessions
+	DelegationReader
 }
 
 // NewSecureUploads 建立端點的 handler。
@@ -67,7 +74,7 @@ func NewSecureUploads(m SecureFiles, log *slog.Logger) *SecureUploads {
 }
 
 // WithDelegation 接上代行路由驗代行 session 的來源。
-func (h *SecureUploads) WithDelegation(sessions httpdelegation.Sessions) *SecureUploads {
+func (h *SecureUploads) WithDelegation(sessions DelegationAccess) *SecureUploads {
 	h.sessions = sessions
 	return h
 }
@@ -117,8 +124,11 @@ func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.
 	return media.Uploader{ID: p.ID}, nil, true
 }
 
-// delegatedUploader 只以 X-HK-Operation-Session 的代行 session 授權（與 MediaDelegatedService 同一個 httpdelegation.Authorize，被拒絕寫 FAILED 稽核）：
-// 缺憑證或解析不到 401，session 已撤銷、逾時或沒有 media.upload 403；管理員與店家都只來自 session，所以續傳與預覽只對開會話的那位管理員、那家店成立。
+// delegatedUploader 只以 X-HK-Operation-Session 的代行 session 授權，與 BeginSecureUpload 同一組檢查：
+// httpdelegation.Authorize 解析憑證並檢查 session 此刻可用且帶 media.upload（被拒絕寫一列 FAILED 稽核並提早回應），
+// 通過後 DelegatedRead 再檢查店家此刻可代行（關店、停權、撤回代行授權；被拒絕寫一列 FAILED 稽核），店家取自它交回的 st.StoreID，
+// 所以兩段拒絕互斥、每次請求最多一列稽核。
+// 缺憑證或解析不到 401；session 已撤銷或逾時、沒有 media.upload、店家不可代行 403。管理員只來自 session，
 // 請求上的顧客 cookie、Bearer 與管理員身分都不參與授權。
 func (h *SecureUploads) delegatedUploader(w http.ResponseWriter, r *http.Request) (media.Uploader, func(), bool) {
 	sensitiveHeaders(w)
@@ -127,17 +137,24 @@ func (h *SecureUploads) delegatedUploader(w http.ResponseWriter, r *http.Request
 		return media.Uploader{}, nil, false
 	}
 	c, err := httpdelegation.Authorize(r.Context(), h.sessions, h.log, r.Pattern, delegatedUploadMethod, r.Header)
+	var u media.Uploader
+	if err == nil {
+		err = h.sessions.DelegatedRead(r.Context(), c, func(_ context.Context, st seller.Store) error {
+			u = media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: st.StoreID}
+			return nil
+		})
+	}
 	if err == nil {
 		touch := func() { httpdelegation.Touch(r.Context(), h.sessions, h.log, c.Session.ID) }
-		return media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: c.Session.Target.StoreID}, touch, true
+		return u, touch, true
 	}
 	switch apperr.KindOf(err) {
 	case apperr.KindUnauthenticated:
 		http.Error(w, "unauthenticated", http.StatusUnauthorized)
-	case apperr.KindPermissionDenied:
+	case apperr.KindPermissionDenied, apperr.KindFailedPrecondition, apperr.KindNotFound:
 		http.Error(w, "forbidden", http.StatusForbidden)
-	case apperr.KindInternal, apperr.KindInvalidInput, apperr.KindNotFound, apperr.KindVersionConflict, apperr.KindAlreadyExists,
-		apperr.KindFailedPrecondition, apperr.KindUnavailable, apperr.KindResourceExhausted:
+	case apperr.KindInternal, apperr.KindInvalidInput, apperr.KindVersionConflict, apperr.KindAlreadyExists,
+		apperr.KindUnavailable, apperr.KindResourceExhausted:
 		h.log.ErrorContext(r.Context(), "media：代行上傳驗證代行 session 失敗", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	default:

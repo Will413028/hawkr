@@ -119,8 +119,8 @@ func (s *Service) BeginSecureUpload(ctx context.Context, uploader model.Uploader
 	if s.d.Keyring == nil {
 		return SecureBeginResult{}, model.ErrNoKeyring
 	}
-	if uploader.ID <= 0 {
-		return SecureBeginResult{}, apperr.InvalidInputOn([]string{"uploader"}, "%s", text.MediaUploaderInvalid(loc(ctx)))
+	if err := checkUploader(ctx, uploader); err != nil {
+		return SecureBeginResult{}, err
 	}
 	if size < 1 || size > model.MaxSecureUploadSize {
 		return SecureBeginResult{}, apperr.InvalidInputOn([]string{"size"}, "%s", text.MediaSecureSizeOutOfRange(loc(ctx), text.MediaSecureSizeOutOfRangeArgs{Max: int(model.MaxSecureUploadSize)}))
@@ -171,8 +171,8 @@ func (s *Service) putChunk(ctx context.Context, uploader model.Uploader, token s
 	if s.d.Keyring == nil {
 		return SecureChunkResult{}, model.ErrNoKeyring
 	}
-	if uploader.ID <= 0 {
-		return SecureChunkResult{}, apperr.InvalidInputOn([]string{"uploader"}, "%s", text.MediaUploaderInvalid(loc(ctx)))
+	if err := checkUploader(ctx, uploader); err != nil {
+		return SecureChunkResult{}, err
 	}
 	row, err := s.own(ctx, uploader, token)
 	if err != nil {
