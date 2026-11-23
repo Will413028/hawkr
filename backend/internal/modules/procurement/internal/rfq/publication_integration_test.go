@@ -508,7 +508,7 @@ func TestExecuteStaleBranchesLeaveTheApprovalPending(t *testing.T) {
 	pending("核准凍的版本")
 }
 
-// R1：版本對得上但狀態不是 PENDING 的核准不能領走。只靠 version 擋的實作（拿掉 state = 'PENDING'）會讓這個測試變紅。
+// 版本對得上但狀態不是 PENDING 的核准不能領走。只靠 version 擋的實作（拿掉 state = 'PENDING'）會讓這個測試變紅。
 func TestExecuteRejectsAnApprovalWhoseVersionMatchesButIsNotPending(t *testing.T) {
 	for _, state := range []string{"EXECUTING", "SUCCEEDED"} {
 		f := newFixture(t)
@@ -541,7 +541,7 @@ func TestExecuteRejectsAnApprovalVersionThatIsNotTheOnePreviewReturned(t *testin
 	}
 }
 
-// R2：核准到 expires_at 的那一刻起就過期（expires_at 之前有效、等於 expires_at 已過期）。
+// 核准到 expires_at 的那一刻起就過期（expires_at 之前有效、等於 expires_at 已過期）。
 func TestExecuteApprovalExpiryBoundary(t *testing.T) {
 	f := newFixture(t)
 	p := f.approved(f.publicationIn())
@@ -557,7 +557,7 @@ func TestExecuteApprovalExpiryBoundary(t *testing.T) {
 	}
 }
 
-// A9-D35(6)：需求狀態改變不產生新版本，所以 Execute 要再查一次；被拒時核准維持 PENDING（領取一起還原）。
+// 需求狀態改變不產生新版本，所以 Execute 要再查一次；被拒時核准維持 PENDING（領取一起還原）。
 func TestExecuteRequiresAReadyOrMatchingRequest(t *testing.T) {
 	f := newFixture(t)
 	p := f.approved(f.publicationIn())
@@ -577,7 +577,7 @@ func TestExecuteRequiresAReadyOrMatchingRequest(t *testing.T) {
 	}
 }
 
-// A9-D35(5)：指定對象的核准存候選集，執行時重驗它仍是有效的候選集；預覽之後同一版本又搜尋成功就失效。
+// 指定對象的核准存候選集，執行時重驗它仍是有效的候選集；預覽之後同一版本又搜尋成功就失效。
 func TestExecuteDirectRechecksTheEffectiveCandidateSet(t *testing.T) {
 	f := newFixture(t)
 	set, c := f.searched(10, 20)
@@ -635,7 +635,7 @@ func TestExecuteRechecksTheResponseDeadlineInTaipei(t *testing.T) {
 	}
 }
 
-// C6：Execute 重送比對 approval_version；版本不同回 INVALID_ARGUMENT，不回放。
+// Execute 重送比對 approval_version；版本不同回 INVALID_ARGUMENT，不回放。
 func TestExecuteReplayComparesTheApprovalVersion(t *testing.T) {
 	f := newFixture(t)
 	p := f.approved(f.publicationIn())
