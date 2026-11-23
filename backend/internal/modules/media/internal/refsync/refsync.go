@@ -17,9 +17,11 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // 時間參數。Link 與 Unlink 各是一次最多 5 秒的呼叫（internal/legacy/mediaservice，沒有內層重試）。
@@ -125,7 +127,7 @@ func Reject(ctx context.Context, q Queries, ref Ref, candidates ...Candidate) er
 			fields = append(fields, c.Field)
 		}
 	}
-	return apperr.InvalidInputOn(fields, "圖片無法使用，請重新上傳")
+	return apperr.InvalidInputOn(fields, "%s", text.MediaImageUnusable(uitext.LocaleFrom(ctx)))
 }
 
 // Syncer 是一個擁有模組的同步：Media 是遠端，Queries 與 Current 是擁有者的資料，Enqueue 排入這個模組的同步 job。

@@ -8,7 +8,8 @@
 // 再 CompleteUpload 通知伺服器；伺服器非同步處理（辨認格式、重新編碼、去除 metadata），client 以 GetUpload 輪詢到 READY 或 REJECTED。
 // READY 的 staged token 交給擁有該圖片的 API（例如更新頭像）轉正；轉正前的暫存只有上傳者本人能續用。
 // 機敏檔案：BeginSecureUpload 開分段會話，段本身走單體的 /api/files/secure_uploads 端點（不經 Connect）。處理被拒絕不是錯誤：GetUpload 以 state REJECTED 與 reject_reason 回報。
-// 設計：ADR docs/adr/2026-11-22-media-upload-channels.md。
+// 代行營運（MediaDelegatedService）：管理員代行店家時開機敏檔的分段上傳會話，段走後台的 /api/files/admin/secure_uploads 端點。
+// 設計：ADR docs/adr/2026-11-22-media-upload-channels.md；代行上傳 plan B1-D16。
 package mediav1alpha1connect
 
 import (
@@ -30,6 +31,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// MediaAppServiceName is the fully-qualified name of the MediaAppService service.
 	MediaAppServiceName = "hawkr.media.v1alpha1.MediaAppService"
+	// MediaDelegatedServiceName is the fully-qualified name of the MediaDelegatedService service.
+	MediaDelegatedServiceName = "hawkr.media.v1alpha1.MediaDelegatedService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -52,6 +55,9 @@ const (
 	// MediaAppServiceBeginSecureUploadProcedure is the fully-qualified name of the MediaAppService's
 	// BeginSecureUpload RPC.
 	MediaAppServiceBeginSecureUploadProcedure = "/hawkr.media.v1alpha1.MediaAppService/BeginSecureUpload"
+	// MediaDelegatedServiceBeginSecureUploadProcedure is the fully-qualified name of the
+	// MediaDelegatedService's BeginSecureUpload RPC.
+	MediaDelegatedServiceBeginSecureUploadProcedure = "/hawkr.media.v1alpha1.MediaDelegatedService/BeginSecureUpload"
 )
 
 // MediaAppServiceClient is a client for the hawkr.media.v1alpha1.MediaAppService service.
@@ -226,4 +232,82 @@ func (UnimplementedMediaAppServiceHandler) GetUpload(context.Context, *connect.R
 
 func (UnimplementedMediaAppServiceHandler) BeginSecureUpload(context.Context, *connect.Request[v1alpha1.BeginSecureUploadRequest]) (*connect.Response[v1alpha1.BeginSecureUploadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload is not implemented"))
+}
+
+// MediaDelegatedServiceClient is a client for the hawkr.media.v1alpha1.MediaDelegatedService
+// service.
+type MediaDelegatedServiceClient interface {
+	// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
+	// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
+	BeginSecureUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse], error)
+}
+
+// NewMediaDelegatedServiceClient constructs a client for the
+// hawkr.media.v1alpha1.MediaDelegatedService service. By default, it uses the Connect protocol with
+// the binary Protobuf Codec, asks for gzipped responses, and sends uncompressed requests. To use
+// the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewMediaDelegatedServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) MediaDelegatedServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	mediaDelegatedServiceMethods := v1alpha1.File_hawkr_media_v1alpha1_media_proto.Services().ByName("MediaDelegatedService").Methods()
+	return &mediaDelegatedServiceClient{
+		beginSecureUpload: connect.NewClient[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest, v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse](
+			httpClient,
+			baseURL+MediaDelegatedServiceBeginSecureUploadProcedure,
+			connect.WithSchema(mediaDelegatedServiceMethods.ByName("BeginSecureUpload")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// mediaDelegatedServiceClient implements MediaDelegatedServiceClient.
+type mediaDelegatedServiceClient struct {
+	beginSecureUpload *connect.Client[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest, v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse]
+}
+
+// BeginSecureUpload calls hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload.
+func (c *mediaDelegatedServiceClient) BeginSecureUpload(ctx context.Context, req *connect.Request[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse], error) {
+	return c.beginSecureUpload.CallUnary(ctx, req)
+}
+
+// MediaDelegatedServiceHandler is an implementation of the
+// hawkr.media.v1alpha1.MediaDelegatedService service.
+type MediaDelegatedServiceHandler interface {
+	// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
+	// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
+	BeginSecureUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse], error)
+}
+
+// NewMediaDelegatedServiceHandler builds an HTTP handler from the service implementation. It
+// returns the path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewMediaDelegatedServiceHandler(svc MediaDelegatedServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	mediaDelegatedServiceMethods := v1alpha1.File_hawkr_media_v1alpha1_media_proto.Services().ByName("MediaDelegatedService").Methods()
+	mediaDelegatedServiceBeginSecureUploadHandler := connect.NewUnaryHandler(
+		MediaDelegatedServiceBeginSecureUploadProcedure,
+		svc.BeginSecureUpload,
+		connect.WithSchema(mediaDelegatedServiceMethods.ByName("BeginSecureUpload")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/hawkr.media.v1alpha1.MediaDelegatedService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case MediaDelegatedServiceBeginSecureUploadProcedure:
+			mediaDelegatedServiceBeginSecureUploadHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedMediaDelegatedServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedMediaDelegatedServiceHandler struct{}
+
+func (UnimplementedMediaDelegatedServiceHandler) BeginSecureUpload(context.Context, *connect.Request[v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest]) (*connect.Response[v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload is not implemented"))
 }

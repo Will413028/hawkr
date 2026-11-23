@@ -389,3 +389,69 @@ func TestPreviewMidStreamFailureAbortsResponse(t *testing.T) {
 type errReader struct{ err error }
 
 func (e errReader) Read([]byte) (int, error) { return 0, e.err }
+
+func adminSecureServer(t *testing.T, f *fakeSecure, timeout time.Duration) *httptest.Server {
+	t.Helper()
+	h := NewSecureUploads(f, nil)
+	h.readTimeout = timeout
+	mux := http.NewServeMux()
+	mux.Handle(AdminChunkRoute, h.AdminChunk())
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("X-Test-Who") {
+		case "account":
+			r = r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: 7}))
+		case "admin":
+			r = r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 7}))
+		}
+		mux.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// 後台的段上傳：上傳者是管理員（{ID: 管理員, Admin: true}），原始位元組原樣交給模組；顧客帳號與沒有登入的被拒絕，模組沒有被呼叫。
+func TestAdminChunkUploaderIsTheAdmin(t *testing.T) {
+	f := &fakeSecure{}
+	srv := adminSecureServer(t, f, time.Minute)
+	resp := do(t, http.MethodPut, srv.URL+"/api/files/admin/secure_uploads/tok/chunks/2", "admin", strings.NewReader("abcde"), 5)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("狀態 %d，預期 204", resp.StatusCode)
+	}
+	if !f.chunkWho.Admin || f.chunkWho.ID != 7 || f.chunkToken != "tok" || f.chunkIndex != 2 || f.chunkLen != 5 || f.chunkRead != 5 {
+		t.Fatalf("模組收到 %+v", f)
+	}
+	if h := resp.Header.Get("Cache-Control"); h != "private, no-store" {
+		t.Fatalf("Cache-Control = %q", h)
+	}
+	f = &fakeSecure{}
+	srv = adminSecureServer(t, f, time.Minute)
+	for who, want := range map[string]int{"": http.StatusUnauthorized, "account": http.StatusForbidden} {
+		resp := do(t, http.MethodPut, srv.URL+"/api/files/admin/secure_uploads/tok/chunks/0", who, strings.NewReader("a"), 1)
+		if resp.StatusCode != want || f.chunkToken != "" {
+			t.Errorf("who=%q 回 %d（模組被呼叫：%v），預期 %d 且不呼叫", who, resp.StatusCode, f.chunkToken != "", want)
+		}
+	}
+}
+
+// 後台路由沿用顧客段路由的語意：超過段大小 413、index 不符 409 加 Hawkr-Next-Index、慢速 body 408、client 中斷 400。
+func TestAdminChunkSharesTheChunkSemantics(t *testing.T) {
+	url := "/api/files/admin/secure_uploads/tok/chunks/0"
+	big := strings.NewReader(strings.Repeat("a", media.SecureChunkSize+1))
+	srv := adminSecureServer(t, &fakeSecure{}, time.Minute)
+	if resp := do(t, http.MethodPut, srv.URL+url, "admin", big, media.SecureChunkSize+1); resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Errorf("超量回 %d，預期 413", resp.StatusCode)
+	}
+	mismatch := apperr.FailedPrecondition("不符").WithMetadata(metaNextIndex, "3")
+	srv = adminSecureServer(t, &fakeSecure{chunkErr: mismatch}, time.Minute)
+	resp := do(t, http.MethodPut, srv.URL+url, "admin", strings.NewReader("a"), 1)
+	if resp.StatusCode != http.StatusConflict || resp.Header.Get(NextIndexHeader) != "3" {
+		t.Errorf("index 不符回 %d、%s=%q，預期 409 與 3", resp.StatusCode, NextIndexHeader, resp.Header.Get(NextIndexHeader))
+	}
+	srv = adminSecureServer(t, &fakeSecure{}, 100*time.Millisecond)
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { _ = pw.Close() })
+	go func() { _, _ = pw.Write([]byte("ab")) }()
+	if resp := do(t, http.MethodPut, srv.URL+url, "admin", pr, 10); resp.StatusCode != http.StatusRequestTimeout {
+		t.Errorf("慢速 body 回 %d，預期 408", resp.StatusCode)
+	}
+}

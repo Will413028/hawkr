@@ -125,10 +125,10 @@
 | 105 | `service/StagedTokenServiceTest.java:81` | `forgedSignatureRejected` | B1-2：`TestStagedToken_ForgedSignatureRejected` | — |
 | 106 | `service/StagedTokenServiceTest.java:101` | `tokenSignedWithOldKeyRejectedAfterRotation` | B1-2：`TestStagedToken_OldKeyRejectedAfterRotation` | — |
 | 107 | `service/StagedTokenServiceTest.java:118` | `expiredTokenRejected` | B1-2：`TestStagedToken_ExpiredRejected` | — |
-| 108 | `service/UploadSessionServiceTest.java:65` | `persistsSanitizedOriginalFilename` | B1-3：`TestCreateUpload_PersistsSanitizedOriginalFilename` | — |
+| 108 | `service/UploadSessionServiceTest.java:65` | `persistsSanitizedOriginalFilename` | — | 不保留原始檔名（B1-D16、缺陷 5.16）：沒有檔名欄位可持久化，也就沒有消毒後的檔名要驗；Go 的暫存列不存呼叫端的檔名 |
 | 109 | `service/UploadSessionServiceTest.java:77` | `objectKeyGenerationReceivesRawFilename` | — | 「key 要吃原值、消毒須排在 key 生成之後」是 Java 的順序陷阱；Go 的 key 不含呼叫端檔名（缺陷 5.16），沒有這個順序依賴 |
-| 110 | `service/UploadSessionServiceTest.java:95` | `storesNullWhenNothingSurvivesSanitization` | B1-3：`TestCreateUpload_StoresNullWhenNothingSurvivesSanitization` | — |
-| 111 | `service/UploadSessionServiceTest.java:107` | `keepsCleanCjkFilename` | B1-3：`TestCreateUpload_KeepsCleanCjkFilename` | — |
+| 110 | `service/UploadSessionServiceTest.java:95` | `storesNullWhenNothingSurvivesSanitization` | — | 不保留原始檔名（B1-D16）：沒有檔名消毒，也就沒有「消毒後什麼都不剩」的分支 |
+| 111 | `service/UploadSessionServiceTest.java:107` | `keepsCleanCjkFilename` | — | 不保留原始檔名（B1-D16）：檔名不進任何欄位，中日韓字元是否原樣保留不成立；需要顯示名時由擁有者依文件類型產生 |
 | 112 | `storage/AbstractStorageServiceTest.java:45` | `generateObjectKey_normalExtension` | B1-2：`TestObjectKey_ShapeForPublicStaging`（暫存 key 格式 `tmp/{date}/{id}`；key 不含呼叫端輸入） | — |
 | 113 | `storage/AbstractStorageServiceTest.java:53` | `generateObjectKey_rejectsBackslashInExtension` | B1-2：`TestObjectKey_NeverContainsCallerInput`（含反斜線的副檔名不進 key；路徑穿越拒絕保留為「key 不含呼叫端輸入」） | — |
 | 114 | `storage/AbstractStorageServiceTest.java:60` | `generateObjectKey_rejectsSlashInExtension` | B1-2：`TestObjectKey_NeverContainsCallerInput`（含斜線的副檔名，同列 113 的表格案例） | — |
@@ -198,7 +198,7 @@
 | 178 | `util/AssetFilenameTest.java:337` | `stripsDecodedNul` | — | `AssetFilename.fromSourceUrl` 沒有呼叫端（`rg -l fromSourceUrl backend/services/java` 只命中定義它的 `AssetFilename.java`），匯入路徑的 URL→檔名不在 media 的範圍；函式與它的案例一起不搬 |
 | 179 | `util/AssetFilenameTest.java:344` | `takesLastPathSegment` | — | `AssetFilename.fromSourceUrl` 沒有呼叫端（`rg -l fromSourceUrl backend/services/java` 只命中定義它的 `AssetFilename.java`），匯入路徑的 URL→檔名不在 media 的範圍；函式與它的案例一起不搬 |
 
-合計：Go 對應 125 列、退場 54 列、共 179 列【量：`check-test-map.py` 輸出】。
+合計：Go 對應 122 列、退場 57 列、共 179 列【量：`check-test-map.py` 輸出】。
 
 ## 二、機敏上傳的行為規格（B1-D12）
 

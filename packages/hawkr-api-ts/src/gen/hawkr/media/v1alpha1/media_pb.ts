@@ -8,7 +8,8 @@
 // 再 CompleteUpload 通知伺服器；伺服器非同步處理（辨認格式、重新編碼、去除 metadata），client 以 GetUpload 輪詢到 READY 或 REJECTED。
 // READY 的 staged token 交給擁有該圖片的 API（例如更新頭像）轉正；轉正前的暫存只有上傳者本人能續用。
 // 機敏檔案：BeginSecureUpload 開分段會話，段本身走單體的 /api/files/secure_uploads 端點（不經 Connect）。處理被拒絕不是錯誤：GetUpload 以 state REJECTED 與 reject_reason 回報。
-// 設計：ADR docs/adr/2026-11-22-media-upload-channels.md。
+// 代行營運（MediaDelegatedService）：管理員代行店家時開機敏檔的分段上傳會話，段走後台的 /api/files/admin/secure_uploads 端點。
+// 設計：ADR docs/adr/2026-11-22-media-upload-channels.md；代行上傳 plan B1-D16。
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
@@ -21,7 +22,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/media/v1alpha1/media.proto.
  */
 export const file_hawkr_media_v1alpha1_media: GenFile = /*@__PURE__*/
-  fileDesc("CiBoYXdrci9tZWRpYS92MWFscGhhMS9tZWRpYS5wcm90bxIUaGF3a3IubWVkaWEudjFhbHBoYTEiVAoSQmVnaW5VcGxvYWRSZXF1ZXN0EhEKBHNpemUYASABKANCA+BBAhIZCgxjb250ZW50X3R5cGUYAiABKAlCA+BBAhIQCgNtZDUYAyABKAlCA+BBAiKQAgoTQmVnaW5VcGxvYWRSZXNwb25zZRIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAxIXCgp1cGxvYWRfdXJsGAIgASgJQgPgQQMSWQoOdXBsb2FkX2hlYWRlcnMYAyADKAsyPC5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblVwbG9hZFJlc3BvbnNlLlVwbG9hZEhlYWRlcnNFbnRyeUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDGjQKElVwbG9hZEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjIKFUNvbXBsZXRlVXBsb2FkUmVxdWVzdBIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAiIYChZDb21wbGV0ZVVwbG9hZFJlc3BvbnNlIi0KEEdldFVwbG9hZFJlcXVlc3QSGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQIi1wEKEUdldFVwbG9hZFJlc3BvbnNlEjUKBXN0YXRlGAEgASgOMiEuaGF3a3IubWVkaWEudjFhbHBoYTEuVXBsb2FkU3RhdGVCA+BBAxJDCg1yZWplY3RfcmVhc29uGAIgASgOMiIuaGF3a3IubWVkaWEudjFhbHBoYTEuUmVqZWN0UmVhc29uQgPgQQNIAIgBARI0CgtleHBpcmVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IQCg5fcmVqZWN0X3JlYXNvbiItChhCZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QSEQoEc2l6ZRgBIAEoA0ID4EECIp8BChlCZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlEhkKDHN0YWdlZF90b2tlbhgBIAEoCUID4EEDEhcKCmNodW5rX3NpemUYAiABKAVCA+BBAxIYCgtjaHVua19jb3VudBgDIAEoBUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDKuQBCgtVcGxvYWRTdGF0ZRIcChhVUExPQURfU1RBVEVfVU5TUEVDSUZJRUQQABIYChRVUExPQURfU1RBVEVfUEVORElORxABEhkKFVVQTE9BRF9TVEFURV9VUExPQURFRBACEhYKElVQTE9BRF9TVEFURV9SRUFEWRADEhkKFVVQTE9BRF9TVEFURV9SRUpFQ1RFRBAEEhoKFlVQTE9BRF9TVEFURV9DT05GSVJNRUQQBRIZChVVUExPQURfU1RBVEVfREVMRVRJTkcQBhIYChRVUExPQURfU1RBVEVfREVMRVRFRBAHKtoBCgxSZWplY3RSZWFzb24SHQoZUkVKRUNUX1JFQVNPTl9VTlNQRUNJRklFRBAAEiUKIVJFSkVDVF9SRUFTT05fVU5SRUNPR05JWkVEX0ZPUk1BVBABEh8KG1JFSkVDVF9SRUFTT05fU0laRV9NSVNNQVRDSBACEiMKH1JFSkVDVF9SRUFTT05fQ0hFQ0tTVU1fTUlTTUFUQ0gQAxIjCh9SRUpFQ1RfUkVBU09OX1BST0NFU1NJTkdfRkFJTEVEEAQSGQoVUkVKRUNUX1JFQVNPTl9FWFBJUkVEEAUyuwMKD01lZGlhQXBwU2VydmljZRJiCgtCZWdpblVwbG9hZBIoLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luVXBsb2FkUmVxdWVzdBopLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luVXBsb2FkUmVzcG9uc2UScAoOQ29tcGxldGVVcGxvYWQSKy5oYXdrci5tZWRpYS52MWFscGhhMS5Db21wbGV0ZVVwbG9hZFJlcXVlc3QaLC5oYXdrci5tZWRpYS52MWFscGhhMS5Db21wbGV0ZVVwbG9hZFJlc3BvbnNlIgOQAgISXAoJR2V0VXBsb2FkEiYuaGF3a3IubWVkaWEudjFhbHBoYTEuR2V0VXBsb2FkUmVxdWVzdBonLmhhd2tyLm1lZGlhLnYxYWxwaGExLkdldFVwbG9hZFJlc3BvbnNlEnQKEUJlZ2luU2VjdXJlVXBsb2FkEi4uaGF3a3IubWVkaWEudjFhbHBoYTEuQmVnaW5TZWN1cmVVcGxvYWRSZXF1ZXN0Gi8uaGF3a3IubWVkaWEudjFhbHBoYTEuQmVnaW5TZWN1cmVVcGxvYWRSZXNwb25zZWIGcHJvdG8z", [file_google_api_field_behavior, file_google_protobuf_timestamp]);
+  fileDesc("CiBoYXdrci9tZWRpYS92MWFscGhhMS9tZWRpYS5wcm90bxIUaGF3a3IubWVkaWEudjFhbHBoYTEiVAoSQmVnaW5VcGxvYWRSZXF1ZXN0EhEKBHNpemUYASABKANCA+BBAhIZCgxjb250ZW50X3R5cGUYAiABKAlCA+BBAhIQCgNtZDUYAyABKAlCA+BBAiKQAgoTQmVnaW5VcGxvYWRSZXNwb25zZRIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAxIXCgp1cGxvYWRfdXJsGAIgASgJQgPgQQMSWQoOdXBsb2FkX2hlYWRlcnMYAyADKAsyPC5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblVwbG9hZFJlc3BvbnNlLlVwbG9hZEhlYWRlcnNFbnRyeUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDGjQKElVwbG9hZEhlYWRlcnNFbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBIjIKFUNvbXBsZXRlVXBsb2FkUmVxdWVzdBIZCgxzdGFnZWRfdG9rZW4YASABKAlCA+BBAiIYChZDb21wbGV0ZVVwbG9hZFJlc3BvbnNlIi0KEEdldFVwbG9hZFJlcXVlc3QSGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQIi1wEKEUdldFVwbG9hZFJlc3BvbnNlEjUKBXN0YXRlGAEgASgOMiEuaGF3a3IubWVkaWEudjFhbHBoYTEuVXBsb2FkU3RhdGVCA+BBAxJDCg1yZWplY3RfcmVhc29uGAIgASgOMiIuaGF3a3IubWVkaWEudjFhbHBoYTEuUmVqZWN0UmVhc29uQgPgQQNIAIgBARI0CgtleHBpcmVfdGltZRgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IQCg5fcmVqZWN0X3JlYXNvbiItChhCZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QSEQoEc2l6ZRgBIAEoA0ID4EECIp8BChlCZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlEhkKDHN0YWdlZF90b2tlbhgBIAEoCUID4EEDEhcKCmNodW5rX3NpemUYAiABKAVCA+BBAxIYCgtjaHVua19jb3VudBgDIAEoBUID4EEDEjQKC2V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDIkIKLU1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVxdWVzdBIRCgRzaXplGAEgASgDQgPgQQIitAEKLk1lZGlhRGVsZWdhdGVkU2VydmljZUJlZ2luU2VjdXJlVXBsb2FkUmVzcG9uc2USGQoMc3RhZ2VkX3Rva2VuGAEgASgJQgPgQQMSFwoKY2h1bmtfc2l6ZRgCIAEoBUID4EEDEhgKC2NodW5rX2NvdW50GAMgASgFQgPgQQMSNAoLZXhwaXJlX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMq5AEKC1VwbG9hZFN0YXRlEhwKGFVQTE9BRF9TVEFURV9VTlNQRUNJRklFRBAAEhgKFFVQTE9BRF9TVEFURV9QRU5ESU5HEAESGQoVVVBMT0FEX1NUQVRFX1VQTE9BREVEEAISFgoSVVBMT0FEX1NUQVRFX1JFQURZEAMSGQoVVVBMT0FEX1NUQVRFX1JFSkVDVEVEEAQSGgoWVVBMT0FEX1NUQVRFX0NPTkZJUk1FRBAFEhkKFVVQTE9BRF9TVEFURV9ERUxFVElORxAGEhgKFFVQTE9BRF9TVEFURV9ERUxFVEVEEAcq2gEKDFJlamVjdFJlYXNvbhIdChlSRUpFQ1RfUkVBU09OX1VOU1BFQ0lGSUVEEAASJQohUkVKRUNUX1JFQVNPTl9VTlJFQ09HTklaRURfRk9STUFUEAESHwobUkVKRUNUX1JFQVNPTl9TSVpFX01JU01BVENIEAISIwofUkVKRUNUX1JFQVNPTl9DSEVDS1NVTV9NSVNNQVRDSBADEiMKH1JFSkVDVF9SRUFTT05fUFJPQ0VTU0lOR19GQUlMRUQQBBIZChVSRUpFQ1RfUkVBU09OX0VYUElSRUQQBTK7AwoPTWVkaWFBcHBTZXJ2aWNlEmIKC0JlZ2luVXBsb2FkEiguaGF3a3IubWVkaWEudjFhbHBoYTEuQmVnaW5VcGxvYWRSZXF1ZXN0GikuaGF3a3IubWVkaWEudjFhbHBoYTEuQmVnaW5VcGxvYWRSZXNwb25zZRJwCg5Db21wbGV0ZVVwbG9hZBIrLmhhd2tyLm1lZGlhLnYxYWxwaGExLkNvbXBsZXRlVXBsb2FkUmVxdWVzdBosLmhhd2tyLm1lZGlhLnYxYWxwaGExLkNvbXBsZXRlVXBsb2FkUmVzcG9uc2UiA5ACAhJcCglHZXRVcGxvYWQSJi5oYXdrci5tZWRpYS52MWFscGhhMS5HZXRVcGxvYWRSZXF1ZXN0GicuaGF3a3IubWVkaWEudjFhbHBoYTEuR2V0VXBsb2FkUmVzcG9uc2USdAoRQmVnaW5TZWN1cmVVcGxvYWQSLi5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QaLy5oYXdrci5tZWRpYS52MWFscGhhMS5CZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlMrgBChVNZWRpYURlbGVnYXRlZFNlcnZpY2USngEKEUJlZ2luU2VjdXJlVXBsb2FkEkMuaGF3a3IubWVkaWEudjFhbHBoYTEuTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5TZWN1cmVVcGxvYWRSZXF1ZXN0GkQuaGF3a3IubWVkaWEudjFhbHBoYTEuTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5TZWN1cmVVcGxvYWRSZXNwb25zZWIGcHJvdG8z", [file_google_api_field_behavior, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message hawkr.media.v1alpha1.BeginUploadRequest
@@ -239,6 +240,69 @@ export const BeginSecureUploadResponseSchema: GenMessage<BeginSecureUploadRespon
   messageDesc(file_hawkr_media_v1alpha1_media, 7);
 
 /**
+ * MediaDelegatedServiceBeginSecureUploadRequest 與 BeginSecureUploadRequest 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）；沒有 store_id：店家由代行 session 決定。
+ *
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest
+ */
+export type MediaDelegatedServiceBeginSecureUploadRequest = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest"> & {
+  /**
+   * 檔案的明文位元組數；必須大於零且不超過伺服器的上限，段總數由它算出。
+   *
+   * @generated from field: int64 size = 1;
+   */
+  size: bigint;
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest.
+ * Use `create(MediaDelegatedServiceBeginSecureUploadRequestSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceBeginSecureUploadRequestSchema: GenMessage<MediaDelegatedServiceBeginSecureUploadRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 8);
+
+/**
+ * MediaDelegatedServiceBeginSecureUploadResponse 與 BeginSecureUploadResponse 的欄位與意義相同。
+ *
+ * @generated from message hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse
+ */
+export type MediaDelegatedServiceBeginSecureUploadResponse = Message<"hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse"> & {
+  /**
+   * 不透明的憑證，放在後台段上傳的網址路徑裡，交給擁有者的 API 轉正；只出現這一次。
+   *
+   * @generated from field: string staged_token = 1;
+   */
+  stagedToken: string;
+
+  /**
+   * 每段的位元組數；除最後一段外每段剛好這個大小，最後一段是餘數。client 不寫死。
+   *
+   * @generated from field: int32 chunk_size = 2;
+   */
+  chunkSize: number;
+
+  /**
+   * 段總數；段序號是 0 到 chunk_count - 1。
+   *
+   * @generated from field: int32 chunk_count = 3;
+   */
+  chunkCount: number;
+
+  /**
+   * 會話的到期時間；過了之後 staged token 不能再用。
+   *
+   * @generated from field: google.protobuf.Timestamp expire_time = 4;
+   */
+  expireTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse.
+ * Use `create(MediaDelegatedServiceBeginSecureUploadResponseSchema)` to create a new message.
+ */
+export const MediaDelegatedServiceBeginSecureUploadResponseSchema: GenMessage<MediaDelegatedServiceBeginSecureUploadResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_media_v1alpha1_media, 9);
+
+/**
  * UploadState 是一筆暫存上傳的狀態。client 遇到 UNSPECIFIED 或不認得的值走「未知」的呈現。
  *
  * @generated from enum hawkr.media.v1alpha1.UploadState
@@ -414,4 +478,31 @@ export const MediaAppService: GenService<{
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_media_v1alpha1_media, 0);
+
+/**
+ * MediaDelegatedService 是代行營運中的平台管理員為代行店家上傳機敏檔：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 admin 的 BFF 轉送，不放在請求訊息），
+ * 不讀顧客或管理員的身分；擁有者是 session 建立當下綁定的那一家店，請求不帶 store_id。
+ * 需要能力 media.upload（B1-D16）：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；session 沒有 media.upload 回 permission_denied；
+ * 店家此刻不可代行回 failed_precondition，只拒絕、不撤銷 session。回應一律不可快取（private, no-store）。
+ *
+ * 稽核：上傳只產生會過期的暫存，不改賣家看得到的資料，所以成功的 BeginSecureUpload 與段上傳都不寫代行稽核；稽核留在擁有者確認時的寫入。被拒絕的請求另寫一列 FAILED。
+ * 會話的上傳者是管理員本人（與 Java 一致）；不保留原始檔名。
+ *
+ * @generated from service hawkr.media.v1alpha1.MediaDelegatedService
+ */
+export const MediaDelegatedService: GenService<{
+  /**
+   * BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
+   * 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+   * size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
+   *
+   * @generated from rpc hawkr.media.v1alpha1.MediaDelegatedService.BeginSecureUpload
+   */
+  beginSecureUpload: {
+    methodKind: "unary";
+    input: typeof MediaDelegatedServiceBeginSecureUploadRequestSchema;
+    output: typeof MediaDelegatedServiceBeginSecureUploadResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_hawkr_media_v1alpha1_media, 1);
 

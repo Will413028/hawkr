@@ -245,6 +245,52 @@ final $typed_data.Uint8List beginSecureUploadResponseDescriptor = $convert.base6
     'a19jb3VudBgDIAEoBUID4EEDUgpjaHVua0NvdW50EkAKC2V4cGlyZV90aW1lGAQgASgLMhouZ2'
     '9vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpleHBpcmVUaW1l');
 
+@$core.Deprecated(
+    'Use mediaDelegatedServiceBeginSecureUploadRequestDescriptor instead')
+const MediaDelegatedServiceBeginSecureUploadRequest$json = {
+  '1': 'MediaDelegatedServiceBeginSecureUploadRequest',
+  '2': [
+    {'1': 'size', '3': 1, '4': 1, '5': 3, '8': {}, '10': 'size'},
+  ],
+};
+
+/// Descriptor for `MediaDelegatedServiceBeginSecureUploadRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List
+    mediaDelegatedServiceBeginSecureUploadRequestDescriptor =
+    $convert.base64Decode(
+        'Ci1NZWRpYURlbGVnYXRlZFNlcnZpY2VCZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QSFwoEc2l6ZR'
+        'gBIAEoA0ID4EECUgRzaXpl');
+
+@$core.Deprecated(
+    'Use mediaDelegatedServiceBeginSecureUploadResponseDescriptor instead')
+const MediaDelegatedServiceBeginSecureUploadResponse$json = {
+  '1': 'MediaDelegatedServiceBeginSecureUploadResponse',
+  '2': [
+    {'1': 'staged_token', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'stagedToken'},
+    {'1': 'chunk_size', '3': 2, '4': 1, '5': 5, '8': {}, '10': 'chunkSize'},
+    {'1': 'chunk_count', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'chunkCount'},
+    {
+      '1': 'expire_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'expireTime'
+    },
+  ],
+};
+
+/// Descriptor for `MediaDelegatedServiceBeginSecureUploadResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List
+    mediaDelegatedServiceBeginSecureUploadResponseDescriptor =
+    $convert.base64Decode(
+        'Ci5NZWRpYURlbGVnYXRlZFNlcnZpY2VCZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlEiYKDHN0YW'
+        'dlZF90b2tlbhgBIAEoCUID4EEDUgtzdGFnZWRUb2tlbhIiCgpjaHVua19zaXplGAIgASgFQgPg'
+        'QQNSCWNodW5rU2l6ZRIkCgtjaHVua19jb3VudBgDIAEoBUID4EEDUgpjaHVua0NvdW50EkAKC2'
+        'V4cGlyZV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpleHBp'
+        'cmVUaW1l');
+
 const $core.Map<$core.String, $core.dynamic> MediaAppServiceBase$json = {
   '1': 'MediaAppService',
   '2': [
@@ -300,3 +346,33 @@ final $typed_data.Uint8List mediaAppServiceDescriptor = $convert.base64Decode(
     'JlcXVlc3QaJy5oYXdrci5tZWRpYS52MWFscGhhMS5HZXRVcGxvYWRSZXNwb25zZRJ0ChFCZWdp'
     'blNlY3VyZVVwbG9hZBIuLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luU2VjdXJlVXBsb2FkUm'
     'VxdWVzdBovLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luU2VjdXJlVXBsb2FkUmVzcG9uc2U=');
+
+const $core.Map<$core.String, $core.dynamic> MediaDelegatedServiceBase$json = {
+  '1': 'MediaDelegatedService',
+  '2': [
+    {
+      '1': 'BeginSecureUpload',
+      '2':
+          '.hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest',
+      '3':
+          '.hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse'
+    },
+  ],
+};
+
+@$core.Deprecated('Use mediaDelegatedServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+    MediaDelegatedServiceBase$messageJson = {
+  '.hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadRequest':
+      MediaDelegatedServiceBeginSecureUploadRequest$json,
+  '.hawkr.media.v1alpha1.MediaDelegatedServiceBeginSecureUploadResponse':
+      MediaDelegatedServiceBeginSecureUploadResponse$json,
+  '.google.protobuf.Timestamp': $0.Timestamp$json,
+};
+
+/// Descriptor for `MediaDelegatedService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List mediaDelegatedServiceDescriptor = $convert.base64Decode(
+    'ChVNZWRpYURlbGVnYXRlZFNlcnZpY2USngEKEUJlZ2luU2VjdXJlVXBsb2FkEkMuaGF3a3IubW'
+    'VkaWEudjFhbHBoYTEuTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5TZWN1cmVVcGxvYWRSZXF1'
+    'ZXN0GkQuaGF3a3IubWVkaWEudjFhbHBoYTEuTWVkaWFEZWxlZ2F0ZWRTZXJ2aWNlQmVnaW5TZW'
+    'N1cmVVcGxvYWRSZXNwb25zZQ==');

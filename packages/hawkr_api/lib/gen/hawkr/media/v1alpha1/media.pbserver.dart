@@ -65,3 +65,34 @@ abstract class MediaAppServiceBase extends $pb.GeneratedService {
   $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       get $messageJson => MediaAppServiceBase$messageJson;
 }
+
+abstract class MediaDelegatedServiceBase extends $pb.GeneratedService {
+  $async.Future<$1.MediaDelegatedServiceBeginSecureUploadResponse>
+      beginSecureUpload($pb.ServerContext ctx,
+          $1.MediaDelegatedServiceBeginSecureUploadRequest request);
+
+  $pb.GeneratedMessage createRequest($core.String methodName) {
+    switch (methodName) {
+      case 'BeginSecureUpload':
+        return $1.MediaDelegatedServiceBeginSecureUploadRequest();
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx,
+      $core.String methodName, $pb.GeneratedMessage request) {
+    switch (methodName) {
+      case 'BeginSecureUpload':
+        return beginSecureUpload(
+            ctx, request as $1.MediaDelegatedServiceBeginSecureUploadRequest);
+      default:
+        throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $core.Map<$core.String, $core.dynamic> get $json =>
+      MediaDelegatedServiceBase$json;
+  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
+      get $messageJson => MediaDelegatedServiceBase$messageJson;
+}

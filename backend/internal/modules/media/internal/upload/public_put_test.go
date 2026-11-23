@@ -67,15 +67,15 @@ func TestPreparePublic_EnforcesTheSizeLimitOnActualBytes(t *testing.T) {
 
 func TestPublicErr_ClassifiesInputProblemsAndPipelineFailures(t *testing.T) {
 	for _, e := range []error{image.ErrUnrecognized, image.ErrMalformed, image.ErrTooLarge} {
-		if got := publicErr(fmt.Errorf("w: %w", e)); apperr.KindOf(got) != apperr.KindInvalidInput {
+		if got := publicErr(t.Context(), fmt.Errorf("w: %w", e)); apperr.KindOf(got) != apperr.KindInvalidInput {
 			t.Errorf("%v：err = %v，預期 invalid_input", e, got)
 		}
 	}
-	got := publicErr(fmt.Errorf("w: %w", image.ErrProcessing))
+	got := publicErr(t.Context(), fmt.Errorf("w: %w", image.ErrProcessing))
 	if got == nil || apperr.KindOf(got) == apperr.KindInvalidInput || !errors.Is(got, image.ErrProcessing) {
 		t.Fatalf("err = %v，管線自己的失敗不該說成輸入不合法", got)
 	}
-	if boom := errors.New("boom"); !errors.Is(publicErr(boom), boom) {
+	if boom := errors.New("boom"); !errors.Is(publicErr(t.Context(), boom), boom) {
 		t.Fatal("其他錯誤應原樣回傳")
 	}
 }
