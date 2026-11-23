@@ -6,6 +6,7 @@ CREATE TABLE "payment"."payments" (
   "buyer_id" bigint NOT NULL,
   "amount" bigint NOT NULL,
   "provider" text NOT NULL,
+  "description" text NOT NULL,
   "status" text NOT NULL DEFAULT 'CREATING',
   "external_payment_id" text NULL,
   "external_charge_id" text NULL,
@@ -25,6 +26,7 @@ CREATE TABLE "payment"."payments" (
   CONSTRAINT "payments_charge_only_when_paid_check" CHECK ((status = 'SUCCEEDED'::text) OR (external_charge_id IS NULL)),
   CONSTRAINT "payments_created_check" CHECK ((status <> ALL (ARRAY['AWAITING_PAYMENT'::text, 'PROCESSING'::text, 'SUCCEEDED'::text])) OR (external_payment_id IS NOT NULL)),
   CONSTRAINT "payments_creating_check" CHECK ((status <> 'CREATING'::text) OR (external_payment_id IS NULL)),
+  CONSTRAINT "payments_description_check" CHECK ((char_length(description) >= 1) AND (char_length(description) <= 200)),
   CONSTRAINT "payments_external_id_check" CHECK ((external_payment_id IS NULL) OR ((char_length(external_payment_id) >= 1) AND (char_length(external_payment_id) <= 255))),
   CONSTRAINT "payments_failure_check" CHECK ((status = 'CREATE_FAILED'::text) = (failure_reason IS NOT NULL)),
   CONSTRAINT "payments_failure_reason_check" CHECK ((failure_reason IS NULL) OR ((char_length(failure_reason) >= 1) AND (char_length(failure_reason) <= 200))),
@@ -75,7 +77,9 @@ CREATE TABLE "payment"."refunds" (
   CONSTRAINT "refunds_reversed_check" CHECK ((status <> ALL (ARRAY['REVERSED'::text, 'REFUNDING'::text, 'SUCCEEDED'::text])) OR (reversal_amount = 0) OR (reversal_external_id IS NOT NULL)),
   CONSTRAINT "refunds_reversing_check" CHECK ((status <> 'REVERSING'::text) OR (reversal_amount > 0)),
   CONSTRAINT "refunds_status_check" CHECK (status = ANY (ARRAY['PENDING'::text, 'REVERSING'::text, 'REVERSED'::text, 'REFUNDING'::text, 'SUCCEEDED'::text, 'FAILED'::text])),
-  CONSTRAINT "refunds_succeeded_check" CHECK ((status = 'SUCCEEDED'::text) = (external_refund_id IS NOT NULL))
+  CONSTRAINT "refunds_succeeded_check" CHECK ((status <> 'SUCCEEDED'::text) OR (external_refund_id IS NOT NULL)),
+  CONSTRAINT "refunds_external_state_check" CHECK ((external_refund_id IS NULL) OR (status = ANY (ARRAY['REFUNDING'::text, 'SUCCEEDED'::text, 'FAILED'::text]))),
+  CONSTRAINT "refunds_external_called_check" CHECK ((external_refund_id IS NULL) OR (refund_called_at IS NOT NULL))
 );
 -- Create index "refunds_external" to table: "refunds"
 CREATE UNIQUE INDEX "refunds_external" ON "payment"."refunds" ("external_refund_id") WHERE (external_refund_id IS NOT NULL);
@@ -110,7 +114,8 @@ CREATE TABLE "payment"."transfers" (
   CONSTRAINT "transfers_reversed_check" CHECK ((reversed_amount >= 0) AND (reversed_amount <= amount)),
   CONSTRAINT "transfers_status_check" CHECK (status = ANY (ARRAY['PENDING'::text, 'SUCCEEDED'::text, 'FAILED'::text])),
   CONSTRAINT "transfers_store_id_check" CHECK (store_id > 0),
-  CONSTRAINT "transfers_succeeded_check" CHECK ((status = 'SUCCEEDED'::text) = (external_transfer_id IS NOT NULL))
+  CONSTRAINT "transfers_succeeded_check" CHECK ((status <> 'SUCCEEDED'::text) OR (external_transfer_id IS NOT NULL)),
+  CONSTRAINT "transfers_external_state_check" CHECK ((external_transfer_id IS NULL) OR (status = ANY (ARRAY['SUCCEEDED'::text, 'FAILED'::text])))
 );
 -- Create index "transfers_active_payment" to table: "transfers"
 CREATE UNIQUE INDEX "transfers_active_payment" ON "payment"."transfers" ("payment_id") WHERE (status = ANY (ARRAY['PENDING'::text, 'SUCCEEDED'::text]));

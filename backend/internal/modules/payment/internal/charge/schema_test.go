@@ -60,3 +60,51 @@ func TestTheFakeProviderNameMatchesTheProviderColumnFormat(t *testing.T) {
 		t.Fatalf("provider 名稱 %q 不符合格式", NewFake().Name())
 	}
 }
+
+// constraintBody 取出 schema.sql 裡某個 CHECK 的整段內容（到該行結尾）。
+func constraintBody(t *testing.T, constraint string) string {
+	t.Helper()
+	raw, err := os.ReadFile("../../db/schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK (.*)`).FindSubmatch(raw)
+	if m == nil {
+		t.Fatalf("schema.sql 沒有 %s", constraint)
+	}
+	return string(m[1])
+}
+
+// 外部 ID 不只在 SUCCEEDED 存得下來：provider 已回 ID 的狀態（退款 REFUNDING、建立之後才失敗的 FAILED、轉帳的 FAILED）都允許，入帳一定要有 ID，
+// 還沒呼叫 provider 的狀態不能有。行為由整合測試 TestTheSchemaStoresTheExternalIDOfEveryStateThatHasOne 守，這裡守 schema 的宣告不被改回「ID 與 SUCCEEDED 一一對應」。
+func TestExternalIDsAreAllowedInEveryStateTheProviderHasAlreadyAnswered(t *testing.T) {
+	t.Parallel()
+	for constraint, want := range map[string][]string{
+		"refunds_external_state_check":   {"REFUNDING", "SUCCEEDED", "FAILED"},
+		"transfers_external_state_check": {"SUCCEEDED", "FAILED"},
+	} {
+		if got := checkValuesIn(t, constraint); !slices.Equal(got, want) {
+			t.Errorf("%s：schema=%v，want %v", constraint, got, want)
+		}
+	}
+	for _, c := range []string{"refunds_succeeded_check", "transfers_succeeded_check"} {
+		if body := constraintBody(t, c); regexp.MustCompile(`=\s*\(external_`).MatchString(body) {
+			t.Errorf("%s 把外部 ID 綁死在 SUCCEEDED：%s", c, body)
+		}
+	}
+}
+
+// checkValuesIn 取出某個 CHECK 裡 status IN (...) 的清單。
+func checkValuesIn(t *testing.T, constraint string) []string {
+	t.Helper()
+	body := constraintBody(t, constraint)
+	m := regexp.MustCompile(`status IN \(([^)]*)\)`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatalf("%s 沒有 status IN：%s", constraint, body)
+	}
+	var out []string
+	for _, v := range regexp.MustCompile(`'([A-Z_]+)'`).FindAllStringSubmatch(m[1], -1) {
+		out = append(out, v[1])
+	}
+	return out
+}

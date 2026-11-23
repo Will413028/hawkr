@@ -23,9 +23,19 @@ func (CreateArgs) Kind() string { return "payment.charge_create" }
 // InsertOpts 是補做 job 的排入選項：以付款 ID 去重（不含已完成的），暫時性的失敗最多重試 maxAttempts 次。
 func (CreateArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
 
+// enqueueCreate 立刻排入補做（掃描用：列已經閒置）。
 func enqueueCreate(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
+	return enqueueCreateAt(ctx, jc, id, time.Time{})
+}
+
+// enqueueCreateAt 排入補做，at 不是零值時延到那個時刻才跑：請求內的建立還在進行時，補做不能與它搶同一把冪等鍵（Stripe 對並行的同鍵請求回 409，也會讓先寫入的一方
+// 讓請求拿不到 client_secret），所以建立付款時排在請求內呼叫的上限之後。
+func enqueueCreateAt(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID, at time.Time) error {
 	args := CreateArgs{PaymentID: id}
 	opts := args.InsertOpts()
+	if !at.IsZero() {
+		opts.ScheduledAt = at
+	}
 	return jc.Enqueue(ctx, args, &opts)
 }
 

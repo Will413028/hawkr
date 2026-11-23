@@ -57,6 +57,7 @@ type Fake struct {
 	cancelErrs   []error
 	creates      int
 	createKeys   []string
+	createDescs  []string
 	gets         int
 	cancels      int
 	refunds      map[string]*fakeRefund
@@ -216,6 +217,13 @@ func (f *Fake) CreateKeys() []string {
 	return append([]string(nil), f.createKeys...)
 }
 
+// CreateDescriptions 回傳每次 CreatePayment 收到的付款說明（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) CreateDescriptions() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.createDescs...)
+}
+
 // Violations 回傳違反呼叫規則的紀錄（在 transaction 內、沒有 deadline）。
 func (f *Fake) Violations() []string {
 	f.mu.Lock()
@@ -259,11 +267,12 @@ func (f *Fake) CreatePayment(ctx context.Context, in CreateInput) (Snapshot, err
 	f.check(ctx, "CreatePayment")
 	f.creates++
 	f.createKeys = append(f.createKeys, in.IdempotencyKey)
+	f.createDescs = append(f.createDescs, in.Description)
 	if err := pop(&f.createErrs); err != nil {
 		return Snapshot{}, err
 	}
-	if in.Amount <= 0 || in.TransferGroup == "" || in.IdempotencyKey == "" {
-		return Snapshot{}, fmt.Errorf("%w：金額、transfer_group 與冪等鍵必填", ErrPermanent)
+	if in.Amount <= 0 || in.TransferGroup == "" || in.IdempotencyKey == "" || in.Description == "" {
+		return Snapshot{}, fmt.Errorf("%w：金額、說明、transfer_group 與冪等鍵必填", ErrPermanent)
 	}
 	if id, ok := f.byKey[in.IdempotencyKey]; ok {
 		cur := f.intents[id]

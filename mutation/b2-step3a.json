@@ -4,8 +4,8 @@
    "id": "create-inside-transaction",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/service.go",
-   "old": "\t\tif row.Status == string(model.PaymentCreating) {\n\t\t\treturn enqueueCreate(ctx, s.d.Jobs, row.ID)\n",
-   "new": "\t\tif row.Status == string(model.PaymentCreating) {\n\t\t\t_, _ = s.d.Provider.CreatePayment(ctx, CreateInput{PaymentID: row.ID, OrderNo: row.OrderNo, StoreID: row.StoreID, Amount: row.Amount, TransferGroup: row.OrderNo, IdempotencyKey: row.CreateIdempotencyKey.String()})\n\t\t\treturn enqueueCreate(ctx, s.d.Jobs, row.ID)\n",
+   "old": "\t\tif row.Status == string(model.PaymentCreating) {\n\t\t\treturn enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))\n",
+   "new": "\t\tif row.Status == string(model.PaymentCreating) {\n\t\t\t_, _ = s.d.Provider.CreatePayment(ctx, CreateInput{PaymentID: row.ID, OrderNo: row.OrderNo, StoreID: row.StoreID, Amount: row.Amount, Description: row.Description, TransferGroup: row.OrderNo, IdempotencyKey: row.CreateIdempotencyKey.String()})\n\t\t\treturn enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))\n",
    "test": "internal/modules/payment ^TestCreatePaymentCreatesTheIntentAfterCommitOutsideTheTransactionWithTheStoredKey$",
    "why": "寫付款列的 transaction 內呼叫 provider：fake 的 Violations 記下 transaction 內與沒有 deadline 的呼叫。"
   },
@@ -13,7 +13,7 @@
    "id": "no-retry-job-on-failure",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/service.go",
-   "old": "\t\t\treturn enqueueCreate(ctx, s.d.Jobs, row.ID)\n",
+   "old": "\t\t\treturn enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))\n",
    "new": "\t\t\treturn nil\n",
    "test": "internal/modules/payment ^TestCreatePaymentWhenTheProviderFailsReturnsPendingAndTheJobRetriesWithTheSameKey$",
    "why": "寫列的 transaction 不排補做 job：provider 失敗回 pending 之後沒有人以同一把鍵補做。"
@@ -94,8 +94,8 @@
    "id": "sync-does-not-mark-events-processed",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/sync.go",
-   "old": "\t\tif res.written {",
-   "new": "\t\tif false && res.written {",
+   "old": "\t\tif res.judged {",
+   "new": "\t\tif false && res.judged {",
    "test": "internal/modules/payment ^TestADuplicatePaymentEventIsRecordedOnceAndPublishesOnce$",
    "why": "同步寫入後不把讀取開始前收到的事件標為已處理：事件永遠留在 inbox 等補掃。"
   },
@@ -161,6 +161,51 @@
    "new": "CREATE INDEX \"refunds_request\"",
    "test": "internal/modules/payment ^TestTheSchemaGuardsTheTransferAndRefundInvariants$",
    "why": "refunds_request 不是唯一索引：同一把退款冪等鍵可以寫兩列。"
+  },
+  {
+   "id": "refund-external-id-only-when-succeeded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "old": "CHECK ((external_refund_id IS NULL) OR (status = ANY (ARRAY['REFUNDING'::text, 'SUCCEEDED'::text, 'FAILED'::text]))),",
+   "new": "CHECK ((external_refund_id IS NULL) OR (status = 'SUCCEEDED'::text)),",
+   "test": "internal/modules/payment ^TestTheSchemaStoresTheExternalIDOfEveryStateThatHasOne$",
+   "why": "外部 ID 只允許在 SUCCEEDED：provider 已回 ID 但還在處理的 REFUNDING 與建立後才失敗的 FAILED 存不了 ID，只能靠冪等鍵（24 小時）重查。"
+  },
+  {
+   "id": "kept-snapshot-not-marked-processed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/sync.go",
+   "old": "\t\tif res.judged {",
+   "new": "\t\tif res.written {",
+   "test": "internal/modules/payment ^TestASnapshotThatKeepsTheSucceededRowStillMarksItsEventsProcessed$",
+   "why": "列已入帳、快照不是入帳（保留列）時事件不標記已處理：同步每次都回 again，job 每 2 秒 snooze 永遠重跑。"
+  },
+  {
+   "id": "catch-up-job-not-delayed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\t\t\treturn enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))\n",
+   "new": "\t\t\treturn enqueueCreate(ctx, s.d.Jobs, row.ID)\n",
+   "test": "internal/modules/payment ^TestTheCatchUpJobIsScheduledAfterTheInRequestCallTimeout$",
+   "why": "補做 job 提交後立刻可跑，與請求內的建立搶同一把冪等鍵。"
+  },
+  {
+   "id": "request-secret-not-recovered",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\tif res.clientSecret == \"\" && res.row.Status == string(model.PaymentAwaitingPayment) {",
+   "new": "\tif false && res.clientSecret == \"\" && res.row.Status == string(model.PaymentAwaitingPayment) {",
+   "test": "internal/modules/payment ^TestACatchUpJobThatWritesFirstStillLetsTheRequestReturnTheSecret$",
+   "why": "補做 job 先寫入時請求回 AWAITING_PAYMENT 但 client_secret 是空的。"
+  },
+  {
+   "id": "canceled-payment-not-reset",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "row.Status == string(model.PaymentCreateFailed) || row.Status == string(model.PaymentCanceled) {",
+   "new": "row.Status == string(model.PaymentCreateFailed) {",
+   "test": "internal/modules/payment ^TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow$",
+   "why": "CANCELED 的列在訂單仍可付時沿用已取消的 PaymentIntent，買家無法再付。"
   }
  ]
 }

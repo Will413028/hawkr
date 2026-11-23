@@ -17,7 +17,7 @@ func deadline(t *testing.T) context.Context {
 }
 
 func input(key string) CreateInput {
-	return CreateInput{OrderNo: "O1", StoreID: 1, Amount: 100, TransferGroup: "O1", IdempotencyKey: key}
+	return CreateInput{OrderNo: "O1", StoreID: 1, Amount: 100, TransferGroup: "O1", IdempotencyKey: key, Description: "d"}
 }
 
 // 同一把冪等鍵回同一個 PaymentIntent；同一把鍵送了不同內容是永久失敗（Stripe 的 idempotency_error）。

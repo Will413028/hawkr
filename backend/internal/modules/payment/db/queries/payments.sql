@@ -1,8 +1,8 @@
 -- name: InsertPayment :execrows
 -- 建立付款的 transaction 寫「建立中」的列（沒有外部 ID）。order_no 唯一（D8：一張訂單一個 PaymentIntent）：同一張訂單已有列時不寫（ON CONFLICT DO NOTHING），
 -- 呼叫端再讀既有的列決定怎麼處理。
-INSERT INTO payment.payments (id, order_no, store_id, buyer_id, amount, provider, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(order_no), sqlc.arg(store_id), sqlc.arg(buyer_id), sqlc.arg(amount), sqlc.arg(provider), sqlc.arg(now), sqlc.arg(now))
+INSERT INTO payment.payments (id, order_no, store_id, buyer_id, amount, provider, description, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(order_no), sqlc.arg(store_id), sqlc.arg(buyer_id), sqlc.arg(amount), sqlc.arg(provider), sqlc.arg(description), sqlc.arg(now), sqlc.arg(now))
 ON CONFLICT (order_no) DO NOTHING;
 
 -- name: PaymentByID :one
@@ -58,18 +58,36 @@ SET status = 'CREATE_FAILED',
 WHERE id = sqlc.arg(id) AND status = 'CREATING' AND external_payment_id IS NULL
 RETURNING *;
 
--- name: ResetFailedPayment :one
--- 買家對建立失敗的訂單再次付款：同一列換新冪等鍵、重設回建立中（一張訂單仍只有一列）；訂單資料以這次讀到的為準。
+-- name: ResetPayment :one
+-- 買家對「不會再成功」的付款再次付款（建立失敗的終局，或已取消而訂單仍可付）：同一列換新冪等鍵、清掉舊的外部 ID 與讀取結果、重設回建立中、provider 與說明以目前的為準
+-- （一張訂單仍只有一列、一次只有一個有效 PaymentIntent）；訂單資料以這次讀到的為準。
 UPDATE payment.payments
 SET status = 'CREATING',
     failure_reason = NULL,
+    last_error = NULL,
+    external_payment_id = NULL,
+    external_charge_id = NULL,
+    paid_at = NULL,
+    fetched_at = NULL,
     create_called_at = NULL,
     create_idempotency_key = gen_random_uuid(),
+    provider = sqlc.arg(provider),
+    description = sqlc.arg(description),
     store_id = sqlc.arg(store_id),
     buyer_id = sqlc.arg(buyer_id),
     amount = sqlc.arg(amount),
     updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND status = 'CREATE_FAILED'
+WHERE id = sqlc.arg(id) AND status IN ('CREATE_FAILED', 'CANCELED')
+RETURNING *;
+
+-- name: RebindCreatingPayment :one
+-- 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：改成目前的 provider 並換新冪等鍵、重新起算呼叫時刻（舊 provider 的呼叫結果從來沒有回到本地，買家沒有拿過那個 PaymentIntent 的 secret）。
+UPDATE payment.payments
+SET provider = sqlc.arg(provider),
+    create_idempotency_key = gen_random_uuid(),
+    create_called_at = NULL,
+    updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND status = 'CREATING' AND external_payment_id IS NULL AND provider <> sqlc.arg(provider)
 RETURNING *;
 
 -- name: CreatingPaymentIDs :many

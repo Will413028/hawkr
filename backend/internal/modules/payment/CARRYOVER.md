@@ -38,7 +38,7 @@
 | Java 的狀態 INIT／PAID／FAILED／CONFLICT 與逐一 CAS 轉移 | 狀態由 webhook 推進，webhook 可能亂序 | 部分成立：亂序成立，FAILED 與 CONFLICT 不成立（失敗的嘗試讓 PaymentIntent 回到等待付款；重複付款與過期列的 CONFLICT 由 D5 取代） | 狀態由 provider 的快照推導，終局不倒退 | 改成 `Next`：入帳是終局、取消後入帳由成功勝出；失敗原因記 `last_error`，不是狀態 |
 | 共用的 job 與掃描輔助（`enqueueAll`、`jobError`、fake 的呼叫規則檢查、逾時常數）在 account 與 charge 各一份 | 兩處的輔助同形，抽出才不會分岔 | 部分成立：形狀相近，但鍵型別（`int64` 與 UUID）、掃描的對象與終局狀態不同，抽出要靠泛型或介面，現在只有兩個使用者；兩個子領域互不 import（`internal/arch`），共用只能放 platform | 主計畫：共用 helper 在第一個外部整合時依實際需要抽出 | 各自實作，不動 account 的守門測試；每份不到 30 行。觸發：第三個子領域（B10 的 finance）需要同樣的輔助，或 3b、3c 發現 charge 內要複製第三份時抽出到 platform |
 | `inbox.events` 的未處理事件永不刪（上表末列的觸發：第二個 handler 接上 inbox） | 每個 handler 要自己補掃 | 觸發了：charge 是第二個 handler | 事件有終局狀態（死信） | 仍沿用：charge 有自己的補掃（久未讀的未結案付款、有舊的未處理事件的付款，`payment.charge_sweep`），沒有 payment 無法處理的事件類別留在 inbox；死信延後。觸發：3b、3c 加入退款與轉帳事件的 handler，或上線前 |
-| 付款事件與收款帳戶事件共用 `POST /webhooks/stripe` 與簽章密鑰 | 同一個 event destination | 不成立：thin 與 snapshot 是不同的 destination，各一把密鑰（`spikes.md`） | 一個 destination 一個 endpoint 一把密鑰 | 不沿用：付款事件走 `POST /webhooks/stripe-payments`、在 inbox 以獨立的 provider 名稱登記（同名 `Register` 會 panic）；簽章密鑰的設定隨 3d 的 Stripe adapter 進 `cmd/hawkr` |
+| 付款事件與收款帳戶事件共用 `POST /webhooks/stripe` 與簽章密鑰 | 同一個 event destination | 不成立：thin 與 snapshot 是不同的 destination，各一把密鑰（`spikes.md`） | 一個 destination 一個 endpoint 一把密鑰 | 不沿用：付款事件走 `POST /webhooks/stripe-payments`、在 inbox 以獨立的 provider 名稱登記（同名 `Register` 會 panic）；簽章密鑰是獨立的設定 `STRIPE_PAYMENT_WEBHOOK_SECRET`（3a 已進 `cmd/hawkr` 的 `readCharge`，與 `STRIPE_WEBHOOK_SECRET` 相同啟動失敗；用它驗簽的 Stripe adapter 在 3d） |
 | Java 在 transaction 內呼叫 order gRPC（`GetOrderForPayment`） | 同一個交易內要訂單資料 | 不成立（規則 5） | 外部呼叫在 transaction 外 | 不沿用：訂單 port 在 transaction 外先讀，寫列時帶快照（歸屬、店家、金額）；步驟 4 以 `internal/legacy/grpcclient` 實作，B8 換 in-process |
 
 ## 傳輸層的沿用盤點
@@ -58,7 +58,7 @@
 - 系統未上線，資料沒有搬移：seller 的 `payment_accounts` 與 `payment_provider_events` 刪除，`payment.accounts` 與 `inbox.events` 是新的 baseline。
 - 後台 RPC 的 service 與權限名稱改變（見上表）；admin 同一次更新。
 - 付款（3a，B2）：Java 在 transaction 內呼叫 order gRPC、PayUni 與寫列同一個 transaction；改成 transaction 外讀訂單、寫列與補做 job 一個 transaction、提交後在請求內建立 PaymentIntent（D7 修訂）。
-- 付款只有一列一個 PaymentIntent（D8）：Java 的嘗試序號、換付款方式與復活舊列都不存在；`CreatePayment` 重送回既有的列。
+- 付款只有一列一個 PaymentIntent（D8；`CANCELED` 且訂單仍可付時同一列換新鍵、清外部 ID 重設）：Java 的嘗試序號、換付款方式與復活舊列都不存在；`CreatePayment` 重送回既有的列。
 - 零元訂單：Java 直接記 PAID；3a 回 FailedPrecondition（Stripe 不能收零元），由訂單一方在步驟 4 決定怎麼完成零元訂單。卡片金額上下限（1–199,999）是 PayUni 的限制，不搬；provider 對金額的拒絕是永久失敗，進 CREATE_FAILED。
 - 付款失敗：Java 的 FAILED 是終局；Stripe 的失敗嘗試讓 PaymentIntent 回到等待付款，列只記 `last_error`，買家在同一個 PaymentIntent 上重試。重複付款、過期列的 CONFLICT 與 rescue 退款不存在（D5 修訂：訂單一方判斷並發起自動退款）。
 - 逾期付款的取消（Java 的 `ExpiredTransactionScheduler`）與 `ClosePaymentByOrderNo`：port 與 fake 有 `CancelPayment`，use case 與逾期 job 在步驟 4；3a 沒有。

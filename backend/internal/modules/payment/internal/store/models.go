@@ -42,6 +42,7 @@ type PaymentPayment struct {
 	BuyerID              int64
 	Amount               int64
 	Provider             string
+	Description          string
 	Status               string
 	ExternalPaymentID    *string
 	ExternalChargeID     *string

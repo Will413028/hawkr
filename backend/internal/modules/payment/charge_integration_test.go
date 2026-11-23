@@ -302,7 +302,7 @@ func TestAnUnresolvedCreatePastTheDeadlineIsTerminalAndTheKeyIsNeverReplayed(t *
 		t.Fatalf("期限之後仍重送：%d → %d 次", calls, after)
 	}
 	f.jobs.mu.Lock()
-	f.jobs.args = nil
+	f.jobs.args, f.jobs.opts = nil, nil
 	f.jobs.mu.Unlock()
 	created, _, err := f.module.SweepPayments(context.Background())
 	must(t, err)
@@ -614,7 +614,7 @@ func TestSweepQueuesIdleCreatesStaleReadsAndOldUnprocessedEvents(t *testing.T) {
 	must(t, f.fake.Settle(extDone, PaymentStateSucceeded, f.now))
 	f.sync(t, done.ID)
 	f.jobs.mu.Lock()
-	f.jobs.args = nil
+	f.jobs.args, f.jobs.opts = nil, nil
 	f.jobs.mu.Unlock()
 	h := http.Header{}
 	h.Set(ChargeFakeEventHeader, "evt_late")
@@ -723,5 +723,208 @@ VALUES ($1, $2, $3, 50, $4, $5, now(), now())`, uuid.NewV7(), p.ID, key, status,
 	must(t, insertRefund("k4", "REVERSING", 30))
 	if err := exec("UPDATE payment.payments SET status = 'SUCCEEDED' WHERE id = $1", p.ID); err == nil {
 		t.Fatal("入帳的付款沒有 charge 與入帳時間")
+	}
+}
+
+// 外部 ID 在 provider 已回傳的每個狀態都存得下來（F1）：退款 REFUNDING（provider 回了 ID 但還在處理）與建立之後才失敗的 FAILED、轉帳建立之後才失敗的 FAILED；
+// 入帳（SUCCEEDED）一定要有 ID；還沒呼叫 provider 的狀態不能有 ID；有 ID 一定要有呼叫時刻。
+// mutation：把 refunds_succeeded_check 改回「(status = 'SUCCEEDED') = (external_refund_id IS NOT NULL)」→ REFUNDING 帶 ID 的列寫不進去，失敗。
+func TestTheSchemaStoresTheExternalIDOfEveryStateThatHasOne(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	ctx := context.Background()
+	f.order("O-F1", 11, 7, 100)
+	p := f.create(t, 11, "O-F1")
+	exec := func(sql string, args ...any) error {
+		_, err := f.db.Conn(ctx).Exec(ctx, sql, args...)
+		return err
+	}
+	ptr := func(s string) *string { return &s }
+	insertRefund := func(key, status string, ext *string, called bool) error {
+		return exec(`INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, refund_called_at, external_refund_id, failure_reason, created_at, updated_at)
+VALUES ($1, $2, $3, 50, $4::text, CASE WHEN $5::bool THEN now() END, $6::text, CASE WHEN $4::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, key, status, called, ext)
+	}
+	must(t, insertRefund("r1", "REFUNDING", ptr("re_1"), true))
+	must(t, insertRefund("r2", "FAILED", ptr("re_2"), true))
+	must(t, insertRefund("r3", "SUCCEEDED", ptr("re_3"), true))
+	if err := insertRefund("r4", "SUCCEEDED", nil, true); err == nil {
+		t.Fatal("退款入帳卻沒有外部 ID")
+	}
+	if err := insertRefund("r5", "PENDING", ptr("re_5"), true); err == nil {
+		t.Fatal("還沒呼叫 provider 的退款有外部 ID")
+	}
+	if err := insertRefund("r6", "FAILED", ptr("re_6"), false); err == nil {
+		t.Fatal("有外部 ID 卻沒有呼叫時刻")
+	}
+	insertTransfer := func(status string, ext *string) error {
+		return exec(`INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, status, external_transfer_id, called_at, failure_reason, created_at, updated_at)
+VALUES ($1, $2, 7, 100, 'acct_1', $3::text, $4::text, CASE WHEN $4::text IS NOT NULL OR $3::text = 'SUCCEEDED' THEN now() END, CASE WHEN $3::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, status, ext)
+	}
+	must(t, insertTransfer("FAILED", ptr("tr_f")))
+	if err := insertTransfer("SUCCEEDED", nil); err == nil {
+		t.Fatal("轉帳入帳卻沒有外部 ID")
+	}
+	if err := insertTransfer("PENDING", ptr("tr_p")); err == nil {
+		t.Fatal("還沒呼叫 provider 的轉帳有外部 ID")
+	}
+	must(t, insertTransfer("SUCCEEDED", ptr("tr_s")))
+}
+
+// 已判斷過的快照一律標記事件已處理（F3）：入帳的列收到非入帳的快照（保留列、記警示）之後，涵蓋它的事件被標記，同步不再要求重跑一輪（job 不再每 2 秒 snooze）。
+// mutation：sync.go 的 `if res.judged` 改回 `if res.written` → 事件永遠未處理、again 為 true，失敗。
+func TestASnapshotThatKeepsTheSucceededRowStillMarksItsEventsProcessed(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.order("O-F3", 11, 7, 100)
+	p := f.create(t, 11, "O-F3")
+	ext := f.externalOf(t, "O-F3")
+	must(t, f.fake.Settle(ext, PaymentStateSucceeded, f.now))
+	f.sync(t, p.ID)
+	must(t, f.fake.SetState(ext, PaymentStateAwaitingPayment))
+	f.receive(t, "evt_keep", ext)
+	if again := f.sync(t, p.ID); again {
+		t.Fatal("已判斷過的快照之後仍要求再跑一輪（job 會一直 snooze）")
+	}
+	if !f.processed(t, "evt_keep") || f.statusOf(t, "O-F3") != PaymentSucceeded {
+		t.Fatalf("事件已處理=%v，狀態=%s", f.processed(t, "evt_keep"), f.statusOf(t, "O-F3"))
+	}
+}
+
+// 補做 job 排在請求內呼叫的上限之後（F4）：建立付款時排入的補做帶 ScheduledAt，晚於「現在加請求內的呼叫上限」；掃描排的（列已閒置）立刻執行。
+// mutation：ensureRow 的 enqueueCreateAt 改回 enqueueCreate → ScheduledAt 是零值，失敗。
+func TestTheCatchUpJobIsScheduledAfterTheInRequestCallTimeout(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.order("O-F4a", 11, 7, 100)
+	f.fake.FailCreate(errors.New("逾時"))
+	f.create(t, 11, "O-F4a")
+	got := f.jobs.scheduledAt(kindChargeCreate)
+	if len(got) != 1 || !got[0].After(f.now.Add(10*time.Second)) {
+		t.Fatalf("補做 job 的 ScheduledAt=%v，現在=%v", got, f.now)
+	}
+	f.jobs.mu.Lock()
+	f.jobs.args, f.jobs.opts = nil, nil
+	f.jobs.mu.Unlock()
+	f.now = f.now.Add(15 * time.Minute)
+	if created, _, err := f.module.SweepPayments(context.Background()); err != nil || created != 1 {
+		t.Fatalf("掃描：%d %v", created, err)
+	}
+	if got := f.jobs.scheduledAt(kindChargeCreate); len(got) != 1 || !got[0].IsZero() {
+		t.Fatalf("掃描排的補做應立刻執行：%v", got)
+	}
+}
+
+// 補做 job 先於請求寫入（F4）：請求結束時列已是 AWAITING_PAYMENT、請求自己的快照被較新的讀取擋下，回應仍要帶 client_secret（改走讀取路徑向 provider 取）。
+// mutation：createInRequest 拿掉「列是 AWAITING_PAYMENT 卻沒有 secret 就 view」→ ClientSecret 是空的，失敗。
+func TestACatchUpJobThatWritesFirstStillLetsTheRequestReturnTheSecret(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	ctx := context.Background()
+	f.order("O-F4b", 11, 7, 100)
+	f.fake.OnCreate = func() {
+		ids := f.paymentIDs(t, kindChargeCreate)
+		if len(ids) != 1 {
+			t.Errorf("補做 job=%v", ids)
+			return
+		}
+		f.now = f.now.Add(time.Second)
+		must(t, f.module.CreatePaymentIntent(ctx, ids[0], false))
+	}
+	p := f.create(t, 11, "O-F4b")
+	if p.Status != PaymentAwaitingPayment || p.ClientSecret == "" || f.fake.Intents() != 1 {
+		t.Fatalf("付款=%+v，PaymentIntent %d 個", p, f.fake.Intents())
+	}
+	f.noViolations(t)
+}
+
+// 已取消的付款、訂單仍可付（F5）：同一列換新冪等鍵、清掉舊的外部 ID、建出新的 PaymentIntent（仍是一張訂單一列、一次只有一個有效的 PaymentIntent）。
+// mutation：ensureRow 的重設條件拿掉 `|| row.Status == string(model.PaymentCanceled)` → 取消的列沿用舊 PaymentIntent，失敗。
+func TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.order("O-F5", 11, 7, 100)
+	p := f.create(t, 11, "O-F5")
+	oldExt, oldKey := f.externalOf(t, "O-F5"), f.keyOf(t, "O-F5")
+	must(t, f.fake.Settle(oldExt, PaymentStateCanceled, f.now))
+	f.sync(t, p.ID)
+	if f.statusOf(t, "O-F5") != PaymentCanceled {
+		t.Fatalf("狀態=%s", f.statusOf(t, "O-F5"))
+	}
+	again := f.create(t, 11, "O-F5")
+	newExt := f.externalOf(t, "O-F5")
+	if again.ID != p.ID || again.Status != PaymentAwaitingPayment || again.ClientSecret == "" || newExt == "" || newExt == oldExt || f.keyOf(t, "O-F5") == oldKey {
+		t.Fatalf("重設=%+v，外部 ID %s → %s", again, oldExt, newExt)
+	}
+	if f.count(t, "SELECT count(*) FROM payment.payments") != 1 || f.fake.Intents() != 2 || f.count(t, "SELECT count(*) FROM payment.payments WHERE external_payment_id = $1", oldExt) != 0 {
+		t.Fatalf("一張訂單一列：%d 列，PaymentIntent %d 個", f.count(t, "SELECT count(*) FROM payment.payments"), f.fake.Intents())
+	}
+	f.unpayable("O-F5", 11)
+	must(t, f.fake.Settle(newExt, PaymentStateCanceled, f.now))
+	f.sync(t, p.ID)
+	if _, err := f.module.CreatePayment(context.Background(), 11, "O-F5"); apperr.KindOf(err) != apperr.KindFailedPrecondition || f.statusOf(t, "O-F5") != PaymentCanceled {
+		t.Fatalf("訂單不可付時不能重設：%v %s", err, f.statusOf(t, "O-F5"))
+	}
+}
+
+// 建立中、沒有外部 ID 的列屬於別的 provider（設定換了）（F6）：補做改成目前的 provider、換新鍵並建立，不是永遠卡在建立中。
+// mutation：create() 拿掉 rebind 分支、恢復「provider 不同就直接回傳」→ 列留在 CREATING，失敗。
+func TestACreatingRowOfAnotherProviderIsReboundByTheCatchUp(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.order("O-F6", 11, 7, 100)
+	f.fake.FailCreate(errors.New("逾時"))
+	p := f.create(t, 11, "O-F6")
+	oldKey := f.keyOf(t, "O-F6")
+	ctx := context.Background()
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.payments SET provider = 'retired_provider' WHERE order_no = 'O-F6'")
+	must(t, err)
+	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
+	if got := f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-F6'"); got != ChargeFakeName || f.statusOf(t, "O-F6") != PaymentAwaitingPayment || f.keyOf(t, "O-F6") == oldKey {
+		t.Fatalf("provider=%s 狀態=%s", got, f.statusOf(t, "O-F6"))
+	}
+	if f.fake.Intents() != 1 {
+		t.Fatalf("PaymentIntent %d 個", f.fake.Intents())
+	}
+}
+
+// 判定 anomaly 之後標記事件已處理（F7）：已經告警、列不動；事件不再留在 inbox 讓掃描一直重排。
+// mutation：Sync 拿掉 ErrAnomaly 分支裡的 markEventsProcessed → 事件仍未處理，失敗。
+func TestAnAnomalyMarksItsEventsProcessedAndLeavesTheRowAlone(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.order("O-F7", 11, 7, 100)
+	p := f.create(t, 11, "O-F7")
+	ext := f.externalOf(t, "O-F7")
+	f.receive(t, "evt_anom", ext)
+	must(t, f.fake.SetAmount(ext, 5))
+	if _, err := f.module.SyncPayment(context.Background(), p.ID); !errors.Is(err, ErrChargePermanent) {
+		t.Fatalf("金額不符：%v", err)
+	}
+	if !f.processed(t, "evt_anom") || f.statusOf(t, "O-F7") != PaymentAwaitingPayment || !strings.Contains(f.logs.String(), "不一致") {
+		t.Fatalf("事件已處理=%v 狀態=%s", f.processed(t, "evt_anom"), f.statusOf(t, "O-F7"))
+	}
+}
+
+// 付款說明存在列上、送 provider，冪等重送時不變（F8）：訂單改名之後補做仍送建立當時的說明；沒有商品名稱時用訂單編號；超過上限截斷。
+// mutation：create() 的 CreateInput.Description 改回 called.OrderNo → 送出的是訂單編號，失敗。
+func TestThePaymentDescriptionIsStoredAndSentUnchangedOnReplay(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	ctx := context.Background()
+	f.orders.put(PaymentOrder{OrderNo: "O-F8", BuyerID: 11, StoreID: 7, Amount: 100, Payable: true, Description: "  藍色 T 恤  "})
+	f.fake.FailCreate(errors.New("逾時"))
+	p := f.create(t, 11, "O-F8")
+	f.orders.put(PaymentOrder{OrderNo: "O-F8", BuyerID: 11, StoreID: 7, Amount: 100, Payable: true, Description: "改名了"})
+	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
+	if got := f.fake.CreateDescriptions(); len(got) != 2 || got[0] != "藍色 T 恤" || got[1] != "藍色 T 恤" {
+		t.Fatalf("送出的說明=%q", got)
+	}
+	f.orders.put(PaymentOrder{OrderNo: "O-F8b", BuyerID: 11, StoreID: 7, Amount: 100, Payable: true})
+	f.create(t, 11, "O-F8b")
+	f.orders.put(PaymentOrder{OrderNo: "O-F8c", BuyerID: 11, StoreID: 7, Amount: 100, Payable: true, Description: strings.Repeat("長", 300)})
+	f.create(t, 11, "O-F8c")
+	got := f.fake.CreateDescriptions()
+	if len(got) != 4 || got[2] != "O-F8b" || len([]rune(got[3])) != 200 {
+		t.Fatalf("送出的說明=%q", got)
 	}
 }

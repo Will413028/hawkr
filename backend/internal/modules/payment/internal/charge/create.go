@@ -45,10 +45,21 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 	if err != nil {
 		return createResult{}, err
 	}
-	if row.Status != string(model.PaymentCreating) || row.Provider != p.Name() {
+	if row.Status != string(model.PaymentCreating) {
 		return createResult{row: row}, nil
 	}
 	now := s.d.Now().UTC()
+	if row.Provider != p.Name() {
+		// 設定換了 provider：沒有外部 ID 的列改成目前的（換新鍵、重新起算），否則它永遠卡在建立中、掃描一直排空的 job。
+		rebound, err := s.rebind(ctx, paymentID, p.Name(), now)
+		if err != nil {
+			return createResult{}, err
+		}
+		if rebound.Status != string(model.PaymentCreating) || rebound.Provider != p.Name() {
+			return createResult{row: rebound}, nil
+		}
+		row = rebound
+	}
 	if row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline {
 		return s.failCreate(ctx, paymentID, failedUnresolved)
 	}
@@ -63,7 +74,7 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	snap, err := p.CreatePayment(callCtx, CreateInput{
-		PaymentID: called.ID, OrderNo: called.OrderNo, StoreID: called.StoreID, Amount: called.Amount, Description: called.OrderNo,
+		PaymentID: called.ID, OrderNo: called.OrderNo, StoreID: called.StoreID, Amount: called.Amount, Description: called.Description,
 		TransferGroup: called.OrderNo, IdempotencyKey: called.CreateIdempotencyKey.String(),
 	})
 	if errors.Is(err, ErrPermanent) {
@@ -86,6 +97,23 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 		return err
 	})
 	return out, err
+}
+
+// rebind 在獨立的 transaction 把建立中、沒有外部 ID 的列改成目前的 provider；列已不是那樣時回目前的列。
+func (s *Service) rebind(ctx context.Context, paymentID uuid.UUID, provider string, now time.Time) (store.PaymentPayment, error) {
+	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+	defer cancel()
+	var row store.PaymentPayment
+	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		r, err := q.RebindCreatingPayment(ctx, store.RebindCreatingPaymentParams{ID: paymentID, Provider: provider, Now: now})
+		if errors.Is(err, pgx.ErrNoRows) {
+			r, err = q.PaymentByID(ctx, paymentID)
+		}
+		row = r
+		return err
+	})
+	return row, err
 }
 
 // markCalled 在獨立的 transaction 記下「呼叫過」的時刻（呼叫 provider 之前提交）。
@@ -122,15 +150,17 @@ func (s *Service) failCreate(ctx context.Context, paymentID uuid.UUID, reason st
 	return createResult{row: row}, err
 }
 
-// applyResult 是 applySnapshot 的結果：written 為 true 表示快照寫進了列（沒有被衝突或較新的讀取擋下）。
+// applyResult 是 applySnapshot 的結果：written 為 true 表示快照寫進了列；judged 為 true 表示這份快照已經被判斷過、不需要再讀一次
+// （寫進了列，或與列的終局狀態衝突而保留列）。兩者都不是表示讀取過期（較新的讀取已寫入）。
 type applyResult struct {
 	row     store.PaymentPayment
 	written bool
+	judged  bool
 }
 
 // applySnapshot 在呼叫方的 transaction 內鎖付款列、驗證快照、推導狀態並寫入；狀態與寫入之前不同時發布 PaymentChanged（同一個狀態的重複讀取不重發）。
 // 快照與列對不起來（外部 ID 換了、金額不符、狀態不是有效值、入帳卻沒有 charge）回 ErrAnomaly 或不認得狀態的錯誤，不寫入；衝突（列已入帳、快照不是入帳）不寫入並記警示。
-// 只在這次讀取的開始時間不早於已存的 fetched_at 時寫入：較早開始的讀取被擋下時 written 是 false。
+// 只在這次讀取的開始時間不早於已存的 fetched_at 時寫入：較早開始的讀取被擋下時 written 與 judged 都是 false。
 func (s *Service) applySnapshot(ctx context.Context, paymentID uuid.UUID, snap Snapshot, startedAt time.Time) (applyResult, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	locked, err := q.LockPayment(ctx, paymentID)
@@ -152,7 +182,7 @@ func (s *Service) applySnapshot(ctx context.Context, paymentID uuid.UUID, snap S
 	}
 	if keep {
 		s.d.Logger.WarnContext(ctx, "payment：provider 的快照與付款列的終局狀態衝突，不覆蓋", "payment_id", paymentID.String(), "order_no", locked.OrderNo, "status", locked.Status, "snapshot_state", string(snap.State))
-		return applyResult{row: locked}, nil
+		return applyResult{row: locked, judged: true}, nil
 	}
 	params := store.ApplyPaymentIntentSnapshotParams{
 		ID: paymentID, Status: string(next), ExternalPaymentID: &snap.ExternalID, FetchedAt: &startedAt, Now: s.d.Now().UTC(),
@@ -182,7 +212,7 @@ func (s *Service) applySnapshot(ctx context.Context, paymentID uuid.UUID, snap S
 			return applyResult{}, err
 		}
 	}
-	return applyResult{row: written, written: true}, nil
+	return applyResult{row: written, written: true, judged: true}, nil
 }
 
 func derefString(s *string) string {

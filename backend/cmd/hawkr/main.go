@@ -163,6 +163,7 @@ func runServe(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
+	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
 	if err := e.Err(); err != nil {
@@ -222,7 +223,7 @@ func runServe(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -369,6 +370,7 @@ func runWorker(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
+	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
 	if err := e.Err(); err != nil {
@@ -424,7 +426,7 @@ func runWorker(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)

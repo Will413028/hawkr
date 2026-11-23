@@ -24,6 +24,10 @@ const (
 	// callTimeout 是 job 內單次呼叫 provider 的上限；requestCallTimeout 是請求內建立 PaymentIntent 的上限（逾時回 pending，補做 job 接手）。
 	callTimeout        = 20 * time.Second
 	requestCallTimeout = 10 * time.Second
+	// createJobDelay 是建立付款時補做 job 延後多久才跑：請求內呼叫的上限再加一點餘裕，請求內的建立正常結束之前補做不會開始。
+	createJobDelay = requestCallTimeout + 5*time.Second
+	// descriptionMax 是付款說明的字數上限（以 rune 計，與 payments_description_check 相同）。
+	descriptionMax = 200
 	// writeTimeout 是寫結果的 transaction 的上限（job 的 ctx 逾時被取消後仍要能寫入）。
 	writeTimeout = 15 * time.Second
 	// jobTimeout 是一次 job 的上限：一次 provider 呼叫加幾次寫結果的 transaction。
@@ -142,8 +146,8 @@ func (s *Service) CreatePayment(ctx context.Context, buyerID int64, orderNo stri
 	return s.view(ctx, row)
 }
 
-// ensureRow 在一個 transaction 內取得這張訂單的付款列：沒有就寫「建立中」的列；有就沿用（建立失敗的終局換新鍵重設回建立中）；
-// 列還在建立中時同 transaction 排入補做 job。
+// ensureRow 在一個 transaction 內取得這張訂單的付款列：沒有就寫「建立中」的列；有就沿用（建立失敗的終局，或已取消而訂單仍可付的列，同一列換新鍵、清掉舊的外部 ID 重設回建立中）；
+// 列還在建立中時同 transaction 排入補做 job（延到請求內建立的上限之後，見 createJobDelay）。
 func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPayment, error) {
 	var row store.PaymentPayment
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -170,8 +174,10 @@ func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPaym
 		if err := orderRefusal(order); err != nil {
 			return err
 		}
-		if row.Status == string(model.PaymentCreateFailed) {
-			row, err = q.ResetFailedPayment(ctx, store.ResetFailedPaymentParams{ID: row.ID, StoreID: order.StoreID, BuyerID: order.BuyerID, Amount: order.Amount, Now: now})
+		if row.Status == string(model.PaymentCreateFailed) || row.Status == string(model.PaymentCanceled) {
+			row, err = q.ResetPayment(ctx, store.ResetPaymentParams{
+				ID: row.ID, StoreID: order.StoreID, BuyerID: order.BuyerID, Amount: order.Amount, Provider: s.d.Provider.Name(), Description: paymentDescription(order), Now: now,
+			})
 			if err != nil {
 				return err
 			}
@@ -180,11 +186,23 @@ func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPaym
 			return apperr.FailedPrecondition("訂單內容在付款建立之後變動了")
 		}
 		if row.Status == string(model.PaymentCreating) {
-			return enqueueCreate(ctx, s.d.Jobs, row.ID)
+			return enqueueCreateAt(ctx, s.d.Jobs, row.ID, now.Add(createJobDelay))
 		}
 		return nil
 	})
 	return row, err
+}
+
+// paymentDescription 是送給 provider 的付款說明：訂單給的商品名稱（去頭尾空白、超過上限截斷），沒有就用訂單編號；存在列上，冪等重送時內容不變。
+func paymentDescription(order Order) string {
+	d := strings.TrimSpace(order.Description)
+	if d == "" {
+		return order.OrderNo
+	}
+	if utf8.RuneCountInString(d) > descriptionMax {
+		d = strings.TrimSpace(string([]rune(d)[:descriptionMax]))
+	}
+	return d
 }
 
 // orderRefusal 是訂單現在不能建立付款的原因（不可付、金額不是正數）；可以建立時是 nil。
@@ -199,6 +217,7 @@ func orderRefusal(order Order) error {
 }
 
 // createInRequest 在請求內建立 PaymentIntent（transaction 已提交）：成功回含 client_secret 的付款；暫時性失敗與逾時回 pending（補做 job 已排），永久拒絕回 CREATE_FAILED。
+// 結束時列已經是 AWAITING_PAYMENT 卻沒有 secret（補做 job 先寫入、請求的快照被擋下）時改走讀取路徑向 provider 取 secret；取不到就回沒有 secret 的付款，由 client 以 GetPayment 重讀。
 func (s *Service) createInRequest(ctx context.Context, row store.PaymentPayment) (model.Payment, error) {
 	res, err := s.create(ctx, row.ID, requestCallTimeout)
 	if err != nil {
@@ -207,7 +226,14 @@ func (s *Service) createInRequest(ctx context.Context, row store.PaymentPayment)
 		if rerr != nil {
 			return model.Payment{}, rerr
 		}
-		return toModel(latest, ""), nil
+		res = createResult{row: latest}
+	}
+	if res.clientSecret == "" && res.row.Status == string(model.PaymentAwaitingPayment) {
+		out, verr := s.view(ctx, res.row)
+		if verr == nil {
+			return out, nil
+		}
+		s.d.Logger.WarnContext(ctx, "payment：請求內建立後讀不到 client_secret，由 client 重讀", "payment_id", row.ID.String(), "order_no", row.OrderNo, "err", verr)
 	}
 	return toModel(res.row, res.clientSecret), nil
 }
