@@ -1,11 +1,12 @@
 // Package charge 是付款：provider 中立的 port（PaymentIntent、退款、轉帳與撤回、付款事件）、付款的本地狀態、建立付款（請求內建立、job 補做）、
-// 同步與補掃，以及 platform inbox 的付款事件處理（計畫 2026-11-23-b2-payment 步驟 3a）。
+// 同步與補掃、轉帳與撤回，以及 platform inbox 的付款事件處理（計畫 2026-11-23-b2-payment）。
 //
 // 結構（backend AGENTS.md 規則 4、5）：
 //   - 建立付款：transaction 內只寫「建立中」的列與補做 job；提交之後在請求內、transaction 外帶列上的冪等鍵向 provider 建立 PaymentIntent 並回 client_secret（D7 修訂）。
-//     失敗或逾時回 pending，補做 job 與週期掃描以同一把鍵重送；呼叫過、沒有外部 ID 的列在期限（UnresolvedDeadline）內重送，超過進終局。
+//   - 搬錢呼叫（建立付款、轉帳、撤回、退款）的結果三分：成功、確定失敗（終局拒絕 ErrPermanent、可重試拒絕 ErrRetryableRefusal）、不明（其餘錯誤）。
+//     可重試拒絕換新冪等鍵重試、不計期限；不明在 ResendWindow 之前同一把鍵重送，之後只查回（Find*），查無要再過 NotFoundWait 才算確定不存在；
+//     與 provider 對不起來、前置條件不成立或查回連續失敗進 ANOMALY（ADR D68）。
 //   - 付款事件：webhook 先寫 inbox；handler 只排以付款為唯一鍵的同步 job，job 在 transaction 外重讀 PaymentIntent（不信事件內容），在 transaction 內改狀態並發 PaymentChanged。
-//   - 退款、轉帳與撤回的 port 方法與 schema 由 3b、3c 的 use case 使用；本步只定簽章並讓 Fake 能被測試驅動。
 package charge
 
 import (
@@ -58,7 +59,8 @@ type Snapshot struct {
 	ClientSecret string
 }
 
-// CreateInput 是建立 PaymentIntent 的輸入。IdempotencyKey 是付款列上保存的 UUID：每次重送都用它，期限內得到同一個 PaymentIntent。
+// CreateInput 是建立 PaymentIntent 的輸入。IdempotencyKey 是付款列上保存的 UUID：每次重送都用它，期限內得到同一個 PaymentIntent；它同時是這次嘗試的 ID，
+// adapter 在建立的物件寫入 metadata（attempt_id），FindPayment 依它比對（換新鍵就是新的嘗試）。
 // TransferGroup 是訂單號（一筆付款只對一家店，之後的轉帳以它關聯）；StoreID 與 PaymentID 只作 metadata 對帳；Amount 是整數，幣別由 adapter 的設定決定（D9）。
 type CreateInput struct {
 	PaymentID      uuid.UUID
@@ -70,7 +72,7 @@ type CreateInput struct {
 	IdempotencyKey string
 }
 
-// RefundInput 是建立退款的輸入（3c）。ExternalPaymentID 是付款的 PaymentIntent；IdempotencyKey 是退款列上保存的 UUID。
+// RefundInput 是建立退款的輸入。ExternalPaymentID 是付款的 PaymentIntent；IdempotencyKey 是退款列上保存的 UUID，同時是這次嘗試的 ID：adapter 在建立的物件寫入 metadata，FindRefund 依它比對。
 type RefundInput struct {
 	ExternalPaymentID string
 	Amount            int64
@@ -112,7 +114,7 @@ type RefundSnapshot struct {
 	FailureReason string
 }
 
-// TransferInput 是建立轉帳的輸入（3b）：付款的入帳（SourceChargeID）與賣家的外部帳戶（DestinationAccountID），TransferGroup 同付款。
+// TransferInput 是建立轉帳的輸入：付款的入帳（SourceChargeID）與賣家的外部帳戶（DestinationAccountID），TransferGroup 同付款；IdempotencyKey 同時是嘗試 ID（見 CreateInput）。
 type TransferInput struct {
 	Amount               int64
 	SourceChargeID       string
@@ -128,7 +130,7 @@ type TransferSnapshot struct {
 	ReversedAmount int64
 }
 
-// ReversalInput 是撤回轉帳（可以部分）的輸入（3b、3c）：Amount 不得超過轉帳的剩餘可撤額度。
+// ReversalInput 是撤回轉帳（可以部分）的輸入：Amount 不得超過轉帳的剩餘可撤額度；IdempotencyKey 同時是嘗試 ID（見 CreateInput）。
 type ReversalInput struct {
 	ExternalTransferID string
 	Amount             int64
@@ -141,7 +143,7 @@ type ReversalSnapshot struct {
 	Amount     int64
 }
 
-// EventKind 是付款事件指的物件種類。3a 只處理付款（PaymentIntent）；退款與轉帳的事件由 3b、3c 加入，之前 ParseEvent 對它們回 ErrIgnoredEvent。
+// EventKind 是付款事件指的物件種類。目前只處理付款（PaymentIntent）；退款與轉帳的事件 ParseEvent 回 ErrIgnoredEvent。
 type EventKind string
 
 // 事件指的物件種類。
@@ -157,27 +159,41 @@ type Event struct {
 	ObjectID string
 }
 
-// Provider 是付款的 port。真正的實作是 Stripe（3d），測試與本機用 Fake。傳輸錯誤（連線、逾時、5xx、429）回一般錯誤，job 重試；provider 以業務理由拒絕、
-// 重試也不會成功時包 ErrPermanent。實作不得把傳輸錯誤轉成業務結果。每個呼叫都有 deadline，而且不得在 DB transaction 內呼叫（規則 5）。
+// Provider 是付款的 port。真正的實作是 Stripe adapter，測試與本機用 Fake。搬錢的建立呼叫（CreatePayment、CreateRefund、CreateTransfer、ReverseTransfer）的錯誤三分：
+//   - 包 ErrPermanent：provider 拒絕且重試也不會成功（終局，同一把鍵只會拿回同一個錯誤）；
+//   - 包 ErrRetryableRefusal：provider 明確拒絕、沒有執行，之後重試可能成功（平台餘額不足、429）；呼叫方換新冪等鍵重試，不計期限；
+//   - 其餘（連線、逾時、5xx、無法判斷的回應）：結果不明，provider 那邊可能已執行。
+//
+// 實作不得把不明轉成業務結果，也不得把「可能已執行」的錯誤歸類成可重試拒絕。每個呼叫都有 deadline，而且不得在 DB transaction 內呼叫（規則 5）。
+// Find* 是強一致的查回（不用最終一致的 Search）：依建立時寫入 provider 物件 metadata 的嘗試 ID 比對，回傳（找到的快照、是否找到、錯誤）；
+// 找不到是 found=false 且 err=nil，查回本身失敗回 err。
 type Provider interface {
 	// Name 是 provider 的代碼（小寫英數與底線），存在付款列的 provider 欄，也是 inbox 的 provider 名稱：必須與收款帳戶的 provider 名稱不同
 	// （inbox 同名登記會 panic；一個事件 destination 一個 endpoint 一把簽章密鑰）。
 	Name() string
 	// CreatePayment 以 IdempotencyKey 冪等地建立 PaymentIntent 並回傳它的快照（含 ClientSecret）。同一把鍵在保存期內重送得到同一個 PaymentIntent。
 	CreatePayment(ctx context.Context, in CreateInput) (Snapshot, error)
+	// FindPayment 依嘗試 ID（建立時的冪等鍵）查回 PaymentIntent。
+	FindPayment(ctx context.Context, attemptID string) (Snapshot, bool, error)
 	// GetPayment 讀 PaymentIntent 目前的狀態（含 ClientSecret，讀得到時）；不存在是永久失敗。
 	GetPayment(ctx context.Context, externalID string) (Snapshot, error)
 	// CancelPayment 取消尚未入帳的 PaymentIntent 並回傳取消後的快照；冪等：已取消視為成功。已入帳的回傳入帳的快照（State 是 StateSucceeded，不是錯誤），
 	// 由呼叫方依狀態處理。
 	CancelPayment(ctx context.Context, externalID string) (Snapshot, error)
-	// CreateRefund 以 IdempotencyKey 冪等地建立退款（3c）。
+	// CreateRefund 以 IdempotencyKey 冪等地建立退款。
 	CreateRefund(ctx context.Context, in RefundInput) (RefundSnapshot, error)
-	// GetRefund 讀退款目前的狀態（3c）。
+	// FindRefund 依嘗試 ID 查回付款（externalPaymentID）底下的退款。
+	FindRefund(ctx context.Context, externalPaymentID, attemptID string) (RefundSnapshot, bool, error)
+	// GetRefund 讀退款目前的狀態。
 	GetRefund(ctx context.Context, externalID string) (RefundSnapshot, error)
-	// CreateTransfer 以 IdempotencyKey 冪等地建立帶 source_transaction 的轉帳（3b）；平台餘額不足是可重試的一般錯誤（spikes.md #8），不是 ErrPermanent。
+	// CreateTransfer 以 IdempotencyKey 冪等地建立帶 source_transaction 的轉帳；平台餘額不足是 ErrRetryableRefusal，不是 ErrPermanent。
 	CreateTransfer(ctx context.Context, in TransferInput) (TransferSnapshot, error)
-	// ReverseTransfer 以 IdempotencyKey 冪等地撤回轉帳的一部分或全部（3b、3c）；賣家餘額不足不是錯誤（spikes.md #9）。
+	// FindTransfer 以 transfer_group 列出轉帳後依嘗試 ID 比對。
+	FindTransfer(ctx context.Context, transferGroup, attemptID string) (TransferSnapshot, bool, error)
+	// ReverseTransfer 以 IdempotencyKey 冪等地撤回轉帳的一部分或全部；賣家餘額不足不是錯誤。
 	ReverseTransfer(ctx context.Context, in ReversalInput) (ReversalSnapshot, error)
+	// FindReversal 列出該轉帳的撤回後依嘗試 ID 比對。
+	FindReversal(ctx context.Context, externalTransferID, attemptID string) (ReversalSnapshot, bool, error)
 	// ParseEvent 驗簽並取出事件 ID 與物件；簽章不符或格式不合回 ErrInvalidEvent，驗過簽章但不是要處理的事件回 ErrIgnoredEvent。
 	ParseEvent(header http.Header, body []byte) (Event, error)
 }
@@ -185,6 +201,8 @@ type Provider interface {
 var (
 	// ErrPermanent 標示重試也不會成功的失敗。
 	ErrPermanent = errors.New("charge: permanent failure")
+	// ErrRetryableRefusal 標示 provider 明確拒絕、沒有執行，之後重試可能成功（平台餘額不足、429）：呼叫方換新冪等鍵重試，不計任何期限。
+	ErrRetryableRefusal = errors.New("charge: retryable refusal")
 	// ErrInvalidEvent 標示事件的簽章或格式不合，不處理。
 	ErrInvalidEvent = errors.New("charge: invalid event")
 	// ErrIgnoredEvent 標示驗過簽章、但不是要處理的事件：回應 2xx，不寫 inbox、不排 job。
@@ -204,7 +222,7 @@ type Order struct {
 	Description string
 }
 
-// Orders 是訂單一方的 port，由組裝點注入（步驟 4 以 Java order 的 GetOrderForPayment 實作，B8 換成 ordering 的 in-process 呼叫）。呼叫在 transaction 外。
+// Orders 是訂單一方的 port，由組裝點注入（過渡期以 Java order 的 GetOrderForPayment 實作，之後換成 ordering 的 in-process 呼叫）。呼叫在 transaction 外。
 // 訂單不存在回 apperr.NotFound。
 type Orders interface {
 	OrderForPayment(ctx context.Context, orderNo string) (Order, error)

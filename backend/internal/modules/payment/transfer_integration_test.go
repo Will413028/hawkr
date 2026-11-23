@@ -20,7 +20,7 @@ const (
 	kindTransferReversal = "payment.transfer_reversal"
 )
 
-var errInsufficientFunds = errors.New("stripe：insufficient available funds（HTTP 400）")
+var errInsufficientFunds = fmt.Errorf("%w：stripe insufficient available funds（HTTP 400）", ErrChargeRetryableRefusal)
 
 // paidPayment 建立並讓一筆付款入帳（store 7、金額 amount），回傳付款。
 func (f *chargeFixture) paidPayment(t *testing.T, orderNo string, amount int64) Payment {
@@ -53,7 +53,7 @@ func (f *chargeFixture) insertRefund(t *testing.T, paymentID uuid.UUID, status s
 	ctx := context.Background()
 	id := uuid.NewV7()
 	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_amount, failure_reason, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5::text, $6, CASE WHEN $5::text = 'FAILED' THEN 'x' END, $7, $7)`, id, paymentID, id.String(), amount, status, reversalAmount, f.now)
+VALUES ($1, $2, $3, $4, $5::text, $6, CASE WHEN $5::text IN ('FAILED', 'ANOMALY') THEN 'x' END, $7, $7)`, id, paymentID, id.String(), amount, status, reversalAmount, f.now)
 	must(t, err)
 	return id
 }
@@ -236,9 +236,11 @@ func TestTheTransferJobCallsTheProviderOutsideTheTransactionWithTheStoredKey(t *
 	f.noViolations(t)
 }
 
-// 平台餘額不足是可重試的錯誤，不是終局：轉帳留在 PENDING、以同一把鍵重送，之後成功；用完重試的最後一次只記警示、留給掃描。
-// mutation：把 Transfer 對錯誤的分類改成「任何錯誤都進 FAILED」（insufficient funds 視為終局）→ 轉帳變 FAILED，失敗。
-func TestPlatformInsufficientFundsKeepsTheTransferPendingAndALaterRetrySucceeds(t *testing.T) {
+// 平台餘額不足是可重試拒絕（沒有執行），不是終局也不是結果不明：每次換新冪等鍵重試、不計任何期限（超過舊的 12 小時仍是 PENDING 並繼續呼叫 provider、不進查回），之後成功；
+// 用完重試的最後一次只記警示、留給掃描。
+// mutation：Transfer 把 callRetryable 當 callUnknown（同鍵重送）→ 下面「每次換新鍵」失敗。
+// mutation：Transfer 把可重試拒絕留著 called_at 不清（計入期限）→ 超過視窗後改走查回、不再呼叫 provider，「繼續呼叫」失敗。
+func TestPlatformInsufficientFundsRotatesTheKeyKeepsThePendingRowPastTheOldDeadlineAndALaterRetrySucceeds(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	f.paidPayment(t, "T-5", 100)
@@ -246,28 +248,34 @@ func TestPlatformInsufficientFundsKeepsTheTransferPendingAndALaterRetrySucceeds(
 	tr := f.requestTransfer(t, "T-5")
 	f.fake.FailTransfer(errInsufficientFunds, errInsufficientFunds, errInsufficientFunds)
 	for i := 0; i < 2; i++ {
-		if err := f.runTransfer(tr.ID, false); !errors.Is(err, errInsufficientFunds) {
+		if err := f.runTransfer(tr.ID, false); !errors.Is(err, ErrChargeRetryableRefusal) {
 			t.Fatalf("第 %d 次：%v", i+1, err)
 		}
-		if f.transferText(t, "status", tr.ID) != "PENDING" || f.transferText(t, "failure_reason", tr.ID) != "" {
-			t.Fatalf("餘額不足之後的狀態=%s", f.transferText(t, "status", tr.ID))
+		if f.transferText(t, "status", tr.ID) != "PENDING" || f.transferText(t, "failure_reason", tr.ID) != "" || f.transferText(t, "called_at", tr.ID) != "" {
+			t.Fatalf("餘額不足之後的狀態=%s called_at=%q", f.transferText(t, "status", tr.ID), f.transferText(t, "called_at", tr.ID))
 		}
+		f.now = f.now.Add(30 * time.Hour)
 	}
 	if err := f.runTransfer(tr.ID, true); err != nil || f.transferText(t, "status", tr.ID) != "PENDING" {
 		t.Fatalf("最後一次嘗試：%v，狀態 %s", err, f.transferText(t, "status", tr.ID))
 	}
 	must(t, f.runTransfer(tr.ID, false))
-	if f.transferText(t, "status", tr.ID) != "SUCCEEDED" {
-		t.Fatalf("之後的重試沒有成功：%s", f.transferText(t, "status", tr.ID))
+	if f.transferText(t, "status", tr.ID) != "SUCCEEDED" || f.fake.LookupCalls() != 0 || f.fake.Transfers() != 1 {
+		t.Fatalf("之後的重試沒有成功：%s，查回 %d 次", f.transferText(t, "status", tr.ID), f.fake.LookupCalls())
 	}
 	keys := f.fake.TransferKeys()
 	if len(keys) != 4 {
 		t.Fatalf("呼叫次數=%d", len(keys))
 	}
+	seen := map[string]bool{}
 	for _, k := range keys {
-		if k != keys[0] {
-			t.Fatalf("重送換了鍵：%v", keys)
+		if seen[k] {
+			t.Fatalf("可重試拒絕之後沒有換新鍵：%v", keys)
 		}
+		seen[k] = true
+	}
+	if keys[3] != f.transferText(t, "idempotency_key", tr.ID) {
+		t.Fatalf("成功的是列上目前的鍵：%v", keys)
 	}
 	f.noViolations(t)
 }
@@ -294,38 +302,23 @@ func TestAPermanentRefusalOfTheTransferIsTerminalAndFreesTheActiveSlot(t *testin
 	}
 }
 
-// 結果不明（呼叫過、回應遺失）：期限內以同一把鍵重送取回同一筆轉帳（provider 只有一筆）；超過 UnresolvedDeadline 進終局 FAILED，鍵不再重送。
-// mutation：拿掉 transfer() 的期限判斷 → 超過期限仍重送，失敗。
-// mutation：拿掉呼叫之前的 markTransferCalled → called_at 一直是空，期限不起算，失敗。
-func TestAnUnresolvedTransferIsReplayedWithinTheDeadlineAndTerminalPastIt(t *testing.T) {
+// 結果不明（呼叫過、回應遺失）：ResendWindow 內以同一把鍵重送取回同一筆轉帳（provider 只有一筆）。
+// mutation：拿掉呼叫之前的 markTransferCalled → called_at 一直是空，視窗不起算，converge 測試的查回路徑失敗。
+func TestAnUnknownTransferIsReplayedWithTheSameKeyWithinTheResendWindow(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	f.paidPayment(t, "T-7", 100)
-	f.paidPayment(t, "T-7b", 100)
 	f.enableAccount(t, 7, "acct_seller_7", true)
 	lost := f.requestTransfer(t, "T-7")
+	key := f.transferText(t, "idempotency_key", lost.ID)
 	f.fake.FailTransferAfterCreate(errors.New("回應逾時"))
 	if err := f.runTransfer(lost.ID, false); err == nil || f.transferText(t, "status", lost.ID) != "PENDING" || f.transferText(t, "called_at", lost.ID) == "" {
 		t.Fatalf("回應遺失之後：%v，狀態 %s", err, f.transferText(t, "status", lost.ID))
 	}
+	f.now = f.now.Add(PaymentResendWindow - time.Minute)
 	must(t, f.runTransfer(lost.ID, false))
-	if f.transferText(t, "status", lost.ID) != "SUCCEEDED" || f.fake.Transfers() != 1 {
-		t.Fatalf("期限內重送沒有取回同一筆：%s，provider 有 %d 筆", f.transferText(t, "status", lost.ID), f.fake.Transfers())
-	}
-	// 超過期限。
-	stuck := f.requestTransfer(t, "T-7b")
-	f.fake.FailTransferAfterCreate(errors.New("回應逾時"))
-	if err := f.runTransfer(stuck.ID, false); err == nil {
-		t.Fatal("回應遺失沒有回錯誤")
-	}
-	calls := f.fake.TransferCalls()
-	f.now = f.now.Add(PaymentUnresolvedDeadline + time.Minute)
-	must(t, f.runTransfer(stuck.ID, false))
-	if f.transferText(t, "status", stuck.ID) != "FAILED" || f.transferText(t, "failure_reason", stuck.ID) != "unresolved_transfer" {
-		t.Fatalf("終局=%s", f.transferText(t, "status", stuck.ID))
-	}
-	if f.fake.TransferCalls() != calls {
-		t.Fatalf("期限之後仍重送：%d → %d 次", calls, f.fake.TransferCalls())
+	if f.transferText(t, "status", lost.ID) != "SUCCEEDED" || f.fake.Transfers() != 1 || f.transferText(t, "idempotency_key", lost.ID) != key || f.fake.LookupCalls() != 0 {
+		t.Fatalf("視窗內重送沒有取回同一筆：%s，provider 有 %d 筆", f.transferText(t, "status", lost.ID), f.fake.Transfers())
 	}
 	f.noViolations(t)
 }
@@ -432,9 +425,8 @@ func TestAReversalRetriesWithTheSameKeyAfterATransientFailure(t *testing.T) {
 	}
 }
 
-// 永久拒絕與結果不明：退款進終局 FAILED（不佔額度），reversed_amount 不動；結果不明超過期限鍵不再重送，期限內以同一把鍵取回同一次撤回。
-// mutation：拿掉 reverse() 的期限判斷 → 超過期限仍重送，失敗。
-func TestAReversalTerminalStatesLeaveTheTransferUntouched(t *testing.T) {
+// 永久拒絕與結果不明：永久拒絕讓退款進終局 FAILED（不佔額度），reversed_amount 不動；視窗內以同一把鍵取回同一次撤回。
+func TestAReversalPermanentRefusalLeavesTheTransferUntouchedAndAnUnknownOneIsReplayedWithinTheWindow(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	p, tr := f.transferred(t, "T-11")
@@ -446,29 +438,21 @@ func TestAReversalTerminalStatesLeaveTheTransferUntouched(t *testing.T) {
 		t.Fatalf("永久拒絕之後：%s", f.refundText(t, "status", refused))
 	}
 	replayed := f.insertRefund(t, p.ID, "REVERSING", 10, 10)
+	key := f.refundText(t, "reversal_idempotency_key", replayed)
 	f.fake.FailReversalAfterCreate(errors.New("回應逾時"))
 	if err := f.module.ReversePaymentTransfer(ctx, replayed, false); err == nil || f.refundText(t, "reversal_called_at", replayed) == "" {
 		t.Fatalf("回應遺失：%v", err)
 	}
 	must(t, f.module.ReversePaymentTransfer(ctx, replayed, false))
-	if f.refundText(t, "status", replayed) != "REVERSED" || f.reversedOf(t, tr.ID) != 10 {
-		t.Fatalf("期限內重送沒有取回同一次撤回：%s，%d", f.refundText(t, "status", replayed), f.reversedOf(t, tr.ID))
-	}
-	stuck := f.insertRefund(t, p.ID, "REVERSING", 10, 10)
-	f.fake.FailReversalAfterCreate(errors.New("回應逾時"))
-	if err := f.module.ReversePaymentTransfer(ctx, stuck, false); err == nil {
-		t.Fatal("回應遺失沒有回錯誤")
-	}
-	calls := f.fake.ReversalCalls()
-	f.now = f.now.Add(PaymentUnresolvedDeadline + time.Minute)
-	must(t, f.module.ReversePaymentTransfer(ctx, stuck, false))
-	if f.refundText(t, "status", stuck) != "FAILED" || f.refundText(t, "failure_reason", stuck) != "unresolved_reversal" || f.fake.ReversalCalls() != calls || f.reversedOf(t, tr.ID) != 10 {
-		t.Fatalf("結果不明的終局=%s，呼叫 %d → %d，reversed %d", f.refundText(t, "status", stuck), calls, f.fake.ReversalCalls(), f.reversedOf(t, tr.ID))
+	if f.refundText(t, "status", replayed) != "REVERSED" || f.reversedOf(t, tr.ID) != 10 || f.refundText(t, "reversal_idempotency_key", replayed) != key {
+		t.Fatalf("視窗內重送沒有取回同一次撤回：%s，%d", f.refundText(t, "status", replayed), f.reversedOf(t, tr.ID))
 	}
 }
 
-// 對不到已成立的轉帳、或撤回額度超過剩餘可撤額度的退款是異常（ErrAnomaly，永久）：不呼叫 provider、退款保持 REVERSING 可查。
-func TestAReversalThatCannotMatchTheTransferIsAnAnomalyAndCallsNothing(t *testing.T) {
+// 對不到已成立的轉帳、或撤回額度超過剩餘可撤額度的退款是前置條件異常：不呼叫 provider、退款進 ANOMALY（原因記在 failure_reason、發 MoneyAnomaly）、
+// 補掃不再重排（以前只取消 job，掃描會永遠重排）。
+// mutation：reverse() 的前置條件異常改回只回 ErrAnomaly、不寫 ANOMALY → 狀態仍是 REVERSING，失敗。
+func TestAReversalThatCannotMatchTheTransferParksTheRefundInAnomalyAndTheSweepStops(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	ctx := context.Background()
@@ -478,13 +462,21 @@ func TestAReversalThatCannotMatchTheTransferIsAnAnomalyAndCallsNothing(t *testin
 	tooMuch := f.insertRefund(t, p.ID, "REVERSING", 100, 100)
 	other := f.insertRefund(t, p.ID, "REVERSING", 10, 10)
 	must(t, f.module.ReversePaymentTransfer(ctx, other, false))
-	for _, id := range []uuid.UUID{noTransfer, tooMuch} {
-		if err := f.module.ReversePaymentTransfer(ctx, id, false); !errors.Is(err, ErrChargePermanent) || f.refundText(t, "status", id) != "REVERSING" {
-			t.Fatalf("%s：%v，%s", id, err, f.refundText(t, "status", id))
+	for id, reason := range map[uuid.UUID]string{noTransfer: "no_succeeded_transfer", tooMuch: "reversal_exceeds_remaining"} {
+		must(t, f.module.ReversePaymentTransfer(ctx, id, false))
+		if f.refundText(t, "status", id) != "ANOMALY" || f.refundText(t, "failure_reason", id) != reason {
+			t.Fatalf("%s：%s %s", id, f.refundText(t, "status", id), f.refundText(t, "failure_reason", id))
 		}
 	}
-	if f.fake.ReversalCalls() != 1 {
-		t.Fatalf("異常的退款呼叫了 provider：%d", f.fake.ReversalCalls())
+	if f.fake.ReversalCalls() != 1 || len(f.anomalies) != 2 {
+		t.Fatalf("異常的退款呼叫了 provider（%d 次）或事件數 %d", f.fake.ReversalCalls(), len(f.anomalies))
+	}
+	f.clearJobs()
+	f.now = f.now.Add(48 * time.Hour)
+	_, _, err := f.module.SweepPayments(ctx)
+	must(t, err)
+	if len(f.jobIDs(t, kindTransferReversal, "refund_id")) != 0 {
+		t.Fatal("ANOMALY 的退款被補掃重排")
 	}
 }
 

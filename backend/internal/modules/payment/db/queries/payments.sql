@@ -54,6 +54,72 @@ SET status = sqlc.arg(status),
 WHERE id = sqlc.arg(id)
 RETURNING *;
 
+-- name: RotateCreateKey :one
+-- provider 已知拒絕（可重試、沒有執行）：付款列換新的冪等鍵、清掉呼叫時刻與查回失敗次數，不計任何期限；呼叫方同 transaction 取代有效嘗試並寫新的一列。
+-- 只有仍用 old_key 的建立中列換（並行的呼叫不重複換）。
+UPDATE payment.payments
+SET create_idempotency_key = gen_random_uuid(),
+    create_called_at = NULL,
+    create_lookup_failures = 0,
+    updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND status = 'CREATING' AND external_payment_id IS NULL AND create_idempotency_key = sqlc.arg(old_key)
+RETURNING *;
+
+-- name: BumpCreateLookupFailures :one
+UPDATE payment.payments
+SET create_lookup_failures = create_lookup_failures + 1,
+    updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND status = 'CREATING' AND external_payment_id IS NULL
+RETURNING create_lookup_failures;
+
+-- name: ClearCreateLookupFailures :exec
+UPDATE payment.payments
+SET create_lookup_failures = 0
+WHERE id = sqlc.arg(id) AND status = 'CREATING' AND create_lookup_failures > 0;
+
+-- name: AnomalyPayment :one
+-- provider 與本地紀錄不符或查回連續失敗：還在建立中、沒有外部 ID 的列進 ANOMALY（佔住這張訂單，補掃不再重試），原因記在 failure_reason。
+UPDATE payment.payments
+SET status = 'ANOMALY',
+    failure_reason = sqlc.arg(reason),
+    updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND status = 'CREATING' AND external_payment_id IS NULL
+RETURNING *;
+
+-- name: ResolvePaymentLinked :one
+-- 後台人工結案：ANOMALY 的付款在 provider 確實有 PaymentIntent（external_payment_id 是證據）：連上它、暫記 AWAITING_PAYMENT，真正的狀態由隨後的同步重讀推導。
+UPDATE payment.payments
+SET status = 'AWAITING_PAYMENT',
+    external_payment_id = sqlc.arg(external_payment_id),
+    failure_reason = NULL,
+    create_called_at = COALESCE(create_called_at, sqlc.arg(now)::timestamptz),
+    create_lookup_failures = 0,
+    updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND status = 'ANOMALY' AND external_payment_id IS NULL
+RETURNING *;
+
+-- name: ResolvePaymentFailed :one
+-- 後台人工結案：確認 provider 沒有這筆付款，ANOMALY 進 CREATE_FAILED（買家可以再付，換新鍵）。
+UPDATE payment.payments
+SET status = 'CREATE_FAILED',
+    failure_reason = sqlc.arg(failure_reason),
+    updated_at = sqlc.arg(now)
+WHERE id = sqlc.arg(id) AND status = 'ANOMALY'
+RETURNING *;
+
+-- name: EffectiveAttempt :one
+SELECT *
+FROM payment.payment_attempts
+WHERE payment_id = sqlc.arg(payment_id) AND superseded_at IS NULL;
+
+-- name: LinkEffectiveAttempt :one
+-- 後台人工結案：有效嘗試連上 provider 的 PaymentIntent（還沒有外部 ID 的才連）。
+UPDATE payment.payment_attempts
+SET external_payment_id = sqlc.arg(external_payment_id),
+    called_at = COALESCE(called_at, sqlc.arg(now)::timestamptz)
+WHERE payment_id = sqlc.arg(payment_id) AND superseded_at IS NULL AND external_payment_id IS NULL
+RETURNING *;
+
 -- name: FailPaymentCreate :one
 -- 建立的終局：只有還在建立中、沒有外部 ID 的列能進 CREATE_FAILED。
 UPDATE payment.payments
@@ -75,6 +141,7 @@ SET status = 'CREATING',
     paid_at = NULL,
     fetched_at = NULL,
     create_called_at = NULL,
+    create_lookup_failures = 0,
     create_idempotency_key = gen_random_uuid(),
     provider = sqlc.arg(provider),
     description = sqlc.arg(description),
@@ -86,12 +153,13 @@ WHERE id = sqlc.arg(id) AND status IN ('CREATE_FAILED', 'CANCELED')
 RETURNING *;
 
 -- name: RebindCreatingPayment :one
--- 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空），或已超過 stale_before（UnresolvedDeadline 之前）時改成目前的 provider，
+-- 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空），或已早於 stale_before（查無才算數的時刻）時改成目前的 provider，
 -- 換新冪等鍵、重新起算呼叫時刻。呼叫過又還在期限內的列不動：舊 provider 的呼叫可能已經在 provider 那邊建出 PaymentIntent，改綁會讓買家拿到兩個。
 UPDATE payment.payments
 SET provider = sqlc.arg(provider),
     create_idempotency_key = gen_random_uuid(),
     create_called_at = NULL,
+    create_lookup_failures = 0,
     updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND status = 'CREATING' AND external_payment_id IS NULL AND provider <> sqlc.arg(provider)
   AND (create_called_at IS NULL OR create_called_at < sqlc.arg(stale_before)::timestamptz)

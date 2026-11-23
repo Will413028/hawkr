@@ -73,7 +73,7 @@ func enqueueCancel(ctx context.Context, jc jobs.Enqueuer, attemptID uuid.UUID) e
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// TransferArgs 是建立轉帳的 job（3b），以轉帳 ID 為唯一鍵：RequestTransfer 在寫列的同一個 transaction 排入，由它在 transaction 外帶列上的冪等鍵呼叫 provider。
+// TransferArgs 是建立轉帳的 job，以轉帳 ID 為唯一鍵：RequestTransfer 在寫列的同一個 transaction 排入，由它在 transaction 外帶列上的冪等鍵呼叫 provider。
 type TransferArgs struct {
 	TransferID uuid.UUID `json:"transfer_id" river:"unique"`
 }
@@ -90,7 +90,7 @@ func enqueueTransfer(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error 
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// ReversalArgs 是撤回轉帳的 job（3b、3c），以退款 ID 為唯一鍵：退款 use case 在寫下 REVERSING 退款列的同一個 transaction 排入。
+// ReversalArgs 是撤回轉帳的 job，以退款 ID 為唯一鍵：退款 use case 在寫下 REVERSING 退款列的同一個 transaction 排入。
 type ReversalArgs struct {
 	RefundID uuid.UUID `json:"refund_id" river:"unique"`
 }
@@ -235,11 +235,11 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 }
 
 // Sweep 是付款自己的補掃（D63 的分工同收款帳戶：platform 只重派沒有派送成功的 inbox 列），每個付款在自己的 transaction 內排入一個 job：
-//   - 建立：還在建立中、閒置超過 createIdle 的列補排補做 job（呼叫過、沒有外部 ID 的列在 UnresolvedDeadline 內以同一把鍵重送，超過由補做 job 進終局）；
+//   - 建立：還在建立中、閒置超過 createIdle 的列補排補做 job（結果不明的列由補做 job 依 ResendWindow 同鍵重送或查回）；
 //   - 狀態：已建立、未結案、超過 readIdle 沒讀過的列補排同步（掉了 webhook 的保底）；
 //   - 舊嘗試：被取代、還沒結案又超過 readIdle 沒讀過的舊 PaymentIntent 所屬的付款補排同步；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的付款補排同步（任何狀態）；
-//   - 轉帳與撤回：PENDING 的轉帳、REVERSING 的退款閒置超過 createIdle 就補排各自的 job（呼叫過、結果不明的超過期限由 job 進終局）。
+//   - 轉帳與撤回：PENDING 的轉帳、REVERSING 的退款閒置超過 createIdle 就補排各自的 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；ANOMALY 的列一律不補排。
 //
 // 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次；補排的轉帳與撤回算在 created）。沒有設定 provider 時什麼都不做。
 func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {

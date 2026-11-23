@@ -64,15 +64,6 @@
    "why": "寫付款列拿掉 ON CONFLICT (order_no) DO NOTHING：同一張訂單第二次建立撞唯一鍵，沒有沿用既有的列。"
   },
   {
-   "id": "unresolved-deadline-removed",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/payment/internal/charge/create.go",
-   "old": "if row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline {",
-   "new": "if false && row.CreateCalledAt != nil && now.Sub(*row.CreateCalledAt) > UnresolvedDeadline {",
-   "test": "internal/modules/payment ^TestAnUnresolvedCreatePastTheDeadlineIsTerminalAndTheKeyIsNeverReplayed$",
-   "why": "拿掉結果不明的期限：超過冪等鍵保存期仍以同一把鍵重送。"
-  },
-  {
    "id": "replay-uses-a-fresh-key",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/create.go",
@@ -147,7 +138,7 @@
   {
    "id": "active-transfer-index-not-unique",
    "stack": "go-integration",
-   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "file": "backend/internal/modules/payment/db/migrations/20261123145729_payment_unresolved_convergence.sql",
    "old": "CREATE UNIQUE INDEX \"transfers_active_payment\"",
    "new": "CREATE INDEX \"transfers_active_payment\"",
    "test": "internal/modules/payment ^TestTheSchemaGuardsTheTransferAndRefundInvariants$",
@@ -276,7 +267,7 @@
    "file": "backend/internal/modules/payment/internal/store/payments.sql.go",
    "old": "\n  AND (create_called_at IS NULL OR create_called_at < $4::timestamptz)",
    "new": "\n  AND $4::timestamptz IS NOT NULL",
-   "test": "internal/modules/payment ^TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrIsPastTheDeadline$",
+   "test": "internal/modules/payment ^TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrIsPastTheNotFoundWait$",
    "why": "R2-4：呼叫過又還在期限內的別的 provider 的列也被改綁，舊 provider 已建出的 PaymentIntent 變成第二個。"
   },
   {
@@ -296,6 +287,51 @@
    "new": "\t\treturn fmt.Errorf(\"%w：入帳沒有 charge\", ErrAnomaly)\n",
    "test": "internal/modules/payment ^TestAnIncompleteSuccessSnapshotKeepsItsEventsUnprocessedUntilItIsComplete$",
    "why": "R2-5：入帳缺 charge 的暫時性快照當成 anomaly：事件被標記已處理、job 被取消，provider 補齊之後不會再讀。"
+  },
+  {
+   "id": "create-resend-window-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if !inResendWindow(row.CreateCalledAt, now) {",
+   "new": "if false && !inResendWindow(row.CreateCalledAt, now) {",
+   "test": "internal/modules/payment ^TestAnUnresolvedCreateIsLookedUpPastTheResendWindowAndFailsOnlyAfterTheNotFoundWait$",
+   "why": "拿掉重送視窗：過了視窗仍以同一把鍵呼叫 CreatePayment，不走查回。"
+  },
+  {
+   "id": "create-not-found-wait-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if now.Sub(*row.CreateCalledAt) < NotFoundAfter {",
+   "new": "if false {",
+   "test": "internal/modules/payment ^TestAnUnresolvedCreateIsLookedUpPastTheResendWindowAndFailsOnlyAfterTheNotFoundWait$",
+   "why": "拿掉查無的最短等待：查無立刻進 CREATE_FAILED。"
+  },
+  {
+   "id": "create-new-key-before-lookup",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if !inResendWindow(row.CreateCalledAt, now) {\n\t\treturn s.lookupCreate(ctx, row, now, timeout)\n\t}",
+   "new": "if !inResendWindow(row.CreateCalledAt, now) {\n\t\tif err := s.rotateCreateKey(ctx, paymentID, row.CreateIdempotencyKey, now); err != nil {\n\t\t\treturn createResult{}, err\n\t\t}\n\t\treturn s.create(ctx, paymentID, timeout)\n\t}",
+   "test": "internal/modules/payment ^TestAnUnknownCreateFoundByLookupCreatesNoSecondIntent$",
+   "why": "查回之前就換新鍵：結果不明但其實已建立的 PaymentIntent 之外又建出第二個。"
+  },
+  {
+   "id": "create-retryable-refusal-treated-as-unknown",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/convergence.go",
+   "old": "\tcase errors.Is(err, ErrRetryableRefusal):\n\t\treturn callRetryable\n",
+   "new": "",
+   "test": "internal/modules/payment ^TestARetryableRefusalOfTheCreateRotatesTheKeyAndTheAttemptAndIsNeverCounted$",
+   "why": "可重試拒絕被當成結果不明：同鍵重送、計入期限，不換新鍵與新嘗試。"
+  },
+  {
+   "id": "next-lets-anomaly-be-overwritten",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/status.go",
+   "old": "\tcase model.PaymentCreateFailed, model.PaymentAnomaly:",
+   "new": "\tcase model.PaymentCreateFailed:",
+   "test": "internal/modules/payment/internal/charge ^TestNextFollowsTheDecisionTable$",
+   "why": "ANOMALY 可被快照改寫：待人工結案的付款被自動推進。"
   }
  ]
 }

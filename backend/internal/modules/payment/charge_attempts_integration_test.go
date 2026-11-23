@@ -233,9 +233,9 @@ func TestAnEventOfASupersededIntentIsSweptAndFullyProcessed(t *testing.T) {
 	}
 }
 
-// 建立中的列屬於別的 provider：舊 provider 的呼叫過又還在期限內不改綁（它可能已在 provider 那邊建出 PaymentIntent）；超過期限才改成目前的、舊嘗試記為被取代、新嘗試換新鍵。
+// 建立中的列屬於別的 provider：舊 provider 的呼叫過又還沒到查無算數的時刻不改綁（它可能已在 provider 那邊建出 PaymentIntent）；到了才改成目前的、舊嘗試記為被取代、新嘗試換新鍵。
 // mutation：RebindCreatingPayment 拿掉 create_called_at 的條件 → 期限內也被改綁，失敗。
-func TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrIsPastTheDeadline(t *testing.T) {
+func TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrIsPastTheNotFoundWait(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	ctx := context.Background()
@@ -247,12 +247,12 @@ func TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrI
 	f.exec(t, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = $1", p.ID)
 	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
 	if f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'") != "retired_provider" || f.keyOf(t, "O-R4") != oldKey || f.statusOf(t, "O-R4") != PaymentCreating || f.fake.Intents() != 0 {
-		t.Fatal("期限內不該改綁、不該呼叫 provider")
+		t.Fatal("查無算數之前不該改綁、不該呼叫 provider")
 	}
-	f.now = f.now.Add(PaymentUnresolvedDeadline + time.Minute)
+	f.now = f.now.Add(PaymentNotFoundAfter + time.Minute)
 	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
 	if f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'") != ChargeFakeName || f.keyOf(t, "O-R4") == oldKey || f.statusOf(t, "O-R4") != PaymentAwaitingPayment || f.fake.Intents() != 1 {
-		t.Fatalf("超過期限應改綁並建立：provider=%s 狀態=%s", f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'"), f.statusOf(t, "O-R4"))
+		t.Fatalf("查無算數之後應改綁並建立：provider=%s 狀態=%s", f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'"), f.statusOf(t, "O-R4"))
 	}
 	if f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1", p.ID) != 2 || f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1 AND superseded_at IS NOT NULL AND provider = 'retired_provider'", p.ID) != 1 {
 		t.Fatal("舊 provider 的嘗試應記為被取代、新嘗試另寫一列")

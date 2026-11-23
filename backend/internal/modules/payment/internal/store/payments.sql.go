@@ -12,6 +12,49 @@ import (
 	"uuid"
 )
 
+const anomalyPayment = `-- name: AnomalyPayment :one
+UPDATE payment.payments
+SET status = 'ANOMALY',
+    failure_reason = $1,
+    updated_at = $2
+WHERE id = $3 AND status = 'CREATING' AND external_payment_id IS NULL
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
+`
+
+type AnomalyPaymentParams struct {
+	Reason *string
+	Now    time.Time
+	ID     uuid.UUID
+}
+
+// provider 與本地紀錄不符或查回連續失敗：還在建立中、沒有外部 ID 的列進 ANOMALY（佔住這張訂單，補掃不再重試），原因記在 failure_reason。
+func (q *Queries) AnomalyPayment(ctx context.Context, arg AnomalyPaymentParams) (PaymentPayment, error) {
+	row := q.db.QueryRow(ctx, anomalyPayment, arg.Reason, arg.Now, arg.ID)
+	var i PaymentPayment
+	err := row.Scan(
+		&i.ID,
+		&i.OrderNo,
+		&i.StoreID,
+		&i.BuyerID,
+		&i.Amount,
+		&i.Provider,
+		&i.Description,
+		&i.Status,
+		&i.ExternalPaymentID,
+		&i.ExternalChargeID,
+		&i.PaidAt,
+		&i.LastError,
+		&i.FailureReason,
+		&i.FetchedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const applyAttemptSnapshot = `-- name: ApplyAttemptSnapshot :one
 UPDATE payment.payment_attempts
 SET external_payment_id = COALESCE(external_payment_id, $1::text),
@@ -66,7 +109,7 @@ SET status = $1,
     fetched_at = $9,
     updated_at = $10
 WHERE id = $11
-RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 `
 
 type ApplyPaymentIntentSnapshotParams struct {
@@ -117,6 +160,7 @@ func (q *Queries) ApplyPaymentIntentSnapshot(ctx context.Context, arg ApplyPayme
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -223,6 +267,37 @@ func (q *Queries) AttemptsOfPayment(ctx context.Context, arg AttemptsOfPaymentPa
 	return items, nil
 }
 
+const bumpCreateLookupFailures = `-- name: BumpCreateLookupFailures :one
+UPDATE payment.payments
+SET create_lookup_failures = create_lookup_failures + 1,
+    updated_at = $1
+WHERE id = $2 AND status = 'CREATING' AND external_payment_id IS NULL
+RETURNING create_lookup_failures
+`
+
+type BumpCreateLookupFailuresParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+func (q *Queries) BumpCreateLookupFailures(ctx context.Context, arg BumpCreateLookupFailuresParams) (int32, error) {
+	row := q.db.QueryRow(ctx, bumpCreateLookupFailures, arg.Now, arg.ID)
+	var create_lookup_failures int32
+	err := row.Scan(&create_lookup_failures)
+	return create_lookup_failures, err
+}
+
+const clearCreateLookupFailures = `-- name: ClearCreateLookupFailures :exec
+UPDATE payment.payments
+SET create_lookup_failures = 0
+WHERE id = $1 AND status = 'CREATING' AND create_lookup_failures > 0
+`
+
+func (q *Queries) ClearCreateLookupFailures(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearCreateLookupFailures, id)
+	return err
+}
+
 const creatingPaymentIDs = `-- name: CreatingPaymentIDs :many
 SELECT id
 FROM payment.payments
@@ -256,6 +331,31 @@ func (q *Queries) CreatingPaymentIDs(ctx context.Context, arg CreatingPaymentIDs
 		return nil, err
 	}
 	return items, nil
+}
+
+const effectiveAttempt = `-- name: EffectiveAttempt :one
+SELECT id, payment_id, provider, external_payment_id, idempotency_key, called_at, state, fetched_at, superseded_at, excess_paid_at, created_at
+FROM payment.payment_attempts
+WHERE payment_id = $1 AND superseded_at IS NULL
+`
+
+func (q *Queries) EffectiveAttempt(ctx context.Context, paymentID uuid.UUID) (PaymentPaymentAttempt, error) {
+	row := q.db.QueryRow(ctx, effectiveAttempt, paymentID)
+	var i PaymentPaymentAttempt
+	err := row.Scan(
+		&i.ID,
+		&i.PaymentID,
+		&i.Provider,
+		&i.ExternalPaymentID,
+		&i.IdempotencyKey,
+		&i.CalledAt,
+		&i.State,
+		&i.FetchedAt,
+		&i.SupersededAt,
+		&i.ExcessPaidAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const ensureEffectiveAttempt = `-- name: EnsureEffectiveAttempt :exec
@@ -330,7 +430,7 @@ SET status = 'CREATE_FAILED',
     failure_reason = $1,
     updated_at = $2
 WHERE id = $3 AND status = 'CREATING' AND external_payment_id IS NULL
-RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 `
 
 type FailPaymentCreateParams struct {
@@ -360,6 +460,7 @@ func (q *Queries) FailPaymentCreate(ctx context.Context, arg FailPaymentCreatePa
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -402,8 +503,42 @@ func (q *Queries) InsertPayment(ctx context.Context, arg InsertPaymentParams) (i
 	return result.RowsAffected(), nil
 }
 
+const linkEffectiveAttempt = `-- name: LinkEffectiveAttempt :one
+UPDATE payment.payment_attempts
+SET external_payment_id = $1,
+    called_at = COALESCE(called_at, $2::timestamptz)
+WHERE payment_id = $3 AND superseded_at IS NULL AND external_payment_id IS NULL
+RETURNING id, payment_id, provider, external_payment_id, idempotency_key, called_at, state, fetched_at, superseded_at, excess_paid_at, created_at
+`
+
+type LinkEffectiveAttemptParams struct {
+	ExternalPaymentID *string
+	Now               time.Time
+	PaymentID         uuid.UUID
+}
+
+// 後台人工結案：有效嘗試連上 provider 的 PaymentIntent（還沒有外部 ID 的才連）。
+func (q *Queries) LinkEffectiveAttempt(ctx context.Context, arg LinkEffectiveAttemptParams) (PaymentPaymentAttempt, error) {
+	row := q.db.QueryRow(ctx, linkEffectiveAttempt, arg.ExternalPaymentID, arg.Now, arg.PaymentID)
+	var i PaymentPaymentAttempt
+	err := row.Scan(
+		&i.ID,
+		&i.PaymentID,
+		&i.Provider,
+		&i.ExternalPaymentID,
+		&i.IdempotencyKey,
+		&i.CalledAt,
+		&i.State,
+		&i.FetchedAt,
+		&i.SupersededAt,
+		&i.ExcessPaidAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const lockPayment = `-- name: LockPayment :one
-SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 FROM payment.payments
 WHERE id = $1
 FOR UPDATE
@@ -430,6 +565,7 @@ func (q *Queries) LockPayment(ctx context.Context, id uuid.UUID) (PaymentPayment
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -491,7 +627,7 @@ UPDATE payment.payments
 SET create_called_at = COALESCE(create_called_at, $1::timestamptz),
     updated_at = $1
 WHERE id = $2 AND status = 'CREATING'
-RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 `
 
 type MarkPaymentCreateCalledParams struct {
@@ -520,6 +656,7 @@ func (q *Queries) MarkPaymentCreateCalled(ctx context.Context, arg MarkPaymentCr
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -527,7 +664,7 @@ func (q *Queries) MarkPaymentCreateCalled(ctx context.Context, arg MarkPaymentCr
 }
 
 const paymentByExternal = `-- name: PaymentByExternal :one
-SELECT p.id, p.order_no, p.store_id, p.buyer_id, p.amount, p.provider, p.description, p.status, p.external_payment_id, p.external_charge_id, p.paid_at, p.last_error, p.failure_reason, p.fetched_at, p.create_idempotency_key, p.create_called_at, p.created_at, p.updated_at
+SELECT p.id, p.order_no, p.store_id, p.buyer_id, p.amount, p.provider, p.description, p.status, p.external_payment_id, p.external_charge_id, p.paid_at, p.last_error, p.failure_reason, p.fetched_at, p.create_idempotency_key, p.create_called_at, p.create_lookup_failures, p.created_at, p.updated_at
 FROM payment.payments p
 JOIN payment.payment_attempts a ON a.payment_id = p.id
 WHERE a.provider = $1 AND a.external_payment_id = $2
@@ -559,6 +696,7 @@ func (q *Queries) PaymentByExternal(ctx context.Context, arg PaymentByExternalPa
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -566,7 +704,7 @@ func (q *Queries) PaymentByExternal(ctx context.Context, arg PaymentByExternalPa
 }
 
 const paymentByID = `-- name: PaymentByID :one
-SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 FROM payment.payments
 WHERE id = $1
 `
@@ -591,6 +729,7 @@ func (q *Queries) PaymentByID(ctx context.Context, id uuid.UUID) (PaymentPayment
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -598,7 +737,7 @@ func (q *Queries) PaymentByID(ctx context.Context, id uuid.UUID) (PaymentPayment
 }
 
 const paymentByOrderNo = `-- name: PaymentByOrderNo :one
-SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 FROM payment.payments
 WHERE order_no = $1
 `
@@ -623,6 +762,7 @@ func (q *Queries) PaymentByOrderNo(ctx context.Context, orderNo string) (Payment
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -701,10 +841,11 @@ UPDATE payment.payments
 SET provider = $1,
     create_idempotency_key = gen_random_uuid(),
     create_called_at = NULL,
+    create_lookup_failures = 0,
     updated_at = $2
 WHERE id = $3 AND status = 'CREATING' AND external_payment_id IS NULL AND provider <> $1
   AND (create_called_at IS NULL OR create_called_at < $4::timestamptz)
-RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 `
 
 type RebindCreatingPaymentParams struct {
@@ -714,7 +855,7 @@ type RebindCreatingPaymentParams struct {
 	StaleBefore time.Time
 }
 
-// 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空），或已超過 stale_before（UnresolvedDeadline 之前）時改成目前的 provider，
+// 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空），或已早於 stale_before（查無才算數的時刻）時改成目前的 provider，
 // 換新冪等鍵、重新起算呼叫時刻。呼叫過又還在期限內的列不動：舊 provider 的呼叫可能已經在 provider 那邊建出 PaymentIntent，改綁會讓買家拿到兩個。
 func (q *Queries) RebindCreatingPayment(ctx context.Context, arg RebindCreatingPaymentParams) (PaymentPayment, error) {
 	row := q.db.QueryRow(ctx, rebindCreatingPayment,
@@ -741,6 +882,7 @@ func (q *Queries) RebindCreatingPayment(ctx context.Context, arg RebindCreatingP
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -757,6 +899,7 @@ SET status = 'CREATING',
     paid_at = NULL,
     fetched_at = NULL,
     create_called_at = NULL,
+    create_lookup_failures = 0,
     create_idempotency_key = gen_random_uuid(),
     provider = $1,
     description = $2,
@@ -765,7 +908,7 @@ SET status = 'CREATING',
     amount = $5,
     updated_at = $6
 WHERE id = $7 AND status IN ('CREATE_FAILED', 'CANCELED')
-RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, created_at, updated_at
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 `
 
 type ResetPaymentParams struct {
@@ -808,6 +951,96 @@ func (q *Queries) ResetPayment(ctx context.Context, arg ResetPaymentParams) (Pay
 		&i.FetchedAt,
 		&i.CreateIdempotencyKey,
 		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const resolvePaymentFailed = `-- name: ResolvePaymentFailed :one
+UPDATE payment.payments
+SET status = 'CREATE_FAILED',
+    failure_reason = $1,
+    updated_at = $2
+WHERE id = $3 AND status = 'ANOMALY'
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
+`
+
+type ResolvePaymentFailedParams struct {
+	FailureReason *string
+	Now           time.Time
+	ID            uuid.UUID
+}
+
+// 後台人工結案：確認 provider 沒有這筆付款，ANOMALY 進 CREATE_FAILED（買家可以再付，換新鍵）。
+func (q *Queries) ResolvePaymentFailed(ctx context.Context, arg ResolvePaymentFailedParams) (PaymentPayment, error) {
+	row := q.db.QueryRow(ctx, resolvePaymentFailed, arg.FailureReason, arg.Now, arg.ID)
+	var i PaymentPayment
+	err := row.Scan(
+		&i.ID,
+		&i.OrderNo,
+		&i.StoreID,
+		&i.BuyerID,
+		&i.Amount,
+		&i.Provider,
+		&i.Description,
+		&i.Status,
+		&i.ExternalPaymentID,
+		&i.ExternalChargeID,
+		&i.PaidAt,
+		&i.LastError,
+		&i.FailureReason,
+		&i.FetchedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const resolvePaymentLinked = `-- name: ResolvePaymentLinked :one
+UPDATE payment.payments
+SET status = 'AWAITING_PAYMENT',
+    external_payment_id = $1,
+    failure_reason = NULL,
+    create_called_at = COALESCE(create_called_at, $2::timestamptz),
+    create_lookup_failures = 0,
+    updated_at = $2
+WHERE id = $3 AND status = 'ANOMALY' AND external_payment_id IS NULL
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
+`
+
+type ResolvePaymentLinkedParams struct {
+	ExternalPaymentID *string
+	Now               time.Time
+	ID                uuid.UUID
+}
+
+// 後台人工結案：ANOMALY 的付款在 provider 確實有 PaymentIntent（external_payment_id 是證據）：連上它、暫記 AWAITING_PAYMENT，真正的狀態由隨後的同步重讀推導。
+func (q *Queries) ResolvePaymentLinked(ctx context.Context, arg ResolvePaymentLinkedParams) (PaymentPayment, error) {
+	row := q.db.QueryRow(ctx, resolvePaymentLinked, arg.ExternalPaymentID, arg.Now, arg.ID)
+	var i PaymentPayment
+	err := row.Scan(
+		&i.ID,
+		&i.OrderNo,
+		&i.StoreID,
+		&i.BuyerID,
+		&i.Amount,
+		&i.Provider,
+		&i.Description,
+		&i.Status,
+		&i.ExternalPaymentID,
+		&i.ExternalChargeID,
+		&i.PaidAt,
+		&i.LastError,
+		&i.FailureReason,
+		&i.FetchedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -837,6 +1070,51 @@ func (q *Queries) ReviveAttempt(ctx context.Context, id uuid.UUID) (PaymentPayme
 		&i.SupersededAt,
 		&i.ExcessPaidAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const rotateCreateKey = `-- name: RotateCreateKey :one
+UPDATE payment.payments
+SET create_idempotency_key = gen_random_uuid(),
+    create_called_at = NULL,
+    create_lookup_failures = 0,
+    updated_at = $1
+WHERE id = $2 AND status = 'CREATING' AND external_payment_id IS NULL AND create_idempotency_key = $3
+RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
+`
+
+type RotateCreateKeyParams struct {
+	Now    time.Time
+	ID     uuid.UUID
+	OldKey uuid.UUID
+}
+
+// provider 已知拒絕（可重試、沒有執行）：付款列換新的冪等鍵、清掉呼叫時刻與查回失敗次數，不計任何期限；呼叫方同 transaction 取代有效嘗試並寫新的一列。
+// 只有仍用 old_key 的建立中列換（並行的呼叫不重複換）。
+func (q *Queries) RotateCreateKey(ctx context.Context, arg RotateCreateKeyParams) (PaymentPayment, error) {
+	row := q.db.QueryRow(ctx, rotateCreateKey, arg.Now, arg.ID, arg.OldKey)
+	var i PaymentPayment
+	err := row.Scan(
+		&i.ID,
+		&i.OrderNo,
+		&i.StoreID,
+		&i.BuyerID,
+		&i.Amount,
+		&i.Provider,
+		&i.Description,
+		&i.Status,
+		&i.ExternalPaymentID,
+		&i.ExternalChargeID,
+		&i.PaidAt,
+		&i.LastError,
+		&i.FailureReason,
+		&i.FetchedAt,
+		&i.CreateIdempotencyKey,
+		&i.CreateCalledAt,
+		&i.CreateLookupFailures,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

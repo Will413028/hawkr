@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,10 @@ type fakeTransfer struct {
 
 // Fake 是記憶體內的 provider：測試與本機用。每個呼叫都檢查不在 DB transaction 內、有 deadline（規則 5），違規記在 Violations。
 // 同一把冪等鍵重送回同一個物件（內容不同是永久失敗，與 Stripe 的 idempotency_error 一致）。
+//
+// 建立呼叫的四種結果都能驅動：成功（不注入）、終局拒絕（FailX(ErrPermanent)）、可重試拒絕（FailX(ErrRetryableRefusal)，沒有建立物件）、不明
+// （FailX(一般錯誤) 是呼叫沒有到達 provider，FailXAfterCreate(一般錯誤) 是物件已建立、回應遺失）。查回（Find*）依嘗試 ID（建立時的冪等鍵）比對：
+// 物件存在就是「找到」，不存在是「查無」，FailLookup 注入查回本身的失敗。
 type Fake struct {
 	// OnCreate 在 CreatePayment 進行中（建立之前）執行一次，測試用來製造交錯。
 	OnCreate func()
@@ -68,6 +73,7 @@ type Fake struct {
 	transferErrs []error
 	reversals    map[string]ReversalSnapshot
 	reversalKeys map[string]string
+	reversalOf   map[string]string
 	reversalErrs []error
 	// transferLost 與 reversalLost 是「已建立、回應遺失」的錯誤佇列；transferCalls 與 reversalCalls 計呼叫次數（失敗的也算）。
 	transferSeen  []string
@@ -76,6 +82,8 @@ type Fake struct {
 	reversalLost  []error
 	transferCalls int
 	reversalCalls int
+	lookupErrs    []error
+	lookups       int
 	violations    []string
 }
 
@@ -83,7 +91,7 @@ type Fake struct {
 func NewFake() *Fake {
 	return &Fake{
 		intents: map[string]*fakeIntent{}, byKey: map[string]string{}, refunds: map[string]*fakeRefund{}, refundByKey: map[string]string{},
-		transfers: map[string]*fakeTransfer{}, transferKeys: map[string]string{}, reversals: map[string]ReversalSnapshot{}, reversalKeys: map[string]string{},
+		transfers: map[string]*fakeTransfer{}, transferKeys: map[string]string{}, reversals: map[string]ReversalSnapshot{}, reversalKeys: map[string]string{}, reversalOf: map[string]string{},
 	}
 }
 
@@ -152,6 +160,45 @@ func (f *Fake) FailReversalAfterCreate(errs ...error) {
 	push(&f.reversalLost, errs)
 }
 
+// FailLookup 讓接下來的 Find*（不分種類）依序回這些錯誤（排完就正常查回）。
+func (f *Fake) FailLookup(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	push(&f.lookupErrs, errs)
+}
+
+// LookupCalls 回傳 Find* 的呼叫次數（失敗的也算）。
+func (f *Fake) LookupCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lookups
+}
+
+// SetTransferAmount 改 provider 那邊轉帳的金額（測試查回或建立的結果與列對不起來）。
+func (f *Fake) SetTransferAmount(externalID string, amount int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	tr, ok := f.transfers[externalID]
+	if !ok {
+		return fmt.Errorf("fake：沒有轉帳 %s", externalID)
+	}
+	tr.snap.Amount = amount
+	return nil
+}
+
+// SetReversalAmount 改 provider 那邊撤回的金額（測試查回或建立的結果與列對不起來）。
+func (f *Fake) SetReversalAmount(externalID string, amount int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.reversals[externalID]
+	if !ok {
+		return fmt.Errorf("fake：沒有撤回 %s", externalID)
+	}
+	r.Amount = amount
+	f.reversals[externalID] = r
+	return nil
+}
+
 // TransferCalls 回傳 CreateTransfer 的呼叫次數（失敗的呼叫也算）。
 func (f *Fake) TransferCalls() int {
 	f.mu.Lock()
@@ -178,6 +225,29 @@ func (f *Fake) ReversalKeys() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.reversalSeen...)
+}
+
+// TransferIDs 回傳 provider 那邊已建立的轉帳的外部 ID（依 ID 排序）。
+func (f *Fake) TransferIDs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return sortedKeys(f.transfers)
+}
+
+// ReversalIDs 回傳 provider 那邊已建立的撤回的外部 ID（依 ID 排序）。
+func (f *Fake) ReversalIDs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return sortedKeys(f.reversals)
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // Transfers 回傳 provider 那邊已建立的轉帳數（同一把鍵只算一筆）。
@@ -350,6 +420,69 @@ func (f *Fake) CreatePayment(ctx context.Context, in CreateInput) (Snapshot, err
 	return f.intents[id].snap, nil
 }
 
+// lookup 計次並回注入的查回失敗；要持有 f.mu。
+func (f *Fake) lookup(ctx context.Context, op string) error {
+	f.check(ctx, op)
+	f.lookups++
+	return pop(&f.lookupErrs)
+}
+
+// FindPayment 實作 Provider：依建立時的冪等鍵（嘗試 ID）查回。
+func (f *Fake) FindPayment(ctx context.Context, attemptID string) (Snapshot, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.lookup(ctx, "FindPayment"); err != nil {
+		return Snapshot{}, false, err
+	}
+	id, ok := f.byKey[attemptID]
+	if !ok {
+		return Snapshot{}, false, nil
+	}
+	return f.intents[id].snap, true, nil
+}
+
+// FindRefund 實作 Provider：依建立時的冪等鍵（嘗試 ID）查回。
+func (f *Fake) FindRefund(ctx context.Context, externalPaymentID, attemptID string) (RefundSnapshot, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.lookup(ctx, "FindRefund"); err != nil {
+		return RefundSnapshot{}, false, err
+	}
+	id, ok := f.refundByKey[attemptID]
+	if !ok || f.refunds[id].in.ExternalPaymentID != externalPaymentID {
+		return RefundSnapshot{}, false, nil
+	}
+	return f.refunds[id].snap, true, nil
+}
+
+// FindTransfer 實作 Provider：依 transfer_group 與建立時的冪等鍵（嘗試 ID）查回。
+func (f *Fake) FindTransfer(ctx context.Context, transferGroup, attemptID string) (TransferSnapshot, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.lookup(ctx, "FindTransfer"); err != nil {
+		return TransferSnapshot{}, false, err
+	}
+	id, ok := f.transferKeys[attemptID]
+	if !ok || f.transfers[id].in.TransferGroup != transferGroup {
+		return TransferSnapshot{}, false, nil
+	}
+	return f.transfers[id].snap, true, nil
+}
+
+// FindReversal 實作 Provider：依轉帳 ID 與建立時的冪等鍵（嘗試 ID）查回。
+func (f *Fake) FindReversal(ctx context.Context, externalTransferID, attemptID string) (ReversalSnapshot, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.lookup(ctx, "FindReversal"); err != nil {
+		return ReversalSnapshot{}, false, err
+	}
+	id, ok := f.reversalKeys[attemptID]
+	if !ok || f.reversalOf[id] != externalTransferID {
+		return ReversalSnapshot{}, false, nil
+	}
+	return f.reversals[id], true, nil
+}
+
 // GetPayment 實作 Provider：不存在是永久失敗。
 func (f *Fake) GetPayment(ctx context.Context, externalID string) (Snapshot, error) {
 	f.mu.Lock()
@@ -419,7 +552,7 @@ func (f *Fake) GetRefund(ctx context.Context, externalID string) (RefundSnapshot
 	return r.snap, nil
 }
 
-// CreateTransfer 實作 Provider：同一個冪等鍵回同一筆轉帳；轉帳金額超過付款是永久失敗；FailTransfer 可以注入「平台餘額不足」這類可重試的一般錯誤。
+// CreateTransfer 實作 Provider：同一個冪等鍵回同一筆轉帳；轉帳金額超過付款是永久失敗；FailTransfer 可以注入「平台餘額不足」這類可重試拒絕（ErrRetryableRefusal）。
 func (f *Fake) CreateTransfer(ctx context.Context, in TransferInput) (TransferSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -445,7 +578,7 @@ func (f *Fake) CreateTransfer(ctx context.Context, in TransferInput) (TransferSn
 	return snap, nil
 }
 
-// ReverseTransfer 實作 Provider：同一個冪等鍵回同一次撤回；撤回超過轉帳的剩餘額度是永久失敗（Stripe 回 400，spikes.md #4）；賣家餘額不足不是錯誤（#9）。
+// ReverseTransfer 實作 Provider：同一個冪等鍵回同一次撤回；撤回超過轉帳的剩餘額度是永久失敗（Stripe 回 400）；賣家餘額不足不是錯誤。
 func (f *Fake) ReverseTransfer(ctx context.Context, in ReversalInput) (ReversalSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -466,7 +599,7 @@ func (f *Fake) ReverseTransfer(ctx context.Context, in ReversalInput) (ReversalS
 	id := fmt.Sprintf("fake_trr_%d", f.next)
 	tr.snap.ReversedAmount += in.Amount
 	snap := ReversalSnapshot{ExternalID: id, Amount: in.Amount}
-	f.reversals[id], f.reversalKeys[in.IdempotencyKey] = snap, id
+	f.reversals[id], f.reversalKeys[in.IdempotencyKey], f.reversalOf[id] = snap, id, in.ExternalTransferID
 	if err := pop(&f.reversalLost); err != nil {
 		return ReversalSnapshot{}, err
 	}

@@ -21,16 +21,18 @@ const (
 	PaymentSucceeded PaymentStatus = "SUCCEEDED"
 	// PaymentCanceled 已取消（provider 的成功仍會勝出）。
 	PaymentCanceled PaymentStatus = "CANCELED"
-	// PaymentCreateFailed 建立的終局：provider 永久拒絕，或結果不明超過期限。
+	// PaymentCreateFailed 建立的終局：provider 永久拒絕，或查回證明 provider 沒有這筆。
 	PaymentCreateFailed PaymentStatus = "CREATE_FAILED"
+	// PaymentAnomaly 建立的結果與 provider 對不起來或查回連續失敗：佔住這張訂單、補掃不再重試，由後台人工結案。
+	PaymentAnomaly PaymentStatus = "ANOMALY"
 )
 
 // PaymentStatusValues 回傳全部付款狀態，與 payments_status_check 相同。
 func PaymentStatusValues() []PaymentStatus {
-	return []PaymentStatus{PaymentCreating, PaymentAwaitingPayment, PaymentProcessing, PaymentSucceeded, PaymentCanceled, PaymentCreateFailed}
+	return []PaymentStatus{PaymentCreating, PaymentAwaitingPayment, PaymentProcessing, PaymentSucceeded, PaymentCanceled, PaymentCreateFailed, PaymentAnomaly}
 }
 
-// TransferStatus 是轉帳的狀態（transfers_status_check；3b 使用）。
+// TransferStatus 是轉帳的狀態（transfers_status_check）。
 type TransferStatus string
 
 // 轉帳的狀態。
@@ -41,11 +43,13 @@ const (
 	TransferSucceeded TransferStatus = "SUCCEEDED"
 	// TransferFailed 終局失敗，不佔「一筆付款最多一筆有效轉帳」。
 	TransferFailed TransferStatus = "FAILED"
+	// TransferAnomaly 與 provider 對不起來或前置條件不成立：不能確定沒有搬錢，所以仍佔位，補掃不再重試，由後台人工結案。
+	TransferAnomaly TransferStatus = "ANOMALY"
 )
 
 // TransferStatusValues 回傳全部轉帳狀態，與 transfers_status_check 相同。
 func TransferStatusValues() []TransferStatus {
-	return []TransferStatus{TransferPending, TransferSucceeded, TransferFailed}
+	return []TransferStatus{TransferPending, TransferSucceeded, TransferFailed, TransferAnomaly}
 }
 
 // Transfer 是付款轉給賣家的轉帳（transfers 的對外視圖）；ReversedAmount 是累計已撤回的額度。
@@ -56,12 +60,12 @@ type Transfer struct {
 	Amount         int64
 	ReversedAmount int64
 	Status         TransferStatus
-	// FailureReason 只在 TransferFailed 有值。
+	// FailureReason 只在 TransferFailed 與 TransferAnomaly 有值。
 	FailureReason string
 	CreatedAt     time.Time
 }
 
-// RefundStatus 是退款的狀態（refunds_status_check；3c 使用）。
+// RefundStatus 是退款的狀態（refunds_status_check）。
 type RefundStatus string
 
 // 退款的狀態。
@@ -78,11 +82,13 @@ const (
 	RefundSucceeded RefundStatus = "SUCCEEDED"
 	// RefundFailed 退款失敗，不佔累計額度。
 	RefundFailed RefundStatus = "FAILED"
+	// RefundAnomaly 與 provider 對不起來或前置條件不成立：仍佔額度，補掃不再重試，由後台人工結案。
+	RefundAnomaly RefundStatus = "ANOMALY"
 )
 
 // RefundStatusValues 回傳全部退款狀態，與 refunds_status_check 相同。
 func RefundStatusValues() []RefundStatus {
-	return []RefundStatus{RefundPending, RefundReversing, RefundReversed, RefundRefunding, RefundSucceeded, RefundFailed}
+	return []RefundStatus{RefundPending, RefundReversing, RefundReversed, RefundRefunding, RefundSucceeded, RefundFailed, RefundAnomaly}
 }
 
 // Payment 是買家對一張訂單的付款。金額是整數、不帶幣別（D9）。
@@ -126,3 +132,32 @@ type ExcessPaid struct {
 	ExternalPaymentID string
 	ExcessPaidAt      time.Time
 }
+
+// AnomalyKind 是進入 ANOMALY 的物件種類。
+type AnomalyKind string
+
+// 進入 ANOMALY 的物件種類。
+const (
+	AnomalyPayment  AnomalyKind = "payment"
+	AnomalyTransfer AnomalyKind = "transfer"
+	AnomalyRefund   AnomalyKind = "refund"
+)
+
+// MoneyAnomaly 是告警事件：搬錢的物件（付款、轉帳、退款）與 provider 對不起來而進入 ANOMALY，或 provider 已搬錢本地卻已不在可接收的狀態，需要人工核對。
+// 在寫入狀態的同一個 transaction 內發布（沒有狀態可寫的孤兒結果也發布）；Reason 是原因碼與 ID 的簡短說明，不含個資。
+type MoneyAnomaly struct {
+	OccurredAt time.Time
+	Kind       AnomalyKind
+	ObjectID   uuid.UUID
+	PaymentID  uuid.UUID
+	Reason     string
+}
+
+// AnomalyOutcome 是人工結案的結果：AnomalySucceeded 是 provider 確實執行了（附 provider 物件 ID 為證據），AnomalyFailed 是確認 provider 沒有執行。
+type AnomalyOutcome string
+
+// 人工結案的結果。
+const (
+	AnomalySucceeded AnomalyOutcome = "SUCCEEDED"
+	AnomalyFailed    AnomalyOutcome = "FAILED"
+)
