@@ -40,7 +40,8 @@
 |---|---|
 | 來源 transaction 只排一個通知意圖 job，收件人與偏好在 worker 決定；例外只有明列的清除訂閱者：停權與刪帳號時同 tx 刪 token（通知 ADR 決策 4） | A8-1 的結構性測試：notification 的同步訂閱者只呼叫 `jobs.Enqueue`，白名單列出 token 清除訂閱者（A8-3 加入）；backend 單體規則 4 |
 | 意圖冪等鍵 = 事件來源身分；投遞冪等鍵 =（意圖、收件人、渠道） | 投遞紀錄 UNIQUE、重送 runbook、未觸達查詢 |
-| 投遞紀錄是每筆通知觸達與否的唯一來源（River 只保留完成的 job 24 小時） | 重送、未觸達率查詢 |
+| 投遞紀錄是每筆推播與 email 觸達與否的唯一來源（River 只保留完成的 job 24 小時）；收件匣不是渠道，收件匣列本身就是進收件匣的紀錄 | 重送、未觸達率查詢 |
+| 收件匣參數快照不含第三方個資（只存 ID，讀取時解析） | 註冊表自檢、收件匣讀取、個資清除 |
 | 收件匣只存型別＋參數快照＋聚合鍵，讀取時依請求語系組字 | 收件匣讀取 API、型別渲染程式的保留、個資清除鍵 |
 | BUYER 受眾只推 buyer App、STORE 只推 seller App；串流訂閱鍵 `(account_id, 受眾)` | `device_tokens.app`、推播 job、串流 hub |
 | 封鎖雙方之間不送互動通知；自我通知以帳號比對 | worker 的略過規則（經 buyer、seller 公開 API 讀封鎖）；A7-3 的同一個測試 |
@@ -85,26 +86,33 @@
 
 - [ ] **A8-1 模組本體（walking skeleton）**（被擋於：無）
   - 範圍：`internal/modules/notification`：
-    - schema：收件匣（型別、參數快照、聚合鍵、actor 清單、已讀）、通知意圖、每渠道投遞紀錄（待送／已送／永久失敗、實際送出的文字與 locale）、裝置 token（`last_registered_at`）、偏好覆寫列 `(account_id, 受眾, 分類, 渠道, enabled)`、公告、suppression 名單。
+    - schema：收件匣（型別、參數快照、聚合鍵、actor 帳號 ID 清單、已讀）、通知意圖、每渠道投遞紀錄（待送／已送／永久失敗、實際送出的文字與 locale）、裝置 token（`last_registered_at`）、偏好覆寫列 `(account_id, 受眾, 分類, 渠道, enabled)`。公告表隨 A8-2、suppression 表隨 A8-3 建（第一個讀寫者出現時）。
+    - 收件匣不是投遞渠道：投遞紀錄只記推播與 email；收件匣列本身就是「已進收件匣」的紀錄，聚合時多個意圖合併成一列。
+    - 參數快照不存他人的個資：actor 與其他第三方只存帳號 ID（或業務 ID），名稱、頭像在讀取時向擁有模組解析，已刪除的顯示通用稱呼；註冊表自檢禁止型別參數宣告第三方名稱欄位。投遞紀錄的「實際送出文字」是例外（送出時的事實），由保留期與下方個資清除處理。
+    - 舊模板機制的去向（盤點 §3–§5）：`payload_filter` 改成型別內的 typed 條件（Go 程式，不是資料）；silent 推播改成 D6 的狀態重讀提示（沒有可見文字的型別不建）；`image_key_template` 改成 D14 的可選圖片欄位；逐列寫進 `CARRYOVER.md`。
     - 型別註冊表：typed 參數、受眾、偏好分類（D4）、呈現分類（D6）、渠道、可選聚合鍵（讚、追蹤用）、冪等鍵來源、actor 欄位、文案（模組 `internal/text`，zh-TW／en）、深連結、可選的推播圖片（商品類型別帶，D14）；預設偏好與不可關的分類寫在註冊表。
     - 入口：同步訂閱者只排意圖 job；worker 解析收件人、套偏好、自我略過（帳號比對）、封鎖略過、寫收件匣（有聚合鍵時未讀列 upsert）與投遞紀錄、排渠道 job。
-    - 保留期清除 job（收件匣與投遞紀錄都 180 天硬刪，D2、D15）；個資清除：訂閱 `identity.AccountDeleted`（`identity/events.go:9`）、`buyer.BuyerDeleted`（`buyer/events.go:25`）、`seller.StoreRetired`（`seller/events.go:31`），排 job 清收件匣參數與偏好（token 的同步刪除在 A8-3）；未送出的意圖在 worker 執行時先確認收件帳號未刪除，所以刪除後到清除 job 跑完之間不會再送。
-    - `internal/arch/modules.go` 的 notification 列加 `accountsuspension`、`moderation`。
+    - 保留期清除 job（收件匣、投遞紀錄與通知意圖都 180 天硬刪，D2、D15；意圖表同期限，因為它只為冪等存在，超過 River 重試期即無用，用 `jobs.SweepOpts`）；個資清除：訂閱 `identity.AccountDeleted`（`identity/events.go:9`）、`buyer.BuyerDeleted`（`buyer/events.go:25`）、`seller.StoreRetired`（`seller/events.go:31`），排 job 刪該收件人的收件匣列、偏好、投遞紀錄的送出文字與意圖參數（token 的同步刪除在 A8-3）；worker 在寫收件匣的同一個 transaction 先以 `FOR SHARE` 鎖收件帳號列（依 `platform/lockorder`，identity 帳號列最先）並確認未刪除，消除「檢查後才 commit 刪除」的競態。
+    - `internal/arch/modules.go` 的 notification 列改成實際依賴：只留已在單體、且 A8 會訂閱或讀取的模組（identity、buyer、seller、review、im、social、procurement、delegation、payment、accountsuspension、moderation），刪掉還沒搬或已退場的（catalog、ordering、fulfillment、invoice、coupon、aftersales、finance）；那些隨各自搬遷時加（D13）。
     - 一個型別端到端：`accountsuspension.Suspended` → 收件匣。`CARRYOVER.md` 沿用盤點表（盤點 §2、§6 每列）。
+  - 子步驟（一個 session 做不完，2026-11-23 拆分；各自有驗收，依序做）：
+    - **A8-1a 骨架、schema、註冊表**：`make new-module` 產骨架並登記 `cmd/hawkr/modules.go`；上列全部表（`schema.sql`＋migration＋sqlc）；型別註冊表與 `internal/text`（先只有 `account_suspended`、`account_unsuspended` 兩型別）；`modules.go` 依賴改成實際依賴；`CARRYOVER.md`（盤點 §2–§6 每列）、模組 `AGENTS.md`。驗收：兩型別 zh-TW／en 固定輸出比對測試、註冊表自檢測試（每型別有冪等鍵來源、分類在 D4 清單、呈現分類在 D6 清單、聚合鍵只在宣告可聚合的型別、參數不含第三方名稱欄位）、`TestSchemaFileMatchesMigrations` 等既有守門、lint／vet。mutation：不可關分類改成可關 → 註冊表測試紅。
+    - **A8-1b 意圖管線與第一個端到端型別**：同步訂閱者→意圖 job→worker（收件人解析、偏好、自我略過、收件匣寫入與聚合 upsert、投遞紀錄；渠道 job 先只排不送，A8-3 接 adapter；寫收件匣的 transaction 內以 `FOR SHARE` 鎖收件帳號列並確認未刪除）；`accountsuspension.Suspended`／`Unsuspended` 訂閱；結構性測試。驗收：下方 integration 的冪等、偏好、自我略過、聚合四項、刪除後到達的意圖不建收件匣與 Suspended→收件匣；mutation 其餘三項。
+    - **A8-1c 保留期與個資清除**：180 天清除 job、三個刪除事件的清除 job（被擋於 D16）。驗收：下方 integration 的清除兩項（刪除事件後清除、到期硬刪）。
   - 消費端：`rg -n "accountsuspension\.(Suspended|Unsuspended)" backend/internal`；`internal/arch/modules.go`。
   - 不能動：accountsuspension 的事件型別與發布 transaction。
-  - 驗收：每個型別的固定輸出比對測試（zh-TW、en）；結構性測試：notification 的同步訂閱者只呼叫 `jobs.Enqueue`；integration：同一事件投遞兩次只有一列、偏好關閉的分類不建收件匣但不可關的分類仍建、自我通知被略過、同聚合鍵的未讀通知合併成一列、三個刪除事件後收件匣參數與偏好被清、刪除後到達的意圖不建收件匣、180 天到期列被硬刪；`make lint-monolith`、`make test-all`、`GOWORK=off go vet -tags integration ./...`。mutation（進 `mutation/`）：拿掉意圖冪等 UNIQUE → 冪等測試紅；自我略過改回比 buyer_id → 略過測試紅；不可關分類改成可關 → 測試紅；聚合 upsert 改成 insert → 合併測試紅。
+  - 驗收：每個型別的固定輸出比對測試（zh-TW、en）；結構性測試：notification 的同步訂閱者只呼叫 `jobs.Enqueue`；integration：同一事件投遞兩次只有一列、偏好關閉的分類不建收件匣但不可關的分類仍建、自我通知被略過、同聚合鍵的未讀通知合併成一列、三個刪除事件後收件匣、偏好、投遞送出文字與意圖參數被清、刪除後到達的意圖不建收件匣、180 天到期的收件匣／投遞紀錄／意圖列被硬刪；`make lint-monolith`、`make test-all`、`GOWORK=off go vet -tags integration ./...`。mutation（進 `mutation/`）：拿掉意圖冪等 UNIQUE → 冪等測試紅；自我略過改回比 buyer_id → 略過測試紅；不可關分類改成可關 → 測試紅；聚合 upsert 改成 insert → 合併測試紅。
   - 停止條件：型別註冊表無法不靠執行期反射表達上列屬性。
 
 - [ ] **A8-2 Connect API 與串流**（被擋於：A8-1、D6）
-  - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。推播 payload 與串流訊號帶 D6 的狀態重讀提示 enum。賣家工作區即時通道與通知串流共用路徑、SSE 連線與 topic `notification:user:{storeId}`（A8-0 U10，`fact-checks.md`；`seller_workspace_channel.go:14-34`），一起搬：同一個串流與 hub 承載 `seller_workspace` 事件、其發布端（`ResolveTopic` 讀 `payload.sellerId`）與批次事件名，website `useSellerWorkspaceRealtime` 改接新串流。
+  - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到；公告表在本步建）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。推播 payload 與串流訊號帶 D6 的狀態重讀提示 enum。賣家工作區即時通道與通知串流共用路徑、SSE 連線與 topic `notification:user:{storeId}`（A8-0 U10，`fact-checks.md`；`seller_workspace_channel.go:14-34`），一起搬：同一個串流與 hub 承載 `seller_workspace` 事件、其發布端（`ResolveTopic` 讀 `payload.sellerId`）與批次事件名，website `useSellerWorkspaceRealtime` 改接新串流。
   - 消費端：`rg -n "notifications|notification-preferences|device-token" website/ admin/ buyer-app/lib seller-app/lib backend/gateway backend/internal/httpapi`。
   - 不能動：舊 REST 在 A8-7 前仍可用。
   - 驗收：`buf lint`、`buf breaking`、TS／Dart 生成無 drift；Connect 特性測試涵蓋每支方法；串流 integration：建立通知後收到訊號、另一受眾收不到、超過上限被拒、發 `seller.order.updated` 後賣家工作區訂閱者收到事件。mutation：拿掉 `seller_workspace` 事件的轉送 → 賣家工作區測試紅；串流鍵拿掉受眾 → 跨受眾測試紅；`MarkAsRead` 改回非本人也成功 → NotFound 測試紅；`total` 不套分類篩選 → 篩選計數測試紅；拿掉串流上限檢查 → 上限測試紅。
 
 - [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1；真實 provider 驗收另擋於 Will 的帳號）
   - 範圍：
-    - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Resend adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 寫 suppression）；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字。
+    - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Resend adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 先寫 `platform/inbox` 再寫 suppression 表（本步建））；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字。
     - token：登入 upsert 改綁、登出刪、帳號停權（`accountsuspension.Suspended`）與刪帳號（`identity.AccountDeleted`）時由同 transaction 的同步訂閱者刪列，加進 A8-1 結構測試的白名單、每日 job 刪 60 天未更新的 token；店家停權不動。
     - 重送：依投遞紀錄重排永久失敗的手段與 runbook；未觸達查詢：近 N 天交易必要型別沒有任何渠道送達的數量（後台唯讀）。
     - 依 D3 的裁決表為單體事件定義型別並訂閱：social（留言、讚、追蹤的店發文；讚用聚合鍵）、buyer 的追蹤店家（`cmd/hawkr/buyer_events.go:20` 現經 `buyerrelay`；用聚合鍵）、review、im（離線推播）、seller（檢舉收到與結果、seller 新增公開事件 `CaseInquiryCreated`（`seller/events.go`，在 `CreateCaseInquiry` 的同一個 transaction 發布）、措施與治理、KYC 審核結果）、payment `PayoutAccountChanged`（payment 先加首次啟用時間、補件期限欄位；期限前提醒是另一型別 `payout_account_deadline`）；型別清單以 `event-adjudication.md` 與 D3 為準（收藏不做、im 只推播不寫收件匣、解除請求只送 Decided）、accountsuspension 停權與解除、delegation 代行完成、procurement `RfqPublished`。moderation 新增事件（消費者此時出現）：內容被隱藏、作者收到警告、案件結案（帶每位檢舉人帳號），在處置的同一個 transaction 發布。`ReportReceived` 的確認信：意圖參數只放 report 參照，worker 執行時向 seller 讀地址。
@@ -181,6 +189,7 @@
 | D14 推播圖片 | 註冊表有可選圖片欄位，商品類型別帶圖；FCM payload 帶圖片 URL；iOS 加 Notification Service Extension（A8-6） | 已決 2026-11-23，Will |
 | D15 投遞紀錄保留期 | 180 天硬刪，與收件匣同一個清除 job（舊系統只刪 failed／skipped 超過 30 天） | 已決 2026-11-23，Will |
 | D13 legacy 通知轉接 | 不做；通知型別隨發送端搬遷 | 已決 2026-11-23，Will |
+| D16 投遞紀錄「實際送出文字」裡的第三方名稱 | 未決。問題：actor 刪帳號後，別人投遞紀錄的送出文字仍含其名稱，最長 180 天。選項：(a) 接受，送出文字是「送了什麼」的事實紀錄，期限受 D15 約束；(b) 不存送出文字，只存型別＋參數（ID）＋locale，需要時重組，代價是重組結果可能與當時不同、客訴時無法證明送了什麼；(c) actor 刪帳號時也掃描清除。建議 (a)：業界（SendGrid、Postmark 的 message activity）保留送出內容到保留期，GDPR 以有限保留期滿足最小化。擋住 A8-1c | 未決，交 Will 2026-11-23 |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
 
@@ -191,7 +200,9 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | A8-0 基線與事實查核 | 完成 | 基線見文末；`event-adjudication.md`、`fact-checks.md`、`inventory.md` 去向；`python3 backend/docs/plans/2026-11-23-a8-notification/check_dispositions.py` → 0 個空格（填表前 243 個） |  | 本次 |
-| A8-1 模組本體 | 未開始 | | | |
+| A8-1a 骨架、schema、註冊表 | 進行中 | | | |
+| A8-1b 意圖管線 | 未開始 | | | |
+| A8-1c 保留期與個資清除 | 未開始 | | | |
 | A8-2 Connect API 與串流 | 未開始 | | | |
 | A8-3 渠道與事件訂閱 | 未開始 | | | |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |
