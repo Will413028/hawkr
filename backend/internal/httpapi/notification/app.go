@@ -26,6 +26,7 @@ import (
 
 // Notifications 是通知的來源（*notification.Module）。
 type Notifications interface {
+	ValidateAudience(ctx context.Context, a notification.Audience) error
 	ListInbox(ctx context.Context, r notification.Recipient, category *notification.Category, l uitext.Locale, after *notification.InboxCursor, size int32) (notification.InboxPage, error)
 	UnreadCount(ctx context.Context, r notification.Recipient) (int64, error)
 	MarkInboxItemRead(ctx context.Context, accountID int64, id uuid.UUID) error
@@ -79,7 +80,11 @@ func (h *App) recipient(ctx context.Context, audience pb.NotificationAudience) (
 	if err != nil {
 		return notification.Recipient{}, err
 	}
-	switch rpc.EnumFromProto[notification.Audience](audience) {
+	a := rpc.EnumFromProto[notification.Audience](audience)
+	if err := h.notifications.ValidateAudience(ctx, a); err != nil {
+		return notification.Recipient{}, err
+	}
+	switch a {
 	case notification.AudienceBuyer:
 		return notification.Recipient{AccountID: p.ID, Audience: notification.AudienceBuyer}, nil
 	case notification.AudienceStore:
@@ -89,7 +94,7 @@ func (h *App) recipient(ctx context.Context, audience pb.NotificationAudience) (
 		}
 		return notification.Recipient{AccountID: p.ID, Audience: notification.AudienceStore, StoreID: s.StoreID}, nil
 	}
-	return notification.Recipient{}, rpc.RequiredField("audience", "audience 必須是有效的受眾")
+	return notification.Recipient{}, fmt.Errorf("受眾 %q 通過檢查卻沒有對應的收件人", a)
 }
 
 func (h *App) ListInboxItems(ctx context.Context, req *connect.Request[pb.ListInboxItemsRequest]) (*connect.Response[pb.ListInboxItemsResponse], error) {
@@ -105,9 +110,6 @@ func (h *App) ListInboxItems(ctx context.Context, req *connect.Request[pb.ListIn
 	categoryName := ""
 	if req.Msg.Category != nil {
 		c := rpc.EnumFromProto[notification.Category](req.Msg.GetCategory())
-		if c == "" {
-			return nil, rpc.RequiredField("category", "category 必須是有效的分類")
-		}
 		category, categoryName = &c, string(c)
 	}
 	scope := rpc.FilterScope(notificationv1alpha1connect.NotificationAppServiceListInboxItemsProcedure, rpc.FormatID(r.AccountID), string(r.Audience), rpc.FormatID(r.StoreID), categoryName)
@@ -200,9 +202,6 @@ func (h *App) BatchDeleteInboxItems(ctx context.Context, req *connect.Request[pb
 		return nil, err
 	}
 	raw := req.Msg.GetIds()
-	if len(raw) == 0 || len(raw) > notification.MaxBatchDelete {
-		return nil, rpc.RequiredField("ids", fmt.Sprintf("ids 必須是 1 到 %d 個通知 ID", notification.MaxBatchDelete))
-	}
 	ids := make([]uuid.UUID, len(raw))
 	for i, s := range raw {
 		if ids[i], err = rpc.ParseUUID("ids", s); err != nil {
@@ -246,13 +245,7 @@ func (h *App) UpdateNotificationPreference(ctx context.Context, req *connect.Req
 		return nil, err
 	}
 	category := rpc.EnumFromProto[notification.Category](req.Msg.GetCategory())
-	if category == "" {
-		return nil, rpc.RequiredField("category", "category 必須是有效的分類")
-	}
 	channel := rpc.EnumFromProto[notification.Channel](req.Msg.GetChannel())
-	if channel == "" {
-		return nil, rpc.RequiredField("channel", "channel 必須是有效的渠道")
-	}
 	p, err := h.notifications.UpdateNotificationPreference(ctx, r, category, channel, req.Msg.GetEnabled())
 	if err != nil {
 		return nil, err
@@ -277,13 +270,7 @@ func (h *App) RegisterDeviceToken(ctx context.Context, req *connect.Request[pb.R
 		return nil, err
 	}
 	token := req.Msg.GetToken()
-	if token == "" || len(token) > notification.MaxTokenLen {
-		return nil, rpc.RequiredField("token", fmt.Sprintf("token 必須是 1 到 %d 個字元", notification.MaxTokenLen))
-	}
 	app := deviceApp(req.Msg.GetApp())
-	if app == "" {
-		return nil, rpc.RequiredField("app", "app 必須是有效的 App")
-	}
 	if err := h.notifications.RegisterDeviceToken(ctx, p.ID, app, token); err != nil {
 		return nil, err
 	}
@@ -296,9 +283,6 @@ func (h *App) DeleteDeviceToken(ctx context.Context, req *connect.Request[pb.Del
 		return nil, err
 	}
 	token := req.Msg.GetToken()
-	if token == "" {
-		return nil, rpc.RequiredField("token", "token 不可為空")
-	}
 	if err := h.notifications.DeleteDeviceToken(ctx, p.ID, token); err != nil {
 		return nil, err
 	}

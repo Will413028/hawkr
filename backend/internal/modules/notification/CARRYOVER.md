@@ -108,6 +108,8 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 |---|---|---|---|---|
 | gateway 對 notification-service 的 16 支 gRPC 與一條 SSE（`inventory.md` §1，含錯誤吞掉的呼叫與跨身分的串流） | 四個 client 要讀寫收件匣、偏好、token 與公告 | 不成立：舊 REST、手寫 client 與 gRPC 呼叫隨 A8-7 刪除；缺陷 #8、#11、#17、#18、#19 在舊傳輸層 | Connect service 加生成的 client，錯誤用 `ErrorReason`，分頁 cursor，串流只傳失效訊號 | 全部在 A8-2 重新設計，本步驟不新增對外方法；`inventory.md` §1 的去向欄為準 |
 
+- 收件匣列表依 `updated_at` 排序分頁：聚合列合併新事件會更新 `updated_at`（依最後活動排，是有意的），所以翻頁途中被合併的列可能跳過或重複；client 收到串流失效訊號時從第一頁重新整理，不接著用舊的 page token。
+
 ## 意圖管線（A8-1b）
 
 - 意圖冪等鍵＝型別名稱＋事件來源身分，由 `intents_idempotency_key_key` 與 `InsertIntent` 的 `ON CONFLICT` 保證；同一事件投遞兩次只有一個意圖、一個 job。守門：`TestSameEventTwiceMakesOneIntentAndOneInboxRow`。

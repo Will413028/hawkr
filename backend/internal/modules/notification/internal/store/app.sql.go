@@ -16,7 +16,7 @@ import (
 const countInboxItems = `-- name: CountInboxItems :one
 SELECT count(*) FROM notification.inbox_items
 WHERE account_id = $1 AND audience = $2
-  AND ($2::text = 'BUYER' OR store_id = $3::bigint)
+  AND (store_id = $3::bigint OR ($3::bigint IS NULL AND store_id IS NULL))
   AND type = ANY($4::text[])
 `
 
@@ -43,7 +43,7 @@ func (q *Queries) CountInboxItems(ctx context.Context, arg CountInboxItemsParams
 const countUnreadInboxItems = `-- name: CountUnreadInboxItems :one
 SELECT count(*) FROM notification.inbox_items
 WHERE account_id = $1 AND audience = $2
-  AND ($2::text = 'BUYER' OR store_id = $3::bigint)
+  AND (store_id = $3::bigint OR ($3::bigint IS NULL AND store_id IS NULL))
   AND type = ANY($4::text[])
   AND read_at IS NULL
 `
@@ -126,7 +126,7 @@ func (q *Queries) DeletePreferenceOverride(ctx context.Context, arg DeletePrefer
 const listInboxItems = `-- name: ListInboxItems :many
 SELECT id, type, params, read_at, updated_at FROM notification.inbox_items
 WHERE account_id = $1 AND audience = $2
-  AND ($2::text = 'BUYER' OR store_id = $3::bigint)
+  AND (store_id = $3::bigint OR ($3::bigint IS NULL AND store_id IS NULL))
   AND type = ANY($4::text[])
   AND ($5::timestamptz IS NULL OR (updated_at, id) < ($5::timestamptz, $6::uuid))
 ORDER BY updated_at DESC, id DESC
@@ -152,7 +152,8 @@ type ListInboxItemsRow struct {
 }
 
 // 收件人（帳號、受眾、店）的收件匣，新到舊（updated_at：聚合列是最後一次合併的時間，再依 id）。types 是呼叫端依受眾與分類從註冊表算出的型別名稱：
-// 沒有註冊的型別（已退場）不顯示也不計數。BUYER 列的 store_id 一定是 NULL（CHECK），所以只有 STORE 才比店。after_* 都是 NULL 表示第一頁。
+// 沒有註冊的型別（已退場）不顯示也不計數。BUYER 列的 store_id 一定是 NULL（CHECK）：店家條件寫成「等於店家 ID，或兩邊都是 NULL」，參數是常數時只剩一邊，
+// 讓 (account_id, audience, store_id, updated_at, id) 的索引從 store_id 到排序都用得上（IS NOT DISTINCT FROM 不能用索引）。after_* 都是 NULL 表示第一頁。
 func (q *Queries) ListInboxItems(ctx context.Context, arg ListInboxItemsParams) ([]ListInboxItemsRow, error) {
 	rows, err := q.db.Query(ctx, listInboxItems,
 		arg.AccountID,
@@ -190,7 +191,7 @@ func (q *Queries) ListInboxItems(ctx context.Context, arg ListInboxItemsParams) 
 const markAllInboxItemsRead = `-- name: MarkAllInboxItemsRead :execrows
 UPDATE notification.inbox_items SET read_at = $1::timestamptz
 WHERE account_id = $2 AND audience = $3
-  AND ($3::text = 'BUYER' OR store_id = $4::bigint)
+  AND (store_id = $4::bigint OR ($4::bigint IS NULL AND store_id IS NULL))
   AND type = ANY($5::text[])
   AND read_at IS NULL
 `

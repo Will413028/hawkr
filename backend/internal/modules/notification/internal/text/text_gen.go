@@ -54,6 +54,33 @@ func AccountUnsuspendedTitle(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "帳號已解除停權", Locale: uitext.ZhTW}
 }
 
+// AudienceInvalid 是模組句子 audience.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AudienceInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The notification audience is not valid.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "通知的受眾不正確。", Locale: uitext.ZhTW}
+}
+
+// DeviceAppInvalid 是模組句子 device_app.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DeviceAppInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The app for the push token must be the buyer app or the seller app.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "推播 token 所屬的 App 必須是買家 App 或賣家 App。", Locale: uitext.ZhTW}
+}
+
+// DeviceTokenInvalid 是模組句子 device_token.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DeviceTokenInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The push token must be 1 to 4096 characters.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "推播 token 必須是 1 到 4096 個字元。", Locale: uitext.ZhTW}
+}
+
 // InboxItemBatchInvalid 是模組句子 inbox_item.batch_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func InboxItemBatchInvalid(l uitext.Locale) uitext.Message {
 	switch l {

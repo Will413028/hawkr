@@ -29,6 +29,18 @@
       "message": "帳號已解除停權",
       "description": "收件匣與推播的標題：帳號解除停權（account_unsuspended 型別）。"
     },
+    "audience.invalid": {
+      "message": "通知的受眾不正確。",
+      "description": "請求的 audience 沒給或不認得：NotificationAppService 需要受眾的方法。"
+    },
+    "device_app.invalid": {
+      "message": "推播 token 所屬的 App 必須是買家 App 或賣家 App。",
+      "description": "RegisterDeviceToken 的 app 沒給或不認得。"
+    },
+    "device_token.invalid": {
+      "message": "推播 token 必須是 1 到 4096 個字元。",
+      "description": "RegisterDeviceToken、DeleteDeviceToken 的 token 為空或超過 4096 個字元。"
+    },
     "inbox_item.batch_invalid": {
       "message": "一次要刪除 1 到 100 則不重複的通知。",
       "description": "BatchDeleteInboxItems 的 ids 為空、重複或超過 100 個。"

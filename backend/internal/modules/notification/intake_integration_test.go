@@ -203,6 +203,10 @@ func (testRegistry) Lookup(name string) (registry.Entry, bool) {
 	return registry.Lookup(name)
 }
 
+func (testRegistry) All() []registry.Entry {
+	return append(registry.All(), testLike, testPush, testTwin, testStoreNote, testStorePushOnly)
+}
+
 // fakeStores 取代 seller：測試只需要「店家是否已退場」。沒登記的店視為存在、營運中。
 type fakeStores struct {
 	mu      sync.Mutex
@@ -682,5 +686,41 @@ func TestSkippedIntentsAreLogged(t *testing.T) {
 	}
 	if !warned {
 		t.Fatalf("買家列不存在的略過沒有以 Warn 記錄：%q", f.logs.String())
+	}
+}
+
+// 收件匣列表用注入的註冊表：intake 寫進來的測試型別（只在測試註冊表裡）列得出來。
+func TestListInboxUsesTheInjectedRegistry(t *testing.T) {
+	f := setupIntake(t)
+	acct := f.newAccount(t)
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "e1", PostID: "p", ActorID: acct + 1})
+	f.run(t)
+	page, err := f.module.ListInbox(context.Background(), Recipient{AccountID: acct, Audience: AudienceBuyer}, nil, uitext.ZhTW, nil, 10)
+	if err != nil || len(page.Items) != 1 || page.Total != 1 {
+		t.Fatalf("測試型別的列沒列出來：%v %+v", err, page)
+	}
+}
+
+// 一列組不出文字（參數快照壞掉）只被記錄並略過，其他列照常列出；Total 仍計入它（只依型別篩選）。
+func TestListInboxSkipsARowThatCannotRender(t *testing.T) {
+	f := setupIntake(t)
+	acct := f.newAccount(t)
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "e1", PostID: "p", ActorID: acct + 1})
+	f.accept(t, "test_push", pushParams{AccountID: acct, EventID: "e2"})
+	f.run(t)
+	var badID uuid.UUID
+	if err := f.db.Pool().QueryRow(context.Background(),
+		`UPDATE notification.inbox_items SET params = '"broken"'::jsonb WHERE account_id = $1 AND type = 'test_like' RETURNING id`, acct).Scan(&badID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := f.module.ListInbox(context.Background(), Recipient{AccountID: acct, Audience: AudienceBuyer}, nil, uitext.ZhTW, nil, 10)
+	if err != nil {
+		t.Fatalf("一列壞掉不該讓整份收件匣失敗：%v", err)
+	}
+	if len(page.Items) != 1 || page.Total != 2 {
+		t.Fatalf("items = %d、total = %d，預期 1 與 2", len(page.Items), page.Total)
+	}
+	if out := f.logs.String(); !strings.Contains(out, badID.String()) || !strings.Contains(out, "test_like") {
+		t.Fatalf("沒有記下壞掉的列：%s", out)
 	}
 }

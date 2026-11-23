@@ -44,7 +44,7 @@ type Item struct {
 	Time         time.Time
 }
 
-// Page 是收件匣的一頁；Total 是同一個受眾與分類篩選下的全部筆數。
+// Page 是收件匣的一頁；Total 是同一個受眾與分類篩選下、型別已註冊的全部筆數（含組不出文字而被略過的列）。
 type Page struct {
 	Items []Item
 	Next  *Cursor
@@ -53,6 +53,7 @@ type Page struct {
 
 // ListInbox 列出收件人的收件匣，新到舊。category 不為 nil 時只列該分類，分類不屬於受眾回 invalid_argument。size 已由呼叫端正規化。
 // 只顯示註冊表裡有型別的列；文字依 l 組，型別自己指定的語系（例如公告只有英文）以型別為準。
+// Total 與未讀數只依型別（受眾、分類、註冊表）篩選，不看文字組不組得出來：組不出文字的列會被記錄並略過，所以 Total 可能比所有頁加起來多。
 func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.PrefCategory, l uitext.Locale, after *Cursor, size int32) (Page, error) {
 	if err := r.validate(); err != nil {
 		return Page{}, err
@@ -61,7 +62,6 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 	if err != nil {
 		return Page{}, err
 	}
-	q := store.New(s.d.DB.Conn(ctx))
 	arg := store.ListInboxItemsParams{
 		AccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: types, MaxRows: size + 1,
 	}
@@ -69,15 +69,23 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 		arg.AfterUpdatedAt = &after.UpdatedAt
 		arg.AfterID = pgtype.UUID{Bytes: after.ID, Valid: true}
 	}
-	rows, err := q.ListInboxItems(ctx, arg)
+	var rows []store.ListInboxItemsRow
+	var page Page
+	// 列與總筆數在同一份快照讀，兩者之間提交的新通知不會讓 total 與列對不上。
+	err = s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
+		q := store.New(s.d.DB.Conn(ctx))
+		var err error
+		if rows, err = q.ListInboxItems(ctx, arg); err != nil {
+			return fmt.Errorf("讀取收件匣：%w", err)
+		}
+		if page.Total, err = q.CountInboxItems(ctx, store.CountInboxItemsParams{AccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: types}); err != nil {
+			return fmt.Errorf("計算收件匣筆數：%w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return Page{}, fmt.Errorf("讀取收件匣：%w", err)
+		return Page{}, err
 	}
-	total, err := q.CountInboxItems(ctx, store.CountInboxItemsParams{AccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: types})
-	if err != nil {
-		return Page{}, fmt.Errorf("計算收件匣筆數：%w", err)
-	}
-	page := Page{Total: total}
 	if len(rows) > int(size) {
 		last := rows[size-1]
 		page.Next = &Cursor{UpdatedAt: last.UpdatedAt, ID: last.ID}
@@ -86,7 +94,9 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 	for _, row := range rows {
 		item, err := s.render(l, row)
 		if err != nil {
-			return Page{}, err
+			// 一列組不出文字（參數快照壞掉）不拖垮整份收件匣：記錄後略過這一列。
+			s.d.Logger.ErrorContext(ctx, "收件匣列組不出文字，略過", "inbox_item_id", row.ID, "type", row.Type, "error", err)
+			continue
 		}
 		page.Items = append(page.Items, item)
 	}

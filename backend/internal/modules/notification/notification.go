@@ -65,13 +65,13 @@ type Module struct {
 // New 建立模組。
 func New(d Deps) *Module { return newModule(d, registry.Registry{}) }
 
-func newModule(d Deps, reg intake.Registry) *Module {
+func newModule(d Deps, reg app.Registry) *Module {
 	return &Module{
 		intake: intake.New(intake.Deps{
 			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
 		}),
 		purge: purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger}),
-		app:   app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: registry.Registry{}, Now: d.Now}),
+		app:   app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Now: d.Now, Logger: d.Logger}),
 	}
 }
 

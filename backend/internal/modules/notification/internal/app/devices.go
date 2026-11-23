@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // App 是裝置 token 所屬的 App：BUYER 只收買家受眾的推播，SELLER 只收店家受眾的。
@@ -18,6 +20,8 @@ const (
 
 // MaxTokenLen 是 token 的長度上限（db/schema.sql 的 CHECK：1 到 4096 個字元）。
 const MaxTokenLen = 4096
+
+func validToken(token string) bool { return token != "" && len(token) <= MaxTokenLen }
 
 func (a App) valid() bool { return a == AppBuyer || a == AppSeller }
 
@@ -35,11 +39,12 @@ func (s *Service) lockAccount(ctx context.Context, accountID int64) error {
 
 // RegisterDeviceToken 註冊帳號的推播 token：同一個 token 換帳號登入時改綁給呼叫者，並更新最後註冊時間（App 每次啟動都呼叫）。
 func (s *Service) RegisterDeviceToken(ctx context.Context, accountID int64, app App, token string) error {
+	l := uitext.LocaleFrom(ctx)
 	switch {
-	case token == "" || len(token) > MaxTokenLen:
-		return apperr.InvalidInputOn([]string{"Token"}, "token 必須是 1 到 %d 個字元", MaxTokenLen)
+	case !validToken(token):
+		return apperr.InvalidInputOn([]string{"Token"}, "%s", text.DeviceTokenInvalid(l))
 	case !app.valid():
-		return apperr.InvalidInputOn([]string{"App"}, "app 必須是買家 App 或賣家 App")
+		return apperr.InvalidInputOn([]string{"App"}, "%s", text.DeviceAppInvalid(l))
 	}
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		if err := s.lockAccount(ctx, accountID); err != nil {
@@ -55,6 +60,9 @@ func (s *Service) RegisterDeviceToken(ctx context.Context, accountID int64, app 
 
 // DeleteDeviceToken 刪除帳號自己的一個 token；不存在或屬於別的帳號也成功，不洩漏它是否存在。
 func (s *Service) DeleteDeviceToken(ctx context.Context, accountID int64, token string) error {
+	if !validToken(token) {
+		return apperr.InvalidInputOn([]string{"Token"}, "%s", text.DeviceTokenInvalid(uitext.LocaleFrom(ctx)))
+	}
 	if err := store.New(s.d.DB.Conn(ctx)).DeleteDeviceToken(ctx, store.DeleteDeviceTokenParams{Token: token, AccountID: accountID}); err != nil {
 		return fmt.Errorf("刪除裝置 token：%w", err)
 	}

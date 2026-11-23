@@ -4,6 +4,7 @@ package notification
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -564,4 +565,16 @@ func TestWatchNotificationsIsNotImplementedYet(t *testing.T) {
 		_ = stream.Close()
 	}
 	wantCode(t, err, connect.CodeUnimplemented)
+}
+
+// 輸入檢查的句子只有模組文字一個來源：依請求語系回，handler 不另寫句子。
+func TestValidationSentencesFollowTheRequestLocale(t *testing.T) {
+	t.Parallel()
+	s := setup(t)
+	for lang, want := range map[string]string{"zh-TW": "受眾", "en": "audience is not valid"} {
+		_, err := s.client.ListInboxItems(t.Context(), as(connect.NewRequest(&pb.ListInboxItemsRequest{}), 7, lang))
+		if got := invalidField(t, err); got != "audience" || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s：欄位 %q、錯誤 %v，預期含 %q", lang, got, err, want)
+		}
+	}
 }

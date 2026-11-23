@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
@@ -32,13 +33,19 @@ type Deps struct {
 	Accounts Accounts
 	Registry Registry
 	Now      func() time.Time
+	Logger   *slog.Logger
 }
 
 // Service 是登入帳號的通知用例。
 type Service struct{ d Deps }
 
 // New 建立 Service。
-func New(d Deps) *Service { return &Service{d: d} }
+func New(d Deps) *Service {
+	if d.Logger == nil {
+		d.Logger = slog.Default()
+	}
+	return &Service{d: d}
+}
 
 // Recipient 是通知的收件身分：帳號與受眾；STORE 受眾另帶店家 ID，BUYER 的 StoreID 一定是 0。
 type Recipient struct {
@@ -70,4 +77,12 @@ func (r Recipient) storeID() *int64 {
 
 func notFound(ctx context.Context) error {
 	return apperr.NotFound("%s", text.InboxItemNotFound(uitext.LocaleFrom(ctx)))
+}
+
+// ValidateAudience 檢查請求的受眾：沒給或不認得回 invalid_argument（指向 Audience 欄位）。
+func (s *Service) ValidateAudience(ctx context.Context, a model.Audience) error {
+	if a != model.AudienceBuyer && a != model.AudienceStore {
+		return apperr.InvalidInputOn([]string{"Audience"}, "%s", text.AudienceInvalid(uitext.LocaleFrom(ctx)))
+	}
+	return nil
 }

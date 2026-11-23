@@ -97,3 +97,8 @@ func (m *Module) RegisterDeviceToken(ctx context.Context, accountID int64, devic
 func (m *Module) DeleteDeviceToken(ctx context.Context, accountID int64, token string) error {
 	return m.app.DeleteDeviceToken(ctx, accountID, token)
 }
+
+// ValidateAudience 檢查請求的受眾：沒給或不認得回 invalid_argument。
+func (m *Module) ValidateAudience(ctx context.Context, a Audience) error {
+	return m.app.ValidateAudience(ctx, a)
+}

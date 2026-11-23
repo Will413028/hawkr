@@ -1,9 +1,10 @@
 -- name: ListInboxItems :many
 -- 收件人（帳號、受眾、店）的收件匣，新到舊（updated_at：聚合列是最後一次合併的時間，再依 id）。types 是呼叫端依受眾與分類從註冊表算出的型別名稱：
--- 沒有註冊的型別（已退場）不顯示也不計數。BUYER 列的 store_id 一定是 NULL（CHECK），所以只有 STORE 才比店。after_* 都是 NULL 表示第一頁。
+-- 沒有註冊的型別（已退場）不顯示也不計數。BUYER 列的 store_id 一定是 NULL（CHECK）：店家條件寫成「等於店家 ID，或兩邊都是 NULL」，參數是常數時只剩一邊，
+-- 讓 (account_id, audience, store_id, updated_at, id) 的索引從 store_id 到排序都用得上（IS NOT DISTINCT FROM 不能用索引）。after_* 都是 NULL 表示第一頁。
 SELECT id, type, params, read_at, updated_at FROM notification.inbox_items
 WHERE account_id = sqlc.arg(account_id) AND audience = sqlc.arg(audience)
-  AND (sqlc.arg(audience)::text = 'BUYER' OR store_id = sqlc.narg(store_id)::bigint)
+  AND (store_id = sqlc.narg(store_id)::bigint OR (sqlc.narg(store_id)::bigint IS NULL AND store_id IS NULL))
   AND type = ANY(sqlc.arg(types)::text[])
   AND (sqlc.narg(after_updated_at)::timestamptz IS NULL OR (updated_at, id) < (sqlc.narg(after_updated_at)::timestamptz, sqlc.narg(after_id)::uuid))
 ORDER BY updated_at DESC, id DESC
@@ -13,13 +14,13 @@ LIMIT sqlc.arg(max_rows);
 -- 與 ListInboxItems 同一組篩選（受眾、店、型別）的全部筆數。
 SELECT count(*) FROM notification.inbox_items
 WHERE account_id = sqlc.arg(account_id) AND audience = sqlc.arg(audience)
-  AND (sqlc.arg(audience)::text = 'BUYER' OR store_id = sqlc.narg(store_id)::bigint)
+  AND (store_id = sqlc.narg(store_id)::bigint OR (sqlc.narg(store_id)::bigint IS NULL AND store_id IS NULL))
   AND type = ANY(sqlc.arg(types)::text[]);
 
 -- name: CountUnreadInboxItems :one
 SELECT count(*) FROM notification.inbox_items
 WHERE account_id = sqlc.arg(account_id) AND audience = sqlc.arg(audience)
-  AND (sqlc.arg(audience)::text = 'BUYER' OR store_id = sqlc.narg(store_id)::bigint)
+  AND (store_id = sqlc.narg(store_id)::bigint OR (sqlc.narg(store_id)::bigint IS NULL AND store_id IS NULL))
   AND type = ANY(sqlc.arg(types)::text[])
   AND read_at IS NULL;
 
@@ -32,7 +33,7 @@ RETURNING id;
 -- name: MarkAllInboxItemsRead :execrows
 UPDATE notification.inbox_items SET read_at = sqlc.arg(now)::timestamptz
 WHERE account_id = sqlc.arg(account_id) AND audience = sqlc.arg(audience)
-  AND (sqlc.arg(audience)::text = 'BUYER' OR store_id = sqlc.narg(store_id)::bigint)
+  AND (store_id = sqlc.narg(store_id)::bigint OR (sqlc.narg(store_id)::bigint IS NULL AND store_id IS NULL))
   AND type = ANY(sqlc.arg(types)::text[])
   AND read_at IS NULL;
 

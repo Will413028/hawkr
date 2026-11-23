@@ -407,17 +407,17 @@ func TestSuspendedAccountCanReadItsOwnSanctionsAndManageItsBlocks(t *testing.T) 
 	}
 }
 
-// 通知（NotificationAppService）：停權的帳號讀得到收件匣（要讀到停權通知）、偏好與串流；已讀、刪除、改偏好與註冊 token 是寫入；
-// 註銷 token 是收斂動作，停權時放行，而且只放行這一個（註冊同一個 token 的路徑不放行）。
-func TestSuspendedAccountReadsNotificationsAndCanOnlyDropItsDeviceToken(t *testing.T) {
+// 通知（NotificationAppService）：停權的帳號讀得到收件匣（要讀到停權通知）、偏好與串流，也能標已讀與註銷 token；
+// 刪除、改偏好與註冊 token 是寫入，停權時不放行（註冊同一個 token 的路徑也不放行）。
+func TestSuspendedAccountReadsNotificationsMarksReadAndDropsItsDeviceToken(t *testing.T) {
 	h := suspendedEntry()
 	const svc = "/hawkr.notification.v1alpha1.NotificationAppService/"
-	for _, m := range []string{"ListInboxItems", "GetUnreadCount", "GetNotificationPreferences", "WatchNotifications", "DeleteDeviceToken"} {
+	for _, m := range []string{"ListInboxItems", "GetUnreadCount", "GetNotificationPreferences", "WatchNotifications", "MarkInboxItemRead", "MarkAllInboxItemsRead", "DeleteDeviceToken"} {
 		if rec, s := callAs(t, h, "suspended", http.MethodPost, svc+m); rec.Code != http.StatusOK || !s.Principal || !s.Suspended {
 			t.Errorf("%s：%d %+v，預期放行", m, rec.Code, s)
 		}
 	}
-	for _, m := range []string{"MarkInboxItemRead", "MarkAllInboxItemsRead", "BatchDeleteInboxItems", "UpdateNotificationPreference", "RegisterDeviceToken"} {
+	for _, m := range []string{"BatchDeleteInboxItems", "UpdateNotificationPreference", "RegisterDeviceToken"} {
 		rec, s := callAs(t, h, "suspended", http.MethodPost, svc+m)
 		if _, reason := reasonOf(t, rec.Body.Bytes()); rec.Code != http.StatusForbidden || reason != "ACCOUNT_SUSPENDED" || s.Called {
 			t.Errorf("%s：%d %q，預期 ACCOUNT_SUSPENDED", m, rec.Code, rec.Body)

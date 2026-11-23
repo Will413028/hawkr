@@ -13,8 +13,8 @@
    "id": "total-ignores-category-filter",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/app/inbox.go",
-   "old": "StoreID: r.storeID(), Types: types})\n\tif err != nil {\n\t\treturn Page{}, fmt.Errorf(\"計算收件匣筆數",
-   "new": "StoreID: r.storeID(), Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil)})\n\tif err != nil {\n\t\treturn Page{}, fmt.Errorf(\"計算收件匣筆數",
+   "old": "StoreID: r.storeID(), Types: types}); err != nil {\n\t\t\treturn fmt.Errorf(\"計算收件匣筆數",
+   "new": "StoreID: r.storeID(), Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil)}); err != nil {\n\t\t\treturn fmt.Errorf(\"計算收件匣筆數",
    "test": "internal/httpapi/notification ^TestListInboxItemsPaginatesNewestFirstAndTotalFollowsTheFilter$",
    "why": "total_size 不套分類篩選（回整個收件匣的筆數）"
   },
@@ -105,17 +105,44 @@
    "file": "backend/internal/httpapi/effects.go",
    "old": "NotificationAppService/DeleteDeviceToken\":            EffectSelfService,",
    "new": "NotificationAppService/DeleteDeviceToken\":            EffectWrite,",
-   "test": "internal/httpapi ^TestSuspendedAccountReadsNotificationsAndCanOnlyDropItsDeviceToken$",
+   "test": "internal/httpapi ^TestSuspendedAccountReadsNotificationsMarksReadAndDropsItsDeviceToken$",
    "why": "停權的帳號不能註銷裝置 token"
   },
   {
-   "id": "stream-not-rate-limit-exempt",
+   "id": "suspended-cannot-mark-read",
    "stack": "go",
-   "file": "backend/internal/httpapi/ratelimit.go",
-   "old": "\t\tif rateExempt[r.URL.Path] {",
-   "new": "\t\tif false && rateExempt[r.URL.Path] {",
-   "test": "internal/httpapi ^TestNotificationStreamIsExemptFromTheRateLimit$",
-   "why": "通知串流不再豁免限流"
+   "file": "backend/internal/httpapi/effects.go",
+   "old": "NotificationAppService/MarkInboxItemRead\":            EffectSelfService,",
+   "new": "NotificationAppService/MarkInboxItemRead\":            EffectWrite,",
+   "test": "internal/httpapi ^TestSuspendedAccountReadsNotificationsMarksReadAndDropsItsDeviceToken$",
+   "why": "停權的帳號不能把通知標成已讀"
+  },
+  {
+   "id": "list-fails-on-unrenderable-row",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "\"error\", err)\n\t\t\tcontinue",
+   "new": "\"error\", err)\n\t\t\treturn Page{}, err",
+   "test": "internal/modules/notification ^TestListInboxSkipsARowThatCannotRender$",
+   "why": "一列組不出文字就讓整份收件匣失敗"
+  },
+  {
+   "id": "app-ignores-injected-registry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/notification.go",
+   "old": "Registry: reg, Now: d.Now, Logger: d.Logger}",
+   "new": "Registry: registry.Registry{}, Now: d.Now, Logger: d.Logger}",
+   "test": "internal/modules/notification ^TestListInboxUsesTheInjectedRegistry$",
+   "why": "收件匣用寫死的正式註冊表，不用注入的"
+  },
+  {
+   "id": "audience-not-validated-by-module",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/app.go",
+   "old": "if a != model.AudienceBuyer && a != model.AudienceStore {",
+   "new": "if false {",
+   "test": "internal/httpapi/notification ^TestValidationSentencesFollowTheRequestLocale$",
+   "why": "模組不檢查受眾，沒給受眾不再是依語系的 invalid_argument"
   }
  ]
 }
