@@ -95,7 +95,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 |---|---|---|
 | `SubmitTurn` | 建立型（run） | `agent_runs (buyer_id, client_request_id)` |
 | `StartCandidateSearch` | 建立型（候選集與 run） | `agent_runs (buyer_id, client_request_id)`；候選集由 run 的 `candidate_set_id` 指到，重送回同一個 run 與候選集（A9-D29） |
-| `SubmitAnswer`、`Rewind` | 建立型（輪次與新 revision） | `turns (buyer_id, client_request_id)` |
+| `SubmitAnswer`、`Rewind` | 建立型（輪次與新 revision） | `turns (buyer_id, client_request_id)`；重送回放 `turns.turn_result`（A9-D33(2)），同一把鍵已被 run 用掉也算內容不同 |
 | `PreviewRfqPrice` | 建立型 | `price_previews (buyer_id, client_request_id)` |
 | `ConfirmRfqSnapshot` | 建立型 | `confirmed_rfq_snapshots (buyer_id, client_request_id)` |
 | `PreviewRfqPublication` | 建立型（核准） | `rfq_publication_approvals (buyer_id, client_request_id)` |
@@ -137,6 +137,9 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 - 候選：無 `display_name`、`seller_name`、`logo_key`、`store_code`、`brand_*`（S9）；`selected`、`selected_at` 在 `candidates`（S11）；無 `policy_version`、lease、`fencing_token`（S1）。
 - 需求：無 `active_revision_id`、`version`、`branch_id`、`slots_hash`、`slots_json`（slots 改九個具名欄位，S2、S3）；`revision.status` 只有 `ACTIVE`、`SUPERSEDED`。
 - 對話：無 `adk_session_id`；`turns` 取代 `answer_patches`，訊息原文是具名欄位。
+- 輪次（A9-D33）：`turns.turn_result`（TurnResult 的 wire JSON，NOT NULL）。必要條件：SubmitAnswer、Rewind 不經 run（A9-D31），重送沒有 run 事件可回放，重算會因 planner 或文案改動而與第一次不同；所以任何來源的 commit 都寫它，重送回放它。業界：Stripe idempotency key、AIP-155 存第一次回應。重送的比對是同需求、同來源、同買家回答、同讀到的版本（結果版本的前一號）；倒回再比欄位（存下的問題的 `slot_key`）；回答的欄位本身不在輪次上，同一把鍵、同回答文字、同版本但換欄位時不會被分辨出來（接受的缺口，要精確要另存請求指紋）。
+- 版本祖先（A9-D33(3)）：`parent_revision_id` 是內容祖先而不是被取代者；Rewind 的新版（來源 REWIND）內容同目標版、祖先是目標版（git 在舊 commit 上開分支、LangGraph time travel），不重新啟用舊版；取代順序由 `revision_no` 與現行表示。目標沿祖先鏈計算：最近一個改動該格的版本的祖先，所以再倒回同一格會繼續往前退。沒有可倒回的內容回 FAILED_PRECONDITION，不加 ErrorReason。
+- SubmitAnswer 只收確定性回答（A9-D33(1)）：選項、數量、略過、對到唯一末層的品項文字；提問卡與中斷永遠由 run 擁有（業界：LangGraph interrupt、OpenAI `required_action` 屬於 run／thread）。UNIT、ITEM_DISAMBIGUATION、ITEM_RESOLUTION 不是回答的欄位。
 - 詢價：核准、發布無 hash 與快照複本、無 `candidate_set_id`、`candidate_set_policy_version`、`price_preview_version`；預覽與快照無 `version`、`payload_hash`、`canonical_payload_json`（hash 由 Go 重算，S3、S5）；接受單無 `version`、`request_hash`、`lane`。
 - 狀態值收斂（S6）：發布 `PUBLISHED`；`write_closed_reason` 只有 `DECLINED`；接受單 `state` 為 `ACTIVE`、`ORDER_FAILED`（新增，A9-D19 修訂：建單失敗解除 live 鎖）；邀請 `delivery_state` 無 `NOT_SENT`。proto `PublicationState` 刪 `SUPERSEDED`、`CANCELLED`。
 - 回價：版本無驗證欄位與 hash 複本；賣家回價身分列無 `buyer_id`、`version`；品相欄位（`offered_quality_*`、`conversion_basis`）仍是契約必填，是否屬 scope cut 殘留由 A9-3c 開工時交 Will 決定。

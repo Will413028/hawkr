@@ -1,7 +1,7 @@
 // Package buyerprocurement 實作買家採購 Connect API（BuyerProcurementAppService）的傳輸：請求驗證、錯誤與欄位路徑對應、
 // 事件與讀取模型轉成 proto。送出、取消、串流、搜尋、接續與快照的規則都在 modules/procurement，這裡不重做。
 //
-// 實作 run 的送出、取消、串流、接續與搜尋，以及快照讀取與對話管理；其餘方法由內嵌的 Unimplemented 回 unimplemented，handler 尚未掛載。
+// 實作 run 的送出、取消、串流、接續與搜尋，快照讀取與對話管理，以及需求編輯（ToggleSelection、SubmitAnswer、Rewind）；其餘方法由內嵌的 Unimplemented 回 unimplemented，handler 尚未掛載。
 package buyerprocurement
 
 import (
