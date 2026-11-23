@@ -58,7 +58,7 @@
    "id": "seller-bare-seconds-read-as-iso",
    "stack": "flutter:seller-app",
    "file": "packages/hawkr_api/lib/src/taipei_display.dart",
-   "old": "  if (RegExp(r'^\\d+$').hasMatch(text)) {",
+   "old": "  if (RegExp(r'^\\d{10}$').hasMatch(text)) {",
    "new": "  if (false) {",
    "test": "test/features/order/presentation/order_card_widgets/order_info_column_date_test.dart a bare 10-digit seconds string is epoch, not a year-171238 date",
    "why": "Digit-only strings go back to DateTime.tryParse, so a 10-digit seconds string is no longer read as epoch."

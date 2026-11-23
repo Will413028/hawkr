@@ -84,13 +84,17 @@ class CustomerOrderCardWidget extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 8.w),
-                      Text(
-                        context.taipeiDisplay.formatIso(order.date),
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w400,
-                          color: AppColors.textPrimary.withValues(alpha: 0.8),
-                          height: 1.43, // lineHeight 20
+                      Flexible(
+                        child: Text(
+                          context.taipeiDisplay.formatIso(order.date),
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w400,
+                            color: AppColors.textPrimary.withValues(alpha: 0.8),
+                            height: 1.43, // lineHeight 20
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
