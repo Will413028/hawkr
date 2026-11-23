@@ -7,7 +7,7 @@
 // 上傳是三步：BeginUpload 取得預簽的 PUT 網址與 staged token，client 以回應列出的標頭把檔案直接 PUT 到物件儲存，
 // 再 CompleteUpload 通知伺服器；伺服器非同步處理（辨認格式、重新編碼、去除 metadata），client 以 GetUpload 輪詢到 READY 或 REJECTED。
 // READY 的 staged token 交給擁有該圖片的 API（例如更新頭像）轉正；轉正前的暫存只有上傳者本人能續用。
-// 機敏檔案不走這裡（走單體的專用上傳端點）。處理被拒絕不是錯誤：GetUpload 以 state REJECTED 與 reject_reason 回報。
+// 機敏檔案：BeginSecureUpload 開分段會話，段本身走單體的 /api/files/secure_uploads 端點（不經 Connect）。處理被拒絕不是錯誤：GetUpload 以 state REJECTED 與 reject_reason 回報。
 // 設計：ADR docs/adr/2026-11-22-media-upload-channels.md。
 package mediav1alpha1connect
 
@@ -49,6 +49,9 @@ const (
 	// MediaAppServiceGetUploadProcedure is the fully-qualified name of the MediaAppService's GetUpload
 	// RPC.
 	MediaAppServiceGetUploadProcedure = "/hawkr.media.v1alpha1.MediaAppService/GetUpload"
+	// MediaAppServiceBeginSecureUploadProcedure is the fully-qualified name of the MediaAppService's
+	// BeginSecureUpload RPC.
+	MediaAppServiceBeginSecureUploadProcedure = "/hawkr.media.v1alpha1.MediaAppService/BeginSecureUpload"
 )
 
 // MediaAppServiceClient is a client for the hawkr.media.v1alpha1.MediaAppService service.
@@ -64,6 +67,11 @@ type MediaAppServiceClient interface {
 	// GetUpload 讀暫存的處理狀態。staged token 是憑證，所以不標 NO_SIDE_EFFECTS（以 POST 呼叫、不放進網址；規範第三節）；client 輪詢，失敗下一輪再讀。
 	// staged token 不存在或不是呼叫者的回 not_found（兩者不可區分）。
 	GetUpload(context.Context, *connect.Request[v1alpha1.GetUploadRequest]) (*connect.Response[v1alpha1.GetUploadResponse], error)
+	// BeginSecureUpload 開一個機敏檔案的分段上傳會話（B1-D17）。回傳 staged token、段大小與段總數；client 依段大小把檔案切段，
+	// 從第 0 段起依序以 `PUT /api/files/secure_uploads/{staged_token}/chunks/{index}`（原始位元組 body，不經 Connect；規範第十三節）送出。
+	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size（訊息是在地化文字）；伺服器沒有設定加密金鑰回 unavailable。
+	// 每次呼叫建立新的會話；沒有送完的由伺服器回收。
+	BeginSecureUpload(context.Context, *connect.Request[v1alpha1.BeginSecureUploadRequest]) (*connect.Response[v1alpha1.BeginSecureUploadResponse], error)
 }
 
 // NewMediaAppServiceClient constructs a client for the hawkr.media.v1alpha1.MediaAppService
@@ -96,14 +104,21 @@ func NewMediaAppServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(mediaAppServiceMethods.ByName("GetUpload")),
 			connect.WithClientOptions(opts...),
 		),
+		beginSecureUpload: connect.NewClient[v1alpha1.BeginSecureUploadRequest, v1alpha1.BeginSecureUploadResponse](
+			httpClient,
+			baseURL+MediaAppServiceBeginSecureUploadProcedure,
+			connect.WithSchema(mediaAppServiceMethods.ByName("BeginSecureUpload")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // mediaAppServiceClient implements MediaAppServiceClient.
 type mediaAppServiceClient struct {
-	beginUpload    *connect.Client[v1alpha1.BeginUploadRequest, v1alpha1.BeginUploadResponse]
-	completeUpload *connect.Client[v1alpha1.CompleteUploadRequest, v1alpha1.CompleteUploadResponse]
-	getUpload      *connect.Client[v1alpha1.GetUploadRequest, v1alpha1.GetUploadResponse]
+	beginUpload       *connect.Client[v1alpha1.BeginUploadRequest, v1alpha1.BeginUploadResponse]
+	completeUpload    *connect.Client[v1alpha1.CompleteUploadRequest, v1alpha1.CompleteUploadResponse]
+	getUpload         *connect.Client[v1alpha1.GetUploadRequest, v1alpha1.GetUploadResponse]
+	beginSecureUpload *connect.Client[v1alpha1.BeginSecureUploadRequest, v1alpha1.BeginSecureUploadResponse]
 }
 
 // BeginUpload calls hawkr.media.v1alpha1.MediaAppService.BeginUpload.
@@ -121,6 +136,11 @@ func (c *mediaAppServiceClient) GetUpload(ctx context.Context, req *connect.Requ
 	return c.getUpload.CallUnary(ctx, req)
 }
 
+// BeginSecureUpload calls hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload.
+func (c *mediaAppServiceClient) BeginSecureUpload(ctx context.Context, req *connect.Request[v1alpha1.BeginSecureUploadRequest]) (*connect.Response[v1alpha1.BeginSecureUploadResponse], error) {
+	return c.beginSecureUpload.CallUnary(ctx, req)
+}
+
 // MediaAppServiceHandler is an implementation of the hawkr.media.v1alpha1.MediaAppService service.
 type MediaAppServiceHandler interface {
 	// BeginUpload 宣告要上傳的檔案，回傳預簽的 PUT 網址、client 必須原樣帶上的標頭與 staged token。
@@ -134,6 +154,11 @@ type MediaAppServiceHandler interface {
 	// GetUpload 讀暫存的處理狀態。staged token 是憑證，所以不標 NO_SIDE_EFFECTS（以 POST 呼叫、不放進網址；規範第三節）；client 輪詢，失敗下一輪再讀。
 	// staged token 不存在或不是呼叫者的回 not_found（兩者不可區分）。
 	GetUpload(context.Context, *connect.Request[v1alpha1.GetUploadRequest]) (*connect.Response[v1alpha1.GetUploadResponse], error)
+	// BeginSecureUpload 開一個機敏檔案的分段上傳會話（B1-D17）。回傳 staged token、段大小與段總數；client 依段大小把檔案切段，
+	// 從第 0 段起依序以 `PUT /api/files/secure_uploads/{staged_token}/chunks/{index}`（原始位元組 body，不經 Connect；規範第十三節）送出。
+	// size 小於一或超過伺服器的上限回 invalid_argument 指向 size（訊息是在地化文字）；伺服器沒有設定加密金鑰回 unavailable。
+	// 每次呼叫建立新的會話；沒有送完的由伺服器回收。
+	BeginSecureUpload(context.Context, *connect.Request[v1alpha1.BeginSecureUploadRequest]) (*connect.Response[v1alpha1.BeginSecureUploadResponse], error)
 }
 
 // NewMediaAppServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -162,6 +187,12 @@ func NewMediaAppServiceHandler(svc MediaAppServiceHandler, opts ...connect.Handl
 		connect.WithSchema(mediaAppServiceMethods.ByName("GetUpload")),
 		connect.WithHandlerOptions(opts...),
 	)
+	mediaAppServiceBeginSecureUploadHandler := connect.NewUnaryHandler(
+		MediaAppServiceBeginSecureUploadProcedure,
+		svc.BeginSecureUpload,
+		connect.WithSchema(mediaAppServiceMethods.ByName("BeginSecureUpload")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.media.v1alpha1.MediaAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case MediaAppServiceBeginUploadProcedure:
@@ -170,6 +201,8 @@ func NewMediaAppServiceHandler(svc MediaAppServiceHandler, opts ...connect.Handl
 			mediaAppServiceCompleteUploadHandler.ServeHTTP(w, r)
 		case MediaAppServiceGetUploadProcedure:
 			mediaAppServiceGetUploadHandler.ServeHTTP(w, r)
+		case MediaAppServiceBeginSecureUploadProcedure:
+			mediaAppServiceBeginSecureUploadHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -189,4 +222,8 @@ func (UnimplementedMediaAppServiceHandler) CompleteUpload(context.Context, *conn
 
 func (UnimplementedMediaAppServiceHandler) GetUpload(context.Context, *connect.Request[v1alpha1.GetUploadRequest]) (*connect.Response[v1alpha1.GetUploadResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaAppService.GetUpload is not implemented"))
+}
+
+func (UnimplementedMediaAppServiceHandler) BeginSecureUpload(context.Context, *connect.Request[v1alpha1.BeginSecureUploadRequest]) (*connect.Response[v1alpha1.BeginSecureUploadResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload is not implemented"))
 }

@@ -463,6 +463,173 @@ class GetUploadResponse extends $pb.GeneratedMessage {
   $0.Timestamp ensureExpireTime() => $_ensure(2);
 }
 
+class BeginSecureUploadRequest extends $pb.GeneratedMessage {
+  factory BeginSecureUploadRequest({
+    $fixnum.Int64? size,
+  }) {
+    final result = BeginSecureUploadRequest._();
+    if (size != null) result.size = size;
+    return result;
+  }
+
+  BeginSecureUploadRequest._();
+
+  factory BeginSecureUploadRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BeginSecureUploadRequest()..mergeFromBuffer(data, registry);
+  factory BeginSecureUploadRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BeginSecureUploadRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BeginSecureUploadRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance: BeginSecureUploadRequest.$_createMessage)
+    ..aInt64(1, _omitFieldNames ? '' : 'size')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeginSecureUploadRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeginSecureUploadRequest copyWith(
+          void Function(BeginSecureUploadRequest) updates) =>
+      super.copyWith((message) => updates(message as BeginSecureUploadRequest))
+          as BeginSecureUploadRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BeginSecureUploadRequest() / BeginSecureUploadRequest.new instead')
+  static BeginSecureUploadRequest create() => BeginSecureUploadRequest._();
+  static $pb.GeneratedMessage $_createMessage() => BeginSecureUploadRequest._();
+  @$core.override
+  BeginSecureUploadRequest createEmptyInstance() =>
+      BeginSecureUploadRequest._();
+  @$core.pragma('dart2js:noInline')
+  static BeginSecureUploadRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BeginSecureUploadRequest>(
+          BeginSecureUploadRequest.$_createMessage);
+  static BeginSecureUploadRequest? _defaultInstance;
+
+  /// 檔案的明文位元組數；必須大於零且不超過伺服器的上限，段總數由它算出。
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get size => $_getI64(0);
+  @$pb.TagNumber(1)
+  set size($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSize() => $_clearField(1);
+}
+
+class BeginSecureUploadResponse extends $pb.GeneratedMessage {
+  factory BeginSecureUploadResponse({
+    $core.String? stagedToken,
+    $core.int? chunkSize,
+    $core.int? chunkCount,
+    $0.Timestamp? expireTime,
+  }) {
+    final result = BeginSecureUploadResponse._();
+    if (stagedToken != null) result.stagedToken = stagedToken;
+    if (chunkSize != null) result.chunkSize = chunkSize;
+    if (chunkCount != null) result.chunkCount = chunkCount;
+    if (expireTime != null) result.expireTime = expireTime;
+    return result;
+  }
+
+  BeginSecureUploadResponse._();
+
+  factory BeginSecureUploadResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BeginSecureUploadResponse()..mergeFromBuffer(data, registry);
+  factory BeginSecureUploadResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      BeginSecureUploadResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BeginSecureUploadResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance: BeginSecureUploadResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'stagedToken')
+    ..aI(2, _omitFieldNames ? '' : 'chunkSize')
+    ..aI(3, _omitFieldNames ? '' : 'chunkCount')
+    ..aOM<$0.Timestamp>(4, _omitFieldNames ? '' : 'expireTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeginSecureUploadResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeginSecureUploadResponse copyWith(
+          void Function(BeginSecureUploadResponse) updates) =>
+      super.copyWith((message) => updates(message as BeginSecureUploadResponse))
+          as BeginSecureUploadResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use BeginSecureUploadResponse() / BeginSecureUploadResponse.new instead')
+  static BeginSecureUploadResponse create() => BeginSecureUploadResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      BeginSecureUploadResponse._();
+  @$core.override
+  BeginSecureUploadResponse createEmptyInstance() =>
+      BeginSecureUploadResponse._();
+  @$core.pragma('dart2js:noInline')
+  static BeginSecureUploadResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BeginSecureUploadResponse>(
+          BeginSecureUploadResponse.$_createMessage);
+  static BeginSecureUploadResponse? _defaultInstance;
+
+  /// 不透明的憑證，放在段上傳與暫存預覽的網址路徑裡，交給擁有者的 API 轉正；只出現這一次。
+  @$pb.TagNumber(1)
+  $core.String get stagedToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set stagedToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStagedToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStagedToken() => $_clearField(1);
+
+  /// 每段的位元組數；除最後一段外每段剛好這個大小，最後一段是餘數。client 不寫死。
+  @$pb.TagNumber(2)
+  $core.int get chunkSize => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set chunkSize($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasChunkSize() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearChunkSize() => $_clearField(2);
+
+  /// 段總數；段序號是 0 到 chunk_count - 1。
+  @$pb.TagNumber(3)
+  $core.int get chunkCount => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set chunkCount($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasChunkCount() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearChunkCount() => $_clearField(3);
+
+  /// 會話的到期時間；過了之後 staged token 不能再用。
+  @$pb.TagNumber(4)
+  $0.Timestamp get expireTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set expireTime($0.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExpireTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExpireTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $0.Timestamp ensureExpireTime() => $_ensure(3);
+}
+
 /// MediaAppService 是登入的買家與賣家上傳公開圖片；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 class MediaAppServiceApi {
   final $pb.RpcClient _client;
@@ -491,6 +658,15 @@ class MediaAppServiceApi {
           $pb.ClientContext? ctx, GetUploadRequest request) =>
       _client.invoke<GetUploadResponse>(
           ctx, 'MediaAppService', 'GetUpload', request, GetUploadResponse());
+
+  /// BeginSecureUpload 開一個機敏檔案的分段上傳會話（B1-D17）。回傳 staged token、段大小與段總數；client 依段大小把檔案切段，
+  /// 從第 0 段起依序以 `PUT /api/files/secure_uploads/{staged_token}/chunks/{index}`（原始位元組 body，不經 Connect；規範第十三節）送出。
+  /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size（訊息是在地化文字）；伺服器沒有設定加密金鑰回 unavailable。
+  /// 每次呼叫建立新的會話；沒有送完的由伺服器回收。
+  $async.Future<BeginSecureUploadResponse> beginSecureUpload(
+          $pb.ClientContext? ctx, BeginSecureUploadRequest request) =>
+      _client.invoke<BeginSecureUploadResponse>(ctx, 'MediaAppService',
+          'BeginSecureUpload', request, BeginSecureUploadResponse());
 }
 
 const $core.bool _omitFieldNames =

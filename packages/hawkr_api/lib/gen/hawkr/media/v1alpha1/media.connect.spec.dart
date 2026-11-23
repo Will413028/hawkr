@@ -40,4 +40,15 @@ abstract final class MediaAppService {
     hawkrmediav1alpha1media.GetUploadRequest.new,
     hawkrmediav1alpha1media.GetUploadResponse.new,
   );
+
+  /// BeginSecureUpload 開一個機敏檔案的分段上傳會話（B1-D17）。回傳 staged token、段大小與段總數；client 依段大小把檔案切段，
+  /// 從第 0 段起依序以 `PUT /api/files/secure_uploads/{staged_token}/chunks/{index}`（原始位元組 body，不經 Connect；規範第十三節）送出。
+  /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size（訊息是在地化文字）；伺服器沒有設定加密金鑰回 unavailable。
+  /// 每次呼叫建立新的會話；沒有送完的由伺服器回收。
+  static const beginSecureUpload = connect.Spec(
+    '/$name/BeginSecureUpload',
+    connect.StreamType.unary,
+    hawkrmediav1alpha1media.BeginSecureUploadRequest.new,
+    hawkrmediav1alpha1media.BeginSecureUploadResponse.new,
+  );
 }

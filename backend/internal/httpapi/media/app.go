@@ -22,6 +22,7 @@ type Uploads interface {
 	BeginUpload(ctx context.Context, uploader media.Uploader, in media.BeginInput) (media.BeginResult, error)
 	CompleteUpload(ctx context.Context, uploader media.Uploader, token string) error
 	GetUpload(ctx context.Context, uploader media.Uploader, token string) (media.UploadStatus, error)
+	BeginSecureUpload(ctx context.Context, uploader media.Uploader, size int64) (media.SecureBeginResult, error)
 }
 
 // App 實作 MediaAppService。
@@ -95,4 +96,21 @@ func (h *App) GetUpload(ctx context.Context, req *connect.Request[pb.GetUploadRe
 		out.RejectReason = &r
 	}
 	return connect.NewResponse(out), nil
+}
+
+func (h *App) BeginSecureUpload(ctx context.Context, req *connect.Request[pb.BeginSecureUploadRequest]) (*connect.Response[pb.BeginSecureUploadResponse], error) {
+	u, uploads, err := h.uploader(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := uploads.BeginSecureUpload(ctx, u, req.Msg.GetSize())
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.BeginSecureUploadResponse{
+		StagedToken: res.Token,
+		ChunkSize:   int32(res.ChunkSize),  //nolint:gosec // SecureChunkSize 是 4 MiB
+		ChunkCount:  int32(res.ChunkCount), //nolint:gosec // 段總數最多 MaxSecureUploadSize / SecureChunkSize
+		ExpireTime:  timestamppb.New(res.ExpiresAt),
+	}), nil
 }

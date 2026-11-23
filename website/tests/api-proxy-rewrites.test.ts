@@ -5,12 +5,13 @@ import {
 	apiProxyTarget,
 	authProxyTarget,
 	connectProxyTarget,
+	filesProxyTarget,
 	isLocalApiProxyBuild,
 } from "../lib/api/local-proxy";
 
 const MONOLITH = "https://api.example.org/api/v1";
 
-test("the rewrites forward the three browser prefixes to the monolith", () => {
+test("the rewrites forward the four browser prefixes to the monolith", () => {
 	assert.deepEqual(
 		apiProxyRewrites({ NODE_ENV: "production", API_BASE_URL: MONOLITH }),
 		[
@@ -21,6 +22,10 @@ test("the rewrites forward the three browser prefixes to the monolith", () => {
 			{
 				source: "/api/auth/:path*",
 				destination: "https://api.example.org/api/auth/:path*",
+			},
+			{
+				source: "/api/files/:path*",
+				destination: "https://api.example.org/api/files/:path*",
 			},
 			{
 				source: "/api/v1/:path*",
@@ -40,6 +45,7 @@ test("the rewrites honour a base path and a trailing slash of API_BASE_URL", () 
 		[
 			"http://127.0.0.1:9/edge/:path*",
 			"http://127.0.0.1:9/api/auth/:path*",
+			"http://127.0.0.1:9/api/files/:path*",
 			"http://127.0.0.1:9/edge/api/v1/:path*",
 		],
 	);
@@ -53,6 +59,7 @@ test("a rewrite destination and the route handler target agree for every prefix"
 	const requests = [
 		["/api/connect/hawkr.v1.Svc/Method", connectProxyTarget],
 		["/api/auth/google/start", authProxyTarget],
+		["/api/files/secure_uploads/x/chunks/0", filesProxyTarget],
 		["/api/v1/public/products", apiProxyTarget],
 	] as const;
 	for (const [path, target] of requests) {

@@ -32,6 +32,9 @@ type fakeUploads struct {
 	beginRes media.BeginResult
 	status   media.UploadStatus
 	err      error
+
+	secureSizes []int64
+	secureRes   media.SecureBeginResult
 }
 
 func (f *fakeUploads) BeginUpload(_ context.Context, u media.Uploader, in media.BeginInput) (media.BeginResult, error) {
@@ -47,6 +50,12 @@ func (f *fakeUploads) CompleteUpload(_ context.Context, u media.Uploader, token 
 func (f *fakeUploads) GetUpload(_ context.Context, u media.Uploader, token string) (media.UploadStatus, error) {
 	f.who, f.tokens = append(f.who, u), append(f.tokens, token)
 	return f.status, f.err
+}
+
+func (f *fakeUploads) BeginSecureUpload(_ context.Context, u media.Uploader, size int64) (media.SecureBeginResult, error) {
+	f.who = append(f.who, u)
+	f.secureSizes = append(f.secureSizes, size)
+	return f.secureRes, f.err
 }
 
 type noJobs struct{}
@@ -95,8 +104,8 @@ func TestMediaAppRequiresALogin(t *testing.T) {
 	f := &fakeUploads{}
 	e := newEnv(t, newApp(f))
 	methods := pb.File_hawkr_media_v1alpha1_media_proto.Services().ByName("MediaAppService").Methods()
-	if methods.Len() != 3 {
-		t.Fatalf("MediaAppService 有 %d 支方法，預期 3", methods.Len())
+	if methods.Len() != 4 {
+		t.Fatalf("MediaAppService 有 %d 支方法，預期 4", methods.Len())
 	}
 	for i := range methods.Len() {
 		name := string(methods.Get(i).Name())
@@ -126,7 +135,8 @@ func TestOnlyAnAccountCanCall(t *testing.T) {
 	_, err1 := e.client.BeginUpload(ctx, asAdmin(&pb.BeginUploadRequest{Size: 1, ContentType: "image/png", Md5: "x"}))
 	_, err2 := e.client.CompleteUpload(ctx, asAdmin(&pb.CompleteUploadRequest{StagedToken: token}))
 	_, err3 := e.client.GetUpload(ctx, asAdmin(&pb.GetUploadRequest{StagedToken: token}))
-	for i, err := range []error{err1, err2, err3} {
+	_, err4 := e.client.BeginSecureUpload(ctx, asAdmin(&pb.BeginSecureUploadRequest{Size: 1}))
+	for i, err := range []error{err1, err2, err3, err4} {
 		if connect.CodeOf(err) != connect.CodePermissionDenied {
 			t.Errorf("方法 %d：管理員回 %v，預期 permission_denied", i, err)
 		}
@@ -266,5 +276,30 @@ func TestBeginUploadOverTheLimitIsInvalidArgumentAndIssuesNoURL(t *testing.T) {
 	}
 	if bad == nil || len(bad.GetFieldViolations()) != 1 || bad.GetFieldViolations()[0].GetField() != "size" {
 		t.Fatalf("BadRequest 應指向 size：%v", err)
+	}
+}
+
+func TestBeginSecureUploadReturnsChunkPlan(t *testing.T) {
+	exp := time.Date(2026, 11, 23, 1, 2, 3, 0, time.UTC)
+	f := &fakeUploads{secureRes: media.SecureBeginResult{Token: "tok", ChunkSize: media.SecureChunkSize, ChunkCount: 3, ExpiresAt: exp}}
+	e := newEnv(t, newApp(f))
+	resp, err := e.client.BeginSecureUpload(t.Context(), signedIn(&pb.BeginSecureUploadRequest{Size: 9_000_000}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := resp.Msg
+	if m.GetStagedToken() != "tok" || m.GetChunkSize() != media.SecureChunkSize || m.GetChunkCount() != 3 || !m.GetExpireTime().AsTime().Equal(exp) {
+		t.Fatalf("回應 = %v", m)
+	}
+	if len(f.secureSizes) != 1 || f.secureSizes[0] != 9_000_000 || f.who[0].ID != 7 {
+		t.Fatalf("模組收到 size %v、上傳者 %v", f.secureSizes, f.who)
+	}
+}
+
+func TestBeginSecureUploadWithoutModuleIsUnavailable(t *testing.T) {
+	e := newEnv(t, NewApp(nil))
+	_, err := e.client.BeginSecureUpload(t.Context(), signedIn(&pb.BeginSecureUploadRequest{Size: 1}))
+	if connect.CodeOf(err) != connect.CodeUnavailable {
+		t.Fatalf("回 %v，預期 unavailable", err)
 	}
 }

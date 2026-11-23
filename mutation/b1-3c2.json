@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "chunk-no-read-deadline",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/secure_files.go",
+   "old": "time.Now().Add(h.readTimeout)",
+   "new": "time.Time{}",
+   "test": "internal/httpapi/media ^TestChunkSlowBodyTimesOut$",
+   "why": "拿掉每個段請求讀 body 的時限：慢速 body 不會被切斷，不再回 408"
+  },
+  {
+   "id": "chunk-no-max-bytes-reader",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/secure_files.go",
+   "old": "body := http.MaxBytesReader(w, r.Body, media.SecureChunkSize)",
+   "new": "body := r.Body",
+   "test": "internal/httpapi/media ^TestChunkOverSegmentSizeIsRejected$",
+   "why": "拿掉段大小的 body 上限：超過段大小的請求被模組整份讀完，不回 413"
+  },
+  {
+   "id": "chunk-no-next-index-header",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/secure_files.go",
+   "old": "w.Header().Set(NextIndexHeader, next)\n",
+   "new": "_ = next\n",
+   "test": "internal/httpapi/media ^TestChunkIndexMismatchIs409WithNextIndex$",
+   "why": "index 不符的 409 不帶 Hawkr-Next-Index：client 無法依下一個序號續傳"
+  },
+  {
+   "id": "proxy-no-files-route",
+   "stack": "website",
+   "file": "website/lib/api/local-proxy.ts",
+   "old": "\tfiles: { source: \"/api/files\", upstream: () => \"/api/files\" },\n",
+   "new": "",
+   "test": "lib/api/local-proxy.unit.test.ts targets the monolith root /api/files, not /api/v1/files",
+   "why": "PROXY_ROUTES 拿掉 files：/api/files 不再轉到單體根目錄，段上傳打不到單體"
+  }
+ ]
+}

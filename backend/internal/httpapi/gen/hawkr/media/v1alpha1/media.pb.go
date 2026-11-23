@@ -9,7 +9,7 @@
 // 上傳是三步：BeginUpload 取得預簽的 PUT 網址與 staged token，client 以回應列出的標頭把檔案直接 PUT 到物件儲存，
 // 再 CompleteUpload 通知伺服器；伺服器非同步處理（辨認格式、重新編碼、去除 metadata），client 以 GetUpload 輪詢到 READY 或 REJECTED。
 // READY 的 staged token 交給擁有該圖片的 API（例如更新頭像）轉正；轉正前的暫存只有上傳者本人能續用。
-// 機敏檔案不走這裡（走單體的專用上傳端點）。處理被拒絕不是錯誤：GetUpload 以 state REJECTED 與 reject_reason 回報。
+// 機敏檔案：BeginSecureUpload 開分段會話，段本身走單體的 /api/files/secure_uploads 端點（不經 Connect）。處理被拒絕不是錯誤：GetUpload 以 state REJECTED 與 reject_reason 回報。
 // 設計：ADR docs/adr/2026-11-22-media-upload-channels.md。
 
 package mediav1alpha1
@@ -491,6 +491,123 @@ func (x *GetUploadResponse) GetExpireTime() *timestamppb.Timestamp {
 	return nil
 }
 
+type BeginSecureUploadRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 檔案的明文位元組數；必須大於零且不超過伺服器的上限，段總數由它算出。
+	Size          int64 `protobuf:"varint,1,opt,name=size,proto3" json:"size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginSecureUploadRequest) Reset() {
+	*x = BeginSecureUploadRequest{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginSecureUploadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginSecureUploadRequest) ProtoMessage() {}
+
+func (x *BeginSecureUploadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginSecureUploadRequest.ProtoReflect.Descriptor instead.
+func (*BeginSecureUploadRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *BeginSecureUploadRequest) GetSize() int64 {
+	if x != nil {
+		return x.Size
+	}
+	return 0
+}
+
+type BeginSecureUploadResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 不透明的憑證，放在段上傳與暫存預覽的網址路徑裡，交給擁有者的 API 轉正；只出現這一次。
+	StagedToken string `protobuf:"bytes,1,opt,name=staged_token,json=stagedToken,proto3" json:"staged_token,omitempty"`
+	// 每段的位元組數；除最後一段外每段剛好這個大小，最後一段是餘數。client 不寫死。
+	ChunkSize int32 `protobuf:"varint,2,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"`
+	// 段總數；段序號是 0 到 chunk_count - 1。
+	ChunkCount int32 `protobuf:"varint,3,opt,name=chunk_count,json=chunkCount,proto3" json:"chunk_count,omitempty"`
+	// 會話的到期時間；過了之後 staged token 不能再用。
+	ExpireTime    *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expire_time,json=expireTime,proto3" json:"expire_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginSecureUploadResponse) Reset() {
+	*x = BeginSecureUploadResponse{}
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginSecureUploadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginSecureUploadResponse) ProtoMessage() {}
+
+func (x *BeginSecureUploadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_media_v1alpha1_media_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginSecureUploadResponse.ProtoReflect.Descriptor instead.
+func (*BeginSecureUploadResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_media_v1alpha1_media_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *BeginSecureUploadResponse) GetStagedToken() string {
+	if x != nil {
+		return x.StagedToken
+	}
+	return ""
+}
+
+func (x *BeginSecureUploadResponse) GetChunkSize() int32 {
+	if x != nil {
+		return x.ChunkSize
+	}
+	return 0
+}
+
+func (x *BeginSecureUploadResponse) GetChunkCount() int32 {
+	if x != nil {
+		return x.ChunkCount
+	}
+	return 0
+}
+
+func (x *BeginSecureUploadResponse) GetExpireTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpireTime
+	}
+	return nil
+}
+
 var File_hawkr_media_v1alpha1_media_proto protoreflect.FileDescriptor
 
 const file_hawkr_media_v1alpha1_media_proto_rawDesc = "" +
@@ -520,7 +637,17 @@ const file_hawkr_media_v1alpha1_media_proto_rawDesc = "" +
 	"\rreject_reason\x18\x02 \x01(\x0e2\".hawkr.media.v1alpha1.RejectReasonB\x03\xe0A\x03H\x00R\frejectReason\x88\x01\x01\x12@\n" +
 	"\vexpire_time\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"expireTimeB\x10\n" +
-	"\x0e_reject_reason*\xe4\x01\n" +
+	"\x0e_reject_reason\"3\n" +
+	"\x18BeginSecureUploadRequest\x12\x17\n" +
+	"\x04size\x18\x01 \x01(\x03B\x03\xe0A\x02R\x04size\"\xcf\x01\n" +
+	"\x19BeginSecureUploadResponse\x12&\n" +
+	"\fstaged_token\x18\x01 \x01(\tB\x03\xe0A\x03R\vstagedToken\x12\"\n" +
+	"\n" +
+	"chunk_size\x18\x02 \x01(\x05B\x03\xe0A\x03R\tchunkSize\x12$\n" +
+	"\vchunk_count\x18\x03 \x01(\x05B\x03\xe0A\x03R\n" +
+	"chunkCount\x12@\n" +
+	"\vexpire_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"expireTime*\xe4\x01\n" +
 	"\vUploadState\x12\x1c\n" +
 	"\x18UPLOAD_STATE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14UPLOAD_STATE_PENDING\x10\x01\x12\x19\n" +
@@ -536,11 +663,12 @@ const file_hawkr_media_v1alpha1_media_proto_rawDesc = "" +
 	"\x1bREJECT_REASON_SIZE_MISMATCH\x10\x02\x12#\n" +
 	"\x1fREJECT_REASON_CHECKSUM_MISMATCH\x10\x03\x12#\n" +
 	"\x1fREJECT_REASON_PROCESSING_FAILED\x10\x04\x12\x19\n" +
-	"\x15REJECT_REASON_EXPIRED\x10\x052\xc5\x02\n" +
+	"\x15REJECT_REASON_EXPIRED\x10\x052\xbb\x03\n" +
 	"\x0fMediaAppService\x12b\n" +
 	"\vBeginUpload\x12(.hawkr.media.v1alpha1.BeginUploadRequest\x1a).hawkr.media.v1alpha1.BeginUploadResponse\x12p\n" +
 	"\x0eCompleteUpload\x12+.hawkr.media.v1alpha1.CompleteUploadRequest\x1a,.hawkr.media.v1alpha1.CompleteUploadResponse\"\x03\x90\x02\x02\x12\\\n" +
-	"\tGetUpload\x12&.hawkr.media.v1alpha1.GetUploadRequest\x1a'.hawkr.media.v1alpha1.GetUploadResponseB\xf5\x01\n" +
+	"\tGetUpload\x12&.hawkr.media.v1alpha1.GetUploadRequest\x1a'.hawkr.media.v1alpha1.GetUploadResponse\x12t\n" +
+	"\x11BeginSecureUpload\x12..hawkr.media.v1alpha1.BeginSecureUploadRequest\x1a/.hawkr.media.v1alpha1.BeginSecureUploadResponseB\xf5\x01\n" +
 	"\x18com.hawkr.media.v1alpha1B\n" +
 	"MediaProtoP\x01Z[github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1;mediav1alpha1\xa2\x02\x03HMX\xaa\x02\x14Hawkr.Media.V1alpha1\xca\x02\x14Hawkr\\Media\\V1alpha1\xe2\x02 Hawkr\\Media\\V1alpha1\\GPBMetadata\xea\x02\x16Hawkr::Media::V1alpha1b\x06proto3"
 
@@ -557,36 +685,41 @@ func file_hawkr_media_v1alpha1_media_proto_rawDescGZIP() []byte {
 }
 
 var file_hawkr_media_v1alpha1_media_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_hawkr_media_v1alpha1_media_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_hawkr_media_v1alpha1_media_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_hawkr_media_v1alpha1_media_proto_goTypes = []any{
-	(UploadState)(0),               // 0: hawkr.media.v1alpha1.UploadState
-	(RejectReason)(0),              // 1: hawkr.media.v1alpha1.RejectReason
-	(*BeginUploadRequest)(nil),     // 2: hawkr.media.v1alpha1.BeginUploadRequest
-	(*BeginUploadResponse)(nil),    // 3: hawkr.media.v1alpha1.BeginUploadResponse
-	(*CompleteUploadRequest)(nil),  // 4: hawkr.media.v1alpha1.CompleteUploadRequest
-	(*CompleteUploadResponse)(nil), // 5: hawkr.media.v1alpha1.CompleteUploadResponse
-	(*GetUploadRequest)(nil),       // 6: hawkr.media.v1alpha1.GetUploadRequest
-	(*GetUploadResponse)(nil),      // 7: hawkr.media.v1alpha1.GetUploadResponse
-	nil,                            // 8: hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
-	(*timestamppb.Timestamp)(nil),  // 9: google.protobuf.Timestamp
+	(UploadState)(0),                  // 0: hawkr.media.v1alpha1.UploadState
+	(RejectReason)(0),                 // 1: hawkr.media.v1alpha1.RejectReason
+	(*BeginUploadRequest)(nil),        // 2: hawkr.media.v1alpha1.BeginUploadRequest
+	(*BeginUploadResponse)(nil),       // 3: hawkr.media.v1alpha1.BeginUploadResponse
+	(*CompleteUploadRequest)(nil),     // 4: hawkr.media.v1alpha1.CompleteUploadRequest
+	(*CompleteUploadResponse)(nil),    // 5: hawkr.media.v1alpha1.CompleteUploadResponse
+	(*GetUploadRequest)(nil),          // 6: hawkr.media.v1alpha1.GetUploadRequest
+	(*GetUploadResponse)(nil),         // 7: hawkr.media.v1alpha1.GetUploadResponse
+	(*BeginSecureUploadRequest)(nil),  // 8: hawkr.media.v1alpha1.BeginSecureUploadRequest
+	(*BeginSecureUploadResponse)(nil), // 9: hawkr.media.v1alpha1.BeginSecureUploadResponse
+	nil,                               // 10: hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
+	(*timestamppb.Timestamp)(nil),     // 11: google.protobuf.Timestamp
 }
 var file_hawkr_media_v1alpha1_media_proto_depIdxs = []int32{
-	8, // 0: hawkr.media.v1alpha1.BeginUploadResponse.upload_headers:type_name -> hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
-	9, // 1: hawkr.media.v1alpha1.BeginUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
-	0, // 2: hawkr.media.v1alpha1.GetUploadResponse.state:type_name -> hawkr.media.v1alpha1.UploadState
-	1, // 3: hawkr.media.v1alpha1.GetUploadResponse.reject_reason:type_name -> hawkr.media.v1alpha1.RejectReason
-	9, // 4: hawkr.media.v1alpha1.GetUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
-	2, // 5: hawkr.media.v1alpha1.MediaAppService.BeginUpload:input_type -> hawkr.media.v1alpha1.BeginUploadRequest
-	4, // 6: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:input_type -> hawkr.media.v1alpha1.CompleteUploadRequest
-	6, // 7: hawkr.media.v1alpha1.MediaAppService.GetUpload:input_type -> hawkr.media.v1alpha1.GetUploadRequest
-	3, // 8: hawkr.media.v1alpha1.MediaAppService.BeginUpload:output_type -> hawkr.media.v1alpha1.BeginUploadResponse
-	5, // 9: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:output_type -> hawkr.media.v1alpha1.CompleteUploadResponse
-	7, // 10: hawkr.media.v1alpha1.MediaAppService.GetUpload:output_type -> hawkr.media.v1alpha1.GetUploadResponse
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	10, // 0: hawkr.media.v1alpha1.BeginUploadResponse.upload_headers:type_name -> hawkr.media.v1alpha1.BeginUploadResponse.UploadHeadersEntry
+	11, // 1: hawkr.media.v1alpha1.BeginUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	0,  // 2: hawkr.media.v1alpha1.GetUploadResponse.state:type_name -> hawkr.media.v1alpha1.UploadState
+	1,  // 3: hawkr.media.v1alpha1.GetUploadResponse.reject_reason:type_name -> hawkr.media.v1alpha1.RejectReason
+	11, // 4: hawkr.media.v1alpha1.GetUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	11, // 5: hawkr.media.v1alpha1.BeginSecureUploadResponse.expire_time:type_name -> google.protobuf.Timestamp
+	2,  // 6: hawkr.media.v1alpha1.MediaAppService.BeginUpload:input_type -> hawkr.media.v1alpha1.BeginUploadRequest
+	4,  // 7: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:input_type -> hawkr.media.v1alpha1.CompleteUploadRequest
+	6,  // 8: hawkr.media.v1alpha1.MediaAppService.GetUpload:input_type -> hawkr.media.v1alpha1.GetUploadRequest
+	8,  // 9: hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload:input_type -> hawkr.media.v1alpha1.BeginSecureUploadRequest
+	3,  // 10: hawkr.media.v1alpha1.MediaAppService.BeginUpload:output_type -> hawkr.media.v1alpha1.BeginUploadResponse
+	5,  // 11: hawkr.media.v1alpha1.MediaAppService.CompleteUpload:output_type -> hawkr.media.v1alpha1.CompleteUploadResponse
+	7,  // 12: hawkr.media.v1alpha1.MediaAppService.GetUpload:output_type -> hawkr.media.v1alpha1.GetUploadResponse
+	9,  // 13: hawkr.media.v1alpha1.MediaAppService.BeginSecureUpload:output_type -> hawkr.media.v1alpha1.BeginSecureUploadResponse
+	10, // [10:14] is the sub-list for method output_type
+	6,  // [6:10] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_media_v1alpha1_media_proto_init() }
@@ -601,7 +734,7 @@ func file_hawkr_media_v1alpha1_media_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_media_v1alpha1_media_proto_rawDesc), len(file_hawkr_media_v1alpha1_media_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

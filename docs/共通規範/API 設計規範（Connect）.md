@@ -199,7 +199,7 @@
 
 - web 用 JSON（除錯方便）。App 也用 JSON，並接受 gzip：gzip 之後 binary 只再小 15–20%，解碼的差距以微秒計（試點 6.7 的量測）。出現大量或頻繁的回應（清單分頁、串流），或裝置上的解碼成為可見的延遲時，重新評估 binary。
 - 串流只用 server streaming。AI 助理的 AG-UI 事件格式是否改成 proto 串流另外決定。
-- 檔案上傳用 presigned URL 直接上傳到儲存空間，API 只處理 metadata；媒體的 Range／206 由儲存空間或 CDN 直接提供。
+- 公開圖片用 presigned URL 直接上傳到儲存空間，API 只處理 metadata；機敏檔分段經單體（第十三節）；媒體的 Range／206 由儲存空間或 CDN 直接提供。
 
 ## 十二、生成
 
@@ -213,6 +213,7 @@
 - 每條 `/api/files/admin/…` 端點宣告一個權限（`platform/adminperm` 目錄裡的 `<模組>.<資源>.<動詞>`，例如 `seller.kyc_documents.get`），宣告在 `backend/internal/httpapi` 的 `fileRoute.permission`：入口在 handler 之前檢查呼叫者是管理員而且角色允許它（`adminauth.GuardFile`），模組自己的授權在那之後。啟動時檢查每條 `/api/files/admin/` 路由都宣告了目錄裡的權限、其他路由沒有宣告，不合法就不能啟動；新增端點沒寫宣告等於不能啟動。與 admin Connect 方法的宣告同一套目錄與規則（ADR `2026-10-04-admin-roles`）。
 - 機敏檔案回應 `Cache-Control: private, no-store`，加 `X-Content-Type-Options: nosniff`；`Content-Type` 只放行確定安全的型別，其餘一律 `application/octet-stream`。
 - 以業務資源定址（申請、位置），不以 asset ID：asset ID 只在擁有者的資料表裡，不出現在 URL 與回應。每次讀取是否留稽核由擁有者決定；要稽核的先寫紀錄再送內容（寫不進去就不送）。
+- 機敏檔上傳分段經單體（B1-D17）：Connect 方法 `BeginSecureUpload` 回 token、段大小與段總數，段本身是 `PUT /api/files/secure_uploads/{token}/chunks/{index}`，原始位元組 body（不經 Connect，JSON 編碼會膨脹約三分之一）；每個請求限讀 body 90 秒、大小不超過段大小。錯誤沿用本節的規則（只回 HTTP 狀態）；唯一例外：index 不是下一個要送的段回 `409`，並帶回應 header `Hawkr-Next-Index: <n>`（下一個要送的序號，比照 tus 以 header 傳 offset），client 依它續傳。上傳者本人以 `GET /api/files/secure_uploads/{token}` 預覽確認前的暫存。
 - 取得網址的方式是擁有者的 Connect 方法回傳（例如 KYC 的 `GetKYCApplication` 回傳的 `KYCDocument.view_uri`），不由 client 自己組。
 
 ## 與〈API 設計規範〉的關係

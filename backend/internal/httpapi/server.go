@@ -197,8 +197,19 @@ type fileRoute struct {
 	permission adminperm.Permission
 }
 
-// fileRoutes 是單體的檔案回應：後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
+// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
 func fileRoutes(deps Deps) []fileRoute {
+	routes := sellerFileRoutes(deps)
+	if deps.Media != nil {
+		secure := httpmedia.NewSecureUploads(deps.Media, deps.Logger)
+		routes = append(routes,
+			fileRoute{pattern: httpmedia.ChunkRoute, handler: secure.Chunk()},
+			fileRoute{pattern: httpmedia.PreviewRoute, handler: secure.Preview()})
+	}
+	return routes
+}
+
+func sellerFileRoutes(deps Deps) []fileRoute {
 	if deps.Seller == nil {
 		return nil
 	}

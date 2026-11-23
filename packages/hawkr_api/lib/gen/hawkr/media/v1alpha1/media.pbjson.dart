@@ -206,6 +206,45 @@ final $typed_data.Uint8List getUploadResponseDescriptor = $convert.base64Decode(
     'oLZXhwaXJlX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCmV4'
     'cGlyZVRpbWVCEAoOX3JlamVjdF9yZWFzb24=');
 
+@$core.Deprecated('Use beginSecureUploadRequestDescriptor instead')
+const BeginSecureUploadRequest$json = {
+  '1': 'BeginSecureUploadRequest',
+  '2': [
+    {'1': 'size', '3': 1, '4': 1, '5': 3, '8': {}, '10': 'size'},
+  ],
+};
+
+/// Descriptor for `BeginSecureUploadRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List beginSecureUploadRequestDescriptor =
+    $convert.base64Decode(
+        'ChhCZWdpblNlY3VyZVVwbG9hZFJlcXVlc3QSFwoEc2l6ZRgBIAEoA0ID4EECUgRzaXpl');
+
+@$core.Deprecated('Use beginSecureUploadResponseDescriptor instead')
+const BeginSecureUploadResponse$json = {
+  '1': 'BeginSecureUploadResponse',
+  '2': [
+    {'1': 'staged_token', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'stagedToken'},
+    {'1': 'chunk_size', '3': 2, '4': 1, '5': 5, '8': {}, '10': 'chunkSize'},
+    {'1': 'chunk_count', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'chunkCount'},
+    {
+      '1': 'expire_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'expireTime'
+    },
+  ],
+};
+
+/// Descriptor for `BeginSecureUploadResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List beginSecureUploadResponseDescriptor = $convert.base64Decode(
+    'ChlCZWdpblNlY3VyZVVwbG9hZFJlc3BvbnNlEiYKDHN0YWdlZF90b2tlbhgBIAEoCUID4EEDUg'
+    'tzdGFnZWRUb2tlbhIiCgpjaHVua19zaXplGAIgASgFQgPgQQNSCWNodW5rU2l6ZRIkCgtjaHVu'
+    'a19jb3VudBgDIAEoBUID4EEDUgpjaHVua0NvdW50EkAKC2V4cGlyZV90aW1lGAQgASgLMhouZ2'
+    '9vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpleHBpcmVUaW1l');
+
 const $core.Map<$core.String, $core.dynamic> MediaAppServiceBase$json = {
   '1': 'MediaAppService',
   '2': [
@@ -225,6 +264,11 @@ const $core.Map<$core.String, $core.dynamic> MediaAppServiceBase$json = {
       '2': '.hawkr.media.v1alpha1.GetUploadRequest',
       '3': '.hawkr.media.v1alpha1.GetUploadResponse'
     },
+    {
+      '1': 'BeginSecureUpload',
+      '2': '.hawkr.media.v1alpha1.BeginSecureUploadRequest',
+      '3': '.hawkr.media.v1alpha1.BeginSecureUploadResponse'
+    },
   ],
 };
 
@@ -240,6 +284,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.media.v1alpha1.CompleteUploadResponse': CompleteUploadResponse$json,
   '.hawkr.media.v1alpha1.GetUploadRequest': GetUploadRequest$json,
   '.hawkr.media.v1alpha1.GetUploadResponse': GetUploadResponse$json,
+  '.hawkr.media.v1alpha1.BeginSecureUploadRequest':
+      BeginSecureUploadRequest$json,
+  '.hawkr.media.v1alpha1.BeginSecureUploadResponse':
+      BeginSecureUploadResponse$json,
 };
 
 /// Descriptor for `MediaAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -249,4 +297,6 @@ final $typed_data.Uint8List mediaAppServiceDescriptor = $convert.base64Decode(
     'c3BvbnNlEnAKDkNvbXBsZXRlVXBsb2FkEisuaGF3a3IubWVkaWEudjFhbHBoYTEuQ29tcGxldG'
     'VVcGxvYWRSZXF1ZXN0GiwuaGF3a3IubWVkaWEudjFhbHBoYTEuQ29tcGxldGVVcGxvYWRSZXNw'
     'b25zZSIDkAICElwKCUdldFVwbG9hZBImLmhhd2tyLm1lZGlhLnYxYWxwaGExLkdldFVwbG9hZF'
-    'JlcXVlc3QaJy5oYXdrci5tZWRpYS52MWFscGhhMS5HZXRVcGxvYWRSZXNwb25zZQ==');
+    'JlcXVlc3QaJy5oYXdrci5tZWRpYS52MWFscGhhMS5HZXRVcGxvYWRSZXNwb25zZRJ0ChFCZWdp'
+    'blNlY3VyZVVwbG9hZBIuLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luU2VjdXJlVXBsb2FkUm'
+    'VxdWVzdBovLmhhd2tyLm1lZGlhLnYxYWxwaGExLkJlZ2luU2VjdXJlVXBsb2FkUmVzcG9uc2U=');

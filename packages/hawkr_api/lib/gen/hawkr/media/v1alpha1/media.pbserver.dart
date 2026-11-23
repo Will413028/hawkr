@@ -27,6 +27,8 @@ abstract class MediaAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $1.CompleteUploadRequest request);
   $async.Future<$1.GetUploadResponse> getUpload(
       $pb.ServerContext ctx, $1.GetUploadRequest request);
+  $async.Future<$1.BeginSecureUploadResponse> beginSecureUpload(
+      $pb.ServerContext ctx, $1.BeginSecureUploadRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
@@ -36,6 +38,8 @@ abstract class MediaAppServiceBase extends $pb.GeneratedService {
         return $1.CompleteUploadRequest();
       case 'GetUpload':
         return $1.GetUploadRequest();
+      case 'BeginSecureUpload':
+        return $1.BeginSecureUploadRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -50,6 +54,8 @@ abstract class MediaAppServiceBase extends $pb.GeneratedService {
         return completeUpload(ctx, request as $1.CompleteUploadRequest);
       case 'GetUpload':
         return getUpload(ctx, request as $1.GetUploadRequest);
+      case 'BeginSecureUpload':
+        return beginSecureUpload(ctx, request as $1.BeginSecureUploadRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
