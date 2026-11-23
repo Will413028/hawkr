@@ -1,10 +1,10 @@
 # coupon 模組
 
-<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（根目錄 `.agentfile-lint.toml`）。行為規格與已知限制寫在 `backend/docs/modules/coupon.md`，理由寫在 ADR，這裡只指過去。 -->
+<!-- 只放改這個模組前必須知道的規則，上限 6,000 bytes（根目錄 `.agentfile-lint.toml`）。行為規格與理由寫在計畫與 ADR，這裡只指過去。 -->
 
 ## 職責
 
-優惠券：活動（折抵規則、總量、資格）與買家持有的券（領券、指定發放、系統補償、鎖定、核銷、釋放、作廢、提前結束活動）。給 httpapi（買家、賣家、admin）與 ordering（結帳與訂單狀態轉換，B8）用。B7 期間 Java order、aftersales 經 `internal/legacy/couponserver`（B7-4）呼叫。計畫與決定：`backend/docs/plans/2026-11-23-b7-coupon.md`（D1–D8、BD1–BD34）。行為規格的唯一來源是 `backend/docs/modules/coupon.md`（B7-6 補）。
+優惠券：活動（折抵規則、總量、資格）與買家持有的券（領券、指定發放、系統補償、鎖定、核銷、釋放、作廢、提前結束活動）。給 httpapi（買家、賣家、admin）與 ordering（結帳與訂單狀態轉換，B8）用。B7 期間 Java order、aftersales 經 `internal/legacy/couponserver`（B7-4）呼叫。行為規格的唯一來源是 `backend/docs/plans/2026-11-23-b7-coupon.md` 的決定（D1–D8）與缺陷處置（BD1–BD34）。
 
 ## 擁有的資料
 
