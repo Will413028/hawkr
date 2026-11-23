@@ -5468,454 +5468,6 @@ func (x *BuyerStorePickupView) GetUpdatedAt() string {
 	return ""
 }
 
-type ImportHolidaysRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AdminAccountId int64                  `protobuf:"varint,1,opt,name=admin_account_id,json=adminAccountId,proto3" json:"admin_account_id,omitempty"` // Gateway JWT 注入（E.5.5 例外）
-	CsvUrl         string                 `protobuf:"bytes,2,opt,name=csv_url,json=csvUrl,proto3" json:"csv_url,omitempty"`                            // 政府 CSV 下載 URL
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *ImportHolidaysRequest) Reset() {
-	*x = ImportHolidaysRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[76]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImportHolidaysRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImportHolidaysRequest) ProtoMessage() {}
-
-func (x *ImportHolidaysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[76]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImportHolidaysRequest.ProtoReflect.Descriptor instead.
-func (*ImportHolidaysRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{76}
-}
-
-func (x *ImportHolidaysRequest) GetAdminAccountId() int64 {
-	if x != nil {
-		return x.AdminAccountId
-	}
-	return 0
-}
-
-func (x *ImportHolidaysRequest) GetCsvUrl() string {
-	if x != nil {
-		return x.CsvUrl
-	}
-	return ""
-}
-
-type ImportHolidaysResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Data          *ImportHolidaysData    `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ImportHolidaysResponse) Reset() {
-	*x = ImportHolidaysResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[77]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImportHolidaysResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImportHolidaysResponse) ProtoMessage() {}
-
-func (x *ImportHolidaysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[77]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImportHolidaysResponse.ProtoReflect.Descriptor instead.
-func (*ImportHolidaysResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{77}
-}
-
-func (x *ImportHolidaysResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *ImportHolidaysResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *ImportHolidaysResponse) GetData() *ImportHolidaysData {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-type ImportHolidaysData struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Year          string                 `protobuf:"bytes,1,opt,name=year,proto3" json:"year,omitempty"`                                        // 匯入年份
-	ImportedCount string                 `protobuf:"bytes,2,opt,name=imported_count,json=importedCount,proto3" json:"imported_count,omitempty"` // 匯入筆數
-	DeletedCount  string                 `protobuf:"bytes,3,opt,name=deleted_count,json=deletedCount,proto3" json:"deleted_count,omitempty"`    // 刪除舊資料筆數
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ImportHolidaysData) Reset() {
-	*x = ImportHolidaysData{}
-	mi := &file_shipping_shipping_proto_msgTypes[78]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImportHolidaysData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImportHolidaysData) ProtoMessage() {}
-
-func (x *ImportHolidaysData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[78]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImportHolidaysData.ProtoReflect.Descriptor instead.
-func (*ImportHolidaysData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{78}
-}
-
-func (x *ImportHolidaysData) GetYear() string {
-	if x != nil {
-		return x.Year
-	}
-	return ""
-}
-
-func (x *ImportHolidaysData) GetImportedCount() string {
-	if x != nil {
-		return x.ImportedCount
-	}
-	return ""
-}
-
-func (x *ImportHolidaysData) GetDeletedCount() string {
-	if x != nil {
-		return x.DeletedCount
-	}
-	return ""
-}
-
-type ImportHolidaysFromContentRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AdminAccountId int64                  `protobuf:"varint,1,opt,name=admin_account_id,json=adminAccountId,proto3" json:"admin_account_id,omitempty"` // Gateway JWT 注入（E.5.5 例外）
-	Year           string                 `protobuf:"bytes,2,opt,name=year,proto3" json:"year,omitempty"`                                              // 顯式指定年份（前端可控，string）
-	CsvContent     string                 `protobuf:"bytes,3,opt,name=csv_content,json=csvContent,proto3" json:"csv_content,omitempty"`                // CSV 檔案文字內容（前端 FileReader 讀取）
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *ImportHolidaysFromContentRequest) Reset() {
-	*x = ImportHolidaysFromContentRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[79]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ImportHolidaysFromContentRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ImportHolidaysFromContentRequest) ProtoMessage() {}
-
-func (x *ImportHolidaysFromContentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[79]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ImportHolidaysFromContentRequest.ProtoReflect.Descriptor instead.
-func (*ImportHolidaysFromContentRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{79}
-}
-
-func (x *ImportHolidaysFromContentRequest) GetAdminAccountId() int64 {
-	if x != nil {
-		return x.AdminAccountId
-	}
-	return 0
-}
-
-func (x *ImportHolidaysFromContentRequest) GetYear() string {
-	if x != nil {
-		return x.Year
-	}
-	return ""
-}
-
-func (x *ImportHolidaysFromContentRequest) GetCsvContent() string {
-	if x != nil {
-		return x.CsvContent
-	}
-	return ""
-}
-
-type GetHolidayCoverageRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AdminAccountId int64                  `protobuf:"varint,1,opt,name=admin_account_id,json=adminAccountId,proto3" json:"admin_account_id,omitempty"` // Gateway JWT 注入（E.5.5 例外）
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *GetHolidayCoverageRequest) Reset() {
-	*x = GetHolidayCoverageRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[80]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetHolidayCoverageRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHolidayCoverageRequest) ProtoMessage() {}
-
-func (x *GetHolidayCoverageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[80]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHolidayCoverageRequest.ProtoReflect.Descriptor instead.
-func (*GetHolidayCoverageRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{80}
-}
-
-func (x *GetHolidayCoverageRequest) GetAdminAccountId() int64 {
-	if x != nil {
-		return x.AdminAccountId
-	}
-	return 0
-}
-
-type GetHolidayCoverageResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Data          *HolidayCoverageData   `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetHolidayCoverageResponse) Reset() {
-	*x = GetHolidayCoverageResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[81]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetHolidayCoverageResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHolidayCoverageResponse) ProtoMessage() {}
-
-func (x *GetHolidayCoverageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[81]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHolidayCoverageResponse.ProtoReflect.Descriptor instead.
-func (*GetHolidayCoverageResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{81}
-}
-
-func (x *GetHolidayCoverageResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *GetHolidayCoverageResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *GetHolidayCoverageResponse) GetData() *HolidayCoverageData {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-type HolidayCoverageData struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Years         []*HolidayYearCoverage `protobuf:"bytes,1,rep,name=years,proto3" json:"years,omitempty"`
-	CoverageDays  string                 `protobuf:"bytes,2,opt,name=coverage_days,json=coverageDays,proto3" json:"coverage_days,omitempty"` // 距耗盡天數（與 §8 metric 同源公式）；空表 "-1"
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *HolidayCoverageData) Reset() {
-	*x = HolidayCoverageData{}
-	mi := &file_shipping_shipping_proto_msgTypes[82]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HolidayCoverageData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HolidayCoverageData) ProtoMessage() {}
-
-func (x *HolidayCoverageData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[82]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HolidayCoverageData.ProtoReflect.Descriptor instead.
-func (*HolidayCoverageData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{82}
-}
-
-func (x *HolidayCoverageData) GetYears() []*HolidayYearCoverage {
-	if x != nil {
-		return x.Years
-	}
-	return nil
-}
-
-func (x *HolidayCoverageData) GetCoverageDays() string {
-	if x != nil {
-		return x.CoverageDays
-	}
-	return ""
-}
-
-type HolidayYearCoverage struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Year           string                 `protobuf:"bytes,1,opt,name=year,proto3" json:"year,omitempty"`                                             // 年份
-	Count          string                 `protobuf:"bytes,2,opt,name=count,proto3" json:"count,omitempty"`                                           // 該年筆數
-	MaxHolidayDate string                 `protobuf:"bytes,3,opt,name=max_holiday_date,json=maxHolidayDate,proto3" json:"max_holiday_date,omitempty"` // 該年最大假日日期（YYYY-MM-DD）
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
-}
-
-func (x *HolidayYearCoverage) Reset() {
-	*x = HolidayYearCoverage{}
-	mi := &file_shipping_shipping_proto_msgTypes[83]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HolidayYearCoverage) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HolidayYearCoverage) ProtoMessage() {}
-
-func (x *HolidayYearCoverage) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[83]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HolidayYearCoverage.ProtoReflect.Descriptor instead.
-func (*HolidayYearCoverage) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{83}
-}
-
-func (x *HolidayYearCoverage) GetYear() string {
-	if x != nil {
-		return x.Year
-	}
-	return ""
-}
-
-func (x *HolidayYearCoverage) GetCount() string {
-	if x != nil {
-		return x.Count
-	}
-	return ""
-}
-
-func (x *HolidayYearCoverage) GetMaxHolidayDate() string {
-	if x != nil {
-		return x.MaxHolidayDate
-	}
-	return ""
-}
-
 type ListBusinessDaysRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccountId     int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"` // Gateway JWT 注入（E.5.5 例外）
@@ -5925,7 +5477,7 @@ type ListBusinessDaysRequest struct {
 
 func (x *ListBusinessDaysRequest) Reset() {
 	*x = ListBusinessDaysRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[84]
+	mi := &file_shipping_shipping_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5937,7 +5489,7 @@ func (x *ListBusinessDaysRequest) String() string {
 func (*ListBusinessDaysRequest) ProtoMessage() {}
 
 func (x *ListBusinessDaysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[84]
+	mi := &file_shipping_shipping_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5950,7 +5502,7 @@ func (x *ListBusinessDaysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBusinessDaysRequest.ProtoReflect.Descriptor instead.
 func (*ListBusinessDaysRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{84}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *ListBusinessDaysRequest) GetAccountId() int64 {
@@ -5971,7 +5523,7 @@ type ListBusinessDaysResponse struct {
 
 func (x *ListBusinessDaysResponse) Reset() {
 	*x = ListBusinessDaysResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[85]
+	mi := &file_shipping_shipping_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5983,7 +5535,7 @@ func (x *ListBusinessDaysResponse) String() string {
 func (*ListBusinessDaysResponse) ProtoMessage() {}
 
 func (x *ListBusinessDaysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[85]
+	mi := &file_shipping_shipping_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5996,7 +5548,7 @@ func (x *ListBusinessDaysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBusinessDaysResponse.ProtoReflect.Descriptor instead.
 func (*ListBusinessDaysResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{85}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *ListBusinessDaysResponse) GetCode() int32 {
@@ -6030,7 +5582,7 @@ type BusinessDay struct {
 
 func (x *BusinessDay) Reset() {
 	*x = BusinessDay{}
-	mi := &file_shipping_shipping_proto_msgTypes[86]
+	mi := &file_shipping_shipping_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6042,7 +5594,7 @@ func (x *BusinessDay) String() string {
 func (*BusinessDay) ProtoMessage() {}
 
 func (x *BusinessDay) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[86]
+	mi := &file_shipping_shipping_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6055,7 +5607,7 @@ func (x *BusinessDay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BusinessDay.ProtoReflect.Descriptor instead.
 func (*BusinessDay) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{86}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *BusinessDay) GetDate() string {
@@ -6072,118 +5624,6 @@ func (x *BusinessDay) GetDayOfWeek() string {
 	return ""
 }
 
-type GetHolidaysInternalRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	FromDate      string                 `protobuf:"bytes,1,opt,name=from_date,json=fromDate,proto3" json:"from_date,omitempty"` // ISO 8601 日期（YYYY-MM-DD），閉區間
-	ToDate        string                 `protobuf:"bytes,2,opt,name=to_date,json=toDate,proto3" json:"to_date,omitempty"`       // ISO 8601 日期（YYYY-MM-DD），閉區間
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetHolidaysInternalRequest) Reset() {
-	*x = GetHolidaysInternalRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[87]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetHolidaysInternalRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHolidaysInternalRequest) ProtoMessage() {}
-
-func (x *GetHolidaysInternalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[87]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHolidaysInternalRequest.ProtoReflect.Descriptor instead.
-func (*GetHolidaysInternalRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{87}
-}
-
-func (x *GetHolidaysInternalRequest) GetFromDate() string {
-	if x != nil {
-		return x.FromDate
-	}
-	return ""
-}
-
-func (x *GetHolidaysInternalRequest) GetToDate() string {
-	if x != nil {
-		return x.ToDate
-	}
-	return ""
-}
-
-type GetHolidaysInternalResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	HolidayDates  []string               `protobuf:"bytes,3,rep,name=holiday_dates,json=holidayDates,proto3" json:"holiday_dates,omitempty"` // ISO 8601 日期，升冪；區間內沒有假日時為空陣列
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetHolidaysInternalResponse) Reset() {
-	*x = GetHolidaysInternalResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[88]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetHolidaysInternalResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetHolidaysInternalResponse) ProtoMessage() {}
-
-func (x *GetHolidaysInternalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[88]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetHolidaysInternalResponse.ProtoReflect.Descriptor instead.
-func (*GetHolidaysInternalResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{88}
-}
-
-func (x *GetHolidaysInternalResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *GetHolidaysInternalResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *GetHolidaysInternalResponse) GetHolidayDates() []string {
-	if x != nil {
-		return x.HolidayDates
-	}
-	return nil
-}
-
 type ConfirmCvsShipmentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StoreId       int64                  `protobuf:"varint,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`               // Gateway JWT 注入（E.5.5 例外）
@@ -6195,7 +5635,7 @@ type ConfirmCvsShipmentRequest struct {
 
 func (x *ConfirmCvsShipmentRequest) Reset() {
 	*x = ConfirmCvsShipmentRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[89]
+	mi := &file_shipping_shipping_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6207,7 +5647,7 @@ func (x *ConfirmCvsShipmentRequest) String() string {
 func (*ConfirmCvsShipmentRequest) ProtoMessage() {}
 
 func (x *ConfirmCvsShipmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[89]
+	mi := &file_shipping_shipping_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6220,7 +5660,7 @@ func (x *ConfirmCvsShipmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmCvsShipmentRequest.ProtoReflect.Descriptor instead.
 func (*ConfirmCvsShipmentRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{89}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ConfirmCvsShipmentRequest) GetStoreId() int64 {
@@ -6254,7 +5694,7 @@ type ConfirmCvsShipmentResponse struct {
 
 func (x *ConfirmCvsShipmentResponse) Reset() {
 	*x = ConfirmCvsShipmentResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[90]
+	mi := &file_shipping_shipping_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6266,7 +5706,7 @@ func (x *ConfirmCvsShipmentResponse) String() string {
 func (*ConfirmCvsShipmentResponse) ProtoMessage() {}
 
 func (x *ConfirmCvsShipmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[90]
+	mi := &file_shipping_shipping_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6279,7 +5719,7 @@ func (x *ConfirmCvsShipmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmCvsShipmentResponse.ProtoReflect.Descriptor instead.
 func (*ConfirmCvsShipmentResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{90}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *ConfirmCvsShipmentResponse) GetCode() int32 {
@@ -6311,7 +5751,7 @@ type CreateReturnCvsShipmentRequest struct {
 
 func (x *CreateReturnCvsShipmentRequest) Reset() {
 	*x = CreateReturnCvsShipmentRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[91]
+	mi := &file_shipping_shipping_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6323,7 +5763,7 @@ func (x *CreateReturnCvsShipmentRequest) String() string {
 func (*CreateReturnCvsShipmentRequest) ProtoMessage() {}
 
 func (x *CreateReturnCvsShipmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[91]
+	mi := &file_shipping_shipping_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6336,7 +5776,7 @@ func (x *CreateReturnCvsShipmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReturnCvsShipmentRequest.ProtoReflect.Descriptor instead.
 func (*CreateReturnCvsShipmentRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{91}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *CreateReturnCvsShipmentRequest) GetOrderNo() string {
@@ -6406,7 +5846,7 @@ type CreateReturnHomeShipmentRequest struct {
 
 func (x *CreateReturnHomeShipmentRequest) Reset() {
 	*x = CreateReturnHomeShipmentRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[92]
+	mi := &file_shipping_shipping_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6418,7 +5858,7 @@ func (x *CreateReturnHomeShipmentRequest) String() string {
 func (*CreateReturnHomeShipmentRequest) ProtoMessage() {}
 
 func (x *CreateReturnHomeShipmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[92]
+	mi := &file_shipping_shipping_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6431,7 +5871,7 @@ func (x *CreateReturnHomeShipmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReturnHomeShipmentRequest.ProtoReflect.Descriptor instead.
 func (*CreateReturnHomeShipmentRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{92}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *CreateReturnHomeShipmentRequest) GetOrderNo() string {
@@ -6515,7 +5955,7 @@ type CreateReturnShipmentResponse struct {
 
 func (x *CreateReturnShipmentResponse) Reset() {
 	*x = CreateReturnShipmentResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[93]
+	mi := &file_shipping_shipping_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6527,7 +5967,7 @@ func (x *CreateReturnShipmentResponse) String() string {
 func (*CreateReturnShipmentResponse) ProtoMessage() {}
 
 func (x *CreateReturnShipmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[93]
+	mi := &file_shipping_shipping_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6540,7 +5980,7 @@ func (x *CreateReturnShipmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReturnShipmentResponse.ProtoReflect.Descriptor instead.
 func (*CreateReturnShipmentResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{93}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *CreateReturnShipmentResponse) GetCode() int32 {
@@ -6578,7 +6018,7 @@ type ReturnShipmentData struct {
 
 func (x *ReturnShipmentData) Reset() {
 	*x = ReturnShipmentData{}
-	mi := &file_shipping_shipping_proto_msgTypes[94]
+	mi := &file_shipping_shipping_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6590,7 +6030,7 @@ func (x *ReturnShipmentData) String() string {
 func (*ReturnShipmentData) ProtoMessage() {}
 
 func (x *ReturnShipmentData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[94]
+	mi := &file_shipping_shipping_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6603,7 +6043,7 @@ func (x *ReturnShipmentData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReturnShipmentData.ProtoReflect.Descriptor instead.
 func (*ReturnShipmentData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{94}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *ReturnShipmentData) GetShipmentNo() string {
@@ -6658,7 +6098,7 @@ type GetSellerReturnConfigRequest struct {
 
 func (x *GetSellerReturnConfigRequest) Reset() {
 	*x = GetSellerReturnConfigRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[95]
+	mi := &file_shipping_shipping_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6670,7 +6110,7 @@ func (x *GetSellerReturnConfigRequest) String() string {
 func (*GetSellerReturnConfigRequest) ProtoMessage() {}
 
 func (x *GetSellerReturnConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[95]
+	mi := &file_shipping_shipping_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6683,7 +6123,7 @@ func (x *GetSellerReturnConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerReturnConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerReturnConfigRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{95}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *GetSellerReturnConfigRequest) GetStoreId() string {
@@ -6711,7 +6151,7 @@ type GetSellerReturnConfigResponse struct {
 
 func (x *GetSellerReturnConfigResponse) Reset() {
 	*x = GetSellerReturnConfigResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[96]
+	mi := &file_shipping_shipping_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6723,7 +6163,7 @@ func (x *GetSellerReturnConfigResponse) String() string {
 func (*GetSellerReturnConfigResponse) ProtoMessage() {}
 
 func (x *GetSellerReturnConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[96]
+	mi := &file_shipping_shipping_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6736,7 +6176,7 @@ func (x *GetSellerReturnConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerReturnConfigResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerReturnConfigResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{96}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *GetSellerReturnConfigResponse) GetCode() int32 {
@@ -6777,7 +6217,7 @@ type SellerReturnConfigData struct {
 
 func (x *SellerReturnConfigData) Reset() {
 	*x = SellerReturnConfigData{}
-	mi := &file_shipping_shipping_proto_msgTypes[97]
+	mi := &file_shipping_shipping_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6789,7 +6229,7 @@ func (x *SellerReturnConfigData) String() string {
 func (*SellerReturnConfigData) ProtoMessage() {}
 
 func (x *SellerReturnConfigData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[97]
+	mi := &file_shipping_shipping_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6802,7 +6242,7 @@ func (x *SellerReturnConfigData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerReturnConfigData.ProtoReflect.Descriptor instead.
 func (*SellerReturnConfigData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{97}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *SellerReturnConfigData) GetReturnStoreCode() string {
@@ -6878,7 +6318,7 @@ type RetryReturnPrintLabelRequest struct {
 
 func (x *RetryReturnPrintLabelRequest) Reset() {
 	*x = RetryReturnPrintLabelRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[98]
+	mi := &file_shipping_shipping_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6890,7 +6330,7 @@ func (x *RetryReturnPrintLabelRequest) String() string {
 func (*RetryReturnPrintLabelRequest) ProtoMessage() {}
 
 func (x *RetryReturnPrintLabelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[98]
+	mi := &file_shipping_shipping_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6903,7 +6343,7 @@ func (x *RetryReturnPrintLabelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryReturnPrintLabelRequest.ProtoReflect.Descriptor instead.
 func (*RetryReturnPrintLabelRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{98}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *RetryReturnPrintLabelRequest) GetShipTradeNo() string {
@@ -6923,7 +6363,7 @@ type RetryReturnPrintLabelResponse struct {
 
 func (x *RetryReturnPrintLabelResponse) Reset() {
 	*x = RetryReturnPrintLabelResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[99]
+	mi := &file_shipping_shipping_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6935,7 +6375,7 @@ func (x *RetryReturnPrintLabelResponse) String() string {
 func (*RetryReturnPrintLabelResponse) ProtoMessage() {}
 
 func (x *RetryReturnPrintLabelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[99]
+	mi := &file_shipping_shipping_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6948,7 +6388,7 @@ func (x *RetryReturnPrintLabelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryReturnPrintLabelResponse.ProtoReflect.Descriptor instead.
 func (*RetryReturnPrintLabelResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{99}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *RetryReturnPrintLabelResponse) GetCode() int32 {
@@ -6975,7 +6415,7 @@ type LookupShipTradeNoRequest struct {
 
 func (x *LookupShipTradeNoRequest) Reset() {
 	*x = LookupShipTradeNoRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[100]
+	mi := &file_shipping_shipping_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6987,7 +6427,7 @@ func (x *LookupShipTradeNoRequest) String() string {
 func (*LookupShipTradeNoRequest) ProtoMessage() {}
 
 func (x *LookupShipTradeNoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[100]
+	mi := &file_shipping_shipping_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7000,7 +6440,7 @@ func (x *LookupShipTradeNoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LookupShipTradeNoRequest.ProtoReflect.Descriptor instead.
 func (*LookupShipTradeNoRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{100}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *LookupShipTradeNoRequest) GetOrderNo() string {
@@ -7031,7 +6471,7 @@ type LookupShipTradeNoResponse struct {
 
 func (x *LookupShipTradeNoResponse) Reset() {
 	*x = LookupShipTradeNoResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[101]
+	mi := &file_shipping_shipping_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7043,7 +6483,7 @@ func (x *LookupShipTradeNoResponse) String() string {
 func (*LookupShipTradeNoResponse) ProtoMessage() {}
 
 func (x *LookupShipTradeNoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[101]
+	mi := &file_shipping_shipping_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7056,7 +6496,7 @@ func (x *LookupShipTradeNoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LookupShipTradeNoResponse.ProtoReflect.Descriptor instead.
 func (*LookupShipTradeNoResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{101}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *LookupShipTradeNoResponse) GetCode() int32 {
@@ -7122,7 +6562,7 @@ type ListShipmentsForAdminRequest struct {
 
 func (x *ListShipmentsForAdminRequest) Reset() {
 	*x = ListShipmentsForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[102]
+	mi := &file_shipping_shipping_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7134,7 +6574,7 @@ func (x *ListShipmentsForAdminRequest) String() string {
 func (*ListShipmentsForAdminRequest) ProtoMessage() {}
 
 func (x *ListShipmentsForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[102]
+	mi := &file_shipping_shipping_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7147,7 +6587,7 @@ func (x *ListShipmentsForAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListShipmentsForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListShipmentsForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{102}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *ListShipmentsForAdminRequest) GetAccountId() int64 {
@@ -7252,7 +6692,7 @@ type ListShipmentsForAdminResponse struct {
 
 func (x *ListShipmentsForAdminResponse) Reset() {
 	*x = ListShipmentsForAdminResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[103]
+	mi := &file_shipping_shipping_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7264,7 +6704,7 @@ func (x *ListShipmentsForAdminResponse) String() string {
 func (*ListShipmentsForAdminResponse) ProtoMessage() {}
 
 func (x *ListShipmentsForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[103]
+	mi := &file_shipping_shipping_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7277,7 +6717,7 @@ func (x *ListShipmentsForAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListShipmentsForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListShipmentsForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{103}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *ListShipmentsForAdminResponse) GetCode() int32 {
@@ -7313,7 +6753,7 @@ type ListShipmentsForAdminData struct {
 
 func (x *ListShipmentsForAdminData) Reset() {
 	*x = ListShipmentsForAdminData{}
-	mi := &file_shipping_shipping_proto_msgTypes[104]
+	mi := &file_shipping_shipping_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7325,7 +6765,7 @@ func (x *ListShipmentsForAdminData) String() string {
 func (*ListShipmentsForAdminData) ProtoMessage() {}
 
 func (x *ListShipmentsForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[104]
+	mi := &file_shipping_shipping_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7338,7 +6778,7 @@ func (x *ListShipmentsForAdminData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListShipmentsForAdminData.ProtoReflect.Descriptor instead.
 func (*ListShipmentsForAdminData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{104}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *ListShipmentsForAdminData) GetRecords() []*AdminShipmentSummary {
@@ -7392,7 +6832,7 @@ type AdminShipmentSummary struct {
 
 func (x *AdminShipmentSummary) Reset() {
 	*x = AdminShipmentSummary{}
-	mi := &file_shipping_shipping_proto_msgTypes[105]
+	mi := &file_shipping_shipping_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7404,7 +6844,7 @@ func (x *AdminShipmentSummary) String() string {
 func (*AdminShipmentSummary) ProtoMessage() {}
 
 func (x *AdminShipmentSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[105]
+	mi := &file_shipping_shipping_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7417,7 +6857,7 @@ func (x *AdminShipmentSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminShipmentSummary.ProtoReflect.Descriptor instead.
 func (*AdminShipmentSummary) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{105}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *AdminShipmentSummary) GetShipmentId() string {
@@ -7535,7 +6975,7 @@ type GetShipmentForAdminRequest struct {
 
 func (x *GetShipmentForAdminRequest) Reset() {
 	*x = GetShipmentForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[106]
+	mi := &file_shipping_shipping_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7547,7 +6987,7 @@ func (x *GetShipmentForAdminRequest) String() string {
 func (*GetShipmentForAdminRequest) ProtoMessage() {}
 
 func (x *GetShipmentForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[106]
+	mi := &file_shipping_shipping_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7560,7 +7000,7 @@ func (x *GetShipmentForAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetShipmentForAdminRequest.ProtoReflect.Descriptor instead.
 func (*GetShipmentForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{106}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *GetShipmentForAdminRequest) GetAccountId() int64 {
@@ -7588,7 +7028,7 @@ type GetShipmentForAdminResponse struct {
 
 func (x *GetShipmentForAdminResponse) Reset() {
 	*x = GetShipmentForAdminResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[107]
+	mi := &file_shipping_shipping_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7600,7 +7040,7 @@ func (x *GetShipmentForAdminResponse) String() string {
 func (*GetShipmentForAdminResponse) ProtoMessage() {}
 
 func (x *GetShipmentForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[107]
+	mi := &file_shipping_shipping_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7613,7 +7053,7 @@ func (x *GetShipmentForAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetShipmentForAdminResponse.ProtoReflect.Descriptor instead.
 func (*GetShipmentForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{107}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *GetShipmentForAdminResponse) GetCode() int32 {
@@ -7684,7 +7124,7 @@ type AdminShipmentDetail struct {
 
 func (x *AdminShipmentDetail) Reset() {
 	*x = AdminShipmentDetail{}
-	mi := &file_shipping_shipping_proto_msgTypes[108]
+	mi := &file_shipping_shipping_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7696,7 +7136,7 @@ func (x *AdminShipmentDetail) String() string {
 func (*AdminShipmentDetail) ProtoMessage() {}
 
 func (x *AdminShipmentDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[108]
+	mi := &file_shipping_shipping_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7709,7 +7149,7 @@ func (x *AdminShipmentDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminShipmentDetail.ProtoReflect.Descriptor instead.
 func (*AdminShipmentDetail) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{108}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *AdminShipmentDetail) GetShipmentId() string {
@@ -8004,7 +7444,7 @@ type ListSellerShipmentSettingsForAdminRequest struct {
 
 func (x *ListSellerShipmentSettingsForAdminRequest) Reset() {
 	*x = ListSellerShipmentSettingsForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[109]
+	mi := &file_shipping_shipping_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8016,7 +7456,7 @@ func (x *ListSellerShipmentSettingsForAdminRequest) String() string {
 func (*ListSellerShipmentSettingsForAdminRequest) ProtoMessage() {}
 
 func (x *ListSellerShipmentSettingsForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[109]
+	mi := &file_shipping_shipping_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8029,7 +7469,7 @@ func (x *ListSellerShipmentSettingsForAdminRequest) ProtoReflect() protoreflect.
 
 // Deprecated: Use ListSellerShipmentSettingsForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListSellerShipmentSettingsForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{109}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *ListSellerShipmentSettingsForAdminRequest) GetAccountId() int64 {
@@ -8120,7 +7560,7 @@ type ListSellerShipmentSettingsForAdminResponse struct {
 
 func (x *ListSellerShipmentSettingsForAdminResponse) Reset() {
 	*x = ListSellerShipmentSettingsForAdminResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[110]
+	mi := &file_shipping_shipping_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8132,7 +7572,7 @@ func (x *ListSellerShipmentSettingsForAdminResponse) String() string {
 func (*ListSellerShipmentSettingsForAdminResponse) ProtoMessage() {}
 
 func (x *ListSellerShipmentSettingsForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[110]
+	mi := &file_shipping_shipping_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8145,7 +7585,7 @@ func (x *ListSellerShipmentSettingsForAdminResponse) ProtoReflect() protoreflect
 
 // Deprecated: Use ListSellerShipmentSettingsForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListSellerShipmentSettingsForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{110}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *ListSellerShipmentSettingsForAdminResponse) GetCode() int32 {
@@ -8181,7 +7621,7 @@ type ListSellerShipmentSettingsForAdminData struct {
 
 func (x *ListSellerShipmentSettingsForAdminData) Reset() {
 	*x = ListSellerShipmentSettingsForAdminData{}
-	mi := &file_shipping_shipping_proto_msgTypes[111]
+	mi := &file_shipping_shipping_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8193,7 +7633,7 @@ func (x *ListSellerShipmentSettingsForAdminData) String() string {
 func (*ListSellerShipmentSettingsForAdminData) ProtoMessage() {}
 
 func (x *ListSellerShipmentSettingsForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[111]
+	mi := &file_shipping_shipping_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8206,7 +7646,7 @@ func (x *ListSellerShipmentSettingsForAdminData) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use ListSellerShipmentSettingsForAdminData.ProtoReflect.Descriptor instead.
 func (*ListSellerShipmentSettingsForAdminData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{111}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *ListSellerShipmentSettingsForAdminData) GetRecords() []*AdminSellerShipmentSettingSummary {
@@ -8259,7 +7699,7 @@ type AdminSellerShipmentSettingSummary struct {
 
 func (x *AdminSellerShipmentSettingSummary) Reset() {
 	*x = AdminSellerShipmentSettingSummary{}
-	mi := &file_shipping_shipping_proto_msgTypes[112]
+	mi := &file_shipping_shipping_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8271,7 +7711,7 @@ func (x *AdminSellerShipmentSettingSummary) String() string {
 func (*AdminSellerShipmentSettingSummary) ProtoMessage() {}
 
 func (x *AdminSellerShipmentSettingSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[112]
+	mi := &file_shipping_shipping_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8284,7 +7724,7 @@ func (x *AdminSellerShipmentSettingSummary) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use AdminSellerShipmentSettingSummary.ProtoReflect.Descriptor instead.
 func (*AdminSellerShipmentSettingSummary) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{112}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *AdminSellerShipmentSettingSummary) GetSettingId() string {
@@ -8399,7 +7839,7 @@ type ListSellerShipmentAnomaliesRequest struct {
 
 func (x *ListSellerShipmentAnomaliesRequest) Reset() {
 	*x = ListSellerShipmentAnomaliesRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[113]
+	mi := &file_shipping_shipping_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8411,7 +7851,7 @@ func (x *ListSellerShipmentAnomaliesRequest) String() string {
 func (*ListSellerShipmentAnomaliesRequest) ProtoMessage() {}
 
 func (x *ListSellerShipmentAnomaliesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[113]
+	mi := &file_shipping_shipping_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8424,7 +7864,7 @@ func (x *ListSellerShipmentAnomaliesRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ListSellerShipmentAnomaliesRequest.ProtoReflect.Descriptor instead.
 func (*ListSellerShipmentAnomaliesRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{113}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *ListSellerShipmentAnomaliesRequest) GetStoreId() string {
@@ -8480,7 +7920,7 @@ type ListSellerShipmentAnomaliesResponse struct {
 
 func (x *ListSellerShipmentAnomaliesResponse) Reset() {
 	*x = ListSellerShipmentAnomaliesResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[114]
+	mi := &file_shipping_shipping_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8492,7 +7932,7 @@ func (x *ListSellerShipmentAnomaliesResponse) String() string {
 func (*ListSellerShipmentAnomaliesResponse) ProtoMessage() {}
 
 func (x *ListSellerShipmentAnomaliesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[114]
+	mi := &file_shipping_shipping_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8505,7 +7945,7 @@ func (x *ListSellerShipmentAnomaliesResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ListSellerShipmentAnomaliesResponse.ProtoReflect.Descriptor instead.
 func (*ListSellerShipmentAnomaliesResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{114}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *ListSellerShipmentAnomaliesResponse) GetCode() int32 {
@@ -8541,7 +7981,7 @@ type ListSellerShipmentAnomaliesData struct {
 
 func (x *ListSellerShipmentAnomaliesData) Reset() {
 	*x = ListSellerShipmentAnomaliesData{}
-	mi := &file_shipping_shipping_proto_msgTypes[115]
+	mi := &file_shipping_shipping_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8553,7 +7993,7 @@ func (x *ListSellerShipmentAnomaliesData) String() string {
 func (*ListSellerShipmentAnomaliesData) ProtoMessage() {}
 
 func (x *ListSellerShipmentAnomaliesData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[115]
+	mi := &file_shipping_shipping_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8566,7 +8006,7 @@ func (x *ListSellerShipmentAnomaliesData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSellerShipmentAnomaliesData.ProtoReflect.Descriptor instead.
 func (*ListSellerShipmentAnomaliesData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{115}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *ListSellerShipmentAnomaliesData) GetRecords() []*ShipmentAnomalyView {
@@ -8615,7 +8055,7 @@ type ShipmentAnomalyView struct {
 
 func (x *ShipmentAnomalyView) Reset() {
 	*x = ShipmentAnomalyView{}
-	mi := &file_shipping_shipping_proto_msgTypes[116]
+	mi := &file_shipping_shipping_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8627,7 +8067,7 @@ func (x *ShipmentAnomalyView) String() string {
 func (*ShipmentAnomalyView) ProtoMessage() {}
 
 func (x *ShipmentAnomalyView) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[116]
+	mi := &file_shipping_shipping_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8640,7 +8080,7 @@ func (x *ShipmentAnomalyView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShipmentAnomalyView.ProtoReflect.Descriptor instead.
 func (*ShipmentAnomalyView) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{116}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *ShipmentAnomalyView) GetShipmentId() string {
@@ -8722,7 +8162,7 @@ type GetSellerShipmentAnomalyStatsRequest struct {
 
 func (x *GetSellerShipmentAnomalyStatsRequest) Reset() {
 	*x = GetSellerShipmentAnomalyStatsRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[117]
+	mi := &file_shipping_shipping_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8734,7 +8174,7 @@ func (x *GetSellerShipmentAnomalyStatsRequest) String() string {
 func (*GetSellerShipmentAnomalyStatsRequest) ProtoMessage() {}
 
 func (x *GetSellerShipmentAnomalyStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[117]
+	mi := &file_shipping_shipping_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8747,7 +8187,7 @@ func (x *GetSellerShipmentAnomalyStatsRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use GetSellerShipmentAnomalyStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerShipmentAnomalyStatsRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{117}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *GetSellerShipmentAnomalyStatsRequest) GetStoreId() string {
@@ -8768,7 +8208,7 @@ type GetSellerShipmentAnomalyStatsResponse struct {
 
 func (x *GetSellerShipmentAnomalyStatsResponse) Reset() {
 	*x = GetSellerShipmentAnomalyStatsResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[118]
+	mi := &file_shipping_shipping_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8780,7 +8220,7 @@ func (x *GetSellerShipmentAnomalyStatsResponse) String() string {
 func (*GetSellerShipmentAnomalyStatsResponse) ProtoMessage() {}
 
 func (x *GetSellerShipmentAnomalyStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[118]
+	mi := &file_shipping_shipping_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8793,7 +8233,7 @@ func (x *GetSellerShipmentAnomalyStatsResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use GetSellerShipmentAnomalyStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerShipmentAnomalyStatsResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{118}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *GetSellerShipmentAnomalyStatsResponse) GetCode() int32 {
@@ -8830,7 +8270,7 @@ type GetSellerShipmentAnomalyStatsData struct {
 
 func (x *GetSellerShipmentAnomalyStatsData) Reset() {
 	*x = GetSellerShipmentAnomalyStatsData{}
-	mi := &file_shipping_shipping_proto_msgTypes[119]
+	mi := &file_shipping_shipping_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8842,7 +8282,7 @@ func (x *GetSellerShipmentAnomalyStatsData) String() string {
 func (*GetSellerShipmentAnomalyStatsData) ProtoMessage() {}
 
 func (x *GetSellerShipmentAnomalyStatsData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[119]
+	mi := &file_shipping_shipping_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8855,7 +8295,7 @@ func (x *GetSellerShipmentAnomalyStatsData) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetSellerShipmentAnomalyStatsData.ProtoReflect.Descriptor instead.
 func (*GetSellerShipmentAnomalyStatsData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{119}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *GetSellerShipmentAnomalyStatsData) GetTotal() string {
@@ -8904,7 +8344,7 @@ type AnomalyTypeCount struct {
 
 func (x *AnomalyTypeCount) Reset() {
 	*x = AnomalyTypeCount{}
-	mi := &file_shipping_shipping_proto_msgTypes[120]
+	mi := &file_shipping_shipping_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8916,7 +8356,7 @@ func (x *AnomalyTypeCount) String() string {
 func (*AnomalyTypeCount) ProtoMessage() {}
 
 func (x *AnomalyTypeCount) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[120]
+	mi := &file_shipping_shipping_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8929,7 +8369,7 @@ func (x *AnomalyTypeCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnomalyTypeCount.ProtoReflect.Descriptor instead.
 func (*AnomalyTypeCount) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{120}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *AnomalyTypeCount) GetAnomalyType() string {
@@ -8964,7 +8404,7 @@ type AcknowledgeShipmentAnomalyRequest struct {
 
 func (x *AcknowledgeShipmentAnomalyRequest) Reset() {
 	*x = AcknowledgeShipmentAnomalyRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[121]
+	mi := &file_shipping_shipping_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8976,7 +8416,7 @@ func (x *AcknowledgeShipmentAnomalyRequest) String() string {
 func (*AcknowledgeShipmentAnomalyRequest) ProtoMessage() {}
 
 func (x *AcknowledgeShipmentAnomalyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[121]
+	mi := &file_shipping_shipping_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8989,7 +8429,7 @@ func (x *AcknowledgeShipmentAnomalyRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use AcknowledgeShipmentAnomalyRequest.ProtoReflect.Descriptor instead.
 func (*AcknowledgeShipmentAnomalyRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{121}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *AcknowledgeShipmentAnomalyRequest) GetStoreId() string {
@@ -9024,7 +8464,7 @@ type AcknowledgeShipmentAnomalyResponse struct {
 
 func (x *AcknowledgeShipmentAnomalyResponse) Reset() {
 	*x = AcknowledgeShipmentAnomalyResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[122]
+	mi := &file_shipping_shipping_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9036,7 +8476,7 @@ func (x *AcknowledgeShipmentAnomalyResponse) String() string {
 func (*AcknowledgeShipmentAnomalyResponse) ProtoMessage() {}
 
 func (x *AcknowledgeShipmentAnomalyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[122]
+	mi := &file_shipping_shipping_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9049,7 +8489,7 @@ func (x *AcknowledgeShipmentAnomalyResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use AcknowledgeShipmentAnomalyResponse.ProtoReflect.Descriptor instead.
 func (*AcknowledgeShipmentAnomalyResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{122}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *AcknowledgeShipmentAnomalyResponse) GetCode() int32 {
@@ -9083,7 +8523,7 @@ type AcknowledgeShipmentAnomalyData struct {
 
 func (x *AcknowledgeShipmentAnomalyData) Reset() {
 	*x = AcknowledgeShipmentAnomalyData{}
-	mi := &file_shipping_shipping_proto_msgTypes[123]
+	mi := &file_shipping_shipping_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9095,7 +8535,7 @@ func (x *AcknowledgeShipmentAnomalyData) String() string {
 func (*AcknowledgeShipmentAnomalyData) ProtoMessage() {}
 
 func (x *AcknowledgeShipmentAnomalyData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[123]
+	mi := &file_shipping_shipping_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9108,7 +8548,7 @@ func (x *AcknowledgeShipmentAnomalyData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcknowledgeShipmentAnomalyData.ProtoReflect.Descriptor instead.
 func (*AcknowledgeShipmentAnomalyData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{123}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *AcknowledgeShipmentAnomalyData) GetAckId() string {
@@ -9136,7 +8576,7 @@ type IgnoreShipmentAnomalyRequest struct {
 
 func (x *IgnoreShipmentAnomalyRequest) Reset() {
 	*x = IgnoreShipmentAnomalyRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[124]
+	mi := &file_shipping_shipping_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9148,7 +8588,7 @@ func (x *IgnoreShipmentAnomalyRequest) String() string {
 func (*IgnoreShipmentAnomalyRequest) ProtoMessage() {}
 
 func (x *IgnoreShipmentAnomalyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[124]
+	mi := &file_shipping_shipping_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9161,7 +8601,7 @@ func (x *IgnoreShipmentAnomalyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IgnoreShipmentAnomalyRequest.ProtoReflect.Descriptor instead.
 func (*IgnoreShipmentAnomalyRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{124}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *IgnoreShipmentAnomalyRequest) GetStoreId() string {
@@ -9196,7 +8636,7 @@ type IgnoreShipmentAnomalyResponse struct {
 
 func (x *IgnoreShipmentAnomalyResponse) Reset() {
 	*x = IgnoreShipmentAnomalyResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[125]
+	mi := &file_shipping_shipping_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9208,7 +8648,7 @@ func (x *IgnoreShipmentAnomalyResponse) String() string {
 func (*IgnoreShipmentAnomalyResponse) ProtoMessage() {}
 
 func (x *IgnoreShipmentAnomalyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[125]
+	mi := &file_shipping_shipping_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9221,7 +8661,7 @@ func (x *IgnoreShipmentAnomalyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IgnoreShipmentAnomalyResponse.ProtoReflect.Descriptor instead.
 func (*IgnoreShipmentAnomalyResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{125}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *IgnoreShipmentAnomalyResponse) GetCode() int32 {
@@ -9259,7 +8699,7 @@ type ListShipmentAnomaliesForAdminRequest struct {
 
 func (x *ListShipmentAnomaliesForAdminRequest) Reset() {
 	*x = ListShipmentAnomaliesForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[126]
+	mi := &file_shipping_shipping_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9271,7 +8711,7 @@ func (x *ListShipmentAnomaliesForAdminRequest) String() string {
 func (*ListShipmentAnomaliesForAdminRequest) ProtoMessage() {}
 
 func (x *ListShipmentAnomaliesForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[126]
+	mi := &file_shipping_shipping_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9284,7 +8724,7 @@ func (x *ListShipmentAnomaliesForAdminRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ListShipmentAnomaliesForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListShipmentAnomaliesForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{126}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *ListShipmentAnomaliesForAdminRequest) GetStoreId() string {
@@ -9340,7 +8780,7 @@ type ListShipmentAnomaliesForAdminResponse struct {
 
 func (x *ListShipmentAnomaliesForAdminResponse) Reset() {
 	*x = ListShipmentAnomaliesForAdminResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[127]
+	mi := &file_shipping_shipping_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9352,7 +8792,7 @@ func (x *ListShipmentAnomaliesForAdminResponse) String() string {
 func (*ListShipmentAnomaliesForAdminResponse) ProtoMessage() {}
 
 func (x *ListShipmentAnomaliesForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[127]
+	mi := &file_shipping_shipping_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9365,7 +8805,7 @@ func (x *ListShipmentAnomaliesForAdminResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use ListShipmentAnomaliesForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListShipmentAnomaliesForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{127}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *ListShipmentAnomaliesForAdminResponse) GetCode() int32 {
@@ -9401,7 +8841,7 @@ type ListShipmentAnomaliesForAdminData struct {
 
 func (x *ListShipmentAnomaliesForAdminData) Reset() {
 	*x = ListShipmentAnomaliesForAdminData{}
-	mi := &file_shipping_shipping_proto_msgTypes[128]
+	mi := &file_shipping_shipping_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9413,7 +8853,7 @@ func (x *ListShipmentAnomaliesForAdminData) String() string {
 func (*ListShipmentAnomaliesForAdminData) ProtoMessage() {}
 
 func (x *ListShipmentAnomaliesForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[128]
+	mi := &file_shipping_shipping_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9426,7 +8866,7 @@ func (x *ListShipmentAnomaliesForAdminData) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListShipmentAnomaliesForAdminData.ProtoReflect.Descriptor instead.
 func (*ListShipmentAnomaliesForAdminData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{128}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *ListShipmentAnomaliesForAdminData) GetRecords() []*AdminShipmentAnomalyView {
@@ -9478,7 +8918,7 @@ type AdminShipmentAnomalyView struct {
 
 func (x *AdminShipmentAnomalyView) Reset() {
 	*x = AdminShipmentAnomalyView{}
-	mi := &file_shipping_shipping_proto_msgTypes[129]
+	mi := &file_shipping_shipping_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9490,7 +8930,7 @@ func (x *AdminShipmentAnomalyView) String() string {
 func (*AdminShipmentAnomalyView) ProtoMessage() {}
 
 func (x *AdminShipmentAnomalyView) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[129]
+	mi := &file_shipping_shipping_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9503,7 +8943,7 @@ func (x *AdminShipmentAnomalyView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminShipmentAnomalyView.ProtoReflect.Descriptor instead.
 func (*AdminShipmentAnomalyView) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{129}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *AdminShipmentAnomalyView) GetShipmentId() string {
@@ -9610,7 +9050,7 @@ type AcknowledgeShipmentAnomalyForAdminRequest struct {
 
 func (x *AcknowledgeShipmentAnomalyForAdminRequest) Reset() {
 	*x = AcknowledgeShipmentAnomalyForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[130]
+	mi := &file_shipping_shipping_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9622,7 +9062,7 @@ func (x *AcknowledgeShipmentAnomalyForAdminRequest) String() string {
 func (*AcknowledgeShipmentAnomalyForAdminRequest) ProtoMessage() {}
 
 func (x *AcknowledgeShipmentAnomalyForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[130]
+	mi := &file_shipping_shipping_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9635,7 +9075,7 @@ func (x *AcknowledgeShipmentAnomalyForAdminRequest) ProtoReflect() protoreflect.
 
 // Deprecated: Use AcknowledgeShipmentAnomalyForAdminRequest.ProtoReflect.Descriptor instead.
 func (*AcknowledgeShipmentAnomalyForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{130}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *AcknowledgeShipmentAnomalyForAdminRequest) GetAccountId() int64 {
@@ -9670,7 +9110,7 @@ type IgnoreShipmentAnomalyForAdminRequest struct {
 
 func (x *IgnoreShipmentAnomalyForAdminRequest) Reset() {
 	*x = IgnoreShipmentAnomalyForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[131]
+	mi := &file_shipping_shipping_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9682,7 +9122,7 @@ func (x *IgnoreShipmentAnomalyForAdminRequest) String() string {
 func (*IgnoreShipmentAnomalyForAdminRequest) ProtoMessage() {}
 
 func (x *IgnoreShipmentAnomalyForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[131]
+	mi := &file_shipping_shipping_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9695,7 +9135,7 @@ func (x *IgnoreShipmentAnomalyForAdminRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use IgnoreShipmentAnomalyForAdminRequest.ProtoReflect.Descriptor instead.
 func (*IgnoreShipmentAnomalyForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{131}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *IgnoreShipmentAnomalyForAdminRequest) GetAccountId() int64 {
@@ -9740,7 +9180,7 @@ type UberQuoteItem struct {
 
 func (x *UberQuoteItem) Reset() {
 	*x = UberQuoteItem{}
-	mi := &file_shipping_shipping_proto_msgTypes[132]
+	mi := &file_shipping_shipping_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9752,7 +9192,7 @@ func (x *UberQuoteItem) String() string {
 func (*UberQuoteItem) ProtoMessage() {}
 
 func (x *UberQuoteItem) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[132]
+	mi := &file_shipping_shipping_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9765,7 +9205,7 @@ func (x *UberQuoteItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UberQuoteItem.ProtoReflect.Descriptor instead.
 func (*UberQuoteItem) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{132}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *UberQuoteItem) GetSkuId() string {
@@ -9843,7 +9283,7 @@ type UberQuoteDropoff struct {
 
 func (x *UberQuoteDropoff) Reset() {
 	*x = UberQuoteDropoff{}
-	mi := &file_shipping_shipping_proto_msgTypes[133]
+	mi := &file_shipping_shipping_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9855,7 +9295,7 @@ func (x *UberQuoteDropoff) String() string {
 func (*UberQuoteDropoff) ProtoMessage() {}
 
 func (x *UberQuoteDropoff) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[133]
+	mi := &file_shipping_shipping_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9868,7 +9308,7 @@ func (x *UberQuoteDropoff) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UberQuoteDropoff.ProtoReflect.Descriptor instead.
 func (*UberQuoteDropoff) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{133}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *UberQuoteDropoff) GetReceiverName() string {
@@ -9919,7 +9359,7 @@ type GetUberQuoteForCheckoutRequest struct {
 
 func (x *GetUberQuoteForCheckoutRequest) Reset() {
 	*x = GetUberQuoteForCheckoutRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[134]
+	mi := &file_shipping_shipping_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9931,7 +9371,7 @@ func (x *GetUberQuoteForCheckoutRequest) String() string {
 func (*GetUberQuoteForCheckoutRequest) ProtoMessage() {}
 
 func (x *GetUberQuoteForCheckoutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[134]
+	mi := &file_shipping_shipping_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9944,7 +9384,7 @@ func (x *GetUberQuoteForCheckoutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUberQuoteForCheckoutRequest.ProtoReflect.Descriptor instead.
 func (*GetUberQuoteForCheckoutRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{134}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *GetUberQuoteForCheckoutRequest) GetBuyerId() int64 {
@@ -9999,7 +9439,7 @@ type UberQuoteData struct {
 
 func (x *UberQuoteData) Reset() {
 	*x = UberQuoteData{}
-	mi := &file_shipping_shipping_proto_msgTypes[135]
+	mi := &file_shipping_shipping_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10011,7 +9451,7 @@ func (x *UberQuoteData) String() string {
 func (*UberQuoteData) ProtoMessage() {}
 
 func (x *UberQuoteData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[135]
+	mi := &file_shipping_shipping_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10024,7 +9464,7 @@ func (x *UberQuoteData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UberQuoteData.ProtoReflect.Descriptor instead.
 func (*UberQuoteData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{135}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *UberQuoteData) GetAvailable() bool {
@@ -10080,7 +9520,7 @@ type GetUberQuoteForCheckoutResponse struct {
 
 func (x *GetUberQuoteForCheckoutResponse) Reset() {
 	*x = GetUberQuoteForCheckoutResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[136]
+	mi := &file_shipping_shipping_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10092,7 +9532,7 @@ func (x *GetUberQuoteForCheckoutResponse) String() string {
 func (*GetUberQuoteForCheckoutResponse) ProtoMessage() {}
 
 func (x *GetUberQuoteForCheckoutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[136]
+	mi := &file_shipping_shipping_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10105,7 +9545,7 @@ func (x *GetUberQuoteForCheckoutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUberQuoteForCheckoutResponse.ProtoReflect.Descriptor instead.
 func (*GetUberQuoteForCheckoutResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{136}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *GetUberQuoteForCheckoutResponse) GetCode() int32 {
@@ -10148,7 +9588,7 @@ type ValidateUberQuoteForCheckoutRequest struct {
 
 func (x *ValidateUberQuoteForCheckoutRequest) Reset() {
 	*x = ValidateUberQuoteForCheckoutRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[137]
+	mi := &file_shipping_shipping_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10160,7 +9600,7 @@ func (x *ValidateUberQuoteForCheckoutRequest) String() string {
 func (*ValidateUberQuoteForCheckoutRequest) ProtoMessage() {}
 
 func (x *ValidateUberQuoteForCheckoutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[137]
+	mi := &file_shipping_shipping_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10173,7 +9613,7 @@ func (x *ValidateUberQuoteForCheckoutRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ValidateUberQuoteForCheckoutRequest.ProtoReflect.Descriptor instead.
 func (*ValidateUberQuoteForCheckoutRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{137}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *ValidateUberQuoteForCheckoutRequest) GetQuoteId() string {
@@ -10249,7 +9689,7 @@ type ValidateUberQuoteData struct {
 
 func (x *ValidateUberQuoteData) Reset() {
 	*x = ValidateUberQuoteData{}
-	mi := &file_shipping_shipping_proto_msgTypes[138]
+	mi := &file_shipping_shipping_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10261,7 +9701,7 @@ func (x *ValidateUberQuoteData) String() string {
 func (*ValidateUberQuoteData) ProtoMessage() {}
 
 func (x *ValidateUberQuoteData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[138]
+	mi := &file_shipping_shipping_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10274,7 +9714,7 @@ func (x *ValidateUberQuoteData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateUberQuoteData.ProtoReflect.Descriptor instead.
 func (*ValidateUberQuoteData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{138}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *ValidateUberQuoteData) GetValid() bool {
@@ -10330,7 +9770,7 @@ type ValidateUberQuoteForCheckoutResponse struct {
 
 func (x *ValidateUberQuoteForCheckoutResponse) Reset() {
 	*x = ValidateUberQuoteForCheckoutResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[139]
+	mi := &file_shipping_shipping_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10342,7 +9782,7 @@ func (x *ValidateUberQuoteForCheckoutResponse) String() string {
 func (*ValidateUberQuoteForCheckoutResponse) ProtoMessage() {}
 
 func (x *ValidateUberQuoteForCheckoutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[139]
+	mi := &file_shipping_shipping_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10355,7 +9795,7 @@ func (x *ValidateUberQuoteForCheckoutResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ValidateUberQuoteForCheckoutResponse.ProtoReflect.Descriptor instead.
 func (*ValidateUberQuoteForCheckoutResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{139}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *ValidateUberQuoteForCheckoutResponse) GetCode() int32 {
@@ -10429,7 +9869,7 @@ type UberDeliverySummary struct {
 
 func (x *UberDeliverySummary) Reset() {
 	*x = UberDeliverySummary{}
-	mi := &file_shipping_shipping_proto_msgTypes[140]
+	mi := &file_shipping_shipping_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10441,7 +9881,7 @@ func (x *UberDeliverySummary) String() string {
 func (*UberDeliverySummary) ProtoMessage() {}
 
 func (x *UberDeliverySummary) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[140]
+	mi := &file_shipping_shipping_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10454,7 +9894,7 @@ func (x *UberDeliverySummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UberDeliverySummary.ProtoReflect.Descriptor instead.
 func (*UberDeliverySummary) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{140}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *UberDeliverySummary) GetDeliveryNo() string {
@@ -10647,7 +10087,7 @@ type UberDeliveryQuoteView struct {
 
 func (x *UberDeliveryQuoteView) Reset() {
 	*x = UberDeliveryQuoteView{}
-	mi := &file_shipping_shipping_proto_msgTypes[141]
+	mi := &file_shipping_shipping_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10659,7 +10099,7 @@ func (x *UberDeliveryQuoteView) String() string {
 func (*UberDeliveryQuoteView) ProtoMessage() {}
 
 func (x *UberDeliveryQuoteView) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[141]
+	mi := &file_shipping_shipping_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10672,7 +10112,7 @@ func (x *UberDeliveryQuoteView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UberDeliveryQuoteView.ProtoReflect.Descriptor instead.
 func (*UberDeliveryQuoteView) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{141}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *UberDeliveryQuoteView) GetQuoteId() string {
@@ -10747,7 +10187,7 @@ type UberPodArtifactView struct {
 
 func (x *UberPodArtifactView) Reset() {
 	*x = UberPodArtifactView{}
-	mi := &file_shipping_shipping_proto_msgTypes[142]
+	mi := &file_shipping_shipping_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10759,7 +10199,7 @@ func (x *UberPodArtifactView) String() string {
 func (*UberPodArtifactView) ProtoMessage() {}
 
 func (x *UberPodArtifactView) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[142]
+	mi := &file_shipping_shipping_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10772,7 +10212,7 @@ func (x *UberPodArtifactView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UberPodArtifactView.ProtoReflect.Descriptor instead.
 func (*UberPodArtifactView) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{142}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *UberPodArtifactView) GetArtifactType() string {
@@ -10832,7 +10272,7 @@ type UberDeliveryTimelineEntry struct {
 
 func (x *UberDeliveryTimelineEntry) Reset() {
 	*x = UberDeliveryTimelineEntry{}
-	mi := &file_shipping_shipping_proto_msgTypes[143]
+	mi := &file_shipping_shipping_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10844,7 +10284,7 @@ func (x *UberDeliveryTimelineEntry) String() string {
 func (*UberDeliveryTimelineEntry) ProtoMessage() {}
 
 func (x *UberDeliveryTimelineEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[143]
+	mi := &file_shipping_shipping_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10857,7 +10297,7 @@ func (x *UberDeliveryTimelineEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UberDeliveryTimelineEntry.ProtoReflect.Descriptor instead.
 func (*UberDeliveryTimelineEntry) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{143}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *UberDeliveryTimelineEntry) GetFromStatus() string {
@@ -10945,7 +10385,7 @@ type ListSellerUberDeliveriesRequest struct {
 
 func (x *ListSellerUberDeliveriesRequest) Reset() {
 	*x = ListSellerUberDeliveriesRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[144]
+	mi := &file_shipping_shipping_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10957,7 +10397,7 @@ func (x *ListSellerUberDeliveriesRequest) String() string {
 func (*ListSellerUberDeliveriesRequest) ProtoMessage() {}
 
 func (x *ListSellerUberDeliveriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[144]
+	mi := &file_shipping_shipping_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10970,7 +10410,7 @@ func (x *ListSellerUberDeliveriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSellerUberDeliveriesRequest.ProtoReflect.Descriptor instead.
 func (*ListSellerUberDeliveriesRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{144}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *ListSellerUberDeliveriesRequest) GetStoreId() int64 {
@@ -11061,7 +10501,7 @@ type ListSellerUberDeliveriesResponse struct {
 
 func (x *ListSellerUberDeliveriesResponse) Reset() {
 	*x = ListSellerUberDeliveriesResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[145]
+	mi := &file_shipping_shipping_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11073,7 +10513,7 @@ func (x *ListSellerUberDeliveriesResponse) String() string {
 func (*ListSellerUberDeliveriesResponse) ProtoMessage() {}
 
 func (x *ListSellerUberDeliveriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[145]
+	mi := &file_shipping_shipping_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11086,7 +10526,7 @@ func (x *ListSellerUberDeliveriesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSellerUberDeliveriesResponse.ProtoReflect.Descriptor instead.
 func (*ListSellerUberDeliveriesResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{145}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *ListSellerUberDeliveriesResponse) GetCode() int32 {
@@ -11122,7 +10562,7 @@ type ListSellerUberDeliveriesData struct {
 
 func (x *ListSellerUberDeliveriesData) Reset() {
 	*x = ListSellerUberDeliveriesData{}
-	mi := &file_shipping_shipping_proto_msgTypes[146]
+	mi := &file_shipping_shipping_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11134,7 +10574,7 @@ func (x *ListSellerUberDeliveriesData) String() string {
 func (*ListSellerUberDeliveriesData) ProtoMessage() {}
 
 func (x *ListSellerUberDeliveriesData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[146]
+	mi := &file_shipping_shipping_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11147,7 +10587,7 @@ func (x *ListSellerUberDeliveriesData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSellerUberDeliveriesData.ProtoReflect.Descriptor instead.
 func (*ListSellerUberDeliveriesData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{146}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *ListSellerUberDeliveriesData) GetRecords() []*UberDeliverySummary {
@@ -11189,7 +10629,7 @@ type GetSellerUberDeliveryRequest struct {
 
 func (x *GetSellerUberDeliveryRequest) Reset() {
 	*x = GetSellerUberDeliveryRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[147]
+	mi := &file_shipping_shipping_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11201,7 +10641,7 @@ func (x *GetSellerUberDeliveryRequest) String() string {
 func (*GetSellerUberDeliveryRequest) ProtoMessage() {}
 
 func (x *GetSellerUberDeliveryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[147]
+	mi := &file_shipping_shipping_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11214,7 +10654,7 @@ func (x *GetSellerUberDeliveryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerUberDeliveryRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerUberDeliveryRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{147}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *GetSellerUberDeliveryRequest) GetStoreId() int64 {
@@ -11242,7 +10682,7 @@ type GetSellerUberDeliveryResponse struct {
 
 func (x *GetSellerUberDeliveryResponse) Reset() {
 	*x = GetSellerUberDeliveryResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[148]
+	mi := &file_shipping_shipping_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11254,7 +10694,7 @@ func (x *GetSellerUberDeliveryResponse) String() string {
 func (*GetSellerUberDeliveryResponse) ProtoMessage() {}
 
 func (x *GetSellerUberDeliveryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[148]
+	mi := &file_shipping_shipping_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11267,7 +10707,7 @@ func (x *GetSellerUberDeliveryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerUberDeliveryResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerUberDeliveryResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{148}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *GetSellerUberDeliveryResponse) GetCode() int32 {
@@ -11310,7 +10750,7 @@ type SellerUberDeliveryDetail struct {
 
 func (x *SellerUberDeliveryDetail) Reset() {
 	*x = SellerUberDeliveryDetail{}
-	mi := &file_shipping_shipping_proto_msgTypes[149]
+	mi := &file_shipping_shipping_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11322,7 +10762,7 @@ func (x *SellerUberDeliveryDetail) String() string {
 func (*SellerUberDeliveryDetail) ProtoMessage() {}
 
 func (x *SellerUberDeliveryDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[149]
+	mi := &file_shipping_shipping_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11335,7 +10775,7 @@ func (x *SellerUberDeliveryDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerUberDeliveryDetail.ProtoReflect.Descriptor instead.
 func (*SellerUberDeliveryDetail) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{149}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{139}
 }
 
 func (x *SellerUberDeliveryDetail) GetSummary() *UberDeliverySummary {
@@ -11414,7 +10854,7 @@ type ListUberDeliveriesForAdminRequest struct {
 
 func (x *ListUberDeliveriesForAdminRequest) Reset() {
 	*x = ListUberDeliveriesForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[150]
+	mi := &file_shipping_shipping_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11426,7 +10866,7 @@ func (x *ListUberDeliveriesForAdminRequest) String() string {
 func (*ListUberDeliveriesForAdminRequest) ProtoMessage() {}
 
 func (x *ListUberDeliveriesForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[150]
+	mi := &file_shipping_shipping_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11439,7 +10879,7 @@ func (x *ListUberDeliveriesForAdminRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListUberDeliveriesForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListUberDeliveriesForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{150}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *ListUberDeliveriesForAdminRequest) GetAccountId() int64 {
@@ -11558,7 +10998,7 @@ type ListUberDeliveriesForAdminResponse struct {
 
 func (x *ListUberDeliveriesForAdminResponse) Reset() {
 	*x = ListUberDeliveriesForAdminResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[151]
+	mi := &file_shipping_shipping_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11570,7 +11010,7 @@ func (x *ListUberDeliveriesForAdminResponse) String() string {
 func (*ListUberDeliveriesForAdminResponse) ProtoMessage() {}
 
 func (x *ListUberDeliveriesForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[151]
+	mi := &file_shipping_shipping_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11583,7 +11023,7 @@ func (x *ListUberDeliveriesForAdminResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ListUberDeliveriesForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListUberDeliveriesForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{151}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *ListUberDeliveriesForAdminResponse) GetCode() int32 {
@@ -11619,7 +11059,7 @@ type ListUberDeliveriesForAdminData struct {
 
 func (x *ListUberDeliveriesForAdminData) Reset() {
 	*x = ListUberDeliveriesForAdminData{}
-	mi := &file_shipping_shipping_proto_msgTypes[152]
+	mi := &file_shipping_shipping_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11631,7 +11071,7 @@ func (x *ListUberDeliveriesForAdminData) String() string {
 func (*ListUberDeliveriesForAdminData) ProtoMessage() {}
 
 func (x *ListUberDeliveriesForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[152]
+	mi := &file_shipping_shipping_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11644,7 +11084,7 @@ func (x *ListUberDeliveriesForAdminData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUberDeliveriesForAdminData.ProtoReflect.Descriptor instead.
 func (*ListUberDeliveriesForAdminData) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{152}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *ListUberDeliveriesForAdminData) GetRecords() []*UberDeliverySummary {
@@ -11685,7 +11125,7 @@ type GetUberDeliveryForAdminRequest struct {
 
 func (x *GetUberDeliveryForAdminRequest) Reset() {
 	*x = GetUberDeliveryForAdminRequest{}
-	mi := &file_shipping_shipping_proto_msgTypes[153]
+	mi := &file_shipping_shipping_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11697,7 +11137,7 @@ func (x *GetUberDeliveryForAdminRequest) String() string {
 func (*GetUberDeliveryForAdminRequest) ProtoMessage() {}
 
 func (x *GetUberDeliveryForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[153]
+	mi := &file_shipping_shipping_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11710,7 +11150,7 @@ func (x *GetUberDeliveryForAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUberDeliveryForAdminRequest.ProtoReflect.Descriptor instead.
 func (*GetUberDeliveryForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{153}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *GetUberDeliveryForAdminRequest) GetAccountId() int64 {
@@ -11738,7 +11178,7 @@ type GetUberDeliveryForAdminResponse struct {
 
 func (x *GetUberDeliveryForAdminResponse) Reset() {
 	*x = GetUberDeliveryForAdminResponse{}
-	mi := &file_shipping_shipping_proto_msgTypes[154]
+	mi := &file_shipping_shipping_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11750,7 +11190,7 @@ func (x *GetUberDeliveryForAdminResponse) String() string {
 func (*GetUberDeliveryForAdminResponse) ProtoMessage() {}
 
 func (x *GetUberDeliveryForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[154]
+	mi := &file_shipping_shipping_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11763,7 +11203,7 @@ func (x *GetUberDeliveryForAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUberDeliveryForAdminResponse.ProtoReflect.Descriptor instead.
 func (*GetUberDeliveryForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{154}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *GetUberDeliveryForAdminResponse) GetCode() int32 {
@@ -11807,7 +11247,7 @@ type AdminUberDeliveryDetail struct {
 
 func (x *AdminUberDeliveryDetail) Reset() {
 	*x = AdminUberDeliveryDetail{}
-	mi := &file_shipping_shipping_proto_msgTypes[155]
+	mi := &file_shipping_shipping_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11819,7 +11259,7 @@ func (x *AdminUberDeliveryDetail) String() string {
 func (*AdminUberDeliveryDetail) ProtoMessage() {}
 
 func (x *AdminUberDeliveryDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_shipping_shipping_proto_msgTypes[155]
+	mi := &file_shipping_shipping_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11832,7 +11272,7 @@ func (x *AdminUberDeliveryDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminUberDeliveryDetail.ProtoReflect.Descriptor instead.
 func (*AdminUberDeliveryDetail) Descriptor() ([]byte, []int) {
-	return file_shipping_shipping_proto_rawDescGZIP(), []int{155}
+	return file_shipping_shipping_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *AdminUberDeliveryDetail) GetSummary() *UberDeliverySummary {
@@ -12372,36 +11812,7 @@ const file_shipping_shipping_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\tR\tupdatedAt\"Z\n" +
-	"\x15ImportHolidaysRequest\x12(\n" +
-	"\x10admin_account_id\x18\x01 \x01(\x03R\x0eadminAccountId\x12\x17\n" +
-	"\acsv_url\x18\x02 \x01(\tR\x06csvUrl\"~\n" +
-	"\x16ImportHolidaysResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x126\n" +
-	"\x04data\x18\x03 \x01(\v2\".hawkr.shipping.ImportHolidaysDataR\x04data\"t\n" +
-	"\x12ImportHolidaysData\x12\x12\n" +
-	"\x04year\x18\x01 \x01(\tR\x04year\x12%\n" +
-	"\x0eimported_count\x18\x02 \x01(\tR\rimportedCount\x12#\n" +
-	"\rdeleted_count\x18\x03 \x01(\tR\fdeletedCount\"\x81\x01\n" +
-	" ImportHolidaysFromContentRequest\x12(\n" +
-	"\x10admin_account_id\x18\x01 \x01(\x03R\x0eadminAccountId\x12\x12\n" +
-	"\x04year\x18\x02 \x01(\tR\x04year\x12\x1f\n" +
-	"\vcsv_content\x18\x03 \x01(\tR\n" +
-	"csvContent\"E\n" +
-	"\x19GetHolidayCoverageRequest\x12(\n" +
-	"\x10admin_account_id\x18\x01 \x01(\x03R\x0eadminAccountId\"\x83\x01\n" +
-	"\x1aGetHolidayCoverageResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
-	"\x04data\x18\x03 \x01(\v2#.hawkr.shipping.HolidayCoverageDataR\x04data\"u\n" +
-	"\x13HolidayCoverageData\x129\n" +
-	"\x05years\x18\x01 \x03(\v2#.hawkr.shipping.HolidayYearCoverageR\x05years\x12#\n" +
-	"\rcoverage_days\x18\x02 \x01(\tR\fcoverageDays\"i\n" +
-	"\x13HolidayYearCoverage\x12\x12\n" +
-	"\x04year\x18\x01 \x01(\tR\x04year\x12\x14\n" +
-	"\x05count\x18\x02 \x01(\tR\x05count\x12(\n" +
-	"\x10max_holiday_date\x18\x03 \x01(\tR\x0emaxHolidayDate\"8\n" +
+	"updated_at\x18\t \x01(\tR\tupdatedAt\"8\n" +
 	"\x17ListBusinessDaysRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\x03R\taccountId\"\x8a\x01\n" +
@@ -12411,14 +11822,7 @@ const file_shipping_shipping_proto_rawDesc = "" +
 	"\rbusiness_days\x18\x03 \x03(\v2\x1b.hawkr.shipping.BusinessDayR\fbusinessDays\"A\n" +
 	"\vBusinessDay\x12\x12\n" +
 	"\x04date\x18\x01 \x01(\tR\x04date\x12\x1e\n" +
-	"\vday_of_week\x18\x02 \x01(\tR\tdayOfWeek\"R\n" +
-	"\x1aGetHolidaysInternalRequest\x12\x1b\n" +
-	"\tfrom_date\x18\x01 \x01(\tR\bfromDate\x12\x17\n" +
-	"\ato_date\x18\x02 \x01(\tR\x06toDate\"p\n" +
-	"\x1bGetHolidaysInternalResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12#\n" +
-	"\rholiday_dates\x18\x03 \x03(\tR\fholidayDates\"v\n" +
+	"\vday_of_week\x18\x02 \x01(\tR\tdayOfWeek\"v\n" +
 	"\x19ConfirmCvsShipmentRequest\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\x03R\astoreId\x12\x19\n" +
 	"\border_no\x18\x02 \x01(\tR\aorderNo\x12#\n" +
@@ -12972,7 +12376,7 @@ const file_shipping_shipping_proto_rawDesc = "" +
 	"\x05quote\x18\x06 \x01(\v2%.hawkr.shipping.UberDeliveryQuoteViewR\x05quote\x12H\n" +
 	"\rpod_artifacts\x18\a \x03(\v2#.hawkr.shipping.UberPodArtifactViewR\fpodArtifacts\x12K\n" +
 	"\x0fallowed_actions\x18\b \x03(\v2\".hawkr.shipping.ActionAvailabilityR\x0eallowedActions\x12E\n" +
-	"\btimeline\x18\t \x03(\v2).hawkr.shipping.UberDeliveryTimelineEntryR\btimeline2\xca4\n" +
+	"\btimeline\x18\t \x03(\v2).hawkr.shipping.UberDeliveryTimelineEntryR\btimeline2\x951\n" +
 	"\x0fShippingService\x12\\\n" +
 	"\rPrintCvsLabel\x12$.hawkr.shipping.PrintCvsLabelRequest\x1a%.hawkr.shipping.PrintCvsLabelResponse\x12k\n" +
 	"\x12BatchPrintCvsLabel\x12).hawkr.shipping.BatchPrintCvsLabelRequest\x1a*.hawkr.shipping.BatchPrintCvsLabelResponse\x12q\n" +
@@ -13003,12 +12407,8 @@ const file_shipping_shipping_proto_rawDesc = "" +
 	"\x15GetShippingFeeConfigs\x12,.hawkr.shipping.GetShippingFeeConfigsRequest\x1a-.hawkr.shipping.GetShippingFeeConfigsResponse\x12h\n" +
 	"\x11LookupShippingFee\x12(.hawkr.shipping.LookupShippingFeeRequest\x1a).hawkr.shipping.LookupShippingFeeResponse\x12}\n" +
 	"\x18CalculateShippingOptions\x12/.hawkr.shipping.CalculateShippingOptionsRequest\x1a0.hawkr.shipping.CalculateShippingOptionsResponse\x12z\n" +
-	"\x17ValidateProductShipping\x12..hawkr.shipping.ValidateProductShippingRequest\x1a/.hawkr.shipping.ValidateProductShippingResponse\x12_\n" +
-	"\x0eImportHolidays\x12%.hawkr.shipping.ImportHolidaysRequest\x1a&.hawkr.shipping.ImportHolidaysResponse\x12u\n" +
-	"\x19ImportHolidaysFromContent\x120.hawkr.shipping.ImportHolidaysFromContentRequest\x1a&.hawkr.shipping.ImportHolidaysResponse\x12k\n" +
-	"\x12GetHolidayCoverage\x12).hawkr.shipping.GetHolidayCoverageRequest\x1a*.hawkr.shipping.GetHolidayCoverageResponse\x12e\n" +
-	"\x10ListBusinessDays\x12'.hawkr.shipping.ListBusinessDaysRequest\x1a(.hawkr.shipping.ListBusinessDaysResponse\x12n\n" +
-	"\x13GetHolidaysInternal\x12*.hawkr.shipping.GetHolidaysInternalRequest\x1a+.hawkr.shipping.GetHolidaysInternalResponse\x12w\n" +
+	"\x17ValidateProductShipping\x12..hawkr.shipping.ValidateProductShippingRequest\x1a/.hawkr.shipping.ValidateProductShippingResponse\x12e\n" +
+	"\x10ListBusinessDays\x12'.hawkr.shipping.ListBusinessDaysRequest\x1a(.hawkr.shipping.ListBusinessDaysResponse\x12w\n" +
 	"\x17CreateReturnCvsShipment\x12..hawkr.shipping.CreateReturnCvsShipmentRequest\x1a,.hawkr.shipping.CreateReturnShipmentResponse\x12y\n" +
 	"\x18CreateReturnHomeShipment\x12/.hawkr.shipping.CreateReturnHomeShipmentRequest\x1a,.hawkr.shipping.CreateReturnShipmentResponse\x12t\n" +
 	"\x15GetSellerReturnConfig\x12,.hawkr.shipping.GetSellerReturnConfigRequest\x1a-.hawkr.shipping.GetSellerReturnConfigResponse\x12t\n" +
@@ -13044,7 +12444,7 @@ func file_shipping_shipping_proto_rawDescGZIP() []byte {
 	return file_shipping_shipping_proto_rawDescData
 }
 
-var file_shipping_shipping_proto_msgTypes = make([]protoimpl.MessageInfo, 157)
+var file_shipping_shipping_proto_msgTypes = make([]protoimpl.MessageInfo, 147)
 var file_shipping_shipping_proto_goTypes = []any{
 	(*PrintCvsLabelRequest)(nil),                       // 0: hawkr.shipping.PrintCvsLabelRequest
 	(*PrintCvsLabelResponse)(nil),                      // 1: hawkr.shipping.PrintCvsLabelResponse
@@ -13122,87 +12522,77 @@ var file_shipping_shipping_proto_goTypes = []any{
 	(*DeleteBuyerStorePickupRequest)(nil),              // 73: hawkr.shipping.DeleteBuyerStorePickupRequest
 	(*DeleteBuyerStorePickupResponse)(nil),             // 74: hawkr.shipping.DeleteBuyerStorePickupResponse
 	(*BuyerStorePickupView)(nil),                       // 75: hawkr.shipping.BuyerStorePickupView
-	(*ImportHolidaysRequest)(nil),                      // 76: hawkr.shipping.ImportHolidaysRequest
-	(*ImportHolidaysResponse)(nil),                     // 77: hawkr.shipping.ImportHolidaysResponse
-	(*ImportHolidaysData)(nil),                         // 78: hawkr.shipping.ImportHolidaysData
-	(*ImportHolidaysFromContentRequest)(nil),           // 79: hawkr.shipping.ImportHolidaysFromContentRequest
-	(*GetHolidayCoverageRequest)(nil),                  // 80: hawkr.shipping.GetHolidayCoverageRequest
-	(*GetHolidayCoverageResponse)(nil),                 // 81: hawkr.shipping.GetHolidayCoverageResponse
-	(*HolidayCoverageData)(nil),                        // 82: hawkr.shipping.HolidayCoverageData
-	(*HolidayYearCoverage)(nil),                        // 83: hawkr.shipping.HolidayYearCoverage
-	(*ListBusinessDaysRequest)(nil),                    // 84: hawkr.shipping.ListBusinessDaysRequest
-	(*ListBusinessDaysResponse)(nil),                   // 85: hawkr.shipping.ListBusinessDaysResponse
-	(*BusinessDay)(nil),                                // 86: hawkr.shipping.BusinessDay
-	(*GetHolidaysInternalRequest)(nil),                 // 87: hawkr.shipping.GetHolidaysInternalRequest
-	(*GetHolidaysInternalResponse)(nil),                // 88: hawkr.shipping.GetHolidaysInternalResponse
-	(*ConfirmCvsShipmentRequest)(nil),                  // 89: hawkr.shipping.ConfirmCvsShipmentRequest
-	(*ConfirmCvsShipmentResponse)(nil),                 // 90: hawkr.shipping.ConfirmCvsShipmentResponse
-	(*CreateReturnCvsShipmentRequest)(nil),             // 91: hawkr.shipping.CreateReturnCvsShipmentRequest
-	(*CreateReturnHomeShipmentRequest)(nil),            // 92: hawkr.shipping.CreateReturnHomeShipmentRequest
-	(*CreateReturnShipmentResponse)(nil),               // 93: hawkr.shipping.CreateReturnShipmentResponse
-	(*ReturnShipmentData)(nil),                         // 94: hawkr.shipping.ReturnShipmentData
-	(*GetSellerReturnConfigRequest)(nil),               // 95: hawkr.shipping.GetSellerReturnConfigRequest
-	(*GetSellerReturnConfigResponse)(nil),              // 96: hawkr.shipping.GetSellerReturnConfigResponse
-	(*SellerReturnConfigData)(nil),                     // 97: hawkr.shipping.SellerReturnConfigData
-	(*RetryReturnPrintLabelRequest)(nil),               // 98: hawkr.shipping.RetryReturnPrintLabelRequest
-	(*RetryReturnPrintLabelResponse)(nil),              // 99: hawkr.shipping.RetryReturnPrintLabelResponse
-	(*LookupShipTradeNoRequest)(nil),                   // 100: hawkr.shipping.LookupShipTradeNoRequest
-	(*LookupShipTradeNoResponse)(nil),                  // 101: hawkr.shipping.LookupShipTradeNoResponse
-	(*ListShipmentsForAdminRequest)(nil),               // 102: hawkr.shipping.ListShipmentsForAdminRequest
-	(*ListShipmentsForAdminResponse)(nil),              // 103: hawkr.shipping.ListShipmentsForAdminResponse
-	(*ListShipmentsForAdminData)(nil),                  // 104: hawkr.shipping.ListShipmentsForAdminData
-	(*AdminShipmentSummary)(nil),                       // 105: hawkr.shipping.AdminShipmentSummary
-	(*GetShipmentForAdminRequest)(nil),                 // 106: hawkr.shipping.GetShipmentForAdminRequest
-	(*GetShipmentForAdminResponse)(nil),                // 107: hawkr.shipping.GetShipmentForAdminResponse
-	(*AdminShipmentDetail)(nil),                        // 108: hawkr.shipping.AdminShipmentDetail
-	(*ListSellerShipmentSettingsForAdminRequest)(nil),  // 109: hawkr.shipping.ListSellerShipmentSettingsForAdminRequest
-	(*ListSellerShipmentSettingsForAdminResponse)(nil), // 110: hawkr.shipping.ListSellerShipmentSettingsForAdminResponse
-	(*ListSellerShipmentSettingsForAdminData)(nil),     // 111: hawkr.shipping.ListSellerShipmentSettingsForAdminData
-	(*AdminSellerShipmentSettingSummary)(nil),          // 112: hawkr.shipping.AdminSellerShipmentSettingSummary
-	(*ListSellerShipmentAnomaliesRequest)(nil),         // 113: hawkr.shipping.ListSellerShipmentAnomaliesRequest
-	(*ListSellerShipmentAnomaliesResponse)(nil),        // 114: hawkr.shipping.ListSellerShipmentAnomaliesResponse
-	(*ListSellerShipmentAnomaliesData)(nil),            // 115: hawkr.shipping.ListSellerShipmentAnomaliesData
-	(*ShipmentAnomalyView)(nil),                        // 116: hawkr.shipping.ShipmentAnomalyView
-	(*GetSellerShipmentAnomalyStatsRequest)(nil),       // 117: hawkr.shipping.GetSellerShipmentAnomalyStatsRequest
-	(*GetSellerShipmentAnomalyStatsResponse)(nil),      // 118: hawkr.shipping.GetSellerShipmentAnomalyStatsResponse
-	(*GetSellerShipmentAnomalyStatsData)(nil),          // 119: hawkr.shipping.GetSellerShipmentAnomalyStatsData
-	(*AnomalyTypeCount)(nil),                           // 120: hawkr.shipping.AnomalyTypeCount
-	(*AcknowledgeShipmentAnomalyRequest)(nil),          // 121: hawkr.shipping.AcknowledgeShipmentAnomalyRequest
-	(*AcknowledgeShipmentAnomalyResponse)(nil),         // 122: hawkr.shipping.AcknowledgeShipmentAnomalyResponse
-	(*AcknowledgeShipmentAnomalyData)(nil),             // 123: hawkr.shipping.AcknowledgeShipmentAnomalyData
-	(*IgnoreShipmentAnomalyRequest)(nil),               // 124: hawkr.shipping.IgnoreShipmentAnomalyRequest
-	(*IgnoreShipmentAnomalyResponse)(nil),              // 125: hawkr.shipping.IgnoreShipmentAnomalyResponse
-	(*ListShipmentAnomaliesForAdminRequest)(nil),       // 126: hawkr.shipping.ListShipmentAnomaliesForAdminRequest
-	(*ListShipmentAnomaliesForAdminResponse)(nil),      // 127: hawkr.shipping.ListShipmentAnomaliesForAdminResponse
-	(*ListShipmentAnomaliesForAdminData)(nil),          // 128: hawkr.shipping.ListShipmentAnomaliesForAdminData
-	(*AdminShipmentAnomalyView)(nil),                   // 129: hawkr.shipping.AdminShipmentAnomalyView
-	(*AcknowledgeShipmentAnomalyForAdminRequest)(nil),  // 130: hawkr.shipping.AcknowledgeShipmentAnomalyForAdminRequest
-	(*IgnoreShipmentAnomalyForAdminRequest)(nil),       // 131: hawkr.shipping.IgnoreShipmentAnomalyForAdminRequest
-	(*UberQuoteItem)(nil),                              // 132: hawkr.shipping.UberQuoteItem
-	(*UberQuoteDropoff)(nil),                           // 133: hawkr.shipping.UberQuoteDropoff
-	(*GetUberQuoteForCheckoutRequest)(nil),             // 134: hawkr.shipping.GetUberQuoteForCheckoutRequest
-	(*UberQuoteData)(nil),                              // 135: hawkr.shipping.UberQuoteData
-	(*GetUberQuoteForCheckoutResponse)(nil),            // 136: hawkr.shipping.GetUberQuoteForCheckoutResponse
-	(*ValidateUberQuoteForCheckoutRequest)(nil),        // 137: hawkr.shipping.ValidateUberQuoteForCheckoutRequest
-	(*ValidateUberQuoteData)(nil),                      // 138: hawkr.shipping.ValidateUberQuoteData
-	(*ValidateUberQuoteForCheckoutResponse)(nil),       // 139: hawkr.shipping.ValidateUberQuoteForCheckoutResponse
-	(*UberDeliverySummary)(nil),                        // 140: hawkr.shipping.UberDeliverySummary
-	(*UberDeliveryQuoteView)(nil),                      // 141: hawkr.shipping.UberDeliveryQuoteView
-	(*UberPodArtifactView)(nil),                        // 142: hawkr.shipping.UberPodArtifactView
-	(*UberDeliveryTimelineEntry)(nil),                  // 143: hawkr.shipping.UberDeliveryTimelineEntry
-	(*ListSellerUberDeliveriesRequest)(nil),            // 144: hawkr.shipping.ListSellerUberDeliveriesRequest
-	(*ListSellerUberDeliveriesResponse)(nil),           // 145: hawkr.shipping.ListSellerUberDeliveriesResponse
-	(*ListSellerUberDeliveriesData)(nil),               // 146: hawkr.shipping.ListSellerUberDeliveriesData
-	(*GetSellerUberDeliveryRequest)(nil),               // 147: hawkr.shipping.GetSellerUberDeliveryRequest
-	(*GetSellerUberDeliveryResponse)(nil),              // 148: hawkr.shipping.GetSellerUberDeliveryResponse
-	(*SellerUberDeliveryDetail)(nil),                   // 149: hawkr.shipping.SellerUberDeliveryDetail
-	(*ListUberDeliveriesForAdminRequest)(nil),          // 150: hawkr.shipping.ListUberDeliveriesForAdminRequest
-	(*ListUberDeliveriesForAdminResponse)(nil),         // 151: hawkr.shipping.ListUberDeliveriesForAdminResponse
-	(*ListUberDeliveriesForAdminData)(nil),             // 152: hawkr.shipping.ListUberDeliveriesForAdminData
-	(*GetUberDeliveryForAdminRequest)(nil),             // 153: hawkr.shipping.GetUberDeliveryForAdminRequest
-	(*GetUberDeliveryForAdminResponse)(nil),            // 154: hawkr.shipping.GetUberDeliveryForAdminResponse
-	(*AdminUberDeliveryDetail)(nil),                    // 155: hawkr.shipping.AdminUberDeliveryDetail
-	nil,                                                // 156: hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
+	(*ListBusinessDaysRequest)(nil),                    // 76: hawkr.shipping.ListBusinessDaysRequest
+	(*ListBusinessDaysResponse)(nil),                   // 77: hawkr.shipping.ListBusinessDaysResponse
+	(*BusinessDay)(nil),                                // 78: hawkr.shipping.BusinessDay
+	(*ConfirmCvsShipmentRequest)(nil),                  // 79: hawkr.shipping.ConfirmCvsShipmentRequest
+	(*ConfirmCvsShipmentResponse)(nil),                 // 80: hawkr.shipping.ConfirmCvsShipmentResponse
+	(*CreateReturnCvsShipmentRequest)(nil),             // 81: hawkr.shipping.CreateReturnCvsShipmentRequest
+	(*CreateReturnHomeShipmentRequest)(nil),            // 82: hawkr.shipping.CreateReturnHomeShipmentRequest
+	(*CreateReturnShipmentResponse)(nil),               // 83: hawkr.shipping.CreateReturnShipmentResponse
+	(*ReturnShipmentData)(nil),                         // 84: hawkr.shipping.ReturnShipmentData
+	(*GetSellerReturnConfigRequest)(nil),               // 85: hawkr.shipping.GetSellerReturnConfigRequest
+	(*GetSellerReturnConfigResponse)(nil),              // 86: hawkr.shipping.GetSellerReturnConfigResponse
+	(*SellerReturnConfigData)(nil),                     // 87: hawkr.shipping.SellerReturnConfigData
+	(*RetryReturnPrintLabelRequest)(nil),               // 88: hawkr.shipping.RetryReturnPrintLabelRequest
+	(*RetryReturnPrintLabelResponse)(nil),              // 89: hawkr.shipping.RetryReturnPrintLabelResponse
+	(*LookupShipTradeNoRequest)(nil),                   // 90: hawkr.shipping.LookupShipTradeNoRequest
+	(*LookupShipTradeNoResponse)(nil),                  // 91: hawkr.shipping.LookupShipTradeNoResponse
+	(*ListShipmentsForAdminRequest)(nil),               // 92: hawkr.shipping.ListShipmentsForAdminRequest
+	(*ListShipmentsForAdminResponse)(nil),              // 93: hawkr.shipping.ListShipmentsForAdminResponse
+	(*ListShipmentsForAdminData)(nil),                  // 94: hawkr.shipping.ListShipmentsForAdminData
+	(*AdminShipmentSummary)(nil),                       // 95: hawkr.shipping.AdminShipmentSummary
+	(*GetShipmentForAdminRequest)(nil),                 // 96: hawkr.shipping.GetShipmentForAdminRequest
+	(*GetShipmentForAdminResponse)(nil),                // 97: hawkr.shipping.GetShipmentForAdminResponse
+	(*AdminShipmentDetail)(nil),                        // 98: hawkr.shipping.AdminShipmentDetail
+	(*ListSellerShipmentSettingsForAdminRequest)(nil),  // 99: hawkr.shipping.ListSellerShipmentSettingsForAdminRequest
+	(*ListSellerShipmentSettingsForAdminResponse)(nil), // 100: hawkr.shipping.ListSellerShipmentSettingsForAdminResponse
+	(*ListSellerShipmentSettingsForAdminData)(nil),     // 101: hawkr.shipping.ListSellerShipmentSettingsForAdminData
+	(*AdminSellerShipmentSettingSummary)(nil),          // 102: hawkr.shipping.AdminSellerShipmentSettingSummary
+	(*ListSellerShipmentAnomaliesRequest)(nil),         // 103: hawkr.shipping.ListSellerShipmentAnomaliesRequest
+	(*ListSellerShipmentAnomaliesResponse)(nil),        // 104: hawkr.shipping.ListSellerShipmentAnomaliesResponse
+	(*ListSellerShipmentAnomaliesData)(nil),            // 105: hawkr.shipping.ListSellerShipmentAnomaliesData
+	(*ShipmentAnomalyView)(nil),                        // 106: hawkr.shipping.ShipmentAnomalyView
+	(*GetSellerShipmentAnomalyStatsRequest)(nil),       // 107: hawkr.shipping.GetSellerShipmentAnomalyStatsRequest
+	(*GetSellerShipmentAnomalyStatsResponse)(nil),      // 108: hawkr.shipping.GetSellerShipmentAnomalyStatsResponse
+	(*GetSellerShipmentAnomalyStatsData)(nil),          // 109: hawkr.shipping.GetSellerShipmentAnomalyStatsData
+	(*AnomalyTypeCount)(nil),                           // 110: hawkr.shipping.AnomalyTypeCount
+	(*AcknowledgeShipmentAnomalyRequest)(nil),          // 111: hawkr.shipping.AcknowledgeShipmentAnomalyRequest
+	(*AcknowledgeShipmentAnomalyResponse)(nil),         // 112: hawkr.shipping.AcknowledgeShipmentAnomalyResponse
+	(*AcknowledgeShipmentAnomalyData)(nil),             // 113: hawkr.shipping.AcknowledgeShipmentAnomalyData
+	(*IgnoreShipmentAnomalyRequest)(nil),               // 114: hawkr.shipping.IgnoreShipmentAnomalyRequest
+	(*IgnoreShipmentAnomalyResponse)(nil),              // 115: hawkr.shipping.IgnoreShipmentAnomalyResponse
+	(*ListShipmentAnomaliesForAdminRequest)(nil),       // 116: hawkr.shipping.ListShipmentAnomaliesForAdminRequest
+	(*ListShipmentAnomaliesForAdminResponse)(nil),      // 117: hawkr.shipping.ListShipmentAnomaliesForAdminResponse
+	(*ListShipmentAnomaliesForAdminData)(nil),          // 118: hawkr.shipping.ListShipmentAnomaliesForAdminData
+	(*AdminShipmentAnomalyView)(nil),                   // 119: hawkr.shipping.AdminShipmentAnomalyView
+	(*AcknowledgeShipmentAnomalyForAdminRequest)(nil),  // 120: hawkr.shipping.AcknowledgeShipmentAnomalyForAdminRequest
+	(*IgnoreShipmentAnomalyForAdminRequest)(nil),       // 121: hawkr.shipping.IgnoreShipmentAnomalyForAdminRequest
+	(*UberQuoteItem)(nil),                              // 122: hawkr.shipping.UberQuoteItem
+	(*UberQuoteDropoff)(nil),                           // 123: hawkr.shipping.UberQuoteDropoff
+	(*GetUberQuoteForCheckoutRequest)(nil),             // 124: hawkr.shipping.GetUberQuoteForCheckoutRequest
+	(*UberQuoteData)(nil),                              // 125: hawkr.shipping.UberQuoteData
+	(*GetUberQuoteForCheckoutResponse)(nil),            // 126: hawkr.shipping.GetUberQuoteForCheckoutResponse
+	(*ValidateUberQuoteForCheckoutRequest)(nil),        // 127: hawkr.shipping.ValidateUberQuoteForCheckoutRequest
+	(*ValidateUberQuoteData)(nil),                      // 128: hawkr.shipping.ValidateUberQuoteData
+	(*ValidateUberQuoteForCheckoutResponse)(nil),       // 129: hawkr.shipping.ValidateUberQuoteForCheckoutResponse
+	(*UberDeliverySummary)(nil),                        // 130: hawkr.shipping.UberDeliverySummary
+	(*UberDeliveryQuoteView)(nil),                      // 131: hawkr.shipping.UberDeliveryQuoteView
+	(*UberPodArtifactView)(nil),                        // 132: hawkr.shipping.UberPodArtifactView
+	(*UberDeliveryTimelineEntry)(nil),                  // 133: hawkr.shipping.UberDeliveryTimelineEntry
+	(*ListSellerUberDeliveriesRequest)(nil),            // 134: hawkr.shipping.ListSellerUberDeliveriesRequest
+	(*ListSellerUberDeliveriesResponse)(nil),           // 135: hawkr.shipping.ListSellerUberDeliveriesResponse
+	(*ListSellerUberDeliveriesData)(nil),               // 136: hawkr.shipping.ListSellerUberDeliveriesData
+	(*GetSellerUberDeliveryRequest)(nil),               // 137: hawkr.shipping.GetSellerUberDeliveryRequest
+	(*GetSellerUberDeliveryResponse)(nil),              // 138: hawkr.shipping.GetSellerUberDeliveryResponse
+	(*SellerUberDeliveryDetail)(nil),                   // 139: hawkr.shipping.SellerUberDeliveryDetail
+	(*ListUberDeliveriesForAdminRequest)(nil),          // 140: hawkr.shipping.ListUberDeliveriesForAdminRequest
+	(*ListUberDeliveriesForAdminResponse)(nil),         // 141: hawkr.shipping.ListUberDeliveriesForAdminResponse
+	(*ListUberDeliveriesForAdminData)(nil),             // 142: hawkr.shipping.ListUberDeliveriesForAdminData
+	(*GetUberDeliveryForAdminRequest)(nil),             // 143: hawkr.shipping.GetUberDeliveryForAdminRequest
+	(*GetUberDeliveryForAdminResponse)(nil),            // 144: hawkr.shipping.GetUberDeliveryForAdminResponse
+	(*AdminUberDeliveryDetail)(nil),                    // 145: hawkr.shipping.AdminUberDeliveryDetail
+	nil,                                                // 146: hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
 }
 var file_shipping_shipping_proto_depIdxs = []int32{
 	2,   // 0: hawkr.shipping.PrintCvsLabelResponse.data:type_name -> hawkr.shipping.CvsLabelData
@@ -13214,7 +12604,7 @@ var file_shipping_shipping_proto_depIdxs = []int32{
 	14,  // 6: hawkr.shipping.BatchHomeLabelData.results:type_name -> hawkr.shipping.BatchHomeLabelResult
 	17,  // 7: hawkr.shipping.CallTcatResponse.data:type_name -> hawkr.shipping.CallTcatData
 	25,  // 8: hawkr.shipping.GetShipmentsByOrderNosResponse.data:type_name -> hawkr.shipping.ShipmentDetailView
-	156, // 9: hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.entries:type_name -> hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
+	146, // 9: hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.entries:type_name -> hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
 	25,  // 10: hawkr.shipping.GetShipmentResponse.data:type_name -> hawkr.shipping.ShipmentDetailView
 	26,  // 11: hawkr.shipping.ShipmentDetailView.allowed_actions:type_name -> hawkr.shipping.ActionAvailability
 	33,  // 12: hawkr.shipping.OnboardShippingResponse.data:type_name -> hawkr.shipping.ShippingOnboardingView
@@ -13233,164 +12623,153 @@ var file_shipping_shipping_proto_depIdxs = []int32{
 	75,  // 25: hawkr.shipping.AddBuyerStorePickupResponse.data:type_name -> hawkr.shipping.BuyerStorePickupView
 	75,  // 26: hawkr.shipping.UpdateBuyerStorePickupResponse.data:type_name -> hawkr.shipping.BuyerStorePickupView
 	75,  // 27: hawkr.shipping.ListBuyerStorePickupsResponse.data:type_name -> hawkr.shipping.BuyerStorePickupView
-	78,  // 28: hawkr.shipping.ImportHolidaysResponse.data:type_name -> hawkr.shipping.ImportHolidaysData
-	82,  // 29: hawkr.shipping.GetHolidayCoverageResponse.data:type_name -> hawkr.shipping.HolidayCoverageData
-	83,  // 30: hawkr.shipping.HolidayCoverageData.years:type_name -> hawkr.shipping.HolidayYearCoverage
-	86,  // 31: hawkr.shipping.ListBusinessDaysResponse.business_days:type_name -> hawkr.shipping.BusinessDay
-	94,  // 32: hawkr.shipping.CreateReturnShipmentResponse.data:type_name -> hawkr.shipping.ReturnShipmentData
-	97,  // 33: hawkr.shipping.GetSellerReturnConfigResponse.data:type_name -> hawkr.shipping.SellerReturnConfigData
-	104, // 34: hawkr.shipping.ListShipmentsForAdminResponse.data:type_name -> hawkr.shipping.ListShipmentsForAdminData
-	105, // 35: hawkr.shipping.ListShipmentsForAdminData.records:type_name -> hawkr.shipping.AdminShipmentSummary
-	108, // 36: hawkr.shipping.GetShipmentForAdminResponse.data:type_name -> hawkr.shipping.AdminShipmentDetail
-	111, // 37: hawkr.shipping.ListSellerShipmentSettingsForAdminResponse.data:type_name -> hawkr.shipping.ListSellerShipmentSettingsForAdminData
-	112, // 38: hawkr.shipping.ListSellerShipmentSettingsForAdminData.records:type_name -> hawkr.shipping.AdminSellerShipmentSettingSummary
-	115, // 39: hawkr.shipping.ListSellerShipmentAnomaliesResponse.data:type_name -> hawkr.shipping.ListSellerShipmentAnomaliesData
-	116, // 40: hawkr.shipping.ListSellerShipmentAnomaliesData.records:type_name -> hawkr.shipping.ShipmentAnomalyView
-	119, // 41: hawkr.shipping.GetSellerShipmentAnomalyStatsResponse.data:type_name -> hawkr.shipping.GetSellerShipmentAnomalyStatsData
-	120, // 42: hawkr.shipping.GetSellerShipmentAnomalyStatsData.by_type:type_name -> hawkr.shipping.AnomalyTypeCount
-	123, // 43: hawkr.shipping.AcknowledgeShipmentAnomalyResponse.data:type_name -> hawkr.shipping.AcknowledgeShipmentAnomalyData
-	123, // 44: hawkr.shipping.IgnoreShipmentAnomalyResponse.data:type_name -> hawkr.shipping.AcknowledgeShipmentAnomalyData
-	128, // 45: hawkr.shipping.ListShipmentAnomaliesForAdminResponse.data:type_name -> hawkr.shipping.ListShipmentAnomaliesForAdminData
-	129, // 46: hawkr.shipping.ListShipmentAnomaliesForAdminData.records:type_name -> hawkr.shipping.AdminShipmentAnomalyView
-	133, // 47: hawkr.shipping.GetUberQuoteForCheckoutRequest.dropoff:type_name -> hawkr.shipping.UberQuoteDropoff
-	132, // 48: hawkr.shipping.GetUberQuoteForCheckoutRequest.items:type_name -> hawkr.shipping.UberQuoteItem
-	135, // 49: hawkr.shipping.GetUberQuoteForCheckoutResponse.data:type_name -> hawkr.shipping.UberQuoteData
-	133, // 50: hawkr.shipping.ValidateUberQuoteForCheckoutRequest.dropoff:type_name -> hawkr.shipping.UberQuoteDropoff
-	132, // 51: hawkr.shipping.ValidateUberQuoteForCheckoutRequest.items:type_name -> hawkr.shipping.UberQuoteItem
-	138, // 52: hawkr.shipping.ValidateUberQuoteForCheckoutResponse.data:type_name -> hawkr.shipping.ValidateUberQuoteData
-	146, // 53: hawkr.shipping.ListSellerUberDeliveriesResponse.data:type_name -> hawkr.shipping.ListSellerUberDeliveriesData
-	140, // 54: hawkr.shipping.ListSellerUberDeliveriesData.records:type_name -> hawkr.shipping.UberDeliverySummary
-	149, // 55: hawkr.shipping.GetSellerUberDeliveryResponse.data:type_name -> hawkr.shipping.SellerUberDeliveryDetail
-	140, // 56: hawkr.shipping.SellerUberDeliveryDetail.summary:type_name -> hawkr.shipping.UberDeliverySummary
-	141, // 57: hawkr.shipping.SellerUberDeliveryDetail.quote:type_name -> hawkr.shipping.UberDeliveryQuoteView
-	142, // 58: hawkr.shipping.SellerUberDeliveryDetail.pod_artifacts:type_name -> hawkr.shipping.UberPodArtifactView
-	26,  // 59: hawkr.shipping.SellerUberDeliveryDetail.allowed_actions:type_name -> hawkr.shipping.ActionAvailability
-	152, // 60: hawkr.shipping.ListUberDeliveriesForAdminResponse.data:type_name -> hawkr.shipping.ListUberDeliveriesForAdminData
-	140, // 61: hawkr.shipping.ListUberDeliveriesForAdminData.records:type_name -> hawkr.shipping.UberDeliverySummary
-	155, // 62: hawkr.shipping.GetUberDeliveryForAdminResponse.data:type_name -> hawkr.shipping.AdminUberDeliveryDetail
-	140, // 63: hawkr.shipping.AdminUberDeliveryDetail.summary:type_name -> hawkr.shipping.UberDeliverySummary
-	141, // 64: hawkr.shipping.AdminUberDeliveryDetail.quote:type_name -> hawkr.shipping.UberDeliveryQuoteView
-	142, // 65: hawkr.shipping.AdminUberDeliveryDetail.pod_artifacts:type_name -> hawkr.shipping.UberPodArtifactView
-	26,  // 66: hawkr.shipping.AdminUberDeliveryDetail.allowed_actions:type_name -> hawkr.shipping.ActionAvailability
-	143, // 67: hawkr.shipping.AdminUberDeliveryDetail.timeline:type_name -> hawkr.shipping.UberDeliveryTimelineEntry
-	23,  // 68: hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry.value:type_name -> hawkr.shipping.ProviderStatusEntry
-	0,   // 69: hawkr.shipping.ShippingService.PrintCvsLabel:input_type -> hawkr.shipping.PrintCvsLabelRequest
-	3,   // 70: hawkr.shipping.ShippingService.BatchPrintCvsLabel:input_type -> hawkr.shipping.BatchPrintCvsLabelRequest
-	7,   // 71: hawkr.shipping.ShippingService.GenerateHomeLabelPdf:input_type -> hawkr.shipping.GenerateHomeLabelPdfRequest
-	10,  // 72: hawkr.shipping.ShippingService.BatchGenerateHomeLabelPdf:input_type -> hawkr.shipping.BatchGenerateHomeLabelPdfRequest
-	15,  // 73: hawkr.shipping.ShippingService.CallTcat:input_type -> hawkr.shipping.CallTcatRequest
-	89,  // 74: hawkr.shipping.ShippingService.ConfirmCvsShipment:input_type -> hawkr.shipping.ConfirmCvsShipmentRequest
-	18,  // 75: hawkr.shipping.ShippingService.GetShipmentByOrderNo:input_type -> hawkr.shipping.GetShipmentByOrderNoRequest
-	19,  // 76: hawkr.shipping.ShippingService.GetShipmentsByOrderNos:input_type -> hawkr.shipping.GetShipmentsByOrderNosRequest
-	21,  // 77: hawkr.shipping.ShippingService.BatchGetProviderStatusByOrderIds:input_type -> hawkr.shipping.BatchGetProviderStatusByOrderIdsRequest
-	27,  // 78: hawkr.shipping.ShippingService.QueryShipmentStatus:input_type -> hawkr.shipping.QueryShipmentStatusRequest
-	28,  // 79: hawkr.shipping.ShippingService.GetShipmentTracking:input_type -> hawkr.shipping.GetShipmentTrackingRequest
-	29,  // 80: hawkr.shipping.ShippingService.GetSellerShipmentTracking:input_type -> hawkr.shipping.GetSellerShipmentTrackingRequest
-	30,  // 81: hawkr.shipping.ShippingService.OnboardCvsShipping:input_type -> hawkr.shipping.OnboardCvsShippingRequest
-	31,  // 82: hawkr.shipping.ShippingService.OnboardHomeDeliveryShipping:input_type -> hawkr.shipping.OnboardHomeDeliveryRequest
-	34,  // 83: hawkr.shipping.ShippingService.ListShippingOnboardings:input_type -> hawkr.shipping.ListShippingOnboardingsRequest
-	36,  // 84: hawkr.shipping.ShippingService.GetShippingOnboarding:input_type -> hawkr.shipping.GetShippingOnboardingRequest
-	38,  // 85: hawkr.shipping.ShippingService.ToggleShippingOnboarding:input_type -> hawkr.shipping.ToggleShippingOnboardingRequest
-	39,  // 86: hawkr.shipping.ShippingService.ListSellerShippingMethods:input_type -> hawkr.shipping.ListSellerShippingMethodsRequest
-	67,  // 87: hawkr.shipping.ShippingService.AddBuyerStorePickup:input_type -> hawkr.shipping.AddBuyerStorePickupRequest
-	69,  // 88: hawkr.shipping.ShippingService.UpdateBuyerStorePickup:input_type -> hawkr.shipping.UpdateBuyerStorePickupRequest
-	71,  // 89: hawkr.shipping.ShippingService.ListBuyerStorePickups:input_type -> hawkr.shipping.ListBuyerStorePickupsRequest
-	73,  // 90: hawkr.shipping.ShippingService.DeleteBuyerStorePickup:input_type -> hawkr.shipping.DeleteBuyerStorePickupRequest
-	42,  // 91: hawkr.shipping.ShippingService.GetStoreMapParams:input_type -> hawkr.shipping.GetStoreMapParamsRequest
-	45,  // 92: hawkr.shipping.ShippingService.GetStoreMapRedirectForm:input_type -> hawkr.shipping.GetStoreMapRedirectFormRequest
-	47,  // 93: hawkr.shipping.ShippingService.DecryptStoreMapResult:input_type -> hawkr.shipping.DecryptStoreMapResultRequest
-	50,  // 94: hawkr.shipping.ShippingService.GetSellerShippingConfig:input_type -> hawkr.shipping.GetSellerShippingConfigRequest
-	53,  // 95: hawkr.shipping.ShippingService.GetShippingFeeConfigs:input_type -> hawkr.shipping.GetShippingFeeConfigsRequest
-	57,  // 96: hawkr.shipping.ShippingService.LookupShippingFee:input_type -> hawkr.shipping.LookupShippingFeeRequest
-	59,  // 97: hawkr.shipping.ShippingService.CalculateShippingOptions:input_type -> hawkr.shipping.CalculateShippingOptionsRequest
-	63,  // 98: hawkr.shipping.ShippingService.ValidateProductShipping:input_type -> hawkr.shipping.ValidateProductShippingRequest
-	76,  // 99: hawkr.shipping.ShippingService.ImportHolidays:input_type -> hawkr.shipping.ImportHolidaysRequest
-	79,  // 100: hawkr.shipping.ShippingService.ImportHolidaysFromContent:input_type -> hawkr.shipping.ImportHolidaysFromContentRequest
-	80,  // 101: hawkr.shipping.ShippingService.GetHolidayCoverage:input_type -> hawkr.shipping.GetHolidayCoverageRequest
-	84,  // 102: hawkr.shipping.ShippingService.ListBusinessDays:input_type -> hawkr.shipping.ListBusinessDaysRequest
-	87,  // 103: hawkr.shipping.ShippingService.GetHolidaysInternal:input_type -> hawkr.shipping.GetHolidaysInternalRequest
-	91,  // 104: hawkr.shipping.ShippingService.CreateReturnCvsShipment:input_type -> hawkr.shipping.CreateReturnCvsShipmentRequest
-	92,  // 105: hawkr.shipping.ShippingService.CreateReturnHomeShipment:input_type -> hawkr.shipping.CreateReturnHomeShipmentRequest
-	95,  // 106: hawkr.shipping.ShippingService.GetSellerReturnConfig:input_type -> hawkr.shipping.GetSellerReturnConfigRequest
-	98,  // 107: hawkr.shipping.ShippingService.RetryReturnPrintLabel:input_type -> hawkr.shipping.RetryReturnPrintLabelRequest
-	100, // 108: hawkr.shipping.ShippingService.LookupShipTradeNo:input_type -> hawkr.shipping.LookupShipTradeNoRequest
-	102, // 109: hawkr.shipping.ShippingService.ListShipmentsForAdmin:input_type -> hawkr.shipping.ListShipmentsForAdminRequest
-	106, // 110: hawkr.shipping.ShippingService.GetShipmentForAdmin:input_type -> hawkr.shipping.GetShipmentForAdminRequest
-	109, // 111: hawkr.shipping.ShippingService.ListSellerShipmentSettingsForAdmin:input_type -> hawkr.shipping.ListSellerShipmentSettingsForAdminRequest
-	113, // 112: hawkr.shipping.ShippingService.ListSellerShipmentAnomalies:input_type -> hawkr.shipping.ListSellerShipmentAnomaliesRequest
-	117, // 113: hawkr.shipping.ShippingService.GetSellerShipmentAnomalyStats:input_type -> hawkr.shipping.GetSellerShipmentAnomalyStatsRequest
-	121, // 114: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomaly:input_type -> hawkr.shipping.AcknowledgeShipmentAnomalyRequest
-	124, // 115: hawkr.shipping.ShippingService.IgnoreShipmentAnomaly:input_type -> hawkr.shipping.IgnoreShipmentAnomalyRequest
-	126, // 116: hawkr.shipping.ShippingService.ListShipmentAnomaliesForAdmin:input_type -> hawkr.shipping.ListShipmentAnomaliesForAdminRequest
-	130, // 117: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomalyForAdmin:input_type -> hawkr.shipping.AcknowledgeShipmentAnomalyForAdminRequest
-	131, // 118: hawkr.shipping.ShippingService.IgnoreShipmentAnomalyForAdmin:input_type -> hawkr.shipping.IgnoreShipmentAnomalyForAdminRequest
-	134, // 119: hawkr.shipping.ShippingService.GetUberQuoteForCheckout:input_type -> hawkr.shipping.GetUberQuoteForCheckoutRequest
-	137, // 120: hawkr.shipping.ShippingService.ValidateUberQuoteForCheckout:input_type -> hawkr.shipping.ValidateUberQuoteForCheckoutRequest
-	144, // 121: hawkr.shipping.ShippingService.ListSellerUberDeliveries:input_type -> hawkr.shipping.ListSellerUberDeliveriesRequest
-	147, // 122: hawkr.shipping.ShippingService.GetSellerUberDelivery:input_type -> hawkr.shipping.GetSellerUberDeliveryRequest
-	150, // 123: hawkr.shipping.ShippingService.ListUberDeliveriesForAdmin:input_type -> hawkr.shipping.ListUberDeliveriesForAdminRequest
-	153, // 124: hawkr.shipping.ShippingService.GetUberDeliveryForAdmin:input_type -> hawkr.shipping.GetUberDeliveryForAdminRequest
-	1,   // 125: hawkr.shipping.ShippingService.PrintCvsLabel:output_type -> hawkr.shipping.PrintCvsLabelResponse
-	4,   // 126: hawkr.shipping.ShippingService.BatchPrintCvsLabel:output_type -> hawkr.shipping.BatchPrintCvsLabelResponse
-	8,   // 127: hawkr.shipping.ShippingService.GenerateHomeLabelPdf:output_type -> hawkr.shipping.GenerateHomeLabelPdfResponse
-	12,  // 128: hawkr.shipping.ShippingService.BatchGenerateHomeLabelPdf:output_type -> hawkr.shipping.BatchGenerateHomeLabelPdfResponse
-	16,  // 129: hawkr.shipping.ShippingService.CallTcat:output_type -> hawkr.shipping.CallTcatResponse
-	90,  // 130: hawkr.shipping.ShippingService.ConfirmCvsShipment:output_type -> hawkr.shipping.ConfirmCvsShipmentResponse
-	24,  // 131: hawkr.shipping.ShippingService.GetShipmentByOrderNo:output_type -> hawkr.shipping.GetShipmentResponse
-	20,  // 132: hawkr.shipping.ShippingService.GetShipmentsByOrderNos:output_type -> hawkr.shipping.GetShipmentsByOrderNosResponse
-	22,  // 133: hawkr.shipping.ShippingService.BatchGetProviderStatusByOrderIds:output_type -> hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse
-	24,  // 134: hawkr.shipping.ShippingService.QueryShipmentStatus:output_type -> hawkr.shipping.GetShipmentResponse
-	24,  // 135: hawkr.shipping.ShippingService.GetShipmentTracking:output_type -> hawkr.shipping.GetShipmentResponse
-	24,  // 136: hawkr.shipping.ShippingService.GetSellerShipmentTracking:output_type -> hawkr.shipping.GetShipmentResponse
-	32,  // 137: hawkr.shipping.ShippingService.OnboardCvsShipping:output_type -> hawkr.shipping.OnboardShippingResponse
-	32,  // 138: hawkr.shipping.ShippingService.OnboardHomeDeliveryShipping:output_type -> hawkr.shipping.OnboardShippingResponse
-	35,  // 139: hawkr.shipping.ShippingService.ListShippingOnboardings:output_type -> hawkr.shipping.ListShippingOnboardingsResponse
-	37,  // 140: hawkr.shipping.ShippingService.GetShippingOnboarding:output_type -> hawkr.shipping.GetShippingOnboardingResponse
-	32,  // 141: hawkr.shipping.ShippingService.ToggleShippingOnboarding:output_type -> hawkr.shipping.OnboardShippingResponse
-	40,  // 142: hawkr.shipping.ShippingService.ListSellerShippingMethods:output_type -> hawkr.shipping.ListSellerShippingMethodsResponse
-	68,  // 143: hawkr.shipping.ShippingService.AddBuyerStorePickup:output_type -> hawkr.shipping.AddBuyerStorePickupResponse
-	70,  // 144: hawkr.shipping.ShippingService.UpdateBuyerStorePickup:output_type -> hawkr.shipping.UpdateBuyerStorePickupResponse
-	72,  // 145: hawkr.shipping.ShippingService.ListBuyerStorePickups:output_type -> hawkr.shipping.ListBuyerStorePickupsResponse
-	74,  // 146: hawkr.shipping.ShippingService.DeleteBuyerStorePickup:output_type -> hawkr.shipping.DeleteBuyerStorePickupResponse
-	43,  // 147: hawkr.shipping.ShippingService.GetStoreMapParams:output_type -> hawkr.shipping.GetStoreMapParamsResponse
-	46,  // 148: hawkr.shipping.ShippingService.GetStoreMapRedirectForm:output_type -> hawkr.shipping.GetStoreMapRedirectFormResponse
-	48,  // 149: hawkr.shipping.ShippingService.DecryptStoreMapResult:output_type -> hawkr.shipping.DecryptStoreMapResultResponse
-	51,  // 150: hawkr.shipping.ShippingService.GetSellerShippingConfig:output_type -> hawkr.shipping.GetSellerShippingConfigResponse
-	54,  // 151: hawkr.shipping.ShippingService.GetShippingFeeConfigs:output_type -> hawkr.shipping.GetShippingFeeConfigsResponse
-	58,  // 152: hawkr.shipping.ShippingService.LookupShippingFee:output_type -> hawkr.shipping.LookupShippingFeeResponse
-	60,  // 153: hawkr.shipping.ShippingService.CalculateShippingOptions:output_type -> hawkr.shipping.CalculateShippingOptionsResponse
-	65,  // 154: hawkr.shipping.ShippingService.ValidateProductShipping:output_type -> hawkr.shipping.ValidateProductShippingResponse
-	77,  // 155: hawkr.shipping.ShippingService.ImportHolidays:output_type -> hawkr.shipping.ImportHolidaysResponse
-	77,  // 156: hawkr.shipping.ShippingService.ImportHolidaysFromContent:output_type -> hawkr.shipping.ImportHolidaysResponse
-	81,  // 157: hawkr.shipping.ShippingService.GetHolidayCoverage:output_type -> hawkr.shipping.GetHolidayCoverageResponse
-	85,  // 158: hawkr.shipping.ShippingService.ListBusinessDays:output_type -> hawkr.shipping.ListBusinessDaysResponse
-	88,  // 159: hawkr.shipping.ShippingService.GetHolidaysInternal:output_type -> hawkr.shipping.GetHolidaysInternalResponse
-	93,  // 160: hawkr.shipping.ShippingService.CreateReturnCvsShipment:output_type -> hawkr.shipping.CreateReturnShipmentResponse
-	93,  // 161: hawkr.shipping.ShippingService.CreateReturnHomeShipment:output_type -> hawkr.shipping.CreateReturnShipmentResponse
-	96,  // 162: hawkr.shipping.ShippingService.GetSellerReturnConfig:output_type -> hawkr.shipping.GetSellerReturnConfigResponse
-	99,  // 163: hawkr.shipping.ShippingService.RetryReturnPrintLabel:output_type -> hawkr.shipping.RetryReturnPrintLabelResponse
-	101, // 164: hawkr.shipping.ShippingService.LookupShipTradeNo:output_type -> hawkr.shipping.LookupShipTradeNoResponse
-	103, // 165: hawkr.shipping.ShippingService.ListShipmentsForAdmin:output_type -> hawkr.shipping.ListShipmentsForAdminResponse
-	107, // 166: hawkr.shipping.ShippingService.GetShipmentForAdmin:output_type -> hawkr.shipping.GetShipmentForAdminResponse
-	110, // 167: hawkr.shipping.ShippingService.ListSellerShipmentSettingsForAdmin:output_type -> hawkr.shipping.ListSellerShipmentSettingsForAdminResponse
-	114, // 168: hawkr.shipping.ShippingService.ListSellerShipmentAnomalies:output_type -> hawkr.shipping.ListSellerShipmentAnomaliesResponse
-	118, // 169: hawkr.shipping.ShippingService.GetSellerShipmentAnomalyStats:output_type -> hawkr.shipping.GetSellerShipmentAnomalyStatsResponse
-	122, // 170: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomaly:output_type -> hawkr.shipping.AcknowledgeShipmentAnomalyResponse
-	125, // 171: hawkr.shipping.ShippingService.IgnoreShipmentAnomaly:output_type -> hawkr.shipping.IgnoreShipmentAnomalyResponse
-	127, // 172: hawkr.shipping.ShippingService.ListShipmentAnomaliesForAdmin:output_type -> hawkr.shipping.ListShipmentAnomaliesForAdminResponse
-	122, // 173: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomalyForAdmin:output_type -> hawkr.shipping.AcknowledgeShipmentAnomalyResponse
-	125, // 174: hawkr.shipping.ShippingService.IgnoreShipmentAnomalyForAdmin:output_type -> hawkr.shipping.IgnoreShipmentAnomalyResponse
-	136, // 175: hawkr.shipping.ShippingService.GetUberQuoteForCheckout:output_type -> hawkr.shipping.GetUberQuoteForCheckoutResponse
-	139, // 176: hawkr.shipping.ShippingService.ValidateUberQuoteForCheckout:output_type -> hawkr.shipping.ValidateUberQuoteForCheckoutResponse
-	145, // 177: hawkr.shipping.ShippingService.ListSellerUberDeliveries:output_type -> hawkr.shipping.ListSellerUberDeliveriesResponse
-	148, // 178: hawkr.shipping.ShippingService.GetSellerUberDelivery:output_type -> hawkr.shipping.GetSellerUberDeliveryResponse
-	151, // 179: hawkr.shipping.ShippingService.ListUberDeliveriesForAdmin:output_type -> hawkr.shipping.ListUberDeliveriesForAdminResponse
-	154, // 180: hawkr.shipping.ShippingService.GetUberDeliveryForAdmin:output_type -> hawkr.shipping.GetUberDeliveryForAdminResponse
-	125, // [125:181] is the sub-list for method output_type
-	69,  // [69:125] is the sub-list for method input_type
-	69,  // [69:69] is the sub-list for extension type_name
-	69,  // [69:69] is the sub-list for extension extendee
-	0,   // [0:69] is the sub-list for field type_name
+	78,  // 28: hawkr.shipping.ListBusinessDaysResponse.business_days:type_name -> hawkr.shipping.BusinessDay
+	84,  // 29: hawkr.shipping.CreateReturnShipmentResponse.data:type_name -> hawkr.shipping.ReturnShipmentData
+	87,  // 30: hawkr.shipping.GetSellerReturnConfigResponse.data:type_name -> hawkr.shipping.SellerReturnConfigData
+	94,  // 31: hawkr.shipping.ListShipmentsForAdminResponse.data:type_name -> hawkr.shipping.ListShipmentsForAdminData
+	95,  // 32: hawkr.shipping.ListShipmentsForAdminData.records:type_name -> hawkr.shipping.AdminShipmentSummary
+	98,  // 33: hawkr.shipping.GetShipmentForAdminResponse.data:type_name -> hawkr.shipping.AdminShipmentDetail
+	101, // 34: hawkr.shipping.ListSellerShipmentSettingsForAdminResponse.data:type_name -> hawkr.shipping.ListSellerShipmentSettingsForAdminData
+	102, // 35: hawkr.shipping.ListSellerShipmentSettingsForAdminData.records:type_name -> hawkr.shipping.AdminSellerShipmentSettingSummary
+	105, // 36: hawkr.shipping.ListSellerShipmentAnomaliesResponse.data:type_name -> hawkr.shipping.ListSellerShipmentAnomaliesData
+	106, // 37: hawkr.shipping.ListSellerShipmentAnomaliesData.records:type_name -> hawkr.shipping.ShipmentAnomalyView
+	109, // 38: hawkr.shipping.GetSellerShipmentAnomalyStatsResponse.data:type_name -> hawkr.shipping.GetSellerShipmentAnomalyStatsData
+	110, // 39: hawkr.shipping.GetSellerShipmentAnomalyStatsData.by_type:type_name -> hawkr.shipping.AnomalyTypeCount
+	113, // 40: hawkr.shipping.AcknowledgeShipmentAnomalyResponse.data:type_name -> hawkr.shipping.AcknowledgeShipmentAnomalyData
+	113, // 41: hawkr.shipping.IgnoreShipmentAnomalyResponse.data:type_name -> hawkr.shipping.AcknowledgeShipmentAnomalyData
+	118, // 42: hawkr.shipping.ListShipmentAnomaliesForAdminResponse.data:type_name -> hawkr.shipping.ListShipmentAnomaliesForAdminData
+	119, // 43: hawkr.shipping.ListShipmentAnomaliesForAdminData.records:type_name -> hawkr.shipping.AdminShipmentAnomalyView
+	123, // 44: hawkr.shipping.GetUberQuoteForCheckoutRequest.dropoff:type_name -> hawkr.shipping.UberQuoteDropoff
+	122, // 45: hawkr.shipping.GetUberQuoteForCheckoutRequest.items:type_name -> hawkr.shipping.UberQuoteItem
+	125, // 46: hawkr.shipping.GetUberQuoteForCheckoutResponse.data:type_name -> hawkr.shipping.UberQuoteData
+	123, // 47: hawkr.shipping.ValidateUberQuoteForCheckoutRequest.dropoff:type_name -> hawkr.shipping.UberQuoteDropoff
+	122, // 48: hawkr.shipping.ValidateUberQuoteForCheckoutRequest.items:type_name -> hawkr.shipping.UberQuoteItem
+	128, // 49: hawkr.shipping.ValidateUberQuoteForCheckoutResponse.data:type_name -> hawkr.shipping.ValidateUberQuoteData
+	136, // 50: hawkr.shipping.ListSellerUberDeliveriesResponse.data:type_name -> hawkr.shipping.ListSellerUberDeliveriesData
+	130, // 51: hawkr.shipping.ListSellerUberDeliveriesData.records:type_name -> hawkr.shipping.UberDeliverySummary
+	139, // 52: hawkr.shipping.GetSellerUberDeliveryResponse.data:type_name -> hawkr.shipping.SellerUberDeliveryDetail
+	130, // 53: hawkr.shipping.SellerUberDeliveryDetail.summary:type_name -> hawkr.shipping.UberDeliverySummary
+	131, // 54: hawkr.shipping.SellerUberDeliveryDetail.quote:type_name -> hawkr.shipping.UberDeliveryQuoteView
+	132, // 55: hawkr.shipping.SellerUberDeliveryDetail.pod_artifacts:type_name -> hawkr.shipping.UberPodArtifactView
+	26,  // 56: hawkr.shipping.SellerUberDeliveryDetail.allowed_actions:type_name -> hawkr.shipping.ActionAvailability
+	142, // 57: hawkr.shipping.ListUberDeliveriesForAdminResponse.data:type_name -> hawkr.shipping.ListUberDeliveriesForAdminData
+	130, // 58: hawkr.shipping.ListUberDeliveriesForAdminData.records:type_name -> hawkr.shipping.UberDeliverySummary
+	145, // 59: hawkr.shipping.GetUberDeliveryForAdminResponse.data:type_name -> hawkr.shipping.AdminUberDeliveryDetail
+	130, // 60: hawkr.shipping.AdminUberDeliveryDetail.summary:type_name -> hawkr.shipping.UberDeliverySummary
+	131, // 61: hawkr.shipping.AdminUberDeliveryDetail.quote:type_name -> hawkr.shipping.UberDeliveryQuoteView
+	132, // 62: hawkr.shipping.AdminUberDeliveryDetail.pod_artifacts:type_name -> hawkr.shipping.UberPodArtifactView
+	26,  // 63: hawkr.shipping.AdminUberDeliveryDetail.allowed_actions:type_name -> hawkr.shipping.ActionAvailability
+	133, // 64: hawkr.shipping.AdminUberDeliveryDetail.timeline:type_name -> hawkr.shipping.UberDeliveryTimelineEntry
+	23,  // 65: hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry.value:type_name -> hawkr.shipping.ProviderStatusEntry
+	0,   // 66: hawkr.shipping.ShippingService.PrintCvsLabel:input_type -> hawkr.shipping.PrintCvsLabelRequest
+	3,   // 67: hawkr.shipping.ShippingService.BatchPrintCvsLabel:input_type -> hawkr.shipping.BatchPrintCvsLabelRequest
+	7,   // 68: hawkr.shipping.ShippingService.GenerateHomeLabelPdf:input_type -> hawkr.shipping.GenerateHomeLabelPdfRequest
+	10,  // 69: hawkr.shipping.ShippingService.BatchGenerateHomeLabelPdf:input_type -> hawkr.shipping.BatchGenerateHomeLabelPdfRequest
+	15,  // 70: hawkr.shipping.ShippingService.CallTcat:input_type -> hawkr.shipping.CallTcatRequest
+	79,  // 71: hawkr.shipping.ShippingService.ConfirmCvsShipment:input_type -> hawkr.shipping.ConfirmCvsShipmentRequest
+	18,  // 72: hawkr.shipping.ShippingService.GetShipmentByOrderNo:input_type -> hawkr.shipping.GetShipmentByOrderNoRequest
+	19,  // 73: hawkr.shipping.ShippingService.GetShipmentsByOrderNos:input_type -> hawkr.shipping.GetShipmentsByOrderNosRequest
+	21,  // 74: hawkr.shipping.ShippingService.BatchGetProviderStatusByOrderIds:input_type -> hawkr.shipping.BatchGetProviderStatusByOrderIdsRequest
+	27,  // 75: hawkr.shipping.ShippingService.QueryShipmentStatus:input_type -> hawkr.shipping.QueryShipmentStatusRequest
+	28,  // 76: hawkr.shipping.ShippingService.GetShipmentTracking:input_type -> hawkr.shipping.GetShipmentTrackingRequest
+	29,  // 77: hawkr.shipping.ShippingService.GetSellerShipmentTracking:input_type -> hawkr.shipping.GetSellerShipmentTrackingRequest
+	30,  // 78: hawkr.shipping.ShippingService.OnboardCvsShipping:input_type -> hawkr.shipping.OnboardCvsShippingRequest
+	31,  // 79: hawkr.shipping.ShippingService.OnboardHomeDeliveryShipping:input_type -> hawkr.shipping.OnboardHomeDeliveryRequest
+	34,  // 80: hawkr.shipping.ShippingService.ListShippingOnboardings:input_type -> hawkr.shipping.ListShippingOnboardingsRequest
+	36,  // 81: hawkr.shipping.ShippingService.GetShippingOnboarding:input_type -> hawkr.shipping.GetShippingOnboardingRequest
+	38,  // 82: hawkr.shipping.ShippingService.ToggleShippingOnboarding:input_type -> hawkr.shipping.ToggleShippingOnboardingRequest
+	39,  // 83: hawkr.shipping.ShippingService.ListSellerShippingMethods:input_type -> hawkr.shipping.ListSellerShippingMethodsRequest
+	67,  // 84: hawkr.shipping.ShippingService.AddBuyerStorePickup:input_type -> hawkr.shipping.AddBuyerStorePickupRequest
+	69,  // 85: hawkr.shipping.ShippingService.UpdateBuyerStorePickup:input_type -> hawkr.shipping.UpdateBuyerStorePickupRequest
+	71,  // 86: hawkr.shipping.ShippingService.ListBuyerStorePickups:input_type -> hawkr.shipping.ListBuyerStorePickupsRequest
+	73,  // 87: hawkr.shipping.ShippingService.DeleteBuyerStorePickup:input_type -> hawkr.shipping.DeleteBuyerStorePickupRequest
+	42,  // 88: hawkr.shipping.ShippingService.GetStoreMapParams:input_type -> hawkr.shipping.GetStoreMapParamsRequest
+	45,  // 89: hawkr.shipping.ShippingService.GetStoreMapRedirectForm:input_type -> hawkr.shipping.GetStoreMapRedirectFormRequest
+	47,  // 90: hawkr.shipping.ShippingService.DecryptStoreMapResult:input_type -> hawkr.shipping.DecryptStoreMapResultRequest
+	50,  // 91: hawkr.shipping.ShippingService.GetSellerShippingConfig:input_type -> hawkr.shipping.GetSellerShippingConfigRequest
+	53,  // 92: hawkr.shipping.ShippingService.GetShippingFeeConfigs:input_type -> hawkr.shipping.GetShippingFeeConfigsRequest
+	57,  // 93: hawkr.shipping.ShippingService.LookupShippingFee:input_type -> hawkr.shipping.LookupShippingFeeRequest
+	59,  // 94: hawkr.shipping.ShippingService.CalculateShippingOptions:input_type -> hawkr.shipping.CalculateShippingOptionsRequest
+	63,  // 95: hawkr.shipping.ShippingService.ValidateProductShipping:input_type -> hawkr.shipping.ValidateProductShippingRequest
+	76,  // 96: hawkr.shipping.ShippingService.ListBusinessDays:input_type -> hawkr.shipping.ListBusinessDaysRequest
+	81,  // 97: hawkr.shipping.ShippingService.CreateReturnCvsShipment:input_type -> hawkr.shipping.CreateReturnCvsShipmentRequest
+	82,  // 98: hawkr.shipping.ShippingService.CreateReturnHomeShipment:input_type -> hawkr.shipping.CreateReturnHomeShipmentRequest
+	85,  // 99: hawkr.shipping.ShippingService.GetSellerReturnConfig:input_type -> hawkr.shipping.GetSellerReturnConfigRequest
+	88,  // 100: hawkr.shipping.ShippingService.RetryReturnPrintLabel:input_type -> hawkr.shipping.RetryReturnPrintLabelRequest
+	90,  // 101: hawkr.shipping.ShippingService.LookupShipTradeNo:input_type -> hawkr.shipping.LookupShipTradeNoRequest
+	92,  // 102: hawkr.shipping.ShippingService.ListShipmentsForAdmin:input_type -> hawkr.shipping.ListShipmentsForAdminRequest
+	96,  // 103: hawkr.shipping.ShippingService.GetShipmentForAdmin:input_type -> hawkr.shipping.GetShipmentForAdminRequest
+	99,  // 104: hawkr.shipping.ShippingService.ListSellerShipmentSettingsForAdmin:input_type -> hawkr.shipping.ListSellerShipmentSettingsForAdminRequest
+	103, // 105: hawkr.shipping.ShippingService.ListSellerShipmentAnomalies:input_type -> hawkr.shipping.ListSellerShipmentAnomaliesRequest
+	107, // 106: hawkr.shipping.ShippingService.GetSellerShipmentAnomalyStats:input_type -> hawkr.shipping.GetSellerShipmentAnomalyStatsRequest
+	111, // 107: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomaly:input_type -> hawkr.shipping.AcknowledgeShipmentAnomalyRequest
+	114, // 108: hawkr.shipping.ShippingService.IgnoreShipmentAnomaly:input_type -> hawkr.shipping.IgnoreShipmentAnomalyRequest
+	116, // 109: hawkr.shipping.ShippingService.ListShipmentAnomaliesForAdmin:input_type -> hawkr.shipping.ListShipmentAnomaliesForAdminRequest
+	120, // 110: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomalyForAdmin:input_type -> hawkr.shipping.AcknowledgeShipmentAnomalyForAdminRequest
+	121, // 111: hawkr.shipping.ShippingService.IgnoreShipmentAnomalyForAdmin:input_type -> hawkr.shipping.IgnoreShipmentAnomalyForAdminRequest
+	124, // 112: hawkr.shipping.ShippingService.GetUberQuoteForCheckout:input_type -> hawkr.shipping.GetUberQuoteForCheckoutRequest
+	127, // 113: hawkr.shipping.ShippingService.ValidateUberQuoteForCheckout:input_type -> hawkr.shipping.ValidateUberQuoteForCheckoutRequest
+	134, // 114: hawkr.shipping.ShippingService.ListSellerUberDeliveries:input_type -> hawkr.shipping.ListSellerUberDeliveriesRequest
+	137, // 115: hawkr.shipping.ShippingService.GetSellerUberDelivery:input_type -> hawkr.shipping.GetSellerUberDeliveryRequest
+	140, // 116: hawkr.shipping.ShippingService.ListUberDeliveriesForAdmin:input_type -> hawkr.shipping.ListUberDeliveriesForAdminRequest
+	143, // 117: hawkr.shipping.ShippingService.GetUberDeliveryForAdmin:input_type -> hawkr.shipping.GetUberDeliveryForAdminRequest
+	1,   // 118: hawkr.shipping.ShippingService.PrintCvsLabel:output_type -> hawkr.shipping.PrintCvsLabelResponse
+	4,   // 119: hawkr.shipping.ShippingService.BatchPrintCvsLabel:output_type -> hawkr.shipping.BatchPrintCvsLabelResponse
+	8,   // 120: hawkr.shipping.ShippingService.GenerateHomeLabelPdf:output_type -> hawkr.shipping.GenerateHomeLabelPdfResponse
+	12,  // 121: hawkr.shipping.ShippingService.BatchGenerateHomeLabelPdf:output_type -> hawkr.shipping.BatchGenerateHomeLabelPdfResponse
+	16,  // 122: hawkr.shipping.ShippingService.CallTcat:output_type -> hawkr.shipping.CallTcatResponse
+	80,  // 123: hawkr.shipping.ShippingService.ConfirmCvsShipment:output_type -> hawkr.shipping.ConfirmCvsShipmentResponse
+	24,  // 124: hawkr.shipping.ShippingService.GetShipmentByOrderNo:output_type -> hawkr.shipping.GetShipmentResponse
+	20,  // 125: hawkr.shipping.ShippingService.GetShipmentsByOrderNos:output_type -> hawkr.shipping.GetShipmentsByOrderNosResponse
+	22,  // 126: hawkr.shipping.ShippingService.BatchGetProviderStatusByOrderIds:output_type -> hawkr.shipping.BatchGetProviderStatusByOrderIdsResponse
+	24,  // 127: hawkr.shipping.ShippingService.QueryShipmentStatus:output_type -> hawkr.shipping.GetShipmentResponse
+	24,  // 128: hawkr.shipping.ShippingService.GetShipmentTracking:output_type -> hawkr.shipping.GetShipmentResponse
+	24,  // 129: hawkr.shipping.ShippingService.GetSellerShipmentTracking:output_type -> hawkr.shipping.GetShipmentResponse
+	32,  // 130: hawkr.shipping.ShippingService.OnboardCvsShipping:output_type -> hawkr.shipping.OnboardShippingResponse
+	32,  // 131: hawkr.shipping.ShippingService.OnboardHomeDeliveryShipping:output_type -> hawkr.shipping.OnboardShippingResponse
+	35,  // 132: hawkr.shipping.ShippingService.ListShippingOnboardings:output_type -> hawkr.shipping.ListShippingOnboardingsResponse
+	37,  // 133: hawkr.shipping.ShippingService.GetShippingOnboarding:output_type -> hawkr.shipping.GetShippingOnboardingResponse
+	32,  // 134: hawkr.shipping.ShippingService.ToggleShippingOnboarding:output_type -> hawkr.shipping.OnboardShippingResponse
+	40,  // 135: hawkr.shipping.ShippingService.ListSellerShippingMethods:output_type -> hawkr.shipping.ListSellerShippingMethodsResponse
+	68,  // 136: hawkr.shipping.ShippingService.AddBuyerStorePickup:output_type -> hawkr.shipping.AddBuyerStorePickupResponse
+	70,  // 137: hawkr.shipping.ShippingService.UpdateBuyerStorePickup:output_type -> hawkr.shipping.UpdateBuyerStorePickupResponse
+	72,  // 138: hawkr.shipping.ShippingService.ListBuyerStorePickups:output_type -> hawkr.shipping.ListBuyerStorePickupsResponse
+	74,  // 139: hawkr.shipping.ShippingService.DeleteBuyerStorePickup:output_type -> hawkr.shipping.DeleteBuyerStorePickupResponse
+	43,  // 140: hawkr.shipping.ShippingService.GetStoreMapParams:output_type -> hawkr.shipping.GetStoreMapParamsResponse
+	46,  // 141: hawkr.shipping.ShippingService.GetStoreMapRedirectForm:output_type -> hawkr.shipping.GetStoreMapRedirectFormResponse
+	48,  // 142: hawkr.shipping.ShippingService.DecryptStoreMapResult:output_type -> hawkr.shipping.DecryptStoreMapResultResponse
+	51,  // 143: hawkr.shipping.ShippingService.GetSellerShippingConfig:output_type -> hawkr.shipping.GetSellerShippingConfigResponse
+	54,  // 144: hawkr.shipping.ShippingService.GetShippingFeeConfigs:output_type -> hawkr.shipping.GetShippingFeeConfigsResponse
+	58,  // 145: hawkr.shipping.ShippingService.LookupShippingFee:output_type -> hawkr.shipping.LookupShippingFeeResponse
+	60,  // 146: hawkr.shipping.ShippingService.CalculateShippingOptions:output_type -> hawkr.shipping.CalculateShippingOptionsResponse
+	65,  // 147: hawkr.shipping.ShippingService.ValidateProductShipping:output_type -> hawkr.shipping.ValidateProductShippingResponse
+	77,  // 148: hawkr.shipping.ShippingService.ListBusinessDays:output_type -> hawkr.shipping.ListBusinessDaysResponse
+	83,  // 149: hawkr.shipping.ShippingService.CreateReturnCvsShipment:output_type -> hawkr.shipping.CreateReturnShipmentResponse
+	83,  // 150: hawkr.shipping.ShippingService.CreateReturnHomeShipment:output_type -> hawkr.shipping.CreateReturnShipmentResponse
+	86,  // 151: hawkr.shipping.ShippingService.GetSellerReturnConfig:output_type -> hawkr.shipping.GetSellerReturnConfigResponse
+	89,  // 152: hawkr.shipping.ShippingService.RetryReturnPrintLabel:output_type -> hawkr.shipping.RetryReturnPrintLabelResponse
+	91,  // 153: hawkr.shipping.ShippingService.LookupShipTradeNo:output_type -> hawkr.shipping.LookupShipTradeNoResponse
+	93,  // 154: hawkr.shipping.ShippingService.ListShipmentsForAdmin:output_type -> hawkr.shipping.ListShipmentsForAdminResponse
+	97,  // 155: hawkr.shipping.ShippingService.GetShipmentForAdmin:output_type -> hawkr.shipping.GetShipmentForAdminResponse
+	100, // 156: hawkr.shipping.ShippingService.ListSellerShipmentSettingsForAdmin:output_type -> hawkr.shipping.ListSellerShipmentSettingsForAdminResponse
+	104, // 157: hawkr.shipping.ShippingService.ListSellerShipmentAnomalies:output_type -> hawkr.shipping.ListSellerShipmentAnomaliesResponse
+	108, // 158: hawkr.shipping.ShippingService.GetSellerShipmentAnomalyStats:output_type -> hawkr.shipping.GetSellerShipmentAnomalyStatsResponse
+	112, // 159: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomaly:output_type -> hawkr.shipping.AcknowledgeShipmentAnomalyResponse
+	115, // 160: hawkr.shipping.ShippingService.IgnoreShipmentAnomaly:output_type -> hawkr.shipping.IgnoreShipmentAnomalyResponse
+	117, // 161: hawkr.shipping.ShippingService.ListShipmentAnomaliesForAdmin:output_type -> hawkr.shipping.ListShipmentAnomaliesForAdminResponse
+	112, // 162: hawkr.shipping.ShippingService.AcknowledgeShipmentAnomalyForAdmin:output_type -> hawkr.shipping.AcknowledgeShipmentAnomalyResponse
+	115, // 163: hawkr.shipping.ShippingService.IgnoreShipmentAnomalyForAdmin:output_type -> hawkr.shipping.IgnoreShipmentAnomalyResponse
+	126, // 164: hawkr.shipping.ShippingService.GetUberQuoteForCheckout:output_type -> hawkr.shipping.GetUberQuoteForCheckoutResponse
+	129, // 165: hawkr.shipping.ShippingService.ValidateUberQuoteForCheckout:output_type -> hawkr.shipping.ValidateUberQuoteForCheckoutResponse
+	135, // 166: hawkr.shipping.ShippingService.ListSellerUberDeliveries:output_type -> hawkr.shipping.ListSellerUberDeliveriesResponse
+	138, // 167: hawkr.shipping.ShippingService.GetSellerUberDelivery:output_type -> hawkr.shipping.GetSellerUberDeliveryResponse
+	141, // 168: hawkr.shipping.ShippingService.ListUberDeliveriesForAdmin:output_type -> hawkr.shipping.ListUberDeliveriesForAdminResponse
+	144, // 169: hawkr.shipping.ShippingService.GetUberDeliveryForAdmin:output_type -> hawkr.shipping.GetUberDeliveryForAdminResponse
+	118, // [118:170] is the sub-list for method output_type
+	66,  // [66:118] is the sub-list for method input_type
+	66,  // [66:66] is the sub-list for extension type_name
+	66,  // [66:66] is the sub-list for extension extendee
+	0,   // [0:66] is the sub-list for field type_name
 }
 
 func init() { file_shipping_shipping_proto_init() }
@@ -13404,7 +12783,7 @@ func file_shipping_shipping_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_shipping_shipping_proto_rawDesc), len(file_shipping_shipping_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   157,
+			NumMessages:   147,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

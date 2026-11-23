@@ -1,0 +1,69 @@
+{
+  "@@locale": "zh",
+  "languageName": "繁體中文",
+  "@languageName": {
+    "description": "This language's own name, shown in a language picker. Never translated: each locale spells its own name."
+  },
+  "timeAgoJustNow": "剛剛",
+  "@timeAgoJustNow": {
+    "description": "Relative time under one minute."
+  },
+  "timeAgoMinutes": "{count, plural, other{{count}分鐘前}}",
+  "@timeAgoMinutes": {
+    "description": "Relative time in whole minutes (1 to 59).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoHours": "{count, plural, other{{count}小時前}}",
+  "@timeAgoHours": {
+    "description": "Relative time in whole hours (1 to 23).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoDays": "{count, plural, other{{count}天前}}",
+  "@timeAgoDays": {
+    "description": "Relative time in Taipei calendar days (1 to 6).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoMonthDay": "{month}/{day}",
+  "@timeAgoMonthDay": {
+    "description": "Taipei date in the current year, month and day.",
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoFullDate": "{year}/{month}/{day}",
+  "@timeAgoFullDate": {
+    "description": "Taipei date in an earlier year.",
+    "placeholders": {
+      "year": {
+        "type": "int"
+      },
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "taipeiTimeLabel": "台北時間",
+  "@taipeiTimeLabel": {
+    "description": "Marks a displayed time as Taipei time when the device time zone offset is not +8."
+  }
+}

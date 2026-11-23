@@ -50,7 +50,6 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerCartRoutes(public, app, h)
 	registerMediaRoutes(public, app, h)
 	registerShippingRoutes(app, admin, h)
-	registerLogisticsFinanceRoutes(app, admin, h)
 
 	// PayUni Webhook（頂層路由，外部回調無需 JWT）
 	registerPayUniWebhookRoute(r)

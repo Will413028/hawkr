@@ -1,3 +1,6 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -315,26 +318,11 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
       userName: _nameOf(entry),
       userAvatar: avatar,
       createdAt: entry.hasCreateTime()
-          ? entry.createTime.toDateTime().toLocal()
+          ? entry.createTime.toDateTime()
           : DateTime.now(),
       replyToUserName: parentName,
       replies: replies,
     );
-  }
-
-  String _formatTimeAgo(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inHours < 24) {
-      if (diff.inHours > 0) return '${diff.inHours}小時前';
-      if (diff.inMinutes > 0) return '${diff.inMinutes}分鐘前';
-      return '剛剛';
-    }
-    if (diff.inDays < 7) return '${diff.inDays}天前';
-    if (dt.year == now.year) {
-      return '${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-    }
-    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -462,7 +450,7 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     Widget commentCard(_CommentNode n) => _CommentCard(
       node: n,
       onReply: () => _setReplyTarget(n),
-      formatTimeAgo: _formatTimeAgo,
+      formatTimeAgo: (time) => timeAgoText(context.l10n, taipeiTimeAgo(time)),
       onEdit: _onEditComment,
       onDelete: _onDeleteComment,
       onReportOrBlock: _onReportOrBlock,

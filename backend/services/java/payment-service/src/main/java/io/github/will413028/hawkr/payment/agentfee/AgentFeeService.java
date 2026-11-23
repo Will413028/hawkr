@@ -18,8 +18,7 @@ import org.springframework.stereotype.Service;
  *   <li>✅ 依 {@code ADR-011} 把 domain 給的<b>目標淨額</b>反推成送出金額（gross-up）</li>
  *   <li>✅ 呼叫 PayUni、解讀回應、把 {@code 0000-00-00} 這種哨兵值翻成「未設」</li>
  *   <li>❌ <b>不</b>持有應收、不決定要不要收、不做去重
- *       —— 那些是同服務內 {@code io.github.will413028.hawkr.payment.logistics} 模組的事
- *       （70 §14.2 逐字「本 RPC 不負責去重」；2026-09-12 架構合併前那個模組是獨立服務）</li>
+ *       —— 那些是呼叫端的事（70 §14.2 逐字「本 RPC 不負責去重」）</li>
  * </ul>
  *
  * <h2>🔴 呼叫端必須先落地 trade_no 才呼叫本類</h2>

@@ -1,3 +1,5 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -856,6 +858,11 @@ class _QuoteTextField extends HookWidget {
   }
 }
 
+/// 日期時間選擇器的起始臺北牆上時間：已有值用它，沒有值是 [now] 起算一天後。
+@visibleForTesting
+DateTime quotePickerInitial(DateTime? current, DateTime now) =>
+    (current ?? now.toUtc().add(const Duration(days: 1))).taipeiWall;
+
 class _DateTimeField extends StatelessWidget {
   const _DateTimeField({
     required this.label,
@@ -873,13 +880,19 @@ class _DateTimeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parsed = value.isEmpty ? null : DateTime.tryParse(value)?.toLocal();
+    final parsed = value.isEmpty ? null : DateTime.tryParse(value);
     return Padding(
       padding: const EdgeInsets.only(bottom: HkSpace.md),
       child: InkWell(
         onTap: () => _pick(context, parsed),
         child: InputDecorator(
-          decoration: InputDecoration(labelText: label, errorText: error),
+          decoration: InputDecoration(
+            labelText: label,
+            errorText: error,
+            helperText: isDeviceInTaipeiOffset()
+                ? null
+                : context.l10n.taipeiTimeLabel,
+          ),
           child: Text(
             parsed == null ? '尚未設定' : _formatLocal(parsed),
             style: AppTypography.body,
@@ -890,6 +903,7 @@ class _DateTimeField extends StatelessWidget {
   }
 
   static String _formatLocal(DateTime value) {
+    value = value.taipeiWall;
     String two(int n) => n.toString().padLeft(2, '0');
     return '${value.year}-${two(value.month)}-${two(value.day)} '
         '${two(value.hour)}:${two(value.minute)}';
@@ -897,7 +911,7 @@ class _DateTimeField extends StatelessWidget {
 
   Future<void> _pick(BuildContext context, DateTime? current) async {
     final now = DateTime.now();
-    final base = current ?? now.add(const Duration(days: 1));
+    final base = quotePickerInitial(current, now);
     final date = await showDatePicker(
       context: context,
       initialDate: base,
@@ -912,7 +926,13 @@ class _DateTimeField extends StatelessWidget {
     if (time == null) return;
     onChanged(
       toRfc3339Utc(
-        DateTime(date.year, date.month, date.day, time.hour, time.minute),
+        DateTime.utc(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        ).subtract(const Duration(hours: 8)),
       ),
     );
   }

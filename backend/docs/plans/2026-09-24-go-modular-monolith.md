@@ -288,7 +288,8 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - media 改成不認識業務（ADR `2026-10-03-media-references-owner-side.md`，Will 2026-10-03）：只存資產與生命週期（暫存→確認→刪除），引用只在擁有者的表；刪除是擁有者經 outbox 送出的明確指令，GC 只清過期沒確認的暫存檔；機敏下載由擁有者授權後向 media 要短效的簽章網址；拿掉 `asset_reference` 與 media 端的 `(ref_type, ref_id)`。B1 之前的做法（每個 ref 只有一個同步 job 寫引用、只精準解除退場的圖）在 B1 時換成確認／刪除的介面。
   - B1 搬儲存時要帶走的不變量：寫入 `public/` 的圖片剝除 metadata、只留方向（Java `ImageMetadataStripper`，49 號設計書 §8.1；2026-10-31）。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用，也鏡像在 Go 的 `media/ref_type.go`、`pkg/media/ref_type.go` 與 `media/finalize_args.go`。觸發：B1 把 media 改成不認識業務（拿掉 `(ref_type, ref_id)`）時，連同 CodeMeta 值與生成物一起刪。
-- [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 再處理。
+- [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 刪除。
+  - 不改寫、直接刪（Will 2026-11-23）：PayUni 特有的流程 `AtmReactivationService`、`PendingPaymentReconcile*`、`PaymentReturnController`、`PaymentPageService`、`UnknownPaymentFallbackConsumer`、`PayUniRefund*Consumer`、`RescueRefundConsumer`，由 Stripe 的 webhook（inbox、event id 去重）與冪等鍵取代。
   - `createRefund` 依 D5 修正。
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
 - [ ] **B3 fulfillment**
@@ -296,6 +297,8 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
     - 理由：台灣在地物流商的多賣家模式都要簽約（綠界的平台商 PlatformID 要專案合作開通、物流沒有平台商測試編號；PayUni 代理商 API 要簽約，2026-10-29 決定不簽）；國外的 Shippo Platform Account 要人工開通，EasyPost 開子帳號只能用正式金鑰，兩家都不支援台灣超商。作品集要展示的是出貨單與訂單的狀態機、模組分界與事件，自寄就能完整跑通。
     - 保留供應商中立的物流 port（建單、取標籤、貨態 webhook 先寫 inbox、以事件 ID 去重），每個賣家帶一個外部帳戶 ID 欄位；作品集只放模擬 adapter，用來跑建單到貨態回傳的流程與測試。真實物流商（綠界的平台商模式等）在決定上線並簽約後才寫 adapter。
     - 不帶過來：PayUni 物流與 `payuni-webhook-service` 的超商、宅配建單與貨態；超商門市電子地圖、追蹤號碼的自動查詢、即時運費報價。client 上依賴這些的介面在本步一起刪或改成自寄流程（UI 流程改動先取得同意）。
+    - 不改寫、直接刪的 Java 程式（Will 2026-11-23）：shipping 除運費規則與出貨狀態外全部（Tcat、PayUni 建單、`ShipmentLabel*`、`BatchHomeLabelService`、`StoreMapService`、`BuyerStorePickupService`、`OnboardingService`、`ShipmentAnomalyService`、貨態與標籤對帳排程）；order 的 `ShipmentCreationBackstopScheduler`、`ShippingFeeGrpcFetcher`。有 client 介面的要先取得 UI 同意：超商門市地圖（buyer-app `store_map_webview_screen.dart`、`store_pickup_form_screen.dart`，website `lib/checkout/store-pickups.ts`）、seller-app 配送異常看板（`features/shipment_anomaly/`）。
+    - `payuni-webhook-service` 整個刪除：B2 拿掉 PayUni 金流、本步拿掉 PayUni 物流、Uber 已裁切後沒有用途；連同 gateway 的 `routes_webhook_simulator.go` 與 `routes_payment.go` 裡的代理。
     - 開工前：盤點設計書 65–70 裡假設平台串接物流商的段落，改寫或刪除；`internal/legacy/sellerserver` 回給 Java 的物流 `MerId` 隨 Java shipping 退場刪除。
     - 假日（A3 計畫 10f-4，2026-11-22）：假日資料的擁有者已搬到單體 `internal/platform/bizcalendar`，Java shipping 的 `holidays` 表沒有寫入入口了，但 `HolidayService` 的宅配處理期限還在讀它，資料過期後算出的期限偏早。Java shipping 退場時一併刪除 `HolidayService`、`holidays` 表與 4 支沒有呼叫者的 RPC（`ImportHolidays`、`ImportHolidaysFromContent`、`GetHolidayCoverage`、`GetHolidaysInternal`；`rg -l "GetHolidaysInternal|ImportHolidays|GetHolidayCoverage" backend --glob '*.go' --glob '!**/gen/**' --glob '!*.pb.go'` 無結果）。
   - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`backend/docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `backend/docs/runbooks/uber-quote-retention.md` 一併刪除；清單見原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂；Will 2026-10-29）。
@@ -325,6 +328,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 訂單號重新設計，不照搬 `OrderNoGenerator`：`"O" + TSID % 10^9` 加上 `UNIQUE(order_no)`，約 3.7 萬筆訂單就有一半機率撞號（生日界）。訂單號是給人看的編號，另開 `UNIQUE` 欄，不由 ID 截斷或取模（PostgreSQL 設計規範 §二）。
   - agent 的「接受報價 → 建單」改在同一個 transaction 內完成，並標記 RFQ ADR 為 superseded。
 - [ ] **B9 aftersales**
+  - 不改寫、直接刪（Will 2026-11-23）：平台建退貨物流單的 `ShipmentLabelConsumer`、`AfterSaleLabelRetryService`、`ShipmentCreationFailedConsumer`、`ReturnShipmentStatusConsumer`、`StorePickupTimeoutScheduler`，與 PayUni 特有的 `UnknownRefundFallbackConsumer`；退貨改成買家自寄、回填追蹤號碼。
   - 取消、退款任務、優惠券補償在同一個 transaction 內完成。
   - 設定「進行中售後」旗標。
   - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表。
@@ -332,7 +336,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [ ] **B10 finance**
   - 賣家撥款從 ordering 移入。
   - 撥款與對帳經 payment port（收款開通 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`）：PayUni 的「代理商先收、訂單完成後撥款」改對應 Stripe Connect 的 separate charges and transfers；代理商費反推與 ADR `payuni-channel-fee-bearer` 在本步重審。
-  - 物流財務與責任判定從 Java payment-service 移入，Java payment-service 就此退場。
+  - 物流財務與責任判定不改寫、直接刪（Will 2026-11-23）：賣家自寄後平台不代收也不負擔運費，沒有可算的對象。範圍：Java payment 的 `Logistics*`、`ResponsibilityCaseService`、`FulfillmentResponsibilityGrpcService`、`LogisticsCostIncurredConsumer`、`ResponsibilityFinalizedConsumer`；order 的 `ResponsibilityFinalizedConsumer`；`payment.proto` 的對應 RPC；gateway 的 `routes_logistics.go`、`payment_responsibility_client.go` 與 openapi 對應段落；CodeMeta 的物流責任值域。client 只有 CodeMeta 生成物引用（`rg -l -i "logistics.?financ|responsibilit" admin/src seller-app/lib website/lib buyer-app/lib`）。Java payment-service 隨本步退場。
 
 **階段驗收**
 

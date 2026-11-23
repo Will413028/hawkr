@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -446,7 +447,7 @@ class AiAssistantScreen extends HookConsumerWidget {
   }
 
   String _formatTime(DateTime dt) {
-    final t = dt.toLocal();
+    final t = dt.taipei;
     final h = t.hour;
     final m = t.minute.toString().padLeft(2, '0');
     final period = h < 12 ? '上午' : '下午';
@@ -455,11 +456,11 @@ class AiAssistantScreen extends HookConsumerWidget {
   }
 
   String _formatSeparatorTime(DateTime dt) {
-    final t = dt.toLocal();
+    final t = dt.taipei;
     final time =
         '${t.hour.toString().padLeft(2, '0')}:'
         '${t.minute.toString().padLeft(2, '0')}';
-    final today = DateTime.now();
+    final today = DateTime.now().taipei;
     if (t.year == today.year && t.month == today.month && t.day == today.day) {
       return time;
     }
@@ -603,7 +604,7 @@ class _OrderCard extends StatelessWidget {
 
   String _formatDate() {
     if (order.createTimeMs <= 0) return '';
-    final d = DateTime.fromMillisecondsSinceEpoch(order.createTimeMs).toLocal();
+    final d = DateTime.fromMillisecondsSinceEpoch(order.createTimeMs).taipei;
     return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
   }
 

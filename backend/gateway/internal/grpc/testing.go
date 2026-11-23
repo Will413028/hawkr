@@ -116,20 +116,6 @@ func NewPaymentClientForTest(c paymentpb.PaymentServiceClient) *PaymentClient {
 	return &PaymentClient{client: c}
 }
 
-// NewPaymentResponsibilityClientForTest creates a PaymentClient whose
-// FulfillmentResponsibilityService half is the given mock. Mirrors
-// NewAccountDelegationClientForTest: the two halves are separate fields on
-// PaymentClient (one connection in production), so a responsibility test that used
-// NewPaymentClientForTest would get a nil stub and panic rather than fail.
-//
-// It exists for a specific kind of assertion: the A-5 decision guard must be shown to
-// leave the downstream UNCALLED on a value outside {APPROVE, REJECT}. A guard that
-// only returns 400 but still fires the RPC would pass a status-only assertion while
-// letting an unreviewed proposal through.
-func NewPaymentResponsibilityClientForTest(c paymentpb.FulfillmentResponsibilityServiceClient) *PaymentClient {
-	return &PaymentClient{responsibility: c}
-}
-
 // ==================== Buyer ====================
 
 // NewBuyerClientForTest creates a BuyerClient with the given mock proto client.

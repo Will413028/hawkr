@@ -255,8 +255,8 @@ DelegationService,GrantDelegationAuthorization,account-service,api: identity.Gra
 DelegationService,UpdateDelegationAuthorization,account-service,api: identity.UpdateDelegationAuthorization；gateway、social 經 internal/legacy/delegationservice
 DelegationService,RevokeDelegationAuthorization,account-service,api: identity.RevokeDelegationAuthorization；gateway、social 經 internal/legacy/delegationservice
 DelegationService,ListDelegationAuthorizationHistory,account-service,api: identity.DelegationAuthorizationHistory；gateway、social 經 internal/legacy/delegationservice
-FulfillmentResponsibilityService,ProposeResponsibilityResolutionForAdmin,payment-service,
-FulfillmentResponsibilityService,ReviewResponsibilityResolutionForAdmin,payment-service,
+FulfillmentResponsibilityService,ProposeResponsibilityResolutionForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+FulfillmentResponsibilityService,ReviewResponsibilityResolutionForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
 IMService,SendMessage,im-service,api: ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer
 IMService,BroadcastMessage,im-service,removed: 沒有呼叫方（gateway 與 Java 都不呼叫），單體不提供廣播
 IMService,IsUserOnline,im-service,api: ChatAppService.GetPresence、GetStorePresence
@@ -344,17 +344,17 @@ InvoiceService,ListInvoiceAuditLogsForAdmin,invoice-service,
 InvoiceService,ResolveOrderInvoiceModeInternal,invoice-service,
 InvoiceService,ValidateOrderInvoiceInputInternal,invoice-service,
 InvoiceService,GetSellerInvoiceCapabilitySimple,invoice-service,
-LogisticsFinanceService,GetSellerLogisticsFinanceSummary,payment-service,
-LogisticsFinanceService,ListSellerLogisticsReceivables,payment-service,
-LogisticsFinanceService,ListSellerLogisticsLedgerEntries,payment-service,
-LogisticsFinanceService,ListLogisticsReceivablesForAdmin,payment-service,
-LogisticsFinanceService,GetLogisticsReceivableForAdmin,payment-service,
-LogisticsFinanceService,ListLogisticsCollectionsForAdmin,payment-service,
-LogisticsFinanceService,ListLogisticsAdjustmentsForAdmin,payment-service,
-LogisticsFinanceService,ListProviderStatementsForAdmin,payment-service,
-LogisticsFinanceService,GetProviderStatementForAdmin,payment-service,
-LogisticsFinanceService,ListFulfillmentExceptionCasesForAdmin,payment-service,
-LogisticsFinanceService,GetFulfillmentExceptionCaseForAdmin,payment-service,
+LogisticsFinanceService,GetSellerLogisticsFinanceSummary,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,ListSellerLogisticsReceivables,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,ListSellerLogisticsLedgerEntries,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,ListLogisticsReceivablesForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,GetLogisticsReceivableForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,ListLogisticsCollectionsForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,ListLogisticsAdjustmentsForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,ListProviderStatementsForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,GetProviderStatementForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,ListFulfillmentExceptionCasesForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
+LogisticsFinanceService,GetFulfillmentExceptionCaseForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
 MediaService,CreateUploadSession,media-service,
 MediaService,CompleteUploadSession,media-service,
 MediaService,FinalizeImages,media-service,
@@ -671,11 +671,11 @@ ShippingService,GetShippingFeeConfigs,shipping-service,
 ShippingService,LookupShippingFee,shipping-service,
 ShippingService,CalculateShippingOptions,shipping-service,
 ShippingService,ValidateProductShipping,shipping-service,
-ShippingService,ImportHolidays,shipping-service,
-ShippingService,ImportHolidaysFromContent,shipping-service,
-ShippingService,GetHolidayCoverage,shipping-service,
+ShippingService,ImportHolidays,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
+ShippingService,ImportHolidaysFromContent,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
+ShippingService,GetHolidayCoverage,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
 ShippingService,ListBusinessDays,shipping-service,
-ShippingService,GetHolidaysInternal,shipping-service,
+ShippingService,GetHolidaysInternal,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
 ShippingService,CreateReturnCvsShipment,shipping-service,
 ShippingService,CreateReturnHomeShipment,shipping-service,
 ShippingService,GetSellerReturnConfig,shipping-service,

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
@@ -70,6 +71,9 @@ Future<void> _pump(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp.router(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           routerConfig: GoRouter(
             routes: [

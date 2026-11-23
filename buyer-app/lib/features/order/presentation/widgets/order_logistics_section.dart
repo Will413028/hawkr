@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -288,7 +289,7 @@ class _TrackBody extends StatelessWidget {
   static String _formatTime(String iso) {
     final parsed = DateTime.tryParse(iso);
     if (parsed == null) return iso;
-    final local = parsed.toLocal();
+    final local = parsed.taipeiWall;
     String two(int n) => n.toString().padLeft(2, '0');
     return '${local.year}/${two(local.month)}/${two(local.day)} '
         '${two(local.hour)}:${two(local.minute)}';

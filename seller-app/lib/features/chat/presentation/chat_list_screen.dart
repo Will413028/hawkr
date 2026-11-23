@@ -1,3 +1,6 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/l10n/l10n.dart';
+import 'package:hawkr_seller/l10n/time_ago_text.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -135,7 +138,9 @@ class ChatListScreen extends HookConsumerWidget {
                 return _ConversationCard(
                   title: item.title,
                   subtitle: item.subtitle,
-                  date: item.date,
+                  date: item.timeAgo == null
+                      ? ''
+                      : timeAgoText(context.l10n, item.timeAgo!),
                   unreadCount: item.unreadCount,
                   avatarUrl: item.avatarUrl,
                   onTap: () async {
@@ -675,7 +680,7 @@ class _ChatItem {
   const _ChatItem({
     required this.title,
     required this.subtitle,
-    required this.date,
+    required this.timeAgo,
     required this.unreadCount,
     required this.conversationId,
     required this.participantId,
@@ -687,7 +692,9 @@ class _ChatItem {
     return _ChatItem(
       title: c.buyer.deleted ? buyerProfileDeletedName(locale) : (name ?? '顧客'),
       subtitle: previewText(c.preview, locale),
-      date: c.lastMessageTime == null ? '' : formatTimeAgo(c.lastMessageTime!),
+      timeAgo: c.lastMessageTime == null
+          ? null
+          : taipeiTimeAgo(c.lastMessageTime!),
       unreadCount: c.unreadCount,
       conversationId: c.id,
       participantId: c.buyer.id,
@@ -697,7 +704,7 @@ class _ChatItem {
 
   final String title;
   final String subtitle;
-  final String date;
+  final TimeAgo? timeAgo;
   final int unreadCount;
   final String conversationId;
   final String participantId;

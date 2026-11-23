@@ -51,8 +51,6 @@ exchanges:
   type: topic
 - name: payment.events
   type: topic
-- name: payment.events.dlx
-  type: topic
 - name: payment.webhook.dlx
   type: direct
 - name: procurement.events
@@ -282,51 +280,6 @@ queues:
   bindings:
   - exchange: hawkr.shipping
     key: '#'
-# N16：責任判定 financially final → order-service 驅動 35 → DELIVERY_FAILED_NO_REFUND(54)
-# ＋ 同交易建撥款任務（36 §3.3.1 / 03 §5.7.3）。
-# 🔴 producer 是 payment-service（責任兩張表由它擁有，事件與落列同交易），走它既有的
-#    outbox_events；exchange 是列上持久化的明示值 hawkr.shipping（V11 的 exchange 欄）。
-# 🔴 這條 queue 是 54 的唯一入口：order-service 沒有人工改狀態端點、也沒有補推排程
-#    ⇒ 漏了這個條目，整個終態變成死碼，而 passive declare 讓它不 crash、不進 DLQ、不報錯。
-# ⚠️ dlq 只給 via + routing_key（不帶 queue:）＝ 自帶 DLQ 形狀，與 order.shipping.* 家族一致
-#    ⇒ 展開後 queues +2、bindings +2、exchanges +0。
-- name: order.fulfillment.responsibility_finalized
-  dlq:
-    via: hawkr.order.dlx
-    routing_key: order.fulfillment.responsibility_finalized.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: fulfillment.responsibility.finalized
-# N16 的第二個 consumer：payment-service 的 Logistics Finance
-#（settlement counterparty 已 resolved ⇒ 決定該 leg 要不要有賣家應收，70 §3.1.1／§6.3）。
-# 🔴 一條 key、兩條 queue 是刻意的：order 與 payment 對同一件事做兩件**不同**的副作用
-#    （訂單終態轉換 vs receivable 的處置）。合併成一條再由單一 consumer 代打，
-#    會讓其中一邊的失敗把另一邊一起拖進 DLQ。topic exchange 對同一個 routing key
-#    投遞給每一條綁定的 queue，這正是它存在的理由。
-# 🔴 兩條的 dlq via 指向**不同**的 DLX 也是刻意的：DLX 跟著 consumer 服務走，
-#    不跟著 producer、也不跟著來源 exchange ⇒ 每個服務在自己的 DLX 上看齊自己全部的死信。
-#    既有先例：aftersales.payment.refund.result 的 binding 來自 payment.events，
-#    而它的 via 是 aftersales.events.dlx。
-# ⚠️ payment 側用 payment.events.dlx（36 §3.3.1 指定），不是 hawkr.payment.dlx
-#    ——payment-service 兩個 DLX 並存，猜錯的症狀是死信落到另一個 exchange，
-#    而該 queue 的死信查詢會回空的（看起來像「沒有死信」）。
-- name: payment.fulfillment.responsibility_finalized
-  dlq:
-    via: payment.events.dlx
-    routing_key: payment.fulfillment.responsibility_finalized.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: fulfillment.responsibility.finalized
-# logistics.cost.incurred —— durable join 的成本側入口（70 §3.1.4、§7.1）。
-# producer 是 shipping-service（成本金額是 shipping domain fact），
-# 但 DLX 走 payment.events.dlx：DLX 跟著 consumer 服務走，不是跟著來源 exchange（36 §6.2 註）。
-- name: payment.logistics.cost_incurred
-  dlq:
-    via: payment.events.dlx
-    routing_key: payment.logistics.cost_incurred.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: logistics.cost.incurred
 - name: order.aftersales.awaiting.buyer.page
   dlq:
     via: hawkr.order.dlx

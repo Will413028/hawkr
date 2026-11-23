@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,25 +18,7 @@ class OrderInfoColumn extends ConsumerWidget {
 
   final OrderSummary order;
 
-  String _formatDate(String raw) {
-    if (raw.isEmpty) return '';
-    DateTime? dt = DateTime.tryParse(raw);
-    if (dt == null) {
-      final m = RegExp(r'\d{10,13}').firstMatch(raw);
-      if (m != null) {
-        final n = int.tryParse(m.group(0)!);
-        if (n != null) {
-          dt = (m.group(0)!.length >= 13)
-              ? DateTime.fromMillisecondsSinceEpoch(n)
-              : DateTime.fromMillisecondsSinceEpoch(n * 1000);
-        }
-      }
-    }
-    if (dt == null) return raw;
-    final local = dt.toLocal();
-    String pad(int v) => v.toString().padLeft(2, '0');
-    return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';
-  }
+  String _formatDate(String raw) => formatOrderInfoDate(raw);
 
   String _formatShortDate(String raw) {
     if (raw.isEmpty) return '';
@@ -214,4 +197,26 @@ class OrderInfoColumn extends ConsumerWidget {
       },
     );
   }
+}
+
+/// 訂單時間字串（ISO、10 位秒數或 13 位毫秒數）轉臺北時間 `yyyy/MM/dd HH:mm`。
+@visibleForTesting
+String formatOrderInfoDate(String raw) {
+  if (raw.isEmpty) return '';
+  DateTime? dt = DateTime.tryParse(raw);
+  if (dt == null) {
+    final m = RegExp(r'\d{10,13}').firstMatch(raw);
+    if (m != null) {
+      final n = int.tryParse(m.group(0)!);
+      if (n != null) {
+        dt = (m.group(0)!.length >= 13)
+            ? DateTime.fromMillisecondsSinceEpoch(n, isUtc: true)
+            : DateTime.fromMillisecondsSinceEpoch(n * 1000, isUtc: true);
+      }
+    }
+  }
+  if (dt == null) return raw;
+  final local = dt.taipeiWall;
+  String pad(int v) => v.toString().padLeft(2, '0');
+  return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';
 }

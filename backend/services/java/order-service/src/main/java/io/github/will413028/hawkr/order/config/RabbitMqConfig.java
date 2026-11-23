@@ -344,35 +344,6 @@ public class RabbitMqConfig {
                 .with(AfterSalesEventType.AWAITING_BUYER_PAGE.value());
     }
 
-    // ── N16 履約責任判定 financially final（36 §3.3.1／03 §5.7.3）────────────────
-    //
-    // 🔴 這條訂閱是 35 → DELIVERY_FAILED_NO_REFUND(54) 與建撥款任務的**唯一入口**。
-    //    order-service 沒有人工改狀態端點、也沒有補推排程 ⇒ 少了它，那個終態就是死碼。
-    //
-    // ⚠️ dev/prod 已切 passive declare（SPRING_RABBITMQ_DYNAMIC=false）⇒ 這裡的
-    //    @Bean 只是**意圖宣告**，broker 上的資源由 infra/mq/topology/topology.yaml
-    //    （Terraform）佈建。兩邊都要有：漏了 topology 條目的症狀是**訂閱靜默失效**
-    //    ——不 crash、不進 DLQ、不報錯（10 檔 §10.7）。
-    //
-    // 🔴 DLX 用 order-service 自己的（EXCHANGE_ORDER_DLX），不是來源 exchange 的。
-    //    DLX 跟著 consumer 服務走，每個服務才能在自己的 DLX 上看齊自己全部的死信。
-    @Bean
-    public Queue orderFulfillmentResponsibilityFinalizedQueue() {
-        return QueueBuilder.durable(MqConstants.QUEUE_ORDER_FULFILLMENT_RESPONSIBILITY_FINALIZED)
-                .withArgument("x-dead-letter-exchange", MqConstants.EXCHANGE_ORDER_DLX)
-                .withArgument("x-dead-letter-routing-key",
-                        MqConstants.QUEUE_ORDER_FULFILLMENT_RESPONSIBILITY_FINALIZED_DLQ)
-                .build();
-    }
-
-    @Bean
-    public Binding bindFulfillmentResponsibilityFinalized(
-            Queue orderFulfillmentResponsibilityFinalizedQueue, TopicExchange shippingExchange) {
-        return BindingBuilder.bind(orderFulfillmentResponsibilityFinalizedQueue)
-                .to(shippingExchange)
-                .with(MqConstants.ROUTING_KEY_FULFILLMENT_RESPONSIBILITY_FINALIZED);
-    }
-
     // 60h 自動完成倒數的暫停/恢復事件（03 §5.8）
     @Bean
     public Queue orderAftersalesCountdownQueue() {

@@ -36,21 +36,6 @@ public final class MqConstants {
     // Dead letter exchanges
     public static final String EXCHANGE_ORDER_DLX = "hawkr.order.dlx";
     public static final String EXCHANGE_PAYMENT_DLX = "hawkr.payment.dlx";
-    /**
-     * payment-service 的<b>第二個</b> DLX。
-     *
-     * <p>⚠️ <b>它與 {@link #EXCHANGE_PAYMENT_DLX} 並存不是重複</b>：兩者都已在
-     * {@code infra/mq/topology/topology.yaml} 上佈建且各有既有 queue 掛著
-     * （{@code payment.events.dlx} ← buyer／seller 的 membership payment result；
-     * {@code hawkr.payment.dlx} ← payment.rescue.refund）。
-     * 合併它們是一次破壞性 topology 變更（刪 queue ＋ 改 binding），不在任何一波的射程內。
-     *
-     * <p>🔴 新增 queue 時<b>照設計書指定的那一個寫</b>，不要憑「payment 的 DLX 應該是哪個」猜
-     * ——猜錯的症狀是死信落到另一個 exchange，而該 queue 的死信查詢會回**空的**
-     * （看起來像「沒有死信」，其實是找錯地方）。
-     * N16 的 payment 側 queue 依 36 §3.3.1 用本常數。
-     */
-    public static final String EXCHANGE_PAYMENT_EVENTS_DLX = "payment.events.dlx";
     public static final String EXCHANGE_MARKETING_DLX = "hawkr.marketing.dlx";
     public static final String EXCHANGE_NOTIFICATION_DLX = "hawkr.notification.dlx";
     public static final String EXCHANGE_SELLER_BIZ_DLX = "hawkr.seller.dlx";
@@ -407,13 +392,6 @@ public final class MqConstants {
     public static final String QUEUE_ORDER_AFTERSALES_CANCEL_COMPLETED_DLQ = "order.aftersales.cancel.completed.dlq";
     public static final String QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE_DLQ = "order.aftersales.awaiting.buyer.page.dlq";
     public static final String QUEUE_ORDER_AFTERSALES_COUNTDOWN_DLQ = "order.aftersales.countdown.dlq";
-    // N16 的死信。🔴 DLX 跟著 **consumer 服務**走（hawkr.order.dlx），不跟著來源
-    // exchange（hawkr.shipping）——每個服務才能在自己的 DLX 上看齊自己全部的死信。
-    // 既有先例：aftersales.payment.refund.result 的 binding 來自 payment.events，
-    // 而它的 via 是 aftersales.events.dlx。
-    public static final String QUEUE_ORDER_FULFILLMENT_RESPONSIBILITY_FINALIZED_DLQ =
-            "order.fulfillment.responsibility_finalized.dlq";
-
     // order-service Review consumer DLQ（§23 P2.3-3，2026-05-20）
     public static final String QUEUE_ORDER_REVIEW_CREATED_DLQ = "order.review.created.dlq";
 
@@ -508,39 +486,6 @@ public final class MqConstants {
     public static final String QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE = "order.aftersales.awaiting.buyer.page";
     // 自動完成 60h 倒數的暫停/恢復事件（03 §5.8）
     public static final String QUEUE_ORDER_AFTERSALES_COUNTDOWN = "order.aftersales.countdown";
-
-    // ── N16 的 payment 側 consumer（Logistics Finance，36 §3.3.1）──────────────
-    // 🔴 與 order-service 那條是**同一條 routing key、兩條 queue**：兩邊對同一件事做兩件
-    //    不同的副作用（訂單終態轉換 vs settlement counterparty 與 receivable 的處置）。
-    //    合併成一條再由單一 consumer 代打，會讓其中一邊的失敗把另一邊一起拖進 DLQ。
-    //    topic exchange 對同一個 routing key 投遞給**每一條**綁定的 queue，這正是它存在的理由。
-    public static final String QUEUE_PAYMENT_FULFILLMENT_RESPONSIBILITY_FINALIZED =
-            "payment.fulfillment.responsibility_finalized";
-    public static final String QUEUE_PAYMENT_FULFILLMENT_RESPONSIBILITY_FINALIZED_DLQ =
-            "payment.fulfillment.responsibility_finalized.dlq";
-
-    /**
-     * Logistics Finance 消費 provider 成本事實（70 §3.1.4 durable join 的成本側入口）。
-     *
-     * <p>🔴 DLX 走 {@link #EXCHANGE_PAYMENT_EVENTS_DLX}——<b>DLX 跟著 consumer 服務走，
-     * 不是跟著來源 exchange</b>（36 §6.2 註）。來源是 {@link #EXCHANGE_SHIPPING}，
-     * 但死信要落在 payment 自己的 DLX 上，否則排查時會跑到 shipping 的死信去找。
-     */
-    public static final String QUEUE_PAYMENT_LOGISTICS_COST_INCURRED =
-            "payment.logistics.cost_incurred";
-    public static final String QUEUE_PAYMENT_LOGISTICS_COST_INCURRED_DLQ =
-            "payment.logistics.cost_incurred.dlq";
-
-    // ── N16 履約責任判定 financially final（36 §3.3.1／03 §5.7.3）──────────────
-    // 🔴 order-service 是**兩個** consumer 之一（另一個是 payment-service 的 Logistics
-    //    Finance）。同一條 routing key、兩條 queue 是刻意的：兩邊對同一件事做兩件不同的
-    //    副作用（訂單終態轉換 vs receivable 建立與否），合併成一條再由單一 consumer 代打
-    //    會讓其中一邊的失敗把另一邊一起拖進 DLQ。
-    // 🔴 這條 queue 是 `35 → 54` 與建撥款任務的**唯一入口**：order-service 不提供人工改
-    //    狀態端點、也沒有補推排程 ⇒ 漏登記 topology.yaml 就是整個終態變成死碼，而
-    //    passive declare 讓它**不 crash、不進 DLQ、不報錯**。
-    public static final String QUEUE_ORDER_FULFILLMENT_RESPONSIBILITY_FINALIZED =
-            "order.fulfillment.responsibility_finalized";
 
     // AfterSales DLX
     public static final String EXCHANGE_AFTERSALES_DLX = "aftersales.events.dlx";

@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -859,7 +860,7 @@ String _displayOrderDateTime(String raw) {
   if (raw.trim().isEmpty) return '—';
   final parsed = DateTime.tryParse(raw.trim());
   if (parsed == null) return raw;
-  final local = parsed.toLocal();
+  final local = parsed.taipeiWall;
   String pad(int value) => value.toString().padLeft(2, '0');
   return '${local.year}/${pad(local.month)}/${pad(local.day)} '
       '${pad(local.hour)}:${pad(local.minute)}';
@@ -1004,7 +1005,7 @@ String _formatDateTime(String raw) {
   if (raw.isEmpty) return '';
   final dt = DateTime.tryParse(raw);
   if (dt == null) return raw;
-  final local = dt.toLocal();
+  final local = dt.taipeiWall;
   return '${local.year}年${local.month.toString().padLeft(2, '0')}月${local.day.toString().padLeft(2, '0')}日 ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }
 

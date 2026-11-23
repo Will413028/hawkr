@@ -20,7 +20,9 @@ import 'core/observability/sentry_scrub.dart';
 import 'core/analytics/analytics_identity.dart';
 import 'core/analytics/analytics_providers.dart';
 import 'core/layout/app_media_query_policy.dart';
+import 'core/l10n/ui_locale.dart';
 import 'core/layout/app_text_size.dart';
+import 'l10n/gen/app_localizations.dart';
 import 'core/networking/app_version_headers.dart';
 import 'core/routing/app_router.dart';
 import 'core/routing/buyer_navigation_observer.dart';
@@ -371,6 +373,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           title: 'Hawkr',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
+          locale: ref.watch(uiLocaleProvider).flutterLocale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           builder: (context, child) {
             final mq = AppMediaQueryPolicy.apply(
               MediaQuery.of(context),

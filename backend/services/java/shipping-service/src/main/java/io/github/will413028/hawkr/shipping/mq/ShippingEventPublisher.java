@@ -3,7 +3,6 @@ package io.github.will413028.hawkr.shipping.mq;
 import io.github.will413028.hawkr.common.mq.MqConstants;
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
 import io.github.will413028.hawkr.common.obs.mq.ObsRabbitPublisher;
-import io.github.will413028.hawkr.shipping.service.dto.LogisticsCostIncurredPayload;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.shipping.exception.ShippingBusinessException;
 import io.github.will413028.hawkr.shipping.service.dto.ShippingEventPayload;
@@ -147,34 +146,6 @@ public class ShippingEventPublisher {
         } catch (Exception e) {
             log.error("ShippingEventPublisher.publishProcessingTimeout.error",
                     "賣家逾期事件發布失敗, orderNo=" + orderNo, e);
-        }
-    }
-
-    /**
-     * 發布 {@code logistics.cost.incurred}——provider 這條 leg 已產生成本（70 §7.1）。
-     *
-     * <p>🔴 <b>fail-loud，不吞例外。</b> 本服務沒有 outbox（實查：全服務無 outbox 表），
-     * publisher 是交易外的 {@code ObsRabbitPublisher} ⇒ 發送失敗時這一筆成本事實<b>會丟</b>，
-     * 而不是延後送達。吞掉例外等於讓「向賣家收不到這筆錢」變成一個沒有訊號的事件。
-     *
-     * <p>⚠️ <b>最終兜底不在這條路徑上</b>：provider 月結帳單匯入（70 §6.1）會帶來該期間的
-     * <b>全部</b>成本事實並走 true-up（§6.2）⇒ 事件丟失是<b>可偵測、可補回</b>的。
-     * 把 outbox 加進 shipping-service 是獨立的工程，不在本波射程內。
-     */
-    public void publishLogisticsCostIncurred(LogisticsCostIncurredPayload payload) {
-        try {
-            byte[] messageBytes = objectMapper.writeValueAsBytes(payload);
-            rabbitPublisher.publish(MqConstants.EXCHANGE_SHIPPING,
-                    MqConstants.ROUTING_KEY_LOGISTICS_COST_INCURRED, messageBytes,
-                    MqConstants.EVENT_TYPE_LOGISTICS_COST_INCURRED);
-            log.info("ShippingEventPublisher.publishLogisticsCostIncurred.success",
-                    "provider 成本事實發布成功: providerDeliveryRef=" + payload.providerDeliveryRef(),
-                    "orderNo", payload.orderNo());
-        } catch (Exception e) {
-            log.error("ShippingEventPublisher.publishLogisticsCostIncurred.error",
-                    "provider 成本事實發布失敗（本服務無 outbox ⇒ 這一筆會丟，靠月結對帳補回）: "
-                            + e.getMessage());
-            throw new ShippingBusinessException(GrpcResponseCode.INTERNAL_ERROR, "MQ 事件發布失敗");
         }
     }
 

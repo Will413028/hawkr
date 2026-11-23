@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/semantics.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:hawkr_seller/core/l10n/ui_locale.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart' show UiLocale;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -86,9 +88,9 @@ class SellerComponentCatalogApp extends StatelessWidget {
       title: 'Hawkr · 賣家元件庫',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      locale: const Locale('zh', 'TW'),
-      supportedLocales: const [Locale('zh', 'TW'), Locale('en', 'US')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      locale: UiLocale.zhTW.flutterLocale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       builder: (context, child) => MediaQuery(
         data: AppMediaQueryPolicy.apply(
           MediaQuery.of(

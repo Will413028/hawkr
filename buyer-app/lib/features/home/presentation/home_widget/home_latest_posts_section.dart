@@ -1,3 +1,6 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -218,7 +221,10 @@ class _HomePostPreviewCard extends StatelessWidget {
                           _MerchantMeta(
                             name: merchantName,
                             avatarUrl: post.merchantAvatar ?? '',
-                            timeLabel: _formatTimeAgo(post.createdAt),
+                            timeLabel: timeAgoText(
+                              context.l10n,
+                              _timeAgoOf(post.createdAt),
+                            ),
                           ),
                           const SizedBox(height: HkSpace.xs),
                           Text(
@@ -465,7 +471,7 @@ class _PostPreviewError extends StatelessWidget {
   }
 }
 
-String _formatTimeAgo(dynamic value) {
+TimeAgo _timeAgoOf(dynamic value) {
   final DateTime? date = switch (value) {
     int timestamp => DateTime.fromMillisecondsSinceEpoch(
       timestamp > 1000000000000 ? timestamp : timestamp * 1000,
@@ -475,15 +481,10 @@ String _formatTimeAgo(dynamic value) {
           ? timestamp.toInt()
           : timestamp.toInt() * 1000,
     ),
-    String text => DateTime.tryParse(text),
+    String text => tryParseTaipeiInstant(text),
     _ => null,
   };
-  if (date == null) return '剛剛';
+  if (date == null) return const TimeAgoJustNow();
 
-  final difference = DateTime.now().difference(date);
-  if (difference.isNegative || difference.inMinutes < 1) return '剛剛';
-  if (difference.inMinutes < 60) return '${difference.inMinutes}分鐘前';
-  if (difference.inHours < 24) return '${difference.inHours}小時前';
-  if (difference.inDays < 7) return '${difference.inDays}天前';
-  return '${date.month}/${date.day}';
+  return taipeiTimeAgo(date);
 }

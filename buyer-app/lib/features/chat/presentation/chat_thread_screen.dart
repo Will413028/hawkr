@@ -11,6 +11,7 @@ import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -60,7 +61,7 @@ class _Row {
   final PendingSend? pending;
 
   DateTime get time => message != null && message!.hasCreateTime()
-      ? message!.createTime.toDateTime().toLocal()
+      ? message!.createTime.toDateTime()
       : DateTime.now();
 
   bool get isSelf =>
@@ -460,10 +461,10 @@ class ChatThreadScreen extends HookConsumerWidget {
 
               Widget? timeSeparator;
               if (showTimeSeparator) {
-                final t = row.time;
+                final t = row.time.taipei;
                 final timeStr =
                     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-                final today = DateTime.now();
+                final today = DateTime.now().taipei;
                 final isToday =
                     t.year == today.year &&
                     t.month == today.month &&
@@ -540,7 +541,7 @@ class ChatThreadScreen extends HookConsumerWidget {
                       ),
                     );
 
-              final t = row.time;
+              final t = row.time.taipei;
               final h12 = t.hour == 0
                   ? 12
                   : (t.hour > 12 ? t.hour - 12 : t.hour);

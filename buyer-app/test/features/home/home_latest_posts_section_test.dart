@@ -3,6 +3,7 @@ import 'package:hawkr_buyer/features/home/presentation/home_widget/home_latest_p
 import 'package:hawkr_buyer/features/social/data/social_model.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_post_card_surface.dart';
 import 'package:flutter/material.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -122,7 +123,12 @@ void main() {
         overrides: [
           homePostPreviewRepositoryProvider.overrideWithValue(repository),
         ],
-        child: MaterialApp.router(routerConfig: router),
+        child: MaterialApp.router(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
       ),
     );
     await tester.pump();
@@ -144,6 +150,9 @@ Widget _testApp({
       homePostPreviewRepositoryProvider.overrideWithValue(repository),
     ],
     child: MaterialApp(
+      locale: const Locale('zh'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(
           context,

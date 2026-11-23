@@ -5,18 +5,6 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import '../data/chat_model.dart';
 
-/// 相對時間字樣（剛剛 / N 分鐘前 / N 小時前 / N 天前 / 日期）。
-String formatTimeAgo(DateTime dt) {
-  final now = DateTime.now();
-  final diff = now.difference(dt);
-  if (diff.inSeconds < 60) return '剛剛';
-  if (diff.inMinutes < 60) return '${diff.inMinutes}分鐘前';
-  if (diff.inHours < 24) return '${diff.inHours}小時前';
-  if (diff.inDays < 7) return '${diff.inDays}天前';
-  if (dt.year == now.year) return '${dt.month}/${dt.day}';
-  return '${dt.year}/${dt.month}/${dt.day}';
-}
-
 /// 對話列表預覽的文字：墓碑與圖片用目錄的句子，文字訊息用內容；伺服器沒有帶預覽時是空字串，種類不認得（含 UNSPECIFIED）時用目錄的「不支援的訊息」。
 String previewText(ChatPreview? p, UiLocale locale) {
   if (p == null) return '';

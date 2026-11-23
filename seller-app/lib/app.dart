@@ -1,7 +1,8 @@
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:hawkr_seller/core/l10n/ui_locale.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -293,17 +294,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         routerConfig: goRouter,
         title: 'DaliyFresh Farmer',
         theme: AppTheme.light,
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('zh', 'TW'),
-          Locale('zh', 'CN'),
-          Locale('en', 'US'),
-        ],
-        locale: const Locale('zh', 'TW'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: ref.watch(uiLocaleProvider).flutterLocale,
         builder: (context, child) {
           final mediaQuery = AppMediaQueryPolicy.apply(
             MediaQuery.of(context),

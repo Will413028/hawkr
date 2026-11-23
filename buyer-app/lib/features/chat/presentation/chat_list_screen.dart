@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
@@ -10,6 +11,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart' show UiLocale;
 
 import '../../../core/l10n/ui_locale.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/category_top_bar.dart';
@@ -32,18 +35,6 @@ class ChatListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
-  /// 將時間轉為相對時間文字
-  static String _formatTimeAgo(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inSeconds < 60) return '剛剛';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分鐘前';
-    if (diff.inHours < 24) return '${diff.inHours}小時前';
-    if (diff.inDays < 7) return '${diff.inDays}天前';
-    if (dt.year == now.year) return '${dt.month}/${dt.day}';
-    return '${dt.year}/${dt.month}/${dt.day}';
-  }
-
   static String _nameOf(pb.Conversation c, UiLocale locale) =>
       c.hasStore() ? c.store.displayName(locale) : '店家';
 
@@ -313,7 +304,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                   final c = list[index];
                                   final name = _nameOf(c, locale);
                                   final time = c.hasLastMessageTime()
-                                      ? c.lastMessageTime.toDateTime().toLocal()
+                                      ? c.lastMessageTime.toDateTime()
                                       : null;
                                   return ChatConversationTile(
                                     key: ValueKey(c.id),
@@ -324,7 +315,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                     lastMessage: _previewOf(c, locale),
                                     date: time == null
                                         ? ''
-                                        : _formatTimeAgo(time),
+                                        : timeAgoText(
+                                            context.l10n,
+                                            taipeiTimeAgo(time),
+                                          ),
                                     unread: c.unreadCount.toInt(),
                                     onTap: () async {
                                       ChatFocusPolicy.dismissKeyboard();

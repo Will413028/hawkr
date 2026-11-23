@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -534,14 +535,14 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
     if (dateStr.isEmpty) return '';
     final dt = DateTime.tryParse(dateStr);
     if (dt == null) return dateStr;
-    final local = dt.toLocal();
+    final local = dt.taipeiWall;
     return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
   String _formatDeadline(String raw) {
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
-    final local = dt.toLocal();
+    final local = dt.taipeiWall;
     return '${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 }

@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
@@ -1452,7 +1453,7 @@ String _formatDateTime(String raw) {
   if (raw.isEmpty) return '';
   final dt = DateTime.tryParse(raw);
   if (dt == null) return raw;
-  final local = dt.toLocal();
+  final local = dt.taipeiWall;
   return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
       '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }

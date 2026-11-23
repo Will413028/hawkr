@@ -93,15 +93,6 @@ var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/shipping_onboardings/cvs", authz.CapShippingSetup},
 	{"POST", "/api/v1/app/shipping_onboardings/home_delivery", authz.CapShippingSetup},
 	{"POST", "/api/v1/app/shipping_quotes", authz.CapProductManage},
-	// ---- 70 號《賣家物流財務》賣家面（W6-3 Logistics Finance）----
-	// CAP_ORDER_FULFILL，與 /shipments 群組同一類：物流費是「處理既有
-	// 已付款訂單」這條軸上的東西。⚠️ 停權白名單（CapOrderFulfill 在停權白名單）
-	// 是刻意的——停權賣家仍必須看得到自己欠平台多少，否則他連要不要付清都無從判斷，
-	// 而那筆錢平台是真的要收的（§24 分類原則的「救濟管道」那一格）。
-	// 全部唯讀：本波不開任何寫入端點。
-	{"GET", "/api/v1/app/logistics_finance", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/logistics_finance/ledger", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/logistics_finance/receivables", authz.CapOrderFulfill},
 	// ---- 58 號《電子發票服務》賣家面（§8.1.6(b) 逐條裁決表）----
 	// 25 條 ＝ CapInvoiceTaxRemedy 8（救濟管道，停權白名單）＋ CapInvoiceManage 13
 	// （擴張型與唯讀查看，BLOCK）＋ CapOrderFulfill 4（履行既有訂單義務）。
