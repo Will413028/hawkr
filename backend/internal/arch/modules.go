@@ -52,6 +52,14 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"coupon": {Packages: map[string][]string{
+		"campaign": {"model", "rows", "store"},
+		"model":    {},
+		"qualify":  {"model", "store"},
+		"rows":     {"model", "store"},
+		"store":    {},
+		"voucher":  {"model", "qualify", "rows", "store"},
+	}},
 	"crm": {Packages: map[string][]string{
 		"model":   {},
 		"project": {"model", "store"},
