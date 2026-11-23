@@ -1,0 +1,121 @@
+{
+ "mutants": [
+  {
+   "id": "rfq-lock-skips-revision-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/rfq.go",
+   "old": "if !hasActive || active.ID != expected {",
+   "new": "if !hasActive {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPriceBranches$",
+   "why": "The shared lock step stops comparing the caller's expected revision with the active one, so PreviewRfqPrice accepts a stale revision."
+  },
+  {
+   "id": "rfq-confirm-skips-preview-revision",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/confirm.go",
+   "old": "prev.RequestRevisionID != rev.ID || ",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestConfirmSnapshotRejectsAPreviewMadeForAnEarlierRevision$",
+   "why": "ConfirmRfqSnapshot no longer checks that the price preview was made for the active revision."
+  },
+  {
+   "id": "rfq-confirm-skips-preview-expiry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/confirm.go",
+   "old": "!now.Before(prev.ExpiresAt) || ",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestConfirmSnapshotStaleBranches$",
+   "why": "ConfirmRfqSnapshot accepts a price preview after its 15 minute lifetime."
+  },
+  {
+   "id": "rfq-approval-cas-skips-pending-state",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": " AND state = 'PENDING'",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteAnApprovalThatWasAlreadyExecutedIsAVersionConflict$",
+   "why": "The approval claim stops requiring state PENDING, so an executed approval can be claimed again."
+  },
+  {
+   "id": "rfq-approval-cas-skips-expiry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": " AND expires_at > $1::timestamptz",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteAnExpiredApprovalIsAVersionConflictAndLeavesItPending$",
+   "why": "The approval claim stops checking expires_at, so an expired approval can be executed."
+  },
+  {
+   "id": "rfq-execute-skips-payload-hash-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "c.sellerHash != in.PayloadHash || (",
+   "new": "(",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteStaleBranchesLeaveTheApprovalPending$",
+   "why": "ExecuteRfqPublication stops comparing the caller's payload hash with the hash recomputed from the approval."
+  },
+  {
+   "id": "rfq-execute-ignores-subscriber-failure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "\t\t}); err != nil {\n\t\t\treturn fmt.Errorf(\"rfq：發布事件：%w\", err)\n\t\t}",
+   "new": "\t\t}); err != nil {\n\t\t\t_ = err\n\t\t}",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteIsAtomicWhenTheEventSubscriberFails$",
+   "why": "A failing event subscriber no longer fails the publication, so the publication commits without its event."
+  },
+  {
+   "id": "rfq-replay-reports-not-replayed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "return publicationOf(pub, approval, c, true), nil",
+   "new": "return publicationOf(pub, approval, c, false), nil",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteReplaysTheFirstPublicationWithoutNewInvitesOrEvents$",
+   "why": "A replayed publication is reported as newly created."
+  },
+  {
+   "id": "rfq-replay-ignores-approval",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": " || pub.ApprovalID != in.ApprovalID",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteRejectsTheSameKeyWithDifferentContent$",
+   "why": "The idempotency check stops comparing the approval, so the same key replays for a different approval."
+  },
+  {
+   "id": "rfq-direct-skips-effective-candidate-set",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "if !effective {",
+   "new": "if !effective && false {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationDirectOnlyAcceptsTheEffectiveCandidateSet$",
+   "why": "PreviewRfqPublication stops requiring the DIRECT audience to come from the effective candidate set."
+  },
+  {
+   "id": "rfq-seller-hash-drops-delivery-city",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/compile.go",
+   "old": "DeliveryCity: p.DeliveryCity, ",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestSellerHashCoversEveryPayloadField$",
+   "why": "The seller-facing hash input drops the delivery city, so changing it no longer changes the hash."
+  },
+  {
+   "id": "rfq-snapshot-hash-drops-delivery-city",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/hashes.go",
+   "old": "DeliveryCity: rev.DeliveryCity, ",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestSnapshotHashCoversEveryStoredField$",
+   "why": "The snapshot hash input drops the delivery city of the confirmed revision."
+  },
+  {
+   "id": "rfq-preview-hash-drops-basis-unit",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/hashes.go",
+   "old": " BasisUnit: p.BasisUnit,",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewHashCoversEveryStoredField$",
+   "why": "The price preview hash input drops the pricing basis unit."
+  }
+ ]
+}
