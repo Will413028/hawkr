@@ -53,12 +53,12 @@ const (
 	// BuyerServiceListSubscribedSellerIdsProcedure is the fully-qualified name of the BuyerService's
 	// ListSubscribedSellerIds RPC.
 	BuyerServiceListSubscribedSellerIdsProcedure = "/hawkr.buyer.BuyerService/ListSubscribedSellerIds"
-	// BuyerServiceResolvePrincipalsProcedure is the fully-qualified name of the BuyerService's
-	// ResolvePrincipals RPC.
-	BuyerServiceResolvePrincipalsProcedure = "/hawkr.buyer.BuyerService/ResolvePrincipals"
 	// BuyerServiceBatchCheckRestockSubscriptionsProcedure is the fully-qualified name of the
 	// BuyerService's BatchCheckRestockSubscriptions RPC.
 	BuyerServiceBatchCheckRestockSubscriptionsProcedure = "/hawkr.buyer.BuyerService/BatchCheckRestockSubscriptions"
+	// BuyerServiceResolvePrincipalsProcedure is the fully-qualified name of the BuyerService's
+	// ResolvePrincipals RPC.
+	BuyerServiceResolvePrincipalsProcedure = "/hawkr.buyer.BuyerService/ResolvePrincipals"
 	// BuyerServiceListBuyerIDsByAccountProcedure is the fully-qualified name of the BuyerService's
 	// ListBuyerIDsByAccount RPC.
 	BuyerServiceListBuyerIDsByAccountProcedure = "/hawkr.buyer.BuyerService/ListBuyerIDsByAccount"
@@ -72,52 +72,47 @@ const (
 
 // BuyerServiceClient is a client for the hawkr.buyer.BuyerService service.
 type BuyerServiceClient interface {
-	// Profile
+	// ========== Profile ==========
 	GetBuyerProfile(context.Context, *connect.Request[buyer.GetBuyerProfileRequest]) (*connect.Response[buyer.BuyerProfileResponse], error)
+	// ========== Address ==========
 	GetAddress(context.Context, *connect.Request[buyer.GetAddressRequest]) (*connect.Response[buyer.GetAddressResponse], error)
 	ValidateAddress(context.Context, *connect.Request[buyer.ValidateAddressRequest]) (*connect.Response[buyer.ValidateAddressResponse], error)
+	// ========== Favorites and Subscriptions ==========
 	CheckFavorite(context.Context, *connect.Request[buyer.CheckFavoriteRequest]) (*connect.Response[buyer.CheckFavoriteResponse], error)
 	BatchCheckFavorites(context.Context, *connect.Request[buyer.BatchCheckFavoritesRequest]) (*connect.Response[buyer.BatchCheckFavoritesResponse], error)
 	// 取得使用者所有收藏的 product_id 列表（供 product-service /public/products?followed_product_only=true 使用，見 02 §4.2.4）
 	ListFavoritedProductIds(context.Context, *connect.Request[buyer.ListFavoritedProductIdsRequest]) (*connect.Response[buyer.ListFavoritedProductIdsResponse], error)
 	// 取得使用者所有追蹤的 seller_id 列表（供 product-service /public/products?followed_seller_only=true 使用，見 02 §4.2.4）
 	ListSubscribedSellerIds(context.Context, *connect.Request[buyer.ListSubscribedSellerIdsRequest]) (*connect.Response[buyer.ListSubscribedSellerIdsResponse], error)
-	// ========== Cross-Role Guards: Principal Resolution ==========
-	// 解析 buyer_id → 登入 principal account_id（② 買家 store-stint re-key
-	// W2/W3，mirrors the seller module ResolvePrincipals；供 im-service
-	// SendMessage 自我對話防護用）。只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
-	ResolvePrincipals(context.Context, *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error)
 	// 批次檢查多個 product 是否訂閱（PDP detail / 訂閱列表頁 client-side cache）
 	BatchCheckRestockSubscriptions(context.Context, *connect.Request[buyer.BatchCheckRestockSubscriptionsRequest]) (*connect.Response[buyer.BatchCheckRestockSubscriptionsResponse], error)
-	// ========== Internal: PII-Purge Historical Stint Lookup (D8, buyer-store-stint-rekey-w2w3) ==========
+	// ========== Principal Resolution ==========
+	// 解析 buyer_id → 登入 principal account_id（供 im-service SendMessage 自我對話防護用）。
+	// 只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
+	ResolvePrincipals(context.Context, *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error)
+	// ========== Historical Stint Lookup ==========
 	// Returns ALL buyer_id stints ever assigned to this account_id, including
-	// closed ones — unlike GetBuyerProfile/EnsureBuyerProfile, which only ever
-	// resolve the CURRENT stint. INTERNAL USE ONLY: exists solely for the
+	// closed ones — unlike GetBuyerProfile, which only resolves the CURRENT
+	// stint. INTERNAL USE ONLY: exists solely for the
 	// buyer.deleted/account.deleted PII-purge consumer (im-service) to
 	// enumerate every buyer_id a message's sender_id may have used across
 	// re-registrations, so it can scrub all of them. Do not call this from any
 	// caller-facing feature, authorization check, or display path.
 	ListBuyerIDsByAccount(context.Context, *connect.Request[buyer.ListBuyerIDsByAccountRequest]) (*connect.Response[buyer.ListBuyerIDsByAccountResponse], error)
-	// ========== Display: Tombstone-safe Name Resolution (#2830) ==========
+	// ========== Display ==========
 	// 解析 buyer_id → **可公開顯示**的名字，已註銷的 stint 也解得出來。
 	//
-	// 🔴 與 BatchGetBuyerMetaByBuyerIDs 的差別，以及為什麼需要兩支：
-	// 那支帶 `deleted_at IS NULL`（`GetBuyersByBuyerIDs`），那是**刻意的 PII 邊界**
-	// ——帳號關閉後不再供應個資，gateway 有測試把它的 404 行為釘成契約。但它的
-	// 副作用是：所有持有歷史 buyer_id 的顯示面（評論作者、訂單買家、對話對象）
-	// 在買家註銷後一律變成空字串，而各前端各自發明了不同的 fallback
-	// （匿名買家／匿名／會員xxxx／顧客／-／買家／欄位直接消失，共七種）。
-	//
-	// 本 RPC 的解法是**在來源就給出可顯示的值**，而不是讓 N 個顯示端各補一次：
+	// 在來源就給出可顯示的值，而不是讓各顯示端（評論作者、訂單買家、對話對象）各自補 fallback：
 	//   - 未註銷 → 回真實 display_name
 	//   - 已註銷 → **一律回墓碑字串**（與 SetBuyerPIICleared 寫進欄位的同一個常數），
 	//     即使該 stint 的 PII 尚未被 30 天 cron 清掉，**真名也不會離開 DB**
 	//   - avatar_key 對已註銷者恆為空（頭像是個資）
 	//
-	// ⇒ PII 邊界原封不動：已註銷 stint 沒有任何個資經由本 RPC 過線。
+	// ⇒ 已註銷 stint 沒有任何個資經由本 RPC 過線。
 	// ⇒ 「map 有 key ＝ 解析成功／沒有 key ＋ error ＝ 服務不可用」結構上可區分，
-	//    呼叫端不再需要靠空字串去猜是哪一種。
+	//    呼叫端不需要靠空字串去猜是哪一種。
 	BatchGetBuyerDisplayByBuyerIDs(context.Context, *connect.Request[buyer.BatchGetBuyerDisplayByBuyerIDsRequest]) (*connect.Response[buyer.BatchGetBuyerDisplayByBuyerIDsResponse], error)
+	// ========== Entitlement ==========
 	GetBuyerEntitlement(context.Context, *connect.Request[buyer.GetBuyerEntitlementRequest]) (*connect.Response[buyer.BuyerEntitlement], error)
 }
 
@@ -174,16 +169,16 @@ func NewBuyerServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(buyerServiceMethods.ByName("ListSubscribedSellerIds")),
 			connect.WithClientOptions(opts...),
 		),
-		resolvePrincipals: connect.NewClient[buyer.ResolvePrincipalsRequest, buyer.ResolvePrincipalsResponse](
-			httpClient,
-			baseURL+BuyerServiceResolvePrincipalsProcedure,
-			connect.WithSchema(buyerServiceMethods.ByName("ResolvePrincipals")),
-			connect.WithClientOptions(opts...),
-		),
 		batchCheckRestockSubscriptions: connect.NewClient[buyer.BatchCheckRestockSubscriptionsRequest, buyer.BatchCheckRestockSubscriptionsResponse](
 			httpClient,
 			baseURL+BuyerServiceBatchCheckRestockSubscriptionsProcedure,
 			connect.WithSchema(buyerServiceMethods.ByName("BatchCheckRestockSubscriptions")),
+			connect.WithClientOptions(opts...),
+		),
+		resolvePrincipals: connect.NewClient[buyer.ResolvePrincipalsRequest, buyer.ResolvePrincipalsResponse](
+			httpClient,
+			baseURL+BuyerServiceResolvePrincipalsProcedure,
+			connect.WithSchema(buyerServiceMethods.ByName("ResolvePrincipals")),
 			connect.WithClientOptions(opts...),
 		),
 		listBuyerIDsByAccount: connect.NewClient[buyer.ListBuyerIDsByAccountRequest, buyer.ListBuyerIDsByAccountResponse](
@@ -216,8 +211,8 @@ type buyerServiceClient struct {
 	batchCheckFavorites            *connect.Client[buyer.BatchCheckFavoritesRequest, buyer.BatchCheckFavoritesResponse]
 	listFavoritedProductIds        *connect.Client[buyer.ListFavoritedProductIdsRequest, buyer.ListFavoritedProductIdsResponse]
 	listSubscribedSellerIds        *connect.Client[buyer.ListSubscribedSellerIdsRequest, buyer.ListSubscribedSellerIdsResponse]
-	resolvePrincipals              *connect.Client[buyer.ResolvePrincipalsRequest, buyer.ResolvePrincipalsResponse]
 	batchCheckRestockSubscriptions *connect.Client[buyer.BatchCheckRestockSubscriptionsRequest, buyer.BatchCheckRestockSubscriptionsResponse]
+	resolvePrincipals              *connect.Client[buyer.ResolvePrincipalsRequest, buyer.ResolvePrincipalsResponse]
 	listBuyerIDsByAccount          *connect.Client[buyer.ListBuyerIDsByAccountRequest, buyer.ListBuyerIDsByAccountResponse]
 	batchGetBuyerDisplayByBuyerIDs *connect.Client[buyer.BatchGetBuyerDisplayByBuyerIDsRequest, buyer.BatchGetBuyerDisplayByBuyerIDsResponse]
 	getBuyerEntitlement            *connect.Client[buyer.GetBuyerEntitlementRequest, buyer.BuyerEntitlement]
@@ -258,14 +253,14 @@ func (c *buyerServiceClient) ListSubscribedSellerIds(ctx context.Context, req *c
 	return c.listSubscribedSellerIds.CallUnary(ctx, req)
 }
 
-// ResolvePrincipals calls hawkr.buyer.BuyerService.ResolvePrincipals.
-func (c *buyerServiceClient) ResolvePrincipals(ctx context.Context, req *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error) {
-	return c.resolvePrincipals.CallUnary(ctx, req)
-}
-
 // BatchCheckRestockSubscriptions calls hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions.
 func (c *buyerServiceClient) BatchCheckRestockSubscriptions(ctx context.Context, req *connect.Request[buyer.BatchCheckRestockSubscriptionsRequest]) (*connect.Response[buyer.BatchCheckRestockSubscriptionsResponse], error) {
 	return c.batchCheckRestockSubscriptions.CallUnary(ctx, req)
+}
+
+// ResolvePrincipals calls hawkr.buyer.BuyerService.ResolvePrincipals.
+func (c *buyerServiceClient) ResolvePrincipals(ctx context.Context, req *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error) {
+	return c.resolvePrincipals.CallUnary(ctx, req)
 }
 
 // ListBuyerIDsByAccount calls hawkr.buyer.BuyerService.ListBuyerIDsByAccount.
@@ -285,52 +280,47 @@ func (c *buyerServiceClient) GetBuyerEntitlement(ctx context.Context, req *conne
 
 // BuyerServiceHandler is an implementation of the hawkr.buyer.BuyerService service.
 type BuyerServiceHandler interface {
-	// Profile
+	// ========== Profile ==========
 	GetBuyerProfile(context.Context, *connect.Request[buyer.GetBuyerProfileRequest]) (*connect.Response[buyer.BuyerProfileResponse], error)
+	// ========== Address ==========
 	GetAddress(context.Context, *connect.Request[buyer.GetAddressRequest]) (*connect.Response[buyer.GetAddressResponse], error)
 	ValidateAddress(context.Context, *connect.Request[buyer.ValidateAddressRequest]) (*connect.Response[buyer.ValidateAddressResponse], error)
+	// ========== Favorites and Subscriptions ==========
 	CheckFavorite(context.Context, *connect.Request[buyer.CheckFavoriteRequest]) (*connect.Response[buyer.CheckFavoriteResponse], error)
 	BatchCheckFavorites(context.Context, *connect.Request[buyer.BatchCheckFavoritesRequest]) (*connect.Response[buyer.BatchCheckFavoritesResponse], error)
 	// 取得使用者所有收藏的 product_id 列表（供 product-service /public/products?followed_product_only=true 使用，見 02 §4.2.4）
 	ListFavoritedProductIds(context.Context, *connect.Request[buyer.ListFavoritedProductIdsRequest]) (*connect.Response[buyer.ListFavoritedProductIdsResponse], error)
 	// 取得使用者所有追蹤的 seller_id 列表（供 product-service /public/products?followed_seller_only=true 使用，見 02 §4.2.4）
 	ListSubscribedSellerIds(context.Context, *connect.Request[buyer.ListSubscribedSellerIdsRequest]) (*connect.Response[buyer.ListSubscribedSellerIdsResponse], error)
-	// ========== Cross-Role Guards: Principal Resolution ==========
-	// 解析 buyer_id → 登入 principal account_id（② 買家 store-stint re-key
-	// W2/W3，mirrors the seller module ResolvePrincipals；供 im-service
-	// SendMessage 自我對話防護用）。只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
-	ResolvePrincipals(context.Context, *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error)
 	// 批次檢查多個 product 是否訂閱（PDP detail / 訂閱列表頁 client-side cache）
 	BatchCheckRestockSubscriptions(context.Context, *connect.Request[buyer.BatchCheckRestockSubscriptionsRequest]) (*connect.Response[buyer.BatchCheckRestockSubscriptionsResponse], error)
-	// ========== Internal: PII-Purge Historical Stint Lookup (D8, buyer-store-stint-rekey-w2w3) ==========
+	// ========== Principal Resolution ==========
+	// 解析 buyer_id → 登入 principal account_id（供 im-service SendMessage 自我對話防護用）。
+	// 只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
+	ResolvePrincipals(context.Context, *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error)
+	// ========== Historical Stint Lookup ==========
 	// Returns ALL buyer_id stints ever assigned to this account_id, including
-	// closed ones — unlike GetBuyerProfile/EnsureBuyerProfile, which only ever
-	// resolve the CURRENT stint. INTERNAL USE ONLY: exists solely for the
+	// closed ones — unlike GetBuyerProfile, which only resolves the CURRENT
+	// stint. INTERNAL USE ONLY: exists solely for the
 	// buyer.deleted/account.deleted PII-purge consumer (im-service) to
 	// enumerate every buyer_id a message's sender_id may have used across
 	// re-registrations, so it can scrub all of them. Do not call this from any
 	// caller-facing feature, authorization check, or display path.
 	ListBuyerIDsByAccount(context.Context, *connect.Request[buyer.ListBuyerIDsByAccountRequest]) (*connect.Response[buyer.ListBuyerIDsByAccountResponse], error)
-	// ========== Display: Tombstone-safe Name Resolution (#2830) ==========
+	// ========== Display ==========
 	// 解析 buyer_id → **可公開顯示**的名字，已註銷的 stint 也解得出來。
 	//
-	// 🔴 與 BatchGetBuyerMetaByBuyerIDs 的差別，以及為什麼需要兩支：
-	// 那支帶 `deleted_at IS NULL`（`GetBuyersByBuyerIDs`），那是**刻意的 PII 邊界**
-	// ——帳號關閉後不再供應個資，gateway 有測試把它的 404 行為釘成契約。但它的
-	// 副作用是：所有持有歷史 buyer_id 的顯示面（評論作者、訂單買家、對話對象）
-	// 在買家註銷後一律變成空字串，而各前端各自發明了不同的 fallback
-	// （匿名買家／匿名／會員xxxx／顧客／-／買家／欄位直接消失，共七種）。
-	//
-	// 本 RPC 的解法是**在來源就給出可顯示的值**，而不是讓 N 個顯示端各補一次：
+	// 在來源就給出可顯示的值，而不是讓各顯示端（評論作者、訂單買家、對話對象）各自補 fallback：
 	//   - 未註銷 → 回真實 display_name
 	//   - 已註銷 → **一律回墓碑字串**（與 SetBuyerPIICleared 寫進欄位的同一個常數），
 	//     即使該 stint 的 PII 尚未被 30 天 cron 清掉，**真名也不會離開 DB**
 	//   - avatar_key 對已註銷者恆為空（頭像是個資）
 	//
-	// ⇒ PII 邊界原封不動：已註銷 stint 沒有任何個資經由本 RPC 過線。
+	// ⇒ 已註銷 stint 沒有任何個資經由本 RPC 過線。
 	// ⇒ 「map 有 key ＝ 解析成功／沒有 key ＋ error ＝ 服務不可用」結構上可區分，
-	//    呼叫端不再需要靠空字串去猜是哪一種。
+	//    呼叫端不需要靠空字串去猜是哪一種。
 	BatchGetBuyerDisplayByBuyerIDs(context.Context, *connect.Request[buyer.BatchGetBuyerDisplayByBuyerIDsRequest]) (*connect.Response[buyer.BatchGetBuyerDisplayByBuyerIDsResponse], error)
+	// ========== Entitlement ==========
 	GetBuyerEntitlement(context.Context, *connect.Request[buyer.GetBuyerEntitlementRequest]) (*connect.Response[buyer.BuyerEntitlement], error)
 }
 
@@ -383,16 +373,16 @@ func NewBuyerServiceHandler(svc BuyerServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(buyerServiceMethods.ByName("ListSubscribedSellerIds")),
 		connect.WithHandlerOptions(opts...),
 	)
-	buyerServiceResolvePrincipalsHandler := connect.NewUnaryHandler(
-		BuyerServiceResolvePrincipalsProcedure,
-		svc.ResolvePrincipals,
-		connect.WithSchema(buyerServiceMethods.ByName("ResolvePrincipals")),
-		connect.WithHandlerOptions(opts...),
-	)
 	buyerServiceBatchCheckRestockSubscriptionsHandler := connect.NewUnaryHandler(
 		BuyerServiceBatchCheckRestockSubscriptionsProcedure,
 		svc.BatchCheckRestockSubscriptions,
 		connect.WithSchema(buyerServiceMethods.ByName("BatchCheckRestockSubscriptions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	buyerServiceResolvePrincipalsHandler := connect.NewUnaryHandler(
+		BuyerServiceResolvePrincipalsProcedure,
+		svc.ResolvePrincipals,
+		connect.WithSchema(buyerServiceMethods.ByName("ResolvePrincipals")),
 		connect.WithHandlerOptions(opts...),
 	)
 	buyerServiceListBuyerIDsByAccountHandler := connect.NewUnaryHandler(
@@ -429,10 +419,10 @@ func NewBuyerServiceHandler(svc BuyerServiceHandler, opts ...connect.HandlerOpti
 			buyerServiceListFavoritedProductIdsHandler.ServeHTTP(w, r)
 		case BuyerServiceListSubscribedSellerIdsProcedure:
 			buyerServiceListSubscribedSellerIdsHandler.ServeHTTP(w, r)
-		case BuyerServiceResolvePrincipalsProcedure:
-			buyerServiceResolvePrincipalsHandler.ServeHTTP(w, r)
 		case BuyerServiceBatchCheckRestockSubscriptionsProcedure:
 			buyerServiceBatchCheckRestockSubscriptionsHandler.ServeHTTP(w, r)
+		case BuyerServiceResolvePrincipalsProcedure:
+			buyerServiceResolvePrincipalsHandler.ServeHTTP(w, r)
 		case BuyerServiceListBuyerIDsByAccountProcedure:
 			buyerServiceListBuyerIDsByAccountHandler.ServeHTTP(w, r)
 		case BuyerServiceBatchGetBuyerDisplayByBuyerIDsProcedure:
@@ -476,12 +466,12 @@ func (UnimplementedBuyerServiceHandler) ListSubscribedSellerIds(context.Context,
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.BuyerService.ListSubscribedSellerIds is not implemented"))
 }
 
-func (UnimplementedBuyerServiceHandler) ResolvePrincipals(context.Context, *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.BuyerService.ResolvePrincipals is not implemented"))
-}
-
 func (UnimplementedBuyerServiceHandler) BatchCheckRestockSubscriptions(context.Context, *connect.Request[buyer.BatchCheckRestockSubscriptionsRequest]) (*connect.Response[buyer.BatchCheckRestockSubscriptionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions is not implemented"))
+}
+
+func (UnimplementedBuyerServiceHandler) ResolvePrincipals(context.Context, *connect.Request[buyer.ResolvePrincipalsRequest]) (*connect.Response[buyer.ResolvePrincipalsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.BuyerService.ResolvePrincipals is not implemented"))
 }
 
 func (UnimplementedBuyerServiceHandler) ListBuyerIDsByAccount(context.Context, *connect.Request[buyer.ListBuyerIDsByAccountRequest]) (*connect.Response[buyer.ListBuyerIDsByAccountResponse], error) {

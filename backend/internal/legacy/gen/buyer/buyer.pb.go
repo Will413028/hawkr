@@ -1908,9 +1908,9 @@ const file_buyer_buyer_proto_rawDesc = "" +
 	"\rCheckFavorite\x12!.hawkr.buyer.CheckFavoriteRequest\x1a\".hawkr.buyer.CheckFavoriteResponse\x12h\n" +
 	"\x13BatchCheckFavorites\x12'.hawkr.buyer.BatchCheckFavoritesRequest\x1a(.hawkr.buyer.BatchCheckFavoritesResponse\x12t\n" +
 	"\x17ListFavoritedProductIds\x12+.hawkr.buyer.ListFavoritedProductIdsRequest\x1a,.hawkr.buyer.ListFavoritedProductIdsResponse\x12t\n" +
-	"\x17ListSubscribedSellerIds\x12+.hawkr.buyer.ListSubscribedSellerIdsRequest\x1a,.hawkr.buyer.ListSubscribedSellerIdsResponse\x12b\n" +
-	"\x11ResolvePrincipals\x12%.hawkr.buyer.ResolvePrincipalsRequest\x1a&.hawkr.buyer.ResolvePrincipalsResponse\x12\x89\x01\n" +
-	"\x1eBatchCheckRestockSubscriptions\x122.hawkr.buyer.BatchCheckRestockSubscriptionsRequest\x1a3.hawkr.buyer.BatchCheckRestockSubscriptionsResponse\x12n\n" +
+	"\x17ListSubscribedSellerIds\x12+.hawkr.buyer.ListSubscribedSellerIdsRequest\x1a,.hawkr.buyer.ListSubscribedSellerIdsResponse\x12\x89\x01\n" +
+	"\x1eBatchCheckRestockSubscriptions\x122.hawkr.buyer.BatchCheckRestockSubscriptionsRequest\x1a3.hawkr.buyer.BatchCheckRestockSubscriptionsResponse\x12b\n" +
+	"\x11ResolvePrincipals\x12%.hawkr.buyer.ResolvePrincipalsRequest\x1a&.hawkr.buyer.ResolvePrincipalsResponse\x12n\n" +
 	"\x15ListBuyerIDsByAccount\x12).hawkr.buyer.ListBuyerIDsByAccountRequest\x1a*.hawkr.buyer.ListBuyerIDsByAccountResponse\x12\x89\x01\n" +
 	"\x1eBatchGetBuyerDisplayByBuyerIDs\x122.hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsRequest\x1a3.hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse\x12]\n" +
 	"\x13GetBuyerEntitlement\x12'.hawkr.buyer.GetBuyerEntitlementRequest\x1a\x1d.hawkr.buyer.BuyerEntitlementB\xa9\x01\n" +
@@ -1978,8 +1978,8 @@ var file_buyer_buyer_proto_depIdxs = []int32{
 	11, // 11: hawkr.buyer.BuyerService.BatchCheckFavorites:input_type -> hawkr.buyer.BatchCheckFavoritesRequest
 	13, // 12: hawkr.buyer.BuyerService.ListFavoritedProductIds:input_type -> hawkr.buyer.ListFavoritedProductIdsRequest
 	15, // 13: hawkr.buyer.BuyerService.ListSubscribedSellerIds:input_type -> hawkr.buyer.ListSubscribedSellerIdsRequest
-	20, // 14: hawkr.buyer.BuyerService.ResolvePrincipals:input_type -> hawkr.buyer.ResolvePrincipalsRequest
-	22, // 15: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:input_type -> hawkr.buyer.BatchCheckRestockSubscriptionsRequest
+	22, // 14: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:input_type -> hawkr.buyer.BatchCheckRestockSubscriptionsRequest
+	20, // 15: hawkr.buyer.BuyerService.ResolvePrincipals:input_type -> hawkr.buyer.ResolvePrincipalsRequest
 	24, // 16: hawkr.buyer.BuyerService.ListBuyerIDsByAccount:input_type -> hawkr.buyer.ListBuyerIDsByAccountRequest
 	17, // 17: hawkr.buyer.BuyerService.BatchGetBuyerDisplayByBuyerIDs:input_type -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsRequest
 	26, // 18: hawkr.buyer.BuyerService.GetBuyerEntitlement:input_type -> hawkr.buyer.GetBuyerEntitlementRequest
@@ -1990,8 +1990,8 @@ var file_buyer_buyer_proto_depIdxs = []int32{
 	12, // 23: hawkr.buyer.BuyerService.BatchCheckFavorites:output_type -> hawkr.buyer.BatchCheckFavoritesResponse
 	14, // 24: hawkr.buyer.BuyerService.ListFavoritedProductIds:output_type -> hawkr.buyer.ListFavoritedProductIdsResponse
 	16, // 25: hawkr.buyer.BuyerService.ListSubscribedSellerIds:output_type -> hawkr.buyer.ListSubscribedSellerIdsResponse
-	21, // 26: hawkr.buyer.BuyerService.ResolvePrincipals:output_type -> hawkr.buyer.ResolvePrincipalsResponse
-	23, // 27: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:output_type -> hawkr.buyer.BatchCheckRestockSubscriptionsResponse
+	23, // 26: hawkr.buyer.BuyerService.BatchCheckRestockSubscriptions:output_type -> hawkr.buyer.BatchCheckRestockSubscriptionsResponse
+	21, // 27: hawkr.buyer.BuyerService.ResolvePrincipals:output_type -> hawkr.buyer.ResolvePrincipalsResponse
 	25, // 28: hawkr.buyer.BuyerService.ListBuyerIDsByAccount:output_type -> hawkr.buyer.ListBuyerIDsByAccountResponse
 	19, // 29: hawkr.buyer.BuyerService.BatchGetBuyerDisplayByBuyerIDs:output_type -> hawkr.buyer.BatchGetBuyerDisplayByBuyerIDsResponse
 	27, // 30: hawkr.buyer.BuyerService.GetBuyerEntitlement:output_type -> hawkr.buyer.BuyerEntitlement

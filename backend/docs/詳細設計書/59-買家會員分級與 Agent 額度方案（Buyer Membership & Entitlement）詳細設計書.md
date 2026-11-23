@@ -28,7 +28,7 @@
 | 類型 | 項目 |
 |---|---|
 | Goal | 三級方案（`free`／`basic`／`premium`）的額度與價格可透過資料變更，不需重新部署服務。 |
-| Goal | 營運可在後台調整方案目錄的額度、月費與是否開放購買，即時生效。（手動指派方案給單一買家沒有後台 API，指派路徑預定刪除，見 §5.1。） |
+| Goal | 營運可在後台調整方案目錄的額度、月費與是否開放購買，即時生效。（沒有指派方案給單一買家的路徑，每個買家都是 free 方案。） |
 | Goal | `ai-service` 的 57 號 §7 reserve-commit-release 機制不受影響，只有額度上限與週期起訖改由本模組提供。 |
 | Non-Goal | **不**做真的收費／扣款。 |
 | Non-Goal | **不**做網站上的方案選購頁面。 |
@@ -56,7 +56,7 @@ flowchart LR
   MONO -->|"未搬路徑"| GW[Gateway]
   GW -->|"gRPC: ChatStream / ProcurementTurn"| AI["ai-service（§7 quota 機制）"]
   AI -->|"gRPC: GetBuyerEntitlement（legacy buyerserver）"| BS
-  BS --> BSDB[("schema buyer<br/>membership_plans<br/>memberships")]
+  BS --> BSDB[("schema buyer<br/>membership_plans")]
   AI --> AIDB[("hawkr_ai<br/>ai_usage_reservations（57 號所有）")]
 ```
 
@@ -79,7 +79,7 @@ flowchart LR
 
 | 類型 | 項目 |
 |---|---|
-| 技術約束 | `membership_plans` 以 `plan_code` 為自然鍵、`memberships` 以 UUID 為 PK；schema 走單體模組的 Atlas desired state；後台 API 是 Connect；金額以新台幣整數元表示，禁止浮點。 |
+| 技術約束 | `membership_plans` 以 `plan_code` 為自然鍵；schema 走單體模組的 Atlas desired state；後台 API 是 Connect；金額以新台幣整數元表示，禁止浮點。 |
 | 既有系統約束 | `ai_usage_reservations`／§7 reserve-commit-release 是 57 號的機制，本書**不修改它**，只提供 limit／period 來源；`account_id` 是登入 principal，`buyer_id` 是業務身份，兩者不可互換（沿用 57 號 §2 慣例）。會員分級／額度計量軸是 **`buyer_id`**。一個帳號一生只有一個買家（建帳的 transaction 內建立，只隨帳號刪除關閉，見 [ADR 2026-09-30-account-created-provisions-buyer](/docs/adr/2026-09-30-account-created-provisions-buyer.md)），所以權益實際上跟著帳號；刪除帳號後重新註冊是新帳號、新買家，從 free 重新起算。 |
 | 契約約束 | 本模組的對外契約不提供跨版本相容窗口；契約異動一律直接替換，不保留舊欄位／舊語意。 |
 | **假設 (Assumptions)** | `ai-service` 對 `GetBuyerEntitlement` 的呼叫頻率＝每次 agent turn 一次，量級與 `/procurement/turns` 相同 → **QPS 上升到需要快取時才觸發 §9.2 重新評估**，不預先加快取。 |
@@ -100,7 +100,7 @@ flowchart LR
 flowchart TB
   subgraph bs["單體"]
     BSH["legacy buyerserver（gRPC）／httpapi buyer admin（Connect）"] --> BSU["buyer 模組 internal/membership"]
-    BSU --> BSR["sqlc store: buyer.membership_plans / buyer.memberships"]
+    BSU --> BSR["sqlc store: buyer.membership_plans"]
   end
   subgraph ai["ai-service"]
     AIU["usecase: procurement §7 quota check"] --> AIC["grpc client → 單體 BuyerService"]
@@ -111,7 +111,7 @@ flowchart TB
 
 | 模組/package | 責任 | 依賴 |
 |---|---|---|
-| buyer 模組 `internal/membership` | 方案目錄查詢與修改、生效方案判定（含錨點滾動計算） | sqlc store |
+| buyer 模組 `internal/membership` | 方案目錄查詢與修改、權益計算（固定 free 方案，額度週期依錨點逐月滾動） | sqlc store |
 | `ai-service/internal/procurement` | 57 號 §7.5 reserve 之前呼叫 `GetBuyerEntitlement` 取得動態 limit | `internal/client/buyer` grpc client |
 
 ### 4.3 部署拓撲與 Port
@@ -120,7 +120,7 @@ membership 是單體 buyer 模組的一部分，沒有獨立進程或 port；`Ge
 
 ### 4.4 命名／契約規約
 
-- `plan_code` 值域固定為 `free` / `basic` / `premium`（小寫）。值域由 `membership_plans` 的種子列界定，`memberships.plan_code` 以 FK 參照它，DB 層拒絕未知代碼。
+- `plan_code` 值域固定為 `free` / `basic` / `premium`（小寫）。值域由 `membership_plans` 的種子列界定。
 - ai-service 呼叫的 legacy gRPC 是 `GetBuyerEntitlement`；後台是 Connect `BuyerAdminService` 的 `ListMembershipPlans`、`UpdateMembershipPlan`。
 
 ### 4.5 實作位置
@@ -129,7 +129,7 @@ membership 是單體 buyer 模組的一部分，沒有獨立進程或 port；`Ge
 |---|---|
 | `api/hawkr/admin/buyer/v1alpha1/buyer.proto` | 後台方案目錄 API（`ListMembershipPlans`、`UpdateMembershipPlan`） |
 | `backend/api/proto/buyer/buyer.proto` | legacy `GetBuyerEntitlement`（ai-service 搬進單體前的契約） |
-| `backend/internal/modules/buyer/internal/membership/` | 方案判定（含錨點滾動計算）、方案目錄修改 |
+| `backend/internal/modules/buyer/internal/membership/` | 權益計算（含錨點滾動）、方案目錄修改 |
 | `backend/internal/modules/buyer/db/` | 兩張表的 desired state、migration 與種子資料 |
 | `backend/internal/httpapi/buyer/admin.go` | 後台 Connect handler |
 | `backend/internal/legacy/buyerserver/server.go` | `GetBuyerEntitlement` 的 legacy handler |
@@ -146,48 +146,38 @@ membership 是單體 buyer 模組的一部分，沒有獨立進程或 port；`Ge
 
 **`buyer.membership_plans`**（方案目錄）：`plan_code` 是 PK（`free` / `basic` / `premium`，由種子 migration 建立，不能新增或刪除）；`display_name`；`monthly_answer_limit`（每期 Agent 額度，> 0）；`monthly_price_twd`（新台幣整數元，≥ 0）；`is_purchasable`（是否開放自助購買）；`version`（後台 etag）；`created_at`／`updated_at`。
 
-**`buyer.memberships`**（方案指派歷史）：`id`（UUID）；`buyer_id`（業務鍵，**不是** `account_id`）；`plan_code`（FK → `membership_plans`）；`period_start`／`period_end`；`source`（只存 `ADMIN`；免費方案的 `SYSTEM_DEFAULT` 只在查詢時於記憶體合成，不寫入）；`status`（`ACTIVE` \| `SUPERSEDED`）；`request_id`（冪等鍵，全域 UNIQUE）；`granted_by`（admin 操作者的 `account_id`，識別操作者本人）；`note`；`created_at`。
-
-> 指派的寫入路徑（`AssignMembership` 與 `memberships` 表）目前沒有任何呼叫端，預定刪除，刪除時機記在 A3 計畫（`backend/docs/plans/2026-09-29-a3-buyer-seller.md` 步驟 6）。在那之前，下面與指派有關的規則只描述現有程式碼。
+> 買家的方案不落地，沒有指派方案的寫入路徑，由 `Entitlement` 在查詢時計算。有效權益固定是 `free` 方案，要讓買家有不同方案，需要新的設計（含儲存與購買流程），不是恢復舊表。
 
 **不變式**：
 
-- 每個 `buyer_id` 同時最多一筆 `status='ACTIVE'`：partial unique index `memberships_active`（DB 層強制）。
-- 沒有有效 `ACTIVE` row 的買家視為 `free` 方案，週期錨點＝**該買家 `buyers.created_at`**（買家在建帳的 transaction 內建立，所以等於建帳時間）。已關閉（CLOSED）的買家查詢權益回 NotFound。
-- 換方案＝「結束舊 row（`status='SUPERSEDED'`）＋ insert 新 row」，不是 update in place，同一 DB transaction 內完成（見 §5.3）。
-- **週期公式（錨點滾動）**：適用於沒有 active row 的隱性 free 方案——以 `buyers.created_at` 為錨點逐月滾動至涵蓋 `NOW()` 的那一格。`period_end` = `period_start` 下個月同一天（calendar-month anchored）。**admin 指派的 row 不走這個公式**，它的 `period_end` = 指派當下 ＋ `period_days`（未帶時 30 天）。月底邊界 clamp 規則：若 `period_start` 的日期在下個月不存在（例如 1/31 起算，2 月無 31 日），`period_end` 取該月最後一天（1/31 → 2/28 或 2/29）；次一週期續約從該 clamp 後的日期繼續算，**不回補漂移**（不保留原始錨點日，也不追蹤累積誤差）。
+- 每個買家的有效權益固定是 `free` 方案（`membership_plans` 的 `free` 列，`monthly_answer_limit` 取自該列，營運可線上調整）。
+- 週期錨點＝**該買家 stint 的 `buyers.created_at`**（買家在建帳的 transaction 內建立，所以等於建帳時間）。已關閉（CLOSED）的買家查詢權益回 NotFound。
+- 權益不落地：每次查詢由 `Entitlement` 依 `buyers.created_at` 與當下時間計算，沒有狀態需要遷移或過期標記。
+- **週期公式（錨點滾動）**：以 `buyers.created_at` 為錨點逐月滾動至涵蓋 `NOW()` 的那一格。`period_end` = `period_start` 下個月同一天（calendar-month anchored）。月底邊界 clamp 規則：若 `period_start` 的日期在下個月不存在（例如 1/31 起算，2 月無 31 日），`period_end` 取該月最後一天（1/31 → 2/28 或 2/29）；次一週期從該 clamp 後的日期繼續算，**不回補漂移**（不保留原始錨點日，也不追蹤累積誤差）。
 
 **生效方案判定邏輯**：
 
 ```mermaid
 flowchart TD
-  Start["查詢 buyer_id 目前生效方案"] --> HasActive{"有 status='ACTIVE' 的<br/>memberships row？"}
-  HasActive -- 否 --> Free["視為 free 方案<br/>週期錨點 = 該 buyer_id 的 buyers.created_at"]
-  HasActive -- 是 --> InPeriod{"NOW() 是否在<br/>[period_start, period_end) 內？"}
-  InPeriod -- 是 --> UsePlan["採用該 row 的 plan_code<br/>查 membership_plans 取得 monthly_answer_limit"]
-  InPeriod -- 否，已過期 --> Free
-  Free --> Limit["回傳 free 方案的 monthly_answer_limit<br/>（週期依錨點滾動重算）"]
-  UsePlan --> Return["回傳 BuyerEntitlement<br/>{plan_code, limit, period_start, period_end}"]
-  Limit --> Return
+  Start["查詢 buyer_id 目前生效方案"] --> Closed{"買家已關閉？"}
+  Closed -- 是 --> NotFound["回 NotFound"]
+  Closed -- 否 --> Free["free 方案<br/>週期錨點 = 該 buyer_id 的 buyers.created_at"]
+  Free --> Return["回傳 BuyerEntitlement<br/>{plan_code, limit, period_start, period_end}<br/>（週期依錨點滾動重算）"]
 ```
-
-> 過期 row 不會被背景工作標記，純粹是查詢當下的即時判定——不需要每天跑一支批次工作把過期方案標記過期。
 
 ### 5.2 索引與查詢模式
 
 | 索引 | 用途 |
 |---|---|
-| `memberships_active`：`memberships(buyer_id) WHERE status='ACTIVE'`，UNIQUE | `GetBuyerEntitlement` 核心查詢路徑：這個買家現在生效方案 |
-| `memberships_request`：`memberships(request_id)`，UNIQUE | 指派的冪等鍵 |
 | `membership_plans` PK（`plan_code`） | 方案代碼查目錄 |
 
 ### 5.3 序號／排序／一致性
 
-無 seqId 需求（非即時串流資料）。指派路徑（預定刪除）的「新指派覆蓋舊指派」用「同一 transaction 內 `UPDATE` 舊 row `status='SUPERSEDED'` + `INSERT` 新 row」兩步完成，避免中間態被讀到兩筆 active；`buyer_id` 的 partial unique index 是最後一道防線。
+無 seqId 需求（非即時串流資料）；權益不落地，沒有需要排序或一致性保護的寫入。
 
 ### 5.4 Schema 演進與遷移
 
-- 兩張表定義在 buyer 模組的 `db/schema.sql`（desired state），migration 由 `atlas migrate diff` 產生，禁止手寫；種子資料是一支資料 migration（`*_buyer_membership_plan_seeds.sql`）。
+- `membership_plans` 定義在 buyer 模組的 `db/schema.sql`（desired state），migration 由 `atlas migrate diff` 產生，禁止手寫；種子資料是一支資料 migration（`*_buyer_membership_plan_seeds.sql`）。
 - schema 變更一律走 Atlas，不得直接對遠端 DB 下 DDL。
 
 ---
@@ -203,7 +193,7 @@ flowchart TD
 | `ListMembershipPlans` | 回傳全部方案目錄列，不分頁 |
 | `UpdateMembershipPlan` | 以 `update_mask` 修改額度、月費、是否開放購買；`plan_code` 與 `etag` 必填，`plan_code` 不可修改，`display_name` 不開放編輯；不存在的 `plan_code` 回 NotFound，etag 不符回版本衝突 |
 
-錯誤依〈API 設計規範（Connect）〉的 Connect code 與 `ErrorReason`。沒有查詢或指派單一買家方案的後台 API，也沒有買家查詢自己額度的對外端點。
+錯誤依〈API 設計規範（Connect）〉的 Connect code 與 `ErrorReason`。沒有查詢單一買家方案的後台 API，也沒有買家查詢自己額度的對外端點。
 
 > `is_purchasable=false` 只限制自助購買通道；目前沒有購買通道，這個欄位只有後台可改。
 
@@ -213,7 +203,7 @@ ai-service 搬進單體前，以 legacy `BuyerService.GetBuyerEntitlement`（`ba
 
 | RPC | 呼叫者 | 語意 |
 |---|---|---|
-| `GetBuyerEntitlement` | `ai-service` | 以 `buyer_id` 查目前生效方案，回傳 `plan_code`／`monthly_answer_limit`／`period_start`／`period_end`／`source`。沒有有效指派時回 free 方案與依 `buyers.created_at` 錨點算出的週期（不回錯）；買家已關閉時回錯誤 |
+| `GetBuyerEntitlement` | `ai-service` | 以 `buyer_id` 查目前生效方案，回傳 `plan_code`／`monthly_answer_limit`／`period_start`／`period_end`。回 free 方案與依 `buyers.created_at` 錨點算出的週期；買家已關閉時回錯誤 |
 
 契約規約（legacy 慣例）：
 - 數值與 ID 欄位（`buyer_id`／`monthly_answer_limit`）是 `string`。
@@ -222,7 +212,7 @@ ai-service 搬進單體前，以 legacy `BuyerService.GetBuyerEntitlement`（`ba
 
 ### 6.3 非同步事件 (MQ)
 
-N/A——方案指派是同步操作，本模組不發 MQ 事件。
+N/A——本模組不發 MQ 事件。
 
 ### 6.4 即時通道 (WS/SSE)
 
@@ -280,7 +270,7 @@ sequenceDiagram
 
 ### 7.5 連線／狀態生命週期
 
-N/A——無 WS/長連線/工作流；`memberships` 的狀態是資料列狀態（`ACTIVE`/`SUPERSEDED`），已在 §5.1 說明，非連線 FSM。
+N/A——無 WS/長連線/工作流；權益不落地，沒有狀態機。
 
 ---
 
@@ -304,7 +294,7 @@ N/A——無 WS/長連線/工作流；`memberships` 的狀態是資料列狀態�
 
 ### 8.4 一致性與冪等
 
-`UpdateMembershipPlan` 以 etag 防止覆蓋他人的修改。`AssignMembership`（沒有呼叫端，預定刪除，見 §5.1）以 `request_id` 冪等：相同 `request_id` 且內容相同時回傳既有結果，內容不同時回錯誤。
+`UpdateMembershipPlan` 以 etag 防止覆蓋他人的修改。沒有其他寫入路徑。
 
 ### 8.5 設定與機密
 
@@ -376,7 +366,7 @@ N/A——沿用單體與 ai-service 既有的健康檢查，本模組不引入�
 |---|---|---|
 | unit | buyer 模組 `internal/membership` | 週期錨點計算與月底 clamp |
 | unit | `ai-service` | mock `GetBuyerEntitlement` 回傳不同 limit，驗證 57 號 §7 reserve/commit/release 正確套用該 limit |
-| integration | testcontainers | 種子方案、方案目錄的版本衝突、`AssignMembership` 冪等（隨指派路徑刪除） |
+| integration | testcontainers | 種子方案、方案目錄的版本衝突 |
 | integration | 跨服務 | `ai-service` 呼叫 `GetBuyerEntitlement` 逾時／失敗時的 fail-closed 行為 |
 
 ---
@@ -387,4 +377,3 @@ N/A——沿用單體與 ai-service 既有的健康檢查，本模組不引入�
 |---|---|
 | 錨點滾動週期 | 以買家自己的錨點（`buyers.created_at`）起算、逐月推進的額度計算週期：每月同一天、月底 clamp（§5.1）。它是**買家個人**錨點（不同買家各自不同天），與「全平台日曆月固定重置」不是同一件事，不要混淆 |
 | `GetBuyerEntitlement` | `ai-service` 向單體的 legacy BuyerService 查詢買家目前方案額度上限與週期起訖的內部 gRPC |
-| `memberships` | buyer 模組的方案指派歷史表；沒有寫入的呼叫端，預定刪除 |

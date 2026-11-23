@@ -26,8 +26,8 @@ const (
 	BuyerService_BatchCheckFavorites_FullMethodName            = "/hawkr.buyer.BuyerService/BatchCheckFavorites"
 	BuyerService_ListFavoritedProductIds_FullMethodName        = "/hawkr.buyer.BuyerService/ListFavoritedProductIds"
 	BuyerService_ListSubscribedSellerIds_FullMethodName        = "/hawkr.buyer.BuyerService/ListSubscribedSellerIds"
-	BuyerService_ResolvePrincipals_FullMethodName              = "/hawkr.buyer.BuyerService/ResolvePrincipals"
 	BuyerService_BatchCheckRestockSubscriptions_FullMethodName = "/hawkr.buyer.BuyerService/BatchCheckRestockSubscriptions"
+	BuyerService_ResolvePrincipals_FullMethodName              = "/hawkr.buyer.BuyerService/ResolvePrincipals"
 	BuyerService_ListBuyerIDsByAccount_FullMethodName          = "/hawkr.buyer.BuyerService/ListBuyerIDsByAccount"
 	BuyerService_BatchGetBuyerDisplayByBuyerIDs_FullMethodName = "/hawkr.buyer.BuyerService/BatchGetBuyerDisplayByBuyerIDs"
 	BuyerService_GetBuyerEntitlement_FullMethodName            = "/hawkr.buyer.BuyerService/GetBuyerEntitlement"
@@ -39,53 +39,48 @@ const (
 //
 // Buyer Service - 買家服務
 type BuyerServiceClient interface {
-	// Profile
+	// ========== Profile ==========
 	GetBuyerProfile(ctx context.Context, in *GetBuyerProfileRequest, opts ...grpc.CallOption) (*BuyerProfileResponse, error)
+	// ========== Address ==========
 	GetAddress(ctx context.Context, in *GetAddressRequest, opts ...grpc.CallOption) (*GetAddressResponse, error)
 	ValidateAddress(ctx context.Context, in *ValidateAddressRequest, opts ...grpc.CallOption) (*ValidateAddressResponse, error)
+	// ========== Favorites and Subscriptions ==========
 	CheckFavorite(ctx context.Context, in *CheckFavoriteRequest, opts ...grpc.CallOption) (*CheckFavoriteResponse, error)
 	BatchCheckFavorites(ctx context.Context, in *BatchCheckFavoritesRequest, opts ...grpc.CallOption) (*BatchCheckFavoritesResponse, error)
 	// 取得使用者所有收藏的 product_id 列表（供 product-service /public/products?followed_product_only=true 使用，見 02 §4.2.4）
 	ListFavoritedProductIds(ctx context.Context, in *ListFavoritedProductIdsRequest, opts ...grpc.CallOption) (*ListFavoritedProductIdsResponse, error)
 	// 取得使用者所有追蹤的 seller_id 列表（供 product-service /public/products?followed_seller_only=true 使用，見 02 §4.2.4）
 	ListSubscribedSellerIds(ctx context.Context, in *ListSubscribedSellerIdsRequest, opts ...grpc.CallOption) (*ListSubscribedSellerIdsResponse, error)
-	// ========== Cross-Role Guards: Principal Resolution ==========
-	// 解析 buyer_id → 登入 principal account_id（② 買家 store-stint re-key
-	// W2/W3，mirrors the seller module ResolvePrincipals；供 im-service
-	// SendMessage 自我對話防護用）。只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
-	ResolvePrincipals(ctx context.Context, in *ResolvePrincipalsRequest, opts ...grpc.CallOption) (*ResolvePrincipalsResponse, error)
 	// 批次檢查多個 product 是否訂閱（PDP detail / 訂閱列表頁 client-side cache）
 	BatchCheckRestockSubscriptions(ctx context.Context, in *BatchCheckRestockSubscriptionsRequest, opts ...grpc.CallOption) (*BatchCheckRestockSubscriptionsResponse, error)
-	// ========== Internal: PII-Purge Historical Stint Lookup (D8, buyer-store-stint-rekey-w2w3) ==========
+	// ========== Principal Resolution ==========
+	// 解析 buyer_id → 登入 principal account_id（供 im-service SendMessage 自我對話防護用）。
+	// 只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
+	ResolvePrincipals(ctx context.Context, in *ResolvePrincipalsRequest, opts ...grpc.CallOption) (*ResolvePrincipalsResponse, error)
+	// ========== Historical Stint Lookup ==========
 	// Returns ALL buyer_id stints ever assigned to this account_id, including
-	// closed ones — unlike GetBuyerProfile/EnsureBuyerProfile, which only ever
-	// resolve the CURRENT stint. INTERNAL USE ONLY: exists solely for the
+	// closed ones — unlike GetBuyerProfile, which only resolves the CURRENT
+	// stint. INTERNAL USE ONLY: exists solely for the
 	// buyer.deleted/account.deleted PII-purge consumer (im-service) to
 	// enumerate every buyer_id a message's sender_id may have used across
 	// re-registrations, so it can scrub all of them. Do not call this from any
 	// caller-facing feature, authorization check, or display path.
 	ListBuyerIDsByAccount(ctx context.Context, in *ListBuyerIDsByAccountRequest, opts ...grpc.CallOption) (*ListBuyerIDsByAccountResponse, error)
-	// ========== Display: Tombstone-safe Name Resolution (#2830) ==========
+	// ========== Display ==========
 	// 解析 buyer_id → **可公開顯示**的名字，已註銷的 stint 也解得出來。
 	//
-	// 🔴 與 BatchGetBuyerMetaByBuyerIDs 的差別，以及為什麼需要兩支：
-	// 那支帶 `deleted_at IS NULL`（`GetBuyersByBuyerIDs`），那是**刻意的 PII 邊界**
-	// ——帳號關閉後不再供應個資，gateway 有測試把它的 404 行為釘成契約。但它的
-	// 副作用是：所有持有歷史 buyer_id 的顯示面（評論作者、訂單買家、對話對象）
-	// 在買家註銷後一律變成空字串，而各前端各自發明了不同的 fallback
-	// （匿名買家／匿名／會員xxxx／顧客／-／買家／欄位直接消失，共七種）。
-	//
-	// 本 RPC 的解法是**在來源就給出可顯示的值**，而不是讓 N 個顯示端各補一次：
+	// 在來源就給出可顯示的值，而不是讓各顯示端（評論作者、訂單買家、對話對象）各自補 fallback：
 	//   - 未註銷 → 回真實 display_name
 	//   - 已註銷 → **一律回墓碑字串**（與 SetBuyerPIICleared 寫進欄位的同一個常數），
 	//     即使該 stint 的 PII 尚未被 30 天 cron 清掉，**真名也不會離開 DB**
 	//   - avatar_key 對已註銷者恆為空（頭像是個資）
 	//
-	// ⇒ PII 邊界原封不動：已註銷 stint 沒有任何個資經由本 RPC 過線。
+	// ⇒ 已註銷 stint 沒有任何個資經由本 RPC 過線。
 	// ⇒ 「map 有 key ＝ 解析成功／沒有 key ＋ error ＝ 服務不可用」結構上可區分，
 	//
-	//	呼叫端不再需要靠空字串去猜是哪一種。
+	//	呼叫端不需要靠空字串去猜是哪一種。
 	BatchGetBuyerDisplayByBuyerIDs(ctx context.Context, in *BatchGetBuyerDisplayByBuyerIDsRequest, opts ...grpc.CallOption) (*BatchGetBuyerDisplayByBuyerIDsResponse, error)
+	// ========== Entitlement ==========
 	GetBuyerEntitlement(ctx context.Context, in *GetBuyerEntitlementRequest, opts ...grpc.CallOption) (*BuyerEntitlement, error)
 }
 
@@ -167,20 +162,20 @@ func (c *buyerServiceClient) ListSubscribedSellerIds(ctx context.Context, in *Li
 	return out, nil
 }
 
-func (c *buyerServiceClient) ResolvePrincipals(ctx context.Context, in *ResolvePrincipalsRequest, opts ...grpc.CallOption) (*ResolvePrincipalsResponse, error) {
+func (c *buyerServiceClient) BatchCheckRestockSubscriptions(ctx context.Context, in *BatchCheckRestockSubscriptionsRequest, opts ...grpc.CallOption) (*BatchCheckRestockSubscriptionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ResolvePrincipalsResponse)
-	err := c.cc.Invoke(ctx, BuyerService_ResolvePrincipals_FullMethodName, in, out, cOpts...)
+	out := new(BatchCheckRestockSubscriptionsResponse)
+	err := c.cc.Invoke(ctx, BuyerService_BatchCheckRestockSubscriptions_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *buyerServiceClient) BatchCheckRestockSubscriptions(ctx context.Context, in *BatchCheckRestockSubscriptionsRequest, opts ...grpc.CallOption) (*BatchCheckRestockSubscriptionsResponse, error) {
+func (c *buyerServiceClient) ResolvePrincipals(ctx context.Context, in *ResolvePrincipalsRequest, opts ...grpc.CallOption) (*ResolvePrincipalsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(BatchCheckRestockSubscriptionsResponse)
-	err := c.cc.Invoke(ctx, BuyerService_BatchCheckRestockSubscriptions_FullMethodName, in, out, cOpts...)
+	out := new(ResolvePrincipalsResponse)
+	err := c.cc.Invoke(ctx, BuyerService_ResolvePrincipals_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -223,53 +218,48 @@ func (c *buyerServiceClient) GetBuyerEntitlement(ctx context.Context, in *GetBuy
 //
 // Buyer Service - 買家服務
 type BuyerServiceServer interface {
-	// Profile
+	// ========== Profile ==========
 	GetBuyerProfile(context.Context, *GetBuyerProfileRequest) (*BuyerProfileResponse, error)
+	// ========== Address ==========
 	GetAddress(context.Context, *GetAddressRequest) (*GetAddressResponse, error)
 	ValidateAddress(context.Context, *ValidateAddressRequest) (*ValidateAddressResponse, error)
+	// ========== Favorites and Subscriptions ==========
 	CheckFavorite(context.Context, *CheckFavoriteRequest) (*CheckFavoriteResponse, error)
 	BatchCheckFavorites(context.Context, *BatchCheckFavoritesRequest) (*BatchCheckFavoritesResponse, error)
 	// 取得使用者所有收藏的 product_id 列表（供 product-service /public/products?followed_product_only=true 使用，見 02 §4.2.4）
 	ListFavoritedProductIds(context.Context, *ListFavoritedProductIdsRequest) (*ListFavoritedProductIdsResponse, error)
 	// 取得使用者所有追蹤的 seller_id 列表（供 product-service /public/products?followed_seller_only=true 使用，見 02 §4.2.4）
 	ListSubscribedSellerIds(context.Context, *ListSubscribedSellerIdsRequest) (*ListSubscribedSellerIdsResponse, error)
-	// ========== Cross-Role Guards: Principal Resolution ==========
-	// 解析 buyer_id → 登入 principal account_id（② 買家 store-stint re-key
-	// W2/W3，mirrors the seller module ResolvePrincipals；供 im-service
-	// SendMessage 自我對話防護用）。只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
-	ResolvePrincipals(context.Context, *ResolvePrincipalsRequest) (*ResolvePrincipalsResponse, error)
 	// 批次檢查多個 product 是否訂閱（PDP detail / 訂閱列表頁 client-side cache）
 	BatchCheckRestockSubscriptions(context.Context, *BatchCheckRestockSubscriptionsRequest) (*BatchCheckRestockSubscriptionsResponse, error)
-	// ========== Internal: PII-Purge Historical Stint Lookup (D8, buyer-store-stint-rekey-w2w3) ==========
+	// ========== Principal Resolution ==========
+	// 解析 buyer_id → 登入 principal account_id（供 im-service SendMessage 自我對話防護用）。
+	// 只解析存活的買家；其餘的 id 不在 principals 裡，只出現在 unresolved_ids。
+	ResolvePrincipals(context.Context, *ResolvePrincipalsRequest) (*ResolvePrincipalsResponse, error)
+	// ========== Historical Stint Lookup ==========
 	// Returns ALL buyer_id stints ever assigned to this account_id, including
-	// closed ones — unlike GetBuyerProfile/EnsureBuyerProfile, which only ever
-	// resolve the CURRENT stint. INTERNAL USE ONLY: exists solely for the
+	// closed ones — unlike GetBuyerProfile, which only resolves the CURRENT
+	// stint. INTERNAL USE ONLY: exists solely for the
 	// buyer.deleted/account.deleted PII-purge consumer (im-service) to
 	// enumerate every buyer_id a message's sender_id may have used across
 	// re-registrations, so it can scrub all of them. Do not call this from any
 	// caller-facing feature, authorization check, or display path.
 	ListBuyerIDsByAccount(context.Context, *ListBuyerIDsByAccountRequest) (*ListBuyerIDsByAccountResponse, error)
-	// ========== Display: Tombstone-safe Name Resolution (#2830) ==========
+	// ========== Display ==========
 	// 解析 buyer_id → **可公開顯示**的名字，已註銷的 stint 也解得出來。
 	//
-	// 🔴 與 BatchGetBuyerMetaByBuyerIDs 的差別，以及為什麼需要兩支：
-	// 那支帶 `deleted_at IS NULL`（`GetBuyersByBuyerIDs`），那是**刻意的 PII 邊界**
-	// ——帳號關閉後不再供應個資，gateway 有測試把它的 404 行為釘成契約。但它的
-	// 副作用是：所有持有歷史 buyer_id 的顯示面（評論作者、訂單買家、對話對象）
-	// 在買家註銷後一律變成空字串，而各前端各自發明了不同的 fallback
-	// （匿名買家／匿名／會員xxxx／顧客／-／買家／欄位直接消失，共七種）。
-	//
-	// 本 RPC 的解法是**在來源就給出可顯示的值**，而不是讓 N 個顯示端各補一次：
+	// 在來源就給出可顯示的值，而不是讓各顯示端（評論作者、訂單買家、對話對象）各自補 fallback：
 	//   - 未註銷 → 回真實 display_name
 	//   - 已註銷 → **一律回墓碑字串**（與 SetBuyerPIICleared 寫進欄位的同一個常數），
 	//     即使該 stint 的 PII 尚未被 30 天 cron 清掉，**真名也不會離開 DB**
 	//   - avatar_key 對已註銷者恆為空（頭像是個資）
 	//
-	// ⇒ PII 邊界原封不動：已註銷 stint 沒有任何個資經由本 RPC 過線。
+	// ⇒ 已註銷 stint 沒有任何個資經由本 RPC 過線。
 	// ⇒ 「map 有 key ＝ 解析成功／沒有 key ＋ error ＝ 服務不可用」結構上可區分，
 	//
-	//	呼叫端不再需要靠空字串去猜是哪一種。
+	//	呼叫端不需要靠空字串去猜是哪一種。
 	BatchGetBuyerDisplayByBuyerIDs(context.Context, *BatchGetBuyerDisplayByBuyerIDsRequest) (*BatchGetBuyerDisplayByBuyerIDsResponse, error)
+	// ========== Entitlement ==========
 	GetBuyerEntitlement(context.Context, *GetBuyerEntitlementRequest) (*BuyerEntitlement, error)
 	mustEmbedUnimplementedBuyerServiceServer()
 }
@@ -302,11 +292,11 @@ func (UnimplementedBuyerServiceServer) ListFavoritedProductIds(context.Context, 
 func (UnimplementedBuyerServiceServer) ListSubscribedSellerIds(context.Context, *ListSubscribedSellerIdsRequest) (*ListSubscribedSellerIdsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSubscribedSellerIds not implemented")
 }
-func (UnimplementedBuyerServiceServer) ResolvePrincipals(context.Context, *ResolvePrincipalsRequest) (*ResolvePrincipalsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ResolvePrincipals not implemented")
-}
 func (UnimplementedBuyerServiceServer) BatchCheckRestockSubscriptions(context.Context, *BatchCheckRestockSubscriptionsRequest) (*BatchCheckRestockSubscriptionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BatchCheckRestockSubscriptions not implemented")
+}
+func (UnimplementedBuyerServiceServer) ResolvePrincipals(context.Context, *ResolvePrincipalsRequest) (*ResolvePrincipalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolvePrincipals not implemented")
 }
 func (UnimplementedBuyerServiceServer) ListBuyerIDsByAccount(context.Context, *ListBuyerIDsByAccountRequest) (*ListBuyerIDsByAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListBuyerIDsByAccount not implemented")
@@ -464,24 +454,6 @@ func _BuyerService_ListSubscribedSellerIds_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
-func _BuyerService_ResolvePrincipals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ResolvePrincipalsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BuyerServiceServer).ResolvePrincipals(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: BuyerService_ResolvePrincipals_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BuyerServiceServer).ResolvePrincipals(ctx, req.(*ResolvePrincipalsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _BuyerService_BatchCheckRestockSubscriptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BatchCheckRestockSubscriptionsRequest)
 	if err := dec(in); err != nil {
@@ -496,6 +468,24 @@ func _BuyerService_BatchCheckRestockSubscriptions_Handler(srv interface{}, ctx c
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BuyerServiceServer).BatchCheckRestockSubscriptions(ctx, req.(*BatchCheckRestockSubscriptionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BuyerService_ResolvePrincipals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolvePrincipalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BuyerServiceServer).ResolvePrincipals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BuyerService_ResolvePrincipals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BuyerServiceServer).ResolvePrincipals(ctx, req.(*ResolvePrincipalsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -590,12 +580,12 @@ var BuyerService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BuyerService_ListSubscribedSellerIds_Handler,
 		},
 		{
-			MethodName: "ResolvePrincipals",
-			Handler:    _BuyerService_ResolvePrincipals_Handler,
-		},
-		{
 			MethodName: "BatchCheckRestockSubscriptions",
 			Handler:    _BuyerService_BatchCheckRestockSubscriptions_Handler,
+		},
+		{
+			MethodName: "ResolvePrincipals",
+			Handler:    _BuyerService_ResolvePrincipals_Handler,
 		},
 		{
 			MethodName: "ListBuyerIDsByAccount",
