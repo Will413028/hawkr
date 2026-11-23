@@ -303,3 +303,11 @@ func TestBeginSecureUploadWithoutModuleIsUnavailable(t *testing.T) {
 		t.Fatalf("回 %v，預期 unavailable", err)
 	}
 }
+
+func TestBeginSecureUploadWithoutKeyringIsUnavailable(t *testing.T) {
+	e := newEnv(t, newApp(&fakeUploads{err: media.ErrNoKeyring}))
+	_, err := e.client.BeginSecureUpload(t.Context(), signedIn(&pb.BeginSecureUploadRequest{Size: 1}))
+	if connect.CodeOf(err) != connect.CodeUnavailable {
+		t.Fatalf("回 %v，預期 unavailable", err)
+	}
+}

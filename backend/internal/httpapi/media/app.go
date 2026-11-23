@@ -7,6 +7,7 @@ package media
 
 import (
 	"context"
+	"errors"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -104,6 +105,9 @@ func (h *App) BeginSecureUpload(ctx context.Context, req *connect.Request[pb.Beg
 		return nil, err
 	}
 	res, err := uploads.BeginSecureUpload(ctx, u, req.Msg.GetSize())
+	if errors.Is(err, media.ErrNoKeyring) {
+		return nil, rpc.Error(connect.CodeUnavailable, "機敏上傳需要 KEK 但模組沒有設定")
+	}
 	if err != nil {
 		return nil, err
 	}

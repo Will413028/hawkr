@@ -2,10 +2,15 @@ package media
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -25,6 +30,8 @@ type fakeSecure struct {
 	previewWho media.Uploader
 	preview    string
 	previewErr error
+	// previewReader 非 nil 時取代 preview 當讀取來源。
+	previewReader io.Reader
 }
 
 func (f *fakeSecure) PutSecureChunk(_ context.Context, u media.Uploader, token string, index int, body io.Reader, length int64) (media.SecureChunkResult, error) {
@@ -44,6 +51,9 @@ func (f *fakeSecure) ReadStagedSecure(_ context.Context, u media.Uploader, _ str
 	}
 	if u.ID != 7 {
 		return nil, apperr.NotFound("找不到")
+	}
+	if f.previewReader != nil {
+		return io.NopCloser(f.previewReader), nil
 	}
 	return io.NopCloser(strings.NewReader(f.preview)), nil
 }
@@ -127,7 +137,28 @@ func TestChunkRequiresAccount(t *testing.T) {
 	}
 }
 
+// 宣告的長度在上限內、實際 body 超過：由 MaxBytesReader 擋下（直接呼叫 handler，真的 client 不會多送）。
 func TestChunkOverSegmentSizeIsRejected(t *testing.T) {
+	f := &fakeSecure{}
+	h := NewSecureUploads(f, nil).Chunk()
+	size := int64(media.SecureChunkSize + 1)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/api/files/secure_uploads/tok/chunks/0", io.LimitReader(zeroReader{}, size))
+	req.ContentLength = 1
+	req.SetPathValue("token", "tok")
+	req.SetPathValue("index", "0")
+	req = req.WithContext(rpc.WithPrincipal(req.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: 7}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("狀態 %d，預期 413", rec.Code)
+	}
+	if f.chunkRead > media.SecureChunkSize {
+		t.Fatalf("模組讀到 %d 位元組，超過段大小", f.chunkRead)
+	}
+}
+
+// 宣告的 Content-Length 超過段大小：在進模組前就回 413。
+func TestChunkDeclaredLengthOverSegmentSizeIs413(t *testing.T) {
 	f := &fakeSecure{}
 	srv := secureServer(t, f, time.Minute)
 	size := int64(media.SecureChunkSize + 1)
@@ -135,8 +166,60 @@ func TestChunkOverSegmentSizeIsRejected(t *testing.T) {
 	if resp.StatusCode != http.StatusRequestEntityTooLarge {
 		t.Fatalf("狀態 %d，預期 413", resp.StatusCode)
 	}
-	if f.chunkRead > media.SecureChunkSize {
-		t.Fatalf("模組讀到 %d 位元組，超過段大小", f.chunkRead)
+	if f.chunkToken != "" {
+		t.Fatal("超過段大小的宣告不該到模組")
+	}
+}
+
+func TestChunkNonCanonicalIndexIs404(t *testing.T) {
+	f := &fakeSecure{}
+	srv := secureServer(t, f, time.Minute)
+	for _, idx := range []string{"+1", "01", "-1", "1.0", "x"} {
+		resp := do(t, http.MethodPut, srv.URL+"/api/files/secure_uploads/tok/chunks/"+idx, "account", strings.NewReader("a"), 1)
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("index %q 回 %d，預期 404", idx, resp.StatusCode)
+		}
+	}
+	if f.chunkToken != "" {
+		t.Fatal("不合規的 index 不該到模組")
+	}
+}
+
+type logSink struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (l *logSink) Enabled(context.Context, slog.Level) bool { return true }
+func (l *logSink) Handle(_ context.Context, r slog.Record) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if r.Level >= slog.LevelError {
+		l.n++
+	}
+	return nil
+}
+func (l *logSink) WithAttrs([]slog.Attr) slog.Handler { return l }
+func (l *logSink) WithGroup(string) slog.Handler      { return l }
+
+func TestChunkClientAbortIs400WithoutErrorLog(t *testing.T) {
+	for _, err := range []error{
+		context.Canceled,
+		io.ErrUnexpectedEOF,
+		syscall.ECONNRESET,
+		fmt.Errorf("讀段：%w", context.Canceled),
+	} {
+		sink := &logSink{}
+		h := NewSecureUploads(&fakeSecure{chunkErr: err}, slog.New(sink)).Chunk()
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/x", strings.NewReader("a"))
+		req.SetPathValue("token", "tok")
+		req.SetPathValue("index", "0")
+		req = req.WithContext(rpc.WithPrincipal(req.Context(), identity.Principal{Kind: identity.PrincipalAccount, ID: 7}))
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest || sink.n != 0 {
+			t.Errorf("%v：狀態 %d、error log %d 筆，預期 400 與 0 筆", err, rec.Code, sink.n)
+		}
 	}
 }
 
@@ -235,3 +318,37 @@ func TestPreviewUnknownTypeIsOpaque(t *testing.T) {
 		t.Fatalf("Content-Type = %q，預期 application/octet-stream", ct)
 	}
 }
+
+// 預覽讀不到第一段：在送 header 前回錯誤狀態，不是帶著壞內容的 200。
+func TestPreviewFirstSegmentFailureIsNot200(t *testing.T) {
+	f := &fakeSecure{previewReader: errReader{err: errors.New("kek 解不開")}}
+	srv := secureServer(t, f, time.Minute)
+	resp := do(t, http.MethodGet, srv.URL+"/api/files/secure_uploads/tok", "account", nil, 0)
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("狀態 %d，預期 500", resp.StatusCode)
+	}
+}
+
+// 預覽送出中途失敗：連線被中止，client 讀不到完整回應。
+func TestPreviewMidStreamFailureAbortsResponse(t *testing.T) {
+	head := strings.Repeat("a", 2<<20)
+	f := &fakeSecure{previewReader: io.MultiReader(strings.NewReader(head), errReader{err: errors.New("第二段壞了")})}
+	srv := secureServer(t, f, time.Minute)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/api/files/secure_uploads/tok", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Test-Who", "account")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if _, err := io.ReadAll(resp.Body); err == nil {
+		t.Fatal("中途失敗的預期連線被中止，卻讀到完整回應")
+	}
+}
+
+type errReader struct{ err error }
+
+func (e errReader) Read([]byte) (int, error) { return 0, e.err }

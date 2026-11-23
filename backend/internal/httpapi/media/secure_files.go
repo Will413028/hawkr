@@ -6,10 +6,12 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
@@ -85,13 +87,18 @@ func (h *SecureUploads) putChunk(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	index, err := strconv.Atoi(r.PathValue("index"))
-	if err != nil || index < 0 {
+	rawIndex := r.PathValue("index")
+	index, err := strconv.Atoi(rawIndex)
+	if err != nil || index < 0 || strconv.Itoa(index) != rawIndex {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 	if r.ContentLength < 0 {
 		http.Error(w, "length required", http.StatusLengthRequired)
+		return
+	}
+	if r.ContentLength > media.SecureChunkSize {
+		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 	if err := http.NewResponseController(w).SetReadDeadline(time.Now().Add(h.readTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
@@ -117,12 +124,17 @@ func (h *SecureUploads) getPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = rc.Close() }()
 	br := bufio.NewReader(rc)
-	head, _ := br.Peek(512)
+	head, err := br.Peek(512)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, bufio.ErrBufferFull) {
+		h.failure(w, r, err)
+		return
+	}
 	w.Header().Set("Content-Type", safeContentType(http.DetectContentType(head)))
 	w.Header().Set("Content-Disposition", "inline")
 	w.WriteHeader(http.StatusOK)
 	if _, err := io.Copy(w, br); err != nil {
 		h.log.WarnContext(r.Context(), "media：送出機敏暫存預覽中斷", "error", err)
+		panic(http.ErrAbortHandler)
 	}
 }
 
@@ -138,6 +150,9 @@ func (h *SecureUploads) failure(w http.ResponseWriter, r *http.Request, err erro
 		return
 	case errors.Is(err, os.ErrDeadlineExceeded):
 		http.Error(w, "request timeout", http.StatusRequestTimeout)
+		return
+	case isClientAbort(err):
+		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	case errors.Is(err, media.ErrNoKeyring):
 		h.log.ErrorContext(r.Context(), "media：機敏上傳需要 KEK 但模組沒有設定", "error", err)
@@ -180,6 +195,12 @@ func (h *SecureUploads) failure(w http.ResponseWriter, r *http.Request, err erro
 		h.log.ErrorContext(r.Context(), "media：機敏上傳端點失敗", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
+}
+
+// isClientAbort 判斷錯誤是 client 中途斷線或取消（不是伺服器的錯，不記 error）。
+func isClientAbort(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || errors.Is(err, net.ErrClosed)
 }
 
 // safeContentType 只放行圖片與 PDF 的型別，其餘（含 SVG）一律當不透明的二進位。

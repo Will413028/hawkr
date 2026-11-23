@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -476,10 +477,53 @@ func withTracing(tp trace.TracerProvider, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-	return otelhttp.NewHandler(h, "hawkr",
+	traced := otelhttp.NewHandler(restoreURL(h), "hawkr",
 		otelhttp.WithTracerProvider(tp),
 		otelhttp.WithPropagators(propagation.NewCompositeTextMapPropagator()),
 		otelhttp.WithSpanNameFormatter(spanName))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if red, ok := redactedTokenPath(r.URL.Path); ok {
+			// otelhttp 從請求的 URL 取 url.path、http.target 與 url.full 寫進 span：先以遮掉 token 的副本交給它，
+			// 內層再還原真的 URL（restoreURL）。
+			rc := r.Clone(context.WithValue(r.Context(), realURLKey{}, r.URL))
+			u := *r.URL
+			u.Path, u.RawPath = red, ""
+			rc.URL = &u
+			rc.RequestURI = u.RequestURI()
+			r = rc
+		}
+		traced.ServeHTTP(w, r)
+	})
+}
+
+type realURLKey struct{}
+
+// restoreURL 在 otelhttp 之內把 URL 換回真的（withTracing 為 token 路徑換成遮罩的副本）。
+func restoreURL(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u, ok := r.Context().Value(realURLKey{}).(*url.URL); ok {
+			r = r.Clone(r.Context())
+			r.URL = u
+			r.RequestURI = u.RequestURI()
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+const secureUploadsPrefix = "/api/files/secure_uploads/"
+
+// redactedTokenPath 把機敏上傳端點路徑裡的暫存 token 換成 {token}；不是這類路徑回 false。token 是持有即可預覽
+// 的憑據，不進 trace。
+func redactedTokenPath(path string) (string, bool) {
+	rest, ok := strings.CutPrefix(path, secureUploadsPrefix)
+	if !ok {
+		return "", false
+	}
+	_, tail, _ := strings.Cut(rest, "/")
+	if tail == "" {
+		return secureUploadsPrefix + "{token}", true
+	}
+	return secureUploadsPrefix + "{token}/" + tail, true
 }
 
 // spanName 以 procedure 命名 Connect 的請求；其他路徑只用 method，掃描器亂打的路徑不會變成大量的 span 名稱。
