@@ -115,7 +115,7 @@
       "message": "Some of what you entered was adjusted: {items}"
     },
     "reply.approval.complete": {
-      "message": "The RFQ snapshot is confirmed."
+      "message": "The request preview is ready."
     },
     "reply.approval.rationale": {
       "message": "It is sent to sellers only after you approve it."
@@ -133,7 +133,7 @@
       "message": "It needs to be confirmed again."
     },
     "reply.reconfirm.warning": {
-      "message": "Your request changed, so the RFQ snapshot you confirmed earlier is out of date."
+      "message": "Your request changed, so the earlier request preview is out of date."
     },
     "reply.rejected.next": {
       "message": "Please check it again."

@@ -237,7 +237,7 @@
       "description": "有欄位的值被調整後採用（例如過長被截斷）時的提示句，items 是「欄位：原因」以分隔詞連接。"
     },
     "reply.approval.complete": {
-      "message": "RFQ 快照已經確認好了。",
+      "message": "詢價預覽已經準備好了。",
       "description": "發布核准待執行時的完成句。"
     },
     "reply.approval.rationale": {
@@ -266,7 +266,7 @@
       "description": "發布核准過期時的下一步。"
     },
     "reply.reconfirm.warning": {
-      "message": "需求內容有更新，之前確認的 RFQ 快照已經過期。",
+      "message": "需求內容有更新，之前的詢價預覽已經過期。",
       "description": "發布核准過期時的警示句。"
     },
     "reply.rejected.next": {
