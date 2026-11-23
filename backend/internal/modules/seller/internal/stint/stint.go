@@ -59,6 +59,26 @@ func RequireNotRetiredShared(ctx context.Context, q *store.Queries, storeID int6
 	return nil
 }
 
+// ShareLockStore 以 FOR SHARE 鎖住 stint 並回報是否已退場。退場不可逆，所以先不加鎖讀一次：已退場直接回報、不取鎖；
+// 看起來未退場的才取 FOR SHARE，並在鎖內再讀一次。不存在回 NotFound。
+func ShareLockStore(ctx context.Context, q *store.Queries, storeID int64) (retired bool, err error) {
+	if err := model.Positive(storeID); err != nil {
+		return false, err
+	}
+	plain, err := q.StoreByID(ctx, storeID)
+	if err != nil {
+		return false, model.Error(err)
+	}
+	if plain.RetiredAt != nil {
+		return true, nil
+	}
+	row, err := q.ShareLockStore(ctx, storeID)
+	if err != nil {
+		return false, model.Error(err)
+	}
+	return row.RetiredAt != nil, nil
+}
+
 // LockAccountOf 鎖住 storeID 所屬帳號的全部 stint（含已關閉的，依 store_id 的順序）並回傳 storeID 那一列。措施的寫入與
 // 停權期間的重算都以帳號為單位、可能碰到同一個帳號的不同 stint，所以一律先以這個固定的順序鎖，兩個流程不會互鎖；
 // suspension.Recompute 在鎖內才讀措施。店家不存在回 NotFound。

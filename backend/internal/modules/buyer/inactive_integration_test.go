@@ -220,3 +220,61 @@ func TestPubClosedBuyersIsInlined(t *testing.T) {
 		t.Fatalf("pub_closed_buyers 沒有被內聯：\n%s", got)
 	}
 }
+
+// ShareLockByAccount 回報帳號唯一的買家是否已關閉：營運中與刪除中不算關閉，已關閉回 deleted=true，帳號沒有買家回 NotFound，
+// 沒有 transaction 時拒絕；持有共享鎖的 transaction 提交之前，BeginDeletion 的排他鎖拿不到。
+func TestShareLockByAccountReportsClosedAndBlocksTransitions(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	active := profile(t, f, 91)
+	pending := profile(t, f, 92)
+	closed := profile(t, f, 93)
+	must(t, f.module.BeginDeletion(ctx, pending.BuyerID))
+	must(t, f.module.CloseForDeletion(ctx, closed.BuyerID))
+
+	if _, err := f.module.ShareLockByAccount(ctx, active.AccountID); err == nil {
+		t.Fatal("沒有 transaction 時要拒絕：鎖在語句結束就放掉")
+	}
+	for _, c := range []struct {
+		account int64
+		deleted bool
+	}{{active.AccountID, false}, {pending.AccountID, false}, {closed.AccountID, true}} {
+		var got bool
+		err := f.database.InTx(ctx, func(ctx context.Context) error {
+			var err error
+			got, err = f.module.ShareLockByAccount(ctx, c.account)
+			return err
+		})
+		if err != nil || got != c.deleted {
+			t.Fatalf("帳號 %d：deleted=%v err=%v，預期 %v", c.account, got, err, c.deleted)
+		}
+	}
+	err := f.database.InTx(ctx, func(ctx context.Context) error {
+		_, err := f.module.ShareLockByAccount(ctx, 999999)
+		return err
+	})
+	if apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("沒有買家的帳號要 NotFound：%v", err)
+	}
+
+	done := make(chan error, 1)
+	err = f.database.InTx(ctx, func(txCtx context.Context) error {
+		if _, err := f.module.ShareLockByAccount(txCtx, active.AccountID); err != nil {
+			return err
+		}
+		go func() { done <- f.module.BeginDeletion(ctx, active.BuyerID) }()
+		if err := waitForBuyerLock(ctx, f); err != nil {
+			return err
+		}
+		select {
+		case err := <-done:
+			t.Errorf("共享鎖還在時 BeginDeletion 不該完成：%v", err)
+		default:
+		}
+		return nil
+	})
+	must(t, err)
+	must(t, <-done)
+}

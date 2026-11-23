@@ -28,6 +28,16 @@ type Accounts interface {
 	ShareLockAccount(ctx context.Context, id int64) (deleted bool, err error)
 }
 
+// Buyers 是 worker 對 buyer 的需求：以共享鎖鎖住帳號唯一的買家列（commit 前不會被關閉），並回報買家是否已關閉。buyer.Module 實作它。
+type Buyers interface {
+	ShareLockByAccount(ctx context.Context, accountID int64) (deleted bool, err error)
+}
+
+// Stores 是 worker 對 seller 的需求：以共享鎖鎖住店家列（commit 前不會被退場），並回報店家是否已退場。seller.Module 實作它。
+type Stores interface {
+	ShareLockStore(ctx context.Context, storeID int64) (retired bool, err error)
+}
+
 // Registry 是型別註冊表；正式組裝用 registry 套件的 Lookup，測試可以換成帶測試型別的版本。
 type Registry interface {
 	Lookup(name string) (registry.Entry, bool)
@@ -37,6 +47,8 @@ type Registry interface {
 type Deps struct {
 	DB       *db.DB
 	Accounts Accounts
+	Buyers   Buyers
+	Stores   Stores
 	Registry Registry
 	Jobs     jobs.Enqueuer
 	Now      func() time.Time
@@ -142,8 +154,39 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 			s.log().InfoContext(ctx, "收件帳號已刪除，略過通知", "intent_id", intent.ID, "type", intent.Type)
 			return nil
 		}
+		gone, err := s.recipientGone(ctx, spec.Audience, resolved.Recipient)
+		if err != nil {
+			return err
+		}
+		if gone {
+			s.log().InfoContext(ctx, "收件買家已關閉或收件店家已退場，略過通知", "intent_id", intent.ID, "type", intent.Type)
+			return nil
+		}
 		return s.deliver(ctx, intent, spec, resolved)
 	})
+}
+
+// recipientGone 接在帳號共享鎖之後（鎖順序：identity、buyer、seller、notification），以共享鎖鎖住 BUYER 收件人的買家列、
+// STORE 收件人的店家列，回報買家已關閉或店家已退場（BuyerDeleted、StoreRetired 之後不再為這個收件人建列）；
+// 列不存在與已刪除同樣視為不寫，並記 log。
+func (s *Service) recipientGone(ctx context.Context, audience model.Audience, r registry.Recipient) (bool, error) {
+	var gone bool
+	var err error
+	switch audience {
+	case model.AudienceBuyer:
+		gone, err = s.d.Buyers.ShareLockByAccount(ctx, r.AccountID)
+	case model.AudienceStore:
+		gone, err = s.d.Stores.ShareLockStore(ctx, r.StoreID)
+	default:
+		return false, fmt.Errorf("通知受眾 %q 不合法", audience)
+	}
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("鎖定收件人的買家或店家：%w", err)
+	}
+	return gone, nil
 }
 
 func (s *Service) log() *slog.Logger {

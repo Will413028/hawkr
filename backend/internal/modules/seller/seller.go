@@ -600,6 +600,13 @@ func (m *Module) LockNotRetired(ctx context.Context, storeID int64) error {
 	return m.closing.LockNotRetired(ctx, storeID)
 }
 
+// ShareLockStore 在呼叫方的 transaction 內以共享鎖（FOR SHARE）鎖住店家列，讓店家在 commit 之前不被退場；給只需要「店家在寫入完成前
+// 沒有退場」而不改店家的讀者（例如把通知寫給收件店家）。已退場回 retired=true（營運中、關店、等待刪除都放行），不存在回 NotFound。
+// 必須在 transaction 內呼叫。鎖順序：帳號列、買家列、店家列，然後才是呼叫方自己的表。
+func (m *Module) ShareLockStore(ctx context.Context, storeID int64) (retired bool, err error) {
+	return m.closing.ShareLockStore(ctx, storeID)
+}
+
 // BeginDeletion 讓店家隨帳號刪除進入等待；重送安全。只由 accountdeletion 在已鎖住帳號列的 transaction 內呼叫。
 func (m *Module) BeginDeletion(ctx context.Context, storeID int64) error {
 	return m.closing.BeginDeletion(ctx, storeID)

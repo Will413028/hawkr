@@ -54,6 +54,7 @@ var InternalDependencies = map[string]InternalGraph{
 	"notification": {Packages: map[string][]string{
 		"intake":   {"model", "registry", "store"},
 		"model":    {},
+		"purge":    {"model", "store"},
 		"registry": {"model", "text"},
 		"store":    {},
 		"text":     {},

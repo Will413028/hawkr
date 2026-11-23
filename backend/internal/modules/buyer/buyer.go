@@ -222,6 +222,13 @@ func (module *Module) LockNotClosed(ctx context.Context, buyerID int64) error {
 	return module.profile.LockNotClosed(ctx, buyerID)
 }
 
+// ShareLockByAccount 在呼叫方的 transaction 內以共享鎖（FOR SHARE）鎖住帳號唯一的買家列，讓買家列在 commit 之前不被關閉或改變狀態；
+// 給只需要「買家在寫入完成前沒有關閉」而不改買家的讀者（例如把通知寫給收件買家）。買家已關閉時回 deleted=true，刪除中放行，帳號沒有買家回
+// NotFound。必須在 transaction 內呼叫。鎖順序：帳號列、買家列，然後才是呼叫方自己的表。
+func (module *Module) ShareLockByAccount(ctx context.Context, accountID int64) (deleted bool, err error) {
+	return module.profile.ShareLockByAccount(ctx, accountID)
+}
+
 // AccountIDByBuyerID 讀取歷史或現任 stint 所屬的帳號鍵，不曝露個資。
 func (module *Module) AccountIDByBuyerID(ctx context.Context, buyerID int64) (int64, error) {
 	return module.profile.AccountIDByBuyerID(ctx, buyerID)

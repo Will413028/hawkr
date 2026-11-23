@@ -68,9 +68,10 @@ CREATE INDEX inbox_item_intents_item ON notification.inbox_item_intents (inbox_i
 -- 每渠道投遞紀錄：只記推播與 email，是每筆觸達與否的唯一來源。UNIQUE (intent, 收件人, 渠道) 是投遞冪等鍵；收件人含 store_id（一個帳號可以先後擁有已關閉的店與新店，兩間店各是一個收件人；BUYER 的 store_id 是 NULL，NULLS NOT DISTINCT 讓它也受唯一鍵約束）。
 -- 送出之後 locale、sent_title、sent_body 是「實際送出的文字」（送出時的事實，保留期內可由個資清除處理，所以清除後可為 NULL）；
 -- 還沒送出或永久失敗的列沒有送出文字。保留期以 created_at 起算。
+-- intent_id 是 RESTRICT：投遞紀錄的 created_at 晚於意圖，刪過期意圖不能連帶刪掉還在保留期內的投遞紀錄；清除 job 先刪過期投遞，再刪已無投遞的過期意圖。
 CREATE TABLE notification.deliveries (
     id             UUID        PRIMARY KEY,
-    intent_id      UUID        NOT NULL REFERENCES notification.intents (id) ON DELETE CASCADE,
+    intent_id      UUID        NOT NULL REFERENCES notification.intents (id) ON DELETE RESTRICT,
     account_id     BIGINT      NOT NULL,
     audience       TEXT        NOT NULL,
     store_id       BIGINT,
