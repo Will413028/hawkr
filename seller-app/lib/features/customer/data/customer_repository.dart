@@ -498,21 +498,16 @@ class CustomerRepository with ApiRequestHelper {
     return 0;
   }
 
+  /// 臺北日期；空字串或解析失敗是空字串（不顯示未解析的原文，畫面才能只對真的臺北日期附標籤）。
   String _formatDate(String raw, {String format = 'yyyy/MM/dd'}) {
-    if (raw.isEmpty) return '';
-    try {
-      final dt = DateTime.tryParse(
-        raw.contains('T') ? raw : raw.replaceFirst(' ', 'T'),
-      );
-      if (dt != null) {
-        final local = dt.taipeiWall;
-        if (format == 'MM/dd') {
-          return '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
-        }
-        return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
-      }
-    } catch (_) {}
-    return raw;
+    final dt = DateTime.tryParse(
+      raw.contains('T') ? raw : raw.replaceFirst(' ', 'T'),
+    );
+    if (dt == null) return '';
+    final local = dt.taipeiWall;
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return format == 'MM/dd' ? '$month/$day' : '${local.year}/$month/$day';
   }
 }
 

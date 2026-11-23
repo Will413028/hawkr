@@ -21,4 +21,16 @@ void main() {
     expect(DateFormatter.isExpired('2000-01-01T00:00:00Z'), isTrue);
     expect(DateFormatter.isExpired('2999-01-01T00:00:00Z'), isFalse);
   });
+
+  test('tryFormatToYYYYMMDD：解析失敗或空值是 null，formatToYYYYMMDD 保留原文', () {
+    expect(
+      DateFormatter.tryFormatToYYYYMMDD('2026-07-30T17:00:00Z'),
+      '2026/07/31',
+    );
+    expect(DateFormatter.tryFormatToYYYYMMDD('not a date'), isNull);
+    expect(DateFormatter.tryFormatToYYYYMMDD(''), isNull);
+    expect(DateFormatter.tryFormatToYYYYMMDD(null), isNull);
+    expect(DateFormatter.formatToYYYYMMDD('not a date'), 'not a date');
+    expect(DateFormatter.formatToYYYYMMDD(null), '');
+  });
 }

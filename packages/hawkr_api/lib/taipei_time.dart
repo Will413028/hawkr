@@ -169,7 +169,7 @@ DateTime? tryParseTaipeiInstant(String raw) {
 /// [offset] 是否為臺北的 +8 時。
 bool isTaipeiOffset(Duration offset) => offset == _taipeiUtcOffset;
 
-/// 裝置目前的時區偏移不是 +8 時；此時顯示臺北時間處要標「台北時間」（ADR 多語系架構 D5）。
+/// 裝置目前的時區偏移是 +8 時 true；false 時顯示臺北時間處要標「台北時間」（ADR 多語系架構 D5）。
 bool isDeviceInTaipeiOffset({DateTime? now}) =>
     isTaipeiOffset((now ?? DateTime.now()).timeZoneOffset);
 

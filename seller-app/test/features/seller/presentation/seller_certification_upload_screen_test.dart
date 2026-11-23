@@ -32,6 +32,7 @@ import '../../../support/fake_my_store.dart';
 import '../../../support/kyc_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
 import '../../../support/onboarding_fixtures.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _LoggedIn extends Session {
   @override
@@ -213,7 +214,12 @@ void main() {
         container: container,
         child: ScreenUtilInit(
           designSize: const Size(393, 852),
-          builder: (_, _) => MaterialApp.router(routerConfig: router),
+          builder: (_, _) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
         ),
       ),
     );

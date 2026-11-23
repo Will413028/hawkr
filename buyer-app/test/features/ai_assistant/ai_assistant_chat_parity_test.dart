@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 void main() {
   for (final width in <double>[320, 390]) {
@@ -35,6 +36,9 @@ void main() {
             enableScaleWH: () => false,
             enableScaleText: () => false,
             builder: (_, __) => MaterialApp(
+              locale: const Locale('zh'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
               builder: (context, child) => MediaQuery(
                 data: MediaQuery.of(
                   context,
@@ -87,7 +91,12 @@ void main() {
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
           enableScaleText: () => false,
-          builder: (_, __) => const MaterialApp(home: AiAssistantScreen()),
+          builder: (_, __) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: AiAssistantScreen(),
+          ),
         ),
       ),
     );
@@ -129,7 +138,10 @@ void main() {
 
   testWidgets('AI 頭像畫靜態 Material 圖示且保持框的尺寸', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: Center(child: AiAssistantAvatar(size: 40, isReplying: true)),
         ),
@@ -157,7 +169,12 @@ void main() {
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
           enableScaleText: () => false,
-          builder: (_, __) => const MaterialApp(home: AiAssistantScreen()),
+          builder: (_, __) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: AiAssistantScreen(),
+          ),
         ),
       ),
     );

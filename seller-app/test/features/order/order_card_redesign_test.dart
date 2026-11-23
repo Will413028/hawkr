@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 void main() {
   testWidgets('賣家列表卡片與詳情共用狀態、商品與配送風格', (tester) async {
@@ -34,6 +35,9 @@ void main() {
           enableScaleWH: () => false,
           enableScaleText: () => false,
           builder: (_, _) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             theme: AppTheme.light,
             builder: (context, child) => MediaQuery(
               data: AppMediaQueryPolicy.apply(
@@ -142,6 +146,9 @@ void main() {
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           home: Scaffold(
             body: Center(

@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:hawkr_api/taipei_time.dart';
 
 /// 即時倒數行（label + HH:MM:SS / N天 HH:MM:SS），每秒 tick 一次。
 ///
@@ -71,7 +72,7 @@ class _LiveCountdownLineState extends State<LiveCountdownLine> {
 
   @override
   Widget build(BuildContext context) {
-    final dt = DateTime.tryParse(widget.deadlineIso);
+    final dt = tryParseTaipeiInstant(widget.deadlineIso);
     if (dt == null) {
       // 無有效時間：靜態顯示 dash，與 _InfoLine 保持一致排版
       return Row(

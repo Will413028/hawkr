@@ -272,7 +272,7 @@ class _SpendingTable extends StatelessWidget {
                   SizedBox(
                     width: 92.w,
                     child: Text(
-                      h,
+                      i == 0 ? context.taipeiDisplay.labeled(h) : h,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16.sp,
@@ -294,7 +294,7 @@ class _SpendingTable extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _dataCell(context.taipeiDisplay.labeled(r.date)),
+                _dataCell(r.date),
                 SizedBox(width: 8.w),
                 _dataCell(r.orderId),
                 SizedBox(width: 8.w),

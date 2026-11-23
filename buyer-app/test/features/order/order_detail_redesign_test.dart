@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 void main() {
   if (!F.isInitialized) F.init(Flavor.dev);
@@ -64,7 +65,10 @@ void main() {
             designSize: const Size(390, 844),
             enableScaleWH: () => false,
             enableScaleText: () => false,
-            builder: (_, __) => const MaterialApp(
+            builder: (_, __) => MaterialApp(
+              locale: const Locale('zh'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
               home: OrderDetailScreen(
                 orderSn: 'O125369895',
                 heroTag: 'order-detail-card:O125369895',
@@ -141,8 +145,12 @@ void main() {
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
           enableScaleText: () => false,
-          builder: (_, __) =>
-              const MaterialApp(home: OrderDetailScreen(orderSn: 'O125369895')),
+          builder: (_, __) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: OrderDetailScreen(orderSn: 'O125369895'),
+          ),
         ),
       ),
     );

@@ -14,4 +14,10 @@ void main() {
     expect(formatOrderInfoDate('2026-07-30T16:30:00Z'), '2026/07/31 00:30');
     expect(formatOrderInfoDate(''), '');
   });
+
+  test('unparseable text has no formatted date (so no Taipei label)', () {
+    expect(tryFormatOrderInfoDate('soon'), isNull);
+    expect(tryFormatOrderInfoDate(''), isNull);
+    expect(formatOrderInfoDate('soon'), 'soon');
+  });
 }

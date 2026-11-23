@@ -28,6 +28,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../support/fake_seller_repository.dart';
 import 'moderation_fakes.dart';
 import 'package:hawkr_buyer/shared/time/taipei_display.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 pb.StoreReport _store({
   String id = 'r1',
@@ -167,8 +168,13 @@ Future<void> _pump(
           designSize: const Size(390, 844),
           enableScaleWH: () => false,
           enableScaleText: () => false,
-          builder: (_, _) =>
-              MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+          builder: (_, _) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            routerConfig: router,
+          ),
         ),
       ),
     ),

@@ -44,6 +44,36 @@ class CheckTaipeiDisplayTests(unittest.TestCase):
     def test_comment_lines_ignored(self):
         self.assertEqual(self.run_on({"a.dart": "  // d.toLocal() banned\n"}), [])
 
+    def test_tear_off_outside_helper_fails(self):
+        for fn in ("Timestamp", "DateTime", "Date"):
+            self.assertEqual(
+                len(self.run_on({"a.dart": f"xs.map(formatTaipei{fn}).toList();\n"})),
+                1,
+                fn,
+            )
+
+    def test_tear_off_inside_helper_passes(self):
+        self.assertEqual(
+            self.run_on(
+                {"shared/time/taipei_display.dart": "xs.map(formatTaipeiDate);\n"}
+            ),
+            [],
+        )
+
+    def test_trailing_comment_ignored_but_code_before_it_counts(self):
+        self.assertEqual(self.run_on({"a.dart": "final a = 1; // d.toLocal()\n"}), [])
+        self.assertEqual(
+            len(self.run_on({"a.dart": "d.toLocal(); // why\n"})), 1
+        )
+        self.assertEqual(
+            len(self.run_on({"a.dart": "x(formatTaipeiDate); // c\n"})), 1
+        )
+
+    def test_double_slash_in_string_is_not_a_comment(self):
+        self.assertEqual(
+            len(self.run_on({"a.dart": "final u = 'http://x'; d.toLocal();\n"})), 1
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

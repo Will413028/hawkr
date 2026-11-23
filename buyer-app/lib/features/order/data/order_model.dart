@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:hawkr_api/taipei_time.dart';
 
 part 'order_model.freezed.dart';
 part 'order_model.g.dart';
@@ -212,7 +213,7 @@ extension OrderAutoCompleteX on Order {
   /// 距離自動完成還有多少時間（DateTime.now() < autoCompleteAt 時為正值）
   Duration? get autoCompleteRemaining {
     if (autoCompleteAt.isEmpty) return null;
-    final dt = DateTime.tryParse(autoCompleteAt);
+    final dt = tryParseTaipeiInstant(autoCompleteAt);
     if (dt == null) return null;
     return dt.difference(DateTime.now());
   }
@@ -236,7 +237,7 @@ extension OrderPaymentDeadlineX on Order {
   /// 距離付款逾時還有多少時間（正值 = 還沒逾時）
   Duration? get paymentRemaining {
     if (paymentDeadline.isEmpty) return null;
-    final dt = DateTime.tryParse(paymentDeadline);
+    final dt = tryParseTaipeiInstant(paymentDeadline);
     if (dt == null) return null;
     return dt.difference(DateTime.now());
   }

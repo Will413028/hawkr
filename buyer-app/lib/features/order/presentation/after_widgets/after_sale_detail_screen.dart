@@ -702,7 +702,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
   bool _showShipBackUrgentBanner(AfterSaleCase c) {
     if (c.status != AfterSaleStatus.awaitingReturn) return false;
     if (c.shipBackDeadlineAt.isEmpty) return false;
-    final dt = DateTime.tryParse(c.shipBackDeadlineAt);
+    final dt = tryParseTaipeiInstant(c.shipBackDeadlineAt);
     if (dt == null) return false;
     final remaining = dt.difference(DateTime.now());
     if (remaining.isNegative) return false;
@@ -711,7 +711,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
 
   /// PR #983 D-1 警示 banner — 複用既有 `_buildRefundFormBanner` 樣板配色。
   Widget _buildShipBackUrgentBanner(AfterSaleCase c) {
-    final dt = DateTime.tryParse(c.shipBackDeadlineAt);
+    final dt = tryParseTaipeiInstant(c.shipBackDeadlineAt);
     final remaining = dt == null
         ? Duration.zero
         : dt.difference(DateTime.now());

@@ -9,28 +9,19 @@ class DateFormatter {
   /// 输入示例：2026-04-06T00:00:00Z
   /// 输出示例：2026/04/06
   ///
-  /// [dateStr] ISO 8601 格式的日期字符串
-  /// 返回格式化后的日期字符串，如果解析失败返回原字符串
-  static String formatToYYYYMMDD(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return '';
+  /// 返回格式化后的日期字符串，如果解析失败返回原字符串（此时不是臺北日期，不附「台北時間」标签；要标签用 [tryFormatToYYYYMMDD]）
+  static String formatToYYYYMMDD(String? dateStr) =>
+      tryFormatToYYYYMMDD(dateStr) ?? dateStr ?? '';
 
-    try {
-      // 解析 ISO 8601 格式
-      final utc = DateTime.parse(dateStr);
-
-      // 转换为臺北时间
-      final local = utc.taipeiWall;
-
-      // 格式化为 XXXX/XX/XX
-      final year = local.year;
-      final month = local.month.toString().padLeft(2, '0');
-      final day = local.day.toString().padLeft(2, '0');
-
-      return '$year/$month/$day';
-    } catch (e) {
-      // 解析失败时返回原字符串
-      return dateStr;
-    }
+  /// 同 [formatToYYYYMMDD]，空字符串或解析失败回 null。
+  static String? tryFormatToYYYYMMDD(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return null;
+    final utc = DateTime.tryParse(dateStr);
+    if (utc == null) return null;
+    final local = utc.taipeiWall;
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}/$month/$day';
   }
 
   /// 将 DateTime 对象转换为 XXXX/XX/XX 格式

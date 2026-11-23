@@ -17,6 +17,7 @@ import '../../../../shared/widgets/hk_post_card_surface.dart';
 import '../../../../shared/widgets/product_grid_spec.dart';
 import '../../../social/data/social_model.dart';
 import '../home_latest_posts_controller.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 首頁的內容型入口：最多顯示兩則貼文，完整瀏覽交給 social feed。
 class HomeLatestPostsSection extends ConsumerWidget {
@@ -221,8 +222,8 @@ class _HomePostPreviewCard extends StatelessWidget {
                           _MerchantMeta(
                             name: merchantName,
                             avatarUrl: post.merchantAvatar ?? '',
-                            timeLabel: timeAgoText(
-                              context.l10n,
+                            timeLabel: _timeAgoLabel(
+                              context,
                               _timeAgoOf(post.createdAt),
                             ),
                           ),
@@ -488,3 +489,6 @@ TimeAgo _timeAgoOf(dynamic value) {
 
   return taipeiTimeAgo(date);
 }
+
+String _timeAgoLabel(BuildContext context, TimeAgo ago) =>
+    context.taipeiDisplay.agoText(ago, timeAgoText(context.l10n, ago));

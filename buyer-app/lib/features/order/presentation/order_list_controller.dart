@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/session/session_provider.dart';
 import '../data/order_model.dart';
 import '../data/order_repository.dart';
+import 'package:hawkr_api/taipei_time.dart';
 
 part 'order_list_controller.g.dart';
 
@@ -38,7 +39,7 @@ class OrderListController extends _$OrderListController {
         ? o.paymentDeadline
         : o.statusTime;
     if (deadlineStr.isEmpty) return false;
-    final deadline = DateTime.tryParse(deadlineStr);
+    final deadline = tryParseTaipeiInstant(deadlineStr);
     if (deadline == null) return false;
     final nowUtc = DateTime.now().toUtc();
     return deadline.toUtc().isBefore(nowUtc);

@@ -16,6 +16,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import '../../../support/fake_my_store.dart';
 import 'package:hawkr_seller/shared/time/taipei_display.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _Fixed extends AccountRestrictionState {
   _Fixed(this.value);
@@ -79,7 +80,12 @@ Future<List<String>> _pump(
         ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
-          builder: (_, _) => MaterialApp.router(routerConfig: router),
+          builder: (_, _) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
         ),
       ),
     ),

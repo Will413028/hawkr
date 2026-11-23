@@ -187,10 +187,10 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
   TaipeiDisplay t,
 ) {
   final end = measure.hasPeriod() && measure.period.hasEndTime()
-      ? t.timestamp(measure.period.endTime)
+      ? t.plainTimestamp(measure.period.endTime)
       : '';
   final start = measure.hasPeriod() && measure.period.hasStartTime()
-      ? t.timestamp(measure.period.startTime)
+      ? t.plainTimestamp(measure.period.startTime)
       : '';
   final terminated = measure.kind == MeasureKind.MEASURE_KIND_TERMINATION;
   final state = measure.state;
@@ -214,7 +214,9 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
     return (text: stateText, active: false);
   }
   if (showsEffective) {
-    final effective = sellerMeasureTerminationEffective(l, start: start);
+    final effective = t.labeled(
+      sellerMeasureTerminationEffective(l, start: start),
+    );
     // 合約：只有預告終止會是預定生效（見 MEASURE_STATE_SCHEDULED 的註解）。
     if (state == MeasureState.MEASURE_STATE_SCHEDULED) {
       return (text: effective, active: false);
@@ -225,7 +227,9 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
     return (
       text: end.isEmpty
           ? effective
-          : sellerMeasureTerminationEffectiveEnded(l, start: start, end: end),
+          : t.labeled(
+              sellerMeasureTerminationEffectiveEnded(l, start: start, end: end),
+            ),
       active: false,
     );
   }
@@ -233,13 +237,15 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
     return (
       text: end.isEmpty
           ? sellerMeasureSuspensionActiveOpen(l)
-          : sellerMeasureSuspensionActiveUntil(l, end: end),
+          : t.labeled(sellerMeasureSuspensionActiveUntil(l, end: end)),
       active: true,
     );
   }
   if (state == MeasureState.MEASURE_STATE_ENDED) {
     return (
-      text: end.isEmpty ? stateText : sellerMeasureSuspensionEnded(l, end: end),
+      text: end.isEmpty
+          ? stateText
+          : t.labeled(sellerMeasureSuspensionEnded(l, end: end)),
       active: false,
     );
   }

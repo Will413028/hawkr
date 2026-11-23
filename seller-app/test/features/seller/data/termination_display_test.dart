@@ -146,6 +146,21 @@ void main() {
       );
     });
 
+    test('裝置不在 +8：已結束的終止句只在整句尾端附一次「台北時間」', () {
+      final closed = terminationOf(
+        state: MeasureState.MEASURE_STATE_ENDED,
+        start: start,
+        end: DateTime.utc(2026, 11, 1, 6, 15),
+      );
+      final text = measureEffect(
+        closed,
+        UiLocale.zhTW,
+        foreignDeviceDisplay,
+      )!.text;
+      expect(text, '終止生效：2026/11/20 12:30，合作已於 2026/11/01 14:15 結束 (台北時間)');
+      expect('台北時間'.allMatches(text), hasLength(1));
+    });
+
     test('已撤銷：關聯的終止已撤銷', () {
       final m = terminationOf(
         state: MeasureState.MEASURE_STATE_REVOKED,

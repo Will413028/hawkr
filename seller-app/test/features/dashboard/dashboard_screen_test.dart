@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/dashboard_fixtures.dart';
 import '../../support/measure_fixtures.dart';
 import 'package:hawkr_seller/shared/time/taipei_display.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _LoggedIn extends Session {
   @override
@@ -109,6 +110,9 @@ Future<void> _pump(
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           builder: (_, _) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: tickers == null
                 ? const DashboardScreen()
                 : ValueListenableBuilder<bool>(

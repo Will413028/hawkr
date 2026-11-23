@@ -49,6 +49,7 @@ import '../../../shared/widgets/hk_disabled_share.dart';
 import '../../../shared/widgets/hk_disabled_with_hint.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
 import '../../../shared/time/taipei_display.dart';
+import '../../../l10n/l10n.dart';
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
     show SellerCapability;
@@ -2047,7 +2048,9 @@ class _CommentGroup extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     Widget rowFor(PostComment c, {required bool isReply}) => _CommentRow(
       comment: c,
-      dateStr: _relativeDate(c.createTime),
+      dateStr: c.createTime == null
+          ? ''
+          : context.taipeiDisplay.timeAgo(context.l10n, c.createTime!),
       isReply: isReply,
       onReply: () => onReply(c),
       onDelete: () => onDelete(c),
@@ -2209,17 +2212,6 @@ class _CommentAvatar extends StatelessWidget {
           : defaultAvatar,
     );
   }
-}
-
-/// 留言用相對時間：剛剛 / N 分鐘前 / N 小時前 / N 天前 / 否則 yyyy/MM/dd
-String _relativeDate(DateTime? dt) {
-  if (dt == null) return '';
-  final diff = DateTime.now().difference(dt);
-  if (diff.inSeconds < 60) return '剛剛';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} 分鐘前';
-  if (diff.inHours < 24) return '${diff.inHours} 小時前';
-  if (diff.inDays < 7) return '${diff.inDays} 天前';
-  return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
 }
 
 /// 把 `#xxx` token 切出來，上品牌深綠 + w700（跟商品上架的 ExtendedTextField

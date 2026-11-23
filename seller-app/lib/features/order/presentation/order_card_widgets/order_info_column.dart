@@ -19,12 +19,14 @@ class OrderInfoColumn extends ConsumerWidget {
 
   final OrderSummary order;
 
-  String _formatDate(String raw, TaipeiDisplay t) =>
-      t.labeled(formatOrderInfoDate(raw));
+  String _formatDate(String raw, TaipeiDisplay t) {
+    final formatted = tryFormatOrderInfoDate(raw);
+    return formatted == null ? raw : t.labeled(formatted);
+  }
 
   String _formatShortDate(String raw, TaipeiDisplay t) {
-    if (raw.isEmpty) return '';
-    final formatted = formatOrderInfoDate(raw);
+    final formatted = tryFormatOrderInfoDate(raw);
+    if (formatted == null) return raw;
     final match = RegExp(
       r'^\d{4}/(\d{2}/\d{2} \d{2}:\d{2})$',
     ).firstMatch(formatted);
@@ -206,8 +208,11 @@ class OrderInfoColumn extends ConsumerWidget {
 
 /// 訂單時間字串（ISO、10 位秒數或 13 位毫秒數）轉臺北時間 `yyyy/MM/dd HH:mm`。
 @visibleForTesting
-String formatOrderInfoDate(String raw) {
-  if (raw.isEmpty) return '';
+String formatOrderInfoDate(String raw) => tryFormatOrderInfoDate(raw) ?? raw;
+
+/// 解析失敗回 null；空字串回 null（沒有日期可顯示）。
+String? tryFormatOrderInfoDate(String raw) {
+  if (raw.isEmpty) return null;
   DateTime? dt = DateTime.tryParse(raw);
   if (dt == null) {
     final m = RegExp(r'\d{10,13}').firstMatch(raw);
@@ -220,7 +225,7 @@ String formatOrderInfoDate(String raw) {
       }
     }
   }
-  if (dt == null) return raw;
+  if (dt == null) return null;
   final local = dt.taipeiWall;
   String pad(int v) => v.toString().padLeft(2, '0');
   return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';

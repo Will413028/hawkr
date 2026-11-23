@@ -228,10 +228,15 @@ class _InfoPanel extends StatelessWidget {
   static String _periodText(Coupon c, TaipeiDisplay t) {
     final start = DateFormatter.formatToYYYYMMDD(c.startAt);
     final end = DateFormatter.formatToYYYYMMDD(c.endAt);
+    final parsed =
+        (c.startAt == null ||
+            DateFormatter.tryFormatToYYYYMMDD(c.startAt) != null) &&
+        (c.endAt == null || DateFormatter.tryFormatToYYYYMMDD(c.endAt) != null);
+    String wrap(String text) => parsed ? t.labeled(text) : text;
     if (start.isEmpty && end.isEmpty) return '—';
-    if (start.isEmpty) return t.labeled('至 $end');
-    if (end.isEmpty) return t.labeled('$start 起');
-    return t.labeled('$start ~ $end');
+    if (start.isEmpty) return wrap('至 $end');
+    if (end.isEmpty) return wrap('$start 起');
+    return wrap('$start ~ $end');
   }
 
   static String _perAccountText(Coupon c) {

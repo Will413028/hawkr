@@ -19,6 +19,7 @@ import 'package:mocktail/mocktail.dart';
 
 import '../../support/my_store_fixtures.dart';
 import 'post_comment_fixtures.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _Repo extends Mock implements PostRepository {}
 
@@ -78,6 +79,9 @@ Future<_Repo> _openComments(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           home: const PageHomeFeedScreen(initialIndex: 0, sellerName: '測試商家'),
         ),
@@ -107,6 +111,9 @@ Future<void> _pumpFeed(WidgetTester tester, _Repo repo) async {
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           home: const PageHomeFeedScreen(initialIndex: 0, sellerName: '測試商家'),
         ),
@@ -541,6 +548,9 @@ void main() {
           enableScaleWH: () => false,
           enableScaleText: () => false,
           builder: (_, _) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             theme: AppTheme.light,
             home: const PageHomeFeedScreen(initialIndex: 0, sellerName: '測試商家'),
           ),

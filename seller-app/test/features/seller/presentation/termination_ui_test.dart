@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 import '../../../support/measure_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
 import 'package:hawkr_seller/shared/time/taipei_display.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 /// 公告頁標題（App bar）裡的文字；措施卡的狀態標示也叫「合作已終止」，所以標題要限定在 App bar。
 Finder _appBarText(String text) =>
@@ -46,11 +47,21 @@ Future<void> _pumpApp(
           designSize: const Size(393, 852),
           builder: (_, _) => router == null
               ? MaterialApp(
+                  locale: const Locale('zh'),
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
                   home: fullScreen
                       ? home
                       : Scaffold(body: SingleChildScrollView(child: home)),
                 )
-              : MaterialApp.router(routerConfig: router),
+              : MaterialApp.router(
+                  locale: const Locale('zh'),
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  routerConfig: router,
+                ),
         ),
       ),
     ),

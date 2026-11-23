@@ -1,6 +1,4 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/l10n/l10n.dart';
-import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -23,6 +21,7 @@ import '../data/chat_repository.dart';
 import 'chat_focus_policy.dart';
 import 'chat_preview.dart';
 import 'widgets/chat_list_widgets.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
@@ -354,9 +353,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                       resolveConversationLastMessageTime(c);
                                   final String date = localTime == null
                                       ? ''
-                                      : timeAgoText(
+                                      : context.taipeiDisplay.timeAgo(
                                           context.l10n,
-                                          taipeiTimeAgo(localTime),
+                                          localTime,
                                         );
                                   final unread = resolveConversationUnreadCount(
                                     c,

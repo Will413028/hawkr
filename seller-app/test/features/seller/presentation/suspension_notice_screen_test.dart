@@ -16,6 +16,7 @@ import 'package:go_router/go_router.dart';
 import '../../../support/measure_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
 import 'package:hawkr_seller/shared/time/taipei_display.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _RecordingSession extends Session {
   int logouts = 0;
@@ -67,7 +68,12 @@ Future<GoRouter> pumpWithRoutes(
         ],
         child: ScreenUtilInit(
           designSize: const Size(393, 852),
-          builder: (_, _) => MaterialApp.router(routerConfig: router),
+          builder: (_, _) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
         ),
       ),
     ),
@@ -101,8 +107,12 @@ void main() {
           ],
           child: ScreenUtilInit(
             designSize: const Size(393, 852),
-            builder: (_, _) =>
-                const MaterialApp(home: SuspensionNoticeScreen()),
+            builder: (_, _) => MaterialApp(
+              locale: const Locale('zh'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: SuspensionNoticeScreen(),
+            ),
           ),
         ),
       ),
@@ -218,8 +228,12 @@ void main() {
             ],
             child: ScreenUtilInit(
               designSize: const Size(393, 852),
-              builder: (_, _) =>
-                  const MaterialApp(home: SuspensionNoticeScreen()),
+              builder: (_, _) => MaterialApp(
+                locale: const Locale('zh'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: SuspensionNoticeScreen(),
+              ),
             ),
           ),
         ),
@@ -416,7 +430,12 @@ void main() {
             ],
             child: ScreenUtilInit(
               designSize: const Size(393, 852),
-              builder: (_, _) => MaterialApp.router(routerConfig: router),
+              builder: (_, _) => MaterialApp.router(
+                locale: const Locale('zh'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                routerConfig: router,
+              ),
             ),
           ),
         ),

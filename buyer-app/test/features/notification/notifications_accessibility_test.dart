@@ -5,9 +5,11 @@ import 'package:hawkr_buyer/features/notification/data/notification_model.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notification_controller.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notifications_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 class _FixedNotificationListController extends NotificationListController {
   @override
@@ -55,8 +57,15 @@ void main() {
             designSize: const Size(390, 844),
             enableScaleWH: () => false,
             enableScaleText: () => false,
-            builder: (context, child) =>
-                const MaterialApp(home: NotificationsScreen()),
+            builder: (context, child) => MaterialApp(
+              locale: const Locale('zh'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const TaipeiDisplayScope(
+                deviceOffset: Duration(hours: 8),
+                child: NotificationsScreen(),
+              ),
+            ),
           ),
         ),
       );
@@ -90,7 +99,7 @@ void main() {
       final normalRowSemantics = tester
           .getSemantics(normalRow)
           .getSemanticsData();
-      expect(normalRowSemantics.label, '通知：訂單提醒，商品已準備出貨，7/26');
+      expect(normalRowSemantics.label, '通知：訂單提醒，商品已準備出貨，2020/7/26');
       expect(normalRowSemantics.flagsCollection.isButton, isTrue);
       expect(normalRowSemantics.flagsCollection.isChecked, CheckedState.none);
 

@@ -55,6 +55,11 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
     super.dispose();
   }
 
+  String _expiryText(BuildContext context, String endAt) {
+    final formatted = DateFormatter.tryFormatToYYYYMMDD(endAt);
+    return formatted == null ? endAt : context.taipeiDisplay.labeled(formatted);
+  }
+
   @override
   Widget build(BuildContext context) {
     final coupon = widget.coupon;
@@ -211,7 +216,7 @@ class _CouponCardWidgetState extends State<CouponCardWidget>
                                 SizedBox(width: 5.w),
                                 Expanded(
                                   child: Text(
-                                    '有效期至 ${context.taipeiDisplay.labeled(DateFormatter.formatToYYYYMMDD(coupon.endAt))}',
+                                    '有效期至 ${_expiryText(context, coupon.endAt!)}',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontWeight: FontWeight.w400,

@@ -3,8 +3,8 @@
 
 Fails when a .dart file under the given lib directory
   - calls `toLocal(` (output would follow the phone's timezone), or
-  - calls formatTaipeiTimestamp/DateTime/Date( outside shared/time/taipei_display.dart.
-Whole-line `//` comments are ignored.
+  - calls or tear-offs (`.map(formatTaipeiDate)`) formatTaipeiTimestamp/DateTime/Date outside shared/time/taipei_display.dart.
+Whole-line and trailing `//` comments are ignored (a `//` inside a string literal is not a comment).
 """
 
 import re
@@ -13,7 +13,25 @@ from pathlib import Path
 
 HELPER = Path("shared/time/taipei_display.dart")
 TO_LOCAL = re.compile(r"\btoLocal\(")
-FORMAT = re.compile(r"\bformatTaipei(?:Timestamp|DateTime|Date)\(")
+FORMAT = re.compile(r"\bformatTaipei(?:Timestamp|DateTime|Date)\b")
+
+
+def strip_comment(line: str) -> str:
+    quote = None
+    i = 0
+    while i < len(line):
+        c = line[i]
+        if quote:
+            if c == "\\":
+                i += 1
+            elif c == quote:
+                quote = None
+        elif c in "'\"":
+            quote = c
+        elif line.startswith("//", i):
+            return line[:i]
+        i += 1
+    return line
 
 
 def violations(lib: Path):
@@ -21,8 +39,7 @@ def violations(lib: Path):
         rel = path.relative_to(lib)
         is_helper = rel == HELPER
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if line.lstrip().startswith("//"):
-                continue
+            line = strip_comment(line)
             if TO_LOCAL.search(line):
                 yield f"{path}:{n}: toLocal( is banned; show time through TaipeiDisplay"
             if not is_helper and FORMAT.search(line):

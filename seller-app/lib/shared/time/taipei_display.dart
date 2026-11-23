@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hawkr_api/taipei_time.dart';
 
 import '../../l10n/l10n.dart';
+import '../../l10n/time_ago_text.dart';
 
 /// 臺北時間的顯示：格式化與「台北時間」標籤都只走這裡（ADR 多語系架構 D5）。
 ///
@@ -34,6 +35,16 @@ class TaipeiDisplay {
   String timestamp(Timestamp? timestamp) => labeled(plainTimestamp(timestamp));
   String dateTime(DateTime dateTime) => labeled(plainDateTime(dateTime));
   String date(DateTime dateTime) => labeled(plainDate(dateTime));
+
+  /// 相對時間文字 [text]（由 [ago] 產生）；只有一天以上的臺北日期（月日、年月日）附標籤，「N 分鐘前」這類經過時間不附。
+  String agoText(TimeAgo ago, String text) =>
+      ago is TimeAgoMonthDay || ago is TimeAgoFullDate ? labeled(text) : text;
+
+  /// [time] 的相對時間（[taipeiTimeAgo]）與 ARB 文字，日期形時附標籤。
+  String timeAgo(AppLocalizations l, DateTime time, {DateTime? now}) {
+    final ago = taipeiTimeAgo(time, now: now);
+    return agoText(ago, timeAgoText(l, ago));
+  }
 }
 
 /// 測試用：在 widget 樹上方指定裝置偏移；沒有它時取 `DateTime.now()` 的偏移。
@@ -51,15 +62,9 @@ class TaipeiDisplayScope extends InheritedWidget {
       deviceOffset != oldWidget.deviceOffset;
 }
 
-/// 樹上沒有 App 的 localizations（只在沒掛 delegate 的測試樹出現）時用預設語系 zh 的標籤，不丟例外。
-String _label(BuildContext context) =>
-    (Localizations.of<AppLocalizations>(context, AppLocalizations) ??
-            lookupAppLocalizations(const Locale('zh')))
-        .taipeiTimeLabel;
-
 extension TaipeiDisplayContext on BuildContext {
   TaipeiDisplay get taipeiDisplay => TaipeiDisplay(
-    label: _label(this),
+    label: l10n.taipeiTimeLabel,
     deviceOffset:
         dependOnInheritedWidgetOfExactType<TaipeiDisplayScope>()?.deviceOffset,
   );

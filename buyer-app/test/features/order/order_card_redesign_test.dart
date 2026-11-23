@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 void main() {
   setUpAll(() {
@@ -66,6 +67,9 @@ void main() {
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           builder: (_, __) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             routerConfig: router,
             builder: (context, child) => MediaQuery(
               data: AppMediaQueryPolicy.apply(
@@ -200,7 +204,12 @@ void main() {
         ],
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
-          builder: (_, __) => MaterialApp.router(routerConfig: router),
+          builder: (_, __) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
         ),
       ),
     );
@@ -239,6 +248,9 @@ void main() {
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           builder: (_, __) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(body: OrderCard(order: listOrder)),
           ),
         ),
