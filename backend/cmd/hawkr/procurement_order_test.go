@@ -148,3 +148,41 @@ func TestProcurementModuleIsBuiltWithTheBuyerModuleAsEntitlementsInBothRoles(t *
 		}
 	}
 }
+
+// StoreRetired 的訂閱者要在 serve 與 worker 都訂，且 imageai 在 moderation 之前（單體規則 4 的 lockorder）。
+func TestBothRolesSubscribeImageAIBeforeModeration(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"runServe", "runWorker"} {
+		imageAI, moderation := -1, -1
+		for _, d := range file.Decls {
+			fn, ok := d.(*ast.FuncDecl)
+			if !ok || fn.Name.Name != name {
+				continue
+			}
+			i := 0
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				if call, ok := n.(*ast.CallExpr); ok {
+					if id, ok := call.Fun.(*ast.Ident); ok {
+						switch id.Name {
+						case "subscribeImageAI":
+							imageAI = i
+						case "subscribeModeration":
+							moderation = i
+						}
+					}
+					i++
+				}
+				return true
+			})
+		}
+		if imageAI < 0 || moderation < 0 {
+			t.Fatalf("%s：找不到 subscribeImageAI 或 subscribeModeration 的呼叫", name)
+		}
+		if imageAI > moderation {
+			t.Errorf("%s：subscribeImageAI 在 subscribeModeration 之後，違反 lockorder.Modules", name)
+		}
+	}
+}

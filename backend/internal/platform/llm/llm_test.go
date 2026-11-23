@@ -22,7 +22,7 @@ import (
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func TestRegistryIsClosed(t *testing.T) {
-	if want := []string{DefaultModel, DeepSeekFlash, DeepSeekV4Pro}; !slices.Equal(KnownModels(), slices.Sorted(slices.Values(want))) {
+	if want := []string{DefaultModel, GeminiImage, DeepSeekFlash, DeepSeekV4Pro}; !slices.Equal(KnownModels(), slices.Sorted(slices.Values(want))) {
 		t.Fatalf("KnownModels = %v", KnownModels())
 	}
 	for name, spec := range registry {

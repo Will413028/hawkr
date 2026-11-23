@@ -58,6 +58,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
@@ -166,6 +167,7 @@ func runServe(ctx context.Context) error {
 	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
+	imageAIConfig := imageai.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -249,6 +251,8 @@ func runServe(ctx context.Context) error {
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
 	subscribeProcurement(bus, d, log)
+	imageAIModule := newImageAI(d, imageAIConfig)
+	subscribeImageAI(bus, imageAIModule)
 	procurementModule := newProcurement(d, jc, buyerModule, bus, log)
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
@@ -373,6 +377,7 @@ func runWorker(ctx context.Context) error {
 	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
+	imageAIConfig := imageai.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -466,6 +471,8 @@ func runWorker(ctx context.Context) error {
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
 	subscribeProcurement(bus, d, log)
+	imageAIModule := newImageAI(d, imageAIConfig)
+	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
 	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()

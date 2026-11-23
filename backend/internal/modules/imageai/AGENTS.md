@@ -4,11 +4,11 @@
 
 ## 職責
 
-賣家的 AI 修圖、修圖配額與後台風格管理。服務 website 與 seller-app 的賣家與 admin 的風格管理。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：seller、media。目前是骨架，還沒有實作。行為規格的唯一來源是 `backend/docs/modules/imageai.md`。
+賣家的 AI 修圖、修圖配額與後台風格管理。服務 website 與 seller-app 的賣家與 admin 的風格管理。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：seller、media。行為規格的唯一來源是 `backend/docs/modules/imageai.md`。
 
 ## 擁有的資料
 
-目前無 schema，沒有 `db/` 與 migration，登記在 `cmd/hawkr/modules.go` 的 `withoutData`；第一次要存自己的資料時建 schema 與 migration，再移到 `modules()`。讀取模型：無。
+schema `imageai`：`styles`（風格，UUIDv7）、`quotas`（個別額度）、`usage`（每店一列的計數器，帶所屬週的 `period_start`，新的一週由扣額度的 UPSERT 重設）；沒有預約表（A9-D9）。登記在 `cmd/hawkr/modules.go` 的 `modules()`。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -17,12 +17,17 @@
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放對外型別；`internal/feature` 是第一個子領域，實作時改成業務名稱；`internal/store` 是 sqlc 的查詢套件。
+- `internal/model` 放型別與常數；`internal/quota` 是額度的扣、退與店家退場清除；`internal/limit` 是同時修圖的計數 semaphore；`internal/store` 是 sqlc 的查詢套件。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
 
-模組只 import 依賴表允許的模組根套件：`internal/arch` 的依賴方向測試守門。其餘不變量隨實作補上。
+模組只 import 依賴表允許的模組根套件：`internal/arch` 的依賴方向測試守門。
+
+- 扣額度只有一個每店條件 UPSERT（新的一週重設為 1；同一週只在 `used < limit` 時加一，`period_start` 不往回移），外部呼叫在額度的 transaction 之外；失敗退回（在呼叫端 transaction 之外，沒有可退回 `ErrNothingToRefund`），扣後程序終止不退是已知限制（A9-D38）。
+- 每個用途恆有一筆啟用的預設風格（migration seed，CHECK 擋停用預設）；`prompt` 1 到 500 字元。
+- 模型只經 `internal/platform/llm` 建構；模組內不得出現 Gemini 端點字串（`internal/arch` 守門）。
+- 預設額度 10、後台上限 1000 是模組常數，同時修圖上限讀 `IMAGEAI_MAX_CONCURRENT`；數字與理由在 `backend/docs/modules/imageai.md`。
 
 ## 不負責
 
