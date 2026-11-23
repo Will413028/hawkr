@@ -184,8 +184,8 @@
    "id": "seller-private-no-token",
    "stack": "flutter:seller-app",
    "file": "seller-app/lib/features/media/data/media_repository.dart",
-   "old": "if (token == null || token.isEmpty) {\n        throw const UnauthorizedException(",
-   "new": "if (false) {\n        throw const UnauthorizedException(",
+   "old": "if (token == null || token.isEmpty) {\n        throw UnauthorizedException(",
+   "new": "if (false) {\n        throw UnauthorizedException(",
    "test": "test/features/media/media_repository_upload_test.dart private upload without a session token fails before any request",
    "why": "沒有 session token 仍送出機敏上傳"
   },
@@ -193,8 +193,8 @@
    "id": "seller-reject-text",
    "stack": "flutter:seller-app",
    "file": "seller-app/lib/features/media/data/media_repository.dart",
-   "old": "reason.uiText(_locale()) ?? '上傳失敗，請稍後再試'",
-   "new": "'上傳失敗，請稍後再試'",
+   "old": "reason.uiText(_locale()) ?? _defaults(Code.internal)",
+   "new": "_defaults(Code.internal)",
    "test": "test/features/media/media_repository_upload_test.dart REJECTED shows the catalog text of the reason",
    "why": "拒絕原因文字不再取自共用文案目錄"
   },
@@ -211,8 +211,8 @@
    "id": "buyer-reject-text",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/media/data/media_repository.dart",
-   "old": "e.reason.uiText(_locale()) ?? '圖片上傳失敗'",
-   "new": "'圖片上傳失敗'",
+   "old": "e.reason.uiText(_locale()) ?? _defaults(Code.internal)",
+   "new": "_defaults(Code.internal)",
    "test": "test/features/media/media_repository_test.dart REJECTED surfaces the catalog text of the reason",
    "why": "拒絕原因文字不再取自共用文案目錄"
   },
