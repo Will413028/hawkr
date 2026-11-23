@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var (
@@ -168,7 +169,7 @@ func TestPreviewSentences(t *testing.T) {
 		mut  func(*im.RelayMessage)
 		want string
 	}{
-		{"image", func(m *im.RelayMessage) { m.Type, m.Text = im.TypeImage, nil }, "傳送了一張圖片"},
+		{"image", func(m *im.RelayMessage) { m.Type, m.Text = im.TypeImage, nil }, uitext.For(uitext.ZhTW).ChatPreviewImage()},
 		{"100 runes untouched", func(m *im.RelayMessage) { m.Text = &exact }, exact},
 		{"101 runes truncated", func(m *im.RelayMessage) { m.Text = &long }, exact + "..."},
 	}
