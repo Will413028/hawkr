@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/conversation"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/extract"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/quote"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/retention"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfq"
@@ -149,6 +150,7 @@ type Module struct {
 	convs      conversation.Service
 	candidates search.Reader
 	rfq        rfq.Service
+	quotes     quote.Service
 }
 
 // New 建立模組。
@@ -195,6 +197,7 @@ func New(d Deps) *Module {
 	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
 	m.candidates = search.Reader{DB: d.DB}
 	m.rfq = rfq.Service{DB: d.DB, Now: d.Now, Events: d.Events}
+	m.quotes = quote.Service{DB: d.DB, Now: d.Now, Jobs: d.Jobs}
 	return m
 }
 
@@ -528,4 +531,65 @@ func (m *Module) PreviewRfqPublication(ctx context.Context, in PreviewRfqPublica
 // 指定對象的候選集已不是有效的候選集回 ABORTED／VERSION_CONFLICT（candidate_set）。重送同一個 ClientRequestID 回第一次的發布（Replayed），內容不同回 INVALID_ARGUMENT。
 func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublicationInput) (Publication, error) {
 	return m.rfq.ExecutePublication(ctx, in)
+}
+
+// 買家對賣家回價的使用（A9-3b-3d）。
+type (
+	// SellerResponse 是買家看到的一份賣家回價（目前版本），SellerQuote 是它的報價內容，SellerResponsePage 是 ListSellerResponses 的一頁。
+	SellerResponse     = model.BuyerSellerResponse
+	SellerQuote        = model.SellerQuote
+	SellerResponsePage = model.SellerResponsePage
+	// ShortlistEntry 是入圍清單的現況，QuoteAcceptance 是接受報價的結果。
+	ShortlistEntry  = model.ShortlistEntry
+	QuoteAcceptance = model.Acceptance
+	// ListSellerResponsesInput 與 AcceptSellerQuoteInput 是這兩支方法的輸入。
+	ListSellerResponsesInput = quote.ListInput
+	AcceptSellerQuoteInput   = quote.AcceptInput
+	// OrderProvisioningArgs 是接受報價之後建單的 River job 的參數；worker 在 A9-3c。
+	OrderProvisioningArgs = quote.OrderProvisioningArgs
+)
+
+// 回價版本的狀態與買家能不能接受（值等於 proto 列舉去掉前綴）。
+const (
+	ResponseActive           = model.ResponseActive
+	ResponseSuperseded       = model.ResponseSuperseded
+	ResponseWithdrawn        = model.ResponseWithdrawn
+	ResponseExpired          = model.ResponseExpired
+	AcceptabilityAcceptable  = model.AcceptabilityAcceptable
+	AcceptabilityExpired     = model.AcceptabilityExpired
+	AcceptabilityWithdrawn   = model.AcceptabilityWithdrawn
+	AcceptabilitySuperseded  = model.AcceptabilitySuperseded
+	AcceptabilityIneligible  = model.AcceptabilityIneligible
+	ProvisioningCreating     = model.ProvisioningCreating
+	ProvisioningOrderCreated = model.ProvisioningOrderCreated
+	ProvisioningOrderFailed  = model.ProvisioningOrderFailed
+)
+
+// 賣家回價列表的分頁上限。
+const (
+	DefaultSellerResponsePageSize = quote.DefaultPageSize
+	MaxSellerResponsePageSize     = quote.MaxPageSize
+)
+
+// ListSellerResponses 列出一次發布收到的賣家回價，每位賣家只列目前版本（撤回的照列、標狀態），依目前版本的 (送出時間 DESC, 回價 ID) keyset 分頁；status、可否接受、入圍標記與
+// outside_buyer_requested_range（對發布核准凍結的單價區間現算）都在這裡推導。PageSize 0 用 50、超過 100 以 100 計，負數與壞的 PageToken 回 INVALID_ARGUMENT；發布不屬於本人回 NOT_FOUND。
+func (m *Module) ListSellerResponses(ctx context.Context, in ListSellerResponsesInput) (SellerResponsePage, error) {
+	return m.quotes.List(ctx, in)
+}
+
+// PutShortlistEntry 把回價的一個版本放進入圍清單，同一則回價已在清單時換成這個版本；回價不屬於本人的這張需求或沒有這個版本回 NOT_FOUND，版本號不是正數回 INVALID_ARGUMENT。
+func (m *Module) PutShortlistEntry(ctx context.Context, buyerID int64, requestID, sellerResponseID uuid.UUID, version int32) (ShortlistEntry, error) {
+	return m.quotes.PutShortlist(ctx, buyerID, requestID, sellerResponseID, version)
+}
+
+// DeleteShortlistEntry 把回價從入圍清單移除；冪等，不在清單時 Present 也是 false。需求不屬於本人回 NOT_FOUND。
+func (m *Module) DeleteShortlistEntry(ctx context.Context, buyerID int64, requestID, sellerResponseID uuid.UUID, version int32) (ShortlistEntry, error) {
+	return m.quotes.DeleteShortlist(ctx, buyerID, requestID, sellerResponseID, version)
+}
+
+// AcceptSellerQuote 接受回價的指定版本、凍結成交價，並在同一個 transaction 排入建單的 job（OrderProvisioningArgs，worker 與 ordering 呼叫在 A9-3c）。
+// 錯誤與冪等重送見 quote.Service.Accept：不屬於本人 NOT_FOUND；改版或撤回 ABORTED／VERSION_CONFLICT（seller_response）；賣家已停止寫入 RFQ_RECIPIENT_CLOSED；已過有效期限 RFQ_RESPONSE_EXPIRED；
+// hash 不符 ABORTED／VERSION_CONFLICT（publication）；已有進行中的成交 RFQ_CHECKOUT_ALREADY_ACTIVE（metadata 的 orderNo）；重送內容不同 INVALID_ARGUMENT（client_request_id）。
+func (m *Module) AcceptSellerQuote(ctx context.Context, in AcceptSellerQuoteInput) (QuoteAcceptance, error) {
+	return m.quotes.Accept(ctx, in)
 }
