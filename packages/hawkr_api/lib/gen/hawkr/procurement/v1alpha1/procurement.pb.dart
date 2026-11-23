@@ -9943,7 +9943,7 @@ class BuyerProcurementAppServiceApi {
           request,
           ListSellerResponsesResponse());
 
-  /// PutShortlistEntry 把賣家回價的一個版本加入入圍清單；已在清單時回目前的狀態。
+  /// PutShortlistEntry 把賣家回價的一個版本加入入圍清單；同一則回價已在清單時換成請求帶的版本（一則回價只有一個版本在清單），回清單上掛的版本。
   $async.Future<PutShortlistEntryResponse> putShortlistEntry(
           $pb.ClientContext? ctx, PutShortlistEntryRequest request) =>
       _client.invoke<PutShortlistEntryResponse>(
@@ -9953,7 +9953,7 @@ class BuyerProcurementAppServiceApi {
           request,
           PutShortlistEntryResponse());
 
-  /// DeleteShortlistEntry 把賣家回價從入圍清單移除；不在清單時回目前的狀態。
+  /// DeleteShortlistEntry 把賣家回價從入圍清單移除（以回價為單位，不看請求帶的版本）；回被移除那一筆掛的版本，不在清單時回請求帶的版本，present 都是 false。
   $async.Future<DeleteShortlistEntryResponse> deleteShortlistEntry(
           $pb.ClientContext? ctx, DeleteShortlistEntryRequest request) =>
       _client.invoke<DeleteShortlistEntryResponse>(
