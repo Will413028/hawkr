@@ -3646,7 +3646,7 @@ enum ProcurementSellerPartyType {
 
 /// 被檢舉對象的類型，決定 social-service 要去哪張表取快照、處置時要下架哪一種內容（`internal/usecase/dispatcher.go` 依本值分派）。權威值域是 DB CHECK 而非 `api/proto/social/social.proto` 的註解。
 enum ReportTargetType {
-  /// 商品評論 — 商品評論（review-service 擁有，social 只持 target_id）
+  /// 商品評論 — 商品評論（內容由 review 模組擁有，檢舉案件只持 target_id）
   review(code: 'REVIEW', value: 'REVIEW', label: '商品評論'),
   /// 貼文 — 賣家貼文 `cms_post`
   post(code: 'POST', value: 'POST', label: '貼文'),
@@ -3654,7 +3654,7 @@ enum ReportTargetType {
   postComment(code: 'POST_COMMENT', value: 'POST_COMMENT', label: '貼文留言'),
   /// 討論區 — 賣家討論區內容
   sellerForum(code: 'SELLER_FORUM', value: 'SELLER_FORUM', label: '討論區'),
-  /// 聊天訊息 — IM 訊息（im-service 擁有）
+  /// 聊天訊息 — IM 訊息（內容由 im 模組擁有，檢舉案件只持 target_id）
   chatMessage(code: 'CHAT_MESSAGE', value: 'CHAT_MESSAGE', label: '聊天訊息'),
   /// 使用者 — 檢舉對象是人而非單一則內容；此類不下架內容，只走警告／停權
   user(code: 'USER', value: 'USER', label: '使用者');
