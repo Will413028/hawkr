@@ -383,15 +383,13 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 訂單號重新設計，不照搬 `OrderNoGenerator`：`"O" + TSID % 10^9` 加上 `UNIQUE(order_no)`，約 3.7 萬筆訂單就有一半機率撞號（生日界）。訂單號是給人看的編號，另開 `UNIQUE` 欄，不由 ID 截斷或取模（PostgreSQL 設計規範 §二）。
   - agent 的「接受報價 → 建單」改在同一個 transaction 內完成，並標記 RFQ ADR 為 superseded。
 - [ ] **B9 aftersales**
+  - 作品集範圍（Will 2026-11-23）：只做主線——買家取消（未出貨）→ 退款；買家申請退貨 → 賣家同意或拒絕 → 買家自寄並回填追蹤號碼 → 賣家確認收貨 → 退款；逾期由伺服器狀態機推進（賣家不回應、買家逾期未寄）。不做：平台介入裁決（`AfterSaleResolutionService`）與只為它存在的流程；部分退款只保留「指定金額，不超過可退上限」一種，不照搬各種變形。
   - 不改寫、直接刪（Will 2026-11-23）：平台建退貨物流單的 `ShipmentLabelConsumer`、`AfterSaleLabelRetryService`、`ShipmentCreationFailedConsumer`、`ReturnShipmentStatusConsumer`、`StorePickupTimeoutScheduler`，與 PayUni 特有的 `UnknownRefundFallbackConsumer`，以及只發營運告警的 `ReturnStuckAlertScheduler`（作品集沒有人值班接告警）；退貨改成買家自寄、回填追蹤號碼。
   - 取消、退款任務、優惠券補償在同一個 transaction 內完成。
   - 設定「進行中售後」旗標。
-  - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表。
+  - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表：payment 的退款列（B2 `RequestRefund`，呼叫端冪等鍵）加上 payment 的 job 就是重試機制，aftersales 不另建重試任務表。
   - 退款經 payment port（收款開通 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`）；PayUni 的超商與 ATM 轉帳退款不再適用，非原路退款依 port 的能力描述處理。
-- [ ] **B10 finance**：只剩平台手續費與對帳。
-  - 已由其他步驟承接：賣家撥款（Stripe Connect separate charges and transfers：訂單完成時建 Transfer、完成後退款先撤回轉帳）在 B2 做（B2 計畫 D1、D6，`2026-11-23-b2-payment.md`）；ordering 呼叫撥款在 B8 改 in-process；Java payment-service 在 B2 退場。
-  - 剩下的範圍：平台手續費的計算（代理商費反推與 ADR `payuni-channel-fee-bearer` 在本步重審）與撥款對 Stripe 的對帳。作品集需不需要對帳報表在開步時決定，不需要就把本步標為退場。
-  - 物流財務與責任判定不改寫、直接刪（Will 2026-11-23），程式已刪（commit `5883f499e`、`125db5844`、`28a120564`）；只剩 Java payment Flyway V9–V16 建的物流表，沒有程式讀寫，隨 Java payment-service 在 B2 退場一起清掉（B2 盤點 `2026-11-23-b2-payment/inventory.md` 表 4）。
+- [x] **B10 finance**：退場（Will 2026-11-23）。賣家撥款在 B2 做（B2 計畫 D1、D6）；ordering 呼叫撥款在 B8 改 in-process；物流財務與責任判定的程式已刪（commit `5883f499e`、`125db5844`、`28a120564`），剩下的物流表隨 Java payment-service 在 B2 退場。平台手續費與對帳報表不做：作品集沒有營運人員對帳，separate charges and transfers 下的手續費只是轉帳金額少撥一段，真的要收時在 payment 的轉帳金額計算加一個費率即可；ADR `payuni-channel-fee-bearer` 在 B2 收尾時標 superseded。
 
 **階段驗收**
 
