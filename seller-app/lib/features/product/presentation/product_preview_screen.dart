@@ -885,11 +885,17 @@ class ProductPreviewScreen extends HookConsumerWidget {
                   ),
                 ),
                 SizedBox(width: 8.w),
-                Text(
-                  dateStr,
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppColors.textSecondary,
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.sizeOf(context).width * 0.3,
+                  ),
+                  child: Text(
+                    dateStr,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
