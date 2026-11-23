@@ -211,7 +211,7 @@ groups:
   #    退避序列 5*3^(n-1) 秒 = 5/15/45/135/405，max-retries=5 ⇒ **最長正常重試鏈 605 秒
   #    （約 10.1 分鐘）**，之後該列轉 DEAD 而離開 backlog 述詞。
   #    ⇒ backlog 仍在且最舊超過 900 秒 = 已超過最長正常重試鏈 + 緩衝，必定異常。
-  #    （對照：buyer_deleted／seller_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
+  #    （對照：buyer_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
   #      直接照抄 3600 會讓本表的告警比實際失效晚一個數量級。）
   #
   # ⚠️ 與 *OutboxTerminalFailure 那兩組的**語意差異**，不要照抄它們的 expr：
@@ -243,32 +243,6 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：payment outbox_events 出現 DEAD 列（exchange={{ $labels.exchange }}）"
           description: "env={{ $labels.env }}：payment_outbox_dead_rows{exchange=\"{{ $labels.exchange }}\"} 大於 0，代表某筆事件已耗盡重試次數進入 DEAD（8224）。DEAD 是無人推走的終態——候選述詞 status IN ('8221','8223') 不含它，不會有任何程式路徑再碰它，**該事件等於永久遺失**。請查 last_error 判斷原因（常見：exchange 無效被 fail-closed 擋下、routing key 無 binding 而 unroutable）。處置完成（補發或註記後清除該列）前本告警會持續 firing，這是刻意的。查法：SELECT id, exchange, routing_key, retry_count, last_error, created_at FROM outbox_events WHERE status = '8224' ORDER BY created_at;"
-
-  # ── seller_deleted_outbox 積壓／卡住偵測（pkg/outbox 遷移新增）───────
-  # seller-service export outbox_pending_rows / outbox_oldest_pending_age_seconds /
-  # outbox_failed_total，皆帶 outbox_name="seller_deleted" label。
-  - name: seller-deleted-outbox-alerts
-    interval: 60s
-    rules:
-      - alert: SellerDeletedOutboxStuck
-        expr: outbox_oldest_pending_age_seconds{outbox_name="seller_deleted"} > 3600
-        for: 5m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：seller_deleted_outbox 最舊 pending 已卡住超過 1 小時"
-          description: "env={{ $labels.env }}：outbox_oldest_pending_age_seconds{outbox_name=\"seller_deleted\"} 超過 3600 秒，該筆 seller_deleted_outbox row（seller.deleted/onboarded/suspended/unsuspended 之一）疑似卡住，請查 seller-service（可能原因包含 worker 未啟動、DB 不可用、RabbitMQ 不可用、單體（legacy 的 AccountService）RemoveRole 逾時、或該列本身重試異常）。"
-
-      - alert: SellerDeletedOutboxTerminalFailure
-        expr: increase(outbox_failed_total{outbox_name="seller_deleted"}[1h]) > 0
-        for: 0m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：seller_deleted_outbox 出現終態失敗"
-          description: "env={{ $labels.env }}：outbox_failed_total{outbox_name=\"seller_deleted\"} 過去 1 小時有增量，代表某筆賣家 lifecycle 事件（publish 或 RemoveSellerRole）已耗盡重試次數，需人工檢查該 seller_deleted_outbox row 的 last_error。"
 
   # ── 電子發票（58 號設計書 §8.2.4 ①–⑯ ＋ ⑳㉑㉒、§9.3.3 ⑰⑱⑲）──────────────
   # 本 group 共 34 條（2026-09-05 實數；本行原本寫 24，那是條目長大之後沒有回灌的舊值）。

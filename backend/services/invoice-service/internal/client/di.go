@@ -114,7 +114,7 @@ func newBuyerClient(lc fx.Lifecycle, cfg *config.Config) (*buyer.Client, error) 
 
 // newSellerClient 建出 SEL peer client（§6.2）。
 //
-// 位址走既有的 `SELLER_SERVICE_ADDR`（`config.PeerConfig.SellerAddr`，
+// 位址走既有的 `LEGACY_SELLER_GRPC_ADDR`（`config.PeerConfig.SellerAddr`，
 // k8s/values/invoice-service.yaml 已有此鍵）⇒ 本波不需要新增任何 env var。
 func newSellerClient(lc fx.Lifecycle, cfg *config.Config) (*seller.Client, error) {
 	return seller.NewClient(lc, cfg.Peers.SellerAddr)

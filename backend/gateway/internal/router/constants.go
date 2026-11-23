@@ -416,14 +416,6 @@ const (
 	ShareURLPath = "/share_url"
 )
 
-// ==================== 地址搜尋與驗證（/public/address）====================
-
-const (
-	AddressPath        = "/address"
-	AddressSuggestions = "/suggestions"
-	AddressValidate    = "/validate"
-)
-
 // ==================== AI 相關 ====================
 
 // AIServicePath 死代理 /app/ai/*path 已於能力層 PR 刪除（46 §3.7）：CreateProxy

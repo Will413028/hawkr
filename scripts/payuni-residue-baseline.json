@@ -1,7 +1,6 @@
 {
   "backend/internal/legacy/gen/order/order.pb.go": 18,
-  "backend/internal/legacy/gen/seller/seller.pb.go": 207,
-  "backend/internal/legacy/gen/seller/sellerconnect/seller.connect.go": 114,
+  "backend/internal/legacy/gen/seller/seller.pb.go": 7,
   "backend/internal/legacy/sellerserver/server.go": 1,
   "backend/internal/legacy/sellerserver/server_integration_test.go": 1,
   "backend/internal/legacy/sellerserver/server_test.go": 4,

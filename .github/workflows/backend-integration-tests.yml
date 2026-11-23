@@ -12,7 +12,6 @@ on:
   pull_request:
     paths: &integration_paths
       - 'backend/pkg/**'
-      - 'backend/services/seller-service/**'
       - 'backend/services/ai-service/**'
       - 'backend/services/notification-service/**'
       - 'backend/services/invoice-service/**'
@@ -48,7 +47,6 @@ jobs:
             all:
               - 'backend/pkg/**'
               - '.github/workflows/backend-integration-tests.yml'
-            seller-service: ['backend/services/seller-service/**']
             ai-service: ['backend/services/ai-service/**']
             notification-service:
               - 'backend/services/notification-service/**'
@@ -63,7 +61,7 @@ jobs:
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: |
           set -euo pipefail
-          services='["seller-service","ai-service","notification-service","invoice-service"]'
+          services='["ai-service","notification-service","invoice-service"]'
           if [ "$ALL" = "true" ]; then
             modules=$(jq -c '["pkg"] + map("services/" + .)' <<<"$services")
           else

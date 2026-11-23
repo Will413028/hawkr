@@ -53,7 +53,7 @@ func (r *Resolver) CurrentStoreID(ctx context.Context, accountID identity.Accoun
 		return 0, err
 	}
 	if storeID == 0 {
-		return 0, fmt.Errorf("storeid: seller-service returned empty identity for account %d", rawAccountID)
+		return 0, fmt.Errorf("storeid: legacy seller listener returned empty identity for account %d", rawAccountID)
 	}
 	return identity.StoreID(storeID), nil
 }

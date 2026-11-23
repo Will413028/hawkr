@@ -88,8 +88,8 @@ hawkr:
           port: ${MEDIA_SERVICE_GRPC_PORT:9937}
           plaintext: true
         seller:
-          host: ${SELLER_SERVICE_HOST:127.0.0.1}
-          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          host: ${LEGACY_SELLER_GRPC_HOST:127.0.0.1}
+          port: ${LEGACY_SELLER_GRPC_PORT:9941}
           plaintext: true
         shipping:
           host: ${SHIPPING_SERVICE_HOST:127.0.0.1}

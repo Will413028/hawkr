@@ -106,9 +106,6 @@ const (
 	// BuyerServiceGetSubscribersListProcedure is the fully-qualified name of the BuyerService's
 	// GetSubscribersList RPC.
 	BuyerServiceGetSubscribersListProcedure = "/hawkr.buyer.BuyerService/GetSubscribersList"
-	// BuyerServiceGetSubscriberDashboardStatsProcedure is the fully-qualified name of the
-	// BuyerService's GetSubscriberDashboardStats RPC.
-	BuyerServiceGetSubscriberDashboardStatsProcedure = "/hawkr.buyer.BuyerService/GetSubscriberDashboardStats"
 	// BuyerServiceBatchGetSubscriberCountsProcedure is the fully-qualified name of the BuyerService's
 	// BatchGetSubscriberCounts RPC.
 	BuyerServiceBatchGetSubscriberCountsProcedure = "/hawkr.buyer.BuyerService/BatchGetSubscriberCounts"
@@ -211,7 +208,6 @@ type BuyerServiceClient interface {
 	UnsubscribeSeller(context.Context, *connect.Request[buyer.UnsubscribeSellerRequest]) (*connect.Response[buyer.UnsubscribeSellerResponse], error)
 	CheckSubscription(context.Context, *connect.Request[buyer.CheckSubscriptionRequest]) (*connect.Response[buyer.CheckSubscriptionResponse], error)
 	GetSubscribersList(context.Context, *connect.Request[buyer.GetSubscribersListRequest]) (*connect.Response[buyer.SubscribersListResponse], error)
-	GetSubscriberDashboardStats(context.Context, *connect.Request[buyer.GetSubscriberDashboardStatsRequest]) (*connect.Response[buyer.SubscriberDashboardStatsResponse], error)
 	// 批次取得多個賣家的訂閱數（內部服務間呼叫）
 	BatchGetSubscriberCounts(context.Context, *connect.Request[buyer.BatchGetSubscriberCountsRequest]) (*connect.Response[buyer.BatchGetSubscriberCountsResponse], error)
 	// Saved Items（收藏中心聚合讀 API，issue #2362 Phase 1：僅涵蓋 product/seller，貼文/食譜是 non-goal）
@@ -450,12 +446,6 @@ func NewBuyerServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(buyerServiceMethods.ByName("GetSubscribersList")),
 			connect.WithClientOptions(opts...),
 		),
-		getSubscriberDashboardStats: connect.NewClient[buyer.GetSubscriberDashboardStatsRequest, buyer.SubscriberDashboardStatsResponse](
-			httpClient,
-			baseURL+BuyerServiceGetSubscriberDashboardStatsProcedure,
-			connect.WithSchema(buyerServiceMethods.ByName("GetSubscriberDashboardStats")),
-			connect.WithClientOptions(opts...),
-		),
 		batchGetSubscriberCounts: connect.NewClient[buyer.BatchGetSubscriberCountsRequest, buyer.BatchGetSubscriberCountsResponse](
 			httpClient,
 			baseURL+BuyerServiceBatchGetSubscriberCountsProcedure,
@@ -612,7 +602,6 @@ type buyerServiceClient struct {
 	unsubscribeSeller              *connect.Client[buyer.UnsubscribeSellerRequest, buyer.UnsubscribeSellerResponse]
 	checkSubscription              *connect.Client[buyer.CheckSubscriptionRequest, buyer.CheckSubscriptionResponse]
 	getSubscribersList             *connect.Client[buyer.GetSubscribersListRequest, buyer.SubscribersListResponse]
-	getSubscriberDashboardStats    *connect.Client[buyer.GetSubscriberDashboardStatsRequest, buyer.SubscriberDashboardStatsResponse]
 	batchGetSubscriberCounts       *connect.Client[buyer.BatchGetSubscriberCountsRequest, buyer.BatchGetSubscriberCountsResponse]
 	getSavedItems                  *connect.Client[buyer.GetSavedItemsRequest, buyer.SavedItemsResponse]
 	getVisitList                   *connect.Client[buyer.GetVisitListRequest, buyer.VisitListResponse]
@@ -761,11 +750,6 @@ func (c *buyerServiceClient) GetSubscribersList(ctx context.Context, req *connec
 	return c.getSubscribersList.CallUnary(ctx, req)
 }
 
-// GetSubscriberDashboardStats calls hawkr.buyer.BuyerService.GetSubscriberDashboardStats.
-func (c *buyerServiceClient) GetSubscriberDashboardStats(ctx context.Context, req *connect.Request[buyer.GetSubscriberDashboardStatsRequest]) (*connect.Response[buyer.SubscriberDashboardStatsResponse], error) {
-	return c.getSubscriberDashboardStats.CallUnary(ctx, req)
-}
-
 // BatchGetSubscriberCounts calls hawkr.buyer.BuyerService.BatchGetSubscriberCounts.
 func (c *buyerServiceClient) BatchGetSubscriberCounts(ctx context.Context, req *connect.Request[buyer.BatchGetSubscriberCountsRequest]) (*connect.Response[buyer.BatchGetSubscriberCountsResponse], error) {
 	return c.batchGetSubscriberCounts.CallUnary(ctx, req)
@@ -908,7 +892,6 @@ type BuyerServiceHandler interface {
 	UnsubscribeSeller(context.Context, *connect.Request[buyer.UnsubscribeSellerRequest]) (*connect.Response[buyer.UnsubscribeSellerResponse], error)
 	CheckSubscription(context.Context, *connect.Request[buyer.CheckSubscriptionRequest]) (*connect.Response[buyer.CheckSubscriptionResponse], error)
 	GetSubscribersList(context.Context, *connect.Request[buyer.GetSubscribersListRequest]) (*connect.Response[buyer.SubscribersListResponse], error)
-	GetSubscriberDashboardStats(context.Context, *connect.Request[buyer.GetSubscriberDashboardStatsRequest]) (*connect.Response[buyer.SubscriberDashboardStatsResponse], error)
 	// 批次取得多個賣家的訂閱數（內部服務間呼叫）
 	BatchGetSubscriberCounts(context.Context, *connect.Request[buyer.BatchGetSubscriberCountsRequest]) (*connect.Response[buyer.BatchGetSubscriberCountsResponse], error)
 	// Saved Items（收藏中心聚合讀 API，issue #2362 Phase 1：僅涵蓋 product/seller，貼文/食譜是 non-goal）
@@ -1143,12 +1126,6 @@ func NewBuyerServiceHandler(svc BuyerServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(buyerServiceMethods.ByName("GetSubscribersList")),
 		connect.WithHandlerOptions(opts...),
 	)
-	buyerServiceGetSubscriberDashboardStatsHandler := connect.NewUnaryHandler(
-		BuyerServiceGetSubscriberDashboardStatsProcedure,
-		svc.GetSubscriberDashboardStats,
-		connect.WithSchema(buyerServiceMethods.ByName("GetSubscriberDashboardStats")),
-		connect.WithHandlerOptions(opts...),
-	)
 	buyerServiceBatchGetSubscriberCountsHandler := connect.NewUnaryHandler(
 		BuyerServiceBatchGetSubscriberCountsProcedure,
 		svc.BatchGetSubscriberCounts,
@@ -1327,8 +1304,6 @@ func NewBuyerServiceHandler(svc BuyerServiceHandler, opts ...connect.HandlerOpti
 			buyerServiceCheckSubscriptionHandler.ServeHTTP(w, r)
 		case BuyerServiceGetSubscribersListProcedure:
 			buyerServiceGetSubscribersListHandler.ServeHTTP(w, r)
-		case BuyerServiceGetSubscriberDashboardStatsProcedure:
-			buyerServiceGetSubscriberDashboardStatsHandler.ServeHTTP(w, r)
 		case BuyerServiceBatchGetSubscriberCountsProcedure:
 			buyerServiceBatchGetSubscriberCountsHandler.ServeHTTP(w, r)
 		case BuyerServiceGetSavedItemsProcedure:
@@ -1478,10 +1453,6 @@ func (UnimplementedBuyerServiceHandler) CheckSubscription(context.Context, *conn
 
 func (UnimplementedBuyerServiceHandler) GetSubscribersList(context.Context, *connect.Request[buyer.GetSubscribersListRequest]) (*connect.Response[buyer.SubscribersListResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.BuyerService.GetSubscribersList is not implemented"))
-}
-
-func (UnimplementedBuyerServiceHandler) GetSubscriberDashboardStats(context.Context, *connect.Request[buyer.GetSubscriberDashboardStatsRequest]) (*connect.Response[buyer.SubscriberDashboardStatsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.BuyerService.GetSubscriberDashboardStats is not implemented"))
 }
 
 func (UnimplementedBuyerServiceHandler) BatchGetSubscriberCounts(context.Context, *connect.Request[buyer.BatchGetSubscriberCountsRequest]) (*connect.Response[buyer.BatchGetSubscriberCountsResponse], error) {

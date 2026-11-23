@@ -539,98 +539,98 @@ ReviewService,GetSellerOrderReviews,review-service,api: ReviewAppService.ListOwn
 ReviewService,GetSellerOrderReviewStats,review-service,api: ReviewPublicService.GetStoreReviewStats
 ReviewService,ListStoreRatingStats,review-service,api: review.StoreRatingStats（單體內呼叫，discovery 與 seller 讀店家評分）
 ReviewService,HideReview,review-service,removed: 評價的隱藏改走 moderation 的處理結果（review 訂閱，不另開 RPC）
-SellerService,GetSeller,seller-service,
-SellerService,ResolveSellerAccountID,seller-service,
-SellerService,GetCurrentStoreID,seller-service,
-SellerService,GetSellerByMemberId,seller-service,
-SellerService,GetSellerByUserId,seller-service,
-SellerService,GetSellerBatch,seller-service,
-SellerService,ValidateSeller,seller-service,
-SellerService,GetSellerStats,seller-service,
-SellerService,RegisterPayuni,seller-service,
-SellerService,GetPayuniStatus,seller-service,
-SellerService,RetryPayuniRegistration,seller-service,
-SellerService,RefreshPayuniStatus,seller-service,
-SellerService,UpdateMerchantProfile,seller-service,
-SellerService,GetSellerPayuniConfig,seller-service,
-SellerService,MatchCertificateHolder,seller-service,
-SellerService,CreateSeller,seller-service,
-SellerService,UpdateSeller,seller-service,
-SellerService,UpdateSellerSEO,seller-service,
-SellerService,UpdateSellerFoodRegistration,seller-service,
-SellerService,CompleteOnboarding,seller-service,
-SellerService,UpdateLogo,seller-service,
-SellerService,UpdateCover,seller-service,
-SellerService,GetCertificationDraft,seller-service,
-SellerService,SaveCertificationDraft,seller-service,
-SellerService,SubmitCertification,seller-service,
-SellerService,CreateCertificationDraft,seller-service,
-SellerService,SaveCertificationProgress,seller-service,
-SellerService,CancelCertification,seller-service,
-SellerService,SubmitCertificationApplication,seller-service,
-SellerService,GetCertificationApplication,seller-service,
-SellerService,LookupBusinessRegistration,seller-service,
-SellerService,SuggestAddress,seller-service,
-SellerService,ValidateAddress,seller-service,
-SellerService,ApproveCertification,seller-service,
-SellerService,RejectCertification,seller-service,
-SellerService,GetCertificationReviews,seller-service,
-SellerService,ListSellersForAdmin,seller-service,
-SellerService,GetSellerStatsForAdmin,seller-service,
-SellerService,ListCertificationsForAdmin,seller-service,
-SellerService,GetCertificationApplicationForAdmin,seller-service,
-SellerService,BatchGetSellerMeta,seller-service,
-SellerService,ListPublicStoreIDsByCity,seller-service,
-SellerService,ListPublicStoresByCity,seller-service,
-SellerService,ResolvePrincipals,seller-service,
-SellerService,ListStoreIDsByAccount,seller-service,
-SellerService,GetSellerShippingProfile,seller-service,
-SellerService,RecordStoreVisit,seller-service,
-SellerService,GetStoreVisitors,seller-service,
-SellerService,RecordProductView,seller-service,
-SellerService,GetProductViewStats,seller-service,
+SellerService,GetSeller,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,ResolveSellerAccountID,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,GetCurrentStoreID,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,GetSellerByMemberId,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,GetSellerByUserId,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,GetSellerBatch,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,ValidateSeller,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,GetSellerStats,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,RegisterPayuni,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,GetPayuniStatus,seller-service,api: SellerAppService.GetMyPaymentAccount
+SellerService,RetryPayuniRegistration,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,RefreshPayuniStatus,seller-service,api: SellerAppService.RefreshMyPaymentAccount
+SellerService,UpdateMerchantProfile,seller-service,api: SellerAppService.UpdateMyStore（金流商家資料併入店家資料，PayUni 同步由 seller 模組的 job 負責）
+SellerService,GetSellerPayuniConfig,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,MatchCertificateHolder,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,CreateSeller,seller-service,api: SellerAppService.ApplyStore
+SellerService,UpdateSeller,seller-service,api: SellerAppService.UpdateMyStore
+SellerService,UpdateSellerSEO,seller-service,removed: 後台的 SEO 欄位不搬（seller CARRYOVER「完成新手引導」列）
+SellerService,UpdateSellerFoodRegistration,seller-service,api: SellerAppService.UpdateMyStore（食品業者登記是店家資料的欄位）
+SellerService,CompleteOnboarding,seller-service,api: SellerAppService.CompleteMyStoreOnboarding
+SellerService,UpdateLogo,seller-service,api: SellerAppService.UpdateMyStore（logo_staged_token）
+SellerService,UpdateCover,seller-service,api: SellerAppService.UpdateMyStore（cover_staged_token）
+SellerService,GetCertificationDraft,seller-service,removed: 舊版認證 API（Deprecated）；草稿讀取併入 SellerAppService.GetMyKYC
+SellerService,SaveCertificationDraft,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,SubmitCertification,seller-service,removed: 沒有呼叫方（seller-interface-inventory 標 NO CALLER；A3 不搬）
+SellerService,CreateCertificationDraft,seller-service,api: SellerAppService.SaveKYCDraft
+SellerService,SaveCertificationProgress,seller-service,api: SellerAppService.SaveKYCDraft
+SellerService,CancelCertification,seller-service,api: SellerAppService.CancelKYC
+SellerService,SubmitCertificationApplication,seller-service,api: SellerAppService.SubmitKYC
+SellerService,GetCertificationApplication,seller-service,api: SellerAppService.GetMyKYC
+SellerService,LookupBusinessRegistration,seller-service,api: SellerAppService.LookupBusinessRegistration
+SellerService,SuggestAddress,seller-service,"removed: TGOS 地址查詢移除（A3 決定 9a）；gateway 的 /app/address/{suggestions,validate} 與兩支 App、website 的呼叫端隨 11b 刪除"
+SellerService,ValidateAddress,seller-service,"removed: TGOS 地址查詢移除（A3 決定 9a）；gateway 的 /app/address/{suggestions,validate} 與兩支 App、website 的呼叫端隨 11b 刪除"
+SellerService,ApproveCertification,seller-service,api: SellerAdminService.ApproveKYC
+SellerService,RejectCertification,seller-service,api: SellerAdminService.RejectKYC
+SellerService,GetCertificationReviews,seller-service,api: SellerAdminService.GetKYCApplication（審核紀錄併入申請）
+SellerService,ListSellersForAdmin,seller-service,api: SellerAdminService.ListStores
+SellerService,GetSellerStatsForAdmin,seller-service,api: SellerAdminService.GetStoreStats
+SellerService,ListCertificationsForAdmin,seller-service,api: SellerAdminService.ListKYCApplications
+SellerService,GetCertificationApplicationForAdmin,seller-service,api: SellerAdminService.GetKYCApplication
+SellerService,BatchGetSellerMeta,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,ListPublicStoreIDsByCity,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,ListPublicStoresByCity,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,ResolvePrincipals,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,ListStoreIDsByAccount,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,GetSellerShippingProfile,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,RecordStoreVisit,seller-service,removed: 不搬 seller_store_visitors 與它的讀取路由（A3 計畫）
+SellerService,GetStoreVisitors,seller-service,removed: 不搬 seller_store_visitors 與它的讀取路由（A3 計畫）
+SellerService,RecordProductView,seller-service,api: SellerPublicService.RecordProductView
+SellerService,GetProductViewStats,seller-service,api: SellerAppService.GetMyDashboard（儀表板讀 ProductViewsBetween）
 SellerService,GetRecommendedSellers,seller-service,api: discovery.RecommendedSellers（資格門檻＋品質分數＋每 15 分鐘重算，ADR 2026-10-03-recommended-sellers-scoring）；對外在 A3b 步驟 8
-SellerService,DeleteSellerAccount,seller-service,
-SellerService,CreateViolationReport,seller-service,
-SellerService,ListMyViolationReports,seller-service,
-SellerService,CreateFoodSafetyReport,seller-service,
-SellerService,SellerListMyViolations,seller-service,
-SellerService,SellerSubmitAppeal,seller-service,
-SellerService,SellerGetAppeal,seller-service,
-SellerService,GetPublicSellerViolations,seller-service,
-SellerService,AdminListViolationReports,seller-service,
-SellerService,AdminPatchSellerViolationReportStatus,seller-service,
-SellerService,AdminPatchFoodSafetyReportStatus,seller-service,
-SellerService,AdminAcknowledgeFoodSafetyReport,seller-service,
-SellerService,AdminGenerateFDAReport,seller-service,
-SellerService,AdminMarkFDAReported,seller-service,
-SellerService,AdminNotifySeller,seller-service,
-SellerService,AdminCreateViolation,seller-service,
-SellerService,AdminGetViolation,seller-service,
-SellerService,AdminUpdateViolation,seller-service,
-SellerService,AdminRevokeViolation,seller-service,
-SellerService,AdminDecideAppeal,seller-service,
-SellerService,SuspendSellerForAdmin,seller-service,
-SellerService,LiftSellerSuspensionForAdmin,seller-service,
-SellerService,ListSellerSuspensionsForAdmin,seller-service,
-SellerService,GetActiveSellerSuspensionForAdmin,seller-service,
-SellerService,AssignSellerMembershipPlan,seller-service,
-SellerService,GetSellerMembershipPlan,seller-service,
-SellerService,ListSellerMembershipPlans,seller-service,
-SellerService,UpdateSellerMembershipPlan,seller-service,
-SellerService,SearchSellerProspects,seller-service,
-SellerService,CreateSellerProspect,seller-service,
-SellerService,AdminListSellerProspects,seller-service,
-SellerService,AdminGetSellerProspect,seller-service,
-SellerService,AdminUpdateSellerProspect,seller-service,
-SellerService,AdminArchiveSellerProspect,seller-service,
-SellerService,AdminListDuplicateProspects,seller-service,
-SellerService,AdminMergeSellerProspects,seller-service,
-SellerService,AdminConvertSellerProspect,seller-service,
-SellerService,AdminUpdateSellerProspectMedia,seller-service,
-SellerService,AdminListProspectTaxIdMatches,seller-service,
-SellerService,AdminCreateProspectInvite,seller-service,
-SellerService,AdminRevokeProspectInvite,seller-service,
+SellerService,DeleteSellerAccount,seller-service,api: SellerAppService.CloseMyStore；刪帳由 accountdeletion 呼叫 seller 模組
+SellerService,CreateViolationReport,seller-service,api: SellerReportAppService.CreateReport
+SellerService,ListMyViolationReports,seller-service,api: SellerReportAppService.GetMyReport
+SellerService,CreateFoodSafetyReport,seller-service,api: SellerReportAppService.CreateReport（食安是通報類別）
+SellerService,SellerListMyViolations,seller-service,api: SellerAppService.ListMyMeasures
+SellerService,SellerSubmitAppeal,seller-service,api: SellerAppService.SubmitAppeal
+SellerService,SellerGetAppeal,seller-service,api: SellerAppService.GetMyMeasure（申覆內嵌在措施）
+SellerService,GetPublicSellerViolations,seller-service,removed: 公開違規列表刪除（ADR 2026-10-18-seller-governance-consolidated）
+SellerService,AdminListViolationReports,seller-service,api: SellerGovernanceAdminService.ListReports
+SellerService,AdminPatchSellerViolationReportStatus,seller-service,api: SellerGovernanceAdminService.TriageReport、ResolveReport
+SellerService,AdminPatchFoodSafetyReportStatus,seller-service,api: SellerGovernanceAdminService.TriageReport、ResolveReport
+SellerService,AdminAcknowledgeFoodSafetyReport,seller-service,api: SellerGovernanceAdminService.TriageReport
+SellerService,AdminGenerateFDAReport,seller-service,api: SellerGovernanceAdminService（案件、措施與通報；ADR 2026-10-02-seller-governance-in-monolith）
+SellerService,AdminMarkFDAReported,seller-service,api: SellerGovernanceAdminService（案件、措施與通報；ADR 2026-10-02-seller-governance-in-monolith）
+SellerService,AdminNotifySeller,seller-service,api: SellerGovernanceAdminService（案件、措施與通報；ADR 2026-10-02-seller-governance-in-monolith）
+SellerService,AdminCreateViolation,seller-service,api: SellerGovernanceAdminService.DecideCase
+SellerService,AdminGetViolation,seller-service,api: SellerGovernanceAdminService.GetViolation
+SellerService,AdminUpdateViolation,seller-service,api: SellerGovernanceAdminService.ChangeCaseSeverity
+SellerService,AdminRevokeViolation,seller-service,api: SellerGovernanceAdminService.RevokeMeasure
+SellerService,AdminDecideAppeal,seller-service,api: SellerGovernanceAdminService.DecideAppeal
+SellerService,SuspendSellerForAdmin,seller-service,api: SellerGovernanceAdminService.CreateMeasure（停權是措施）
+SellerService,LiftSellerSuspensionForAdmin,seller-service,api: SellerGovernanceAdminService.RevokeMeasure
+SellerService,ListSellerSuspensionsForAdmin,seller-service,api: SellerGovernanceAdminService.ListMeasures
+SellerService,GetActiveSellerSuspensionForAdmin,seller-service,api: SellerAdminService.GetStore（生效中的措施在店家資料）
+SellerService,AssignSellerMembershipPlan,seller-service,removed: 賣家會員分級方案不搬（A3 決定 7）
+SellerService,GetSellerMembershipPlan,seller-service,removed: 賣家會員分級方案不搬（A3 決定 7）
+SellerService,ListSellerMembershipPlans,seller-service,removed: 賣家會員分級方案不搬（A3 決定 7）
+SellerService,UpdateSellerMembershipPlan,seller-service,removed: 賣家會員分級方案不搬（A3 決定 7）
+SellerService,SearchSellerProspects,seller-service,api: internal/legacy/sellerserver 以 Connect 提供，舊 Java／Go 服務仍呼叫（舊 REST 與 gRPC 隨最後一個呼叫方改寫後退場）
+SellerService,CreateSellerProspect,seller-service,api: SellerProspectAdminService.CreateProspect、PreviewProspect
+SellerService,AdminListSellerProspects,seller-service,api: SellerProspectAdminService.ListProspects
+SellerService,AdminGetSellerProspect,seller-service,api: SellerProspectAdminService.GetProspect
+SellerService,AdminUpdateSellerProspect,seller-service,api: SellerProspectAdminService.UpdateProspect
+SellerService,AdminArchiveSellerProspect,seller-service,api: SellerProspectAdminService.ArchiveProspect、RestoreProspect
+SellerService,AdminListDuplicateProspects,seller-service,api: SellerProspectAdminService.ListProspectDuplicates
+SellerService,AdminMergeSellerProspects,seller-service,api: SellerProspectAdminService.MergeProspects
+SellerService,AdminConvertSellerProspect,seller-service,api: SellerProspectAdminService.ConvertProspect
+SellerService,AdminUpdateSellerProspectMedia,seller-service,api: SellerProspectAdminService.UpdateProspect（logo_upload、cover_upload）
+SellerService,AdminListProspectTaxIdMatches,seller-service,api: SellerProspectAdminService.ListProspectTaxIDMatches
+SellerService,AdminCreateProspectInvite,seller-service,removed: 招商邀請子系統整套刪除（A3 步驟 7c）
+SellerService,AdminRevokeProspectInvite,seller-service,removed: 招商邀請子系統整套刪除（A3 步驟 7c）
 SellerService,EnsureVendorPortalInvite,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
 SellerService,MarkVendorPortalInviteSecretDelivered,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
 SellerService,ExchangeVendorPortalInvite,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）

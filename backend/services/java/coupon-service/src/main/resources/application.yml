@@ -68,8 +68,8 @@ hawkr:
     grpc:
       targets:
         seller:
-          host: ${SELLER_SERVICE_HOST:127.0.0.1}
-          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          host: ${LEGACY_SELLER_GRPC_HOST:127.0.0.1}
+          port: ${LEGACY_SELLER_GRPC_PORT:9941}
           plaintext: true
         account:
           host: ${ACCOUNT_SERVICE_HOST:127.0.0.1}

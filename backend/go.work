@@ -8,5 +8,4 @@ use (
 	./services/ai-service
 	./services/invoice-service
 	./services/notification-service
-	./services/seller-service
 )

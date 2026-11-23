@@ -12,8 +12,6 @@ tags:
   description: AI 修圖
 - name: Address
   description: 地址：收貨地址管理
-- name: AddressGeocode
-  description: 地址搜尋
 - name: Admin
   description: 管理員：管理員操作
 - name: AdminAbnormal
@@ -7405,119 +7403,6 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/address/suggestions:
-    get:
-      operationId: addressSuggestions
-      summary: 地址模糊搜尋
-      description: 輸入縣市、鄉鎮區、路名關鍵字，回傳賣家地址候選清單
-      tags:
-      - AddressGeocode
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: county
-        in: query
-        description: 縣市，例如 台北市
-        required: true
-        schema:
-          type: string
-      - name: district
-        in: query
-        description: 鄉鎮市區，例如 中正區
-        required: true
-        schema:
-          type: string
-      - name: query
-        in: query
-        description: 路名+門牌關鍵字，例如 中華路一段25
-        required: true
-        schema:
-          type: string
-      - name: limit
-        in: query
-        description: 最多回傳筆數，預設 8，上限 20
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/AddressSuggestionItem'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/address/validate:
-    get:
-      operationId: addressValidate
-      summary: 地址嚴格驗證
-      description: 輸入完整地址，驗證賣家地址並回傳座標
-      tags:
-      - AddressGeocode
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: address
-        in: query
-        description: 完整地址，例如 臺北市中正區中華路一段1號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AddressValidationResult'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -20971,38 +20856,6 @@ components:
           type: string
         skuId:
           type: string
-    AddressSuggestionItem:
-      type: object
-      properties:
-        county:
-          type: string
-        detail:
-          type: string
-        district:
-          type: string
-        fullAddress:
-          type: string
-        lat:
-          type: number
-        lng:
-          type: number
-    AddressValidationResult:
-      type: object
-      properties:
-        county:
-          type: string
-        detail:
-          type: string
-        district:
-          type: string
-        fullAddress:
-          type: string
-        lat:
-          type: string
-        lng:
-          type: string
-        valid:
-          type: boolean
     AdminAbnormalOrderListResp:
       type: object
       properties:

@@ -39,7 +39,7 @@ aftersales.refund.completed,aftersales.events,aftersales-service,order-service,o
 account.deleted,hawkr.account,account-service,buyer-service,buyer.account.deleted,release buyer avatar media refs,yes,STATE,call: accountdeletion 在刪帳的 transaction 內呼叫 buyer.CloseForDeletion；頭像的 media 參照由 River job（buyer.release_avatar）釋放
 account.deleted,hawkr.account,account-service,im-service,im.account.deleted,cleanup account chat data,yes,STATE,call: im 不訂閱 account.deleted；帳號刪除經 buyer 關閉發 BuyerDeleted，im 訂閱它並排 im.erase_party
 account.deleted,hawkr.account,account-service,notification-service,notification.account.deleted,purge account inbox/devices,yes,STATE,
-account.deleted,hawkr.account,account-service,seller-service,seller.account.deleted,release seller logo/cover media refs,yes,STATE,
+account.deleted,hawkr.account,account-service,seller-service,seller.account.deleted,release seller logo/cover media refs,yes,STATE,call: accountdeletion 在刪帳申請流程呼叫 seller 模組（accountdeletion.Deps.Seller）；店家的 logo、封面媒體參照由 seller 模組自己的清理釋放
 buyer.deleted,hawkr.buyer,buyer-service,coupon-service,coupon.buyer.deleted,cleanup buyer coupons,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,crm-service,crm.buyer.deleted,cleanup CRM buyer data,yes,STATE,in-tx-event: crm 訂閱 buyer.BuyerDeleted，同 transaction 排 crm.erase_party job
 buyer.deleted,hawkr.buyer,buyer-service,im-service,im.buyer.deleted,cleanup buyer chat data,yes,STATE,in-tx-event: im 訂閱 buyer.BuyerDeleted 與 StoreRetired，同 transaction 排 im.erase_party job
@@ -62,7 +62,7 @@ post.created,hawkr.content,social-service,notification-service,notification.cont
 post.hidden_by_platform,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,in-tx-event: seller 模組在建立內容下架措施的 transaction 內發布 seller.MeasureCreated，internal/legacy/socialrelay 對措施的每則貼文轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
 post.liked,hawkr.content,social-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,in-tx-event: social.PostLiked 在寫入的 transaction 內發布，internal/legacy/socialrelay 補欄位轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
 product.viewed,hawkr.content,buyer-service,notification-service,notification.content,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
-product.viewed,hawkr.content,buyer-service,seller-service,seller.product.viewed,record product view analytics (best-effort),yes,SIDE_EFFECT,
+product.viewed,hawkr.content,buyer-service,seller-service,seller.product.viewed,record product view analytics (best-effort),yes,SIDE_EFFECT,call: cmd/hawkr 把 buyer 的 ProductViewed 轉進 seller 的瀏覽計數（internal/modules/seller/views.go），由彙總 job 解析商品所屬店家
 delegation.operation.completed,hawkr.delegation,account-service,notification-service,notification.delegation,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 chat.message.sent,hawkr.im,im-service,notification-service,notification.im,"push+inbox notification (buyer:visible,seller:visible)",yes,SIDE_EFFECT,in-tx-event: im.MessageSent 在送出訊息的 transaction 內發布，internal/legacy/imrelay 的 OnMessageSent 同 transaction 排 legacy.im_message_sent job，worker 組舊 wire 再送 hawkr.im/chat.message.sent；notification 搬進單體（A8）後刪 relay
 invoice.allowance.issued,hawkr.invoice,invoice-service,notification-service,notification.invoice,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
@@ -123,7 +123,7 @@ review.hidden,hawkr.review,review-service,seller-service,seller.review.hidden,ov
 seller.deleted,hawkr.seller,seller-service,gateway,gateway.sse.<pod> (dynamic),invalidate store resolver cache,yes,PROJECTION,
 seller.deleted,hawkr.seller,seller-service,im-service,im.seller.deleted,cleanup seller chat data,yes,STATE,"in-tx-event: im 訂閱 seller.StoreRetired（cmd/hawkr/im.go 的 events.Subscribe(bus, m.OnStoreRetired)），同 transaction 排 im.erase_party job 抹除店家身分寄出的訊息；舊 wire 的 seller.deleted 仍由 sellerrelay 送給其他未搬遷的消費者，im 不再收"
 seller.deleted,hawkr.seller,seller-service,notification-service,notification.seller.deleted,purge seller inbox/devices,yes,STATE,
-seller.deleted,hawkr.seller,seller-service,pricebook-service,pricebook.seller.deleted,cleanup market-watch data,yes,STATE,
+seller.deleted,hawkr.seller,seller-service,pricebook-service,pricebook.seller.deleted,cleanup market-watch data,yes,STATE,removed: pricebook-service 已刪除
 seller.deleted,hawkr.seller,seller-service,product-service,product.seller.deleted,delist seller products,yes,STATE,
 seller.deleted,hawkr.seller,seller-service,social-service,social.seller.deleted,cleanup seller posts/comments/media,yes,STATE,in-tx-event: social 訂閱 seller 的 OnStoreRetired，同 transaction 只 Enqueue 清除 job（M23，TestStoreRetirementEnqueuesAnIdempotentPurge）
 seller.membership_changed,hawkr.seller,seller-service,ai-service,ai_service.seller.membership_changed,update ranking facts,yes,PROJECTION,removed: ai-service 的排名事實投影已刪（migration 20261028100000_drop_seller_ranking_facts）

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../../../core/theme/app_colors.dart';
@@ -8,13 +7,10 @@ import '../../../../../core/theme/hk_tokens.dart';
 import '../../../../../shared/icons/app_icon_colors.dart';
 import '../../../../../shared/utils/floating_toast.dart';
 import '../../../../../shared/widgets/app_dropdown.dart';
-import '../../../../../shared/widgets/hk_button_label.dart';
 import '../../../../../shared/widgets/hk_content_card.dart';
 import '../../../../../shared/widgets/hk_icon.dart';
-import '../../../data/tgos_address_service.dart';
 import '../../../data/shipping_sender.dart';
 import '../data/taiwan_cities_data.dart';
-import 'address_autocomplete_field.dart';
 import 'common_widgets.dart';
 
 /// 黑貓宅急便設定。
@@ -34,11 +30,6 @@ class TaqbinShippingSection extends HookConsumerWidget {
     required this.addressCtrl,
     this.onCitySelected,
     this.onDistrictSelected,
-    required this.addressVerified,
-    required this.addressVerifying,
-    this.onAddressSelected,
-    this.onAddressManualEdit,
-    this.onVerifyAddress,
   });
 
   final ValueNotifier<bool> expanded;
@@ -52,23 +43,9 @@ class TaqbinShippingSection extends HookConsumerWidget {
   final TextEditingController addressCtrl;
   final ValueChanged<String>? onCitySelected;
   final ValueChanged<String>? onDistrictSelected;
-  final ValueNotifier<bool> addressVerified;
-  final ValueNotifier<bool> addressVerifying;
-  final ValueChanged<AddressSuggestion>? onAddressSelected;
-  final VoidCallback? onAddressManualEdit;
-  final VoidCallback? onVerifyAddress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    useListenable(addressCtrl);
-    final canVerify =
-        !enabled &&
-        !addressVerified.value &&
-        !addressVerifying.value &&
-        addressCtrl.text.trim().isNotEmpty &&
-        city.value != null &&
-        district.value != null;
-
     return HkContentCard(
       key: const ValueKey('shipping-taqbin-card'),
       padding: EdgeInsets.zero,
@@ -223,60 +200,10 @@ class TaqbinShippingSection extends HookConsumerWidget {
                           const SizedBox(height: HkSpace.md),
                           const _FieldLabel('路名與門牌'),
                           const SizedBox(height: HkSpace.sm),
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final address = AddressAutocompleteField(
-                                controller: addressCtrl,
-                                county: city.value,
-                                district: district.value,
-                                enabled: !enabled,
-                                verified: addressVerified.value,
-                                onSuggestionSelected: onAddressSelected,
-                                onManualEdit: (_) =>
-                                    onAddressManualEdit?.call(),
-                              );
-                              final button = SizedBox(
-                                height: HkControl.minTap,
-                                child: FilledButton.tonalIcon(
-                                  onPressed: canVerify ? onVerifyAddress : null,
-                                  icon: addressVerifying.value
-                                      ? const SizedBox.square(
-                                          dimension: 18,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : HkIcon(
-                                          addressVerified.value
-                                              ? HkIconName.check
-                                              : HkIconName.location,
-                                          size: 20,
-                                        ),
-                                  label: HkButtonLabel(
-                                    addressVerified.value ? '已驗證' : '驗證地址',
-                                  ),
-                                ),
-                              );
-                              if (constraints.maxWidth < 420) {
-                                return Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    address,
-                                    const SizedBox(height: HkSpace.sm),
-                                    button,
-                                  ],
-                                );
-                              }
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(child: address),
-                                  const SizedBox(width: HkSpace.sm),
-                                  button,
-                                ],
-                              );
-                            },
+                          CustomInput(
+                            controller: addressCtrl,
+                            hint: '路名 + 門牌號碼',
+                            enabled: !enabled,
                           ),
                         ],
                       ),

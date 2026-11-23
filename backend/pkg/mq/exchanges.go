@@ -79,12 +79,11 @@ const (
 
 	RoutingKeyDelegationOperationCompleted = "delegation.operation.completed"
 
-	RoutingKeySellerDeleted           = "seller.deleted"
-	RoutingKeySellerOnboarded         = "seller.onboarded"
-	RoutingKeySellerProfileChanged    = "seller.profile.changed"
-	RoutingKeySellerSuspended         = "seller.suspended"
-	RoutingKeySellerUnsuspended       = "seller.unsuspended"
-	RoutingKeySellerMembershipChanged = "seller.membership_changed"
+	RoutingKeySellerDeleted        = "seller.deleted"
+	RoutingKeySellerOnboarded      = "seller.onboarded"
+	RoutingKeySellerProfileChanged = "seller.profile.changed"
+	RoutingKeySellerSuspended      = "seller.suspended"
+	RoutingKeySellerUnsuspended    = "seller.unsuspended"
 
 	RoutingKeyProcurementRfqPublicationInviteCreated = "procurement.rfq_publication_invite.created"
 
@@ -96,9 +95,6 @@ const (
 )
 
 const (
-	QueueSellerReviewCreated = "seller.review.created"
-	QueueSellerReviewHidden  = "seller.review.hidden"
-
 	QueueInvoiceOrderPaid            = "invoice.order.paid"
 	QueueInvoiceOrderRefundFinalized = "invoice.order.refund.finalized"
 
@@ -109,6 +105,4 @@ const (
 	QueueNotificationBuyerDeleted = "notification.buyer.deleted"
 
 	QueueNotificationSellerDeleted = "notification.seller.deleted"
-
-	QueueSellerAccountDeleted = "seller.account.deleted"
 )

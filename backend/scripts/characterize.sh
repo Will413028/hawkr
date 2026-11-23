@@ -19,7 +19,7 @@
 # PG_USER、PG_PASSWORD、LOG_DIR、FAKE_MEDIA_PORT，要做的事：
 #   - 建自己的 database、套用舊服務的 migration、起舊服務（start_bg）；
 #   - 把 gateway 連到舊服務要的設定加進 gateway_env 陣列，例如 gateway_env+=(X_SERVICE_HOST=127.0.0.1)。
-#   舊服務呼叫 account-service 與 seller-service 的 gRPC 時，連單體的 legacy listener（127.0.0.1:${LEGACY_PORT}）。
+#   舊服務呼叫 account 與 seller 的 gRPC 時，連單體的 legacy listener（127.0.0.1:${LEGACY_PORT}）。
 # 範本在 make new-module 產生的 legacy.sh。舊服務刪除時連同 legacy.sh 一起刪除。
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -153,7 +153,7 @@ start_bg gateway \
   MEDIA_BASE_URL=http://media.invalid \
   REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_PASSWORD=HawkrRedis2026 \
   ACCOUNT_SERVICE_HOST=127.0.0.1 ACCOUNT_SERVICE_GRPC_PORT="$LEGACY_PORT" \
-  SELLER_SERVICE_HOST=127.0.0.1 SELLER_SERVICE_GRPC_PORT="$LEGACY_PORT" \
+  LEGACY_SELLER_GRPC_HOST=127.0.0.1 LEGACY_SELLER_GRPC_PORT="$LEGACY_PORT" \
   ${gateway_env[@]+"${gateway_env[@]}"} \
   "${LOG_DIR}/gateway"
 
