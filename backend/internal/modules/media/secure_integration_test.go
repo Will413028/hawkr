@@ -879,7 +879,10 @@ func TestReadSecure_NotFoundAfterOwnerDeletes(t *testing.T) {
 func TestReadSecure_RejectsPublicAsset(t *testing.T) {
 	f := setup(t)
 	res := ready(t, f, owner)
-	a := confirmSecure(t, f, owner, res.Token)
+	a, err := confirmInTx(f, owner, res.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, _, err := f.m.ReadSecure(t.Context(), a.ID); !errors.Is(err, media.ErrNotSecure) {
 		t.Fatalf("err = %v，預期 ErrNotSecure", err)
 	}
