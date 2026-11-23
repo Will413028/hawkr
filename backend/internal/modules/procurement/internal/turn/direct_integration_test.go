@@ -668,6 +668,9 @@ func TestCommandSlotIsSetOnlyForSubmitAnswerAndRewindTurns(t *testing.T) {
 	if s := slotOf(`source = $1`, "LLM_EXTRACT"); s != nil {
 		t.Errorf("TURN 的 command_slot 要是 NULL：%v", *s)
 	}
+	if n := f.count(`SELECT count(*) FROM procurement.turns WHERE request_id = $1 AND source = 'ANSWER' AND command_slot IS NULL`, f.request); n != 0 {
+		t.Errorf("SubmitAnswer 的輪次一律要帶 command_slot（CHECK 分不出它與 ResumeRun 的回答，由程式保證）：%d 筆是 NULL", n)
+	}
 	for name, stmt := range map[string]string{
 		"倒回沒有欄位":     `UPDATE procurement.turns SET command_slot = NULL WHERE source = 'REWIND'`,
 		"TURN 帶了欄位":  `UPDATE procurement.turns SET command_slot = 'ITEM' WHERE source = 'LLM_EXTRACT'`,
@@ -676,5 +679,26 @@ func TestCommandSlotIsSetOnlyForSubmitAnswerAndRewindTurns(t *testing.T) {
 		if _, err := f.d.Pool().Exec(ctx, stmt); err == nil {
 			t.Errorf("%s：CHECK 要拒絕", name)
 		}
+	}
+}
+
+func TestResumeRunAnswerTurnHasNoCommandSlotAndIsNeverReplayedBySubmitAnswer(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	_, irq := f.ask(ctx)
+	answer := f.resume(irq, "category-21", "")
+	if err := f.runAnswer(ctx, answer); err != nil {
+		t.Fatal(err)
+	}
+	cid := f.run(answer).ClientRequestID
+	var message string
+	if err := f.d.Pool().QueryRow(ctx, `SELECT buyer_message FROM procurement.turns WHERE client_request_id = $1 AND source = 'ANSWER' AND command_slot IS NULL`, cid).Scan(&message); err != nil {
+		t.Fatalf("ResumeRun 的回答輪次要是 source = ANSWER 且 command_slot 為 NULL：%v", err)
+	}
+	// 其他比對（需求、來源、回答、讀到的版本）都對得上，只剩欄位：SubmitAnswer 不能回放 ResumeRun 的輪次。
+	first := f.revisions()[0].ID
+	_, err := f.answer(first, turn.AnswerSlotInput{Slot: slots.Packaging, FreeText: message}, cid)
+	if _, fields := wantErr(t, err, apperr.KindInvalidInput, ""); len(fields) != 1 || fields[0] != "client_request_id" {
+		t.Fatalf("欄位 %v", fields)
 	}
 }

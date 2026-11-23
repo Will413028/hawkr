@@ -167,7 +167,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/turn/direct.go",
    "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
-   "new": "return t.CommandSlot != nil && (t.Source == sourceRewind || *t.CommandSlot == string(k.slot)), nil",
+   "new": "return t.CommandSlot != nil && (t.Source == sourceAnswer || *t.CommandSlot == string(k.slot)), nil",
    "test": "internal/modules/procurement/internal/turn ^TestAnswerReplayWithADifferentSlotIsInvalidArgument$",
    "why": "SubmitAnswer 重送不比對欄位：同一把鍵、同一段文字換欄位也被當成重送"
   },
@@ -176,7 +176,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/turn/direct.go",
    "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
-   "new": "return t.CommandSlot != nil && (t.Source == sourceAnswer || *t.CommandSlot == string(k.slot)), nil",
+   "new": "return t.CommandSlot != nil && (t.Source == sourceRewind || *t.CommandSlot == string(k.slot)), nil",
    "test": "internal/modules/procurement/internal/turn ^TestRewindReplayReturnsTheStoredResultAndDetectsADifferentSlot$",
    "why": "倒回重送不比對欄位：同一把鍵換一個欄位也被當成重送"
   },
@@ -197,6 +197,15 @@
    "new": "if true {",
    "test": "internal/modules/procurement/internal/turn ^TestAnswerDecisionSkippingTheSameSlotTwiceStoresItOnce$",
    "why": "同一欄位略過兩次，skipped_slots 出現重複"
+  },
+  {
+   "id": "replay-accepts-a-turn-without-command-slot",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
+   "new": "return t.CommandSlot == nil || *t.CommandSlot == string(k.slot), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestResumeRunAnswerTurnHasNoCommandSlotAndIsNeverReplayedBySubmitAnswer$",
+   "why": "沒有 command_slot 的輪次（ResumeRun 的回答）也被 SubmitAnswer 當成重送回放"
   }
  ]
 }

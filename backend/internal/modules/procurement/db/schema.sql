@@ -107,7 +107,7 @@ CREATE TABLE procurement.turns (
     turn_result JSONB NOT NULL,
     -- SubmitAnswer 回答的欄位或 Rewind 倒回的欄位（SlotKey 字串）；其他來源的輪次為 NULL。存在的必要條件（A9-D34）：不經 run 的指令重送要比對「同一個欄位」，
     -- 略過的回答沒有 buyer_message、turn_result 的 question 是下一題而不是這一題，兩者都帶不住欄位。source = 'ANSWER' 也含 ResumeRun 的回答（欄位在中斷上，此欄 NULL），
-    -- 所以 CHECK 只能要求 REWIND 必填、LLM_EXTRACT 必空。
+    -- 所以 CHECK 只能要求 REWIND 必填、LLM_EXTRACT 必空。SubmitAnswer 的輪次必帶此欄的不變量由程式保證（Direct 寫入、`TestCommandSlotIsSetOnlyForSubmitAnswerAndRewindTurns`），DB 無法強制。
     command_slot TEXT,
     client_request_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
