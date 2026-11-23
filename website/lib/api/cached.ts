@@ -1,3 +1,4 @@
+import { Code, ConnectError } from "@connectrpc/connect";
 import * as Sentry from "@sentry/nextjs";
 import { cacheLife, cacheTag } from "next/cache";
 import { getEnv } from "@/lib/config/env";
@@ -9,7 +10,14 @@ import {
 	fetchTrendingPosts,
 	fetchTrendingPostTags,
 } from "@/lib/posts/repo";
-import { fetchProductReviews } from "@/lib/reviews/repo";
+import {
+	fetchProductReviewStats,
+	fetchProductReviewsPage,
+	fetchStoreReviewStats,
+	fetchStoreReviewsPage,
+	type ReviewPage,
+	type ReviewStats,
+} from "@/lib/reviews/repo";
 import { fetchPopularHashtags } from "@/lib/search/repo";
 import { fetchAllStoresForSitemap } from "@/lib/seller/list-stores";
 import { fetchPublicStore } from "@/lib/seller/public-store";
@@ -20,8 +28,6 @@ import {
 	fetchProducts,
 	fetchPublicProduct,
 	fetchSellerProducts,
-	fetchSellerReviewStats,
-	fetchSellerReviews,
 } from "./index";
 import { prerenderSafe } from "./prerender";
 
@@ -303,15 +309,41 @@ async function readSellerReviewStats(id: string) {
 	applyCacheTier("SELLER_PROFILE");
 	return fillFetch(
 		"seller-review-stats",
-		() => fetchSellerReviewStats(id, true),
+		() =>
+			absentAs(null, () =>
+				fetchStoreReviewStats(id, {
+					locale: defaultLocale,
+					signal: upstreamSignal(),
+				}),
+			),
 		{
 			key: ["seller-review-stats", id],
-			endpoint: "/public/sellers/{id}/reviews/stats",
+			endpoint: "ReviewPublicService/GetStoreReviewStats",
 		},
 	);
 }
 
-async function readProductReviews(id: string, page: number, pageSize: number) {
+/** 對象不存在（not_found）是可快取的「沒有」；其他錯誤照拋，讓快取保留舊值、呼叫端與空清單分開處理。 */
+async function absentAs<T, E>(
+	absent: E,
+	read: () => Promise<T>,
+): Promise<T | E> {
+	try {
+		return await read();
+	} catch (err) {
+		if (ConnectError.from(err).code === Code.NotFound) return absent;
+		throw err;
+	}
+}
+
+export interface ProductReviewsResult {
+	reviews: ReviewPage["reviews"];
+	/** 評價總數，取自 GetProductReviewStats，不是已載入頁的加總。 */
+	total: number;
+	stats: ReviewStats;
+}
+
+async function readProductReviews(id: string, pageSize: number) {
 	"use cache";
 	// Review bodies are not price/stock — the REVIEWS tier (long window) avoids
 	// the per-minute regeneration the shared product:id tag would otherwise
@@ -320,18 +352,27 @@ async function readProductReviews(id: string, page: number, pageSize: number) {
 	applyCacheTier("REVIEWS");
 	return fillFetch(
 		"product-reviews",
-		() => fetchProductReviews(id, { page, pageSize }),
+		async (): Promise<ProductReviewsResult | null> => {
+			const opts = { locale: defaultLocale, signal: upstreamSignal() } as const;
+			return absentAs(null, async () => {
+				const [page, stats] = await Promise.all([
+					fetchProductReviewsPage(id, { pageSize, ...opts }),
+					fetchProductReviewStats(id, opts),
+				]);
+				return { reviews: page.reviews, total: stats.totalCount, stats };
+			});
+		},
 		{
-			key: ["product-reviews", id, String(page), String(pageSize)],
-			endpoint: "/public/products/{id}/reviews",
+			key: ["product-reviews", id, String(pageSize)],
+			endpoint: "ReviewPublicService/ListProductReviews",
 		},
 	);
 }
 
-// minRating-filtered reviews are intentionally NOT cached here — call
-// fetchProductReviews directly for those (they bypass tag invalidation).
-export function getCachedProductReviews(id: string, page = 1, pageSize = 10) {
-	return readProductReviews(id, page, pageSize).then(settled);
+// 星等篩選的評價不在這裡快取：直接呼叫 fetchProductReviewsPage（不經標籤失效）。
+// 只快取第一頁；後面的頁由 page_token 在瀏覽器逐頁讀。
+export function getCachedProductReviews(id: string, pageSize = 10) {
+	return readProductReviews(id, pageSize).then(settled);
 }
 
 async function readSellerProducts(id: string, page: number, pageSize: number) {
@@ -615,18 +656,28 @@ export function getCachedTrendingPostTags(limit = 8) {
  * profile 評價 tab. Cached under seller:<id> so a write-side review/seller
  * mutation busts it via POST /api/revalidate.
  */
-export async function getCachedSellerReviews(id: string, page = 1) {
-	return readSellerReviews(id, page).then(settled);
+export async function getCachedSellerReviews(id: string) {
+	return readSellerReviews(id).then(settled);
 }
 
-async function readSellerReviews(id: string, page: number) {
+async function readSellerReviews(id: string) {
 	"use cache";
 	cacheTag(sellerTag(id));
 	applyCacheTier("SELLER_PROFILE");
-	return fillFetch("seller-reviews", () => fetchSellerReviews(id, page, true), {
-		key: ["seller-reviews", id, String(page)],
-		endpoint: "/public/sellers/{id}/reviews",
-	});
+	return fillFetch(
+		"seller-reviews",
+		(): Promise<ReviewPage> =>
+			absentAs({ reviews: [], nextPageToken: "" }, () =>
+				fetchStoreReviewsPage(id, {
+					locale: defaultLocale,
+					signal: upstreamSignal(),
+				}),
+			),
+		{
+			key: ["seller-reviews", id],
+			endpoint: "ReviewPublicService/ListStoreReviews",
+		},
+	);
 }
 
 type StorefrontProducts = {

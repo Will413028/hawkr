@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, test } from "node:test";
+import { CustomerSort } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 
 /**
  * hawkr-website#382：稍後購買清單與結帳草稿存在瀏覽器本機、沒有帳號綁定、
@@ -264,17 +265,17 @@ test("換帳號會清掉已掛載賣家 store 的記憶體副本，不只是 loc
 		"../features/seller-center/customers/customersUiStore"
 	);
 	syncLocalPrivateState("1001");
-	useSellerCustomersUiStore.getState().setSearch("上一位賣家的客戶關鍵字");
-	useSellerCustomersUiStore.getState().setSortBy("order_count");
+	useSellerCustomersUiStore.getState().setTagId("上一位賣家的標籤");
+	useSellerCustomersUiStore.getState().setSort(CustomerSort.ORDER_COUNT);
 	// 前提自檢：值真的進了記憶體與 localStorage。
 	assert.equal(
-		useSellerCustomersUiStore.getState().search,
-		"上一位賣家的客戶關鍵字",
-		"seed: 搜尋字串應在記憶體",
+		useSellerCustomersUiStore.getState().tagId,
+		"上一位賣家的標籤",
+		"seed: 標籤篩選應在記憶體",
 	);
 	assert.ok(
 		ls.getItem("hawkr:seller-customers:ui"),
-		"seed: 搜尋字串應已持久化",
+		"seed: 標籤篩選應已持久化",
 	);
 
 	syncLocalPrivateState("2002");
@@ -287,13 +288,13 @@ test("換帳號會清掉已掛載賣家 store 的記憶體副本，不只是 loc
 	// zustand persist 不監聽 storage 事件：只清 localStorage 的話，記憶體裡
 	// 還留著上一位的字串，下一次 set() 會把它整包寫回去，洩漏原地復活。
 	assert.equal(
-		useSellerCustomersUiStore.getState().search,
-		"",
+		useSellerCustomersUiStore.getState().tagId,
+		null,
 		"換帳號後記憶體副本必須回到預設值",
 	);
 	assert.equal(
-		useSellerCustomersUiStore.getState().sortBy,
-		"total_spent",
+		useSellerCustomersUiStore.getState().sort,
+		CustomerSort.TOTAL_SPENT,
 		"換帳號後排序必須回到預設值",
 	);
 });

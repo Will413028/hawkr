@@ -18,8 +18,13 @@
 
 import * as React from "react";
 import { useAuth } from "@/lib/auth/context";
-import { messagePreview } from "@/lib/chat/preview";
-import { getChatSocket } from "@/lib/chat/ws";
+import { previewText } from "@/lib/chat/map";
+import { listConversations } from "@/lib/chat/repo";
+import type { ChatStreamEvent } from "@/lib/chat/stream";
+import type { ChatMessage, Conversation } from "@/lib/chat/types";
+import { useChatStream } from "@/lib/chat/useChatStream";
+import { chatSideOf } from "@/lib/chat/workspace";
+import { useUiText } from "@/lib/i18n/ui-text";
 import { stripLocale } from "@/lib/intl/paths";
 import {
 	NOTIFICATION_NEW_EVENT,
@@ -68,28 +73,28 @@ export default function NotificationToastBridge() {
 		? `${myId || "unknown"}:${activeRole ?? "none"}`
 		: "guest";
 
-	/* ── New chat messages (immediate, via socket) ─────────────── */
-	React.useEffect(() => {
-		if (!signedIn) return;
-		const sock = getChatSocket();
-		sock.connect(); // idempotent; the singleton is never auto-disconnected
-		const seen = new Set<string>();
-		const unsub = sock.onMessage((m) => {
-			const isMessage =
-				m.type === "text" || m.type === "image" || m.type === "chat";
-			if (!isMessage) return;
-			if (myId && String(m.senderId) === myId) return; // my own outgoing
-			if (m.id) {
-				if (seen.has(m.id)) return;
-				// Insertion-ordered: dropping from the front evicts the oldest.
-				if (seen.size >= SEEN_MESSAGE_LIMIT) {
-					for (const oldest of seen) {
-						seen.delete(oldest);
-						if (seen.size < SEEN_MESSAGE_LIMIT) break;
-					}
+	/* ── New chat messages (immediate, via the chat stream) ─────── */
+	const ut = useUiText();
+	const chatSide = chatSideOf(activeRole);
+	const seenMessagesRef = React.useRef(new Set<string>());
+	const peersRef = React.useRef(new Map<string, Conversation>());
+	const lookupRef = React.useRef<Promise<void> | null>(null);
+	const onChatEvent = React.useCallback(
+		(e: ChatStreamEvent) => {
+			if (e.type !== "message" || e.updated) return;
+			const m: ChatMessage = e.message;
+			if (m.sender === chatSide) return; // my own outgoing
+			if (m.hidden || m.erased) return;
+			const seen = seenMessagesRef.current;
+			if (seen.has(m.id)) return;
+			// Insertion-ordered: dropping from the front evicts the oldest.
+			if (seen.size >= SEEN_MESSAGE_LIMIT) {
+				for (const oldest of seen) {
+					seen.delete(oldest);
+					if (seen.size < SEEN_MESSAGE_LIMIT) break;
 				}
-				seen.add(m.id);
 			}
+			seen.add(m.id);
 			// Don't toast while the user is already in the messaging area. Read
 			// the path at event time (window.location) rather than usePathname()
 			// at render — this bridge renders null and only needs the path inside
@@ -100,18 +105,45 @@ export default function NotificationToastBridge() {
 			const role = notificationWorkspaceRole(window.location.pathname);
 			const base =
 				role === "seller" ? "/seller-center/messages" : "/account/messages";
-			show({
-				kind: "message",
-				title: "新訊息",
-				body: messagePreview(m.content, m.type),
-				href: `${base}/${m.senderId}`,
-				dedupeKey: m.id ? `msg:${m.id}` : undefined,
-				// Collapse a burst from the same sender into one stack.
-				groupKey: `chat:${m.senderId}`,
-			});
-		});
-		return unsub;
-	}, [signedIn, myId, show]);
+			void (async () => {
+				let peer = peersRef.current.get(m.conversationId);
+				if (!peer) {
+					// 串流的訊息只帶對話 ID：連結要對方的 ID，從對話列表取。
+					// 同時來一串訊息時共用同一次讀取，不為每則各打一次。
+					lookupRef.current ??= (async () => {
+						try {
+							for (const c of await listConversations(chatSide)) {
+								peersRef.current.set(c.id, c);
+							}
+						} catch {
+							// 讀不到對話列表：通知仍顯示，連結退到收件匣。
+						} finally {
+							lookupRef.current = null;
+						}
+					})();
+					await lookupRef.current;
+					peer = peersRef.current.get(m.conversationId);
+				}
+				show({
+					kind: "message",
+					title: "新訊息",
+					body: previewText(ut, {
+						kind: m.kind,
+						text: m.text,
+						hidden: m.hidden,
+						erased: m.erased,
+						sender: m.sender,
+					}),
+					href: peer ? `${base}/${peer.targetUserId}` : base,
+					dedupeKey: `msg:${m.id}`,
+					// Collapse a burst from the same conversation into one stack.
+					groupKey: `chat:${m.conversationId}`,
+				});
+			})();
+		},
+		[chatSide, show, ut],
+	);
+	useChatStream(chatSide, signedIn, onChatEvent);
 
 	/* ── New orders / notifications (via unread-count increase) ─── */
 	const primedRef = React.useRef(false);

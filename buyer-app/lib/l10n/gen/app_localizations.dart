@@ -193,6 +193,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'最近看過'**
   String get viewedRecently;
+
+  /// Retry button label after a failed load.
+  ///
+  /// In zh, this message translates to:
+  /// **'重試'**
+  String get commonRetry;
+
+  /// Title of the product reviews section and screen.
+  ///
+  /// In zh, this message translates to:
+  /// **'商品評價'**
+  String get productReviewsTitle;
+
+  /// Product reviews title with the total review count.
+  ///
+  /// In zh, this message translates to:
+  /// **'商品評價 ({count})'**
+  String productReviewsTitleWithCount(int count);
+
+  /// Conversation title when the store profile is missing.
+  ///
+  /// In zh, this message translates to:
+  /// **'店家'**
+  String get chatStoreFallbackName;
 }
 
 class _AppLocalizationsDelegate

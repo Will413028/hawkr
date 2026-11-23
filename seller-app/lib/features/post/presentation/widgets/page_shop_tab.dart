@@ -34,6 +34,7 @@ import '../../../product/data/product_upload_service.dart';
 import '../../data/post_repository.dart';
 import '../shop_tab_controller.dart';
 import 'storefront_tab_glass.dart';
+import '../../../review/data/review_repository.dart';
 
 /// 商城 Tab — 管理商品、開通流程、上架狀態
 class PageShopTab extends ConsumerStatefulWidget {
@@ -361,44 +362,24 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
     final Object? skuId = skuRaw;
     if (skuId == null || sellerId == null) return;
 
-    // 評分（rating summary + reviews）+ grades 各自隔離失敗，互不影響
-    // reviews list 跟 buyer merchant_shop_tab 一致：當 source of truth
-    // 拿評論數，避免 rating summary endpoint 給錯數量造成「商品有評論但顯示 0」
+    // 評分統計與 grades 各自隔離失敗，互不影響
     final results = await Future.wait<dynamic>([
       ref
-          .read(productRepositoryProvider)
-          .getPublicProductRatingSummary(skuId)
-          .catchError((_) => <String, num>{}),
+          .read(reviewRepositoryProvider)
+          .productStats(skuId.toString())
+          .then<ReviewStats?>((s) => s)
+          .catchError((_) => null),
       ref
           .read(productRepositoryProvider)
           .getSellerProductGrades(sellerId, skuId)
           .catchError((_) => <Map<String, dynamic>>[]),
-      ref
-          .read(productRepositoryProvider)
-          .getSellerProductReviewsPublic(sellerId, skuId)
-          .catchError((_) => <Map<String, dynamic>>[]),
     ]);
     if (!mounted) return;
 
-    final rateResp = results[0] is Map
-        ? (results[0] as Map<String, dynamic>)
-        : <String, dynamic>{};
-    final rateData = rateResp['data'] is Map
-        ? (rateResp['data'] as Map<String, dynamic>)
-        : rateResp;
+    final stats = results[0] is ReviewStats ? results[0] as ReviewStats : null;
     final grades = results[1] is List
         ? (results[1] as List).whereType<Map<String, dynamic>>().toList()
         : <Map<String, dynamic>>[];
-    final reviewsList = results[2] is List
-        ? (results[2] as List).whereType<Map<String, dynamic>>().toList()
-        : <Map<String, dynamic>>[];
-
-    double parseNum(dynamic v) {
-      if (v == null) return 0;
-      if (v is num) return v.toDouble();
-      return double.tryParse(v.toString()) ?? 0;
-    }
-
     int? minP;
     int? maxP;
     int? minList;
@@ -435,28 +416,11 @@ class _AddedProductCardState extends ConsumerState<_AddedProductCard> {
       }
     }
 
-    // 從 reviews list 算 avg + count（buyer pattern）
-    double reviewsAvg = 0;
-    int validRated = 0;
-    for (final r in reviewsList) {
-      final v = parseNum(r['rating'] ?? r['score'] ?? r['stars']);
-      if (v > 0) {
-        reviewsAvg += v;
-        validRated++;
-      }
-    }
-    if (validRated > 0) reviewsAvg /= validRated;
-
     setState(() {
-      // reviews list 有資料就採用（更準）；否則 fallback rating summary endpoint
-      if (reviewsList.isNotEmpty) {
-        _avgRating = reviewsAvg;
-        _ratingCount = reviewsList.length;
-      } else {
-        _avgRating = parseNum(rateData['rating'] ?? rateData['avg']);
-        _ratingCount = parseNum(
-          rateData['reviewCount'] ?? rateData['count'],
-        ).toInt();
+      // 評分與評價數只取自統計 RPC；讀取失敗時不更動，不顯示成 0 則評價。
+      if (stats != null) {
+        _avgRating = stats.average;
+        _ratingCount = stats.count;
       }
       if (minP != null) _minPrice = minP;
       if (maxP != null) _maxPrice = maxP;

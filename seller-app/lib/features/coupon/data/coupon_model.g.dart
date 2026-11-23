@@ -51,21 +51,3 @@ Map<String, dynamic> _$CouponToJson(_Coupon instance) => <String, dynamic>{
   'sellerName': instance.sellerName,
   'createdAt': instance.createdAt,
 };
-
-_CustomerLookupResult _$CustomerLookupResultFromJson(
-  Map<String, dynamic> json,
-) => _CustomerLookupResult(
-  uid: json['uid'] as String,
-  buyerName: json['buyerName'] as String? ?? '',
-  phone: json['phone'] as String? ?? '',
-  avatarUrl: json['avatarUrl'] as String?,
-);
-
-Map<String, dynamic> _$CustomerLookupResultToJson(
-  _CustomerLookupResult instance,
-) => <String, dynamic>{
-  'uid': instance.uid,
-  'buyerName': instance.buyerName,
-  'phone': instance.phone,
-  'avatarUrl': instance.avatarUrl,
-};

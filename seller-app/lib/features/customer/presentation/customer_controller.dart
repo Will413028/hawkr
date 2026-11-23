@@ -1,22 +1,43 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../data/customer_repository.dart';
+import '../../order/data/order_repository.dart';
 import '../data/customer_model.dart';
-import '../../coupon/data/coupon_model.dart';
+import '../data/customer_orders.dart';
+import '../data/customer_repository.dart';
 
-part 'customer_controller.freezed.dart';
 part 'customer_controller.g.dart';
 
-@freezed
-abstract class CustomerFilter with _$CustomerFilter {
-  const factory CustomerFilter({
-    /// 'normal' / 'vip' / 'blocklist' / null (全部)
-    String? customerType,
-    @Default('visitCount') String sortBy,
-    String? keyword,
-    int? tagId,
-  }) = _CustomerFilter;
+/// 讀取失敗直接呈現錯誤與重試，不走 provider 的自動重試（重試期間畫面會一直停在讀取中，失敗看不見）。
+Duration? _noRetry(int retryCount, Object error) => null;
+
+/// 客戶列表的篩選與排序：[type] 不給是全部客戶，[tagId] 是單一標籤。預設依訂單數由多到少。
+class CustomerFilter {
+  const CustomerFilter({
+    this.type,
+    this.sort = CustomerSort.CUSTOMER_SORT_ORDER_COUNT,
+    this.descending = true,
+    this.tagId,
+  });
+
+  final CustomerType? type;
+  final CustomerSort sort;
+  final bool descending;
+  final String? tagId;
+
+  CustomerFilter copyWith({
+    CustomerType? type,
+    bool clearType = false,
+    CustomerSort? sort,
+    bool? descending,
+    String? tagId,
+    bool clearTagId = false,
+  }) => CustomerFilter(
+    type: clearType ? null : (type ?? this.type),
+    sort: sort ?? this.sort,
+    descending: descending ?? this.descending,
+    tagId: clearTagId ? null : (tagId ?? this.tagId),
+  );
 }
 
 @riverpod
@@ -24,50 +45,182 @@ class CustomerFilterNotifier extends _$CustomerFilterNotifier {
   @override
   CustomerFilter build() => const CustomerFilter();
 
-  void setCustomerType(String? type) =>
-      state = state.copyWith(customerType: type);
+  void setType(CustomerType? type) =>
+      state = state.copyWith(type: type, clearType: type == null);
 
-  void setSortBy(String sortBy) => state = state.copyWith(sortBy: sortBy);
+  void setSort(CustomerSort sort, {bool descending = true}) =>
+      state = state.copyWith(sort: sort, descending: descending);
 
-  void setKeyword(String? keyword) => state = state.copyWith(keyword: keyword);
-
-  void setTagId(int? tagId) => state = state.copyWith(tagId: tagId);
+  void setTagId(String? tagId) =>
+      state = state.copyWith(tagId: tagId, clearTagId: tagId == null);
 }
 
-@riverpod
-Future<List<Customer>> customerListNotifier(Ref ref) async {
-  final filter = ref.watch(customerFilterProvider);
-  final repo = ref.read(customerRepositoryProvider);
+/// 客戶列表已載入的頁數加上繼續載入的狀態；[nextPageToken] 為空表示沒有更多。
+class CustomerListState {
+  const CustomerListState({
+    required this.customers,
+    required this.nextPageToken,
+    this.loadingMore = false,
+    this.loadMoreError,
+  });
 
-  return repo.getCustomers(
-    customerType: filter.customerType,
-    sortBy: filter.sortBy,
-    keyword: filter.keyword,
-    tagId: filter.tagId,
+  final List<Customer> customers;
+  final String nextPageToken;
+  final bool loadingMore;
+
+  /// 繼續載入失敗的錯誤；已載入的客戶保留，不當成清單讀取失敗。
+  final Object? loadMoreError;
+
+  bool get hasMore => nextPageToken.isNotEmpty;
+
+  CustomerListState copyWith({
+    List<Customer>? customers,
+    String? nextPageToken,
+    bool? loadingMore,
+    Object? loadMoreError,
+    bool clearError = false,
+  }) => CustomerListState(
+    customers: customers ?? this.customers,
+    nextPageToken: nextPageToken ?? this.nextPageToken,
+    loadingMore: loadingMore ?? this.loadingMore,
+    loadMoreError: clearError ? null : (loadMoreError ?? this.loadMoreError),
   );
+}
+
+@Riverpod(retry: _noRetry)
+class CustomerList extends _$CustomerList {
+  @override
+  Future<CustomerListState> build() async {
+    final filter = ref.watch(customerFilterProvider);
+    final page = await ref
+        .read(customerRepositoryProvider)
+        .listCustomers(
+          type: filter.type,
+          tagId: filter.tagId,
+          sort: filter.sort,
+          descending: filter.descending,
+        );
+    return CustomerListState(
+      customers: page.customers,
+      nextPageToken: page.nextPageToken,
+    );
+  }
+
+  /// 載入下一頁；篩選換了（provider 重建）之後舊頁的結果丟棄。
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    final filter = ref.read(customerFilterProvider);
+    state = AsyncData(current.copyWith(loadingMore: true, clearError: true));
+    try {
+      final page = await ref
+          .read(customerRepositoryProvider)
+          .listCustomers(
+            type: filter.type,
+            tagId: filter.tagId,
+            sort: filter.sort,
+            descending: filter.descending,
+            pageToken: current.nextPageToken,
+          );
+      if (!ref.mounted || ref.read(customerFilterProvider) != filter) return;
+      state = AsyncData(
+        current.copyWith(
+          customers: [...current.customers, ...page.customers],
+          nextPageToken: page.nextPageToken,
+          loadingMore: false,
+        ),
+      );
+    } catch (e) {
+      if (!ref.mounted) return;
+      state = AsyncData(current.copyWith(loadingMore: false, loadMoreError: e));
+    }
+  }
 }
 
 // ─── 顧客詳情相關 ────────────────────────────────────────────────────────────
 
-@riverpod
-Future<({List<OrderRecord> orders, List<SpendingRecord> spending})>
-customerOrders(Ref ref, String customerId) {
-  return ref.read(customerRepositoryProvider).getCustomerOrders(customerId);
+/// 客戶的訂單（店家訂單列表以 `buyer_id` 篩選）一頁的筆數；讀到不足一頁就是沒有下一頁。
+const customerOrdersPageSize = 50;
+
+class CustomerOrdersState {
+  const CustomerOrdersState({
+    required this.orders,
+    required this.nextPage,
+    required this.hasMore,
+    this.loadingMore = false,
+    this.loadMoreError,
+  });
+
+  final List<OrderRecord> orders;
+  final int nextPage;
+  final bool hasMore;
+  final bool loadingMore;
+
+  /// 繼續載入失敗的錯誤；已載入的訂單保留，不當成列表讀取失敗。
+  final Object? loadMoreError;
+
+  CustomerOrdersState copyWith({
+    List<OrderRecord>? orders,
+    int? nextPage,
+    bool? hasMore,
+    bool? loadingMore,
+    Object? loadMoreError,
+    bool clearError = false,
+  }) => CustomerOrdersState(
+    orders: orders ?? this.orders,
+    nextPage: nextPage ?? this.nextPage,
+    hasMore: hasMore ?? this.hasMore,
+    loadingMore: loadingMore ?? this.loadingMore,
+    loadMoreError: clearError ? null : (loadMoreError ?? this.loadMoreError),
+  );
 }
 
-@riverpod
-Future<List<Coupon>> customerCoupons(Ref ref, String customerId) {
-  return ref.read(customerRepositoryProvider).getCustomerCoupons(customerId);
-}
+/// 客戶的訂單：逐頁讀店家訂單列表，沒有筆數上限。
+@Riverpod(retry: _noRetry)
+class CustomerOrders extends _$CustomerOrders {
+  @override
+  Future<CustomerOrdersState> build(String buyerId) async {
+    final page = await ref
+        .read(orderRepositoryProvider)
+        .fetchMatchedOrders(pageSize: customerOrdersPageSize, buyerId: buyerId);
+    return CustomerOrdersState(
+      orders: page.map(orderRecordFromSummary).toList(),
+      nextPage: 2,
+      hasMore: page.length >= customerOrdersPageSize,
+    );
+  }
 
-@riverpod
-Future<List<CustomerTag>> customerTags(Ref ref, String buyerId) {
-  return ref.read(customerRepositoryProvider).getCustomerTags(buyerId);
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    state = AsyncData(current.copyWith(loadingMore: true, clearError: true));
+    try {
+      final page = await ref
+          .read(orderRepositoryProvider)
+          .fetchMatchedOrders(
+            page: current.nextPage,
+            pageSize: customerOrdersPageSize,
+            buyerId: buyerId,
+          );
+      if (!ref.mounted) return;
+      state = AsyncData(
+        current.copyWith(
+          orders: [...current.orders, ...page.map(orderRecordFromSummary)],
+          nextPage: current.nextPage + 1,
+          hasMore: page.length >= customerOrdersPageSize,
+          loadingMore: false,
+        ),
+      );
+    } catch (e) {
+      if (!ref.mounted) return;
+      state = AsyncData(current.copyWith(loadingMore: false, loadMoreError: e));
+    }
+  }
 }
 
 // ─── 商家標籤 ────────────────────────────────────────────────────────────────
 
-@riverpod
+@Riverpod(retry: _noRetry)
 Future<List<CustomerTag>> sellerTags(Ref ref) {
-  return ref.read(customerRepositoryProvider).getSellerTags();
+  return ref.read(customerRepositoryProvider).listTags();
 }

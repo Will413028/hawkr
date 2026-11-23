@@ -8,7 +8,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'config/flavor.dart';
 import 'config/app_constants.dart';
-import 'config/media_image.dart';
 import 'core/analytics/analytics_identity.dart';
 import 'core/layout/app_media_query_policy.dart';
 import 'core/layout/app_text_size.dart';
@@ -19,7 +18,8 @@ import 'shared/utils/hk_log.dart';
 import 'shared/utils/keyboard_unfocus_controller.dart';
 import 'features/app_update/application/force_update_provider.dart';
 import 'features/chat/data/active_chat_gate.dart';
-import 'features/chat/data/chat_repository.dart';
+import 'features/chat/data/chat_session.dart';
+import 'features/seller/data/current_store.dart';
 import 'features/notification/data/push/manager.dart';
 import 'shared/widgets/chat_bubble_icon.dart';
 import 'shared/widgets/environment_banner.dart';
@@ -61,18 +61,23 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     );
     // 監聯新訊息事件；eager read → creates the keepAlive provider
     _newMessageSub = ref
-        .read(chatRepositoryProvider)
+        .read(chatSessionProvider)
         .onNewMessage
         .listen(
           (event) {
             HKLog.logD(
-              '[MyApp] ★★★ Received new message event! sender=${event.senderId} ★★★',
+              '[MyApp] ★★★ Received new message event! conversation=${event.conversationId} ★★★',
             );
             _showNewMessageToast(event);
           },
           onError: (e) => HKLog.logD('[MyApp] Stream error: $e'),
           onDone: () => HKLog.logD('[MyApp] Stream done'),
         );
+    ref.listenManual(
+      sellerStoreIdProvider,
+      (prev, next) =>
+          onChatStoreIdChanged(ref.read(chatSessionProvider), prev, next),
+    );
     HKLog.logD('[MyApp] ====== Listener setup completed ======');
   }
 
@@ -98,7 +103,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   void _showNewMessageToast(ChatNotificationEvent event) {
     HKLog.logD(
-      '[MyApp] _showNewMessageToast called from sender=${event.senderId}',
+      '[MyApp] _showNewMessageToast called from conversation=${event.conversationId}',
     );
 
     // 使用者正在跟這個人聊天 → 不彈 toast，跟 FCM 前景 banner 同邏輯
@@ -108,8 +113,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final gate = ref.read(activeChatGateProvider);
     final activePeer = gate.peerId;
     final activeConv = gate.conversationId;
-    final senderId = event.senderId;
-    final conversationId = event.conversationId ?? '';
+    final senderId = event.buyerId;
+    final conversationId = event.conversationId;
     final matchesPeer =
         senderId.isNotEmpty && activePeer != null && activePeer == senderId;
     final matchesConv =
@@ -265,32 +270,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     );
   }
 
-  /// WS `chat` / `notification` 推播的 `avatarKey` → 顯示 URL。
-  /// （唯一來源是 WebSocket，見 `chat_repository.dart` 的 `_emitNewMessageEvent`
-  /// 兩處呼叫點；FCM 那條路不經過這裡。）
-  ///
-  /// 值可能是 objectKey、本站顯示 URL，或外部（Google）URL；三種都交給
-  /// `buildImageUrl`（唯一組裝入口）：本站 URL 還原成 key 後改用 avatar 尺寸重組，
-  /// 外部 URL 原樣 passthrough。
-  ///
-  /// **為什麼這裡不需要「裸 `/api/` 路徑」與「`i/{preset}/` 前綴污染」的護欄**
-  /// （#430 B3 移除舊分支時查證，2026-08-05）：
-  /// - `buildImageUrl` 的 `/api/` passthrough 只對 http URL 生效，裸路徑會被當成
-  ///   objectKey 組出 `{mediaBase}/i/avatar/api/...`（必 404）；`i/{preset}/` 前綴
-  ///   也只有 `mediaObjectKey` 會剝除。兩者確實是 `buildImageUrl` 的盲區。
-  /// - 但這個值到不了那兩種形狀：後端只放 objectKey。
-  ///   `im-service` 的 WS payload 取 `AvatarKey` / `LogoKey`
-  ///   （`internal/client/seller/client.go:66,78,80`、`buyer/client.go:58`，
-  ///   emit 於 `internal/usecase/message.go:505-506`，49 §6.6 明載「WS payload 只帶
-  ///   objectKey」），值就是 `sellers.logo` / `buyers.avatar` 欄位原文。
-  /// - 兩環境全表普查（2026-08-05）：dev 114＋124 列、prod 17＋12 列，
-  ///   **100% 以 `public/` 開頭**，`/api/`、`member`、`i/` 前綴各 0 列。
-  /// 所以舊分支保護的是 49 號媒體遷移前的歷史形狀，現已不可達。
-  /// 若哪天 WS 改帶完整 URL 或動態端點路徑，要回頭補護欄並加測試釘住。
-  String? _resolveAvatarUrl(String? rawAvatar) {
-    final value = rawAvatar?.trim() ?? '';
-    if (value.isEmpty) return null;
-    return buildImageUrl(value, ImagePreset.avatar);
+  /// 通知的頭像網址：伺服器回的圖片已經是可顯示的網址（`Image.uri`），空值回 null。
+  String? _resolveAvatarUrl(String? uri) {
+    final value = uri?.trim() ?? '';
+    return value.isEmpty ? null : value;
   }
 
   @override

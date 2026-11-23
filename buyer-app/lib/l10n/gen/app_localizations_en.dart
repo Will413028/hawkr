@@ -109,4 +109,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get viewedRecently => 'Viewed recently';
+
+  @override
+  String get commonRetry => 'Retry';
+
+  @override
+  String get productReviewsTitle => 'Reviews';
+
+  @override
+  String productReviewsTitleWithCount(int count) {
+    return 'Reviews ($count)';
+  }
+
+  @override
+  String get chatStoreFallbackName => 'Store';
 }

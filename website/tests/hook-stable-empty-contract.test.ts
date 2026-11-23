@@ -9,10 +9,6 @@ const FRESH_EMPTY = /(\?\?|\|\||:)\s*(\[\]|\{\})\s*[),;]*\s*$/;
 
 const ALLOWED = new Map<string, string[]>([
 	[
-		"lib/hooks/useSellerCustomers.ts",
-		["queryFn: () => fetchSellerCustomers(params ?? {}),"],
-	],
-	[
 		"lib/hooks/useSellerProducts.ts",
 		["queryFn: () => scope.repos.products.fetchSellerProducts(params ?? {}),"],
 	],

@@ -153,27 +153,6 @@ export async function setupRfqPriceReview(
 		},
 	]);
 
-	await page.route("**/api/v1/app/chat/conversations", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({ code: 0, data: { records: [] } }),
-		}),
-	);
-	await page.route("**/api/v1/app/chat/unread", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({ code: 0, data: { unread: 0 } }),
-		}),
-	);
-	await page.route("**/api/v1/app/chat/ws-ticket", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({ code: 0, data: {} }),
-		}),
-	);
 	await page.route(
 		"**/api/v1/app/buyers/me/procurement/turns/stream",
 		(route) =>

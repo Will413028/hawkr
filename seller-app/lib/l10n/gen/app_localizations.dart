@@ -146,11 +146,119 @@ abstract class AppLocalizations {
   /// **'台北時間'**
   String get taipeiTimeLabel;
 
-  /// Caption above a table of times, shown when the device time zone offset is not +8.
+  /// Retry button label after a failed load.
   ///
   /// In zh, this message translates to:
-  /// **'時間為台北時間'**
-  String get taipeiTimeTableNote;
+  /// **'重試'**
+  String get commonRetry;
+
+  /// Reload button label after a failed load.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新載入'**
+  String get commonReload;
+
+  /// Button that loads the next page of a list.
+  ///
+  /// In zh, this message translates to:
+  /// **'載入更多'**
+  String get commonLoadMore;
+
+  /// Chat list footer button after loading the next page failed.
+  ///
+  /// In zh, this message translates to:
+  /// **'載入更多失敗，點此重試'**
+  String get chatLoadMoreFailedRetry;
+
+  /// Chat title when the buyer has no name.
+  ///
+  /// In zh, this message translates to:
+  /// **'顧客'**
+  String get chatBuyerFallbackName;
+
+  /// Hint under a chat message that failed to send.
+  ///
+  /// In zh, this message translates to:
+  /// **'送出失敗，點一下重送'**
+  String get chatSendFailedResend;
+
+  /// Hint under a chat message that is being sent.
+  ///
+  /// In zh, this message translates to:
+  /// **'傳送中…'**
+  String get chatSending;
+
+  /// Prefix before the time of a message the buyer has read, followed by the time.
+  ///
+  /// In zh, this message translates to:
+  /// **'已讀 '**
+  String get chatReadPrefix;
+
+  /// Title of the chat thread load error panel.
+  ///
+  /// In zh, this message translates to:
+  /// **'目前無法載入訊息'**
+  String get chatLoadFailedTitle;
+
+  /// Description of the chat thread load error panel.
+  ///
+  /// In zh, this message translates to:
+  /// **'請確認網路連線後再試一次。'**
+  String get chatLoadFailedDescription;
+
+  /// Subtitle of the customer orders screen.
+  ///
+  /// In zh, this message translates to:
+  /// **'顧客訂單'**
+  String get customerOrdersTitle;
+
+  /// Empty state of the customer orders screen.
+  ///
+  /// In zh, this message translates to:
+  /// **'暫無訂單'**
+  String get customerOrdersEmpty;
+
+  /// Customer display name when the buyer has no name.
+  ///
+  /// In zh, this message translates to:
+  /// **'買家'**
+  String get customerBuyerFallbackName;
+
+  /// Button that opens the customer picker when issuing a coupon.
+  ///
+  /// In zh, this message translates to:
+  /// **'從客戶名單選擇'**
+  String get couponPickFromCustomers;
+
+  /// Hint when no customer is selected for a coupon issue.
+  ///
+  /// In zh, this message translates to:
+  /// **'從客戶名單挑選這次發放的會員'**
+  String get couponPickFromCustomersHint;
+
+  /// Title of the report sheet for a chat message.
+  ///
+  /// In zh, this message translates to:
+  /// **'檢舉訊息'**
+  String get reportMessageTitle;
+
+  /// Title of the customer picker sheet.
+  ///
+  /// In zh, this message translates to:
+  /// **'選擇客戶'**
+  String get customerPickerTitle;
+
+  /// Empty state of the customer picker sheet.
+  ///
+  /// In zh, this message translates to:
+  /// **'沒有可選的客戶'**
+  String get customerPickerEmpty;
+
+  /// Confirm button of the customer picker with the number selected.
+  ///
+  /// In zh, this message translates to:
+  /// **'加入名單（{count}）'**
+  String customerPickerAdd(int count);
 }
 
 class _AppLocalizationsDelegate

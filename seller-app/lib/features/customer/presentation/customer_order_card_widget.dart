@@ -10,14 +10,12 @@ import '../../../shared/time/taipei_display.dart';
 
 /// 訂單卡片元件 — Figma: 5324:61151
 ///
-/// 顯示：訂單編號、日期、購買品項、金額、評分、評論
+/// 顯示：訂單編號、日期、購買品項、金額
 /// 點擊進入訂單詳情頁
 ///
 /// Layout (p-16, column gap-6):
 /// - Row1: #orderId (16sp Bold #565656) + date (14sp Regular gray80) — spaceBetween, h-24, w-293
 /// - Row2: items (16sp Regular #565656 w-215) + $amount (16sp Bold primary) — spaceBetween, h-24, w-293
-/// - Row3: star icons (16px, gap-4)
-/// - Row4: review text (14sp Regular #565656, h-20)
 /// - Shield badge: top-right, 40w x 42h, rounded-bl/br-30
 class CustomerOrderCardWidget extends StatelessWidget {
   final OrderRecord order;
@@ -131,27 +129,6 @@ class CustomerOrderCardWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(height: 6.h),
-                // Row 3: star rating — full width w-338
-                _StarRating(rating: order.rating),
-                SizedBox(height: 6.h),
-                // Row 4: review text — full width w-338
-                SizedBox(
-                  height: 20.h,
-                  child: Text(
-                    order.review.isNotEmpty ? order.review : '尚無評論',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w400,
-                      color: order.review.isNotEmpty
-                          ? AppColors.textPrimary
-                          : AppColors.textPrimary.withValues(alpha: 0.4),
-                      height: 1.43,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
               ],
             ),
           ),
@@ -168,6 +145,7 @@ class CustomerOrderCardWidget extends StatelessWidget {
 
   static (Color, IconData) _badgeConfig(OrderStatus status) {
     return switch (status) {
+      OrderStatus.pendingPayment => (AppColors.warning, AppIcons.hourglassTop),
       OrderStatus.delivering => (
         AppColors.warning,
         AppIcons.localShippingOutlined,
@@ -182,34 +160,6 @@ class CustomerOrderCardWidget extends StatelessWidget {
       ),
       OrderStatus.issue => (AppColors.error, AppIcons.campaignOutlined),
     };
-  }
-}
-
-/// Star rating row — 16px star icons, gap-4, filled = golden, empty = grey outline
-class _StarRating extends StatelessWidget {
-  final int rating;
-
-  const _StarRating({required this.rating});
-
-  @override
-  Widget build(BuildContext context) {
-    // Clamp rating 0-5, show up to 5 stars
-    final filled = rating.clamp(0, 5);
-
-    return Row(
-      children: List.generate(5, (i) {
-        return Padding(
-          padding: EdgeInsets.only(right: i < 4 ? 4.w : 0),
-          child: Icon(
-            i < filled ? AppIcons.star : AppIcons.starBorder,
-            size: 16.sp,
-            color: i < filled
-                ? AppIconColors.gold
-                : AppIconColors.defaultColor.withValues(alpha: 0.3),
-          ),
-        );
-      }),
-    );
   }
 }
 

@@ -1,3 +1,5 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
+import '../../../../core/l10n/ui_locale.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
@@ -21,11 +23,11 @@ class CouponTagSelectionCard extends StatefulWidget {
   });
 
   final List<CustomerTag> allTags;
-  final Set<int> selectedTagIds;
+  final Set<String> selectedTagIds;
   final List<Customer> matchedCustomers;
   final bool isLoading;
   final VoidCallback onLoadTags;
-  final ValueChanged<int> onTagToggled;
+  final ValueChanged<String> onTagToggled;
   final ValueChanged<int> onRemoveCustomer;
 
   @override
@@ -176,9 +178,8 @@ class _CouponTagSelectionCardState extends State<CouponTagSelectionCard> {
             ...widget.matchedCustomers.asMap().entries.map((entry) {
               final customer = entry.value;
               return _CustomerCard(
-                name: customer.name,
+                name: customer.displayName(context.uiLocale, context.l10n),
                 accountId: customer.id,
-                phone: customer.phone,
                 onRemove: () => widget.onRemoveCustomer(entry.key),
               );
             }),
@@ -302,13 +303,11 @@ class _CustomerCard extends StatelessWidget {
   const _CustomerCard({
     required this.name,
     required this.accountId,
-    required this.phone,
     required this.onRemove,
   });
 
   final String name;
   final String accountId;
-  final String phone;
   final VoidCallback onRemove;
 
   @override
@@ -363,10 +362,7 @@ class _CustomerCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  [
-                    if (accountId.isNotEmpty) 'ID $accountId',
-                    if (phone.isNotEmpty) phone,
-                  ].join(' · '),
+                  [if (accountId.isNotEmpty) 'ID $accountId'].join(' · '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

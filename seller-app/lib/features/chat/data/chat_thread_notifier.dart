@@ -1,21 +1,24 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../dashboard/data/dashboard_chat_unread_provider.dart';
 import 'chat_model.dart';
 import 'chat_repository.dart';
+import 'chat_session.dart';
+import 'chat_stream_client.dart';
 
 part 'chat_thread_notifier.g.dart';
 
-/// Key for a ChatThread provider family instance.
-/// Equality: both fields must match so full-screen and embedded sharing same
-/// peerId+conversationId reuse the same cached notifier.
+/// 一個對話頁的 provider key：[peerId] 是買家 ID（從客戶或訂單進來時給），[conversationId] 是從列表或推播進來時給；
+/// 至少給一個。
 class ChatThreadArg {
+  const ChatThreadArg({this.peerId = '', this.conversationId});
+
   final String peerId;
   final String? conversationId;
-
-  const ChatThreadArg({required this.peerId, this.conversationId});
 
   @override
   bool operator ==(Object other) =>
@@ -27,339 +30,411 @@ class ChatThreadArg {
   int get hashCode => Object.hash(peerId, conversationId);
 }
 
-@riverpod
+/// 對話頁的資料。
+class ChatThreadData {
+  const ChatThreadData({
+    required this.messages,
+    required this.conversationId,
+    required this.hasMoreOlder,
+    required this.peerReadSeq,
+    this.buyer,
+  });
+
+  /// 依 seq 由小到大，本機送出中與失敗的訊息排在最後。
+  final List<ChatMessage> messages;
+
+  /// 對話 ID；買家與這家店還沒有對話時是 null，第一則訊息送出後才有。
+  final String? conversationId;
+  final bool hasMoreOlder;
+  final int peerReadSeq;
+
+  /// 對方買家的名稱與頭像（取自對話列表）；找不到對話時是 null。
+  final ChatBuyerInfo? buyer;
+
+  /// 從已載入的最舊一則起、seq 連續到哪裡；中間有缺口時停在缺口前，補洞從這裡往後讀。
+  int get contiguousLastSeq {
+    var last = 0;
+    for (final m in messages) {
+      if (m.seq <= 0) continue;
+      if (last == 0 || m.seq == last + 1) {
+        last = m.seq;
+      } else if (m.seq > last + 1) {
+        break;
+      }
+    }
+    return last;
+  }
+
+  /// 已確定在伺服器上的最後一個 seq。
+  int get lastSeq {
+    var s = 0;
+    for (final m in messages) {
+      if (m.seq > s) s = m.seq;
+    }
+    return s;
+  }
+
+  ChatThreadData copyWith({
+    List<ChatMessage>? messages,
+    String? conversationId,
+    bool? hasMoreOlder,
+    int? peerReadSeq,
+  }) => ChatThreadData(
+    messages: messages ?? this.messages,
+    conversationId: conversationId ?? this.conversationId,
+    hasMoreOlder: hasMoreOlder ?? this.hasMoreOlder,
+    peerReadSeq: peerReadSeq ?? this.peerReadSeq,
+    buyer: buyer,
+  );
+}
+
+class _SendJob {
+  const _SendJob({this.text, this.imageStagedToken});
+  final String? text;
+  final String? imageStagedToken;
+}
+
+/// 讀取失敗立刻顯示錯誤與重試，不走 Riverpod 的自動重試（它會讓畫面一直停在載入中）。
+Duration? _noAutoRetry(int retryCount, Object error) => null;
+
+@Riverpod(retry: _noAutoRetry)
 class ChatThread extends _$ChatThread {
-  // ── Dedup set ─────────────────────────────────────────────────────────────
-  // Keys: id (primary) or "${seqId}_${senderId}" (fallback when id is empty).
-  // Seeded in build(); cleared on refetchAndReplace().
-  final Set<String> _seenIds = {};
+  static const _uuid = Uuid();
 
-  // ── Pagination ────────────────────────────────────────────────────────────
-  bool _hasMore = true;
+  final Map<String, _SendJob> _jobs = {};
   bool _loadingOlder = false;
+  bool _fillingGap = false;
+  StreamSubscription<ChatStreamEvent>? _sub;
 
-  // ── Peer resolution ───────────────────────────────────────────────────────
-  // arg.peerId may be '' when screen opened via conversationId-only route.
-  // Resolved from participants on first load; used in _getReceiver().
-  String? _resolvedPeerId;
-
-  // ── Side-channel: participants from last load ─────────────────────────────
-  List<ChatParticipant> _participants = const [];
-  List<ChatParticipant> get lastParticipants => _participants;
-  bool get hasMoreOlderHistory => _hasMore;
-
-  // ── WS subscriptions ─────────────────────────────────────────────────────
-  StreamSubscription<ChatMessage>? _msgSub;
-  StreamSubscription<ChatConnectionState>? _connSub;
-
-  // ── Build ─────────────────────────────────────────────────────────────────
+  ChatRepository get _repo => ref.read(chatRepositoryProvider);
+  ChatSession get _session => ref.read(chatSessionProvider);
 
   @override
-  Future<List<ChatMessage>> build(ChatThreadArg arg) async {
-    _resolvedPeerId = arg.peerId.isNotEmpty ? arg.peerId : null;
+  Future<ChatThreadData> build(ChatThreadArg arg) async {
+    unawaited(_sub?.cancel());
+    _sub = _session.events.listen(_onEvent);
+    ref.onDispose(() => _sub?.cancel());
 
-    final repo = ref.read(chatRepositoryProvider);
-
-    // Cancel previous subscriptions (defensive; Riverpod re-runs build on
-    // arg change, not on keepAlive refresh).
-    _msgSub?.cancel();
-    _connSub?.cancel();
-
-    _msgSub = repo.onMessage.listen(_handleIncoming);
-
-    // skip(1): connectionStateStream is BehaviorSubject (emit-on-subscribe).
-    // Ignore the seed; react only to transitions (reconnect→connected).
-    _connSub = repo.connectionStateStream.skip(1).listen((s) {
-      if (s == ChatConnectionState.connected) {
-        refetchAndReplace();
-      }
-    });
-
-    ref.onDispose(() {
-      _msgSub?.cancel();
-      _connSub?.cancel();
-    });
-
-    return _fetchAndSeed();
-  }
-
-  // ── Private helpers ────────────────────────────────────────────────────────
-
-  bool get _useConv => (arg.conversationId ?? '').isNotEmpty;
-
-  String _getReceiver() {
-    if (_resolvedPeerId != null && _resolvedPeerId!.isNotEmpty) {
-      return _resolvedPeerId!;
+    if (arg.peerId.isEmpty && (arg.conversationId ?? '').isEmpty) {
+      throw ArgumentError('chat thread needs a peerId or a conversationId');
     }
-    if (arg.peerId.isNotEmpty) return arg.peerId;
-    // Fallback for the conversationId-only (push-tap) entry path, before
-    // participants resolve _resolvedPeerId: parse the peer (buyer) numeric id
-    // out of the roomId — supports both `b{buyer}_s{seller}` (new) and
-    // `m{seller}_{buyer}` (legacy) conventions.
-    final conv = arg.conversationId ?? '';
-    if (conv.contains('_')) {
-      final peer = resolveChatPeerId(
-        conv,
-        ownId: ref.read(chatRepositoryProvider).ownAccountId,
-      );
-      if (peer.isNotEmpty && peer != conv) return peer;
-    }
-    return ''; // unresolved — send() must guard
-  }
-
-  Future<List<ChatMessage>> _fetchAndSeed() async {
-    final repo = ref.read(chatRepositoryProvider);
-    final result = await repo.getHistoryWithParticipants(
-      participantId: _useConv ? '' : arg.peerId,
+    // 先看列表載入時記下的，沒有再依買家向伺服器取；只有對話 ID 又沒記下時，買家資料留空。
+    var conv = _session.conversationFor(
       conversationId: arg.conversationId,
-      pageSize: 50,
+      buyerId: arg.peerId,
     );
+    if (conv == null && arg.peerId.isNotEmpty) {
+      conv = await _repo.getConversationByBuyer(arg.peerId);
+    }
+    final convId = conv?.id ?? arg.conversationId;
+    if (convId == null || convId.isEmpty) {
+      return const ChatThreadData(
+        messages: [],
+        conversationId: null,
+        hasMoreOlder: false,
+        peerReadSeq: 0,
+      );
+    }
+    final page = await _repo.listOlder(convId);
+    final data = ChatThreadData(
+      messages: page.messages,
+      conversationId: convId,
+      hasMoreOlder: page.hasMore,
+      peerReadSeq: page.peerReadSeq,
+      buyer: conv?.buyer,
+    );
+    _session.client.noteSeq(convId, data.lastSeq);
+    // build 回傳之後 state 才有值，所以下一輪事件迴圈再標已讀。
+    unawaited(Future<void>(markRead));
+    return data;
+  }
 
-    _participants = result.participants;
+  String? get conversationId => state.value?.conversationId;
 
-    // Resolve peerId from participants when arg.peerId was empty.
-    if (_resolvedPeerId == null || _resolvedPeerId!.isEmpty) {
-      for (final p in result.participants) {
-        if (p.role == '1' || p.role == 'buyer') {
-          _resolvedPeerId = p.userId;
-          break;
-        }
+  // ── 事件 ───────────────────────────────────────────────────────────────
+
+  void _onEvent(ChatStreamEvent e) {
+    final data = state.value;
+    final conv = data?.conversationId;
+    if (data == null) return;
+    if (conv == null) {
+      // 對話還不存在時開著這頁：買家（或另一台裝置）送出第一則訊息後對話才出現，認得是這個買家的就接上。
+      if (e case ChatMessageArrived(:final message)) {
+        unawaited(_adoptConversation(message));
       }
-    }
-
-    final msgs = result.messages
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-    _hasMore = msgs.length >= 50;
-    _seenIds.clear();
-    for (final m in msgs) {
-      if (m.id.isNotEmpty) _seenIds.add(m.id);
-    }
-
-    _markRead();
-
-    return msgs;
-  }
-
-  void _markRead() {
-    final repo = ref.read(chatRepositoryProvider);
-    final pid = _getReceiver();
-    if (pid.isNotEmpty) {
-      repo
-          .markAllMessagesRead(participantId: pid)
-          .catchError((_) => false)
-          .whenComplete(() => ref.invalidate(dashboardChatUnreadProvider));
-      repo.sendReadReceipt(receiverId: pid);
-    }
-    final convId = arg.conversationId;
-    if (convId != null && convId.isNotEmpty) {
-      repo
-          .markConversationAsRead(convId)
-          .catchError((_) => false)
-          .whenComplete(() => ref.invalidate(dashboardChatUnreadProvider));
-    }
-  }
-
-  void _handleIncoming(ChatMessage msg) {
-    // Sync-done signal: gap-fill acknowledgement — no UI needed.
-    if (msg.messageType == 'sync_done') return;
-
-    // Read receipt: peer read our messages → flip own msgs to read.
-    if (msg.messageType == 'read_receipt') {
-      if (msg.senderId == _getReceiver()) markMyMessagesRead();
       return;
     }
-
-    // Typing signals: widget displays these via its own repo.onMessage sub.
-    if (msg.messageType == 'typing' ||
-        msg.messageType == 'start_typing' ||
-        msg.messageType == 'stop_typing') {
-      return;
+    switch (e) {
+      case ChatMessageArrived(:final message, :final updated):
+        if (message.conversationId != conv) return;
+        _applyMessage(message);
+        if (!updated && !message.fromStore) markRead();
+        _checkGap(message);
+      case ChatPeerRead(:final conversationId, :final peerReadSeq):
+        if (conversationId != conv) return;
+        if (peerReadSeq > data.peerReadSeq) {
+          state = AsyncData(data.copyWith(peerReadSeq: peerReadSeq));
+        }
+      case ChatResync(:final conversationId):
+        if (conversationId == null || conversationId == conv) {
+          unawaited(fillGap());
+        }
+      case ChatReady():
+      case ChatUnreadChanged():
+        break;
     }
-
-    // Filter to this conversation's messages only.
-    if (!_isRelevantMessage(msg)) return;
-
-    applyIncoming(msg);
-
-    // Peer sending us a message implies they've seen our previous ones.
-    if (msg.senderId == _getReceiver()) markMyMessagesRead();
   }
 
-  bool _isRelevantMessage(ChatMessage msg) {
-    final peer = _getReceiver();
-    if (peer.isEmpty) return false;
-    return msg.senderId == peer || msg.receiverId == peer;
-  }
+  bool _adopting = false;
 
-  // ── Public API (canonical contract) ───────────────────────────────────────
-
-  /// Full refetch + REPLACE. Called on WS reconnect (transition to connected).
-  /// Expresses loading/error via AsyncValue — no silent swallow.
-  Future<void> refetchAndReplace() async {
-    state = const AsyncLoading();
+  Future<void> _adoptConversation(ChatMessage m) async {
+    if (_adopting || arg.peerId.isEmpty) return;
+    _adopting = true;
     try {
-      final msgs = await _fetchAndSeed();
-      state = AsyncData(msgs);
-    } catch (e, st) {
-      state = AsyncError(e, st);
+      final found = await _repo.getConversationByBuyer(arg.peerId);
+      final cur = state.value;
+      if (!ref.mounted ||
+          found == null ||
+          found.id != m.conversationId ||
+          cur == null ||
+          cur.conversationId != null) {
+        return;
+      }
+      state = AsyncData(
+        ChatThreadData(
+          messages: cur.messages,
+          conversationId: found.id,
+          hasMoreOlder: cur.hasMoreOlder,
+          peerReadSeq: cur.peerReadSeq,
+          buyer: found.buyer,
+        ),
+      );
+      _applyMessage(m);
+      if (!m.fromStore) markRead();
+      _session.client.noteSeq(found.id, m.seq);
+      _checkGap(m);
+    } on Object {
+      // 認不出來就維持空對話；之後的事件會再試。
+    } finally {
+      _adopting = false;
     }
   }
 
-  /// Prepend older page. Returns false when no more pages available.
-  Future<bool> loadOlder() async {
-    if (!_hasMore) return false;
-    if (_loadingOlder) return false;
-    final current = state.value ?? [];
-    if (current.isEmpty) return false;
+  void _checkGap(ChatMessage m) {
+    final data = state.value;
+    if (data == null || m.seq <= 0) return;
+    if (m.seq > data.contiguousLastSeq + 1 && data.contiguousLastSeq > 0) {
+      unawaited(fillGap());
+    }
+  }
 
+  /// 補 seq 缺口：讀 `after_seq` 之後的訊息併進來（重連、Resync 與偵測到序號跳號時）。
+  Future<void> fillGap() async {
+    final data = state.value;
+    final conv = data?.conversationId;
+    if (data == null || conv == null || _fillingGap) return;
+    _fillingGap = true;
+    try {
+      final page = await _repo.listAfter(conv, data.contiguousLastSeq);
+      if (!ref.mounted) return;
+      for (final m in page.messages) {
+        _applyMessage(m);
+      }
+      final cur = state.value;
+      if (cur != null && page.peerReadSeq > cur.peerReadSeq) {
+        state = AsyncData(cur.copyWith(peerReadSeq: page.peerReadSeq));
+      }
+      _session.client.noteSeq(conv, state.value?.contiguousLastSeq ?? 0);
+    } on Object {
+      // 補洞失敗不蓋掉畫面上已有的訊息；下一次事件或重連會再補。
+    } finally {
+      _fillingGap = false;
+    }
+  }
+
+  /// 併入一則伺服器的訊息：同 id 或同 seq 取代（可見度改變），沒有就依 seq 插入。送出中的訊息在送出回應時依
+  /// requestId 移除，所以自己的訊息先經串流回來也不會重複。
+  void _applyMessage(ChatMessage m) {
+    final data = state.value;
+    if (data == null) return;
+    final list = [...data.messages];
+    final byId = list.indexWhere((x) => x.id == m.id);
+    final bySeq = m.seq > 0 ? list.indexWhere((x) => x.seq == m.seq) : -1;
+    if (byId >= 0) {
+      list[byId] = m;
+    } else if (bySeq >= 0) {
+      list[bySeq] = m;
+    } else {
+      list.add(m);
+    }
+    state = AsyncData(data.copyWith(messages: _sorted(list)));
+  }
+
+  List<ChatMessage> _sorted(List<ChatMessage> list) {
+    final sent = list.where((m) => m.seq > 0).toList()
+      ..sort((a, b) => a.seq.compareTo(b.seq));
+    final local = list.where((m) => m.seq == 0).toList();
+    return [...sent, ...local];
+  }
+
+  // ── 公開操作 ───────────────────────────────────────────────────────────
+
+  /// 重新載入（錯誤畫面的「重試」）。
+  Future<void> reload() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => build(arg));
+  }
+
+  /// 往舊的方向載入一頁；回傳是否多了訊息。
+  Future<bool> loadOlder() async {
+    final data = state.value;
+    final conv = data?.conversationId;
+    if (data == null || conv == null || !data.hasMoreOlder || _loadingOlder) {
+      return false;
+    }
+    final first = data.messages.where((m) => m.seq > 0).firstOrNull;
+    if (first == null) return false;
     _loadingOlder = true;
     try {
-      final oldestId = int.tryParse(current.first.id);
-      final older = await ref
-          .read(chatRepositoryProvider)
-          .getHistory(
-            participantId: _useConv ? '' : arg.peerId,
-            conversationId: arg.conversationId,
-            beforeId: oldestId,
-            pageSize: 50,
-          );
-      if (older.isEmpty) {
-        _hasMore = false;
-        return false;
-      }
-      older.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-      final existingIds = current.map((m) => m.id).toSet();
-      final deduped = older.where((m) => existingIds.add(m.id)).toList();
-      if (deduped.isNotEmpty) {
-        for (final m in deduped) {
-          if (m.id.isNotEmpty) _seenIds.add(m.id);
-        }
-        state = AsyncData([...deduped, ...current]);
-      }
-      if (older.length < 50) _hasMore = false;
-      return deduped.isNotEmpty;
-    } catch (_) {
+      final page = await _repo.listOlder(conv, beforeSeq: first.seq);
+      if (!ref.mounted) return false;
+      final cur = state.value ?? data;
+      final ids = cur.messages.map((m) => m.id).toSet();
+      final older = page.messages.where((m) => ids.add(m.id)).toList();
+      state = AsyncData(
+        cur.copyWith(
+          messages: _sorted([...older, ...cur.messages]),
+          hasMoreOlder: page.hasMore,
+        ),
+      );
+      return older.isNotEmpty;
+    } on Object {
       return false;
     } finally {
       _loadingOlder = false;
     }
   }
 
-  /// Dedup + insert one incoming WS message.
-  /// Primary key: id; fallback: (seqId, senderId) when id is empty.
-  /// Skips empty control frames (empty content + non-text type).
-  void applyIncoming(ChatMessage msg) {
-    if (msg.messageContent.isEmpty && msg.messageType != 'text') return;
-
-    if (msg.id.isNotEmpty) {
-      if (!_seenIds.add(msg.id)) return;
-    } else if (msg.seqId > 0) {
-      final key = '${msg.seqId}_${msg.senderId}';
-      if (!_seenIds.add(key)) return;
-    }
-
-    final current = state.value ?? [];
-    state = AsyncData([...current, msg]);
-
-    // Mark conversation read on every incoming peer message.
-    final convId = arg.conversationId;
-    if (convId != null && convId.isNotEmpty) {
-      ref
-          .read(chatRepositoryProvider)
-          .markConversationAsRead(convId)
-          .catchError((_) => false)
-          .whenComplete(() => ref.invalidate(dashboardChatUnreadProvider));
-    }
-    if (msg.senderId == _getReceiver() && _getReceiver().isNotEmpty) {
-      ref
-          .read(chatRepositoryProvider)
-          .sendReadReceipt(receiverId: _getReceiver());
-    }
-  }
-
-  void addOptimistic(ChatMessage msg) {
-    _seenIds.add(msg.id);
-    final current = state.value ?? [];
-    state = AsyncData([...current, msg]);
-  }
-
-  void confirmOptimistic(String tempId, String realId) {
-    _seenIds
-      ..remove(tempId)
-      ..add(realId);
-    final current = state.value ?? [];
-    state = AsyncData(
-      current.map((m) => m.id == tempId ? m.copyWith(id: realId) : m).toList(),
+  /// 把這一方的已讀游標推到目前最後一則買家訊息。
+  void markRead() {
+    final data = state.value;
+    final conv = data?.conversationId;
+    if (data == null || conv == null) return;
+    final lastPeer = data.messages
+        .where((m) => !m.fromStore && m.seq > 0)
+        .map((m) => m.seq)
+        .fold<int>(0, (a, b) => a > b ? a : b);
+    if (lastPeer == 0) return;
+    unawaited(
+      _repo.markRead(conv, lastPeer).catchError((Object _) {}).whenComplete(() {
+        if (ref.mounted) ref.invalidate(dashboardChatUnreadProvider);
+      }),
     );
   }
 
-  void removeOptimistic(String tempId) {
-    _seenIds.remove(tempId);
-    final current = state.value ?? [];
-    state = AsyncData(current.where((m) => m.id != tempId).toList());
+  /// 送出文字。送出中的訊息立刻出現在畫面上；失敗時留在畫面上標成失敗，並把錯誤丟給呼叫端顯示。
+  Future<void> sendText(String text) => _send(
+    _SendJob(text: text),
+    pending: (rid, conv) => ChatMessage.pending(
+      requestId: rid,
+      conversationId: conv,
+      kind: pb.MessageKind.MESSAGE_KIND_TEXT,
+      text: text,
+    ),
+  );
+
+  /// 送出圖片：[stagedToken] 是 media 上傳完成後的 staged token，[previewUri] 是送出中顯示的本機預覽。
+  Future<void> sendImage(String stagedToken, {String? previewUri}) => _send(
+    _SendJob(imageStagedToken: stagedToken),
+    pending: (rid, conv) => ChatMessage.pending(
+      requestId: rid,
+      conversationId: conv,
+      kind: pb.MessageKind.MESSAGE_KIND_IMAGE,
+      imageUri: previewUri,
+    ),
+  );
+
+  /// 重送一則失敗的訊息：帶同一個 request_id，伺服器已收過就回第一次的那則。
+  Future<void> retry(String requestId) async {
+    final data = state.value;
+    final job = _jobs[requestId];
+    if (data == null || job == null) return;
+    _setSendState(requestId, ChatSendState.sending);
+    await _dispatch(requestId, job);
   }
 
-  /// Peer read-receipt → flip all my unread messages to read=true.
-  void markMyMessagesRead() {
-    final current = state.value;
-    if (current == null) return;
-    final peer = _getReceiver();
-    final updated = current
-        .map((m) => m.senderId != peer && !m.read ? m.copyWith(read: true) : m)
-        .toList();
-    state = AsyncData(updated);
-  }
-
-  /// Send a message. Adds optimistic entry immediately; confirms or removes
-  /// on completion. Rethrows on failure so the widget can show a toast.
-  Future<void> send({
-    required String content,
-    String messageType = 'text',
-    String? optimisticTempId,
-    Map<String, String>? extra,
+  Future<void> _send(
+    _SendJob job, {
+    required ChatMessage Function(String requestId, String conv) pending,
   }) async {
-    final recv = _getReceiver();
-    if (recv.isEmpty) {
-      // Receiver unresolved (no participants + no parseable conversationId).
-      // Throw BEFORE the optimistic bubble so the screen's catch shows a toast
-      // instead of silently sending with an empty receiverId.
-      throw StateError('無法解析聊天對象，請稍候再試');
-    }
-    final tempId =
-        optimisticTempId ?? 'temp_${DateTime.now().millisecondsSinceEpoch}';
-
-    addOptimistic(
-      ChatMessage(
-        id: tempId,
-        senderId: '',
-        receiverId: recv,
-        messageContent: content,
-        messageType: messageType,
-        timestamp: DateTime.now(),
+    final data = state.value;
+    if (data == null) throw StateError('chat thread is not loaded');
+    final rid = _uuid.v4();
+    _jobs[rid] = job;
+    state = AsyncData(
+      data.copyWith(
+        messages: [...data.messages, pending(rid, data.conversationId ?? '')],
       ),
     );
+    await _dispatch(rid, job);
+  }
 
+  Future<void> _dispatch(String requestId, _SendJob job) async {
+    final conv = state.value?.conversationId;
     try {
-      final result = await ref
-          .read(chatRepositoryProvider)
-          .sendMessage(
-            receiverId: recv,
-            messageContent: content,
-            messageType: messageType,
-            extra: extra,
-          );
+      final sent = (conv == null || conv.isEmpty)
+          ? await _repo.sendToBuyer(
+              arg.peerId,
+              requestId: requestId,
+              text: job.text,
+              imageStagedToken: job.imageStagedToken,
+            )
+          : await _repo.send(
+              conv,
+              requestId: requestId,
+              text: job.text,
+              imageStagedToken: job.imageStagedToken,
+            );
       if (!ref.mounted) return;
-      final data = result?['data'] as Map<String, dynamic>?;
-      final realId = (data?['messageId'] ?? '').toString();
-      if (realId.isNotEmpty) {
-        confirmOptimistic(tempId, realId);
-      } else {
-        removeOptimistic(tempId);
-      }
-    } catch (e) {
-      if (ref.mounted) removeOptimistic(tempId);
+      _jobs.remove(requestId);
+      final cur = state.value!;
+      final list = cur.messages.where((m) => m.requestId != requestId).toList();
+      state = AsyncData(
+        cur.copyWith(
+          messages: list,
+          conversationId: cur.conversationId ?? sent.conversationId,
+        ),
+      );
+      _applyMessage(sent);
+      _session.client.noteSeq(sent.conversationId, sent.seq);
+    } on Object {
+      if (ref.mounted) _setSendState(requestId, ChatSendState.failed);
       rethrow;
     }
+  }
+
+  void _setSendState(String requestId, ChatSendState s) {
+    final data = state.value;
+    if (data == null) return;
+    state = AsyncData(
+      data.copyWith(
+        messages: [
+          for (final m in data.messages)
+            m.requestId == requestId ? m.copyWith(sendState: s) : m,
+        ],
+      ),
+    );
+  }
+
+  /// 放棄一則失敗的訊息。
+  void discard(String requestId) {
+    _jobs.remove(requestId);
+    final data = state.value;
+    if (data == null) return;
+    state = AsyncData(
+      data.copyWith(
+        messages: data.messages.where((m) => m.requestId != requestId).toList(),
+      ),
+    );
   }
 }

@@ -23,6 +23,7 @@ class ChatInputBar extends StatelessWidget {
     this.sending = false,
     this.hintText = '輸入訊息...',
     this.topSlot,
+    this.readOnlyMessage,
   });
 
   final TextEditingController controller;
@@ -35,6 +36,9 @@ class ChatInputBar extends StatelessWidget {
   /// 額外放在輸入列上方的內容（例如回覆預覽）。
   final Widget? topSlot;
 
+  /// 不是 null 時輸入列換成這段說明（對話不能再送：對方封鎖、店家停業、對方帳號已刪除）。
+  final String? readOnlyMessage;
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
@@ -45,14 +49,22 @@ class ChatInputBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ?topSlot,
-            _InputRow(
-              controller: controller,
-              focusNode: focusNode,
-              sending: sending,
-              hintText: hintText,
-              onSend: onSend,
-              onPlusPressed: onPlusPressed,
-            ),
+            if (readOnlyMessage != null)
+              Text(
+                readOnlyMessage!,
+                key: const ValueKey('chat-input-read-only'),
+                textAlign: TextAlign.center,
+                style: AppTypography.body.copyWith(color: _InputRow._hint),
+              )
+            else
+              _InputRow(
+                controller: controller,
+                focusNode: focusNode,
+                sending: sending,
+                hintText: hintText,
+                onSend: onSend,
+                onPlusPressed: onPlusPressed,
+              ),
           ],
         ),
       ),

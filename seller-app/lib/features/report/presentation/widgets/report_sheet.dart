@@ -1,27 +1,31 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../../../core/exceptions/app_exception.dart';
-import '../../../../shared/utils/floating_toast.dart';
-import '../../data/report_model.dart';
-import '../../data/report_repository.dart';
-import '../report_block_error_dispatch.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import 'package:uuid/uuid.dart';
 
-/// 顯示檢舉底部選單（backend-payuni#645）。
-///
-/// [targetType] 決定 admin 裁決時會打到哪張表，選值規則見 [ReportTargetType]；
-/// [targetId] 是對應實體的 string id（TSID）。
+import '../../../../core/l10n/ui_locale.dart';
+import '../../../../shared/utils/floating_toast.dart';
+import '../../data/moderation_repository.dart';
+
+/// 檢舉說明的上限（`moderation.proto` SubmitReportRequest.description，以 rune 計）。
+const reportDescriptionMaxRunes = 500;
+
+/// 顯示檢舉聊天訊息的底部選單；[messageId] 是被檢舉訊息的 ID，檢舉人由伺服器依訊息所屬的對話推導。
 /// 回傳 true 代表已成功送出檢舉。
 Future<bool> showReportSheet(
   BuildContext context,
   WidgetRef ref, {
-  required ReportTargetType targetType,
-  required String targetId,
+  required String messageId,
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
@@ -37,17 +41,15 @@ Future<bool> showReportSheet(
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
     ),
-    builder: (_) =>
-        _ReportSheetContent(targetType: targetType, targetId: targetId),
+    builder: (_) => _ReportSheetContent(messageId: messageId),
   );
   return result ?? false;
 }
 
 class _ReportSheetContent extends ConsumerStatefulWidget {
-  const _ReportSheetContent({required this.targetType, required this.targetId});
+  const _ReportSheetContent({required this.messageId});
 
-  final ReportTargetType targetType;
-  final String targetId;
+  final String messageId;
 
   @override
   ConsumerState<_ReportSheetContent> createState() =>
@@ -55,7 +57,10 @@ class _ReportSheetContent extends ConsumerStatefulWidget {
 }
 
 class _ReportSheetContentState extends ConsumerState<_ReportSheetContent> {
-  String? _selectedReason;
+  static const _uuid = Uuid();
+
+  PolicyCategory? _selected;
+  ({PolicyCategory category, String description, String requestId})? _attempt;
   final _descController = TextEditingController();
   bool _submitting = false;
 
@@ -65,33 +70,55 @@ class _ReportSheetContentState extends ConsumerState<_ReportSheetContent> {
     super.dispose();
   }
 
+  bool get _canSubmit {
+    final selected = _selected;
+    if (_submitting || selected == null) return false;
+    if (selected == PolicyCategory.POLICY_CATEGORY_OTHER) {
+      return _descController.text.trim().isNotEmpty;
+    }
+    return true;
+  }
+
+  /// 內容（原因與說明）沒變的重試帶同一個 request_id；內容變了就是新的嘗試，換新的 request_id。
+  String _requestIdFor(PolicyCategory category, String description) {
+    final previous = _attempt;
+    if (previous != null &&
+        previous.category == category &&
+        previous.description == description) {
+      return previous.requestId;
+    }
+    final next = (
+      category: category,
+      description: description,
+      requestId: _uuid.v4(),
+    );
+    _attempt = next;
+    return next.requestId;
+  }
+
   Future<void> _submit() async {
-    final reason = _selectedReason;
-    if (reason == null || _submitting) return;
+    if (!_canSubmit) return;
+    final category = _selected!;
+    final description = _descController.text.trim();
     setState(() => _submitting = true);
     try {
       await ref
-          .read(reportRepositoryProvider)
-          .submitReport(
-            targetType: widget.targetType.value,
-            targetId: widget.targetId,
-            reasonCode: reason,
-            description: _descController.text.trim().isEmpty
-                ? null
-                : _descController.text.trim(),
+          .read(moderationRepositoryProvider)
+          .reportChatMessage(
+            messageId: widget.messageId,
+            category: category,
+            description: description,
+            requestId: _requestIdFor(category, description),
           );
       if (!mounted) return;
       Navigator.of(context).pop(true);
       FloatingToast.success(context, '已送出檢舉，感謝你的回報');
     } catch (e) {
       if (!mounted) return;
-      final handled = handleReportBlockApiError(context, e);
-      if (!handled) {
-        FloatingToast.error(
-          context,
-          e is AppException ? e.message : '檢舉送出失敗，請稍後再試',
-        );
-      }
+      FloatingToast.error(
+        context,
+        errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+      );
       setState(() => _submitting = false);
     }
   }
@@ -123,7 +150,7 @@ class _ReportSheetContentState extends ConsumerState<_ReportSheetContent> {
               ),
               SizedBox(height: 16.h),
               Text(
-                '檢舉${widget.targetType.label}',
+                context.l10n.reportMessageTitle,
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.w700,
@@ -143,27 +170,26 @@ class _ReportSheetContentState extends ConsumerState<_ReportSheetContent> {
                 spacing: 8.w,
                 runSpacing: 8.h,
                 children: [
-                  for (final r in reportReasonsFor(widget.targetType))
+                  for (final r in moderationSubmitReportRequestCategory)
                     ChoiceChip(
-                      label: Text(r.label),
-                      selected: _selectedReason == r.code,
-                      onSelected: (_) =>
-                          setState(() => _selectedReason = r.code),
+                      label: Text(r.uiText(ref.watch(uiLocaleProvider)) ?? ''),
+                      selected: _selected == r,
+                      onSelected: (_) => setState(() => _selected = r),
                       selectedColor: AppColors.primarySoft,
                       backgroundColor: AppColors.bgPrimary,
                       labelStyle: TextStyle(
                         fontSize: 14.sp,
-                        color: _selectedReason == r.code
+                        color: _selected == r
                             ? AppColors.primary
                             : AppColors.textPrimary,
-                        fontWeight: _selectedReason == r.code
+                        fontWeight: _selected == r
                             ? FontWeight.w700
                             : FontWeight.w400,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(999.r),
                         side: BorderSide(
-                          color: _selectedReason == r.code
+                          color: _selected == r
                               ? AppColors.primary
                               : AppColors.dividerLight,
                         ),
@@ -175,7 +201,9 @@ class _ReportSheetContentState extends ConsumerState<_ReportSheetContent> {
               TextField(
                 controller: _descController,
                 maxLines: 3,
-                maxLength: 200,
+                maxLength: reportDescriptionMaxRunes,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
+                onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: '補充說明（選填）',
                   border: OutlineInputBorder(
@@ -188,9 +216,7 @@ class _ReportSheetContentState extends ConsumerState<_ReportSheetContent> {
                 width: double.infinity,
                 height: HkControl.minTap,
                 child: ElevatedButton(
-                  onPressed: (_selectedReason == null || _submitting)
-                      ? null
-                      : _submit,
+                  onPressed: _canSubmit ? _submit : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     disabledBackgroundColor: AppColors.dividerLight,

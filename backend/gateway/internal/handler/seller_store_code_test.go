@@ -10,7 +10,6 @@ import (
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	couponpb "github.com/Will413028/hawkr/go-pkg/proto/coupon"
-	impb "github.com/Will413028/hawkr/go-pkg/proto/im"
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	"google.golang.org/grpc"
 )
@@ -156,46 +155,6 @@ func TestMyCoupons_CarrySellerStoreCode(t *testing.T) {
 		}
 		assertJSONString(t, row, "storeCode", testStoreCode)
 	}
-}
-
-func TestConversations_CarrySellerStoreCode(t *testing.T) {
-	mock := &mockIMServiceClient{
-		GetConversationsFn: func(ctx context.Context, in *impb.GetConversationsRequest, opts ...grpc.CallOption) (*impb.GetConversationsResponse, error) {
-			return &impb.GetConversationsResponse{
-				Code: 0,
-				Conversations: []*impb.Conversation{{
-					TargetUserId: testStoreID,
-					StoreName:    "Seller A",
-					StoreCode:    testStoreCode,
-				}},
-			}, nil
-		},
-	}
-	h := &Holder{IM: grpcclient.NewIMClientForTest(mock), BuyerID: buyerGrandfatherResolverForTest()}
-
-	r := setupChatRouter(h)
-	req, _ := http.NewRequest("GET", "/api/v1/app/chat/conversations", nil)
-	req.Header.Set("X-Account-Id", "42")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	body := parseJSON(t, w.Body)
-	assertCode(t, body, 0)
-
-	data, ok := body["data"].(map[string]interface{})
-	if !ok {
-		t.Fatal("data is not an object")
-	}
-	rows, ok := data["conversations"].([]interface{})
-	if !ok || len(rows) == 0 {
-		t.Fatal("conversations is not a non-empty array")
-	}
-	row, ok := rows[0].(map[string]interface{})
-	if !ok {
-		t.Fatal("conversations[0] is not an object")
-	}
-	assertJSONString(t, row, "storeCode", testStoreCode)
 }
 
 // 結帳預覽的 orderGroups 是買家「下單前最後一眼」看到的賣家區塊，和其他四條一樣

@@ -1,17 +1,13 @@
 "use client";
 
+import { Code, ConnectError } from "@connectrpc/connect";
 import * as React from "react";
-import { UnauthorizedError } from "@/lib/api/client";
-import { type RoleSlot, roleToHeader } from "@/lib/auth/active-role";
-import { getChatSocket } from "@/lib/chat/ws";
+import type { ChatSide } from "./types";
+import { useChatStream } from "./useChatStream";
 
 /**
- * Event-driven chat-unread source. Replaces the 30s polling hook
- * (`useChatUnreadPolling`): the backend now pushes an authoritative
- * `unread_changed` WS event on every send / mark-read, so we SET the
- * count from that and only hit REST for the initial baseline + once on
- * each WS (re)connect. No interval. Mirrors notification's
- * `useUnreadCount`, but the channel is the existing chat WebSocket.
+ * 事件驅動的聊天未讀數：基準由 `fetcher` 讀一次（掛載與身分改變時），之後以串流的 `Ready` 與 `UnreadChanged`
+ * 的絕對值覆寫；沒有輪詢。
  */
 export interface UnreadPollingResult {
 	count: number;
@@ -26,15 +22,15 @@ interface Options {
 	fetcher: () => Promise<number>;
 	enabled: boolean;
 	resetSignal?: unknown;
-	/** Current active role; live events whose role !== this are ignored (stale socket guard). */
-	activeRole?: RoleSlot | null;
+	/** 目前工作區對應的對話方；串流依它開買家版或店家版。 */
+	side: ChatSide;
 }
 
 export function useChatUnreadStream({
 	fetcher,
 	enabled,
 	resetSignal,
-	activeRole,
+	side,
 }: Options): UnreadPollingResult {
 	const [count, setCountState] = React.useState(0);
 	const [loading, setLoading] = React.useState(false);
@@ -54,14 +50,14 @@ export function useChatUnreadStream({
 			const next = await fetcherRef.current();
 			if (!cancelledRef.current) setCountState(next);
 		} catch (err) {
-			if (err instanceof UnauthorizedError) setCountState(0);
-			// other errors: keep last known count, don't flap
+			if (ConnectError.from(err).code === Code.Unauthenticated)
+				setCountState(0);
+			// 其他錯誤：保留最後已知的數字，不閃動。
 		} finally {
 			if (!cancelledRef.current) setLoading(false);
 		}
 	}, [enabled]);
 
-	// Baseline on mount + resetSignal change.
 	React.useEffect(() => {
 		void resetSignal;
 		cancelledRef.current = false;
@@ -72,27 +68,12 @@ export function useChatUnreadStream({
 		};
 	}, [load, resetSignal]);
 
-	// Authoritative SET on unread_changed (filtered to current role) + re-baseline on reconnect.
-	React.useEffect(() => {
-		if (!enabled) return;
-		const want = roleToHeader(activeRole ?? null); // "BUYER" | "SELLER" | undefined
-		const sock = getChatSocket();
-		const offUnread = sock.onUnreadChanged(({ role, unreadCount }) => {
-			// Stale-socket guard: ignore events for a role other than the active one.
-			if (want && role && role !== want) return;
-			setCountState(Math.max(0, unreadCount));
-		});
-		const offState = sock.onState((s) => {
-			if (s === "connected") void load();
-		});
-		return () => {
-			offUnread();
-			offState();
-		};
-	}, [enabled, load, activeRole]);
+	useChatStream(side, enabled, (e) => {
+		if (e.type === "ready" || e.type === "unread") {
+			setCountState(Math.max(0, e.unreadCount));
+		}
+	});
 
-	// setCount/decrement/increment are kept for UnreadPollingResult shape parity
-	// (mirrors notification's useUnreadCount) and optimistic-update consumers.
 	const setCount = React.useCallback(
 		(next: number) => setCountState(Math.max(0, next)),
 		[],

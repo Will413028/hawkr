@@ -7,6 +7,9 @@ import 'package:dio/dio.dart' as dio_lib show Headers;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/gen/google/rpc/error_details.pb.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as chat;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pb.dart' as buyer;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
@@ -19,7 +22,6 @@ import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/session/account_restriction.dart';
 import 'package:hawkr_buyer/features/ai_assistant/data/ai_assistant_repository.dart';
-import 'package:hawkr_buyer/features/chat/data/chat_repository.dart';
 import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
@@ -363,6 +365,38 @@ void main() {
       expect(h.auth.fetches, 0);
     });
 
+    test('對話自動已讀（MarkConversationRead）收到 ACCOUNT_SUSPENDED：靜默', () async {
+      final h = harness();
+      await h.c.read(sessionProvider.future);
+      final chatClient = ChatAppServiceClient(
+        FakeTransportBuilder()
+            .unary(
+              ChatAppService.markConversationRead,
+              (_, _) => throw _denied(suspended: true),
+            )
+            .unary(
+              ChatAppService.sendMessage,
+              (_, _) => throw _denied(suspended: true),
+            )
+            .build(interceptors: [h.c.read(_suspension)]),
+      );
+      await expectLater(
+        chatClient.markConversationRead(chat.MarkConversationReadRequest()),
+        throwsA(isA<ConnectException>()),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(h.c.read(accountRestrictionProvider), isNull);
+      expect(h.c.read(suspendedActionNoticeProvider), 0);
+
+      await expectLater(
+        chatClient.sendMessage(chat.SendMessageRequest()),
+        throwsA(isA<ConnectException>()),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(h.c.read(accountRestrictionProvider), isNotNull);
+      expect(h.c.read(suspendedActionNoticeProvider), 1);
+    });
+
     for (final (name, call)
         in <(String, Future<Object?> Function(SocialAppServiceClient))>[
           (
@@ -457,23 +491,13 @@ void main() {
       expect(h.auth.fetches, 0);
     });
 
-    test('背景寫入（開通知自動已讀、對話已讀）收到 ACCOUNT_SUSPENDED：靜默', () async {
+    test('背景寫入（開通知自動已讀）收到 ACCOUNT_SUSPENDED：靜默', () async {
       final h = await dioHarness(HttpStatus.forbidden);
       await send(h.dio, 'PATCH', '/app/notifications/5/read');
-      await send(h.dio, 'PATCH', '/app/chat/conversations/u1');
-      await send(h.dio, 'POST', '/app/chat/ws-ticket');
 
       expect(h.c.read(accountRestrictionProvider), isNull);
       expect(h.c.read(suspendedActionNoticeProvider), 0);
       expect(h.auth.fetches, 0);
-    });
-
-    test('使用者點的對話全部已讀（PATCH /app/chat/conversations）是主動寫入：進受限狀態並提示', () async {
-      final h = await dioHarness(HttpStatus.forbidden);
-      await send(h.dio, 'PATCH', '/app/chat/conversations');
-
-      expect(h.c.read(accountRestrictionProvider), isNotNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 1);
     });
 
     test('rejected() 拋例外：請求仍以 DioException 結束', () async {
@@ -599,80 +623,6 @@ void main() {
         repo.streamChat(message: 'hi').drain<void>(),
         throwsA(anything),
       );
-
-      expect(h.c.read(accountRestrictionProvider), isNull);
-    });
-
-    ChatRepository chatWith(ProviderContainer c, String body) {
-      final repo = ChatRepository.withDio(
-        sessionToken: () async => 'tok',
-        accountId: () => 'acc_01J',
-        dio: Dio(BaseOptions(validateStatus: (_) => true))
-          ..httpClientAdapter = _Status(403, [], body),
-        onSuspended: () =>
-            c.read(accountRestrictionProvider.notifier).rejected(),
-      );
-      addTearDown(repo.dispose);
-      return repo;
-    }
-
-    const suspendedBody =
-        '{"code":403,"message":"x","reason":"ACCOUNT_SUSPENDED"}';
-
-    test('聊天連線（ws-ticket）收到 403 ACCOUNT_SUSPENDED：背景寫入，靜默', () async {
-      final h = harness();
-      await h.c.read(sessionProvider.future);
-      final repo = chatWith(h.c, suspendedBody);
-
-      await repo.connect();
-      await Future<void>.delayed(Duration.zero);
-
-      expect(h.c.read(accountRestrictionProvider), isNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 0);
-    });
-
-    test('聊天送出訊息收到 403 ACCOUNT_SUSPENDED：進受限狀態並提示', () async {
-      final h = harness();
-      await h.c.read(sessionProvider.future);
-      final repo = chatWith(h.c, suspendedBody);
-
-      await expectLater(
-        repo.sendMessage(receiverId: 'u1', messageContent: 'hi'),
-        throwsA(anything),
-      );
-      await Future<void>.delayed(Duration.zero);
-
-      expect(h.c.read(accountRestrictionProvider), isNotNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 1);
-    });
-
-    test('對話自動已讀收到 403 ACCOUNT_SUSPENDED：靜默', () async {
-      final h = harness();
-      await h.c.read(sessionProvider.future);
-      final repo = chatWith(h.c, suspendedBody);
-
-      await repo.markConversationAsRead('u1');
-      await Future<void>.delayed(Duration.zero);
-
-      expect(h.c.read(accountRestrictionProvider), isNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 0);
-    });
-
-    test('聊天連線（ws-ticket）收到 403 沒有 reason：不是停權', () async {
-      final h = harness();
-      await h.c.read(sessionProvider.future);
-      final repo = ChatRepository.withDio(
-        sessionToken: () async => 'tok',
-        accountId: () => 'acc_01J',
-        dio: Dio(BaseOptions(validateStatus: (_) => true))
-          ..httpClientAdapter = _Status(403, [], '{"code":403,"message":"x"}'),
-        onSuspended: () =>
-            h.c.read(accountRestrictionProvider.notifier).rejected(),
-      );
-      addTearDown(repo.dispose);
-
-      await repo.connect();
-      await Future<void>.delayed(Duration.zero);
 
       expect(h.c.read(accountRestrictionProvider), isNull);
     });

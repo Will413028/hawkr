@@ -63,20 +63,6 @@ class CouponTemplateDetail {
   final int usedCount;
 }
 
-/// 客戶查詢結果（指定會員發券用）
-@freezed
-abstract class CustomerLookupResult with _$CustomerLookupResult {
-  const factory CustomerLookupResult({
-    required String uid,
-    @Default('') String buyerName,
-    @Default('') String phone,
-    String? avatarUrl,
-  }) = _CustomerLookupResult;
-
-  factory CustomerLookupResult.fromJson(Map<String, dynamic> json) =>
-      _$CustomerLookupResultFromJson(json);
-}
-
 /// 優惠券列表頁面狀態
 @freezed
 abstract class CouponListState with _$CouponListState {

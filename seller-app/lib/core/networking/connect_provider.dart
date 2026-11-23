@@ -1,7 +1,11 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart'
@@ -61,6 +65,31 @@ SocialAppServiceClient socialClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 SocialPublicServiceClient socialPublicClient(Ref ref) =>
     SocialPublicServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 店家側的聊天（ChatAppService 的 `*Store*` 方法與對話上的方法），登入後呼叫；店家由伺服器依呼叫者此刻的店推導。
+@Riverpod(keepAlive: true)
+ChatAppServiceClient chatClient(Ref ref) =>
+    ChatAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 店家的客戶與標籤（CrmAppService），登入後呼叫。
+@Riverpod(keepAlive: true)
+CrmAppServiceClient crmClient(Ref ref) =>
+    CrmAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 店家的評價（ReviewAppService：自己店的評價列表與回覆），登入後呼叫。
+@Riverpod(keepAlive: true)
+ReviewAppServiceClient reviewAppClient(Ref ref) =>
+    ReviewAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 商品評價的公開讀取（ReviewPublicService）；帶登入身分的 transport 與 [socialPublicClient] 相同理由。
+@Riverpod(keepAlive: true)
+ReviewPublicServiceClient reviewPublicClient(Ref ref) =>
+    ReviewPublicServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 檢舉（ModerationAppService：店家檢舉聊天訊息、讀自己店送出的檢舉），登入後呼叫。
+@Riverpod(keepAlive: true)
+ModerationAppServiceClient moderationAppClient(Ref ref) =>
+    ModerationAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 @Riverpod(keepAlive: true)

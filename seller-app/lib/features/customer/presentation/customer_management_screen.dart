@@ -1,16 +1,18 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../config/image_config.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/widgets/app_dropdown.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_content_card.dart';
@@ -23,53 +25,33 @@ import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/customer_model.dart';
 import 'customer_controller.dart';
+import 'customer_load_more_footer.dart';
 
-class CustomerManagementScreen extends HookConsumerWidget {
+/// 排序選項（契約的 `CustomerSort`）；標籤取自共用文案目錄。
+const customerSortOptions = <CustomerSort>[
+  CustomerSort.CUSTOMER_SORT_ORDER_COUNT,
+  CustomerSort.CUSTOMER_SORT_TOTAL_SPENT,
+  CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME,
+];
+
+/// 排序的標籤：UNSPECIFIED 依契約等同首購時間，先正規化再查目錄。
+String customerSortLabel(CustomerSort sort, UiLocale l) {
+  final s = sort == CustomerSort.CUSTOMER_SORT_UNSPECIFIED
+      ? CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME
+      : sort;
+  return s.uiText(l) ?? commonUnknown(l);
+}
+
+class CustomerManagementScreen extends ConsumerWidget {
   const CustomerManagementScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final searchCtrl = useTextEditingController();
-
-    // Watch filter state
     final filter = ref.watch(customerFilterProvider);
     final filterNotifier = ref.read(customerFilterProvider.notifier);
-
-    String sortLabel(String v) => switch (v) {
-      'visitCount' => '消費次數',
-      'totalSpent' => '消費金額',
-      'lastVisit' => '最近光顧',
-      _ => '消費次數',
-    };
-
-    // Watch list state
     final asyncCustomers = ref.watch(customerListProvider);
-
-    // Helper to handle debounce
-    final debouncer = useMemoized(() => _Debouncer(milliseconds: 500));
-
-    // Sync text controller with filter state initially or when changed externally
-    // But we avoid loop by checking value
-    useEffect(() {
-      if (searchCtrl.text != (filter.keyword ?? '')) {
-        searchCtrl.text = filter.keyword ?? '';
-      }
-      return null;
-    }, []);
-
-    // Listen to text changes
-    useEffect(() {
-      void listener() {
-        debouncer.run(() {
-          if (searchCtrl.text != (filter.keyword ?? '')) {
-            filterNotifier.setKeyword(searchCtrl.text);
-          }
-        });
-      }
-
-      searchCtrl.addListener(listener);
-      return () => searchCtrl.removeListener(listener);
-    }, [searchCtrl]);
+    final locale = context.uiLocale;
+    final sortLabel = customerSortLabel(filter.sort, locale);
 
     return Scaffold(
       backgroundColor: AppColors.surfacePage,
@@ -89,43 +71,30 @@ class CustomerManagementScreen extends HookConsumerWidget {
         ),
         child: Column(
           children: [
-            // Search and Filter Row
             _CustomerControls(
-              searchController: searchCtrl,
-              sortLabel: sortLabel(filter.sortBy),
+              sortLabel: sortLabel,
               onSortSelected: (label) {
-                final value = switch (label) {
-                  '消費次數' => 'visitCount',
-                  '消費金額' => 'totalSpent',
-                  '最近光顧' => 'lastVisit',
-                  _ => 'visitCount',
-                };
-                filterNotifier.setSortBy(value);
+                final option = customerSortOptions.firstWhere(
+                  (o) => customerSortLabel(o, locale) == label,
+                );
+                filterNotifier.setSort(option);
               },
             ),
-            // Tab Bar
             _CustomerTabBar(
-              selectedStatus: filter.customerType,
-              onTabChanged: (type) => filterNotifier.setCustomerType(type),
+              selectedType: filter.type,
+              onTabChanged: filterNotifier.setType,
             ),
-            // Customer List
             Expanded(
-              // 里面的内容 垂直start
               child: asyncCustomers.when(
-                data: (customers) {
+                data: (state) {
+                  final customers = state.customers;
                   if (customers.isEmpty) {
-                    final isSearching =
-                        filter.keyword?.trim().isNotEmpty == true;
-                    return HkEmptyState(
-                      key: const ValueKey('seller-customers-empty-state'),
-                      iconKey: const ValueKey(
-                        'seller-customers-empty-state-icon',
-                      ),
-                      icon: isSearching ? HkIconName.search : HkIconName.users,
-                      message: isSearching ? '找不到相關顧客' : '暫無顧客',
-                      description: isSearching
-                          ? '試試不同的關鍵字，或清除搜尋條件。'
-                          : '有人下單後會自動加入這份名單。',
+                    return const HkEmptyState(
+                      key: ValueKey('seller-customers-empty-state'),
+                      iconKey: ValueKey('seller-customers-empty-state-icon'),
+                      icon: HkIconName.users,
+                      message: '暫無顧客',
+                      description: '有人下單後會自動加入這份名單。',
                       topPadding: 48,
                     );
                   }
@@ -141,8 +110,26 @@ class CustomerManagementScreen extends HookConsumerWidget {
                           HkSpace.lg,
                           HkSpace.large,
                         ),
-                        itemCount: customers.length,
+                        itemCount: customers.length + (state.hasMore ? 1 : 0),
                         itemBuilder: (context, index) {
+                          if (index == customers.length) {
+                            return CustomerLoadMoreFooter(
+                              errorKey: const ValueKey(
+                                'seller-customers-load-more-error',
+                              ),
+                              onLoadMore: ref
+                                  .read(customerListProvider.notifier)
+                                  .loadMore,
+                              errorMessage: state.loadMoreError == null
+                                  ? null
+                                  : errorText(
+                                      state.loadMoreError!,
+                                      defaults: ref.read(
+                                        defaultErrorTextProvider,
+                                      ),
+                                    ),
+                            );
+                          }
                           final customer = customers[index];
                           return Padding(
                             padding: const EdgeInsets.only(bottom: HkSpace.md),
@@ -164,6 +151,10 @@ class CustomerManagementScreen extends HookConsumerWidget {
                 },
                 loading: () => const TruckLoadingOverlay(),
                 error: (err, stack) => _CustomerErrorState(
+                  message: errorText(
+                    err,
+                    defaults: ref.read(defaultErrorTextProvider),
+                  ),
                   onRetry: () => ref.invalidate(customerListProvider),
                 ),
               ),
@@ -175,61 +166,23 @@ class CustomerManagementScreen extends HookConsumerWidget {
   }
 }
 
+/// 列表尾端：進到畫面時自動載入下一頁；失敗時顯示錯誤與重試，已載入的客戶不受影響。
 class _CustomerControls extends StatelessWidget {
   const _CustomerControls({
-    required this.searchController,
     required this.sortLabel,
     required this.onSortSelected,
   });
 
-  final TextEditingController searchController;
   final String sortLabel;
   final ValueChanged<String> onSortSelected;
 
   @override
   Widget build(BuildContext context) {
-    final search = SizedBox(
-      height: HkControl.minTap,
-      child: TextField(
-        controller: searchController,
-        textAlignVertical: TextAlignVertical.center,
-        style: AppTypography.body,
-        decoration: InputDecoration(
-          hintText: '搜尋姓名或電話',
-          hintStyle: AppTypography.body.copyWith(
-            color: AppColors.textSecondary,
-          ),
-          prefixIcon: const HkIcon(
-            HkIconName.search,
-            size: 20,
-            color: AppIconColors.muted,
-          ),
-          filled: true,
-          fillColor: AppColors.neutralWhite.withValues(alpha: 0.74),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: HkSpace.md,
-            vertical: HkSpace.md,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(HkRadius.pill),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(HkRadius.pill),
-            borderSide: const BorderSide(color: AppColors.cardBorder),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(HkRadius.pill),
-            borderSide: const BorderSide(
-              color: AppColors.actionPrimary,
-              width: 1.5,
-            ),
-          ),
-        ),
-      ),
-    );
     final sort = AppDropdown(
-      items: const ['消費次數', '消費金額', '最近光顧'],
+      items: [
+        for (final o in customerSortOptions)
+          customerSortLabel(o, context.uiLocale),
+      ],
       selectedItem: sortLabel,
       onSelected: onSortSelected,
       showSearch: false,
@@ -267,27 +220,7 @@ class _CustomerControls extends StatelessWidget {
           child: HkFrostedCardSurface(
             child: Padding(
               padding: const EdgeInsets.all(HkSpace.sm),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (constraints.maxWidth < 420) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        search,
-                        const SizedBox(height: HkSpace.sm),
-                        Align(alignment: Alignment.centerRight, child: sort),
-                      ],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      Expanded(child: search),
-                      const SizedBox(width: HkSpace.sm),
-                      sort,
-                    ],
-                  );
-                },
-              ),
+              child: Align(alignment: Alignment.centerRight, child: sort),
             ),
           ),
         ),
@@ -297,30 +230,32 @@ class _CustomerControls extends StatelessWidget {
 }
 
 class _CustomerTabBar extends StatelessWidget {
-  final String? selectedStatus;
-  final ValueChanged<String?> onTabChanged;
+  final CustomerType? selectedType;
+  final ValueChanged<CustomerType?> onTabChanged;
 
   const _CustomerTabBar({
-    required this.selectedStatus,
+    required this.selectedType,
     required this.onTabChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final tabs = <({String label, String? status})>[
-      (label: '全部顧客', status: null),
-      (label: 'VIP', status: 'vip'),
-      (label: '黑名單', status: 'blocklist'),
+    final tabs = <({String label, CustomerType? type})>[
+      (label: '全部顧客', type: null),
+      (
+        label:
+            CustomerType.CUSTOMER_TYPE_VIP.uiText(context.uiLocale) ??
+            commonUnknown(context.uiLocale),
+        type: CustomerType.CUSTOMER_TYPE_VIP,
+      ),
     ];
-    final selectedIndex = tabs.indexWhere(
-      (tab) => tab.status == selectedStatus,
-    );
+    final selectedIndex = tabs.indexWhere((tab) => tab.type == selectedType);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: HkSpace.lg),
       child: HkGlassTabBar(
         labels: tabs.map((tab) => tab.label).toList(),
         selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
-        onTap: (index) => onTabChanged(tabs[index].status),
+        onTap: (index) => onTabChanged(tabs[index].type),
       ),
     );
   }
@@ -348,7 +283,8 @@ class _CustomerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return HkContentCard(
       onTap: onTap,
-      semanticLabel: '查看顧客 ${customer.name}',
+      semanticLabel:
+          '查看顧客 ${customer.displayName(context.uiLocale, context.l10n)}',
       padding: const EdgeInsets.symmetric(
         horizontal: HkSpace.lg,
         vertical: HkSpace.md,
@@ -362,7 +298,7 @@ class _CustomerCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                // Avatar with VIP / blacklist badge
+                // Avatar with VIP badge
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -402,8 +338,7 @@ class _CustomerCard extends StatelessWidget {
                               ),
                       ),
                     ),
-                    // VIP badge — hidden when blacklisted (blacklist takes priority)
-                    if (customer.isVip && !customer.isBlacklisted)
+                    if (customer.isVip)
                       Positioned(
                         right: -2.w,
                         bottom: -2.h,
@@ -421,42 +356,18 @@ class _CustomerCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    // Blacklist badge
-                    if (customer.isBlacklisted)
-                      Positioned(
-                        right: -4.w,
-                        bottom: -8.h,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.w,
-                            vertical: 4.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.textSecondary,
-                            borderRadius: BorderRadius.circular(12.r),
-                          ),
-                          child: Text(
-                            '黑名單',
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.bgCard,
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
                 SizedBox(width: 16.w),
 
-                // Name + phone
+                // Name + ID
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        customer.name,
+                        customer.displayName(context.uiLocale, context.l10n),
                         style: TextStyle(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.w700,
@@ -467,9 +378,7 @@ class _CustomerCard extends StatelessWidget {
                       ),
                       SizedBox(height: 6.h),
                       Text(
-                        customer.phone.isNotEmpty
-                            ? customer.phone
-                            : 'ID: ${customer.id}',
+                        'ID: ${customer.id}',
                         style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w400,
@@ -499,7 +408,7 @@ class _CustomerCard extends StatelessWidget {
                     ),
                     SizedBox(height: 6.h),
                     Text(
-                      '${customer.visitCount} 次消費',
+                      '${customer.orderCount} 次消費',
                       style: TextStyle(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w400,
@@ -553,13 +462,15 @@ class _CustomerCard extends StatelessWidget {
 }
 
 class _CustomerErrorState extends StatelessWidget {
-  const _CustomerErrorState({required this.onRetry});
+  const _CustomerErrorState({required this.message, required this.onRetry});
 
+  final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     return Center(
+      key: const ValueKey('seller-customers-error-state'),
       child: HkContentCard(
         padding: const EdgeInsets.all(HkSpace.xl),
         child: Column(
@@ -571,7 +482,11 @@ class _CustomerErrorState extends StatelessWidget {
               color: AppIconColors.danger,
             ),
             const SizedBox(height: HkSpace.sm),
-            Text('顧客資料載入失敗', style: AppTypography.sectionTitle),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: AppTypography.sectionTitle,
+            ),
             const SizedBox(height: HkSpace.md),
             FilledButton.tonal(
               onPressed: onRetry,
@@ -581,17 +496,5 @@ class _CustomerErrorState extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _Debouncer {
-  final int milliseconds;
-  Timer? _timer;
-
-  _Debouncer({required this.milliseconds});
-
-  void run(VoidCallback action) {
-    _timer?.cancel();
-    _timer = Timer(Duration(milliseconds: milliseconds), action);
   }
 }

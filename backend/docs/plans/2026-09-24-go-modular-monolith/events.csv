@@ -37,12 +37,12 @@ aftersales.refund.completed,aftersales.events,aftersales-service,crm-service,crm
 aftersales.refund.completed,aftersales.events,aftersales-service,notification-service,notification.aftersales,"push+inbox notification (buyer:visible,seller:silent)",yes,SIDE_EFFECT,
 aftersales.refund.completed,aftersales.events,aftersales-service,order-service,order.aftersales.refund.completed,apply aftersales refund to order + emit order.refund.finalized,yes,STATE,
 account.deleted,hawkr.account,account-service,buyer-service,buyer.account.deleted,release buyer avatar media refs,yes,STATE,call: accountdeletion 在刪帳的 transaction 內呼叫 buyer.CloseForDeletion；頭像的 media 參照由 River job（buyer.release_avatar）釋放
-account.deleted,hawkr.account,account-service,im-service,im.account.deleted,cleanup account chat data,yes,STATE,
+account.deleted,hawkr.account,account-service,im-service,im.account.deleted,cleanup account chat data,yes,STATE,call: im 不訂閱 account.deleted；帳號刪除經 buyer 關閉發 BuyerDeleted，im 訂閱它並排 im.erase_party
 account.deleted,hawkr.account,account-service,notification-service,notification.account.deleted,purge account inbox/devices,yes,STATE,
 account.deleted,hawkr.account,account-service,seller-service,seller.account.deleted,release seller logo/cover media refs,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,coupon-service,coupon.buyer.deleted,cleanup buyer coupons,yes,STATE,
-buyer.deleted,hawkr.buyer,buyer-service,crm-service,crm.buyer.deleted,cleanup CRM buyer data,yes,STATE,
-buyer.deleted,hawkr.buyer,buyer-service,im-service,im.buyer.deleted,cleanup buyer chat data,yes,STATE,
+buyer.deleted,hawkr.buyer,buyer-service,crm-service,crm.buyer.deleted,cleanup CRM buyer data,yes,STATE,in-tx-event: crm 訂閱 buyer.BuyerDeleted，同 transaction 排 crm.erase_party job
+buyer.deleted,hawkr.buyer,buyer-service,im-service,im.buyer.deleted,cleanup buyer chat data,yes,STATE,in-tx-event: im 訂閱 buyer.BuyerDeleted 與 StoreRetired，同 transaction 排 im.erase_party job
 buyer.deleted,hawkr.buyer,buyer-service,notification-service,notification.buyer.deleted,purge buyer inbox/devices,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,social-service,social.buyer.deleted,cleanup buyer posts/comments,yes,STATE,in-tx-event: social 訂閱 buyer.BuyerDeletionRequested 與 BuyerDeleted，同 transaction 記 inactive_authors 並 Enqueue 清除 job（A7-D11）
 buyer.favorite.added,hawkr.buyer,buyer-service,notification-service,notification.buyer,push+inbox notification (seller:visible),yes,SIDE_EFFECT,

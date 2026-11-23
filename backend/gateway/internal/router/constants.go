@@ -66,7 +66,6 @@ const (
 	// Aliases with 's' suffix for compatibility
 	ProductsIDPath  = "/:id"
 	ProductsBrief   = "/:id/brief"
-	ProductsReviews = "/:id/reviews"
 	ProductsRating  = "/:id/rating"
 	ProductsRelated = "/:id/related"
 
@@ -94,16 +93,6 @@ const (
 	CategoryRestore        = "/:id/restore"
 	ProductsBatchChangeCat = "/products/batch-change-category"
 )
-
-// ==================== Review（/app/reviews）====================
-
-const (
-	ReviewsPath = "/reviews"
-	ReviewID    = "/:id"
-)
-
-// SellerReviewReply 賣家回覆評論（#1174）— 掛 /app/sellers group（requireSeller 保護）
-const SellerReviewReply = "/reviews/:id/reply"
 
 // ==================== Order（/app/orders）====================
 
@@ -493,35 +482,9 @@ const (
 	WebhookSimulatorLookupPath = "/dev/webhook-simulator/lookup"
 )
 
-// ==================== CRM（/app/sellers/me）====================
-
-const (
-	CrmCustomers            = "/customers"
-	CrmCustomerID           = "/customers/:buyerId"
-	CrmCustomerTags         = "/customers/:buyerId/tags"
-	CrmCustomerTagID        = "/customers/:buyerId/tags/:tagId"
-	CrmCustomerOrders       = "/customers/:buyerId/orders"
-	CrmCustomerCoupons      = "/customers/:buyerId/coupons"
-	CrmCustomerMeta         = "/customers/:buyerId/meta"
-	CrmCustomerLookup       = "/customers/lookup"
-	CrmCustomerSearchByTags = "/customers/search-by-tags"
-	CrmTags                 = "/tags"
-	CrmTagID                = "/tags/:tagId"
-)
-
 // ==================== 聊天相關 ====================
 
 const (
-	ChatPath                 = "/chat"
-	ChatWS                   = "/ws"
-	ChatWSTicket             = "/ws-ticket"
-	ChatMessages             = "/messages"
-	ChatHistory              = "/history/:targetId"
-	ChatConversations        = "/conversations"
-	ChatUnread               = "/unread"
-	ChatReadReceipts         = "/messages"
-	ChatConversationReceipts = "/conversations/:targetId"
-	ChatAllReceipts          = "/conversations"
 
 	// Service names
 	ServiceProduct    = "product"

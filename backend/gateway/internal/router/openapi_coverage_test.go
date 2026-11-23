@@ -24,7 +24,7 @@ import (
 const specPath = "../../../api/openapi/openapi.yaml"
 
 // maxRESTOperations 是清單的端點數上限，只准變少：模組搬遷刪掉 REST 路由後，把它改成新的端點數鎖住新低點。
-const maxRESTOperations = 361
+const maxRESTOperations = 328
 
 // 分類理由；路由隨模組搬遷刪除時從清單移除，不再補進規格。
 const (

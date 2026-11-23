@@ -1,3 +1,7 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
+import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -9,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../config/image_config.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../shared/widgets/hk_frosted_icon_button.dart';
@@ -16,7 +21,6 @@ import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/dialog_close_button.dart';
 import '../../../shared/widgets/optimized_image.dart';
-import '../../coupon/data/coupon_model.dart';
 import '../data/customer_model.dart';
 import '../data/customer_repository.dart';
 
@@ -24,13 +28,8 @@ import '../data/customer_repository.dart';
 class CustomerDetailResult {
   final String customerId;
   final bool isVip;
-  final bool isBlacklisted;
 
-  const CustomerDetailResult({
-    required this.customerId,
-    required this.isVip,
-    required this.isBlacklisted,
-  });
+  const CustomerDetailResult({required this.customerId, required this.isVip});
 }
 
 class CustomerDetailScreen extends HookConsumerWidget {
@@ -40,112 +39,104 @@ class CustomerDetailScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Full customer detail (enriched with email/address/avatar from detail API)
     final currentCustomer = useState<Customer>(customer);
     final updatingType = useState(false);
-
-    // Local state for editing
+    final loadError = useState<Object?>(null);
     final currentTags = useState<List<CustomerTag>>(List.from(customer.tags));
+    final defaults = ref.read(defaultErrorTextProvider);
 
-    // Load fresh detail + tags on mount
-    useEffect(() {
-      Future<void> loadDetail() async {
-        final repo = ref.read(customerRepositoryProvider);
-        try {
-          final [detail, tags] = await Future.wait([
-            repo.getCustomerByAccountId(customer.id),
-            repo.getCustomerTags(customer.id),
-          ]);
-          if (!context.mounted) return;
-          if (detail is Customer) {
-            currentCustomer.value = detail;
-          }
-          if (tags is List<CustomerTag>) {
-            currentTags.value = tags;
-          }
-        } catch (_) {}
+    // 進頁時重讀客戶（GetCustomer 帶標籤）；失敗顯示伺服器的錯誤文字，保留列表帶進來的資料。
+    Future<void> loadDetail() async {
+      loadError.value = null;
+      try {
+        final detail = await ref
+            .read(customerRepositoryProvider)
+            .getCustomer(customer.id);
+        if (!context.mounted) return;
+        if (detail != null) {
+          currentCustomer.value = detail;
+          currentTags.value = detail.tags;
+        }
+      } catch (e) {
+        if (context.mounted) loadError.value = e;
       }
+    }
 
+    useEffect(() {
       loadDetail();
       return null;
     }, []);
 
-    // Use enriched customer for display (falls back to passed-in customer until detail loads)
     final c = currentCustomer.value;
+    final isVip = c.isVip;
 
-    // Derive VIP/blacklist from customer_type (mutually exclusive)
-    final isVip = c.customerType == 'vip';
-    final isBlacklisted = c.customerType == 'blocklist';
-
-    // Tag operations
-    Future<void> addTag(String name) async {
-      await ref.read(customerRepositoryProvider).addCustomerTags(customer.id, [
-        name,
-      ]);
-      final fresh = await ref
-          .read(customerRepositoryProvider)
-          .getCustomerTags(customer.id);
-      currentTags.value = fresh;
+    // 標籤寫入失敗時顯示伺服器的錯誤文字並回 null；成功回貼完（移除完）之後客戶身上的標籤。
+    Future<List<CustomerTag>?> addTag(String name) async {
+      try {
+        final updated = await ref
+            .read(customerRepositoryProvider)
+            .addCustomerTags(customer.id, [name]);
+        currentTags.value = updated.tags;
+        return updated.tags;
+      } catch (e) {
+        if (context.mounted) {
+          FloatingToast.error(context, errorText(e, defaults: defaults));
+        }
+        return null;
+      }
     }
 
-    Future<void> removeTag(CustomerTag tag) async {
-      await ref
-          .read(customerRepositoryProvider)
-          .removeCustomerTag(customer.id, tag.id);
-      currentTags.value = currentTags.value
-          .where((t) => t.id != tag.id)
-          .toList();
+    Future<List<CustomerTag>?> removeTag(CustomerTag tag) async {
+      try {
+        final updated = await ref
+            .read(customerRepositoryProvider)
+            .removeCustomerTag(customer.id, tag.id);
+        currentTags.value = updated.tags;
+        return updated.tags;
+      } catch (e) {
+        if (context.mounted) {
+          FloatingToast.error(context, errorText(e, defaults: defaults));
+        }
+        return null;
+      }
     }
 
     void popWithResult() {
-      context.pop(
-        CustomerDetailResult(
-          customerId: customer.id,
-          isVip: isVip,
-          isBlacklisted: isBlacklisted,
-        ),
+      context.pop(CustomerDetailResult(customerId: customer.id, isVip: isVip));
+    }
+
+    void openOrders() {
+      context.push(
+        '/customer/orders',
+        extra: {
+          'customerName': c.displayName(context.uiLocale, context.l10n),
+          'customerId': customer.id,
+        },
       );
     }
 
-    Future<void> navigateToSpendingHistory({int initialTab = 0}) async {
-      final repo = ref.read(customerRepositoryProvider);
-
-      // Fetch with graceful fallback — endpoints may not exist yet (B-49)
-      ({List<OrderRecord> orders, List<SpendingRecord> spending}) ordersRec = (
-        orders: [],
-        spending: [],
-      );
-      List<Coupon> couponsRec = [];
-
+    Future<void> toggleVip() async {
+      if (updatingType.value) return;
+      final next = isVip
+          ? CustomerType.CUSTOMER_TYPE_NORMAL
+          : CustomerType.CUSTOMER_TYPE_VIP;
+      updatingType.value = true;
       try {
-        ordersRec = await repo.getCustomerOrders(customer.id);
-      } catch (_) {}
-
-      try {
-        couponsRec = await repo.getCustomerCoupons(customer.id);
-      } catch (_) {}
-
-      if (!context.mounted) return;
-
-      int totalRef = 0;
-      for (var s in ordersRec.spending) {
-        totalRef += s.refund;
+        final updated = await ref
+            .read(customerRepositoryProvider)
+            .updateCustomerType(customer.id, next);
+        if (!context.mounted) return;
+        currentCustomer.value = currentCustomer.value.copyWith(
+          type: updated.type,
+        );
+        FloatingToast.success(context, isVip ? '已取消 VIP' : '已升級為 VIP');
+      } catch (e) {
+        if (context.mounted) {
+          FloatingToast.error(context, errorText(e, defaults: defaults));
+        }
+      } finally {
+        if (context.mounted) updatingType.value = false;
       }
-
-      context.push(
-        '/customer/spending-history',
-        extra: {
-          'customerName': c.name,
-          'customerId': customer.id,
-          'customerPhone': c.phone,
-          'totalSpent': c.totalSpent,
-          'totalRefund': totalRef,
-          'records': ordersRec.spending,
-          'orders': ordersRec.orders,
-          'coupons': couponsRec,
-          'initialTab': initialTab,
-        },
-      );
     }
 
     Future<void> showCustomerMenu(BuildContext buttonContext) async {
@@ -189,60 +180,9 @@ class CustomerDetailScreen extends HookConsumerWidget {
               ],
             ),
           ),
-          PopupMenuItem<String>(
-            value: 'blacklist',
-            child: Row(
-              children: [
-                Icon(
-                  AppIcons.blockOutlined,
-                  size: 20.sp,
-                  color: isBlacklisted
-                      ? AppIconColors.muted
-                      : AppIconColors.defaultColor,
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  isBlacklisted ? '解除黑名單' : '設黑名單',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    color: isBlacklisted
-                        ? AppColors.textSecondary
-                        : AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       );
-      if (value == null || !context.mounted) return;
-      if (updatingType.value) return;
-      final newType = value == 'vip'
-          ? (isVip ? 'normal' : 'vip')
-          : (isBlacklisted ? 'normal' : 'blocklist');
-      final message = value == 'vip'
-          ? (isVip ? '已取消 VIP' : '已升級為 VIP')
-          : (isBlacklisted ? '已解除黑名單' : '已加入黑名單');
-      final repo = ref.read(customerRepositoryProvider);
-      updatingType.value = true;
-      try {
-        await repo.updateCustomerType(customer.id, newType);
-        if (!context.mounted) return;
-        // Mutation success is authoritative even if the refresh is unavailable.
-        currentCustomer.value = currentCustomer.value.copyWith(
-          customerType: newType,
-        );
-        try {
-          final detail = await repo.getCustomerByAccountId(customer.id);
-          if (!context.mounted) return;
-          if (detail != null) currentCustomer.value = detail;
-        } catch (_) {}
-        if (context.mounted) FloatingToast.success(context, message);
-      } catch (_) {
-        if (context.mounted) FloatingToast.error(context, '更新顧客狀態失敗，請稍後再試');
-      } finally {
-        if (context.mounted) updatingType.value = false;
-      }
+      if (value == 'vip' && context.mounted) await toggleVip();
     }
 
     final moreButton = Builder(
@@ -263,7 +203,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
       child: Scaffold(
         backgroundColor: AppColors.bgPrimary,
         appBar: HkGlassAppBar(
-          title: Text(c.name),
+          title: Text(c.displayName(context.uiLocale, context.l10n)),
           subtitle: '顧客 360',
           onBackPressed: popWithResult,
           actions: [
@@ -271,7 +211,10 @@ class CustomerDetailScreen extends HookConsumerWidget {
               tooltip: '聯絡顧客',
               onPressed: () => context.push(
                 '/chat/thread',
-                extra: {'title': c.name, 'participantId': c.id},
+                extra: {
+                  'title': c.displayName(context.uiLocale, context.l10n),
+                  'participantId': c.id,
+                },
               ),
               icon: const HkIcon(
                 HkIconName.chat,
@@ -287,10 +230,31 @@ class CustomerDetailScreen extends HookConsumerWidget {
           child: Column(
             children: [
               SizedBox(height: 16.h),
+              if (loadError.value != null)
+                Padding(
+                  key: const ValueKey('customer-detail-load-error'),
+                  padding: EdgeInsets.only(bottom: 12.h),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          errorText(loadError.value!, defaults: defaults),
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: AppColors.danger,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: loadDetail,
+                        child: HkButtonLabel(context.l10n.commonRetry),
+                      ),
+                    ],
+                  ),
+                ),
               _buildProfileSection(
                 c,
                 isVip,
-                isBlacklisted,
                 currentTags.value,
                 context,
                 onAddTag: addTag,
@@ -299,11 +263,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
               SizedBox(height: 16.h),
               Container(height: 1, color: const Color(0x1A42493F)),
               SizedBox(height: 16.h),
-              _buildStatsSection(c, navigateToSpendingHistory),
-              SizedBox(height: 16.h),
-              _buildContactSection(c),
-              SizedBox(height: 16.h),
-              _buildFrequentItemsSection(c),
+              _buildStatsSection(c, openOrders),
               SizedBox(height: 40.h),
             ],
           ),
@@ -315,11 +275,10 @@ class CustomerDetailScreen extends HookConsumerWidget {
   Widget _buildProfileSection(
     Customer customer,
     bool isVip,
-    bool isBlacklisted,
     List<CustomerTag> tags,
     BuildContext context, {
-    required Future<void> Function(String name) onAddTag,
-    required Future<void> Function(CustomerTag tag) onRemoveTag,
+    required Future<List<CustomerTag>?> Function(String name) onAddTag,
+    required Future<List<CustomerTag>?> Function(CustomerTag tag) onRemoveTag,
   }) {
     return Column(
       children: [
@@ -366,46 +325,11 @@ class CustomerDetailScreen extends HookConsumerWidget {
                   ),
                 ),
               ),
-            if (isBlacklisted)
-              Positioned(
-                bottom: -10.h,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 12.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.textPrimary,
-                      borderRadius: BorderRadius.circular(999.r),
-                      border: Border.all(color: AppColors.bgCard, width: 1.5.w),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.cardShadow,
-                          blurRadius: 4.r,
-                          offset: Offset(0, 4.h),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      '黑名單',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.bgCard,
-                        letterSpacing: 1.sp,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
         SizedBox(height: 12.h),
         Text(
-          customer.name,
+          customer.displayName(context.uiLocale, context.l10n),
           style: TextStyle(
             fontSize: 20.sp,
             fontWeight: FontWeight.w700,
@@ -454,8 +378,8 @@ class CustomerDetailScreen extends HookConsumerWidget {
   Widget _buildTagsRow(
     List<CustomerTag> tags,
     BuildContext context, {
-    required Future<void> Function(String name) onAddTag,
-    required Future<void> Function(CustomerTag tag) onRemoveTag,
+    required Future<List<CustomerTag>?> Function(String name) onAddTag,
+    required Future<List<CustomerTag>?> Function(CustomerTag tag) onRemoveTag,
   }) {
     return Wrap(
       spacing: 8,
@@ -552,46 +476,25 @@ class CustomerDetailScreen extends HookConsumerWidget {
     child: Icon(AppIcons.person, size: 48.sp, color: AppIconColors.muted),
   );
 
-  Widget _buildStatsSection(
-    Customer customer,
-    Function({int initialTab}) onNav,
-  ) {
-    return Column(
+  Widget _buildStatsSection(Customer customer, VoidCallback onOpenOrders) {
+    return Row(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: AppIcons.monetizationOnOutlined,
-                label: '消費總金額',
-                value: customer.totalSpent.toString(),
-                onTap: () => onNav(),
-              ),
-            ),
-            SizedBox(width: 16.w),
-            Expanded(
-              child: _buildStatCard(
-                icon: AppIcons.assignmentOutlined,
-                label: '訂單數',
-                value: customer.visitCount.toString(),
-                onTap: () => onNav(initialTab: 1),
-              ),
-            ),
-          ],
+        Expanded(
+          child: _buildStatCard(
+            icon: AppIcons.monetizationOnOutlined,
+            label: '消費總金額',
+            value: customer.totalSpent.toString(),
+            onTap: onOpenOrders,
+          ),
         ),
-        SizedBox(height: 16.h),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: AppIcons.couponOutlined,
-                label: '優惠卷',
-                value: customer.couponCount.toString(),
-                onTap: () => onNav(initialTab: 2),
-              ),
-            ),
-            const Spacer(),
-          ],
+        SizedBox(width: 16.w),
+        Expanded(
+          child: _buildStatCard(
+            icon: AppIcons.assignmentOutlined,
+            label: '訂單數',
+            value: customer.orderCount.toString(),
+            onTap: onOpenOrders,
+          ),
         ),
       ],
     );
@@ -658,138 +561,11 @@ class CustomerDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildContactSection(Customer customer) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '聯絡資訊',
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textEmphasis,
-              height: 1.5,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          _buildContactRow(
-            icon: AppIcons.phoneOutlined,
-            value: customer.phone.isNotEmpty ? customer.phone : '未填寫',
-          ),
-          SizedBox(height: 8.h),
-          _buildContactRow(
-            icon: AppIcons.location,
-            value: customer.address ?? '未填寫',
-          ),
-          SizedBox(height: 8.h),
-          _buildContactRow(
-            icon: AppIcons.emailOutlined,
-            value: customer.email ?? '未填寫 Email',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactRow({required IconData icon, required String value}) {
-    return Row(
-      children: [
-        ExcludeSemantics(
-          child: Icon(icon, size: 24.w, color: AppIconColors.secondary),
-        ),
-        SizedBox(width: 6.w),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textPrimary,
-              height: 1.5,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFrequentItemsSection(Customer customer) {
-    if (customer.frequentItems.isEmpty) return const SizedBox.shrink();
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.cardBorder),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 2,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '常購品項',
-            style: TextStyle(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textEmphasis,
-              height: 1.5,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          Wrap(
-            spacing: 8.w,
-            runSpacing: 8.h,
-            children: customer.frequentItems.map((item) {
-              return Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Text(
-                  item,
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.textPrimary,
-                    height: 1.43,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showTagManagementSheet(
     BuildContext context,
     List<CustomerTag> currentTags,
-    Future<void> Function(String) onAddTag,
-    Future<void> Function(CustomerTag) onRemoveTag,
+    Future<List<CustomerTag>?> Function(String) onAddTag,
+    Future<List<CustomerTag>?> Function(CustomerTag) onRemoveTag,
   ) {
     showModalBottomSheet(
       context: context,
@@ -844,8 +620,8 @@ class CustomerTagManagementHeader extends StatelessWidget {
 
 class _TagManagementSheet extends HookWidget {
   final List<CustomerTag> initialTags;
-  final Future<void> Function(String) onAddTag;
-  final Future<void> Function(CustomerTag) onRemoveTag;
+  final Future<List<CustomerTag>?> Function(String) onAddTag;
+  final Future<List<CustomerTag>?> Function(CustomerTag) onRemoveTag;
 
   const _TagManagementSheet({
     required this.initialTags,
@@ -878,34 +654,23 @@ class _TagManagementSheet extends HookWidget {
         return;
       }
       isLoading.value = true;
-      try {
-        await onAddTag(trimmed);
-        tags.value = [...tags.value, CustomerTag(id: 0, name: trimmed)];
+      final updated = await onAddTag(trimmed);
+      if (updated != null) {
+        tags.value = updated;
         hasChanges.value = true;
         textCtrl.clear();
-      } catch (_) {
-        if (context.mounted) FloatingToast.error(context, '新增標籤失敗');
-      } finally {
-        isLoading.value = false;
       }
+      if (context.mounted) isLoading.value = false;
     }
 
     Future<void> removeTag(CustomerTag tag) async {
-      if (tag.id == 0) {
-        tags.value = tags.value.where((t) => t.name != tag.name).toList();
-        hasChanges.value = true;
-        return;
-      }
       isLoading.value = true;
-      try {
-        await onRemoveTag(tag);
-        tags.value = tags.value.where((t) => t.id != tag.id).toList();
+      final updated = await onRemoveTag(tag);
+      if (updated != null) {
+        tags.value = updated;
         hasChanges.value = true;
-      } catch (_) {
-        if (context.mounted) FloatingToast.error(context, '移除標籤失敗');
-      } finally {
-        isLoading.value = false;
       }
+      if (context.mounted) isLoading.value = false;
     }
 
     return Padding(

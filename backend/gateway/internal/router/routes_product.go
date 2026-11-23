@@ -9,7 +9,7 @@ import (
 
 // registerProductRoutes 配置商品、類別、評價、橫幅相關路由
 // 涵蓋 public / app / admin 三大 Namespace
-func registerProductRoutes(public *gin.RouterGroup, app *gin.RouterGroup, admin *gin.RouterGroup, h *handler.Holder) *gin.RouterGroup {
+func registerProductRoutes(public *gin.RouterGroup, app *gin.RouterGroup, admin *gin.RouterGroup, h *handler.Holder) {
 	// ==========================================================
 	// Public — 匿名可存取
 	// ==========================================================
@@ -124,5 +124,4 @@ func registerProductRoutes(public *gin.RouterGroup, app *gin.RouterGroup, admin 
 	admin.GET(CategoriesPath+CategoryProducts, h.ListProductsByCategory)
 	admin.POST(ProductsBatchChangeCat, h.BatchChangeProductCategory)
 
-	return pubProducts
 }

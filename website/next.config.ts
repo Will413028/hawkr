@@ -12,7 +12,7 @@ import {
 	buildContentSecurityPolicy,
 	originOf,
 	parseUploadOrigins,
-	withWebSocketSiblings,
+	uniqueOrigins,
 } from "./lib/security/csp";
 import { PRIVATE_PREFIXES } from "./lib/seo/indexability";
 
@@ -40,11 +40,11 @@ const IMAGE_REMOTE_PATTERNS: NonNullable<
 
 /**
  * The origins the browser itself talks to, taken from the same env values the
- * app reads: the API gateway (https and its ws sibling for chat), the API base
+ * app reads: the API gateway (https; chat streams over fetch, not WebSocket), the API base
  * when it is absolute, the media gateway, and the Sentry ingest host of
  * `NEXT_PUBLIC_SENTRY_DSN`. An unset value contributes nothing.
  */
-const APP_CONNECT_ORIGINS = withWebSocketSiblings([
+const APP_CONNECT_ORIGINS = uniqueOrigins([
 	getEnv().gatewayHost,
 	originOf(getEnv().apiBaseUrl),
 	MEDIA_ORIGIN,

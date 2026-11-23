@@ -7,13 +7,13 @@ import {
 	buildContentSecurityPolicy,
 	type ContentSecurityPolicyInput,
 	parseUploadOrigins,
-	withWebSocketSiblings,
+	uniqueOrigins,
 } from "../lib/security/csp";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(testDir);
 
-const APP_ORIGINS = ["https://api.example.org", "wss://api.example.org"];
+const APP_ORIGINS = ["https://api.example.org"];
 
 function policy(overrides: Partial<ContentSecurityPolicyInput> = {}): string {
 	return buildContentSecurityPolicy({
@@ -124,8 +124,8 @@ test("a malformed upload origin fails the build instead of widening the policy",
 
 // API gateway、media gateway 與 Sentry ingest 的 origin 取自 app 讀的同一組 env，
 // connect-src 不寫死任何自家主機；env 沒設的來源就不出現在清單裡。
-test("connect-src takes the app's own origins from its input and lists a ws sibling", () => {
-	const origins = withWebSocketSiblings([
+test("connect-src takes the app's own origins from its input, deduplicated, with no websocket origins", () => {
+	const origins = uniqueOrigins([
 		"https://api.example.org",
 		"",
 		"https://media.example.org",
@@ -133,9 +133,7 @@ test("connect-src takes the app's own origins from its input and lists a ws sibl
 	]);
 	assert.deepEqual(origins, [
 		"https://api.example.org",
-		"wss://api.example.org",
 		"https://media.example.org",
-		"wss://media.example.org",
 	]);
 	const connect = directive(
 		policy({ appConnectOrigins: origins }),

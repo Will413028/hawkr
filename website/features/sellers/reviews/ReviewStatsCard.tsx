@@ -1,24 +1,17 @@
+import type { ReviewStats } from "@/lib/reviews/repo";
 import { StarsSvg } from "./ReviewList";
 
-export interface SellerReviewStats {
-	avgRating?: number | string;
-	rating1Count?: number | string;
-	rating2Count?: number | string;
-	rating3Count?: number | string;
-	rating4Count?: number | string;
-	rating5Count?: number | string;
-	totalCount?: number | string;
-}
+export type SellerReviewStats = ReviewStats;
 
 export function computeRatingPercents(stats: SellerReviewStats): number[] {
-	const total = Number(stats.totalCount) || 0;
+	const total = stats.totalCount;
 	if (total === 0) return [0, 0, 0, 0, 0];
 	const counts = [
-		Number(stats.rating5Count) || 0,
-		Number(stats.rating4Count) || 0,
-		Number(stats.rating3Count) || 0,
-		Number(stats.rating2Count) || 0,
-		Number(stats.rating1Count) || 0,
+		stats.rating5Count,
+		stats.rating4Count,
+		stats.rating3Count,
+		stats.rating2Count,
+		stats.rating1Count,
 	];
 	return counts.map((c) => Math.round((c / total) * 100));
 }
@@ -29,8 +22,8 @@ export default function ReviewStatsCard({
 }: {
 	stats: SellerReviewStats | null;
 }) {
-	const totalCount = stats ? Number(stats.totalCount) || 0 : 0;
-	const avgRating = stats ? Number(stats.avgRating) || 0 : 0;
+	const totalCount = stats ? stats.totalCount : 0;
+	const avgRating = stats ? stats.averageRating : 0;
 	const ratingPercents = stats ? computeRatingPercents(stats) : [0, 0, 0, 0, 0];
 	const ratingBars = [5, 4, 3, 2, 1].map((stars, index) => ({
 		stars,

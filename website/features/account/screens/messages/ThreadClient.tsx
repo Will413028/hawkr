@@ -1,30 +1,31 @@
 "use client";
 
 import "@/styles/features/messages.css";
+import {
+	chatMessageUnsupportedKind,
+	chatPreviewErased,
+	chatPreviewHidden,
+} from "@hawkr/ui-text/keys";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Link from "@/components/shared/Link";
 import UploadLoadingIndicator from "@/components/shared/UploadLoadingIndicator";
 import Button from "@/components/ui/Button";
 import { ImageCropDialog } from "@/components/ui/ImageCropDialog";
-import AttachmentPicker from "@/features/messages/components/AttachmentPicker";
-import {
-	ChatOrderCard,
-	ChatProductCard,
-	type OrderCardData,
-	type ProductCardData,
-	tryParseOrder,
-	tryParseProduct,
-} from "@/features/messages/components/ChatCards";
 import ChatContextPanel from "@/features/messages/components/ChatContextPanel";
+import ChatMessageActions from "@/features/messages/components/ChatMessageActions";
 import ChatPeerAvatar from "@/features/messages/components/ChatPeerAvatar";
 import SendButton from "@/features/messages/components/SendButton";
+import { peerName } from "@/lib/chat/map";
+import type { ChatMessage } from "@/lib/chat/types";
 import { chatWorkspaceRole } from "@/lib/chat/workspace";
 import { formatTaipeiTime } from "@/lib/date/taipei";
 import { useChatThread, useConversations } from "@/lib/hooks/useChat";
 import { useComposerScroll } from "@/lib/hooks/useComposerScroll";
 import { useKeyboardInset } from "@/lib/hooks/useKeyboardInset";
+import { type UiText, useUiText } from "@/lib/i18n/ui-text";
 import { usePathname } from "@/lib/intl/navigation";
 import { buildImageUrl } from "@/lib/media/cdn";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
@@ -104,44 +105,19 @@ function formatDateSeparator(ts: number): string {
 }
 
 /**
- * Classify a chat message's payload into one of four render shapes.
- * Mirrors the buyer APP's `chat_room_screen` structured-message branch
- * (`isOrderCard` / `isProductCard`) plus a JSON-`text` short-circuit
- * for replies whose wrapper carries only a plain string. The renderer
- * applies a `--card` modifier so structured cards drop the bubble's
- * default padding / background and let the card own its surface.
+ * 一則訊息的內文：文字、圖片，或沒有內容的墓碑（被平台隱藏、寄件方已刪除或退場、種類不支援，文字取自共用文案目錄）。
  */
-type BubbleKind =
+type BubbleBody =
 	| { kind: "text"; text: string }
 	| { kind: "image"; url: string }
-	| { kind: "product"; data: ProductCardData }
-	| { kind: "order"; data: OrderCardData };
+	| { kind: "tombstone"; text: string };
 
-function classifyBubble(type: string, content: string): BubbleKind {
-	if (type === "image") return { kind: "image", url: content };
-	const trimmed = (content ?? "").trim();
-	if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-		const order = tryParseOrder(content);
-		if (order) return { kind: "order", data: order };
-		const product = tryParseProduct(content);
-		if (product) return { kind: "product", data: product };
-		// Wrapper carrying just `{ text: "..." }` — flatten to plain text.
-		try {
-			const decoded = JSON.parse(trimmed) as Record<string, unknown>;
-			if (decoded && typeof decoded.text === "string" && decoded.text.trim()) {
-				return { kind: "text", text: decoded.text.trim() };
-			}
-			for (const k of ["url", "image", "imageUrl", "img", "src"] as const) {
-				const v = decoded?.[k];
-				if (typeof v === "string" && v.trim()) {
-					return { kind: "image", url: v };
-				}
-			}
-		} catch {
-			/* fall through to plain text */
-		}
-	}
-	return { kind: "text", text: content };
+function bubbleBody(m: ChatMessage, ut: UiText): BubbleBody {
+	if (m.erased) return { kind: "tombstone", text: ut(chatPreviewErased()) };
+	if (m.hidden) return { kind: "tombstone", text: ut(chatPreviewHidden()) };
+	if (m.kind === "image") return { kind: "image", url: m.imageUrl ?? "" };
+	if (m.kind === "text") return { kind: "text", text: m.text ?? "" };
+	return { kind: "tombstone", text: ut(chatMessageUnsupportedKind()) };
 }
 
 export default function ThreadClient({
@@ -173,16 +149,14 @@ export default function ThreadClient({
 		loading,
 		error,
 		connectionState,
-		peerTyping,
 		peerOnline,
+		peerReadSeq,
+		side,
 		send,
 		sendImage,
-		notifyTyping,
-		// Resolved buyer_id / store_id, not the raw session accountId — the hook
-		// owns this derivation so the bubble alignment here can never disagree
-		// with the filter that decided which messages land in the thread.
-		myId,
 	} = useChatThread(targetId);
+	const ut = useUiText();
+	const tMessages = useTranslations("account.messages");
 	const headStatus = resolveHeadStatus(connectionState, peerOnline);
 	// Expectation-management line above the composer (the Airbnb
 	// "typical response time" slot). Sending goes over HTTP POST, so a
@@ -201,21 +175,17 @@ export default function ThreadClient({
 		? "/seller-center/messages"
 		: "/account/messages";
 	const activeConversation = conversations.items.find(
-		(item) => String(item.targetUserId) === String(targetId),
+		(item) => item.targetUserId === targetId,
 	);
 
 	const [draft, setDraft] = React.useState("");
 	const [sending, setSending] = React.useState(false);
 	const [sendingImage, setSendingImage] = React.useState(false);
 	const [pendingImage, setPendingImage] = React.useState<File | null>(null);
-	const [attachOpen, setAttachOpen] = React.useState(false);
 	const imageInputRef = React.useRef<HTMLInputElement | null>(null);
 	const scrollerRef = React.useRef<HTMLDivElement | null>(null);
 	const composerRef = React.useRef<HTMLTextAreaElement | null>(null);
 	useComposerScroll(composerRef, draft);
-	const typingDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(
-		null,
-	);
 
 	const { views: peerViews } = useStoreCardViews(
 		!isSeller && targetId ? [targetId] : [],
@@ -223,7 +193,10 @@ export default function ThreadClient({
 	const peerView = peerViews.get(String(targetId));
 
 	const peerNickname =
-		activeConversation?.targetNickname || peerView?.name || hintedName || "";
+		(activeConversation ? peerName(ut, activeConversation) : "") ||
+		peerView?.name ||
+		hintedName ||
+		"";
 	const peerAvatar = isSeller
 		? activeConversation?.targetAvatar || hintedAvatar || ""
 		: activeConversation?.logo_url || peerView?.logoUrl || "";
@@ -248,7 +221,6 @@ export default function ThreadClient({
 		try {
 			await send(draft.trim());
 			setDraft("");
-			notifyTyping(false);
 		} catch {
 			// useChatThread already rolls back the optimistic row and exposes the
 			// friendly error. Consume the rejection at the event boundary so an
@@ -261,25 +233,6 @@ export default function ThreadClient({
 
 	const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setDraft(e.target.value);
-		notifyTyping(true);
-		if (typingDebounce.current) clearTimeout(typingDebounce.current);
-		typingDebounce.current = setTimeout(() => notifyTyping(false), 3_000);
-	};
-
-	const handlePickAttachment = async (payload: string) => {
-		// Attachment payloads go through the same `send()` pipeline as plain
-		// text — the receiver re-parses the JSON via `tryParseOrder` /
-		// `tryParseProduct` and renders a ChatCard. We don't pre-validate
-		// here because send() carries its own retry / error UI.
-		if (sending) return;
-		setSending(true);
-		try {
-			await send(payload);
-		} catch {
-			// Error UI and optimistic rollback are owned by useChatThread.
-		} finally {
-			setSending(false);
-		}
 	};
 
 	const handlePickImage = () => {
@@ -399,17 +352,17 @@ export default function ThreadClient({
 					) : (
 						<ul className="thread-page__list">
 							{messages.map((m, i) => {
-								const mine = m.senderId === myId;
-								const clock = formatClock(m.timestamp);
-								const body = classifyBubble(m.type, m.content);
-								const isCard = body.kind === "product" || body.kind === "order";
-								const prevTs = i > 0 ? messages[i - 1]?.timestamp : null;
-								const curDay = dayKey(m.timestamp);
+								const body = bubbleBody(m, ut);
+								const mine = m.sender === side;
+								const read = mine && m.seq !== null && m.seq <= peerReadSeq;
+								const clock = formatClock(m.timeMs);
+								const prevTs = i > 0 ? messages[i - 1]?.timeMs : null;
+								const curDay = dayKey(m.timeMs);
 								const separatorLabel =
 									curDay && curDay !== dayKey(prevTs)
-										? formatDateSeparator(m.timestamp)
+										? formatDateSeparator(m.timeMs)
 										: "";
-								const bubbleKey = m.id || `${m.timestamp}-${m.senderId}-${i}`;
+								const bubbleKey = m.id;
 								return (
 									<React.Fragment key={bubbleKey}>
 										{separatorLabel ? (
@@ -421,66 +374,28 @@ export default function ThreadClient({
 											</li>
 										) : null}
 										<li
-											className={[
-												"thread-page__bubble",
-												mine ? "is-mine" : "",
-												isCard ? "thread-page__bubble--card" : "",
-											]
+											className={["thread-page__bubble", mine ? "is-mine" : ""]
 												.filter(Boolean)
 												.join(" ")}
 										>
 											{body.kind === "image" ? (
 												<ChatImage url={body.url} />
-											) : body.kind === "product" ? (
-												<ChatProductCard
-													data={body.data}
-													mine={mine}
-													shareUrl={
-														body.data.id
-															? `${typeof window !== "undefined" ? window.location.origin : ""}/products/${encodeURIComponent(body.data.id)}`
-															: undefined
-													}
-													onView={() => {
-														const href = body.data.id
-															? `/products/${encodeURIComponent(body.data.id)}`
-															: body.data.name
-																? `/market/products?q=${encodeURIComponent(body.data.name)}`
-																: "/market/products";
-														router.push(href);
-													}}
-												/>
-											) : body.kind === "order" ? (
-												<ChatOrderCard
-													data={body.data}
-													mine={mine}
-													onView={() => {
-														if (!body.data.orderNo) return;
-														router.push(
-															`${threadHrefBase.startsWith("/seller-center") ? "/seller-center/orders" : "/account/orders"}/${encodeURIComponent(body.data.orderNo)}`,
-														);
-													}}
-													onSecondary={() => {
-														if (body.data.variant === "preview") {
-															// 再買一次 — drop the buyer into the order detail
-															// where the reorder action already lives. The chat
-															// card doesn't have enough payload (raw SKU ids /
-															// quantities) to populate the cart directly.
-															if (!body.data.orderNo) return;
-															router.push(
-																`/account/orders/${encodeURIComponent(body.data.orderNo)}?action=reorder`,
-															);
-														} else {
-															// 聯絡賣家 — user is already in this thread; pull
-															// focus to the compose textarea so they can type.
-															composerRef.current?.focus();
-														}
-													}}
-												/>
 											) : (
 												<p>{body.text}</p>
 											)}
 											{clock ? <small>{clock}</small> : null}
-											{mine && m.read ? (
+											{!mine && m.seq !== null ? (
+												<ChatMessageActions
+													side={side}
+													messageId={m.id}
+													peerName={
+														peerNickname ||
+														tMessages(isSeller ? "peerCustomer" : "peerSeller")
+													}
+													onBlocked={() => void conversations.refresh()}
+												/>
+											) : null}
+											{read ? (
 												<AppIcon
 													name="show"
 													className="thread-page__read"
@@ -493,11 +408,6 @@ export default function ThreadClient({
 								);
 							})}
 						</ul>
-					)}
-					{peerTyping && (
-						<div className="thread-page__typing" aria-live="polite">
-							<span /> <span /> <span /> 對方正在輸入…
-						</div>
 					)}
 				</div>
 
@@ -527,18 +437,6 @@ export default function ThreadClient({
 					 * bordered container (instead of four scattered circles), so the
 					 * composer reads as one control — the Airbnb/Nextdoor pattern. */}
 					<div className="thread-page__field">
-						<button
-							type="button"
-							className="thread-page__attach"
-							onClick={() => setAttachOpen((v) => !v)}
-							aria-label={attachOpen ? "關閉附件選單" : "附加商品或訂單"}
-							aria-haspopup="dialog"
-							aria-expanded={attachOpen}
-						>
-							{/* Matches the image icon beside it: same 20px optical size. The button owns the hit area; this plus mark
-							 * intentionally has no glyph-level frame. */}
-							<AppIcon name="plus" size={20} />
-						</button>
 						<Button
 							type="button"
 							variant="light"
@@ -591,14 +489,6 @@ export default function ThreadClient({
 						/>
 					</div>
 				</form>
-
-				<AttachmentPicker
-					open={attachOpen}
-					onClose={() => setAttachOpen(false)}
-					onPick={handlePickAttachment}
-					role={isSeller ? "seller" : "buyer"}
-					peerId={targetId}
-				/>
 			</section>
 			{/* Buyer-side only: the peer is a seller with a public profile, so
 			 * the grid can grow a commerce-context rail at >=1440px. Rendered

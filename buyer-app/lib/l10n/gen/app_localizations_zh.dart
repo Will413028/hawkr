@@ -103,4 +103,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get viewedRecently => '最近看過';
+
+  @override
+  String get commonRetry => '重試';
+
+  @override
+  String get productReviewsTitle => '商品評價';
+
+  @override
+  String productReviewsTitleWithCount(int count) {
+    return '商品評價 ($count)';
+  }
+
+  @override
+  String get chatStoreFallbackName => '店家';
 }

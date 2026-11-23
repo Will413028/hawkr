@@ -1,3 +1,4 @@
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as pb;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -48,9 +49,9 @@ class BlockedBuyerItem {
     return other.buyerId.compareTo(buyerId);
   }
 
-  /// 顯示名稱：已刪除的買家顯示 [deletedBuyerLabel]，沒有名稱時用「買家」。
-  String get displayLabel => deleted
-      ? deletedBuyerLabel
+  /// 顯示名稱：已刪除的買家用目錄的 `buyer.Profile.deleted_name`，沒有名稱時用「買家」。
+  String displayLabel(UiLocale l) => deleted
+      ? buyerProfileDeletedName(l)
       : name.isNotEmpty
       ? name
       : '買家';
@@ -77,6 +78,16 @@ class StoreBlockRepository {
   /// 以討論區留言封鎖它的作者。
   Future<void> blockByForumEntry(String forumEntryId) async {
     await _seller.blockBuyer(pb.BlockBuyerRequest(forumEntryId: forumEntryId));
+  }
+
+  /// 以聊天訊息封鎖它所屬對話的買家（呼叫者此刻的店要是該對話的店家）。
+  Future<void> blockByMessage(String messageId) async {
+    await _seller.blockBuyer(pb.BlockBuyerRequest(messageId: messageId));
+  }
+
+  /// 以評價封鎖寫這則評價的買家（要是呼叫者此刻的店的評價）。
+  Future<void> blockByReview(String reviewId) async {
+    await _seller.blockBuyer(pb.BlockBuyerRequest(reviewId: reviewId));
   }
 
   Future<void> unblock(String buyerId) async {

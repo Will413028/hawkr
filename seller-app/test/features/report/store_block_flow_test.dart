@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/image.pb.dart' as common;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
@@ -10,7 +11,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/report/data/store_block_repository.dart';
-import 'package:hawkr_seller/shared/models/buyer_card_info.dart';
 import 'package:hawkr_seller/features/report/presentation/block_list_screen.dart';
 import 'package:hawkr_seller/features/report/presentation/widgets/block_actions.dart';
 
@@ -180,7 +180,7 @@ void main() {
       ),
     );
     await _pump(tester, transport, const BlockListScreen());
-    expect(find.text(deletedBuyerLabel), findsOneWidget);
+    expect(find.text(buyerProfileDeletedName(UiLocale.zhTW)), findsOneWidget);
   });
 
   testWidgets('blank buyer name uses the shared fallback in title and toast', (

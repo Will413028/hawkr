@@ -89,6 +89,8 @@ export interface ProductReview {
 	date?: string;
 	createdAt?: string;
 	created_at?: number;
+	/** 目前登入者自己的評價，不顯示檢舉。 */
+	isMine?: boolean;
 }
 
 function textOrEmpty(value: unknown): string {

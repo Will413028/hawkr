@@ -27,11 +27,12 @@ import {
 	FavoriteSchema,
 	RestockSubscriptionSchema,
 } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
+import { ConversationSchema } from "@hawkr/api/gen/hawkr/chat/v1alpha1/chat_pb";
 import { buildHomeSnapshot } from "../features/home/homeSnapshot";
 import { deriveDetailLayoutProps } from "../features/product/deriveDetailLayoutProps";
 import { normalizeDetail } from "../lib/after-sales/normalize";
 import { flattenGroups } from "../lib/cart/types";
-import { normalizeConversation } from "../lib/chat/repo";
+import { conversationFromProto } from "../lib/chat/map";
 import { mapProduct } from "../lib/market/listFilters";
 import { imageUri } from "../lib/media/image";
 import { normalizeMemberCard } from "../lib/member-cards/repo";
@@ -312,33 +313,29 @@ test("generated favorite resolves its image URI template", () => {
 	);
 });
 
-test("chat conversation avatar reads avatarKey, not the URL twin", () => {
-	// GET /app/chat/conversations → conversations[0], verbatim.
-	const conv = normalizeConversation({
-		targetUserId: 2636840881,
-		targetNickname: "Cora Chou",
-		avatarKey: "public/buyer_avatar/2636840881/abc.png",
-		avatarUrl:
-			"https://test-media.example.com/i/original/public/buyer_avatar/2636840881/abc.png",
-	});
-	assert.equal(conv.targetAvatar, "public/buyer_avatar/2636840881/abc.png");
-
-	assert.equal(
-		normalizeConversation({
-			targetUserId: 1,
-			avatarUrl: "https://cdn/only-the-url.png",
-		}).targetAvatar,
-		undefined,
+test("chat conversation avatar reads the buyer's Image, not an object key", () => {
+	const conv = conversationFromProto(
+		create(ConversationSchema, {
+			id: "c1",
+			buyer: {
+				id: "2636840881",
+				name: "Cora Chou",
+				avatar: {
+					uriTemplate: "https://test-media.example.com/i/{preset}/abc.png",
+				},
+			},
+		}),
+		"store",
 	);
-
-	// The subject-prefixed pair retired by backend#2216. A payload carrying only
-	// those must resolve to nothing — any revived fallback turns this red.
 	assert.equal(
-		normalizeConversation({
-			targetUserId: 1,
-			targetAvatarKey: "public/buyer_avatar/2636840881/retired.png",
-			targetAvatarUrl: "https://cdn/retired.png",
-		}).targetAvatar,
+		conv.targetAvatar,
+		"https://test-media.example.com/i/avatar/abc.png",
+	);
+	assert.equal(
+		conversationFromProto(
+			create(ConversationSchema, { id: "c2", buyer: { id: "1" } }),
+			"store",
+		).targetAvatar,
 		undefined,
 	);
 });
@@ -487,11 +484,7 @@ test("PDP exposes backend purchasable as the purchase-box authority", () => {
 	assert.equal(derived.purchasable, false);
 });
 
-test("PDP review photos read the normalizer's field, not wire names", () => {
-	// reviewsResult arrives already normalized (lib/reviews/repo.ts). Since
-	// backend#2235 the normalized shape mirrors the wire field-for-field, so
-	// `imageKeys` is the name on BOTH sides — feeding it must produce the photo.
-	// The retired alias `images` is asserted dead in the second case below.
+test("PDP review photos come from the normalized imageUrls", () => {
 	const derived = deriveDetailLayoutProps({
 		product: {},
 		seller: null,
@@ -501,39 +494,22 @@ test("PDP review photos read the normalizer's field, not wire names", () => {
 			reviews: [
 				{
 					id: "1",
+					productId: "p",
+					storeId: "s",
 					rating: 5,
 					content: "x",
-					imageKeys: ["public/order_review/wire-key.png"],
-					imageUrls: ["https://test-media.example.com/i/original/x.png"],
+					imageUrls: ["https://test-media.example.com/i/card/x.png"],
+					skuName: "",
+					price: 0,
+					createdAt: 0,
 				},
 			],
 		},
 		descriptionImageDimEntries: [],
 	});
 	assert.deepEqual(derived.reviews[0].photos, [
-		"public/order_review/wire-key.png",
+		"https://test-media.example.com/i/card/x.png",
 	]);
-
-	// The pre-#2235 normalized name. Reading it again would silently resurrect a
-	// second spelling for the same list.
-	const viaRetiredName = deriveDetailLayoutProps({
-		product: {},
-		seller: null,
-		sellerStats: null,
-		reviewsResult: {
-			total: 1,
-			reviews: [
-				{
-					id: "1",
-					rating: 5,
-					content: "x",
-					images: ["public/order_review/retired-name.png"],
-				},
-			],
-		},
-		descriptionImageDimEntries: [],
-	});
-	assert.deepEqual(viaRetiredName.reviews[0].photos, []);
 });
 
 /* ------------------------------ derived-URL twins are not fallbacks (#430 D4)

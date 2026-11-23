@@ -40,12 +40,6 @@ func TestOrderCheckoutPostReviewDTOs_OutwardJSONKeyIsOperationalKey(t *testing.T
 			wantContain:  []string{`"buyerId":"` + buyerID + `"`, `"storeId":"` + storeID + `"`},
 			wantNotExist: []string{`"buyerAccountId"`, `"sellerAccountId"`},
 		},
-		{
-			name:         "OrderReviewRecord",
-			v:            OrderReviewRecord{BuyerID: buyerID, StoreID: storeID},
-			wantContain:  []string{`"buyerId":"` + buyerID + `"`, `"storeId":"` + storeID + `"`},
-			wantNotExist: []string{`"buyerAccountId"`, `"sellerAccountId"`},
-		},
 	}
 
 	for _, tc := range cases {

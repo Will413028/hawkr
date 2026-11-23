@@ -137,20 +137,21 @@ class _Harness {
 }
 
 /// 只開 [showReportBlockActionSheet] 的按鈕，用來單獨驗證「對象型別決定走哪條 API」。
-Widget _opener(BlockTarget? target, {bool Function()? onBlocked}) => Builder(
-  builder: (context) => TextButton(
-    onPressed: () async {
-      final blocked = await showReportBlockActionSheet(
-        context,
-        reportTarget: const SocialReportTarget.post('101'),
-        blockTarget: target,
-        blockUserLabel: '對方',
-      );
-      if (blocked) onBlocked?.call();
-    },
-    child: const Text('開啟選單'),
-  ),
-);
+Widget _opener(SocialBlockTarget? target, {bool Function()? onBlocked}) =>
+    Builder(
+      builder: (context) => TextButton(
+        onPressed: () async {
+          final blocked = await showReportBlockActionSheet(
+            context,
+            reportTarget: const SocialReportTarget.post('101'),
+            blockTarget: target,
+            blockUserLabel: '對方',
+          );
+          if (blocked) onBlocked?.call();
+        },
+        child: const Text('開啟選單'),
+      ),
+    );
 
 Future<void> _confirmBlock(WidgetTester tester) async {
   await tester.tap(find.text('開啟選單'));
@@ -192,19 +193,22 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
     });
 
-    testWidgets('聊天與評價的對象仍走舊 REST，不呼叫 BuyerAppService', (tester) async {
+    testWidgets('聊天訊息：BlockAuthor 只送訊息 ID，確認說明同封鎖店家', (tester) async {
       final h = _Harness();
-      await h.pump(tester, _opener(const LegacyBlockTarget('42')));
+      await h.pump(
+        tester,
+        _opener(const ChatMessageBlockTarget('msg-1', storeId: '7')),
+      );
 
       await _confirmBlock(tester);
-      expect(find.text(legacyBlockConfirmText), findsOneWidget);
+      expect(find.text(blockStoreConfirmText), findsOneWidget);
       await tester.tap(find.text('封鎖'));
       await tester.pumpAndSettle();
 
-      expect(h.legacy.requests.single.method, 'POST');
-      expect(h.legacy.requests.single.path, '/app/blocks/42');
+      expect(h.app.authorBlocks.single.messageId, 'msg-1');
+      expect(h.app.authorBlocks.single.hasCommentId(), isFalse);
       expect(h.app.storeBlocks, isEmpty);
-      expect(h.app.authorBlocks, isEmpty);
+      expect(h.legacy.requests, isEmpty);
       await tester.pump(const Duration(seconds: 3));
     });
 

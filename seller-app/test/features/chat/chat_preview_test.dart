@@ -1,58 +1,74 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
+import 'package:hawkr_seller/features/chat/data/chat_model.dart';
 import 'package:hawkr_seller/features/chat/presentation/chat_preview.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+
+import 'support/chat_fakes.dart';
+
+ChatPreview _p({
+  pb.MessageKind kind = pb.MessageKind.MESSAGE_KIND_TEXT,
+  String? text,
+  bool hidden = false,
+  bool erased = false,
+}) => ChatPreview(
+  kind: kind,
+  text: text,
+  hidden: hidden,
+  erased: erased,
+  fromStore: false,
+);
 
 void main() {
-  group('derivePreview', () {
-    test('回歸：後端截斷過的卡片 JSON 不可洩漏成原文', () {
-      // 對應線上 bug：lastMsg 是被截斷、json.decode 會失敗的卡片 payload
-      final preview = derivePreview(
-        '{"messageType":"product","productId":"859783856743286973","product',
-        '',
-      );
-      expect(preview, '傳送了一張卡片');
-      expect(preview.contains('{'), isFalse);
+  group('previewText', () {
+    test('text preview is the text', () {
+      expect(previewText(_p(text: '你好'), UiLocale.zhTW), '你好');
     });
 
-    test('完整 product 卡片 JSON → 商品卡片字樣', () {
-      final preview = derivePreview(
-        '{"messageType":"product","productId":"859783856743286973","productName":"池上米"}',
-        '',
-      );
-      expect(preview, '傳送了一張商品卡片');
-    });
-
-    test('order 卡片 JSON → 訂單卡片字樣', () {
+    test('image preview uses the catalog sentence', () {
       expect(
-        derivePreview('{"messageType":"order","orderSn":"A123"}', ''),
-        '傳送了一張訂單卡片',
+        previewText(_p(kind: pb.MessageKind.MESSAGE_KIND_IMAGE), UiLocale.zhTW),
+        chatPreviewImage(UiLocale.zhTW),
       );
     });
 
-    test('type 參數為 image → 圖片字樣', () {
-      expect(derivePreview('', 'image'), '傳送了一張圖片');
+    test('hidden and erased use the catalog sentences, even with text', () {
+      expect(
+        previewText(_p(text: 'secret', hidden: true), UiLocale.zhTW),
+        chatPreviewHidden(UiLocale.zhTW),
+      );
+      expect(
+        previewText(_p(text: 'secret', erased: true), UiLocale.zhTW),
+        chatPreviewErased(UiLocale.zhTW),
+      );
     });
 
-    test('純文字訊息維持原文', () {
-      expect(derivePreview('請問還有現貨嗎？', 'text'), '請問還有現貨嗎？');
-    });
-
-    test('任何 { 開頭且無法辨識的 payload 一律不顯示原文', () {
-      final preview = derivePreview('{"foo":"bar","baz":123', '');
-      expect(preview.startsWith('{'), isFalse);
-    });
+    test(
+      'no preview is empty; an unknown kind shows the catalog sentence, never raw payload',
+      () {
+        expect(previewText(null, UiLocale.zhTW), '');
+        expect(
+          previewText(
+            _p(kind: pb.MessageKind.MESSAGE_KIND_UNSPECIFIED, text: '{"a":1}'),
+            UiLocale.zhTW,
+          ),
+          chatMessageUnsupportedKind(UiLocale.zhTW),
+        );
+        expect(chatMessageUnsupportedKind(UiLocale.zhTW), '不支援的訊息');
+      },
+    );
   });
 
-  group('cardLabelForType（送出卡片時 client 端算 preview 用）', () {
-    test('product → 商品卡片字樣', () {
-      expect(cardLabelForType('product'), '傳送了一張商品卡片');
-    });
-
-    test('order_prev → 訂單卡片字樣', () {
-      expect(cardLabelForType('order_prev'), '傳送了一張訂單卡片');
-    });
-
-    test('text → null（非卡片型別）', () {
-      expect(cardLabelForType('text'), isNull);
+  group('tombstoneText', () {
+    test('tombstones show the catalog sentence, normal messages null', () {
+      expect(
+        tombstoneText(
+          ChatMessage.fromProto(protoMessage(1, hidden: true)),
+          UiLocale.zhTW,
+        ),
+        chatPreviewHidden(UiLocale.zhTW),
+      );
+      expect(tombstoneText(clientMessage(1), UiLocale.zhTW), isNull);
     });
   });
 }

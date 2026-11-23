@@ -50,13 +50,7 @@ services:
       TZ: UTC
       GIN_MODE: release
       APP_ENV: local
-      JWT_SECRET: ${JWT_SECRET}
       GATEWAY_URL: ${GATEWAY_URL:-http://127.0.0.1:9900}
-
-      # 入口是在本機跑的單體（make serve，:8080）：認證、CORS、CSRF 都在單體，gateway 信任單體帶的
-      # 身分 header。這份清單只剩 chat 的 WebSocket upgrade 檢查 Origin 用（handler/chat.go），
-      # 到 IM 搬進單體（遷移計畫 A6）為止。
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3001,http://localhost:3000}
 
       # Service Discovery (Direct connection for local dev)
       ACCOUNT_SERVICE_HOST: host.docker.internal
@@ -67,26 +61,18 @@ services:
       BUYER_SERVICE_GRPC_PORT: 9941
       SELLER_SERVICE_HOST: host.docker.internal
       SELLER_SERVICE_GRPC_PORT: 9941
-      CRM_SERVICE_HOST: crm-service
-      CRM_SERVICE_GRPC_PORT: 10030
       PRODUCT_SERVICE_HOST: product-service
       PRODUCT_SERVICE_PORT: 9912
       ORDER_SERVICE_HOST: order-service
       ORDER_SERVICE_PORT: 9914
       COUPON_SERVICE_HOST: coupon-service
       COUPON_SERVICE_GRPC_PORT: 9951
-      REVIEW_SERVICE_HOST: review-service
-      REVIEW_SERVICE_GRPC_PORT: 10033
       AFTERSALES_SERVICE_HOST: aftersales-service
       AFTERSALES_SERVICE_GRPC_PORT: 9923
       PAYMENT_SERVICE_HOST: payment-service
       PAYMENT_SERVICE_PORT: 9924
       SHIPPING_SERVICE_HOST: shipping-service
       SHIPPING_SERVICE_GRPC_PORT: 9931
-      IM_SERVICE_HOST: im-service
-      IM_SERVICE_GRPC_PORT: 9933
-      IM_CHAT_STREAM_JWT_SECRET: ${IM_CHAT_STREAM_JWT_SECRET:-}
-      IM_CHAT_STREAM_JWT_SECRET_PREV: ${IM_CHAT_STREAM_JWT_SECRET_PREV:-}
       MEDIA_SERVICE_HOST: media-service
       MEDIA_SERVICE_PORT: 9936
       # 圖片 objectKey → 顯示 URL 的域名唯一來源（49 號 §6.1）；Gateway 組 {語意}Url 欄位
@@ -862,214 +848,6 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9946/actuator/health"]
       interval: 60s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  crm-service:
-    build:
-      context: .
-      dockerfile: services/crm-service/Dockerfile
-      target: dev
-      args:
-        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
-    image: hawkr/crm-service:latest
-    container_name: crm-service
-    restart: unless-stopped
-    ports:
-      - "10030:10030"
-    volumes:
-      - ./services/crm-service:/app/services/crm-service
-      - ./pkg:/app/pkg
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      BUYER_SERVICE_HOST: host.docker.internal
-      BUYER_SERVICE_GRPC_PORT: 9941
-      GRPC_PORT: 10030
-
-      # RabbitMQ（#1625：原缺此變數 → fallback localhost，本地 crm consumer 自 2026-06-28 起靜默斷線）
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_crm
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # Dev Configs
-      NACOS_ENABLED: "false"
-      TRACING_ENABLED: "true"
-      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
-      GONOSUMDB: "*"
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-
-    healthcheck:
-      test: ["CMD-SHELL", "cd /app/services/crm-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10030 -service hawkr.crm.CrmService"]
-      interval: 60s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Review Service (gRPC 10033)
-  # ==========================================
-
-  review-service:
-    build:
-      context: .
-      dockerfile: services/review-service/Dockerfile
-      target: dev
-      args:
-        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
-    image: hawkr/review-service:latest
-    container_name: review-service
-    restart: unless-stopped
-    ports:
-      - "10033:10033"
-    volumes:
-      - ./services/review-service:/app/services/review-service
-      - ./pkg:/app/pkg
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      BUYER_SERVICE_HOST: host.docker.internal
-      BUYER_SERVICE_GRPC_PORT: 9941
-      SELLER_SERVICE_HOST: host.docker.internal
-      SELLER_SERVICE_GRPC_PORT: 9941
-      GRPC_PORT: 10033
-      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_review
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # Order Service
-      ORDER_SERVICE_ADDR: order-service:9915
-
-      # RabbitMQ
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
-
-      # Dev Configs
-      NACOS_ENABLED: "false"
-      TRACING_ENABLED: "true"
-      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
-      GONOSUMDB: "*"
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-
-    healthcheck:
-      test: ["CMD-SHELL", "cd /app/services/review-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10033 -service hawkr.review.ReviewService"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # IM Service (gRPC 9933；final architecture，無 service-local HTTP/WS)
-  # ==========================================
-
-  im-service:
-    build:
-      context: .
-      dockerfile: services/im-service/Dockerfile
-      target: dev
-      args:
-        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
-    image: hawkr/im-service:latest
-    container_name: im-service
-    restart: unless-stopped
-    ports:
-      - "9933:9933"
-    volumes:
-      - ./services/im-service:/app/services/im-service
-      - ./pkg:/app/pkg
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      IM_CHAT_STREAM_JWT_SECRET: ${IM_CHAT_STREAM_JWT_SECRET:-}
-      IM_CHAT_STREAM_JWT_SECRET_PREV: ${IM_CHAT_STREAM_JWT_SECRET_PREV:-}
-      TZ: UTC
-      BUYER_SERVICE_ADDR: host.docker.internal:9941
-      SELLER_SERVICE_ADDR: host.docker.internal:9941
-      GRPC_PORT: 9933
-      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_im
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
-      OSS_ENDPOINT: ${OSS_ENDPOINT}
-      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
-      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
-      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
-      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
-      GONOSUMDB: "*"
-
-    healthcheck:
-      test: ["CMD-SHELL", "cd /app/services/im-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:9933 -service hawkr.im.IMService"]
-      interval: 60s
-      timeout: 5s
       retries: 3
       start_period: 60s
     networks:

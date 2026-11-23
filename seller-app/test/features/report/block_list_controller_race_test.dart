@@ -13,6 +13,9 @@ BlockedBuyerItem _b(String id, [int rank = 0]) => BlockedBuyerItem(
 );
 
 class _Repo implements StoreBlockRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+
   _Repo(this.firstPage);
 
   List<BlockedBuyerItem> firstPage;

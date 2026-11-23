@@ -51,30 +51,6 @@ test.describe("procurement assistant — interrupt／resume（doc57 run ledger�
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-		// Messages shell fixtures — registered after the generic gateway mock so
-		// their typed response wins Playwright's last-route-first dispatch.
-		await page.route("**/api/v1/app/chat/conversations", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: { records: [] } }),
-			}),
-		);
-		await page.route("**/api/v1/app/chat/unread", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: { unread: 0 } }),
-			}),
-		);
-		await page.route("**/api/v1/app/chat/ws-ticket", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			}),
-		);
-
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});

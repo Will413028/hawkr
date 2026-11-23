@@ -1,18 +1,26 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
+import {
+	CustomerSort,
+	CustomerType,
+} from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/ui/Button";
 import { acquireBodyScrollLock } from "@/lib/browser/body-scroll-lock";
+import { useCrmStoreId } from "@/lib/hooks/useCrmStoreId";
+import { useSellerTags } from "@/lib/hooks/useSellerTags";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import {
-	type CustomerTag,
-	type FetchSellerCustomersParams,
-	fetchSellerCustomersPage,
-	fetchSellerTags,
+	customerTypeText,
+	type ListCustomersParams,
+	listAllCustomers,
+	listCustomers,
 	type SellerCustomer,
-	type SellerCustomerType,
-} from "@/lib/seller/repo";
+} from "@/lib/seller/crm";
 
 interface Props {
 	open: boolean;
@@ -25,29 +33,22 @@ interface Props {
 	onClose: () => void;
 }
 
-type CustomerTypeFilter = "" | SellerCustomerType;
-
 const PAGE_SIZE = 50;
-const BULK_PAGE_SIZE = 200;
-const CUSTOMER_TYPE_OPTIONS: Array<{
-	value: CustomerTypeFilter;
-	label: string;
-}> = [
-	{ value: "", label: "全部客戶" },
-	{ value: "vip", label: "VIP" },
-	{ value: "normal", label: "一般" },
-	{ value: "blocklist", label: "黑名單" },
+const CUSTOMER_TYPE_OPTIONS: CustomerType[] = [
+	CustomerType.UNSPECIFIED,
+	CustomerType.VIP,
+	CustomerType.NORMAL,
 ];
-const CUSTOMER_TYPE_LABEL: Record<SellerCustomerType, string> = {
-	normal: "一般",
-	vip: "VIP",
-	blocklist: "黑名單",
-};
 
 function fallbackCustomer(id: string): SellerCustomer {
 	return {
 		id,
 		name: `買家 #${id}`,
+		deleted: false,
+		customerType: CustomerType.UNSPECIFIED,
+		totalSpent: 0,
+		orderCount: 0,
+		tags: [],
 	};
 }
 
@@ -72,8 +73,8 @@ function rowsFromSelection(
 /**
  * Buyer picker dialog for the create-coupon "指定買家" flow.
  *
- * Backed by `GET /app/sellers/me/customers` with debounced keyword search and
- * CRM segmentation filters. Segment actions still resolve to buyer account IDs
+ * Backed by `CrmAppService.ListCustomers` (classification and single-tag filters,
+ * `page_token` paging, no total or keyword search). Segment actions still resolve to buyer account IDs
  * and reuse the coupon service's existing `targetType=3 + buyerAccountIds`
  * contract, so no new coupon-target enum is required.
  */
@@ -83,15 +84,19 @@ export default function CouponBuyerPicker({
 	onConfirm,
 	onClose,
 }: Props) {
-	const [keyword, setKeyword] = React.useState("");
-	const [debounced, setDebounced] = React.useState("");
-	const [customerType, setCustomerType] =
-		React.useState<CustomerTypeFilter>("");
+	const { storeId } = useCrmStoreId();
+	const defaults = useDefaultErrorText();
+	const ut = useUiText();
+	const t = useTranslations("sellerCenter.customers");
+	const [customerType, setCustomerType] = React.useState<CustomerType>(
+		CustomerType.UNSPECIFIED,
+	);
 	const [tagId, setTagId] = React.useState<string | null>(null);
-	const [tagPool, setTagPool] = React.useState<CustomerTag[]>([]);
+	const { tags: tagPool, error: tagPoolError } = useSellerTags();
 	const [list, setList] = React.useState<SellerCustomer[]>([]);
-	const [total, setTotal] = React.useState(0);
+	const [nextPageToken, setNextPageToken] = React.useState("");
 	const [loading, setLoading] = React.useState(false);
+	const [loadingMore, setLoadingMore] = React.useState(false);
 	const [bulkSelecting, setBulkSelecting] = React.useState(false);
 	const [error, setError] = React.useState<string | null>(null);
 	const [selected, setSelected] = React.useState<Set<string>>(
@@ -103,23 +108,25 @@ export default function CouponBuyerPicker({
 
 	const activeTag = tagPool.find((tag) => tag.id === tagId) ?? null;
 	const activeFilterLabel = [
-		customerType ? CUSTOMER_TYPE_LABEL[customerType] : "全部客戶",
+		customerType === CustomerType.UNSPECIFIED
+			? "全部客戶"
+			: customerTypeText(ut, customerType),
 		activeTag ? `#${activeTag.name}` : null,
-		debounced ? `搜尋「${debounced}」` : null,
 	]
 		.filter(Boolean)
 		.join(" · ");
+	const filterText = t("filter", { label: activeFilterLabel });
 
-	const currentParams = React.useMemo<FetchSellerCustomersParams>(
+	const currentParams = React.useMemo<Omit<ListCustomersParams, "pageToken">>(
 		() => ({
-			keyword: debounced || undefined,
 			pageSize: PAGE_SIZE,
-			customerType: customerType || undefined,
+			type:
+				customerType === CustomerType.UNSPECIFIED ? undefined : customerType,
 			tagId: tagId ?? undefined,
-			sortBy: "order_count",
-			sortOrder: "desc",
+			sort: CustomerSort.ORDER_COUNT,
+			descending: true,
 		}),
-		[customerType, debounced, tagId],
+		[customerType, tagId],
 	);
 
 	// Reset internal state whenever the dialog re-opens so a stale
@@ -130,51 +137,30 @@ export default function CouponBuyerPicker({
 		setSelectedRows(
 			new Map(initialSelected.map((id) => [id, fallbackCustomer(id)])),
 		);
-		setKeyword("");
-		setDebounced("");
-		setCustomerType("");
+		setCustomerType(CustomerType.UNSPECIFIED);
 		setTagId(null);
 		setError(null);
 		// `initialSelected` intentionally a snapshot per open
 	}, [open, initialSelected]);
 
 	React.useEffect(() => {
-		if (!open) return;
-		let alive = true;
-		fetchSellerTags()
-			.then((tags) => {
-				if (alive) setTagPool(tags);
-			})
-			.catch(() => {
-				if (alive) setTagPool([]);
-			});
-		return () => {
-			alive = false;
-		};
-	}, [open]);
-
-	// Debounce the keyword → backend call. 240ms feels responsive while
-	// still avoiding a request per keystroke.
-	React.useEffect(() => {
-		const t = window.setTimeout(() => setDebounced(keyword), 240);
-		return () => window.clearTimeout(t);
-	}, [keyword]);
-
-	React.useEffect(() => {
-		if (!open) return;
+		if (!open || !storeId) return;
 		let alive = true;
 		setLoading(true);
 		setError(null);
-		fetchSellerCustomersPage({ ...currentParams, page: 1 })
+		listCustomers(storeId, currentParams)
 			.then((page) => {
 				if (!alive) return;
-				setList(page.records);
-				setTotal(page.total);
-				setSelectedRows((prev) => mergeRowsIntoMap(prev, page.records));
+				setList(page.customers);
+				setNextPageToken(page.nextPageToken);
+				setSelectedRows((prev) => mergeRowsIntoMap(prev, page.customers));
 			})
 			.catch((e: unknown) => {
-				if (alive)
-					setError(e instanceof Error ? e.message : "載入客戶清單失敗");
+				// 讀取失敗：清掉列表，錯誤文字取代「沒有客戶」的空狀態。
+				if (!alive) return;
+				setList([]);
+				setNextPageToken("");
+				setError(errorText(e, defaults));
 			})
 			.finally(() => {
 				if (alive) setLoading(false);
@@ -182,7 +168,26 @@ export default function CouponBuyerPicker({
 		return () => {
 			alive = false;
 		};
-	}, [open, currentParams]);
+	}, [open, storeId, currentParams, defaults]);
+
+	const loadMore = async () => {
+		if (!storeId || !nextPageToken || loadingMore) return;
+		setLoadingMore(true);
+		setError(null);
+		try {
+			const page = await listCustomers(storeId, {
+				...currentParams,
+				pageToken: nextPageToken,
+			});
+			setList((prev) => [...prev, ...page.customers]);
+			setNextPageToken(page.nextPageToken);
+			setSelectedRows((prev) => mergeRowsIntoMap(prev, page.customers));
+		} catch (e) {
+			setError(errorText(e, defaults));
+		} finally {
+			setLoadingMore(false);
+		}
+	};
 
 	// Esc to close, lock body scroll while open — same pattern as
 	// CertGateDialog so the workspace feels coherent.
@@ -223,34 +228,13 @@ export default function CouponBuyerPicker({
 	};
 
 	const selectCurrentFilter = async () => {
-		if (bulkSelecting || total === 0) return;
+		if (bulkSelecting || !storeId || list.length === 0) return;
 		setBulkSelecting(true);
 		setError(null);
 		try {
-			const first = await fetchSellerCustomersPage({
-				...currentParams,
-				page: 1,
-				pageSize: BULK_PAGE_SIZE,
-			});
-			const rows = [...first.records];
-			const expected = first.total;
-			const pageCount = Math.ceil(expected / BULK_PAGE_SIZE);
-			for (
-				let page = 2;
-				page <= pageCount && rows.length < expected;
-				page += 1
-			) {
-				const next = await fetchSellerCustomersPage({
-					...currentParams,
-					page,
-					pageSize: BULK_PAGE_SIZE,
-				});
-				if (next.records.length === 0) break;
-				rows.push(...next.records);
-			}
-			selectRows(rows);
+			selectRows(await listAllCustomers(storeId, currentParams));
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "套用分群失敗");
+			setError(errorText(e, defaults));
 		} finally {
 			setBulkSelecting(false);
 		}
@@ -297,15 +281,6 @@ export default function CouponBuyerPicker({
 				</header>
 
 				<div className="flex shrink-0 flex-col gap-3 border-b border-hk-border-soft px-3 py-3 sm:px-5">
-					<input
-						type="search"
-						value={keyword}
-						onChange={(e) => setKeyword(e.target.value)}
-						placeholder="搜尋客戶名稱 / 電話"
-						aria-label="搜尋客戶"
-						className="h-11 w-full rounded-md border border-hk-border-soft bg-hk-surface-card px-3 font-inherit focus:border-hk-primary focus:outline-none focus:ring-3 focus:ring-hk-primary/20 sm:h-10"
-					/>
-
 					<fieldset className="border-0 p-0 m-0 min-w-0">
 						<legend className="mb-2 text-xs font-semibold text-hk-muted">
 							客戶等級
@@ -315,16 +290,18 @@ export default function CouponBuyerPicker({
 							className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible"
 						>
 							{CUSTOMER_TYPE_OPTIONS.map((opt) => {
-								const active = customerType === opt.value;
+								const active = customerType === opt;
 								return (
 									<button
-										key={opt.value || "all"}
+										key={opt}
 										type="button"
 										className={`h-11 shrink-0 whitespace-nowrap px-3 rounded-full border text-xs font-semibold cursor-pointer transition-colors sm:h-8 ${active ? "bg-hk-primary text-white border-hk-primary dark:bg-hk-ink-200 dark:text-hk-ink-900" : "bg-hk-surface-card text-hk-muted border-hk-border-soft hover:border-hk-primary/50 hover:text-hk-primary"}`}
 										aria-pressed={active}
-										onClick={() => setCustomerType(opt.value)}
+										onClick={() => setCustomerType(opt)}
 									>
-										{opt.label}
+										{opt === CustomerType.UNSPECIFIED
+											? "全部客戶"
+											: customerTypeText(ut, opt)}
 									</button>
 								);
 							})}
@@ -372,9 +349,9 @@ export default function CouponBuyerPicker({
 					>
 						<span
 							className="max-w-[72vw] shrink-0 truncate whitespace-nowrap text-xs text-hk-muted sm:min-w-[180px] sm:max-w-none sm:flex-1"
-							title={`目前篩選：${activeFilterLabel || "全部客戶"} · ${total} 位`}
+							title={filterText}
 						>
-							目前篩選：{activeFilterLabel || "全部客戶"} · {total} 位
+							{filterText}
 						</span>
 						<Button
 							type="button"
@@ -382,12 +359,12 @@ export default function CouponBuyerPicker({
 							color="default"
 							size="sm"
 							onClick={selectCurrentFilter}
-							disabled={bulkSelecting || loading || total === 0}
+							disabled={bulkSelecting || loading || list.length === 0}
 							isLoading={bulkSelecting}
 							loadingLabel="套用分群買家中…"
 							className="h-11 min-h-11 shrink-0 whitespace-nowrap sm:h-8 sm:min-h-8"
 						>
-							全選此分群（{total}）
+							{t("selectSegment")}
 						</Button>
 						<Button
 							type="button"
@@ -414,12 +391,12 @@ export default function CouponBuyerPicker({
 					</div>
 				</div>
 
-				{error && (
+				{(error ?? tagPoolError) && (
 					<p
 						className="m-0 bg-hk-danger/10 px-3 py-3 text-sm text-hk-danger sm:px-5"
 						role="alert"
 					>
-						{error}
+						{error ?? tagPoolError}
 					</p>
 				)}
 
@@ -433,9 +410,11 @@ export default function CouponBuyerPicker({
 							載入中…
 						</p>
 					) : list.length === 0 ? (
-						<p className="py-6 px-4 m-0 text-center text-hk-muted text-sm">
-							{debounced ? `找不到「${debounced}」` : "目前篩選沒有客戶。"}
-						</p>
+						error ? null : (
+							<p className="py-6 px-4 m-0 text-center text-hk-muted text-sm">
+								目前篩選沒有客戶。
+							</p>
+						)
 					) : (
 						list.map((c) => {
 							const id = String(c.id);
@@ -466,25 +445,23 @@ export default function CouponBuyerPicker({
 											<strong className="text-sm font-semibold text-hk-heading truncate">
 												{c.name}
 											</strong>
-											{c.customerType === "vip" && (
+											{c.customerType === CustomerType.VIP && (
 												<span className="shrink-0 rounded-full bg-hk-primary/10 text-hk-accent-on-tint px-2 py-0.5 text-[0.6875rem] font-bold dark:bg-hk-ink-200/18 dark:text-hk-ink-200">
-													VIP
+													{customerTypeText(ut, c.customerType)}
 												</span>
 											)}
 										</span>
 										<small className="text-xs text-hk-muted">
-											{c.phone ?? ""}
-											{c.phone && c.orderCount ? " · " : ""}
 											{c.orderCount ? `${c.orderCount} 筆訂單` : ""}
 										</small>
-										{c.tags && c.tags.length > 0 && (
+										{c.tags.length > 0 && (
 											<span className="flex flex-wrap gap-1">
 												{c.tags.slice(0, 3).map((tag) => (
 													<span
-														key={tag}
+														key={tag.id}
 														className="rounded-full bg-hk-surface-muted px-2 py-0.5 text-[0.6875rem] font-semibold text-hk-muted dark:bg-white/8"
 													>
-														{tag}
+														{tag.name}
 													</span>
 												))}
 												{c.tags.length > 3 && (
@@ -499,6 +476,21 @@ export default function CouponBuyerPicker({
 							);
 						})
 					)}
+					{nextPageToken ? (
+						<Button
+							type="button"
+							variant="bordered"
+							color="default"
+							size="sm"
+							onClick={() => void loadMore()}
+							disabled={loadingMore}
+							isLoading={loadingMore}
+							loadingLabel={t("loadingMoreCustomers")}
+							className="mx-3 my-2 shrink-0"
+						>
+							{t("loadMore")}
+						</Button>
+					) : null}
 				</div>
 
 				<footer

@@ -35,9 +35,6 @@ func AuthMetadataStreamInterceptor() grpc.StreamClientInterceptor {
 		if requestID, ok := ctx.Value(CtxKeyRequestID).(string); ok && requestID != "" {
 			pairs = append(pairs, "x-request-id", requestID)
 		}
-		if reason, ok := ctx.Value(CtxKeySellerSuspended).(string); ok && reason != "" {
-			pairs = append(pairs, "x-seller-suspended", reason)
-		}
 		if buyerID, ok := ctx.Value(CtxKeyBuyerID).(identity.BuyerID); ok && buyerID > 0 {
 			pairs = append(pairs, "x-buyer-id", strconv.FormatInt(int64(buyerID), 10))
 		}

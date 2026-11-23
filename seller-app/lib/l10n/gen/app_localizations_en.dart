@@ -61,5 +61,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taipeiTimeLabel => 'Taipei time';
 
   @override
-  String get taipeiTimeTableNote => 'Times are in Taipei time';
+  String get commonRetry => 'Retry';
+
+  @override
+  String get commonReload => 'Reload';
+
+  @override
+  String get commonLoadMore => 'Load more';
+
+  @override
+  String get chatLoadMoreFailedRetry => 'Could not load more. Tap to retry';
+
+  @override
+  String get chatBuyerFallbackName => 'Customer';
+
+  @override
+  String get chatSendFailedResend => 'Failed to send. Tap to resend';
+
+  @override
+  String get chatSending => 'Sending…';
+
+  @override
+  String get chatReadPrefix => 'Read ';
+
+  @override
+  String get chatLoadFailedTitle => 'Cannot load messages right now';
+
+  @override
+  String get chatLoadFailedDescription =>
+      'Check your connection and try again.';
+
+  @override
+  String get customerOrdersTitle => 'Customer orders';
+
+  @override
+  String get customerOrdersEmpty => 'No orders yet';
+
+  @override
+  String get customerBuyerFallbackName => 'Buyer';
+
+  @override
+  String get couponPickFromCustomers => 'Choose from customers';
+
+  @override
+  String get couponPickFromCustomersHint =>
+      'Pick the members for this issue from your customer list';
+
+  @override
+  String get reportMessageTitle => 'Report message';
+
+  @override
+  String get customerPickerTitle => 'Select customers';
+
+  @override
+  String get customerPickerEmpty => 'No customers to select';
+
+  @override
+  String customerPickerAdd(int count) {
+    return 'Add to list ($count)';
+  }
 }

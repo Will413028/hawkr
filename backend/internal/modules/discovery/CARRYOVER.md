@@ -52,6 +52,6 @@ seller-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 候選從「營收前 3×limit」改為「全部合格店家」；曝光資格是 seller 的 `ExposableStores`（含 KYC 核准、收款帳戶轉帳能力啟用、停權、店家資料完整度），不再只看 status 與 PayUni。
 - 回傳是店家 ID、近 30 天成立訂單數，以及快照的計算時間；評價與其餘顯示欄位由 httpapi 組裝。
 - limit 必須是 1 到 50，沒有預設值。
-- 新的上游：order 的 `ListStoreOrderStats`（Java 新增）、review 的 `ListStoreRatingStats`（review-service 新增的批次 RPC）；`REVIEW_SERVICE_ADDR` 是新的 worker 設定。
+- 新的上游：order 的 `ListStoreOrderStats`（Java 新增）、review 的 `ListStoreRatingStats`（review-service 新增的批次 RPC）；評價統計已在 A6-6e 改讀 review 模組（`REVIEW_SERVICE_ADDR` 已刪）。
 - 新表 `discovery.recompute_state`（新鮮度與重算的序列化）。
 - 回傳多了快照的計算時間（評價數與平均不再對外輸出）。

@@ -1,3 +1,5 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
 import '../../../features/seller/data/current_store.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
@@ -23,6 +25,9 @@ import '../../../shared/widgets/optimized_image.dart';
 import '../../seller/presentation/seller_store_avatar.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import '../../../core/l10n/ui_locale.dart';
+import '../../review/data/review_repository.dart';
 
 /// fontSize 可能為數字或 px 字串（web 存 "26px"）→ 統一解析為 double。
 double parseDescFontSize(dynamic v) {
@@ -234,7 +239,8 @@ class ProductPreviewScreen extends HookConsumerWidget {
     final currentImageIndex = useState(0);
     final imageUrls = useState<List<String>>([]);
     final grades = useState<List<Map<String, dynamic>>>([]);
-    final reviews = useState<List<Map<String, dynamic>>>([]);
+    final reviews = useState<List<ReviewItem>>([]);
+    final reviewsError = useState<Object?>(null);
     final selectedGradeIndex = useState<int?>(null);
     final loading = useState(true);
     final avgRating = useState<double?>(null);
@@ -248,20 +254,17 @@ class ProductPreviewScreen extends HookConsumerWidget {
     final description = useState<String?>(null);
     final descriptionBlocks = useState<List<Map<String, dynamic>>?>(null);
 
-    Future<List<Map<String, dynamic>>> loadReviews(
-      String sellerId,
-      Object skuId,
-    ) async {
+    Future<void> loadReviews(Object productId) async {
       try {
-        final reviewList = await ref
-            .read(productRepositoryProvider)
-            .listPublicProductReviews(sellerId, skuId);
+        final page = await ref
+            .read(reviewRepositoryProvider)
+            .listProductReviews(productId.toString());
         if (context.mounted) {
-          reviews.value = reviewList.take(2).toList();
+          reviews.value = page.reviews.take(2).toList();
+          reviewsError.value = null;
         }
-        return reviewList;
       } catch (e) {
-        return [];
+        if (context.mounted) reviewsError.value = e;
       }
     }
 
@@ -290,12 +293,11 @@ class ProductPreviewScreen extends HookConsumerWidget {
         final results = await Future.wait([
           ref.read(productRepositoryProvider).getProductDetail(productId),
           ref
-              .read(productRepositoryProvider)
-              .getPublicProductRatingSummary(productId),
-          if (sellerId != null)
-            loadReviews(sellerId, productId)
-          else
-            Future.value(<Map<String, dynamic>>[]),
+              .read(reviewRepositoryProvider)
+              .productStats(productId.toString())
+              .then<ReviewStats?>((s) => s)
+              .catchError((_) => null),
+          if (sellerId != null) loadReviews(productId) else Future.value(),
         ]);
 
         if (!context.mounted) return;
@@ -396,35 +398,12 @@ class ProductPreviewScreen extends HookConsumerWidget {
 
         if (!context.mounted) return;
 
-        final ratingSummary = results[1] as Map<String, dynamic>? ?? {};
-        final ratingData = ratingSummary['data'] is Map
-            ? ratingSummary['data'] as Map<String, dynamic>
-            : ratingSummary;
-
         imageUrls.value = resolvedImageUrls;
         grades.value = loadedGrades;
-        // OpenAPI handler.ProductRatingResponse：data.{rating, reviewCount}（string）
-        // 之前讀 'avg'/'count' 永遠拿不到 → avgRating.value 恆為 0；同時讓
-        // buildSellerCard (line 443: sellerRating ?? avgRating.value) 也壞。
-        // 一併保留舊欄位 fallback 不破壞向下相容。
-        final avgVal =
-            ratingData['rating'] ??
-            ratingData['avg'] ??
-            ratingData['averageRating'] ??
-            0;
-        avgRating.value =
-            (avgVal is num ? avgVal : num.tryParse(avgVal.toString()) ?? 0)
-                .toDouble();
-        final countVal =
-            ratingData['reviewCount'] ??
-            ratingData['count'] ??
-            ratingData['totalReviews'] ??
-            0;
-        reviewCount.value =
-            (countVal is num
-                    ? countVal
-                    : num.tryParse(countVal.toString()) ?? 0)
-                .toInt();
+        // 評分與評價數只取自 GetProductReviewStats；讀取失敗時留空，不顯示成 0。
+        final stats = results[1] as ReviewStats?;
+        avgRating.value = stats?.average;
+        reviewCount.value = stats?.count;
 
         origin.value = loadedOrigin;
         description.value = loadedDesc;
@@ -840,23 +819,19 @@ class ProductPreviewScreen extends HookConsumerWidget {
       );
     }
 
-    Widget buildReviewItem(Map<String, dynamic> review, {bool isLast = false}) {
-      // `ReviewListItem`（gateway/internal/handler/review.go）的欄位是 `username`。
-      final rawName = (review['username'] ?? '').toString();
-      final userName = rawName.isEmpty ? '匿名' : rawName;
+    Widget buildReviewItem(ReviewItem review, {bool isLast = false}) {
+      final userName = review.authorName.isEmpty ? '匿名' : review.authorName;
       final maskedName = userName.length > 1
           ? '${userName[0]}${'*' * (userName.length - 1)}'
           : userName;
-      // 後端 rating 有時是 int / 有時是 string（"5"）→ 用 tryParse 容錯
-      final ratingRaw = review['rating'] ?? 5;
-      final num rating = ratingRaw is num
-          ? ratingRaw
-          : (num.tryParse(ratingRaw.toString()) ?? 5);
-      final content = review['content'] ?? '';
-      final date = review['createdAt'] ?? '';
-      final dateStr = date.toString().length >= 10
-          ? date.toString().substring(0, 10)
-          : date.toString();
+      final num rating = review.rating;
+      final content = review.content;
+      final createWall = review.createTime?.taipeiWall;
+      final dateStr = createWall == null
+          ? ''
+          : context.taipeiDisplay.labeled(
+              '${createWall.year}-${createWall.month.toString().padLeft(2, '0')}-${createWall.day.toString().padLeft(2, '0')}',
+            );
 
       return Container(
         padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
@@ -942,7 +917,7 @@ class ProductPreviewScreen extends HookConsumerWidget {
     }
 
     Widget buildReviewSection() {
-      final rCount = reviewCount.value ?? reviews.value.length;
+      final rCount = reviewCount.value ?? 0;
 
       return Container(
         margin: EdgeInsets.symmetric(horizontal: 24.w),
@@ -1015,7 +990,23 @@ class ProductPreviewScreen extends HookConsumerWidget {
               ],
             ),
             SizedBox(height: 16.h),
-            if (reviews.value.isEmpty)
+            if (reviewsError.value case final error?)
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.h),
+                  child: Text(
+                    errorText(
+                      error,
+                      defaults: ref.read(defaultErrorTextProvider),
+                    ),
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              )
+            else if (reviews.value.isEmpty)
               Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 16.h),

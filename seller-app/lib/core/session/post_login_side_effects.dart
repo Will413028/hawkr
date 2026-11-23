@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/chat/data/chat_repository.dart';
+import '../../features/chat/data/chat_session.dart';
+import '../../features/order/data/order_status_notifier.dart';
 import '../../features/notification/data/push/manager.dart';
 import '../../features/seller/data/current_store.dart';
 
-/// 登入 / session 恢復後的副作用（chat polling、FCM 上報、seller 同步）。
+/// 登入 / session 恢復後的副作用（聊天串流與訂單輪詢、FCM 上報、seller 同步）。
 ///
 /// 這些都是硬 singleton / 網路呼叫，在 `flutter test` 會丟
 /// MissingPluginException 或留 pending timer。抽成可注入 seam：
@@ -24,13 +25,15 @@ class RealPostLoginSideEffects implements PostLoginSideEffects {
 
   @override
   void onLogin() {
-    _ref.read(chatRepositoryProvider).startPolling();
+    OrderStatusNotifier.instance.startListening();
+    _ref.read(chatSessionProvider).start();
     PushNotificationManager.instance.onUserLoggedIn();
   }
 
   @override
   Future<void> onSessionRestored() async {
-    _ref.read(chatRepositoryProvider).startPolling();
+    OrderStatusNotifier.instance.startListening();
+    _ref.read(chatSessionProvider).start();
     PushNotificationManager.instance.onUserLoggedIn();
     // 由 Session.initialize() 呼叫：等 currentStoreProvider 讀完 GetMyStore。它只依賴 session 的帳號，
     // 不會重新進入 initialize()。

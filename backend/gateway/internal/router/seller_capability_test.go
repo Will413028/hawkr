@@ -21,11 +21,7 @@ type routeCap struct {
 // §3.4 的 capability↔類別映射表 (source: .claude/tmp/suspension/06-功能矩陣.md).
 // The test asserts the live authz registry equals this set exactly — drift in either
 // direction (a mount changing cap, or a new gated route missing from this table)
-// fails CI. Deviations from 06's raw lean are the 46 §3.4 authority overriding it:
-//   - me/reviews* : 06 leans ALLOW-ALWAYS (唯讀分析), but §3.4 裁決
-//     "報表/唯讀查看也鎖" → CAP_MARKETING (BLOCK).
-//   - all CRM 查詢 (customers*, orders, coupons): 06 leans ALLOW-ORDER/ALLOW for some,
-//     but §3.4 CAP_MARKETING covers "CRM 寫入+查詢" → BLOCK.
+// fails CI.
 //
 // /app/coupon_templates 建立/列表/詳情（CAP_MARKETING）掛 requireSeller。
 // Revoke=CONTENT_CONTRACT 白名單不 deny，不掛 guard 故不在 registry。
@@ -60,17 +56,6 @@ var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/sellers/me/assistant/product-autofill", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/me/assistant/product-listing/chat", authz.CapMarketing},
 	{"GET", "/api/v1/app/sellers/me/assistant/sessions/latest", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/customers", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/customers/:buyerId", authz.CapMarketing},
-	{"PATCH", "/api/v1/app/sellers/me/customers/:buyerId", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/customers/:buyerId/coupons", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/customers/:buyerId/meta", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/customers/:buyerId/orders", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/customers/:buyerId/tags", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/customers/:buyerId/tags", authz.CapMarketing},
-	{"DELETE", "/api/v1/app/sellers/me/customers/:buyerId/tags/:tagId", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/customers/lookup", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/customers/search-by-tags", authz.CapMarketing},
 	{"GET", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
 	{"PUT", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
 	// Hawkr 幫找 — 賣家確認報價單邀請（doc 55 §5/§7）。承接一筆新生意＝擴張型操作，
@@ -85,17 +70,10 @@ var expectedSellerRoutes = []routeCap{
 	{"POST", "/api/v1/app/sellers/me/procurement/publications/:publication_id/seller-responses", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/me/procurement/publications/:publication_id/seller-responses/:seller_response_id/withdraw", authz.CapMarketing},
 	{"POST", "/api/v1/app/sellers/me/procurement/publications/:publication_id/decline", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/reviews", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/reviews/stats", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/tags", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/tags", authz.CapMarketing},
-	{"DELETE", "/api/v1/app/sellers/me/tags/:tagId", authz.CapMarketing},
-	{"PATCH", "/api/v1/app/sellers/me/tags/:tagId", authz.CapMarketing},
 	// 賣家市場行情查詢（P6+P7+#2786 categoryId 解析）：8/2 原裁決是唯讀市場資訊、
 	// 非賣家專屬資料，只掛 JWTAuth 不掛 capability——2026-08-27 推翻，改採「其餘
 	// 全鎖含純唯讀查看」原則（46 §3.4 dashboard/CRM 查詢/報表同款裁決）收斂進
 	// CAP_MARKETING（BLOCK-if-suspended，停權賣家不可見）。
-	{"POST", "/api/v1/app/sellers/reviews/:id/reply", authz.CapMarketing},
 	{"POST", "/api/v1/app/shipments/:order_no/call_tcat", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/shipments/:order_no/confirm", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/shipments/:order_no/generate_home_label", authz.CapOrderFulfill},

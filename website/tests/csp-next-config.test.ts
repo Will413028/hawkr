@@ -37,7 +37,7 @@ test("next.config wires the configured upload, API and media origins into connec
 	assert.ok(connect.includes("https://*.uploads.example.org"));
 	assert.ok(connect.includes("https://media.example.org"));
 	assert.ok(connect.includes("https://api.example.org"));
-	assert.ok(connect.includes("wss://api.example.org"));
+	assert.ok(!connect.some((source) => source.startsWith("wss:")));
 });
 
 test("next.config without MEDIA_UPLOAD_ORIGINS leaves no upload origin and no widening", async () => {

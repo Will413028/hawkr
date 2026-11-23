@@ -1,340 +1,277 @@
 /**
- * Product reviews — buyer write + public list.
- *
- * Endpoints:
- *   POST   /app/reviews                     submit an order-item review (see
- *                                           submitOrderItemReview) — the real
- *                                           backend route; photos ride along as
- *                                           `stagedTokens`.
- *   GET    /public/products/{id}/reviews    ?page&size&rating
- *   POST   /app/sellers/reviews/{id}/reply  (seller reply; body { content })
+ * 評價的資料層：ReviewPublicService（公開列表與統計）與 ReviewAppService（買家寫、讀自己的、店主回覆）。
+ * 列表是 page_token 分頁，評價數與平均分、星等分佈只取自統計 RPC（GetProductReviewStats、
+ * GetStoreReviewStats），不由 client 加總已載入的頁。讀取失敗一律拋出，由呼叫端與「沒有評價」分開呈現。
  */
 
-import { apiClient, authedFetch } from "../api/client";
+import { timestampDate } from "@bufbuild/protobuf/wkt";
+import type { Review as WireReview } from "@hawkr/api/gen/hawkr/review/v1alpha1/review_pb";
+import { reviewAppClient, reviewPublicClient } from "../connect/review";
+import type { PublicTransportOptions } from "../connect/transport";
+import { imageUri } from "../media/image";
 
-/** Seller's official reply to a buyer review. Backend returns it as a `reply`
- *  object on each list item (`{ content, repliedAt }`); absent when unanswered. */
+/** 店家回覆。 */
 export interface ReviewReply {
 	content: string;
-	/** ISO 8601 UTC, e.g. `2026-06-28T15:59:32Z`. */
+	/** ISO 8601 UTC。 */
 	repliedAt: string;
 }
 
-/**
- * 一則公開商品評論 —— `gateway/internal/handler/review.go` 的 `ReviewListItem`。
- * wire 欄名（全 camelCase，backend#2235）：
- * `reviewId / buyerId / productId / username / avatarKey / avatarUrl /
- *  rating / content / createdAt / imageKeys / imageUrls / reply`。
- *
- * 這個端點**不帶** likeCount / replyCount（只有 `/app/reviews/{id}` 的
- * `ReviewDetail` 有），所以這裡不宣告，免得有人照著讀到 undefined。
- */
+/** 一則評價（公開列表、買家自己的列表共用）；圖片是伺服器給的 uri_template 代入 preset 後的網址。 */
 export interface Review {
 	id: string;
 	productId: string;
-	buyerId: string;
-	username: string;
-	/** Buyer avatar objectKey (wire `avatarKey`, 49 §6.1 SSOT). */
-	avatarKey?: string;
+	storeId: string;
+	/** 作者名稱；作者沒有名稱或已刪帳號時是 undefined，由呈現層決定顯示。 */
+	username?: string;
+	avatarUrl?: string;
 	rating: number;
 	content: string;
-	/** 評論附圖 objectKey 陣列（wire `imageKeys`）。 */
-	imageKeys: string[];
-	/** Seller reply; `undefined` = not yet replied (drives the 已回/未回 state). */
+	imageUrls: string[];
+	/** 下單當時的規格名稱。 */
+	skuName: string;
+	productImageUrl?: string;
+	/** 下單當時的單價，新台幣元。 */
+	price: number;
 	reply?: ReviewReply;
+	/** 建立時間（unix 毫秒）。 */
 	createdAt: number;
+	orderNo?: string;
+	orderItemId?: string;
+	/** 這則評價是目前登入者寫的（`Review.is_mine`）。 */
+	isMine: boolean;
 }
 
-/** `data.stats` —— review.go:164-171 `ReviewStatsBlock`。零值不再被 omitempty
- *  吃掉（backend#2235），所以每個欄位都一定在 wire 上，`0` 就是真的 0。 */
+/** 評價統計：數量、平均分與星等分佈（`GetProductReviewStats`、`GetStoreReviewStats`）。 */
 export interface ReviewStats {
 	totalCount: number;
 	averageRating: number;
-	rating5Count: number;
-	rating4Count: number;
-	rating3Count: number;
-	rating2Count: number;
 	rating1Count: number;
-	withImagesCount: number;
+	rating2Count: number;
+	rating3Count: number;
+	rating4Count: number;
+	rating5Count: number;
 }
 
-export interface ReviewListResult {
+export interface ReviewPage {
 	reviews: Review[];
-	stats: ReviewStats;
-	page: number;
-	pageSize: number;
-	total: number;
+	/** 空字串是沒有下一頁。 */
+	nextPageToken: string;
+}
+
+export interface ReadOptions extends PublicTransportOptions {
+	signal?: AbortSignal;
+	timeoutMs?: number;
+}
+
+/** 買家一次最多附的照片張數（review.proto `image_staged_tokens`）。 */
+export const REVIEW_PHOTO_LIMIT = 4;
+
+function secondsOf(ts: Parameters<typeof timestampDate>[0]): number {
+	return timestampDate(ts).getTime();
+}
+
+export function reviewFromWire(wire: WireReview): Review {
+	return {
+		id: wire.id,
+		productId: wire.productId,
+		storeId: wire.storeId,
+		username: wire.author?.name?.trim() || undefined,
+		avatarUrl: imageUri(wire.author?.avatar, "avatar"),
+		rating: wire.rating,
+		content: wire.content,
+		imageUrls: wire.images.flatMap((img) => {
+			const url = imageUri(img, "card");
+			return url ? [url] : [];
+		}),
+		skuName: wire.skuName,
+		productImageUrl: imageUri(wire.itemImage, "thumb"),
+		price: Number(wire.price),
+		reply: wire.reply
+			? {
+					content: wire.reply.content,
+					repliedAt: wire.reply.replyTime
+						? timestampDate(wire.reply.replyTime).toISOString()
+						: "",
+				}
+			: undefined,
+		createdAt: wire.createTime ? secondsOf(wire.createTime) : 0,
+		orderNo: wire.orderNo || undefined,
+		orderItemId: wire.orderItemId || undefined,
+		isMine: wire.isMine,
+	};
+}
+
+interface WireStats {
+	count: number;
+	average: number;
+	distribution: readonly { rating: number; count: number }[];
+}
+
+/** 統計回應整理成固定 1 到 5 星的欄位；分佈缺的星等是 0。 */
+export function statsFromWire(wire: WireStats): ReviewStats {
+	const at = (star: number) =>
+		wire.distribution.find((d) => d.rating === star)?.count ?? 0;
+	return {
+		totalCount: wire.count,
+		averageRating: wire.average,
+		rating1Count: at(1),
+		rating2Count: at(2),
+		rating3Count: at(3),
+		rating4Count: at(4),
+		rating5Count: at(5),
+	};
+}
+
+function splitOptions(opts: ReadOptions) {
+	const { signal, timeoutMs, ...transport } = opts;
+	return { transport, call: { signal, timeoutMs } };
+}
+
+export const PRODUCT_REVIEWS_PAGE_SIZE = 10;
+
+export async function fetchProductReviewsPage(
+	productId: string,
+	{
+		pageToken = "",
+		pageSize = PRODUCT_REVIEWS_PAGE_SIZE,
+		rating,
+		withImages = false,
+		...opts
+	}: {
+		pageToken?: string;
+		pageSize?: number;
+		/** 只列這個星等（1 到 5，等於不是下限）。 */
+		rating?: number;
+		withImages?: boolean;
+	} & ReadOptions = {},
+): Promise<ReviewPage> {
+	const { transport, call } = splitOptions(opts);
+	const res = await reviewPublicClient(transport).listProductReviews(
+		{ productId, pageSize, pageToken, rating, withImages },
+		call,
+	);
+	return {
+		reviews: res.reviews.map(reviewFromWire),
+		nextPageToken: res.nextPageToken,
+	};
+}
+
+export async function fetchProductReviewStats(
+	productId: string,
+	opts: ReadOptions = {},
+): Promise<ReviewStats> {
+	const { transport, call } = splitOptions(opts);
+	return statsFromWire(
+		await reviewPublicClient(transport).getProductReviewStats(
+			{ productId },
+			call,
+		),
+	);
+}
+
+export const STORE_REVIEWS_PAGE_SIZE = 10;
+
+export async function fetchStoreReviewsPage(
+	storeId: string,
+	{
+		pageToken = "",
+		pageSize = STORE_REVIEWS_PAGE_SIZE,
+		...opts
+	}: { pageToken?: string; pageSize?: number } & ReadOptions = {},
+): Promise<ReviewPage> {
+	const { transport, call } = splitOptions(opts);
+	const res = await reviewPublicClient(transport).listStoreReviews(
+		{ storeId, pageSize, pageToken },
+		call,
+	);
+	return {
+		reviews: res.reviews.map(reviewFromWire),
+		nextPageToken: res.nextPageToken,
+	};
+}
+
+export async function fetchStoreReviewStats(
+	storeId: string,
+	opts: ReadOptions = {},
+): Promise<ReviewStats> {
+	const { transport, call } = splitOptions(opts);
+	return statsFromWire(
+		await reviewPublicClient(transport).getStoreReviewStats({ storeId }, call),
+	);
 }
 
 /**
- * Submit-review payload — mirrors the APP's `ReviewRepository.addReview`
- * (`POST /app/reviews`). Photos are uploaded first via `uploadImageFile` and
- * passed here as `stagedTokens` (max 4); the backend finalizes them.
+ * 店家評價的第 [page] 頁（從 1 起）：契約只有 page_token，所以從第一頁沿著 next_page_token 走到目標頁。
+ * 中途沒有下一頁表示那一頁在結尾之後，回空清單（這是真的沒有，不是讀取失敗）；任何一頁讀取失敗照拋。
  */
+export async function fetchStoreReviewsAtPage(
+	storeId: string,
+	page: number,
+	opts: ReadOptions = {},
+): Promise<ReviewPage> {
+	let token = "";
+	for (let current = 1; current < page; current++) {
+		const skipped = await fetchStoreReviewsPage(storeId, {
+			...opts,
+			pageToken: token,
+		});
+		if (skipped.nextPageToken === "") return { reviews: [], nextPageToken: "" };
+		token = skipped.nextPageToken;
+	}
+	return fetchStoreReviewsPage(storeId, { ...opts, pageToken: token });
+}
+
+export const MY_REVIEWS_PAGE_SIZE = 20;
+
+/** 買家自己寫過的評價（`ListMyReviews`），新到舊由伺服器決定。 */
+export async function fetchMyReviewsPage({
+	pageToken = "",
+	pageSize = MY_REVIEWS_PAGE_SIZE,
+	signal,
+}: {
+	pageToken?: string;
+	pageSize?: number;
+	signal?: AbortSignal;
+} = {}): Promise<ReviewPage> {
+	const res = await reviewAppClient().listMyReviews(
+		{ pageSize, pageToken },
+		{ signal },
+	);
+	return {
+		reviews: res.reviews.map(reviewFromWire),
+		nextPageToken: res.nextPageToken,
+	};
+}
+
 export interface SubmitOrderItemReviewBody {
 	orderNo: string;
-	orderItemId: number | string;
-	productId?: number | string;
-	/** Product/order-item snapshot fields accepted by the review backend. */
-	skuName?: string;
-	/** 被評論商品的封面顯示 URL（wire `productImageUrl`）。這裡刻意保留
-	 *  `product` 前綴 —— 同一個物件上的 `imageKeys` 是買家上傳的評論附圖，
-	 *  收斂成 `imageUrl` 會讓單數與複數指涉兩件不同的事。 */
-	productImageUrl?: string;
-	price?: number | string;
+	orderItemId: string;
 	rating: number;
 	content?: string;
-	/** Up to 4 stagedTokens from `uploadImageFile`. */
+	/** 最多 {@link REVIEW_PHOTO_LIMIT} 個 `uploadImageFile` 回的 stagedToken。 */
 	stagedTokens?: string[];
-}
-
-/** Max review photos the backend accepts. */
-export const REVIEW_PHOTO_LIMIT = 4;
-
-function asRecord(value: unknown): Record<string, unknown> {
-	return value && typeof value === "object" && !Array.isArray(value)
-		? (value as Record<string, unknown>)
-		: {};
-}
-
-function pickString(
-	source: Record<string, unknown>,
-	keys: readonly string[],
-): string | undefined {
-	for (const key of keys) {
-		const value = source[key];
-		if (typeof value === "string" && value.trim()) return value;
-		if (typeof value === "number") return String(value);
-	}
-	return undefined;
-}
-
-// pickNestedString 隨欄名收斂一併移除：它存在的理由是「同一個值可能掛在
-// 好幾層不同的父鍵下」，而 backend#2235 之後每個欄位只有一個位置一個名字。
-function normalizeTimestamp(value: unknown): number {
-	if (typeof value === "number") return value;
-	if (typeof value === "string") {
-		const numeric = Number(value);
-		if (Number.isFinite(numeric)) return numeric;
-		const parsed = Date.parse(value);
-		if (Number.isFinite(parsed)) return parsed;
-	}
-	return 0;
-}
-
-function normalizeReply(value: unknown): ReviewReply | undefined {
-	const raw = asRecord(value);
-	const content = pickString(raw, ["content"]);
-	if (!content) return undefined;
-	return { content, repliedAt: pickString(raw, ["repliedAt"]) ?? "" };
-}
-
-function normalizeReview(value: unknown): Review {
-	const raw = asRecord(value);
-	// §231: read the bare objectKey (SSOT) only — the wire's paired `avatarUrl`
-	// is composed FROM it, so falling back to the URL could only ever mask a
-	// contract break. Avatar/buildImageUrl resolve the key.
-	const avatarKey = pickString(raw, ["avatarKey"]);
-	// §231: `imageKeys` (bare keys) is the SSOT and the only photo array on the
-	// wire — `/public/products/{id}/reviews` emits `imageKeys` + the derived
-	// `imageUrls` twin and never an `images` field.
-	const imageSource = Array.isArray(raw.imageKeys) ? raw.imageKeys : [];
-	return {
-		// Public product reviews key it `reviewId` (the seller aggregate at
-		// `/app/sellers/me/reviews` uses `id`); read both so the id is never empty
-		// — an empty id collides React keys and breaks per-review actions.
-		id: pickString(raw, ["id", "reviewId"]) ?? "",
-		productId: pickString(raw, ["productId"]) ?? "",
-		buyerId: pickString(raw, ["buyerId"]) ?? "",
-		username: pickString(raw, ["username"]) ?? "匿名",
-		avatarKey,
-		rating: Number(raw.rating ?? 0),
-		content: String(raw.content ?? ""),
-		imageKeys: imageSource.filter(
-			(img): img is string => typeof img === "string",
-		),
-		reply: normalizeReply(raw.reply),
-		createdAt: normalizeTimestamp(raw.createdAt),
-	};
-}
-
-function normalizeStats(value: unknown): ReviewStats {
-	const raw = asRecord(value);
-	const n = (key: string) => Number(raw[key] ?? 0) || 0;
-	return {
-		totalCount: n("totalCount"),
-		averageRating: n("averageRating"),
-		rating5Count: n("rating5Count"),
-		rating4Count: n("rating4Count"),
-		rating3Count: n("rating3Count"),
-		rating2Count: n("rating2Count"),
-		rating1Count: n("rating1Count"),
-		withImagesCount: n("withImagesCount"),
-	};
-}
-
-export async function fetchProductReviews(
-	productId: number | string,
-	{
-		page = 1,
-		pageSize = 10,
-		rating,
-	}: {
-		page?: number;
-		pageSize?: number;
-		/** Exact star filter (1–5), not a minimum — the gateway matches on equality. */
-		rating?: number;
-	} = {},
-): Promise<ReviewListResult> {
-	// Gateway reads `size` / `rating` (review.go GetProductReviews). A query name
-	// it doesn't recognise is dropped silently — no 400, just the default page
-	// size and an inert star filter — so check the handler before renaming these.
-	const query: Record<string, string> = {
-		page: String(page),
-		size: String(pageSize),
-	};
-	if (rating) query.rating = String(rating);
-	// Public endpoint, anonymous → omit. softFailNotFound: a 404 product yields a
-	// cacheable empty list, but a 5xx / network error / unparseable body THROWS so
-	// the sole caller getCachedProductReviews keeps its prior stale page instead of
-	// caching an outage-time empty list (ReviewsAsync's .catch(prerenderSafe) still
-	// guards the render). throwOnEnvelopeError off preserves the prior "read data
-	// regardless of envelope code" behaviour.
-	//
-	// Envelope（backend#2211 C8）：records / total / page / pageSize / stats 全部
-	// 在 `data` 之下，三個數值欄是 string。
-	const envelope = await apiClient.public.get<unknown>(
-		`/products/${encodeURIComponent(String(productId))}/reviews`,
-		{
-			query,
-			credentials: "omit",
-			throwOnEnvelopeError: false,
-			softFailNotFound: true,
-		},
-	);
-	const nested = asRecord(envelope.data);
-	// Number() 包裝不能拿掉：total / page / pageSize 是 string。
-	const reviewsRaw: unknown[] = Array.isArray(nested.records)
-		? (nested.records as unknown[])
-		: [];
-	return {
-		reviews: reviewsRaw.map(normalizeReview),
-		stats: normalizeStats(nested.stats),
-		page: Number(nested.page ?? page),
-		pageSize: Number(nested.pageSize ?? pageSize),
-		total: Number(nested.total ?? 0),
-	};
-}
-
-/** One review the buyer has written (GET /app/me/reviews — per order item).
- *  Wire shape = `gateway/internal/handler/order_review.go` `OrderReviewRecord`. */
-export interface MyReview {
-	id: string;
-	/** Empty when backend omits it → card renders non-clickable. */
-	orderNo: string;
-	orderItemId: string;
-	productId: string;
-	rating: number;
-	content: string;
-	/** 買家上傳的評論附圖 objectKey 陣列（wire `imageKeys`）。 */
-	imageKeys: string[];
-	skuName: string;
-	/** 被評論商品的封面 objectKey（wire `productImageKey`）。`product` 前綴刻意
-	 *  保留：同物件上的 `imageKeys` 是評論附圖，兩者不是同一件事。 */
-	productImageKey: string;
-	/** Unit price in 元, as a string (matches backend FormatInt). */
-	price: string;
-	createdAt: number;
-}
-
-export interface MyReviewListResult {
-	records: MyReview[];
-	page: number;
-	pageSize: number;
-	total: number;
-}
-
-function normalizeMyReview(value: unknown): MyReview {
-	const raw = asRecord(value);
-	// §231: `imageKeys` is the objectKey SSOT. The paired `imageUrls` is
-	// `mediaurl.BuildURL(base, imageKeys…)` (order_review.go:188-191) — composed
-	// from these very keys, so it can never carry a photo the keys lack.
-	const rawImages = raw.imageKeys;
-	return {
-		id: pickString(raw, ["id"]) ?? "",
-		orderNo: pickString(raw, ["orderNo"]) ?? "",
-		orderItemId: pickString(raw, ["orderItemId"]) ?? "",
-		productId: pickString(raw, ["productId"]) ?? "",
-		rating: Number(raw.rating ?? 0),
-		content: String(raw.content ?? ""),
-		imageKeys: Array.isArray(rawImages)
-			? rawImages.filter((img): img is string => typeof img === "string")
-			: [],
-		skuName: pickString(raw, ["skuName"]) ?? "",
-		// §231: the order-item snapshot is a flat `productImageKey` (objectKey
-		// SSOT) + `productImageUrl` pair (order_review.go:182-183); the caller
-		// feeds the key into buildImageUrl.
-		productImageKey: pickString(raw, ["productImageKey"]) ?? "",
-		price: pickString(raw, ["price"]) ?? "",
-		createdAt: normalizeTimestamp(raw.createdAt),
-	};
-}
-
-/** GET /app/me/reviews — reviews the logged-in buyer has written (paged). */
-export async function fetchMyReviews({
-	page = 1,
-	pageSize = 20,
-}: {
-	page?: number;
-	pageSize?: number;
-} = {}): Promise<MyReviewListResult> {
-	const { data } = await apiClient.authed.get<{
-		records?: unknown[];
-		page?: number | string;
-		pageSize?: number | string;
-		total?: number | string;
-	}>("/me/reviews", {
-		query: { page: String(page), size: String(pageSize) },
-	});
-	const d = data ?? {};
-	return {
-		records: (d.records ?? []).map(normalizeMyReview),
-		page: Number(d.page ?? page),
-		pageSize: Number(d.pageSize ?? pageSize),
-		total: Number(d.total ?? 0),
-	};
 }
 
 export async function submitOrderItemReview(
 	body: SubmitOrderItemReviewBody,
-): Promise<void> {
-	const price =
-		body.price != null && body.price !== "" ? Number(body.price) : undefined;
-	await authedFetch("/app/reviews", {
-		method: "POST",
-		json: {
-			orderNo: body.orderNo,
-			orderItemId: String(body.orderItemId),
-			productId:
-				body.productId != null && body.productId !== ""
-					? String(body.productId)
-					: undefined,
-			skuName: body.skuName?.trim() || undefined,
-			productImageUrl: body.productImageUrl?.trim() || undefined,
-			price: Number.isFinite(price) ? price : undefined,
-			rating: body.rating,
-			content: body.content,
-			stagedTokens: body.stagedTokens?.length ? body.stagedTokens : undefined,
-		},
+): Promise<Review> {
+	const res = await reviewAppClient().createReview({
+		orderNo: body.orderNo,
+		orderItemId: body.orderItemId,
+		rating: body.rating,
+		content: body.content ?? "",
+		imageStagedTokens: body.stagedTokens ?? [],
 	});
+	if (!res.review) throw new Error("CreateReview returned no review");
+	return reviewFromWire(res.review);
 }
 
 export async function replyReview(
-	reviewId: number | string,
+	reviewId: string,
 	content: string,
-): Promise<void> {
-	await authedFetch(
-		`/app/sellers/reviews/${encodeURIComponent(String(reviewId))}/reply`,
-		{ method: "POST", json: { content } },
-	);
+): Promise<Review> {
+	const res = await reviewAppClient().replyReview({ reviewId, content });
+	if (!res.review) throw new Error("ReplyReview returned no review");
+	return reviewFromWire(res.review);
 }

@@ -60,9 +60,11 @@ class _Harness extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: const Size(390, 844),
-      builder: (_, _) => MaterialApp(home: Scaffold(body: child)),
+    return ProviderScope(
+      child: ScreenUtilInit(
+        designSize: const Size(390, 844),
+        builder: (_, _) => MaterialApp(home: Scaffold(body: child)),
+      ),
     );
   }
 }

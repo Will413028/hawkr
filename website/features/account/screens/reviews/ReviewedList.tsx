@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import AppImage from "@/components/shared/AppImage";
 import Link from "@/components/shared/Link";
 import Button from "@/components/ui/Button";
@@ -11,13 +12,14 @@ import { resolveCdnUrl } from "@/lib/media/cdn";
 
 /** "已評價" tab — reviews the buyer has already written (view-only). */
 export default function ReviewedList() {
+	const t = useTranslations("account.reviews");
 	const { reviews, loading, loadingMore, error, hasMore, loadMore } =
 		useMyReviews();
 
 	if (loading && reviews.length === 0) {
 		return <p className="text-foreground-soft text-sm">載入中…</p>;
 	}
-	if (error && reviews.length === 0) {
+	if (error != null && reviews.length === 0) {
 		return <p className="text-danger text-sm">載入評價失敗，請稍後再試。</p>;
 	}
 	if (reviews.length === 0) {
@@ -42,7 +44,7 @@ export default function ReviewedList() {
 						<div className="flex flex-col gap-3 p-4">
 							<div className="grid grid-cols-[64px_1fr_auto] gap-3 items-start">
 								<AppImage
-									src={resolveCdnUrl(r.productImageKey)}
+									src={resolveCdnUrl(r.productImageUrl ?? "")}
 									width={64}
 									height={64}
 									sizes="64px"
@@ -67,9 +69,9 @@ export default function ReviewedList() {
 									{formatDate(r.createdAt)}
 								</small>
 							</div>
-							{r.imageKeys.length > 0 ? (
+							{r.imageUrls.length > 0 ? (
 								<div className="flex gap-2 flex-wrap">
-									{r.imageKeys.map((img) => (
+									{r.imageUrls.map((img) => (
 										<AppImage
 											key={img}
 											src={resolveCdnUrl(img)}
@@ -104,6 +106,11 @@ export default function ReviewedList() {
 					);
 				})}
 			</ul>
+			{error != null ? (
+				<p className="text-danger text-sm text-center m-0" role="alert">
+					{t("loadMoreFailed")}
+				</p>
+			) : null}
 			{hasMore ? (
 				<div className="flex justify-center">
 					<Button
@@ -114,7 +121,7 @@ export default function ReviewedList() {
 						isLoading={loadingMore}
 						loadingLabel="載入評論中…"
 					>
-						載更多
+						{error != null ? t("retry") : "載更多"}
 					</Button>
 				</div>
 			) : null}
