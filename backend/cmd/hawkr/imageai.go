@@ -1,16 +1,18 @@
 package main
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
 // newImageAI 在 composition root 建唯一的 imageai 實例；serve 與 worker 各建一個（程序各自一個 pod 內的同時修圖上限）。
-func newImageAI(d *db.DB, cfg imageai.Config) *imageai.Module {
-	return imageai.New(imageai.Deps{DB: d, Now: time.Now, MaxConcurrent: cfg.MaxConcurrent})
+func newImageAI(d *db.DB, cfg imageai.Config, sellers imageai.StoreGuard, images llm.ImageGenerator, log *slog.Logger) *imageai.Module {
+	return imageai.New(imageai.Deps{DB: d, Now: time.Now, Seller: sellers, Images: images, Log: log, MaxConcurrent: cfg.MaxConcurrent})
 }
 
 // subscribeImageAI 讓店家退場在同一個 transaction 刪該店的修圖額度與用量（單體規則 4 的原子狀態變更）。

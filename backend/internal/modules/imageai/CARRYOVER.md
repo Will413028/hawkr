@@ -26,10 +26,10 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
-| 請求大小：body_guard 10 MiB、gRPC 20 MB | 舊入口收原圖 | 否：單體 Connect 全域 2 MiB（`internal/httpapi/server.go`），規範 §十、§十一 | 檔案走 presigned 上傳；或暫態運算 inline 加上限 | A9-D37：inline `bytes`、上限 2 MiB，client 先縮圖，超過回 invalid_argument 帶 field；規範 §十一 區分暫態運算與要保存的檔案 |
-| 身分：gateway header 判斷 admin（AD8）、metadata 注入 store | 兩進程信任邊界 | 否：session 與 Cloudflare Access 在入口層 | 入口層宣告權限 | `adminauth` 宣告讀 2、寫 5 `audited`，同 tx `adminaudit.Record`（A9-4c） |
-| 錯誤：bizcode 4291、9250–9253 | 舊 REST 契約 | 否 | `ErrorReason` 加 Connect code | 照 `error_reason.proto` 的四個 `IMAGE_*` |
-| 限流：byte 預算 semaphore（256 MiB、×6） | 防大圖同時解碼吃光記憶體 | 部分：入口固定上限後等於「同時 N 張」 | 併發數 semaphore；外部 provider 的專案層級速率限制另由 provider 回 429 處理 | 改併發數 semaphore，N 由 `platform/config` 讀；預設值依舊公式推得 21，未量測（`IMAGEAI_MAX_CONCURRENT`，4a 已落地，以記憶體量測校正前不當成容量保證）；跨 pod 不協調，Gemini 429 轉 `RESOURCE_EXHAUSTED`。先佔名額再扣額度（A9-4b） |
+| 請求大小：body_guard 10 MiB、gRPC 20 MB | 舊入口收原圖 | 否：單體 Connect 全域 2 MiB（`internal/httpapi/server.go`），規範 §十、§十一 | 檔案走 presigned 上傳；或暫態運算 inline 加上限 | A9-D37、A9-D42（A9-4b 落地）：inline `bytes`，原圖上限 2 MiB 由模組檢查、回 invalid_argument 帶 `image_data`；`ImageAiAppService` 單獨把讀取上限設 3 MiB 容納 base64；client 先縮圖；規範 §十、§十一 區分暫態運算與要保存的檔案 |
+| 身分：gateway header 判斷 admin（AD8）、metadata 注入 store | 兩進程信任邊界 | 否：session 與 Cloudflare Access 在入口層 | 入口層宣告權限 | app 兩支（A9-4b）：handler 由 session 經 `seller.CurrentStore` 推導店家，沒有店家回 permission_denied，請求不帶店家 ID；後台：`adminauth` 宣告讀 2、寫 5 `audited`，同 tx `adminaudit.Record`（A9-4c） |
+| 錯誤：bizcode 4291、9250–9253 | 舊 REST 契約 | 否 | `ErrorReason` 加 Connect code | 照 `error_reason.proto` 的四個 `IMAGE_*`（A9-4b 落地；文案進模組 `internal/text`，不再寫死在 handler） |
+| 限流：byte 預算 semaphore（256 MiB、×6） | 防大圖同時解碼吃光記憶體 | 部分：入口固定上限後等於「同時 N 張」 | 併發數 semaphore；外部 provider 的專案層級速率限制另由 provider 回 429 處理 | 改併發數 semaphore，N 由 `platform/config` 讀；預設值依舊公式推得 21，未量測（`IMAGEAI_MAX_CONCURRENT`，4a 已落地，以記憶體量測校正前不當成容量保證）；跨 pod 不協調，Gemini 429 轉 `RESOURCE_EXHAUSTED`。先佔名額再扣額度（A9-4b 落地：`internal/transform`，滿了回 resource_exhausted 帶 RetryInfo、不扣額度；Gemini 429 同樣轉 resource_exhausted） |
 | 下游逾時：修圖 60s | 外部 provider 要有 deadline | 成立 | 同 | 保留，集中到 `platform/llm`（見 M6） |
 
 ## 與 ai-service 的差異

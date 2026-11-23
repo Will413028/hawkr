@@ -251,7 +251,7 @@ func runServe(ctx context.Context) error {
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
 	subscribeProcurement(bus, d, log)
-	imageAIModule := newImageAI(d, imageAIConfig)
+	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), log)
 	subscribeImageAI(bus, imageAIModule)
 	procurementModule := newProcurement(d, jc, buyerModule, bus, log)
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
@@ -286,6 +286,7 @@ func runServe(ctx context.Context) error {
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Assistant:   assistantModule,
 		Procurement: procurementModule,
+		ImageAI:     imageAIModule,
 		Ready:       d.Ping,
 		Social:      socialModule,
 		Review:      reviewModule,
@@ -472,7 +473,7 @@ func runWorker(ctx context.Context) error {
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
 	subscribeProcurement(bus, d, log)
-	imageAIModule := newImageAI(d, imageAIConfig)
+	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), log)
 	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
 	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, log)

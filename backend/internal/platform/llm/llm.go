@@ -65,6 +65,8 @@ const (
 	StatusEnabled Status = "enabled"
 	// StatusNotConfigured 是預設模型沒有金鑰：沒有人選過它，不算設定錯誤。
 	StatusNotConfigured Status = "not_configured"
+	// StatusDisabled 是呼叫端刻意不開通（DisabledImage）：不讀金鑰、不建 client，不是缺設定也不是設定錯誤。
+	StatusDisabled Status = "disabled"
 	// StatusMisconfigured 是模型名不在登記表、角色不允許該模型、明確選了的 provider 缺金鑰，或 client 建構失敗。
 	StatusMisconfigured Status = "misconfigured"
 )

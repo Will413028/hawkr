@@ -65,6 +65,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.assistant.v1alpha1.AssistantAppService/SendAssistantMessage":      EffectWrite,
 	"/hawkr.assistant.v1alpha1.AssistantAppService/WatchAssistantTurn":        EffectRead,
 	"/hawkr.assistant.v1alpha1.AssistantAppService/GetLatestAssistantSession": EffectRead,
+	// ImageAiAppService：修圖會扣額度並花模型成本，停權的帳號不能；讀風格與用量可以。
+	"/hawkr.imageai.v1alpha1.ImageAiAppService/TransformImage": EffectWrite,
+	"/hawkr.imageai.v1alpha1.ImageAiAppService/ListAiStyles":   EffectRead,
 	// BuyerProcurementAppService：送出、搜尋、編修需求、發布詢價、入圍與接受報價都改變狀態（有些會花 LLM 成本），停權的帳號不能；讀取、串流與純計算的價格試算可以。
 	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/SubmitTurn":              EffectWrite,
 	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/WatchRun":                EffectRead,

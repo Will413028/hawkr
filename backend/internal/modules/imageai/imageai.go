@@ -7,14 +7,18 @@ import (
 	"context"
 	"embed"
 	"io/fs"
+	"log/slog"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/limit"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/quota"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/style"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/transform"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -48,6 +52,26 @@ var ErrNothingToRefund = model.ErrNothingToRefund
 // Usage 是一次扣額度之後的本週狀態。
 type Usage = model.Usage
 
+// 一次修圖的輸入、輸出與風格；StoreID 是呼叫者的店家，由入口層從 session 推導。
+type (
+	TransformInput  = model.TransformInput
+	TransformOutput = model.TransformOutput
+	Style           = model.Style
+	StyleList       = model.StyleList
+	StyleCategory   = model.StyleCategory
+)
+
+const (
+	// CategoryProduct 是商品圖用途。
+	CategoryProduct = model.CategoryProduct
+	// CategoryPost 是貼文圖用途。
+	CategoryPost = model.CategoryPost
+	// MaxImageBytes 是修圖原圖的大小上限。
+	MaxImageBytes = model.MaxImageBytes
+	// MaxPromptRunes 是修圖提示詞的字元數上限。
+	MaxPromptRunes = model.MaxPromptRunes
+)
+
 // StoreRetired 是 seller 在店家退場時同 transaction 發布的事件（本模組的訂閱者見 Module.OnStoreRetired）。
 type StoreRetired = seller.StoreRetired
 
@@ -70,14 +94,26 @@ func ReadConfig(e *config.Env) Config {
 type Deps struct {
 	DB  *db.DB
 	Now func() time.Time
+	// Seller 在扣額度前確認店家未退場（*seller.Module）。
+	Seller StoreGuard
+	// Images 是圖片模型（llm.NewImage(...).Generator()）；停用時回 llm.ErrImageDisabled 的實作。
+	Images llm.ImageGenerator
+	Log    *slog.Logger
 	// MaxConcurrent 是每個 pod 同時進行的修圖數上限；0 取預設。
 	MaxConcurrent int
 }
 
+// StoreGuard 在呼叫方的 transaction 內鎖住店家列、確認尚未退場；已退場與不存在回 NotFound（*seller.Module 滿足它）。
+type StoreGuard interface {
+	LockNotRetired(ctx context.Context, storeID int64) error
+}
+
 // Module 是 imageai 模組。
 type Module struct {
-	quota   *quota.Service
-	limiter *limit.Limiter
+	quota     *quota.Service
+	limiter   *limit.Limiter
+	styles    *style.Service
+	transform *transform.Service
 }
 
 // New 建立模組。
@@ -86,7 +122,30 @@ func New(d Deps) *Module {
 	if n == 0 {
 		n = model.DefaultMaxConcurrent
 	}
-	return &Module{quota: quota.New(d.DB, d.Now), limiter: limit.New(n)}
+	q := quota.New(d.DB, d.Now)
+	l := limit.New(n)
+	return &Module{
+		quota: q, limiter: l, styles: style.New(d.DB),
+		transform: transform.New(transform.Deps{Slots: l, Quota: q, Guard: d.Seller, Tx: d.DB.InTx, Generator: d.Images, Log: d.Log}),
+	}
+}
+
+// Transform 以提示詞修一張圖並回傳這次之後的本週用量。輸入不合（Image、MimeType、Prompt 欄位）回 InvalidInput；同時修圖滿了回 ResourceExhausted
+// （帶 RetryAfter，不扣額度）；本週額度用完回 ResourceExhausted 與 ReasonImageQuotaExceeded；店家已退場回 PermissionDenied；模型擋下回 InvalidInput 與
+// ReasonImageSafetyBlocked 或 ReasonImageRecitationBlocked，沒有產出圖片回 Unavailable 與 ReasonImageNotProduced，供應商無法呼叫回 Unavailable。
+// 扣了額度之後的任何失敗都退回額度。
+func (m *Module) Transform(ctx context.Context, in TransformInput) (TransformOutput, error) {
+	return m.transform.Transform(ctx, in)
+}
+
+// ListStyles 列出 category 用途的啟用中風格（不含預設風格）與預設提示詞；category 不合法回 InvalidInput（欄位 Category）。
+func (m *Module) ListStyles(ctx context.Context, category StyleCategory) (StyleList, error) {
+	return m.styles.List(ctx, category)
+}
+
+// CurrentUsage 是店家此刻的本週用量，唯讀、不扣額度；讀取失敗回錯誤。
+func (m *Module) CurrentUsage(ctx context.Context, storeID int64) (Usage, error) {
+	return m.quota.Current(ctx, storeID)
 }
 
 // AcquireTransformSlot 不等待地佔一個同時修圖的名額；滿了回 ok=false。release 可重複呼叫，只釋放一次。

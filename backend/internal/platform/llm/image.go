@@ -41,13 +41,38 @@ type ImageGenerator interface {
 
 // ImageModel 是一個已決定開通與否的圖片模型。零值不可用，由 NewImage 建構。
 type ImageModel struct {
-	gen    ImageGenerator
-	name   string
-	status Status
+	gen     ImageGenerator
+	name    string
+	status  Status
+	timeout time.Duration
 }
 
-// Generator 永遠非 nil：停用時是回 ErrImageDisabled 的實作。
-func (m ImageModel) Generator() ImageGenerator { return m.gen }
+// Generator 永遠非 nil：停用時是回 ErrImageDisabled 的實作。回傳的 generator 一律帶 deadline（imageCallTimeout），
+// 包含 NewImageModel 的替身：deadline 在這裡施加，不依賴各實作自己設。
+func (m ImageModel) Generator() ImageGenerator {
+	t := m.timeout
+	if t <= 0 {
+		t = imageCallTimeout
+	}
+	return boundedImage{inner: m.gen, timeout: t}
+}
+
+// withTimeout 換掉 deadline，只給測試縮短等待。
+func (m ImageModel) withTimeout(d time.Duration) ImageModel {
+	m.timeout = d
+	return m
+}
+
+type boundedImage struct {
+	inner   ImageGenerator
+	timeout time.Duration
+}
+
+func (b boundedImage) GenerateImage(ctx context.Context, req ImageRequest) (ImageResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, b.timeout)
+	defer cancel()
+	return b.inner.GenerateImage(ctx, req)
+}
 
 // Name 是開通的模型名，停用時為空字串。
 func (m ImageModel) Name() string { return m.name }
@@ -64,6 +89,9 @@ func NewImage(cfg Config, log *slog.Logger) ImageModel {
 func NewImageModel(g ImageGenerator, name string) ImageModel {
 	return ImageModel{gen: g, name: name, status: StatusEnabled}
 }
+
+// DisabledImage 是刻意不開通的圖片模型（不讀金鑰、不建 client），給不需要呼叫模型的程序。
+func DisabledImage() ImageModel { return disabledImage(StatusDisabled) }
 
 func disabledImage(status Status) ImageModel {
 	return ImageModel{gen: disabledImageGenerator{}, status: status}
@@ -94,8 +122,6 @@ type genaiImage struct {
 }
 
 func (g genaiImage) GenerateImage(ctx context.Context, req ImageRequest) (ImageResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, imageCallTimeout)
-	defer cancel()
 	contents := []*genai.Content{genai.NewContentFromParts([]*genai.Part{
 		genai.NewPartFromBytes(req.Image, req.MimeType),
 		genai.NewPartFromText(req.Prompt),
