@@ -4,7 +4,10 @@ import 'package:hawkr_api/transport.dart' show ConnectException;
 
 import '../../../core/exceptions/app_exception.dart';
 
-/// 送出訊息失敗的呈現決定：顯示的文字永遠是伺服器的 LocalizedMessage（沒有時是 code 的預設文字，取自共用文案目錄）。
+/// 送出訊息失敗的呈現決定。
+///
+/// 文字來源：[AppException]（例如圖片上傳失敗）用產生它的 repository 已決定的文字；其餘錯誤是伺服器的
+/// LocalizedMessage，沒有時是 code 的預設文字（取自共用文案目錄）。
 class ChatSendFailure {
   const ChatSendFailure({required this.message, required this.readOnly});
 
