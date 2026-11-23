@@ -193,6 +193,7 @@
 ## 十、大小與逾時
 
 - 請求大小上限由單體的 `connect.WithReadMaxBytes` 決定，2 MiB，與 gateway 的 `BodyGuard` 一般路由相同；模組的文字欄位不設長度上限，只檢查產品規格訂的上限。
+- 例外：`ImageAiAppService` 的 `TransformImage` 單一請求上限 3 MiB，因為它 inline 帶最大 2 MiB 的暫態圖片（§十一的暫態圖片條款），JSON／base64 編碼後才放得下；其他服務要調高上限，必須先修訂本節。
 - 逾時：client 以 `Connect-Timeout-Ms` 帶；沒帶時單體套用預設的上限（interceptor）。
 
 ## 十一、wire 格式與串流

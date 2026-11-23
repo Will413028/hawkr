@@ -170,7 +170,8 @@ func (x *AiStyle) GetDisplayOrder() int32 {
 
 type TransformImageRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 原圖的內容，上限 2 MiB（與單體的請求大小上限相同），client 先縮圖；超過回 invalid_argument。
+	// 原圖的內容，bytes 上限 2 MiB，client 先縮圖；超過回 invalid_argument，BadRequest 帶出這個欄位的 field violation。
+	// 服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
 	// 這是只做運算、不保存的暫態圖片，所以 inline；要保存的檔案走 media 的 presigned 上傳。
 	ImageData []byte `protobuf:"bytes,1,opt,name=image_data,json=imageData,proto3" json:"image_data,omitempty"`
 	// 原圖的格式，例如 image/jpeg、image/png。

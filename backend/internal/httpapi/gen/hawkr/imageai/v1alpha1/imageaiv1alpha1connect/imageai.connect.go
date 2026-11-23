@@ -53,6 +53,7 @@ type ImageAiAppServiceClient interface {
 	// IMAGE_NOT_PRODUCED（模型沒有產出圖片，重試可能成功），模型供應商無法呼叫也回 unavailable。
 	// 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo，不扣額度。
 	// 原圖超過 2 MiB 或提示詞超過 500 字回 invalid_argument，BadRequest 帶出 field。
+	// 這個服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
 	// 呼叫失敗時額度退回；扣了額度之後伺服器程序中途終止的那一次不退回，是已知限制。
 	TransformImage(context.Context, *connect.Request[v1alpha1.TransformImageRequest]) (*connect.Response[v1alpha1.TransformImageResponse], error)
 	// ListAiStyles 列出某個用途的啟用中風格，連同本週的額度使用量。
@@ -112,6 +113,7 @@ type ImageAiAppServiceHandler interface {
 	// IMAGE_NOT_PRODUCED（模型沒有產出圖片，重試可能成功），模型供應商無法呼叫也回 unavailable。
 	// 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo，不扣額度。
 	// 原圖超過 2 MiB 或提示詞超過 500 字回 invalid_argument，BadRequest 帶出 field。
+	// 這個服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
 	// 呼叫失敗時額度退回；扣了額度之後伺服器程序中途終止的那一次不退回，是已知限制。
 	TransformImage(context.Context, *connect.Request[v1alpha1.TransformImageRequest]) (*connect.Response[v1alpha1.TransformImageResponse], error)
 	// ListAiStyles 列出某個用途的啟用中風格，連同本週的額度使用量。

@@ -203,7 +203,8 @@ class TransformImageRequest extends $pb.GeneratedMessage {
           TransformImageRequest.$_createMessage);
   static TransformImageRequest? _defaultInstance;
 
-  /// 原圖的內容，上限 2 MiB（與單體的請求大小上限相同），client 先縮圖；超過回 invalid_argument。
+  /// 原圖的內容，bytes 上限 2 MiB，client 先縮圖；超過回 invalid_argument，BadRequest 帶出這個欄位的 field violation。
+  /// 服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
   /// 這是只做運算、不保存的暫態圖片，所以 inline；要保存的檔案走 media 的 presigned 上傳。
   @$pb.TagNumber(1)
   $core.List<$core.int> get imageData => $_getN(0);
@@ -502,6 +503,7 @@ class ImageAiAppServiceApi {
   /// IMAGE_NOT_PRODUCED（模型沒有產出圖片，重試可能成功），模型供應商無法呼叫也回 unavailable。
   /// 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo，不扣額度。
   /// 原圖超過 2 MiB 或提示詞超過 500 字回 invalid_argument，BadRequest 帶出 field。
+  /// 這個服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
   /// 呼叫失敗時額度退回；扣了額度之後伺服器程序中途終止的那一次不退回，是已知限制。
   $async.Future<TransformImageResponse> transformImage(
           $pb.ClientContext? ctx, TransformImageRequest request) =>
