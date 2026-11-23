@@ -114,34 +114,37 @@ type wireTemplate struct {
 	} `json:"targetAccounts"`
 }
 
-// wireInt 讀 proto JSON 的 int64 字串；空字串是未設定的 0，其餘解析失敗代表 wire 格式不對，直接 panic 讓測試失敗。
-func wireInt(s string) int64 {
-	if s == "" {
+// numReader 讀 proto JSON 的 int64 字串；空字串與 "null"（舊 gateway 對未設定數字的編碼）是 0，其餘解析失敗記下第一個錯誤。
+type numReader struct{ err error }
+
+func (r *numReader) int(s string) int64 {
+	if s == "" || s == "null" {
 		return 0
 	}
 	n, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		panic(fmt.Sprintf("wire 的數字欄位不是整數：%q：%v", s, err))
+	if err != nil && r.err == nil {
+		r.err = fmt.Errorf("wire 的數字欄位不是整數：%q：%w", s, err)
 	}
 	return n
 }
 
-func (w wireTemplate) template() Template {
+func (w wireTemplate) template() (Template, error) {
+	var r numReader
 	t := Template{
 		ID: w.TemplateID, Title: w.Title,
 		Type:   enumFromWire(typeWire, w.Type),
 		Target: enumFromWire(targetWire, w.TargetType),
 		Status: enumFromWire(statusWire, w.Status),
 		Issuer: issuerFromWire(w.IssuerType), StoreID: w.ApplicableStoreID, IssuerStoreID: w.IssuerStoreID,
-		Threshold: wireInt(w.ThresholdAmount), DiscountAmount: wireInt(w.DiscountAmount),
-		DiscountPercent: int(wireInt(w.DiscountPercent)), MaxDiscount: wireInt(w.MaxDiscountAmount),
-		TotalIssueLimit: int(wireInt(w.TotalIssueLimit)), IssuedCount: int(wireInt(w.IssuedCount)),
+		Threshold: r.int(w.ThresholdAmount), DiscountAmount: r.int(w.DiscountAmount),
+		DiscountPercent: int(r.int(w.DiscountPercent)), MaxDiscount: r.int(w.MaxDiscountAmount),
+		TotalIssueLimit: int(r.int(w.TotalIssueLimit)), IssuedCount: int(r.int(w.IssuedCount)),
 		ClaimRequired: w.ClaimRequired, Claimed: w.Claimed,
 	}
 	for _, a := range w.TargetAccounts {
 		t.TargetBuyers = append(t.TargetBuyers, a.BuyerID)
 	}
-	return t
+	return t, r.err
 }
 
 type wirePage[T any] struct {
@@ -149,12 +152,16 @@ type wirePage[T any] struct {
 	Total   string `json:"total"`
 }
 
-func templates(ws []wireTemplate) []Template {
+func templates(ws []wireTemplate) ([]Template, error) {
 	out := make([]Template, 0, len(ws))
 	for _, w := range ws {
-		out = append(out, w.template())
+		t, err := w.template()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
 	}
-	return out
+	return out, nil
 }
 
 func decimal(n int64) string {
@@ -211,7 +218,13 @@ func (d *restDriver) ListMyCoupons(ctx context.Context, c ch.Caller, in ListQuer
 	for _, u := range out.UsedRecords {
 		used = append(used, Instance{ID: u.InstanceID, TemplateID: u.TemplateID, Status: u.Status})
 	}
-	return MyCoupons{Available: templates(out.Records), Used: used, Total: int(wireInt(out.Total))}, nil
+	avail, err := templates(out.Records)
+	if err != nil {
+		return MyCoupons{}, err
+	}
+	var r numReader
+	res := MyCoupons{Available: avail, Used: used, Total: int(r.int(out.Total))}
+	return res, r.err
 }
 
 func (d *restDriver) ListAvailable(ctx context.Context, c ch.Caller, in AvailableQuery) (AvailableList, error) {
@@ -230,11 +243,16 @@ func (d *restDriver) ListAvailable(ctx context.Context, c ch.Caller, in Availabl
 	if err := d.rest.Do(ctx, c, http.MethodGet, withQuery(appCoupons+"/available", q), nil, &out); err != nil {
 		return AvailableList{}, err
 	}
-	list := AvailableList{Total: int(wireInt(out.Total))}
-	for _, r := range out.Records {
-		list.Records = append(list.Records, AvailableCoupon{Template: r.Template.template(), EstimatedDiscount: wireInt(r.EstimatedDiscount)})
+	var nr numReader
+	list := AvailableList{Total: int(nr.int(out.Total))}
+	for _, rec := range out.Records {
+		t, err := rec.Template.template()
+		if err != nil {
+			return AvailableList{}, err
+		}
+		list.Records = append(list.Records, AvailableCoupon{Template: t, EstimatedDiscount: nr.int(rec.EstimatedDiscount)})
 	}
-	return list, nil
+	return list, nr.err
 }
 
 func (d *restDriver) Claim(ctx context.Context, c ch.Caller, templateID string) (ClaimResult, error) {
@@ -271,7 +289,7 @@ func (d *restDriver) SellerCreate(ctx context.Context, c ch.Caller, in TemplateI
 	if err := d.rest.Do(ctx, c, http.MethodPost, appTemplates, templateBody(in), &out); err != nil {
 		return Template{}, err
 	}
-	return out.template(), nil
+	return out.template()
 }
 
 func (d *restDriver) SellerList(ctx context.Context, c ch.Caller, status Status, p Page) (TemplateList, error) {
@@ -284,7 +302,13 @@ func (d *restDriver) SellerList(ctx context.Context, c ch.Caller, status Status,
 	if err := d.rest.Do(ctx, c, http.MethodGet, withQuery(appTemplates, q), nil, &out); err != nil {
 		return TemplateList{}, err
 	}
-	return TemplateList{Records: templates(out.Records), Total: int(wireInt(out.Total))}, nil
+	recs, err := templates(out.Records)
+	if err != nil {
+		return TemplateList{}, err
+	}
+	var r numReader
+	res := TemplateList{Records: recs, Total: int(r.int(out.Total))}
+	return res, r.err
 }
 
 func (d *restDriver) SellerDetail(ctx context.Context, c ch.Caller, templateID string) (SellerDetail, error) {
@@ -296,7 +320,13 @@ func (d *restDriver) SellerDetail(ctx context.Context, c ch.Caller, templateID s
 	if err := d.rest.Do(ctx, c, http.MethodGet, appTemplates+"/"+url.PathEscape(templateID), nil, &out); err != nil {
 		return SellerDetail{}, err
 	}
-	return SellerDetail{Template: out.Template.template(), Used: int(wireInt(out.UsedCount)), Reserved: int(wireInt(out.ReservedCount))}, nil
+	t, err := out.Template.template()
+	if err != nil {
+		return SellerDetail{}, err
+	}
+	var r numReader
+	res := SellerDetail{Template: t, Used: int(r.int(out.UsedCount)), Reserved: int(r.int(out.ReservedCount))}
+	return res, r.err
 }
 
 func (d *restDriver) SellerRevoke(ctx context.Context, c ch.Caller, templateID, reason string) error {
@@ -318,7 +348,7 @@ func (d *restDriver) AdminCreate(ctx context.Context, c ch.Caller, in TemplateIn
 	if err := d.rest.Do(ctx, c, http.MethodPost, adminTemplate, body, &out); err != nil {
 		return Template{}, err
 	}
-	return out.template(), nil
+	return out.template()
 }
 
 func (d *restDriver) AdminPublish(ctx context.Context, c ch.Caller, templateID string) error {
@@ -338,7 +368,9 @@ func (d *restDriver) AdminIssue(ctx context.Context, c ch.Caller, templateID str
 	if err := d.rest.Do(ctx, c, http.MethodPost, adminTemplate+"/"+url.PathEscape(templateID)+"/issue", body, &out); err != nil {
 		return IssueResult{}, err
 	}
-	return IssueResult{Issued: int(wireInt(out.IssuedCount)), Distributed: int(wireInt(out.DistributedCount))}, nil
+	var r numReader
+	res := IssueResult{Issued: int(r.int(out.IssuedCount)), Distributed: int(r.int(out.DistributedCount))}
+	return res, r.err
 }
 
 func (d *restDriver) AdminVoid(ctx context.Context, c ch.Caller, voucherID, reason string) error {
