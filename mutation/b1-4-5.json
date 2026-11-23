@@ -580,7 +580,7 @@
    "id": "social-update-no-markdeleted",
    "stack": "go-integration",
    "file": "backend/internal/modules/social/internal/post/post.go",
-   "old": "s.d.Media.MarkDeleted(ctx, []uuid.UUID{*row.ImageAssetID})",
+   "old": "s.d.Media.MarkDeleted(ctx, retired)",
    "new": "error(nil)",
    "test": "internal/modules/social ^TestPostImageReplacementConfirmsTheNewAssetAndMarksTheOldDeleted$",
    "why": "換圖或清掉圖不再標記舊資產刪除"
