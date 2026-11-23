@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfqhash"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
-	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -81,9 +80,7 @@ type progress struct {
 	runs         []model.RunSummary
 	active       *uuid.UUID
 	confirmation *model.OpenConfirmation
-	// disambiguation 是待回答的中斷卡上的分類名稱。
-	disambiguation []string
-	published      *model.PublishedRfq
+	published    *model.PublishedRfq
 }
 
 func (r Reader) progress(ctx context.Context, q *store.Queries, buyerID int64, requestID uuid.UUID) (progress, error) {
@@ -111,7 +108,7 @@ func (r Reader) progress(ctx context.Context, q *store.Queries, buyerID int64, r
 		return progress{}, err
 	}
 	if found {
-		if out.confirmation, out.disambiguation, err = confirmationOf(irq); err != nil {
+		if out.confirmation, err = confirmationOf(irq); err != nil {
 			return progress{}, err
 		}
 	}
@@ -191,16 +188,10 @@ func messagesOf(turns []store.ProcurementTurn) ([]model.ConversationMessage, err
 	return out, nil
 }
 
-func confirmationOf(i run.OpenInterrupt) (*model.OpenConfirmation, []string, error) {
+func confirmationOf(i run.OpenInterrupt) (*model.OpenConfirmation, error) {
 	var p turn.InterruptPayload
 	if err := json.Unmarshal(i.Payload, &p); err != nil {
-		return nil, nil, fmt.Errorf("snapshot：解析中斷 %s 的 payload：%w", i.ID, err)
-	}
-	var labels []string
-	if slotKeyOf(p.Question.SlotKey) == slots.ItemDisambiguation {
-		for _, c := range p.Candidates {
-			labels = append(labels, c.Label)
-		}
+		return nil, fmt.Errorf("snapshot：解析中斷 %s 的 payload：%w", i.ID, err)
 	}
 	return &model.OpenConfirmation{
 		InterruptID: i.ID, Kind: i.InterruptKind, Processing: i.Processing,
@@ -209,7 +200,7 @@ func confirmationOf(i run.OpenInterrupt) (*model.OpenConfirmation, []string, err
 			Options: optionsOf(p.Question.Options), UnitOptions: optionsOf(p.Question.UnitOptions),
 			AllowFreeText: p.Question.AllowFreeText, CanSkip: p.Question.CanSkip,
 		},
-	}, labels, nil
+	}, nil
 }
 
 func optionsOf(in []turn.OptionJSON) []model.QuestionOption {

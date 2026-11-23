@@ -244,13 +244,13 @@
    "why": "缺店家卡片的候選被靜默回 store 為空"
   },
   {
-   "id": "disambiguation-from-any-interrupt",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
-   "old": "if slotKeyOf(p.Question.SlotKey) == slots.ItemDisambiguation {",
-   "new": "if slots.ItemDisambiguation != \"\" {",
-   "test": "internal/modules/procurement ^TestGetSnapshotOpenInterruptOutsideTheItemCardHasNoDisambiguation$",
-   "why": "任何中斷的候選都被當成品項消歧卡"
+   "id": "token-lower-bound-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "if t.UpdatedAt < minTokenMicro {",
+   "new": "if t.UpdatedAt < -1<<63 {",
+   "test": "internal/modules/procurement/internal/conversation ^TestDecodeTokenRoundTripsAndRejectsTimestampsOutsideTimestamptzRange$",
+   "why": "低於 timestamptz 下界的 token 被接受，送進查詢變成 INTERNAL"
   }
  ]
 }

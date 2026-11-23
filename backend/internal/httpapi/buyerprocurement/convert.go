@@ -228,12 +228,6 @@ func requestSnapshotToProto(s procurement.RequestSnapshot) (*pb.GetSnapshotRespo
 		}
 		out.MissingRequired = append(out.MissingRequired, key)
 	}
-	if len(s.ItemDisambiguation) > 0 {
-		out.ItemDisambiguation = &pb.ItemDisambiguation{}
-		for _, label := range s.ItemDisambiguation {
-			out.ItemDisambiguation.Candidates = append(out.ItemDisambiguation.Candidates, &pb.ItemDisambiguationOption{Label: label})
-		}
-	}
 	if out.Runs, err = runsToProto(s.Runs); err != nil {
 		return nil, err
 	}

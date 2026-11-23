@@ -9,17 +9,15 @@ import (
 // RequestSnapshot 是 GetSnapshot 的讀取模型：以需求為鍵，目前版本的欄位加上 run、中斷與發布結果。
 // 狀態、run 類型是 proto enum 值名去掉前綴的代碼。
 type RequestSnapshot struct {
-	RequestID       uuid.UUID
-	RevisionID      uuid.UUID
-	Status          string
-	Slots           RequirementSlots
-	MissingRequired []SlotKey
-	// ItemDisambiguation 是待回答的品項消歧卡上的分類名稱（依卡上順序）；沒有待回答的消歧時為空。
-	ItemDisambiguation []string
-	Runs               []RunSummary
-	ActiveRunID        *uuid.UUID
-	OpenConfirmation   *OpenConfirmation
-	PublishedRfq       *PublishedRfq
+	RequestID        uuid.UUID
+	RevisionID       uuid.UUID
+	Status           string
+	Slots            RequirementSlots
+	MissingRequired  []SlotKey
+	Runs             []RunSummary
+	ActiveRunID      *uuid.UUID
+	OpenConfirmation *OpenConfirmation
+	PublishedRfq     *PublishedRfq
 }
 
 // RequirementSlots 是需求版本的欄位；沒有值的欄位是 nil。

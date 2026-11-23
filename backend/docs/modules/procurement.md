@@ -67,7 +67,7 @@
 
 ## 7. 讀取與對話管理（A9-3b-3a，A9-D31 Q7–Q9）
 
-- `GetSnapshot(buyerID, requestID)`（`snapshot.Reader.GetByRequest`）以需求為鍵：現行版本的欄位（`slots.FromRevision`）、`MissingRequired`、待回答的中斷卡上的分類名稱（`ItemDisambiguation`）、run、進行中的 run、待回答的中斷與最新的發布結果。需求不存在、不屬於買家，或它的對話已被買家刪除回 NOT_FOUND（契約沒寫刪除對話後需求能否由 request_id 讀取，這裡取較保守的 NOT_FOUND）。`PublishedRfq.RfqSnapshotHash` 與 `GetRuntimeSnapshot` 相同，由 `internal/rfqhash` 對確認快照、它確認的需求版本與價格預覽重算（SHA-256 對固定欄位順序的 JSON）；3c 的 `ConfirmRfqSnapshot` 必須以同一個函式算 `payload_hash`。
+- `GetSnapshot(buyerID, requestID)`（`snapshot.Reader.GetByRequest`）以需求為鍵：現行版本的欄位（`slots.FromRevision`）、`MissingRequired`、run、進行中的 run、待回答的中斷與最新的發布結果。需求不存在、不屬於買家，或它的對話已被買家刪除回 NOT_FOUND（契約沒寫刪除對話後需求能否由 request_id 讀取，這裡取較保守的 NOT_FOUND）。`PublishedRfq.RfqSnapshotHash` 與 `GetRuntimeSnapshot` 相同，由 `internal/rfqhash` 對確認快照、它確認的需求版本與價格預覽重算（SHA-256 對固定欄位順序的 JSON）；3c 的 `ConfirmRfqSnapshot` 必須以同一個函式算 `payload_hash`。
 - `GetConversationMessages` 與 `GetRuntimeSnapshot` 的訊息同源（`snapshot.messagesOf`）。
 - `ListConversations`：keyset `(updated_at DESC, id DESC)`，走索引 `conversations_buyer_active`；`page_size` 0 是 20、超過 50 以 50 計、負數與壞 `page_token` 回 INVALID_ARGUMENT（欄位 `page_size`、`page_token`）；token 是 `(updated_at 微秒, id)` 的 base64url JSON，不透明。
 - `RenameConversation`：去頭尾空白後 1 到 40 字元、不含 `\n`、`\r`，否則 INVALID_ARGUMENT（欄位 `title`）；DB 的 `conversations_title_check` 同為 40。目標狀態的方法，不建收據。

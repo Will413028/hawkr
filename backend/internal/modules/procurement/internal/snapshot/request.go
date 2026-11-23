@@ -52,7 +52,7 @@ func (r Reader) readRequest(ctx context.Context, buyerID int64, requestID uuid.U
 	}
 	return model.RequestSnapshot{
 		RequestID: req.ID, RevisionID: rev.ID, Status: req.Status, Slots: slotsOf(set), MissingRequired: set.MissingRequired(),
-		ItemDisambiguation: p.disambiguation, Runs: p.runs, ActiveRunID: p.active, OpenConfirmation: p.confirmation, PublishedRfq: p.published,
+		Runs: p.runs, ActiveRunID: p.active, OpenConfirmation: p.confirmation, PublishedRfq: p.published,
 	}, nil
 }
 

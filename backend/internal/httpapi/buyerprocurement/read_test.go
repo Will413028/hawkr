@@ -108,11 +108,10 @@ func TestGetSnapshotMapsEveryFieldAndRejectsUnspecified(t *testing.T) {
 		RequestID: ownedRun, RevisionID: ownedRun, Status: "CLARIFYING",
 		Slots: procurement.RequirementSlots{Item: &item, Quantity: &qty, DeliveryCity: &city, DeliveryDate: &date,
 			ItemResolution: &procurement.ItemResolution{Kind: "CATEGORY_CONFIRMED", Label: "蘋果", DisplayValue: "蘋果"}},
-		MissingRequired:    []procurement.SlotKey{"UNIT"},
-		ItemDisambiguation: []string{"蘋果", "蘋果乾"},
-		Runs:               []procurement.RunSummary{{RunID: ownedRun, RunType: "TURN", Status: "RUNNING", LastCursor: "2"}},
-		ActiveRunID:        &active,
-		PublishedRfq:       &procurement.PublishedRfq{PublicationID: ownedRun, Version: 1, PublishTime: now, ConfirmedRfqSnapshotID: ownedRun, RfqSnapshotHash: "abc"},
+		MissingRequired: []procurement.SlotKey{"UNIT"},
+		Runs:            []procurement.RunSummary{{RunID: ownedRun, RunType: "TURN", Status: "RUNNING", LastCursor: "2"}},
+		ActiveRunID:     &active,
+		PublishedRfq:    &procurement.PublishedRfq{PublicationID: ownedRun, Version: 1, PublishTime: now, ConfirmedRfqSnapshotID: ownedRun, RfqSnapshotHash: "abc"},
 	}}
 	c := setup(t, m)
 	res, err := c.GetSnapshot(t.Context(), as(connect.NewRequest(&pb.GetSnapshotRequest{RequestId: ownedRun.String()}), accountID))
@@ -125,7 +124,6 @@ func TestGetSnapshotMapsEveryFieldAndRejectsUnspecified(t *testing.T) {
 		s.GetSlots().GetDeliveryCity() != "台北市" || d.GetYear() != 2026 || d.GetMonth() != 12 || d.GetDay() != 1 ||
 		s.GetSlots().GetItemResolution().GetKind() != pb.ItemResolutionKind_ITEM_RESOLUTION_KIND_CATEGORY_CONFIRMED ||
 		len(s.GetMissingRequired()) != 1 || s.GetMissingRequired()[0] != pb.SlotKey_SLOT_KEY_UNIT ||
-		len(s.GetItemDisambiguation().GetCandidates()) != 2 || s.GetItemDisambiguation().GetCandidates()[1].GetLabel() != "蘋果乾" ||
 		s.GetActiveRunId() != active.String() || s.GetRuns()[0].GetStatus() != pb.RunStatus_RUN_STATUS_RUNNING ||
 		s.GetPublishedRfq().GetRfqSnapshotHash() != "abc" || s.GetOpenConfirmation() != nil {
 		t.Fatalf("快照 = %v", s)

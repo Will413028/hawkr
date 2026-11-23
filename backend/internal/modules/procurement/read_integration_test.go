@@ -103,8 +103,8 @@ func TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash(t *testing.T) {
 	if s.MissingRequired == nil || len(s.MissingRequired) != 0 {
 		t.Errorf("必填都填了，MissingRequired 要是空的：%v", s.MissingRequired)
 	}
-	if s.OpenConfirmation == nil || s.OpenConfirmation.InterruptID != irq || !slices.Equal(s.ItemDisambiguation, []string{"蘋果"}) {
-		t.Errorf("待回答的中斷與消歧卡：%+v %v", s.OpenConfirmation, s.ItemDisambiguation)
+	if s.OpenConfirmation == nil || s.OpenConfirmation.InterruptID != irq {
+		t.Errorf("待回答的中斷：%+v", s.OpenConfirmation)
 	}
 	if len(s.Runs) != 1 || s.Runs[0].RunID != c.run {
 		t.Errorf("runs：%+v", s.Runs)
@@ -165,7 +165,7 @@ func TestGetSnapshotListsTheMissingRequiredSlotsAndHasNoPublicationOrInterruptYe
 	if s.PublishedRfq != nil {
 		t.Errorf("還沒發布，PublishedRfq 要是 nil：%+v", s.PublishedRfq)
 	}
-	if s.OpenConfirmation != nil || len(s.ItemDisambiguation) != 0 || s.ActiveRunID != nil || len(s.Runs) != 0 {
+	if s.OpenConfirmation != nil || s.ActiveRunID != nil || len(s.Runs) != 0 {
 		t.Errorf("還沒有中斷與 run：%+v", s)
 	}
 }
@@ -173,7 +173,7 @@ func TestGetSnapshotListsTheMissingRequiredSlotsAndHasNoPublicationOrInterruptYe
 const quantityCard = `{"stage":"","query":"","candidates":[{"categoryId":"21","label":"蘋果","path":"水果 > 蘋果"}],` +
 	`"question":{"slotKey":"SLOT_KEY_QUANTITY","prompt":"要幾件？","allowFreeText":true}}`
 
-func TestGetSnapshotOpenInterruptOutsideTheItemCardHasNoDisambiguation(t *testing.T) {
+func TestGetSnapshotOpenInterruptOutsideTheItemCardIsTheOpenConfirmation(t *testing.T) {
 	ctx := context.Background()
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
@@ -190,9 +190,6 @@ func TestGetSnapshotOpenInterruptOutsideTheItemCardHasNoDisambiguation(t *testin
 	}
 	if s.OpenConfirmation == nil || s.OpenConfirmation.InterruptID != irq || s.OpenConfirmation.Question.SlotKey != "QUANTITY" {
 		t.Errorf("待回答的中斷：%+v", s.OpenConfirmation)
-	}
-	if len(s.ItemDisambiguation) != 0 {
-		t.Errorf("不是品項卡就沒有消歧：%v", s.ItemDisambiguation)
 	}
 	if s.PublishedRfq != nil {
 		t.Errorf("seed 沒發布：%+v", s.PublishedRfq)
