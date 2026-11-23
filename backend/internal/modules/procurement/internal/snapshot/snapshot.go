@@ -14,6 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfqhash"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -119,7 +120,7 @@ func (r Reader) progress(ctx context.Context, q *store.Queries, buyerID int64, r
 	pub, err := q.GetLatestPublicationByRequest(ctx, store.GetLatestPublicationByRequestParams{RequestID: requestID, BuyerID: &owner})
 	switch {
 	case err == nil:
-		hash, err := snapshotHash(ctx, q, buyerID, requestID, pub.ConfirmedRfqSnapshotID)
+		hash, err := snapshotHash(ctx, q, buyerID, requestID, pub.ConfirmedRfqSnapshotID, pub.SchemaVersion)
 		if err != nil {
 			return progress{}, err
 		}
@@ -134,8 +135,8 @@ func (r Reader) progress(ctx context.Context, q *store.Queries, buyerID int64, r
 	return out, nil
 }
 
-// snapshotHash 由確認快照、它確認的需求版本與價格預覽重算 hash（rfqhash）；三者都是不可變的列，缺任何一列是資料不一致。
-func snapshotHash(ctx context.Context, q *store.Queries, buyerID int64, requestID, snapshotID uuid.UUID) (string, error) {
+// snapshotHash 由發布的 schema_version、確認快照、它確認的需求版本與價格預覽重算 hash（rfqhash）；三者都是不可變的列，缺任何一列是資料不一致。
+func snapshotHash(ctx context.Context, q *store.Queries, buyerID int64, requestID, snapshotID uuid.UUID, schemaVersion string) (string, error) {
 	owner := buyerID
 	snap, err := q.GetConfirmedSnapshot(ctx, store.GetConfirmedSnapshotParams{ID: snapshotID, RequestID: requestID, BuyerID: &owner})
 	if err != nil {
@@ -150,7 +151,7 @@ func snapshotHash(ctx context.Context, q *store.Queries, buyerID int64, requestI
 		return "", fmt.Errorf("snapshot：讀取快照的價格預覽：%w", err)
 	}
 	return rfqhash.Snapshot(rfqhash.Input{
-		ConfirmedRfqSnapshotID: snap.ID.String(), RequestRevisionID: rev.ID.String(), PricePreviewID: prev.ID.String(), BuyerNote: snap.BuyerNote,
+		SchemaVersion: schemaVersion, ConfirmedRfqSnapshotID: snap.ID.String(), RequestRevisionID: rev.ID.String(), PricePreviewID: prev.ID.String(), BuyerNote: snap.BuyerNote,
 		Requirement: rfqhash.Slots{
 			Item: rev.Item, Quantity: rev.Quantity, Unit: rev.Unit, Packaging: rev.Packaging, BudgetPerUnit: rev.BudgetPerUnit,
 			DeliveryCity: rev.DeliveryCity, DeliveryDate: rfqhash.Date(rev.DeliveryDate), ExactMatchRequired: rev.ExactMatchRequired,
@@ -196,8 +197,10 @@ func confirmationOf(i run.OpenInterrupt) (*model.OpenConfirmation, []string, err
 		return nil, nil, fmt.Errorf("snapshot：解析中斷 %s 的 payload：%w", i.ID, err)
 	}
 	var labels []string
-	for _, c := range p.Candidates {
-		labels = append(labels, c.Label)
+	if slotKeyOf(p.Question.SlotKey) == slots.ItemDisambiguation {
+		for _, c := range p.Candidates {
+			labels = append(labels, c.Label)
+		}
 	}
 	return &model.OpenConfirmation{
 		InterruptID: i.ID, Kind: i.InterruptKind, Processing: i.Processing,

@@ -121,8 +121,8 @@
    "id": "title-newline-allowed",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
-   "old": " || strings.ContainsAny(t, \"\\n\\r\")",
-   "new": "",
+   "old": " || strings.IndexFunc(t, isLineBreakOrControl) >= 0",
+   "new": " || false",
    "test": "internal/modules/procurement ^TestRenameConversationTitleRules$",
    "why": "標題可以含換行"
   },
@@ -193,10 +193,64 @@
    "id": "candidate-store-card-dropped",
    "stack": "go",
    "file": "backend/internal/httpapi/buyerprocurement/convert.go",
-   "old": "Store: cards[c.StoreID]",
-   "new": "Store: nil",
+   "old": "Store: card}",
+   "new": "Store: func() *commonpb.StoreCard { _ = card; return nil }()}",
    "test": "internal/httpapi/buyerprocurement ^TestGetCandidateSearchAssemblesStoreCardsAndFacts$",
    "why": "候選不帶 StoreCard"
+  },
+  {
+   "id": "start-search-ignores-deleted-conversation",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/start.go",
+   "old": "RequestID: in.RequestID, BuyerID: in.BuyerID}); errors.Is(err, pgx.ErrNoRows) {\n\t\treturn apperr.NotFound(\"找不到這個需求\")",
+   "new": "RequestID: in.RequestID, BuyerID: in.BuyerID}); false && errors.Is(err, pgx.ErrNoRows) {\n\t\treturn apperr.NotFound(\"找不到這個需求\")",
+   "test": "internal/modules/procurement/internal/search ^TestStartIsNotFoundOnceTheConversationIsDeleted$",
+   "why": "對話刪除後仍可開始候選搜尋"
+  },
+  {
+   "id": "candidate-search-read-ignores-deleted-conversation",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/read.go",
+   "old": "BuyerID: buyerID}); errors.Is(err, pgx.ErrNoRows) {\n\t\treturn model.CandidateSearch{}, notFound()",
+   "new": "BuyerID: buyerID}); false && errors.Is(err, pgx.ErrNoRows) {\n\t\treturn model.CandidateSearch{}, notFound()",
+   "test": "internal/modules/procurement/internal/search ^TestGetCandidateSearchIsNotFoundOnceTheConversationIsDeleted$",
+   "why": "對話刪除後仍讀得到候選搜尋結果"
+  },
+  {
+   "id": "rfqhash-schema-version-out-of-preimage",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfqhash/rfqhash.go",
+   "old": "SchemaVersion          string  `json:\"schemaVersion\"`",
+   "new": "SchemaVersion          string  `json:\"-\"`",
+   "test": "internal/modules/procurement/internal/rfqhash ^TestSnapshotIsDeterministicAndPinned$",
+   "why": "原像不含 schema_version：hash 不再綁版本"
+  },
+  {
+   "id": "title-accepts-line-separator",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
+   "old": "unicode.IsControl(r) || r == '\\u2028' || r == '\\u2029'",
+   "new": "unicode.IsControl(r) && r < ' '",
+   "test": "internal/modules/procurement/internal/conversation ^TestValidTitleRejectsEveryLineBreakAndControlRune$",
+   "why": "標題只擋 \\n \\r：U+2028、U+0085 等混進標題"
+  },
+  {
+   "id": "candidate-without-store-card-is-silent",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/convert.go",
+   "old": "if !ok {\n\t\t\treturn nil, fmt.Errorf(\"buyerprocurement：候選 %s 的店 %d 沒有店家卡片（搜尋只收曾公開過的店）\", c.ID, c.StoreID)\n\t\t}",
+   "new": "_ = ok",
+   "test": "internal/httpapi/buyerprocurement ^TestGetCandidateSearchAssemblesStoreCardsAndFacts$",
+   "why": "缺店家卡片的候選被靜默回 store 為空"
+  },
+  {
+   "id": "disambiguation-from-any-interrupt",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
+   "old": "if slotKeyOf(p.Question.SlotKey) == slots.ItemDisambiguation {",
+   "new": "if slots.ItemDisambiguation != \"\" {",
+   "test": "internal/modules/procurement ^TestGetSnapshotOpenInterruptOutsideTheItemCardHasNoDisambiguation$",
+   "why": "任何中斷的候選都被當成品項消歧卡"
   }
  ]
 }

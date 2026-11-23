@@ -34,7 +34,7 @@ type Starter struct {
 	Submitter run.Submitter
 }
 
-// Start 開始一次搜尋。需求不屬於買家回 NOT_FOUND；需求不在 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；
+// Start 開始一次搜尋。需求不屬於買家或它的對話已刪除回 NOT_FOUND；需求不在 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；
 // 同需求已有進行中的 run 或買家的上限，依 run.Submitter。同一個 client_request_id 重送回第一次的 run 與它的候選集。
 func (s Starter) Start(ctx context.Context, in StartInput) (Started, error) {
 	runID, err := s.Submitter.Submit(ctx, run.SubmitInput{
@@ -68,6 +68,11 @@ func (s Starter) check(ctx context.Context, q *store.Queries, in StartInput) err
 	}
 	if err != nil {
 		return fmt.Errorf("search：讀取需求：%w", err)
+	}
+	if _, err := q.GetConversationByRequest(ctx, store.GetConversationByRequestParams{RequestID: in.RequestID, BuyerID: in.BuyerID}); errors.Is(err, pgx.ErrNoRows) {
+		return apperr.NotFound("找不到這個需求")
+	} else if err != nil {
+		return fmt.Errorf("search：讀取對話：%w", err)
 	}
 	if !slices.Contains(searchable, req.Status) {
 		return notReady()

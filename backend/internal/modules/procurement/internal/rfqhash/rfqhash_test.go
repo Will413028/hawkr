@@ -6,7 +6,7 @@ func ptr[T any](v T) *T { return &v }
 
 func base() Input {
 	return Input{
-		ConfirmedRfqSnapshotID: "s1", RequestRevisionID: "r1", PricePreviewID: "p1", BuyerNote: "請盡快",
+		SchemaVersion: SchemaV1, ConfirmedRfqSnapshotID: "s1", RequestRevisionID: "r1", PricePreviewID: "p1", BuyerNote: "請盡快",
 		Requirement: Slots{Item: ptr("外套"), Quantity: ptr(int32(3)), Unit: ptr("件"), BudgetPerUnit: ptr(int64(500)), DeliveryDate: ptr("2026-12-01")},
 		Price:       Price{RangeLowerAmount: 400, RangeUpperAmount: 600, BasisQuantity: 1, BasisUnit: "件", TotalLowerAmount: ptr(int64(1200)), TotalUpperAmount: ptr(int64(1800)), TotalQuantity: ptr(int32(3)), TotalUnit: ptr("件")},
 	}
@@ -21,9 +21,19 @@ func TestSnapshotIsDeterministicAndPinned(t *testing.T) {
 	if a != b || len(a) != 64 {
 		t.Fatalf("同輸入要同 hash：%q %q", a, b)
 	}
-	const golden = "0c5928787576017f44953621ecccae9df578d3b1be4c3e90d1bad0ca42b05035"
+	const golden = "dc18e77e1fc560e5ee05a5e72a408df6ed288bb9da650c222d5faacbca6c4825"
 	if a != golden {
 		t.Fatalf("golden 變了：%s", a)
+	}
+}
+
+func TestUnknownSchemaVersionIsAnError(t *testing.T) {
+	for _, v := range []string{"", "v0", "v2", "V1"} {
+		in := base()
+		in.SchemaVersion = v
+		if got, err := Snapshot(in); err == nil {
+			t.Errorf("schema_version %q 要回錯誤，得到 %s", v, got)
+		}
 	}
 }
 

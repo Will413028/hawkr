@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
@@ -58,8 +59,15 @@ func decodeToken(raw string) (token, bool) {
 	if err := json.Unmarshal(b, &t); err != nil || t.ID == (uuid.UUID{}) {
 		return token{}, false
 	}
+	if t.UpdatedAt < minTokenMicro {
+		return token{}, false
+	}
 	return t, true
 }
+
+// minTokenMicro 是 Postgres timestamptz 的下界（4713 BC）；範圍外的值送進查詢會變成 INTERNAL。
+// 上界不用檢查：int64 微秒最多到 294247 AD，在 timestamptz 的上界 294276 AD 之內。
+var minTokenMicro = time.Date(-4712, 1, 2, 0, 0, 0, 0, time.UTC).UnixMicro()
 
 // List 回傳買家自己的對話，依 (updated_at, id) 由新到舊，已刪除的不列。pageSize 為 0 用預設，超過上限以上限計，負數回 INVALID_ARGUMENT（欄位 page_size）；
 // pageToken 不是這個方法發出的 token 回 INVALID_ARGUMENT（欄位 page_token）。
@@ -106,14 +114,16 @@ func (s Service) List(ctx context.Context, buyerID int64, pageSize int32, pageTo
 	return out, nil
 }
 
-// ValidTitle 去頭尾空白後檢查標題：不能是空的、不超過 MaxTitleRunes 個字元、不含換行；回傳去空白後的標題。
+// ValidTitle 去頭尾空白後檢查標題：不能是空的、不超過 MaxTitleRunes 個字元、不含換行與其他控制字元（含 U+2028、U+2029）；回傳去空白後的標題。
 func ValidTitle(raw string) (string, error) {
 	t := trimtext.Trim(raw)
-	if t == "" || utf8.RuneCountInString(t) > MaxTitleRunes || strings.ContainsAny(t, "\n\r") {
+	if t == "" || utf8.RuneCountInString(t) > MaxTitleRunes || strings.IndexFunc(t, isLineBreakOrControl) >= 0 {
 		return "", apperr.InvalidInputOn([]string{"title"}, "標題需為 1 到 %d 個字元，不含換行", MaxTitleRunes)
 	}
 	return t, nil
 }
+
+func isLineBreakOrControl(r rune) bool { return unicode.IsControl(r) || r == '\u2028' || r == '\u2029' }
 
 // Rename 改買家自己的對話的標題（目標狀態的方法：重送結果相同，不建收據）。標題不合規則回 INVALID_ARGUMENT（欄位 title）；
 // 對話不存在、已刪除或不是買家的回 NOT_FOUND。

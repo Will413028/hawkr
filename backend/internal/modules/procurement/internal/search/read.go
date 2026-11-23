@@ -21,7 +21,7 @@ import (
 // Reader 是 GetCandidateSearch 的讀取模型。
 type Reader struct{ DB *db.DB }
 
-// Get 回傳買家自己的候選搜尋 run 的狀態與結果（A9-D29(3)）。run 不存在、不是這位買家的、不是 CANDIDATE_SEARCH，或不屬於這個需求，一律回 NOT_FOUND。
+// Get 回傳買家自己的候選搜尋 run 的狀態與結果（A9-D29(3)）。run 不存在、不是這位買家的、不是 CANDIDATE_SEARCH、不屬於這個需求，或需求的對話已刪除，一律回 NOT_FOUND。
 // 只有 SUCCEEDED 的 run 有候選；FAILED 帶失敗原因；其餘狀態（排隊、執行中、取消）只回狀態。
 // 候選的事實依需求的現行版本與語系在讀取時組出，FactsAsOf 是 run 完成的時間。呼叫端的 ctx 不可已在 transaction 內。
 func (g Reader) Get(ctx context.Context, buyerID int64, requestID, runID uuid.UUID, locale uitext.Locale) (model.CandidateSearch, error) {
@@ -36,6 +36,11 @@ func (g Reader) Get(ctx context.Context, buyerID int64, requestID, runID uuid.UU
 
 func (g Reader) read(ctx context.Context, buyerID int64, requestID, runID uuid.UUID, locale uitext.Locale) (model.CandidateSearch, error) {
 	q := store.New(g.DB.Conn(ctx))
+	if _, err := q.GetConversationByRequest(ctx, store.GetConversationByRequestParams{RequestID: requestID, BuyerID: buyerID}); errors.Is(err, pgx.ErrNoRows) {
+		return model.CandidateSearch{}, notFound()
+	} else if err != nil {
+		return model.CandidateSearch{}, fmt.Errorf("search：讀取對話：%w", err)
+	}
 	r, err := q.GetRunForBuyer(ctx, store.GetRunForBuyerParams{ID: runID, BuyerID: buyerID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.CandidateSearch{}, notFound()

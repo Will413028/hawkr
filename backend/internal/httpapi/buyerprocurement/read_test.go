@@ -148,7 +148,7 @@ func TestGetCandidateSearchAssemblesStoreCardsAndFacts(t *testing.T) {
 	}
 	m := &fakeModule{search: procurement.CandidateSearch{
 		RequestID: ownedRun, RunID: ownedRun, CandidateSetID: ownedRun, Status: "SUCCEEDED",
-		Candidates: []procurement.Candidate{cand(900, true), cand(404, false)},
+		Candidates: []procurement.Candidate{cand(900, true), cand(901, false)},
 	}}
 	c := setup(t, m)
 	req := func() *connect.Request[pb.GetCandidateSearchRequest] {
@@ -167,8 +167,12 @@ func TestGetCandidateSearchAssemblesStoreCardsAndFacts(t *testing.T) {
 		first.GetUnverifiableFacts()[0].GetReason() != "請確認數量 3" || !first.GetFactsTime().AsTime().Equal(now) {
 		t.Errorf("候選 = %v", first)
 	}
-	if second.GetStore() != nil || second.GetSelected() {
-		t.Errorf("沒公開過的店沒有卡片、不設 store：%v", second)
+	if second.GetStore().GetName() != "店901" || second.GetSelected() {
+		t.Errorf("第二個候選 = %v", second)
+	}
+	m.search.Candidates = append(m.search.Candidates, cand(404, false))
+	if _, err := c.GetCandidateSearch(t.Context(), req()); connect.CodeOf(err) != connect.CodeInternal {
+		t.Errorf("候選的店沒有店家卡片 = %v，要 INTERNAL（搜尋只收曾公開過的店）", err)
 	}
 
 	m.search = procurement.CandidateSearch{RequestID: ownedRun, RunID: ownedRun, CandidateSetID: ownedRun, Status: "QUEUED"}

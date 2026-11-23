@@ -12,6 +12,7 @@ import (
 
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfqhash"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -99,6 +100,9 @@ func TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash(t *testing.T) {
 	if s.ActiveRunID != nil {
 		t.Errorf("等待輸入的 run 不是進行中：%v", s.ActiveRunID)
 	}
+	if s.MissingRequired == nil || len(s.MissingRequired) != 0 {
+		t.Errorf("必填都填了，MissingRequired 要是空的：%v", s.MissingRequired)
+	}
 	if s.OpenConfirmation == nil || s.OpenConfirmation.InterruptID != irq || !slices.Equal(s.ItemDisambiguation, []string{"蘋果"}) {
 		t.Errorf("待回答的中斷與消歧卡：%+v %v", s.OpenConfirmation, s.ItemDisambiguation)
 	}
@@ -106,7 +110,7 @@ func TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash(t *testing.T) {
 		t.Errorf("runs：%+v", s.Runs)
 	}
 	want, err := rfqhash.Snapshot(rfqhash.Input{
-		ConfirmedRfqSnapshotID: c.snapshot.String(), RequestRevisionID: c.revision.String(), PricePreviewID: c.preview.String(), BuyerNote: "請盡快",
+		SchemaVersion: rfqhash.SchemaV1, ConfirmedRfqSnapshotID: c.snapshot.String(), RequestRevisionID: c.revision.String(), PricePreviewID: c.preview.String(), BuyerNote: "請盡快",
 		Requirement: rfqhash.Slots{Item: ptr("外套"), Quantity: ptr(int32(3)), Unit: ptr("件"), BudgetPerUnit: ptr(int64(500)), DeliveryCity: ptr("台北市"),
 			DeliveryDate: ptr(epoch.Format(time.DateOnly)), ExactMatchRequired: ptr(false)},
 		Price: rfqhash.Price{RangeLowerAmount: 400, RangeUpperAmount: 600, BasisQuantity: 1, BasisUnit: "件",
@@ -128,6 +132,71 @@ func TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash(t *testing.T) {
 	}
 	_, err = m.GetSnapshot(ctx, 7, c.request)
 	wantKind(t, "對話已刪除的需求", err, apperr.KindNotFound)
+}
+
+// partialRequest 寫一個只有品項的需求與它的對話，必填的城市與單位還缺。
+func partialRequest(ctx context.Context, t *testing.T, d *db.DB, buyerID int64) uuid.UUID {
+	t.Helper()
+	q := store.New(d.Conn(ctx))
+	req := id()
+	if err := q.InsertRequest(ctx, store.InsertRequestParams{ID: req, BuyerID: &buyerID, Now: epoch}); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := q.InsertRevision(ctx, store.InsertRevisionParams{ID: id(), RequestID: req, BuyerID: &buyerID, RevisionNo: 1, Item: ptr("外套"), Now: epoch}); err != nil || n != 1 {
+		t.Fatalf("InsertRevision n=%d err=%v", n, err)
+	}
+	if err := q.InsertConversation(ctx, store.InsertConversationParams{ID: id(), BuyerID: buyerID, RequestID: req, Now: epoch}); err != nil {
+		t.Fatal(err)
+	}
+	return req
+}
+
+func TestGetSnapshotListsTheMissingRequiredSlotsAndHasNoPublicationOrInterruptYet(t *testing.T) {
+	ctx := context.Background()
+	m, d := runtimeModule(t)
+	req := partialRequest(ctx, t, d, 7)
+	s, err := m.GetSnapshot(ctx, 7, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(s.MissingRequired, []model.SlotKey{"DELIVERY_CITY", "UNIT"}) {
+		t.Errorf("MissingRequired = %v，要 [DELIVERY_CITY UNIT]", s.MissingRequired)
+	}
+	if s.PublishedRfq != nil {
+		t.Errorf("還沒發布，PublishedRfq 要是 nil：%+v", s.PublishedRfq)
+	}
+	if s.OpenConfirmation != nil || len(s.ItemDisambiguation) != 0 || s.ActiveRunID != nil || len(s.Runs) != 0 {
+		t.Errorf("還沒有中斷與 run：%+v", s)
+	}
+}
+
+const quantityCard = `{"stage":"","query":"","candidates":[{"categoryId":"21","label":"蘋果","path":"水果 > 蘋果"}],` +
+	`"question":{"slotKey":"SLOT_KEY_QUANTITY","prompt":"要幾件？","allowFreeText":true}}`
+
+func TestGetSnapshotOpenInterruptOutsideTheItemCardHasNoDisambiguation(t *testing.T) {
+	ctx := context.Background()
+	m, d := runtimeModule(t)
+	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET status = 'WAITING_FOR_INPUT' WHERE id = $1`, c.run); err != nil {
+		t.Fatal(err)
+	}
+	irq := id()
+	if err := store.New(d.Conn(ctx)).InsertInterrupt(ctx, store.InsertInterruptParams{ID: irq, RunID: c.run, Payload: []byte(quantityCard), Now: epoch}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := m.GetSnapshot(ctx, 7, c.request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.OpenConfirmation == nil || s.OpenConfirmation.InterruptID != irq || s.OpenConfirmation.Question.SlotKey != "QUANTITY" {
+		t.Errorf("待回答的中斷：%+v", s.OpenConfirmation)
+	}
+	if len(s.ItemDisambiguation) != 0 {
+		t.Errorf("不是品項卡就沒有消歧：%v", s.ItemDisambiguation)
+	}
+	if s.PublishedRfq != nil {
+		t.Errorf("seed 沒發布：%+v", s.PublishedRfq)
+	}
 }
 
 func TestGetConversationMessagesMatchesTheRuntimeSnapshot(t *testing.T) {

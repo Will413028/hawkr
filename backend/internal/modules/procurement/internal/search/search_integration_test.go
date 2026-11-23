@@ -27,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var pg *testdb.Server
@@ -151,6 +152,7 @@ func newFixture(t *testing.T, status, kind string) *fixture {
 	q := store.New(d.Conn(ctx))
 	b := buyer
 	must(t, q.InsertRequest(ctx, store.InsertRequestParams{ID: f.request, BuyerID: &b, Now: now}))
+	must(t, q.InsertConversation(ctx, store.InsertConversationParams{ID: uuid.NewV7(), BuyerID: buyer, RequestID: f.request, Now: now}))
 	item, label, unit, city := "小白菜", "小白菜", "KG", "臺北市"
 	var cat *int64
 	if kind == "CATEGORY_CONFIRMED" {
@@ -633,5 +635,37 @@ func TestStartReplayReturnsTheSameRunAndCandidateSet(t *testing.T) {
 	must(t, err)
 	if _, err := f.starter().Start(context.Background(), search.StartInput{BuyerID: buyer, RequestID: other.request, ClientRequestID: cid}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("同一個 client_request_id 不同需求要 INVALID_ARGUMENT：%v", err)
+	}
+}
+
+func (f *fixture) deleteConversation() {
+	f.t.Helper()
+	if _, err := f.d.Pool().Exec(context.Background(), `UPDATE procurement.conversations SET deleted_at = $2 WHERE request_id = $1`, f.request, now); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func TestStartIsNotFoundOnceTheConversationIsDeleted(t *testing.T) {
+	f := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
+	f.deleteConversation()
+	_, err := f.start(uuid.NewV7())
+	if apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("對話已刪除後開始搜尋 = %v，要 NOT_FOUND", err)
+	}
+	if n := f.count(`SELECT count(*) FROM procurement.agent_runs WHERE request_id = $1`, f.request); n != 0 {
+		t.Errorf("被拒絕的搜尋不得建 run：%d 筆", n)
+	}
+}
+
+func TestGetCandidateSearchIsNotFoundOnceTheConversationIsDeleted(t *testing.T) {
+	f := newFixture(t, "REQUIREMENT_READY", "CATEGORY_CONFIRMED")
+	s := f.mustStart()
+	r := search.Reader{DB: f.d}
+	if _, err := r.Get(context.Background(), buyer, f.request, s.RunID, uitext.ZhTW); err != nil {
+		t.Fatalf("刪除前讀得到：%v", err)
+	}
+	f.deleteConversation()
+	if _, err := r.Get(context.Background(), buyer, f.request, s.RunID, uitext.ZhTW); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("對話已刪除後讀取 = %v，要 NOT_FOUND", err)
 	}
 }

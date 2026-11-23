@@ -259,7 +259,11 @@ func candidateSearchToProto(s procurement.CandidateSearch, cards map[int64]*comm
 		}
 	}
 	for _, c := range s.Candidates {
-		cand := &pb.Candidate{Id: c.ID.String(), FactsTime: timestamppb.New(c.FactsAsOf), Selected: c.Selected, Store: cards[c.StoreID]}
+		card, ok := cards[c.StoreID]
+		if !ok {
+			return nil, fmt.Errorf("buyerprocurement：候選 %s 的店 %d 沒有店家卡片（搜尋只收曾公開過的店）", c.ID, c.StoreID)
+		}
+		cand := &pb.Candidate{Id: c.ID.String(), FactsTime: timestamppb.New(c.FactsAsOf), Selected: c.Selected, Store: card}
 		for _, f := range c.MatchedFacts {
 			k, err := slotKeyToProto(f.SlotKey)
 			if err != nil {
