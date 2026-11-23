@@ -8085,12 +8085,10 @@ class RunFinished extends $pb.GeneratedMessage {
   factory RunFinished({
     RunStatus? status,
     RunFailureReason? failureReason,
-    $core.String? localizedMessage,
   }) {
     final result = RunFinished._();
     if (status != null) result.status = status;
     if (failureReason != null) result.failureReason = failureReason;
-    if (localizedMessage != null) result.localizedMessage = localizedMessage;
     return result;
   }
 
@@ -8112,7 +8110,6 @@ class RunFinished extends $pb.GeneratedMessage {
         enumValues: RunStatus.values)
     ..aE<RunFailureReason>(2, _omitFieldNames ? '' : 'failureReason',
         enumValues: RunFailureReason.values)
-    ..aOS(3, _omitFieldNames ? '' : 'localizedMessage')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8155,16 +8152,6 @@ class RunFinished extends $pb.GeneratedMessage {
   $core.bool hasFailureReason() => $_has(1);
   @$pb.TagNumber(2)
   void clearFailureReason() => $_clearField(2);
-
-  /// 給使用者看的失敗說明（zh-TW 或 en，依請求的語系）；只在 FAILED 時有值。
-  @$pb.TagNumber(3)
-  $core.String get localizedMessage => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set localizedMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasLocalizedMessage() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearLocalizedMessage() => $_clearField(3);
 }
 
 class CancelRunRequest extends $pb.GeneratedMessage {
@@ -8485,13 +8472,11 @@ class ResumeRunResponse extends $pb.GeneratedMessage {
   factory ResumeRunResponse({
     $core.String? runId,
     RunStatus? runStatus,
-    TurnResult? result,
   }) {
-    final result$ = ResumeRunResponse._();
-    if (runId != null) result$.runId = runId;
-    if (runStatus != null) result$.runStatus = runStatus;
-    if (result != null) result$.result = result;
-    return result$;
+    final result = ResumeRunResponse._();
+    if (runId != null) result.runId = runId;
+    if (runStatus != null) result.runStatus = runStatus;
+    return result;
   }
 
   ResumeRunResponse._();
@@ -8511,8 +8496,6 @@ class ResumeRunResponse extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'runId')
     ..aE<RunStatus>(2, _omitFieldNames ? '' : 'runStatus',
         enumValues: RunStatus.values)
-    ..aOM<TurnResult>(3, _omitFieldNames ? '' : 'result',
-        subBuilder: TurnResult.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8546,6 +8529,8 @@ class ResumeRunResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearRunId() => $_clearField(1);
 
+  /// 回答 run 當下的狀態；ResumeRun 在回答 run 排入後立即回傳，client 以 run_id 訂閱 WatchRun 取得結果，
+  /// 或重新載入時讀 GetRuntimeSnapshot。
   @$pb.TagNumber(2)
   RunStatus get runStatus => $_getN(1);
   @$pb.TagNumber(2)
@@ -8554,19 +8539,6 @@ class ResumeRunResponse extends $pb.GeneratedMessage {
   $core.bool hasRunStatus() => $_has(1);
   @$pb.TagNumber(2)
   void clearRunStatus() => $_clearField(2);
-
-  /// 不填：ResumeRun 在回答 run 排入後立即回傳，client 以 run_id 訂閱 WatchRun 取得結果，
-  /// 或重新載入時讀 GetRuntimeSnapshot。
-  @$pb.TagNumber(3)
-  TurnResult get result => $_getN(2);
-  @$pb.TagNumber(3)
-  set result(TurnResult value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasResult() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearResult() => $_clearField(3);
-  @$pb.TagNumber(3)
-  TurnResult ensureResult() => $_ensure(2);
 }
 
 class SellerPublicationSummary extends $pb.GeneratedMessage {

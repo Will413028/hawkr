@@ -1139,8 +1139,9 @@ message RunFinished {
   RunStatus status = 1;
   // 只在 FAILED 時有值。
   RunFailureReason failure_reason = 2;
-  // 給使用者看的失敗說明（zh-TW 或 en，依請求的語系）；只在 FAILED 時有值。
-  string localized_message = 3;
+  // 事件不帶失敗說明的文字：client 依 failure_reason 對應顯示。
+  reserved 3;
+  reserved "localized_message";
 }
 
 message CancelRunRequest {
@@ -1177,10 +1178,11 @@ message ResumeRunRequest {
 
 message ResumeRunResponse {
   string run_id = 1;
-  RunStatus run_status = 2;
-  // 不填：ResumeRun 在回答 run 排入後立即回傳，client 以 run_id 訂閱 WatchRun 取得結果，
+  // 回答 run 當下的狀態；ResumeRun 在回答 run 排入後立即回傳，client 以 run_id 訂閱 WatchRun 取得結果，
   // 或重新載入時讀 GetRuntimeSnapshot。
-  optional TurnResult result = 3;
+  RunStatus run_status = 2;
+  reserved 3;
+  reserved "result";
 }
 
 // ---- 賣家回價（賣家端） ----

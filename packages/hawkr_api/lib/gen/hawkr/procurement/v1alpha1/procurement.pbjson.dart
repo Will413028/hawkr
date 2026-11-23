@@ -3305,22 +3305,19 @@ const RunFinished$json = {
       '6': '.hawkr.procurement.v1alpha1.RunFailureReason',
       '10': 'failureReason'
     },
-    {
-      '1': 'localized_message',
-      '3': 3,
-      '4': 1,
-      '5': 9,
-      '10': 'localizedMessage'
-    },
   ],
+  '9': [
+    {'1': 3, '2': 4},
+  ],
+  '10': ['localized_message'],
 };
 
 /// Descriptor for `RunFinished`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List runFinishedDescriptor = $convert.base64Decode(
     'CgtSdW5GaW5pc2hlZBI9CgZzdGF0dXMYASABKA4yJS5oYXdrci5wcm9jdXJlbWVudC52MWFscG'
     'hhMS5SdW5TdGF0dXNSBnN0YXR1cxJTCg5mYWlsdXJlX3JlYXNvbhgCIAEoDjIsLmhhd2tyLnBy'
-    'b2N1cmVtZW50LnYxYWxwaGExLlJ1bkZhaWx1cmVSZWFzb25SDWZhaWx1cmVSZWFzb24SKwoRbG'
-    '9jYWxpemVkX21lc3NhZ2UYAyABKAlSEGxvY2FsaXplZE1lc3NhZ2U=');
+    'b2N1cmVtZW50LnYxYWxwaGExLlJ1bkZhaWx1cmVSZWFzb25SDWZhaWx1cmVSZWFzb25KBAgDEA'
+    'RSEWxvY2FsaXplZF9tZXNzYWdl');
 
 @$core.Deprecated('Use cancelRunRequestDescriptor instead')
 const CancelRunRequest$json = {
@@ -3437,28 +3434,18 @@ const ResumeRunResponse$json = {
       '6': '.hawkr.procurement.v1alpha1.RunStatus',
       '10': 'runStatus'
     },
-    {
-      '1': 'result',
-      '3': 3,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.procurement.v1alpha1.TurnResult',
-      '9': 0,
-      '10': 'result',
-      '17': true
-    },
   ],
-  '8': [
-    {'1': '_result'},
+  '9': [
+    {'1': 3, '2': 4},
   ],
+  '10': ['result'],
 };
 
 /// Descriptor for `ResumeRunResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List resumeRunResponseDescriptor = $convert.base64Decode(
     'ChFSZXN1bWVSdW5SZXNwb25zZRIVCgZydW5faWQYASABKAlSBXJ1bklkEkQKCnJ1bl9zdGF0dX'
     'MYAiABKA4yJS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5SdW5TdGF0dXNSCXJ1blN0YXR1'
-    'cxJDCgZyZXN1bHQYAyABKAsyJi5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5UdXJuUmVzdW'
-    'x0SABSBnJlc3VsdIgBAUIJCgdfcmVzdWx0');
+    'c0oECAMQBFIGcmVzdWx0');
 
 @$core.Deprecated('Use sellerPublicationSummaryDescriptor instead')
 const SellerPublicationSummary$json = {
