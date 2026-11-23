@@ -4,7 +4,7 @@
 # D4）。搬遷中的模組另外起它的舊服務，同一份情境以 REST 經入口與 gateway 打舊服務、以 Connect 打單體。呼叫者的身分
 # 是以 hawkr dev-token 簽的 token（本機的暫時金鑰，不連任何外部 provider）。
 #
-# 只用 docker-compose-infra.yml 的 Postgres 與 Redis（先 make infra-up）；舊服務與單體呼叫的 media-service 是
+# 只用 docker-compose-infra.yml 的 Postgres 與 Redis（先 make infra-up；舊服務是 Java 的 coupon-service 時還要它的 RabbitMQ）；舊服務與單體呼叫的 media-service 是
 # 測試自己聽的假服務（characterize.ServeFakeMedia）。服務以 env -i 啟動，不讀 .env、不繼承 shell 的環境變數，
 # 不會連到任何外部服務。在 backend/ 執行：
 #

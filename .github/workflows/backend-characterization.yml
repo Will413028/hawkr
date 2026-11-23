@@ -1,0 +1,114 @@
+name: backend characterization
+
+# 特性測試：scripts/characterize.sh <模組> 在 runner 上起單體、gateway 與搬遷中模組的舊服務，
+# 同一份情境以 REST 打舊服務、以 Connect 打單體。
+# 每個有 internal/httpapi/<模組>/characterization/legacy.sh 的模組一個 matrix 項，清單由第一個 job 掃檔案得出，
+# 不手抄。舊服務是 Java 時，legacy.sh 的 `# maven-pl: <模組名>` 行告訴這支 workflow 建哪個 jar（Go 服務沒有這行）。
+# 腳本只用 Docker 的 Postgres、Redis、RabbitMQ 與本機服務，不連外（服務以 env -i 啟動）。
+# 終點：最後一個 legacy.sh 刪除時，連同本 workflow 一起刪除。
+#
+# 這裡不設 GOWORK：characterize.sh 自己決定哪一步用 go.work（gateway、舊服務）、哪一步 GOWORK=off（單體）。
+
+on:
+  pull_request:
+    paths: &characterization_paths
+      - 'backend/internal/**'
+      - 'backend/cmd/**'
+      - 'backend/gateway/**'
+      - 'backend/services/**'
+      - 'backend/pkg/**'
+      - 'backend/go.mod'
+      - 'backend/go.sum'
+      - 'backend/go.work'
+      - 'backend/.go-version'
+      - 'backend/scripts/characterize.sh'
+      - 'backend/docker-compose-infra.yml'
+      - 'backend/scripts/init-databases.sh'
+      - 'backend/infra/seed-data/**'
+      - '.github/workflows/backend-characterization.yml'
+  push:
+    branches: [main, dev]
+    paths: *characterization_paths
+  workflow_dispatch:
+
+concurrency:
+  group: backend-characterization-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  modules:
+    name: 找出有舊服務的模組
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      modules: ${{ steps.modules.outputs.modules }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # 沒有任何 legacy.sh 是合法的空結果（matrix 項為空，下一個 job 略過），不讓 step 變紅。
+      - name: 掃描 legacy.sh
+        id: modules
+        run: |
+          set -euo pipefail
+          modules=$(
+            for f in backend/internal/httpapi/*/characterization/legacy.sh; do
+              [ -e "$f" ] || continue
+              module=$(basename "$(dirname "$(dirname "$f")")")
+              maven_pl=$(sed -n 's/^# maven-pl: *//p' "$f" | head -n 1)
+              jq -n --arg module "$module" --arg maven_pl "$maven_pl" '{module: $module, maven_pl: $maven_pl}'
+            done | jq -sc .
+          )
+          echo "modules=$modules" >> "$GITHUB_OUTPUT"
+          echo "將跑特性測試：$modules"
+
+  characterize:
+    name: ${{ matrix.module }} 特性測試
+    needs: modules
+    if: needs.modules.outputs.modules != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.modules.outputs.modules) }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/.go-version
+          cache-dependency-path: backend/**/go.sum
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        if: matrix.maven_pl != ''
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/services/java/**/pom.xml
+      - name: 建 Java 舊服務的 jar
+        if: matrix.maven_pl != ''
+        working-directory: backend/services/java
+        env:
+          MAVEN_PL: ${{ matrix.maven_pl }}
+        run: ./mvnw package -B -q -pl ":$MAVEN_PL" -am -DskipTests
+      # characterize.sh 用 lsof 檢查 port；runner image 沒有時才裝。
+      - name: 確認 lsof
+        run: command -v lsof >/dev/null || sudo apt-get install -y lsof
+      # 只起腳本與舊服務要的 Postgres、Redis 與 RabbitMQ（容器名 hawkr-postgres 是腳本 docker exec 的目標）。
+      - name: 起 Postgres、Redis 與 RabbitMQ
+        run: docker compose -f docker-compose-infra.yml up -d --wait postgres redis rabbitmq
+      - name: 特性測試
+        env:
+          MODULE: ${{ matrix.module }}
+        run: scripts/characterize.sh "$MODULE"
+      - name: 容器 log（失敗時）
+        if: failure()
+        run: docker compose -f docker-compose-infra.yml logs --no-color postgres redis rabbitmq | tail -n 200
