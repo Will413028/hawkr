@@ -133,7 +133,7 @@ class _RefundWebViewScreenState extends State<RefundWebViewScreen> {
 
   /// ISO 8601 UTC → "yyyy-MM-dd"（顯示用）
   String _formatIsoDate(String iso, TaipeiDisplay t) {
-    return t.formatIso(iso, TaipeiFormat.dashDate);
+    return t.formatIso(iso, TaipeiFormat.date);
   }
 
   @override

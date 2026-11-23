@@ -148,7 +148,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
 
   static String _formatDate(DateTime? date, TaipeiDisplay t) {
     if (date == null) return '';
-    return t.format(date, TaipeiFormat.dashDate);
+    return t.format(date, TaipeiFormat.date);
   }
 
   @override

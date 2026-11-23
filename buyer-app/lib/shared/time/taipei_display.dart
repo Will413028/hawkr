@@ -6,7 +6,8 @@ import '../../l10n/time_ago_text.dart';
 
 export 'package:hawkr_api/taipei_time.dart' show TaipeiDisplay, TaipeiFormat;
 
-/// 測試用：在 widget 樹上方指定裝置偏移；沒有它時取 `DateTime.now()` 的偏移。
+/// [TaipeiDisplayContext.taipeiDisplay] 讀取裝置偏移的注入點：樹上方有它就用它的 [deviceOffset]，
+/// 沒有則取 `DateTime.now()` 的偏移。測試以它覆寫裝置偏移。
 class TaipeiDisplayScope extends InheritedWidget {
   const TaipeiDisplayScope({
     super.key,

@@ -105,17 +105,8 @@
    "file": "packages/hawkr_api/lib/src/taipei_display.dart",
    "old": "t.year == today.year && t.month == today.month && t.day == today.day;",
    "new": "t.year == today.year && t.month == today.month;",
-   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else month/day",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else date and time",
    "why": "The separator treats any day of the same month as today, so yesterday shows the time only."
-  },
-  {
-   "id": "buyer-embedded-epoch-default-on",
-   "stack": "flutter:buyer-app",
-   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
-   "old": "  if (!embeddedEpoch) return null;\n",
-   "new": "",
-   "test": "../packages/hawkr_api/test/taipei_time_test.dart digit runs of other lengths and text with digits are null",
-   "why": "Digits embedded in text are parsed as Unix time at every call site again."
   },
   {
    "id": "seller-is-taipei-offset-always-true",
@@ -141,17 +132,44 @@
    "file": "packages/hawkr_api/lib/src/taipei_display.dart",
    "old": "t.year == today.year && t.month == today.month && t.day == today.day;",
    "new": "t.year == today.year && t.month == today.month;",
-   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else month/day",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else date and time",
    "why": "The separator treats any day of the same month as today, so yesterday shows the time only."
   },
   {
-   "id": "seller-embedded-epoch-default-on",
+   "id": "buyer-time-format-back-to-twelve-hour",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "    TaipeiFormat.time => hm,",
+   "new": "    TaipeiFormat.time => '${t.hour % 12}:${_pad(t.minute)}',",
+   "test": "test/shared/time/taipei_display_test.dart the three layouts: date, date and time, time of day (24-hour)",
+   "why": "The time layout drops 24-hour and shows a 12-hour clock again, so the unified time style differs from the other layouts."
+  },
+  {
+   "id": "buyer-date-format-back-to-dash",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "    TaipeiFormat.date => '${t.year}/$mm/$dd',",
+   "new": "    TaipeiFormat.date => '${t.year}-$mm-$dd',",
+   "test": "test/shared/time/taipei_display_test.dart the three layouts: date, date and time, time of day (24-hour)",
+   "why": "The date layout goes back to the dash style that was one of nine historical layouts."
+  },
+  {
+   "id": "seller-time-format-back-to-twelve-hour",
    "stack": "flutter:seller-app",
    "file": "packages/hawkr_api/lib/src/taipei_display.dart",
-   "old": "  if (!embeddedEpoch) return null;\n",
-   "new": "",
-   "test": "../packages/hawkr_api/test/taipei_time_test.dart digit runs of other lengths and text with digits are null",
-   "why": "Digits embedded in text are parsed as Unix time at every call site again."
+   "old": "    TaipeiFormat.time => hm,",
+   "new": "    TaipeiFormat.time => '${t.hour % 12}:${_pad(t.minute)}',",
+   "test": "test/shared/time/taipei_display_test.dart the three layouts: date, date and time, time of day (24-hour)",
+   "why": "The time layout drops 24-hour and shows a 12-hour clock again, so the unified time style differs from the other layouts."
+  },
+  {
+   "id": "seller-date-format-back-to-dash",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/src/taipei_display.dart",
+   "old": "    TaipeiFormat.date => '${t.year}/$mm/$dd',",
+   "new": "    TaipeiFormat.date => '${t.year}-$mm-$dd',",
+   "test": "test/shared/time/taipei_display_test.dart the three layouts: date, date and time, time of day (24-hour)",
+   "why": "The date layout goes back to the dash style that was one of nine historical layouts."
   }
  ]
 }

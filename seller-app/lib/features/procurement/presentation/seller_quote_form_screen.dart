@@ -858,10 +858,9 @@ class _QuoteTextField extends HookWidget {
   }
 }
 
-/// 日期時間選擇器的起始值：已有值用它，沒有值是 [now] 起算一天後。
-@visibleForTesting
-TaipeiPickerInitial quotePickerInitial(DateTime? current, DateTime now) =>
-    taipeiPickerInitial(current, now);
+/// 日期時間選擇器的起始時間點：已有值用它，沒有值是 [now] 起算一天後。
+DateTime quotePickerSeed(DateTime? current, DateTime now) =>
+    current ?? now.toUtc().add(const Duration(days: 1));
 
 class _DateTimeField extends StatelessWidget {
   const _DateTimeField({
@@ -894,7 +893,7 @@ class _DateTimeField extends StatelessWidget {
           child: Text(
             parsed == null
                 ? '尚未設定'
-                : TaipeiDisplay.plainIso(value, TaipeiFormat.dashDateTime)!,
+                : TaipeiDisplay.plainIso(value, TaipeiFormat.dateTime)!,
             style: AppTypography.body,
           ),
         ),
@@ -904,7 +903,7 @@ class _DateTimeField extends StatelessWidget {
 
   Future<void> _pick(BuildContext context, DateTime? current) async {
     final now = DateTime.now();
-    final base = quotePickerInitial(current, now);
+    final base = taipeiPickerInitial(quotePickerSeed(current, now));
     final date = await showDatePicker(
       context: context,
       initialDate: base.initialDate,

@@ -9,6 +9,7 @@ import 'package:hawkr_seller/features/procurement/presentation/seller_quote_labe
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -319,11 +320,13 @@ void main() {
     () {
       // 2026-07-30 20:00 UTC is 2026-07-31 04:00 Taipei; one day later is 08-01 04:00 Taipei.
       final now = DateTime.utc(2026, 7, 30, 20);
-      final t = quotePickerInitial(null, now);
+      final t = taipeiPickerInitial(quotePickerSeed(null, now));
       expect(t.initialDate, DateTime(2026, 8, 1));
       expect(t.initialTime, (hour: 4, minute: 0));
       // An existing UTC value is shown as Taipei wall clock.
-      final c = quotePickerInitial(DateTime.utc(2026, 7, 30, 16), now);
+      final c = taipeiPickerInitial(
+        quotePickerSeed(DateTime.utc(2026, 7, 30, 16), now),
+      );
       expect(c.initialDate, DateTime(2026, 7, 31));
       expect(c.initialTime, (hour: 0, minute: 0));
     },

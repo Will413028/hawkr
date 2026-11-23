@@ -150,8 +150,8 @@ void main() {
     test('slash dates parse as Taipei wall clock', () {
       expect(TaipeiDisplay.plainIso('2026/07/30 08:30'), '2026/07/30 08:30');
       expect(
-        TaipeiDisplay.plainIso('2026/07/30', TaipeiFormat.dashDate),
-        '2026-07-30',
+        TaipeiDisplay.plainIso('2026/07/30', TaipeiFormat.date),
+        '2026/07/30',
       );
     });
   });
@@ -177,50 +177,36 @@ void main() {
       expect(foreign.formatIso('ts=1785398400'), 'ts=1785398400');
       expect(foreign.formatIso('17853984000'), '17853984000');
     });
-
-    test('embeddedEpoch opts in to digits embedded in text', () {
-      expect(
-        TaipeiDisplay.plainIso('ts=1785398400', null, true),
-        '2026/07/30 16:00',
-      );
-      expect(
-        TaipeiDisplay.plainIso('ts=1785398400000', null, true),
-        '2026/07/30 16:00',
-      );
-      expect(TaipeiDisplay.plainIso('no digits', null, true), isNull);
-    });
   });
 
   group('TaipeiFormat', () {
     final t = DateTime.utc(2026, 7, 4, 16, 5); // Taipei 2026-07-05 00:05
-    test('each layout', () {
+    test('three layouts, digits and symbols only', () {
       String f(TaipeiFormat x) => TaipeiDisplay.plain(t, x);
+      expect(TaipeiFormat.values, hasLength(3));
       expect(f(TaipeiFormat.dateTime), '2026/07/05 00:05');
       expect(f(TaipeiFormat.date), '2026/07/05');
-      expect(f(TaipeiFormat.dashDate), '2026-07-05');
-      expect(f(TaipeiFormat.dashDateTime), '2026-07-05 00:05');
-      expect(f(TaipeiFormat.monthDayTime), '07/05 00:05');
-      expect(f(TaipeiFormat.monthDayTimeUnpadded), '7/5 00:05');
-      expect(f(TaipeiFormat.cjkDateTime), '2026年07月05日 00:05');
       expect(f(TaipeiFormat.time), '00:05');
-      expect(f(TaipeiFormat.meridiemTime), '上午12:05');
+      for (final x in TaipeiFormat.values) {
+        expect(f(x), matches(RegExp(r'^[0-9/: ]+$')));
+      }
     });
 
-    test('meridiem around noon', () {
+    test('time is 24-hour around noon', () {
       String f(int utcHour) => TaipeiDisplay.plain(
         DateTime.utc(2026, 7, 5, utcHour, 30),
-        TaipeiFormat.meridiemTime,
+        TaipeiFormat.time,
       );
-      expect(f(3), '上午11:30');
-      expect(f(4), '下午12:30');
-      expect(f(5), '下午01:30');
+      expect(f(3), '11:30');
+      expect(f(4), '12:30');
+      expect(f(5), '13:30');
     });
   });
 
   group('plainSeparator / isBeforeTaipeiToday', () {
     // now = 2026-07-31 00:10 Taipei.
     final now = DateTime.utc(2026, 7, 30, 16, 10);
-    test('same Taipei day shows the time only, else month/day', () {
+    test('same Taipei day shows the time only, else date and time', () {
       expect(
         TaipeiDisplay.plainSeparator(
           DateTime.utc(2026, 7, 30, 16, 5),
@@ -233,7 +219,7 @@ void main() {
           DateTime.utc(2026, 7, 30, 15, 59),
           now: now,
         ),
-        '7/30 23:59',
+        '2026/07/30 23:59',
       );
     });
 
@@ -294,7 +280,7 @@ void main() {
   group('picker conversions', () {
     test('initial is one day after now in Taipei wall clock', () {
       final now = DateTime.utc(2026, 7, 30, 16, 0); // Taipei 07-31 00:00
-      final base = taipeiPickerInitial(null, now);
+      final base = taipeiPickerInitial(now.add(const Duration(days: 1)));
       expect(base.initialDate, DateTime(2026, 8, 1));
       expect(base.initialTime, (hour: 0, minute: 0));
     });
@@ -302,7 +288,6 @@ void main() {
     test('picked wall fields convert back to the instant', () {
       expect(
         taipeiPickerInitial(
-          null,
           DateTime.utc(2026),
         ).instantOf(DateTime(2026, 8, 1), hour: 0, minute: 0),
         DateTime.utc(2026, 7, 31, 16, 0),

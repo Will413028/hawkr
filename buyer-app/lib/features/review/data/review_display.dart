@@ -15,6 +15,6 @@ extension ReviewDisplay on pb.Review {
   /// 建立日期 `YYYY-MM-DD`（臺北日期，裝置偏移不是 +8 時附標籤）；沒有時是空字串。
   String createDateText(TaipeiDisplay t) {
     if (!hasCreateTime()) return '';
-    return t.format(createTime.toDateTime(), TaipeiFormat.dashDate);
+    return t.format(createTime.toDateTime(), TaipeiFormat.date);
   }
 }

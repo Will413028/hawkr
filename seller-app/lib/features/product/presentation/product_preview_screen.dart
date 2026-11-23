@@ -828,7 +828,7 @@ class ProductPreviewScreen extends HookConsumerWidget {
       final createTime = review.createTime;
       final dateStr = createTime == null
           ? ''
-          : context.taipeiDisplay.format(createTime, TaipeiFormat.dashDate);
+          : context.taipeiDisplay.format(createTime, TaipeiFormat.date);
 
       return Container(
         padding: EdgeInsets.only(bottom: isLast ? 0 : 16),

@@ -535,7 +535,7 @@ class ChatThreadScreen extends HookConsumerWidget {
 
               final timeStr = context.taipeiDisplay.format(
                 row.time,
-                TaipeiFormat.meridiemTime,
+                TaipeiFormat.time,
               );
               final read =
                   row.message != null && row.message!.seq <= thread.peerReadSeq;
