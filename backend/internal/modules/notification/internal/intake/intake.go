@@ -136,7 +136,7 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	if slices.Contains(resolved.ActorAccounts, resolved.Recipient.AccountID) {
 		// 自己觸發的事不通知自己；比的是帳號，不是店或買家 ID。
 		s.log().InfoContext(ctx, "收件人就是 actor，略過通知", "intent_id", intent.ID, "type", intent.Type)
-		return nil
+		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return s.scrubSkipped(ctx, intent.ID) })
 	}
 	spec := e.Spec()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -165,7 +165,7 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	})
 }
 
-// scrubSkipped 在 Process 因收件人已刪除、已關閉或已退場而略過時，把這個意圖的參數換成 '{}'（D16）：意圖還沒有收件匣連結或投遞紀錄，
+// scrubSkipped 在 Process 因收件人已刪除、已關閉、已退場或就是 actor 而略過時，把這個意圖的參數換成 '{}'（D16）：意圖還沒有收件匣連結或投遞紀錄，
 // 收件人的清除 job 找不到它；與略過同一個 transaction。
 func (s *Service) scrubSkipped(ctx context.Context, intentID uuid.UUID) error {
 	if err := store.New(s.d.DB.Conn(ctx)).ScrubIntentParams(ctx, intentID); err != nil {

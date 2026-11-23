@@ -339,6 +339,16 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int {
 	return n
 }
 
+func (f *fixture) intentParamsScrubbed(t *testing.T) {
+	t.Helper()
+	if n := f.count(t, `SELECT count(*) FROM notification.intents`); n == 0 {
+		t.Fatal("沒有意圖列可檢查")
+	}
+	if n := f.count(t, `SELECT count(*) FROM notification.intents WHERE params <> '{}'::jsonb`); n != 0 {
+		t.Fatalf("略過的意圖仍有 %d 筆參數沒清成 {}", n)
+	}
+}
+
 func (f *fixture) inboxCount(t *testing.T, account int64) int {
 	return f.count(t, `SELECT count(*) FROM notification.inbox_items WHERE account_id = $1`, account)
 }
@@ -465,6 +475,7 @@ func TestSelfNotificationIsSkipped(t *testing.T) {
 	if got := f.inboxCount(t, acct); got != 0 {
 		t.Fatalf("自己讚自己仍寫了 %d 列", got)
 	}
+	f.intentParamsScrubbed(t)
 	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "other", PostID: "p1", ActorID: other})
 	f.run(t)
 	if got := f.inboxCount(t, acct); got != 1 {
@@ -514,6 +525,19 @@ func TestIntentArrivingAfterAccountDeletionWritesNothing(t *testing.T) {
 	if n := f.count(t, `SELECT count(*) FROM notification.deliveries WHERE account_id = $1`, acct); n != 0 {
 		t.Fatalf("已刪除的帳號仍寫了 %d 列投遞紀錄", n)
 	}
+	f.intentParamsScrubbed(t)
+}
+
+func TestIntentForAMissingAccountWritesNothingAndScrubsParams(t *testing.T) {
+	f := setupIntake(t)
+	const missing int64 = 987654321
+	other := f.newAccount(t)
+	f.accept(t, "test_like", likeParams{AccountID: missing, EventID: "m1", PostID: "p1", ActorID: other})
+	f.run(t)
+	if got := f.inboxCount(t, missing); got != 0 {
+		t.Fatalf("不存在的帳號寫了 %d 列收件匣", got)
+	}
+	f.intentParamsScrubbed(t)
 }
 
 func TestDeliveryChannelsEachGetARecordAndAJobInTheSameTransaction(t *testing.T) {
@@ -645,5 +669,18 @@ func TestSkippedIntentsAreLogged(t *testing.T) {
 	f.run(t)
 	if !strings.Contains(f.logs.String(), "收件帳號已刪除") {
 		t.Fatalf("帳號已刪除的略過沒有記錄：%q", f.logs.String())
+	}
+	noBuyer := f.newAccount(t)
+	f.mustExec(t, `DELETE FROM buyer.buyers WHERE account_id = $1`, noBuyer)
+	f.accept(t, "test_like", likeParams{AccountID: noBuyer, EventID: "nb", PostID: "p1", ActorID: acct})
+	f.run(t)
+	warned := false
+	for _, line := range strings.Split(f.logs.String(), "\n") {
+		if strings.Contains(line, "level=WARN") && strings.Contains(line, "收件帳號沒有買家列") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Fatalf("買家列不存在的略過沒有以 Warn 記錄：%q", f.logs.String())
 	}
 }

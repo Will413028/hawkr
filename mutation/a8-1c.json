@@ -62,6 +62,15 @@
    "new": "if a.StoreID < 0 {\n\t\t// 偏好是",
    "test": "internal/modules/notification ^TestPurgeAfterEachDeletionEvent$/^StoreRetired$",
    "why": "The StoreRetired purge deletes the account's whole STORE preference set, wiping the preferences of a store the seller reopened."
+  },
+  {
+   "id": "worker-account-missing-keeps-intent-params",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "\"收件帳號不存在，略過通知\", \"intent_id\", intent.ID, \"type\", intent.Type)\n\t\t\t\treturn s.scrubSkipped(ctx, intent.ID)",
+   "new": "\"收件帳號不存在，略過通知\", \"intent_id\", intent.ID, \"type\", intent.Type)\n\t\t\t\treturn nil",
+   "test": "internal/modules/notification ^TestIntentForAMissingAccountWritesNothingAndScrubsParams$",
+   "why": "Process skips an intent whose recipient account does not exist without clearing its params, so the personal data stays for the 180-day retention."
   }
  ]
 }
