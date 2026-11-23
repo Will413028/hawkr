@@ -161,6 +161,38 @@ func TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable(t *testing.T) 
 	}
 }
 
+// 評價附圖的引用只由同步登記與解除：送出後同步要在 media 登記，刪帳清除後再同步要解除。
+func TestReviewImagesSyncLinkAndUnlinkOnPurge(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	b := f.newBuyer(t)
+	it := f.order(b, storeID, 710)
+	r := must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, StagedTokens: []string{"s1", "s2"}}))
+	ref := media.Ref{Type: media.RefTypeOrderReview, ID: r.ID.String()}
+	if res, err := f.module.SyncMedia(ctx, ref); err != nil {
+		t.Fatalf("%+v %v", res, err)
+	}
+	for _, token := range []string{"s1", "s2"} {
+		if !f.media.HasRef(ref, media.AssetFor(token)) {
+			t.Fatalf("同步後 media 要有附圖 %s 的引用", token)
+		}
+	}
+	f.requestDeletion(t, b)
+	if err := f.module.PurgeAuthor(ctx, b.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+	if res, err := f.module.SyncMedia(ctx, ref); err != nil {
+		t.Fatalf("%+v %v", res, err)
+	}
+	for _, token := range []string{"s1", "s2"} {
+		if f.media.HasRef(ref, media.AssetFor(token)) {
+			t.Fatalf("清除後同步要解除附圖 %s 的引用", token)
+		}
+	}
+}
+
 // purge 分批：超過一批的評價全部刪完（一批 200）。
 func TestPurgeLoopsOverBatches(t *testing.T) {
 	t.Parallel()

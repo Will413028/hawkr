@@ -60,7 +60,7 @@
    "file": "backend/internal/modules/media/internal/refsync/refsync.go",
    "old": "s.Media.Link(ctx, ref, st.current)",
    "new": "error(nil)",
-   "test": "internal/modules/review ^TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable$",
+   "test": "internal/modules/review ^TestReviewImagesSyncLinkAndUnlinkOnPurge$",
    "why": "共用同步不再 Link 目前的資產：模組的引用沒有登記。"
   },
   {
@@ -69,7 +69,7 @@
    "file": "backend/internal/modules/media/internal/refsync/refsync.go",
    "old": "s.Media.Unlink(ctx, ref, unlink)",
    "new": "error(nil)",
-   "test": "internal/modules/review ^TestRD4PurgeDeletesRowsAndImagesAndSyncsMediaAndIsRerunnable$",
+   "test": "internal/modules/review ^TestReviewImagesSyncLinkAndUnlinkOnPurge$",
    "why": "共用同步不再 Unlink 退場的資產：被取代或釋放的資產仍被引用。"
   },
   {
