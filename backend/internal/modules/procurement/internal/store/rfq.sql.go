@@ -291,7 +291,7 @@ func (q *Queries) GetLatestPricePreviewForRevision(ctx context.Context, arg GetL
 }
 
 const getLatestPublicationByRequest = `-- name: GetLatestPublicationByRequest :one
-SELECT p.id, p.version, p.published_at, a.confirmed_rfq_snapshot_id,
+SELECT p.id, p.version, p.published_at, p.schema_version, a.confirmed_rfq_snapshot_id,
     (SELECT count(*) FROM procurement.rfq_publication_approval_recipients r WHERE r.approval_id = a.id)::int AS recipient_count,
     (SELECT count(*) FROM procurement.rfq_publication_invites i WHERE i.publication_id = p.id)::int AS queued_count
 FROM procurement.rfq_publications p
@@ -310,12 +310,13 @@ type GetLatestPublicationByRequestRow struct {
 	ID                     uuid.UUID
 	Version                int32
 	PublishedAt            time.Time
+	SchemaVersion          string
 	ConfirmedRfqSnapshotID uuid.UUID
 	RecipientCount         int32
 	QueuedCount            int32
 }
 
-// 需求最新一次的發布，連同核准的快照 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
+// 需求最新一次的發布，連同核准的快照 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0），以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
 func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLatestPublicationByRequestParams) (GetLatestPublicationByRequestRow, error) {
 	row := q.db.QueryRow(ctx, getLatestPublicationByRequest, arg.RequestID, arg.BuyerID)
 	var i GetLatestPublicationByRequestRow
@@ -323,6 +324,7 @@ func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLate
 		&i.ID,
 		&i.Version,
 		&i.PublishedAt,
+		&i.SchemaVersion,
 		&i.ConfirmedRfqSnapshotID,
 		&i.RecipientCount,
 		&i.QueuedCount,

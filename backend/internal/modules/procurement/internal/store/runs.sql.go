@@ -527,6 +527,38 @@ func (q *Queries) ListRunsByRequest(ctx context.Context, arg ListRunsByRequestPa
 	return items, nil
 }
 
+const listUnfinishedRunIDsByRequest = `-- name: ListUnfinishedRunIDsByRequest :many
+SELECT id FROM procurement.agent_runs
+WHERE request_id = $1 AND buyer_id = $2 AND status IN ('QUEUED', 'RUNNING', 'CANCEL_REQUESTED', 'WAITING_FOR_INPUT')
+ORDER BY id
+`
+
+type ListUnfinishedRunIDsByRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   int64
+}
+
+// 需求還沒結束的 run（含等待輸入的），依 id 升序；不鎖：呼叫端逐個依全域鎖順序鎖並重讀狀態（刪除對話時全部取消）。
+func (q *Queries) ListUnfinishedRunIDsByRequest(ctx context.Context, arg ListUnfinishedRunIDsByRequestParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listUnfinishedRunIDsByRequest, arg.RequestID, arg.BuyerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWaitingRunIDs = `-- name: ListWaitingRunIDs :many
 SELECT id FROM procurement.agent_runs
 WHERE buyer_id = $1 AND request_id = $2 AND status = 'WAITING_FOR_INPUT'

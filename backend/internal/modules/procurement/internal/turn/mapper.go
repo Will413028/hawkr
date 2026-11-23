@@ -8,21 +8,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 )
 
-// setFromRevision 把需求版本的列轉成 slots.Set。品項解析的 kind、label 與分類 ID 一起存在或一起沒有（資料表的 CHECK）。
-func setFromRevision(r store.ProcurementRequestRevision) slots.Set {
-	s := slots.Set{
-		Item: r.Item, Quantity: r.Quantity, Unit: r.Unit, Packaging: r.Packaging, BudgetPerUnit: r.BudgetPerUnit,
-		DeliveryCity: r.DeliveryCity, DeliveryDate: r.DeliveryDate, ExactMatchRequired: r.ExactMatchRequired,
-	}
-	if r.ItemResolutionKind != nil && r.ItemResolutionLabel != nil {
-		res := slots.Resolution{Kind: slots.ItemResolutionKind(*r.ItemResolutionKind), Label: *r.ItemResolutionLabel}
-		if r.ItemResolutionCategoryID != nil {
-			res.CategoryID = *r.ItemResolutionCategoryID
-		}
-		s.Resolution = &res
-	}
-	return s
-}
+// setFromRevision 把需求版本的列轉成 slots.Set（對應在 slots.FromRevision，讀取模型共用）。
+func setFromRevision(r store.ProcurementRequestRevision) slots.Set { return slots.FromRevision(r) }
 
 // revisionParams 把 slots.Set 轉成新版本的寫入參數（欄位與 setFromRevision 一一對應）。
 func revisionParams(s slots.Set, p store.InsertRevisionParams) store.InsertRevisionParams {

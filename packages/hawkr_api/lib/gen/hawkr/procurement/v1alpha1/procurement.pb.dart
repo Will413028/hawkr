@@ -727,121 +727,6 @@ class Slots extends $pb.GeneratedMessage {
   ItemResolution ensureItemResolution() => $_ensure(8);
 }
 
-class ItemDisambiguationOption extends $pb.GeneratedMessage {
-  factory ItemDisambiguationOption({
-    $core.String? label,
-  }) {
-    final result = ItemDisambiguationOption._();
-    if (label != null) result.label = label;
-    return result;
-  }
-
-  ItemDisambiguationOption._();
-
-  factory ItemDisambiguationOption.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ItemDisambiguationOption()..mergeFromBuffer(data, registry);
-  factory ItemDisambiguationOption.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ItemDisambiguationOption()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ItemDisambiguationOption',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
-      createEmptyInstance: ItemDisambiguationOption.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'label')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ItemDisambiguationOption clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ItemDisambiguationOption copyWith(
-          void Function(ItemDisambiguationOption) updates) =>
-      super.copyWith((message) => updates(message as ItemDisambiguationOption))
-          as ItemDisambiguationOption;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use ItemDisambiguationOption() / ItemDisambiguationOption.new instead')
-  static ItemDisambiguationOption create() => ItemDisambiguationOption._();
-  static $pb.GeneratedMessage $_createMessage() => ItemDisambiguationOption._();
-  @$core.override
-  ItemDisambiguationOption createEmptyInstance() =>
-      ItemDisambiguationOption._();
-  @$core.pragma('dart2js:noInline')
-  static ItemDisambiguationOption getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ItemDisambiguationOption>(
-          ItemDisambiguationOption.$_createMessage);
-  static ItemDisambiguationOption? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get label => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set label($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasLabel() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearLabel() => $_clearField(1);
-}
-
-/// ItemDisambiguation 是品項有多個可能的分類時，可供買家選的分類。
-class ItemDisambiguation extends $pb.GeneratedMessage {
-  factory ItemDisambiguation({
-    $core.Iterable<ItemDisambiguationOption>? candidates,
-  }) {
-    final result = ItemDisambiguation._();
-    if (candidates != null) result.candidates.addAll(candidates);
-    return result;
-  }
-
-  ItemDisambiguation._();
-
-  factory ItemDisambiguation.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ItemDisambiguation()..mergeFromBuffer(data, registry);
-  factory ItemDisambiguation.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ItemDisambiguation()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ItemDisambiguation',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
-      createEmptyInstance: ItemDisambiguation.$_createMessage)
-    ..pPM<ItemDisambiguationOption>(1, _omitFieldNames ? '' : 'candidates',
-        subBuilder: ItemDisambiguationOption.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ItemDisambiguation clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ItemDisambiguation copyWith(void Function(ItemDisambiguation) updates) =>
-      super.copyWith((message) => updates(message as ItemDisambiguation))
-          as ItemDisambiguation;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated('Use ItemDisambiguation() / ItemDisambiguation.new instead')
-  static ItemDisambiguation create() => ItemDisambiguation._();
-  static $pb.GeneratedMessage $_createMessage() => ItemDisambiguation._();
-  @$core.override
-  ItemDisambiguation createEmptyInstance() => ItemDisambiguation._();
-  @$core.pragma('dart2js:noInline')
-  static ItemDisambiguation getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ItemDisambiguation>(
-          ItemDisambiguation.$_createMessage);
-  static ItemDisambiguation? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $pb.PbList<ItemDisambiguationOption> get candidates => $_getList(0);
-}
-
 class Block extends $pb.GeneratedMessage {
   factory Block({
     BlockKind? kind,
@@ -2195,7 +2080,6 @@ class GetSnapshotResponse extends $pb.GeneratedMessage {
     RequestStatus? status,
     Slots? slots,
     $core.Iterable<SlotKey>? missingRequired,
-    ItemDisambiguation? itemDisambiguation,
     $core.Iterable<RunSummary>? runs,
     $core.String? activeRunId,
     OpenConfirmation? openConfirmation,
@@ -2207,8 +2091,6 @@ class GetSnapshotResponse extends $pb.GeneratedMessage {
     if (status != null) result.status = status;
     if (slots != null) result.slots = slots;
     if (missingRequired != null) result.missingRequired.addAll(missingRequired);
-    if (itemDisambiguation != null)
-      result.itemDisambiguation = itemDisambiguation;
     if (runs != null) result.runs.addAll(runs);
     if (activeRunId != null) result.activeRunId = activeRunId;
     if (openConfirmation != null) result.openConfirmation = openConfirmation;
@@ -2241,8 +2123,6 @@ class GetSnapshotResponse extends $pb.GeneratedMessage {
         valueOf: SlotKey.valueOf,
         enumValues: SlotKey.values,
         defaultEnumValue: SlotKey.SLOT_KEY_UNSPECIFIED)
-    ..aOM<ItemDisambiguation>(6, _omitFieldNames ? '' : 'itemDisambiguation',
-        subBuilder: ItemDisambiguation.$_createMessage)
     ..pPM<RunSummary>(7, _omitFieldNames ? '' : 'runs',
         subBuilder: RunSummary.$_createMessage)
     ..aOS(8, _omitFieldNames ? '' : 'activeRunId')
@@ -2316,53 +2196,41 @@ class GetSnapshotResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   $pb.PbList<SlotKey> get missingRequired => $_getList(4);
 
-  /// 品項有多個可能的分類，等買家選；沒有時不設。
-  @$pb.TagNumber(6)
-  ItemDisambiguation get itemDisambiguation => $_getN(5);
-  @$pb.TagNumber(6)
-  set itemDisambiguation(ItemDisambiguation value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasItemDisambiguation() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearItemDisambiguation() => $_clearField(6);
-  @$pb.TagNumber(6)
-  ItemDisambiguation ensureItemDisambiguation() => $_ensure(5);
-
   @$pb.TagNumber(7)
-  $pb.PbList<RunSummary> get runs => $_getList(6);
+  $pb.PbList<RunSummary> get runs => $_getList(5);
 
   /// 進行中的 run；沒有時是空字串。
   @$pb.TagNumber(8)
-  $core.String get activeRunId => $_getSZ(7);
+  $core.String get activeRunId => $_getSZ(6);
   @$pb.TagNumber(8)
-  set activeRunId($core.String value) => $_setString(7, value);
+  set activeRunId($core.String value) => $_setString(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasActiveRunId() => $_has(7);
+  $core.bool hasActiveRunId() => $_has(6);
   @$pb.TagNumber(8)
   void clearActiveRunId() => $_clearField(8);
 
   /// 只在進行中的 run 停在等待輸入時設定。
   @$pb.TagNumber(9)
-  OpenConfirmation get openConfirmation => $_getN(8);
+  OpenConfirmation get openConfirmation => $_getN(7);
   @$pb.TagNumber(9)
   set openConfirmation(OpenConfirmation value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasOpenConfirmation() => $_has(8);
+  $core.bool hasOpenConfirmation() => $_has(7);
   @$pb.TagNumber(9)
   void clearOpenConfirmation() => $_clearField(9);
   @$pb.TagNumber(9)
-  OpenConfirmation ensureOpenConfirmation() => $_ensure(8);
+  OpenConfirmation ensureOpenConfirmation() => $_ensure(7);
 
   @$pb.TagNumber(10)
-  PublishedRfq get publishedRfq => $_getN(9);
+  PublishedRfq get publishedRfq => $_getN(8);
   @$pb.TagNumber(10)
   set publishedRfq(PublishedRfq value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasPublishedRfq() => $_has(9);
+  $core.bool hasPublishedRfq() => $_has(8);
   @$pb.TagNumber(10)
   void clearPublishedRfq() => $_clearField(10);
   @$pb.TagNumber(10)
-  PublishedRfq ensurePublishedRfq() => $_ensure(9);
+  PublishedRfq ensurePublishedRfq() => $_ensure(8);
 }
 
 class MatchedFact extends $pb.GeneratedMessage {

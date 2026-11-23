@@ -81,7 +81,7 @@ CREATE TABLE procurement.conversations (
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT conversations_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT conversations_title_source_check CHECK (title_source IN ('AUTO', 'USER')),
-    CONSTRAINT conversations_title_check CHECK (char_length(title) <= 200 AND title !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT conversations_title_check CHECK (char_length(title) <= 40 AND title !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT conversations_preview_check CHECK (char_length(last_message_preview) <= 200 AND last_message_preview !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );
 CREATE UNIQUE INDEX conversations_request ON procurement.conversations (request_id);

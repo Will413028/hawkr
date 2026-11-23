@@ -38,29 +38,54 @@ type CancelOutcome struct {
 func (c Canceller) Cancel(ctx context.Context, buyerID int64, runID uuid.UUID) (CancelOutcome, error) {
 	var out CancelOutcome
 	err := c.DB.InTx(ctx, func(ctx context.Context) error {
-		r, err := c.Ledger.lockRun(ctx, runID)
-		if err != nil {
-			return err
-		}
-		if r.BuyerID != buyerID {
-			return apperr.NotFound("找不到這個 run")
-		}
-		switch r.Status {
-		case StatusCancelled:
-			out = CancelOutcome{Status: r.Status, Disposition: DispositionAlreadyCancelled}
-		case StatusWaitingForInput:
-			if err := cancelWaiting(ctx, c.DB, c.Ledger, c.Jobs, r.ID); err != nil {
-				return err
-			}
-			out = CancelOutcome{Status: StatusCancelled, Disposition: DispositionRequested}
-		case StatusQueued, StatusRunning, StatusCancelRequested:
-			return c.request(ctx, r, &out)
-		default:
-			out = CancelOutcome{Status: r.Status, Disposition: DispositionAlreadyTerminal}
-		}
-		return nil
+		var err error
+		out, err = c.cancelLocked(ctx, buyerID, runID)
+		return err
 	})
 	return out, err
+}
+
+// CancelAllOfRequest 取消需求所有還沒結束的 run（含等待輸入的），在呼叫端已開的 transaction 內，沿用 Cancel 的每一條路徑；
+// 依 id 升序逐個鎖並重讀狀態（提問的 run 的 id 先於回答它的 run，符合鎖順序；已被前一個取消順帶處理的回答 run 重讀後走冪等分支）。
+func (c Canceller) CancelAllOfRequest(ctx context.Context, buyerID int64, requestID uuid.UUID) error {
+	ids, err := store.New(c.DB.Conn(ctx)).ListUnfinishedRunIDsByRequest(ctx, store.ListUnfinishedRunIDsByRequestParams{RequestID: requestID, BuyerID: buyerID})
+	if err != nil {
+		return fmt.Errorf("run：列出需求還沒結束的 run：%w", err)
+	}
+	for _, id := range ids {
+		if _, err := c.cancelLocked(ctx, buyerID, id); err != nil {
+			return fmt.Errorf("run：取消 run %s：%w", id, err)
+		}
+	}
+	return nil
+}
+
+// cancelLocked 在呼叫端的 transaction 內鎖 run 並依狀態取消。
+func (c Canceller) cancelLocked(ctx context.Context, buyerID int64, runID uuid.UUID) (CancelOutcome, error) {
+	r, err := c.Ledger.lockRun(ctx, runID)
+	if err != nil {
+		return CancelOutcome{}, err
+	}
+	if r.BuyerID != buyerID {
+		return CancelOutcome{}, apperr.NotFound("找不到這個 run")
+	}
+	var out CancelOutcome
+	switch r.Status {
+	case StatusCancelled:
+		out = CancelOutcome{Status: r.Status, Disposition: DispositionAlreadyCancelled}
+	case StatusWaitingForInput:
+		if err := cancelWaiting(ctx, c.DB, c.Ledger, c.Jobs, r.ID); err != nil {
+			return CancelOutcome{}, err
+		}
+		out = CancelOutcome{Status: StatusCancelled, Disposition: DispositionRequested}
+	case StatusQueued, StatusRunning, StatusCancelRequested:
+		if err := c.request(ctx, r, &out); err != nil {
+			return CancelOutcome{}, err
+		}
+	default:
+		out = CancelOutcome{Status: r.Status, Disposition: DispositionAlreadyTerminal}
+	}
+	return out, nil
 }
 
 func (c Canceller) request(ctx context.Context, r store.ProcurementAgentRun, out *CancelOutcome) error {

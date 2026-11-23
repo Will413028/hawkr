@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfqhash"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
@@ -66,46 +67,97 @@ func (r Reader) read(ctx context.Context, buyerID int64, conversationID uuid.UUI
 	if out.Messages, err = messagesOf(turns); err != nil {
 		return model.RuntimeSnapshot{}, err
 	}
-
-	runs, err := q.ListRunsByRequest(ctx, store.ListRunsByRequestParams{RequestID: req.ID, BuyerID: buyerID, MaxRows: model.RuntimeSnapshotMaxRuns})
+	p, err := r.progress(ctx, q, buyerID, req.ID)
 	if err != nil {
-		return model.RuntimeSnapshot{}, fmt.Errorf("snapshot：讀取 run：%w", err)
+		return model.RuntimeSnapshot{}, err
+	}
+	out.Runs, out.ActiveRunID, out.OpenConfirmation, out.PublishedRfq = p.runs, p.active, p.confirmation, p.published
+	return out, nil
+}
+
+// progress 是 GetRuntimeSnapshot 與 GetSnapshot 共用的部分：需求的 run、進行中的 run、待回答的中斷與最新的發布結果。
+type progress struct {
+	runs         []model.RunSummary
+	active       *uuid.UUID
+	confirmation *model.OpenConfirmation
+	published    *model.PublishedRfq
+}
+
+func (r Reader) progress(ctx context.Context, q *store.Queries, buyerID int64, requestID uuid.UUID) (progress, error) {
+	var out progress
+	runs, err := q.ListRunsByRequest(ctx, store.ListRunsByRequestParams{RequestID: requestID, BuyerID: buyerID, MaxRows: model.RuntimeSnapshotMaxRuns})
+	if err != nil {
+		return progress{}, fmt.Errorf("snapshot：讀取 run：%w", err)
 	}
 	for _, x := range runs {
-		out.Runs = append(out.Runs, model.RunSummary{
+		out.runs = append(out.runs, model.RunSummary{
 			RunID: x.ID, RunType: x.RunType, Status: x.Status, LastCursor: run.Cursor(x.LastEventSeq), Terminal: run.IsTerminal(x.Status),
 		})
 	}
 
-	active, err := q.GetInProgressRunForRequest(ctx, store.GetInProgressRunForRequestParams{RequestID: req.ID, BuyerID: buyerID})
+	active, err := q.GetInProgressRunForRequest(ctx, store.GetInProgressRunForRequestParams{RequestID: requestID, BuyerID: buyerID})
 	switch {
 	case err == nil:
-		out.ActiveRunID = &active.ID
+		out.active = &active.ID
 	case !errors.Is(err, pgx.ErrNoRows):
-		return model.RuntimeSnapshot{}, fmt.Errorf("snapshot：讀取進行中的 run：%w", err)
+		return progress{}, fmt.Errorf("snapshot：讀取進行中的 run：%w", err)
 	}
 
-	irq, found, err := r.Ledger.OpenInterruptForRequest(ctx, buyerID, req.ID)
+	irq, found, err := r.Ledger.OpenInterruptForRequest(ctx, buyerID, requestID)
 	if err != nil {
-		return model.RuntimeSnapshot{}, err
+		return progress{}, err
 	}
 	if found {
-		if out.OpenConfirmation, err = confirmationOf(irq); err != nil {
-			return model.RuntimeSnapshot{}, err
+		if out.confirmation, err = confirmationOf(irq); err != nil {
+			return progress{}, err
 		}
 	}
 
-	pub, err := q.GetLatestPublicationByRequest(ctx, store.GetLatestPublicationByRequestParams{RequestID: req.ID, BuyerID: &owner})
+	owner := buyerID
+	pub, err := q.GetLatestPublicationByRequest(ctx, store.GetLatestPublicationByRequestParams{RequestID: requestID, BuyerID: &owner})
 	switch {
 	case err == nil:
-		out.PublishedRfq = &model.PublishedRfq{
+		hash, err := snapshotHash(ctx, q, buyerID, requestID, pub.ConfirmedRfqSnapshotID, pub.SchemaVersion)
+		if err != nil {
+			return progress{}, err
+		}
+		out.published = &model.PublishedRfq{
 			PublicationID: pub.ID, Version: pub.Version, PublishTime: pub.PublishedAt,
 			RecipientCount: pub.RecipientCount, QueuedCount: pub.QueuedCount, ConfirmedRfqSnapshotID: pub.ConfirmedRfqSnapshotID,
+			RfqSnapshotHash: hash,
 		}
 	case !errors.Is(err, pgx.ErrNoRows):
-		return model.RuntimeSnapshot{}, fmt.Errorf("snapshot：讀取發布結果：%w", err)
+		return progress{}, fmt.Errorf("snapshot：讀取發布結果：%w", err)
 	}
 	return out, nil
+}
+
+// snapshotHash 由發布的 schema_version、確認快照、它確認的需求版本與價格預覽重算 hash（rfqhash）；三者都是不可變的列，缺任何一列是資料不一致。
+func snapshotHash(ctx context.Context, q *store.Queries, buyerID int64, requestID, snapshotID uuid.UUID, schemaVersion string) (string, error) {
+	owner := buyerID
+	snap, err := q.GetConfirmedSnapshot(ctx, store.GetConfirmedSnapshotParams{ID: snapshotID, RequestID: requestID, BuyerID: &owner})
+	if err != nil {
+		return "", fmt.Errorf("snapshot：讀取確認快照 %s：%w", snapshotID, err)
+	}
+	rev, err := q.GetRevision(ctx, store.GetRevisionParams{ID: snap.RequestRevisionID, RequestID: requestID, BuyerID: &owner})
+	if err != nil {
+		return "", fmt.Errorf("snapshot：讀取快照的需求版本：%w", err)
+	}
+	prev, err := q.GetPricePreview(ctx, store.GetPricePreviewParams{ID: snap.PricePreviewID, RequestID: requestID, BuyerID: &owner})
+	if err != nil {
+		return "", fmt.Errorf("snapshot：讀取快照的價格預覽：%w", err)
+	}
+	return rfqhash.Snapshot(rfqhash.Input{
+		SchemaVersion: schemaVersion, ConfirmedRfqSnapshotID: snap.ID.String(), RequestRevisionID: rev.ID.String(), PricePreviewID: prev.ID.String(), BuyerNote: snap.BuyerNote,
+		Requirement: rfqhash.Slots{
+			Item: rev.Item, Quantity: rev.Quantity, Unit: rev.Unit, Packaging: rev.Packaging, BudgetPerUnit: rev.BudgetPerUnit,
+			DeliveryCity: rev.DeliveryCity, DeliveryDate: rfqhash.Date(rev.DeliveryDate), ExactMatchRequired: rev.ExactMatchRequired,
+		},
+		Price: rfqhash.Price{
+			RangeLowerAmount: prev.RangeLowerAmount, RangeUpperAmount: prev.RangeUpperAmount, BasisQuantity: prev.BasisQuantity, BasisUnit: prev.BasisUnit,
+			TotalLowerAmount: prev.TotalLowerAmount, TotalUpperAmount: prev.TotalUpperAmount, TotalQuantity: prev.TotalQuantity, TotalUnit: prev.TotalUnit,
+		},
+	})
 }
 
 type recordedWire struct {
