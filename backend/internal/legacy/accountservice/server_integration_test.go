@@ -96,7 +96,7 @@ func (f *fixture) account(t *testing.T, roles ...identity.Role) int64 {
 		t.Fatal(err)
 	}
 	for _, r := range roles {
-		if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: r, SourceID: nil}); err != nil {
+		if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: r}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -161,32 +161,21 @@ func TestRolesAndDeletion(t *testing.T) {
 	if _, err := f.client.BindBuyer(ctx, connect.NewRequest(&pb.BindBuyerRequest{AccountId: id})); connect.CodeOf(err) != connect.CodeUnimplemented {
 		t.Fatalf("BindBuyer = %v", err)
 	}
-	// 賣家角色由 seller 模組建店時授予；這裡直接以 identity 授予，驗證舊 RemoveRole 的來源比對。
-	for _, source := range []int64{11, 12} {
-		if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller, SourceID: &source}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	// 重新入駐之後，遲到的舊撤銷（來源 11）不生效（#3189）。
-	r, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{
-		AccountId: id, Role: pb.Role_ROLE_SELLER, SourceId: 11, OtherRoleState: pb.OtherRoleState_OTHER_ROLE_STATE_ABSENT,
-	}))
-	if err != nil || r.Msg.GetCode() != 0 || r.Msg.GetAccountFullyDeleted() {
-		t.Fatalf("過期的撤銷 = %v, %v", r, err)
+	// 賣家角色由 seller 模組建店時授予；這裡直接以 identity 授予。
+	if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
+		t.Fatal(err)
 	}
 	if a, _ := f.m.Account(ctx, id); !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("角色 = %v", a.Roles)
 	}
-	// 移除最後一個角色也不刪帳號（帳號活著就是買家），即使舊呼叫方回報另一個角色 ABSENT。
-	r, err = f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{
-		AccountId: id, Role: pb.Role_ROLE_SELLER, SourceId: 12, OtherRoleState: pb.OtherRoleState_OTHER_ROLE_STATE_ABSENT,
-	}))
+	// 移除最後一個角色也不刪帳號（帳號活著就是買家）。
+	r, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_SELLER}))
 	if err != nil || r.Msg.GetCode() != 0 || r.Msg.GetAccountFullyDeleted() {
 		t.Fatalf("移除賣家 = %v, %v", r, err)
 	}
 	// 買家不是角色：舊的 ROLE_BUYER 一律拒絕，帳號不變。
 	r, err = f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{
-		AccountId: id, Role: pb.Role_ROLE_BUYER, OtherRoleState: pb.OtherRoleState_OTHER_ROLE_STATE_ABSENT,
+		AccountId: id, Role: pb.Role_ROLE_BUYER,
 	}))
 	if err != nil || r.Msg.GetCode() != codeInvalidInput || r.Msg.GetAccountFullyDeleted() {
 		t.Fatalf("移除買家 = %v, %v", r, err)

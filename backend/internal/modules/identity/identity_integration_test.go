@@ -132,8 +132,6 @@ func wantReason(t *testing.T, err error, want apperr.Reason) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
-
 // account 直接寫入一個帳號與它的登入身分（GOOGLE，subject 是 user；email 取自 f.emails）。買家不是角色（W5）：
 // 建帳之後沒有任何角色。
 func (f *fixture) account(t *testing.T, user string) int64 {
@@ -296,19 +294,15 @@ func TestRemoveRole(t *testing.T) {
 	ctx := context.Background()
 	id := f.account(t, "user_1")
 
-	// #3189：賣家重新入駐（來源 2）之後，遲到的舊撤銷（來源 1）不生效。
-	if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: id, Role: RoleSeller, SourceID: ptr[int64](1)}); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: id, Role: RoleSeller, SourceID: ptr[int64](2)}); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: id, Role: RoleSeller, SourceID: ptr[int64](1)}); err != nil {
-		t.Fatal(err)
+	// 重複授予同一個角色不變。
+	for range 2 {
+		if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: id, Role: RoleSeller}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	a, _ := f.m.Account(ctx, id)
 	if !slices.Equal(a.Roles, []Role{RoleSeller}) {
-		t.Fatalf("柵欄沒擋下：角色 = %v", a.Roles)
+		t.Fatalf("角色 = %v", a.Roles)
 	}
 	// 角色的變更下一個請求就生效：每個請求都讀。
 	if got, err := f.authenticate(t, "user_1"); err != nil || !slices.Equal(got.Principal.Roles, []Role{RoleSeller}) {
@@ -316,7 +310,7 @@ func TestRemoveRole(t *testing.T) {
 	}
 	// 移除最後一個角色不刪帳號（W5：帳號活著就是買家，刪帳由 accountdeletion 編排），重送也一樣。
 	for range 2 {
-		if err := f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: id, Role: RoleSeller, SourceID: ptr[int64](2)}); err != nil {
+		if err := f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: id, Role: RoleSeller}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -340,7 +334,7 @@ func TestRemoveRole(t *testing.T) {
 		t.Fatalf("AccountDeleted 發了 %d 次", len(f.deleted))
 	}
 	wantKind(t, f.m.RemoveRole(ctx, RemoveRoleInput{AccountID: 999, Role: RoleSeller}), apperr.KindNotFound)
-	wantKind(t, f.m.GrantRole(ctx, GrantRoleInput{AccountID: id, Role: RoleSeller, SourceID: nil}), apperr.KindNotFound)
+	wantKind(t, f.m.GrantRole(ctx, GrantRoleInput{AccountID: id, Role: RoleSeller}), apperr.KindNotFound)
 }
 
 func TestAdminsAreCreatedForAccessSubjects(t *testing.T) {
@@ -458,7 +452,7 @@ func TestListAccounts(t *testing.T) {
 		ids = append(ids, f.account(t, user))
 		f.now = f.now.Add(time.Minute)
 	}
-	if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: ids[1], Role: RoleSeller, SourceID: ptr[int64](5)}); err != nil {
+	if err := f.m.GrantRole(ctx, GrantRoleInput{AccountID: ids[1], Role: RoleSeller}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.m.DeleteAccount(ctx, ids[2]); err != nil {

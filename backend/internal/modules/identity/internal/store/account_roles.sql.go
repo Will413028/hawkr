@@ -19,34 +19,22 @@ func (q *Queries) DeleteAccountRoles(ctx context.Context, accountID int64) error
 	return err
 }
 
-const grantAccountRole = `-- name: GrantAccountRole :execrows
-INSERT INTO identity.account_roles (account_id, role, source_id, granted_at)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (account_id, role) DO UPDATE
-SET source_id = EXCLUDED.source_id
-WHERE identity.account_roles.source_id IS DISTINCT FROM EXCLUDED.source_id
+const grantAccountRole = `-- name: GrantAccountRole :exec
+INSERT INTO identity.account_roles (account_id, role, granted_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (account_id, role) DO NOTHING
 `
 
 type GrantAccountRoleParams struct {
 	AccountID int64
 	Role      string
-	SourceID  *int64
 	Now       time.Time
 }
 
-// 授予角色；已經有這個角色時改指到新的來源（呼叫方永遠帶當下的來源，重新入駐後遲到的舊撤銷因此擋得下）。
-// 回傳 0 表示角色與來源都沒有變。
-func (q *Queries) GrantAccountRole(ctx context.Context, arg GrantAccountRoleParams) (int64, error) {
-	result, err := q.db.Exec(ctx, grantAccountRole,
-		arg.AccountID,
-		arg.Role,
-		arg.SourceID,
-		arg.Now,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// 授予角色；已經有這個角色時不變。
+func (q *Queries) GrantAccountRole(ctx context.Context, arg GrantAccountRoleParams) error {
+	_, err := q.db.Exec(ctx, grantAccountRole, arg.AccountID, arg.Role, arg.Now)
+	return err
 }
 
 const listRolesOfAccounts = `-- name: ListRolesOfAccounts :many
@@ -80,40 +68,17 @@ func (q *Queries) ListRolesOfAccounts(ctx context.Context, accountIds []int64) (
 	return items, nil
 }
 
-const revokeAccountRole = `-- name: RevokeAccountRole :one
-WITH current_grant AS (
-    SELECT 1 FROM identity.account_roles cg
-    WHERE cg.account_id = $1 AND cg.role = $2
-),
-revoked_grant AS (
-    DELETE FROM identity.account_roles rg
-    WHERE rg.account_id = $1
-      AND rg.role = $2
-      AND (rg.source_id IS NULL OR rg.source_id = $3)
-    RETURNING 1
-)
-SELECT
-    EXISTS (SELECT 1 FROM revoked_grant) AS revoked,
-    EXISTS (SELECT 1 FROM current_grant) AS had_role
+const revokeAccountRole = `-- name: RevokeAccountRole :exec
+DELETE FROM identity.account_roles
+WHERE account_id = $1 AND role = $2
 `
 
 type RevokeAccountRoleParams struct {
 	AccountID int64
 	Role      string
-	SourceID  *int64
 }
 
-type RevokeAccountRoleRow struct {
-	Revoked bool
-	HadRole bool
-}
-
-// 移除角色，只在目前的授予沒有來源、或來源就是 source_id 時生效（#3189 的柵欄）。
-// had_role 是移除之前帳號有沒有這個角色：had_role 而且沒有 revoked，表示被柵欄擋下（角色屬於較新的來源）。
-// 兩個 CTE 讀同一個 snapshot，had_role 描述的是這次移除面對的狀態。
-func (q *Queries) RevokeAccountRole(ctx context.Context, arg RevokeAccountRoleParams) (RevokeAccountRoleRow, error) {
-	row := q.db.QueryRow(ctx, revokeAccountRole, arg.AccountID, arg.Role, arg.SourceID)
-	var i RevokeAccountRoleRow
-	err := row.Scan(&i.Revoked, &i.HadRole)
-	return i, err
+func (q *Queries) RevokeAccountRole(ctx context.Context, arg RevokeAccountRoleParams) error {
+	_, err := q.db.Exec(ctx, revokeAccountRole, arg.AccountID, arg.Role)
+	return err
 }

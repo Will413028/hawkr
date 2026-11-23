@@ -165,16 +165,12 @@ const ReleaseReasonAccountDeleted = "ACCOUNT_DELETED"
 type RemoveRoleInput struct {
 	AccountID int64
 	Role      Role
-	// SourceID 是要撤銷的那次授予的來源；目前的授予屬於另一個（較新的）來源時不移除（遲到的撤銷
-	// 不能蓋掉重新入駐後的授予，#3189）。
-	SourceID *int64
 }
 
 // GrantRoleInput 是授予帳號角色的輸入。
 type GrantRoleInput struct {
 	AccountID int64
 	Role      Role
-	SourceID  *int64
 }
 
 // Admin 是管理員。

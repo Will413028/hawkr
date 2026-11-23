@@ -58,7 +58,7 @@
 
 - `store_id`（`seller.stores` 主鍵，`BIGINT GENERATED ALWAYS AS IDENTITY`，建立後不變）是賣家歸屬的 aggregate 身分，跨服務的賣家歸屬鍵一律用它；`store_code`（`BIGINT NOT NULL`，唯一索引 `stores_store_code`，範圍 1–9999999999）是對外的店家代碼（店面網址與舊服務的店家識別）；`account_id`（非唯一，建立後不變）是登入 principal，同一個帳號可累積多個 stint。三者是不同的值，不得互相代入，也不得假設任兩者相等（包含守衛比對與測試 fixture）。`store_id` 由資料庫發號，`store_code` 由 seller 自己產生，兩者不同來源。
 - `store_code` 由 `onboarding.RandomStoreCode` 產生：西元年後兩碼乘以 10^8，加上 8 位 `crypto/rand`；撞到 `stores_store_code` 時換一個再試，最多 5 次（`maxStoreCodeAttempts`），連續撞號回錯誤；撞號不使 transaction 失效（`INSERT … ON CONFLICT DO NOTHING`）。
-- 開店的順序（同一個 transaction）：鎖 identity 帳號列（`LockAccount`）→ 確認沒有目前的 stint、帳號沒有生效中的停權或終止合作、帳號沒有被 identity 停權（`OpeningState.AccountSuspended`，`accountsuspension` 停權的帳號開店要等解除，與停權序列化；`TestOpeningWaitsForASuspensionAndThenIsRefused`） → 建立 stint → 授予 SELLER（`source_id` 是新的 `store_id`）→ 發 `StoreOpened`；帳號等待刪除時 identity 拒絕授予，整筆回滾。`Apply` 與 `CloseMyStore`（對外的關店方法，契約是 `api/hawkr/seller/v1alpha1/seller.proto`；有未結訂單回 `failed_precondition`，停權中也可以關店）都先鎖 identity 帳號列、再鎖該帳號的 stint（帳號列先於店家列），序列化同一帳號併發的開店與關店；`stores_current_account` 是最後的資料庫防線。
+- 開店的順序（同一個 transaction）：鎖 identity 帳號列（`LockAccount`）→ 確認沒有目前的 stint、帳號沒有生效中的停權或終止合作、帳號沒有被 identity 停權（`OpeningState.AccountSuspended`，`accountsuspension` 停權的帳號開店要等解除，與停權序列化；`TestOpeningWaitsForASuspensionAndThenIsRefused`） → 建立 stint → 授予 SELLER→ 發 `StoreOpened`；帳號等待刪除時 identity 拒絕授予，整筆回滾。`Apply` 與 `CloseMyStore`（對外的關店方法，契約是 `api/hawkr/seller/v1alpha1/seller.proto`；有未結訂單回 `failed_precondition`，停權中也可以關店）都先鎖 identity 帳號列、再鎖該帳號的 stint（帳號列先於店家列），序列化同一帳號併發的開店與關店；`stores_current_account` 是最後的資料庫防線。
 - `status`：`ACTIVE`、`PENDING_DELETION`（隨帳號刪除進入等待）、`CLOSED`；停權不存在這裡，由措施在讀取時推導（§5）。轉移：`Apply` 建立 `ACTIVE`；關店（賣家自助、終止合作、帳號刪除）`ACTIVE` → `CLOSED`；帳號刪除等待 `ACTIVE` → `PENDING_DELETION`，刪除流程關閉後 → `CLOSED`；恢復營業（終止合作撤銷或申覆成立，退場前，§11）`CLOSED` → `ACTIVE`；退場與個資清理後 row 保留。
 - 索引：`stores_current_account`（`UNIQUE(account_id) WHERE status <> 'CLOSED'`，每個帳號至多一個目前的 stint，「找某人現在的店」走它）、`stores_account`（以帳號找全部的 stint）、`stores_store_code`（MerID 唯一性的防線）。
 - 只有賣家走 insert-new-stint：帳號再次開店另開新列、舊列保留，新列必須鑄新 `store_code`。買家與帳號同生命週期，不重新授予。
@@ -487,8 +487,6 @@
 - **未結訂單檢查的時間窗**：`Orders` port（§11）在 transaction 外問 ordering 的現況（現在的實作是 `internal/legacy/orderservice`），與之後鎖帳號、關店之間仍可能有新訂單成立，舊服務的訂單不在單體的鎖裡。解除條件：訂單搬進單體，以 ordering 自己的判斷在同一個 transaction 內檢查（`CARRYOVER.md`「7c 審查後的結論」）。
 
 - **media 引用有同步空窗**：新轉正的資產要在 media GC 的 7 天寬限內被同步 job Link，轉正之後、同步完成之前沒有引用；job 失敗由 River 重試並記 error log。解除條件：引用移進業務列的 transaction，同步 job 與退場表消失。
-
-- **identity 的 `source_id` 柵欄**：只為 seller-service 的非同步移除而存在，開店與關店照樣帶 `store_id` 當來源。解除條件：seller-service 退場。
 
 - **治理事件沒有訂閱者**：§18 的治理事件還沒有 notification 的訂閱與送達紀錄。解除條件：notification 與資料保存期限搬進單體。
 

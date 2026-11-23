@@ -35,7 +35,6 @@ type IdentityAccountIdentity struct {
 type IdentityAccountRole struct {
 	AccountID int64
 	Role      string
-	SourceID  *int64
 	GrantedAt time.Time
 }
 

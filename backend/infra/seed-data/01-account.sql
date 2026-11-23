@@ -97,9 +97,9 @@ BEGIN
   END IF;
 
   SELECT string_agg(r.account_id::text, ', ' ORDER BY r.account_id) INTO bad FROM identity.account_roles r JOIN seed_accounts s ON s.id = r.account_id
-  WHERE r.role = 'SELLER' AND r.source_id IS DISTINCT FROM s.seller_store_id;
+  WHERE r.role = 'SELLER' AND s.seller_store_id IS NULL;
   IF bad IS NOT NULL THEN
-    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子帳號 % 的 SELLER 角色指向種子以外的店家（或 3001 這類不該有店的帳號已開店）。請重建本機資料庫', bad;
+    RAISE EXCEPTION '01-account.sql 中止，沒有寫入任何資料：種子帳號 % 有 SELLER 角色，但種子沒有替它們開店（例如 3001 這類不該有店的帳號已開店）。請重建本機資料庫', bad;
   END IF;
 
   SELECT string_agg(d.address_id || '（買家' || d.buyer_id || '）', ', ' ORDER BY d.address_id) INTO bad FROM buyer.shipping_addresses d
@@ -154,11 +154,11 @@ SET display_name = EXCLUDED.display_name, phone = EXCLUDED.phone, gender = EXCLU
 WHERE (buyer.buyers.display_name, buyer.buyers.phone, buyer.buyers.gender, buyer.buyers.city)
       IS DISTINCT FROM (EXCLUDED.display_name, EXCLUDED.phone, EXCLUDED.gender, EXCLUDED.city);
 
--- 賣家角色的來源是店家（store_id，#3189 的柵欄）：9、4 的店由 dev-seed 以同樣的 store_id 寫入（cmd/hawkr/dev_seed.go，
+-- 9、4 的店由 dev-seed 寫入（cmd/hawkr/dev_seed.go，
 -- store_id 與 account_id 刻意不同值，互換的缺陷才藏不住）。3001 是還沒開店的買家：SELLER 角色與店家永遠成對，開店時 seller 模組在同一個
 -- transaction 建店並授予角色，所以沒有店就沒有角色（有角色沒有店是壞掉的不變量，入口回 500）。
-INSERT INTO identity.account_roles (account_id, role, source_id)
-SELECT id, 'SELLER', seller_store_id FROM seed_accounts WHERE seller_store_id IS NOT NULL
+INSERT INTO identity.account_roles (account_id, role)
+SELECT id, 'SELLER' FROM seed_accounts WHERE seller_store_id IS NOT NULL
 ON CONFLICT (account_id, role) DO NOTHING;
 
 -- 先把 fixture 裡不是預設的地址降級，再 upsert，預設地址的 partial UNIQUE 才不會在中途衝突。

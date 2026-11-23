@@ -71,57 +71,6 @@ func (Role) EnumDescriptor() ([]byte, []int) {
 	return file_account_account_proto_rawDescGZIP(), []int{0}
 }
 
-// 呼叫方對「帳號另一個角色是否還活著」的判定結果。
-// 未帶 / 查詢失敗一律是 UNKNOWN，identity 模組據此 fail-closed 不 cascade。
-type OtherRoleState int32
-
-const (
-	OtherRoleState_OTHER_ROLE_STATE_UNKNOWN OtherRoleState = 0
-	OtherRoleState_OTHER_ROLE_STATE_ACTIVE  OtherRoleState = 1
-	OtherRoleState_OTHER_ROLE_STATE_ABSENT  OtherRoleState = 2
-)
-
-// Enum value maps for OtherRoleState.
-var (
-	OtherRoleState_name = map[int32]string{
-		0: "OTHER_ROLE_STATE_UNKNOWN",
-		1: "OTHER_ROLE_STATE_ACTIVE",
-		2: "OTHER_ROLE_STATE_ABSENT",
-	}
-	OtherRoleState_value = map[string]int32{
-		"OTHER_ROLE_STATE_UNKNOWN": 0,
-		"OTHER_ROLE_STATE_ACTIVE":  1,
-		"OTHER_ROLE_STATE_ABSENT":  2,
-	}
-)
-
-func (x OtherRoleState) Enum() *OtherRoleState {
-	p := new(OtherRoleState)
-	*p = x
-	return p
-}
-
-func (x OtherRoleState) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (OtherRoleState) Descriptor() protoreflect.EnumDescriptor {
-	return file_account_account_proto_enumTypes[1].Descriptor()
-}
-
-func (OtherRoleState) Type() protoreflect.EnumType {
-	return &file_account_account_proto_enumTypes[1]
-}
-
-func (x OtherRoleState) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use OtherRoleState.Descriptor instead.
-func (OtherRoleState) EnumDescriptor() ([]byte, []int) {
-	return file_account_account_proto_rawDescGZIP(), []int{1}
-}
-
 type GoogleOAuthRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	IdToken  string                 `protobuf:"bytes,1,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`     // Google ID Token
@@ -1475,13 +1424,8 @@ func (x *CheckPhoneResponse) GetAvailable() bool {
 }
 
 type BindSellerRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	AccountId int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// source_id 是「造成這次授予的那個實體」——seller 角色填 sellers.store_id
-	// （該次入駐的 stint surrogate）。identity 模組把它記在 account_roles 上，
-	// 之後的撤銷必須指名同一個 source_id 才會生效（見 RemoveRoleRequest.source_id）。
-	// 0 = 未歸因（identity 模組內部授予）：這種授予任何撤銷都撤得掉。
-	SourceId      int64 `protobuf:"varint,4,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1519,13 +1463,6 @@ func (*BindSellerRequest) Descriptor() ([]byte, []int) {
 func (x *BindSellerRequest) GetAccountId() int64 {
 	if x != nil {
 		return x.AccountId
-	}
-	return 0
-}
-
-func (x *BindSellerRequest) GetSourceId() int64 {
-	if x != nil {
-		return x.SourceId
 	}
 	return 0
 }
@@ -2560,23 +2497,9 @@ func (x *GetAccountForAdminResponse) GetData() *AdminAccountItem {
 }
 
 type RemoveRoleRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	AccountId      int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	Role           Role                   `protobuf:"varint,2,opt,name=role,proto3,enum=hawkr.account.Role" json:"role,omitempty"`
-	OtherRoleState OtherRoleState         `protobuf:"varint,3,opt,name=other_role_state,json=otherRoleState,proto3,enum=hawkr.account.OtherRoleState" json:"other_role_state,omitempty"`
-	// source_id 是「授權這次撤銷的那個實體」——seller 角色填被關閉的
-	// sellers.store_id。撤銷只在當前授予正是由同一個 source_id 造成時才生效：
-	//
-	//	UPDATE account_roles ... WHERE revoked_at IS NULL
-	//	  AND (source_id IS NULL OR source_id = @source_id)
-	//
-	// 這道柵欄存在的理由是撤銷會延遲執行（非同步的 job 重試
-	// 退避最長數小時），期間帳號可能已經重新入駐並取得一筆**較新**的授予。沒有
-	// 柵欄時，過期的撤銷會蓋掉那筆合法授予，受害者變成「有店、無角色」且無自癒
-	// 路徑。柵欄比對就在那一句 UPDATE 裡，不存在 check-then-act 的競態窗口。
-	//
-	// 0 = 不指名來源：只撤得掉 source_id IS NULL 的未歸因授予。
-	SourceId      int64 `protobuf:"varint,4,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     int64                  `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Role          Role                   `protobuf:"varint,2,opt,name=role,proto3,enum=hawkr.account.Role" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2623,20 +2546,6 @@ func (x *RemoveRoleRequest) GetRole() Role {
 		return x.Role
 	}
 	return Role_ROLE_UNSPECIFIED
-}
-
-func (x *RemoveRoleRequest) GetOtherRoleState() OtherRoleState {
-	if x != nil {
-		return x.OtherRoleState
-	}
-	return OtherRoleState_OTHER_ROLE_STATE_UNKNOWN
-}
-
-func (x *RemoveRoleRequest) GetSourceId() int64 {
-	if x != nil {
-		return x.SourceId
-	}
-	return 0
 }
 
 type RemoveRoleResponse struct {
@@ -4302,11 +4211,10 @@ const file_account_account_proto_rawDesc = "" +
 	"\x12CheckPhoneResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1c\n" +
-	"\tavailable\x18\x03 \x01(\bR\tavailable\"[\n" +
+	"\tavailable\x18\x03 \x01(\bR\tavailable\"g\n" +
 	"\x11BindSellerRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\x03R\taccountId\x12\x1b\n" +
-	"\tsource_id\x18\x04 \x01(\x03R\bsourceIdJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04\"\\\n" +
+	"account_id\x18\x01 \x01(\x03R\taccountIdJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\tseller_idR\vmerchant_idR\tsource_id\"\\\n" +
 	"\x12BindSellerResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x18\n" +
@@ -4380,13 +4288,11 @@ const file_account_account_proto_rawDesc = "" +
 	"\x1aGetAccountForAdminResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x123\n" +
-	"\x04data\x18\x03 \x01(\v2\x1f.hawkr.account.AdminAccountItemR\x04data\"\xc1\x01\n" +
+	"\x04data\x18\x03 \x01(\v2\x1f.hawkr.account.AdminAccountItemR\x04data\"\x84\x01\n" +
 	"\x11RemoveRoleRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\x03R\taccountId\x12'\n" +
-	"\x04role\x18\x02 \x01(\x0e2\x13.hawkr.account.RoleR\x04role\x12G\n" +
-	"\x10other_role_state\x18\x03 \x01(\x0e2\x1d.hawkr.account.OtherRoleStateR\x0eotherRoleState\x12\x1b\n" +
-	"\tsource_id\x18\x04 \x01(\x03R\bsourceId\"v\n" +
+	"\x04role\x18\x02 \x01(\x0e2\x13.hawkr.account.RoleR\x04roleJ\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\x10other_role_stateR\tsource_id\"v\n" +
 	"\x12RemoveRoleResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x122\n" +
@@ -4504,11 +4410,7 @@ const file_account_account_proto_rawDesc = "" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +
 	"ROLE_BUYER\x10\x01\x12\x0f\n" +
-	"\vROLE_SELLER\x10\x02*h\n" +
-	"\x0eOtherRoleState\x12\x1c\n" +
-	"\x18OTHER_ROLE_STATE_UNKNOWN\x10\x00\x12\x1b\n" +
-	"\x17OTHER_ROLE_STATE_ACTIVE\x10\x01\x12\x1b\n" +
-	"\x17OTHER_ROLE_STATE_ABSENT\x10\x022\xfe\x16\n" +
+	"\vROLE_SELLER\x10\x022\xfe\x16\n" +
 	"\x0eAccountService\x12M\n" +
 	"\vGoogleOAuth\x12!.hawkr.account.GoogleOAuthRequest\x1a\x1b.hawkr.account.AuthResponse\x12K\n" +
 	"\n" +
@@ -4560,166 +4462,164 @@ func file_account_account_proto_rawDescGZIP() []byte {
 	return file_account_account_proto_rawDescData
 }
 
-var file_account_account_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_account_account_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_account_account_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
 var file_account_account_proto_goTypes = []any{
 	(Role)(0),                               // 0: hawkr.account.Role
-	(OtherRoleState)(0),                     // 1: hawkr.account.OtherRoleState
-	(*GoogleOAuthRequest)(nil),              // 2: hawkr.account.GoogleOAuthRequest
-	(*AppleOAuthRequest)(nil),               // 3: hawkr.account.AppleOAuthRequest
-	(*AuthResponse)(nil),                    // 4: hawkr.account.AuthResponse
-	(*AuthData)(nil),                        // 5: hawkr.account.AuthData
-	(*ValidateUserRequest)(nil),             // 6: hawkr.account.ValidateUserRequest
-	(*ValidateUserResponse)(nil),            // 7: hawkr.account.ValidateUserResponse
-	(*VerifyPhoneRequest)(nil),              // 8: hawkr.account.VerifyPhoneRequest
-	(*VerifyPhoneResponse)(nil),             // 9: hawkr.account.VerifyPhoneResponse
-	(*SendOtpRequest)(nil),                  // 10: hawkr.account.SendOtpRequest
-	(*SendOtpResponse)(nil),                 // 11: hawkr.account.SendOtpResponse
-	(*RefreshTokenRequest)(nil),             // 12: hawkr.account.RefreshTokenRequest
-	(*RefreshTokenResponse)(nil),            // 13: hawkr.account.RefreshTokenResponse
-	(*GetAccountInfoRequest)(nil),           // 14: hawkr.account.GetAccountInfoRequest
-	(*GetAccountInfoBatchRequest)(nil),      // 15: hawkr.account.GetAccountInfoBatchRequest
-	(*AccountInfoResponse)(nil),             // 16: hawkr.account.AccountInfoResponse
-	(*AccountInfoBatchResponse)(nil),        // 17: hawkr.account.AccountInfoBatchResponse
-	(*AccountInfo)(nil),                     // 18: hawkr.account.AccountInfo
-	(*GetAccountByPhoneRequest)(nil),        // 19: hawkr.account.GetAccountByPhoneRequest
-	(*CheckPhoneRequest)(nil),               // 20: hawkr.account.CheckPhoneRequest
-	(*CheckPhoneResponse)(nil),              // 21: hawkr.account.CheckPhoneResponse
-	(*BindSellerRequest)(nil),               // 22: hawkr.account.BindSellerRequest
-	(*BindSellerResponse)(nil),              // 23: hawkr.account.BindSellerResponse
-	(*BindBuyerRequest)(nil),                // 24: hawkr.account.BindBuyerRequest
-	(*BindBuyerResponse)(nil),               // 25: hawkr.account.BindBuyerResponse
-	(*AdminLoginRequest)(nil),               // 26: hawkr.account.AdminLoginRequest
-	(*AdminGoogleLoginRequest)(nil),         // 27: hawkr.account.AdminGoogleLoginRequest
-	(*AdminLoginResponse)(nil),              // 28: hawkr.account.AdminLoginResponse
-	(*SuspendAccountRequest)(nil),           // 29: hawkr.account.SuspendAccountRequest
-	(*SuspendAccountResponse)(nil),          // 30: hawkr.account.SuspendAccountResponse
-	(*UnsuspendAccountRequest)(nil),         // 31: hawkr.account.UnsuspendAccountRequest
-	(*UnsuspendAccountResponse)(nil),        // 32: hawkr.account.UnsuspendAccountResponse
-	(*AdminAccountItem)(nil),                // 33: hawkr.account.AdminAccountItem
-	(*AdminAccountStats)(nil),               // 34: hawkr.account.AdminAccountStats
-	(*AdminAccountListData)(nil),            // 35: hawkr.account.AdminAccountListData
-	(*ListAccountsForAdminRequest)(nil),     // 36: hawkr.account.ListAccountsForAdminRequest
-	(*ListAccountsForAdminResponse)(nil),    // 37: hawkr.account.ListAccountsForAdminResponse
-	(*GetAccountForAdminRequest)(nil),       // 38: hawkr.account.GetAccountForAdminRequest
-	(*GetAccountForAdminResponse)(nil),      // 39: hawkr.account.GetAccountForAdminResponse
-	(*RemoveRoleRequest)(nil),               // 40: hawkr.account.RemoveRoleRequest
-	(*RemoveRoleResponse)(nil),              // 41: hawkr.account.RemoveRoleResponse
-	(*LinkConfirmRequest)(nil),              // 42: hawkr.account.LinkConfirmRequest
-	(*LinkConfirmResponse)(nil),             // 43: hawkr.account.LinkConfirmResponse
-	(*ListAuthProvidersRequest)(nil),        // 44: hawkr.account.ListAuthProvidersRequest
-	(*AuthProviderInfo)(nil),                // 45: hawkr.account.AuthProviderInfo
-	(*ListAuthProvidersResponse)(nil),       // 46: hawkr.account.ListAuthProvidersResponse
-	(*BindAuthProviderRequest)(nil),         // 47: hawkr.account.BindAuthProviderRequest
-	(*BindAuthProviderResponse)(nil),        // 48: hawkr.account.BindAuthProviderResponse
-	(*UnbindAuthProviderRequest)(nil),       // 49: hawkr.account.UnbindAuthProviderRequest
-	(*UnbindAuthProviderResponse)(nil),      // 50: hawkr.account.UnbindAuthProviderResponse
-	(*AuthErrorDetail)(nil),                 // 51: hawkr.account.AuthErrorDetail
-	(*PersistWebSessionRequest)(nil),        // 52: hawkr.account.PersistWebSessionRequest
-	(*PersistWebSessionResponse)(nil),       // 53: hawkr.account.PersistWebSessionResponse
-	(*TouchWebSessionRequest)(nil),          // 54: hawkr.account.TouchWebSessionRequest
-	(*TouchWebSessionResponse)(nil),         // 55: hawkr.account.TouchWebSessionResponse
-	(*GetWebSessionRequest)(nil),            // 56: hawkr.account.GetWebSessionRequest
-	(*GetWebSessionResponse)(nil),           // 57: hawkr.account.GetWebSessionResponse
-	(*DeleteWebSessionRequest)(nil),         // 58: hawkr.account.DeleteWebSessionRequest
-	(*DeleteWebSessionResponse)(nil),        // 59: hawkr.account.DeleteWebSessionResponse
-	(*RevokeTokenRequest)(nil),              // 60: hawkr.account.RevokeTokenRequest
-	(*RevokeTokenResponse)(nil),             // 61: hawkr.account.RevokeTokenResponse
-	(*RevokeAllCredentialsRequest)(nil),     // 62: hawkr.account.RevokeAllCredentialsRequest
-	(*RevokeAllCredentialsResponse)(nil),    // 63: hawkr.account.RevokeAllCredentialsResponse
-	(*CheckCredentialRequest)(nil),          // 64: hawkr.account.CheckCredentialRequest
-	(*CheckCredentialResponse)(nil),         // 65: hawkr.account.CheckCredentialResponse
-	(*GetAccountStatsForAdminRequest)(nil),  // 66: hawkr.account.GetAccountStatsForAdminRequest
-	(*GetAccountStatsForAdminResponse)(nil), // 67: hawkr.account.GetAccountStatsForAdminResponse
-	(*timestamppb.Timestamp)(nil),           // 68: google.protobuf.Timestamp
+	(*GoogleOAuthRequest)(nil),              // 1: hawkr.account.GoogleOAuthRequest
+	(*AppleOAuthRequest)(nil),               // 2: hawkr.account.AppleOAuthRequest
+	(*AuthResponse)(nil),                    // 3: hawkr.account.AuthResponse
+	(*AuthData)(nil),                        // 4: hawkr.account.AuthData
+	(*ValidateUserRequest)(nil),             // 5: hawkr.account.ValidateUserRequest
+	(*ValidateUserResponse)(nil),            // 6: hawkr.account.ValidateUserResponse
+	(*VerifyPhoneRequest)(nil),              // 7: hawkr.account.VerifyPhoneRequest
+	(*VerifyPhoneResponse)(nil),             // 8: hawkr.account.VerifyPhoneResponse
+	(*SendOtpRequest)(nil),                  // 9: hawkr.account.SendOtpRequest
+	(*SendOtpResponse)(nil),                 // 10: hawkr.account.SendOtpResponse
+	(*RefreshTokenRequest)(nil),             // 11: hawkr.account.RefreshTokenRequest
+	(*RefreshTokenResponse)(nil),            // 12: hawkr.account.RefreshTokenResponse
+	(*GetAccountInfoRequest)(nil),           // 13: hawkr.account.GetAccountInfoRequest
+	(*GetAccountInfoBatchRequest)(nil),      // 14: hawkr.account.GetAccountInfoBatchRequest
+	(*AccountInfoResponse)(nil),             // 15: hawkr.account.AccountInfoResponse
+	(*AccountInfoBatchResponse)(nil),        // 16: hawkr.account.AccountInfoBatchResponse
+	(*AccountInfo)(nil),                     // 17: hawkr.account.AccountInfo
+	(*GetAccountByPhoneRequest)(nil),        // 18: hawkr.account.GetAccountByPhoneRequest
+	(*CheckPhoneRequest)(nil),               // 19: hawkr.account.CheckPhoneRequest
+	(*CheckPhoneResponse)(nil),              // 20: hawkr.account.CheckPhoneResponse
+	(*BindSellerRequest)(nil),               // 21: hawkr.account.BindSellerRequest
+	(*BindSellerResponse)(nil),              // 22: hawkr.account.BindSellerResponse
+	(*BindBuyerRequest)(nil),                // 23: hawkr.account.BindBuyerRequest
+	(*BindBuyerResponse)(nil),               // 24: hawkr.account.BindBuyerResponse
+	(*AdminLoginRequest)(nil),               // 25: hawkr.account.AdminLoginRequest
+	(*AdminGoogleLoginRequest)(nil),         // 26: hawkr.account.AdminGoogleLoginRequest
+	(*AdminLoginResponse)(nil),              // 27: hawkr.account.AdminLoginResponse
+	(*SuspendAccountRequest)(nil),           // 28: hawkr.account.SuspendAccountRequest
+	(*SuspendAccountResponse)(nil),          // 29: hawkr.account.SuspendAccountResponse
+	(*UnsuspendAccountRequest)(nil),         // 30: hawkr.account.UnsuspendAccountRequest
+	(*UnsuspendAccountResponse)(nil),        // 31: hawkr.account.UnsuspendAccountResponse
+	(*AdminAccountItem)(nil),                // 32: hawkr.account.AdminAccountItem
+	(*AdminAccountStats)(nil),               // 33: hawkr.account.AdminAccountStats
+	(*AdminAccountListData)(nil),            // 34: hawkr.account.AdminAccountListData
+	(*ListAccountsForAdminRequest)(nil),     // 35: hawkr.account.ListAccountsForAdminRequest
+	(*ListAccountsForAdminResponse)(nil),    // 36: hawkr.account.ListAccountsForAdminResponse
+	(*GetAccountForAdminRequest)(nil),       // 37: hawkr.account.GetAccountForAdminRequest
+	(*GetAccountForAdminResponse)(nil),      // 38: hawkr.account.GetAccountForAdminResponse
+	(*RemoveRoleRequest)(nil),               // 39: hawkr.account.RemoveRoleRequest
+	(*RemoveRoleResponse)(nil),              // 40: hawkr.account.RemoveRoleResponse
+	(*LinkConfirmRequest)(nil),              // 41: hawkr.account.LinkConfirmRequest
+	(*LinkConfirmResponse)(nil),             // 42: hawkr.account.LinkConfirmResponse
+	(*ListAuthProvidersRequest)(nil),        // 43: hawkr.account.ListAuthProvidersRequest
+	(*AuthProviderInfo)(nil),                // 44: hawkr.account.AuthProviderInfo
+	(*ListAuthProvidersResponse)(nil),       // 45: hawkr.account.ListAuthProvidersResponse
+	(*BindAuthProviderRequest)(nil),         // 46: hawkr.account.BindAuthProviderRequest
+	(*BindAuthProviderResponse)(nil),        // 47: hawkr.account.BindAuthProviderResponse
+	(*UnbindAuthProviderRequest)(nil),       // 48: hawkr.account.UnbindAuthProviderRequest
+	(*UnbindAuthProviderResponse)(nil),      // 49: hawkr.account.UnbindAuthProviderResponse
+	(*AuthErrorDetail)(nil),                 // 50: hawkr.account.AuthErrorDetail
+	(*PersistWebSessionRequest)(nil),        // 51: hawkr.account.PersistWebSessionRequest
+	(*PersistWebSessionResponse)(nil),       // 52: hawkr.account.PersistWebSessionResponse
+	(*TouchWebSessionRequest)(nil),          // 53: hawkr.account.TouchWebSessionRequest
+	(*TouchWebSessionResponse)(nil),         // 54: hawkr.account.TouchWebSessionResponse
+	(*GetWebSessionRequest)(nil),            // 55: hawkr.account.GetWebSessionRequest
+	(*GetWebSessionResponse)(nil),           // 56: hawkr.account.GetWebSessionResponse
+	(*DeleteWebSessionRequest)(nil),         // 57: hawkr.account.DeleteWebSessionRequest
+	(*DeleteWebSessionResponse)(nil),        // 58: hawkr.account.DeleteWebSessionResponse
+	(*RevokeTokenRequest)(nil),              // 59: hawkr.account.RevokeTokenRequest
+	(*RevokeTokenResponse)(nil),             // 60: hawkr.account.RevokeTokenResponse
+	(*RevokeAllCredentialsRequest)(nil),     // 61: hawkr.account.RevokeAllCredentialsRequest
+	(*RevokeAllCredentialsResponse)(nil),    // 62: hawkr.account.RevokeAllCredentialsResponse
+	(*CheckCredentialRequest)(nil),          // 63: hawkr.account.CheckCredentialRequest
+	(*CheckCredentialResponse)(nil),         // 64: hawkr.account.CheckCredentialResponse
+	(*GetAccountStatsForAdminRequest)(nil),  // 65: hawkr.account.GetAccountStatsForAdminRequest
+	(*GetAccountStatsForAdminResponse)(nil), // 66: hawkr.account.GetAccountStatsForAdminResponse
+	(*timestamppb.Timestamp)(nil),           // 67: google.protobuf.Timestamp
 }
 var file_account_account_proto_depIdxs = []int32{
-	5,  // 0: hawkr.account.AuthResponse.data:type_name -> hawkr.account.AuthData
-	18, // 1: hawkr.account.VerifyPhoneResponse.account:type_name -> hawkr.account.AccountInfo
-	18, // 2: hawkr.account.AccountInfoResponse.data:type_name -> hawkr.account.AccountInfo
-	18, // 3: hawkr.account.AccountInfoBatchResponse.data:type_name -> hawkr.account.AccountInfo
-	5,  // 4: hawkr.account.AdminLoginResponse.data:type_name -> hawkr.account.AuthData
-	33, // 5: hawkr.account.AdminAccountListData.list:type_name -> hawkr.account.AdminAccountItem
-	35, // 6: hawkr.account.ListAccountsForAdminResponse.data:type_name -> hawkr.account.AdminAccountListData
-	33, // 7: hawkr.account.GetAccountForAdminResponse.data:type_name -> hawkr.account.AdminAccountItem
+	4,  // 0: hawkr.account.AuthResponse.data:type_name -> hawkr.account.AuthData
+	17, // 1: hawkr.account.VerifyPhoneResponse.account:type_name -> hawkr.account.AccountInfo
+	17, // 2: hawkr.account.AccountInfoResponse.data:type_name -> hawkr.account.AccountInfo
+	17, // 3: hawkr.account.AccountInfoBatchResponse.data:type_name -> hawkr.account.AccountInfo
+	4,  // 4: hawkr.account.AdminLoginResponse.data:type_name -> hawkr.account.AuthData
+	32, // 5: hawkr.account.AdminAccountListData.list:type_name -> hawkr.account.AdminAccountItem
+	34, // 6: hawkr.account.ListAccountsForAdminResponse.data:type_name -> hawkr.account.AdminAccountListData
+	32, // 7: hawkr.account.GetAccountForAdminResponse.data:type_name -> hawkr.account.AdminAccountItem
 	0,  // 8: hawkr.account.RemoveRoleRequest.role:type_name -> hawkr.account.Role
-	1,  // 9: hawkr.account.RemoveRoleRequest.other_role_state:type_name -> hawkr.account.OtherRoleState
-	68, // 10: hawkr.account.AuthProviderInfo.linked_at:type_name -> google.protobuf.Timestamp
-	68, // 11: hawkr.account.AuthProviderInfo.last_used_at:type_name -> google.protobuf.Timestamp
-	45, // 12: hawkr.account.ListAuthProvidersResponse.providers:type_name -> hawkr.account.AuthProviderInfo
-	68, // 13: hawkr.account.PersistWebSessionRequest.expires_at:type_name -> google.protobuf.Timestamp
-	68, // 14: hawkr.account.TouchWebSessionRequest.expires_at:type_name -> google.protobuf.Timestamp
-	68, // 15: hawkr.account.RevokeTokenRequest.issued_at:type_name -> google.protobuf.Timestamp
-	68, // 16: hawkr.account.RevokeTokenRequest.expires_at:type_name -> google.protobuf.Timestamp
-	68, // 17: hawkr.account.CheckCredentialRequest.issued_at:type_name -> google.protobuf.Timestamp
-	34, // 18: hawkr.account.GetAccountStatsForAdminResponse.data:type_name -> hawkr.account.AdminAccountStats
-	2,  // 19: hawkr.account.AccountService.GoogleOAuth:input_type -> hawkr.account.GoogleOAuthRequest
-	3,  // 20: hawkr.account.AccountService.AppleOAuth:input_type -> hawkr.account.AppleOAuthRequest
-	6,  // 21: hawkr.account.AccountService.ValidateUser:input_type -> hawkr.account.ValidateUserRequest
-	8,  // 22: hawkr.account.AccountService.VerifyPhone:input_type -> hawkr.account.VerifyPhoneRequest
-	10, // 23: hawkr.account.AccountService.SendOtp:input_type -> hawkr.account.SendOtpRequest
-	12, // 24: hawkr.account.AccountService.RefreshToken:input_type -> hawkr.account.RefreshTokenRequest
-	14, // 25: hawkr.account.AccountService.GetAccountInfo:input_type -> hawkr.account.GetAccountInfoRequest
-	15, // 26: hawkr.account.AccountService.GetAccountInfoBatch:input_type -> hawkr.account.GetAccountInfoBatchRequest
-	20, // 27: hawkr.account.AccountService.CheckPhone:input_type -> hawkr.account.CheckPhoneRequest
-	19, // 28: hawkr.account.AccountService.GetAccountByPhone:input_type -> hawkr.account.GetAccountByPhoneRequest
-	22, // 29: hawkr.account.AccountService.BindSeller:input_type -> hawkr.account.BindSellerRequest
-	24, // 30: hawkr.account.AccountService.BindBuyer:input_type -> hawkr.account.BindBuyerRequest
-	26, // 31: hawkr.account.AccountService.AdminLogin:input_type -> hawkr.account.AdminLoginRequest
-	27, // 32: hawkr.account.AccountService.AdminGoogleLogin:input_type -> hawkr.account.AdminGoogleLoginRequest
-	29, // 33: hawkr.account.AccountService.SuspendAccount:input_type -> hawkr.account.SuspendAccountRequest
-	31, // 34: hawkr.account.AccountService.UnsuspendAccount:input_type -> hawkr.account.UnsuspendAccountRequest
-	36, // 35: hawkr.account.AccountService.ListAccountsForAdmin:input_type -> hawkr.account.ListAccountsForAdminRequest
-	38, // 36: hawkr.account.AccountService.GetAccountForAdmin:input_type -> hawkr.account.GetAccountForAdminRequest
-	40, // 37: hawkr.account.AccountService.RemoveRole:input_type -> hawkr.account.RemoveRoleRequest
-	42, // 38: hawkr.account.AccountService.LinkConfirm:input_type -> hawkr.account.LinkConfirmRequest
-	44, // 39: hawkr.account.AccountService.ListAuthProviders:input_type -> hawkr.account.ListAuthProvidersRequest
-	47, // 40: hawkr.account.AccountService.BindAuthProvider:input_type -> hawkr.account.BindAuthProviderRequest
-	49, // 41: hawkr.account.AccountService.UnbindAuthProvider:input_type -> hawkr.account.UnbindAuthProviderRequest
-	52, // 42: hawkr.account.AccountService.PersistWebSession:input_type -> hawkr.account.PersistWebSessionRequest
-	54, // 43: hawkr.account.AccountService.TouchWebSession:input_type -> hawkr.account.TouchWebSessionRequest
-	56, // 44: hawkr.account.AccountService.GetWebSession:input_type -> hawkr.account.GetWebSessionRequest
-	58, // 45: hawkr.account.AccountService.DeleteWebSession:input_type -> hawkr.account.DeleteWebSessionRequest
-	60, // 46: hawkr.account.AccountService.RevokeToken:input_type -> hawkr.account.RevokeTokenRequest
-	62, // 47: hawkr.account.AccountService.RevokeAllCredentials:input_type -> hawkr.account.RevokeAllCredentialsRequest
-	64, // 48: hawkr.account.AccountService.CheckCredential:input_type -> hawkr.account.CheckCredentialRequest
-	66, // 49: hawkr.account.AccountService.GetAccountStatsForAdmin:input_type -> hawkr.account.GetAccountStatsForAdminRequest
-	4,  // 50: hawkr.account.AccountService.GoogleOAuth:output_type -> hawkr.account.AuthResponse
-	4,  // 51: hawkr.account.AccountService.AppleOAuth:output_type -> hawkr.account.AuthResponse
-	7,  // 52: hawkr.account.AccountService.ValidateUser:output_type -> hawkr.account.ValidateUserResponse
-	9,  // 53: hawkr.account.AccountService.VerifyPhone:output_type -> hawkr.account.VerifyPhoneResponse
-	11, // 54: hawkr.account.AccountService.SendOtp:output_type -> hawkr.account.SendOtpResponse
-	13, // 55: hawkr.account.AccountService.RefreshToken:output_type -> hawkr.account.RefreshTokenResponse
-	16, // 56: hawkr.account.AccountService.GetAccountInfo:output_type -> hawkr.account.AccountInfoResponse
-	17, // 57: hawkr.account.AccountService.GetAccountInfoBatch:output_type -> hawkr.account.AccountInfoBatchResponse
-	21, // 58: hawkr.account.AccountService.CheckPhone:output_type -> hawkr.account.CheckPhoneResponse
-	16, // 59: hawkr.account.AccountService.GetAccountByPhone:output_type -> hawkr.account.AccountInfoResponse
-	23, // 60: hawkr.account.AccountService.BindSeller:output_type -> hawkr.account.BindSellerResponse
-	25, // 61: hawkr.account.AccountService.BindBuyer:output_type -> hawkr.account.BindBuyerResponse
-	28, // 62: hawkr.account.AccountService.AdminLogin:output_type -> hawkr.account.AdminLoginResponse
-	28, // 63: hawkr.account.AccountService.AdminGoogleLogin:output_type -> hawkr.account.AdminLoginResponse
-	30, // 64: hawkr.account.AccountService.SuspendAccount:output_type -> hawkr.account.SuspendAccountResponse
-	32, // 65: hawkr.account.AccountService.UnsuspendAccount:output_type -> hawkr.account.UnsuspendAccountResponse
-	37, // 66: hawkr.account.AccountService.ListAccountsForAdmin:output_type -> hawkr.account.ListAccountsForAdminResponse
-	39, // 67: hawkr.account.AccountService.GetAccountForAdmin:output_type -> hawkr.account.GetAccountForAdminResponse
-	41, // 68: hawkr.account.AccountService.RemoveRole:output_type -> hawkr.account.RemoveRoleResponse
-	43, // 69: hawkr.account.AccountService.LinkConfirm:output_type -> hawkr.account.LinkConfirmResponse
-	46, // 70: hawkr.account.AccountService.ListAuthProviders:output_type -> hawkr.account.ListAuthProvidersResponse
-	48, // 71: hawkr.account.AccountService.BindAuthProvider:output_type -> hawkr.account.BindAuthProviderResponse
-	50, // 72: hawkr.account.AccountService.UnbindAuthProvider:output_type -> hawkr.account.UnbindAuthProviderResponse
-	53, // 73: hawkr.account.AccountService.PersistWebSession:output_type -> hawkr.account.PersistWebSessionResponse
-	55, // 74: hawkr.account.AccountService.TouchWebSession:output_type -> hawkr.account.TouchWebSessionResponse
-	57, // 75: hawkr.account.AccountService.GetWebSession:output_type -> hawkr.account.GetWebSessionResponse
-	59, // 76: hawkr.account.AccountService.DeleteWebSession:output_type -> hawkr.account.DeleteWebSessionResponse
-	61, // 77: hawkr.account.AccountService.RevokeToken:output_type -> hawkr.account.RevokeTokenResponse
-	63, // 78: hawkr.account.AccountService.RevokeAllCredentials:output_type -> hawkr.account.RevokeAllCredentialsResponse
-	65, // 79: hawkr.account.AccountService.CheckCredential:output_type -> hawkr.account.CheckCredentialResponse
-	67, // 80: hawkr.account.AccountService.GetAccountStatsForAdmin:output_type -> hawkr.account.GetAccountStatsForAdminResponse
-	50, // [50:81] is the sub-list for method output_type
-	19, // [19:50] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	67, // 9: hawkr.account.AuthProviderInfo.linked_at:type_name -> google.protobuf.Timestamp
+	67, // 10: hawkr.account.AuthProviderInfo.last_used_at:type_name -> google.protobuf.Timestamp
+	44, // 11: hawkr.account.ListAuthProvidersResponse.providers:type_name -> hawkr.account.AuthProviderInfo
+	67, // 12: hawkr.account.PersistWebSessionRequest.expires_at:type_name -> google.protobuf.Timestamp
+	67, // 13: hawkr.account.TouchWebSessionRequest.expires_at:type_name -> google.protobuf.Timestamp
+	67, // 14: hawkr.account.RevokeTokenRequest.issued_at:type_name -> google.protobuf.Timestamp
+	67, // 15: hawkr.account.RevokeTokenRequest.expires_at:type_name -> google.protobuf.Timestamp
+	67, // 16: hawkr.account.CheckCredentialRequest.issued_at:type_name -> google.protobuf.Timestamp
+	33, // 17: hawkr.account.GetAccountStatsForAdminResponse.data:type_name -> hawkr.account.AdminAccountStats
+	1,  // 18: hawkr.account.AccountService.GoogleOAuth:input_type -> hawkr.account.GoogleOAuthRequest
+	2,  // 19: hawkr.account.AccountService.AppleOAuth:input_type -> hawkr.account.AppleOAuthRequest
+	5,  // 20: hawkr.account.AccountService.ValidateUser:input_type -> hawkr.account.ValidateUserRequest
+	7,  // 21: hawkr.account.AccountService.VerifyPhone:input_type -> hawkr.account.VerifyPhoneRequest
+	9,  // 22: hawkr.account.AccountService.SendOtp:input_type -> hawkr.account.SendOtpRequest
+	11, // 23: hawkr.account.AccountService.RefreshToken:input_type -> hawkr.account.RefreshTokenRequest
+	13, // 24: hawkr.account.AccountService.GetAccountInfo:input_type -> hawkr.account.GetAccountInfoRequest
+	14, // 25: hawkr.account.AccountService.GetAccountInfoBatch:input_type -> hawkr.account.GetAccountInfoBatchRequest
+	19, // 26: hawkr.account.AccountService.CheckPhone:input_type -> hawkr.account.CheckPhoneRequest
+	18, // 27: hawkr.account.AccountService.GetAccountByPhone:input_type -> hawkr.account.GetAccountByPhoneRequest
+	21, // 28: hawkr.account.AccountService.BindSeller:input_type -> hawkr.account.BindSellerRequest
+	23, // 29: hawkr.account.AccountService.BindBuyer:input_type -> hawkr.account.BindBuyerRequest
+	25, // 30: hawkr.account.AccountService.AdminLogin:input_type -> hawkr.account.AdminLoginRequest
+	26, // 31: hawkr.account.AccountService.AdminGoogleLogin:input_type -> hawkr.account.AdminGoogleLoginRequest
+	28, // 32: hawkr.account.AccountService.SuspendAccount:input_type -> hawkr.account.SuspendAccountRequest
+	30, // 33: hawkr.account.AccountService.UnsuspendAccount:input_type -> hawkr.account.UnsuspendAccountRequest
+	35, // 34: hawkr.account.AccountService.ListAccountsForAdmin:input_type -> hawkr.account.ListAccountsForAdminRequest
+	37, // 35: hawkr.account.AccountService.GetAccountForAdmin:input_type -> hawkr.account.GetAccountForAdminRequest
+	39, // 36: hawkr.account.AccountService.RemoveRole:input_type -> hawkr.account.RemoveRoleRequest
+	41, // 37: hawkr.account.AccountService.LinkConfirm:input_type -> hawkr.account.LinkConfirmRequest
+	43, // 38: hawkr.account.AccountService.ListAuthProviders:input_type -> hawkr.account.ListAuthProvidersRequest
+	46, // 39: hawkr.account.AccountService.BindAuthProvider:input_type -> hawkr.account.BindAuthProviderRequest
+	48, // 40: hawkr.account.AccountService.UnbindAuthProvider:input_type -> hawkr.account.UnbindAuthProviderRequest
+	51, // 41: hawkr.account.AccountService.PersistWebSession:input_type -> hawkr.account.PersistWebSessionRequest
+	53, // 42: hawkr.account.AccountService.TouchWebSession:input_type -> hawkr.account.TouchWebSessionRequest
+	55, // 43: hawkr.account.AccountService.GetWebSession:input_type -> hawkr.account.GetWebSessionRequest
+	57, // 44: hawkr.account.AccountService.DeleteWebSession:input_type -> hawkr.account.DeleteWebSessionRequest
+	59, // 45: hawkr.account.AccountService.RevokeToken:input_type -> hawkr.account.RevokeTokenRequest
+	61, // 46: hawkr.account.AccountService.RevokeAllCredentials:input_type -> hawkr.account.RevokeAllCredentialsRequest
+	63, // 47: hawkr.account.AccountService.CheckCredential:input_type -> hawkr.account.CheckCredentialRequest
+	65, // 48: hawkr.account.AccountService.GetAccountStatsForAdmin:input_type -> hawkr.account.GetAccountStatsForAdminRequest
+	3,  // 49: hawkr.account.AccountService.GoogleOAuth:output_type -> hawkr.account.AuthResponse
+	3,  // 50: hawkr.account.AccountService.AppleOAuth:output_type -> hawkr.account.AuthResponse
+	6,  // 51: hawkr.account.AccountService.ValidateUser:output_type -> hawkr.account.ValidateUserResponse
+	8,  // 52: hawkr.account.AccountService.VerifyPhone:output_type -> hawkr.account.VerifyPhoneResponse
+	10, // 53: hawkr.account.AccountService.SendOtp:output_type -> hawkr.account.SendOtpResponse
+	12, // 54: hawkr.account.AccountService.RefreshToken:output_type -> hawkr.account.RefreshTokenResponse
+	15, // 55: hawkr.account.AccountService.GetAccountInfo:output_type -> hawkr.account.AccountInfoResponse
+	16, // 56: hawkr.account.AccountService.GetAccountInfoBatch:output_type -> hawkr.account.AccountInfoBatchResponse
+	20, // 57: hawkr.account.AccountService.CheckPhone:output_type -> hawkr.account.CheckPhoneResponse
+	15, // 58: hawkr.account.AccountService.GetAccountByPhone:output_type -> hawkr.account.AccountInfoResponse
+	22, // 59: hawkr.account.AccountService.BindSeller:output_type -> hawkr.account.BindSellerResponse
+	24, // 60: hawkr.account.AccountService.BindBuyer:output_type -> hawkr.account.BindBuyerResponse
+	27, // 61: hawkr.account.AccountService.AdminLogin:output_type -> hawkr.account.AdminLoginResponse
+	27, // 62: hawkr.account.AccountService.AdminGoogleLogin:output_type -> hawkr.account.AdminLoginResponse
+	29, // 63: hawkr.account.AccountService.SuspendAccount:output_type -> hawkr.account.SuspendAccountResponse
+	31, // 64: hawkr.account.AccountService.UnsuspendAccount:output_type -> hawkr.account.UnsuspendAccountResponse
+	36, // 65: hawkr.account.AccountService.ListAccountsForAdmin:output_type -> hawkr.account.ListAccountsForAdminResponse
+	38, // 66: hawkr.account.AccountService.GetAccountForAdmin:output_type -> hawkr.account.GetAccountForAdminResponse
+	40, // 67: hawkr.account.AccountService.RemoveRole:output_type -> hawkr.account.RemoveRoleResponse
+	42, // 68: hawkr.account.AccountService.LinkConfirm:output_type -> hawkr.account.LinkConfirmResponse
+	45, // 69: hawkr.account.AccountService.ListAuthProviders:output_type -> hawkr.account.ListAuthProvidersResponse
+	47, // 70: hawkr.account.AccountService.BindAuthProvider:output_type -> hawkr.account.BindAuthProviderResponse
+	49, // 71: hawkr.account.AccountService.UnbindAuthProvider:output_type -> hawkr.account.UnbindAuthProviderResponse
+	52, // 72: hawkr.account.AccountService.PersistWebSession:output_type -> hawkr.account.PersistWebSessionResponse
+	54, // 73: hawkr.account.AccountService.TouchWebSession:output_type -> hawkr.account.TouchWebSessionResponse
+	56, // 74: hawkr.account.AccountService.GetWebSession:output_type -> hawkr.account.GetWebSessionResponse
+	58, // 75: hawkr.account.AccountService.DeleteWebSession:output_type -> hawkr.account.DeleteWebSessionResponse
+	60, // 76: hawkr.account.AccountService.RevokeToken:output_type -> hawkr.account.RevokeTokenResponse
+	62, // 77: hawkr.account.AccountService.RevokeAllCredentials:output_type -> hawkr.account.RevokeAllCredentialsResponse
+	64, // 78: hawkr.account.AccountService.CheckCredential:output_type -> hawkr.account.CheckCredentialResponse
+	66, // 79: hawkr.account.AccountService.GetAccountStatsForAdmin:output_type -> hawkr.account.GetAccountStatsForAdminResponse
+	49, // [49:80] is the sub-list for method output_type
+	18, // [18:49] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_account_account_proto_init() }
@@ -4732,7 +4632,7 @@ func file_account_account_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_account_account_proto_rawDesc), len(file_account_account_proto_rawDesc)),
-			NumEnums:      2,
+			NumEnums:      1,
 			NumMessages:   66,
 			NumExtensions: 0,
 			NumServices:   1,
