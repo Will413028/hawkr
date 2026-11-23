@@ -48,48 +48,48 @@ type CreateInput struct {
 // Create 建立活動。賣家（Issuer.StoreID）建立的活動直接 ACTIVE，並在鎖住配額列之後檢查同時進行的活動數（BD15）；
 // admin 建立的是 DRAFT，經 Publish 才生效。COMPENSATION 只由 voucher.IssueCompensation 建立。
 func (s *Service) Create(ctx context.Context, in CreateInput) (model.Campaign, error) {
-	title, err := in.Validate()
+	title, err := in.Validate(ctx)
 	if err != nil {
 		return model.Campaign{}, err
 	}
 	if !in.Issuer.Valid() {
-		return model.Campaign{}, model.Invalid("Issuer", "issuer")
+		return model.Campaign{}, model.Invalid(ctx, "Issuer", model.InvalidIssuerInvalid)
 	}
 	if in.TotalLimit < 0 {
-		return model.Campaign{}, model.Invalid("TotalLimit", "total limit")
+		return model.Campaign{}, model.Invalid(ctx, "TotalLimit", model.InvalidTotalLimitNegative)
 	}
 	if in.StoreID < 0 || len(in.TargetBuyers) > model.MaxTargetBuyers {
-		return model.Campaign{}, model.Invalid("StoreID", "store or target list")
+		return model.Campaign{}, model.Invalid(ctx, "StoreID", model.InvalidStoreOrTargetInvalid)
 	}
 	seller := in.Issuer.StoreID > 0
 	switch in.TargetType {
 	case model.TargetAll, model.TargetDesignated:
 	case model.TargetMember:
 		if in.StoreID == 0 && !seller {
-			return model.Campaign{}, model.Invalid("StoreID", "member campaign needs a store")
+			return model.Campaign{}, model.Invalid(ctx, "StoreID", model.InvalidMemberNeedsStore)
 		}
 	case model.TargetCompensation:
-		return model.Campaign{}, model.Invalid("TargetType", "compensation campaigns are issued only through IssueCompensation")
+		return model.Campaign{}, model.Invalid(ctx, "TargetType", model.InvalidCompensationNotCreatable)
 	default:
-		return model.Campaign{}, model.Invalid("TargetType", "target type")
+		return model.Campaign{}, model.Invalid(ctx, "TargetType", model.InvalidTargetTypeInvalid)
 	}
 	if in.TargetType != model.TargetDesignated && len(in.TargetBuyers) > 0 {
-		return model.Campaign{}, model.Invalid("TargetBuyers", "target list only for designated")
+		return model.Campaign{}, model.Invalid(ctx, "TargetBuyers", model.InvalidTargetListOnlyDesignated)
 	}
-	buyers, err := model.PositiveUnique("TargetBuyers", in.TargetBuyers)
+	buyers, err := model.PositiveUnique(ctx, "TargetBuyers", in.TargetBuyers)
 	if err != nil {
 		return model.Campaign{}, err
 	}
 	if seller && in.TargetType == model.TargetDesignated && len(buyers) == 0 {
-		return model.Campaign{}, model.Invalid("TargetBuyers", "designated campaign needs buyers")
+		return model.Campaign{}, model.Invalid(ctx, "TargetBuyers", model.InvalidDesignatedNeedsBuyers)
 	}
 	if seller && in.StoreID != 0 && in.StoreID != in.Issuer.StoreID {
-		return model.Campaign{}, model.Invalid("StoreID", "seller campaign is for its own store")
+		return model.Campaign{}, model.Invalid(ctx, "StoreID", model.InvalidOwnStoreOnly)
 	}
 
 	now := s.d.Now()
 	if !in.EndAt.After(now) {
-		return model.Campaign{}, model.Invalid("EndAt", "end must be in the future")
+		return model.Campaign{}, model.Invalid(ctx, "EndAt", model.InvalidEndInPast)
 	}
 	p := store.InsertCampaignParams{
 		ID: s.d.NewID(), Title: title, DiscountType: string(in.DiscountType), ThresholdAmount: in.ThresholdAmount,
@@ -167,8 +167,11 @@ func (s *Service) checkQuota(ctx context.Context, q *store.Queries, storeID int6
 
 // SetQuota 設定店家同時進行的活動數上限（admin，D6）。
 func (s *Service) SetQuota(ctx context.Context, storeID int64, maxCount int32) error {
-	if storeID <= 0 || maxCount < 0 {
-		return model.Invalid("StoreID", "quota")
+	if storeID <= 0 {
+		return model.Invalid(ctx, "StoreID", model.InvalidStoreInvalid)
+	}
+	if maxCount < 0 {
+		return model.Invalid(ctx, "MaxCount", model.InvalidQuotaInvalid)
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		return s.q(ctx).UpsertQuota(ctx, store.UpsertQuotaParams{StoreID: storeID, MaxCampaignCount: maxCount, Now: s.d.Now()})
@@ -195,7 +198,7 @@ func (s *Service) Publish(ctx context.Context, id uuid.UUID) error {
 			return err
 		}
 		if model.CampaignStatus(row.Status) == model.StatusDraft && !row.EndAt.After(now) {
-			return model.Invalid("EndAt", "end must be in the future")
+			return model.Precondition(ctx, model.ReasonOutsideWindow)
 		}
 		return model.Precondition(ctx, model.ReasonInvalidStatus)
 	})
@@ -220,7 +223,7 @@ type EndResult struct {
 // End 提前結束活動（D5）：擋新的領取與鎖定、作廢 AVAILABLE 的券，LOCKED 的券照常核銷或釋放（BD8）。
 // 先鎖活動列：與領券、發券排隊，結束之後進來的都看到 ENDED。已結束的活動重送是成功（Voided = 0）。
 func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
-	reason, err := model.NormalizeReason(in.Reason)
+	reason, err := model.NormalizeReason(ctx, in.Reason)
 	if err != nil {
 		return EndResult{}, err
 	}

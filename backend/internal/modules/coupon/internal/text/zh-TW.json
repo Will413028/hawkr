@@ -1,5 +1,145 @@
 {
   "default": {
+    "invalid.admin_id_invalid": {
+      "message": "操作的管理員不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.amount_invalid": {
+      "message": "補償金額或使用門檻超出允許範圍",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.buyer_count_invalid": {
+      "message": "一次發放的買家人數必須是 1 到 500",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.buyer_id_invalid": {
+      "message": "買家不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.buyer_store_issuer_invalid": {
+      "message": "買家、店家或發行者不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.cash_discount_no_percent": {
+      "message": "現金折抵不能設定折抵百分比或折抵上限",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.cash_discount_positive": {
+      "message": "現金折抵金額必須大於 0",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.compensation_not_creatable": {
+      "message": "補償活動不能手動建立",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.compensation_rule_invalid": {
+      "message": "補償券的使用門檻必須至少是折抵金額的 5 倍，且訂單折抵後至少剩 100 元",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.designated_needs_buyers": {
+      "message": "指定對象的活動必須設定名單",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.discount_above_threshold": {
+      "message": "折抵金額不能高於使用門檻",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.end_in_past": {
+      "message": "結束時間必須晚於現在",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.id_positive": {
+      "message": "編號必須是正整數",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.issuer_invalid": {
+      "message": "發行者必須是平台或一家店家",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.member_needs_store": {
+      "message": "會員活動必須指定店家",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.order_amount_invalid": {
+      "message": "訂單金額不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.order_no_invalid": {
+      "message": "訂單編號必須是 1 到 128 個字",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.own_store_only": {
+      "message": "店家只能為自己的店建立活動",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.percent_needs_cap": {
+      "message": "百分比折抵必須設定折抵上限",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.percent_no_amount": {
+      "message": "百分比折抵不能設定固定折抵金額",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.percent_out_of_range": {
+      "message": "折抵百分比必須介於 1 到 99",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.period_order": {
+      "message": "開始時間必須早於結束時間",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.quota_invalid": {
+      "message": "活動數上限不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.reason_length": {
+      "message": "理由不能超過 255 個字",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.seller_compensation_needs_threshold": {
+      "message": "店家發的補償券必須設定使用門檻",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.source_invalid": {
+      "message": "補償來源不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.source_other_buyer": {
+      "message": "這個補償來源已經發給另一位買家",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.store_invalid": {
+      "message": "店家不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.store_or_target_invalid": {
+      "message": "店家或指定名單的內容不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.target_list_only_designated": {
+      "message": "只有指定對象的活動能設定名單",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.target_type_invalid": {
+      "message": "活動對象不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.threshold_negative": {
+      "message": "使用門檻不能是負數",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.title_length": {
+      "message": "活動名稱必須是 1 到 100 個字",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.total_limit_negative": {
+      "message": "總發行量不能是負數",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.unknown_discount_type": {
+      "message": "折抵方式不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
     "reason.below_threshold": {
       "message": "訂單金額未達使用門檻",
       "description": "訂單金額小於活動門檻（COUPON_BELOW_THRESHOLD）。"

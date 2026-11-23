@@ -205,10 +205,11 @@ var reasonText = map[Reason]func(uitext.Locale) uitext.Message{
 }
 
 func message(ctx context.Context, r Reason) uitext.Message {
-	if f, ok := reasonText[r]; ok {
-		return f(uitext.LocaleFrom(ctx))
+	f, ok := reasonText[r]
+	if !ok {
+		panic("coupon：沒有原因句子：" + string(r))
 	}
-	return uitext.Message{Text: string(r), Locale: uitext.ZhTW}
+	return f(uitext.LocaleFrom(ctx))
 }
 
 // NotFound 回傳 NotFound 分類、帶業務原因與該原因的句子的錯誤。
@@ -221,8 +222,94 @@ func Precondition(ctx context.Context, r Reason) error {
 	return WithReason(apperr.FailedPrecondition("%s", message(ctx, r)), r)
 }
 
-// Invalid 回傳指出欄位 field 的 InvalidInput。
-func Invalid(field, msg string) error { return apperr.InvalidInputOn([]string{field}, "%s", msg) }
+// InvalidKey 是欄位錯誤的使用者面句子（模組的 internal/text）。
+type InvalidKey string
+
+const (
+	InvalidTitleLength                      InvalidKey = "invalid.title_length"
+	InvalidReasonLength                     InvalidKey = "invalid.reason_length"
+	InvalidCashDiscountPositive             InvalidKey = "invalid.cash_discount_positive"
+	InvalidCashDiscountNoPercent            InvalidKey = "invalid.cash_discount_no_percent"
+	InvalidDiscountAboveThreshold           InvalidKey = "invalid.discount_above_threshold"
+	InvalidPercentOutOfRange                InvalidKey = "invalid.percent_out_of_range"
+	InvalidPercentNeedsCap                  InvalidKey = "invalid.percent_needs_cap"
+	InvalidPercentNoAmount                  InvalidKey = "invalid.percent_no_amount"
+	InvalidUnknownDiscountType              InvalidKey = "invalid.unknown_discount_type"
+	InvalidThresholdNegative                InvalidKey = "invalid.threshold_negative"
+	InvalidPeriodOrder                      InvalidKey = "invalid.period_order"
+	InvalidEndInPast                        InvalidKey = "invalid.end_in_past"
+	InvalidIDPositive                       InvalidKey = "invalid.id_positive"
+	InvalidIssuerInvalid                    InvalidKey = "invalid.issuer_invalid"
+	InvalidTotalLimitNegative               InvalidKey = "invalid.total_limit_negative"
+	InvalidStoreOrTargetInvalid             InvalidKey = "invalid.store_or_target_invalid"
+	InvalidMemberNeedsStore                 InvalidKey = "invalid.member_needs_store"
+	InvalidCompensationNotCreatable         InvalidKey = "invalid.compensation_not_creatable"
+	InvalidTargetTypeInvalid                InvalidKey = "invalid.target_type_invalid"
+	InvalidTargetListOnlyDesignated         InvalidKey = "invalid.target_list_only_designated"
+	InvalidDesignatedNeedsBuyers            InvalidKey = "invalid.designated_needs_buyers"
+	InvalidOwnStoreOnly                     InvalidKey = "invalid.own_store_only"
+	InvalidQuotaInvalid                     InvalidKey = "invalid.quota_invalid"
+	InvalidOrderNoInvalid                   InvalidKey = "invalid.order_no_invalid"
+	InvalidBuyerIDInvalid                   InvalidKey = "invalid.buyer_id_invalid"
+	InvalidAdminIDInvalid                   InvalidKey = "invalid.admin_id_invalid"
+	InvalidBuyerCountInvalid                InvalidKey = "invalid.buyer_count_invalid"
+	InvalidSourceInvalid                    InvalidKey = "invalid.source_invalid"
+	InvalidBuyerStoreIssuerInvalid          InvalidKey = "invalid.buyer_store_issuer_invalid"
+	InvalidAmountInvalid                    InvalidKey = "invalid.amount_invalid"
+	InvalidCompensationRuleInvalid          InvalidKey = "invalid.compensation_rule_invalid"
+	InvalidSellerCompensationNeedsThreshold InvalidKey = "invalid.seller_compensation_needs_threshold"
+	InvalidSourceOtherBuyer                 InvalidKey = "invalid.source_other_buyer"
+	InvalidStoreInvalid                     InvalidKey = "invalid.store_invalid"
+	InvalidOrderAmountInvalid               InvalidKey = "invalid.order_amount_invalid"
+)
+
+// invalidText 是各欄位錯誤的使用者面句子。
+var invalidText = map[InvalidKey]func(uitext.Locale) uitext.Message{
+	InvalidTitleLength:                      text.InvalidTitleLength,
+	InvalidReasonLength:                     text.InvalidReasonLength,
+	InvalidCashDiscountPositive:             text.InvalidCashDiscountPositive,
+	InvalidCashDiscountNoPercent:            text.InvalidCashDiscountNoPercent,
+	InvalidDiscountAboveThreshold:           text.InvalidDiscountAboveThreshold,
+	InvalidPercentOutOfRange:                text.InvalidPercentOutOfRange,
+	InvalidPercentNeedsCap:                  text.InvalidPercentNeedsCap,
+	InvalidPercentNoAmount:                  text.InvalidPercentNoAmount,
+	InvalidUnknownDiscountType:              text.InvalidUnknownDiscountType,
+	InvalidThresholdNegative:                text.InvalidThresholdNegative,
+	InvalidPeriodOrder:                      text.InvalidPeriodOrder,
+	InvalidEndInPast:                        text.InvalidEndInPast,
+	InvalidIDPositive:                       text.InvalidIdPositive,
+	InvalidIssuerInvalid:                    text.InvalidIssuerInvalid,
+	InvalidTotalLimitNegative:               text.InvalidTotalLimitNegative,
+	InvalidStoreOrTargetInvalid:             text.InvalidStoreOrTargetInvalid,
+	InvalidMemberNeedsStore:                 text.InvalidMemberNeedsStore,
+	InvalidCompensationNotCreatable:         text.InvalidCompensationNotCreatable,
+	InvalidTargetTypeInvalid:                text.InvalidTargetTypeInvalid,
+	InvalidTargetListOnlyDesignated:         text.InvalidTargetListOnlyDesignated,
+	InvalidDesignatedNeedsBuyers:            text.InvalidDesignatedNeedsBuyers,
+	InvalidOwnStoreOnly:                     text.InvalidOwnStoreOnly,
+	InvalidQuotaInvalid:                     text.InvalidQuotaInvalid,
+	InvalidOrderNoInvalid:                   text.InvalidOrderNoInvalid,
+	InvalidBuyerIDInvalid:                   text.InvalidBuyerIdInvalid,
+	InvalidAdminIDInvalid:                   text.InvalidAdminIdInvalid,
+	InvalidBuyerCountInvalid:                text.InvalidBuyerCountInvalid,
+	InvalidSourceInvalid:                    text.InvalidSourceInvalid,
+	InvalidBuyerStoreIssuerInvalid:          text.InvalidBuyerStoreIssuerInvalid,
+	InvalidAmountInvalid:                    text.InvalidAmountInvalid,
+	InvalidCompensationRuleInvalid:          text.InvalidCompensationRuleInvalid,
+	InvalidSellerCompensationNeedsThreshold: text.InvalidSellerCompensationNeedsThreshold,
+	InvalidSourceOtherBuyer:                 text.InvalidSourceOtherBuyer,
+	InvalidStoreInvalid:                     text.InvalidStoreInvalid,
+	InvalidOrderAmountInvalid:               text.InvalidOrderAmountInvalid,
+}
+
+// Invalid 回傳指出欄位 field 的 InvalidInput，訊息是 key 的使用者面句子（依 ctx 的語系）。
+func Invalid(ctx context.Context, field string, key InvalidKey) error {
+	f, ok := invalidText[key]
+	if !ok {
+		panic("coupon：沒有欄位錯誤句子：" + string(key))
+	}
+	return apperr.InvalidInputOn([]string{field}, "%s", f(uitext.LocaleFrom(ctx)))
+}
 
 // Issuer 是活動的發行者：admin 或賣家店家，恰有一個有值。
 type Issuer struct {
@@ -248,59 +335,59 @@ type CampaignSpec struct {
 }
 
 // NormalizeTitle 去頭尾空白並檢查長度（1 到 MaxTitleRunes 個字元）。
-func NormalizeTitle(title string) (string, error) {
+func NormalizeTitle(ctx context.Context, title string) (string, error) {
 	t := trimtext.Trim(title)
 	if n := utf8.RuneCountInString(t); n < 1 || n > MaxTitleRunes {
-		return "", Invalid("Title", "title length")
+		return "", Invalid(ctx, "Title", InvalidTitleLength)
 	}
 	return t, nil
 }
 
 // NormalizeReason 去頭尾空白；空字串回 ""（沒有理由），超長回 InvalidInput。
-func NormalizeReason(reason string) (string, error) {
+func NormalizeReason(ctx context.Context, reason string) (string, error) {
 	r := trimtext.Trim(reason)
 	if utf8.RuneCountInString(r) > MaxReasonRunes {
-		return "", Invalid("Reason", "reason length")
+		return "", Invalid(ctx, "Reason", InvalidReasonLength)
 	}
 	return r, nil
 }
 
 // Validate 檢查規則自洽，與 DB 的 CHECK 同一組條件（先擋下回 InvalidInput，CHECK 是後備）：折抵欄位依方式、
 // 門檻不得為負、現金折抵不得超過門檻（門檻 0 = 無門檻，不套用，BD32）、起日不晚於迄日。回傳去空白後的名稱。
-func (s CampaignSpec) Validate() (string, error) {
-	title, err := NormalizeTitle(s.Title)
+func (s CampaignSpec) Validate(ctx context.Context) (string, error) {
+	title, err := NormalizeTitle(ctx, s.Title)
 	if err != nil {
 		return "", err
 	}
 	switch s.DiscountType {
 	case DiscountCash:
 		if s.DiscountAmount <= 0 {
-			return "", Invalid("DiscountAmount", "cash discount must be positive")
+			return "", Invalid(ctx, "DiscountAmount", InvalidCashDiscountPositive)
 		}
 		if s.DiscountPercent != 0 || s.MaxDiscountAmount != 0 {
-			return "", Invalid("DiscountPercent", "cash discount carries no percent")
+			return "", Invalid(ctx, "DiscountPercent", InvalidCashDiscountNoPercent)
 		}
 		if s.ThresholdAmount != 0 && s.DiscountAmount > s.ThresholdAmount {
-			return "", Invalid("DiscountAmount", "discount above threshold")
+			return "", Invalid(ctx, "DiscountAmount", InvalidDiscountAboveThreshold)
 		}
 	case DiscountPercent:
 		if s.DiscountPercent < 1 || s.DiscountPercent > 99 {
-			return "", Invalid("DiscountPercent", "percent out of range")
+			return "", Invalid(ctx, "DiscountPercent", InvalidPercentOutOfRange)
 		}
 		if s.MaxDiscountAmount <= 0 {
-			return "", Invalid("MaxDiscountAmount", "percent discount needs a cap")
+			return "", Invalid(ctx, "MaxDiscountAmount", InvalidPercentNeedsCap)
 		}
 		if s.DiscountAmount != 0 {
-			return "", Invalid("DiscountAmount", "percent discount carries no amount")
+			return "", Invalid(ctx, "DiscountAmount", InvalidPercentNoAmount)
 		}
 	default:
-		return "", Invalid("DiscountType", "unknown discount type")
+		return "", Invalid(ctx, "DiscountType", InvalidUnknownDiscountType)
 	}
 	if s.ThresholdAmount < 0 {
-		return "", Invalid("ThresholdAmount", "threshold must not be negative")
+		return "", Invalid(ctx, "ThresholdAmount", InvalidThresholdNegative)
 	}
 	if s.StartAt.IsZero() || s.EndAt.IsZero() || s.StartAt.After(s.EndAt) {
-		return "", Invalid("EndAt", "start must not be after end")
+		return "", Invalid(ctx, "EndAt", InvalidPeriodOrder)
 	}
 	return title, nil
 }
@@ -314,12 +401,12 @@ func Discount(c Campaign, orderAmount int64) int64 {
 }
 
 // PositiveUnique 檢查 ids 都是正整數並去重（保持第一次出現的順序）；field 是錯誤指出的欄位。
-func PositiveUnique(field string, ids []int64) ([]int64, error) {
+func PositiveUnique(ctx context.Context, field string, ids []int64) ([]int64, error) {
 	seen := make(map[int64]struct{}, len(ids))
 	out := make([]int64, 0, len(ids))
 	for _, id := range ids {
 		if id <= 0 {
-			return nil, Invalid(field, "id must be positive")
+			return nil, Invalid(ctx, field, InvalidIDPositive)
 		}
 		if _, dup := seen[id]; !dup {
 			seen[id] = struct{}{}

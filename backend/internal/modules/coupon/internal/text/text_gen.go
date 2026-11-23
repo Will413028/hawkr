@@ -7,6 +7,321 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// InvalidAdminIdInvalid 是模組句子 invalid.admin_id_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidAdminIdInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The operating admin is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "操作的管理員不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidAmountInvalid 是模組句子 invalid.amount_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidAmountInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The amount or minimum order amount is out of range", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "補償金額或使用門檻超出允許範圍", Locale: uitext.ZhTW}
+}
+
+// InvalidBuyerCountInvalid 是模組句子 invalid.buyer_count_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidBuyerCountInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The number of buyers must be 1 to 500", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "一次發放的買家人數必須是 1 到 500", Locale: uitext.ZhTW}
+}
+
+// InvalidBuyerIdInvalid 是模組句子 invalid.buyer_id_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidBuyerIdInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The buyer is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "買家不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidBuyerStoreIssuerInvalid 是模組句子 invalid.buyer_store_issuer_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidBuyerStoreIssuerInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The buyer, store or issuer is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "買家、店家或發行者不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidCashDiscountNoPercent 是模組句子 invalid.cash_discount_no_percent；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidCashDiscountNoPercent(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A cash discount cannot have a percentage or a cap", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "現金折抵不能設定折抵百分比或折抵上限", Locale: uitext.ZhTW}
+}
+
+// InvalidCashDiscountPositive 是模組句子 invalid.cash_discount_positive；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidCashDiscountPositive(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The cash discount must be greater than 0", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "現金折抵金額必須大於 0", Locale: uitext.ZhTW}
+}
+
+// InvalidCompensationNotCreatable 是模組句子 invalid.compensation_not_creatable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidCompensationNotCreatable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A compensation campaign cannot be created manually", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "補償活動不能手動建立", Locale: uitext.ZhTW}
+}
+
+// InvalidCompensationRuleInvalid 是模組句子 invalid.compensation_rule_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidCompensationRuleInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The minimum order amount must be at least 5 times the discount, leaving at least 100 after the discount", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "補償券的使用門檻必須至少是折抵金額的 5 倍，且訂單折抵後至少剩 100 元", Locale: uitext.ZhTW}
+}
+
+// InvalidDesignatedNeedsBuyers 是模組句子 invalid.designated_needs_buyers；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidDesignatedNeedsBuyers(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A designated campaign needs a target list", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "指定對象的活動必須設定名單", Locale: uitext.ZhTW}
+}
+
+// InvalidDiscountAboveThreshold 是模組句子 invalid.discount_above_threshold；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidDiscountAboveThreshold(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The discount cannot exceed the minimum order amount", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "折抵金額不能高於使用門檻", Locale: uitext.ZhTW}
+}
+
+// InvalidEndInPast 是模組句子 invalid.end_in_past；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidEndInPast(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The end time must be in the future", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "結束時間必須晚於現在", Locale: uitext.ZhTW}
+}
+
+// InvalidIdPositive 是模組句子 invalid.id_positive；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidIdPositive(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The ID must be a positive integer", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "編號必須是正整數", Locale: uitext.ZhTW}
+}
+
+// InvalidIssuerInvalid 是模組句子 invalid.issuer_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidIssuerInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The issuer must be either the platform or one store", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "發行者必須是平台或一家店家", Locale: uitext.ZhTW}
+}
+
+// InvalidMemberNeedsStore 是模組句子 invalid.member_needs_store；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidMemberNeedsStore(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A member campaign needs a store", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "會員活動必須指定店家", Locale: uitext.ZhTW}
+}
+
+// InvalidOrderAmountInvalid 是模組句子 invalid.order_amount_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidOrderAmountInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The order amount is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "訂單金額不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidOrderNoInvalid 是模組句子 invalid.order_no_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidOrderNoInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The order number must be 1 to 128 characters", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "訂單編號必須是 1 到 128 個字", Locale: uitext.ZhTW}
+}
+
+// InvalidOwnStoreOnly 是模組句子 invalid.own_store_only；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidOwnStoreOnly(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store can only create campaigns for itself", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家只能為自己的店建立活動", Locale: uitext.ZhTW}
+}
+
+// InvalidPercentNeedsCap 是模組句子 invalid.percent_needs_cap；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidPercentNeedsCap(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A percentage discount needs a cap", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "百分比折抵必須設定折抵上限", Locale: uitext.ZhTW}
+}
+
+// InvalidPercentNoAmount 是模組句子 invalid.percent_no_amount；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidPercentNoAmount(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A percentage discount cannot have a fixed amount", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "百分比折抵不能設定固定折抵金額", Locale: uitext.ZhTW}
+}
+
+// InvalidPercentOutOfRange 是模組句子 invalid.percent_out_of_range；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidPercentOutOfRange(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The discount percentage must be between 1 and 99", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "折抵百分比必須介於 1 到 99", Locale: uitext.ZhTW}
+}
+
+// InvalidPeriodOrder 是模組句子 invalid.period_order；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidPeriodOrder(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The start time must not be after the end time", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "開始時間必須早於結束時間", Locale: uitext.ZhTW}
+}
+
+// InvalidQuotaInvalid 是模組句子 invalid.quota_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidQuotaInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The campaign limit is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "活動數上限不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidReasonLength 是模組句子 invalid.reason_length；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidReasonLength(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The reason must be at most 255 characters", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "理由不能超過 255 個字", Locale: uitext.ZhTW}
+}
+
+// InvalidSellerCompensationNeedsThreshold 是模組句子 invalid.seller_compensation_needs_threshold；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidSellerCompensationNeedsThreshold(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store compensation coupon needs a minimum order amount", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家發的補償券必須設定使用門檻", Locale: uitext.ZhTW}
+}
+
+// InvalidSourceInvalid 是模組句子 invalid.source_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidSourceInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The compensation source is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "補償來源不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidSourceOtherBuyer 是模組句子 invalid.source_other_buyer；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidSourceOtherBuyer(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This compensation source was already issued to another buyer", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這個補償來源已經發給另一位買家", Locale: uitext.ZhTW}
+}
+
+// InvalidStoreInvalid 是模組句子 invalid.store_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidStoreInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The store is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidStoreOrTargetInvalid 是模組句子 invalid.store_or_target_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidStoreOrTargetInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The store or target list is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家或指定名單的內容不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidTargetListOnlyDesignated 是模組句子 invalid.target_list_only_designated；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidTargetListOnlyDesignated(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Only a designated campaign can have a target list", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "只有指定對象的活動能設定名單", Locale: uitext.ZhTW}
+}
+
+// InvalidTargetTypeInvalid 是模組句子 invalid.target_type_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidTargetTypeInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The campaign target is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "活動對象不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidThresholdNegative 是模組句子 invalid.threshold_negative；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidThresholdNegative(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The minimum order amount cannot be negative", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "使用門檻不能是負數", Locale: uitext.ZhTW}
+}
+
+// InvalidTitleLength 是模組句子 invalid.title_length；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidTitleLength(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The campaign title must be 1 to 100 characters", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "活動名稱必須是 1 到 100 個字", Locale: uitext.ZhTW}
+}
+
+// InvalidTotalLimitNegative 是模組句子 invalid.total_limit_negative；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidTotalLimitNegative(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The total limit cannot be negative", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "總發行量不能是負數", Locale: uitext.ZhTW}
+}
+
+// InvalidUnknownDiscountType 是模組句子 invalid.unknown_discount_type；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidUnknownDiscountType(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The discount type is not valid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "折抵方式不正確", Locale: uitext.ZhTW}
+}
+
 // ReasonBelowThreshold 是模組句子 reason.below_threshold；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReasonBelowThreshold(l uitext.Locale) uitext.Message {
 	switch l {

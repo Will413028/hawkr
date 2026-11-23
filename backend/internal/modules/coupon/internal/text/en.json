@@ -1,5 +1,110 @@
 {
   "default": {
+    "invalid.admin_id_invalid": {
+      "message": "The operating admin is not valid"
+    },
+    "invalid.amount_invalid": {
+      "message": "The amount or minimum order amount is out of range"
+    },
+    "invalid.buyer_count_invalid": {
+      "message": "The number of buyers must be 1 to 500"
+    },
+    "invalid.buyer_id_invalid": {
+      "message": "The buyer is not valid"
+    },
+    "invalid.buyer_store_issuer_invalid": {
+      "message": "The buyer, store or issuer is not valid"
+    },
+    "invalid.cash_discount_no_percent": {
+      "message": "A cash discount cannot have a percentage or a cap"
+    },
+    "invalid.cash_discount_positive": {
+      "message": "The cash discount must be greater than 0"
+    },
+    "invalid.compensation_not_creatable": {
+      "message": "A compensation campaign cannot be created manually"
+    },
+    "invalid.compensation_rule_invalid": {
+      "message": "The minimum order amount must be at least 5 times the discount, leaving at least 100 after the discount"
+    },
+    "invalid.designated_needs_buyers": {
+      "message": "A designated campaign needs a target list"
+    },
+    "invalid.discount_above_threshold": {
+      "message": "The discount cannot exceed the minimum order amount"
+    },
+    "invalid.end_in_past": {
+      "message": "The end time must be in the future"
+    },
+    "invalid.id_positive": {
+      "message": "The ID must be a positive integer"
+    },
+    "invalid.issuer_invalid": {
+      "message": "The issuer must be either the platform or one store"
+    },
+    "invalid.member_needs_store": {
+      "message": "A member campaign needs a store"
+    },
+    "invalid.order_amount_invalid": {
+      "message": "The order amount is not valid"
+    },
+    "invalid.order_no_invalid": {
+      "message": "The order number must be 1 to 128 characters"
+    },
+    "invalid.own_store_only": {
+      "message": "A store can only create campaigns for itself"
+    },
+    "invalid.percent_needs_cap": {
+      "message": "A percentage discount needs a cap"
+    },
+    "invalid.percent_no_amount": {
+      "message": "A percentage discount cannot have a fixed amount"
+    },
+    "invalid.percent_out_of_range": {
+      "message": "The discount percentage must be between 1 and 99"
+    },
+    "invalid.period_order": {
+      "message": "The start time must not be after the end time"
+    },
+    "invalid.quota_invalid": {
+      "message": "The campaign limit is not valid"
+    },
+    "invalid.reason_length": {
+      "message": "The reason must be at most 255 characters"
+    },
+    "invalid.seller_compensation_needs_threshold": {
+      "message": "A store compensation coupon needs a minimum order amount"
+    },
+    "invalid.source_invalid": {
+      "message": "The compensation source is not valid"
+    },
+    "invalid.source_other_buyer": {
+      "message": "This compensation source was already issued to another buyer"
+    },
+    "invalid.store_invalid": {
+      "message": "The store is not valid"
+    },
+    "invalid.store_or_target_invalid": {
+      "message": "The store or target list is not valid"
+    },
+    "invalid.target_list_only_designated": {
+      "message": "Only a designated campaign can have a target list"
+    },
+    "invalid.target_type_invalid": {
+      "message": "The campaign target is not valid"
+    },
+    "invalid.threshold_negative": {
+      "message": "The minimum order amount cannot be negative"
+    },
+    "invalid.title_length": {
+      "message": "The campaign title must be 1 to 100 characters"
+    },
+    "invalid.total_limit_negative": {
+      "message": "The total limit cannot be negative"
+    },
+    "invalid.unknown_discount_type": {
+      "message": "The discount type is not valid"
+    },
     "reason.below_threshold": {
       "message": "The order total is below the minimum for this coupon"
     },

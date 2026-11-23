@@ -584,35 +584,97 @@ func TestSuspendedStoreBlocksClaimAndLockButNotRedeem(t *testing.T) {
 	f.mustLock(held, "O1")
 }
 
-// 同一筆訂單並發鎖兩張不同的券：一張成功，另一張回 ORDER_HOLDS_ANOTHER_VOUCHER（不是 Internal）。
+// 同一筆訂單在兩個 transaction 各鎖一張不同的券：後到的在 UPDATE 卡在唯一鍵上，先到的 commit 後它撞上 vouchers_order_no_key，
+// 要回 ORDER_HOLDS_ANOTHER_VOUCHER（不是 Internal），而且它所在的 transaction 仍可使用、可以 commit（衝突發生在 savepoint 內）。
+// 時序由 pg_locks 決定：先到的 commit 之前，等到後到的確實卡在鎖上，兩邊的預先檢查都已通過。
 func TestConcurrentLockOfTwoVouchersForOneOrder(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	c := f.campaign()
 	v1, v2 := f.claim(c, buyer1), f.claim(c, buyer2)
-	for i := range 5 {
-		order := fmt.Sprint("O-SAME-", i)
-		errs := parallel(2, func(j int) error {
-			_, err := f.lock([]coupon.Voucher{v1, v2}[j], order)
-			return err
-		})
-		ok := 0
-		for _, err := range errs {
-			if err == nil {
-				ok++
-				continue
+	ctx := context.Background()
+	const order = "O-SAME"
+
+	firstLocked := make(chan error, 1)
+	release := make(chan struct{})
+	firstDone := make(chan error, 1)
+	go func() {
+		firstDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			_, err := f.lock(v1, order)
+			firstLocked <- err
+			if err != nil {
+				return err
 			}
-			wantReason(t, err, coupon.ReasonOrderHoldsAnotherVoucher)
+			<-release
+			return nil
+		})
+	}()
+	if err := <-firstLocked; err != nil {
+		t.Fatalf("先到的鎖券：%v", err)
+	}
+
+	var secondLockErr error
+	secondDone := make(chan error, 1)
+	go func() {
+		secondDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			_, secondLockErr = f.m.Lock(ctx, f.lockInput(v2, order))
+			if _, err := f.db.Conn(ctx).Exec(ctx, "SELECT 1"); err != nil {
+				return err
+			}
+			return nil
+		})
+	}()
+
+	deadline := time.Now().Add(30 * time.Second)
+	for f.scalar("SELECT count(*) FROM pg_locks WHERE NOT granted AND locktype = 'transactionid'") == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("後到的 transaction 沒有卡在唯一鍵的鎖上")
 		}
-		if ok != 1 {
-			t.Fatalf("訂單 %s 成功 %d 筆，要 1", order, ok)
-		}
-		if _, err := f.m.Release(context.Background(), order); err != nil {
-			t.Fatal(err)
-		}
-		if f.voucherStatus(v1.ID) != "AVAILABLE" || f.voucherStatus(v2.ID) != "AVAILABLE" {
-			t.Fatal("釋放後兩張券都要回到 AVAILABLE")
-		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	close(release)
+
+	if err := <-firstDone; err != nil {
+		t.Fatalf("先到的 transaction：%v", err)
+	}
+	if err := <-secondDone; err != nil {
+		t.Fatalf("後到的 transaction 在失敗的鎖定之後要仍可使用並 commit：%v", err)
+	}
+	wantReason(t, secondLockErr, coupon.ReasonOrderHoldsAnotherVoucher)
+	if f.voucherStatus(v1.ID) != "LOCKED" || f.voucherStatus(v2.ID) != "AVAILABLE" {
+		t.Fatalf("v1 = %s、v2 = %s，要 LOCKED 與 AVAILABLE", f.voucherStatus(v1.ID), f.voucherStatus(v2.ID))
+	}
+}
+
+// 已由這筆訂單持有的券，重送 Lock 與 Quote 不因折抵算出 0 元而被拒絕（零折抵只擋新的鎖定）；券仍由該訂單持有。
+func TestReplayOfHeldVoucherIgnoresZeroDiscount(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	c := f.campaign(func(in *coupon.CreateCampaignInput) {
+		in.DiscountType, in.DiscountAmount, in.DiscountPercent, in.MaxDiscountAmount = coupon.DiscountPercent, 0, 1, 100
+	})
+	v := f.claim(c, buyer1)
+	if r := f.mustLock(v, "O1"); r.Discount != 10 || r.Replayed {
+		t.Fatalf("1000 元的 1%% 首次鎖定 = %+v", r)
+	}
+	in := f.lockInput(v, "O1")
+	in.OrderAmount = 50
+	r, err := f.m.Lock(context.Background(), in)
+	if err != nil || !r.Replayed || r.Discount != 0 {
+		t.Fatalf("重送 Lock = %+v, %v，要 Replayed 且折抵 0", r, err)
+	}
+	q, err := f.m.Quote(context.Background(), in)
+	if err != nil || !q.Replayed || q.Discount != 0 {
+		t.Fatalf("Quote = %+v, %v，要 Replayed 且折抵 0", q, err)
+	}
+	if got := f.voucherStatus(v.ID); got != "LOCKED" {
+		t.Fatalf("券狀態 = %s，要維持 LOCKED", got)
+	}
+	other := f.claim(c, buyer2)
+	if _, err := f.m.Quote(context.Background(), coupon.LockInput{VoucherID: other.ID, BuyerID: buyer2, OrderNo: "O2", StoreID: storeA, OrderAmount: 50}); err == nil {
+		t.Fatal("沒有持有的券 Quote 出 0 元折抵要被拒絕")
+	} else {
+		wantReason(t, err, coupon.ReasonNoDiscount)
 	}
 }
 

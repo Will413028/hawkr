@@ -84,13 +84,13 @@ func (s *Service) targets(ctx context.Context, c model.Campaign, buyerID int64) 
 	}
 }
 
-// Fit 檢查訂單面的條件並回傳折抵金額：店家在活動的適用範圍內、訂單金額達門檻、折抵大於 0（百分比折抵可能算出 0 元，不消耗券）。orderAmount 必須是正數且不超過 MaxOrderAmount。
+// Fit 檢查訂單面的條件並回傳折抵金額：店家在活動的適用範圍內、訂單金額達門檻（折抵可能是 0，由 RequireDiscount 在新鎖定的路徑拒絕）。orderAmount 必須是正數且不超過 MaxOrderAmount。
 func Fit(ctx context.Context, c model.Campaign, storeID, orderAmount int64) (int64, error) {
 	if storeID <= 0 {
-		return 0, model.Invalid("StoreID", "store id")
+		return 0, model.Invalid(ctx, "StoreID", model.InvalidStoreInvalid)
 	}
 	if orderAmount <= 0 || orderAmount > model.MaxOrderAmount {
-		return 0, model.Invalid("OrderAmount", "order amount")
+		return 0, model.Invalid(ctx, "OrderAmount", model.InvalidOrderAmountInvalid)
 	}
 	if c.StoreID != nil && *c.StoreID != storeID {
 		return 0, model.Precondition(ctx, model.ReasonNotApplicableToStore)
@@ -98,9 +98,13 @@ func Fit(ctx context.Context, c model.Campaign, storeID, orderAmount int64) (int
 	if orderAmount < c.ThresholdAmount {
 		return 0, model.Precondition(ctx, model.ReasonBelowThreshold)
 	}
-	discount := model.Discount(c, orderAmount)
+	return model.Discount(c, orderAmount), nil
+}
+
+// RequireDiscount 對新鎖定的路徑拒絕折抵為 0 的結果（百分比折抵可能算出 0 元，不消耗券）；已由同一筆訂單持有的重送不經過它。
+func RequireDiscount(ctx context.Context, discount int64) error {
 	if discount <= 0 {
-		return 0, model.Precondition(ctx, model.ReasonNoDiscount)
+		return model.Precondition(ctx, model.ReasonNoDiscount)
 	}
-	return discount, nil
+	return nil
 }

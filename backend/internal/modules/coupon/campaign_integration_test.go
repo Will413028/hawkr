@@ -310,9 +310,7 @@ func TestCreateAndPublishRejectAnEndInThePast(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.advance(2 * time.Hour)
-	if err := f.m.PublishCampaign(context.Background(), c.ID); err == nil || coupon.ReasonOf(err) != "" {
-		t.Fatalf("發布已過期的草稿要回 InvalidInput：%v", err)
-	}
+	wantReason(t, f.m.PublishCampaign(context.Background(), c.ID), coupon.ReasonOutsideWindow)
 	if got := f.scalar("SELECT count(*) FROM coupon.coupon_campaigns WHERE id = $1 AND status = 'DRAFT'", c.ID); got != 1 {
 		t.Fatal("被擋下的草稿要維持 DRAFT")
 	}

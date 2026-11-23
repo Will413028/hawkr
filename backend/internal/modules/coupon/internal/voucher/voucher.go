@@ -45,15 +45,15 @@ func (s *Service) logOp(ctx context.Context, q *store.Queries, p store.InsertLog
 }
 
 // isOrderNoConflict 回報 err 是不是 vouchers_order_no_key 的唯一鍵衝突：同一筆訂單並發鎖兩張不同的券時，後到的撞上它。
-// 撞上之後 transaction 已中止，呼叫方不得再下 SQL。
+// 衝突發生在 lockVoucher 的 savepoint 內，回滾到 savepoint 後呼叫方的 transaction 仍可使用。
 func isOrderNoConflict(err error) bool {
 	var pg *pgconn.PgError
 	return errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == "vouchers_order_no_key"
 }
 
-func validOrderNo(orderNo string) error {
+func validOrderNo(ctx context.Context, orderNo string) error {
 	if n := utf8.RuneCountInString(orderNo); n < 1 || n > model.MaxOrderNoLen {
-		return model.Invalid("OrderNo", "order no")
+		return model.Invalid(ctx, "OrderNo", model.InvalidOrderNoInvalid)
 	}
 	return nil
 }
@@ -68,7 +68,7 @@ type ClaimResult struct {
 // 買家已有這個活動的券時回既有的那張（冪等，不遞增）。超過總量回 ReasonIssueLimitReached。
 func (s *Service) Claim(ctx context.Context, campaignID uuid.UUID, buyerID int64) (ClaimResult, error) {
 	if buyerID <= 0 {
-		return ClaimResult{}, model.Invalid("BuyerID", "buyer id")
+		return ClaimResult{}, model.Invalid(ctx, "BuyerID", model.InvalidBuyerIDInvalid)
 	}
 	var res ClaimResult
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -153,12 +153,12 @@ type IssueResult struct {
 // 全部或全不發：新建的券數會超過總量就整筆失敗（ReasonIssueLimitReached）。
 func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error) {
 	if in.AdminID <= 0 {
-		return IssueResult{}, model.Invalid("AdminID", "admin id")
+		return IssueResult{}, model.Invalid(ctx, "AdminID", model.InvalidAdminIDInvalid)
 	}
 	if len(in.BuyerIDs) == 0 || len(in.BuyerIDs) > model.MaxIssueBatch {
-		return IssueResult{}, model.Invalid("BuyerIDs", "buyer count")
+		return IssueResult{}, model.Invalid(ctx, "BuyerIDs", model.InvalidBuyerCountInvalid)
 	}
-	buyers, err := model.PositiveUnique("BuyerIDs", in.BuyerIDs)
+	buyers, err := model.PositiveUnique(ctx, "BuyerIDs", in.BuyerIDs)
 	if err != nil {
 		return IssueResult{}, err
 	}
@@ -259,28 +259,28 @@ type CompensationResult struct {
 func (s *Service) IssueCompensation(ctx context.Context, in CompensationInput) (CompensationResult, error) {
 	sourceID := in.SourceID
 	if !in.SourceType.Valid() || utf8.RuneCountInString(sourceID) < 1 || utf8.RuneCountInString(sourceID) > model.MaxSourceIDLen {
-		return CompensationResult{}, model.Invalid("SourceID", "source")
+		return CompensationResult{}, model.Invalid(ctx, "SourceID", model.InvalidSourceInvalid)
 	}
 	if in.BuyerID <= 0 || in.StoreID <= 0 || !in.Issuer.Valid() || (in.Issuer.StoreID > 0 && in.Issuer.StoreID != in.StoreID) {
-		return CompensationResult{}, model.Invalid("StoreID", "buyer, store or issuer")
+		return CompensationResult{}, model.Invalid(ctx, "StoreID", model.InvalidBuyerStoreIssuerInvalid)
 	}
 	if in.Amount <= 0 || in.Amount > model.MaxOrderAmount/5 || in.MinOrderAmount < 0 || in.MinOrderAmount > model.MaxOrderAmount {
-		return CompensationResult{}, model.Invalid("Amount", "amount")
+		return CompensationResult{}, model.Invalid(ctx, "Amount", model.InvalidAmountInvalid)
 	}
 	if in.MinOrderAmount > 0 && (in.MinOrderAmount < in.Amount*5 || in.MinOrderAmount-in.Amount < 100) {
-		return CompensationResult{}, model.Invalid("MinOrderAmount", "compensation rule")
+		return CompensationResult{}, model.Invalid(ctx, "MinOrderAmount", model.InvalidCompensationRuleInvalid)
 	}
 	if in.Issuer.StoreID > 0 && in.MinOrderAmount == 0 {
-		return CompensationResult{}, model.Invalid("MinOrderAmount", "seller compensation needs a threshold")
+		return CompensationResult{}, model.Invalid(ctx, "MinOrderAmount", model.InvalidSellerCompensationNeedsThreshold)
 	}
 	now := s.d.Now()
 	spec := model.CampaignSpec{Title: in.Title, DiscountType: model.DiscountCash, DiscountAmount: in.Amount, ThresholdAmount: in.MinOrderAmount, StartAt: now, EndAt: in.EndAt}
-	title, err := spec.Validate()
+	title, err := spec.Validate(ctx)
 	if err != nil {
 		return CompensationResult{}, err
 	}
 	if !in.EndAt.After(now) {
-		return CompensationResult{}, model.Invalid("EndAt", "end must be in the future")
+		return CompensationResult{}, model.Invalid(ctx, "EndAt", model.InvalidEndInPast)
 	}
 
 	var res CompensationResult
@@ -338,7 +338,7 @@ func (s *Service) existingCompensation(ctx context.Context, q *store.Queries, in
 		return err
 	}
 	if vrow.BuyerID != in.BuyerID {
-		return model.Invalid("SourceID", "source already issued to another buyer")
+		return model.Invalid(ctx, "SourceID", model.InvalidSourceOtherBuyer)
 	}
 	crow, err := q.GetCampaign(ctx, vrow.CampaignID)
 	if err != nil {
@@ -371,7 +371,7 @@ func heldBy(v store.CouponCouponVoucher, orderNo string) bool {
 
 // Quote 驗券但不鎖：與 Lock 同一組檢查（資格、時間窗、店家範圍、門檻），回傳折抵金額。
 func (s *Service) Quote(ctx context.Context, in LockInput) (LockResult, error) {
-	if err := validOrderNo(in.OrderNo); err != nil {
+	if err := validOrderNo(ctx, in.OrderNo); err != nil {
 		return LockResult{}, err
 	}
 	var res LockResult
@@ -393,6 +393,11 @@ func (s *Service) Quote(ctx context.Context, in LockInput) (LockResult, error) {
 		if err != nil {
 			return err
 		}
+		if !heldBy(vrow, in.OrderNo) {
+			if err := qualify.RequireDiscount(ctx, discount); err != nil {
+				return err
+			}
+		}
 		res = LockResult{Voucher: rows.Voucher(vrow), Discount: discount, Replayed: heldBy(vrow, in.OrderNo)}
 		return nil
 	})
@@ -411,7 +416,7 @@ func availability(ctx context.Context, v store.CouponCouponVoucher) error {
 
 func (s *Service) load(ctx context.Context, q *store.Queries, in LockInput) (store.CouponCouponVoucher, model.Campaign, error) {
 	if in.BuyerID <= 0 {
-		return store.CouponCouponVoucher{}, model.Campaign{}, model.Invalid("BuyerID", "buyer id")
+		return store.CouponCouponVoucher{}, model.Campaign{}, model.Invalid(ctx, "BuyerID", model.InvalidBuyerIDInvalid)
 	}
 	vrow, err := q.GetVoucher(ctx, in.VoucherID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && vrow.BuyerID != in.BuyerID) {
@@ -432,7 +437,7 @@ func (s *Service) load(ctx context.Context, q *store.Queries, in LockInput) (sto
 // 每次鎖定都重驗資格、時間窗、店家範圍與門檻（BD1、BD2），與領券同一個判定；只有「已由同一筆訂單持有」的重送略過資格
 // （活動結束後重送仍成功，D5：locked 照常完成）。
 func (s *Service) Lock(ctx context.Context, in LockInput) (LockResult, error) {
-	if err := validOrderNo(in.OrderNo); err != nil {
+	if err := validOrderNo(ctx, in.OrderNo); err != nil {
 		return LockResult{}, err
 	}
 	var res LockResult
@@ -464,12 +469,15 @@ func (s *Service) lock(ctx context.Context, in LockInput) (LockResult, error) {
 	if err != nil {
 		return LockResult{}, err
 	}
+	if err := qualify.RequireDiscount(ctx, discount); err != nil {
+		return LockResult{}, err
+	}
 	if other, err := q.GetVoucherByOrderNo(ctx, &in.OrderNo); err == nil && other.ID != vrow.ID {
 		return LockResult{}, model.Precondition(ctx, model.ReasonOrderHoldsAnotherVoucher)
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return LockResult{}, err
 	}
-	locked, err := q.LockVoucher(ctx, store.LockVoucherParams{ID: vrow.ID, BuyerID: in.BuyerID, OrderNo: &in.OrderNo, Now: rows.TimePtr(now)})
+	locked, err := s.lockVoucher(ctx, store.LockVoucherParams{ID: vrow.ID, BuyerID: in.BuyerID, OrderNo: &in.OrderNo, Now: rows.TimePtr(now)})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return s.lostLock(ctx, q, vrow.ID, in, discount)
 	}
@@ -487,6 +495,30 @@ func (s *Service) lock(ctx context.Context, in LockInput) (LockResult, error) {
 		return LockResult{}, err
 	}
 	return LockResult{Voucher: rows.Voucher(fresh), Discount: discount}, nil
+}
+
+// lockVoucher 在 savepoint 內執行鎖定的 UPDATE：失敗（含 order_no 的唯一鍵衝突）就回滾到 savepoint，
+// 呼叫方的 transaction 不會被 Postgres 中止，之後還能下 SQL 或 commit。
+func (s *Service) lockVoucher(ctx context.Context, p store.LockVoucherParams) (store.LockVoucherRow, error) {
+	tx, ok := db.TxFrom(ctx)
+	if !ok {
+		return store.New(s.d.DB.Conn(ctx)).LockVoucher(ctx, p)
+	}
+	sp, err := tx.Begin(ctx)
+	if err != nil {
+		return store.LockVoucherRow{}, err
+	}
+	v, err := store.New(sp).LockVoucher(ctx, p)
+	if err != nil {
+		if rbErr := sp.Rollback(context.WithoutCancel(ctx)); rbErr != nil {
+			return store.LockVoucherRow{}, errors.Join(err, rbErr)
+		}
+		return store.LockVoucherRow{}, err
+	}
+	if err := sp.Commit(ctx); err != nil {
+		return store.LockVoucherRow{}, err
+	}
+	return v, nil
 }
 
 // lostLock 處理條件式 UPDATE 沒有更新任何列：重讀券，同一筆訂單已持有（並發的重送）是冪等成功，否則回券現在的狀態對應的原因。
@@ -513,7 +545,7 @@ type RedeemResult struct {
 // Redeem 核銷持有這筆訂單的鎖定中的券。重送冪等；這筆訂單沒有持有任何券回 NotFound（ReasonNoVoucherForOrder）。
 // 核銷不檢查活動狀態與時間：鎖定當下已驗過，結束活動或過期都不影響已鎖的券（D5、BD8）。
 func (s *Service) Redeem(ctx context.Context, orderNo string) (RedeemResult, error) {
-	if err := validOrderNo(orderNo); err != nil {
+	if err := validOrderNo(ctx, orderNo); err != nil {
 		return RedeemResult{}, err
 	}
 	var res RedeemResult
@@ -556,7 +588,7 @@ type ReleaseResult struct {
 // 活動已結束時改為作廢（D5：結束之後沒有 AVAILABLE）。重送冪等。讀活動列時共享鎖，與結束活動排隊，所以不會在結束
 // 掃過之後才回到可用。
 func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, error) {
-	if err := validOrderNo(orderNo); err != nil {
+	if err := validOrderNo(ctx, orderNo); err != nil {
 		return ReleaseResult{}, err
 	}
 	var res ReleaseResult
@@ -602,9 +634,9 @@ type VoidInput struct {
 // Void 作廢單張券（admin，D6）：AVAILABLE 或 LOCKED（Release 漏送而卡住的券）；已核銷的與已作廢的回 ReasonInvalidStatus。
 func (s *Service) Void(ctx context.Context, in VoidInput) error {
 	if in.AdminID <= 0 {
-		return model.Invalid("AdminID", "admin id")
+		return model.Invalid(ctx, "AdminID", model.InvalidAdminIDInvalid)
 	}
-	reason, err := model.NormalizeReason(in.Reason)
+	reason, err := model.NormalizeReason(ctx, in.Reason)
 	if err != nil {
 		return err
 	}

@@ -70,7 +70,7 @@
    "old": "\tif isOrderNoConflict(err) {",
    "new": "\tif false && isOrderNoConflict(err) {",
    "test": "internal/modules/coupon ^TestConcurrentLockOfTwoVouchersForOneOrder$",
-   "why": "拿掉 vouchers_order_no_key 唯一鍵衝突的對應：同一筆訂單並發鎖兩張券時後到的回 Internal 而不是 ORDER_HOLDS_ANOTHER_VOUCHER，並發測試要紅。"
+   "why": "拿掉 vouchers_order_no_key 唯一鍵衝突的對應：後到的 transaction 在 pg_locks 確認卡住、先到的 commit 後撞上唯一鍵，回 Internal 而不是 ORDER_HOLDS_ANOTHER_VOUCHER，時序是決定性的，測試每次都要紅。"
   },
   {
    "id": "quota-counts-expired",
@@ -88,7 +88,34 @@
    "old": "\tif discount <= 0 {",
    "new": "\tif false && discount <= 0 {",
    "test": "internal/modules/coupon ^TestLockRejectsAPercentDiscountThatRoundsToZero$",
-   "why": "Fit 拿掉折抵為 0 的檢查：算出 0 元的百分比券仍被鎖定而消耗，測試要紅。"
+   "why": "RequireDiscount 拿掉折抵為 0 的檢查：算出 0 元的百分比券在新鎖定時仍被鎖定而消耗，測試要紅。"
+  },
+  {
+   "id": "lock-no-savepoint",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\ttx, ok := db.TxFrom(ctx)\n\tif !ok {\n\t\treturn store.New(s.d.DB.Conn(ctx)).LockVoucher(ctx, p)",
+   "new": "\ttx, ok := db.TxFrom(ctx)\n\tif true || !ok {\n\t\treturn store.New(s.d.DB.Conn(ctx)).LockVoucher(ctx, p)",
+   "test": "internal/modules/coupon ^TestConcurrentLockOfTwoVouchersForOneOrder$",
+   "why": "鎖定的 UPDATE 不再包在 savepoint 內：唯一鍵衝突讓呼叫方的 transaction 被 Postgres 中止，衝突之後的 SELECT 1 與 commit 失敗，測試要紅。"
+  },
+  {
+   "id": "lock-replay-rejects-zero-discount",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\t\treturn LockResult{Voucher: rows.Voucher(vrow), Discount: discount, Replayed: true}, nil\n\t}\n\tnow := s.d.Now()",
+   "new": "\t\tif err := qualify.RequireDiscount(ctx, discount); err != nil {\n\t\t\treturn LockResult{}, err\n\t\t}\n\t\treturn LockResult{Voucher: rows.Voucher(vrow), Discount: discount, Replayed: true}, nil\n\t}\n\tnow := s.d.Now()",
+   "test": "internal/modules/coupon ^TestReplayOfHeldVoucherIgnoresZeroDiscount$",
+   "why": "零折抵檢查移回 Lock 的重送路徑：已由同一筆訂單持有的券以 0 元折抵重送 Lock 被拒絕（NO_DISCOUNT），重送測試要紅。"
+  },
+  {
+   "id": "quote-replay-rejects-zero-discount",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\t\tif !heldBy(vrow, in.OrderNo) {\n\t\t\tif err := qualify.RequireDiscount(ctx, discount); err != nil {",
+   "new": "\t\tif true {\n\t\t\tif err := qualify.RequireDiscount(ctx, discount); err != nil {",
+   "test": "internal/modules/coupon ^TestReplayOfHeldVoucherIgnoresZeroDiscount$",
+   "why": "Quote 對已持有的券也套用零折抵檢查：以 0 元折抵 Quote 被拒絕（NO_DISCOUNT），重送測試要紅。"
   }
  ]
 }
