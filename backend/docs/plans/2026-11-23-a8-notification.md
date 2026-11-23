@@ -83,7 +83,7 @@
   - 驗收：基線結果與四份產出在附件；裁決表與 `inventory.md` 去向欄無空格（新增一次性腳本 `2026-11-23-a8-notification/check_dispositions.py`，不進 `scripts/`）。
   - 停止條件：基線有會擋 A8 的失敗；U8 發現 client 依型別做互動（D6 要重議）。
 
-- [ ] **A8-1 模組本體（walking skeleton）**（被擋於：A8-0）
+- [ ] **A8-1 模組本體（walking skeleton）**（被擋於：D14、D15）
   - 範圍：`internal/modules/notification`：
     - schema：收件匣（型別、參數快照、聚合鍵、actor 清單、已讀）、通知意圖、每渠道投遞紀錄（待送／已送／永久失敗、實際送出的文字與 locale）、裝置 token（`last_registered_at`）、偏好覆寫列 `(account_id, 受眾, 分類, 渠道, enabled)`、公告、suppression 名單。
     - 型別註冊表：typed 參數、受眾、偏好分類（D4）、呈現分類（D6）、渠道、可選聚合鍵（讚、追蹤用）、冪等鍵來源、actor 欄位、文案（模組 `internal/text`，zh-TW／en）、深連結；預設偏好與不可關的分類寫在註冊表。
@@ -97,18 +97,18 @@
   - 停止條件：型別註冊表無法不靠執行期反射表達上列屬性。
 
 - [ ] **A8-2 Connect API 與串流**（被擋於：A8-1、D6）
-  - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。
+  - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。推播 payload 與串流訊號帶 D6 的狀態重讀提示 enum。賣家工作區即時通道與通知串流共用路徑、SSE 連線與 topic `notification:user:{storeId}`（A8-0 U10，`fact-checks.md`；`seller_workspace_channel.go:14-34`），一起搬：同一個串流與 hub 承載 `seller_workspace` 事件、其發布端（`ResolveTopic` 讀 `payload.sellerId`）與批次事件名，website `useSellerWorkspaceRealtime` 改接新串流。
   - 消費端：`rg -n "notifications|notification-preferences|device-token" website/ admin/ buyer-app/lib seller-app/lib backend/gateway backend/internal/httpapi`。
   - 不能動：舊 REST 在 A8-7 前仍可用。
-  - 驗收：`buf lint`、`buf breaking`、TS／Dart 生成無 drift；Connect 特性測試涵蓋每支方法；串流 integration：建立通知後收到訊號、另一受眾收不到、超過上限被拒。mutation：串流鍵拿掉受眾 → 跨受眾測試紅；`MarkAsRead` 改回非本人也成功 → NotFound 測試紅；`total` 不套分類篩選 → 篩選計數測試紅；拿掉串流上限檢查 → 上限測試紅。
+  - 驗收：`buf lint`、`buf breaking`、TS／Dart 生成無 drift；Connect 特性測試涵蓋每支方法；串流 integration：建立通知後收到訊號、另一受眾收不到、超過上限被拒、發 `seller.order.updated` 後賣家工作區訂閱者收到事件。mutation：拿掉 `seller_workspace` 事件的轉送 → 賣家工作區測試紅；串流鍵拿掉受眾 → 跨受眾測試紅；`MarkAsRead` 改回非本人也成功 → NotFound 測試紅；`total` 不套分類篩選 → 篩選計數測試紅；拿掉串流上限檢查 → 上限測試紅。
 
-- [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1、D3 逐列表；真實 provider 驗收另擋於 Will 的帳號）
+- [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1、D3b；真實 provider 驗收另擋於 Will 的帳號）
   - 範圍：
     - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Resend adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 寫 suppression）；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字。
     - token：登入 upsert 改綁、登出刪、帳號停權（`accountsuspension.Suspended`）與刪帳號（`identity.AccountDeleted`）時由同 transaction 的同步訂閱者刪列，加進 A8-1 結構測試的白名單、每日 job 刪 60 天未更新的 token；店家停權不動。
     - 重送：依投遞紀錄重排永久失敗的手段與 runbook；未觸達查詢：近 N 天交易必要型別沒有任何渠道送達的數量（後台唯讀）。
-    - 依 D3 的裁決表為單體事件定義型別並訂閱：social（留言、讚、追蹤的店發文；讚用聚合鍵）、buyer 的追蹤店家（`cmd/hawkr/buyer_events.go:20` 現經 `buyerrelay`；用聚合鍵）、review、im（離線推播）、seller（檢舉收到與結果、seller 新增公開事件 `CaseInquiryCreated`（`seller/events.go`，在 `CreateCaseInquiry` 的同一個 transaction 發布）、措施與治理、KYC 審核結果）、payment `PayoutAccountChanged`（含首次啟用時間、補件期限欄位與期限前提醒）、accountsuspension 停權與解除、delegation 代行完成、procurement `RfqPublished`。moderation 新增事件（消費者此時出現）：內容被隱藏、作者收到警告、案件結案（帶每位檢舉人帳號），在處置的同一個 transaction 發布。`ReportReceived` 的確認信：意圖參數只放 report 參照，worker 執行時向 seller 讀地址。
-    - 刪除 `socialrelay`、`imrelay`、`reviewrelay` 的 notification 一半、`delegationservice/events.go` 的通知 wire、`sellerrelay` 對 notification 的部分、`buyerrelay` 的追蹤與 `product.viewed` wire、相關 wire／golden 測試、`pkg/mq` social 常數。
+    - 依 D3 的裁決表為單體事件定義型別並訂閱：social（留言、讚、追蹤的店發文；讚用聚合鍵）、buyer 的追蹤店家（`cmd/hawkr/buyer_events.go:20` 現經 `buyerrelay`；用聚合鍵）、review、im（離線推播）、seller（檢舉收到與結果、seller 新增公開事件 `CaseInquiryCreated`（`seller/events.go`，在 `CreateCaseInquiry` 的同一個 transaction 發布）、措施與治理、KYC 審核結果）、payment `PayoutAccountChanged`（payment 先加首次啟用時間、補件期限欄位；期限前提醒是另一型別 `payout_account_deadline`）；型別清單以 `event-adjudication.md` 與 D3 為準（收藏不做、im 只推播不寫收件匣、解除請求只送 Decided）、accountsuspension 停權與解除、delegation 代行完成、procurement `RfqPublished`。moderation 新增事件（消費者此時出現）：內容被隱藏、作者收到警告、案件結案（帶每位檢舉人帳號），在處置的同一個 transaction 發布。`ReportReceived` 的確認信：意圖參數只放 report 參照，worker 執行時向 seller 讀地址。
+    - 刪除 `socialrelay`、`imrelay`、`reviewrelay` 的 notification 一半、`delegationservice/events.go` 的通知 wire、`sellerrelay` 對 notification 的部分、`buyerrelay` 的追蹤、`product.viewed` 與 `product.restock.target` wire（`buyer.deleted`、`favorite.*` 有 Java 消費者，保留）、相關 wire／golden 測試、`pkg/mq` social 常數。
   - 消費端：`rg -n "socialrelay|imrelay|reviewrelay|sellerrelay|buyerrelay|delegationservice" backend/`；`rg -n "CreateCaseInquiry" backend/internal`；`rg -n "hawkr\.(content|im|review|delegation)" backend/ --type go`。
   - 不能動：各模組事件型別的既有欄位（只加不改）；`reviewrelay` 給 Java product 評分聚合的那一半（A6 延後項）。
   - 驗收：測試證明每個被訂閱的事件都有對應型別、每個型別都有訂閱或明列為公告；integration（替身）：暫時性錯誤重試後只送一次、永久性錯誤不重試、Unregistered 停用 token、BUYER 受眾不推 seller App、停權與刪帳號後 token 在同一個 transaction 消失、60 天未更新的 token 被清、suppression 名單內不寄、確認信地址不在任何 job 參數裡、每個型別一個「事件 → 收件匣」案例、封鎖雙方不送；relay 刪除後 `rg` 0 hit。mutation：永久錯誤改暫時 → 測試紅；拿掉受眾 App 過濾 → 測試紅；拿掉封鎖略過 → A7-3 測試紅；移除一個訂閱 → 覆蓋測試紅。真實 provider：Firebase 就緒後送一則推播到測試裝置，結果貼進度表；真實寄信見「延後」。
@@ -167,16 +167,19 @@
 | D0b River vs 工作流引擎（Temporal 等） | River | 已決 2026-11-23，Will |
 | D1 文案位置 | 模組 `internal/text`（伺服器組字，client 不需要） | 已決 2026-11-23，Will |
 | D2 收件匣保留期 | 180 天硬刪 | 已決 2026-11-23，Will |
-| D3 事件裁決 | 範圍只有單體事件；原則：有使用者需要知道且有發送端才做型別；`product.viewed` 不做；`MeasureRequestSubmitted` 不進通知（管理員不是收件人）。逐列表在 A8-0 產出後交 Will | 原則已決，逐列表未決 |
+| D3 事件裁決 | 範圍只有單體事件；原則：有使用者需要知道且有發送端才做型別；`product.viewed` 不做；`MeasureRequestSubmitted` 不進通知（管理員不是收件人）。逐列表見附件 `event-adjudication.md`，開放問題 1–7 照建議：收藏不做；聊天只推播不寫收件匣；`MeasureCreated(SUSPENSION)` 不另發（由 `StoreSuspended` 通知）；解除請求被接受時只送 `MeasureRequestDecided`（worker 對同一 `MeasureID` 去重）；`PayoutAccountChanged` 加首次啟用時間與補件期限欄位，期限提醒另立 `payout_account_deadline`；`content_hidden` 只給買家作者；`rfq_invited` 歸互動。問題 8（`StoreClosed`／`StoreReopened`／`StorePendingDeletion`／`BuyerDeletionRequested` 是否納入）未決 | 已決 2026-11-23，Will（問題 8 未決） |
+| D3b 範圍外的四個 seller／buyer 事件 | `StoreClosed`、`StoreReopened`、`StorePendingDeletion`、`BuyerDeletionRequested` 是否做型別；只影響 A8-3 的型別清單 | 未決，擋 A8-3 |
 | D4 偏好分類 | 交易必要（訂單、出貨、退款售後、撥款、帳號與治理）：收件匣、email 不可關；互動（聊天、評價、留言、讚、追蹤、追蹤的店發文）：可關；行銷（coupon、restock）：預設開、可關（個資法第 20 條）；賣家 `shipment_anomaly` 推播不可關。只存覆寫列 | 已決 2026-11-23，Will |
 | D5 取貨簡訊 | 刪除（B3 賣家自寄） | 已決 2026-11-23，Will |
-| D6 收件匣回應 | 伺服器組字＋8–10 個呈現分類 enum（不是每型別一個值）；A8-0 的 U8 發現互動分支時重議 | 已決 2026-11-23，Will |
+| D6 收件匣回應 | 伺服器組字＋10 個呈現分類 enum（`ORDER`、`REFUND`、`PAYOUT`、`MESSAGE`、`SOCIAL`、`REVIEW`、`PROMOTION`、`PROCUREMENT`、`ACCOUNT`、`SYSTEM`；不是每型別一個值）＋深連結。重議（A8-0 U8：App 推播依型別重讀訂單／售後／賣家狀態、在聊天室時不彈 banner，見 `fact-checks.md`）：推播與串流另帶狀態重讀提示 enum（`ORDER`、`AFTER_SALE`、`SELLER_STATUS`，可為空），聊天抑制以深連結指向的聊天室判斷；不公開每型別 enum | 已決 2026-11-23，Will；重議同日 |
 | D7 Android | 不做：兩支 App 的 Android 已於 2026-09-26 移除（簡報誤以為仍在，2026-11-23 更正）；token 不存 platform，記 `last_registered_at`，60 天未更新清除 | 已決 2026-11-23，Will；更正同日 |
 | D8 寄信服務 | Resend（免費額度足夠、不需審核）＋交易信專用子網域；adapter 介面不綁 provider。真實寄信等買網域 | 已決 2026-11-23，Will |
 | D9 代行者讀店家通知 | 不能 | 已決 2026-11-23，Will |
 | D10 投遞模型 | 來源 tx 只排意圖 job，worker 展開；投遞紀錄保留為唯一帳本 | 已決 2026-11-23，Will |
 | D11 串流內容 | 只傳失效訊號，不做續傳游標 | 已決 2026-11-23，Will |
 | D12 收件匣聚合 | 型別可宣告聚合鍵，未讀時合併；不做時間窗摘要 | 已決 2026-11-23，Will |
+| D14 推播圖片 | 新型別的推播是否帶圖片（舊模板 44 個帶 `image_key_template`；inventory §4 #11） | 未決，擋 A8-1 註冊表屬性與 A8-3 FCM adapter |
+| D15 投遞紀錄保留期 | 投遞紀錄（D10 唯一帳本）保留多久；舊系統刪 failed／skipped 超過 30 天（inventory §6 #3a），D2 只定收件匣 180 天 | 未決，擋 A8-1 清除 job |
 | D13 legacy 通知轉接 | 不做；通知型別隨發送端搬遷 | 已決 2026-11-23，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
@@ -187,7 +190,7 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| A8-0 基線與事實查核 | 未開始 | | | |
+| A8-0 基線與事實查核 | 完成 | 基線見文末；`event-adjudication.md`、`fact-checks.md`、`inventory.md` 去向；`python3 backend/docs/plans/2026-11-23-a8-notification/check_dispositions.py` → 0 個空格（填表前 243 個） | inventory 去向有 2 列「待決」（D14、D15） | 本次 |
 | A8-1 模組本體 | 未開始 | | | |
 | A8-2 Connect API 與串流 | 未開始 | | | |
 | A8-3 渠道與事件訂閱 | 未開始 | | | |
@@ -199,4 +202,16 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 
 ## 基線
 
-（A8-0 填）
+A8-0，2026-11-23，dev `bcc906501`（工作區另有其他 session 未提交的 B7 文件改動，不影響 Go 與 client 程式）：
+
+| 檢查 | 結果 |
+|---|---|
+| backend `make lint-monolith` | 通過 |
+| backend `make vet-all` | 通過 |
+| backend `make test-all`（不含 integration tag） | 通過 |
+| `services/notification-service` `go test ./...` | 通過 |
+| website `lint`、`design:check --apps-root ..`、`contrast:check`、`test:unit`、`test`（vitest unit） | 通過 |
+| admin `lint`、`test` | 通過 |
+| buyer-app、seller-app `fvm flutter analyze`、`fvm dart format --set-exit-if-changed lib test` | 通過 |
+
+未跑：integration（起容器，交 CI）、website `build`／`test:build-output`／e2e、Flutter 完整 `flutter test`（交 CI）。既有失敗：無。
