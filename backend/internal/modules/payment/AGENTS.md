@@ -4,11 +4,15 @@
 
 ## 職責
 
-收款與付款。現階段只擁有收款帳戶（收款開通 ADR D28）：外部帳戶的本地快取、建立與同步 job、輪詢、provider 的 port 與 Stripe／fake adapter、收款事件的 inbox handler、後台的讀取、重新整理、重試建立、重試關閉與刪除對應。給 seller（核准、開通 session、個資清理）與後台用。行為規格的唯一來源是 `backend/docs/modules/payment.md`。
+收款與付款。收款帳戶（收款開通 ADR D28）：外部帳戶快取、建立與同步 job、輪詢、port 與 adapter、收款事件 handler、後台的讀取與重試，給 seller 與後台用。付款（B2 3a）：付款列、PaymentIntent 建立、同步與補掃、事件 handler；轉帳與退款是 3b、3c。行為規格的唯一來源是 `backend/docs/modules/payment.md`。
 
 ## 擁有的資料
 
-schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；`Deps.Audit` 必填）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`、httpapi 的 `TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller`。view 與函式在 `db/objects.sql`。webhook inbox 不在這裡：`inbox.events` 由 platform 擁有（`internal/platform/inbox`，D29）。讀取模型：無。
+schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。
+
+付款三表 `payments`、`transfers`、`refunds`（UUIDv7 主鍵）。
+
+管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；`Deps.Audit` 必填）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`、httpapi `TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller`。view 與函式在 `db/objects.sql`。webhook inbox 由 platform 擁有（D29）。
 
 ## 發布的讀取介面
 
@@ -17,7 +21,7 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件（`events.go`）與錯誤。
-- `internal/account`：收款帳戶的 use case、port 與 adapter、job（子領域規則見 `internal/account/AGENTS.md`）。`internal/model`：對外型別與事件。`internal/store`：sqlc 生成，不得手改。
+- `internal/account`：收款帳戶的 use case、port 與 adapter、job（子領域規則見 `internal/account/AGENTS.md`）。`internal/charge`：付款（不變量見 `internal/charge/AGENTS.md`，兩個子領域互不 import）。`internal/model`：對外型別與事件。`internal/store`：sqlc 生成，不得手改。
 - 依賴圖的唯一來源是 `internal/arch/modules.go`：payment 是葉節點，不 import 任何模組；擁有者是否營運中與聯絡信箱經組裝點注入的 `Owners`（信箱建立外部帳戶時才讀，不存副本）。
 
 ## 不變量
@@ -32,10 +36,10 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 
 ## 不負責
 
-- 開通閘門、防詐 hash、可曝光公告：seller（讀 seller 自存的副本）。
+- 開通閘門、防詐 hash、可曝光公告：seller（讀自存的副本）。
 - inbox 的表、派送 job、補掃與清理：platform `internal/platform/inbox`。
 - 確認呼叫者是擁有者：seller 的入口（D30）。
 
 ## 決策紀錄
 
-沿用機制的判斷在同目錄的 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-09-24-go-modular-monolith.md`（文末修訂「payment 模組先只擁有收款帳戶」：payment 先只有收款帳戶、seller 依賴 payment、規則 5 的 inbox 由 platform 提供）、`docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`（收款帳戶的擁有者、port 與 Stripe；Dn 編號見「決定編號」表）。
+沿用機制的判斷在同目錄的 `CARRYOVER.md`。相關 ADR：`docs/adr/2026-09-24-go-modular-monolith.md`（文末修訂：seller 依賴 payment，規則 5 的 inbox 由 platform 提供）、`docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`（收款帳戶的擁有者、port 與 Stripe；Dn 編號見「決定編號」表）。
