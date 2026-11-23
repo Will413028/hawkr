@@ -73,3 +73,11 @@
 - `RenameConversation`：去頭尾空白後 1 到 40 字元、不含 `\n`、`\r`，否則 INVALID_ARGUMENT（欄位 `title`）；DB 的 `conversations_title_check` 同為 40。目標狀態的方法，不建收據。
 - `DeleteConversation`：同一個 transaction 依序取買家送出鎖、`Canceller.CancelAllOfRequest`（需求還沒結束的 run，含等待輸入的，逐個走 `CancelRun` 的路徑，買家取消不退額度）、軟刪除對話；已發布的詢價與接受單不動。已刪除的重送回成功，不存在或不是本人回 NOT_FOUND。
 - `GetCandidateSearch(buyerID, requestID, runID, locale)`（`search.Reader`）：run 不存在、不是本人、不是 CANDIDATE_SEARCH 或不屬於該需求回 NOT_FOUND。候選集在建 run 時就建好，所以每個狀態都有 `CandidateSetID`；只有 SUCCEEDED 有候選（事實由需求現行版本讀取時組出，`FactsAsOf` 是 run 完成的時間），FAILED 帶失敗原因，其餘狀態只回狀態。店家卡片在 httpapi 組（`seller.Module.StoreCards`）；沒公開過的店沒有卡片，候選照列、不設 `store`。
+
+## 8. 需求編輯（A9-3b-3b，A9-D31 Q1–Q2、A9-D33）
+
+- `ToggleSelection`（`search.Selector`）：目標狀態的方法，重送結果相同。同一個 transaction 鎖需求列，需求不屬於本人、對話已刪除、候選集不屬於這個需求或候選不在候選集裡回 NOT_FOUND；候選集不是有效的候選集（需求不在 MATCHING，或不是最新一筆成功搜尋的候選集）回 ABORTED／`VERSION_CONFLICT`，`conflictTarget` 是 `candidate_set`。
+- `SubmitAnswer`、`Rewind`（`turn.Direct`）同步、不建 run、不扣額度。transaction 內依序鎖買家的送出、現行版本、需求列；先看重送（輪次存在才回放），再守衛：待回覆的中斷 FAILED_PRECONDITION／`APPROVAL_PENDING`、同需求進行中的 run `PROCUREMENT_RUN_IN_PROGRESS`、讀到的版本不是現行版本 ABORTED／`VERSION_CONFLICT`（`conflictTarget` 是 `request_revision`）；需求不屬於本人或沒有對話 NOT_FOUND。分類樹讀取在 transaction 外。
+- 重送回放 `turns.turn_result`，位元組與第一次相同；同一個 `client_request_id` 內容不同（需求、來源、回答、欄位（`turns.command_slot`）、讀到的版本任一不同，或鍵已被 run 用掉）回 INVALID_ARGUMENT（`client_request_id`）。
+- SubmitAnswer 的欄位：ITEM（文字，須唯一對到一個末層分類，否則 INVALID_ARGUMENT `free_text`）、QUANTITY（數字文字與單位選項至少一個；缺的一邊現況要已有）、PACKAGING、BUDGET_PER_UNIT（整數文字）、DELIVERY_CITY（選項或文字）、DELIVERY_DATE（文字）。選項只認 `planner.BuildFor` 的白名單；略過只給可略過的欄位（PACKAGING、BUDGET_PER_UNIT），記進 `turns.skipped_slots`；值被 `slots.Apply` 拒絕不是錯誤，記在 `TurnResult.rejected`。
+- Rewind 的欄位同上（UNIT 視同 QUANTITY）。新版本內容同目標版，問題是倒回那一格（`planner.BuildFor`），連續選填計數歸零；需求狀態依 `nextStatus`：MATCHING 時品項解析變了才退回。

@@ -138,7 +138,9 @@ type Module struct {
 	hub        *run.Hub
 	watcher    run.Watcher
 	searcher   search.Starter
+	selector   search.Selector
 	resumer    turn.Resumer
+	direct     turn.Direct
 	snapshots  snapshot.Reader
 	convs      conversation.Service
 	candidates search.Reader
@@ -155,13 +157,17 @@ func New(d Deps) *Module {
 		panic("procurement.New：Deps.Logger 必填")
 	}
 	ledger := run.Ledger{DB: d.DB, Now: d.Now}
+	var rs *resolver.Resolver
+	if d.Taxonomy != nil {
+		rs = resolver.New(d.Taxonomy, resolver.EmbeddedSynonyms(), d.Now)
+	}
 	hub := run.NewHub(d.DB, run.MaxSubscriptions, d.Logger)
 	var quota turn.QuotaSource = noQuota{}
 	if d.Entitlements != nil {
 		quota = quotaOf{d.Entitlements}
 	}
 	m := &Module{
-		dispatcher: run.Dispatcher{DB: d.DB, Ledger: ledger, Executors: executors(d, ledger), Logger: d.Logger},
+		dispatcher: run.Dispatcher{DB: d.DB, Ledger: ledger, Executors: executors(d, ledger, rs), Logger: d.Logger},
 		submitter:  run.Submitter{DB: d.DB, Ledger: ledger, Jobs: d.Jobs, Limits: d.Limits},
 		canceller:  run.Canceller{DB: d.DB, Ledger: ledger, Jobs: d.Jobs},
 		hub:        hub,
@@ -172,7 +178,12 @@ func New(d Deps) *Module {
 	}
 	m.turns = turn.Submitter{Submitter: m.submitter, Quota: quota}
 	m.searcher = search.Starter{Submitter: m.submitter}
+	m.selector = search.Selector{DB: d.DB, Now: d.Now}
 	m.resumer = turn.Resumer{Submitter: m.submitter}
+	m.direct = turn.Direct{DB: d.DB, Now: d.Now}
+	if rs != nil { // nil 指標放進介面不等於 nil，沒給分類樹時 ITEM 回答要回組裝錯誤
+		m.direct.Resolver = rs
+	}
 	m.snapshots = snapshot.Reader{DB: d.DB, Ledger: ledger}
 	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
 	m.candidates = search.Reader{DB: d.DB}
@@ -181,7 +192,7 @@ func New(d Deps) *Module {
 
 // executors 在呼叫端給的登記之外補上 TURN、CANDIDATE_SEARCH 與 CLARIFICATION_RESUME 的 executor。
 // TURN 需要 LLM 與 Taxonomy；CANDIDATE_SEARCH 只需要 Search、Sellers 與 Taxonomy，不依賴 LLM；CLARIFICATION_RESUME 只需要 Taxonomy（回答不呼叫模型）。缺依賴是組裝錯誤，panic 訊息指名缺的欄位。
-func executors(d Deps, ledger run.Ledger) map[string]Executor {
+func executors(d Deps, ledger run.Ledger, rs *resolver.Resolver) map[string]Executor {
 	hasLLM := d.LLM.LLM() != nil
 	switch {
 	case hasLLM && d.Taxonomy == nil:
@@ -197,7 +208,6 @@ func executors(d Deps, ledger run.Ledger) map[string]Executor {
 	for k, v := range d.Executors {
 		out[k] = v
 	}
-	rs := resolver.New(d.Taxonomy, resolver.EmbeddedSynonyms(), d.Now)
 	if _, ok := out[run.RunTypeTurn]; !ok && hasLLM {
 		shape := extract.ShapeSchema // 停用的模型沒有 provider：呼叫一律回 ErrDisabled，形狀無關
 		if d.LLM.Enabled() {
@@ -293,6 +303,35 @@ type CandidateSearchStarted = search.Started
 // 重送同一個 client_request_id 回第一次的 run 與候選集（內容不同回 INVALID_ARGUMENT）。
 func (m *Module) StartCandidateSearch(ctx context.Context, in StartCandidateSearchInput) (CandidateSearchStarted, error) {
 	return m.searcher.Start(ctx, in)
+}
+
+// ToggleSelectionInput 是勾選或取消勾選一個候選的輸入：Selected 是目標狀態。
+type ToggleSelectionInput = search.SelectInput
+
+// ToggleSelection 把一個候選設成指定的勾選狀態（目標狀態的方法，重送結果相同，不建收據）。需求不屬於買家、對話已刪除、候選集不屬於這個需求或候選不在候選集裡回 NOT_FOUND；
+// 候選集不是有效的候選集（需求不在 MATCHING，或不是最新一筆成功搜尋的候選集）回 ABORTED／VERSION_CONFLICT，conflictTarget 是 candidate_set。
+func (m *Module) ToggleSelection(ctx context.Context, in ToggleSelectionInput) error {
+	return m.selector.Select(ctx, in)
+}
+
+// SubmitAnswerInput 是回答一個釐清問題的輸入（SubmitAnswer）。
+type SubmitAnswerInput = turn.AnswerSlotInput
+
+// RewindInput 是讓需求退回某個欄位的輸入（Rewind）。
+type RewindInput = turn.RewindInput
+
+// SubmitAnswer 回答一個釐清問題（A9-D31）：同步、不建 run、不扣額度，回傳 TurnResult 的 wire JSON（proto JSON，與 turn_result 事件的內容同一份格式）。
+// 只收確定性的回答（A9-D33(1)）：選項、數量、略過；品項文字須唯一對到一個末層分類，對到多個或零個回 INVALID_ARGUMENT（欄位 FreeText），請改用 SubmitTurn；
+// 形狀不合回 INVALID_ARGUMENT 並指出欄位；需求不屬於買家或沒有對話回 NOT_FOUND；有待回覆的中斷回 FAILED_PRECONDITION／APPROVAL_PENDING；同需求有進行中的 run 回 PROCUREMENT_RUN_IN_PROGRESS；
+// 讀到的版本不是現行版本回 ABORTED／VERSION_CONFLICT（conflictTarget 是 request_revision）。重送同一個 ClientRequestID 回第一次存下的結果（不重算），內容不同回 INVALID_ARGUMENT（欄位 client_request_id）。
+func (m *Module) SubmitAnswer(ctx context.Context, in SubmitAnswerInput) ([]byte, error) {
+	return m.direct.Answer(ctx, in)
+}
+
+// Rewind 讓需求退回某個欄位重新回答（A9-D31、A9-D33）：新增內容同目標版的新版本（祖先是目標版，不重新啟用舊版本），目標沿內容祖先鏈計算；
+// 這個欄位沒有可倒回的內容回 FAILED_PRECONDITION（沒有 reason）。其餘錯誤與重送規則同 SubmitAnswer。回傳 TurnResult 的 wire JSON。
+func (m *Module) Rewind(ctx context.Context, in RewindInput) ([]byte, error) {
+	return m.direct.Rewind(ctx, in)
 }
 
 // ResumeRunInput 是回答一個中斷的輸入：OptionID 與 FreeText 恰一個（ClarificationResponse）。

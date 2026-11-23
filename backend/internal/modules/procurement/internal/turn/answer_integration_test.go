@@ -116,6 +116,7 @@ func TestAnswerRunCommitsAnAnswerTurnResolvesTheInterruptAndSucceedsTheAskingRun
 	if f.used() != 1 {
 		t.Errorf("used = %d，回答 run 不扣額度", f.used())
 	}
+	f.requireStoredTurnResult(answer)
 }
 
 func TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesExactlyOnePending(t *testing.T) {

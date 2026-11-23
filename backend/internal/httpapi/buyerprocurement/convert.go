@@ -2,6 +2,7 @@ package buyerprocurement
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"google.golang.org/genproto/googleapis/type/date"
@@ -10,6 +11,7 @@ import (
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 )
 
@@ -61,6 +63,18 @@ func slotKeyToProto(k procurement.SlotKey) (pb.SlotKey, error) {
 		return 0, fmt.Errorf("buyerprocurement：欄位 %q 沒有對應的 SlotKey", k)
 	}
 	return pb.SlotKey(v), nil
+}
+
+// slotKeyFromProto 把請求的欄位代碼轉成模組的欄位代碼；沒給（UNSPECIFIED）是缺必填欄位。
+func slotKeyFromProto(k pb.SlotKey) (procurement.SlotKey, error) {
+	if k == pb.SlotKey_SLOT_KEY_UNSPECIFIED {
+		return "", rpc.RequiredField("slot_key", "slot_key 不能是空的")
+	}
+	name, ok := strings.CutPrefix(k.String(), "SLOT_KEY_")
+	if !ok {
+		return "", rpc.RequiredField("slot_key", "slot_key 不認得")
+	}
+	return procurement.SlotKey(name), nil
 }
 
 func dispositionToProto(code string) (pb.CancelDisposition, error) {

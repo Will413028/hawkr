@@ -78,7 +78,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	must("InsertConversation", q.InsertConversation(ctx, store.InsertConversationParams{ID: c.conversation, BuyerID: buyerID, RequestID: c.request, Now: epoch}))
 	n, err := q.InsertTurn(ctx, store.InsertTurnParams{
 		ID: c.turn, RequestID: c.request, ConversationID: c.conversation, BuyerID: buyerID, ResultRevisionID: c.revision, Source: "LLM_EXTRACT",
-		BuyerMessage: "我要三件外套", AssistantReply: "好的", Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), OptionalStreak: 2, SkippedSlots: []string{"PACKAGING"}, ClientRequestID: id(), Now: epoch,
+		BuyerMessage: "我要三件外套", AssistantReply: "好的", Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), OptionalStreak: 2, SkippedSlots: []string{"PACKAGING"}, TurnResult: []byte("{}"), ClientRequestID: id(), Now: epoch,
 	})
 	rows("InsertTurn", n, err)
 	must("InsertCandidateSet", q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: c.candidateSet, RequestID: c.request, RequestRevisionID: c.revision, BuyerID: buyerID, Now: epoch}))
@@ -232,7 +232,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	}
 	dup, err := q.InsertTurn(ctx, store.InsertTurnParams{
 		ID: id(), RequestID: c.request, ConversationID: c.conversation, BuyerID: c.buyer, ResultRevisionID: rev2, Source: "ANSWER",
-		Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), SkippedSlots: []string{}, ClientRequestID: turns[0].ClientRequestID, Now: epoch,
+		Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), SkippedSlots: []string{}, TurnResult: []byte("{}"), ClientRequestID: turns[0].ClientRequestID, Now: epoch,
 	})
 	if err != nil || dup != 0 {
 		t.Fatalf("重送的 InsertTurn n=%d err=%v", dup, err)
@@ -240,7 +240,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	nilSkipID := id()
 	if n, err := q.InsertTurn(ctx, store.InsertTurnParams{
 		ID: id(), RequestID: c.request, ConversationID: c.conversation, BuyerID: c.buyer, ResultRevisionID: rev2, Source: "ANSWER",
-		Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), SkippedSlots: nil, ClientRequestID: nilSkipID, Now: epoch,
+		Steps: []byte("[]"), RecordedThisTurn: []byte("[]"), SkippedSlots: nil, TurnResult: []byte("{}"), ClientRequestID: nilSkipID, Now: epoch,
 	}); err != nil || n != 1 {
 		t.Fatalf("nil SkippedSlots 的 InsertTurn 要存成空陣列，n=%d err=%v", n, err)
 	}

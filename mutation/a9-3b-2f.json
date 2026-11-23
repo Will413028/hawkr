@@ -157,8 +157,8 @@
    "id": "event-strict-decode",
    "stack": "go",
    "file": "backend/internal/httpapi/buyerprocurement/app.go",
-   "old": "protojson.UnmarshalOptions{DiscardUnknown: false}",
-   "new": "protojson.UnmarshalOptions{DiscardUnknown: true}",
+   "old": "protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(e.Payload, out)",
+   "new": "protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(e.Payload, out)",
    "test": "internal/httpapi/buyerprocurement ^TestEventToProtoRejectsUnknownOrEmptyPayloads$",
    "why": "事件 payload 的未知欄位被默默丟掉，欄位漂移不再被發現"
   },

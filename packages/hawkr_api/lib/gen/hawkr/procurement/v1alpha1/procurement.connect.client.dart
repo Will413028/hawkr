@@ -106,7 +106,8 @@ extension type BuyerProcurementAppServiceClient (connect.Transport _transport) {
   }
 
   /// SubmitAnswer 回答一個釐清問題。需求有待回覆的中斷時改用 ResumeRun，回 FAILED_PRECONDITION，
-  /// reason 是 APPROVAL_PENDING。
+  /// reason 是 APPROVAL_PENDING。只收確定性的回答（選項、數量、略過；品項文字須唯一對到一個末層分類），
+  /// 品項文字對到多個或零個分類回 INVALID_ARGUMENT（field 是 free_text），請改用 SubmitTurn。
   Future<hawkrprocurementv1alpha1procurement.SubmitAnswerResponse> submitAnswer(
     hawkrprocurementv1alpha1procurement.SubmitAnswerRequest input, {
     connect.Headers? headers,

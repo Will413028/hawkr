@@ -28,6 +28,7 @@ CREATE TABLE procurement.requests (
 CREATE INDEX requests_buyer ON procurement.requests (buyer_id, created_at DESC) WHERE buyer_id IS NOT NULL;
 
 -- 需求的一個版本，append-only。slots 是具名欄位（S3）；欄位 NULL 表示買家還沒填。
+-- parent_revision_id 是內容祖先（這一版從哪一版的內容長出來；Rewind 的新版指向倒回的目標版），不是被取代者；取代順序是 revision_no 與現行（status）。
 CREATE TABLE procurement.request_revisions (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
@@ -101,6 +102,13 @@ CREATE TABLE procurement.turns (
     recorded_this_turn JSONB NOT NULL DEFAULT '[]',
     optional_streak INTEGER NOT NULL DEFAULT 0,
     skipped_slots TEXT[] NOT NULL DEFAULT '{}',
+    -- TurnResult 的 wire JSON（第一次提交時的完整回應）。存在的必要條件：SubmitAnswer 與 Rewind 不經 run，重送沒有 run 事件可回放，
+    -- 重算會因 planner 或文案改動而與第一次不同；任何來源的 turn 一律寫它（A9-D33(2)）。
+    turn_result JSONB NOT NULL,
+    -- SubmitAnswer 回答的欄位或 Rewind 倒回的欄位（SlotKey 字串）；其他來源的輪次為 NULL。存在的必要條件（A9-D34）：不經 run 的指令重送要比對「同一個欄位」，
+    -- 略過的回答沒有 buyer_message、turn_result 的 question 是下一題而不是這一題，兩者都帶不住欄位。source = 'ANSWER' 也含 ResumeRun 的回答（欄位在中斷上，此欄 NULL），
+    -- 所以 CHECK 只能要求 REWIND 必填、LLM_EXTRACT 必空。SubmitAnswer 的輪次必帶此欄的不變量由程式保證（Direct 寫入、`TestCommandSlotIsSetOnlyForSubmitAnswerAndRewindTurns`），DB 無法強制。
+    command_slot TEXT,
     client_request_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT turns_buyer_check CHECK (buyer_id > 0),
@@ -109,8 +117,14 @@ CREATE TABLE procurement.turns (
     CONSTRAINT turns_assistant_reply_check CHECK (char_length(assistant_reply) <= 4000 AND assistant_reply !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT turns_steps_check CHECK (jsonb_typeof(steps) = 'array'),
     CONSTRAINT turns_recorded_check CHECK (jsonb_typeof(recorded_this_turn) = 'array'),
+    CONSTRAINT turns_turn_result_check CHECK (jsonb_typeof(turn_result) = 'object'),
     CONSTRAINT turns_optional_streak_check CHECK (optional_streak >= 0),
-    CONSTRAINT turns_skipped_slots_check CHECK (skipped_slots <@ ARRAY['PACKAGING', 'BUDGET_PER_UNIT'])
+    CONSTRAINT turns_skipped_slots_check CHECK (skipped_slots <@ ARRAY['PACKAGING', 'BUDGET_PER_UNIT']),
+    CONSTRAINT turns_command_slot_check CHECK (
+        command_slot IS NOT NULL AND command_slot IN ('ITEM', 'QUANTITY', 'PACKAGING', 'BUDGET_PER_UNIT', 'DELIVERY_CITY', 'DELIVERY_DATE')
+        AND source IN ('ANSWER', 'REWIND')
+        OR command_slot IS NULL AND source IN ('LLM_EXTRACT', 'ANSWER')
+    )
 );
 CREATE UNIQUE INDEX turns_idempotency ON procurement.turns (buyer_id, client_request_id);
 CREATE INDEX turns_request ON procurement.turns (request_id, created_at DESC);

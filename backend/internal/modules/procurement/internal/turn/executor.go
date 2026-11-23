@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -126,59 +125,74 @@ func (e Executor) load(ctx context.Context, r store.ProcurementAgentRun) (loaded
 	if _, err := q.GetConversationForBuyer(ctx, store.GetConversationForBuyerParams{ID: ld.conversationID, BuyerID: r.BuyerID}); err != nil {
 		return loaded{}, fmt.Errorf("turn：讀取對話：%w", err)
 	}
-	ld.prior.requestOf = ld.request.Status
-
 	rev, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: r.RequestID, BuyerID: ld.buyerID})
 	switch {
 	case err == nil:
 		ld.active = &rev
-		ld.prior.current = setFromRevision(rev)
 	case !errors.Is(err, pgx.ErrNoRows):
 		return loaded{}, fmt.Errorf("turn：讀取現行版本：%w", err)
 	}
+	if ld.prior, err = loadPrior(ctx, q, ld.request, ld.active, r.BuyerID, e.Now()); err != nil {
+		return loaded{}, err
+	}
+	return ld, nil
+}
 
-	prev, err := q.GetLatestTurnByRequest(ctx, store.GetLatestTurnByRequestParams{RequestID: r.RequestID, BuyerID: r.BuyerID})
+// loadPrior 讀這一輪開始前的狀態：需求狀態、現行版本的內容、上一輪的選填進度、價格預覽與確認快照。run 驅動的 executor 與不經 run 的回答、倒回共用。
+func loadPrior(ctx context.Context, q *store.Queries, req store.ProcurementRequest, active *store.ProcurementRequestRevision, buyerID int64, now time.Time) (priorState, error) {
+	prior := priorState{requestOf: req.Status}
+	buyer := &buyerID
+	prev, err := q.GetLatestTurnByRequest(ctx, store.GetLatestTurnByRequestParams{RequestID: req.ID, BuyerID: buyerID})
 	switch {
 	case err == nil:
 		pt := &prevTurn{optionalStreak: int(prev.OptionalStreak)}
 		for _, k := range prev.SkippedSlots {
 			pt.skipped = append(pt.skipped, model.SlotKey(k))
 		}
-		ld.prior.prevTurn = pt
+		prior.prevTurn = pt
 	case !errors.Is(err, pgx.ErrNoRows):
-		return loaded{}, fmt.Errorf("turn：讀取上一輪：%w", err)
+		return priorState{}, fmt.Errorf("turn：讀取上一輪：%w", err)
 	}
-
-	if ld.active != nil {
-		_, err := q.GetLatestPricePreviewForRevision(ctx, store.GetLatestPricePreviewForRevisionParams{
-			RequestID: r.RequestID, RequestRevisionID: ld.active.ID, BuyerID: ld.buyerID, Now: e.Now(),
-		})
-		switch {
-		case err == nil:
-			ld.prior.preview = true
-		case !errors.Is(err, pgx.ErrNoRows):
-			return loaded{}, fmt.Errorf("turn：讀取價格預覽：%w", err)
-		}
-		snap, err := q.GetLatestConfirmedSnapshotByRequest(ctx, store.GetLatestConfirmedSnapshotByRequestParams{RequestID: r.RequestID, BuyerID: ld.buyerID})
-		switch {
-		case err == nil:
-			ld.prior.snapshot = &snapshotState{onCurrentRevision: snap.RequestRevisionID == ld.active.ID}
-		case !errors.Is(err, pgx.ErrNoRows):
-			return loaded{}, fmt.Errorf("turn：讀取確認快照：%w", err)
-		}
+	if active == nil {
+		return prior, nil
 	}
-	return ld, nil
+	prior.current = setFromRevision(*active)
+	_, err = q.GetLatestPricePreviewForRevision(ctx, store.GetLatestPricePreviewForRevisionParams{
+		RequestID: req.ID, RequestRevisionID: active.ID, BuyerID: buyer, Now: now,
+	})
+	switch {
+	case err == nil:
+		prior.preview = true
+	case !errors.Is(err, pgx.ErrNoRows):
+		return priorState{}, fmt.Errorf("turn：讀取價格預覽：%w", err)
+	}
+	snap, err := q.GetLatestConfirmedSnapshotByRequest(ctx, store.GetLatestConfirmedSnapshotByRequestParams{RequestID: req.ID, BuyerID: buyer})
+	switch {
+	case err == nil:
+		prior.snapshot = &snapshotState{onCurrentRevision: snap.RequestRevisionID == active.ID}
+	case !errors.Is(err, pgx.ErrNoRows):
+		return priorState{}, fmt.Errorf("turn：讀取確認快照：%w", err)
+	}
+	return prior, nil
 }
 
-// commit 在單一 transaction 內寫完這一輪：先鎖自己的 run（之後的轉換不會被取消搶在中間），再寫版本、輪次、狀態、標題與預覽，
-// 最後寫 turn_result 並轉 SUCCEEDED，或寫中斷。任何一步失敗整個回滾，run 由 Dispatcher 依回傳的錯誤收斂。
+// commit 在單一 transaction 內寫完這一輪：先鎖自己的 run（之後的轉換不會被取消搶在中間），再寫版本、輪次（含 turn_result）、狀態、標題與預覽，
+// 最後寫 turn_result 事件並轉 SUCCEEDED，或寫中斷。任何一步失敗整個回滾，run 由 Dispatcher 依回傳的錯誤收斂。
 func (e Executor) commit(ctx context.Context, ld loaded, d decision, now time.Time) error {
 	id := ids{request: ld.run.RequestID, conversation: ld.conversationID, revision: uuid.NewV7(), turn: uuid.NewV7(), run: ld.run.ID}
 	var interruptID uuid.UUID
 	if d.interrupt != nil {
 		interruptID = uuid.NewV7()
 	}
-	event, err := turnResultEvent(d, id, now, interruptID)
+	tr, err := turnResultWire(d, id, now, interruptID)
+	if err != nil {
+		return err
+	}
+	stored, err := json.Marshal(tr)
+	if err != nil {
+		return fmt.Errorf("turn：組 turn_result：%w", err)
+	}
+	event, err := turnResultEventOf(tr)
 	if err != nil {
 		return err
 	}
@@ -188,16 +202,6 @@ func (e Executor) commit(ctx context.Context, ld loaded, d decision, now time.Ti
 			return fmt.Errorf("turn：組中斷 payload：%w", err)
 		}
 	}
-	streak := d.plan.OptionalStreak
-	if streak < 0 || streak > math.MaxInt32 {
-		return fmt.Errorf("turn：連續選填計數 %d 超出範圍", streak)
-	}
-	streak32 := int32(streak)
-	recorded, err := json.Marshal(nonNil(d.recorded))
-	if err != nil {
-		return fmt.Errorf("turn：組 recorded_this_turn：%w", err)
-	}
-
 	source := ld.source
 	if source == "" {
 		source = sourceLLMExtract
@@ -226,53 +230,11 @@ func (e Executor) commit(ctx context.Context, ld loaded, d decision, now time.Ti
 		if ld.active != nil {
 			parent = &ld.active.ID
 		}
-		if _, err := q.SupersedeActiveRevision(ctx, store.SupersedeActiveRevisionParams{RequestID: id.request, BuyerID: ld.buyerID}); err != nil {
-			return fmt.Errorf("turn：取代現行版本：%w", err)
-		}
-		no, err := q.NextRevisionNo(ctx, store.NextRevisionNoParams{RequestID: id.request, BuyerID: ld.buyerID})
-		if err != nil {
-			return fmt.Errorf("turn：版本序號：%w", err)
-		}
-		n, err := q.InsertRevision(ctx, revisionParams(d.next, store.InsertRevisionParams{
-			ID: id.revision, RevisionNo: no, ParentRevisionID: parent, Now: now, RequestID: id.request, BuyerID: ld.buyerID,
-		}))
-		if err != nil {
-			return fmt.Errorf("turn：寫入版本：%w", err)
-		}
-		if n == 0 {
-			return fmt.Errorf("turn：需求 %s 不屬於這位買家", id.request)
-		}
-		skipped := make([]string, 0, len(d.plan.Skipped))
-		for _, k := range d.plan.Skipped {
-			skipped = append(skipped, string(k))
-		}
-		n, err = q.InsertTurn(ctx, store.InsertTurnParams{
-			ID: id.turn, RequestID: id.request, ConversationID: id.conversation, BuyerID: ld.run.BuyerID, ResultRevisionID: id.revision,
-			Source: source, BuyerMessage: ld.message, AssistantReply: d.replyText, Steps: []byte("[]"), RecordedThisTurn: recorded,
-			OptionalStreak: streak32, SkippedSlots: skipped, ClientRequestID: ld.run.ClientRequestID, Now: now,
-		})
-		if err != nil {
-			return fmt.Errorf("turn：寫入輪次：%w", err)
-		}
-		if n == 0 {
-			return fmt.Errorf("turn：client_request_id %s 已有輪次", ld.run.ClientRequestID)
-		}
-		if d.status != ld.request.Status {
-			n, err := q.SetRequestStatus(ctx, store.SetRequestStatusParams{Status: d.status, Now: now, ID: id.request, BuyerID: ld.buyerID, FromStatus: ld.request.Status})
-			if err != nil {
-				return fmt.Errorf("turn：更新需求狀態：%w", err)
-			}
-			if n == 0 {
-				return fmt.Errorf("turn：需求 %s 的狀態已不是 %s", id.request, ld.request.Status)
-			}
-		}
-		if err := q.SetConversationPreview(ctx, store.SetConversationPreviewParams{Preview: bounded(d.replyText, maxPreviewRunes), Now: now, ID: id.conversation, BuyerID: ld.run.BuyerID}); err != nil {
-			return fmt.Errorf("turn：更新對話預覽：%w", err)
-		}
-		if title := autoTitle(d.next); title != "" {
-			if err := q.SetConversationAutoTitle(ctx, store.SetConversationAutoTitleParams{Title: title, Now: now, ID: id.conversation, BuyerID: ld.run.BuyerID}); err != nil {
-				return fmt.Errorf("turn：更新自動標題：%w", err)
-			}
+		if err := writeTurn(ctx, q, turnWrite{
+			ids: id, buyerID: ld.run.BuyerID, parent: parent, d: d, source: source, message: ld.message,
+			clientRequestID: ld.run.ClientRequestID, fromStatus: ld.request.Status, result: stored, now: now,
+		}); err != nil {
+			return err
 		}
 
 		if d.interrupt != nil {

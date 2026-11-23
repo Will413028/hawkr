@@ -51,6 +51,11 @@ type fakeModule struct {
 	submitErr error
 	resumeErr error
 	searchErr error
+	toggleErr error
+	toggles   []procurement.ToggleSelectionInput
+	answers   []procurement.SubmitAnswerInput
+	rewinds   []procurement.RewindInput
+	directErr error
 	events    []procurement.RunEvent
 	snapshot  procurement.RuntimeSnapshot
 	outcome   procurement.CancelRunOutcome
@@ -106,6 +111,29 @@ func (f *fakeModule) StartCandidateSearch(context.Context, procurement.StartCand
 		return procurement.CandidateSearchStarted{}, f.searchErr
 	}
 	return procurement.CandidateSearchStarted{RunID: ownedRun, CandidateSetID: ownedRun, Status: "QUEUED"}, nil
+}
+
+func (f *fakeModule) ToggleSelection(_ context.Context, in procurement.ToggleSelectionInput) error {
+	f.toggles = append(f.toggles, in)
+	return f.toggleErr
+}
+
+const storedTurnResult = `{"requestId":"r","conversationId":"c","revisionId":"v","slots":{"item":"蘋果"},"reply":"好的","question":{"slotKey":"SLOT_KEY_DELIVERY_CITY","prompt":"送到哪裡","canSkip":false},"textFallback":"好的","messageId":"m","createTime":"2026-11-23T00:00:00Z"}`
+
+func (f *fakeModule) SubmitAnswer(_ context.Context, in procurement.SubmitAnswerInput) ([]byte, error) {
+	f.answers = append(f.answers, in)
+	if f.directErr != nil {
+		return nil, f.directErr
+	}
+	return []byte(storedTurnResult), nil
+}
+
+func (f *fakeModule) Rewind(_ context.Context, in procurement.RewindInput) ([]byte, error) {
+	f.rewinds = append(f.rewinds, in)
+	if f.directErr != nil {
+		return nil, f.directErr
+	}
+	return []byte(storedTurnResult), nil
 }
 
 func (f *fakeModule) GetRuntimeSnapshot(_ context.Context, buyer int64, conv uuid.UUID) (procurement.RuntimeSnapshot, error) {
@@ -512,4 +540,149 @@ func (f *fakeModule) GetCandidateSearch(_ context.Context, buyer int64, request,
 		return procurement.CandidateSearch{}, apperr.NotFound("找不到這次候選搜尋")
 	}
 	return f.search, nil
+}
+
+func TestToggleSelectionValidatesIDsAndNamesTheField(t *testing.T) {
+	m := &fakeModule{}
+	c := setup(t, m)
+	for name, tc := range map[string]struct {
+		req   *pb.ToggleSelectionRequest
+		field string
+	}{
+		"沒有 request_id":        {&pb.ToggleSelectionRequest{CandidateSetId: goodID, CandidateId: goodID}, "request_id"},
+		"candidate_set_id 不合法": {&pb.ToggleSelectionRequest{RequestId: goodID, CandidateSetId: "abc", CandidateId: goodID}, "candidate_set_id"},
+		"沒有 candidate_id":      {&pb.ToggleSelectionRequest{RequestId: goodID, CandidateSetId: goodID}, "candidate_id"},
+	} {
+		_, err := c.ToggleSelection(t.Context(), as(connect.NewRequest(tc.req), accountID))
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s：%v，要 INVALID_ARGUMENT", name, err)
+			continue
+		}
+		if got := violationFields(t, err); len(got) != 1 || got[0] != tc.field {
+			t.Errorf("%s：欄位 = %v，要 [%s]", name, got, tc.field)
+		}
+	}
+	if len(m.toggles) != 0 {
+		t.Fatalf("被拒絕的請求不得到達模組：%+v", m.toggles)
+	}
+}
+
+func TestToggleSelectionPassesTheBuyerAndTargetStateAndMapsErrors(t *testing.T) {
+	m := &fakeModule{}
+	c := setup(t, m)
+	req := &pb.ToggleSelectionRequest{RequestId: goodID, CandidateSetId: goodID, CandidateId: goodID, Selected: true}
+	res, err := c.ToggleSelection(t.Context(), as(connect.NewRequest(req), accountID))
+	if err != nil || res.Msg.GetRequestId() != goodID || res.Msg.GetCandidateSetId() != goodID || res.Msg.GetCandidateId() != goodID || !res.Msg.GetSelected() {
+		t.Fatalf("回應 = %v, %v", res, err)
+	}
+	if len(m.toggles) != 1 || m.toggles[0].BuyerID != buyerID || !m.toggles[0].Selected || m.toggles[0].RequestID.String() != goodID {
+		t.Fatalf("模組收到 %+v", m.toggles)
+	}
+	m.toggleErr = apperr.VersionConflict("過時").WithMetadata("conflictTarget", "candidate_set")
+	_, err = c.ToggleSelection(t.Context(), as(connect.NewRequest(req), accountID))
+	if connect.CodeOf(err) != connect.CodeAborted || reasonOf(t, err) != apperr.ReasonVersionConflict.String() {
+		t.Errorf("過時的候選集 = %v，要 ABORTED／VERSION_CONFLICT", err)
+	}
+	m.toggleErr = apperr.NotFound("找不到")
+	_, err = c.ToggleSelection(t.Context(), as(connect.NewRequest(req), accountID))
+	if connect.CodeOf(err) != connect.CodeNotFound {
+		t.Errorf("別人的需求 = %v，要 NOT_FOUND", err)
+	}
+}
+
+func TestSubmitAnswerAndRewindValidateAtTheEntryAndNameTheField(t *testing.T) {
+	m := &fakeModule{}
+	c := setup(t, m)
+	slot := pb.SlotKey_SLOT_KEY_DELIVERY_CITY
+	for name, tc := range map[string]struct {
+		req   *pb.SubmitAnswerRequest
+		field string
+	}{
+		"沒有 request_id":            {&pb.SubmitAnswerRequest{SlotKey: slot, ExpectedRevisionId: goodID, ClientRequestId: goodID}, "request_id"},
+		"沒有 slot_key":              {&pb.SubmitAnswerRequest{RequestId: goodID, ExpectedRevisionId: goodID, ClientRequestId: goodID}, "slot_key"},
+		"expected_revision_id 不合法": {&pb.SubmitAnswerRequest{RequestId: goodID, SlotKey: slot, ExpectedRevisionId: "abc", ClientRequestId: goodID}, "expected_revision_id"},
+		"沒有 expected_revision_id":  {&pb.SubmitAnswerRequest{RequestId: goodID, SlotKey: slot, ClientRequestId: goodID}, "expected_revision_id"},
+		"client_request_id 不是 v4":  {&pb.SubmitAnswerRequest{RequestId: goodID, SlotKey: slot, ExpectedRevisionId: goodID, ClientRequestId: "abc"}, "client_request_id"},
+	} {
+		_, err := c.SubmitAnswer(t.Context(), as(connect.NewRequest(tc.req), accountID))
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("SubmitAnswer %s：%v，要 INVALID_ARGUMENT", name, err)
+			continue
+		}
+		if got := violationFields(t, err); len(got) != 1 || got[0] != tc.field {
+			t.Errorf("SubmitAnswer %s：欄位 = %v，要 [%s]", name, got, tc.field)
+		}
+		rw := &pb.RewindRequest{RequestId: tc.req.GetRequestId(), SlotKey: tc.req.GetSlotKey(), ExpectedRevisionId: tc.req.GetExpectedRevisionId(), ClientRequestId: tc.req.GetClientRequestId()}
+		_, err = c.Rewind(t.Context(), as(connect.NewRequest(rw), accountID))
+		if got := violationFields(t, err); len(got) != 1 || got[0] != tc.field {
+			t.Errorf("Rewind %s：欄位 = %v，要 [%s]", name, got, tc.field)
+		}
+	}
+	if len(m.answers)+len(m.rewinds) != 0 {
+		t.Fatalf("被拒絕的請求不得到達模組：%+v %+v", m.answers, m.rewinds)
+	}
+}
+
+func TestSubmitAnswerAndRewindPassTheCallerAndReturnTheStoredTurnResult(t *testing.T) {
+	m := &fakeModule{}
+	c := setup(t, m)
+	res, err := c.SubmitAnswer(t.Context(), as(connect.NewRequest(&pb.SubmitAnswerRequest{
+		RequestId: goodID, SlotKey: pb.SlotKey_SLOT_KEY_QUANTITY, FreeText: "20", UnitOptionId: "unit-kg", ExpectedRevisionId: goodID, ClientRequestId: goodID,
+	}), accountID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := res.Msg.GetResult()
+	if r.GetReply() != "好的" || r.GetSlots().GetItem() != "蘋果" || r.GetQuestion().GetSlotKey() != pb.SlotKey_SLOT_KEY_DELIVERY_CITY {
+		t.Fatalf("結果 = %v", r)
+	}
+	if len(m.answers) != 1 || m.answers[0].BuyerID != buyerID || m.answers[0].Slot != "QUANTITY" || m.answers[0].FreeText != "20" || m.answers[0].UnitOptionID != "unit-kg" || m.answers[0].ExpectedRevisionID.String() != goodID {
+		t.Fatalf("模組收到 %+v", m.answers)
+	}
+	rw, err := c.Rewind(t.Context(), as(connect.NewRequest(&pb.RewindRequest{RequestId: goodID, SlotKey: pb.SlotKey_SLOT_KEY_UNIT, ExpectedRevisionId: goodID, ClientRequestId: goodID}), accountID))
+	if err != nil || rw.Msg.GetResult().GetReply() != "好的" {
+		t.Fatalf("Rewind = %v %v", rw, err)
+	}
+	if len(m.rewinds) != 1 || m.rewinds[0].BuyerID != buyerID || m.rewinds[0].Slot != "UNIT" {
+		t.Fatalf("模組收到 %+v", m.rewinds)
+	}
+}
+
+func TestSubmitAnswerAndRewindMapModuleErrors(t *testing.T) {
+	m := &fakeModule{}
+	c := setup(t, m)
+	answer := &pb.SubmitAnswerRequest{RequestId: goodID, SlotKey: pb.SlotKey_SLOT_KEY_ITEM, FreeText: "蘋果", ExpectedRevisionId: goodID, ClientRequestId: goodID}
+	rewind := &pb.RewindRequest{RequestId: goodID, SlotKey: pb.SlotKey_SLOT_KEY_ITEM, ExpectedRevisionId: goodID, ClientRequestId: goodID}
+	for name, tc := range map[string]struct {
+		err    error
+		code   connect.Code
+		reason string
+		fields []string
+	}{
+		"品項文字對不到唯一分類": {apperr.InvalidInputOn([]string{"FreeText"}, "請改用一般訊息"), connect.CodeInvalidArgument, "", []string{"free_text"}},
+		"選項不在問題上":     {apperr.InvalidInputOn([]string{"OptionID"}, "x"), connect.CodeInvalidArgument, "", []string{"option_id"}},
+		"單位選項":        {apperr.InvalidInputOn([]string{"UnitOptionID"}, "x"), connect.CodeInvalidArgument, "", []string{"unit_option_id"}},
+		"略過":          {apperr.InvalidInputOn([]string{"Skip"}, "x"), connect.CodeInvalidArgument, "", []string{"skip"}},
+		"欄位不能用":       {apperr.InvalidInputOn([]string{"SlotKey"}, "x"), connect.CodeInvalidArgument, "", []string{"slot_key"}},
+		"重送內容不同":      {apperr.InvalidInputOn([]string{"client_request_id"}, "x"), connect.CodeInvalidArgument, "", []string{"client_request_id"}},
+		"版本過時":        {apperr.VersionConflict("過時").WithMetadata("conflictTarget", "request_revision"), connect.CodeAborted, apperr.ReasonVersionConflict.String(), nil},
+		"待回覆的中斷":      {apperr.FailedPrecondition("有中斷").WithReason(apperr.ReasonApprovalPending), connect.CodeFailedPrecondition, apperr.ReasonApprovalPending.String(), nil},
+		"進行中的 run":    {apperr.FailedPrecondition("進行中").WithReason(apperr.ReasonProcurementRunInProgress), connect.CodeFailedPrecondition, apperr.ReasonProcurementRunInProgress.String(), nil},
+		"沒有可倒回的內容":    {apperr.FailedPrecondition("沒有可倒回的內容"), connect.CodeFailedPrecondition, "", nil},
+		"別人的需求":       {apperr.NotFound("找不到"), connect.CodeNotFound, "", nil},
+	} {
+		m.directErr = tc.err
+		_, errA := c.SubmitAnswer(t.Context(), as(connect.NewRequest(answer), accountID))
+		_, errR := c.Rewind(t.Context(), as(connect.NewRequest(rewind), accountID))
+		for rpcName, err := range map[string]error{"SubmitAnswer": errA, "Rewind": errR} {
+			if connect.CodeOf(err) != tc.code || reasonOf(t, err) != tc.reason {
+				t.Errorf("%s %s：%v，要 %v／%q", rpcName, name, err, tc.code, tc.reason)
+			}
+			if len(tc.fields) > 0 && (rpcName == "SubmitAnswer" || tc.fields[0] == "slot_key" || tc.fields[0] == "client_request_id") { // 倒回只有這兩個欄位違規
+				if got := violationFields(t, err); fmt.Sprint(got) != fmt.Sprint(tc.fields) {
+					t.Errorf("%s %s：欄位 = %v，要 %v", rpcName, name, got, tc.fields)
+				}
+			}
+		}
+	}
 }

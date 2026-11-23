@@ -109,19 +109,31 @@ func finish(l uitext.Locale, prior priorState, patch slots.Patch, next slots.Set
 	var q *planner.Question
 	capExhausted := false
 	skipped := map[model.SlotKey]bool{}
-	prevStreak := 0
-	var prevSkipped []model.SlotKey
 	if prior.prevTurn != nil {
-		prevStreak = prior.prevTurn.optionalStreak
-		prevSkipped = prior.prevTurn.skipped
-		for _, k := range prevSkipped {
+		for _, k := range prior.prevTurn.skipped {
 			skipped[k] = true
 		}
 	}
 	if pending != nil {
 		q = pending.card
 	} else {
-		q, capExhausted = planner.PickNext(next, missing, skipped, prevStreak)
+		prev := 0
+		if prior.prevTurn != nil {
+			prev = prior.prevTurn.optionalStreak
+		}
+		q, capExhausted = planner.PickNext(next, missing, skipped, prev)
+	}
+	return render(l, prior, patch, next, rejected, pending, q, capExhausted)
+}
+
+// render 是 finish 挑好問題之後的尾段：選 act、渲染文字、決定需求狀態。倒回直接給它指定的問題。
+func render(l uitext.Locale, prior priorState, patch slots.Patch, next slots.Set, rejected []slots.Rejection, pending *pendingCard, q *planner.Question, capExhausted bool) decision {
+	missing := next.MissingRequired()
+	prevStreak := 0
+	var prevSkipped []model.SlotKey
+	if prior.prevTurn != nil {
+		prevStreak = prior.prevTurn.optionalStreak
+		prevSkipped = prior.prevTurn.skipped
 	}
 
 	plan := planner.Decide(planner.Input{

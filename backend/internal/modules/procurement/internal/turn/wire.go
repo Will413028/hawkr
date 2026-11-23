@@ -91,7 +91,7 @@ type turnResultJSON struct {
 	TextFallback     string         `json:"textFallback"`
 	MessageID        string         `json:"messageId"`
 	CreateTime       string         `json:"createTime"`
-	RunID            string         `json:"runId"`
+	RunID            string         `json:"runId,omitempty"`
 	Interrupt        *interruptJSON `json:"interrupt,omitempty"`
 }
 
@@ -133,17 +133,20 @@ func questionWire(q *reply.RenderedQuestion) *QuestionJSON {
 	}
 }
 
-// turnResultEvent 組 turn_result 事件的 payload（{"turn_result": {...}}）。interruptID 非零時是停在等待輸入的一輪。
-func turnResultEvent(d decision, ids ids, now time.Time, interruptID uuid.UUID) ([]byte, error) {
+// turnResultWire 組這一輪的 TurnResult。interruptID 非零時是停在等待輸入的一輪；ids.run 為零值（不經 run 的回答與倒回）時不填 run_id。
+func turnResultWire(d decision, ids ids, now time.Time, interruptID uuid.UUID) (turnResultJSON, error) {
 	tr := turnResultJSON{
 		RequestID: ids.request.String(), ConversationID: ids.conversation.String(), RevisionID: ids.revision.String(),
 		Slots: slotsWire(d.next), Reply: d.replyText, Question: questionWire(d.question),
-		TextFallback: d.replyText, MessageID: ids.turn.String(), CreateTime: now.UTC().Format(time.RFC3339Nano), RunID: ids.run.String(),
+		TextFallback: d.replyText, MessageID: ids.turn.String(), CreateTime: now.UTC().Format(time.RFC3339Nano),
+	}
+	if ids.run != (uuid.UUID{}) {
+		tr.RunID = ids.run.String()
 	}
 	for _, r := range d.rejected {
 		name := r.Reason.ProtoName()
 		if name == "" {
-			return nil, fmt.Errorf("turn：沒有對應的 proto 拒絕原因：%q", r.Reason)
+			return turnResultJSON{}, fmt.Errorf("turn：沒有對應的 proto 拒絕原因：%q", r.Reason)
 		}
 		tr.Rejected = append(tr.Rejected, rejectedJSON{Key: slotKey(r.Key), Reason: name})
 	}
@@ -157,11 +160,25 @@ func turnResultEvent(d decision, ids ids, now time.Time, interruptID uuid.UUID) 
 	if interruptID != (uuid.UUID{}) {
 		tr.Interrupt = &interruptJSON{InterruptID: interruptID.String(), Kind: "INTERRUPT_KIND_CLARIFICATION"}
 	}
+	return tr, nil
+}
+
+// turnResultEventOf 把 TurnResult 包成 turn_result 事件的 payload（{"turn_result": {...}}）。
+func turnResultEventOf(tr turnResultJSON) ([]byte, error) {
 	b, err := json.Marshal(map[string]any{run.EventTurnResult: tr})
 	if err != nil {
 		return nil, fmt.Errorf("turn：組 turn_result 事件：%w", err)
 	}
 	return b, nil
+}
+
+// turnResultEvent 組 turn_result 事件的 payload。
+func turnResultEvent(d decision, ids ids, now time.Time, interruptID uuid.UUID) ([]byte, error) {
+	tr, err := turnResultWire(d, ids, now, interruptID)
+	if err != nil {
+		return nil, err
+	}
+	return turnResultEventOf(tr)
 }
 
 // 中斷 payload 的階段。

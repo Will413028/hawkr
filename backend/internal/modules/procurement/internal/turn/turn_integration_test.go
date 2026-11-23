@@ -226,6 +226,24 @@ func (f *fixture) noWrites(id uuid.UUID, why string) {
 	}
 }
 
+// requireStoredTurnResult 確認 run 的輪次存的 turn_result 與串流的 turn_result 事件內容相同（A9-D33(2)：任何來源的 commit 都寫它）。
+func (f *fixture) requireStoredTurnResult(runID uuid.UUID) {
+	f.t.Helper()
+	var stored, event string
+	if err := f.d.Pool().QueryRow(context.Background(), `SELECT t.turn_result::text, e.payload->>'turn_result' FROM procurement.turns t
+		JOIN procurement.agent_runs r ON r.buyer_id = t.buyer_id AND r.client_request_id = t.client_request_id
+		JOIN procurement.agent_run_events e ON e.run_id = r.id AND e.event_type = 'turn_result' WHERE r.id = $1`, runID).Scan(&stored, &event); err != nil {
+		f.t.Fatal(err)
+	}
+	var a, b map[string]any
+	if err := json.Unmarshal([]byte(stored), &a); err != nil || len(a) == 0 {
+		f.t.Fatalf("turns.turn_result 不是非空物件：%q %v", stored, err)
+	}
+	if err := json.Unmarshal([]byte(event), &b); err != nil || fmt.Sprint(a) != fmt.Sprint(b) {
+		f.t.Fatalf("turns.turn_result 要等於事件的 turn_result：\n%s\n%s", stored, event)
+	}
+}
+
 const ok = `{"item":"小白菜","unit":"KG","delivery_city":"臺北市","quantity":20}`
 
 func TestSuccessWritesRevisionTurnEventsAndKeepsUsageConsumed(t *testing.T) { // I1
@@ -277,6 +295,7 @@ func TestSuccessWritesRevisionTurnEventsAndKeepsUsageConsumed(t *testing.T) { //
 	if got := f.count(`SELECT count(*) FROM procurement.agent_runs WHERE id = $1 AND result_revision_id IS NOT NULL`, id); got != 0 {
 		t.Error("agent_runs.result_revision_id 不寫（Q9）")
 	}
+	f.requireStoredTurnResult(id)
 }
 
 func TestSecondTurnSupersedesCarriesProgressAndChainsRevisions(t *testing.T) { // I1 後半、A9-D25(1)
@@ -338,6 +357,7 @@ func TestAmbiguousItemInterruptsWithMatchingInterruptID(t *testing.T) { // I2
 	if f.used() != 1 {
 		t.Errorf("used = %d，等待輸入時額度仍已扣", f.used())
 	}
+	f.requireStoredTurnResult(id)
 	next := f.submit("改問別的", uitext.ZhTW)
 	if r := f.run(id); r.Status != run.StatusCancelled {
 		t.Errorf("同需求的新一輪要取消等待中的 run：%s", r.Status)
@@ -532,7 +552,7 @@ func TestExistingTurnForTheSameClientRequestFailsTheRun(t *testing.T) { // I9
 	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO procurement.request_revisions (id, request_id, revision_no, status, item, created_at) VALUES ($1, $2, 1, 'SUPERSEDED', '舊', $3)`, rev, f.request, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO procurement.turns (id, request_id, conversation_id, buyer_id, result_revision_id, source, client_request_id, created_at) VALUES ($1, $2, $3, $4, $5, 'LLM_EXTRACT', $6, $7)`,
+	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO procurement.turns (id, request_id, conversation_id, buyer_id, result_revision_id, source, turn_result, client_request_id, created_at) VALUES ($1, $2, $3, $4, $5, 'LLM_EXTRACT', '{}', $6, $7)`,
 		uuid.NewV7(), f.request, f.conversation, buyer, rev, r.ClientRequestID, now); err != nil {
 		t.Fatal(err)
 	}
