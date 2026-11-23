@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -537,22 +536,11 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
   );
 
   String _formatDate(String dateStr, TaipeiDisplay t) {
-    if (dateStr.isEmpty) return '';
-    final dt = DateTime.tryParse(dateStr);
-    if (dt == null) return dateStr;
-    final local = dt.taipeiWall;
-    return t.labeled(
-      '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
-    );
+    return t.formatIso(dateStr);
   }
 
   String _formatDeadline(String raw, TaipeiDisplay t) {
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    final local = dt.taipeiWall;
-    return t.labeled(
-      '${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
-    );
+    return t.formatIso(raw, TaipeiFormat.monthDayTimeUnpadded);
   }
 }
 

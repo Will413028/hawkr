@@ -11,7 +11,6 @@ import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pb.dart';
 import 'package:hawkr_api/images.dart' show ImagePreset, ImageUri;
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -462,14 +461,6 @@ class ChatThreadScreen extends HookConsumerWidget {
 
               Widget? timeSeparator;
               if (showTimeSeparator) {
-                final t = row.time.taipei;
-                final timeStr =
-                    '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-                final today = DateTime.now().taipei;
-                final isToday =
-                    t.year == today.year &&
-                    t.month == today.month &&
-                    t.day == today.day;
                 timeSeparator = Padding(
                   padding: EdgeInsets.symmetric(vertical: 12.h),
                   child: Center(
@@ -483,9 +474,7 @@ class ChatThreadScreen extends HookConsumerWidget {
                         borderRadius: BorderRadius.circular(12.r),
                       ),
                       child: Text(
-                        context.taipeiDisplay.labeled(
-                          isToday ? timeStr : '${t.month}/${t.day} $timeStr',
-                        ),
+                        context.taipeiDisplay.separator(row.time),
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -544,12 +533,9 @@ class ChatThreadScreen extends HookConsumerWidget {
                       ),
                     );
 
-              final t = row.time.taipei;
-              final h12 = t.hour == 0
-                  ? 12
-                  : (t.hour > 12 ? t.hour - 12 : t.hour);
-              final timeStr = context.taipeiDisplay.labeled(
-                '${t.hour < 12 ? "上午" : "下午"}${h12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+              final timeStr = context.taipeiDisplay.format(
+                row.time,
+                TaipeiFormat.meridiemTime,
               );
               final read =
                   row.message != null && row.message!.seq <= thread.peerReadSeq;

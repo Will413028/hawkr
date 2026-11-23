@@ -861,7 +861,7 @@ class _QuoteTextField extends HookWidget {
 /// 日期時間選擇器的起始臺北牆上時間：已有值用它，沒有值是 [now] 起算一天後。
 @visibleForTesting
 DateTime quotePickerInitial(DateTime? current, DateTime now) =>
-    (current ?? now.toUtc().add(const Duration(days: 1))).taipeiWall;
+    taipeiPickerInitial(current, now);
 
 class _DateTimeField extends StatelessWidget {
   const _DateTimeField({
@@ -892,19 +892,14 @@ class _DateTimeField extends StatelessWidget {
             helperText: context.taipeiDisplay.labelIfNeeded,
           ),
           child: Text(
-            parsed == null ? '尚未設定' : _formatLocal(parsed),
+            parsed == null
+                ? '尚未設定'
+                : TaipeiDisplay.plainIso(value, TaipeiFormat.dashDateTime)!,
             style: AppTypography.body,
           ),
         ),
       ),
     );
-  }
-
-  static String _formatLocal(DateTime value) {
-    value = value.taipeiWall;
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${value.year}-${two(value.month)}-${two(value.day)} '
-        '${two(value.hour)}:${two(value.minute)}';
   }
 
   Future<void> _pick(BuildContext context, DateTime? current) async {
@@ -924,13 +919,13 @@ class _DateTimeField extends StatelessWidget {
     if (time == null) return;
     onChanged(
       toRfc3339Utc(
-        DateTime.utc(
+        taipeiInstantOfPicked(
           date.year,
           date.month,
           date.day,
           time.hour,
           time.minute,
-        ).subtract(const Duration(hours: 8)),
+        ),
       ),
     );
   }

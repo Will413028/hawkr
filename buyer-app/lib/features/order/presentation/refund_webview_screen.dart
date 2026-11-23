@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
@@ -134,12 +133,7 @@ class _RefundWebViewScreenState extends State<RefundWebViewScreen> {
 
   /// ISO 8601 UTC → "yyyy-MM-dd"（顯示用）
   String _formatIsoDate(String iso, TaipeiDisplay t) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return iso;
-    final local = dt.taipeiWall;
-    return t.labeled(
-      '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}',
-    );
+    return t.formatIso(iso, TaipeiFormat.dashDate);
   }
 
   @override

@@ -2050,7 +2050,7 @@ class _CommentGroup extends ConsumerWidget {
       comment: c,
       dateStr: c.createTime == null
           ? ''
-          : context.taipeiDisplay.timeAgo(context.l10n, c.createTime!),
+          : context.taipeiDisplay.timeAgoIn(context.l10n, c.createTime!),
       isReply: isReply,
       onReply: () => onReply(c),
       onDelete: () => onDelete(c),

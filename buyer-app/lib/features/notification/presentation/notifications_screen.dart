@@ -748,7 +748,7 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
   }
 
   static String _formatTime(BuildContext context, DateTime dateTime) =>
-      context.taipeiDisplay.timeAgo(context.l10n, dateTime);
+      context.taipeiDisplay.timeAgoIn(context.l10n, dateTime);
 
   static String _senderNameFromData(NotificationItem n) {
     return _firstDataString(n.data, const [

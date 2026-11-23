@@ -187,10 +187,10 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
   TaipeiDisplay t,
 ) {
   final end = measure.hasPeriod() && measure.period.hasEndTime()
-      ? t.plainTimestamp(measure.period.endTime)
+      ? TaipeiDisplay.plainTimestamp(measure.period.endTime)
       : '';
   final start = measure.hasPeriod() && measure.period.hasStartTime()
-      ? t.plainTimestamp(measure.period.startTime)
+      ? TaipeiDisplay.plainTimestamp(measure.period.startTime)
       : '';
   final terminated = measure.kind == MeasureKind.MEASURE_KIND_TERMINATION;
   final state = measure.state;

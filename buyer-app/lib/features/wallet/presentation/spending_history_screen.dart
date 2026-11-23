@@ -1,5 +1,4 @@
 import 'package:hawkr_api/money.dart';
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -212,32 +211,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
 
   /// 解析失敗回 null（呼叫端不為原樣字串附臺北時間標籤）。
   String? _tryFormatDate(String raw) {
-    if (raw.isEmpty) return null;
-    try {
-      DateTime? dt;
-      final digits = RegExp(r'^\d+$');
-      if (digits.hasMatch(raw)) {
-        if (raw.length >= 13) {
-          final ms = int.tryParse(raw.substring(0, 13));
-          if (ms != null) {
-            dt = DateTime.fromMillisecondsSinceEpoch(ms).taipei;
-          }
-        } else if (raw.length >= 10) {
-          final sec = int.tryParse(raw.substring(0, 10));
-          if (sec != null) {
-            dt = DateTime.fromMillisecondsSinceEpoch(sec * 1000).taipei;
-          }
-        }
-      }
-      dt ??= DateTime.tryParse(
-        raw.replaceFirst(' ', 'T').replaceAll('/', '-'),
-      )?.taipeiWall;
-      if (dt == null) return null;
-      String two(int n) => n.toString().padLeft(2, '0');
-      return '${dt.year}/${two(dt.month)}/${two(dt.day)}';
-    } catch (_) {
-      return null;
-    }
+    return TaipeiDisplay.plainIso(raw, TaipeiFormat.date);
   }
 
   String _truncateOrderId(String orderId) {

@@ -559,7 +559,7 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                     Text(
                       node.createdAt == null
                           ? ''
-                          : context.taipeiDisplay.timeAgo(
+                          : context.taipeiDisplay.timeAgoIn(
                               context.l10n,
                               node.createdAt!,
                             ),

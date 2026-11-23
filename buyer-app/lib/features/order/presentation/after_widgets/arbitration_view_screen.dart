@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -371,13 +370,6 @@ class ArbitrationViewScreen extends HookConsumerWidget {
   };
 
   String _formatTime(String raw, TaipeiDisplay t) {
-    if (raw.isEmpty) return '';
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    final local = dt.taipeiWall;
-    return t.labeled(
-      '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
-    );
+    return t.formatIso(raw);
   }
 }

@@ -125,7 +125,7 @@ jobs:
           fi
           flutter pub get
           dart run tool/check_hardcoded_han.dart --baseline "../../${APP}/tool/han_baseline.json" --check-baseline-against "$old_file"
-      - name: Guard Taipei time display (no toLocal, formatTaipei* only in the helper)
+      - name: Guard Taipei time display (no toLocal; wall-clock accessors are compile-time private in hawkr_api)
         id: taipei_display
         continue-on-error: true
         env:

@@ -85,7 +85,7 @@ class CustomerOrderCardWidget extends StatelessWidget {
                       ),
                       SizedBox(width: 8.w),
                       Text(
-                        context.taipeiDisplay.labeled(order.date),
+                        context.taipeiDisplay.formatIso(order.date),
                         style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w400,

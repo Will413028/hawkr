@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
@@ -854,25 +853,12 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
   String _text(String? value) => value?.trim() ?? '';
 
   String _formatTime(String raw, TaipeiDisplay t) {
-    if (raw.isEmpty) return '';
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    final local = dt.taipeiWall;
-    String pad(int v) => v.toString().padLeft(2, '0');
-    return t.labeled(
-      '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}',
-    );
+    return t.formatIso(raw);
   }
 
   /// 退款預計日 / 入帳日：只取年月日，給「退款將於 X 退回買家帳戶」這類訊息用。
   String _formatRefundDate(String? raw, TaipeiDisplay t) {
-    final text = raw?.trim() ?? '';
-    if (text.isEmpty) return '';
-    final dt = DateTime.tryParse(text);
-    if (dt == null) return text;
-    final local = dt.taipeiWall;
-    String pad(int v) => v.toString().padLeft(2, '0');
-    return t.labeled('${local.year}/${pad(local.month)}/${pad(local.day)}');
+    return t.formatIso(raw ?? '', TaipeiFormat.date);
   }
 }
 

@@ -421,10 +421,7 @@ class ChatThreadScreen extends HookConsumerWidget {
   }
 }
 
-String _hhmm(DateTime t) {
-  final l = t.taipei;
-  return '${l.hour.toString().padLeft(2, '0')}:${l.minute.toString().padLeft(2, '0')}';
-}
+String _hhmm(DateTime t) => TaipeiDisplay.plain(t, TaipeiFormat.time);
 
 /// 智能圓角 — 連續同一人訊息合併角落（Telegram 風格）
 BorderRadius _smartBorderRadius(bool isSelf, bool isFirst, bool hasNext) {

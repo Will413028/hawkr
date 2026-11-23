@@ -1,5 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
-
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -441,23 +439,11 @@ class AiAssistantScreen extends HookConsumerWidget {
   }
 
   String _formatTime(DateTime dt, TaipeiDisplay td) {
-    final t = dt.taipei;
-    final h = t.hour;
-    final m = t.minute.toString().padLeft(2, '0');
-    final period = h < 12 ? '上午' : '下午';
-    final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-    return td.labeled('$period${h12.toString().padLeft(2, '0')}:$m');
+    return td.format(dt, TaipeiFormat.meridiemTime);
   }
 
   String _formatSeparatorTime(DateTime dt, TaipeiDisplay td) {
-    final t = dt.taipei;
-    final time =
-        '${t.hour.toString().padLeft(2, '0')}:'
-        '${t.minute.toString().padLeft(2, '0')}';
-    final today = DateTime.now().taipei;
-    final isToday =
-        t.year == today.year && t.month == today.month && t.day == today.day;
-    return td.labeled(isToday ? time : '${t.month}/${t.day} $time');
+    return td.separator(dt);
   }
 }
 
@@ -599,9 +585,9 @@ class _OrderCard extends StatelessWidget {
 
   String _formatDate(TaipeiDisplay t) {
     if (order.createTimeMs <= 0) return '';
-    final d = DateTime.fromMillisecondsSinceEpoch(order.createTimeMs).taipei;
-    return t.labeled(
-      '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}',
+    return t.format(
+      DateTime.fromMillisecondsSinceEpoch(order.createTimeMs),
+      TaipeiFormat.date,
     );
   }
 

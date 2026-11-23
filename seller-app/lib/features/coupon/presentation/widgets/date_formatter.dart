@@ -15,13 +15,8 @@ class DateFormatter {
 
   /// 同 [formatToYYYYMMDD]，空字符串或解析失败回 null。
   static String? tryFormatToYYYYMMDD(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return null;
-    final utc = DateTime.tryParse(dateStr);
-    if (utc == null) return null;
-    final local = utc.taipeiWall;
-    final month = local.month.toString().padLeft(2, '0');
-    final day = local.day.toString().padLeft(2, '0');
-    return '${local.year}/$month/$day';
+    if (dateStr == null) return null;
+    return TaipeiDisplay.plainIso(dateStr, TaipeiFormat.date);
   }
 
   /// 将 DateTime 对象转换为 XXXX/XX/XX 格式
@@ -43,20 +38,7 @@ class DateFormatter {
   /// [dateStr] ISO 8601 格式的日期字符串
   /// 返回 true 表示已过期，false 表示未过期
   static bool isExpired(String? dateStr) {
-    if (dateStr == null || dateStr.isEmpty) return false;
-
-    try {
-      final utc = DateTime.parse(dateStr);
-      final local = utc.taipeiWall;
-      final now = DateTime.now().taipei;
-
-      // 比较日期（忽略时间）
-      final expireDate = DateTime(local.year, local.month, local.day);
-      final today = DateTime(now.year, now.month, now.day);
-
-      return expireDate.isBefore(today);
-    } catch (e) {
-      return false;
-    }
+    if (dateStr == null) return false;
+    return TaipeiDisplay.isBeforeTaipeiToday(dateStr);
   }
 }

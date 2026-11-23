@@ -20,59 +20,54 @@ class CheckTaipeiDisplayTests(unittest.TestCase):
                 p.write_text(text, encoding="utf-8")
             return list(check.violations(lib))
 
-    def test_clean_lib_passes(self):
-        self.assertEqual(self.run_on({"a.dart": "final x = t.taipeiWall;\n"}), [])
+    def flagged(self, text):
+        return len(self.run_on({"a.dart": text}))
 
-    def test_to_local_fails_everywhere_including_helper(self):
-        self.assertEqual(len(self.run_on({"a.dart": "d.toLocal();\n"})), 1)
+    def test_clean_lib_passes(self):
+        self.assertEqual(self.flagged("final x = d.toUtc();\n"), 0)
+
+    def test_to_local_fails_in_any_file(self):
+        self.assertEqual(self.flagged("d.toLocal();\n"), 1)
         self.assertEqual(
             len(self.run_on({"shared/time/taipei_display.dart": "d.toLocal();\n"})), 1
         )
 
-    def test_format_call_outside_helper_fails(self):
-        for fn in ("Timestamp", "DateTime", "Date"):
-            self.assertEqual(
-                len(self.run_on({"a.dart": f"formatTaipei{fn}(x);\n"})), 1, fn
-            )
-
-    def test_format_call_inside_helper_passes(self):
-        self.assertEqual(
-            self.run_on({"shared/time/taipei_display.dart": "formatTaipeiDate(x);\n"}),
-            [],
-        )
-
-    def test_comment_lines_ignored(self):
-        self.assertEqual(self.run_on({"a.dart": "  // d.toLocal() banned\n"}), [])
-
-    def test_tear_off_outside_helper_fails(self):
-        for fn in ("Timestamp", "DateTime", "Date"):
-            self.assertEqual(
-                len(self.run_on({"a.dart": f"xs.map(formatTaipei{fn}).toList();\n"})),
-                1,
-                fn,
-            )
-
-    def test_tear_off_inside_helper_passes(self):
-        self.assertEqual(
-            self.run_on(
-                {"shared/time/taipei_display.dart": "xs.map(formatTaipeiDate);\n"}
-            ),
-            [],
-        )
+    def test_comments_ignored(self):
+        self.assertEqual(self.flagged("  // d.toLocal() banned\n"), 0)
+        self.assertEqual(self.flagged("/* d.toLocal() */ final a = 1;\n"), 0)
+        self.assertEqual(self.flagged("/* a\n d.toLocal()\n /* nested */ b */\n"), 0)
+        self.assertEqual(self.flagged("/// d.toLocal()\n"), 0)
 
     def test_trailing_comment_ignored_but_code_before_it_counts(self):
-        self.assertEqual(self.run_on({"a.dart": "final a = 1; // d.toLocal()\n"}), [])
-        self.assertEqual(
-            len(self.run_on({"a.dart": "d.toLocal(); // why\n"})), 1
-        )
-        self.assertEqual(
-            len(self.run_on({"a.dart": "x(formatTaipeiDate); // c\n"})), 1
-        )
+        self.assertEqual(self.flagged("final a = 1; // d.toLocal()\n"), 0)
+        self.assertEqual(self.flagged("d.toLocal(); // why\n"), 1)
 
     def test_double_slash_in_string_is_not_a_comment(self):
+        self.assertEqual(self.flagged("final u = 'http://x'; d.toLocal();\n"), 1)
+
+    def test_string_contents_ignored(self):
+        self.assertEqual(self.flagged("final s = 'call d.toLocal() later';\n"), 0)
+        self.assertEqual(self.flagged('final s = "d.toLocal()";\n'), 0)
+
+    def test_raw_string_with_backslash_and_comment_marker(self):
+        self.assertEqual(self.flagged("final s = r'C:\\\\ // d.toLocal()';\n"), 0)
+        self.assertEqual(self.flagged("final s = r'\\'; d.toLocal();\n"), 1)
+
+    def test_triple_quoted_multiline_string(self):
         self.assertEqual(
-            len(self.run_on({"a.dart": "final u = 'http://x'; d.toLocal();\n"})), 1
+            self.flagged("final s = '''\nline // one\nd.toLocal()\n''';\n"), 0
         )
+        self.assertEqual(
+            self.flagged("final s = '''\nx\n'''; d.toLocal();\n"), 1
+        )
+
+    def test_interpolation_is_code(self):
+        self.assertEqual(self.flagged("final s = 'at ${d.toLocal()}';\n"), 1)
+        self.assertEqual(self.flagged("final s = 'at ${f({1: 2})} d.toLocal()';\n"), 0)
+
+    def test_reports_line_number(self):
+        found = self.run_on({"a.dart": "a;\nb;\nd.toLocal();\n"})
+        self.assertTrue(found[0].startswith(str(Path(found[0].split(":")[0])) + ":3:"))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/time/taipei_display.dart';
 import 'package:hawkr_seller/l10n/l10n.dart';
 import 'dart:async' as async;
@@ -149,10 +148,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
 
   static String _formatDate(DateTime? date, TaipeiDisplay t) {
     if (date == null) return '';
-    final d = date.taipeiWall;
-    return t.labeled(
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
-    );
+    return t.format(date, TaipeiFormat.dashDate);
   }
 
   @override

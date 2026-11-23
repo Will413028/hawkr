@@ -100,15 +100,6 @@
    "why": "Per-literal count increases in an existing file no longer fail."
   },
   {
-   "id": "seller-order-seconds-epoch-not-utc",
-   "stack": "flutter:seller-app",
-   "file": "seller-app/lib/features/order/presentation/order_card_widgets/order_info_column.dart",
-   "old": ": DateTime.fromMillisecondsSinceEpoch(n * 1000, isUtc: true);",
-   "new": ": DateTime.fromMillisecondsSinceEpoch(n * 1000);",
-   "test": "test/features/order/presentation/order_card_widgets/order_info_column_date_test.dart seconds and milliseconds epoch show the same Taipei time",
-   "why": "The 10-digit seconds branch loses its UTC flag, so taipeiWall leaves device-local time unshifted."
-  },
-  {
    "id": "han-baseline-against-loosened",
    "stack": "flutter:buyer-app",
    "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",

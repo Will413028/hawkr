@@ -670,7 +670,7 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
   }
 
   static String _formatTime(BuildContext context, DateTime dateTime) =>
-      context.taipeiDisplay.timeAgo(context.l10n, dateTime);
+      context.taipeiDisplay.timeAgoIn(context.l10n, dateTime);
 
   /// 從 notification.data 取得買家名稱（多種後端 key fallback）。
   /// 沒有的話回傳空字串，caller 用原文 fallback。

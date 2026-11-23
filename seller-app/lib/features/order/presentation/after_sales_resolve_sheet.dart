@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 
@@ -1527,7 +1528,7 @@ class _RejectDialogState extends State<_RejectDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final createdAt = DateTime.tryParse(widget.afterSaleCase.createdAt);
+    final createdAt = tryParseTaipeiInstant(widget.afterSaleCase.createdAt);
 
     return _ResolveDialog(
       title: '婉拒售後申請',

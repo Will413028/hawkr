@@ -1,4 +1,3 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'dart:io';
@@ -138,25 +137,7 @@ class _StatusInfoBox extends StatelessWidget {
   }
 
   String _formatDate(String raw, TaipeiDisplay t) {
-    if (raw.isEmpty) return '';
-    DateTime? dt = DateTime.tryParse(raw);
-    if (dt == null) {
-      final m = RegExp(r'\d{10,13}').firstMatch(raw);
-      if (m != null) {
-        final n = int.tryParse(m.group(0)!);
-        if (n != null) {
-          dt = (m.group(0)!.length >= 13)
-              ? DateTime.fromMillisecondsSinceEpoch(n, isUtc: true)
-              : DateTime.fromMillisecondsSinceEpoch(n * 1000, isUtc: true);
-        }
-      }
-    }
-    if (dt == null) return raw;
-    final local = dt.taipeiWall;
-    String pad(int v) => v.toString().padLeft(2, '0');
-    return t.labeled(
-      '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}',
-    );
+    return t.formatIso(raw);
   }
 
   bool _isShipmentUnprocessed(String ss) =>

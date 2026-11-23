@@ -21,7 +21,7 @@ class CustomerOrderDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return SharedOrderDetailScreen(
       orderId: order.orderId,
-      fallbackDateText: context.taipeiDisplay.labeled(order.date),
+      fallbackDateText: context.taipeiDisplay.formatIso(order.date),
       fallbackItemsText: order.items,
       fallbackAmount: order.amount,
     );
