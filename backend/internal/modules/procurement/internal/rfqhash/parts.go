@@ -2,7 +2,7 @@
 // 演算法是 SHA-256 對固定欄位順序的 JSON（struct 欄位順序即輸出順序，沒有 map，所以確定），原像（preimage）以發布核准的 schema_version 為版本：
 // 原像包含 schemaVersion，欄位集合依版本分派，不認得的版本回錯誤。同樣的版本與輸入永遠得到同一個值，改任何一個欄位 hash 就變。
 // 新增或改變原像的欄位必須新增一個版本（新的原像型別與分派分支），不得更動既有版本的欄位集合，否則已發布的詢價 hash 會變；每個版本有 golden 測試。
-// 兩種 hash：受眾（Audience）與賣家可見內容（SellerFacing）。各自一個型別，不共用欄位，所以一個 hash 不會被當成另一個的值。
+// 三種 hash：受眾（Audience）、賣家可見內容（SellerFacing）與賣家回價一個版本的報價內容（SellerResponse，A9-D36，版本固定 SchemaV1，不含 ID、版本號與送出時間）。各自一個型別，不共用欄位，所以一個 hash 不會被當成另一個的值。
 // 賣家可見內容的 hash 是 AcceptSellerQuote 比對的對象，原像涵蓋賣家看到的全部欄位（ADR 2026-11-23-seller-facing-hash-supersedes-snapshot-hash）。
 package rfqhash
 

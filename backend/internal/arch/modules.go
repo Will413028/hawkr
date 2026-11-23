@@ -105,6 +105,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"reply":        {"model", "planner", "slots", "text"},                                // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
 		"resolver":     {},                                                                   // 品項用詞對分類樹，人工同義詞（A9-D7）
 		"rfq":          {"model", "rfqhash", "search", "store"},                              // 詢價發布鏈：價格預覽、確認快照、發布核准、執行發布，hash 由不可變的列重算（A9-3b-3c、A9-D31）
+		"quote":        {"model", "rfq", "rfqhash", "run", "store"},                          // 買家對賣家回價的使用：列出目前版本、入圍清單、接受報價並同 transaction 排入建單 job（A9-3b-3d）
 		"rfqhash":      {},                                                                   // 價格預覽、確認快照、受眾與賣家可見內容的 hash（SHA-256 對固定欄位順序的 JSON，A9-D31 Q5）
 		"retention":    {"store"},                                                            // 買家關閉後刪除與匿名（S10）
 		"run":          {"store"},                                                            // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）

@@ -72,6 +72,8 @@ type fakeModule struct {
 	renameErr       error
 
 	rfq rfqFake
+
+	quote quoteFake
 }
 
 func (f *fakeModule) SubmitTurn(_ context.Context, in procurement.SubmitTurnInput) (procurement.TurnSubmitted, error) {

@@ -1,0 +1,220 @@
+{
+  "mutants": [
+    {
+      "id": "accept-live-lock-not-classified",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": "return liveCollision(ctx, q, in)",
+      "new": "return nil",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptLiveLockCollisionReportsTheCheckoutAndItsOrder$",
+      "why": "A collision with the live lock no longer reports RFQ_CHECKOUT_ALREADY_ACTIVE (and the orderNo), so the second acceptance silently returns an empty result."
+    },
+    {
+      "id": "accept-skips-valid-until-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": "if now.After(version.ValidUntil) {",
+      "new": "if false && now.After(version.ValidUntil) {",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptRejectsAnExpiredVersion$",
+      "why": "An expired version can be accepted."
+    },
+    {
+      "id": "accept-skips-hash-comparison",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": "if in.ExpectedSellerFacingHash != sellerHash {",
+      "new": "if false && in.ExpectedSellerFacingHash != sellerHash {",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptComparesTheHashRecomputedFromTheFrozenPublication$",
+      "why": "The expected seller-facing hash is never compared with the server-recomputed one, so a stale tab can accept."
+    },
+    {
+      "id": "accept-skips-latest-version-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": "if resp.LatestVersion != in.ExpectedVersion || (resp.WithdrawnVersion",
+      "new": "if (resp.WithdrawnVersion",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptRejectsAVersionThatIsNoLongerTheLatest$",
+      "why": "A version that is no longer the latest can be accepted."
+    },
+    {
+      "id": "accept-skips-withdrawn-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": "(resp.WithdrawnVersion != nil && *resp.WithdrawnVersion == in.ExpectedVersion)",
+      "new": "false",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptRejectsAWithdrawnVersion$",
+      "why": "A withdrawn version can be accepted."
+    },
+    {
+      "id": "accept-skips-write-closed-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": "if resp.WriteClosedAt != nil {",
+      "new": "if false && resp.WriteClosedAt != nil {",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptRejectsWhenTheSellerStoppedWriting$",
+      "why": "A response the seller stopped writing (declined) can be accepted."
+    },
+    {
+      "id": "accept-replay-ignores-hash",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": " || a.SellerFacingHash != in.ExpectedSellerFacingHash {",
+      "new": " {",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptReplayWithDifferentContentIsRejected$",
+      "why": "A replay with the same key but a different expected hash is served from the first acceptance instead of being rejected."
+    },
+    {
+      "id": "accept-job-args-wrong-id",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/accept.go",
+      "old": "OrderProvisioningArgs{AcceptanceID: acceptance.ID}",
+      "new": "OrderProvisioningArgs{AcceptanceID: in.ClientRequestID}",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptFreezesThePriceAndEnqueuesTheOrderJobInTheSameTransaction$",
+      "why": "The enqueued order-provisioning job does not carry the acceptance id."
+    },
+    {
+      "id": "accept-lock-query-drops-owner",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
+      "old": "WHERE r.id = $1 AND r.request_id = $2 AND p.buyer_id = $3\nFOR UPDATE OF r",
+      "new": "WHERE r.id = $1 AND r.request_id = $2 AND ($3::bigint IS NULL OR true)\nFOR UPDATE OF r",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptChecksOwnership$",
+      "why": "The locking query ignores the buyer, so another buyer's response is locked and accepted past the NOT_FOUND gate."
+    },
+    {
+      "id": "list-query-drops-owner",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+      "old": "FROM procurement.rfq_publications WHERE id = $1 AND buyer_id = $2\n`\n\ntype GetPublicationParams",
+      "new": "FROM procurement.rfq_publications WHERE id = $1 AND ($2::bigint IS NULL OR true)\n`\n\ntype GetPublicationParams",
+      "test": "internal/modules/procurement/internal/quote ^TestListOnlyShowsTheRequestedPublicationOfTheBuyersOwnRequest$",
+      "why": "List loads another buyer's publication; the next owner-scoped read fails instead of returning NOT_FOUND."
+    },
+    {
+      "id": "list-query-drops-keyset",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
+      "old": "  AND ($4::uuid IS NULL\n",
+      "new": "  AND (true OR $4::uuid IS NULL\n",
+      "test": "internal/modules/procurement/internal/quote ^TestListPaginatesByIdentityCreationTimeThenIDWithoutDuplicatesOrGaps$",
+      "why": "Every page returns the first rows again: the keyset condition is gone."
+    },
+    {
+      "id": "list-page-size-not-capped",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/list.go",
+      "old": "case pageSize > MaxPageSize:",
+      "new": "case false && pageSize > MaxPageSize:",
+      "test": "internal/modules/procurement/internal/quote ^TestListPageSizeBoundsAndTokens$",
+      "why": "A page_size above 100 is no longer clamped."
+    },
+    {
+      "id": "shortlist-put-keeps-old-version",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
+      "old": "DO UPDATE SET seller_response_version = EXCLUDED.seller_response_version, updated_at = EXCLUDED.updated_at",
+      "new": "DO UPDATE SET updated_at = EXCLUDED.updated_at",
+      "test": "internal/modules/procurement/internal/quote ^TestPutShortlistOverwritesTheVersionOfTheSameResponse$",
+      "why": "Putting a different version of the same response keeps the old version in the shortlist."
+    },
+    {
+      "id": "shortlist-put-drops-owner",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
+      "old": "AND p.buyer_id = $3\n`\n\ntype GetSellerResponseForBuyerParams",
+      "new": "AND ($3::bigint IS NULL OR true)\n`\n\ntype GetSellerResponseForBuyerParams",
+      "test": "internal/modules/procurement/internal/quote ^TestPutShortlistChecksOwnershipOfTheResponseAndTheVersion$",
+      "why": "PutShortlistEntry accepts a response that belongs to another buyer."
+    },
+    {
+      "id": "shortlist-delete-drops-owner",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+      "old": "FROM procurement.requests WHERE id = $1 AND buyer_id = $2\n`\n\ntype GetRequestForBuyerParams",
+      "new": "FROM procurement.requests WHERE id = $1 AND ($2::bigint IS NULL OR true)\n`\n\ntype GetRequestForBuyerParams",
+      "test": "internal/modules/procurement/internal/quote ^TestDeleteShortlistOnlyTouchesTheBuyersOwnRequest$",
+      "why": "DeleteShortlist no longer checks that the request belongs to the buyer, so it removes another buyer's entry."
+    },
+    {
+      "id": "version-status-ignores-withdrawn",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": "case withdrawn != nil && *withdrawn == version:",
+      "new": "case false && withdrawn != nil && *withdrawn == version:",
+      "test": "internal/modules/procurement/internal/quote ^TestVersionStatus$",
+      "why": "A withdrawn current version is reported as active."
+    },
+    {
+      "id": "acceptability-ignores-live-acceptance",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": "if writeClosed || requestHasLiveAcceptance {",
+      "new": "if writeClosed {",
+      "test": "internal/modules/procurement/internal/quote ^TestAcceptability$",
+      "why": "A quote stays ACCEPTABLE after the request already has a live acceptance."
+    },
+    {
+      "id": "outside-range-ignores-upper-bound",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": "return goods.Cmp(scaleBound(lower, offered, basis)) < 0 || goods.Cmp(scaleBound(upper, offered, basis)) > 0",
+      "new": "return goods.Cmp(scaleBound(lower, offered, basis)) < 0",
+      "test": "internal/modules/procurement/internal/quote ^TestOutsideRange$",
+      "why": "A quote above the buyer's range is not flagged."
+    },
+    {
+      "id": "handler-accepts-zero-version",
+      "stack": "go",
+      "file": "backend/internal/httpapi/buyerprocurement/quote.go",
+      "old": "if err != nil || v <= 0 {",
+      "new": "if err != nil || v < 0 {",
+      "test": "internal/httpapi/buyerprocurement ^TestQuoteMethodsValidateAtTheEntryAndNameTheField$",
+      "why": "A zero seller response version passes the handler validation."
+    },
+    {
+      "id": "hash-valid-until-timezone",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/rfqhash/response.go",
+      "old": "ValidUntil: in.ValidUntil.UTC().Format(time.RFC3339Nano),",
+      "new": "ValidUntil: in.ValidUntil.Format(time.RFC3339Nano),",
+      "test": "internal/modules/procurement/internal/rfqhash ^TestSellerResponseHashIgnoresTheTimeZoneOfTheInstant$",
+      "why": "The payload hash depends on the time zone of valid_until."
+    },
+    {
+      "id": "list-order-by-current-version-submit-time",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
+      "old": "ORDER BY r.created_at DESC, r.id DESC\nLIMIT $6",
+      "new": "ORDER BY v.submitted_at DESC, r.id DESC\nLIMIT $6",
+      "test": "internal/modules/procurement/internal/quote ^TestListPaginationSurvivesASellerRevisingBetweenPages$",
+      "why": "Ordering by the mutable current version's submit time lets a revision move a row across the page boundary."
+    },
+    {
+      "id": "shortlist-delete-reports-request-version",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/shortlist.go",
+      "old": "out.Version = removed",
+      "new": "_ = removed",
+      "test": "internal/modules/procurement/internal/quote ^TestDeleteShortlistIsIdempotentAndReportsAbsence$",
+      "why": "Delete echoes the request's version instead of the version of the removed entry."
+    },
+    {
+      "id": "outside-range-ignores-offered-unit",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": " || v.OfferedQuantityUnit != basisUnit {",
+      "new": " {",
+      "test": "internal/modules/procurement/internal/quote ^TestOutsideRange$",
+      "why": "A quote in a different unit than the request basis is compared against the range."
+    },
+    {
+      "id": "outside-range-scale-ignores-quantity",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": "product := new(big.Int).Mul(big.NewInt(bound), big.NewInt(offered))",
+      "new": "product := new(big.Int).Mul(big.NewInt(bound), basis)",
+      "test": "internal/modules/procurement/internal/quote ^TestOutsideRange$",
+      "why": "The range is not scaled to the offered quantity."
+    }
+  ]
+}

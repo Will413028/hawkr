@@ -194,14 +194,14 @@ type BuyerProcurementAppServiceClient interface {
 	GetRuntimeSnapshot(context.Context, *connect.Request[v1alpha1.GetRuntimeSnapshotRequest]) (*connect.Response[v1alpha1.GetRuntimeSnapshotResponse], error)
 	// ListSellerResponses 列出一張需求已發布的詢價收到的賣家回價（每位賣家的目前版本）。
 	ListSellerResponses(context.Context, *connect.Request[v1alpha1.ListSellerResponsesRequest]) (*connect.Response[v1alpha1.ListSellerResponsesResponse], error)
-	// PutShortlistEntry 把賣家回價的一個版本加入入圍清單；已在清單時回目前的狀態。
+	// PutShortlistEntry 把賣家回價的一個版本加入入圍清單；同一則回價已在清單時換成請求帶的版本（一則回價只有一個版本在清單），回清單上掛的版本。
 	PutShortlistEntry(context.Context, *connect.Request[v1alpha1.PutShortlistEntryRequest]) (*connect.Response[v1alpha1.PutShortlistEntryResponse], error)
-	// DeleteShortlistEntry 把賣家回價從入圍清單移除；不在清單時回目前的狀態。
+	// DeleteShortlistEntry 把賣家回價從入圍清單移除（以回價為單位，不看請求帶的版本）；回被移除那一筆掛的版本，不在清單時回請求帶的版本，present 都是 false。
 	DeleteShortlistEntry(context.Context, *connect.Request[v1alpha1.DeleteShortlistEntryRequest]) (*connect.Response[v1alpha1.DeleteShortlistEntryResponse], error)
 	// AcceptSellerQuote 接受賣家回價的指定版本並凍結成交價，隨後建立待付款訂單。報價已改版、已撤回回 ABORTED，
 	// conflictTarget 是 seller_response；報價已過有效期回 FAILED_PRECONDITION，reason 是 RFQ_RESPONSE_EXPIRED；
 	// 同一張需求已有進行中的成交回 FAILED_PRECONDITION，reason 是 RFQ_CHECKOUT_ALREADY_ACTIVE（metadata 的 orderNo 是
-	// 既有訂單，買家去付款，不是重新接受）；已經成交回 FAILED_PRECONDITION，reason 是 RFQ_ALREADY_AWARDED。
+	// 既有訂單，買家去付款，不是重新接受）。
 	AcceptSellerQuote(context.Context, *connect.Request[v1alpha1.AcceptSellerQuoteRequest]) (*connect.Response[v1alpha1.AcceptSellerQuoteResponse], error)
 	RenameConversation(context.Context, *connect.Request[v1alpha1.RenameConversationRequest]) (*connect.Response[v1alpha1.RenameConversationResponse], error)
 	DeleteConversation(context.Context, *connect.Request[v1alpha1.DeleteConversationRequest]) (*connect.Response[v1alpha1.DeleteConversationResponse], error)
@@ -570,14 +570,14 @@ type BuyerProcurementAppServiceHandler interface {
 	GetRuntimeSnapshot(context.Context, *connect.Request[v1alpha1.GetRuntimeSnapshotRequest]) (*connect.Response[v1alpha1.GetRuntimeSnapshotResponse], error)
 	// ListSellerResponses 列出一張需求已發布的詢價收到的賣家回價（每位賣家的目前版本）。
 	ListSellerResponses(context.Context, *connect.Request[v1alpha1.ListSellerResponsesRequest]) (*connect.Response[v1alpha1.ListSellerResponsesResponse], error)
-	// PutShortlistEntry 把賣家回價的一個版本加入入圍清單；已在清單時回目前的狀態。
+	// PutShortlistEntry 把賣家回價的一個版本加入入圍清單；同一則回價已在清單時換成請求帶的版本（一則回價只有一個版本在清單），回清單上掛的版本。
 	PutShortlistEntry(context.Context, *connect.Request[v1alpha1.PutShortlistEntryRequest]) (*connect.Response[v1alpha1.PutShortlistEntryResponse], error)
-	// DeleteShortlistEntry 把賣家回價從入圍清單移除；不在清單時回目前的狀態。
+	// DeleteShortlistEntry 把賣家回價從入圍清單移除（以回價為單位，不看請求帶的版本）；回被移除那一筆掛的版本，不在清單時回請求帶的版本，present 都是 false。
 	DeleteShortlistEntry(context.Context, *connect.Request[v1alpha1.DeleteShortlistEntryRequest]) (*connect.Response[v1alpha1.DeleteShortlistEntryResponse], error)
 	// AcceptSellerQuote 接受賣家回價的指定版本並凍結成交價，隨後建立待付款訂單。報價已改版、已撤回回 ABORTED，
 	// conflictTarget 是 seller_response；報價已過有效期回 FAILED_PRECONDITION，reason 是 RFQ_RESPONSE_EXPIRED；
 	// 同一張需求已有進行中的成交回 FAILED_PRECONDITION，reason 是 RFQ_CHECKOUT_ALREADY_ACTIVE（metadata 的 orderNo 是
-	// 既有訂單，買家去付款，不是重新接受）；已經成交回 FAILED_PRECONDITION，reason 是 RFQ_ALREADY_AWARDED。
+	// 既有訂單，買家去付款，不是重新接受）。
 	AcceptSellerQuote(context.Context, *connect.Request[v1alpha1.AcceptSellerQuoteRequest]) (*connect.Response[v1alpha1.AcceptSellerQuoteResponse], error)
 	RenameConversation(context.Context, *connect.Request[v1alpha1.RenameConversationRequest]) (*connect.Response[v1alpha1.RenameConversationResponse], error)
 	DeleteConversation(context.Context, *connect.Request[v1alpha1.DeleteConversationRequest]) (*connect.Response[v1alpha1.DeleteConversationResponse], error)

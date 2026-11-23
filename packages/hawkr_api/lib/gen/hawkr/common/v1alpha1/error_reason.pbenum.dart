@@ -200,10 +200,6 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason RFQ_CHECKOUT_ALREADY_ACTIVE =
       ErrorReason._(33, _omitEnumNames ? '' : 'RFQ_CHECKOUT_ALREADY_ACTIVE');
 
-  /// 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
-  static const ErrorReason RFQ_ALREADY_AWARDED =
-      ErrorReason._(34, _omitEnumNames ? '' : 'RFQ_ALREADY_AWARDED');
-
   /// 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
   /// ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
   static const ErrorReason AGENT_MONTHLY_QUOTA_EXCEEDED =
@@ -281,7 +277,6 @@ class ErrorReason extends $pb.ProtobufEnum {
     RFQ_RESPONSE_EXPIRED,
     RFQ_RECIPIENT_CLOSED,
     RFQ_CHECKOUT_ALREADY_ACTIVE,
-    RFQ_ALREADY_AWARDED,
     AGENT_MONTHLY_QUOTA_EXCEEDED,
     IMAGE_QUOTA_EXCEEDED,
     IMAGE_SAFETY_BLOCKED,
