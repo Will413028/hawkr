@@ -315,7 +315,8 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 代行改店面（gateway 店面四條路由目前固定回 503）：設計書 56 §6.1.7 與 §2.2 第 2 列附近仍描述 gateway 呼叫 seller-service `UpdateSeller`；A10 依 seller 模組的欄位與限制重新設計店面代行，並改寫這些段落（Will 2026-10-28）。
   - 代行營運有 24 條路由不在現有 API 清單裡（gateway 的 `routesNotInSpec`，另有 binary 代理 9 條等），搬遷時以路由表為準，不能只看 `openapi.yaml`。
   - website 的代行 client（`lib/api/delegated.ts`、`app/(delegated)/adm/api/_upstream.ts`）還送 `X-Requested-With`，理由是 gateway 的 CSRF guard；A2 之後 gateway 沒有這道檢查，入口的 CSRF 看 `Sec-Fetch-Site`／Origin。它在 56 號設計書的 header 允許清單裡，改 client 時一起改清單。
-- [ ] **A11 discovery**：從 seller 搬出推薦賣家排行。
+- [x] **A11 discovery**：從 seller 搬出推薦賣家排行。主體已在 A3 步驟 7d、8c 完成（2026-10-03，`internal/modules/discovery`、`DiscoveryPublicService.SuggestRecommendedSellers`）。
+  - `Orders`、`Products` 兩個 port 仍由 legacy 接 Java。觸發：B4 catalog、B8 ordering 搬進單體時改接 Go 模組。
 
 每一步還要處理兩件事：
 - 這個服務原本提供給 Java 呼叫方的 gRPC server，移進單體的 `internal/legacy/`。
