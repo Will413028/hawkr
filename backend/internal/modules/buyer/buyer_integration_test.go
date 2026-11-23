@@ -419,32 +419,15 @@ func TestRestockFanOutNotifiesOnce(t *testing.T) {
 	}
 }
 
-func TestMembershipIdempotency(t *testing.T) {
+func TestEntitlementIsFreePlanWithRollingPeriod(t *testing.T) {
 	t.Parallel()
 	fixture := setup(t)
 	ctx := context.Background()
 	buyer := profile(t, fixture, 1)
-	other := profile(t, fixture, 2)
-	var err error
-	input := AssignMembershipInput{BuyerID: buyer.BuyerID, PlanCode: "basic", RequestID: "request-1"}
-	first, err := fixture.module.AssignMembership(ctx, input)
+	first, err := fixture.module.Entitlement(ctx, buyer.BuyerID)
 	must(t, err)
-	second, err := fixture.module.AssignMembership(ctx, input)
-	must(t, err)
-	if first != second {
-		t.Fatal(first, second)
-	}
-	input.PlanCode = "premium"
-	if _, err = fixture.module.AssignMembership(ctx, input); apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Fatal("same key different plan accepted", err)
-	}
-	input.PlanCode = "basic"
-	input.BuyerID = other.BuyerID
-	if _, err = fixture.module.AssignMembership(ctx, input); apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Fatal("same key different buyer accepted", err)
-	}
-	if count(t, fixture, "SELECT count(*) FROM buyer.memberships") != 1 {
-		t.Fatal("idempotency added rows")
+	if first.PlanCode != "free" || !first.PeriodStart.Equal(buyer.CreatedAt) {
+		t.Fatal(first)
 	}
 	fixture.now = fixture.now.AddDate(0, 0, 31)
 	ent, err := fixture.module.Entitlement(ctx, buyer.BuyerID)
@@ -590,8 +573,6 @@ func TestEnumChecksMatchGo(t *testing.T) {
 	}{
 		{"buyers", "buyers_status_check", stringsOf(StatusValues())},
 		{"buyers", "buyers_gender_check", stringsOf(GenderValues())},
-		{"memberships", "memberships_source_check", stringsOf(MembershipSourceValues())},
-		{"memberships", "memberships_status_check", stringsOf(MembershipStatusValues())},
 	} {
 		for _, value := range tt.values {
 			if !regexp.MustCompile(`^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$`).MatchString(value) {
@@ -613,11 +594,10 @@ func TestEnumChecksMatchGo(t *testing.T) {
 	}
 }
 
-func TestMembershipWriteAndDBConstraints(t *testing.T) {
+func TestPlanWriteValidation(t *testing.T) {
 	t.Parallel()
 	fixture := setup(t)
 	ctx := context.Background()
-	buyer := profile(t, fixture, 1)
 	var err error
 	zero := int32(0)
 	negative := int64(-1)
@@ -637,22 +617,6 @@ func TestMembershipWriteAndDBConstraints(t *testing.T) {
 	read, err := fixture.module.Plan(ctx, "basic")
 	if err != nil || read.MonthlyPriceTWD != largePrice {
 		t.Fatalf("plan=%+v err=%v", read, err)
-	}
-	_, err = fixture.module.AssignMembership(ctx, AssignMembershipInput{BuyerID: buyer.BuyerID, PlanCode: "free", RequestID: "one"})
-	must(t, err)
-	for _, stmt := range []string{"UPDATE buyer.memberships SET source='invalid' WHERE buyer_id=$1", "UPDATE buyer.memberships SET source='SYSTEM_DEFAULT' WHERE buyer_id=$1", "UPDATE buyer.memberships SET request_id='' WHERE buyer_id=$1", "UPDATE buyer.memberships SET status='invalid' WHERE buyer_id=$1", "UPDATE buyer.memberships SET period_end=period_start WHERE buyer_id=$1"} {
-		if _, err = fixture.database.Conn(ctx).Exec(ctx, stmt, buyer.BuyerID); err == nil {
-			t.Fatal("DB accepted", stmt)
-		}
-	}
-	_, err = fixture.database.Conn(ctx).Exec(ctx, "INSERT INTO buyer.memberships(id,buyer_id,plan_code,period_start,period_end,source,status,request_id,created_at) VALUES ($1,$2,'free',$3,$4,'ADMIN','ACTIVE','two',$3)", uuid.NewV7(), buyer.BuyerID, fixture.now, fixture.now.AddDate(0, 1, 0))
-	if err == nil {
-		t.Fatal("DB accepted two active memberships")
-	}
-	_, err = fixture.module.AssignMembership(ctx, AssignMembershipInput{BuyerID: buyer.BuyerID, PlanCode: "free", RequestID: "two"})
-	must(t, err)
-	if count(t, fixture, "SELECT count(*) FROM buyer.memberships WHERE buyer_id=$1 AND status='ACTIVE'", buyer.BuyerID) != 1 {
-		t.Fatal("assignment did not supersede")
 	}
 }
 

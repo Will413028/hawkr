@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "entitlement-plan-is-free",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/membership/membership.go",
+   "old": "queries.Plan(ctx, \"free\")",
+   "new": "queries.Plan(ctx, \"basic\")",
+   "test": "internal/modules/buyer ^TestEntitlementIsFreePlanWithRollingPeriod$",
+   "why": "沒有指派表之後，權益固定是 free 方案；換成別的方案代碼，測試必須變紅"
+  },
+  {
+   "id": "entitlement-period-boundary",
+   "stack": "go",
+   "file": "backend/internal/modules/buyer/internal/membership/membership.go",
+   "old": "for !now.Before(end) {",
+   "new": "for now.After(end) {",
+   "test": "internal/modules/buyer/internal/membership ^TestPeriodClampAndBoundary$",
+   "why": "額度週期的終點是開區間：now 剛好等於終點時屬於下一個週期"
+  }
+ ]
+}

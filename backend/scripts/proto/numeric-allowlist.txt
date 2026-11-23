@@ -15,18 +15,12 @@ hawkr.account.AccountInfo.account_id
 hawkr.account.AccountInfo.account_type
 hawkr.account.AccountInfo.created_at
 hawkr.account.AccountInfo.updated_at
-hawkr.account.AuthData.account_type
 # §6.2 #3 exception — gateway-internal SSOT RPC (issue #1592, SSOT since #2014 →
 # PR #2022): GetWebSession is called only by the gateway's own web-session lookup,
 # on every Redis miss or error; the response never crosses into an
 # HTTP-facing gateway response, so account_id/account_type/login_role are kept
 # native int64/int32 end-to-end (mirrors hawkr.buyer.ResolvePrincipalsResponse
 # and hawkr.seller.ListStoreIDsByAccountResponse). NOT Track-1 backlog.
-hawkr.account.GetWebSessionResponse.account_id
-hawkr.account.GetWebSessionResponse.account_type
-hawkr.account.GetWebSessionResponse.login_role
-hawkr.account.LinkConfirmResponse.account_type
-hawkr.account.RefreshTokenResponse.expires_in
 # §6.2 exception — 56 號 ADM 代行營運（DelegationService）. Two distinct grounds,
 # both spelled out in the design doc, so these are NOT Track-1 backlog:
 #   (a) §4.1 例外 2「Response int32 code」— biz_code / denied_code are business codes,
@@ -50,20 +44,8 @@ hawkr.ai.RecommendedProduct.price_max
 hawkr.ai.RecommendedProduct.price_min
 hawkr.ai.RecommendedProduct.rating
 hawkr.ai.RecommendedProduct.score
-hawkr.buyer.BatchGetSubscriberCountsResponse.counts
 # §6.2 #3 exception — internal-only cross-service batch profile lookup;
 # buyer_id is the native int64 map key and never crosses an HTTP response boundary.
-hawkr.buyer.BuyerMeta.buyer_id
-hawkr.buyer.FavoriteCountResponse.count
-hawkr.buyer.FavoriteInfo.created_at
-hawkr.buyer.FavoriteInfo.list_price_max
-hawkr.buyer.FavoriteInfo.list_price_min
-hawkr.buyer.FavoriteInfo.price_max
-hawkr.buyer.FavoriteInfo.price_min
-hawkr.buyer.FavoriteInfo.rating_x10
-hawkr.buyer.FavoriteInfo.sale_price_max
-hawkr.buyer.FavoriteInfo.sale_price_min
-hawkr.buyer.FavoriteListResponse.total
 hawkr.buyer.ListFavoritedProductIdsResponse.product_ids
 # §6.2 #3 exception — internal-only cross-service RPC (im-service → buyer),
 # never gateway-exposed; map value is an account_id kept int64 end-to-end.
@@ -75,15 +57,6 @@ hawkr.buyer.ResolvePrincipalsResponse.principals
 # input values back for membership-checking, never gateway-exposed. Kept
 # native int64 for the same reason as .principals, not separate backlog.
 hawkr.buyer.ResolvePrincipalsResponse.unresolved_ids
-hawkr.buyer.SubscriberInfo.buyer_id
-hawkr.buyer.SubscriberInfo.id
-hawkr.buyer.SubscriberInfo.subscribed_at
-hawkr.buyer.SubscribersListResponse.total
-hawkr.buyer.SubscriptionItem.rating
-hawkr.buyer.SubscriptionItem.subscribed_at
-hawkr.buyer.SubscriptionListResponse.total
-hawkr.buyer.VisitListResponse.total
-hawkr.buyer.VisitOperationResponse.affected
 hawkr.order.GetSellerOrderStatusCountsResponse.aftersales_count
 hawkr.order.GetSellerOrderStatusCountsResponse.completed_count
 hawkr.order.GetSellerOrderStatusCountsResponse.in_progress_count

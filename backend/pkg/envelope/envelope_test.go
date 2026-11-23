@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
+	buyerpb "github.com/Will413028/hawkr/go-pkg/proto/buyer"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -216,7 +217,7 @@ func TestOKProto_WrapsProtoInEnvelope(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	OKProto(c, &accountpb.RefreshTokenResponse{ExpiresIn: 123})
+	OKProto(c, &accountpb.AccountInfo{CreatedAt: 123})
 
 	var env map[string]json.RawMessage
 	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
@@ -228,7 +229,7 @@ func TestOKProto_WrapsProtoInEnvelope(t *testing.T) {
 	if string(env["message"]) != `"success"` {
 		t.Errorf("want message success; got %s", env["message"])
 	}
-	if !strings.Contains(string(env["data"]), `"expiresIn":"123"`) {
+	if !strings.Contains(string(env["data"]), `"createdAt":"123"`) {
 		t.Errorf("want data carrying camelCase int64-string; got %s", env["data"])
 	}
 }
@@ -238,15 +239,15 @@ func TestOKProto_WrapsProtoInEnvelope(t *testing.T) {
 // dropping EmitUnpopulated breaks every passthrough endpoint silently.
 func TestProtoToRaw_MarshalerContract(t *testing.T) {
 	// camelCase (UseProtoNames=false) AND int64-as-string.
-	got := string(ProtoToRaw(&accountpb.RefreshTokenResponse{ExpiresIn: 123}))
-	if !strings.Contains(got, `"expiresIn":"123"`) {
-		t.Errorf("want camelCase int64-as-string `\"expiresIn\":\"123\"`; got %s", got)
+	got := string(ProtoToRaw(&accountpb.AccountInfo{CreatedAt: 123}))
+	if !strings.Contains(got, `"createdAt":"123"`) {
+		t.Errorf("want camelCase int64-as-string `\"createdAt\":\"123\"`; got %s", got)
 	}
 
 	// EmitUnpopulated: a zero-value bool field is still present (camelCase too).
-	gotZero := string(ProtoToRaw(&accountpb.AuthResponse{}))
-	if !strings.Contains(gotZero, `"needPhoneVerification":false`) {
-		t.Errorf("want emit-unpopulated `\"needPhoneVerification\":false`; got %s", gotZero)
+	gotZero := string(ProtoToRaw(&buyerpb.AddressInfo{}))
+	if !strings.Contains(gotZero, `"isDefault":false`) {
+		t.Errorf("want emit-unpopulated `\"isDefault\":false`; got %s", gotZero)
 	}
 }
 

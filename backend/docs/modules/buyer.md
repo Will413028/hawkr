@@ -68,9 +68,8 @@
 
 ## 8. 會員
 
-- 方案表 `membership_plans`，指派表 `memberships`。每個買家最多一個 ACTIVE 會員（partial UNIQUE）。
-- `request_id` 必填且全域 UNIQUE（1–100 字元）。指派鎖買家；以 `request_id` 的 transaction advisory lock 序列化跨買家重試，並比對 buyer、plan、期間、操作者與 note。
-- 會員月週期以錨點月 clamp，不回補；人工指派用明確天數；付費過期回 free。時間由注入的 clock 提供。
+- 方案表 `membership_plans`。沒有指派表與指派入口：每個買家的權益都是 `free` 方案（步驟 11e 刪除 `memberships`），計費或指派入口要做時重新設計。
+- 額度月週期以 stint 的建立時間為錨點逐月滾動，月底 clamp，不回補。時間由注入的 clock 提供。
 - 會員方案的種子資料是一支資料 migration（`*_buyer_membership_plan_seeds.sql`）。額度與價格是設計書 59 的 placeholder 值，後台的 `UpdateMembershipPlan` 可修改。
 
 ## 9. 讀取模型與輸入邊界

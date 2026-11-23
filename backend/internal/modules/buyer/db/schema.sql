@@ -123,27 +123,6 @@ CREATE TABLE buyer.membership_plans (
     CONSTRAINT membership_plans_price_check CHECK (monthly_price_twd >= 0)
 );
 
--- 會員指派：每個 stint 最多一筆 active；request_id 必填且全域唯一。
-CREATE TABLE buyer.memberships (
-    id           UUID PRIMARY KEY,
-    buyer_id     BIGINT NOT NULL REFERENCES buyer.buyers (buyer_id),
-    plan_code    TEXT NOT NULL REFERENCES buyer.membership_plans (plan_code),
-    period_start TIMESTAMPTZ NOT NULL,
-    period_end   TIMESTAMPTZ NOT NULL,
-    source       TEXT NOT NULL,
-    status       TEXT NOT NULL,
-    request_id   TEXT NOT NULL,
-    granted_by   BIGINT,
-    note         TEXT NOT NULL DEFAULT '',
-    created_at   TIMESTAMPTZ NOT NULL,
-    CONSTRAINT memberships_request_check CHECK (char_length(request_id) BETWEEN 1 AND 100),
-    CONSTRAINT memberships_period_check CHECK (period_end > period_start),
-    CONSTRAINT memberships_source_check CHECK (source IN ('ADMIN')),
-    CONSTRAINT memberships_status_check CHECK (status IN ('ACTIVE', 'SUPERSEDED'))
-);
-CREATE UNIQUE INDEX memberships_active ON buyer.memberships (buyer_id) WHERE status = 'ACTIVE';
-CREATE UNIQUE INDEX memberships_request ON buyer.memberships (request_id);
-
 -- media 引用的同步版本：業務列改變 ref 的資產時在同一個 transaction 遞增 seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變
 -- 才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。ref 的列不刪除：
 -- 刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。

@@ -24,7 +24,7 @@ func (f *fakeBuyerServiceClient) GetBuyerEntitlement(_ context.Context, _ *pb.Ge
 func TestGetBuyerEntitlement_ParsesResponse(t *testing.T) {
 	fake := &fakeBuyerServiceClient{resp: &pb.BuyerEntitlement{
 		PlanCode: "premium", MonthlyAnswerLimit: "1000",
-		PeriodStart: "2026-01-01T00:00:00Z", PeriodEnd: "2026-01-31T00:00:00Z", Source: "admin",
+		PeriodStart: "2026-01-01T00:00:00Z", PeriodEnd: "2026-01-31T00:00:00Z",
 	}}
 	c := &client{client: fake}
 
@@ -32,7 +32,6 @@ func TestGetBuyerEntitlement_ParsesResponse(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "premium", got.PlanCode)
 	require.Equal(t, 1000, got.MonthlyAnswerLimit)
-	require.Equal(t, "admin", got.Source)
 }
 
 func TestGetBuyerEntitlement_InvalidLimit_ReturnsError(t *testing.T) {

@@ -1,17 +1,14 @@
-// Package membership 提供會員方案、指派與額度週期。
+// Package membership 提供會員方案與額度週期。
 package membership
 
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
-	"uuid"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/model"
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -48,13 +45,12 @@ func nextMonth(current time.Time) time.Time {
 	return time.Date(year, month+1, min(day, last), current.Hour(), current.Minute(), current.Second(), current.Nanosecond(), time.UTC)
 }
 
-func entitlement(planRow store.BuyerMembershipPlan, membershipRow store.BuyerMembership) model.Entitlement {
+func entitlement(planRow store.BuyerMembershipPlan, start, end time.Time) model.Entitlement {
 	return model.Entitlement{
 		PlanCode:           planRow.PlanCode,
 		MonthlyAnswerLimit: planRow.MonthlyAnswerLimit,
-		PeriodStart:        membershipRow.PeriodStart,
-		PeriodEnd:          membershipRow.PeriodEnd,
-		Source:             model.MembershipSource(membershipRow.Source),
+		PeriodStart:        start,
+		PeriodEnd:          end,
 	}
 }
 
@@ -71,7 +67,7 @@ func plan(planRow store.BuyerMembershipPlan) model.Plan {
 	}
 }
 
-// Entitlement 讀取有效權益；沒有有效指派時以 stint 錨點計算免費週期。
+// Entitlement 讀取有效權益：每個買家都是免費方案，額度週期以 stint 的建立時間為錨點逐月滾動。
 func (service *Service) Entitlement(ctx context.Context, buyerID int64) (model.Entitlement, error) {
 	if err := model.Positive(buyerID); err != nil {
 		return model.Entitlement{}, err
@@ -84,102 +80,12 @@ func (service *Service) Entitlement(ctx context.Context, buyerID int64) (model.E
 	if buyerRow.Status == string(model.Closed) {
 		return model.Entitlement{}, apperr.NotFound("買家已關閉")
 	}
-	now := service.deps.Now().UTC()
-	membershipRow, err := queries.ActiveMembership(ctx, buyerID)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return model.Entitlement{}, err
-	}
-	if err != nil || now.Before(membershipRow.PeriodStart) || !now.Before(membershipRow.PeriodEnd) {
-		start, end := Period(buyerRow.CreatedAt, now)
-		membershipRow = store.BuyerMembership{
-			PlanCode:    "free",
-			PeriodStart: start,
-			PeriodEnd:   end,
-			Source:      string(model.MembershipSystemDefault),
-		}
-	}
-	planRow, err := queries.Plan(ctx, membershipRow.PlanCode)
+	start, end := Period(buyerRow.CreatedAt, service.deps.Now().UTC())
+	planRow, err := queries.Plan(ctx, "free")
 	if err != nil {
 		return model.Entitlement{}, planError(err)
 	}
-	return entitlement(planRow, membershipRow), nil
-}
-
-// AssignMembership 指派會員；相同 request_id 必須具有相同內容。
-func (service *Service) AssignMembership(ctx context.Context, input model.AssignMembershipInput) (model.Entitlement, error) {
-	if input.GrantedBy != nil {
-		if err := model.Positive(*input.GrantedBy); err != nil {
-			return model.Entitlement{}, err
-		}
-	}
-	if err := model.Positive(input.BuyerID); err != nil {
-		return model.Entitlement{}, err
-	}
-	if strings.TrimSpace(input.RequestID) == "" || len(input.RequestID) > 100 {
-		return model.Entitlement{}, apperr.InvalidInput("必須提供 request_id，最長 100 字元")
-	}
-	if input.PeriodDays == 0 {
-		input.PeriodDays = 30
-	}
-	if input.PeriodDays < 1 || input.PeriodDays > 36500 {
-		return model.Entitlement{}, apperr.InvalidInput("會員期間不合法")
-	}
-	var result model.Entitlement
-	err := service.deps.DB.InTx(ctx, func(ctx context.Context) error {
-		queries := store.New(service.deps.DB.Conn(ctx))
-		if err := queries.LockMembershipRequest(ctx, input.RequestID); err != nil {
-			return err
-		}
-		old, err := queries.MembershipRequest(ctx, input.RequestID)
-		if err == nil {
-			if old.BuyerID != input.BuyerID || old.PlanCode != input.PlanCode || old.PeriodEnd.Sub(old.PeriodStart) != time.Duration(input.PeriodDays)*24*time.Hour || old.Note != input.Note || !sameID(old.GrantedBy, input.GrantedBy) {
-				return apperr.InvalidInput("request_id 已用於不同指派")
-			}
-			planRow, err := queries.Plan(ctx, old.PlanCode)
-			result = entitlement(planRow, old)
-			return err
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		if _, err = stint.Require(ctx, queries, input.BuyerID, false); err != nil {
-			return err
-		}
-		planRow, err := queries.Plan(ctx, input.PlanCode)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return apperr.InvalidInputOn([]string{"plan_code"}, "無此會員方案")
-		}
-		if err != nil {
-			return err
-		}
-		if err := queries.Supersede(ctx, input.BuyerID); err != nil {
-			return err
-		}
-		now := service.deps.Now().UTC()
-		membershipRow, err := queries.AssignMembership(ctx, store.AssignMembershipParams{
-			ID:          uuid.NewV7(),
-			BuyerID:     input.BuyerID,
-			PlanCode:    input.PlanCode,
-			PeriodStart: now,
-			PeriodEnd:   now.AddDate(0, 0, input.PeriodDays),
-			RequestID:   input.RequestID,
-			GrantedBy:   input.GrantedBy,
-			Note:        input.Note,
-		})
-		result = entitlement(planRow, membershipRow)
-		return err
-	})
-	if err != nil {
-		return model.Entitlement{}, err
-	}
-	return result, nil
-}
-
-func sameID(left, right *int64) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return *left == *right
+	return entitlement(planRow, start, end), nil
 }
 
 // ListPlans 列出全部會員方案。

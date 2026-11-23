@@ -35,42 +35,11 @@ const (
 	Other Gender = "OTHER"
 )
 
-// MembershipSource 會員權益的來源。
-type MembershipSource string
-
-const (
-	// MembershipAdmin 為實際儲存的管理員指派來源。
-	MembershipAdmin MembershipSource = "ADMIN"
-	// MembershipSystemDefault 僅用於記憶體中合成的免費權益，不寫入資料庫。
-	MembershipSystemDefault MembershipSource = "SYSTEM_DEFAULT"
-)
-
-// MembershipStatus 會員指派現況或歷史狀態。
-type MembershipStatus string
-
-const (
-	// MembershipActive 目前生效的指派。
-	MembershipActive MembershipStatus = "ACTIVE"
-	// MembershipSuperseded 已被替代的指派。
-	MembershipSuperseded MembershipStatus = "SUPERSEDED"
-)
-
 // StatusValues 回傳實際儲存的全部買家狀態。
 func StatusValues() []Status { return []Status{Active, PendingDeletion, Closed} }
 
 // GenderValues 回傳實際儲存的全部性別。
 func GenderValues() []Gender { return []Gender{Male, Female, Other} }
-
-// MembershipSourceValues 回傳實際儲存的來源，供 CHECK 驗證。
-func MembershipSourceValues() []MembershipSource {
-	// SYSTEM_DEFAULT 僅為記憶體中的免費權益來源，不寫入 memberships。
-	return []MembershipSource{MembershipAdmin}
-}
-
-// MembershipStatusValues 回傳全部合法值，供 CHECK 與契約驗證。
-func MembershipStatusValues() []MembershipStatus {
-	return []MembershipStatus{MembershipActive, MembershipSuperseded}
-}
 
 // Profile 買家 stint 的個人資料。
 type Profile struct {
@@ -242,17 +211,6 @@ type Entitlement struct {
 	PlanCode               string
 	MonthlyAnswerLimit     int32
 	PeriodStart, PeriodEnd time.Time
-	Source                 MembershipSource
-}
-
-// AssignMembershipInput 帶 request_id 的人工會員指派輸入。
-type AssignMembershipInput struct {
-	BuyerID    int64
-	PlanCode   string
-	PeriodDays int
-	RequestID  string
-	GrantedBy  *int64
-	Note       string
 }
 
 // FavoriteAdded 帶 UUIDv7、OccurredAt 與業務 ID 的 FavoriteAdded 事件。

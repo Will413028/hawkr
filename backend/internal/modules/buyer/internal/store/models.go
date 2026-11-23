@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"uuid"
 )
 
 type BuyerBlockedBuyer struct {
@@ -54,20 +53,6 @@ type BuyerMediaRefSync struct {
 	Seq       int64
 	SyncedSeq int64
 	UpdatedAt time.Time
-}
-
-type BuyerMembership struct {
-	ID          uuid.UUID
-	BuyerID     int64
-	PlanCode    string
-	PeriodStart time.Time
-	PeriodEnd   time.Time
-	Source      string
-	Status      string
-	RequestID   string
-	GrantedBy   *int64
-	Note        string
-	CreatedAt   time.Time
 }
 
 type BuyerMembershipPlan struct {

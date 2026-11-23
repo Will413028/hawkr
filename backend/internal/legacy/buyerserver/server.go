@@ -103,38 +103,6 @@ func (s *Server) GetBuyerProfile(ctx context.Context, req *connect.Request[pb.Ge
 	return connect.NewResponse(&pb.BuyerProfileResponse{Data: profile(p)}), nil
 }
 
-func (s *Server) GetBuyerProfileByBuyerID(ctx context.Context, req *connect.Request[pb.GetBuyerProfileByBuyerIDRequest]) (*connect.Response[pb.BuyerProfileResponse], error) {
-	p, err := s.buyer.ProfileByBuyerID(ctx, req.Msg.GetBuyerId())
-	if err != nil {
-		code, msg, fatal := failure(err)
-		if fatal != nil {
-			return nil, fatal
-		}
-		return connect.NewResponse(&pb.BuyerProfileResponse{Code: code, Message: msg}), nil
-	}
-	return connect.NewResponse(&pb.BuyerProfileResponse{Data: profile(p)}), nil
-}
-
-func (s *Server) GetAddressList(ctx context.Context, req *connect.Request[pb.GetAddressListRequest]) (*connect.Response[pb.AddressListResponse], error) {
-	items, err := s.buyer.ListAddresses(ctx, req.Msg.GetBuyerId())
-	if err != nil {
-		code, msg, fatal := failure(err)
-		if fatal != nil {
-			return nil, fatal
-		}
-		return connect.NewResponse(&pb.AddressListResponse{Code: code, Message: msg}), nil
-	}
-	out := make([]*pb.AddressInfo, 0, len(items))
-	for _, a := range items {
-		info, err := s.address(ctx, a)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, info)
-	}
-	return connect.NewResponse(&pb.AddressListResponse{Data: out}), nil
-}
-
 func (s *Server) GetAddress(ctx context.Context, req *connect.Request[pb.GetAddressRequest]) (*connect.Response[pb.GetAddressResponse], error) {
 	a, err := s.buyer.GetAddress(ctx, req.Msg.GetBuyerId(), req.Msg.GetAddressId())
 	if err != nil {
@@ -223,22 +191,6 @@ func (s *Server) ResolvePrincipals(ctx context.Context, req *connect.Request[pb.
 	return connect.NewResponse(&pb.ResolvePrincipalsResponse{Principals: resolved, UnresolvedIds: unresolved}), nil
 }
 
-func (s *Server) BatchGetBuyerMetaByBuyerIDs(ctx context.Context, req *connect.Request[pb.BatchGetBuyerMetaByBuyerIDsRequest]) (*connect.Response[pb.BatchGetBuyerMetaByBuyerIDsResponse], error) {
-	rows, err := s.buyer.BatchMeta(ctx, req.Msg.GetBuyerIds())
-	if err != nil {
-		code, msg, fatal := failure(err)
-		if fatal != nil {
-			return nil, fatal
-		}
-		return connect.NewResponse(&pb.BatchGetBuyerMetaByBuyerIDsResponse{Code: code, Message: msg}), nil
-	}
-	out := make(map[int64]*pb.BuyerMeta, len(rows))
-	for _, p := range rows {
-		out[p.BuyerID] = &pb.BuyerMeta{BuyerId: p.BuyerID, Nickname: p.DisplayName, AvatarKey: optional(p.Avatar)}
-	}
-	return connect.NewResponse(&pb.BatchGetBuyerMetaByBuyerIDsResponse{Buyers: out}), nil
-}
-
 func (s *Server) ListBuyerIDsByAccount(ctx context.Context, req *connect.Request[pb.ListBuyerIDsByAccountRequest]) (*connect.Response[pb.ListBuyerIDsByAccountResponse], error) {
 	ids, err := s.buyer.BuyerIDsByAccount(ctx, req.Msg.GetAccountId())
 	if err != nil {
@@ -268,17 +220,5 @@ func (s *Server) GetBuyerEntitlement(ctx context.Context, req *connect.Request[p
 		}
 		return connect.NewResponse(&pb.BuyerEntitlement{Code: code, Message: msg}), nil
 	}
-	return connect.NewResponse(&pb.BuyerEntitlement{PlanCode: e.PlanCode, MonthlyAnswerLimit: format(int64(e.MonthlyAnswerLimit)), PeriodStart: e.PeriodStart.UTC().Format(time.RFC3339), PeriodEnd: e.PeriodEnd.UTC().Format(time.RFC3339), Source: string(e.Source)}), nil
-}
-
-func (s *Server) BatchGetSubscriberCounts(ctx context.Context, req *connect.Request[pb.BatchGetSubscriberCountsRequest]) (*connect.Response[pb.BatchGetSubscriberCountsResponse], error) {
-	counts, err := s.buyer.SubscriberCounts(ctx, req.Msg.GetStoreIds())
-	if err != nil {
-		code, msg, fatal := failure(err)
-		if fatal != nil {
-			return nil, fatal
-		}
-		return connect.NewResponse(&pb.BatchGetSubscriberCountsResponse{Code: code, Message: msg}), nil
-	}
-	return connect.NewResponse(&pb.BatchGetSubscriberCountsResponse{Counts: counts}), nil
+	return connect.NewResponse(&pb.BuyerEntitlement{PlanCode: e.PlanCode, MonthlyAnswerLimit: format(int64(e.MonthlyAnswerLimit)), PeriodStart: e.PeriodStart.UTC().Format(time.RFC3339), PeriodEnd: e.PeriodEnd.UTC().Format(time.RFC3339)}), nil
 }

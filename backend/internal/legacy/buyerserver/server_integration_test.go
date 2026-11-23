@@ -67,18 +67,6 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
-	t.Run("GetBuyerProfileByBuyerID", func(t *testing.T) {
-		r, e := s.GetBuyerProfileByBuyerID(ctx, connect.NewRequest(&pb.GetBuyerProfileByBuyerIDRequest{BuyerId: p.BuyerID}))
-		if e != nil || r.Msg.GetData().GetAccountId() != strconv.FormatInt(accountID, 10) {
-			t.Fatalf("%v %v", r, e)
-		}
-	})
-	t.Run("GetAddressList", func(t *testing.T) {
-		r, e := s.GetAddressList(ctx, connect.NewRequest(&pb.GetAddressListRequest{BuyerId: p.BuyerID}))
-		if e != nil || len(r.Msg.GetData()) != 1 || r.Msg.GetData()[0].GetId() != strconv.FormatInt(a.AddressID, 10) {
-			t.Fatalf("%v %v", r, e)
-		}
-	})
 	t.Run("GetAddress", func(t *testing.T) {
 		r, e := s.GetAddress(ctx, connect.NewRequest(&pb.GetAddressRequest{BuyerId: p.BuyerID, AddressId: a.AddressID}))
 		if e != nil || r.Msg.GetData().GetReceiverName() != "王小明" {
@@ -114,12 +102,6 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
-	t.Run("BatchGetBuyerMetaByBuyerIDs", func(t *testing.T) {
-		r, e := s.BatchGetBuyerMetaByBuyerIDs(ctx, connect.NewRequest(&pb.BatchGetBuyerMetaByBuyerIDsRequest{BuyerIds: []int64{p.BuyerID}}))
-		if e != nil || r.Msg.GetBuyers()[p.BuyerID].GetNickname() != "買家甲" {
-			t.Fatalf("%v %v", r, e)
-		}
-	})
 	t.Run("ListBuyerIDsByAccount", func(t *testing.T) {
 		r, e := s.ListBuyerIDsByAccount(ctx, connect.NewRequest(&pb.ListBuyerIDsByAccountRequest{AccountId: accountID}))
 		if e != nil || len(r.Msg.GetBuyerIds()) != 1 || r.Msg.GetBuyerIds()[0] != strconv.FormatInt(p.BuyerID, 10) {
@@ -129,12 +111,6 @@ func TestEveryLegacyBuyerRPCReadsTheModule(t *testing.T) {
 	t.Run("GetBuyerEntitlement", func(t *testing.T) {
 		r, e := s.GetBuyerEntitlement(ctx, connect.NewRequest(&pb.GetBuyerEntitlementRequest{BuyerId: strconv.FormatInt(p.BuyerID, 10)}))
 		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetPlanCode() == "" {
-			t.Fatalf("%v %v", r, e)
-		}
-	})
-	t.Run("BatchGetSubscriberCounts", func(t *testing.T) {
-		r, e := s.BatchGetSubscriberCounts(ctx, connect.NewRequest(&pb.BatchGetSubscriberCountsRequest{StoreIds: []int64{91}}))
-		if e != nil || r.Msg.GetCounts()[91] != 1 {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
