@@ -446,7 +446,7 @@
    "stack": "go",
    "file": "backend/internal/modules/seller/internal/model/media.go",
    "old": "return FileContent{Body: body, ContentType: contentType}, nil",
-   "new": "return FileContent{Body: body, ContentType: \"\"}, nil",
+   "new": "return FileContent{Body: body, ContentType: contentType[:0]}, nil",
    "test": "internal/modules/seller/internal/model ^TestReadSecureReturnsTheRecordedTypeAndClassifiesFailures$",
    "why": "機敏檔的型別不再用 media 上傳時記下的型別"
   },

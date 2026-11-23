@@ -5,7 +5,7 @@
    "stack": "go",
    "file": "backend/internal/modules/seller/internal/model/media.go",
    "old": "return FileContent{Body: body, ContentType: contentType}, nil",
-   "new": "return FileContent{Body: body, ContentType: \"\"}, nil",
+   "new": "return FileContent{Body: body, ContentType: contentType[:0]}, nil",
    "test": "internal/modules/seller/internal/model ^TestReadSecureReturnsTheRecordedTypeAndClassifiesFailures$",
    "why": "拿掉 media 上傳時記下的型別，回應型別退回不透明二進位"
   },
@@ -76,8 +76,8 @@
    "id": "s3-put-sends-cache-control",
    "stack": "go",
    "file": "backend/internal/modules/media/internal/storage/s3.go",
-   "old": "\t\tCacheControl:  cacheControl,\n",
-   "new": "",
+   "old": "\t\tcacheControl = aws.String(cc)\n",
+   "new": "\t\t_ = cc\n",
    "test": "internal/modules/media/internal/storage ^TestS3PutSetsPublicCacheControlOnlyOnPublicObjects$",
    "why": "Put 不再把 Cache-Control 送給物件儲存，public 物件沒有帶 max-age=3600"
   },
