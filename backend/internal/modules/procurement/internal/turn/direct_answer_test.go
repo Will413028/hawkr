@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/planner"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -181,5 +183,51 @@ func TestAnswerDecisionItemTakesTheResolutionAndRegressesMatching(t *testing.T) 
 	}
 	if d.status != statusRequirementReady {
 		t.Errorf("MATCHING 時改了品項解析要退回，status = %s", d.status)
+	}
+}
+
+func TestAnswerDecisionSkipIsNotARejectedInput(t *testing.T) {
+	for _, slot := range []model.SlotKey{slots.Packaging, slots.BudgetPerUnit} {
+		prior := readyPrior()
+		prior.current.Quantity, prior.current.DeliveryDate = ip32(3), dp()
+		p, err := planAnswer(AnswerSlotInput{Slot: slot, Skip: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		d, err := answerDecision(uitext.ZhTW, now, prior, p, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(d.rejected) != 0 || len(d.recorded) != 0 {
+			t.Errorf("%s：略過不該有拒絕或記錄：rejected=%+v recorded=%+v", slot, d.rejected, d.recorded)
+		}
+		if d.plan.Act == planner.InputRejected {
+			t.Errorf("%s：略過不該出 INPUT_REJECTED", slot)
+		}
+	}
+}
+
+func TestAnswerDecisionSkippingTheSameSlotTwiceStoresItOnce(t *testing.T) {
+	prior := readyPrior()
+	prior.current.Quantity, prior.current.DeliveryDate = ip32(3), dp()
+	p, _ := planAnswer(AnswerSlotInput{Slot: slots.Packaging, Skip: true})
+	d1, err := answerDecision(uitext.ZhTW, now, prior, p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior.prevTurn = &prevTurn{skipped: d1.plan.Skipped}
+	d2, err := answerDecision(uitext.ZhTW, now, prior, p, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := slices.Index(d2.plan.Skipped, slots.Packaging); n < 0 || slices.Index(d2.plan.Skipped[n+1:], slots.Packaging) >= 0 {
+		t.Errorf("skipped = %v，要只出現一次", d2.plan.Skipped)
+	}
+}
+
+func TestPlanAnswerRejectsUnitSlotBecauseUnitAnswersUseQuantity(t *testing.T) {
+	_, err := planAnswer(AnswerSlotInput{Slot: slots.Unit, UnitOptionID: "unit-kg"})
+	if got := fieldsOf(t, err); !slices.Equal(got, []string{"SlotKey"}) {
+		t.Fatalf("UNIT 回答 = %v，要 SlotKey", got)
 	}
 }

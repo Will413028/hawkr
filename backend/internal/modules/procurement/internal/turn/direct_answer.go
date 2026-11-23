@@ -37,7 +37,7 @@ const (
 	fieldSkip         = "Skip"
 )
 
-// answerable 是 SubmitAnswer 收的欄位：UNIT 折進 QUANTITY，品項消歧與品項解析由 run 或伺服器擁有。
+// answerable 是 SubmitAnswer 收的欄位：UNIT 不收（單位的回答走 QUANTITY 加 unit_option_id，沿用表的決定；倒回才把 UNIT 折進 QUANTITY），品項消歧與品項解析由 run 或伺服器擁有。
 var answerable = []model.SlotKey{
 	slots.Item, slots.Quantity, slots.Packaging, slots.BudgetPerUnit, slots.DeliveryCity, slots.DeliveryDate,
 }
@@ -157,9 +157,12 @@ func (p answerPlan) messageText() string {
 	return p.text
 }
 
-// patch 是這個回答對現況的改動；QUANTITY 缺數量或缺單位時要現況已有，否則回 INVALID_ARGUMENT。res 只給 ITEM（唯一對到的末層分類）。
+// patch 是這個回答對現況的改動；略過不寫任何值（空的 patch，只有略過欄位的記帳）；QUANTITY 缺數量或缺單位時要現況已有，否則回 INVALID_ARGUMENT。res 只給 ITEM（唯一對到的末層分類）。
 func (p answerPlan) patch(current slots.Set, res *slots.Resolution) (slots.Patch, error) {
 	var patch slots.Patch
+	if p.skip {
+		return patch, nil
+	}
 	value := p.text
 	if p.option != "" {
 		value = p.option
@@ -205,7 +208,9 @@ func answerDecision(l uitext.Locale, now time.Time, prior priorState, p answerPl
 		if prior.prevTurn != nil {
 			pt = *prior.prevTurn
 		}
-		pt.skipped = append(slices.Clone(pt.skipped), p.slot)
+		if !slices.Contains(pt.skipped, p.slot) {
+			pt.skipped = append(slices.Clone(pt.skipped), p.slot)
+		}
 		prior.prevTurn = &pt
 	}
 	return finish(l, prior, patch, next, rejected, nil), nil
