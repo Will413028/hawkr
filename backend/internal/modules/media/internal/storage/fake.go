@@ -17,8 +17,9 @@ type Fake struct {
 }
 
 type fakeObject struct {
-	data        []byte
-	contentType string
+	data         []byte
+	contentType  string
+	cacheControl string
 }
 
 // NewFake 回傳空的 Fake。
@@ -58,7 +59,7 @@ func (f *Fake) Head(_ context.Context, key string) (ObjectInfo, error) {
 	if !ok {
 		return ObjectInfo{}, ErrNotFound
 	}
-	return ObjectInfo{Size: int64(len(o.data)), ContentType: o.contentType}, nil
+	return ObjectInfo{Size: int64(len(o.data)), ContentType: o.contentType, CacheControl: o.cacheControl}, nil
 }
 
 // Put 實作 Store；Body 長度與 Size 不符是錯誤。
@@ -79,7 +80,7 @@ func (f *Fake) Put(_ context.Context, in PutInput) error {
 	if contentType == "" {
 		contentType = DefaultContentType
 	}
-	f.objects[in.Key] = fakeObject{data: data, contentType: contentType}
+	f.objects[in.Key] = fakeObject{data: data, contentType: contentType, cacheControl: CacheControlFor(in.Key)}
 	return nil
 }
 

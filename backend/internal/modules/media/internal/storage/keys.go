@@ -20,6 +20,17 @@ const (
 	PrefixSecure Prefix = "secure"
 )
 
+// PublicCacheControl 是 public/ 物件的 Cache-Control：key 是隨機產生、內容不可變（換圖是新資產與新 key），可以讓 CDN 與瀏覽器永久快取。
+const PublicCacheControl = "public, max-age=31536000, immutable"
+
+// CacheControlFor 是寫入 key 時要設的 Cache-Control：只有 public/ 物件設 PublicCacheControl，tmp/ 與 secure/ 不設（空字串）。
+func CacheControlFor(key string) string {
+	if strings.HasPrefix(key, string(PrefixPublic)+"/") {
+		return PublicCacheControl
+	}
+	return ""
+}
+
 // NewKey 回傳 `<prefix>/<uuid v4>`。key 由伺服器隨機產生，不含呼叫端檔名，也不含任何可猜的部分。
 func NewKey(p Prefix) string {
 	var b [16]byte

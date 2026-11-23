@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"uuid"
 )
 
 type fakeS3 struct {
@@ -117,6 +118,29 @@ func TestS3PutSendsBodyAndType(t *testing.T) {
 		}
 		if gotBody != "hello" || gotType != "text/plain" {
 			t.Fatalf("server saw %q %q", gotBody, gotType)
+		}
+	}
+}
+
+func TestS3PutSetsImmutableCacheControlOnlyOnPublicObjects(t *testing.T) {
+	var got string
+	s, _ := newFakeS3(t, func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("Cache-Control")
+		w.WriteHeader(http.StatusOK)
+	})
+	for key, want := range map[string]string{
+		NewKey(PrefixPublic):                   "public, max-age=31536000, immutable",
+		NewKey(PrefixTmp):                      "",
+		NewKey(PrefixSecure):                   "",
+		NewSecureChunkKey(uuid.New(), 0):       "",
+		"publicity/looks-like-the-prefix-only": "",
+	} {
+		got = "unset"
+		if err := s.Put(context.Background(), PutInput{Key: key, Body: bytes.NewReader([]byte("x")), Size: 1}); err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("%s: Cache-Control = %q, want %q", key, got, want)
 		}
 	}
 }

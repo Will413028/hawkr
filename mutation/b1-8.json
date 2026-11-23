@@ -71,6 +71,24 @@
    "new": "_ = displays[0].AvatarAssetID",
    "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnCopyOfTheReportedBuyersAvatar$",
    "why": "凍結買家時不帶頭像資產 ID，頭像沒被複製"
+  },
+  {
+   "id": "s3-put-sends-cache-control",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tCacheControl:  cacheControl,\n",
+   "new": "",
+   "test": "internal/modules/media/internal/storage ^TestS3PutSetsImmutableCacheControlOnlyOnPublicObjects$",
+   "why": "Put 不再把 Cache-Control 送給物件儲存，public 物件沒有長期快取"
+  },
+  {
+   "id": "cache-control-only-for-public-prefix",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/keys.go",
+   "old": "strings.HasPrefix(key, string(PrefixPublic)+\"/\")",
+   "new": "strings.HasPrefix(key, \"\")",
+   "test": "internal/modules/media/internal/storage ^TestS3PutSetsImmutableCacheControlOnlyOnPublicObjects$",
+   "why": "tmp/ 與 secure/ 物件也被設成永久快取"
   }
  ]
 }

@@ -115,7 +115,7 @@ func (s *S3) Head(ctx context.Context, key string) (ObjectInfo, error) {
 		}
 		return ObjectInfo{}, fmt.Errorf("storage: head: %w", err)
 	}
-	return ObjectInfo{Size: aws.ToInt64(out.ContentLength), ContentType: aws.ToString(out.ContentType)}, nil
+	return ObjectInfo{Size: aws.ToInt64(out.ContentLength), ContentType: aws.ToString(out.ContentType), CacheControl: aws.ToString(out.CacheControl)}, nil
 }
 
 // Put 實作 Store。
@@ -146,12 +146,17 @@ func (s *S3) Put(ctx context.Context, in PutInput) error {
 	if in.ContentType != "" {
 		contentType = aws.String(in.ContentType)
 	}
+	var cacheControl *string
+	if cc := CacheControlFor(in.Key); cc != "" {
+		cacheControl = aws.String(cc)
+	}
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(s.bucket),
 		Key:           aws.String(in.Key),
 		Body:          body,
 		ContentLength: aws.Int64(in.Size),
 		ContentType:   contentType,
+		CacheControl:  cacheControl,
 	})
 	if err != nil {
 		return fmt.Errorf("storage: put: %w", err)

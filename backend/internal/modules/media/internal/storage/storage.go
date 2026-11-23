@@ -32,7 +32,7 @@ type Store interface {
 	Get(ctx context.Context, key string) (io.ReadCloser, error)
 	// Head 回傳物件的大小與型別。不存在回 ErrNotFound。
 	Head(ctx context.Context, key string) (ObjectInfo, error)
-	// Put 寫入物件。Body 應為 io.ReadSeeker（例如暫存檔）；非 seekable 的 Body 會整個讀進記憶體。
+	// Put 寫入物件；public/ 的物件帶 PublicCacheControl（CacheControlFor），tmp/ 與 secure/ 不帶。Body 應為 io.ReadSeeker（例如暫存檔）；非 seekable 的 Body 會整個讀進記憶體。
 	// Body 剩餘長度與 Size 不符回 ErrSizeMismatch。同一個 key 重寫會覆蓋，讓處理 job 重試時冪等。
 	Put(ctx context.Context, in PutInput) error
 	// Delete 刪除物件；物件不存在視為成功。
@@ -60,8 +60,9 @@ type PresignedPut struct {
 
 // ObjectInfo 是 Head 的結果。
 type ObjectInfo struct {
-	Size        int64
-	ContentType string
+	Size         int64
+	ContentType  string
+	CacheControl string
 }
 
 // PutInput 是 Put 的參數；Body 讀滿 Size 個位元組。

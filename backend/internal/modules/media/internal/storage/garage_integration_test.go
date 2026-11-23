@@ -315,8 +315,18 @@ func TestGarageStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Size != int64(len(body)) || info.ContentType != "application/x-test" {
+		if info.Size != int64(len(body)) || info.ContentType != "application/x-test" || info.CacheControl != PublicCacheControl {
 			t.Fatalf("head = %+v", info)
+		}
+		tmpKey := NewKey(PrefixTmp)
+		if err := s.Put(ctx, PutInput{Key: tmpKey, Body: bytes.NewReader(body), Size: int64(len(body))}); err != nil {
+			t.Fatal(err)
+		}
+		if tmpInfo, err := s.Head(ctx, tmpKey); err != nil || tmpInfo.CacheControl != "" {
+			t.Fatalf("tmp head = %+v, %v；tmp/ 物件不該帶 Cache-Control", tmpInfo, err)
+		}
+		if err := s.Delete(ctx, tmpKey); err != nil {
+			t.Fatal(err)
 		}
 		if got := readAll(t, s, key); !bytes.Equal(got, body) {
 			t.Fatalf("got %q want %q", got, body)
