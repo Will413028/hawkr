@@ -105,7 +105,7 @@
    "file": "packages/hawkr_api/lib/src/taipei_display.dart",
    "old": "t.year == today.year && t.month == today.month && t.day == today.day;",
    "new": "t.year == today.year && t.month == today.month;",
-   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else month/day",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else date and time",
    "why": "The separator treats any day of the same month as today, so yesterday shows the time only."
   },
   {
@@ -132,7 +132,7 @@
    "file": "packages/hawkr_api/lib/src/taipei_display.dart",
    "old": "t.year == today.year && t.month == today.month && t.day == today.day;",
    "new": "t.year == today.year && t.month == today.month;",
-   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else month/day",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart same Taipei day shows the time only, else date and time",
    "why": "The separator treats any day of the same month as today, so yesterday shows the time only."
   },
   {
