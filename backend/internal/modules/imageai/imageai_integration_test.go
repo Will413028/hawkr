@@ -414,10 +414,10 @@ func TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder(t *testing
 		exec(t, d, `INSERT INTO imageai.styles (id, name, label, prompt, category, display_order, enabled, thumbnail_key, created_at, updated_at)
 			VALUES ($1, $2, $2, 'p-' || $2, $3, $4, $5, $6, now(), now())`, id, name, category, order, enabled, thumb)
 	}
-	ins("019e9a00-0000-7000-8000-000000000001", "b", "PRODUCT", 1, true, "styles/b.jpg")
-	ins("019e9a00-0000-7000-8000-000000000002", "a", "PRODUCT", 2, true, "")
-	ins("019e9a00-0000-7000-8000-000000000003", "off", "PRODUCT", 0, false, "")
-	ins("019e9a00-0000-7000-8000-000000000004", "post-only", "POST", 0, true, "")
+	ins("019e9b00-0000-7000-8000-000000000001", "b", "PRODUCT", 1, true, "styles/b.jpg")
+	ins("019e9b00-0000-7000-8000-000000000002", "a", "PRODUCT", 2, true, "")
+	ins("019e9b00-0000-7000-8000-000000000003", "off", "PRODUCT", 0, false, "")
+	ins("019e9b00-0000-7000-8000-000000000004", "post-only", "POST", 0, true, "")
 	list, err := m.ListStyles(ctx, imageai.CategoryProduct)
 	if err != nil {
 		t.Fatal(err)
