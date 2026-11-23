@@ -446,7 +446,7 @@
    "stack": "go",
    "file": "backend/internal/modules/seller/internal/model/media.go",
    "old": "ContentType: http.DetectContentType(data[:min(len(data), secureSniffLen)])",
-   "new": "ContentType: \"application/octet-stream\"",
+   "new": "ContentType: http.DetectContentType(nil)",
    "test": "internal/modules/seller/internal/model ^TestReadSecureSniffsTheTypeAndClassifiesFailures$",
    "why": "機敏檔的型別不再由內容辨認"
   },
@@ -762,7 +762,7 @@
    "file": "backend/internal/modules/social/internal/post/post.go",
    "old": "(asset != nil && *row.ImageAssetID != asset.ID)",
    "new": "asset != nil",
-   "test": "internal/modules/social ^TestResendingTheCurrentImageTokenKeepsTheAssetActive$",
+   "test": "internal/modules/social ^TestResendingTheCurrentImageTokenIsRejectedAndKeepsTheAssetActive$",
    "why": "重送目前的 token 時把仍在用的圖標成刪除"
   },
   {

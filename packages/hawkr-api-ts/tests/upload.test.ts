@@ -381,11 +381,17 @@ describe("uploadSecureFile", () => {
 
 	it("fails on a 409 that does not advance", async () => {
 		const { app } = secureClient(4, 3);
+		let puts = 0;
 		await expect(
 			uploadSecureFile(app, file, {
-				put: async () => ok(409, { "Hawkr-Next-Index": "0" }),
+				put: async () => {
+					puts++;
+					return ok(409, { "Hawkr-Next-Index": "0" });
+				},
 			}),
 		).rejects.toMatchObject({ kind: "chunk_failed", status: 409 });
+		// 立刻放棄：不靠續傳次數上限才停下來。
+		expect(puts).toBe(1);
 	});
 
 	it("fails on a 409 without a usable header", async () => {
