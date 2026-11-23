@@ -865,14 +865,14 @@ class MediaAppServiceApi {
 /// 店家此刻不可代行回 failed_precondition，只拒絕、不撤銷 session。回應一律不可快取（private, no-store）。
 ///
 /// 稽核：上傳只產生會過期的暫存，不改賣家看得到的資料，所以成功的 BeginSecureUpload 與段上傳都不寫代行稽核；稽核留在擁有者確認時的寫入。被拒絕的請求另寫一列 FAILED。
-/// 會話的上傳者是管理員本人（與 Java 一致），並綁定被代行的那一家店：段上傳與暫存預覽（`GET /api/files/admin/secure_uploads/{staged_token}`）都要帶同一個 X-HK-Operation-Session，session 此刻有效、帶 media.upload 且屬於這位管理員；擁有者確認時 token 也只對同一家店成立。不保留原始檔名。
+/// 會話的上傳者是管理員本人（與 Java 一致），並綁定被代行的那一家店：段上傳與暫存預覽（`GET /api/files/delegated/secure_uploads/{staged_token}`）都只以 X-HK-Operation-Session 授權（沒有管理員 Bearer），session 此刻有效且帶 media.upload，上傳者是 session 的管理員；擁有者確認時 token 也只對同一家店成立。不保留原始檔名。
 class MediaDelegatedServiceApi {
   final $pb.RpcClient _client;
 
   MediaDelegatedServiceApi(this._client);
 
   /// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
-  /// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員、在綁定的同一家店的代行 session 之下（請求帶 X-HK-Operation-Session）能續傳。
+  /// 段以 `PUT /api/files/delegated/secure_uploads/{staged_token}/chunks/{index}` 送出（原始位元組 body，不經 Connect；規範第十三節），只有綁定的那家店的有效代行 session（請求帶 X-HK-Operation-Session）能續傳。
   /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
   $async.Future<MediaDelegatedServiceBeginSecureUploadResponse>
       beginSecureUpload($pb.ClientContext? ctx,

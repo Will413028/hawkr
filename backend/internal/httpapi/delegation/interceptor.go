@@ -118,6 +118,13 @@ func Authorize(ctx context.Context, sessions Sessions, logger *slog.Logger, proc
 	return caller, nil
 }
 
+// Touch 順延代行 session 的閒置逾時；請求成功之後才呼叫，失敗只記 error，不改變已完成的請求結果。interceptor 與不經 Connect 的代行路由共用。
+func Touch(ctx context.Context, sessions Sessions, logger *slog.Logger, sessionID int64) {
+	if err := sessions.TouchDelegation(ctx, sessionID); err != nil {
+		logger.ErrorContext(ctx, "代行 session 順延閒置逾時失敗", "session_id", sessionID, "err", err)
+	}
+}
+
 func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		ctx, err := i.enter(ctx, req.Spec().Procedure, req.Header())
@@ -130,9 +137,7 @@ func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		}
 		// 請求成功才算活動：被拒絕或失敗的請求（含 handler 與元件內的拒絕）不順延閒置逾時；順延失敗不改變已完成的請求結果。
 		if c, cerr := CallerFrom(ctx); cerr == nil {
-			if terr := i.sessions.TouchDelegation(ctx, c.Session.ID); terr != nil {
-				i.logger.ErrorContext(ctx, "代行 session 順延閒置逾時失敗", "session_id", c.Session.ID, "err", terr)
-			}
+			Touch(ctx, i.sessions, i.logger, c.Session.ID)
 		}
 		return resp, nil
 	}

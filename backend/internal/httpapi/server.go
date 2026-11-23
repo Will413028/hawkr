@@ -206,7 +206,7 @@ type fileRoute struct {
 	permission adminperm.Permission
 }
 
-// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的後台段上傳與暫存預覽（B1-D16，權限 delegation.sessions.create，另要有效的代行 session）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
+// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的段上傳與暫存預覽（B1-D16，只以有效的代行 session 憑證授權，不是後台路由）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
 func fileRoutes(deps Deps) []fileRoute {
 	routes := sellerFileRoutes(deps)
 	if deps.Media != nil {
@@ -216,9 +216,9 @@ func fileRoutes(deps Deps) []fileRoute {
 		}
 		routes = append(routes,
 			fileRoute{pattern: httpmedia.ChunkRoute, handler: secure.Chunk()},
-			fileRoute{pattern: httpmedia.AdminChunkRoute, handler: secure.AdminChunk(), permission: adminperm.DelegationSessionsCreate},
+			fileRoute{pattern: httpmedia.DelegatedChunkRoute, handler: secure.DelegatedChunk()},
 			fileRoute{pattern: httpmedia.PreviewRoute, handler: secure.Preview()},
-			fileRoute{pattern: httpmedia.AdminPreviewRoute, handler: secure.AdminPreview(), permission: adminperm.DelegationSessionsCreate})
+			fileRoute{pattern: httpmedia.DelegatedPreviewRoute, handler: secure.DelegatedPreview()})
 	}
 	return routes
 }
@@ -529,17 +529,17 @@ func restoreURL(next http.Handler) http.Handler {
 }
 
 const (
-	secureUploadsPrefix      = "/api/files/secure_uploads/"
-	adminSecureUploadsPrefix = "/api/files/admin/secure_uploads/"
+	secureUploadsPrefix          = "/api/files/secure_uploads/"
+	delegatedSecureUploadsPrefix = "/api/files/delegated/secure_uploads/"
 )
 
-// redactedTokenPath 把機敏上傳端點（顧客的 /api/files/secure_uploads/ 與後台代行的 /api/files/admin/secure_uploads/）路徑裡的暫存 token 換成 {token}；
+// redactedTokenPath 把機敏上傳端點（顧客的 /api/files/secure_uploads/ 與代行營運的 /api/files/delegated/secure_uploads/）路徑裡的暫存 token 換成 {token}；
 // 不是這類路徑回 false。token 是持有即可預覽的憑據，不進 trace。
 func redactedTokenPath(path string) (string, bool) {
 	if !strings.Contains(path, "secure_uploads") {
 		return "", false
 	}
-	for _, prefix := range []string{secureUploadsPrefix, adminSecureUploadsPrefix} {
+	for _, prefix := range []string{secureUploadsPrefix, delegatedSecureUploadsPrefix} {
 		if rest, ok := strings.CutPrefix(path, prefix); ok {
 			_, tail, _ := strings.Cut(rest, "/")
 			if idx, isChunk := strings.CutPrefix(tail, "chunks/"); tail == "" || isChunk && idx != "" && !strings.Contains(idx, "/") {

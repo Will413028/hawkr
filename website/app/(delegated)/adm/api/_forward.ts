@@ -12,6 +12,7 @@ import {
 } from "./_csrf";
 import {
 	callDelegatedConnect,
+	callDelegatedFile,
 	callDelegatedUpstream,
 	type DelegatedUpstreamResult,
 	type DelegatedUpstreamTimeout,
@@ -50,6 +51,11 @@ const ORDER_NO_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
 /** 媒體 upload session（UUID 或 TSID，兩種都可能）。 */
 const MEDIA_SESSION_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
+const SECURE_UPLOAD_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+const CHUNK_INDEX_PATTERN = /^(?:0|[1-9]\d{0,5})$/;
+/** 單體的段大小（`model.SecureChunkSize`）；超過的 body 不讀、不轉送。 */
+const SECURE_CHUNK_MAX_BYTES = 4 << 20;
+
 function segment(value: string, pattern: RegExp): string {
 	if (!pattern.test(value)) {
 		throw new DelegatedRequestRejectedError("INVALID_PATH_PARAM", 400);
@@ -77,6 +83,16 @@ export function orderNoSegment(value: string): string {
 
 export function mediaSessionSegment(value: string): string {
 	return segment(value, MEDIA_SESSION_PATTERN);
+}
+
+/** 機敏上傳暫存 token（單體以 base64url 產生）。 */
+export function secureUploadTokenSegment(value: string): string {
+	return segment(value, SECURE_UPLOAD_TOKEN_PATTERN);
+}
+
+/** 段序號：十進位、無前導零（單體只認標準形）。 */
+export function chunkIndexSegment(value: string): string {
+	return segment(value, CHUNK_INDEX_PATTERN);
 }
 
 /**
@@ -325,6 +341,101 @@ export async function forwardDelegatedConnect(
 			visitorIp: getVisitorIp(request),
 		});
 		return respond(result);
+	} catch (error) {
+		if (error instanceof DelegatedUpstreamUnavailableError) {
+			return delegatedJson(
+				{ code: UPSTREAM_FAILURE },
+				error.timedOut ? 504 : 502,
+			);
+		}
+		throw error;
+	}
+}
+
+export interface DelegatedFileSpec {
+	method: "GET" | "PUT";
+	/** 單體根目錄之後的路徑。**每支 route 自己寫死**，不從請求推導。 */
+	path: string;
+}
+
+/** 單體回應裡放行給瀏覽器的標頭：其餘一律不轉（含 Set-Cookie 與任何上游自訂標頭）。 */
+const FILE_RESPONSE_HEADERS = [
+	"content-type",
+	"content-disposition",
+	"hawkr-next-index",
+	"retry-after",
+] as const;
+
+function fileResponse(upstream: Response): Response {
+	const headers = new Headers({
+		"Cache-Control": "private, no-store",
+		"X-Content-Type-Options": "nosniff",
+	});
+	const ok = upstream.status >= 200 && upstream.status <= 299;
+	for (const name of FILE_RESPONSE_HEADERS) {
+		// 失敗回應的 body 不轉（只轉狀態與重試所需的標頭），所以 content-type 也不帶。
+		if (!ok && (name === "content-type" || name === "content-disposition")) {
+			continue;
+		}
+		const value = upstream.headers.get(name);
+		if (value !== null) headers.set(name, value);
+	}
+	if (upstream.status >= 300 && upstream.status <= 399) {
+		return delegatedJson({ code: UPSTREAM_FAILURE }, 502);
+	}
+	return new Response(ok && upstream.status !== 204 ? upstream.body : null, {
+		status: upstream.status,
+		headers,
+	});
+}
+
+/**
+ * 代行 BFF 轉送單體檔案端點（機敏檔的段上傳與暫存預覽）：與 `forwardDelegated` 同一個檢查順序
+ * （path 值域、保留標頭與 CSRF、憑證、body），差別是 body 與回應都是原始位元組。PUT 要有 `Content-Length`
+ * （411）且不超過段大小（413），body 整段讀進記憶體後原樣送出（上限 4 MiB）。
+ */
+export async function forwardDelegatedFile(
+	request: Request,
+	source: DelegatedFileSpec | (() => DelegatedFileSpec),
+): Promise<Response> {
+	let spec: DelegatedFileSpec;
+	let credential: string | null;
+	let body: ArrayBuffer | undefined;
+	try {
+		spec = typeof source === "function" ? source() : source;
+		assertDelegatedBrowserRequest(request);
+		credential = readOperationCredential(request);
+		if (!credential) {
+			throw new DelegatedRequestRejectedError("CREDENTIAL_MISSING", 401);
+		}
+		if (spec.method === "PUT") {
+			const declared = request.headers.get("content-length");
+			if (declared === null || !/^\d{1,10}$/.test(declared)) {
+				throw new DelegatedRequestRejectedError("INVALID_BODY", 411);
+			}
+			if (Number(declared) > SECURE_CHUNK_MAX_BYTES) {
+				throw new DelegatedRequestRejectedError("INVALID_BODY", 413);
+			}
+			body = await request.arrayBuffer();
+			if (body.byteLength !== Number(declared)) {
+				throw new DelegatedRequestRejectedError("INVALID_BODY", 400);
+			}
+		}
+	} catch (error) {
+		if (error instanceof DelegatedRequestRejectedError) return rejection(error);
+		throw error;
+	}
+	try {
+		return fileResponse(
+			await callDelegatedFile({
+				method: spec.method,
+				path: spec.path,
+				timeout: "file",
+				credential,
+				visitorIp: getVisitorIp(request),
+				body,
+			}),
+		);
 	} catch (error) {
 		if (error instanceof DelegatedUpstreamUnavailableError) {
 			return delegatedJson(

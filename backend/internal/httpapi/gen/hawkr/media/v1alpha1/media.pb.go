@@ -10,7 +10,7 @@
 // 再 CompleteUpload 通知伺服器；伺服器非同步處理（辨認格式、重新編碼、去除 metadata），client 以 GetUpload 輪詢到 READY 或 REJECTED。
 // READY 的 staged token 交給擁有該圖片的 API（例如更新頭像）轉正；轉正前的暫存只有上傳者本人能續用。
 // 機敏檔案：BeginSecureUpload 開分段會話，段本身走單體的 /api/files/secure_uploads 端點（不經 Connect）。處理被拒絕不是錯誤：GetUpload 以 state REJECTED 與 reject_reason 回報。
-// 代行營運（MediaDelegatedService）：管理員代行店家時開機敏檔的分段上傳會話，段走後台的 /api/files/admin/secure_uploads 端點。
+// 代行營運（MediaDelegatedService）：管理員代行店家時開機敏檔的分段上傳會話，段走單體的 /api/files/delegated/secure_uploads 端點。
 // 設計：ADR docs/adr/2026-11-22-media-upload-channels.md；代行上傳 plan B1-D16。
 
 package mediav1alpha1

@@ -32,9 +32,13 @@ const (
 type fakeSessions struct {
 	sessions map[string]moddelegation.DelegationSession
 	denied   []moddelegation.DelegatedMethod
+	touched  []int64
 }
 
-func (f *fakeSessions) TouchDelegation(context.Context, int64) error { return nil }
+func (f *fakeSessions) TouchDelegation(_ context.Context, id int64) error {
+	f.touched = append(f.touched, id)
+	return nil
+}
 
 func (f *fakeSessions) ResolveDelegation(_ context.Context, c string, _ bool) (moddelegation.DelegationSession, error) {
 	s, ok := f.sessions[c]

@@ -6,7 +6,7 @@ import {
 } from "@connectrpc/connect";
 import { SocialDelegatedService } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import { getEnv } from "@/lib/config/env";
-import { publicTransport } from "@/lib/connect/transport";
+import { connectBaseUrl, publicTransport } from "@/lib/connect/transport";
 
 /**
  * 代行 BFF 唯一的上游轉送點（56 號 §4.5 L1040）。
@@ -31,9 +31,15 @@ const TIMEOUT_MS: Record<DelegatedUpstreamTimeout, number> = {
 	session: 10_000,
 	mutation: 15_000,
 	batch: 60_000,
+	// 機敏檔的一段（單體端讀 body 的時限是 90 秒，這裡多留 10 秒給回應）。
+	file: 100_000,
 };
 
-export type DelegatedUpstreamTimeout = "session" | "mutation" | "batch";
+export type DelegatedUpstreamTimeout =
+	| "session"
+	| "mutation"
+	| "batch"
+	| "file";
 
 export interface DelegatedUpstreamRequest {
 	method: "GET" | "POST" | "PATCH" | "DELETE";
@@ -156,6 +162,56 @@ export async function callDelegatedUpstream(
 				? envelope.traceId
 				: null,
 	};
+}
+
+export interface DelegatedFileRequest {
+	method: "GET" | "PUT";
+	/** 單體根目錄之後的路徑（`/api/files/delegated/…`），一條路徑對一條單體路徑。 */
+	path: string;
+	timeout: DelegatedUpstreamTimeout;
+	credential: string;
+	visitorIp?: string | null;
+	/** PUT 的原始位元組，原樣送出；`Content-Length` 由它的長度決定。 */
+	body?: ArrayBuffer;
+}
+
+/**
+ * 代行 BFF 對單體檔案端點（`/api/files/delegated/…`，不經 Connect、不是 envelope）的轉送：憑證同樣只是
+ * `X-HK-Operation-Session`，body 與回應都是原始位元組，所以回傳的是未解析的 `Response`（呼叫端決定放行哪些標頭）。
+ * 3xx 不跟隨（`redirect: "manual"`），逾時與連不上丟 `DelegatedUpstreamUnavailableError`。
+ */
+export async function callDelegatedFile(
+	request: DelegatedFileRequest,
+): Promise<Response> {
+	const url = `${connectBaseUrl(false)}${request.path}`;
+	const headers = new Headers({
+		"X-HK-Operation-Session": request.credential,
+	});
+	if (request.body !== undefined) {
+		headers.set("Content-Type", "application/octet-stream");
+		headers.set("Content-Length", String(request.body.byteLength));
+	}
+	const { signOriginAuth, ORIGIN_AUTH_HEADER } = await import(
+		"@/lib/api/origin-auth.server"
+	);
+	const attestation = await signOriginAuth({
+		method: request.method,
+		url,
+		visitorIp: request.visitorIp ?? undefined,
+	});
+	if (attestation) headers.set(ORIGIN_AUTH_HEADER, attestation);
+	try {
+		return await fetch(url, {
+			method: request.method,
+			headers,
+			body: request.body,
+			cache: "no-store",
+			redirect: "manual",
+			signal: AbortSignal.timeout(TIMEOUT_MS[request.timeout]),
+		});
+	} catch (error) {
+		throw new DelegatedUpstreamUnavailableError(error);
+	}
 }
 
 /** 轉給瀏覽器的回應：只有 code／data／traceId，never message。 */

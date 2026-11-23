@@ -18,10 +18,10 @@ func TestTracingRedactsSecureUploadToken(t *testing.T) {
 		"/api/files/secure_uploads/" + token,
 		"/api/files/secure_uploads//" + token + "/chunks/0",
 		"/api//files/secure_uploads/" + token,
-		"/api/files/admin/secure_uploads/" + token + "/chunks/0",
-		"/api/files/admin/secure_uploads/" + token + "/chunks/0?x=1",
-		"/api/files/admin/secure_uploads/" + token,
-		"/api/files/admin/secure_uploads//" + token + "/chunks/0",
+		"/api/files/delegated/secure_uploads/" + token + "/chunks/0",
+		"/api/files/delegated/secure_uploads/" + token + "/chunks/0?x=1",
+		"/api/files/delegated/secure_uploads/" + token,
+		"/api/files/delegated/secure_uploads//" + token + "/chunks/0",
 	} {
 		rec := tracetest.NewSpanRecorder()
 		tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
@@ -54,14 +54,14 @@ func TestTracingRedactsSecureUploadToken(t *testing.T) {
 // token 換成 {token}，路由的其餘部分留著：顧客與後台（代行營運）的兩個前綴各自保留自己的路徑，trace 上分得出是哪一條路由。
 func TestRedactedTokenPathKeepsTheRoute(t *testing.T) {
 	for in, want := range map[string]string{
-		"/api/files/secure_uploads/T/chunks/0":             "/api/files/secure_uploads/{token}/chunks/0",
-		"/api/files/secure_uploads/T":                      "/api/files/secure_uploads/{token}",
-		"/api/files/admin/secure_uploads/T/chunks/12":      "/api/files/admin/secure_uploads/{token}/chunks/12",
-		"/api/files/admin/secure_uploads/T":                "/api/files/admin/secure_uploads/{token}",
-		"/api/files/admin/secure_uploads/T/chunks/0/extra": "/api/files/admin/secure_uploads/{redacted}",
-		"/api/files/secure_uploads/T/other":                "/api/files/secure_uploads/{redacted}",
-		"/api//files/admin/secure_uploads/T":               "/api/files/{redacted}",
-		"/api/files/admin/secure_uploads//T/chunks/0":      "/api/files/admin/secure_uploads/{redacted}",
+		"/api/files/secure_uploads/T/chunks/0":                 "/api/files/secure_uploads/{token}/chunks/0",
+		"/api/files/secure_uploads/T":                          "/api/files/secure_uploads/{token}",
+		"/api/files/delegated/secure_uploads/T/chunks/12":      "/api/files/delegated/secure_uploads/{token}/chunks/12",
+		"/api/files/delegated/secure_uploads/T":                "/api/files/delegated/secure_uploads/{token}",
+		"/api/files/delegated/secure_uploads/T/chunks/0/extra": "/api/files/delegated/secure_uploads/{redacted}",
+		"/api/files/secure_uploads/T/other":                    "/api/files/secure_uploads/{redacted}",
+		"/api//files/delegated/secure_uploads/T":               "/api/files/{redacted}",
+		"/api/files/delegated/secure_uploads//T/chunks/0":      "/api/files/delegated/secure_uploads/{redacted}",
 	} {
 		if got, ok := redactedTokenPath(in); !ok || got != want {
 			t.Errorf("redactedTokenPath(%q) = %q, %v，預期 %q", in, got, ok, want)

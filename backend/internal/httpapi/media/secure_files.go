@@ -26,12 +26,12 @@ import (
 const (
 	// ChunkRoute 是段上傳端點的 ServeMux 樣式。
 	ChunkRoute = "PUT /api/files/secure_uploads/{token}/chunks/{index}"
-	// AdminChunkRoute 是代行營運的段上傳端點（B1-D16）：上傳者是開會話的管理員，後台路由，權限由 fileRoute.permission 宣告。
-	AdminChunkRoute = "PUT /api/files/admin/secure_uploads/{token}/chunks/{index}"
+	// DelegatedChunkRoute 是代行營運的段上傳端點（B1-D16）：只以代行 session 憑證授權，不是後台路由（沒有管理員 Bearer 與權限）。
+	DelegatedChunkRoute = "PUT /api/files/delegated/secure_uploads/{token}/chunks/{index}"
 	// PreviewRoute 是確認前暫存預覽端點的 ServeMux 樣式。
 	PreviewRoute = "GET /api/files/secure_uploads/{token}"
-	// AdminPreviewRoute 是代行營運的暫存預覽端點（B1-D16）：只有開會話的管理員、在同一個代行 session 之下能看。
-	AdminPreviewRoute = "GET /api/files/admin/secure_uploads/{token}"
+	// DelegatedPreviewRoute 是代行營運的暫存預覽端點（B1-D16）：只有開會話的那個代行 session 能看。
+	DelegatedPreviewRoute = "GET /api/files/delegated/secure_uploads/{token}"
 
 	// NextIndexHeader 是 index 不符（409）時帶回下一個要送的段序號的回應 header。
 	NextIndexHeader = "Hawkr-Next-Index"
@@ -66,20 +66,22 @@ func NewSecureUploads(m SecureFiles, log *slog.Logger) *SecureUploads {
 	return &SecureUploads{m: m, log: log, readTimeout: ChunkReadTimeout}
 }
 
-// WithDelegation 接上後台路由驗代行 session 的來源。
+// WithDelegation 接上代行路由驗代行 session 的來源。
 func (h *SecureUploads) WithDelegation(sessions httpdelegation.Sessions) *SecureUploads {
 	h.sessions = sessions
 	return h
 }
 
 // Chunk 回 PUT 的 handler。
-func (h *SecureUploads) Chunk() http.Handler { return http.HandlerFunc(h.putChunk) }
+func (h *SecureUploads) Chunk() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.uploader) })
+}
 
-// AdminChunk 回後台 PUT 的 handler：段請求的語意與 Chunk 完全相同（時限、大小上限、409 與 Hawkr-Next-Index、錯誤分類），只有上傳者不同：
-// 呼叫者是管理員，Uploader 是 {ID: 管理員 ID, Admin: true, Store: 代行店家}，會話只有開它的管理員、在綁定的同一家店的代行 session 之下能續傳
-// （請求要帶 X-HK-Operation-Session，session 此刻 ACTIVE、帶 media.upload、操作者是這位管理員，見 adminUploader）。
-func (h *SecureUploads) AdminChunk() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.adminUploader) })
+// DelegatedChunk 回代行營運 PUT 的 handler：段請求的語意與 Chunk 完全相同（時限、大小上限、409 與 Hawkr-Next-Index、錯誤分類），
+// 只有授權不同：憑證只有 X-HK-Operation-Session（website 代行工作區的 BFF 轉送，沒有管理員 Bearer 也沒有顧客登入），Uploader 是
+// {ID: session 的管理員, Admin: true, Store: session 的店家}，見 delegatedUploader。
+func (h *SecureUploads) DelegatedChunk() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.delegatedUploader) })
 }
 
 // Preview 回 GET 的 handler。
@@ -87,52 +89,47 @@ func (h *SecureUploads) Preview() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.preview(w, r, h.uploader) })
 }
 
-// AdminPreview 回後台 GET 預覽的 handler：預覽語意與 Preview 相同，上傳者的驗證與 AdminChunk 相同。
-func (h *SecureUploads) AdminPreview() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.preview(w, r, h.adminUploader) })
+// DelegatedPreview 回代行營運 GET 預覽的 handler：預覽語意與 Preview 相同，授權與 DelegatedChunk 相同。
+func (h *SecureUploads) DelegatedPreview() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.preview(w, r, h.delegatedUploader) })
 }
 
-// uploader 設好機敏回應的 header 並取出呼叫的顧客帳號；沒有登入 401、不是顧客帳號 403。
-func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.Uploader, bool) {
+// authenticate 設好機敏回應的 header 後取出上傳者；ok 為 false 時已回應。touch 非 nil 時，請求成功之後要呼叫它。
+type authenticate func(w http.ResponseWriter, r *http.Request) (u media.Uploader, touch func(), ok bool)
+
+func sensitiveHeaders(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+}
+
+// uploader 取出呼叫的顧客帳號；沒有登入 401、不是顧客帳號 403。
+func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.Uploader, func(), bool) {
+	sensitiveHeaders(w)
 	p, ok := rpc.PrincipalFrom(r.Context())
 	switch {
 	case !ok:
 		http.Error(w, "unauthenticated", http.StatusUnauthorized)
-		return media.Uploader{}, false
+		return media.Uploader{}, nil, false
 	case p.Kind != identity.PrincipalAccount:
 		http.Error(w, "forbidden", http.StatusForbidden)
-		return media.Uploader{}, false
+		return media.Uploader{}, nil, false
 	}
-	return media.Uploader{ID: p.ID}, true
+	return media.Uploader{ID: p.ID}, nil, true
 }
 
-// adminUploader 設好機敏回應的 header 並取出呼叫的管理員與他的代行店家：沒有登入 401、不是管理員 403（角色是否允許由 adminauth.GuardFile 先擋）；
-// 再以 X-HK-Operation-Session 的代行 session 授權（與 MediaDelegatedService 同一個 httpdelegation.Authorize，被拒絕寫 FAILED 稽核）：缺憑證 401，
-// session 已撤銷、逾時、沒有 media.upload 或操作者不是這位管理員 403。店家只來自 session，所以續傳與預覽只對開會話的那家店成立。
-func (h *SecureUploads) adminUploader(w http.ResponseWriter, r *http.Request) (media.Uploader, bool) {
-	w.Header().Set("Cache-Control", "private, no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	p, ok := rpc.PrincipalFrom(r.Context())
-	switch {
-	case !ok:
-		http.Error(w, "unauthenticated", http.StatusUnauthorized)
-		return media.Uploader{}, false
-	case p.Kind != identity.PrincipalAdmin:
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return media.Uploader{}, false
-	case h.sessions == nil:
+// delegatedUploader 只以 X-HK-Operation-Session 的代行 session 授權（與 MediaDelegatedService 同一個 httpdelegation.Authorize，被拒絕寫 FAILED 稽核）：
+// 缺憑證或解析不到 401，session 已撤銷、逾時或沒有 media.upload 403；管理員與店家都只來自 session，所以續傳與預覽只對開會話的那位管理員、那家店成立。
+// 請求上的顧客 cookie、Bearer 與管理員身分都不參與授權。
+func (h *SecureUploads) delegatedUploader(w http.ResponseWriter, r *http.Request) (media.Uploader, func(), bool) {
+	sensitiveHeaders(w)
+	if h.sessions == nil {
 		http.Error(w, "unavailable", http.StatusServiceUnavailable)
-		return media.Uploader{}, false
+		return media.Uploader{}, nil, false
 	}
-	c, err := httpdelegation.Authorize(r.Context(), h.sessions, h.log, r.Pattern, adminUploadMethod, r.Header)
-	switch {
-	case err == nil && c.Session.Actor.AdminID != p.ID:
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return media.Uploader{}, false
-	case err == nil:
-		return media.Uploader{ID: p.ID, Admin: true, Store: c.Session.Target.StoreID}, true
+	c, err := httpdelegation.Authorize(r.Context(), h.sessions, h.log, r.Pattern, delegatedUploadMethod, r.Header)
+	if err == nil {
+		touch := func() { httpdelegation.Touch(r.Context(), h.sessions, h.log, c.Session.ID) }
+		return media.Uploader{ID: c.Session.Actor.AdminID, Admin: true, Store: c.Session.Target.StoreID}, touch, true
 	}
 	switch apperr.KindOf(err) {
 	case apperr.KindUnauthenticated:
@@ -141,22 +138,20 @@ func (h *SecureUploads) adminUploader(w http.ResponseWriter, r *http.Request) (m
 		http.Error(w, "forbidden", http.StatusForbidden)
 	case apperr.KindInternal, apperr.KindInvalidInput, apperr.KindNotFound, apperr.KindVersionConflict, apperr.KindAlreadyExists,
 		apperr.KindFailedPrecondition, apperr.KindUnavailable, apperr.KindResourceExhausted:
-		h.log.ErrorContext(r.Context(), "media：後台上傳驗證代行 session 失敗", "error", err)
+		h.log.ErrorContext(r.Context(), "media：代行上傳驗證代行 session 失敗", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	default:
-		h.log.ErrorContext(r.Context(), "media：後台上傳驗證代行 session 失敗", "error", err)
+		h.log.ErrorContext(r.Context(), "media：代行上傳驗證代行 session 失敗", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
-	return media.Uploader{}, false
+	return media.Uploader{}, nil, false
 }
 
-// adminUploadMethod 是後台路由要的代行宣告：與 BeginSecureUpload 同一份（能力 media.upload、被拒絕的稽核動作與資源）。
-var adminUploadMethod = DelegatedDeclaration.Methods[mediav1alpha1connect.MediaDelegatedServiceBeginSecureUploadProcedure]
+// delegatedUploadMethod 是代行路由要的宣告：與 BeginSecureUpload 同一份（能力 media.upload、被拒絕的稽核動作與資源）。
+var delegatedUploadMethod = DelegatedDeclaration.Methods[mediav1alpha1connect.MediaDelegatedServiceBeginSecureUploadProcedure]
 
-func (h *SecureUploads) putChunk(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.uploader) }
-
-func (h *SecureUploads) chunk(w http.ResponseWriter, r *http.Request, who func(http.ResponseWriter, *http.Request) (media.Uploader, bool)) {
-	u, ok := who(w, r)
+func (h *SecureUploads) chunk(w http.ResponseWriter, r *http.Request, who authenticate) {
+	u, touch, ok := who(w, r)
 	if !ok {
 		return
 	}
@@ -182,11 +177,14 @@ func (h *SecureUploads) chunk(w http.ResponseWriter, r *http.Request, who func(h
 		h.failure(w, r, err)
 		return
 	}
+	if touch != nil {
+		touch()
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *SecureUploads) preview(w http.ResponseWriter, r *http.Request, who func(http.ResponseWriter, *http.Request) (media.Uploader, bool)) {
-	u, ok := who(w, r)
+func (h *SecureUploads) preview(w http.ResponseWriter, r *http.Request, who authenticate) {
+	u, touch, ok := who(w, r)
 	if !ok {
 		return
 	}
@@ -201,6 +199,9 @@ func (h *SecureUploads) preview(w http.ResponseWriter, r *http.Request, who func
 	if err != nil && !errors.Is(err, io.EOF) {
 		h.failure(w, r, err)
 		return
+	}
+	if touch != nil {
+		touch()
 	}
 	w.Header().Set("Content-Type", safeContentType(http.DetectContentType(head)))
 	w.Header().Set("Content-Disposition", "inline")
