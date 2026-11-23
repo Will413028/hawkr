@@ -600,6 +600,18 @@ func (m *Module) LockNotRetired(ctx context.Context, storeID int64) error {
 	return m.closing.LockNotRetired(ctx, storeID)
 }
 
+// StoreAccount 是店家 stint 與所屬帳號的對應（ListLiveStoreAccounts 的元素）。
+type StoreAccount = model.StoreAccount
+
+// MaxLiveStoresPage 是 ListLiveStoreAccounts 一頁的上限。
+const MaxLiveStoresPage = model.MaxLiveStoresPage
+
+// ListLiveStoreAccounts 列出 store_id 大於 afterStoreID、尚未退場（營運中、關店、等待刪除都算）的店家與其帳號，依 store_id 由小到大，
+// 最多 limit 筆（1 到 MaxLiveStoresPage）；不足 limit 筆表示沒有更多。給通知公告這類對全體店家的大量派送：不加鎖，寫入端以 LockNotRetired 守門。
+func (m *Module) ListLiveStoreAccounts(ctx context.Context, afterStoreID int64, limit int) ([]StoreAccount, error) {
+	return m.closing.ListLiveStoreAccounts(ctx, afterStoreID, limit)
+}
+
 // BeginDeletion 讓店家隨帳號刪除進入等待；重送安全。只由 accountdeletion 在已鎖住帳號列的 transaction 內呼叫。
 func (m *Module) BeginDeletion(ctx context.Context, storeID int64) error {
 	return m.closing.BeginDeletion(ctx, storeID)

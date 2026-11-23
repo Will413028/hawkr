@@ -157,3 +157,11 @@ SET display_name = NULL,
     updated_at = $2,
     version = version + 1
 WHERE buyer_id = $1 AND status = 'CLOSED' AND pii_cleared_at IS NULL;
+
+-- name: ListLiveAccounts :many
+-- 尚未關閉的買家（營運中與刪除中）的 (buyer_id, account_id)，依 buyer_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知公告）。
+SELECT buyer_id, account_id
+FROM buyer.buyers
+WHERE status <> 'CLOSED' AND buyer_id > sqlc.arg(after_buyer_id)
+ORDER BY buyer_id
+LIMIT sqlc.arg(page_size);

@@ -102,6 +102,12 @@ func New(deps Deps) *Module {
 // Status stint 的生命週期狀態。
 type Status = model.Status
 
+// AccountRef 是買家 stint 與所屬帳號的對應（ListLiveAccounts 的元素）。
+type AccountRef = model.AccountRef
+
+// MaxLiveAccountsPage 是 ListLiveAccounts 一頁的上限。
+const MaxLiveAccountsPage = model.MaxLiveAccountsPage
+
 // Gender 買家自行提供的性別。
 type Gender = model.Gender
 
@@ -227,6 +233,12 @@ func (module *Module) LockNotClosed(ctx context.Context, buyerID int64) error {
 // NotFound。必須在 transaction 內呼叫。鎖順序：帳號列、買家列，然後才是呼叫方自己的表。
 func (module *Module) ShareLockByAccount(ctx context.Context, accountID int64) (deleted bool, err error) {
 	return module.profile.ShareLockByAccount(ctx, accountID)
+}
+
+// ListLiveAccounts 列出 buyer_id 大於 afterBuyerID、尚未關閉（營運中與刪除中）的買家與其帳號，依 buyer_id 由小到大，最多 limit 筆
+// （1 到 MaxLiveAccountsPage）；不足 limit 筆表示沒有更多。給通知公告這類對全體買家的大量派送：不加鎖，寫入端以 ShareLockByAccount 守門。
+func (module *Module) ListLiveAccounts(ctx context.Context, afterBuyerID int64, limit int) ([]AccountRef, error) {
+	return module.profile.ListLiveAccounts(ctx, afterBuyerID, limit)
 }
 
 // AccountIDByBuyerID 讀取歷史或現任 stint 所屬的帳號鍵，不曝露個資。

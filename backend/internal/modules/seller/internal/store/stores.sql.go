@@ -485,6 +485,45 @@ func (q *Queries) LatestStoreOfAccount(ctx context.Context, accountID int64) (Se
 	return i, err
 }
 
+const listLiveStoreAccounts = `-- name: ListLiveStoreAccounts :many
+SELECT store_id, account_id
+FROM seller.stores
+WHERE retired_at IS NULL AND store_id > $1
+ORDER BY store_id
+LIMIT $2
+`
+
+type ListLiveStoreAccountsParams struct {
+	AfterStoreID int64
+	PageSize     int32
+}
+
+type ListLiveStoreAccountsRow struct {
+	StoreID   int64
+	AccountID int64
+}
+
+// 尚未退場（retired_at 為空；營運中、關店、等待刪除都算）的店家 (store_id, account_id)，依 store_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知公告）。
+func (q *Queries) ListLiveStoreAccounts(ctx context.Context, arg ListLiveStoreAccountsParams) ([]ListLiveStoreAccountsRow, error) {
+	rows, err := q.db.Query(ctx, listLiveStoreAccounts, arg.AfterStoreID, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveStoreAccountsRow{}
+	for rows.Next() {
+		var i ListLiveStoreAccountsRow
+		if err := rows.Scan(&i.StoreID, &i.AccountID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockAccountStores = `-- name: LockAccountStores :many
 SELECT store_id, store_code, account_id, status, version, store_name, description, logo_key, logo_asset_id, cover_key, cover_asset_id, contact_phone, contact_name, contact_mobile, support_email, town_code, address_detail, prize, website_url, onboarding_completed, created_at, updated_at, pii_purged_at, first_exposed_at, current_closed_at, retired_at
 FROM seller.stores

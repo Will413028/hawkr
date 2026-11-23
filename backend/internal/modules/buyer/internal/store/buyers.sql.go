@@ -338,6 +338,45 @@ func (q *Queries) CurrentBuyerID(ctx context.Context, accountID int64) (int64, e
 	return buyer_id, err
 }
 
+const listLiveAccounts = `-- name: ListLiveAccounts :many
+SELECT buyer_id, account_id
+FROM buyer.buyers
+WHERE status <> 'CLOSED' AND buyer_id > $1
+ORDER BY buyer_id
+LIMIT $2
+`
+
+type ListLiveAccountsParams struct {
+	AfterBuyerID int64
+	PageSize     int32
+}
+
+type ListLiveAccountsRow struct {
+	BuyerID   int64
+	AccountID int64
+}
+
+// 尚未關閉的買家（營運中與刪除中）的 (buyer_id, account_id)，依 buyer_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知公告）。
+func (q *Queries) ListLiveAccounts(ctx context.Context, arg ListLiveAccountsParams) ([]ListLiveAccountsRow, error) {
+	rows, err := q.db.Query(ctx, listLiveAccounts, arg.AfterBuyerID, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveAccountsRow{}
+	for rows.Next() {
+		var i ListLiveAccountsRow
+		if err := rows.Scan(&i.BuyerID, &i.AccountID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockBuyer = `-- name: LockBuyer :one
 SELECT buyer_id, account_id, status, version, display_name, phone, gender, avatar, avatar_asset_id, birth_date, city, job, created_at, updated_at, deleted_at, pii_cleared_at
 FROM buyer.buyers

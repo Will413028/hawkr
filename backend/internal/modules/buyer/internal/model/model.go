@@ -75,6 +75,12 @@ type Display struct {
 	Deleted             bool
 }
 
+// AccountRef 是買家 stint 與所屬帳號的對應，只有鍵，不含個資。
+type AccountRef struct{ BuyerID, AccountID int64 }
+
+// MaxLiveAccountsPage 是 ListLiveAccounts 一頁的上限。
+const MaxLiveAccountsPage = 1000
+
 // Address 買家擁有的收貨地址。
 type Address struct {
 	AddressID, BuyerID                                   int64

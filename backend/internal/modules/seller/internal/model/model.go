@@ -409,6 +409,12 @@ func Error(err error) error {
 	return err
 }
 
+// StoreAccount 是店家 stint 與所屬帳號的對應，只有鍵，不含個資。
+type StoreAccount struct{ StoreID, AccountID int64 }
+
+// MaxLiveStoresPage 是 ListLiveStoreAccounts 一頁的上限。
+const MaxLiveStoresPage = 1000
+
 // Positive 驗證每個 ID 都是正數。
 func Positive(ids ...int64) error {
 	for _, id := range ids {
