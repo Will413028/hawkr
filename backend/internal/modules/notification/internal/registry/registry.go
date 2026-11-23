@@ -15,12 +15,26 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// Content 是一則通知組好的字。
+// Content 是一則通知組好的字。標題與內文各帶它實際使用的語系（uitext.Message.Locale）；通知的語系由它們決定，不另外宣告。
 type Content struct {
-	Title string
-	Body  string
-	// Locale 是實際使用的語系；留空表示用請求的語系。
-	Locale uitext.Locale
+	Title uitext.Message
+	Body  uitext.Message
+	// Fragments 是嵌進標題或內文的其他文字（例如政策分類的顯示文字），它們的語系要和標題、內文一致，不在一句話裡夾另一種語言。
+	Fragments []uitext.Message
+}
+
+// locale 回傳 Content 實際使用的語系；各部分的語系不一致時回錯誤。
+func (c Content) locale() (uitext.Locale, error) {
+	l := c.Title.Locale
+	for _, m := range append([]uitext.Message{c.Body}, c.Fragments...) {
+		if m.Locale != l {
+			return "", fmt.Errorf("文字各部分的語系不一致：%q 與 %q", l, m.Locale)
+		}
+	}
+	if l == "" {
+		return "", fmt.Errorf("文字沒有標明語系")
+	}
+	return l, nil
 }
 
 // Definition 是一個通知型別，P 是它的 typed 參數（只存 ID 與事件事實，不存第三方的名稱、頭像或聯絡方式）。
@@ -78,7 +92,7 @@ type Rendered struct {
 	StateHint      model.StateHint
 	AggregationKey string
 	ActorAccounts  []int64
-	// Locale 是實際使用的語系（文案缺字時是 zh-TW）。
+	// Locale 是文字實際使用的語系，取自組出來的文字（請求的語系沒有文字時是 zh-TW）。
 	Locale uitext.Locale
 }
 
@@ -93,6 +107,9 @@ type Entry interface {
 	// validate 檢查型別定義本身；回傳全部違規。
 	validate() []error
 }
+
+// MaxIdempotencyKeyLen 是冪等鍵的長度上限，與 db/schema.sql intents.idempotency_key 的 CHECK 一致。
+const MaxIdempotencyKeyLen = 200
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 
@@ -133,7 +150,11 @@ func (e *entry[P]) idempotencyKey(p P) (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("通知型別 %s 的冪等鍵來源是空的", e.d.Name)
 	}
-	return e.d.Name + ":" + id, nil
+	key := e.d.Name + ":" + id
+	if len(key) > MaxIdempotencyKeyLen {
+		return "", fmt.Errorf("通知型別 %s 的冪等鍵 %d 字元，超過上限 %d", e.d.Name, len(key), MaxIdempotencyKeyLen)
+	}
+	return key, nil
 }
 
 func (e *entry[P]) Render(l uitext.Locale, params json.RawMessage) (Rendered, error) {
@@ -150,10 +171,11 @@ func (e *entry[P]) render(l uitext.Locale, p P) (Rendered, error) {
 	if err != nil {
 		return Rendered{}, fmt.Errorf("通知型別 %s 組字失敗：%w", d.Name, err)
 	}
-	if c.Locale != "" {
-		l = c.Locale
+	l, err = c.locale()
+	if err != nil {
+		return Rendered{}, fmt.Errorf("通知型別 %s：%w", d.Name, err)
 	}
-	r := Rendered{Title: c.Title, Body: c.Body, Presentation: d.Presentation, StateHint: d.StateHint, Locale: l}
+	r := Rendered{Title: c.Title.Text, Body: c.Body.Text, Presentation: d.Presentation, StateHint: d.StateHint, Locale: l}
 	if d.DeepLink != nil {
 		r.DeepLink = d.DeepLink(p)
 	}
@@ -188,6 +210,8 @@ func (e *entry[P]) validate() []error {
 	}
 	if !model.ValidCategory(d.Category) {
 		bad("偏好分類 %q 不在 D4 清單", d.Category)
+	} else if !model.ValidCategoryFor(d.Audience, d.Category) {
+		bad("偏好分類 %q 不屬於受眾 %q", d.Category, d.Audience)
 	}
 	if !slices.Contains(model.Presentations(), d.Presentation) {
 		bad("呈現分類 %q 不在 D6 清單", d.Presentation)
@@ -222,8 +246,15 @@ func (e *entry[P]) validate() []error {
 		bad("沒有文案")
 	} else {
 		for _, l := range []uitext.Locale{uitext.ZhTW, uitext.EN} {
-			if c, err := d.Text(l, d.Example); err != nil || c.Title == "" || c.Body == "" {
+			c, err := d.Text(l, d.Example)
+			if err != nil || c.Title.Text == "" || c.Body.Text == "" {
 				bad("語系 %s 的範例組不出標題與內文（%v）", l, err)
+				continue
+			}
+			if got, err := c.locale(); err != nil {
+				bad("語系 %s 的範例：%v", l, err)
+			} else if got != l {
+				bad("語系 %s 的範例實際用了 %s；en 沒有文字不能退回中文", l, got)
 			}
 		}
 	}

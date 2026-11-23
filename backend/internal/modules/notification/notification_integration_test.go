@@ -137,3 +137,68 @@ func TestDeviceTokenIsBoundToOneAccount(t *testing.T) {
 	wantConstraint(t, exec(t, d, `INSERT INTO notification.device_tokens (token, account_id, app, last_registered_at) VALUES ('t1', 8, 'BUYER', $1)`, epoch), "23505", "device_tokens_pkey")
 	wantConstraint(t, exec(t, d, `INSERT INTO notification.device_tokens (token, account_id, app, last_registered_at) VALUES ('t2', 7, 'WEB', $1)`, epoch), "23514", "device_tokens_app_check")
 }
+
+// 意圖先被清除（依 created_at 掃）時，收件匣列留著：它的保留期從 updated_at（最後一次合併）起算，不隨來源意圖消失；intent_id 設為 NULL。
+func TestDeletingTheIntentKeepsTheInboxItem(t *testing.T) {
+	t.Parallel()
+	d := setup(t)
+	intent := newIntent(t, d, "k")
+	item := uuid.NewV7()
+	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, intent_id, created_at, updated_at)
+		VALUES ($1, 7, 'BUYER', 'account_suspended', '{}', 'like:1', $2, $3, $3)`, item, intent, epoch)
+	mustExec(t, d, `DELETE FROM notification.intents WHERE id = $1`, intent)
+	var intentID *uuid.UUID
+	if err := d.Pool().QueryRow(context.Background(), `SELECT intent_id FROM notification.inbox_items WHERE id = $1`, item).Scan(&intentID); err != nil {
+		t.Fatalf("收件匣列應該還在：%v", err)
+	}
+	if intentID != nil {
+		t.Errorf("intent_id = %v，預期 NULL", *intentID)
+	}
+}
+
+// 同一個帳號先後擁有兩間店（舊店已關閉）時，兩間店是兩個收件人：未讀聚合列與投遞列都不互相合併、不互相擋。
+func TestTwoStoresOfOneAccountAreSeparateRecipients(t *testing.T) {
+	t.Parallel()
+	d := setup(t)
+	intent := newIntent(t, d, "k")
+	insertItem := func(store int64) error {
+		return exec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, intent_id, created_at, updated_at)
+			VALUES ($1, 7, 'STORE', $2, 'account_suspended', '{}', 'follow:1', $3, $4, $4)`, uuid.NewV7(), store, intent, epoch)
+	}
+	if err := insertItem(9); err != nil {
+		t.Fatal(err)
+	}
+	if err := insertItem(10); err != nil {
+		t.Fatalf("同帳號的另一間店是另一個收件人：%v", err)
+	}
+	wantConstraint(t, insertItem(9), "23505", "inbox_items_unread_aggregation")
+
+	insertDelivery := func(audience string, store *int64) error {
+		return exec(t, d, `INSERT INTO notification.deliveries (id, intent_id, account_id, audience, store_id, channel, status, created_at, updated_at)
+			VALUES ($1, $2, 7, $3, $4, 'PUSH', 'PENDING', $5, $5)`, uuid.NewV7(), intent, audience, store, epoch)
+	}
+	s9, s10 := int64(9), int64(10)
+	if err := insertDelivery("STORE", &s9); err != nil {
+		t.Fatal(err)
+	}
+	if err := insertDelivery("STORE", &s10); err != nil {
+		t.Fatalf("同帳號的另一間店各有自己的投遞列：%v", err)
+	}
+	wantConstraint(t, insertDelivery("STORE", &s9), "23505", "deliveries_recipient_channel_key")
+	if err := insertDelivery("BUYER", nil); err != nil {
+		t.Fatal(err)
+	}
+	wantConstraint(t, insertDelivery("BUYER", nil), "23505", "deliveries_recipient_channel_key")
+}
+
+// BUYER 列的 store_id 是 NULL：未讀聚合的唯一鍵用 NULLS NOT DISTINCT，NULL 不會讓同一個買家有兩列未讀的同聚合鍵。
+// （TestUnreadAggregationKeyIsUniquePerRecipient 已涵蓋；這裡確認買家與店家身分的同帳號互不相擋。）
+func TestBuyerAndStoreIdentitiesOfOneAccountDoNotCollide(t *testing.T) {
+	t.Parallel()
+	d := setup(t)
+	intent := newIntent(t, d, "k")
+	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, aggregation_key, intent_id, created_at, updated_at)
+		VALUES ($1, 7, 'BUYER', 'account_suspended', '{}', 'k:1', $2, $3, $3)`, uuid.NewV7(), intent, epoch)
+	mustExec(t, d, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, aggregation_key, intent_id, created_at, updated_at)
+		VALUES ($1, 7, 'STORE', 9, 'account_suspended', '{}', 'k:1', $2, $3, $3)`, uuid.NewV7(), intent, epoch)
+}

@@ -27,8 +27,8 @@ CREATE INDEX intents_created ON notification.intents (created_at);
 
 -- 收件匣列：型別＋參數快照＋聚合鍵，讀取時依請求語系組字（收件匣不是投遞渠道，這一列本身就是「已進收件匣」的紀錄）。
 -- 收件人是 (account_id, audience, store_id)：BUYER 沒有 store_id，STORE 一定有。actor_account_ids 只存帳號 ID（讀取時向擁有模組解析名稱）。
--- 有聚合鍵的未讀列同一個收件人只有一列（unique index），後來的意圖合併進去（A8-1b 的 upsert）；已讀之後的新意圖另開一列。
--- 保留期以 updated_at（最後一次合併）起算。
+-- 有聚合鍵的未讀列同一個收件人（含 store_id）只有一列（unique index，NULLS NOT DISTINCT 涵蓋 BUYER 的 NULL store_id），後來的意圖合併進去（A8-1b 的 upsert）；已讀之後的新意圖另開一列。
+-- 保留期以 updated_at（最後一次合併）起算；intent_id 是來源意圖（意圖先被清除時設為 NULL，收件匣列不跟著消失）。
 CREATE TABLE notification.inbox_items (
     id                UUID        PRIMARY KEY,
     account_id        BIGINT      NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE notification.inbox_items (
     params            JSONB       NOT NULL,
     aggregation_key   TEXT,
     actor_account_ids BIGINT[]    NOT NULL DEFAULT '{}',
-    intent_id         UUID        NOT NULL REFERENCES notification.intents (id) ON DELETE CASCADE,
+    intent_id         UUID        REFERENCES notification.intents (id) ON DELETE SET NULL,
     read_at           TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL,
     updated_at        TIMESTAMPTZ NOT NULL,
@@ -49,12 +49,12 @@ CREATE TABLE notification.inbox_items (
     CONSTRAINT inbox_items_aggregation_key_check CHECK (aggregation_key IS NULL OR char_length(aggregation_key) BETWEEN 1 AND 200),
     CONSTRAINT inbox_items_updated_check CHECK (updated_at >= created_at)
 );
-CREATE INDEX inbox_items_recipient ON notification.inbox_items (account_id, audience, updated_at DESC, id DESC);
-CREATE INDEX inbox_items_unread ON notification.inbox_items (account_id, audience) WHERE read_at IS NULL;
-CREATE UNIQUE INDEX inbox_items_unread_aggregation ON notification.inbox_items (account_id, audience, aggregation_key) WHERE aggregation_key IS NOT NULL AND read_at IS NULL;
+CREATE INDEX inbox_items_recipient ON notification.inbox_items (account_id, audience, store_id, updated_at DESC, id DESC);
+CREATE INDEX inbox_items_unread ON notification.inbox_items (account_id, audience, store_id) WHERE read_at IS NULL;
+CREATE UNIQUE INDEX inbox_items_unread_aggregation ON notification.inbox_items (account_id, audience, store_id, aggregation_key) NULLS NOT DISTINCT WHERE aggregation_key IS NOT NULL AND read_at IS NULL;
 CREATE INDEX inbox_items_updated ON notification.inbox_items (updated_at);
 
--- 每渠道投遞紀錄：只記推播與 email，是每筆觸達與否的唯一來源。UNIQUE (intent, 收件人, 渠道) 是投遞冪等鍵（store_id 由 account_id＋audience 決定，不進鍵）。
+-- 每渠道投遞紀錄：只記推播與 email，是每筆觸達與否的唯一來源。UNIQUE (intent, 收件人, 渠道) 是投遞冪等鍵；收件人含 store_id（一個帳號可以先後擁有已關閉的店與新店，兩間店各是一個收件人；BUYER 的 store_id 是 NULL，NULLS NOT DISTINCT 讓它也受唯一鍵約束）。
 -- 送出之後 locale、sent_title、sent_body 是「實際送出的文字」（送出時的事實，保留期內可由個資清除處理，所以清除後可為 NULL）；
 -- 還沒送出或永久失敗的列沒有送出文字。保留期以 created_at 起算。
 CREATE TABLE notification.deliveries (
@@ -72,7 +72,7 @@ CREATE TABLE notification.deliveries (
     created_at     TIMESTAMPTZ NOT NULL,
     updated_at     TIMESTAMPTZ NOT NULL,
     sent_at        TIMESTAMPTZ,
-    CONSTRAINT deliveries_recipient_channel_key UNIQUE (intent_id, account_id, audience, channel),
+    CONSTRAINT deliveries_recipient_channel_key UNIQUE NULLS NOT DISTINCT (intent_id, account_id, audience, store_id, channel),
     CONSTRAINT deliveries_account_check CHECK (account_id > 0),
     CONSTRAINT deliveries_audience_check CHECK (audience IN ('BUYER', 'STORE')),
     CONSTRAINT deliveries_store_check CHECK ((audience = 'STORE') = (store_id IS NOT NULL) AND (store_id IS NULL OR store_id > 0)),
@@ -83,7 +83,7 @@ CREATE TABLE notification.deliveries (
     CONSTRAINT deliveries_sent_text_check CHECK (status = 'SENT' OR (locale IS NULL AND sent_title IS NULL AND sent_body IS NULL)),
     CONSTRAINT deliveries_failure_check CHECK ((status = 'FAILED_PERMANENT') = (failure_reason IS NOT NULL))
 );
-CREATE INDEX deliveries_recipient ON notification.deliveries (account_id, audience);
+CREATE INDEX deliveries_recipient ON notification.deliveries (account_id, audience, store_id);
 CREATE INDEX deliveries_status ON notification.deliveries (status, created_at) WHERE status <> 'SENT';
 CREATE INDEX deliveries_created ON notification.deliveries (created_at);
 

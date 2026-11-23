@@ -60,7 +60,7 @@ CREATE TABLE "notification"."deliveries" (
   "updated_at" timestamptz NOT NULL,
   "sent_at" timestamptz NULL,
   PRIMARY KEY ("id"),
-  CONSTRAINT "deliveries_recipient_channel_key" UNIQUE ("intent_id", "account_id", "audience", "channel"),
+  CONSTRAINT "deliveries_recipient_channel_key" UNIQUE NULLS NOT DISTINCT ("intent_id", "account_id", "audience", "store_id", "channel"),
   CONSTRAINT "deliveries_intent_id_fkey" FOREIGN KEY ("intent_id") REFERENCES "notification"."intents" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
   CONSTRAINT "deliveries_account_check" CHECK (account_id > 0),
   CONSTRAINT "deliveries_audience_check" CHECK (audience = ANY (ARRAY['BUYER'::text, 'STORE'::text])),
@@ -75,7 +75,7 @@ CREATE TABLE "notification"."deliveries" (
 -- Create index "deliveries_created" to table: "deliveries"
 CREATE INDEX "deliveries_created" ON "notification"."deliveries" ("created_at");
 -- Create index "deliveries_recipient" to table: "deliveries"
-CREATE INDEX "deliveries_recipient" ON "notification"."deliveries" ("account_id", "audience");
+CREATE INDEX "deliveries_recipient" ON "notification"."deliveries" ("account_id", "audience", "store_id");
 -- Create index "deliveries_status" to table: "deliveries"
 CREATE INDEX "deliveries_status" ON "notification"."deliveries" ("status", "created_at") WHERE (status <> 'SENT'::text);
 -- Create "inbox_items" table
@@ -88,12 +88,12 @@ CREATE TABLE "notification"."inbox_items" (
   "params" jsonb NOT NULL,
   "aggregation_key" text NULL,
   "actor_account_ids" bigint[] NOT NULL DEFAULT '{}',
-  "intent_id" uuid NOT NULL,
+  "intent_id" uuid NULL,
   "read_at" timestamptz NULL,
   "created_at" timestamptz NOT NULL,
   "updated_at" timestamptz NOT NULL,
   PRIMARY KEY ("id"),
-  CONSTRAINT "inbox_items_intent_id_fkey" FOREIGN KEY ("intent_id") REFERENCES "notification"."intents" ("id") ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT "inbox_items_intent_id_fkey" FOREIGN KEY ("intent_id") REFERENCES "notification"."intents" ("id") ON UPDATE NO ACTION ON DELETE SET NULL,
   CONSTRAINT "inbox_items_account_check" CHECK (account_id > 0),
   CONSTRAINT "inbox_items_aggregation_key_check" CHECK ((aggregation_key IS NULL) OR ((char_length(aggregation_key) >= 1) AND (char_length(aggregation_key) <= 200))),
   CONSTRAINT "inbox_items_audience_check" CHECK (audience = ANY (ARRAY['BUYER'::text, 'STORE'::text])),
@@ -102,10 +102,10 @@ CREATE TABLE "notification"."inbox_items" (
   CONSTRAINT "inbox_items_updated_check" CHECK (updated_at >= created_at)
 );
 -- Create index "inbox_items_recipient" to table: "inbox_items"
-CREATE INDEX "inbox_items_recipient" ON "notification"."inbox_items" ("account_id", "audience", "updated_at" DESC, "id" DESC);
+CREATE INDEX "inbox_items_recipient" ON "notification"."inbox_items" ("account_id", "audience", "store_id", "updated_at" DESC, "id" DESC);
 -- Create index "inbox_items_unread" to table: "inbox_items"
-CREATE INDEX "inbox_items_unread" ON "notification"."inbox_items" ("account_id", "audience") WHERE (read_at IS NULL);
+CREATE INDEX "inbox_items_unread" ON "notification"."inbox_items" ("account_id", "audience", "store_id") WHERE (read_at IS NULL);
 -- Create index "inbox_items_unread_aggregation" to table: "inbox_items"
-CREATE UNIQUE INDEX "inbox_items_unread_aggregation" ON "notification"."inbox_items" ("account_id", "audience", "aggregation_key") WHERE ((aggregation_key IS NOT NULL) AND (read_at IS NULL));
+CREATE UNIQUE INDEX "inbox_items_unread_aggregation" ON "notification"."inbox_items" ("account_id", "audience", "store_id", "aggregation_key") NULLS NOT DISTINCT WHERE ((aggregation_key IS NOT NULL) AND (read_at IS NULL));
 -- Create index "inbox_items_updated" to table: "inbox_items"
 CREATE INDEX "inbox_items_updated" ON "notification"."inbox_items" ("updated_at");

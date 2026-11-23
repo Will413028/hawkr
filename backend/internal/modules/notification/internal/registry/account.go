@@ -39,14 +39,14 @@ var accountSuspended = Define(Definition[AccountSuspendedParams]{
 	IdempotencySource: "accountsuspension.Suspended.SuspensionID",
 	IdempotencyKey:    func(p AccountSuspendedParams) string { return p.SuspensionID.String() },
 	Text: func(l uitext.Locale, p AccountSuspendedParams) (Content, error) {
-		reason, l, err := categoryLabel(l, p.Category)
+		reason, err := categoryLabel(l, p.Category)
 		if err != nil {
 			return Content{}, err
 		}
 		return Content{
-			Locale: l,
-			Title:  text.AccountSuspendedTitle(l).Text,
-			Body:   text.AccountSuspendedBody(l, text.AccountSuspendedBodyArgs{Reason: reason, Time: uitext.FormatDateTime(l, p.SuspendedAt)}).Text,
+			Title:     text.AccountSuspendedTitle(l),
+			Body:      text.AccountSuspendedBody(l, text.AccountSuspendedBodyArgs{Reason: reason.Text, Time: uitext.FormatDateTime(l, p.SuspendedAt)}),
+			Fragments: []uitext.Message{reason},
 		}, nil
 	},
 	Example: AccountSuspendedParams{SuspensionID: exampleSuspensionID, Category: policy.Spam, SuspendedAt: exampleAt},
@@ -62,8 +62,8 @@ var accountUnsuspended = Define(Definition[AccountUnsuspendedParams]{
 	IdempotencyKey:    func(p AccountUnsuspendedParams) string { return p.SuspensionID.String() },
 	Text: func(l uitext.Locale, p AccountUnsuspendedParams) (Content, error) {
 		return Content{
-			Title: text.AccountUnsuspendedTitle(l).Text,
-			Body:  text.AccountUnsuspendedBody(l, text.AccountUnsuspendedBodyArgs{Time: uitext.FormatDateTime(l, p.ReleasedAt)}).Text,
+			Title: text.AccountUnsuspendedTitle(l),
+			Body:  text.AccountUnsuspendedBody(l, text.AccountUnsuspendedBodyArgs{Time: uitext.FormatDateTime(l, p.ReleasedAt)}),
 		}, nil
 	},
 	Example: AccountUnsuspendedParams{SuspensionID: exampleSuspensionID, ReleasedAt: exampleAt},

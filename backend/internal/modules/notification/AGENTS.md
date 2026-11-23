@@ -22,11 +22,11 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 
 ## 不變量
 
-- 偏好分類只有 D4 的 14 個；交易必要分類的收件匣與 email 不可關、`SHIPMENT_ANOMALY` 的推播也不可關，規則只在 `model.Disableable`。守門：`TestDisableableFollowsD4`。
+- 偏好分類只有 D4 的 14 個；交易必要分類的收件匣與 email 不可關、店家 `SHIPMENT_ANOMALY` 的推播也不可關，規則只在 `model.Disableable(受眾, 分類, 渠道)`；每個受眾有自己的分類集合（`model.CategoriesFor`）。守門：`TestDisableableFollowsD4`、`TestCategoriesAreScopedPerAudience`。
 - 每個型別有冪等鍵來源（意圖冪等鍵＝型別名稱＋事件來源身分）、分類在 D4 清單、呈現分類在 D6 清單、聚合鍵只在宣告可聚合的型別。守門：`registry.Validate`、`TestEveryRegisteredTypePassesTheSelfCheck`、`TestSelfCheckRejectsBrokenDefinitions`。
 - 參數快照只存 ID 與事件事實，不存第三方的名稱、頭像或聯絡方式；actor 只存帳號 ID。守門：`TestParamsDeclareNoThirdPartyNameFields`。
-- 每個型別在 zh-TW、en 有固定輸出。守門：`TestGoldenRendering`、`TestGoldenIdempotencyKeys`。
-- 收件人是 `(account_id, 受眾, store_id)`，BUYER 沒有 store_id、STORE 一定有；投遞冪等鍵是 (意圖, 帳號, 受眾, 渠道)。守門：`inbox_items_store_check`、`deliveries_recipient_channel_key`。
+- 每個型別在 zh-TW、en 有固定輸出。en 沒有執行期退回 zh-TW：型別能組出的每個值在 en 都要有文字，文字的語系取自組出來的文字（`Rendered.Locale`），各部分不一致即錯誤，冪等鍵不得超過 200 字元。守門：`TestGoldenRendering`、`TestGoldenIdempotencyKeys`、`TestEveryRenderableValueHasEnglishText`、`TestRenderRejectsMixedLocales`、`TestIdempotencyKeyLengthIsBounded`。
+- 收件人是 `(account_id, 受眾, store_id)`，BUYER 沒有 store_id、STORE 一定有；投遞冪等鍵是 (意圖, 帳號, 受眾, store_id, 渠道)（NULLS NOT DISTINCT），未讀聚合鍵也含 store_id，同帳號先後的兩間店是兩個收件人。收件匣列的 `intent_id` 在意圖被清除時設為 NULL，列不跟著刪。守門：`inbox_items_store_check`、`deliveries_recipient_channel_key`、`inbox_items_unread_aggregation`。
 - 依賴方向：notification 依賴來源模組的公開事件型別與讀取 API，來源模組不 import notification。守門：`internal/arch` 的依賴表（notification 列只含已在單體、會訂閱或讀取的模組）。
 
 ## 不負責
