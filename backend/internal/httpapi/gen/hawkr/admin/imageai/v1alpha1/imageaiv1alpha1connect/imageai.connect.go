@@ -73,15 +73,17 @@ type ImageAiAdminServiceClient interface {
 	// CreateAiStyle 新增風格；縮圖必須是新上傳的圖。
 	CreateAiStyle(context.Context, *connect.Request[v1alpha1.CreateAiStyleRequest]) (*connect.Response[v1alpha1.CreateAiStyleResponse], error)
 	UpdateAiStyle(context.Context, *connect.Request[v1alpha1.UpdateAiStyleRequest]) (*connect.Response[v1alpha1.UpdateAiStyleResponse], error)
-	// DeleteAiStyle 刪除風格，並釋放它的縮圖。
+	// DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
+	// 先把另一個風格的 default_style 設成 true。
 	DeleteAiStyle(context.Context, *connect.Request[v1alpha1.DeleteAiStyleRequest]) (*connect.Response[v1alpha1.DeleteAiStyleResponse], error)
 	// GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
+	// 店家不存在回 not_found。
 	GetAiQuota(context.Context, *connect.Request[v1alpha1.GetAiQuotaRequest]) (*connect.Response[v1alpha1.GetAiQuotaResponse], error)
 	// UpdateAiQuota 為一家店個別設定每週額度。額度以店家為 key，沒有 Create：還沒有個別設定時（custom 為 false），
 	// 不帶 etag 的呼叫建立它；已經有個別設定卻沒帶 etag 回 ALREADY_EXISTS（VERSION_CONFLICT）；
-	// 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。
+	// 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。店家不存在回 not_found。
 	UpdateAiQuota(context.Context, *connect.Request[v1alpha1.UpdateAiQuotaRequest]) (*connect.Response[v1alpha1.UpdateAiQuotaResponse], error)
-	// DeleteAiQuota 刪除一家店的個別設定，回到預設額度。沒有個別設定時回 NOT_FOUND。
+	// DeleteAiQuota 刪除一家店的個別設定，回到預設額度。店家不存在或沒有個別設定時回 NOT_FOUND。
 	DeleteAiQuota(context.Context, *connect.Request[v1alpha1.DeleteAiQuotaRequest]) (*connect.Response[v1alpha1.DeleteAiQuotaResponse], error)
 }
 
@@ -198,15 +200,17 @@ type ImageAiAdminServiceHandler interface {
 	// CreateAiStyle 新增風格；縮圖必須是新上傳的圖。
 	CreateAiStyle(context.Context, *connect.Request[v1alpha1.CreateAiStyleRequest]) (*connect.Response[v1alpha1.CreateAiStyleResponse], error)
 	UpdateAiStyle(context.Context, *connect.Request[v1alpha1.UpdateAiStyleRequest]) (*connect.Response[v1alpha1.UpdateAiStyleResponse], error)
-	// DeleteAiStyle 刪除風格，並釋放它的縮圖。
+	// DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
+	// 先把另一個風格的 default_style 設成 true。
 	DeleteAiStyle(context.Context, *connect.Request[v1alpha1.DeleteAiStyleRequest]) (*connect.Response[v1alpha1.DeleteAiStyleResponse], error)
 	// GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
+	// 店家不存在回 not_found。
 	GetAiQuota(context.Context, *connect.Request[v1alpha1.GetAiQuotaRequest]) (*connect.Response[v1alpha1.GetAiQuotaResponse], error)
 	// UpdateAiQuota 為一家店個別設定每週額度。額度以店家為 key，沒有 Create：還沒有個別設定時（custom 為 false），
 	// 不帶 etag 的呼叫建立它；已經有個別設定卻沒帶 etag 回 ALREADY_EXISTS（VERSION_CONFLICT）；
-	// 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。
+	// 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。店家不存在回 not_found。
 	UpdateAiQuota(context.Context, *connect.Request[v1alpha1.UpdateAiQuotaRequest]) (*connect.Response[v1alpha1.UpdateAiQuotaResponse], error)
-	// DeleteAiQuota 刪除一家店的個別設定，回到預設額度。沒有個別設定時回 NOT_FOUND。
+	// DeleteAiQuota 刪除一家店的個別設定，回到預設額度。店家不存在或沒有個別設定時回 NOT_FOUND。
 	DeleteAiQuota(context.Context, *connect.Request[v1alpha1.DeleteAiQuotaRequest]) (*connect.Response[v1alpha1.DeleteAiQuotaResponse], error)
 }
 

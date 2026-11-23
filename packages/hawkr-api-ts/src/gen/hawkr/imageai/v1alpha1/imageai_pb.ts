@@ -76,7 +76,8 @@ export const AiStyleSchema: GenMessage<AiStyle> = /*@__PURE__*/
  */
 export type TransformImageRequest = Message<"hawkr.imageai.v1alpha1.TransformImageRequest"> & {
   /**
-   * 原圖的內容。
+   * 原圖的內容，上限 2 MiB（與單體的請求大小上限相同），client 先縮圖；超過回 invalid_argument。
+   * 這是只做運算、不保存的暫態圖片，所以 inline；要保存的檔案走 media 的 presigned 上傳。
    *
    * @generated from field: bytes image_data = 1;
    */
@@ -90,7 +91,8 @@ export type TransformImageRequest = Message<"hawkr.imageai.v1alpha1.TransformIma
   mimeType: string;
 
   /**
-   * 修圖提示詞，通常取自 AiStyle.prompt 或 ListAiStylesResponse.default_prompt。
+   * 修圖提示詞，通常取自 AiStyle.prompt 或 ListAiStylesResponse.default_prompt。去掉頭尾空白後至少 1 個、
+   * 最多 500 個字元（以 Unicode 字元計，不是 byte）。
    *
    * @generated from field: string prompt = 3;
    */
@@ -164,7 +166,7 @@ export const ListAiStylesRequestSchema: GenMessage<ListAiStylesRequest> = /*@__P
  */
 export type ListAiStylesResponse = Message<"hawkr.imageai.v1alpha1.ListAiStylesResponse"> & {
   /**
-   * 沒有選風格時使用的提示詞。
+   * 沒有選風格時使用的提示詞，取自這個用途的預設風格。
    *
    * @generated from field: string default_prompt = 1;
    */
@@ -241,8 +243,9 @@ export const ImageAiAppService: GenService<{
    * 錯誤：本週額度用完回 resource_exhausted，reason 是 IMAGE_QUOTA_EXCEEDED；invalid_argument 的 reason 是
    * IMAGE_SAFETY_BLOCKED 與 IMAGE_RECITATION_BLOCKED（輸入要換：換圖或改提示詞，不要重試）；unavailable 的 reason 是
    * IMAGE_NOT_PRODUCED（模型沒有產出圖片，重試可能成功），模型供應商無法呼叫也回 unavailable。
-   * 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo。
-   * 呼叫失敗時額度退回。
+   * 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo，不扣額度。
+   * 原圖超過 2 MiB 或提示詞超過 500 字回 invalid_argument，BadRequest 帶出 field。
+   * 呼叫失敗時額度退回；扣了額度之後伺服器程序中途終止的那一次不退回，是已知限制。
    *
    * @generated from rpc hawkr.imageai.v1alpha1.ImageAiAppService.TransformImage
    */

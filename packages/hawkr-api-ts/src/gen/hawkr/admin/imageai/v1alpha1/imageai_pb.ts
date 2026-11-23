@@ -55,7 +55,7 @@ export type AiStyle = Message<"hawkr.admin.imageai.v1alpha1.AiStyle"> & {
   label: string;
 
   /**
-   * 套用這個風格時送給模型的提示詞。
+   * 套用這個風格時送給模型的提示詞；去掉頭尾空白後至少 1 個、最多 500 個字元（以 Unicode 字元計）。
    *
    * @generated from field: string prompt = 4;
    */
@@ -81,7 +81,8 @@ export type AiStyle = Message<"hawkr.admin.imageai.v1alpha1.AiStyle"> & {
   displayOrder: number;
 
   /**
-   * 是否為該用途的預設風格；同一個用途只有一個預設。
+   * 是否為該用途的預設風格；同一個用途只有一個預設。只能設成 true（原本的預設自動取消）；
+   * 設成 false 回 invalid_argument，換預設只能把另一個風格設成 true。
    *
    * @generated from field: bool default_style = 8;
    */
@@ -140,7 +141,7 @@ export type AiQuota = Message<"hawkr.admin.imageai.v1alpha1.AiQuota"> & {
   storeId: string;
 
   /**
-   * 每週可修圖的次數上限。
+   * 每週可修圖的次數上限，0 到 1000。
    *
    * @generated from field: int32 weekly_limit = 2;
    */
@@ -484,7 +485,8 @@ export const ImageAiAdminService: GenService<{
     output: typeof UpdateAiStyleResponseSchema;
   },
   /**
-   * DeleteAiStyle 刪除風格，並釋放它的縮圖。
+   * DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
+   * 先把另一個風格的 default_style 設成 true。
    *
    * @generated from rpc hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiStyle
    */
@@ -495,6 +497,7 @@ export const ImageAiAdminService: GenService<{
   },
   /**
    * GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
+   * 店家不存在回 not_found。
    *
    * @generated from rpc hawkr.admin.imageai.v1alpha1.ImageAiAdminService.GetAiQuota
    */
@@ -506,7 +509,7 @@ export const ImageAiAdminService: GenService<{
   /**
    * UpdateAiQuota 為一家店個別設定每週額度。額度以店家為 key，沒有 Create：還沒有個別設定時（custom 為 false），
    * 不帶 etag 的呼叫建立它；已經有個別設定卻沒帶 etag 回 ALREADY_EXISTS（VERSION_CONFLICT）；
-   * 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。
+   * 帶了過期的 etag 回 ABORTED（VERSION_CONFLICT）。店家不存在回 not_found。
    *
    * @generated from rpc hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiQuota
    */
@@ -516,7 +519,7 @@ export const ImageAiAdminService: GenService<{
     output: typeof UpdateAiQuotaResponseSchema;
   },
   /**
-   * DeleteAiQuota 刪除一家店的個別設定，回到預設額度。沒有個別設定時回 NOT_FOUND。
+   * DeleteAiQuota 刪除一家店的個別設定，回到預設額度。店家不存在或沒有個別設定時回 NOT_FOUND。
    *
    * @generated from rpc hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiQuota
    */

@@ -15,8 +15,9 @@ abstract final class ImageAiAppService {
   /// 錯誤：本週額度用完回 resource_exhausted，reason 是 IMAGE_QUOTA_EXCEEDED；invalid_argument 的 reason 是
   /// IMAGE_SAFETY_BLOCKED 與 IMAGE_RECITATION_BLOCKED（輸入要換：換圖或改提示詞，不要重試）；unavailable 的 reason 是
   /// IMAGE_NOT_PRODUCED（模型沒有產出圖片，重試可能成功），模型供應商無法呼叫也回 unavailable。
-  /// 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo。
-  /// 呼叫失敗時額度退回。
+  /// 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo，不扣額度。
+  /// 原圖超過 2 MiB 或提示詞超過 500 字回 invalid_argument，BadRequest 帶出 field。
+  /// 呼叫失敗時額度退回；扣了額度之後伺服器程序中途終止的那一次不退回，是已知限制。
   static const transformImage = connect.Spec(
     '/$name/TransformImage',
     connect.StreamType.unary,

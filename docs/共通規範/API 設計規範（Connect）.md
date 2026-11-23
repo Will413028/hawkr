@@ -199,7 +199,7 @@
 
 - web 用 JSON（除錯方便）。App 也用 JSON，並接受 gzip：gzip 之後 binary 只再小 15–20%，解碼的差距以微秒計（試點 6.7 的量測）。出現大量或頻繁的回應（清單分頁、串流），或裝置上的解碼成為可見的延遲時，重新評估 binary。
 - 串流只用 server streaming。AI 助理的 AG-UI 事件格式是否改成 proto 串流另外決定。
-- 檔案上傳用 presigned URL 直接上傳到儲存空間，API 只處理 metadata；媒體的 Range／206 由儲存空間或 CDN 直接提供。
+- 要保存的檔案上傳用 presigned URL 直接上傳到儲存空間，API 只處理 metadata。只做運算、不保存的暫態圖片（例如 AI 修圖的原圖與結果）可以 inline 在 `bytes` 欄位，大小受 §十 的 2 MiB 請求上限約束，proto 註解寫明上限，client 先縮圖；超過回 invalid_argument 並帶 field。媒體的 Range／206 由儲存空間或 CDN 直接提供。
 
 ## 十二、生成
 

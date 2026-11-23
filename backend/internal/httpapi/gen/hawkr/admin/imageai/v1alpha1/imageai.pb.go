@@ -44,14 +44,15 @@ type AiStyle struct {
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	// 顯示用的名稱。
 	Label string `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
-	// 套用這個風格時送給模型的提示詞。
+	// 套用這個風格時送給模型的提示詞；去掉頭尾空白後至少 1 個、最多 500 個字元（以 Unicode 字元計）。
 	Prompt    string          `protobuf:"bytes,4,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	Thumbnail *v1alpha1.Image `protobuf:"bytes,5,opt,name=thumbnail,proto3" json:"thumbnail,omitempty"`
 	// 換成剛上傳的縮圖；空字串表示沿用目前的圖。建立時必填。
 	ThumbnailStagedToken string `protobuf:"bytes,6,opt,name=thumbnail_staged_token,json=thumbnailStagedToken,proto3" json:"thumbnail_staged_token,omitempty"`
 	// 顯示順序，小的在前。
 	DisplayOrder int32 `protobuf:"varint,7,opt,name=display_order,json=displayOrder,proto3" json:"display_order,omitempty"`
-	// 是否為該用途的預設風格；同一個用途只有一個預設。
+	// 是否為該用途的預設風格；同一個用途只有一個預設。只能設成 true（原本的預設自動取消）；
+	// 設成 false 回 invalid_argument，換預設只能把另一個風格設成 true。
 	DefaultStyle bool `protobuf:"varint,8,opt,name=default_style,json=defaultStyle,proto3" json:"default_style,omitempty"`
 	// 停用的風格前台看不到。
 	Enabled bool `protobuf:"varint,9,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -191,7 +192,7 @@ type AiQuota struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 店家的 ID。
 	StoreId string `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	// 每週可修圖的次數上限。
+	// 每週可修圖的次數上限，0 到 1000。
 	WeeklyLimit int32 `protobuf:"varint,2,opt,name=weekly_limit,json=weeklyLimit,proto3" json:"weekly_limit,omitempty"`
 	// 本週已使用的次數。
 	WeeklyUsage int32 `protobuf:"varint,3,opt,name=weekly_usage,json=weeklyUsage,proto3" json:"weekly_usage,omitempty"`
