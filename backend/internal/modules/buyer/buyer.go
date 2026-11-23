@@ -169,12 +169,6 @@ const MaxStatsWindows = model.MaxStatsWindows
 // AdminStats 後台買家統計。
 type AdminStats = model.AdminStats
 
-// Plan 會員方案與額度設定。
-type Plan = model.Plan
-
-// UpdatePlanInput 會員方案的部分更新；nil 欄位保留原值。
-type UpdatePlanInput = model.UpdatePlanInput
-
 // Entitlement 有效方案、額度與期間。
 type Entitlement = model.Entitlement
 
@@ -423,21 +417,6 @@ func (module *Module) FanOut(ctx context.Context, input FanOutInput) (bool, erro
 // Entitlement 讀取有效權益：免費方案，額度週期以 stint 錨點計算。
 func (module *Module) Entitlement(ctx context.Context, buyerID int64) (Entitlement, error) {
 	return module.membership.Entitlement(ctx, buyerID)
-}
-
-// ListPlans 列出全部會員方案。
-func (module *Module) ListPlans(ctx context.Context) ([]Plan, error) {
-	return module.membership.ListPlans(ctx)
-}
-
-// Plan 依代碼讀取單一會員方案。
-func (module *Module) Plan(ctx context.Context, planCode string) (Plan, error) {
-	return module.membership.Plan(ctx, planCode)
-}
-
-// UpdatePlan 修改提供的欄位；不存在的 plan_code 回 NotFound。
-func (module *Module) UpdatePlan(ctx context.Context, input UpdatePlanInput) (Plan, error) {
-	return module.membership.UpdatePlan(ctx, input)
 }
 
 // LockForDeletion 在呼叫方的 transaction 內鎖住買家列（持有到 transaction 結束）。accountdeletion 在派發買家的刪除事件之前，先依單體規則 4

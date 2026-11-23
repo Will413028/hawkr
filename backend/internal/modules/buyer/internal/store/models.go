@@ -55,17 +55,6 @@ type BuyerMediaRefSync struct {
 	UpdatedAt time.Time
 }
 
-type BuyerMembershipPlan struct {
-	PlanCode           string
-	DisplayName        string
-	MonthlyAnswerLimit int32
-	MonthlyPriceTwd    int64
-	IsPurchasable      bool
-	Version            int64
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-}
-
 type BuyerRestockSubscription struct {
 	BuyerID   int64
 	ProductID int64

@@ -67,9 +67,7 @@ var declarations = map[string]declaration{
 	bizcalendarv1alpha1connect.BizCalendarAdminServicePreviewHolidayCalendarProcedure:     requires(adminperm.BizcalendarHolidayCalendarsPreview, auditReadOnly),
 	bizcalendarv1alpha1connect.BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure: requires(adminperm.BizcalendarHolidayCalendarCoveragesGet, auditReadOnly),
 
-	buyerv1alpha1connect.BuyerAdminServiceGetBuyerStatsProcedure:        requires(adminperm.BuyerBuyerStatsGet, auditReadOnly),
-	buyerv1alpha1connect.BuyerAdminServiceListMembershipPlansProcedure:  requires(adminperm.BuyerMembershipPlansList, auditReadOnly),
-	buyerv1alpha1connect.BuyerAdminServiceUpdateMembershipPlanProcedure: requires(adminperm.BuyerMembershipPlansUpdate, auditPending),
+	buyerv1alpha1connect.BuyerAdminServiceGetBuyerStatsProcedure: requires(adminperm.BuyerBuyerStatsGet, auditReadOnly),
 
 	contentv1alpha1connect.ContentAdminServiceListBannersProcedure:          requires(adminperm.ContentBannersList, auditReadOnly),
 	contentv1alpha1connect.ContentAdminServiceGetBannerProcedure:            requires(adminperm.ContentBannersGet, auditReadOnly),

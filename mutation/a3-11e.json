@@ -1,13 +1,22 @@
 {
  "mutants": [
   {
-   "id": "entitlement-plan-is-free",
+   "id": "entitlement-default-plan-code",
    "stack": "go-integration",
    "file": "backend/internal/modules/buyer/internal/membership/membership.go",
-   "old": "queries.Plan(ctx, \"free\")",
-   "new": "queries.Plan(ctx, \"basic\")",
+   "old": "DefaultPlanCode                 = \"free\"",
+   "new": "DefaultPlanCode                 = \"basic\"",
    "test": "internal/modules/buyer ^TestEntitlementIsFreePlanWithRollingPeriod$",
-   "why": "沒有指派表之後，權益固定是 free 方案；換成別的方案代碼，測試必須變紅"
+   "why": "沒有方案表之後，權益的方案代碼是具名常數；換掉它，測試必須變紅"
+  },
+  {
+   "id": "entitlement-default-quota",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/membership/membership.go",
+   "old": "DefaultMonthlyAnswerLimit int32 = 100",
+   "new": "DefaultMonthlyAnswerLimit int32 = 101",
+   "test": "internal/modules/buyer ^TestDefaultEntitlementQuota$",
+   "why": "預設額度與歷史 seed 的 free 列相同（100）；改值，測試必須變紅"
   },
   {
    "id": "entitlement-period-boundary",

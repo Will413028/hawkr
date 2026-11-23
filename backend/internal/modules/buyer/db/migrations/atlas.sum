@@ -1,4 +1,4 @@
-h1:dhXXIz8GZLdxAp7LvYV8H3pzsVOPSA8RLzKDUf1FFbM=
+h1:sYTlmf6pRUXOxCMTAB91s26LzhnLWWikWNJjMc2gXts=
 20260928215932_buyer_schema.sql h1:cPW6PVSv32fI3+pFmfKVVcWNWACyQcjRl+8UtDQrOqI=
 20260928230627_buyer_tables.sql h1:du5isn4Kz8zoySdcLZY08aTCpSIPqVj1jPIb7vjL07o=
 20260928230628_buyer_membership_plan_seeds.sql h1:Mvn1TBmcjETjXk3mPrudT+jNOLCjOwJwTIwpsrG+dS8=
@@ -13,3 +13,4 @@ h1:dhXXIz8GZLdxAp7LvYV8H3pzsVOPSA8RLzKDUf1FFbM=
 20261023130753_buyer_pub_blocks.sql h1:0xnZxwV4PRSYy4HV4yP4ccbxpqJvaWK0YClIhgMF4P4=
 20261121022246_buyer_pub_closed_buyers.sql h1:V0ndk2vKccfTJ0OA+2OQsNm0Mc4GwVYkx/RjKgIeN04=
 20261123075138_drop_buyer_memberships.sql h1:EcreQD+0Gj6Jz2YUiPCEoP/DSpBhBXnpgoUcCtx7Lps=
+20261123120000_drop_buyer_membership_plans.sql h1:9pFnBuV1i8sbilivlB0DU26588COWA3+FDtIhDIgwj0=

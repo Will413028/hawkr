@@ -109,20 +109,6 @@ CREATE TABLE buyer.restock_subscriptions (
 );
 CREATE INDEX restock_product ON buyer.restock_subscriptions (product_id, buyer_id);
 
--- 會員方案：plan_code 是自然鍵；額度為正整數、價格非負。
-CREATE TABLE buyer.membership_plans (
-    plan_code            TEXT PRIMARY KEY,
-    display_name         TEXT NOT NULL,
-    monthly_answer_limit INTEGER NOT NULL,
-    monthly_price_twd    BIGINT NOT NULL,
-    is_purchasable       BOOLEAN NOT NULL,
-    version              BIGINT NOT NULL DEFAULT 1,
-    created_at           TIMESTAMPTZ NOT NULL,
-    updated_at           TIMESTAMPTZ NOT NULL,
-    CONSTRAINT membership_plans_limit_check CHECK (monthly_answer_limit > 0),
-    CONSTRAINT membership_plans_price_check CHECK (monthly_price_twd >= 0)
-);
-
 -- media 引用的同步版本：業務列改變 ref 的資產時在同一個 transaction 遞增 seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變
 -- 才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。ref 的列不刪除：
 -- 刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。

@@ -26,8 +26,6 @@ const (
 	BizcalendarHolidayCalendarsPreview     Permission = "bizcalendar.holiday_calendars.preview"
 	BizcalendarHolidayCalendarCoveragesGet Permission = "bizcalendar.holiday_calendar_coverages.get"
 	BuyerBuyerStatsGet                     Permission = "buyer.buyer_stats.get"
-	BuyerMembershipPlansList               Permission = "buyer.membership_plans.list"
-	BuyerMembershipPlansUpdate             Permission = "buyer.membership_plans.update"
 	ContentBannersList                     Permission = "content.banners.list"
 	ContentBannersGet                      Permission = "content.banners.get"
 	ContentBannersCreate                   Permission = "content.banners.create"
@@ -121,7 +119,7 @@ const (
 func Catalog() []Permission {
 	return []Permission{
 		BizcalendarHolidayCalendarsImport, BizcalendarHolidayCalendarsPreview, BizcalendarHolidayCalendarCoveragesGet,
-		BuyerBuyerStatsGet, BuyerMembershipPlansList, BuyerMembershipPlansUpdate,
+		BuyerBuyerStatsGet,
 		ContentBannersList, ContentBannersGet, ContentBannersCreate, ContentBannersUpdate, ContentBannersDelete,
 		ContentAppVersionGatesList, ContentAppVersionGatesCreate, ContentAppVersionGatesUpdate,
 		DelegationSessionsCreate,

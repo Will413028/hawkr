@@ -16,7 +16,6 @@ const MERCHANT_DETAIL = "src/app/admin/merchants/[id]/page.tsx";
 const LEGACY_PAGES = [
 	"ai-styles",
 	"app-versions",
-	"membership-plans",
 	"notification-templates",
 	"holiday-calendar",
 	"posts",

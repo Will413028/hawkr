@@ -594,30 +594,4 @@ func TestEnumChecksMatchGo(t *testing.T) {
 	}
 }
 
-func TestPlanWriteValidation(t *testing.T) {
-	t.Parallel()
-	fixture := setup(t)
-	ctx := context.Background()
-	var err error
-	zero := int32(0)
-	negative := int64(-1)
-	for _, input := range []UpdatePlanInput{{PlanCode: "free", MonthlyAnswerLimit: &zero}, {PlanCode: "free", MonthlyPriceTWD: &negative}, {PlanCode: "free"}} {
-		if _, err = fixture.module.UpdatePlan(ctx, input); apperr.KindOf(err) != apperr.KindInvalidInput {
-			t.Fatal("invalid plan accepted", err)
-		}
-	}
-	if _, err := fixture.module.Plan(ctx, "missing"); apperr.KindOf(err) != apperr.KindNotFound {
-		t.Fatalf("missing plan=%v", err)
-	}
-	largePrice := int64(1 << 31)
-	updated, err := fixture.module.UpdatePlan(ctx, UpdatePlanInput{PlanCode: "basic", MonthlyPriceTWD: &largePrice})
-	if err != nil || updated.MonthlyPriceTWD != largePrice {
-		t.Fatalf("price=%+v err=%v", updated, err)
-	}
-	read, err := fixture.module.Plan(ctx, "basic")
-	if err != nil || read.MonthlyPriceTWD != largePrice {
-		t.Fatalf("plan=%+v err=%v", read, err)
-	}
-}
-
 func ptr[T any](value T) *T { return &value }
