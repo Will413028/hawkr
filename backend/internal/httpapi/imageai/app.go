@@ -61,7 +61,7 @@ func (h *App) store(ctx context.Context) (int64, error) {
 	st, err := h.stores.CurrentStore(ctx, p.ID)
 	if err != nil {
 		if apperr.KindOf(err) == apperr.KindNotFound {
-			return 0, apperr.PermissionDenied("%s", rpc.CommonText(ctx, connect.CodePermissionDenied).Text)
+			return 0, rpc.CommonFailure(ctx, connect.CodePermissionDenied)
 		}
 		return 0, err
 	}

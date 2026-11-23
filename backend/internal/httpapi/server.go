@@ -233,16 +233,20 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	if deps.Logger == nil {
 		deps.Logger = slog.New(slog.DiscardHandler)
 	}
-	opts := []connect.HandlerOption{
-		connect.WithInterceptors(rpc.NewInterceptor(deps.Logger), adminauth.NewInterceptor(deps.Logger)),
-		connect.WithReadMaxBytes(maxRequestBytes),
-		connect.WithCompressMinBytes(compressMinBytes),
-	}
-	services, err := connectServices(deps, opts...)
+	services, err := connectServices(deps, handlerOptions(deps.Logger)...)
 	if err != nil {
 		return nil, err
 	}
 	return assemble(deps, services, fileRoutes(deps)...)
+}
+
+// handlerOptions 是每個 Connect service 共用的 handler 選項：攔截器、讀取上限與壓縮門檻。New 與測試用同一份。
+func handlerOptions(log *slog.Logger) []connect.HandlerOption {
+	return []connect.HandlerOption{
+		connect.WithInterceptors(rpc.NewInterceptor(log), adminauth.NewInterceptor(log)),
+		connect.WithReadMaxBytes(maxRequestBytes),
+		connect.WithCompressMinBytes(compressMinBytes),
+	}
 }
 
 // fileRoute 是不經 Connect 的檔案回應（API 設計規範（Connect）§十三）：樣式含 method，掛在 /api/files/ 底下，與 Connect 同一條入口

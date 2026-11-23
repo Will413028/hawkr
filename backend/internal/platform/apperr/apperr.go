@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"slices"
 	"time"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // Kind 是錯誤的分類。
@@ -242,6 +244,28 @@ type Error struct {
 	violations []FieldViolation
 	RetryAfter time.Duration
 	Metadata   map[string]string
+	locale     uitext.Locale
+}
+
+// Locale 是 Message 的語系：建構時有格式參數是 uitext.Message（模組句子，語系是實際使用的語系）就取它的 Locale，
+// 否則是 zh-TW（字面值都是 zh-TW）。
+func (e *Error) Locale() uitext.Locale {
+	if e.locale == "" {
+		return uitext.ZhTW
+	}
+	return e.locale
+}
+
+// newError 建立錯誤；args 裡第一個 uitext.Message 的語系成為錯誤的語系。
+func newError(kind Kind, format string, args []any) *Error {
+	e := &Error{kind: kind, Message: fmt.Sprintf(format, args...)}
+	for _, a := range args {
+		if m, ok := a.(uitext.Message); ok {
+			e.locale = m.Locale
+			break
+		}
+	}
+	return e
 }
 
 // WithReason 設定業務原因並回傳同一個錯誤。
@@ -269,7 +293,7 @@ func (e *Error) Error() string { return e.kind.String() + ": " + e.Message }
 
 // InvalidInput 回傳 KindInvalidInput 的錯誤，不指出欄位。
 func InvalidInput(format string, args ...any) *Error {
-	return &Error{kind: KindInvalidInput, Message: fmt.Sprintf(format, args...)}
+	return newError(KindInvalidInput, format, args)
 }
 
 // InvalidInputOn 回傳 KindInvalidInput 的錯誤，指出出錯的欄位，每個欄位的訊息都是整體的 Message。欄位只屬於
@@ -293,42 +317,44 @@ func InvalidInputFields(violations []FieldViolation, format string, args ...any)
 
 // NotFound 回傳 KindNotFound 的錯誤。
 func NotFound(format string, args ...any) *Error {
-	return &Error{kind: KindNotFound, Message: fmt.Sprintf(format, args...)}
+	return newError(KindNotFound, format, args)
 }
 
 // VersionConflict 回傳 KindVersionConflict 的錯誤，業務原因是 VERSION_CONFLICT。
 func VersionConflict(format string, args ...any) *Error {
-	return &Error{kind: KindVersionConflict, Message: fmt.Sprintf(format, args...), Reason: ReasonVersionConflict}
+	return newError(KindVersionConflict, format, args).WithReason(ReasonVersionConflict)
 }
 
 // AlreadyExists 回傳 KindAlreadyExists 的錯誤。
 func AlreadyExists(format string, args ...any) *Error {
-	return &Error{kind: KindAlreadyExists, Message: fmt.Sprintf(format, args...)}
+	return newError(KindAlreadyExists, format, args)
 }
 
 // FailedPrecondition 回傳 KindFailedPrecondition 的錯誤。
 func FailedPrecondition(format string, args ...any) *Error {
-	return &Error{kind: KindFailedPrecondition, Message: fmt.Sprintf(format, args...)}
+	return newError(KindFailedPrecondition, format, args)
 }
 
 // Unauthenticated 回傳 KindUnauthenticated 的錯誤。
 func Unauthenticated(format string, args ...any) *Error {
-	return &Error{kind: KindUnauthenticated, Message: fmt.Sprintf(format, args...)}
+	return newError(KindUnauthenticated, format, args)
 }
 
 // PermissionDenied 回傳 KindPermissionDenied 的錯誤。
 func PermissionDenied(format string, args ...any) *Error {
-	return &Error{kind: KindPermissionDenied, Message: fmt.Sprintf(format, args...)}
+	return newError(KindPermissionDenied, format, args)
 }
 
 // Unavailable 回傳 KindUnavailable 的錯誤。
 func Unavailable(format string, args ...any) *Error {
-	return &Error{kind: KindUnavailable, Message: fmt.Sprintf(format, args...)}
+	return newError(KindUnavailable, format, args)
 }
 
 // ResourceExhausted 回傳 KindResourceExhausted 的錯誤；retryAfter 是多久之後可以再試，不知道時給 0。
 func ResourceExhausted(retryAfter time.Duration, format string, args ...any) *Error {
-	return &Error{kind: KindResourceExhausted, Message: fmt.Sprintf(format, args...), RetryAfter: retryAfter}
+	e := newError(KindResourceExhausted, format, args)
+	e.RetryAfter = retryAfter
+	return e
 }
 
 // KindOf 回傳 err 鏈上第一個 *Error 的分類；沒有時回傳 KindInternal。

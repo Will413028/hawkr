@@ -206,6 +206,69 @@
    "new": "apperr.InvalidInputOn([]string{\"Image\"}, \"%s\", text.TransformMimeMismatch(l))",
    "test": "internal/modules/imageai/internal/transform ^TestInvalidInputIsRejectedWithFieldAndNothingIsCharged$",
    "why": "宣告格式與內容不符的違規掛在 image_data 而不是 mime_type"
+  },
+  {
+   "id": "image-deadline-removed",
+   "stack": "go",
+   "file": "backend/internal/platform/llm/image.go",
+   "old": "\tctx, cancel := context.WithTimeout(ctx, b.timeout)\n\tdefer cancel()\n\treturn b.inner.GenerateImage(ctx, req)",
+   "new": "\treturn b.inner.GenerateImage(ctx, req)",
+   "test": "internal/platform/llm ^TestImageGeneratorIsBoundedByADeadline$",
+   "why": "拿掉圖片模型呼叫的 deadline：卡住的 generator 永遠不回"
+  },
+  {
+   "id": "permission-denied-catalog-text-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/imageai/app.go",
+   "old": "rpc.CommonFailure(ctx, connect.CodePermissionDenied)",
+   "new": "rpc.Error(connect.CodePermissionDenied, \"no store\")",
+   "test": "internal/httpapi/imageai ^TestNonSellerPermissionDeniedUsesTheCatalogTextAndItsLocale$",
+   "why": "非賣家的 permission_denied 沒有帶共用文案目錄的文字與語系"
+  },
+  {
+   "id": "read-limit-default-removed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/server.go",
+   "old": "\t\tconnect.WithReadMaxBytes(maxRequestBytes),\n\t\tconnect.WithCompressMinBytes(compressMinBytes),",
+   "new": "\t\tconnect.WithCompressMinBytes(compressMinBytes),",
+   "test": "internal/httpapi ^TestImageAiServiceAcceptsA3MiBRequestAndEveryOtherServiceKeepsTwoMiB$",
+   "why": "拿掉共用的 2 MiB 讀取上限：其他 service 不再擋 2 到 3 MiB 的請求"
+  },
+  {
+   "id": "apperr-locale-dropped",
+   "stack": "go",
+   "file": "backend/internal/platform/apperr/apperr.go",
+   "old": "\t\t\te.locale = m.Locale\n",
+   "new": "\t\t\t_ = m\n",
+   "test": "internal/platform/apperr ^TestLocaleFollowsTheUitextMessageArgument$",
+   "why": "apperr 不記 uitext.Message 的語系：en 句子被當成 zh-TW"
+  },
+  {
+   "id": "apperr-message-locale-hardcoded",
+   "stack": "go",
+   "file": "backend/internal/httpapi/rpc/errors.go",
+   "old": "LocalizedMessage(uitext.Message{Text: ae.Message, Locale: ae.Locale()})",
+   "new": "LocalizedMessage(uitext.Message{Text: ae.Message, Locale: uitext.ZhTW})",
+   "test": "internal/httpapi/rpc ^TestAppErrLocalizedMessageKeepsTheMessageLocale$",
+   "why": "fromAppErr 的 LocalizedMessage 固定標 zh-TW"
+  },
+  {
+   "id": "apperr-violation-locale-hardcoded",
+   "stack": "go",
+   "file": "backend/internal/httpapi/rpc/errors.go",
+   "old": "LocalizedMessage: LocalizedMessage(uitext.Message{Text: v.Message, Locale: ae.Locale()}),",
+   "new": "LocalizedMessage: LocalizedMessage(uitext.Message{Text: v.Message, Locale: uitext.ZhTW}),",
+   "test": "internal/httpapi/rpc ^TestAppErrLocalizedMessageKeepsTheMessageLocale$",
+   "why": "欄位違規的 LocalizedMessage 固定標 zh-TW"
+  },
+  {
+   "id": "disabled-image-status-not-configured",
+   "stack": "go",
+   "file": "backend/internal/platform/llm/image.go",
+   "old": "disabledImage(StatusDisabled)",
+   "new": "disabledImage(StatusNotConfigured)",
+   "test": "internal/platform/llm ^TestDisabledImageIsDisabledNotNotConfigured$",
+   "why": "刻意停用的圖片模型回報成缺設定"
   }
  ]
 }

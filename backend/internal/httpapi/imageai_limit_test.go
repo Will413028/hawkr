@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"connectrpc.com/connect"
-
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
@@ -34,7 +32,7 @@ func postJSON(t *testing.T, services []service, path, method, body string) int {
 
 func TestImageAiServiceAcceptsA3MiBRequestAndEveryOtherServiceKeepsTwoMiB(t *testing.T) {
 	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)},
-		connect.WithReadMaxBytes(maxRequestBytes))
+		handlerOptions(slog.New(slog.DiscardHandler))...)
 	if err != nil {
 		t.Fatal(err)
 	}

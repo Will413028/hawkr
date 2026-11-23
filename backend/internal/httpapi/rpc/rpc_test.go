@@ -559,3 +559,52 @@ func TestRequireAdmin(t *testing.T) {
 		t.Errorf("管理員：%d, %v", id, err)
 	}
 }
+
+func localesOf(t *testing.T, err *connect.Error) (message string, locales []string) {
+	t.Helper()
+	for _, d := range err.Details() {
+		v, derr := d.Value()
+		if derr != nil {
+			t.Fatal(derr)
+		}
+		switch m := v.(type) {
+		case *errdetails.LocalizedMessage:
+			message = m.GetMessage()
+			locales = append(locales, "message:"+m.GetLocale())
+		case *errdetails.BadRequest:
+			for _, f := range m.GetFieldViolations() {
+				locales = append(locales, f.GetField()+":"+f.GetLocalizedMessage().GetLocale())
+			}
+		}
+	}
+	return message, locales
+}
+
+func TestAppErrLocalizedMessageKeepsTheMessageLocale(t *testing.T) {
+	en := uitext.Message{Text: "The prompt is too long", Locale: uitext.EN}
+	ctx := uitext.WithLocale(context.Background(), uitext.EN)
+	msg, locales := localesOf(t, toConnect(ctx, apperr.InvalidInputOn([]string{"Prompt"}, "%s", en)).err)
+	if msg != en.Text || !slices.Equal(locales, []string{"message:en"}) {
+		t.Fatalf("en：message = %q，locales = %v", msg, locales)
+	}
+	ce := toConnect(ctx, WithFieldPaths(apperr.InvalidInputOn([]string{"Prompt"}, "%s", en), FieldPaths{"Prompt": "prompt"})).err
+	_, locales = localesOf(t, ce)
+	if !slices.Equal(locales, []string{"message:en", "prompt:en"}) {
+		t.Fatalf("en 欄位：locales = %v", locales)
+	}
+	_, locales = localesOf(t, toConnect(ctx, apperr.NotFound("%s", "找不到")).err)
+	if !slices.Equal(locales, []string{"message:zh-TW"}) {
+		t.Fatalf("字面值：locales = %v", locales)
+	}
+}
+
+func TestCommonFailureKeepsTheRequestLocale(t *testing.T) {
+	// en 目錄沒有 common.error.*：文字退回 zh-TW，標籤必須同樣是 zh-TW（文字與語系一致）。
+	for l, want := range map[uitext.Locale]string{uitext.EN: "zh-TW", uitext.ZhTW: "zh-TW"} {
+		ctx := uitext.WithLocale(context.Background(), l)
+		msg, locales := localesOf(t, toConnect(ctx, CommonFailure(ctx, connect.CodePermissionDenied)).err)
+		if want := []string{"message:" + want}; !slices.Equal(locales, want) || msg != CommonText(ctx, connect.CodePermissionDenied).Text {
+			t.Errorf("%s：message = %q，locales = %v", l, msg, locales)
+		}
+	}
+}

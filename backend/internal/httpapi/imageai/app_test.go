@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 const (
@@ -251,5 +252,35 @@ func TestListAiStylesPropagatesUsageReadErrors(t *testing.T) {
 	_, err := c.ListAiStyles(t.Context(), as(connect.NewRequest(&pb.ListAiStylesRequest{}), sellerAccount))
 	if connect.CodeOf(err) != connect.CodeInternal {
 		t.Fatalf("用量讀取失敗不能被吞掉：%v", err)
+	}
+}
+
+func TestNonSellerPermissionDeniedUsesTheCatalogTextAndItsLocale(t *testing.T) {
+	c := setup(t, &fakeModule{})
+	for _, lang := range []string{"zh-TW", "en"} {
+		req := as(connect.NewRequest(&pb.ListAiStylesRequest{}), sellerAccount+1)
+		req.Header().Set("Accept-Language", lang)
+		_, err := c.ListAiStyles(t.Context(), req)
+		if connect.CodeOf(err) != connect.CodePermissionDenied {
+			t.Fatalf("%s：err = %v", lang, err)
+		}
+		msgs := details[*errdetails.LocalizedMessage](t, err)
+		if len(msgs) != 1 {
+			t.Fatalf("%s：LocalizedMessage %d 筆", lang, len(msgs))
+		}
+		// en 目錄沒有 common.error.PERMISSION_DENIED：文字退回 zh-TW，標籤要同樣是 zh-TW。
+		if msgs[0].GetMessage() != "無權操作" || msgs[0].GetLocale() != "zh-TW" {
+			t.Errorf("%s：%q（%s）", lang, msgs[0].GetMessage(), msgs[0].GetLocale())
+		}
+	}
+}
+
+func TestModuleErrorKeepsItsMessageLocale(t *testing.T) {
+	m := &fakeModule{transformErr: apperr.PermissionDenied("%s", uitext.Message{Text: "No access", Locale: uitext.EN})}
+	c := setup(t, m)
+	_, err := c.TransformImage(t.Context(), as(connect.NewRequest(&pb.TransformImageRequest{ImageData: []byte("x"), MimeType: "image/png", Prompt: "p"}), sellerAccount))
+	msgs := details[*errdetails.LocalizedMessage](t, err)
+	if len(msgs) != 1 || msgs[0].GetMessage() != "No access" || msgs[0].GetLocale() != "en" {
+		t.Fatalf("LocalizedMessage = %v", msgs)
 	}
 }
