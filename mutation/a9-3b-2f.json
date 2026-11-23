@@ -68,7 +68,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/turn/submit.go",
    "old": "case utf8.RuneCountInString(msg) > MaxMessageRunes:",
-   "new": "case false:",
+   "new": "case utf8.RuneCountInString(msg) < 0:",
    "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnRejectsMessagesAndUnknownRequestsBeforeAnyRun$",
    "why": "拿掉 2000 字元上限的檢查"
   },

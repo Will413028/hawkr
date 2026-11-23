@@ -284,19 +284,33 @@ func watchErr(t *testing.T, c procurementv1alpha1connect.BuyerProcurementAppServ
 	return out, st.Err()
 }
 
+// watchUntilTurnResult 訂閱到 turn_result 就收線：停在 WAITING_FOR_INPUT 的 run 不會有 finished，串流會開到視窗結束。
+func watchUntilTurnResult(t *testing.T, c procurementv1alpha1connect.BuyerProcurementAppServiceClient, runID string, account int64) *pb.TurnResult {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Second)
+	defer cancel()
+	st, err := c.WatchRun(ctx, as(connect.NewRequest(&pb.WatchRunRequest{RunId: runID}), account))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for st.Receive() {
+		if r := st.Msg().GetTurnResult(); r != nil {
+			return r
+		}
+		if st.Msg().GetFinished() != nil {
+			t.Fatalf("要停在中斷，卻收到 finished：%v", st.Msg())
+		}
+	}
+	t.Fatalf("串流結束前沒有 turn_result：%v", st.Err())
+	return nil
+}
+
 func TestResumeRunAnswersTheClarificationThenWatchRunFinishes(t *testing.T) {
 	c := newClient(t, &stubLLM{reply: func(int) string { return ambigous }})
 	sub := submit(t, c, "", cid1)
-	evs := watch(t, c, sub.GetRunId(), accountID)
-	f := finished(t, evs)
-	var asked *pb.TurnResult
-	for _, e := range evs {
-		if e.GetTurnResult() != nil {
-			asked = e.GetTurnResult()
-		}
-	}
+	asked := watchUntilTurnResult(t, c, sub.GetRunId(), accountID)
 	if asked == nil || asked.GetInterrupt().GetInterruptId() == "" || len(asked.GetQuestion().GetOptions()) == 0 {
-		t.Fatalf("要停在中斷並帶選項：%v finished=%v", asked, f)
+		t.Fatalf("要停在中斷並帶選項：%v", asked)
 	}
 	snap := snapshot(t, c, sub.GetConversationId())
 	oc := snap.GetOpenConfirmation()

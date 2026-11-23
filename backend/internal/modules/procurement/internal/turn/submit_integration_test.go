@@ -14,6 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // txQuota 記錄額度是在 transaction 內讀的（買家的送出鎖之後）。
@@ -49,7 +50,7 @@ func newSubmitter(f *fixture, q turn.QuotaSource) turn.Submitter {
 func TestSubmitReadsTheQuotaInsideTheTransaction(t *testing.T) { // A9-D24：額度與扣額度同一個 transaction、買家鎖之後
 	f := newFixture(t)
 	q := &txQuota{conn: f.d.Conn}
-	if _, err := newSubmitter(f, q).Submit(context.Background(), turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: uuid.NewV7()}); err != nil {
+	if _, err := newSubmitter(f, q).Submit(context.Background(), turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: uuid.NewV7(), Locale: uitext.ZhTW}); err != nil {
 		t.Fatal(err)
 	}
 	if q.calls != 1 || !q.inTx || q.unlocked {
@@ -62,18 +63,18 @@ func TestReplayOfADeletedConversationIsNotFound(t *testing.T) {
 	f := newFixture(t)
 	s := newSubmitter(f, &txQuota{})
 	cid := uuid.NewV7()
-	first, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid})
+	first, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid, Locale: uitext.ZhTW})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid}); err != nil || again != first {
+	if again, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid, Locale: uitext.ZhTW}); err != nil || again != first {
 		t.Fatalf("重送 = %+v, %v，要回放 %+v", again, err, first)
 	}
 	n, err := store.New(f.d.Conn(ctx)).SoftDeleteConversation(ctx, store.SoftDeleteConversationParams{ID: first.ConversationID, BuyerID: buyer, Now: &now})
 	if err != nil || n != 1 {
 		t.Fatalf("刪除對話 = %d, %v", n, err)
 	}
-	_, err = s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid})
+	_, err = s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid, Locale: uitext.ZhTW})
 	if apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("對話已刪除後重送 = %v，要 NOT_FOUND", err)
 	}
@@ -85,19 +86,19 @@ func TestReplayDoesNotReadTheQuotaAndMismatchesAreRejected(t *testing.T) {
 	q := &txQuota{}
 	s := newSubmitter(f, q)
 	cid := uuid.NewV7()
-	first, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid})
+	first, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid, Locale: uitext.ZhTW})
 	if err != nil {
 		t.Fatal(err)
 	}
 	dead := newSubmitter(f, failingQuota{})
-	if again, err := dead.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid}); err != nil || again != first {
+	if again, err := dead.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: cid, Locale: uitext.ZhTW}); err != nil || again != first {
 		t.Fatalf("額度來源失敗時重送 = %+v, %v，要回放 %+v", again, err, first)
 	}
-	if _, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要香蕉", ClientRequestID: cid}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, Message: "要香蕉", ClientRequestID: cid, Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("內容不同的重送 = %v，要 INVALID_ARGUMENT", err)
 	}
 	other := uuid.NewV7()
-	if _, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, RequestID: &other, Message: "要蘋果", ClientRequestID: cid}); apperr.KindOf(err) != apperr.KindNotFound {
+	if _, err := s.Submit(ctx, turn.SubmitInput{BuyerID: buyer, RequestID: &other, Message: "要蘋果", ClientRequestID: cid, Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("重送指定不存在的需求 = %v，要 NOT_FOUND", err)
 	}
 }
