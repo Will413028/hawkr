@@ -283,11 +283,17 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 
 順序依 ADR D8，由下而上：
 
-- [ ] **B1 media**
+- [x] **B1 media**
   - 子計畫與進度：`2026-11-21-b1-media.md`（本段以下的條目若與子計畫衝突，以子計畫為準）。
   - media 改成不認識業務（ADR `2026-10-03-media-references-owner-side.md`，Will 2026-10-03）：只存資產與生命週期（暫存→確認→刪除），引用只在擁有者的表；刪除是擁有者經 outbox 送出的明確指令，GC 只清過期沒確認的暫存檔；機敏下載由擁有者授權後向 media 要短效的簽章網址；拿掉 `asset_reference` 與 media 端的 `(ref_type, ref_id)`。B1 之前的做法（每個 ref 只有一個同步 job 寫引用、只精準解除退場的圖）在 B1 時換成確認／刪除的介面。
   - B1 搬儲存時要帶走的不變量：寫入 `public/` 的圖片剝除 metadata、只留方向（Java `ImageMetadataStripper`，49 號設計書 §8.1；2026-10-31）。
-  - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用，也鏡像在 Go 的 `media/ref_type.go`、`pkg/media/ref_type.go` 與 `media/finalize_args.go`。觸發：B1 把 media 改成不認識業務（拿掉 `(ref_type, ref_id)`）時，連同 CodeMeta 值與生成物一起刪。
+  - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用。單體的 `media/ref_type.go` 與 `media/finalize_args.go` 已在 B1-5 刪除；`pkg/media/ref_type.go` 與 `pkg/media/client.go` 仍被舊 Go 服務（seller、im、review、invoice-service 的 `internal/client/media`）使用。觸發：CodeMeta 值隨下面「Java media-service 退場」刪；`pkg/media` 隨最後一個 import 它的舊 Go 服務目錄刪除（`rg -l 'go-pkg/media"' -g '*.go' backend/services` 為 0 時），同時拿掉 `generate.sh --go-media` 與 `backend-monolith.yml` 的對應路徑。
+  - B1 收尾後的延後項（來源：子計畫「範圍」的延後，2026-11-23 搬到這裡）：
+    - Java media-service 退場（刪服務目錄、compose service、Java CI 路徑、`api/proto/media`、CodeMeta 中仍被 Java 使用的 `AssetReferenceType` 值、Java `ImageMetadataStripper`）。觸發：最後一個 Java 呼叫端（B3、B4、B8、B9）與 Go invoice-service（B10）遷出。
+    - Java 服務的 21 條上傳流程恢復（子計畫附件 `upload-routing.md` 第三節）。觸發：B3、B4、B8、B9 各自改寫時改用 Go media 的 `Confirm`。
+    - 舊 Go 服務的 8 條上傳流程恢復（同附件第四節，B1-D11）。觸發：評價圖、聊天傳圖是 A6-6；稅籍證明與發票解鎖佐證是 B10；AI 風格縮圖是 ai-service 搬進單體。
+    - 服務內部直傳的接線：託運單 PDF 走 `PutSecure`、`PutPublic` 只收圖片（B1-D14）。觸發：B3 fulfillment 改寫；B1 只提供 port 與測試。
+    - 公開圖片 CDN 快取拉長：目前 `Cache-Control: public, max-age=3600`（Will 2026-11-23）。觸發：有了「刪除資產時清 CDN 快取」的機制。
 - [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 再處理。
   - `createRefund` 依 D5 修正。
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
