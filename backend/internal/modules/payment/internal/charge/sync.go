@@ -10,6 +10,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 )
 
@@ -24,6 +25,9 @@ import (
 func (s *Service) Sync(ctx context.Context, paymentID uuid.UUID) (again bool, err error) {
 	if s.d.Provider == nil {
 		return false, nil
+	}
+	if _, ok := db.TxFrom(ctx); ok {
+		return false, errInTransaction
 	}
 	p := s.d.Provider
 	attempts, err := store.New(s.d.DB.Conn(ctx)).AttemptsOfPayment(ctx, store.AttemptsOfPaymentParams{PaymentID: paymentID, Provider: p.Name()})

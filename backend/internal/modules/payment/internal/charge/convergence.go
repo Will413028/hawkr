@@ -45,6 +45,20 @@ func inResendWindow(calledAt *time.Time, now time.Time) bool {
 	return calledAt == nil || now.Sub(*calledAt) < ResendWindow
 }
 
+// firstCall 回傳剛記下的呼叫時刻是不是這把鍵的第一次呼叫：呼叫前讀到的 called_at 是空的，而且記下的時刻就是這次的 now（沒有被並行的呼叫搶先記過）。
+// 只有第一次呼叫被 provider 明確拒絕，才證明這把鍵底下沒有任何東西執行過、可以換新鍵；重送被拒絕時前一次的結果仍不明（ADR D68）。
+func firstCall(before, after *time.Time, now time.Time) bool {
+	return before == nil && after != nil && after.Sub(now).Abs() < 2*time.Microsecond
+}
+
+// withDetail 把原因碼與外部 ID 併成事件的原因；沒有外部 ID 就是原因碼本身。
+func withDetail(reason, detail string) string {
+	if detail == "" {
+		return reason
+	}
+	return reason + ":" + detail
+}
+
 // publishAnomaly 在呼叫方的 transaction 內發布 MoneyAnomaly。
 func (s *Service) publishAnomaly(ctx context.Context, kind model.AnomalyKind, objectID, paymentID uuid.UUID, reason string) error {
 	return events.Publish(ctx, s.d.Events, model.MoneyAnomaly{OccurredAt: s.d.Now().UTC(), Kind: kind, ObjectID: objectID, PaymentID: paymentID, Reason: reason})

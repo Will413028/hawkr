@@ -153,8 +153,8 @@ WHERE id = sqlc.arg(id) AND status IN ('CREATE_FAILED', 'CANCELED')
 RETURNING *;
 
 -- name: RebindCreatingPayment :one
--- 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空），或已早於 stale_before（查無才算數的時刻）時改成目前的 provider，
--- 換新冪等鍵、重新起算呼叫時刻。呼叫過又還在期限內的列不動：舊 provider 的呼叫可能已經在 provider 那邊建出 PaymentIntent，改綁會讓買家拿到兩個。
+-- 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空）時改成目前的 provider，換新冪等鍵。
+-- 呼叫過的列不改綁：舊 provider 已無法查回，無從證明它沒有建出 PaymentIntent，改綁會讓買家拿到兩個；那樣的列由呼叫方進 ANOMALY。
 UPDATE payment.payments
 SET provider = sqlc.arg(provider),
     create_idempotency_key = gen_random_uuid(),
@@ -162,7 +162,7 @@ SET provider = sqlc.arg(provider),
     create_lookup_failures = 0,
     updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND status = 'CREATING' AND external_payment_id IS NULL AND provider <> sqlc.arg(provider)
-  AND (create_called_at IS NULL OR create_called_at < sqlc.arg(stale_before)::timestamptz)
+  AND create_called_at IS NULL
 RETURNING *;
 
 -- name: CreatingPaymentIDs :many

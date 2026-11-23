@@ -885,30 +885,6 @@ func TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow(t *testi
 	}
 }
 
-// 建立中、沒有外部 ID 的列屬於別的 provider（設定換了），舊 provider 的呼叫已過了查無算數的時刻：補做改成目前的 provider、換新鍵並建立，不是永遠卡在建立中（算數之前不改綁見 charge_attempts_integration_test）。
-// mutation：create() 拿掉 rebind 分支、恢復「provider 不同就直接回傳」→ 列留在 CREATING，失敗。
-func TestACreatingRowOfAnotherProviderIsReboundByTheCatchUp(t *testing.T) {
-	t.Parallel()
-	f := setupCharge(t)
-	f.order("O-F6", 11, 7, 100)
-	f.fake.FailCreate(errors.New("逾時"))
-	p := f.create(t, 11, "O-F6")
-	oldKey := f.keyOf(t, "O-F6")
-	ctx := context.Background()
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.payments SET provider = 'retired_provider' WHERE order_no = 'O-F6'")
-	must(t, err)
-	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = $1", p.ID)
-	must(t, err)
-	f.now = f.now.Add(PaymentNotFoundAfter + time.Minute)
-	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
-	if got := f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-F6'"); got != ChargeFakeName || f.statusOf(t, "O-F6") != PaymentAwaitingPayment || f.keyOf(t, "O-F6") == oldKey {
-		t.Fatalf("provider=%s 狀態=%s", got, f.statusOf(t, "O-F6"))
-	}
-	if f.fake.Intents() != 1 {
-		t.Fatalf("PaymentIntent %d 個", f.fake.Intents())
-	}
-}
-
 // 判定 anomaly 之後標記事件已處理：已經告警、列不動；事件不再留在 inbox 讓掃描一直重排。
 // mutation：Sync 拿掉 ErrAnomaly 分支裡的 markEventsProcessed → 事件仍未處理，失敗。
 func TestAnAnomalyMarksItsEventsProcessedAndLeavesTheRowAlone(t *testing.T) {

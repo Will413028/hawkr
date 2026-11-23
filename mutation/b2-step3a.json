@@ -262,15 +262,6 @@
    "why": "R2-3：被取代的舊嘗試也寫付款列：舊 PaymentIntent 的同步把舊外部 ID 與狀態寫回剛重設的列。"
   },
   {
-   "id": "rebind-ignores-the-old-call",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/payment/internal/store/payments.sql.go",
-   "old": "\n  AND (create_called_at IS NULL OR create_called_at < $4::timestamptz)",
-   "new": "\n  AND $4::timestamptz IS NOT NULL",
-   "test": "internal/modules/payment ^TestACreatingRowOfAnotherProviderIsReboundOnlyWhenTheOldCallNeverWentOutOrIsPastTheNotFoundWait$",
-   "why": "R2-4：呼叫過又還在期限內的別的 provider 的列也被改綁，舊 provider 已建出的 PaymentIntent 變成第二個。"
-  },
-  {
    "id": "snapshot-provider-not-compared",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/create.go",
@@ -332,6 +323,60 @@
    "new": "\tcase model.PaymentCreateFailed:",
    "test": "internal/modules/payment/internal/charge ^TestNextFollowsTheDecisionTable$",
    "why": "ANOMALY 可被快照改寫：待人工結案的付款被自動推進。"
+  },
+  {
+   "id": "round3-rebind-ignores-the-old-call",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/payments.sql.go",
+   "old": "provider <> $1\n  AND create_called_at IS NULL\nRETURNING",
+   "new": "provider <> $1\nRETURNING",
+   "test": "internal/modules/payment ^TestACreatingRowOfAnotherProviderThatWasCalledGoesToAnomalyInsteadOfBeingRebound$",
+   "why": "D1：SQL 是唯一的守門（呼叫過的列不改綁）。拿掉後呼叫過的別的 provider 的列被改綁並換新鍵，不進 ANOMALY。"
+  },
+  {
+   "id": "round3-create-resend-refusal-rotates-key",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if !firstCall(row.CreateCalledAt, called.CreateCalledAt, now) {",
+   "new": "if false {",
+   "test": "internal/modules/payment ^TestARetryableRefusalOnAResendOfAnUnknownCreateKeepsTheKey$",
+   "why": "R1：重送被可重試拒絕也換鍵，前一次結果不明的 PaymentIntent 可能被丟下、再建第二個。"
+  },
+  {
+   "id": "round3-anomaly-payment-snapshot-silent",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "if locked.Status == string(model.PaymentAnomaly) {",
+   "new": "if false {",
+   "test": "internal/modules/payment ^TestAnAnomalousPaymentThatReceivesASnapshotWithAnExternalIDPublishesMoneyAnomaly$",
+   "why": "R4：ANOMALY 的付款收到帶外部 ID 的快照只記警示 log，沒有 MoneyAnomaly。"
+  },
+  {
+   "id": "round3-sync-without-transaction-guard",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/sync.go",
+   "old": "if _, ok := db.TxFrom(ctx); ok {\n\t\treturn false, errInTransaction\n\t}",
+   "new": "_ = db.TxFrom",
+   "test": "internal/modules/payment ^TestProviderCallingJobMethodsRefuseToRunInsideATransaction$",
+   "why": "D3：Sync 在 transaction 內照常執行。"
+  },
+  {
+   "id": "round3-cancel-without-transaction-guard",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/attempt.go",
+   "old": "if _, ok := db.TxFrom(ctx); ok {\n\t\treturn errInTransaction\n\t}",
+   "new": "_ = db.TxFrom",
+   "test": "internal/modules/payment ^TestProviderCallingJobMethodsRefuseToRunInsideATransaction$",
+   "why": "D3：CancelAttempt 在 transaction 內照常執行。"
+  },
+  {
+   "id": "round3-sweep-without-transaction-guard",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/jobs.go",
+   "old": "if _, ok := db.TxFrom(ctx); ok {\n\t\treturn 0, 0, errInTransaction\n\t}",
+   "new": "_ = db.TxFrom",
+   "test": "internal/modules/payment ^TestProviderCallingJobMethodsRefuseToRunInsideATransaction$",
+   "why": "D3：Sweep 在 transaction 內照常執行。"
   }
  ]
 }

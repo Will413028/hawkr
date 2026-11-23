@@ -164,6 +164,7 @@ VALUES ($1, $2, 7, 100, 'acct_seller_7', now(), now())`, uuid.NewV7(), f.idOf(t,
 
 // provider 回的轉帳與列不符（金額不同）進 ANOMALY，不寫成 SUCCEEDED：查回找到的與呼叫回應的都一樣。
 // mutation：acceptTransfer 拿掉金額比對 → 以錯誤金額記成 SUCCEEDED，失敗。
+// 列上的 failure_reason 只存原因碼（上限 200 字）；外部 ID 只進事件與 log。
 func TestAMismatchedProviderTransferIsAnAnomalyNotASuccess(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
@@ -172,8 +173,11 @@ func TestAMismatchedProviderTransferIsAnAnomalyNotASuccess(t *testing.T) {
 	must(t, f.fake.SetTransferAmount(f.fake.TransferIDs()[0], 1))
 	f.pastResendWindow()
 	must(t, f.runTransfer(tr.ID, false))
-	if f.transferText(t, "status", tr.ID) != "ANOMALY" || !strings.HasPrefix(f.transferText(t, "failure_reason", tr.ID), "reply_mismatch") || f.transferText(t, "external_transfer_id", tr.ID) != "" {
+	if f.transferText(t, "status", tr.ID) != "ANOMALY" || f.transferText(t, "failure_reason", tr.ID) != "reply_mismatch" || f.transferText(t, "external_transfer_id", tr.ID) != "" {
 		t.Fatalf("查回對不起來：%s %s", f.transferText(t, "status", tr.ID), f.transferText(t, "failure_reason", tr.ID))
+	}
+	if len(f.anomalies) != 1 || !strings.Contains(f.anomalies[0].Reason, f.fake.TransferIDs()[0]) || !strings.Contains(f.logs.String(), f.fake.TransferIDs()[0]) {
+		t.Fatalf("外部 ID 應只進事件與 log：%+v", f.anomalies)
 	}
 	// 建立的回應不符：provider 回的金額是錯的。
 	f2 := setupCharge(t)
@@ -252,9 +256,9 @@ func TestResolvingATransferAnomalyWritesTheAuditInTheSameTransaction(t *testing.
 	if !strings.Contains(detail, ids[0]) || !strings.Contains(detail, "lookup_failed") || f.text(t, "SELECT target_type FROM adminaudit.records WHERE target_id = $1", a.ID.String()) != "payment_transfer" {
 		t.Fatalf("稽核內容=%s", detail)
 	}
-	// 證據指到已經對應別的轉帳的 provider ID：唯一鍵衝突，整個 transaction（含稽核）回滾。
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, b.ID, AnomalySucceeded, ids[0]); apperr.KindOf(err) != apperr.KindAlreadyExists {
-		t.Fatalf("證據衝突：%v", err)
+	// 證據指到別的轉帳的 provider ID：核對 b 的嘗試 ID 查不到它，結案被擋下，列與稽核都不動。
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, b.ID, AnomalySucceeded, ids[0]); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("證據指到別的轉帳：%v", err)
 	}
 	if f.transferText(t, "status", b.ID) != "ANOMALY" || f.auditCount(t) != 1 {
 		t.Fatalf("衝突沒有回滾：%s，稽核 %d 筆", f.transferText(t, "status", b.ID), f.auditCount(t))
@@ -384,8 +388,10 @@ func TestResolvingARefundReversalAnomalyAccruesTheReversalOnSuccess(t *testing.T
 	ok := f.insertRefund(t, p.ID, "ANOMALY", 30, 30)
 	bad := f.insertRefund(t, p.ID, "ANOMALY", 20, 20)
 	f.exec(t, "UPDATE payment.refunds SET failure_reason = 'lookup_failed' WHERE status = 'ANOMALY'")
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, ok, AnomalySucceeded, "trr_manual_1"))
-	if f.refundText(t, "status", ok) != "REVERSED" || f.refundText(t, "reversal_external_id", ok) != "trr_manual_1" || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 1 {
+	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.refundText(t, "reversal_idempotency_key", ok)})
+	must(t, err)
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, ok, AnomalySucceeded, rev.ExternalID))
+	if f.refundText(t, "status", ok) != "REVERSED" || f.refundText(t, "reversal_external_id", ok) != rev.ExternalID || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 1 {
 		t.Fatalf("成功結案：%s，reversed %d", f.refundText(t, "status", ok), f.reversedOf(t, tr.ID))
 	}
 	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, bad, AnomalyFailed, ""))
@@ -502,7 +508,7 @@ func TestACreateAnomalyHoldsTheOrderAndIsResolvedByAnAdmin(t *testing.T) {
 }
 
 // 會呼叫 provider 的 job 方法不能在 transaction 內呼叫（與 RequestPaymentTransfer、CreatePayment 相同的守門）。
-// mutation：拿掉 Transfer、Reverse 或 Create 的 TxFrom 檢查 → 對應的呼叫在 transaction 內執行，失敗。
+// mutation：拿掉 Transfer、Reverse、Create、Sync、CancelAttempt、Sweep 或 ResolveAnomaly 的 TxFrom 檢查 → 對應的呼叫在 transaction 內執行，失敗。
 func TestProviderCallingJobMethodsRefuseToRunInsideATransaction(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
@@ -511,6 +517,18 @@ func TestProviderCallingJobMethodsRefuseToRunInsideATransaction(t *testing.T) {
 		"transfer": func(ctx context.Context) error { return f.module.CreatePaymentTransfer(ctx, uuid.NewV7(), false) },
 		"reversal": func(ctx context.Context) error { return f.module.ReversePaymentTransfer(ctx, uuid.NewV7(), false) },
 		"create":   func(ctx context.Context) error { return f.module.CreatePaymentIntent(ctx, uuid.NewV7(), false) },
+		"sync": func(ctx context.Context) error {
+			_, err := f.module.SyncPayment(ctx, uuid.NewV7())
+			return err
+		},
+		"cancel": func(ctx context.Context) error { return f.module.CancelPaymentAttempt(ctx, uuid.NewV7()) },
+		"sweep": func(ctx context.Context) error {
+			_, _, err := f.module.SweepPayments(ctx)
+			return err
+		},
+		"resolve": func(ctx context.Context) error {
+			return f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, uuid.NewV7(), AnomalyFailed, "")
+		},
 	} {
 		err := f.db.InTx(ctx, func(ctx context.Context) error { return call(ctx) })
 		if err == nil || !strings.Contains(err.Error(), "transaction 內呼叫") {

@@ -12,15 +12,15 @@ FROM payment.refunds
 WHERE payment_id = $1 AND status <> 'FAILED';
 
 -- name: InsertTransfer :execrows
--- 一筆付款最多一筆有效（PENDING、SUCCEEDED、ANOMALY）轉帳，由唯一索引 transfers_active_payment 守：已有有效轉帳時不寫（ON CONFLICT DO NOTHING），呼叫端再讀既有的那筆。
+-- 一筆付款最多一筆有效（不是 FAILED 的）轉帳，只由唯一索引 transfers_active_payment 守（哪些狀態佔位只寫在索引的條件裡）：已有有效轉帳時不寫（ON CONFLICT DO NOTHING，不指定索引），呼叫端再讀既有的那筆。
 INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, created_at, updated_at)
 VALUES (sqlc.arg(id), sqlc.arg(payment_id), sqlc.arg(store_id), sqlc.arg(amount), sqlc.arg(destination_account_id), sqlc.arg(now), sqlc.arg(now))
-ON CONFLICT (payment_id) WHERE status IN ('PENDING', 'SUCCEEDED', 'ANOMALY') DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- name: ActiveTransferByPayment :one
 SELECT *
 FROM payment.transfers
-WHERE payment_id = $1 AND status IN ('PENDING', 'SUCCEEDED', 'ANOMALY');
+WHERE payment_id = $1 AND status <> 'FAILED';
 
 -- name: SucceededTransferByPayment :one
 SELECT *

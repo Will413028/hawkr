@@ -58,13 +58,16 @@ func (s *Service) reverse(ctx context.Context, refundID uuid.UUID) error {
 	}
 	tr, err := q.SucceededTransferByPayment(ctx, ref.PaymentID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return s.anomalyReversal(ctx, ref, "no_succeeded_transfer")
+		return s.anomalyReversal(ctx, ref, "no_succeeded_transfer", "")
 	}
 	if err != nil {
 		return err
 	}
-	if tr.ExternalTransferID == nil || ref.ReversalAmount > tr.Amount-tr.ReversedAmount {
-		return s.anomalyReversal(ctx, ref, "reversal_exceeds_remaining")
+	if tr.ExternalTransferID == nil {
+		return s.anomalyReversal(ctx, ref, "transfer_without_external_id", "")
+	}
+	if ref.ReversalAmount > tr.Amount-tr.ReversedAmount {
+		return s.anomalyReversal(ctx, ref, "reversal_exceeds_remaining", "")
 	}
 	now := s.d.Now().UTC()
 	if !inResendWindow(ref.ReversalCalledAt, now) {
@@ -84,6 +87,10 @@ func (s *Service) reverse(ctx context.Context, refundID uuid.UUID) error {
 		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕撤回轉帳", "refund_id", refundID.String(), "transfer_id", tr.ID.String(), "err", err)
 		return s.failReversal(ctx, refundID, failedRefused)
 	case callRetryable:
+		if !firstCall(ref.ReversalCalledAt, called.ReversalCalledAt, now) {
+			s.d.Logger.WarnContext(ctx, "payment：重送撤回被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "refund_id", refundID.String(), "transfer_id", tr.ID.String(), "err", err)
+			return err
+		}
 		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕撤回轉帳、沒有執行，換新冪等鍵重試", "refund_id", refundID.String(), "transfer_id", tr.ID.String(), "err", err)
 		if rerr := s.rotateReversalKey(ctx, refundID, called.ReversalIdempotencyKey, now); rerr != nil {
 			return errors.Join(err, rerr)
@@ -120,7 +127,7 @@ func (s *Service) lookupReversal(ctx context.Context, ref store.PaymentRefund, t
 // acceptReversal 驗證 provider 回的撤回（呼叫的回應或查回找到的）與列相符後，在一個 transaction 內累加轉帳的 reversed_amount 並把退款推進到 REVERSED；不符進 ANOMALY。
 func (s *Service) acceptReversal(ctx context.Context, ref store.PaymentRefund, tr store.PaymentTransfer, snap ReversalSnapshot) error {
 	if snap.ExternalID == "" || snap.Amount != ref.ReversalAmount {
-		return s.anomalyReversal(ctx, ref, "reply_mismatch:"+snap.ExternalID)
+		return s.anomalyReversal(ctx, ref, "reply_mismatch", snap.ExternalID)
 	}
 	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancelWrite()
@@ -208,7 +215,7 @@ func (s *Service) reversalLookupFailed(ctx context.Context, ref store.PaymentRef
 		return errors.Join(cause, err)
 	}
 	if n >= LookupFailureLimit {
-		return s.anomalyReversal(ctx, ref, "lookup_failed")
+		return s.anomalyReversal(ctx, ref, "lookup_failed", "")
 	}
 	return fmt.Errorf("charge: 退款 %s 的撤回查回失敗：%w", ref.ID, cause)
 }
@@ -225,8 +232,9 @@ func (s *Service) clearReversalLookupFailures(ctx context.Context, ref store.Pay
 }
 
 // anomalyReversal 讓 REVERSING 的退款進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；退款已不是 REVERSING 時什麼都不做。
-func (s *Service) anomalyReversal(ctx context.Context, ref store.PaymentRefund, reason string) error {
-	s.d.Logger.ErrorContext(ctx, "payment：退款的撤回進 ANOMALY，待人工核對 provider", "refund_id", ref.ID.String(), "payment_id", ref.PaymentID.String(), "reason", reason)
+// 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件（failure_reason 上限 200 字）。
+func (s *Service) anomalyReversal(ctx context.Context, ref store.PaymentRefund, reason, detail string) error {
+	s.d.Logger.ErrorContext(ctx, "payment：退款的撤回進 ANOMALY，待人工核對 provider", "refund_id", ref.ID.String(), "payment_id", ref.PaymentID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
@@ -237,7 +245,7 @@ func (s *Service) anomalyReversal(ctx context.Context, ref store.PaymentRefund, 
 		if err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, reason)
+		return s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, withDetail(reason, detail))
 	})
 }
 

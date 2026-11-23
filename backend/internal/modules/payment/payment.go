@@ -381,6 +381,12 @@ const (
 	PaymentAnomaly         = model.PaymentAnomaly
 )
 
+// ChargeTransferInput 與 ChargeTransferSnapshot 是建立轉帳的 port 型別（測試包裝 provider 用）。
+type (
+	ChargeTransferInput    = charge.TransferInput
+	ChargeTransferSnapshot = charge.TransferSnapshot
+)
+
 // ChargeReversalInput 與 ChargeReversalSnapshot 是撤回轉帳的 port 型別（測試包裝 provider 用）。
 type (
 	ChargeReversalInput    = charge.ReversalInput

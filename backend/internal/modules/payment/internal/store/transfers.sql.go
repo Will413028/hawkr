@@ -15,7 +15,7 @@ import (
 const activeTransferByPayment = `-- name: ActiveTransferByPayment :one
 SELECT id, payment_id, store_id, amount, reversed_amount, destination_account_id, status, external_transfer_id, failure_reason, idempotency_key, called_at, lookup_failures, created_at, updated_at
 FROM payment.transfers
-WHERE payment_id = $1 AND status IN ('PENDING', 'SUCCEEDED', 'ANOMALY')
+WHERE payment_id = $1 AND status <> 'FAILED'
 `
 
 func (q *Queries) ActiveTransferByPayment(ctx context.Context, paymentID uuid.UUID) (PaymentTransfer, error) {
@@ -341,7 +341,7 @@ func (q *Queries) FailTransfer(ctx context.Context, arg FailTransferParams) (Pay
 const insertTransfer = `-- name: InsertTransfer :execrows
 INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $6)
-ON CONFLICT (payment_id) WHERE status IN ('PENDING', 'SUCCEEDED', 'ANOMALY') DO NOTHING
+ON CONFLICT DO NOTHING
 `
 
 type InsertTransferParams struct {
@@ -353,7 +353,7 @@ type InsertTransferParams struct {
 	Now                  time.Time
 }
 
-// 一筆付款最多一筆有效（PENDING、SUCCEEDED、ANOMALY）轉帳，由唯一索引 transfers_active_payment 守：已有有效轉帳時不寫（ON CONFLICT DO NOTHING），呼叫端再讀既有的那筆。
+// 一筆付款最多一筆有效（不是 FAILED 的）轉帳，只由唯一索引 transfers_active_payment 守（哪些狀態佔位只寫在索引的條件裡）：已有有效轉帳時不寫（ON CONFLICT DO NOTHING，不指定索引），呼叫端再讀既有的那筆。
 func (q *Queries) InsertTransfer(ctx context.Context, arg InsertTransferParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertTransfer,
 		arg.ID,

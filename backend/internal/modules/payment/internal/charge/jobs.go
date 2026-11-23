@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
@@ -246,6 +247,9 @@ func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 	p := s.d.Provider
 	if p == nil {
 		return 0, 0, nil
+	}
+	if _, ok := db.TxFrom(ctx); ok {
+		return 0, 0, errInTransaction
 	}
 	queue := func(enqueue func(context.Context, jobs.Enqueuer, uuid.UUID) error, id uuid.UUID) error {
 		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueue(ctx, s.d.Jobs, id) })

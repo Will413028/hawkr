@@ -152,7 +152,7 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 		return err
 	}
 	if pay.ExternalChargeID == nil {
-		return s.anomalyTransfer(ctx, row, "payment_without_charge")
+		return s.anomalyTransfer(ctx, row, "payment_without_charge", "")
 	}
 	now := s.d.Now().UTC()
 	if !inResendWindow(row.CalledAt, now) {
@@ -173,6 +173,10 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立轉帳", "transfer_id", transferID.String(), "order_no", pay.OrderNo, "err", err)
 		return s.failTransfer(ctx, transferID, failedRefused)
 	case callRetryable:
+		if !firstCall(row.CalledAt, called.CalledAt, now) {
+			s.d.Logger.WarnContext(ctx, "payment：重送轉帳被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "transfer_id", transferID.String(), "order_no", pay.OrderNo, "err", err)
+			return err
+		}
 		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立轉帳、沒有執行，換新冪等鍵重試", "transfer_id", transferID.String(), "order_no", pay.OrderNo, "err", err)
 		if rerr := s.rotateTransferKey(ctx, transferID, called.IdempotencyKey, now); rerr != nil {
 			return errors.Join(err, rerr)
@@ -209,21 +213,35 @@ func (s *Service) lookupTransfer(ctx context.Context, row store.PaymentTransfer,
 // acceptTransfer 驗證 provider 回的轉帳（建立的回應或查回找到的）與列相符後記成功；不符進 ANOMALY。
 func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer, snap TransferSnapshot) error {
 	if snap.ExternalID == "" || snap.Amount != row.Amount {
-		return s.anomalyTransfer(ctx, row, "reply_mismatch:"+snap.ExternalID)
+		return s.anomalyTransfer(ctx, row, "reply_mismatch", snap.ExternalID)
 	}
 	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancelWrite()
-	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
+	orphan := false
+	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		if _, err := q.LockPayment(ctx, row.PaymentID); err != nil {
 			return err
 		}
 		_, err := q.SucceedTransfer(ctx, store.SucceedTransferParams{ID: row.ID, ExternalTransferID: &snap.ExternalID, Now: s.d.Now().UTC()})
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
+			cur, rerr := q.TransferByID(ctx, row.ID)
+			if rerr != nil {
+				return rerr
+			}
+			if cur.Status == string(model.TransferSucceeded) && cur.ExternalTransferID != nil && *cur.ExternalTransferID == snap.ExternalID {
+				return nil
+			}
+			orphan = true
+			return s.publishAnomaly(ctx, model.AnomalyTransfer, row.ID, row.PaymentID, withDetail("transferred_but_transfer_"+cur.Status, snap.ExternalID))
 		}
 		return err
 	})
+	if err == nil && orphan {
+		s.d.Logger.ErrorContext(ctx, "payment：provider 已建立轉帳，轉帳列卻已不在 PENDING，待人工核對",
+			"transfer_id", row.ID.String(), "payment_id", row.PaymentID.String(), "transfer_external_id", snap.ExternalID)
+	}
+	return err
 }
 
 // markTransferCalled 在獨立的 transaction 記下「呼叫過」的時刻（呼叫 provider 之前提交）；列已不是 PENDING 時回 nil。
@@ -273,7 +291,7 @@ func (s *Service) transferLookupFailed(ctx context.Context, row store.PaymentTra
 		return errors.Join(cause, err)
 	}
 	if n >= LookupFailureLimit {
-		return s.anomalyTransfer(ctx, row, "lookup_failed")
+		return s.anomalyTransfer(ctx, row, "lookup_failed", "")
 	}
 	return fmt.Errorf("charge: 轉帳 %s 查回失敗：%w", row.ID, cause)
 }
@@ -290,8 +308,9 @@ func (s *Service) clearTransferLookupFailures(ctx context.Context, row store.Pay
 }
 
 // anomalyTransfer 讓 PENDING 的轉帳進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不是 PENDING 時什麼都不做。
-func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer, reason string) error {
-	s.d.Logger.ErrorContext(ctx, "payment：轉帳進 ANOMALY，待人工核對 provider", "transfer_id", row.ID.String(), "payment_id", row.PaymentID.String(), "reason", reason)
+// 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件（failure_reason 上限 200 字）。
+func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer, reason, detail string) error {
+	s.d.Logger.ErrorContext(ctx, "payment：轉帳進 ANOMALY，待人工核對 provider", "transfer_id", row.ID.String(), "payment_id", row.PaymentID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
@@ -303,7 +322,7 @@ func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer
 		if err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyTransfer, t.ID, t.PaymentID, reason)
+		return s.publishAnomaly(ctx, model.AnomalyTransfer, t.ID, t.PaymentID, withDetail(reason, detail))
 	})
 }
 

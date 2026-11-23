@@ -844,26 +844,20 @@ SET provider = $1,
     create_lookup_failures = 0,
     updated_at = $2
 WHERE id = $3 AND status = 'CREATING' AND external_payment_id IS NULL AND provider <> $1
-  AND (create_called_at IS NULL OR create_called_at < $4::timestamptz)
+  AND create_called_at IS NULL
 RETURNING id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 `
 
 type RebindCreatingPaymentParams struct {
-	Provider    string
-	Now         time.Time
-	ID          uuid.UUID
-	StaleBefore time.Time
+	Provider string
+	Now      time.Time
+	ID       uuid.UUID
 }
 
-// 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空），或已早於 stale_before（查無才算數的時刻）時改成目前的 provider，
-// 換新冪等鍵、重新起算呼叫時刻。呼叫過又還在期限內的列不動：舊 provider 的呼叫可能已經在 provider 那邊建出 PaymentIntent，改綁會讓買家拿到兩個。
+// 建立中、沒有外部 ID 的列屬於別的 provider（設定改了）：只在舊 provider 的呼叫從沒送出（create_called_at 為空）時改成目前的 provider，換新冪等鍵。
+// 呼叫過的列不改綁：舊 provider 已無法查回，無從證明它沒有建出 PaymentIntent，改綁會讓買家拿到兩個；那樣的列由呼叫方進 ANOMALY。
 func (q *Queries) RebindCreatingPayment(ctx context.Context, arg RebindCreatingPaymentParams) (PaymentPayment, error) {
-	row := q.db.QueryRow(ctx, rebindCreatingPayment,
-		arg.Provider,
-		arg.Now,
-		arg.ID,
-		arg.StaleBefore,
-	)
+	row := q.db.QueryRow(ctx, rebindCreatingPayment, arg.Provider, arg.Now, arg.ID)
 	var i PaymentPayment
 	err := row.Scan(
 		&i.ID,
