@@ -40,10 +40,10 @@
    "id": "upload-md5-order",
    "stack": "ts-package:hawkr-api-ts",
    "file": "packages/hawkr-api-ts/src/connect/upload.ts",
-   "old": "view.getUint32(off + i * 4, true)",
-   "new": "view.getUint32(off + i * 4, false)",
+   "old": "return btoa(bin);",
+   "new": "return btoa([...bin].reverse().join(\"\"));",
    "test": "tests/upload.test.ts matches node crypto",
-   "why": "MD5 位元組序錯"
+   "why": "MD5 摘要的位元組序錯（hash-wasm 之後這裡只剩摘要轉 base64）"
   },
   {
    "id": "upload-poll-no-timeout",
@@ -274,8 +274,8 @@
    "id": "b1-5a-buyer-replace-no-markdeleted",
    "stack": "go-integration",
    "file": "backend/internal/modules/buyer/internal/profile/profile.go",
-   "old": "if current.AvatarAssetID != nil && *current.AvatarAssetID != asset.ID {",
-   "new": "if false && current.AvatarAssetID != nil && *current.AvatarAssetID != asset.ID {",
+   "old": "[]uuid.UUID{asset.ID}); len(retired) > 0 {",
+   "new": "[]uuid.UUID{asset.ID}); false && len(retired) > 0 {",
    "test": "internal/modules/buyer ^TestReplacingTheAvatarConfirmsTheNewAssetAndMarksTheOldDeleted$",
    "why": "換頭像不再把被換掉的資產 MarkDeleted"
   },
@@ -283,8 +283,8 @@
    "id": "b1-5a-buyer-markdeleted-error-swallowed",
    "stack": "go-integration",
    "file": "backend/internal/modules/buyer/internal/profile/profile.go",
-   "old": "if err := service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID}); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}",
-   "new": "_ = service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID})",
+   "old": "if err := service.deps.Media.MarkDeleted(ctx, retired); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}",
+   "new": "_ = service.deps.Media.MarkDeleted(ctx, retired)",
    "test": "internal/modules/buyer ^TestRolledBackAvatarWriteLeavesTheNewAssetStaged$",
    "why": "MarkDeleted 失敗不再讓換圖整筆回滾，新資產被確認卻沒有刪掉舊的"
   },
@@ -301,10 +301,10 @@
    "id": "b1-5a-buyer-secure-avatar-allowed",
    "stack": "go-integration",
    "file": "backend/internal/modules/buyer/internal/profile/profile.go",
-   "old": "return media.RequireVisibility(ctx, media.VisibilityPublic, a)",
-   "new": "return \"\"",
+   "old": "\"AvatarStagedToken\", avatarToken, media.VisibilityPublic)",
+   "new": "\"AvatarStagedToken\", avatarToken, media.VisibilitySecure)",
    "test": "internal/modules/buyer ^TestSecureAssetCannotBeTheAvatar$",
-   "why": "機敏資產可以被當成公開頭像"
+   "why": "頭像欄位改要機敏可見性：機敏資產可以被當成頭像，公開資產反被拒"
   },
   {
    "id": "b1-5a-buyer-close-no-markdeleted",
@@ -355,19 +355,19 @@
    "id": "profile-image-must-be-public-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/seller/internal/profile/profile.go",
-   "old": "return media.RequireVisibility(ctx, media.VisibilityPublic, a)",
-   "new": "return \"\"",
+   "old": "[]model.ConfirmItem{{Field: c.field, Token: c.token}}, media.VisibilityPublic)",
+   "new": "[]model.ConfirmItem{{Field: c.field, Token: c.token}}, media.VisibilitySecure)",
    "test": "internal/modules/seller ^TestStoreImagesMustBePublicAssets$",
-   "why": "logo 與封面接受機敏資產"
+   "why": "logo 與封面改要機敏可見性：接受機敏資產"
   },
   {
    "id": "kyc-document-must-be-secure-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/seller/internal/kyc/documents.go",
-   "old": "return media.RequireVisibility(ctx, media.VisibilitySecure, a)",
-   "new": "return \"\"",
+   "old": "items, media.VisibilitySecure)",
+   "new": "items, media.VisibilityPublic)",
    "test": "internal/modules/seller ^TestKYCDocumentsMustBeSecureAssets$",
-   "why": "證件接受公開資產"
+   "why": "證件改要公開可見性：接受公開資產"
   },
   {
    "id": "kyc-replaced-document-not-deleted",
@@ -427,10 +427,10 @@
    "id": "evidence-must-be-secure-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/seller/internal/model/evidence.go",
-   "old": "return media.RequireVisibility(ctx, media.VisibilitySecure, a)",
-   "new": "return \"\"",
+   "old": "items, media.VisibilitySecure)",
+   "new": "items, media.VisibilityPublic)",
    "test": "internal/modules/seller ^TestEvidenceMustBeSecureAssets$",
-   "why": "佐證接受公開資產"
+   "why": "佐證改要公開可見性：接受公開資產"
   },
   {
    "id": "read-secure-missing-not-classified",
@@ -445,10 +445,10 @@
    "id": "read-secure-content-type-not-sniffed",
    "stack": "go",
    "file": "backend/internal/modules/seller/internal/model/media.go",
-   "old": "ContentType: http.DetectContentType(data[:min(len(data), secureSniffLen)])",
-   "new": "ContentType: http.DetectContentType(nil)",
-   "test": "internal/modules/seller/internal/model ^TestReadSecureSniffsTheTypeAndClassifiesFailures$",
-   "why": "機敏檔的型別不再由內容辨認"
+   "old": "return FileContent{Body: body, ContentType: contentType}, nil",
+   "new": "return FileContent{Body: body, ContentType: \"\"}, nil",
+   "test": "internal/modules/seller/internal/model ^TestReadSecureReturnsTheRecordedTypeAndClassifiesFailures$",
+   "why": "機敏檔的型別不再用 media 上傳時記下的型別"
   },
   {
    "id": "confirm-all-stops-reporting-all",
@@ -499,10 +499,10 @@
    "id": "prospect-image-must-be-public-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/seller/internal/prospect/images.go",
-   "old": "return media.RequireVisibility(ctx, media.VisibilityPublic, a)",
-   "new": "return \"\"",
+   "old": "items, media.VisibilityPublic)",
+   "new": "items, media.VisibilitySecure)",
    "test": "internal/modules/seller ^TestProspectImagesMustBePublicAssets$",
-   "why": "業者圖片接受機敏資產"
+   "why": "業者圖片改要機敏可見性：接受機敏資產"
   },
   {
    "id": "content-replace-no-markdeleted",
@@ -517,8 +517,8 @@
    "id": "content-delete-no-markdeleted",
    "stack": "go-integration",
    "file": "backend/internal/modules/content/internal/banner/banner.go",
-   "old": "\t\treturn m.d.Media.MarkDeleted(ctx, images.Retired([]uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}, nil))",
-   "new": "\t\t_ = old\n\t\treturn nil",
+   "old": "return m.d.Media.MarkDeleted(ctx, media.RetiredAssets([]uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}, nil))",
+   "new": "_ = old\n\t\treturn nil",
    "test": "internal/modules/content ^TestDeletingABannerMarksBothImagesDeleted$",
    "why": "刪除 banner 不再標記兩張圖刪除"
   },
@@ -534,10 +534,10 @@
   {
    "id": "content-retired-ignores-shared-asset",
    "stack": "go",
-   "file": "backend/internal/modules/content/internal/images/images.go",
-   "old": "if !slices.Contains(after, a) && !slices.Contains(out, a) {",
-   "new": "if !slices.Contains(out, a) {",
-   "test": "internal/modules/content/internal/images ^TestRetiredIsASetDifferenceAcrossAllSlotsOfTheRef$",
+   "file": "backend/internal/modules/media/retired.go",
+   "old": "if !slices.Contains(after, b) && !slices.Contains(out, b) {",
+   "new": "if !slices.Contains(out, b) {",
+   "test": "internal/modules/media ^TestRetiredAssetsIsADeduplicatedSetDifference$",
    "why": "退場不再扣掉仍被別的位置指著的資產"
   },
   {
@@ -679,7 +679,7 @@
    "id": "mod-snapshot-copy-not-confirmed",
    "stack": "go-integration",
    "file": "backend/internal/modules/moderation/internal/report/report.go",
-   "old": "\t\ta, err := s.d.Media.Confirm(ctx, up, copies[src])",
+   "old": "\t\ta, err := s.d.Media.Confirm(ctx, up, copies[src], media.VisibilityPublic)",
    "new": "\t\t_ = up\n\t\ta, err := media.ConfirmedAsset{ID: uuid.New()}, error(nil)\n\t\t_ = copies",
    "test": "internal/modules/moderation ^TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage$",
    "why": "複本沒被 Confirm，狀態不是 ACTIVE"
