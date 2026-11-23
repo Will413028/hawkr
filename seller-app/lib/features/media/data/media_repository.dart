@@ -14,6 +14,7 @@ import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/connect_provider.dart';
 import '../../../core/session/auth_session_provider.dart';
 import '../../../shared/utils/hk_log.dart';
+import '../../../shared/utils/image_format_detector.dart';
 import '../../../shared/utils/image_processing_service.dart';
 import 'media_model.dart';
 
@@ -126,9 +127,10 @@ class MediaRepository {
   /// 上傳聊天圖片
   Future<MediaUploadResult> uploadChatImage({required Uint8List bytes}) async {
     HKLog.logD('[MediaRepo] Uploading chat image: ${bytes.length} bytes');
+    final (ext, _) = ImageFormatDetector.detect(bytes);
     return uploadWithSession(
       bytes: bytes,
-      filename: 'chat_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      filename: 'chat_${DateTime.now().millisecondsSinceEpoch}.$ext',
       compress: true,
     );
   }
