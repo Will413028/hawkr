@@ -6,7 +6,7 @@
 
 - `Go-owner`：請求走 Connect，由單體模組處理（handler 在 `backend/internal/httpapi/**`，轉正在 `backend/internal/modules/**` 的 `media.FinalizeField`／`FinalizeList`）。
 - `Java`：請求走 `/api/v1` REST，經 gateway handler 呼叫 Java 服務的 gRPC。
-- `other-legacy-Go`：請求走 `/api/v1` REST，經 gateway 呼叫舊的 Go 服務（review-service、im-service、invoice-service、ai-service），舊服務自己呼叫 Java media 轉正。單體裡雖有同名模組（review、im），但 client 的 RPC 還沒搬過去（A6-6 未做；invoice 是 B10），所以現在的消費者是舊 Go 服務。
+- `other-legacy-Go`：請求走 `/api/v1` REST，經 gateway 呼叫舊的 Go 服務（invoice-service、ai-service），舊服務自己呼叫 Java media 轉正。review-service 與 im-service 已被 dev 的 A6-6 刪除，評價與聊天的 client 現在走 Connect 到單體的 review、im 模組（B1-9 合併後改標 Go-owner）。
 - `none`：路由存在但固定回 503，沒有消費者。
 - 證據等級：measured＝開過 client 呼叫點、帶 token 的請求、gateway handler 或單體 handler；inferred＝只靠名稱或欄位反推。
 
@@ -34,8 +34,8 @@ ref_type／scope：所有 client 建立會話時只送 `contentType`、`fileSize
 | W12 | `website/features/seller/components/ShipmentDialogs.tsx:271`（`TcatReservationDialog`，`seller-center/orders/OrderDetailClient.tsx:298` 送出） | 黑貓宅配取號附出貨照片 | REST `POST /app/shipments/:orderNo/generate_home_label` 的 `stagedTokens`（`website/lib/seller/shipment.ts:160-165`） | gateway `handler/shipping.go:429` → `h.Shipping` 的 GenerateHomeLabel → Java shipping-service | Java（shipping） | measured |
 | W13 | `ShipmentDialogs.tsx:587`（`SevenElevenShipDialog`，`OrderDetailClient.tsx:399` 送出） | 7-11 出貨確認附照片 | REST `POST /app/shipments/:orderNo/confirm` 的 `stagedTokens`（`shipment.ts:237-241`） | gateway `handler/shipping.go:1307` → `h.Shipping.ConfirmCvsShipment` → Java shipping-service | Java（shipping） | measured |
 | W14 | `website/features/seller-center/orders/SellerOrdersPage.tsx:1786`（`:1872` 送出） | 訂單列表超商確認出貨照片 | 同 W13 | 同 W13 | Java（shipping） | measured |
-| W15 | `website/features/account/screens/orders/ReviewClient.tsx:113` | 買家訂單評論圖 | REST `POST /app/reviews` 的 `stagedTokens`（`website/lib/reviews/repo.ts:313,327`） | gateway `handler/order_review.go:70` → `h.OrderReview.SubmitOrderReview` → 舊 Go review-service（`services/review-service/internal/grpc/handler.go:132-148`，自帶 media client 轉正） | other-legacy-Go（review-service；單體 `modules/review/internal/write/write.go:115` 已有轉正邏輯但 client RPC 未接，A6-6） | measured |
-| W16 | `website/lib/hooks/useChat.ts:361` | 買家聊天傳圖 | REST `POST /app/chat/messages`（`website/lib/chat/repo.ts:164`），content 放 staged token | gateway `handler/chat.go:194` → `h.IM.SendMessage` → 舊 Go im-service（`services/im-service/internal/usecase/message.go`）；單體 `modules/im/internal/write/send.go:55` 未接 client | other-legacy-Go（im-service） | measured（im-service 內部只到 grep 命中檔） |
+| W15 | `website/features/account/screens/orders/ReviewClient.tsx:113` | 買家訂單評論圖 | Connect `ReviewAppService.CreateReview` 的 `image_staged_tokens`（`website/lib/reviews/repo.ts`） | 單體 `modules/review/internal/write/write.go` 提交時在 transaction 內 `media.ConfirmFields`（舊 review-service 與 gateway `POST /app/reviews` 已被 dev 的 A6-6 刪除） | Go-owner（review） | measured（dev 合併後 2026-11-23，B1-9）|
+| W16 | `website/lib/hooks/useChat.ts:361` | 買家聊天傳圖 | Connect `ChatAppService` 送訊息的 `image_staged_token`（`website/lib/chat/repo.ts`） | 單體 `modules/im/internal/write/send.go`：`Send` 的 transaction 先取 request_id 的鎖與重送判定，之後才 `media.ConfirmField`（B1-D26；重送判定必須排在 Confirm 之前，否則並行或重送的同一個 request_id 會撞到 token 已確認，B1-D23） | Go-owner（im） | measured（dev 合併後 2026-11-23，B1-9）|
 | W17 | `website/features/account/screens/orders/ReturnClient.tsx:271` | 買家申請售後附照片 | REST `POST /app/after_sales` 的 `photoTokens`（`website/lib/after-sales/buyer-repo.ts:45-51`） | gateway `handler/aftersales.go:365` → `h.Aftersales.CreateAfterSaleCase` → Java aftersales-service（`EvidenceService`） | Java（aftersales） | measured |
 | W18 | `website/features/account/screens/after-sales/AfterSaleDetailClient.tsx:772` | 買家補件照片 | REST `POST /app/after_sales/:caseNo/supplement` 的 `photoTokens`（`buyer-repo.ts:76-83`） | gateway `aftersales.go:506` → `SupplementEvidence` → Java aftersales-service | Java（aftersales） | measured |
 | W19 | `AfterSaleDetailClient.tsx:875` | 買家申訴（仲裁）佐證 | REST `POST /app/after_sales/:caseNo/appeal` 的 `evidencePhotoTokens`（`buyer-repo.ts:88-100`） | gateway `aftersales.go:1107` → `SubmitAppeal` → Java aftersales-service | Java（aftersales） | measured |
@@ -69,7 +69,7 @@ ref_type／scope：所有 client 建立會話時只送 `contentType`、`fileSize
 | S7 | `product_upload_service.dart:626` | 商品圖庫（編輯） | REST `PUT /api/v1/app/products/{id}`（`:331`）（`:633`） | 同 S5 | Java（product） | measured |
 | S8 | `seller-app/lib/features/order/presentation/order_card_widgets/order_expanded_section.dart:23`（`order_bottom_row.dart:467`） | 宅配取號附出貨照片 | REST `POST /api/v1/app/shipments/$orderNo/generate_home_label`（`features/order/data/order_repository.dart:356`） | gateway `shipping.go:429` → Java shipping-service | Java（shipping） | measured |
 | S9 | 同上（`order_bottom_row.dart:631`） | 超商確認出貨附照片 | REST `POST /api/v1/app/shipments/$orderNo/confirm`（`order_repository.dart:212-220`） | gateway `shipping.go:1307` → Java shipping-service | Java（shipping） | measured |
-| S10 | `seller-app/lib/features/chat/presentation/chat_thread_screen.dart:609`（`seller_repository.dart:34`） | 賣家聊天傳圖 | REST `POST /api/v1/app/chat/messages`（`chat_repository.dart:746,994`） | gateway `chat.go:194` → 舊 Go im-service | other-legacy-Go（im-service） | measured |
+| S10 | `seller-app/lib/features/chat/presentation/chat_thread_screen.dart:609`（`seller_repository.dart:34`） | 賣家聊天傳圖 | Connect `ChatAppService` 送訊息的 `image_staged_token`（`seller-app` chat notifier `sendImage`） | 單體 `modules/im/internal/write/send.go`：`Send` 的 transaction 先取 request_id 的鎖與重送判定，之後才 `media.ConfirmField`（B1-D26；重送判定必須排在 Confirm 之前，否則並行或重送的同一個 request_id 會撞到 token 已確認，B1-D23） | Go-owner（im） | measured（dev 合併後 2026-11-23，B1-9）|
 | S11 | `seller-app/lib/features/seller/presentation/seller_inquiry_reply_screen.dart:189`（機敏） | 回覆平台詢問附件 | Connect `replyToInquiry`（`seller/data/inquiries.dart:188-192`） | seller 模組 `httpapi/seller/inquiries.go:92` | Go-owner（seller） | measured |
 | S12 | `seller_measure_request_form_screen.dart:273`（機敏） | 措施申覆／補救佐證 | Connect `submitAppeal`／`requestRemediation`（`seller/data/measures.dart:228-241`） | seller 模組 `httpapi/seller/measures.go:79,105` | Go-owner（seller） | measured |
 | S13 | `seller-app/lib/features/seller/data/kyc_wizard.dart:678`（機敏） | 認證證件文件 | Connect `saveKYCDraft`（`kyc_wizard.dart:446`） | seller 模組 `httpapi/seller/kyc.go:64` | Go-owner（seller） | measured |
@@ -84,8 +84,8 @@ ref_type／scope：所有 client 建立會話時只送 `contentType`、`fileSize
 | B4 | `buyer-app/lib/features/order/presentation/after_widgets/after_sale_screen.dart:133` | 申請售後照片 | REST `POST /app/after_sales`（`order/data/after_sale_repository.dart:34`）`photoTokens` | gateway `aftersales.go:365` → Java aftersales-service | Java（aftersales） | measured |
 | B5 | `after_widgets/submit_appeal_screen.dart:87` | 售後申訴佐證 | REST `POST /app/after_sales/:caseNo/appeal`（`after_sale_repository.dart:179`）`evidencePhotoTokens` | gateway `aftersales.go:1107` → Java aftersales-service | Java（aftersales） | measured |
 | B6 | `buyer-app/lib/features/order/presentation/confirm_receipt_dialog.dart:100` | 買家確認收貨附照片 | REST `POST /app/orders/{orderNo}/confirm_receipt`（`order/data/order_repository.dart:158`）`stagedTokens` | gateway `handler/order.go:862,865` → `h.Order.ConfirmReceipt` → Java order-service（`OrderGrpcService`） | Java（order） | measured |
-| B7 | `buyer-app/lib/features/review/presentation/order_review_screen.dart:184` | 訂單評論圖 | REST `POST /app/reviews`（`review/data/review_repository.dart:158,247`） | gateway `order_review.go:70` → 舊 Go review-service | other-legacy-Go（review-service） | measured |
-| B8 | `buyer-app/lib/features/chat/presentation/chat_thread_screen.dart:1206` | 聊天傳圖 | REST `POST {chat}/messages`（`chat/data/chat_repository.dart:684`） | gateway `chat.go:194` → 舊 Go im-service | other-legacy-Go（im-service） | measured |
+| B7 | `buyer-app/lib/features/review/presentation/order_review_screen.dart:184` | 訂單評論圖 | Connect `ReviewAppService.CreateReview` 的 `image_staged_tokens`（`review/data/review_repository.dart`） | 單體 `modules/review/internal/write/write.go` 提交時在 transaction 內 `media.ConfirmFields`（舊 review-service 與 gateway `POST /app/reviews` 已被 dev 的 A6-6 刪除） | Go-owner（review） | measured（dev 合併後 2026-11-23，B1-9）|
+| B8 | `buyer-app/lib/features/chat/presentation/chat_thread_screen.dart:1206` | 聊天傳圖 | Connect `ChatAppService` 送訊息的 `image_staged_token`（`buyer-app` chat notifier `sendImage`；送出中的氣泡用本機檔案預覽，B1-D18） | 單體 `modules/im/internal/write/send.go`：`Send` 的 transaction 先取 request_id 的鎖與重送判定，之後才 `media.ConfirmField`（B1-D26；重送判定必須排在 Confirm 之前，否則並行或重送的同一個 request_id 會撞到 token 已確認，B1-D23） | Go-owner（im） | measured（dev 合併後 2026-11-23，B1-9）|
 
 ## 二、`secure_download`／`secure_preview` URL 組裝與檔案擁有者
 
@@ -115,10 +115,9 @@ order 的 client 呼叫點只有 buyer-app 的 B6；website 的確認收貨（`w
 
 | 舊 Go 服務 | 列 | 說明 |
 |---|---|---|
-| review-service | W15、B7 | 單體 review 模組有轉正程式，但 client RPC 還沒切（A6-6）。B1-4 讓 client 拿 Go media 的 token，舊 review-service 仍用 Java media 轉正，收不下 |
-| im-service | W16、S10、B8 | 同上，單體 im 模組的 client RPC 也還沒切（A6-6） |
 | invoice-service | W25、A3 | B10 才搬；B1 計畫書沒寫這兩條流程在 B1-4 後的處置 |
 | ai-service | A4 | 計畫書「不做」段提到 ai 等舊 Go 服務的 media client 隨服務目錄刪除，但 AI 風格縮圖這條流程的處置沒寫 |
+| imageai 模組（尚未搬進單體，目前只有骨架；dev 的契約 `api/hawkr/admin/imageai/v1alpha1/imageai.proto` 的 `thumbnail_staged_token`） | A4（AI 風格縮圖） | 未來列：模組實作時 `ai_styles.thumbnail_asset_id` 在自己的 transaction 內 `Confirm(…, VisibilityPublic)`，更新與刪除時 `MarkDeleted` 被換掉的縮圖，並以 `media.NewFake()`／UUID 資產 ID 寫測試；在那之前 A4 仍是 ai-service 流程，本機失敗 |
 | invoice-service（下載） | 第二節 `seller-repo.ts:439,1068` | 稅籍證明與收據授權核定文件的 `secure_download`：invoice 的檔案面只服務發票 PDF，沒有擁有者端點；B1-4 刪掉組 media 網址的程式，下載本機失敗到 B10（設計審查 2026-11-23） |
 
 ## 五、統計
@@ -130,26 +129,28 @@ order 的 client 呼叫點只有 buyer-app 的 B6；website 的確認收貨（`w
 | admin | 5 |
 | seller-app | 13 |
 | buyer-app | 8 |
-| Go-owner | 21（website 8、admin 3、seller-app 7、buyer-app 3） |
+| Go-owner | 26（website 10、admin 3、seller-app 8、buyer-app 5） |
 | Java | 21（website 13、admin 0、seller-app 5、buyer-app 3） |
-| other-legacy-Go | 8（website 3、admin 2、seller-app 1、buyer-app 2） |
+| other-legacy-Go | 3（website 1、admin 2；review-service、im-service 被 dev 刪除後，W15、W16、S10、B7、B8 改標 Go-owner，B1-9） |
 | none（503） | 1（website W3） |
 | 無法判定 | 0 |
 
-Go-owner 21 列依單體模組：
+Go-owner 26 列依單體模組：
 
 - seller：W2、W21、W22、W23、W24、A2、A5、S1、S2、S11、S12、S13、B2、B3，共 14
 - social：W4、W5、S3、S4，共 4
 - buyer：W1、B1，共 2
 - content：A1，共 1
+- review：W15、B7，共 2
+- im：W16、S10、B8，共 3
 
-B1 計畫書寫「七個擁有者後端（buyer、content、im、moderation、review、seller、social）」。實際命中的單體模組只有 seller、social、buyer、content 四個。moderation 沒有任何 client 上傳呼叫點直達（檢舉走 seller 模組的 `Reports`；`modules/moderation/internal/mediaref` 只管引用）。review、im 目前的消費者是舊 Go 服務（第四節），不是單體模組。
+B1 計畫書寫「七個擁有者後端（buyer、content、im、moderation、review、seller、social）」。client 上傳呼叫點直達的單體模組是 seller、social、buyer、content，以及 dev 的 A6-6 把 client 切到單體之後的 review、im（B1-9）。moderation 沒有任何 client 上傳呼叫點直達（檢舉走 seller 模組的 `Reports`；佐證圖片由 moderation 在建快照時 `CopyPublic`，B1-D20）。
 
 ## 六、無法驗證或只到推論
 
 - W7：代行商品頁是否掛 DescriptionEditor 沒逐一確認（inferred）。
 - S4：賣家 App 貼文編輯對應的單體 handler 沒逐行開，只由請求欄位與 proto 反推。
 - Java 端 token 轉正（`FinalizeImages`）靠 grep 命中檔名（`ProductService.java`、`ShippingService.java`、`OrderGrpcService.java`、`EvidenceService.java`），沒有逐行追到。
-- 舊 Go 服務（review、im、invoice、ai）的轉正細節只開過 client 與 usecase 的命中行。
+- 舊 Go 服務（invoice、ai）的轉正細節只開過 client 與 usecase 的命中行。
 - website `lib/seller/shipment.ts:205-215` 的 `printCvsLabel` 有 `stagedTokens` 參數，但 gateway 的 `PrintCvsLabelReq` 沒有這個欄位，也沒有呼叫端傳值，屬死參數，不列為呼叫點。
 - 沒有跑任何 build、測試或 client；全部是靜態閱讀。
