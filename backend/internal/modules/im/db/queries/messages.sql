@@ -1,11 +1,14 @@
 -- 訊息列：寫入、讀取、抹除。
 
 -- name: InsertMessage :one
--- 撞 (對話, 寄件方, request_id) 的唯一鍵時不寫、不回列（pgx.ErrNoRows）：呼叫端把整個 transaction 回滾（連同 AllocateSeq 推進的 seq）再重來，重讀第一則。
+-- 呼叫端已持有 LockSendRequest 的鎖並做過重送判定，所以不會撞 (對話, 寄件方, request_id) 的唯一鍵；唯一鍵留作最後防線，撞到回錯誤（Internal）。
 INSERT INTO im.messages (id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at)
 VALUES (sqlc.arg(id), sqlc.arg(conversation_id), sqlc.arg(seq), sqlc.arg(sender_kind), sqlc.arg(request_id), sqlc.arg(message_type), sqlc.narg(content), sqlc.narg(image_asset_id), sqlc.narg(image_object_key), sqlc.arg(now))
-ON CONFLICT ON CONSTRAINT messages_request_key DO NOTHING
 RETURNING *;
+
+-- name: LockSendRequest :exec
+-- 同一個 (買家, 店家, 寄件方, request_id) 的送出在這裡排隊（交易級 advisory lock，不鎖業務列，不在鎖序裡）：取得之後的 MessageByRequest 看得到前一個交易已提交的訊息。
+SELECT pg_advisory_xact_lock(hashtextextended('im.send:' || sqlc.arg(buyer_id)::bigint::text || ':' || sqlc.arg(store_id)::bigint::text || ':' || sqlc.arg(sender_kind)::text || ':' || sqlc.arg(request_id)::uuid::text, 0));
 
 -- name: MessageByRequest :one
 -- 送出冪等的重送判定：這個對話、這一方、這個 request_id 第一次寫入的訊息；對話還不存在或沒有這個 request_id 時沒有列。隱藏的以 hidden 標出（同列表查詢的述詞），內容由呼叫端換成墓碑；不鎖列。
