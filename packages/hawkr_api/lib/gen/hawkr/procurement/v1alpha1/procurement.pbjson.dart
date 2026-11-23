@@ -999,13 +999,12 @@ const PublishedRfq$json = {
     {'1': 'recipient_count', '3': 4, '4': 1, '5': 5, '10': 'recipientCount'},
     {'1': 'queued_count', '3': 5, '4': 1, '5': 5, '10': 'queuedCount'},
     {
-      '1': 'confirmed_rfq_snapshot_id',
+      '1': 'seller_facing_hash',
       '3': 6,
       '4': 1,
       '5': 9,
-      '10': 'confirmedRfqSnapshotId'
+      '10': 'sellerFacingHash'
     },
-    {'1': 'rfq_snapshot_hash', '3': 7, '4': 1, '5': 9, '10': 'rfqSnapshotHash'},
   ],
 };
 
@@ -1014,9 +1013,8 @@ final $typed_data.Uint8List publishedRfqDescriptor = $convert.base64Decode(
     'CgxQdWJsaXNoZWRSZnESJQoOcHVibGljYXRpb25faWQYASABKAlSDXB1YmxpY2F0aW9uSWQSGA'
     'oHdmVyc2lvbhgCIAEoCVIHdmVyc2lvbhI9CgxwdWJsaXNoX3RpbWUYAyABKAsyGi5nb29nbGUu'
     'cHJvdG9idWYuVGltZXN0YW1wUgtwdWJsaXNoVGltZRInCg9yZWNpcGllbnRfY291bnQYBCABKA'
-    'VSDnJlY2lwaWVudENvdW50EiEKDHF1ZXVlZF9jb3VudBgFIAEoBVILcXVldWVkQ291bnQSOQoZ'
-    'Y29uZmlybWVkX3JmcV9zbmFwc2hvdF9pZBgGIAEoCVIWY29uZmlybWVkUmZxU25hcHNob3RJZB'
-    'IqChFyZnFfc25hcHNob3RfaGFzaBgHIAEoCVIPcmZxU25hcHNob3RIYXNo');
+    'VSDnJlY2lwaWVudENvdW50EiEKDHF1ZXVlZF9jb3VudBgFIAEoBVILcXVldWVkQ291bnQSLAoS'
+    'c2VsbGVyX2ZhY2luZ19oYXNoGAYgASgJUhBzZWxsZXJGYWNpbmdIYXNo');
 
 @$core.Deprecated('Use conversationMessageDescriptor instead')
 const ConversationMessage$json = {
@@ -1704,16 +1702,8 @@ const PreviewRfqPriceRequest$json = {
       '10': 'expectedRevisionId'
     },
     {
-      '1': 'client_request_id',
-      '3': 3,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'clientRequestId'
-    },
-    {
       '1': 'buyer_requested_range',
-      '3': 4,
+      '3': 3,
       '4': 1,
       '5': 11,
       '6': '.hawkr.procurement.v1alpha1.BuyerRequestedRange',
@@ -1727,28 +1717,24 @@ const PreviewRfqPriceRequest$json = {
 final $typed_data.Uint8List previewRfqPriceRequestDescriptor = $convert.base64Decode(
     'ChZQcmV2aWV3UmZxUHJpY2VSZXF1ZXN0EiIKCnJlcXVlc3RfaWQYASABKAlCA+BBAlIJcmVxdW'
     'VzdElkEjUKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAIgASgJQgPgQQJSEmV4cGVjdGVkUmV2aXNp'
-    'b25JZBI3ChFjbGllbnRfcmVxdWVzdF9pZBgDIAEoCUIL4EEC4ozP1wgCCAFSD2NsaWVudFJlcX'
-    'Vlc3RJZBJoChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYBCABKAsyLy5oYXdrci5wcm9jdXJlbWVu'
-    'dC52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlQgPgQQJSE2J1eWVyUmVxdWVzdGVkUmFuZ2'
-    'U=');
+    'b25JZBJoChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYAyABKAsyLy5oYXdrci5wcm9jdXJlbWVudC'
+    '52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlQgPgQQJSE2J1eWVyUmVxdWVzdGVkUmFuZ2U=');
 
 @$core.Deprecated('Use previewRfqPriceResponseDescriptor instead')
 const PreviewRfqPriceResponse$json = {
   '1': 'PreviewRfqPriceResponse',
   '2': [
-    {'1': 'price_preview_id', '3': 1, '4': 1, '5': 9, '10': 'pricePreviewId'},
     {
       '1': 'buyer_requested_range',
-      '3': 3,
+      '3': 1,
       '4': 1,
       '5': 11,
       '6': '.hawkr.procurement.v1alpha1.BuyerRequestedRange',
       '10': 'buyerRequestedRange'
     },
-    {'1': 'payload_hash', '3': 4, '4': 1, '5': 9, '10': 'payloadHash'},
     {
       '1': 'quote_total_range',
-      '3': 5,
+      '3': 2,
       '4': 1,
       '5': 11,
       '6': '.hawkr.procurement.v1alpha1.QuoteTotalRange',
@@ -1760,103 +1746,15 @@ const PreviewRfqPriceResponse$json = {
   '8': [
     {'1': '_quote_total_range'},
   ],
-  '9': [
-    {'1': 2, '2': 3},
-  ],
-  '10': ['version'],
 };
 
 /// Descriptor for `PreviewRfqPriceResponse`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List previewRfqPriceResponseDescriptor = $convert.base64Decode(
-    'ChdQcmV2aWV3UmZxUHJpY2VSZXNwb25zZRIoChBwcmljZV9wcmV2aWV3X2lkGAEgASgJUg5wcm'
-    'ljZVByZXZpZXdJZBJjChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYAyABKAsyLy5oYXdrci5wcm9j'
-    'dXJlbWVudC52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlUhNidXllclJlcXVlc3RlZFJhbm'
-    'dlEiEKDHBheWxvYWRfaGFzaBgEIAEoCVILcGF5bG9hZEhhc2gSXAoRcXVvdGVfdG90YWxfcmFu'
-    'Z2UYBSABKAsyKy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5RdW90ZVRvdGFsUmFuZ2VIAF'
-    'IPcXVvdGVUb3RhbFJhbmdliAEBQhQKEl9xdW90ZV90b3RhbF9yYW5nZUoECAIQA1IHdmVyc2lv'
-    'bg==');
-
-@$core.Deprecated('Use confirmRfqSnapshotRequestDescriptor instead')
-const ConfirmRfqSnapshotRequest$json = {
-  '1': 'ConfirmRfqSnapshotRequest',
-  '2': [
-    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'requestId'},
-    {
-      '1': 'client_request_id',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'clientRequestId'
-    },
-    {
-      '1': 'expected_revision_id',
-      '3': 3,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'expectedRevisionId'
-    },
-    {
-      '1': 'price_preview_id',
-      '3': 4,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'pricePreviewId'
-    },
-    {'1': 'payload_hash', '3': 6, '4': 1, '5': 9, '8': {}, '10': 'payloadHash'},
-    {'1': 'buyer_note', '3': 7, '4': 1, '5': 9, '10': 'buyerNote'},
-  ],
-  '9': [
-    {'1': 5, '2': 6},
-  ],
-  '10': ['price_preview_version'],
-};
-
-/// Descriptor for `ConfirmRfqSnapshotRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List confirmRfqSnapshotRequestDescriptor = $convert.base64Decode(
-    'ChlDb25maXJtUmZxU25hcHNob3RSZXF1ZXN0EiIKCnJlcXVlc3RfaWQYASABKAlCA+BBAlIJcm'
-    'VxdWVzdElkEjcKEWNsaWVudF9yZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIAVIPY2xpZW50'
-    'UmVxdWVzdElkEjUKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAMgASgJQgPgQQJSEmV4cGVjdGVkUm'
-    'V2aXNpb25JZBItChBwcmljZV9wcmV2aWV3X2lkGAQgASgJQgPgQQJSDnByaWNlUHJldmlld0lk'
-    'EiYKDHBheWxvYWRfaGFzaBgGIAEoCUID4EECUgtwYXlsb2FkSGFzaBIdCgpidXllcl9ub3RlGA'
-    'cgASgJUglidXllck5vdGVKBAgFEAZSFXByaWNlX3ByZXZpZXdfdmVyc2lvbg==');
-
-@$core.Deprecated('Use confirmRfqSnapshotResponseDescriptor instead')
-const ConfirmRfqSnapshotResponse$json = {
-  '1': 'ConfirmRfqSnapshotResponse',
-  '2': [
-    {
-      '1': 'confirmed_rfq_snapshot_id',
-      '3': 1,
-      '4': 1,
-      '5': 9,
-      '10': 'confirmedRfqSnapshotId'
-    },
-    {'1': 'payload_hash', '3': 2, '4': 1, '5': 9, '10': 'payloadHash'},
-    {
-      '1': 'expire_time',
-      '3': 3,
-      '4': 1,
-      '5': 11,
-      '6': '.google.protobuf.Timestamp',
-      '9': 0,
-      '10': 'expireTime',
-      '17': true
-    },
-  ],
-  '8': [
-    {'1': '_expire_time'},
-  ],
-};
-
-/// Descriptor for `ConfirmRfqSnapshotResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List confirmRfqSnapshotResponseDescriptor = $convert.base64Decode(
-    'ChpDb25maXJtUmZxU25hcHNob3RSZXNwb25zZRI5Chljb25maXJtZWRfcmZxX3NuYXBzaG90X2'
-    'lkGAEgASgJUhZjb25maXJtZWRSZnFTbmFwc2hvdElkEiEKDHBheWxvYWRfaGFzaBgCIAEoCVIL'
-    'cGF5bG9hZEhhc2gSQAoLZXhwaXJlX3RpbWUYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZX'
-    'N0YW1wSABSCmV4cGlyZVRpbWWIAQFCDgoMX2V4cGlyZV90aW1l');
+    'ChdQcmV2aWV3UmZxUHJpY2VSZXNwb25zZRJjChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYASABKA'
+    'syLy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlUhNidXll'
+    'clJlcXVlc3RlZFJhbmdlElwKEXF1b3RlX3RvdGFsX3JhbmdlGAIgASgLMisuaGF3a3IucHJvY3'
+    'VyZW1lbnQudjFhbHBoYTEuUXVvdGVUb3RhbFJhbmdlSABSD3F1b3RlVG90YWxSYW5nZYgBAUIU'
+    'ChJfcXVvdGVfdG90YWxfcmFuZ2U=');
 
 @$core.Deprecated('Use sellerFacingRequestedRangeDescriptor instead')
 const SellerFacingRequestedRange$json = {
@@ -1996,33 +1894,35 @@ const PreviewRfqPublicationRequest$json = {
       '10': 'expectedRevisionId'
     },
     {
-      '1': 'confirmed_rfq_snapshot_id',
+      '1': 'buyer_requested_range',
       '3': 4,
       '4': 1,
-      '5': 9,
+      '5': 11,
+      '6': '.hawkr.procurement.v1alpha1.BuyerRequestedRange',
       '8': {},
-      '10': 'confirmedRfqSnapshotId'
+      '10': 'buyerRequestedRange'
     },
+    {'1': 'buyer_note', '3': 5, '4': 1, '5': 9, '10': 'buyerNote'},
     {
       '1': 'audience_mode',
-      '3': 5,
+      '3': 6,
       '4': 1,
       '5': 14,
       '6': '.hawkr.procurement.v1alpha1.AudienceMode',
       '8': {},
       '10': 'audienceMode'
     },
-    {'1': 'candidate_set_id', '3': 6, '4': 1, '5': 9, '10': 'candidateSetId'},
+    {'1': 'candidate_set_id', '3': 7, '4': 1, '5': 9, '10': 'candidateSetId'},
     {
       '1': 'selected_candidate_ids',
-      '3': 7,
+      '3': 8,
       '4': 3,
       '5': 9,
       '10': 'selectedCandidateIds'
     },
     {
       '1': 'response_deadline',
-      '3': 8,
+      '3': 9,
       '4': 1,
       '5': 11,
       '6': '.google.type.Date',
@@ -2041,13 +1941,14 @@ final $typed_data.Uint8List previewRfqPublicationRequestDescriptor = $convert.ba
     'ChxQcmV2aWV3UmZxUHVibGljYXRpb25SZXF1ZXN0EiIKCnJlcXVlc3RfaWQYASABKAlCA+BBAl'
     'IJcmVxdWVzdElkEjcKEWNsaWVudF9yZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIAVIPY2xp'
     'ZW50UmVxdWVzdElkEjUKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAMgASgJQgPgQQJSEmV4cGVjdG'
-    'VkUmV2aXNpb25JZBI+Chljb25maXJtZWRfcmZxX3NuYXBzaG90X2lkGAQgASgJQgPgQQJSFmNv'
-    'bmZpcm1lZFJmcVNuYXBzaG90SWQSUgoNYXVkaWVuY2VfbW9kZRgFIAEoDjIoLmhhd2tyLnByb2'
-    'N1cmVtZW50LnYxYWxwaGExLkF1ZGllbmNlTW9kZUID4EECUgxhdWRpZW5jZU1vZGUSKAoQY2Fu'
-    'ZGlkYXRlX3NldF9pZBgGIAEoCVIOY2FuZGlkYXRlU2V0SWQSNAoWc2VsZWN0ZWRfY2FuZGlkYX'
-    'RlX2lkcxgHIAMoCVIUc2VsZWN0ZWRDYW5kaWRhdGVJZHMSQwoRcmVzcG9uc2VfZGVhZGxpbmUY'
-    'CCABKAsyES5nb29nbGUudHlwZS5EYXRlSABSEHJlc3BvbnNlRGVhZGxpbmWIAQFCFAoSX3Jlc3'
-    'BvbnNlX2RlYWRsaW5l');
+    'VkUmV2aXNpb25JZBJoChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYBCABKAsyLy5oYXdrci5wcm9j'
+    'dXJlbWVudC52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlQgPgQQJSE2J1eWVyUmVxdWVzdG'
+    'VkUmFuZ2USHQoKYnV5ZXJfbm90ZRgFIAEoCVIJYnV5ZXJOb3RlElIKDWF1ZGllbmNlX21vZGUY'
+    'BiABKA4yKC5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5BdWRpZW5jZU1vZGVCA+BBAlIMYX'
+    'VkaWVuY2VNb2RlEigKEGNhbmRpZGF0ZV9zZXRfaWQYByABKAlSDmNhbmRpZGF0ZVNldElkEjQK'
+    'FnNlbGVjdGVkX2NhbmRpZGF0ZV9pZHMYCCADKAlSFHNlbGVjdGVkQ2FuZGlkYXRlSWRzEkMKEX'
+    'Jlc3BvbnNlX2RlYWRsaW5lGAkgASgLMhEuZ29vZ2xlLnR5cGUuRGF0ZUgAUhByZXNwb25zZURl'
+    'YWRsaW5liAEBQhQKEl9yZXNwb25zZV9kZWFkbGluZQ==');
 
 @$core.Deprecated('Use previewRfqPublicationResponseDescriptor instead')
 const PreviewRfqPublicationResponse$json = {
@@ -2895,12 +2796,12 @@ const AcceptSellerQuoteRequest$json = {
       '10': 'expectedSellerResponseVersion'
     },
     {
-      '1': 'expected_rfq_snapshot_hash',
+      '1': 'expected_seller_facing_hash',
       '3': 5,
       '4': 1,
       '5': 9,
       '8': {},
-      '10': 'expectedRfqSnapshotHash'
+      '10': 'expectedSellerFacingHash'
     },
   ],
 };
@@ -2911,8 +2812,8 @@ final $typed_data.Uint8List acceptSellerQuoteRequestDescriptor = $convert.base64
     'F1ZXN0SWQSNwoRY2xpZW50X3JlcXVlc3RfaWQYAiABKAlCC+BBAuKMz9cIAggBUg9jbGllbnRS'
     'ZXF1ZXN0SWQSMQoSc2VsbGVyX3Jlc3BvbnNlX2lkGAMgASgJQgPgQQJSEHNlbGxlclJlc3Bvbn'
     'NlSWQSTAogZXhwZWN0ZWRfc2VsbGVyX3Jlc3BvbnNlX3ZlcnNpb24YBCABKAlCA+BBAlIdZXhw'
-    'ZWN0ZWRTZWxsZXJSZXNwb25zZVZlcnNpb24SQAoaZXhwZWN0ZWRfcmZxX3NuYXBzaG90X2hhc2'
-    'gYBSABKAlCA+BBAlIXZXhwZWN0ZWRSZnFTbmFwc2hvdEhhc2g=');
+    'ZWN0ZWRTZWxsZXJSZXNwb25zZVZlcnNpb24SQgobZXhwZWN0ZWRfc2VsbGVyX2ZhY2luZ19oYX'
+    'NoGAUgASgJQgPgQQJSGGV4cGVjdGVkU2VsbGVyRmFjaW5nSGFzaA==');
 
 @$core.Deprecated('Use acceptSellerQuoteResponseDescriptor instead')
 const AcceptSellerQuoteResponse$json = {
@@ -4088,12 +3989,8 @@ const $core.Map<$core.String, $core.dynamic>
     {
       '1': 'PreviewRfqPrice',
       '2': '.hawkr.procurement.v1alpha1.PreviewRfqPriceRequest',
-      '3': '.hawkr.procurement.v1alpha1.PreviewRfqPriceResponse'
-    },
-    {
-      '1': 'ConfirmRfqSnapshot',
-      '2': '.hawkr.procurement.v1alpha1.ConfirmRfqSnapshotRequest',
-      '3': '.hawkr.procurement.v1alpha1.ConfirmRfqSnapshotResponse'
+      '3': '.hawkr.procurement.v1alpha1.PreviewRfqPriceResponse',
+      '4': {'34': 1},
     },
     {
       '1': 'PreviewRfqPublication',
@@ -4225,10 +4122,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.procurement.v1alpha1.PreviewRfqPriceResponse':
       PreviewRfqPriceResponse$json,
   '.hawkr.procurement.v1alpha1.QuoteTotalRange': QuoteTotalRange$json,
-  '.hawkr.procurement.v1alpha1.ConfirmRfqSnapshotRequest':
-      ConfirmRfqSnapshotRequest$json,
-  '.hawkr.procurement.v1alpha1.ConfirmRfqSnapshotResponse':
-      ConfirmRfqSnapshotResponse$json,
   '.hawkr.procurement.v1alpha1.PreviewRfqPublicationRequest':
       PreviewRfqPublicationRequest$json,
   '.hawkr.procurement.v1alpha1.PreviewRfqPublicationResponse':
@@ -4317,45 +4210,43 @@ final $typed_data.Uint8List buyerProcurementAppServiceDescriptor = $convert.base
     'dEFuc3dlchIvLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlN1Ym1pdEFuc3dlclJlcXVlc3'
     'QaMC5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5TdWJtaXRBbnN3ZXJSZXNwb25zZRJfCgZS'
     'ZXdpbmQSKS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5SZXdpbmRSZXF1ZXN0GiouaGF3a3'
-    'IucHJvY3VyZW1lbnQudjFhbHBoYTEuUmV3aW5kUmVzcG9uc2USegoPUHJldmlld1JmcVByaWNl'
+    'IucHJvY3VyZW1lbnQudjFhbHBoYTEuUmV3aW5kUmVzcG9uc2USfwoPUHJldmlld1JmcVByaWNl'
     'EjIuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUHJldmlld1JmcVByaWNlUmVxdWVzdBozLm'
-    'hhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlByZXZpZXdSZnFQcmljZVJlc3BvbnNlEoMBChJD'
-    'b25maXJtUmZxU25hcHNob3QSNS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5Db25maXJtUm'
-    'ZxU25hcHNob3RSZXF1ZXN0GjYuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuQ29uZmlybVJm'
-    'cVNuYXBzaG90UmVzcG9uc2USjAEKFVByZXZpZXdSZnFQdWJsaWNhdGlvbhI4Lmhhd2tyLnByb2'
-    'N1cmVtZW50LnYxYWxwaGExLlByZXZpZXdSZnFQdWJsaWNhdGlvblJlcXVlc3QaOS5oYXdrci5w'
-    'cm9jdXJlbWVudC52MWFscGhhMS5QcmV2aWV3UmZxUHVibGljYXRpb25SZXNwb25zZRKMAQoVRX'
-    'hlY3V0ZVJmcVB1YmxpY2F0aW9uEjguaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuRXhlY3V0'
-    'ZVJmcVB1YmxpY2F0aW9uUmVxdWVzdBo5Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkV4ZW'
-    'N1dGVSZnFQdWJsaWNhdGlvblJlc3BvbnNlEoUBChFMaXN0Q29udmVyc2F0aW9ucxI0Lmhhd2ty'
-    'LnByb2N1cmVtZW50LnYxYWxwaGExLkxpc3RDb252ZXJzYXRpb25zUmVxdWVzdBo1Lmhhd2tyLn'
-    'Byb2N1cmVtZW50LnYxYWxwaGExLkxpc3RDb252ZXJzYXRpb25zUmVzcG9uc2UiA5ACARKXAQoX'
-    'R2V0Q29udmVyc2F0aW9uTWVzc2FnZXMSOi5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5HZX'
-    'RDb252ZXJzYXRpb25NZXNzYWdlc1JlcXVlc3QaOy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhh'
-    'MS5HZXRDb252ZXJzYXRpb25NZXNzYWdlc1Jlc3BvbnNlIgOQAgESiAEKEkdldFJ1bnRpbWVTbm'
-    'Fwc2hvdBI1Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkdldFJ1bnRpbWVTbmFwc2hvdFJl'
-    'cXVlc3QaNi5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5HZXRSdW50aW1lU25hcHNob3RSZX'
-    'Nwb25zZSIDkAIBEosBChNMaXN0U2VsbGVyUmVzcG9uc2VzEjYuaGF3a3IucHJvY3VyZW1lbnQu'
-    'djFhbHBoYTEuTGlzdFNlbGxlclJlc3BvbnNlc1JlcXVlc3QaNy5oYXdrci5wcm9jdXJlbWVudC'
-    '52MWFscGhhMS5MaXN0U2VsbGVyUmVzcG9uc2VzUmVzcG9uc2UiA5ACARKAAQoRUHV0U2hvcnRs'
-    'aXN0RW50cnkSNC5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5QdXRTaG9ydGxpc3RFbnRyeV'
-    'JlcXVlc3QaNS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5QdXRTaG9ydGxpc3RFbnRyeVJl'
-    'c3BvbnNlEokBChREZWxldGVTaG9ydGxpc3RFbnRyeRI3Lmhhd2tyLnByb2N1cmVtZW50LnYxYW'
-    'xwaGExLkRlbGV0ZVNob3J0bGlzdEVudHJ5UmVxdWVzdBo4Lmhhd2tyLnByb2N1cmVtZW50LnYx'
-    'YWxwaGExLkRlbGV0ZVNob3J0bGlzdEVudHJ5UmVzcG9uc2USgAEKEUFjY2VwdFNlbGxlclF1b3'
-    'RlEjQuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuQWNjZXB0U2VsbGVyUXVvdGVSZXF1ZXN0'
-    'GjUuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuQWNjZXB0U2VsbGVyUXVvdGVSZXNwb25zZR'
-    'KDAQoSUmVuYW1lQ29udmVyc2F0aW9uEjUuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUmVu'
-    'YW1lQ29udmVyc2F0aW9uUmVxdWVzdBo2Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlJlbm'
-    'FtZUNvbnZlcnNhdGlvblJlc3BvbnNlEoMBChJEZWxldGVDb252ZXJzYXRpb24SNS5oYXdrci5w'
-    'cm9jdXJlbWVudC52MWFscGhhMS5EZWxldGVDb252ZXJzYXRpb25SZXF1ZXN0GjYuaGF3a3IucH'
-    'JvY3VyZW1lbnQudjFhbHBoYTEuRGVsZXRlQ29udmVyc2F0aW9uUmVzcG9uc2USZwoIV2F0Y2hS'
-    'dW4SKy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5XYXRjaFJ1blJlcXVlc3QaLC5oYXdrci'
-    '5wcm9jdXJlbWVudC52MWFscGhhMS5XYXRjaFJ1blJlc3BvbnNlMAESaAoJQ2FuY2VsUnVuEiwu'
-    'aGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuQ2FuY2VsUnVuUmVxdWVzdBotLmhhd2tyLnByb2'
-    'N1cmVtZW50LnYxYWxwaGExLkNhbmNlbFJ1blJlc3BvbnNlEmgKCVJlc3VtZVJ1bhIsLmhhd2ty'
-    'LnByb2N1cmVtZW50LnYxYWxwaGExLlJlc3VtZVJ1blJlcXVlc3QaLS5oYXdrci5wcm9jdXJlbW'
-    'VudC52MWFscGhhMS5SZXN1bWVSdW5SZXNwb25zZQ==');
+    'hhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlByZXZpZXdSZnFQcmljZVJlc3BvbnNlIgOQAgES'
+    'jAEKFVByZXZpZXdSZnFQdWJsaWNhdGlvbhI4Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLl'
+    'ByZXZpZXdSZnFQdWJsaWNhdGlvblJlcXVlc3QaOS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhh'
+    'MS5QcmV2aWV3UmZxUHVibGljYXRpb25SZXNwb25zZRKMAQoVRXhlY3V0ZVJmcVB1YmxpY2F0aW'
+    '9uEjguaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuRXhlY3V0ZVJmcVB1YmxpY2F0aW9uUmVx'
+    'dWVzdBo5Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkV4ZWN1dGVSZnFQdWJsaWNhdGlvbl'
+    'Jlc3BvbnNlEoUBChFMaXN0Q29udmVyc2F0aW9ucxI0Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxw'
+    'aGExLkxpc3RDb252ZXJzYXRpb25zUmVxdWVzdBo1Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaG'
+    'ExLkxpc3RDb252ZXJzYXRpb25zUmVzcG9uc2UiA5ACARKXAQoXR2V0Q29udmVyc2F0aW9uTWVz'
+    'c2FnZXMSOi5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5HZXRDb252ZXJzYXRpb25NZXNzYW'
+    'dlc1JlcXVlc3QaOy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5HZXRDb252ZXJzYXRpb25N'
+    'ZXNzYWdlc1Jlc3BvbnNlIgOQAgESiAEKEkdldFJ1bnRpbWVTbmFwc2hvdBI1Lmhhd2tyLnByb2'
+    'N1cmVtZW50LnYxYWxwaGExLkdldFJ1bnRpbWVTbmFwc2hvdFJlcXVlc3QaNi5oYXdrci5wcm9j'
+    'dXJlbWVudC52MWFscGhhMS5HZXRSdW50aW1lU25hcHNob3RSZXNwb25zZSIDkAIBEosBChNMaX'
+    'N0U2VsbGVyUmVzcG9uc2VzEjYuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuTGlzdFNlbGxl'
+    'clJlc3BvbnNlc1JlcXVlc3QaNy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5MaXN0U2VsbG'
+    'VyUmVzcG9uc2VzUmVzcG9uc2UiA5ACARKAAQoRUHV0U2hvcnRsaXN0RW50cnkSNC5oYXdrci5w'
+    'cm9jdXJlbWVudC52MWFscGhhMS5QdXRTaG9ydGxpc3RFbnRyeVJlcXVlc3QaNS5oYXdrci5wcm'
+    '9jdXJlbWVudC52MWFscGhhMS5QdXRTaG9ydGxpc3RFbnRyeVJlc3BvbnNlEokBChREZWxldGVT'
+    'aG9ydGxpc3RFbnRyeRI3Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkRlbGV0ZVNob3J0bG'
+    'lzdEVudHJ5UmVxdWVzdBo4Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLkRlbGV0ZVNob3J0'
+    'bGlzdEVudHJ5UmVzcG9uc2USgAEKEUFjY2VwdFNlbGxlclF1b3RlEjQuaGF3a3IucHJvY3VyZW'
+    '1lbnQudjFhbHBoYTEuQWNjZXB0U2VsbGVyUXVvdGVSZXF1ZXN0GjUuaGF3a3IucHJvY3VyZW1l'
+    'bnQudjFhbHBoYTEuQWNjZXB0U2VsbGVyUXVvdGVSZXNwb25zZRKDAQoSUmVuYW1lQ29udmVyc2'
+    'F0aW9uEjUuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYTEuUmVuYW1lQ29udmVyc2F0aW9uUmVx'
+    'dWVzdBo2Lmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLlJlbmFtZUNvbnZlcnNhdGlvblJlc3'
+    'BvbnNlEoMBChJEZWxldGVDb252ZXJzYXRpb24SNS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhh'
+    'MS5EZWxldGVDb252ZXJzYXRpb25SZXF1ZXN0GjYuaGF3a3IucHJvY3VyZW1lbnQudjFhbHBoYT'
+    'EuRGVsZXRlQ29udmVyc2F0aW9uUmVzcG9uc2USZwoIV2F0Y2hSdW4SKy5oYXdrci5wcm9jdXJl'
+    'bWVudC52MWFscGhhMS5XYXRjaFJ1blJlcXVlc3QaLC5oYXdrci5wcm9jdXJlbWVudC52MWFscG'
+    'hhMS5XYXRjaFJ1blJlc3BvbnNlMAESaAoJQ2FuY2VsUnVuEiwuaGF3a3IucHJvY3VyZW1lbnQu'
+    'djFhbHBoYTEuQ2FuY2VsUnVuUmVxdWVzdBotLmhhd2tyLnByb2N1cmVtZW50LnYxYWxwaGExLk'
+    'NhbmNlbFJ1blJlc3BvbnNlEmgKCVJlc3VtZVJ1bhIsLmhhd2tyLnByb2N1cmVtZW50LnYxYWxw'
+    'aGExLlJlc3VtZVJ1blJlcXVlc3QaLS5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5SZXN1bW'
+    'VSdW5SZXNwb25zZQ==');
 
 const $core.Map<$core.String, $core.dynamic>
     SellerProcurementAppServiceBase$json = {

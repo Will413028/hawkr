@@ -441,7 +441,7 @@ func TestSnapshotMapsEveryFieldAndRejectsUnspecified(t *testing.T) {
 		OpenConfirmation: &procurement.OpenConfirmation{InterruptID: ownedRun, Kind: "CLARIFICATION", Processing: true,
 			Question: procurement.ClarifyQuestion{SlotKey: "ITEM_DISAMBIGUATION", Prompt: "哪一種？", AllowFreeText: true,
 				Options: []procurement.QuestionOption{{OptionID: "o1", Label: "A"}}, UnitOptions: []procurement.QuestionOption{{OptionID: "u1", Label: "kg"}}}},
-		PublishedRfq: &procurement.PublishedRfq{PublicationID: ownedRun, Version: 2, PublishTime: now, RecipientCount: 3, QueuedCount: 2, ConfirmedRfqSnapshotID: ownedRun},
+		PublishedRfq: &procurement.PublishedRfq{PublicationID: ownedRun, Version: 2, PublishTime: now, RecipientCount: 3, QueuedCount: 2},
 	}}
 	c := setup(t, m)
 	res, err := c.GetRuntimeSnapshot(t.Context(), as(connect.NewRequest(&pb.GetRuntimeSnapshotRequest{ConversationId: ownedRun.String()}), accountID))

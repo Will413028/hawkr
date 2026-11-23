@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -38,7 +39,7 @@ func (j *fakeJobs) CancelJob(context.Context, int64) (rivertype.JobState, bool, 
 func runtimeModule(t *testing.T) (*Module, *db.DB) {
 	t.Helper()
 	d := newDB(t)
-	m := New(Deps{DB: d, Now: func() time.Time { return epoch }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Jobs: &fakeJobs{}})
+	m := New(Deps{DB: d, Now: func() time.Time { return epoch }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Jobs: &fakeJobs{}, Events: events.NewBus()})
 	return m, d
 }
 
@@ -94,7 +95,7 @@ func TestGetRuntimeSnapshotMirrorsTheConversation(t *testing.T) {
 		t.Errorf("沒有中斷：%+v", s.OpenConfirmation)
 	}
 	p := s.PublishedRfq
-	if p == nil || p.PublicationID != c.publication || p.ConfirmedRfqSnapshotID != c.snapshot || p.RecipientCount != 1 || p.QueuedCount != 1 || p.Version != 1 {
+	if p == nil || p.PublicationID != c.publication || p.RecipientCount != 1 || p.QueuedCount != 1 || p.Version != 1 {
 		t.Errorf("發布結果：%+v", p)
 	}
 }

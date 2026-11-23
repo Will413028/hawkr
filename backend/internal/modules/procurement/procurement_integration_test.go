@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -44,7 +45,7 @@ func ptr[T any](v T) *T { return &v }
 type chain struct {
 	buyer                                               int64
 	request, revision, conversation, turn, candidateSet uuid.UUID
-	candidate, preview, snapshot, approval, publication uuid.UUID
+	candidate, approval, publication                    uuid.UUID
 	invite, sellerResponse, acceptance, run             uuid.UUID
 	acceptanceClientRequest                             uuid.UUID
 }
@@ -99,20 +100,9 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	if !published {
 		return c
 	}
-	c.preview, c.snapshot, c.approval, c.publication, c.invite, c.sellerResponse, c.acceptance = id(), id(), id(), id(), id(), id(), id()
-	n, err = q.InsertPricePreview(ctx, store.InsertPricePreviewParams{
-		ID: c.preview, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600,
-		BasisQuantity: 1, BasisUnit: "件", TotalLowerAmount: ptr(int64(1200)), TotalUpperAmount: ptr(int64(1800)), TotalQuantity: ptr(int32(3)), TotalUnit: ptr("件"),
-		ClientRequestID: id(), ExpiresAt: epoch.Add(time.Hour), Now: epoch,
-	})
-	rows("InsertPricePreview", n, err)
-	n, err = q.InsertConfirmedSnapshot(ctx, store.InsertConfirmedSnapshotParams{
-		ID: c.snapshot, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, PricePreviewID: c.preview, BuyerNote: "請盡快", ClientRequestID: id(),
-		ExpiresAt: epoch.Add(time.Hour), Now: epoch,
-	})
-	rows("InsertConfirmedSnapshot", n, err)
+	c.approval, c.publication, c.invite, c.sellerResponse, c.acceptance = id(), id(), id(), id(), id()
 	n, err = q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, ConfirmedRfqSnapshotID: c.snapshot, AudienceMode: "DIRECT_RECIPIENTS",
+		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600, BuyerNote: "請盡快", CandidateSetID: &c.candidateSet, AudienceMode: "DIRECT_RECIPIENTS",
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	})
 	rows("InsertApproval", n, err)
@@ -121,7 +111,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	must("ClaimApprovalForExecute", err)
 	n, err = q.MarkApprovalSucceeded(ctx, store.MarkApprovalSucceededParams{ID: c.approval, Version: claimed.Version, Now: epoch})
 	rows("MarkApprovalSucceeded", n, err)
-	n, err = q.InsertPublication(ctx, store.InsertPublicationParams{ID: c.publication, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, ApprovalID: c.approval, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch})
+	n, err = q.InsertPublication(ctx, store.InsertPublicationParams{ID: c.publication, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, ApprovalID: c.approval, ApprovalVersion: 1, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch})
 	rows("InsertPublication", n, err)
 	must("InsertInvite", q.InsertInvite(ctx, store.InsertInviteParams{ID: c.invite, PublicationID: c.publication, Position: 0, StoreID: storeID, Now: epoch}))
 	must("InsertSellerResponse", q.InsertSellerResponse(ctx, store.InsertSellerResponseParams{ID: c.sellerResponse, PublicationID: c.publication, RequestID: c.request, StoreID: storeID, Now: epoch}))
@@ -133,7 +123,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 func acceptanceParams(c chain, buyerID int64, acceptanceID, clientRequest uuid.UUID) store.InsertAcceptanceParams {
 	return store.InsertAcceptanceParams{
 		ID: acceptanceID, BuyerID: &buyerID, RequestID: c.request, PublicationID: c.publication, SellerResponseID: c.sellerResponse, SellerResponseVersion: 1,
-		SellerResponsePayloadHash: "h1", ConfirmedRfqPayloadHash: "h2", StoreID: storeID, Currency: "TWD", GoodsAmount: 1000, ShippingAmount: 100, TaxAmount: 50,
+		SellerResponsePayloadHash: "h1", SellerFacingHash: "h2", StoreID: storeID, Currency: "TWD", GoodsAmount: 1000, ShippingAmount: 100, TaxAmount: 50,
 		AcceptedDealPrice: 1150, ClientRequestID: clientRequest, Now: epoch,
 	}
 }
@@ -274,25 +264,8 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 		t.Fatal("取消選取後 selected_at 要清掉")
 	}
 
-	pv, err := q.GetPricePreview(ctx, store.GetPricePreviewParams{ID: c.preview, RequestID: c.request, BuyerID: &c.buyer})
-	if err != nil || pv.TotalQuantity == nil || *pv.TotalQuantity != 3 {
-		t.Fatalf("GetPricePreview = %+v, %v", pv, err)
-	}
-	if dup, err := q.InsertPricePreview(ctx, store.InsertPricePreviewParams{ID: id(), BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, BasisQuantity: 1, BasisUnit: "件", ClientRequestID: pv.ClientRequestID, ExpiresAt: epoch, Now: epoch}); err != nil || dup != 0 {
-		t.Fatalf("重送的 InsertPricePreview n=%d err=%v", dup, err)
-	}
-	if got, err := q.GetPricePreviewByClientRequest(ctx, store.GetPricePreviewByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: pv.ClientRequestID}); err != nil || got.ID != c.preview {
-		t.Fatalf("GetPricePreviewByClientRequest = %+v, %v", got, err)
-	}
-	snap, err := q.GetConfirmedSnapshot(ctx, store.GetConfirmedSnapshotParams{ID: c.snapshot, RequestID: c.request, BuyerID: &c.buyer})
-	if err != nil || snap.BuyerNote != "請盡快" {
-		t.Fatalf("GetConfirmedSnapshot = %+v, %v", snap, err)
-	}
-	if got, err := q.GetConfirmedSnapshotByClientRequest(ctx, store.GetConfirmedSnapshotByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: snap.ClientRequestID}); err != nil || got.ID != c.snapshot {
-		t.Fatalf("GetConfirmedSnapshotByClientRequest = %+v, %v", got, err)
-	}
 	appr, err := q.GetApproval(ctx, store.GetApprovalParams{ID: c.approval, RequestID: c.request, BuyerID: &c.buyer})
-	if err != nil || appr.State != "SUCCEEDED" || appr.Version != 3 {
+	if err != nil || appr.State != "SUCCEEDED" || appr.Version != 3 || appr.BuyerNote != "請盡快" || appr.RangeLowerAmount != 400 || appr.RangeUpperAmount != 600 || appr.CandidateSetID == nil || *appr.CandidateSetID != c.candidateSet {
 		t.Fatalf("GetApproval = %+v, %v", appr, err)
 	}
 	if got, err := q.GetApprovalByClientRequest(ctx, store.GetApprovalByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: appr.ClientRequestID}); err != nil || got.ID != c.approval {
@@ -312,7 +285,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	if got, err := q.GetPublicationByClientRequest(ctx, store.GetPublicationByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: pub.ClientRequestID}); err != nil || got.ID != c.publication {
 		t.Fatalf("GetPublicationByClientRequest = %+v, %v", got, err)
 	}
-	if dup, err := q.InsertPublication(ctx, store.InsertPublicationParams{ID: id(), BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, ApprovalID: c.approval, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch}); err != nil || dup != 0 {
+	if dup, err := q.InsertPublication(ctx, store.InsertPublicationParams{ID: id(), BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, ApprovalID: c.approval, ApprovalVersion: 1, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch}); err != nil || dup != 0 {
 		t.Fatalf("同一個核准只能發布一次：n=%d err=%v", dup, err)
 	}
 	otherBuyer := int64(999)
@@ -357,7 +330,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	}
 	expiredApproval := id()
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, ConfirmedRfqSnapshotID: c.snapshot, AudienceMode: "DIRECT_RECIPIENTS",
+		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: &c.candidateSet, AudienceMode: "DIRECT_RECIPIENTS",
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval（過期測試）n=%d err=%v", n, err)
@@ -502,7 +475,7 @@ type snapshotOfBuyer struct {
 	anonymized                                                 map[string]int
 }
 
-var anonymizedTables = []string{"price_previews", "confirmed_rfq_snapshots", "rfq_publication_approvals", "rfq_publications", "buyer_quote_acceptances"}
+var anonymizedTables = []string{"rfq_publication_approvals", "rfq_publications", "buyer_quote_acceptances"}
 
 func snap(ctx context.Context, t *testing.T, d *db.DB, c chain) snapshotOfBuyer {
 	t.Helper()
@@ -528,7 +501,7 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 	published := seed(ctx, t, q, 41, true)
 	draft := seed(ctx, t, q, 41, false)
 	bystander := seed(ctx, t, q, 42, true)
-	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: events.NewBus()})
 
 	deleteBuyer := func() error {
 		return d.InTx(ctx, func(ctx context.Context) error { return m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: 41}) })
@@ -580,7 +553,7 @@ func TestBuyerDeletedIsAtomicWhenALaterStepFails(t *testing.T) {
 		CREATE TRIGGER fail_usage_delete BEFORE DELETE ON procurement.usage FOR EACH ROW EXECUTE FUNCTION procurement.fail_usage_delete();`); err != nil {
 		t.Fatal(err)
 	}
-	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: events.NewBus()})
 	err := d.InTx(ctx, func(ctx context.Context) error { return m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: 51}) })
 	if err == nil {
 		t.Fatal("注入的失敗要讓 OnBuyerDeleted 回錯")
@@ -627,22 +600,10 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	d := newDB(t)
 	q := store.New(d.Pool())
 	c := seed(ctx, t, q, 71, false)
-	snapshot, preview, approval := id(), id(), id()
+	approval := id()
 	policyID, policyVersion := "wish-pool", int32(1)
-	if n, err := q.InsertPricePreview(ctx, store.InsertPricePreviewParams{
-		ID: preview, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2,
-		BasisQuantity: 1, BasisUnit: "件", ClientRequestID: id(), ExpiresAt: epoch.Add(time.Hour), Now: epoch,
-	}); err != nil || n != 1 {
-		t.Fatalf("InsertPricePreview n=%d err=%v", n, err)
-	}
-	if n, err := q.InsertConfirmedSnapshot(ctx, store.InsertConfirmedSnapshotParams{
-		ID: snapshot, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, PricePreviewID: preview, ClientRequestID: id(),
-		ExpiresAt: epoch.Add(time.Hour), Now: epoch,
-	}); err != nil || n != 1 {
-		t.Fatalf("InsertConfirmedSnapshot n=%d err=%v", n, err)
-	}
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, ConfirmedRfqSnapshotID: snapshot, AudienceMode: "WISH_POOL",
+		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, AudienceMode: "WISH_POOL",
 		AudiencePolicyID: &policyID, AudiencePolicyVersion: &policyVersion, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval n=%d err=%v", n, err)
@@ -671,7 +632,7 @@ func TestBuyerDeletedDeletesRunsBeforeAnonymizingPublications(t *testing.T) {
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO procurement.agent_run_events (run_id, seq, event_type, occurred_at, created_at) VALUES ($1, 1, 'text', $2, $2)`, c.run, epoch); err != nil {
 		t.Fatal(err)
 	}
-	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: events.NewBus()})
 	if err := d.InTx(ctx, func(ctx context.Context) error { return m.OnBuyerDeleted(ctx, buyer.BuyerDeleted{BuyerID: 51}) }); err != nil {
 		t.Fatal(err)
 	}

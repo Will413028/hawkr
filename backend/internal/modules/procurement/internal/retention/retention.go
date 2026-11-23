@@ -43,12 +43,6 @@ var steps = []step{
 	{"未發布的需求", []string{"requests"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteUnpublishedBuyerRequests(ctx, &b)
 	}},
-	{"預覽", []string{"price_previews"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
-		return q.AnonymizeBuyerPricePreviews(ctx, &b)
-	}},
-	{"快照", []string{"confirmed_rfq_snapshots"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
-		return q.AnonymizeBuyerSnapshots(ctx, &b)
-	}},
 	{"核准", []string{"rfq_publication_approvals"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.AnonymizeBuyerApprovals(ctx, &b)
 	}},

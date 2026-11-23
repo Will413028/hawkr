@@ -129,12 +129,6 @@
     "reply.correction.updated": {
       "message": "Updated: {facts}"
     },
-    "reply.price_preview.context": {
-      "message": "A market reference price is available."
-    },
-    "reply.price_preview.next": {
-      "message": "Would you like to confirm the price range you want to ask for first?"
-    },
     "reply.reconfirm.next": {
       "message": "It needs to be confirmed again."
     },

@@ -18,18 +18,18 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// RFQ 發布鏈四支方法的欄位違規對照：模組的欄位名對到請求的 proto 路徑。
+// RFQ 發布鏈三支方法的欄位違規對照：模組的欄位名對到請求的 proto 路徑。
 var (
-	pricePaths   = rpc.FieldPaths{"LowerBoundAmount": "buyer_requested_range.lower_bound_amount", "UpperBoundAmount": "buyer_requested_range.upper_bound_amount", "client_request_id": "client_request_id"}
-	confirmPaths = rpc.FieldPaths{"BuyerNote": "buyer_note", "client_request_id": "client_request_id"}
+	pricePaths   = rpc.FieldPaths{"LowerBoundAmount": "buyer_requested_range.lower_bound_amount", "UpperBoundAmount": "buyer_requested_range.upper_bound_amount"}
 	publishPaths = rpc.FieldPaths{
+		"LowerBoundAmount": "buyer_requested_range.lower_bound_amount", "UpperBoundAmount": "buyer_requested_range.upper_bound_amount", "BuyerNote": "buyer_note",
 		"AudienceMode": "audience_mode", "CandidateSetID": "candidate_set_id", "SelectedCandidateIDs[]": "selected_candidate_ids[]",
 		"ResponseDeadline": "response_deadline", "client_request_id": "client_request_id",
 	}
 	executePaths = rpc.FieldPaths{"client_request_id": "client_request_id"}
 )
 
-// PreviewRfqPrice 依買家預期的單價區間算出詢價總額區間並存成預覽。
+// PreviewRfqPrice 依買家預期的單價區間算出詢價總額區間（純計算，不寫入）。
 func (h *App) PreviewRfqPrice(ctx context.Context, req *connect.Request[pb.PreviewRfqPriceRequest]) (*connect.Response[pb.PreviewRfqPriceResponse], error) {
 	buyerID, err := h.caller(ctx)
 	if err != nil {
@@ -44,23 +44,17 @@ func (h *App) PreviewRfqPrice(ctx context.Context, req *connect.Request[pb.Previ
 	if err != nil {
 		return nil, err
 	}
-	cid, err := clientRequestID(msg.GetClientRequestId())
-	if err != nil {
-		return nil, err
-	}
 	r := msg.GetBuyerRequestedRange()
 	if r == nil {
 		return nil, rpc.RequiredField("buyer_requested_range", "buyer_requested_range 不能是空的")
 	}
 	p, err := h.m.PreviewRfqPrice(ctx, procurement.PreviewRfqPriceInput{
-		BuyerID: buyerID, RequestID: requestID, ExpectedRevisionID: expected, ClientRequestID: cid,
-		LowerBoundAmount: r.GetLowerBoundAmount(), UpperBoundAmount: r.GetUpperBoundAmount(),
+		BuyerID: buyerID, RequestID: requestID, ExpectedRevisionID: expected, LowerBoundAmount: r.GetLowerBoundAmount(), UpperBoundAmount: r.GetUpperBoundAmount(),
 	})
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, pricePaths)
 	}
 	out := &pb.PreviewRfqPriceResponse{
-		PricePreviewId: p.ID.String(), PayloadHash: p.PayloadHash,
 		BuyerRequestedRange: &pb.BuyerRequestedRange{
 			LowerBoundAmount: p.LowerBoundAmount, UpperBoundAmount: p.UpperBoundAmount, BasisQuantity: p.BasisQuantity, BasisUnit: p.BasisUnit,
 		},
@@ -71,45 +65,7 @@ func (h *App) PreviewRfqPrice(ctx context.Context, req *connect.Request[pb.Previ
 	return connect.NewResponse(out), nil
 }
 
-// ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照。
-func (h *App) ConfirmRfqSnapshot(ctx context.Context, req *connect.Request[pb.ConfirmRfqSnapshotRequest]) (*connect.Response[pb.ConfirmRfqSnapshotResponse], error) {
-	buyerID, err := h.caller(ctx)
-	if err != nil {
-		return nil, err
-	}
-	msg := req.Msg
-	requestID, err := rpc.ParseUUID("request_id", msg.GetRequestId())
-	if err != nil {
-		return nil, err
-	}
-	cid, err := clientRequestID(msg.GetClientRequestId())
-	if err != nil {
-		return nil, err
-	}
-	expected, err := rpc.ParseUUID("expected_revision_id", msg.GetExpectedRevisionId())
-	if err != nil {
-		return nil, err
-	}
-	previewID, err := rpc.ParseUUID("price_preview_id", msg.GetPricePreviewId())
-	if err != nil {
-		return nil, err
-	}
-	if msg.GetPayloadHash() == "" {
-		return nil, rpc.RequiredField("payload_hash", "payload_hash 不能是空的")
-	}
-	snap, err := h.m.ConfirmRfqSnapshot(ctx, procurement.ConfirmRfqSnapshotInput{
-		BuyerID: buyerID, RequestID: requestID, ClientRequestID: cid, ExpectedRevisionID: expected, PricePreviewID: previewID,
-		PayloadHash: msg.GetPayloadHash(), BuyerNote: msg.GetBuyerNote(),
-	})
-	if err != nil {
-		return nil, rpc.WithFieldPaths(err, confirmPaths)
-	}
-	return connect.NewResponse(&pb.ConfirmRfqSnapshotResponse{
-		ConfirmedRfqSnapshotId: snap.ID.String(), PayloadHash: snap.PayloadHash, ExpireTime: timestamppb.New(snap.ExpiresAt),
-	}), nil
-}
-
-// PreviewRfqPublication 編出要發給賣家的內容並建立不可變的發布核准。
+// PreviewRfqPublication 編出要發給賣家的內容並建立不可變、只能執行一次的發布核准。
 func (h *App) PreviewRfqPublication(ctx context.Context, req *connect.Request[pb.PreviewRfqPublicationRequest]) (*connect.Response[pb.PreviewRfqPublicationResponse], error) {
 	buyerID, err := h.caller(ctx)
 	if err != nil {
@@ -128,16 +84,17 @@ func (h *App) PreviewRfqPublication(ctx context.Context, req *connect.Request[pb
 	if err != nil {
 		return nil, err
 	}
-	snapshotID, err := rpc.ParseUUID("confirmed_rfq_snapshot_id", msg.GetConfirmedRfqSnapshotId())
-	if err != nil {
-		return nil, err
+	r := msg.GetBuyerRequestedRange()
+	if r == nil {
+		return nil, rpc.RequiredField("buyer_requested_range", "buyer_requested_range 不能是空的")
 	}
 	mode, err := audienceModeFromProto(msg.GetAudienceMode())
 	if err != nil {
 		return nil, err
 	}
 	in := procurement.PreviewRfqPublicationInput{
-		BuyerID: buyerID, RequestID: requestID, ClientRequestID: cid, ExpectedRevisionID: expected, SnapshotID: snapshotID, AudienceMode: mode,
+		BuyerID: buyerID, RequestID: requestID, ClientRequestID: cid, ExpectedRevisionID: expected,
+		LowerBoundAmount: r.GetLowerBoundAmount(), UpperBoundAmount: r.GetUpperBoundAmount(), BuyerNote: msg.GetBuyerNote(), AudienceMode: mode,
 	}
 	if raw := msg.GetCandidateSetId(); raw != "" {
 		id, err := rpc.ParseUUID("candidate_set_id", raw)

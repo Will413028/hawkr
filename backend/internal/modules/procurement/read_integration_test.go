@@ -109,22 +109,19 @@ func TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash(t *testing.T) {
 	if len(s.Runs) != 1 || s.Runs[0].RunID != c.run {
 		t.Errorf("runs：%+v", s.Runs)
 	}
-	want, err := rfqhash.Snapshot(rfqhash.Input{
-		SchemaVersion: rfqhash.SchemaV1, ConfirmedRfqSnapshotID: c.snapshot.String(), RequestRevisionID: c.revision.String(), PricePreviewID: c.preview.String(), BuyerNote: "請盡快",
-		Requirement: rfqhash.Slots{Item: ptr("外套"), Quantity: ptr(int32(3)), Unit: ptr("件"), BudgetPerUnit: ptr(int64(500)), DeliveryCity: ptr("台北市"),
-			DeliveryDate: ptr(epoch.Format(time.DateOnly)), ExactMatchRequired: ptr(false)},
-		Price: rfqhash.Price{RangeLowerAmount: 400, RangeUpperAmount: 600, BasisQuantity: 1, BasisUnit: "件",
-			TotalLowerAmount: ptr(int64(1200)), TotalUpperAmount: ptr(int64(1800)), TotalQuantity: ptr(int32(3)), TotalUnit: ptr("件")},
+	want, err := rfqhash.SellerFacing(rfqhash.SellerFacingInput{
+		SchemaVersion: rfqhash.SchemaV1, Item: "外套", Quantity: ptr(int32(3)), Unit: ptr("件"), DeliveryCity: "台北市", DeliveryDate: ptr(epoch.Format(time.DateOnly)),
+		BuyerNote: "請盡快", Range: rfqhash.SellerRange{BasisQuantity: 1, BasisUnit: "件", LowerBoundAmount: 400, UpperBoundAmount: 600},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	p := s.PublishedRfq
-	if p == nil || p.PublicationID != c.publication || p.RfqSnapshotHash != want {
+	if p == nil || p.PublicationID != c.publication || p.SellerFacingHash != want {
 		t.Errorf("發布結果與重算的 hash：%+v，要 hash %s", p, want)
 	}
 	rt, err := m.GetRuntimeSnapshot(ctx, 7, c.conversation)
-	if err != nil || rt.PublishedRfq == nil || rt.PublishedRfq.RfqSnapshotHash != want {
+	if err != nil || rt.PublishedRfq == nil || rt.PublishedRfq.SellerFacingHash != want {
 		t.Errorf("GetRuntimeSnapshot 的 hash 要與 GetSnapshot 相同：%+v %v", rt.PublishedRfq, err)
 	}
 	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.conversations SET deleted_at = $2 WHERE id = $1`, c.conversation, epoch); err != nil {

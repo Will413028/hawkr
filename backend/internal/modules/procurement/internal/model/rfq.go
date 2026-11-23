@@ -22,22 +22,12 @@ type QuoteTotal struct {
 	Unit                               string
 }
 
-// PricePreview 是 PreviewRfqPrice 的結果：單價區間與計價基準（BasisQuantity 個 BasisUnit）、總額區間（需求沒有數量時為 nil）與預覽的 hash。
-type PricePreview struct {
-	ID, RequestID, RequestRevisionID   uuid.UUID
+// PriceQuote 是 PreviewRfqPrice 的結果（純計算，不存）：單價區間與計價基準（BasisQuantity 個 BasisUnit）、總額區間（需求沒有數量時為 nil）。
+type PriceQuote struct {
 	LowerBoundAmount, UpperBoundAmount int64
 	BasisQuantity                      int32
 	BasisUnit                          string
 	Total                              *QuoteTotal
-	PayloadHash                        string
-	ExpiresAt                          time.Time
-}
-
-// ConfirmedRfqSnapshot 是 ConfirmRfqSnapshot 的結果；PayloadHash 是快照的 hash（與 PublishedRfq.RfqSnapshotHash 同值）。
-type ConfirmedRfqSnapshot struct {
-	ID          uuid.UUID
-	PayloadHash string
-	ExpiresAt   time.Time
 }
 
 // SellerFacing 是賣家看得到的詢價內容（白名單欄位）；日期欄位是當日（UTC 午夜）。

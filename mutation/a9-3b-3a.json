@@ -183,11 +183,11 @@
   {
    "id": "snapshot-hash-ignores-note",
    "stack": "go-integration",
-   "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
-   "old": "BuyerNote: snap.BuyerNote,",
-   "new": "BuyerNote: \"\",",
+   "file": "backend/internal/modules/procurement/internal/rfq/compile.go",
+   "old": "ResponseDate: a.ResponseDeadline, BuyerNote: a.BuyerNote,",
+   "new": "ResponseDate: a.ResponseDeadline, BuyerNote: \"\",",
    "test": "internal/modules/procurement ^TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash$",
-   "why": "重算的 hash 少了買家備註"
+   "why": "重算的賣家可見內容 hash 少了核准凍結的買家備註"
   },
   {
    "id": "candidate-store-card-dropped",
@@ -219,11 +219,11 @@
   {
    "id": "rfqhash-schema-version-out-of-preimage",
    "stack": "go",
-   "file": "backend/internal/modules/procurement/internal/rfqhash/rfqhash.go",
-   "old": "SchemaVersion          string  `json:\"schemaVersion\"`",
-   "new": "SchemaVersion          string  `json:\"-\"`",
-   "test": "internal/modules/procurement/internal/rfqhash ^TestSnapshotIsDeterministicAndPinned$",
-   "why": "原像不含 schema_version：hash 不再綁版本"
+   "file": "backend/internal/modules/procurement/internal/rfqhash/parts.go",
+   "old": "SchemaVersion    string        `json:\"schemaVersion\"`",
+   "new": "SchemaVersion    string        `json:\"-\"`",
+   "test": "internal/modules/procurement/internal/rfqhash ^TestPartsAreDeterministicAndPinned$",
+   "why": "賣家可見內容的原像不含 schema_version：hash 不再綁版本"
   },
   {
    "id": "title-accepts-line-separator",

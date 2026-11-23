@@ -70,7 +70,7 @@ type ProcurementBuyerQuoteAcceptance struct {
 	SellerResponseID          uuid.UUID
 	SellerResponseVersion     int32
 	SellerResponsePayloadHash string
-	ConfirmedRfqPayloadHash   string
+	SellerFacingHash          string
 	StoreID                   int64
 	Currency                  string
 	GoodsAmount               int64
@@ -116,18 +116,6 @@ type ProcurementCandidateSet struct {
 	CreatedAt         time.Time
 }
 
-type ProcurementConfirmedRfqSnapshot struct {
-	ID                uuid.UUID
-	BuyerID           *int64
-	RequestID         uuid.UUID
-	RequestRevisionID uuid.UUID
-	PricePreviewID    uuid.UUID
-	BuyerNote         string
-	ClientRequestID   uuid.UUID
-	ExpiresAt         time.Time
-	CreatedAt         time.Time
-}
-
 type ProcurementConversation struct {
 	ID                 uuid.UUID
 	BuyerID            int64
@@ -138,24 +126,6 @@ type ProcurementConversation struct {
 	DeletedAt          *time.Time
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
-}
-
-type ProcurementPricePreview struct {
-	ID                uuid.UUID
-	BuyerID           *int64
-	RequestID         uuid.UUID
-	RequestRevisionID uuid.UUID
-	RangeLowerAmount  int64
-	RangeUpperAmount  int64
-	BasisQuantity     int32
-	BasisUnit         string
-	TotalLowerAmount  *int64
-	TotalUpperAmount  *int64
-	TotalQuantity     *int32
-	TotalUnit         *string
-	ClientRequestID   uuid.UUID
-	ExpiresAt         time.Time
-	CreatedAt         time.Time
 }
 
 type ProcurementRequest struct {
@@ -193,6 +163,7 @@ type ProcurementRfqPublication struct {
 	RequestID         uuid.UUID
 	RequestRevisionID uuid.UUID
 	ApprovalID        uuid.UUID
+	ApprovalVersion   int32
 	State             string
 	SchemaVersion     string
 	ClientRequestID   uuid.UUID
@@ -202,23 +173,26 @@ type ProcurementRfqPublication struct {
 }
 
 type ProcurementRfqPublicationApproval struct {
-	ID                     uuid.UUID
-	Version                int32
-	BuyerID                *int64
-	RequestID              uuid.UUID
-	RequestRevisionID      uuid.UUID
-	ConfirmedRfqSnapshotID uuid.UUID
-	ResponseDeadline       *time.Time
-	AudienceMode           string
-	AudiencePolicyID       *string
-	AudiencePolicyVersion  *int32
-	State                  string
-	SchemaVersion          string
-	ClientRequestID        uuid.UUID
-	GeneratedAt            time.Time
-	ExpiresAt              time.Time
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                    uuid.UUID
+	Version               int32
+	BuyerID               *int64
+	RequestID             uuid.UUID
+	RequestRevisionID     uuid.UUID
+	RangeLowerAmount      int64
+	RangeUpperAmount      int64
+	BuyerNote             string
+	CandidateSetID        *uuid.UUID
+	ResponseDeadline      *time.Time
+	AudienceMode          string
+	AudiencePolicyID      *string
+	AudiencePolicyVersion *int32
+	State                 string
+	SchemaVersion         string
+	ClientRequestID       uuid.UUID
+	GeneratedAt           time.Time
+	ExpiresAt             time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type ProcurementRfqPublicationApprovalRecipient struct {

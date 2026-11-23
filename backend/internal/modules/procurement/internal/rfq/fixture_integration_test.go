@@ -32,7 +32,7 @@ const buyer int64 = 1
 
 func ptr[T any](v T) *T { return &v }
 
-// fixture 是一位買家的一張需求（現行版本：小白菜、3 KG、台北市）與一個可注入時間、可注入訂閱者失敗的服務。
+// fixture 是一位買家的一張需求（REQUIREMENT_READY；現行版本：小白菜、3 KG、台北市）與一個可注入時間、可注入訂閱者失敗的服務。
 type fixture struct {
 	t             *testing.T
 	d             *db.DB
@@ -78,6 +78,13 @@ func (f *fixture) adopt(buyerID int64) {
 	must(f.t, q.InsertRequest(ctx, store.InsertRequestParams{ID: f.request, BuyerID: &buyerID, Now: start}))
 	must(f.t, q.InsertConversation(ctx, store.InsertConversationParams{ID: uuid.NewV7(), BuyerID: buyerID, RequestID: f.request, Now: start}))
 	f.revise(func(p *store.InsertRevisionParams) {})
+	f.setStatus("REQUIREMENT_READY")
+}
+
+// setStatus 直接改需求狀態：狀態改變不產生新版本，發布鏈要在預覽與執行時各查一次。
+func (f *fixture) setStatus(status string) {
+	f.t.Helper()
+	f.exec(`UPDATE procurement.requests SET status = $2 WHERE id = $1`, f.request, status)
 }
 
 func (f *fixture) service() rfq.Service {
@@ -160,36 +167,19 @@ func (f *fixture) events() []model.RfqPublished {
 	return append([]model.RfqPublished(nil), f.published...)
 }
 
-func (f *fixture) priceIn() rfq.PreviewPriceInput {
-	return rfq.PreviewPriceInput{BuyerID: f.buyer, RequestID: f.request, ExpectedRevisionID: f.revision, ClientRequestID: uuid.NewV7(), LowerBoundAmount: 100, UpperBoundAmount: 200}
+func (f *fixture) priceIn() rfq.PriceInput {
+	return rfq.PriceInput{BuyerID: f.buyer, RequestID: f.request, ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200}
 }
 
-func (f *fixture) preview() model.PricePreview {
-	f.t.Helper()
-	p, err := f.service().PreviewPrice(context.Background(), f.priceIn())
-	must(f.t, err)
-	return p
-}
-
-func (f *fixture) confirmIn(p model.PricePreview) rfq.ConfirmInput {
-	return rfq.ConfirmInput{BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, PricePreviewID: p.ID, PayloadHash: p.PayloadHash}
-}
-
-func (f *fixture) confirmed() model.ConfirmedRfqSnapshot {
-	f.t.Helper()
-	snap, err := f.service().ConfirmSnapshot(context.Background(), f.confirmIn(f.preview()))
-	must(f.t, err)
-	return snap
-}
-
-func (f *fixture) publicationIn(snap model.ConfirmedRfqSnapshot) rfq.PreviewPublicationInput {
+func (f *fixture) publicationIn() rfq.PreviewPublicationInput {
 	return rfq.PreviewPublicationInput{
-		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, SnapshotID: snap.ID, AudienceMode: model.AudienceWishPool,
+		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
+		AudienceMode: model.AudienceWishPool,
 	}
 }
 
-func (f *fixture) directIn(snap model.ConfirmedRfqSnapshot, set uuid.UUID, candidates ...uuid.UUID) rfq.PreviewPublicationInput {
-	in := f.publicationIn(snap)
+func (f *fixture) directIn(set uuid.UUID, candidates ...uuid.UUID) rfq.PreviewPublicationInput {
+	in := f.publicationIn()
 	in.AudienceMode, in.CandidateSetID, in.SelectedCandidateIDs = model.AudienceDirectRecipients, &set, candidates
 	return in
 }

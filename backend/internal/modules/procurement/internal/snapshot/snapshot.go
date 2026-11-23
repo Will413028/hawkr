@@ -117,37 +117,18 @@ func (r Reader) progress(ctx context.Context, q *store.Queries, buyerID int64, r
 	pub, err := q.GetLatestPublicationByRequest(ctx, store.GetLatestPublicationByRequestParams{RequestID: requestID, BuyerID: &owner})
 	switch {
 	case err == nil:
-		hash, err := snapshotHash(ctx, q, buyerID, requestID, pub.ConfirmedRfqSnapshotID, pub.SchemaVersion)
+		hash, err := rfq.SellerFacingHash(ctx, q, buyerID, requestID, pub.ApprovalID)
 		if err != nil {
 			return progress{}, err
 		}
 		out.published = &model.PublishedRfq{
 			PublicationID: pub.ID, Version: pub.Version, PublishTime: pub.PublishedAt,
-			RecipientCount: pub.RecipientCount, QueuedCount: pub.QueuedCount, ConfirmedRfqSnapshotID: pub.ConfirmedRfqSnapshotID,
-			RfqSnapshotHash: hash,
+			RecipientCount: pub.RecipientCount, QueuedCount: pub.QueuedCount, SellerFacingHash: hash,
 		}
 	case !errors.Is(err, pgx.ErrNoRows):
 		return progress{}, fmt.Errorf("snapshot：讀取發布結果：%w", err)
 	}
 	return out, nil
-}
-
-// snapshotHash 由發布的 schema_version、確認快照、它確認的需求版本與價格預覽重算 hash（rfq.SnapshotHash）；三者都是不可變的列，缺任何一列是資料不一致。
-func snapshotHash(ctx context.Context, q *store.Queries, buyerID int64, requestID, snapshotID uuid.UUID, schemaVersion string) (string, error) {
-	owner := buyerID
-	snap, err := q.GetConfirmedSnapshot(ctx, store.GetConfirmedSnapshotParams{ID: snapshotID, RequestID: requestID, BuyerID: &owner})
-	if err != nil {
-		return "", fmt.Errorf("snapshot：讀取確認快照 %s：%w", snapshotID, err)
-	}
-	rev, err := q.GetRevision(ctx, store.GetRevisionParams{ID: snap.RequestRevisionID, RequestID: requestID, BuyerID: &owner})
-	if err != nil {
-		return "", fmt.Errorf("snapshot：讀取快照的需求版本：%w", err)
-	}
-	prev, err := q.GetPricePreview(ctx, store.GetPricePreviewParams{ID: snap.PricePreviewID, RequestID: requestID, BuyerID: &owner})
-	if err != nil {
-		return "", fmt.Errorf("snapshot：讀取快照的價格預覽：%w", err)
-	}
-	return rfq.SnapshotHash(snap, rev, prev, schemaVersion)
 }
 
 type recordedWire struct {

@@ -479,24 +479,6 @@ func ReplyCorrectionUpdated(l uitext.Locale, a ReplyCorrectionUpdatedArgs) uitex
 	return uitext.Message{Text: "已經幫你更新：" + a.Facts, Locale: uitext.ZhTW}
 }
 
-// ReplyPricePreviewContext 是模組句子 reply.price_preview.context；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func ReplyPricePreviewContext(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "A market reference price is available.", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "已經有市場參考價可以看了。", Locale: uitext.ZhTW}
-}
-
-// ReplyPricePreviewNext 是模組句子 reply.price_preview.next；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func ReplyPricePreviewNext(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Would you like to confirm the price range you want to ask for first?", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "要不要先確認一下希望詢價區間？", Locale: uitext.ZhTW}
-}
-
 // ReplyReconfirmNext 是模組句子 reply.reconfirm.next；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReplyReconfirmNext(l uitext.Locale) uitext.Message {
 	switch l {

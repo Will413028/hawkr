@@ -1502,8 +1502,7 @@ class PublishedRfq extends $pb.GeneratedMessage {
     $1.Timestamp? publishTime,
     $core.int? recipientCount,
     $core.int? queuedCount,
-    $core.String? confirmedRfqSnapshotId,
-    $core.String? rfqSnapshotHash,
+    $core.String? sellerFacingHash,
   }) {
     final result = PublishedRfq._();
     if (publicationId != null) result.publicationId = publicationId;
@@ -1511,9 +1510,7 @@ class PublishedRfq extends $pb.GeneratedMessage {
     if (publishTime != null) result.publishTime = publishTime;
     if (recipientCount != null) result.recipientCount = recipientCount;
     if (queuedCount != null) result.queuedCount = queuedCount;
-    if (confirmedRfqSnapshotId != null)
-      result.confirmedRfqSnapshotId = confirmedRfqSnapshotId;
-    if (rfqSnapshotHash != null) result.rfqSnapshotHash = rfqSnapshotHash;
+    if (sellerFacingHash != null) result.sellerFacingHash = sellerFacingHash;
     return result;
   }
 
@@ -1537,8 +1534,7 @@ class PublishedRfq extends $pb.GeneratedMessage {
         subBuilder: $1.Timestamp.$_createMessage)
     ..aI(4, _omitFieldNames ? '' : 'recipientCount')
     ..aI(5, _omitFieldNames ? '' : 'queuedCount')
-    ..aOS(6, _omitFieldNames ? '' : 'confirmedRfqSnapshotId')
-    ..aOS(7, _omitFieldNames ? '' : 'rfqSnapshotHash')
+    ..aOS(6, _omitFieldNames ? '' : 'sellerFacingHash')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1612,26 +1608,16 @@ class PublishedRfq extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearQueuedCount() => $_clearField(5);
 
-  /// 這次發布依據的詢價確認快照（ConfirmRfqSnapshotResponse.confirmed_rfq_snapshot_id）。
+  /// 賣家實際收到的內容的 hash（SHA-256 小寫十六進位），與 ExecuteRfqPublicationResponse.seller_facing_payload_hash 是同一個值，
+  /// 原樣帶進 AcceptSellerQuoteRequest.expected_seller_facing_hash；讓買家重新載入之後仍能接受報價。
   @$pb.TagNumber(6)
-  $core.String get confirmedRfqSnapshotId => $_getSZ(5);
+  $core.String get sellerFacingHash => $_getSZ(5);
   @$pb.TagNumber(6)
-  set confirmedRfqSnapshotId($core.String value) => $_setString(5, value);
+  set sellerFacingHash($core.String value) => $_setString(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasConfirmedRfqSnapshotId() => $_has(5);
+  $core.bool hasSellerFacingHash() => $_has(5);
   @$pb.TagNumber(6)
-  void clearConfirmedRfqSnapshotId() => $_clearField(6);
-
-  /// 該快照的 hash，與 ConfirmRfqSnapshotResponse.payload_hash 是同一個值，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
-  /// 讓買家重新載入之後仍能接受報價。
-  @$pb.TagNumber(7)
-  $core.String get rfqSnapshotHash => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set rfqSnapshotHash($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasRfqSnapshotHash() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearRfqSnapshotHash() => $_clearField(7);
+  void clearSellerFacingHash() => $_clearField(6);
 }
 
 class ConversationMessage extends $pb.GeneratedMessage {
@@ -3621,14 +3607,12 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
   factory PreviewRfqPriceRequest({
     $core.String? requestId,
     $core.String? expectedRevisionId,
-    $core.String? clientRequestId,
     BuyerRequestedRange? buyerRequestedRange,
   }) {
     final result = PreviewRfqPriceRequest._();
     if (requestId != null) result.requestId = requestId;
     if (expectedRevisionId != null)
       result.expectedRevisionId = expectedRevisionId;
-    if (clientRequestId != null) result.clientRequestId = clientRequestId;
     if (buyerRequestedRange != null)
       result.buyerRequestedRange = buyerRequestedRange;
     return result;
@@ -3650,8 +3634,7 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
       createEmptyInstance: PreviewRfqPriceRequest.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'expectedRevisionId')
-    ..aOS(3, _omitFieldNames ? '' : 'clientRequestId')
-    ..aOM<BuyerRequestedRange>(4, _omitFieldNames ? '' : 'buyerRequestedRange',
+    ..aOM<BuyerRequestedRange>(3, _omitFieldNames ? '' : 'buyerRequestedRange',
         subBuilder: BuyerRequestedRange.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -3698,38 +3681,25 @@ class PreviewRfqPriceRequest extends $pb.GeneratedMessage {
   void clearExpectedRevisionId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get clientRequestId => $_getSZ(2);
+  BuyerRequestedRange get buyerRequestedRange => $_getN(2);
   @$pb.TagNumber(3)
-  set clientRequestId($core.String value) => $_setString(2, value);
+  set buyerRequestedRange(BuyerRequestedRange value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasClientRequestId() => $_has(2);
+  $core.bool hasBuyerRequestedRange() => $_has(2);
   @$pb.TagNumber(3)
-  void clearClientRequestId() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  BuyerRequestedRange get buyerRequestedRange => $_getN(3);
-  @$pb.TagNumber(4)
-  set buyerRequestedRange(BuyerRequestedRange value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasBuyerRequestedRange() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearBuyerRequestedRange() => $_clearField(4);
-  @$pb.TagNumber(4)
-  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(3);
+  void clearBuyerRequestedRange() => $_clearField(3);
+  @$pb.TagNumber(3)
+  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(2);
 }
 
 class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
   factory PreviewRfqPriceResponse({
-    $core.String? pricePreviewId,
     BuyerRequestedRange? buyerRequestedRange,
-    $core.String? payloadHash,
     QuoteTotalRange? quoteTotalRange,
   }) {
     final result = PreviewRfqPriceResponse._();
-    if (pricePreviewId != null) result.pricePreviewId = pricePreviewId;
     if (buyerRequestedRange != null)
       result.buyerRequestedRange = buyerRequestedRange;
-    if (payloadHash != null) result.payloadHash = payloadHash;
     if (quoteTotalRange != null) result.quoteTotalRange = quoteTotalRange;
     return result;
   }
@@ -3748,11 +3718,9 @@ class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
       createEmptyInstance: PreviewRfqPriceResponse.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'pricePreviewId')
-    ..aOM<BuyerRequestedRange>(3, _omitFieldNames ? '' : 'buyerRequestedRange',
+    ..aOM<BuyerRequestedRange>(1, _omitFieldNames ? '' : 'buyerRequestedRange',
         subBuilder: BuyerRequestedRange.$_createMessage)
-    ..aOS(4, _omitFieldNames ? '' : 'payloadHash')
-    ..aOM<QuoteTotalRange>(5, _omitFieldNames ? '' : 'quoteTotalRange',
+    ..aOM<QuoteTotalRange>(2, _omitFieldNames ? '' : 'quoteTotalRange',
         subBuilder: QuoteTotalRange.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -3781,263 +3749,27 @@ class PreviewRfqPriceResponse extends $pb.GeneratedMessage {
   static PreviewRfqPriceResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.String get pricePreviewId => $_getSZ(0);
+  BuyerRequestedRange get buyerRequestedRange => $_getN(0);
   @$pb.TagNumber(1)
-  set pricePreviewId($core.String value) => $_setString(0, value);
+  set buyerRequestedRange(BuyerRequestedRange value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasPricePreviewId() => $_has(0);
+  $core.bool hasBuyerRequestedRange() => $_has(0);
   @$pb.TagNumber(1)
-  void clearPricePreviewId() => $_clearField(1);
-
-  @$pb.TagNumber(3)
-  BuyerRequestedRange get buyerRequestedRange => $_getN(1);
-  @$pb.TagNumber(3)
-  set buyerRequestedRange(BuyerRequestedRange value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasBuyerRequestedRange() => $_has(1);
-  @$pb.TagNumber(3)
-  void clearBuyerRequestedRange() => $_clearField(3);
-  @$pb.TagNumber(3)
-  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(1);
-
-  /// 這份預覽的 hash（SHA-256 小寫十六進位），原樣帶進 ConfirmRfqSnapshotRequest.payload_hash。
-  @$pb.TagNumber(4)
-  $core.String get payloadHash => $_getSZ(2);
-  @$pb.TagNumber(4)
-  set payloadHash($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(4)
-  $core.bool hasPayloadHash() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearPayloadHash() => $_clearField(4);
+  void clearBuyerRequestedRange() => $_clearField(1);
+  @$pb.TagNumber(1)
+  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(0);
 
   /// 需求沒有填數量時不設；不回 0，也不把單價當總額。
-  @$pb.TagNumber(5)
-  QuoteTotalRange get quoteTotalRange => $_getN(3);
-  @$pb.TagNumber(5)
-  set quoteTotalRange(QuoteTotalRange value) => $_setField(5, value);
-  @$pb.TagNumber(5)
-  $core.bool hasQuoteTotalRange() => $_has(3);
-  @$pb.TagNumber(5)
-  void clearQuoteTotalRange() => $_clearField(5);
-  @$pb.TagNumber(5)
-  QuoteTotalRange ensureQuoteTotalRange() => $_ensure(3);
-}
-
-class ConfirmRfqSnapshotRequest extends $pb.GeneratedMessage {
-  factory ConfirmRfqSnapshotRequest({
-    $core.String? requestId,
-    $core.String? clientRequestId,
-    $core.String? expectedRevisionId,
-    $core.String? pricePreviewId,
-    $core.String? payloadHash,
-    $core.String? buyerNote,
-  }) {
-    final result = ConfirmRfqSnapshotRequest._();
-    if (requestId != null) result.requestId = requestId;
-    if (clientRequestId != null) result.clientRequestId = clientRequestId;
-    if (expectedRevisionId != null)
-      result.expectedRevisionId = expectedRevisionId;
-    if (pricePreviewId != null) result.pricePreviewId = pricePreviewId;
-    if (payloadHash != null) result.payloadHash = payloadHash;
-    if (buyerNote != null) result.buyerNote = buyerNote;
-    return result;
-  }
-
-  ConfirmRfqSnapshotRequest._();
-
-  factory ConfirmRfqSnapshotRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ConfirmRfqSnapshotRequest()..mergeFromBuffer(data, registry);
-  factory ConfirmRfqSnapshotRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ConfirmRfqSnapshotRequest()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ConfirmRfqSnapshotRequest',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
-      createEmptyInstance: ConfirmRfqSnapshotRequest.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..aOS(2, _omitFieldNames ? '' : 'clientRequestId')
-    ..aOS(3, _omitFieldNames ? '' : 'expectedRevisionId')
-    ..aOS(4, _omitFieldNames ? '' : 'pricePreviewId')
-    ..aOS(6, _omitFieldNames ? '' : 'payloadHash')
-    ..aOS(7, _omitFieldNames ? '' : 'buyerNote')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ConfirmRfqSnapshotRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ConfirmRfqSnapshotRequest copyWith(
-          void Function(ConfirmRfqSnapshotRequest) updates) =>
-      super.copyWith((message) => updates(message as ConfirmRfqSnapshotRequest))
-          as ConfirmRfqSnapshotRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use ConfirmRfqSnapshotRequest() / ConfirmRfqSnapshotRequest.new instead')
-  static ConfirmRfqSnapshotRequest create() => ConfirmRfqSnapshotRequest._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      ConfirmRfqSnapshotRequest._();
-  @$core.override
-  ConfirmRfqSnapshotRequest createEmptyInstance() =>
-      ConfirmRfqSnapshotRequest._();
-  @$core.pragma('dart2js:noInline')
-  static ConfirmRfqSnapshotRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ConfirmRfqSnapshotRequest>(
-          ConfirmRfqSnapshotRequest.$_createMessage);
-  static ConfirmRfqSnapshotRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get requestId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set requestId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasRequestId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearRequestId() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $core.String get clientRequestId => $_getSZ(1);
+  QuoteTotalRange get quoteTotalRange => $_getN(1);
   @$pb.TagNumber(2)
-  set clientRequestId($core.String value) => $_setString(1, value);
+  set quoteTotalRange(QuoteTotalRange value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasClientRequestId() => $_has(1);
+  $core.bool hasQuoteTotalRange() => $_has(1);
   @$pb.TagNumber(2)
-  void clearClientRequestId() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get expectedRevisionId => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set expectedRevisionId($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasExpectedRevisionId() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearExpectedRevisionId() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get pricePreviewId => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set pricePreviewId($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasPricePreviewId() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearPricePreviewId() => $_clearField(4);
-
-  /// 預覽回應的 payload_hash。
-  @$pb.TagNumber(6)
-  $core.String get payloadHash => $_getSZ(4);
-  @$pb.TagNumber(6)
-  set payloadHash($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(6)
-  $core.bool hasPayloadHash() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearPayloadHash() => $_clearField(6);
-
-  /// 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
-  @$pb.TagNumber(7)
-  $core.String get buyerNote => $_getSZ(5);
-  @$pb.TagNumber(7)
-  set buyerNote($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(7)
-  $core.bool hasBuyerNote() => $_has(5);
-  @$pb.TagNumber(7)
-  void clearBuyerNote() => $_clearField(7);
-}
-
-class ConfirmRfqSnapshotResponse extends $pb.GeneratedMessage {
-  factory ConfirmRfqSnapshotResponse({
-    $core.String? confirmedRfqSnapshotId,
-    $core.String? payloadHash,
-    $1.Timestamp? expireTime,
-  }) {
-    final result = ConfirmRfqSnapshotResponse._();
-    if (confirmedRfqSnapshotId != null)
-      result.confirmedRfqSnapshotId = confirmedRfqSnapshotId;
-    if (payloadHash != null) result.payloadHash = payloadHash;
-    if (expireTime != null) result.expireTime = expireTime;
-    return result;
-  }
-
-  ConfirmRfqSnapshotResponse._();
-
-  factory ConfirmRfqSnapshotResponse.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ConfirmRfqSnapshotResponse()..mergeFromBuffer(data, registry);
-  factory ConfirmRfqSnapshotResponse.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      ConfirmRfqSnapshotResponse()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ConfirmRfqSnapshotResponse',
-      package: const $pb.PackageName(
-          _omitMessageNames ? '' : 'hawkr.procurement.v1alpha1'),
-      createEmptyInstance: ConfirmRfqSnapshotResponse.$_createMessage)
-    ..aOS(1, _omitFieldNames ? '' : 'confirmedRfqSnapshotId')
-    ..aOS(2, _omitFieldNames ? '' : 'payloadHash')
-    ..aOM<$1.Timestamp>(3, _omitFieldNames ? '' : 'expireTime',
-        subBuilder: $1.Timestamp.$_createMessage)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ConfirmRfqSnapshotResponse clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ConfirmRfqSnapshotResponse copyWith(
-          void Function(ConfirmRfqSnapshotResponse) updates) =>
-      super.copyWith(
-              (message) => updates(message as ConfirmRfqSnapshotResponse))
-          as ConfirmRfqSnapshotResponse;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  @$core.Deprecated(
-      'Use ConfirmRfqSnapshotResponse() / ConfirmRfqSnapshotResponse.new instead')
-  static ConfirmRfqSnapshotResponse create() => ConfirmRfqSnapshotResponse._();
-  static $pb.GeneratedMessage $_createMessage() =>
-      ConfirmRfqSnapshotResponse._();
-  @$core.override
-  ConfirmRfqSnapshotResponse createEmptyInstance() =>
-      ConfirmRfqSnapshotResponse._();
-  @$core.pragma('dart2js:noInline')
-  static ConfirmRfqSnapshotResponse getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ConfirmRfqSnapshotResponse>(
-          ConfirmRfqSnapshotResponse.$_createMessage);
-  static ConfirmRfqSnapshotResponse? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get confirmedRfqSnapshotId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set confirmedRfqSnapshotId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasConfirmedRfqSnapshotId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearConfirmedRfqSnapshotId() => $_clearField(1);
-
+  void clearQuoteTotalRange() => $_clearField(2);
   @$pb.TagNumber(2)
-  $core.String get payloadHash => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set payloadHash($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasPayloadHash() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearPayloadHash() => $_clearField(2);
-
-  /// 快照到期的時間；這個欄位加入之前建立的快照沒有。
-  @$pb.TagNumber(3)
-  $1.Timestamp get expireTime => $_getN(2);
-  @$pb.TagNumber(3)
-  set expireTime($1.Timestamp value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasExpireTime() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearExpireTime() => $_clearField(3);
-  @$pb.TagNumber(3)
-  $1.Timestamp ensureExpireTime() => $_ensure(2);
+  QuoteTotalRange ensureQuoteTotalRange() => $_ensure(1);
 }
 
 class SellerFacingRequestedRange extends $pb.GeneratedMessage {
@@ -4339,7 +4071,8 @@ class PreviewRfqPublicationRequest extends $pb.GeneratedMessage {
     $core.String? requestId,
     $core.String? clientRequestId,
     $core.String? expectedRevisionId,
-    $core.String? confirmedRfqSnapshotId,
+    BuyerRequestedRange? buyerRequestedRange,
+    $core.String? buyerNote,
     AudienceMode? audienceMode,
     $core.String? candidateSetId,
     $core.Iterable<$core.String>? selectedCandidateIds,
@@ -4350,8 +4083,9 @@ class PreviewRfqPublicationRequest extends $pb.GeneratedMessage {
     if (clientRequestId != null) result.clientRequestId = clientRequestId;
     if (expectedRevisionId != null)
       result.expectedRevisionId = expectedRevisionId;
-    if (confirmedRfqSnapshotId != null)
-      result.confirmedRfqSnapshotId = confirmedRfqSnapshotId;
+    if (buyerRequestedRange != null)
+      result.buyerRequestedRange = buyerRequestedRange;
+    if (buyerNote != null) result.buyerNote = buyerNote;
     if (audienceMode != null) result.audienceMode = audienceMode;
     if (candidateSetId != null) result.candidateSetId = candidateSetId;
     if (selectedCandidateIds != null)
@@ -4377,12 +4111,14 @@ class PreviewRfqPublicationRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'clientRequestId')
     ..aOS(3, _omitFieldNames ? '' : 'expectedRevisionId')
-    ..aOS(4, _omitFieldNames ? '' : 'confirmedRfqSnapshotId')
-    ..aE<AudienceMode>(5, _omitFieldNames ? '' : 'audienceMode',
+    ..aOM<BuyerRequestedRange>(4, _omitFieldNames ? '' : 'buyerRequestedRange',
+        subBuilder: BuyerRequestedRange.$_createMessage)
+    ..aOS(5, _omitFieldNames ? '' : 'buyerNote')
+    ..aE<AudienceMode>(6, _omitFieldNames ? '' : 'audienceMode',
         enumValues: AudienceMode.values)
-    ..aOS(6, _omitFieldNames ? '' : 'candidateSetId')
-    ..pPS(7, _omitFieldNames ? '' : 'selectedCandidateIds')
-    ..aOM<$0.Date>(8, _omitFieldNames ? '' : 'responseDeadline',
+    ..aOS(7, _omitFieldNames ? '' : 'candidateSetId')
+    ..pPS(8, _omitFieldNames ? '' : 'selectedCandidateIds')
+    ..aOM<$0.Date>(9, _omitFieldNames ? '' : 'responseDeadline',
         subBuilder: $0.Date.$_createMessage)
     ..hasRequiredFields = false;
 
@@ -4442,49 +4178,62 @@ class PreviewRfqPublicationRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearExpectedRevisionId() => $_clearField(3);
 
+  /// 買家預期的單價範圍；核准把它與需求現行版本一起凍結，賣家看到的就是這個範圍。
   @$pb.TagNumber(4)
-  $core.String get confirmedRfqSnapshotId => $_getSZ(3);
+  BuyerRequestedRange get buyerRequestedRange => $_getN(3);
   @$pb.TagNumber(4)
-  set confirmedRfqSnapshotId($core.String value) => $_setString(3, value);
+  set buyerRequestedRange(BuyerRequestedRange value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasConfirmedRfqSnapshotId() => $_has(3);
+  $core.bool hasBuyerRequestedRange() => $_has(3);
   @$pb.TagNumber(4)
-  void clearConfirmedRfqSnapshotId() => $_clearField(4);
+  void clearBuyerRequestedRange() => $_clearField(4);
+  @$pb.TagNumber(4)
+  BuyerRequestedRange ensureBuyerRequestedRange() => $_ensure(3);
 
+  /// 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
   @$pb.TagNumber(5)
-  AudienceMode get audienceMode => $_getN(4);
+  $core.String get buyerNote => $_getSZ(4);
   @$pb.TagNumber(5)
-  set audienceMode(AudienceMode value) => $_setField(5, value);
+  set buyerNote($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasAudienceMode() => $_has(4);
+  $core.bool hasBuyerNote() => $_has(4);
   @$pb.TagNumber(5)
-  void clearAudienceMode() => $_clearField(5);
+  void clearBuyerNote() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  AudienceMode get audienceMode => $_getN(5);
+  @$pb.TagNumber(6)
+  set audienceMode(AudienceMode value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAudienceMode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAudienceMode() => $_clearField(6);
 
   /// AUDIENCE_MODE_DIRECT_RECIPIENTS 必填。
-  @$pb.TagNumber(6)
-  $core.String get candidateSetId => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set candidateSetId($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasCandidateSetId() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearCandidateSetId() => $_clearField(6);
+  @$pb.TagNumber(7)
+  $core.String get candidateSetId => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set candidateSetId($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCandidateSetId() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCandidateSetId() => $_clearField(7);
 
   /// AUDIENCE_MODE_DIRECT_RECIPIENTS 必填，順序有意義。
-  @$pb.TagNumber(7)
-  $pb.PbList<$core.String> get selectedCandidateIds => $_getList(6);
+  @$pb.TagNumber(8)
+  $pb.PbList<$core.String> get selectedCandidateIds => $_getList(7);
 
-  /// 賣家回價的期限；沒有設定表示不設期限。
-  @$pb.TagNumber(8)
-  $0.Date get responseDeadline => $_getN(7);
-  @$pb.TagNumber(8)
-  set responseDeadline($0.Date value) => $_setField(8, value);
-  @$pb.TagNumber(8)
-  $core.bool hasResponseDeadline() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearResponseDeadline() => $_clearField(8);
-  @$pb.TagNumber(8)
-  $0.Date ensureResponseDeadline() => $_ensure(7);
+  /// 賣家回價的期限（當日，台北時區），不得早於今天；沒有設定表示不設期限。
+  @$pb.TagNumber(9)
+  $0.Date get responseDeadline => $_getN(8);
+  @$pb.TagNumber(9)
+  set responseDeadline($0.Date value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasResponseDeadline() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearResponseDeadline() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $0.Date ensureResponseDeadline() => $_ensure(8);
 }
 
 class PreviewRfqPublicationResponse extends $pb.GeneratedMessage {
@@ -6847,7 +6596,7 @@ class AcceptSellerQuoteRequest extends $pb.GeneratedMessage {
     $core.String? clientRequestId,
     $core.String? sellerResponseId,
     $core.String? expectedSellerResponseVersion,
-    $core.String? expectedRfqSnapshotHash,
+    $core.String? expectedSellerFacingHash,
   }) {
     final result = AcceptSellerQuoteRequest._();
     if (requestId != null) result.requestId = requestId;
@@ -6855,8 +6604,8 @@ class AcceptSellerQuoteRequest extends $pb.GeneratedMessage {
     if (sellerResponseId != null) result.sellerResponseId = sellerResponseId;
     if (expectedSellerResponseVersion != null)
       result.expectedSellerResponseVersion = expectedSellerResponseVersion;
-    if (expectedRfqSnapshotHash != null)
-      result.expectedRfqSnapshotHash = expectedRfqSnapshotHash;
+    if (expectedSellerFacingHash != null)
+      result.expectedSellerFacingHash = expectedSellerFacingHash;
     return result;
   }
 
@@ -6878,7 +6627,7 @@ class AcceptSellerQuoteRequest extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'clientRequestId')
     ..aOS(3, _omitFieldNames ? '' : 'sellerResponseId')
     ..aOS(4, _omitFieldNames ? '' : 'expectedSellerResponseVersion')
-    ..aOS(5, _omitFieldNames ? '' : 'expectedRfqSnapshotHash')
+    ..aOS(5, _omitFieldNames ? '' : 'expectedSellerFacingHash')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6943,15 +6692,16 @@ class AcceptSellerQuoteRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearExpectedSellerResponseVersion() => $_clearField(4);
 
-  /// 需求被別的裝置改過（快照不符）回 ABORTED，conflictTarget 是 rfq_snapshot。
+  /// 買家畫面上那份詢價內容的 hash，取自 PublishedRfq.seller_facing_hash 或 ExecuteRfqPublicationResponse.seller_facing_payload_hash。
+  /// 伺服器從這筆報價所屬的發布凍結的內容重算，兩者不符（買家看到的不是賣家報價時依據的那份）回 ABORTED，conflictTarget 是 publication。
   @$pb.TagNumber(5)
-  $core.String get expectedRfqSnapshotHash => $_getSZ(4);
+  $core.String get expectedSellerFacingHash => $_getSZ(4);
   @$pb.TagNumber(5)
-  set expectedRfqSnapshotHash($core.String value) => $_setString(4, value);
+  set expectedSellerFacingHash($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasExpectedRfqSnapshotHash() => $_has(4);
+  $core.bool hasExpectedSellerFacingHash() => $_has(4);
   @$pb.TagNumber(5)
-  void clearExpectedRfqSnapshotHash() => $_clearField(5);
+  void clearExpectedSellerFacingHash() => $_clearField(5);
 }
 
 class AcceptSellerQuoteResponse extends $pb.GeneratedMessage {
@@ -10112,9 +9862,9 @@ class BuyerProcurementAppServiceApi {
       _client.invoke<RewindResponse>(ctx, 'BuyerProcurementAppService',
           'Rewind', request, RewindResponse());
 
-  /// PreviewRfqPrice 依買家預期的單價範圍與需求數量，算出詢價總額區間並存成預覽（有效 15 分鐘）。
+  /// PreviewRfqPrice 依買家預期的單價範圍與需求數量算出詢價總額區間；純計算，不寫入任何資料。
   /// 買家沒有給合法的範圍（下界與上界是正整數、下界不大於上界）回 INVALID_ARGUMENT；
-  /// 需求還沒有單位（算不出計價基準）回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY；
+  /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位（算不出計價基準）回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY；
   /// 需求已有數量與單位卻算不出總額（溢位）回 FAILED_PRECONDITION，沒有 reason。
   /// 讀到的需求版本不是現行版本回 ABORTED，conflictTarget 是 request_revision；需求不屬於呼叫者回 NOT_FOUND。
   $async.Future<PreviewRfqPriceResponse> previewRfqPrice(
@@ -10122,22 +9872,12 @@ class BuyerProcurementAppServiceApi {
       _client.invoke<PreviewRfqPriceResponse>(ctx, 'BuyerProcurementAppService',
           'PreviewRfqPrice', request, PreviewRfqPriceResponse());
 
-  /// ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照（有效 24 小時）。需求版本過時回 ABORTED，conflictTarget 是 request_revision；
-  /// 預覽屬於別的需求、對應的不是現行版本、已過期或 payload_hash 與預覽不符回 ABORTED，conflictTarget 是 price_preview；
-  /// 預覽不屬於呼叫者回 NOT_FOUND；buyer_note 超過 500 字回 INVALID_ARGUMENT。
-  $async.Future<ConfirmRfqSnapshotResponse> confirmRfqSnapshot(
-          $pb.ClientContext? ctx, ConfirmRfqSnapshotRequest request) =>
-      _client.invoke<ConfirmRfqSnapshotResponse>(
-          ctx,
-          'BuyerProcurementAppService',
-          'ConfirmRfqSnapshot',
-          request,
-          ConfirmRfqSnapshotResponse());
-
-  /// PreviewRfqPublication 依確認快照編出要發給賣家的內容並建立不可變的發布核准（有效 24 小時），不發布、不通知。
-  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；快照屬於別的需求或對應的不是現行版本回 ABORTED，conflictTarget 是 rfq_snapshot；
-  /// 指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
-  /// 確認快照、候選集不屬於呼叫者回 NOT_FOUND；受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、回價期限不是合法日期回 INVALID_ARGUMENT。
+  /// PreviewRfqPublication 依需求現行版本、買家的單價範圍與補充說明編出要發給賣家的內容，並建立不可變、只能執行一次的發布核准（有效 24 小時），
+  /// 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與（指定對象時）候選集。
+  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
+  /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位，回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
+  /// 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、
+  /// 回價期限不是合法日期或早於今天（台北時區）回 INVALID_ARGUMENT。
   /// 公開池的收件人在發布時決定，預覽的 recipient_count 是 0。
   $async.Future<PreviewRfqPublicationResponse> previewRfqPublication(
           $pb.ClientContext? ctx, PreviewRfqPublicationRequest request) =>
@@ -10149,8 +9889,10 @@ class BuyerProcurementAppServiceApi {
           PreviewRfqPublicationResponse());
 
   /// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
-  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本，
-  /// 或 payload_hash 與核准的內容不符回 ABORTED，conflictTarget 是 publication_approval；核准不屬於呼叫者回 NOT_FOUND。
+  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本、
+  /// 核准的回價期限已早於今天（台北時區），或 payload_hash 與核准的內容不符回 ABORTED，conflictTarget 是 publication_approval；
+  /// 指定對象的候選集已不是有效的候選集回 ABORTED，conflictTarget 是 candidate_set；核准不屬於呼叫者回 NOT_FOUND。
+  /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
   /// 重送同一個 client_request_id 回第一次的發布（replayed 為 true），內容不同回 INVALID_ARGUMENT。
   $async.Future<ExecuteRfqPublicationResponse> executeRfqPublication(
           $pb.ClientContext? ctx, ExecuteRfqPublicationRequest request) =>

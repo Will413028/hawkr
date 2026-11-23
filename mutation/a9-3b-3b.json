@@ -4,8 +4,8 @@
    "id": "toggle-set-identity-check-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/search/select.go",
-   "old": "err != nil || *latest != in.CandidateSetID {",
-   "new": "err != nil || latest == nil {",
+   "old": "return req.Status == statusMatching && latest != nil && *latest == setID, nil",
+   "new": "return req.Status == statusMatching && latest != nil, nil",
    "test": "internal/modules/procurement/internal/search ^TestToggleSelectionOnASupersededSetIsAbortedAfterAReSearchSucceeds$",
    "why": "不再比對候選集是不是最新成功搜尋的那一個：重搜之後還能勾舊候選集"
   },
@@ -13,8 +13,8 @@
    "id": "toggle-matching-check-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/search/select.go",
-   "old": "if req.Status != statusMatching || err != nil",
-   "new": "if req.Status == \"\" || err != nil",
+   "old": "return req.Status == statusMatching && latest != nil && *latest == setID, nil",
+   "new": "return latest != nil && *latest == setID, nil",
    "test": "internal/modules/procurement/internal/search ^TestToggleSelectionIsAbortedOnceTheRequestLeavesMatching$",
    "why": "不再要求需求在 MATCHING：離開 MATCHING 之後還能勾選"
   },
@@ -22,8 +22,8 @@
    "id": "toggle-unsucceeded-set-accepted",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/search/select.go",
-   "old": "if req.Status != statusMatching || err != nil || *latest != in.CandidateSetID {",
-   "new": "if req.Status != statusMatching || latest != nil && *latest != in.CandidateSetID {",
+   "old": "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn false, nil\n\t}",
+   "new": "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn req.Status == statusMatching, nil\n\t}",
    "test": "internal/modules/procurement/internal/search ^TestToggleSelectionOnASetWhoseSearchHasNotSucceededIsAborted$",
    "why": "沒有成功過的搜尋也算有效：搜尋中的候選集被勾選"
   },

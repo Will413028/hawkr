@@ -17,88 +17,81 @@ func ptr[T any](v T) *T { return &v }
 
 var day = time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 
-func previewRow() store.ProcurementPricePreview {
-	return store.ProcurementPricePreview{
-		ID: uuid.NewV7(), RequestRevisionID: uuid.NewV7(), RangeLowerAmount: 100, RangeUpperAmount: 200, BasisQuantity: 1, BasisUnit: "KG",
-		TotalLowerAmount: ptr(int64(300)), TotalUpperAmount: ptr(int64(600)), TotalQuantity: ptr(int32(3)), TotalUnit: ptr("KG"),
-	}
-}
-
 func revisionRow() store.ProcurementRequestRevision {
 	return store.ProcurementRequestRevision{
-		ID: uuid.NewV7(), Item: ptr("小白菜"), Quantity: ptr(int32(3)), Unit: ptr("KG"), Packaging: ptr("箱"), BudgetPerUnit: ptr(int64(90)),
+		ID: uuid.NewV7(), Item: ptr("小白菜"), ItemResolutionLabel: ptr("小白菜"), Quantity: ptr(int32(3)), Unit: ptr("KG"), Packaging: ptr("箱"), BudgetPerUnit: ptr(int64(90)),
 		DeliveryCity: ptr("台北市"), DeliveryDate: ptr(day), ExactMatchRequired: ptr(false),
 	}
 }
 
-func snapshotRow() store.ProcurementConfirmedRfqSnapshot {
-	return store.ProcurementConfirmedRfqSnapshot{ID: uuid.NewV7(), BuyerNote: "請盡快"}
-}
-
-// 每個存下的欄位都進 hash：少一個欄位，改那個欄位的值 hash 不變，測試就紅。
-func TestPreviewHashCoversEveryStoredField(t *testing.T) {
-	base := previewRow()
-	want, err := PreviewHash(base)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, mutate := range map[string]func(*store.ProcurementPricePreview){
-		"id":          func(p *store.ProcurementPricePreview) { p.ID = uuid.NewV7() },
-		"revision id": func(p *store.ProcurementPricePreview) { p.RequestRevisionID = uuid.NewV7() },
-		"lower":       func(p *store.ProcurementPricePreview) { p.RangeLowerAmount++ },
-		"upper":       func(p *store.ProcurementPricePreview) { p.RangeUpperAmount++ },
-		"basis q":     func(p *store.ProcurementPricePreview) { p.BasisQuantity = 1000 },
-		"basis u":     func(p *store.ProcurementPricePreview) { p.BasisUnit = "GRAM" },
-		"total lower": func(p *store.ProcurementPricePreview) { p.TotalLowerAmount = ptr(int64(301)) },
-		"total upper": func(p *store.ProcurementPricePreview) { p.TotalUpperAmount = ptr(int64(601)) },
-		"total q":     func(p *store.ProcurementPricePreview) { p.TotalQuantity = ptr(int32(4)) },
-		"total u":     func(p *store.ProcurementPricePreview) { p.TotalUnit = ptr("GRAM") },
-	} {
-		p := base
-		mutate(&p)
-		if got, _ := PreviewHash(p); got == want {
-			t.Errorf("改 %s，預覽的 hash 沒變", name)
-		}
-	}
-	if again, _ := PreviewHash(base); again != want {
-		t.Error("同一列要同一個 hash")
+func approvalRow() store.ProcurementRfqPublicationApproval {
+	return store.ProcurementRfqPublicationApproval{
+		ID: uuid.NewV7(), SchemaVersion: rfqhash.SchemaV1, AudienceMode: model.AudienceWishPool, AudiencePolicyID: ptr("P"), AudiencePolicyVersion: ptr(int32(1)),
+		RangeLowerAmount: 100, RangeUpperAmount: 200, BuyerNote: "請盡快", ResponseDeadline: ptr(day.AddDate(0, 0, -3)),
 	}
 }
 
-func TestSnapshotHashCoversEveryStoredField(t *testing.T) {
-	snap, rev, prev := snapshotRow(), revisionRow(), previewRow()
-	want, err := SnapshotHash(snap, rev, prev, rfqhash.SchemaV1)
+// 賣家看得到的每個欄位，不論來自核准凍結的欄位或需求版本，都進 hash：少一個欄位的對照，就能偷偷改掉那個欄位而 hash 不變。
+func TestAssembledSellerHashCoversEveryApprovalAndRevisionField(t *testing.T) {
+	base, err := assemble(approvalRow(), revisionRow(), compiled{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	type rows struct {
-		snap store.ProcurementConfirmedRfqSnapshot
-		rev  store.ProcurementRequestRevision
-		prev store.ProcurementPricePreview
-	}
-	for name, mutate := range map[string]func(*rows){
-		"snapshot id": func(r *rows) { r.snap.ID = uuid.NewV7() },
-		"buyer note":  func(r *rows) { r.snap.BuyerNote = "x" },
-		"revision id": func(r *rows) { r.rev.ID = uuid.NewV7() },
-		"item":        func(r *rows) { r.rev.Item = ptr("x") },
-		"quantity":    func(r *rows) { r.rev.Quantity = ptr(int32(9)) },
-		"unit":        func(r *rows) { r.rev.Unit = ptr("GRAM") },
-		"packaging":   func(r *rows) { r.rev.Packaging = ptr("x") },
-		"budget":      func(r *rows) { r.rev.BudgetPerUnit = ptr(int64(1)) },
-		"city":        func(r *rows) { r.rev.DeliveryCity = ptr("x") },
-		"date":        func(r *rows) { r.rev.DeliveryDate = ptr(day.AddDate(0, 0, 1)) },
-		"exact match": func(r *rows) { r.rev.ExactMatchRequired = ptr(true) },
-		"preview id":  func(r *rows) { r.prev.ID = uuid.NewV7() },
-		"range lower": func(r *rows) { r.prev.RangeLowerAmount++ },
-		"range upper": func(r *rows) { r.prev.RangeUpperAmount++ },
-		"basis":       func(r *rows) { r.prev.BasisQuantity = 1000 },
-		"total":       func(r *rows) { r.prev.TotalLowerAmount = nil },
+	for name, mutate := range map[string]func(*store.ProcurementRfqPublicationApproval, *store.ProcurementRequestRevision){
+		"approval lower": func(a *store.ProcurementRfqPublicationApproval, _ *store.ProcurementRequestRevision) {
+			a.RangeLowerAmount++
+		},
+		"approval upper": func(a *store.ProcurementRfqPublicationApproval, _ *store.ProcurementRequestRevision) {
+			a.RangeUpperAmount++
+		},
+		"approval note": func(a *store.ProcurementRfqPublicationApproval, _ *store.ProcurementRequestRevision) {
+			a.BuyerNote = "x"
+		},
+		"approval deadline": func(a *store.ProcurementRfqPublicationApproval, _ *store.ProcurementRequestRevision) {
+			a.ResponseDeadline = nil
+		},
+		"revision item": func(_ *store.ProcurementRfqPublicationApproval, r *store.ProcurementRequestRevision) {
+			r.Item = ptr("x")
+		},
+		"revision label": func(_ *store.ProcurementRfqPublicationApproval, r *store.ProcurementRequestRevision) {
+			r.ItemResolutionLabel = ptr("x")
+		},
+		"revision quantity": func(_ *store.ProcurementRfqPublicationApproval, r *store.ProcurementRequestRevision) {
+			r.Quantity = ptr(int32(4))
+		},
+		"revision unit": func(_ *store.ProcurementRfqPublicationApproval, r *store.ProcurementRequestRevision) {
+			r.Unit = ptr("GRAM")
+		},
+		"revision packaging": func(_ *store.ProcurementRfqPublicationApproval, r *store.ProcurementRequestRevision) {
+			r.Packaging = nil
+		},
+		"revision city": func(_ *store.ProcurementRfqPublicationApproval, r *store.ProcurementRequestRevision) {
+			r.DeliveryCity = ptr("x")
+		},
+		"revision date": func(_ *store.ProcurementRfqPublicationApproval, r *store.ProcurementRequestRevision) {
+			r.DeliveryDate = ptr(day.AddDate(0, 0, 1))
+		},
 	} {
-		r := rows{snap, rev, prev}
-		mutate(&r)
-		if got, _ := SnapshotHash(r.snap, r.rev, r.prev, rfqhash.SchemaV1); got == want {
-			t.Errorf("改 %s，快照的 hash 沒變", name)
+		a, r := approvalRow(), revisionRow()
+		mutate(&a, &r)
+		got, err := assemble(a, r, compiled{})
+		if err != nil {
+			t.Fatalf("%s：%v", name, err)
 		}
+		if got.sellerHash == base.sellerHash {
+			t.Errorf("改 %s，賣家可見內容的 hash 沒變", name)
+		}
+	}
+}
+
+func TestAssembledSellerHashIgnoresFieldsTheSellerNeverSees(t *testing.T) {
+	base, _ := assemble(approvalRow(), revisionRow(), compiled{})
+	a, r := approvalRow(), revisionRow()
+	r.BudgetPerUnit, r.ExactMatchRequired = ptr(int64(1)), ptr(true)
+	a.ID, a.ExpiresAt = uuid.NewV7(), day
+	got, _ := assemble(a, r, compiled{})
+	if got.sellerHash != base.sellerHash {
+		t.Error("買家自己的預算與精確比對、核准的 ID 與到期時間賣家看不到，不該進賣家可見內容的 hash")
 	}
 }
 

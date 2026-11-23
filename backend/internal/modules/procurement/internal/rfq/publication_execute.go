@@ -10,6 +10,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfqhash"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/search"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -24,13 +25,11 @@ type ExecuteInput struct {
 }
 
 // ExecutePublication 以核准的版本建立發布，同一個 transaction 寫入發布、指定對象的邀請與一則 RfqPublished 事件，任何一步失敗全部還原（核准的 PENDING→EXECUTING 也還原）。不建 run、不發通知。
-// 需求或核准不屬於買家回 NOT_FOUND；讀到的需求版本不是現行版本回 ABORTED／VERSION_CONFLICT（request_revision）；
-// 核准是別的需求的、版本不符、不是 PENDING（已執行過）、已過期、凍結的需求版本已不是現行版本、PayloadHash 與核准的內容不符、指定對象的受眾名單是空的，回 ABORTED／VERSION_CONFLICT（publication_approval）。
-// 重送同一個 ClientRequestID 回第一次的發布（Replayed 為 true，先於其餘檢查，不重複建邀請與事件），內容（需求、核准、讀到的版本、PayloadHash）不同回 INVALID_ARGUMENT（欄位 client_request_id）。
+// 需求或核准不屬於買家回 NOT_FOUND；讀到的需求版本不是現行版本回 ABORTED／VERSION_CONFLICT（request_revision）；需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；
+// 核准是別的需求的、版本不符、不是 PENDING（已執行過）、已過期（expires_at 當下已過期）、凍結的需求版本已不是現行版本、回價期限已早於今天（台北時區）、PayloadHash 與核准的內容不符、指定對象的受眾名單是空的，回 ABORTED／VERSION_CONFLICT（publication_approval）；
+// 指定對象的候選集已不是有效的候選集（search.IsEffective）回 ABORTED／VERSION_CONFLICT（candidate_set）。
+// 重送同一個 ClientRequestID 回第一次的發布（Replayed 為 true，先於其餘檢查，不重複建邀請與事件），內容（需求、核准、核准版本、讀到的版本、PayloadHash）不同回 INVALID_ARGUMENT（欄位 client_request_id）。
 func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model.Publication, error) {
-	if s.Events == nil {
-		return model.Publication{}, errors.New("procurement：ExecuteRfqPublication 需要 Deps.Events")
-	}
 	var out model.Publication
 	err := s.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.DB.Conn(ctx))
@@ -38,7 +37,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		if out, err = replayPublication(ctx, q, in); err != nil || out.ID != (uuid.UUID{}) {
 			return err
 		}
-		_, rev, err := lockRequest(ctx, q, in.BuyerID, in.RequestID, in.ExpectedRevisionID)
+		req, rev, err := lockRequest(ctx, q, in.BuyerID, in.RequestID, in.ExpectedRevisionID)
 		if err != nil {
 			return err
 		}
@@ -64,8 +63,20 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		if err != nil {
 			return fmt.Errorf("rfq：領取發布核准：%w", err)
 		}
-		if claimed.RequestRevisionID != rev.ID {
+		if claimed.RequestRevisionID != rev.ID || (claimed.ResponseDeadline != nil && deadlinePassed(*claimed.ResponseDeadline, now)) {
 			return stale
+		}
+		if claimed.AudienceMode == model.AudienceDirectRecipients {
+			if claimed.CandidateSetID == nil {
+				return stale
+			}
+			effective, err := search.IsEffective(ctx, q, req, in.BuyerID, *claimed.CandidateSetID)
+			if err != nil {
+				return err
+			}
+			if !effective {
+				return versionConflict("這個候選集已不是有效的候選集，請重新預覽", TargetCandidateSet)
+			}
 		}
 		c, err := compile(ctx, q, in.BuyerID, claimed)
 		if err != nil {
@@ -75,7 +86,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 			return stale
 		}
 		pub := store.InsertPublicationParams{
-			ID: uuid.NewV7(), BuyerID: &in.BuyerID, RequestID: in.RequestID, RequestRevisionID: rev.ID, ApprovalID: claimed.ID,
+			ID: uuid.NewV7(), BuyerID: &in.BuyerID, RequestID: in.RequestID, RequestRevisionID: rev.ID, ApprovalID: claimed.ID, ApprovalVersion: in.ApprovalVersion,
 			SchemaVersion: rfqhash.SchemaV1, ClientRequestID: in.ClientRequestID, Now: now,
 		}
 		n, err := q.InsertPublication(ctx, pub)
@@ -111,7 +122,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 	return out, err
 }
 
-// replayPublication 以冪等鍵找第一次的發布：沒有回零值；有但內容（需求、核准、讀到的版本、PayloadHash）不同回 INVALID_ARGUMENT。
+// replayPublication 以冪等鍵找第一次的發布：沒有回零值；有但內容（需求、核准、核准版本、讀到的版本、PayloadHash）不同回 INVALID_ARGUMENT。
 func replayPublication(ctx context.Context, q *store.Queries, in ExecuteInput) (model.Publication, error) {
 	pub, err := q.GetPublicationByClientRequest(ctx, store.GetPublicationByClientRequestParams{BuyerID: &in.BuyerID, ClientRequestID: in.ClientRequestID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -120,7 +131,7 @@ func replayPublication(ctx context.Context, q *store.Queries, in ExecuteInput) (
 	if err != nil {
 		return model.Publication{}, fmt.Errorf("rfq：讀取發布的冪等鍵：%w", err)
 	}
-	if pub.RequestID != in.RequestID || pub.ApprovalID != in.ApprovalID || pub.RequestRevisionID != in.ExpectedRevisionID {
+	if pub.RequestID != in.RequestID || pub.ApprovalID != in.ApprovalID || pub.ApprovalVersion != in.ApprovalVersion || pub.RequestRevisionID != in.ExpectedRevisionID {
 		return model.Publication{}, idempotencyMismatch()
 	}
 	approval, err := q.GetApprovalForBuyer(ctx, store.GetApprovalForBuyerParams{ID: pub.ApprovalID, BuyerID: &in.BuyerID})

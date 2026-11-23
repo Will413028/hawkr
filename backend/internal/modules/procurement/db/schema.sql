@@ -8,7 +8,7 @@
 -- 31 張舊表依 A9-D19（table-audit.md 的 S1–S11）收斂：沒有 candidate_leads（AD4）、controller_kind（AD12）、external lane 與 prospect（A9-D1）、
 -- 預約表（A9-D9）、outbox 與 *_commands（M11、S4）。頭尾不得有空白的文字欄用 `trimtext.Check` 展開（單體規則 9），登記在 cmd/hawkr 的 trimmedColumns。
 --
--- 買家刪除（S10）：requests、price_previews、confirmed_rfq_snapshots、approvals、publications、acceptances 的 buyer_id 可為 NULL：已發布的詢價與賣家
+-- 買家刪除（S10）：requests、approvals、publications、acceptances 的 buyer_id 可為 NULL：已發布的詢價與賣家
 -- 看得到的紀錄保留（匿名，保留期跟詢價的生命週期），其餘買家資料（對話、輪次、候選、run、額度）刪除。
 
 CREATE SCHEMA IF NOT EXISTS public;
@@ -157,63 +157,19 @@ CREATE TABLE procurement.candidates (
 CREATE UNIQUE INDEX candidates_set_store ON procurement.candidates (candidate_set_id, store_id);
 CREATE INDEX candidates_set_rank ON procurement.candidates (candidate_set_id, rank);
 
--- 詢價價格預覽，只 INSERT：沒有 version（S5），hash 由 Go 從欄位重算。
-CREATE TABLE procurement.price_previews (
-    id UUID PRIMARY KEY,
-    buyer_id BIGINT,
-    request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
-    request_revision_id UUID NOT NULL REFERENCES procurement.request_revisions (id) ON DELETE CASCADE,
-    range_lower_amount BIGINT NOT NULL,
-    range_upper_amount BIGINT NOT NULL,
-    basis_quantity INT NOT NULL,
-    basis_unit TEXT NOT NULL,
-    total_lower_amount BIGINT,
-    total_upper_amount BIGINT,
-    total_quantity INT,
-    total_unit TEXT,
-    client_request_id UUID NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT price_previews_buyer_check CHECK (buyer_id > 0),
-    CONSTRAINT price_previews_range_check CHECK (range_lower_amount >= 0 AND range_upper_amount >= range_lower_amount),
-    CONSTRAINT price_previews_basis_check CHECK (basis_quantity > 0 AND char_length(basis_unit) >= 1),
-    CONSTRAINT price_previews_total_check CHECK (
-        (total_lower_amount IS NULL) = (total_upper_amount IS NULL)
-        AND (total_lower_amount IS NULL) = (total_quantity IS NULL)
-        AND (total_lower_amount IS NULL) = (total_unit IS NULL)
-    ),
-    CONSTRAINT price_previews_basis_unit_check CHECK (char_length(basis_unit) <= 40 AND basis_unit !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
-    CONSTRAINT price_previews_total_unit_check CHECK (char_length(total_unit) <= 40 AND total_unit !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
-);
-CREATE UNIQUE INDEX price_previews_idempotency ON procurement.price_previews (buyer_id, client_request_id);
-CREATE INDEX price_previews_request ON procurement.price_previews (request_id);
-
--- 買家確認的詢價快照，只 INSERT。buyer_note 是買家原文、轉呈賣家（S3：具名文字欄，登記 trimmedColumns）。
-CREATE TABLE procurement.confirmed_rfq_snapshots (
-    id UUID PRIMARY KEY,
-    buyer_id BIGINT,
-    request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
-    request_revision_id UUID NOT NULL REFERENCES procurement.request_revisions (id) ON DELETE CASCADE,
-    price_preview_id UUID NOT NULL REFERENCES procurement.price_previews (id) ON DELETE CASCADE,
-    buyer_note TEXT NOT NULL DEFAULT '',
-    client_request_id UUID NOT NULL,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT confirmed_rfq_snapshots_buyer_check CHECK (buyer_id > 0),
-    CONSTRAINT confirmed_rfq_snapshots_note_check CHECK (char_length(buyer_note) <= 500 AND buyer_note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
-);
-CREATE UNIQUE INDEX confirmed_rfq_snapshots_idempotency ON procurement.confirmed_rfq_snapshots (buyer_id, client_request_id);
-CREATE INDEX confirmed_rfq_snapshots_request ON procurement.confirmed_rfq_snapshots (request_id, created_at DESC);
-
--- 發布核准（預覽發布時建立）。只存參照，不複製 hash 與快照欄位（S5）；hash 由 Go 從參照的不可變列重算。
--- schema_version 保留：hash 要知道 preimage 的版本才能重算（S3）。
+-- 發布核准（PreviewRfqPublication 建立）：買家對「發給誰、發什麼」的唯一一個同意，不可變、會到期、只能執行一次（A9-D35）。
+-- 賣家看得到的內容由需求版本（不可變）加上這裡凍結的單價範圍、補充說明與回價期限組出；hash 由 Go 重算（S5），表裡沒有 hash 欄。
+-- schema_version 保留：hash 要知道 preimage 的版本才能重算（S3）。指定對象時 candidate_set_id 是預覽當下的候選集，Execute 重驗它仍有效（search.IsEffective）。
 CREATE TABLE procurement.rfq_publication_approvals (
     id UUID PRIMARY KEY,
     version INT NOT NULL DEFAULT 1,
     buyer_id BIGINT,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
     request_revision_id UUID NOT NULL REFERENCES procurement.request_revisions (id) ON DELETE CASCADE,
-    confirmed_rfq_snapshot_id UUID NOT NULL REFERENCES procurement.confirmed_rfq_snapshots (id) ON DELETE CASCADE,
+    range_lower_amount BIGINT NOT NULL,
+    range_upper_amount BIGINT NOT NULL,
+    buyer_note TEXT NOT NULL DEFAULT '',
+    candidate_set_id UUID REFERENCES procurement.candidate_sets (id) ON DELETE SET NULL,
     response_deadline DATE,
     audience_mode TEXT NOT NULL,
     audience_policy_id TEXT,
@@ -232,7 +188,10 @@ CREATE TABLE procurement.rfq_publication_approvals (
     CONSTRAINT rfq_publication_approvals_schema_check CHECK (char_length(schema_version) >= 1),
     CONSTRAINT rfq_publication_approvals_policy_check CHECK (
         (audience_mode = 'WISH_POOL') = (audience_policy_id IS NOT NULL AND audience_policy_version IS NOT NULL)
-    )
+    ),
+    CONSTRAINT rfq_publication_approvals_range_check CHECK (range_lower_amount > 0 AND range_upper_amount >= range_lower_amount),
+    CONSTRAINT rfq_publication_approvals_candidate_set_check CHECK (audience_mode = 'DIRECT_RECIPIENTS' OR candidate_set_id IS NULL),
+    CONSTRAINT rfq_publication_approvals_note_check CHECK (char_length(buyer_note) <= 500 AND buyer_note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );
 CREATE UNIQUE INDEX rfq_publication_approvals_idempotency ON procurement.rfq_publication_approvals (buyer_id, client_request_id);
 CREATE INDEX rfq_publication_approvals_request ON procurement.rfq_publication_approvals (request_id, created_at DESC);
@@ -256,6 +215,7 @@ CREATE TABLE procurement.rfq_publications (
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
     request_revision_id UUID NOT NULL REFERENCES procurement.request_revisions (id) ON DELETE CASCADE,
     approval_id UUID NOT NULL REFERENCES procurement.rfq_publication_approvals (id) ON DELETE CASCADE,
+    approval_version INT NOT NULL,
     state TEXT NOT NULL DEFAULT 'PUBLISHED',
     schema_version TEXT NOT NULL,
     client_request_id UUID NOT NULL,
@@ -265,6 +225,7 @@ CREATE TABLE procurement.rfq_publications (
     CONSTRAINT rfq_publications_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT rfq_publications_version_check CHECK (version >= 1),
     CONSTRAINT rfq_publications_state_check CHECK (state IN ('PUBLISHED')),
+    CONSTRAINT rfq_publications_approval_version_check CHECK (approval_version >= 1),
     CONSTRAINT rfq_publications_schema_check CHECK (char_length(schema_version) >= 1)
 );
 CREATE UNIQUE INDEX rfq_publications_approval ON procurement.rfq_publications (approval_id);
@@ -383,7 +344,7 @@ CREATE TABLE procurement.buyer_shortlist_entries (
 CREATE UNIQUE INDEX buyer_shortlist_entries_response ON procurement.buyer_shortlist_entries (request_id, seller_response_id);
 
 -- 買家接受一份報價。state 只收有寫入者的值（S6，A9-D19 修訂）：ACTIVE，與建單重試用盡後的 ORDER_FAILED；live 鎖只擋 ACTIVE，
--- 所以建單失敗後買家可以再接受（同家或別家）。成交價（三金額）凍結在這裡；接受當下的快照 hash 與回價 hash 是買家 CAS 的對象，留作稽核（S5 的 (c)）。
+-- 所以建單失敗後買家可以再接受（同家或別家）。成交價（三金額）凍結在這裡；接受當下賣家可見內容的 hash 與回價 hash 是買家 CAS 的對象，留作稽核（S5 的 (c)）。
 CREATE TABLE procurement.buyer_quote_acceptances (
     id UUID PRIMARY KEY,
     buyer_id BIGINT,
@@ -392,7 +353,7 @@ CREATE TABLE procurement.buyer_quote_acceptances (
     seller_response_id UUID NOT NULL REFERENCES procurement.seller_responses (id) ON DELETE CASCADE,
     seller_response_version INT NOT NULL,
     seller_response_payload_hash TEXT NOT NULL,
-    confirmed_rfq_payload_hash TEXT NOT NULL,
+    seller_facing_hash TEXT NOT NULL,
     store_id BIGINT NOT NULL,
     currency TEXT NOT NULL,
     goods_amount BIGINT NOT NULL,

@@ -238,11 +238,11 @@
     },
     "reply.approval.complete": {
       "message": "RFQ 快照已經確認好了。",
-      "description": "詢價快照已確認、待核准時的完成句。"
+      "description": "發布核准待執行時的完成句。"
     },
     "reply.approval.rationale": {
       "message": "等你核准後才會正式送出給賣家。",
-      "description": "詢價快照已確認、待核准時的原因句。"
+      "description": "發布核准待執行時的原因句。"
     },
     "reply.basics_ready.next": {
       "message": "需求已齊，可以開始找候選。",
@@ -261,21 +261,13 @@
       },
       "description": "買家更正已有欄位時的確認句，facts 以分隔詞連接。"
     },
-    "reply.price_preview.context": {
-      "message": "已經有市場參考價可以看了。",
-      "description": "已有價格參考時的說明。"
-    },
-    "reply.price_preview.next": {
-      "message": "要不要先確認一下希望詢價區間？",
-      "description": "已有價格參考時的下一步。"
-    },
     "reply.reconfirm.next": {
       "message": "需要重新確認一次。",
-      "description": "詢價確認快照過期時的下一步。"
+      "description": "發布核准過期時的下一步。"
     },
     "reply.reconfirm.warning": {
       "message": "需求內容有更新，之前確認的 RFQ 快照已經過期。",
-      "description": "詢價確認快照過期時的警示句。"
+      "description": "發布核准過期時的警示句。"
     },
     "reply.rejected.next": {
       "message": "麻煩再確認一下。",
