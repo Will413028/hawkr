@@ -163,7 +163,7 @@ func TestPurgeAfterEachDeletionEvent(t *testing.T) {
 				return purge.RecipientArgs{AccountID: a, Audience: "STORE", StoreID: 11}
 			},
 			gone:      []string{"A/STORE11"},
-			prefsGone: []string{"A/STORE"},
+			prefsGone: nil, // 偏好沒有店別：同帳號重開的店仍在用，StoreRetired 不刪偏好。
 		},
 	}
 	for _, sc := range scenarios {
@@ -272,6 +272,10 @@ func TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing(t *testing
 		if f.inboxCount(t, kept) != 1 || f.count(t, `SELECT count(*) FROM notification.deliveries WHERE account_id = $1`, kept) != 2 {
 			t.Fatal("其他買家的通知要照常寫入")
 		}
+		// 略過的意圖沒有收件匣連結與投遞紀錄，清除 job 找不到它，Process 略過時自己把參數換成 '{}'（D16）；寫入的那筆保留參數。
+		if n := f.count(t, `SELECT count(*) FROM notification.intents WHERE params <> '{}'::jsonb`); n != 1 {
+			t.Fatalf("買家關閉後才處理的意圖參數要清掉，還有 %d 筆非空（預期只剩寫入的那一筆）", n)
+		}
 	})
 	t.Run("StoreRetired", func(t *testing.T) {
 		f := setupIntake(t)
@@ -288,6 +292,9 @@ func TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing(t *testing
 		}
 		if n := f.count(t, `SELECT count(*) FROM notification.inbox_items WHERE account_id = $1 AND store_id = 12`, acct); n != 1 {
 			t.Fatalf("同帳號另一間店的通知要照常寫入：%d 列", n)
+		}
+		if n := f.count(t, `SELECT count(*) FROM notification.intents WHERE params <> '{}'::jsonb`); n != 1 {
+			t.Fatalf("店家退場後才處理的意圖參數要清掉，還有 %d 筆非空（預期只剩另一間店的那一筆）", n)
 		}
 	})
 }

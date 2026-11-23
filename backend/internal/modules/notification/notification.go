@@ -36,10 +36,10 @@ func Migrations() fs.FS {
 	return sub
 }
 
-// Buyers 是 worker 對 buyer 的需求（*buyer.Module 滿足它）：以共享鎖鎖住收件買家列，並回報買家是否已關閉。
+// Buyers 是 worker 對 buyer 的需求（*buyer.Module 滿足它）：以 FOR KEY SHARE 鎖住收件買家列，並回報買家是否已關閉。
 type Buyers = intake.Buyers
 
-// Stores 是 worker 對 seller 的需求（*seller.Module 滿足它）：以共享鎖鎖住收件店家列，並回報店家是否已退場。
+// Stores 是 worker 對 seller 的需求（*seller.Module 滿足它）：以 FOR KEY SHARE 鎖住收件店家列，店家已退場回 NotFound。
 type Stores = intake.Stores
 
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。

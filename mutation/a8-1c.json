@@ -31,8 +31,8 @@
    "id": "worker-recipient-gone-check-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/intake/intake.go",
-   "old": "\t\tif gone {\n\t\t\ts.log().InfoContext(ctx, \"收件買家已關閉或收件店家已退場",
-   "new": "\t\tif gone && false {\n\t\t\ts.log().InfoContext(ctx, \"收件買家已關閉或收件店家已退場",
+   "old": "\t\tif gone {\n\t\t\treturn s.scrubSkipped",
+   "new": "\t\tif gone && false {\n\t\t\treturn s.scrubSkipped",
    "test": "internal/modules/notification ^TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing$",
    "why": "The worker no longer skips an intent whose buyer is closed or whose store is retired, so it rebuilds rows for a purged recipient."
   },
@@ -44,6 +44,24 @@
    "new": "AND true",
    "test": "internal/modules/notification ^TestRetentionSweepDeletesExpiredRowsOnly$",
    "why": "The intent sweep drops the no-remaining-delivery condition, so an expired intent with a younger delivery hits the RESTRICT foreign key and the job fails."
+  },
+  {
+   "id": "worker-skip-keeps-intent-params",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "\t\tif gone {\n\t\t\treturn s.scrubSkipped(ctx, intent.ID)\n\t\t}",
+   "new": "\t\tif gone {\n\t\t\treturn nil\n\t\t}",
+   "test": "internal/modules/notification ^TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing$",
+   "why": "Process skips an intent for a closed buyer or retired store without clearing its params, so the personal data stays for the 180-day retention."
+  },
+  {
+   "id": "store-retired-purge-deletes-preferences",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/purge/recipient.go",
+   "old": "if a.StoreID > 0 {\n\t\t// 偏好是",
+   "new": "if a.StoreID < 0 {\n\t\t// 偏好是",
+   "test": "internal/modules/notification ^TestPurgeAfterEachDeletionEvent$/^StoreRetired$",
+   "why": "The StoreRetired purge deletes the account's whole STORE preference set, wiping the preferences of a store the seller reopened."
   }
  ]
 }

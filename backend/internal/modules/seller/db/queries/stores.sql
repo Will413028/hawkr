@@ -63,14 +63,6 @@ FROM seller.stores
 WHERE store_id = $1
 FOR KEY SHARE;
 
--- name: ShareLockStore :one
--- 以 FOR SHARE 讀取指定 stint：與 RetireDueStores、LockAccountStores 的 FOR UPDATE 互斥，持有到呼叫方的 transaction 結束。
--- 給只需要「店家在寫入完成前沒有退場」的讀者（例如 notification 把通知寫給收件店家）。
-SELECT store_id, retired_at
-FROM seller.stores
-WHERE store_id = $1
-FOR SHARE;
-
 -- name: CreateStore :one
 -- 建立新的 stint；store_code 撞號時不寫入、回 0 列，由呼叫方換一個代碼重試。帳號已有目前的 stint 時違反
 -- stores_current_account（呼叫方先鎖帳號再檢查，所以只在不變量被破壞時發生）。

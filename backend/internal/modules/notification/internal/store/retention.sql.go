@@ -8,6 +8,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"uuid"
 )
 
 const deleteAccountPreferenceOverrides = `-- name: DeleteAccountPreferenceOverrides :exec
@@ -130,6 +132,19 @@ func (q *Queries) DeleteRecipientInboxItems(ctx context.Context, arg DeleteRecip
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const scrubIntentParams = `-- name: ScrubIntentParams :exec
+UPDATE notification.intents
+SET params = '{}'::jsonb
+WHERE id = $1 AND params <> '{}'::jsonb
+`
+
+// 個資清除：Process 發現收件人已刪除或退場而略過時，把這一個意圖的參數換成 '{}'（意圖還沒有收件匣連結或投遞紀錄，
+// ScrubRecipientIntentParams 找不到它）；已是 '{}' 時不動，所以可重跑。
+func (q *Queries) ScrubIntentParams(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, scrubIntentParams, id)
+	return err
 }
 
 const scrubRecipientDeliveryText = `-- name: ScrubRecipientDeliveryText :execrows

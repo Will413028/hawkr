@@ -209,16 +209,16 @@ type fakeStores struct {
 	retired map[int64]bool
 }
 
-func (f *fakeStores) ShareLockStore(ctx context.Context, storeID int64) (bool, error) {
+func (f *fakeStores) LockNotRetired(ctx context.Context, storeID int64) error {
 	if _, ok := db.TxFrom(ctx); !ok {
-		panic("ShareLockStore 必須在 transaction 內呼叫")
+		panic("LockNotRetired 必須在 transaction 內呼叫")
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if storeID <= 0 {
-		return false, apperr.NotFound("店家不存在")
+	if storeID <= 0 || f.retired[storeID] {
+		return apperr.NotFound("店家已退場")
 	}
-	return f.retired[storeID], nil
+	return nil
 }
 
 func (f *fakeStores) retire(storeID int64) {

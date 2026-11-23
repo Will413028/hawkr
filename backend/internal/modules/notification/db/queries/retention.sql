@@ -29,6 +29,13 @@ WHERE id IN (
     LIMIT sqlc.arg(max_rows)
 );
 
+-- name: ScrubIntentParams :exec
+-- 個資清除：Process 發現收件人已刪除或退場而略過時，把這一個意圖的參數換成 '{}'（意圖還沒有收件匣連結或投遞紀錄，
+-- ScrubRecipientIntentParams 找不到它）；已是 '{}' 時不動，所以可重跑。
+UPDATE notification.intents
+SET params = '{}'::jsonb
+WHERE id = sqlc.arg(id) AND params <> '{}'::jsonb;
+
 -- name: ScrubRecipientIntentParams :execrows
 -- 個資清除：把該收件人的意圖參數換成 '{}'（意圖經 inbox_item_intents 與 deliveries 找到），分批；已是 '{}' 的不再處理，所以可重跑。
 -- 收件人範圍：audience 為 NULL 是帳號的全部列；store_id 為 NULL 不限店。

@@ -141,7 +141,7 @@ func (service *Service) LockNotClosed(ctx context.Context, id int64) error {
 	return stint.RequireNotClosedShared(ctx, store.New(service.deps.DB.Conn(ctx)), id)
 }
 
-// ShareLockByAccount 在呼叫方的 transaction 內以 FOR SHARE 鎖住帳號唯一的買家列，並回報買家是否已關閉（CLOSED）；
+// ShareLockByAccount 在呼叫方的 transaction 內以 FOR KEY SHARE 鎖住帳號唯一的買家列，並回報買家是否已關閉（CLOSED）；
 // 刪除中（PENDING_DELETION）還不算關閉。帳號沒有買家回 NotFound；沒有 transaction 是呼叫端的錯誤。
 func (service *Service) ShareLockByAccount(ctx context.Context, accountID int64) (deleted bool, err error) {
 	if err := model.Positive(accountID); err != nil {
@@ -150,7 +150,7 @@ func (service *Service) ShareLockByAccount(ctx context.Context, accountID int64)
 	if _, ok := db.TxFrom(ctx); !ok {
 		return false, errors.New("buyer：ShareLockByAccount 必須在 transaction 內呼叫")
 	}
-	row, err := store.New(service.deps.DB.Conn(ctx)).ShareLockBuyerByAccount(ctx, accountID)
+	row, err := store.New(service.deps.DB.Conn(ctx)).LockBuyerSharedByAccount(ctx, accountID)
 	if err != nil {
 		return false, model.Error(err)
 	}

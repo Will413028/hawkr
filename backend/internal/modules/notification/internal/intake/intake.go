@@ -33,9 +33,9 @@ type Buyers interface {
 	ShareLockByAccount(ctx context.Context, accountID int64) (deleted bool, err error)
 }
 
-// Stores 是 worker 對 seller 的需求：以共享鎖鎖住店家列（commit 前不會被退場），並回報店家是否已退場。seller.Module 實作它。
+// Stores 是 worker 對 seller 的需求：以 FOR KEY SHARE 鎖住店家列（commit 前不會被退場）；已退場與不存在回 NotFound。seller.Module 實作它。
 type Stores interface {
-	ShareLockStore(ctx context.Context, storeID int64) (retired bool, err error)
+	LockNotRetired(ctx context.Context, storeID int64) error
 }
 
 // Registry 是型別註冊表；正式組裝用 registry 套件的 Lookup，測試可以換成帶測試型別的版本。
@@ -146,47 +146,64 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 		if err != nil {
 			if apperr.KindOf(err) == apperr.KindNotFound {
 				s.log().WarnContext(ctx, "收件帳號不存在，略過通知", "intent_id", intent.ID, "type", intent.Type)
-				return nil
+				return s.scrubSkipped(ctx, intent.ID)
 			}
 			return fmt.Errorf("鎖定收件帳號：%w", err)
 		}
 		if deleted {
 			s.log().InfoContext(ctx, "收件帳號已刪除，略過通知", "intent_id", intent.ID, "type", intent.Type)
-			return nil
+			return s.scrubSkipped(ctx, intent.ID)
 		}
-		gone, err := s.recipientGone(ctx, spec.Audience, resolved.Recipient)
+		gone, err := s.recipientGone(ctx, intent, spec.Audience, resolved.Recipient)
 		if err != nil {
 			return err
 		}
 		if gone {
-			s.log().InfoContext(ctx, "收件買家已關閉或收件店家已退場，略過通知", "intent_id", intent.ID, "type", intent.Type)
-			return nil
+			return s.scrubSkipped(ctx, intent.ID)
 		}
 		return s.deliver(ctx, intent, spec, resolved)
 	})
 }
 
-// recipientGone 接在帳號共享鎖之後（鎖順序：identity、buyer、seller、notification），以共享鎖鎖住 BUYER 收件人的買家列、
-// STORE 收件人的店家列，回報買家已關閉或店家已退場（BuyerDeleted、StoreRetired 之後不再為這個收件人建列）；
-// 列不存在與已刪除同樣視為不寫，並記 log。
-func (s *Service) recipientGone(ctx context.Context, audience model.Audience, r registry.Recipient) (bool, error) {
-	var gone bool
-	var err error
+// scrubSkipped 在 Process 因收件人已刪除、已關閉或已退場而略過時，把這個意圖的參數換成 '{}'（D16）：意圖還沒有收件匣連結或投遞紀錄，
+// 收件人的清除 job 找不到它；與略過同一個 transaction。
+func (s *Service) scrubSkipped(ctx context.Context, intentID uuid.UUID) error {
+	if err := store.New(s.d.DB.Conn(ctx)).ScrubIntentParams(ctx, intentID); err != nil {
+		return fmt.Errorf("清除略過的通知意圖參數：%w", err)
+	}
+	return nil
+}
+
+// recipientGone 接在帳號共享鎖之後（鎖順序：identity、buyer、seller、notification），以 FOR KEY SHARE 鎖住 BUYER 收件人的買家列、
+// STORE 收件人的店家列，回報買家已關閉或店家已退場（BuyerDeleted、StoreRetired 之後不再為這個收件人建列）。買家列不存在記 Warn
+// 並視為不寫；店家已退場與不存在無法區分（同樣回 NotFound），記 Info 並視為不寫。
+func (s *Service) recipientGone(ctx context.Context, intent store.NotificationIntent, audience model.Audience, r registry.Recipient) (bool, error) {
 	switch audience {
 	case model.AudienceBuyer:
-		gone, err = s.d.Buyers.ShareLockByAccount(ctx, r.AccountID)
+		deleted, err := s.d.Buyers.ShareLockByAccount(ctx, r.AccountID)
+		switch {
+		case apperr.KindOf(err) == apperr.KindNotFound:
+			s.log().WarnContext(ctx, "收件帳號沒有買家列，略過通知", "intent_id", intent.ID, "type", intent.Type)
+			return true, nil
+		case err != nil:
+			return false, fmt.Errorf("鎖定收件買家：%w", err)
+		case deleted:
+			s.log().InfoContext(ctx, "收件買家已關閉，略過通知", "intent_id", intent.ID, "type", intent.Type)
+		}
+		return deleted, nil
 	case model.AudienceStore:
-		gone, err = s.d.Stores.ShareLockStore(ctx, r.StoreID)
+		err := s.d.Stores.LockNotRetired(ctx, r.StoreID)
+		switch {
+		case apperr.KindOf(err) == apperr.KindNotFound:
+			s.log().InfoContext(ctx, "收件店家已退場，略過通知", "intent_id", intent.ID, "type", intent.Type)
+			return true, nil
+		case err != nil:
+			return false, fmt.Errorf("鎖定收件店家：%w", err)
+		}
+		return false, nil
 	default:
 		return false, fmt.Errorf("通知受眾 %q 不合法", audience)
 	}
-	if apperr.KindOf(err) == apperr.KindNotFound {
-		return true, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("鎖定收件人的買家或店家：%w", err)
-	}
-	return gone, nil
 }
 
 func (s *Service) log() *slog.Logger {

@@ -49,7 +49,7 @@ func (a RecipientArgs) scope() (audience *string, storeID *int64) {
 }
 
 // Recipient 清除一個收件人範圍：先把該收件人的意圖參數換成 '{}'、清掉投遞紀錄的送出文字（列留著，D16），再刪收件匣列（連結隨列刪除，
-// 所以意圖要先處理），最後刪偏好覆寫。每批一個 transaction，每一步都可重跑：已處理的列不再符合條件。
+// 所以意圖要先處理），最後刪偏好覆寫；限定單店的範圍（StoreRetired）不刪偏好。每批一個 transaction，每一步都可重跑：已處理的列不再符合條件。
 func (s *Service) Recipient(ctx context.Context, a RecipientArgs) error {
 	if err := a.validate(); err != nil {
 		return err
@@ -73,6 +73,10 @@ func (s *Service) Recipient(ctx context.Context, a RecipientArgs) error {
 		if _, err := s.batches(ctx, step.run); err != nil {
 			return fmt.Errorf("清除%s：%w", step.name, err)
 		}
+	}
+	if a.StoreID > 0 {
+		// 偏好是 (帳號, 受眾) 的、沒有店別；一間店退場時，同帳號可能已重開另一間店，整組 STORE 偏好不能刪。
+		return nil
 	}
 	err := store.New(s.d.DB.Conn(ctx)).DeleteAccountPreferenceOverrides(ctx, store.DeleteAccountPreferenceOverridesParams{AccountID: a.AccountID, Audience: audience})
 	if err != nil {

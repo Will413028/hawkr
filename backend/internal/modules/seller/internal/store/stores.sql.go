@@ -723,27 +723,6 @@ func (q *Queries) ReopenStore(ctx context.Context, arg ReopenStoreParams) (Selle
 	return i, err
 }
 
-const shareLockStore = `-- name: ShareLockStore :one
-SELECT store_id, retired_at
-FROM seller.stores
-WHERE store_id = $1
-FOR SHARE
-`
-
-type ShareLockStoreRow struct {
-	StoreID   int64
-	RetiredAt *time.Time
-}
-
-// 以 FOR SHARE 讀取指定 stint：與 RetireDueStores、LockAccountStores 的 FOR UPDATE 互斥，持有到呼叫方的 transaction 結束。
-// 給只需要「店家在寫入完成前沒有退場」的讀者（例如 notification 把通知寫給收件店家）。
-func (q *Queries) ShareLockStore(ctx context.Context, storeID int64) (ShareLockStoreRow, error) {
-	row := q.db.QueryRow(ctx, shareLockStore, storeID)
-	var i ShareLockStoreRow
-	err := row.Scan(&i.StoreID, &i.RetiredAt)
-	return i, err
-}
-
 const storeByCode = `-- name: StoreByCode :one
 SELECT store_id, store_code, account_id, status, version, store_name, description, logo_key, logo_asset_id, cover_key, cover_asset_id, contact_phone, contact_name, contact_mobile, support_email, town_code, address_detail, prize, website_url, onboarding_completed, created_at, updated_at, pii_purged_at, first_exposed_at, current_closed_at, retired_at
 FROM seller.stores
