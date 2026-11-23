@@ -295,7 +295,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
   - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
   - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。
-- [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。
+- [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。階段計畫：`2026-11-23-a8-notification.md`（盤點、步驟、決定 A8-D1–D9 與進度寫在那裡；本段以下是計畫建立前的原文，Clerk webhook 一條已由計畫前提取代）。
   - 發票寄送的買家 email 來源：單體 buyer 沒有 email，email 只在 identity（`accounts.email`）；A8 定 identity 的 email 同步時，一併決定發票（invoice-service）寄送地址取自 identity 的哪個欄位與介面（設計書 58 U5，Will 2026-10-28）。
   - 通知的維運重送：舊的 outbox 手動補列已隨 outbox 刪除，設計書 56 的 runbook 已無重送步驟；A8 設計投遞紀錄時一併定義重送手段（例如重排永久失敗的投遞紀錄）與 runbook（Will 2026-10-28）。
   - identity 接 Clerk 的 `user.updated` webhook（驗證簽章）同步已驗證的主要 email，作為 email 渠道的寄件地址；不在寄信時呼叫 Clerk Backend API（ADR `2026-09-27-identity-clerk.md` 文末〈修訂：email 作為通知的寄件地址〉）。完成時 `backend/docs/modules/identity.md` 的 email 從「建帳時的快照」改成同步後的規格。
