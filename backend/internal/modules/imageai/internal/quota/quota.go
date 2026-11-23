@@ -91,6 +91,20 @@ func (s *Service) Refund(ctx context.Context, storeID int64, periodStart time.Ti
 	return nil
 }
 
+// Current 是店家此刻的本週用量（唯讀，不扣額度）；資料庫錯誤原樣往上回，不當成預設值。
+func (s *Service) Current(ctx context.Context, storeID int64) (model.Usage, error) {
+	start := WeekStart(s.now())
+	limit, err := s.Limit(ctx, storeID)
+	if err != nil {
+		return model.Usage{}, err
+	}
+	used, err := s.Used(ctx, storeID, start)
+	if err != nil {
+		return model.Usage{}, err
+	}
+	return model.Usage{Used: used, Limit: limit, PeriodStart: start, ResetTime: NextWeekStart(start)}, nil
+}
+
 // Used 是店家在 periodStart 那週已用的次數，沒有紀錄是 0。
 func (s *Service) Used(ctx context.Context, storeID int64, periodStart time.Time) (int32, error) {
 	used, err := store.New(s.db.Conn(ctx)).GetUsage(ctx, store.GetUsageParams{StoreID: storeID, PeriodStart: periodStart})

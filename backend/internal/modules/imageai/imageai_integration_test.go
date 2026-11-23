@@ -12,8 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
@@ -307,5 +309,142 @@ func TestConsumeCountsAgainstANewerExistingPeriodWithoutMovingItBackwards(t *tes
 	}
 	if err := m.RefundQuota(ctx, 50, u.PeriodStart); err != nil || used(t, d, 50) != 1 {
 		t.Fatalf("用回傳的週退款：%v used = %d", err, used(t, d, 50))
+	}
+}
+
+type stubGuard struct{ err error }
+
+func (g stubGuard) LockNotRetired(context.Context, int64) error { return g.err }
+
+type stubGen struct {
+	res   llm.ImageResult
+	err   error
+	calls int
+}
+
+func (g *stubGen) GenerateImage(context.Context, llm.ImageRequest) (llm.ImageResult, error) {
+	g.calls++
+	return g.res, g.err
+}
+
+func setupTransform(t *testing.T, guardErr error, gen *stubGen) (*db.DB, *imageai.Module) {
+	t.Helper()
+	t.Parallel()
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "imageai", Dir: imageai.Migrations()}))
+	return d, imageai.New(imageai.Deps{DB: d, Now: func() time.Time { return wednesday }, Seller: stubGuard{err: guardErr}, Images: gen})
+}
+
+func pngInput(storeID int64) imageai.TransformInput {
+	return imageai.TransformInput{StoreID: storeID, Image: append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 32)...), MimeType: "image/png", Prompt: "白底"}
+}
+
+func TestTransformChargesTheQuotaOnSuccessAndRefundsWhenTheModelFails(t *testing.T) {
+	gen := &stubGen{res: llm.ImageResult{Image: []byte("out"), MimeType: "image/png"}}
+	d, m := setupTransform(t, nil, gen)
+	ctx := context.Background()
+	out, err := m.Transform(ctx, pngInput(1))
+	if err != nil || string(out.Image) != "out" || out.Usage.Used != 1 || out.Usage.Limit != imageai.DefaultWeeklyLimit || used(t, d, 1) != 1 {
+		t.Fatalf("out = %+v err = %v used = %d", out, err, used(t, d, 1))
+	}
+	gen.res, gen.err = llm.ImageResult{}, errors.New("provider down")
+	if _, err := m.Transform(ctx, pngInput(1)); err == nil {
+		t.Fatal("模型失敗要回錯誤")
+	}
+	if used(t, d, 1) != 1 {
+		t.Fatalf("失敗的那一次要退回，used = %d", used(t, d, 1))
+	}
+	gen.err, gen.res = nil, llm.ImageResult{FinishReason: "IMAGE_SAFETY"}
+	if _, err := m.Transform(ctx, pngInput(1)); err == nil || used(t, d, 1) != 1 {
+		t.Fatalf("被擋下也要退回：%v used = %d", err, used(t, d, 1))
+	}
+}
+
+func TestTransformStopsAtTheQuotaWithoutCallingTheModel(t *testing.T) {
+	gen := &stubGen{res: llm.ImageResult{Image: []byte("out"), MimeType: "image/png"}}
+	d, m := setupTransform(t, nil, gen)
+	setLimit(t, d, 1, 1)
+	ctx := context.Background()
+	if _, err := m.Transform(ctx, pngInput(1)); err != nil {
+		t.Fatal(err)
+	}
+	_, err := m.Transform(ctx, pngInput(1))
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Reason != apperr.ReasonImageQuotaExceeded || gen.calls != 1 || used(t, d, 1) != 1 {
+		t.Fatalf("err = %v calls = %d used = %d", err, gen.calls, used(t, d, 1))
+	}
+}
+
+func TestTransformForARetiredStoreCreatesNoUsageRow(t *testing.T) {
+	gen := &stubGen{res: llm.ImageResult{Image: []byte("out"), MimeType: "image/png"}}
+	d, m := setupTransform(t, apperr.NotFound("已退場"), gen)
+	_, err := m.Transform(context.Background(), pngInput(1))
+	if apperr.KindOf(err) != apperr.KindPermissionDenied || gen.calls != 0 {
+		t.Fatalf("err = %v calls = %d", err, gen.calls)
+	}
+	var n int
+	if err := d.Pool().QueryRow(context.Background(), `SELECT count(*) FROM imageai.usage`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("退場的店不能重建用量列：%d %v", n, err)
+	}
+}
+
+func TestCurrentUsageReadsWithoutConsuming(t *testing.T) {
+	d, m := setup(t)
+	ctx := context.Background()
+	u, err := m.CurrentUsage(ctx, 1)
+	if err != nil || u.Used != 0 || u.Limit != imageai.DefaultWeeklyLimit || used(t, d, 1) != 0 {
+		t.Fatalf("u = %+v err = %v", u, err)
+	}
+	if _, err := m.ConsumeQuota(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	setLimit(t, d, 1, 3)
+	if u, err := m.CurrentUsage(ctx, 1); err != nil || u.Used != 1 || u.Limit != 3 || used(t, d, 1) != 1 {
+		t.Fatalf("u = %+v err = %v", u, err)
+	}
+	d.Pool().Close()
+	if _, err := m.CurrentUsage(ctx, 1); err == nil {
+		t.Fatal("資料庫錯誤要往上回，不能當成預設值")
+	}
+}
+
+func TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder(t *testing.T) {
+	d, m := setup(t)
+	ctx := context.Background()
+	ins := func(id, name, category string, order int, enabled bool, thumb string) {
+		exec(t, d, `INSERT INTO imageai.styles (id, name, label, prompt, category, display_order, enabled, thumbnail_key, created_at, updated_at)
+			VALUES ($1, $2, $2, 'p-' || $2, $3, $4, $5, $6, now(), now())`, id, name, category, order, enabled, thumb)
+	}
+	ins("019e9a00-0000-7000-8000-000000000001", "b", "PRODUCT", 1, true, "styles/b.jpg")
+	ins("019e9a00-0000-7000-8000-000000000002", "a", "PRODUCT", 2, true, "")
+	ins("019e9a00-0000-7000-8000-000000000003", "off", "PRODUCT", 0, false, "")
+	ins("019e9a00-0000-7000-8000-000000000004", "post-only", "POST", 0, true, "")
+	list, err := m.ListStyles(ctx, imageai.CategoryProduct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, s := range list.Styles {
+		names = append(names, s.Name)
+	}
+	if len(names) != 2 || names[0] != "b" || names[1] != "a" || list.Styles[0].ThumbnailKey != "styles/b.jpg" || list.Styles[0].DisplayOrder != 1 {
+		t.Fatalf("風格 = %+v", list.Styles)
+	}
+	var want string
+	if err := d.Pool().QueryRow(ctx, `SELECT prompt FROM imageai.styles WHERE category = 'PRODUCT' AND is_default`).Scan(&want); err != nil {
+		t.Fatal(err)
+	}
+	if list.DefaultPrompt != want || want == "" {
+		t.Fatalf("DefaultPrompt = %q，預設風格的 prompt = %q", list.DefaultPrompt, want)
+	}
+	post, err := m.ListStyles(ctx, imageai.CategoryPost)
+	if err != nil || len(post.Styles) != 1 || post.Styles[0].Name != "post-only" {
+		t.Fatalf("POST = %+v err = %v", post, err)
+	}
+	if _, err := m.ListStyles(ctx, ""); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("空用途要回 InvalidInput：%v", err)
+	}
+	d.Pool().Close()
+	if _, err := m.ListStyles(ctx, imageai.CategoryProduct); err == nil {
+		t.Fatal("資料庫錯誤要往上回")
 	}
 }

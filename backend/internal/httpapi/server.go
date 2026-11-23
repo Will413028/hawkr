@@ -49,12 +49,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/crm/v1alpha1/crmv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/imageai/v1alpha1/imageaiv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/review/v1alpha1/reviewv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
+	httpimageai "github.com/Will413028/hawkr/backend/internal/httpapi/imageai"
 	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	httpreview "github.com/Will413028/hawkr/backend/internal/httpapi/review"
@@ -71,6 +73,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
@@ -121,6 +124,8 @@ type Deps struct {
 	Assistant *assistant.Module
 	// Procurement 是買家採購（BuyerProcurementAppService）。
 	Procurement *procurement.Module
+	// ImageAI 是賣家修圖（ImageAiAppService）。
+	ImageAI *imageai.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
 	// httpseller.NewStatsSource 建立。
 	Stats *httpseller.StatsSource
@@ -151,6 +156,10 @@ type Deps struct {
 // maxRequestBytes 是單一請求的大小上限（API 設計規範（Connect）§十）：模組的文字欄位不設長度上限，
 // 大小由這裡擋，與 gateway 的 BodyGuard 一般路由相同。
 const maxRequestBytes = 2 << 20
+
+// imageAIMaxRequestBytes 是 ImageAiAppService 單一請求的大小上限（API 設計規範（Connect）§十的例外）：原圖最多 2 MiB（模組檢查），
+// JSON／base64 編碼後才放得下。
+const imageAIMaxRequestBytes = 3 << 20
 
 // compressMinBytes 以下的回應不壓縮：壓縮的額外負擔大於省下的傳輸量。
 const compressMinBytes = 1 << 10
@@ -214,6 +223,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Procurement == nil {
 		return nil, fmt.Errorf("httpapi：BuyerProcurementAppService 需要 Procurement")
+	}
+	if deps.ImageAI == nil {
+		return nil, fmt.Errorf("httpapi：ImageAiAppService 需要 ImageAI")
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
@@ -462,6 +474,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
 	add(procurementv1alpha1connect.NewBuyerProcurementAppServiceHandler(httpbuyerprocurement.NewApp(deps.Procurement, deps.Buyer, deps.Seller, deps.Images, deps.Logger), opts...))
+	add(imageaiv1alpha1connect.NewImageAiAppServiceHandler(httpimageai.NewApp(deps.ImageAI, deps.Seller, deps.Images, deps.Logger), append(slices.Clone(opts), connect.WithReadMaxBytes(imageAIMaxRequestBytes))...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
 	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
 	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)

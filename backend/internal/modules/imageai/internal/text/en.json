@@ -1,0 +1,46 @@
+{
+  "default": {
+    "style.category_invalid": {
+      "message": "The style category is not valid"
+    },
+    "style.default_missing": {
+      "message": "Styles are unavailable right now. Please try again later"
+    },
+    "transform.busy": {
+      "message": "Image editing is busy right now. Please try again shortly"
+    },
+    "transform.image_empty": {
+      "message": "Please provide an image to edit"
+    },
+    "transform.image_too_large": {
+      "message": "The image must be at most {max} MB. Please resize it first"
+    },
+    "transform.mime_unsupported": {
+      "message": "Only JPEG, PNG and WebP images are supported"
+    },
+    "transform.not_produced": {
+      "message": "No image was produced this time. Please try again"
+    },
+    "transform.prompt_length": {
+      "message": "The prompt must be 1 to {max} characters"
+    },
+    "transform.provider_busy": {
+      "message": "AI image editing is very busy. Please try again shortly"
+    },
+    "transform.provider_unavailable": {
+      "message": "AI image editing is temporarily unavailable. Please try again later"
+    },
+    "transform.quota_exceeded": {
+      "message": "You have used all of this week's image edits"
+    },
+    "transform.recitation_blocked": {
+      "message": "The result was too similar to copyrighted content. Please use a different photo"
+    },
+    "transform.safety_blocked": {
+      "message": "The image or prompt did not pass the safety check. Please use a different photo or change the prompt"
+    },
+    "transform.store_unavailable": {
+      "message": "This store cannot use image editing"
+    }
+  }
+}

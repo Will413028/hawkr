@@ -1,0 +1,193 @@
+{
+ "mutants": [
+  {
+   "id": "consume-before-acquire",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "\trelease, ok := s.d.Slots.TryAcquire()\n\tif !ok {\n\t\treturn model.TransformOutput{}, apperr.ResourceExhausted(busyRetryAfter, \"%s\", text.TransformBusy(l))\n\t}\n\tdefer release()\n\n\tusage, err := s.charge(ctx, l, in.StoreID)\n\tif err != nil {\n\t\treturn model.TransformOutput{}, err\n\t}\n",
+   "new": "\tusage, err := s.charge(ctx, l, in.StoreID)\n\tif err != nil {\n\t\treturn model.TransformOutput{}, err\n\t}\n\trelease, ok := s.d.Slots.TryAcquire()\n\tif !ok {\n\t\treturn model.TransformOutput{}, apperr.ResourceExhausted(busyRetryAfter, \"%s\", text.TransformBusy(l))\n\t}\n\tdefer release()\n",
+   "test": "internal/modules/imageai/internal/transform ^TestSlotFullIsRejectedBeforeAnyQuotaIsCharged$",
+   "why": "先扣額度再佔名額：同時修圖滿了仍會扣一次額度"
+  },
+  {
+   "id": "no-consume-call",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "\t\tu, err := s.d.Quota.Consume(ctx, storeID)\n",
+   "new": "\t\tvar u model.Usage\n\t\tvar err error\n",
+   "test": "internal/modules/imageai/internal/transform ^TestQuotaExhaustedCarriesReasonAndMetadata$",
+   "why": "拿掉扣額度的呼叫：額度用完永遠不會被擋下"
+  },
+  {
+   "id": "no-consume-call-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "\t\tu, err := s.d.Quota.Consume(ctx, storeID)\n",
+   "new": "\t\tvar u model.Usage\n\t\tvar err error\n",
+   "test": "internal/modules/imageai ^TestTransformStopsAtTheQuotaWithoutCallingTheModel$",
+   "why": "拿掉扣額度的呼叫：真實資料庫的用量不增加、額度不擋"
+  },
+  {
+   "id": "no-refund",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "if rerr := s.d.Quota.Refund(ctx, in.StoreID, usage.PeriodStart); rerr != nil {",
+   "new": "if rerr := error(nil); rerr != nil {",
+   "test": "internal/modules/imageai/internal/transform ^TestEachModelRefusalMapsToItsReasonAndRefunds$",
+   "why": "模型失敗不退回額度"
+  },
+  {
+   "id": "no-refund-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "if rerr := s.d.Quota.Refund(ctx, in.StoreID, usage.PeriodStart); rerr != nil {",
+   "new": "if rerr := error(nil); rerr != nil {",
+   "test": "internal/modules/imageai ^TestTransformChargesTheQuotaOnSuccessAndRefundsWhenTheModelFails$",
+   "why": "模型失敗不退回額度：真實資料庫的用量停在失敗之後"
+  },
+  {
+   "id": "no-retired-guard",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "\t\tif err := s.d.Guard.LockNotRetired(ctx, storeID); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/transform ^TestRetiredStoreIsNeverCharged$",
+   "why": "扣額度前不確認店家未退場：退場的店仍被扣額度"
+  },
+  {
+   "id": "no-retired-guard-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "\t\tif err := s.d.Guard.LockNotRetired(ctx, storeID); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai ^TestTransformForARetiredStoreCreatesNoUsageRow$",
+   "why": "扣額度前不確認店家未退場：退場的店重建用量列"
+  },
+  {
+   "id": "no-size-limit",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "if len(in.Image) > model.MaxImageBytes {",
+   "new": "if false {",
+   "test": "internal/modules/imageai/internal/transform ^TestInvalidInputIsRejectedWithFieldAndNothingIsCharged$",
+   "why": "拿掉 2 MiB 原圖上限"
+  },
+  {
+   "id": "prompt-bytes-not-runes",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "n == 0 || n > model.MaxPromptRunes",
+   "new": "n == 0 || len(prompt) > model.MaxPromptRunes",
+   "test": "internal/modules/imageai/internal/transform ^TestPromptBoundariesCountRunesAfterTrim$",
+   "why": "提示詞長度改以 byte 計：500 個中文字被拒絕"
+  },
+  {
+   "id": "no-prompt-trim",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "prompt = trimtext.Trim(in.Prompt)",
+   "new": "prompt = in.Prompt + trimtext.Trim(\"\")",
+   "test": "internal/modules/imageai/internal/transform ^TestInvalidInputIsRejectedWithFieldAndNothingIsCharged$",
+   "why": "提示詞不去頭尾空白：全空白的提示詞通過"
+  },
+  {
+   "id": "recitation-only-bare-code",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "case \"IMAGE_RECITATION\", \"RECITATION\":",
+   "new": "case \"RECITATION\":",
+   "test": "internal/modules/imageai/internal/transform ^TestEachModelRefusalMapsToItsReasonAndRefunds$",
+   "why": "IMAGE_RECITATION 不再歸為著作權複誦，變成沒有產出圖片"
+  },
+  {
+   "id": "retry-three-times",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "if attempt == 2 {",
+   "new": "if attempt == 3 {",
+   "test": "internal/modules/imageai/internal/transform ^TestEachModelRefusalMapsToItsReasonAndRefunds$",
+   "why": "沒有產出圖片重試超過一次"
+  },
+  {
+   "id": "quota-reason-dropped",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "\t\t\tWithReason(apperr.ReasonImageQuotaExceeded).\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/transform ^TestQuotaExhaustedCarriesReasonAndMetadata$",
+   "why": "額度用完的錯誤沒有 IMAGE_QUOTA_EXCEEDED"
+  },
+  {
+   "id": "safety-reason-swapped",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "WithReason(apperr.ReasonImageSafetyBlocked)",
+   "new": "WithReason(apperr.ReasonImageRecitationBlocked)",
+   "test": "internal/modules/imageai/internal/transform ^TestEachModelRefusalMapsToItsReasonAndRefunds$",
+   "why": "安全性擋下回成著作權的 reason"
+  },
+  {
+   "id": "not-produced-reason-dropped",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": ".WithReason(apperr.ReasonImageNotProduced)",
+   "new": "",
+   "test": "internal/modules/imageai/internal/transform ^TestEachModelRefusalMapsToItsReasonAndRefunds$",
+   "why": "沒有產出圖片的錯誤沒有 IMAGE_NOT_PRODUCED"
+  },
+  {
+   "id": "handler-image-path-dropped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/imageai/app.go",
+   "old": "\"Image\": \"image_data\", ",
+   "new": "",
+   "test": "internal/httpapi/imageai ^TestTransformImageMapsModuleFieldsToRequestPaths$",
+   "why": "原圖的欄位違規沒有對到 image_data"
+  },
+  {
+   "id": "imageai-read-limit-global",
+   "stack": "go",
+   "file": "backend/internal/httpapi/server.go",
+   "old": "connect.WithReadMaxBytes(imageAIMaxRequestBytes)",
+   "new": "connect.WithReadMaxBytes(maxRequestBytes)",
+   "test": "internal/httpapi ^TestImageAiServiceAcceptsA3MiBRequestAndEveryOtherServiceKeepsTwoMiB$",
+   "why": "ImageAiAppService 沒有單獨放寬到 3 MiB：2 MiB 原圖的 JSON 請求被擋"
+  },
+  {
+   "id": "styles-include-disabled",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/store/styles.sql.go",
+   "old": "WHERE category = $1 AND enabled",
+   "new": "WHERE category = $1",
+   "test": "internal/modules/imageai ^TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder$",
+   "why": "風格清單含停用的"
+  },
+  {
+   "id": "styles-order-by-name",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/store/styles.sql.go",
+   "old": "ORDER BY display_order, name",
+   "new": "ORDER BY name",
+   "test": "internal/modules/imageai ^TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder$",
+   "why": "風格不依 display_order 排序"
+  },
+  {
+   "id": "styles-default-listed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/style/style.go",
+   "old": "\t\tif r.IsDefault {\n",
+   "new": "\t\tif r.IsDefault && false {\n",
+   "test": "internal/modules/imageai ^TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder$",
+   "why": "預設風格列入清單、DefaultPrompt 空"
+  },
+  {
+   "id": "styles-error-swallowed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/style/style.go",
+   "old": "return model.StyleList{}, fmt.Errorf(\"style：讀 %s 的風格：%w\", category, err)",
+   "new": "return model.StyleList{}, nil",
+   "test": "internal/modules/imageai ^TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder$",
+   "why": "風格讀取的資料庫錯誤被吞掉"
+  }
+ ]
+}

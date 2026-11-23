@@ -88,10 +88,13 @@ var InternalDependencies = map[string]InternalGraph{
 		"write":    {"mediaref", "model", "rows", "store", "text"},
 	}},
 	"imageai": {Packages: map[string][]string{
-		"limit": {},
-		"model": {},
-		"quota": {"model", "store"},
-		"store": {},
+		"limit":     {},
+		"model":     {},
+		"quota":     {"model", "store"},
+		"store":     {},
+		"style":     {"model", "store", "text"},
+		"text":      {},
+		"transform": {"model", "text"},
 	}},
 	"assistant": {Packages: map[string][]string{
 		"adksession": {},                // ADK session.Service 的 pgx 實作，schema assistant（A9-D27）
