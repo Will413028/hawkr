@@ -490,34 +490,32 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            LayoutBuilder(
-              builder: (context, constraints) => Row(
-                children: [
-                  _buildUserAvatar(avatar),
-                  const SizedBox(width: HkSpace.md),
-                  Expanded(
+            Row(
+              children: [
+                _buildUserAvatar(avatar),
+                const SizedBox(width: HkSpace.md),
+                Expanded(
+                  child: Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.bodyBold,
+                  ),
+                ),
+                if (date.isNotEmpty) ...[
+                  const SizedBox(width: HkSpace.sm),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width * 0.4,
+                    ),
                     child: Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodyBold,
+                      date,
+                      textAlign: TextAlign.end,
+                      style: AppTypography.caption,
                     ),
                   ),
-                  if (date.isNotEmpty) ...[
-                    const SizedBox(width: HkSpace.sm),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: constraints.maxWidth * 0.45,
-                      ),
-                      child: Text(
-                        date,
-                        textAlign: TextAlign.end,
-                        style: AppTypography.caption,
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
             const SizedBox(height: HkSpace.md),
             Row(
