@@ -1,7 +1,7 @@
 # B2 買家付款的 Stripe Connect 收款模式（charge model）簡報
 
 ## 0. 前提問題
-- 有沒有要改的東西已排定重寫？沒有。ADR `docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md` 第 41 行選 destination charges，但自己標了「推論，未核出處（推測）」；master plan B9 寫 separate charges and transfers。兩份文件互相矛盾，這份簡報要做的就是二選一（核對出處：ADR 第 41 行）。
+- 有沒有要改的東西已排定重寫？沒有。ADR `docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md` 第 41 行選 destination charges，但自己標了「推論，未核出處（推測）」；master plan B10 寫 separate charges and transfers。兩份文件互相矛盾，這份簡報要做的就是二選一（核對出處：ADR 第 41 行）。
 - **真實的限制**：
   - 賣家是 v2 `recipient` 帳戶，只有 `stripe_transfers`。recipient 帳戶不能申請 `card_payments`，所以不能用 `on_behalf_of`，也不能用 direct charges（直接在賣家帳戶上收款）（核對出處：docs.stripe.com/connect/service-agreement-types、docs.stripe.com/connect/destination-charges「settlement merchant」段）。
   - 平台是 US，賣家要在 US/CA/UK/EEA/CH 才能跨境轉帳（核對出處：separate-charges-and-transfers「Cross-border transfers」段）。

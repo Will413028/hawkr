@@ -388,10 +388,10 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 設定「進行中售後」旗標。
   - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表。
   - 退款經 payment port（收款開通 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`）；PayUni 的超商與 ATM 轉帳退款不再適用，非原路退款依 port 的能力描述處理。
-- [ ] **B10 finance**
-  - 賣家撥款從 ordering 移入。
-  - 撥款與對帳經 payment port（收款開通 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`）：PayUni 的「代理商先收、訂單完成後撥款」改對應 Stripe Connect 的 separate charges and transfers；代理商費反推與 ADR `payuni-channel-fee-bearer` 在本步重審。
-  - 物流財務與責任判定不改寫、直接刪（Will 2026-11-23）：賣家自寄後平台不代收也不負擔運費，沒有可算的對象。範圍：Java payment 的 `Logistics*`、`ResponsibilityCaseService`、`FulfillmentResponsibilityGrpcService`、`LogisticsCostIncurredConsumer`、`ResponsibilityFinalizedConsumer`；order 的 `ResponsibilityFinalizedConsumer`；`payment.proto` 的對應 RPC；gateway 的 `routes_logistics.go`、`payment_responsibility_client.go` 與 openapi 對應段落；CodeMeta 的物流責任值域。client 只有 CodeMeta 生成物引用（`rg -l -i "logistics.?financ|responsibilit" admin/src seller-app/lib website/lib buyer-app/lib`）。Java payment-service 隨本步退場。
+- [ ] **B10 finance**：只剩平台手續費與對帳。
+  - 已由其他步驟承接：賣家撥款（Stripe Connect separate charges and transfers：訂單完成時建 Transfer、完成後退款先撤回轉帳）在 B2 做（B2 計畫 D1、D6，`2026-11-23-b2-payment.md`）；ordering 呼叫撥款在 B8 改 in-process；Java payment-service 在 B2 退場。
+  - 剩下的範圍：平台手續費的計算（代理商費反推與 ADR `payuni-channel-fee-bearer` 在本步重審）與撥款對 Stripe 的對帳。作品集需不需要對帳報表在開步時決定，不需要就把本步標為退場。
+  - 物流財務與責任判定不改寫、直接刪（Will 2026-11-23），程式已刪（commit `5883f499e`、`125db5844`、`28a120564`）；只剩 Java payment Flyway V9–V16 建的物流表，沒有程式讀寫，隨 Java payment-service 在 B2 退場一起清掉（B2 盤點 `2026-11-23-b2-payment/inventory.md` 表 4）。
 
 **階段驗收**
 
