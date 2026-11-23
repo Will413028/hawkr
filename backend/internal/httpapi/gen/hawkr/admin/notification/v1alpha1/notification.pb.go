@@ -127,7 +127,7 @@ func (x *Announcement) GetDispatched() bool {
 type CreateAnnouncementRequest struct {
 	state     protoimpl.MessageState          `protogen:"open.v1"`
 	Audiences []v1alpha1.NotificationAudience `protobuf:"varint,1,rep,packed,name=audiences,proto3,enum=hawkr.notification.v1alpha1.NotificationAudience" json:"audiences,omitempty"`
-	// 必填；長度上限由伺服器訂，超過回 invalid_argument。
+	// 必填；一律英文，不分語系，所有使用者看到同一份。長度上限由伺服器訂，超過回 invalid_argument。
 	Title         string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Body          string `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
 	RequestId     string `protobuf:"bytes,4,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`

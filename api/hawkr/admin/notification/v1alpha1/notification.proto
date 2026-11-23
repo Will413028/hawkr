@@ -38,7 +38,7 @@ message Announcement {
 
 message CreateAnnouncementRequest {
   repeated hawkr.notification.v1alpha1.NotificationAudience audiences = 1 [(google.api.field_behavior) = REQUIRED];
-  // 必填；長度上限由伺服器訂，超過回 invalid_argument。
+  // 必填；一律英文，不分語系，所有使用者看到同一份。長度上限由伺服器訂，超過回 invalid_argument。
   string title = 2 [(google.api.field_behavior) = REQUIRED];
   string body = 3 [(google.api.field_behavior) = REQUIRED];
   string request_id = 4 [(google.api.field_info).format = UUID4];

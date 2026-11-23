@@ -86,7 +86,7 @@ export type CreateAnnouncementRequest = Message<"hawkr.admin.notification.v1alph
   audiences: NotificationAudience[];
 
   /**
-   * 必填；長度上限由伺服器訂，超過回 invalid_argument。
+   * 必填；一律英文，不分語系，所有使用者看到同一份。長度上限由伺服器訂，超過回 invalid_argument。
    *
    * @generated from field: string title = 2;
    */
