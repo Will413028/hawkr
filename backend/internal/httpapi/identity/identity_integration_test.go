@@ -39,6 +39,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
@@ -101,7 +102,7 @@ func setup(t *testing.T, o options) *fixture {
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Social: noSchedules{}, Now: time.Now, Logger: log})
 	events.Subscribe(bus, del.OnAdminRoleRevoked)
-	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, Buyer: buyers, Social: &social.Module{}, Legacy: o.legacy, LegacyPrefixes: []string{"/api/v1/"}, Ready: d.Ping, Identity: m, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Delegation: del, Origins: []string{"https://web.example"}, Logger: log})
+	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, ImageAI: &imageai.Module{}, Buyer: buyers, Social: &social.Module{}, Legacy: o.legacy, LegacyPrefixes: []string{"/api/v1/"}, Ready: d.Ping, Identity: m, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Delegation: del, Origins: []string{"https://web.example"}, Logger: log})
 	if err != nil {
 		t.Fatal(err)
 	}

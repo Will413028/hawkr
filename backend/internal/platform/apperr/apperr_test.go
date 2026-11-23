@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 func TestKindOfFollowsTheErrorChain(t *testing.T) {
@@ -106,5 +108,24 @@ func TestFieldViolationsReturnsACopy(t *testing.T) {
 	e.FieldViolations()[0].Field = "changed"
 	if got := e.FieldViolations()[0].Field; got != "A" {
 		t.Fatalf("Field = %q，內部欄位被改動", got)
+	}
+}
+
+func TestLocaleFollowsTheUitextMessageArgument(t *testing.T) {
+	en := uitext.Message{Text: "Too long", Locale: uitext.EN}
+	for name, e := range map[string]*Error{
+		"invalid input":      InvalidInput("%s", en),
+		"invalid input on":   InvalidInputOn([]string{"A"}, "%s", en),
+		"not found":          NotFound("%s", en),
+		"permission denied":  PermissionDenied("%s", en),
+		"resource exhausted": ResourceExhausted(time.Second, "%s", en),
+		"version conflict":   VersionConflict("%s", en),
+	} {
+		if e.Locale() != uitext.EN || e.Message != "Too long" {
+			t.Errorf("%s：locale = %q，message = %q", name, e.Locale(), e.Message)
+		}
+	}
+	if l := NotFound("%s", "找不到").Locale(); l != uitext.ZhTW {
+		t.Errorf("字面值的語系 = %q", l)
 	}
 }

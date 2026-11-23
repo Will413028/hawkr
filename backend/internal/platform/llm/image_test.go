@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/model/gemini"
@@ -153,5 +154,51 @@ func TestReadConfigImageModel(t *testing.T) {
 	cfg := ReadConfig(config.FromMap(map[string]string{"LLM_IMAGEAI_MODEL": GeminiImage}))
 	if cfg.Models[ImageAI] != GeminiImage {
 		t.Fatalf("cfg = %+v", cfg)
+	}
+}
+
+type hangingGenerator struct {
+	gotDeadline chan bool
+}
+
+func (h hangingGenerator) GenerateImage(ctx context.Context, _ ImageRequest) (ImageResult, error) {
+	_, ok := ctx.Deadline()
+	h.gotDeadline <- ok
+	<-ctx.Done()
+	return ImageResult{}, ctx.Err()
+}
+
+func TestImageGeneratorIsBoundedByADeadline(t *testing.T) {
+	g := hangingGenerator{gotDeadline: make(chan bool, 1)}
+	m := NewImageModel(g, "fake").withTimeout(20 * time.Millisecond)
+	done := make(chan error, 1)
+	go func() {
+		_, err := m.Generator().GenerateImage(context.Background(), ImageRequest{})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("err = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("generator was not bounded by a deadline")
+	}
+	if !<-g.gotDeadline {
+		t.Fatal("ctx passed to the generator has no deadline")
+	}
+}
+
+func TestImageGeneratorDefaultDeadlineIsImageCallTimeout(t *testing.T) {
+	b, ok := NewImageModel(hangingGenerator{}, "fake").Generator().(boundedImage)
+	if !ok || b.timeout != imageCallTimeout {
+		t.Fatalf("generator = %+v", b)
+	}
+}
+
+func TestDisabledImageIsDisabledNotNotConfigured(t *testing.T) {
+	m := DisabledImage()
+	if m.Enabled() || m.Status() != StatusDisabled {
+		t.Fatalf("status = %v", m.Status())
 	}
 }

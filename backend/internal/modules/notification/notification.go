@@ -14,9 +14,12 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -33,10 +36,18 @@ func Migrations() fs.FS {
 	return sub
 }
 
+// Buyers 是 worker 對 buyer 的需求（*buyer.Module 滿足它）：以 FOR KEY SHARE 鎖住收件買家列，並回報買家是否已關閉。
+type Buyers = intake.Buyers
+
+// Stores 是 worker 對 seller 的需求（*seller.Module 滿足它）：以 FOR KEY SHARE 鎖住收件店家列，店家已退場回 NotFound。
+type Stores = intake.Stores
+
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
 type Deps struct {
 	DB       *db.DB
 	Identity *identity.Module
+	Buyer    Buyers
+	Seller   Stores
 	Jobs     jobs.Enqueuer
 	Now      func() time.Time
 	NewID    func() uuid.UUID
@@ -46,15 +57,19 @@ type Deps struct {
 // Module 是 notification 模組。
 type Module struct {
 	intake *intake.Service
+	purge  *purge.Service
 }
 
 // New 建立模組。
 func New(d Deps) *Module { return newModule(d, registry.Registry{}) }
 
 func newModule(d Deps, reg intake.Registry) *Module {
-	return &Module{intake: intake.New(intake.Deps{
-		DB: d.DB, Accounts: d.Identity, Registry: reg, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
-	})}
+	return &Module{
+		intake: intake.New(intake.Deps{
+			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
+		}),
+		purge: purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger}),
+	}
 }
 
 // OnSuspended 是 accountsuspension.Suspended 的同步訂閱者：只在發布的 transaction 內登記意圖並排 job。
@@ -67,5 +82,26 @@ func (m *Module) OnUnsuspended(ctx context.Context, e accountsuspension.Unsuspen
 	return m.intake.OnUnsuspended(ctx, e)
 }
 
-// AddWorkers 登記 River worker（意圖展開）。由 cmd/hawkr 的 worker 接上。
-func (m *Module) AddWorkers(workers *river.Workers) { m.intake.AddWorkers(workers) }
+// OnAccountDeleted 是 identity.AccountDeleted 的同步訂閱者：只在發布的 transaction 內排個資清除 job。
+func (m *Module) OnAccountDeleted(ctx context.Context, e identity.AccountDeleted) error {
+	return m.purge.OnAccountDeleted(ctx, e)
+}
+
+// OnBuyerDeleted 是 buyer.BuyerDeleted 的同步訂閱者，同 OnAccountDeleted。
+func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
+	return m.purge.OnBuyerDeleted(ctx, e)
+}
+
+// OnStoreRetired 是 seller.StoreRetired 的同步訂閱者，同 OnAccountDeleted。
+func (m *Module) OnStoreRetired(ctx context.Context, e seller.StoreRetired) error {
+	return m.purge.OnStoreRetired(ctx, e)
+}
+
+// AddWorkers 登記 River worker（意圖展開、保留期清除、個資清除）。由 cmd/hawkr 的 worker 接上。
+func (m *Module) AddWorkers(workers *river.Workers) {
+	m.intake.AddWorkers(workers)
+	purge.AddWorkers(workers, m.purge)
+}
+
+// PeriodicJobs 回傳週期 job：保留期清除。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob { return purge.PeriodicJobs() }

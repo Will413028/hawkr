@@ -420,6 +420,27 @@ func (q *Queries) LockBuyerShared(ctx context.Context, buyerID int64) (BuyerBuye
 	return i, err
 }
 
+const lockBuyerSharedByAccount = `-- name: LockBuyerSharedByAccount :one
+SELECT status, pii_cleared_at
+FROM buyer.buyers
+WHERE account_id = $1
+FOR KEY SHARE
+`
+
+type LockBuyerSharedByAccountRow struct {
+	Status       string
+	PiiClearedAt *time.Time
+}
+
+// 以 FOR KEY SHARE 讀取帳號唯一的買家列（一個帳號一生一個買家）：只與狀態轉換、刪帳的 FOR UPDATE 互斥（同 LockBuyerShared），不擋業務寫入的
+// FOR NO KEY UPDATE，持有到呼叫方的 transaction 結束。給只需要「買家在寫入完成前沒有關閉」的讀者（例如 notification 把通知寫給收件買家）。
+func (q *Queries) LockBuyerSharedByAccount(ctx context.Context, accountID int64) (LockBuyerSharedByAccountRow, error) {
+	row := q.db.QueryRow(ctx, lockBuyerSharedByAccount, accountID)
+	var i LockBuyerSharedByAccountRow
+	err := row.Scan(&i.Status, &i.PiiClearedAt)
+	return i, err
+}
+
 const pending = `-- name: Pending :exec
 UPDATE buyer.buyers
 SET status = 'PENDING_DELETION',

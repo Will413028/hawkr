@@ -15,10 +15,15 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -32,6 +37,7 @@ type recorder struct {
 	mu         sync.Mutex
 	args       []intake.ProcessArgs
 	deliveries []intake.DeliverArgs
+	purges     []purge.RecipientArgs
 	// deliverUnique 記錄每個渠道 job 是否以參數（投遞紀錄 ID）唯一。
 	deliverUnique []bool
 }
@@ -42,6 +48,8 @@ func (r *recorder) Enqueue(_ context.Context, a river.JobArgs, opts *river.Inser
 	switch a := a.(type) {
 	case intake.ProcessArgs:
 		r.args = append(r.args, a)
+	case purge.RecipientArgs:
+		r.purges = append(r.purges, a)
 	case intake.DeliverArgs:
 		r.deliveries = append(r.deliveries, a)
 		r.deliverUnique = append(r.deliverUnique, opts != nil && opts.UniqueOpts.ByArgs)
@@ -55,6 +63,14 @@ func (r *recorder) deliverJobs() ([]intake.DeliverArgs, []bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]intake.DeliverArgs(nil), r.deliveries...), append([]bool(nil), r.deliverUnique...)
+}
+
+func (r *recorder) takePurges() []purge.RecipientArgs {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := r.purges
+	r.purges = nil
+	return out
 }
 
 func (r *recorder) take() []intake.ProcessArgs {
@@ -132,6 +148,43 @@ var testTwin = registry.Define(registry.Definition[likeParams]{
 	Example: likeParams{AccountID: 1, EventID: "e", PostID: "p", ActorID: 2},
 })
 
+type storeNoteParams struct {
+	AccountID int64  `json:"account_id"`
+	StoreID   int64  `json:"store_id"`
+	EventID   string `json:"event_id"`
+}
+
+// testStoreNote 是 STORE 受眾、有收件匣與推播的測試型別；testStorePushOnly 只有推播（意圖只經投遞紀錄找得到）。
+var testStoreNote = registry.Define(registry.Definition[storeNoteParams]{
+	Name: "test_store_note", Audience: model.AudienceStore, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
+	Channels:          []model.Channel{model.ChannelInbox, model.ChannelPush},
+	IdempotencySource: "test.StoreNote.EventID",
+	IdempotencyKey:    func(p storeNoteParams) string { return p.EventID },
+	OccurredAt:        func(storeNoteParams) time.Time { return epoch },
+	Recipient: func(p storeNoteParams) registry.Recipient {
+		return registry.Recipient{AccountID: p.AccountID, StoreID: p.StoreID}
+	},
+	Text: func(l uitext.Locale, _ storeNoteParams) (registry.Content, error) {
+		return registry.Content{Title: uitext.Message{Text: "t", Locale: l}, Body: uitext.Message{Text: "b", Locale: l}}, nil
+	},
+	Example: storeNoteParams{AccountID: 1, StoreID: 1, EventID: "e"},
+})
+
+var testStorePushOnly = registry.Define(registry.Definition[storeNoteParams]{
+	Name: "test_store_push_only", Audience: model.AudienceStore, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
+	Channels:          []model.Channel{model.ChannelPush},
+	IdempotencySource: "test.StorePushOnly.EventID",
+	IdempotencyKey:    func(p storeNoteParams) string { return p.EventID },
+	OccurredAt:        func(storeNoteParams) time.Time { return epoch },
+	Recipient: func(p storeNoteParams) registry.Recipient {
+		return registry.Recipient{AccountID: p.AccountID, StoreID: p.StoreID}
+	},
+	Text: func(l uitext.Locale, _ storeNoteParams) (registry.Content, error) {
+		return registry.Content{Title: uitext.Message{Text: "t", Locale: l}, Body: uitext.Message{Text: "b", Locale: l}}, nil
+	},
+	Example: storeNoteParams{AccountID: 1, StoreID: 1, EventID: "e"},
+})
+
 type testRegistry struct{}
 
 func (testRegistry) Lookup(name string) (registry.Entry, bool) {
@@ -142,13 +195,43 @@ func (testRegistry) Lookup(name string) (registry.Entry, bool) {
 		return testPush, true
 	case "test_agg_twin":
 		return testTwin, true
+	case "test_store_note":
+		return testStoreNote, true
+	case "test_store_push_only":
+		return testStorePushOnly, true
 	}
 	return registry.Lookup(name)
+}
+
+// fakeStores 取代 seller：測試只需要「店家是否已退場」。沒登記的店視為存在、營運中。
+type fakeStores struct {
+	mu      sync.Mutex
+	retired map[int64]bool
+}
+
+func (f *fakeStores) LockNotRetired(ctx context.Context, storeID int64) error {
+	if _, ok := db.TxFrom(ctx); !ok {
+		panic("LockNotRetired 必須在 transaction 內呼叫")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if storeID <= 0 || f.retired[storeID] {
+		return apperr.NotFound("店家已退場")
+	}
+	return nil
+}
+
+func (f *fakeStores) retire(storeID int64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.retired[storeID] = true
 }
 
 type fixture struct {
 	db       *db.DB
 	identity *identity.Module
+	buyer    *buyer.Module
+	stores   *fakeStores
 	bus      *events.Bus
 	jobs     *recorder
 	module   *Module
@@ -177,17 +260,24 @@ func setupIntake(t *testing.T) *fixture {
 	t.Parallel()
 	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
+		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "notification", Dir: Migrations()},
 	))
 	logs := &syncBuffer{}
 	log := slog.New(slog.NewTextHandler(logs, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
+	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
+	stores := &fakeStores{retired: map[int64]bool{}}
 	rec := &recorder{}
-	m := newModule(Deps{DB: d, Identity: id, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log}, testRegistry{})
+	m := newModule(Deps{DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log}, testRegistry{})
 	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)
 	events.Subscribe[accountsuspension.Unsuspended](bus, m.OnUnsuspended)
-	return &fixture{db: d, identity: id, bus: bus, jobs: rec, module: m, logs: logs}
+	events.Subscribe[identity.AccountDeleted](bus, m.OnAccountDeleted)
+	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)
+	events.Subscribe[seller.StoreRetired](bus, m.OnStoreRetired)
+	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs}
 }
 
 func (f *fixture) newAccount(t *testing.T) int64 {
@@ -242,6 +332,16 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int {
 		t.Fatal(err)
 	}
 	return n
+}
+
+func (f *fixture) intentParamsScrubbed(t *testing.T) {
+	t.Helper()
+	if n := f.count(t, `SELECT count(*) FROM notification.intents`); n == 0 {
+		t.Fatal("沒有意圖列可檢查")
+	}
+	if n := f.count(t, `SELECT count(*) FROM notification.intents WHERE params <> '{}'::jsonb`); n != 0 {
+		t.Fatalf("略過的意圖仍有 %d 筆參數沒清成 {}", n)
+	}
 }
 
 func (f *fixture) inboxCount(t *testing.T, account int64) int {
@@ -370,6 +470,7 @@ func TestSelfNotificationIsSkipped(t *testing.T) {
 	if got := f.inboxCount(t, acct); got != 0 {
 		t.Fatalf("自己讚自己仍寫了 %d 列", got)
 	}
+	f.intentParamsScrubbed(t)
 	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "other", PostID: "p1", ActorID: other})
 	f.run(t)
 	if got := f.inboxCount(t, acct); got != 1 {
@@ -419,6 +520,19 @@ func TestIntentArrivingAfterAccountDeletionWritesNothing(t *testing.T) {
 	if n := f.count(t, `SELECT count(*) FROM notification.deliveries WHERE account_id = $1`, acct); n != 0 {
 		t.Fatalf("已刪除的帳號仍寫了 %d 列投遞紀錄", n)
 	}
+	f.intentParamsScrubbed(t)
+}
+
+func TestIntentForAMissingAccountWritesNothingAndScrubsParams(t *testing.T) {
+	f := setupIntake(t)
+	const missing int64 = 987654321
+	other := f.newAccount(t)
+	f.accept(t, "test_like", likeParams{AccountID: missing, EventID: "m1", PostID: "p1", ActorID: other})
+	f.run(t)
+	if got := f.inboxCount(t, missing); got != 0 {
+		t.Fatalf("不存在的帳號寫了 %d 列收件匣", got)
+	}
+	f.intentParamsScrubbed(t)
 }
 
 func TestDeliveryChannelsEachGetARecordAndAJobInTheSameTransaction(t *testing.T) {
@@ -550,5 +664,18 @@ func TestSkippedIntentsAreLogged(t *testing.T) {
 	f.run(t)
 	if !strings.Contains(f.logs.String(), "收件帳號已刪除") {
 		t.Fatalf("帳號已刪除的略過沒有記錄：%q", f.logs.String())
+	}
+	noBuyer := f.newAccount(t)
+	f.mustExec(t, `DELETE FROM buyer.buyers WHERE account_id = $1`, noBuyer)
+	f.accept(t, "test_like", likeParams{AccountID: noBuyer, EventID: "nb", PostID: "p1", ActorID: acct})
+	f.run(t)
+	warned := false
+	for _, line := range strings.Split(f.logs.String(), "\n") {
+		if strings.Contains(line, "level=WARN") && strings.Contains(line, "收件帳號沒有買家列") {
+			warned = true
+		}
+	}
+	if !warned {
+		t.Fatalf("買家列不存在的略過沒有以 Warn 記錄：%q", f.logs.String())
 	}
 }

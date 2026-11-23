@@ -1,0 +1,70 @@
+{
+  "default": {
+    "style.category_invalid": {
+      "message": "風格用途不合法",
+      "description": "風格用途不是 PRODUCT 或 POST。"
+    },
+    "transform.busy": {
+      "message": "目前修圖的人較多，請稍後再試",
+      "description": "同時進行的修圖超過這個 pod 的上限；不扣額度，帶 RetryInfo。"
+    },
+    "transform.image_empty": {
+      "message": "請提供要修的圖片",
+      "description": "原圖沒有內容。"
+    },
+    "transform.image_too_large": {
+      "message": "圖片不能超過 {max} MB，請先縮小再上傳",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "原圖超過 model.MaxImageBytes；max 是以 MiB 計的上限。"
+    },
+    "transform.mime_mismatch": {
+      "message": "宣告的圖片格式與圖片內容不符",
+      "description": "mime_type 宣告的格式與伺服器依內容判斷的格式不同。"
+    },
+    "transform.mime_unsupported": {
+      "message": "只支援 JPEG、PNG、WebP 格式的圖片",
+      "description": "伺服器依內容判斷的格式不在白名單。"
+    },
+    "transform.not_produced": {
+      "message": "這次沒有成功產生圖片，請再試一次",
+      "description": "模型沒有產出圖片（IMAGE_NOT_PRODUCED），已重試一次仍失敗；額度退回。"
+    },
+    "transform.prompt_length": {
+      "message": "修圖描述必須是 1 到 {max} 個字",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "提示詞去掉頭尾空白後不是 1 到 model.MaxPromptRunes 個字元。"
+    },
+    "transform.provider_busy": {
+      "message": "AI 修圖的使用量很高，請稍後再試",
+      "description": "模型供應商回 429；額度退回，帶 RetryInfo。"
+    },
+    "transform.provider_unavailable": {
+      "message": "AI 修圖暫時無法使用，請稍後再試",
+      "description": "模型供應商無法呼叫、逾時或尚未開通；額度退回。"
+    },
+    "transform.quota_exceeded": {
+      "message": "本週的修圖次數已用完",
+      "description": "本週額度用完（IMAGE_QUOTA_EXCEEDED）。"
+    },
+    "transform.recitation_blocked": {
+      "message": "產生的圖片與版權內容過於相似，請換一張照片",
+      "description": "模型以著作權複誦擋下（IMAGE_RECITATION_BLOCKED）；額度退回。"
+    },
+    "transform.safety_blocked": {
+      "message": "圖片或描述未通過安全性檢查，請換一張照片或修改描述",
+      "description": "模型以安全性擋下（IMAGE_SAFETY_BLOCKED）；額度退回。"
+    },
+    "transform.store_unavailable": {
+      "message": "這家店目前無法使用修圖",
+      "description": "店家已退場，不能扣額度。"
+    }
+  }
+}

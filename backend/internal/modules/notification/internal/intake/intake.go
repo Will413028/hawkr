@@ -28,6 +28,16 @@ type Accounts interface {
 	ShareLockAccount(ctx context.Context, id int64) (deleted bool, err error)
 }
 
+// Buyers 是 worker 對 buyer 的需求：以共享鎖鎖住帳號唯一的買家列（commit 前不會被關閉），並回報買家是否已關閉。buyer.Module 實作它。
+type Buyers interface {
+	ShareLockByAccount(ctx context.Context, accountID int64) (deleted bool, err error)
+}
+
+// Stores 是 worker 對 seller 的需求：以 FOR KEY SHARE 鎖住店家列（commit 前不會被退場）；已退場與不存在回 NotFound。seller.Module 實作它。
+type Stores interface {
+	LockNotRetired(ctx context.Context, storeID int64) error
+}
+
 // Registry 是型別註冊表；正式組裝用 registry 套件的 Lookup，測試可以換成帶測試型別的版本。
 type Registry interface {
 	Lookup(name string) (registry.Entry, bool)
@@ -37,6 +47,8 @@ type Registry interface {
 type Deps struct {
 	DB       *db.DB
 	Accounts Accounts
+	Buyers   Buyers
+	Stores   Stores
 	Registry Registry
 	Jobs     jobs.Enqueuer
 	Now      func() time.Time
@@ -124,7 +136,7 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	if slices.Contains(resolved.ActorAccounts, resolved.Recipient.AccountID) {
 		// 自己觸發的事不通知自己；比的是帳號，不是店或買家 ID。
 		s.log().InfoContext(ctx, "收件人就是 actor，略過通知", "intent_id", intent.ID, "type", intent.Type)
-		return nil
+		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return s.scrubSkipped(ctx, intent.ID) })
 	}
 	spec := e.Spec()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -134,16 +146,64 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 		if err != nil {
 			if apperr.KindOf(err) == apperr.KindNotFound {
 				s.log().WarnContext(ctx, "收件帳號不存在，略過通知", "intent_id", intent.ID, "type", intent.Type)
-				return nil
+				return s.scrubSkipped(ctx, intent.ID)
 			}
 			return fmt.Errorf("鎖定收件帳號：%w", err)
 		}
 		if deleted {
 			s.log().InfoContext(ctx, "收件帳號已刪除，略過通知", "intent_id", intent.ID, "type", intent.Type)
-			return nil
+			return s.scrubSkipped(ctx, intent.ID)
+		}
+		gone, err := s.recipientGone(ctx, intent, spec.Audience, resolved.Recipient)
+		if err != nil {
+			return err
+		}
+		if gone {
+			return s.scrubSkipped(ctx, intent.ID)
 		}
 		return s.deliver(ctx, intent, spec, resolved)
 	})
+}
+
+// scrubSkipped 在 Process 因收件人已刪除、已關閉、已退場或就是 actor 而略過時，把這個意圖的參數換成 '{}'（D16）：意圖還沒有收件匣連結或投遞紀錄，
+// 收件人的清除 job 找不到它；與略過同一個 transaction。
+func (s *Service) scrubSkipped(ctx context.Context, intentID uuid.UUID) error {
+	if err := store.New(s.d.DB.Conn(ctx)).ScrubIntentParams(ctx, intentID); err != nil {
+		return fmt.Errorf("清除略過的通知意圖參數：%w", err)
+	}
+	return nil
+}
+
+// recipientGone 接在帳號共享鎖之後（鎖順序：identity、buyer、seller、notification），以 FOR KEY SHARE 鎖住 BUYER 收件人的買家列、
+// STORE 收件人的店家列，回報買家已關閉或店家已退場（BuyerDeleted、StoreRetired 之後不再為這個收件人建列）。買家列不存在記 Warn
+// 並視為不寫；店家已退場與不存在無法區分（同樣回 NotFound），記 Info 並視為不寫。
+func (s *Service) recipientGone(ctx context.Context, intent store.NotificationIntent, audience model.Audience, r registry.Recipient) (bool, error) {
+	switch audience {
+	case model.AudienceBuyer:
+		deleted, err := s.d.Buyers.ShareLockByAccount(ctx, r.AccountID)
+		switch {
+		case apperr.KindOf(err) == apperr.KindNotFound:
+			s.log().WarnContext(ctx, "收件帳號沒有買家列，略過通知", "intent_id", intent.ID, "type", intent.Type)
+			return true, nil
+		case err != nil:
+			return false, fmt.Errorf("鎖定收件買家：%w", err)
+		case deleted:
+			s.log().InfoContext(ctx, "收件買家已關閉，略過通知", "intent_id", intent.ID, "type", intent.Type)
+		}
+		return deleted, nil
+	case model.AudienceStore:
+		err := s.d.Stores.LockNotRetired(ctx, r.StoreID)
+		switch {
+		case apperr.KindOf(err) == apperr.KindNotFound:
+			s.log().InfoContext(ctx, "收件店家已退場，略過通知", "intent_id", intent.ID, "type", intent.Type)
+			return true, nil
+		case err != nil:
+			return false, fmt.Errorf("鎖定收件店家：%w", err)
+		}
+		return false, nil
+	default:
+		return false, fmt.Errorf("通知受眾 %q 不合法", audience)
+	}
 }
 
 func (s *Service) log() *slog.Logger {

@@ -28,8 +28,7 @@ import (
 // （它們改變「可以決定」與決定的依據）；指令本身不帶 etag。
 
 // errInquiryNotFound 是詢問不存在：不另加伺服器句子，文字是共用文案目錄 Connect code NOT_FOUND 的預設文字（common.error.NOT_FOUND，與傳輸層的 rpc.CommonText 同一個來源）。
-// apperr 錯誤的 LocalizedMessage 一律標 zh-TW（rpc 的 errorLocale，I-server 隨 apperr 一起處理），所以這裡也固定取 zh-TW：文字與標籤一致，
-// 不隨請求語系取到別的語系的文字再被標成 zh-TW。目錄裡缺這個 key 時 TestInquiryNotFoundTextIsInTheCatalog 失敗（不會在執行期悄悄變成空白）。
+// 這裡固定取 zh-TW 的文字並以 .Text 傳入 apperr（不帶 Message 的語系，標 zh-TW），文字與標籤一致。目錄裡缺這個 key 時 TestInquiryNotFoundTextIsInTheCatalog 失敗（不會在執行期悄悄變成空白）。
 func errInquiryNotFound() error {
 	m, _ := uitext.For(uitext.ZhTW).CommonError("NOT_FOUND")
 	return apperr.NotFound("%s", m.Text)
