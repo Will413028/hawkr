@@ -248,6 +248,7 @@ func TestListConversationsTokenPagingHasNoGapsOrDuplicatesEvenWithEqualUpdatedAt
 			at = epoch.Add(time.Duration(i) * time.Second)
 		}
 		all = append(all, newConversation(ctx, t, d, 7, at))
+		newConversation(ctx, t, d, 8, at) // 別的買家的對話與每一筆交錯在同一時間戳：翻頁不得帶出
 	}
 	gone := newConversation(ctx, t, d, 7, same)
 	newConversation(ctx, t, d, 8, same) // 別的買家、相同的 updated_at：翻頁不得帶出
@@ -440,11 +441,11 @@ func TestGetCandidateSearchHasThreeShapes(t *testing.T) {
 	if err != nil || got.Status != "QUEUED" || got.CandidateSetID != c.candidateSet || len(got.Candidates) != 0 || got.FailureReason != "" {
 		t.Errorf("QUEUED：%+v %v", got, err)
 	}
-	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET status = 'FAILED', failure_reason = 'SEARCH_FAILED', completed_at = $2 WHERE id = $1`, searchRun, epoch); err != nil {
+	if _, err := d.Pool().Exec(ctx, `UPDATE procurement.agent_runs SET status = 'FAILED', failure_reason = 'WORKER_LOST', completed_at = $2 WHERE id = $1`, searchRun, epoch); err != nil {
 		t.Fatal(err)
 	}
 	got, err = get()
-	if err != nil || got.Status != "FAILED" || got.FailureReason != "SEARCH_FAILED" || len(got.Candidates) != 0 {
+	if err != nil || got.Status != "FAILED" || got.FailureReason != "WORKER_LOST" || len(got.Candidates) != 0 {
 		t.Errorf("FAILED：%+v %v", got, err)
 	}
 	done := epoch.Add(time.Hour)
@@ -473,6 +474,9 @@ func TestGetCandidateSearchHasThreeShapes(t *testing.T) {
 	wantKind(t, "TURN 類型的 run", err, apperr.KindNotFound)
 	_, err = m.GetCandidateSearch(ctx, 7, id(), searchRun, uitext.ZhTW)
 	wantKind(t, "不屬於這個需求", err, apperr.KindNotFound)
+	sibling := seed(ctx, t, q, 7, false)
+	_, err = m.GetCandidateSearch(ctx, 7, sibling.request, searchRun, uitext.ZhTW)
+	wantKind(t, "同一買家另一個需求的 run", err, apperr.KindNotFound)
 	_, err = m.GetCandidateSearch(ctx, 7, c.request, id(), uitext.ZhTW)
 	wantKind(t, "不存在的 run", err, apperr.KindNotFound)
 }

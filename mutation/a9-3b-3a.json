@@ -121,8 +121,8 @@
    "id": "title-newline-allowed",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/conversation/conversation.go",
-   "old": " || strings.IndexFunc(t, isLineBreakOrControl) >= 0",
-   "new": " || false",
+   "old": "func isLineBreakOrControl(r rune) bool { return unicode.IsControl(r) || r == '\\u2028' || r == '\\u2029' }",
+   "new": "func isLineBreakOrControl(r rune) bool { return unicode.IsControl(r) && false }",
    "test": "internal/modules/procurement ^TestRenameConversationTitleRules$",
    "why": "標題可以含換行"
   },
