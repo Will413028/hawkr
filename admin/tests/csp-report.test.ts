@@ -32,6 +32,14 @@ test("enforced CSP carries the required hardening directives", () => {
 	}
 });
 
+test("CSP script-src allows WebAssembly compile without unsafe-eval", () => {
+	const config = readFileSync(join(projectRoot, "next.config.ts"), "utf8");
+	const scriptSrc = config.match(/"(script-src [^"]*)"/)?.[1];
+	assert.ok(scriptSrc);
+	assert.match(scriptSrc, /'wasm-unsafe-eval'/);
+	assert.doesNotMatch(scriptSrc, /'unsafe-eval'/);
+});
+
 test("CSP img-src allows blob: for KYC document previews", () => {
 	const config = readFileSync(join(projectRoot, "next.config.ts"), "utf8");
 	const imgSrc = config.match(/"(img-src [^"]*)"/)?.[1];

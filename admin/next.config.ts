@@ -17,7 +17,7 @@ const MEDIA_ORIGIN = originOf(process.env.NEXT_PUBLIC_MEDIA_BASE_URL);
  */
 const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
-	"script-src 'self'",
+	"script-src 'self' 'wasm-unsafe-eval'",
 	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 	"font-src 'self' https://fonts.gstatic.com",
 	// image-gateway（R2 + Cloudflare Worker）是唯一圖片來源，origin 取自
