@@ -384,32 +384,6 @@ func TestConnectVersionConflicts(t *testing.T) {
 	newAddress.Etag = ""
 	_, err = f.app.UpdateAddress(ctx, connect.NewRequest(&pb.UpdateAddressRequest{Address: newAddress}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
-	plans, err := f.admin.ListMembershipPlans(ctx, connect.NewRequest(&adminpb.ListMembershipPlansRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan := plans.Msg.GetMembershipPlans()[0]
-	stale := proto.Clone(plan).(*adminpb.MembershipPlan)
-	stale.MonthlyPrice++
-	_, err = f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(&adminpb.UpdateMembershipPlanRequest{MembershipPlan: stale, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"monthly_price"}}}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	stale.MonthlyPrice++
-	_, err = f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(&adminpb.UpdateMembershipPlanRequest{MembershipPlan: stale, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"monthly_price"}}}))
-	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
-	plans, err = f.admin.ListMembershipPlans(ctx, connect.NewRequest(&adminpb.ListMembershipPlansRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, current := range plans.Msg.GetMembershipPlans() {
-		if current.GetPlanCode() == plan.GetPlanCode() && current.GetMonthlyPrice() != plan.GetMonthlyPrice()+1 {
-			t.Fatalf("plan overwritten: %v", current)
-		}
-	}
-	stale.Etag = ""
-	_, err = f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(&adminpb.UpdateMembershipPlanRequest{MembershipPlan: stale}))
-	wantCode(t, err, connect.CodeInvalidArgument, "")
 }
 
 func TestConnectAddressOwnershipAndPaging(t *testing.T) {
@@ -692,10 +666,6 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plans, err := f.admin.ListMembershipPlans(ctx, connect.NewRequest(&adminpb.ListMembershipPlansRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
 	cases := []struct {
 		valid func() proto.Message
 		call  func(proto.Message) error
@@ -715,12 +685,6 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 			return &pb.UpdateProfileRequest{Profile: &pb.Profile{DisplayName: "暱稱", Etag: profile.Msg.GetProfile().GetEtag()}}
 		}, func(m proto.Message) error {
 			_, e := f.app.UpdateProfile(ctx, connect.NewRequest(m.(*pb.UpdateProfileRequest)))
-			return e
-		}},
-		{func() proto.Message {
-			return &adminpb.UpdateMembershipPlanRequest{MembershipPlan: proto.Clone(plans.Msg.GetMembershipPlans()[0]).(*adminpb.MembershipPlan)}
-		}, func(m proto.Message) error {
-			_, e := f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(m.(*adminpb.UpdateMembershipPlanRequest)))
 			return e
 		}},
 	}

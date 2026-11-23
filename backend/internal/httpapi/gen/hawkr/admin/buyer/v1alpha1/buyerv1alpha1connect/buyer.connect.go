@@ -2,7 +2,7 @@
 //
 // Source: hawkr/admin/buyer/v1alpha1/buyer.proto
 
-// buyer 模組給後台的 API：買家統計與買家會員方案（設計書 59）。前台的 API 在 hawkr.buyer.v1alpha1。
+// buyer 模組給後台的 API：買家統計（設計書 59）。前台的 API 在 hawkr.buyer.v1alpha1。
 package buyerv1alpha1connect
 
 import (
@@ -37,22 +37,12 @@ const (
 	// BuyerAdminServiceGetBuyerStatsProcedure is the fully-qualified name of the BuyerAdminService's
 	// GetBuyerStats RPC.
 	BuyerAdminServiceGetBuyerStatsProcedure = "/hawkr.admin.buyer.v1alpha1.BuyerAdminService/GetBuyerStats"
-	// BuyerAdminServiceListMembershipPlansProcedure is the fully-qualified name of the
-	// BuyerAdminService's ListMembershipPlans RPC.
-	BuyerAdminServiceListMembershipPlansProcedure = "/hawkr.admin.buyer.v1alpha1.BuyerAdminService/ListMembershipPlans"
-	// BuyerAdminServiceUpdateMembershipPlanProcedure is the fully-qualified name of the
-	// BuyerAdminService's UpdateMembershipPlan RPC.
-	BuyerAdminServiceUpdateMembershipPlanProcedure = "/hawkr.admin.buyer.v1alpha1.BuyerAdminService/UpdateMembershipPlan"
 )
 
 // BuyerAdminServiceClient is a client for the hawkr.admin.buyer.v1alpha1.BuyerAdminService service.
 type BuyerAdminServiceClient interface {
 	// GetBuyerStats 回傳買家的統計（會員管理頁）。
 	GetBuyerStats(context.Context, *connect.Request[v1alpha1.GetBuyerStatsRequest]) (*connect.Response[v1alpha1.GetBuyerStatsResponse], error)
-	// ListMembershipPlans 列出全部會員方案。方案是 migration 建立的固定集合（免費、基本、進階），不分頁。
-	ListMembershipPlans(context.Context, *connect.Request[v1alpha1.ListMembershipPlansRequest]) (*connect.Response[v1alpha1.ListMembershipPlansResponse], error)
-	// UpdateMembershipPlan 修改會員方案（update_mask）。方案不能新增或刪除。
-	UpdateMembershipPlan(context.Context, *connect.Request[v1alpha1.UpdateMembershipPlanRequest]) (*connect.Response[v1alpha1.UpdateMembershipPlanResponse], error)
 }
 
 // NewBuyerAdminServiceClient constructs a client for the
@@ -74,27 +64,12 @@ func NewBuyerAdminServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
-		listMembershipPlans: connect.NewClient[v1alpha1.ListMembershipPlansRequest, v1alpha1.ListMembershipPlansResponse](
-			httpClient,
-			baseURL+BuyerAdminServiceListMembershipPlansProcedure,
-			connect.WithSchema(buyerAdminServiceMethods.ByName("ListMembershipPlans")),
-			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-			connect.WithClientOptions(opts...),
-		),
-		updateMembershipPlan: connect.NewClient[v1alpha1.UpdateMembershipPlanRequest, v1alpha1.UpdateMembershipPlanResponse](
-			httpClient,
-			baseURL+BuyerAdminServiceUpdateMembershipPlanProcedure,
-			connect.WithSchema(buyerAdminServiceMethods.ByName("UpdateMembershipPlan")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
 // buyerAdminServiceClient implements BuyerAdminServiceClient.
 type buyerAdminServiceClient struct {
-	getBuyerStats        *connect.Client[v1alpha1.GetBuyerStatsRequest, v1alpha1.GetBuyerStatsResponse]
-	listMembershipPlans  *connect.Client[v1alpha1.ListMembershipPlansRequest, v1alpha1.ListMembershipPlansResponse]
-	updateMembershipPlan *connect.Client[v1alpha1.UpdateMembershipPlanRequest, v1alpha1.UpdateMembershipPlanResponse]
+	getBuyerStats *connect.Client[v1alpha1.GetBuyerStatsRequest, v1alpha1.GetBuyerStatsResponse]
 }
 
 // GetBuyerStats calls hawkr.admin.buyer.v1alpha1.BuyerAdminService.GetBuyerStats.
@@ -102,25 +77,11 @@ func (c *buyerAdminServiceClient) GetBuyerStats(ctx context.Context, req *connec
 	return c.getBuyerStats.CallUnary(ctx, req)
 }
 
-// ListMembershipPlans calls hawkr.admin.buyer.v1alpha1.BuyerAdminService.ListMembershipPlans.
-func (c *buyerAdminServiceClient) ListMembershipPlans(ctx context.Context, req *connect.Request[v1alpha1.ListMembershipPlansRequest]) (*connect.Response[v1alpha1.ListMembershipPlansResponse], error) {
-	return c.listMembershipPlans.CallUnary(ctx, req)
-}
-
-// UpdateMembershipPlan calls hawkr.admin.buyer.v1alpha1.BuyerAdminService.UpdateMembershipPlan.
-func (c *buyerAdminServiceClient) UpdateMembershipPlan(ctx context.Context, req *connect.Request[v1alpha1.UpdateMembershipPlanRequest]) (*connect.Response[v1alpha1.UpdateMembershipPlanResponse], error) {
-	return c.updateMembershipPlan.CallUnary(ctx, req)
-}
-
 // BuyerAdminServiceHandler is an implementation of the hawkr.admin.buyer.v1alpha1.BuyerAdminService
 // service.
 type BuyerAdminServiceHandler interface {
 	// GetBuyerStats 回傳買家的統計（會員管理頁）。
 	GetBuyerStats(context.Context, *connect.Request[v1alpha1.GetBuyerStatsRequest]) (*connect.Response[v1alpha1.GetBuyerStatsResponse], error)
-	// ListMembershipPlans 列出全部會員方案。方案是 migration 建立的固定集合（免費、基本、進階），不分頁。
-	ListMembershipPlans(context.Context, *connect.Request[v1alpha1.ListMembershipPlansRequest]) (*connect.Response[v1alpha1.ListMembershipPlansResponse], error)
-	// UpdateMembershipPlan 修改會員方案（update_mask）。方案不能新增或刪除。
-	UpdateMembershipPlan(context.Context, *connect.Request[v1alpha1.UpdateMembershipPlanRequest]) (*connect.Response[v1alpha1.UpdateMembershipPlanResponse], error)
 }
 
 // NewBuyerAdminServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -137,27 +98,10 @@ func NewBuyerAdminServiceHandler(svc BuyerAdminServiceHandler, opts ...connect.H
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
-	buyerAdminServiceListMembershipPlansHandler := connect.NewUnaryHandler(
-		BuyerAdminServiceListMembershipPlansProcedure,
-		svc.ListMembershipPlans,
-		connect.WithSchema(buyerAdminServiceMethods.ByName("ListMembershipPlans")),
-		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
-		connect.WithHandlerOptions(opts...),
-	)
-	buyerAdminServiceUpdateMembershipPlanHandler := connect.NewUnaryHandler(
-		BuyerAdminServiceUpdateMembershipPlanProcedure,
-		svc.UpdateMembershipPlan,
-		connect.WithSchema(buyerAdminServiceMethods.ByName("UpdateMembershipPlan")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/hawkr.admin.buyer.v1alpha1.BuyerAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case BuyerAdminServiceGetBuyerStatsProcedure:
 			buyerAdminServiceGetBuyerStatsHandler.ServeHTTP(w, r)
-		case BuyerAdminServiceListMembershipPlansProcedure:
-			buyerAdminServiceListMembershipPlansHandler.ServeHTTP(w, r)
-		case BuyerAdminServiceUpdateMembershipPlanProcedure:
-			buyerAdminServiceUpdateMembershipPlanHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -169,12 +113,4 @@ type UnimplementedBuyerAdminServiceHandler struct{}
 
 func (UnimplementedBuyerAdminServiceHandler) GetBuyerStats(context.Context, *connect.Request[v1alpha1.GetBuyerStatsRequest]) (*connect.Response[v1alpha1.GetBuyerStatsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.buyer.v1alpha1.BuyerAdminService.GetBuyerStats is not implemented"))
-}
-
-func (UnimplementedBuyerAdminServiceHandler) ListMembershipPlans(context.Context, *connect.Request[v1alpha1.ListMembershipPlansRequest]) (*connect.Response[v1alpha1.ListMembershipPlansResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.buyer.v1alpha1.BuyerAdminService.ListMembershipPlans is not implemented"))
-}
-
-func (UnimplementedBuyerAdminServiceHandler) UpdateMembershipPlan(context.Context, *connect.Request[v1alpha1.UpdateMembershipPlanRequest]) (*connect.Response[v1alpha1.UpdateMembershipPlanResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.buyer.v1alpha1.BuyerAdminService.UpdateMembershipPlan is not implemented"))
 }

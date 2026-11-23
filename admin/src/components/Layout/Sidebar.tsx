@@ -183,11 +183,6 @@ const navGroups: Array<{ section: string; items: NavItem[] }> = [
 				label: "App 版本管理",
 				icon: "mobile",
 			},
-			{
-				href: "/admin/membership-plans",
-				label: "會員方案目錄",
-				icon: "diamond",
-			},
 		],
 	},
 	{

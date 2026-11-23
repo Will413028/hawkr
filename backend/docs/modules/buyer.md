@@ -5,7 +5,7 @@
 ## 1. 範圍與公開面
 
 - 買家 stint、profile、頭像、收貨地址、收藏、追蹤（賣家訂閱）、個人封鎖、瀏覽、補貨訂閱與刪除。
-- 會員方案、指派與額度週期（設計書 59、ADR `2026-09-18-buyer-membership-entitlement-model`）。
+- 額度週期與預設額度（設計書 59、ADR `2026-09-18-buyer-membership-entitlement-model`）。
 - 業務事件在同一個 transaction 內發布（含進入刪除中時的 `BuyerDeletionRequested`、關閉時的 `BuyerDeleted`）；River 釋放頭像與清理 PII。
 - 買家不是 identity 的角色：建立與關閉買家都不授予、移除角色，也不自己鎖帳號。
 - buyer_id、address_id 是資料庫發號的 IDENTITY 整數；membership 是 UUIDv7；收藏、追蹤、補貨等關聯用複合自然鍵（ADR `2026-09-25-row-identity-by-data-kind`）。
@@ -27,7 +27,7 @@
 
 ## 3. 個人資料與頭像
 
-- 更新以 SQL 條件式版本比對；profile、地址與會員方案各自持有版本。
+- 更新以 SQL 條件式版本比對；profile 與地址各自持有版本。
 - profile 在買家列鎖內合併：nil 保留，`DisplayName` 空字串拒絕，Phone、Gender、City、Job 空字串與 BirthDate 零值清為 NULL。並行的 profile 更新不遺失任何欄位。
 - gender、買家與會員狀態、會員 source 有 CHECK；寫入驗證與受限轉移由純函式驗證涵蓋。會員 source 的唯一儲存值是 ADMIN，SYSTEM_DEFAULT 只在記憶體合成權益。
 - 頭像引用只由 `buyer.media_sync` 同步 job 寫入（`internal/mediaref`，演算法是 `media.Sync`，規格見 `backend/docs/modules/media.md` §5）。
@@ -68,9 +68,8 @@
 
 ## 8. 會員
 
-- 方案表 `membership_plans`。沒有指派表與指派入口：每個買家的權益都是 `free` 方案（步驟 11e 刪除 `memberships`），計費或指派入口要做時重新設計。
+- 沒有方案表、指派表與指派入口：每個買家的權益都是 `free` 方案，額度是 `internal/membership` 的具名常數 `DefaultMonthlyAnswerLimit`（100，值與歷史 seed `*_buyer_membership_plan_seeds.sql` 的 free 列相同）。步驟 11e 刪除 `memberships`、11g 刪除 `membership_plans` 與後台方案 RPC；計費或指派入口要做時重新設計方案模型。
 - 額度月週期以 stint 的建立時間為錨點逐月滾動，月底 clamp，不回補。時間由注入的 clock 提供。
-- 會員方案的種子資料是一支資料 migration（`*_buyer_membership_plan_seeds.sql`）。額度與價格是設計書 59 的 placeholder 值，後台的 `UpdateMembershipPlan` 可修改。
 
 ## 9. 讀取模型與輸入邊界
 
@@ -93,4 +92,4 @@
 - buyer_id 與 address_id 是數字 ID，不是 UUID。
 - social-service 的 `GetSubscribersList` 由 legacy adapter 以有界 offset 轉接（`SubscribersOffset`）。gateway buyer REST 不由 legacy server 承接，不提供 offset 或 `GetSavedItems` 形狀。
 - 頭像引用的登記與解除只由同步 job 做，media 是遠端服務，所以換圖不能在呼叫者 transaction 內開始。
-- 會員方案的額度與價格是 placeholder 值。
+- 預設額度是 placeholder 常數。

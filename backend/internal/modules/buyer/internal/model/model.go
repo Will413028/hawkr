@@ -187,25 +187,6 @@ const MaxStatsWindows = 4
 // AdminStats 後台買家統計。
 type AdminStats struct{ Total int64 }
 
-// Plan 會員方案與額度設定。
-type Plan struct {
-	PlanCode, DisplayName string
-	Version               int64
-	MonthlyAnswerLimit    int32
-	MonthlyPriceTWD       int64
-	IsPurchasable         bool
-	CreatedAt, UpdatedAt  time.Time
-}
-
-// UpdatePlanInput 會員方案的部分更新；nil 欄位保留原值。
-type UpdatePlanInput struct {
-	PlanCode           string
-	ExpectedVersion    int64
-	MonthlyAnswerLimit *int32
-	MonthlyPriceTWD    *int64
-	IsPurchasable      *bool
-}
-
 // Entitlement 有效方案、額度與期間。
 type Entitlement struct {
 	PlanCode               string

@@ -165,7 +165,7 @@ func TestLongSuggestedNicknameAndClosedPrincipals(t *testing.T) {
 	}
 }
 
-func TestSeededEntitlementAndPlanErrors(t *testing.T) {
+func TestDefaultEntitlementQuota(t *testing.T) {
 	t.Parallel()
 	fixture := setup(t)
 	ctx := context.Background()
@@ -174,16 +174,6 @@ func TestSeededEntitlementAndPlanErrors(t *testing.T) {
 	must(t, err)
 	if entitlement.PlanCode != "free" || entitlement.MonthlyAnswerLimit != 100 {
 		t.Fatal(entitlement)
-	}
-	_, err = fixture.module.UpdatePlan(ctx, UpdatePlanInput{PlanCode: "missing", MonthlyAnswerLimit: ptr(int32(100))})
-	if apperr.KindOf(err) != apperr.KindNotFound {
-		t.Fatalf("update unknown plan: %v", err)
-	}
-	_, err = fixture.database.Conn(ctx).Exec(ctx, "DELETE FROM buyer.membership_plans WHERE plan_code='free'")
-	must(t, err)
-	_, err = fixture.module.Entitlement(ctx, buyer.BuyerID)
-	if apperr.KindOf(err) != apperr.KindNotFound || !strings.Contains(err.Error(), "會員方案") || strings.Contains(err.Error(), "買家資料") {
-		t.Fatalf("missing plan mislabeled: %v", err)
 	}
 }
 
