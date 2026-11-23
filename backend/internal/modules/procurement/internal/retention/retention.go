@@ -29,7 +29,7 @@ var exempt = map[string]string{
 
 var steps = []step{
 	// run 最先刪（A9-D20 R4）：子表（輸入、事件、產出、interrupt）隨 run CASCADE；agent_runs.buyer_id 維持 NOT NULL，
-	// 所以不能留到匿名步驟，agent_runs.publication_id 是 ON DELETE SET NULL，之後的步驟不再碰到 run。
+	// 所以不能留到匿名步驟，之後的步驟不再碰到 run。
 	{"run", []string{"agent_runs"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) { return q.DeleteBuyerRuns(ctx, b) }},
 	{"對話", []string{"conversations"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteBuyerConversations(ctx, b)

@@ -18,7 +18,6 @@ type ProcurementAgentRun struct {
 	ConversationID   *uuid.UUID
 	InterruptID      *uuid.UUID
 	CandidateSetID   *uuid.UUID
-	PublicationID    *uuid.UUID
 	RunType          string
 	Status           string
 	FailureReason    *string

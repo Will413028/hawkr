@@ -42,7 +42,7 @@ func (q *Queries) ConsumeUsage(ctx context.Context, arg ConsumeUsageParams) (int
 }
 
 const getRunForBuyer = `-- name: GetRunForBuyer :one
-SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, publication_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 AND buyer_id = $2
+SELECT id, buyer_id, request_id, conversation_id, interrupt_id, candidate_set_id, run_type, status, failure_reason, result_revision_id, last_event_seq, min_available_seq, client_request_id, job_id, quota_period_start, created_at, started_at, completed_at, updated_at FROM procurement.agent_runs WHERE id = $1 AND buyer_id = $2
 `
 
 type GetRunForBuyerParams struct {
@@ -60,7 +60,6 @@ func (q *Queries) GetRunForBuyer(ctx context.Context, arg GetRunForBuyerParams) 
 		&i.ConversationID,
 		&i.InterruptID,
 		&i.CandidateSetID,
-		&i.PublicationID,
 		&i.RunType,
 		&i.Status,
 		&i.FailureReason,

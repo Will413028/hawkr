@@ -351,7 +351,7 @@ func TestAWaitingRunCanBeCancelledButNeverFailedOrExpired(t *testing.T) {
 }
 
 func TestOnlyTurnRunsChargeQuota(t *testing.T) {
-	for runType, want := range map[string]bool{RunTypeTurn: true, RunTypeCandidateSearch: false, RunTypeResume: false, "PUBLICATION": false} {
+	for runType, want := range map[string]bool{RunTypeTurn: true, RunTypeCandidateSearch: false, RunTypeResume: false} {
 		if got := ChargesQuota(runType); got != want {
 			t.Errorf("ChargesQuota(%s) = %v，要 %v", runType, got, want)
 		}

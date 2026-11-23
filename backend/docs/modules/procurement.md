@@ -25,7 +25,7 @@
 - CLARIFICATION_RESUME executor（`turn.AnswerExecutor`，只需要分類樹，不呼叫模型）：`ApplyAnswer` 套用到中斷 payload；解析成功寫 `source = ANSWER` 的新版本（存 `item_resolution_category_id`）與輪次（買家訊息是選項標籤或文字原文），經 TURN 的 commit 到 SUCCEEDED 或新的中斷；答案被拒（`OutcomeInvalid`）run 以 `ANSWER_REJECTED` 失敗，中斷維持 PENDING、不還原；不扣額度。TURN 與回答 run 共用的 commit 在 transaction 開頭先 `Ledger.LockAskingOf`，回答 run 的鎖順序因此是提問的 run、中斷、回答的 run。
 - 中斷（`Ledger.Interrupt`）：同一個 transaction 寫 `turn_result` 事件（可省）、把 RUNNING 的 run 轉 WAITING_FOR_INPUT（回答 run 在此提交所答的中斷）、再新增 PENDING 的 CLARIFICATION 中斷（payload 是接續的唯一狀態）。`agent_run_interrupts.request_id` 加部分唯一索引，每個需求最多一筆 PENDING。狀態 PENDING／RESOLVED（回答成功）／CANCELLED（提問的 run 被取消或被同需求的新一輪 TURN 取代，同交易轉，不佔索引；正在回答它的 run 在同交易要求取消，同 CancelRun 的路徑：CANCEL_REQUESTED 並取消 job，job 已死直接 CANCELLED）；`closed_at` 是離開 PENDING 的時間。讀取只認 WAITING_FOR_INPUT 的 run 的 PENDING 中斷（`OpenInterruptForRun`、`OpenInterruptForRequest`），並回 `Processing`：有回答它的 run 在 QUEUED、RUNNING 或 CANCEL_REQUESTED 時為真（讀取模型呈現「處理中」，否則「等回答」）。
 - 執行者登記：`Dispatcher.Executors` 依 run 類型登記；領到沒有登記執行者的類型，記 log 並依該類型的 pipeline 失敗收斂（TURN 退額度，其餘不退），不留在 RUNNING 等 reconciler。接線：`cmd/hawkr` 的 `addProcurementWorkers`（worker 角色）登記執行 run 的 worker、reconciler 與清除；`startProcurementHub`（serve 角色）啟動共用 LISTEN；兩個角色的 `newProcurement` 都給 job client。
-- BuyerDeleted：先刪 `agent_runs WHERE buyer_id`（輸入、事件、interrupt 隨 CASCADE），再把其他表的 `buyer_id` 設 NULL；`agent_runs.buyer_id` 維持 NOT NULL，`publication_id` 為 `ON DELETE SET NULL`。
+- BuyerDeleted：先刪 `agent_runs WHERE buyer_id`（輸入、事件、interrupt 隨 CASCADE），再把其他表的 `buyer_id` 設 NULL；`agent_runs.buyer_id` 維持 NOT NULL（A9-D31 Q3：發布不建 run，`agent_runs` 沒有 `publication_id`）。
 
 ## 3. TURN 執行（A9-3b-2c）
 
