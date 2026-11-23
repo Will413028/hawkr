@@ -170,6 +170,8 @@
 - 未採：三端都用 Checkout 託管頁（App 開外部瀏覽器）：不加依賴、程式最少，但付款流程跳出 App、回 App 靠回跳頁重讀。
 
 **建立付款何時回 client_secret**（Will 2026-11-23）：`CreatePayment` 在 transaction 內寫付款列與 job，提交後有上限地等 job 建好 PaymentIntent 再回 client_secret；逾時回 pending，client 以 `GetPayment` 重讀。外部呼叫仍在 transaction 外（D5 的單體規則），買家正常情況一次往返。
+
+修訂（Will 2026-11-23，B2 步驟 3 開工時的設計審查）：不等 job。transaction 寫付款列與補做 job，提交後在請求內、transaction 外帶冪等鍵直接建立 PaymentIntent 並回 client_secret（Stripe accept-a-payment 的標準做法，同 `CreateOnboardingSession`）；失敗或逾時回 pending，由 job 以同一把冪等鍵補做，client 以 `GetPayment` 重讀。捨棄原案的理由：「請求內等 job 完成」要新增輪詢或 River 完成訂閱的機制，而直接呼叫已符合「外部呼叫在 transaction 外」。
 - 未採：一律先回 pending、client 輪詢：最單純，但每次付款都多一段等待畫面與輪詢。
 - 未採：在請求內直接呼叫 Stripe（業界常見的同步寫法）：違反「外部呼叫不在 transaction 內、先寫 intent」，中途失敗會留下 Stripe 有、資料庫沒有的 PaymentIntent。
 
@@ -264,6 +266,6 @@
 | D62 | 後台動作的紀錄放平台層 `internal/platform/adminaudit`，同一個 transaction 內寫一筆 | `2026-11-14-platform-admin-audit-log.md`；`2026-10-18-seller-governance-consolidated.md`「修訂：後台動作的紀錄放在平台層」 |
 | D63 | 結果不明的列只用同一把冪等鍵在 7 天內重送了結，不列出帳戶、不換新鍵（超過保存期的重試要確認） | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
 | D64 | 買家付款介面：web Payment Element、App `flutter_stripe` PaymentSheet；刪 Apple Pay 商家驗證 | 本檔「買家付款介面」 |
-| D65 | `CreatePayment` 有上限地等 job 建好 PaymentIntent 再回 client_secret，逾時回 pending 由 `GetPayment` 重讀 | 本檔「建立付款何時回 client_secret」 |
+| D65 | `CreatePayment` 提交後在請求內帶冪等鍵建立 PaymentIntent 回 client_secret，失敗由 job 補做、client 以 `GetPayment` 重讀（2026-11-23 修訂） | 本檔「建立付款何時回 client_secret」 |
 | D66 | 一張訂單一個 PaymentIntent；只留買家 `GetPayment` 與後台查詢，刪賣家版付款歷程 | 本檔「付款嘗試歷程」 |
 | D67 | Stripe adapter 以 USD 收付，訂單整數金額照搬成 cent；port 與資料模型不帶幣別 | 本檔「付款與轉帳的幣別」 |
