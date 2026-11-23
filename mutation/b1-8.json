@@ -96,7 +96,7 @@
    "file": "packages/hawkr-api-ts/src/connect/upload.ts",
    "old": "offset < file.size; offset += MD5_SLICE_BYTES",
    "new": "offset < Math.min(file.size, MD5_SLICE_BYTES); offset += MD5_SLICE_BYTES",
-   "test": "tests/upload.test.ts md5Base64 matches node crypto for 9437189 bytes, hashed slice by slice",
+   "test": "tests/upload.test.ts matches node crypto for 9437189 bytes, hashed slice by slice",
    "why": "只雜湊第一片，大於一片的檔案 MD5 錯誤"
   },
   {
@@ -105,7 +105,7 @@
    "file": "packages/hawkr-api-ts/src/connect/upload.ts",
    "old": "hasher.update(new Uint8Array(await slice.arrayBuffer()));",
    "new": "await slice.arrayBuffer();",
-   "test": "tests/upload.test.ts md5Base64 matches the RFC 1321 test vectors",
+   "test": "tests/upload.test.ts matches the RFC 1321 test vectors",
    "why": "切片的內容沒有餵進 MD5"
   },
   {
