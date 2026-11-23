@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"uuid"
 
 	"connectrpc.com/connect"
@@ -118,7 +119,7 @@ func (h *App) ListInboxItems(ctx context.Context, req *connect.Request[pb.ListIn
 	if err != nil {
 		return nil, err
 	}
-	resp := &pb.ListInboxItemsResponse{Items: make([]*pb.InboxItem, 0, len(page.Items)), TotalSize: int32(min(page.Total, 1<<31-1))}
+	resp := &pb.ListInboxItemsResponse{Items: make([]*pb.InboxItem, 0, len(page.Items)), TotalSize: count32(page.Total)}
 	for _, it := range page.Items {
 		resp.Items = append(resp.Items, h.itemPB(it))
 	}
@@ -126,6 +127,14 @@ func (h *App) ListInboxItems(ctx context.Context, req *connect.Request[pb.ListIn
 		resp.NextPageToken = rpc.TokenFor(scope, page.Next)
 	}
 	return connect.NewResponse(resp), nil
+}
+
+// count32 把筆數放進契約的 int32；超過上限時取上限（收件匣不會有這麼多列）。
+func count32(n int64) int32 {
+	if n > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	return int32(n) //nolint:gosec // clamped above
 }
 
 func (h *App) itemPB(it notification.InboxItem) *pb.InboxItem {
@@ -155,7 +164,7 @@ func (h *App) GetUnreadCount(ctx context.Context, req *connect.Request[pb.GetUnr
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&pb.GetUnreadCountResponse{UnreadCount: int32(min(n, 1<<31-1))}), nil
+	return connect.NewResponse(&pb.GetUnreadCountResponse{UnreadCount: count32(n)}), nil
 }
 
 func (h *App) MarkInboxItemRead(ctx context.Context, req *connect.Request[pb.MarkInboxItemReadRequest]) (*connect.Response[pb.MarkInboxItemReadResponse], error) {
@@ -182,7 +191,7 @@ func (h *App) MarkAllInboxItemsRead(ctx context.Context, req *connect.Request[pb
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&pb.MarkAllInboxItemsReadResponse{UpdatedCount: int32(min(n, 1<<31-1))}), nil
+	return connect.NewResponse(&pb.MarkAllInboxItemsReadResponse{UpdatedCount: count32(n)}), nil
 }
 
 func (h *App) BatchDeleteInboxItems(ctx context.Context, req *connect.Request[pb.BatchDeleteInboxItemsRequest]) (*connect.Response[pb.BatchDeleteInboxItemsResponse], error) {

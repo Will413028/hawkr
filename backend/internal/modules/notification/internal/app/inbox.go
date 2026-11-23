@@ -78,7 +78,7 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 		return Page{}, fmt.Errorf("計算收件匣筆數：%w", err)
 	}
 	page := Page{Total: total}
-	if int32(len(rows)) > size {
+	if len(rows) > int(size) {
 		last := rows[size-1]
 		page.Next = &Cursor{UpdatedAt: last.UpdatedAt, ID: last.ID}
 		rows = rows[:size]

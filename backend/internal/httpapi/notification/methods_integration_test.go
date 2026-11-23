@@ -212,7 +212,7 @@ func TestMarkInboxItemReadIsOwnerOnlyAndIdempotent(t *testing.T) {
 	}
 
 	notOwner, missing := read(7, theirs), read(7, uuid.NewV7().String())
-	a, b := wantCode(t, notOwner, connect.CodeNotFound), wantCode(t, missing, connect.CodeNotFound)
+	a, b := errCode(t, notOwner, connect.CodeNotFound), errCode(t, missing, connect.CodeNotFound)
 	if a.Message() != b.Message() || len(a.Details()) != len(b.Details()) {
 		t.Fatalf("不是自己的與不存在的回應要完全相同：%v / %v", a, b)
 	}

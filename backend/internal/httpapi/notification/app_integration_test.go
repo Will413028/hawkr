@@ -145,7 +145,7 @@ func (s *stack) item(t *testing.T, account int64, audience string, storeID int64
 	return id.String()
 }
 
-func wantCode(t *testing.T, err error, code connect.Code) *connect.Error {
+func errCode(t *testing.T, err error, code connect.Code) *connect.Error {
 	t.Helper()
 	var ce *connect.Error
 	if !errors.As(err, &ce) || ce.Code() != code {
@@ -154,10 +154,15 @@ func wantCode(t *testing.T, err error, code connect.Code) *connect.Error {
 	return ce
 }
 
+func wantCode(t *testing.T, err error, code connect.Code) {
+	t.Helper()
+	_ = errCode(t, err, code)
+}
+
 // invalidField 要求 err 是 invalid_argument 並回傳它指出的第一個欄位路徑。
 func invalidField(t *testing.T, err error) string {
 	t.Helper()
-	ce := wantCode(t, err, connect.CodeInvalidArgument)
+	ce := errCode(t, err, connect.CodeInvalidArgument)
 	for _, d := range ce.Details() {
 		v, derr := d.Value()
 		if derr != nil {
