@@ -18,15 +18,6 @@ func StyleCategoryInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "風格用途不合法", Locale: uitext.ZhTW}
 }
 
-// StyleDefaultMissing 是模組句子 style.default_missing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func StyleDefaultMissing(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Styles are unavailable right now. Please try again later", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "目前無法讀取風格，請稍後再試", Locale: uitext.ZhTW}
-}
-
 // TransformBusy 是模組句子 transform.busy；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func TransformBusy(l uitext.Locale) uitext.Message {
 	switch l {
@@ -57,6 +48,15 @@ func TransformImageTooLarge(l uitext.Locale, a TransformImageTooLargeArgs) uitex
 		return uitext.Message{Text: "The image must be at most " + strconv.Itoa(a.Max) + " MB. Please resize it first", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "圖片不能超過 " + strconv.Itoa(a.Max) + " MB，請先縮小再上傳", Locale: uitext.ZhTW}
+}
+
+// TransformMimeMismatch 是模組句子 transform.mime_mismatch；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func TransformMimeMismatch(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The declared image format does not match the image content", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "宣告的圖片格式與圖片內容不符", Locale: uitext.ZhTW}
 }
 
 // TransformMimeUnsupported 是模組句子 transform.mime_unsupported；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

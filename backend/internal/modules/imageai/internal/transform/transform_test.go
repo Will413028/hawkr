@@ -84,9 +84,6 @@ type fakeGen struct {
 
 func (g *fakeGen) GenerateImage(ctx context.Context, _ llm.ImageRequest) (llm.ImageResult, error) {
 	*g.order = append(*g.order, "generate")
-	if _, ok := ctx.Deadline(); !ok {
-		panic("模型呼叫沒有 deadline")
-	}
 	i := g.calls
 	g.calls++
 	if g.err != nil {
@@ -191,7 +188,7 @@ func TestInvalidInputIsRejectedWithFieldAndNothingIsCharged(t *testing.T) {
 		"mime empty":            {func(in *model.TransformInput) { in.MimeType = "" }, "MimeType"},
 		"mime not allowed":      {func(in *model.TransformInput) { in.MimeType = "image/gif" }, "MimeType"},
 		"bytes not an image":    {func(in *model.TransformInput) { in.Image = bytes.Repeat([]byte("x"), 100) }, "Image"},
-		"mime lies about bytes": {func(in *model.TransformInput) { in.Image = jpeg }, "Image"},
+		"mime lies about bytes": {func(in *model.TransformInput) { in.Image = jpeg }, "MimeType"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -269,6 +266,7 @@ func TestEachModelRefusalMapsToItsReasonAndRefunds(t *testing.T) {
 		"finish recitation":   {[]llm.ImageResult{{FinishReason: "IMAGE_RECITATION"}}, apperr.KindInvalidInput, "IMAGE_RECITATION_BLOCKED", 1},
 		"no image":            {[]llm.ImageResult{{FinishReason: "NO_IMAGE"}}, apperr.KindUnavailable, "IMAGE_NOT_PRODUCED", 2},
 		"stop without image":  {[]llm.ImageResult{{FinishReason: "STOP"}}, apperr.KindUnavailable, "IMAGE_NOT_PRODUCED", 2},
+		"unspecified block":   {[]llm.ImageResult{{BlockReason: "BLOCKED_REASON_UNSPECIFIED"}}, apperr.KindUnavailable, "IMAGE_NOT_PRODUCED", 2},
 		"empty response":      {[]llm.ImageResult{{}}, apperr.KindUnavailable, "IMAGE_NOT_PRODUCED", 2},
 		"image other":         {[]llm.ImageResult{{FinishReason: "IMAGE_OTHER"}}, apperr.KindUnavailable, "IMAGE_NOT_PRODUCED", 2},
 	}

@@ -65,6 +65,9 @@ func NewImageModel(g ImageGenerator, name string) ImageModel {
 	return ImageModel{gen: g, name: name, status: StatusEnabled}
 }
 
+// DisabledImage 是刻意不開通的圖片模型（不讀金鑰、不建 client），給不需要呼叫模型的程序。
+func DisabledImage() ImageModel { return disabledImage(StatusNotConfigured) }
+
 func disabledImage(status Status) ImageModel {
 	return ImageModel{gen: disabledImageGenerator{}, status: status}
 }

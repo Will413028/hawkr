@@ -188,6 +188,24 @@
    "new": "return model.StyleList{}, nil",
    "test": "internal/modules/imageai ^TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder$",
    "why": "風格讀取的資料庫錯誤被吞掉"
+  },
+  {
+   "id": "unspecified-block-reason-is-safety",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "if r.BlockReason != \"\" && r.BlockReason != blockReasonUnspecified {",
+   "new": "if r.BlockReason != \"\" {",
+   "test": "internal/modules/imageai/internal/transform ^TestEachModelRefusalMapsToItsReasonAndRefunds$",
+   "why": "BLOCKED_REASON_UNSPECIFIED 被當成安全性擋下，不重試也不回 IMAGE_NOT_PRODUCED"
+  },
+  {
+   "id": "mime-mismatch-on-image-field",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/transform/transform.go",
+   "old": "apperr.InvalidInputOn([]string{\"MimeType\"}, \"%s\", text.TransformMimeMismatch(l))",
+   "new": "apperr.InvalidInputOn([]string{\"Image\"}, \"%s\", text.TransformMimeMismatch(l))",
+   "test": "internal/modules/imageai/internal/transform ^TestInvalidInputIsRejectedWithFieldAndNothingIsCharged$",
+   "why": "宣告格式與內容不符的違規掛在 image_data 而不是 mime_type"
   }
  ]
 }

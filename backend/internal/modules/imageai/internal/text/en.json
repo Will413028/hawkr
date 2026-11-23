@@ -3,9 +3,6 @@
     "style.category_invalid": {
       "message": "The style category is not valid"
     },
-    "style.default_missing": {
-      "message": "Styles are unavailable right now. Please try again later"
-    },
     "transform.busy": {
       "message": "Image editing is busy right now. Please try again shortly"
     },
@@ -14,6 +11,9 @@
     },
     "transform.image_too_large": {
       "message": "The image must be at most {max} MB. Please resize it first"
+    },
+    "transform.mime_mismatch": {
+      "message": "The declared image format does not match the image content"
     },
     "transform.mime_unsupported": {
       "message": "Only JPEG, PNG and WebP images are supported"

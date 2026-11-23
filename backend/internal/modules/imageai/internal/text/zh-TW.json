@@ -4,10 +4,6 @@
       "message": "風格用途不合法",
       "description": "風格用途不是 PRODUCT 或 POST。"
     },
-    "style.default_missing": {
-      "message": "目前無法讀取風格，請稍後再試",
-      "description": "用途沒有啟用中的預設風格（schema 的不變量被破壞，不該發生）。"
-    },
     "transform.busy": {
       "message": "目前修圖的人較多，請稍後再試",
       "description": "同時進行的修圖超過這個 pod 的上限；不扣額度，帶 RetryInfo。"
@@ -25,9 +21,13 @@
       },
       "description": "原圖超過 model.MaxImageBytes；max 是以 MiB 計的上限。"
     },
+    "transform.mime_mismatch": {
+      "message": "宣告的圖片格式與圖片內容不符",
+      "description": "mime_type 宣告的格式與伺服器依內容判斷的格式不同。"
+    },
     "transform.mime_unsupported": {
       "message": "只支援 JPEG、PNG、WebP 格式的圖片",
-      "description": "伺服器依內容判斷的格式不在白名單，或與 mime_type 不符。"
+      "description": "伺服器依內容判斷的格式不在白名單。"
     },
     "transform.not_produced": {
       "message": "這次沒有成功產生圖片，請再試一次",

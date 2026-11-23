@@ -20,8 +20,6 @@ import (
 )
 
 const (
-	// generateTimeout 是一次模型呼叫的 deadline；最多呼叫兩次（沒有產出圖片時重試一次）。
-	generateTimeout = 60 * time.Second
 	// busyRetryAfter 是同時修圖滿了時建議 client 等多久再試。
 	busyRetryAfter = 10 * time.Second
 	// providerBusyRetryAfter 是模型供應商回 429 時建議 client 等多久再試。
@@ -57,8 +55,6 @@ type Deps struct {
 	Tx        Tx
 	Generator llm.ImageGenerator
 	Log       *slog.Logger
-	// Timeout 是一次模型呼叫的 deadline；0 取預設。
-	Timeout time.Duration
 }
 
 // Service 執行修圖。
@@ -68,9 +64,6 @@ type Service struct{ d Deps }
 func New(d Deps) *Service {
 	if d.Log == nil {
 		d.Log = slog.New(slog.DiscardHandler)
-	}
-	if d.Timeout == 0 {
-		d.Timeout = generateTimeout
 	}
 	return &Service{d: d}
 }
@@ -120,8 +113,11 @@ func validate(l uitext.Locale, in model.TransformInput) (mime, prompt string, er
 		return "", "", apperr.InvalidInputOn([]string{"MimeType"}, "%s", text.TransformMimeUnsupported(l))
 	}
 	sniffed, _, _ := strings.Cut(http.DetectContentType(in.Image), ";")
-	if !slices.Contains(allowedMimeTypes, sniffed) || sniffed != declared {
+	if !slices.Contains(allowedMimeTypes, sniffed) {
 		return "", "", apperr.InvalidInputOn([]string{"Image"}, "%s", text.TransformMimeUnsupported(l))
+	}
+	if sniffed != declared {
+		return "", "", apperr.InvalidInputOn([]string{"MimeType"}, "%s", text.TransformMimeMismatch(l))
 	}
 	return sniffed, prompt, nil
 }
@@ -152,7 +148,7 @@ func (s *Service) charge(ctx context.Context, l uitext.Locale, storeID int64) (m
 
 func (s *Service) generate(ctx context.Context, l uitext.Locale, req llm.ImageRequest) (llm.ImageResult, error) {
 	for attempt := 1; ; attempt++ {
-		res, err := s.call(ctx, req)
+		res, err := s.d.Generator.GenerateImage(ctx, req)
 		if err != nil {
 			return llm.ImageResult{}, providerError(ctx, l, err)
 		}
@@ -172,12 +168,6 @@ func (s *Service) generate(ctx context.Context, l uitext.Locale, req llm.ImageRe
 	}
 }
 
-func (s *Service) call(ctx context.Context, req llm.ImageRequest) (llm.ImageResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, s.d.Timeout)
-	defer cancel()
-	return s.d.Generator.GenerateImage(ctx, req)
-}
-
 func providerError(ctx context.Context, l uitext.Locale, err error) error {
 	if ctx.Err() != nil && errors.Is(err, ctx.Err()) {
 		return err
@@ -188,6 +178,8 @@ func providerError(ctx context.Context, l uitext.Locale, err error) error {
 	return apperr.WithCause(apperr.Unavailable("%s", text.TransformProviderUnavailable(l)), err)
 }
 
+const blockReasonUnspecified = "BLOCKED_REASON_UNSPECIFIED"
+
 type refusalKind int
 
 const (
@@ -196,10 +188,10 @@ const (
 	refusalRecitation
 )
 
-// refusal 把沒有產出圖片的回覆分類：prompt 被擋（BlockReason 非空）與安全類結束原因是確定性的安全性擋下，著作權複誦同理；
+// refusal 把沒有產出圖片的回覆分類：prompt 被擋（BlockReason 非空且不是 BLOCKED_REASON_UNSPECIFIED）與安全類結束原因是確定性的安全性擋下，著作權複誦同理；
 // 其餘（NO_IMAGE、IMAGE_OTHER、STOP、空字串）是模型的非決定性行為，視為沒有產出。
 func refusal(r llm.ImageResult) refusalKind {
-	if r.BlockReason != "" {
+	if r.BlockReason != "" && r.BlockReason != blockReasonUnspecified {
 		return refusalSafety
 	}
 	switch r.FinishReason {
