@@ -52,18 +52,18 @@ notification-service（設計書 12、13）的現況：
 ## 決策
 
 1. **通知型別定義在程式碼**：每一種通知是一個型別，宣告 typed 參數 struct、受眾、偏好分類、渠道（收件匣、可見推播、只帶資料的推播、email）、文案與深連結。zh-TW 文案集中在一個訊息目錄。每個型別有固定輸出的比對測試。`notification_templates` 表與設計書 12、13 的模板設計退場。
-2. **明確訂閱**：單體內的模組以 in-process 事件觸發，在產生事件的 transaction 內排入 River job；舊服務的事件由 `internal/legacy` 逐一訂閱個別 routing key，不用 wildcard。每個被訂閱的事件都有對應的通知型別，測試檢查。`event-anomalies.md` §1 的送不到的事件，以及 `order.delivered`（沒有消費者）、`coupon.issued`（發布端是死碼）等矛盾，在 A8 開工時逐一裁決。
+2. **明確訂閱**（部分已被 2026-11-23 修訂取代）：單體內的模組以 in-process 事件觸發，在產生事件的 transaction 內排入 River job；舊服務的事件由 `internal/legacy` 逐一訂閱個別 routing key，不用 wildcard。每個被訂閱的事件都有對應的通知型別，測試檢查。`event-anomalies.md` §1 的送不到的事件，以及 `order.delivered`（沒有消費者）、`coupon.issued`（發布端是死碼）等矛盾，在 A8 開工時逐一裁決。
 3. **收件人是帳號加受眾**：`(account_id, 受眾 = BUYER | STORE, store_id)`。店家通知在送出時解析「誰收這家店的通知」，今天只有店主帳號；日後有店員時只改這個解析。管理員不是收件人（業務告警維持 Discord 與後台佇列）；代行者不收店家的通知；只有聯絡方式、沒有帳號的外部收件人有兩種：vendor portal 的業者（邀請與 A8 加入的 email OTP，ADR `2026-10-03-vendor-portal-invite-scoped-access.md`）與匿名通報人（處理結果，ADR `2026-10-18-seller-governance-consolidated.md`，依 DSA Art.16 告知通報人）。匿名通報人留 email 時寄結果；只留電話時不通知，列為決策 9 的 SMS 候選。
-4. **裝置 token**：以 token 為主鍵，記錄 App（buyer、seller）與綁定的帳號；登入時 upsert 改綁，主動登出時刪除；帳號停權（Clerk BanUser）與刪帳號在同一個 transaction 刪除該帳號的 token（被動登出時 App 不會呼叫刪除）；店家停權不動 token，店家仍要收到處分與申訴相關的通知。BUYER 受眾只推 buyer App，STORE 受眾只推 seller App。網頁的即時串流以 `(account_id, 受眾)` 訂閱，受眾由 website 的頁面決定（買家頁、賣家中心）；管理員的代行頁不訂閱店家的串流。即時串流依主計畫 D7 改成 Connect server streaming。
+4. **裝置 token**（部分已被 2026-11-23 修訂取代）：以 token 為主鍵，記錄 App（buyer、seller）與綁定的帳號；登入時 upsert 改綁，主動登出時刪除；帳號停權（Clerk BanUser）與刪帳號在同一個 transaction 刪除該帳號的 token（被動登出時 App 不會呼叫刪除）；店家停權不動 token，店家仍要收到處分與申訴相關的通知。BUYER 受眾只推 buyer App，STORE 受眾只推 seller App。網頁的即時串流以 `(account_id, 受眾)` 訂閱，受眾由 website 的頁面決定（買家頁、賣家中心）；管理員的代行頁不訂閱店家的串流。即時串流依主計畫 D7 改成 Connect server streaming。
 5. **收件匣**：存型別、參數（渲染當下的不可變值，例如金額、名稱快照）與 ID，讀取時只組文字。推播實際送出的文字存在投遞紀錄。收件匣有保留期（A8 定天數）後硬刪，舊型別的渲染程式保留到該型別的資料刪光。參數裡的個資逐欄寫明清除鍵：店家資料跟著 seller 關店後的個資清除以 store_id 清，買家資料以帳號清。店關閉後，舊店的通知留在原 store_id 底下，新開的店不繼承；關店後才發生的事件（退款、撥款）以 email 為主要渠道。
 6. **公告是資料**：營運撰寫的公告一則一列存在 DB，收件匣以參照連結；收件匣的發送與推播分開，沒有裝置 token 的人也收得到。
 7. **投遞**：每個（事件、收件人、渠道）一個冪等鍵；每個渠道一筆投遞紀錄，狀態為待送、已送、永久失敗；收件匣與推播是不同的 job，一個失敗不影響另一個；暫時性錯誤以指數退避重試。FCM 的錯誤分類沿用現行（只在 Unregistered、SenderIDMismatch 停用 token），ThirdPartyAuthError（APNs 憑證問題）補上告警。寄信 adapter 對外只回暫時性與永久性兩種錯誤，provider 的原始錯誤不往上丟：原樣上拋會讓呼叫端的重試長進某一家 provider 的狀態碼，換 provider 就要全部重寫。adapter 自己不重試，重試只在投遞 job；永久性錯誤直接記為永久失敗，持續重送死信箱會拉低寄件網域的信譽，而交易信共用同一個網域（沿用 vendor portal E1 設計書 §3.3，`backend/docs/superpowers/specs/2026-09-11-vendor-portal-e1-invite-email-design.md`（私人封存））。
-8. **偏好與 email**：偏好是分類乘以渠道；哪些分類的收件匣不可關（交易必要）、哪些推播不可關（例如賣家的 `shipment_anomaly`）定義在程式碼。行銷性質的分類（現有的 coupon、restock、follower、post 在 A8 逐一歸類）預設開啟、可隨時關閉（opt-out，個資法第 20 條）；email 渠道跟著同一份偏好矩陣，交易必要的 email 不可關。email 只寄交易與安全類，初版清單：
+8. **偏好與 email**（部分已被 2026-11-23 修訂取代）：偏好是分類乘以渠道；哪些分類的收件匣不可關（交易必要）、哪些推播不可關（例如賣家的 `shipment_anomaly`）定義在程式碼。行銷性質的分類（現有的 coupon、restock、follower、post 在 A8 逐一歸類）預設開啟、可隨時關閉（opt-out，個資法第 20 條）；email 渠道跟著同一份偏好矩陣，交易必要的 email 不可關。email 只寄交易與安全類，初版清單：
    - 買家：訂單成立、被取消（賣家取消或逾時）、付款失敗或待付款即將逾期、出貨、可取貨、取貨即將逾期或已退回、退款結果。
    - 賣家：新訂單、即將逾時未出貨、退貨或爭議申請、撥款與結算、KYC、PayUni、7-ELEVEN 開通結果、停權與治理處分、代行完成。
    - 電子發票的通知信依 ADR `2026-09-18-invoice-service-architecture.md` 的 ADR-11 由平台寄送（不用 AMEGO 代寄），屬交易類，由本模組的 email 渠道投遞。行銷 email 不做。
    寄件地址是帳號的已驗證主要 email，由 identity 以 Clerk 的 `user.updated` webhook 同步（見 Clerk ADR 的修訂；不在寄信時呼叫 Clerk，寄信路徑不多一個外部依賴）；沒有 email 的帳號只收站內通知，註冊時不強迫補填。寄信的平台工作在 A8 完成：新的寄信服務帳號與寄件網域、SPF、DKIM、DMARC、退信與投訴 webhook 寫入 suppression list、Apple 私密轉寄的寄件網域登記。
-9. **SMS、LINE、Web Push**：不做，渠道以 adapter 介面預留。例外候選是取貨簡訊：生鮮在超商逾期未取就是損失，以訂單上的收件人電話快照（Java order-service 的 `recipient_phone`，B 階段後是 order 模組的對應欄位；不是會被修改或刪除的買家地址簿）寄取貨通知屬於配送目的；A8 開工時查 7-ELEVEN 是否自行寄送取貨簡訊給收件人，不寄就在「可取貨」「取貨即將逾期」兩個型別加 SMS 渠道。
+9. **SMS、LINE、Web Push**（部分已被 2026-11-23 修訂取代）：不做，渠道以 adapter 介面預留。例外候選是取貨簡訊：生鮮在超商逾期未取就是損失，以訂單上的收件人電話快照（Java order-service 的 `recipient_phone`，B 階段後是 order 模組的對應欄位；不是會被修改或刪除的買家地址簿）寄取貨通知屬於配送目的；A8 開工時查 7-ELEVEN 是否自行寄送取貨簡訊給收件人，不寄就在「可取貨」「取貨即將逾期」兩個型別加 SMS 渠道。
 
 ## 後果
 
@@ -86,3 +86,15 @@ notification-service（設計書 12、13）的現況：
 - 決策 1 的「zh-TW 文案集中在一個訊息目錄」：改為每個通知型別的文案在集中的訊息目錄中有 `zh-TW`、`en` 兩份（ICU 受限子集，生成有型別的 Go 函式；英文內容在 `en` 發佈前可以先空）。仍是程式碼單一來源，仍有固定輸出的比對測試，測試涵蓋每個已發佈語系。
 - 決策 5「收件匣存型別、參數，讀取時只組文字」：讀取時依讀者的語系組字；推播與 email 在送出時依收件人 `preferred_locale` 組字，投遞紀錄存實際送出的文字與 locale。推播文字由伺服器組好，不用 APNs `loc-key`／FCM `body_loc_key`。
 - 通知中的 website 連結依收件人 `preferred_locale` 加語系前綴（`/en/…`）。
+
+## 修訂：業界基線對照後的調整（2026-11-23，Will 決定）
+
+原決策段保留歷史。對照與取捨見 `backend/docs/plans/2026-11-23-a8-notification/baseline-brief.md`，結論見 A8 計畫決定表。
+
+- 補上被否決的方案：通知基礎設施（Novu、Knock、Courier）——Novu 自架要另部署 MongoDB、Redis 與多個 Node 服務，違反單一 binary；SaaS 讓通知資料離開自己的 DB，個資清除做不到。工作流引擎（Temporal 等）——River job 已足夠。
+- 決策 2「舊服務的事件由 `internal/legacy` 逐一訂閱」：取消。還沒搬的服務的通知型別在該服務搬進單體時定義（主計畫「模組完成的定義」），不寫轉接；那段期間那些事件沒有通知（未上線）。
+- 決策 2「在產生事件的 transaction 內排入 River job」：改為只排一個「通知意圖」job，收件人解析、偏好、略過規則在 worker 執行。
+- 決策 4 加：token 記最後註冊時間，App 每次啟動回報，60 天未更新清除（FCM token 管理建議）；收 Android。即時串流只傳未讀數與最新 ID 的失效訊號，client 重拉列表，不做續傳。
+- 決策 5 加：型別可宣告聚合鍵，未讀時合併成一列（讚、追蹤）；保留期 180 天。
+- 決策 8：寄件地址改為 identity 在每次登入同步的已驗證 email（`identity.ContactEmail`，Clerk 已移除）；Apple 私密轉寄網域登記刪除（沒有 Apple 登入）；寄信服務為 Postmark 與交易信子網域。follower、post 歸互動分類，行銷只剩 coupon、restock。
+- 決策 9：取貨簡訊候選失效（B3 改賣家自寄，平台不建超商取貨單）。

@@ -41,6 +41,7 @@
 - [ ] **對外 API**：以根目錄 `api/` 的 proto 重新設計（〈API 設計規範（Connect）〉，不照搬舊的路徑與 envelope），單體以 Connect handler 提供，在單體的 `connectServices` 加一列（A2 起入口在單體，gateway 不再代理 Connect）。
 - [ ] **client**：四個 client 中用到這個模組的，改用生成的 client，刪除該模組的手寫 REST 呼叫與型別；gateway 刪除該模組的 REST 路由，現有 API 清單（`api/openapi/openapi.yaml`）一起刪掉對應的端點。第二個讓 website 與 admin 都改用 Connect 的模組，把兩邊逐字重複的 Connect 錯誤分類器與重試做成 pnpm workspace 的共用套件（Will 2026-09-26；試點計畫的 client 沿用盤點）。
 - [ ] 刪除舊服務的目錄、compose service、CI workflow 的路徑。proto 只在仍有 Java 呼叫方時保留，並移到 `internal/legacy/`。
+- [ ] **通知型別**：舊服務發往 notification 的每個事件逐一裁決：在 `internal/modules/notification` 定義通知型別並以 in-process 事件訂閱，或不做並附理由；不經 `internal/legacy` 轉接（A8 計畫 `2026-11-23-a8-notification.md` D13，Will 2026-11-23）。
 - [ ] D9 gate 通過。
 - [ ] 檢查這個模組相關的既有 ADR：仍然有效，或新增 ADR 取代，並標記 superseded。
 
@@ -295,11 +296,11 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
   - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
   - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。
-- [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。階段計畫：`2026-11-23-a8-notification.md`（盤點、步驟、決定 A8-D1–D9 與進度寫在那裡；本段以下是計畫建立前的原文，Clerk webhook 一條已由計畫前提取代）。
+- [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。階段計畫：`2026-11-23-a8-notification.md`（盤點、步驟、決定 D0–D13 與進度寫在那裡；本段以下是計畫建立前的原文，Clerk webhook 一條已由計畫前提取代）。
   - 發票寄送的買家 email 來源：單體 buyer 沒有 email，email 只在 identity（`accounts.email`）；A8 定 identity 的 email 同步時，一併決定發票（invoice-service）寄送地址取自 identity 的哪個欄位與介面（設計書 58 U5，Will 2026-10-28）。
   - 通知的維運重送：舊的 outbox 手動補列已隨 outbox 刪除，設計書 56 的 runbook 已無重送步驟；A8 設計投遞紀錄時一併定義重送手段（例如重排永久失敗的投遞紀錄）與 runbook（Will 2026-10-28）。
-  - identity 接 Clerk 的 `user.updated` webhook（驗證簽章）同步已驗證的主要 email，作為 email 渠道的寄件地址；不在寄信時呼叫 Clerk Backend API（ADR `2026-09-27-identity-clerk.md` 文末〈修訂：email 作為通知的寄件地址〉）。完成時 `backend/docs/modules/identity.md` 的 email 從「建帳時的快照」改成同步後的規格。
-  - `notifications/stream` 的 SSE 依 D7 改成 server streaming，續傳用游標欄位取代 `Last-Event-ID`，保留每個帳號的串流上限。
+  - （已被 A8 計畫取代：寄件地址改用 identity 登入同步）~~identity 接 Clerk 的 `user.updated` webhook（驗證簽章）同步已驗證的主要 email，作為 email 渠道的寄件地址；不在寄信時呼叫 Clerk Backend API（ADR `2026-09-27-identity-clerk.md` 文末〈修訂：email 作為通知的寄件地址〉）。完成時 `backend/docs/modules/identity.md` 的 email 從「建帳時的快照」改成同步後的規格。~~
+  - （已被 A8 計畫 D11 取代：串流只傳失效訊號、不做續傳）~~`notifications/stream` 的 SSE 依 D7 改成 server streaming，續傳用游標欄位取代 `Last-Event-ID`，保留每個帳號的串流上限。~~
   - 治理的通知（A3b `step10e-reports-brief.md` R4、R7、R9，Will 2026-10-18）：訂閱 seller 的 `ReportReceived`、`ReportResolved`（通報人一定是登入的買家，用站內通知；匿名入口在 A3b 10f-2a 刪除），以及在 seller 加上詢問的事件並訂閱（賣家；3c-b 預先發出的 `CaseInquiryCreated` 因沒有消費者已刪除，A8 依「消費者出現時再加事件」在這一刀加）；食安事件通知某個商品過去 6 個月的購買者，前提是查得到購買者（B8）。
   - **確認信地址不得留在 job 參數裡**（A3b 3c-a 設計審查 #10，Will 2026-10-18）：`ReportReceived.ConfirmationEmail`（匿名送出留的 email）只在事件與 A8 同一個 transaction 排入的 job 參數裡，seller 不落表（`seller/events.go` 的註解寫同一條）。River v0.47.0（`backend/go.mod`）預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天（`rivershared/riversharedmaintenance/river_shared_maintenance.go:35-37`；專案沒有覆寫 `*JobRetentionPeriod`），參數裡的地址會跟著留那麼久。所以寄送 job 必須在完成或丟棄時清掉參數裡的地址，或參數只放 report／supplement 的參照、執行時再讀（地址就落在 seller，回到 365 天的聯絡方式保留規則管得到的範圍）。觸發：A8 訂閱 `ReportReceived` 的那一刀；驗收要有測試證明 job 完成與丟棄之後參數不含地址。
   - 賣家收款開通結果與平台審核結果的通知（ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`、`2026-11-13-seller-platform-review-and-identity-matching.md`，Will 2026-11-02、2026-11-12）：舊的 `merchant.verification.*`（含管理員退回）與 `sellerconsumer` 的 PayUni 審核通知已停發，賣家現在不會收到核准、退回或收款帳戶啟用、需補件、停用的通知。A8 訂閱 seller 的 KYC 審核事件與 payment 的 `PayoutAccountChanged`；email 只寄 identity 已驗證的信箱，自填聯絡信箱要先有驗證碼驗證。收款帳戶的首次啟用時間與補件期限（Stripe `requirements.summary.minimum_deadline`）欄位與期限前提醒在這一刀一起加。
@@ -342,7 +343,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - media 改成不認識業務（ADR `2026-10-03-media-references-owner-side.md`，Will 2026-10-03）：只存資產與生命週期（暫存→確認→刪除），引用只在擁有者的表；刪除是擁有者經 outbox 送出的明確指令，GC 只清過期沒確認的暫存檔；機敏下載由擁有者授權後向 media 要短效的簽章網址；拿掉 `asset_reference` 與 media 端的 `(ref_type, ref_id)`。B1 之前的做法（每個 ref 只有一個同步 job 寫引用、只精準解除退場的圖）在 B1 時換成確認／刪除的介面。
   - B1 搬儲存時要帶走的不變量：寫入 `public/` 的圖片剝除 metadata、只留方向（Java `ImageMetadataStripper`，49 號設計書 §8.1；2026-10-31）。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：CodeMeta `AssetReferenceType` 的食譜值（content 的食譜已刪）還被 Java media-service 使用，也鏡像在 Go 的 `media/ref_type.go`、`pkg/media/ref_type.go` 與 `media/finalize_args.go`。觸發：B1 把 media 改成不認識業務（拿掉 `(ref_type, ref_id)`）時，連同 CodeMeta 值與生成物一起刪。
-- [ ] **B2 payment**：物流財務與責任判定先留在 Java，B10 刪除。
+- [ ] **B2 payment**：計畫與進度見 `2026-11-23-b2-payment.md`。物流財務與責任判定已刪（commit `5883f499e`）。收款模式改為 separate charges and transfers，轉帳機制在 B2 做（收款開通 ADR D20 修訂，Will 2026-11-23）。
   - 不改寫、直接刪（Will 2026-11-23）：PayUni 特有的流程 `AtmReactivationService`、`PendingPaymentReconcile*`、`PaymentReturnController`、`PaymentPageService`、`UnknownPaymentFallbackConsumer`、`PayUniRefund*Consumer`、`RescueRefundConsumer`，由 Stripe 的 webhook（inbox、event id 去重）與冪等鍵取代。
   - `createRefund` 依 D5 修正。
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
@@ -373,7 +374,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 - [x] **B5 productimport**：不改寫，整個移除（Will 2026-11-15 範圍裁切，ADR `2026-10-27-general-ecommerce-scope-cut` 文末的 2026-11-15 修訂）。Java product-import-service、gateway 的 `/app/product_import_jobs` 端點、product 與 media 的匯入專用 RPC 與資料表、MQ 拓撲與 CodeMeta 值域一併刪除。
 - [ ] **B6 cart**
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：購物車與結帳契約裡的配送溫層（`cart.proto` 的 `delivery_temp`、`溫層`，order 的 `deliveryTemp`）。買家端 client 現在原樣回傳伺服器配送選項的 `deliveryTemp`（ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂的 D8：Java 以它查運費、材積上限、免運與運費負擔，寫死常溫會讓冷藏、冷凍商品算錯）：website `lib/checkout/draft.ts`、`lib/checkout/repo.ts`、`features/cart/cartUiStore.ts`、`features/checkout/screens/CheckoutClient.tsx`，buyer-app `features/cart/data/cart_repository.dart`、`checkout_payment_sheet.dart`。觸發：B6 cart 改寫（與 B8 ordering 的結帳）不帶溫層欄位時，三處 client 的欄位與測試一起刪。
-- [ ] **B7 coupon**
+- [ ] **B7 coupon**：計畫與進度見 `2026-11-23-b7-coupon.md`。
 - [ ] **B8 ordering**
   - checkout 在單一 transaction 內完成：鎖購物車、扣庫存、建單、鎖定優惠券。
   - 發票快照移交給 invoice。
