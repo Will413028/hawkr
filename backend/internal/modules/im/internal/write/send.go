@@ -72,7 +72,7 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 			out = first
 			return err
 		}
-		// 守門鎖是 transaction 內的第一組語句，在 guard（含 Orders 的網路呼叫，transaction 之外）之後、AllocateSeq 之前：
+		// 守門鎖緊接在 LockSendRequest 與 transaction 內的重送判定之後，在 guard（含 Orders 的網路呼叫，transaction 之外）之後、AllocateSeq 之前：
 		// 買家先於店家（鎖序同 accountdeletion），持有到 transaction 結束。取到之後才算這次寫入看到的狀態，不重用 guard 的讀取結果。
 		// 不得把 guard 或 legacy 呼叫搬進這個 transaction（列鎖會跨網路呼叫）。
 		// 兩個守門鎖都取（買家先於店家），再依寄件人優先翻譯 NotFound：雙方都已停用時回「寄件人已停用」，不因取鎖順序變成收件人訊息。
