@@ -5,7 +5,6 @@ package accountservice
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -145,11 +144,6 @@ func TestGetAccountInfo(t *testing.T) {
 		batch.Msg.GetData()[1].GetAccountType() != 1 {
 		t.Fatalf("batch = %v, %v", batch, err)
 	}
-	// 帳號沒有手機：以手機找一律是「找不到」，與原本查無此手機相同。
-	byPhone, err := f.client.GetAccountByPhone(ctx, connect.NewRequest(&pb.GetAccountByPhoneRequest{Phone: "0900000000"}))
-	if err != nil || byPhone.Msg.GetCode() != codeNotFound || byPhone.Msg.GetData() != nil {
-		t.Fatalf("以手機找 = %v, %v", byPhone, err)
-	}
 }
 
 func TestRolesAndDeletion(t *testing.T) {
@@ -157,20 +151,12 @@ func TestRolesAndDeletion(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	id := f.account(t)
-	// BindBuyer 沒有呼叫方，不實作。
-	if _, err := f.client.BindBuyer(ctx, connect.NewRequest(&pb.BindBuyerRequest{AccountId: id})); connect.CodeOf(err) != connect.CodeUnimplemented {
-		t.Fatalf("BindBuyer = %v", err)
-	}
 	// 賣家角色由 seller 模組建店時授予；這裡直接以 identity 授予。
 	if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
 		t.Fatal(err)
 	}
 	if a, _ := f.m.Account(ctx, id); !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("角色 = %v", a.Roles)
-	}
-	// RemoveRole 的移除由 seller 模組隨店家關閉進行，舊契約的呼叫不實作。
-	if _, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_SELLER})); connect.CodeOf(err) != connect.CodeUnimplemented {
-		t.Fatalf("RemoveRole = %v", err)
 	}
 	if a, err := f.m.Account(ctx, id); err != nil || a.Deleted || !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("帳號 = %+v, %v", a, err)
@@ -194,21 +180,5 @@ func TestRolesAndDeletion(t *testing.T) {
 	}
 	if len(f.published) != 1 {
 		t.Fatalf("事件 %d 則", len(f.published))
-	}
-}
-
-func TestUnimplementedMethods(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	// 還沒實作的方法（已經搬到 Connect 或刪除）回 unimplemented。
-	_, err := f.client.GoogleOAuth(ctx, connect.NewRequest(&pb.GoogleOAuthRequest{}))
-	var ce *connect.Error
-	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnimplemented {
-		t.Fatalf("GoogleOAuth = %v", err)
-	}
-	_, err = f.client.SuspendAccount(ctx, connect.NewRequest(&pb.SuspendAccountRequest{}))
-	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnimplemented {
-		t.Fatalf("SuspendAccount = %v", err)
 	}
 }

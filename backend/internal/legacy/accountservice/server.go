@@ -98,9 +98,3 @@ func (s *Server) GetAccountInfoBatch(ctx context.Context, req *connect.Request[p
 	}
 	return connect.NewResponse(out), nil
 }
-
-// GetAccountByPhone 是舊的賣家 CRM 以手機找顧客：帳號沒有手機，一律回「找不到」，
-// 與原本查無此手機相同。改用什麼資料找顧客隨 A3（seller、buyer）決定。
-func (s *Server) GetAccountByPhone(context.Context, *connect.Request[pb.GetAccountByPhoneRequest]) (*connect.Response[pb.AccountInfoResponse], error) {
-	return connect.NewResponse(&pb.AccountInfoResponse{Code: codeNotFound, Message: "這支手機沒有帳號"}), nil
-}

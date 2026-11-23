@@ -23,7 +23,7 @@ func fakeInvoker(replyCode int32, replyMsg string, retErr error) grpc.UnaryInvok
 		if retErr != nil {
 			return retErr
 		}
-		if r, ok := reply.(*accountpb.AuthResponse); ok {
+		if r, ok := reply.(*accountpb.AccountInfoResponse); ok {
 			r.Code = replyCode
 			r.Message = replyMsg
 		}
@@ -33,8 +33,8 @@ func fakeInvoker(replyCode int32, replyMsg string, retErr error) grpc.UnaryInvok
 
 func TestEnvelopeGuard_Success_NoWrap(t *testing.T) {
 	intercept := EnvelopeGuardInterceptor()
-	reply := &accountpb.AuthResponse{}
-	err := intercept(context.Background(), "/m", &accountpb.GoogleOAuthRequest{}, reply, nil,
+	reply := &accountpb.AccountInfoResponse{}
+	err := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, reply, nil,
 		fakeInvoker(0, "OK", nil))
 	if err != nil {
 		t.Fatalf("expected nil error for code=0, got %v", err)
@@ -44,7 +44,7 @@ func TestEnvelopeGuard_Success_NoWrap(t *testing.T) {
 func TestEnvelopeGuard_InvokerError_Passthrough(t *testing.T) {
 	intercept := EnvelopeGuardInterceptor()
 	want := errors.New("connection refused")
-	got := intercept(context.Background(), "/m", &accountpb.GoogleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+	got := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 		fakeInvoker(0, "", want))
 	if got == nil || got.Error() != want.Error() {
 		t.Fatalf("expected invoker error to passthrough, got %v", got)
@@ -59,7 +59,7 @@ func TestEnvelopeGuard_InvokerError_Passthrough(t *testing.T) {
 // quota used up" (#2272).
 func TestEnvelopeGuard_QuotaExceeded_MapsToResourceExhaustedWithBizCode(t *testing.T) {
 	intercept := EnvelopeGuardInterceptor()
-	got := intercept(context.Background(), "/m", &accountpb.AppleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+	got := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 		fakeInvoker(4291, "本週 AI 修圖額度已用完（10/10），下週一重置", nil))
 
 	st, ok := status.FromError(got)
@@ -78,7 +78,7 @@ func TestEnvelopeGuard_ProductVisibilityCodes_MapToNotFoundWithBizCode(t *testin
 	intercept := EnvelopeGuardInterceptor()
 	for _, code := range []int32{3021, 3022, 3023} {
 		t.Run(fmt.Sprintf("code_%d", code), func(t *testing.T) {
-			got := intercept(context.Background(), "/m", &accountpb.AppleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+			got := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 				fakeInvoker(code, "商品不可公開", nil))
 			st, ok := status.FromError(got)
 			if !ok {
@@ -97,7 +97,7 @@ func TestEnvelopeGuard_ProductVisibilityCodes_MapToNotFoundWithBizCode(t *testin
 
 func TestEnvelopeGuard_UnknownBusinessCode_AddsPrefix(t *testing.T) {
 	intercept := EnvelopeGuardInterceptor()
-	got := intercept(context.Background(), "/m", &accountpb.AppleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+	got := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 		fakeInvoker(9999, "something broke", nil))
 
 	st, ok := status.FromError(got)
@@ -129,7 +129,7 @@ func TestEnvelopeGuard_KnownCodeMapping_Unprefixed(t *testing.T) {
 		{503, codes.Unavailable},
 	}
 	for _, tc := range cases {
-		err := intercept(context.Background(), "/m", &accountpb.AppleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+		err := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 			fakeInvoker(tc.code, "msg", nil))
 		st, _ := status.FromError(err)
 		if st.Code() != tc.want {
@@ -141,44 +141,25 @@ func TestEnvelopeGuard_KnownCodeMapping_Unprefixed(t *testing.T) {
 	}
 }
 
-// TestEnvelopeGuard_RefreshTokenUnavailable_MapsToGRPCUnavailable pins the
-// actual production guarantee behind issue #1544 L2's "DB hiccup must not
-// look like an invalid refresh token" contract.
-//
-// gateway/internal/handler/auth.go's RefreshToken has an `if resp.Code ==
-// int32(errors.CodeUnavailable)` branch, but that branch is DEAD on the wire:
-// client.go's DefaultDialOpts chains EnvelopeGuardInterceptor onto every
-// Gateway gRPC client (including account), and this interceptor turns any
-// non-zero resp.Code into a gRPC error before invoker returns — so by the
-// time the handler runs, `err != nil` is already true and `resp` is nil.
-// `if resp.Code != 0` can never be reached in production.
-//
-// The handler-level test (auth_refresh_test.go's
-// TestRefreshToken_StoreUnavailableIsHTTP503NotUnauthorized) only stays
-// meaningful because grpc/testing.go's NewAccountClientForTest bypasses this
-// interceptor chain entirely and hands the handler a raw mock response —
-// that's a valid test of the handler's branch, but it is NOT the thing that
-// keeps production honest. The real guarantee is this mapping: 503 →
-// codes.Unavailable in envelopeCodeToGRPC (which response.GrpcErr then turns
-// into HTTP 503). If someone removes the `503: {grpcCode: codes.Unavailable}`
-// line from that table, auth_refresh_test.go stays green while every
-// production DB hiccup on refresh silently collapses to HTTP 401 and
-// force-logs-out both Flutter apps. This test is the one that actually
-// catches that regression.
-func TestEnvelopeGuard_RefreshTokenUnavailable_MapsToGRPCUnavailable(t *testing.T) {
+// TestEnvelopeGuard_Unavailable_MapsToGRPCUnavailable pins the mapping of an envelope
+// code 503 to codes.Unavailable in envelopeCodeToGRPC, which response.GrpcErr then turns
+// into HTTP 503. EnvelopeGuardInterceptor is chained onto every gateway gRPC client, so a
+// handler never sees a non-zero resp.Code; if the 503 entry is removed, a downstream
+// database hiccup collapses into a different status instead of a retryable 503.
+func TestEnvelopeGuard_Unavailable_MapsToGRPCUnavailable(t *testing.T) {
 	intercept := EnvelopeGuardInterceptor()
 	invoker := func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, opts ...grpc.CallOption) error {
-		r, ok := reply.(*accountpb.RefreshTokenResponse)
+		r, ok := reply.(*accountpb.AccountInfoResponse)
 		if !ok {
-			t.Fatalf("reply type = %T, want *accountpb.RefreshTokenResponse", reply)
+			t.Fatalf("reply type = %T, want *accountpb.AccountInfoResponse", reply)
 		}
 		r.Code = 503
 		r.Message = "credential store unavailable"
 		return nil
 	}
 
-	err := intercept(context.Background(), accountpb.AccountService_RefreshToken_FullMethodName,
-		&accountpb.RefreshTokenRequest{}, &accountpb.RefreshTokenResponse{}, nil, invoker)
+	err := intercept(context.Background(), accountpb.AccountService_GetAccountInfo_FullMethodName,
+		&accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil, invoker)
 
 	st, ok := status.FromError(err)
 	if !ok {
@@ -202,7 +183,7 @@ func TestEnvelopeGuard_KnownCodeMapping_PrefixedBizCode(t *testing.T) {
 		{9400, codes.InvalidArgument},
 	}
 	for _, tc := range cases {
-		err := intercept(context.Background(), "/m", &accountpb.AppleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+		err := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 			fakeInvoker(tc.code, "msg", nil))
 		st, _ := status.FromError(err)
 		if st.Code() != tc.want {
@@ -244,8 +225,8 @@ func carrierCtx(t *testing.T) (context.Context, *gin.Context) {
 func TestEnvelopeGuard_PreserveData_ArmsCarrier(t *testing.T) {
 	ctx, gc := carrierCtx(t)
 	intercept := EnvelopeGuardInterceptor()
-	reply := &accountpb.AuthResponse{}
-	err := intercept(ctx, "/m", &accountpb.GoogleOAuthRequest{}, reply, nil,
+	reply := &accountpb.AccountInfoResponse{}
+	err := intercept(ctx, "/m", &accountpb.GetAccountInfoRequest{}, reply, nil,
 		fakeInvoker(4001, "商品不可購買", nil))
 	if err != nil {
 		t.Fatalf("preserveData 碼不該轉成 gRPC error，得到 %v", err)
@@ -264,8 +245,8 @@ func TestEnvelopeGuard_PreserveData_ArmsCarrier(t *testing.T) {
 // **絕不會產生 code=0 的假成功**。
 func TestEnvelopeGuard_PreserveData_NoCarrier_FailsClosed(t *testing.T) {
 	intercept := EnvelopeGuardInterceptor()
-	reply := &accountpb.AuthResponse{}
-	err := intercept(context.Background(), "/m", &accountpb.GoogleOAuthRequest{}, reply, nil,
+	reply := &accountpb.AccountInfoResponse{}
+	err := intercept(context.Background(), "/m", &accountpb.GetAccountInfoRequest{}, reply, nil,
 		fakeInvoker(9331, "憑證驗證失敗", nil))
 	if err == nil {
 		t.Fatal("沒有 carrier 時 preserveData 碼必須降級成 gRPC error，不得 return nil")
@@ -289,14 +270,14 @@ func TestEnvelopeGuard_PreserveData_NoCarrier_FailsClosed(t *testing.T) {
 func TestEnvelopeGuard_OtherMethodSuccessDoesNotDisarm(t *testing.T) {
 	ctx, gc := carrierCtx(t)
 	intercept := EnvelopeGuardInterceptor()
-	if err := intercept(ctx, "/m1", &accountpb.GoogleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+	if err := intercept(ctx, "/m1", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 		fakeInvoker(4091, "價格已變動", nil)); err != nil {
 		t.Fatalf("arm 階段不該有 error: %v", err)
 	}
 	if _, armed := bizcarrier.Armed(gc); !armed {
 		t.Fatal("前置條件不成立：第一支 RPC 應該已經 arm")
 	}
-	if err := intercept(ctx, "/m2", &accountpb.GoogleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+	if err := intercept(ctx, "/m2", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 		fakeInvoker(0, "success", nil)); err != nil {
 		t.Fatalf("code=0 不該有 error: %v", err)
 	}
@@ -310,11 +291,11 @@ func TestEnvelopeGuard_OtherMethodSuccessDoesNotDisarm(t *testing.T) {
 func TestEnvelopeGuard_SameMethodRetrySuccessDisarms(t *testing.T) {
 	ctx, gc := carrierCtx(t)
 	intercept := EnvelopeGuardInterceptor()
-	if err := intercept(ctx, "/m1", &accountpb.GoogleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+	if err := intercept(ctx, "/m1", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 		fakeInvoker(4091, "價格已變動", nil)); err != nil {
 		t.Fatalf("arm 階段不該有 error: %v", err)
 	}
-	if err := intercept(ctx, "/m1", &accountpb.GoogleOAuthRequest{}, &accountpb.AuthResponse{}, nil,
+	if err := intercept(ctx, "/m1", &accountpb.GetAccountInfoRequest{}, &accountpb.AccountInfoResponse{}, nil,
 		fakeInvoker(0, "success", nil)); err != nil {
 		t.Fatalf("code=0 不該有 error: %v", err)
 	}

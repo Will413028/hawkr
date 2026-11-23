@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/go-pkg/grpcclient"
-	"github.com/Will413028/hawkr/go-pkg/identity"
 	pb "github.com/Will413028/hawkr/go-pkg/proto/buyer"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -20,8 +19,8 @@ type BuyerClient struct {
 
 // NewBuyerClient creates a new buyer gRPC client
 func NewBuyerClient() (*BuyerClient, error) {
-	host := getEnvOrDefault("BUYER_SERVICE_HOST", "127.0.0.1")
-	port := getEnvOrDefault("BUYER_SERVICE_GRPC_PORT", "9941")
+	host := getEnvOrDefault("LEGACY_BUYER_GRPC_HOST", "127.0.0.1")
+	port := getEnvOrDefault("LEGACY_BUYER_GRPC_PORT", "9941")
 	target := fmt.Sprintf("%s:%s", host, port)
 
 	conn, err := grpcclient.Dial(target, DefaultDialOpts()...)
@@ -51,20 +50,6 @@ func (c *BuyerClient) GetProfile(ctx context.Context, accountID int64) (*pb.Buye
 	defer cancel()
 
 	resp, err := c.client.GetBuyerProfile(ctx, &pb.GetBuyerProfileRequest{AccountId: accountID})
-	if err != nil {
-		return nil, err
-	}
-	if resp.Code != 0 {
-		return nil, fmt.Errorf("buyer service error: code=%d msg=%s", resp.Code, resp.Message)
-	}
-	return resp.Data, nil
-}
-
-func (c *BuyerClient) GetProfileByBuyerID(ctx context.Context, buyerID int64) (*pb.BuyerInfo, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	resp, err := c.client.GetBuyerProfileByBuyerID(ctx, &pb.GetBuyerProfileByBuyerIDRequest{BuyerId: buyerID})
 	if err != nil {
 		return nil, err
 	}
@@ -111,29 +96,6 @@ func (c *BuyerClient) BatchCheckFavorites(ctx context.Context, buyerID int64, pr
 		return nil, fmt.Errorf("buyer service error: code=%d msg=%s", resp.Code, resp.Message)
 	}
 	return resp.FavoritedProductIds, nil
-}
-
-// ==================== Buyer Meta ====================
-
-// GetBuyerMetaByBuyerID retrieves basic buyer info by the buyer_id PK.
-func (c *BuyerClient) GetBuyerMetaByBuyerID(ctx context.Context, buyerID identity.BuyerID) (*pb.BuyerMeta, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	resp, err := c.client.BatchGetBuyerMetaByBuyerIDs(ctx, &pb.BatchGetBuyerMetaByBuyerIDsRequest{
-		BuyerIds: []int64{int64(buyerID)},
-	})
-	if err != nil {
-		return nil, err
-	}
-	if resp.Code != 0 {
-		return nil, fmt.Errorf("buyer service error: code=%d msg=%s", resp.Code, resp.Message)
-	}
-	meta, ok := resp.Buyers[int64(buyerID)]
-	if !ok {
-		return nil, nil
-	}
-	return meta, nil
 }
 
 // ==================== Restock Subscription (#942) ====================
