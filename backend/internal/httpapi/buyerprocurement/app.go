@@ -1,7 +1,8 @@
 // Package buyerprocurement 實作買家採購 Connect API（BuyerProcurementAppService）的傳輸：請求驗證、錯誤與欄位路徑對應、
 // 事件與讀取模型轉成 proto。送出、取消、串流、搜尋、接續與快照的規則都在 modules/procurement，這裡不重做。
 //
-// 實作 run 的送出、取消、串流、接續與搜尋，快照讀取與對話管理，需求編輯（ToggleSelection、SubmitAnswer、Rewind），以及詢價發布鏈（PreviewRfqPrice、PreviewRfqPublication、ExecuteRfqPublication，rfq.go）；其餘方法由內嵌的 Unimplemented 回 unimplemented，handler 尚未掛載。
+// 實作 23 支方法：run 的送出、取消、串流、接續與搜尋，快照讀取與對話管理，需求編輯（ToggleSelection、SubmitAnswer、Rewind），詢價發布鏈（PreviewRfqPrice、PreviewRfqPublication、ExecuteRfqPublication，rfq.go），
+// 以及賣家回價的比較與接受（ListSellerResponses、PutShortlistEntry、DeleteShortlistEntry、AcceptSellerQuote，quote.go）。沒有方法落回 Unimplemented：handler 沒有內嵌它，缺方法編不過。
 package buyerprocurement
 
 import (
@@ -43,6 +44,10 @@ type Module interface {
 	PreviewRfqPrice(ctx context.Context, in procurement.PreviewRfqPriceInput) (procurement.PriceQuote, error)
 	PreviewRfqPublication(ctx context.Context, in procurement.PreviewRfqPublicationInput) (procurement.PublicationPreview, error)
 	ExecuteRfqPublication(ctx context.Context, in procurement.ExecuteRfqPublicationInput) (procurement.Publication, error)
+	ListSellerResponses(ctx context.Context, in procurement.ListSellerResponsesInput) (procurement.SellerResponsePage, error)
+	PutShortlistEntry(ctx context.Context, buyerID int64, requestID, sellerResponseID uuid.UUID, version int32) (procurement.ShortlistEntry, error)
+	DeleteShortlistEntry(ctx context.Context, buyerID int64, requestID, sellerResponseID uuid.UUID, version int32) (procurement.ShortlistEntry, error)
+	AcceptSellerQuote(ctx context.Context, in procurement.AcceptSellerQuoteInput) (procurement.QuoteAcceptance, error)
 }
 
 // StoreCards 讀候選賣家的店家卡片（*seller.Module 滿足它）：從沒公開過與不存在的店不在回傳裡；一次最多 seller.MaxBatchSize 個。
@@ -52,7 +57,6 @@ type StoreCards interface {
 
 // App 是 BuyerProcurementAppService 的 handler。
 type App struct {
-	procurementv1alpha1connect.UnimplementedBuyerProcurementAppServiceHandler
 	m      Module
 	buyers rpc.BuyerLookup
 	cards  StoreCards

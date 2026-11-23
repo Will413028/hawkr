@@ -23,6 +23,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -61,7 +62,7 @@ func TestServeAnswersUntilContextEnds(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	ready := func(context.Context) error { return nil }
-	h, err := httpapi.NewHandler(httpapi.Deps{Assistant: &assistant.Module{}, CRM: &crm.Module{}, Buyer: &buyer.Module{}, Social: &social.Module{}, Moderation: &moderation.Module{}, Ready: ready, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, IM: &im.Module{}, Identity: &identity.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}})
+	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, Buyer: &buyer.Module{}, Social: &social.Module{}, Moderation: &moderation.Module{}, Ready: ready, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, IM: &im.Module{}, Identity: &identity.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}})
 	if err != nil {
 		t.Fatal(err)
 	}

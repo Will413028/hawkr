@@ -27,6 +27,7 @@ import (
 	httpbizcalendar "github.com/Will413028/hawkr/backend/internal/httpapi/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
+	httpbuyerprocurement "github.com/Will413028/hawkr/backend/internal/httpapi/buyerprocurement"
 	httpchat "github.com/Will413028/hawkr/backend/internal/httpapi/chat"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
 	httpcrm "github.com/Will413028/hawkr/backend/internal/httpapi/crm"
@@ -49,6 +50,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/review/v1alpha1/reviewv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
@@ -71,6 +73,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -116,6 +119,8 @@ type Deps struct {
 	Moderation *moderation.Module
 	// Assistant 是買家助理（AssistantAppService）。
 	Assistant *assistant.Module
+	// Procurement 是買家採購（BuyerProcurementAppService）。
+	Procurement *procurement.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
 	// httpseller.NewStatsSource 建立。
 	Stats *httpseller.StatsSource
@@ -206,6 +211,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Assistant == nil {
 		return nil, fmt.Errorf("httpapi：AssistantAppService 需要 Assistant")
+	}
+	if deps.Procurement == nil {
+		return nil, fmt.Errorf("httpapi：BuyerProcurementAppService 需要 Procurement")
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
@@ -444,6 +452,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(httpbizcalendar.NewAdmin(deps.BizCalendar, deps.Now), opts...))
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
+	add(procurementv1alpha1connect.NewBuyerProcurementAppServiceHandler(httpbuyerprocurement.NewApp(deps.Procurement, deps.Buyer, deps.Seller, deps.Images, deps.Logger), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
 	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
 	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)

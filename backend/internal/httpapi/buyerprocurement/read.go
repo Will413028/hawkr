@@ -10,7 +10,6 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
-	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -144,7 +143,11 @@ func (h *App) GetCandidateSearch(ctx context.Context, req *connect.Request[pb.Ge
 	if err != nil {
 		return nil, err
 	}
-	cards, err := h.storeCards(ctx, res.Candidates)
+	ids := make([]int64, len(res.Candidates))
+	for i, c := range res.Candidates {
+		ids[i] = c.StoreID
+	}
+	cards, err := h.storeCards(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -155,12 +158,8 @@ func (h *App) GetCandidateSearch(ctx context.Context, req *connect.Request[pb.Ge
 	return connect.NewResponse(out), nil
 }
 
-// storeCards 依 seller 的批次上限分批讀候選的店家卡片並轉成契約的 StoreCard。
-func (h *App) storeCards(ctx context.Context, candidates []procurement.Candidate) (map[int64]*commonpb.StoreCard, error) {
-	ids := make([]int64, len(candidates))
-	for i, c := range candidates {
-		ids[i] = c.StoreID
-	}
+// storeCards 依 seller 的批次上限分批讀店家卡片並轉成契約的 StoreCard；沒公開過與不存在的店不在回傳裡。
+func (h *App) storeCards(ctx context.Context, ids []int64) (map[int64]*commonpb.StoreCard, error) {
 	out := make(map[int64]*commonpb.StoreCard, len(ids))
 	for start := 0; start < len(ids); start += seller.MaxBatchSize {
 		end := min(start+seller.MaxBatchSize, len(ids))

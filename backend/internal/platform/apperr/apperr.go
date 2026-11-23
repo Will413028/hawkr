@@ -195,9 +195,6 @@ var ReasonRfqRecipientClosed = newReason("RFQ_RECIPIENT_CLOSED")
 // ReasonRfqCheckoutAlreadyActive 表示同一張採購需求已有進行中的成交；搭配 FailedPrecondition，Metadata 的 orderNo 是既有訂單。
 var ReasonRfqCheckoutAlreadyActive = newReason("RFQ_CHECKOUT_ALREADY_ACTIVE")
 
-// ReasonRfqAlreadyAwarded 表示同一張採購需求已經成交，不能再接受報價；搭配 FailedPrecondition。
-var ReasonRfqAlreadyAwarded = newReason("RFQ_ALREADY_AWARDED")
-
 // ReasonAgentMonthlyQuotaExceeded 表示本期的採購額度已用完；搭配 ResourceExhausted，Metadata 的 remaining、resetTime 說明剩餘與重置時間。
 var ReasonAgentMonthlyQuotaExceeded = newReason("AGENT_MONTHLY_QUOTA_EXCEEDED")
 
