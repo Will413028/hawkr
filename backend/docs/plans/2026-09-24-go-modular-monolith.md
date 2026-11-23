@@ -198,6 +198,57 @@
   - seller 第一個 `*AppService`：實作錯誤模型 ADR `2026-09-25-api-error-model.md` D10 的賣家停權（`permission_denied` 加 `ErrorInfo.reason` `SELLER_SUSPENDED`，取代 9240 加 HTTP 409），在同一個變更加入 `ErrorReason` 的值、單體裡能力檢查的產生、client 把它轉成賣家身分的停權狀態，並端到端驗證（Connect 試點的通過條件 7）。能力檢查的做法（逐方法宣告、Redis 快取、fail-open）依模組完成的定義重新評估 ADR `2026-09-18-seller-capability-authorization.md`。
   - 申請成為商家：舊 gateway 的 `POST /app/sellers` 在 seller-service 建店並授予 SELLER 之後，才驗證城市代碼，驗證失敗回 400 而商店與角色已經寫入（A2 的 compose 驗收，2026-09-29）。搬進 seller 模組時，輸入驗證放在建店之前，建店與授予角色同一個 transaction。
   - 收款開通改走 payment port（PayUni 換 Stripe Connect，作品集為主）：決定在 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md` 的「決定編號」。改的是 A3b 已完成的 7c、8b、8f（KYC、PayUni 綁定、後台審核）；付款、退款、撥款與物流的部分寫在 B2、B3、B8–B10。
+  - A3 延後項（A3 計畫 11d 搬回，來源步驟見各項；觸發由 11d 補的已標明）：
+  - 商品與訂單側的停權連動（下架、取消待付款訂單）仍由 Java consumer 處理。觸發：B 階段 catalog、ordering 搬進單體時。
+  - 賣家儀表板的訂單數據改呼叫 order 模組公開 API、刪 `GetStorePeriodOrderStats`／`GetSellerOrderStatusCounts` 的 legacy client，並重評自買單判斷（`buyer_id <> store_id` 比的是不同業務鍵，兩個區塊口徑不一致）。觸發：B 階段 order 搬進單體時。
+  - 儀表板請求帶期間（`from`／`to`）。觸發：UI 要範圍選擇時。
+  - 管理員理由（`close_reason`、刪帳號理由）的個資清理不動。觸發：隱私政策定稿或 A8 時重新評估。
+  - 店家搜尋全表掃描。觸發：超過 1 萬列或 p95 超過 200 ms 時加索引。
+  - 停權篩選以帳號陣列傳入清單、`ActingStore` 熱路徑的 query plan 未量測。觸發：p95 變差時清單改接專用查詢。
+  - 後台「顯示全文」不加限流。觸發：A8 的稽核告警。
+  - 第一個非 OWNER 後台角色、`GetSession` 回 permissions、UI 依權限隱藏（UI 改動先問 Will）。觸發：第二位管理員加入且職務確定時。
+  - 代行資格併入後台角色。觸發：A10。
+  - 指派、認領與審閱佇列實體化成工作項目表（跨模組合併亦同）。觸發：第 2 位有裁定權限的管理員、第一個推導不出的工作狀態、或 social／invoice 搬進單體時。
+  - `ListReviewQueue` 效能線（5 千筆開著的待辦 p95 19.7 ms）。觸發：p95 超過 300 ms 時改實體化。
+  - 升級用 `priority`。觸發：出現主管角色時。
+  - QA 抽樣。觸發：第 2 位管理員，或每週裁定超過約 50 件時。
+  - 申訴複核者不得是原決定者（條款 18.4）。觸發：出現第二個角色時。
+  - 審閱佇列依呼叫者的權限過濾種類。觸發：角色開始分工時。
+  - 案件聚合與「通報與措施的合併時間軸」。觸發：上線後第一次出現同一家店、同一事件 3 筆以上的通報時。
+  - `REPORT_INVESTIGATE` 的調查期限與「等賣家回覆」的暫停規則。觸發：上線後累積 20 筆結案通報，取 P90 訂值並加暫停。
+  - 透明度匯出。觸發：進入歐盟營運或台灣立法時。
+  - 違規申訴的期限或「不能申訴」原因欄位（`can_appeal` 以外）。觸發：條款加上期限時。
+  - SubmitKYC、統編查詢的限流用程序內計數。觸發：單體多於一個 instance 時改共用儲存。
+  - 商業登記非 01 的名稱查詢對照。觸發：取得需要授權 IP 的名稱查詢端點的樣本時。
+  - `SHIPPING_SETUP` 條件放寬成「PayUni 已註冊」並實測 C2C 與宅配能否在審核中建店；物流 Connect 方法宣告 `SHIPPING_SETUP`。觸發：取得 PayUni sandbox 帳號，或物流搬進單體時。
+  - 物流表單改送鄉鎮代碼，刪 `taiwan_cities_data`、website 的同形表、兩端的臺台轉換與 `townByName`。觸發：開始搬物流模組，或取得 PayUni sandbox 時。
+  - shipping 的 Uber 報價需要經緯度，沒有經緯度的地址報價失敗。觸發：shipping 搬進單體或接上地理編碼時，由那一步決定來源與降級。
+  - coupon 收券人清單的電話是空的（電話在 buyer）。觸發：coupon 搬進單體時（A6 crm 接上 buyer 電話查詢時可提前）。
+  - sitemap 店家超過 45,000 家要分片（現在全部輸出並回報 Sentry）。觸發：店家數超過 45,000 時。
+  - 第 6 刀 code-review 第 2 輪 5 個 nit（記憶滿 500 筆整個清空、`preview-host-noindex` 測試的 reset 位置、`lib/forum` 依賴 `lib/seller` 的共用記憶、`GetStore` 失敗時跳過討論串檢查、sitemap 測試名與斷言不符）。觸發：下次改店家或討論串 guard、sitemap 時一起修。
+  - 店家 SEO 覆寫（賣家編輯店家處）。觸發：上線開索引後 Search Console 顯示店家頁標題問題時。
+  - buyer-app `category_repository` 的手寫記憶體快取整個 App session 不刷新。觸發：B catalog 改寫分類讀取、改由 Riverpod provider 管理時。
+  - `BatchGetStores` 的 100 上限在 TS 與 Dart 各一份（來源 `seller.proto` 註解）。觸發：上限改變時兩端一起改。
+  - buyer-app 地址 ID 仍以 `int` 保存。觸發：結帳改走 Connect 時。
+  - 非工程人員譯者或第三個語系出現時，共用文案改用 TMS。觸發：出現譯者或第三語系時。
+  - website 語言切換器（設計要 Will 同意，網址不依瀏覽器語言導向）。觸發：`en` 加進 `publishedLocales` 之前（`LAUNCH_BLOCKERS` 閘門）。
+  - `/en/<不存在的網址>` 回語系正確的 404（現在回 zh-TW 的 `global-not-found`）。觸發：同上。
+  - en 介面英文文字齊全，含 `EN_IDENTITY.description`。觸發：同上。
+  - middleware matcher 擋不到被排除前綴底下沒人服務的子路徑（`/images/products/1`、`/api/products/1`）。觸發：同上。
+  - `navigation-layer` 測試補「非字面、非外部網址的 `<a href>` 必須來自 `useLocalizedHref`／`localizeHref`」。觸發：同上。
+  - 商店頁 en 版（App Store Connect，不在 repo）。觸發：en 發佈門檻。
+  - 規則 E 的 translator 判斷與 ARB 判斷沒有 mutant（mutation runner 沒有 `packages/` 的 stack）。觸發：runner 加套件 stack 時補。
+  - CI mutation job 的 flutter stack 沒有真實清單跑過。觸發：第一份 Flutter 清單。
+  - 法律文件中文正本與英文參考譯本的條款效力、R5 的詐欺犯罪危害防制條例第 37 條保存期（關店後 6 個月）請律師確認。觸發：上線前。
+  - website 檢舉選單在 `useSellerSelf` 載入前短暫顯示於自己的店；`notice` 全空白未 trim。觸發：下次改 website 檢舉表單時。
+  - 檢舉詳情的佐證只顯示張數、不顯示縮圖。觸發：使用者回饋需要回看佐證，或 admin 機敏檔路由開放檢舉人讀取（觸發由 11d 補，取自 wiki pending-details）。
+  - 「我的檢舉」卡片與詳情不顯示商品名稱（沒有以 product_id 讀商品的 API）。觸發：商品模組提供以 id 讀取的公開 API 時。
+  - website 補充說明字數上限（`validateSupplementDescription` 超長分支）與帳號選單「我的檢舉」入口沒有 vitest 測試。觸發：下次改這兩處時補測試並加進 mutation 清單。
+  - website 店名讀取失敗時一直顯示佔位（`useStoreCardViews` 的 `settled` 沒有錯誤與重讀）。觸發：改 `useStoreCardViews` 或使用者回報時。
+  - dev seed `01-account.sql` 先授 SELLER 後開店的空窗。觸發：改 dev seed 流程時。
+  - #2805（公司時期未完成項，已移交主計畫 B2／Stripe 整合）。觸發：B2 Stripe 整合開工時（觸發由 11d 補）。
+  - D5 outbound client 的遮罩（公司時期未完成項，已移交 B2／Stripe 整合）。觸發：B2 Stripe 整合開工時（觸發由 11d 補）。
+  - 根目錄 pnpm workspace 引入 turbo。觸發：CI 時間成為瓶頸時。
 
 A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主鍵照 ID 策略的過渡規則暫用 `bigint GENERATED ALWAYS AS IDENTITY`，不用 TSID；最後一個 Java 消費者改寫後，以一個 migration 換成 uuid。
 - [x] **A4 pricebook**：取消，不搬。pricebook 整個刪除（ADR `2026-10-27-general-ecommerce-scope-cut.md` D1），執行計畫 `2026-10-27-ecommerce-scope-cut`（已刪除，見該 ADR 文末修訂）步驟 5、6；完成時勾掉這一項。
