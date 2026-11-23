@@ -141,8 +141,6 @@ const (
 	// 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
 	// client 引導買家去付款，不是叫他重新接受。
 	ErrorReason_RFQ_CHECKOUT_ALREADY_ACTIVE ErrorReason = 33
-	// 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
-	ErrorReason_RFQ_ALREADY_AWARDED ErrorReason = 34
 	// 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
 	// ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
 	ErrorReason_AGENT_MONTHLY_QUOTA_EXCEEDED ErrorReason = 35
@@ -208,7 +206,6 @@ var (
 		31: "RFQ_RESPONSE_EXPIRED",
 		32: "RFQ_RECIPIENT_CLOSED",
 		33: "RFQ_CHECKOUT_ALREADY_ACTIVE",
-		34: "RFQ_ALREADY_AWARDED",
 		35: "AGENT_MONTHLY_QUOTA_EXCEEDED",
 		36: "IMAGE_QUOTA_EXCEEDED",
 		37: "IMAGE_SAFETY_BLOCKED",
@@ -253,7 +250,6 @@ var (
 		"RFQ_RESPONSE_EXPIRED":         31,
 		"RFQ_RECIPIENT_CLOSED":         32,
 		"RFQ_CHECKOUT_ALREADY_ACTIVE":  33,
-		"RFQ_ALREADY_AWARDED":          34,
 		"AGENT_MONTHLY_QUOTA_EXCEEDED": 35,
 		"IMAGE_QUOTA_EXCEEDED":         36,
 		"IMAGE_SAFETY_BLOCKED":         37,
@@ -296,7 +292,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xfc\b\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xfe\b\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -332,8 +328,7 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x0eRUN_NOT_ACTIVE\x10\x1e\x12\x18\n" +
 	"\x14RFQ_RESPONSE_EXPIRED\x10\x1f\x12\x18\n" +
 	"\x14RFQ_RECIPIENT_CLOSED\x10 \x12\x1f\n" +
-	"\x1bRFQ_CHECKOUT_ALREADY_ACTIVE\x10!\x12\x17\n" +
-	"\x13RFQ_ALREADY_AWARDED\x10\"\x12 \n" +
+	"\x1bRFQ_CHECKOUT_ALREADY_ACTIVE\x10!\x12 \n" +
 	"\x1cAGENT_MONTHLY_QUOTA_EXCEEDED\x10#\x12\x18\n" +
 	"\x14IMAGE_QUOTA_EXCEEDED\x10$\x12\x18\n" +
 	"\x14IMAGE_SAFETY_BLOCKED\x10%\x12\x1c\n" +
@@ -341,7 +336,7 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x12IMAGE_NOT_PRODUCED\x10'\x12\x1e\n" +
 	"\x1aASSISTANT_TURN_IN_PROGRESS\x10(\x12\x19\n" +
 	"\x15ASSISTANT_TURN_FAILED\x10)\x12\x1f\n" +
-	"\x1bPROCUREMENT_RUN_IN_PROGRESS\x10*B\x82\x02\n" +
+	"\x1bPROCUREMENT_RUN_IN_PROGRESS\x10*\"\x04\b\"\x10\"*\x13RFQ_ALREADY_AWARDEDB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

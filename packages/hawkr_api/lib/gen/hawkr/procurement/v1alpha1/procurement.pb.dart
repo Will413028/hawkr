@@ -5996,6 +5996,7 @@ class BuyerFacingSellerResponse extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearStatus() => $_clearField(3);
 
+  /// 伺服器對這個版本的報價內容（quote 與幣別）算的 hash（SHA-256 小寫十六進位），不含 ID、版本號與送出時間。
   @$pb.TagNumber(4)
   $core.String get payloadHash => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -8475,6 +8476,7 @@ class SellerResponseVersion extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearStatus() => $_clearField(4);
 
+  /// 伺服器對這個版本的報價內容（quote 與幣別）算的 hash（SHA-256 小寫十六進位），不含 ID、版本號與送出時間。
   @$pb.TagNumber(5)
   $core.String get payloadHash => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -9964,7 +9966,7 @@ class BuyerProcurementAppServiceApi {
   /// AcceptSellerQuote 接受賣家回價的指定版本並凍結成交價，隨後建立待付款訂單。報價已改版、已撤回回 ABORTED，
   /// conflictTarget 是 seller_response；報價已過有效期回 FAILED_PRECONDITION，reason 是 RFQ_RESPONSE_EXPIRED；
   /// 同一張需求已有進行中的成交回 FAILED_PRECONDITION，reason 是 RFQ_CHECKOUT_ALREADY_ACTIVE（metadata 的 orderNo 是
-  /// 既有訂單，買家去付款，不是重新接受）；已經成交回 FAILED_PRECONDITION，reason 是 RFQ_ALREADY_AWARDED。
+  /// 既有訂單，買家去付款，不是重新接受）。
   $async.Future<AcceptSellerQuoteResponse> acceptSellerQuote(
           $pb.ClientContext? ctx, AcceptSellerQuoteRequest request) =>
       _client.invoke<AcceptSellerQuoteResponse>(

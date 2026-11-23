@@ -5370,10 +5370,11 @@ type BuyerFacingSellerResponse struct {
 	SellerResponseId      string                 `protobuf:"bytes,1,opt,name=seller_response_id,json=sellerResponseId,proto3" json:"seller_response_id,omitempty"`
 	SellerResponseVersion string                 `protobuf:"bytes,2,opt,name=seller_response_version,json=sellerResponseVersion,proto3" json:"seller_response_version,omitempty"`
 	Status                SellerResponseStatus   `protobuf:"varint,3,opt,name=status,proto3,enum=hawkr.procurement.v1alpha1.SellerResponseStatus" json:"status,omitempty"`
-	PayloadHash           string                 `protobuf:"bytes,4,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
-	SubmitTime            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
-	Store                 *v1alpha1.StoreCard    `protobuf:"bytes,6,opt,name=store,proto3" json:"store,omitempty"`
-	Quote                 *SellerQuote           `protobuf:"bytes,7,opt,name=quote,proto3" json:"quote,omitempty"`
+	// 伺服器對這個版本的報價內容（quote 與幣別）算的 hash（SHA-256 小寫十六進位），不含 ID、版本號與送出時間。
+	PayloadHash string                 `protobuf:"bytes,4,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
+	SubmitTime  *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
+	Store       *v1alpha1.StoreCard    `protobuf:"bytes,6,opt,name=store,proto3" json:"store,omitempty"`
+	Quote       *SellerQuote           `protobuf:"bytes,7,opt,name=quote,proto3" json:"quote,omitempty"`
 	// 報價超出買家預期的範圍；只標示，不修改賣家的金額。
 	OutsideBuyerRequestedRange bool               `protobuf:"varint,8,opt,name=outside_buyer_requested_range,json=outsideBuyerRequestedRange,proto3" json:"outside_buyer_requested_range,omitempty"`
 	Shortlisted                bool               `protobuf:"varint,9,opt,name=shortlisted,proto3" json:"shortlisted,omitempty"`
@@ -7148,8 +7149,9 @@ type SellerResponseVersion struct {
 	SellerResponseVersion string                 `protobuf:"bytes,2,opt,name=seller_response_version,json=sellerResponseVersion,proto3" json:"seller_response_version,omitempty"`
 	PublicationId         string                 `protobuf:"bytes,3,opt,name=publication_id,json=publicationId,proto3" json:"publication_id,omitempty"`
 	Status                SellerResponseStatus   `protobuf:"varint,4,opt,name=status,proto3,enum=hawkr.procurement.v1alpha1.SellerResponseStatus" json:"status,omitempty"`
-	PayloadHash           string                 `protobuf:"bytes,5,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
-	SubmitTime            *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
+	// 伺服器對這個版本的報價內容（quote 與幣別）算的 hash（SHA-256 小寫十六進位），不含 ID、版本號與送出時間。
+	PayloadHash string                 `protobuf:"bytes,5,opt,name=payload_hash,json=payloadHash,proto3" json:"payload_hash,omitempty"`
+	SubmitTime  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=submit_time,json=submitTime,proto3" json:"submit_time,omitempty"`
 	// 取代這一版的版本；仍是最新版時是空字串。
 	SupersededByVersion        string       `protobuf:"bytes,7,opt,name=superseded_by_version,json=supersededByVersion,proto3" json:"superseded_by_version,omitempty"`
 	OutsideBuyerRequestedRange bool         `protobuf:"varint,8,opt,name=outside_buyer_requested_range,json=outsideBuyerRequestedRange,proto3" json:"outside_buyer_requested_range,omitempty"`

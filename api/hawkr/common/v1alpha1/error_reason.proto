@@ -120,8 +120,8 @@ enum ErrorReason {
   // 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
   // client 引導買家去付款，不是叫他重新接受。
   RFQ_CHECKOUT_ALREADY_ACTIVE = 33;
-  // 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
-  RFQ_ALREADY_AWARDED = 34;
+  reserved 34;
+  reserved "RFQ_ALREADY_AWARDED";
   // 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
   // ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
   AGENT_MONTHLY_QUOTA_EXCEEDED = 35;
