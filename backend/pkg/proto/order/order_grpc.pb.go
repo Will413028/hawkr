@@ -28,7 +28,6 @@ const (
 	OrderService_ConfirmReceipt_FullMethodName                     = "/hawkr.order.OrderService/ConfirmReceipt"
 	OrderService_GetSellerOrders_FullMethodName                    = "/hawkr.order.OrderService/GetSellerOrders"
 	OrderService_GetSellerOrderDetail_FullMethodName               = "/hawkr.order.OrderService/GetSellerOrderDetail"
-	OrderService_GetOrderByShipTradeNo_FullMethodName              = "/hawkr.order.OrderService/GetOrderByShipTradeNo"
 	OrderService_GetOrderForReview_FullMethodName                  = "/hawkr.order.OrderService/GetOrderForReview"
 	OrderService_GetOrderForShipping_FullMethodName                = "/hawkr.order.OrderService/GetOrderForShipping"
 	OrderService_GetBuyerMerchantSummary_FullMethodName            = "/hawkr.order.OrderService/GetBuyerMerchantSummary"
@@ -50,7 +49,6 @@ const (
 	OrderService_GetStorePeriodOrderStats_FullMethodName           = "/hawkr.order.OrderService/GetStorePeriodOrderStats"
 	OrderService_RetryGrant_FullMethodName                         = "/hawkr.order.OrderService/RetryGrant"
 	OrderService_ListAbnormalOrdersForAdmin_FullMethodName         = "/hawkr.order.OrderService/ListAbnormalOrdersForAdmin"
-	OrderService_GetOrderAggregates_FullMethodName                 = "/hawkr.order.OrderService/GetOrderAggregates"
 	OrderService_GetOrderInvoiceSnapshotInternal_FullMethodName    = "/hawkr.order.OrderService/GetOrderInvoiceSnapshotInternal"
 	OrderService_ReviseOrderInvoiceSnapshotInternal_FullMethodName = "/hawkr.order.OrderService/ReviseOrderInvoiceSnapshotInternal"
 	OrderService_GetUberQuoteForCheckout_FullMethodName            = "/hawkr.order.OrderService/GetUberQuoteForCheckout"
@@ -94,8 +92,6 @@ type OrderServiceClient interface {
 	GetSellerOrders(ctx context.Context, in *GetSellerOrdersRequest, opts ...grpc.CallOption) (*GetSellerOrdersResponse, error)
 	// 查詢賣家訂單詳情
 	GetSellerOrderDetail(ctx context.Context, in *GetSellerOrderDetailRequest, opts ...grpc.CallOption) (*GetSellerOrderDetailResponse, error)
-	// 根據物流序號查詢訂單（shipping-service 用）
-	GetOrderByShipTradeNo(ctx context.Context, in *GetOrderByShipTradeNoRequest, opts ...grpc.CallOption) (*GetOrderByShipTradeNoResponse, error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(ctx context.Context, in *GetOrderForReviewRequest, opts ...grpc.CallOption) (*GetOrderForReviewResponse, error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
@@ -144,8 +140,6 @@ type OrderServiceClient interface {
 	// ==================== §29 Admin 異常訂單列表 ====================
 	// 跨服務異常訂單聚合（依 order.status 批次聚合 provider_* from Payment / Shipping）
 	ListAbnormalOrdersForAdmin(ctx context.Context, in *ListAbnormalOrdersForAdminRequest, opts ...grpc.CallOption) (*ListAbnormalOrdersForAdminResponse, error)
-	// ==== 服務間：CRM 訂單聚合 ====
-	GetOrderAggregates(ctx context.Context, in *GetOrderAggregatesRequest, opts ...grpc.CallOption) (*GetOrderAggregatesResponse, error)
 	// ==== 服務間：發票開立所需的訂單不可變快照（58 號 §7.1.2 步驟 5 ①）====
 	// invoice-service 的 order.paid consumer 專用；唯讀、不改任何狀態。
 	// 走 52 號 HMAC 內部授權四 header，client deadline 3s（58 號 §7.5「逾時矩陣」）。
@@ -262,16 +256,6 @@ func (c *orderServiceClient) GetSellerOrderDetail(ctx context.Context, in *GetSe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetSellerOrderDetailResponse)
 	err := c.cc.Invoke(ctx, OrderService_GetSellerOrderDetail_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *orderServiceClient) GetOrderByShipTradeNo(ctx context.Context, in *GetOrderByShipTradeNoRequest, opts ...grpc.CallOption) (*GetOrderByShipTradeNoResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetOrderByShipTradeNoResponse)
-	err := c.cc.Invoke(ctx, OrderService_GetOrderByShipTradeNo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -488,16 +472,6 @@ func (c *orderServiceClient) ListAbnormalOrdersForAdmin(ctx context.Context, in 
 	return out, nil
 }
 
-func (c *orderServiceClient) GetOrderAggregates(ctx context.Context, in *GetOrderAggregatesRequest, opts ...grpc.CallOption) (*GetOrderAggregatesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetOrderAggregatesResponse)
-	err := c.cc.Invoke(ctx, OrderService_GetOrderAggregates_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *orderServiceClient) GetOrderInvoiceSnapshotInternal(ctx context.Context, in *GetOrderInvoiceSnapshotInternalRequest, opts ...grpc.CallOption) (*GetOrderInvoiceSnapshotInternalResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetOrderInvoiceSnapshotInternalResponse)
@@ -566,8 +540,6 @@ type OrderServiceServer interface {
 	GetSellerOrders(context.Context, *GetSellerOrdersRequest) (*GetSellerOrdersResponse, error)
 	// 查詢賣家訂單詳情
 	GetSellerOrderDetail(context.Context, *GetSellerOrderDetailRequest) (*GetSellerOrderDetailResponse, error)
-	// 根據物流序號查詢訂單（shipping-service 用）
-	GetOrderByShipTradeNo(context.Context, *GetOrderByShipTradeNoRequest) (*GetOrderByShipTradeNoResponse, error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(context.Context, *GetOrderForReviewRequest) (*GetOrderForReviewResponse, error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
@@ -616,8 +588,6 @@ type OrderServiceServer interface {
 	// ==================== §29 Admin 異常訂單列表 ====================
 	// 跨服務異常訂單聚合（依 order.status 批次聚合 provider_* from Payment / Shipping）
 	ListAbnormalOrdersForAdmin(context.Context, *ListAbnormalOrdersForAdminRequest) (*ListAbnormalOrdersForAdminResponse, error)
-	// ==== 服務間：CRM 訂單聚合 ====
-	GetOrderAggregates(context.Context, *GetOrderAggregatesRequest) (*GetOrderAggregatesResponse, error)
 	// ==== 服務間：發票開立所需的訂單不可變快照（58 號 §7.1.2 步驟 5 ①）====
 	// invoice-service 的 order.paid consumer 專用；唯讀、不改任何狀態。
 	// 走 52 號 HMAC 內部授權四 header，client deadline 3s（58 號 §7.5「逾時矩陣」）。
@@ -676,9 +646,6 @@ func (UnimplementedOrderServiceServer) GetSellerOrders(context.Context, *GetSell
 }
 func (UnimplementedOrderServiceServer) GetSellerOrderDetail(context.Context, *GetSellerOrderDetailRequest) (*GetSellerOrderDetailResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSellerOrderDetail not implemented")
-}
-func (UnimplementedOrderServiceServer) GetOrderByShipTradeNo(context.Context, *GetOrderByShipTradeNoRequest) (*GetOrderByShipTradeNoResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetOrderByShipTradeNo not implemented")
 }
 func (UnimplementedOrderServiceServer) GetOrderForReview(context.Context, *GetOrderForReviewRequest) (*GetOrderForReviewResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOrderForReview not implemented")
@@ -742,9 +709,6 @@ func (UnimplementedOrderServiceServer) RetryGrant(context.Context, *RetryGrantRe
 }
 func (UnimplementedOrderServiceServer) ListAbnormalOrdersForAdmin(context.Context, *ListAbnormalOrdersForAdminRequest) (*ListAbnormalOrdersForAdminResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAbnormalOrdersForAdmin not implemented")
-}
-func (UnimplementedOrderServiceServer) GetOrderAggregates(context.Context, *GetOrderAggregatesRequest) (*GetOrderAggregatesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetOrderAggregates not implemented")
 }
 func (UnimplementedOrderServiceServer) GetOrderInvoiceSnapshotInternal(context.Context, *GetOrderInvoiceSnapshotInternalRequest) (*GetOrderInvoiceSnapshotInternalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOrderInvoiceSnapshotInternal not implemented")
@@ -934,24 +898,6 @@ func _OrderService_GetSellerOrderDetail_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrderServiceServer).GetSellerOrderDetail(ctx, req.(*GetSellerOrderDetailRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _OrderService_GetOrderByShipTradeNo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetOrderByShipTradeNoRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrderServiceServer).GetOrderByShipTradeNo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrderService_GetOrderByShipTradeNo_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrderServiceServer).GetOrderByShipTradeNo(ctx, req.(*GetOrderByShipTradeNoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1334,24 +1280,6 @@ func _OrderService_ListAbnormalOrdersForAdmin_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _OrderService_GetOrderAggregates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetOrderAggregatesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrderServiceServer).GetOrderAggregates(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrderService_GetOrderAggregates_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrderServiceServer).GetOrderAggregates(ctx, req.(*GetOrderAggregatesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _OrderService_GetOrderInvoiceSnapshotInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetOrderInvoiceSnapshotInternalRequest)
 	if err := dec(in); err != nil {
@@ -1450,10 +1378,6 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _OrderService_GetSellerOrderDetail_Handler,
 		},
 		{
-			MethodName: "GetOrderByShipTradeNo",
-			Handler:    _OrderService_GetOrderByShipTradeNo_Handler,
-		},
-		{
 			MethodName: "GetOrderForReview",
 			Handler:    _OrderService_GetOrderForReview_Handler,
 		},
@@ -1536,10 +1460,6 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAbnormalOrdersForAdmin",
 			Handler:    _OrderService_ListAbnormalOrdersForAdmin_Handler,
-		},
-		{
-			MethodName: "GetOrderAggregates",
-			Handler:    _OrderService_GetOrderAggregates_Handler,
 		},
 		{
 			MethodName: "GetOrderInvoiceSnapshotInternal",

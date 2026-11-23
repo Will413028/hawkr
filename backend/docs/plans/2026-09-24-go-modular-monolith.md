@@ -328,7 +328,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 訂單號重新設計，不照搬 `OrderNoGenerator`：`"O" + TSID % 10^9` 加上 `UNIQUE(order_no)`，約 3.7 萬筆訂單就有一半機率撞號（生日界）。訂單號是給人看的編號，另開 `UNIQUE` 欄，不由 ID 截斷或取模（PostgreSQL 設計規範 §二）。
   - agent 的「接受報價 → 建單」改在同一個 transaction 內完成，並標記 RFQ ADR 為 superseded。
 - [ ] **B9 aftersales**
-  - 不改寫、直接刪（Will 2026-11-23）：平台建退貨物流單的 `ShipmentLabelConsumer`、`AfterSaleLabelRetryService`、`ShipmentCreationFailedConsumer`、`ReturnShipmentStatusConsumer`、`StorePickupTimeoutScheduler`，與 PayUni 特有的 `UnknownRefundFallbackConsumer`；退貨改成買家自寄、回填追蹤號碼。
+  - 不改寫、直接刪（Will 2026-11-23）：平台建退貨物流單的 `ShipmentLabelConsumer`、`AfterSaleLabelRetryService`、`ShipmentCreationFailedConsumer`、`ReturnShipmentStatusConsumer`、`StorePickupTimeoutScheduler`，與 PayUni 特有的 `UnknownRefundFallbackConsumer`，以及只發營運告警的 `ReturnStuckAlertScheduler`（作品集沒有人值班接告警）；退貨改成買家自寄、回填追蹤號碼。
   - 取消、退款任務、優惠券補償在同一個 transaction 內完成。
   - 設定「進行中售後」旗標。
   - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表。

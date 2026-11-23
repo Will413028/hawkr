@@ -41,8 +41,6 @@ const (
 	PaymentService_BatchGetRefundProviderStatusByCaseIds_FullMethodName  = "/io.github.will413028.hawkr.payment.grpc.PaymentService/BatchGetRefundProviderStatusByCaseIds"
 	PaymentService_BatchGetRefundProviderStatusByOrderIds_FullMethodName = "/io.github.will413028.hawkr.payment.grpc.PaymentService/BatchGetRefundProviderStatusByOrderIds"
 	PaymentService_HandlePaymentPageReturn_FullMethodName                = "/io.github.will413028.hawkr.payment.grpc.PaymentService/HandlePaymentPageReturn"
-	PaymentService_SubmitAgentFee_FullMethodName                         = "/io.github.will413028.hawkr.payment.grpc.PaymentService/SubmitAgentFee"
-	PaymentService_QueryAgentFee_FullMethodName                          = "/io.github.will413028.hawkr.payment.grpc.PaymentService/QueryAgentFee"
 	PaymentService_DecryptPayUniResult_FullMethodName                    = "/io.github.will413028.hawkr.payment.grpc.PaymentService/DecryptPayUniResult"
 	PaymentService_ValidateApplePayMerchant_FullMethodName               = "/io.github.will413028.hawkr.payment.grpc.PaymentService/ValidateApplePayMerchant"
 	PaymentService_AckAtmRefundAccepted_FullMethodName                   = "/io.github.will413028.hawkr.payment.grpc.PaymentService/AckAtmRefundAccepted"
@@ -102,15 +100,6 @@ type PaymentServiceClient interface {
 	// 信用卡付款 Return 處理（Gateway 接收 PayUni Form POST 後呼叫）
 	// 解密 + 驗簽 + 更新交易狀態 + 組裝 Deep Link
 	HandlePaymentPageReturn(ctx context.Context, in *HandlePaymentPageReturnRequest, opts ...grpc.CallOption) (*HandlePaymentPageReturnResponse, error)
-	// 送出多功能收付。
-	// 🔴 呼叫端必須**先落地 trade_no** 才呼叫本 RPC（70 §3.3 pre-commit）；
-	// 🔴 **本 RPC 不負責去重**——PayUni 官方三處逐字標 TradeNo「可重複」，
-	//
-	//	去重只能由呼叫端的 DB UNIQUE 保證。
-	SubmitAgentFee(ctx context.Context, in *SubmitAgentFeeRequest, opts ...grpc.CallOption) (*SubmitAgentFeeResponse, error)
-	// 查詢多功能收付的撥款結果（agent_fee_query）。
-	// 回 FundDate 與實際 Fee —— 那是「平台到底收到多少」的唯一來源。
-	QueryAgentFee(ctx context.Context, in *QueryAgentFeeRequest, opts ...grpc.CallOption) (*QueryAgentFeeResponse, error)
 	// PayUni 加密資料通用解密（供其他微服務呼叫，如 AfterSales ATM 退款回調）
 	DecryptPayUniResult(ctx context.Context, in *DecryptPayUniResultRequest, opts ...grpc.CallOption) (*DecryptPayUniResultResponse, error)
 	// Apple Pay on Web Merchant Validation：對 Apple validationURL 取 merchantSession
@@ -346,26 +335,6 @@ func (c *paymentServiceClient) HandlePaymentPageReturn(ctx context.Context, in *
 	return out, nil
 }
 
-func (c *paymentServiceClient) SubmitAgentFee(ctx context.Context, in *SubmitAgentFeeRequest, opts ...grpc.CallOption) (*SubmitAgentFeeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SubmitAgentFeeResponse)
-	err := c.cc.Invoke(ctx, PaymentService_SubmitAgentFee_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *paymentServiceClient) QueryAgentFee(ctx context.Context, in *QueryAgentFeeRequest, opts ...grpc.CallOption) (*QueryAgentFeeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryAgentFeeResponse)
-	err := c.cc.Invoke(ctx, PaymentService_QueryAgentFee_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *paymentServiceClient) DecryptPayUniResult(ctx context.Context, in *DecryptPayUniResultRequest, opts ...grpc.CallOption) (*DecryptPayUniResultResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DecryptPayUniResultResponse)
@@ -504,15 +473,6 @@ type PaymentServiceServer interface {
 	// 信用卡付款 Return 處理（Gateway 接收 PayUni Form POST 後呼叫）
 	// 解密 + 驗簽 + 更新交易狀態 + 組裝 Deep Link
 	HandlePaymentPageReturn(context.Context, *HandlePaymentPageReturnRequest) (*HandlePaymentPageReturnResponse, error)
-	// 送出多功能收付。
-	// 🔴 呼叫端必須**先落地 trade_no** 才呼叫本 RPC（70 §3.3 pre-commit）；
-	// 🔴 **本 RPC 不負責去重**——PayUni 官方三處逐字標 TradeNo「可重複」，
-	//
-	//	去重只能由呼叫端的 DB UNIQUE 保證。
-	SubmitAgentFee(context.Context, *SubmitAgentFeeRequest) (*SubmitAgentFeeResponse, error)
-	// 查詢多功能收付的撥款結果（agent_fee_query）。
-	// 回 FundDate 與實際 Fee —— 那是「平台到底收到多少」的唯一來源。
-	QueryAgentFee(context.Context, *QueryAgentFeeRequest) (*QueryAgentFeeResponse, error)
 	// PayUni 加密資料通用解密（供其他微服務呼叫，如 AfterSales ATM 退款回調）
 	DecryptPayUniResult(context.Context, *DecryptPayUniResultRequest) (*DecryptPayUniResultResponse, error)
 	// Apple Pay on Web Merchant Validation：對 Apple validationURL 取 merchantSession
@@ -607,12 +567,6 @@ func (UnimplementedPaymentServiceServer) BatchGetRefundProviderStatusByOrderIds(
 }
 func (UnimplementedPaymentServiceServer) HandlePaymentPageReturn(context.Context, *HandlePaymentPageReturnRequest) (*HandlePaymentPageReturnResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HandlePaymentPageReturn not implemented")
-}
-func (UnimplementedPaymentServiceServer) SubmitAgentFee(context.Context, *SubmitAgentFeeRequest) (*SubmitAgentFeeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SubmitAgentFee not implemented")
-}
-func (UnimplementedPaymentServiceServer) QueryAgentFee(context.Context, *QueryAgentFeeRequest) (*QueryAgentFeeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method QueryAgentFee not implemented")
 }
 func (UnimplementedPaymentServiceServer) DecryptPayUniResult(context.Context, *DecryptPayUniResultRequest) (*DecryptPayUniResultResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DecryptPayUniResult not implemented")
@@ -1022,42 +976,6 @@ func _PaymentService_HandlePaymentPageReturn_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _PaymentService_SubmitAgentFee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SubmitAgentFeeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PaymentServiceServer).SubmitAgentFee(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: PaymentService_SubmitAgentFee_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PaymentServiceServer).SubmitAgentFee(ctx, req.(*SubmitAgentFeeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _PaymentService_QueryAgentFee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryAgentFeeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PaymentServiceServer).QueryAgentFee(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: PaymentService_QueryAgentFee_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PaymentServiceServer).QueryAgentFee(ctx, req.(*QueryAgentFeeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _PaymentService_DecryptPayUniResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DecryptPayUniResultRequest)
 	if err := dec(in); err != nil {
@@ -1306,14 +1224,6 @@ var PaymentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HandlePaymentPageReturn",
 			Handler:    _PaymentService_HandlePaymentPageReturn_Handler,
-		},
-		{
-			MethodName: "SubmitAgentFee",
-			Handler:    _PaymentService_SubmitAgentFee_Handler,
-		},
-		{
-			MethodName: "QueryAgentFee",
-			Handler:    _PaymentService_QueryAgentFee_Handler,
 		},
 		{
 			MethodName: "DecryptPayUniResult",

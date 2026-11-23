@@ -13,8 +13,7 @@ import java.util.UUID;
  * （36 §7.4 Idempotency Conformance Contract）。
  *
  * <p><b>{@code storeId} / {@code store_id}</b>：店家的 {@code store_id}
- * surrogate（原始值，非登入 account_id）。crm-service 的 {@code RecordOrder} 統計與本分支新增
- * 的 {@code GetOrderAggregates} reconcile RPC 皆以此欄位 key 統計資料，必須維持 store_id，
+ * surrogate（原始值，非登入 account_id）。crm-service 的 {@code RecordOrder} 統計以此欄位 key 統計資料，必須維持 store_id，
  * 不可帶入解析後的登入 account_id（否則會與 store_id-keyed 的儲存/查詢路徑不一致）。
  *
  * <p><b>{@code notifySellerAccountId} / {@code notify_seller_account_id}</b>：由

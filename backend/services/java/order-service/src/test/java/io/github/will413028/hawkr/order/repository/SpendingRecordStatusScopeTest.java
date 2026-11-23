@@ -81,7 +81,7 @@ class SpendingRecordStatusScopeTest {
      * FULLY_REFUNDED(70) 刻意排除：AfterSalesRefundEventHandler.applyFullRefund 只做狀態
      * CAS、<b>不累加</b> refund_total_amount，納入只會顯示「金額 X／退回 0」的錯誤資訊
      * （dev 實測 4 筆 status=70 的 refund_total_amount 全為 0）。crm-service 的
-     * RecordRefund 與本 repository 的 findOrderAggregates 都是同一個判斷。
+     * RecordRefund 也是同一個判斷。
      */
     @Test
     @DisplayName("FULLY_REFUNDED(70) / CANCELLED(80) 不納入消費紀錄")

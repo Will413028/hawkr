@@ -29,7 +29,7 @@ class PaymentGrpcRedirectFormTest {
         // 建構子僅賦值不呼叫；只需要 pageService，其餘依賴傳 null
         return new PaymentGrpcService(
                 null, null, pageService, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
     }
 
     @Test

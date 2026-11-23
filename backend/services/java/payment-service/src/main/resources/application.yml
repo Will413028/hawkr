@@ -79,27 +79,7 @@ hawkr:
     node-id-base: 0  # Payment Service: 0-99
     pod-index: ${POD_INDEX:0}
   # L2 補救路徑：待付款交易補收排程
-  # 🔴 多功能收付（agent_fee）的費率政策 —— ADR-011 的 gross-up 輸入。
-  #
-  # **四個值全部沒有預設，這是刻意的**（70 §10.3 EV-P6）：
-  #   給 1% 當預設 ⇒「未確認」變成一個看不見的狀態，而金額會照樣送出去
-  #   取整方向猜錯 ⇒ 整數制下會**系統性**短收或多收，不是偶爾差一元
-  #   gross／net 語意搞反 ⇒「扣 1% 後撥款」與「另外收 1%」差一個 1/(1−r)
-  #
-  # 缺任一項時 AgentFeeGrossUp.solve() 直接拋（fail-closed），送不出任何一筆。
-  # ⚠️ 這是 **Enablement Blocker 不是 Implementation Blocker**：schema／狀態機／
-  #    對帳／residual 機制全部可以先做完，缺的只是「可以自動送出」這個開關。
-  #    拿到 PayUni 書面費率契約後才填這四個值。
   payment:
-    agent-fee:
-      rate:
-        rate-numerator: ${PAYUNI_AGENT_FEE_RATE_NUMERATOR:}
-        rate-denominator: ${PAYUNI_AGENT_FEE_RATE_DENOMINATOR:}
-        # UP / DOWN / HALF_UP
-        rounding: ${PAYUNI_AGENT_FEE_ROUNDING:}
-        min-fee: ${PAYUNI_AGENT_FEE_MIN:}
-        max-fee: ${PAYUNI_AGENT_FEE_MAX:}
-        version: ${PAYUNI_AGENT_FEE_POLICY_VERSION:}
     reconcile:
       pending:
         enabled: ${RECONCILE_PENDING_ENABLED:true}
@@ -128,10 +108,6 @@ payuni:
     id: ${PAYUNI_AGENT_ID:HAWK}  # 代理商前綴字（4碼大寫，撥款 API 使用）
     key: ${PAYUNI_AGENT_KEY}  # 代理商 Key（加解密用）
     iv: ${PAYUNI_AGENT_IV}  # 代理商 IV（加解密用）
-    # 代理商出入帳商店代號（agent_fee 的 AgentMerID，條件必填）。
-    # 🔴 **留空與未設定是同一件事，而那正確**：官方標「未帶則依平台預設」，
-    #    而空字串塞進 EncryptInfo 等於指定一個不存在的商店 ⇒ AgentFeeService 會略過它。
-    mer-id: ${PAYUNI_AGENT_MER_ID:}
   api:
    #  base-url: ${PAYUNI_API_URL:https://api.payuni.com.tw}
    base-url: ${PAYUNI_API_URL:https://sandbox-api.payuni.com.tw}

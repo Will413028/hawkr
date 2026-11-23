@@ -135,7 +135,6 @@ public class PaymentGrpcService extends PaymentServiceGrpc.PaymentServiceImplBas
     private final io.github.will413028.hawkr.payment.application.service.PaymentAdminQueryService adminQueryService;
     private final PaymentLogMapper paymentLogMapper;
     private final ApplePayMerchantValidator applePayMerchantValidator;
-    private final io.github.will413028.hawkr.payment.agentfee.AgentFeeService agentFeeService;
 
     @Value("${hawkr.web.frontend-url}")
     private String webFrontendUrl;
@@ -155,8 +154,7 @@ public class PaymentGrpcService extends PaymentServiceGrpc.PaymentServiceImplBas
             RefundTransactionRepository refundRepository,
             io.github.will413028.hawkr.payment.application.service.PaymentAdminQueryService adminQueryService,
             PaymentLogMapper paymentLogMapper,
-            ApplePayMerchantValidator applePayMerchantValidator,
-            io.github.will413028.hawkr.payment.agentfee.AgentFeeService agentFeeService
+            ApplePayMerchantValidator applePayMerchantValidator
     ) {
         this.paymentService = paymentService;
         this.paymentCloseService = paymentCloseService;
@@ -173,7 +171,6 @@ public class PaymentGrpcService extends PaymentServiceGrpc.PaymentServiceImplBas
         this.adminQueryService = adminQueryService;
         this.paymentLogMapper = paymentLogMapper;
         this.applePayMerchantValidator = applePayMerchantValidator;
-        this.agentFeeService = agentFeeService;
     }
 
     // ==================== 授權輔助方法 ====================
@@ -729,107 +726,6 @@ public class PaymentGrpcService extends PaymentServiceGrpc.PaymentServiceImplBas
 
         } catch (Exception e) {
             GrpcErrorHandler.handleException(responseObserver, io.github.will413028.hawkr.payment.grpc.GrantPaymentResponse.newBuilder(), e, "PaymentGrpcService", "grantPayment");
-        }
-    }
-
-    // ==================== 多功能收付（agent_fee，線 B 收款通道）====================
-
-    /**
-     * 送出多功能收付（{@code ADR-009} 的「收款執行」那一格）。
-     *
-     * <h2>🔴 三件事必須分清楚，否則呼叫端會做出相反的處置</h2>
-     * <ul>
-     *   <li><b>明確受理</b>（{@code SUCCESS}）⇒ 應收進 SUBMITTED，等次日</li>
-     *   <li><b>明確拒絕</b>（有回應、非 SUCCESS）⇒ 沒有受理、不存在「可能已經扣了」的窗口
-     *       ⇒ 可以自動退避重送</li>
-     *   <li><b>未取得回應</b>（逾時／連線失敗，{@code providerResponded=false}）
-     *       ⇒ 🔴 <b>不得視為失敗、不得自動重送</b>——PayUni 可能已經受理了，
-     *       而自動重送的期望值是「把一次不確定變成一次確定的重複扣款」</li>
-     * </ul>
-     *
-     * <p>🔴 <b>本 RPC 不負責去重</b>（70 §14.2 逐字）：官方標 {@code TradeNo} 可重複，
-     * 去重只能由呼叫端的 DB UNIQUE 保證，且必須<b>在呼叫本 RPC 之前</b>落地。
-     */
-    @Override
-    public void submitAgentFee(io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeRequest request,
-                                StreamObserver<io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeResponse> responseObserver) {
-        try {
-            long targetNet = Long.parseLong(request.getTargetNetAmount());
-            int feeType = Integer.parseInt(request.getFeeType());
-            int balType = Integer.parseInt(request.getBalType());
-
-            io.github.will413028.hawkr.payment.agentfee.AgentFeeService.SubmitOutcome outcome =
-                    agentFeeService.submit(request.getMerId(), request.getTradeNo(), targetNet, feeType, balType);
-
-            responseObserver.onNext(io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .setData(io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeData.newBuilder()
-                            .setProviderStatus(outcome.providerStatus())
-                            .setProviderMessage(outcome.providerMessage())
-                            .setGrossAmount(String.valueOf(outcome.grossAmount()))
-                            .setEstimatedFee(String.valueOf(outcome.estimatedFee()))
-                            .setFeePolicyVersion(outcome.feePolicyVersion())
-                            .setProviderResponded(outcome.providerResponded())
-                            .build())
-                    .build());
-            responseObserver.onCompleted();
-
-            log.info("PaymentGrpcService.submitAgentFee.done",
-                    "agent_fee 送出 responded=" + outcome.providerResponded()
-                            + " status=" + outcome.providerStatus(),
-                    "tradeNo", request.getTradeNo());
-
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(responseObserver,
-                    io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeResponse.newBuilder(), e,
-                    "PaymentGrpcService", "submitAgentFee");
-        }
-    }
-
-    /**
-     * 查詢多功能收付的撥款結果。
-     *
-     * <p>🔴 回應把 PayUni 的兩個哨兵值翻譯掉，因為它們在 wire 上長得像正常值：
-     * <ul>
-     *   <li>{@code FundDate = "0000-00-00"} ⇒ {@code fund_date} <b>不設值</b>（尚未撥款）</li>
-     *   <li>查無此筆 ⇒ {@code found = false}，與「尚未撥款」<b>是兩件事</b>——
-     *       混在一起的話，呼叫端會把「沒受理」誤讀成「還沒到次日」而一直等下去</li>
-     * </ul>
-     */
-    @Override
-    public void queryAgentFee(io.github.will413028.hawkr.payment.grpc.QueryAgentFeeRequest request,
-                               StreamObserver<io.github.will413028.hawkr.payment.grpc.QueryAgentFeeResponse> responseObserver) {
-        try {
-            long grossAmount = Long.parseLong(request.getGrossAmount());
-
-            io.github.will413028.hawkr.payment.agentfee.AgentFeeService.QueryOutcome outcome =
-                    agentFeeService.query(request.getMerId(), request.getTradeNo(), grossAmount);
-
-            io.github.will413028.hawkr.payment.grpc.QueryAgentFeeData.Builder data =
-                    io.github.will413028.hawkr.payment.grpc.QueryAgentFeeData.newBuilder()
-                            .setFound(outcome.found())
-                            .setMerId(outcome.merId())
-                            .setTradeNo(outcome.tradeNo())
-                            .setGrossAmount(String.valueOf(outcome.grossAmount()))
-                            .setFeeType(outcome.feeType())
-                            .setBalType(outcome.balType())
-                            .setTradeDate(outcome.tradeDate());
-            outcome.fundDate().ifPresent(data::setFundDate);
-            outcome.actualFee().ifPresent(fee -> data.setActualFee(String.valueOf(fee)));
-            outcome.agentMerId().ifPresent(data::setAgentMerId);
-
-            responseObserver.onNext(io.github.will413028.hawkr.payment.grpc.QueryAgentFeeResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .setData(data.build())
-                    .build());
-            responseObserver.onCompleted();
-
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(responseObserver,
-                    io.github.will413028.hawkr.payment.grpc.QueryAgentFeeResponse.newBuilder(), e,
-                    "PaymentGrpcService", "queryAgentFee");
         }
     }
 
