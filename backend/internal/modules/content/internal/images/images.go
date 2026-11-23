@@ -92,15 +92,3 @@ func After(old []uuid.UUID, rs ...Resolved) []uuid.UUID {
 	}
 	return out
 }
-
-// Retired 列出退場的資產：寫入之前這個 ref 的所有資產減去寫入之後的所有資產（集合差，去重）。同一個 ref 的多個位置可以指著
-// 同一個資產，所以不能逐位置比對：只換掉其中一個位置時，資產仍被別的位置指著，不退場。
-func Retired(old, after []uuid.UUID) []uuid.UUID {
-	var out []uuid.UUID
-	for _, a := range old {
-		if !slices.Contains(after, a) && !slices.Contains(out, a) {
-			out = append(out, a)
-		}
-	}
-	return out
-}

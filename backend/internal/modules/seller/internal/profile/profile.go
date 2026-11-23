@@ -451,9 +451,9 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 			version = row.Version
 		}
 		if len(changes) > 0 {
-			retired := model.RetiredAssets(
-				[]*uuid.UUID{logo.assetOf(current), cover.assetOf(current)},
-				[]*uuid.UUID{logo.assetOf(row), cover.assetOf(row)})
+			retired := media.RetiredAssets(
+				media.AssetIDs(logo.assetOf(current), cover.assetOf(current)),
+				media.AssetIDs(logo.assetOf(row), cover.assetOf(row)))
 			if len(retired) > 0 {
 				if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {
 					return err

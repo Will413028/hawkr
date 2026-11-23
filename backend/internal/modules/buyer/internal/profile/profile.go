@@ -354,8 +354,8 @@ func (service *Service) UpdateProfile(ctx context.Context, input model.UpdatePro
 			if err != nil {
 				return err
 			}
-			if current.AvatarAssetID != nil && *current.AvatarAssetID != asset.ID {
-				if err := service.deps.Media.MarkDeleted(ctx, []uuid.UUID{*current.AvatarAssetID}); err != nil {
+			if retired := media.RetiredAssets(media.AssetIDs(current.AvatarAssetID), []uuid.UUID{asset.ID}); len(retired) > 0 {
+				if err := service.deps.Media.MarkDeleted(ctx, retired); err != nil {
 					return err
 				}
 			}

@@ -52,12 +52,7 @@ type imageUpload struct {
 // retireImages 在封存或合併清掉業者的圖片欄位時，把目前的 logo 與封面 MarkDeleted（必須在寫入的 transaction 內）。封存之後的還原不會把圖帶回來，
 // 所以被清掉的圖不會再被寫回。
 func (s *Service) retireImages(ctx context.Context, row store.SellerProspect) error {
-	var retired []uuid.UUID
-	for _, kind := range []imageKind{logoKind, coverKind} {
-		if asset := kind.assetOf(row); asset != nil {
-			retired = append(retired, *asset)
-		}
-	}
+	retired := media.RetiredAssets(media.AssetIDs(logoKind.assetOf(row), coverKind.assetOf(row)), nil)
 	if len(retired) == 0 {
 		return nil
 	}

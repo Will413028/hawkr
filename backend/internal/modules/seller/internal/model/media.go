@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"slices"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -39,19 +38,4 @@ type ConfirmItem = media.ConfirmItem
 // ConfirmAll 在寫入的 transaction 內依序確認 items 的 staged token，一次回報所有不合格的（語意見 media.ConfirmFields）。
 func ConfirmAll(ctx context.Context, m Media, uploader media.Uploader, items []ConfirmItem, want media.Visibility) ([]media.ConfirmedAsset, error) {
 	return media.ConfirmFields(ctx, m, uploader, items, want)
-}
-
-// RetiredAssets 列出退場的資產：寫入之前所有位置的資產減去寫入之後所有位置的資產（集合差，去重）。同一列的多個位置可以指著同一個資產，
-// 所以不能逐位置比對：重送沒變的 token 或只換掉其中一個位置時，仍被指著的資產不退場。
-func RetiredAssets(before, after []*uuid.UUID) []uuid.UUID {
-	var out []uuid.UUID
-	for _, b := range before {
-		if b == nil || slices.Contains(out, *b) {
-			continue
-		}
-		if !slices.ContainsFunc(after, func(a *uuid.UUID) bool { return a != nil && *a == *b }) {
-			out = append(out, *b)
-		}
-	}
-	return out
 }

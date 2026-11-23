@@ -6,7 +6,7 @@
 
 - 實作在 `internal/modules/media`，自己的 `media` schema 與 migration，登記在 `cmd/hawkr/modules.go` 的 `modules()`。組裝點（`cmd/hawkr/media.go`）提供物件儲存（`MEDIA_STORAGE`）與 KEK 金鑰環（`MEDIA_KEKS`），把 `media.Queues()`、`AddWorkers`、`PeriodicJobs` 接進 worker；缺設定或 KEK 格式錯誤時啟動失敗，不退回 fake。
 - 擁有媒體的模組（buyer、seller、content、social、review、im、moderation）直接依賴 `*media.Module` 的方法子集，不經轉接層。Java 的 media-service 與 `pkg/media` 只服務還沒搬進單體的舊服務。
-- 根套件公開 `Uploader`、`ConfirmedAsset`、`PutPublicResult` 等別名與 `ErrNotSecure`、`ErrNoTransaction`、`ErrInTransaction`、`ErrNoKeyring`；`ConfirmFields`、`ConfirmField` 是擁有者確認 token 時把不合格的 token 指到欄位錯誤的共用函式。
+- 根套件公開 `Uploader`、`ConfirmedAsset`、`PutPublicResult` 等別名與 `ErrNotSecure`、`ErrNoTransaction`、`ErrInTransaction`、`ErrNoKeyring`；`ConfirmFields`、`ConfirmField` 是擁有者確認 token 時把不合格的 token 指到欄位錯誤的共用函式；`RetiredAssets`、`AssetIDs` 是擁有者算「寫入前的資產減寫入後的資產」交給 `MarkDeleted` 的共用 helper（B1-D23）。
 - 測試用的記憶體內替身：`Fake`（`media.NewFake`，擁有者模組的 `Confirm`、`MarkDeleted`、`ReadSecure`、`CopyPublic`）與 `MemoryStore`（物件儲存）。
 - 模組內依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 

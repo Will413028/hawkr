@@ -28,7 +28,7 @@ schema `content`（`db/schema.sql`）：`banners`（兩張圖的 asset ID 是 UU
 - 啟用中的 banner 最多 20 則。守門：`TestBannersCanOnlyBeActivatedUpToTheLimit`。規格：§2。
 - banner 的貼文目標建立與換掉時必須公開可讀（經 `social.PubliclyReadablePosts`，規則在 social），前台讀取隱藏目標已不公開可讀的 banner；content 依賴 social，social 不得依賴 content。守門：`TestCreateBannerRejectsAPostTargetThatIsNotPubliclyReadable`、`TestPublicReadHidesBannersWhosePostIsNoLongerReadable`。規格：`backend/docs/modules/content.md`。
 - 圖片在寫入 banner 的 transaction 內 `Confirm`（key 與 asset ID 成對且必填），換圖與刪除時被換掉或終態的資產 `MarkDeleted`；寫入回滾時新資產仍是暫存。守門：`TestReplacingABannerImageConfirmsTheNewAssetAndMarksTheOldDeleted`、`TestRolledBackBannerWriteLeavesTheNewAssetStaged`、`TestDeletingABannerMarksBothImagesDeleted`、DB 的 `NOT NULL`。規格：§3。
-- 退場是寫入前後該 ref 所有資產的集合差：兩張圖共用同一個資產時，只換一張不標記刪除。守門：`TestRetiredIsASetDifferenceAcrossAllSlotsOfTheRef`、`TestUpdateBannerMarksExactlyTheReplacedImagesDeleted`。規格：§3。
+- 退場是寫入前後該 ref 所有資產的集合差：兩張圖共用同一個資產時，只換一張不標記刪除。守門：`TestRetiredAssetsAcrossAllSlotsOfTheRef`、`TestUpdateBannerMarksExactlyTheReplacedImagesDeleted`。規格：§3。
 - 修改必須帶讀到的版本，以條件式 UPDATE 為準，回傳取自 `RETURNING`；刪除可以帶版本。守門：`TestUpdateBannerRejectsAStaleVersionBeforeFinalizing`、`TestDeleteChecksTheVersionWhenGiven`。規格：§4。
 - 版本門檻以 app_type 識別，建立只建立、修改要帶版本。守門：`TestAppVersionGateCreateOnlyCreatesAndUpdateNeedsTheVersion`、`TestConcurrentCreatesOfTheSameGate`。規格：§5。
 - 版本門檻一律 fail-open：沒有設定、門檻或 App 送來的版本格式不對，都不要求更新。守門：`TestCheckAppVersion`。規格：§5。

@@ -19,11 +19,11 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"uuid"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -463,9 +463,9 @@ func (s *Service) Update(ctx context.Context, in model.UpdateProspectInput) (mod
 			return err
 		}
 		if len(uploads) > 0 {
-			retired := model.RetiredAssets(
-				[]*uuid.UUID{logoKind.assetOf(locked), coverKind.assetOf(locked)},
-				[]*uuid.UUID{logoKind.assetOf(updated), coverKind.assetOf(updated)})
+			retired := media.RetiredAssets(
+				media.AssetIDs(logoKind.assetOf(locked), coverKind.assetOf(locked)),
+				media.AssetIDs(logoKind.assetOf(updated), coverKind.assetOf(updated)))
 			if len(retired) > 0 {
 				if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {
 					return err

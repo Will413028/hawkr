@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -394,7 +395,7 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 			return nil
 		}
 		before := []uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}
-		retired := images.Retired(before, images.After(before, resolved...))
+		retired := media.RetiredAssets(before, images.After(before, resolved...))
 		return m.d.Media.MarkDeleted(ctx, retired)
 	})
 	if err != nil {
@@ -422,7 +423,7 @@ func (m *Service) DeleteBanner(ctx context.Context, id uuid.UUID, version int64)
 		if n == 0 {
 			return m.bannerWriteMissed(ctx, id)
 		}
-		return m.d.Media.MarkDeleted(ctx, images.Retired([]uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}, nil))
+		return m.d.Media.MarkDeleted(ctx, media.RetiredAssets([]uuid.UUID{old.PreviewImageAssetID, old.PopupImageAssetID}, nil))
 	})
 }
 

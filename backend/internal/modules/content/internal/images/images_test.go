@@ -6,6 +6,7 @@ import (
 	"testing"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -20,25 +21,25 @@ func TestRequireNamesTheSlotWithoutAnyImage(t *testing.T) {
 	}
 }
 
-func TestRetiredIsASetDifferenceAcrossAllSlotsOfTheRef(t *testing.T) {
+func TestRetiredAssetsAcrossAllSlotsOfTheRef(t *testing.T) {
 	a, b, c := uuid.NewV7(), uuid.NewV7(), uuid.NewV7()
 	old := []uuid.UUID{a, a}
 	replacedOne := Resolved{Key: "k", AssetID: &b}
 	kept := Resolved{Key: "k2"}
 	// 兩個位置指著同一個資產 a，只換掉一個位置：a 仍被另一個位置指著，不退場。
-	if got := Retired(old, After(old, replacedOne, kept)); len(got) != 0 {
+	if got := media.RetiredAssets(old, After(old, replacedOne, kept)); len(got) != 0 {
 		t.Fatalf("資產仍被別的位置指著，不該退場：%v", got)
 	}
 	// 兩個位置都換掉：a 只退場一次。
-	if got := Retired(old, After(old, replacedOne, Resolved{Key: "k3", AssetID: &c})); !slices.Equal(got, []uuid.UUID{a}) {
+	if got := media.RetiredAssets(old, After(old, replacedOne, Resolved{Key: "k3", AssetID: &c})); !slices.Equal(got, []uuid.UUID{a}) {
 		t.Fatalf("兩個位置都換掉：%v", got)
 	}
 	// 沿用與同一個資產不退場；刪除（沒有寫入之後的資產）全部退場並去重。
 	two := []uuid.UUID{a, b}
-	if got := Retired(two, After(two, kept, Resolved{Key: "k4", AssetID: &b})); len(got) != 0 {
+	if got := media.RetiredAssets(two, After(two, kept, Resolved{Key: "k4", AssetID: &b})); len(got) != 0 {
 		t.Fatalf("沿用與同一個資產：%v", got)
 	}
-	if got := Retired(old, nil); !slices.Equal(got, []uuid.UUID{a}) {
+	if got := media.RetiredAssets(old, nil); !slices.Equal(got, []uuid.UUID{a}) {
 		t.Fatalf("刪除：%v", got)
 	}
 }
