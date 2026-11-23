@@ -33,10 +33,6 @@
       "message": "預設風格必須啟用",
       "description": "停用中的風格不能設成預設（SetDefaultAiStyle），目前的預設風格也不能停用（A9-D39，FAILED_PRECONDITION）。"
     },
-    "admin.style_etag_required": {
-      "message": "請帶入風格的版本（etag）",
-      "description": "更新風格時 etag 必填，沒帶回 INVALID_ARGUMENT。"
-    },
     "admin.style_label_required": {
       "message": "風格顯示名稱不能空白",
       "description": "label 去掉頭尾空白後是空的。"

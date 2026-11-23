@@ -77,15 +77,6 @@ func AdminStyleDefaultMustBeEnabled(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "預設風格必須啟用", Locale: uitext.ZhTW}
 }
 
-// AdminStyleEtagRequired 是模組句子 admin.style_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func AdminStyleEtagRequired(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "The style version (etag) is required", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "請帶入風格的版本（etag）", Locale: uitext.ZhTW}
-}
-
 // AdminStyleLabelRequired 是模組句子 admin.style_label_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func AdminStyleLabelRequired(l uitext.Locale) uitext.Message {
 	switch l {

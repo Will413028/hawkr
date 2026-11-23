@@ -165,7 +165,7 @@ func TestUpdateStyleRequiresTheVersion(t *testing.T) {
 	_, err := h.s.UpdateStyle(context.Background(), updateInput(s.ID, 0))
 	wantKind(t, err, apperr.KindInvalidInput)
 	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Message != text.AdminStyleEtagRequired(uitext.LocaleFrom(context.Background())).Text || ae.Message == text.AdminStyleStale(uitext.LocaleFrom(context.Background())).Text {
+	if !errors.As(err, &ae) || ae.Message != "必須提供讀取時的版本" || ae.Message == text.AdminStyleStale(uitext.LocaleFrom(context.Background())).Text {
 		t.Fatalf("缺 etag 要用自己的文字，得到 %v", err)
 	}
 }
@@ -173,7 +173,7 @@ func TestUpdateStyleRequiresTheVersion(t *testing.T) {
 func TestUpdateStyleStaleVersionIsRejectedBeforeFinalizingTheThumbnail(t *testing.T) {
 	h := newHarness(t)
 	s := h.seed("a", "PRODUCT", false, "a")
-	in := updateInput(s.ID, s.Version-1)
+	in := updateInput(s.ID, s.Version+1)
 	in.ThumbnailToken = "t2"
 	_, err := h.s.UpdateStyle(context.Background(), in)
 	wantKind(t, err, apperr.KindVersionConflict)
@@ -254,6 +254,24 @@ func TestUpdateStyleTokenThatCannotBeFinalizedLeavesTheStyleUntouched(t *testing
 	}
 }
 
+func TestUpdateStyleVersionIsCheckedInsideTheTxBeforeTheDefaultRule(t *testing.T) {
+	h := newHarness(t)
+	s := h.seed("a", "PRODUCT", false, "")
+	h.q.onLock = func(id uuid.UUID) {
+		cur := h.q.styles[id]
+		cur.Version++
+		cur.IsDefault = true
+		h.q.styles[id] = cur
+	}
+	in := updateInput(s.ID, s.Version)
+	in.Enabled = false
+	_, err := h.s.UpdateStyle(context.Background(), in)
+	wantKind(t, err, apperr.KindVersionConflict)
+	if len(h.audit.entries) != 0 {
+		t.Fatal("版本不符不該寫稽核")
+	}
+}
+
 func TestUpdateStyleDefaultRules(t *testing.T) {
 	ctx := context.Background()
 	t.Run("停用目前的預設風格是 failed_precondition", func(t *testing.T) {
@@ -330,7 +348,7 @@ func TestSetDefaultRules(t *testing.T) {
 		h := newHarness(t)
 		d := h.seed("d", "PRODUCT", true, "")
 		o := h.seed("o", "PRODUCT", false, "")
-		_, err := h.s.SetDefault(ctx, actor, o.ID, o.Version-1)
+		_, err := h.s.SetDefault(ctx, actor, o.ID, o.Version+1)
 		wantKind(t, err, apperr.KindVersionConflict)
 		if !h.q.styles[d.ID].IsDefault || len(h.audit.entries) != 0 {
 			t.Fatal("版本不符不該改預設或寫稽核")

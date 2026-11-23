@@ -26,6 +26,7 @@ type txKey struct{}
 type fakeQ struct {
 	styles map[uuid.UUID]store.ImageaiStyle
 	quotas map[int64]store.ImageaiQuota
+	onLock func(uuid.UUID)
 }
 
 func newFakeQ() *fakeQ {
@@ -57,6 +58,9 @@ func (f *fakeQ) GetStyle(_ context.Context, id uuid.UUID) (store.ImageaiStyle, e
 }
 
 func (f *fakeQ) LockStyle(ctx context.Context, id uuid.UUID) (store.ImageaiStyle, error) {
+	if f.onLock != nil {
+		f.onLock(id)
+	}
 	return f.GetStyle(ctx, id)
 }
 

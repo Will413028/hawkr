@@ -214,7 +214,7 @@ func (h *Admin) UpdateAiQuota(ctx context.Context, req *connect.Request[adminpb.
 	if err := rpc.ApplyUpdateMask(merged, msg, req.Msg.GetUpdateMask()); err != nil {
 		return nil, err
 	}
-	if !cur.Custom {
+	if version == 0 && !cur.Custom {
 		fields, err := rpc.WritableFields(msg, req.Msg.GetUpdateMask())
 		if err != nil {
 			return nil, err

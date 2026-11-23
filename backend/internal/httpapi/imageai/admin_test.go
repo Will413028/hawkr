@@ -405,6 +405,19 @@ func TestUpdateAiQuotaWithoutAnEtagSendsVersionZero(t *testing.T) {
 	}
 }
 
+func TestUpdateAiQuotaWithAnEtagSkipsTheCreateOnlyWeeklyLimitCheck(t *testing.T) {
+	m := newFakeAdmin()
+	c := setupAdmin(t, m)
+	if _, err := c.UpdateAiQuota(context.Background(), connect.NewRequest(&adminpb.UpdateAiQuotaRequest{
+		AiQuota: &adminpb.AiQuota{StoreId: "11", Memo: "活動", Etag: "3"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"memo"}},
+	})); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.quotaIn) != 1 || m.quotaIn[0].Version != 3 {
+		t.Fatalf("帶 etag 時要交給模組比對版本：%+v", m.quotaIn)
+	}
+}
+
 func TestUpdateAiQuotaCreateRequiresWeeklyLimit(t *testing.T) {
 	for name, req := range map[string]*adminpb.UpdateAiQuotaRequest{
 		"mask 沒有 weekly_limit": {AiQuota: &adminpb.AiQuota{StoreId: "11", Memo: "活動", WeeklyLimit: 50}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"memo"}}},

@@ -119,7 +119,7 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (model.AdminStyle, error) {
 	l := loc(ctx)
 	if in.Version <= 0 {
-		return model.AdminStyle{}, apperr.InvalidInputOn([]string{"Version"}, "%s", text.AdminStyleEtagRequired(l))
+		return model.AdminStyle{}, apperr.InvalidInputOn([]string{"Version"}, "必須提供讀取時的版本")
 	}
 	label, prompt, err := validateText(ctx, in.Label, in.Prompt)
 	if err != nil {
@@ -155,6 +155,9 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 		}
 		if err != nil {
 			return fmt.Errorf("admin：鎖定風格 %s：%w", in.ID, err)
+		}
+		if old.Version != in.Version {
+			return styleStale(ctx)
 		}
 		key, asset := old.ThumbnailKey, old.ThumbnailAssetID
 		if newAsset != "" {

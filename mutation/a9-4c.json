@@ -215,6 +215,24 @@
    "new": "\tif false && !cur.Custom {\n",
    "test": "internal/httpapi/imageai ^TestUpdateAiQuotaCreateRequiresWeeklyLimit$",
    "why": "建立個別額度不檢查 weekly_limit 必填"
+  },
+  {
+   "id": "quota-weekly-limit-check-ignores-etag",
+   "stack": "go",
+   "file": "backend/internal/httpapi/imageai/admin.go",
+   "old": "\tif version == 0 && !cur.Custom {",
+   "new": "\tif !cur.Custom {",
+   "test": "internal/httpapi/imageai ^TestUpdateAiQuotaWithAnEtagSkipsTheCreateOnlyWeeklyLimitCheck$",
+   "why": "weekly_limit 必填檢查不分建立或修改：帶 etag 的修改在列已被刪除時回 INVALID_ARGUMENT 而不是 VERSION_CONFLICT"
+  },
+  {
+   "id": "no-in-tx-version-check",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif old.Version != in.Version {\n\t\t\treturn styleStale(ctx)\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleVersionIsCheckedInsideTheTxBeforeTheDefaultRule$",
+   "why": "transaction 內不先比對版本：競爭後的過期請求回 FAILED_PRECONDITION 而不是 VERSION_CONFLICT"
   }
  ]
 }

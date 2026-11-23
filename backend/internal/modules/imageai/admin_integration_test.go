@@ -272,7 +272,7 @@ func TestDefaultStyleRulesAgainstTheRealConstraints(t *testing.T) {
 	if created.IsDefault || f.count(t, `SELECT count(*) FROM imageai.styles WHERE category = 'PRODUCT' AND is_default`) != 1 {
 		t.Fatalf("新增的風格不該是預設：%+v", created)
 	}
-	if _, err := f.m.SetDefaultStyle(ctx, admin, created.ID, created.Version-1); kind(err) != apperr.KindVersionConflict {
+	if _, err := f.m.SetDefaultStyle(ctx, admin, created.ID, created.Version+1); kind(err) != apperr.KindVersionConflict {
 		t.Fatalf("etag 過期：err = %v", err)
 	}
 	got, err := f.m.SetDefaultStyle(ctx, admin, created.ID, created.Version)
