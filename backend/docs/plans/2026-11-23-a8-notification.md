@@ -200,7 +200,7 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | A8-0 基線與事實查核 | 完成 | 基線見文末；`event-adjudication.md`、`fact-checks.md`、`inventory.md` 去向；`python3 backend/docs/plans/2026-11-23-a8-notification/check_dispositions.py` → 0 個空格（填表前 243 個） |  | 本次 |
-| A8-1a 骨架、schema、註冊表 | 進行中 | | | |
+| A8-1a 骨架、schema、註冊表 | 程式完成待驗收 | 本機：gofmt、lint-monolith（0 issues）、vet integration、notification／arch／cmd／uitext unit -race、mutation --validate；開工與完成前設計審查、code-review＋合約審查兩輪（findings 13，blocking 1 已修） | integration（3＋5 個 schema 測試）、TS／Dart ui-text generated-diff、mutation `a8-1a.json`：待 CI | `fe89c9128`..`9075c1bc1` |
 | A8-1b 意圖管線 | 未開始 | | | |
 | A8-1c 保留期與個資清除 | 未開始 | | | |
 | A8-2 Connect API 與串流 | 未開始 | | | |
