@@ -94,7 +94,7 @@ notification-service（設計書 12、13）的現況：
 - 補上被否決的方案：通知基礎設施（Novu、Knock、Courier）——Novu 自架要另部署 MongoDB、Redis 與多個 Node 服務，違反單一 binary；SaaS 讓通知資料離開自己的 DB，個資清除做不到。工作流引擎（Temporal 等）——River job 已足夠。
 - 決策 2「舊服務的事件由 `internal/legacy` 逐一訂閱」：取消。還沒搬的服務的通知型別在該服務搬進單體時定義（主計畫「模組完成的定義」），不寫轉接；那段期間那些事件沒有通知（未上線）。
 - 決策 2「在產生事件的 transaction 內排入 River job」：改為只排一個「通知意圖」job，收件人解析、偏好、略過規則在 worker 執行。
-- 決策 4 加：token 記最後註冊時間，App 每次啟動回報，60 天未更新清除（FCM token 管理建議）；收 Android。即時串流只傳未讀數與最新 ID 的失效訊號，client 重拉列表，不做續傳。
+- 決策 4 加：token 記最後註冊時間，App 每次啟動回報，60 天未更新清除（FCM token 管理建議）；App 只有 iOS（Android 已移除），token 不存 platform。即時串流只傳未讀數與最新 ID 的失效訊號，client 重拉列表，不做續傳。
 - 決策 5 加：型別可宣告聚合鍵，未讀時合併成一列（讚、追蹤）；保留期 180 天。
 - 決策 8：寄件地址改為 identity 在每次登入同步的已驗證 email（`identity.ContactEmail`，Clerk 已移除）；Apple 私密轉寄網域登記刪除（沒有 Apple 登入）；寄信服務為 Resend 新帳號（免費額度足夠；真實寄信等網域） 與交易信子網域。follower、post 歸互動分類，行銷只剩 coupon、restock。
 - 決策 9：取貨簡訊候選失效（B3 改賣家自寄，平台不建超商取貨單）。

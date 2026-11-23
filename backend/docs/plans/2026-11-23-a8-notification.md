@@ -97,7 +97,7 @@
   - 停止條件：型別註冊表無法不靠執行期反射表達上列屬性。
 
 - [ ] **A8-2 Connect API 與串流**（被擋於：A8-1、D6）
-  - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（`ios`、`android`；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。
+  - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。
   - 消費端：`rg -n "notifications|notification-preferences|device-token" website/ admin/ buyer-app/lib seller-app/lib backend/gateway backend/internal/httpapi`。
   - 不能動：舊 REST 在 A8-7 前仍可用。
   - 驗收：`buf lint`、`buf breaking`、TS／Dart 生成無 drift；Connect 特性測試涵蓋每支方法；串流 integration：建立通知後收到訊號、另一受眾收不到、超過上限被拒。mutation：串流鍵拿掉受眾 → 跨受眾測試紅；`MarkAsRead` 改回非本人也成功 → NotFound 測試紅；`total` 不套分類篩選 → 篩選計數測試紅；拿掉串流上限檢查 → 上限測試紅。
@@ -125,7 +125,7 @@
   - 驗收：website、admin CI 等價檢查；新增 website 測試：收到訊號後重拉列表、重連後拉一次；e2e 交給 CI。mutation：收到訊號不重拉 → 測試紅；重連後不拉 → 重連測試紅。
 
 - [ ] **A8-6 buyer-app 與 seller-app**（被擋於：A8-2；真機推播驗收另擋於 Firebase 專案）
-  - 範圍：兩支 App 的收件匣、偏好、token 註冊（iOS、Android；每次啟動註冊）、登出刪 token 改用 `packages/hawkr_api`；換新 Firebase 專案設定。每支 App 一個 session。
+  - 範圍：兩支 App 的收件匣、偏好、token 註冊（每次啟動註冊，不送 `platform`）、登出刪 token 改用 `packages/hawkr_api`；換新 Firebase 專案設定。推播改用可見通知（APNs alert，FCM `notification` payload），刪掉以背景 isolate＋`flutter_local_notifications` 顯示 data-only 推播的路徑（iOS 會節流）。每支 App 一個 session。
   - 消費端：`rg -n "notification|device_registrar|device-token" buyer-app/lib seller-app/lib`。
   - 驗收：analyze、format、custom_lint、生成檢查與改動到的測試檔（完整 `flutter test` 交 CI）；真機：登入收到推播、登出不再收到、換帳號登入不收前一人的通知。
 
@@ -147,7 +147,8 @@
 | 5–7 廣播分頁、同步逾時、計數不實、只送有 token 的人 | 修：公告是資料，收件匣與推播分開 job | A8-2、A8-3 |
 | 8 丟 Code、9 白名單不一致、10 分類不在清單、11 未驗證受眾、24 `push_mode` 無 CHECK | 消失：Connect 錯誤；分類與受眾只在註冊表 | A8-1、A8-2 |
 | 12 自我略過比錯身分空間 | 修：帳號比對 | A8-1 |
-| 13 token 同機多人、14 刪帳號只清 chat、15 只收 iOS | 修：token 主鍵與綁定、個資清除、收 Android | A8-1、A8-3 |
+| 13 token 同機多人、14 刪帳號只清 chat | 修：token 主鍵與綁定、個資清除 | A8-1、A8-3 |
+| 15 只收 iOS | 不是缺陷：Android 已移除；刪 `platform` 欄位與兩處驗證 | A8-2、A8-7 |
 | 16 永久保留 | 修：180 天 | A8-1 |
 | 17 `total` 不受篩選、18 已讀無 NotFound | 修 | A8-2 |
 | 19 串流跨身分、20 串流 best-effort | 消失：`(account_id, 受眾)`；串流只是訊號，資料由列表保證 | A8-2 |
@@ -170,7 +171,7 @@
 | D4 偏好分類 | 交易必要（訂單、出貨、退款售後、撥款、帳號與治理）：收件匣、email 不可關；互動（聊天、評價、留言、讚、追蹤、追蹤的店發文）：可關；行銷（coupon、restock）：預設開、可關（個資法第 20 條）；賣家 `shipment_anomaly` 推播不可關。只存覆寫列 | 已決 2026-11-23，Will |
 | D5 取貨簡訊 | 刪除（B3 賣家自寄） | 已決 2026-11-23，Will |
 | D6 收件匣回應 | 伺服器組字＋8–10 個呈現分類 enum（不是每型別一個值）；A8-0 的 U8 發現互動分支時重議 | 已決 2026-11-23，Will |
-| D7 Android | 一起收；token 記 `last_registered_at`，60 天未更新清除 | 已決 2026-11-23，Will |
+| D7 Android | 不做：兩支 App 的 Android 已於 2026-09-26 移除（簡報誤以為仍在，2026-11-23 更正）；token 不存 platform，記 `last_registered_at`，60 天未更新清除 | 已決 2026-11-23，Will；更正同日 |
 | D8 寄信服務 | Resend（免費額度足夠、不需審核）＋交易信專用子網域；adapter 介面不綁 provider。真實寄信等買網域 | 已決 2026-11-23，Will |
 | D9 代行者讀店家通知 | 不能 | 已決 2026-11-23，Will |
 | D10 投遞模型 | 來源 tx 只排意圖 job，worker 展開；投遞紀錄保留為唯一帳本 | 已決 2026-11-23，Will |
