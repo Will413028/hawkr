@@ -580,3 +580,101 @@ func TestADirectTurnIsTheBaseOfTheNextRunBasedTurn(t *testing.T) {
 	}
 	f.requireStoredTurnResult(id)
 }
+
+func (f *fixture) answer(expected uuid.UUID, in turn.AnswerSlotInput, cid uuid.UUID) ([]byte, error) {
+	in.BuyerID, in.RequestID, in.ExpectedRevisionID, in.ClientRequestID, in.Locale = buyer, f.request, expected, cid, uitext.ZhTW
+	return f.direct().Answer(context.Background(), in)
+}
+
+func TestAnswerSkipStoresNoRejectedInput(t *testing.T) {
+	for _, slot := range []model.SlotKey{slots.Packaging, slots.BudgetPerUnit} {
+		f := newFixture(t)
+		rev := f.seed("臺北市", "REQUIREMENT_READY")
+		cid := uuid.NewV7()
+		raw, err := f.answer(rev, turn.AnswerSlotInput{Slot: slot, Skip: true}, cid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v := view(t, raw); len(v.Rejected) != 0 {
+			t.Fatalf("%s：略過不該有 rejected：%s", slot, raw)
+		}
+		var stored []byte
+		if err := f.d.Pool().QueryRow(context.Background(), `SELECT turn_result FROM procurement.turns WHERE client_request_id = $1`, cid).Scan(&stored); err != nil || len(view(t, stored).Rejected) != 0 {
+			t.Fatalf("%s：存下的 turn_result 不該有 rejected：%s %v", slot, stored, err)
+		}
+	}
+}
+
+func TestAnswerReplayWithADifferentSlotIsInvalidArgument(t *testing.T) {
+	text := func(slot model.SlotKey) turn.AnswerSlotInput {
+		return turn.AnswerSlotInput{Slot: slot, FreeText: "100"}
+	}
+	skip := func(slot model.SlotKey) turn.AnswerSlotInput { return turn.AnswerSlotInput{Slot: slot, Skip: true} }
+	for name, tc := range map[string]struct{ first, second turn.AnswerSlotInput }{
+		"同一段文字回答不同欄位": {text(slots.Quantity), text(slots.BudgetPerUnit)},
+		"略過不同欄位":      {skip(slots.Packaging), skip(slots.BudgetPerUnit)},
+	} {
+		f := newFixture(t)
+		rev := f.seed("臺北市", "REQUIREMENT_READY")
+		cid := uuid.NewV7()
+		first, err := f.answer(rev, tc.first, cid)
+		if err != nil {
+			t.Fatalf("%s：%v", name, err)
+		}
+		revs, turns := len(f.revisions()), f.turnCount()
+		_, err = f.answer(rev, tc.second, cid)
+		if _, fields := wantErr(t, err, apperr.KindInvalidInput, ""); len(fields) != 1 || fields[0] != "client_request_id" {
+			t.Fatalf("%s：欄位 %v", name, fields)
+		}
+		again, err := f.answer(rev, tc.first, cid)
+		if err != nil || !bytes.Equal(first, again) {
+			t.Fatalf("%s：同欄位重送要回放第一次的結果：%v\n%s\n%s", name, err, first, again)
+		}
+		if len(f.revisions()) != revs || f.turnCount() != turns {
+			t.Fatalf("%s：重送不得再寫入", name)
+		}
+	}
+}
+
+func TestCommandSlotIsSetOnlyForSubmitAnswerAndRewindTurns(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t)
+	rev := f.seed("臺北市", "REQUIREMENT_READY")
+	answerCid, rewindCid := uuid.NewV7(), uuid.NewV7()
+	if _, err := f.answerCity(rev, "city-taichung", answerCid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.rewind(f.active().ID, "DELIVERY_CITY", rewindCid); err != nil {
+		t.Fatal(err)
+	}
+	id := f.submit("加上包裝", uitext.ZhTW)
+	l := &scripted{steps: []func(context.Context) (*adkmodel.LLMResponse, error){say(`{"packaging":"箱"}`)}}
+	if err := f.runWith(ctx, id, f.executor(llmExtractor(l))); err != nil {
+		t.Fatal(err)
+	}
+	slotOf := func(where string, arg any) *string {
+		var s *string
+		if err := f.d.Pool().QueryRow(ctx, `SELECT command_slot FROM procurement.turns WHERE `+where, arg).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	if s := slotOf(`client_request_id = $1`, answerCid); s == nil || *s != "DELIVERY_CITY" {
+		t.Errorf("SubmitAnswer 的 command_slot = %v", s)
+	}
+	if s := slotOf(`client_request_id = $1`, rewindCid); s == nil || *s != "DELIVERY_CITY" {
+		t.Errorf("Rewind 的 command_slot = %v", s)
+	}
+	if s := slotOf(`source = $1`, "LLM_EXTRACT"); s != nil {
+		t.Errorf("TURN 的 command_slot 要是 NULL：%v", *s)
+	}
+	for name, stmt := range map[string]string{
+		"倒回沒有欄位":     `UPDATE procurement.turns SET command_slot = NULL WHERE source = 'REWIND'`,
+		"TURN 帶了欄位":  `UPDATE procurement.turns SET command_slot = 'ITEM' WHERE source = 'LLM_EXTRACT'`,
+		"欄位不在可回答的範圍": `UPDATE procurement.turns SET command_slot = 'UNIT' WHERE source = 'ANSWER'`,
+	} {
+		if _, err := f.d.Pool().Exec(ctx, stmt); err == nil {
+			t.Errorf("%s：CHECK 要拒絕", name)
+		}
+	}
+}

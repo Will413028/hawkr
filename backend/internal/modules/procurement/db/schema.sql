@@ -105,6 +105,10 @@ CREATE TABLE procurement.turns (
     -- TurnResult 的 wire JSON（第一次提交時的完整回應）。存在的必要條件：SubmitAnswer 與 Rewind 不經 run，重送沒有 run 事件可回放，
     -- 重算會因 planner 或文案改動而與第一次不同；任何來源的 turn 一律寫它（A9-D33(2)）。
     turn_result JSONB NOT NULL,
+    -- SubmitAnswer 回答的欄位或 Rewind 倒回的欄位（SlotKey 字串）；其他來源的輪次為 NULL。存在的必要條件（A9-D34）：不經 run 的指令重送要比對「同一個欄位」，
+    -- 略過的回答沒有 buyer_message、turn_result 的 question 是下一題而不是這一題，兩者都帶不住欄位。source = 'ANSWER' 也含 ResumeRun 的回答（欄位在中斷上，此欄 NULL），
+    -- 所以 CHECK 只能要求 REWIND 必填、LLM_EXTRACT 必空。
+    command_slot TEXT,
     client_request_id UUID NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT turns_buyer_check CHECK (buyer_id > 0),
@@ -115,7 +119,12 @@ CREATE TABLE procurement.turns (
     CONSTRAINT turns_recorded_check CHECK (jsonb_typeof(recorded_this_turn) = 'array'),
     CONSTRAINT turns_turn_result_check CHECK (jsonb_typeof(turn_result) = 'object'),
     CONSTRAINT turns_optional_streak_check CHECK (optional_streak >= 0),
-    CONSTRAINT turns_skipped_slots_check CHECK (skipped_slots <@ ARRAY['PACKAGING', 'BUDGET_PER_UNIT'])
+    CONSTRAINT turns_skipped_slots_check CHECK (skipped_slots <@ ARRAY['PACKAGING', 'BUDGET_PER_UNIT']),
+    CONSTRAINT turns_command_slot_check CHECK (
+        command_slot IS NOT NULL AND command_slot IN ('ITEM', 'QUANTITY', 'PACKAGING', 'BUDGET_PER_UNIT', 'DELIVERY_CITY', 'DELIVERY_DATE')
+        AND source IN ('ANSWER', 'REWIND')
+        OR command_slot IS NULL AND source IN ('LLM_EXTRACT', 'ANSWER')
+    )
 );
 CREATE UNIQUE INDEX turns_idempotency ON procurement.turns (buyer_id, client_request_id);
 CREATE INDEX turns_request ON procurement.turns (request_id, created_at DESC);

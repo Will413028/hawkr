@@ -128,7 +128,7 @@ func (q *Queries) GetConversationIncludingDeleted(ctx context.Context, arg GetCo
 }
 
 const getLatestTurnByRequest = `-- name: GetLatestTurnByRequest :one
-SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1
+SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, command_slot, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1
 `
 
 type GetLatestTurnByRequestParams struct {
@@ -154,6 +154,7 @@ func (q *Queries) GetLatestTurnByRequest(ctx context.Context, arg GetLatestTurnB
 		&i.OptionalStreak,
 		&i.SkippedSlots,
 		&i.TurnResult,
+		&i.CommandSlot,
 		&i.ClientRequestID,
 		&i.CreatedAt,
 	)
@@ -220,7 +221,7 @@ func (q *Queries) GetRevision(ctx context.Context, arg GetRevisionParams) (Procu
 }
 
 const getTurnByClientRequest = `-- name: GetTurnByClientRequest :one
-SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at FROM procurement.turns WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, command_slot, client_request_id, created_at FROM procurement.turns WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetTurnByClientRequestParams struct {
@@ -245,6 +246,7 @@ func (q *Queries) GetTurnByClientRequest(ctx context.Context, arg GetTurnByClien
 		&i.OptionalStreak,
 		&i.SkippedSlots,
 		&i.TurnResult,
+		&i.CommandSlot,
 		&i.ClientRequestID,
 		&i.CreatedAt,
 	)
@@ -352,10 +354,10 @@ func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) 
 const insertTurn = `-- name: InsertTurn :execrows
 INSERT INTO procurement.turns (
     id, request_id, conversation_id, buyer_id, result_revision_id, source,
-    buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at)
+    buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, command_slot, client_request_id, created_at)
 VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11, COALESCE($12::text[], '{}'), $13, $14, $15)
+    $7, $8, $9, $10, $11, COALESCE($12::text[], '{}'), $13, $14, $15, $16)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
 
@@ -373,6 +375,7 @@ type InsertTurnParams struct {
 	OptionalStreak   int32
 	SkippedSlots     []string
 	TurnResult       []byte
+	CommandSlot      *string
 	ClientRequestID  uuid.UUID
 	Now              time.Time
 }
@@ -393,6 +396,7 @@ func (q *Queries) InsertTurn(ctx context.Context, arg InsertTurnParams) (int64, 
 		arg.OptionalStreak,
 		arg.SkippedSlots,
 		arg.TurnResult,
+		arg.CommandSlot,
 		arg.ClientRequestID,
 		arg.Now,
 	)
@@ -544,7 +548,7 @@ func (q *Queries) ListRevisions(ctx context.Context, arg ListRevisionsParams) ([
 }
 
 const listTurnsByRequest = `-- name: ListTurnsByRequest :many
-SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at, id
+SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, command_slot, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at, id
 `
 
 type ListTurnsByRequestParams struct {
@@ -575,6 +579,7 @@ func (q *Queries) ListTurnsByRequest(ctx context.Context, arg ListTurnsByRequest
 			&i.OptionalStreak,
 			&i.SkippedSlots,
 			&i.TurnResult,
+			&i.CommandSlot,
 			&i.ClientRequestID,
 			&i.CreatedAt,
 		); err != nil {

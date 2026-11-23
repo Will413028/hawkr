@@ -9,6 +9,7 @@ import (
 
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 )
 
@@ -26,7 +27,9 @@ type turnWrite struct {
 	fromStatus string
 	// result 是 TurnResult 的 wire JSON，原樣存進 turns.turn_result。
 	result []byte
-	now    time.Time
+	// commandSlot 是 SubmitAnswer 回答、Rewind 倒回的欄位（turns.command_slot）；其他來源為空。
+	commandSlot model.SlotKey
+	now         time.Time
 }
 
 // writeTurn 在呼叫端的 transaction 內寫：取代現行版本、新版本、輪次（含 turn_result）、需求狀態、對話預覽與自動標題。呼叫端已鎖好需求相關的列。
@@ -60,10 +63,15 @@ func writeTurn(ctx context.Context, q *store.Queries, w turnWrite) error {
 	for _, k := range d.plan.Skipped {
 		skipped = append(skipped, string(k))
 	}
+	var commandSlot *string
+	if w.commandSlot != "" {
+		cs := string(w.commandSlot)
+		commandSlot = &cs
+	}
 	n, err = q.InsertTurn(ctx, store.InsertTurnParams{
 		ID: id.turn, RequestID: id.request, ConversationID: id.conversation, BuyerID: buyer, ResultRevisionID: id.revision,
 		Source: w.source, BuyerMessage: w.message, AssistantReply: d.replyText, Steps: []byte("[]"), RecordedThisTurn: recorded,
-		OptionalStreak: int32(streak), SkippedSlots: skipped, TurnResult: w.result, ClientRequestID: w.clientRequestID, Now: w.now,
+		OptionalStreak: int32(streak), SkippedSlots: skipped, TurnResult: w.result, CommandSlot: commandSlot, ClientRequestID: w.clientRequestID, Now: w.now,
 	})
 	if err != nil {
 		return fmt.Errorf("turn：寫入輪次：%w", err)

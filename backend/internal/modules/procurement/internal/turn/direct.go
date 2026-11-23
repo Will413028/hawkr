@@ -29,13 +29,13 @@ type Direct struct {
 	Now      func() time.Time
 }
 
-// commandKey 是重送要對上的指令：同一個 client_request_id 必須來自同一個需求、同一種來源、同一個買家回答與同一個讀到的版本（倒回再加上倒回的欄位）。
+// commandKey 是重送要對上的指令：同一個 client_request_id 必須來自同一個需求、同一種來源、同一個欄位、同一個買家回答與同一個讀到的版本。
 type commandKey struct {
 	request  uuid.UUID
 	source   string
 	message  string
 	expected uuid.UUID
-	// slot 只有倒回比對：回答的欄位不在輪次上，由 message 與 expected 判定同一個回答。
+	// slot 是回答或倒回的欄位，存在 turns.command_slot（A9-D34）。
 	slot model.SlotKey
 }
 
@@ -72,7 +72,7 @@ func (d Direct) Answer(ctx context.Context, in AnswerSlotInput) ([]byte, error) 
 	}
 	c := command{
 		buyer: in.BuyerID, request: in.RequestID, clientRequestID: in.ClientRequestID, expected: in.ExpectedRevisionID,
-		key: commandKey{request: in.RequestID, source: sourceAnswer, message: plan.message, expected: in.ExpectedRevisionID},
+		key: commandKey{request: in.RequestID, source: sourceAnswer, message: plan.message, expected: in.ExpectedRevisionID, slot: plan.slot},
 	}
 	if out, ok, err := d.replay(ctx, store.New(d.DB.Conn(ctx)), c); err != nil || ok {
 		return out, err
@@ -176,16 +176,7 @@ func (d Direct) sameCommand(ctx context.Context, q *store.Queries, t store.Procu
 	if result.RevisionNo < 2 || !hasRevision(revs, result.RevisionNo-1, k.expected) {
 		return false, nil
 	}
-	if k.slot == "" {
-		return true, nil
-	}
-	var stored struct {
-		Question *QuestionJSON `json:"question"`
-	}
-	if err := json.Unmarshal(t.TurnResult, &stored); err != nil {
-		return false, fmt.Errorf("turn：解析 turn_result：%w", err)
-	}
-	return stored.Question != nil && stored.Question.SlotKey == slotKey(k.slot), nil
+	return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil
 }
 
 func hasRevision(revs []store.ProcurementRequestRevision, no int32, id uuid.UUID) bool {
@@ -229,7 +220,7 @@ func (d Direct) execute(ctx context.Context, c command, source, message string) 
 		}
 		if err := writeTurn(ctx, q, turnWrite{
 			ids: id, buyerID: c.buyer, parent: &parent, d: dec, source: source, message: message,
-			clientRequestID: c.clientRequestID, fromStatus: req.Status, result: result, now: now,
+			clientRequestID: c.clientRequestID, fromStatus: req.Status, result: result, commandSlot: c.key.slot, now: now,
 		}); err != nil {
 			return err
 		}
