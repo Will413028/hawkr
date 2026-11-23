@@ -6,77 +6,111 @@
 ## 並發與冪等
 
 1. **賣家發行的券與補償券在驗券、鎖券時不檢查 target_type 資格**（嚴重度：高，若 template_id 外流）【量】
+   - 處置：修：validate 與 reserve 共用同一個資格判定，並重驗狀態、時間窗、scope、門檻
    - 證據：資格函式 `isEligible` 只在 `BuyerClaimCoupon` 被呼叫（`rg -n 'isEligible\(' backend/services/java/coupon-service/src/main` 只命中 `J/grpc/CouponGrpcService.java:298`、定義 `:1123`）。`ValidateCoupon`（`J/service/CouponInstanceService.java:52-112`）與 `ReserveCoupon`（`:119-187`）只檢查「`claim_required` 為 true 時要已領」（`:94-100`、`:123-130`）。但賣家模板、賣家補償券、admin 補償券全部以 `claim_required=false` 建立（`J/service/CouponTemplateService.java:106`、`:145`、`:179`），因此這三類模板在驗券與鎖券時沒有任何「這個 buyer 是不是 DESIGNATED／MEMBER／COMPENSATION 名單內的人」的檢查。
    - 影響面（推）：結帳請求的 `couponTemplateId` 由 client 提供（`backend/gateway/internal/handler/checkout.go:345`、`:365`），order-service 直接拿去驗（`O/checkout/CheckoutService.java:692`、`:953`）。任何買家只要知道別人的補償券或指定券的 template_id（TSID，賣家端 `SellerGetTemplateDetail` 會回 id；TSID 本身含時間序，可猜測範圍【推】）就可能拿到折扣。`coupon_target_accounts` 只在列表與領券時被查。
 2. **鎖券（Reserve）不重驗模板狀態、時間窗、scope、門檻，模板不存在也不報錯**（嚴重度：中）【量】
+   - 處置：修：validate 與 reserve 共用同一個資格判定，並重驗狀態、時間窗、scope、門檻
    - 證據：`J/service/CouponInstanceService.java:123-130` 取模板後只在 `template != null && claim_required` 時做領取檢查；`template == null` 時直接往下建 instance（`:168-177`）。沒有 status／start_at／end_at／`applicable_store_id`／threshold 的任何比對。驗券與鎖券之間隔著 order-service 建單（`O/checkout/CheckoutService.java:1064` 的 `createOrderFromCheckout` 在 `:1076` 的 reserve 之前）。這段時間內模板被停用、收回、過期、停權，reserve 仍會成功，折扣已經算進訂單。
 3. **instance 的 `applicable_store_id` 永遠是 NULL，賣家端「買家持券」永遠回空**（嚴重度：高，功能性）【量】
+   - 處置：修：隨 D2
    - 證據：`J/grpc/CouponGrpcService.java:368` 呼叫 `instanceService.reserveCoupon(templateId, buyerId, orderNo, null)`；`reserveCoupon`（`J/service/CouponInstanceService.java:173`）把這個參數寫進 `instance.applicable_store_id`；`rg -n 'setApplicableStoreId' backend/services/java/coupon-service/src/main` 顯示 instance 的唯一寫入點就是這裡。`ListBuyerCouponsForSeller` 的查詢條件是 `applicable_store_id = storeId`（`J/service/CouponInstanceService.java:278`），對 production 寫入的資料永遠不命中。另外 `ListMyCoupons` 的已用券以 `inst.getApplicableStoreId()` 查賣家名稱（`J/grpc/CouponGrpcService.java:168-175`），也因此為空，已用券的賣家名稱／logo／store_code 全空。測試用的假資料自己設了 `STORE_ID`（`backend/services/java/coupon-service/src/test/java/io/github/will413028/hawkr/coupon/grpc/CouponGrpcServiceStoreCodeTest.java:52`），蓋住了這件事。
 4. **領券超發**（嚴重度：高，有 `total_issue_limit` 的 admin 模板）【量】
+   - 處置：修：原子遞增與條件式 UPDATE，不用整列覆寫；重複鎖券是冪等成功
    - 證據：`BuyerClaimCoupon` 先在記憶體檢查 `issued_count >= total_issue_limit`（`J/grpc/CouponGrpcService.java:304-308`，讀的是剛查的舊值），之後 `claimCoupon`（`J/service/CouponClaimService.java:33-47`）先 `INSERT … ON CONFLICT DO NOTHING` 進 `coupon_claims`，成功才 `incrementIssuedCount(+1)`，而**遞增的回傳值被忽略**（`:36`）。遞增 SQL 帶條件 `issued_count + N <= total_issue_limit`（`J/mapper/CouponTemplateMapper.java:70-77`），超額時 affected=0，但 claim 列已經寫入。N 個並發領券在 `issued_count = limit-1` 時都通過預檢、都寫入 claim，只有一個遞增成功。`claim` 列即「領到」（驗券時以 claim 列判斷，`CouponInstanceService.java:95`），所以實際發出數可以超過上限。沒有 `@Transactional`。批次路徑 `batchClaimForBuyers`（`CouponClaimService.java:71-82`）同樣：多列 INSERT 全成功，之後 `incrementIssuedCount(+N)` 在超限時回 0，回傳值同樣被忽略；`AdminDistributeTemplate`、`AdminIssueCoupons(immediate_distribute)` 都沒有事前的上限檢查。
 5. **`publishTemplate`／`disableTemplate` 用整列 `updateById`，會用舊值覆蓋並發遞增的 `issued_count`**（嚴重度：中）【推】
+   - 處置：修：原子遞增與條件式 UPDATE，不用整列覆寫；重複鎖券是冪等成功
    - 證據：`J/service/CouponTemplateService.java:203-222`：`selectById` 讀整列（含 `issued_count`），改 `status` 後 `templateMapper.updateById(template)`。MyBatis-Plus 預設只略過 null 欄位，非 null 的 `issued_count` 會被一起寫回；兩次呼叫之間若有 `incrementIssuedCount` 成功，該次遞增被舊值覆蓋。實際嚴重度取決於 MyBatis-Plus 版本的 `updateStrategy`（沒有查 `pom.xml` 與 `mybatis-plus` 設定，故為推論）。
 6. **鎖券首次建立的並發撞唯一索引，回系統錯誤而不是「已鎖定／冪等成功」**（嚴重度：中）【推】
+   - 處置：修：原子遞增與條件式 UPDATE，不用整列覆寫；重複鎖券是冪等成功
    - 證據：`J/service/CouponInstanceService.java:132-177`：先查既有 instance 再 INSERT（註解 `:132` 自承是「避開 UNIQUE 違規」的 pre-check，不是鎖）。兩個並發請求（同 template、同 buyer，不論同單號或不同單號）都看到「無既有」後同時 INSERT，後者撞 `uk_inst_template_owner`（`R/db/migration/V1__init_coupon.sql:109-111`），拋 `DuplicateKeyException` 進 `onSystemError`（`CouponGrpcService.java:380`）。同單號重送（本應冪等）在並發下也會失敗；order-service 因此取消訂單（`O/checkout/CheckoutService.java:1079-1087`）。
 7. **`@Transactional` 的 `reserveCoupon` 內 `writeLog` 吞例外**（嚴重度：低～中）【推】
+   - 處置：修：寫入都在同一個 transaction 內；log 失敗就整筆失敗
    - 證據：`J/service/CouponInstanceService.java:119`（`@Transactional`）與 `:362-379`（`writeLog` 的 `catch (Exception e)` 只記 log）。若 log 的 INSERT 因 DB 錯誤失敗，PostgreSQL 的交易會進入 aborted 狀態，之後 commit 實際是 rollback，而方法已回傳 instanceId 並由 gRPC 回 `success=true`，order-service 拿到一個不存在的 instance id 寫進訂單。`coupon_redemption_logs.detail` 只有 `VARCHAR(500)`（`V1__init_coupon.sql:132`），`revokeByTemplate` 的 detail 內含呼叫端傳入的 `reason`（`CouponInstanceService.java:221-223`），超過 500 字會觸發這個失敗路徑（revoke 本身非 `@Transactional`，那條路徑只會漏記 log）。沒有實驗驗證 PG aborted 行為與 pgjdbc 的互動。
 8. **賣家收回模板時 RESERVED 的券一併作廢，進行中的訂單核銷失敗且無補償**（嚴重度：高，金額）【量】
+   - 處置：依 D5
    - 證據：`SellerRevokeTemplate`（`J/grpc/CouponGrpcService.java:704-709`）先 `revokeTemplate`（ACTIVE→REVOKED），再 `revokeByTemplate`，SQL 是 `WHERE template_id=? AND status IN ('0','1')`（`J/mapper/CouponInstanceMapper.java:97-103`），把 RESERVED（結帳中、已建單、折扣已算入應付金額）也設為 REVOKED。之後付款成功→核銷任務→`consumeCoupon` 要求 `status='1'`（`CouponInstanceMapper.java:38-49`）→ affected=0、也不是 USED → 回 `success=false`。order-service 的 consume client 對此只記 warn（`O/checkout/client/CheckoutCouponGrpcClient.java:141-143`），所以訂單照折扣價成立、券已被收回、沒有任何人被告知；`AutoReleaseJob` 只掃 status='1'，也不會再處理。兩段 SQL 也不在同一個交易（無 `@Transactional`）。
 9. **補償券發放沒有冪等鍵；aftersales 在交易內跨服務發券，失敗重試會多發**（嚴重度：高，金額）【量】
+   - 處置：依 D4
    - 證據：`GrantSellerCompensationCoupon`（`J/grpc/CouponGrpcService.java:1056-1107`）每次呼叫都 `createSellerCompensationTemplate`（新 TSID）並寫目標名單；`ref_case_no` 只進標題（`J/service/CouponTemplateService.java:165`），沒有唯一約束或查重。呼叫端 `A/service/AfterSaleResolutionService.java:347-381`：發券（gRPC）→ INSERT 決議 → `closeByCouponCompensation`，若 `updated == 0`（`:381-384`）或之後任何一步失敗／gRPC deadline（10 秒，`A/grpc/client/CouponGrpcClient.java:19`）逾時，`@Transactional` 回滾但券已建立；案件仍 PENDING，賣家重送就再發一張。`AdminGrantCompensationCoupon`（`CouponGrpcService.java:964-1004`）同樣沒有冪等鍵。
 10. **`ConsumeCoupon` 的失敗被 order-service client 吞掉，核銷任務一律被標為完成**（嚴重度：中，有後備）【量】
+   - 處置：接受到 B8（Will 2026-11-23，依 D1、D3）：Java 的 order client 不改；鎖不會被別單奪走，持鎖 Redeem 只會因轉接層錯誤失敗；B8 同 transaction 核銷後不再成立
     - 證據：`O/checkout/client/CheckoutCouponGrpcClient.java:125-153` 把 gRPC 例外與 `success=false` 都只 `log.warn`、不拋；`O/worker/CouponConsumptionWorker.java:76-84` 呼叫後無條件 `markDone`。結果：coupon-service 暫時不可用時，worker 的重試（`calculateRetryDelay`、`max_retry_count`、人工介入）完全不會觸發。後備是 coupon-service 自己的 `AutoReleaseJob`（RESERVED 超過 5 分鐘、訂單非 PENDING_PAYMENT 非 CANCELLED 就補 consume），所以最終一致，但 order 端的重試機制與其註解（「失敗時自動重試」`CouponConsumptionWorker.java:8`）實質上是死的。`releaseCoupon` 的 client（`:160-186`）同樣吞例外，其註解說「失敗由 Coupon AutoReleaseJob 兜底」（`O/service/OrderExpiryCancellationService.java:168`）。
 
 ## 規則與資料一致性
 
 11. **券的列表可見性與資格判定是兩份重複實作，且 Account 服務失敗時行為相反**（嚴重度：中）【量】
+   - 處置：修：列表與資格判定只有一份實作
     - 證據：`selectAvailableForBuyer`（`J/mapper/CouponTemplateMapper.java:34-62`）註解自承與 `isEligible` 要同步（`:21-22`，「接受的技術債」）。Account RPC 失敗時 `getAccountCreatedAt` 回 -1（`J/grpc/client/AccountGrpcClient.java:66-69`）；`isEligible` 對 ALL 型在 `buyerCreatedAt < 0` 時回 false（`CouponGrpcService.java:1136`，fail-closed），但 SQL 路徑把 -1 毫秒轉成 1969-12-31（`J/service/CouponTemplateService.java:318-319`），條件 `t.created_at >= #{buyerCreatedAt}` 對所有 ALL 型模板為真（fail-open）。結果：Account 失敗時列表顯示所有 ALL 型券，但領取被拒。
 12. **列表分頁在 SQL 之後又在記憶體過濾，`total` 是該頁筆數**（嚴重度：中）【量】
+   - 處置：修：分頁在 SQL 內完成、`total` 是總數；非法值回 `InvalidArgument`（Connect 重新設計時自然處理）
     - 證據：`ListMyCoupons`（`J/grpc/CouponGrpcService.java:130-160`）與 `ListAvailableCoupons`（`:207-243`）先由 SQL 取一頁，再於記憶體剔除「已有 USED／RESERVED instance」「低於門檻」「claim_required 未領」，`setTotal(eligible.size())`。被剔除的筆數造成該頁不足、跨頁缺漏；已用／鎖定的 template 集合用 `listByOwner(buyer,null,1,9999)` 取前 9,999 筆（`:134`、`:211`），超過就漏。
 13. **`status` 過濾的合法值被安靜忽略**（嚴重度：低）【量】
+   - 處置：修：分頁在 SQL 內完成、`total` 是總數；非法值回 `InvalidArgument`（Connect 重新設計時自然處理）
     - 證據：`ListMyCoupons`（`J/grpc/CouponGrpcService.java:99-117`）註解寫「其他值→INVALID_PARAM（禁止靜默回空）」，但實作對合法的 `1`、`3`、`4`、`5` 都靜默忽略，只傳 `1` 時 `wantUnused`、`wantUsed` 皆 false，回空成功。
 14. **格式錯誤的數值被 `parseLongOrNull`／`parseIntOrNull` 吞成 null，語意被放大**（嚴重度：中）【量】
+   - 處置：修：分頁在 SQL 內完成、`total` 是總數；非法值回 `InvalidArgument`（Connect 重新設計時自然處理）
     - 證據：`backend/services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/proto/ProtoConversionUtils.java:46-55`、`:109-118`（`NumberFormatException` → null）。`AdminCreateTemplate` 的 `total_issue_limit` 寫錯→`null`→預設 -1＝無限（`CouponGrpcService.java:806`、`CouponTemplateService.java:62`）；`applicable_store_id` 寫錯→null＝全平台券（`:798`）。`CouponGrpcService.java:974-977` 在補償券路徑刻意避開 `parseNullableLong`，註解正是描述這個風險（「把限店補償券放大成全平台券」），但同檔案其他路徑沒有套用。`ListAvailableCoupons` 的 `order_amount` 寫錯→null→門檻不篩、預估折扣 0。
 15. **賣家配額檢查與模板建立不是原子的**（嚴重度：低）【量】
+   - 處置：修：原子遞增與條件式 UPDATE，不用整列覆寫；重複鎖券是冪等成功
     - 證據：`J/grpc/CouponGrpcService.java:489`（`checkQuota`）與 `:517`（建立模板）之間無鎖、無交易；`CouponQuotaService.java:35-42` 只是 count 後比較。並發建立可超過配額。`updateQuota`（`:47-60`）先查後寫，並發對新店的兩次寫入會撞 PK。
 16. **`usage_limit_per_account` 被儲存但沒有任何執行邏輯**（嚴重度：低）【量】
+   - 處置：刪除欄位：沒有執行邏輯，沒有 client 設定它
     - 證據：`rg -n 'getUsageLimitPerAccount' backend/services/java/coupon-service/src/main` 只在 `CouponGrpcService.java:1183` 輸出到 `TemplateInfo`；真正的限制是 `uk_inst_template_owner` 的 `(template_id, owner_buyer_id)`（`V1__init_coupon.sql:109`），等於寫死每人 1 張，而 USED、EXPIRED 的 instance 仍占用名額（索引只排除 `'5'`、`'4'`）。
 17. **`AdminVoidInstance` 只能作廢 UNUSED，OpenAPI／handler 說明寫 0 與 1**（嚴重度：低）【量】
+   - 處置：修：契約只寫實際支援的狀態
     - 證據：SQL `WHERE instance_id=? AND status='0'`（`J/mapper/CouponInstanceMapper.java:109-115`）；`backend/gateway/internal/handler/coupon.go:1039` 說「status=0(未使用)/1(已鎖定)」。又因 instance 只在 reserve 時建立（#18），UNUSED 的 instance 只出現在「已 release 的券」，admin 想作廢「正在結帳的券」做不到。
 18. **「到期預警」幾乎掃不到券**（嚴重度：中，功能性）【量】
+   - 處置：修：隨 D2
     - 證據：`CouponExpiringWarningJob` 只掃 `ci.status='0'`（UNUSED，`J/mapper/CouponInstanceMapper.java:211-228`），而 instance 只在 `reserveCoupon` 建立且一律以 RESERVED 起始（`CouponInstanceService.java:168-177`）；UNUSED 只會在 release 或 re-reserve 後出現。買家領到、尚未結帳的券不存在 instance，所以不會被預警。`AutoExpireJob` 同理：`expireInstancesByTemplate` 只處理 UNUSED（`CouponInstanceMapper.java:151-159`）。
 19. **`BuyerDeleted` 只作廢 UNUSED instance，`coupon_claims` 與 `coupon_target_accounts` 的資料留在表裡**（嚴重度：低；是否有行為影響取決於 buyer_id 在重新註冊時是否換新）【推】
+   - 處置：修：刪帳時清掉 claims 與 target accounts
     - 證據：`J/mq/BuyerDeletedConsumer.java:68` → `voidAllUnusedByOwner`（`J/mapper/CouponInstanceMapper.java:122-129`，`WHERE owner_buyer_id=? AND status='0'`）。該 consumer 的 Javadoc（`:19-28`）與 `RabbitMqConfig.java:12-21` 的目標是「重新註冊後舊券不再冒回來」，但領券紀錄與指定名單未動；RESERVED 的券也不動。
 20. **補償券相關欄位被忽略**（嚴重度：低）【量】
+   - 處置：修：隨 Connect 重新設計
     - 證據：`AdminGrantCompensationCoupon` 的 `ref_order_no`、`reason` 完全沒讀（`J/grpc/CouponGrpcService.java:964-1004`），也沒有稽核；`GrantSellerCompensationCoupon` 的 `message` 沒讀（`:1056-1107`）。gateway 把這些欄位當必填送進來（`handler/coupon.go:994-1000` 的 binding）。
 21. **`AdminIssueCoupons` 回傳的 `issued_count` 是請求長度，不是實際新增名單數**（嚴重度：低）【量】
+   - 處置：修：隨 Connect 重新設計
     - 證據：`J/grpc/CouponGrpcService.java:907`（`buyerIds.size()`）；`insertTargetAccounts` 用 `INSERT … ON CONFLICT DO NOTHING`（`J/mapper/CouponTargetAccountMapper.java:43-48`）且回傳值被丟棄（`CouponGrpcService.java:1114-1118`）。
 22. **驗券的「尚未領取」是 envelope 錯誤，order-service 取不到原因**（嚴重度：低）【量】
+   - 處置：修：隨 Connect 重新設計
     - 證據：`ValidateCoupon` 對 `claim_required` 未領拋 `COUPON_NOT_CLAIMED`（`J/service/CouponInstanceService.java:96-99`），經 `onBusinessError` 回 code=7011、`data` 為預設值（`valid=false`、`description=""`）。`CheckoutCouponGrpcClient.validateCoupon`（`O/checkout/client/CheckoutCouponGrpcClient.java:70-76`）只看 `result.getValid()`，不讀 `response.code`，所以拋出的 `COUPON_NOT_AVAILABLE` 帶空訊息。其他失敗原因則以 `valid=false` 加描述字串回傳，兩種契約並存。
 23. **兩個 `@Transactional` 之外的多步驟寫入**（嚴重度：低～中）【量】
+   - 處置：修：寫入都在同一個 transaction 內；log 失敗就整筆失敗
     - 證據：`SellerCreateTemplate`（模板 INSERT 與 `coupon_target_accounts` 逐筆 INSERT，`J/grpc/CouponGrpcService.java:517`、`:531`）、`GrantSellerCompensationCoupon`（`:1082`、`:1086`）、`AdminGrantCompensationCoupon`（`:985`、`:989`）、`AdminCreateTemplate`（`:793`、`:813`）：模板已落庫後名單 INSERT 失敗，留下 ACTIVE 且沒有名單的 DESIGNATED／COMPENSATION 模板（補償券是 ACTIVE 且 `total_issue_limit=1`，沒名單等於沒人能用，但佔用該賣家的 `current_active_count` 以外的資料）。
 24. **`AdminCreateTemplate` 與賣家建立對無效輸入走系統錯誤**（嚴重度：低）【量】
+   - 處置：修：分頁在 SQL 內完成、`total` 是總數；非法值回 `InvalidArgument`（Connect 重新設計時自然處理）
     - 證據：`Long.parseLong(id)` 無 try（`J/grpc/CouponGrpcService.java:786`）；賣家建立沒先對 `type` 做 `CodeMetaValidator`，未知值在 `CouponType.fromValue` 拋 `IllegalArgumentException`（`backend/services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/code/CouponType.java:62-66`；呼叫在 `J/service/CouponTemplateService.java:376`），落入 `onSystemError` 而非 `INVALID_PARAM`。
 
 ## 排程、時間與外部依賴
 
 25. **對帳排程的實際頻率與程式碼預設不同；批次可能被查無訂單的 instance 卡住；單一執行緒共用**（嚴重度：低～中）
+   - 處置：刪除：對帳 job 依 D3 不做；到期改推導；只剩到期提醒的 River periodic job，以游標前進
     - 證據：`AutoReleaseJob.java:48` 預設 `0 */5 * * * ?`，但 `R/application.yml:94` 覆寫成 `0 * * * * ?`（每分鐘）【量】。`findStaleReserved` 以 `ORDER BY reserved_at ASC LIMIT 200`（`CouponInstanceMapper.java:136-145`），而查不到訂單的 instance 會被計為 orphan 並**不改變狀態**（`AutoReleaseJob.java:74-78`），下一輪又排在最前面；累積超過 200 筆的 orphan 會讓後面的 instance 永遠輪不到【推，無 test】。每筆呼叫 order-service 的 deadline 是 10 秒（`OrderGrpcClient.java`），最壞一批 200 × 10 秒；Spring 預設 scheduling pool 為 1（`CheckoutCouponGrpcClient.java:22-31` 註解的前提），會擋住 `AutoExpireJob` 與預警【推】。`AutoReleaseJob` 對「非 0、非 80」的任何狀態一律 consume（`:91-94`），包含未知或例外狀態（fail-open）【量】。
 26. **時區：`TIMESTAMPTZ` 欄位以 `LocalDateTime` 讀寫，cron 吃 JVM 預設時區，沒有任何明確設定**（嚴重度：未知，取決於部署環境）【推】
+   - 處置：修：UTC 與 `timestamptz`
     - 證據：欄位皆 `TIMESTAMPTZ`（`V1__init_coupon.sql:30-31`、`:40`…）；實體用 `LocalDateTime`（`J/entity/CouponTemplateEntity.java:33-34`）；Java 端比較用 `DateTimeUtils.nowUtc()`（`CouponInstanceService.java:65`），SQL 端用 `NOW()`（`CouponTemplateMapper.java:38-39`）；JDBC URL 沒有 `options=-c TimeZone=UTC`（`R/application.yml:30`），Dockerfile 與 pom 沒有設 TZ（`rg -n 'TZ\|timezone' backend/services/java/coupon-service/Dockerfile backend/services/java/coupon-service/pom.xml` 無命中）。若 JVM 與 PG session 時區不同，`LocalDateTime` 與 `timestamptz` 之間的轉換會偏移，驗券（Java 比較）與列表（SQL 比較）可能出現不同判定。`CouponExpiringWarningJob` 的 cron `0 0 1 * * ?`（JVM 預設時區）與其 `date_key`（UTC，`:87`）也可能差一天。沒有實測目前部署的 TZ。
 27. **到期預警與其他事件發送失敗被吞掉，無重試**（嚴重度：低，原作者已知）【量】
+   - 處置：修：依 D7，事件同 transaction 發出，投遞歸 notification
     - 證據：`J/event/CouponEventPublisher.java:44-49`、`:55-63` 的 `catch` 只記 log；`CouponExpiringWarningJob.java:43-50` 註解承認 at-most-once、「需另案」。
 28. **MEMBER 型券在 Order 服務失敗時整批消失，無告警**（嚴重度：低）【量】
+   - 處置：修：依 D3，不再靜默降級
     - 證據：`J/grpc/client/OrderGrpcClient.java:69-71` 例外回 `Collections.emptySet()`；`CouponTemplateService.java:323-325` 再補哨兵 `-1`；結果是 MEMBER 型模板從 `ListMyCoupons`／`ListAvailableCoupons` 靜默消失。
 29. **快取失效不完整**（嚴重度：低，只影響顯示）【量】
+   - 處置：刪除：模組不做模板快取（同進程直接查 DB），死碼與死 key 不搬
     - 證據：`coupon:tpl:{id}` 只在 `sellerRevokeTemplate`、`adminDisableTemplate` 清（`CouponGrpcService.java:710`、`:861`）；`publishTemplate`、停權停用／還原、`expireTemplates`、`AdminUpdate…` 都不清，TTL 30 分鐘（`CacheKeyConstants.java:18`）。快取只用於 `getTemplateWithCache` 的顯示（`CouponGrpcService.java:173`、`:757`）。`coupon:avail:*` 沒有任何寫入但每次寫入都做 SCAN＋UNLINK（`CouponCacheService.java:69-76`，`CacheKeyConstants.java:11-13` 的 TODO #1426）。
 30. **死碼與未連線的設定**（嚴重度：低；只是盤點）【量】
+   - 處置：刪除：模組不做模板快取（同進程直接查 DB），死碼與死 key 不搬
     - `publishCouponIssued` 無 production 呼叫端（`CSV/event-anomalies.md:14`）；mapper `reserveCoupon`、`countActiveByTemplateAndOwner`、`CouponTargetAccountMapper.countByTemplateAndBuyer`、`CouponClaimMapper.countByTemplateId`；service `listAvailable`；`AccountGrpcClient.batchGetNicknames`；`R/application.yml:99-100` 的 `coupon.notification.admin-fallback-image-key`；`CouponRedemptionAction` 的 `ISSUE`、`RECEIVE`、`EXPIRE` 不寫入（`rg -n 'CouponRedemptionAction\.' backend/services/java/coupon-service/src/main` 只有 RESERVE／CONSUME／RELEASE／REVOKE／ANNUL）。`coupon_redemption_logs.trace_id`、`request_id` 恆寫空字串（`CouponInstanceService.java:372-373`）。（`CSV` 縮寫＝`backend/docs/plans/2026-09-24-go-modular-monolith`。）
 31. **V6 的 CHECK 約束從未補上**（嚴重度：低）【量】
+   - 處置：修：schema 加上 CHECK
     - 證據：`V6__split_issuer_identity_columns.sql:9-22` 註解說 CHECK 留給下一個 contract release；`rg -n 'chk_tpl_issuer_identity' backend/services/java/coupon-service` 命中 V6 檔頭註解、`J/grpc/CouponGrpcService.java:601`（註解）與 test 內的註解，沒有任何 `ADD CONSTRAINT`。`issuer_type` 與兩個 issuer 欄位的互斥目前只靠寫入路徑保證；`coupon_templates` 整張表沒有任何 CHECK（`type`、`status`、`target_type` 皆自由字串）、也沒有 FK。
 32. **CASH 券沒有「折扣不得超過門檻／訂單」的建立期檢查**（嚴重度：低）【量】
+   - 處置：修：建立時檢查折抵金額不超過門檻
     - 證據：`validateTemplateParams`（`J/service/CouponTemplateService.java:366-403`）只要求 `discount_amount>0`；`calculateDiscount` 以 `Math.min(discount_amount, orderAmount)` 封頂（`CouponInstanceService.java:335`），所以賣家可建「門檻 0、折扣 1,000,000」的券而讓任何訂單折到 0（賣家自擔；補償券另有 5 倍規則，`CouponGrpcService.java:1076`）。
 33. **`ListBuyerCouponsForSeller` 在 REST 層以 `sellerViewGuard(CapOrderFulfill)` 保護，但沒有任何前端呼叫它**（嚴重度：低；盤點）【量】
+   - 處置：刪除：沒有消費端，D6 不保留
     - 證據：client-inventory.md §1、§6：website、seller-app、admin 皆無 `view=seller` 的 coupon 呼叫；加上 #3，這支 RPC 同時是「無呼叫端」與「查詢條件永遠不命中」。
 34. **buyer-app 用錯路由（疑似死碼）**（嚴重度：低；盤點）【推】
+   - 處置：刪除：B7-5 刪掉死碼
     - 證據：`buyer-app/lib/features/wallet/data/wallet_remote_service.dart:48-60` 的 `fetchCouponTemplates` 呼叫 `GET /app/coupon_templates`，這是 `CapMarketing` 的賣家路由（`backend/gateway/internal/router/routes_coupon.go:45`）；lib 內除 repository 包裝外沒有其他呼叫端。`buyer-app/lib/features/category/presentation/category_landing_screen.dart:148-160` 取 `data['data']` 當 List，而 gateway 回的 `data` 是含 `records`／`usedRecords` 的物件（`backend/gateway/internal/handler/coupon.go:323-328`），券數量會是 0（未實際呼叫確認）。
