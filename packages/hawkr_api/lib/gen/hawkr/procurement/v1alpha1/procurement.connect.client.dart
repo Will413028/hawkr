@@ -143,9 +143,11 @@ extension type BuyerProcurementAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// PreviewRfqPrice 依買家預期的單價範圍與需求數量，算出詢價總額區間並存成預覽（有效 15 分鐘）。
+  /// PreviewRfqPrice 依買家預期的單價範圍與需求數量算出詢價總額區間；純計算，不寫入任何資料。
   /// 買家沒有給合法的範圍（下界與上界是正整數、下界不大於上界）回 INVALID_ARGUMENT；
-  /// 需求已有數量與單位卻算不出總額回 FAILED_PRECONDITION。
+  /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位（算不出計價基準）回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY；
+  /// 需求已有數量與單位卻算不出總額（溢位）回 FAILED_PRECONDITION，沒有 reason。
+  /// 讀到的需求版本不是現行版本回 ABORTED，conflictTarget 是 request_revision；需求不屬於呼叫者回 NOT_FOUND。
   Future<hawkrprocurementv1alpha1procurement.PreviewRfqPriceResponse> previewRfqPrice(
     hawkrprocurementv1alpha1procurement.PreviewRfqPriceRequest input, {
     connect.Headers? headers,
@@ -163,25 +165,13 @@ extension type BuyerProcurementAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照。預覽或需求版本過時回 ABORTED。
-  Future<hawkrprocurementv1alpha1procurement.ConfirmRfqSnapshotResponse> confirmRfqSnapshot(
-    hawkrprocurementv1alpha1procurement.ConfirmRfqSnapshotRequest input, {
-    connect.Headers? headers,
-    connect.AbortSignal? signal,
-    Function(connect.Headers)? onHeader,
-    Function(connect.Headers)? onTrailer,
-  }) {
-    return connect.Client(_transport).unary(
-      specs.BuyerProcurementAppService.confirmRfqSnapshot,
-      input,
-      signal: signal,
-      headers: headers,
-      onHeader: onHeader,
-      onTrailer: onTrailer,
-    );
-  }
-
-  /// PreviewRfqPublication 依確認快照編出要發給賣家的內容並建立不可變的發布核准，不發布、不通知。
+  /// PreviewRfqPublication 依需求現行版本、買家的單價範圍與補充說明編出要發給賣家的內容，並建立不可變、只能執行一次的發布核准（有效 24 小時），
+  /// 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與（指定對象時）候選集。
+  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
+  /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位，回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
+  /// 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、
+  /// 回價期限不是合法日期或早於今天（台北時區）回 INVALID_ARGUMENT。
+  /// 公開池的收件人在發布時決定，預覽的 recipient_count 是 0。
   Future<hawkrprocurementv1alpha1procurement.PreviewRfqPublicationResponse> previewRfqPublication(
     hawkrprocurementv1alpha1procurement.PreviewRfqPublicationRequest input, {
     connect.Headers? headers,
@@ -199,7 +189,12 @@ extension type BuyerProcurementAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到。
+  /// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
+  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本、
+  /// 核准的回價期限已早於今天（台北時區），或 payload_hash 與核准的內容不符回 ABORTED，conflictTarget 是 publication_approval；
+  /// 指定對象的候選集已不是有效的候選集回 ABORTED，conflictTarget 是 candidate_set；核准不屬於呼叫者回 NOT_FOUND。
+  /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
+  /// 重送同一個 client_request_id 回第一次的發布（replayed 為 true），內容不同回 INVALID_ARGUMENT。
   Future<hawkrprocurementv1alpha1procurement.ExecuteRfqPublicationResponse> executeRfqPublication(
     hawkrprocurementv1alpha1procurement.ExecuteRfqPublicationRequest input, {
     connect.Headers? headers,

@@ -22,6 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
@@ -114,7 +115,7 @@ func newClient(t *testing.T, l *stubLLM) procurementv1alpha1connect.BuyerProcure
 	lq := &lateQueue{}
 	m := procurement.New(procurement.Deps{
 		DB: d, Now: time.Now, Logger: log, Jobs: lq, LLM: llm.NewModel(l, "stub", llm.Gemini), Taxonomy: taxonomy{},
-		Search: products{}, Sellers: stores{}, Entitlements: entitlements{},
+		Search: products{}, Sellers: stores{}, Entitlements: entitlements{}, Events: events.NewBus(),
 	})
 	workers := river.NewWorkers()
 	m.AddWorkers(workers)

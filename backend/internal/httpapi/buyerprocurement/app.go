@@ -1,7 +1,7 @@
 // Package buyerprocurement 實作買家採購 Connect API（BuyerProcurementAppService）的傳輸：請求驗證、錯誤與欄位路徑對應、
 // 事件與讀取模型轉成 proto。送出、取消、串流、搜尋、接續與快照的規則都在 modules/procurement，這裡不重做。
 //
-// 實作 run 的送出、取消、串流、接續與搜尋，快照讀取與對話管理，以及需求編輯（ToggleSelection、SubmitAnswer、Rewind）；其餘方法由內嵌的 Unimplemented 回 unimplemented，handler 尚未掛載。
+// 實作 run 的送出、取消、串流、接續與搜尋，快照讀取與對話管理，需求編輯（ToggleSelection、SubmitAnswer、Rewind），以及詢價發布鏈（PreviewRfqPrice、PreviewRfqPublication、ExecuteRfqPublication，rfq.go）；其餘方法由內嵌的 Unimplemented 回 unimplemented，handler 尚未掛載。
 package buyerprocurement
 
 import (
@@ -40,6 +40,9 @@ type Module interface {
 	RenameConversation(ctx context.Context, buyerID int64, conversationID uuid.UUID, title string) error
 	DeleteConversation(ctx context.Context, buyerID int64, conversationID uuid.UUID) error
 	GetCandidateSearch(ctx context.Context, buyerID int64, requestID, runID uuid.UUID, locale uitext.Locale) (procurement.CandidateSearch, error)
+	PreviewRfqPrice(ctx context.Context, in procurement.PreviewRfqPriceInput) (procurement.PriceQuote, error)
+	PreviewRfqPublication(ctx context.Context, in procurement.PreviewRfqPublicationInput) (procurement.PublicationPreview, error)
+	ExecuteRfqPublication(ctx context.Context, in procurement.ExecuteRfqPublicationInput) (procurement.Publication, error)
 }
 
 // StoreCards 讀候選賣家的店家卡片（*seller.Module 滿足它）：從沒公開過與不存在的店不在回傳裡；一次最多 seller.MaxBatchSize 個。

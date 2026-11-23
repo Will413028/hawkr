@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,9 @@ const (
 
 // searchable 是可以開始或完成搜尋的需求狀態。
 var searchable = []string{statusRequirementReady, statusMatching}
+
+// Searchable 回傳需求狀態是否可以開始或完成搜尋；詢價發布預覽與執行用同一個判斷（A9-D35）。
+func Searchable(status string) bool { return slices.Contains(searchable, status) }
 
 // LeafChecker 以分類 ID 查分類樹：節點存在而且是末層才回 true（*resolver.Resolver 滿足它）。
 // 答案來自開始讀取不早於 notBefore 且在 TTL 之內的分類樹；拿不到這樣的樹回錯誤。破壞性的決定（清買家確認的分類）只能依它。

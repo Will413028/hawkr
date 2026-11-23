@@ -33,18 +33,6 @@ func (q *Queries) AnonymizeBuyerApprovals(ctx context.Context, buyerID *int64) (
 	return result.RowsAffected(), nil
 }
 
-const anonymizeBuyerPricePreviews = `-- name: AnonymizeBuyerPricePreviews :execrows
-UPDATE procurement.price_previews SET buyer_id = NULL WHERE buyer_id = $1
-`
-
-func (q *Queries) AnonymizeBuyerPricePreviews(ctx context.Context, buyerID *int64) (int64, error) {
-	result, err := q.db.Exec(ctx, anonymizeBuyerPricePreviews, buyerID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const anonymizeBuyerPublications = `-- name: AnonymizeBuyerPublications :execrows
 UPDATE procurement.rfq_publications SET buyer_id = NULL WHERE buyer_id = $1
 `
@@ -64,18 +52,6 @@ UPDATE procurement.requests SET buyer_id = NULL WHERE buyer_id = $1
 // 已發布的需求保留（賣家看得到的詢價依附在它上面），buyer_id 設 NULL。
 func (q *Queries) AnonymizeBuyerRequests(ctx context.Context, buyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, anonymizeBuyerRequests, buyerID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const anonymizeBuyerSnapshots = `-- name: AnonymizeBuyerSnapshots :execrows
-UPDATE procurement.confirmed_rfq_snapshots SET buyer_id = NULL WHERE buyer_id = $1
-`
-
-func (q *Queries) AnonymizeBuyerSnapshots(ctx context.Context, buyerID *int64) (int64, error) {
-	result, err := q.db.Exec(ctx, anonymizeBuyerSnapshots, buyerID)
 	if err != nil {
 		return 0, err
 	}
@@ -151,7 +127,7 @@ WHERE r.buyer_id = $1
   AND NOT EXISTS (SELECT 1 FROM procurement.rfq_publications p WHERE p.request_id = r.id)
 `
 
-// 沒有發布過的需求整張刪除（連帶 revision、輪次、預覽、快照、核准，都是 ON DELETE CASCADE）。
+// 沒有發布過的需求整張刪除（連帶 revision、輪次、核准，都是 ON DELETE CASCADE）。
 func (q *Queries) DeleteUnpublishedBuyerRequests(ctx context.Context, buyerID *int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteUnpublishedBuyerRequests, buyerID)
 	if err != nil {

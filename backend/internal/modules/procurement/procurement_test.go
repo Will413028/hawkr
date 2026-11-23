@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
@@ -166,7 +167,7 @@ func TestNewRegistersTheSearchExecutorAndRejectsPartialWiring(t *testing.T) {
 
 func testDeps() procurement.Deps {
 	return procurement.Deps{
-		DB: new(db.DB), Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		DB: new(db.DB), Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: events.NewBus(),
 	}
 }
 
@@ -175,6 +176,7 @@ func TestNewRejectsMissingRequiredDeps(t *testing.T) {
 		"DB":     func(d *procurement.Deps) { d.DB = nil },
 		"Now":    func(d *procurement.Deps) { d.Now = nil },
 		"Logger": func(d *procurement.Deps) { d.Logger = nil },
+		"Events": func(d *procurement.Deps) { d.Events = nil },
 	}
 	for name, clear := range cases {
 		d := testDeps()
@@ -197,7 +199,7 @@ func registered[T river.JobArgs](w *river.Workers) bool {
 
 // 漏登記執行 run 的 worker，送出的 run 永遠停在 QUEUED；漏了 reconciler 或清除，死掉的 run 與過期事件沒有人收。
 func TestAddWorkersRegistersTheRunReconcilerAndPurgeWorkers(t *testing.T) {
-	m := procurement.New(procurement.Deps{DB: &db.DB{}, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	m := procurement.New(procurement.Deps{DB: &db.DB{}, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: events.NewBus()})
 	w := river.NewWorkers()
 	m.AddWorkers(w)
 	if !registered[run.RunArgs](w) {
@@ -217,7 +219,7 @@ func (noTaxonomy) CategoryTree(context.Context) ([]procurement.TaxonomyNode, err
 
 func newDeps(extra func(*procurement.Deps)) procurement.Deps {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	d := procurement.Deps{DB: new(db.DB), Now: time.Now, Logger: log}
+	d := procurement.Deps{DB: new(db.DB), Now: time.Now, Logger: log, Events: events.NewBus()}
 	extra(&d)
 	return d
 }

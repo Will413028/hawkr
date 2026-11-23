@@ -16,7 +16,7 @@ const claimApprovalForExecute = `-- name: ClaimApprovalForExecute :one
 UPDATE procurement.rfq_publication_approvals
 SET state = 'EXECUTING', version = version + 1, updated_at = $1
 WHERE id = $2 AND version = $3 AND buyer_id = $4 AND state = 'PENDING' AND expires_at > $1::timestamptz
-RETURNING id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at
+RETURNING id, version, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at
 `
 
 type ClaimApprovalForExecuteParams struct {
@@ -41,7 +41,10 @@ func (q *Queries) ClaimApprovalForExecute(ctx context.Context, arg ClaimApproval
 		&i.BuyerID,
 		&i.RequestID,
 		&i.RequestRevisionID,
-		&i.ConfirmedRfqSnapshotID,
+		&i.RangeLowerAmount,
+		&i.RangeUpperAmount,
+		&i.BuyerNote,
+		&i.CandidateSetID,
 		&i.ResponseDeadline,
 		&i.AudienceMode,
 		&i.AudiencePolicyID,
@@ -58,7 +61,7 @@ func (q *Queries) ClaimApprovalForExecute(ctx context.Context, arg ClaimApproval
 }
 
 const getAcceptanceByClientRequest = `-- name: GetAcceptanceByClientRequest :one
-SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetAcceptanceByClientRequestParams struct {
@@ -77,7 +80,7 @@ func (q *Queries) GetAcceptanceByClientRequest(ctx context.Context, arg GetAccep
 		&i.SellerResponseID,
 		&i.SellerResponseVersion,
 		&i.SellerResponsePayloadHash,
-		&i.ConfirmedRfqPayloadHash,
+		&i.SellerFacingHash,
 		&i.StoreID,
 		&i.Currency,
 		&i.GoodsAmount,
@@ -98,7 +101,7 @@ func (q *Queries) GetAcceptanceByClientRequest(ctx context.Context, arg GetAccep
 }
 
 const getApproval = `-- name: GetApproval :one
-SELECT id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement.rfq_publication_approvals WHERE id = $1 AND request_id = $2 AND buyer_id = $3
+SELECT id, version, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement.rfq_publication_approvals WHERE id = $1 AND request_id = $2 AND buyer_id = $3
 `
 
 type GetApprovalParams struct {
@@ -116,7 +119,10 @@ func (q *Queries) GetApproval(ctx context.Context, arg GetApprovalParams) (Procu
 		&i.BuyerID,
 		&i.RequestID,
 		&i.RequestRevisionID,
-		&i.ConfirmedRfqSnapshotID,
+		&i.RangeLowerAmount,
+		&i.RangeUpperAmount,
+		&i.BuyerNote,
+		&i.CandidateSetID,
 		&i.ResponseDeadline,
 		&i.AudienceMode,
 		&i.AudiencePolicyID,
@@ -133,7 +139,7 @@ func (q *Queries) GetApproval(ctx context.Context, arg GetApprovalParams) (Procu
 }
 
 const getApprovalByClientRequest = `-- name: GetApprovalByClientRequest :one
-SELECT id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement.rfq_publication_approvals WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, version, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement.rfq_publication_approvals WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetApprovalByClientRequestParams struct {
@@ -150,7 +156,10 @@ func (q *Queries) GetApprovalByClientRequest(ctx context.Context, arg GetApprova
 		&i.BuyerID,
 		&i.RequestID,
 		&i.RequestRevisionID,
-		&i.ConfirmedRfqSnapshotID,
+		&i.RangeLowerAmount,
+		&i.RangeUpperAmount,
+		&i.BuyerNote,
+		&i.CandidateSetID,
 		&i.ResponseDeadline,
 		&i.AudienceMode,
 		&i.AudiencePolicyID,
@@ -166,132 +175,87 @@ func (q *Queries) GetApprovalByClientRequest(ctx context.Context, arg GetApprova
 	return i, err
 }
 
-const getConfirmedSnapshot = `-- name: GetConfirmedSnapshot :one
-SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at FROM procurement.confirmed_rfq_snapshots WHERE id = $1 AND request_id = $2 AND buyer_id = $3
+const getApprovalForBuyer = `-- name: GetApprovalForBuyer :one
+SELECT id, version, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement.rfq_publication_approvals WHERE id = $1 AND buyer_id = $2
 `
 
-type GetConfirmedSnapshotParams struct {
-	ID        uuid.UUID
-	RequestID uuid.UUID
-	BuyerID   *int64
+type GetApprovalForBuyerParams struct {
+	ID      uuid.UUID
+	BuyerID *int64
 }
 
-func (q *Queries) GetConfirmedSnapshot(ctx context.Context, arg GetConfirmedSnapshotParams) (ProcurementConfirmedRfqSnapshot, error) {
-	row := q.db.QueryRow(ctx, getConfirmedSnapshot, arg.ID, arg.RequestID, arg.BuyerID)
-	var i ProcurementConfirmedRfqSnapshot
+// 只依擁有者查（不收斂到需求）：核准屬於買家的另一張需求與核准不存在要分得開（前者是過時，後者是 NOT_FOUND）。
+func (q *Queries) GetApprovalForBuyer(ctx context.Context, arg GetApprovalForBuyerParams) (ProcurementRfqPublicationApproval, error) {
+	row := q.db.QueryRow(ctx, getApprovalForBuyer, arg.ID, arg.BuyerID)
+	var i ProcurementRfqPublicationApproval
 	err := row.Scan(
 		&i.ID,
-		&i.BuyerID,
-		&i.RequestID,
-		&i.RequestRevisionID,
-		&i.PricePreviewID,
-		&i.BuyerNote,
-		&i.ClientRequestID,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getConfirmedSnapshotByClientRequest = `-- name: GetConfirmedSnapshotByClientRequest :one
-SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at FROM procurement.confirmed_rfq_snapshots WHERE buyer_id = $1 AND client_request_id = $2
-`
-
-type GetConfirmedSnapshotByClientRequestParams struct {
-	BuyerID         *int64
-	ClientRequestID uuid.UUID
-}
-
-func (q *Queries) GetConfirmedSnapshotByClientRequest(ctx context.Context, arg GetConfirmedSnapshotByClientRequestParams) (ProcurementConfirmedRfqSnapshot, error) {
-	row := q.db.QueryRow(ctx, getConfirmedSnapshotByClientRequest, arg.BuyerID, arg.ClientRequestID)
-	var i ProcurementConfirmedRfqSnapshot
-	err := row.Scan(
-		&i.ID,
-		&i.BuyerID,
-		&i.RequestID,
-		&i.RequestRevisionID,
-		&i.PricePreviewID,
-		&i.BuyerNote,
-		&i.ClientRequestID,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getLatestConfirmedSnapshotByRequest = `-- name: GetLatestConfirmedSnapshotByRequest :one
-SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at FROM procurement.confirmed_rfq_snapshots
-WHERE request_id = $1 AND buyer_id = $2
-ORDER BY created_at DESC, id DESC LIMIT 1
-`
-
-type GetLatestConfirmedSnapshotByRequestParams struct {
-	RequestID uuid.UUID
-	BuyerID   *int64
-}
-
-// 需求最新的確認快照（不論對應哪一版）；沒有回 ErrNoRows。
-func (q *Queries) GetLatestConfirmedSnapshotByRequest(ctx context.Context, arg GetLatestConfirmedSnapshotByRequestParams) (ProcurementConfirmedRfqSnapshot, error) {
-	row := q.db.QueryRow(ctx, getLatestConfirmedSnapshotByRequest, arg.RequestID, arg.BuyerID)
-	var i ProcurementConfirmedRfqSnapshot
-	err := row.Scan(
-		&i.ID,
-		&i.BuyerID,
-		&i.RequestID,
-		&i.RequestRevisionID,
-		&i.PricePreviewID,
-		&i.BuyerNote,
-		&i.ClientRequestID,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getLatestPricePreviewForRevision = `-- name: GetLatestPricePreviewForRevision :one
-SELECT id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, basis_quantity, basis_unit, total_lower_amount, total_upper_amount, total_quantity, total_unit, client_request_id, expires_at, created_at FROM procurement.price_previews
-WHERE request_id = $1 AND request_revision_id = $2 AND buyer_id = $3 AND expires_at > $4
-ORDER BY created_at DESC, id DESC LIMIT 1
-`
-
-type GetLatestPricePreviewForRevisionParams struct {
-	RequestID         uuid.UUID
-	RequestRevisionID uuid.UUID
-	BuyerID           *int64
-	Now               time.Time
-}
-
-// 該版本最新、尚未過期的價格預覽；沒有回 ErrNoRows。
-func (q *Queries) GetLatestPricePreviewForRevision(ctx context.Context, arg GetLatestPricePreviewForRevisionParams) (ProcurementPricePreview, error) {
-	row := q.db.QueryRow(ctx, getLatestPricePreviewForRevision,
-		arg.RequestID,
-		arg.RequestRevisionID,
-		arg.BuyerID,
-		arg.Now,
-	)
-	var i ProcurementPricePreview
-	err := row.Scan(
-		&i.ID,
+		&i.Version,
 		&i.BuyerID,
 		&i.RequestID,
 		&i.RequestRevisionID,
 		&i.RangeLowerAmount,
 		&i.RangeUpperAmount,
-		&i.BasisQuantity,
-		&i.BasisUnit,
-		&i.TotalLowerAmount,
-		&i.TotalUpperAmount,
-		&i.TotalQuantity,
-		&i.TotalUnit,
+		&i.BuyerNote,
+		&i.CandidateSetID,
+		&i.ResponseDeadline,
+		&i.AudienceMode,
+		&i.AudiencePolicyID,
+		&i.AudiencePolicyVersion,
+		&i.State,
+		&i.SchemaVersion,
 		&i.ClientRequestID,
+		&i.GeneratedAt,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getLatestPendingApprovalByRequest = `-- name: GetLatestPendingApprovalByRequest :one
+SELECT id, version, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement.rfq_publication_approvals
+WHERE request_id = $1 AND buyer_id = $2 AND state = 'PENDING' AND expires_at > $3::timestamptz
+ORDER BY created_at DESC, id DESC LIMIT 1
+`
+
+type GetLatestPendingApprovalByRequestParams struct {
+	RequestID uuid.UUID
+	BuyerID   *int64
+	Now       time.Time
+}
+
+// 需求最新的、尚未過期的待執行核准（不論對應哪一版）；沒有回 ErrNoRows。planner 用它判斷詢價階段（A9-D35）。
+func (q *Queries) GetLatestPendingApprovalByRequest(ctx context.Context, arg GetLatestPendingApprovalByRequestParams) (ProcurementRfqPublicationApproval, error) {
+	row := q.db.QueryRow(ctx, getLatestPendingApprovalByRequest, arg.RequestID, arg.BuyerID, arg.Now)
+	var i ProcurementRfqPublicationApproval
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.RequestRevisionID,
+		&i.RangeLowerAmount,
+		&i.RangeUpperAmount,
+		&i.BuyerNote,
+		&i.CandidateSetID,
+		&i.ResponseDeadline,
+		&i.AudienceMode,
+		&i.AudiencePolicyID,
+		&i.AudiencePolicyVersion,
+		&i.State,
+		&i.SchemaVersion,
+		&i.ClientRequestID,
+		&i.GeneratedAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getLatestPublicationByRequest = `-- name: GetLatestPublicationByRequest :one
-SELECT p.id, p.version, p.published_at, p.schema_version, a.confirmed_rfq_snapshot_id,
+SELECT p.id, p.version, p.published_at, p.schema_version, a.id AS approval_id,
     (SELECT count(*) FROM procurement.rfq_publication_approval_recipients r WHERE r.approval_id = a.id)::int AS recipient_count,
     (SELECT count(*) FROM procurement.rfq_publication_invites i WHERE i.publication_id = p.id)::int AS queued_count
 FROM procurement.rfq_publications p
@@ -307,16 +271,16 @@ type GetLatestPublicationByRequestParams struct {
 }
 
 type GetLatestPublicationByRequestRow struct {
-	ID                     uuid.UUID
-	Version                int32
-	PublishedAt            time.Time
-	SchemaVersion          string
-	ConfirmedRfqSnapshotID uuid.UUID
-	RecipientCount         int32
-	QueuedCount            int32
+	ID             uuid.UUID
+	Version        int32
+	PublishedAt    time.Time
+	SchemaVersion  string
+	ApprovalID     uuid.UUID
+	RecipientCount int32
+	QueuedCount    int32
 }
 
-// 需求最新一次的發布，連同核准的快照 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0），以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
+// 需求最新一次的發布，連同核准的 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0），以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
 func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLatestPublicationByRequestParams) (GetLatestPublicationByRequestRow, error) {
 	row := q.db.QueryRow(ctx, getLatestPublicationByRequest, arg.RequestID, arg.BuyerID)
 	var i GetLatestPublicationByRequestRow
@@ -325,7 +289,7 @@ func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLate
 		&i.Version,
 		&i.PublishedAt,
 		&i.SchemaVersion,
-		&i.ConfirmedRfqSnapshotID,
+		&i.ApprovalID,
 		&i.RecipientCount,
 		&i.QueuedCount,
 	)
@@ -333,7 +297,7 @@ func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLate
 }
 
 const getLiveAcceptance = `-- name: GetLiveAcceptance :one
-SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND buyer_id = $2 AND state = 'ACTIVE'
+SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND buyer_id = $2 AND state = 'ACTIVE'
 `
 
 type GetLiveAcceptanceParams struct {
@@ -352,7 +316,7 @@ func (q *Queries) GetLiveAcceptance(ctx context.Context, arg GetLiveAcceptancePa
 		&i.SellerResponseID,
 		&i.SellerResponseVersion,
 		&i.SellerResponsePayloadHash,
-		&i.ConfirmedRfqPayloadHash,
+		&i.SellerFacingHash,
 		&i.StoreID,
 		&i.Currency,
 		&i.GoodsAmount,
@@ -372,73 +336,8 @@ func (q *Queries) GetLiveAcceptance(ctx context.Context, arg GetLiveAcceptancePa
 	return i, err
 }
 
-const getPricePreview = `-- name: GetPricePreview :one
-SELECT id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, basis_quantity, basis_unit, total_lower_amount, total_upper_amount, total_quantity, total_unit, client_request_id, expires_at, created_at FROM procurement.price_previews WHERE id = $1 AND request_id = $2 AND buyer_id = $3
-`
-
-type GetPricePreviewParams struct {
-	ID        uuid.UUID
-	RequestID uuid.UUID
-	BuyerID   *int64
-}
-
-func (q *Queries) GetPricePreview(ctx context.Context, arg GetPricePreviewParams) (ProcurementPricePreview, error) {
-	row := q.db.QueryRow(ctx, getPricePreview, arg.ID, arg.RequestID, arg.BuyerID)
-	var i ProcurementPricePreview
-	err := row.Scan(
-		&i.ID,
-		&i.BuyerID,
-		&i.RequestID,
-		&i.RequestRevisionID,
-		&i.RangeLowerAmount,
-		&i.RangeUpperAmount,
-		&i.BasisQuantity,
-		&i.BasisUnit,
-		&i.TotalLowerAmount,
-		&i.TotalUpperAmount,
-		&i.TotalQuantity,
-		&i.TotalUnit,
-		&i.ClientRequestID,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getPricePreviewByClientRequest = `-- name: GetPricePreviewByClientRequest :one
-SELECT id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, basis_quantity, basis_unit, total_lower_amount, total_upper_amount, total_quantity, total_unit, client_request_id, expires_at, created_at FROM procurement.price_previews WHERE buyer_id = $1 AND client_request_id = $2
-`
-
-type GetPricePreviewByClientRequestParams struct {
-	BuyerID         *int64
-	ClientRequestID uuid.UUID
-}
-
-func (q *Queries) GetPricePreviewByClientRequest(ctx context.Context, arg GetPricePreviewByClientRequestParams) (ProcurementPricePreview, error) {
-	row := q.db.QueryRow(ctx, getPricePreviewByClientRequest, arg.BuyerID, arg.ClientRequestID)
-	var i ProcurementPricePreview
-	err := row.Scan(
-		&i.ID,
-		&i.BuyerID,
-		&i.RequestID,
-		&i.RequestRevisionID,
-		&i.RangeLowerAmount,
-		&i.RangeUpperAmount,
-		&i.BasisQuantity,
-		&i.BasisUnit,
-		&i.TotalLowerAmount,
-		&i.TotalUpperAmount,
-		&i.TotalQuantity,
-		&i.TotalUnit,
-		&i.ClientRequestID,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
 const getPublication = `-- name: GetPublication :one
-SELECT id, version, buyer_id, request_id, request_revision_id, approval_id, state, schema_version, client_request_id, published_at, created_at, updated_at FROM procurement.rfq_publications WHERE id = $1 AND buyer_id = $2
+SELECT id, version, buyer_id, request_id, request_revision_id, approval_id, approval_version, state, schema_version, client_request_id, published_at, created_at, updated_at FROM procurement.rfq_publications WHERE id = $1 AND buyer_id = $2
 `
 
 type GetPublicationParams struct {
@@ -456,6 +355,7 @@ func (q *Queries) GetPublication(ctx context.Context, arg GetPublicationParams) 
 		&i.RequestID,
 		&i.RequestRevisionID,
 		&i.ApprovalID,
+		&i.ApprovalVersion,
 		&i.State,
 		&i.SchemaVersion,
 		&i.ClientRequestID,
@@ -467,7 +367,7 @@ func (q *Queries) GetPublication(ctx context.Context, arg GetPublicationParams) 
 }
 
 const getPublicationByClientRequest = `-- name: GetPublicationByClientRequest :one
-SELECT id, version, buyer_id, request_id, request_revision_id, approval_id, state, schema_version, client_request_id, published_at, created_at, updated_at FROM procurement.rfq_publications WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, version, buyer_id, request_id, request_revision_id, approval_id, approval_version, state, schema_version, client_request_id, published_at, created_at, updated_at FROM procurement.rfq_publications WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetPublicationByClientRequestParams struct {
@@ -485,6 +385,7 @@ func (q *Queries) GetPublicationByClientRequest(ctx context.Context, arg GetPubl
 		&i.RequestID,
 		&i.RequestRevisionID,
 		&i.ApprovalID,
+		&i.ApprovalVersion,
 		&i.State,
 		&i.SchemaVersion,
 		&i.ClientRequestID,
@@ -526,7 +427,7 @@ func (q *Queries) GetSellerResponse(ctx context.Context, arg GetSellerResponsePa
 const insertAcceptance = `-- name: InsertAcceptance :execrows
 INSERT INTO procurement.buyer_quote_acceptances (
     id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash,
-    confirmed_rfq_payload_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price,
+    seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price,
     client_request_id, accepted_at, created_at, updated_at)
 VALUES (
     $1, $2, $3, $4, $5, $6, $7,
@@ -543,7 +444,7 @@ type InsertAcceptanceParams struct {
 	SellerResponseID          uuid.UUID
 	SellerResponseVersion     int32
 	SellerResponsePayloadHash string
-	ConfirmedRfqPayloadHash   string
+	SellerFacingHash          string
 	StoreID                   int64
 	Currency                  string
 	GoodsAmount               int64
@@ -565,7 +466,7 @@ func (q *Queries) InsertAcceptance(ctx context.Context, arg InsertAcceptancePara
 		arg.SellerResponseID,
 		arg.SellerResponseVersion,
 		arg.SellerResponsePayloadHash,
-		arg.ConfirmedRfqPayloadHash,
+		arg.SellerFacingHash,
 		arg.StoreID,
 		arg.Currency,
 		arg.GoodsAmount,
@@ -583,28 +484,31 @@ func (q *Queries) InsertAcceptance(ctx context.Context, arg InsertAcceptancePara
 
 const insertApproval = `-- name: InsertApproval :execrows
 INSERT INTO procurement.rfq_publication_approvals (
-    id, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, response_deadline, audience_mode,
-    audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
+    id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline,
+    audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7,
-    $8, $9, 'PENDING', $10, $11, $12, $13, $12, $12)
+    $1, $2, $3, $4, $5, $6, $7, $8, $9,
+    $10, $11, $12, 'PENDING', $13, $14, $15, $16, $15, $15)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
 
 type InsertApprovalParams struct {
-	ID                     uuid.UUID
-	BuyerID                *int64
-	RequestID              uuid.UUID
-	RequestRevisionID      uuid.UUID
-	ConfirmedRfqSnapshotID uuid.UUID
-	ResponseDeadline       *time.Time
-	AudienceMode           string
-	AudiencePolicyID       *string
-	AudiencePolicyVersion  *int32
-	SchemaVersion          string
-	ClientRequestID        uuid.UUID
-	Now                    time.Time
-	ExpiresAt              time.Time
+	ID                    uuid.UUID
+	BuyerID               *int64
+	RequestID             uuid.UUID
+	RequestRevisionID     uuid.UUID
+	RangeLowerAmount      int64
+	RangeUpperAmount      int64
+	BuyerNote             string
+	CandidateSetID        *uuid.UUID
+	ResponseDeadline      *time.Time
+	AudienceMode          string
+	AudiencePolicyID      *string
+	AudiencePolicyVersion *int32
+	SchemaVersion         string
+	ClientRequestID       uuid.UUID
+	Now                   time.Time
+	ExpiresAt             time.Time
 }
 
 func (q *Queries) InsertApproval(ctx context.Context, arg InsertApprovalParams) (int64, error) {
@@ -613,7 +517,10 @@ func (q *Queries) InsertApproval(ctx context.Context, arg InsertApprovalParams) 
 		arg.BuyerID,
 		arg.RequestID,
 		arg.RequestRevisionID,
-		arg.ConfirmedRfqSnapshotID,
+		arg.RangeLowerAmount,
+		arg.RangeUpperAmount,
+		arg.BuyerNote,
+		arg.CandidateSetID,
 		arg.ResponseDeadline,
 		arg.AudienceMode,
 		arg.AudiencePolicyID,
@@ -645,43 +552,6 @@ func (q *Queries) InsertApprovalRecipient(ctx context.Context, arg InsertApprova
 	return err
 }
 
-const insertConfirmedSnapshot = `-- name: InsertConfirmedSnapshot :execrows
-INSERT INTO procurement.confirmed_rfq_snapshots (
-    id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-ON CONFLICT (buyer_id, client_request_id) DO NOTHING
-`
-
-type InsertConfirmedSnapshotParams struct {
-	ID                uuid.UUID
-	BuyerID           *int64
-	RequestID         uuid.UUID
-	RequestRevisionID uuid.UUID
-	PricePreviewID    uuid.UUID
-	BuyerNote         string
-	ClientRequestID   uuid.UUID
-	ExpiresAt         time.Time
-	Now               time.Time
-}
-
-func (q *Queries) InsertConfirmedSnapshot(ctx context.Context, arg InsertConfirmedSnapshotParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertConfirmedSnapshot,
-		arg.ID,
-		arg.BuyerID,
-		arg.RequestID,
-		arg.RequestRevisionID,
-		arg.PricePreviewID,
-		arg.BuyerNote,
-		arg.ClientRequestID,
-		arg.ExpiresAt,
-		arg.Now,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const insertInvite = `-- name: InsertInvite :exec
 INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, store_id, delivery_state, delivery_state_at, created_at, updated_at)
 VALUES ($1, $2, $3, $4, 'QUEUED', $5, $5, $5)
@@ -706,62 +576,10 @@ func (q *Queries) InsertInvite(ctx context.Context, arg InsertInviteParams) erro
 	return err
 }
 
-const insertPricePreview = `-- name: InsertPricePreview :execrows
-INSERT INTO procurement.price_previews (
-    id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, basis_quantity, basis_unit,
-    total_lower_amount, total_upper_amount, total_quantity, total_unit, client_request_id, expires_at, created_at)
-VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8,
-    $9, $10, $11, $12, $13, $14, $15)
-ON CONFLICT (buyer_id, client_request_id) DO NOTHING
-`
-
-type InsertPricePreviewParams struct {
-	ID                uuid.UUID
-	BuyerID           *int64
-	RequestID         uuid.UUID
-	RequestRevisionID uuid.UUID
-	RangeLowerAmount  int64
-	RangeUpperAmount  int64
-	BasisQuantity     int32
-	BasisUnit         string
-	TotalLowerAmount  *int64
-	TotalUpperAmount  *int64
-	TotalQuantity     *int32
-	TotalUnit         *string
-	ClientRequestID   uuid.UUID
-	ExpiresAt         time.Time
-	Now               time.Time
-}
-
-func (q *Queries) InsertPricePreview(ctx context.Context, arg InsertPricePreviewParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertPricePreview,
-		arg.ID,
-		arg.BuyerID,
-		arg.RequestID,
-		arg.RequestRevisionID,
-		arg.RangeLowerAmount,
-		arg.RangeUpperAmount,
-		arg.BasisQuantity,
-		arg.BasisUnit,
-		arg.TotalLowerAmount,
-		arg.TotalUpperAmount,
-		arg.TotalQuantity,
-		arg.TotalUnit,
-		arg.ClientRequestID,
-		arg.ExpiresAt,
-		arg.Now,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const insertPublication = `-- name: InsertPublication :execrows
 INSERT INTO procurement.rfq_publications (
-    id, buyer_id, request_id, request_revision_id, approval_id, schema_version, client_request_id, published_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $8)
+    id, buyer_id, request_id, request_revision_id, approval_id, approval_version, schema_version, client_request_id, published_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, $9)
 ON CONFLICT DO NOTHING
 `
 
@@ -771,6 +589,7 @@ type InsertPublicationParams struct {
 	RequestID         uuid.UUID
 	RequestRevisionID uuid.UUID
 	ApprovalID        uuid.UUID
+	ApprovalVersion   int32
 	SchemaVersion     string
 	ClientRequestID   uuid.UUID
 	Now               time.Time
@@ -783,6 +602,7 @@ func (q *Queries) InsertPublication(ctx context.Context, arg InsertPublicationPa
 		arg.RequestID,
 		arg.RequestRevisionID,
 		arg.ApprovalID,
+		arg.ApprovalVersion,
 		arg.SchemaVersion,
 		arg.ClientRequestID,
 		arg.Now,

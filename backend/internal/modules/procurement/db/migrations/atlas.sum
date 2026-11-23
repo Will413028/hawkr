@@ -1,4 +1,4 @@
-h1:5gLjcvtUf3pESxyAQmIXL5OCBfztd8c+D2yACYX/LTs=
+h1:39D8l1tQbFHrubXrbiwPBOadovgWbCwC1h0uoXbR/9Y=
 20261121020526_procurement_schema.sql h1:4b7iMy5vWcgTh3b/6mcHgpMKKYiu4IlZRsz0bTxOgiA=
 20261121050422_procurement_run_lifecycle.sql h1:I4ieRXRo48BLbf15Mayok7JxbgdDDg5wjAmsmACUlms=
 20261121121937_procurement_turn_optional_progress.sql h1:I8kh61q0KdMqUkXaPgFzO6AEAyPiqxd51Nq4p7/lBYQ=
@@ -11,3 +11,5 @@ h1:5gLjcvtUf3pESxyAQmIXL5OCBfztd8c+D2yACYX/LTs=
 20261123024034_procurement_conversation_title_40.sql h1:Pf+9dm5a/jIqaNYIHVMzQ/ku6w4n+qPXolaw8JkmA7A=
 20261123042228_procurement_turn_result.sql h1:DKCKq2cYnYGIGvKBap669mZQZ8uvvC86945RA7WnrAM=
 20261123063545_procurement_turn_command_slot.sql h1:6QJ2P9X031rWj+p43r7DDfh9zCDjLhJEMC0rhQ9BzPw=
+20261123073719_procurement_drop_publication_run.sql h1:DLpVk+SEwIaPqLtfpgd1v6tUjRvKF6MhLjrLapZ7Pww=
+20261123082310_procurement_collapse_rfq_chain.sql h1:KAtPPPOhMfuxCgHZisVq2rL3VT8NUBhrfBsDwDyGp+0=

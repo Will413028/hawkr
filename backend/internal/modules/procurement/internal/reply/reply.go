@@ -94,11 +94,6 @@ func render(l uitext.Locale, p planner.Plan, a Args) []Block {
 			{Understood, text.ReplyBasicsReadyUnderstood(l).Text},
 			{NextStep, text.ReplyBasicsReadyNext(l).Text},
 		}
-	case planner.PricePreviewAvailable:
-		return []Block{
-			{Context, text.ReplyPricePreviewContext(l).Text},
-			{NextStep, text.ReplyPricePreviewNext(l).Text},
-		}
 	case planner.RfqReconfirmRequired:
 		return []Block{
 			{Warning, text.ReplyReconfirmWarning(l).Text},

@@ -138,7 +138,7 @@ func (e Executor) load(ctx context.Context, r store.ProcurementAgentRun) (loaded
 	return ld, nil
 }
 
-// loadPrior 讀這一輪開始前的狀態：需求狀態、現行版本的內容、上一輪的選填進度、價格預覽與確認快照。run 驅動的 executor 與不經 run 的回答、倒回共用。
+// loadPrior 讀這一輪開始前的狀態：需求狀態、現行版本的內容、上一輪的選填進度與未過期的待執行發布核准。run 驅動的 executor 與不經 run 的回答、倒回共用。
 func loadPrior(ctx context.Context, q *store.Queries, req store.ProcurementRequest, active *store.ProcurementRequestRevision, buyerID int64, now time.Time) (priorState, error) {
 	prior := priorState{requestOf: req.Status}
 	buyer := &buyerID
@@ -157,21 +157,12 @@ func loadPrior(ctx context.Context, q *store.Queries, req store.ProcurementReque
 		return prior, nil
 	}
 	prior.current = setFromRevision(*active)
-	_, err = q.GetLatestPricePreviewForRevision(ctx, store.GetLatestPricePreviewForRevisionParams{
-		RequestID: req.ID, RequestRevisionID: active.ID, BuyerID: buyer, Now: now,
-	})
+	appr, err := q.GetLatestPendingApprovalByRequest(ctx, store.GetLatestPendingApprovalByRequestParams{RequestID: req.ID, BuyerID: buyer, Now: now})
 	switch {
 	case err == nil:
-		prior.preview = true
+		prior.approval = &approvalState{onCurrentRevision: appr.RequestRevisionID == active.ID}
 	case !errors.Is(err, pgx.ErrNoRows):
-		return priorState{}, fmt.Errorf("turn：讀取價格預覽：%w", err)
-	}
-	snap, err := q.GetLatestConfirmedSnapshotByRequest(ctx, store.GetLatestConfirmedSnapshotByRequestParams{RequestID: req.ID, BuyerID: buyer})
-	switch {
-	case err == nil:
-		prior.snapshot = &snapshotState{onCurrentRevision: snap.RequestRevisionID == active.ID}
-	case !errors.Is(err, pgx.ErrNoRows):
-		return priorState{}, fmt.Errorf("turn：讀取確認快照：%w", err)
+		return priorState{}, fmt.Errorf("turn：讀取發布核准：%w", err)
 	}
 	return prior, nil
 }

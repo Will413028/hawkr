@@ -15,7 +15,6 @@ const (
 	CorrectionApplied           Act = "CORRECTION_APPLIED"
 	InputRejected               Act = "INPUT_REJECTED"
 	RequestBasicsReady          Act = "REQUEST_BASICS_READY"
-	PricePreviewAvailable       Act = "PRICE_PREVIEW_AVAILABLE"
 	RfqReconfirmRequired        Act = "RFQ_RECONFIRM_REQUIRED"
 	PublicationApprovalRequired Act = "PUBLICATION_APPROVAL_REQUIRED"
 	ItemNeedsDisambiguation     Act = "ITEM_NEEDS_DISAMBIGUATION"
@@ -24,20 +23,20 @@ const (
 // All 是所有 act，供測試窮舉。
 var All = []Act{
 	AckAndAskRequired, AckAndAskOptional, CorrectionApplied, InputRejected,
-	RequestBasicsReady, PricePreviewAvailable, RfqReconfirmRequired, PublicationApprovalRequired,
+	RequestBasicsReady, RfqReconfirmRequired, PublicationApprovalRequired,
 	ItemNeedsDisambiguation,
 }
 
-// RfqState 是這個需求的詢價確認快照相對於現行版本的狀態。
+// RfqState 是這個需求未過期的待執行發布核准相對於現行版本的狀態（A9-D35）。
 type RfqState int
 
 // 詢價確認狀態。
 const (
-	// RfqNone 是沒有任何確認快照。
+	// RfqNone 是沒有未過期的待執行發布核准。
 	RfqNone RfqState = iota
-	// RfqStale 是有快照，但對應的不是現行版本。
+	// RfqStale 是有核准，但對應的不是現行版本。
 	RfqStale
-	// RfqConfirmed 是有快照，且對得上現行版本。
+	// RfqConfirmed 是有核准，且對得上現行版本。
 	RfqConfirmed
 )
 
@@ -50,9 +49,8 @@ type Input struct {
 	Rejected      []slots.Rejection
 	Recorded      []slots.Recorded
 	// Question 是這一輪算出的下一題，沒有時 nil；品項消歧中時是 BuildItemDisambiguation 的結果。
-	Question              *Question
-	PricePreviewAvailable bool
-	Rfq                   RfqState
+	Question *Question
+	Rfq      RfqState
 	// PrevStreak 與 Skipped 是上一輪持久化的連續選填計數與買家跳過的欄位；CapExhausted 是 PickNext 這一輪回的第二個值。
 	PrevStreak   int
 	Skipped      []model.SlotKey
@@ -71,8 +69,8 @@ type Plan struct {
 	Skipped        []model.SlotKey
 }
 
-// Decide 選出這一輪的 act。優先序：有欄位被拒、更正已有的欄位、品項消歧、必填未齊、詢價快照過期、快照已確認待核准、
-// 還有選填問題、有價格參考、需求齊備。被截斷但值有保留的欄位只是調整提示，不算被拒。
+// Decide 選出這一輪的 act。優先序：有欄位被拒、更正已有的欄位、品項消歧、必填未齊、發布核准過期、核准待執行、
+// 還有選填問題、需求齊備。被截斷但值有保留的欄位只是調整提示，不算被拒。
 // 品項消歧中（執行器已中斷）時，被拒與更正的回覆由 reply 在警告或更正文字之後接上消歧問句。
 // 更正的欄位排在 Salient 最前面，而且一定全數帶入（其餘事實補到 MaxSalientFacts 為止），敘述才說得出改了什麼。
 func Decide(in Input) Plan {
@@ -110,8 +108,6 @@ func selectAct(in Input, rejected, corrected bool) Act {
 		return PublicationApprovalRequired
 	case in.Question != nil:
 		return AckAndAskOptional
-	case in.PricePreviewAvailable:
-		return PricePreviewAvailable
 	}
 	return RequestBasicsReady
 }

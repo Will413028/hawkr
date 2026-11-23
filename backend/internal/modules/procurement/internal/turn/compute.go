@@ -48,8 +48,7 @@ const (
 type priorState struct {
 	current   slots.Set
 	prevTurn  *prevTurn
-	preview   bool
-	snapshot  *snapshotState
+	approval  *approvalState
 	requestOf string // requests.status
 }
 
@@ -58,8 +57,8 @@ type prevTurn struct {
 	skipped        []model.SlotKey
 }
 
-// snapshotState 是需求最新的確認快照指向的版本是不是這一輪開始前的現行版本。
-type snapshotState struct{ onCurrentRevision bool }
+// approvalState 是需求最新的、未過期的待執行發布核准（A9-D35）指向的版本是不是這一輪開始前的現行版本。
+type approvalState struct{ onCurrentRevision bool }
 
 // decision 是這一輪算出來的全部結果（純資料，沒有 I/O）。
 type decision struct {
@@ -138,7 +137,7 @@ func render(l uitext.Locale, prior priorState, patch slots.Patch, next slots.Set
 
 	plan := planner.Decide(planner.Input{
 		Current: prior.current, Next: next, Rejected: rejected, Recorded: slots.RecordedThisTurn(patch, prior.current, next), Question: q,
-		PricePreviewAvailable: prior.preview && sameContent(prior.current, next), Rfq: rfqState(prior, next),
+		Rfq:        rfqState(prior, next),
 		PrevStreak: prevStreak, Skipped: prevSkipped, CapExhausted: capExhausted,
 	})
 	blocks := reply.Render(l, plan, reply.Args{Missing: missing, Rejected: rejected})
@@ -179,13 +178,13 @@ func confirmable(next slots.Set, ms []resolver.Match, now time.Time) []confirmed
 	return out
 }
 
-// rfqState 把「需求最新的確認快照」換成 planner 的詢價狀態：快照指向這一輪開始前的現行版本、而且這一輪沒有改動內容才算有效，
-// 其餘有快照的都是過期（內容變了，快照不再對得上）。
+// rfqState 把「需求最新的未過期待執行發布核准」換成 planner 的詢價狀態：核准指向這一輪開始前的現行版本、而且這一輪沒有改動內容才算有效，
+// 其餘有核准的都是過期（內容變了，核准不再對得上）；沒有未過期的待執行核准是 RfqNone。
 func rfqState(prior priorState, next slots.Set) planner.RfqState {
 	switch {
-	case prior.snapshot == nil:
+	case prior.approval == nil:
 		return planner.RfqNone
-	case prior.snapshot.onCurrentRevision && sameContent(prior.current, next):
+	case prior.approval.onCurrentRevision && sameContent(prior.current, next):
 		return planner.RfqConfirmed
 	}
 	return planner.RfqStale
