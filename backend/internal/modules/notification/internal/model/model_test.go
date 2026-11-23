@@ -98,6 +98,12 @@ func TestAnnouncementCategoryFollowsD18(t *testing.T) {
 		if Disableable(a, CategoryAnnouncement, ChannelInbox) || !Disableable(a, CategoryAnnouncement, ChannelPush) {
 			t.Errorf("%s 的公告：收件匣不可關、推播可關", a)
 		}
+		if Delivers(a, CategoryAnnouncement, ChannelEmail) || Disableable(a, CategoryAnnouncement, ChannelEmail) {
+			t.Errorf("%s 的公告不寄 email，不是可列的組合", a)
+		}
+		if !Delivers(a, CategoryAnnouncement, ChannelInbox) || !Delivers(a, CategoryAnnouncement, ChannelPush) {
+			t.Errorf("%s 的公告送達收件匣與推播", a)
+		}
 	}
 }
 

@@ -62,7 +62,7 @@ const (
 	ClassTransactional CategoryClass = "TRANSACTIONAL"
 	ClassInteraction   CategoryClass = "INTERACTION"
 	ClassMarketing     CategoryClass = "MARKETING"
-	// ClassSystem 是後台公告（D18）：收件匣與 email 不可關，推播可關。
+	// ClassSystem 是後台公告（D18）：收件匣不可關，推播可關，不寄 email。
 	ClassSystem CategoryClass = "SYSTEM"
 )
 
@@ -73,10 +73,15 @@ type categoryDef struct {
 	audiences []Audience
 	// locked 是這個分類不可關的渠道。
 	locked []Channel
+	// undelivered 是這個分類不會送達的渠道：偏好 API 不列這些組合，也不接受設定。
+	undelivered []Channel
 }
 
 // D4：交易必要的收件匣與 email 不可關（推播可關，賣家 SHIPMENT_ANOMALY 的推播也不可關）；互動與行銷全部可關、預設開。
 var transactionalLocked = []Channel{ChannelInbox, ChannelEmail}
+
+// D18：公告只有收件匣與推播，收件匣不可關。
+var announcementLocked = []Channel{ChannelInbox}
 
 // 受眾的分類集合：SHIPMENT_ANOMALY 與 PAYOUT、REVIEW、FOLLOW 只有店家會收到；FOLLOWED_STORE_POST、COUPON、RESTOCK 只有買家會收到
 // （舊服務 notification_preference.go 的 SellerCategories／BuyerCategories 同樣如此，後者的註解說明配送異常不對買家開放）。
@@ -87,21 +92,21 @@ var (
 )
 
 var categoryDefs = []categoryDef{
-	{CategoryOrder, ClassTransactional, bothAudiences, transactionalLocked},
-	{CategoryShipment, ClassTransactional, bothAudiences, transactionalLocked},
-	{CategoryShipmentAnomaly, ClassTransactional, storeOnly, []Channel{ChannelInbox, ChannelPush, ChannelEmail}},
-	{CategoryAftersales, ClassTransactional, bothAudiences, transactionalLocked},
-	{CategoryPayout, ClassTransactional, storeOnly, transactionalLocked},
-	{CategoryAccount, ClassTransactional, bothAudiences, transactionalLocked},
-	{CategoryChat, ClassInteraction, bothAudiences, nil},
-	{CategoryReview, ClassInteraction, storeOnly, nil},
-	{CategoryComment, ClassInteraction, bothAudiences, nil},
-	{CategoryLike, ClassInteraction, bothAudiences, nil},
-	{CategoryFollow, ClassInteraction, storeOnly, nil},
-	{CategoryFollowedStorePost, ClassInteraction, buyerOnly, nil},
-	{CategoryCoupon, ClassMarketing, buyerOnly, nil},
-	{CategoryRestock, ClassMarketing, buyerOnly, nil},
-	{CategoryAnnouncement, ClassSystem, bothAudiences, transactionalLocked},
+	{CategoryOrder, ClassTransactional, bothAudiences, transactionalLocked, nil},
+	{CategoryShipment, ClassTransactional, bothAudiences, transactionalLocked, nil},
+	{CategoryShipmentAnomaly, ClassTransactional, storeOnly, []Channel{ChannelInbox, ChannelPush, ChannelEmail}, nil},
+	{CategoryAftersales, ClassTransactional, bothAudiences, transactionalLocked, nil},
+	{CategoryPayout, ClassTransactional, storeOnly, transactionalLocked, nil},
+	{CategoryAccount, ClassTransactional, bothAudiences, transactionalLocked, nil},
+	{CategoryChat, ClassInteraction, bothAudiences, nil, nil},
+	{CategoryReview, ClassInteraction, storeOnly, nil, nil},
+	{CategoryComment, ClassInteraction, bothAudiences, nil, nil},
+	{CategoryLike, ClassInteraction, bothAudiences, nil, nil},
+	{CategoryFollow, ClassInteraction, storeOnly, nil, nil},
+	{CategoryFollowedStorePost, ClassInteraction, buyerOnly, nil, nil},
+	{CategoryCoupon, ClassMarketing, buyerOnly, nil, nil},
+	{CategoryRestock, ClassMarketing, buyerOnly, nil, nil},
+	{CategoryAnnouncement, ClassSystem, bothAudiences, announcementLocked, []Channel{ChannelEmail}},
 }
 
 // Categories 回傳全部偏好分類（D4 的 14 個加 D18 的 ANNOUNCEMENT）；每次回傳新的切片。
@@ -151,10 +156,16 @@ func ClassOf(c PrefCategory) (CategoryClass, bool) {
 	return d.class, ok
 }
 
-// Disableable 回報受眾 a 的使用者能不能關掉分類 c 在渠道 ch 的通知；受眾沒有的分類、不在清單內的分類或渠道一律不可關（偏好 API 不接受它們）。
+// Delivers 回報受眾 a 的分類 c 會不會送達渠道 ch；偏好 API 只列送達的組合。目前只有公告不寄 email，其餘分類全部渠道都送達。
+func Delivers(a Audience, c PrefCategory, ch Channel) bool {
+	d, ok := lookupCategory(c)
+	return ok && slices.Contains(d.audiences, a) && slices.Contains(Channels(), ch) && !slices.Contains(d.undelivered, ch)
+}
+
+// Disableable 回報受眾 a 的使用者能不能關掉分類 c 在渠道 ch 的通知；受眾沒有的分類、不送達的組合、不在清單內的分類或渠道一律不可關（偏好 API 不接受它們）。
 func Disableable(a Audience, c PrefCategory, ch Channel) bool {
 	d, ok := lookupCategory(c)
-	if !ok || !slices.Contains(d.audiences, a) || !slices.Contains(Channels(), ch) {
+	if !ok || !slices.Contains(d.audiences, a) || !Delivers(a, c, ch) {
 		return false
 	}
 	return !slices.Contains(d.locked, ch)

@@ -618,7 +618,7 @@ export const NotificationAudienceSchema: GenEnum<NotificationAudience> = /*@__PU
 
 /**
  * NotificationCategory 是偏好分類：使用者設定偏好的單位，也是收件匣的篩選單位。
- * 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開；公告收件匣與 email 不可關、推播可關。
+ * 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開；公告收件匣不可關、推播可關、不寄 email（偏好不列 email）。
  *
  * @generated from enum hawkr.notification.v1alpha1.NotificationCategory
  */
