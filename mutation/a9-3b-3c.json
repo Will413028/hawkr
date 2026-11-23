@@ -239,7 +239,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/turn/executor.go",
    "old": "onCurrentRevision: appr.RequestRevisionID == active.ID}",
-   "new": "onCurrentRevision: true}",
+   "new": "onCurrentRevision: appr.RequestRevisionID == active.ID || true}",
    "test": "internal/modules/procurement/internal/turn ^TestPlannerStageIsStaleWhenTheApprovalIsOnAnEarlierRevision$",
    "why": "The planner treats a pending approval on an earlier revision as if it were on the current one."
   },

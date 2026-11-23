@@ -85,9 +85,9 @@ func TestPreviewPublicationDirectOnlyAcceptsTheEffectiveCandidateSet(t *testing.
 		t.Fatalf("有效的候選集要收：%v", err)
 	}
 
-	f.exec(`UPDATE procurement.requests SET status = 'CLARIFYING' WHERE id = $1`, f.request)
+	f.setStatus("CLARIFYING")
 	_, err = f.service().PreviewPublication(ctx, f.directIn(newSet, newCands[1]))
-	wantConflict(t, err, "candidate_set") // 需求已離開 MATCHING
+	wantKind(t, err, apperr.KindFailedPrecondition) // 需求已離開 MATCHING：狀態檢查先於候選集檢查
 	if n := f.count("procurement.rfq_publication_approvals"); n != 1 {
 		t.Fatalf("被拒的請求不寫入，rfq_publication_approvals %d 列", n)
 	}
@@ -150,7 +150,7 @@ func TestPreviewPublicationStaleBranches(t *testing.T) {
 
 	foreign := f.sibling(buyer + 1)
 	notMine := f.publicationIn()
-	notMine.BuyerID, notMine.RequestID, notMine.ExpectedRevisionID = foreign.buyer, foreign.request, foreign.revision
+	notMine.RequestID, notMine.ExpectedRevisionID = foreign.request, foreign.revision // 買家是 f.buyer，需求是別人的
 	_, err = f.service().PreviewPublication(ctx, notMine)
 	wantKind(t, err, apperr.KindNotFound)
 
