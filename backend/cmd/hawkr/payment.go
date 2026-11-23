@@ -84,7 +84,7 @@ func readStripe(e *config.Env, log *slog.Logger) payment.Provider {
 		e.Fail("STRIPE_ACCOUNT_NAMESPACE：%v", err)
 		return nil
 	}
-	client, err := stripe.New(stripe.Config{SecretKey: key, WebhookSecret: whsecret, AccountNamespace: namespace})
+	client, err := stripe.New(stripe.Config{SecretKey: key, WebhookSecret: whsecret, AccountNamespace: namespace, Logger: log})
 	if err != nil {
 		e.Fail("Stripe：%v", err)
 		return nil

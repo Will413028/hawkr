@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -46,6 +47,8 @@ type Config struct {
 	HTTPClient *http.Client
 	// Wait 是 429 退避的等待；nil 時用計時器，ctx 結束就回傳。
 	Wait func(ctx context.Context, d time.Duration) error
+	// Logger 記錄每次 HTTP 往返（每次 429 重送各一筆）的請求摘要，本文經遮罩（redact.go）；nil 時不記。
+	Logger *slog.Logger
 }
 
 // Client 呼叫 Stripe。
@@ -88,7 +91,11 @@ func New(cfg Config) (*Client, error) {
 	if next == nil {
 		next = http.DefaultTransport
 	}
-	hc.Transport = recorder{next: next}
+	lg := cfg.Logger
+	if lg == nil {
+		lg = slog.New(slog.DiscardHandler)
+	}
+	hc.Transport = recorder{next: next, log: lg}
 	backends := sdk.NewBackendsWithConfig(&sdk.BackendConfig{
 		URL:               sdk.String(base.String()),
 		HTTPClient:        hc,
@@ -198,12 +205,19 @@ func (e *exchange) apiError() *APIError {
 	return &APIError{Status: e.status, Code: env.Error.Code, Message: env.Error.Message}
 }
 
-// recorder 讀完回應本文（上限 maxResponseBytes）再還給 SDK，非 2xx 時把狀態、標頭與本文記進呼叫的 ctx。
-type recorder struct{ next http.RoundTripper }
+// recorder 讀完回應本文（上限 maxResponseBytes）再還給 SDK，非 2xx 時把狀態、標頭與本文記進呼叫的 ctx；
+// 每次往返另寫一筆遮罩後的請求摘要（方法、路徑、冪等鍵、狀態、Request-Id、耗時、請求與回應本文），標頭只取這幾個，Authorization 不會進記錄。
+type recorder struct {
+	next http.RoundTripper
+	log  *slog.Logger
+}
 
 func (r recorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqBody := requestBody(req)
+	start := time.Now()
 	resp, err := r.next.RoundTrip(req)
 	if err != nil {
+		r.log.LogAttrs(req.Context(), slog.LevelWarn, "stripe request failed", append(r.requestAttrs(req, reqBody, start), slog.String("error", scrub(err.Error())))...)
 		return nil, err
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
@@ -216,12 +230,60 @@ func (r recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	resp.Body = io.NopCloser(bytes.NewReader(data))
 	resp.ContentLength = int64(len(data))
+	level := slog.LevelInfo
+	if resp.StatusCode >= 400 {
+		level = slog.LevelWarn
+	}
+	attrs := append(r.requestAttrs(req, reqBody, start),
+		slog.Int("status", resp.StatusCode),
+		slog.String("request_id", scrub(resp.Header.Get("Request-Id"))),
+		slog.String("response_body", redactBody(resp.Header.Get("Content-Type"), data)))
+	r.log.LogAttrs(req.Context(), level, "stripe request", attrs...)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if ex, ok := req.Context().Value(exchangeKey{}).(*exchange); ok {
 			*ex = exchange{status: resp.StatusCode, header: resp.Header.Clone(), body: data}
 		}
 	}
 	return resp, nil
+}
+
+func (r recorder) requestAttrs(req *http.Request, body []byte, start time.Time) []slog.Attr {
+	attrs := []slog.Attr{
+		slog.String("method", req.Method),
+		slog.String("path", scrub(req.URL.Path)),
+		slog.String("idempotency_key", scrub(req.Header.Get("Idempotency-Key"))),
+		slog.Duration("duration", time.Since(start)),
+	}
+	if req.URL.RawQuery != "" {
+		attrs = append(attrs, slog.String("query", redactForm(req.URL.RawQuery)))
+	}
+	if b := redactBody(req.Header.Get("Content-Type"), body); b != "" {
+		attrs = append(attrs, slog.String("request_body", b))
+	}
+	return attrs
+}
+
+// requestBody 取出請求本文供記錄，並確保傳輸層仍讀得到完整本文。
+func requestBody(req *http.Request) []byte {
+	if req.Body == nil || req.Body == http.NoBody {
+		return nil
+	}
+	if req.GetBody != nil {
+		rc, err := req.GetBody()
+		if err != nil {
+			return nil
+		}
+		defer func() { _ = rc.Close() }()
+		b, _ := io.ReadAll(io.LimitReader(rc, maxResponseBytes))
+		return b
+	}
+	b, err := io.ReadAll(req.Body)
+	_ = req.Body.Close()
+	req.Body = io.NopCloser(bytes.NewReader(b))
+	if err != nil {
+		return nil
+	}
+	return b
 }
 
 // call 在總上限 timeout 內執行一次 SDK 呼叫：429 依 Retry-After（沒有就指數退避）等待後重送，最多 maxAttempts 次；
