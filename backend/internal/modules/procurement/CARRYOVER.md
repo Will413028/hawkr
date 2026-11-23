@@ -126,6 +126,64 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | trace | 跨程序追蹤 | 否：單體 | 單一 trace | `agent_run_events.trace_id` 不建（沒有讀取者，3b 若要再補） |
 | 下游呼叫的逾時與重試 | 外部 provider 要有 deadline | 成立 | 明確 timeout、retry | LLM 走 `internal/platform/llm`（M6）；分類樹讀取 `LoadTimeout`；ordering 建單的 River job 退避與重試用盡（轉 `ORDER_FAILED`）在 3c |
 
+## 詢價發布鏈的沿用盤點（A9-3b-3c，A9-D31 Q3–Q6）
+
+| 機制 | 當時為什麼 | 現在成立嗎 | 從零設計 | 結論 |
+|---|---|---|---|---|
+| 發布建一個 `PUBLICATION` run 與 `RFQ_PUBLICATION_RESULT` artifact | 買家的 replay 要看到這次發布 | 否：artifact 已刪（A9-D24(5)），快照改讀 `GetLatestPublicationByRequest` | 發布是同步命令，不是 agent run | 不建 run；刪 `run_type` 的 PUBLICATION 與 `agent_runs.publication_id`（Q3） |
+| 發布 outbox（INVITE_CREATED／EXTERNAL）與 `rfq_publication_commands` | 跨服務可靠外送；冪等收據 | 否：單體規則 4（M11、S4） | 同 transaction 寫發布、邀請與一則模組事件，投遞由訂閱者做 | `model.RfqPublished` 在 `ExecuteRfqPublication` 的 transaction 內 `events.Publish`；relay 與通知在 A9-3c（Q4）。冪等鍵放在 `rfq_publications` |
+| 核准、確認快照、預覽各存 hash 與 canonical payload 複本，執行時比對存下的 hash | 被參照的列可變 | 否：參照的列不可變（S5） | hash 由不可變的列重算，比對「呼叫端帶來的」與「重算的」 | `internal/rfqhash`（SHA-256 對固定欄位順序的 JSON，原像含 `schemaVersion`）；讀取端與寫入端用 `rfq.SnapshotHash` 同一個對照（Q5） |
+| 四種 hash 各自的原像（預覽範圍、受眾、賣家可見內容、快照） | 各自獨立演進 | 成立 | 同演算法、各自一個型別，欄位不共用 | `rfqhash` 的 `PricePreview`、`Audience`、`SellerFacing`、`Snapshot`；`TestEvery*FieldChangesTheHash`、`Test*HashCovers*` 守欄位覆蓋 |
+| 審核前的 `candidate_set_id` 與 `candidate_set_policy_version` 進受眾 hash | 重驗「發給誰」 | 否：受眾名單（店家與順序）已凍結在 `_recipients`，候選集的有效性在預覽時由 `search.IsEffective` 檢查（A9-D29(4)） | 受眾 = 模式、政策、有序店家 | 不存候選集欄位；受眾 hash 只含模式、政策與有序店家 ID |
+| EXTERNAL 站外收件人（prospect lane） | vendor portal | 否（A9-D1 刪） | 只有平台店家 | 邀請只有 `store_id` |
+| 執行的 `canonical_request_hash` 判斷重送是否同一次請求 | 命令表存雜湊 | 否：沒有命令表 | 重送比對冪等鍵所在實體的欄位 | 比對需求、核准、讀到的版本與 payload hash；核准版本不比（它只是 CAS token，成功後已前進） |
+| 單一仲裁者：`ClaimApprovalForExecute` 的 CAS（state、version、buyer、`expires_at`） | exactly-one 與零寫入 | 成立 | 同 | 過期、已執行、版本不符都只由這個 UPDATE 判定，Go 不重複檢查；拒絕路徑整筆 rollback，核准維持 PENDING |
+| 預覽 15 分、快照與核准各 24 小時、`MaxBuyerNoteLen` 200 | 沿用 | 預覽與核准沿用；補充說明上限依 proto 與 DB CHECK 是 500（proto 勝） | 同 | `rfq.PricePreviewTTL`、`SnapshotTTL`、`ApprovalTTL`、`MaxBuyerNoteRunes` |
+| 確認快照的 `expires_at` 不被讀（舊程式只寫） | 沒有人擋 | 同 | 該擋或不存 | 照舊不擋（proto 寫「快照到期的時間」但沒說到期後的行為）；待 Will 決定，見 A9-3c 回報 |
+| 公開池的受眾政策 `WISH_POOL_ALL_ACTIVE_SELLERS_V1`／1 | 全站未停權賣家 | 成立（proto 註解同） | 同 | `rfq.WishPoolPolicyID`；預覽 `recipient_count` 為 0，收件人與封鎖檢查在 A9-3c（A9-D29(5)） |
+
+### 舊分支到新契約的對照（A9-3b-3c）
+
+| 舊分支 | 新契約 | 守門 |
+|---|---|---|
+| 價格預覽：clientRequestId 必填 | handler 以 `client_request_id`（UUIDv4）擋，INVALID_ARGUMENT | `TestRfqMethodsValidateAtTheEntryAndNameTheField` |
+| 價格預覽：冪等命中且輸入 hash 不同 | INVALID_ARGUMENT，欄位 `client_request_id`（比對需求、讀到的版本、區間） | `TestPreviewPriceReplaysTheFirstResultAndRejectsDifferentContent` |
+| 價格預覽：revision ≠ expected（STALE_REVISION） | ABORTED／VERSION_CONFLICT，conflictTarget `request_revision` | `TestPreviewPriceBranches` |
+| 價格預覽：range 不合法（FAILED_PRECONDITION BUYER_REQUESTED_RANGE_REQUIRED） | INVALID_ARGUMENT，欄位 `buyer_requested_range.lower_bound_amount`／`upper_bound_amount`（新契約以 proto 註解為準） | `TestPreviewPriceBranches`、`TestValidRange` |
+| 價格預覽：有單位數量卻算不出（QUANTITY_UNIT_UNCONVERTIBLE） | FAILED_PRECONDITION，無 reason（只剩溢位） | `TestPreviewPriceOverflowIsAFailedPreconditionWithoutAReason`、`TestTotalReportsOverflow` |
+| 價格預覽：`referenceBasis`（GRAM 每 1000） | 同 | `TestPreviewPriceBasisAndTotalByRequirement`、`TestBasis` |
+| 價格預覽：沒有單位（舊程式留空的計價基準） | FAILED_PRECONDITION／REQUIREMENT_NOT_READY（新表 `basis_unit` NOT NULL；SSOT 沒寫，取最窄的擋法） | `TestPreviewPriceRequirementWithoutAUnitIsNotReady` |
+| 價格預覽：`delivery_city` 欄位 | 刪（Q6）；賣家看到的交貨縣市取需求版本 | proto |
+| 價格預覽：不屬於買家的需求 | NOT_FOUND（含已刪除的對話） | `TestPreviewPriceBranches` |
+| 確認：buyer_note 過長（200） | INVALID_ARGUMENT，欄位 `buyer_note`，上限 500 字、先去頭尾空白 | `TestConfirmSnapshotNoteLimit` |
+| 確認：冪等命中但 request／preview／version 不同 | INVALID_ARGUMENT，欄位 `client_request_id`（比對需求、預覽、讀到的版本、補充說明） | `TestConfirmSnapshotReplaysTheFirstResultAndRejectsDifferentContent` |
+| 確認：revision ≠ expected | VERSION_CONFLICT `request_revision` | `TestConfirmSnapshotStaleBranches` |
+| 確認：預覽不屬於買家（RESOURCE_NOT_FOUND） | NOT_FOUND | `TestConfirmSnapshotStaleBranches` |
+| 確認：preview.request ≠ request、preview.revision ≠ active、過期、version／hash 不符 | VERSION_CONFLICT `price_preview`（version 已刪，A9-D21） | `TestConfirmSnapshotStaleBranches`、`TestConfirmSnapshotRejectsAPreviewMadeForAnEarlierRevision` |
+| 發布預覽：revision ≠ expected | VERSION_CONFLICT `request_revision` | `TestPreviewPublicationStaleBranches` |
+| 發布預覽：快照不屬於買家 | NOT_FOUND | `TestPreviewPublicationStaleBranches` |
+| 發布預覽：snapshot.request／revision 不符（APPROVAL_STALE） | VERSION_CONFLICT `rfq_snapshot` | `TestPreviewPublicationStaleBranches` |
+| 發布預覽：WISH_POOL 帶候選、DIRECT 沒帶候選集或候選、候選重複、未知模式 | INVALID_ARGUMENT，指向該欄位（含重複的索引） | `TestAudienceShape`、`TestPreviewPublicationShapeErrorsPointAtTheField` |
+| 發布預覽：候選集不屬於買家或這個需求（舊：INVALID_ARGUMENT） | NOT_FOUND（與 ToggleSelection 一致） | `TestPreviewPublicationDirectBranches` |
+| 發布預覽：候選集不是需求現行版本的（舊：`set.RequestRevisionID` ≠ active） | 改成有效候選集檢查（A9-D29(4)）：VERSION_CONFLICT `candidate_set` | `TestPreviewPublicationDirectOnlyAcceptsTheEffectiveCandidateSet` |
+| 發布預覽：候選不在候選集裡 | INVALID_ARGUMENT，欄位 `selected_candidate_ids[i]` | `TestPreviewPublicationDirectBranches` |
+| 發布預覽：候選身分解析失敗（Internal） | 不存在：候選只有 `store_id`（NOT NULL、CHECK > 0） | schema |
+| 發布預覽：回價期限格式 | handler 以 `google.type.Date` 驗證日曆日期，INVALID_ARGUMENT | `TestDateFromProto` |
+| 發布預覽：冪等鍵撞到不同核准（IDEMPOTENCY_KEY_CONFLICT） | INVALID_ARGUMENT，欄位 `client_request_id`；內容相同回同一份核准 | `TestPreviewPublicationRejectsTheSameKeyWithDifferentContent`、`TestPreviewPublicationWishPoolHasNoRecipientsAndTheHashesAreRecomputable` |
+| 執行：命令重送回原發布 | `Replayed` 為 true，不重複建邀請與事件（先於其餘檢查，過期核准也回放） | `TestExecuteReplaysTheFirstPublicationWithoutNewInvitesOrEvents` |
+| 執行：同鍵不同內容（ErrPublicationCommandConflict） | INVALID_ARGUMENT，欄位 `client_request_id` | `TestExecuteRejectsTheSameKeyWithDifferentContent` |
+| 執行：revision ≠ expected | VERSION_CONFLICT `request_revision` | `TestExecuteStaleBranchesLeaveTheApprovalPending` |
+| 執行：核准 CAS 失敗（版本、已執行）、核准不是這個需求的、payload hash 不符 | VERSION_CONFLICT `publication_approval` | `TestExecuteAnApprovalThatWasAlreadyExecutedIsAVersionConflict`、`TestExecuteStaleBranchesLeaveTheApprovalPending` |
+| 執行：approval.revision ≠ active（舊：STALE_REVISION） | VERSION_CONFLICT `publication_approval`（核准凍的版本已過時） | `TestExecuteStaleBranchesLeaveTheApprovalPending` |
+| 執行：核准過期（APPROVAL_STALE） | VERSION_CONFLICT `publication_approval`，核准維持 PENDING | `TestExecuteAnExpiredApprovalIsAVersionConflictAndLeavesItPending` |
+| 執行：DIRECT 受眾名單是空的／hash 不符 | 名單空：VERSION_CONFLICT `publication_approval`；hash 不再存，名單即來源，沒有「存下的 hash 不符」 | `Service.ExecutePublication` |
+| 執行：核准不屬於買家 | NOT_FOUND（舊：CAS 失敗統稱 stale；新契約 not-owned → NOT_FOUND） | `TestExecuteStaleBranchesLeaveTheApprovalPending` |
+| 執行：UnknownAudienceMode、PublicationNotFound（Internal） | 不存在：模式有 CHECK，發布與核准在同 transaction 建立 | schema |
+| 執行：建 ledger run 與 artifact | 不建（Q3） | `TestExecuteWishPoolCreatesThePublicationOneEventAndNoRun` |
+| 執行：invite 與 outbox 同 transaction | invite 與 `RfqPublished` 事件同 transaction；任何一步失敗全部還原 | `TestExecuteIsAtomicWhenTheEventSubscriberFails`、`TestExecuteIsAtomicWhenAnInviteInsertFails`、`TestExecuteConcurrentRetriesCreateOnePublicationAndOneEvent` |
+
+整合測試（`-tags integration`）只寫、沒有在本機跑，待 CI。
+
 ## 與 ai-service 的差異
 
 資料沒有搬移（系統從未上線），schema 是新的 baseline。每一項對外看得到或 schema 上的差異一行。

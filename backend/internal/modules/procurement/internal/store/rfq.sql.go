@@ -166,6 +166,41 @@ func (q *Queries) GetApprovalByClientRequest(ctx context.Context, arg GetApprova
 	return i, err
 }
 
+const getApprovalForBuyer = `-- name: GetApprovalForBuyer :one
+SELECT id, version, buyer_id, request_id, request_revision_id, confirmed_rfq_snapshot_id, response_deadline, audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at FROM procurement.rfq_publication_approvals WHERE id = $1 AND buyer_id = $2
+`
+
+type GetApprovalForBuyerParams struct {
+	ID      uuid.UUID
+	BuyerID *int64
+}
+
+// 只依擁有者查（不收斂到需求），理由同 GetPricePreviewForBuyer。
+func (q *Queries) GetApprovalForBuyer(ctx context.Context, arg GetApprovalForBuyerParams) (ProcurementRfqPublicationApproval, error) {
+	row := q.db.QueryRow(ctx, getApprovalForBuyer, arg.ID, arg.BuyerID)
+	var i ProcurementRfqPublicationApproval
+	err := row.Scan(
+		&i.ID,
+		&i.Version,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.RequestRevisionID,
+		&i.ConfirmedRfqSnapshotID,
+		&i.ResponseDeadline,
+		&i.AudienceMode,
+		&i.AudiencePolicyID,
+		&i.AudiencePolicyVersion,
+		&i.State,
+		&i.SchemaVersion,
+		&i.ClientRequestID,
+		&i.GeneratedAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getConfirmedSnapshot = `-- name: GetConfirmedSnapshot :one
 SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at FROM procurement.confirmed_rfq_snapshots WHERE id = $1 AND request_id = $2 AND buyer_id = $3
 `
@@ -204,6 +239,33 @@ type GetConfirmedSnapshotByClientRequestParams struct {
 
 func (q *Queries) GetConfirmedSnapshotByClientRequest(ctx context.Context, arg GetConfirmedSnapshotByClientRequestParams) (ProcurementConfirmedRfqSnapshot, error) {
 	row := q.db.QueryRow(ctx, getConfirmedSnapshotByClientRequest, arg.BuyerID, arg.ClientRequestID)
+	var i ProcurementConfirmedRfqSnapshot
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.RequestRevisionID,
+		&i.PricePreviewID,
+		&i.BuyerNote,
+		&i.ClientRequestID,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getConfirmedSnapshotForBuyer = `-- name: GetConfirmedSnapshotForBuyer :one
+SELECT id, buyer_id, request_id, request_revision_id, price_preview_id, buyer_note, client_request_id, expires_at, created_at FROM procurement.confirmed_rfq_snapshots WHERE id = $1 AND buyer_id = $2
+`
+
+type GetConfirmedSnapshotForBuyerParams struct {
+	ID      uuid.UUID
+	BuyerID *int64
+}
+
+// 只依擁有者查（不收斂到需求），理由同 GetPricePreviewForBuyer。
+func (q *Queries) GetConfirmedSnapshotForBuyer(ctx context.Context, arg GetConfirmedSnapshotForBuyerParams) (ProcurementConfirmedRfqSnapshot, error) {
+	row := q.db.QueryRow(ctx, getConfirmedSnapshotForBuyer, arg.ID, arg.BuyerID)
 	var i ProcurementConfirmedRfqSnapshot
 	err := row.Scan(
 		&i.ID,
@@ -416,6 +478,39 @@ type GetPricePreviewByClientRequestParams struct {
 
 func (q *Queries) GetPricePreviewByClientRequest(ctx context.Context, arg GetPricePreviewByClientRequestParams) (ProcurementPricePreview, error) {
 	row := q.db.QueryRow(ctx, getPricePreviewByClientRequest, arg.BuyerID, arg.ClientRequestID)
+	var i ProcurementPricePreview
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.RequestID,
+		&i.RequestRevisionID,
+		&i.RangeLowerAmount,
+		&i.RangeUpperAmount,
+		&i.BasisQuantity,
+		&i.BasisUnit,
+		&i.TotalLowerAmount,
+		&i.TotalUpperAmount,
+		&i.TotalQuantity,
+		&i.TotalUnit,
+		&i.ClientRequestID,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getPricePreviewForBuyer = `-- name: GetPricePreviewForBuyer :one
+SELECT id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, basis_quantity, basis_unit, total_lower_amount, total_upper_amount, total_quantity, total_unit, client_request_id, expires_at, created_at FROM procurement.price_previews WHERE id = $1 AND buyer_id = $2
+`
+
+type GetPricePreviewForBuyerParams struct {
+	ID      uuid.UUID
+	BuyerID *int64
+}
+
+// 只依擁有者查（不收斂到需求）：預覽屬於買家的另一張需求與預覽不存在要分得開（前者是過時，後者是 NOT_FOUND）。
+func (q *Queries) GetPricePreviewForBuyer(ctx context.Context, arg GetPricePreviewForBuyerParams) (ProcurementPricePreview, error) {
+	row := q.db.QueryRow(ctx, getPricePreviewForBuyer, arg.ID, arg.BuyerID)
 	var i ProcurementPricePreview
 	err := row.Scan(
 		&i.ID,

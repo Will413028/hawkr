@@ -104,12 +104,13 @@ var InternalDependencies = map[string]InternalGraph{
 		"planner":      {"model", "slots"},                                                   // 一輪釐清要問什麼、說哪一類話：問題挑選、act 優先序（A9-3b-2a）
 		"reply":        {"model", "planner", "slots", "text"},                                // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
 		"resolver":     {},                                                                   // 品項用詞對分類樹，人工同義詞（A9-D7）
-		"rfqhash":      {},                                                                   // 詢價確認快照的 hash（SHA-256 對固定欄位順序的 JSON，A9-D31 Q5）
+		"rfq":          {"model", "rfqhash", "search", "store"},                              // 詢價發布鏈：價格預覽、確認快照、發布核准、執行發布，hash 由不可變的列重算（A9-3b-3c、A9-D31）
+		"rfqhash":      {},                                                                   // 價格預覽、確認快照、受眾與賣家可見內容的 hash（SHA-256 對固定欄位順序的 JSON，A9-D31 Q5）
 		"retention":    {"store"},                                                            // 買家關閉後刪除與匿名（S10）
 		"run":          {"store"},                                                            // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
 		"search":       {"candidate", "model", "reply", "resolver", "run", "slots", "store"}, // CANDIDATE_SEARCH 的 executor 與開始搜尋的 use case：品項解析定輸入、單一 transaction 提交（A9-3b-2d、A9-D29）
 		"slots":        {"model", "store"},                                                   // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
-		"snapshot":     {"model", "rfqhash", "run", "slots", "store", "turn"},                // GetRuntimeSnapshot 的讀取模型：對話、訊息、run、待回答的中斷、發布結果在同一份快照內讀齊（A9-D30(4)）
+		"snapshot":     {"model", "rfq", "run", "slots", "store", "turn"},                    // GetRuntimeSnapshot 的讀取模型：對話、訊息、run、待回答的中斷、發布結果在同一份快照內讀齊（A9-D30(4)）
 		"store":        {},
 		"text":         {},                                                                            // 模組句子（ADR 2026-10-17 多語系）
 		"turn":         {"extract", "model", "planner", "reply", "resolver", "run", "slots", "store"}, // TURN 與 CLARIFICATION_RESUME 的 executor 與 ResumeRun 的 use case：抽取、套用、解析品項、規劃、單一 transaction 提交（A9-3b-2c、A9-3b-2e）

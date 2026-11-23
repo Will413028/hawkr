@@ -10,6 +10,10 @@ ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 -- name: GetPricePreview :one
 SELECT * FROM procurement.price_previews WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
 
+-- name: GetPricePreviewForBuyer :one
+-- 只依擁有者查（不收斂到需求）：預覽屬於買家的另一張需求與預覽不存在要分得開（前者是過時，後者是 NOT_FOUND）。
+SELECT * FROM procurement.price_previews WHERE id = @id AND buyer_id = @buyer_id;
+
 -- name: GetPricePreviewByClientRequest :one
 SELECT * FROM procurement.price_previews WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
 
@@ -21,6 +25,10 @@ ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetConfirmedSnapshot :one
 SELECT * FROM procurement.confirmed_rfq_snapshots WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
+
+-- name: GetConfirmedSnapshotForBuyer :one
+-- 只依擁有者查（不收斂到需求），理由同 GetPricePreviewForBuyer。
+SELECT * FROM procurement.confirmed_rfq_snapshots WHERE id = @id AND buyer_id = @buyer_id;
 
 -- name: GetConfirmedSnapshotByClientRequest :one
 SELECT * FROM procurement.confirmed_rfq_snapshots WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
@@ -36,6 +44,10 @@ ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetApproval :one
 SELECT * FROM procurement.rfq_publication_approvals WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
+
+-- name: GetApprovalForBuyer :one
+-- 只依擁有者查（不收斂到需求），理由同 GetPricePreviewForBuyer。
+SELECT * FROM procurement.rfq_publication_approvals WHERE id = @id AND buyer_id = @buyer_id;
 
 -- name: GetApprovalByClientRequest :one
 SELECT * FROM procurement.rfq_publication_approvals WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;

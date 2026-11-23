@@ -22,12 +22,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/retention"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfq"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/search"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -78,6 +80,8 @@ type Deps struct {
 	Entitlements EntitlementReader
 	// Limits 是每位買家的送出上限，零值取預設（同時進行中 2、每分鐘送出 10）。
 	Limits run.Limits
+	// Events 是 ExecuteRfqPublication 在同 transaction 發布 RfqPublished 的事件匯流排；沒給時 ExecuteRfqPublication 回組裝錯誤。
+	Events *events.Bus
 }
 
 // EntitlementReader 是 SubmitTurn 取額度要用的 buyer 方法：每月上限與期間（*buyer.Module 滿足它）。
@@ -144,6 +148,7 @@ type Module struct {
 	snapshots  snapshot.Reader
 	convs      conversation.Service
 	candidates search.Reader
+	rfq        rfq.Service
 }
 
 // New 建立模組。
@@ -187,6 +192,7 @@ func New(d Deps) *Module {
 	m.snapshots = snapshot.Reader{DB: d.DB, Ledger: ledger}
 	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
 	m.candidates = search.Reader{DB: d.DB}
+	m.rfq = rfq.Service{DB: d.DB, Now: d.Now, Events: d.Events}
 	return m
 }
 
@@ -467,4 +473,65 @@ func (m *Module) DeleteConversation(ctx context.Context, buyerID int64, conversa
 // 只有 SUCCEEDED 有候選（事實依需求現行版本與 locale 讀取時組出），FAILED 帶失敗原因代碼。ctx 不可已在 transaction 內。
 func (m *Module) GetCandidateSearch(ctx context.Context, buyerID int64, requestID, runID uuid.UUID, locale uitext.Locale) (CandidateSearch, error) {
 	return m.candidates.Get(ctx, buyerID, requestID, runID, locale)
+}
+
+// 詢價發布鏈的型別（A9-3b-3c）。
+type (
+	// RfqPublished 在 ExecuteRfqPublication 的 transaction 內發出，含發布與每個邀請；重送冪等的發布不再發（通知與 relay 消費它）。
+	RfqPublished = model.RfqPublished
+	// RfqInvite 是發布時發給一家店的邀請。
+	RfqInvite = model.RfqInvite
+	// PricePreview 是價格預覽，QuoteTotal 是它的總額區間。
+	PricePreview = model.PricePreview
+	QuoteTotal   = model.QuoteTotal
+	// ConfirmedRfqSnapshot 是確認快照。
+	ConfirmedRfqSnapshot = model.ConfirmedRfqSnapshot
+	// SellerFacing 是賣家看得到的詢價內容，PublicationPreview 是發布預覽（核准），Publication 是執行的結果。
+	SellerFacing       = model.SellerFacing
+	PublicationPreview = model.PublicationPreview
+	Publication        = model.Publication
+)
+
+// 發布受眾的模式。
+const (
+	AudienceWishPool         = model.AudienceWishPool
+	AudienceDirectRecipients = model.AudienceDirectRecipients
+)
+
+// 詢價發布鏈的上限（BuyerNote 的字元數）。
+const MaxBuyerNoteRunes = rfq.MaxBuyerNoteRunes
+
+type (
+	// PreviewRfqPriceInput、ConfirmRfqSnapshotInput、PreviewRfqPublicationInput、ExecuteRfqPublicationInput 是詢價發布鏈四支方法的輸入。
+	PreviewRfqPriceInput       = rfq.PreviewPriceInput
+	ConfirmRfqSnapshotInput    = rfq.ConfirmInput
+	PreviewRfqPublicationInput = rfq.PreviewPublicationInput
+	ExecuteRfqPublicationInput = rfq.ExecuteInput
+)
+
+// PreviewRfqPrice 依買家預期的單價區間與需求現行版本的數量、單位算出總額區間，存成 15 分鐘有效的預覽（A9-3b-3c）。
+// 區間不合法回 INVALID_ARGUMENT；需求不屬於買家回 NOT_FOUND；讀到的版本不是現行版本回 ABORTED／VERSION_CONFLICT（request_revision）；
+// 需求沒有單位回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；溢位回 FAILED_PRECONDITION。重送同一個 ClientRequestID 回第一次的預覽，內容不同回 INVALID_ARGUMENT。
+func (m *Module) PreviewRfqPrice(ctx context.Context, in PreviewRfqPriceInput) (PricePreview, error) {
+	return m.rfq.PreviewPrice(ctx, in)
+}
+
+// ConfirmRfqSnapshot 對一份價格預覽產生不可變的確認快照（24 小時有效）。需求或預覽不屬於買家回 NOT_FOUND；buyer_note 超過 MaxBuyerNoteRunes 回 INVALID_ARGUMENT；
+// 需求版本過時回 ABORTED／VERSION_CONFLICT（request_revision）；預覽屬於別的需求、對應的不是現行版本、已過期或 hash 不符回 ABORTED／VERSION_CONFLICT（price_preview）。重送規則同 PreviewRfqPrice。
+func (m *Module) ConfirmRfqSnapshot(ctx context.Context, in ConfirmRfqSnapshotInput) (ConfirmedRfqSnapshot, error) {
+	return m.rfq.ConfirmSnapshot(ctx, in)
+}
+
+// PreviewRfqPublication 依確認快照編出賣家看得到的內容並建立不可變的發布核准（24 小時有效），不發布、不通知。DIRECT_RECIPIENTS 的候選必須屬於有效的候選集（A9-D29(4)）。
+// 欄位與模式不合回 INVALID_ARGUMENT；需求、快照、候選集不屬於買家回 NOT_FOUND；需求版本過時、快照過時、候選集不是有效的候選集分別回 ABORTED／VERSION_CONFLICT
+// （request_revision、rfq_snapshot、candidate_set）。重送規則同 PreviewRfqPrice。公開池的收件人與發布時的封鎖檢查在 A9-3c。
+func (m *Module) PreviewRfqPublication(ctx context.Context, in PreviewRfqPublicationInput) (PublicationPreview, error) {
+	return m.rfq.PreviewPublication(ctx, in)
+}
+
+// ExecuteRfqPublication 以核准的版本建立發布，同 transaction 寫入發布、邀請與 RfqPublished 事件，不建 run（A9-D31 Q3、Q4）。
+// 需求或核准不屬於買家回 NOT_FOUND；需求版本過時回 ABORTED／VERSION_CONFLICT（request_revision）；核准過時（不是這個需求的、版本不符、已執行、已過期、凍結的版本不是現行版本、hash 不符）
+// 回 ABORTED／VERSION_CONFLICT（publication_approval）。重送同一個 ClientRequestID 回第一次的發布（Replayed），內容不同回 INVALID_ARGUMENT。需要 Deps.Events。
+func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublicationInput) (Publication, error) {
+	return m.rfq.ExecutePublication(ctx, in)
 }
