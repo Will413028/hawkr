@@ -304,6 +304,7 @@ type ProcurementTurn struct {
 	RecordedThisTurn []byte
 	OptionalStreak   int32
 	SkippedSlots     []string
+	TurnResult       []byte
 	ClientRequestID  uuid.UUID
 	CreatedAt        time.Time
 }

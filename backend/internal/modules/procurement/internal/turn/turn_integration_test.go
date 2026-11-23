@@ -532,7 +532,7 @@ func TestExistingTurnForTheSameClientRequestFailsTheRun(t *testing.T) { // I9
 	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO procurement.request_revisions (id, request_id, revision_no, status, item, created_at) VALUES ($1, $2, 1, 'SUPERSEDED', '舊', $3)`, rev, f.request, now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO procurement.turns (id, request_id, conversation_id, buyer_id, result_revision_id, source, client_request_id, created_at) VALUES ($1, $2, $3, $4, $5, 'LLM_EXTRACT', $6, $7)`,
+	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO procurement.turns (id, request_id, conversation_id, buyer_id, result_revision_id, source, turn_result, client_request_id, created_at) VALUES ($1, $2, $3, $4, $5, 'LLM_EXTRACT', '{}', $6, $7)`,
 		uuid.NewV7(), f.request, f.conversation, buyer, rev, r.ClientRequestID, now); err != nil {
 		t.Fatal(err)
 	}

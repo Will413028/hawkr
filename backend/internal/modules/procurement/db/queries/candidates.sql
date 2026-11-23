@@ -23,3 +23,10 @@ UPDATE procurement.candidates c
 SET selected = @selected::bool, selected_at = CASE WHEN @selected::bool THEN @now::timestamptz ELSE NULL END
 FROM procurement.candidate_sets s
 WHERE c.id = @id AND c.candidate_set_id = s.id AND s.id = @candidate_set_id AND s.request_id = @request_id AND s.buyer_id = @buyer_id;
+
+-- name: GetLatestSucceededSearchSet :one
+-- 需求最新一筆成功的候選搜尋所產生的候選集 ID（有效的候選集＝需求在 MATCHING 時的這一個，A9-D29(4)）；沒有成功過的搜尋沒有列。
+SELECT candidate_set_id FROM procurement.agent_runs
+WHERE request_id = @request_id AND buyer_id = @buyer_id AND run_type = 'CANDIDATE_SEARCH' AND status = 'SUCCEEDED' AND candidate_set_id IS NOT NULL
+ORDER BY created_at DESC, id DESC
+LIMIT 1;

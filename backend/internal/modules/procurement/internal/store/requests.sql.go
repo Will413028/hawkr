@@ -128,7 +128,7 @@ func (q *Queries) GetConversationIncludingDeleted(ctx context.Context, arg GetCo
 }
 
 const getLatestTurnByRequest = `-- name: GetLatestTurnByRequest :one
-SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1
+SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at DESC, id DESC LIMIT 1
 `
 
 type GetLatestTurnByRequestParams struct {
@@ -153,6 +153,7 @@ func (q *Queries) GetLatestTurnByRequest(ctx context.Context, arg GetLatestTurnB
 		&i.RecordedThisTurn,
 		&i.OptionalStreak,
 		&i.SkippedSlots,
+		&i.TurnResult,
 		&i.ClientRequestID,
 		&i.CreatedAt,
 	)
@@ -219,7 +220,7 @@ func (q *Queries) GetRevision(ctx context.Context, arg GetRevisionParams) (Procu
 }
 
 const getTurnByClientRequest = `-- name: GetTurnByClientRequest :one
-SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at FROM procurement.turns WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at FROM procurement.turns WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetTurnByClientRequestParams struct {
@@ -243,6 +244,7 @@ func (q *Queries) GetTurnByClientRequest(ctx context.Context, arg GetTurnByClien
 		&i.RecordedThisTurn,
 		&i.OptionalStreak,
 		&i.SkippedSlots,
+		&i.TurnResult,
 		&i.ClientRequestID,
 		&i.CreatedAt,
 	)
@@ -350,10 +352,10 @@ func (q *Queries) InsertRevision(ctx context.Context, arg InsertRevisionParams) 
 const insertTurn = `-- name: InsertTurn :execrows
 INSERT INTO procurement.turns (
     id, request_id, conversation_id, buyer_id, result_revision_id, source,
-    buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at)
+    buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at)
 VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11, COALESCE($12::text[], '{}'), $13, $14)
+    $7, $8, $9, $10, $11, COALESCE($12::text[], '{}'), $13, $14, $15)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING
 `
 
@@ -370,6 +372,7 @@ type InsertTurnParams struct {
 	RecordedThisTurn []byte
 	OptionalStreak   int32
 	SkippedSlots     []string
+	TurnResult       []byte
 	ClientRequestID  uuid.UUID
 	Now              time.Time
 }
@@ -389,6 +392,7 @@ func (q *Queries) InsertTurn(ctx context.Context, arg InsertTurnParams) (int64, 
 		arg.RecordedThisTurn,
 		arg.OptionalStreak,
 		arg.SkippedSlots,
+		arg.TurnResult,
 		arg.ClientRequestID,
 		arg.Now,
 	)
@@ -540,7 +544,7 @@ func (q *Queries) ListRevisions(ctx context.Context, arg ListRevisionsParams) ([
 }
 
 const listTurnsByRequest = `-- name: ListTurnsByRequest :many
-SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at, id
+SELECT id, request_id, conversation_id, buyer_id, result_revision_id, source, buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at FROM procurement.turns WHERE request_id = $1 AND buyer_id = $2 ORDER BY created_at, id
 `
 
 type ListTurnsByRequestParams struct {
@@ -570,6 +574,7 @@ func (q *Queries) ListTurnsByRequest(ctx context.Context, arg ListTurnsByRequest
 			&i.RecordedThisTurn,
 			&i.OptionalStreak,
 			&i.SkippedSlots,
+			&i.TurnResult,
 			&i.ClientRequestID,
 			&i.CreatedAt,
 		); err != nil {
@@ -616,6 +621,29 @@ func (q *Queries) LockActiveRevision(ctx context.Context, arg LockActiveRevision
 		&i.DeliveryDate,
 		&i.ExactMatchRequired,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const lockRequestForBuyer = `-- name: LockRequestForBuyer :one
+SELECT id, buyer_id, status, created_at, updated_at FROM procurement.requests WHERE id = $1 AND buyer_id = $2 FOR UPDATE
+`
+
+type LockRequestForBuyerParams struct {
+	ID      uuid.UUID
+	BuyerID *int64
+}
+
+// 鎖需求列（在現行版本之後鎖）：不經 run 的寫入（SubmitAnswer、Rewind、ToggleSelection）與搜尋提交、TURN 提交串行。
+func (q *Queries) LockRequestForBuyer(ctx context.Context, arg LockRequestForBuyerParams) (ProcurementRequest, error) {
+	row := q.db.QueryRow(ctx, lockRequestForBuyer, arg.ID, arg.BuyerID)
+	var i ProcurementRequest
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

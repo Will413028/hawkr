@@ -35,6 +35,26 @@ func (q *Queries) GetCandidateSetForBuyer(ctx context.Context, arg GetCandidateS
 	return i, err
 }
 
+const getLatestSucceededSearchSet = `-- name: GetLatestSucceededSearchSet :one
+SELECT candidate_set_id FROM procurement.agent_runs
+WHERE request_id = $1 AND buyer_id = $2 AND run_type = 'CANDIDATE_SEARCH' AND status = 'SUCCEEDED' AND candidate_set_id IS NOT NULL
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+type GetLatestSucceededSearchSetParams struct {
+	RequestID uuid.UUID
+	BuyerID   int64
+}
+
+// 需求最新一筆成功的候選搜尋所產生的候選集 ID（有效的候選集＝需求在 MATCHING 時的這一個，A9-D29(4)）；沒有成功過的搜尋沒有列。
+func (q *Queries) GetLatestSucceededSearchSet(ctx context.Context, arg GetLatestSucceededSearchSetParams) (*uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getLatestSucceededSearchSet, arg.RequestID, arg.BuyerID)
+	var candidate_set_id *uuid.UUID
+	err := row.Scan(&candidate_set_id)
+	return candidate_set_id, err
+}
+
 const insertCandidate = `-- name: InsertCandidate :exec
 INSERT INTO procurement.candidates (id, candidate_set_id, store_id, source_id, rank, created_at)
 VALUES ($1, $2, $3, $4, $5, $6)

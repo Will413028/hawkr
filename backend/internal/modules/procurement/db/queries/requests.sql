@@ -2,6 +2,10 @@
 INSERT INTO procurement.requests (id, buyer_id, status, created_at, updated_at)
 VALUES (@id, @buyer_id, 'CLARIFYING', @now, @now);
 
+-- name: LockRequestForBuyer :one
+-- 鎖需求列（在現行版本之後鎖）：不經 run 的寫入（SubmitAnswer、Rewind、ToggleSelection）與搜尋提交、TURN 提交串行。
+SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id FOR UPDATE;
+
 -- name: GetRequestForBuyer :one
 -- 不屬於呼叫者的需求與不存在的回同一個沒有列（呼叫端回 NOT_FOUND）。
 SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id;
@@ -108,10 +112,10 @@ WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 -- 冪等鍵在實體上（S4）：同一位買家的同一個 client_request_id 已有輪次時回 0 列，呼叫端改讀既有的輪次。
 INSERT INTO procurement.turns (
     id, request_id, conversation_id, buyer_id, result_revision_id, source,
-    buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, client_request_id, created_at)
+    buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, client_request_id, created_at)
 VALUES (
     @id, @request_id, @conversation_id, @buyer_id, @result_revision_id, @source,
-    @buyer_message, @assistant_reply, @steps, @recorded_this_turn, @optional_streak, COALESCE(@skipped_slots::text[], '{}'), @client_request_id, @now)
+    @buyer_message, @assistant_reply, @steps, @recorded_this_turn, @optional_streak, COALESCE(@skipped_slots::text[], '{}'), @turn_result, @client_request_id, @now)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetTurnByClientRequest :one
