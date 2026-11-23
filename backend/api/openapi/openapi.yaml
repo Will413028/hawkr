@@ -678,7 +678,7 @@ paths:
     post:
       operationId: proxyCreateAiStyle
       summary: 新增 AI 修圖風格
-      description: thumbnailStagedToken：透過 media service 上傳後取得的 staged token，後端會自動 finalize 並寫入 thumbnailUrl
+      description: thumbnailStagedToken：經媒體上傳流程（MediaAppService）取得的 staged token，後端會自動 finalize 並寫入 thumbnailUrl
       tags:
       - AIImage
       security:
@@ -768,7 +768,7 @@ paths:
     put:
       operationId: proxyUpdateAiStyle
       summary: 修改 AI 修圖風格
-      description: thumbnailStagedToken：透過 media service 上傳後取得的 staged token，後端會自動 finalize 並覆寫 thumbnailUrl；不傳則保留原有縮圖
+      description: thumbnailStagedToken：經媒體上傳流程（MediaAppService）取得的 staged token，後端會自動 finalize 並覆寫 thumbnailUrl；不傳則保留原有縮圖
       tags:
       - AIImage
       security:
@@ -11765,7 +11765,7 @@ paths:
       summary: 發送聊天訊息
       description: |-
         透過 IM 服務發送一則聊天訊息給指定使用者。type 支援 "text"（預設）和 "image"。
-        type=image 時，content 須為 Media Service 的 staged token，後端會自動 FinalizeImages 轉正為 CDN URL。
+        type=image 時，content 須為媒體上傳流程（MediaAppService）取得的 staged token，後端會自動 FinalizeImages 轉正為 CDN URL。
       tags:
       - Chat
       security:
@@ -14076,7 +14076,7 @@ paths:
     post:
       operationId: confirmReceipt
       summary: 確認收貨
-      description: 買家對已送達訂單確認收貨，提前完成訂單。可選擇附上收貨照片（先呼叫 media-service 取得 stagedTokens）。若未主動確認，系統將在送達後 3 天自動完成。確認後系統將非同步進行撥款指示
+      description: 買家對已送達訂單確認收貨，提前完成訂單。可選擇附上收貨照片（先經媒體上傳流程（MediaAppService）取得 stagedTokens）。若未主動確認，系統將在送達後 3 天自動完成。確認後系統將非同步進行撥款指示
       tags:
       - Order
       security:
@@ -26972,7 +26972,7 @@ components:
       properties:
         stagedTokens:
           type: array
-          description: 買家收貨照片 stagedToken（選填，由 media-service 預上傳取得）
+          description: 買家收貨照片 stagedToken（選填，經媒體上傳流程（MediaAppService）預上傳取得）
           items:
             type: string
     ConfirmReturnReceiptRequest:

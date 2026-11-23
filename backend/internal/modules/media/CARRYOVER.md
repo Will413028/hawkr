@@ -47,3 +47,37 @@ Java `StorageService` 的操作與 Go port 的對應：`generatePresignedUploadU
 | 內部直傳「上傳並立刻確認」（Java `ServerUploadAndFinalize`、`ServerUploadSecureAndFinalize`，一次呼叫收位元組、寫物件、建資產） | 伺服器自己產生的檔案（出貨單 PDF）要成為資產，沒有 client 可走預簽流程 | 成立，但擁有者要在自己的 transaction 內確認，業務列與資產確認才一起提交；媒體不能替擁有者提交 | 檔案先進暫存、擁有者的 transaction 內確認、沒確認的由 GC 回收（與 client 上傳同一條路），不另設「已確認」的捷徑 | 不照搬一步到位：`PutSecure`（PDF 與圖片，同分段密文管線（`BeginSecureUpload` 加逐段 `PutSecureChunk`；內部讀完 body 才知道段總數，所以 body 全進記憶體、上限 `MaxSecureUploadSize`））與 `PutPublic`（只收圖片，同步重新編碼、同一組上限）建 `READY` 暫存並回 token，擁有者以操作者為 `Uploader` 呼叫既有 `Confirm`；公開 PDF 與「公開只收圖片」衝突，出貨單一律走 `PutSecure`；不新增資產狀態與身分型別，PutPublic 的暫存列帶從未寫入的保留 tmp_key 與寫入物件（重新編碼後內容，與列上的大小、型別一致）的 MD5 以滿足欄位約束；伺服器內部呼叫沒有人能重試，所以 `PutSecure` 共用機敏名額但滿了等名額（受 ctx 約束，client 的 `UploadSecure` 仍立即回 ResourceExhausted），`PutPublic` 的解碼受 `model.PublicPutConcurrency` 名額約束（與處理 queue 合計每個 process 同時解碼 `ProcessQueueWorkers + PublicPutConcurrency` 張）（B1-D14，Will 2026-11-22；`TestPutPublic_ValidImageIsConfirmableAndBecomesActivePublic`、`TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm`） |
 | 上傳時保留消毒後的原始檔名（Java `UploadSessionService`，`persistsSanitizedOriginalFilename` 等三個測試） | 畫面要顯示使用者上傳的檔名 | 不成立：四個 client 搜不到顯示 media 原始檔名的畫面（搜 `original_?filename` 與 `display_?name` 兩個常見欄位名）；檔名是呼叫端輸入，保留就要消毒（缺陷 5.16） | 不存檔名；需要顯示名時由擁有者依文件類型產生 | 不沿用（B1-D16）；`test-map.md` 108、110、111 改寫退場理由。 |
 | 資產與暫存列上存「已確認、已請求刪除」狀態（`ACTIVE`、`DELETING` 由擁有者 transaction 內的 UPDATE 寫入） | 狀態寫在被引用的那一列最直接 | 不成立：擁有者 transaction 內更新 media 既有的列會違反單體規則 4（檢查器在整合測試抓到約 100 筆違規）；從零設計會是「擁有者只新增事實列，狀態由讀取端推導」（Rails Active Storage 的 attach 也是 INSERT attachments 而不 UPDATE blob） | 認領列加刪除請求列，狀態由 SQL 推導 | `upload_claims`、`asset_deletion_requests` 只由擁有者 INSERT；`assets.state` 縮成物理生命週期（`STAGED`、`DELETING`、`DELETED`）；推導唯一定義在 `GetAssetView` 與 `model.DeriveAssetState`；認領與請求列在物理刪除完成時隨資產一起刪（B1-D25） |
+
+## 傳輸層的沿用盤點
+
+不適用，沒有沿用的 gateway handler。gateway 對 media 的 REST（`/app/media/*`、`/api/v1/admin/media/secure_preview/*`）在 B1-4 刪除（`gateway/internal/router/admin_secure_media_removed_test.go` 守住舊路由不再註冊；`rg -n 'upload_sessions|secure_preview' -g '*.go' backend/gateway` 只剩該測試）；對外 API 是重新設計的 Connect `MediaAppService`、`MediaDelegatedService`（`internal/httpapi/server.go` 註冊，契約 `api/hawkr/media/v1alpha1/media.proto`），機敏分段與讀取是規範第十三節的原始位元組端點，沒有任何 gateway handler 或補資料邏輯被搬進來。
+
+## CodeMeta 與錯誤碼的去向
+
+ADR `2026-09-25-codemeta-retirement.md` 過渡第 3 步：media 的每組舊代碼值在單體內由什麼取代。CodeMeta 文件已逐項標上擁有者（B1-7）。
+
+| 舊值 | 去向 | 依據 |
+|---|---|---|
+| `AssetReferenceType`（22 個 `ref_type`，7101 起） | 刪除：Go media 不記引用也不認識業務，擁有者以資產 ID 直接擁有資產（B1-D3）；`pkg/media/ref_type.go` 已隨 B1-5 刪除，剩下的值只服務 Java media 與還沒搬的舊 Go 服務（`業務類型碼.md` 的擁有者段） | `internal/modules/media/AGENTS.md`「不變量」 |
+| `MediaUploadSessionStatus`（7001–7004） | proto enum `UploadState`（對外）、`media.staged_uploads.state` 與 `media.assets.state` 的 CHECK（儲存）；Java 的四個值隨 Java media 退場刪除 | `api/hawkr/media/v1alpha1/media.proto`；`db/schema.sql` 的 `staged_uploads_state_check`、`assets_state_check` |
+| `StagedTokenScope`（7201、7202，JWT claim） | 刪除：staged token 是不透明隨機字串、只存 SHA-256，公開與機敏由資產 visibility 區分，沒有 scope 這個維度（B1-D2） | `db/schema.sql` 的 `staged_uploads` |
+| 錯誤碼 9220 `MEDIA_OBJECT_KEY_REQUIRED` | 刪除：沒有任何呼叫端（只剩定義與生成檔），隨 CodeMeta 退場 | `rg -n 'MEDIA_OBJECT_KEY_REQUIRED\|MediaObjectKeyRequired' backend` 只命中 `pkg/errors/bizcode/bizcode.go`、`GrpcResponseCode.java` 與文件 |
+| 拒絕原因（Java 以字串與 200＋body `code` 傳遞） | proto enum `RejectReason`；其他錯誤走 `ErrorReason` 與型別化錯誤（見上表「200＋body `code` 的錯誤傳遞」列） | `media.proto` 的 `RejectReason` |
+
+## 公司時期未完成項
+
+legacy-backlog 的 B1 段（B1-7 對照現行程式碼）。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| #2758：Media GC 在 claim 之後仍可 Link，會刪掉剛開始使用的圖 | 修掉（B1-D1、D25）：沒有 Link 這個動作；擁有者 `Confirm` 與 GC 搶同一筆認領，只有一方成功，GC 不碰已確認的上傳（已 settle 與未 settle 都一樣） | `TestConfirmAndGC_ConcurrentOnlyOneSucceeds`（`lifecycle_integration_test.go:791`）、`TestConfirmAndGC_DeterministicInterleavings`、`TestGC_NeverClaimsAConfirmedUploadSettledOrNot`（`:609`）、`TestConfirmFieldsAndGCNeverDeadlockOrStall`（`appendonly_integration_test.go:288`） |
+| #2759：機敏上傳同 session 併發 PUT 讓 AES key 與 R2 密文不一致 | 修掉（B1-D4、D17）：每檔隨機 DEK 以 KEK 包裹存資產列，每段密文綁資產與位置；同一段併發時只留勝出者的物件、敗者刪自己的物件並讀回勝出者 | `TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObject`（`secure_integration_test.go:625`）、`TestReadSecure_SwappedDroppedForeignOrRecountedChunksFailToRead`（`:934`）、`TestReadSecure_FailsWhenWrappedDEKMovedToAnotherAsset`（`:1047`） |
+| #2760：Java media client 四個服務把非零業務碼當成成功 | 設計改變不再成立（B1-D7）：Go media 沒有「200＋body `code`」這層，錯誤是型別化錯誤與 Connect 的狀態碼（見沿用盤點「200＋body `code` 的錯誤傳遞」列）；四個 Java 服務的 client 不修也不寫轉接，隨各服務改寫成 Go 時刪除 | `CARRYOVER.md` 沿用盤點；計畫 B1-D7 |
+| #2766：標準上傳的記憶體補償有競態，crash 後留下無追蹤的 R2 物件 | 修掉（B1-D5）：標準上傳是 client 預簽直傳，先建暫存列再簽網址，物件一定有列指著，沒有記憶體補償；中斷留下的列與物件由 GC 過寬限回收，處理輸給 GC 時刪自己的物件 | `TestProcess_LostToGCLeavesNoOrphanObject`（`lifecycle_integration_test.go:1347`）、`TestGC_ReclaimsStuckUploadedAfterGrace`（`:1028`）、`TestGC_ReclaimsExpiredUploadingSessionChunksAndOrphans`（`secure_integration_test.go:531`） |
+| #2771：Go media client `ReleaseReferences` 在 request 取消後立即失敗且沒有安全重試 | 設計改變不再成立（B1-D3、D25）：client 與 `ReleaseReferences` 都刪除（`rg -n 'legacy/mediaservice' -g '*.go' backend` 為 0）；擁有者在自己的 transaction 內 `MarkDeleted`（只新增刪除請求列），實體刪除由 River job 重試，不依賴請求的 context；取消後清理另有測試 | `TestPutSecureChunk_PutFailureCleanupRunsWithADeadlineEvenWhenTheRequestIsCancelled`（`internal/upload/secure_abort_integration_test.go:146`）、`TestDeleteJob_StorageFailureKeepsRowRetryable`（`lifecycle_integration_test.go:1224`） |
+| #2778：AI 風格縮圖的 raw `thumbnail_key` 可以繞過 ownership 與 Link | media 這一側不再成立，ai-service 這一側仍成立，未修：Go media 只接受擁有者以 staged token `Confirm`（上傳者綁定），沒有收裸 key 的入口；舊 Go ai-service 的 `thumbnail_key` 欄位還在，AI 風格縮圖的上傳流程依 B1-D11 本機失敗，隨 ai-service 搬進單體時改成 `Confirm` 並刪掉裸 key 欄位 | `services/ai-service/internal/usecase/style_usecase.go`；計畫 B1-D11 |
+| #2780：換圖流程的 broad Release 在併發更新時會刪掉勝出圖片的引用 | 設計改變不再成立（B1-D23）：沒有 Release；擁有者以全部欄位的前後差集決定 `MarkDeleted`，與寫入同一個 transaction，且一個資產只能被一個擁有者確認，不會共用 | `TestConfirm_ConfirmedInAnotherTransactionIsRejected`（`lifecycle_integration_test.go:680`）、`TestConfirmThenMarkDeletedSameTxDeletionWins`（`appendonly_integration_test.go:176`） |
+| #1865：加密金鑰缺少時要 fail-closed，不外洩內部例外訊息 | 修掉（B1-D4）：沒有金鑰環時機敏的開始、寫入、讀取、重新包裹全部回 `ErrNoKeyring` 且不寫任何物件；啟動時金鑰設定錯誤直接失敗；對外回 unavailable 與通用文字，細節只進 error log | `TestSecureUpload_RefusesWhenKeyringMissing`（`secure_integration_test.go:753`）、`TestParseKeyring_StartupFailsOnBadConfig`（`:1262`）、`TestBeginSecureUploadWithoutKeyringIsUnavailable`（`internal/httpapi/media/app_test.go:310`） |
+| #1801：媒體 URL 寫入與上傳契約統一成 camelCase | 設計改變不再成立（B1-D6）：舊 REST 的欄位命名問題隨 gateway 的 media REST 一起刪除；新契約是 proto，欄位 snake_case、JSON 由 protojson 生成 camelCase，由 `buf lint` 守住 | `api/hawkr/media/v1alpha1/media.proto`；`.github/workflows/api-contract.yml` |
+| #1803：商家沒有 logo 時各處 fallback 不一致 | 待決：不屬於 media（media 不認識 logo 這個用途，沒有圖就沒有資產）；fallback 散在 website、admin、兩支 App 的呈現層，要統一屬於 UI 改動，需先取得同意 | `rg -il 'logo' website/components buyer-app/lib seller-app/lib admin/src` |
+| 舊 checkout 的本機分支 `docs/media-reference-level-triggered-reconcile`、`docs/post-media-reference-lifecycle`、`chore/media-object-integrity-audit` | 刪除：三條分支不在這個 repo（`git rev-parse` 查無），不搬；前兩條的主題是引用層對帳與引用生命週期，對應的 `asset_reference` 反向索引在 B1-D3、D25 後不存在（`replicas.csv` 該列 removed）；物件完整性由處理時核對大小與 MD5、機敏讀取時驗證密文取代 | 計畫 B1-D3、D25；`TestPublicProcess_SizeMismatchIsRejectedAndCannotBeConfirmed`、`TestReadSecure_TamperedTruncatedOrTaglessCiphertextFailsBeforeAnyPlaintext` |

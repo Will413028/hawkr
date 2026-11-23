@@ -39,7 +39,7 @@ aftersales.refund.completed,aftersales.events,aftersales-service,order-service,o
 account.deleted,hawkr.account,account-service,buyer-service,buyer.account.deleted,release buyer avatar media refs,yes,STATE,call: accountdeletion 在刪帳的 transaction 內呼叫 buyer.CloseForDeletion；頭像的 media 參照由 River job（buyer.release_avatar）釋放
 account.deleted,hawkr.account,account-service,im-service,im.account.deleted,cleanup account chat data,yes,STATE,
 account.deleted,hawkr.account,account-service,notification-service,notification.account.deleted,purge account inbox/devices,yes,STATE,
-account.deleted,hawkr.account,account-service,seller-service,seller.account.deleted,release seller logo/cover media refs,yes,STATE,
+account.deleted,hawkr.account,account-service,seller-service,seller.account.deleted,release seller logo/cover media refs,yes,STATE,removed: seller 模組已在單體內，取消這個訂閱；logo、封面不隨帳號刪除事件釋放，店家關閉保留，個資清理（退場）的同一個 transaction 內 MarkDeleted（seller CARRYOVER；TestCloseKeepsTheImagesUntilThePurgeReleasesThem）
 buyer.deleted,hawkr.buyer,buyer-service,coupon-service,coupon.buyer.deleted,cleanup buyer coupons,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,crm-service,crm.buyer.deleted,cleanup CRM buyer data,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,im-service,im.buyer.deleted,cleanup buyer chat data,yes,STATE,
