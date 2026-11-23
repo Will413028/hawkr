@@ -483,7 +483,7 @@ seller 約是 buyer 的兩倍半，比 A2 大。所以拆成 **A3a buyer、A3b s
         - 盤點與決定（2026-11-23，dev `05ce7d4c`）：
           - D9 gate：compose 已無 `TGOS_BASE_URL`（隨 11b 刪除），`MEDIA_BASE_URL` 改為必填無預設；ADR 寫的 CI 黑名單 gate 從未建出（`rg -il denylist scripts .github/workflows backend/scripts` 無結果）。**不建，修 ADR**（Will 2026-11-23）：`docs/adr/2026-09-24-go-modular-monolith.md` D9 段改寫為目前做法與理由。
           - #2777（KYC 暫存 token 在取消、換類型、刪帳號時未釋放）：照原範圍查 `seller/internal/kyc` 後修，附回歸測試。#3189：成因已由 closing 同 transaction 呼叫 identity 消除，隨下一項的柵欄移除結案。#2806：**結案，被 Stripe ADR（`docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`）取代**；#2805 與 outbound client 遮罩：**移交主計畫 B2／Stripe 整合**（Will 2026-11-23）。
-          - identity 拿掉 `source_id` 柵欄：新 migration 刪欄位、刪柵欄查詢與 `SourceID`（model、account、onboarding、closing、legacy accountservice `sourceOf`、devseed 註解）；proto `account.proto` 的 `source_id` 與 `OtherRoleState` **刪除並 `reserved` 號碼與名稱**（Will 2026-11-23）；`RoleState` 已無 Go 使用。更新 `identity/CARRYOVER.md`、`docs/modules/identity.md` §3。
+          - identity 拿掉 `source_id` 柵欄：新 migration 刪欄位、刪柵欄查詢與 `SourceID`（model、account、onboarding、closing、legacy accountservice `sourceOf`、devseed 註解）；proto `account.proto` 的 `source_id` 與 `OtherRoleState` **刪除並 `reserved` 號碼與名稱**（Will 2026-11-23）；`RoleState` 已無 Go 使用。更新 `identity/CARRYOVER.md`、`backend/docs/modules/identity.md` §3。
           - 設計書 28：已在 6d（`a5ff7323`）刪除，本項只剩修 `public-read-backend-inventory.md` 的三處引用，與 ADR `2026-09-18-product-view-stats-ownership-and-storage.md` 範圍裡的 `services/seller-service/` 改指 `seller/internal/views`。
       - [ ] **11d 收尾核對**：盤點去向無空格、完成定義逐項核對、獨立設計審查、延後項搬回主清單。
 
