@@ -1,0 +1,211 @@
+{
+ "mutants": [
+  {
+   "id": "m1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
+   "old": "if kept, err = dropBlocking(ctx, blocks, buyerID, kept); err != nil {",
+   "new": "if _, err = dropBlocking(ctx, blocks, buyerID, kept); err != nil {",
+   "test": "internal/modules/procurement/internal/candidate ^TestSearchDropsClosedAndBlockingStoresBeforeCounting$",
+   "why": "封鎖過濾的結果被丟掉（呼叫仍在）：封鎖這位買家的店留在候選"
+  },
+  {
+   "id": "m2",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
+   "old": "kept, err := KeepOpen(ctx, open, fresh)",
+   "new": "kept, err := fresh, error(nil)",
+   "test": "internal/modules/procurement/internal/candidate ^TestSearchDropsClosedAndBlockingStoresBeforeCounting$",
+   "why": "拿掉 KeepOpen 呼叫：沒營業中的店成為候選"
+  },
+  {
+   "id": "m3",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
+   "old": "if len(out) >= MaxStores {",
+   "new": "if len(out) >= MaxStores*100 {",
+   "test": "internal/modules/procurement/internal/candidate ^TestSearchStopsOnceTwentyStoresAreKept$",
+   "why": "拿掉「滿 20 家就停」：繼續翻頁、候選超過 20 家"
+  },
+  {
+   "id": "m4",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
+   "old": "for page := 1; page <= MaxPages; page++ {",
+   "new": "for page := 1; ; page++ {",
+   "test": "internal/modules/procurement/internal/candidate ^TestSearchStopsAfterMaxPages$",
+   "why": "拿掉 5 頁上限：翻到搜尋沒有更多頁為止"
+  },
+  {
+   "id": "m5",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
+   "old": "if pg.Last {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/candidate ^TestSearchStopsAtAShortLastPage$",
+   "why": "最後一頁（短頁）不停：繼續要下一頁"
+  },
+  {
+   "id": "m6",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
+   "old": "if _, dup := seen[h.StoreID]; dup {",
+   "new": "if _, dup := seen[h.StoreID]; dup && false {",
+   "test": "internal/modules/procurement/internal/candidate ^TestSearchKeepsTheFirstProductOfEachStore$",
+   "why": "一店只留第一筆被拿掉：同一家店重複成為候選"
+  },
+  {
+   "id": "m7",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "if err != nil || active.ID != ld.set.RequestRevisionID {",
+   "new": "if err != nil {",
+   "test": "internal/modules/procurement/internal/search ^TestStaleRevisionFailsTheRunWithoutCandidatesOrStatusChange$",
+   "why": "拿掉版本守衛：提交時現行版本已變仍寫入候選並轉 MATCHING"
+  },
+  {
+   "id": "m8",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "store.SetRequestStatusFromAnyParams{ToStatus: statusMatching,",
+   "new": "store.SetRequestStatusFromAnyParams{ToStatus: statusRequirementReady,",
+   "test": "internal/modules/procurement/internal/search ^TestSuccessWritesRankedCandidatesMovesToMatchingAndSucceeds$",
+   "why": "搜尋成功不轉 MATCHING"
+  },
+  {
+   "id": "m9",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/start.go",
+   "old": "\treturn id, nil\n}\n\nfunc notReady() error {",
+   "new": "\tif _, err := q.SetRequestStatusFromAny(ctx, store.SetRequestStatusFromAnyParams{ToStatus: statusMatching, Now: s.Submitter.Ledger.Now(), ID: in.RequestID, BuyerID: &buyer, FromStatuses: searchable}); err != nil {\n\t\treturn uuid.UUID{}, err\n\t}\n\treturn id, nil\n}\n\nfunc notReady() error {",
+   "test": "internal/modules/procurement/internal/search ^TestStartDoesNotChangeStatusOrChargeQuota$",
+   "why": "Start 改成會轉 MATCHING：搜尋還沒成功需求就進了 MATCHING"
+  },
+  {
+   "id": "m10",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "return candidate.Query{CategoryID: *rev.ItemResolutionCategoryID}, nil",
+   "new": "return candidate.Query{CategoryID: *rev.ItemResolutionCategoryID, Keyword: *rev.ItemResolutionLabel}, nil",
+   "test": "internal/modules/procurement/internal/search ^TestQueryUsesTheCategoryIDAndNoKeywordWhenTheCategoryIsConfirmed$",
+   "why": "CATEGORY_CONFIRMED 改成同時帶關鍵字"
+  },
+  {
+   "id": "m11",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "if fieldDiffers(k, prev, next) {",
+   "new": "if fieldDiffers(k, prev, next) || !sameContent(slots.Set{Quantity: prev.Quantity}, slots.Set{Quantity: next.Quantity}) {",
+   "test": "internal/modules/procurement/internal/turn ^TestMatchingRegressesOnlyWhenASearchFieldChanges$",
+   "why": "搜尋影響欄位加回數量：改數量又退回 REQUIREMENT_READY"
+  },
+  {
+   "id": "m12",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "if !leaf {",
+   "new": "if false && !leaf {",
+   "test": "internal/modules/procurement/internal/search ^TestCategoryNoLongerALeafClearsTheResolutionAndReopensClarification$",
+   "why": "拿掉分類檢查：分類不再是末層仍照分類 ID 搜尋"
+  },
+  {
+   "id": "m13",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "Last: len(hits) < productservice.SearchPageSize",
+   "new": "Last: len(hits) <= productservice.SearchPageSize",
+   "test": "cmd/hawkr ^TestProductSearchTreatsOnlyAShortPageAsTheLastPage$",
+   "why": "剛好 50 筆的一頁被當成最後一頁：少翻一頁"
+  },
+  {
+   "id": "m14",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "if err := ctx.Err(); err != nil {",
+   "new": "if err := ctx.Err(); false && err != nil {",
+   "test": "internal/modules/procurement/internal/search ^TestFindReturnsTheContextErrorWhenCancelledAfterASuccessfulSearch$",
+   "why": "拿掉搜尋後的 ctx 檢查：ctx 已結束仍進 commit"
+  },
+  {
+   "id": "m15",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "_, leaf, err := e.Resolver.LeafAsOf(ctx, q.CategoryID, notBefore)",
+   "new": "_, leaf, err := e.Resolver.LeafAsOf(ctx, q.CategoryID, time.Time{})",
+   "test": "internal/modules/procurement/internal/search ^TestFindSearchesWhenTheTreeConfirmsALeafAndPassesTheRevisionTimeAsTheLowerBound$",
+   "why": "分類檢查不帶時間下限：剛建立的分類在較舊的快取樹上被誤判"
+  },
+  {
+   "id": "m16",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/resolver/resolver.go",
+   "old": "now.Sub(r.loadedAt) < TreeTTL && !r.readStart.Before(notBefore)",
+   "new": "!r.readStart.Before(notBefore)",
+   "test": "internal/modules/procurement/internal/resolver ^TestLeafAsOfReloadsAnExpiredTreeEvenWhenTheCachedAnswerIsPositive$",
+   "why": "LeafAsOf 不看 TTL：過期的樹仍被當成新鮮"
+  },
+  {
+   "id": "m17",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if HasInput(in.RunType) {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/run ^TestCandidateSearchWritesNoRunInputAndReplaysOnRequestAndType$",
+   "why": "候選搜尋也寫輸入列：空訊息撞 CHECK"
+  },
+  {
+   "id": "m18",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tcandidateSetID, err := s.prepareCandidateSet(ctx, q, in)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "candidateSetID, err := s.prepareCandidateSet(ctx, q, in)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}",
+   "test": "internal/modules/procurement/internal/run ^TestCandidateSearchChecksInProgressRunBeforePreparingTheCandidateSet$",
+   "why": "先建候選集再檢查進行中的 run：對即將被取代的版本建候選集"
+  },
+  {
+   "id": "m19",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/executor.go",
+   "old": "e.find(ctx, r.BuyerID, q, ld.revision.CreatedAt)",
+   "new": "e.find(ctx, r.BuyerID, q, time.Time{})",
+   "test": "internal/modules/procurement/internal/search ^TestCategoryNoLongerALeafClearsTheResolutionAndReopensClarification$",
+   "why": "Execute 不以候選集所指版本的建立時間當下限"
+  },
+  {
+   "id": "m20",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/resolver/resolver.go",
+   "old": "TreeTTL && !r.readStart.Before(notBefore)",
+   "new": "TreeTTL",
+   "test": "internal/modules/procurement/internal/resolver ^TestLeafAsOfReloadsATreeLoadedBeforeNotBeforeAndSeesTheNewLeaf$",
+   "why": "LeafAsOf 不看 notBefore：TTL 內但早於分類建立的樹被當成新鮮"
+  },
+  {
+   "id": "m21",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if err := s.checkRequest(ctx, q, in); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "if err := s.checkLimits(ctx, q, in.BuyerID, &in.RequestID, now); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.checkRequest(ctx, q, in); err != nil {\n\t\t\treturn err\n\t\t}",
+   "test": "internal/modules/procurement/internal/run ^TestCandidateSearchOnSomeoneElsesRequestIsNotFoundEvenWhileItHasARunInProgress$",
+   "why": "擁有者檢查在上限檢查之後：別人的需求回 PROCUREMENT_RUN_IN_PROGRESS"
+  },
+  {
+   "id": "m22",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/resume.go",
+   "old": "if r.RunType != RunTypeResume || r.InterruptID == nil || *r.InterruptID != in.InterruptID {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/run ^TestResumeReplayWithACandidateSearchRunsClientRequestIDIsInvalidInputNotAnInternalError$",
+   "why": "Resume 重送不做前置比對：候選搜尋 run 去讀輸入，ErrNoRows 變內部錯誤"
+  },
+  {
+   "id": "m23",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": "FOR UPDATE OF v",
+   "new": "",
+   "test": "internal/modules/procurement/internal/search ^TestCommitWaitsForAnUncommittedRevisionReplacementThenFailsWithoutCandidates$",
+   "why": "拿掉現行版本列的 FOR UPDATE：搜尋提交不等版本取代，以舊版本寫入候選"
+  }
+ ]
+}

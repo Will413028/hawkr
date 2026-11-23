@@ -1,0 +1,72 @@
+{
+  "scenario": "return_policy_fixed_text",
+  "description": "BuyerReturnPolicy emits ReturnPolicyText then done with empty session_id; no LLM, no session.",
+  "input": {
+    "rpc": "BuyerReturnPolicy",
+    "endpoint_key": "",
+    "message": "",
+    "buyer_id": 4242
+  },
+  "fake_tool_backend": {
+    "orders": [
+      {
+        "OrderNo": "ORD-1001",
+        "Status": "20",
+        "SellerName": "阿嬤的菜園",
+        "Amount": 580,
+        "CreateTimeMs": 1700000000000,
+        "ItemCount": 2
+      },
+      {
+        "OrderNo": "ORD-1002",
+        "Status": "30",
+        "SellerName": "海味小舖",
+        "Amount": 1200,
+        "CreateTimeMs": 1700100000000,
+        "ItemCount": 1
+      }
+    ],
+    "details": {
+      "ORD-1001": {
+        "OrderNo": "ORD-1001",
+        "Status": "20",
+        "SellerName": "阿嬤的菜園",
+        "ShippingMethod": "黑貓冷藏",
+        "ShippingStatus": "IN_TRANSIT",
+        "RecipientName": "王小明",
+        "PaymentMethod": "CREDIT_CARD",
+        "Amount": 580,
+        "CreateTimeMs": 0,
+        "ShippingFee": 120
+      },
+      "ORD-1002": {
+        "OrderNo": "ORD-1002",
+        "Status": "30",
+        "SellerName": "海味小舖",
+        "ShippingMethod": "宅配",
+        "ShippingStatus": "DELIVERED",
+        "RecipientName": "王小明",
+        "PaymentMethod": "ATM",
+        "Amount": 1200,
+        "CreateTimeMs": 0,
+        "ShippingFee": 150
+      }
+    }
+  },
+  "scripted_llm": null,
+  "observed_llm_requests": null,
+  "emitted_events": [
+    {
+      "kind": "text",
+      "order": 0,
+      "text": "🔄 退貨申請流程說明：\n\n📋 退貨條件：\n• 收到商品後 24hr 內可申請退貨\n• 商品需保持完整包裝及標籤\n• 生鮮商品需確保冷藏/冷凍狀態\n\n📝 申請步驟：\n1. 已完成訂單點選商品評分，進到商品評分頁的右上角，進入售後服務\n2. 上傳商品照片，填寫退貨原因，按下送出申請按鈕\n3. 等待賣家回覆審核\n4. 審核通過後安排退款\n\n⏰ 退款時間：\n• 信用卡：7-14 個工作天\n• ATM轉帳：3-5 個工作天\n\n需要我協助您申請退貨嗎？"
+    },
+    {
+      "kind": "done",
+      "order": 1
+    }
+  ],
+  "rpc_result": {
+    "status_code": "OK"
+  }
+}

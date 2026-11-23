@@ -3,6 +3,15 @@
     "admin.moderation.CaseReport.outcome_unset": {
       "message": "Under review"
     },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": {
+      "message": "Looking up the order details"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS": {
+      "message": "Looking up your orders"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE": {
+      "message": "Checking your package tracking"
+    },
     "buyer.Gender.GENDER_FEMALE": {
       "message": "Female"
     },
@@ -119,6 +128,45 @@
     },
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
       "message": "Provider-hosted"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE": {
+      "message": "The budget per unit is out of range"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED": {
+      "message": "The city could not be recognized"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT": {
+      "message": "The date format is not valid"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR": {
+      "message": "The date is missing the year"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_PAST": {
+      "message": "The date has already passed"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR": {
+      "message": "The date is too far ahead"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_EMPTY": {
+      "message": "The content is empty"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE": {
+      "message": "The quantity is out of range"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM": {
+      "message": "The item is missing or was rejected, so no item category can be set"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL": {
+      "message": "The item category has no name"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": {
+      "message": "The way the item category was decided is unknown"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_TRUNCATED": {
+      "message": "Over the length limit, shortened"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
+      "message": "This unit is not supported"
     },
     "review.Review.rating_label_1": {
       "message": "Very dissatisfied"

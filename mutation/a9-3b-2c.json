@@ -1,0 +1,337 @@
+{
+ "mutants": [
+  {
+   "id": "m1",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/interrupt.go",
+   "old": "id := in.ID",
+   "new": "id := uuid.NewV7()",
+   "test": "internal/modules/procurement/internal/turn ^TestAmbiguousItemInterruptsWithMatchingInterruptID$",
+   "why": "中斷改成在 Ledger 內重新產生 ID：turn_result 事件裡的 interrupt.interruptId 不再等於中斷列的 ID"
+  },
+  {
+   "id": "m2",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "return &run.InvalidTransitionError{From: cur.Status, To: run.StatusSucceeded}",
+   "new": "return nil",
+   "test": "internal/modules/procurement/internal/turn ^TestCancelLandingBeforeTheCommitRollsEverythingBack$",
+   "why": "提交前的狀態守門（取消已搶在前面，run 為 CANCEL_REQUESTED）不再回錯：空 transaction 提交、run 停在 CANCEL_REQUESTED 而不是收斂到 CANCELLED。原 mutant（吞掉 SUCCEEDED 轉換錯誤）等價：守門先擋下，且該錯誤在 Postgres 本來就會讓 tx 中止"
+  },
+  {
+   "id": "m3",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "return classifyExtractErr(ctx, err)",
+   "new": "patch = slots.Patch{}",
+   "test": "internal/modules/procurement/internal/turn ^TestModelFailureFailsWithPipelineErrorAndRefundsOnce$",
+   "why": "模型失敗改成降級（空 patch 續行）：run 不再失敗退額度"
+  },
+  {
+   "id": "m3b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "return classifyExtractErr(ctx, err)",
+   "new": "patch = slots.Patch{}",
+   "test": "internal/modules/procurement/internal/turn ^TestDisabledModelFailsWithPipelineErrorAndRefunds$",
+   "why": "模型停用（ErrDisabled）改成降級續行：run 不再失敗退額度"
+  },
+  {
+   "id": "m4",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "prevSkipped = prior.prevTurn.skipped",
+   "new": "prevSkipped = nil",
+   "test": "internal/modules/procurement/internal/turn ^TestOptionalProgressIsReadFromThePreviousTurnAndPlannedForThisOne$",
+   "why": "不帶上一輪買家跳過的欄位"
+  },
+  {
+   "id": "m5",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "prevStreak = prior.prevTurn.optionalStreak",
+   "new": "prevStreak = 0",
+   "test": "internal/modules/procurement/internal/turn ^TestOptionalProgressIsReadFromThePreviousTurnAndPlannedForThisOne$",
+   "why": "連續選填計數不接上一輪"
+  },
+  {
+   "id": "m5b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "prevStreak = prior.prevTurn.optionalStreak",
+   "new": "prevStreak = 0",
+   "test": "internal/modules/procurement/internal/turn ^TestSecondTurnSupersedesCarriesProgressAndChainsRevisions$",
+   "why": "寫進 turns.optional_streak 的計數不接上一輪"
+  },
+  {
+   "id": "m6",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/settle.go",
+   "old": "if r.QuotaPeriodStart == nil {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/turn ^TestModelFailureFailsWithPipelineErrorAndRefundsOnce$",
+   "why": "失敗不再退額度（TURN 失敗的 run 有額度期間，退款整段被跳過；與 a9-3b-2b p2 同一個守門）"
+  },
+  {
+   "id": "m10a",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "if !ae.retryable || budget.Err() != nil {",
+   "new": "if budget.Err() != nil {",
+   "test": "internal/modules/procurement/internal/extract ^TestNonRetryableErrorsAreNotRetried$",
+   "why": "不可重試的錯誤（4xx、停用）也重試"
+  },
+  {
+   "id": "m10b",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "if !ae.retryable || budget.Err() != nil {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/extract ^TestMalformedThenValidRetriesExactlyOnce$",
+   "why": "可重試的錯誤也不重試"
+  },
+  {
+   "id": "m11",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "out[run.RunTypeTurn] = turn.Executor{",
+   "new": "_ = turn.Executor{",
+   "test": "internal/modules/procurement ^TestNewRegistersTheTurnExecutorOnlyWithLLMAndTaxonomy$",
+   "why": "New 不再登記 TURN 的 executor"
+  },
+  {
+   "id": "u1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "Reason: run.FailureModelUnavailable, Err: err}",
+   "new": "Reason: run.FailureTurnPipelineErr, Err: err}",
+   "test": "internal/modules/procurement/internal/turn ^TestClassifyExtractErr$",
+   "why": "服務不可用不再分類為 MODEL_UNAVAILABLE"
+  },
+  {
+   "id": "u1b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "Reason: run.FailureModelUnavailable, Err: err}",
+   "new": "Reason: run.FailureTurnPipelineErr, Err: err}",
+   "test": "internal/modules/procurement/internal/turn ^TestModelFailureFailsWithPipelineErrorAndRefundsOnce$",
+   "why": "服務不可用的 run 以 TURN_PIPELINE_ERROR 收尾"
+  },
+  {
+   "id": "t1",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+   "old": " AND title_source = 'AUTO'",
+   "new": "",
+   "test": "internal/modules/procurement/internal/turn ^TestAutoTitleUpdatesOnlyWhileAutoAndStaysEmptyWithoutAnItem$",
+   "why": "自動標題不再只在 title_source = AUTO 時更新：買家改過的標題被覆寫"
+  },
+  {
+   "id": "d1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/planner/question.go",
+   "old": "cands = cands[:min(len(cands), MaxItemOptions)]",
+   "new": "cands = cands[:len(cands)]",
+   "test": "internal/modules/procurement/internal/planner ^TestItemDisambiguationCapsAtFiveAndLabelsWithThePath$",
+   "why": "消歧卡的上限 5 改成不限"
+  },
+  {
+   "id": "f1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "retryable: !nonRetryableCodes[resp.ErrorCode],",
+   "new": "retryable: !nonRetryableCodes[resp.ErrorCode], unavailable: true,",
+   "test": "internal/modules/procurement/internal/extract ^TestErrorCodeResponseIsNotRetriedAndNotUnavailable$",
+   "why": "帶 ErrorCode 的回應改成算服務不可用（MODEL_UNAVAILABLE）"
+  },
+  {
+   "id": "f2",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "if applied, _ := next.Apply(slots.Patch{Resolution: &r}, now); applied.Resolution != nil {",
+   "new": "if applied, _ := next.Apply(slots.Patch{Resolution: &r}, now); true {",
+   "test": "internal/modules/procurement/internal/turn ^TestInvalidCandidatesNeverAppearOnTheCard$",
+   "why": "命中不再先過 Apply 驗證：標籤空白、分類 ID 不合法的候選出現在消歧卡上"
+  },
+  {
+   "id": "f3",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/planner/plan.go",
+   "old": "\tcase rejected:\n\t\treturn InputRejected\n\tcase corrected:\n\t\treturn CorrectionApplied\n\tcase in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:\n\t\treturn ItemNeedsDisambiguation\n",
+   "new": "\tcase in.Question != nil && in.Question.Slot == slots.ItemDisambiguation:\n\t\treturn ItemNeedsDisambiguation\n\tcase rejected:\n\t\treturn InputRejected\n\tcase corrected:\n\t\treturn CorrectionApplied\n",
+   "test": "internal/modules/procurement/internal/planner ^TestDecideParity$",
+   "why": "品項消歧改排在被拒與更正之前：被拒或更正的輪次 act 變成 ITEM_NEEDS_DISAMBIGUATION，優先序改變"
+  },
+  {
+   "id": "f4",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/slots/slots.go",
+   "old": "len(s.MissingRequired()) == 0 && s.Resolution != nil }",
+   "new": "len(s.MissingRequired()) == 0 }",
+   "test": "internal/modules/procurement/internal/turn ^TestNotReadyWhileTheItemHasNoResolution$",
+   "why": "齊備判斷不再要求品項已有解析：必填齊全但品項還在消歧時進入 REQUIREMENT_READY"
+  },
+  {
+   "id": "f5",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/reply/reply.go",
+   "old": "if isItemDisambiguation(p) {\n\t\t\tnext = questionPrompt(l, p)\n\t\t}",
+   "new": "if false {\n\t\t\tnext = questionPrompt(l, p)\n\t\t}",
+   "test": "internal/modules/procurement/internal/reply ^TestRejectedAndCorrectionRepliesEndWithThePendingQuestion$",
+   "why": "被拒的回覆在消歧中不再接上消歧問句：執行器已中斷但文字沒問問題"
+  },
+  {
+   "id": "f6",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/reply/reply.go",
+   "old": "\tcase isItemDisambiguation(p):\n\t\treturn questionPrompt(l, p)\n\tcase len(a.Missing)",
+   "new": "\tcase len(a.Missing)",
+   "test": "internal/modules/procurement/internal/reply ^TestCorrectionCarriesTheNextStep$",
+   "why": "更正之後的下一步不再優先帶消歧問句"
+  },
+  {
+   "id": "f7",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "retryable: !nonRetryableCodes[resp.ErrorCode],",
+   "new": "retryable: false,",
+   "test": "internal/modules/procurement/internal/extract ^TestUnclearOutputErrorCodesRetryOnceAndAreNotUnavailable$",
+   "why": "OTHER 與 MALFORMED_FUNCTION_CALL 不再重試一次"
+  },
+  {
+   "id": "f8",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "retryable: !nonRetryableCodes[resp.ErrorCode],",
+   "new": "retryable: true,",
+   "test": "internal/modules/procurement/internal/extract ^TestErrorCodeResponseIsNotRetriedAndNotUnavailable$",
+   "why": "安全類 ErrorCode 也重試"
+  },
+  {
+   "id": "m8",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "return applyGroup(ctx, rs, l, now, p, c)",
+   "new": "return resolvedOutcome(slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: c.CategoryID, Label: c.Label}), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyGroupChoice$",
+   "why": "選大類後直接以大類當品項確認：不再在該大類底下找末層"
+  },
+  {
+   "id": "m9",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "if a.OptionID == planner.ItemOtherOptionID {\n\t\treturn interrupt(l, describeCard(p.Query)), nil",
+   "new": "if a.OptionID == planner.ItemOtherOptionID {\n\t\treturn resolvedOutcome(slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 1, Label: \"\"}), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyOtherGoesToDescribeNeverConfirms$",
+   "why": "選「其他」直接產生空 label 的 CATEGORY_CONFIRMED，不進 DESCRIBE"
+  },
+  {
+   "id": "m12",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "len(groups) >= 2",
+   "new": "len(groups) >= 1",
+   "test": "internal/modules/procurement/internal/turn ^TestGroupCardOnlyWhenMoreThanFiveAcrossGroups$",
+   "why": "GROUP 卡條件拿掉「跨大類」：命中全在同一大類也問大類"
+  },
+  {
+   "id": "m12i",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "len(groups) >= 2",
+   "new": "len(groups) >= 3",
+   "test": "internal/modules/procurement/internal/turn ^TestManyMatchesAcrossGroupsInterruptWithAGroupCard$",
+   "why": "跨兩個大類不再出 GROUP 卡：TURN executor 寫出的中斷 stage 變成 ITEM"
+  },
+  {
+   "id": "m13",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "if len(ms) > planner.MaxItemOptions {",
+   "new": "if len(ms) >= planner.MaxItemOptions {",
+   "test": "internal/modules/procurement/internal/turn ^TestGroupCardOnlyWhenMoreThanFiveAcrossGroups$",
+   "why": "命中剛好 5 個且跨大類也問大類（門檻差一）"
+  },
+  {
+   "id": "m14",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "if planner.ItemOptionID(planner.ItemCandidate{CategoryID: c.CategoryID}) == id {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyItemChoice$",
+   "why": "ITEM 選項 ID 不對照 payload 的候選：永遠取第一個候選"
+  },
+  {
+   "id": "m15",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "func onCard(p InterruptPayload, id string) bool {",
+   "new": "func onCard(p InterruptPayload, id string) bool {\n\tif true {\n\t\treturn true\n\t}",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyRejectsOptionsNotOnTheCard$",
+   "why": "選項不檢查是否在卡上：DESCRIBE 卡（沒有選項）也收「其他」"
+  },
+  {
+   "id": "m16",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "if p.Stage == StageDescribe {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/turn ^TestApplyFreeText$",
+   "why": "DESCRIBE 階段 0 命中改成再出 DESCRIBE 卡：不再以 BUYER_DESCRIBED 解析"
+  },
+  {
+   "id": "fix1-f1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "\tms = leavesOnly(ms)\n\tif len(ms) == 0 {\n\t\treturn describeCard(query)\n\t}\n",
+   "new": "\tms = leavesOnly(ms)\n",
+   "test": "internal/modules/procurement/internal/turn ^TestZeroMatchesAsksDescribeNotEmptyItemCard$",
+   "why": "零命中不再回 DESCRIBE 卡：出空的 ITEM 卡，ITEM 打字查無結果會再問一次相同的描述卡"
+  },
+  {
+   "id": "fix1-f2",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "for _, m := range leavesOnly(ms) {",
+   "new": "for _, m := range ms {",
+   "test": "internal/modules/procurement/internal/turn ^TestNonLeafMatchesNeverConfirmOrCount$",
+   "why": "confirmable 不再排除非末層：大類或中間層節點可被確認為品項"
+  },
+  {
+   "id": "fix3-r1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "m, ok, err := rs.Leaf(ctx, c.CategoryID)",
+   "new": "m, ok, err := resolver.Match{}, false, error(nil)",
+   "test": "internal/modules/procurement/internal/turn ^TestLeafListCardPickConfirms$",
+   "why": "ITEM 選項改回不以分類 ID 查現行分類樹：末層清單卡的選項永遠無法確認，一直重出卡"
+  },
+  {
+   "id": "fix3-r2",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/card.go",
+   "old": "if m.Leaf && m.CategoryID != m.RootID {",
+   "new": "if m.Leaf {",
+   "test": "internal/modules/procurement/internal/turn ^TestChildlessRootNeverConfirmsOnTypedPath$",
+   "why": "leavesOnly 不再排除無子節點的大類自己：打字路徑可確認大類"
+  },
+  {
+   "id": "fix3-r3",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "return decideMatches(l, p.Query, current), nil\n}\n\n// applyGroup",
+   "new": "return interrupt(l, buildCard(p.Query, matchesOf(current))), nil\n}\n\n// applyGroup",
+   "test": "internal/modules/procurement/internal/turn ^TestStalePickRebuildsThroughDecideMatches$",
+   "why": "過期選項重建不走 decideMatches：只剩 1 個命中時出 1 個選項的卡而不是確認"
+  },
+  {
+   "id": "fix3-r4",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "if h.match.RootID == p.Root {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/turn ^TestStalePickOnGroupNarrowedCardStaysInRoot$",
+   "why": "過期選項重建不限在卡的大類內：退回 GROUP 卡"
+  }
+ ]
+}

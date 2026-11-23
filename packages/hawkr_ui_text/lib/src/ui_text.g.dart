@@ -4,17 +4,36 @@
 // ignore_for_file: unnecessary_parenthesis, unused_import, prefer_single_quotes, unnecessary_string_interpolations
 
 import 'package:connectrpc/connect.dart' show Code;
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart' as hawkr_assistant_v1alpha1_assistant;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 
 import '../hawkr_ui_text.dart' show UiLocale;
+
+String? _assistantAssistantTool(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '正在查詢你的訂單',
+(UiLocale.en, 1) => 'Looking up your orders',
+(UiLocale.zhTW, 2) => '正在查詢訂單詳情',
+(UiLocale.en, 2) => 'Looking up the order details',
+(UiLocale.zhTW, 3) => '正在查詢包裹物流',
+(UiLocale.en, 3) => 'Checking your package tracking',
+_ => null,
+};
+}
+
+extension AssistantAssistantToolUiText on hawkr_assistant_v1alpha1_assistant.AssistantTool {
+  /// assistant.AssistantTool 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _assistantAssistantTool(l, value);
+}
 
 String? _buyerGender(UiLocale l, int value) {
 return switch ((l, value)) {
@@ -187,6 +206,43 @@ _ => null,
 extension PaymentRequirementCollectionUiText on hawkr_payment_v1alpha1_payment.RequirementCollection {
   /// payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _paymentRequirementCollection(l, value);
+}
+
+String? _procurementRejectionReason(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '內容是空的',
+(UiLocale.en, 1) => 'The content is empty',
+(UiLocale.zhTW, 2) => '超過長度上限，已截斷',
+(UiLocale.en, 2) => 'Over the length limit, shortened',
+(UiLocale.zhTW, 3) => '數量不在可接受的範圍內',
+(UiLocale.en, 3) => 'The quantity is out of range',
+(UiLocale.zhTW, 4) => '單價預算不在可接受的範圍內',
+(UiLocale.en, 4) => 'The budget per unit is out of range',
+(UiLocale.zhTW, 5) => '這個單位不支援',
+(UiLocale.en, 5) => 'This unit is not supported',
+(UiLocale.zhTW, 6) => '無法辨識這個縣市',
+(UiLocale.en, 6) => 'The city could not be recognized',
+(UiLocale.zhTW, 7) => '日期格式不正確',
+(UiLocale.en, 7) => 'The date format is not valid',
+(UiLocale.zhTW, 8) => '日期缺少西元年份',
+(UiLocale.en, 8) => 'The date is missing the year',
+(UiLocale.zhTW, 9) => '日期已經過了',
+(UiLocale.en, 9) => 'The date has already passed',
+(UiLocale.zhTW, 10) => '日期太久以後',
+(UiLocale.en, 10) => 'The date is too far ahead',
+(UiLocale.zhTW, 11) => '品項未確定，無法指定品項分類',
+(UiLocale.en, 11) => 'The item is missing or was rejected, so no item category can be set',
+(UiLocale.zhTW, 12) => '品項分類沒有名稱',
+(UiLocale.en, 12) => 'The item category has no name',
+(UiLocale.zhTW, 13) => '品項分類的判定方式不明',
+(UiLocale.en, 13) => 'The way the item category was decided is unknown',
+_ => null,
+};
+}
+
+extension ProcurementRejectionReasonUiText on hawkr_procurement_v1alpha1_procurement.RejectionReason {
+  /// procurement.RejectionReason 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _procurementRejectionReason(l, value);
 }
 
 String? _sellerContentKind(UiLocale l, int value) {

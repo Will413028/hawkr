@@ -1,0 +1,19 @@
+{
+  "default": {
+    "return_policy.closing": {
+      "message": "Would you like help requesting a return?"
+    },
+    "return_policy.facts": {
+      "message": "📋 Return conditions:\n• You can request a return within 24 hours of receiving the item\n• The item must keep its original packaging and labels\n• Fresh items must stay refrigerated or frozen\n\n📝 How to apply:\n1. On a completed order, tap the product rating, open the rating page, and go to After-sales service at the top right\n2. Upload photos of the item, enter the reason for the return, and tap Submit\n3. Wait for the seller to review your request\n4. Once approved, a refund is arranged\n\n⏰ Refund time:\n• Credit card: 7-14 business days\n• ATM transfer: 3-5 business days"
+    },
+    "return_policy.title": {
+      "message": "🔄 How to request a return:"
+    },
+    "turn.failed": {
+      "message": "The lookup failed. Please try again later."
+    },
+    "turn.interrupted": {
+      "message": "The reply was interrupted. Please try again later."
+    }
+  }
+}

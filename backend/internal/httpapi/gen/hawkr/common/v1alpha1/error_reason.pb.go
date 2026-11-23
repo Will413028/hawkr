@@ -34,8 +34,10 @@ const (
 	// 依據的版本已經過時：修改時帶的 etag 與目前的不符（搭配 aborted），或以 key 建立時那筆已經存在
 	// （搭配 already_exists）。client 保留使用者的輸入，並顯示最新的版本讓使用者對照後再送出
 	// （ADR 2026-09-25-optimistic-concurrency-etag）。ErrorInfo.metadata 的 conflictTarget 可以說是哪一個物件過時，值由各 API 定義、
-	// client 不認得時照一般版本衝突處理。商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
+	// client 不認得時照一般版本衝突處理。
+	// 商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
 	// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。
+	// 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`rfq_snapshot` 是詢價確認快照過時，`candidate_set` 是候選的依據早於目前的需求版本，`approval` 是發布核准或價格預覽已過時，`publication` 是賣家看到的詢價已被改版，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
 	ErrorReason_VERSION_CONFLICT ErrorReason = 1
 	// 賣家帳號停權中，這個操作不在停權時仍可做的範圍（搭配 permission_denied）。client 轉成賣家的停權狀態：
 	// 顯示停權通知，並以 GetMyStore 讀停權的來源與原因。
@@ -116,6 +118,57 @@ const (
 	// 標籤數量已達上限（搭配 failed_precondition）：每家店最多 200 個標籤、每位客戶最多 20 個標籤。client 顯示 LocalizedMessage，不再提供新增入口。
 	// CrmAppService.CreateTag、AddCustomerTags。
 	ErrorReason_CRM_TAG_LIMIT ErrorReason = 24
+	// 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：procurement 的 server streaming（WatchRun）。
+	// client 放棄接續，改讀 GetRuntimeSnapshot 重建畫面。assistant 的 WatchAssistantTurn 不用這個值：輪次被清除回 not_found。
+	ErrorReason_REPLAY_CURSOR_EXPIRED ErrorReason = 25
+	// 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：assistant 與 procurement 的 server streaming（WatchAssistantTurn、WatchRun）。
+	// client 帶了不是伺服器發出的 cursor；放棄接續，procurement 改讀 GetRuntimeSnapshot，助理重新送出。
+	ErrorReason_REPLAY_CURSOR_AHEAD ErrorReason = 26
+	// 採購需求的必填欄位還沒有填滿，不能搜尋候選（搭配 failed_precondition）：StartCandidateSearch。client 回到釐清問答。
+	ErrorReason_REQUIREMENT_NOT_READY ErrorReason = 27
+	// 需求有一個待回覆的中斷（run 停在等待輸入）（搭配 failed_precondition）：SubmitAnswer、Rewind 在這期間不能寫入，
+	// 否則中斷會被孤立。client 改用 ResumeRun 回覆，或 CancelRun 取消。
+	ErrorReason_APPROVAL_PENDING ErrorReason = 28
+	// 要回覆的中斷已經被回覆過（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+	ErrorReason_APPROVAL_ALREADY_RESOLVED ErrorReason = 29
+	// run 的狀態不允許這個命令，因為它已不在進行中（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+	ErrorReason_RUN_NOT_ACTIVE ErrorReason = 30
+	// 被接受的賣家回價版本已過有效期（搭配 failed_precondition）：AcceptSellerQuote。不可接受，也不自動改接受別版。
+	ErrorReason_RFQ_RESPONSE_EXPIRED ErrorReason = 31
+	// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
+	// SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
+	ErrorReason_RFQ_RECIPIENT_CLOSED ErrorReason = 32
+	// 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
+	// client 引導買家去付款，不是叫他重新接受。
+	ErrorReason_RFQ_CHECKOUT_ALREADY_ACTIVE ErrorReason = 33
+	// 同一張需求已經成交（搭配 failed_precondition）：AcceptSellerQuote。這是終局，與 RFQ_CHECKOUT_ALREADY_ACTIVE 不同，不能再付款。
+	ErrorReason_RFQ_ALREADY_AWARDED ErrorReason = 34
+	// 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
+	// ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
+	ErrorReason_AGENT_MONTHLY_QUOTA_EXCEEDED ErrorReason = 35
+	// 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
+	// 不提供重試。ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
+	// 同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，帶 RetryInfo，稍後可再試。
+	ErrorReason_IMAGE_QUOTA_EXCEEDED ErrorReason = 36
+	// 圖片或提示詞被安全性檢查擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
+	// client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
+	ErrorReason_IMAGE_SAFETY_BLOCKED ErrorReason = 37
+	// 圖片涉及著作權複誦而被擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
+	// client 請使用者換一張圖，不自動重試。額度退回。
+	ErrorReason_IMAGE_RECITATION_BLOCKED ErrorReason = 38
+	// 模型沒有產出圖片（搭配 unavailable）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
+	// client 可以讓使用者直接重試。額度退回。
+	ErrorReason_IMAGE_NOT_PRODUCED ErrorReason = 39
+	// 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
+	// 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
+	ErrorReason_ASSISTANT_TURN_IN_PROGRESS ErrorReason = 40
+	// 助理這一輪失敗（用於 AssistantStreamError.reason）：WatchAssistantTurn 串流裡 error 事件的原因，沒有搭配的 Connect code
+	// （事件在串流內）。失敗的細分（沒有任何輸出、已輸出部分文字後中斷）只進伺服器 log。client 顯示 localized_message，
+	// 可以讓使用者重新送出。
+	ErrorReason_ASSISTANT_TURN_FAILED ErrorReason = 41
+	// 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch、ResumeRun。同一個需求同時只允許一個進行中的 run
+	// （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
+	ErrorReason_PROCUREMENT_RUN_IN_PROGRESS ErrorReason = 42
 )
 
 // Enum value maps for ErrorReason.
@@ -146,33 +199,69 @@ var (
 		22: "RECEIVER_DELETED",
 		23: "CRM_TAG_NAME_TAKEN",
 		24: "CRM_TAG_LIMIT",
+		25: "REPLAY_CURSOR_EXPIRED",
+		26: "REPLAY_CURSOR_AHEAD",
+		27: "REQUIREMENT_NOT_READY",
+		28: "APPROVAL_PENDING",
+		29: "APPROVAL_ALREADY_RESOLVED",
+		30: "RUN_NOT_ACTIVE",
+		31: "RFQ_RESPONSE_EXPIRED",
+		32: "RFQ_RECIPIENT_CLOSED",
+		33: "RFQ_CHECKOUT_ALREADY_ACTIVE",
+		34: "RFQ_ALREADY_AWARDED",
+		35: "AGENT_MONTHLY_QUOTA_EXCEEDED",
+		36: "IMAGE_QUOTA_EXCEEDED",
+		37: "IMAGE_SAFETY_BLOCKED",
+		38: "IMAGE_RECITATION_BLOCKED",
+		39: "IMAGE_NOT_PRODUCED",
+		40: "ASSISTANT_TURN_IN_PROGRESS",
+		41: "ASSISTANT_TURN_FAILED",
+		42: "PROCUREMENT_RUN_IN_PROGRESS",
 	}
 	ErrorReason_value = map[string]int32{
-		"ERROR_REASON_UNSPECIFIED":   0,
-		"VERSION_CONFLICT":           1,
-		"SELLER_SUSPENDED":           2,
-		"PROSPECT_MATCH_FOUND":       3,
-		"PROSPECT_TAX_ID_HELD":       4,
-		"AGREEMENT_OUTDATED":         5,
-		"SELLER_REQUIREMENT_MISSING": 6,
-		"STORE_OPENING_SUSPENDED":    7,
-		"STORE_OPENING_TERMINATED":   8,
-		"ACCOUNT_HAS_STORE":          9,
-		"ACCOUNT_SUSPENDED":          10,
-		"IDENTITY_ALREADY_LINKED":    11,
-		"REAUTHENTICATION_REQUIRED":  12,
-		"CONTACT_EMAIL_REQUIRED":     13,
-		"CONTENT_TAKEDOWN_ACTIVE":    14,
-		"REVIEW_ALREADY_EXISTS":      15,
-		"ORDER_NOT_REVIEWABLE":       16,
-		"REVIEW_WINDOW_EXPIRED":      17,
-		"REVIEW_NOT_REPLYABLE":       18,
-		"SELF_MESSAGE_NOT_ALLOWED":   19,
-		"STORE_CLOSED":               20,
-		"CHAT_BLOCKED":               21,
-		"RECEIVER_DELETED":           22,
-		"CRM_TAG_NAME_TAKEN":         23,
-		"CRM_TAG_LIMIT":              24,
+		"ERROR_REASON_UNSPECIFIED":     0,
+		"VERSION_CONFLICT":             1,
+		"SELLER_SUSPENDED":             2,
+		"PROSPECT_MATCH_FOUND":         3,
+		"PROSPECT_TAX_ID_HELD":         4,
+		"AGREEMENT_OUTDATED":           5,
+		"SELLER_REQUIREMENT_MISSING":   6,
+		"STORE_OPENING_SUSPENDED":      7,
+		"STORE_OPENING_TERMINATED":     8,
+		"ACCOUNT_HAS_STORE":            9,
+		"ACCOUNT_SUSPENDED":            10,
+		"IDENTITY_ALREADY_LINKED":      11,
+		"REAUTHENTICATION_REQUIRED":    12,
+		"CONTACT_EMAIL_REQUIRED":       13,
+		"CONTENT_TAKEDOWN_ACTIVE":      14,
+		"REVIEW_ALREADY_EXISTS":        15,
+		"ORDER_NOT_REVIEWABLE":         16,
+		"REVIEW_WINDOW_EXPIRED":        17,
+		"REVIEW_NOT_REPLYABLE":         18,
+		"SELF_MESSAGE_NOT_ALLOWED":     19,
+		"STORE_CLOSED":                 20,
+		"CHAT_BLOCKED":                 21,
+		"RECEIVER_DELETED":             22,
+		"CRM_TAG_NAME_TAKEN":           23,
+		"CRM_TAG_LIMIT":                24,
+		"REPLAY_CURSOR_EXPIRED":        25,
+		"REPLAY_CURSOR_AHEAD":          26,
+		"REQUIREMENT_NOT_READY":        27,
+		"APPROVAL_PENDING":             28,
+		"APPROVAL_ALREADY_RESOLVED":    29,
+		"RUN_NOT_ACTIVE":               30,
+		"RFQ_RESPONSE_EXPIRED":         31,
+		"RFQ_RECIPIENT_CLOSED":         32,
+		"RFQ_CHECKOUT_ALREADY_ACTIVE":  33,
+		"RFQ_ALREADY_AWARDED":          34,
+		"AGENT_MONTHLY_QUOTA_EXCEEDED": 35,
+		"IMAGE_QUOTA_EXCEEDED":         36,
+		"IMAGE_SAFETY_BLOCKED":         37,
+		"IMAGE_RECITATION_BLOCKED":     38,
+		"IMAGE_NOT_PRODUCED":           39,
+		"ASSISTANT_TURN_IN_PROGRESS":   40,
+		"ASSISTANT_TURN_FAILED":        41,
+		"PROCUREMENT_RUN_IN_PROGRESS":  42,
 	}
 )
 
@@ -207,7 +296,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\x8e\x05\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xfc\b\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -234,7 +323,25 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\fCHAT_BLOCKED\x10\x15\x12\x14\n" +
 	"\x10RECEIVER_DELETED\x10\x16\x12\x16\n" +
 	"\x12CRM_TAG_NAME_TAKEN\x10\x17\x12\x11\n" +
-	"\rCRM_TAG_LIMIT\x10\x18B\x82\x02\n" +
+	"\rCRM_TAG_LIMIT\x10\x18\x12\x19\n" +
+	"\x15REPLAY_CURSOR_EXPIRED\x10\x19\x12\x17\n" +
+	"\x13REPLAY_CURSOR_AHEAD\x10\x1a\x12\x19\n" +
+	"\x15REQUIREMENT_NOT_READY\x10\x1b\x12\x14\n" +
+	"\x10APPROVAL_PENDING\x10\x1c\x12\x1d\n" +
+	"\x19APPROVAL_ALREADY_RESOLVED\x10\x1d\x12\x12\n" +
+	"\x0eRUN_NOT_ACTIVE\x10\x1e\x12\x18\n" +
+	"\x14RFQ_RESPONSE_EXPIRED\x10\x1f\x12\x18\n" +
+	"\x14RFQ_RECIPIENT_CLOSED\x10 \x12\x1f\n" +
+	"\x1bRFQ_CHECKOUT_ALREADY_ACTIVE\x10!\x12\x17\n" +
+	"\x13RFQ_ALREADY_AWARDED\x10\"\x12 \n" +
+	"\x1cAGENT_MONTHLY_QUOTA_EXCEEDED\x10#\x12\x18\n" +
+	"\x14IMAGE_QUOTA_EXCEEDED\x10$\x12\x18\n" +
+	"\x14IMAGE_SAFETY_BLOCKED\x10%\x12\x1c\n" +
+	"\x18IMAGE_RECITATION_BLOCKED\x10&\x12\x16\n" +
+	"\x12IMAGE_NOT_PRODUCED\x10'\x12\x1e\n" +
+	"\x1aASSISTANT_TURN_IN_PROGRESS\x10(\x12\x19\n" +
+	"\x15ASSISTANT_TURN_FAILED\x10)\x12\x1f\n" +
+	"\x1bPROCUREMENT_RUN_IN_PROGRESS\x10*B\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

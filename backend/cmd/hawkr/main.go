@@ -35,6 +35,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerserver"
+	"github.com/Will413028/hawkr/backend/internal/legacy/categoryservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/crmconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/delegationservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
@@ -53,6 +54,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/socialrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
@@ -63,6 +65,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
@@ -161,6 +164,7 @@ func runServe(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
+	llmConfig := llm.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -243,6 +247,10 @@ func runServe(ctx context.Context) error {
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
+	subscribeProcurement(bus, d, log)
+	procurementModule := newProcurement(d, jc, buyerModule, log)
+	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
+	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
 	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
@@ -259,8 +267,18 @@ func runServe(ctx context.Context) error {
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	del := newDelegation(bus, delegationDeps)
+	// 買家助理的 LLM 只經單一建構點（internal/platform/llm）；沒有 API key 時回停用的 LLM，輪次以失敗結束。
+	assistantModule := assistant.New(assistant.Deps{DB: d, LLM: llm.New(llm.Assistant, llmConfig, log).LLM(), Orders: assistantOrders{orders}, Now: time.Now})
+	// 收到停止訊號就讓進行中的輪次以失敗結束：WatchAssistantTurn 的串流最長 100 秒，不等輪次結束 HTTP 的收尾會被它拖到逾時。
+	stopAssistant := context.AfterFunc(ctx, func() {
+		sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		_ = assistantModule.Shutdown(sc)
+	})
+	defer stopAssistant()
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
+		Assistant:  assistantModule,
 		Ready:      d.Ping,
 		Social:     socialModule,
 		Review:     reviewModule,
@@ -319,7 +337,10 @@ func runServe(ctx context.Context) error {
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
 	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
 	// Run 的連線是專用的（Deps.ListenConnConfig 為 nil：以主連線池的設定另開），所以 DATABASE_URL 必須是直連或 session 模式的 Postgres，不能經 transaction pooling。
-	return serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
+	serveErr := serveWithRun(ctx, imModule.Run, listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
+	sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	return errors.Join(serveErr, assistantModule.Shutdown(sc))
 }
 
 // workerConcurrency 是 default queue 同時執行的 job 上限。
@@ -348,6 +369,7 @@ func runWorker(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
+	llmConfig := llm.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -370,6 +392,11 @@ func runWorker(ctx context.Context) error {
 		return err
 	}
 	products, err := productservice.New(productAddr, internalSecret)
+	if err != nil {
+		return err
+	}
+	// 品項解析讀的分類樹在舊 product-service（catalog 搬進單體前）。
+	categories, err := categoryservice.New(productAddr, internalSecret)
 	if err != nil {
 		return err
 	}
@@ -435,11 +462,14 @@ func runWorker(ctx context.Context) error {
 		Jobs:         jc,
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
+	subscribeProcurement(bus, d, log)
 	subscribeModeration(bus, moderationModule)
 	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
 	contentModule.AddWorkers(workers)
+	procurementModule := newProcurementWorker(d, jc, buyerModule, llm.New(llm.Procurement, llmConfig, log), categories, products, sellerModule, log)
+	addProcurementWorkers(workers, procurementModule)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)
 	payments.AddWorkers(workers)
@@ -473,6 +503,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)
+	periodic = append(periodic, procurementModule.PeriodicJobs()...)
 	periodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)
 	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency}, periodic)
 	if err != nil {

@@ -94,3 +94,75 @@ func TestSuspensionEntriesAllowListIsExact(t *testing.T) {
 		t.Fatalf("允許呼叫停權入口的目錄 = %s", got)
 	}
 }
+
+// genai 的型別各處可用；建構 client 的 genai.NewClient 只有 internal/platform/llm，測試檔也不例外。
+func TestLLMClientCallsOnlyInPlatformLLM(t *testing.T) {
+	root := moduleRoot(t)
+	scanned := 0
+	for _, top := range []string{"cmd", "internal"} {
+		err := filepath.WalkDir(filepath.Join(root, top), func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.Contains(path, "/testdata/") {
+				return nil
+			}
+			src, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if generatedFile(src) {
+				return nil
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			res, err := CheckRestrictedPackageCalls(filepath.ToSlash(rel), src, LLMClientCalls)
+			if err != nil {
+				return err
+			}
+			scanned++
+			for _, v := range res.Violations {
+				t.Error(v)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if scanned < 300 {
+		t.Fatalf("只掃到 %d 個檔：檢查範圍不對", scanned)
+	}
+}
+
+func TestCheckRestrictedPackageCallsResolvesTheImport(t *testing.T) {
+	const imp = "import \"google.golang.org/genai\"\n"
+	cases := []struct {
+		name, file, src string
+		want            int
+	}{
+		{"呼叫 NewClient", "internal/modules/assistant/x.go", "package x\n" + imp + "func f() { _, _ = genai.NewClient(ctx, nil) }\n", 1},
+		{"測試檔也算", "internal/modules/assistant/x_test.go", "package x\n" + imp + "func f() { _, _ = genai.NewClient(ctx, nil) }\n", 1},
+		{"函式值", "internal/httpapi/x.go", "package x\n" + imp + "var f = genai.NewClient\n", 1},
+		{"別名", "cmd/hawkr/main.go", "package x\nimport g \"google.golang.org/genai\"\nfunc f() { _, _ = g.NewClient(ctx, nil) }\n", 1},
+		{"dot import", "cmd/hawkr/main.go", "package x\nimport . \"google.golang.org/genai\"\nfunc f() { _, _ = NewClient(ctx, nil) }\n", 1},
+		{"只用型別", "internal/modules/assistant/x.go", "package x\n" + imp + "var c *genai.Content\nvar p = genai.NewContentFromText(\"a\", genai.RoleUser)\n", 0},
+		{"其他套件的 NewClient", "internal/modules/assistant/x.go", "package x\nimport \"example.com/other\"\nfunc f() { _ = other.NewClient() }\n", 0},
+		{"沒 import 的同名變數", "internal/modules/assistant/x.go", "package x\nfunc f() { genai := t; _ = genai.NewClient }\n", 0},
+		{"platform/llm 可以", "internal/platform/llm/llm.go", "package x\n" + imp + "func f() { _, _ = genai.NewClient(ctx, nil) }\n", 0},
+		{"目錄名只是前綴相同的不算", "internal/platform/llmx/x.go", "package x\n" + imp + "func f() { _, _ = genai.NewClient(ctx, nil) }\n", 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			res, err := CheckRestrictedPackageCalls(c.file, []byte(c.src), LLMClientCalls)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(res.Violations) != c.want {
+				t.Fatalf("違規 %d 處，預期 %d：%v", len(res.Violations), c.want, res.Violations)
+			}
+		})
+	}
+}

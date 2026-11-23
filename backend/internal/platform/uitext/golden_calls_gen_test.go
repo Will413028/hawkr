@@ -39,6 +39,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 	switch c.Fn {
 	case "admin.moderation.CaseReport.outcome_unset":
 		return t.AdminModerationCaseReportOutcomeUnset(), true
+	case "assistant.AssistantTool":
+		return t.AssistantAssistantTool(goldenEnum(c.Value, "ASSISTANT_TOOL_"))
 	case "buyer.Gender":
 		return t.BuyerGender(goldenEnum(c.Value, "GENDER_"))
 	case "buyer.Profile.deleted_name":
@@ -78,6 +80,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
+	case "procurement.RejectionReason":
+		return t.ProcurementRejectionReason(goldenEnum(c.Value, "REJECTION_REASON_"))
 	case "review.Review.rating_label_1":
 		return t.ReviewReviewRatingLabel1(), true
 	case "review.Review.rating_label_2":

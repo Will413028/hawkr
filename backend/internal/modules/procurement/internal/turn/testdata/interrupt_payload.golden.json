@@ -1,0 +1,35 @@
+{
+  "stage": "ITEM",
+  "query": "蘋果",
+  "candidates": [
+    {
+      "categoryId": "1",
+      "label": "蘋果",
+      "path": "水果 \u003e 蘋果"
+    },
+    {
+      "categoryId": "2",
+      "label": "蘋果",
+      "path": "加工品 \u003e 蘋果"
+    }
+  ],
+  "question": {
+    "slotKey": "SLOT_KEY_ITEM_DISAMBIGUATION",
+    "prompt": "找到幾個相符的品項，麻煩選一下你要的是哪一個：",
+    "options": [
+      {
+        "optionId": "category-1",
+        "label": "水果 \u003e 蘋果"
+      },
+      {
+        "optionId": "category-2",
+        "label": "加工品 \u003e 蘋果"
+      },
+      {
+        "optionId": "item-other",
+        "label": "其他（自己輸入）"
+      }
+    ],
+    "allowFreeText": true
+  }
+}

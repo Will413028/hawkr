@@ -1,0 +1,121 @@
+{
+  "scenario": "latest_session_after_chat",
+  "description": "BuyerLatestSession after one chat turn: latest session id plus user/model text messages (tool call/response events skipped).",
+  "input": {
+    "rpc": "BuyerLatestSession",
+    "endpoint_key": "",
+    "message": "",
+    "buyer_id": 4242,
+    "note": "pre-step: one BuyerChat turn 'ORD-1001 的詳細資訊？' with coordinator-\u003especialist-\u003etool"
+  },
+  "fake_tool_backend": {
+    "orders": [
+      {
+        "OrderNo": "ORD-1001",
+        "Status": "20",
+        "SellerName": "阿嬤的菜園",
+        "Amount": 580,
+        "CreateTimeMs": 1700000000000,
+        "ItemCount": 2
+      },
+      {
+        "OrderNo": "ORD-1002",
+        "Status": "30",
+        "SellerName": "海味小舖",
+        "Amount": 1200,
+        "CreateTimeMs": 1700100000000,
+        "ItemCount": 1
+      }
+    ],
+    "details": {
+      "ORD-1001": {
+        "OrderNo": "ORD-1001",
+        "Status": "20",
+        "SellerName": "阿嬤的菜園",
+        "ShippingMethod": "黑貓冷藏",
+        "ShippingStatus": "IN_TRANSIT",
+        "RecipientName": "王小明",
+        "PaymentMethod": "CREDIT_CARD",
+        "Amount": 580,
+        "CreateTimeMs": 0,
+        "ShippingFee": 120
+      },
+      "ORD-1002": {
+        "OrderNo": "ORD-1002",
+        "Status": "30",
+        "SellerName": "海味小舖",
+        "ShippingMethod": "宅配",
+        "ShippingStatus": "DELIVERED",
+        "RecipientName": "王小明",
+        "PaymentMethod": "ATM",
+        "Amount": 1200,
+        "CreateTimeMs": 0,
+        "ShippingFee": 150
+      }
+    }
+  },
+  "scripted_llm": [
+    {
+      "agent": "buyer_coordinator",
+      "chunks": [
+        {
+          "function_call": {
+            "name": "buyer_order_specialist",
+            "args": {
+              "request": "查詢訂單 ORD-1001 詳情"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "agent": "buyer_order_specialist",
+      "chunks": [
+        {
+          "function_call": {
+            "name": "get_buyer_order_detail",
+            "args": {
+              "order_no": "ORD-1001"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "agent": "buyer_order_specialist",
+      "chunks": [
+        {
+          "text": "配送中。"
+        }
+      ]
+    },
+    {
+      "agent": "buyer_coordinator",
+      "chunks": [
+        {
+          "text": "訂單 ORD-1001 正在配送中。"
+        }
+      ]
+    }
+  ],
+  "observed_llm_requests": null,
+  "emitted_events": [],
+  "rpc_result": {
+    "latest_session": {
+      "messages": [
+        {
+          "role": "user",
+          "text": "ORD-1001 的詳細資訊？",
+          "timestamp": "\u003cRFC3339 timestamp\u003e"
+        },
+        {
+          "role": "model",
+          "text": "訂單 ORD-1001 正在配送中。",
+          "timestamp": "\u003cRFC3339 timestamp\u003e"
+        }
+      ],
+      "session_id": "\u003cSESSION_ID\u003e"
+    },
+    "status_code": "OK"
+  }
+}

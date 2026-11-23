@@ -1,0 +1,35 @@
+{
+  "stage": "GROUP",
+  "query": "蘋果",
+  "candidates": [
+    {
+      "categoryId": "48468",
+      "label": "水果",
+      "path": "水果"
+    },
+    {
+      "categoryId": "28405",
+      "label": "加工品",
+      "path": "加工品"
+    }
+  ],
+  "question": {
+    "slotKey": "SLOT_KEY_ITEM_DISAMBIGUATION",
+    "prompt": "相符的品項分散在幾個大類，請先選你要的是哪一類：",
+    "options": [
+      {
+        "optionId": "category-48468",
+        "label": "水果"
+      },
+      {
+        "optionId": "category-28405",
+        "label": "加工品"
+      },
+      {
+        "optionId": "item-other",
+        "label": "其他（自己輸入）"
+      }
+    ],
+    "allowFreeText": true
+  }
+}
