@@ -387,9 +387,19 @@ func (f *fixture) stage(t *testing.T) string {
 // assetState 是資產在 media 的狀態；資產不存在時失敗。
 func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
 	t.Helper()
-	var st string
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id = $1", id).Scan(&st); err != nil {
+	st, err := media.AssetStateOf(context.Background(), f.db, id)
+	if err != nil {
 		t.Fatal(err)
 	}
-	return st
+	return string(st)
+}
+
+// stagedAssets 是推導後處於 STAGED（還沒確認）的資產數。
+func (f *fixture) stagedAssets(t *testing.T) int {
+	t.Helper()
+	n, err := media.CountAssetsInState(context.Background(), f.db, media.AssetStaged)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }

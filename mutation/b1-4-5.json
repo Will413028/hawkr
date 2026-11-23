@@ -751,7 +751,7 @@
    "id": "media-confirm-cross-tx-allowed",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/upload.go",
-   "old": "if !here {",
+   "old": "if !claim.Here {",
    "new": "if false {",
    "test": "internal/modules/media ^TestConfirm_ConfirmedInAnotherTransactionIsRejected$",
    "why": "已在別的 transaction 確認過的 token 可以再確認，一個資產被兩個擁有者共用（B1-D23）"
@@ -827,6 +827,42 @@
    "new": "\tif false {",
    "test": "internal/modules/media ^TestConfirmFieldsKeepsTheAlreadyConfirmedMarker$",
    "why": "ConfirmFields 把已確認轉成欄位錯誤時丟掉標記"
+  },
+  {
+   "id": "media-claim-upload-no-on-conflict",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "ON CONFLICT (upload_id) DO NOTHING\nRETURNING asset_id\n",
+   "new": "RETURNING asset_id\n",
+   "test": "internal/modules/media ^TestConfirmBlocksOnUncommittedClaim$",
+   "why": "ClaimUpload 沒有 ON CONFLICT DO NOTHING：同一個 token 並行確認時輸家得到唯一鍵錯誤，而不是 B1-D23 的已確認回應"
+  },
+  {
+   "id": "media-settle-is-a-noop",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "UPDATE media.staged_uploads AS u SET state = 'CONFIRMED', updated_at = $1",
+   "new": "UPDATE media.staged_uploads AS u SET state = 'READY', updated_at = $1",
+   "test": "internal/modules/media ^TestConfirm_Success$",
+   "why": "settle 沒有把已確認的 READY 暫存物化成 CONFIRMED：staged_uploads_gc 索引會永遠累積已確認的列"
+  },
+  {
+   "id": "media-reclaimed-claim-reports-already-used",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if model.ClaimKind(claim.Kind) == model.ClaimReclaimed {",
+   "new": "if false {",
+   "test": "internal/modules/media ^TestConfirmAndGC_DeterministicInterleavings$",
+   "why": "輸給 GC 的 Confirm 讀到 RECLAIMED 認領卻回「已被確認過」，而不是「已過期」"
+  },
+  {
+   "id": "media-derive-ignores-deletion-request",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/model/lifecycle.go",
+   "old": "\tcase deleteRequested:\n\t\treturn AssetDeleting\n",
+   "new": "",
+   "test": "internal/modules/media/internal/model ^TestDeriveAssetState$",
+   "why": "推導的資產狀態忽略擁有者的刪除請求：commit 後仍是 ACTIVE，直到 job 套用才變 DELETING"
   }
  ]
 }

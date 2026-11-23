@@ -527,8 +527,8 @@ func TestRolledBackPostImageReplacementLeavesTheNewAssetStaged(t *testing.T) {
 	if got := f.postAsset(t, p.ID); got != first {
 		t.Fatalf("回滾後貼文的資產 = %s，預期 %s", got, first)
 	}
-	var staged int64
-	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM media.assets WHERE state = 'STAGED'").Scan(&staged); err != nil || staged != 1 {
+	staged, err := media.CountAssetsInState(ctx, f.db, media.AssetStaged)
+	if err != nil || staged != 1 {
 		t.Fatalf("回滾後新資產仍是暫存：%d %v", staged, err)
 	}
 	fail = false

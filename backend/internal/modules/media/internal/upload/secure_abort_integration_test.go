@@ -94,6 +94,9 @@ func TestAbortDirect_RowAlreadyDeletingReturnsExpiredAndKeepsObject(t *testing.T
 	if err := d.Pool().QueryRow(t.Context(), `SELECT id, final_key FROM media.staged_uploads`).Scan(&id, &key); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := d.Pool().Exec(t.Context(), `INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at) SELECT id, 'RECLAIMED', asset_id, now() FROM media.staged_uploads WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := d.Pool().Exec(t.Context(), `UPDATE media.staged_uploads SET state = 'DELETING' WHERE id = $1`, id); err != nil {
 		t.Fatal(err)
 	}
@@ -174,6 +177,9 @@ func TestPutSecureChunk_LosingToGCReturnsExpiredAndDeletesItsOwnObject(t *testin
 	svc, d2, st := secureServiceWith(t, func(f *storage.Fake) storage.Store {
 		hs = &hookStore{Fake: f}
 		hs.afterPut = func() {
+			if _, err := d.Pool().Exec(context.Background(), `INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at) SELECT id, 'RECLAIMED', NULL, now() FROM media.staged_uploads`); err != nil {
+				panic(err)
+			}
 			if _, err := d.Pool().Exec(context.Background(), `UPDATE media.staged_uploads SET state = 'DELETING'`); err != nil {
 				panic(err)
 			}

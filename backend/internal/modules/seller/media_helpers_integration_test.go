@@ -16,6 +16,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 )
 
@@ -75,9 +77,9 @@ func (f *fixture) stageSecure(t *testing.T, uploader media.Uploader, data []byte
 
 func (f *fixture) assetState(t *testing.T, assetID uuid.UUID) string {
 	t.Helper()
-	var state string
-	must(t, f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id=$1", assetID).Scan(&state))
-	return state
+	st, err := media.AssetStateOf(context.Background(), f.db, assetID)
+	must(t, err)
+	return string(st)
 }
 
 // wantAsset 檢查資產的狀態：ACTIVE（已確認）、DELETING（已標記刪除）或 STAGED（還沒確認）。
@@ -200,4 +202,26 @@ func (f *fixture) evidence(t *testing.T, uploader media.Uploader, names ...strin
 		tokens[i], _ = f.stageSecure(t, uploader, evidencePDF(name))
 	}
 	return tokens
+}
+
+// activeEvidenceAssets 是詢問回覆的附件中，media 推導狀態為 ACTIVE 的資產數。
+func (f *fixture) activeEvidenceAssets(t *testing.T, inquiryID uuid.UUID) int {
+	t.Helper()
+	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "SELECT asset_id FROM seller.case_inquiry_reply_evidence WHERE inquiry_id = $1", inquiryID)
+	must(t, err)
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	must(t, err)
+	n := 0
+	for _, id := range ids {
+		if f.assetState(t, id) == string(media.AssetActive) {
+			n++
+		}
+	}
+	return n
+}
+
+// markAssetDeleted 以擁有者的身分（自己的 transaction）請求刪除資產：推導狀態立刻是 DELETING，物件由 media 的套用 job 之後刪。
+func (f *fixture) markAssetDeleted(t *testing.T, ctx context.Context, id uuid.UUID) {
+	t.Helper()
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return f.media.MarkDeleted(ctx, []uuid.UUID{id}) }))
 }

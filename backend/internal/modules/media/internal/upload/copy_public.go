@@ -25,11 +25,11 @@ func (s *Service) CopyPublic(ctx context.Context, uploader model.Uploader, sourc
 	if uploader.ID <= 0 {
 		return PublicPutResult{}, apperr.InvalidInputOn([]string{"uploader"}, "%s", text.MediaUploaderInvalid(loc(ctx)))
 	}
-	src, err := s.q(ctx).GetAsset(ctx, sourceID)
+	src, err := s.q(ctx).GetAssetView(ctx, sourceID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return PublicPutResult{}, fmt.Errorf("media：讀取來源資產：%w", err)
 	}
-	if err != nil || model.AssetState(src.State) != model.AssetActive || model.Visibility(src.Visibility) != model.VisibilityPublic {
+	if err != nil || deriveState(src) != model.AssetActive || model.Visibility(src.Visibility) != model.VisibilityPublic {
 		return PublicPutResult{}, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
 	rc, err := s.d.Store.Get(ctx, src.ObjectKey)

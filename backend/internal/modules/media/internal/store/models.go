@@ -7,6 +7,7 @@ package store
 import (
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"uuid"
 )
 
@@ -22,6 +23,12 @@ type MediaAsset struct {
 	ChunkCount  *int32
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+type MediaAssetDeletionRequest struct {
+	AssetID     uuid.UUID
+	RequestedAt time.Time
+	AppliedAt   *time.Time
 }
 
 type MediaSecureChunk struct {
@@ -53,4 +60,12 @@ type MediaStagedUpload struct {
 	ExpiresAt           time.Time
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+
+type MediaUploadClaim struct {
+	UploadID   uuid.UUID
+	Kind       string
+	AssetID    *uuid.UUID
+	ClaimedXid pgtype.Uint64
+	CreatedAt  time.Time
 }

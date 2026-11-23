@@ -57,6 +57,8 @@ type (
 	BeginResult = upload.BeginResult
 	// UploadStatus 是 GetUpload 的結果。
 	UploadStatus = upload.Status
+	// AssetState 是資產推導後的狀態（B1-D25）。
+	AssetState = model.AssetState
 	// ConfirmedAsset 是 Confirm 回傳的資產。
 	ConfirmedAsset = upload.ConfirmedAsset
 	// ProcessFunc 是處理 job 的內容。
@@ -74,6 +76,11 @@ type (
 const (
 	VisibilityPublic = model.VisibilityPublic
 	VisibilitySecure = model.VisibilitySecure
+
+	AssetStaged   = model.AssetStaged
+	AssetActive   = model.AssetActive
+	AssetDeleting = model.AssetDeleting
+	AssetDeleted  = model.AssetDeleted
 
 	UploadPending   = model.StatePending
 	UploadUploading = model.StateUploading
@@ -179,7 +186,7 @@ func New(d Deps) *Module {
 		upload: upload.New(upload.Deps{
 			DB: d.DB, Jobs: d.Jobs, Store: d.Store, Process: d.Process, NewID: d.NewID, Now: d.Now, Logger: d.Logger, Keyring: d.Keyring,
 		}),
-		reclaim: reclaim.New(reclaim.Deps{DB: d.DB, Jobs: d.Jobs, Store: d.Store, Now: d.Now, Logger: d.Logger}),
+		reclaim: reclaim.New(reclaim.Deps{DB: d.DB, Store: d.Store, Now: d.Now, Logger: d.Logger}),
 	}
 }
 
@@ -269,6 +276,27 @@ func (m *Module) CollectGarbage(ctx context.Context) (GCResult, error) {
 }
 
 // DeleteAssets 是實體刪除 job 的內容（刪所有標記中的物件），給 worker 與測試呼叫。
+// ApplyDeletions 套用擁有者的刪除請求（資產標為 DELETING）並物化已確認的暫存列，回傳套用的請求數；排程 job 與測試使用。不得在 transaction 內呼叫。
+func (m *Module) ApplyDeletions(ctx context.Context) (int, error) {
+	return m.reclaim.ApplyDeletions(ctx)
+}
+
+// AssetState 回傳資產推導後的狀態（STAGED、ACTIVE、DELETING、DELETED；B1-D25），資產不存在回 pgx.ErrNoRows。
+// 擁有者的整合測試以它斷言資產狀態，不自己拼 SQL 謂詞。
+func (m *Module) AssetState(ctx context.Context, assetID uuid.UUID) (AssetState, error) {
+	return m.upload.AssetState(ctx, assetID)
+}
+
+// AssetStateOf 與 CountAssetsInState 是不經 Module 實例的診斷入口（擁有者模組的整合測試只有資料庫連線）：同一條推導路徑。
+func AssetStateOf(ctx context.Context, d *db.DB, assetID uuid.UUID) (AssetState, error) {
+	return upload.AssetStateOf(ctx, d, assetID)
+}
+
+// CountAssetsInState 回傳推導後處於 want 的資產數。
+func CountAssetsInState(ctx context.Context, d *db.DB, want AssetState) (int, error) {
+	return upload.CountAssetsInState(ctx, d, want)
+}
+
 func (m *Module) DeleteAssets(ctx context.Context) (int, error) { return m.reclaim.DeleteAssets(ctx) }
 
 // AddWorkers 登記 River worker（處理、實體刪除、暫存 GC）。

@@ -418,7 +418,7 @@ func TestRecordInquiryReply(t *testing.T) {
 		t.Fatalf("case=%+v", got.Case.Case)
 	}
 	// 附件以管理員的身分確認（Admin: true；media 只讓上傳者本人確認），兩份都是有效的資產。
-	if n := f.count(t, "SELECT count(*) FROM seller.case_inquiry_reply_evidence e JOIN media.assets a ON a.id = e.asset_id WHERE e.inquiry_id = $1 AND a.state = 'ACTIVE'", i.ID); n != 2 {
+	if n := f.activeEvidenceAssets(t, i.ID); n != 2 {
 		t.Fatalf("有效的附件資產=%d", n)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.case_inquiry_reply_evidence WHERE inquiry_id = $1", i.ID); n != 2 {

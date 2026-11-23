@@ -116,7 +116,7 @@ func TestSellerReplyEndsTheInquiryAndIsVisibleToAdmin(t *testing.T) {
 		r.RepliedByAccountID != owner || r.RecordedByAdminID != 0 || !r.ReceivedAt.Equal(f.now) || !r.RecordedAt.Equal(f.now) || len(r.Evidence) != 0 {
 		t.Fatalf("reply=%+v", got)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.case_inquiry_reply_evidence e JOIN media.assets a ON a.id = e.asset_id WHERE e.inquiry_id = $1 AND a.state = 'ACTIVE'", i.ID); n != 2 {
+	if n := f.activeEvidenceAssets(t, i.ID); n != 2 {
 		t.Fatalf("有效的附件資產=%d", n)
 	}
 	after := f.caseOf(t, c.ID)

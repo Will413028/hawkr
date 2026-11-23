@@ -16,6 +16,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -304,13 +306,38 @@ func uploadKeys(t *testing.T, f *fixture, id uuid.UUID) (tmp string, final *stri
 	return tmp, final, asset
 }
 
+// assetState 是資產推導後的狀態（STAGED、ACTIVE、DELETING、DELETED），經 media.AssetState（GetAssetView 與 DeriveAssetState），不重寫謂詞。
 func assetState(t *testing.T, f *fixture, id uuid.UUID) string {
+	t.Helper()
+	st, err := f.m.AssetState(t.Context(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(st)
+}
+
+// physicalAssetState 是資產列上記的物理 state（STAGED、DELETING、DELETED）。
+func physicalAssetState(t *testing.T, f *fixture, id uuid.UUID) string {
 	t.Helper()
 	var s string
 	if err := f.d.Pool().QueryRow(t.Context(), `SELECT state FROM media.assets WHERE id = $1`, id).Scan(&s); err != nil {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// claimKind 是暫存列的認領種類（CONFIRMED、RECLAIMED），沒有認領是空字串。
+func claimKind(t *testing.T, f *fixture, uploadID uuid.UUID) string {
+	t.Helper()
+	var kind string
+	err := f.d.Pool().QueryRow(t.Context(), `SELECT kind FROM media.upload_claims WHERE upload_id = $1`, uploadID).Scan(&kind)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ""
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return kind
 }
 
 func assetCount(t *testing.T, f *fixture) int {
@@ -331,10 +358,10 @@ func jobCount(t *testing.T, f *fixture, kind string) int {
 	return n
 }
 
-// assertNoDanglingAssets：沒有任何 STAGED 或 ACTIVE 的資產指著不存在的物件。
+// assertNoDanglingAssets：沒有任何尚未開始刪除（STAGED，含已確認）的資產指著不存在的物件。
 func assertNoDanglingAssets(t *testing.T, f *fixture) {
 	t.Helper()
-	rows, err := f.d.Pool().Query(t.Context(), `SELECT object_key FROM media.assets WHERE state IN ('STAGED', 'ACTIVE')`)
+	rows, err := f.d.Pool().Query(t.Context(), `SELECT object_key FROM media.assets WHERE state = 'STAGED'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -567,8 +594,45 @@ func TestConfirm_Success(t *testing.T) {
 	if a.ID != assetIDOf(t, f, res.ID) || a.Visibility != media.VisibilityPublic || a.SizeBytes != int64(len(payload)) || a.ContentType != "image/png" {
 		t.Fatalf("Confirm = %+v", a)
 	}
-	if uploadState(t, f, res.ID) != "CONFIRMED" || assetState(t, f, a.ID) != "ACTIVE" {
-		t.Fatal("確認後暫存列應該是 CONFIRMED、資產應該是 ACTIVE")
+	if claimKind(t, f, res.ID) != "CONFIRMED" || assetState(t, f, a.ID) != "ACTIVE" || physicalAssetState(t, f, a.ID) != "STAGED" || uploadState(t, f, res.ID) != "READY" {
+		t.Fatal("確認只新增 CONFIRMED 認領：推導的資產是 ACTIVE，資產列與暫存列的物理 state 都不動（STAGED、READY）")
+	}
+	if _, err := f.m.ApplyDeletions(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if uploadState(t, f, res.ID) != "CONFIRMED" {
+		t.Fatal("settle 之後暫存列應該物化成 CONFIRMED")
+	}
+}
+
+// 確認過的暫存永遠不會被 GC 認領：不論 settle 有沒有跑。
+func TestGC_NeverClaimsAConfirmedUploadSettledOrNot(t *testing.T) {
+	for _, settle := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unsettled", true: "settled"}[settle], func(t *testing.T) { testGCNeverClaimsConfirmed(t, settle) })
+	}
+}
+
+func testGCNeverClaimsConfirmed(t *testing.T, settle bool) {
+	{
+		f := setup(t)
+		res := ready(t, f, owner)
+		a, err := confirmInTx(f, owner, res.Token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if settle {
+			if _, err := f.m.ApplyDeletions(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		f.clock.Advance(100 * media.UploadTTL)
+		got, err := f.m.CollectGarbage(t.Context())
+		if err != nil || got.Claimed != 0 {
+			t.Fatalf("settle=%v：GC = %+v, %v，已確認的不該被認領", settle, got, err)
+		}
+		if claimKind(t, f, res.ID) != "CONFIRMED" || assetState(t, f, a.ID) != "ACTIVE" {
+			t.Fatalf("settle=%v：已確認的暫存與資產必須原封不動", settle)
+		}
 	}
 }
 
@@ -624,6 +688,9 @@ func TestConfirm_ConfirmedInAnotherTransactionIsRejected(t *testing.T) {
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	if got := assetState(t, f, first.ID); got != "ACTIVE" {
 		t.Fatalf("被拒的第二次確認不能動資產：%s", got)
+	}
+	if _, err := confirmInTx(f, owner, res.Token); !errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+		t.Fatalf("跨 transaction 確認 = %v，預期 ErrUploadAlreadyConfirmed", err)
 	}
 }
 
@@ -755,7 +822,7 @@ func TestConfirmAndGC_ConcurrentOnlyOneSucceeds(t *testing.T) {
 		}
 		state := uploadState(t, f, res.ID)
 		if confirmErr == nil {
-			if state != "CONFIRMED" || assetState(t, f, *asset) != "ACTIVE" || !f.store.has(*final) {
+			if claimKind(t, f, res.ID) != "CONFIRMED" || assetState(t, f, *asset) != "ACTIVE" || !f.store.has(*final) {
 				t.Fatalf("第 %d 輪確認成功，卻是 state=%s asset=%s 物件存在=%v", i, state, assetState(t, f, *asset), f.store.has(*final))
 			}
 		} else {
@@ -787,27 +854,30 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 			return err
 		})
 		wantKind(t, err, apperr.KindFailedPrecondition)
+		if errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+			t.Fatal("輸給 GC 的 Confirm 該回「已過期」，不是「已在別的 transaction 確認」")
+		}
 		if uploadState(t, f, res.ID) != "DELETED" || assetState(t, f, *asset) != "DELETED" || f.store.has(*final) {
 			t.Fatal("GC 贏了，列或物件卻沒被回收")
 		}
 	})
 
-	t.Run("GC runs while Confirm holds the row lock, Confirm wins", func(t *testing.T) {
+	t.Run("GC runs while Confirm holds an uncommitted claim, GC skips and Confirm wins", func(t *testing.T) {
 		res := ready(t, f, owner)
 		_, final, asset := uploadKeys(t, f, res.ID)
 		err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 			if _, err := confirmer.Confirm(ctx, owner, res.Token); err != nil {
 				return err
 			}
-			// Confirm 的 transaction 還沒提交、持有列鎖；GC 以 SKIP LOCKED 略過這一列。
+			// Confirm 的 transaction 還沒提交、持有認領列；GC 的認領等不到（lock_timeout）就跳過這一列。
 			_, err := collector.CollectGarbage(t.Context())
 			return err
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if uploadState(t, f, res.ID) != "CONFIRMED" || assetState(t, f, *asset) != "ACTIVE" || !f.store.has(*final) {
-			t.Fatal("Confirm 持鎖期間 GC 動到這一列")
+		if claimKind(t, f, res.ID) != "CONFIRMED" || assetState(t, f, *asset) != "ACTIVE" || !f.store.has(*final) {
+			t.Fatal("Confirm 持有未提交的認領期間 GC 動到這一列")
 		}
 	})
 }
@@ -860,7 +930,7 @@ func TestGC_NeverDeletesConfirmedAssets(t *testing.T) {
 	if got.Claimed != 0 {
 		t.Fatalf("GC 標記了 %d 列，已確認的不該被標記", got.Claimed)
 	}
-	if uploadState(t, f, res.ID) != "CONFIRMED" || assetState(t, f, a.ID) != "ACTIVE" || !f.store.has(*final) {
+	if claimKind(t, f, res.ID) != "CONFIRMED" || assetState(t, f, a.ID) != "ACTIVE" || !f.store.has(*final) {
 		t.Fatal("已確認的資產與它的物件必須原封不動")
 	}
 }
@@ -1010,11 +1080,51 @@ func confirmed(t *testing.T, f *fixture) (media.ConfirmedAsset, string) {
 	return a, *final
 }
 
+func applyDeletions(t *testing.T, f *fixture) {
+	t.Helper()
+	if _, err := f.m.ApplyDeletions(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func count(t *testing.T, f *fixture, query string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := f.d.Pool().QueryRow(t.Context(), query, args...).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func assertDeletionRequests(t *testing.T, f *fixture, want int) {
+	t.Helper()
+	if n := count(t, f, `SELECT count(*) FROM media.asset_deletion_requests`); n != want {
+		t.Fatalf("刪除請求 %d 筆，預期 %d", n, want)
+	}
+}
+
+// orphanDeleting 是違反 B1-D25 不變量的列數：物理 DELETING 的已確認資產一定有刪除請求（只有擁有者的請求或 GC 的未確認回收能讓資產離開 STAGED；
+// 資產物理刪除完成時請求與認領才一併刪，所以不變量只能對 DELETING 檢查）。
+func orphanDeleting(t *testing.T, f *fixture) int {
+	t.Helper()
+	return count(t, f, `SELECT count(*) FROM media.assets a
+		WHERE a.state = 'DELETING'
+		  AND EXISTS (SELECT 1 FROM media.upload_claims c WHERE c.asset_id = a.id AND c.kind = 'CONFIRMED')
+		  AND NOT EXISTS (SELECT 1 FROM media.asset_deletion_requests r WHERE r.asset_id = a.id)`)
+}
+
+func assertNoOrphanDeleting(t *testing.T, f *fixture) {
+	t.Helper()
+	if n := orphanDeleting(t, f); n != 0 {
+		t.Fatalf("%d 個已確認的資產是物理 DELETING 卻沒有刪除請求", n)
+	}
+}
+
 func markDeletedInTx(f *fixture, ids ...uuid.UUID) error {
 	return f.d.InTx(f.t.Context(), func(ctx context.Context) error { return f.m.MarkDeleted(ctx, ids) })
 }
 
-func TestMarkDeleted_MarksOnlyConfirmedAssetsAndEnqueuesTheDeleteJob(t *testing.T) {
+func TestMarkDeleted_RequestsOnlyConfirmedAssetsAndEnqueuesNothing(t *testing.T) {
 	f := setup(t)
 	a, _ := confirmed(t, f)
 	staged := ready(t, f, owner)
@@ -1022,14 +1132,15 @@ func TestMarkDeleted_MarksOnlyConfirmedAssetsAndEnqueuesTheDeleteJob(t *testing.
 	if err := markDeletedInTx(f, a.ID, a.ID, stagedAsset, uuid.New()); err != nil { // 重複、未確認、不存在的 ID 都忽略
 		t.Fatal(err)
 	}
-	if got := assetState(t, f, a.ID); got != "DELETING" {
-		t.Fatalf("已確認的資產 = %s，預期 DELETING", got)
+	if got := assetState(t, f, a.ID); got != "DELETING" || physicalAssetState(t, f, a.ID) != "STAGED" {
+		t.Fatalf("已確認的資產推導 = %s、物理 = %s，預期推導 DELETING、物理仍 STAGED（job 還沒套用）", got, physicalAssetState(t, f, a.ID))
 	}
+	assertDeletionRequests(t, f, 1)
 	if got := assetState(t, f, stagedAsset); got != "STAGED" {
 		t.Fatalf("未確認的資產 = %s，擁有者的刪除指令不能刪它", got)
 	}
-	if n := jobCount(t, f, "media.delete_assets"); n != 1 {
-		t.Fatalf("刪除 job %d 個，預期 1", n)
+	if n := jobCount(t, f, "media.apply_deletions"); n != 0 {
+		t.Fatalf("擁有者的 transaction 不得排 job，現有 %d 個", n)
 	}
 	if err := markDeletedInTx(f, a.ID); err != nil { // 冪等
 		t.Fatal(err)
@@ -1052,9 +1163,10 @@ func TestMarkDeleted_RollsBackWithTheOwnersTransaction(t *testing.T) {
 	if !errors.Is(err, errBusiness) {
 		t.Fatal(err)
 	}
-	if got := assetState(t, f, a.ID); got != "ACTIVE" || jobCount(t, f, "media.delete_assets") != 0 {
-		t.Fatalf("回滾後資產 = %s、job = %d，預期 ACTIVE 且沒有 job", got, jobCount(t, f, "media.delete_assets"))
+	if got := assetState(t, f, a.ID); got != "ACTIVE" {
+		t.Fatalf("回滾後資產 = %s，預期 ACTIVE", got)
 	}
+	assertDeletionRequests(t, f, 0)
 	if err := f.m.MarkDeleted(t.Context(), []uuid.UUID{a.ID}); !errors.Is(err, media.ErrNoTransaction) {
 		t.Fatalf("沒有 transaction 的 MarkDeleted = %v，預期 ErrNoTransaction", err)
 	}
@@ -1069,12 +1181,23 @@ func TestDeleteJob_ThreeStepsDeleteTheObjectAndMarkDeleted(t *testing.T) {
 	if !f.store.has(final) {
 		t.Fatal("標記刪除時物件還不該被刪（物件由 transaction 外的 job 刪）")
 	}
+	if n, err := f.m.DeleteAssets(t.Context()); err != nil || n != 0 {
+		t.Fatalf("請求還沒套用，DeleteAssets 不該刪任何東西：%d, %v", n, err)
+	}
+	if n, err := f.m.ApplyDeletions(t.Context()); err != nil || n != 1 {
+		t.Fatalf("ApplyDeletions = %d, %v", n, err)
+	}
+	assertNoOrphanDeleting(t, f)
 	n, err := f.m.DeleteAssets(t.Context())
 	if err != nil || n != 1 {
 		t.Fatalf("DeleteAssets = %d, %v", n, err)
 	}
 	if f.store.has(final) || assetState(t, f, a.ID) != "DELETED" {
 		t.Fatal("物件應該已刪、資產應該是 DELETED")
+	}
+	assertDeletionRequests(t, f, 0) // 物理刪除完成時，請求與認領隨資產一起刪
+	if n := count(t, f, `SELECT count(*) FROM media.upload_claims`); n != 0 {
+		t.Fatalf("物理刪除完成後還有 %d 筆認領", n)
 	}
 	if n, err := f.m.DeleteAssets(t.Context()); err != nil || n != 0 { // 冪等
 		t.Fatalf("第二次 DeleteAssets = %d, %v", n, err)
@@ -1087,6 +1210,7 @@ func TestDeleteJob_StorageFailureKeepsRowRetryable(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
+	applyDeletions(t, f)
 	f.store.setDeleteFailure(final, errors.New("r2 unavailable"))
 	if _, err := f.m.DeleteAssets(t.Context()); err == nil {
 		t.Fatal("刪物件失敗應該回錯誤讓 job 重試")
@@ -1136,6 +1260,7 @@ func TestDeleteJob_FailureDoesNotBlockOtherRows(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID, b.ID); err != nil {
 		t.Fatal(err)
 	}
+	applyDeletions(t, f)
 	f.store.setDeleteFailure(aKey, errors.New("r2 unavailable"))
 	if _, err := f.m.DeleteAssets(t.Context()); err == nil {
 		t.Fatal("應該回 a 的錯誤")
@@ -1161,6 +1286,7 @@ func TestStorageIsNeverCalledInsideATransaction(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
+	applyDeletions(t, f)
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -1185,6 +1311,7 @@ func TestStorageEntryPointsRefuseAContextWithATransaction(t *testing.T) {
 		"ProcessUpload":  func(ctx context.Context) error { return f.m.ProcessUpload(ctx, res.ID, 1, media.ProcessMaxAttempts) },
 		"CollectGarbage": func(ctx context.Context) error { _, err := f.m.CollectGarbage(ctx); return err },
 		"DeleteAssets":   func(ctx context.Context) error { _, err := f.m.DeleteAssets(ctx); return err },
+		"ApplyDeletions": func(ctx context.Context) error { _, err := f.m.ApplyDeletions(ctx); return err },
 	}
 	for name, call := range calls {
 		err := f.d.InTx(t.Context(), call)

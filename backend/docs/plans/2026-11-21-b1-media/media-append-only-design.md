@@ -173,7 +173,12 @@ media 自己：`lifecycle_integration_test.go:1025,1094,1116-1121,1143,1204` 的
 - `schema.sql` 表頭註解（`:14-16,47-52`）同步；plan B1-D9 註記「標記＝INSERT 請求列」（D25 已說明）、進度表。
 - 驗收（backend/）：`make sqlc`、`gofmt -l .`、`make lint-monolith`、`GOWORK=off go vet -tags integration ./...`、`python3 scripts/mutation/run.py --validate`、`go test ./internal/modules/media/... ./internal/platform/lockorder/...`（單元）；整合測試與 mutation 由 CI 跑，lockorder 違規數歸零為主要判準。
 
-## 8. 待決（D25 未決定的真取捨）
-1. **ApplyInterval**：建議 30s（刪除延遲 vs 每 30s 一次空查詢，部分索引下成本可忽略）；替代 5s（更接近現在 commit 後立即 job）或沿用 5 分鐘（簡單但刪除延遲大）。
-2. **claim／request 列保留**：建議永久保留（每筆數十 bytes，是 D23 判斷與稽核紀錄；暫存列與資產列本來也保留作墓碑，`schema.sql:16`）；替代是資產 DELETED 後 N 天由 media job 刪——但會違反「claim 永不 DELETE」並需先處理 §1.1 的 FK 前提。
-3. **settle 物化 vs 改 GC 索引**：建議 §3.7 物化；替代是把 `staged_uploads_gc` 索引改成不含 READY、GC 另走 claims 反查，省一個 UPDATE 但 GC 查詢較複雜。
+## 8. 待決（D25 未決定的真取捨；2026-11-23 全部決定）
+1. **ApplyInterval**（已決：30s，可調常數 `reclaim.ApplyInterval`）：建議 30s（刪除延遲 vs 每 30s 一次空查詢，部分索引下成本可忽略）；替代 5s（更接近現在 commit 後立即 job）或沿用 5 分鐘（簡單但刪除延遲大）。
+2. **claim／request 列保留**（已決：與暫存／資產列同生命週期，media 的物理刪除 job 在同一個 transaction 刪除，沒有獨立保留期；因此 §1.1 的 FK 前提不受影響，被刪的是子列）：原建議永久保留（每筆數十 bytes，是 D23 判斷與稽核紀錄；暫存列與資產列本來也保留作墓碑，`schema.sql:16`）；替代是資產 DELETED 後 N 天由 media job 刪——但會違反「claim 永不 DELETE」並需先處理 §1.1 的 FK 前提。
+3. **settle 物化 vs 改 GC 索引**（已決：§3.7 物化）：建議 §3.7 物化；替代是把 `staged_uploads_gc` 索引改成不含 READY、GC 另走 claims 反查，省一個 UPDATE 但 GC 查詢較複雜。
+
+## 9. 審查修正（2026-11-23，已實作）
+- §3.4 GC 絕不等擁有者未提交的認領：候選用純 SELECT 列出，每列一個 transaction、`SET LOCAL lock_timeout`（`GCLockTimeout` 100ms），逾時（SQLSTATE 55P03）跳過、下一輪再試；擁有者不取 advisory lock。測試：`TestConfirmFieldsAndGCNeverDeadlockOrStall`。
+- §3.2 物理 `DELETING` 的已確認資產一定有刪除請求：fixtures 改為經 `MarkDeleted` 造狀態；`TestOrphanDeletingInvariantHoldsAndTheCheckIsNotVacuous` 斷言並附反例。物理刪除完成（`DELETED`）時請求與認領列一併刪除（決定 2），所以不變量只能對 `DELETING` 檢查。
+- 測試 helper：`media.AssetStateOf`／`CountAssetsInState`（根套件，因為其他模組的測試只能 import 根套件）經 `GetAssetView` 與 `DeriveAssetState`，不重寫謂詞。

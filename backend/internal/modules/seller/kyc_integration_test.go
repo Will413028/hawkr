@@ -1552,8 +1552,9 @@ func TestKYCDocumentReadFailuresAreDistinguished(t *testing.T) {
 		t.Fatalf("正常讀取：%v", err)
 	}
 	// 資產在 media 已經不是有效的機敏資產（被標為刪除），列還指著它。
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE media.assets SET state = 'DELETING' WHERE id = $1::uuid", sub.Documents[0].AssetID)
+	docAsset, err := uuid.Parse(sub.Documents[0].AssetID)
 	must(t, err)
+	f.markAssetDeleted(t, ctx, docAsset)
 	if err := read(); !errors.Is(err, ErrFileMissing) {
 		t.Fatalf("media 說沒有：%v", err)
 	}

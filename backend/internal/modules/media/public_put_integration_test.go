@@ -295,6 +295,7 @@ func TestCopyPublic_ProducesAnIndependentConfirmableAssetAndLeavesTheSourceUntou
 	if st := assetState(t, f, dup.ID); st != "ACTIVE" {
 		t.Fatalf("來源被刪除後複本狀態 = %s，預期 ACTIVE", st)
 	}
+	applyDeletions(t, f)
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
 		t.Fatal(err)
 	}

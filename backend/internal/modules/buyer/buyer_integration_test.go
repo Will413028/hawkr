@@ -122,9 +122,9 @@ func stageAvatar(t *testing.T, fixture *fixture, accountID int64) (string, uuid.
 
 func assetState(t *testing.T, fixture *fixture, assetID uuid.UUID) string {
 	t.Helper()
-	var state string
-	must(t, fixture.database.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id=$1", assetID).Scan(&state))
-	return state
+	st, err := media.AssetStateOf(context.Background(), fixture.database, assetID)
+	must(t, err)
+	return string(st)
 }
 
 func must(t *testing.T, err error) {

@@ -83,11 +83,11 @@ func (f *realFixture) stage(t *testing.T) (string, uuid.UUID) {
 
 func (f *realFixture) assetState(t *testing.T, id uuid.UUID) string {
 	t.Helper()
-	var state string
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id=$1", id).Scan(&state); err != nil {
+	st, err := media.AssetStateOf(context.Background(), f.db, id)
+	if err != nil {
 		t.Fatal(err)
 	}
-	return state
+	return string(st)
 }
 
 func (f *realFixture) create(t *testing.T) (content.Banner, [2]uuid.UUID) {

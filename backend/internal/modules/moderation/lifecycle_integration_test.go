@@ -186,7 +186,7 @@ func TestASnapshotRollbackLeavesTheCopyUnconfirmed(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	before := f.count(t, "SELECT count(*) FROM media.assets WHERE state = 'STAGED'")
+	before := f.stagedAssets(t)
 	reporter, _ := f.newBuyer(t)
 	if _, err := f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: Target{Kind: TargetPost, ContentID: w.post.ID}, Category: policy.MisleadingInfo}); err == nil {
 		t.Fatal("寫入檢舉被觸發器擋下，送出要失敗")
@@ -194,7 +194,7 @@ func TestASnapshotRollbackLeavesTheCopyUnconfirmed(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM moderation.case_snapshots"); n != 0 {
 		t.Fatalf("回滾之後不該有快照列：%d", n)
 	}
-	if n := f.count(t, "SELECT count(*) FROM media.assets WHERE state = 'STAGED'"); n != before+1 {
+	if n := f.stagedAssets(t); n != before+1 {
 		t.Fatalf("回滾之後複本要留在 STAGED（未確認）：之前 %d，之後 %d", before, n)
 	}
 }

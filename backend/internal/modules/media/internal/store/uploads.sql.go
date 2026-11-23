@@ -40,51 +40,40 @@ func (q *Queries) AdvanceSecureUpload(ctx context.Context, arg AdvanceSecureUplo
 	return result.RowsAffected(), nil
 }
 
-const claimExpiredUploads = `-- name: ClaimExpiredUploads :many
-UPDATE media.staged_uploads
-SET state = 'DELETING', updated_at = $1
-WHERE id IN (
-    SELECT u.id FROM media.staged_uploads AS u
-    WHERE (u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= $1)
-       OR (u.state = 'UPLOADED' AND u.expires_at <= $2)
-    ORDER BY u.expires_at, u.id
-    LIMIT $3
-    FOR UPDATE SKIP LOCKED)
-RETURNING id, asset_id
+const claimUpload = `-- name: ClaimUpload :one
+INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
+SELECT u.id, 'CONFIRMED', u.asset_id, $1
+FROM media.staged_uploads AS u
+WHERE u.id = $2 AND u.state = 'READY' AND u.expires_at > $1
+ON CONFLICT (upload_id) DO NOTHING
+RETURNING asset_id
 `
 
-type ClaimExpiredUploadsParams struct {
-	Now            time.Time
-	UploadedBefore time.Time
-	MaxRows        int32
+type ClaimUploadParams struct {
+	Now time.Time
+	ID  uuid.UUID
 }
 
-type ClaimExpiredUploadsRow struct {
-	ID      uuid.UUID
-	AssetID *uuid.UUID
+// 擁有者確認（B1-D25）：READY 且未過期的暫存列認領為 CONFIRMED，只新增一列、不更新任何既有列。與 GC 的 ReclaimUpload 搶同一個唯一鍵 upload_id，
+// 輸的一方沒有列（pgx.ErrNoRows）；同一個鍵被另一個還沒提交的 transaction 插入時會等它結束。回傳認領的資產 ID。
+func (q *Queries) ClaimUpload(ctx context.Context, arg ClaimUploadParams) (*uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, claimUpload, arg.Now, arg.ID)
+	var asset_id *uuid.UUID
+	err := row.Scan(&asset_id)
+	return asset_id, err
 }
 
-// GC 階段一：過期且未確認（PENDING、UPLOADING、READY、REJECTED）的列，以及過期超過寬限仍停在 UPLOADED 的列（處理 job 已不會再來），
-// 轉 DELETING 並回傳，隨 transaction 提交；物件由 transaction 外刪。
-// 條件只在子查詢寫一次，FOR UPDATE 在等到鎖之後會重新檢查它，所以和 MarkUploadConfirmed 同時發生時只有一方成功。
-func (q *Queries) ClaimExpiredUploads(ctx context.Context, arg ClaimExpiredUploadsParams) ([]ClaimExpiredUploadsRow, error) {
-	rows, err := q.db.Query(ctx, claimExpiredUploads, arg.Now, arg.UploadedBefore, arg.MaxRows)
+const deleteClaimOfUpload = `-- name: DeleteClaimOfUpload :execrows
+DELETE FROM media.upload_claims WHERE upload_id = $1 AND kind = 'RECLAIMED'
+`
+
+// 暫存列物理刪除完成：它的 RECLAIMED 認領一併刪（state 已是 DELETED，不再需要認領來擋 Confirm）。
+func (q *Queries) DeleteClaimOfUpload(ctx context.Context, uploadID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteClaimOfUpload, uploadID)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	defer rows.Close()
-	items := []ClaimExpiredUploadsRow{}
-	for rows.Next() {
-		var i ClaimExpiredUploadsRow
-		if err := rows.Scan(&i.ID, &i.AssetID); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return result.RowsAffected(), nil
 }
 
 const deleteSecureChunks = `-- name: DeleteSecureChunks :exec
@@ -95,6 +84,31 @@ DELETE FROM media.secure_chunks WHERE asset_id = $1
 func (q *Queries) DeleteSecureChunks(ctx context.Context, assetID uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteSecureChunks, assetID)
 	return err
+}
+
+const getClaim = `-- name: GetClaim :one
+SELECT upload_id, kind, asset_id, (claimed_xid = pg_current_xact_id())::boolean AS here
+FROM media.upload_claims WHERE upload_id = $1
+`
+
+type GetClaimRow struct {
+	UploadID uuid.UUID
+	Kind     string
+	AssetID  *uuid.UUID
+	Here     bool
+}
+
+// 暫存列的認領；here 表示是目前這個 transaction 寫的（Confirm 重入只在同一個 transaction 內冪等，B1-D23）。
+func (q *Queries) GetClaim(ctx context.Context, uploadID uuid.UUID) (GetClaimRow, error) {
+	row := q.db.QueryRow(ctx, getClaim, uploadID)
+	var i GetClaimRow
+	err := row.Scan(
+		&i.UploadID,
+		&i.Kind,
+		&i.AssetID,
+		&i.Here,
+	)
+	return i, err
 }
 
 const getSecureChunk = `-- name: GetSecureChunk :one
@@ -177,6 +191,70 @@ func (q *Queries) GetUploadByTokenHash(ctx context.Context, tokenHash []byte) (M
 		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUploadView = `-- name: GetUploadView :one
+SELECT u.id, u.token_hash, u.uploader_id, u.uploader_admin, u.delegated_store_id, u.visibility, u.declared_size, u.declared_content_type, u.declared_md5, u.state, u.reject_reason, u.tmp_key, u.final_key, u.asset_id, u.planned_asset_id, u.chunk_count, u.next_index, u.kek_id, u.wrapped_dek, u.expires_at, u.created_at, u.updated_at, EXISTS (
+    SELECT 1 FROM media.upload_claims AS c WHERE c.upload_id = u.id AND c.kind = 'CONFIRMED') AS confirmed
+FROM media.staged_uploads AS u WHERE u.id = $1
+`
+
+type GetUploadViewRow struct {
+	ID                  uuid.UUID
+	TokenHash           []byte
+	UploaderID          int64
+	UploaderAdmin       bool
+	DelegatedStoreID    *int64
+	Visibility          string
+	DeclaredSize        int64
+	DeclaredContentType *string
+	DeclaredMd5         *string
+	State               string
+	RejectReason        *string
+	TmpKey              *string
+	FinalKey            *string
+	AssetID             *uuid.UUID
+	PlannedAssetID      *uuid.UUID
+	ChunkCount          *int32
+	NextIndex           *int32
+	KekID               *string
+	WrappedDek          []byte
+	ExpiresAt           time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	Confirmed           bool
+}
+
+// 暫存列加它是否有 CONFIRMED 認領（推導出的 CONFIRMED，不論列上的 state 是 READY 還是已物化的 CONFIRMED）。
+func (q *Queries) GetUploadView(ctx context.Context, id uuid.UUID) (GetUploadViewRow, error) {
+	row := q.db.QueryRow(ctx, getUploadView, id)
+	var i GetUploadViewRow
+	err := row.Scan(
+		&i.ID,
+		&i.TokenHash,
+		&i.UploaderID,
+		&i.UploaderAdmin,
+		&i.DelegatedStoreID,
+		&i.Visibility,
+		&i.DeclaredSize,
+		&i.DeclaredContentType,
+		&i.DeclaredMd5,
+		&i.State,
+		&i.RejectReason,
+		&i.TmpKey,
+		&i.FinalKey,
+		&i.AssetID,
+		&i.PlannedAssetID,
+		&i.ChunkCount,
+		&i.NextIndex,
+		&i.KekID,
+		&i.WrappedDek,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Confirmed,
 	)
 	return i, err
 }
@@ -329,6 +407,57 @@ func (q *Queries) ListDeletingUploads(ctx context.Context, arg ListDeletingUploa
 	return items, nil
 }
 
+const listReclaimableUploads = `-- name: ListReclaimableUploads :many
+SELECT u.id, u.expires_at FROM media.staged_uploads AS u
+WHERE ((u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= $1)
+    OR (u.state = 'UPLOADED' AND u.expires_at <= $2))
+  AND (u.expires_at, u.id) > ($3::timestamptz, $4::uuid)
+  AND NOT EXISTS (SELECT 1 FROM media.upload_claims AS c WHERE c.upload_id = u.id)
+ORDER BY u.expires_at, u.id
+LIMIT $5
+`
+
+type ListReclaimableUploadsParams struct {
+	Now            time.Time
+	UploadedBefore time.Time
+	AfterExpiresAt time.Time
+	AfterID        uuid.UUID
+	MaxRows        int32
+}
+
+type ListReclaimableUploadsRow struct {
+	ID        uuid.UUID
+	ExpiresAt time.Time
+}
+
+// GC 階段一的候選：過期且未確認（PENDING、UPLOADING、READY、REJECTED）的列，以及過期超過寬限仍停在 UPLOADED 的列（處理 job 已不會再來），
+// 而且還沒有任何認領。純 SELECT、不鎖列；(expires_at, id) 是 keyset，被跳過的列不會讓迴圈原地打轉。
+func (q *Queries) ListReclaimableUploads(ctx context.Context, arg ListReclaimableUploadsParams) ([]ListReclaimableUploadsRow, error) {
+	rows, err := q.db.Query(ctx, listReclaimableUploads,
+		arg.Now,
+		arg.UploadedBefore,
+		arg.AfterExpiresAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListReclaimableUploadsRow{}
+	for rows.Next() {
+		var i ListReclaimableUploadsRow
+		if err := rows.Scan(&i.ID, &i.ExpiresAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSecureChunks = `-- name: ListSecureChunks :many
 SELECT idx, object_key FROM media.secure_chunks WHERE asset_id = $1 ORDER BY idx
 `
@@ -404,6 +533,26 @@ func (q *Queries) ListUploadsToRewrap(ctx context.Context, arg ListUploadsToRewr
 	return items, nil
 }
 
+const markReclaimedUploadDeleting = `-- name: MarkReclaimedUploadDeleting :one
+UPDATE media.staged_uploads
+SET state = 'DELETING', updated_at = $1
+WHERE id = $2 AND state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
+RETURNING asset_id
+`
+
+type MarkReclaimedUploadDeletingParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+// 贏得 RECLAIMED 認領的暫存列轉 DELETING，回傳它指著的資產（可能沒有）；物件隨後在 transaction 外刪。
+func (q *Queries) MarkReclaimedUploadDeleting(ctx context.Context, arg MarkReclaimedUploadDeletingParams) (*uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, markReclaimedUploadDeleting, arg.Now, arg.ID)
+	var asset_id *uuid.UUID
+	err := row.Scan(&asset_id)
+	return asset_id, err
+}
+
 const markSecureUploadReady = `-- name: MarkSecureUploadReady :execrows
 UPDATE media.staged_uploads
 SET state = 'READY', asset_id = planned_asset_id, final_key = $1, updated_at = $2
@@ -423,26 +572,6 @@ func (q *Queries) MarkSecureUploadReady(ctx context.Context, arg MarkSecureUploa
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const markUploadConfirmed = `-- name: MarkUploadConfirmed :one
-UPDATE media.staged_uploads
-SET state = 'CONFIRMED', updated_at = $1
-WHERE id = $2 AND state = 'READY' AND expires_at > $1
-RETURNING asset_id
-`
-
-type MarkUploadConfirmedParams struct {
-	Now time.Time
-	ID  uuid.UUID
-}
-
-// READY → CONFIRMED；只接受未過期的列，回傳該列的 asset_id（READY 一定有）。與 GC 的 ClaimExpiredUploads 搶同一列，輸的一方沒有列（pgx.ErrNoRows）。
-func (q *Queries) MarkUploadConfirmed(ctx context.Context, arg MarkUploadConfirmedParams) (*uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, markUploadConfirmed, arg.Now, arg.ID)
-	var asset_id *uuid.UUID
-	err := row.Scan(&asset_id)
-	return asset_id, err
 }
 
 const markUploadDeleted = `-- name: MarkUploadDeleted :execrows
@@ -526,6 +655,32 @@ func (q *Queries) MarkUploadUploaded(ctx context.Context, arg MarkUploadUploaded
 	return result.RowsAffected(), nil
 }
 
+const reclaimUpload = `-- name: ReclaimUpload :one
+INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
+SELECT u.id, 'RECLAIMED', u.asset_id, $1
+FROM media.staged_uploads AS u
+WHERE u.id = $2
+  AND ((u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= $1)
+    OR (u.state = 'UPLOADED' AND u.expires_at <= $3))
+ON CONFLICT (upload_id) DO NOTHING
+RETURNING upload_id
+`
+
+type ReclaimUploadParams struct {
+	Now            time.Time
+	ID             uuid.UUID
+	UploadedBefore time.Time
+}
+
+// GC 階段一：以 RECLAIMED 認領一筆過期的暫存列。條件與 ListReclaimableUploads 相同，在插入時重新檢查；輸給 Confirm（或已被認領）沒有列。
+// 呼叫端先 SET LOCAL lock_timeout：同一個鍵被擁有者還沒提交的認領佔著時不等它，跳過這一列。
+func (q *Queries) ReclaimUpload(ctx context.Context, arg ReclaimUploadParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, reclaimUpload, arg.Now, arg.ID, arg.UploadedBefore)
+	var upload_id uuid.UUID
+	err := row.Scan(&upload_id)
+	return upload_id, err
+}
+
 const rejectSecureUploadAtFirstChunk = `-- name: RejectSecureUploadAtFirstChunk :execrows
 UPDATE media.staged_uploads
 SET state = 'REJECTED', reject_reason = $1, updated_at = $2
@@ -575,14 +730,28 @@ func (q *Queries) RewrapUpload(ctx context.Context, arg RewrapUploadParams) (int
 	return result.RowsAffected(), nil
 }
 
-const uploadConfirmedInThisTx = `-- name: UploadConfirmedInThisTx :one
-SELECT (xmin = pg_current_xact_id()::xid)::boolean AS confirmed_here FROM media.staged_uploads WHERE id = $1
+const settleConfirmedUploads = `-- name: SettleConfirmedUploads :execrows
+UPDATE media.staged_uploads AS u SET state = 'CONFIRMED', updated_at = $1
+WHERE u.id IN (
+    SELECT u2.id FROM media.staged_uploads AS u2
+    JOIN media.upload_claims AS c ON c.upload_id = u2.id AND c.kind = 'CONFIRMED'
+    WHERE u2.state = 'READY'
+    ORDER BY u2.id
+    LIMIT $2
+    FOR NO KEY UPDATE OF u2 SKIP LOCKED)
+  AND u.state = 'READY'
 `
 
-// 這筆暫存列是不是被目前的 transaction 轉成 CONFIRMED 的（列的 xmin 是最後寫入它的 transaction）；Confirm 重入只在同一個 transaction 內冪等（B1-D23）。
-func (q *Queries) UploadConfirmedInThisTx(ctx context.Context, id uuid.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, uploadConfirmedInThisTx, id)
-	var confirmed_here bool
-	err := row.Scan(&confirmed_here)
-	return confirmed_here, err
+type SettleConfirmedUploadsParams struct {
+	Now     time.Time
+	MaxRows int32
+}
+
+// settle：把已有 CONFIRMED 認領的 READY 暫存列物化成 CONFIRMED，讓 staged_uploads_gc 索引不累積已確認的列。推導不依賴它。
+func (q *Queries) SettleConfirmedUploads(ctx context.Context, arg SettleConfirmedUploadsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, settleConfirmedUploads, arg.Now, arg.MaxRows)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

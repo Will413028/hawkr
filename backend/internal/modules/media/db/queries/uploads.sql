@@ -87,27 +87,56 @@ UPDATE media.staged_uploads
 SET state = 'REJECTED', reject_reason = sqlc.arg(reason), updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND state = 'UPLOADED';
 
--- name: MarkUploadConfirmed :one
--- READY → CONFIRMED；只接受未過期的列，回傳該列的 asset_id（READY 一定有）。與 GC 的 ClaimExpiredUploads 搶同一列，輸的一方沒有列（pgx.ErrNoRows）。
-UPDATE media.staged_uploads
-SET state = 'CONFIRMED', updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND state = 'READY' AND expires_at > sqlc.arg(now)
+-- name: ClaimUpload :one
+-- 擁有者確認（B1-D25）：READY 且未過期的暫存列認領為 CONFIRMED，只新增一列、不更新任何既有列。與 GC 的 ReclaimUpload 搶同一個唯一鍵 upload_id，
+-- 輸的一方沒有列（pgx.ErrNoRows）；同一個鍵被另一個還沒提交的 transaction 插入時會等它結束。回傳認領的資產 ID。
+INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
+SELECT u.id, 'CONFIRMED', u.asset_id, sqlc.arg(now)
+FROM media.staged_uploads AS u
+WHERE u.id = sqlc.arg(id) AND u.state = 'READY' AND u.expires_at > sqlc.arg(now)
+ON CONFLICT (upload_id) DO NOTHING
 RETURNING asset_id;
 
--- name: ClaimExpiredUploads :many
--- GC 階段一：過期且未確認（PENDING、UPLOADING、READY、REJECTED）的列，以及過期超過寬限仍停在 UPLOADED 的列（處理 job 已不會再來），
--- 轉 DELETING 並回傳，隨 transaction 提交；物件由 transaction 外刪。
--- 條件只在子查詢寫一次，FOR UPDATE 在等到鎖之後會重新檢查它，所以和 MarkUploadConfirmed 同時發生時只有一方成功。
+-- name: GetClaim :one
+-- 暫存列的認領；here 表示是目前這個 transaction 寫的（Confirm 重入只在同一個 transaction 內冪等，B1-D23）。
+SELECT upload_id, kind, asset_id, (claimed_xid = pg_current_xact_id())::boolean AS here
+FROM media.upload_claims WHERE upload_id = sqlc.arg(upload_id);
+
+-- name: GetUploadView :one
+-- 暫存列加它是否有 CONFIRMED 認領（推導出的 CONFIRMED，不論列上的 state 是 READY 還是已物化的 CONFIRMED）。
+SELECT u.*, EXISTS (
+    SELECT 1 FROM media.upload_claims AS c WHERE c.upload_id = u.id AND c.kind = 'CONFIRMED') AS confirmed
+FROM media.staged_uploads AS u WHERE u.id = sqlc.arg(id);
+
+-- name: ListReclaimableUploads :many
+-- GC 階段一的候選：過期且未確認（PENDING、UPLOADING、READY、REJECTED）的列，以及過期超過寬限仍停在 UPLOADED 的列（處理 job 已不會再來），
+-- 而且還沒有任何認領。純 SELECT、不鎖列；(expires_at, id) 是 keyset，被跳過的列不會讓迴圈原地打轉。
+SELECT u.id, u.expires_at FROM media.staged_uploads AS u
+WHERE ((u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= sqlc.arg(now))
+    OR (u.state = 'UPLOADED' AND u.expires_at <= sqlc.arg(uploaded_before)))
+  AND (u.expires_at, u.id) > (sqlc.arg(after_expires_at)::timestamptz, sqlc.arg(after_id)::uuid)
+  AND NOT EXISTS (SELECT 1 FROM media.upload_claims AS c WHERE c.upload_id = u.id)
+ORDER BY u.expires_at, u.id
+LIMIT sqlc.arg(max_rows);
+
+-- name: ReclaimUpload :one
+-- GC 階段一：以 RECLAIMED 認領一筆過期的暫存列。條件與 ListReclaimableUploads 相同，在插入時重新檢查；輸給 Confirm（或已被認領）沒有列。
+-- 呼叫端先 SET LOCAL lock_timeout：同一個鍵被擁有者還沒提交的認領佔著時不等它，跳過這一列。
+INSERT INTO media.upload_claims (upload_id, kind, asset_id, created_at)
+SELECT u.id, 'RECLAIMED', u.asset_id, sqlc.arg(now)
+FROM media.staged_uploads AS u
+WHERE u.id = sqlc.arg(id)
+  AND ((u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= sqlc.arg(now))
+    OR (u.state = 'UPLOADED' AND u.expires_at <= sqlc.arg(uploaded_before)))
+ON CONFLICT (upload_id) DO NOTHING
+RETURNING upload_id;
+
+-- name: MarkReclaimedUploadDeleting :one
+-- 贏得 RECLAIMED 認領的暫存列轉 DELETING，回傳它指著的資產（可能沒有）；物件隨後在 transaction 外刪。
 UPDATE media.staged_uploads
 SET state = 'DELETING', updated_at = sqlc.arg(now)
-WHERE id IN (
-    SELECT u.id FROM media.staged_uploads AS u
-    WHERE (u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= sqlc.arg(now))
-       OR (u.state = 'UPLOADED' AND u.expires_at <= sqlc.arg(uploaded_before))
-    ORDER BY u.expires_at, u.id
-    LIMIT sqlc.arg(max_rows)
-    FOR UPDATE SKIP LOCKED)
-RETURNING id, asset_id;
+WHERE id = sqlc.arg(id) AND state IN ('PENDING', 'UPLOADING', 'UPLOADED', 'READY', 'REJECTED')
+RETURNING asset_id;
 
 -- name: ListDeletingUploads :many
 SELECT id, tmp_key, final_key, asset_id, planned_asset_id FROM media.staged_uploads
@@ -119,6 +148,18 @@ LIMIT sqlc.arg(max_rows);
 UPDATE media.staged_uploads SET state = 'DELETED', updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND state = 'DELETING';
 
--- name: UploadConfirmedInThisTx :one
--- 這筆暫存列是不是被目前的 transaction 轉成 CONFIRMED 的（列的 xmin 是最後寫入它的 transaction）；Confirm 重入只在同一個 transaction 內冪等（B1-D23）。
-SELECT (xmin = pg_current_xact_id()::xid)::boolean AS confirmed_here FROM media.staged_uploads WHERE id = sqlc.arg(id);
+-- name: DeleteClaimOfUpload :execrows
+-- 暫存列物理刪除完成：它的 RECLAIMED 認領一併刪（state 已是 DELETED，不再需要認領來擋 Confirm）。
+DELETE FROM media.upload_claims WHERE upload_id = sqlc.arg(upload_id) AND kind = 'RECLAIMED';
+
+-- name: SettleConfirmedUploads :execrows
+-- settle：把已有 CONFIRMED 認領的 READY 暫存列物化成 CONFIRMED，讓 staged_uploads_gc 索引不累積已確認的列。推導不依賴它。
+UPDATE media.staged_uploads AS u SET state = 'CONFIRMED', updated_at = sqlc.arg(now)
+WHERE u.id IN (
+    SELECT u2.id FROM media.staged_uploads AS u2
+    JOIN media.upload_claims AS c ON c.upload_id = u2.id AND c.kind = 'CONFIRMED'
+    WHERE u2.state = 'READY'
+    ORDER BY u2.id
+    LIMIT sqlc.arg(max_rows)
+    FOR NO KEY UPDATE OF u2 SKIP LOCKED)
+  AND u.state = 'READY';

@@ -175,8 +175,9 @@ func TestEvidenceReadFailuresAreDistinguished(t *testing.T) {
 	if err := read(); err != nil {
 		t.Fatalf("正常讀取：%v", err)
 	}
-	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE media.assets SET state = 'DELETING' WHERE id = (SELECT asset_id FROM seller.report_evidence WHERE report_id = $1)", r.ReportID)
-	must(t, err)
+	var evidenceAsset uuid.UUID
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT asset_id FROM seller.report_evidence WHERE report_id = $1", r.ReportID).Scan(&evidenceAsset))
+	f.markAssetDeleted(t, ctx, evidenceAsset)
 	if err := read(); !errors.Is(err, ErrFileMissing) {
 		t.Fatalf("media 說沒有：%v", err)
 	}

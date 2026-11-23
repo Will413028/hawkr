@@ -78,7 +78,7 @@ func TestFirstAvatarMarksNothingDeleted(t *testing.T) {
 	if got := assetState(t, f, asset); got != "ACTIVE" {
 		t.Fatalf("state=%s，預期 ACTIVE", got)
 	}
-	if n := count(t, f, "SELECT count(*) FROM media.assets WHERE state <> 'ACTIVE'"); n != 0 {
+	if n := notActiveAssets(t, f); n != 0 {
 		t.Fatalf("有 %d 個資產不是 ACTIVE", n)
 	}
 }
@@ -204,10 +204,29 @@ func TestSecureAssetCannotBeTheAvatar(t *testing.T) {
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("err=%v，預期 InvalidInput", err)
 	}
-	if n := count(t, f, "SELECT count(*) FROM media.assets WHERE state = 'ACTIVE'"); n != 0 {
+	if n := activeAssets(t, f); n != 0 {
 		t.Fatalf("機敏資產被確認：%d", n)
 	}
 	if id := avatarAssetOf(t, f, p.BuyerID); id != nil {
 		t.Fatalf("avatar_asset_id=%v，預期 NULL", id)
 	}
+}
+
+func activeAssets(t *testing.T, f *fixture) int {
+	t.Helper()
+	n, err := media.CountAssetsInState(context.Background(), f.database, media.AssetActive)
+	must(t, err)
+	return n
+}
+
+// notActiveAssets 是推導後不是 ACTIVE 的資產數（STAGED、DELETING、DELETED）。
+func notActiveAssets(t *testing.T, f *fixture) int {
+	t.Helper()
+	total := 0
+	for _, st := range []media.AssetState{media.AssetStaged, media.AssetDeleting, media.AssetDeleted} {
+		n, err := media.CountAssetsInState(context.Background(), f.database, st)
+		must(t, err)
+		total += n
+	}
+	return total
 }

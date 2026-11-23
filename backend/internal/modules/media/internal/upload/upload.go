@@ -280,21 +280,29 @@ func (s *Service) Complete(ctx context.Context, uploader model.Uploader, token s
 	})
 }
 
-// Get 回傳暫存列的狀態與拒絕原因，給 client 輪詢；只有上傳者本人看得到。
+// Get 回傳暫存列的狀態與拒絕原因，給 client 輪詢；只有上傳者本人看得到。有 CONFIRMED 認領就是 CONFIRMED（不論 settle 是否已物化）。
 func (s *Service) Get(ctx context.Context, uploader model.Uploader, token string) (Status, error) {
 	row, err := s.own(ctx, uploader, token)
 	if err != nil {
 		return Status{}, err
 	}
-	st := Status{State: model.UploadState(row.State), ExpiresAt: row.ExpiresAt}
-	if row.RejectReason != nil {
-		st.RejectReason = model.RejectReason(*row.RejectReason)
+	view, err := s.q(ctx).GetUploadView(ctx, row.ID)
+	if err != nil {
+		return Status{}, fmt.Errorf("media：讀取暫存上傳：%w", err)
+	}
+	st := Status{State: model.UploadState(view.State), ExpiresAt: view.ExpiresAt}
+	if view.Confirmed {
+		st.State = model.StateConfirmed
+	}
+	if view.RejectReason != nil {
+		st.RejectReason = model.RejectReason(*view.RejectReason)
 	}
 	return st, nil
 }
 
-// Confirm 在擁有者的 transaction 內確認暫存：只接受 READY、未過期、上傳者相符的列，把暫存列與資產一起轉成確認。同一個 transaction 內重入（已 CONFIRMED）
-// 回同一個資產（只回這筆暫存列所記的資產）；token 已在別的 transaction 確認過回 FailedPrecondition，避免一個資產被兩個擁有者共用（B1-D23）。與 GC 同時發生時只有一方成功。ctx 必須帶 transaction，確認才會與業務列一起提交或回滾。
+// Confirm 在擁有者的 transaction 內確認暫存（B1-D25）：只接受 READY、未過期、上傳者相符的列，只新增一列 CONFIRMED 認領，不更新任何 media 既有的列。
+// 同一個 transaction 內重入回同一個資產（資產在同 transaction 已被請求刪除則 MediaAssetUnavailable）；token 已在別的 transaction 確認過回
+// FailedPrecondition，避免一個資產被兩個擁有者共用（B1-D23）。與 GC 搶同一個認領鍵，只有一方成功。ctx 必須帶 transaction，確認才會與業務列一起提交或回滾。
 func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token string) (ConfirmedAsset, error) {
 	if err := model.RequireTx(ctx); err != nil {
 		return ConfirmedAsset{}, err
@@ -303,39 +311,37 @@ func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token st
 	if err != nil {
 		return ConfirmedAsset{}, err
 	}
-	assetID, err := s.q(ctx).MarkUploadConfirmed(ctx, store.MarkUploadConfirmedParams{ID: row.ID, Now: s.d.Now()})
+	assetID, err := s.q(ctx).ClaimUpload(ctx, store.ClaimUploadParams{ID: row.ID, Now: s.d.Now()})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return ConfirmedAsset{}, fmt.Errorf("media：確認暫存上傳：%w", err)
 	}
+	if err == nil {
+		if assetID == nil {
+			return ConfirmedAsset{}, fmt.Errorf("media：READY 的暫存上傳 %s 沒有資產", row.ID)
+		}
+		return s.assetOf(ctx, *assetID, false)
+	}
+	claim, err := s.q(ctx).GetClaim(ctx, row.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		cur, err := s.q(ctx).GetUpload(ctx, row.ID)
 		if err != nil {
 			return ConfirmedAsset{}, fmt.Errorf("media：重讀暫存上傳：%w", err)
 		}
-		if model.UploadState(cur.State) != model.StateConfirmed {
-			return ConfirmedAsset{}, notConfirmable(ctx, cur, s.d.Now())
-		}
-		here, err := s.q(ctx).UploadConfirmedInThisTx(ctx, row.ID)
-		if err != nil {
-			return ConfirmedAsset{}, fmt.Errorf("media：判斷確認的 transaction：%w", err)
-		}
-		if !here {
-			return ConfirmedAsset{}, model.MarkConfirmedElsewhere(apperr.FailedPrecondition("%s", text.MediaUploadAlreadyUsed(loc(ctx))))
-		}
-		return s.assetOf(ctx, cur, true)
+		return ConfirmedAsset{}, notConfirmable(ctx, cur, s.d.Now())
 	}
-	if assetID == nil {
-		return ConfirmedAsset{}, fmt.Errorf("media：READY 的暫存上傳 %s 沒有資產", row.ID)
-	}
-	n, err := s.q(ctx).ActivateAsset(ctx, store.ActivateAssetParams{ID: *assetID, Now: s.d.Now()})
 	if err != nil {
-		return ConfirmedAsset{}, fmt.Errorf("media：啟用資產：%w", err)
+		return ConfirmedAsset{}, fmt.Errorf("media：讀取認領：%w", err)
 	}
-	if n != 1 {
-		return ConfirmedAsset{}, fmt.Errorf("media：暫存上傳 %s 的資產 %s 不是 STAGED", row.ID, *assetID)
+	if model.ClaimKind(claim.Kind) == model.ClaimReclaimed {
+		return ConfirmedAsset{}, apperr.FailedPrecondition("%s", text.MediaUploadExpired(loc(ctx)))
 	}
-	row.AssetID = assetID
-	return s.assetOf(ctx, row, false)
+	if !claim.Here {
+		return ConfirmedAsset{}, model.MarkConfirmedElsewhere(apperr.FailedPrecondition("%s", text.MediaUploadAlreadyUsed(loc(ctx))))
+	}
+	if claim.AssetID == nil {
+		return ConfirmedAsset{}, fmt.Errorf("media：暫存上傳 %s 的 CONFIRMED 認領沒有資產", row.ID)
+	}
+	return s.assetOf(ctx, *claim.AssetID, true)
 }
 
 // notConfirmable 把「不能確認」的暫存列翻成呼叫端看得到的錯誤。
@@ -356,19 +362,54 @@ func notConfirmable(ctx context.Context, row store.MediaStagedUpload, now time.T
 	return apperr.FailedPrecondition("%s", text.MediaUploadNotReady(loc(ctx)))
 }
 
-// assetOf 回傳暫存列所記的資產；requireActive 時資產不是 ACTIVE（例如已被擁有者刪除）回 FailedPrecondition。
-func (s *Service) assetOf(ctx context.Context, row store.MediaStagedUpload, requireActive bool) (ConfirmedAsset, error) {
-	if row.AssetID == nil {
-		return ConfirmedAsset{}, fmt.Errorf("media：暫存上傳 %s 沒有資產", row.ID)
-	}
-	a, err := s.q(ctx).GetAsset(ctx, *row.AssetID)
+// assetOf 回傳資產（欄位不變、不加鎖）；requireActive 時推導的狀態不是 ACTIVE（例如同 transaction 已被請求刪除）回 FailedPrecondition。
+func (s *Service) assetOf(ctx context.Context, assetID uuid.UUID, requireActive bool) (ConfirmedAsset, error) {
+	a, err := s.q(ctx).GetAssetView(ctx, assetID)
 	if err != nil {
 		return ConfirmedAsset{}, fmt.Errorf("media：讀取資產：%w", err)
 	}
-	if requireActive && model.AssetState(a.State) != model.AssetActive {
+	if requireActive && deriveState(a) != model.AssetActive {
 		return ConfirmedAsset{}, apperr.FailedPrecondition("%s", text.MediaAssetUnavailable(loc(ctx)))
 	}
 	return ConfirmedAsset{ID: a.ID, ObjectKey: a.ObjectKey, Visibility: model.Visibility(a.Visibility), ContentType: a.ContentType, SizeBytes: a.SizeBytes}, nil
+}
+
+// deriveState 是 GetAssetView 一列的推導狀態，唯一經 model.DeriveAssetState。
+func deriveState(a store.GetAssetViewRow) model.AssetState {
+	return model.DeriveAssetState(model.AssetState(a.State), a.Confirmed, a.DeleteRequested)
+}
+
+// AssetState 回傳資產推導後的狀態（B1-D25）；資產不存在回 pgx.ErrNoRows。給擁有者的測試與診斷，不得在擁有者 transaction 內拿來判斷業務。
+func (s *Service) AssetState(ctx context.Context, assetID uuid.UUID) (model.AssetState, error) {
+	return AssetStateOf(ctx, s.d.DB, assetID)
+}
+
+// AssetStateOf 是 AssetState 的本體：GetAssetView 加 model.DeriveAssetState，不重寫謂詞。
+func AssetStateOf(ctx context.Context, d *db.DB, assetID uuid.UUID) (model.AssetState, error) {
+	a, err := store.New(d.Conn(ctx)).GetAssetView(ctx, assetID)
+	if err != nil {
+		return "", err
+	}
+	return deriveState(a), nil
+}
+
+// CountAssetsInState 回傳推導後處於 want 的資產數（逐筆經 GetAssetView，與 AssetStateOf 同一條推導路徑）。
+func CountAssetsInState(ctx context.Context, d *db.DB, want model.AssetState) (int, error) {
+	ids, err := store.New(d.Conn(ctx)).ListAssetIDs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, id := range ids {
+		got, err := AssetStateOf(ctx, d, id)
+		if err != nil {
+			return 0, err
+		}
+		if got == want {
+			n++
+		}
+	}
+	return n, nil
 }
 
 // acquire 取一個名額並回傳放回的函式。wait 為 false 時滿了立即回 ResourceExhausted（client 上傳：有人可以稍後重試）；

@@ -115,18 +115,26 @@ const (
 	StateDeleted UploadState = "DELETED"
 )
 
-// AssetState 是資產的狀態。
+// AssetState 是資產對外的狀態：STAGED、ACTIVE、DELETING 都由 DeriveAssetState 推導，列上的 state 只記物理生命週期（B1-D25）。
 type AssetState string
 
 const (
 	// AssetStaged：處理完成、尚未確認。
 	AssetStaged AssetState = "STAGED"
-	// AssetActive：已確認，只由擁有者的 MarkDeleted 刪除。
+	// AssetActive：已確認（有 CONFIRMED 認領）且沒有刪除請求，只由擁有者的 MarkDeleted 刪除；只從推導產生，不存在資料庫。
 	AssetActive AssetState = "ACTIVE"
-	// AssetDeleting：已標記刪除，物件尚未刪掉。
+	// AssetDeleting：擁有者已請求刪除（或 media 已標記），物件尚未刪掉。
 	AssetDeleting AssetState = "DELETING"
 	// AssetDeleted：物件已刪。
 	AssetDeleted AssetState = "DELETED"
+)
+
+// ClaimKind 是 upload_claims.kind：CONFIRMED 是擁有者確認，RECLAIMED 是 GC 回收。
+type ClaimKind string
+
+const (
+	ClaimConfirmed ClaimKind = "CONFIRMED"
+	ClaimReclaimed ClaimKind = "RECLAIMED"
 )
 
 // RejectReason 是暫存上傳被拒絕的原因代碼。
@@ -194,4 +202,23 @@ func RequireTx(ctx context.Context) error {
 		return ErrNoTransaction
 	}
 	return nil
+}
+
+// DeriveAssetState 由資產列的物理 state 與兩個事實推導資產的狀態（B1-D25）：confirmed 是有 CONFIRMED 認領，deleteRequested 是有擁有者的刪除請求。
+// 推導的唯一定義；讀取、確認重入與測試 helper 都經它，不各自重寫謂詞。
+func DeriveAssetState(physical AssetState, confirmed, deleteRequested bool) AssetState {
+	switch physical {
+	case AssetDeleted:
+		return AssetDeleted
+	case AssetDeleting:
+		return AssetDeleting
+	case AssetStaged, AssetActive:
+	}
+	switch {
+	case deleteRequested:
+		return AssetDeleting
+	case confirmed:
+		return AssetActive
+	}
+	return AssetStaged
 }

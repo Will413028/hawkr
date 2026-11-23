@@ -1,15 +1,6 @@
 {
  "mutants": [
   {
-   "id": "gc-claims-confirmed",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
-   "old": "WHERE (u.state IN ('PENDING', 'UPLOADING', 'READY', 'REJECTED') AND u.expires_at <= $1)",
-   "new": "WHERE (u.expires_at <= $1)",
-   "test": "internal/modules/media ^TestGC_NeverDeletesConfirmedAssets$",
-   "why": "GC no longer restricts itself to unconfirmed rows, so an expired confirmed upload is claimed for deletion"
-  },
-  {
    "id": "confirm-skips-uploader-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/upload.go",
@@ -22,8 +13,8 @@
    "id": "confirm-ignores-state",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
-   "old": "WHERE id = $2 AND state = 'READY' AND expires_at > $1",
-   "new": "WHERE id = $2 AND expires_at > $1",
+   "old": "WHERE u.id = $2 AND u.state = 'READY' AND u.expires_at > $1",
+   "new": "WHERE u.id = $2 AND u.expires_at > $1",
    "test": "internal/modules/media ^TestConfirm_RejectsStagingNotYetReady$",
    "why": "the conditional UPDATE in Confirm lost its state condition, so an upload that is not READY can be confirmed"
   },
@@ -31,8 +22,8 @@
    "id": "confirm-ignores-expiry",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
-   "old": "WHERE id = $2 AND state = 'READY' AND expires_at > $1",
-   "new": "WHERE id = $2 AND state = 'READY'",
+   "old": "WHERE u.id = $2 AND u.state = 'READY' AND u.expires_at > $1",
+   "new": "WHERE u.id = $2 AND u.state = 'READY'",
    "test": "internal/modules/media ^TestConfirm_RejectsExpiredStaging$",
    "why": "Confirm accepts an expired staging row"
   },
@@ -94,17 +85,17 @@
    "id": "mark-deleted-takes-staged",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/store/assets.sql.go",
-   "old": "WHERE id = ANY($2::uuid[]) AND state = 'ACTIVE'",
-   "new": "WHERE id = ANY($2::uuid[]) AND state IN ('ACTIVE', 'STAGED')",
-   "test": "internal/modules/media ^TestMarkDeleted_MarksOnlyConfirmedAssetsAndEnqueuesTheDeleteJob$",
-   "why": "the owner's delete command can also delete an unconfirmed staged asset"
+   "old": "WHERE c.asset_id = ANY($2::uuid[]) AND c.kind = 'CONFIRMED'",
+   "new": "WHERE c.asset_id = ANY($2::uuid[])",
+   "test": "internal/modules/media ^TestMarkDeleted_IgnoresAssetsOfReclaimedUploads$",
+   "why": "the owner's delete command can also request deletion of an asset that GC reclaimed (never confirmed)"
   },
   {
    "id": "delete-assets-guard-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
-   "old": "if err := model.RequireNoTx(ctx); err != nil {\n\t\treturn 0, err\n\t}",
-   "new": "",
+   "old": "func (s *Service) DeleteAssets(ctx context.Context) (int, error) {\n\tif err := model.RequireNoTx(ctx); err != nil {\n\t\treturn 0, err\n\t}",
+   "new": "func (s *Service) DeleteAssets(ctx context.Context) (int, error) {",
    "test": "internal/modules/media ^TestStorageEntryPointsRefuseAContextWithATransaction$",
    "why": "DeleteAssets no longer refuses a context that carries a transaction"
   },
@@ -112,8 +103,8 @@
    "id": "confirm-reentry-ignores-asset-state",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/upload/upload.go",
-   "old": "if requireActive && model.AssetState(a.State) != model.AssetActive {",
-   "new": "if false && requireActive && model.AssetState(a.State) != model.AssetActive {",
+   "old": "if requireActive && deriveState(a) != model.AssetActive {",
+   "new": "if false && requireActive && deriveState(a) != model.AssetActive {",
    "test": "internal/modules/media ^TestConfirm_ReentryAfterMarkDeletedIsRejected$",
    "why": "a replayed token returns an asset that the owner already deleted"
   },

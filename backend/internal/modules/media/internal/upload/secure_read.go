@@ -20,6 +20,14 @@ import (
 // rewrapBatch 是 RewrapDEKs 每批取的資產數。
 const rewrapBatch = 100
 
+// assetFromView 取出資產列本身的欄位（推導用的兩個事實不屬於列）。
+func assetFromView(a store.GetAssetViewRow) store.MediaAsset {
+	return store.MediaAsset{
+		ID: a.ID, Visibility: a.Visibility, ObjectKey: a.ObjectKey, ContentType: a.ContentType, SizeBytes: a.SizeBytes,
+		State: a.State, KekID: a.KekID, WrappedDek: a.WrappedDek, ChunkCount: a.ChunkCount, CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt,
+	}
+}
+
 // openAsset 依 secure_chunks 按 idx 排序依序開各段的物件並串流解密；一個 AEAD 段的 tag 驗過才交出那一段的明文。
 // 列數不等於資產列的段總數、或序號不連續，視為損毀（secure.ErrCorrupt）。第一段在這裡就打開，物件不存在在開啟時就回錯誤。
 func (s *Service) openAsset(ctx context.Context, a store.MediaAsset) (io.ReadCloser, error) {
@@ -138,7 +146,7 @@ func (s *Service) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadClo
 	if s.d.Keyring == nil {
 		return nil, model.ErrNoKeyring
 	}
-	a, err := s.q(ctx).GetAsset(ctx, assetID)
+	a, err := s.q(ctx).GetAssetView(ctx, assetID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
@@ -148,10 +156,10 @@ func (s *Service) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadClo
 	if model.Visibility(a.Visibility) != model.VisibilitySecure {
 		return nil, model.ErrNotSecure
 	}
-	if model.AssetState(a.State) != model.AssetActive {
+	if deriveState(a) != model.AssetActive {
 		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
-	return s.openAsset(ctx, a)
+	return s.openAsset(ctx, assetFromView(a))
 }
 
 // ReadStagedSecure 是確認前的預覽：憑 token 讀上傳者自己、READY 且未過期的機敏暫存；資產 ID 不外露。
@@ -173,17 +181,21 @@ func (s *Service) ReadStagedSecure(ctx context.Context, uploader model.Uploader,
 	if model.Visibility(row.Visibility) != model.VisibilitySecure {
 		return nil, model.ErrNotSecure
 	}
-	if model.UploadState(row.State) != model.StateReady || !row.ExpiresAt.After(s.d.Now()) || row.AssetID == nil {
+	view, err := s.q(ctx).GetUploadView(ctx, row.ID)
+	if err != nil {
+		return nil, fmt.Errorf("media：讀取暫存上傳：%w", err)
+	}
+	if model.UploadState(view.State) != model.StateReady || view.Confirmed || !view.ExpiresAt.After(s.d.Now()) || view.AssetID == nil {
 		return nil, apperr.FailedPrecondition("%s", text.MediaSecurePreviewUnavailable(loc(ctx)))
 	}
-	a, err := s.q(ctx).GetAsset(ctx, *row.AssetID)
+	a, err := s.q(ctx).GetAssetView(ctx, *view.AssetID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("media：讀取資產：%w", err)
 	}
-	return s.openAsset(ctx, a)
+	return s.openAsset(ctx, assetFromView(a))
 }
 
 // RewrapDEKs 把 kek_id 不是 primary 的機敏資產（DELETED 除外）與還在 UPLOADING 的機敏暫存列的 DEK 解包再以 primary 包裹，回傳這次實際更新的筆數。

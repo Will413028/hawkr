@@ -69,11 +69,11 @@ func (m *autoMedia) Confirm(ctx context.Context, u media.Uploader, token string)
 
 func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
 	t.Helper()
-	var state string
-	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "SELECT state FROM media.assets WHERE id=$1", id).Scan(&state); err != nil {
+	st, err := media.AssetStateOf(context.Background(), f.db, id)
+	if err != nil {
 		t.Fatal(err)
 	}
-	return state
+	return string(st)
 }
 
 func (f *fixture) postAsset(t *testing.T, postID uuid.UUID) uuid.UUID {

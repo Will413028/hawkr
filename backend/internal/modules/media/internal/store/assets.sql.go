@@ -12,23 +12,46 @@ import (
 	"uuid"
 )
 
-const activateAsset = `-- name: ActivateAsset :execrows
-UPDATE media.assets SET state = 'ACTIVE', updated_at = $1
-WHERE id = $2 AND state = 'STAGED'
+const applyDeletionRequests = `-- name: ApplyDeletionRequests :many
+WITH picked AS (
+    SELECT asset_id FROM media.asset_deletion_requests
+    WHERE applied_at IS NULL
+    ORDER BY requested_at, asset_id
+    LIMIT $2
+    FOR UPDATE SKIP LOCKED),
+marked AS (
+    UPDATE media.assets AS a SET state = 'DELETING', updated_at = $1::timestamptz
+    FROM picked AS p WHERE a.id = p.asset_id AND a.state = 'STAGED'
+    RETURNING a.id)
+UPDATE media.asset_deletion_requests AS r SET applied_at = $1::timestamptz
+FROM picked AS p WHERE r.asset_id = p.asset_id
+RETURNING r.asset_id
 `
 
-type ActivateAssetParams struct {
-	Now time.Time
-	ID  uuid.UUID
+type ApplyDeletionRequestsParams struct {
+	Now     time.Time
+	MaxRows int32
 }
 
-// STAGED → ACTIVE（確認）。
-func (q *Queries) ActivateAsset(ctx context.Context, arg ActivateAssetParams) (int64, error) {
-	result, err := q.db.Exec(ctx, activateAsset, arg.Now, arg.ID)
+// 套用 job：把還沒套用的請求所指的資產標為 DELETING，並記 applied_at。冪等：資產只從 STAGED 轉，applied_at 只寫一次，兩個 worker 由 SKIP LOCKED 分開。
+func (q *Queries) ApplyDeletionRequests(ctx context.Context, arg ApplyDeletionRequestsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, applyDeletionRequests, arg.Now, arg.MaxRows)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var asset_id uuid.UUID
+		if err := rows.Scan(&asset_id); err != nil {
+			return nil, err
+		}
+		items = append(items, asset_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const claimAssetsOfUploads = `-- name: ClaimAssetsOfUploads :execrows
@@ -41,7 +64,7 @@ type ClaimAssetsOfUploadsParams struct {
 	Ids []uuid.UUID
 }
 
-// GC 階段一的另一半：被 GC 的暫存列所指的資產（還是 STAGED）一起轉 DELETING。
+// GC 階段一的另一半：贏得 RECLAIMED 認領的暫存列所指的資產（還是 STAGED）一起轉 DELETING。
 func (q *Queries) ClaimAssetsOfUploads(ctx context.Context, arg ClaimAssetsOfUploadsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, claimAssetsOfUploads, arg.Now, arg.Ids)
 	if err != nil {
@@ -50,13 +73,57 @@ func (q *Queries) ClaimAssetsOfUploads(ctx context.Context, arg ClaimAssetsOfUpl
 	return result.RowsAffected(), nil
 }
 
-const getAsset = `-- name: GetAsset :one
-SELECT id, visibility, object_key, content_type, size_bytes, state, kek_id, wrapped_dek, chunk_count, created_at, updated_at FROM media.assets WHERE id = $1
+const deleteClaimsOfAsset = `-- name: DeleteClaimsOfAsset :execrows
+DELETE FROM media.upload_claims WHERE asset_id = $1::uuid
 `
 
-func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (MediaAsset, error) {
-	row := q.db.QueryRow(ctx, getAsset, id)
-	var i MediaAsset
+func (q *Queries) DeleteClaimsOfAsset(ctx context.Context, assetID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteClaimsOfAsset, assetID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteRequestOfAsset = `-- name: DeleteRequestOfAsset :execrows
+DELETE FROM media.asset_deletion_requests WHERE asset_id = $1
+`
+
+func (q *Queries) DeleteRequestOfAsset(ctx context.Context, assetID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteRequestOfAsset, assetID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getAssetView = `-- name: GetAssetView :one
+SELECT a.id, a.visibility, a.object_key, a.content_type, a.size_bytes, a.state, a.kek_id, a.wrapped_dek, a.chunk_count, a.created_at, a.updated_at,
+    EXISTS (SELECT 1 FROM media.upload_claims AS c WHERE c.asset_id = a.id AND c.kind = 'CONFIRMED') AS confirmed,
+    EXISTS (SELECT 1 FROM media.asset_deletion_requests AS r WHERE r.asset_id = a.id) AS delete_requested
+FROM media.assets AS a WHERE a.id = $1
+`
+
+type GetAssetViewRow struct {
+	ID              uuid.UUID
+	Visibility      string
+	ObjectKey       string
+	ContentType     string
+	SizeBytes       int64
+	State           string
+	KekID           *string
+	WrappedDek      []byte
+	ChunkCount      *int32
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Confirmed       bool
+	DeleteRequested bool
+}
+
+// 資產加推導狀態需要的兩個事實（B1-D25）：有沒有 CONFIRMED 認領、有沒有刪除請求；model.DeriveAssetState 由它們與 state 推導。
+func (q *Queries) GetAssetView(ctx context.Context, id uuid.UUID) (GetAssetViewRow, error) {
+	row := q.db.QueryRow(ctx, getAssetView, id)
+	var i GetAssetViewRow
 	err := row.Scan(
 		&i.ID,
 		&i.Visibility,
@@ -69,6 +136,8 @@ func (q *Queries) GetAsset(ctx context.Context, id uuid.UUID) (MediaAsset, error
 		&i.ChunkCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Confirmed,
+		&i.DeleteRequested,
 	)
 	return i, err
 }
@@ -124,6 +193,31 @@ type InsertSecureAssetFromUploadParams struct {
 func (q *Queries) InsertSecureAssetFromUpload(ctx context.Context, arg InsertSecureAssetFromUploadParams) error {
 	_, err := q.db.Exec(ctx, insertSecureAssetFromUpload, arg.ObjectKey, arg.Now, arg.UploadID)
 	return err
+}
+
+const listAssetIDs = `-- name: ListAssetIDs :many
+SELECT id FROM media.assets ORDER BY id
+`
+
+// 診斷與測試：列出所有資產 ID（狀態由 GetAssetView 推導，不在這裡重寫謂詞）。
+func (q *Queries) ListAssetIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listAssetIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAssetsToRewrap = `-- name: ListAssetsToRewrap :many
@@ -222,31 +316,34 @@ func (q *Queries) MarkAssetDeleted(ctx context.Context, arg MarkAssetDeletedPara
 	return result.RowsAffected(), nil
 }
 
-const markAssetsDeleting = `-- name: MarkAssetsDeleting :many
-UPDATE media.assets SET state = 'DELETING', updated_at = $1
-WHERE id = ANY($2::uuid[]) AND state = 'ACTIVE'
-RETURNING id
+const requestDeletions = `-- name: RequestDeletions :many
+INSERT INTO media.asset_deletion_requests (asset_id, requested_at)
+SELECT c.asset_id, $1 FROM media.upload_claims AS c
+WHERE c.asset_id = ANY($2::uuid[]) AND c.kind = 'CONFIRMED'
+ORDER BY c.asset_id
+ON CONFLICT (asset_id) DO NOTHING
+RETURNING asset_id
 `
 
-type MarkAssetsDeletingParams struct {
+type RequestDeletionsParams struct {
 	Now time.Time
 	Ids []uuid.UUID
 }
 
-// 擁有者的刪除指令：只有 ACTIVE 的資產會轉 DELETING（未確認的暫存只由 GC 刪；已在刪除中或已刪的不重複處理）；不存在的 ID 忽略。
-func (q *Queries) MarkAssetsDeleting(ctx context.Context, arg MarkAssetsDeletingParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, markAssetsDeleting, arg.Now, arg.Ids)
+// 擁有者的刪除指令（B1-D25）：只對已確認的資產 INSERT 請求列，不更新任何既有列；未確認、不存在的 ID 被濾掉，已請求過的冪等。
+func (q *Queries) RequestDeletions(ctx context.Context, arg RequestDeletionsParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, requestDeletions, arg.Now, arg.Ids)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	items := []uuid.UUID{}
 	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		var asset_id uuid.UUID
+		if err := rows.Scan(&asset_id); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, asset_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -276,6 +373,26 @@ func (q *Queries) RewrapAsset(ctx context.Context, arg RewrapAssetParams) (int64
 		arg.ID,
 		arg.OldKekID,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const settleDeletedAssetUploads = `-- name: SettleDeletedAssetUploads :execrows
+UPDATE media.staged_uploads SET state = 'DELETED', updated_at = $1
+WHERE id IN (SELECT c.upload_id FROM media.upload_claims AS c WHERE c.asset_id = $2::uuid AND c.kind = 'CONFIRMED')
+  AND state IN ('READY', 'CONFIRMED')
+`
+
+type SettleDeletedAssetUploadsParams struct {
+	Now     time.Time
+	AssetID uuid.UUID
+}
+
+// 資產物理刪除完成：認領它的暫存列（擁有者確認的那一筆）轉 DELETED，之後它的 CONFIRMED 認領可以刪。
+func (q *Queries) SettleDeletedAssetUploads(ctx context.Context, arg SettleDeletedAssetUploadsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, settleDeletedAssetUploads, arg.Now, arg.AssetID)
 	if err != nil {
 		return 0, err
 	}

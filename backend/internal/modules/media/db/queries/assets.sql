@@ -13,22 +13,44 @@ SELECT u.planned_asset_id, 'SECURE', sqlc.arg(object_key), u.declared_content_ty
 FROM media.staged_uploads AS u
 WHERE u.id = sqlc.arg(upload_id) AND u.state = 'UPLOADING' AND u.next_index = u.chunk_count;
 
--- name: GetAsset :one
-SELECT * FROM media.assets WHERE id = sqlc.arg(id);
+-- name: GetAssetView :one
+-- 資產加推導狀態需要的兩個事實（B1-D25）：有沒有 CONFIRMED 認領、有沒有刪除請求；model.DeriveAssetState 由它們與 state 推導。
+SELECT a.*,
+    EXISTS (SELECT 1 FROM media.upload_claims AS c WHERE c.asset_id = a.id AND c.kind = 'CONFIRMED') AS confirmed,
+    EXISTS (SELECT 1 FROM media.asset_deletion_requests AS r WHERE r.asset_id = a.id) AS delete_requested
+FROM media.assets AS a WHERE a.id = sqlc.arg(id);
 
--- name: ActivateAsset :execrows
--- STAGED → ACTIVE（確認）。
-UPDATE media.assets SET state = 'ACTIVE', updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND state = 'STAGED';
+-- name: ListAssetIDs :many
+-- 診斷與測試：列出所有資產 ID（狀態由 GetAssetView 推導，不在這裡重寫謂詞）。
+SELECT id FROM media.assets ORDER BY id;
 
--- name: MarkAssetsDeleting :many
--- 擁有者的刪除指令：只有 ACTIVE 的資產會轉 DELETING（未確認的暫存只由 GC 刪；已在刪除中或已刪的不重複處理）；不存在的 ID 忽略。
-UPDATE media.assets SET state = 'DELETING', updated_at = sqlc.arg(now)
-WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND state = 'ACTIVE'
-RETURNING id;
+-- name: RequestDeletions :many
+-- 擁有者的刪除指令（B1-D25）：只對已確認的資產 INSERT 請求列，不更新任何既有列；未確認、不存在的 ID 被濾掉，已請求過的冪等。
+INSERT INTO media.asset_deletion_requests (asset_id, requested_at)
+SELECT c.asset_id, sqlc.arg(now) FROM media.upload_claims AS c
+WHERE c.asset_id = ANY(sqlc.arg(ids)::uuid[]) AND c.kind = 'CONFIRMED'
+ORDER BY c.asset_id
+ON CONFLICT (asset_id) DO NOTHING
+RETURNING asset_id;
+
+-- name: ApplyDeletionRequests :many
+-- 套用 job：把還沒套用的請求所指的資產標為 DELETING，並記 applied_at。冪等：資產只從 STAGED 轉，applied_at 只寫一次，兩個 worker 由 SKIP LOCKED 分開。
+WITH picked AS (
+    SELECT asset_id FROM media.asset_deletion_requests
+    WHERE applied_at IS NULL
+    ORDER BY requested_at, asset_id
+    LIMIT sqlc.arg(max_rows)
+    FOR UPDATE SKIP LOCKED),
+marked AS (
+    UPDATE media.assets AS a SET state = 'DELETING', updated_at = sqlc.arg(now)::timestamptz
+    FROM picked AS p WHERE a.id = p.asset_id AND a.state = 'STAGED'
+    RETURNING a.id)
+UPDATE media.asset_deletion_requests AS r SET applied_at = sqlc.arg(now)::timestamptz
+FROM picked AS p WHERE r.asset_id = p.asset_id
+RETURNING r.asset_id;
 
 -- name: ClaimAssetsOfUploads :execrows
--- GC 階段一的另一半：被 GC 的暫存列所指的資產（還是 STAGED）一起轉 DELETING。
+-- GC 階段一的另一半：贏得 RECLAIMED 認領的暫存列所指的資產（還是 STAGED）一起轉 DELETING。
 UPDATE media.assets SET state = 'DELETING', updated_at = sqlc.arg(now)
 WHERE id = ANY(sqlc.arg(ids)::uuid[]) AND state = 'STAGED';
 
@@ -53,3 +75,15 @@ LIMIT sqlc.arg(max_rows);
 -- 只在列上的 kek_id 仍是取出時的舊值才更新：兩個 RewrapDEKs 同時跑、或擁有者並行讀取時只有一方生效，輸的視為已處理。
 UPDATE media.assets SET kek_id = sqlc.arg(new_kek_id), wrapped_dek = sqlc.arg(new_wrapped_dek), updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND kek_id = sqlc.arg(old_kek_id);
+
+-- name: SettleDeletedAssetUploads :execrows
+-- 資產物理刪除完成：認領它的暫存列（擁有者確認的那一筆）轉 DELETED，之後它的 CONFIRMED 認領可以刪。
+UPDATE media.staged_uploads SET state = 'DELETED', updated_at = sqlc.arg(now)
+WHERE id IN (SELECT c.upload_id FROM media.upload_claims AS c WHERE c.asset_id = sqlc.arg(asset_id)::uuid AND c.kind = 'CONFIRMED')
+  AND state IN ('READY', 'CONFIRMED');
+
+-- name: DeleteClaimsOfAsset :execrows
+DELETE FROM media.upload_claims WHERE asset_id = sqlc.arg(asset_id)::uuid;
+
+-- name: DeleteRequestOfAsset :execrows
+DELETE FROM media.asset_deletion_requests WHERE asset_id = sqlc.arg(asset_id);

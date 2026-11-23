@@ -575,6 +575,7 @@ func TestMarkDeleted_RemovesEveryChunkObjectOfASecureAsset(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
+	applyDeletions(t, f)
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -1243,6 +1244,7 @@ func TestRewrapDEKs_SkipsDeletedAndReportsUnknownKek(t *testing.T) {
 	if err := markDeletedInTx(f, deleted.ID); err != nil {
 		t.Fatal(err)
 	}
+	applyDeletions(t, f)
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -1289,6 +1291,7 @@ func TestDeleteAssets_RemovesTheSecureChunkRowsOfADeletedAsset(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
+	applyDeletions(t, f)
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
 		t.Fatal(err)
 	}

@@ -38,7 +38,8 @@ func TestStoredCodesMatchSchemaChecks(t *testing.T) {
 	}{
 		{"assets_visibility_check", []string{string(model.VisibilityPublic), string(model.VisibilitySecure)}},
 		{"staged_uploads_visibility_check", []string{string(model.VisibilityPublic), string(model.VisibilitySecure)}},
-		{"assets_state_check", []string{string(model.AssetStaged), string(model.AssetActive), string(model.AssetDeleting), string(model.AssetDeleted)}},
+		{"assets_state_check", []string{string(model.AssetStaged), string(model.AssetDeleting), string(model.AssetDeleted)}},
+		{"upload_claims_kind_check", []string{"CONFIRMED", "RECLAIMED"}},
 		{"staged_uploads_state_check", []string{
 			string(model.StatePending), string(model.StateUploading), string(model.StateUploaded), string(model.StateReady), string(model.StateRejected),
 			string(model.StateConfirmed), string(model.StateDeleting), string(model.StateDeleted),
@@ -92,5 +93,27 @@ func TestPermanentUnwrapsAndKeepsTheReason(t *testing.T) {
 	var perm *model.PermanentError
 	if !errors.As(err, &perm) || perm.Reason != model.RejectUnrecognizedFormat || !errors.Is(err, cause) {
 		t.Fatalf("err = %v，沒有保留原因或根因", err)
+	}
+}
+
+func TestDeriveAssetState(t *testing.T) {
+	cases := []struct {
+		physical                   model.AssetState
+		confirmed, deleteRequested bool
+		want                       model.AssetState
+	}{
+		{model.AssetStaged, false, false, model.AssetStaged},
+		{model.AssetStaged, true, false, model.AssetActive},
+		{model.AssetStaged, true, true, model.AssetDeleting},
+		{model.AssetStaged, false, true, model.AssetDeleting},
+		{model.AssetDeleting, true, false, model.AssetDeleting},
+		{model.AssetDeleting, false, false, model.AssetDeleting},
+		{model.AssetDeleted, true, true, model.AssetDeleted},
+		{model.AssetDeleted, false, false, model.AssetDeleted},
+	}
+	for _, c := range cases {
+		if got := model.DeriveAssetState(c.physical, c.confirmed, c.deleteRequested); got != c.want {
+			t.Errorf("DeriveAssetState(%s, %v, %v) = %s，預期 %s", c.physical, c.confirmed, c.deleteRequested, got, c.want)
+		}
 	}
 }
