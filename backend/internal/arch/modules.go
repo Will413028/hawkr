@@ -61,7 +61,9 @@ var InternalDependencies = map[string]InternalGraph{
 		"voucher":  {"model", "qualify", "rows", "store"},
 	}},
 	"notification": {Packages: map[string][]string{
+		"intake":   {"model", "registry", "store"},
 		"model":    {},
+		"purge":    {"model", "store"},
 		"registry": {"model", "text"},
 		"store":    {},
 		"text":     {},
@@ -97,9 +99,13 @@ var InternalDependencies = map[string]InternalGraph{
 		"write":    {"mediaref", "model", "rows", "store", "text"},
 	}},
 	"imageai": {Packages: map[string][]string{
-		"feature": {},
-		"model":   {},
-		"store":   {},
+		"limit":     {},
+		"model":     {},
+		"quota":     {"model", "store"},
+		"store":     {},
+		"style":     {"model", "store", "text"},
+		"text":      {},
+		"transform": {"model", "text"},
 	}},
 	"assistant": {Packages: map[string][]string{
 		"adksession": {},                // ADK session.Service 的 pgx 實作，schema assistant（A9-D27）
@@ -141,7 +147,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"text":      {},
 		"view":      {"model", "snapshot", "store", "text"}, // snapshot：案件的店家取自快照
 	}},
-	"payment": {Packages: map[string][]string{"account": {"model", "store"}, "model": {}, "store": {}}},
+	"payment": {Packages: map[string][]string{"account": {"model", "store"}, "charge": {"model", "store"}, "model": {}, "store": {}}},
 	"social": {Packages: map[string][]string{
 		"actor":      {"model", "text", "visibility"},
 		"comment":    {"actor", "model", "reads", "store", "text", "textcheck", "visibility"},

@@ -9,6 +9,10 @@ SELECT * FROM identity.accounts WHERE id = ANY(sqlc.arg(ids)::bigint[]) ORDER BY
 -- 鎖住存活的帳號，讓同一個帳號的角色變更、停權與刪除依序執行。
 SELECT * FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR UPDATE;
 
+-- name: ShareLockLiveAccount :one
+-- 共享鎖住存活的帳號：只要求帳號列在 transaction commit 之前不被刪除或改動，不擋其他讀者的共享鎖（給只讀取帳號狀態、不改帳號的呼叫者）。
+SELECT id FROM identity.accounts WHERE id = $1 AND deleted_at IS NULL FOR SHARE;
+
 -- name: SuspendAccount :execrows
 -- 已經停權時沒有列被更新（冪等）。
 UPDATE identity.accounts

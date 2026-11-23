@@ -13,11 +13,13 @@ CREATE SCHEMA notification;
 -- 通知意圖：來源 transaction 排的一件「某事件要通知」的紀錄。idempotency_key 是事件來源身分（型別註冊表每個型別宣告它的來源），
 -- UNIQUE 保證同一事件投遞兩次只有一個意圖；它只為冪等存在，保留期與收件匣同為 180 天（超過 River 重試期即無用）。
 -- params 是型別的 typed 參數快照（JSON）：只存 ID 與事件事實，不存第三方的名稱或頭像。
+-- occurred_at 是來源事件發生的時間（取自事件，不是 job 處理的時間）：聚合合併時以它判斷參數誰比較新。
 CREATE TABLE notification.intents (
     id              UUID        PRIMARY KEY,
     type            TEXT        NOT NULL,
     idempotency_key TEXT        NOT NULL,
     params          JSONB       NOT NULL,
+    occurred_at     TIMESTAMPTZ NOT NULL,
     created_at      TIMESTAMPTZ NOT NULL,
     CONSTRAINT intents_idempotency_key_key UNIQUE (idempotency_key),
     CONSTRAINT intents_type_check CHECK (type ~ '^[a-z][a-z0-9_]{0,62}$'),
@@ -28,7 +30,8 @@ CREATE INDEX intents_created ON notification.intents (created_at);
 -- 收件匣列：型別＋參數快照＋聚合鍵，讀取時依請求語系組字（收件匣不是投遞渠道，這一列本身就是「已進收件匣」的紀錄）。
 -- 收件人是 (account_id, audience, store_id)：BUYER 沒有 store_id，STORE 一定有。actor_account_ids 只存帳號 ID（讀取時向擁有模組解析名稱）。
 -- 有聚合鍵的未讀列同一個收件人（含 store_id）只有一列（unique index，NULLS NOT DISTINCT 涵蓋 BUYER 的 NULL store_id），後來的意圖合併進去（A8-1b 的 upsert）；已讀之後的新意圖另開一列。
--- 保留期以 updated_at（最後一次合併）起算；intent_id 是來源意圖（意圖先被清除時設為 NULL，收件匣列不跟著消失）。
+-- 保留期以 updated_at（最後一次合併）起算。occurred_at 是目前參數所屬事件的發生時間（合併時只有較新的事件才換參數）。
+-- 哪些意圖已經寫進這一列由 inbox_item_intents 記（worker 重試的冪等依據）。
 CREATE TABLE notification.inbox_items (
     id                UUID        PRIMARY KEY,
     account_id        BIGINT      NOT NULL,
@@ -38,7 +41,7 @@ CREATE TABLE notification.inbox_items (
     params            JSONB       NOT NULL,
     aggregation_key   TEXT,
     actor_account_ids BIGINT[]    NOT NULL DEFAULT '{}',
-    intent_id         UUID        REFERENCES notification.intents (id) ON DELETE SET NULL,
+    occurred_at       TIMESTAMPTZ NOT NULL,
     read_at           TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL,
     updated_at        TIMESTAMPTZ NOT NULL,
@@ -54,12 +57,21 @@ CREATE INDEX inbox_items_unread ON notification.inbox_items (account_id, audienc
 CREATE UNIQUE INDEX inbox_items_unread_aggregation ON notification.inbox_items (account_id, audience, store_id, aggregation_key) NULLS NOT DISTINCT WHERE aggregation_key IS NOT NULL AND read_at IS NULL;
 CREATE INDEX inbox_items_updated ON notification.inbox_items (updated_at);
 
+-- 意圖與收件匣列的連結：一個意圖（只有一個收件人）寫進或合併進哪一列。intent_id 是主鍵，worker 重試時以它判斷這個意圖已經處理過，
+-- 即使它先前合併進的列之後被讀過、不再是聚合目標也不會重複建列。意圖被清除時只刪連結（收件匣列留著），收件匣列被清除時連結跟著刪。
+CREATE TABLE notification.inbox_item_intents (
+    intent_id     UUID PRIMARY KEY REFERENCES notification.intents (id) ON DELETE CASCADE,
+    inbox_item_id UUID NOT NULL REFERENCES notification.inbox_items (id) ON DELETE CASCADE
+);
+CREATE INDEX inbox_item_intents_item ON notification.inbox_item_intents (inbox_item_id);
+
 -- 每渠道投遞紀錄：只記推播與 email，是每筆觸達與否的唯一來源。UNIQUE (intent, 收件人, 渠道) 是投遞冪等鍵；收件人含 store_id（一個帳號可以先後擁有已關閉的店與新店，兩間店各是一個收件人；BUYER 的 store_id 是 NULL，NULLS NOT DISTINCT 讓它也受唯一鍵約束）。
 -- 送出之後 locale、sent_title、sent_body 是「實際送出的文字」（送出時的事實，保留期內可由個資清除處理，所以清除後可為 NULL）；
 -- 還沒送出或永久失敗的列沒有送出文字。保留期以 created_at 起算。
+-- intent_id 是 RESTRICT：投遞紀錄的 created_at 晚於意圖，刪過期意圖不能連帶刪掉還在保留期內的投遞紀錄；清除 job 先刪過期投遞，再刪已無投遞的過期意圖。
 CREATE TABLE notification.deliveries (
     id             UUID        PRIMARY KEY,
-    intent_id      UUID        NOT NULL REFERENCES notification.intents (id) ON DELETE CASCADE,
+    intent_id      UUID        NOT NULL REFERENCES notification.intents (id) ON DELETE RESTRICT,
     account_id     BIGINT      NOT NULL,
     audience       TEXT        NOT NULL,
     store_id       BIGINT,

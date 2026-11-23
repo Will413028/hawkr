@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/riverqueue/river"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/account"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/charge"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -51,18 +53,28 @@ type Deps struct {
 	Owners   Owners
 	Now      func() time.Time
 	Logger   *slog.Logger
+	// Charge 是付款的 provider（Stripe adapter 與 ChargeFake）；nil 表示沒有設定付款，付款的呼叫回 FailedPrecondition。設定了它時 Inbox 與 PaymentOrders 必填，
+	// 它的名稱不得與收款帳戶的 Provider 相同（inbox 以 provider 名稱登記，同名會 panic）。
+	Charge ChargeProvider
+	// PaymentOrders 是訂單一方的 port（付款建立時讀應付資訊），由組裝點注入；步驟 4 接 Java order，B8 換 ordering 的 in-process 呼叫。
+	PaymentOrders PaymentOrders
 }
 
 // Module 是 payment 模組。
 type Module struct {
 	accounts *account.Service
+	charges  *charge.Service
 }
 
 // New 建立模組。
 func New(d Deps) *Module {
-	return &Module{accounts: account.New(account.Deps{
+	m := &Module{accounts: account.New(account.Deps{
 		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Inbox: d.Inbox, Audit: d.Audit, Provider: d.Provider, Owners: d.Owners, Now: d.Now, Logger: d.Logger,
 	})}
+	m.charges = charge.New(charge.Deps{
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Inbox: d.Inbox, Provider: d.Charge, Orders: d.PaymentOrders, Now: d.Now, Logger: d.Logger,
+	})
+	return m
 }
 
 // Provider 是收款開通的 port（Stripe adapter 與 Fake 實作）。
@@ -303,7 +315,129 @@ func (m *Module) PurgeAccount(ctx context.Context, storeID int64, finalAttempt b
 }
 
 // AddWorkers 登記 River worker。
-func (m *Module) AddWorkers(workers *river.Workers) { m.accounts.AddWorkers(workers) }
+func (m *Module) AddWorkers(workers *river.Workers) {
+	m.accounts.AddWorkers(workers)
+	m.charges.AddWorkers(workers)
+}
 
 // PeriodicJobs 回傳週期 job。
-func (m *Module) PeriodicJobs() []*river.PeriodicJob { return m.accounts.PeriodicJobs() }
+func (m *Module) PeriodicJobs() []*river.PeriodicJob {
+	return append(m.accounts.PeriodicJobs(), m.charges.PeriodicJobs()...)
+}
+
+// ChargeProvider 是付款的 port（PaymentIntent、退款、轉帳與撤回、付款事件；Stripe adapter 在 3d，Fake 給測試與本機）。
+type ChargeProvider = charge.Provider
+
+// ChargeFake 是記憶體內的付款 provider，測試與本機用。
+type ChargeFake = charge.Fake
+
+// NewChargeFake 建立 ChargeFake。
+func NewChargeFake() *ChargeFake { return charge.NewFake() }
+
+// ChargeFakeName 是 ChargeFake 的 provider 代碼。
+const ChargeFakeName = charge.FakeName
+
+// ChargeFakeEventHeader 是 ChargeFake 的事件 ID header（body 是 PaymentIntent ID，可帶 "|宣稱的狀態"，宣稱不被信任）。
+const ChargeFakeEventHeader = charge.FakeEventHeader
+
+// ChargeFakeIgnoredEventHeader 讓 ChargeFake 把事件當成不處理的事件。
+const ChargeFakeIgnoredEventHeader = charge.FakeIgnoredEventHeader
+
+// PaymentOrders 是訂單一方的 port（建立付款時讀歸屬、可付與金額）。
+type PaymentOrders = charge.Orders
+
+// PaymentOrder 是建立付款當下訂單一方回的事實。
+type PaymentOrder = charge.Order
+
+// PaymentSnapshot 是 PaymentIntent 某一刻的中立狀態。
+type PaymentSnapshot = charge.Snapshot
+
+// PaymentState 是 provider 回報的 PaymentIntent 的中立狀態。
+type PaymentState = charge.State
+
+// PaymentIntent 的中立狀態。
+const (
+	PaymentStateAwaitingPayment = charge.StateAwaitingPayment
+	PaymentStateProcessing      = charge.StateProcessing
+	PaymentStateSucceeded       = charge.StateSucceeded
+	PaymentStateCanceled        = charge.StateCanceled
+	PaymentStateUnknown         = charge.StateUnknown
+)
+
+// Payment 是買家對一張訂單的付款。
+type Payment = model.Payment
+
+// PaymentStatus 是付款的狀態。
+type PaymentStatus = model.PaymentStatus
+
+// 付款的狀態。
+const (
+	PaymentCreating        = model.PaymentCreating
+	PaymentAwaitingPayment = model.PaymentAwaitingPayment
+	PaymentProcessing      = model.PaymentProcessing
+	PaymentSucceeded       = model.PaymentSucceeded
+	PaymentCanceled        = model.PaymentCanceled
+	PaymentCreateFailed    = model.PaymentCreateFailed
+)
+
+// ErrChargePermanent 標示付款 provider 重試也不會成功的失敗。
+var ErrChargePermanent = charge.ErrPermanent
+
+// ErrChargeInvalidEvent 標示付款事件的簽章或格式不合。
+var ErrChargeInvalidEvent = charge.ErrInvalidEvent
+
+// ErrChargeIgnoredEvent 標示驗過簽章但不處理的付款事件。
+var ErrChargeIgnoredEvent = charge.ErrIgnoredEvent
+
+// PaymentUnresolvedDeadline 是建立付款「呼叫過、沒有外部 ID」最久等多久（12 小時），期限內以同一把冪等鍵重送，超過進終局 CREATE_FAILED。
+const PaymentUnresolvedDeadline = charge.UnresolvedDeadline
+
+// PaymentIdempotencyRetention 是本模組依賴的付款冪等鍵保存期（24 小時）；超過的鍵從不重送。
+const PaymentIdempotencyRetention = charge.IdempotencyRetention
+
+// ChargeConfigured 回傳是否設定了付款 provider。
+func (m *Module) ChargeConfigured() bool { return m.charges.Configured() }
+
+// CreatePayment 建立買家對一張訂單的付款（計畫 D7 修訂、D8）：transaction 內寫付款列與補做 job，提交之後在請求內、transaction 外帶冪等鍵建立 PaymentIntent 並回 client_secret；
+// provider 失敗或逾時回狀態 CREATING 的付款（pending），補做 job 以同一把鍵接手，呼叫端用 GetPayment 重讀。同一張訂單只有一個 PaymentIntent。呼叫方先確認呼叫者是買家，且不能在 transaction 內呼叫。
+func (m *Module) CreatePayment(ctx context.Context, buyerID int64, orderNo string) (Payment, error) {
+	return m.charges.CreatePayment(ctx, buyerID, orderNo)
+}
+
+// GetPayment 讀買家自己的付款，AWAITING_PAYMENT 時向 provider 讀 client_secret 一併回傳（不存）；不是呼叫者的付款回 NotFound。呼叫方不能在 transaction 內呼叫。
+func (m *Module) GetPayment(ctx context.Context, buyerID int64, orderNo string) (Payment, error) {
+	return m.charges.GetPayment(ctx, buyerID, orderNo)
+}
+
+// ReceivePaymentEvent 接收付款 provider 的 webhook（獨立的路由與簽章密鑰）：驗簽，同一個 transaction 寫進 platform inbox 並排入派送 job。
+func (m *Module) ReceivePaymentEvent(ctx context.Context, header http.Header, body []byte) error {
+	return m.charges.ReceiveEvent(ctx, header, body)
+}
+
+// CreatePaymentIntent 是補做 job（payment.charge_create）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時暫時性失敗只記警示 log，留給週期掃描。
+func (m *Module) CreatePaymentIntent(ctx context.Context, paymentID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Create(ctx, paymentID, finalAttempt)
+}
+
+// SyncPayment 重讀 PaymentIntent 並寫入狀態：同步 job（payment.charge_sync）的內容，給 worker 與測試呼叫；again 為 true 表示讀取期間又收到事件。外部呼叫在 transaction 外。
+func (m *Module) SyncPayment(ctx context.Context, paymentID uuid.UUID) (again bool, err error) {
+	return m.charges.Sync(ctx, paymentID)
+}
+
+// CancelPaymentAttempt 是取消舊 PaymentIntent 的 job（payment.charge_cancel）的內容，給 worker 與測試呼叫：只取消已被取代、還沒結案的嘗試。
+func (m *Module) CancelPaymentAttempt(ctx context.Context, attemptID uuid.UUID) error {
+	return m.charges.CancelAttempt(ctx, attemptID)
+}
+
+// ExcessPaid 是一次重複入帳：同一張訂單已經以另一個 PaymentIntent 入帳，這個舊 PaymentIntent 也扣到了款（不自動退款）。
+type ExcessPaid = model.ExcessPaid
+
+// ExcessPaidPayments 列出重複入帳（後台查詢）；afterID 是上一頁最後一筆的 AttemptID，第一頁傳零值。
+func (m *Module) ExcessPaidPayments(ctx context.Context, afterID uuid.UUID, limit int32) ([]ExcessPaid, error) {
+	return m.charges.ExcessPaid(ctx, afterID, limit)
+}
+
+// SweepPayments 是付款的定期掃描（payment.charge_sweep）的內容，給 worker 與測試呼叫；回傳排入補做與同步的付款數。
+func (m *Module) SweepPayments(ctx context.Context) (created, synced int, err error) {
+	return m.charges.Sweep(ctx)
+}

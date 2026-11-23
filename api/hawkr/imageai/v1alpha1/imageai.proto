@@ -15,8 +15,10 @@ service ImageAiAppService {
   // 錯誤：本週額度用完回 resource_exhausted，reason 是 IMAGE_QUOTA_EXCEEDED；invalid_argument 的 reason 是
   // IMAGE_SAFETY_BLOCKED 與 IMAGE_RECITATION_BLOCKED（輸入要換：換圖或改提示詞，不要重試）；unavailable 的 reason 是
   // IMAGE_NOT_PRODUCED（模型沒有產出圖片，重試可能成功），模型供應商無法呼叫也回 unavailable。
-  // 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo。
-  // 呼叫失敗時額度退回。
+  // 同時進行的修圖超過上限回 resource_exhausted，帶 RetryInfo，不扣額度。
+  // 原圖超過 2 MiB 或提示詞超過 500 字回 invalid_argument，BadRequest 帶出 field。
+  // 這個服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
+  // 呼叫失敗時額度退回；扣了額度之後伺服器程序中途終止的那一次不退回，是已知限制。
   rpc TransformImage(TransformImageRequest) returns (TransformImageResponse);
 
   // ListAiStyles 列出某個用途的啟用中風格，連同本週的額度使用量。
@@ -49,11 +51,14 @@ message AiStyle {
 }
 
 message TransformImageRequest {
-  // 原圖的內容。
+  // 原圖的內容，bytes 上限 2 MiB，client 先縮圖；超過回 invalid_argument，BadRequest 帶出這個欄位的 field violation。
+  // 服務接受最大 3 MiB 的請求訊息，讓 2 MiB 原圖的 JSON／base64 編碼放得下。
+  // 這是只做運算、不保存的暫態圖片，所以 inline；要保存的檔案走 media 的 presigned 上傳。
   bytes image_data = 1 [(google.api.field_behavior) = REQUIRED];
   // 原圖的格式，例如 image/jpeg、image/png。
   string mime_type = 2 [(google.api.field_behavior) = REQUIRED];
-  // 修圖提示詞，通常取自 AiStyle.prompt 或 ListAiStylesResponse.default_prompt。
+  // 修圖提示詞，通常取自 AiStyle.prompt 或 ListAiStylesResponse.default_prompt。去掉頭尾空白後至少 1 個、
+  // 最多 500 個字元（以 Unicode 字元計，不是 byte）。
   string prompt = 3 [(google.api.field_behavior) = REQUIRED];
 }
 
@@ -72,7 +77,7 @@ message ListAiStylesRequest {
 }
 
 message ListAiStylesResponse {
-  // 沒有選風格時使用的提示詞。
+  // 沒有選風格時使用的提示詞，取自這個用途的預設風格。
   string default_prompt = 1;
   // 本週已使用的次數與上限（呼叫者的店家）。
   int32 weekly_usage = 2;

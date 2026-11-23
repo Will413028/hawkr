@@ -34,3 +34,73 @@ type PaymentAccount struct {
 	PurgeBlockedReason     *string
 	PurgeReplayRequestedAt *time.Time
 }
+
+type PaymentPayment struct {
+	ID                   uuid.UUID
+	OrderNo              string
+	StoreID              int64
+	BuyerID              int64
+	Amount               int64
+	Provider             string
+	Description          string
+	Status               string
+	ExternalPaymentID    *string
+	ExternalChargeID     *string
+	PaidAt               *time.Time
+	LastError            *string
+	FailureReason        *string
+	FetchedAt            *time.Time
+	CreateIdempotencyKey uuid.UUID
+	CreateCalledAt       *time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}
+
+type PaymentPaymentAttempt struct {
+	ID                uuid.UUID
+	PaymentID         uuid.UUID
+	Provider          string
+	ExternalPaymentID *string
+	IdempotencyKey    uuid.UUID
+	CalledAt          *time.Time
+	State             *string
+	FetchedAt         *time.Time
+	SupersededAt      *time.Time
+	ExcessPaidAt      *time.Time
+	CreatedAt         time.Time
+}
+
+type PaymentRefund struct {
+	ID                     uuid.UUID
+	PaymentID              uuid.UUID
+	RequestKey             string
+	Amount                 int64
+	Auto                   bool
+	Status                 string
+	ReversalAmount         int64
+	ReversalIdempotencyKey uuid.UUID
+	ReversalCalledAt       *time.Time
+	ReversalExternalID     *string
+	IdempotencyKey         uuid.UUID
+	RefundCalledAt         *time.Time
+	ExternalRefundID       *string
+	FailureReason          *string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+}
+
+type PaymentTransfer struct {
+	ID                   uuid.UUID
+	PaymentID            uuid.UUID
+	StoreID              int64
+	Amount               int64
+	ReversedAmount       int64
+	DestinationAccountID string
+	Status               string
+	ExternalTransferID   *string
+	FailureReason        *string
+	IdempotencyKey       uuid.UUID
+	CalledAt             *time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}

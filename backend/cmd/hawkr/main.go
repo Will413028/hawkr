@@ -58,6 +58,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
@@ -163,8 +164,10 @@ func runServe(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
+	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
+	imageAIConfig := imageai.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -222,7 +225,7 @@ func runServe(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -248,10 +251,13 @@ func runServe(ctx context.Context) error {
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
 	subscribeProcurement(bus, d, log)
+	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), log)
+	subscribeImageAI(bus, imageAIModule)
 	procurementModule := newProcurement(d, jc, buyerModule, bus, log)
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
+	subscribeNotification(bus, newNotification(d, id, buyerModule, sellerModule, jc, log))
 	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
 		p, ok := rpc.PrincipalFrom(ctx)
@@ -280,6 +286,7 @@ func runServe(ctx context.Context) error {
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Assistant:   assistantModule,
 		Procurement: procurementModule,
+		ImageAI:     imageAIModule,
 		Ready:       d.Ping,
 		Social:      socialModule,
 		Review:      reviewModule,
@@ -369,8 +376,10 @@ func runWorker(ctx context.Context) error {
 	idc := readIdentityConfig(verifierCtx, e)
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
+	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
+	imageAIConfig := imageai.ReadConfig(e)
 	if err := e.Err(); err != nil {
 		return err
 	}
@@ -424,7 +433,7 @@ func runWorker(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -464,7 +473,11 @@ func runWorker(ctx context.Context) error {
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
 	subscribeProcurement(bus, d, log)
+	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), log)
+	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, log)
+	subscribeNotification(bus, notificationModule)
 	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
@@ -480,6 +493,7 @@ func runWorker(ctx context.Context) error {
 	imModule.AddWorkers(workers)
 	crmModule.AddWorkers(workers)
 	moderationModule.AddWorkers(workers)
+	notificationModule.AddWorkers(workers)
 	discoveryModule.AddWorkers(workers)
 	deletion.AddWorkers(workers)
 	consumer.AddWorkers(workers)
@@ -502,6 +516,7 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, imModule.PeriodicJobs()...)
 	periodic = append(periodic, crmModule.PeriodicJobs()...)
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
+	periodic = append(periodic, notificationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
 	periodic = append(periodic, contentModule.PeriodicJobs()...)
 	periodic = append(periodic, procurementModule.PeriodicJobs()...)

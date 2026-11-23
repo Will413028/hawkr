@@ -11,6 +11,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -46,6 +47,7 @@ func modules() []migrate.Module {
 		{Name: "im", Dir: im.Migrations()},
 		{Name: "crm", Dir: crm.Migrations()},
 		{Name: "coupon", Dir: coupon.Migrations()},
+		{Name: "imageai", Dir: imageai.Migrations()},
 		{Name: "notification", Dir: notification.Migrations()},
 	}
 }
@@ -70,5 +72,4 @@ var apiOnly = []string{
 var withoutData = []string{
 	"reviewqueue",       // 待辦由各來源模組的資料推導，讀 seller、payment 與 moderation 發布的 pub_review_items
 	"accountsuspension", // 停權紀錄在 identity，這個模組只編排：鎖帳號、確認沒有店家、呼叫 identity、發事件
-	"imageai",           // 骨架，表隨 A9-4 建立
 }

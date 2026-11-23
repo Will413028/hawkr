@@ -26,9 +26,6 @@ import (
 // errorDomain 是 ErrorInfo 的 domain。錯誤只有我們自己的產生者，正式網域上線時才確定。
 const errorDomain = "hawkr"
 
-// errorLocale 是 apperr 的文字的語系：apperr 的文字目前都是 zh-TW 字面值。
-const errorLocale = uitext.ZhTW
-
 // LocalizedMessage 回傳給使用者看的文字；locale 一律取自文字本身（Message.Locale 是實際使用的語系，缺字退回 zh-TW 時就是 zh-TW，
 // ADR 2026-10-17-multi-locale-architecture D3），不接受另外傳入的語系。錯誤的 detail 與回應裡非錯誤的使用者文字（例如動作不能做的原因）用同一個型別。
 func LocalizedMessage(m uitext.Message) *errdetails.LocalizedMessage {
@@ -45,6 +42,12 @@ func CommonText(ctx context.Context, code connect.Code) uitext.Message {
 // CommonError 回帶預設文字（CommonText）的 Connect 錯誤；給入口中介層自己寫回應時用。
 func CommonError(ctx context.Context, code connect.Code) *connect.Error {
 	return toConnect(ctx, userError(code, CommonText(ctx, code))).err
+}
+
+// CommonFailure 回帶預設文字（CommonText）的錯誤值，給 handler 以 return 回傳，由 interceptor 轉成 Connect 錯誤；
+// 語系取自 ctx。與 CommonError 不同：CommonError 回的 *connect.Error 不是 toConnect 認得的來源。
+func CommonFailure(ctx context.Context, code connect.Code) error {
+	return userError(code, CommonText(ctx, code))
 }
 
 // transportError 是傳輸層自己判斷的錯誤。它與模組的 apperr 是 toConnect 僅有的兩種來源：其他錯誤
@@ -66,7 +69,7 @@ func Error(code connect.Code, format string, args ...any) error {
 // UserError 回傳 Connect 的錯誤，帶給使用者看的文字（LocalizedMessage）；給 interceptor 之外、自己寫回應的
 // 中介層用（例如入口在解析 session 失敗時回 unavailable）。
 func UserError(code connect.Code, text string) *connect.Error {
-	return toConnect(context.Background(), userError(code, uitext.Message{Text: text, Locale: errorLocale})).err
+	return toConnect(context.Background(), userError(code, uitext.Message{Text: text, Locale: uitext.ZhTW})).err
 }
 
 // ConnectError 把模組的錯誤（apperr）轉成 Connect 的錯誤，與 interceptor 的轉換相同；給入口中介層自己寫回應、
@@ -157,7 +160,7 @@ func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths, request p
 	if ae.Reason != (apperr.Reason{}) {
 		addDetail(ce, &errdetails.ErrorInfo{Reason: ae.Reason.String(), Domain: errorDomain, Metadata: ae.Metadata})
 	}
-	addDetail(ce, LocalizedMessage(uitext.Message{Text: ae.Message, Locale: errorLocale}))
+	addDetail(ce, LocalizedMessage(uitext.Message{Text: ae.Message, Locale: ae.Locale()}))
 	if ae.RetryAfter > 0 {
 		addDetail(ce, &errdetails.RetryInfo{RetryDelay: durationpb.New(ae.RetryAfter)})
 	}
@@ -177,7 +180,7 @@ func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths, request p
 		violations = append(violations, &errdetails.BadRequest_FieldViolation{
 			Field:            path,
 			Description:      v.Message,
-			LocalizedMessage: LocalizedMessage(uitext.Message{Text: v.Message, Locale: errorLocale}),
+			LocalizedMessage: LocalizedMessage(uitext.Message{Text: v.Message, Locale: ae.Locale()}),
 		})
 	}
 	if len(violations) > 0 {

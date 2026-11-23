@@ -84,7 +84,7 @@
   - 驗收：基線結果與四份產出在附件；裁決表與 `inventory.md` 去向欄無空格（新增一次性腳本 `2026-11-23-a8-notification/check_dispositions.py`，不進 `scripts/`）。
   - 停止條件：基線有會擋 A8 的失敗；U8 發現 client 依型別做互動（D6 要重議）。
 
-- [ ] **A8-1 模組本體（walking skeleton）**（被擋於：無）
+- [x] **A8-1 模組本體（walking skeleton）**（被擋於：無）
   - 範圍：`internal/modules/notification`：
     - schema：收件匣（型別、參數快照、聚合鍵、actor 帳號 ID 清單、已讀）、通知意圖、每渠道投遞紀錄（待送／已送／永久失敗、實際送出的文字與 locale）、裝置 token（`last_registered_at`）、偏好覆寫列 `(account_id, 受眾, 分類, 渠道, enabled)`。公告表隨 A8-2、suppression 表隨 A8-3 建（第一個讀寫者出現時）。
     - 收件匣不是投遞渠道：投遞紀錄只記推播與 email；收件匣列本身就是「已進收件匣」的紀錄，聚合時多個意圖合併成一列。
@@ -98,7 +98,7 @@
   - 子步驟（一個 session 做不完，2026-11-23 拆分；各自有驗收，依序做）：
     - **A8-1a 骨架、schema、註冊表**：`make new-module` 產骨架並登記 `cmd/hawkr/modules.go`；上列全部表（`schema.sql`＋migration＋sqlc）；型別註冊表與 `internal/text`（先只有 `account_suspended`、`account_unsuspended` 兩型別）；`modules.go` 依賴改成實際依賴；`CARRYOVER.md`（盤點 §2–§6 每列）、模組 `AGENTS.md`。驗收：兩型別 zh-TW／en 固定輸出比對測試、註冊表自檢測試（每型別有冪等鍵來源、分類在 D4 清單、呈現分類在 D6 清單、聚合鍵只在宣告可聚合的型別、參數不含第三方名稱欄位）、`TestSchemaFileMatchesMigrations` 等既有守門、lint／vet。mutation：不可關分類改成可關 → 註冊表測試紅。
     - **A8-1b 意圖管線與第一個端到端型別**：同步訂閱者→意圖 job→worker（收件人解析、偏好、自我略過、收件匣寫入與聚合 upsert、投遞紀錄；渠道 job 先只排不送，A8-3 接 adapter；寫收件匣的 transaction 內以 `FOR SHARE` 鎖收件帳號列並確認未刪除）；`accountsuspension.Suspended`／`Unsuspended` 訂閱；結構性測試。驗收：下方 integration 的冪等、偏好、自我略過、聚合四項、刪除後到達的意圖不建收件匣與 Suspended→收件匣；mutation 其餘三項。
-    - **A8-1c 保留期與個資清除**：180 天清除 job、三個刪除事件的清除 job（D16 已決）。驗收：下方 integration 的清除兩項（刪除事件後清除、到期硬刪）。
+    - **A8-1c 保留期與個資清除**：180 天清除 job、三個刪除事件的清除 job（D16 已決）。開工時查到兩處缺口（2026-11-23，主 session 依 D15 與本步驗收裁決）：(1) `deliveries.intent_id` 的 `ON DELETE CASCADE` 讓刪過期意圖連帶刪掉未滿 180 天的投遞紀錄（投遞的 `created_at` 晚於意圖）：FK 改 `ON DELETE RESTRICT`，清除 job 先刪過期投遞，再刪過期且已無投遞的意圖；(2) worker 只鎖 identity 帳號列，`BuyerDeleted`／`StoreRetired` 之後處理的意圖仍會替已清除的收件人建列：worker 在同一個 transaction 依 `platform/lockorder` 再以 `FOR SHARE` 鎖 BUYER 收件人的 buyer 列、STORE 收件人的 store 列（經 buyer、seller 公開方法），已刪除或已退場就略過。驗收：下方 integration 的清除兩項（刪除事件後清除、到期硬刪）。
   - 消費端：`rg -n "accountsuspension\.(Suspended|Unsuspended)" backend/internal`；`internal/arch/modules.go`。
   - 不能動：accountsuspension 的事件型別與發布 transaction。
   - 驗收：每個型別的固定輸出比對測試（zh-TW、en）；結構性測試：notification 的同步訂閱者只呼叫 `jobs.Enqueue`；integration：同一事件投遞兩次只有一列、偏好關閉的分類不建收件匣但不可關的分類仍建、自我通知被略過、同聚合鍵的未讀通知合併成一列、三個刪除事件後收件匣、偏好、投遞送出文字與意圖參數被清、刪除後到達的意圖不建收件匣、180 天到期的收件匣／投遞紀錄／意圖列被硬刪；`make lint-monolith`、`make test-all`、`GOWORK=off go vet -tags integration ./...`。mutation（進 `mutation/`）：拿掉意圖冪等 UNIQUE → 冪等測試紅；自我略過改回比 buyer_id → 略過測試紅；不可關分類改成可關 → 測試紅；聚合 upsert 改成 insert → 合併測試紅。
@@ -112,7 +112,7 @@
 
 - [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1；真實 provider 驗收另擋於 Will 的帳號）
   - 範圍：
-    - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Resend adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 先寫 `platform/inbox` 再寫 suppression 表（本步建））；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字。
+    - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Resend adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 先寫 `platform/inbox` 再寫 suppression 表（本步建））；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字；送出前在同一個 transaction 以 A8-1c 的同一組鎖確認收件人未刪除、未退場，否則把投遞標成永久失敗、不寫送出文字（A8-1c 審查 R1-4：清除之後才執行的待送 job 不得寫回送出文字）。
     - token：登入 upsert 改綁、登出刪、帳號停權（`accountsuspension.Suspended`）與刪帳號（`identity.AccountDeleted`）時由同 transaction 的同步訂閱者刪列，加進 A8-1 結構測試的白名單、每日 job 刪 60 天未更新的 token；店家停權不動。
     - 重送：依投遞紀錄重排永久失敗的手段與 runbook；未觸達查詢：近 N 天交易必要型別沒有任何渠道送達的數量（後台唯讀）。
     - 依 D3 的裁決表為單體事件定義型別並訂閱：social（留言、讚、追蹤的店發文；讚用聚合鍵）、buyer 的追蹤店家（`cmd/hawkr/buyer_events.go:20` 現經 `buyerrelay`；用聚合鍵）、review、im（離線推播）、seller（檢舉收到與結果、seller 新增公開事件 `CaseInquiryCreated`（`seller/events.go`，在 `CreateCaseInquiry` 的同一個 transaction 發布）、措施與治理、KYC 審核結果）、payment `PayoutAccountChanged`（payment 先加首次啟用時間、補件期限欄位；期限前提醒是另一型別 `payout_account_deadline`）；型別清單以 `event-adjudication.md` 與 D3 為準（收藏不做、im 只推播不寫收件匣、解除請求只送 Decided）、accountsuspension 停權與解除、delegation 代行完成、procurement `RfqPublished`。moderation 新增事件（消費者此時出現）：內容被隱藏、作者收到警告、案件結案（帶每位檢舉人帳號），在處置的同一個 transaction 發布。`ReportReceived` 的確認信：意圖參數只放 report 參照，worker 執行時向 seller 讀地址。
@@ -200,9 +200,9 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
 | A8-0 基線與事實查核 | 完成 | 基線見文末；`event-adjudication.md`、`fact-checks.md`、`inventory.md` 去向；`python3 backend/docs/plans/2026-11-23-a8-notification/check_dispositions.py` → 0 個空格（填表前 243 個） |  | 本次 |
-| A8-1a 骨架、schema、註冊表 | 程式完成待驗收 | 本機：gofmt、lint-monolith（0 issues）、vet integration、notification／arch／cmd／uitext unit -race、mutation --validate；開工與完成前設計審查、code-review＋合約審查兩輪（findings 13，blocking 1 已修） | integration（3＋5 個 schema 測試）、TS／Dart ui-text generated-diff、mutation `a8-1a.json`：待 CI | `fe89c9128`..`9075c1bc1` |
-| A8-1b 意圖管線 | 未開始 | | | |
-| A8-1c 保留期與個資清除 | 未開始 | | | |
+| A8-1a 骨架、schema、註冊表 | 完成 | 本機：gofmt、lint-monolith（0 issues）、vet integration、notification／arch／cmd／uitext unit -race、mutation --validate；開工與完成前設計審查、code-review＋合約審查兩輪（findings 13，blocking 1 已修） ；CI `d049c19ab`：notification integration ok、ui-text generated diff、mutation、其餘 16 個 workflow 綠 | backend monolith 紅只因既有的 `httpapi TestEveryServiceInTheContractIsMounted`（imageai、procurement 未掛，A9 範圍；`6298a02b1` 起已紅） | `fe89c9128`..`9075c1bc1` |
+| A8-1b 意圖管線 | 完成 | 本機：gofmt、lint（0 issues）、vet integration、notification／identity／arch／lockorder／cmd unit -race、mutation --validate；code-review＋合約審查兩輪（findings 10，blocking 0；fixed 8、rejected 1 nit：同時間戳由處理順序決定，機率可忽略） ；CI：mutation 綠（`f62fa160e`）；integration 在 run 45195973731（`52498bd7b`，含本步）notification、notification/internal/intake、identity ok | backend monolith 紅只因既有的 `httpapi TestEveryServiceInTheContractIsMounted`（A9）；repo hygiene 紅是 B2 的 PayUni 殘留（`payment/CARRYOVER.md`），推送前已紅 | `1d3383a9b`..`c213cfec3` |
+| A8-1c 保留期與個資清除 | 完成 | 本機：gofmt、lint-monolith（0 issues）、vet integration、notification／buyer／seller／arch／lockorder／cmd unit -race、mutation --validate（8 個）；合約審查 NO DEFECTS；code-review＋第 2 輪審查（findings 10，blocking 0；fixed 8：R1-1/2/3/5/6、D1–D3，recorded 1：R1-4 寫進 A8-3，accepted 1：D4 店家鎖順序由 seller 自己的測試涵蓋）；CI run 45204116577（`8e72287e2`）：notification、intake、purge、buyer、seller integration ok；mutation 綠（8 個） | backend monolith 紅只因既有的 `httpapi TestEveryServiceInTheContractIsMounted`（A9）；repo hygiene 紅是既有的 B2 PayUni 殘留（`payment/CARRYOVER.md`） | `90d5530ca`..`f23cac6ef` |
 | A8-2 Connect API 與串流 | 未開始 | | | |
 | A8-3 渠道與事件訂閱 | 未開始 | | | |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |

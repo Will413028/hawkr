@@ -32,9 +32,9 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 | §3.1#13 消費 `hawkr.shipping` 的 `#`：5 個出貨模板 | 出貨狀態要通知買賣家 | 不成立：fulfillment 與 Java shipping 還沒搬進單體 | 通知型別隨發送端搬遷（D13） | 隨發送端搬遷（D13） |
 | §3.1#14 消費 `payment.events` 的 `#`：1 個付款模板 | 付款結果要通知 | 不成立：該 key 的發送端還在 Java | 通知型別隨發送端搬遷（D13） | 隨發送端搬遷（D13） |
 | §3.1#15 消費 `procurement.events` 的 `#`：詢價邀請 | RFQ 發布要通知被邀請的賣家 | 成立：procurement 已在單體；消費方式不成立（MQ） | 同步訂閱者排意圖 job；`rfq_invited` 歸互動（D3） | 改寫成 `procurement.RfqPublished` 的同步訂閱者（`rfq_invited`；A8-3）；外部業者 key 隨發送端搬遷（D13） |
-| §3.2#1 `buyer.deleted` 靜態 queue：以 accountId 呼叫 buyer、seller 兩個服務列舉歷史 id，紅線化 chat 收件匣並軟刪 | 買家刪帳後其收件匣的個資要清掉 | 成立（需求）；跨服務 gRPC 列舉歷史 id 不成立（單體同一資料庫）；只處理 chat 與軟刪（軟刪留下資料）不符 180 天硬刪（D2） | 訂閱擁有者的刪除事件，排 job 硬刪收件人的資料（A8-1c，被擋於 D16） | 改寫成 個資清除訂閱者：訂閱 `buyer.BuyerDeleted`，排 job 清收件匣參數與偏好，未送出的意圖執行時先確認收件帳號未刪除（A8-1） |
-| §3.2#2 `account.deleted` 靜態 queue：只做 chat 紅線化，不停用 token、不刪偏好 | 帳號刪除後不該再收到通知、偏好不留 | 成立（需求）；舊實作不完整（缺陷 #14） | 訂閱 `identity.AccountDeleted` 清收件匣與偏好，同 transaction 刪 token（A8-3） | 改寫成 個資清除訂閱者：訂閱 `identity.AccountDeleted` 清收件匣與偏好（A8-1），同 transaction 刪 token（A8-3） |
-| §3.2#3 `seller.deleted` 靜態 queue：紅線化 chat、軟刪退休 store 的收件匣、停用 token | 店家退休後其收件匣個資要清掉 | 成立（需求）；軟刪不成立 | 訂閱 `seller.StoreRetired` 清收件匣參數與偏好（A8-1c） | 改寫成 個資清除訂閱者：訂閱 `seller.StoreRetired` 清收件匣參數與偏好（A8-1） |
+| §3.2#1 `buyer.deleted` 靜態 queue：以 accountId 呼叫 buyer、seller 兩個服務列舉歷史 id，紅線化 chat 收件匣並軟刪 | 買家刪帳後其收件匣的個資要清掉 | 成立（需求）；跨服務 gRPC 列舉歷史 id 不成立（單體同一資料庫）；只處理 chat 與軟刪（軟刪留下資料）不符 180 天硬刪（D2） | 訂閱擁有者的刪除事件，排 job 硬刪收件人的資料（A8-1c，被擋於 D16） | 已建（A8-1c）：訂閱 `buyer.BuyerDeleted` 的同步訂閱者只排 `notification.purge_recipient` job（帳號的 BUYER 受眾）；job 分批把該收件人的意圖參數換成 `'{}'`（經收件匣連結與投遞紀錄找到）、清掉投遞紀錄的送出文字與語系（列留著，D16）、刪收件匣列與帳號的 BUYER 偏好；worker 在帳號共享鎖之後以 `buyer.ShareLockByAccount`（`FOR KEY SHARE`）鎖買家列，買家已關閉不寫 |
+| §3.2#2 `account.deleted` 靜態 queue：只做 chat 紅線化，不停用 token、不刪偏好 | 帳號刪除後不該再收到通知、偏好不留 | 成立（需求）；舊實作不完整（缺陷 #14） | 訂閱 `identity.AccountDeleted` 清收件匣與偏好，同 transaction 刪 token（A8-3） | 已建（A8-1c）：訂閱 `identity.AccountDeleted` 的同步訂閱者只排清除 job（帳號的全部受眾），清除內容同 §3.2#1，偏好兩個受眾都刪；token 的同步刪除在 A8-3 |
+| §3.2#3 `seller.deleted` 靜態 queue：紅線化 chat、軟刪退休 store 的收件匣、停用 token | 店家退休後其收件匣個資要清掉 | 成立（需求）；軟刪不成立 | 訂閱 `seller.StoreRetired` 清收件匣參數與偏好（A8-1c） | 已建（A8-1c）：訂閱 `seller.StoreRetired` 的同步訂閱者只排清除 job（帳號的 STORE 受眾，收件匣、投遞紀錄、意圖以 `store_id` 限定那間店，同帳號的另一間店不動；偏好是帳號與受眾的、沒有店別，同帳號可能已重開另一間店，所以不刪偏好），清除內容同 §3.2#1；worker 以 `seller.LockNotRetired`（`FOR KEY SHARE`）鎖店家列，店家已退場不寫 |
 | §3.3#1 發布 `notification.inbox.new` 給 gateway SSE（fire-and-forget、錯誤丟棄、含整個 item） | web 即時看到新通知 | 不成立：單體是單一行程，hub 用記憶體即可；串流只是訊號，資料由列表保證（缺陷 #19、#20） | 只傳失效訊號、不做續傳游標（D11） | 改寫成 單體行程內 hub 的串流失效訊號（未讀數與最新收件匣 ID，不經 MQ、不帶 item；D11；A8-2） |
 | §3.3#2 發布 `notification.unread_changed` | 已讀、刪除後其他分頁更新未讀數 | 不成立：不經 MQ | 單體行程內 hub 的串流失效訊號，鍵 `(account_id, 受眾)`（D11） | 改寫成 單體行程內 hub 的串流失效訊號（未讀數與最新收件匣 ID，不經 MQ；D11；A8-2） |
 | §4#1 FCM 可見推播（`SendEachForMulticast`，Notification payload 帶標題、內文、圖片，APNs sound） | iOS App 要收到可見推播 | 成立：兩支 App 只有 iOS；Firebase 專案要換新的（Will 的外部前置） | 可見通知（APNs alert）才不會被 iOS 節流（A8-6）；adapter 介面不綁 provider | 改寫成 FCM adapter 可見通知（APNs alert，FCM `notification` payload；A8-3、A8-6） |
@@ -107,6 +107,16 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
 | gateway 對 notification-service 的 16 支 gRPC 與一條 SSE（`inventory.md` §1，含錯誤吞掉的呼叫與跨身分的串流） | 四個 client 要讀寫收件匣、偏好、token 與公告 | 不成立：舊 REST、手寫 client 與 gRPC 呼叫隨 A8-7 刪除；缺陷 #8、#11、#17、#18、#19 在舊傳輸層 | Connect service 加生成的 client，錯誤用 `ErrorReason`，分頁 cursor，串流只傳失效訊號 | 全部在 A8-2 重新設計，本步驟不新增對外方法；`inventory.md` §1 的去向欄為準 |
+
+## 意圖管線（A8-1b）
+
+- 意圖冪等鍵＝型別名稱＋事件來源身分，由 `intents_idempotency_key_key` 與 `InsertIntent` 的 `ON CONFLICT` 保證；同一事件投遞兩次只有一個意圖、一個 job。守門：`TestSameEventTwiceMakesOneIntentAndOneInboxRow`。
+- 同步訂閱者只准呼叫 `Accept`，`Accept` 只准插意圖列與排 job；A8-3 的裝置 token 同步刪除訂閱者要登記在 `subscribers_test.go` 的 `tokenPurgeSubscribers`（現在是空的）。守門：`TestSynchronousSubscribersOnlyAccept`、`TestAcceptOnlyInsertsTheIntentAndEnqueues`。
+- 寫收件匣與投遞紀錄的 transaction 先以共享鎖鎖 identity 帳號列（`identity.ShareLockAccount`，`FOR SHARE`：只要帳號 commit 前不被刪，多個 worker 不互相等）、再碰 notification 的列（`platform/lockorder`）；帳號已刪除的意圖不寫任何列。守門：`TestIntentArrivingAfterAccountDeletionWritesNothing` 與 integration 測試的 lockorder checker。
+- 偏好：不可關（`model.Disableable`）的渠道忽略覆寫列；可關的看覆寫列，沒有列就是預設開。自我略過比的是帳號（actor 帳號 ID 與收件帳號 ID），不是店或買家 ID。守門：`TestPreferencesDisableOnlyDisableableCategories`、`TestSelfNotificationIsSkipped`。
+- 收件匣的聚合：有聚合鍵的型別，同一個收件人（含 store_id）未讀的同鍵列合併（actor 取聯集；參數只在來源事件時間 `occurred_at` 不早於該列目前的事件時才換，與 job 處理順序無關），已讀之後另開一列；聚合鍵與冪等鍵一樣以型別名稱為前綴，超過 200 字元改存 `<型別>:sha256`。worker 重試靠連結表 `inbox_item_intents`（意圖主鍵）判斷已寫過，合併進去的列之後被讀過也不會重複建列。守門：`TestUnreadNotificationsWithTheSameAggregationKeyMerge`、`TestRetryOfAMergedIntentDoesNotCreateARowAfterTheRowWasRead`、`TestMergeKeepsTheParamsOfTheNewerEventRegardlessOfProcessingOrder`、`TestSameRawAggregationKeyOfTwoTypesStaysTwoRows`、`TestLongKeysAreHashedToFit`。
+- 收件人由型別的 `Recipient(參數)` 取出：事件的對象帳號與（STORE 受眾的）店 ID 在建立意圖時就寫進參數快照，worker 不再向 seller 讀「帳號目前的店」（事件發生當下的店才是收件人，之後換店不會改道）；`registry.Validate` 要求 STORE 一定有 store_id、BUYER 一定沒有。
+- 投遞紀錄是推播與 email 的唯一帳本：worker 建 `PENDING` 的列（偏好關掉的渠道不建），並在同一個 transaction 為每筆新紀錄排一個 `notification.deliver` job（以投遞紀錄 ID 唯一；紀錄已存在的重試不再排）；這一步 job 不送出、紀錄留在 `PENDING`，A8-3 把 adapter 接進這個 job 並更新狀態，不另開第二份狀態、也不掃 `PENDING` 的列。守門：`TestDeliveryChannelsEachGetARecordAndAJobInTheSameTransaction`。
 
 ## 與 舊服務的差異
 

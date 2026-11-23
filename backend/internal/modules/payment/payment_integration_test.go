@@ -60,13 +60,14 @@ var (
 type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
+	opts []river.InsertOpts
 	out  []bool
 	// fail 不是 nil 時，排入這個種類的 job 回 fail（只有一次）：模擬 handler 在 Go 端失敗而 transaction 本身沒有壞。
 	failKind string
 	fail     error
 }
 
-func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.InsertOpts) error {
+func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.fail != nil && args.Kind() == q.failKind {
@@ -76,6 +77,11 @@ func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.Insert
 	}
 	_, inTx := db.TxFrom(ctx)
 	q.args = append(q.args, args)
+	var o river.InsertOpts
+	if opts != nil {
+		o = *opts
+	}
+	q.opts = append(q.opts, o)
 	q.out = append(q.out, !inTx)
 	return nil
 }
@@ -97,6 +103,19 @@ func (q *queue) storeIDs(t *testing.T, kind string) []int64 {
 		}
 		must(t, json.Unmarshal(raw, &v))
 		out = append(out, v.StoreID)
+	}
+	return out
+}
+
+// scheduledAt 是某個種類的 job 排入時帶的 ScheduledAt（依排入順序；零值是立刻執行）。
+func (q *queue) scheduledAt(kind string) []time.Time {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	var out []time.Time
+	for i, a := range q.args {
+		if a.Kind() == kind {
+			out = append(out, q.opts[i].ScheduledAt)
+		}
 	}
 	return out
 }
@@ -1848,7 +1867,7 @@ func TestSweepWithoutAProviderRequeuesPurgeAndTheRowReachesTheTerminalStateAfter
 		t.Helper()
 		queued := f.jobs.storeIDs(t, kindPurge)
 		f.jobs.mu.Lock()
-		f.jobs.args = nil
+		f.jobs.args, f.jobs.opts = nil, nil
 		f.jobs.out = nil
 		f.jobs.mu.Unlock()
 		for _, id := range queued {

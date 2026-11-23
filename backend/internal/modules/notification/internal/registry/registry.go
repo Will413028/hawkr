@@ -6,10 +6,13 @@
 package registry
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -55,6 +58,10 @@ type Definition[P any] struct {
 	IdempotencySource string
 	// IdempotencyKey 由參數取出事件來源身分；Entry.IdempotencyKey 會加上型別名稱前綴，所以不同型別不會互撞。
 	IdempotencyKey func(P) string
+	// OccurredAt 由參數取出來源事件發生的時間（事件自己的時間，不是處理時間）：聚合合併時以它判斷哪一份參數比較新。
+	OccurredAt func(P) time.Time
+	// Recipient 由參數取出收件人：帳號 ID（事件來源身分之外，事件的對象帳號也要進參數快照），STORE 受眾另帶 StoreID；BUYER 受眾的 StoreID 一定是 0。
+	Recipient func(P) Recipient
 	// Aggregatable 宣告型別可聚合（D12：讚、追蹤）；為 true 才可以有 AggregationKey，而且一定要有。
 	Aggregatable   bool
 	AggregationKey func(P) string
@@ -68,6 +75,19 @@ type Definition[P any] struct {
 	ImageKey func(P) string
 	// Example 是固定輸出測試與註冊表自檢用的範例參數。
 	Example P
+}
+
+// Recipient 是型別從參數取出的收件人：(帳號, 受眾) 的帳號與 STORE 受眾的店。受眾本身是型別的屬性（Spec.Audience）。
+type Recipient struct {
+	AccountID int64
+	StoreID   int64
+}
+
+// Resolved 是參數快照裡與投遞有關的事實（不含文字）：worker 用它解析收件人、聚合與略過自己。
+type Resolved struct {
+	Recipient      Recipient
+	AggregationKey string
+	ActorAccounts  []int64
 }
 
 // Spec 是型別的靜態屬性（不含參數相關的函式）。
@@ -99,17 +119,32 @@ type Rendered struct {
 // Entry 是註冊表裡一個型別的非泛型介面：參數以 JSON 快照傳進來。
 type Entry interface {
 	Spec() Spec
-	// IdempotencyKey 回傳意圖的冪等鍵：型別名稱加事件來源身分。
+	// IdempotencyKey 回傳意圖的冪等鍵：型別名稱加事件來源身分（超過長度上限時改存雜湊，見 scopedKey）。
 	IdempotencyKey(params json.RawMessage) (string, error)
+	// OccurredAt 回傳來源事件發生的時間。
+	OccurredAt(params json.RawMessage) (time.Time, error)
 	Render(l uitext.Locale, params json.RawMessage) (Rendered, error)
+	// Resolve 由參數快照取出收件人、聚合鍵與 actor，不組字。
+	Resolve(params json.RawMessage) (Resolved, error)
 	// ExampleParams 回傳範例參數的 JSON 與解碼後的值（自檢與固定輸出測試用）。
 	ExampleParams() (json.RawMessage, any, error)
 	// validate 檢查型別定義本身；回傳全部違規。
 	validate() []error
 }
 
-// MaxIdempotencyKeyLen 是冪等鍵的長度上限，與 db/schema.sql intents.idempotency_key 的 CHECK 一致。
+// MaxIdempotencyKeyLen 是冪等鍵與聚合鍵的長度上限，與 db/schema.sql 的 CHECK（intents.idempotency_key、inbox_items.aggregation_key）一致。
 const MaxIdempotencyKeyLen = 200
+
+// scopedKey 把型別內的鍵加上型別名稱前綴，不同型別不會撞鍵。超過上限時改存「型別名稱:來源的 sha256 十六進位」（決定性、長度固定，
+// 型別名稱最長 63 字元，合計不超過 128），而不是讓寫入時才被 CHECK 擋下。
+func scopedKey(typeName, source string) string {
+	key := typeName + ":" + source
+	if len(key) <= MaxIdempotencyKeyLen {
+		return key
+	}
+	sum := sha256.Sum256([]byte(source))
+	return typeName + ":" + hex.EncodeToString(sum[:])
+}
 
 var namePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 
@@ -150,11 +185,26 @@ func (e *entry[P]) idempotencyKey(p P) (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("通知型別 %s 的冪等鍵來源是空的", e.d.Name)
 	}
-	key := e.d.Name + ":" + id
-	if len(key) > MaxIdempotencyKeyLen {
-		return "", fmt.Errorf("通知型別 %s 的冪等鍵 %d 字元，超過上限 %d", e.d.Name, len(key), MaxIdempotencyKeyLen)
+	return scopedKey(e.d.Name, id), nil
+}
+
+func (e *entry[P]) OccurredAt(params json.RawMessage) (time.Time, error) {
+	p, err := e.decode(params)
+	if err != nil {
+		return time.Time{}, err
 	}
-	return key, nil
+	return e.occurredAt(p)
+}
+
+func (e *entry[P]) occurredAt(p P) (time.Time, error) {
+	if e.d.OccurredAt == nil {
+		return time.Time{}, fmt.Errorf("通知型別 %s 沒有事件時間來源", e.d.Name)
+	}
+	t := e.d.OccurredAt(p)
+	if t.IsZero() {
+		return time.Time{}, fmt.Errorf("通知型別 %s 的事件時間是空的", e.d.Name)
+	}
+	return t, nil
 }
 
 func (e *entry[P]) Render(l uitext.Locale, params json.RawMessage) (Rendered, error) {
@@ -182,13 +232,51 @@ func (e *entry[P]) render(l uitext.Locale, p P) (Rendered, error) {
 	if d.ImageKey != nil {
 		r.ImageKey = d.ImageKey(p)
 	}
-	if d.AggregationKey != nil {
-		r.AggregationKey = d.AggregationKey(p)
-	}
+	r.AggregationKey = e.aggregationKey(p)
 	if d.Actors != nil {
 		r.ActorAccounts = d.Actors(p)
 	}
 	return r, nil
+}
+
+func (e *entry[P]) Resolve(params json.RawMessage) (Resolved, error) {
+	p, err := e.decode(params)
+	if err != nil {
+		return Resolved{}, err
+	}
+	return e.resolve(p)
+}
+
+func (e *entry[P]) resolve(p P) (Resolved, error) {
+	d := e.d
+	if d.Recipient == nil {
+		return Resolved{}, fmt.Errorf("通知型別 %s 沒有收件人解析", d.Name)
+	}
+	r := d.Recipient(p)
+	if r.AccountID <= 0 {
+		return Resolved{}, fmt.Errorf("通知型別 %s 的參數沒有收件帳號", d.Name)
+	}
+	if (d.Audience == model.AudienceStore) != (r.StoreID > 0) || r.StoreID < 0 {
+		return Resolved{}, fmt.Errorf("通知型別 %s：受眾 %s 的收件人 StoreID 是 %d（STORE 一定有、BUYER 一定沒有）", d.Name, d.Audience, r.StoreID)
+	}
+	out := Resolved{Recipient: r}
+	out.AggregationKey = e.aggregationKey(p)
+	if d.Actors != nil {
+		out.ActorAccounts = d.Actors(p)
+	}
+	return out, nil
+}
+
+// aggregationKey 是儲存用的聚合鍵：型別內的鍵加型別名稱前綴（兩個型別的同名鍵不會合併成一列），沒有聚合鍵時是空字串。
+func (e *entry[P]) aggregationKey(p P) string {
+	if e.d.AggregationKey == nil {
+		return ""
+	}
+	k := e.d.AggregationKey(p)
+	if k == "" {
+		return ""
+	}
+	return scopedKey(e.d.Name, k)
 }
 
 func (e *entry[P]) ExampleParams() (json.RawMessage, any, error) {
@@ -237,6 +325,12 @@ func (e *entry[P]) validate() []error {
 	} else if _, err := e.idempotencyKey(d.Example); err != nil {
 		bad("範例參數取不出冪等鍵：%v", err)
 	}
+	if _, err := e.occurredAt(d.Example); err != nil {
+		bad("範例參數取不出事件時間：%v", err)
+	}
+	if _, err := e.resolve(d.Example); err != nil {
+		bad("範例參數解析不出收件人：%v", err)
+	}
 	if d.Aggregatable != (d.AggregationKey != nil) {
 		bad("聚合鍵只能在宣告可聚合的型別，而且可聚合的型別一定要有聚合鍵（Aggregatable=%v、AggregationKey 有值=%v）", d.Aggregatable, d.AggregationKey != nil)
 	} else if d.AggregationKey != nil && d.AggregationKey(d.Example) == "" {
@@ -278,3 +372,9 @@ func Lookup(name string) (Entry, bool) {
 	}
 	return nil, false
 }
+
+// Registry 是正式的型別註冊表（All、Lookup 的方法形式，給需要注入註冊表的呼叫端）。
+type Registry struct{}
+
+// Lookup 依名稱找型別。
+func (Registry) Lookup(name string) (Entry, bool) { return Lookup(name) }
