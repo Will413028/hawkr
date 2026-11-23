@@ -2,8 +2,10 @@ package quote
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
@@ -38,24 +40,30 @@ func (s Service) PutShortlist(ctx context.Context, buyerID int64, requestID, sel
 	return out, err
 }
 
-// DeleteShortlist 把賣家回價從入圍清單移除（目標狀態的方法，不在清單時結果相同，Present 為 false）；Version 是請求帶的版本。
+// DeleteShortlist 把賣家回價從入圍清單移除（目標狀態的方法，不在清單時結果相同，Present 為 false）；Version 是被移除那一列掛的版本，不在清單時是請求帶的版本。
 // 需求不屬於這位買家回 NOT_FOUND；版本號不是正數回 INVALID_ARGUMENT（seller_response_version）。
 func (s Service) DeleteShortlist(ctx context.Context, buyerID int64, requestID, sellerResponseID uuid.UUID, version int32) (model.ShortlistEntry, error) {
 	if version <= 0 {
 		return model.ShortlistEntry{}, apperr.InvalidInputOn([]string{"seller_response_version"}, "seller_response_version 必須是正整數")
 	}
+	out := model.ShortlistEntry{SellerResponseID: sellerResponseID, Version: version, Present: false}
 	err := s.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.DB.Conn(ctx))
 		if _, err := q.GetRequestForBuyer(ctx, store.GetRequestForBuyerParams{ID: requestID, BuyerID: &buyerID}); err != nil {
 			return owned(err, "張需求")
 		}
-		if _, err := q.DeleteShortlistEntry(ctx, store.DeleteShortlistEntryParams{RequestID: requestID, SellerResponseID: sellerResponseID, BuyerID: &buyerID}); err != nil {
+		removed, err := q.DeleteShortlistEntry(ctx, store.DeleteShortlistEntryParams{RequestID: requestID, SellerResponseID: sellerResponseID})
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			return nil
+		case err != nil:
 			return fmt.Errorf("quote：移出入圍清單：%w", err)
 		}
+		out.Version = removed
 		return nil
 	})
 	if err != nil {
 		return model.ShortlistEntry{}, err
 	}
-	return model.ShortlistEntry{SellerResponseID: sellerResponseID, Version: version, Present: false}, nil
+	return out, nil
 }

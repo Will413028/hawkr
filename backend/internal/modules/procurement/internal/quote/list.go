@@ -25,14 +25,14 @@ type ListInput struct {
 	PageToken                string
 }
 
-// token 是 next_page_token 的內容：上一頁最後一列的 (submitted_at, 回價 ID)，base64url 的 JSON，對 client 不透明。
+// token 是 next_page_token 的內容：上一頁最後一列的 (回價 created_at, 回價 ID)，base64url 的 JSON，對 client 不透明。
 type token struct {
-	SubmittedAt int64     `json:"s"` // Unix 微秒（與 timestamptz 同精度）
-	ID          uuid.UUID `json:"i"`
+	CreatedAt int64     `json:"c"` // Unix 微秒（與 timestamptz 同精度）
+	ID        uuid.UUID `json:"i"`
 }
 
 func encodeToken(t time.Time, id uuid.UUID) string {
-	b, _ := json.Marshal(token{SubmittedAt: t.UnixMicro(), ID: id})
+	b, _ := json.Marshal(token{CreatedAt: t.UnixMicro(), ID: id})
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
@@ -45,13 +45,13 @@ func decodeToken(raw string) (token, bool) {
 		return token{}, false
 	}
 	var t token
-	if err := json.Unmarshal(b, &t); err != nil || t.ID == (uuid.UUID{}) || t.SubmittedAt < minTokenMicro {
+	if err := json.Unmarshal(b, &t); err != nil || t.ID == (uuid.UUID{}) || t.CreatedAt < minTokenMicro {
 		return token{}, false
 	}
 	return t, true
 }
 
-// List 回傳一次發布收到的賣家回價，每位賣家只列目前版本（撤回的目前版本照列、標狀態），依目前版本的 (submitted_at DESC, 回價 ID) 分頁。
+// List 回傳一次發布收到的賣家回價，每位賣家只列目前版本（撤回的目前版本照列、標狀態），依回價身分列的 (created_at DESC, 回價 ID DESC) 分頁（身分列不可變，賣家改版不影響翻頁）。
 // pageSize 為 0 用預設，超過上限以上限計，負數回 INVALID_ARGUMENT（page_size）；pageToken 不是這個方法發出的 token 回 INVALID_ARGUMENT（page_token）。
 // 發布不存在、不屬於這位買家或不屬於這張需求回 NOT_FOUND。
 func (s Service) List(ctx context.Context, in ListInput) (model.SellerResponsePage, error) {
@@ -70,8 +70,8 @@ func (s Service) List(ctx context.Context, in ListInput) (model.SellerResponsePa
 		if !ok {
 			return model.SellerResponsePage{}, apperr.InvalidInputOn([]string{"page_token"}, "page_token 不是有效的分頁 token")
 		}
-		after, id := time.UnixMicro(t.SubmittedAt).UTC(), t.ID
-		params.AfterSubmittedAt, params.AfterID = &after, &id
+		after, id := time.UnixMicro(t.CreatedAt).UTC(), t.ID
+		params.AfterCreatedAt, params.AfterID = &after, &id
 	}
 	var out model.SellerResponsePage
 	err := s.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
@@ -129,7 +129,7 @@ func (s Service) List(ctx context.Context, in ListInput) (model.SellerResponsePa
 		}
 		if more {
 			last := rows[len(rows)-1]
-			out.NextPageToken = encodeToken(last.ProcurementSellerResponseVersion.SubmittedAt, last.ProcurementSellerResponse.ID)
+			out.NextPageToken = encodeToken(last.ProcurementSellerResponse.CreatedAt, last.ProcurementSellerResponse.ID)
 		}
 		return nil
 	})

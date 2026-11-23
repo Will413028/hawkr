@@ -32,14 +32,16 @@ func TestListShowsEachSellersCurrentVersionWithStatusAcceptabilityAndRange(t *te
 	closed := f.respond(f.publication, 15, version{goods: 400})
 	f.exec(`UPDATE procurement.seller_responses SET write_closed_at = $2, write_closed_reason = 'DECLINED' WHERE id = $1`, closed, start)
 	low := f.respond(f.publication, 16, version{goods: 299})
-	otherBasis := f.respond(f.publication, 17, version{goods: 1, unitBasis: "2", quantity: "4"})
+	otherUnit := f.respond(f.publication, 17, version{goods: 1, unit: "G", quantity: "4"})
+	fractional := f.respond(f.publication, 19, version{goods: 250, quantity: "2.5"}) // 2.5 KG × 100~200 = 250~500：不是整數倍也比較
+	fractionalLow := f.respond(f.publication, 20, version{goods: 249, quantity: "2.5"})
 	noVersions := uuid.NewV7() // 還沒送出任何版本的回價身分列不列
 	f.exec(`INSERT INTO procurement.seller_responses (id, publication_id, request_id, store_id, created_at, updated_at) VALUES ($1, $2, $3, 18, $4, $4)`, noVersions, f.publication, f.request, start)
 
 	page, err := f.service().List(t.Context(), f.listIn())
 	must(t, err)
-	if page.NextPageToken != "" || len(page.Responses) != 7 {
-		t.Fatalf("要 7 筆（沒有版本的不列）且沒有下一頁：%d %q", len(page.Responses), page.NextPageToken)
+	if page.NextPageToken != "" || len(page.Responses) != 9 {
+		t.Fatalf("要 9 筆（沒有版本的不列）且沒有下一頁：%d %q", len(page.Responses), page.NextPageToken)
 	}
 	got := byID(page.Responses)
 	for name, c := range map[string]struct {
@@ -49,13 +51,15 @@ func TestListShowsEachSellersCurrentVersionWithStatusAcceptabilityAndRange(t *te
 		acceptability string
 		outside       bool
 	}{
-		"進行中":    {active, 1, model.ResponseActive, model.AcceptabilityAcceptable, false},
-		"過期":     {expired, 1, model.ResponseExpired, model.AcceptabilityExpired, false},
-		"撤回":     {withdrawn, 1, model.ResponseWithdrawn, model.AcceptabilityWithdrawn, false},
-		"只列目前版本": {superseded, 2, model.ResponseActive, model.AcceptabilityAcceptable, true},
-		"賣家停止寫入": {closed, 1, model.ResponseActive, model.AcceptabilityIneligible, false},
-		"低於區間":   {low, 1, model.ResponseActive, model.AcceptabilityAcceptable, true},
-		"計價基準不同": {otherBasis, 1, model.ResponseActive, model.AcceptabilityAcceptable, false},
+		"進行中":     {active, 1, model.ResponseActive, model.AcceptabilityAcceptable, false},
+		"過期":      {expired, 1, model.ResponseExpired, model.AcceptabilityExpired, false},
+		"撤回":      {withdrawn, 1, model.ResponseWithdrawn, model.AcceptabilityWithdrawn, false},
+		"只列目前版本":  {superseded, 2, model.ResponseActive, model.AcceptabilityAcceptable, true},
+		"賣家停止寫入":  {closed, 1, model.ResponseActive, model.AcceptabilityIneligible, false},
+		"低於區間":    {low, 1, model.ResponseActive, model.AcceptabilityAcceptable, true},
+		"報價單位不同":  {otherUnit, 1, model.ResponseActive, model.AcceptabilityAcceptable, false},
+		"小數數量區間內": {fractional, 1, model.ResponseActive, model.AcceptabilityAcceptable, false},
+		"小數數量低於":  {fractionalLow, 1, model.ResponseActive, model.AcceptabilityAcceptable, true},
 	} {
 		r, ok := got[c.id]
 		if !ok {
@@ -102,9 +106,8 @@ func TestListMarksTheShortlistOnlyOnTheVersionThatIsInIt(t *testing.T) {
 	}
 }
 
-func TestListPaginatesBySubmitTimeThenIDWithoutDuplicatesOrGaps(t *testing.T) {
+func TestListPaginatesByIdentityCreationTimeThenIDWithoutDuplicatesOrGaps(t *testing.T) {
 	f := newFixture(t)
-	var want []uuid.UUID
 	type row struct {
 		id uuid.UUID
 		at time.Time
@@ -112,15 +115,16 @@ func TestListPaginatesBySubmitTimeThenIDWithoutDuplicatesOrGaps(t *testing.T) {
 	var rows []row
 	for i := range 7 {
 		at := start.Add(time.Duration(i/2) * time.Minute) // 兩兩同時間，靠回價 ID 排序
-		id := f.respond(f.publication, int64(100+i), version{goods: 400, submitted: at})
+		id := f.respondAt(at, f.publication, int64(100+i), version{goods: 400})
 		rows = append(rows, row{id, at})
 	}
 	slices.SortFunc(rows, func(a, b row) int {
 		if c := b.at.Compare(a.at); c != 0 {
 			return c
 		}
-		return a.id.Compare(b.id)
+		return b.id.Compare(a.id)
 	})
+	var want []uuid.UUID
 	for _, r := range rows {
 		want = append(want, r.id)
 	}
@@ -141,7 +145,39 @@ func TestListPaginatesBySubmitTimeThenIDWithoutDuplicatesOrGaps(t *testing.T) {
 		in.PageToken = page.NextPageToken
 	}
 	if !slices.Equal(got, want) || pages != 3 {
-		t.Fatalf("翻頁（%d 頁）要依 (送出時間 DESC, ID) 不漏不重：\n得到 %v\n要   %v", pages, got, want)
+		t.Fatalf("翻頁（%d 頁）要依 (建立時間 DESC, ID DESC) 不漏不重：\n得到 %v\n要   %v", pages, got, want)
+	}
+}
+
+func TestListPaginationSurvivesASellerRevisingBetweenPages(t *testing.T) {
+	f := newFixture(t)
+	var ids []uuid.UUID
+	for i := range 4 {
+		ids = append(ids, f.respondAt(start.Add(time.Duration(i)*time.Minute), f.publication, int64(100+i), version{goods: 400}))
+	}
+	// 回價依建立時間由新到舊：ids[3]、ids[2]、ids[1]、ids[0]。
+	in := f.listIn()
+	in.PageSize = 2
+	first, err := f.service().List(t.Context(), in)
+	must(t, err)
+	if len(first.Responses) != 2 || first.Responses[0].ID != ids[3] || first.Responses[1].ID != ids[2] || first.NextPageToken == "" {
+		t.Fatalf("第一頁 = %+v", first.Responses)
+	}
+	// 第二頁還沒取之前，後面那一則回價改版，新版本的送出時間晚於其他所有版本。
+	f.exec(`UPDATE procurement.seller_responses SET latest_version = 2 WHERE id = $1`, ids[0])
+	f.exec(`INSERT INTO procurement.seller_response_versions (
+			id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit,
+			offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
+			valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
+		SELECT $2, seller_response_id, 2, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit,
+			offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
+			valid_until, outside_buyer_requested_range, publication_version, $3, $4, $4
+		FROM procurement.seller_response_versions WHERE seller_response_id = $1 AND version = 1`, ids[0], uuid.NewV7(), uuid.NewV7(), start.Add(time.Hour))
+	in.PageToken = first.NextPageToken
+	second, err := f.service().List(t.Context(), in)
+	must(t, err)
+	if len(second.Responses) != 2 || second.Responses[0].ID != ids[1] || second.Responses[1].ID != ids[0] || second.Responses[1].Version != 2 || second.NextPageToken != "" {
+		t.Fatalf("改版的那一則仍要在第二頁（版本 2）：%+v", second.Responses)
 	}
 }
 

@@ -1,5 +1,5 @@
-// Package quote 是買家對賣家回價的使用：列出一次發布收到的回價（每位賣家的目前版本）、入圍清單、接受報價（A9-3b-3d）。
-// 回價的寫入者（賣家送出、撤回、婉拒）在 A9-3c；這裡只讀回價列，接受報價只寫接受單並在同一個 transaction 排入建單的 job，建單本身（job 的 worker 與 ordering 呼叫）在 A9-3c（A9-D31 Q10）。
+// Package quote 是買家對賣家回價的使用：列出一次發布收到的回價（每位賣家的目前版本）、入圍清單、接受報價。
+// 這裡只讀回價列（寫入回價的是賣家端的 use case）；接受報價只寫接受單並在同一個 transaction 排入建單的 job，job 的 worker 與 ordering 呼叫不在這個套件（A9-D31 Q10）。
 // 狀態與可否接受都由列推導（版本只 INSERT、沒有 status 欄），outside_buyer_requested_range 對發布核准凍結的單價區間現算（A9-D35(2)）。
 // 版本衝突的 conflictTarget：seller_response（買家手上那一版已不是目前、可接受的那一版）、publication（買家畫面上的詢價內容與賣家報價時依據的那份不同）。
 package quote
@@ -42,7 +42,7 @@ type Service struct {
 }
 
 // OrderProvisioningArgs 是接受報價之後建立待付款訂單的 job：每筆接受單恰好一個 job，在寫入接受單的同一個 transaction 排入。
-// 接受單的寫入（冪等鍵與 live 鎖的唯一索引）就是排入的閘門，重送走回放、不再排入，所以不設 job 層的唯一鍵；worker 與 ordering 呼叫在 A9-3c。
+// 接受單的寫入（冪等鍵與 live 鎖的唯一索引）就是排入的閘門，重送走回放、不再排入，所以不設 job 層的唯一鍵；worker 與 ordering 呼叫不在這個套件。
 type OrderProvisioningArgs struct {
 	AcceptanceID uuid.UUID `json:"acceptanceId"`
 }
@@ -88,19 +88,24 @@ func Acceptability(status string, writeClosed, requestHasLiveAcceptance bool) st
 	return model.AcceptabilityAcceptable
 }
 
-// OutsideRange 回傳報價是否超出買家預期的單價區間：區間是每 basisQuantity 個 basisUnit 的貨款單價，報價的計價基準與區間相同、
-// 報價數量是計價基準的整數倍時，貨款（不含運費與稅）與放大到報價數量的區間比；基準不同、數量不是整數倍或讀不出數字時回 false（不能比較，不標示）。
+// OutsideRange 回傳報價是否超出買家預期的單價區間：區間是每 basisQuantity 個 basisUnit 的貨款單價；報價數量的單位與 basisUnit 相同時，
+// 區間依報價數量等比放大（bound × 報價數量 ÷ basisQuantity，四捨五入到元，與 rfq.Total 同規則），貨款（不含運費與稅）超出放大後的區間就是 true。
+// 報價數量可以不是基準的整數倍。單位不同（換算說明 conversion_basis 是自由文字，讀不出換算）、數量不是正的有限數時回 false（不能比較，不標示）。
 func OutsideRange(lower, upper int64, basisQuantity int32, basisUnit string, v store.ProcurementSellerResponseVersion) bool {
-	unitBasis, ok1 := milli(v.UnitBasisQuantity)
-	offered, ok2 := milli(v.OfferedQuantity)
-	if !ok1 || !ok2 || basisQuantity <= 0 || v.UnitBasisUnit != basisUnit || unitBasis != int64(basisQuantity)*1000 || offered <= 0 || offered%unitBasis != 0 {
+	offered, ok := milli(v.OfferedQuantity)
+	if !ok || basisQuantity <= 0 || offered <= 0 || v.OfferedQuantityUnit != basisUnit {
 		return false
 	}
-	multiple := big.NewInt(offered / unitBasis)
+	basis := big.NewInt(int64(basisQuantity) * 1000)
 	goods := big.NewInt(v.GoodsAmount)
-	lo := new(big.Int).Mul(big.NewInt(lower), multiple)
-	hi := new(big.Int).Mul(big.NewInt(upper), multiple)
-	return goods.Cmp(lo) < 0 || goods.Cmp(hi) > 0
+	return goods.Cmp(scaleBound(lower, offered, basis)) < 0 || goods.Cmp(scaleBound(upper, offered, basis)) > 0
+}
+
+// scaleBound 回傳 bound × offered ÷ basis 四捨五入到整數（offered 與 basis 同為千分位整數）。
+func scaleBound(bound, offered int64, basis *big.Int) *big.Int {
+	product := new(big.Int).Mul(big.NewInt(bound), big.NewInt(offered))
+	product.Add(product, new(big.Int).Div(basis, big.NewInt(2)))
+	return product.Quo(product, basis)
 }
 
 // milli 把 NUMERIC(14, 3) 讀回的值換成千分位整數（3 -> 3000）；不是有限的數或不是整千分位時 ok 為 false。

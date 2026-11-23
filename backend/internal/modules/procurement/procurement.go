@@ -533,7 +533,7 @@ func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublica
 	return m.rfq.ExecutePublication(ctx, in)
 }
 
-// 買家對賣家回價的使用（A9-3b-3d）。
+// 買家對賣家回價的使用的型別。
 type (
 	// SellerResponse 是買家看到的一份賣家回價（目前版本），SellerQuote 是它的報價內容，SellerResponsePage 是 ListSellerResponses 的一頁。
 	SellerResponse     = model.BuyerSellerResponse
@@ -545,7 +545,7 @@ type (
 	// ListSellerResponsesInput 與 AcceptSellerQuoteInput 是這兩支方法的輸入。
 	ListSellerResponsesInput = quote.ListInput
 	AcceptSellerQuoteInput   = quote.AcceptInput
-	// OrderProvisioningArgs 是接受報價之後建單的 River job 的參數；worker 在 A9-3c。
+	// OrderProvisioningArgs 是接受報價之後建單的 River job 的參數；這個套件只排入，不註冊 worker。
 	OrderProvisioningArgs = quote.OrderProvisioningArgs
 )
 
@@ -587,7 +587,7 @@ func (m *Module) DeleteShortlistEntry(ctx context.Context, buyerID int64, reques
 	return m.quotes.DeleteShortlist(ctx, buyerID, requestID, sellerResponseID, version)
 }
 
-// AcceptSellerQuote 接受回價的指定版本、凍結成交價，並在同一個 transaction 排入建單的 job（OrderProvisioningArgs，worker 與 ordering 呼叫在 A9-3c）。
+// AcceptSellerQuote 接受回價的指定版本、凍結成交價，並在同一個 transaction 排入建單的 job（OrderProvisioningArgs，這個套件只排入，不註冊 worker）。
 // 錯誤與冪等重送見 quote.Service.Accept：不屬於本人 NOT_FOUND；改版或撤回 ABORTED／VERSION_CONFLICT（seller_response）；賣家已停止寫入 RFQ_RECIPIENT_CLOSED；已過有效期限 RFQ_RESPONSE_EXPIRED；
 // hash 不符 ABORTED／VERSION_CONFLICT（publication）；已有進行中的成交 RFQ_CHECKOUT_ALREADY_ACTIVE（metadata 的 orderNo）；重送內容不同 INVALID_ARGUMENT（client_request_id）。
 func (m *Module) AcceptSellerQuote(ctx context.Context, in AcceptSellerQuoteInput) (QuoteAcceptance, error) {

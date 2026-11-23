@@ -123,12 +123,13 @@ func (f *fixture) publish() (uuid.UUID, string) {
 	return pub.ID, pub.SellerFacingHash
 }
 
-// version 是賣家回價的一個版本（測試直接寫表，寫入者在 A9-3c）。
+// version 是賣家回價的一個版本（測試直接寫表）。
 type version struct {
 	goods      int64
 	validUntil time.Time
 	submitted  time.Time
 	quantity   string
+	unit       string // 報價數量的單位，預設 KG
 	unitBasis  string
 }
 
@@ -139,12 +140,21 @@ func (f *fixture) service() quote.Service {
 // respond 為一家店在發布上建回價，依序寫入版本（版本號從 1 起），latest_version 是最後一個。
 func (f *fixture) respond(publication uuid.UUID, storeID int64, versions ...version) uuid.UUID {
 	f.t.Helper()
+	return f.respondAt(start, publication, storeID, versions...)
+}
+
+// respondAt 同 respond，回價身分列的建立時間是 created。
+func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID int64, versions ...version) uuid.UUID {
+	f.t.Helper()
 	ctx := context.Background()
 	id := uuid.NewV7()
-	must(f.t, store.New(f.d.Conn(ctx)).InsertSellerResponse(ctx, store.InsertSellerResponseParams{ID: id, PublicationID: publication, RequestID: f.request, StoreID: storeID, Now: start}))
+	must(f.t, store.New(f.d.Conn(ctx)).InsertSellerResponse(ctx, store.InsertSellerResponseParams{ID: id, PublicationID: publication, RequestID: f.request, StoreID: storeID, Now: created}))
 	for i, v := range versions {
 		if v.quantity == "" {
 			v.quantity = "3"
+		}
+		if v.unit == "" {
+			v.unit = "KG"
 		}
 		if v.unitBasis == "" {
 			v.unitBasis = "1"
@@ -159,8 +169,8 @@ func (f *fixture) respond(publication uuid.UUID, storeID int64, versions ...vers
 				id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit,
 				offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
 				valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', 'A', '', $4::text::numeric, 'KG', $5::text::numeric, 'KG', '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
-			uuid.NewV7(), id, int32(i+1), v.unitBasis, v.quantity, v.goods, v.goods+15, v.validUntil, uuid.NewV7(), v.submitted)
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', 'A', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
+			uuid.NewV7(), id, int32(i+1), v.unitBasis, v.quantity, v.goods, v.goods+15, v.validUntil, uuid.NewV7(), v.submitted, v.unit)
 	}
 	f.exec(`UPDATE procurement.seller_responses SET latest_version = $2 WHERE id = $1`, id, int32(len(versions)))
 	return id

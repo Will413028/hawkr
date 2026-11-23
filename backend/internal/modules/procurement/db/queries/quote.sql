@@ -1,7 +1,7 @@
 -- name: ListCurrentSellerResponses :many
--- 一次發布收到的賣家回價，每位賣家只列目前版本（latest_version > 0），依目前版本的送出時間由新到舊、同時間依回價 ID 由小到大（keyset (submitted_at DESC, id ASC)）。
+-- 一次發布收到的賣家回價，每位賣家只列目前版本（latest_version > 0），依回價身分列的建立時間由新到舊、同時間依回價 ID 由大到小（keyset (created_at DESC, id DESC)；身分列不可變，賣家改版不會讓列換位置）。
 -- 回價身分列沒有 buyer_id，擁有者由發布推出（p.buyer_id）：不是這位買家的發布、或發布不屬於這張需求，一列都不回。
--- 游標是上一頁最後一列的 (submitted_at, id)；沒有游標時 after_id 為 NULL。shortlisted 只在入圍清單掛的就是這個版本時為 true。
+-- 游標是上一頁最後一列的 (created_at, id)；沒有游標時 after_id 為 NULL。shortlisted 只在入圍清單掛的就是這個版本時為 true。
 SELECT sqlc.embed(r), sqlc.embed(v), (s.id IS NOT NULL)::boolean AS shortlisted
 FROM procurement.seller_responses r
 JOIN procurement.rfq_publications p ON p.id = r.publication_id
@@ -9,9 +9,9 @@ JOIN procurement.seller_response_versions v ON v.seller_response_id = r.id AND v
 LEFT JOIN procurement.buyer_shortlist_entries s ON s.seller_response_id = r.id AND s.request_id = r.request_id AND s.seller_response_version = v.version
 WHERE r.request_id = @request_id AND r.publication_id = @publication_id AND p.buyer_id = @buyer_id AND r.latest_version > 0
   AND (sqlc.narg('after_id')::uuid IS NULL
-       OR v.submitted_at < sqlc.narg('after_submitted_at')::timestamptz
-       OR (v.submitted_at = sqlc.narg('after_submitted_at')::timestamptz AND r.id > sqlc.narg('after_id')::uuid))
-ORDER BY v.submitted_at DESC, r.id ASC
+       OR r.created_at < sqlc.narg('after_created_at')::timestamptz
+       OR (r.created_at = sqlc.narg('after_created_at')::timestamptz AND r.id < sqlc.narg('after_id')::uuid))
+ORDER BY r.created_at DESC, r.id DESC
 LIMIT @page_size;
 
 -- name: GetSellerResponseForBuyer :one
@@ -37,8 +37,8 @@ VALUES (@id, @request_id, @seller_response_id, @seller_response_version, @now, @
 ON CONFLICT (request_id, seller_response_id) DO UPDATE SET seller_response_version = EXCLUDED.seller_response_version, updated_at = EXCLUDED.updated_at
 RETURNING *;
 
--- name: DeleteShortlistEntry :execrows
--- 目標狀態的方法：不在清單時刪 0 列，結果相同。
-DELETE FROM procurement.buyer_shortlist_entries e
-WHERE e.request_id = @request_id AND e.seller_response_id = @seller_response_id
-  AND EXISTS (SELECT 1 FROM procurement.requests q WHERE q.id = e.request_id AND q.buyer_id = @buyer_id);
+-- name: DeleteShortlistEntry :one
+-- 目標狀態的方法：不在清單時沒有列回來，結果相同。擁有者由呼叫端先以 GetRequestForBuyer 確認。
+DELETE FROM procurement.buyer_shortlist_entries
+WHERE request_id = @request_id AND seller_response_id = @seller_response_id
+RETURNING seller_response_version;

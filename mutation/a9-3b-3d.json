@@ -84,11 +84,11 @@
     {
       "id": "list-query-drops-owner",
       "stack": "go-integration",
-      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
-      "old": "WHERE r.request_id = $1 AND r.publication_id = $2 AND p.buyer_id = $3 AND r.latest_version > 0",
-      "new": "WHERE r.request_id = $1 AND r.publication_id = $2 AND ($3::bigint IS NULL OR true) AND r.latest_version > 0",
-      "test": "internal/modules/procurement/internal/quote ^TestListQueryReturnsNothingForAnotherBuyerOrRequest$",
-      "why": "The list query no longer restricts to the buyer's own publication."
+      "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+      "old": "FROM procurement.rfq_publications WHERE id = $1 AND buyer_id = $2\n`\n\ntype GetPublicationParams",
+      "new": "FROM procurement.rfq_publications WHERE id = $1 AND ($2::bigint IS NULL OR true)\n`\n\ntype GetPublicationParams",
+      "test": "internal/modules/procurement/internal/quote ^TestListOnlyShowsTheRequestedPublicationOfTheBuyersOwnRequest$",
+      "why": "List loads another buyer's publication; the next owner-scoped read fails instead of returning NOT_FOUND."
     },
     {
       "id": "list-query-drops-keyset",
@@ -96,7 +96,7 @@
       "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
       "old": "  AND ($4::uuid IS NULL\n",
       "new": "  AND (true OR $4::uuid IS NULL\n",
-      "test": "internal/modules/procurement/internal/quote ^TestListPaginatesBySubmitTimeThenIDWithoutDuplicatesOrGaps$",
+      "test": "internal/modules/procurement/internal/quote ^TestListPaginatesByIdentityCreationTimeThenIDWithoutDuplicatesOrGaps$",
       "why": "Every page returns the first rows again: the keyset condition is gone."
     },
     {
@@ -129,11 +129,11 @@
     {
       "id": "shortlist-delete-drops-owner",
       "stack": "go-integration",
-      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
-      "old": "AND EXISTS (SELECT 1 FROM procurement.requests q WHERE q.id = e.request_id AND q.buyer_id = $3)",
-      "new": "AND EXISTS (SELECT 1 FROM procurement.requests q WHERE q.id = e.request_id AND ($3::bigint IS NULL OR true))",
+      "file": "backend/internal/modules/procurement/internal/store/requests.sql.go",
+      "old": "FROM procurement.requests WHERE id = $1 AND buyer_id = $2\n`\n\ntype GetRequestForBuyerParams",
+      "new": "FROM procurement.requests WHERE id = $1 AND ($2::bigint IS NULL OR true)\n`\n\ntype GetRequestForBuyerParams",
       "test": "internal/modules/procurement/internal/quote ^TestDeleteShortlistOnlyTouchesTheBuyersOwnRequest$",
-      "why": "The delete query removes entries of another buyer's request."
+      "why": "DeleteShortlist no longer checks that the request belongs to the buyer, so it removes another buyer's entry."
     },
     {
       "id": "version-status-ignores-withdrawn",
@@ -157,8 +157,8 @@
       "id": "outside-range-ignores-upper-bound",
       "stack": "go",
       "file": "backend/internal/modules/procurement/internal/quote/quote.go",
-      "old": "return goods.Cmp(lo) < 0 || goods.Cmp(hi) > 0",
-      "new": "return goods.Cmp(lo) < 0",
+      "old": "return goods.Cmp(scaleBound(lower, offered, basis)) < 0 || goods.Cmp(scaleBound(upper, offered, basis)) > 0",
+      "new": "return goods.Cmp(scaleBound(lower, offered, basis)) < 0",
       "test": "internal/modules/procurement/internal/quote ^TestOutsideRange$",
       "why": "A quote above the buyer's range is not flagged."
     },
@@ -179,6 +179,42 @@
       "new": "ValidUntil: in.ValidUntil.Format(time.RFC3339Nano),",
       "test": "internal/modules/procurement/internal/rfqhash ^TestSellerResponseHashIgnoresTheTimeZoneOfTheInstant$",
       "why": "The payload hash depends on the time zone of valid_until."
+    },
+    {
+      "id": "list-order-by-current-version-submit-time",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/quote.sql.go",
+      "old": "ORDER BY r.created_at DESC, r.id DESC\nLIMIT $6",
+      "new": "ORDER BY v.submitted_at DESC, r.id DESC\nLIMIT $6",
+      "test": "internal/modules/procurement/internal/quote ^TestListPaginationSurvivesASellerRevisingBetweenPages$",
+      "why": "Ordering by the mutable current version's submit time lets a revision move a row across the page boundary."
+    },
+    {
+      "id": "shortlist-delete-reports-request-version",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/shortlist.go",
+      "old": "out.Version = removed",
+      "new": "_ = removed",
+      "test": "internal/modules/procurement/internal/quote ^TestDeleteShortlistIsIdempotentAndReportsAbsence$",
+      "why": "Delete echoes the request's version instead of the version of the removed entry."
+    },
+    {
+      "id": "outside-range-ignores-offered-unit",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": " || v.OfferedQuantityUnit != basisUnit {",
+      "new": " {",
+      "test": "internal/modules/procurement/internal/quote ^TestOutsideRange$",
+      "why": "A quote in a different unit than the request basis is compared against the range."
+    },
+    {
+      "id": "outside-range-scale-ignores-quantity",
+      "stack": "go",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": "product := new(big.Int).Mul(big.NewInt(bound), big.NewInt(offered))",
+      "new": "product := new(big.Int).Mul(big.NewInt(bound), basis)",
+      "test": "internal/modules/procurement/internal/quote ^TestOutsideRange$",
+      "why": "The range is not scaled to the offered quantity."
     }
   ]
 }
