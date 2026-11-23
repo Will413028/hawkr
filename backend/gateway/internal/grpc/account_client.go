@@ -50,14 +50,6 @@ func (c *AccountClient) Close() error {
 	return nil
 }
 
-// GetAccountByPhone retrieves account info by phone number.
-func (c *AccountClient) GetAccountByPhone(ctx context.Context, phone string) (*pb.AccountInfoResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	return c.client.GetAccountByPhone(ctx, &pb.GetAccountByPhoneRequest{Phone: phone})
-}
-
 // GetCurrentDelegationSession resolves an operation credential into its session
 // snapshot (56 §6.1.0 / §6.2.4a).
 //

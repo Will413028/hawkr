@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "type-switch-keeps-document-refs",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/kyc/kyc.go",
+   "old": "markDeleted(ctx, s.d.Media, retired)",
+   "new": "markDeleted(ctx, s.d.Media, nil)",
+   "test": "internal/modules/seller ^TestKYCSwitchingToIndividualRetiresTheCompanyDocuments$",
+   "why": "存檔寫入不把被清掉或換掉的公司文件標為刪除，換成個人之後資產仍是 ACTIVE"
+  },
+  {
+   "id": "cancel-keeps-document-refs",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/kyc/documents.go",
+   "old": "return markDeleted(ctx, m, assetIDs(docs))\n}",
+   "new": "return markDeleted(ctx, m, nil)\n}",
+   "test": "internal/modules/seller ^TestKYCDocumentsAreConfirmedWithTheApplicationAndReplacedOnesMarkedDeleted$",
+   "why": "申請取消不把全部公司文件標為刪除，取消後資產仍是 ACTIVE"
+  }
+ ]
+}

@@ -111,7 +111,7 @@ func (s *Service) Apply(ctx context.Context, in model.ApplyInput) (model.Store, 
 			return err
 		}
 		if err := s.d.Identity.GrantRole(ctx, identity.GrantRoleInput{
-			AccountID: in.AccountID, Role: identity.RoleSeller, SourceID: &created.StoreID,
+			AccountID: in.AccountID, Role: identity.RoleSeller,
 		}); err != nil {
 			return err
 		}

@@ -1,0 +1,6 @@
+/* 權限說明：內容與 Info.plist 的預設值相同。 */
+"NSCameraUsageDescription" = "We need camera access to let merchants capture and send photos to customers.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Allow Hawkr to access your location to show your position on the map.";
+"NSLocationWhenInUseUsageDescription" = "Allow Hawkr to access your location to show your position on the map.";
+"NSPhotoLibraryAddUsageDescription" = "We need photo library access to save and upload ID card photos for verification.";
+"NSPhotoLibraryUsageDescription" = "We need photo access to let merchants send order-related pictures to customers.";

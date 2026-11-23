@@ -23,10 +23,10 @@ type Config struct {
 	OrderServicePort       string `env:"ORDER_SERVICE_GRPC_PORT" default:"9915"`
 	ProductServiceHost     string `env:"PRODUCT_SERVICE_HOST" default:"127.0.0.1"`
 	ProductServicePort     string `env:"PRODUCT_SERVICE_GRPC_PORT" default:"9913"`
-	SellerServiceHost      string `env:"SELLER_SERVICE_HOST" default:"127.0.0.1"`
-	SellerServicePort      string `env:"SELLER_SERVICE_GRPC_PORT" default:"9941"`
-	BuyerServiceHost       string `env:"BUYER_SERVICE_HOST" default:"127.0.0.1"`
-	BuyerServicePort       string `env:"BUYER_SERVICE_GRPC_PORT" default:"9941"`
+	SellerServiceHost      string `env:"LEGACY_SELLER_GRPC_HOST" default:"127.0.0.1"`
+	SellerServicePort      string `env:"LEGACY_SELLER_GRPC_PORT" default:"9941"`
+	BuyerServiceHost       string `env:"LEGACY_BUYER_GRPC_HOST" default:"127.0.0.1"`
+	BuyerServicePort       string `env:"LEGACY_BUYER_GRPC_PORT" default:"9941"`
 	MediaServiceHost       string `env:"MEDIA_SERVICE_HOST" default:"127.0.0.1"`
 	MediaServicePort       string `env:"MEDIA_SERVICE_GRPC_PORT" default:"9937"`
 

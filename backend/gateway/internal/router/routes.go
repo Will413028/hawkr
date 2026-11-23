@@ -43,14 +43,12 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	adminNoAuth.Use(middleware.StripDelegationReservedHeaders())
 
 	// 負責微服務路由（payment, media, product, order, cart）
-	pubProducts := registerProductRoutes(public, app, admin, h)
-	registerReviewRoutes(pubProducts, app, h)
+	registerProductRoutes(public, app, admin, h)
 	registerPaymentRoutes(app, admin, h)
 	registerOrderRoutes(app, admin, h)
 	registerCheckoutRoutes(app, h)
 	registerCartRoutes(public, app, h)
 	registerShippingRoutes(app, admin, h)
-	registerLogisticsFinanceRoutes(app, admin, h)
 
 	// PayUni Webhook（頂層路由，外部回調無需 JWT）
 	registerPayUniWebhookRoute(r)
@@ -70,16 +68,13 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerBuyerRoutes(public, app, h)
 	registerCouponRoutes(app, admin, h)
 	registerAfterSalesRoutes(app, r, h)
-	registerChatRoutes(app, h)
 	registerAdminNonManagedRoutes(app, admin, h)
-	registerCRMRoutes(app, h)
 	registerAIRoutes(app, admin, h)
 	registerProcurementQuoteRoutes(app, h)
 	registerVendorPortalRoutes(public, h)
 	registerShareRoutes(app, h)
 	registerNotificationRoutes(app, h)
 	registerAdminNotificationTemplateRoutes(admin, h)
-	registerAddressRoutes(app, h)
 	registerDevRoutes(public, h)
 
 	// ADM 代行營運（56 號）：14 支走 ADM session、18 支走 operation credential。

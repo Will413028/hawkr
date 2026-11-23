@@ -1,0 +1,211 @@
+{
+ "mutants": [
+  {
+   "id": "toggle-set-identity-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/select.go",
+   "old": "return req.Status == statusMatching && latest != nil && *latest == setID, nil",
+   "new": "return req.Status == statusMatching && latest != nil, nil",
+   "test": "internal/modules/procurement/internal/search ^TestToggleSelectionOnASupersededSetIsAbortedAfterAReSearchSucceeds$",
+   "why": "不再比對候選集是不是最新成功搜尋的那一個：重搜之後還能勾舊候選集"
+  },
+  {
+   "id": "toggle-matching-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/select.go",
+   "old": "return req.Status == statusMatching && latest != nil && *latest == setID, nil",
+   "new": "return latest != nil && *latest == setID, nil",
+   "test": "internal/modules/procurement/internal/search ^TestToggleSelectionIsAbortedOnceTheRequestLeavesMatching$",
+   "why": "不再要求需求在 MATCHING：離開 MATCHING 之後還能勾選"
+  },
+  {
+   "id": "toggle-unsucceeded-set-accepted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/search/select.go",
+   "old": "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn false, nil\n\t}",
+   "new": "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn req.Status == statusMatching, nil\n\t}",
+   "test": "internal/modules/procurement/internal/search ^TestToggleSelectionOnASetWhoseSearchHasNotSucceededIsAborted$",
+   "why": "沒有成功過的搜尋也算有效：搜尋中的候選集被勾選"
+  },
+  {
+   "id": "answer-expected-revision-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "if !hasActive || active.ID != c.expected {",
+   "new": "if !hasActive {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerStaleExpectedRevisionIsAbortedWithRequestRevisionTarget$",
+   "why": "SubmitAnswer 不再比對讀到的版本：過時的回答照樣寫入"
+  },
+  {
+   "id": "rewind-expected-revision-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "if !hasActive || active.ID != c.expected {",
+   "new": "if !hasActive {",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindStaleExpectedRevisionIsAborted$",
+   "why": "Rewind 不再比對讀到的版本：過時的倒回照樣寫入"
+  },
+  {
+   "id": "pending-interrupt-guard-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "BuyerID: c.buyer}); err == nil {\n\t\treturn none(apperr.FailedPrecondition(\"這個需求有待回答的問題",
+   "new": "BuyerID: c.buyer}); err == nil && c.request == (uuid.UUID{}) {\n\t\treturn none(apperr.FailedPrecondition(\"這個需求有待回答的問題",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerAndRewindWithAPendingInterruptAreFailedPreconditionApprovalPending$",
+   "why": "不再擋待回覆的中斷：中斷還在時回答或倒回照樣寫入"
+  },
+  {
+   "id": "in-progress-run-guard-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "BuyerID: c.buyer}); err == nil {\n\t\treturn none(apperr.FailedPrecondition(\"這個需求已有進行中的 run\")",
+   "new": "BuyerID: c.buyer}); err == nil && c.request == (uuid.UUID{}) {\n\t\treturn none(apperr.FailedPrecondition(\"這個需求已有進行中的 run\")",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerAndRewindWhileARunIsInProgressAreRefused$",
+   "why": "不再擋進行中的 run：run 還在跑時回答或倒回照樣寫入"
+  },
+  {
+   "id": "answer-replay-not-served-from-stored-result",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.TurnResult, true, nil",
+   "new": "return nil, false, nil",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerReplayReturnsTheStoredResultByteForByteEvenAfterTheStateMoved$",
+   "why": "重送不再回放存下的 turn_result：重算（這裡是版本過時）而不是回第一次的結果"
+  },
+  {
+   "id": "rewind-replay-not-served-from-stored-result",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.TurnResult, true, nil",
+   "new": "return nil, false, nil",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindReplayReturnsTheStoredResultAndDetectsADifferentSlot$",
+   "why": "倒回重送不再回放存下的 turn_result"
+  },
+  {
+   "id": "replay-message-comparison-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": " || t.BuyerMessage != k.message {",
+   "new": " {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerReplayWithDifferentContentOrRequestIsInvalidArgument$",
+   "why": "重送不比對回答內容：同一個鍵換一個選項也被當成重送"
+  },
+  {
+   "id": "replay-expected-revision-comparison-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "if result.RevisionNo < 2 || !hasRevision(revs, result.RevisionNo-1, k.expected) {",
+   "new": "if result.RevisionNo < 2 || !hasRevision(revs, result.RevisionNo-1, result.ID) && k.expected == (uuid.UUID{}) {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerReplayWithDifferentContentOrRequestIsInvalidArgument$",
+   "why": "重送不比對讀到的版本：同一個鍵換一個讀到的版本也被當成重送"
+  },
+  {
+   "id": "item-answer-accepts-several-matches",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "if len(cands) != 1 {",
+   "new": "if len(cands) == 0 {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerItemTextNeedsExactlyOneLeafCategory$",
+   "why": "ITEM 文字對到多個分類也收下第一個：SubmitAnswer 替買家選了品項"
+  },
+  {
+   "id": "skip-guard-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/direct_answer.go",
+   "old": "case in.Skip && !card.CanSkip:",
+   "new": "case in.Skip && card == nil:",
+   "test": "internal/modules/procurement/internal/turn ^TestPlanAnswerChecksTheShapeAndNamesTheFields$",
+   "why": "必填欄位也能略過"
+  },
+  {
+   "id": "matching-not-regressed-when-item-resolution-changes",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "var searchAffectingFields = []model.SlotKey{slots.ItemResolution}",
+   "new": "var searchAffectingFields = []model.SlotKey{}",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindDecisionRegressesMatchingOnlyWhenTheItemResolutionChanges$",
+   "why": "品項解析變了不再把 MATCHING 退回：倒回品項之後仍停在 MATCHING"
+  },
+  {
+   "id": "rewind-status-ignores-the-resolution-change",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/compute.go",
+   "old": "d.status = nextStatus(prior.requestOf, prior.current, next, next.Ready())",
+   "new": "d.status = nextStatus(prior.requestOf, next, next, next.Ready())",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindItemFromMatchingGoesBackToReadyButRewindingTheCityStaysMatching$",
+   "why": "需求狀態拿目標版比目標版：倒回品項解析之後不退回 MATCHING"
+  },
+  {
+   "id": "rewind-target-is-the-changing-revision-not-its-parent",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/rewind.go",
+   "old": "\t\t\treturn parent, nil\n",
+   "new": "\t\t\treturn cur, nil\n",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindTargetIsTheParentOfTheNearestRevisionThatChangedTheSlot$",
+   "why": "倒回的目標是改動這一格的那一版自己，不是它的祖先：倒回沒有退一步"
+  },
+  {
+   "id": "rewind-ancestor-walk-stops-at-the-first-revision",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/rewind.go",
+   "old": "\t\tcur = parent\n",
+   "new": "\t\tcur = nil\n",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindTargetStepsFurtherBackAfterARewindAndThenRunsOut$",
+   "why": "祖先鏈只看一步：倒回過一次之後再倒回找不到目標"
+  },
+  {
+   "id": "rewind-new-revision-parent-is-the-active-one",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "setFromRevision(*target), slot), target.ID, nil",
+   "new": "setFromRevision(*target), slot), st.active.ID, nil",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindStepsBackAlongTheAncestorChainAndRunsOut$",
+   "why": "倒回的新版本祖先記成被取代的現行版，不是目標版：第二次倒回在兩個值之間來回"
+  },
+  {
+   "id": "answer-replay-slot-comparison-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
+   "new": "return t.CommandSlot != nil && (t.Source == sourceAnswer || *t.CommandSlot == string(k.slot)), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerReplayWithADifferentSlotIsInvalidArgument$",
+   "why": "SubmitAnswer 重送不比對欄位：同一把鍵、同一段文字換欄位也被當成重送"
+  },
+  {
+   "id": "rewind-replay-slot-comparison-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
+   "new": "return t.CommandSlot != nil && (t.Source == sourceRewind || *t.CommandSlot == string(k.slot)), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindReplayReturnsTheStoredResultAndDetectsADifferentSlot$",
+   "why": "倒回重送不比對欄位：同一把鍵換一個欄位也被當成重送"
+  },
+  {
+   "id": "skip-writes-the-empty-value-and-is-rejected",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/direct_answer.go",
+   "old": "\tif p.skip {\n\t\treturn patch, nil\n\t}\n",
+   "new": "\tif p.skip && p.slot == \"\" {\n\t\treturn patch, nil\n\t}\n",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerDecisionSkipIsNotARejectedInput$",
+   "why": "略過又照常寫入空值：PACKAGING 被 slots 以 EMPTY 拒絕，回覆說輸入被拒絕"
+  },
+  {
+   "id": "skipped-slot-not-deduplicated",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/direct_answer.go",
+   "old": "if !slices.Contains(pt.skipped, p.slot) {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerDecisionSkippingTheSameSlotTwiceStoresItOnce$",
+   "why": "同一欄位略過兩次，skipped_slots 出現重複"
+  },
+  {
+   "id": "replay-accepts-a-turn-without-command-slot",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
+   "new": "return t.CommandSlot == nil || *t.CommandSlot == string(k.slot), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestResumeRunAnswerTurnHasNoCommandSlotAndIsNeverReplayedBySubmitAnswer$",
+   "why": "沒有 command_slot 的輪次（ResumeRun 的回答）也被 SubmitAnswer 當成重送回放"
+  }
+ ]
+}

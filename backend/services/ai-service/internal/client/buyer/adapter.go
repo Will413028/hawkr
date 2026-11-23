@@ -21,7 +21,6 @@ type Entitlement struct {
 	MonthlyAnswerLimit int
 	PeriodStart        time.Time
 	PeriodEnd          time.Time
-	Source             string
 }
 
 // Client is ai-service's gRPC client to buyer-service's membership/quota RPCs.
@@ -83,6 +82,6 @@ func (c *client) GetBuyerEntitlement(ctx context.Context, buyerID identity.Buyer
 
 	return Entitlement{
 		PlanCode: resp.GetPlanCode(), MonthlyAnswerLimit: limit,
-		PeriodStart: start.UTC(), PeriodEnd: end.UTC(), Source: resp.GetSource(),
+		PeriodStart: start.UTC(), PeriodEnd: end.UTC(),
 	}, nil
 }

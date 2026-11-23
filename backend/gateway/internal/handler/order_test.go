@@ -430,6 +430,48 @@ func TestGetMyOrders_SellerView_UsesResolvedSurrogate(t *testing.T) {
 	}
 }
 
+// 賣家視角的 buyer_id 是 CRM 的買家代理鍵：原樣傳給 order-service，不當成帳號代碼解析（解析會把 8001 這個代理鍵換成別人的買家）。
+func TestGetMyOrders_SellerView_BuyerIDIsTheCRMSurrogateNotAnAccountID(t *testing.T) {
+	var captured *orderpb.GetSellerOrdersRequest
+	orderMock := &mockOrderServiceClient{
+		GetSellerOrdersFn: func(ctx context.Context, in *orderpb.GetSellerOrdersRequest, opts ...grpc.CallOption) (*orderpb.GetSellerOrdersResponse, error) {
+			captured = in
+			return &orderpb.GetSellerOrdersResponse{Code: 0, Meta: &orderpb.PageMeta{TotalItems: "0", CurrentPage: "1"}}, nil
+		},
+	}
+	// 任何帳號代碼都會被解析成 5555：若 handler 還去解析，BuyerId 會變成 5555。
+	h := &Holder{Order: grpcclient.NewOrderClientForTest(orderMock), Store: storeResolverForTest(7001), BuyerID: buyerResolverForTest(5555)}
+	r := setupOrderRouter(h)
+
+	req, _ := http.NewRequest("GET", "/api/v1/app/orders?view=seller&buyer_id=8001", nil)
+	req.Header.Set("X-Account-Id", "99")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assertHTTPStatus(t, w, http.StatusOK)
+	if captured == nil || captured.BuyerId != "8001" || captured.StoreId != 7001 {
+		t.Errorf("request = %+v, want BuyerId 8001 (CRM surrogate as-is) and StoreId 7001", captured)
+	}
+}
+
+func TestGetMyOrders_SellerView_InvalidBuyerIDIs400AndNeverReachesOrderService(t *testing.T) {
+	orderMock := &mockOrderServiceClient{
+		GetSellerOrdersFn: func(ctx context.Context, in *orderpb.GetSellerOrdersRequest, opts ...grpc.CallOption) (*orderpb.GetSellerOrdersResponse, error) {
+			t.Fatal("order-service must not be called with an invalid buyer_id")
+			return nil, nil
+		},
+	}
+	h := &Holder{Order: grpcclient.NewOrderClientForTest(orderMock), Store: storeResolverForTest(7001), BuyerID: buyerResolverForTest(5555)}
+	r := setupOrderRouter(h)
+	for _, raw := range []string{"abc", "0", "-1"} {
+		req, _ := http.NewRequest("GET", "/api/v1/app/orders?view=seller&buyer_id="+raw, nil)
+		req.Header.Set("X-Account-Id", "99")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		assertHTTPStatus(t, w, http.StatusBadRequest)
+	}
+}
+
 func TestGetMyOrders_SellerView_NoCurrentSeller403(t *testing.T) {
 	orderMock := &mockOrderServiceClient{
 		GetSellerOrdersFn: func(ctx context.Context, in *orderpb.GetSellerOrdersRequest, opts ...grpc.CallOption) (*orderpb.GetSellerOrdersResponse, error) {
@@ -652,32 +694,6 @@ func TestConfirmReceipt_UsesResolvedBuyerID(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusOK)
 	if captured == nil || captured.BuyerId != 8001 {
 		t.Errorf("BuyerId = %+v, want 8001 (resolved buyer_id, not JWT account_id 100)", captured)
-	}
-}
-
-func TestGetMyOrders_SellerView_BuyerFilter_ResolvesTarget(t *testing.T) {
-	var captured *orderpb.GetSellerOrdersRequest
-	orderMock := &mockOrderServiceClient{
-		GetSellerOrdersFn: func(ctx context.Context, in *orderpb.GetSellerOrdersRequest, opts ...grpc.CallOption) (*orderpb.GetSellerOrdersResponse, error) {
-			captured = in
-			return &orderpb.GetSellerOrdersResponse{Code: 0, Meta: &orderpb.PageMeta{TotalItems: "0", CurrentPage: "1"}}, nil
-		},
-	}
-	h := &Holder{
-		Order:   grpcclient.NewOrderClientForTest(orderMock),
-		Store:   storeResolverForTest(7001),
-		BuyerID: buyerResolverForTest(8001),
-	}
-	r := setupOrderRouter(h)
-
-	req, _ := http.NewRequest("GET", "/api/v1/app/orders?view=seller&buyer_id=42", nil)
-	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	if captured == nil || captured.BuyerId != "8001" {
-		t.Errorf("BuyerId = %+v, want \"8001\" (resolved surrogate, not raw 42)", captured)
 	}
 }
 

@@ -9,8 +9,8 @@ part 'buyer_avatar_provider.g.dart';
 @Riverpod(keepAlive: true)
 Future<String?> buyerAvatar(Ref ref, int buyerId) async {
   final repo = ref.watch(customerRepositoryProvider);
-  final meta = await repo.getBuyerMeta(buyerId.toString());
-  return meta?.avatarUrl;
+  final customer = await repo.getCustomer(buyerId.toString());
+  return customer?.avatarUrl;
 }
 
 /// 根據 orderNo 取得買家頭像 URL。

@@ -18,6 +18,7 @@ import '../../../media/data/media_repository.dart';
 import '../../data/order_model.dart';
 import '../order_status_presentation.dart';
 import 'pill_button.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 // ── 上傳出貨照片，回傳 stagedToken（失敗或未上傳回傳 null） ─────────────────
 Future<String?> uploadShipmentPhoto(
@@ -135,24 +136,8 @@ class _StatusInfoBox extends StatelessWidget {
     return DateTime.now().isAfter(dt);
   }
 
-  String _formatDate(String raw) {
-    if (raw.isEmpty) return '';
-    DateTime? dt = DateTime.tryParse(raw);
-    if (dt == null) {
-      final m = RegExp(r'\d{10,13}').firstMatch(raw);
-      if (m != null) {
-        final n = int.tryParse(m.group(0)!);
-        if (n != null) {
-          dt = (m.group(0)!.length >= 13)
-              ? DateTime.fromMillisecondsSinceEpoch(n)
-              : DateTime.fromMillisecondsSinceEpoch(n * 1000);
-        }
-      }
-    }
-    if (dt == null) return raw;
-    final local = dt.toLocal();
-    String pad(int v) => v.toString().padLeft(2, '0');
-    return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';
+  String _formatDate(String raw, TaipeiDisplay t) {
+    return t.formatIso(raw);
   }
 
   bool _isShipmentUnprocessed(String ss) =>
@@ -230,7 +215,7 @@ class _StatusInfoBox extends StatelessWidget {
     final statusCode = order.statusCode ?? 0;
     final isCancelled = statusCode == 80;
     final statusTitle = _statusTitle(statusCode, isCancelled);
-    final statusTime = _formatDate(order.dateTime);
+    final statusTime = _formatDate(order.dateTime, context.taipeiDisplay);
 
     return Container(
       width: double.infinity,
@@ -304,7 +289,7 @@ class _StatusInfoBox extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '下載pdf檔案期限：\n${expireAt.isNotEmpty ? _formatDate(expireAt) : ''}',
+                  '下載pdf檔案期限：\n${expireAt.isNotEmpty ? _formatDate(expireAt, context.taipeiDisplay) : ''}',
                   style: infoStyle,
                 ),
               ),

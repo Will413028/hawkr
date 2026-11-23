@@ -1,4 +1,5 @@
 import 'package:hawkr_seller/core/codemeta/code_meta.dart';
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_seller/features/procurement/data/procurement_error.dart';
 import 'package:hawkr_seller/features/procurement/data/seller_quote_model.dart';
 import 'package:hawkr_seller/features/procurement/data/seller_quote_repository.dart';
@@ -8,6 +9,7 @@ import 'package:hawkr_seller/features/procurement/presentation/seller_quote_labe
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -61,6 +63,9 @@ Future<void> _pumpScreen(
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (_, _) => const MaterialApp(
+          locale: Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: SellerQuoteFormScreen(publicationId: _publicationId),
         ),
       ),
@@ -309,4 +314,21 @@ void main() {
     expect(find.text('重新載入'), findsOneWidget);
     expect(find.text('送出正式回價'), findsNothing);
   });
+
+  test(
+    'picker default is one day after now, as Taipei wall clock, on any device offset',
+    () {
+      // 2026-07-30 20:00 UTC is 2026-07-31 04:00 Taipei; one day later is 08-01 04:00 Taipei.
+      final now = DateTime.utc(2026, 7, 30, 20);
+      final t = taipeiPickerInitial(quotePickerSeed(null, now));
+      expect(t.initialDate, DateTime(2026, 8, 1));
+      expect(t.initialTime, (hour: 4, minute: 0));
+      // An existing UTC value is shown as Taipei wall clock.
+      final c = taipeiPickerInitial(
+        quotePickerSeed(DateTime.utc(2026, 7, 30, 16), now),
+      );
+      expect(c.initialDate, DateTime(2026, 7, 31));
+      expect(c.initialTime, (hour: 0, minute: 0));
+    },
+  );
 }

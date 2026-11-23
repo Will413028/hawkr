@@ -1,0 +1,150 @@
+{
+  "@@locale": "zh",
+  "languageName": "繁體中文",
+  "@languageName": {
+    "description": "This language's own name, shown in a language picker. Never translated: each locale spells its own name."
+  },
+  "timeAgoJustNow": "剛剛",
+  "@timeAgoJustNow": {
+    "description": "Relative time under one minute."
+  },
+  "timeAgoMinutes": "{count, plural, other{{count}分鐘前}}",
+  "@timeAgoMinutes": {
+    "description": "Relative time in whole minutes (1 to 59).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoHours": "{count, plural, other{{count}小時前}}",
+  "@timeAgoHours": {
+    "description": "Relative time in whole hours (1 to 23).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoDays": "{count, plural, other{{count}天前}}",
+  "@timeAgoDays": {
+    "description": "Relative time in Taipei calendar days (1 to 6).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoMonthDay": "{month}/{day}",
+  "@timeAgoMonthDay": {
+    "description": "Taipei date in the current year, month and day.",
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoFullDate": "{year}/{month}/{day}",
+  "@timeAgoFullDate": {
+    "description": "Taipei date in an earlier year.",
+    "placeholders": {
+      "year": {
+        "type": "int"
+      },
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "taipeiTimeLabel": "台北時間",
+  "@taipeiTimeLabel": {
+    "description": "Marks a displayed time as Taipei time when the device time zone offset is not +8."
+  },
+  "commonRetry": "重試",
+  "@commonRetry": {
+    "description": "Retry button label after a failed load."
+  },
+  "commonReload": "重新載入",
+  "@commonReload": {
+    "description": "Reload button label after a failed load."
+  },
+  "commonLoadMore": "載入更多",
+  "@commonLoadMore": {
+    "description": "Button that loads the next page of a list."
+  },
+  "chatLoadMoreFailedRetry": "載入更多失敗，點此重試",
+  "@chatLoadMoreFailedRetry": {
+    "description": "Chat list footer button after loading the next page failed."
+  },
+  "chatBuyerFallbackName": "顧客",
+  "@chatBuyerFallbackName": {
+    "description": "Chat title when the buyer has no name."
+  },
+  "chatSendFailedResend": "送出失敗，點一下重送",
+  "@chatSendFailedResend": {
+    "description": "Hint under a chat message that failed to send."
+  },
+  "chatSending": "傳送中…",
+  "@chatSending": {
+    "description": "Hint under a chat message that is being sent."
+  },
+  "chatReadPrefix": "已讀 ",
+  "@chatReadPrefix": {
+    "description": "Prefix before the time of a message the buyer has read, followed by the time."
+  },
+  "chatLoadFailedTitle": "目前無法載入訊息",
+  "@chatLoadFailedTitle": {
+    "description": "Title of the chat thread load error panel."
+  },
+  "chatLoadFailedDescription": "請確認網路連線後再試一次。",
+  "@chatLoadFailedDescription": {
+    "description": "Description of the chat thread load error panel."
+  },
+  "customerOrdersTitle": "顧客訂單",
+  "@customerOrdersTitle": {
+    "description": "Subtitle of the customer orders screen."
+  },
+  "customerOrdersEmpty": "暫無訂單",
+  "@customerOrdersEmpty": {
+    "description": "Empty state of the customer orders screen."
+  },
+  "customerBuyerFallbackName": "買家",
+  "@customerBuyerFallbackName": {
+    "description": "Customer display name when the buyer has no name."
+  },
+  "couponPickFromCustomers": "從客戶名單選擇",
+  "@couponPickFromCustomers": {
+    "description": "Button that opens the customer picker when issuing a coupon."
+  },
+  "couponPickFromCustomersHint": "從客戶名單挑選這次發放的會員",
+  "@couponPickFromCustomersHint": {
+    "description": "Hint when no customer is selected for a coupon issue."
+  },
+  "reportMessageTitle": "檢舉訊息",
+  "@reportMessageTitle": {
+    "description": "Title of the report sheet for a chat message."
+  },
+  "customerPickerTitle": "選擇客戶",
+  "@customerPickerTitle": {
+    "description": "Title of the customer picker sheet."
+  },
+  "customerPickerEmpty": "沒有可選的客戶",
+  "@customerPickerEmpty": {
+    "description": "Empty state of the customer picker sheet."
+  },
+  "customerPickerAdd": "加入名單（{count}）",
+  "@customerPickerAdd": {
+    "description": "Confirm button of the customer picker with the number selected.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}

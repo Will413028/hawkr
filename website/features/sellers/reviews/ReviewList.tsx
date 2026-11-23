@@ -1,8 +1,11 @@
 import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
+import ReportActionMenu from "@/features/report/ReportActionMenu";
+import { useUiText } from "@/lib/i18n/ui-text";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { parseRating } from "@/lib/products/rating";
+import { reviewerName } from "@/lib/reviews/reviewer-name";
 import { formatReviewDate } from "./formatReviewDate";
 
 const STAR_PATH =
@@ -30,6 +33,8 @@ export interface SellerReviewItem {
 	productImageUrl?: string;
 	/** 商品 ID（#1155）；有值且非 "0" 時商品名/縮圖連到商品頁。legacy 評論可能無此欄位。 */
 	productId?: string;
+	/** 這則評價是目前登入者寫的；自己的評價不顯示檢舉。 */
+	isMine?: boolean;
 }
 
 export function StarsSvg({
@@ -71,6 +76,7 @@ export default function ReviewList({
 	reviews: SellerReviewItem[];
 	busy?: boolean;
 }) {
+	const ut = useUiText();
 	return (
 		<div
 			className="flex flex-col gap-[var(--space-4)]"
@@ -132,15 +138,15 @@ export default function ReviewList({
 						<div className="flex items-center gap-[var(--space-3)] mb-[var(--space-3)]">
 							<Avatar
 								src={review.avatar}
-								name={review.author || review.userName}
-								alt={review.author || review.userName}
+								name={reviewerName(ut, review.author || review.userName)}
+								alt={reviewerName(ut, review.author || review.userName)}
 								entity="buyer"
 								className="w-10 h-10 shrink-0 rounded-full object-cover"
 								fallbackClassName="w-10 h-10 shrink-0 rounded-full object-cover"
 							/>
 							<div className="flex-1 flex flex-col gap-[2px] min-w-0">
 								<span className="text-[color:var(--text-heading)] text-[length:var(--text-sm)] font-bold">
-									{review.author || review.userName}
+									{reviewerName(ut, review.author || review.userName)}
 								</span>
 								<div className="flex gap-[1px] text-[var(--accent-warm)]">
 									<StarsSvg
@@ -154,6 +160,11 @@ export default function ReviewList({
 							<span className="shrink-0 text-[var(--color-gray-mid)] text-[length:var(--text-xs)]">
 								{review.date || formatReviewDate(review.createdAt)}
 							</span>
+							{review.id && !review.isMine ? (
+								<ReportActionMenu
+									target={{ kind: "review", id: String(review.id) }}
+								/>
+							) : null}
 						</div>
 						<p className="mb-[var(--space-3)] text-[color:var(--text-body)] text-[length:var(--text-sm)] leading-relaxed">
 							{review.text || review.content}

@@ -143,8 +143,8 @@ class OrderServiceNotificationPayloadTest {
 
         OrderCompletedPayload core = MAPPER.readValue(completedRow.getPayload(), OrderCompletedPayload.class);
         assertEquals(String.valueOf(storeId), core.storeId(),
-                "core payload storeId must stay the raw store_id (7001) — crm stats and "
-                        + "GetOrderAggregates reconcile key by store_id, not login account_id");
+                "core payload storeId must stay the raw store_id (7001) — crm stats "
+                        + "key by store_id, not login account_id");
         assertEquals(String.valueOf(buyerId), core.buyerId(),
                 "core payload buyerId must stay the raw buyer_id (3001)");
         assertNull(core.notifySellerAccountId(),

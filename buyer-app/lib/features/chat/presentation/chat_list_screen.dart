@@ -1,25 +1,31 @@
 import 'dart:async';
 
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart' show UiLocale;
 
+import '../../../core/l10n/ui_locale.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/category_top_bar.dart';
-import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_icon.dart';
 import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../data/chat_conversation_fields.dart';
-import '../data/chat_model.dart';
+import '../../seller/data/store_card_display.dart';
+import '../data/chat_display.dart';
+import '../data/chat_realtime.dart';
 import '../data/chat_repository.dart';
+import '../data/latest_request.dart';
 import 'chat_focus_policy.dart';
-import 'chat_preview.dart';
 import 'widgets/chat_list_widgets.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
@@ -28,32 +34,20 @@ class ChatListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
-  /// 將時間轉為相對時間文字
-  static String _formatTimeAgo(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inSeconds < 60) return '剛剛';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分鐘前';
-    if (diff.inHours < 24) return '${diff.inHours}小時前';
-    if (diff.inDays < 7) return '${diff.inDays}天前';
-    if (dt.year == now.year) return '${dt.month}/${dt.day}';
-    return '${dt.year}/${dt.month}/${dt.day}';
-  }
+  static String _nameOf(pb.Conversation c, UiLocale locale, String fallback) =>
+      c.hasStore() ? c.store.displayName(locale) : fallback;
+
+  static String _previewOf(pb.Conversation c, UiLocale locale) =>
+      c.hasPreview() ? chatPreviewText(c.preview, locale) : '';
 
   bool _loading = true;
-  String? _error;
-  List<Map<String, dynamic>> _conversations = const [];
-  Timer? _updateTimer;
-  StreamSubscription<ChatMessage>? _wsMessageSub;
-  Timer? _wsRefreshDebounce;
-  // keepAlive provider，於 initState（widget 存活期）capture 一次；dispose() 改用
-  // 這個實例呼叫，不在 dispose 內再碰 ref——widget 拆除路徑上 ref.read 本身不安全。
-  late final ChatRepository _chatRepo;
-  // Note: participant names and avatars are returned directly by
-  // GET /app/chat/conversations（欄位定義見 data/chat_conversation_fields.dart）。
-  // No per-user profile fetch (N+1) is needed.
-
-  bool _isUpdating = false;
+  Object? _error;
+  List<pb.Conversation> _conversations = const [];
+  StreamSubscription<pb.ChatEvent>? _eventSub;
+  Timer? _refreshDebounce;
+  final _latestRefresh = LatestRequest();
+  // keepAlive provider，於 initState（widget 存活期）capture 一次；dispose() 改用這個實例呼叫。
+  late final ChatRealtime _realtime;
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -63,23 +57,31 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     super.initState();
     // 進場零動畫
     WidgetsBinding.instance.addPostFrameCallback((_) => _skipRouteTransition());
-    _chatRepo = ref.read(chatRepositoryProvider);
+    _realtime = ref.read(chatRealtimeProvider);
     _refresh(showLoading: true);
-    // 列表駐留期間保持 WebSocket 連線（refCount +1），訂閱 onMessage 讓對方
-    // 新訊息即時刷新列表（lastMessage / unreadCount），不再只靠 FCM + pull-to-refresh
-    unawaited(_chatRepo.connectForChat());
-    _wsMessageSub = _chatRepo.onMessage.listen(_handleIncomingWsMessage);
+    // 列表駐留期間保持串流連線；新訊息、串流重連的 Ready 與 Resync 都重取列表。
+    _realtime.acquire();
+    _eventSub = _realtime.events.listen(_onEvent);
   }
 
-  void _handleIncomingWsMessage(ChatMessage m) {
-    // 忽略 typing / presence 等非訊息事件（這些 id 為空）
-    if (m.id.isEmpty) return;
-    // 防抖：短時間多條訊息只觸發一次 refetch，避免打爆 API
-    _wsRefreshDebounce?.cancel();
-    _wsRefreshDebounce = Timer(const Duration(milliseconds: 400), () {
-      if (!mounted) return;
-      unawaited(_updateConversationsInBackground());
-    });
+  void _onEvent(pb.ChatEvent event) {
+    switch (event.whichEvent()) {
+      case pb.ChatEvent_Event.message:
+        // 防抖：短時間多則訊息只重取一次。
+        _refreshDebounce?.cancel();
+        _refreshDebounce = Timer(const Duration(milliseconds: 400), () {
+          if (mounted) unawaited(_refresh());
+        });
+      case pb.ChatEvent_Event.ready:
+      case pb.ChatEvent_Event.resync:
+        _refreshDebounce?.cancel();
+        unawaited(_refresh());
+      case pb.ChatEvent_Event.unread:
+      case pb.ChatEvent_Event.peerRead:
+      case pb.ChatEvent_Event.heartbeat:
+      case pb.ChatEvent_Event.notSet:
+        break;
+    }
   }
 
   void _skipRouteTransition() {
@@ -99,104 +101,41 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     jumpToEnd(route.secondaryAnimation);
   }
 
-  Future<void> _updateConversationsInBackground() async {
-    if (_isUpdating) return; // 防重入
-    _isUpdating = true;
-
-    try {
-      HKLog.logD('ChatListScreen: Background updating conversations...');
-      // 非同步獲取最新的對話列表
-      final conversations = await ref
-          .read(chatRepositoryProvider)
-          .getConversations(pageSize: 50);
-
-      // 只有在組件還存在時才更新UI
-      if (mounted) {
-        // 檢查是否有變化，避免不必要的UI更新
-        final hasChanges =
-            _conversations.length != conversations.length ||
-            !_areConversationsEqual(_conversations, conversations);
-
-        if (hasChanges) {
-          HKLog.logD(
-            'ChatListScreen: Conversations updated (${conversations.length} items)',
-          );
-          setState(() {
-            _conversations = conversations;
-            _error = null;
-          });
-        }
-      }
-    } catch (e) {
-      // 靜默處理錯誤，避免干擾用戶操作
-      HKLog.logE('ChatListScreen: Background update failed: $e');
-    } finally {
-      _isUpdating = false;
-    }
-  }
-
-  // 比較兩個對話列表是否相等（簡單比較）
-  bool _areConversationsEqual(
-    List<Map<String, dynamic>> list1,
-    List<Map<String, dynamic>> list2,
-  ) {
-    if (list1.length != list2.length) return false;
-    for (int i = 0; i < list1.length; i++) {
-      final conv1 = list1[i];
-      final conv2 = list2[i];
-      // 比較關鍵欄位（im.proto Conversation 的實際欄位；原本比的
-      // conversationId / lastContent / lastTimestamp 後端從未回過，三個恆為
-      // null，使長度相同的兩份列表恆判定為「沒變」，背景更新永遠不重繪）
-      if (conv1[conversationTargetUserIdKey] !=
-              conv2[conversationTargetUserIdKey] ||
-          conv1[conversationLastMessageKey] !=
-              conv2[conversationLastMessageKey] ||
-          conv1[conversationUnreadCountKey] !=
-              conv2[conversationUnreadCountKey] ||
-          conv1[conversationLastMessageTimeKey] !=
-              conv2[conversationLastMessageTimeKey]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   @override
   void dispose() {
-    _updateTimer?.cancel();
-    _wsRefreshDebounce?.cancel();
-    _wsMessageSub?.cancel();
-    unawaited(_chatRepo.disconnectFromChat());
+    _refreshDebounce?.cancel();
+    unawaited(_eventSub?.cancel());
+    _realtime.release();
     _searchController.dispose();
     super.dispose();
   }
 
+  /// 重取全部對話。重取失敗時保留已顯示的列表，只顯示錯誤。
   Future<void> _refresh({bool showLoading = false}) async {
-    // 暫停自動更新，避免衝突
-    _isUpdating = true;
-
-    setState(() {
-      if (showLoading) _loading = true;
-      _error = null;
-    });
+    if (showLoading && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
-      final convs = await ref
-          .read(chatRepositoryProvider)
-          .getConversations(pageSize: 50);
-      if (!mounted) return;
+      final result = await _latestRefresh.run(
+        ref.read(chatRepositoryProvider).listAllConversations,
+      );
+      if (!mounted || result.superseded) return;
+      final convs = result.value!;
       setState(() {
         _conversations = convs;
         _loading = false;
+        _error = null;
       });
     } catch (e) {
+      HKLog.logE('ChatListScreen: refresh failed: $e');
       if (!mounted) return;
       setState(() {
-        _error = '載入失敗，請稍後再試';
+        _error = e;
         _loading = false;
       });
-    } finally {
-      // 恢復自動更新
-      _isUpdating = false;
     }
   }
 
@@ -286,7 +225,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
-                child: ChatErrorBanner(message: _error!, onRetry: _refresh),
+                child: ChatErrorBanner(
+                  message: errorText(
+                    _error!,
+                    defaults: ref.read(defaultErrorTextProvider),
+                  ),
+                  onRetry: _refresh,
+                ),
               ),
             ),
           Expanded(
@@ -303,18 +248,16 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                           onRefresh: _refresh,
                           child: Builder(
                             builder: (context) {
+                              final locale = ref.watch(uiLocaleProvider);
                               final base = _conversations;
                               final rawQuery = _searchQuery.trim();
                               final q = rawQuery.toLowerCase();
                               final list = q.isEmpty
                                   ? base
                                   : base.where((c) {
-                                      final last =
-                                          (c[conversationLastMessageKey] ?? '')
-                                              .toString();
-                                      final name =
-                                          resolveConversationDisplayName(c);
-                                      final hay = ('$name $last').toLowerCase();
+                                      final hay =
+                                          '${_nameOf(c, locale, context.l10n.chatStoreFallbackName)} ${_previewOf(c, locale)}'
+                                              .toLowerCase();
                                       return hay.contains(q);
                                     }).toList();
 
@@ -358,133 +301,39 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                     const SizedBox(height: HkSpace.md),
                                 itemBuilder: (context, index) {
                                   final c = list[index];
-                                  final preview = chatConversationPreview(c);
-                                  final localTime =
-                                      resolveConversationLastMessageTime(c);
-                                  final String date = localTime == null
-                                      ? ''
-                                      : _formatTimeAgo(localTime);
-                                  final unread = resolveConversationUnreadCount(
+                                  final name = _nameOf(
                                     c,
+                                    locale,
+                                    context.l10n.chatStoreFallbackName,
                                   );
-
-                                  final String merchantId =
-                                      resolveConversationTargetId(c);
-                                  // 需求：列表顯示商家名稱（不是暱稱）
-                                  final String displayName =
-                                      resolveConversationDisplayName(c);
-                                  final String avatarUrl =
-                                      resolveConversationAvatarUrl(c);
-
-                                  HKLog.logD(
-                                    'ChatList item merchantId=$merchantId name=$displayName avatar=${avatarUrl.isNotEmpty ? avatarUrl : '(none)'}',
-                                  );
-
+                                  final time = c.hasLastMessageTime()
+                                      ? c.lastMessageTime.toDateTime()
+                                      : null;
                                   return ChatConversationTile(
-                                    key: ValueKey(merchantId),
-                                    name: displayName,
-                                    avatarUrl: avatarUrl,
-                                    lastMessage: preview,
-                                    date: date,
-                                    unread: unread,
+                                    key: ValueKey(c.id),
+                                    name: name,
+                                    avatarUrl: c.hasStore()
+                                        ? c.store.logoUri
+                                        : '',
+                                    lastMessage: _previewOf(c, locale),
+                                    date: time == null
+                                        ? ''
+                                        : context.taipeiDisplay.timeAgoIn(
+                                            context.l10n,
+                                            time,
+                                          ),
+                                    unread: c.unreadCount.toInt(),
                                     onTap: () async {
-                                      HKLog.logD(
-                                        '=== ChatListScreen: Item Tap Event ===',
+                                      ChatFocusPolicy.dismissKeyboard();
+                                      await context.push(
+                                        '/chat/room',
+                                        extra: {
+                                          'conversationId': c.id,
+                                          'merchantName': name,
+                                        },
                                       );
-                                      HKLog.logD(
-                                        'About to navigate with merchantId: "$merchantId" merchantName: "$displayName"',
-                                      );
-
-                                      if (merchantId.isEmpty) {
-                                        HKLog.logE(
-                                          'ERROR: merchantId is empty! Original data was: $c',
-                                        );
-                                        showCommonSnackBar(
-                                          context,
-                                          '無法提取商家ID，原始數據：${c.keys.toList()}',
-                                        );
-                                        return;
-                                      }
-
-                                      // 如果有未讀訊息，先清除未讀數量
-                                      // 後端 PATCH /app/chat/conversations/{targetId} 的 targetId 是
-                                      // 「對方使用者 ID」（int64），也就是 targetUserId。
-                                      final readTargetId = merchantId;
-                                      if (unread > 0) {
-                                        HKLog.logD(
-                                          'Clearing unread count with targetId=$readTargetId',
-                                        );
-                                        try {
-                                          // 更新本地狀態，立即清除紅點
-                                          setState(() {
-                                            c[conversationUnreadCountKey] = 0;
-                                          });
-
-                                          // 調用後端 API 清除未讀（唯一正確路徑：用對方 user id）
-                                          if (readTargetId.isNotEmpty) {
-                                            await ref
-                                                .read(chatRepositoryProvider)
-                                                .markConversationAsRead(
-                                                  readTargetId,
-                                                );
-                                          }
-                                        } catch (e) {
-                                          HKLog.logE(
-                                            'Failed to clear unread count: $e',
-                                          );
-                                        }
-                                      }
-
-                                      HKLog.logD(
-                                        'SUCCESS: Navigating to ChatThreadScreen...',
-                                      );
-                                      if (context.mounted) {
-                                        ChatFocusPolicy.dismissKeyboard();
-                                        await context.push(
-                                          '/chat/room',
-                                          // conversationId 不在這裡傳：對話列表 API
-                                          // 不回這個欄位，ChatThreadScreen 進場時
-                                          // 本來就是 null，收到第一則 WS 訊息才回填。
-                                          extra: {
-                                            'merchantId': merchantId,
-                                            'merchantName': displayName,
-                                          },
-                                        );
-                                        // 從 chat room 返回後先確保 server 端未讀已清（防止
-                                        // 離開前最後一批訊息未被 markMessageRead）
-                                        if (readTargetId.isNotEmpty) {
-                                          try {
-                                            await ref
-                                                .read(chatRepositoryProvider)
-                                                .markConversationAsRead(
-                                                  readTargetId,
-                                                );
-                                          } catch (_) {}
-                                        }
-                                        // 再重抓對話列表
-                                        if (mounted) {
-                                          await _updateConversationsInBackground();
-                                          // 最終保險：refetch 回來若 server 仍回 unread>0（cache
-                                          // 延遲 / 對方於回列表瞬間又送訊息），強制歸 0 僅限此對話
-                                          if (mounted) {
-                                            setState(() {
-                                              for (final item
-                                                  in _conversations) {
-                                                final itemTarget =
-                                                    resolveConversationTargetId(
-                                                      item,
-                                                    );
-                                                if (itemTarget ==
-                                                        readTargetId &&
-                                                    itemTarget.isNotEmpty) {
-                                                  item[conversationUnreadCountKey] =
-                                                      0;
-                                                }
-                                              }
-                                            });
-                                          }
-                                        }
-                                      }
+                                      // 從聊天室回來：伺服器的未讀已清，重取列表。
+                                      if (mounted) await _refresh();
                                     },
                                   );
                                 },

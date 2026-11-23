@@ -58,7 +58,7 @@ void main() {
           isA<ArgumentError>().having(
             (e) => e.message,
             'message',
-            contains('不是 oneof 的子訊息'),
+            contains('is not a oneof member message'),
           ),
         ),
         reason: path,
@@ -76,7 +76,7 @@ void main() {
         isA<ArgumentError>().having(
           (e) => e.message,
           'message',
-          contains('不是 oneof 的子訊息'),
+          contains('is not a oneof member message'),
         ),
       ),
     );

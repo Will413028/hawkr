@@ -19,17 +19,13 @@ type Holder struct {
 	Order         *grpcclient.OrderClient
 	Payment       *grpcclient.PaymentClient
 	Cart          *grpcclient.CartClient
-	IM            *grpcclient.IMClient
 	Notification  *grpcclient.NotificationClient
 	Shipping      *grpcclient.ShippingClient
 	Coupon        *grpcclient.CouponClient
-	Crm           *grpcclient.CrmClient
 	AI            *grpcclient.AIClient
 	AIAssistant   *grpcclient.AIAssistantClient
 	AIProcurement *grpcclient.AIProcurementClient
 	Category      *grpcclient.CategoryClient
-	Review        *grpcclient.ReviewServiceClient
-	OrderReview   *grpcclient.OrderReviewServiceClient
 	Aftersales    *grpcclient.AftersalesClient
 	Invoice       *grpcclient.InvoiceServiceClient
 	Store         *storeid.Resolver

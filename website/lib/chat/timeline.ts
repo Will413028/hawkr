@@ -1,43 +1,18 @@
 /**
- * Chat timeline ordering + dedup helpers (pure, no React/network).
+ * 聊天時間線的排序與去重（純函式，不碰 React 與網路）。
  *
- * Messages are ordered by `seqId` — the server's per-room monotonic sequence —
- * not by `timestamp`, so out-of-order delivery (sync replay after a reconnect)
- * settles into the authoritative order. `seqId` is a 64-bit value carried as a
- * decimal string (can exceed JS 2^53), so all comparison goes through BigInt;
- * `Number()` would silently collapse large neighbours into a tie.
- *
- * Optimistic (just-sent, not-yet-persisted) messages carry no seqId; they pin
- * to the bottom in send order until the server echo upgrades them with a seqId
- * (see `upsertMessage`) — the standard "your message settles into place" UX.
+ * 訊息以對話內的 `seq`（從 1 起連號、沒有空洞）排序，不看時間：斷線補洞後亂序到達的訊息會落在正確的位置。
+ * 還沒有 `seq` 的樂觀訊息（剛送出、伺服器還沒回）固定在最下面，依送出時間排；伺服器回應後換成真正的訊息。
  */
 
 import type { ChatMessage } from "./types";
 
-function seqBig(seqId?: string): bigint | null {
-	if (!seqId) return null;
-	try {
-		return BigInt(seqId);
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Total order over messages. Persisted (seqId-bearing) messages come first,
- * ordered by seqId; optimistic ones come last, ordered by send time. Grouping
- * by "has seqId" keeps this transitive — a naive "seqId else timestamp"
- * comparator is non-transitive and corrupts the sort.
- */
+/** 全序：有 seq 的在前（依 seq），樂觀訊息在後（依送出時間）。 */
 export function compareMessages(a: ChatMessage, b: ChatMessage): number {
-	const sa = seqBig(a.seqId);
-	const sb = seqBig(b.seqId);
-	if (sa !== null && sb !== null) return sa < sb ? -1 : sa > sb ? 1 : 0;
-	if (sa !== null) return -1; // a persisted, b optimistic → a first
-	if (sb !== null) return 1; // b persisted → b first
-	// both optimistic → send order; `|| 0` guards a NaN timestamp from a
-	// malformed frame, which would otherwise make Array.sort non-deterministic.
-	return (a.timestamp || 0) - (b.timestamp || 0);
+	if (a.seq !== null && b.seq !== null) return a.seq - b.seq;
+	if (a.seq !== null) return -1;
+	if (b.seq !== null) return 1;
+	return (a.timeMs || 0) - (b.timeMs || 0);
 }
 
 export function sortTimeline(messages: ChatMessage[]): ChatMessage[] {
@@ -45,78 +20,50 @@ export function sortTimeline(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /**
- * Insert `next` into a sorted timeline. Dedups by id; when the duplicate is the
- * server echo of a message we already hold seqId-less (our own sent message),
- * the echo's seqId is merged in so it sorts into place rather than staying
- * pinned to the bottom. Returns a new, sorted array.
+ * 放進一則伺服器的訊息：同 seq 的取代（可見度改變時，墓碑或還原；`MessageEvent.updated`），
+ * 同 id 的取代（送出回應與串流的回聲是同一則），否則加入。回新陣列。
  */
-export function upsertMessage(
+export function upsertServerMessage(
 	current: ChatMessage[] | undefined,
 	next: ChatMessage,
 ): ChatMessage[] {
 	const list = current ?? [];
-	const i = next.id ? list.findIndex((m) => m.id === next.id) : -1;
-	if (i >= 0) {
-		const existing = list[i];
-		// Already present (e.g. the server echo of our own send). Fill in the
-		// authoritative fields the REST response didn't carry — seqId (so it sorts
-		// into place) and conversationId (the room id the sync gap-fill keys on) —
-		// without clobbering the reconciled content/id. Nothing new ⇒ same ref.
-		const seqId = existing.seqId ?? next.seqId;
-		const conversationId = existing.conversationId ?? next.conversationId;
-		if (
-			seqId === existing.seqId &&
-			conversationId === existing.conversationId
-		) {
-			return list;
-		}
-		const merged = [...list];
-		merged[i] = { ...existing, seqId, conversationId };
-		return sortTimeline(merged);
-	}
-	return sortTimeline([...list, next]);
+	const i = list.findIndex(
+		(m) => m.id === next.id || (next.seq !== null && m.seq === next.seq),
+	);
+	if (i < 0) return sortTimeline([...list, next]);
+	const merged = [...list];
+	merged[i] = next;
+	return sortTimeline(merged);
 }
 
 /**
- * Reconcile an optimistic send against the REST response. If the WS echo of the
- * same message already inserted the real id (echo-first race), drop the
- * optimistic copy to avoid a duplicate bubble; otherwise promote the optimistic
- * copy to the real id (+ optional content/timestamp patch). Re-sorts.
+ * 送出回應：把樂觀訊息換成伺服器的訊息。串流的回聲先到時，同 seq 已經在清單裡，只丟掉樂觀的那則。
  */
 export function reconcileOptimistic(
 	current: ChatMessage[] | undefined,
 	optimisticId: string,
-	real: { id: string; timestamp: number; content?: string; seqId?: string },
+	server: ChatMessage,
 ): ChatMessage[] {
-	const list = current ?? [];
-	if (real.id && list.some((m) => m.id === real.id)) {
-		// Echo-first race: the WS echo already inserted the real id. Drop our
-		// optimistic copy, but still apply the REST content patch to the survivor —
-		// for images that's the permanent CDN url, which the echo frame may not
-		// carry. (Text sends have no content patch, so this is a no-op there.)
-		return sortTimeline(
-			list
-				.filter((m) => m.id !== optimisticId)
-				.map((m) =>
-					m.id === real.id && real.content != null
-						? { ...m, content: real.content }
-						: m,
-				),
-		);
-	}
-	return sortTimeline(
-		list.map((m) =>
-			m.id === optimisticId
-				? {
-						...m,
-						id: real.id || m.id,
-						timestamp: real.timestamp,
-						content: real.content ?? m.content,
-						// The sender gets no WS self-echo, so this REST seqId is the only
-						// thing that lifts the message off the seqId-less bottom.
-						seqId: real.seqId ?? m.seqId,
-					}
-				: m,
-		),
-	);
+	const without = (current ?? []).filter((m) => m.id !== optimisticId);
+	return upsertServerMessage(without, server);
+}
+
+export function lastSeq(messages: ChatMessage[]): number {
+	let max = 0;
+	for (const m of messages) if (m.seq !== null && m.seq > max) max = m.seq;
+	return max;
+}
+
+/**
+ * 收到 `incoming` 時是否漏了訊息：它的 seq 大於手上最後一則加一。回要補的起點（`ListMessages` 的 `after_seq`）；
+ * 沒有缺口回 null。手上沒有任何訊息時不判斷（整頁會重讀）。
+ */
+export function gapAfter(
+	messages: ChatMessage[],
+	incomingSeq: number,
+): number | null {
+	const last = lastSeq(messages);
+	if (last === 0) return null;
+	return incomingSeq > last + 1 ? last : null;
 }

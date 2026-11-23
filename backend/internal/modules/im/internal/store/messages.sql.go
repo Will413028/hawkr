@@ -87,9 +87,10 @@ func (q *Queries) GetMessageForRelay(ctx context.Context, id uuid.UUID) (GetMess
 
 const insertMessage = `-- name: InsertMessage :one
 
-INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, image_asset_id, image_object_key, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, conversation_id, seq, sender_kind, message_type, content, image_asset_id, image_object_key, created_at, erased_at
+INSERT INTO im.messages (id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT ON CONSTRAINT messages_request_key DO NOTHING
+RETURNING id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at, erased_at
 `
 
 type InsertMessageParams struct {
@@ -97,6 +98,7 @@ type InsertMessageParams struct {
 	ConversationID uuid.UUID
 	Seq            int64
 	SenderKind     string
+	RequestID      uuid.UUID
 	MessageType    string
 	Content        *string
 	ImageAssetID   *uuid.UUID
@@ -105,12 +107,14 @@ type InsertMessageParams struct {
 }
 
 // 訊息列：寫入、讀取、抹除。
+// 撞 (對話, 寄件方, request_id) 的唯一鍵時不寫、不回列（pgx.ErrNoRows）：呼叫端把整個 transaction 回滾（連同 AllocateSeq 推進的 seq）再重來，重讀第一則。
 func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (ImMessage, error) {
 	row := q.db.QueryRow(ctx, insertMessage,
 		arg.ID,
 		arg.ConversationID,
 		arg.Seq,
 		arg.SenderKind,
+		arg.RequestID,
 		arg.MessageType,
 		arg.Content,
 		arg.ImageAssetID,
@@ -123,6 +127,7 @@ func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (I
 		&i.ConversationID,
 		&i.Seq,
 		&i.SenderKind,
+		&i.RequestID,
 		&i.MessageType,
 		&i.Content,
 		&i.ImageAssetID,
@@ -386,6 +391,82 @@ func (q *Queries) LockStoreMessageBatch(ctx context.Context, arg LockStoreMessag
 		return nil, err
 	}
 	return items, nil
+}
+
+const messageByRequest = `-- name: MessageByRequest :one
+SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
+FROM im.messages AS m
+JOIN im.conversations AS c ON c.id = m.conversation_id
+LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
+WHERE c.buyer_id = $1 AND c.store_id = $2
+  AND m.sender_kind = $3 AND m.request_id = $4
+`
+
+type MessageByRequestParams struct {
+	BuyerID    int64
+	StoreID    int64
+	SenderKind string
+	RequestID  uuid.UUID
+}
+
+type MessageByRequestRow struct {
+	ID             uuid.UUID
+	ConversationID uuid.UUID
+	Seq            int64
+	SenderKind     string
+	MessageType    string
+	Content        *string
+	ImageAssetID   *uuid.UUID
+	ImageObjectKey *string
+	CreatedAt      time.Time
+	ErasedAt       *time.Time
+	Hidden         bool
+}
+
+// 送出冪等的重送判定：這個對話、這一方、這個 request_id 第一次寫入的訊息；對話還不存在或沒有這個 request_id 時沒有列。隱藏的以 hidden 標出（同列表查詢的述詞），內容由呼叫端換成墓碑；不鎖列。
+func (q *Queries) MessageByRequest(ctx context.Context, arg MessageByRequestParams) (MessageByRequestRow, error) {
+	row := q.db.QueryRow(ctx, messageByRequest,
+		arg.BuyerID,
+		arg.StoreID,
+		arg.SenderKind,
+		arg.RequestID,
+	)
+	var i MessageByRequestRow
+	err := row.Scan(
+		&i.ID,
+		&i.ConversationID,
+		&i.Seq,
+		&i.SenderKind,
+		&i.MessageType,
+		&i.Content,
+		&i.ImageAssetID,
+		&i.ImageObjectKey,
+		&i.CreatedAt,
+		&i.ErasedAt,
+		&i.Hidden,
+	)
+	return i, err
+}
+
+const messageParties = `-- name: MessageParties :one
+SELECT c.id AS conversation_id, c.buyer_id, c.store_id
+FROM im.messages AS m JOIN im.conversations AS c ON c.id = m.conversation_id
+WHERE m.id = $1
+`
+
+type MessagePartiesRow struct {
+	ConversationID uuid.UUID
+	BuyerID        int64
+	StoreID        int64
+}
+
+// 訊息所屬對話的雙方（歸屬）：不套可見性（隱藏、抹除的訊息照樣回），不鎖列。
+func (q *Queries) MessageParties(ctx context.Context, messageID uuid.UUID) (MessagePartiesRow, error) {
+	row := q.db.QueryRow(ctx, messageParties, messageID)
+	var i MessagePartiesRow
+	err := row.Scan(&i.ConversationID, &i.BuyerID, &i.StoreID)
+	return i, err
 }
 
 const messagesForReport = `-- name: MessagesForReport :many

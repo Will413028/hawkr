@@ -15,34 +15,29 @@ import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
-import '../data/legacy_report_repository.dart';
 import '../data/moderation_repository.dart';
 import '../data/report_target.dart';
-import '../data/report_target_type.dart';
 import 'rune_limit_formatter.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
 /// 檢舉說明的上限（`moderation.proto` SubmitReportRequest.description，以 rune 計）。
 const _descriptionMaxRunes = 500;
 
-/// 一個檢舉原因選項：社群對象帶 [category]，聊天與評價（舊 REST）帶 [legacy]。
+/// 一個檢舉原因選項。
 class _ReasonOption {
   const _ReasonOption({
     required this.label,
     required this.requiresDescription,
-    this.category,
-    this.legacy,
+    required this.category,
   });
 
   final String label;
 
   /// 選了這項要補說明（「其他」）。
   final bool requiresDescription;
-  final PolicyCategory? category;
-  final ReportReasonCode? legacy;
+  final PolicyCategory category;
 
-  bool sameAs(_ReasonOption other) =>
-      category == other.category && legacy == other.legacy;
+  bool sameAs(_ReasonOption other) => category == other.category;
 }
 
 /// 一次送出嘗試：內容（原因與說明）沒變的重試帶同一個 request_id，伺服器回第一次的結果；
@@ -55,13 +50,12 @@ class _SubmitAttempt {
   final String requestId;
 }
 
-/// 通用檢舉底部彈窗。社群內容（貼文、留言、討論區留言）送 `ModerationAppService`，
-/// 聊天與評價送舊 `/app/reports`；用哪一條由 [target] 的型別決定。
+/// 通用檢舉底部彈窗：社群內容、評價與聊天訊息都送 `ModerationAppService`，只帶 [target] 的參照。
 /// 使用：`await showReportSheet(context, target: const SocialReportTarget.post('123'))`
 class ReportSheetWidget extends ConsumerStatefulWidget {
   const ReportSheetWidget({super.key, required this.target});
 
-  final ReportTarget target;
+  final SocialReportTarget target;
 
   @override
   ConsumerState<ReportSheetWidget> createState() => _ReportSheetWidgetState();
@@ -84,20 +78,10 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
     return true;
   }
 
-  List<_ReasonOption> _options(UiLocale locale) => switch (widget.target) {
-    SocialReportTarget() => [
-      for (final category in communityReportCategories)
-        _socialOption(category, locale),
-    ],
-    LegacyReportTarget(:final type) => [
-      for (final reason in reportReasonsFor(type))
-        _ReasonOption(
-          label: reason.label,
-          requiresDescription: reason == ReportReasonCode.other,
-          legacy: reason,
-        ),
-    ],
-  };
+  List<_ReasonOption> _options(UiLocale locale) => [
+    for (final category in moderationSubmitReportRequestCategory)
+      _socialOption(category, locale),
+  ];
 
   _ReasonOption _socialOption(PolicyCategory category, UiLocale locale) {
     return _ReasonOption(
@@ -131,26 +115,14 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
       final detail = selected.requiresDescription
           ? _detailCtrl.text.trim()
           : '';
-      switch (widget.target) {
-        case final SocialReportTarget target:
-          await ref
-              .read(moderationRepositoryProvider)
-              .submitReport(
-                target: target,
-                category: selected.category!,
-                description: detail,
-                requestId: _attemptFor(selected.category!, detail).requestId,
-              );
-        case final LegacyReportTarget target:
-          await ref
-              .read(legacyReportRepositoryProvider)
-              .submitReport(
-                targetType: target.type.value,
-                targetId: target.id,
-                reasonCode: selected.legacy!.code,
-                description: detail.isNotEmpty ? detail : null,
-              );
-      }
+      await ref
+          .read(moderationRepositoryProvider)
+          .submitReport(
+            target: widget.target,
+            category: selected.category,
+            description: detail,
+            requestId: _attemptFor(selected.category, detail).requestId,
+          );
       if (!mounted) return;
       Navigator.of(context).pop(true);
       showFloatingToast(context, '舉報成功，我們會盡快審核', isSuccess: true);
@@ -161,9 +133,7 @@ class _ReportSheetWidgetState extends ConsumerState<ReportSheetWidget> {
       if (isAccountSuspendedError(e)) return;
       showFloatingToast(
         context,
-        widget.target is SocialReportTarget
-            ? errorText(e, defaults: ref.read(defaultErrorTextProvider))
-            : e.toString().replaceAll('Exception: ', ''),
+        errorText(e, defaults: ref.read(defaultErrorTextProvider)),
         isSuccess: false,
       );
     }
@@ -376,7 +346,7 @@ class _ReasonTile extends StatelessWidget {
 /// 顯示通用檢舉底部彈窗。回傳 true 表示已成功送出檢舉。
 Future<bool?> showReportSheet(
   BuildContext context, {
-  required ReportTarget target,
+  required SocialReportTarget target,
 }) {
   return showModalBottomSheet<bool>(
     context: context,

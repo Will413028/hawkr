@@ -222,7 +222,7 @@ type CreateReportRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 被檢舉的店家 id（店家卡片的 id，不是 store_code）。
 	StoreId string `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	// 檢舉的類別：政策分類中檢舉人可選的值，除了 PLATFORM_ABUSE（只給平台判定與認定）；UNSPECIFIED 與 PLATFORM_ABUSE 回 invalid_argument。
+	// 檢舉的類別：只接受 accepted_policy_categories 列出的值，其他值（含 UNSPECIFIED）回 invalid_argument。
 	Category v1alpha1.PolicyCategory `protobuf:"varint,2,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	// 檢舉內容，最多 2000 字。
 	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
@@ -422,7 +422,11 @@ type GetMyReportResponse struct {
 	// 補充（去重併入的與檢舉人主動補充的合在一起），舊到新。
 	Supplements []*ReportSupplement `protobuf:"bytes,2,rep,name=supplements,proto3" json:"supplements,omitempty"`
 	// 原檢舉與全部補充的佐證，依送出的順序。
-	Evidence      []*ReportEvidence `protobuf:"bytes,3,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	Evidence []*ReportEvidence `protobuf:"bytes,3,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	// 檢舉人此刻能不能補充（還沒有結果，且補充數未達 supplement_max）；由伺服器判斷，與 AddReportSupplement 的前置檢查是同一個規則，client 不自己從結果與補充數推導。
+	CanSupplement bool `protobuf:"varint,4,opt,name=can_supplement,json=canSupplement,proto3" json:"can_supplement,omitempty"`
+	// 每筆檢舉最多的補充數（伺服器的上限，達到後 AddReportSupplement 回 failed_precondition）；client 用它顯示「n/上限」。
+	SupplementMax int32 `protobuf:"varint,5,opt,name=supplement_max,json=supplementMax,proto3" json:"supplement_max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -476,6 +480,20 @@ func (x *GetMyReportResponse) GetEvidence() []*ReportEvidence {
 		return x.Evidence
 	}
 	return nil
+}
+
+func (x *GetMyReportResponse) GetCanSupplement() bool {
+	if x != nil {
+		return x.CanSupplement
+	}
+	return false
+}
+
+func (x *GetMyReportResponse) GetSupplementMax() int32 {
+	if x != nil {
+		return x.SupplementMax
+	}
+	return 0
 }
 
 // ReportSupplement 是檢舉的一則補充；只新增，每筆檢舉最多 10 則。
@@ -660,9 +678,13 @@ func (x *AddReportSupplementRequest) GetEvidenceStagedTokens() []string {
 type AddReportSupplementResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 補充之後的檢舉、全部補充與佐證（同 GetMyReportResponse）。
-	Report        *StoreReport        `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
-	Supplements   []*ReportSupplement `protobuf:"bytes,2,rep,name=supplements,proto3" json:"supplements,omitempty"`
-	Evidence      []*ReportEvidence   `protobuf:"bytes,3,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	Report      *StoreReport        `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	Supplements []*ReportSupplement `protobuf:"bytes,2,rep,name=supplements,proto3" json:"supplements,omitempty"`
+	Evidence    []*ReportEvidence   `protobuf:"bytes,3,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	// 檢舉人此刻能不能補充（還沒有結果，且補充數未達 supplement_max）；由伺服器判斷，與 AddReportSupplement 的前置檢查是同一個規則，client 不自己從結果與補充數推導。
+	CanSupplement bool `protobuf:"varint,4,opt,name=can_supplement,json=canSupplement,proto3" json:"can_supplement,omitempty"`
+	// 每筆檢舉最多的補充數（伺服器的上限，達到後 AddReportSupplement 回 failed_precondition）；client 用它顯示「n/上限」。
+	SupplementMax int32 `protobuf:"varint,5,opt,name=supplement_max,json=supplementMax,proto3" json:"supplement_max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -718,11 +740,25 @@ func (x *AddReportSupplementResponse) GetEvidence() []*ReportEvidence {
 	return nil
 }
 
+func (x *AddReportSupplementResponse) GetCanSupplement() bool {
+	if x != nil {
+		return x.CanSupplement
+	}
+	return false
+}
+
+func (x *AddReportSupplementResponse) GetSupplementMax() int32 {
+	if x != nil {
+		return x.SupplementMax
+	}
+	return 0
+}
+
 var File_hawkr_seller_v1alpha1_report_proto protoreflect.FileDescriptor
 
 const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xd7\x03\n" +
+	"\"hawkr/seller/v1alpha1/report.proto\x12\x15hawkr.seller.v1alpha1\x1a+hawkr/common/v1alpha1/accepted_values.proto\x1a+hawkr/common/v1alpha1/policy_category.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/rpc/error_details.proto\"\xd7\x03\n" +
 	"\vStoreReport\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1d\n" +
@@ -738,10 +774,11 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\aoutcome\x18\n" +
 	" \x01(\x0e2$.hawkr.seller.v1alpha1.ReportOutcomeB\x03\xe0A\x03H\x00R\aoutcome\x88\x01\x01B\n" +
 	"\n" +
-	"\b_outcome\"\x94\x02\n" +
+	"\b_outcome\"\xa4\x02\n" +
 	"\x13CreateReportRequest\x12\x1e\n" +
-	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12F\n" +
-	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x03\xe0A\x02R\bcategory\x12%\n" +
+	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12V\n" +
+	"\bcategory\x18\x02 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryB\x13\xe0A\x02\x8a\xb5\x18\f\x01\x02\x03\x04\x05\x06\a\b\t\n" +
+	"\v\rR\bcategory\x12%\n" +
 	"\vdescription\x18\x03 \x01(\tB\x03\xe0A\x02R\vdescription\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x04 \x01(\tR\tproductId\x12\x19\n" +
@@ -752,11 +789,13 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\fsupplemented\x18\x02 \x01(\bB\x03\xe0A\x03R\fsupplemented\x129\n" +
 	"\x06notice\x18\x03 \x01(\v2\x1c.google.rpc.LocalizedMessageB\x03\xe0A\x03R\x06notice\"6\n" +
 	"\x12GetMyReportRequest\x12 \n" +
-	"\treport_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breportId\"\xdf\x01\n" +
+	"\treport_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breportId\"\xb7\x02\n" +
 	"\x13GetMyReportResponse\x12:\n" +
 	"\x06report\x18\x01 \x01(\v2\".hawkr.seller.v1alpha1.StoreReportR\x06report\x12I\n" +
 	"\vsupplements\x18\x02 \x03(\v2'.hawkr.seller.v1alpha1.ReportSupplementR\vsupplements\x12A\n" +
-	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence\"\xb0\x01\n" +
+	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence\x12*\n" +
+	"\x0ecan_supplement\x18\x04 \x01(\bB\x03\xe0A\x03R\rcanSupplement\x12*\n" +
+	"\x0esupplement_max\x18\x05 \x01(\x05B\x03\xe0A\x03R\rsupplementMax\"\xb0\x01\n" +
 	"\x10ReportSupplement\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12;\n" +
@@ -768,11 +807,13 @@ const file_hawkr_seller_v1alpha1_report_proto_rawDesc = "" +
 	"\x1aAddReportSupplementRequest\x12 \n" +
 	"\treport_id\x18\x01 \x01(\tB\x03\xe0A\x02R\breportId\x12%\n" +
 	"\vdescription\x18\x02 \x01(\tB\x03\xe0A\x02R\vdescription\x124\n" +
-	"\x16evidence_staged_tokens\x18\x03 \x03(\tR\x14evidenceStagedTokens\"\xe7\x01\n" +
+	"\x16evidence_staged_tokens\x18\x03 \x03(\tR\x14evidenceStagedTokens\"\xbf\x02\n" +
 	"\x1bAddReportSupplementResponse\x12:\n" +
 	"\x06report\x18\x01 \x01(\v2\".hawkr.seller.v1alpha1.StoreReportR\x06report\x12I\n" +
 	"\vsupplements\x18\x02 \x03(\v2'.hawkr.seller.v1alpha1.ReportSupplementR\vsupplements\x12A\n" +
-	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence*\xcc\x01\n" +
+	"\bevidence\x18\x03 \x03(\v2%.hawkr.seller.v1alpha1.ReportEvidenceR\bevidence\x12*\n" +
+	"\x0ecan_supplement\x18\x04 \x01(\bB\x03\xe0A\x03R\rcanSupplement\x12*\n" +
+	"\x0esupplement_max\x18\x05 \x01(\x05B\x03\xe0A\x03R\rsupplementMax*\xcc\x01\n" +
 	"\rReportOutcome\x12\x1e\n" +
 	"\x1aREPORT_OUTCOME_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bREPORT_OUTCOME_ACTION_TAKEN\x10\x01\x12\x1f\n" +

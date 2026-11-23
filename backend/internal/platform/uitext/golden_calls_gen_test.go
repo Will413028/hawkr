@@ -37,10 +37,24 @@ func goldenEnum(name, prefix string) string {
 // goldenCall 呼叫 c.Fn 對應的生成函式；ok 是 false 表示「沒有文字」。
 func goldenCall(t Text, c goldenCase) (string, bool) {
 	switch c.Fn {
+	case "admin.moderation.CaseReport.outcome_unset":
+		return t.AdminModerationCaseReportOutcomeUnset(), true
+	case "assistant.AssistantTool":
+		return t.AssistantAssistantTool(goldenEnum(c.Value, "ASSISTANT_TOOL_"))
 	case "buyer.Gender":
 		return t.BuyerGender(goldenEnum(c.Value, "GENDER_"))
+	case "buyer.Profile.deleted_name":
+		return t.BuyerProfileDeletedName(), true
 	case "buyer.Profile.gender_unset":
 		return t.BuyerProfileGenderUnset(), true
+	case "chat.Message.unsupported_kind":
+		return t.ChatMessageUnsupportedKind(), true
+	case "chat.Preview.erased":
+		return t.ChatPreviewErased(), true
+	case "chat.Preview.hidden":
+		return t.ChatPreviewHidden(), true
+	case "chat.Preview.image":
+		return t.ChatPreviewImage(), true
 	case "common.PolicyCategory":
 		return t.CommonPolicyCategory(goldenEnum(c.Value, "POLICY_CATEGORY_"))
 	case "common.StoreCard.closed_store":
@@ -52,8 +66,14 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return m.Text, ok
 	case "common.unknown":
 		return t.CommonUnknown(), true
+	case "crm.CustomerSort":
+		return t.CrmCustomerSort(goldenEnum(c.Value, "CUSTOMER_SORT_"))
+	case "crm.CustomerType":
+		return t.CrmCustomerType(goldenEnum(c.Value, "CUSTOMER_TYPE_"))
 	case "media.RejectReason":
 		return t.MediaRejectReason(goldenEnum(c.Value, "REJECT_REASON_"))
+	case "moderation.CommunityReport.outcome_unset":
+		return t.ModerationCommunityReportOutcomeUnset(), true
 	case "moderation.ReportOutcome":
 		return t.ModerationReportOutcome(goldenEnum(c.Value, "REPORT_OUTCOME_"))
 	case "moderation.ReportTargetKind":
@@ -62,6 +82,20 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
+	case "procurement.RejectionReason":
+		return t.ProcurementRejectionReason(goldenEnum(c.Value, "REJECTION_REASON_"))
+	case "review.Review.rating_label_1":
+		return t.ReviewReviewRatingLabel1(), true
+	case "review.Review.rating_label_2":
+		return t.ReviewReviewRatingLabel2(), true
+	case "review.Review.rating_label_3":
+		return t.ReviewReviewRatingLabel3(), true
+	case "review.Review.rating_label_4":
+		return t.ReviewReviewRatingLabel4(), true
+	case "review.Review.rating_label_5":
+		return t.ReviewReviewRatingLabel5(), true
+	case "review.ReviewAuthor.anonymous_name":
+		return t.ReviewReviewAuthorAnonymousName(), true
 	case "seller.ContentKind":
 		return t.SellerContentKind(goldenEnum(c.Value, "CONTENT_KIND_"))
 	case "seller.InquiryKind":

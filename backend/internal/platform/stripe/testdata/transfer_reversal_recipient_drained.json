@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "body": {
+    "id": "trr_1Uew7cRPCx5baPmEJ7ToDWPJ",
+    "object": "transfer_reversal",
+    "amount": 2000,
+    "balance_transaction": "txn_1Uew7dRPCx5baPmE8xkQSFTY",
+    "created": 1795436004,
+    "currency": "usd",
+    "destination_payment_refund": "pyr_1Uew7cRCeiuh2SHH3mVjglTZ",
+    "metadata": {},
+    "source_refund": null,
+    "transfer": "tr_3Uew77RPCx5baPmE17PUW7zF"
+  }
+}

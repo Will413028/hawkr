@@ -28,6 +28,8 @@ import '../../data/post_comment.dart';
 import '../../data/post_repository.dart';
 import 'post_card.dart' show showPostActionMenu;
 import 'storefront_tab_glass.dart';
+import '../../../../shared/time/taipei_display.dart';
+import '../../../../l10n/l10n.dart';
 
 /// 互動回聲 Tab — 顯示買家對貼文的留言與按讚，支援賣家回覆及刪除留言
 class PageEchoTab extends ConsumerStatefulWidget {
@@ -133,23 +135,6 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
       viewerCanDelete: m.viewerCanDelete,
       viewerCanReply: m.viewerCanReply,
     );
-  }
-
-  /// 格式化時間顯示
-  String _formatEchoTimeAgo(DateTime? dt) {
-    if (dt == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inHours < 24) {
-      if (diff.inHours > 0) return '${diff.inHours}小時前';
-      if (diff.inMinutes > 0) return '${diff.inMinutes}分鐘前';
-      return '剛剛';
-    }
-    if (diff.inDays < 7) return '${diff.inDays}天前';
-    if (dt.year == now.year) {
-      return '${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-    }
-    return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
   }
 
   /// 重建樹狀結構
@@ -572,7 +557,12 @@ class _PageEchoTabState extends ConsumerState<PageEchoTab>
                       ),
                     ),
                     Text(
-                      _formatEchoTimeAgo(node.createdAt),
+                      node.createdAt == null
+                          ? ''
+                          : context.taipeiDisplay.timeAgoIn(
+                              context.l10n,
+                              node.createdAt!,
+                            ),
                       style: TextStyle(
                         fontSize: 14.sp,
                         color: AppColors.textPrimary.withValues(alpha: 0.5),

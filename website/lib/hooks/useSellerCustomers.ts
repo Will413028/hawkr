@@ -1,69 +1,73 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import {
 	keepPreviousData,
-	useQuery,
+	useInfiniteQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { queryKeys } from "@/lib/query/keys";
 import {
-	fetchSellerCustomers,
+	type ListCustomersParams,
+	listCustomers,
 	type SellerCustomer,
-	type SellerCustomerType,
-} from "@/lib/seller/repo";
+} from "@/lib/seller/crm";
+import { useCrmStoreId } from "./useCrmStoreId";
 import { useQueryIdentity } from "./useQueryIdentity";
 
-export type UseSellerCustomersParams = {
-	page?: number;
-	pageSize?: number;
-	keyword?: string;
-	tagId?: string | number;
-	customerType?: SellerCustomerType;
-	sortBy?: "total_spent" | "order_count";
-	sortOrder?: "asc" | "desc";
-};
+export type UseSellerCustomersParams = Omit<ListCustomersParams, "pageToken">;
 
 interface UseSellerCustomersResult {
+	/** 已載入的客戶；讀取失敗時是 null（與「沒有客戶」的空陣列分開）。 */
 	data: SellerCustomer[] | null;
 	loading: boolean;
+	/** 還有下一頁（`nextPageToken` 非空）。 */
+	hasMore: boolean;
+	loadingMore: boolean;
+	loadMore: () => Promise<void>;
+	/** 伺服器文字（或該 code 的預設文字）；沒有失敗時是 null。 */
 	error: string | null;
 	refresh: () => Promise<void>;
 }
 
 /**
- * The seller's CRM customer list (`/app/sellers/me/customers`). Each consumer
- * passes its own page/pageSize/keyword (CustomersClient 50, messages workspace
- * 200, coupon picker debounced search), so — like `useSellerProducts` — the
- * params live in the queryKey and each variant is its own cache entry; there is
- * no read-side dedup. The win is write-side: after a classification / tag change
- * in the detail drawer, `useInvalidateSellerCustomers` refetches the list so the
- * row badges + chips update, replacing the manual `load()` + mutated-ref dance.
- *
- * `refetchOnWindowFocus` is off: CustomersClient layers two N-row enrichment
- * fan-outs (per-row tags + last-purchase) on top of this list, keyed off the
- * result reference, so a focus-driven refetch would re-fire 50+ requests for no
- * real freshness gain. Refetches stay intentional (mount / filter / invalidate).
- * `placeholderData: keepPreviousData` holds the prior filter's rows on screen
- * while a tab/sort/tag switch (a new queryKey) loads, instead of flashing the
- * whole table to skeleton — the same behaviour the old mutable-list version had.
+ * 店家的客戶列表（`CrmAppService.ListCustomers`），以 `page_token` 往後載入；沒有總數。
+ * 篩選與排序在 queryKey，換一組就是新的快取；換篩選時保留上一組的列直到新的載入完。
+ * `refetchOnWindowFocus` 關閉：重新讀取只在掛載、換篩選與 invalidate 時發生。
  */
 export function useSellerCustomers(
-	params?: UseSellerCustomersParams,
+	params: UseSellerCustomersParams = {},
 ): UseSellerCustomersResult {
 	const identity = useQueryIdentity();
-	const query = useQuery({
-		queryKey: queryKeys.seller.customers(identity, params),
-		queryFn: () => fetchSellerCustomers(params ?? {}),
-		enabled: identity.activeRole === "seller",
+	const { storeId, loading: storeLoading, error: storeError } = useCrmStoreId();
+	const defaults = useDefaultErrorText();
+	const query = useInfiniteQuery({
+		queryKey: queryKeys.seller.customers(identity, { storeId, ...params }),
+		queryFn: ({ pageParam }) =>
+			listCustomers(storeId as string, { ...params, pageToken: pageParam }),
+		initialPageParam: "",
+		getNextPageParam: (last) => last.nextPageToken || undefined,
+		enabled: identity.activeRole === "seller" && Boolean(storeId),
 		staleTime: 30_000,
 		refetchOnWindowFocus: false,
 		placeholderData: keepPreviousData,
 	});
+	const data = useMemo(
+		() => query.data?.pages.flatMap((page) => page.customers) ?? null,
+		[query.data],
+	);
+	const failure = storeError ?? query.error;
 	return {
-		data: query.data ?? null,
-		loading: query.isLoading,
-		error: query.error instanceof Error ? query.error.message : null,
+		data,
+		loading: storeLoading || query.isLoading,
+		hasMore: query.hasNextPage,
+		loadingMore: query.isFetchingNextPage,
+		loadMore: async () => {
+			await query.fetchNextPage();
+		},
+		error: failure ? errorText(failure, defaults) : null,
 		refresh: async () => {
 			await query.refetch();
 		},

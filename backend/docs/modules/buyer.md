@@ -5,7 +5,7 @@
 ## 1. 範圍與公開面
 
 - 買家 stint、profile、頭像、收貨地址、收藏、追蹤（賣家訂閱）、個人封鎖、瀏覽、補貨訂閱與刪除。
-- 會員方案、指派與額度週期（設計書 59、ADR `2026-09-18-buyer-membership-entitlement-model`）。
+- 額度週期與預設額度（設計書 59、ADR `2026-09-18-buyer-membership-entitlement-model`）。
 - 業務事件在同一個 transaction 內發布（含進入刪除中時的 `BuyerDeletionRequested`、關閉時的 `BuyerDeleted`）；River 釋放頭像與清理 PII。
 - 買家不是 identity 的角色：建立與關閉買家都不授予、移除角色，也不自己鎖帳號。
 - buyer_id、address_id 是資料庫發號的 IDENTITY 整數；membership 是 UUIDv7；收藏、追蹤、補貨等關聯用複合自然鍵（ADR `2026-09-25-row-identity-by-data-kind`）。
@@ -27,7 +27,7 @@
 
 ## 3. 個人資料與頭像
 
-- 更新以 SQL 條件式版本比對；profile、地址與會員方案各自持有版本。
+- 更新以 SQL 條件式版本比對；profile 與地址各自持有版本。
 - profile 在買家列鎖內合併：nil 保留，`DisplayName` 空字串拒絕，Phone、Gender、City、Job 空字串與 BirthDate 零值清為 NULL。並行的 profile 更新不遺失任何欄位。
 - gender、買家與會員狀態、會員 source 有 CHECK；寫入驗證與受限轉移由純函式驗證涵蓋。會員 source 的唯一儲存值是 ADMIN，SYSTEM_DEFAULT 只在記憶體合成權益。
 - 換頭像在版本條件的 transaction 內：通過版本與合併後的文字驗證後 `Confirm` 新資產（必須是公開圖片），寫 object key 與 asset ID（UUID，`buyers_avatar_asset_check` 要求成對），並把被換掉的資產 `MarkDeleted`。任何一步失敗整筆回滾，新資產仍是暫存，由 media 的 GC 回收。
@@ -64,10 +64,8 @@
 
 ## 8. 會員
 
-- 方案表 `membership_plans`，指派表 `memberships`。每個買家最多一個 ACTIVE 會員（partial UNIQUE）。
-- `request_id` 必填且全域 UNIQUE（1–100 字元）。指派鎖買家；以 `request_id` 的 transaction advisory lock 序列化跨買家重試，並比對 buyer、plan、期間、操作者與 note。
-- 會員月週期以錨點月 clamp，不回補；人工指派用明確天數；付費過期回 free。時間由注入的 clock 提供。
-- 會員方案的種子資料是一支資料 migration（`*_buyer_membership_plan_seeds.sql`）。額度與價格是設計書 59 的 placeholder 值，後台的 `UpdateMembershipPlan` 可修改。
+- 沒有方案表、指派表與指派入口：每個買家的權益都是 `free` 方案，額度是 `internal/membership` 的具名常數 `DefaultMonthlyAnswerLimit`（100，值與歷史 seed `*_buyer_membership_plan_seeds.sql` 的 free 列相同）。步驟 11e 刪除 `memberships`、11g 刪除 `membership_plans` 與後台方案 RPC；計費或指派入口要做時重新設計方案模型。
+- 額度月週期以 stint 的建立時間為錨點逐月滾動，月底 clamp，不回補。時間由注入的 clock 提供。
 
 ## 9. 讀取模型與輸入邊界
 
@@ -90,4 +88,4 @@
 - buyer_id 與 address_id 是數字 ID，不是 UUID。
 - social-service 的 `GetSubscribersList` 由 legacy adapter 以有界 offset 轉接（`SubscribersOffset`）。gateway buyer REST 不由 legacy server 承接，不提供 offset 或 `GetSavedItems` 形狀。
 - 換圖與關閉都在呼叫者的 transaction 內呼叫 media 的 `Confirm`、`MarkDeleted`（同一個 Postgres）。
-- 會員方案的額度與價格是 placeholder 值。
+- 預設額度是 placeholder 常數。

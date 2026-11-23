@@ -9,7 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/store"
 )
 
-// MessageRow 與 store.ListMessagesBeforeRow、store.ListMessagesAfterRow 同欄位同順序，可以直接轉型。
+// MessageRow 與 store.ListMessagesBeforeRow、store.ListMessagesAfterRow、store.MessageByRequestRow 同欄位同順序，可以直接轉型。
 type MessageRow struct {
 	ID             uuid.UUID
 	ConversationID uuid.UUID

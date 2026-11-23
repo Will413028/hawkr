@@ -31,13 +31,14 @@ CREATE TABLE im.conversations (
 CREATE INDEX conversations_buyer ON im.conversations (buyer_id, last_message_at DESC, id DESC);
 CREATE INDEX conversations_store ON im.conversations (store_id, last_message_at DESC, id DESC);
 
--- 訊息。寄件人以 (sender_kind, 對話的 buyer_id 或 store_id) 表示，不另存 ID。抹除（刪帳、退場）後保留列（seq 連續），內容與圖片欄位清空，
+-- 訊息。寄件人以 (sender_kind, 對話的 buyer_id 或 store_id) 表示，不另存 ID。request_id 是寄件方帶的送出冪等鍵（UUIDv4），同一對話同一寄件方重送回第一則。抹除（刪帳、退場）後保留列（seq 連續），內容與圖片欄位清空，
 -- 由 messages_shape_check 保證抹除後內容真的不在。content 只放文字訊息。
 CREATE TABLE im.messages (
     id               UUID        PRIMARY KEY,
     conversation_id  UUID        NOT NULL REFERENCES im.conversations (id) ON DELETE CASCADE,
     seq              BIGINT      NOT NULL,
     sender_kind      TEXT        NOT NULL,
+    request_id       UUID        NOT NULL,
     message_type     TEXT        NOT NULL,
     content          TEXT,
     image_asset_id   UUID,
@@ -45,6 +46,7 @@ CREATE TABLE im.messages (
     created_at       TIMESTAMPTZ NOT NULL,
     erased_at        TIMESTAMPTZ,
     CONSTRAINT messages_seq_key UNIQUE (conversation_id, seq),
+    CONSTRAINT messages_request_key UNIQUE (conversation_id, sender_kind, request_id),
     CONSTRAINT messages_seq_check CHECK (seq > 0),
     CONSTRAINT messages_sender_kind_check CHECK (sender_kind IN ('BUYER', 'STORE')),
     CONSTRAINT messages_type_check CHECK (message_type IN ('TEXT', 'IMAGE')),

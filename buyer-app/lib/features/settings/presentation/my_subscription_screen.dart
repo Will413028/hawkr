@@ -1,3 +1,6 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
+import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'dart:async';
@@ -42,6 +45,7 @@ import '../../../shared/utils/price_display.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_skeleton_shimmer.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_placeholder.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class _SubscriptionGlassBackdrop extends StatelessWidget {
   const _SubscriptionGlassBackdrop();
@@ -408,27 +412,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     if (reviewCount > 0) item['reviewCount'] = reviewCount;
   }
 
-  void _applyReviewStatsFromReviews(
-    Map<String, dynamic> item,
-    List<Map<String, dynamic>> reviews,
-  ) {
-    item['reviewCount'] = reviews.length;
-    if (reviews.isEmpty) {
-      item['rating'] = 0.0;
-      return;
-    }
-
-    var total = 0.0;
-    var validCount = 0;
-    for (final review in reviews) {
-      final rating = _parseRatingValue(review['rating']);
-      if (rating <= 0) continue;
-      total += rating;
-      validCount++;
-    }
-    item['rating'] = validCount > 0 ? total / validCount : 0.0;
-  }
-
   Future<void> _enrichProductReviewStats(
     Map<String, dynamic> item,
     String productId,
@@ -440,31 +423,14 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
     if (hasReviewCount && hasRating) return;
 
     try {
-      final reviewRepository = ref.read(reviewRepositoryProvider);
-      final summary = await reviewRepository.getMerchantProductReviewSummary(
-        productId,
-      );
-      final hasSummaryTotal = summary['hasTotal'] == true;
-      final summaryTotal = _parseIntValue(summary['total']);
-      final summaryRating = _parseRatingValue(summary['rating']);
-      if (hasSummaryTotal) item['reviewCount'] = summaryTotal;
-      if (summaryRating > 0) item['rating'] = summaryRating;
-      if (hasSummaryTotal &&
-          (summaryTotal <= 0 || summaryRating > 0 || hasRating)) {
-        return;
-      }
-
-      final reviews = await reviewRepository.getMerchantProductReviews(
-        productId,
-      );
-      if (reviews.isEmpty) {
-        if (!hasReviewCount) item['reviewCount'] = 0;
-        if (!hasRating) item['rating'] = 0.0;
-        return;
-      }
-      _applyReviewStatsFromReviews(item, reviews);
-      if (hasSummaryTotal) item['reviewCount'] = summaryTotal;
-    } catch (_) {}
+      final summary = await ref
+          .read(reviewRepositoryProvider)
+          .getProductReviewStats(productId);
+      if (!hasReviewCount) item['reviewCount'] = summary.count;
+      if (!hasRating) item['rating'] = summary.average;
+    } catch (_) {
+      // 補充統計失敗時保留卡片原有的值，不當成沒有評價。
+    }
   }
 
   /// 追蹤店家卡片的顯示資料，全部來自 API 回的店家卡片。
@@ -766,45 +732,6 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
                 .getProductImages(pid);
             if (imgs.isNotEmpty) {
               enriched[i]['productImage'] = imgs.first.toString().trim();
-            }
-          } catch (_) {}
-        }
-
-        // 載入商品規格價格範圍（若 API 未回傳則補抓）
-        if ((m['minPrice'] ?? '').toString().isEmpty) {
-          try {
-            final grades = await ref
-                .read(productRepositoryProvider)
-                .getMerchantProductGrades(mid, pid);
-            if (grades.isNotEmpty) {
-              num? minPrice;
-              num? maxPrice;
-              for (final grade in grades) {
-                final priceVal =
-                    grade['price'] ?? grade['unitPrice'] ?? grade['salePrice'];
-                if (priceVal != null) {
-                  num price;
-                  if (priceVal is num) {
-                    price = priceVal;
-                  } else {
-                    final parsed = num.tryParse(priceVal.toString());
-                    if (parsed == null) continue;
-                    price = parsed;
-                  }
-                  if (price > 0) {
-                    if (minPrice == null || price < minPrice) {
-                      minPrice = price;
-                    }
-                    if (maxPrice == null || price > maxPrice) {
-                      maxPrice = price;
-                    }
-                  }
-                }
-              }
-              if (minPrice != null) {
-                enriched[i]['minPrice'] = minPrice.toString();
-                enriched[i]['maxPrice'] = (maxPrice ?? minPrice).toString();
-              }
             }
           } catch (_) {}
         }
@@ -1598,30 +1525,27 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
         final milliseconds = value > 1000000000000
             ? value.toInt()
             : value.toInt() * 1000;
-        return DateTime.fromMillisecondsSinceEpoch(milliseconds).toLocal();
+        return DateTime.fromMillisecondsSinceEpoch(milliseconds, isUtc: true);
       }
       final raw = value.toString().trim();
       final numeric = int.tryParse(raw);
       if (numeric != null) {
         final milliseconds = numeric > 1000000000000 ? numeric : numeric * 1000;
-        return DateTime.fromMillisecondsSinceEpoch(milliseconds).toLocal();
+        return DateTime.fromMillisecondsSinceEpoch(milliseconds, isUtc: true);
       }
-      final parsed = DateTime.tryParse(raw);
-      if (parsed != null) return parsed.toLocal();
+      final parsed = tryParseTaipeiInstant(raw);
+      if (parsed != null) return parsed;
     }
     return null;
   }
 
   String _historyLabel(Map<String, dynamic> item) {
     final time = _activityTime(item);
-    if (time == null) return '最近看過';
-    final difference = DateTime.now().difference(time);
-    if (difference.isNegative || difference.inMinutes < 1) return '剛剛看過';
-    if (difference.inHours < 1) return '${difference.inMinutes} 分鐘前看過';
-    if (difference.inDays < 1) return '${difference.inHours} 小時前看過';
-    if (difference.inDays == 1) return '昨天看過';
-    if (difference.inDays < 7) return '${difference.inDays} 天前看過';
-    return '${time.month}/${time.day} 看過';
+    if (time == null) return context.l10n.viewedRecently;
+    return context.taipeiDisplay.agoText(
+      taipeiTimeAgo(time),
+      historyViewedText(context.l10n, time),
+    );
   }
 
   void _openMerchant(String storeCode) {

@@ -3,8 +3,8 @@
  *
  * active role 是賣家帳號（每個帳號都是買家）目前在看哪個工作區：純粹是 client 的狀態，不是授權。存在
  * localStorage。預設的規則在這裡：帳號有賣家角色而且存的工作區是賣家才是賣家，其他情況是買家。Connect 不讀工作區
- * （服務名稱本身就表示以哪個身分呼叫，ADR 2026-10-07-connect-without-perspective）；只有舊 REST、SSE、AI chat 與
- * chat ws-ticket 以 X-Active-Role（`BUYER`、`SELLER`）帶上，舊 gateway 依它選擇以買家或賣家動作。伺服器不保存
+ * （服務名稱本身就表示以哪個身分呼叫，ADR 2026-10-07-connect-without-perspective）；只有舊 REST、SSE 與 AI chat
+ * 以 X-Active-Role（`BUYER`、`SELLER`）帶上，舊 gateway 依它選擇以買家或賣家動作。伺服器不保存
  * （〈API 設計規範（Connect）〉§二）。
  */
 

@@ -16,6 +16,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
@@ -65,8 +66,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 86 {
-		t.Fatalf("declarations=%d methods=%d，預期 86", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 87 {
+		t.Fatalf("declarations=%d methods=%d，預期 87", got, want)
 	}
 
 	for procedure := range declarations {
@@ -329,6 +330,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 		}
 	}
 	wantAudited := []string{
+		bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,
@@ -350,7 +352,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 }
 
 // readOnly 只給讀取（Get、List、Preview）與明列的例外：新的寫入方法不能被標成 readOnly 躲過紀錄。
-// mutation：把 UpdateMembershipPlan 標成 readOnly → 這個測試失敗。
+// mutation：把 UpdateBanner 標成 readOnly → 這個測試失敗。
 func TestOnlyReadsAndNamedExceptionsAreReadOnly(t *testing.T) {
 	exceptions := map[string]string{
 		"RefreshPaymentAccount": "同步重讀 provider 並覆寫快取，結果由 provider 決定，不是管理員的決定",
@@ -361,7 +363,7 @@ func TestOnlyReadsAndNamedExceptionsAreReadOnly(t *testing.T) {
 			continue
 		}
 		method := procedure[strings.LastIndex(procedure, "/")+1:]
-		if strings.HasPrefix(method, "Get") || strings.HasPrefix(method, "List") || method == "PreviewProspect" {
+		if strings.HasPrefix(method, "Get") || strings.HasPrefix(method, "List") || method == "PreviewProspect" || method == "PreviewHolidayCalendar" {
 			continue
 		}
 		if _, ok := exceptions[method]; !ok {
@@ -375,7 +377,6 @@ func TestOnlyReadsAndNamedExceptionsAreReadOnly(t *testing.T) {
 // 不得加進這份清單。
 // mutation：把任何一支不在清單內的方法（例如 payment 的 RetryPaymentAccountPurge）宣告成 auditPending → 下面的測試失敗。
 var frozenAuditPending = []string{
-	"/hawkr.admin.buyer.v1alpha1.BuyerAdminService/UpdateMembershipPlan",
 	"/hawkr.admin.content.v1alpha1.ContentAdminService/CreateAppVersionGate",
 	"/hawkr.admin.content.v1alpha1.ContentAdminService/CreateBanner",
 	"/hawkr.admin.content.v1alpha1.ContentAdminService/DeleteBanner",

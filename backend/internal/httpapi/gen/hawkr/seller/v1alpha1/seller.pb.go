@@ -7942,6 +7942,8 @@ type BlockBuyerRequest struct {
 	//
 	//	*BlockBuyerRequest_CommentId
 	//	*BlockBuyerRequest_ForumEntryId
+	//	*BlockBuyerRequest_ReviewId
+	//	*BlockBuyerRequest_MessageId
 	Source        isBlockBuyerRequest_Source `protobuf_oneof:"source"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -8002,6 +8004,24 @@ func (x *BlockBuyerRequest) GetForumEntryId() string {
 	return ""
 }
 
+func (x *BlockBuyerRequest) GetReviewId() string {
+	if x != nil {
+		if x, ok := x.Source.(*BlockBuyerRequest_ReviewId); ok {
+			return x.ReviewId
+		}
+	}
+	return ""
+}
+
+func (x *BlockBuyerRequest) GetMessageId() string {
+	if x != nil {
+		if x, ok := x.Source.(*BlockBuyerRequest_MessageId); ok {
+			return x.MessageId
+		}
+	}
+	return ""
+}
+
 type isBlockBuyerRequest_Source interface {
 	isBlockBuyerRequest_Source()
 }
@@ -8016,9 +8036,23 @@ type BlockBuyerRequest_ForumEntryId struct {
 	ForumEntryId string `protobuf:"bytes,2,opt,name=forum_entry_id,json=forumEntryId,proto3,oneof"`
 }
 
+type BlockBuyerRequest_ReviewId struct {
+	// 評價 ID：封鎖寫這則評價的買家（要是呼叫者此刻的店的評價）。
+	ReviewId string `protobuf:"bytes,3,opt,name=review_id,json=reviewId,proto3,oneof"`
+}
+
+type BlockBuyerRequest_MessageId struct {
+	// 聊天訊息 ID：封鎖這則訊息所屬對話的買家（呼叫者此刻的店要是該對話的店家；不是回 not_found，與訊息不存在相同）。訊息已隱藏或抹除仍可當參照。
+	MessageId string `protobuf:"bytes,4,opt,name=message_id,json=messageId,proto3,oneof"`
+}
+
 func (*BlockBuyerRequest_CommentId) isBlockBuyerRequest_Source() {}
 
 func (*BlockBuyerRequest_ForumEntryId) isBlockBuyerRequest_Source() {}
+
+func (*BlockBuyerRequest_ReviewId) isBlockBuyerRequest_Source() {}
+
+func (*BlockBuyerRequest_MessageId) isBlockBuyerRequest_Source() {}
 
 type BlockBuyerResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -8742,11 +8776,14 @@ const file_hawkr_seller_v1alpha1_seller_proto_rawDesc = "" +
 	"\x18RecordProductViewRequest\x12\"\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"\x1b\n" +
-	"\x19RecordProductViewResponse\"f\n" +
+	"\x19RecordProductViewResponse\"\xa6\x01\n" +
 	"\x11BlockBuyerRequest\x12\x1f\n" +
 	"\n" +
 	"comment_id\x18\x01 \x01(\tH\x00R\tcommentId\x12&\n" +
-	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryIdB\b\n" +
+	"\x0eforum_entry_id\x18\x02 \x01(\tH\x00R\fforumEntryId\x12\x1d\n" +
+	"\treview_id\x18\x03 \x01(\tH\x00R\breviewId\x12\x1f\n" +
+	"\n" +
+	"message_id\x18\x04 \x01(\tH\x00R\tmessageIdB\b\n" +
 	"\x06source\".\n" +
 	"\x12BlockBuyerResponse\x12\x18\n" +
 	"\achanged\x18\x01 \x01(\bR\achanged\"5\n" +
@@ -9421,6 +9458,8 @@ func file_hawkr_seller_v1alpha1_seller_proto_init() {
 	file_hawkr_seller_v1alpha1_seller_proto_msgTypes[96].OneofWrappers = []any{
 		(*BlockBuyerRequest_CommentId)(nil),
 		(*BlockBuyerRequest_ForumEntryId)(nil),
+		(*BlockBuyerRequest_ReviewId)(nil),
+		(*BlockBuyerRequest_MessageId)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

@@ -1094,9 +1094,9 @@ type CaseReport struct {
 	Category v1alpha11.PolicyCategory `protobuf:"varint,3,opt,name=category,proto3,enum=hawkr.common.v1alpha1.PolicyCategory" json:"category,omitempty"`
 	// 送出時的說明；沒有或已超過保留期被清除時是空字串。
 	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	// 結果由案件的決定推導：進行中是 PENDING。
-	Outcome       v1alpha1.ReportOutcome `protobuf:"varint,5,opt,name=outcome,proto3,enum=hawkr.moderation.v1alpha1.ReportOutcome" json:"outcome,omitempty"`
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	// 結果由案件的決定推導：進行中不設值。
+	Outcome       *v1alpha1.ReportOutcome `protobuf:"varint,5,opt,name=outcome,proto3,enum=hawkr.moderation.v1alpha1.ReportOutcome,oneof" json:"outcome,omitempty"`
+	CreateTime    *timestamppb.Timestamp  `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1178,8 +1178,8 @@ func (x *CaseReport) GetDescription() string {
 }
 
 func (x *CaseReport) GetOutcome() v1alpha1.ReportOutcome {
-	if x != nil {
-		return x.Outcome
+	if x != nil && x.Outcome != nil {
+		return *x.Outcome
 	}
 	return v1alpha1.ReportOutcome(0)
 }
@@ -1784,19 +1784,21 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\tasset_ids\x18\x06 \x03(\tB\x03\xe0A\x03R\bassetIds\x12<\n" +
 	"\tsend_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\bsendTime\x12\x1b\n" +
 	"\x06hidden\x18\b \x01(\bB\x03\xe0A\x03R\x06hidden\x12\x1b\n" +
-	"\x06erased\x18\t \x01(\bB\x03\xe0A\x03R\x06erased\"\xef\x02\n" +
+	"\x06erased\x18\t \x01(\bB\x03\xe0A\x03R\x06erased\"\x80\x03\n" +
 	"\n" +
 	"CaseReport\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x03R\x02id\x12,\n" +
 	"\x11reporter_buyer_id\x18\x02 \x01(\tH\x00R\x0freporterBuyerId\x12,\n" +
 	"\x11reporter_store_id\x18\a \x01(\tH\x00R\x0freporterStoreId\x12A\n" +
 	"\bcategory\x18\x03 \x01(\x0e2%.hawkr.common.v1alpha1.PolicyCategoryR\bcategory\x12 \n" +
-	"\vdescription\x18\x04 \x01(\tR\vdescription\x12B\n" +
-	"\aoutcome\x18\x05 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeR\aoutcome\x12;\n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12G\n" +
+	"\aoutcome\x18\x05 \x01(\x0e2(.hawkr.moderation.v1alpha1.ReportOutcomeH\x01R\aoutcome\x88\x01\x01\x12;\n" +
 	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"createTimeB\n" +
 	"\n" +
-	"\breporter\"\xde\x01\n" +
+	"\breporterB\n" +
+	"\n" +
+	"\b_outcome\"\xde\x01\n" +
 	"\x10ListCasesRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +

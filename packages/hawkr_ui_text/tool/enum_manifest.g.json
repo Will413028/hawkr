@@ -1,6 +1,27 @@
 {
   "enums": [
     {
+      "name": "hawkr.assistant.v1alpha1.AssistantMessageRole",
+      "dartClass": "AssistantMessageRole",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.assistant.v1alpha1.AssistantTool",
+      "dartClass": "AssistantTool",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.assistant.v1alpha1.AssistantTopic",
+      "dartClass": "AssistantTopic",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.buyer.v1alpha1.BuyerStatus",
       "dartClass": "BuyerStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart",
@@ -12,6 +33,20 @@
       "dartClass": "Gender",
       "dartLibrary": "package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart",
       "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.chat.v1alpha1.ChatParty",
+      "dartClass": "ChatParty",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.chat.v1alpha1.MessageKind",
+      "dartClass": "MessageKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pbenum.dart",
+      "inCatalog": false,
       "serverOwned": false
     },
     {
@@ -40,6 +75,20 @@
       "dartClass": "AppType",
       "dartLibrary": "package:hawkr_api/gen/hawkr/content/v1alpha1/content.pbenum.dart",
       "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.crm.v1alpha1.CustomerSort",
+      "dartClass": "CustomerSort",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.crm.v1alpha1.CustomerType",
+      "dartClass": "CustomerType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart",
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -74,6 +123,13 @@
       "name": "hawkr.identity.v1alpha1.Role",
       "dartClass": "Role",
       "dartLibrary": "package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.imageai.v1alpha1.AiStyleCategory",
+      "dartClass": "AiStyleCategory",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/imageai/v1alpha1/imageai.pbenum.dart",
       "inCatalog": false,
       "serverOwned": false
     },
@@ -124,6 +180,146 @@
       "dartClass": "RequirementCollection",
       "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
       "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.AudienceMode",
+      "dartClass": "AudienceMode",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.BlockKind",
+      "dartClass": "BlockKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.CancelDisposition",
+      "dartClass": "CancelDisposition",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.ConversationRole",
+      "dartClass": "ConversationRole",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.InterruptKind",
+      "dartClass": "InterruptKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.InviteDeliveryState",
+      "dartClass": "InviteDeliveryState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.ItemResolutionKind",
+      "dartClass": "ItemResolutionKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.OrderProvisioningState",
+      "dartClass": "OrderProvisioningState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.PublicationState",
+      "dartClass": "PublicationState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.QuoteAcceptability",
+      "dartClass": "QuoteAcceptability",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.RejectionReason",
+      "dartClass": "RejectionReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.RequestStatus",
+      "dartClass": "RequestStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.RunFailureReason",
+      "dartClass": "RunFailureReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.RunStatus",
+      "dartClass": "RunStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.RunType",
+      "dartClass": "RunType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.SellerResponseStatus",
+      "dartClass": "SellerResponseStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.SellerResponseType",
+      "dartClass": "SellerResponseType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.SlotKey",
+      "dartClass": "SlotKey",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.StepStatus",
+      "dartClass": "StepStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.procurement.v1alpha1.TaxInclusionBasis",
+      "dartClass": "TaxInclusionBasis",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
+      "inCatalog": false,
       "serverOwned": false
     },
     {

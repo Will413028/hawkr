@@ -1,5 +1,17 @@
 {
   "default": {
+    "admin.moderation.CaseReport.outcome_unset": {
+      "message": "Under review"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": {
+      "message": "Looking up the order details"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS": {
+      "message": "Looking up your orders"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE": {
+      "message": "Checking your package tracking"
+    },
     "buyer.Gender.GENDER_FEMALE": {
       "message": "Female"
     },
@@ -9,8 +21,35 @@
     "buyer.Gender.GENDER_OTHER": {
       "message": "Other"
     },
+    "buyer.Profile.deleted_name": {
+      "message": "Deleted account"
+    },
     "buyer.Profile.gender_unset": {
       "message": "Not set"
+    },
+    "chat.Message.unsupported_kind": {
+      "message": "Unsupported message"
+    },
+    "chat.Preview.erased": {
+      "message": "This message has been removed"
+    },
+    "chat.Preview.hidden": {
+      "message": "This message has been hidden"
+    },
+    "chat.Preview.image": {
+      "message": "Sent a photo"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT": {
+      "message": "Counterfeit goods"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION": {
+      "message": "Fake certification"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY": {
+      "message": "Food safety"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FRAUD": {
+      "message": "Fraud or transaction manipulation"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
       "message": "Harassment or bullying"
@@ -18,11 +57,38 @@
     "common.PolicyCategory.POLICY_CATEGORY_HATE": {
       "message": "Hate or discriminatory speech"
     },
+    "common.PolicyCategory.POLICY_CATEGORY_IMPERSONATION": {
+      "message": "Impersonation"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_IP_INFRINGEMENT": {
+      "message": "Intellectual property infringement"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO": {
+      "message": "False or misleading information"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_OFF_PLATFORM_TRADE": {
+      "message": "Off-platform transactions"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_OTHER": {
+      "message": "Other"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE": {
+      "message": "Platform abuse"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PRIVACY": {
+      "message": "Misuse of personal data"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS": {
+      "message": "Illegal or prohibited goods"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT": {
       "message": "Sexual content"
     },
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "Spam"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE": {
+      "message": "Unlicensed sale"
     },
     "common.StoreCard.closed_store": {
       "message": "Closed store"
@@ -35,6 +101,21 @@
     },
     "common.StoreCardStatus.STORE_CARD_STATUS_PAUSED": {
       "message": "Temporarily closed"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME": {
+      "message": "First order date"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT": {
+      "message": "Order count"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT": {
+      "message": "Total spent"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_NORMAL": {
+      "message": "Regular customer"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_VIP": {
+      "message": "VIP"
     },
     "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH": {
       "message": "The file was corrupted during upload. Please upload it again."
@@ -51,11 +132,11 @@
     "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT": {
       "message": "The file format was not recognized. Use a JPEG, PNG, WebP or GIF image."
     },
+    "moderation.CommunityReport.outcome_unset": {
+      "message": "Under review"
+    },
     "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "Resolved (no violation)"
-    },
-    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "Under review"
     },
     "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
       "message": "Resolved (violation)"
@@ -101,6 +182,63 @@
     },
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
       "message": "Provider-hosted"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE": {
+      "message": "The budget per unit is out of range"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED": {
+      "message": "The city could not be recognized"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT": {
+      "message": "The date format is not valid"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR": {
+      "message": "The date is missing the year"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_PAST": {
+      "message": "The date has already passed"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR": {
+      "message": "The date is too far ahead"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_EMPTY": {
+      "message": "The content is empty"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE": {
+      "message": "The quantity is out of range"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM": {
+      "message": "The item is missing or was rejected, so no item category can be set"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL": {
+      "message": "The item category has no name"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": {
+      "message": "The way the item category was decided is unknown"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_TRUNCATED": {
+      "message": "Over the length limit, shortened"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
+      "message": "This unit is not supported"
+    },
+    "review.Review.rating_label_1": {
+      "message": "Very dissatisfied"
+    },
+    "review.Review.rating_label_2": {
+      "message": "Dissatisfied"
+    },
+    "review.Review.rating_label_3": {
+      "message": "Okay"
+    },
+    "review.Review.rating_label_4": {
+      "message": "Satisfied"
+    },
+    "review.Review.rating_label_5": {
+      "message": "Very satisfied"
+    },
+    "review.ReviewAuthor.anonymous_name": {
+      "message": "Anonymous member"
     },
     "seller.InquiryKind.INQUIRY_KIND_EXPLANATION": {
       "message": "Provide an explanation"

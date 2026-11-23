@@ -29,19 +29,23 @@ void _check(BuilderInfo root, String path) {
       throw ArgumentError.value(
         path,
         'paths',
-        '欄位 ${segments[i]} 不存在於 ${root.qualifiedMessageName}',
+        'field ${segments[i]} does not exist in ${root.qualifiedMessageName}',
       );
     }
     if (i == segments.length - 1) return;
     final next = field.subBuilder;
     if (!field.isGroupOrMessage || field.isRepeated || next == null) {
-      throw ArgumentError.value(path, 'paths', '${segments[i]} 不是訊息欄位');
+      throw ArgumentError.value(
+        path,
+        'paths',
+        '${segments[i]} is not a message field',
+      );
     }
     if (!info.oneofs.containsKey(field.tagNumber)) {
       throw ArgumentError.value(
         path,
         'paths',
-        '${segments[i]} 不是 oneof 的子訊息，路徑只能停在它',
+        '${segments[i]} is not a oneof member message; the path must end there',
       );
     }
     info = next().info_;

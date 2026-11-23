@@ -116,7 +116,7 @@ const (
 	ActionWarn          = model.ActionWarn
 	ActionBan           = model.ActionBan
 	ActionTakedown      = model.ActionTakedown
-	OutcomePending      = model.OutcomePending
+	OutcomeNone         = model.OutcomeNone
 	OutcomeViolation    = model.OutcomeViolation
 	OutcomeNoViolation  = model.OutcomeNoViolation
 	CaseOpen            = model.CaseOpen
@@ -236,6 +236,11 @@ func (m *Module) SubmitReport(ctx context.Context, in SubmitInput) (SubmitResult
 // MyReports 列出檢舉人自己的檢舉，新到舊（keyset）：對象、類別、說明與由案件推導的結果（進行中、違規、不違規）；不含案件 ID。
 func (m *Module) MyReports(ctx context.Context, buyerID int64, after *ReportCursor, size int32) (ReportPage, error) {
 	return m.report.MyReports(ctx, buyerID, after, size)
+}
+
+// MyStoreReports 列出店家以檢舉人身分送出的檢舉（只有聊天訊息），形狀、排序與分頁同 MyReports；店家退場後的檢舉列留著但呼叫方不再有「此刻的店」，所以讀不到。
+func (m *Module) MyStoreReports(ctx context.Context, storeID int64, after *ReportCursor, size int32) (ReportPage, error) {
+	return m.report.MyStoreReports(ctx, storeID, after, size)
 }
 
 // DecideCase 處理案件並結案：違規要帶認定類別、處置種類與給作者的理由，處置（social 的隱藏或警告、停權、seller 的內容下架）與結案在同一個 transaction；

@@ -56,9 +56,6 @@ service OrderService {
 
     // ==================== 服務間呼叫 ====================
 
-    // 根據物流序號查詢訂單（shipping-service 用）
-    rpc GetOrderByShipTradeNo(GetOrderByShipTradeNoRequest) returns (GetOrderByShipTradeNoResponse);
-
     // 查詢訂單評論資格（review-service 用）
     rpc GetOrderForReview(GetOrderForReviewRequest) returns (GetOrderForReviewResponse);
 
@@ -135,9 +132,6 @@ service OrderService {
     // ==================== §29 Admin 異常訂單列表 ====================
     // 跨服務異常訂單聚合（依 order.status 批次聚合 provider_* from Payment / Shipping）
     rpc ListAbnormalOrdersForAdmin(ListAbnormalOrdersForAdminRequest) returns (ListAbnormalOrdersForAdminResponse);
-
-    // ==== 服務間：CRM 訂單聚合 ====
-    rpc GetOrderAggregates(GetOrderAggregatesRequest) returns (GetOrderAggregatesResponse);
 
     // ==== 服務間：發票開立所需的訂單不可變快照（58 號 §7.1.2 步驟 5 ①）====
     // invoice-service 的 order.paid consumer 專用；唯讀、不改任何狀態。
@@ -652,16 +646,6 @@ message FinancialLogView {
 
 // ==================== 服務間呼叫訊息 ====================
 
-message GetOrderByShipTradeNoRequest {
-    string ship_trade_no = 1;     // 物流序號（shipment_no）
-}
-
-message GetOrderByShipTradeNoResponse {
-    int32 code = 1;
-    string message = 2;
-    OrderDetailView data = 3;
-}
-
 // ==================== 物流建單查詢（Shipping Service 內部呼叫）====================
 
 message GetOrderForShippingRequest {
@@ -1153,27 +1137,6 @@ message GetSellerOrderStatusCountsResponse {
 }
 
 // ==================== 推薦商家訊息 ====================
-
-// ==================== 服務間：CRM 訂單聚合（issue #1519，crm-service GetOrderAggregates）====================
-
-message GetOrderAggregatesRequest {
-    int64 store_id = 1;    // 0 = 不篩選（全店家聚合）
-    PageRequest page = 2;
-}
-
-message GetOrderAggregatesResponse {
-    int32 code = 1;
-    string message = 2;
-    repeated OrderAggregateItem data = 3;
-    PageMeta meta = 4;
-}
-
-message OrderAggregateItem {
-    string store_id = 1;          // §6.1：exposed 欄位一律 string，避免 JSON number 精度遺失
-    string buyer_id = 2;
-    string order_count = 3;
-    string total_net_amount = 4;
-}
 
 message GetTopSellersByRevenueRequest {
     int32 days = 1;   // 計算區間天數（預設 30）

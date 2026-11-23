@@ -343,7 +343,7 @@ public class OrderService {
         //    SELLER_DIRECT，而**本方法曾是全系統唯一繞過那道閘門的地方**。
         //
         // ⚠️ 退場的是**帳務形狀不是值域**：PLATFORM_CONSIGNMENT 等三個仍是 DB CHECK 的
-        //    合法值（payment-service 的 LedgerTxn 還在用），只是再也沒有寫入路徑。
+        //    合法值，只是再也沒有寫入路徑。
         //    要啟用受託代銷，改的是 OrderPolicyResolver（加賣家契約查詢），不是這裡
         //    ——否則就會重演「一條路徑偷偷啟用了另一條路徑刻意關掉的東西」。
         //
@@ -588,14 +588,6 @@ public class OrderService {
         return order;
     }
 
-    public OrderEntity getOrderByShipmentNo(String shipmentNo) {
-        OrderEntity order = orderRepository.findByShipmentNo(shipmentNo);
-        if (order == null) {
-            throw new OrderNotFoundException("shipment_no=" + shipmentNo);
-        }
-        return order;
-    }
-
     public List<OrderItemEntity> getOrderItems(String orderNo) {
         return orderItemRepository.findByOrderNo(orderNo);
     }
@@ -836,15 +828,6 @@ public class OrderService {
             out.add(orderRepository.findStorePeriodOrderStats(storeId, w[0], w[1], QUALIFYING_ORDER_STATUSES));
         }
         return out;
-    }
-
-    public List<OrderAggregateResult> getOrderAggregates(long storeId, int page, int size) {
-        int offset = (page - 1) * size;
-        return orderRepository.findOrderAggregates(storeId, size, offset);
-    }
-
-    public long countOrderAggregates(long storeId) {
-        return orderRepository.countOrderAggregates(storeId);
     }
 
     public List<OrderEntity> searchOrders(String orderNo, long buyerId, long storeId, String status, int page, int size) {

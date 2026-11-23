@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/session/session_provider.dart';
 import '../data/wallet_model.dart';
@@ -37,6 +38,7 @@ final class WalletCouponCardState {
     required this.content,
     required this.rule,
     required this.expire,
+    required this.expireIsTime,
     required this.discountLabel,
     required this.sellerName,
     required this.storeId,
@@ -81,6 +83,7 @@ final class WalletCouponCardState {
       content: content,
       rule: ruleParts.join('  '),
       expire: _expiryLabel(coupon.endAt),
+      expireIsTime: _expiryParses(coupon.endAt),
       discountLabel: discountLabel,
       sellerName: (coupon.sellerName ?? '').trim(),
       storeId: (coupon.storeId ?? '').trim(),
@@ -94,6 +97,7 @@ final class WalletCouponCardState {
   final String content;
   final String rule;
   final String expire;
+  final bool expireIsTime;
   final String discountLabel;
   final String sellerName;
   final String storeId;
@@ -120,18 +124,20 @@ final class WalletCouponCardState {
     return value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
   }
 
+  /// [expire] 是解析成功的臺北日期（顯示時要附標籤）；解析失敗的原樣字串不是。
+  static bool _expiryParses(String? raw) {
+    return TaipeiDisplay.plainIso(raw ?? '') != null;
+  }
+
   static String _expiryLabel(String? raw) {
     final value = raw?.trim() ?? '';
     if (value.isEmpty) return '';
-    try {
-      final date = DateTime.parse(value).toLocal();
-      return '有效期至 ${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-    } on FormatException {
-      final fallback = value.length >= 10
-          ? value.substring(0, 10).replaceAll('-', '/')
-          : value;
-      return '有效期至 $fallback';
-    }
+    final date =
+        TaipeiDisplay.plainIso(value, TaipeiFormat.date) ??
+        (value.length >= 10
+            ? value.substring(0, 10).replaceAll('-', '/')
+            : value);
+    return '有效期至 $date';
   }
 
   /// 規則說明只由 wire 真的有的欄位組：`thresholdAmount` / `discountAmount` /

@@ -26,7 +26,9 @@ import (
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
@@ -34,11 +36,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
@@ -157,10 +161,10 @@ func startAdminStack(t *testing.T) *adminStack {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := httpapi.NewHandler(httpapi.Deps{
+	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, Assistant: &assistant.Module{},
 		Ready: d.Ping, Identity: id, Seller: sellers, Social: socialModule, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
 		Delegation: delegation.New(delegationDeps), Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute,
-		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: mod,
+		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: mod,
 		BuyerPorts: httpbuyer.Ports{Stores: sellers},
 	})
 	if err != nil {
@@ -399,7 +403,7 @@ func TestGetCaseAndNotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 	if res.Msg.GetCase().GetId() != w.postOpen || res.Msg.GetCase().GetState() != adminpb.CaseState_CASE_STATE_OPEN || res.Msg.GetCase().GetEtag() == "" ||
-		len(res.Msg.GetReports()) != 1 || res.Msg.GetReports()[0].GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING {
+		len(res.Msg.GetReports()) != 1 || res.Msg.GetReports()[0].Outcome != nil {
 		t.Fatalf("response = %+v", res.Msg)
 	}
 	_, err = s.admin.GetCase(t.Context(), connect.NewRequest(&adminpb.GetCaseRequest{Id: uuid.New().String()}))

@@ -1,0 +1,28 @@
+{
+  "status": 200,
+  "body": {
+    "id": "tr_3Uew6dRPCx5baPmE1xJ79PK1",
+    "object": "transfer",
+    "amount": 9000,
+    "amount_reversed": 0,
+    "balance_transaction": "txn_3Uew6dRPCx5baPmE1DbVnIVZ",
+    "created": 1795435944,
+    "currency": "usd",
+    "description": null,
+    "destination": "acct_1Ube4FRCeiuh2SHH",
+    "destination_payment": "py_1Uew6eRCeiuh2SHH8cWocvQd",
+    "livemode": false,
+    "metadata": {},
+    "reversals": {
+      "object": "list",
+      "data": [],
+      "has_more": false,
+      "total_count": 0,
+      "url": "<MASKED>"
+    },
+    "reversed": false,
+    "source_transaction": "ch_3Uew6dRPCx5baPmE1wWmgUSM",
+    "source_type": "card",
+    "transfer_group": "order_A"
+  }
+}

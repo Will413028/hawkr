@@ -195,27 +195,6 @@ func (c *ShippingClient) DeleteBuyerStorePickup(ctx context.Context, req *pb.Del
 	return c.shippingClient.DeleteBuyerStorePickup(ctx, req)
 }
 
-// ImportHolidays 匯入假日
-func (c *ShippingClient) ImportHolidays(ctx context.Context, req *pb.ImportHolidaysRequest) (*pb.ImportHolidaysResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-	return c.shippingClient.ImportHolidays(ctx, req)
-}
-
-// ImportHolidaysFromContent 由 CSV 內容匯入假日（檔案上傳版）
-func (c *ShippingClient) ImportHolidaysFromContent(ctx context.Context, req *pb.ImportHolidaysFromContentRequest) (*pb.ImportHolidaysResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-	return c.shippingClient.ImportHolidaysFromContent(ctx, req)
-}
-
-// GetHolidayCoverage 查詢各年度假日覆蓋現況
-func (c *ShippingClient) GetHolidayCoverage(ctx context.Context, req *pb.GetHolidayCoverageRequest) (*pb.GetHolidayCoverageResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	return c.shippingClient.GetHolidayCoverage(ctx, req)
-}
-
 // ListBusinessDays 查詢可出貨工作天
 func (c *ShippingClient) ListBusinessDays(ctx context.Context, req *pb.ListBusinessDaysRequest) (*pb.ListBusinessDaysResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

@@ -1,8 +1,8 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import 'inquiries.dart' show isInquiryOverdue;
+import '../../../shared/time/taipei_display.dart';
 
 /// 詢問畫面的顯示文字。契約只給列舉，種類、狀態、回覆管道的名稱取自共用文案目錄（`hawkr_ui_text`），
 /// 純函式的 `l` 是 UI 語系，沒有文字的值（UNSPECIFIED、不認得）回 null；
@@ -49,30 +49,30 @@ const inquiryReplyTitle = '回覆詢問';
 }
 
 /// 「回覆期限：2026/11/20 10:00」；沒有期限（不是待回覆）時 null。
-String? inquiryDeadlineText(Inquiry inquiry) {
+String? inquiryDeadlineText(Inquiry inquiry, TaipeiDisplay t) {
   if (!inquiry.hasReplyDeadline() || !inquiry.replyDeadline.hasDueTime()) {
     return null;
   }
-  final text = formatTaipeiTimestamp(inquiry.replyDeadline.dueTime);
+  final text = t.timestamp(inquiry.replyDeadline.dueTime);
   return text.isEmpty ? null : '回覆期限：$text';
 }
 
 /// 「提供紀錄 · 2026/11/20 10:00」之類的副標：種類與建立時間。
-String inquiryMeta(Inquiry inquiry, UiLocale l) {
+String inquiryMeta(Inquiry inquiry, UiLocale l, TaipeiDisplay t) {
   final parts = [
     inquiry.kind.uiText(l),
-    if (inquiry.hasCreateTime()) formatTaipeiTimestamp(inquiry.createTime),
+    if (inquiry.hasCreateTime()) t.timestamp(inquiry.createTime),
   ].whereType<String>().where((part) => part.isNotEmpty);
   return parts.join(' · ');
 }
 
 /// 已回覆詢問的回覆摘要：管道與時間（管理員記下的系統外回覆與賣家中心回覆同形）。
-String? inquiryReplyMeta(Inquiry inquiry, UiLocale l) {
+String? inquiryReplyMeta(Inquiry inquiry, UiLocale l, TaipeiDisplay t) {
   if (!inquiry.hasReply()) return null;
   final reply = inquiry.reply;
   final parts = [
     reply.channel.uiText(l),
-    if (reply.hasReceiveTime()) formatTaipeiTimestamp(reply.receiveTime),
+    if (reply.hasReceiveTime()) t.timestamp(reply.receiveTime),
   ].whereType<String>().where((part) => part.isNotEmpty);
   return parts.isEmpty ? null : parts.join(' · ');
 }

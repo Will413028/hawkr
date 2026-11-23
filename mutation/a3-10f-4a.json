@@ -1,0 +1,76 @@
+{
+ "mutants": [
+  {
+   "id": "uncovered-day-weekday-fallback",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\tif !ok {\n\t\treturn false, false\n\t}\n\treturn !day.Holiday, true",
+   "new": "\tif !ok {\n\t\twd := twtime.Day(t).Weekday()\n\t\treturn wd != time.Saturday && wd != time.Sunday, true\n\t}\n\treturn !day.Holiday, true",
+   "test": "internal/platform/bizcalendar ^TestIsBusinessDay$|^TestUncoveredDayIsNeverReportedAsBusinessDay$",
+   "why": "Uncovered days fall back to the weekday rule instead of being not computable."
+  },
+  {
+   "id": "weekend-ignores-holiday-flag",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\treturn !day.Holiday, true",
+   "new": "\tif wd := twtime.Day(t).Weekday(); wd == time.Saturday || wd == time.Sunday {\n\t\treturn false, true\n\t}\n\treturn !day.Holiday, true",
+   "test": "internal/platform/bizcalendar ^TestIsBusinessDay$",
+   "why": "A makeup Saturday with flag 0 is no longer a business day; weekday overrides the is_holiday flag."
+  },
+  {
+   "id": "add-business-days-off-by-one",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\tcursor := twtime.Day(from)\n\tfor counted := 0; counted < n; {",
+   "new": "\tcursor := twtime.Day(from).AddDate(0, 0, 1)\n\tfor counted := 0; counted < n; {",
+   "test": "internal/platform/bizcalendar ^TestAddBusinessDays$",
+   "why": "Counting starts two days after from instead of the day after."
+  },
+  {
+   "id": "add-business-days-uncovered-counted",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\t\tif !ok {\n\t\t\treturn time.Time{}, false\n\t\t}\n\t\tif !day.Holiday {\n\t\t\tcounted++",
+   "new": "\t\tif !ok {\n\t\t\tcounted++\n\t\t\tcontinue\n\t\t}\n\t\tif !day.Holiday {\n\t\t\tcounted++",
+   "test": "internal/platform/bizcalendar ^TestAddBusinessDays$",
+   "why": "AddBusinessDays counts an uncovered day as a business day instead of reporting not computable."
+  },
+  {
+   "id": "between-uncovered-skipped",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\t\tif !ok {\n\t\t\treturn 0, false\n\t\t}",
+   "new": "\t\tif !ok {\n\t\t\tcontinue\n\t\t}",
+   "test": "internal/platform/bizcalendar ^TestBusinessDaysBetween$",
+   "why": "BusinessDaysBetween silently skips uncovered days instead of reporting not computable."
+  },
+  {
+   "id": "parse-accepts-364-day-year",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "d.Year() == year; d = d.AddDate(0, 0, 1) {",
+   "new": "d.Year() == year && d.YearDay() < daysInYear(year); d = d.AddDate(0, 0, 1) {",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^缺最後一天$",
+   "why": "A year missing its last day (364 rows) is accepted."
+  },
+  {
+   "id": "parse-accepts-flag-1",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\tcase flagHoliday:",
+   "new": "\tcase flagHoliday, \"1\":",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^旗標_1$",
+   "why": "Flag 1 is accepted as a holiday instead of being rejected."
+  },
+  {
+   "id": "parse-ignores-declared-year",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/parse.go",
+   "old": "\t\tif date.Year() != year {",
+   "new": "\t\tif false && date.Year() != year {",
+   "test": "internal/platform/bizcalendar ^TestParseRejects$/^年份不符$",
+   "why": "A file whose rows are in another year than the declared year is accepted."
+  }
+ ]
+}

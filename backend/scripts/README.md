@@ -98,12 +98,8 @@ DB_PASSWORD=<本機 postgres 密碼> ./scripts/init-databases.sh local
 | 服務 | 資料庫 |
 |------|--------|
 | ai-service | hawkr_ai |
-| crm-service | hawkr_crm |
-| im-service | hawkr_im |
 | invoice-service | hawkr_invoice |
 | notification-service | hawkr_notification |
-| review-service | hawkr_review |
-| seller-service | hawkr_seller |
 
 現況以 `ls services/*/db/atlas.hcl` 為準。Java 服務不使用 Atlas，schema 由各服務的 Flyway 在啟動時套用。
 
@@ -127,9 +123,9 @@ DB_PASSWORD=<本機 postgres 密碼> ./scripts/init-databases.sh local
 **A:**
 
 ```bash
-cd services/seller-service/db
+cd services/notification-service/db
 atlas migrate apply --dir "file://migrations" \
-  --url "postgres://dbadmin:<密碼>@localhost:5432/hawkr_seller?sslmode=disable"
+  --url "postgres://dbadmin:<密碼>@localhost:5432/hawkr_notification?sslmode=disable"
 ```
 
 不要用各服務 Makefile 的 `make migrate-apply`：它的 `--env dev` 連的是**共用的遠端 dev 資料庫**。
@@ -142,12 +138,12 @@ atlas migrate apply --dir "file://migrations" \
 
 1. **修改 schema 檔案**
    ```bash
-   vim services/seller-service/db/schema/schema.sql
+   vim services/notification-service/db/schema/schema.sql
    ```
 
 2. **自動產生 migration**（互動輸入 migration 名稱）
    ```bash
-   cd services/seller-service && make migrate-diff
+   cd services/notification-service && make migrate-diff
    ```
 
 3. **重算 checksum**（漏了 CI 直接紅）
@@ -159,13 +155,13 @@ atlas migrate apply --dir "file://migrations" \
    ```bash
    cd ../../..
    ./dev.sh seed
-   (cd services/seller-service && go test ./...)
+   (cd services/notification-service && go test ./...)
    ```
 
 5. **提交**（新的 migration 檔與 `atlas.sum` 一起，逐檔精確 add）
    ```bash
-   git add services/seller-service/db/migrations/<timestamp>_<name>.sql \
-           services/seller-service/db/migrations/atlas.sum
+   git add services/notification-service/db/migrations/<timestamp>_<name>.sql \
+           services/notification-service/db/migrations/atlas.sum
    ```
 
 遠端由 CI/CD 在部署前的 migrate job 套用，不需要手動 apply。

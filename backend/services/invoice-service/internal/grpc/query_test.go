@@ -665,12 +665,18 @@ type qBizDays struct {
 	synced *time.Time
 }
 
-func (qBizDays) DeleteAll(context.Context) (int64, error)           { return 0, nil }
-func (qBizDays) Insert(context.Context, time.Time, time.Time) error { return nil }
-func (qBizDays) ListHolidays(context.Context, time.Time, time.Time) ([]time.Time, error) {
-	return nil, nil
+func (qBizDays) DeleteAll(context.Context) (int64, error)                             { return 0, nil }
+func (qBizDays) Insert(context.Context, time.Time, time.Time) error                   { return nil }
+func (f qBizDays) SetCoverage(context.Context, time.Time, time.Time, time.Time) error { return nil }
+
+// Snapshot 回「推送時間 −30 天 ～ +400 天」的涵蓋區間：這些測試只需要區間罩得住測試日期。
+func (f qBizDays) Snapshot(context.Context, time.Time, time.Time) ([]time.Time, *domain.BusinessDayCoverage, error) {
+	if f.synced == nil {
+		return nil, nil, nil
+	}
+	base := *f.synced
+	return nil, &domain.BusinessDayCoverage{From: base.AddDate(0, 0, -30), To: base.AddDate(0, 0, 400), SyncedAt: base}, nil
 }
-func (f qBizDays) SyncedAt(context.Context) (*time.Time, error) { return f.synced, nil }
 
 // syncedNow 讓涵蓋窗口罩得住測試用的日期。
 func syncedNow(t time.Time) *time.Time { v := t; return &v }

@@ -14208,6 +14208,171 @@ func (x *GetSellerInvoiceCapabilitySimpleResponse) GetData() *GetSellerInvoiceCa
 	return nil
 }
 
+// ReplaceBusinessDayMirror — 單體在每次匯入假日行事曆成功後與每天一次的對帳呼叫。
+type ReplaceBusinessDayMirrorRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CoveredFrom   string                 `protobuf:"bytes,1,opt,name=covered_from,json=coveredFrom,proto3" json:"covered_from,omitempty"`    // 涵蓋區間起日（含），台北日 YYYY-MM-DD
+	CoveredTo     string                 `protobuf:"bytes,2,opt,name=covered_to,json=coveredTo,proto3" json:"covered_to,omitempty"`          // 涵蓋區間迄日（含），台北日 YYYY-MM-DD；必須 >= covered_from
+	HolidayDates  []string               `protobuf:"bytes,3,rep,name=holiday_dates,json=holidayDates,proto3" json:"holiday_dates,omitempty"` // 區間內放假的日期 YYYY-MM-DD，必須都落在 [covered_from, covered_to]；重複的日期視為一天
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplaceBusinessDayMirrorRequest) Reset() {
+	*x = ReplaceBusinessDayMirrorRequest{}
+	mi := &file_invoice_invoice_proto_msgTypes[181]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplaceBusinessDayMirrorRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplaceBusinessDayMirrorRequest) ProtoMessage() {}
+
+func (x *ReplaceBusinessDayMirrorRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_invoice_invoice_proto_msgTypes[181]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplaceBusinessDayMirrorRequest.ProtoReflect.Descriptor instead.
+func (*ReplaceBusinessDayMirrorRequest) Descriptor() ([]byte, []int) {
+	return file_invoice_invoice_proto_rawDescGZIP(), []int{181}
+}
+
+func (x *ReplaceBusinessDayMirrorRequest) GetCoveredFrom() string {
+	if x != nil {
+		return x.CoveredFrom
+	}
+	return ""
+}
+
+func (x *ReplaceBusinessDayMirrorRequest) GetCoveredTo() string {
+	if x != nil {
+		return x.CoveredTo
+	}
+	return ""
+}
+
+func (x *ReplaceBusinessDayMirrorRequest) GetHolidayDates() []string {
+	if x != nil {
+		return x.HolidayDates
+	}
+	return nil
+}
+
+type ReplaceBusinessDayMirrorData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HolidayCount  string                 `protobuf:"bytes,1,opt,name=holiday_count,json=holidayCount,proto3" json:"holiday_count,omitempty"` // 寫入的假日天數（去重後）
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplaceBusinessDayMirrorData) Reset() {
+	*x = ReplaceBusinessDayMirrorData{}
+	mi := &file_invoice_invoice_proto_msgTypes[182]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplaceBusinessDayMirrorData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplaceBusinessDayMirrorData) ProtoMessage() {}
+
+func (x *ReplaceBusinessDayMirrorData) ProtoReflect() protoreflect.Message {
+	mi := &file_invoice_invoice_proto_msgTypes[182]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplaceBusinessDayMirrorData.ProtoReflect.Descriptor instead.
+func (*ReplaceBusinessDayMirrorData) Descriptor() ([]byte, []int) {
+	return file_invoice_invoice_proto_rawDescGZIP(), []int{182}
+}
+
+func (x *ReplaceBusinessDayMirrorData) GetHolidayCount() string {
+	if x != nil {
+		return x.HolidayCount
+	}
+	return ""
+}
+
+type ReplaceBusinessDayMirrorResponse struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Code          int32                         `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                        `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Data          *ReplaceBusinessDayMirrorData `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplaceBusinessDayMirrorResponse) Reset() {
+	*x = ReplaceBusinessDayMirrorResponse{}
+	mi := &file_invoice_invoice_proto_msgTypes[183]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplaceBusinessDayMirrorResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplaceBusinessDayMirrorResponse) ProtoMessage() {}
+
+func (x *ReplaceBusinessDayMirrorResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_invoice_invoice_proto_msgTypes[183]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplaceBusinessDayMirrorResponse.ProtoReflect.Descriptor instead.
+func (*ReplaceBusinessDayMirrorResponse) Descriptor() ([]byte, []int) {
+	return file_invoice_invoice_proto_rawDescGZIP(), []int{183}
+}
+
+func (x *ReplaceBusinessDayMirrorResponse) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *ReplaceBusinessDayMirrorResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ReplaceBusinessDayMirrorResponse) GetData() *ReplaceBusinessDayMirrorData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 var File_invoice_invoice_proto protoreflect.FileDescriptor
 
 const file_invoice_invoice_proto_rawDesc = "" +
@@ -15421,7 +15586,18 @@ const file_invoice_invoice_proto_rawDesc = "" +
 	"(GetSellerInvoiceCapabilitySimpleResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12G\n" +
-	"\x04data\x18\x03 \x01(\v23.hawkr.invoice.GetSellerInvoiceCapabilitySimpleDataR\x04data2\xd6I\n" +
+	"\x04data\x18\x03 \x01(\v23.hawkr.invoice.GetSellerInvoiceCapabilitySimpleDataR\x04data\"\x88\x01\n" +
+	"\x1fReplaceBusinessDayMirrorRequest\x12!\n" +
+	"\fcovered_from\x18\x01 \x01(\tR\vcoveredFrom\x12\x1d\n" +
+	"\n" +
+	"covered_to\x18\x02 \x01(\tR\tcoveredTo\x12#\n" +
+	"\rholiday_dates\x18\x03 \x03(\tR\fholidayDates\"C\n" +
+	"\x1cReplaceBusinessDayMirrorData\x12#\n" +
+	"\rholiday_count\x18\x01 \x01(\tR\fholidayCount\"\x91\x01\n" +
+	" ReplaceBusinessDayMirrorResponse\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12?\n" +
+	"\x04data\x18\x03 \x01(\v2+.hawkr.invoice.ReplaceBusinessDayMirrorDataR\x04data2\xd3J\n" +
 	"\x0eInvoiceService\x12{\n" +
 	"\x18ListBuyerInvoiceProfiles\x12..hawkr.invoice.ListBuyerInvoiceProfilesRequest\x1a/.hawkr.invoice.ListBuyerInvoiceProfilesResponse\x12x\n" +
 	"\x19CreateBuyerInvoiceProfile\x12/.hawkr.invoice.CreateBuyerInvoiceProfileRequest\x1a*.hawkr.invoice.BuyerInvoiceProfileResponse\x12x\n" +
@@ -15496,7 +15672,8 @@ const file_invoice_invoice_proto_rawDesc = "" +
 	"\x1cListInvoiceAuditLogsForAdmin\x122.hawkr.invoice.ListInvoiceAuditLogsForAdminRequest\x1a3.hawkr.invoice.ListInvoiceAuditLogsForAdminResponse\x12\x90\x01\n" +
 	"\x1fResolveOrderInvoiceModeInternal\x125.hawkr.invoice.ResolveOrderInvoiceModeInternalRequest\x1a6.hawkr.invoice.ResolveOrderInvoiceModeInternalResponse\x12\x96\x01\n" +
 	"!ValidateOrderInvoiceInputInternal\x127.hawkr.invoice.ValidateOrderInvoiceInputInternalRequest\x1a8.hawkr.invoice.ValidateOrderInvoiceInputInternalResponse\x12\x93\x01\n" +
-	" GetSellerInvoiceCapabilitySimple\x126.hawkr.invoice.GetSellerInvoiceCapabilitySimpleRequest\x1a7.hawkr.invoice.GetSellerInvoiceCapabilitySimpleResponseBk\n" +
+	" GetSellerInvoiceCapabilitySimple\x126.hawkr.invoice.GetSellerInvoiceCapabilitySimpleRequest\x1a7.hawkr.invoice.GetSellerInvoiceCapabilitySimpleResponse\x12{\n" +
+	"\x18ReplaceBusinessDayMirror\x12..hawkr.invoice.ReplaceBusinessDayMirrorRequest\x1a/.hawkr.invoice.ReplaceBusinessDayMirrorResponseBk\n" +
 	"'io.github.will413028.hawkr.invoice.grpcB\fInvoiceProtoP\x01Z0github.com/Will413028/hawkr/go-pkg/proto/invoiceb\x06proto3"
 
 var (
@@ -15511,7 +15688,7 @@ func file_invoice_invoice_proto_rawDescGZIP() []byte {
 	return file_invoice_invoice_proto_rawDescData
 }
 
-var file_invoice_invoice_proto_msgTypes = make([]protoimpl.MessageInfo, 181)
+var file_invoice_invoice_proto_msgTypes = make([]protoimpl.MessageInfo, 184)
 var file_invoice_invoice_proto_goTypes = []any{
 	(*InvoiceProfileInfo)(nil),                         // 0: hawkr.invoice.InvoiceProfileInfo
 	(*InvoiceLine)(nil),                                // 1: hawkr.invoice.InvoiceLine
@@ -15694,6 +15871,9 @@ var file_invoice_invoice_proto_goTypes = []any{
 	(*GetSellerInvoiceCapabilitySimpleRequest)(nil),    // 178: hawkr.invoice.GetSellerInvoiceCapabilitySimpleRequest
 	(*GetSellerInvoiceCapabilitySimpleData)(nil),       // 179: hawkr.invoice.GetSellerInvoiceCapabilitySimpleData
 	(*GetSellerInvoiceCapabilitySimpleResponse)(nil),   // 180: hawkr.invoice.GetSellerInvoiceCapabilitySimpleResponse
+	(*ReplaceBusinessDayMirrorRequest)(nil),            // 181: hawkr.invoice.ReplaceBusinessDayMirrorRequest
+	(*ReplaceBusinessDayMirrorData)(nil),               // 182: hawkr.invoice.ReplaceBusinessDayMirrorData
+	(*ReplaceBusinessDayMirrorResponse)(nil),           // 183: hawkr.invoice.ReplaceBusinessDayMirrorResponse
 }
 var file_invoice_invoice_proto_depIdxs = []int32{
 	3,   // 0: hawkr.invoice.InvoiceDocumentDetail.summary:type_name -> hawkr.invoice.InvoiceDocumentSummary
@@ -15792,159 +15972,162 @@ var file_invoice_invoice_proto_depIdxs = []int32{
 	176, // 93: hawkr.invoice.ValidateOrderInvoiceInputInternalResponse.data:type_name -> hawkr.invoice.ValidateOrderInvoiceInputInternalData
 	5,   // 94: hawkr.invoice.GetSellerInvoiceCapabilitySimpleData.intake_limit:type_name -> hawkr.invoice.SellerIntakeLimit
 	179, // 95: hawkr.invoice.GetSellerInvoiceCapabilitySimpleResponse.data:type_name -> hawkr.invoice.GetSellerInvoiceCapabilitySimpleData
-	11,  // 96: hawkr.invoice.InvoiceService.ListBuyerInvoiceProfiles:input_type -> hawkr.invoice.ListBuyerInvoiceProfilesRequest
-	14,  // 97: hawkr.invoice.InvoiceService.CreateBuyerInvoiceProfile:input_type -> hawkr.invoice.CreateBuyerInvoiceProfileRequest
-	15,  // 98: hawkr.invoice.InvoiceService.UpdateBuyerInvoiceProfile:input_type -> hawkr.invoice.UpdateBuyerInvoiceProfileRequest
-	16,  // 99: hawkr.invoice.InvoiceService.DeleteBuyerInvoiceProfile:input_type -> hawkr.invoice.DeleteBuyerInvoiceProfileRequest
-	18,  // 100: hawkr.invoice.InvoiceService.SetDefaultBuyerInvoiceProfile:input_type -> hawkr.invoice.SetDefaultBuyerInvoiceProfileRequest
-	20,  // 101: hawkr.invoice.InvoiceService.GetOrderInvoice:input_type -> hawkr.invoice.GetOrderInvoiceRequest
-	23,  // 102: hawkr.invoice.InvoiceService.GetInvoiceDocument:input_type -> hawkr.invoice.GetInvoiceDocumentRequest
-	30,  // 103: hawkr.invoice.InvoiceService.GetInvoiceDocumentFile:input_type -> hawkr.invoice.GetInvoiceDocumentFileRequest
-	26,  // 104: hawkr.invoice.InvoiceService.ListBuyerInvoiceDocuments:input_type -> hawkr.invoice.ListBuyerInvoiceDocumentsRequest
-	29,  // 105: hawkr.invoice.InvoiceService.GetBuyerInvoiceDocument:input_type -> hawkr.invoice.GetBuyerInvoiceDocumentRequest
-	34,  // 106: hawkr.invoice.InvoiceService.CreateInvoiceCorrection:input_type -> hawkr.invoice.CreateInvoiceCorrectionRequest
-	35,  // 107: hawkr.invoice.InvoiceService.GetInvoiceCorrection:input_type -> hawkr.invoice.GetInvoiceCorrectionRequest
-	38,  // 108: hawkr.invoice.InvoiceService.CreateInvoiceComplaint:input_type -> hawkr.invoice.CreateInvoiceComplaintRequest
-	39,  // 109: hawkr.invoice.InvoiceService.ListOrderInvoiceComplaints:input_type -> hawkr.invoice.ListOrderInvoiceComplaintsRequest
-	40,  // 110: hawkr.invoice.InvoiceService.GetInvoiceComplaint:input_type -> hawkr.invoice.GetInvoiceComplaintRequest
-	41,  // 111: hawkr.invoice.InvoiceService.RejectInvoiceComplaintResponse:input_type -> hawkr.invoice.RejectInvoiceComplaintResponseRequest
-	42,  // 112: hawkr.invoice.InvoiceService.WithdrawInvoiceComplaint:input_type -> hawkr.invoice.WithdrawInvoiceComplaintRequest
-	43,  // 113: hawkr.invoice.InvoiceService.ReopenInvoiceComplaint:input_type -> hawkr.invoice.ReopenInvoiceComplaintRequest
-	47,  // 114: hawkr.invoice.InvoiceService.GetSellerInvoiceOverview:input_type -> hawkr.invoice.GetSellerInvoiceOverviewRequest
-	57,  // 115: hawkr.invoice.InvoiceService.GetSellerTaxProfile:input_type -> hawkr.invoice.GetSellerTaxProfileRequest
-	58,  // 116: hawkr.invoice.InvoiceService.SaveSellerTaxProfileDraft:input_type -> hawkr.invoice.SaveSellerTaxProfileDraftRequest
-	59,  // 117: hawkr.invoice.InvoiceService.SubmitSellerTaxProfile:input_type -> hawkr.invoice.SubmitSellerTaxProfileRequest
-	60,  // 118: hawkr.invoice.InvoiceService.RequestSellerTaxExtension:input_type -> hawkr.invoice.RequestSellerTaxExtensionRequest
-	61,  // 119: hawkr.invoice.InvoiceService.GetSelfIssueAttestation:input_type -> hawkr.invoice.GetSelfIssueAttestationRequest
-	62,  // 120: hawkr.invoice.InvoiceService.AcceptSelfIssueAttestation:input_type -> hawkr.invoice.AcceptSelfIssueAttestationRequest
-	66,  // 121: hawkr.invoice.InvoiceService.GetSellerProviderAccount:input_type -> hawkr.invoice.GetSellerProviderAccountRequest
-	67,  // 122: hawkr.invoice.InvoiceService.PutSellerProviderCredentials:input_type -> hawkr.invoice.PutSellerProviderCredentialsRequest
-	68,  // 123: hawkr.invoice.InvoiceService.VerifySellerProviderAccount:input_type -> hawkr.invoice.VerifySellerProviderAccountRequest
-	69,  // 124: hawkr.invoice.InvoiceService.ActivateSellerProviderAccount:input_type -> hawkr.invoice.ActivateSellerProviderAccountRequest
-	70,  // 125: hawkr.invoice.InvoiceService.RotateSellerProviderCredentials:input_type -> hawkr.invoice.RotateSellerProviderCredentialsRequest
-	73,  // 126: hawkr.invoice.InvoiceService.GetSellerReceiptAuthorization:input_type -> hawkr.invoice.GetSellerReceiptAuthorizationRequest
-	74,  // 127: hawkr.invoice.InvoiceService.ConfirmSellerReceiptAuthorization:input_type -> hawkr.invoice.ConfirmSellerReceiptAuthorizationRequest
-	76,  // 128: hawkr.invoice.InvoiceService.ListSellerInvoiceDocuments:input_type -> hawkr.invoice.ListSellerInvoiceDocumentsRequest
-	83,  // 129: hawkr.invoice.InvoiceService.GetSellerInvoiceDocument:input_type -> hawkr.invoice.GetSellerInvoiceDocumentRequest
-	80,  // 130: hawkr.invoice.InvoiceService.ListSellerReceivedInvoiceDocuments:input_type -> hawkr.invoice.ListSellerReceivedInvoiceDocumentsRequest
-	86,  // 131: hawkr.invoice.InvoiceService.ResendInvoiceNotification:input_type -> hawkr.invoice.ResendInvoiceNotificationRequest
-	87,  // 132: hawkr.invoice.InvoiceService.ResendBuyerInvoiceNotification:input_type -> hawkr.invoice.ResendBuyerInvoiceNotificationRequest
-	91,  // 133: hawkr.invoice.InvoiceService.GetSellerInvoiceJob:input_type -> hawkr.invoice.GetSellerInvoiceJobRequest
-	93,  // 134: hawkr.invoice.InvoiceService.ListOrderExternalIssuances:input_type -> hawkr.invoice.ListOrderExternalIssuancesRequest
-	96,  // 135: hawkr.invoice.InvoiceService.ReportExternalIssuance:input_type -> hawkr.invoice.ReportExternalIssuanceRequest
-	97,  // 136: hawkr.invoice.InvoiceService.ListSellerInvoiceComplaints:input_type -> hawkr.invoice.ListSellerInvoiceComplaintsRequest
-	98,  // 137: hawkr.invoice.InvoiceService.GetSellerInvoiceComplaint:input_type -> hawkr.invoice.GetSellerInvoiceComplaintRequest
-	99,  // 138: hawkr.invoice.InvoiceService.RespondSellerInvoiceComplaint:input_type -> hawkr.invoice.RespondSellerInvoiceComplaintRequest
-	100, // 139: hawkr.invoice.InvoiceService.GetInvoiceOverviewForAdmin:input_type -> hawkr.invoice.GetInvoiceOverviewForAdminRequest
-	105, // 140: hawkr.invoice.InvoiceService.ListTaxReviewsForAdmin:input_type -> hawkr.invoice.ListTaxReviewsForAdminRequest
-	108, // 141: hawkr.invoice.InvoiceService.GetTaxReviewForAdmin:input_type -> hawkr.invoice.GetTaxReviewForAdminRequest
-	110, // 142: hawkr.invoice.InvoiceService.DecideTaxReviewForAdmin:input_type -> hawkr.invoice.DecideTaxReviewForAdminRequest
-	111, // 143: hawkr.invoice.InvoiceService.DecideTaxExtensionForAdmin:input_type -> hawkr.invoice.DecideTaxExtensionForAdminRequest
-	115, // 144: hawkr.invoice.InvoiceService.ListProviderAccountsForAdmin:input_type -> hawkr.invoice.ListProviderAccountsForAdminRequest
-	118, // 145: hawkr.invoice.InvoiceService.GetProviderAccountForAdmin:input_type -> hawkr.invoice.GetProviderAccountForAdminRequest
-	120, // 146: hawkr.invoice.InvoiceService.HealthCheckProviderAccountForAdmin:input_type -> hawkr.invoice.HealthCheckProviderAccountForAdminRequest
-	121, // 147: hawkr.invoice.InvoiceService.DeactivateProviderAccountForAdmin:input_type -> hawkr.invoice.DeactivateProviderAccountForAdminRequest
-	124, // 148: hawkr.invoice.InvoiceService.ReactivateProviderAccountForAdmin:input_type -> hawkr.invoice.ReactivateProviderAccountForAdminRequest
-	125, // 149: hawkr.invoice.InvoiceService.RevokeProviderAccountForAdmin:input_type -> hawkr.invoice.RevokeProviderAccountForAdminRequest
-	129, // 150: hawkr.invoice.InvoiceService.ListProviderCutoversForAdmin:input_type -> hawkr.invoice.ListProviderCutoversForAdminRequest
-	132, // 151: hawkr.invoice.InvoiceService.ListInvoiceDocumentsForAdmin:input_type -> hawkr.invoice.ListInvoiceDocumentsForAdminRequest
-	135, // 152: hawkr.invoice.InvoiceService.GetInvoiceDocumentForAdmin:input_type -> hawkr.invoice.GetInvoiceDocumentForAdminRequest
-	139, // 153: hawkr.invoice.InvoiceService.ResendInvoiceNotificationForAdmin:input_type -> hawkr.invoice.ResendInvoiceNotificationForAdminRequest
-	140, // 154: hawkr.invoice.InvoiceService.ListInvoiceJobsForAdmin:input_type -> hawkr.invoice.ListInvoiceJobsForAdminRequest
-	143, // 155: hawkr.invoice.InvoiceService.GetInvoiceJobForAdmin:input_type -> hawkr.invoice.GetInvoiceJobForAdminRequest
-	146, // 156: hawkr.invoice.InvoiceService.RetryInvoiceJobForAdmin:input_type -> hawkr.invoice.RetryInvoiceJobForAdminRequest
-	147, // 157: hawkr.invoice.InvoiceService.CancelInvoiceJobForAdmin:input_type -> hawkr.invoice.CancelInvoiceJobForAdminRequest
-	148, // 158: hawkr.invoice.InvoiceService.ResumeInvoiceDocumentForAdmin:input_type -> hawkr.invoice.ResumeInvoiceDocumentForAdminRequest
-	152, // 159: hawkr.invoice.InvoiceService.RequestManualUnlockForAdmin:input_type -> hawkr.invoice.RequestManualUnlockForAdminRequest
-	153, // 160: hawkr.invoice.InvoiceService.ApproveManualUnlockForAdmin:input_type -> hawkr.invoice.ApproveManualUnlockForAdminRequest
-	155, // 161: hawkr.invoice.InvoiceService.ReportManualResultForAdmin:input_type -> hawkr.invoice.ReportManualResultForAdminRequest
-	159, // 162: hawkr.invoice.InvoiceService.CreateManualIssuanceForAdmin:input_type -> hawkr.invoice.CreateManualIssuanceForAdminRequest
-	162, // 163: hawkr.invoice.InvoiceService.ListInvoiceComplaintsForAdmin:input_type -> hawkr.invoice.ListInvoiceComplaintsForAdminRequest
-	163, // 164: hawkr.invoice.InvoiceService.GetInvoiceComplaintForAdmin:input_type -> hawkr.invoice.GetInvoiceComplaintForAdminRequest
-	164, // 165: hawkr.invoice.InvoiceService.ActOnInvoiceComplaintForAdmin:input_type -> hawkr.invoice.ActOnInvoiceComplaintForAdminRequest
-	169, // 166: hawkr.invoice.InvoiceService.ListInvoiceAuditLogsForAdmin:input_type -> hawkr.invoice.ListInvoiceAuditLogsForAdminRequest
-	172, // 167: hawkr.invoice.InvoiceService.ResolveOrderInvoiceModeInternal:input_type -> hawkr.invoice.ResolveOrderInvoiceModeInternalRequest
-	175, // 168: hawkr.invoice.InvoiceService.ValidateOrderInvoiceInputInternal:input_type -> hawkr.invoice.ValidateOrderInvoiceInputInternalRequest
-	178, // 169: hawkr.invoice.InvoiceService.GetSellerInvoiceCapabilitySimple:input_type -> hawkr.invoice.GetSellerInvoiceCapabilitySimpleRequest
-	13,  // 170: hawkr.invoice.InvoiceService.ListBuyerInvoiceProfiles:output_type -> hawkr.invoice.ListBuyerInvoiceProfilesResponse
-	19,  // 171: hawkr.invoice.InvoiceService.CreateBuyerInvoiceProfile:output_type -> hawkr.invoice.BuyerInvoiceProfileResponse
-	19,  // 172: hawkr.invoice.InvoiceService.UpdateBuyerInvoiceProfile:output_type -> hawkr.invoice.BuyerInvoiceProfileResponse
-	17,  // 173: hawkr.invoice.InvoiceService.DeleteBuyerInvoiceProfile:output_type -> hawkr.invoice.DeleteBuyerInvoiceProfileResponse
-	19,  // 174: hawkr.invoice.InvoiceService.SetDefaultBuyerInvoiceProfile:output_type -> hawkr.invoice.BuyerInvoiceProfileResponse
-	22,  // 175: hawkr.invoice.InvoiceService.GetOrderInvoice:output_type -> hawkr.invoice.GetOrderInvoiceResponse
-	24,  // 176: hawkr.invoice.InvoiceService.GetInvoiceDocument:output_type -> hawkr.invoice.GetInvoiceDocumentResponse
-	32,  // 177: hawkr.invoice.InvoiceService.GetInvoiceDocumentFile:output_type -> hawkr.invoice.GetInvoiceDocumentFileResponse
-	28,  // 178: hawkr.invoice.InvoiceService.ListBuyerInvoiceDocuments:output_type -> hawkr.invoice.ListBuyerInvoiceDocumentsResponse
-	24,  // 179: hawkr.invoice.InvoiceService.GetBuyerInvoiceDocument:output_type -> hawkr.invoice.GetInvoiceDocumentResponse
-	37,  // 180: hawkr.invoice.InvoiceService.CreateInvoiceCorrection:output_type -> hawkr.invoice.InvoiceCorrectionResponse
-	37,  // 181: hawkr.invoice.InvoiceService.GetInvoiceCorrection:output_type -> hawkr.invoice.InvoiceCorrectionResponse
-	44,  // 182: hawkr.invoice.InvoiceService.CreateInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	46,  // 183: hawkr.invoice.InvoiceService.ListOrderInvoiceComplaints:output_type -> hawkr.invoice.ListInvoiceComplaintsResponse
-	44,  // 184: hawkr.invoice.InvoiceService.GetInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	44,  // 185: hawkr.invoice.InvoiceService.RejectInvoiceComplaintResponse:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	44,  // 186: hawkr.invoice.InvoiceService.WithdrawInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	44,  // 187: hawkr.invoice.InvoiceService.ReopenInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	49,  // 188: hawkr.invoice.InvoiceService.GetSellerInvoiceOverview:output_type -> hawkr.invoice.GetSellerInvoiceOverviewResponse
-	56,  // 189: hawkr.invoice.InvoiceService.GetSellerTaxProfile:output_type -> hawkr.invoice.SellerTaxProfileResponse
-	56,  // 190: hawkr.invoice.InvoiceService.SaveSellerTaxProfileDraft:output_type -> hawkr.invoice.SellerTaxProfileResponse
-	56,  // 191: hawkr.invoice.InvoiceService.SubmitSellerTaxProfile:output_type -> hawkr.invoice.SellerTaxProfileResponse
-	56,  // 192: hawkr.invoice.InvoiceService.RequestSellerTaxExtension:output_type -> hawkr.invoice.SellerTaxProfileResponse
-	63,  // 193: hawkr.invoice.InvoiceService.GetSelfIssueAttestation:output_type -> hawkr.invoice.SelfIssueAttestationResponse
-	63,  // 194: hawkr.invoice.InvoiceService.AcceptSelfIssueAttestation:output_type -> hawkr.invoice.SelfIssueAttestationResponse
-	65,  // 195: hawkr.invoice.InvoiceService.GetSellerProviderAccount:output_type -> hawkr.invoice.SellerProviderAccountResponse
-	65,  // 196: hawkr.invoice.InvoiceService.PutSellerProviderCredentials:output_type -> hawkr.invoice.SellerProviderAccountResponse
-	65,  // 197: hawkr.invoice.InvoiceService.VerifySellerProviderAccount:output_type -> hawkr.invoice.SellerProviderAccountResponse
-	65,  // 198: hawkr.invoice.InvoiceService.ActivateSellerProviderAccount:output_type -> hawkr.invoice.SellerProviderAccountResponse
-	65,  // 199: hawkr.invoice.InvoiceService.RotateSellerProviderCredentials:output_type -> hawkr.invoice.SellerProviderAccountResponse
-	72,  // 200: hawkr.invoice.InvoiceService.GetSellerReceiptAuthorization:output_type -> hawkr.invoice.SellerReceiptAuthorizationResponse
-	72,  // 201: hawkr.invoice.InvoiceService.ConfirmSellerReceiptAuthorization:output_type -> hawkr.invoice.SellerReceiptAuthorizationResponse
-	78,  // 202: hawkr.invoice.InvoiceService.ListSellerInvoiceDocuments:output_type -> hawkr.invoice.ListSellerInvoiceDocumentsResponse
-	85,  // 203: hawkr.invoice.InvoiceService.GetSellerInvoiceDocument:output_type -> hawkr.invoice.GetSellerInvoiceDocumentResponse
-	82,  // 204: hawkr.invoice.InvoiceService.ListSellerReceivedInvoiceDocuments:output_type -> hawkr.invoice.ListSellerReceivedInvoiceDocumentsResponse
-	89,  // 205: hawkr.invoice.InvoiceService.ResendInvoiceNotification:output_type -> hawkr.invoice.ResendInvoiceNotificationResponse
-	89,  // 206: hawkr.invoice.InvoiceService.ResendBuyerInvoiceNotification:output_type -> hawkr.invoice.ResendInvoiceNotificationResponse
-	92,  // 207: hawkr.invoice.InvoiceService.GetSellerInvoiceJob:output_type -> hawkr.invoice.GetSellerInvoiceJobResponse
-	95,  // 208: hawkr.invoice.InvoiceService.ListOrderExternalIssuances:output_type -> hawkr.invoice.ListOrderExternalIssuancesResponse
-	92,  // 209: hawkr.invoice.InvoiceService.ReportExternalIssuance:output_type -> hawkr.invoice.GetSellerInvoiceJobResponse
-	46,  // 210: hawkr.invoice.InvoiceService.ListSellerInvoiceComplaints:output_type -> hawkr.invoice.ListInvoiceComplaintsResponse
-	44,  // 211: hawkr.invoice.InvoiceService.GetSellerInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	44,  // 212: hawkr.invoice.InvoiceService.RespondSellerInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	103, // 213: hawkr.invoice.InvoiceService.GetInvoiceOverviewForAdmin:output_type -> hawkr.invoice.GetInvoiceOverviewForAdminResponse
-	107, // 214: hawkr.invoice.InvoiceService.ListTaxReviewsForAdmin:output_type -> hawkr.invoice.ListTaxReviewsForAdminResponse
-	109, // 215: hawkr.invoice.InvoiceService.GetTaxReviewForAdmin:output_type -> hawkr.invoice.GetTaxReviewForAdminResponse
-	113, // 216: hawkr.invoice.InvoiceService.DecideTaxReviewForAdmin:output_type -> hawkr.invoice.DecideTaxReviewForAdminResponse
-	113, // 217: hawkr.invoice.InvoiceService.DecideTaxExtensionForAdmin:output_type -> hawkr.invoice.DecideTaxReviewForAdminResponse
-	117, // 218: hawkr.invoice.InvoiceService.ListProviderAccountsForAdmin:output_type -> hawkr.invoice.ListProviderAccountsForAdminResponse
-	119, // 219: hawkr.invoice.InvoiceService.GetProviderAccountForAdmin:output_type -> hawkr.invoice.GetProviderAccountForAdminResponse
-	119, // 220: hawkr.invoice.InvoiceService.HealthCheckProviderAccountForAdmin:output_type -> hawkr.invoice.GetProviderAccountForAdminResponse
-	123, // 221: hawkr.invoice.InvoiceService.DeactivateProviderAccountForAdmin:output_type -> hawkr.invoice.DeactivateProviderAccountForAdminResponse
-	119, // 222: hawkr.invoice.InvoiceService.ReactivateProviderAccountForAdmin:output_type -> hawkr.invoice.GetProviderAccountForAdminResponse
-	127, // 223: hawkr.invoice.InvoiceService.RevokeProviderAccountForAdmin:output_type -> hawkr.invoice.RevokeProviderAccountForAdminResponse
-	131, // 224: hawkr.invoice.InvoiceService.ListProviderCutoversForAdmin:output_type -> hawkr.invoice.ListProviderCutoversForAdminResponse
-	134, // 225: hawkr.invoice.InvoiceService.ListInvoiceDocumentsForAdmin:output_type -> hawkr.invoice.ListInvoiceDocumentsForAdminResponse
-	138, // 226: hawkr.invoice.InvoiceService.GetInvoiceDocumentForAdmin:output_type -> hawkr.invoice.GetInvoiceDocumentForAdminResponse
-	89,  // 227: hawkr.invoice.InvoiceService.ResendInvoiceNotificationForAdmin:output_type -> hawkr.invoice.ResendInvoiceNotificationResponse
-	142, // 228: hawkr.invoice.InvoiceService.ListInvoiceJobsForAdmin:output_type -> hawkr.invoice.ListInvoiceJobsForAdminResponse
-	145, // 229: hawkr.invoice.InvoiceService.GetInvoiceJobForAdmin:output_type -> hawkr.invoice.GetInvoiceJobForAdminResponse
-	150, // 230: hawkr.invoice.InvoiceService.RetryInvoiceJobForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
-	150, // 231: hawkr.invoice.InvoiceService.CancelInvoiceJobForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
-	150, // 232: hawkr.invoice.InvoiceService.ResumeInvoiceDocumentForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
-	154, // 233: hawkr.invoice.InvoiceService.RequestManualUnlockForAdmin:output_type -> hawkr.invoice.ManualUnlockResponse
-	154, // 234: hawkr.invoice.InvoiceService.ApproveManualUnlockForAdmin:output_type -> hawkr.invoice.ManualUnlockResponse
-	150, // 235: hawkr.invoice.InvoiceService.ReportManualResultForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
-	161, // 236: hawkr.invoice.InvoiceService.CreateManualIssuanceForAdmin:output_type -> hawkr.invoice.CreateManualIssuanceForAdminResponse
-	46,  // 237: hawkr.invoice.InvoiceService.ListInvoiceComplaintsForAdmin:output_type -> hawkr.invoice.ListInvoiceComplaintsResponse
-	44,  // 238: hawkr.invoice.InvoiceService.GetInvoiceComplaintForAdmin:output_type -> hawkr.invoice.InvoiceComplaintResponse
-	167, // 239: hawkr.invoice.InvoiceService.ActOnInvoiceComplaintForAdmin:output_type -> hawkr.invoice.ActOnInvoiceComplaintForAdminResponse
-	171, // 240: hawkr.invoice.InvoiceService.ListInvoiceAuditLogsForAdmin:output_type -> hawkr.invoice.ListInvoiceAuditLogsForAdminResponse
-	174, // 241: hawkr.invoice.InvoiceService.ResolveOrderInvoiceModeInternal:output_type -> hawkr.invoice.ResolveOrderInvoiceModeInternalResponse
-	177, // 242: hawkr.invoice.InvoiceService.ValidateOrderInvoiceInputInternal:output_type -> hawkr.invoice.ValidateOrderInvoiceInputInternalResponse
-	180, // 243: hawkr.invoice.InvoiceService.GetSellerInvoiceCapabilitySimple:output_type -> hawkr.invoice.GetSellerInvoiceCapabilitySimpleResponse
-	170, // [170:244] is the sub-list for method output_type
-	96,  // [96:170] is the sub-list for method input_type
-	96,  // [96:96] is the sub-list for extension type_name
-	96,  // [96:96] is the sub-list for extension extendee
-	0,   // [0:96] is the sub-list for field type_name
+	182, // 96: hawkr.invoice.ReplaceBusinessDayMirrorResponse.data:type_name -> hawkr.invoice.ReplaceBusinessDayMirrorData
+	11,  // 97: hawkr.invoice.InvoiceService.ListBuyerInvoiceProfiles:input_type -> hawkr.invoice.ListBuyerInvoiceProfilesRequest
+	14,  // 98: hawkr.invoice.InvoiceService.CreateBuyerInvoiceProfile:input_type -> hawkr.invoice.CreateBuyerInvoiceProfileRequest
+	15,  // 99: hawkr.invoice.InvoiceService.UpdateBuyerInvoiceProfile:input_type -> hawkr.invoice.UpdateBuyerInvoiceProfileRequest
+	16,  // 100: hawkr.invoice.InvoiceService.DeleteBuyerInvoiceProfile:input_type -> hawkr.invoice.DeleteBuyerInvoiceProfileRequest
+	18,  // 101: hawkr.invoice.InvoiceService.SetDefaultBuyerInvoiceProfile:input_type -> hawkr.invoice.SetDefaultBuyerInvoiceProfileRequest
+	20,  // 102: hawkr.invoice.InvoiceService.GetOrderInvoice:input_type -> hawkr.invoice.GetOrderInvoiceRequest
+	23,  // 103: hawkr.invoice.InvoiceService.GetInvoiceDocument:input_type -> hawkr.invoice.GetInvoiceDocumentRequest
+	30,  // 104: hawkr.invoice.InvoiceService.GetInvoiceDocumentFile:input_type -> hawkr.invoice.GetInvoiceDocumentFileRequest
+	26,  // 105: hawkr.invoice.InvoiceService.ListBuyerInvoiceDocuments:input_type -> hawkr.invoice.ListBuyerInvoiceDocumentsRequest
+	29,  // 106: hawkr.invoice.InvoiceService.GetBuyerInvoiceDocument:input_type -> hawkr.invoice.GetBuyerInvoiceDocumentRequest
+	34,  // 107: hawkr.invoice.InvoiceService.CreateInvoiceCorrection:input_type -> hawkr.invoice.CreateInvoiceCorrectionRequest
+	35,  // 108: hawkr.invoice.InvoiceService.GetInvoiceCorrection:input_type -> hawkr.invoice.GetInvoiceCorrectionRequest
+	38,  // 109: hawkr.invoice.InvoiceService.CreateInvoiceComplaint:input_type -> hawkr.invoice.CreateInvoiceComplaintRequest
+	39,  // 110: hawkr.invoice.InvoiceService.ListOrderInvoiceComplaints:input_type -> hawkr.invoice.ListOrderInvoiceComplaintsRequest
+	40,  // 111: hawkr.invoice.InvoiceService.GetInvoiceComplaint:input_type -> hawkr.invoice.GetInvoiceComplaintRequest
+	41,  // 112: hawkr.invoice.InvoiceService.RejectInvoiceComplaintResponse:input_type -> hawkr.invoice.RejectInvoiceComplaintResponseRequest
+	42,  // 113: hawkr.invoice.InvoiceService.WithdrawInvoiceComplaint:input_type -> hawkr.invoice.WithdrawInvoiceComplaintRequest
+	43,  // 114: hawkr.invoice.InvoiceService.ReopenInvoiceComplaint:input_type -> hawkr.invoice.ReopenInvoiceComplaintRequest
+	47,  // 115: hawkr.invoice.InvoiceService.GetSellerInvoiceOverview:input_type -> hawkr.invoice.GetSellerInvoiceOverviewRequest
+	57,  // 116: hawkr.invoice.InvoiceService.GetSellerTaxProfile:input_type -> hawkr.invoice.GetSellerTaxProfileRequest
+	58,  // 117: hawkr.invoice.InvoiceService.SaveSellerTaxProfileDraft:input_type -> hawkr.invoice.SaveSellerTaxProfileDraftRequest
+	59,  // 118: hawkr.invoice.InvoiceService.SubmitSellerTaxProfile:input_type -> hawkr.invoice.SubmitSellerTaxProfileRequest
+	60,  // 119: hawkr.invoice.InvoiceService.RequestSellerTaxExtension:input_type -> hawkr.invoice.RequestSellerTaxExtensionRequest
+	61,  // 120: hawkr.invoice.InvoiceService.GetSelfIssueAttestation:input_type -> hawkr.invoice.GetSelfIssueAttestationRequest
+	62,  // 121: hawkr.invoice.InvoiceService.AcceptSelfIssueAttestation:input_type -> hawkr.invoice.AcceptSelfIssueAttestationRequest
+	66,  // 122: hawkr.invoice.InvoiceService.GetSellerProviderAccount:input_type -> hawkr.invoice.GetSellerProviderAccountRequest
+	67,  // 123: hawkr.invoice.InvoiceService.PutSellerProviderCredentials:input_type -> hawkr.invoice.PutSellerProviderCredentialsRequest
+	68,  // 124: hawkr.invoice.InvoiceService.VerifySellerProviderAccount:input_type -> hawkr.invoice.VerifySellerProviderAccountRequest
+	69,  // 125: hawkr.invoice.InvoiceService.ActivateSellerProviderAccount:input_type -> hawkr.invoice.ActivateSellerProviderAccountRequest
+	70,  // 126: hawkr.invoice.InvoiceService.RotateSellerProviderCredentials:input_type -> hawkr.invoice.RotateSellerProviderCredentialsRequest
+	73,  // 127: hawkr.invoice.InvoiceService.GetSellerReceiptAuthorization:input_type -> hawkr.invoice.GetSellerReceiptAuthorizationRequest
+	74,  // 128: hawkr.invoice.InvoiceService.ConfirmSellerReceiptAuthorization:input_type -> hawkr.invoice.ConfirmSellerReceiptAuthorizationRequest
+	76,  // 129: hawkr.invoice.InvoiceService.ListSellerInvoiceDocuments:input_type -> hawkr.invoice.ListSellerInvoiceDocumentsRequest
+	83,  // 130: hawkr.invoice.InvoiceService.GetSellerInvoiceDocument:input_type -> hawkr.invoice.GetSellerInvoiceDocumentRequest
+	80,  // 131: hawkr.invoice.InvoiceService.ListSellerReceivedInvoiceDocuments:input_type -> hawkr.invoice.ListSellerReceivedInvoiceDocumentsRequest
+	86,  // 132: hawkr.invoice.InvoiceService.ResendInvoiceNotification:input_type -> hawkr.invoice.ResendInvoiceNotificationRequest
+	87,  // 133: hawkr.invoice.InvoiceService.ResendBuyerInvoiceNotification:input_type -> hawkr.invoice.ResendBuyerInvoiceNotificationRequest
+	91,  // 134: hawkr.invoice.InvoiceService.GetSellerInvoiceJob:input_type -> hawkr.invoice.GetSellerInvoiceJobRequest
+	93,  // 135: hawkr.invoice.InvoiceService.ListOrderExternalIssuances:input_type -> hawkr.invoice.ListOrderExternalIssuancesRequest
+	96,  // 136: hawkr.invoice.InvoiceService.ReportExternalIssuance:input_type -> hawkr.invoice.ReportExternalIssuanceRequest
+	97,  // 137: hawkr.invoice.InvoiceService.ListSellerInvoiceComplaints:input_type -> hawkr.invoice.ListSellerInvoiceComplaintsRequest
+	98,  // 138: hawkr.invoice.InvoiceService.GetSellerInvoiceComplaint:input_type -> hawkr.invoice.GetSellerInvoiceComplaintRequest
+	99,  // 139: hawkr.invoice.InvoiceService.RespondSellerInvoiceComplaint:input_type -> hawkr.invoice.RespondSellerInvoiceComplaintRequest
+	100, // 140: hawkr.invoice.InvoiceService.GetInvoiceOverviewForAdmin:input_type -> hawkr.invoice.GetInvoiceOverviewForAdminRequest
+	105, // 141: hawkr.invoice.InvoiceService.ListTaxReviewsForAdmin:input_type -> hawkr.invoice.ListTaxReviewsForAdminRequest
+	108, // 142: hawkr.invoice.InvoiceService.GetTaxReviewForAdmin:input_type -> hawkr.invoice.GetTaxReviewForAdminRequest
+	110, // 143: hawkr.invoice.InvoiceService.DecideTaxReviewForAdmin:input_type -> hawkr.invoice.DecideTaxReviewForAdminRequest
+	111, // 144: hawkr.invoice.InvoiceService.DecideTaxExtensionForAdmin:input_type -> hawkr.invoice.DecideTaxExtensionForAdminRequest
+	115, // 145: hawkr.invoice.InvoiceService.ListProviderAccountsForAdmin:input_type -> hawkr.invoice.ListProviderAccountsForAdminRequest
+	118, // 146: hawkr.invoice.InvoiceService.GetProviderAccountForAdmin:input_type -> hawkr.invoice.GetProviderAccountForAdminRequest
+	120, // 147: hawkr.invoice.InvoiceService.HealthCheckProviderAccountForAdmin:input_type -> hawkr.invoice.HealthCheckProviderAccountForAdminRequest
+	121, // 148: hawkr.invoice.InvoiceService.DeactivateProviderAccountForAdmin:input_type -> hawkr.invoice.DeactivateProviderAccountForAdminRequest
+	124, // 149: hawkr.invoice.InvoiceService.ReactivateProviderAccountForAdmin:input_type -> hawkr.invoice.ReactivateProviderAccountForAdminRequest
+	125, // 150: hawkr.invoice.InvoiceService.RevokeProviderAccountForAdmin:input_type -> hawkr.invoice.RevokeProviderAccountForAdminRequest
+	129, // 151: hawkr.invoice.InvoiceService.ListProviderCutoversForAdmin:input_type -> hawkr.invoice.ListProviderCutoversForAdminRequest
+	132, // 152: hawkr.invoice.InvoiceService.ListInvoiceDocumentsForAdmin:input_type -> hawkr.invoice.ListInvoiceDocumentsForAdminRequest
+	135, // 153: hawkr.invoice.InvoiceService.GetInvoiceDocumentForAdmin:input_type -> hawkr.invoice.GetInvoiceDocumentForAdminRequest
+	139, // 154: hawkr.invoice.InvoiceService.ResendInvoiceNotificationForAdmin:input_type -> hawkr.invoice.ResendInvoiceNotificationForAdminRequest
+	140, // 155: hawkr.invoice.InvoiceService.ListInvoiceJobsForAdmin:input_type -> hawkr.invoice.ListInvoiceJobsForAdminRequest
+	143, // 156: hawkr.invoice.InvoiceService.GetInvoiceJobForAdmin:input_type -> hawkr.invoice.GetInvoiceJobForAdminRequest
+	146, // 157: hawkr.invoice.InvoiceService.RetryInvoiceJobForAdmin:input_type -> hawkr.invoice.RetryInvoiceJobForAdminRequest
+	147, // 158: hawkr.invoice.InvoiceService.CancelInvoiceJobForAdmin:input_type -> hawkr.invoice.CancelInvoiceJobForAdminRequest
+	148, // 159: hawkr.invoice.InvoiceService.ResumeInvoiceDocumentForAdmin:input_type -> hawkr.invoice.ResumeInvoiceDocumentForAdminRequest
+	152, // 160: hawkr.invoice.InvoiceService.RequestManualUnlockForAdmin:input_type -> hawkr.invoice.RequestManualUnlockForAdminRequest
+	153, // 161: hawkr.invoice.InvoiceService.ApproveManualUnlockForAdmin:input_type -> hawkr.invoice.ApproveManualUnlockForAdminRequest
+	155, // 162: hawkr.invoice.InvoiceService.ReportManualResultForAdmin:input_type -> hawkr.invoice.ReportManualResultForAdminRequest
+	159, // 163: hawkr.invoice.InvoiceService.CreateManualIssuanceForAdmin:input_type -> hawkr.invoice.CreateManualIssuanceForAdminRequest
+	162, // 164: hawkr.invoice.InvoiceService.ListInvoiceComplaintsForAdmin:input_type -> hawkr.invoice.ListInvoiceComplaintsForAdminRequest
+	163, // 165: hawkr.invoice.InvoiceService.GetInvoiceComplaintForAdmin:input_type -> hawkr.invoice.GetInvoiceComplaintForAdminRequest
+	164, // 166: hawkr.invoice.InvoiceService.ActOnInvoiceComplaintForAdmin:input_type -> hawkr.invoice.ActOnInvoiceComplaintForAdminRequest
+	169, // 167: hawkr.invoice.InvoiceService.ListInvoiceAuditLogsForAdmin:input_type -> hawkr.invoice.ListInvoiceAuditLogsForAdminRequest
+	172, // 168: hawkr.invoice.InvoiceService.ResolveOrderInvoiceModeInternal:input_type -> hawkr.invoice.ResolveOrderInvoiceModeInternalRequest
+	175, // 169: hawkr.invoice.InvoiceService.ValidateOrderInvoiceInputInternal:input_type -> hawkr.invoice.ValidateOrderInvoiceInputInternalRequest
+	178, // 170: hawkr.invoice.InvoiceService.GetSellerInvoiceCapabilitySimple:input_type -> hawkr.invoice.GetSellerInvoiceCapabilitySimpleRequest
+	181, // 171: hawkr.invoice.InvoiceService.ReplaceBusinessDayMirror:input_type -> hawkr.invoice.ReplaceBusinessDayMirrorRequest
+	13,  // 172: hawkr.invoice.InvoiceService.ListBuyerInvoiceProfiles:output_type -> hawkr.invoice.ListBuyerInvoiceProfilesResponse
+	19,  // 173: hawkr.invoice.InvoiceService.CreateBuyerInvoiceProfile:output_type -> hawkr.invoice.BuyerInvoiceProfileResponse
+	19,  // 174: hawkr.invoice.InvoiceService.UpdateBuyerInvoiceProfile:output_type -> hawkr.invoice.BuyerInvoiceProfileResponse
+	17,  // 175: hawkr.invoice.InvoiceService.DeleteBuyerInvoiceProfile:output_type -> hawkr.invoice.DeleteBuyerInvoiceProfileResponse
+	19,  // 176: hawkr.invoice.InvoiceService.SetDefaultBuyerInvoiceProfile:output_type -> hawkr.invoice.BuyerInvoiceProfileResponse
+	22,  // 177: hawkr.invoice.InvoiceService.GetOrderInvoice:output_type -> hawkr.invoice.GetOrderInvoiceResponse
+	24,  // 178: hawkr.invoice.InvoiceService.GetInvoiceDocument:output_type -> hawkr.invoice.GetInvoiceDocumentResponse
+	32,  // 179: hawkr.invoice.InvoiceService.GetInvoiceDocumentFile:output_type -> hawkr.invoice.GetInvoiceDocumentFileResponse
+	28,  // 180: hawkr.invoice.InvoiceService.ListBuyerInvoiceDocuments:output_type -> hawkr.invoice.ListBuyerInvoiceDocumentsResponse
+	24,  // 181: hawkr.invoice.InvoiceService.GetBuyerInvoiceDocument:output_type -> hawkr.invoice.GetInvoiceDocumentResponse
+	37,  // 182: hawkr.invoice.InvoiceService.CreateInvoiceCorrection:output_type -> hawkr.invoice.InvoiceCorrectionResponse
+	37,  // 183: hawkr.invoice.InvoiceService.GetInvoiceCorrection:output_type -> hawkr.invoice.InvoiceCorrectionResponse
+	44,  // 184: hawkr.invoice.InvoiceService.CreateInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	46,  // 185: hawkr.invoice.InvoiceService.ListOrderInvoiceComplaints:output_type -> hawkr.invoice.ListInvoiceComplaintsResponse
+	44,  // 186: hawkr.invoice.InvoiceService.GetInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	44,  // 187: hawkr.invoice.InvoiceService.RejectInvoiceComplaintResponse:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	44,  // 188: hawkr.invoice.InvoiceService.WithdrawInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	44,  // 189: hawkr.invoice.InvoiceService.ReopenInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	49,  // 190: hawkr.invoice.InvoiceService.GetSellerInvoiceOverview:output_type -> hawkr.invoice.GetSellerInvoiceOverviewResponse
+	56,  // 191: hawkr.invoice.InvoiceService.GetSellerTaxProfile:output_type -> hawkr.invoice.SellerTaxProfileResponse
+	56,  // 192: hawkr.invoice.InvoiceService.SaveSellerTaxProfileDraft:output_type -> hawkr.invoice.SellerTaxProfileResponse
+	56,  // 193: hawkr.invoice.InvoiceService.SubmitSellerTaxProfile:output_type -> hawkr.invoice.SellerTaxProfileResponse
+	56,  // 194: hawkr.invoice.InvoiceService.RequestSellerTaxExtension:output_type -> hawkr.invoice.SellerTaxProfileResponse
+	63,  // 195: hawkr.invoice.InvoiceService.GetSelfIssueAttestation:output_type -> hawkr.invoice.SelfIssueAttestationResponse
+	63,  // 196: hawkr.invoice.InvoiceService.AcceptSelfIssueAttestation:output_type -> hawkr.invoice.SelfIssueAttestationResponse
+	65,  // 197: hawkr.invoice.InvoiceService.GetSellerProviderAccount:output_type -> hawkr.invoice.SellerProviderAccountResponse
+	65,  // 198: hawkr.invoice.InvoiceService.PutSellerProviderCredentials:output_type -> hawkr.invoice.SellerProviderAccountResponse
+	65,  // 199: hawkr.invoice.InvoiceService.VerifySellerProviderAccount:output_type -> hawkr.invoice.SellerProviderAccountResponse
+	65,  // 200: hawkr.invoice.InvoiceService.ActivateSellerProviderAccount:output_type -> hawkr.invoice.SellerProviderAccountResponse
+	65,  // 201: hawkr.invoice.InvoiceService.RotateSellerProviderCredentials:output_type -> hawkr.invoice.SellerProviderAccountResponse
+	72,  // 202: hawkr.invoice.InvoiceService.GetSellerReceiptAuthorization:output_type -> hawkr.invoice.SellerReceiptAuthorizationResponse
+	72,  // 203: hawkr.invoice.InvoiceService.ConfirmSellerReceiptAuthorization:output_type -> hawkr.invoice.SellerReceiptAuthorizationResponse
+	78,  // 204: hawkr.invoice.InvoiceService.ListSellerInvoiceDocuments:output_type -> hawkr.invoice.ListSellerInvoiceDocumentsResponse
+	85,  // 205: hawkr.invoice.InvoiceService.GetSellerInvoiceDocument:output_type -> hawkr.invoice.GetSellerInvoiceDocumentResponse
+	82,  // 206: hawkr.invoice.InvoiceService.ListSellerReceivedInvoiceDocuments:output_type -> hawkr.invoice.ListSellerReceivedInvoiceDocumentsResponse
+	89,  // 207: hawkr.invoice.InvoiceService.ResendInvoiceNotification:output_type -> hawkr.invoice.ResendInvoiceNotificationResponse
+	89,  // 208: hawkr.invoice.InvoiceService.ResendBuyerInvoiceNotification:output_type -> hawkr.invoice.ResendInvoiceNotificationResponse
+	92,  // 209: hawkr.invoice.InvoiceService.GetSellerInvoiceJob:output_type -> hawkr.invoice.GetSellerInvoiceJobResponse
+	95,  // 210: hawkr.invoice.InvoiceService.ListOrderExternalIssuances:output_type -> hawkr.invoice.ListOrderExternalIssuancesResponse
+	92,  // 211: hawkr.invoice.InvoiceService.ReportExternalIssuance:output_type -> hawkr.invoice.GetSellerInvoiceJobResponse
+	46,  // 212: hawkr.invoice.InvoiceService.ListSellerInvoiceComplaints:output_type -> hawkr.invoice.ListInvoiceComplaintsResponse
+	44,  // 213: hawkr.invoice.InvoiceService.GetSellerInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	44,  // 214: hawkr.invoice.InvoiceService.RespondSellerInvoiceComplaint:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	103, // 215: hawkr.invoice.InvoiceService.GetInvoiceOverviewForAdmin:output_type -> hawkr.invoice.GetInvoiceOverviewForAdminResponse
+	107, // 216: hawkr.invoice.InvoiceService.ListTaxReviewsForAdmin:output_type -> hawkr.invoice.ListTaxReviewsForAdminResponse
+	109, // 217: hawkr.invoice.InvoiceService.GetTaxReviewForAdmin:output_type -> hawkr.invoice.GetTaxReviewForAdminResponse
+	113, // 218: hawkr.invoice.InvoiceService.DecideTaxReviewForAdmin:output_type -> hawkr.invoice.DecideTaxReviewForAdminResponse
+	113, // 219: hawkr.invoice.InvoiceService.DecideTaxExtensionForAdmin:output_type -> hawkr.invoice.DecideTaxReviewForAdminResponse
+	117, // 220: hawkr.invoice.InvoiceService.ListProviderAccountsForAdmin:output_type -> hawkr.invoice.ListProviderAccountsForAdminResponse
+	119, // 221: hawkr.invoice.InvoiceService.GetProviderAccountForAdmin:output_type -> hawkr.invoice.GetProviderAccountForAdminResponse
+	119, // 222: hawkr.invoice.InvoiceService.HealthCheckProviderAccountForAdmin:output_type -> hawkr.invoice.GetProviderAccountForAdminResponse
+	123, // 223: hawkr.invoice.InvoiceService.DeactivateProviderAccountForAdmin:output_type -> hawkr.invoice.DeactivateProviderAccountForAdminResponse
+	119, // 224: hawkr.invoice.InvoiceService.ReactivateProviderAccountForAdmin:output_type -> hawkr.invoice.GetProviderAccountForAdminResponse
+	127, // 225: hawkr.invoice.InvoiceService.RevokeProviderAccountForAdmin:output_type -> hawkr.invoice.RevokeProviderAccountForAdminResponse
+	131, // 226: hawkr.invoice.InvoiceService.ListProviderCutoversForAdmin:output_type -> hawkr.invoice.ListProviderCutoversForAdminResponse
+	134, // 227: hawkr.invoice.InvoiceService.ListInvoiceDocumentsForAdmin:output_type -> hawkr.invoice.ListInvoiceDocumentsForAdminResponse
+	138, // 228: hawkr.invoice.InvoiceService.GetInvoiceDocumentForAdmin:output_type -> hawkr.invoice.GetInvoiceDocumentForAdminResponse
+	89,  // 229: hawkr.invoice.InvoiceService.ResendInvoiceNotificationForAdmin:output_type -> hawkr.invoice.ResendInvoiceNotificationResponse
+	142, // 230: hawkr.invoice.InvoiceService.ListInvoiceJobsForAdmin:output_type -> hawkr.invoice.ListInvoiceJobsForAdminResponse
+	145, // 231: hawkr.invoice.InvoiceService.GetInvoiceJobForAdmin:output_type -> hawkr.invoice.GetInvoiceJobForAdminResponse
+	150, // 232: hawkr.invoice.InvoiceService.RetryInvoiceJobForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
+	150, // 233: hawkr.invoice.InvoiceService.CancelInvoiceJobForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
+	150, // 234: hawkr.invoice.InvoiceService.ResumeInvoiceDocumentForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
+	154, // 235: hawkr.invoice.InvoiceService.RequestManualUnlockForAdmin:output_type -> hawkr.invoice.ManualUnlockResponse
+	154, // 236: hawkr.invoice.InvoiceService.ApproveManualUnlockForAdmin:output_type -> hawkr.invoice.ManualUnlockResponse
+	150, // 237: hawkr.invoice.InvoiceService.ReportManualResultForAdmin:output_type -> hawkr.invoice.InvoiceJobMutationResponse
+	161, // 238: hawkr.invoice.InvoiceService.CreateManualIssuanceForAdmin:output_type -> hawkr.invoice.CreateManualIssuanceForAdminResponse
+	46,  // 239: hawkr.invoice.InvoiceService.ListInvoiceComplaintsForAdmin:output_type -> hawkr.invoice.ListInvoiceComplaintsResponse
+	44,  // 240: hawkr.invoice.InvoiceService.GetInvoiceComplaintForAdmin:output_type -> hawkr.invoice.InvoiceComplaintResponse
+	167, // 241: hawkr.invoice.InvoiceService.ActOnInvoiceComplaintForAdmin:output_type -> hawkr.invoice.ActOnInvoiceComplaintForAdminResponse
+	171, // 242: hawkr.invoice.InvoiceService.ListInvoiceAuditLogsForAdmin:output_type -> hawkr.invoice.ListInvoiceAuditLogsForAdminResponse
+	174, // 243: hawkr.invoice.InvoiceService.ResolveOrderInvoiceModeInternal:output_type -> hawkr.invoice.ResolveOrderInvoiceModeInternalResponse
+	177, // 244: hawkr.invoice.InvoiceService.ValidateOrderInvoiceInputInternal:output_type -> hawkr.invoice.ValidateOrderInvoiceInputInternalResponse
+	180, // 245: hawkr.invoice.InvoiceService.GetSellerInvoiceCapabilitySimple:output_type -> hawkr.invoice.GetSellerInvoiceCapabilitySimpleResponse
+	183, // 246: hawkr.invoice.InvoiceService.ReplaceBusinessDayMirror:output_type -> hawkr.invoice.ReplaceBusinessDayMirrorResponse
+	172, // [172:247] is the sub-list for method output_type
+	97,  // [97:172] is the sub-list for method input_type
+	97,  // [97:97] is the sub-list for extension type_name
+	97,  // [97:97] is the sub-list for extension extendee
+	0,   // [0:97] is the sub-list for field type_name
 }
 
 func init() { file_invoice_invoice_proto_init() }
@@ -15958,7 +16141,7 @@ func file_invoice_invoice_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_invoice_invoice_proto_rawDesc), len(file_invoice_invoice_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   181,
+			NumMessages:   184,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

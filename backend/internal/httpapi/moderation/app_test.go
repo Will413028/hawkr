@@ -20,7 +20,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -33,6 +35,12 @@ type fakeReports struct {
 	gotBuyer int64
 	gotSize  int32
 	gotAfter *moderation.ReportCursor
+	gotStore int64
+}
+
+func (f *fakeReports) MyStoreReports(_ context.Context, storeID int64, after *moderation.ReportCursor, size int32) (moderation.ReportPage, error) {
+	f.gotStore, f.gotSize, f.gotAfter = storeID, size, after
+	return f.page, f.err
 }
 
 func (f *fakeReports) SubmitReport(_ context.Context, in moderation.SubmitInput) (moderation.SubmitResult, error) {
@@ -45,9 +53,32 @@ func (f *fakeReports) MyReports(_ context.Context, b int64, after *moderation.Re
 	return f.page, f.err
 }
 
-type fakeBuyers struct{}
+// fakeBuyers 把帳號對到買家 7；missing 為真時帳號沒有買家身分（NotFound）。
+type fakeBuyers struct{ missing bool }
 
-func (fakeBuyers) CurrentBuyerID(context.Context, int64) (int64, error) { return 7, nil }
+func (f fakeBuyers) CurrentBuyerID(context.Context, int64) (int64, error) {
+	if f.missing {
+		return 0, apperr.NotFound("沒有買家身分")
+	}
+	return 7, nil
+}
+
+// fakeMessages 以固定的歸屬回答 MessageParties；沒有登記的訊息是 NotFound。
+type fakeMessages struct {
+	parties map[uuid.UUID]im.ConversationParties
+	err     error
+}
+
+func (f fakeMessages) MessageParties(_ context.Context, id uuid.UUID) (im.ConversationParties, error) {
+	if f.err != nil {
+		return im.ConversationParties{}, f.err
+	}
+	p, ok := f.parties[id]
+	if !ok {
+		return im.ConversationParties{}, apperr.NotFound("沒有這則訊息")
+	}
+	return p, nil
+}
 
 type env struct {
 	r      *fakeReports
@@ -62,12 +93,28 @@ func newEnv(t *testing.T, r *fakeReports) *env {
 	return newEnvWith(t, r, &fakeStores{})
 }
 
+// identities 是測試的呼叫者身分與訊息歸屬：buyers 決定帳號的買家身分，messages 是訊息的歸屬。
+type identities struct {
+	buyers   fakeBuyers
+	messages fakeMessages
+}
+
 // newEnvWith 以指定的社群與店家來源掛上 handler；env.r 只在來源是 *fakeReports 時有值。
 func newEnvWith(t *testing.T, reports Reports, stores StoreReports) *env {
 	t.Helper()
+	return newEnvIdentities(t, reports, stores, identities{})
+}
+
+func newEnvIdentities(t *testing.T, reports Reports, stores StoreReports, ids identities) *env {
+	t.Helper()
 	r, _ := reports.(*fakeReports)
 	logs := &bytes.Buffer{}
-	path, handler := moderationv1alpha1connect.NewModerationAppServiceHandler(NewApp(reports, stores, fakeBuyers{}), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.NewTextHandler(logs, nil)))))
+	log := slog.New(slog.NewTextHandler(logs, nil))
+	app, err := NewApp(reports, stores, ids.buyers, ids.messages, log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, handler := moderationv1alpha1connect.NewModerationAppServiceHandler(app, connect.WithInterceptors(rpc.NewInterceptor(log)))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		switch {
@@ -92,8 +139,8 @@ func signedIn[T any](msg *T) *connect.Request[T] {
 func TestModerationAppRequiresALogin(t *testing.T) {
 	e := newEnv(t, &fakeReports{})
 	methods := pb.File_hawkr_moderation_v1alpha1_moderation_proto.Services().ByName("ModerationAppService").Methods()
-	if methods.Len() != 2 {
-		t.Fatalf("ModerationAppService 有 %d 支方法，預期 2", methods.Len())
+	if methods.Len() != 3 {
+		t.Fatalf("ModerationAppService 有 %d 支方法，預期 3", methods.Len())
 	}
 	for i := range methods.Len() {
 		name := string(methods.Get(i).Name())
@@ -196,7 +243,7 @@ func TestListMyReportsMapsCommunityItemsAndPages(t *testing.T) {
 	r := &fakeReports{page: moderation.ReportPage{
 		Items: []moderation.ReportItem{
 			{Report: moderation.Report{ID: id1, Category: policy.Spam, Description: "廣告", CreatedAt: at, Outcome: moderation.OutcomeViolation}, Target: moderation.Target{Kind: moderation.TargetPost, ContentID: target}, ClosedAt: &closed},
-			{Report: moderation.Report{ID: id2, Category: policy.Harassment, CreatedAt: at.Add(-time.Minute), Outcome: moderation.OutcomePending}, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 9}},
+			{Report: moderation.Report{ID: id2, Category: policy.Harassment, CreatedAt: at.Add(-time.Minute), Outcome: moderation.OutcomeNone}, Target: moderation.Target{Kind: moderation.TargetBuyer, BuyerID: 9}},
 		},
 		Next: &moderation.ReportCursor{CreatedAt: at.Add(-time.Minute), ID: id2},
 	}}
@@ -215,7 +262,7 @@ func TestListMyReportsMapsCommunityItemsAndPages(t *testing.T) {
 		!a.GetCreateTime().AsTime().Equal(at) || !a.GetResolveTime().AsTime().Equal(closed) || a.GetStore() != nil {
 		t.Fatalf("第一筆：%v", a)
 	}
-	if b.GetCommunity().GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_BUYER || b.GetCommunity().GetTarget().GetId() != "9" || b.GetCommunity().GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || b.ResolveTime != nil {
+	if b.GetCommunity().GetTarget().GetKind() != pb.ReportTargetKind_REPORT_TARGET_KIND_BUYER || b.GetCommunity().GetTarget().GetId() != "9" || b.GetCommunity().Outcome != nil || b.ResolveTime != nil {
 		t.Fatalf("第二筆：%v", b)
 	}
 	if r.gotBuyer != 7 || r.gotSize != 5 || resp.Msg.GetNextPageToken() == "" {

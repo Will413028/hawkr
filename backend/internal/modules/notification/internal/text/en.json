@@ -1,0 +1,16 @@
+{
+  "default": {
+    "account_suspended.body": {
+      "message": "Your account was suspended on {time} for the following reason: {reason}. Some features are restricted."
+    },
+    "account_suspended.title": {
+      "message": "Your account has been suspended"
+    },
+    "account_unsuspended.body": {
+      "message": "Your account suspension was lifted on {time}. You can use your account normally again."
+    },
+    "account_unsuspended.title": {
+      "message": "Your account suspension has been lifted"
+    }
+  }
+}

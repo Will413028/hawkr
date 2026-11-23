@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import AccountMenuIcon from "@/features/account/components/AccountMenuIcon";
 import {
 	BUYER_MENU_GROUPS,
+	buyerMenuLabel,
 	isAccountMenuActive,
 } from "@/features/account/menu";
 import { useAuth } from "@/lib/auth/context";
@@ -34,6 +35,7 @@ export default function AccountSidebar() {
 	const [signingOut, setSigningOut] = React.useState(false);
 
 	const tCommon = useTranslations("common");
+	const tMenu = useTranslations("account.menu");
 	const displayName = identity.nickname || tCommon("memberFallback");
 	const avatar = identity.avatarKey;
 
@@ -105,7 +107,9 @@ export default function AccountSidebar() {
 									>
 										<AccountMenuIcon name={item.icon} />
 									</span>
-									<span className="flex-1 min-w-0 truncate">{item.label}</span>
+									<span className="flex-1 min-w-0 truncate">
+										{buyerMenuLabel(item, tMenu)}
+									</span>
 								</Link>
 							);
 						})}

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
+	fulfillConnect,
+	mockChatConversations,
 	mockMyKyc,
 	mockMyStore,
 	seedStoredActiveRole,
@@ -9,6 +11,11 @@ import {
 const BUYER_ID = "300";
 const SELLER_ID = "200";
 const BUYER_NAME = "抽屜測試買家";
+
+const crmMethod = (method: string) =>
+	new RegExp(
+		`/api/connect/hawkr\\.crm\\.v1alpha1\\.CrmAppService/${method}(?:\\?|$)`,
+	);
 
 const json = (data: unknown) => ({
 	status: 200,
@@ -34,44 +41,23 @@ for (const failFirst of [false, true]) {
 
 		await mockMyStore(page, { id: SELLER_ID, storeName: "抽屜測試商店" });
 		await mockMyKyc(page, { status: "APPROVED" });
-		await page.route("**/api/v1/app/sellers/me/customers?**", (route) =>
-			route.fulfill(json({ list: [] })),
+		await page.route(crmMethod("ListCustomers"), (route) =>
+			fulfillConnect(route, { customers: [], nextPageToken: "" }),
 		);
-		await page.route("**/api/v1/app/sellers/me/tags", (route) =>
-			route.fulfill(json({ list: [] })),
+		await page.route(crmMethod("ListTags"), (route) =>
+			fulfillConnect(route, { tags: [] }),
 		);
 		await page.route("**/api/v1/app/orders?**", (route) =>
 			route.fulfill(json({ records: [], total: 0 })),
 		);
-		await page.route("**/api/v1/app/chat/conversations?**", (route) =>
-			route.fulfill(
-				json({
-					records: [
-						{
-							targetUserId: BUYER_ID,
-							targetNickname: BUYER_NAME,
-							lastMessage: "請問今天可以出貨嗎？",
-							lastMessageTime: "2026-09-05T00:00:00Z",
-							unreadCount: 0,
-						},
-					],
-				}),
-			),
-		);
-		await page.route(`**/api/v1/app/chat/history/${BUYER_ID}?**`, (route) =>
-			route.fulfill(json({ messages: [] })),
-		);
-		await page.route(`**/api/v1/app/chat/conversations/${BUYER_ID}`, (route) =>
-			route.fulfill(json({})),
-		);
-		await page.route("**/api/v1/app/chat/unread", (route) =>
-			route.fulfill(json({ unread: 0 })),
-		);
-		// An empty ticket keeps the socket deliberately offline: this behavior test
-		// exercises the drawer and never reaches an external WebSocket.
-		await page.route("**/api/v1/app/chat/ws-ticket", (route) =>
-			route.fulfill(json({})),
-		);
+		await mockChatConversations(page, "store", [
+			{
+				id: "conv-drawer-1",
+				peerId: BUYER_ID,
+				peerName: BUYER_NAME,
+				lastText: "請問今天可以出貨嗎？",
+			},
+		]);
 
 		await page.goto("/seller-center/messages");
 		const desktopTrigger = page

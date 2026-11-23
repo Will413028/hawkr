@@ -170,7 +170,7 @@ func TestGetCaseReturnsTheCaseWithItsReports(t *testing.T) {
 	f := &fakeCases{detail: moderation.CaseDetail{
 		Case: moderation.Case{ID: caseID, Target: moderation.Target{Kind: moderation.TargetPost, ContentID: uuid.New()}, Version: 4, OpenedAt: at, ReportCount: 1, MeasureID: &measure, StoreID: &store},
 		Reports: []moderation.Report{{
-			ID: reportID, CaseID: caseID, ReporterBuyerID: 11, Category: moderationCategory(), Description: "廣告", CreatedAt: at, Outcome: moderation.OutcomePending,
+			ID: reportID, CaseID: caseID, ReporterBuyerID: 11, Category: moderationCategory(), Description: "廣告", CreatedAt: at, Outcome: moderation.OutcomeNone,
 		}},
 	}}
 	c := newAdminEnv(t, f)
@@ -180,7 +180,7 @@ func TestGetCaseReturnsTheCaseWithItsReports(t *testing.T) {
 	}
 	r := res.Msg.GetReports()
 	if f.gotID != caseID || res.Msg.GetCase().GetId() != caseID.String() || len(r) != 1 || r[0].GetReporterBuyerId() != "11" || r[0].GetDescription() != "廣告" ||
-		r[0].GetOutcome() != pb.ReportOutcome_REPORT_OUTCOME_PENDING || r[0].GetId() != reportID.String() ||
+		r[0].Outcome != nil || r[0].GetId() != reportID.String() ||
 		res.Msg.GetCase().GetReportCount() != 1 || res.Msg.GetCase().GetMeasureId() != measure.String() || res.Msg.GetCase().GetStoreId() != "12" {
 		t.Fatalf("response = %+v", res.Msg)
 	}

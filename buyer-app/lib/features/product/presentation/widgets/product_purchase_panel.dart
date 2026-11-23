@@ -1,3 +1,4 @@
+import 'package:hawkr_api/money.dart';
 import 'package:hawkr_buyer/config/image_config.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
@@ -409,10 +410,12 @@ class ProductPurchaseSelector extends StatelessWidget {
     final selectedSpec = _selectedSpec;
     final stock = purchaseSpecStock(selectedSpec);
     final displayQuantity = quantity < 1 ? 1 : quantity;
-    final total = currentPrice == null ? null : currentPrice! * displayQuantity;
+    final total = currentPrice == null
+        ? null
+        : moneyTotal(currentPrice!, displayQuantity);
     final listTotal = currentListPrice == null
         ? null
-        : currentListPrice! * displayQuantity;
+        : moneyTotal(currentListPrice!, displayQuantity);
 
     final priceBlock = Column(
       key: const ValueKey('product-purchase-price'),
@@ -424,7 +427,7 @@ class ProductPurchaseSelector extends StatelessWidget {
             children: [
               TextSpan(text: 'NT\$ ', style: AppTypography.priceUnit),
               TextSpan(
-                text: total == null ? '--' : _formatMoney(total),
+                text: total == null ? '--' : formatMoneyAmount(total),
                 style: AppTypography.priceTotal.copyWith(
                   fontSize: 20,
                   height: 1,
@@ -433,7 +436,7 @@ class ProductPurchaseSelector extends StatelessWidget {
               if (listTotal != null && total != null && listTotal > total) ...[
                 TextSpan(text: '  ', style: AppTypography.caption),
                 TextSpan(
-                  text: _formatMoney(listTotal),
+                  text: formatMoneyAmount(listTotal),
                   style: AppTypography.caption.copyWith(
                     color: AppColors.textSecondary,
                     decoration: TextDecoration.lineThrough,
@@ -447,7 +450,7 @@ class ProductPurchaseSelector extends StatelessWidget {
         if (currentPrice != null && displayQuantity > 1) ...[
           const SizedBox(height: HkSpace.xs),
           Text(
-            '單價 NT\$ ${_formatMoney(currentPrice!)} × $displayQuantity',
+            '單價 NT\$ ${formatMoneyAmount(currentPrice!)} × $displayQuantity',
             style: AppTypography.metaMuted,
           ),
         ],
@@ -495,13 +498,6 @@ class ProductPurchaseSelector extends StatelessWidget {
         );
       },
     );
-  }
-
-  static String _formatMoney(num value) {
-    final asDouble = value.toDouble();
-    return asDouble == asDouble.roundToDouble()
-        ? asDouble.toInt().toString()
-        : asDouble.toStringAsFixed(2);
   }
 }
 

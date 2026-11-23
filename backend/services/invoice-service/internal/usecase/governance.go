@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/Will413028/hawkr/go-pkg/database"
 	"github.com/Will413028/hawkr/go-pkg/timeutil"
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 	"go.uber.org/zap"
@@ -116,28 +115,14 @@ type GovernanceObserver interface {
 	ObserveApprovalRecheckDue(count int64)
 }
 
-// HolidaySource 是行事曆的 owner 端（shipping-service 的 holidays 表）。
-//
-// 介面放在這裡而不是 domain：它是**出站依賴**不是儲存層，而 usecase 只需要
-// 「給我這段區間的假日」這一件事。
-type HolidaySource interface {
-	GetHolidays(ctx context.Context, from, to time.Time) ([]time.Time, error)
-}
-
 // Governance 是 INV.gov 的 usecase。
 type Governance struct {
 	profiles GovernanceStore
 	counter  CrossPeriodCounter
 	obs      GovernanceObserver
-	// businessDays／holidays 是行事曆鏡像的兩端。**兩個都可以是 nil**：
-	// 本地開發起不了 shipping-service 時 wiring 會傳 nil，此時整段同步跳過並記一行
-	// warn，其餘治理工作照跑。零值 BusinessCalendar 是安全側（偏晚的硬上限）。
-	businessDays domain.BusinessDayRepository
-	holidays     HolidaySource
 	// inbox／outboxRows 是 §5.4.6 的兩張清理表。**兩個都可以是 nil**，理由同上。
 	inbox      InboxPayloadPurger
 	outboxRows OutboxCleaner
-	tx         database.TxManager
 	log        *zap.Logger
 	now        func() time.Time
 }
@@ -168,15 +153,11 @@ func NewGovernance(
 	profiles GovernanceStore,
 	counter CrossPeriodCounter,
 	obs GovernanceObserver,
-	businessDays domain.BusinessDayRepository,
-	holidays HolidaySource,
-	tx database.TxManager,
 	log *zap.Logger,
 	now func() time.Time,
 ) *Governance {
 	return &Governance{
 		profiles: profiles, counter: counter, obs: obs,
-		businessDays: businessDays, holidays: holidays, tx: tx,
 		log: orNop(log), now: now,
 	}
 }
@@ -245,10 +226,6 @@ func (u *Governance) RunOnce(ctx context.Context) error {
 		}
 	}
 
-	// 行事曆鏡像每日整段覆蓋（§5.1.14）。放在最後：它會打一次跨服務 RPC，
-	// 失敗不得影響前面兩件純 DB 的工作。
-	syncErr := u.syncBusinessDayMirror(ctx, now)
-
 	u.log.Info("invoice.gov.scanned",
 		zap.Int("expired_profiles", len(expired)),
 		zap.String("cross_period_window", string(crossPeriodWindow(now))),
@@ -256,60 +233,5 @@ func (u *Governance) RunOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if cErr != nil {
-		return cErr
-	}
-	return syncErr
-}
-
-// syncBusinessDayMirror 把 shipping-service 的假日整段覆蓋進本地鏡像（§5.1.14）。
-//
-// 🔴 **整段 DELETE + INSERT 必須在同一個交易裡**，而且 RPC 要在交易**之外**先拿到
-// 資料。反過來做（先開交易、交易內打 RPC）會讓一次 8 秒的 RPC 逾時把 DELETE 之後的
-// 空表暴露給併發的申訴建立——而空表在 BusinessCalendar 那端是零涵蓋 ⇒ 那幾筆申訴的
-// SLA 全部落在 14 天硬上限。
-//
-// 🔴 **RPC 失敗一律保留舊鏡像**：昨天的行事曆比空表準得多。這一條是本函式存在的
-// 全部理由——同步器的價值不在「同步成功」，在「失敗時不要把東西弄壞」。
-//
-// ⚠️ 這支同步器在 2026-09-04 之前**不存在**（#3089 第 17 項）：DeleteAll／Insert
-// 兩個方法零呼叫端，鏡像自建表以來一列都沒有 ⇒ 每一筆申訴的 SLA 都是 14 自然日
-// 而不是 3 工作天，而那個退化是**靜默**的（ComplaintSlaDueAt 恆有回傳值）。
-func (u *Governance) syncBusinessDayMirror(ctx context.Context, now time.Time) error {
-	if u.businessDays == nil || u.holidays == nil || u.tx == nil {
-		u.log.Warn("invoice.gov.calendar_sync_skipped",
-			zap.Bool("has_repo", u.businessDays != nil),
-			zap.Bool("has_source", u.holidays != nil))
-		return nil
-	}
-
-	from, to := domain.BusinessDayMirrorWindow(now)
-	rows, err := u.holidays.GetHolidays(ctx, from, to)
-	if err != nil {
-		// 保留舊鏡像。這裡回 error 讓 RunOnce 的回傳值帶著它，排程器那層會 log。
-		u.log.Error("invoice.gov.calendar_fetch_failed", zap.Error(err))
-		return err
-	}
-
-	err = u.tx.WithTx(ctx, func(ctx context.Context) error {
-		if _, dErr := u.businessDays.DeleteAll(ctx); dErr != nil {
-			return dErr
-		}
-		for _, d := range rows {
-			if iErr := u.businessDays.Insert(ctx, d, now); iErr != nil {
-				return iErr
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		u.log.Error("invoice.gov.calendar_write_failed", zap.Error(err), zap.Int("holidays", len(rows)))
-		return err
-	}
-
-	u.log.Info("invoice.gov.calendar_synced",
-		zap.Int("holidays", len(rows)),
-		zap.String("from", from.Format("2006-01-02")),
-		zap.String("to", to.Format("2006-01-02")))
-	return nil
+	return cErr
 }

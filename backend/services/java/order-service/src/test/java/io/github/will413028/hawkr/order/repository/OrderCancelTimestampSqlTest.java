@@ -76,13 +76,6 @@ class OrderCancelTimestampSqlTest {
         STATUS_WRITERS.put("applyPartialRefundByStatus", false);      // 50 → 60（CASE），不是終態取消
         STATUS_WRITERS.put("updateOrderDelivered", false);            // → DELIVERED，寫 delivered_at
         STATUS_WRITERS.put("completeDeliveredOrderByStatus", false);  // → COMPLETED，寫 confirmed_at
-        // 🔴 35 → DELIVERY_FAILED_NO_REFUND(54)：**不是取消**（03 §2.1）。
-        //    它是「配送未成功、但不退款、且**可撥款**」的財務結案終態——語意與 CANCELLED(80) 相反：
-        //    取消是錢回買家，這一格是錢照撥給賣家。標成取消會讓它去寫 cancelled_at，
-        //    而那個欄位的讀者（對帳、客服、報表）會把一筆已撥款的訂單讀成已取消。
-        // ⚠️ 它也**不寫任何業務時間欄**：54 不經過 DELIVERED(40)，買家從未收貨
-        //    ⇒ confirmed_at／delivered_at 一個都不該有值（03 §2.1 下游讀者表第 7 項）。
-        STATUS_WRITERS.put("markDeliveryFailedNoRefund", false);
         // —— 取消：三條入口（賣家／售後、買家自願、系統逾時／停權），全部必須寫 cancelled_at
         STATUS_WRITERS.put("cancelOrderInternalCas", true);
         STATUS_WRITERS.put("cancelOrderByBuyerCas", true);

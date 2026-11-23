@@ -1,3 +1,6 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/l10n/l10n.dart';
+import 'package:hawkr_seller/l10n/time_ago_text.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -5,17 +8,18 @@ import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../data/chat_repository.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import '../../../core/l10n/ui_locale.dart';
+import '../data/chat_conversations_notifier.dart';
+import '../data/chat_model.dart';
 import '../../dashboard/data/dashboard_chat_unread_provider.dart';
 import '../../../config/image_config.dart';
-import '../../../config/media_image.dart';
-import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/hk_async_state_panel.dart';
+import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_content_card.dart';
 import '../../../shared/widgets/hk_frosted_card_surface.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
@@ -24,6 +28,7 @@ import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/optimized_image.dart';
 import 'chat_empty_state.dart';
 import 'chat_preview.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class ChatListScreen extends HookConsumerWidget {
   const ChatListScreen({super.key});
@@ -37,137 +42,31 @@ class ChatListScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final error = useState<String?>(null);
-    final conversations = useState<List<Map<String, dynamic>>>(const []);
-    final unreadTotal = useState(0);
-    // Note: participant names and avatars are now returned directly by
-    // GET /app/chat/conversations (targetNickname, avatarKey/avatarUrl,
-    // storeName, logoKey/logoUrl). No per-user profile fetch (N+1) is needed.
-    final isUpdating = useState(false);
-    final isInitialLoading = useState(true);
+    final conversations = ref.watch(chatConversationsProvider);
+    final notifier = ref.read(chatConversationsProvider.notifier);
+    final unreadTotal = ref.watch(dashboardChatUnreadProvider).value ?? 0;
+    final locale = ref.watch(uiLocaleProvider);
     final searchCtrl = useTextEditingController();
     final query = useState('');
 
-    Future<void> refreshUnreadTotal() async {
-      try {
-        final unread = await ref.read(chatRepositoryProvider).getUnreadCount();
-        if (context.mounted) unreadTotal.value = unread;
-      } catch (_) {
-        if (context.mounted) unreadTotal.value = 0;
-      }
-    }
-
-    Future<void> loadConversations() async {
-      error.value = null;
-      try {
-        final svc = ref.read(chatRepositoryProvider);
-        // 平行抓對話列表 + 未讀數，減少首屏等待
-        final results = await Future.wait([
-          svc.getConversations(pageSize: 50),
-          svc.getUnreadCount(),
-        ]);
-        if (context.mounted) {
-          conversations.value = results[0] as List<Map<String, dynamic>>;
-          unreadTotal.value = results[1] as int;
-        }
-      } catch (e) {
-        if (context.mounted) error.value = e.toString();
-      } finally {
-        if (context.mounted) isInitialLoading.value = false;
-      }
-    }
-
-    Future<void> backgroundUpdate() async {
-      if (isUpdating.value || !context.mounted) return;
-      isUpdating.value = true;
-      try {
-        final svc = ref.read(chatRepositoryProvider);
-        final convsList = await svc.getConversations(pageSize: 50);
-        final unreadCount = await svc.getUnreadCount();
-        if (context.mounted) {
-          final hasChanges =
-              conversations.value.length != convsList.length ||
-              unreadTotal.value != unreadCount ||
-              !conversations.value.every(
-                (old) => convsList.any(
-                  (n) =>
-                      old['conversationId'] == n['conversationId'] &&
-                      old['lastContent'] == n['lastContent'],
-                ),
-              );
-          if (hasChanges) {
-            conversations.value = convsList;
-            unreadTotal.value = unreadCount;
-          }
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          HKLog.logD('[ChatList] Background update failed: $e');
-        }
-      } finally {
-        isUpdating.value = false;
-      }
-    }
-
     useEffect(() {
-      // 聊天列表不建立 WS 連線，靠 FCM 推播更新。WS 只在聊天室內使用。
-      loadConversations();
-
-      // 仍監聽 WS 訊息流（如果使用者從聊天室返回列表，WS 可能還未斷線）
-      final svc = ref.read(chatRepositoryProvider);
-      final msgSub = svc.onMessage.listen((msg) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) {
-            HKLog.logD('[ChatList] New message received, refreshing...');
-            backgroundUpdate();
-          }
-        });
-      });
-      final unreadSub = svc.onUnreadCountChange.listen((count) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted && count != unreadTotal.value) {
-            HKLog.logD('[ChatList] Unread count changed: $count');
-            unreadTotal.value = count;
-            backgroundUpdate();
-          }
-        });
-      });
-
       void onSearchChanged() {
         if (context.mounted) query.value = searchCtrl.text.trim();
       }
 
       searchCtrl.addListener(onSearchChanged);
-
-      return () {
-        msgSub.cancel();
-        unreadSub.cancel();
-        searchCtrl.removeListener(onSearchChanged);
-      };
+      return () => searchCtrl.removeListener(onSearchChanged);
     }, const []);
 
-    String? extractLastMessageIdFor(String? conversationId) {
-      if (conversationId == null || conversationId.isEmpty) return null;
-      try {
-        final raw = conversations.value.firstWhere(
-          (c) => (c['targetUserId'] ?? '').toString() == conversationId,
-          orElse: () => const {},
-        );
-        if (raw.isEmpty) return null;
-        final v = raw['lastMessageId'];
-        return v?.toString();
-      } catch (_) {
-        return null;
-      }
+    Future<void> reload() async {
+      ref.invalidate(dashboardChatUnreadProvider);
+      await notifier.reload();
     }
 
     Widget buildBody() {
-      if (isInitialLoading.value) {
-        return const _ChatListLoadingSkeleton();
-      }
-
-      if (error.value != null) {
-        return ListView(
+      return conversations.when(
+        loading: () => const _ChatListLoadingSkeleton(),
+        error: (e, _) => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(
             HkSpace.lg,
@@ -181,123 +80,92 @@ class ChatListScreen extends HookConsumerWidget {
               title: '目前無法載入對話',
               description: '請確認網路連線後再試一次；既有訊息不會因此遺失。',
               actionLabel: '重新載入',
-              onAction: loadConversations,
+              onAction: reload,
             ),
           ],
-        );
-      }
-
-      final q = query.value.toLowerCase();
-      final filteredConvs = q.isEmpty
-          ? conversations.value
-          : conversations.value.where((raw) {
-              final rawTitle = (raw['targetNickname'] ?? '').toString();
-              final lastMsg = (raw['lastMessage'] ?? '').toString();
-              final nameCandidate = rawTitle.toLowerCase();
-              return nameCandidate.contains(q) ||
-                  lastMsg.toLowerCase().contains(q);
-            }).toList();
-
-      final allItems = <_ChatItem>[];
-      for (final it in filteredConvs) {
-        allItems.add(_resolveItem(it));
-      }
-
-      if (allItems.isEmpty) {
-        return ChatEmptyState(
-          isSearching: q.isNotEmpty,
-          onClearSearch: () {
-            searchCtrl.clear();
-            query.value = '';
-            FocusScope.of(context).unfocus();
-          },
-        );
-      }
-
-      return ListView.separated(
-        key: const ValueKey('seller-chat-conversation-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          HkSpace.lg,
-          HkSpace.sm,
-          HkSpace.lg,
-          HkSpace.section,
         ),
-        itemCount: allItems.length,
-        separatorBuilder: (_, _) => const SizedBox(height: HkSpace.sm),
-        itemBuilder: (context, index) {
-          final item = allItems[index];
-          final isService = item.isService;
-          final avatarUrl = item.avatarUrl;
-
-          Future<void> openConversation() async {
-            final pid0 = item.participantId ?? '';
-            if (pid0.isNotEmpty) {
-              unawaited(
-                ref
-                    .read(chatRepositoryProvider)
-                    .markAllMessagesRead(participantId: pid0)
-                    .catchError((_) => false)
-                    .whenComplete(() {
-                      if (context.mounted) {
-                        ref.invalidate(dashboardChatUnreadProvider);
-                      }
-                    }),
-              );
-            }
-
-            if (!isService && item.unreadCount > 0) {
-              final convId = item.conversationId;
-              extractLastMessageIdFor(convId);
-
-              conversations.value = conversations.value.map((c) {
-                final cid = (c['targetUserId'] ?? '').toString();
-                if (cid == (convId ?? '')) {
-                  final updated = Map<String, dynamic>.from(c);
-                  updated['unreadCount'] = 0;
-                  return updated;
-                }
-                return c;
+        data: (data) {
+          final q = query.value.toLowerCase();
+          final items =
+              [
+                for (final c in data.items)
+                  _ChatItem.fromConversation(c, locale),
+              ].where((it) {
+                if (q.isEmpty) return true;
+                return it.title.toLowerCase().contains(q) ||
+                    it.subtitle.toLowerCase().contains(q);
               }).toList();
 
-              final targetId = item.participantId ?? convId;
-              if (targetId != null && targetId.isNotEmpty) {
-                unawaited(
-                  ref
-                      .read(chatRepositoryProvider)
-                      .markConversationAsRead(targetId)
-                      .catchError((_) => false)
-                      .whenComplete(() {
-                        refreshUnreadTotal();
-                        if (context.mounted) {
-                          ref.invalidate(dashboardChatUnreadProvider);
-                        }
-                      }),
-                );
-              } else {
-                unawaited(refreshUnreadTotal());
-              }
-            }
-
-            if (!context.mounted) return;
-            await context.push(
-              '/chat/thread',
-              extra: {
-                'title': item.title,
-                'conversationId': item.conversationId,
-                'participantId': item.participantId,
+          if (items.isEmpty) {
+            return ChatEmptyState(
+              isSearching: q.isNotEmpty,
+              onClearSearch: () {
+                searchCtrl.clear();
+                query.value = '';
+                FocusScope.of(context).unfocus();
               },
             );
-            if (context.mounted) await loadConversations();
           }
 
-          return _ConversationCard(
-            title: item.title,
-            subtitle: item.subtitle,
-            date: item.date,
-            unreadCount: item.unreadCount,
-            avatarUrl: avatarUrl,
-            onTap: openConversation,
+          return NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n.metrics.extentAfter < 200) unawaited(notifier.loadMore());
+              return false;
+            },
+            child: ListView.separated(
+              key: const ValueKey('seller-chat-conversation-list'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                HkSpace.lg,
+                HkSpace.sm,
+                HkSpace.lg,
+                HkSpace.section,
+              ),
+              itemCount: items.length + (data.hasMore ? 1 : 0),
+              separatorBuilder: (_, _) => const SizedBox(height: HkSpace.sm),
+              itemBuilder: (context, index) {
+                if (index == items.length) {
+                  return data.loadMoreFailed
+                      ? TextButton(
+                          onPressed: notifier.loadMore,
+                          child: HkButtonLabel(
+                            context.l10n.chatLoadMoreFailedRetry,
+                          ),
+                        )
+                      : const Padding(
+                          padding: EdgeInsets.all(HkSpace.md),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                }
+                final item = items[index];
+                return _ConversationCard(
+                  title: item.title,
+                  subtitle: item.subtitle,
+                  date: item.timeAgo == null
+                      ? ''
+                      : context.taipeiDisplay.agoText(
+                          item.timeAgo!,
+                          timeAgoText(context.l10n, item.timeAgo!),
+                        ),
+                  unreadCount: item.unreadCount,
+                  avatarUrl: item.avatarUrl,
+                  onTap: () async {
+                    await context.push(
+                      '/chat/thread',
+                      extra: {
+                        'title': item.title,
+                        'conversationId': item.conversationId,
+                        'participantId': item.participantId,
+                      },
+                    );
+                    if (context.mounted) {
+                      ref.invalidate(dashboardChatUnreadProvider);
+                      unawaited(notifier.refresh());
+                    }
+                  },
+                );
+              },
+            ),
           );
         },
       );
@@ -307,9 +175,7 @@ class ChatListScreen extends HookConsumerWidget {
       backgroundColor: AppColors.surfacePage,
       appBar: HkGlassAppBar(
         title: const Text('訊息中心'),
-        subtitle: unreadTotal.value > 0
-            ? '${unreadTotal.value} 則未讀訊息'
-            : '與顧客保持聯繫',
+        subtitle: unreadTotal > 0 ? '$unreadTotal 則未讀訊息' : '與顧客保持聯繫',
       ),
       body: DecoratedBox(
         decoration: BoxDecoration(
@@ -363,8 +229,8 @@ class ChatListScreen extends HookConsumerWidget {
                           ],
                           const SizedBox(height: HkSpace.xl),
                           _ConversationSectionHeader(
-                            count: conversations.value.length,
-                            unreadCount: unreadTotal.value,
+                            count: conversations.value?.items.length ?? 0,
+                            unreadCount: unreadTotal,
                           ),
                         ],
                       ),
@@ -372,7 +238,7 @@ class ChatListScreen extends HookConsumerWidget {
                     const SizedBox(height: HkSpace.xs),
                     Expanded(
                       child: FruitRefreshIndicator(
-                        onRefresh: loadConversations,
+                        onRefresh: reload,
                         child: buildBody(),
                       ),
                     ),
@@ -816,120 +682,37 @@ class _SkeletonBlock extends StatelessWidget {
   }
 }
 
-_ChatItem _resolveItem(Map<String, dynamic> raw) {
-  final convId = (raw['targetUserId'] ?? '').toString();
-
-  final rawTitle = (raw['targetNickname'] ?? '').toString();
-  final title = rawTitle.isNotEmpty ? rawTitle : '顧客';
-
-  // 契約成對回 `avatarKey` + `avatarUrl`（gateway chat.go `GetConversations`），
-  // SSOT 是 key。舊欄位 `targetAvatarKey` / `targetAvatarUrl` / `targetAvatar`
-  // 皆已不存在——這裡沒有任何其他欄位能兜底（賣家端會話的 `logoKey`/`logoUrl`
-  // 恆為空），讀錯即全空。
-  final rawAvatar = (raw['avatarKey'] ?? raw['avatarUrl'] ?? '')
-      .toString()
-      .trim();
-  final resolvedAvatar = rawAvatar.isEmpty
-      ? ''
-      : buildImageUrl(rawAvatar, ImagePreset.avatar);
-  final avatarUrl = resolvedAvatar.isEmpty ? null : resolvedAvatar;
-
-  final lastMsg = (raw['lastMessage'] ?? '').toString();
-
-  final lastTypeRaw = (raw['lastMessageType'] ?? '').toString().toLowerCase();
-  final subtitle = derivePreview(lastMsg, lastTypeRaw);
-
-  // API spec: lastMessageTime 是 int64 epoch 毫秒
-  final ts = raw['lastMessageTime'];
-
-  String date = '';
-  try {
-    DateTime? d;
-    if (ts is int && ts > 0) {
-      // API 可能回傳秒或毫秒，用數值大小判斷
-      d = (ts < 10000000000)
-          ? DateTime.fromMillisecondsSinceEpoch(ts * 1000)
-          : DateTime.fromMillisecondsSinceEpoch(ts);
-    } else if (ts != null) {
-      // 嘗試 ISO 字串
-      d = DateTime.tryParse('$ts');
-      if (d == null) {
-        final tsInt = int.tryParse('$ts') ?? 0;
-        if (tsInt > 0) {
-          d = (tsInt < 10000000000)
-              ? DateTime.fromMillisecondsSinceEpoch(tsInt * 1000)
-              : DateTime.fromMillisecondsSinceEpoch(tsInt);
-        }
-      }
-    }
-    if (d != null && d.millisecondsSinceEpoch > 0) {
-      if (d.isUtc) d = d.toLocal();
-      date = formatTimeAgo(d);
-    }
-  } catch (_) {}
-
-  final unread = (raw['unreadCount'] is int)
-      ? raw['unreadCount'] as int
-      : int.tryParse('${raw['unreadCount']}') ?? 0;
-
-  final participantId = (raw['targetUserId'] ?? '').toString();
-
-  if (kDebugMode) {
-    HKLog.logD(
-      '[ChatList] convId=$convId title="$title" lastMsg="$lastMsg" date=$date ts=$ts unread=$unread',
-    );
-  }
-
-  return _ChatItem(
-    title: title,
-    subtitle: subtitle,
-    date: date,
-    unreadCount: unread,
-    isService: false,
-    avatarUrl: avatarUrl,
-    conversationId: convId.isNotEmpty ? convId : null,
-    participantId: participantId.isNotEmpty ? participantId : null,
-  );
-}
-
 class _ChatItem {
-  final String title;
-  final String subtitle;
-  final String date;
-  final int unreadCount;
-  final bool isService;
-  final String? avatarUrl;
-  final String? conversationId;
-  final String? participantId;
-
   const _ChatItem({
     required this.title,
     required this.subtitle,
-    required this.date,
-    this.unreadCount = 0,
-    this.isService = false,
+    required this.timeAgo,
+    required this.unreadCount,
+    required this.conversationId,
+    required this.participantId,
     this.avatarUrl,
-    this.conversationId,
-    this.participantId,
   });
 
-  _ChatItem copyWith({
-    String? title,
-    String? subtitle,
-    String? date,
-    int? unreadCount,
-    bool? isService,
-    String? avatarUrl,
-    String? conversationId,
-    String? participantId,
-  }) => _ChatItem(
-    title: title ?? this.title,
-    subtitle: subtitle ?? this.subtitle,
-    date: date ?? this.date,
-    unreadCount: unreadCount ?? this.unreadCount,
-    isService: isService ?? this.isService,
-    avatarUrl: avatarUrl ?? this.avatarUrl,
-    conversationId: conversationId ?? this.conversationId,
-    participantId: participantId ?? this.participantId,
-  );
+  factory _ChatItem.fromConversation(ChatConversation c, UiLocale locale) {
+    final name = c.buyer.name;
+    return _ChatItem(
+      title: c.buyer.deleted ? buyerProfileDeletedName(locale) : (name ?? '顧客'),
+      subtitle: previewText(c.preview, locale),
+      timeAgo: c.lastMessageTime == null
+          ? null
+          : taipeiTimeAgo(c.lastMessageTime!),
+      unreadCount: c.unreadCount,
+      conversationId: c.id,
+      participantId: c.buyer.id,
+      avatarUrl: c.buyer.avatarUri,
+    );
+  }
+
+  final String title;
+  final String subtitle;
+  final TimeAgo? timeAgo;
+  final int unreadCount;
+  final String conversationId;
+  final String participantId;
+  final String? avatarUrl;
 }

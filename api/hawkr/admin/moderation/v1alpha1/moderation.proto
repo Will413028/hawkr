@@ -201,8 +201,8 @@ message CaseReport {
   hawkr.common.v1alpha1.PolicyCategory category = 3;
   // 送出時的說明；沒有或已超過保留期被清除時是空字串。
   string description = 4;
-  // 結果由案件的決定推導：進行中是 PENDING。
-  hawkr.moderation.v1alpha1.ReportOutcome outcome = 5;
+  // 結果由案件的決定推導：進行中不設值。
+  optional hawkr.moderation.v1alpha1.ReportOutcome outcome = 5;
   google.protobuf.Timestamp create_time = 6;
 }
 

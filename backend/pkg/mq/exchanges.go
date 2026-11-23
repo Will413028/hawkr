@@ -79,12 +79,11 @@ const (
 
 	RoutingKeyDelegationOperationCompleted = "delegation.operation.completed"
 
-	RoutingKeySellerDeleted           = "seller.deleted"
-	RoutingKeySellerOnboarded         = "seller.onboarded"
-	RoutingKeySellerProfileChanged    = "seller.profile.changed"
-	RoutingKeySellerSuspended         = "seller.suspended"
-	RoutingKeySellerUnsuspended       = "seller.unsuspended"
-	RoutingKeySellerMembershipChanged = "seller.membership_changed"
+	RoutingKeySellerDeleted        = "seller.deleted"
+	RoutingKeySellerOnboarded      = "seller.onboarded"
+	RoutingKeySellerProfileChanged = "seller.profile.changed"
+	RoutingKeySellerSuspended      = "seller.suspended"
+	RoutingKeySellerUnsuspended    = "seller.unsuspended"
 
 	RoutingKeyProcurementRfqPublicationInviteCreated = "procurement.rfq_publication_invite.created"
 
@@ -96,27 +95,14 @@ const (
 )
 
 const (
-	QueueSellerReviewCreated = "seller.review.created"
-	QueueSellerReviewHidden  = "seller.review.hidden"
-
 	QueueInvoiceOrderPaid            = "invoice.order.paid"
 	QueueInvoiceOrderRefundFinalized = "invoice.order.refund.finalized"
 
 	QueueInvoiceOrderCancelled = "invoice.order.cancelled"
-
-	QueueIMAccountDeleted = "im.account.deleted"
-
-	QueueIMBuyerDeleted = "im.buyer.deleted"
-
-	QueueIMSellerDeleted = "im.seller.deleted"
 
 	QueueNotificationAccountDeleted = "notification.account.deleted"
 
 	QueueNotificationBuyerDeleted = "notification.buyer.deleted"
 
 	QueueNotificationSellerDeleted = "notification.seller.deleted"
-
-	QueueIMSellerSuspended = "im.seller.suspended"
-
-	QueueSellerAccountDeleted = "seller.account.deleted"
 )

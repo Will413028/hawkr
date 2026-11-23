@@ -1,0 +1,58 @@
+{
+ "mutants": [
+  {
+   "id": "chat-by-buyer-not-found-rethrown",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_repository.dart",
+   "old": "if (ConnectException.from(e).code == Code.notFound) return null;",
+   "new": "if (ConnectException.from(e).code == Code.notFound && false) return null;",
+   "test": "test/features/chat/chat_repository_test.dart getConversationByBuyer maps not_found to null",
+   "why": "not_found 不再回 null"
+  },
+  {
+   "id": "chat-by-buyer-id-dropped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_repository.dart",
+   "old": "pb.GetStoreConversationByBuyerRequest(buyerId: buyerId)",
+   "new": "pb.GetStoreConversationByBuyerRequest()",
+   "test": "test/features/chat/chat_repository_test.dart getConversationByBuyer sends buyer_id and maps the conversation",
+   "why": "請求沒帶 buyer_id"
+  },
+  {
+   "id": "chat-thread-skips-by-buyer-lookup",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "      conv = await _repo.getConversationByBuyer(arg.peerId);\n    }\n    final convId",
+   "new": "      conv = null;\n    }\n    final convId",
+   "test": "test/features/chat/chat_thread_notifier_test.dart opens by buyer through the by-buyer lookup, not a list scan",
+   "why": "對話頁開啟時不再依買家查對話"
+  },
+  {
+   "id": "chat-unsupported-kind-empty",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/presentation/chat_preview.dart",
+   "old": "    _ => chatMessageUnsupportedKind(locale),",
+   "new": "    _ => '',",
+   "test": "test/features/chat/chat_preview_test.dart previewText no preview is empty; an unknown kind shows the catalog sentence, never raw payload",
+   "why": "不認得的訊息種類預覽變回空字串"
+  },
+  {
+   "id": "crm-sort-unspecified-not-normalized",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/presentation/customer_management_screen.dart",
+   "old": "      ? CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME",
+   "new": "      ? CustomerSort.CUSTOMER_SORT_ORDER_COUNT",
+   "test": "test/features/customer/customer_management_screen_test.dart sort labels come from the catalog; UNSPECIFIED reads as first order",
+   "why": "UNSPECIFIED 排序沒正規化成首購時間"
+  },
+  {
+   "id": "crm-deleted-name-ignored",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/customer/data/customer_model.dart",
+   "old": "      ? buyerProfileDeletedName(l)",
+   "new": "      ? name",
+   "test": "test/features/customer/customer_management_screen_test.dart a deleted customer shows the catalog deleted name",
+   "why": "已刪除顧客顯示了暱稱而不是目錄的刪除字樣"
+  }
+ ]
+}

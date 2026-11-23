@@ -430,7 +430,7 @@ func TestDevSeedRerunRestoresSeedStoresAndLeavesOtherStoresUntouched(t *testing.
 }
 
 // 種子帳號（這裡是 9）名下有種子以外的未關閉店家時，前提檢查失敗並說明處理方式，dev-seed 本身也拒絕；兩者都不寫、不刪任何資料
-// （不自動刪店：種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id）。
+// （不自動刪店：種子店家寫入會撞上一帳號一家店）。
 func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	ctx := context.Background()
 	d := devSeedEnv(t)
@@ -453,7 +453,7 @@ func TestDevSeedCheckRefusesSeedAccountsThatOwnOtherStores(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM seller.stores`); n != 1 {
 		t.Errorf("seller.stores 有 %d 列，want 只剩使用者的 1 家（沒有寫入、沒有刪除）", n)
 	}
-	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 9 AND source_id = $1`, other); n != 1 {
+	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 9 AND role = 'SELLER'`); n != 1 {
 		t.Errorf("SELLER 角色被動過")
 	}
 	// 沒有種子店家的種子帳號（這裡是 2001）名下種子以外的未關閉店家同樣擋下。
@@ -487,7 +487,7 @@ func TestDevSeedLeavesStoresOfNonSeedAccountsUntouched(t *testing.T) {
 	if now := rowJSON(t, d, `SELECT to_jsonb(s)::text FROM seller.stores s WHERE store_id = $1`, other); now != before {
 		t.Errorf("非種子店家被改動：\n之前 %s\n之後 %s", before, now)
 	}
-	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 3002 AND source_id = $1`, other); n != 1 {
+	if n := count(t, d, `SELECT count(*) FROM identity.account_roles WHERE account_id = 3002 AND role = 'SELLER'`); n != 1 {
 		t.Errorf("非種子帳號的 SELLER 角色被動過")
 	}
 }
@@ -671,7 +671,7 @@ func closeStoreRow(t *testing.T, d *db.DB, storeID int64) {
 	mustExec(t, d, `WITH c AS (INSERT INTO seller.store_closures (store_id, closed_at, closed_by) VALUES ($1, '2026-01-01T00:00:00Z', 'ACCOUNT_OWNER') RETURNING closed_at)
 		UPDATE seller.stores SET status = 'CLOSED', current_closed_at = (SELECT closed_at FROM c), logo_key = NULL, logo_asset_id = NULL, cover_key = NULL, cover_asset_id = NULL
 		WHERE store_id = $1`, storeID)
-	mustExec(t, d, `DELETE FROM identity.account_roles WHERE source_id = $1`, storeID)
+	mustExec(t, d, `DELETE FROM identity.account_roles WHERE account_id = (SELECT account_id FROM seller.stores WHERE store_id = $1)`, storeID)
 }
 
 // 種子帳號名下的「已關閉」非種子店家不擋前提檢查（角色已移除，種子動不到它）；種子照常執行、已關閉的店家原封不動。
@@ -840,7 +840,7 @@ func TestAccountSeedRefusesStateItWouldHaveToRevert(t *testing.T) {
 	}{
 		{"帳號等待刪除", `UPDATE identity.accounts SET deletion_pending_at = now() WHERE id = 2001`, "種子帳號 2001"},
 		{"買家等待刪除", `UPDATE buyer.buyers SET status = 'PENDING_DELETION' WHERE buyer_id = 52002`, "種子買家 52002"},
-		{"SELLER 角色指向別的店", `UPDATE identity.account_roles SET source_id = 7 WHERE account_id = 9`, "種子帳號 9"},
+		{"沒有種子店家的帳號有 SELLER 角色", `INSERT INTO identity.account_roles (account_id, role) VALUES (3001, 'SELLER')`, "種子帳號 3001"},
 		{"買家 ID 對不上", `UPDATE buyer.buyers SET account_id = 2999 WHERE buyer_id = 52001`, "52001"},
 		{"種子以外的預設地址", `UPDATE buyer.shipping_addresses SET is_default = false WHERE address_id = 5200101;
 			INSERT INTO buyer.shipping_addresses (buyer_id, receiver_name, receiver_phone, town_code, address_detail, is_default, created_at, updated_at) VALUES (52001, 'u', '0900000000', '63000020', '使用者預設路1號', true, now(), now())`, "種子買家 52001 有不在 fixture 內的預設地址"},

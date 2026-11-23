@@ -7,7 +7,7 @@
   "check_a": [
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 39160,
+      "line_hint": 30569,
       "key": "acceptedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -15,7 +15,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 31074,
+      "line_hint": 24026,
       "key": "actorAccountId",
       "direction": "spec",
       "count": 2,
@@ -23,7 +23,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 2750,
+      "line_hint": 2554,
       "key": "actor_account_id",
       "direction": "spec",
       "count": 1,
@@ -31,7 +31,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 35553,
+      "line_hint": 27504,
       "key": "approvedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -39,7 +39,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 30368,
+      "line_hint": 23535,
       "key": "buyerAccountId",
       "direction": "spec",
       "count": 1,
@@ -47,7 +47,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 30469,
+      "line_hint": 23636,
       "key": "buyerAccountIds",
       "direction": "spec",
       "count": 2,
@@ -55,7 +55,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 38051,
+      "line_hint": 29606,
       "key": "createdByAccountId",
       "direction": "spec",
       "count": 1,
@@ -63,7 +63,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 33216,
+      "line_hint": 25728,
       "key": "issuerAccountId",
       "direction": "spec",
       "count": 1,
@@ -71,23 +71,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 30324,
-      "key": "ownerAccountId",
-      "direction": "spec",
-      "count": 1,
-      "reason": "規格描述的是現有 wire，與 logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
-    },
-    {
-      "file": "api/openapi/openapi.yaml",
-      "line_hint": 30255,
-      "key": "proposedByAccountId",
-      "direction": "spec",
-      "count": 1,
-      "reason": "規格描述的是現有 wire，與 logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
-    },
-    {
-      "file": "api/openapi/openapi.yaml",
-      "line_hint": 35570,
+      "line_hint": 27521,
       "key": "requestedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -95,23 +79,15 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 30338,
-      "key": "resolvedByAccountId",
-      "direction": "spec",
-      "count": 1,
-      "reason": "規格描述的是現有 wire，與 logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
-    },
-    {
-      "file": "api/openapi/openapi.yaml",
-      "line_hint": 30279,
+      "line_hint": 23993,
       "key": "reviewedByAccountId",
       "direction": "spec",
-      "count": 2,
-      "reason": "規格描述的是現有 wire，與 admin_product_certification.go、logistics_finance.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
+      "count": 1,
+      "reason": "規格描述的是現有 wire，與 admin_product_certification.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 33880,
+      "line_hint": 26374,
       "key": "sellerAccountId",
       "direction": "spec",
       "count": 2,
@@ -119,7 +95,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 31058,
+      "line_hint": 24010,
       "key": "submittedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -127,7 +103,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 6216,
+      "line_hint": 5311,
       "key": "targetAccountId",
       "direction": "spec",
       "count": 1,
@@ -252,38 +228,6 @@
       "direction": "outbound",
       "count": 1,
       "reason": "ManualUnlockInfo 的雙人確認第一人。58 號 §7.3 T14 逐字：「全案唯一真正的雙人機制是 §6 端點 54／55 的人工解鎖（request → approval 兩步、兩個不同 actor_account_id）」⇒ 同一個物件內必須同時出現發起人與覆核人兩個不同欄名，兩者都改成裸 accountId 在結構上不可能。操作者是 ADM 管理員，沒有 store_id/buyer_id。"
-    },
-    {
-      "file": "gateway/internal/handler/logistics_finance.go",
-      "line_hint": 358,
-      "key": "ownerAccountId",
-      "direction": "outbound",
-      "count": 1,
-      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 ownerAccountId 對應 fulfillment_exception_cases.owner_account_id：案件離開 OPEN 時必須有承辦人（chk_exc_owner 是那條保證的機械形式），它回答的是「現在誰負責這張案件」。與同一物件的 storeId 不是同義詞——storeId 是案件牽涉到的賣家，承辦人是我方的人。"
-    },
-    {
-      "file": "gateway/internal/handler/logistics_finance.go",
-      "line_hint": 322,
-      "key": "proposedByAccountId",
-      "direction": "outbound",
-      "count": 1,
-      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 proposedByAccountId 對應 fulfillment_case_resolutions.proposed_by_account_id：提出處置方案的 ADM 操作者。它與 reviewedByAccountId 共同構成 chk_fcr_two_person（覆核者不得為提案者）那條雙人原則的資料面，改名或合併都會讓那條約束失去可稽核性。"
-    },
-    {
-      "file": "gateway/internal/handler/logistics_finance.go",
-      "line_hint": 362,
-      "key": "resolvedByAccountId",
-      "direction": "outbound",
-      "count": 1,
-      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 resolvedByAccountId 對應 fulfillment_exception_cases.resolved_by_account_id：結案者。chk_exc_resolved 要求結案三件套（時間／人／碼）同時有值，這一欄是其中的「人」。"
-    },
-    {
-      "file": "gateway/internal/handler/logistics_finance.go",
-      "line_hint": 324,
-      "key": "reviewedByAccountId",
-      "direction": "outbound",
-      "count": 1,
-      "reason": "V9 的 fulfillment_exception_cases / fulfillment_case_resolutions 欄註解逐字標「⚠️ account_id（ADM 操作者），不是 store_id」：例外案件的承辦、提案、覆核、結案四個角色都是 ADM 管理員，而管理員只有登入 principal、沒有營運鍵——store_id / buyer_id 在這裡不存在對應值。 reviewedByAccountId 對應 fulfillment_case_resolutions.reviewed_by_account_id：覆核者。與 admin_product_certification.go 既有的同名條目同源、同理由（裁決者是 ADM 管理員）。"
     }
   ],
   "check_b": []

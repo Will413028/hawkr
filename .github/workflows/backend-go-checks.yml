@@ -199,10 +199,8 @@ jobs:
           for module in \
               gateway pkg \
               services/ai-service \
-              services/crm-service services/im-service \
               services/invoice-service \
-              services/notification-service services/review-service \
-              services/seller-service; do
+              services/notification-service; do
             echo "=== $module ==="
             (cd "$module" && go mod tidy)
           done

@@ -211,7 +211,7 @@ groups:
   #    退避序列 5*3^(n-1) 秒 = 5/15/45/135/405，max-retries=5 ⇒ **最長正常重試鏈 605 秒
   #    （約 10.1 分鐘）**，之後該列轉 DEAD 而離開 backlog 述詞。
   #    ⇒ backlog 仍在且最舊超過 900 秒 = 已超過最長正常重試鏈 + 緩衝，必定異常。
-  #    （對照：buyer_deleted／seller_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
+  #    （對照：buyer_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
   #      直接照抄 3600 會讓本表的告警比實際失效晚一個數量級。）
   #
   # ⚠️ 與 *OutboxTerminalFailure 那兩組的**語意差異**，不要照抄它們的 expr：
@@ -243,32 +243,6 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：payment outbox_events 出現 DEAD 列（exchange={{ $labels.exchange }}）"
           description: "env={{ $labels.env }}：payment_outbox_dead_rows{exchange=\"{{ $labels.exchange }}\"} 大於 0，代表某筆事件已耗盡重試次數進入 DEAD（8224）。DEAD 是無人推走的終態——候選述詞 status IN ('8221','8223') 不含它，不會有任何程式路徑再碰它，**該事件等於永久遺失**。請查 last_error 判斷原因（常見：exchange 無效被 fail-closed 擋下、routing key 無 binding 而 unroutable）。處置完成（補發或註記後清除該列）前本告警會持續 firing，這是刻意的。查法：SELECT id, exchange, routing_key, retry_count, last_error, created_at FROM outbox_events WHERE status = '8224' ORDER BY created_at;"
-
-  # ── seller_deleted_outbox 積壓／卡住偵測（pkg/outbox 遷移新增）───────
-  # seller-service export outbox_pending_rows / outbox_oldest_pending_age_seconds /
-  # outbox_failed_total，皆帶 outbox_name="seller_deleted" label。
-  - name: seller-deleted-outbox-alerts
-    interval: 60s
-    rules:
-      - alert: SellerDeletedOutboxStuck
-        expr: outbox_oldest_pending_age_seconds{outbox_name="seller_deleted"} > 3600
-        for: 5m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：seller_deleted_outbox 最舊 pending 已卡住超過 1 小時"
-          description: "env={{ $labels.env }}：outbox_oldest_pending_age_seconds{outbox_name=\"seller_deleted\"} 超過 3600 秒，該筆 seller_deleted_outbox row（seller.deleted/onboarded/suspended/unsuspended 之一）疑似卡住，請查 seller-service（可能原因包含 worker 未啟動、DB 不可用、RabbitMQ 不可用、單體（legacy 的 AccountService）RemoveRole 逾時、或該列本身重試異常）。"
-
-      - alert: SellerDeletedOutboxTerminalFailure
-        expr: increase(outbox_failed_total{outbox_name="seller_deleted"}[1h]) > 0
-        for: 0m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：seller_deleted_outbox 出現終態失敗"
-          description: "env={{ $labels.env }}：outbox_failed_total{outbox_name=\"seller_deleted\"} 過去 1 小時有增量，代表某筆賣家 lifecycle 事件（publish 或 RemoveSellerRole）已耗盡重試次數，需人工檢查該 seller_deleted_outbox row 的 last_error。"
 
   # ── 電子發票（58 號設計書 §8.2.4 ①–⑯ ＋ ⑳㉑㉒、§9.3.3 ⑰⑱⑲）──────────────
   # 本 group 共 34 條（2026-09-05 實數；本行原本寫 24，那是條目長大之後沒有回灌的舊值）。
@@ -459,12 +433,11 @@ groups:
           summary: "env={{ $labels.env }}：{{ $value }} 筆付款後修改請求卡在 REISSUE_FAILED"
           description: "env={{ $labels.env }}：**買家原本持有的合法發票已經作廢、新發票不存在，而那是平台的操作造成的**——58 §7.3.6 稱它為最嚴重的單一狀態，SLA 15 分鐘。處置：① 查 invoice_correction_requests 該列的 document_id，找它的替代票（invoice_documents.original_document_id = 該 document_id）與對應 operation ② 替代票的 operation 若在 FAILED_*，走 ADM 端點 52「安全重試」——那會在同一事務內把 correction 推回 VOID_REISSUE_IN_PROGRESS（R09），重開成功後自動落 COMPLETED ③ 替代票**已經 ISSUED** 而 correction 仍是 REISSUE_FAILED ⇒ 那是收尾漏了，走一次性維運 SQL 補 status／reissued_document_id／completed_at，**同一交易補一列 invoice_status_history**（裸 UPDATE 不留痕會讓下一個人看到假的軌跡）④ 無論哪一支，買家都要收到人話通知，不得沿用「處理中」通用文案。🔴 禁止寫 reconciliation job／backfill CLI 清它（CLAUDE.md §22）。⚠️ 既有的 InvoiceVoidWithoutReissue 守不到這一格：它看文件側，重試成功那一刻就熄滅，而 correction 那一列還卡著。"
 
-      # 行事曆鏡像過期（58 §5.1.14；2026-09-04 補）。
+      # 行事曆鏡像過期（58 §5.1.14）。鏡像由單體推送。
       #
       # 🔴 兩個門檻是**兩個不同的失效模式**，不能只設一個：
-      #   -1 ＝ 鏡像空表 ⇒ 同步器從未成功跑過一次（2026-09-04 之前的常態：
-      #        DeleteAll／Insert 零呼叫端）。這是 critical。
-      #   > 48h ＝ 同步器在跑但連兩天失敗（shipping 掛了／NetworkPolicy 被改）。
+      #   -1 ＝ 從未收到推送（`invoice_business_day_coverage` 沒有列）。這是 critical。
+      #   > 48h ＝ 單體在推但連兩天失敗（invoice-service 連不到／單體今年沒有匯入）。
       #
       # 為什麼要告警而不是靠它自己恢復：鏡像過期的後果是**申訴 SLA 悄悄從 3 工作天
       # 退成 14 自然日**，方向偏晚 ⇒ 不會有賣家來抱怨（對他們是好事），
@@ -477,7 +450,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：發票服務的工作日行事曆鏡像是空的"
-          description: "env={{ $labels.env }}：`invoice_business_day_mirror` 一列都沒有 ⇒ `BusinessCalendar` 是**零涵蓋**，每一筆新申訴的 `sla_due_at` 都會落在「起算日 + 14 自然日」的硬上限，而不是 §7.3.5 要求的 3 個工作天。**沒有任何錯誤會出現**（`ComplaintSlaDueAt` 恆有回傳值）。查：① invoice-service 的 `invoice.gov.calendar_*` log —— INV.gov 每日 UTC 16:00 跑一次，`calendar_sync_skipped` 代表 wiring 缺依賴、`calendar_fetch_failed` 代表打不到 shipping、`calendar_write_failed` 代表 DB 寫入失敗 ② shipping-service 的 `holidays` 表本身有沒有資料（owner 在那裡，ADM 有匯入介面）③ NetworkPolicy 的 `shipping-service-ingress` 有沒有還列著 invoice-service。修好之後**不必手動補資料**，下一次 INV.gov 會整段覆蓋。🔴 禁止在 invoice-service 加 seed migration 或手動 INSERT（該表的 COMMENT 明令），它是唯讀鏡像。"
+          description: "env={{ $labels.env }}：`invoice_business_day_coverage` 沒有列 ⇒ invoice-service 從未收到單體推送的行事曆，`BusinessCalendar` 是**零涵蓋**，每一筆新申訴的 `sla_due_at` 都會落在「起算日 + 14 自然日」的硬上限，而不是 §7.3.5 要求的 3 個工作天。**沒有任何錯誤會出現**（`ComplaintSlaDueAt` 恆有回傳值）。查：① **worker 行程**的 log（推送由 worker 的 River job 執行，不在單體 serve 行程）：「行事曆窗口內沒有已匯入的資料，不推送給 invoice-service」warning 代表今天所在的年份尚未匯入（到後台匯入該年度辦公日曆）；「行事曆推送給 invoice-service 失敗」error 代表呼叫失敗 ② worker 的 `INVOICE_SERVICE_ADDR` 與內部密鑰是否指向可連的 invoice-service ③ invoice-service 的 `ReplaceBusinessDayMirror` RPC 錯誤 log（`invoice.calendar.replace_failed`、`invoice.calendar.replace.failed`）。修好之後不必手動補資料，單體每日對帳與每次匯入都會整段覆蓋。🔴 禁止在 invoice-service 加 seed migration 或手動 INSERT，涵蓋區間與假日只來自單體的推送。"
 
       - alert: InvoiceBusinessDayMirrorStale
         expr: min by (env) (invoice_business_day_mirror_age_seconds) > 172800
@@ -487,7 +460,7 @@ groups:
           channel: business
         annotations:
           summary: "env={{ $labels.env }}：工作日行事曆鏡像已 {{ $value | humanizeDuration }} 沒有更新"
-          description: "env={{ $labels.env }}：INV.gov 每日同步一次，超過 48 小時沒更新代表**連續兩天失敗**。鏡像還在（舊資料比空表準得多，同步器刻意在 RPC 失敗時保留舊值），但涵蓋窗口是以 `max(synced_at)` 推算的 [−30, +400] 天 —— 它會隨時間往後漂出真實範圍，屆時落在窗口外的日期一律被當成假日。診斷步驟與上一條相同（`invoice.gov.calendar_*` log ⇒ shipping ⇒ NetworkPolicy）。"
+          description: "env={{ $labels.env }}：單體的 worker 每日對帳推送一次，超過 48 小時沒更新代表**連續兩天推送失敗或沒有推送**。鏡像還在（推送失敗時 invoice-service 保留舊值），但 `invoice_business_day_coverage` 的涵蓋區間不會往後延伸，區間外的日期一律被當成假日。查：worker 行程 log 的「行事曆推送給 invoice-service 失敗」error（job 失敗最多重試 10 次後放棄，隔天對帳 job 再排入）、worker 的 `INVOICE_SERVICE_ADDR` 設定，以及「行事曆窗口內沒有已匯入的資料」warning（今天所在的年份尚未匯入時 worker 什麼都不推）。"
 
       - alert: InvoiceInboxStranded
         expr: sum by (env, event_type, status) (invoice_inbox_stranded_rows) > 0
@@ -973,55 +946,3 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：站外業者邀請信 permanent 失敗率 {{ $value | humanizePercentage }}"
           description: "env={{ $labels.env }}：過去 1 小時站外業者邀請信有超過 20% 被 Resend 判定為 permanent（不可重試，通常是硬退信），且該小時寄送量達到 10 封以上。example.com 同時是訂單信與發票信的寄送網域，兩者都沒有替代管道——先查 notification-service 的 vendor invite consumer log 找出集中退信的收件網域，確認是否為網域信譽被標記的早期訊號。"
-
-  # ── 70 號《物流財務結算》線 B｜賣家物流應收卡住（sql_exporter: logistics_finance）──
-  #
-  # 這一組回答的是 70 §3.2.1 那張表的第 ④ 問：「卡住了誰會知道」。在它之前答案是
-  # **沒有人**——logistics_receivables 的七個狀態在 monitoring/ 全域零命中。
-  #
-  # 🔴 為什麼是 business 而不是 infra：卡住的每一列都對應**一筆真實的錢**
-  #    （平台已經替賣家墊付了 provider 的配送成本，正要向賣家收回）。
-  #    處置一律是人看帳，不是重啟服務。
-  #
-  # 🔴 禁止用 reconciliation job／backfill CLI／drift scanner 清這些列（CLAUDE.md §22）。
-  #    一次性的資料修補走維運 SQL，而動手前要先跑 70 §3.2.2 的三問：
-  #    ① 我要寫的這個值有沒有執行者 ② 推走它的那一句 allowed-from 含不含我造出來的組合
-  #    ③ 同一交易要不要補一列狀態歷程（裸 UPDATE 不留痕 ⇒ 下一個人看到的軌跡是假的）。
-  - name: logistics-finance-alerts
-    interval: 300s
-    rules:
-      # 判準 B「什麼會讓它變回 resolved」：對應的 worker 把列推進下一個狀態，或 ADM 處置完畢。
-      # 正常情況下這個數字恆為 0 ⇒ **不是永久紅候選**，所以不需要 cadence 降頻。
-      #
-      # for: 1h 沿用 InvoiceAdjustmentStuck 的取值（同一類：需要人判斷、太吵會讓人關掉它）。
-      # ⚠️ SQL 側已經各自帶了門檻（PENDING 1h／SUBMITTED expected_fund_date+48h／
-      #    FAILED 72h／SETTLED 24h），這裡的 for 是**再加一層**，不是那個門檻本身。
-      - alert: LogisticsReceivableStuck
-        expr: sum by (env, status) (logistics_receivable_stuck_rows) > 0
-        for: 1h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：{{ $value }} 筆賣家物流應收卡在 {{ $labels.status }}"
-          description: "env={{ $labels.env }}：這些列**沒有執行者在推進**，每一列都對應一筆平台已經墊付、正要向賣家收回的物流成本。依 status 分流：① PENDING 超過 1 小時 ⇒ 提交 worker 沒在動（查該 pod 的 log 與 `SELECT id, submit_lease_until, created_at FROM logistics_receivables WHERE status='PENDING' ORDER BY created_at`；租約全是舊的代表沒有人在 claim，租約一直被刷新代表送出當下在炸）② SUBMITTED 超過 expected_fund_date+48h ⇒ **查詢 worker 沒把它推成 UNCONFIRMED**；特別檢查該列最新一筆 logistics_collection_attempts 的 `expected_fund_date` 是不是 NULL——是的話它對查詢 worker 是永久隱形的（pastGrace() 對 NULL 回 false 且不交給任何人），要人工判定後補值或直接推 UNCONFIRMED ③ FAILED 超過 72 小時 ⇒ 退避重送（1h／6h／24h 至多 3 次）已耗盡，到 ADM 決定重送或 WRITTEN_OFF（強制填理由）④ SETTLED 超過 24 小時且 actual_cost 有值 ⇒ **對帳做了但 true-up 沒做**，`actual > estimated` 的差額永遠不會被收而帳面上看起來一切正常；補 `logistics_adjustments{kind=RECONCILIATION}` 併入下一筆應收，不得由平台默默吸收（70 §6.2）。🔴 禁止寫 reconciliation job／backfill CLI 清它（CLAUDE.md §22）；維運 SQL 動手前先跑 70 §3.2.2 的三問。"
-
-      # 🔴 70 §8 逐字「本書最重要的一條」。
-      #
-      # for: 6h 的語意是「**持續**有未處置的 UNCONFIRMED」，不是「某一列躺了 6 小時」
-      # ——SQL 側刻意沒有時間門檻（UNCONFIRMED 是狀態機裡唯一設計上就沒有自動執行者的
-      # 狀態，出邊三條全是 ADM）。ADM 每小時清掉一筆但新的一直來時它也會響，那是刻意的：
-      # 70 §13 R1 正是「UNCONFIRMED 的人工負擔未知，若發生率高 ADM 會被淹沒」。
-      # ⚠️ 6h 是**起始值**，70 §13 R1 明載要用這支指標本身校準寬限期。
-      #
-      # 為什麼是 warning 不是 critical：處置一定需要人到 PayUni 後台核對，
-      # 沒有可以立刻執行的自動修法。貼 critical 只會讓它被靜音（§2.1.2）。
-      - alert: LogisticsReceivableUnconfirmed
-        expr: sum by (env) (logistics_receivable_unconfirmed_rows) > 0
-        for: 6h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：{{ $value }} 筆賣家物流應收處於 UNCONFIRMED（錢可能收了也可能沒收）"
-          description: "env={{ $labels.env }}：`agent_fee` 已經送出去了，而過了期望撥款日＋寬限期，`agent_fee_query` 回的 `FundDate` 仍是 `0000-00-00`——**「還沒到次日」與「次日執行失敗（最可能是賣家餘額不足）」在 PayUni 的回應上長得一模一樣**，所以這一格代表「錢可能收了也可能沒收」。🔴 **不得自動重送**：PayUni 的 `TradeNo` 官方三處逐字標『可重複』，且 `agent_fee_query` 回單筆結構非陣列 ⇒ 真的送重複了，用官方 API 也對不出有幾筆；自動重送的期望值是把一次不確定變成一次確定的重複扣款（70 §4.1／§4.3 第 3 層）。處置：拿該列最新一筆 `logistics_collection_attempts.trade_no` 到 PayUni 商戶後台核對，三選一（70 §3.2）——① **其實收到了** ⇒ 推 SETTLED，附核對依據與 ADM 留痕（這是最可能的結果）② **確認沒受理** ⇒ 推回 PENDING 並**開一筆新 attempt ＋ 新 trade_no**（原 attempt 留『ADM 判定未受理』理由；用舊 trade_no 重送等於賭 PayUni 真的沒受理）③ **查不出來** ⇒ WRITTEN_OFF，強制填理由。🔴 禁止寫 reconciliation job／backfill CLI（CLAUDE.md §22）；維運 SQL 動手前先跑 70 §3.2.2 的三問。"

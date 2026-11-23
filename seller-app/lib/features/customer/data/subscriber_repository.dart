@@ -50,7 +50,7 @@ class RemoteSubscriberRepository implements SubscriberRepository {
 
   @override
   Future<Customer?> resolveCustomer(String accountId) {
-    return _customerRepository.getCustomerByAccountId(accountId);
+    return _customerRepository.getCustomer(accountId);
   }
 }
 

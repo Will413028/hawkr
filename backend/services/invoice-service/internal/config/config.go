@@ -252,7 +252,7 @@ func Load() (*Config, error) {
 		Peers: PeerConfig{
 			OrderAddr:    pkgconfig.GetEnvOrDefault("ORDER_SERVICE_ADDR", "order-service:9915"),
 			PaymentAddr:  pkgconfig.GetEnvOrDefault("PAYMENT_SERVICE_ADDR", "payment-service:9925"),
-			SellerAddr:   pkgconfig.GetEnvOrDefault("SELLER_SERVICE_ADDR", "127.0.0.1:9941"),
+			SellerAddr:   pkgconfig.GetEnvOrDefault("LEGACY_SELLER_GRPC_ADDR", "127.0.0.1:9941"),
 			BuyerAddr:    pkgconfig.GetEnvOrDefault("BUYER_SERVICE_ADDR", "127.0.0.1:9941"),
 			ShippingAddr: pkgconfig.GetEnvOrDefault("SHIPPING_SERVICE_ADDR", "shipping-service:9931"),
 			MediaAddr: pkgconfig.GetEnvOrDefault("MEDIA_SERVICE_HOST", "media-service") + ":" +

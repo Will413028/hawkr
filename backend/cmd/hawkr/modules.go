@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
@@ -11,11 +12,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 )
@@ -37,16 +41,19 @@ func modules() []migrate.Module {
 		{Name: "social", Dir: social.Migrations()},
 		{Name: "payment", Dir: payment.Migrations()},
 		{Name: "moderation", Dir: moderation.Migrations()},
+		{Name: "assistant", Dir: assistant.Migrations()},
+		{Name: "procurement", Dir: procurement.Migrations()},
 		{Name: "review", Dir: review.Migrations()},
 		{Name: "im", Dir: im.Migrations()},
 		{Name: "crm", Dir: crm.Migrations()},
+		{Name: "notification", Dir: notification.Migrations()},
 	}
 }
 
-// platformData 是 platform 擁有 schema 的套件（收款開通 ADR D29 的 webhook inbox、D62 的後台動作紀錄 adminaudit）：不是模組，desired state 與 migration 在套件的 db/
+// platformData 是 platform 擁有 schema 的套件（收款開通 ADR D29 的 webhook inbox、D62 的後台動作紀錄 adminaudit、工作日行事曆 bizcalendar）：不是模組，desired state 與 migration 在套件的 db/
 // （platformDirs），migrate 時先於模組套用。
 func platformData() []migrate.Module {
-	return []migrate.Module{{Name: inbox.Schema, Dir: inbox.Migrations()}, {Name: adminaudit.Schema, Dir: adminaudit.Migrations()}}
+	return []migrate.Module{{Name: inbox.Schema, Dir: inbox.Migrations()}, {Name: adminaudit.Schema, Dir: adminaudit.Migrations()}, {Name: bizcalendar.Schema, Dir: bizcalendar.Migrations()}}
 }
 
 // migrations 是 migrate 套用的全部：platform 的 schema 先，模組依 modules() 的順序。
@@ -61,7 +68,5 @@ var apiOnly = []string{}
 var withoutData = []string{
 	"reviewqueue",       // 待辦由各來源模組的資料推導，讀 seller、payment 與 moderation 發布的 pub_review_items
 	"accountsuspension", // 停權紀錄在 identity，這個模組只編排：鎖帳號、確認沒有店家、呼叫 identity、發事件
-	"procurement",       // 骨架，表隨 A9-2 建立
-	"assistant",         // 骨架，表隨 A9-3a 建立
 	"imageai",           // 骨架，表隨 A9-4 建立
 }

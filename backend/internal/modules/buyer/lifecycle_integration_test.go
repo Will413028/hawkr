@@ -225,8 +225,6 @@ func TestReadErrorsReturnNilCollections(t *testing.T) {
 	if stats, err := fixture.module.SubscriberStats(ctx, 20, []TimeWindow{{Start: time.Unix(1, 0), End: time.Unix(2, 0)}}); err == nil || stats.New != nil || stats.Total != 0 {
 		t.Fatalf("failed read returned stats: %+v, %v", stats, err)
 	}
-	plans, err := fixture.module.ListPlans(ctx)
-	assertNil(plans, err)
 }
 
 func TestMissingAddressNamesCorrectEntity(t *testing.T) {

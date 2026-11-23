@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "buyer-label-ignores-offset",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "if (formatted.isEmpty || isTaipeiOffset(deviceOffset)) return formatted;",
+   "new": "if (formatted.isEmpty) return formatted;",
+   "test": "test/shared/time/taipei_display_test.dart device offset +8: no label",
+   "why": "withTaipeiLabel drops the offset check, so a device already at +8 still gets the Taipei label."
+  },
+  {
+   "id": "buyer-guard-lets-tolocal-pass",
+   "stack": "flutter:buyer-app",
+   "file": "scripts/check-taipei-display.py",
+   "old": "TO_LOCAL = re.compile(r\"\\btoLocal\\(\")",
+   "new": "TO_LOCAL = re.compile(r\"\\bNEVER_MATCHES_toLocal\\(\")",
+   "test": "test/architecture/taipei_display_guard_test.dart the script fails on toLocal(",
+   "why": "The CI guard stops flagging toLocal( in lib/."
+  },
+  {
+   "id": "seller-label-ignores-offset",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "if (formatted.isEmpty || isTaipeiOffset(deviceOffset)) return formatted;",
+   "new": "if (formatted.isEmpty) return formatted;",
+   "test": "test/shared/time/taipei_display_test.dart device offset +8: no label",
+   "why": "withTaipeiLabel drops the offset check, so a device already at +8 still gets the Taipei label."
+  },
+  {
+   "id": "seller-guard-lets-tolocal-pass",
+   "stack": "flutter:seller-app",
+   "file": "scripts/check-taipei-display.py",
+   "old": "TO_LOCAL = re.compile(r\"\\btoLocal\\(\")",
+   "new": "TO_LOCAL = re.compile(r\"\\bNEVER_MATCHES_toLocal\\(\")",
+   "test": "test/architecture/taipei_display_guard_test.dart the script fails on toLocal(",
+   "why": "The CI guard stops flagging toLocal( in lib/."
+  }
+ ]
+}

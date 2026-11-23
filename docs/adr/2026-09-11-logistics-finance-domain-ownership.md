@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-11-15-fulfillment-seller-managed-shipping.md`（賣家自行出貨，平台不收也不負擔運費，物流財務結算已整體刪除）；原為 accepted |
 | 日期 | 2026-09-11 |
 | 影響範圍 | shipping-service／payment-service 財務事實 ownership |
 | 路徑基準 | `backend/` |
@@ -14,7 +14,7 @@
   🔴 **每一份 financial fact 只能有一個 authority**——兩個 owner 都認為自己是權威，結果是對不起帳。
 - **決定：按「事實 vs 債權」畫界，三個 authority 各司其職。**
 
-⚠️ **authority 欄寫的是「可部署單元 ＋ module」**；[70 號](/backend/docs/詳細設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md)
+⚠️ **authority 欄寫的是「可部署單元 ＋ module」**；70 號（設計書已刪除）
 以 **Runtime Owner** 稱呼同一件事。70 號是 **domain design**，它的存在不依賴任何一個服務名——
 **domain 文件與 deployment boundary 是兩件事**，不要因為服務合併就以為 domain 被取消。
 
@@ -65,7 +65,7 @@
      並靠 `io.github.will413028.hawkr.payment.logistics.{domain,application,repository,infrastructure,scheduler}`
      維持內部分層。
 - **已落實於**：`2026-09-11-ledger-carrier-model-compatibility.md`／`2026-09-11-channel-fee-grossup-in-adapter.md`；66 詳設 §1.6.1 的 punt 由本 ADR 承接；
-  [70 號](/backend/docs/詳細設計書/70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md) §1 的 Runtime Owner 標示；
+  70 號（設計書已刪除） §1 的 Runtime Owner 標示；
   `services/java/payment-service/src/main/resources/db/migration/V9__add_logistics_finance_tables.sql`。
 
 ## 修訂：設計書 65A、66、68、69 已刪除（2026-10-29）

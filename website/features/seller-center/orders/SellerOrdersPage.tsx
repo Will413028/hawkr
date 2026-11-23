@@ -3032,15 +3032,11 @@ function BuyerCell({
 	const primary = snapshotName || currentProfile?.name.trim() || "會員";
 	const resolvedAvatar = avatar || currentProfile?.avatar;
 	const initial = primary.charAt(0);
-	// Jump to the buyer's CRM record. Prefer the buyer ID → detail page;
-	// otherwise fall back to the customers list pre-filtered by the buyer's
-	// own site name. Receiver data belongs in the detail drawer only.
-	const crmQuery = snapshotName || currentProfile?.name.trim() || "";
+	// Jump to the buyer's CRM record (the customer list has no keyword search).
+	// Receiver data belongs in the detail drawer only.
 	const crmHref = buyerId
 		? `/seller-center/customers/${encodeURIComponent(buyerId)}`
-		: crmQuery
-			? `/seller-center/customers?q=${encodeURIComponent(crmQuery)}`
-			: null;
+		: null;
 	// 配送異常已改在「訂單狀態」欄以「異常」徽章呈現，買家頭像的紅點只保留
 	// 待處理售後提示。
 	const showDot = hasAfterSale;

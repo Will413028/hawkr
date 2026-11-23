@@ -17,7 +17,6 @@ import io.github.will413028.hawkr.shipping.mapper.UberQuoteMapper;
 import io.github.will413028.hawkr.shipping.provider.FulfillmentContext;
 import io.github.will413028.hawkr.shipping.provider.FulfillmentProviderAdapter;
 import io.github.will413028.hawkr.shipping.provider.capability.CancelCapability;
-import io.github.will413028.hawkr.shipping.provider.capability.CostCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.CreateCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.DispatchCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.InboundCapability;
@@ -646,38 +645,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_STATE_TRANSITION_REJECTED);
         }
         return id;
-    }
-
-    /**
-     * Uber 的 provider 成本 ＝ <b>checkout 當下被接受的那一筆報價</b>的 {@code fee_amount}。
-     *
-     * <h3>為什麼取 quote 而不是向 Uber 回查</h3>
-     * 官方 delivery 回應雖然有 {@code fee} 欄，但我方 {@code DeliveryResult} <b>刻意不解析它</b>；
-     * 而取消費／等待費<b>根本不在 API 契約內</b>（只出現在月結帳單）。
-     * ⇒ 今天唯一可靠、且與買家被收的運費同源的金額，就是被接受的那筆報價。
-     *
-     * <p>🔴 <b>這不是「猜」</b>：`INV-U1` 保證買家配送費在 capture 當下凍結、永不補收，
-     * 而該值今天是 pass-through（repo 內查無 markup）⇒ 它就是我方付給 Uber 的預估金額。
-     * 真實差額由 provider 月結帳單走 {@code actual_cost} true-up（70 §6.2），
-     * 那是 estimated → actual 的正常路徑，不是缺陷。
-     *
-     * <p>⚠️ <b>單位已在 adapter 入站邊界換算成「元」</b>
-     * （{@code UberApiClient} 解析 E1 回應時走 {@code UberFieldFormat.fromMinorUnits}）
-     * ⇒ {@code uber_quotes.fee_amount} 存的是元整數，此處直接使用、<b>不得再換算一次</b>。
-     *
-     * <p>⚠️ 查無 {@code CHECKOUT_ACCEPTED} 報價 ⇒ 回 empty（<b>不是 0</b>）。
-     * 那代表這條 leg 走的不是正常 checkout 路徑（例如人工補單），成本要由對帳補回，
-     * 而不是用一個編出來的金額向賣家收錢。
-     */
-    @Override
-    public Optional<CostCapability> cost(FulfillmentContext ctx) {
-        return Optional.of(shipment -> {
-            UberQuoteEntity quote = acceptedQuote(shipment.getOrderNo());
-            if (quote == null || quote.getFeeAmount() == null) {
-                return Optional.empty();
-            }
-            return Optional.of(quote.getFeeAmount());
-        });
     }
 
     private UberQuoteEntity acceptedQuote(String orderNo) {

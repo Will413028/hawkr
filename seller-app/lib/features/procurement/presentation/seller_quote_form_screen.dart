@@ -1,3 +1,4 @@
+import 'package:hawkr_api/taipei_time.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -16,6 +17,7 @@ import '../data/seller_quote_model.dart';
 import 'seller_quote_controller.dart';
 import 'seller_quote_labels.dart';
 import 'seller_quote_validation.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 平台賣家的回價表單（Hawkr Agent 採購線，A14 PLATFORM 半邊）。
 ///
@@ -856,6 +858,10 @@ class _QuoteTextField extends HookWidget {
   }
 }
 
+/// 日期時間選擇器的起始時間點：已有值用它，沒有值是 [now] 起算一天後。
+DateTime quotePickerSeed(DateTime? current, DateTime now) =>
+    current ?? now.toUtc().add(const Duration(days: 1));
+
 class _DateTimeField extends StatelessWidget {
   const _DateTimeField({
     required this.label,
@@ -873,15 +879,21 @@ class _DateTimeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final parsed = value.isEmpty ? null : DateTime.tryParse(value)?.toLocal();
+    final parsed = value.isEmpty ? null : DateTime.tryParse(value);
     return Padding(
       padding: const EdgeInsets.only(bottom: HkSpace.md),
       child: InkWell(
         onTap: () => _pick(context, parsed),
         child: InputDecorator(
-          decoration: InputDecoration(labelText: label, errorText: error),
+          decoration: InputDecoration(
+            labelText: label,
+            errorText: error,
+            helperText: context.taipeiDisplay.labelIfNeeded,
+          ),
           child: Text(
-            parsed == null ? '尚未設定' : _formatLocal(parsed),
+            parsed == null
+                ? '尚未設定'
+                : TaipeiDisplay.plainIso(value, TaipeiFormat.dateTime)!,
             style: AppTypography.body,
           ),
         ),
@@ -889,31 +901,26 @@ class _DateTimeField extends StatelessWidget {
     );
   }
 
-  static String _formatLocal(DateTime value) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${value.year}-${two(value.month)}-${two(value.day)} '
-        '${two(value.hour)}:${two(value.minute)}';
-  }
-
   Future<void> _pick(BuildContext context, DateTime? current) async {
     final now = DateTime.now();
-    final base = current ?? now.add(const Duration(days: 1));
+    final base = taipeiPickerInitial(quotePickerSeed(current, now));
     final date = await showDatePicker(
       context: context,
-      initialDate: base,
+      initialDate: base.initialDate,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 3),
     );
     if (date == null || !context.mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(base),
+      initialTime: TimeOfDay(
+        hour: base.initialTime.hour,
+        minute: base.initialTime.minute,
+      ),
     );
     if (time == null) return;
     onChanged(
-      toRfc3339Utc(
-        DateTime(date.year, date.month, date.day, time.hour, time.minute),
-      ),
+      toRfc3339Utc(base.instantOf(date, hour: time.hour, minute: time.minute)),
     );
   }
 }

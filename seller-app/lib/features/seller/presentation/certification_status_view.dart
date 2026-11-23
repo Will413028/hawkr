@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
-import 'package:hawkr_api/taipei_time.dart';
+
 import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -21,6 +21,7 @@ import '../data/payment_onboarding.dart';
 import '../data/seller_status_refresh.dart';
 import 'payment_account_action.dart';
 import 'widgets/certification_journey_stepper.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 平台審核的色調（版面，留在 client）；文字取自共用文案目錄（`seller.KYCStatus`）。`UNSPECIFIED` 與不認得的值沒有色調。
 HkStatusTone? kycStatusTone(KYCStatus status) => switch (status) {
@@ -39,17 +40,18 @@ enum KycStampKind { decide, submit }
 ({KycStampKind kind, String time})? kycStampOf(
   KYCApplication application,
   KYCStatus status,
+  TaipeiDisplay t,
 ) {
   if (status == KYCStatus.KYC_STATUS_APPROVED && application.hasDecideTime()) {
     return (
       kind: KycStampKind.decide,
-      time: formatTaipeiTimestamp(application.decideTime),
+      time: t.timestamp(application.decideTime),
     );
   }
   if (status == KYCStatus.KYC_STATUS_SUBMITTED && application.hasSubmitTime()) {
     return (
       kind: KycStampKind.submit,
-      time: formatTaipeiTimestamp(application.submitTime),
+      time: t.timestamp(application.submitTime),
     );
   }
   return null;
@@ -157,7 +159,7 @@ class _PlatformReviewSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.uiLocale;
     final tone = kycStatusTone(status);
-    final stamp = kycStampOf(application, status);
+    final stamp = kycStampOf(application, status, context.taipeiDisplay);
     return _SectionCard(
       cardKey: const Key('kyc_platform_review'),
       title: '平台審核',
@@ -240,7 +242,7 @@ class _PaymentAccountSection extends HookConsumerWidget {
     final enabled =
         account.status == PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED;
     final fetched = account.hasFetchTime()
-        ? formatTaipeiTimestamp(account.fetchTime)
+        ? context.taipeiDisplay.timestamp(account.fetchTime)
         : null;
     final Widget? button =
         action == null ||

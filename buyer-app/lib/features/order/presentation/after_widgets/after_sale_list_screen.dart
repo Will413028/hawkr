@@ -13,6 +13,7 @@ import '../../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../data/after_sale_model.dart';
 import '../../data/after_sale_repository.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 售後服務列表頁 — 對齊 Figma node 4661:37209
 class AfterSaleListScreen extends ConsumerStatefulWidget {
@@ -174,7 +175,10 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
                         color: AppIconColors.defaultColor,
                       ),
                       SizedBox(width: 6.w),
-                      Text(_formatTime(c.createdAt), style: _infoStyle),
+                      Text(
+                        _formatTime(c.createdAt, context.taipeiDisplay),
+                        style: _infoStyle,
+                      ),
                     ],
                   ),
                   SizedBox(height: 6.h),
@@ -207,7 +211,7 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
                       c.shipBackDeadlineAt.isNotEmpty) ...[
                     SizedBox(height: 6.h),
                     Text(
-                      '寄回截止：${_formatTime(c.shipBackDeadlineAt)}',
+                      '寄回截止：${_formatTime(c.shipBackDeadlineAt, context.taipeiDisplay)}',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
@@ -290,12 +294,7 @@ class _AfterSaleListScreenState extends ConsumerState<AfterSaleListScreen> {
     _ => AppColors.textSecondary,
   };
 
-  String _formatTime(String raw) {
-    if (raw.isEmpty) return '';
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    final local = dt.toLocal();
-    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  String _formatTime(String raw, TaipeiDisplay t) {
+    return t.formatIso(raw);
   }
 }

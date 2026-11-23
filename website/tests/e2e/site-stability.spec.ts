@@ -7,6 +7,7 @@ import {
 	test,
 } from "@playwright/test";
 import { canonicalSellerSegment } from "./helpers/canonical-seller";
+import { captureHydrationDiagnostics } from "./helpers/hydration-diagnostics";
 import { fulfillConnectError, GET_SESSION_URL } from "./helpers/mock-gateway";
 import {
 	assertNoResidualLoading,
@@ -769,6 +770,7 @@ test.describe("long-page stability after ready", {
 					forbiddenMediaRequestUrls.push(request.url());
 				}
 			};
+			captureHydrationDiagnostics(page);
 			page.on("console", onConsole);
 			page.on("pageerror", onPageError);
 			page.on("response", onResponse);

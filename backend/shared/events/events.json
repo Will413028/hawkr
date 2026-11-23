@@ -82,175 +82,12 @@
       "consumer": "order-service",
       "dlq_enabled": true
     },
-    "im.payment.success": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.success",
-      "description": "IM服務監聽支付成功事件（推送通知）",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.refund.success": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.refund.success",
-      "description": "IM服務監聽退款成功事件（推送通知）",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.atm.reminder": {
-      "exchange": "hawkr.payment.delayed",
-      "routing_key": "payment.atm.reminder",
-      "description": "IM服務監聽 ATM 繳款提醒（延遲消息）",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
     "payment.expiry.check": {
       "exchange": "hawkr.payment.delayed",
       "routing_key": "payment.expiry.check",
       "description": "支付服務自消費到期檢查事件（延遲消息）",
       "consumer": "payment-service",
       "dlq_enabled": true
-    },
-    "im.seller.payment.success": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.seller.success",
-      "description": "IM服務監聽賣家支付成功通知（有新訂單）",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 5
-    },
-    "im.seller.payment.failed": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.seller.failed",
-      "description": "IM服務監聽賣家支付失敗通知",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.seller.refund.requested": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.seller.refund.requested",
-      "description": "IM服務監聽賣家退款申請通知",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.seller.refund.completed": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.seller.refund.completed",
-      "description": "IM服務監聽賣家退款完成通知",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.seller.order.expired": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.seller.expired",
-      "description": "IM服務監聽賣家訂單超時通知",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.order.status.updated": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.status.updated",
-      "description": "IM服務監聽訂單狀態變更（通知買賣雙方）",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.order.shipped": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.shipped",
-      "description": "IM服務監聽訂單已出貨（通知買家）",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 5
-    },
-    "im.order.delivered": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.delivered",
-      "description": "IM服務監聽訂單已送達（通知買賣雙方）",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.order.pickup.ready": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.pickup.ready",
-      "description": "IM服務監聽超商取貨就緒（通知買家）",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 5
-    },
-    "im.order.completed": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.completed",
-      "description": "IM服務監聽訂單完成（通知賣家）",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.order.cancelled": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.cancelled",
-      "description": "IM服務監聽訂單取消（通知買賣雙方）",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 7
-    },
-    "im.buyer.payment.failed": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.buyer.failed",
-      "description": "IM服務監聽買家支付失敗通知",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 5
-    },
-    "im.buyer.payment.expired": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.buyer.expired",
-      "description": "IM服務監聽買家支付超時通知",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.buyer.invoice": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.buyer.invoice",
-      "description": "IM服務監聽買家發票通知",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.pickup.reminder": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.pickup.reminder",
-      "description": "IM服務監聽取貨到期提醒（延遲消息）",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 5
-    },
-    "im.pickup.returned": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.pickup.returned",
-      "description": "IM服務監聽取貨退回通知（通知買賣雙方）",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 7
-    },
-    "im.review.invitation": {
-      "exchange": "hawkr.order",
-      "routing_key": "order.review.invitation",
-      "description": "IM服務監聽評價邀請（訂單完成後通知買家）",
-      "consumer": "im-service",
-      "dlq_enabled": true
-    },
-    "im.seller.settlement": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.seller.settlement",
-      "description": "IM服務監聽賣家結算/撥款通知",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 5
-    },
-    "im.seller.settlement.failed": {
-      "exchange": "hawkr.payment",
-      "routing_key": "payment.seller.settlement.failed",
-      "description": "IM服務監聽賣家結算失敗通知",
-      "consumer": "im-service",
-      "dlq_enabled": true,
-      "priority": 7
     }
   },
   "events": {
@@ -842,7 +679,9 @@
         "platform_fee": "decimal",
         "actual_amount": "decimal",
         "order_count": "int32",
-        "order_nos": ["string"],
+        "order_nos": [
+          "string"
+        ],
         "period_start": "string (ISO8601)",
         "period_end": "string (ISO8601)",
         "bank_account_last4": "string",
@@ -873,9 +712,17 @@
   },
   "dlq_config": {
     "max_retry_count": 3,
-    "retry_delay_ms": [1000, 5000, 30000],
+    "retry_delay_ms": [
+      1000,
+      5000,
+      30000
+    ],
     "alert_on_max_retry": true,
-    "alert_channels": ["log", "slack", "email"]
+    "alert_channels": [
+      "log",
+      "slack",
+      "email"
+    ]
   },
   "idempotency_config": {
     "key_prefix": "idempotent:mq:",

@@ -1,0 +1,184 @@
+{
+ "mutants": [
+  {
+   "id": "push-to-ignores-imported-years",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\tto = windowEnd\n\tif through.Before(to) {\n\t\tto = through\n\t}",
+   "new": "\tto = windowEnd\n\t_ = through",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "The pushed coverage always runs to the window end instead of the intersection with the imported years, so a never-imported year is declared covered."
+  },
+  {
+   "id": "push-skips-year-gap",
+   "stack": "go",
+   "file": "backend/internal/platform/bizcalendar/calendar.go",
+   "old": "\tfor c.Covers(year + 1) {",
+   "new": "\tfor year < 2100 {",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchStopsAtTheFirstGap$",
+   "why": "The window extends across a missing year instead of stopping at the first gap, so the gap year is declared covered."
+  },
+  {
+   "id": "push-start-year-uncovered-still-pushed",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\tif !covered {",
+   "new": "\tif !covered && false {",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "A window whose today's year was never imported is still pushed."
+  },
+  {
+   "id": "push-window-past-29",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "pastDays   = 30",
+   "new": "pastDays   = 29",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "The pushed window starts 29 days back instead of 30, one day narrower than invoice's own window."
+  },
+  {
+   "id": "push-window-future-399",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "futureDays = 400",
+   "new": "futureDays = 399",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "The pushed window ends 399 days ahead instead of 400."
+  },
+  {
+   "id": "import-does-not-push",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\t\treturn q.Enqueue(ctx, PushArgs{}, nil)",
+   "new": "\t\treturn nil",
+   "test": "internal/legacy/bizcalendarrelay ^TestOnCalendarImportedEnqueuesOnePush$",
+   "why": "A calendar import no longer enqueues the push to invoice-service."
+  },
+  {
+   "id": "import-ignores-enqueue-failure",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\t\treturn q.Enqueue(ctx, PushArgs{}, nil)",
+   "new": "\t\t_ = q.Enqueue(ctx, PushArgs{}, nil)\n\t\treturn nil",
+   "test": "internal/legacy/bizcalendarrelay ^TestOnCalendarImportedReturnsEnqueueError$",
+   "why": "A failed enqueue is swallowed, so the import commits without a push job."
+  },
+  {
+   "id": "push-run-start-ignores-first-year",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "runStart.After(from)",
+   "new": "false",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "The start is always the window start, so a window start in a never-imported year is declared covered."
+  },
+  {
+   "id": "push-ignores-client-error",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\t\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "\t\tif err := w.client.ReplaceBusinessDayMirror(ctx, from, to, holidays); err != nil {\n\t\t\treturn nil\n\t\t}",
+   "test": "internal/legacy/bizcalendarrelay ^TestPushReturnsClientErrorSoRiverRetries$",
+   "why": "A failed push is reported as success, so River never retries it."
+  },
+  {
+   "id": "mirror-accepts-bad-holiday-date",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\t\t\treturn 0, fmt.Errorf(\"%w: holiday date %q\", ErrInvalidBusinessDayMirror, raw)",
+   "new": "\t\t\tcontinue",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_BadBatchRejectedWholeAndMirrorUntouched$/^holiday_(not_a_date|format)$",
+   "why": "An unparsable holiday date is skipped instead of rejecting the whole batch, so a missing holiday silently shortens the SLA."
+  },
+  {
+   "id": "mirror-no-holiday-range-check",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\t\tif d.Before(from) || d.After(to) {",
+   "new": "\t\tif d.Before(from) && d.After(to) {",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_BadBatchRejectedWholeAndMirrorUntouched$/^holiday_(before|after)_range$",
+   "why": "A holiday outside the pushed coverage range is accepted instead of rejecting the batch."
+  },
+  {
+   "id": "mirror-replace-not-transactional",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\terr = u.tx.WithTx(ctx, func(ctx context.Context) error {",
+   "new": "\terr = func(fn func(context.Context) error) error { return fn(ctx) }(func(ctx context.Context) error {",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_InsertFailureRollsBackEverything$",
+   "why": "The replace runs outside the transaction, so a failed insert leaves the old rows deleted and the mirror half-written."
+  },
+  {
+   "id": "mirror-drops-coverage-write",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/usecase/business_calendar_mirror.go",
+   "old": "\t\treturn u.repo.SetCoverage(ctx, from, to, now)",
+   "new": "\t\treturn nil",
+   "test": "internal/usecase ^TestBusinessCalendarMirror_ReplaceStoresRangeAndHolidays$",
+   "why": "The pushed coverage range is never stored, so the calendar cannot say which days it covers."
+  },
+  {
+   "id": "calendar-coverage-from-synced-at",
+   "stack": "go:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/domain/bizday.go",
+   "old": "\tc.coveredFrom = taipeiMidnight(coverage.From)\n\tc.coveredTo = taipeiMidnight(coverage.To)",
+   "new": "\tc.coveredFrom = taipeiMidnight(coverage.SyncedAt).AddDate(0, 0, -30)\n\tc.coveredTo = taipeiMidnight(coverage.SyncedAt).AddDate(0, 0, 400)",
+   "test": "internal/domain ^TestNewBusinessCalendarUsesStoredRangeNotSyncedAt$",
+   "why": "Coverage is derived from the push time plus a fixed window instead of the stored range, declaring never-imported years covered."
+  },
+  {
+   "id": "holiday-page-calls-wrong-rpc",
+   "stack": "admin",
+   "file": "admin/src/app/admin/holiday-calendar/page.tsx",
+   "old": "BizCalendarAdminService.method.importHolidayCalendar",
+   "new": "BizCalendarAdminService.method.getHolidayCalendarCoverage",
+   "test": "tests/holiday-calendar.test.ts 頁面呼叫 BizCalendarAdminService",
+   "why": "The import mutation points at another RPC, so the page no longer calls the new import service."
+  },
+  {
+   "id": "push-never-extends-back-over-imported-years",
+   "stack": "go",
+   "file": "backend/internal/legacy/bizcalendarrelay/relay.go",
+   "old": "\tfor cal.Covers(first - 1) {",
+   "new": "\tfor false {",
+   "test": "internal/legacy/bizcalendarrelay ^TestBatchIsWindowIntersectImportedYearsContiguousFromStart$",
+   "why": "The imported run is never extended backwards, so a window start in an earlier imported year is clipped to January 1 of today's year."
+  },
+  {
+   "id": "snapshot-inner-joins-coverage",
+   "stack": "go-integration:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/repository/postgres/gen/invoice_business_day_mirror.sql.go",
+   "old": "LEFT JOIN invoice_business_day_coverage c ON true",
+   "new": "JOIN invoice_business_day_coverage c ON true",
+   "test": "internal/repository/postgres ^TestIntegration_BusinessDay_SnapshotSingleQuery$",
+   "why": "Without a coverage row the snapshot returns no rows at all, dropping the holidays instead of reporting never-pushed coverage."
+  },
+  {
+   "id": "snapshot-upper-bound-exclusive",
+   "stack": "go-integration:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/repository/postgres/gen/invoice_business_day_mirror.sql.go",
+   "old": "h.holiday_date <= $2",
+   "new": "h.holiday_date < $2",
+   "test": "internal/repository/postgres ^TestIntegration_BusinessDay_SnapshotSingleQuery$",
+   "why": "A holiday on the last day of the requested range is dropped."
+  },
+  {
+   "id": "snapshot-coverage-only-with-holidays",
+   "stack": "go-integration:backend/services/invoice-service",
+   "file": "backend/services/invoice-service/internal/repository/postgres/audit_repo.go",
+   "old": "\t\tif cov == nil {\n\t\t\tcf, ct",
+   "new": "\t\tif cov == nil && len(holidays) > 0 {\n\t\t\tcf, ct",
+   "test": "internal/repository/postgres ^TestIntegration_BusinessDay_SnapshotSingleQuery$",
+   "why": "A range without holidays reports no coverage, so a covered calendar looks never pushed."
+  },
+  {
+   "id": "withtx-no-deferred-rollback",
+   "stack": "go:backend/pkg",
+   "file": "backend/pkg/database/tx_manager.go",
+   "old": "\t\tif !committed {\n\t\t\t_ = tx.Rollback(context.WithoutCancel(ctx))\n\t\t}",
+   "new": "\t\t_ = committed",
+   "test": "database ^TestWithTx_RollsBackOn(PanicAndRepanics|Goexit)$",
+   "why": "A panic or runtime.Goexit inside fn (t.Fatalf) leaves the transaction open and its pool connection held forever."
+  }
+ ]
+}

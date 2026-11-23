@@ -48,9 +48,8 @@ beforeEach(() => {
 	for (const fn of Object.values(cached)) fn.mockReset();
 	cached.getCachedStore.mockResolvedValue(store);
 	cached.getCachedSellerReviews.mockResolvedValue({
-		records: [],
-		total: 0,
-		totalPages: 0,
+		reviews: [],
+		nextPageToken: "",
 	});
 	cached.getCachedSellerReviewStats.mockResolvedValue(null);
 	cached.getCachedStorePosts.mockResolvedValue({
@@ -72,15 +71,9 @@ describe("public storefront reads use the GetStore store id, never the URL store
 		);
 		const tree = await Page({ params });
 		expect(cached.getCachedStore).toHaveBeenCalledWith(STORE_CODE);
-		expect(cached.getCachedSellerReviews).toHaveBeenCalledWith(
-			STORE_ID,
-			expect.anything(),
-		);
+		expect(cached.getCachedSellerReviews).toHaveBeenCalledWith(STORE_ID);
 		expect(cached.getCachedSellerReviewStats).toHaveBeenCalledWith(STORE_ID);
-		expect(cached.getCachedSellerReviews).not.toHaveBeenCalledWith(
-			STORE_CODE,
-			expect.anything(),
-		);
+		expect(cached.getCachedSellerReviews).not.toHaveBeenCalledWith(STORE_CODE);
 		expect(findProp(tree, "initialReviews")?.props.sellerId).toBe(STORE_ID);
 	});
 

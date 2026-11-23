@@ -41,7 +41,7 @@
 
 ## 4. 檢舉結果的推導
 
-檢舉不存結果：`Case` 回傳的每筆檢舉的結果由所屬案件的決定推導：案件進行中是 `PENDING`，`VIOLATION` 與 `NO_VIOLATION` 照案件。不沿用 seller 的逐筆 outcome。
+檢舉不存結果：`Case` 回傳的每筆檢舉的結果由所屬案件的決定推導：案件進行中不設值（契約的 `outcome` 是 optional，`REPORT_OUTCOME_PENDING` 已刪並保留號碼與名稱），`VIOLATION` 與 `NO_VIOLATION` 照案件。不沿用 seller 的逐筆 outcome。
 
 ## 5. 快照保留期
 
@@ -64,3 +64,12 @@
 - 欄位：`kind` 固定 `MODERATION_CASE`；`item_id` 與 `case_id` 是案件 ID（`item_id` 是它的文字）；`start_at`、`due_at`。
 - 期限（上線前的起始值）：從開案時間 `opened_at`（首筆檢舉的提交時間，`SubmitReport` 開案時寫入）起 72 小時，開始（轉黃）是期限前 24 小時，起始值取自 seller 非食安通報的分案期限，是 moderation 自己的值，沒有即時連動；社群類別沒有食安，不用 4 小時那一檔。時長只寫在 `db/objects.sql` 的 `review_moderation_case(at)`；`at` 由呼叫方傳入，不用 `now()`，期限與 `at` 無關。
 - 守門：`reviewqueue` 的 `TestModerationCasesAreInTheQueueExactlyWhenOpen`（每種領域狀態進不進待辦）、`TestCrossSourceKeysetPagingWithModeration`；`cmd/hawkr` 的 `TestPubContractsMatchMigrations` 比對 `pub.sql`。
+
+## 8. 我的檢舉的合併清單（`ListMyReports`，組裝在 `internal/httpapi/moderation`）
+
+- 呼叫者的全部檢舉（社群與店家）是一支清單，模組之間不互相依賴，所以合併不在任何模組：`httpapi/moderation` 的 `App.ListMyReports` 呼叫 moderation 的 `MyReports` 與 seller 的 `BuyerReports`（買家一律取自 session 的買家身分，只讀自己的），在 handler 內合併。店家檢舉的單筆讀取與補充在 `hawkr.seller.v1alpha1.SellerReportAppService`（`GetMyReport`、`AddReportSupplement`），不經這裡。
+- 排序：`(create_time 新到舊、社群在前、id 新到舊)`，三個鍵都相同的兩筆順序固定（`mergedReport.before`）。
+- 分頁：每頁兩邊各取 `size` 筆（模組以多取一筆判斷還有沒有下一頁，`Next` 非 nil 就是還有），合併後取前 `size` 筆。`page_size` 預設 20、上限取兩個來源上限的較小者。
+- 游標（`myReportsCursor`）是不透明 token，記兩個來源各自的下一頁位置與各自是否已取完（`CommunityDone`、`StoreDone`）：每個來源的游標只推進到「已輸出的最後一筆」，本頁取到但沒輸出的留給下一頁；來源只有在 `Next == nil` 而且取到的每一筆都已輸出時才算取完，取完的來源之後不再讀。token 綁 procedure 名稱與買家（`rpc.PageScope`），偽造的 token 回 invalid_argument。
+- 項目形狀：`MyReportItem` 是共用欄位（`id`、`category`、`description`、`create_time`、`resolve_time`）加 `oneof subject { community, store }`。社群的結果由案件的決定推導（§4），`resolve_time` 是案件結案時間；店家的 `store` 是完整的 `StoreReport`（結果與 `resolution_note` 是 seller 的），共用欄位由它複製而來，所以對店家檢舉在線上出現兩次（`step10f-3-design.md` H1b 接受的代價，盤點見 seller `CARRYOVER.md` 的 10f-1 段）。
+- 守門：`merge_test.go` 的 `TestListMyReportsInterleavesBothSourcesByTimeAcrossPages`、`TestListMyReportsOrdersTiesCommunityFirstThenIDDescending`、`TestListMyReportsOneSourceExhaustedStopsBeingRead`、`TestListMyReportsTailCrossingThePageBoundaryKeepsTheUnemittedSideCursor`、`TestListMyReportsRejectsForgedCursors`；`my_reports_integration_test.go` 的 `TestListMyReportsMergesTheRealModulesInterleavedOwnerOnly`。

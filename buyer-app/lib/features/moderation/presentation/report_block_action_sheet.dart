@@ -22,8 +22,8 @@ enum _SheetAction { delete, report, block }
 /// 選了之後呼叫它；刪除不算封鎖，回傳 false。
 Future<bool> showReportBlockActionSheet(
   BuildContext context, {
-  required ReportTarget reportTarget,
-  BlockTarget? blockTarget,
+  required SocialReportTarget reportTarget,
+  SocialBlockTarget? blockTarget,
   String? blockUserLabel,
   String blockActionLabel = '封鎖此使用者',
   VoidCallback? onDelete,

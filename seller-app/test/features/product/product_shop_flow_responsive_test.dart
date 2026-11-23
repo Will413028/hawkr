@@ -1,7 +1,9 @@
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/product/data/product_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_preview_screen.dart';
 import 'package:hawkr_seller/features/product/presentation/product_reviews_screen.dart';
+import 'package:hawkr_seller/features/review/data/review_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_picker/product_setup_picker_screen.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_picker/picker_l3_content_panel.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_picker/picker_category_search_row.dart';
@@ -24,6 +26,37 @@ class _FixtureSellerRepository implements SellerRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _FixtureReviews implements ReviewRepository {
+  @override
+  Future<ReviewPage> listProductReviews(
+    String productId, {
+    String pageToken = '',
+    int? rating,
+    bool withImages = false,
+  }) async => ReviewPage(
+    reviews: [
+      ReviewItem(
+        id: 'r1',
+        productId: productId,
+        rating: 5,
+        content: '配送準時，水果新鮮，包裝完整。',
+        imageUrls: const [],
+        authorName: '測試買家名稱很長很長但仍必須保留日期',
+        authorAvatarUrl: '',
+        createTime: DateTime.utc(2026, 9, 22, 10),
+      ),
+    ],
+    nextPageToken: '',
+  );
+
+  @override
+  Future<ReviewStats> productStats(String productId) async =>
+      ReviewStats.fromProto(12345, 4.8, const []);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 class _FixtureRepository extends ProductRepository {
   _FixtureRepository() : super(Dio());
 
@@ -43,33 +76,6 @@ class _FixtureRepository extends ProductRepository {
       ],
     },
   };
-
-  @override
-  Future<Map<String, dynamic>> getPublicProductRatingSummary(
-    dynamic productId,
-  ) async => {
-    'code': 0,
-    'data': {'averageRating': 4.8, 'totalCount': 12345},
-  };
-
-  @override
-  Future<List<Map<String, dynamic>>> listPublicProductReviews(
-    String sellerId,
-    dynamic skuId,
-  ) async => [
-    {
-      'username': '測試買家名稱很長很長但仍必須保留日期',
-      'rating': 5,
-      'createdAt': '2026-09-22T10:00:00Z',
-      'content': '配送準時，水果新鮮，包裝完整。',
-    },
-  ];
-
-  @override
-  Future<List<Map<String, dynamic>>> getSellerProductReviewsPublic(
-    String sellerId,
-    dynamic skuId,
-  ) => listPublicProductReviews(sellerId, skuId);
 
   @override
   Future<List<Map<String, dynamic>>> fetchSellerCategoryTree() =>
@@ -113,6 +119,7 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         productRepositoryProvider.overrideWithValue(_FixtureRepository()),
+        reviewRepositoryProvider.overrideWithValue(_FixtureReviews()),
         sellerRepositoryProvider.overrideWithValue(_FixtureSellerRepository()),
       ],
       child: ScreenUtilInit(
@@ -120,6 +127,9 @@ Future<void> _pump(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(

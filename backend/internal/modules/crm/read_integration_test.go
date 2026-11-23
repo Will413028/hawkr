@@ -117,7 +117,7 @@ func TestListCustomersFilters(t *testing.T) {
 	ctx := context.Background()
 	f.seedKeysetStore(buyer1, 10)
 	for _, b := range []int64{buyer1, buyer1 + 3, buyer1 + 7} {
-		if err := f.m.SetCustomerType(ctx, storeA, b, crm.TypeVIP); err != nil {
+		if _, err := f.m.SetCustomerType(ctx, storeA, b, crm.TypeVIP); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -179,10 +179,10 @@ func TestSetCustomerType(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	wantKind(t, f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+	wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
 	for _, bad := range []crm.CustomerType{"BLOCKLIST", "blocklist", "", "vip", "ADMIN"} {
-		if err := f.m.SetCustomerType(ctx, storeA, buyer1, bad); apperr.KindOf(err) != apperr.KindInvalidInput {
+		if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, bad); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%q：err=%v，預期 InvalidInput", bad, err)
 		}
 	}
@@ -190,7 +190,7 @@ func TestSetCustomerType(t *testing.T) {
 	if _, err := f.db.Pool().Exec(ctx, "UPDATE crm.customers SET customer_type = 'BLOCKLIST'"); err == nil {
 		t.Fatal("DB 接受了 BLOCKLIST")
 	}
-	if err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
+	if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
 	c, err := f.m.GetCustomer(ctx, storeA, buyer1)
@@ -198,7 +198,7 @@ func TestSetCustomerType(t *testing.T) {
 		t.Fatalf("customer=%+v err=%v", c, err)
 	}
 	// 其他店的同一位買家不受影響（店家對買家的分類只屬於那家店）。
-	wantKind(t, f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeVIP), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+	wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeVIP)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 }
 
 func TestGetCustomer(t *testing.T) {
@@ -234,10 +234,10 @@ func TestVIPStatuses(t *testing.T) {
 	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
 	f.mustOrder("evt-2", "O2", storeB, buyer1, 100)
 	f.mustOrder("evt-3", "O3", storeA, buyer2, 100)
-	if err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
+	if _, err := f.m.SetCustomerType(ctx, storeA, buyer1, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.m.SetCustomerType(ctx, storeA, buyer2, crm.TypeVIP); err != nil {
+	if _, err := f.m.SetCustomerType(ctx, storeA, buyer2, crm.TypeVIP); err != nil {
 		t.Fatal(err)
 	}
 	got, err := f.m.VIPStatuses(ctx, buyer1, []int64{storeA, storeB, storeC, storeA})

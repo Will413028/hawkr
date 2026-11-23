@@ -13,7 +13,7 @@ part of 'chat_thread_notifier.dart';
 final chatThreadProvider = ChatThreadFamily._();
 
 final class ChatThreadProvider
-    extends $AsyncNotifierProvider<ChatThread, List<ChatMessage>> {
+    extends $NotifierProvider<ChatThread, ChatThreadState> {
   ChatThreadProvider._({
     required ChatThreadFamily super.from,
     required ChatThreadArg super.argument,
@@ -39,6 +39,14 @@ final class ChatThreadProvider
   @override
   ChatThread create() => ChatThread();
 
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatThreadState value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatThreadState>(value),
+    );
+  }
+
   @override
   bool operator ==(Object other) {
     return other is ChatThreadProvider && other.argument == argument;
@@ -50,15 +58,15 @@ final class ChatThreadProvider
   }
 }
 
-String _$chatThreadHash() => r'2d7610d691a6dc775d39169f88e09f8fb4bbdfc7';
+String _$chatThreadHash() => r'c415b687fb604f491580ce6378b01edcf361ac85';
 
 final class ChatThreadFamily extends $Family
     with
         $ClassFamilyOverride<
           ChatThread,
-          AsyncValue<List<ChatMessage>>,
-          List<ChatMessage>,
-          FutureOr<List<ChatMessage>>,
+          ChatThreadState,
+          ChatThreadState,
+          ChatThreadState,
           ChatThreadArg
         > {
   ChatThreadFamily._()
@@ -77,21 +85,20 @@ final class ChatThreadFamily extends $Family
   String toString() => r'chatThreadProvider';
 }
 
-abstract class _$ChatThread extends $AsyncNotifier<List<ChatMessage>> {
+abstract class _$ChatThread extends $Notifier<ChatThreadState> {
   late final _$args = ref.$arg as ChatThreadArg;
   ChatThreadArg get arg => _$args;
 
-  FutureOr<List<ChatMessage>> build(ChatThreadArg arg);
+  ChatThreadState build(ChatThreadArg arg);
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref =
-        this.ref as $Ref<AsyncValue<List<ChatMessage>>, List<ChatMessage>>;
+    final ref = this.ref as $Ref<ChatThreadState, ChatThreadState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<List<ChatMessage>>, List<ChatMessage>>,
-              AsyncValue<List<ChatMessage>>,
+              AnyNotifier<ChatThreadState, ChatThreadState>,
+              ChatThreadState,
               Object?,
               Object?
             >;

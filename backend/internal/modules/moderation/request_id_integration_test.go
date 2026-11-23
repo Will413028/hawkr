@@ -143,7 +143,7 @@ func TestMyReportsListsOnlyTheCallersReportsPagedWithDerivedOutcomes(t *testing.
 	if len(p1.Items) != 2 || p1.Next == nil || p1.Items[0].Report.ID != r3.Report.ID || p1.Items[1].Report.ID != r2.Report.ID {
 		t.Fatalf("第一頁要是最新兩筆且有下一頁：%+v", p1)
 	}
-	if p1.Items[0].Report.Outcome != OutcomePending || p1.Items[0].ClosedAt != nil || p1.Items[1].Report.Outcome != OutcomeViolation || p1.Items[1].ClosedAt == nil {
+	if p1.Items[0].Report.Outcome != OutcomeNone || p1.Items[0].ClosedAt != nil || p1.Items[1].Report.Outcome != OutcomeViolation || p1.Items[1].ClosedAt == nil {
 		t.Fatalf("結果要由案件推導：%+v", p1.Items)
 	}
 	p2, err := f.module.MyReports(ctx, reporter, p1.Next, 2)

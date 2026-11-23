@@ -17,7 +17,6 @@
 
 import { authedFetch } from "@/lib/api/client";
 import { ShippingMethod } from "@/lib/codemeta/enums";
-import { toLogisticsName } from "@/lib/seller/certification-options";
 
 /* ===== Code-meta enums (mirroring Flutter codemeta) ===== */
 
@@ -138,98 +137,6 @@ export async function toggleOnboarding(
 		{ method: "POST", json: { enabled } },
 	);
 	return env.data ?? {};
-}
-
-/* ===== Address validation (TGOS) ===== */
-
-export interface AddressValidationResult {
-	valid?: boolean;
-	county?: string;
-	district?: string;
-	[key: string]: unknown;
-}
-
-export async function validateAddress(
-	address: string,
-): Promise<AddressValidationResult> {
-	const qs = new URLSearchParams({ address });
-	const env = await authedFetch<AddressValidationResult>(
-		`/app/address/validate?${qs}`,
-		{ throwOnHttpError: false },
-	);
-	return env.data ?? {};
-}
-
-/* ===== Address autocomplete (TGOS) ===== */
-
-export interface AddressSuggestion {
-	fullAddress: string;
-	county: string;
-	district: string;
-	detail: string;
-	lat?: number;
-	lng?: number;
-}
-
-/**
- * Debounced address autocomplete — mirrors the seller App's
- * `TgosAddressService.getSuggestions`. County + district are required
- * on the backend; query needs to be at least 2 characters before
- * calling. The backend returns mixed-county results when the address
- * is ambiguous, so we re-filter client-side to the (county, district)
- * the user has selected (App does the same).
- */
-export async function getAddressSuggestions(params: {
-	county: string;
-	district: string;
-	query: string;
-	limit?: number;
-}): Promise<AddressSuggestion[]> {
-	const qs = new URLSearchParams({
-		county: params.county,
-		district: params.district,
-		query: params.query,
-		limit: String(params.limit ?? 8),
-	});
-	try {
-		const env = await authedFetch<AddressSuggestion[]>(
-			`/app/address/suggestions?${qs}`,
-			{ throwOnHttpError: false },
-		);
-		const list = Array.isArray(env.data) ? env.data : [];
-		const norm = (s: string) => toLogisticsName(s).replace(/　/g, "");
-		const wantCounty = norm(params.county);
-		const wantDistrict = norm(params.district);
-		return list.filter(
-			(s) =>
-				norm(s.county ?? "") === wantCounty &&
-				norm(s.district ?? "") === wantDistrict,
-		);
-	} catch {
-		return [];
-	}
-}
-
-/**
- * 物流名稱表寫「台」、內政部與 TGOS 回「臺」：比對縣市、區名稱前把整個字串的臺換成台
- * （台西鄉、霧台鄉、台東市的「台」不在開頭）。
- */
-export function addressNameMatches(a: string, b: string): boolean {
-	return toLogisticsName(a) === toLogisticsName(b);
-}
-
-/**
- * TGOS 驗證結果與表單選的縣市、區一致。TGOS 沒回縣市或區時，那一項不比對。
- */
-export function validationMatchesSelection(
-	v: AddressValidationResult | undefined,
-	city: string,
-	district: string,
-): boolean {
-	if (!v?.valid) return false;
-	if (v.county && !addressNameMatches(v.county, city)) return false;
-	if (v.district && !addressNameMatches(v.district, district)) return false;
-	return true;
 }
 
 /* ===== Helpers for UI state machines ===== */

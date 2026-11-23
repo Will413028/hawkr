@@ -1,8 +1,9 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
-import 'package:hawkr_seller/features/coupon/data/coupon_repository.dart';
 import 'package:hawkr_seller/shared/utils/hk_log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,14 +13,16 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/codemeta/code_meta.dart';
-import '../../../core/exceptions/app_exception.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/widgets/app_dropdown.dart';
 import '../../customer/data/customer_model.dart';
 import '../../customer/data/customer_repository.dart';
 import 'coupon_controller.dart';
+import 'widgets/customer_picker_sheet.dart';
 import 'widgets/section_card.dart';
 import 'widgets/selected_users_list.dart';
+import 'tag_audience_toggle.dart';
 import 'widgets/tag_selection_card.dart';
 import 'widgets/top_bar.dart';
 
@@ -27,18 +30,13 @@ import 'widgets/top_bar.dart';
 class PreselectedUser {
   final String name;
   final String id;
-  final String phone;
 
-  const PreselectedUser({
-    required this.name,
-    required this.id,
-    required this.phone,
-  });
+  const PreselectedUser({required this.name, required this.id});
 }
 
 /// 快速發放優惠券頁面（簡化版）
 ///
-/// 入口：顧客消費記錄頁（[CustomerSpendingHistoryScreen]）的「發優惠券」按鈕，
+/// 入口：顧客消費記錄頁（顧客詳情）的「發優惠券」按鈕，
 /// 可帶入 [PreselectedUser] 預填指定顧客，省去手動搜尋步驟。
 ///
 /// ## 功能
@@ -63,7 +61,6 @@ class AddCouponScreen extends HookConsumerWidget {
     final nameCtrl = useTextEditingController();
     final discountCtrl = useTextEditingController();
     final thresholdCtrl = useTextEditingController();
-    final searchCtrl = useTextEditingController();
 
     // ── Local state ──
     final discountType = useState(CouponType.percent.code);
@@ -71,25 +68,35 @@ class AddCouponScreen extends HookConsumerWidget {
     final useCustomDate = useState(false);
     final selectedDate = useState(DateTime.now().add(const Duration(days: 30)));
     final selectedTargetGroup = useState('指定會員');
-    final isLookingUp = useState(false);
-    final lookupError = useState<String?>(null);
     final saving = useState(false);
 
     // TAG 標籤相關狀態
     final allTags = useState<List<CustomerTag>>([]);
-    final selectedTagIds = useState<Set<int>>({});
+    final selectedTagIds = useState<Set<String>>({});
     final tagCustomers = useState<List<Customer>>([]);
     final tagLoading = useState(false);
+    final tagToggle = useMemoized(
+      () => TagAudienceToggle<Customer>(
+        fetch: (tagId) =>
+            ref.read(customerRepositoryProvider).listAllCustomersWithTag(tagId),
+        setSelected: (v) => selectedTagIds.value = v,
+        setCustomers: (v) => tagCustomers.value = v,
+        setLoading: (v) => tagLoading.value = v,
+        onError: (e) {
+          if (!context.mounted) return;
+          FloatingToast.error(
+            context,
+            errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+          );
+        },
+      ),
+    );
 
     // Selected users
     final selectedUsers = useState<List<Map<String, String>>>(() {
       if (preselectedUser != null) {
         return [
-          {
-            'name': preselectedUser!.name,
-            'id': preselectedUser!.id,
-            'phone': preselectedUser!.phone,
-          },
+          {'name': preselectedUser!.name, 'id': preselectedUser!.id},
         ];
       }
       return <Map<String, String>>[];
@@ -208,55 +215,17 @@ class AddCouponScreen extends HookConsumerWidget {
       }
     }
 
-    Future<void> onAddUser() async {
-      final text = searchCtrl.text.trim();
-      if (text.isEmpty) {
-        FloatingToast.error(context, '請輸入手機號碼');
-        return;
-      }
-      if (isLookingUp.value) return;
-
-      // 檢查是否已添加
-      final alreadyAdded = selectedUsers.value.any(
-        (u) => u['id'] == text || u['phone'] == text,
+    Future<void> onPickUsers() async {
+      final picked = await showCouponCustomerPicker(
+        context,
+        excludedIds: {for (final u in selectedUsers.value) u['id'] ?? ''},
       );
-      if (alreadyAdded) {
-        FloatingToast.error(context, '該用戶已在列表中');
-        return;
-      }
-
-      isLookingUp.value = true;
-      lookupError.value = null;
-      try {
-        final repo = ref.read(couponRepositoryProvider);
-        final result = await repo.lookupByPhone(text);
-
-        // 用 uid 做去重
-        final alreadyExists = selectedUsers.value.any(
-          (u) => u['id'] == result.uid,
-        );
-        if (alreadyExists) {
-          if (context.mounted) FloatingToast.error(context, '該用戶已在列表中');
-          return;
-        }
-
-        selectedUsers.value = [
-          ...selectedUsers.value,
-          {
-            'name': result.buyerName.isNotEmpty ? result.buyerName : '用戶',
-            'id': result.uid,
-            'phone': result.phone,
-          },
-        ];
-        searchCtrl.clear();
-        lookupError.value = null;
-      } on AppException catch (e) {
-        lookupError.value = e.message;
-      } catch (_) {
-        lookupError.value = '查詢失敗，請稍後再試';
-      } finally {
-        isLookingUp.value = false;
-      }
+      if (picked == null || picked.isEmpty || !context.mounted) return;
+      selectedUsers.value = [
+        ...selectedUsers.value,
+        for (final c in picked)
+          {'name': c.displayName(context.uiLocale, context.l10n), 'id': c.id},
+      ];
     }
 
     // ── Build ──
@@ -335,11 +304,8 @@ class AddCouponScreen extends HookConsumerWidget {
                     // Specify user / tags section
                     if (selectedTargetGroup.value == '指定會員')
                       _SpecifyUserSection(
-                        searchCtrl: searchCtrl,
                         selectedUsers: selectedUsers.value,
-                        isLoading: isLookingUp.value,
-                        errorMessage: lookupError.value,
-                        onAddUser: onAddUser,
+                        onPickUsers: onPickUsers,
                         onRemoveUser: (i) {
                           final list = [...selectedUsers.value];
                           list.removeAt(i);
@@ -358,33 +324,22 @@ class AddCouponScreen extends HookConsumerWidget {
                           try {
                             allTags.value = await ref
                                 .read(customerRepositoryProvider)
-                                .getSellerTags();
-                          } catch (_) {}
-                          tagLoading.value = false;
-                        },
-                        onTagToggled: (tagId) async {
-                          final newSet = Set<int>.from(selectedTagIds.value);
-                          newSet.contains(tagId)
-                              ? newSet.remove(tagId)
-                              : newSet.add(tagId);
-                          selectedTagIds.value = newSet;
-                          if (newSet.isEmpty) {
-                            tagCustomers.value = [];
-                            return;
-                          }
-                          tagLoading.value = true;
-                          try {
-                            tagCustomers.value = await ref
-                                .read(customerRepositoryProvider)
-                                .getCustomers(
-                                  tagId: newSet.first,
-                                  pageSize: 100,
-                                );
-                          } catch (_) {
-                            tagCustomers.value = [];
+                                .listTags();
+                          } catch (e) {
+                            if (context.mounted) {
+                              FloatingToast.error(
+                                context,
+                                errorText(
+                                  e,
+                                  defaults: ref.read(defaultErrorTextProvider),
+                                ),
+                              );
+                            }
                           }
                           tagLoading.value = false;
                         },
+                        onTagToggled: (tagId) =>
+                            tagToggle.toggle(tagId, selectedTagIds.value),
                         onRemoveCustomer: (idx) {
                           final list = [...tagCustomers.value];
                           list.removeAt(idx);
@@ -930,20 +885,14 @@ class _TargetGroupCard extends StatelessWidget {
 
 class _SpecifyUserSection extends StatelessWidget {
   const _SpecifyUserSection({
-    required this.searchCtrl,
     required this.selectedUsers,
-    required this.onAddUser,
+    required this.onPickUsers,
     required this.onRemoveUser,
-    this.isLoading = false,
-    this.errorMessage,
   });
 
-  final TextEditingController searchCtrl;
   final List<Map<String, String>> selectedUsers;
-  final VoidCallback onAddUser;
+  final VoidCallback onPickUsers;
   final ValueChanged<int> onRemoveUser;
-  final bool isLoading;
-  final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -963,104 +912,34 @@ class _SpecifyUserSection extends StatelessWidget {
             ),
           ),
           SizedBox(height: 12.h),
-          // Search input
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 40.h,
-                  child: TextField(
-                    controller: searchCtrl,
-                    keyboardType: TextInputType.phone,
-                    style: TextStyle(color: textColor, fontSize: 14.sp),
-                    decoration: InputDecoration(
-                      hintText: '輸入手機號碼',
-                      hintStyle: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14.sp,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.bgCard,
-                      prefixIcon: Icon(
-                        AppIcons.search,
-                        color: AppIconColors.muted,
-                        size: 20.sp,
-                      ),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: const BorderSide(
-                          color: AppColors.cardBorder,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: const BorderSide(
-                          color: AppColors.cardBorder,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: const BorderSide(color: AppColors.primary),
-                      ),
-                    ),
-                  ),
-                ),
+          GestureDetector(
+            key: const ValueKey('coupon-pick-customers'),
+            onTap: onPickUsers,
+            child: Container(
+              height: 40.h,
+              padding: EdgeInsets.symmetric(horizontal: 12.w),
+              decoration: BoxDecoration(
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: AppColors.cardBorder),
               ),
-              SizedBox(width: 8.w),
-              GestureDetector(
-                onTap: isLoading ? null : onAddUser,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  height: 40.h,
-                  padding: EdgeInsets.symmetric(horizontal: 12.w),
-                  decoration: BoxDecoration(
-                    color: isLoading ? themeColor : AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(
-                      color: isLoading ? themeColor : AppColors.cardBorder,
-                    ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    AppIcons.personAddOutlined,
+                    size: 18.sp,
+                    color: themeColor,
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isLoading)
-                        SizedBox(
-                          width: 16.w,
-                          height: 16.w,
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.bgCard,
-                          ),
-                        )
-                      else
-                        Icon(
-                          AppIcons.personAddOutlined,
-                          size: 18.sp,
-                          color: themeColor,
-                        ),
-                      SizedBox(width: 4.w),
-                      Text(
-                        isLoading ? '查詢中' : '添加',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: isLoading ? AppColors.bgCard : themeColor,
-                        ),
-                      ),
-                    ],
+                  SizedBox(width: 4.w),
+                  Text(
+                    context.l10n.couponPickFromCustomers,
+                    style: TextStyle(fontSize: 14.sp, color: themeColor),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-          if (errorMessage != null) ...[
-            SizedBox(height: 8.h),
-            Text(
-              errorMessage!,
-              style: TextStyle(color: AppColors.danger, fontSize: 12.sp),
             ),
-          ],
-          // Selected users
+          ),
           CouponSelectedUsersList(users: selectedUsers, onRemove: onRemoveUser),
         ],
       ),

@@ -5,6 +5,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/requestid"
 )
 
 // FormatID 是對外的 ID：帳號、管理員、買家與店家的主鍵過渡期是整數（ADR 2026-09-25-row-identity-by-data-kind），
@@ -27,9 +28,10 @@ func ParseID(path, raw string) (int64, error) {
 }
 
 // ParseUUID 解析請求裡的 UUID 字串 ID；path 是請求的欄位路徑，格式不對是 INVALID_ARGUMENT，指向該欄位。
+// 只收 36 字元的標準寫法（伺服器發出的就是這種）：uuid.Parse 也收 urn:uuid:、大括號與沒有連字號的寫法，同一個 ID 會有多種拼法。
 func ParseUUID(path, raw string) (uuid.UUID, error) {
 	id, err := uuid.Parse(raw)
-	if err != nil {
+	if err != nil || len(raw) != 36 {
 		return uuid.UUID{}, RequiredField(path, path+" 必須是有效的 ID")
 	}
 	return id, nil
@@ -41,7 +43,7 @@ func ParseRequestID(raw string) (*uuid.UUID, error) {
 		return nil, nil
 	}
 	id, err := uuid.Parse(raw)
-	if err != nil || len(raw) != 36 || id[6]>>4 != 4 || id[8]&0xc0 != 0x80 {
+	if err != nil || len(raw) != 36 || !requestid.IsV4(id) {
 		return nil, RequiredField("request_id", "request_id 必須是 UUIDv4")
 	}
 	return &id, nil

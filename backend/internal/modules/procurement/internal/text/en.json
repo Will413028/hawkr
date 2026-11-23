@@ -1,0 +1,187 @@
+{
+  "default": {
+    "confirm.budget": {
+      "message": "Ask the seller whether they can meet a unit price of NT${budget}"
+    },
+    "confirm.budget_unit": {
+      "message": "Ask the seller whether they can meet a unit price of NT${budget} per {unit}"
+    },
+    "confirm.delivery_city": {
+      "message": "Ask the seller whether they deliver to {city}"
+    },
+    "confirm.delivery_date": {
+      "message": "Ask the seller whether they can deliver by {date}"
+    },
+    "confirm.quantity": {
+      "message": "Ask the seller whether they can supply {quantity}"
+    },
+    "confirm.quantity_unit": {
+      "message": "Ask the seller whether they can supply {quantity} {unit}"
+    },
+    "fact.pair": {
+      "message": "{label}: {content}"
+    },
+    "list.separator": {
+      "message": ", "
+    },
+    "option.describe": {
+      "message": "Describe the item myself"
+    },
+    "option.other": {
+      "message": "Other (type it in)"
+    },
+    "prompt.budget_per_unit": {
+      "message": "Roughly what is your budget per unit?"
+    },
+    "prompt.delivery_city": {
+      "message": "Which city should it be delivered to?"
+    },
+    "prompt.delivery_date": {
+      "message": "When would you like it delivered?"
+    },
+    "prompt.item": {
+      "message": "What would you like to buy?"
+    },
+    "prompt.item_choices": {
+      "message": "We found a few matching items. Please pick the one you mean:"
+    },
+    "prompt.item_describe": {
+      "message": "We could not find a matching item. Please describe what you need:"
+    },
+    "prompt.item_group_choices": {
+      "message": "The matching items fall into several categories. Which category do you mean?"
+    },
+    "prompt.packaging": {
+      "message": "Any packaging requirements?"
+    },
+    "prompt.quantity": {
+      "message": "Roughly how much do you need?"
+    },
+    "prompt.unit": {
+      "message": "Which unit should this order use?"
+    },
+    "reject.budget_range": {
+      "message": "Budget per unit must be between NT$1 and NT${max}"
+    },
+    "reject.city_unrecognized": {
+      "message": "Not a recognizable city or county name"
+    },
+    "reject.date_format": {
+      "message": "Date must be in YYYY-MM-DD format"
+    },
+    "reject.date_missing_year": {
+      "message": "The year is missing; please add it (for example 2026-08-20)"
+    },
+    "reject.date_past": {
+      "message": "The delivery date cannot be earlier than today"
+    },
+    "reject.date_too_far": {
+      "message": "The delivery date cannot be more than {max} days from now"
+    },
+    "reject.empty": {
+      "message": "Empty, not used"
+    },
+    "reject.quantity_range": {
+      "message": "Quantity must be between 1 and {max}"
+    },
+    "reject.resolution_no_item": {
+      "message": "The item is missing or was rejected, so no item category can be set"
+    },
+    "reject.resolution_no_label": {
+      "message": "The item category needs a name"
+    },
+    "reject.resolution_unknown_kind": {
+      "message": "Unknown item category type"
+    },
+    "reject.truncated": {
+      "message": "Longer than {max} characters, truncated"
+    },
+    "reject.unit_not_allowed": {
+      "message": "Unit is not in the allowed list: {allowed}"
+    },
+    "reply.ack_optional.understood": {
+      "message": "Great, we have the main details."
+    },
+    "reply.ack_required.missing": {
+      "message": "We still need: {missing}"
+    },
+    "reply.ack_required.received": {
+      "message": "Got your message."
+    },
+    "reply.ack_required.recorded": {
+      "message": "Noted: {facts}"
+    },
+    "reply.adjusted.warning": {
+      "message": "Some of what you entered was adjusted: {items}"
+    },
+    "reply.approval.complete": {
+      "message": "The request preview is ready."
+    },
+    "reply.approval.rationale": {
+      "message": "It is sent to sellers only after you approve it."
+    },
+    "reply.basics_ready.next": {
+      "message": "Your request is complete. You can start finding candidates."
+    },
+    "reply.basics_ready.understood": {
+      "message": "Great, I have everything."
+    },
+    "reply.correction.updated": {
+      "message": "Updated: {facts}"
+    },
+    "reply.reconfirm.next": {
+      "message": "It needs to be confirmed again."
+    },
+    "reply.reconfirm.warning": {
+      "message": "Your request changed, so the earlier request preview is out of date."
+    },
+    "reply.rejected.next": {
+      "message": "Please check it again."
+    },
+    "reply.rejected.warning": {
+      "message": "Some of what you entered could not be used: {items}"
+    },
+    "slot.budget_per_unit": {
+      "message": "Budget per unit"
+    },
+    "slot.delivery_city": {
+      "message": "Delivery city"
+    },
+    "slot.delivery_date": {
+      "message": "Delivery date"
+    },
+    "slot.exact_match_required": {
+      "message": "Exact match required"
+    },
+    "slot.item": {
+      "message": "Item"
+    },
+    "slot.item_resolution": {
+      "message": "Item category"
+    },
+    "slot.packaging": {
+      "message": "Packaging"
+    },
+    "slot.quantity": {
+      "message": "Quantity"
+    },
+    "slot.unit": {
+      "message": "Unit"
+    },
+    "unit.catty": {
+      "message": "catty"
+    },
+    "unit.gram": {
+      "message": "g"
+    },
+    "unit.kg": {
+      "message": "kg"
+    },
+    "value.no": {
+      "message": "No"
+    },
+    "value.yes": {
+      "message": "Yes"
+    }
+  }
+}

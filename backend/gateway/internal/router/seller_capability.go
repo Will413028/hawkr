@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/Will413028/hawkr/gateway/internal/authz"
-	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
 	"github.com/Will413028/hawkr/gateway/internal/response"
 	"github.com/Will413028/hawkr/go-pkg/errors/bizcode"
@@ -14,7 +13,7 @@ import (
 
 // requireSeller 依帳號角色與入口提供的能力集合（X-Seller-Capabilities，seller 模組推導）檢查能力：只看 cap 是不是
 // 集合的成員，不自己從停權或生命週期推導。拒絕時，現任店家停權中回 9240，其餘（例如等待刪除）回 403。沒有能力集合
-// （沒有店家、ws-ticket）一律拒絕。
+// （沒有店家）一律拒絕。
 func requireSeller(cap authz.Capability) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if middleware.SkipRoleCheck {
@@ -68,31 +67,6 @@ func sellerViewGuard(sellerCap authz.Capability) gin.HandlerFunc {
 		}
 		c.Next() // buyer-facing view
 	}
-}
-
-// injectSellerSuspension 把已驗證的停權原因傳給下游 HTTP 與 gRPC。
-func injectSellerSuspension() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		c.Request.Header.Del(headerSellerSuspended)
-		if !middleware.SkipRoleCheck {
-			if code, _ := c.Get("accountType"); middleware.IsSeller(intVal(code)) {
-				if reason := c.GetString("sellerSuspended"); reason != "" {
-					c.Request.Header.Set(headerSellerSuspended, reason)
-					c.Request = c.Request.WithContext(grpcclient.WithSellerSuspension(c.Request.Context(), reason))
-				}
-			}
-		}
-		c.Next()
-	}
-}
-
-// headerSellerSuspended carries the suspension reason code to downstream services
-// for the IM/social 訂單關聯細分 (46 §4.4). Absent = not suspended (or not a seller).
-const headerSellerSuspended = "X-Seller-Suspended"
-
-func intVal(v any) int {
-	n, _ := v.(int)
-	return n
 }
 
 // sellerHandle mounts a seller-facing route on g and registers (method, fullPath,

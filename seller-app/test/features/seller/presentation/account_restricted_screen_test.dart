@@ -15,6 +15,8 @@ import 'package:hawkr_seller/features/seller/presentation/account_restricted_scr
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import '../../../support/fake_my_store.dart';
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _Fixed extends AccountRestrictionState {
   _Fixed(this.value);
@@ -63,18 +65,28 @@ Future<List<String>> _pump(
   );
   addTearDown(router.dispose);
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        accountRestrictionStateProvider.overrideWith(() => _Fixed(restriction)),
-        myStoreRepositoryProvider.overrideWithValue(
-          FakeMyStoreServer.absent().repository,
+    TaipeiDisplayScope(
+      deviceOffset: const Duration(hours: 8),
+      child: ProviderScope(
+        overrides: [
+          accountRestrictionStateProvider.overrideWith(
+            () => _Fixed(restriction),
+          ),
+          myStoreRepositoryProvider.overrideWithValue(
+            FakeMyStoreServer.absent().repository,
+          ),
+          authRepositoryProvider.overrideWithValue(_AuthRecorder(events)),
+          sessionProvider.overrideWith(() => _Session(events)),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          builder: (_, _) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
         ),
-        authRepositoryProvider.overrideWithValue(_AuthRecorder(events)),
-        sessionProvider.overrideWith(() => _Session(events)),
-      ],
-      child: ScreenUtilInit(
-        designSize: const Size(390, 844),
-        builder: (_, _) => MaterialApp.router(routerConfig: router),
       ),
     ),
   );

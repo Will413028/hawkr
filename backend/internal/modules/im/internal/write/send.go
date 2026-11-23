@@ -3,6 +3,7 @@ package write
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 	"uuid"
@@ -17,7 +18,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/requestid"
 	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -29,9 +32,42 @@ type target struct {
 	store   seller.Store
 }
 
-// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 守門 G1..G5（transaction 外的讀取）→ transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、Confirm 圖片、寫訊息、發 MessageSent；
-// 任何一步失敗整筆回滾，圖片仍是暫存。
+// maxSendAttempts 是同一個 RequestID 被並行請求搶先寫入時，整個送出重來的上限。
+const maxSendAttempts = 4
+
+// errRetry 表示同一個 (對話, 寄件方, RequestID) 已被並行的請求寫入：這次 transaction 整個回滾（含 AllocateSeq 推進的 seq），重來後由重送判定回第一則。
+var errRetry = errors.New("im：並行競爭，重來")
+
+// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 重送判定（同一個 RequestID 回第一則）→ 守門 G1..G5（transaction 外的讀取）→
+// transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、Confirm 圖片、寫訊息、發 MessageSent；任何一步失敗整筆回滾，圖片仍是暫存。
+// 並行的同一個 RequestID 以 messages 的唯一鍵為最終保證：輸家的 transaction 回滾後重來，重讀第一則。
+//
+// 加入外層 transaction 時撞到同一個 RequestID 不重試：唯一鍵衝突不會回滾外層，在同一個 transaction 繼續下 SQL 違反單體規則 3，
+// 已推進的 last_seq 也會隨外層 commit 而留下空洞；這時回 errNestedConflict，呼叫方必須整個回滾後重來。
 func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
+	_, nested := db.TxFrom(ctx)
+	return retrySend(nested, func() (model.Message, error) { return s.send(ctx, in) })
+}
+
+// errNestedConflict 是加入外層 transaction 的 Send 撞到並行寫入的同一個 RequestID：這個 transaction 已不能再用，呼叫方須回滾後重來。
+var errNestedConflict = errors.New("im：外層 transaction 內遇到並行競爭，呼叫方須回滾後重來")
+
+// retrySend 重試 attempt 直到不再遇到 errRetry；nested 為真時 attempt 的 transaction 不是自己的，不能重試。
+func retrySend(nested bool, attempt func() (model.Message, error)) (model.Message, error) {
+	for range maxSendAttempts {
+		out, err := attempt()
+		if errors.Is(err, errRetry) {
+			if nested {
+				return model.Message{}, errNestedConflict
+			}
+			continue
+		}
+		return out, err
+	}
+	return model.Message{}, fmt.Errorf("im：送出連續 %d 次遇到並行競爭", maxSendAttempts)
+}
+
+func (s *Service) send(ctx context.Context, in model.SendInput) (model.Message, error) {
 	l := uitext.LocaleFrom(ctx)
 	body, err := s.checkInput(l, &in)
 	if err != nil {
@@ -40,6 +76,9 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	t, buyerAccount, err := s.resolve(ctx, l, in)
 	if err != nil {
 		return model.Message{}, err
+	}
+	if first, found, err := s.replay(ctx, l, in, t, body); err != nil || found {
+		return first, err
 	}
 	if err := s.guard(ctx, l, in.Sender, t, body); err != nil {
 		return model.Message{}, err
@@ -77,7 +116,7 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		}
 		now := seq.LastMessageAt.UTC()
 		msgID := s.d.NewID()
-		p := store.InsertMessageParams{ID: msgID, ConversationID: seq.ID, Seq: seq.LastSeq, SenderKind: string(sender), MessageType: string(in.Type), Now: now}
+		p := store.InsertMessageParams{ID: msgID, ConversationID: seq.ID, Seq: seq.LastSeq, SenderKind: string(sender), RequestID: in.RequestID, MessageType: string(in.Type), Now: now}
 		if in.Type == model.TypeText {
 			p.Content = &body
 		} else {
@@ -88,6 +127,9 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 			p.ImageAssetID, p.ImageObjectKey = &asset.ID, &asset.ObjectKey
 		}
 		row, err := q.InsertMessage(ctx, p)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errRetry
+		}
 		if err != nil {
 			return err
 		}
@@ -107,6 +149,29 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		return nil
 	})
 	return out, err
+}
+
+// replay 是送出冪等的重送判定：同一個 (對話, 寄件方, RequestID) 已有訊息時回傳第一次寫入的那則（found 為真），不配 seq、不通知、不發事件、不碰圖片；
+// 內容不同（Type 不同，或文字訊息正規化後的文字不同）回 InvalidInput 指向 RequestID。圖片訊息只比 Type（staged token 在第一次已被消耗）。
+// 對話還不存在時沒有列，照常往下走。判定在對話解析與授權之後、守門之前：已送出的訊息不因之後才發生的封鎖或停權而重送失敗。
+func (s *Service) replay(ctx context.Context, l uitext.Locale, in model.SendInput, t target, body string) (model.Message, bool, error) {
+	row, err := s.q(ctx).MessageByRequest(ctx, store.MessageByRequestParams{
+		BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(in.Sender.Kind), RequestID: in.RequestID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Message{}, false, nil
+	}
+	if err != nil {
+		return model.Message{}, false, err
+	}
+	same := row.MessageType == string(in.Type)
+	if same && in.Type == model.TypeText && row.ErasedAt == nil {
+		same = row.Content != nil && *row.Content == body
+	}
+	if !same {
+		return model.Message{}, false, apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.ImRequestIdReused(l))
+	}
+	return rows.Message(rows.MessageRow(row)), true, nil
 }
 
 // closedGuardError 把兩個守門的 NotFound（已關閉、已退場或不存在）翻成原有的訊息與 reason：寄件人那一方先翻（寄件人已停用），
@@ -143,6 +208,9 @@ func partyID(k model.PartyKind, t target) int64 {
 func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, error) {
 	if !in.Sender.Kind.Valid() || in.Sender.ID() <= 0 || (in.Sender.Kind == model.PartyStore && in.Sender.Store == nil) {
 		return "", errors.New("im：寄件人身分不完整")
+	}
+	if !requestid.IsV4(in.RequestID) {
+		return "", apperr.InvalidInputOn([]string{"RequestID"}, "%s", text.ImRequestIdInvalid(l))
 	}
 	switch in.Type {
 	case model.TypeText:

@@ -411,6 +411,268 @@ final class SocialPublicClientProvider
 String _$socialPublicClientHash() =>
     r'6385043b29b731eb108b73e4cf314ffff63bb9da';
 
+/// 店家側的聊天（ChatAppService 的 `*Store*` 方法與對話上的方法），登入後呼叫；店家由伺服器依呼叫者此刻的店推導。
+
+@ProviderFor(chatClient)
+final chatClientProvider = ChatClientProvider._();
+
+/// 店家側的聊天（ChatAppService 的 `*Store*` 方法與對話上的方法），登入後呼叫；店家由伺服器依呼叫者此刻的店推導。
+
+final class ChatClientProvider
+    extends
+        $FunctionalProvider<
+          ChatAppServiceClient,
+          ChatAppServiceClient,
+          ChatAppServiceClient
+        >
+    with $Provider<ChatAppServiceClient> {
+  /// 店家側的聊天（ChatAppService 的 `*Store*` 方法與對話上的方法），登入後呼叫；店家由伺服器依呼叫者此刻的店推導。
+  ChatClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChatAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChatAppServiceClient create(Ref ref) {
+    return chatClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChatAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChatAppServiceClient>(value),
+    );
+  }
+}
+
+String _$chatClientHash() => r'8bc23ee260c22d7978f587e4d1b4e1e6f1e4fd59';
+
+/// 店家的客戶與標籤（CrmAppService），登入後呼叫。
+
+@ProviderFor(crmClient)
+final crmClientProvider = CrmClientProvider._();
+
+/// 店家的客戶與標籤（CrmAppService），登入後呼叫。
+
+final class CrmClientProvider
+    extends
+        $FunctionalProvider<
+          CrmAppServiceClient,
+          CrmAppServiceClient,
+          CrmAppServiceClient
+        >
+    with $Provider<CrmAppServiceClient> {
+  /// 店家的客戶與標籤（CrmAppService），登入後呼叫。
+  CrmClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'crmClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$crmClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<CrmAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CrmAppServiceClient create(Ref ref) {
+    return crmClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CrmAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CrmAppServiceClient>(value),
+    );
+  }
+}
+
+String _$crmClientHash() => r'81d3f74653cbf6a070ea5058dfcf215231442778';
+
+/// 店家的評價（ReviewAppService：自己店的評價列表與回覆），登入後呼叫。
+
+@ProviderFor(reviewAppClient)
+final reviewAppClientProvider = ReviewAppClientProvider._();
+
+/// 店家的評價（ReviewAppService：自己店的評價列表與回覆），登入後呼叫。
+
+final class ReviewAppClientProvider
+    extends
+        $FunctionalProvider<
+          ReviewAppServiceClient,
+          ReviewAppServiceClient,
+          ReviewAppServiceClient
+        >
+    with $Provider<ReviewAppServiceClient> {
+  /// 店家的評價（ReviewAppService：自己店的評價列表與回覆），登入後呼叫。
+  ReviewAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'reviewAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$reviewAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ReviewAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ReviewAppServiceClient create(Ref ref) {
+    return reviewAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ReviewAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ReviewAppServiceClient>(value),
+    );
+  }
+}
+
+String _$reviewAppClientHash() => r'5c6ea7ec43ab70c2468579cb4edc2c769fa49289';
+
+/// 商品評價的公開讀取（ReviewPublicService）；帶登入身分的 transport 與 [socialPublicClient] 相同理由。
+
+@ProviderFor(reviewPublicClient)
+final reviewPublicClientProvider = ReviewPublicClientProvider._();
+
+/// 商品評價的公開讀取（ReviewPublicService）；帶登入身分的 transport 與 [socialPublicClient] 相同理由。
+
+final class ReviewPublicClientProvider
+    extends
+        $FunctionalProvider<
+          ReviewPublicServiceClient,
+          ReviewPublicServiceClient,
+          ReviewPublicServiceClient
+        >
+    with $Provider<ReviewPublicServiceClient> {
+  /// 商品評價的公開讀取（ReviewPublicService）；帶登入身分的 transport 與 [socialPublicClient] 相同理由。
+  ReviewPublicClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'reviewPublicClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$reviewPublicClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ReviewPublicServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ReviewPublicServiceClient create(Ref ref) {
+    return reviewPublicClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ReviewPublicServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ReviewPublicServiceClient>(value),
+    );
+  }
+}
+
+String _$reviewPublicClientHash() =>
+    r'af5bd0dcd8ae63aed245a3c02307d151d10a89ab';
+
+/// 檢舉（ModerationAppService：店家檢舉聊天訊息、讀自己店送出的檢舉），登入後呼叫。
+
+@ProviderFor(moderationAppClient)
+final moderationAppClientProvider = ModerationAppClientProvider._();
+
+/// 檢舉（ModerationAppService：店家檢舉聊天訊息、讀自己店送出的檢舉），登入後呼叫。
+
+final class ModerationAppClientProvider
+    extends
+        $FunctionalProvider<
+          ModerationAppServiceClient,
+          ModerationAppServiceClient,
+          ModerationAppServiceClient
+        >
+    with $Provider<ModerationAppServiceClient> {
+  /// 檢舉（ModerationAppService：店家檢舉聊天訊息、讀自己店送出的檢舉），登入後呼叫。
+  ModerationAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'moderationAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$moderationAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ModerationAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ModerationAppServiceClient create(Ref ref) {
+    return moderationAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ModerationAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ModerationAppServiceClient>(value),
+    );
+  }
+}
+
+String _$moderationAppClientHash() =>
+    r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 
 @ProviderFor(sellerPublicClient)

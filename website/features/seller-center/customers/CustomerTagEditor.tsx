@@ -1,15 +1,17 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Button from "@/components/ui/Button";
+import { useCrmStoreId } from "@/lib/hooks/useCrmStoreId";
 import { useSellerTags } from "@/lib/hooks/useSellerTags";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import {
 	addCustomerTags,
 	type CustomerTag,
-	fetchCustomerTags,
 	removeCustomerTag,
-} from "@/lib/seller/repo";
+} from "@/lib/seller/crm";
 
 /** Quick-add presets — mirror the app's tag bottom-sheet suggestions, kept
  * neutral per the brand voice (no judgemental「奧客」labels in web UI). */
@@ -17,9 +19,8 @@ const QUICK_TAGS = ["新客", "回購", "高消費", "VIP", "待聯繫"];
 
 interface Props {
 	buyerId: string | number;
-	/** Tag names already on the detail payload — rendered instantly while the
-	 * authoritative `{id,name}` list loads (ids are needed to remove). */
-	initialTags?: string[];
+	/** The customer's tags (`Customer.tags`, with ids), from the list row or the detail. */
+	initialTags?: CustomerTag[];
 	/** Fired after a successful add / remove so a host (e.g. the customer list
 	 * behind a drawer) can refresh its tag chips. */
 	onChanged?: () => void;
@@ -31,87 +32,77 @@ type PendingTagAction =
 	| null;
 
 function tagActionKey(tag: CustomerTag): string {
-	return tag.id ? `id-${tag.id}` : `name-${tag.name}`;
+	return `id-${tag.id}`;
 }
 
 /**
- * Inline tag manager for one CRM customer. Reads the buyer's tags (with ids),
- * lets the seller attach free-text / suggested tags and remove existing ones.
- * Backed by `…/customers/{id}/tags` + `…/sellers/me/tags` — see
- * `lib/seller/repo.ts`. Mutations keep their initiating control mounted while
- * pending, then reconcile the authoritative tag list from the server.
+ * Inline tag manager for one CRM customer. Attaches free-text / suggested tags
+ * (`AddCustomerTags`) and removes existing ones (`RemoveCustomerTag`); both return
+ * the customer, whose tags become the new list. Mutations keep their initiating
+ * control mounted while pending.
  */
 export default function CustomerTagEditor({
 	buyerId,
 	initialTags,
 	onChanged,
 }: Props) {
-	// The buyer's applied tags are local editable state — seeded from
-	// the detail's initialTags, then reconciled from the authoritative per-buyer
-	// endpoint. Kept as a direct fetcher (not a shared query) so a background
-	// refetch can't clobber an in-flight add/remove.
-	const [tags, setTags] = React.useState<CustomerTag[]>(() =>
-		(initialTags ?? []).map((name) => ({ id: "", name })),
-	);
+	const { storeId } = useCrmStoreId();
+	const defaults = useDefaultErrorText();
+	// The buyer's applied tags: seeded from the row / detail, replaced by the customer each
+	// mutation returns, and re-seeded when the host hands over a fresher list.
+	const [tags, setTags] = React.useState<CustomerTag[]>(initialTags ?? []);
+	React.useEffect(() => {
+		if (initialTags) setTags(initialTags);
+	}, [initialTags]);
 	// The seller's tag pool (suggestions) is display-only and shared with the
 	// list filter chips → one cached query.
-	const pool = useSellerTags();
+	const { tags: pool, error: poolError } = useSellerTags();
 	const [input, setInput] = React.useState("");
 	const [pendingAction, setPendingAction] =
 		React.useState<PendingTagAction>(null);
 	const [error, setError] = React.useState<string | null>(null);
 	const busy = pendingAction !== null;
 
-	const reload = React.useCallback(async () => {
-		const fresh = await fetchCustomerTags(buyerId);
-		setTags(fresh);
-	}, [buyerId]);
-
-	React.useEffect(() => {
-		let alive = true;
-		fetchCustomerTags(buyerId)
-			.then((mine) => {
-				if (alive) setTags(mine);
-			})
-			.catch(() => {
-				/* tags are non-critical — leave the initial display tags in place */
-			});
-		return () => {
-			alive = false;
-		};
-	}, [buyerId]);
+	// 每次寫入回傳貼完（或移除完）之後的客戶：它的標籤成為新的列表。
+	const applyCustomer = React.useCallback(
+		(customer: { tags: CustomerTag[] }) => setTags(customer.tags),
+		[],
+	);
 
 	const has = (name: string) =>
 		tags.some((t) => t.name.toLowerCase() === name.toLowerCase());
 
 	const add = async (name: string, source: "form" | "suggestion") => {
 		const clean = name.trim();
-		if (!clean || has(clean) || busy) return;
+		if (!clean || has(clean) || busy || !storeId) return;
 		setPendingAction({ kind: "add", source, name: clean });
 		setError(null);
 		setInput("");
 		try {
-			await addCustomerTags(buyerId, [clean]);
-			await reload();
+			const customer = await addCustomerTags(storeId, String(buyerId), [clean]);
+			applyCustomer(customer);
 			onChanged?.();
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "新增標籤失敗");
+			setError(errorText(e, defaults));
 		} finally {
 			setPendingAction(null);
 		}
 	};
 
 	const remove = async (tag: CustomerTag) => {
-		if (busy) return;
+		if (busy || !storeId) return;
 		setPendingAction({ kind: "remove", key: tagActionKey(tag) });
 		setError(null);
 		try {
-			// id:"" is an initial display-only chip; no server removal is needed.
-			if (tag.id) await removeCustomerTag(buyerId, tag.id);
-			setTags((prev) => prev.filter((t) => t !== tag));
+			const customer = await removeCustomerTag(
+				storeId,
+				String(buyerId),
+				tag.id,
+			);
+			applyCustomer(customer);
 			onChanged?.();
 		} catch (e) {
-			setError(e instanceof Error ? e.message : "移除標籤失敗");
+			setError(errorText(e, defaults));
 		} finally {
 			setPendingAction(null);
 		}
@@ -225,9 +216,9 @@ export default function CustomerTagEditor({
 				</div>
 			)}
 
-			{error && (
+			{(error ?? poolError) && (
 				<p className="crm-tag-editor__error" role="alert">
-					{error}
+					{error ?? poolError}
 				</p>
 			)}
 		</div>

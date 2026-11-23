@@ -53,7 +53,7 @@ final class StoreReportDetailProvider
   }
 }
 
-String _$storeReportDetailHash() => r'18ecc7d622a6d0d24cb72aad93365153bb43606f';
+String _$storeReportDetailHash() => r'1762d0bcdb4302c34a9cb826e040f36cca8fed43';
 
 /// 我的一筆店家檢舉的詳情（`GetMyReport`）；補充成功後以回應的完整詳情取代狀態，不重讀。
 

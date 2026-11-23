@@ -226,6 +226,13 @@ WHERE reporter_buyer_id = sqlc.arg(buyer_id)::bigint
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(page_size);
 
+-- name: SupplementCounts :many
+-- 這些通報各有幾則補充（沒有補充的通報不出現在結果）；檢舉人的清單用它補上每筆的補充數。
+SELECT report_id, count(*)::int AS supplement_count
+FROM seller.report_supplements
+WHERE report_id = ANY(sqlc.arg(report_ids)::uuid[])
+GROUP BY report_id;
+
 -- name: InsertEvidenceAccess :exec
 -- 佐證的讀取紀錄：在讀取之前寫入；report_id 與 request_id 剛好一個，連同 position（通報的另加 submission_seq）指向那一張佐證。
 INSERT INTO seller.evidence_accesses (access_id, report_id, submission_seq, request_id, position, admin_id, accessed_at)

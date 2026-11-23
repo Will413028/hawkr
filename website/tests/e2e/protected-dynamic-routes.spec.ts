@@ -9,10 +9,12 @@ import {
 	DYNAMIC_ROUTE_CATALOG,
 	type DynamicRouteAccess,
 } from "./helpers/dynamic-route-catalog";
+import { captureHydrationDiagnostics } from "./helpers/hydration-diagnostics";
 import {
 	fulfillConnect,
 	type MockStore,
 	mockBuyerAddresses,
+	mockChatConversations,
 	mockMyKyc,
 	mockMyStore,
 	setupGatewayMocks,
@@ -79,6 +81,13 @@ interface DynamicRouteCase {
 	/** Connect 的 mock（`/api/connect/*`）；REST 的 `mocks` 打 `/api/v1`。 */
 	setup?(page: Page): Promise<void>;
 	assertVisible(page: Page): Promise<void>;
+}
+
+/** CrmAppService 的 Connect 方法（`/api/connect/hawkr.crm.v1alpha1.CrmAppService/{Method}`）。 */
+function crmMethod(method: string): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.crm\\.v1alpha1\\.CrmAppService/${method}(?:\\?|$)`,
+	);
 }
 
 // GetMyStore 的店家：沒有完成新手引導的店家會被當成半註冊帳號導去 onboarding，
@@ -310,43 +319,22 @@ const SELLER_INVOICE_JOB_FIXTURE = {
 	canReportExternal: false,
 };
 
-const CHAT_BACKGROUND_MOCKS: readonly ApiMock[] = [
-	{ path: "/app/chat/unread", data: { unread: 0 } },
-	{ method: "POST", path: "/app/chat/ws-ticket", data: {} },
-];
-
 const EMPTY_BUYER_AFTER_SALES: ApiMock = {
 	path: "/app/after_sales",
 	data: { records: [], total: 0 },
 };
 
-function chatMocks(targetId: string, targetNickname: string): ApiMock[] {
-	return [
-		{
-			path: "/app/chat/conversations",
-			data: {
-				records: [
-					{
-						targetUserId: targetId,
-						targetNickname,
-						lastMessage: "",
-						lastMessageTime: 0,
-						unreadCount: 0,
-					},
-				],
-			},
-		},
-		{
-			path: `/app/chat/history/${targetId}`,
-			data: { messages: [] },
-		},
-		{
-			method: "PATCH",
-			path: `/app/chat/conversations/${targetId}`,
-			data: {},
-		},
-		...CHAT_BACKGROUND_MOCKS,
-	];
+/** 聊天室頁的 Connect 對話列表（其餘 chat 方法用 `setupGatewayMocks` 的預設回應）。 */
+function chatSetup(
+	side: "buyer" | "store",
+	targetId: string,
+	targetNickname: string,
+) {
+	return async (page: Page) => {
+		await mockChatConversations(page, side, [
+			{ id: "conv-route-1", peerId: targetId, peerName: targetNickname },
+		]);
+	};
 }
 
 async function assertHeading(page: Page, name: string | RegExp) {
@@ -441,15 +429,9 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		role: "buyer",
 		url: `/account/messages/${SELLER_ID}`,
 		pathname: `/account/messages/${SELLER_ID}`,
-		mocks: [...chatMocks(SELLER_ID, "路由測試賣家")],
-		requiredRequests: [
-			{ method: "GET", path: "/app/chat/conversations" },
-			{ method: "GET", path: `/app/chat/history/${SELLER_ID}` },
-			{
-				method: "PATCH",
-				path: `/app/chat/conversations/${SELLER_ID}`,
-			},
-		],
+		mocks: [],
+		setup: chatSetup("buyer", SELLER_ID, "路由測試賣家"),
+		requiredRequests: [],
 		async assertVisible(page) {
 			const thread = page.getByRole("region", { name: "對話內容" });
 			await expect(thread).toBeVisible();
@@ -469,14 +451,8 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		role: "buyer",
 		url: "/account/messages/assistant/demo",
 		pathname: "/account/messages/assistant/demo",
-		mocks: [
-			{
-				path: "/app/chat/conversations",
-				data: { conversations: [] },
-			},
-			...CHAT_BACKGROUND_MOCKS,
-		],
-		requiredRequests: [{ method: "GET", path: "/app/chat/conversations" }],
+		mocks: [],
+		requiredRequests: [],
 		async assertVisible(page) {
 			// initialRequestId is null for this route (page.tsx doesn't pass one
 			// for conversationId="demo"), so session.restoring starts false and
@@ -687,42 +663,33 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		pathname: `/seller-center/customers/${BUYER_ID}`,
 		mocks: [
 			{
-				path: `/app/sellers/me/customers/${BUYER_ID}`,
-				data: {
-					buyerId: BUYER_ID,
-					nickname: "路由測試買家",
-					phone: "0912345678",
-					email: "buyer@example.test",
-					address: "臺北市中正區測試路1號",
-					orderCount: 0,
-					totalSpent: "0",
-					couponCount: 0,
-					customerType: "normal",
-					tags: [],
-				},
-			},
-			{
 				path: "/app/orders",
 				data: { records: [], total: 0, page: 1, pageSize: 100 },
 			},
-			{
-				path: `/app/sellers/me/customers/${BUYER_ID}/tags`,
-				data: [],
-			},
 		],
+		async setup(page) {
+			// 客戶讀取走 CrmAppService（Connect），訂單仍是店家訂單列表加買家篩選。
+			await page.route(crmMethod("GetCustomer"), (route) =>
+				fulfillConnect(route, {
+					customer: {
+						buyerId: BUYER_ID,
+						display: { nickname: "路由測試買家" },
+						type: "CUSTOMER_TYPE_NORMAL",
+						totalSpent: "0",
+						orderCount: 0,
+						tags: [],
+					},
+				}),
+			);
+			await page.route(crmMethod("ListTags"), (route) =>
+				fulfillConnect(route, { tags: [] }),
+			);
+		},
 		requiredRequests: [
-			{
-				method: "GET",
-				path: `/app/sellers/me/customers/${BUYER_ID}`,
-			},
 			{
 				method: "GET",
 				path: "/app/orders",
 				query: { view: "seller", buyer_id: BUYER_ID },
-			},
-			{
-				method: "GET",
-				path: `/app/sellers/me/customers/${BUYER_ID}/tags`,
 			},
 		],
 		async assertVisible(page) {
@@ -828,15 +795,9 @@ const ROUTE_CASES: readonly DynamicRouteCase[] = [
 		role: "seller",
 		url: `/seller-center/messages/${BUYER_ID}`,
 		pathname: `/seller-center/messages/${BUYER_ID}`,
-		mocks: chatMocks(BUYER_ID, "路由測試買家"),
-		requiredRequests: [
-			{ method: "GET", path: "/app/chat/conversations" },
-			{ method: "GET", path: `/app/chat/history/${BUYER_ID}` },
-			{
-				method: "PATCH",
-				path: `/app/chat/conversations/${BUYER_ID}`,
-			},
-		],
+		mocks: [],
+		setup: chatSetup("store", BUYER_ID, "路由測試買家"),
+		requiredRequests: [],
 		async assertVisible(page) {
 			const thread = page.getByRole("region", { name: "對話內容" });
 			await expect(thread).toBeVisible();
@@ -1091,6 +1052,7 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 		}
 	};
 
+	captureHydrationDiagnostics(page);
 	page.on("pageerror", (error) => {
 		issues.push(`pageerror: ${error.message}`);
 	});

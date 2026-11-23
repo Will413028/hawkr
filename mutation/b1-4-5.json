@@ -227,7 +227,7 @@
   },
   {
    "id": "b1-4-l6-media-route-resurrected",
-   "stack": "go-gateway",
+   "stack": "go:backend/gateway",
    "file": "backend/gateway/internal/router/routes.go",
    "old": "\tregisterCartRoutes(public, app, h)\n",
    "new": "\tregisterCartRoutes(public, app, h)\n\tapp.GET(\"/media/secure_download/:asset_id\", func(c *gin.Context) {})\n",
@@ -236,7 +236,7 @@
   },
   {
    "id": "b1-4-l6-whitelist-drop-handoff",
-   "stack": "go-gateway",
+   "stack": "go:backend/gateway",
    "file": "backend/gateway/internal/router/seller_route_assert.go",
    "old": "\t\"POST \" + adminPrefix + \"/delegated-operations/handoff/redeem\",\n",
    "new": "",
@@ -245,16 +245,16 @@
   },
   {
    "id": "b1-4-l6-openapi-op-cap",
-   "stack": "go-gateway",
+   "stack": "go:backend/gateway",
    "file": "backend/gateway/internal/router/openapi_coverage_test.go",
-   "old": "maxRESTOperations = 375",
-   "new": "maxRESTOperations = 377",
+   "old": "maxRESTOperations = 324",
+   "new": "maxRESTOperations = 326",
    "test": "internal/router ^TestEveryRouteIsInOpenAPISpec$",
    "why": "端點數上限放寬，鎖低點的斷言要紅"
   },
   {
    "id": "b1-4-l6-upload-body-tier",
-   "stack": "go-gateway",
+   "stack": "go:backend/gateway",
    "file": "backend/gateway/internal/middleware/body_guard.go",
    "old": "{uploadMaxBodyBytes, uploadReadDeadline}",
    "new": "{defaultMaxBodyBytes, uploadReadDeadline}",
@@ -263,7 +263,7 @@
   },
   {
    "id": "b1-4-l6-activity-flag",
-   "stack": "go-gateway",
+   "stack": "go:backend/gateway",
    "file": "backend/gateway/internal/router/delegated_capability.go",
    "old": "middleware.RegisterDelegatedRoute(method, full)\n\tg.Handle(method, relPath, requireDelegated(cap, deps), h)",
    "new": "g.Handle(method, relPath, requireDelegated(cap, deps), h)",

@@ -1,9 +1,14 @@
+"use client";
+
 import AnchorLink from "@/components/shared/AnchorLink";
 import Avatar from "@/components/shared/Avatar";
 import { Stars } from "@/components/ui/Stars";
 import type { ProductReview } from "@/features/product/ProductDetailLayout";
+import ReportActionMenu from "@/features/report/ReportActionMenu";
+import { useUiText } from "@/lib/i18n/ui-text";
 import { ossImageUrl } from "@/lib/media/cdn";
 import { parseRating } from "@/lib/products/rating";
+import { reviewerName } from "@/lib/reviews/reviewer-name";
 import {
 	PRODUCT_REVIEW_CARD_CLASS,
 	PRODUCT_REVIEW_TEXT_CLASS,
@@ -30,10 +35,14 @@ function textOrNumber(value: unknown): string {
 export default function ProductReviewsSection({
 	reviews,
 	reviewTotal,
+	reportable = false,
 }: {
 	reviews: ProductReview[];
 	reviewTotal: number;
+	/** 公開商品頁才給檢舉入口；賣家預覽與其他內嵌用法不給。 */
+	reportable?: boolean;
 }) {
+	const ut = useUiText();
 	return (
 		<div className="mb-8" id="product-reviews">
 			<div className="flex items-center justify-between mb-4">
@@ -80,15 +89,15 @@ export default function ProductReviewsSection({
 							<div className="flex items-center gap-3 mb-3">
 								<Avatar
 									src={textOrEmpty(review.avatar)}
-									name={review.author || "買家"}
-									alt={review.author || "買家"}
+									name={reviewerName(ut, review.author)}
+									alt={reviewerName(ut, review.author)}
 									entity="buyer"
 									loading="eager"
 									className="w-11 h-11 rounded-full object-cover"
 								/>
 								<div className="flex-1 flex flex-col gap-0.5">
 									<span className="text-[0.9375rem] font-semibold text-hk-heading">
-										{review.author || "買家"}
+										{reviewerName(ut, review.author)}
 									</span>
 									<span className="text-xs text-hk-body">
 										{textOrEmpty(review.date ?? review.createdAt)}
@@ -100,6 +109,16 @@ export default function ProductReviewsSection({
 										size={14}
 									/>
 								</div>
+								{reportable &&
+								!review.isMine &&
+								textOrNumber(review.id ?? review.reviewId) ? (
+									<ReportActionMenu
+										target={{
+											kind: "review",
+											id: textOrNumber(review.id ?? review.reviewId),
+										}}
+									/>
+								) : null}
 							</div>
 							<p className={PRODUCT_REVIEW_TEXT_CLASS}>
 								{textOrEmpty(review.text ?? review.content)}

@@ -1,0 +1,157 @@
+{
+ "mutants": [
+  {
+   "id": "locale-resolve-ignores-published",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/lib/hawkr_ui_text.dart",
+   "old": "return published.contains(UiLocale.en) ? UiLocale.en : UiLocale.zhTW;",
+   "new": "return UiLocale.en;",
+   "test": "test/core/l10n/ui_locale_test.dart 已發佈的 UI 語系：en 未發佈前解析結果一律是 zh-TW",
+   "why": "Locale resolution ignores the published list, so a non-Chinese device gets en while en is unpublished."
+  },
+  {
+   "id": "seller-locale-resolve-ignores-published",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_ui_text/lib/hawkr_ui_text.dart",
+   "old": "return published.contains(UiLocale.en) ? UiLocale.en : UiLocale.zhTW;",
+   "new": "return UiLocale.en;",
+   "test": "test/core/l10n/ui_locale_test.dart 已發佈的 UI 語系：en 未發佈前解析結果一律是 zh-TW",
+   "why": "Same fallback mutation seen through seller-app's provider."
+  },
+  {
+   "id": "accept-language-interceptor-dropped",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/transport.dart",
+   "old": "  acceptLanguageInterceptor(acceptLanguage),\n",
+   "new": "",
+   "test": "test/core/networking/connect_auth_test.dart 實際 provider 接線：Connect 請求帶 App 目前的 UI 語系，單一值",
+   "why": "The shared Connect interceptor chain stops sending Accept-Language."
+  },
+  {
+   "id": "seller-accept-language-interceptor-dropped",
+   "stack": "flutter:seller-app",
+   "file": "packages/hawkr_api/lib/transport.dart",
+   "old": "  acceptLanguageInterceptor(acceptLanguage),\n",
+   "new": "",
+   "test": "test/core/networking/connect_auth_test.dart 實際 provider 接線：Connect 請求帶 App 目前的 UI 語系，單一值",
+   "why": "Same mutation seen through seller-app's provider wiring."
+  },
+  {
+   "id": "buyer-accept-language-tag-empty",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/core/l10n/ui_locale.dart",
+   "old": "    () => ref.read(uiLocaleProvider).tag;",
+   "new": "    () => '';",
+   "test": "test/core/networking/connect_auth_test.dart 實際 provider 接線：Connect 請求帶 App 目前的 UI 語系，單一值",
+   "why": "buyer-app's tag supplier returns an empty string, which the interceptor treats as nothing to send."
+  },
+  {
+   "id": "seller-accept-language-tag-empty",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/core/l10n/ui_locale.dart",
+   "old": "    () => ref.read(uiLocaleProvider).tag;",
+   "new": "    () => '';",
+   "test": "test/core/networking/connect_auth_test.dart 實際 provider 接線：Connect 請求帶 App 目前的 UI 語系，單一值",
+   "why": "seller-app's tag supplier returns an empty string, which the interceptor treats as nothing to send."
+  },
+  {
+   "id": "han-ratchet-new-file-allowed",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
+   "old": "final allowed = base?[lit] ?? 0;",
+   "new": "final allowed = base?[lit] ?? 1000000;",
+   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 新檔含漢字失敗；新檔沒有漢字通過",
+   "why": "A file absent from the baseline gets an unlimited allowance, so new files may hardcode Han literals."
+  },
+  {
+   "id": "han-ratchet-update-guard-removed",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
+   "old": "if (increased.isNotEmpty) {",
+   "new": "if (increased.isNotEmpty && false) {",
+   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart --update 拒絕全域總次數增加，且不寫檔",
+   "why": "--update no longer refuses a global increase, so the baseline can be raised."
+  },
+  {
+   "id": "han-ratchet-stale-not-required",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
+   "old": "if (cmp.stale.isNotEmpty) {",
+   "new": "if (cmp.stale.isNotEmpty && false) {",
+   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 次數減少要求 --update",
+   "why": "A shrunk count no longer requires --update, so the baseline stays loose."
+  },
+  {
+   "id": "han-ratchet-global-total-per-file",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
+   "old": "if (after[lit]! > (before[lit] ?? 0))",
+   "new": "if (after[lit]! > (before[lit] ?? 0) + 1000000)",
+   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 把句子搬到別的檔（總次數不變）可 --update，搬成兩份不行",
+   "why": "The global-total comparison is neutered, so copying a sentence to a second file passes --update."
+  },
+  {
+   "id": "han-ratchet-counts-ignored",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
+   "old": "if (cur > allowed) {",
+   "new": "if (cur > allowed + 1000000) {",
+   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 同檔只增加不減少失敗",
+   "why": "Per-literal count increases in an existing file no longer fail."
+  },
+  {
+   "id": "han-baseline-against-loosened",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_ui_text/tool/check_hardcoded_han.dart",
+   "old": "final loosened = globalIncreases(loadBaseline(old), loadBaseline(current));",
+   "new": "final loosened = <String>[];",
+   "test": "../packages/hawkr_ui_text/test/check_hardcoded_han_test.dart 任一字面值全域總次數變大失敗，新字面值也算",
+   "why": "The baseline-against comparison never reports an increase."
+  },
+  {
+   "id": "money-decimals-restored",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/money.dart",
+   "old": "String formatMoneyAmount(num value) {\n  final n = roundMoney(value);",
+   "new": "String formatMoneyAmount(num value) {\n  if (value % 1 != 0) return value.toStringAsFixed(2);\n  final n = roundMoney(value);",
+   "test": "../packages/hawkr_api/test/money_test.dart rounds fractions instead of printing decimals",
+   "why": "Fractional money prints two decimals again, against the ADR's zero-decimal rule."
+  },
+  {
+   "id": "buyer-time-ago-minutes-unit-swapped",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/l10n/time_ago_text.dart",
+   "old": "TimeAgoMinutes(:final count) => l.timeAgoMinutes(count),",
+   "new": "TimeAgoMinutes(:final count) => l.timeAgoHours(count),",
+   "test": "test/l10n/time_ago_text_test.dart composes zh text from each unit",
+   "why": "Minutes are composed with the hours message, so 5 minutes reads as 5 hours."
+  },
+  {
+   "id": "seller-time-ago-minutes-unit-swapped",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/l10n/time_ago_text.dart",
+   "old": "TimeAgoMinutes(:final count) => l.timeAgoMinutes(count),",
+   "new": "TimeAgoMinutes(:final count) => l.timeAgoHours(count),",
+   "test": "test/l10n/time_ago_text_test.dart composes zh text from each unit",
+   "why": "Minutes are composed with the hours message, so 5 minutes reads as 5 hours."
+  },
+  {
+   "id": "unmarked-time-not-converted-from-taipei-wall",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/taipei_time.dart",
+   "old": "  ).subtract(_taipeiUtcOffset);",
+   "new": "  );",
+   "test": "../packages/hawkr_api/test/taipei_time_test.dart unmarked strings are Taipei wall clock",
+   "why": "A time string without a zone marker is no longer read as Taipei wall clock, so it is 8 hours late."
+  },
+  {
+   "id": "money-total-uses-unrounded-unit",
+   "stack": "flutter:buyer-app",
+   "file": "packages/hawkr_api/lib/money.dart",
+   "old": "int moneyTotal(num unitPrice, int quantity) => roundMoney(unitPrice) * quantity;",
+   "new": "int moneyTotal(num unitPrice, int quantity) => (unitPrice * quantity).round();",
+   "test": "../packages/hawkr_api/test/money_test.dart total is the rounded unit price times quantity",
+   "why": "The total multiplies the unrounded unit price, so it no longer equals the shown unit price times quantity."
+  }
+ ]
+}

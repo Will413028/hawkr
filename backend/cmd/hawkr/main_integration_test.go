@@ -14,6 +14,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
@@ -196,7 +197,7 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	setMediaEnv(t, "dev1:ZGV2LW9ubHktbWVkaWEta2VrLTAwMDAwMDAwMDAwMDA=")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
-	t.Setenv("REVIEW_SERVICE_ADDR", "127.0.0.1:1")
+	t.Setenv("INVOICE_SERVICE_ADDR", "127.0.0.1:1")
 	ctx := context.Background()
 
 	d, err := db.Open(ctx, db.Config{URL: url, ConnectRetryBudget: 5 * time.Second})
@@ -233,7 +234,7 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 }
 
 // platformDirs 是 platformData 每個 schema 的套件目錄（相對於 backend/）。
-var platformDirs = map[string]string{inbox.Schema: "internal/platform/inbox", adminaudit.Schema: "internal/platform/adminaudit"}
+var platformDirs = map[string]string{inbox.Schema: "internal/platform/inbox", adminaudit.Schema: "internal/platform/adminaudit", bizcalendar.Schema: "internal/platform/bizcalendar"}
 
 // sourceDir 是 schema 的原始碼目錄（相對於 backend/）：platform 的在 platformDirs，模組的是 internal/modules/<名稱>。
 func sourceDir(name string) string {

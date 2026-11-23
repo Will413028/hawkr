@@ -149,10 +149,9 @@ make test-all
 make vet-all
 
 # 單一服務
-cd services/seller-service
+cd services/notification-service
 go build ./...
 go test ./...
-go test ./internal/service/ -run TestCertificationUsecase_SubmitForReview
 ```
 
 ### Protobuf
@@ -168,7 +167,7 @@ make proto-lint
 ### 新增 Migration（禁止手動建立）
 
 ```bash
-cd services/seller-service
+cd services/notification-service
 
 # 1. 編輯唯一真實來源
 vim db/schema/schema.sql
@@ -233,7 +232,7 @@ docker compose -f docker-compose-local.yml down -v
 ### Q: 某個 Go 服務的 migration 落後或失敗？
 
 ```bash
-cd services/seller-service/db
+cd services/notification-service/db
 atlas migrate status --env dev      # 看落後哪幾支、錯在哪支
 ```
 

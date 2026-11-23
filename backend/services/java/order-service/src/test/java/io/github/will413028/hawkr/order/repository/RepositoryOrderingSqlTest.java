@@ -79,8 +79,7 @@ class RepositoryOrderingSqlTest {
     private static final Map<String, String> KEY_OVERRIDE = Map.of(
             "OrderRepository#findBuyerMerchantSummaryByStatuses", "store_id",
             "OrderRepository#findTopSellersByRevenue", "store_id",
-            "OrderRepository#findStoreOrderStats", "store_id",
-            "OrderRepository#findOrderAggregates", "buyer_id");
+            "OrderRepository#findStoreOrderStats", "store_id");
 
     /**
      * 判定為「順序無語意」而不加排序的查詢。<b>兩個條件必須同時成立</b>才可以列在這裡：

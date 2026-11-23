@@ -58,15 +58,12 @@ const (
 	SellerCitiesSummaryPath = "/seller-cities/summary" // 商家註冊所在地完整聚合
 	ProductID               = "/:id"
 	ProductBrief            = "/:id/brief"
-	ProductReviews          = "/:id/reviews"
 	ProductSkus             = "/:id/skus"
-	ProductRating           = "/:id/rating"
 	ProductRelated          = "/:id/related"
 
 	// Aliases with 's' suffix for compatibility
 	ProductsIDPath  = "/:id"
 	ProductsBrief   = "/:id/brief"
-	ProductsReviews = "/:id/reviews"
 	ProductsRating  = "/:id/rating"
 	ProductsRelated = "/:id/related"
 
@@ -94,16 +91,6 @@ const (
 	CategoryRestore        = "/:id/restore"
 	ProductsBatchChangeCat = "/products/batch-change-category"
 )
-
-// ==================== Review（/app/reviews）====================
-
-const (
-	ReviewsPath = "/reviews"
-	ReviewID    = "/:id"
-)
-
-// SellerReviewReply 賣家回覆評論（#1174）— 掛 /app/sellers group（requireSeller 保護）
-const SellerReviewReply = "/reviews/:id/reply"
 
 // ==================== Order（/app/orders）====================
 
@@ -151,13 +138,9 @@ const (
 	ShippingMethodsPath = "/shipping_methods"
 )
 
-// ==================== 假日管理（/admin/holidays + /app/shipping_business_days）====================
+// ==================== 出貨工作天（/app/shipping_business_days）====================
 
 const (
-	HolidaysPath             = "/holidays"
-	HolidaysImport           = "/import"
-	HolidaysImportContent    = "/import_content"
-	HolidaysCoverage         = "/coverage"
 	ShippingBusinessDaysPath = "/shipping_business_days"
 )
 
@@ -224,40 +207,6 @@ const (
 	// issue #1327 Admin 配送異常處置（static prefix，必須在 /shipments/:id 之前註冊）
 	AdminShipmentsAnomalyAcknowledge = "/shipments/anomalies/:shipment_id/:anomaly_type/acknowledge"
 	AdminShipmentsAnomalyIgnore      = "/shipments/anomalies/:shipment_id/:anomaly_type/ignore"
-)
-
-// ==================== 物流財務 ====================
-
-const (
-	// 賣家面：物流財務（V9 的九張表；提示詞 W6-3「Logistics Finance」十一個維度）。
-	SellerLogisticsFinancePath     = "/logistics_finance"
-	SellerLogisticsReceivablesPath = "/logistics_finance/receivables"
-	SellerLogisticsLedgerPath      = "/logistics_finance/ledger"
-)
-
-const (
-	// Admin 面：物流財務維運（應收、收款、對帳、調整）。
-	AdminLogisticsReceivablesPath    = "/logistics/receivables"
-	AdminLogisticsReceivableDetail   = "/logistics/receivables/:receivable_no"
-	AdminLogisticsCollectionsPath    = "/logistics/collections"
-	AdminLogisticsAdjustmentsPath    = "/logistics/adjustments"
-	AdminProviderStatementsPath      = "/logistics/provider_statements"
-	AdminProviderStatementDetail     = "/logistics/provider_statements/:statement_no"
-	AdminLogisticsExceptionCasesPath = "/logistics/exception_cases"
-
-	// Admin 面：單一例外案件詳情與責任判定 maker-checker（65）。
-	//
-	// 🔴 以 case_no 定位而不是 case_id：case_no 是對外業務單號（uq_exc_no），ADM 佇列與
-	// 稽核紀錄引用的都是它；case_id 是 TSID 內部主鍵。形狀與
-	// /logistics/receivables/:receivable_no 的既有慣例一致。
-	//
-	// 🔴 覆核端點是 resolutions 底下的**子資源** approvals 而不是
-	// `/resolutions/:resolution_id/review`（動詞）：一次覆核就是對那張提案新增一筆
-	// 批核紀錄，資源化之後後續波次要加「第二關覆核」只是同一個 collection 再加一筆，
-	// 不必再開一支動詞端點（API 設計規範的 Action 形狀留給真的無法資源化者）。
-	AdminLogisticsExceptionCaseDetail     = "/logistics/exception_cases/:case_no"
-	AdminLogisticsCaseResolutionsPath     = "/logistics/exception_cases/:case_no/resolutions"
-	AdminLogisticsCaseResolutionApprovals = "/logistics/exception_cases/:case_no/resolutions/:resolution_id/approvals"
 )
 
 // ==================== Admin Payment（§29）====================
@@ -455,14 +404,6 @@ const (
 	ShareURLPath = "/share_url"
 )
 
-// ==================== 地址搜尋與驗證（/public/address）====================
-
-const (
-	AddressPath        = "/address"
-	AddressSuggestions = "/suggestions"
-	AddressValidate    = "/validate"
-)
-
 // ==================== AI 相關 ====================
 
 // AIServicePath 死代理 /app/ai/*path 已於能力層 PR 刪除（46 §3.7）：CreateProxy
@@ -519,35 +460,9 @@ const (
 	WebhookSimulatorLookupPath = "/dev/webhook-simulator/lookup"
 )
 
-// ==================== CRM（/app/sellers/me）====================
-
-const (
-	CrmCustomers            = "/customers"
-	CrmCustomerID           = "/customers/:buyerId"
-	CrmCustomerTags         = "/customers/:buyerId/tags"
-	CrmCustomerTagID        = "/customers/:buyerId/tags/:tagId"
-	CrmCustomerOrders       = "/customers/:buyerId/orders"
-	CrmCustomerCoupons      = "/customers/:buyerId/coupons"
-	CrmCustomerMeta         = "/customers/:buyerId/meta"
-	CrmCustomerLookup       = "/customers/lookup"
-	CrmCustomerSearchByTags = "/customers/search-by-tags"
-	CrmTags                 = "/tags"
-	CrmTagID                = "/tags/:tagId"
-)
-
 // ==================== 聊天相關 ====================
 
 const (
-	ChatPath                 = "/chat"
-	ChatWS                   = "/ws"
-	ChatWSTicket             = "/ws-ticket"
-	ChatMessages             = "/messages"
-	ChatHistory              = "/history/:targetId"
-	ChatConversations        = "/conversations"
-	ChatUnread               = "/unread"
-	ChatReadReceipts         = "/messages"
-	ChatConversationReceipts = "/conversations/:targetId"
-	ChatAllReceipts          = "/conversations"
 
 	// Service names
 	ServiceProduct    = "product"

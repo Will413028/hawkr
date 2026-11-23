@@ -11,7 +11,6 @@ import (
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
-	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -171,7 +170,7 @@ func reportsPB(reports []moderation.Report) []*adminpb.CaseReport {
 			Id:          r.ID.String(),
 			Category:    rpc.EnumToProto[commonpb.PolicyCategory](r.Category),
 			Description: r.Description,
-			Outcome:     rpc.EnumToProto[pb.ReportOutcome](r.Outcome),
+			Outcome:     outcomePB(r.Outcome),
 			CreateTime:  timestamppb.New(r.CreatedAt),
 		}
 		if r.ReporterStoreID > 0 {

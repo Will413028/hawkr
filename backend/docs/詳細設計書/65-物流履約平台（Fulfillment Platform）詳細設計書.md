@@ -9,8 +9,7 @@
 > | 責任判定案件（maker-checker）與事件 | payment-service、order-service | §5、§6 |
 > | 帳本與 provider 帳單列 | payment-service | §7 |
 >
-> 配送單狀態機、PayUni 宅配與超商流程在 [06](06-物流微服務%EF%BC%88Shipping%20Service%EF%BC%89詳細設計書.md)；
-> 賣家物流應收、收款、true-up 與分錄表在 [70](70-物流財務結算%EF%BC%88Logistics%20Settlement%20%26%20Receivable%EF%BC%89詳細設計書.md)。
+> 配送單狀態機、PayUni 宅配與超商流程在 [06](06-物流微服務%EF%BC%88Shipping%20Service%EF%BC%89詳細設計書.md)。
 > 事件契約與 broker 資源以 [36](36-MQ%20與事件總覽%EF%BC%88MQ%20%26%20Event%20Catalog%EF%BC%89.md) 與 `infra/mq/topology/topology.yaml` 為準。
 > 碼值本體在 `../代碼管理（CodeMeta）/`。
 
@@ -18,7 +17,6 @@
 |---|---|
 | 外部設計 | `../基本設計書/65-物流履約平台（Fulfillment Platform）基本設計書.md` |
 | 母系統 | `06-物流微服務（Shipping Service）詳細設計書.md` |
-| 物流財務 | `70-物流財務結算（Logistics Settlement & Receivable）詳細設計書.md` |
 | 發票鏈 | `58-電子發票服務（Invoice Service）詳細設計書.md` |
 
 | 對應程式碼 | 位置 |

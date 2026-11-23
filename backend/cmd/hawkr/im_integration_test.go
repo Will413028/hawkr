@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
@@ -44,7 +45,13 @@ func (imTestStores) Store(_ context.Context, id int64) (seller.Store, error) {
 	}, nil
 }
 func (imTestStores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
-func (imTestStores) LockNotRetired(context.Context, int64) error                  { return nil }
+func (imTestStores) StoresBlockingBuyer(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+func (imTestStores) BuyersBlockedByStore(context.Context, int64, []int64) (map[int64]bool, error) {
+	return map[int64]bool{}, nil
+}
+func (imTestStores) LockNotRetired(context.Context, int64) error { return nil }
 
 type imNoOrders struct{}
 
@@ -79,7 +86,7 @@ func TestIMDeletionTimingSubscribesOnlyToBuyerDeleted(t *testing.T) {
 	}
 	buyerID, storeID := profile.BuyerID, int64(22)
 	send := func(text string) error {
-		_, err := m.Send(ctx, im.SendInput{Sender: im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, CounterpartID: storeID, Type: im.TypeText, Text: text})
+		_, err := m.Send(ctx, im.SendInput{RequestID: uuid.NewV4(), Sender: im.Party{Kind: im.PartyBuyer, BuyerID: buyerID}, CounterpartID: storeID, Type: im.TypeText, Text: text})
 		return err
 	}
 	count := func(sql string) int64 {

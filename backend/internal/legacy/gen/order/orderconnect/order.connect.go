@@ -59,9 +59,6 @@ const (
 	// OrderServiceGetSellerOrderDetailProcedure is the fully-qualified name of the OrderService's
 	// GetSellerOrderDetail RPC.
 	OrderServiceGetSellerOrderDetailProcedure = "/hawkr.order.OrderService/GetSellerOrderDetail"
-	// OrderServiceGetOrderByShipTradeNoProcedure is the fully-qualified name of the OrderService's
-	// GetOrderByShipTradeNo RPC.
-	OrderServiceGetOrderByShipTradeNoProcedure = "/hawkr.order.OrderService/GetOrderByShipTradeNo"
 	// OrderServiceGetOrderForReviewProcedure is the fully-qualified name of the OrderService's
 	// GetOrderForReview RPC.
 	OrderServiceGetOrderForReviewProcedure = "/hawkr.order.OrderService/GetOrderForReview"
@@ -124,9 +121,6 @@ const (
 	// OrderServiceListAbnormalOrdersForAdminProcedure is the fully-qualified name of the OrderService's
 	// ListAbnormalOrdersForAdmin RPC.
 	OrderServiceListAbnormalOrdersForAdminProcedure = "/hawkr.order.OrderService/ListAbnormalOrdersForAdmin"
-	// OrderServiceGetOrderAggregatesProcedure is the fully-qualified name of the OrderService's
-	// GetOrderAggregates RPC.
-	OrderServiceGetOrderAggregatesProcedure = "/hawkr.order.OrderService/GetOrderAggregates"
 	// OrderServiceGetOrderInvoiceSnapshotInternalProcedure is the fully-qualified name of the
 	// OrderService's GetOrderInvoiceSnapshotInternal RPC.
 	OrderServiceGetOrderInvoiceSnapshotInternalProcedure = "/hawkr.order.OrderService/GetOrderInvoiceSnapshotInternal"
@@ -170,8 +164,6 @@ type OrderServiceClient interface {
 	GetSellerOrders(context.Context, *connect.Request[order.GetSellerOrdersRequest]) (*connect.Response[order.GetSellerOrdersResponse], error)
 	// 查詢賣家訂單詳情
 	GetSellerOrderDetail(context.Context, *connect.Request[order.GetSellerOrderDetailRequest]) (*connect.Response[order.GetSellerOrderDetailResponse], error)
-	// 根據物流序號查詢訂單（shipping-service 用）
-	GetOrderByShipTradeNo(context.Context, *connect.Request[order.GetOrderByShipTradeNoRequest]) (*connect.Response[order.GetOrderByShipTradeNoResponse], error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(context.Context, *connect.Request[order.GetOrderForReviewRequest]) (*connect.Response[order.GetOrderForReviewResponse], error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
@@ -220,8 +212,6 @@ type OrderServiceClient interface {
 	// ==================== §29 Admin 異常訂單列表 ====================
 	// 跨服務異常訂單聚合（依 order.status 批次聚合 provider_* from Payment / Shipping）
 	ListAbnormalOrdersForAdmin(context.Context, *connect.Request[order.ListAbnormalOrdersForAdminRequest]) (*connect.Response[order.ListAbnormalOrdersForAdminResponse], error)
-	// ==== 服務間：CRM 訂單聚合 ====
-	GetOrderAggregates(context.Context, *connect.Request[order.GetOrderAggregatesRequest]) (*connect.Response[order.GetOrderAggregatesResponse], error)
 	// ==== 服務間：發票開立所需的訂單不可變快照（58 號 §7.1.2 步驟 5 ①）====
 	// invoice-service 的 order.paid consumer 專用；唯讀、不改任何狀態。
 	// 走 52 號 HMAC 內部授權四 header，client deadline 3s（58 號 §7.5「逾時矩陣」）。
@@ -307,12 +297,6 @@ func NewOrderServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+OrderServiceGetSellerOrderDetailProcedure,
 			connect.WithSchema(orderServiceMethods.ByName("GetSellerOrderDetail")),
-			connect.WithClientOptions(opts...),
-		),
-		getOrderByShipTradeNo: connect.NewClient[order.GetOrderByShipTradeNoRequest, order.GetOrderByShipTradeNoResponse](
-			httpClient,
-			baseURL+OrderServiceGetOrderByShipTradeNoProcedure,
-			connect.WithSchema(orderServiceMethods.ByName("GetOrderByShipTradeNo")),
 			connect.WithClientOptions(opts...),
 		),
 		getOrderForReview: connect.NewClient[order.GetOrderForReviewRequest, order.GetOrderForReviewResponse](
@@ -441,12 +425,6 @@ func NewOrderServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(orderServiceMethods.ByName("ListAbnormalOrdersForAdmin")),
 			connect.WithClientOptions(opts...),
 		),
-		getOrderAggregates: connect.NewClient[order.GetOrderAggregatesRequest, order.GetOrderAggregatesResponse](
-			httpClient,
-			baseURL+OrderServiceGetOrderAggregatesProcedure,
-			connect.WithSchema(orderServiceMethods.ByName("GetOrderAggregates")),
-			connect.WithClientOptions(opts...),
-		),
 		getOrderInvoiceSnapshotInternal: connect.NewClient[order.GetOrderInvoiceSnapshotInternalRequest, order.GetOrderInvoiceSnapshotInternalResponse](
 			httpClient,
 			baseURL+OrderServiceGetOrderInvoiceSnapshotInternalProcedure,
@@ -479,7 +457,6 @@ type orderServiceClient struct {
 	confirmReceipt                     *connect.Client[order.ConfirmReceiptRequest, order.ConfirmReceiptResponse]
 	getSellerOrders                    *connect.Client[order.GetSellerOrdersRequest, order.GetSellerOrdersResponse]
 	getSellerOrderDetail               *connect.Client[order.GetSellerOrderDetailRequest, order.GetSellerOrderDetailResponse]
-	getOrderByShipTradeNo              *connect.Client[order.GetOrderByShipTradeNoRequest, order.GetOrderByShipTradeNoResponse]
 	getOrderForReview                  *connect.Client[order.GetOrderForReviewRequest, order.GetOrderForReviewResponse]
 	getOrderForShipping                *connect.Client[order.GetOrderForShippingRequest, order.GetOrderForShippingResponse]
 	getBuyerMerchantSummary            *connect.Client[order.GetBuyerMerchantSummaryRequest, order.GetBuyerMerchantSummaryResponse]
@@ -501,7 +478,6 @@ type orderServiceClient struct {
 	getStorePeriodOrderStats           *connect.Client[order.GetStorePeriodOrderStatsRequest, order.GetStorePeriodOrderStatsResponse]
 	retryGrant                         *connect.Client[order.RetryGrantRequest, order.RetryGrantResponse]
 	listAbnormalOrdersForAdmin         *connect.Client[order.ListAbnormalOrdersForAdminRequest, order.ListAbnormalOrdersForAdminResponse]
-	getOrderAggregates                 *connect.Client[order.GetOrderAggregatesRequest, order.GetOrderAggregatesResponse]
 	getOrderInvoiceSnapshotInternal    *connect.Client[order.GetOrderInvoiceSnapshotInternalRequest, order.GetOrderInvoiceSnapshotInternalResponse]
 	reviseOrderInvoiceSnapshotInternal *connect.Client[order.ReviseOrderInvoiceSnapshotInternalRequest, order.ReviseOrderInvoiceSnapshotInternalResponse]
 	getUberQuoteForCheckout            *connect.Client[order.OrderUberQuoteRequest, order.OrderUberQuoteResponse]
@@ -550,11 +526,6 @@ func (c *orderServiceClient) GetSellerOrders(ctx context.Context, req *connect.R
 // GetSellerOrderDetail calls hawkr.order.OrderService.GetSellerOrderDetail.
 func (c *orderServiceClient) GetSellerOrderDetail(ctx context.Context, req *connect.Request[order.GetSellerOrderDetailRequest]) (*connect.Response[order.GetSellerOrderDetailResponse], error) {
 	return c.getSellerOrderDetail.CallUnary(ctx, req)
-}
-
-// GetOrderByShipTradeNo calls hawkr.order.OrderService.GetOrderByShipTradeNo.
-func (c *orderServiceClient) GetOrderByShipTradeNo(ctx context.Context, req *connect.Request[order.GetOrderByShipTradeNoRequest]) (*connect.Response[order.GetOrderByShipTradeNoResponse], error) {
-	return c.getOrderByShipTradeNo.CallUnary(ctx, req)
 }
 
 // GetOrderForReview calls hawkr.order.OrderService.GetOrderForReview.
@@ -662,11 +633,6 @@ func (c *orderServiceClient) ListAbnormalOrdersForAdmin(ctx context.Context, req
 	return c.listAbnormalOrdersForAdmin.CallUnary(ctx, req)
 }
 
-// GetOrderAggregates calls hawkr.order.OrderService.GetOrderAggregates.
-func (c *orderServiceClient) GetOrderAggregates(ctx context.Context, req *connect.Request[order.GetOrderAggregatesRequest]) (*connect.Response[order.GetOrderAggregatesResponse], error) {
-	return c.getOrderAggregates.CallUnary(ctx, req)
-}
-
 // GetOrderInvoiceSnapshotInternal calls hawkr.order.OrderService.GetOrderInvoiceSnapshotInternal.
 func (c *orderServiceClient) GetOrderInvoiceSnapshotInternal(ctx context.Context, req *connect.Request[order.GetOrderInvoiceSnapshotInternalRequest]) (*connect.Response[order.GetOrderInvoiceSnapshotInternalResponse], error) {
 	return c.getOrderInvoiceSnapshotInternal.CallUnary(ctx, req)
@@ -715,8 +681,6 @@ type OrderServiceHandler interface {
 	GetSellerOrders(context.Context, *connect.Request[order.GetSellerOrdersRequest]) (*connect.Response[order.GetSellerOrdersResponse], error)
 	// 查詢賣家訂單詳情
 	GetSellerOrderDetail(context.Context, *connect.Request[order.GetSellerOrderDetailRequest]) (*connect.Response[order.GetSellerOrderDetailResponse], error)
-	// 根據物流序號查詢訂單（shipping-service 用）
-	GetOrderByShipTradeNo(context.Context, *connect.Request[order.GetOrderByShipTradeNoRequest]) (*connect.Response[order.GetOrderByShipTradeNoResponse], error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(context.Context, *connect.Request[order.GetOrderForReviewRequest]) (*connect.Response[order.GetOrderForReviewResponse], error)
 	// 取得物流建單所需訂單資訊（shipping-service 用）
@@ -765,8 +729,6 @@ type OrderServiceHandler interface {
 	// ==================== §29 Admin 異常訂單列表 ====================
 	// 跨服務異常訂單聚合（依 order.status 批次聚合 provider_* from Payment / Shipping）
 	ListAbnormalOrdersForAdmin(context.Context, *connect.Request[order.ListAbnormalOrdersForAdminRequest]) (*connect.Response[order.ListAbnormalOrdersForAdminResponse], error)
-	// ==== 服務間：CRM 訂單聚合 ====
-	GetOrderAggregates(context.Context, *connect.Request[order.GetOrderAggregatesRequest]) (*connect.Response[order.GetOrderAggregatesResponse], error)
 	// ==== 服務間：發票開立所需的訂單不可變快照（58 號 §7.1.2 步驟 5 ①）====
 	// invoice-service 的 order.paid consumer 專用；唯讀、不改任何狀態。
 	// 走 52 號 HMAC 內部授權四 header，client deadline 3s（58 號 §7.5「逾時矩陣」）。
@@ -848,12 +810,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 		OrderServiceGetSellerOrderDetailProcedure,
 		svc.GetSellerOrderDetail,
 		connect.WithSchema(orderServiceMethods.ByName("GetSellerOrderDetail")),
-		connect.WithHandlerOptions(opts...),
-	)
-	orderServiceGetOrderByShipTradeNoHandler := connect.NewUnaryHandler(
-		OrderServiceGetOrderByShipTradeNoProcedure,
-		svc.GetOrderByShipTradeNo,
-		connect.WithSchema(orderServiceMethods.ByName("GetOrderByShipTradeNo")),
 		connect.WithHandlerOptions(opts...),
 	)
 	orderServiceGetOrderForReviewHandler := connect.NewUnaryHandler(
@@ -982,12 +938,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(orderServiceMethods.ByName("ListAbnormalOrdersForAdmin")),
 		connect.WithHandlerOptions(opts...),
 	)
-	orderServiceGetOrderAggregatesHandler := connect.NewUnaryHandler(
-		OrderServiceGetOrderAggregatesProcedure,
-		svc.GetOrderAggregates,
-		connect.WithSchema(orderServiceMethods.ByName("GetOrderAggregates")),
-		connect.WithHandlerOptions(opts...),
-	)
 	orderServiceGetOrderInvoiceSnapshotInternalHandler := connect.NewUnaryHandler(
 		OrderServiceGetOrderInvoiceSnapshotInternalProcedure,
 		svc.GetOrderInvoiceSnapshotInternal,
@@ -1026,8 +976,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 			orderServiceGetSellerOrdersHandler.ServeHTTP(w, r)
 		case OrderServiceGetSellerOrderDetailProcedure:
 			orderServiceGetSellerOrderDetailHandler.ServeHTTP(w, r)
-		case OrderServiceGetOrderByShipTradeNoProcedure:
-			orderServiceGetOrderByShipTradeNoHandler.ServeHTTP(w, r)
 		case OrderServiceGetOrderForReviewProcedure:
 			orderServiceGetOrderForReviewHandler.ServeHTTP(w, r)
 		case OrderServiceGetOrderForShippingProcedure:
@@ -1070,8 +1018,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 			orderServiceRetryGrantHandler.ServeHTTP(w, r)
 		case OrderServiceListAbnormalOrdersForAdminProcedure:
 			orderServiceListAbnormalOrdersForAdminHandler.ServeHTTP(w, r)
-		case OrderServiceGetOrderAggregatesProcedure:
-			orderServiceGetOrderAggregatesHandler.ServeHTTP(w, r)
 		case OrderServiceGetOrderInvoiceSnapshotInternalProcedure:
 			orderServiceGetOrderInvoiceSnapshotInternalHandler.ServeHTTP(w, r)
 		case OrderServiceReviseOrderInvoiceSnapshotInternalProcedure:
@@ -1121,10 +1067,6 @@ func (UnimplementedOrderServiceHandler) GetSellerOrders(context.Context, *connec
 
 func (UnimplementedOrderServiceHandler) GetSellerOrderDetail(context.Context, *connect.Request[order.GetSellerOrderDetailRequest]) (*connect.Response[order.GetSellerOrderDetailResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetSellerOrderDetail is not implemented"))
-}
-
-func (UnimplementedOrderServiceHandler) GetOrderByShipTradeNo(context.Context, *connect.Request[order.GetOrderByShipTradeNoRequest]) (*connect.Response[order.GetOrderByShipTradeNoResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetOrderByShipTradeNo is not implemented"))
 }
 
 func (UnimplementedOrderServiceHandler) GetOrderForReview(context.Context, *connect.Request[order.GetOrderForReviewRequest]) (*connect.Response[order.GetOrderForReviewResponse], error) {
@@ -1209,10 +1151,6 @@ func (UnimplementedOrderServiceHandler) RetryGrant(context.Context, *connect.Req
 
 func (UnimplementedOrderServiceHandler) ListAbnormalOrdersForAdmin(context.Context, *connect.Request[order.ListAbnormalOrdersForAdminRequest]) (*connect.Response[order.ListAbnormalOrdersForAdminResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.ListAbnormalOrdersForAdmin is not implemented"))
-}
-
-func (UnimplementedOrderServiceHandler) GetOrderAggregates(context.Context, *connect.Request[order.GetOrderAggregatesRequest]) (*connect.Response[order.GetOrderAggregatesResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetOrderAggregates is not implemented"))
 }
 
 func (UnimplementedOrderServiceHandler) GetOrderInvoiceSnapshotInternal(context.Context, *connect.Request[order.GetOrderInvoiceSnapshotInternalRequest]) (*connect.Response[order.GetOrderInvoiceSnapshotInternalResponse], error) {

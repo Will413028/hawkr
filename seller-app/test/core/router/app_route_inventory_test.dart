@@ -16,10 +16,7 @@ void main() {
     (symbol: 'CustomerRoutes.customers', path: CustomerRoutes.customers),
     (symbol: 'CustomerRoutes.subscribers', path: CustomerRoutes.subscribers),
     (symbol: 'CustomerRoutes.detail', path: CustomerRoutes.detail),
-    (
-      symbol: 'CustomerRoutes.spendingHistory',
-      path: CustomerRoutes.spendingHistory,
-    ),
+    (symbol: 'CustomerRoutes.orders', path: CustomerRoutes.orders),
     (symbol: 'CustomerRoutes.orderDetail', path: CustomerRoutes.orderDetail),
     (symbol: 'OrderRoutes.details', path: OrderRoutes.details),
     (symbol: 'OrderRoutes.matched', path: OrderRoutes.matched),

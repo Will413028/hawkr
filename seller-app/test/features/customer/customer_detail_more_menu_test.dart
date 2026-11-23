@@ -1,35 +1,39 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'dart:async';
 
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/customer/data/customer_model.dart';
 import 'package:hawkr_seller/features/customer/data/customer_repository.dart';
 import 'package:hawkr_seller/features/customer/presentation/customer_detail_screen.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockCustomerRepository extends Mock implements CustomerRepository {}
 
-Future<void> _pumpCustomer(
-  WidgetTester tester,
-  _MockCustomerRepository repository,
-) async {
+const _normal = Customer(id: '42', name: '測試顧客');
+
+Future<void> _pump(WidgetTester tester, _MockCustomerRepository repo) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [customerRepositoryProvider.overrideWithValue(repository)],
+      overrides: [customerRepositoryProvider.overrideWithValue(repo)],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+
           theme: AppTheme.light,
-          home: CustomerDetailScreen(
-            customer: Customer(id: '42', name: '測試顧客', phone: '0900000000'),
-          ),
+          home: const CustomerDetailScreen(customer: _normal),
         ),
       ),
     ),
@@ -39,180 +43,98 @@ Future<void> _pumpCustomer(
 }
 
 void main() {
+  setUpAll(() => registerFallbackValue(CustomerType.CUSTOMER_TYPE_VIP));
+
+  testWidgets('menu has only the VIP action: no blacklist entry', (
+    tester,
+  ) async {
+    final repo = _MockCustomerRepository();
+    when(() => repo.getCustomer('42')).thenAnswer((_) async => _normal);
+    await _pump(tester, repo);
+    await tester.tap(find.byTooltip('顧客更多操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('升級 VIP'), findsOneWidget);
+    expect(find.textContaining('黑名單'), findsNothing);
+  });
+
+  testWidgets('VIP update sends the contract type and flips the menu label', (
+    tester,
+  ) async {
+    final repo = _MockCustomerRepository();
+    when(() => repo.getCustomer('42')).thenAnswer((_) async => _normal);
+    when(
+      () => repo.updateCustomerType('42', CustomerType.CUSTOMER_TYPE_VIP),
+    ).thenAnswer(
+      (_) async => _normal.copyWith(type: CustomerType.CUSTOMER_TYPE_VIP),
+    );
+    await _pump(tester, repo);
+    await tester.tap(find.byTooltip('顧客更多操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('升級 VIP'));
+    await tester.pumpAndSettle();
+    verify(
+      () => repo.updateCustomerType('42', CustomerType.CUSTOMER_TYPE_VIP),
+    ).called(1);
+    await tester.tap(find.byTooltip('顧客更多操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('取消 VIP'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('a failed update shows the server text and keeps the type', (
+    tester,
+  ) async {
+    final repo = _MockCustomerRepository();
+    when(() => repo.getCustomer('42')).thenAnswer((_) async => _normal);
+    when(() => repo.updateCustomerType(any(), any())).thenAnswer(
+      (_) =>
+          Future.error(ConnectException(Code.permissionDenied, '店家已停權，無法操作客戶')),
+    );
+    await _pump(tester, repo);
+    await tester.tap(find.byTooltip('顧客更多操作'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('升級 VIP'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('顧客更多操作'));
+    await tester.pumpAndSettle();
+    expect(find.text('升級 VIP'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('a failed detail read shows an error row with retry', (
+    tester,
+  ) async {
+    final repo = _MockCustomerRepository();
+    var fail = true;
+    when(() => repo.getCustomer('42')).thenAnswer((_) async {
+      if (fail) throw ConnectException(Code.unavailable, 'down');
+      return _normal;
+    });
+    await _pump(tester, repo);
+    expect(
+      find.byKey(const ValueKey('customer-detail-load-error')),
+      findsOneWidget,
+    );
+    fail = false;
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('customer-detail-load-error')),
+      findsNothing,
+    );
+  });
+
   testWidgets(
-    'cancel menu does not mutate; pending update blocks repeat and failure permits retry',
+    'leaving the page before the read finishes ignores the late response',
     (tester) async {
-      final repository = _MockCustomerRepository();
-      var customer = Customer(id: '42', name: '測試顧客', phone: '0900000000');
-      when(
-        () => repository.getCustomerByAccountId('42'),
-      ).thenAnswer((_) async => customer);
-      when(() => repository.getCustomerTags('42')).thenAnswer((_) async => []);
-      var response = Completer<void>();
-      when(
-        () => repository.updateCustomerType('42', 'vip'),
-      ).thenAnswer((_) => response.future);
-      await _pumpCustomer(tester, repository);
-      await tester.tap(find.byTooltip('顧客更多操作'));
+      final repo = _MockCustomerRepository();
+      final late = Completer<Customer?>();
+      when(() => repo.getCustomer('42')).thenAnswer((_) => late.future);
+      await _pump(tester, repo);
+      await tester.pumpWidget(const SizedBox.shrink());
+      late.complete(_normal);
       await tester.pumpAndSettle();
-      await tester.tapAt(const Offset(10, 400));
-      await tester.pumpAndSettle();
-      verifyNever(() => repository.updateCustomerType(any(), any()));
-      await tester.tap(find.byTooltip('顧客更多操作'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(PopupMenuItem<String>, '升級 VIP'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-      await tester.tap(find.byTooltip('顧客更多操作'));
-      await tester.pump();
-      expect(find.byType(PopupMenuItem<String>), findsNothing);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      verify(() => repository.updateCustomerType('42', 'vip')).called(1);
-      response.completeError(StateError('offline'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      response = Completer<void>();
-      await tester.tap(find.byTooltip('顧客更多操作'));
-      await tester.pumpAndSettle();
-      expect(
-        find.widgetWithText(PopupMenuItem<String>, '升級 VIP'),
-        findsOneWidget,
-      );
-      await tester.tap(find.widgetWithText(PopupMenuItem<String>, '升級 VIP'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-      customer = customer.copyWith(customerType: 'vip');
-      response.complete();
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('顧客更多操作'));
-      await tester.pumpAndSettle();
-      expect(
-        find.widgetWithText(PopupMenuItem<String>, '取消 VIP'),
-        findsOneWidget,
-      );
-      await tester.tapAt(const Offset(10, 400));
-      await tester.pumpAndSettle();
-      await tester.pump(const Duration(seconds: 3));
       expect(tester.takeException(), isNull);
     },
   );
-
-  for (final stage in ['initial load', 'mutation', 'refresh']) {
-    testWidgets('leaving customer during $stage ignores late response', (
-      tester,
-    ) async {
-      final repository = _MockCustomerRepository();
-      final customer = Customer(id: '42', name: '測試顧客', phone: '0900000000');
-      final detail = Completer<Customer?>();
-      final response = Completer<void>();
-      var loads = 0;
-      when(() => repository.getCustomerByAccountId('42')).thenAnswer((_) {
-        loads++;
-        return stage == 'initial load' || loads > 1
-            ? detail.future
-            : Future.value(customer);
-      });
-      when(() => repository.getCustomerTags('42')).thenAnswer((_) async => []);
-      when(
-        () => repository.updateCustomerType('42', 'vip'),
-      ).thenAnswer((_) => response.future);
-      await _pumpCustomer(tester, repository);
-      if (stage != 'initial load') {
-        await tester.tap(find.byTooltip('顧客更多操作'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(PopupMenuItem<String>, '升級 VIP'));
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 350));
-        if (stage == 'refresh') {
-          response.complete();
-          await tester.pump();
-        }
-      }
-      await tester.pumpWidget(const SizedBox.shrink());
-      if (!response.isCompleted) response.complete();
-      detail.complete(customer.copyWith(customerType: 'vip'));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-  }
-
-  for (final action in [
-    (initial: 'normal', selected: '升級 VIP', next: 'vip', after: '取消 VIP'),
-    (initial: 'vip', selected: '取消 VIP', next: 'normal', after: '升級 VIP'),
-    (initial: 'normal', selected: '設黑名單', next: 'blocklist', after: '解除黑名單'),
-    (initial: 'blocklist', selected: '解除黑名單', next: 'normal', after: '設黑名單'),
-  ]) {
-    testWidgets(
-      'circular customer menu preserves ${action.selected} selection',
-      (tester) async {
-        tester.view.physicalSize = const Size(390, 844);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final semantics = tester.ensureSemantics();
-        try {
-          final repository = _MockCustomerRepository();
-          var customer = Customer(
-            id: '42',
-            name: '測試顧客',
-            phone: '0900000000',
-            customerType: action.initial,
-          );
-          when(
-            () => repository.getCustomerByAccountId('42'),
-          ).thenAnswer((_) async => customer);
-          when(
-            () => repository.getCustomerTags('42'),
-          ).thenAnswer((_) async => []);
-          when(
-            () => repository.updateCustomerType('42', action.next),
-          ).thenAnswer((_) async {
-            customer = customer.copyWith(customerType: action.next);
-          });
-          await tester.pumpWidget(
-            ProviderScope(
-              overrides: [
-                customerRepositoryProvider.overrideWithValue(repository),
-              ],
-              child: ScreenUtilInit(
-                designSize: const Size(390, 844),
-                builder: (_, _) => MaterialApp(
-                  theme: AppTheme.light,
-                  home: CustomerDetailScreen(customer: customer),
-                ),
-              ),
-            ),
-          );
-          await tester.pumpAndSettle();
-          final menu = find.bySemanticsLabel('顧客更多操作');
-          expect(menu, findsOneWidget);
-          expect(tester.getSize(menu), const Size(48, 48));
-          await tester.tap(menu);
-          await tester.pumpAndSettle();
-          final selected = find.widgetWithText(
-            PopupMenuItem<String>,
-            action.selected,
-          );
-          expect(selected, findsOneWidget);
-          await tester.tap(selected);
-          await tester.pumpAndSettle();
-          verify(
-            () => repository.updateCustomerType('42', action.next),
-          ).called(1);
-          await tester.tap(menu);
-          await tester.pumpAndSettle();
-          expect(
-            find.widgetWithText(PopupMenuItem<String>, action.after),
-            findsOneWidget,
-          );
-          await tester.tapAt(const Offset(10, 400));
-          await tester.pumpAndSettle();
-          await tester.pump(const Duration(seconds: 3));
-          expect(tester.takeException(), isNull);
-        } finally {
-          semantics.dispose();
-        }
-      },
-    );
-  }
 }

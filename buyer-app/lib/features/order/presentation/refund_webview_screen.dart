@@ -9,6 +9,7 @@ import '../../../shared/widgets/common_dialog.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/floating_toast.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// ATM 退款資訊填寫 WebView
 ///
@@ -103,7 +104,7 @@ class _RefundWebViewScreenState extends State<RefundWebViewScreen> {
         final parts = <String>[];
         if (refundAmount.isNotEmpty) parts.add('退款金額 NT\$ $refundAmount');
         if (estimatedDate.isNotEmpty) {
-          final date = _formatIsoDate(estimatedDate);
+          final date = _formatIsoDate(estimatedDate, context.taipeiDisplay);
           parts.add('預計 $date 入帳');
         }
         final message = parts.isNotEmpty
@@ -131,11 +132,8 @@ class _RefundWebViewScreenState extends State<RefundWebViewScreen> {
   }
 
   /// ISO 8601 UTC → "yyyy-MM-dd"（顯示用）
-  String _formatIsoDate(String iso) {
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return iso;
-    final local = dt.toLocal();
-    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  String _formatIsoDate(String iso, TaipeiDisplay t) {
+    return t.formatIso(iso, TaipeiFormat.date);
   }
 
   @override

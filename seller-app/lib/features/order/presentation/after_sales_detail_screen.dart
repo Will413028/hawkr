@@ -20,6 +20,7 @@ import '../data/after_sale_status_notifier.dart';
 import '../data/order_repository.dart';
 import 'after_sales_confirm_receipt_dialog.dart';
 import 'after_sales_resolve_sheet.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class AfterSalesDetailScreen extends HookConsumerWidget {
   const AfterSalesDetailScreen({super.key, required this.caseNo});
@@ -170,7 +171,7 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
             ),
           ),
           SizedBox(height: 12.h),
-          _buildProcessNotice(c),
+          _buildProcessNotice(context, c),
           if (c.autoEscalated || c.processDeadline.isNotEmpty)
             SizedBox(height: 12.h),
 
@@ -187,7 +188,10 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
                 SizedBox(height: 8.h),
                 _LabelValue(label: '可退金額', value: 'NT\$ ${c.refundableAmount}'),
                 SizedBox(height: 8.h),
-                _LabelValue(label: '申請時間', value: _formatDate(c.createdAt)),
+                _LabelValue(
+                  label: '申請時間',
+                  value: _formatDate(c.createdAt, context.taipeiDisplay),
+                ),
               ],
             ),
           ),
@@ -343,7 +347,7 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildProcessNotice(AfterSaleCase c) {
+  Widget _buildProcessNotice(BuildContext context, AfterSaleCase c) {
     if (c.autoEscalated) {
       return _NoticeCard(
         icon: HkIconName.support,
@@ -364,7 +368,8 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
     return _NoticeCard(
       icon: HkIconName.clock,
       title: '請準時處理售後',
-      message: '請於 $hoursText 確認原因，期限：${_formatDeadline(c.processDeadline)}。',
+      message:
+          '請於 $hoursText 確認原因，期限：${_formatDeadline(c.processDeadline, context.taipeiDisplay)}。',
       color: AppColors.warningText,
     );
   }
@@ -530,19 +535,12 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
     child: Icon(AppIcons.image, size: 24.sp, color: AppIconColors.disabled),
   );
 
-  String _formatDate(String dateStr) {
-    if (dateStr.isEmpty) return '';
-    final dt = DateTime.tryParse(dateStr);
-    if (dt == null) return dateStr;
-    final local = dt.toLocal();
-    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  String _formatDate(String dateStr, TaipeiDisplay t) {
+    return t.formatIso(dateStr);
   }
 
-  String _formatDeadline(String raw) {
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    final local = dt.toLocal();
-    return '${local.month}/${local.day} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  String _formatDeadline(String raw, TaipeiDisplay t) {
+    return t.formatIso(raw, TaipeiFormat.dateTime);
   }
 }
 

@@ -8,7 +8,7 @@
 
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
-| TSID／serial／固定方案 ID | 多服務發號 | 不成立，Java BIGINT 仍成立 | row-identity ADR：實體 UUIDv7、關聯自然鍵 | buyer/address IDENTITY；membership UUIDv7；刪帳申請 UUIDv7 由 accountdeletion 擁有；restock 複合自然鍵；plan_code 與關聯複合鍵 |
+| TSID／serial／固定方案 ID | 多服務發號 | 不成立，Java BIGINT 仍成立 | row-identity ADR：實體 UUIDv7、關聯自然鍵 | buyer/address IDENTITY；membership UUIDv7；刪帳申請 UUIDv7 由 accountdeletion 擁有；restock 複合自然鍵；關聯複合鍵（`plan_code` 已隨方案表刪除） |
 | stint 與建立衝突重讀 | 同一帳號關閉後可重新成為買家，需隔離歷史 | 不成立：建帳就是買家（W1），後台只刪賣家或整個帳號（W3），帳號活著 ⇔ 買家活著；刪除的帳號留墓碑，同一個登入身分不會再建帳號 | 一個聚合一列、以唯一約束保證 | 不再有重新建立：`UNIQUE (account_id)`，建帳事件內單純 INSERT（不授予角色，W5），衝突即錯誤回滾；刪掉登入時的衝突重讀與 CLOSED 重試。status 仍區分 ACTIVE／PENDING_DELETION／CLOSED（等待訂單與 PII 清理需要） |
 | account_id 寫入／PII | 一帳號只有一列 | 成立（W3：一個帳號一生一個買家），但 Java 與事件仍以 buyer_id 為業務鍵 | aggregate ID 定位 | 所有業務寫入與清理改用 buyer_id |
 | buyer_id 與 account_id 各自發號 | 買家是 buyer 這個 bounded context 的聚合 | 成立 | 每個 bounded context 擁有自己的 ID；對外看得到的業務 ID 不暴露登入用的 principal ID | 維持各自發號（Will 2026-10-01 W6）：buyer_id 會出現在賣家看得到的地方（粉絲、CRM、訂單），登入用的 account_id 不外流；本機 seed 刻意讓兩者不同（`buyer_id = account_id + 50000`），互換的缺陷才藏不住 |
@@ -44,7 +44,7 @@
 | OrderStatus 字串未結集合 | 跨服務訂單讀取 | buyer 不擁有 | caller 查詢後輸入 | accountdeletion 的 Orders port 以 buyer_id 查詢，buyer 不依賴 ordering |
 | BuyerStatus／MemberLevel／source/status／gender | 封閉值域 | 除 MemberLevel/outbox 以外成立 | 寫入規則與 CHECK | 移除 MemberLevel/outbox；其餘 CHECK 與測試 |
 | 9203／9204 | 刪除中狀態分支 | 成立 | FailedPrecondition | 模組分類，步驟 3 ErrorReason |
-| 9400 | 無效方案 | 成立 | InvalidInput | 指派回分類錯誤，步驟 3 reason |
+| 9400 | 無效方案 | 不成立：沒有指派入口，也沒有方案代碼輸入 | 沒有輸入就沒有驗證錯誤 | 步驟 11g 起沒有對應的錯誤 |
 | 9700 | 停用地址查詢 | 功能刪除 | 刪無用錯誤 | 步驟 3／5 移除 |
 | 9233 | 補店家資料 | buyer 不再補資料 | httpapi 查 seller | 步驟 3 處理 |
 | NotFound／Forbidden／InvalidInput／Conflict | 錯誤分類 | 成立，地址越權不曝露 | apperr 與 NotFound ownership | NotFound 隱藏他人地址；create conflict 內部重讀 |
@@ -53,7 +53,8 @@
 | 換圖後 best-effort 釋放，加同步 job（`media_sync`／`media_sweep`）、`retired_assets`、`media_ref_sync`、Link／Unlink 重試與解除時間常數 | media 在 B1 前遠端、引用在另一個系統，需要在「刪引用」與「並發加引用」之間建立先後 | 不成立：B1 的 media 與買家同一個 Postgres，引用不再存在（資產只有已確認與已刪除） | 資產確認與業務列同一個 transaction（Active Storage） | B1-5a 刪除：換頭像在版本條件的 transaction 內 `Confirm` 新資產、`MarkDeleted` 被換掉的資產，關閉買家時 `MarkDeleted` 目前的頭像；`internal/mediaref`、兩個 job、兩張表與查詢以 Atlas migration 移除，`avatar_asset_id` 改 UUID（B1-D1、D8、D9） |
 | `FinalizeAndLink(…, ref)` 的 ref 在轉正時就要給 | Java 的 `FinalizeImages` 在建立資產時寫上 ref_type | 不成立：新 media 的資產沒有 ref_type | media 不認識業務 | 刪除；`Confirm(ctx, uploader, token)` 不帶 ref，頭像用途只在 `buyers.avatar_asset_id` |
 | 儲存代碼的表示法 | 模組擁有封閉值域，須與 DB 約束一致 | 成立，ADR CodeMeta D3 | Go 具名字串型別與 UPPER_SNAKE 常數，加 DB CHECK 與集合比對測試 | 全部儲存列舉採 UPPER_SNAKE；步驟 3 驗證 proto 雙向 mapping，legacy 在邊界轉換 |
-| request_id 冪等與 advisory lock | 跨買家同 request 併發 | 不成立：後台指派入口依計畫不搬，`AssignMembership` 沒有呼叫方，`memberships` 不會被寫入，entitlement 一律是預設方案 | 沒有指派入口就不保留寫入路徑（D8）；計費或指派入口要做時重新設計 | Will 2026-10-01 決定刪除寫入路徑（`AssignMembership`、`memberships` 表與測試），entitlement 固定回預設方案，方案表與 admin 的方案管理保留。觸發條件：A3b 收尾（步驟 11）之前或計費設計開工，先到者 |
+| request_id 冪等與 advisory lock | 跨買家同 request 併發 | 不成立：後台指派入口依計畫不搬，`AssignMembership` 沒有呼叫方，`memberships` 不會被寫入，entitlement 一律是預設方案 | 沒有指派入口就不保留寫入路徑（D8）；計費或指派入口要做時重新設計 | Will 2026-10-01 決定刪除寫入路徑（`AssignMembership`、`memberships` 表與測試），entitlement 固定回預設方案，已於步驟 11e 刪除（migration `drop_buyer_memberships`）；方案表與 admin 的方案管理於步驟 11g 刪除（見下方「固定方案與方案表」列） |
+| 固定方案與方案表（`membership_plans`、`UpdatePlan`、版本、價格、`is_purchasable`、後台方案頁與 `BuyerAdminService` 的方案 RPC） | 營運調整方案目錄、買家有多個方案、計費 | 不成立：沒有指派入口、價格都是 0、`is_purchasable` 沒有購買通道、`monthly_order_cap` 類欄位沒有執行者，唯一消費端是 ai 的助理額度（只讀 free 的額度） | 沒有消費者的設定表不建；計費要做時依當時的需求建方案模型（YAGNI） | Will 2026-11-23 決定刪除（步驟 11g）：刪表（migration `drop_buyer_membership_plans`）、`UpdatePlan` 與版本、admin 方案頁與 RPC；額度改成 `internal/membership` 的常數 `DefaultPlanCode`、`DefaultMonthlyAnswerLimit`（100，值取自歷史 seed `20260928230628_buyer_membership_plan_seeds.sql` 的 free 列）；`Entitlement.plan_code` 的回應形狀保留給 `GetBuyerEntitlement` |
 | display_name 空值與 FillName | 舊資料有空暱稱待補 | 不成立，新建一律提供合法名字 | DB 約束未清 PII 時 1–100 字元，清理後 NULL | 移除 DEFAULT 與 FillName；墓碑字串由步驟 3 httpapi／步驟 4 legacy adapter 呈現 |
 | 粉絲週統計 | 台灣賣家按日曆週比較新增數 | 原始計數成立；週日起的週與「本週到目前比上週整週」不成立（比較期不等長，週初必然大跌） | 等長、緊鄰的比較期，以店家時區切日（ShopifyQL `COMPARE TO`、vocus 的創作者統計），回原始值 | `SubscriberStats(storeID, windows)`：總數與各時間窗的新增數，界線由呼叫者給；賣家儀表板（8d）用最近 7 個完整台北日對前 7 日（Will 2026-10-03）。只為 gateway 舊儀表板存在的週日週由 legacy buyerserver 自己算（`TestSubscriberWeeksFollowTheTaipeiSunday`），gateway 的 `/app/sellers/me/dashboard` 路由已在 A3b 第 4B 刀刪除，但成長計算屬 `GetSubscriberDashboardStats` 的回應，該 server 因 seller-service 還讀 Total 而保留（K23），週日週與測試隨它在步驟 11 一起刪；`TestSubscriberStatsCountsEachWindowHalfOpenForTheStore` |
 | 補貨終態歷史 | 有已通知或取消歷史讀者 | 不成立；舊 ListActiveRestockSubscriptionsByBuyerID 與 ListRestock／BatchCheck 只讀待通知 | 純關聯複合主鍵，取消與通知後刪列 | PK (buyer_id, product_id)，無 UUID／status／notified_at；有界 FanOut 事件與刪除同 tx |
@@ -84,7 +85,7 @@
 | offset page | REST 頁碼 | 新契約不成立 | AIP-158 | 模組關聯與地址 keyset，Connect 封裝 token；訂單過渡期讀完舊 RPC 的 offset 頁、排序後以雙欄 keyset 對外分頁 |
 | 未結訂單的狀態集合 | ordering 擁有訂單狀態與刪帳阻擋規則 | 過渡期成立 | 由 ordering 公開 API 判斷 | 暫讀 CodeMeta 的 OrderStatus 投影；ordering 搬進單體時重新評估，由其公開 API 提供規則，檢查移入刪帳 transaction |
 | 會員卡消費排序分頁 | 訂單仍在舊服務 | 過渡期成立 | 由擁有者提供穩定快照或 cursor | 每次請求讀取快照，依淨消費額降序、store_id 降序分頁；跨頁消費額變動可能造成重複或漏項。店家集合有界且 client 下拉刷新，接受此限制；ordering 搬進單體時重新評估 |
-| 資源版本與 etag | 前台並行編輯 profile、地址；後台編輯方案 | 成立 | 各 aggregate root 獨立版本，SQL CAS | buyer／address／plan 分別比對；預設地址切換遞增兩側版本；頭像轉正前預檢且寫入時 CAS |
+| 資源版本與 etag | 前台並行編輯 profile、地址 | 成立 | 各 aggregate root 獨立版本，SQL CAS | buyer／address 分別比對；預設地址切換遞增兩側版本；頭像轉正前預檢且寫入時 CAS |
 | Redis caching | 跨服務延遲 | 未量測，單體不成立 | 索引查詢 | buyer 模組不加快取 |
 | request size／rate limit／trace | 外部入口 | 成立 | 共用 rpc middleware | 步驟 3 使用單體入口 |
 | timeout／retry | 遠端呼叫 | media/Java 過渡成立 | client deadline、job 重試 | media 釋放 job 10 秒；步驟 3／4 legacy client 明確期限 |
@@ -119,4 +120,4 @@ legacy-backlog 的 A3 段裡屬於 buyer 的項目（A3a 步驟 6 對照現行�
 
 ## 特性測試
 
-不採用 D4 的雙跑特性測試（計畫決定 11）：入口、資料模型與刻意修正的缺陷不同，兩側不應得到相同結果。由 `buyer_integration_test.go`、`invariants_integration_test.go`、`lifecycle_integration_test.go`、`version_integration_test.go` 覆蓋建帳時建立買家、關閉的副作用、PII 邊界、部分更新、版本衝突、地址分頁與預設切換、補貨及跨買家會員冪等；方案測試讀 migration 套用的種子資料。pure validation、月週期與排程設定用單元測試；River integration 驗證跨去重時間窗。Connect handler 的測試（授權、etag、越權、分頁、必填欄位、刪帳）在 `internal/httpapi/buyer` 與 `internal/httpapi/identity`；步驟 4 的驗收包含 compose legacy 測試。
+不採用 D4 的雙跑特性測試（計畫決定 11）：入口、資料模型與刻意修正的缺陷不同，兩側不應得到相同結果。由 `buyer_integration_test.go`、`invariants_integration_test.go`、`lifecycle_integration_test.go`、`version_integration_test.go` 覆蓋建帳時建立買家、關閉的副作用、PII 邊界、部分更新、版本衝突、地址分頁與預設切換、補貨及跨買家會員冪等；預設額度的測試固定常數值。pure validation、月週期與排程設定用單元測試；River integration 驗證跨去重時間窗。Connect handler 的測試（授權、etag、越權、分頁、必填欄位、刪帳）在 `internal/httpapi/buyer` 與 `internal/httpapi/identity`；步驟 4 的驗收包含 compose legacy 測試。

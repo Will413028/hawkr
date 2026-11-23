@@ -2,11 +2,9 @@ import 'package:hawkr_seller/core/session/my_store.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/settings/data/shipping_settings_repository.dart';
-import 'package:hawkr_seller/features/settings/data/tgos_address_service.dart';
 import 'package:hawkr_seller/features/settings/presentation/shipping_settings/shipping_settings_screen.dart';
 import 'package:hawkr_seller/features/settings/presentation/shipping_settings/widgets/common_widgets.dart';
 import 'package:hawkr_twaddr/hawkr_twaddr.dart' as twaddr;
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -94,14 +92,6 @@ class _FakeRepository implements ShippingSettingsRepository {
   ) async => const {'code': 0};
 }
 
-class _ValidTgos extends TgosAddressService {
-  _ValidTgos() : super(Dio());
-
-  @override
-  Future<AddressValidation> validate(String address) async =>
-      const AddressValidation(valid: true);
-}
-
 class _StoreHolder extends Notifier<MyStore?> {
   @override
   MyStore? build() => null;
@@ -131,7 +121,6 @@ Future<_FakeRepository> _pump(
           myStoreSnapshotProvider.overrideWith((ref) => ref.watch(_lateStore))
         else
           myStoreSnapshotProvider.overrideWithValue(store),
-        tgosAddressServiceProvider.overrideWithValue(_ValidTgos()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
@@ -404,8 +393,6 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.tap(find.text('驗證地址'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('開通黑貓物流'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('確認開通'));

@@ -15,8 +15,10 @@ func tpe(y int, m time.Month, d, hh int) time.Time {
 	return time.Date(y, m, d, hh, 0, 0, 0, timeutil.LocationTaipei)
 }
 
-// syncedNear 讓涵蓋窗口一定罩得住測試用的日期。
-func syncedNear(t time.Time) *time.Time { v := t; return &v }
+// syncedNear 給一個以 t 為中心（−30 天 ～ +400 天，日期硬寫在這裡）的涵蓋區間，讓它一定罩得住測試用的日期。
+func syncedNear(t time.Time) *BusinessDayCoverage {
+	return &BusinessDayCoverage{From: t.AddDate(0, 0, -30), To: t.AddDate(0, 0, 400), SyncedAt: t}
+}
 
 func TestComplaintSlaDueAtPlainWeek(t *testing.T) {
 	// 2026-03-02 是週一。建案週一 10:00 ⇒ 起算週二 00:00 ⇒ 推 3 個工作天 ⇒ 週五 00:00。
@@ -136,5 +138,30 @@ func TestBusinessDaysAndNaturalDaysDiverge(t *testing.T) {
 	natural := taipeiMidnight(created).AddDate(0, 0, ComplaintSlaBusinessDays+1).UTC()
 	if business.Equal(natural) {
 		t.Fatal("工作天與自然日算出同一個答案，表示週末沒有被扣掉")
+	}
+}
+
+// 涵蓋區間取自儲存的區間，不由推送時間（SyncedAt）加固定窗口推得：
+// 推送時間在區間之外很遠時，區間之外的日子照樣算「未涵蓋」、區間之內的照樣算涵蓋。
+func TestNewBusinessCalendarUsesStoredRangeNotSyncedAt(t *testing.T) {
+	cal := NewBusinessCalendar(nil, &BusinessDayCoverage{
+		From:     tpe(2026, 12, 1, 0),
+		To:       tpe(2026, 12, 31, 0),
+		SyncedAt: tpe(2026, 6, 1, 9), // 若誤用 synced_at±窗口，12 月以外的日期會被當成已涵蓋
+	})
+	if cal.Covers(tpe(2026, 7, 1, 0), tpe(2026, 7, 10, 0)) {
+		t.Fatal("儲存區間之外（即使在 synced_at 的窗口內）必須是未涵蓋")
+	}
+	if cal.IsBusinessDay(tpe(2026, 7, 6, 0)) { // 週一
+		t.Fatal("未涵蓋的日子不得是工作天")
+	}
+	if !cal.Covers(tpe(2026, 12, 1, 0), tpe(2026, 12, 31, 0)) {
+		t.Fatal("儲存區間之內必須是已涵蓋")
+	}
+	if cal.Covers(tpe(2026, 12, 1, 0), tpe(2027, 1, 1, 0)) {
+		t.Fatal("超出儲存區間迄日一天就是未涵蓋")
+	}
+	if !cal.IsBusinessDay(tpe(2026, 12, 14, 0)) { // 週一
+		t.Fatal("區間內的平日（非假日）是工作天")
 	}
 }

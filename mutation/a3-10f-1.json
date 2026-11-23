@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "inquiry-owner-check-always-passes-for-any-account",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/governance/inquiry_seller.go",
+   "old": "\treturn accountID > 0 && storeAccountID == accountID",
+   "new": "\treturn accountID > 0",
+   "test": "internal/modules/seller ^TestSellerCannotReadOrReplyToAnotherStoresInquiry$",
+   "why": "ownsInquiry stops comparing the store's account, so any logged-in account can read and reply to another store's inquiry."
+  },
+  {
+   "id": "replied-inquiry-can-be-replied-again",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/model/case_inquiry.go",
+   "old": "\tcase InquiryStateReplied:\n\t\ta.RecordReply = []InquiryBlock{InquiryBlockReplied}\n",
+   "new": "\tcase InquiryStateReplied:\n\t\ta.RecordReply = nil\n",
+   "test": "internal/modules/seller ^TestSellerReplyEndsTheInquiryAndIsVisibleToAdmin$",
+   "why": "A replied inquiry no longer blocks recording another reply, so the seller can reply a second time."
+  }
+ ]
+}

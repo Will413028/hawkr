@@ -26,6 +26,11 @@ var publicViewerDependent = map[string]bool{
 	"/hawkr.social.v1alpha1.SocialPublicService/SuggestTrendingTags":  false,
 	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       false,
 
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews":    true,
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListStoreReviews":      true,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats":   false,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats": false,
+
 	"/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners": false,
 	"/hawkr.content.v1alpha1.ContentPublicService/CheckAppVersion": false,
 

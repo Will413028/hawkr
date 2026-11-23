@@ -1,0 +1,58 @@
+{
+ "mutants": [
+  {
+   "id": "outcome-pb-always-set",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/app.go",
+   "old": "\tif o == moderation.OutcomeNone {\n\t\treturn nil\n\t}\n",
+   "new": "",
+   "test": "internal/httpapi/moderation ^TestListMyReportsMapsCommunityItemsAndPages$",
+   "why": "An unresolved community report is returned with an explicit UNSPECIFIED outcome instead of an unset field."
+  },
+  {
+   "id": "admin-report-outcome-always-violation",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/admin.go",
+   "old": "Outcome:     outcomePB(r.Outcome),",
+   "new": "Outcome:     outcomePB(moderation.OutcomeViolation),",
+   "test": "internal/httpapi/moderation ^TestGetCaseReturnsTheCaseWithItsReports$",
+   "why": "An unresolved report in a case is returned with a resolved outcome instead of an unset one."
+  },
+  {
+   "id": "outcome-of-open-case-resolved",
+   "stack": "go",
+   "file": "backend/internal/modules/moderation/internal/model/model.go",
+   "old": "\t\treturn OutcomeNone\n",
+   "new": "\t\treturn OutcomeNoViolation\n",
+   "test": "internal/modules/moderation/internal/model ^TestOutcomeIsDerivedFromTheCaseDecision$",
+   "why": "A case without a decision derives a resolved outcome for its reports."
+  },
+  {
+   "id": "website-community-unset-no-text",
+   "stack": "website",
+   "file": "website/features/report/report-logic.ts",
+   "old": "? moderationCommunityReportOutcomeUnset()",
+   "new": "? undefined",
+   "test": "features/report/my-reports.unit.test.ts renders community and store items; only the store item links to detail",
+   "why": "An unset community outcome renders no status text instead of the under-review text."
+  },
+  {
+   "id": "admin-unset-outcome-unknown",
+   "stack": "admin",
+   "file": "admin/src/app/admin/moderation/moderation-text.ts",
+   "old": "? adminModerationCaseReportOutcomeUnset()",
+   "new": "? undefined",
+   "test": "tests/moderation-case-detail-page.test.ts 案件與全部檢舉，舊到新",
+   "why": "An unset outcome shows the unknown text instead of the processing text in the staff case page."
+  },
+  {
+   "id": "buyer-community-unset-no-text",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/moderation/presentation/report_view_parts.dart",
+   "old": "    : moderationCommunityReportOutcomeUnset(locale);",
+   "new": "    : null;",
+   "test": "test/features/moderation/my_reports_screen_test.dart 店家檢舉項目與社群項目並列，沒有結果時顯示審核中",
+   "why": "An unset community outcome renders no status text instead of the under-review text in buyer-app."
+  }
+ ]
+}

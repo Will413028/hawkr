@@ -19,6 +19,7 @@ import '../../data/after_sale_evidence.dart';
 import '../../data/after_sale_model.dart';
 import '../../data/after_sale_repository.dart';
 import '../../data/after_sale_status_notifier.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 賣家訂單卡片「已送達」狀態下的售後展開區。
 ///
@@ -110,7 +111,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
                 _buildErrorState(error.value!, load),
               ] else if (detail.value != null) ...[
                 SizedBox(height: 12.h),
-                _buildDetailContent(detail.value!),
+                _buildDetailContent(context, detail.value!),
               ],
             ],
           ),
@@ -233,16 +234,16 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
 
   // ─── 詳情區（detail API 載入完成後渲染） ────────────
 
-  Widget _buildDetailContent(AfterSaleCase c) {
+  Widget _buildDetailContent(BuildContext context, AfterSaleCase c) {
     final shipTradeNo = _text(c.shipTradeNo);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_isReturnFlow(c)) ...[
-          _buildReturnLogisticsProgress(c),
+          _buildReturnLogisticsProgress(context, c),
           SizedBox(height: 10.h),
         ],
-        _buildBasicInfo(c),
+        _buildBasicInfo(context, c),
         SizedBox(height: 10.h),
         _buildReasonSection(c),
         if (c.resolutions.isNotEmpty) ...[
@@ -253,7 +254,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
             shipTradeNo.isNotEmpty ||
             c.returnShippingMethod.isNotEmpty) ...[
           SizedBox(height: 10.h),
-          _buildReturnShipmentSection(c),
+          _buildReturnShipmentSection(context, c),
         ],
       ],
     );
@@ -317,7 +318,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  Widget _buildBasicInfo(AfterSaleCase c) {
+  Widget _buildBasicInfo(BuildContext context, AfterSaleCase c) {
     final hasRefund =
         c.refundableAmount.isNotEmpty && c.refundableAmount != '0';
     return _groupCard(
@@ -327,7 +328,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
           _cardHeader(HkIconName.receipt, '基本資訊'),
           SizedBox(height: 8.h),
           _infoRow('訂單編號', c.orderNo),
-          _infoRow('申請時間', _formatTime(c.createdAt)),
+          _infoRow('申請時間', _formatTime(c.createdAt, context.taipeiDisplay)),
           if (hasRefund)
             _infoRow(
               '可退金額',
@@ -418,8 +419,8 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  Widget _buildReturnLogisticsProgress(AfterSaleCase c) {
-    final status = _returnLogisticsStatus(c);
+  Widget _buildReturnLogisticsProgress(BuildContext context, AfterSaleCase c) {
+    final status = _returnLogisticsStatus(context, c);
     return _groupCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,7 +440,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
           SizedBox(height: 12.h),
           _processCard(
             title: status.title,
-            time: _returnStatusTime(c),
+            time: _returnStatusTime(context, c),
             message: status.message,
           ),
         ],
@@ -515,7 +516,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  Widget _buildReturnShipmentSection(AfterSaleCase c) {
+  Widget _buildReturnShipmentSection(BuildContext context, AfterSaleCase c) {
     // 退貨單號欄位依退貨方式**明確分派**；未知 / 本版未支援者用中性 label，
     // 不得沿用「退貨物流單」（黑貓語意）或「7-11 退貨代碼」。
     final returnShipping = shippingPresentationOf(c.returnShippingMethod);
@@ -657,7 +658,10 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  _ReturnLogisticsStatus _returnLogisticsStatus(AfterSaleCase c) {
+  _ReturnLogisticsStatus _returnLogisticsStatus(
+    BuildContext context,
+    AfterSaleCase c,
+  ) {
     final code = _text(c.providerStatus);
 
     // ── 退款任務已建立 → 視同「驗貨完成」(step=3) ──────────
@@ -668,8 +672,11 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     final refundTaskStatus = _text(c.refundTaskStatus);
     final refundStatus = refundTaskStatus.toUpperCase();
     final refundFailureMessage = _text(c.refundFailureMessage);
-    final estimatedRefundDate = _formatRefundDate(c.estimatedRefundDate);
-    final bankDate = _formatRefundDate(c.bankDate);
+    final estimatedRefundDate = _formatRefundDate(
+      c.estimatedRefundDate,
+      context.taipeiDisplay,
+    );
+    final bankDate = _formatRefundDate(c.bankDate, context.taipeiDisplay);
     if (c.status == AfterSaleStatus.closed) {
       final msg = bankDate.isNotEmpty
           ? '退款已於 $bankDate 退回買家帳戶'
@@ -812,11 +819,13 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  String _returnStatusTime(AfterSaleCase c) {
+  String _returnStatusTime(BuildContext context, AfterSaleCase c) {
     for (final r in c.resolutions.reversed) {
-      if (r.createdAt.isNotEmpty) return _formatTime(r.createdAt);
+      if (r.createdAt.isNotEmpty) {
+        return _formatTime(r.createdAt, context.taipeiDisplay);
+      }
     }
-    return _formatTime(c.createdAt);
+    return _formatTime(c.createdAt, context.taipeiDisplay);
   }
 
   String _providerStatusText(AfterSaleCase c) {
@@ -843,24 +852,13 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
 
   String _text(String? value) => value?.trim() ?? '';
 
-  String _formatTime(String raw) {
-    if (raw.isEmpty) return '';
-    final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    final local = dt.toLocal();
-    String pad(int v) => v.toString().padLeft(2, '0');
-    return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';
+  String _formatTime(String raw, TaipeiDisplay t) {
+    return t.formatIso(raw);
   }
 
   /// 退款預計日 / 入帳日：只取年月日，給「退款將於 X 退回買家帳戶」這類訊息用。
-  String _formatRefundDate(String? raw) {
-    final text = raw?.trim() ?? '';
-    if (text.isEmpty) return '';
-    final dt = DateTime.tryParse(text);
-    if (dt == null) return text;
-    final local = dt.toLocal();
-    String pad(int v) => v.toString().padLeft(2, '0');
-    return '${local.year}/${pad(local.month)}/${pad(local.day)}';
+  String _formatRefundDate(String? raw, TaipeiDisplay t) {
+    return t.formatIso(raw ?? '', TaipeiFormat.date);
   }
 }
 

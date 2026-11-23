@@ -5,10 +5,11 @@ import {
 	FavoriteSchema,
 	FollowSchema,
 } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
+import { ConversationSchema } from "@hawkr/api/gen/hawkr/chat/v1alpha1/chat_pb";
 import { PostSchema } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import type { PostListItem } from "../lib/api/openapi-types";
 import { type CartGroupWire, flattenGroups } from "../lib/cart/types";
-import { normalizeConversation } from "../lib/chat/repo";
+import { conversationFromProto } from "../lib/chat/map";
 import { mapProduct } from "../lib/market/listFilters";
 import { normalizeMemberCard } from "../lib/member-cards/repo";
 import { normalizeOrder } from "../lib/orders/repo";
@@ -147,23 +148,28 @@ test("merchant logo normalizers use only each endpoint's canonical logo field", 
 		undefined,
 	);
 
-	const conversation = normalizeConversation({
-		targetUserId: "seller-1",
-		targetNickname: "Canonical Store",
-		logoUrl: ` ${CANONICAL} `,
-		logo_url: LEGACY,
-		seller_logo_url: LEGACY,
-		lastMessage: "",
-	});
+	const conversation = conversationFromProto(
+		create(ConversationSchema, {
+			id: "c1",
+			store: {
+				id: "seller-1",
+				name: "Canonical Store",
+				logo: {
+					uriTemplate: "https://media.example.com/i/{preset}/canonical.png",
+				},
+			},
+		}),
+		"buyer",
+	);
 	assert.equal(conversation.logo_url, CANONICAL);
 	assert.equal(
-		normalizeConversation({
-			targetUserId: "seller-2",
-			targetNickname: "Legacy Store",
-			logoUrl: " ",
-			logo_url: LEGACY,
-			lastMessage: "",
-		}).logo_url,
+		conversationFromProto(
+			create(ConversationSchema, {
+				id: "c2",
+				store: { id: "seller-2", name: "No Logo Store" },
+			}),
+			"buyer",
+		).logo_url,
 		undefined,
 	);
 });

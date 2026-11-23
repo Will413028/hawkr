@@ -169,54 +169,6 @@ class CouponRepository {
   }
 
   // ---------------------------------------------------------------------------
-  // Customer Lookup
-  // ---------------------------------------------------------------------------
-
-  static const _customerLookupPath = '/api/v1/app/sellers/me/customers/lookup';
-
-  /// 依手機號碼查詢客戶
-  Future<CustomerLookupResult> lookupByPhone(String phone) async {
-    try {
-      final resp = await _dio.get(
-        _customerLookupPath,
-        queryParameters: {'phone': phone},
-      );
-      return _parseCustomerLookup(resp.data);
-    } on DioException catch (e) {
-      HKLog.logD(
-        '[Coupon] lookupByPhone error: ${e.response?.statusCode} ${e.response?.data}',
-      );
-      throw _handleLookupError(e);
-    }
-  }
-
-  /// 從 DioException 提取 API 錯誤訊息，回傳具描述性的 AppException
-  AppException _handleLookupError(DioException e) {
-    final statusCode = e.response?.statusCode;
-
-    if (statusCode == 404) {
-      return const UnknownException(message: '未找到該用戶');
-    }
-    if (statusCode == 400) {
-      return const UnknownException(message: '查詢參數錯誤，請確認輸入');
-    }
-    return AppException.fromDioException(e);
-  }
-
-  CustomerLookupResult _parseCustomerLookup(dynamic data) {
-    if (data is Map<String, dynamic> && data['code'] == 0) {
-      final inner = data['data'];
-      if (inner is Map<String, dynamic>) {
-        return CustomerLookupResult.fromJson(inner);
-      }
-    }
-    final msg = (data is Map<String, dynamic>)
-        ? data['message']?.toString()
-        : null;
-    throw UnknownException(message: msg ?? '查無此用戶');
-  }
-
-  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 

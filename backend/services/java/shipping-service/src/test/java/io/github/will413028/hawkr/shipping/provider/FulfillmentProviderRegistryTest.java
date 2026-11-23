@@ -4,7 +4,6 @@ import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.shipping.exception.ShippingBusinessException;
 import io.github.will413028.hawkr.shipping.provider.capability.CancelCapability;
-import io.github.will413028.hawkr.shipping.provider.capability.CostCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.CreateCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.DispatchCapability;
 import io.github.will413028.hawkr.shipping.provider.capability.InboundCapability;
@@ -49,7 +48,6 @@ class FulfillmentProviderRegistryTest {
             @Override public Optional<TrackCapability> track(FulfillmentContext c) { return Optional.empty(); }
             @Override public Optional<ReturnCapability> returns(FulfillmentContext c) { return Optional.empty(); }
             @Override public Optional<PodCapability> pod(FulfillmentContext c) { return Optional.empty(); }
-            @Override public Optional<CostCapability> cost(FulfillmentContext c) { return Optional.empty(); }
             @Override public Optional<OnboardCapability> onboard(FulfillmentContext c) { return Optional.empty(); }
             @Override public Optional<InboundCapability> inbound(FulfillmentContext c) { return Optional.empty(); }
             @Override public Optional<StoreLocatorCapability> storeLocator(FulfillmentContext c) { return Optional.empty(); }

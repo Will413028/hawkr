@@ -4,17 +4,37 @@
 // ignore_for_file: unnecessary_parenthesis, unused_import, prefer_single_quotes, unnecessary_string_interpolations
 
 import 'package:connectrpc/connect.dart' show Code;
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart' as hawkr_assistant_v1alpha1_assistant;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart' as hawkr_media_v1alpha1_media;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 
 import '../hawkr_ui_text.dart' show UiLocale;
+
+String? _assistantAssistantTool(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '正在查詢你的訂單',
+(UiLocale.en, 1) => 'Looking up your orders',
+(UiLocale.zhTW, 2) => '正在查詢訂單詳情',
+(UiLocale.en, 2) => 'Looking up the order details',
+(UiLocale.zhTW, 3) => '正在查詢包裹物流',
+(UiLocale.en, 3) => 'Checking your package tracking',
+_ => null,
+};
+}
+
+extension AssistantAssistantToolUiText on hawkr_assistant_v1alpha1_assistant.AssistantTool {
+  /// assistant.AssistantTool 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _assistantAssistantTool(l, value);
+}
 
 String? _buyerGender(UiLocale l, int value) {
 return switch ((l, value)) {
@@ -35,19 +55,32 @@ extension BuyerGenderUiText on hawkr_buyer_v1alpha1_buyer.Gender {
 
 String? _commonPolicyCategory(UiLocale l, int value) {
 return switch ((l, value)) {
-(UiLocale.zhTW || UiLocale.en, 1) => '食品安全',
-(UiLocale.zhTW || UiLocale.en, 2) => '違法或禁售商品',
-(UiLocale.zhTW || UiLocale.en, 3) => '未經許可販售',
-(UiLocale.zhTW || UiLocale.en, 4) => '不實或誤導資訊',
-(UiLocale.zhTW || UiLocale.en, 5) => '假認證',
-(UiLocale.zhTW || UiLocale.en, 6) => '仿冒商品',
-(UiLocale.zhTW || UiLocale.en, 7) => '侵害智慧財產權',
-(UiLocale.zhTW || UiLocale.en, 8) => '詐欺或操縱交易',
-(UiLocale.zhTW || UiLocale.en, 9) => '繞過平台交易',
-(UiLocale.zhTW || UiLocale.en, 10) => '不當使用個人資料',
-(UiLocale.zhTW || UiLocale.en, 11) => '冒用或誤導交易主體',
-(UiLocale.zhTW || UiLocale.en, 12) => '干擾或濫用平台',
-(UiLocale.zhTW || UiLocale.en, 13) => '其他',
+(UiLocale.zhTW, 1) => '食品安全',
+(UiLocale.en, 1) => 'Food safety',
+(UiLocale.zhTW, 2) => '違法或禁售商品',
+(UiLocale.en, 2) => 'Illegal or prohibited goods',
+(UiLocale.zhTW, 3) => '未經許可販售',
+(UiLocale.en, 3) => 'Unlicensed sale',
+(UiLocale.zhTW, 4) => '不實或誤導資訊',
+(UiLocale.en, 4) => 'False or misleading information',
+(UiLocale.zhTW, 5) => '假認證',
+(UiLocale.en, 5) => 'Fake certification',
+(UiLocale.zhTW, 6) => '仿冒商品',
+(UiLocale.en, 6) => 'Counterfeit goods',
+(UiLocale.zhTW, 7) => '侵害智慧財產權',
+(UiLocale.en, 7) => 'Intellectual property infringement',
+(UiLocale.zhTW, 8) => '詐欺或操縱交易',
+(UiLocale.en, 8) => 'Fraud or transaction manipulation',
+(UiLocale.zhTW, 9) => '繞過平台交易',
+(UiLocale.en, 9) => 'Off-platform transactions',
+(UiLocale.zhTW, 10) => '不當使用個人資料',
+(UiLocale.en, 10) => 'Misuse of personal data',
+(UiLocale.zhTW, 11) => '冒用或誤導交易主體',
+(UiLocale.en, 11) => 'Impersonation',
+(UiLocale.zhTW, 12) => '干擾或濫用平台',
+(UiLocale.en, 12) => 'Platform abuse',
+(UiLocale.zhTW, 13) => '其他',
+(UiLocale.en, 13) => 'Other',
 (UiLocale.zhTW, 14) => '垃圾訊息',
 (UiLocale.en, 14) => 'Spam',
 (UiLocale.zhTW, 15) => '騷擾或霸凌',
@@ -82,6 +115,37 @@ extension CommonStoreCardStatusUiText on hawkr_common_v1alpha1_store_card.StoreC
   String? uiText(UiLocale l) => _commonStoreCardStatus(l, value);
 }
 
+String? _crmCustomerSort(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '首購時間',
+(UiLocale.en, 1) => 'First order date',
+(UiLocale.zhTW, 2) => '消費金額',
+(UiLocale.en, 2) => 'Total spent',
+(UiLocale.zhTW, 3) => '訂單數',
+(UiLocale.en, 3) => 'Order count',
+_ => null,
+};
+}
+
+extension CrmCustomerSortUiText on hawkr_crm_v1alpha1_crm.CustomerSort {
+  /// crm.CustomerSort 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _crmCustomerSort(l, value);
+}
+
+String? _crmCustomerType(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '一般客戶',
+(UiLocale.en, 1) => 'Regular customer',
+(UiLocale.zhTW || UiLocale.en, 2) => 'VIP',
+_ => null,
+};
+}
+
+extension CrmCustomerTypeUiText on hawkr_crm_v1alpha1_crm.CustomerType {
+  /// crm.CustomerType 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _crmCustomerType(l, value);
+}
+
 String? _mediaRejectReason(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW, 1) => '無法辨識檔案格式，請改用 JPEG、PNG、WebP 或 GIF 圖片。',
@@ -105,8 +169,6 @@ extension MediaRejectReasonUiText on hawkr_media_v1alpha1_media.RejectReason {
 
 String? _moderationReportOutcome(UiLocale l, int value) {
 return switch ((l, value)) {
-(UiLocale.zhTW, 1) => '審核中',
-(UiLocale.en, 1) => 'Under review',
 (UiLocale.zhTW, 2) => '已處理（違規）',
 (UiLocale.en, 2) => 'Resolved (violation)',
 (UiLocale.zhTW, 3) => '已處理（不違規）',
@@ -179,6 +241,43 @@ _ => null,
 extension PaymentRequirementCollectionUiText on hawkr_payment_v1alpha1_payment.RequirementCollection {
   /// payment.RequirementCollection 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _paymentRequirementCollection(l, value);
+}
+
+String? _procurementRejectionReason(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '內容是空的',
+(UiLocale.en, 1) => 'The content is empty',
+(UiLocale.zhTW, 2) => '超過長度上限，已截斷',
+(UiLocale.en, 2) => 'Over the length limit, shortened',
+(UiLocale.zhTW, 3) => '數量不在可接受的範圍內',
+(UiLocale.en, 3) => 'The quantity is out of range',
+(UiLocale.zhTW, 4) => '單價預算不在可接受的範圍內',
+(UiLocale.en, 4) => 'The budget per unit is out of range',
+(UiLocale.zhTW, 5) => '這個單位不支援',
+(UiLocale.en, 5) => 'This unit is not supported',
+(UiLocale.zhTW, 6) => '無法辨識這個縣市',
+(UiLocale.en, 6) => 'The city could not be recognized',
+(UiLocale.zhTW, 7) => '日期格式不正確',
+(UiLocale.en, 7) => 'The date format is not valid',
+(UiLocale.zhTW, 8) => '日期缺少西元年份',
+(UiLocale.en, 8) => 'The date is missing the year',
+(UiLocale.zhTW, 9) => '日期已經過了',
+(UiLocale.en, 9) => 'The date has already passed',
+(UiLocale.zhTW, 10) => '日期太久以後',
+(UiLocale.en, 10) => 'The date is too far ahead',
+(UiLocale.zhTW, 11) => '品項未確定，無法指定品項分類',
+(UiLocale.en, 11) => 'The item is missing or was rejected, so no item category can be set',
+(UiLocale.zhTW, 12) => '品項分類沒有名稱',
+(UiLocale.en, 12) => 'The item category has no name',
+(UiLocale.zhTW, 13) => '品項分類的判定方式不明',
+(UiLocale.en, 13) => 'The way the item category was decided is unknown',
+_ => null,
+};
+}
+
+extension ProcurementRejectionReasonUiText on hawkr_procurement_v1alpha1_procurement.RejectionReason {
+  /// procurement.RejectionReason 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _procurementRejectionReason(l, value);
 }
 
 String? _sellerContentKind(UiLocale l, int value) {
@@ -597,11 +696,59 @@ extension SocialCommentStateUiText on hawkr_social_v1alpha1_social.CommentState 
   String? placeholder(UiLocale l) => _socialCommentStatePlaceholder(l, value);
 }
 
+/// admin.moderation.CaseReport.outcome_unset
+String adminModerationCaseReportOutcomeUnset(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '審核中',
+UiLocale.en => 'Under review',
+};
+}
+
+/// buyer.Profile.deleted_name
+String buyerProfileDeletedName(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '已刪除帳號',
+UiLocale.en => 'Deleted account',
+};
+}
+
 /// buyer.Profile.gender_unset
 String buyerProfileGenderUnset(UiLocale l) {
 return switch (l) {
 UiLocale.zhTW => '尚未設定',
 UiLocale.en => 'Not set',
+};
+}
+
+/// chat.Message.unsupported_kind
+String chatMessageUnsupportedKind(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '不支援的訊息',
+UiLocale.en => 'Unsupported message',
+};
+}
+
+/// chat.Preview.erased
+String chatPreviewErased(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '此訊息已被移除',
+UiLocale.en => 'This message has been removed',
+};
+}
+
+/// chat.Preview.hidden
+String chatPreviewHidden(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '此訊息已被隱藏',
+UiLocale.en => 'This message has been hidden',
+};
+}
+
+/// chat.Preview.image
+String chatPreviewImage(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '傳送了一張圖片',
+UiLocale.en => 'Sent a photo',
 };
 }
 
@@ -637,6 +784,62 @@ _ => null,
 String commonUnknown(UiLocale l) => switch (l) {
 UiLocale.zhTW || UiLocale.en => '未知',
 };
+
+/// moderation.CommunityReport.outcome_unset
+String moderationCommunityReportOutcomeUnset(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '審核中',
+UiLocale.en => 'Under review',
+};
+}
+
+/// review.Review.rating_label_1
+String reviewReviewRatingLabel1(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '非常不滿意',
+UiLocale.en => 'Very dissatisfied',
+};
+}
+
+/// review.Review.rating_label_2
+String reviewReviewRatingLabel2(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '不滿意',
+UiLocale.en => 'Dissatisfied',
+};
+}
+
+/// review.Review.rating_label_3
+String reviewReviewRatingLabel3(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '一般',
+UiLocale.en => 'Okay',
+};
+}
+
+/// review.Review.rating_label_4
+String reviewReviewRatingLabel4(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '滿意',
+UiLocale.en => 'Satisfied',
+};
+}
+
+/// review.Review.rating_label_5
+String reviewReviewRatingLabel5(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '非常滿意',
+UiLocale.en => 'Very satisfied',
+};
+}
+
+/// review.ReviewAuthor.anonymous_name
+String reviewReviewAuthorAnonymousName(UiLocale l) {
+return switch (l) {
+UiLocale.zhTW => '匿名會員',
+UiLocale.en => 'Anonymous member',
+};
+}
 
 /// seller.KYCApplication.decide_time
 String sellerKYCApplicationDecideTime(UiLocale l, {required String time}) {

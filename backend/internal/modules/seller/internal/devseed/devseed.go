@@ -71,7 +71,7 @@ func New(d Deps) *Service {
 //   - 先鎖店家列（與模組的寫入者同一個順序：店家、申請），才刪子列。
 //
 // 它不碰別人的資料：不在種子的店家（含 SELLER 角色）原封不動。前提不成立時拒絕執行：種子帳號若擁有種子以外的未關閉店家，種子店家寫入會撞上
-// 一帳號一家店與 SELLER 角色的 source_id，Check 在寫入之前就擋下，不自動刪店。已關閉的店家（角色已移除）不受影響。
+// 一帳號一家店，Check 在寫入之前就擋下，不自動刪店。已關閉的店家（角色已移除）不受影響。
 var clearChildrenSQL = []string{
 	`DELETE FROM seller.evidence_accesses WHERE report_id IN (SELECT id FROM seller.reports WHERE store_id = ANY($1)) OR request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))) OR inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_request_evidence WHERE request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)))`,
@@ -171,7 +171,7 @@ SELECT setval(seq, GREATEST(
 FROM (SELECT pg_get_serial_sequence('seller.stores', 'store_id') AS seq) s`
 
 // 種子帳號擁有種子以外的未關閉店家、或種子以外的店家佔用種子的 store_code：一個帳號同時只有一家未關閉的店（stores_current_account 的 UNIQUE）、
-// SELLER 角色的 source_id 只有一個，種子店家寫入會撞上它；已關閉的店家沒有角色，不在此限。store_code 的 unique index 涵蓋所有狀態，所以那一支不篩選。
+// 種子店家寫入會撞上它；已關閉的店家不在此限。store_code 的 unique index 涵蓋所有狀態，所以那一支不篩選。
 // （$1 種子 store_id、$2 種子 store_code、$3 種子帳號。）
 const conflictingStoresSQL = `
 SELECT store_id, account_id, store_code FROM seller.stores
@@ -331,7 +331,7 @@ func check(ctx context.Context, conn db.DBTX, stores []Store, seedAccountIDs []i
 	mixed = slices.DeleteFunc(mixed, func(l string) bool { return l == "" })
 	var sections []string
 	if len(conflicts) > 0 {
-		sections = append(sections, "下列店家是種子帳號名下種子以外的未關閉店家，或佔用種子的 store_code；種子店家寫入會撞上一帳號一家店與 SELLER 角色的 source_id。\n"+strings.Join(conflicts, "\n")+"\n"+
+		sections = append(sections, "下列店家是種子帳號名下種子以外的未關閉店家，或佔用種子的 store_code；種子店家寫入會撞上一帳號一家店。\n"+strings.Join(conflicts, "\n")+"\n"+
 			"請重建本機資料庫；手動測試改用 make dev-token 不帶 -account 建立的新帳號（.agents/skills/backend-e2e-verify/SKILL.md §2），不要用種子的固定帳號")
 	}
 	if len(states) > 0 {

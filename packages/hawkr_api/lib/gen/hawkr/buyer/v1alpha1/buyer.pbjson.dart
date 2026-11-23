@@ -1222,6 +1222,8 @@ const BlockAuthorRequest$json = {
       '9': 0,
       '10': 'forumEntryId'
     },
+    {'1': 'review_id', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'reviewId'},
+    {'1': 'message_id', '3': 4, '4': 1, '5': 9, '9': 0, '10': 'messageId'},
   ],
   '8': [
     {'1': 'source'},
@@ -1231,7 +1233,9 @@ const BlockAuthorRequest$json = {
 /// Descriptor for `BlockAuthorRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List blockAuthorRequestDescriptor = $convert.base64Decode(
     'ChJCbG9ja0F1dGhvclJlcXVlc3QSHwoKY29tbWVudF9pZBgBIAEoCUgAUgljb21tZW50SWQSJg'
-    'oOZm9ydW1fZW50cnlfaWQYAiABKAlIAFIMZm9ydW1FbnRyeUlkQggKBnNvdXJjZQ==');
+    'oOZm9ydW1fZW50cnlfaWQYAiABKAlIAFIMZm9ydW1FbnRyeUlkEh0KCXJldmlld19pZBgDIAEo'
+    'CUgAUghyZXZpZXdJZBIfCgptZXNzYWdlX2lkGAQgASgJSABSCW1lc3NhZ2VJZEIICgZzb3VyY2'
+    'U=');
 
 @$core.Deprecated('Use blockAuthorResponseDescriptor instead')
 const BlockAuthorResponse$json = {

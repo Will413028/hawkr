@@ -1,0 +1,247 @@
+{
+ "mutants": [
+  {
+   "id": "no-worker-registration",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "\tm.dispatcher.AddWorker(workers)\n",
+   "new": "\t_ = m.dispatcher\n",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnThenWatchRunFinishesAndTheSnapshotReflectsIt$",
+   "why": "拿掉 run worker 的登記：SubmitTurn 之後沒有人執行 run，WatchRun 收不到 finished"
+  },
+  {
+   "id": "no-turn-executor",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "if _, ok := out[run.RunTypeTurn]; !ok && hasLLM {",
+   "new": "if _, ok := out[run.RunTypeTurn]; !ok && hasLLM && false {",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnThenWatchRunFinishesAndTheSnapshotReflectsIt$",
+   "why": "拿掉 TURN executor 的登記：run 以 pipeline 失敗收尾，不是 SUCCEEDED"
+  },
+  {
+   "id": "no-search-executor",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "if _, ok := out[run.RunTypeCandidateSearch]; !ok && d.Search != nil {",
+   "new": "if _, ok := out[run.RunTypeCandidateSearch]; !ok && d.Search != nil && false {",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnThenWatchRunFinishesAndTheSnapshotReflectsIt$",
+   "why": "拿掉 CANDIDATE_SEARCH executor 的登記：搜尋 run 失敗、需求不轉 MATCHING"
+  },
+  {
+   "id": "no-resume-executor",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "if _, ok := out[run.RunTypeResume]; !ok {",
+   "new": "if _, ok := out[run.RunTypeResume]; !ok && false {",
+   "test": "internal/httpapi/buyerprocurement ^TestResumeRunAnswersTheClarificationThenWatchRunFinishes$",
+   "why": "拿掉 CLARIFICATION_RESUME executor 的登記：回答 run 失敗"
+  },
+  {
+   "id": "submit-no-quota-limit",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "QuotaLimit: quota.Limit, PeriodStart:",
+   "new": "PeriodStart:",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnThenWatchRunFinishesAndTheSnapshotReflectsIt$",
+   "why": "不帶買家的額度上限：上限 0，第一次送出就額度用完"
+  },
+  {
+   "id": "submit-replay-new-request",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "case err == nil && first.ConversationID != nil &&",
+   "new": "case false && err == nil && first.ConversationID != nil &&",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnThenWatchRunFinishesAndTheSnapshotReflectsIt$",
+   "why": "重送沒指定需求時不沿用第一次的需求：新建一個需求，重送被當成內容不同"
+  },
+  {
+   "id": "submit-blank-message",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "case msg == \"\":",
+   "new": "case false:",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnRejectsMessagesAndUnknownRequestsBeforeAnyRun$",
+   "why": "拿掉空白訊息的檢查：到 DB CHECK 才炸，回的不是 INVALID_ARGUMENT"
+  },
+  {
+   "id": "submit-long-message",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "case utf8.RuneCountInString(msg) > MaxMessageRunes:",
+   "new": "case utf8.RuneCountInString(msg) < 0:",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnRejectsMessagesAndUnknownRequestsBeforeAnyRun$",
+   "why": "拿掉 2000 字元上限的檢查"
+  },
+  {
+   "id": "handler-caller-account-id",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "func (h *App) caller(ctx context.Context) (int64, error) { return rpc.AccountBuyerID(ctx, h.buyers) }",
+   "new": "func (h *App) caller(ctx context.Context) (int64, error) {\n\tp, err := rpc.RequireAccount(ctx)\n\treturn p.ID, err\n}",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnPassesTheBuyerAndMapsModuleErrors$",
+   "why": "把帳號 ID 當買家 ID 傳給模組"
+  },
+  {
+   "id": "submit-error-paths",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "rpc.WithFieldPaths(err, submitPaths)",
+   "new": "err",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnPassesTheBuyerAndMapsModuleErrors$",
+   "why": "SubmitTurn 的模組欄位違規不對應到請求路徑（message、client_request_id）"
+  },
+  {
+   "id": "search-error-paths",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "rpc.WithFieldPaths(err, searchPaths)",
+   "new": "err",
+   "test": "internal/httpapi/buyerprocurement ^TestStartCandidateSearchMapsErrorsAndResult$",
+   "why": "StartCandidateSearch 的欄位違規不對應到請求路徑"
+  },
+  {
+   "id": "resume-error-paths",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "rpc.WithFieldPaths(err, resumePaths)",
+   "new": "err",
+   "test": "internal/httpapi/buyerprocurement ^TestResumeRunMapsNestedAnswerFieldPaths$",
+   "why": "ResumeRun 的回答欄位違規不對應到巢狀路徑"
+  },
+  {
+   "id": "resume-option-path",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "\"OptionID\": \"clarification.option_id\", ",
+   "new": "",
+   "test": "internal/httpapi/buyerprocurement ^TestResumeRunMapsNestedAnswerFieldPaths$",
+   "why": "OptionID 沒有對應到 clarification.option_id"
+  },
+  {
+   "id": "resume-free-text-path",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "\"FreeText\": \"clarification.free_text\", ",
+   "new": "",
+   "test": "internal/httpapi/buyerprocurement ^TestResumeRunMapsNestedAnswerFieldPaths$",
+   "why": "FreeText 沒有對應到 clarification.free_text"
+  },
+  {
+   "id": "resume-missing-answer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "if answer == nil {",
+   "new": "if false {",
+   "test": "internal/httpapi/buyerprocurement ^TestResumeRunMapsNestedAnswerFieldPaths$",
+   "why": "沒帶回答也往模組送"
+  },
+  {
+   "id": "event-keeps-cursor",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "out.Cursor = e.Cursor",
+   "new": "_ = e.Cursor",
+   "test": "internal/httpapi/buyerprocurement ^TestWatchRunConvertsPayloadsAndEndsWithFinished$",
+   "why": "串流事件沒有帶 cursor，client 無法接續"
+  },
+  {
+   "id": "event-requires-content",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "if out.GetEvent() == nil {",
+   "new": "if false {",
+   "test": "internal/httpapi/buyerprocurement ^TestEventToProtoRejectsUnknownOrEmptyPayloads$",
+   "why": "沒有事件內容的 payload 也往 client 送"
+  },
+  {
+   "id": "event-strict-decode",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(e.Payload, out)",
+   "new": "protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(e.Payload, out)",
+   "test": "internal/httpapi/buyerprocurement ^TestEventToProtoRejectsUnknownOrEmptyPayloads$",
+   "why": "事件 payload 的未知欄位被默默丟掉，欄位漂移不再被發現"
+  },
+  {
+   "id": "cancel-disposition",
+   "stack": "go-integration",
+   "file": "backend/internal/httpapi/buyerprocurement/convert.go",
+   "old": "case procurement.CancelDispositionAlreadyCancelled:\n\t\treturn pb.CancelDisposition_CANCEL_DISPOSITION_ALREADY_CANCELLED, nil",
+   "new": "case procurement.CancelDispositionAlreadyCancelled:\n\t\treturn pb.CancelDisposition_CANCEL_DISPOSITION_ALREADY_TERMINAL, nil",
+   "test": "internal/httpapi/buyerprocurement ^TestCancelRunEndsTheStreamWithCancelled$",
+   "why": "已取消的 run 再取消回成已結束"
+  },
+  {
+   "id": "snapshot-open-confirmation",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/convert.go",
+   "old": "InterruptId: c.InterruptID.String(), Kind: kind, Processing: c.Processing,",
+   "new": "InterruptId: c.InterruptID.String(), Kind: kind,",
+   "test": "internal/httpapi/buyerprocurement ^TestSnapshotMapsEveryFieldAndRejectsUnspecified$",
+   "why": "快照丟掉 processing"
+  },
+  {
+   "id": "followup-request-id-v4-only",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "id, err := rpc.ParseUUID(\"request_id\", raw)",
+   "new": "id, err := func() (uuid.UUID, error) {\n\t\t\tp, e := rpc.ParseRequestID(raw)\n\t\t\tif e != nil {\n\t\t\t\treturn uuid.UUID{}, e\n\t\t\t}\n\t\t\treturn *p, nil\n\t\t}()",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnAcceptsAServerIssuedUUIDv7RequestID$",
+   "why": "request_id 又只收 UUIDv4：伺服器以 UUIDv7 建的需求，後續一輪被 INVALID_ARGUMENT 拒絕"
+  },
+  {
+   "id": "serve-no-entitlements",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "newProcurement(d, jc, buyerModule, bus, log)",
+   "new": "newProcurement(d, jc, nil, bus, log)",
+   "test": "cmd/hawkr ^TestProcurementModuleIsBuiltWithTheBuyerModuleAsEntitlementsInBothRoles$",
+   "why": "serve 組採購模組不給 Entitlements：SubmitTurn 每次都回組裝錯誤"
+  },
+  {
+   "id": "submit-replay-skips-deleted-conversation-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "BuyerID: in.BuyerID}); err != nil {\n\t\t\tif errors.Is(err, pgx.ErrNoRows) {\n\t\t\t\treturn uuid.UUID{}, uuid.UUID{}, false, apperr.NotFound(\"找不到這張需求的對話\")\n\t\t\t}\n\t\t\treturn uuid.UUID{}, uuid.UUID{}, false, fmt.Errorf(\"turn：讀取重送的對話",
+   "new": "BuyerID: in.BuyerID}); err != nil && false {\n\t\t\tif errors.Is(err, pgx.ErrNoRows) {\n\t\t\t\treturn uuid.UUID{}, uuid.UUID{}, false, apperr.NotFound(\"找不到這張需求的對話\")\n\t\t\t}\n\t\t\treturn uuid.UUID{}, uuid.UUID{}, false, fmt.Errorf(\"turn：讀取重送的對話",
+   "test": "internal/modules/procurement/internal/turn ^TestReplayOfADeletedConversationIsNotFound$",
+   "why": "重送不檢查對話還在：對話刪除後重送仍回第一次的 run"
+  },
+  {
+   "id": "submit-quota-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "quota, err = s.Quota.TurnQuota(ctx, in.BuyerID)",
+   "new": "quota, err = s.Quota.TurnQuota(context.Background(), in.BuyerID)",
+   "test": "internal/modules/procurement/internal/turn ^TestSubmitReadsTheQuotaInsideTheTransaction$",
+   "why": "額度在 transaction 之外讀（買家送出鎖之前），與扣額度不同一個 transaction"
+  },
+  {
+   "id": "submit-quota-before-lock",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "if err := q.LockBuyerSubmits(ctx, in.BuyerID); err != nil {",
+   "new": "if _, err := s.Quota.TurnQuota(ctx, in.BuyerID); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := q.LockBuyerSubmits(ctx, in.BuyerID); err != nil {",
+   "test": "internal/modules/procurement/internal/turn ^TestSubmitReadsTheQuotaInsideTheTransaction$",
+   "why": "額度在買家的送出鎖之前讀：讀到的額度可能在等鎖時過期，測試的 QuotaSource 看到鎖尚未持有"
+  },
+  {
+   "id": "submit-replay-reads-quota",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "if !replayed {",
+   "new": "if !replayed || true {",
+   "test": "internal/modules/procurement/internal/turn ^TestReplayDoesNotReadTheQuotaAndMismatchesAreRejected$",
+   "why": "重送也讀額度：額度來源失敗時重送被擋，不再回放"
+  },
+  {
+   "id": "worker-no-entitlements",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "newProcurementWorker(d, jc, buyerModule, ",
+   "new": "newProcurementWorker(d, jc, nil, ",
+   "test": "cmd/hawkr ^TestProcurementModuleIsBuiltWithTheBuyerModuleAsEntitlementsInBothRoles$",
+   "why": "worker 組採購模組不給 Entitlements"
+  }
+ ]
+}

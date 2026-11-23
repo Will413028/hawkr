@@ -10,8 +10,6 @@ import Button from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useMyReport } from "@/features/report/hooks";
 import {
-	canSupplement,
-	MAX_SUPPLEMENTS,
 	ownEvidenceCount,
 	storeReportOutcomeMessage,
 } from "@/features/report/report-logic";
@@ -137,7 +135,7 @@ export default function StoreReportDetailClient({
 					<h2 className="m-0 text-base font-semibold">
 						{t("supplementsHeading", {
 							count: detail.supplements.length,
-							max: MAX_SUPPLEMENTS,
+							max: detail.supplementMax,
 						})}
 					</h2>
 					{detail.supplements.map((s) => (
@@ -161,7 +159,7 @@ export default function StoreReportDetailClient({
 						{staleMessage}
 					</p>
 				) : null}
-				{canSupplement(detail) ? (
+				{detail.canSupplement ? (
 					<Button onClick={() => setSupplementOpen(true)}>
 						{t("supplementButton")}
 					</Button>

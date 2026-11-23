@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"testing"
-	"time"
 )
 
 func TestPickActiveRole(t *testing.T) {
@@ -55,7 +54,7 @@ func TestRoleInSet(t *testing.T) {
 }
 
 // sanitizeActiveRole is the one rule that decides whether a resolved active role
-// (單體的 X-Login-Role、ws-ticket) may be used:
+// (單體的 X-Login-Role) may be used:
 // only a role the account actually holds survives; everything else collapses to
 // 0 ("no active role"), never to a guess.
 func TestSanitizeActiveRole(t *testing.T) {
@@ -81,42 +80,5 @@ func TestSanitizeActiveRole(t *testing.T) {
 			t.Errorf("sanitizeActiveRole(%d, accountType=%d) = %d, want %d",
 				tc.role, tc.accountType, got, tc.want)
 		}
-	}
-}
-
-// A ws-ticket's HMAC proves the gateway minted it, not that the baked active role
-// is still held — tickets outlive role removals, and one minted from a poisoned
-// session carries that role forward.
-func TestVerifyChatWSTicket_DropsRoleNotHeld(t *testing.T) {
-	withTestTicketSecret(t, "ticket-role-sanitize-secret")
-
-	poisoned, err := SignChatWSTicket(42, AccountTypeSellerAndBuyer, 7, 30*time.Second)
-	if err != nil {
-		t.Fatalf("SignChatWSTicket: %v", err)
-	}
-	id, ok := verifyChatWSTicket(poisoned)
-	if !ok {
-		t.Fatal("a correctly signed ticket must still verify; only the role is dropped")
-	}
-	if id.LoginRole != 0 {
-		t.Errorf("LoginRole = %d, want 0 (7 is not a role)", id.LoginRole)
-	}
-
-	// Not held ≠ malformed: a seller role on a buyer-only account is dropped too.
-	notHeld, err := SignChatWSTicket(43, AccountTypeBuyer, 2, 30*time.Second)
-	if err != nil {
-		t.Fatalf("SignChatWSTicket: %v", err)
-	}
-	if id, ok := verifyChatWSTicket(notHeld); !ok || id.LoginRole != 0 {
-		t.Errorf("buyer-only ticket claiming seller: ok=%v LoginRole=%d, want ok=true LoginRole=0", ok, id.LoginRole)
-	}
-
-	// A legitimate role is untouched.
-	good, err := SignChatWSTicket(44, AccountTypeSellerAndBuyer, 2, 30*time.Second)
-	if err != nil {
-		t.Fatalf("SignChatWSTicket: %v", err)
-	}
-	if id, ok := verifyChatWSTicket(good); !ok || id.LoginRole != 2 {
-		t.Errorf("valid ticket: ok=%v LoginRole=%d, want ok=true LoginRole=2", ok, id.LoginRole)
 	}
 }

@@ -207,10 +207,9 @@ func getEnvOrDefault(key, defaultVal string) string {
 // 那個形狀沒有 envelope、沒有 traceId、連 ErrorHandler 都不會進，日誌裡不會出現
 // 任何指向配置的線索（#2813 為此花掉整輪才定位到這一行）。
 //
-// #2813 的實際觸發值是 `SELLER_SERVICE_PORT=tcp://10.43.144.51:10021`：k8s 對 Service
-// `seller-service` 自動注入的 service-link 變數，與 gateway 自己要讀的同名 env 撞名。
-// cm/gateway-config 沒有定義 SELLER_SERVICE_PORT，於是 service-link 的值生效，
-// 拼出 `http://seller-service:tcp://10.43.144.51:10021` —— Go 1.26 的 URL host/port
+// 觸發形狀（#2813）：k8s 對 Service 自動注入 `<NAME>_SERVICE_PORT=tcp://<ip>:<port>`
+// service-link 變數，與 gateway 讀的同名 env 撞名；config 沒定義該 env 時 service-link
+// 的值生效，拼出 `http://<host>:tcp://<ip>:<port>` —— Go 1.26 的 URL host/port
 // 驗證判它 `invalid port`，url.Parse 回 nil。同一個 pod 內 ACCOUNT_/BUYER_/SOCIAL_
 // SERVICE_PORT 也是這個形狀，目前沒有代理路由在用；哪天有人加了，這裡會在開機
 // 就炸並印出實際值，而不是再留一個沒有線索的 500。

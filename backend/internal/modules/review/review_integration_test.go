@@ -331,7 +331,7 @@ func TestRD10SingleReadUsesThePublicPredicate(t *testing.T) {
 	if _, err := f.module.GetReview(ctx, r.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("隱藏的評價單筆讀取：%v", err)
 	}
-	if mine := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, nil, 50)); len(mine.Reviews) != 0 {
+	if mine := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, 0, nil, 50)); len(mine.Reviews) != 0 {
 		t.Fatalf("作者的歷史不含隱藏的（舊行為）：%d", len(mine.Reviews))
 	}
 	if _, err := f.module.GetReview(ctx, uuid.UUID{}, 0); kindOf(err) != apperr.KindNotFound {
@@ -593,6 +593,127 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 	}
 	if _, err := f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判", SourceRef: "case-1"}); err != nil {
 		t.Fatalf("來源相符可還原：%v", err)
+	}
+}
+
+// ListMyReviews 帶 order_item_id 只回那個訂單項目的評價；不存在的項目回空；不帶時回全部。
+func TestListMyReviewsFiltersByOrderItem(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	author := f.newBuyer(t)
+	r1 := f.submit(t, author, storeID, 700, 5, "好")
+	r2 := f.submit(t, author, storeID, 701, 4, "不錯")
+
+	one := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r1.OrderItemID, nil, 50))
+	if !sameIDs(ids(one), r1.ID) {
+		t.Fatalf("帶 r1 的訂單項目只回 r1：%v", ids(one))
+	}
+	two := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r2.OrderItemID, nil, 50))
+	if !sameIDs(ids(two), r2.ID) {
+		t.Fatalf("帶 r2 的訂單項目只回 r2：%v", ids(two))
+	}
+	if none := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, r2.OrderItemID+999999, nil, 50)); len(none.Reviews) != 0 {
+		t.Fatalf("不存在的訂單項目回空：%v", ids(none))
+	}
+	if all := must[review.Page](t)(f.module.ListMyReviews(ctx, author.BuyerID, 0, nil, 50)); !sameIDs(ids(all), r2.ID, r1.ID) {
+		t.Fatalf("不帶篩選回全部（新到舊）：%v", ids(all))
+	}
+}
+
+// ReviewStore 不套公開可讀述詞：隱藏與作者刪帳中的評價仍回所屬的店（Public 為 false），不存在才是 NotFound。
+func TestReviewStoreIgnoresVisibilityAndReportsIt(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID := f.exposableStore(t)
+	r := f.submit(t, f.newBuyer(t), storeID, 700, 5, "好")
+	got := must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r.ID))
+	if got.StoreID != storeID || !got.Public {
+		t.Fatalf("公開的評價：%+v", got)
+	}
+	hide(t, f, r.ID)
+	got = must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r.ID))
+	if got.StoreID != storeID || got.Public {
+		t.Fatalf("隱藏的評價仍回店家、Public=false：%+v", got)
+	}
+	r2 := f.submit(t, f.newBuyer(t), storeID, 700, 1, "差")
+	if err := f.buyers.BeginDeletion(ctx, r2.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+	got = must[review.ReviewStore](t)(f.module.ReviewStore(ctx, r2.ID))
+	if got.StoreID != storeID || got.Public {
+		t.Fatalf("作者刪帳中的評價仍回店家、Public=false：%+v", got)
+	}
+	if _, err := f.module.ReviewStore(ctx, uuid.UUID{}); kindOf(err) != apperr.KindNotFound {
+		t.Fatalf("不存在：%v", err)
+	}
+}
+
+// 商品統計與公開列表同一個述詞：隱藏、作者刪帳中的評價不計，其他商品的評價不混入，沒有評價是 0。
+func TestProductStatsExcludeWhatThePublicListExcludes(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	store := f.exposableStore(t)
+	f.submit(t, f.newBuyer(t), store, 710, 5, "")
+	f.submit(t, f.newBuyer(t), store, 710, 4, "")
+	hidden := f.submit(t, f.newBuyer(t), store, 710, 1, "")
+	leaving := f.submit(t, f.newBuyer(t), store, 710, 2, "")
+	f.submit(t, f.newBuyer(t), store, 711, 1, "")
+	hide(t, f, hidden.ID)
+	if err := f.buyers.BeginDeletion(ctx, leaving.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+
+	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 710))
+	if st.Count != 2 || st.Average != 4.5 || st.Distribution != [5]int64{0, 0, 0, 1, 1} {
+		t.Fatalf("只計公開可讀的兩則（分佈同一個述詞）：%+v", st)
+	}
+	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 710, 0, review.Filter{}, nil, 50))
+	if int64(len(page.Reviews)) != st.Count {
+		t.Fatalf("統計與公開列表不一致：%d vs %d", len(page.Reviews), st.Count)
+	}
+	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 712)); none.Count != 0 || none.Average != 0 || none.Distribution != [5]int64{} {
+		t.Fatalf("沒有評價是 0：%+v", none)
+	}
+}
+
+// 商品統計的附圖筆數與公開列表的 with_images 篩選同一個條件：隱藏、作者刪帳中的附圖評價不計，其他商品的不混入，沒有附圖是 0。
+func TestProductStatsWithImagesCountMatchesTheWithImagesFilter(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	store := f.exposableStore(t)
+	submitImg := func(product int64) review.Review {
+		b := f.newBuyer(t)
+		it := f.order(b, store, product)
+		tokens, _ := f.stage(t, b, 1)
+		return must[review.Review](t)(f.module.Submit(ctx, review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 4, StagedTokens: tokens}))
+	}
+	submitImg(730)
+	submitImg(730)
+	hidden := submitImg(730)
+	leaving := submitImg(730)
+	submitImg(731)
+	f.submit(t, f.newBuyer(t), store, 730, 5, "")
+	f.submit(t, f.newBuyer(t), store, 732, 5, "")
+	hide(t, f, hidden.ID)
+	if err := f.buyers.BeginDeletion(ctx, leaving.BuyerID); err != nil {
+		t.Fatal(err)
+	}
+
+	st := must[review.ProductStats](t)(f.module.ProductStats(ctx, 730))
+	if st.Count != 3 || st.WithImagesCount != 2 {
+		t.Fatalf("公開可讀 3 則、其中附圖 2 則：%+v", st)
+	}
+	page := must[review.Page](t)(f.module.ListProductReviews(ctx, 730, 0, review.Filter{WithImages: true}, nil, 50))
+	if int64(len(page.Reviews)) != st.WithImagesCount {
+		t.Fatalf("附圖筆數與 with_images 列表不一致：%d vs %d", len(page.Reviews), st.WithImagesCount)
+	}
+	if none := must[review.ProductStats](t)(f.module.ProductStats(ctx, 732)); none.Count != 1 || none.WithImagesCount != 0 {
+		t.Fatalf("沒有附圖是 0：%+v", none)
 	}
 }
 

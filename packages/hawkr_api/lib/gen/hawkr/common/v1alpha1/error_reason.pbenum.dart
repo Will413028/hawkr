@@ -27,8 +27,10 @@ class ErrorReason extends $pb.ProtobufEnum {
   /// 依據的版本已經過時：修改時帶的 etag 與目前的不符（搭配 aborted），或以 key 建立時那筆已經存在
   /// （搭配 already_exists）。client 保留使用者的輸入，並顯示最新的版本讓使用者對照後再送出
   /// （ADR 2026-09-25-optimistic-concurrency-etag）。ErrorInfo.metadata 的 conflictTarget 可以說是哪一個物件過時，值由各 API 定義、
-  /// client 不認得時照一般版本衝突處理。商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
+  /// client 不認得時照一般版本衝突處理。
+  /// 商家治理（SellerGovernanceAdminService）：`report` 是請求帶的通報 etag 過時，`case` 是案件指令帶的案件 etag 過時，
   /// `target_case` 是分案或移動要加入的案件不成立（版本前進或已關閉），`category_case_opened` 是分案或移動要開新案件、而這個類別剛有了進行中的案件。`authority_order` 是主管機關來函的指令（完成、延長保存、記下告知）帶的來函 etag 過時。
+  /// 採購（BuyerProcurementAppService、SellerProcurementAppService）：`request_revision` 是需求已被改版（expected_revision_id 過時），`candidate_set` 是候選集已不是需求現行有效的那一個，`publication_approval` 是發布核准已過時（已執行、已過期、版本不符、對應的需求版本或回價期限已不能發布），`publication` 是買家畫面上的詢價內容與賣家報價時依據的那份不同，`seller_response` 是賣家回價的版本已不是目前的（改價、撤回，或帶「尚無正式回價」卻已有一版；client 必須明確告知使用者報價已變動，不得靜默改用最新版重送），`run` 是取消用的 run 版本過時。
   static const ErrorReason VERSION_CONFLICT =
       ErrorReason._(1, _omitEnumNames ? '' : 'VERSION_CONFLICT');
 
@@ -106,6 +108,140 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason CONTENT_TAKEDOWN_ACTIVE =
       ErrorReason._(14, _omitEnumNames ? '' : 'CONTENT_TAKEDOWN_ACTIVE');
 
+  /// 這個訂單項目已經有評價（搭配 already_exists）：一個訂單項目至多一則評價，評價建立後不能修改。已有的評價可能已被平台隱藏，
+  /// 隱藏的評價不在 ReviewAppService.ListMyReviews 的結果中：client 顯示「已評價」並不再提供寫評價入口，不要再開寫評價，也不要依賴 ListMyReviews 找回那則評價。
+  /// ReviewAppService.CreateReview。
+  static const ErrorReason REVIEW_ALREADY_EXISTS =
+      ErrorReason._(15, _omitEnumNames ? '' : 'REVIEW_ALREADY_EXISTS');
+
+  /// 訂單目前不能評價（搭配 failed_precondition）：只有已完成的訂單能評價。client 顯示 LocalizedMessage，不提供評價入口。
+  /// ReviewAppService.CreateReview。
+  static const ErrorReason ORDER_NOT_REVIEWABLE =
+      ErrorReason._(16, _omitEnumNames ? '' : 'ORDER_NOT_REVIEWABLE');
+
+  /// 訂單已超過評價期限（搭配 failed_precondition）：訂單完成後 30 天內才能評價。client 顯示 LocalizedMessage，不再提供評價入口。
+  /// ReviewAppService.CreateReview。
+  static const ErrorReason REVIEW_WINDOW_EXPIRED =
+      ErrorReason._(17, _omitEnumNames ? '' : 'REVIEW_WINDOW_EXPIRED');
+
+  /// 這則評價目前不能回覆（搭配 failed_precondition）：被平台隱藏、作者已離開，或店家的回覆被下架。client 顯示 LocalizedMessage，重讀評價列表。
+  /// ReviewAppService.ReplyReview。
+  static const ErrorReason REVIEW_NOT_REPLYABLE =
+      ErrorReason._(18, _omitEnumNames ? '' : 'REVIEW_NOT_REPLYABLE');
+
+  /// 不能傳訊息給自己（搭配 invalid_argument）：買家帳號與店家帳號是同一個帳號。client 不提供對自己的店傳訊息的入口，顯示 LocalizedMessage。
+  /// ChatAppService.SendMessageToStore、SendMessageToBuyer。
+  static const ErrorReason SELF_MESSAGE_NOT_ALLOWED =
+      ErrorReason._(19, _omitEnumNames ? '' : 'SELF_MESSAGE_NOT_ALLOWED');
+
+  /// 這家店已停業，無法傳送訊息（搭配 failed_precondition）：店家狀態是已關閉；等待刪除的店仍可聊天。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer、StreamStoreEvents（店家串流重新驗證時店已不在或換了一家）。
+  static const ErrorReason STORE_CLOSED =
+      ErrorReason._(20, _omitEnumNames ? '' : 'STORE_CLOSED');
+
+  /// 買家與店家之間任一方向有封鎖，而且沒有進行中的訂單或售後（搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  static const ErrorReason CHAT_BLOCKED =
+      ErrorReason._(21, _omitEnumNames ? '' : 'CHAT_BLOCKED');
+
+  /// 對方的帳號已刪除（買家已關閉或店家已退場，搭配 failed_precondition）。client 顯示 LocalizedMessage，輸入框改為唯讀。
+  /// ChatAppService.SendMessage、SendMessageToStore、SendMessageToBuyer。
+  static const ErrorReason RECEIVER_DELETED =
+      ErrorReason._(22, _omitEnumNames ? '' : 'RECEIVER_DELETED');
+
+  /// 同店已有同名標籤（搭配 already_exists）：標籤名稱在一家店內不能重複。client 顯示 LocalizedMessage，留在輸入框讓店家改名。
+  /// CrmAppService.CreateTag、UpdateTag。
+  static const ErrorReason CRM_TAG_NAME_TAKEN =
+      ErrorReason._(23, _omitEnumNames ? '' : 'CRM_TAG_NAME_TAKEN');
+
+  /// 標籤數量已達上限（搭配 failed_precondition）：每家店最多 200 個標籤、每位客戶最多 20 個標籤。client 顯示 LocalizedMessage，不再提供新增入口。
+  /// CrmAppService.CreateTag、AddCustomerTags。
+  static const ErrorReason CRM_TAG_LIMIT =
+      ErrorReason._(24, _omitEnumNames ? '' : 'CRM_TAG_LIMIT');
+
+  /// 串流的 cursor 早於伺服器保留的事件範圍（搭配 failed_precondition）：procurement 的 server streaming（WatchRun）。
+  /// client 放棄接續，改讀 GetRuntimeSnapshot 重建畫面。assistant 的 WatchAssistantTurn 不用這個值：輪次被清除回 not_found。
+  static const ErrorReason REPLAY_CURSOR_EXPIRED =
+      ErrorReason._(25, _omitEnumNames ? '' : 'REPLAY_CURSOR_EXPIRED');
+
+  /// 串流的 cursor 超前於最新的事件（搭配 failed_precondition）：assistant 與 procurement 的 server streaming（WatchAssistantTurn、WatchRun）。
+  /// client 帶了不是伺服器發出的 cursor；放棄接續，procurement 改讀 GetRuntimeSnapshot，助理重新送出。
+  static const ErrorReason REPLAY_CURSOR_AHEAD =
+      ErrorReason._(26, _omitEnumNames ? '' : 'REPLAY_CURSOR_AHEAD');
+
+  /// 採購需求的必填欄位還沒有填滿，不能搜尋候選（搭配 failed_precondition）：StartCandidateSearch。client 回到釐清問答。
+  static const ErrorReason REQUIREMENT_NOT_READY =
+      ErrorReason._(27, _omitEnumNames ? '' : 'REQUIREMENT_NOT_READY');
+
+  /// 需求有一個待回覆的中斷（run 停在等待輸入）（搭配 failed_precondition）：SubmitAnswer、Rewind 在這期間不能寫入，
+  /// 否則中斷會被孤立。client 改用 ResumeRun 回覆，或 CancelRun 取消。
+  static const ErrorReason APPROVAL_PENDING =
+      ErrorReason._(28, _omitEnumNames ? '' : 'APPROVAL_PENDING');
+
+  /// 要回覆的中斷已經被回覆過（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+  static const ErrorReason APPROVAL_ALREADY_RESOLVED =
+      ErrorReason._(29, _omitEnumNames ? '' : 'APPROVAL_ALREADY_RESOLVED');
+
+  /// run 的狀態不允許這個命令，因為它已不在進行中（搭配 failed_precondition）：ResumeRun。client 重讀 GetSnapshot。
+  static const ErrorReason RUN_NOT_ACTIVE =
+      ErrorReason._(30, _omitEnumNames ? '' : 'RUN_NOT_ACTIVE');
+
+  /// 被接受的賣家回價版本已過有效期（搭配 failed_precondition）：AcceptSellerQuote。不可接受，也不自動改接受別版。
+  static const ErrorReason RFQ_RESPONSE_EXPIRED =
+      ErrorReason._(31, _omitEnumNames ? '' : 'RFQ_RESPONSE_EXPIRED');
+
+  /// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
+  /// SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
+  static const ErrorReason RFQ_RECIPIENT_CLOSED =
+      ErrorReason._(32, _omitEnumNames ? '' : 'RFQ_RECIPIENT_CLOSED');
+
+  /// 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，
+  /// client 引導買家去付款，不是叫他重新接受。
+  static const ErrorReason RFQ_CHECKOUT_ALREADY_ACTIVE =
+      ErrorReason._(33, _omitEnumNames ? '' : 'RFQ_CHECKOUT_ALREADY_ACTIVE');
+
+  /// 本期的採購額度已用完（搭配 resource_exhausted）：BuyerProcurementAppService.SubmitTurn，以及串流裡 run 失敗的 error 事件。
+  /// ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
+  static const ErrorReason AGENT_MONTHLY_QUOTA_EXCEEDED =
+      ErrorReason._(35, _omitEnumNames ? '' : 'AGENT_MONTHLY_QUOTA_EXCEEDED');
+
+  /// 本週的 AI 修圖額度已用完（搭配 resource_exhausted）：ImageAiAppService.TransformImage。client 顯示額度用完、
+  /// 不提供重試。ErrorInfo.metadata 的 remaining 是剩餘次數（此時是 0），resetTime 是下一期開始的時間（RFC 3339，UTC）。
+  /// 同時進行的修圖超過上限也回 resource_exhausted，但沒有這個 reason，帶 RetryInfo，稍後可再試。
+  static const ErrorReason IMAGE_QUOTA_EXCEEDED =
+      ErrorReason._(36, _omitEnumNames ? '' : 'IMAGE_QUOTA_EXCEEDED');
+
+  /// 圖片或提示詞被安全性檢查擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
+  /// client 請使用者換一張圖或改提示詞，不自動重試。額度退回。
+  static const ErrorReason IMAGE_SAFETY_BLOCKED =
+      ErrorReason._(37, _omitEnumNames ? '' : 'IMAGE_SAFETY_BLOCKED');
+
+  /// 圖片涉及著作權複誦而被擋下（搭配 invalid_argument）：TransformImage。同一份輸入重送結果相同，
+  /// client 請使用者換一張圖，不自動重試。額度退回。
+  static const ErrorReason IMAGE_RECITATION_BLOCKED =
+      ErrorReason._(38, _omitEnumNames ? '' : 'IMAGE_RECITATION_BLOCKED');
+
+  /// 模型沒有產出圖片（搭配 unavailable）：TransformImage。這是模型的非決定性行為，同一份輸入重送可能成功，
+  /// client 可以讓使用者直接重試。額度退回。
+  static const ErrorReason IMAGE_NOT_PRODUCED =
+      ErrorReason._(39, _omitEnumNames ? '' : 'IMAGE_NOT_PRODUCED');
+
+  /// 這個對話已經有一輪助理回覆進行中（搭配 failed_precondition）：AssistantAppService.SendAssistantMessage。同一個對話同時只允許一輪，
+  /// 兩輪交錯會把事件寫進同一段歷史。client 等這一輪的串流收到 finished 或 error 後再送出，或改開新的對話（session_id 空字串）。
+  static const ErrorReason ASSISTANT_TURN_IN_PROGRESS =
+      ErrorReason._(40, _omitEnumNames ? '' : 'ASSISTANT_TURN_IN_PROGRESS');
+
+  /// 助理這一輪失敗（用於 AssistantStreamError.reason）：WatchAssistantTurn 串流裡 error 事件的原因，沒有搭配的 Connect code
+  /// （事件在串流內）。失敗的細分（沒有任何輸出、已輸出部分文字後中斷）只進伺服器 log。client 顯示 localized_message，
+  /// 可以讓使用者重新送出。
+  static const ErrorReason ASSISTANT_TURN_FAILED =
+      ErrorReason._(41, _omitEnumNames ? '' : 'ASSISTANT_TURN_FAILED');
+
+  /// 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch、ResumeRun。同一個需求同時只允許一個進行中的 run
+  /// （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
+  static const ErrorReason PROCUREMENT_RUN_IN_PROGRESS =
+      ErrorReason._(42, _omitEnumNames ? '' : 'PROCUREMENT_RUN_IN_PROGRESS');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -122,10 +258,37 @@ class ErrorReason extends $pb.ProtobufEnum {
     REAUTHENTICATION_REQUIRED,
     CONTACT_EMAIL_REQUIRED,
     CONTENT_TAKEDOWN_ACTIVE,
+    REVIEW_ALREADY_EXISTS,
+    ORDER_NOT_REVIEWABLE,
+    REVIEW_WINDOW_EXPIRED,
+    REVIEW_NOT_REPLYABLE,
+    SELF_MESSAGE_NOT_ALLOWED,
+    STORE_CLOSED,
+    CHAT_BLOCKED,
+    RECEIVER_DELETED,
+    CRM_TAG_NAME_TAKEN,
+    CRM_TAG_LIMIT,
+    REPLAY_CURSOR_EXPIRED,
+    REPLAY_CURSOR_AHEAD,
+    REQUIREMENT_NOT_READY,
+    APPROVAL_PENDING,
+    APPROVAL_ALREADY_RESOLVED,
+    RUN_NOT_ACTIVE,
+    RFQ_RESPONSE_EXPIRED,
+    RFQ_RECIPIENT_CLOSED,
+    RFQ_CHECKOUT_ALREADY_ACTIVE,
+    AGENT_MONTHLY_QUOTA_EXCEEDED,
+    IMAGE_QUOTA_EXCEEDED,
+    IMAGE_SAFETY_BLOCKED,
+    IMAGE_RECITATION_BLOCKED,
+    IMAGE_NOT_PRODUCED,
+    ASSISTANT_TURN_IN_PROGRESS,
+    ASSISTANT_TURN_FAILED,
+    PROCUREMENT_RUN_IN_PROGRESS,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 14);
+      $pb.ProtobufEnum.$_initByValueList(values, 42);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

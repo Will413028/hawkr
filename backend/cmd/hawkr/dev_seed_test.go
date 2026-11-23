@@ -60,7 +60,7 @@ func mustInt(t *testing.T, s string) int64 {
 }
 
 // devSeedAccountIDs 要與 01-account.sql 的 seed_accounts 雙向一致：01 多一個帳號，它的刪帳申請不會被前提檢查擋下；這裡多一個，前提檢查會無端拒絕。
-// 帶賣家店家的帳號要與 devSeedStores 的店家與 store_id 逐一對上（SELLER 角色的 source_id 是店家）。
+// 帶賣家店家的帳號要與 devSeedStores 的店家與 store_id 逐一對上（01 的 seller_store_id 是種子店家）。
 func TestDevSeedAccountIDsMatchTheAccountSeed(t *testing.T) {
 	rows := seedTable(t, accountSeedSQL(t), "seed_accounts (id, email, seller_store_id)")
 	var got []int64
@@ -87,7 +87,7 @@ func TestDevSeedAccountIDsMatchTheAccountSeed(t *testing.T) {
 	}
 	for account, store := range stores {
 		if roleStore[account] != store {
-			t.Errorf("帳號 %d：01 的 SELLER source_id = %d，devSeedStores 的 store_id = %d", account, roleStore[account], store)
+			t.Errorf("帳號 %d：01 的 seller_store_id = %d，devSeedStores 的 store_id = %d", account, roleStore[account], store)
 		}
 	}
 }

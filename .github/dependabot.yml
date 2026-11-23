@@ -201,32 +201,6 @@ updates:
           - "patch"
   - package-ecosystem: "gomod"
     target-branch: "dev"
-    directory: "/backend/services/crm-service"
-    schedule:
-      interval: "weekly"
-    cooldown:
-      default-days: 14
-      semver-major-days: 30
-    groups:
-      gomod-services-crm-service-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "gomod"
-    target-branch: "dev"
-    directory: "/backend/services/im-service"
-    schedule:
-      interval: "weekly"
-    cooldown:
-      default-days: 14
-      semver-major-days: 30
-    groups:
-      gomod-services-im-service-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "gomod"
-    target-branch: "dev"
     directory: "/backend/services/invoice-service"
     schedule:
       interval: "weekly"
@@ -248,32 +222,6 @@ updates:
       semver-major-days: 30
     groups:
       gomod-services-notification-service-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "gomod"
-    target-branch: "dev"
-    directory: "/backend/services/review-service"
-    schedule:
-      interval: "weekly"
-    cooldown:
-      default-days: 14
-      semver-major-days: 30
-    groups:
-      gomod-services-review-service-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
-  - package-ecosystem: "gomod"
-    target-branch: "dev"
-    directory: "/backend/services/seller-service"
-    schedule:
-      interval: "weekly"
-    cooldown:
-      default-days: 14
-      semver-major-days: 30
-    groups:
-      gomod-services-seller-service-minor-patch:
         update-types:
           - "minor"
           - "patch"

@@ -49,17 +49,20 @@ const ReportOutcome$json = {
   '1': 'ReportOutcome',
   '2': [
     {'1': 'REPORT_OUTCOME_UNSPECIFIED', '2': 0},
-    {'1': 'REPORT_OUTCOME_PENDING', '2': 1},
     {'1': 'REPORT_OUTCOME_VIOLATION', '2': 2},
     {'1': 'REPORT_OUTCOME_NO_VIOLATION', '2': 3},
   ],
+  '4': [
+    {'1': 1, '2': 1},
+  ],
+  '5': ['REPORT_OUTCOME_PENDING'],
 };
 
 /// Descriptor for `ReportOutcome`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List reportOutcomeDescriptor = $convert.base64Decode(
-    'Cg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASGgoWUkVQT1'
-    'JUX09VVENPTUVfUEVORElORxABEhwKGFJFUE9SVF9PVVRDT01FX1ZJT0xBVElPThACEh8KG1JF'
-    'UE9SVF9PVVRDT01FX05PX1ZJT0xBVElPThAD');
+    'Cg1SZXBvcnRPdXRjb21lEh4KGlJFUE9SVF9PVVRDT01FX1VOU1BFQ0lGSUVEEAASHAoYUkVQT1'
+    'JUX09VVENPTUVfVklPTEFUSU9OEAISHwobUkVQT1JUX09VVENPTUVfTk9fVklPTEFUSU9OEAMi'
+    'BAgBEAEqFlJFUE9SVF9PVVRDT01FX1BFTkRJTkc=');
 
 @$core.Deprecated('Use reportTargetDescriptor instead')
 const ReportTarget$json = {
@@ -113,10 +116,10 @@ const SubmitReportRequest$json = {
 /// Descriptor for `SubmitReportRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List submitReportRequestDescriptor = $convert.base64Decode(
     'ChNTdWJtaXRSZXBvcnRSZXF1ZXN0EkQKBnRhcmdldBgBIAEoCzInLmhhd2tyLm1vZGVyYXRpb2'
-    '4udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQJSBnRhcmdldBJGCghjYXRlZ29yeRgCIAEoDjIl'
-    'Lmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUID4EECUghjYXRlZ29yeRIgCg'
-    'tkZXNjcmlwdGlvbhgDIAEoCVILZGVzY3JpcHRpb24SJwoKcmVxdWVzdF9pZBgEIAEoCUII4ozP'
-    '1wgCCAFSCXJlcXVlc3RJZA==');
+    '4udjFhbHBoYTEuUmVwb3J0VGFyZ2V0QgPgQQJSBnRhcmdldBJSCghjYXRlZ29yeRgCIAEoDjIl'
+    'Lmhhd2tyLmNvbW1vbi52MWFscGhhMS5Qb2xpY3lDYXRlZ29yeUIP4EECirUYCA4PEBEEAQgNUg'
+    'hjYXRlZ29yeRIgCgtkZXNjcmlwdGlvbhgDIAEoCVILZGVzY3JpcHRpb24SJwoKcmVxdWVzdF9p'
+    'ZBgEIAEoCUII4ozP1wgCCAFSCXJlcXVlc3RJZA==');
 
 @$core.Deprecated('Use submitReportResponseDescriptor instead')
 const SubmitReportResponse$json = {
@@ -175,6 +178,44 @@ final $typed_data.Uint8List listMyReportsResponseDescriptor = $convert.base64Dec
     'ChVMaXN0TXlSZXBvcnRzUmVzcG9uc2USQQoHcmVwb3J0cxgBIAMoCzInLmhhd2tyLm1vZGVyYX'
     'Rpb24udjFhbHBoYTEuTXlSZXBvcnRJdGVtUgdyZXBvcnRzEiYKD25leHRfcGFnZV90b2tlbhgC'
     'IAEoCVINbmV4dFBhZ2VUb2tlbg==');
+
+@$core.Deprecated('Use listMyStoreReportsRequestDescriptor instead')
+const ListMyStoreReportsRequest$json = {
+  '1': 'ListMyStoreReportsRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyStoreReportsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyStoreReportsRequestDescriptor =
+    $convert.base64Decode(
+        'ChlMaXN0TXlTdG9yZVJlcG9ydHNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoBVIIcGFnZVNpem'
+        'USHQoKcGFnZV90b2tlbhgCIAEoCVIJcGFnZVRva2Vu');
+
+@$core.Deprecated('Use listMyStoreReportsResponseDescriptor instead')
+const ListMyStoreReportsResponse$json = {
+  '1': 'ListMyStoreReportsResponse',
+  '2': [
+    {
+      '1': 'reports',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.moderation.v1alpha1.MyReportItem',
+      '10': 'reports'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyStoreReportsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyStoreReportsResponseDescriptor =
+    $convert.base64Decode(
+        'ChpMaXN0TXlTdG9yZVJlcG9ydHNSZXNwb25zZRJBCgdyZXBvcnRzGAEgAygLMicuaGF3a3IubW'
+        '9kZXJhdGlvbi52MWFscGhhMS5NeVJlcG9ydEl0ZW1SB3JlcG9ydHMSJgoPbmV4dF9wYWdlX3Rv'
+        'a2VuGAIgASgJUg1uZXh0UGFnZVRva2Vu');
 
 @$core.Deprecated('Use myReportItemDescriptor instead')
 const MyReportItem$json = {
@@ -262,16 +303,22 @@ const CommunityReport$json = {
       '4': 1,
       '5': 14,
       '6': '.hawkr.moderation.v1alpha1.ReportOutcome',
-      '10': 'outcome'
+      '9': 0,
+      '10': 'outcome',
+      '17': true
     },
+  ],
+  '8': [
+    {'1': '_outcome'},
   ],
 };
 
 /// Descriptor for `CommunityReport`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List communityReportDescriptor = $convert.base64Decode(
     'Cg9Db21tdW5pdHlSZXBvcnQSPwoGdGFyZ2V0GAEgASgLMicuaGF3a3IubW9kZXJhdGlvbi52MW'
-    'FscGhhMS5SZXBvcnRUYXJnZXRSBnRhcmdldBJCCgdvdXRjb21lGAIgASgOMiguaGF3a3IubW9k'
-    'ZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lUgdvdXRjb21l');
+    'FscGhhMS5SZXBvcnRUYXJnZXRSBnRhcmdldBJHCgdvdXRjb21lGAIgASgOMiguaGF3a3IubW9k'
+    'ZXJhdGlvbi52MWFscGhhMS5SZXBvcnRPdXRjb21lSABSB291dGNvbWWIAQFCCgoIX291dGNvbW'
+    'U=');
 
 const $core.Map<$core.String, $core.dynamic> ModerationAppServiceBase$json = {
   '1': 'ModerationAppService',
@@ -285,6 +332,12 @@ const $core.Map<$core.String, $core.dynamic> ModerationAppServiceBase$json = {
       '1': 'ListMyReports',
       '2': '.hawkr.moderation.v1alpha1.ListMyReportsRequest',
       '3': '.hawkr.moderation.v1alpha1.ListMyReportsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'ListMyStoreReports',
+      '2': '.hawkr.moderation.v1alpha1.ListMyStoreReportsRequest',
+      '3': '.hawkr.moderation.v1alpha1.ListMyStoreReportsResponse',
       '4': {'34': 1},
     },
   ],
@@ -303,6 +356,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.moderation.v1alpha1.MyReportItem': MyReportItem$json,
   '.hawkr.moderation.v1alpha1.CommunityReport': CommunityReport$json,
   '.hawkr.seller.v1alpha1.StoreReport': $1.StoreReport$json,
+  '.hawkr.moderation.v1alpha1.ListMyStoreReportsRequest':
+      ListMyStoreReportsRequest$json,
+  '.hawkr.moderation.v1alpha1.ListMyStoreReportsResponse':
+      ListMyStoreReportsResponse$json,
 };
 
 /// Descriptor for `ModerationAppService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -311,4 +368,7 @@ final $typed_data.Uint8List moderationAppServiceDescriptor = $convert.base64Deco
     '9uLnYxYWxwaGExLlN1Ym1pdFJlcG9ydFJlcXVlc3QaLy5oYXdrci5tb2RlcmF0aW9uLnYxYWxw'
     'aGExLlN1Ym1pdFJlcG9ydFJlc3BvbnNlEncKDUxpc3RNeVJlcG9ydHMSLy5oYXdrci5tb2Rlcm'
     'F0aW9uLnYxYWxwaGExLkxpc3RNeVJlcG9ydHNSZXF1ZXN0GjAuaGF3a3IubW9kZXJhdGlvbi52'
-    'MWFscGhhMS5MaXN0TXlSZXBvcnRzUmVzcG9uc2UiA5ACAQ==');
+    'MWFscGhhMS5MaXN0TXlSZXBvcnRzUmVzcG9uc2UiA5ACARKGAQoSTGlzdE15U3RvcmVSZXBvcn'
+    'RzEjQuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlTdG9yZVJlcG9ydHNSZXF1ZXN0'
+    'GjUuaGF3a3IubW9kZXJhdGlvbi52MWFscGhhMS5MaXN0TXlTdG9yZVJlcG9ydHNSZXNwb25zZS'
+    'IDkAIB');

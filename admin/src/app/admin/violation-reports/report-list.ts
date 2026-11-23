@@ -11,12 +11,9 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/governance_pb";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import { ReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
+import { SELLER_CREATE_REPORT_REQUEST_CATEGORY } from "@hawkr/ui-text/accepted";
 import { type DeadlineView, deadlineView } from "@/lib/deadline";
-import {
-	ALL_CATEGORIES,
-	ASSESSABLE_CATEGORIES,
-	REPORTER_CATEGORIES,
-} from "@/lib/policy-category";
+import { ALL_CATEGORIES, ASSESSABLE_CATEGORIES } from "@/lib/policy-category";
 import { caseStatusText, reportStatusText } from "./report-text";
 
 // 商家通報清單（/admin/violation-reports）的純邏輯：分頁籤對應的伺服器請求與篩選選項、空狀態文字、欄位文字。
@@ -46,7 +43,7 @@ export const REPORT_LIST_TABS: readonly ReportListTab[] = [
 		key: "awaiting-triage",
 		label: "待分案",
 		source: "reports",
-		categories: REPORTER_CATEGORIES,
+		categories: SELLER_CREATE_REPORT_REQUEST_CATEGORY,
 		emptyText: "沒有待分案的通報",
 		emptyFilteredText: "沒有待分案的通報",
 	},

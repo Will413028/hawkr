@@ -46,8 +46,8 @@ test("list-like async controls retain per-action pending identity", () => {
 	const customerDetail = source(
 		"features/seller-center/customers/CustomerDetailPanel.tsx",
 	);
-	assert.match(customerDetail, /isLoading=\{pendingType === opt\.value\}/);
-	assert.match(customerDetail, /loadingLabel=\{opt\.loadingLabel\}/);
+	assert.match(customerDetail, /isLoading=\{pendingType === opt\}/);
+	assert.match(customerDetail, /loadingLabel=\{t\("updatingCategory"\)\}/);
 
 	const tagEditor = source(
 		"features/seller-center/customers/CustomerTagEditor.tsx",
@@ -76,9 +76,9 @@ test("list-like async controls retain per-action pending identity", () => {
 		"adding a tag must not unmount the initiating suggestion while pending",
 	);
 	assert.ok(
-		tagEditor.indexOf("if (tag.id) await removeCustomerTag") <
+		tagEditor.indexOf("await removeCustomerTag") <
 			tagEditor.indexOf(
-				"setTags((prev) => prev.filter",
+				"applyCustomer(customer)",
 				tagEditor.indexOf("const remove"),
 			),
 		"removing a tag keeps its initiating Button mounted until the request settles",

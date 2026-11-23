@@ -1,9 +1,6 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as pb;
 import 'package:hawkr_api/images.dart';
 
-/// 已刪除的買家顯示的墓碑字串，與舊 buyer-service 及單體 legacy adapter 的字面值相同。
-const deletedBuyerLabel = '已刪除帳號';
-
 /// 賣家契約的 `BuyerCard`（追蹤者名單與封鎖名單共用）：已刪除的買家只有 [id]。
 final class BuyerCardInfo {
   const BuyerCardInfo({

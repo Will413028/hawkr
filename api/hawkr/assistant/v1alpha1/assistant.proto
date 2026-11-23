@@ -1,0 +1,152 @@
+syntax = "proto3";
+
+// assistant 模組給前台的 API：買家的 AI 助理（訂單、物流追蹤、退貨政策、一般問答）。
+//
+// 送出與觀看分開（遷移計畫 A9-D12）：SendAssistantMessage 是 unary，伺服器受理後回輪次 ID；
+// WatchAssistantTurn 是 server streaming，只訂閱、不寫入。伺服器每條串流最長 100 秒就正常結束
+// （Vercel 的外部 rewrite 上限），client 以最後收到的 cursor 重新訂閱接續，不漏不重。
+// 串流結束時沒有收到 finished 或 error 事件，就是被截斷，要接續；收到了就是這一輪結束。
+//
+// 事件暫存在單體的記憶體裡（每輪一個只增不減的緩衝，有事件數上限；超過上限這一輪以 error 事件結束）：
+// 輪次 ID 不存在（含輪次結束超過保留期被清除、單體重啟後、不屬於呼叫者）回 NOT_FOUND，client 重新送出；緩衝從不覆蓋舊事件，所以沒有「cursor 過期」；
+// cursor 超前於最新事件（或不是伺服器發的值）回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_AHEAD。
+package hawkr.assistant.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/error_reason.proto";
+
+// AssistantAppService 是登入的買家的助理。身分取自 session，帳號沒有買家角色時回 permission_denied。
+service AssistantAppService {
+  // SendAssistantMessage 送出一則訊息，開始一輪助理回覆。伺服器受理後立刻回輪次 ID，回覆內容從
+  // WatchAssistantTurn 取得。session_id 空字串表示開新的對話。
+  // 每位買家同時進行中的輪次（跨對話）最多 2 輪、每分鐘最多送出 10 次，超過回 resource_exhausted，
+  // 沒有 reason，帶 RetryInfo；以同一個 client_request_id 重送已受理的請求不計入上限。
+  rpc SendAssistantMessage(SendAssistantMessageRequest) returns (SendAssistantMessageResponse);
+
+  // WatchAssistantTurn 訂閱一輪的事件，從 cursor 之後開始（空字串表示從頭）。只讀；伺服器在這一輪結束
+  // （finished 或 error 事件之後）或滿 100 秒時結束串流。
+  rpc WatchAssistantTurn(WatchAssistantTurnRequest) returns (stream WatchAssistantTurnResponse);
+
+  // GetLatestAssistantSession 回傳呼叫者最近一次的對話與最近 100 則訊息；沒有對話時 session_id 是空字串。
+  rpc GetLatestAssistantSession(GetLatestAssistantSessionRequest) returns (GetLatestAssistantSessionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// AssistantTopic 是這一則訊息要助理處理的主題，由畫面上的入口決定。
+enum AssistantTopic {
+  ASSISTANT_TOPIC_UNSPECIFIED = 0;
+  // 查詢我的訂單。
+  ASSISTANT_TOPIC_ORDERS = 1;
+  // 查詢物流進度。
+  ASSISTANT_TOPIC_TRACKING = 2;
+  // 退貨政策；回覆是固定文案，不呼叫 LLM。
+  ASSISTANT_TOPIC_RETURN_POLICY = 3;
+  // 一般問答。
+  ASSISTANT_TOPIC_CHAT = 4;
+}
+
+// AssistantTool 是助理在回覆途中使用的工具；顯示文字在共用文案目錄。
+enum AssistantTool {
+  ASSISTANT_TOOL_UNSPECIFIED = 0;
+  // 查詢我的訂單清單。
+  ASSISTANT_TOOL_GET_MY_ORDERS = 1;
+  // 查詢單筆訂單的詳情。
+  ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL = 2;
+  // 查詢配送中包裹的物流狀態。
+  ASSISTANT_TOOL_TRACK_MY_PACKAGE = 3;
+}
+
+// AssistantMessageRole 是對話中一則訊息的發言者。
+enum AssistantMessageRole {
+  ASSISTANT_MESSAGE_ROLE_UNSPECIFIED = 0;
+  ASSISTANT_MESSAGE_ROLE_USER = 1;
+  ASSISTANT_MESSAGE_ROLE_ASSISTANT = 2;
+}
+
+message SendAssistantMessageRequest {
+  AssistantTopic topic = 1 [(google.api.field_behavior) = REQUIRED];
+  // 要接續的對話；空字串表示開新的對話。
+  string session_id = 2;
+  string message = 3 [(google.api.field_behavior) = REQUIRED];
+  // 附帶的圖片網址；沒有圖時不設。
+  optional string image_url = 4;
+  // 冪等鍵（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送，原樣回第一次的回應（turn_id 與 session_id 不變），不開新的一輪；內容不同回 INVALID_ARGUMENT。
+  // 鍵存在 monolith 的記憶體，重啟後遺失：重啟後重送會開新的一輪。
+  string client_request_id = 5 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message SendAssistantMessageResponse {
+  // 這一輪的 ID，傳給 WatchAssistantTurn。
+  string turn_id = 1;
+  // 這一輪所屬的對話；開新對話時是新建的 ID。
+  string session_id = 2;
+}
+
+message WatchAssistantTurnRequest {
+  string turn_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 上一次收到的事件的 cursor，從它之後接續；空字串表示從這一輪的第一個事件開始。client 當成不透明的字串。
+  string cursor = 2;
+}
+
+// WatchAssistantTurnResponse 是串流上的一個事件。
+message WatchAssistantTurnResponse {
+  // 這個事件的位置。client 記下最後收到的值，重新訂閱時帶回。
+  string cursor = 1;
+  oneof event {
+    // 回覆文字的增量，client 依序串接。
+    AssistantTextDelta text = 2;
+    // 工具執行的結果。
+    AssistantToolResult tool_result = 3;
+    // 這一輪正常結束。
+    AssistantFinished finished = 4;
+    // 這一輪失敗。
+    AssistantStreamError error = 5;
+  }
+}
+
+message AssistantTextDelta {
+  string text = 1;
+}
+
+// AssistantToolResult 說明助理使用了哪個工具，以及它有沒有成功；工具的參數與回傳內容不對外。
+message AssistantToolResult {
+  // 使用的工具；一定是具體的值（不會是 UNSPECIFIED）。
+  AssistantTool tool = 1;
+  // 工具成功執行。false 時助理仍會接著回覆。
+  bool succeeded = 2;
+}
+
+message AssistantFinished {
+  // 這一輪所屬的對話。
+  string session_id = 1;
+}
+
+// AssistantStreamError 是這一輪的失敗，之後沒有其他事件。
+message AssistantStreamError {
+  hawkr.common.v1alpha1.ErrorReason reason = 1;
+  // 給使用者看的文字（zh-TW 或 en，依請求的語系）。
+  string localized_message = 2;
+  // 與 google.rpc.ErrorInfo.metadata 同規則：key 是 lowerCamelCase。
+  map<string, string> metadata = 3;
+}
+
+message GetLatestAssistantSessionRequest {}
+
+message GetLatestAssistantSessionResponse {
+  string session_id = 1;
+  // 最近的 100 則訊息（更舊的不回、不分頁），時間由舊到新。伺服器只讀最近的一段 event，
+  // tool 呼叫特別密集的對話可能不足 100 則。
+  repeated AssistantMessage messages = 2;
+}
+
+message AssistantMessage {
+  AssistantMessageRole role = 1;
+  string text = 2;
+  google.protobuf.Timestamp create_time = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

@@ -1,33 +1,31 @@
 "use client";
 
-import type { SellerCustomerType } from "@/lib/seller/repo";
+import {
+	CustomerSort,
+	CustomerType,
+} from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import { createLocalPrivateStore } from "@/lib/state/createLocalPrivateStore";
 
-export type SellerCustomersSort =
-	| "total_spent"
-	| "order_count"
-	| "last_order_at";
+/** 篩選的分類：UNSPECIFIED 是「全部」（請求不帶 type）。 */
+export type SellerCustomersTypeFilter = CustomerType;
 
 type SellerCustomersPersistedState = {
-	customerType: "" | SellerCustomerType;
-	search: string;
-	sortBy: SellerCustomersSort;
+	customerType: CustomerType;
+	sort: CustomerSort;
 	tagId: string | null;
 };
 
 type SellerCustomersUiState = SellerCustomersPersistedState & {
 	activeCustomerId: string | null;
 	setActiveCustomerId: (id: string | null) => void;
-	setCustomerType: (customerType: "" | SellerCustomerType) => void;
-	setSearch: (search: string) => void;
-	setSortBy: (sortBy: SellerCustomersSort) => void;
+	setCustomerType: (customerType: CustomerType) => void;
+	setSort: (sort: CustomerSort) => void;
 	setTagId: (tagId: string | null) => void;
 };
 
 const defaultState: SellerCustomersPersistedState = {
-	customerType: "",
-	search: "",
-	sortBy: "total_spent",
+	customerType: CustomerType.UNSPECIFIED,
+	sort: CustomerSort.TOTAL_SPENT,
 	tagId: null,
 };
 
@@ -42,8 +40,7 @@ export const useSellerCustomersUiStore = createLocalPrivateStore<
 			set({ activeCustomerId }, false, "seller-customers/setActiveCustomerId"),
 		setCustomerType: (customerType) =>
 			set({ customerType }, false, "seller-customers/setCustomerType"),
-		setSearch: (search) => set({ search }, false, "seller-customers/setSearch"),
-		setSortBy: (sortBy) => set({ sortBy }, false, "seller-customers/setSortBy"),
+		setSort: (sort) => set({ sort }, false, "seller-customers/setSort"),
 		setTagId: (tagId) => set({ tagId }, false, "seller-customers/setTagId"),
 	}),
 	{
@@ -52,9 +49,10 @@ export const useSellerCustomersUiStore = createLocalPrivateStore<
 		defaults: defaultState,
 		partialize: (state) => ({
 			customerType: state.customerType,
-			search: state.search,
-			sortBy: state.sortBy,
+			sort: state.sort,
 			tagId: state.tagId,
 		}),
+		// 版本 0 存的是字串分類與排序（含 blocklist、last_order_at）與搜尋字串，契約已沒有這些值：丟掉，回預設。
+		persistOptions: { version: 1, migrate: () => defaultState },
 	},
 );

@@ -8,8 +8,6 @@ import (
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	"google.golang.org/grpc"
-	grpccodes "google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
 )
 
 func storeGateHolder(getSeller, meta *atomic.Int32, m map[int64]*sellerpb.SellerMeta) *Holder {
@@ -57,44 +55,6 @@ func TestCheckStoreGate_RPCCountAndMode(t *testing.T) {
 				t.Fatalf("GetSeller=%d meta=%d, want %d/%d", g.Load(), m.Load(), tc.wantGet, tc.wantMetaN)
 			}
 		})
-	}
-}
-
-func TestChatFrameTargetGate_CachesDecisionsButNotErrors(t *testing.T) {
-	var g, m atomic.Int32
-	h := storeGateHolder(&g, &m, map[int64]*sellerpb.SellerMeta{100: {HasPublicCard: true}, 200: {}})
-	gate := h.chatFrameTargetGate(context.Background(), 1)
-	for i := 0; i < 5; i++ {
-		if !gate("100") {
-			t.Fatal("100 should be allowed")
-		}
-		if gate("200") {
-			t.Fatal("200 (never public) should be denied")
-		}
-	}
-	if m.Load() != 2 || g.Load() != 2 {
-		t.Fatalf("meta=%d getSeller=%d, want 2/2 (one check per target)", m.Load(), g.Load())
-	}
-	if gate("abc") || gate("0") {
-		t.Fatal("invalid ids must be denied")
-	}
-
-	var calls atomic.Int32
-	failing := &Holder{Seller: grpcclient.NewSellerClientForTest(&mockSellerServiceClient{
-		GetSellerFn: func(context.Context, *sellerpb.GetSellerRequest, ...grpc.CallOption) (*sellerpb.SellerResponse, error) {
-			calls.Add(1)
-			return nil, grpcstatus.Error(grpccodes.Unavailable, "down")
-		},
-	})}
-	g2 := failing.chatFrameTargetGate(context.Background(), 1)
-	if g2("100") || g2("100") {
-		t.Fatal("errors must deny")
-	}
-	if calls.Load() != 2 {
-		t.Fatalf("errors cached: calls=%d, want 2", calls.Load())
-	}
-	if !failing.chatFrameTargetGate(context.Background(), 2)("555") {
-		t.Fatal("seller frames pass through")
 	}
 }
 

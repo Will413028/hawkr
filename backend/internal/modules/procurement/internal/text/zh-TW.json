@@ -1,0 +1,342 @@
+{
+  "default": {
+    "confirm.budget": {
+      "message": "需向賣家確認能否符合 {budget} 元的單價",
+      "params": {
+        "budget": {
+          "type": "integer"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了單價預算、沒填單位。"
+    },
+    "confirm.budget_unit": {
+      "message": "需向賣家確認能否符合 {budget} 元／{unit} 的單價",
+      "params": {
+        "budget": {
+          "type": "integer"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了單價預算與單位。"
+    },
+    "confirm.delivery_city": {
+      "message": "需向賣家確認是否配送至{city}",
+      "params": {
+        "city": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：配送縣市。"
+    },
+    "confirm.delivery_date": {
+      "message": "需向賣家確認能否於 {date} 前到貨",
+      "params": {
+        "date": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：到貨日期（YYYY-MM-DD）。"
+    },
+    "confirm.quantity": {
+      "message": "需向賣家確認是否備有 {quantity} 的供應量",
+      "params": {
+        "quantity": {
+          "type": "integer"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了數量、沒填單位。"
+    },
+    "confirm.quantity_unit": {
+      "message": "需向賣家確認是否備有 {quantity} {unit} 的供應量",
+      "params": {
+        "quantity": {
+          "type": "integer"
+        },
+        "unit": {
+          "type": "string"
+        }
+      },
+      "description": "賣家需確認的事項：買家填了數量與單位。"
+    },
+    "fact.pair": {
+      "message": "{label}：{content}",
+      "params": {
+        "content": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "description": "「欄位名稱與值」的並列寫法，用在本輪記下的事實與被拒欄位的原因。"
+    },
+    "list.separator": {
+      "message": "、",
+      "description": "多個項目並列時的分隔詞（zh-TW 頓號，en 逗號加空格）。"
+    },
+    "option.describe": {
+      "message": "自行描述品項",
+      "description": "品項消歧問題卡的選項：沒有候選時，請買家自行描述。"
+    },
+    "option.other": {
+      "message": "其他（自己輸入）",
+      "description": "品項消歧問題卡固定附加的選項：有候選時的「其他」。"
+    },
+    "prompt.budget_per_unit": {
+      "message": "單價預算大概抓多少？",
+      "description": "問題卡問句：單價預算。"
+    },
+    "prompt.delivery_city": {
+      "message": "要送到哪個城市呢？",
+      "description": "問題卡問句：配送城市。"
+    },
+    "prompt.delivery_date": {
+      "message": "希望什麼時候送達？",
+      "description": "問題卡問句：到貨日期。"
+    },
+    "prompt.item": {
+      "message": "這次想採購什麼品項？",
+      "description": "問題卡問句：品項。"
+    },
+    "prompt.item_choices": {
+      "message": "找到幾個相符的品項，麻煩選一下你要的是哪一個：",
+      "description": "品項消歧問句：有候選分類可選。"
+    },
+    "prompt.item_describe": {
+      "message": "找不到符合的品項，請描述你要的品項：",
+      "description": "品項消歧問句：沒有候選，請買家自行描述。"
+    },
+    "prompt.item_group_choices": {
+      "message": "相符的品項分散在幾個大類，請先選你要的是哪一類：",
+      "description": "品項消歧問句：相符的品項跨多個大類，先問大類。"
+    },
+    "prompt.packaging": {
+      "message": "包裝上有什麼需求嗎？",
+      "description": "問題卡問句：包裝。"
+    },
+    "prompt.quantity": {
+      "message": "大概需要多少數量？",
+      "description": "問題卡問句：數量（複合問題，同時收單位）。"
+    },
+    "prompt.unit": {
+      "message": "這批貨要用什麼單位計算？",
+      "description": "問題卡問句：數量已知而單位未知時的單位追問。"
+    },
+    "reject.budget_range": {
+      "message": "單價預算需介於 1 與 {max} 元之間",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "欄位被拒的原因：單價預算不在範圍內（新台幣元）。"
+    },
+    "reject.city_unrecognized": {
+      "message": "不是可辨識的縣市名稱",
+      "description": "欄位被拒的原因：配送城市不是台灣的縣市（含新竹、嘉義這類市縣同名而有歧義的簡稱）。"
+    },
+    "reject.date_format": {
+      "message": "日期格式需為 YYYY-MM-DD",
+      "description": "欄位被拒的原因：到貨日不是日期的形狀。"
+    },
+    "reject.date_missing_year": {
+      "message": "缺少西元年份，請補上年份（例如 2026-08-20）",
+      "description": "欄位被拒的原因：到貨日缺西元年份（缺年份要問，不替買家猜）。"
+    },
+    "reject.date_past": {
+      "message": "到貨日不可早於今天",
+      "description": "欄位被拒的原因：到貨日早於今天（台北日曆日）。"
+    },
+    "reject.date_too_far": {
+      "message": "到貨日不可超過 {max} 天後",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "欄位被拒的原因：到貨日太遠。"
+    },
+    "reject.empty": {
+      "message": "空值，未採用",
+      "description": "欄位被拒的原因：值是空的。"
+    },
+    "reject.quantity_range": {
+      "message": "數量需介於 1 與 {max} 之間",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "欄位被拒的原因：數量不在範圍內。"
+    },
+    "reject.resolution_no_item": {
+      "message": "品項未確定，無法指定品項分類",
+      "description": "品項分類被拒的原因：需求沒有品項，或品項這輪被退回。"
+    },
+    "reject.resolution_no_label": {
+      "message": "品項分類必須有名稱",
+      "description": "品項分類被拒的原因：名稱是空的。"
+    },
+    "reject.resolution_unknown_kind": {
+      "message": "未知的品項分類類型",
+      "description": "品項分類被拒的原因：判定方式不是已知的值。"
+    },
+    "reject.truncated": {
+      "message": "超過 {max} 字，已截斷",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "欄位被修正的原因：文字過長已截斷（不是丟棄）。"
+    },
+    "reject.unit_not_allowed": {
+      "message": "單位不在允許清單內：{allowed}",
+      "params": {
+        "allowed": {
+          "type": "string"
+        }
+      },
+      "description": "欄位被拒的原因：單位不是允許的重量單位；allowed 是單位代碼以斜線連接。"
+    },
+    "reply.ack_optional.understood": {
+      "message": "好的，主要資訊都到齊了。",
+      "description": "必填已齊、還有選填問題時的確認句。"
+    },
+    "reply.ack_required.missing": {
+      "message": "還想請你補充：{missing}",
+      "params": {
+        "missing": {
+          "type": "string"
+        }
+      },
+      "description": "必填未齊時的追問句：缺的必填欄位名稱，以分隔詞連接。"
+    },
+    "reply.ack_required.received": {
+      "message": "已收到你的訊息。",
+      "description": "必填未齊時的確認句：本輪沒有記下新欄位。"
+    },
+    "reply.ack_required.recorded": {
+      "message": "已記錄：{facts}",
+      "params": {
+        "facts": {
+          "type": "string"
+        }
+      },
+      "description": "必填未齊時的確認句：本輪記下的事實，facts 以分隔詞連接。"
+    },
+    "reply.adjusted.warning": {
+      "message": "有幾個內容我調整過了：{items}",
+      "params": {
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": "有欄位的值被調整後採用（例如過長被截斷）時的提示句，items 是「欄位：原因」以分隔詞連接。"
+    },
+    "reply.approval.complete": {
+      "message": "詢價預覽已經準備好了。",
+      "description": "發布核准待執行時的完成句。"
+    },
+    "reply.approval.rationale": {
+      "message": "等你核准後才會正式送出給賣家。",
+      "description": "發布核准待執行時的原因句。"
+    },
+    "reply.basics_ready.next": {
+      "message": "需求已齊，可以開始找候選。",
+      "description": "需求齊備時的下一步句：只說買家接下來可以做的事，不宣稱已開始搜尋。"
+    },
+    "reply.basics_ready.understood": {
+      "message": "好的，資料都齊了。",
+      "description": "需求齊備時的確認句。"
+    },
+    "reply.correction.updated": {
+      "message": "已經幫你更新：{facts}",
+      "params": {
+        "facts": {
+          "type": "string"
+        }
+      },
+      "description": "買家更正已有欄位時的確認句，facts 以分隔詞連接。"
+    },
+    "reply.reconfirm.next": {
+      "message": "需要重新確認一次。",
+      "description": "發布核准過期時的下一步。"
+    },
+    "reply.reconfirm.warning": {
+      "message": "需求內容有更新，之前的詢價預覽已經過期。",
+      "description": "發布核准過期時的警示句。"
+    },
+    "reply.rejected.next": {
+      "message": "麻煩再確認一下。",
+      "description": "有欄位被拒時的下一步。"
+    },
+    "reply.rejected.warning": {
+      "message": "有幾個內容我沒辦法直接採用：{items}",
+      "params": {
+        "items": {
+          "type": "string"
+        }
+      },
+      "description": "有欄位被拒時的警示句，items 是「欄位：原因」以分隔詞連接。"
+    },
+    "slot.budget_per_unit": {
+      "message": "單價預算",
+      "description": "需求欄位名稱：每單位預算。"
+    },
+    "slot.delivery_city": {
+      "message": "配送城市",
+      "description": "需求欄位名稱：配送城市。"
+    },
+    "slot.delivery_date": {
+      "message": "到貨日期",
+      "description": "需求欄位名稱：到貨日期。"
+    },
+    "slot.exact_match_required": {
+      "message": "是否需完全相符",
+      "description": "需求欄位名稱：是否只找完全相符的品項。"
+    },
+    "slot.item": {
+      "message": "品項",
+      "description": "需求欄位名稱：品項。"
+    },
+    "slot.item_resolution": {
+      "message": "品項分類",
+      "description": "需求欄位名稱：品項被判定的平台分類。"
+    },
+    "slot.packaging": {
+      "message": "包裝",
+      "description": "需求欄位名稱：包裝。"
+    },
+    "slot.quantity": {
+      "message": "數量",
+      "description": "需求欄位名稱：數量。"
+    },
+    "slot.unit": {
+      "message": "單位",
+      "description": "需求欄位名稱：單位。"
+    },
+    "unit.catty": {
+      "message": "台斤",
+      "description": "單位選項：CATTY（台斤）。"
+    },
+    "unit.gram": {
+      "message": "公克",
+      "description": "單位選項：GRAM。"
+    },
+    "unit.kg": {
+      "message": "公斤",
+      "description": "單位選項：KG。"
+    },
+    "value.no": {
+      "message": "否",
+      "description": "是否欄位的值：否。"
+    },
+    "value.yes": {
+      "message": "是",
+      "description": "是否欄位的值：是（完全相符）。"
+    }
+  }
+}

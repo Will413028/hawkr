@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted；遷移計畫 A2（2026-09-27）不影響：決策在 seller 的 aggregate，A3 盤點（2026-09-29）核對：仍是一人一店、沒有店員的需求，沿用。identity 只存帳號的角色，賣家角色的 `source_id` 記授予它的 store_id（#3189 的柵欄） |
+| 狀態 | accepted；遷移計畫 A2（2026-09-27）不影響：決策在 seller 的 aggregate，A3 盤點（2026-09-29）核對：仍是一人一店、沒有店員的需求，沿用。identity 只存帳號的角色；角色列沒有來源欄位（`source_id` 與 #3189 的柵欄已於 A3b 步驟 11c 刪除，seller 在同一個 transaction 內授予與移除角色，不會亂序） |
 | 日期 | 2026-06-29 |
 | 影響範圍 | seller-service、所有 seller-scoped 查詢、IM、PayUni MerID 推導 |
 

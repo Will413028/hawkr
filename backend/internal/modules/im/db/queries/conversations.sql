@@ -21,6 +21,10 @@ RETURNING id, last_seq, (xmax = 0) AS created, last_message_at;
 -- name: GetConversation :one
 SELECT * FROM im.conversations WHERE id = sqlc.arg(id);
 
+-- name: ConversationParties :one
+-- 對話的雙方（歸屬）：不鎖列。
+SELECT id AS conversation_id, buyer_id, store_id FROM im.conversations WHERE id = sqlc.arg(id);
+
 -- name: MarkReadBuyer :one
 -- 只前進不後退，也不超過 last_seq；沒有這個買家的對話沒有列。advanced 表示游標真的前進（冪等重送為假）：先 FOR UPDATE 鎖住並讀出
 -- 更新前的值（並行的 MarkRead 在這裡排隊，拿到的是對方提交後的值），再與它比較，所以同一次前進只會有一個呼叫者得到 advanced。
@@ -87,6 +91,16 @@ WHERE c.store_id = sqlc.arg(store_id)
   AND (sqlc.narg(after_at)::timestamptz IS NULL OR (c.last_message_at, c.id) < (sqlc.narg(after_at)::timestamptz, sqlc.narg(after_id)::uuid))
 ORDER BY c.last_message_at DESC, c.id DESC
 LIMIT sqlc.arg(max_rows);
+
+-- name: GetConversationStoreBuyer :one
+-- 店家依買家取對話：欄位與預覽同 ListConversationsStore；(buyer_id, store_id) 唯一，最多一列。
+SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.store_last_read_seq AS read_seq, c.buyer_last_read_seq AS peer_read_seq, c.last_message_at,
+       m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
+FROM im.conversations AS c
+JOIN im.messages AS m ON m.conversation_id = c.id AND m.seq = c.last_seq
+LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
+WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = sqlc.arg(buyer_id);
 
 -- name: ActiveConversationIDsBuyer :many
 -- 監聽重連後的補洞：這個買家在 since（資料庫時間）之後有新訊息的對話，最多 max_rows 筆。

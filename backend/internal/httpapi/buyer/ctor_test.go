@@ -6,10 +6,13 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
@@ -32,11 +35,17 @@ type unusedBlocking struct{}
 func (unusedBlocking) ContentAuthorFor(context.Context, social.Caller, social.Target) (social.ContentAuthor, error) {
 	panic("unused")
 }
+func (unusedBlocking) GetReview(context.Context, uuid.UUID, int64) (review.Review, error) {
+	panic("unused")
+}
+func (unusedBlocking) MessageParties(context.Context, uuid.UUID) (im.ConversationParties, error) {
+	panic("unused")
+}
 func (unusedBlocking) AccountIDByBuyerID(context.Context, int64) (int64, error) { panic("unused") }
 func (unusedBlocking) Store(context.Context, int64) (seller.Store, error)       { panic("unused") }
 
 func unusedSources() blocks.Sources {
-	return blocks.Sources{Authors: unusedBlocking{}, Identities: blocks.Identities{Buyers: unusedBlocking{}, Stores: unusedBlocking{}}}
+	return blocks.Sources{Authors: unusedBlocking{}, Reviews: unusedBlocking{}, Messages: unusedBlocking{}, Identities: blocks.Identities{Buyers: unusedBlocking{}, Stores: unusedBlocking{}}}
 }
 
 // mustApp 是測試的建構：StatsSource 是必要的（零值被建構子擋下）；沒有指定的測試給一份沒有任何資料的來源。

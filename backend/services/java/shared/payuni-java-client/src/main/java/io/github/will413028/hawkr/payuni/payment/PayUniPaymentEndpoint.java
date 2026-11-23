@@ -57,29 +57,4 @@ public final class PayUniPaymentEndpoint {
      */
     public static final String PATH_GRANT_QUERY = "/api/trade/grant_query";
     public static final String VERSION_GRANT_QUERY = "1.0";
-
-    /**
-     * 多功能收付 v1.0（代理商專用 API 總覽 §2）—— 外層使用 AgentID，走 {@code callAgentApi}。
-     *
-     * <p>🔴 與 {@link #PATH_GRANT} 是<b>方向相反的兩件事</b>：撥款是平台付錢給賣家，
-     * 本 API 的正向（{@code BalType=1}）是平台<b>向賣家收</b>。兩者共用同一個 HTTP 通道，
-     * 但業務語意完全相反 —— 抄錯一個常數，錢會往反方向流。
-     *
-     * <p>⚠️ 官方逐字：「實際交易<b>於次日執行</b>」，且回傳<b>只有 Status／Message 兩欄</b>
-     * （無單號、無受理序號）⇒ 「已受理」與「已收到錢」是兩件事，中間隔著一個真實存在的狀態。
-     */
-    public static final String PATH_AGENT_FEE = "/api/agent/agent_fee";
-    public static final String VERSION_AGENT_FEE = "1.0";
-
-    /**
-     * 多功能收付交易查詢 v1.0（代理商專用 API 總覽 §3）—— 外層使用 AgentID，走 {@code callAgentApi}。
-     *
-     * <p>查詢的 key 是 <b>(MerID, TradeNo, Amt)</b> 三元組 ⇒ 必須帶<b>當初送出的金額</b>。
-     * 回傳含 {@code FundDate}（{@code 0000-00-00} ＝ 尚未撥款）與 {@code Fee}（實際手續費）。
-     *
-     * <p>🔴 <b>回單筆結構、非陣列</b>，而 {@code TradeNo} 官方三處標「可重複」
-     * ⇒ 真的送重複了，用官方 API 也對不出有幾筆。唯一的去重保證只能在我方 DB。
-     */
-    public static final String PATH_AGENT_FEE_QUERY = "/api/agent/agent_fee_query";
-    public static final String VERSION_AGENT_FEE_QUERY = "1.0";
 }

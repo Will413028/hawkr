@@ -71,9 +71,6 @@ var Module = fx.Module("client",
 	fx.Provide(fx.Annotate(newPaymentClient, fx.As(new(invoicemq.PaymentFactsClient)))),
 	// SHIP peer：S06／A12 的出貨狀態欄（#3019）。binding 在提供端，同上。
 	fx.Provide(fx.Annotate(newShippingClient, fx.As(new(invoicegrpc.ShipmentStatusResolver)))),
-	// 同一個 *shipping.Client 也是行事曆鏡像的來源（INV.gov 每日整段覆蓋，
-	// §5.1.14；#3089 第 17 項）。binding 在提供端，同上。
-	fx.Provide(fx.Annotate(newShippingClient, fx.As(new(usecase.HolidaySource)))),
 	// BUY peer：申訴畫面的「是誰提的」欄（#3017 後半）。binding 在提供端，同上。
 	fx.Provide(fx.Annotate(newBuyerClient, fx.As(new(invoicegrpc.BuyerNameResolver)))),
 )
@@ -117,7 +114,7 @@ func newBuyerClient(lc fx.Lifecycle, cfg *config.Config) (*buyer.Client, error) 
 
 // newSellerClient 建出 SEL peer client（§6.2）。
 //
-// 位址走既有的 `SELLER_SERVICE_ADDR`（`config.PeerConfig.SellerAddr`，
+// 位址走既有的 `LEGACY_SELLER_GRPC_ADDR`（`config.PeerConfig.SellerAddr`，
 // k8s/values/invoice-service.yaml 已有此鍵）⇒ 本波不需要新增任何 env var。
 func newSellerClient(lc fx.Lifecycle, cfg *config.Config) (*seller.Client, error) {
 	return seller.NewClient(lc, cfg.Peers.SellerAddr)

@@ -145,7 +145,7 @@ class BlockListScreen extends HookConsumerWidget {
                       onUnblock: () async {
                         final confirmed = await showUnblockConfirmDialog(
                           context,
-                          targetName: blocked.displayLabel,
+                          targetName: blocked.displayLabel(context.uiLocale),
                         );
                         if (!confirmed) return;
                         if (!context.mounted) return;
@@ -252,7 +252,7 @@ class _BlockedUserRow extends StatelessWidget {
           SizedBox(width: 12.w),
           Expanded(
             child: Text(
-              blocked.displayLabel,
+              blocked.displayLabel(context.uiLocale),
               style: TextStyle(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w500,

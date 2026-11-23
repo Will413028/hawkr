@@ -33,6 +33,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -66,6 +68,8 @@ dependencies:
   # 共用文案目錄（由 backend/internal/platform/uitext 生成），與另一支 App 共用。
   hawkr_ui_text:
     path: ../packages/hawkr_ui_text
+  # ARB 生成碼用；釘 flutter_localizations 要求的版本（與 hawkr_ui_text 相同）。
+  intl: 0.20.3
   dio: ^5.7.0
   sentry_flutter: ^9.25.0
   sentry_dio: ^9.25.0
@@ -75,6 +79,7 @@ dependencies:
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
   uuid: ^4.5.1
+  fixnum: ^1.1.1 # int64 值（聊天訊息的 seq 與串流 cursors）；測試也用。
   infinite_scroll_pagination: ^5.1.1
   go_router: ^14.8.1
   logger: ^2.5.0
@@ -85,7 +90,6 @@ dependencies:
   firebase_analytics: ^12.4.2
 
 dev_dependencies:
-  fixnum: ^1.1.1 # Generated int64 values in Connect contract tests.
   flutter_native_splash: ^2.4.1
   package_info_plus: ^10.2.2
   integration_test:
@@ -126,6 +130,7 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  generate: true
 
   # App assets
   assets:

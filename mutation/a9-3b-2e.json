@@ -1,0 +1,220 @@
+{
+ "mutants": [
+  {
+   "id": "shape-both",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "case a.OptionID != \"\" && text != \"\":",
+   "new": "case false:",
+   "test": "internal/modules/procurement/internal/turn ^TestCheckAnswerShape$",
+   "why": "拿掉「option_id 與 free_text 同時給」的檢查：兩個都給也算合法"
+  },
+  {
+   "id": "shape-neither",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "case a.OptionID == \"\" && a.FreeText == \"\":",
+   "new": "case false:",
+   "test": "internal/modules/procurement/internal/turn ^TestCheckAnswerShape$",
+   "why": "拿掉「兩個都沒給」的檢查"
+  },
+  {
+   "id": "shape-blank",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "case a.OptionID == \"\" && text == \"\":",
+   "new": "case false:",
+   "test": "internal/modules/procurement/internal/turn ^TestCheckAnswerShape$",
+   "why": "拿掉「文字只有空白」的檢查"
+  },
+  {
+   "id": "shape-not-on-card",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "case a.OptionID != \"\" && !onCard(p, a.OptionID):",
+   "new": "case false:",
+   "test": "internal/modules/procurement/internal/turn ^TestCheckAnswerShape$",
+   "why": "拿掉「選項在卡上」的檢查：client 可以送卡外的選項"
+  },
+  {
+   "id": "shape-state-first",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/resume.go",
+   "old": "if irq.Status == \"PENDING\" {",
+   "new": "if true {",
+   "test": "internal/modules/procurement ^TestResumeRunReportsAnAnsweredInterruptTheSameWhateverTheInput$",
+   "why": "已回答的中斷也先做形狀檢查：卡外選項回 INVALID_ARGUMENT 而不是 APPROVAL_ALREADY_RESOLVED"
+  },
+  {
+   "id": "shape-option-blank-text",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/apply.go",
+   "old": "text := trimtext.Trim(a.FreeText)",
+   "new": "text := a.FreeText",
+   "test": "internal/modules/procurement/internal/turn ^TestCheckShapeReportsFieldViolationsWithoutAReason$",
+   "why": "CheckAnswer 不先去空白：選項加空白文字被當成兩個都給"
+  },
+  {
+   "id": "decide-unknown-outcome",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/answer.go",
+   "old": "return decision{}, fmt.Errorf(\"turn：未知的回答結果：%d\", out.Kind)",
+   "new": "return decision{}, &run.FailureError{Reason: run.FailureAnswerRejected, Err: errors.New(\"x\")}",
+   "test": "internal/modules/procurement/internal/turn ^TestDecideAnswerUnknownOutcomeIsAPlainError$",
+   "why": "零值或未知結果也當成 ANSWER_REJECTED"
+  },
+  {
+   "id": "shape-too-long",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/resume.go",
+   "old": "> MaxFreeTextRunes {",
+   "new": "> MaxFreeTextRunes*2 {",
+   "test": "internal/modules/procurement/internal/turn ^TestCheckShapeReportsFieldViolationsWithoutAReason$",
+   "why": "文字長度上限放寬：超過 2000 字元的回答會撞 DB CHECK 變成 500"
+  },
+  {
+   "id": "answer-rejected-reason",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/answer.go",
+   "old": "Reason: run.FailureAnswerRejected, Err: fmt.Errorf(\"turn：答案被拒",
+   "new": "Reason: run.FailureTurnPipelineErr, Err: fmt.Errorf(\"turn：答案被拒",
+   "test": "internal/modules/procurement/internal/turn ^TestDecideAnswerInvalidFailsAsAnswerRejected$",
+   "why": "答案被拒不再用 ANSWER_REJECTED，退成一般的 pipeline 失敗"
+  },
+  {
+   "id": "answer-source",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/answer.go",
+   "old": "ld.source = sourceAnswer",
+   "new": "ld.source = sourceLLMExtract",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerRunCommitsAnAnswerTurnResolvesTheInterruptAndSucceedsTheAskingRun$",
+   "why": "回答寫成 source=LLM_EXTRACT 的輪次"
+  },
+  {
+   "id": "answer-label",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/answer.go",
+   "old": "return o.Label",
+   "new": "return optionID",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerTextShowsTheOptionLabelOrTheTrimmedText$",
+   "why": "對話裡買家的回答顯示選項 ID 而不是標籤"
+  },
+  {
+   "id": "rejected-keeps-pending",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "(to == StatusSucceeded || to == StatusWaitingForInput) {",
+   "new": "(to == StatusSucceeded || to == StatusWaitingForInput || to == StatusFailed) {",
+   "test": "internal/modules/procurement/internal/turn ^TestRejectedAnswerFailsWithAnswerRejectedKeepsTheInterruptPendingAndRestoresNothing$",
+   "why": "回答 run 失敗也走提交點：被拒的答案把中斷解決掉"
+  },
+  {
+   "id": "resolve-interrupt",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "if _, err := q.ResolveInterrupt(ctx, store.ResolveInterruptParams{ID: interruptID, Now: ptr(l.Now())}); err != nil {",
+   "new": "if _, err := int64(0), error(nil); err != nil {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerRunCommitsAnAnswerTurnResolvesTheInterruptAndSucceedsTheAskingRun$|^TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesExactlyOnePending$",
+   "why": "回答成功的提交點不再把中斷轉 RESOLVED"
+  },
+  {
+   "id": "lock-order",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "if err := e.Ledger.LockAskingOf(ctx, ld.run.ID); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerCommitLocksTheAskingRunBeforeItsOwnRun$",
+   "why": "commit 不先鎖提問的 run：回答 run 的列先被鎖，鎖順序回到 R6 的反向"
+  },
+  {
+   "id": "snapshot-runs-limit",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/model/snapshot.go",
+   "old": "const RuntimeSnapshotMaxRuns = 20",
+   "new": "const RuntimeSnapshotMaxRuns = 21",
+   "test": "internal/modules/procurement ^TestSnapshotRunsAreTheCurrentRequestsNewestFirstAtMostTwenty$",
+   "why": "runs 上限放寬到 21"
+  },
+  {
+   "id": "snapshot-runs-request",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/runs.sql.go",
+   "old": "WHERE request_id = $1 AND buyer_id = $2\nORDER BY created_at DESC, id DESC\nLIMIT $3::int",
+   "new": "WHERE buyer_id = $2 AND $1::uuid IS NOT NULL\nORDER BY created_at DESC, id DESC\nLIMIT $3::int",
+   "test": "internal/modules/procurement ^TestSnapshotRunsAreTheCurrentRequestsNewestFirstAtMostTwenty$",
+   "why": "runs 列出買家所有需求的 run，不只目前需求"
+  },
+  {
+   "id": "snapshot-runs-order",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/runs.sql.go",
+   "old": "WHERE request_id = $1 AND buyer_id = $2\nORDER BY created_at DESC, id DESC\nLIMIT $3::int",
+   "new": "WHERE request_id = $1 AND buyer_id = $2\nORDER BY created_at ASC, id ASC\nLIMIT $3::int",
+   "test": "internal/modules/procurement ^TestSnapshotRunsAreTheCurrentRequestsNewestFirstAtMostTwenty$",
+   "why": "runs 變成舊到新：上限截掉最新的"
+  },
+  {
+   "id": "snapshot-processing",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
+   "old": "Processing: i.Processing,",
+   "new": "Processing: false,",
+   "test": "internal/modules/procurement ^TestSnapshotOpenConfirmationShowsProcessingWhileAnAnswerRunIsInProgress$",
+   "why": "處理中旗標永遠是 false"
+  },
+  {
+   "id": "snapshot-active",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
+   "old": "out.active = &active.ID",
+   "new": "out.active = nil\n\t\t_ = active",
+   "test": "internal/modules/procurement ^TestGetRuntimeSnapshotMirrorsTheConversation$",
+   "why": "active_run_id 不填"
+  },
+  {
+   "id": "snapshot-not-found",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/snapshot/snapshot.go",
+   "old": "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn model.RuntimeSnapshot{}, apperr.NotFound(\"找不到這個對話\")",
+   "new": "if false {\n\t\treturn model.RuntimeSnapshot{}, apperr.NotFound(\"找不到這個對話\")",
+   "test": "internal/modules/procurement ^TestGetRuntimeSnapshotIsNotFoundForAnotherBuyersOrDeletedConversation$",
+   "why": "別人的或不存在的對話不回 NOT_FOUND"
+  },
+  {
+   "id": "executor-registered",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "if _, ok := out[run.RunTypeResume]; !ok {",
+   "new": "if _, ok := out[run.RunTypeResume]; ok {",
+   "test": "internal/modules/procurement ^TestNewRegistersTheResumeExecutorWithTaxonomyAlone$",
+   "why": "CLARIFICATION_RESUME 的 executor 沒有登記：worker 領到回答 run 會把它標失敗"
+  },
+  {
+   "id": "option-stored",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "optionID = &in.OptionID",
+   "new": "optionID = nil",
+   "test": "internal/modules/procurement/internal/run ^TestResumeStoresTheOptionAndReplaysOnlyTheSameAnswer$",
+   "why": "選項回答的 option_id 沒寫進輸入"
+  },
+  {
+   "id": "replay-option",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/resume.go",
+   "old": "|| !sameOption(input.OptionID, in.OptionID)",
+   "new": "",
+   "test": "internal/modules/procurement/internal/run ^TestResumeStoresTheOptionAndReplaysOnlyTheSameAnswer$",
+   "why": "同一個 client_request_id 換選項被當成同一個回答重放"
+  },
+  {
+   "id": "input-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/db/migrations/20261122191655_procurement_answer_option.sql",
+   "old": "ADD CONSTRAINT \"agent_run_inputs_answer_check\" CHECK ((option_id IS NULL) = (char_length(buyer_message) >= 1))",
+   "new": "ADD CONSTRAINT \"agent_run_inputs_answer_check\" CHECK (true)",
+   "test": "internal/modules/procurement/internal/run ^TestRunInputHoldsExactlyOneOfMessageAndOption$",
+   "why": "DB 不再要求訊息與選項恰一個"
+  }
+ ]
+}

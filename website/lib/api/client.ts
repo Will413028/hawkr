@@ -39,14 +39,12 @@ export const ACCOUNT_SUSPENDED_EVENT = "hk-account:suspended";
 const ACCOUNT_SUSPENDED_REASON = "ACCOUNT_SUSPENDED";
 
 /**
- * 使用者沒有主動觸發的舊 REST 寫入（進入對話、開啟通知、聊天連線時自動送出）：停權帳號收到
+ * 使用者沒有主動觸發的舊 REST 寫入（開啟通知時自動送出）：停權帳號收到
  * `ACCOUNT_SUSPENDED` 時靜默略過，不廣播（A7-D17、A7-D18）。與 Connect 的 `BACKGROUND_WRITE_METHODS` 同一個意思，
  * 形狀對齊 buyer-app 的 `_backgroundRestWrites`；新增自動送出的寫入時加在這裡，其餘寫入都視為使用者主動
  * （`read-all` 是使用者點的，不在這裡）。
  */
 const BACKGROUND_REST_WRITES: readonly { method: string; path: RegExp }[] = [
-	{ method: "POST", path: /\/app\/chat\/ws-ticket\/?$/ },
-	{ method: "PATCH", path: /\/app\/chat\/conversations\/[^/]+\/?$/ },
 	{ method: "PATCH", path: /\/app\/notifications\/\d+\/read\/?$/ },
 ];
 

@@ -25,10 +25,6 @@ const (
 	CtxKeyTraceID contextKey = "auth-trace-id"
 	// CtxKeyRequestID 請求 ID（string）
 	CtxKeyRequestID contextKey = "auth-request-id"
-	// CtxKeySellerSuspended 賣家停權原因碼（string；46 §4.4 IM/social 訂單關聯細分）。
-	// 只能由 injectSellerSuspension middleware 寫入（外部同名 header 已在該
-	// middleware 清除，且外部輸入無法寫 Go context）→ interceptor 轉發即可信。
-	CtxKeySellerSuspended contextKey = "auth-seller-suspended"
 	// CtxKeyBuyerID 買家 ID（identity.BuyerID）。僅 AIAssistantService 目前使用，
 	// 由呼叫端（AI-assistant 買家路由 handler）依路由前綴解析出的 domain id 明確設定，
 	// 不是 auth middleware 全域塞入（跟 CtxKeyAccountID 不同，這不是登入 principal）。
@@ -64,16 +60,6 @@ func WithTraceContext(ctx context.Context, traceID, requestID string) context.Co
 	return ctx
 }
 
-// WithSellerSuspension 將停權原因碼存入 Go context，由 injectSellerSuspension
-// middleware 呼叫（唯一合法寫入點）。AuthMetadataInterceptor 讀到即轉發
-// x-seller-suspended 給下游（im/social usecase 訂單關聯/self-vs-other 細分用）。
-func WithSellerSuspension(ctx context.Context, reasonCode string) context.Context {
-	if reasonCode == "" {
-		return ctx
-	}
-	return context.WithValue(ctx, CtxKeySellerSuspended, reasonCode)
-}
-
 // WithBuyerID 將買家 domain ID 存入 outgoing context，AuthMetadataInterceptor 讀到後
 // 轉發 x-buyer-id metadata。呼叫端自行解析 buyer_id 後呼叫本函式，不經過 auth middleware。
 func WithBuyerID(ctx context.Context, buyerID identity.BuyerID) context.Context {
@@ -106,7 +92,6 @@ func GenerateRequestID() string {
 // - x-account-type
 // - x-trace-id
 // - x-request-id
-// - x-seller-suspended（僅停權注入 middleware 命中時；46 §4.4）
 func AuthMetadataInterceptor() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{},
 		cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
@@ -127,12 +112,6 @@ func AuthMetadataInterceptor() grpc.UnaryClientInterceptor {
 		}
 		if requestID, ok := ctx.Value(CtxKeyRequestID).(string); ok && requestID != "" {
 			pairs = append(pairs, "x-request-id", requestID)
-		}
-
-		// 賣家停權原因碼（僅 injectSellerSuspension middleware 會寫入 context；
-		// 未注入 = 零成本不帶 key。46 §4.4 IM/social 細分）
-		if reason, ok := ctx.Value(CtxKeySellerSuspended).(string); ok && reason != "" {
-			pairs = append(pairs, "x-seller-suspended", reason)
 		}
 
 		// 買家/賣家 domain ID（僅 AIAssistantService 目前設定，見 WithBuyerID/WithStoreID）

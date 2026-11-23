@@ -1,11 +1,14 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
+import type { AssistantTool } from "@hawkr/api/gen/hawkr/assistant/v1alpha1/assistant_pb";
 import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
+import type { CustomerSort, CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import type { RejectReason } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
@@ -14,10 +17,19 @@ import type { UiMessage } from "./message";
 export type { DefaultErrorText, UiMessage } from "./message";
 
 export type UiTextKey =
+	| "admin.moderation.CaseReport.outcome_unset"
+	| "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL"
+	| "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS"
+	| "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE"
 	| "buyer.Gender.GENDER_FEMALE"
 	| "buyer.Gender.GENDER_MALE"
 	| "buyer.Gender.GENDER_OTHER"
+	| "buyer.Profile.deleted_name"
 	| "buyer.Profile.gender_unset"
+	| "chat.Message.unsupported_kind"
+	| "chat.Preview.erased"
+	| "chat.Preview.hidden"
+	| "chat.Preview.image"
 	| "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT"
 	| "common.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION"
 	| "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY"
@@ -55,13 +67,18 @@ export type UiTextKey =
 	| "common.error.UNIMPLEMENTED"
 	| "common.error.UNKNOWN"
 	| "common.unknown"
+	| "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME"
+	| "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT"
+	| "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT"
+	| "crm.CustomerType.CUSTOMER_TYPE_NORMAL"
+	| "crm.CustomerType.CUSTOMER_TYPE_VIP"
 	| "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH"
 	| "media.RejectReason.REJECT_REASON_EXPIRED"
 	| "media.RejectReason.REJECT_REASON_PROCESSING_FAILED"
 	| "media.RejectReason.REJECT_REASON_SIZE_MISMATCH"
 	| "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT"
+	| "moderation.CommunityReport.outcome_unset"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
-	| "moderation.ReportOutcome.REPORT_OUTCOME_PENDING"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_BUYER"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_CHAT_MESSAGE"
@@ -77,6 +94,25 @@ export type UiTextKey =
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
+	| "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE"
+	| "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_PAST"
+	| "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR"
+	| "procurement.RejectionReason.REJECTION_REASON_EMPTY"
+	| "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE"
+	| "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM"
+	| "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL"
+	| "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND"
+	| "procurement.RejectionReason.REJECTION_REASON_TRUNCATED"
+	| "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED"
+	| "review.Review.rating_label_1"
+	| "review.Review.rating_label_2"
+	| "review.Review.rating_label_3"
+	| "review.Review.rating_label_4"
+	| "review.Review.rating_label_5"
+	| "review.ReviewAuthor.anonymous_name"
 	| "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE"
 	| "seller.ContentKind.CONTENT_KIND_COMMENT"
 	| "seller.ContentKind.CONTENT_KIND_FORUM_ENTRY"
@@ -228,6 +264,24 @@ export const SELLER_MEASURE_REQUEST_KIND_NAME: Readonly<Record<number, string>> 
 	2: "MEASURE_REQUEST_KIND_REMEDIATION",
 };
 
+/** admin.moderation.CaseReport.outcome_unset */
+export function adminModerationCaseReportOutcomeUnset(): UiMessage {
+	return { key: "admin.moderation.CaseReport.outcome_unset" };
+}
+
+const ASSISTANT_ASSISTANT_TOOL: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS",
+	2: "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL",
+	3: "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE",
+};
+
+/** assistant.AssistantTool 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function assistantAssistantTool(v: AssistantTool): UiMessage | undefined {
+	const key = ASSISTANT_ASSISTANT_TOOL[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const BUYER_GENDER: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "buyer.Gender.GENDER_MALE",
 	2: "buyer.Gender.GENDER_FEMALE",
@@ -241,9 +295,34 @@ export function buyerGender(v: Gender): UiMessage | undefined {
 	return { key };
 }
 
+/** buyer.Profile.deleted_name */
+export function buyerProfileDeletedName(): UiMessage {
+	return { key: "buyer.Profile.deleted_name" };
+}
+
 /** buyer.Profile.gender_unset */
 export function buyerProfileGenderUnset(): UiMessage {
 	return { key: "buyer.Profile.gender_unset" };
+}
+
+/** chat.Message.unsupported_kind */
+export function chatMessageUnsupportedKind(): UiMessage {
+	return { key: "chat.Message.unsupported_kind" };
+}
+
+/** chat.Preview.erased */
+export function chatPreviewErased(): UiMessage {
+	return { key: "chat.Preview.erased" };
+}
+
+/** chat.Preview.hidden */
+export function chatPreviewHidden(): UiMessage {
+	return { key: "chat.Preview.hidden" };
+}
+
+/** chat.Preview.image */
+export function chatPreviewImage(): UiMessage {
+	return { key: "chat.Preview.image" };
 }
 
 const COMMON_POLICY_CATEGORY: Readonly<Partial<Record<number, UiTextKey>>> = {
@@ -320,6 +399,31 @@ export function commonUnknown(): UiMessage {
 	return { key: "common.unknown" };
 }
 
+const CRM_CUSTOMER_SORT: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME",
+	2: "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT",
+	3: "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT",
+};
+
+/** crm.CustomerSort 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function crmCustomerSort(v: CustomerSort): UiMessage | undefined {
+	const key = CRM_CUSTOMER_SORT[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const CRM_CUSTOMER_TYPE: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "crm.CustomerType.CUSTOMER_TYPE_NORMAL",
+	2: "crm.CustomerType.CUSTOMER_TYPE_VIP",
+};
+
+/** crm.CustomerType 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function crmCustomerType(v: CustomerType): UiMessage | undefined {
+	const key = CRM_CUSTOMER_TYPE[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const MEDIA_REJECT_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT",
 	2: "media.RejectReason.REJECT_REASON_SIZE_MISMATCH",
@@ -335,8 +439,12 @@ export function mediaRejectReason(v: RejectReason): UiMessage | undefined {
 	return { key };
 }
 
+/** moderation.CommunityReport.outcome_unset */
+export function moderationCommunityReportOutcomeUnset(): UiMessage {
+	return { key: "moderation.CommunityReport.outcome_unset" };
+}
+
 const MODERATION_REPORT_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
-	1: "moderation.ReportOutcome.REPORT_OUTCOME_PENDING",
 	2: "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION",
 	3: "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION",
 };
@@ -390,6 +498,59 @@ export function paymentRequirementCollection(v: RequirementCollection): UiMessag
 	const key = PAYMENT_REQUIREMENT_COLLECTION[v];
 	if (key === undefined) return undefined;
 	return { key };
+}
+
+const PROCUREMENT_REJECTION_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "procurement.RejectionReason.REJECTION_REASON_EMPTY",
+	2: "procurement.RejectionReason.REJECTION_REASON_TRUNCATED",
+	3: "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE",
+	4: "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE",
+	5: "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED",
+	6: "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED",
+	7: "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT",
+	8: "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR",
+	9: "procurement.RejectionReason.REJECTION_REASON_DATE_PAST",
+	10: "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR",
+	11: "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM",
+	12: "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL",
+	13: "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND",
+};
+
+/** procurement.RejectionReason 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function procurementRejectionReason(v: RejectionReason): UiMessage | undefined {
+	const key = PROCUREMENT_REJECTION_REASON[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+/** review.Review.rating_label_1 */
+export function reviewReviewRatingLabel1(): UiMessage {
+	return { key: "review.Review.rating_label_1" };
+}
+
+/** review.Review.rating_label_2 */
+export function reviewReviewRatingLabel2(): UiMessage {
+	return { key: "review.Review.rating_label_2" };
+}
+
+/** review.Review.rating_label_3 */
+export function reviewReviewRatingLabel3(): UiMessage {
+	return { key: "review.Review.rating_label_3" };
+}
+
+/** review.Review.rating_label_4 */
+export function reviewReviewRatingLabel4(): UiMessage {
+	return { key: "review.Review.rating_label_4" };
+}
+
+/** review.Review.rating_label_5 */
+export function reviewReviewRatingLabel5(): UiMessage {
+	return { key: "review.Review.rating_label_5" };
+}
+
+/** review.ReviewAuthor.anonymous_name */
+export function reviewReviewAuthorAnonymousName(): UiMessage {
+	return { key: "review.ReviewAuthor.anonymous_name" };
 }
 
 const SELLER_CONTENT_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {

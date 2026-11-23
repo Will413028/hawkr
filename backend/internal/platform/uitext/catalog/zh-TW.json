@@ -1,5 +1,21 @@
 {
   "default": {
+    "admin.moderation.CaseReport.outcome_unset": {
+      "message": "審核中",
+      "description": "案件內的檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": {
+      "message": "正在查詢訂單詳情",
+      "description": "查詢單筆訂單的詳情。"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS": {
+      "message": "正在查詢你的訂單",
+      "description": "查詢我的訂單清單。"
+    },
+    "assistant.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE": {
+      "message": "正在查詢包裹物流",
+      "description": "查詢配送中包裹的物流狀態。"
+    },
     "buyer.Gender.GENDER_FEMALE": {
       "message": "女性",
       "description": "Gender 是買家自填的性別。（值 GENDER_FEMALE）"
@@ -12,77 +28,97 @@
       "message": "其他",
       "description": "Gender 是買家自填的性別。（值 GENDER_OTHER）"
     },
+    "buyer.Profile.deleted_name": {
+      "message": "已刪除帳號",
+      "description": "已刪除帳號的買家顯示的名稱（已刪除的買家沒有名稱與頭像）；店家的對話（ChatBuyer.deleted）、客戶卡片與買家的封鎖名單共用這個詞。"
+    },
     "buyer.Profile.gender_unset": {
       "message": "尚未設定",
       "description": "買家沒有填性別時，性別欄位顯示的文字；也是選單裡清除性別的那一項。"
     },
+    "chat.Message.unsupported_kind": {
+      "message": "不支援的訊息",
+      "description": "訊息的 kind 是 UNSPECIFIED 或 client 不認得的值時，取代內容顯示的文字（MessageKind 的約定：顯示成「不支援的訊息」，不當成錯誤）。"
+    },
+    "chat.Preview.erased": {
+      "message": "此訊息已被移除",
+      "description": "對話列表預覽：最後一則訊息的內容已抹除（erased 為真，寄件方帳號已刪除或店家已退場）。"
+    },
+    "chat.Preview.hidden": {
+      "message": "此訊息已被隱藏",
+      "description": "對話列表預覽：最後一則訊息被平台隱藏（hidden 為真）。"
+    },
+    "chat.Preview.image": {
+      "message": "傳送了一張圖片",
+      "description": "對話列表預覽：最後一則是圖片訊息，沒有被隱藏或抹除。"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT": {
       "message": "仿冒商品",
-      "description": "冒用他人商標或外觀的商品本身（第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+      "description": "冒用他人商標或外觀的商品本身（第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION": {
       "message": "假認證",
-      "description": "不實的認證、檢驗或標章（第十六條第 2 款的一種）。入口：檢舉人、平台判定與認定。"
+      "description": "不實的認證、檢驗或標章（第十六條第 2 款的一種）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY": {
       "message": "食品安全",
-      "description": "有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
+      "description": "有健康風險或疑似食物中毒，或未揭露安全疑慮的商品（條款第十一條、第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_FRAUD": {
       "message": "詐欺或操縱交易",
-      "description": "偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
+      "description": "偽造交易、洗錢、詐欺、濫用優惠、操縱評價或規避風險控管（第十六條第 2 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
       "message": "騷擾或霸凌",
-      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的騷擾或霸凌：針對特定的人或店家的辱罵、威脅或持續打擾（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HATE": {
       "message": "仇恨或歧視言論",
-      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的仇恨或歧視言論：以身分、族群或特徵攻擊他人（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_IMPERSONATION": {
       "message": "冒用或誤導交易主體",
-      "description": "冒用平台名義、未經授權的保證，或讓買家誤認交易主體（第十六條第 8 款）。入口：檢舉人、平台判定與認定。"
+      "description": "冒用平台名義、未經授權的保證，或讓買家誤認交易主體（第十六條第 8 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_IP_INFRINGEMENT": {
       "message": "侵害智慧財產權",
-      "description": "侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。入口：檢舉人、平台判定與認定。"
+      "description": "侵害他人商標、著作權、專利、營業秘密、肖像或其他權利的使用（第十六條第 5 款），例如店名或商品標題用了別人的商標；仿冒商品本身是 COUNTERFEIT。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO": {
       "message": "不實或誤導資訊",
-      "description": "虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。入口：店家通報與社群檢舉的檢舉人、平台判定與認定。"
+      "description": "虛假資料、標示不實或誤導的商品或店家資訊（第十六條第 2 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_OFF_PLATFORM_TRADE": {
       "message": "繞過平台交易",
-      "description": "引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。入口：檢舉人、平台判定與認定。"
+      "description": "引導買家繞過平台付款，或規避平台服務費（第十六條第 3 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_OTHER": {
       "message": "其他",
-      "description": "檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。入口：店家通報與社群檢舉的檢舉人；平台判定與認定不能用。"
+      "description": "檢舉人無法歸類時選。理由要指到條款，所以分案時要改判成有依據的類別，或直接設定結果。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定不能用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE": {
       "message": "干擾或濫用平台",
-      "description": "干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。入口：只有平台判定與認定。"
+      "description": "干擾、探測或破壞平台與資訊安全，或以爬蟲、自動化不當取得資料（第十六條第 6、7 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_PRIVACY": {
       "message": "不當使用個人資料",
-      "description": "未經授權蒐集、利用、揭露或出售買家個人資料（第十六條第 4 款）。入口：檢舉人、平台判定與認定。"
+      "description": "未經授權蒐集、利用、揭露或出售買家個人資料（第十六條第 4 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS": {
       "message": "違法或禁售商品",
-      "description": "違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。入口：檢舉人、平台判定與認定。"
+      "description": "違法、違禁或來源不明，而沒有健康風險的商品（第十六條第 1 款）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT": {
       "message": "色情或性相關內容",
-      "description": "社群內容中的色情、裸露或性暴力內容（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容中的色情、裸露或性暴力內容（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "垃圾訊息",
-      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。入口：社群檢舉的檢舉人、平台判定與認定（含內容下架措施的認定）。"
+      "description": "社群內容的垃圾訊息：重複、無關或以廣告洗版的貼文、留言與討論區留言（社群，A7）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用（含內容下架措施的認定）。"
     },
     "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE": {
       "message": "未經許可販售",
-      "description": "依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。入口：檢舉人、平台判定與認定。"
+      "description": "依法應有的登錄、許可或資格沒有完成就販售（第十一條第 2 項）。檢舉入口可選與否以請求欄位的 accepted_policy_categories 為準（accepted_values.proto）；平台判定與認定可用。"
     },
     "common.StoreCard.closed_store": {
       "message": "已關閉的店家",
@@ -164,6 +200,26 @@
       "message": "未知",
       "description": "不認得的值與 UNSPECIFIED 一律顯示這個字。"
     },
+    "crm.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME": {
+      "message": "首購時間",
+      "description": "首筆完成訂單的時間。"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_ORDER_COUNT": {
+      "message": "訂單數",
+      "description": "CustomerSort 是客戶列表的排序欄位。（值 CUSTOMER_SORT_ORDER_COUNT）"
+    },
+    "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT": {
+      "message": "消費金額",
+      "description": "CustomerSort 是客戶列表的排序欄位。（值 CUSTOMER_SORT_TOTAL_SPENT）"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_NORMAL": {
+      "message": "一般客戶",
+      "description": "CustomerType 是店家對買家的分類。（值 CUSTOMER_TYPE_NORMAL）"
+    },
+    "crm.CustomerType.CUSTOMER_TYPE_VIP": {
+      "message": "VIP",
+      "description": "CustomerType 是店家對買家的分類。（值 CUSTOMER_TYPE_VIP）"
+    },
     "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH": {
       "message": "檔案在上傳過程中損毀，請重新上傳。",
       "description": "實際內容與宣告的 MD5 不符。"
@@ -184,13 +240,13 @@
       "message": "無法辨識檔案格式，請改用 JPEG、PNG、WebP 或 GIF 圖片。",
       "description": "辨認不出是支援的圖片格式。"
     },
+    "moderation.CommunityReport.outcome_unset": {
+      "message": "審核中",
+      "description": "檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"
+    },
     "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "已處理（不違規）",
       "description": "案件認定不違規。"
-    },
-    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "審核中",
-      "description": "案件還在處理中。"
     },
     "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
       "message": "已處理（違規）",
@@ -251,6 +307,82 @@
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
       "message": "金流商收件（託管頁面）",
       "description": "金流商收件（託管頁面為預設）：平台不經手身分與銀行資料。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE": {
+      "message": "單價預算不在可接受的範圍內",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_BUDGET_RANGE）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED": {
+      "message": "無法辨識這個縣市",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_CITY_UNRECOGNIZED）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT": {
+      "message": "日期格式不正確",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_DATE_FORMAT）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR": {
+      "message": "日期缺少西元年份",
+      "description": "日期只有月日、沒有西元年；不替買家補年份。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_PAST": {
+      "message": "日期已經過了",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_DATE_PAST）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_DATE_TOO_FAR": {
+      "message": "日期太久以後",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_DATE_TOO_FAR）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_EMPTY": {
+      "message": "內容是空的",
+      "description": "內容是空的。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_QUANTITY_RANGE": {
+      "message": "數量不在可接受的範圍內",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_QUANTITY_RANGE）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM": {
+      "message": "品項未確定，無法指定品項分類",
+      "description": "品項被丟棄（或還沒有品項），所以不能附上分類判定。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL": {
+      "message": "品項分類沒有名稱",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_RESOLUTION_NO_LABEL）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": {
+      "message": "品項分類的判定方式不明",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_RESOLUTION_UNKNOWN_KIND）"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_TRUNCATED": {
+      "message": "超過長度上限，已截斷",
+      "description": "文字超過長度上限，已截斷後採用（值有保留）。"
+    },
+    "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
+      "message": "這個單位不支援",
+      "description": "RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。（值 REJECTION_REASON_UNIT_NOT_ALLOWED）"
+    },
+    "review.Review.rating_label_1": {
+      "message": "非常不滿意",
+      "description": "評價的星等 1（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_2": {
+      "message": "不滿意",
+      "description": "評價的星等 2（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_3": {
+      "message": "一般",
+      "description": "評價的星等 3（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_4": {
+      "message": "滿意",
+      "description": "評價的星等 4（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.Review.rating_label_5": {
+      "message": "非常滿意",
+      "description": "評價的星等 5（Review.rating 是 1 到 5）對應的文字。"
+    },
+    "review.ReviewAuthor.anonymous_name": {
+      "message": "匿名會員",
+      "description": "評價作者沒有設定暱稱（name 未設）時顯示的名稱。"
     },
     "seller.ContentKind.CONTENT_KIND_CHAT_MESSAGE": {
       "message": "聊天訊息",
@@ -884,13 +1016,13 @@
     }
   },
   "staff": {
+    "admin.moderation.CaseReport.outcome_unset": {
+      "message": "處理中",
+      "description": "案件內的檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。\n受眾：後台員工"
+    },
     "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": {
       "message": "認定不違規",
       "description": "案件認定不違規。\n受眾：後台員工"
-    },
-    "moderation.ReportOutcome.REPORT_OUTCOME_PENDING": {
-      "message": "處理中",
-      "description": "案件還在處理中。\n受眾：後台員工"
     },
     "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION": {
       "message": "認定違規",

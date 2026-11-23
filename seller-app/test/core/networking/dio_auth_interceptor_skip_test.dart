@@ -6,7 +6,10 @@ import 'package:hawkr_seller/core/networking/dio_provider.dart';
 import 'package:hawkr_seller/core/session/auth_session_provider.dart';
 import 'package:hawkr_seller/core/session/post_login_side_effects.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
-import 'package:hawkr_seller/features/chat/data/chat_repository.dart';
+import 'package:hawkr_seller/features/chat/data/chat_session.dart';
+import 'package:hawkr_seller/features/chat/data/chat_stream_client.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+import '../../features/chat/support/chat_fakes.dart';
 import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_platform_interface/test.dart';
@@ -57,7 +60,7 @@ void main() {
     final auth = FakeAuthSession(signedIn: true, tokenValue: 'session-token');
     final container = ProviderContainer(
       overrides: [
-        chatRepositoryProvider.overrideWithValue(_NoopChatRepository()),
+        chatSessionProvider.overrideWithValue(_NoopChatSession()),
         postLoginSideEffectsProvider.overrideWithValue(
           const NoopPostLoginSideEffects(),
         ),
@@ -150,7 +153,7 @@ void main() {
     final (container, dio, adapter, auth) = await buildContainer();
 
     await dio.get<dynamic>(
-      '/api/v1/app/chat/unread',
+      '/api/v1/app/notifications/unread-count',
       options: Options(validateStatus: (_) => true),
     );
 
@@ -163,7 +166,7 @@ void main() {
     final (container, dio, adapter, _) = await buildContainer();
 
     await expectLater(
-      dio.get<dynamic>('/api/v1/app/chat/unread'),
+      dio.get<dynamic>('/api/v1/app/notifications/unread-count'),
       throwsA(isA<DioException>()),
     );
 
@@ -176,7 +179,7 @@ void main() {
     auth.tokenError = const SocketException('offline');
 
     await expectLater(
-      dio.get<dynamic>('/api/v1/app/chat/unread'),
+      dio.get<dynamic>('/api/v1/app/notifications/unread-count'),
       throwsA(
         isA<DioException>().having(
           (e) => e.type,
@@ -231,15 +234,17 @@ class _Unauthorized401Adapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
-class _NoopChatRepository extends ChatRepository {
-  _NoopChatRepository() : super(Dio());
+class _NoopChatSession extends ChatSession {
+  _NoopChatSession()
+    : super(
+        FakeChatRepository(),
+        () => UiLocale.zhTW,
+        client: ChatStreamClient(open: (_) => const Stream.empty()),
+      );
 
   @override
-  void stopPolling() {}
+  void stop() {}
 
   @override
-  void startPolling({Duration interval = const Duration(seconds: 1)}) {}
-
-  @override
-  void useHttpClient(Dio dio) {}
+  void start() {}
 }

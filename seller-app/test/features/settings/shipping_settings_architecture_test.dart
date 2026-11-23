@@ -90,7 +90,7 @@ void main() {
     },
   );
 
-  test('shipping presentation has no low-level I/O and TGOS lives in data', () {
+  test('shipping presentation has no low-level I/O', () {
     final source = File(
       'lib/features/settings/presentation/shipping_settings/'
       'shipping_settings_screen.dart',
@@ -102,17 +102,6 @@ void main() {
     expect(source, isNot(contains('sellerRepositoryProvider')));
     expect(source, isNot(contains('productRepositoryProvider')));
     expect(source, contains('shippingSettingsControllerProvider'));
-    expect(
-      File('lib/features/settings/data/tgos_address_service.dart').existsSync(),
-      isTrue,
-    );
-    expect(
-      File(
-        'lib/features/settings/presentation/shipping_settings/data/'
-        'tgos_address_service.dart',
-      ).existsSync(),
-      isFalse,
-    );
   });
 }
 

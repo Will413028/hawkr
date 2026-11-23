@@ -29,3 +29,17 @@ func TestParseUUID(t *testing.T) {
 		}
 	}
 }
+
+func TestParseUUIDRejectsNonCanonicalForms(t *testing.T) {
+	id := uuid.NewV7()
+	h := id.String()
+	for _, raw := range []string{"urn:uuid:" + h, "{" + h + "}", strings.ReplaceAll(h, "-", ""), " " + h, ""} {
+		_, err := ParseUUID("request_id", raw)
+		if err == nil || !strings.Contains(err.Error(), "request_id") {
+			t.Fatalf("%q：err=%v，要拒絕並指出 request_id", raw, err)
+		}
+	}
+	if got, err := ParseUUID("request_id", strings.ToUpper(h)); err != nil || got != id {
+		t.Fatalf("大寫的標準寫法 got=%v err=%v", got, err)
+	}
+}

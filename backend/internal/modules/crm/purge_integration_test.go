@@ -22,7 +22,7 @@ func (f *fixture) seedBuyerEverywhere(buyerID int64) {
 		if _, err := f.partial("REF-"+o, o, store, buyerID, 100); err != nil {
 			f.t.Fatal(err)
 		}
-		if err := f.m.AddCustomerTags(context.Background(), store, buyerID, []string{"常客"}); err != nil {
+		if _, err := f.m.AddCustomerTags(context.Background(), store, buyerID, []string{"常客"}); err != nil {
 			f.t.Fatal(err)
 		}
 	}

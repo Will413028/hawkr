@@ -1131,6 +1131,64 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 	if _, err := f.module.EndMeasure(ctx, EndMeasureInput{MeasureID: active.ID, AdminID: 7, ExpectedVersion: active.Version}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("依據認定的措施不能 End：%v", err)
 	}
+
+	// 檢舉人的補充：Report.CanSupplement 與 AddReportSupplement 是同一個判斷（沒有結果且未達上限才成功）。
+	supplementScenarios := []struct {
+		name  string
+		build func() SubmitReportResult
+	}{
+		{"沒有補充", func() SubmitReportResult { _, s := f.open(t); return f.reporterReport(t, s.StoreID) }},
+		{"差一則到上限", func() SubmitReportResult {
+			_, s := f.open(t)
+			r := f.reporterReport(t, s.StoreID)
+			for i := range MaxSupplements - 1 {
+				_, err := f.addSupplement(t, r.ReportID, fmt.Sprintf("補充 %d", i+1))
+				must(t, err)
+			}
+			return r
+		}},
+		{"已達上限", func() SubmitReportResult {
+			_, s := f.open(t)
+			r := f.reporterReport(t, s.StoreID)
+			for i := range MaxSupplements {
+				_, err := f.addSupplement(t, r.ReportID, fmt.Sprintf("補充 %d", i+1))
+				must(t, err)
+			}
+			return r
+		}},
+		{"已有結果", func() SubmitReportResult {
+			_, s := f.open(t)
+			r := f.reporterReport(t, s.StoreID)
+			f.mustResolve(t, r.ReportID, OutcomeInsufficient)
+			return r
+		}},
+		{"已有結果且已達上限", func() SubmitReportResult {
+			_, s := f.open(t)
+			r := f.reporterReport(t, s.StoreID)
+			for i := range MaxSupplements {
+				_, err := f.addSupplement(t, r.ReportID, fmt.Sprintf("補充 %d", i+1))
+				must(t, err)
+			}
+			f.mustResolve(t, r.ReportID, OutcomeInsufficient)
+			return r
+		}},
+	}
+	for _, sc := range supplementScenarios {
+		r := sc.build()
+		before, err := f.module.BuyerReport(ctx, reporterBuyer, r.ReportID)
+		must(t, err)
+		want := before.CanSupplement()
+		after, err := f.addSupplement(t, r.ReportID, "再補充")
+		if (err == nil) != want {
+			t.Errorf("補充／%s：can=%v，方法結果=%v", sc.name, want, err)
+		}
+		if err != nil && apperr.KindOf(err) != apperr.KindFailedPrecondition {
+			t.Errorf("補充／%s：被擋下要是 failed_precondition：%v", sc.name, err)
+		}
+		if err == nil && after.SupplementCount != len(before.Supplements)+1 {
+			t.Errorf("補充／%s：回傳的補充數 %d，預期 %d", sc.name, after.SupplementCount, len(before.Supplements)+1)
+		}
+	}
 }
 
 func errField(err error) []string {

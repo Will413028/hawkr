@@ -15,18 +15,12 @@ hawkr.account.AccountInfo.account_id
 hawkr.account.AccountInfo.account_type
 hawkr.account.AccountInfo.created_at
 hawkr.account.AccountInfo.updated_at
-hawkr.account.AuthData.account_type
 # §6.2 #3 exception — gateway-internal SSOT RPC (issue #1592, SSOT since #2014 →
 # PR #2022): GetWebSession is called only by the gateway's own web-session lookup,
 # on every Redis miss or error; the response never crosses into an
 # HTTP-facing gateway response, so account_id/account_type/login_role are kept
 # native int64/int32 end-to-end (mirrors hawkr.buyer.ResolvePrincipalsResponse
 # and hawkr.seller.ListStoreIDsByAccountResponse). NOT Track-1 backlog.
-hawkr.account.GetWebSessionResponse.account_id
-hawkr.account.GetWebSessionResponse.account_type
-hawkr.account.GetWebSessionResponse.login_role
-hawkr.account.LinkConfirmResponse.account_type
-hawkr.account.RefreshTokenResponse.expires_in
 # §6.2 exception — 56 號 ADM 代行營運（DelegationService）. Two distinct grounds,
 # both spelled out in the design doc, so these are NOT Track-1 backlog:
 #   (a) §4.1 例外 2「Response int32 code」— biz_code / denied_code are business codes,
@@ -50,20 +44,8 @@ hawkr.ai.RecommendedProduct.price_max
 hawkr.ai.RecommendedProduct.price_min
 hawkr.ai.RecommendedProduct.rating
 hawkr.ai.RecommendedProduct.score
-hawkr.buyer.BatchGetSubscriberCountsResponse.counts
 # §6.2 #3 exception — internal-only cross-service batch profile lookup;
 # buyer_id is the native int64 map key and never crosses an HTTP response boundary.
-hawkr.buyer.BuyerMeta.buyer_id
-hawkr.buyer.FavoriteCountResponse.count
-hawkr.buyer.FavoriteInfo.created_at
-hawkr.buyer.FavoriteInfo.list_price_max
-hawkr.buyer.FavoriteInfo.list_price_min
-hawkr.buyer.FavoriteInfo.price_max
-hawkr.buyer.FavoriteInfo.price_min
-hawkr.buyer.FavoriteInfo.rating_x10
-hawkr.buyer.FavoriteInfo.sale_price_max
-hawkr.buyer.FavoriteInfo.sale_price_min
-hawkr.buyer.FavoriteListResponse.total
 hawkr.buyer.ListFavoritedProductIdsResponse.product_ids
 # §6.2 #3 exception — internal-only cross-service RPC (im-service → buyer),
 # never gateway-exposed; map value is an account_id kept int64 end-to-end.
@@ -75,17 +57,6 @@ hawkr.buyer.ResolvePrincipalsResponse.principals
 # input values back for membership-checking, never gateway-exposed. Kept
 # native int64 for the same reason as .principals, not separate backlog.
 hawkr.buyer.ResolvePrincipalsResponse.unresolved_ids
-hawkr.buyer.SubscriberDashboardStatsResponse.growth_pct
-hawkr.buyer.SubscriberDashboardStatsResponse.total
-hawkr.buyer.SubscriberInfo.buyer_id
-hawkr.buyer.SubscriberInfo.id
-hawkr.buyer.SubscriberInfo.subscribed_at
-hawkr.buyer.SubscribersListResponse.total
-hawkr.buyer.SubscriptionItem.rating
-hawkr.buyer.SubscriptionItem.subscribed_at
-hawkr.buyer.SubscriptionListResponse.total
-hawkr.buyer.VisitListResponse.total
-hawkr.buyer.VisitOperationResponse.affected
 hawkr.order.GetSellerOrderStatusCountsResponse.aftersales_count
 hawkr.order.GetSellerOrderStatusCountsResponse.completed_count
 hawkr.order.GetSellerOrderStatusCountsResponse.in_progress_count
@@ -98,46 +69,6 @@ hawkr.order.SellerRevenue.total_revenue
 hawkr.order.StoreOrderStats.distinct_buyers
 hawkr.order.StoreOrderStats.qualifying_orders
 hawkr.order.StoreOrderStats.seller_cancelled_orders
-hawkr.review.OrderReviewInfo.rating
-hawkr.review.ProductReviewsResponse.page
-hawkr.review.ProductReviewsResponse.page_size
-hawkr.review.ProductReviewsResponse.total
-hawkr.review.ReviewInfo.like_count
-hawkr.review.ReviewInfo.rating
-hawkr.review.ReviewInfo.reply_count
-hawkr.review.ReviewStats.average_rating
-hawkr.review.ReviewStats.rating_1_count
-hawkr.review.ReviewStats.rating_2_count
-hawkr.review.ReviewStats.rating_3_count
-hawkr.review.ReviewStats.rating_4_count
-hawkr.review.ReviewStats.rating_5_count
-hawkr.review.ReviewStats.total_count
-hawkr.review.ReviewStats.with_images_count
-hawkr.seller.AdminAcknowledgeResponse.ack_latency_ms
-hawkr.seller.AdminCertificationItem.current_step
-hawkr.seller.AdminCertificationItem.total_steps
-hawkr.seller.AdminCertificationListData.limit
-hawkr.seller.AdminCertificationListData.page
-hawkr.seller.AdminCertificationListData.total
-hawkr.seller.AdminCertificationStats.approved
-hawkr.seller.AdminCertificationStats.rejected
-hawkr.seller.AdminCertificationStats.submitted
-hawkr.seller.AdminCertificationStats.total
-hawkr.seller.AdminSellerItem.rating
-hawkr.seller.AdminSellerItem.status
-hawkr.seller.AdminSellerListData.limit
-hawkr.seller.AdminSellerListData.page
-hawkr.seller.AdminSellerListData.total
-hawkr.seller.CertificationApplicationData.current_step
-hawkr.seller.CertificationApplicationData.total_steps
-hawkr.seller.CertificationDraft.current_step
-hawkr.seller.CertificationDraft.total_steps
-hawkr.seller.CreateFoodSafetyReportResponse.ack_estimated_at
-hawkr.seller.FoodSafetyReport.acknowledged_at_ms
-hawkr.seller.FoodSafetyReport.created_at_ms
-hawkr.seller.FoodSafetyReport.fda_reported_at_ms
-hawkr.seller.FoodSafetyReport.investigating_at_ms
-hawkr.seller.FoodSafetyReport.resolved_at_ms
 # §6.2 #3 exception — pure seller-service<->gateway internal RPC (issue #2266):
 # GetCurrentStoreID backs gateway's storeid.Resolver only, deliberately with no
 # business-code envelope (see resolver.go's SellerGetter doc). The int64
@@ -150,16 +81,6 @@ hawkr.seller.GetCurrentStoreIDResponse.store_id
 # PII-purge sweep only; buyer-store-stint rekey W2/W3 D8), never
 # gateway-exposed; store_id list kept int64 end-to-end. NOT Track-1 backlog.
 hawkr.seller.ListStoreIDsByAccountResponse.store_ids
-hawkr.seller.PayuniStatus.approved_at
-hawkr.seller.PayuniStatus.last_synced_at
-hawkr.seller.PayuniStatus.registered_at
-hawkr.seller.ProductViewStatsResponse.growth_pct
-hawkr.seller.ProductViewStatsResponse.view_count
-hawkr.seller.PublicSellerViolation.effective_at_ms
-hawkr.seller.PublicSellerViolation.expires_at_ms
-hawkr.seller.RecommendedSeller.followers
-hawkr.seller.RecommendedSeller.order_count
-hawkr.seller.RecommendedSeller.rating
 # §6.2 #3 exception — internal-only cross-service RPC (im → seller), never gateway-exposed;
 # map value is an account_id kept int64 end-to-end. NOT Track-1 backlog; keep as native numeric.
 hawkr.seller.ResolvePrincipalsResponse.principals
@@ -190,23 +111,6 @@ hawkr.seller.SellerStats.review_count
 hawkr.seller.SellerStats.total_orders
 hawkr.seller.SellerStats.total_products
 hawkr.seller.SellerStats.total_sales
-hawkr.seller.SellerViolation.appeal_decided_at_ms
-hawkr.seller.SellerViolation.appeal_submitted_at_ms
-hawkr.seller.SellerViolation.created_at_ms
-hawkr.seller.SellerViolation.effective_at_ms
-hawkr.seller.SellerViolation.expires_at_ms
-hawkr.seller.SellerViolation.penalty_amount_cents
-hawkr.seller.SellerViolation.revoked_at_ms
-hawkr.seller.SellerViolationReport.created_at_ms
-hawkr.seller.SellerViolationReport.investigating_at_ms
-hawkr.seller.SellerViolationReport.resolved_at_ms
-hawkr.seller.StoreVisitorItem.last_visited_at
-hawkr.seller.StoreVisitorItem.visit_count
-hawkr.seller.StoreVisitorListData.page
-hawkr.seller.StoreVisitorListData.page_size
-hawkr.seller.StoreVisitorListData.total
-hawkr.seller.UnionReportRow.created_at_ms
-hawkr.seller.ValidateSellerResponse.status
 # §6.2 #3 exception — gateway-exposed StreamEvent oneof member (AIAssistantService
 # SellerChat, BuyerChat, etc. return stream StreamEvent directly; StepEvent is a
 # oneof case). seq is a small sequence number (1-N range), not an ID subject to

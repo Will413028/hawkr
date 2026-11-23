@@ -1,3 +1,4 @@
+import '../../../../core/l10n/ui_locale.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
@@ -151,7 +152,7 @@ class SubscriberCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    subscriber.displayName,
+                    subscriber.displayName(context.uiLocale),
                     style: TextStyle(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.w700,

@@ -4,6 +4,10 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart'
+    show GetStoreUnreadCountResponse;
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart'
@@ -45,7 +49,6 @@ class _HermeticSellerAdapter implements HttpClientAdapter {
   final List<RequestOptions> requests = [];
 
   static const allowedGetPaths = {
-    '/api/v1/app/chat/unread',
     '/api/v1/app/notifications/unread-count',
     '/api/v1/app/shipments/anomalies/stats',
   };
@@ -70,7 +73,6 @@ class _HermeticSellerAdapter implements HttpClientAdapter {
     }
 
     final Object body = switch (options.path) {
-      '/api/v1/app/chat/unread' => {'totalUnreadCount': 0},
       '/api/v1/app/notifications/unread-count' => {
         'code': 0,
         'data': {'count': 0},
@@ -281,6 +283,17 @@ class _SellerAppHarness {
             ) {
               dashboardCalls++;
               return GetMyDashboardResponse(dashboard: Dashboard());
+            }).build(),
+          ),
+        ),
+        // 儀表板的聊天未讀數走 Connect（GetStoreUnreadCount）。
+        chatClientProvider.overrideWithValue(
+          ChatAppServiceClient(
+            FakeTransportBuilder().unary(ChatAppService.getStoreUnreadCount, (
+              _,
+              _,
+            ) {
+              return GetStoreUnreadCountResponse();
             }).build(),
           ),
         ),

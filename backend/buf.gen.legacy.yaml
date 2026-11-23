@@ -26,7 +26,7 @@ inputs:
       - api/proto/common/delegation.proto
       - api/proto/media/media.proto
       - api/proto/product/product.proto
+      - api/proto/category/category.proto
       - api/proto/order/order.proto
-      - api/proto/crm/crm.proto
       - api/proto/seller/seller.proto
-      - api/proto/review/review.proto
+      - api/proto/invoice/invoice.proto

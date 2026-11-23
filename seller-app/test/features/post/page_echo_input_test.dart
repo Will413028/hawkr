@@ -29,6 +29,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/my_store_fixtures.dart';
 import 'post_comment_fixtures.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _MockPostRepository extends Mock implements PostRepository {}
 
@@ -139,6 +140,9 @@ Future<_MockPostRepository> _pumpEcho(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(

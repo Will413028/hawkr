@@ -12,6 +12,7 @@ on:
       - 'packages/hawkr_ui_text/**'
       - '.github/workflows/buyer-ci.yml'
       - '.github/workflows/_flutter-quality.yml'
+      - 'scripts/check-taipei-display.py'
   push:
     branches: [main, dev]
     paths:
@@ -24,6 +25,7 @@ on:
       - 'packages/hawkr_ui_text/**'
       - '.github/workflows/buyer-ci.yml'
       - '.github/workflows/_flutter-quality.yml'
+      - 'scripts/check-taipei-display.py'
   workflow_dispatch:
 
 concurrency:

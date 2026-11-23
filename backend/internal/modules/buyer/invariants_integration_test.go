@@ -4,7 +4,6 @@ package buyer_test
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -79,8 +78,6 @@ func TestProfilePartialUpdateAndPendingWrites(t *testing.T) {
 	must(t, fixture.module.ClearVisits(ctx, buyer.BuyerID))
 	must(t, fixture.module.SubscribeRestock(ctx, buyer.BuyerID, 10))
 	must(t, fixture.module.UnsubscribeRestock(ctx, buyer.BuyerID, 10))
-	_, err = fixture.module.AssignMembership(ctx, AssignMembershipInput{BuyerID: buyer.BuyerID, PlanCode: "basic", RequestID: "pending"})
-	must(t, err)
 	current, err := fixture.module.Profile(ctx, buyer.AccountID)
 	must(t, err)
 	token, _ := stageAvatar(t, fixture, buyer.AccountID)
@@ -168,7 +165,7 @@ func TestLongSuggestedNicknameAndClosedPrincipals(t *testing.T) {
 	}
 }
 
-func TestSeededEntitlementAndPlanErrors(t *testing.T) {
+func TestDefaultEntitlementQuota(t *testing.T) {
 	t.Parallel()
 	fixture := setup(t)
 	ctx := context.Background()
@@ -177,21 +174,6 @@ func TestSeededEntitlementAndPlanErrors(t *testing.T) {
 	must(t, err)
 	if entitlement.PlanCode != "free" || entitlement.MonthlyAnswerLimit != 100 {
 		t.Fatal(entitlement)
-	}
-	_, err = fixture.module.AssignMembership(ctx, AssignMembershipInput{BuyerID: buyer.BuyerID, PlanCode: "missing", RequestID: "invalid"})
-	var domainError *apperr.Error
-	if apperr.KindOf(err) != apperr.KindInvalidInput || !errors.As(err, &domainError) || len(domainError.FieldViolations()) != 1 || domainError.FieldViolations()[0].Field != "plan_code" {
-		t.Fatalf("assign unknown plan: %v", err)
-	}
-	_, err = fixture.module.UpdatePlan(ctx, UpdatePlanInput{PlanCode: "missing", MonthlyAnswerLimit: ptr(int32(100))})
-	if apperr.KindOf(err) != apperr.KindNotFound {
-		t.Fatalf("update unknown plan: %v", err)
-	}
-	_, err = fixture.database.Conn(ctx).Exec(ctx, "DELETE FROM buyer.membership_plans WHERE plan_code='free'")
-	must(t, err)
-	_, err = fixture.module.Entitlement(ctx, buyer.BuyerID)
-	if apperr.KindOf(err) != apperr.KindNotFound || !strings.Contains(err.Error(), "會員方案") || strings.Contains(err.Error(), "買家資料") {
-		t.Fatalf("missing plan mislabeled: %v", err)
 	}
 }
 
@@ -244,38 +226,6 @@ func TestCloseForDeletionEffects(t *testing.T) {
 	}
 	if count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE buyer_id=$1", buyer.BuyerID) != 0 {
 		t.Fatal("closing left restock active")
-	}
-}
-
-func TestConcurrentMembershipRequestAcrossBuyers(t *testing.T) {
-	t.Parallel()
-	fixture := setup(t)
-	ctx := context.Background()
-	first, second := profile(t, fixture, 1), profile(t, fixture, 2)
-	start := make(chan struct{})
-	results := make(chan error, 2)
-	for _, buyerID := range []int64{first.BuyerID, second.BuyerID} {
-		go func() {
-			<-start
-			_, err := fixture.module.AssignMembership(ctx, AssignMembershipInput{BuyerID: buyerID, PlanCode: "basic", RequestID: "shared"})
-			results <- err
-		}()
-	}
-	close(start)
-	var succeeded, rejected int
-	for range 2 {
-		err := <-results
-		switch {
-		case err == nil:
-			succeeded++
-		case apperr.KindOf(err) == apperr.KindInvalidInput:
-			rejected++
-		default:
-			t.Fatal(err)
-		}
-	}
-	if succeeded != 1 || rejected != 1 || count(t, fixture, "SELECT count(*) FROM buyer.memberships WHERE request_id='shared'") != 1 {
-		t.Fatalf("succeeded=%d rejected=%d", succeeded, rejected)
 	}
 }
 

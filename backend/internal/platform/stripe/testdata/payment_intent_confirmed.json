@@ -1,0 +1,73 @@
+{
+  "status": 200,
+  "body": {
+    "id": "pi_3Uew6dRPCx5baPmE1eO1Ok5c",
+    "object": "payment_intent",
+    "allowed_payment_method_types": null,
+    "amount": 10000,
+    "amount_capturable": 0,
+    "amount_details": {
+      "tip": {}
+    },
+    "amount_received": 10000,
+    "application": null,
+    "application_fee_amount": null,
+    "automatic_payment_methods": {
+      "allow_redirects": "never",
+      "enabled": true
+    },
+    "canceled_at": null,
+    "cancellation_reason": null,
+    "capture_method": "automatic_async",
+    "client_secret": "<MASKED>",
+    "confirmation_method": "automatic",
+    "created": 1795435943,
+    "currency": "usd",
+    "customer": null,
+    "customer_account": null,
+    "description": "spike A",
+    "excluded_payment_method_types": null,
+    "last_payment_error": null,
+    "latest_charge": "ch_3Uew6dRPCx5baPmE1wWmgUSM",
+    "livemode": false,
+    "managed_payments": {
+      "enabled": false
+    },
+    "metadata": {},
+    "next_action": null,
+    "on_behalf_of": null,
+    "payment_method": "pm_1Uew6dRPCx5baPmEMT62Zejv",
+    "payment_method_configuration_details": {
+      "id": "pmc_1UXPjORPCx5baPmEsBkC1WTe",
+      "parent": null
+    },
+    "payment_method_options": {
+      "card": {
+        "installments": null,
+        "mandate_options": null,
+        "network": null,
+        "request_three_d_secure": "automatic"
+      },
+      "link": {
+        "persistent_token": null
+      }
+    },
+    "payment_method_types": [
+      "card",
+      "link"
+    ],
+    "payment_record": null,
+    "processing": null,
+    "receipt_email": null,
+    "review": null,
+    "setup_future_usage": null,
+    "shared_payment_granted_token": null,
+    "shipping": null,
+    "source": null,
+    "statement_descriptor": null,
+    "statement_descriptor_suffix": null,
+    "status": "succeeded",
+    "transfer_data": null,
+    "transfer_group": "order_A"
+  }
+}

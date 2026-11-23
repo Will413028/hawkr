@@ -11,6 +11,9 @@ on:
     paths: &api_paths
       - 'api/**'
       - 'packages/hawkr_api/**'
+      - 'packages/hawkr_ui_text/tool/check_hardcoded_han.dart'
+      - 'packages/hawkr_ui_text/pubspec.yaml'
+      - 'packages/hawkr_ui_text/pubspec.lock'
       - 'packages/hawkr-api-ts/**'
       # 根目錄的 pnpm workspace（TS 套件的依賴與 lockfile）。
       - 'package.json'
@@ -143,6 +146,53 @@ jobs:
       - name: dart test
         if: always()
         run: dart test
+
+      # 套件不放使用者面文字（ADR 2026-10-17-multi-locale-architecture D4）；baseline 是空的，任何漢字字串字面值都失敗。
+      - name: Guard hardcoded Han literals (ratchet)
+        if: always()
+        working-directory: packages/hawkr_ui_text
+        run: |
+          dart pub get
+          dart run tool/check_hardcoded_han.dart --baseline ../hawkr_api/tool/han_baseline.json ../hawkr_api/lib
+
+      - name: Guard hardcoded Han baseline is not loosened
+        if: always()
+        working-directory: packages/hawkr_ui_text
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            old_sha="$PR_BASE_SHA"
+          else
+            old_sha="$PUSH_BEFORE"
+          fi
+          is_pr=false
+          if [ "$EVENT_NAME" = "pull_request" ]; then is_pr=true; fi
+          if [ -z "$old_sha" ] || [ "$old_sha" = "0000000000000000000000000000000000000000" ]; then
+            if [ "$is_pr" = "true" ]; then
+              echo "::error::pull_request has no base sha to compare against"
+              exit 1
+            fi
+            echo "skip: no comparison commit for event $EVENT_NAME"
+            exit 0
+          fi
+          if ! git fetch --no-tags --depth=1 origin "$old_sha"; then
+            if [ "$is_pr" = "true" ]; then
+              echo "::error::cannot fetch base $old_sha"
+              exit 1
+            fi
+            echo "skip: cannot fetch $old_sha for event $EVENT_NAME"
+            exit 0
+          fi
+          old_file="$RUNNER_TEMP/han_baseline.old.json"
+          if ! git show "$old_sha:packages/hawkr_api/tool/han_baseline.json" > "$old_file"; then
+            echo "skip: $old_sha has no packages/hawkr_api/tool/han_baseline.json (the baseline is being introduced)"
+            exit 0
+          fi
+          dart pub get
+          dart run tool/check_hardcoded_han.dart --baseline ../hawkr_api/tool/han_baseline.json --check-baseline-against "$old_file"
 
   ts:
     name: TS 套件（packages/hawkr-api-ts）：生成物 drift、tsc、biome、vitest

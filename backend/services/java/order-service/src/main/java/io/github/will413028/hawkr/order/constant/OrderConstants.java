@@ -86,24 +86,4 @@ public final class OrderConstants {
 
     /** 物流排程自動確認 */
     public static final String CONFIRM_TYPE_AUTO = "AUTO";
-
-    /**
-     * 🔴 系統判定觸發的撥款，<b>不是收貨確認</b>（03 §5.7.3）。
-     *
-     * <p>用於 {@code grant_payment_tasks.confirm_type}：履約責任判定 financially final ＝
-     * {@code BUYER_CAUSED} ⇒ {@code SHIPPING_ABNORMAL(35)} →
-     * {@code DELIVERY_FAILED_NO_REFUND(54)} 時建立的撥款任務。
-     *
-     * <p>🔴 <b>為什麼不沿用 {@code AUTO}</b>：{@code MANUAL} 與 {@code AUTO} 的語意都是
-     * 「買家收到貨了」（前者買家自己按、後者倒數到期視同收貨）。而這條路徑上
-     * <b>買家從頭到尾沒有收到貨</b>——{@code 54} 不經過 {@code DELIVERED(40)}。
-     * 借用 {@code AUTO} 會讓稽核看到一筆「排程自動確認收貨」的紀錄，
-     * 那是一件<b>沒有發生過的事</b>（同 03 §11.1「命名讓人誤信」的教訓）。
-     *
-     * <p>⚠️ 值長度 6 ≤ {@code VARCHAR(10)}；該欄無 CHECK 約束。
-     * 實查 {@code grant_payment_tasks.confirm_type} <b>零讀取端</b>（純稽核欄，
-     * 全 repo 只有 INSERT 時的 setter）⇒ 新增第三個值不會改變任何分支行為。
-     * 🔴 日後若有人開始依它分流，必須把這三個值一併納入判斷。
-     */
-    public static final String CONFIRM_TYPE_SYSTEM = "SYSTEM";
 }

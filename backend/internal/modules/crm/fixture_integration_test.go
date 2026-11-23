@@ -125,6 +125,22 @@ type fixture struct {
 	owner *buyer.Module
 	bus   *events.Bus
 	logs  *logSink
+	gate  *suspendable
+}
+
+// suspendable 包住真正的 seller 模組，讓測試能在兩次呼叫之間把店家變成停權（Store 的 Sanctions 是 nil 就是沒有推導過、算停權，Authorize fail-closed），
+// 守門（LockNotRetired）仍走真正的 seller。
+type suspendable struct {
+	*seller.Module
+	suspended atomic.Bool
+}
+
+func (g *suspendable) Store(ctx context.Context, storeID int64) (seller.Store, error) {
+	st, err := g.Module.Store(ctx, storeID)
+	if err == nil && g.suspended.Load() {
+		st.Sanctions = nil
+	}
+	return st, err
 }
 
 // 預設的角色：店 storeA..storeC（10..12）與買家 100..199 在 setup 明確建立；其他 ID 的測試自己 seedBuyers／seedStores。
@@ -180,13 +196,14 @@ func setup(t *testing.T) *fixture {
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: now, Logger: log})
 	sl := seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: now, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, now), Events: bus, Jobs: q, Now: now, Logger: log})})
+	gate := &suspendable{Module: sl}
 	seedStores(t, d, storeA, storeC)
 	seedBuyers(t, d, buyer1, buyer1+99)
 	logs := &logSink{}
-	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: owner, Stores: sl, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewJSONHandler(logs, nil))})
+	m := crm.New(crm.Deps{DB: d, Jobs: q, Buyers: owner, Stores: gate, NewID: newIDs(), Now: now, Logger: slog.New(slog.NewJSONHandler(logs, nil))})
 	events.Subscribe(bus, m.OnBuyerDeleted)
 	events.Subscribe(bus, m.OnStoreRetired)
-	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus, logs: logs}
+	return &fixture{t: t, db: d, m: m, q: q, owner: owner, bus: bus, logs: logs, gate: gate}
 }
 
 func (f *fixture) exec(sql string, args ...any) {
@@ -288,3 +305,6 @@ func noErrors(t *testing.T, errs []error) {
 }
 
 func sn(n int) string { return fmt.Sprintf("%d", n) }
+
+// errOnly 只留寫入的錯誤：這些測試關心的是拒絕與副作用，不是回傳的列。
+func errOnly[T any](_ T, err error) error { return err }

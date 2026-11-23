@@ -1,0 +1,396 @@
+syntax = "proto3";
+
+// chat（im 模組）給前台的 API：買家與店家之間的一對一聊天（ChatAppService）。對話與訊息是買家與店家共用的資源，
+// 單一對話上的方法（ListMessages、SendMessage、MarkConversationRead）由對話的歸屬推導呼叫者是買家方或店家方；
+// 沒有單一資源可推導身分的方法依集合分成買家版與店家版兩支（例如 ListConversations 與 ListStoreConversations），
+// 店家版的店家由伺服器從 session 推導（呼叫者此刻的店），請求不帶 store_id。
+//
+// ID 是不透明的字串（對話與訊息是 UUID，買家與店家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。圖片是 hawkr.common.v1alpha1.Image。
+//
+// 伺服器不回顯示句子：訊息預覽是結構化的 Preview，「傳送了一張圖片」「此訊息已被移除」等文字由 client 取自共用文案目錄。
+// 整個服務的回應是 private, no-store。
+package hawkr.chat.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/common/v1alpha1/store_card.proto";
+
+// ChatAppService 是登入者的聊天。
+service ChatAppService {
+  // ListConversations 列出呼叫者（買家）的對話，最近有訊息的在前（最後訊息時間，相同時以 ID 排序）。不因封鎖隱藏對話，不回總數。
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListStoreConversations 列出呼叫者此刻的店的對話，規則同 ListConversations。呼叫者沒有店回 not_found；店家關閉之後沒有權限，回 not_found。
+  rpc ListStoreConversations(ListStoreConversationsRequest) returns (ListStoreConversationsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetStoreConversationByBuyer 取呼叫者此刻的店與某位買家的對話（一對買家與店家只有一個對話）。呼叫者沒有店、店家關閉之後沒有權限、
+  // 買家不存在或兩者之間沒有對話，一律回 not_found，不區分原因。內容的組裝同 ListStoreConversations（不因封鎖隱藏對話，已刪除的買家標示 deleted）。
+  rpc GetStoreConversationByBuyer(GetStoreConversationByBuyerRequest) returns (GetStoreConversationByBuyerResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListMessages 列出對話裡的訊息。預設與 before_seq 是 seq 由大到小（新的在前），before_seq 只列 seq 小於它的訊息；
+  // after_seq 給斷線補洞，只列 seq 大於它的訊息，seq 由小到大（舊的在前）。before_seq 與 after_seq 不能同時給。
+  // 呼叫者不是對話的任一方，與對話不存在一律回 not_found，不區分原因。已隱藏或已抹除的訊息是墓碑，不帶內容。
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SendMessage 對既有的對話送出一則訊息，寄件方由對話的歸屬推導。同一個對話、同一個寄件方以同一個 request_id 重送，
+  // 回第一次寫入的那則訊息；內容不同回 invalid_argument。對方封鎖、店家停業、對方帳號已刪除等見 ErrorReason。
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+
+  // SendMessageToStore 以買家身分對一家店送出訊息：沒有對話時開新對話，有就接續。其餘規則同 SendMessage。店家不存在回 not_found。
+  rpc SendMessageToStore(SendMessageToStoreRequest) returns (SendMessageToStoreResponse);
+
+  // SendMessageToBuyer 以呼叫者此刻的店的身分對一位買家送出訊息：沒有對話時開新對話，有就接續。其餘規則同 SendMessage。
+  // 呼叫者沒有店或買家不存在回 not_found。
+  rpc SendMessageToBuyer(SendMessageToBuyerRequest) returns (SendMessageToBuyerResponse);
+
+  // MarkConversationRead 把呼叫者這一方在對話裡的已讀游標推到 upto_seq：游標只前進，超過對話最後一個 seq 以最後一個計。
+  rpc MarkConversationRead(MarkConversationReadRequest) returns (MarkConversationReadResponse);
+
+  // MarkAllRead 把呼叫者（買家）的全部對話標成已讀。
+  rpc MarkAllRead(MarkAllReadRequest) returns (MarkAllReadResponse);
+
+  // MarkAllStoreRead 把呼叫者此刻的店的全部對話標成已讀。
+  rpc MarkAllStoreRead(MarkAllStoreReadRequest) returns (MarkAllStoreReadResponse);
+
+  // GetUnreadCount 是呼叫者（買家）的總未讀訊息數。
+  rpc GetUnreadCount(GetUnreadCountRequest) returns (GetUnreadCountResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetStoreUnreadCount 是呼叫者此刻的店的總未讀訊息數。
+  rpc GetStoreUnreadCount(GetStoreUnreadCountRequest) returns (GetStoreUnreadCountResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetPresence 回報呼叫者（買家）的對話的對方此刻是否在線，最多一次 50 個對話。沒有最後上線時間。
+  // 其中任何一個不是呼叫者的對話回 not_found（整個請求失敗）。任一方向有封鎖的對話回離線。
+  rpc GetPresence(GetPresenceRequest) returns (GetPresenceResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetStorePresence 同 GetPresence，對象是呼叫者此刻的店的對話。
+  rpc GetStorePresence(GetStorePresenceRequest) returns (GetStorePresenceResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // StreamEvents 是呼叫者（買家）的即時事件流（server streaming）：第一個 frame 是 Ready（總未讀與串流的心跳間隔、最長壽命），
+  // 之後是新訊息、可見度改變、未讀、對方已讀與 Resync，閒置時每 heartbeat_interval 一個 Heartbeat。cursors 是 client 手上每個對話最後的 seq，
+  // 伺服器補上缺的訊息再交出新的；不屬於呼叫者的對話靜默忽略。串流活到 max_lifetime 後正常結束（沒有錯誤），client 以最後的 seq 重連。
+  // 結束的原因：session 失效或帳號刪除是 unauthenticated；伺服器關閉或重新驗證連續失敗是 unavailable，client 依 backoff 重連；
+  // 同一個身分的並行串流超過上限是 resource_exhausted；cursors 超過 50 個是 invalid_argument。帳號停權不結束串流。
+  rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
+
+  // StreamStoreEvents 同 StreamEvents，對象是呼叫者此刻的店。呼叫者沒有店或店家關閉之後沒有權限，回 not_found；串流進行中關店，
+  // 以 failed_precondition 與 STORE_CLOSED 結束。
+  rpc StreamStoreEvents(StreamStoreEventsRequest) returns (stream StreamStoreEventsResponse);
+}
+
+// MessageKind 是訊息的種類。client 遇到 UNSPECIFIED 或不認得的值，顯示成「不支援的訊息」，不當成錯誤。
+enum MessageKind {
+  MESSAGE_KIND_UNSPECIFIED = 0;
+  // 文字訊息。
+  MESSAGE_KIND_TEXT = 1;
+  // 圖片訊息。
+  MESSAGE_KIND_IMAGE = 2;
+}
+
+// ChatParty 是對話的一方。
+enum ChatParty {
+  CHAT_PARTY_UNSPECIFIED = 0;
+  // 買家方。
+  CHAT_PARTY_BUYER = 1;
+  // 店家方。
+  CHAT_PARTY_STORE = 2;
+}
+
+// Message 是一則訊息。隱藏或抹除的訊息是墓碑：hidden 或 erased 為真，沒有 text 與 image。
+message Message {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string conversation_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 訊息在對話裡的序號，從 1 起連號、沒有空洞；client 以序號偵測缺口並用 ListMessages 的 after_seq 補。
+  int64 seq = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 寄件方；不回對方的帳號或業務 ID。
+  ChatParty sender = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  MessageKind kind = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 文字內容；只有沒有被隱藏或抹除的文字訊息才有。
+  optional string text = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 圖片；只有沒有被隱藏或抹除的圖片訊息才有。
+  hawkr.common.v1alpha1.Image image = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 被平台隱藏。
+  bool hidden = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 寄件方的帳號已刪除或店家已退場，內容已抹除。
+  bool erased = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Preview 是對話列表上最後一則訊息的結構化預覽，不含顯示句子。
+message Preview {
+  MessageKind kind = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 文字預覽（最多 100 個字元）；只有沒有被隱藏或抹除的文字訊息才有。
+  optional string text = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool hidden = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool erased = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ChatParty sender = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ChatBuyer 是店家的對話裡的買家：名稱與頭像在讀取時由 buyer 補；帳號已刪除時 deleted 為真，沒有名稱與頭像。
+message ChatBuyer {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 買家的暱稱；沒有設定或已刪除時不設。deleted 為真時 client 顯示文案目錄的 buyer.Profile.deleted_name。
+  optional string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image avatar = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool deleted = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Conversation 是對話列表的一列。買家版（ListConversations）設 store，店家版（ListStoreConversations、GetStoreConversationByBuyer）設 buyer。
+message Conversation {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 對方的店家卡片；只有買家版有。店家從沒公開過時不設（同 StoreCard 的可見性規則），client 顯示「店家」。
+  hawkr.common.v1alpha1.StoreCard store = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 對方的買家；只有店家版（ListStoreConversations、GetStoreConversationByBuyer）有。
+  ChatBuyer buyer = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 呼叫者這一方的未讀訊息數。
+  int64 unread_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp last_message_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  Preview preview = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 對方的已讀游標：seq 不大於它的訊息，對方已讀。
+  int64 peer_read_seq = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// MessageContent 是送出的內容，text 與 image_staged_token 恰好設一個。
+message MessageContent {
+  oneof content {
+    // 文字，去除首尾空白後 1 到 4096 個字元（以 Unicode 字元計）。
+    string text = 1;
+    // 圖片的 staged token（media 上傳完成後拿到的）；token 只能用一次。
+    string image_staged_token = 2 [(google.api.field_behavior) = INPUT_ONLY];
+  }
+}
+
+message ListConversationsRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListConversationsResponse {
+  repeated Conversation conversations = 1;
+  string next_page_token = 2;
+}
+
+message ListStoreConversationsRequest {
+  // 預設 20，上限 100。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListStoreConversationsResponse {
+  repeated Conversation conversations = 1;
+  string next_page_token = 2;
+}
+
+message GetStoreConversationByBuyerRequest {
+  string buyer_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStoreConversationByBuyerResponse {
+  Conversation conversation = 1;
+}
+
+message ListMessagesRequest {
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 預設 20，上限 100。
+  int32 page_size = 2;
+  // 只列 seq 小於它的訊息（新的在前）；不設是從最新開始，明確給 0 是空頁（序號從 1 起，沒有 seq 小於 0 的訊息）。不能與 after_seq 同時給。
+  optional int64 before_seq = 3;
+  // 只列 seq 大於它的訊息（舊的在前），給斷線補洞。不能與 before_seq 同時給。
+  optional int64 after_seq = 4;
+}
+
+message ListMessagesResponse {
+  repeated Message messages = 1;
+  // 為真表示在這一頁之外還有訊息：往舊的方向用最小的 seq 當 before_seq，補洞用最大的 seq 當 after_seq 繼續。
+  bool has_more = 2;
+  // 讀取當下對方在這個對話的已讀游標。
+  int64 peer_read_seq = 3;
+}
+
+message SendMessageRequest {
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // UUIDv4（AIP-155），必填：同一個對話、同一個寄件方以同一個 request_id 重送回第一次的訊息；內容不同回 invalid_argument。
+  string request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  MessageContent content = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SendMessageResponse {
+  Message message = 1;
+}
+
+message SendMessageToStoreRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 同 SendMessageRequest.request_id；冪等的範圍是（對話, 寄件方, request_id）。
+  string request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  MessageContent content = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SendMessageToStoreResponse {
+  Message message = 1;
+}
+
+message SendMessageToBuyerRequest {
+  string buyer_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 同 SendMessageRequest.request_id；冪等的範圍是（對話, 寄件方, request_id）。
+  string request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  MessageContent content = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SendMessageToBuyerResponse {
+  Message message = 1;
+}
+
+message MarkConversationReadRequest {
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 已讀到的 seq，不小於 0。
+  int64 upto_seq = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message MarkConversationReadResponse {}
+
+message MarkAllReadRequest {}
+
+message MarkAllReadResponse {}
+
+message MarkAllStoreReadRequest {}
+
+message MarkAllStoreReadResponse {}
+
+message GetUnreadCountRequest {}
+
+message GetUnreadCountResponse {
+  int64 unread_count = 1;
+}
+
+message GetStoreUnreadCountRequest {}
+
+message GetStoreUnreadCountResponse {
+  int64 unread_count = 1;
+}
+
+// ConversationPresence 是一個對話的對方是否在線。
+message ConversationPresence {
+  string conversation_id = 1;
+  bool online = 2;
+}
+
+message GetPresenceRequest {
+  // 1 到 50 個對話 ID。
+  repeated string conversation_ids = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetPresenceResponse {
+  // 每個請求的對話一項。
+  repeated ConversationPresence presences = 1;
+}
+
+message GetStorePresenceRequest {
+  // 1 到 50 個對話 ID。
+  repeated string conversation_ids = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetStorePresenceResponse {
+  // 每個請求的對話一項。
+  repeated ConversationPresence presences = 1;
+}
+
+message StreamEventsRequest {
+  // conversation_id 到 client 已有的最後一個 seq；最多 50 個，key 必須是對話 ID。
+  map<string, int64> cursors = 1;
+}
+
+message StreamStoreEventsRequest {
+  // 同 StreamEventsRequest.cursors。
+  map<string, int64> cursors = 1;
+}
+
+message StreamEventsResponse {
+  ChatEvent event = 1;
+}
+
+message StreamStoreEventsResponse {
+  ChatEvent event = 1;
+}
+
+// ChatEvent 是串流上的一個 frame：兩支串流方法的回應都包這一個 message（lint 要求每支 RPC 自己的回應型別）。
+message ChatEvent {
+  oneof event {
+    Ready ready = 1;
+    MessageEvent message = 2;
+    UnreadChanged unread = 3;
+    PeerRead peer_read = 4;
+    Resync resync = 5;
+    Heartbeat heartbeat = 6;
+  }
+}
+
+// Ready 是補洞完成後的第一個 frame。
+message Ready {
+  // 呼叫者這一方的總未讀訊息數。
+  int64 unread_count = 1;
+  // 閒置時 Heartbeat 的間隔；client 超過它的兩倍沒收到任何 frame 就當連線已斷並重連。
+  google.protobuf.Duration heartbeat_interval = 2;
+  // 串流的最長壽命（含抖動，已是這一條的實際值）；到期正常結束。
+  google.protobuf.Duration max_lifetime = 3;
+}
+
+// MessageEvent 是新訊息，或同 seq 的可見度改變。
+message MessageEvent {
+  Message message = 1;
+  // 為真表示這是同一個 seq 的可見度改變（變成墓碑或還原），client 以 seq 取代手上的那則。
+  bool updated = 2;
+}
+
+// UnreadChanged 是呼叫者這一方的總未讀訊息數。
+message UnreadChanged {
+  int64 unread_count = 1;
+}
+
+// PeerRead 是對方在一個對話的已讀游標前進。
+message PeerRead {
+  string conversation_id = 1;
+  // seq 不大於它的訊息，對方已讀。
+  int64 peer_read_seq = 2;
+}
+
+// Resync 要求 client 重新取列表與缺口。
+message Resync {
+  oneof scope {
+    // 只有這個對話。
+    string conversation_id = 1;
+    // 全部對話。
+    bool all = 2;
+  }
+}
+
+// Heartbeat 是串流閒置時的保活 frame，沒有內容。
+message Heartbeat {}

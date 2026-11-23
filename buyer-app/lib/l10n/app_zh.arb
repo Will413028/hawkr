@@ -1,0 +1,145 @@
+{
+  "@@locale": "zh",
+  "languageName": "繁體中文",
+  "@languageName": {
+    "description": "This language's own name, shown in a language picker. Never translated: each locale spells its own name."
+  },
+  "timeAgoJustNow": "剛剛",
+  "@timeAgoJustNow": {
+    "description": "Relative time under one minute."
+  },
+  "timeAgoMinutes": "{count, plural, other{{count}分鐘前}}",
+  "@timeAgoMinutes": {
+    "description": "Relative time in whole minutes (1 to 59).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoHours": "{count, plural, other{{count}小時前}}",
+  "@timeAgoHours": {
+    "description": "Relative time in whole hours (1 to 23).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoDays": "{count, plural, other{{count}天前}}",
+  "@timeAgoDays": {
+    "description": "Relative time in Taipei calendar days (1 to 6).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoMonthDay": "{month}/{day}",
+  "@timeAgoMonthDay": {
+    "description": "Taipei date in the current year, month and day.",
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "timeAgoFullDate": "{year}/{month}/{day}",
+  "@timeAgoFullDate": {
+    "description": "Taipei date in an earlier year.",
+    "placeholders": {
+      "year": {
+        "type": "int"
+      },
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "taipeiTimeLabel": "台北時間",
+  "@taipeiTimeLabel": {
+    "description": "Marks a displayed time as Taipei time when the device time zone offset is not +8."
+  },
+  "taipeiTimeTableNote": "時間為台北時間",
+  "@taipeiTimeTableNote": {
+    "description": "Caption above a table of times, shown when the device time zone offset is not +8."
+  },
+  "viewedJustNow": "剛剛看過",
+  "@viewedJustNow": {
+    "description": "Browsing history label under one minute."
+  },
+  "viewedMinutes": "{count, plural, other{{count} 分鐘前看過}}",
+  "@viewedMinutes": {
+    "description": "Browsing history label in whole minutes.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewedHours": "{count, plural, other{{count} 小時前看過}}",
+  "@viewedHours": {
+    "description": "Browsing history label in whole hours.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewedYesterday": "昨天看過",
+  "@viewedYesterday": {
+    "description": "Browsing history label for the previous Taipei calendar day."
+  },
+  "viewedDays": "{count, plural, other{{count} 天前看過}}",
+  "@viewedDays": {
+    "description": "Browsing history label in Taipei calendar days.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "viewedDate": "{month}/{day} 看過",
+  "@viewedDate": {
+    "description": "Browsing history label with the Taipei date.",
+    "placeholders": {
+      "month": {
+        "type": "int"
+      },
+      "day": {
+        "type": "int"
+      }
+    }
+  },
+  "viewedRecently": "最近看過",
+  "@viewedRecently": {
+    "description": "Browsing history label when the time is unknown."
+  },
+  "commonRetry": "重試",
+  "@commonRetry": {
+    "description": "Retry button label after a failed load."
+  },
+  "productReviewsTitle": "商品評價",
+  "@productReviewsTitle": {
+    "description": "Title of the product reviews section and screen."
+  },
+  "productReviewsTitleWithCount": "商品評價 ({count})",
+  "@productReviewsTitleWithCount": {
+    "description": "Product reviews title with the total review count.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatStoreFallbackName": "店家",
+  "@chatStoreFallbackName": {
+    "description": "Conversation title when the store profile is missing."
+  }
+}

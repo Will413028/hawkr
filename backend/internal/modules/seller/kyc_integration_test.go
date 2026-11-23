@@ -768,6 +768,27 @@ func TestKYCSwitchingSellerTypeClearsTheOtherTypesFields(t *testing.T) {
 	}
 }
 
+// 換成個人賣家時公司文件一併清掉：全部在同一個 transaction 內標為刪除。
+func TestKYCSwitchingToIndividualRetiresTheCompanyDocuments(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, _ := f.open(t)
+	tokens, assets := f.stageDocs(t, accountID, 2)
+	in := companyDraft(accountID, taxIDOne)
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[1]}}
+	d := f.savedDraft(t, in)
+	f.wantAsset(t, assets[0], "ACTIVE")
+	f.wantAsset(t, assets[1], "ACTIVE")
+	ind, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, SellerType: individual()})
+	must(t, err)
+	if len(ind.Documents) != 0 {
+		t.Fatalf("documents=%+v", ind.Documents)
+	}
+	f.wantAsset(t, assets[0], "DELETING")
+	f.wantAsset(t, assets[1], "DELETING")
+}
+
 func TestKYCInputValidation(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

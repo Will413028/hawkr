@@ -83,8 +83,7 @@ class PaymentOwnershipBuyerIdContractTest {
                 paymentService, paymentCloseService, pageService, refundService,
                 cryptoService, notifyHandler, webhookMapper,
                 transactionTemplate, objectMapper, auditLogger, transactionRepository,
-                refundRepository, adminQueryService, paymentLogMapper, applePayMerchantValidator,
-                mock(io.github.will413028.hawkr.payment.agentfee.AgentFeeService.class));
+                refundRepository, adminQueryService, paymentLogMapper, applePayMerchantValidator);
     }
 
     /** 一筆屬於 RESOLVED_BUYER_ID 的交易；只填 toPaymentDetail 會無條件讀的欄位，其餘留 null。 */

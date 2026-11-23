@@ -20,8 +20,6 @@ void main() {
     final selected = ValueNotifier(true);
     final city = ValueNotifier<String?>(null);
     final district = ValueNotifier<String?>(null);
-    final verified = ValueNotifier(false);
-    final verifying = ValueNotifier(false);
     final name = TextEditingController();
     final phone = TextEditingController();
     final address = TextEditingController();
@@ -30,8 +28,6 @@ void main() {
       selected.dispose();
       city.dispose();
       district.dispose();
-      verified.dispose();
-      verifying.dispose();
       name.dispose();
       phone.dispose();
       address.dispose();
@@ -62,8 +58,6 @@ void main() {
                     city: city,
                     district: district,
                     addressCtrl: address,
-                    addressVerified: verified,
-                    addressVerifying: verifying,
                   ),
                 ),
               ),
@@ -78,7 +72,7 @@ void main() {
     final settingsContext = tester.element(find.byType(TaqbinShippingSection));
     expect(MediaQuery.textScalerOf(settingsContext).scale(10), 14);
     expect(find.text('聯絡人姓名'), findsOneWidget);
-    expect(find.text('驗證地址'), findsOneWidget);
+    expect(find.text('驗證地址'), findsNothing);
     expect(find.text('配送溫層'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byType(CustomCheckbox));

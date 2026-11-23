@@ -95,6 +95,20 @@ jobs:
       - name: 色彩對比（contrast.py）
         run: pnpm run contrast:check
       - run: pnpm run test:unit
+      - name: 硬寫中文 baseline 不得比 merge-base 變大
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "跳過：沒有可比對的基準 commit（新分支或首次 push）。"; exit 0
+          fi
+          if ! git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+            echo "跳過：取不到基準 commit $BASE_SHA。"; exit 0
+          fi
+          if ! git show "$BASE_SHA:website/scripts/hardcoded-han-baseline.json" > "$RUNNER_TEMP/base.json"; then
+            echo "跳過：基準 commit 沒有 baseline 檔。"; exit 0
+          fi
+          pnpm exec tsx scripts/check-hardcoded-han.ts --check-baseline-against "$RUNNER_TEMP/base.json"
 
   vitest:
     name: vitest

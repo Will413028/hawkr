@@ -52,6 +52,9 @@ type Deps struct {
 }
 
 // Buyers 與 Stores 是 crm 用到的 buyer、seller 公開 API（守門，必須在 transaction 內呼叫）。
+// RequiredCapability 是店家經營客戶與標籤需要的賣家能力；模組的寫入在 transaction 內、讀取在查詢前檢查，handler 不檢查。
+const RequiredCapability = model.RequiredCapability
+
 type (
 	Buyers = write.Buyers
 	Stores = write.Stores
@@ -128,7 +131,7 @@ func New(d Deps) *Module {
 	}
 	return &Module{
 		write:   write.New(write.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores, NewID: d.NewID, Now: d.Now}),
-		read:    read.New(read.Deps{DB: d.DB}),
+		read:    read.New(read.Deps{DB: d.DB, Stores: d.Stores}),
 		project: project.New(project.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores, Now: d.Now, Logger: d.Logger}),
 		purge:   purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Logger: d.Logger}),
 	}
@@ -149,13 +152,13 @@ func (m *Module) ListTags(ctx context.Context, storeID int64) ([]Tag, error) {
 	return m.read.ListTags(ctx, storeID)
 }
 
-// VIPStatuses 回傳買家在各店是否是 VIP（每個請求的店家一筆）；取代 legacy/crmservice.VIPStatuses。
+// VIPStatuses 回傳買家在各店是否是 VIP（每個請求的店家一筆）。
 func (m *Module) VIPStatuses(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error) {
 	return m.read.VIPStatuses(ctx, buyerID, storeIDs)
 }
 
-// SetCustomerType 設定分類；分類值不合法回 InvalidInput，店家沒有這位客戶回 NotFound。
-func (m *Module) SetCustomerType(ctx context.Context, storeID, buyerID int64, t CustomerType) error {
+// SetCustomerType 設定分類並回傳寫入當下的客戶；分類值不合法回 InvalidInput，店家沒有這位客戶回 NotFound。
+func (m *Module) SetCustomerType(ctx context.Context, storeID, buyerID int64, t CustomerType) (Customer, error) {
 	return m.write.SetCustomerType(ctx, storeID, buyerID, t)
 }
 
@@ -164,8 +167,8 @@ func (m *Module) CreateTag(ctx context.Context, storeID int64, name string) (Tag
 	return m.write.CreateTag(ctx, storeID, name)
 }
 
-// RenameTag 改標籤名稱。
-func (m *Module) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) error {
+// RenameTag 改標籤名稱並回傳寫入當下的標籤。
+func (m *Module) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID, name string) (Tag, error) {
 	return m.write.RenameTag(ctx, storeID, tagID, name)
 }
 
@@ -174,13 +177,13 @@ func (m *Module) DeleteTag(ctx context.Context, storeID int64, tagID uuid.UUID) 
 	return m.write.DeleteTag(ctx, storeID, tagID)
 }
 
-// AddCustomerTags 替客戶貼上一批標籤（不存在的先建立）；整批原子：任何一步失敗，整批都沒有寫入。
-func (m *Module) AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) error {
+// AddCustomerTags 替客戶貼上一批標籤（不存在的先建立）並回傳貼完之後的客戶；整批原子：任何一步失敗，整批都沒有寫入。
+func (m *Module) AddCustomerTags(ctx context.Context, storeID, buyerID int64, names []string) (Customer, error) {
 	return m.write.AddCustomerTags(ctx, storeID, buyerID, names)
 }
 
-// RemoveCustomerTag 移除客戶身上的一個標籤（冪等）。
-func (m *Module) RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) error {
+// RemoveCustomerTag 移除客戶身上的一個標籤（冪等）並回傳移除之後的客戶。
+func (m *Module) RemoveCustomerTag(ctx context.Context, storeID, buyerID int64, tagID uuid.UUID) (Customer, error) {
 	return m.write.RemoveCustomerTag(ctx, storeID, buyerID, tagID)
 }
 
@@ -214,7 +217,7 @@ func (m *Module) ErasePartyData(ctx context.Context, kind string, id int64) erro
 // SweepErase 補排已關閉的買家與已退場的店家中仍有資料的身分的清除 job（保底掃描的內容，給 worker 與測試呼叫）。
 func (m *Module) SweepErase(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
 
-// AddWorkers 登記 River worker（清除與其保底掃描）。由 cmd/hawkr 接上（A6-6e）。
+// AddWorkers 登記 River worker（清除與其保底掃描）。由 cmd/hawkr 的 worker 接上。
 func (m *Module) AddWorkers(workers *river.Workers) { purge.AddWorkers(workers, m.purge) }
 
 // PeriodicJobs 回傳保底掃描的排程。

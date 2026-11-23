@@ -8,7 +8,6 @@ import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_cate
 import {
 	CommunityReportSchema,
 	ListMyReportsResponseSchema,
-	ReportOutcome as ModerationOutcome,
 	MyReportItemSchema,
 	ReportTargetKind,
 	ReportTargetSchema,
@@ -21,6 +20,7 @@ import {
 	StoreReportSchema,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import {
+	moderationCommunityReportOutcomeUnset,
 	moderationReportTargetKind,
 	sellerReportOutcome,
 	sellerStoreReportOutcomeUnset,
@@ -123,9 +123,12 @@ function detail(
 	supplementCount = 0,
 	evidencePositions: number[] = [],
 	supplementEvidence: number[] = [],
+	flags: { canSupplement?: boolean; supplementMax?: number } = {},
 ) {
 	return create(GetMyReportResponseSchema, {
 		report,
+		canSupplement: flags.canSupplement ?? true,
+		supplementMax: flags.supplementMax ?? 10,
 		supplements: Array.from({ length: supplementCount }, (_, i) =>
 			create(ReportSupplementSchema, {
 				id: `p${i}`,
@@ -191,7 +194,6 @@ describe("MyReportsClient", () => {
 									kind: ReportTargetKind.POST,
 									id: "post1",
 								}),
-								outcome: ModerationOutcome.PENDING,
 							}),
 						},
 					}),
@@ -214,6 +216,9 @@ describe("MyReportsClient", () => {
 		await waitFor(() => expect(screen.getByText(kind)).toBeTruthy());
 		expect(screen.getByText("店-s1")).toBeTruthy();
 		expect(screen.getByText("店家檢舉說明")).toBeTruthy();
+		expect(
+			screen.getAllByText(ut(moderationCommunityReportOutcomeUnset())),
+		).toHaveLength(2);
 		const links = screen.getAllByRole("link");
 		expect(links).toHaveLength(1);
 		expect(links[0].getAttribute("href")).toBe("/account/reports/r1");
@@ -328,6 +333,9 @@ describe("StoreReportDetailClient", () => {
 					resolutionNote: "已下架商品",
 				}),
 				1,
+				[],
+				[],
+				{ canSupplement: false },
 			),
 		);
 		renderDetail();
@@ -341,13 +349,25 @@ describe("StoreReportDetailClient", () => {
 		expect(screen.queryByRole("button", { name: "補充說明" })).toBeNull();
 	});
 
-	it("hides the supplement button at 10 supplements and shows the count", async () => {
-		mocks.getMyReport.mockResolvedValue(detail(storeReport(), 10));
+	it("hides the supplement button when the server says can_supplement is false and shows the count", async () => {
+		mocks.getMyReport.mockResolvedValue(
+			detail(storeReport(), 10, [], [], { canSupplement: false }),
+		);
 		renderDetail();
 		await waitFor(() =>
 			expect(screen.getByText("補充說明（10/10）")).toBeTruthy(),
 		);
 		expect(screen.queryByRole("button", { name: "補充說明" })).toBeNull();
+	});
+
+	it("takes the heading's maximum from supplement_max, not a client constant", async () => {
+		mocks.getMyReport.mockResolvedValue(
+			detail(storeReport(), 2, [], [], { supplementMax: 7 }),
+		);
+		renderDetail();
+		await waitFor(() =>
+			expect(screen.getByText("補充說明（2/7）")).toBeTruthy(),
+		);
 	});
 
 	it("shows the (n/10) count and the evidence counts without thumbnails", async () => {
@@ -394,6 +414,26 @@ describe("StoreReportDetailClient", () => {
 			}),
 		);
 		expect(screen.getByText("補充說明（3/10）")).toBeTruthy();
+	});
+
+	it("uses can_supplement and supplement_max of the AddReportSupplement response afterwards", async () => {
+		mocks.getMyReport.mockResolvedValue(detail(storeReport(), 2));
+		mocks.addReportSupplement.mockResolvedValue(
+			detail(storeReport(), 3, [], [], {
+				canSupplement: false,
+				supplementMax: 3,
+			}),
+		);
+		renderDetail();
+		fireEvent.click(await screen.findByRole("button", { name: "補充說明" }));
+		fireEvent.change(screen.getByLabelText(/^說明/), {
+			target: { value: "最後一則" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "送出補充說明" }));
+		await waitFor(() =>
+			expect(screen.getByText("補充說明（3/3）")).toBeTruthy(),
+		);
+		expect(screen.queryByRole("button", { name: "補充說明" })).toBeNull();
 	});
 
 	it("does not submit a blank supplement", async () => {

@@ -1,5 +1,4 @@
 import 'package:hawkr_seller/core/theme/app_theme.dart';
-import 'package:hawkr_seller/features/settings/presentation/shipping_settings/widgets/address_autocomplete_field.dart';
 import 'package:hawkr_seller/features/settings/presentation/shipping_settings/widgets/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -40,7 +39,7 @@ void main() {
                     children: [
                       CustomInput(controller: name, hint: '請輸入姓名'),
                       const SizedBox(height: 16),
-                      AddressAutocompleteField(controller: address),
+                      CustomInput(controller: address, hint: '路名 + 門牌號碼'),
                     ],
                   ),
                 ),

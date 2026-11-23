@@ -26,6 +26,8 @@ import '../data/delegation_navigation.dart';
 import '../data/notification_model.dart';
 import '../data/push/manager.dart';
 import 'notification_controller.dart';
+import '../../../shared/time/taipei_display.dart';
+import '../../../l10n/l10n.dart';
 
 final _notificationBuyerMetaProvider =
     FutureProvider.family<_NotificationBuyerMeta?, String>((
@@ -395,7 +397,7 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
         : (fetchedBuyerMeta?.avatarUrl ?? '');
     final title = _personalize(n.title, n, buyerName: buyerName);
     final body = _personalize(n.body, n, buyerName: buyerName);
-    final time = _formatTime(n.createdAt);
+    final time = _formatTime(context, n.createdAt);
     final onActivate = widget.isDeleteMode
         ? () => widget.onSelectionChanged?.call(!widget.isSelected)
         : widget.onTap;
@@ -667,14 +669,8 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
     return systemStyle;
   }
 
-  static String _formatTime(DateTime dateTime) {
-    final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 1) return '剛剛';
-    if (diff.inHours < 1) return '${diff.inMinutes} 分鐘前';
-    if (diff.inDays < 1) return '${diff.inHours} 小時前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-    return '${dateTime.month}/${dateTime.day}';
-  }
+  static String _formatTime(BuildContext context, DateTime dateTime) =>
+      context.taipeiDisplay.timeAgoIn(context.l10n, dateTime);
 
   /// 從 notification.data 取得買家名稱（多種後端 key fallback）。
   /// 沒有的話回傳空字串，caller 用原文 fallback。

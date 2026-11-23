@@ -209,7 +209,7 @@ order-service/
 | # | 讀者 | `54` 的行為 | 落點 |
 |---|---|---|---|
 | 1 | 撥款資格（payout eligibility） | ✅ **eligible**——同事務建 `grant_payment_tasks(PENDING)`，之後**完全沿用**既有 Worker ＋ payout hold 閘門 | §5.4 撥款觸發節、§8.8、§8.8.1 |
-| 2 | 結算（本書等價物 ＝ 撥款任務 ＋ `financial_logs`） | 原訂單款**正常結算給賣家**。⚠️ 「賣家收到原訂單款」與「賣家承擔該次履約的物流成本」是**兩條不同的資金線**，不得混寫（物流成本側見 [70 物流財務結算](70-物流財務結算（Logistics%20Settlement%20%26%20Receivable）詳細設計書.md)） | §3.4、§3.11 |
+| 2 | 結算（本書等價物 ＝ 撥款任務 ＋ `financial_logs`） | 原訂單款**正常結算給賣家**。⚠️ 「賣家收到原訂單款」與「賣家承擔該次履約的物流成本」是**兩條不同的資金線**，不得混寫（物流成本側見 70 物流財務結算（物流財務已刪除）） | §3.4、§3.11 |
 | 3 | 賣家訂單 tab / Dashboard 狀態卡 | 歸入第三桶「**已結束**」（賣家無需再動作），🔴 **不得**被描述為「已完成（正常送達）」 | §2.1 賣家 tab 表、四桶規則 |
 | 4 | 買家訂單 tab / status_counts rollup | 納入買家第三個 tab 的 status filter（否則訂單不在任何 tab、買家看不到）；🔴 **單筆狀態徽章必須顯示「配送失敗」**，不得沿用「已完成」／「已取消」 | §2.1 買家 tab 表、買家 Tab 筆數 Rollup |
 | 5 | ADM 訂單呈現 | 顯示本終態 ＋ 履約責任判定結果 ＋ 其**責任案件／resolution 與 finality 狀態**（`35` 期間看得到「尚未 final」）。⚠️ admin 仍**不提供**手動改 `order.status`（既有裁決不放寬）——🔴 本終態不可逆，不存在「改回去」的操作 | §4.2 管理端 RPC |
@@ -1273,7 +1273,6 @@ message FinancialLogView { string type = 1; string amount = 2; string external_t
 rpc GetOrderForPayment(GetOrderForPaymentRequest) returns (GetOrderForPaymentResponse);
 rpc SnapshotPaymentInfo(SnapshotPaymentInfoRequest) returns (SnapshotPaymentInfoResponse);
 rpc GetOrderForShipping(GetOrderForShippingRequest) returns (GetOrderForShippingResponse);
-rpc GetOrderByShipTradeNo(GetOrderByShipTradeNoRequest) returns (GetOrderByShipTradeNoResponse);
 rpc GetOrderForReview(GetOrderForReviewRequest) returns (GetOrderForReviewResponse);
 rpc GetOrderForAfterSales(GetOrderForAfterSalesRequest) returns (GetOrderForAfterSalesResponse);
 rpc CancelOrderInternal(CancelOrderInternalRequest) returns (CancelOrderInternalResponse);
@@ -1295,9 +1294,6 @@ message OrderShippingInfo {
   string shipping_method = 11; string product_name = 12; string mer_id = 13;
   string delivery_temp = 14; string dimension_sum = 15;
 }
-
-message GetOrderByShipTradeNoRequest { string ship_trade_no = 1; }
-message GetOrderByShipTradeNoResponse { int32 code = 1; string message = 2; OrderDetailView data = 3; }
 
 message GetOrderForAfterSalesRequest { string order_no = 1; }
 message GetOrderForAfterSalesResponse { int32 code = 1; string message = 2; OrderAfterSalesView data = 3; }
@@ -1346,7 +1342,7 @@ message GetSellerOrderStatusCountsResponse {
 |---|---|
 | `GetOrder`（買家視角）且 `status == PENDING_PAYMENT` | `PaymentMethodLimitRules.resolveAvailability(total_actual_amount)` |
 | 其他狀態（已付 / 已取消 / …） | 空清單（非 pending 不能再 `CreatePayment`，回付款方式為噪音） |
-| `GetSellerOrderDetail` / `GetAdminOrderDetail` / `GetOrderByShipTradeNo` 等非買家 caller | 空清單（賣家 / 管理員 / 物流不付款；避免污染共用 `OrderDetailView`） |
+| `GetSellerOrderDetail` / `GetAdminOrderDetail` 等非買家 caller | 空清單（賣家 / 管理員 / 物流不付款；避免污染共用 `OrderDetailView`） |
 
 > **實作約束**：`OrderProtoConverter.toDetailView(...)` 為 5 個 caller 共用的 static 組裝方法，**禁止**把 availability 塞進去（會洩漏到賣家 / 管理員 / 物流回應）。比照既有 `OrderGrpcService.enrichProvider(...)` 的 per-caller `toBuilder().build()` pattern，新增 `enrichAvailablePaymentMethods(base, order)`，**僅在 `OrderGrpcService.getOrder`（買家路徑）呼叫**，內部再以 `status == PENDING_PAYMENT` 守門。
 

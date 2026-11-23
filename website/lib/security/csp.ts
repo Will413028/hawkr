@@ -25,7 +25,8 @@
  *                                    empty style element (covered by 'unsafe-inline');
  *                                    it lists no connect-src host.
  *                                    https://docs.stripe.com/connect/get-started-connect-embedded-components
- *   Backend gateway + chat WS        API base env (https + wss)
+ *   Backend gateway (Connect, incl.   API base env (https)
+ *   the chat server stream)
  *   Media (image-gateway)            NEXT_PUBLIC_MEDIA_BASE_URL
  *   Sentry ingest                    NEXT_PUBLIC_SENTRY_DSN host
  *   Media upload (presigned PUT)     MEDIA_UPLOAD_ORIGINS (deploy-specific; absent
@@ -47,22 +48,9 @@ export function originOf(value: string | undefined): string {
 	}
 }
 
-/**
- * Expand each origin with its websocket sibling (`https` -> `wss`), dropping
- * empty values and duplicates.
- */
-export function withWebSocketSiblings(origins: readonly string[]): string[] {
-	return [
-		...new Set(
-			origins
-				.filter(Boolean)
-				.flatMap((origin) =>
-					/^https?:/.test(origin)
-						? [origin, origin.replace(/^http/, "ws")]
-						: [origin],
-				),
-		),
-	];
+/** Drop empty values and duplicates from a list of origins. */
+export function uniqueOrigins(origins: readonly string[]): string[] {
+	return [...new Set(origins.filter(Boolean))];
 }
 
 /**

@@ -1,0 +1,10 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "message": "This transfer only has ($60.00) remaining to reverse. We cannot reverse ($70.00).",
+      "request_log_url": "<MASKED>",
+      "type": "invalid_request_error"
+    }
+  }
+}

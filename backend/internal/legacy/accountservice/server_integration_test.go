@@ -5,7 +5,6 @@ package accountservice
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -96,7 +95,7 @@ func (f *fixture) account(t *testing.T, roles ...identity.Role) int64 {
 		t.Fatal(err)
 	}
 	for _, r := range roles {
-		if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: r, SourceID: nil}); err != nil {
+		if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: r}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -145,11 +144,6 @@ func TestGetAccountInfo(t *testing.T) {
 		batch.Msg.GetData()[1].GetAccountType() != 1 {
 		t.Fatalf("batch = %v, %v", batch, err)
 	}
-	// 帳號沒有手機：以手機找一律是「找不到」，與原本查無此手機相同。
-	byPhone, err := f.client.GetAccountByPhone(ctx, connect.NewRequest(&pb.GetAccountByPhoneRequest{Phone: "0900000000"}))
-	if err != nil || byPhone.Msg.GetCode() != codeNotFound || byPhone.Msg.GetData() != nil {
-		t.Fatalf("以手機找 = %v, %v", byPhone, err)
-	}
 }
 
 func TestRolesAndDeletion(t *testing.T) {
@@ -157,41 +151,14 @@ func TestRolesAndDeletion(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	id := f.account(t)
-	// BindBuyer 沒有呼叫方，不實作。
-	if _, err := f.client.BindBuyer(ctx, connect.NewRequest(&pb.BindBuyerRequest{AccountId: id})); connect.CodeOf(err) != connect.CodeUnimplemented {
-		t.Fatalf("BindBuyer = %v", err)
-	}
-	// 賣家角色由 seller 模組建店時授予；這裡直接以 identity 授予，驗證舊 RemoveRole 的來源比對。
-	for _, source := range []int64{11, 12} {
-		if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller, SourceID: &source}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	// 重新入駐之後，遲到的舊撤銷（來源 11）不生效（#3189）。
-	r, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{
-		AccountId: id, Role: pb.Role_ROLE_SELLER, SourceId: 11, OtherRoleState: pb.OtherRoleState_OTHER_ROLE_STATE_ABSENT,
-	}))
-	if err != nil || r.Msg.GetCode() != 0 || r.Msg.GetAccountFullyDeleted() {
-		t.Fatalf("過期的撤銷 = %v, %v", r, err)
+	// 賣家角色由 seller 模組建店時授予；這裡直接以 identity 授予。
+	if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
+		t.Fatal(err)
 	}
 	if a, _ := f.m.Account(ctx, id); !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("角色 = %v", a.Roles)
 	}
-	// 移除最後一個角色也不刪帳號（帳號活著就是買家），即使舊呼叫方回報另一個角色 ABSENT。
-	r, err = f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{
-		AccountId: id, Role: pb.Role_ROLE_SELLER, SourceId: 12, OtherRoleState: pb.OtherRoleState_OTHER_ROLE_STATE_ABSENT,
-	}))
-	if err != nil || r.Msg.GetCode() != 0 || r.Msg.GetAccountFullyDeleted() {
-		t.Fatalf("移除賣家 = %v, %v", r, err)
-	}
-	// 買家不是角色：舊的 ROLE_BUYER 一律拒絕，帳號不變。
-	r, err = f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{
-		AccountId: id, Role: pb.Role_ROLE_BUYER, OtherRoleState: pb.OtherRoleState_OTHER_ROLE_STATE_ABSENT,
-	}))
-	if err != nil || r.Msg.GetCode() != codeInvalidInput || r.Msg.GetAccountFullyDeleted() {
-		t.Fatalf("移除買家 = %v, %v", r, err)
-	}
-	if a, err := f.m.Account(ctx, id); err != nil || a.Deleted || len(a.Roles) != 0 {
+	if a, err := f.m.Account(ctx, id); err != nil || a.Deleted || !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("帳號 = %+v, %v", a, err)
 	}
 	if len(f.published) != 0 {
@@ -211,32 +178,7 @@ func TestRolesAndDeletion(t *testing.T) {
 	if err := json.Unmarshal(f.published[0].Body, &e); err != nil || e.EventType != "ACCOUNT_DELETED" || e.AccountID != id || e.EventID == "" || e.EventID != f.published[0].EventID {
 		t.Fatalf("account.deleted = %s, %v", f.published[0].Body, err)
 	}
-	// 已刪除的帳號：移除賣家冪等成功，不再發事件。
-	if r, err := f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_SELLER})); err != nil || r.Msg.GetCode() != 0 {
-		t.Fatalf("移除已刪帳號的賣家 = %v, %v", r, err)
-	}
-
-	r, err = f.client.RemoveRole(ctx, connect.NewRequest(&pb.RemoveRoleRequest{AccountId: id, Role: pb.Role_ROLE_UNSPECIFIED}))
-	if err != nil || r.Msg.GetCode() != codeInvalidInput {
-		t.Fatalf("不認得的角色 = %v, %v", r, err)
-	}
 	if len(f.published) != 1 {
 		t.Fatalf("事件 %d 則", len(f.published))
-	}
-}
-
-func TestUnimplementedMethods(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	// 還沒實作的方法（已經搬到 Connect 或刪除）回 unimplemented。
-	_, err := f.client.GoogleOAuth(ctx, connect.NewRequest(&pb.GoogleOAuthRequest{}))
-	var ce *connect.Error
-	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnimplemented {
-		t.Fatalf("GoogleOAuth = %v", err)
-	}
-	_, err = f.client.SuspendAccount(ctx, connect.NewRequest(&pb.SuspendAccountRequest{}))
-	if !errors.As(err, &ce) || ce.Code() != connect.CodeUnimplemented {
-		t.Fatalf("SuspendAccount = %v", err)
 	}
 }

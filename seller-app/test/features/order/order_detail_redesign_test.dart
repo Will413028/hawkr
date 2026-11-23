@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 void main() {
   const statusLabels = <int, String>{
@@ -80,6 +81,9 @@ class _TestApp extends StatelessWidget {
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: SharedOrderDetailScreen(
             // 空 id 可避免 widget test 觸發後端；生產 route 會傳真實單號。
             orderId: '',

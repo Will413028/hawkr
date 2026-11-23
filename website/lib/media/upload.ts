@@ -151,7 +151,7 @@ function delegatedUploadClient(
 		},
 		getUpload: async (req: { stagedToken: string }) => {
 			const env = await fetcher<GetWire>(`${root}/${token(req.stagedToken)}`);
-			if (!env.data) throw new Error("上傳狀態回應缺少內容");
+			if (!env.data) throw new Error("getUpload response has no data");
 			return {
 				state: env.data.state,
 				rejectReason: env.data.rejectReason ?? undefined,

@@ -1,0 +1,139 @@
+{
+ "mutants": [
+  {
+   "id": "normal-end-reconnect-now",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_stream_client.dart",
+   "old": "          if (sawReady) {\n            failures = 0;\n            continue;\n          }\n",
+   "new": "",
+   "test": "test/features/chat/chat_stream_client_test.dart a normal end (max lifetime) reconnects at once",
+   "why": "正常結束（壽命到）不再立刻重連，改走失敗退避"
+  },
+  {
+   "id": "liveness-twice-heartbeat",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_stream_client.dart",
+   "old": "liveFor = d > Duration.zero ? d * 2 : initialLiveness;",
+   "new": "liveFor = d > Duration.zero ? d * 20 : initialLiveness;",
+   "test": "test/features/chat/chat_stream_client_test.dart no frame for twice the heartbeat interval",
+   "why": "存活逾時不再是心跳間隔的兩倍"
+  },
+  {
+   "id": "store-closed-terminal",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_stream_client.dart",
+   "old": "if (reason == ErrorReason.STORE_CLOSED.name) {",
+   "new": "if (reason == null) {",
+   "test": "test/features/chat/chat_stream_client_test.dart failed_precondition with STORE_CLOSED stops",
+   "why": "STORE_CLOSED 不再讓串流終止"
+  },
+  {
+   "id": "exhausted-long-backoff",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_stream_client.dart",
+   "old": "floor: exhaustedBackoff,",
+   "new": "floor: Duration.zero,",
+   "test": "test/features/chat/chat_stream_client_test.dart resource_exhausted waits at least the long backoff",
+   "why": "並行串流超過上限時不再拉長退避下限"
+  },
+  {
+   "id": "cursor-only-forward",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_stream_client.dart",
+   "old": "if (seq > prev) _cursors[conversationId] = seq;",
+   "new": "_cursors[conversationId] = seq;",
+   "test": "test/features/chat/chat_stream_client_test.dart noteSeq only moves forward",
+   "why": "重連游標可以倒退"
+  },
+  {
+   "id": "reconnect-now-skips-wait",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_stream_client.dart",
+   "old": "if (w != null && !w.isCompleted) {",
+   "new": "if (w != null && w.isCompleted) {",
+   "test": "test/features/chat/chat_stream_client_test.dart reconnectNow skips the backoff wait",
+   "why": "回前景不再跳過退避等待"
+  },
+  {
+   "id": "tombstone-replaces-seq",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "      list[byId] = m;",
+   "new": "      list[byId] = list[byId];",
+   "test": "test/features/chat/chat_thread_notifier_test.dart stream message with updated=true replaces",
+   "why": "同 seq 的可見度改變不再取代手上的那則"
+  },
+  {
+   "id": "gap-detection",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "if (m.seq > data.contiguousLastSeq + 1 && data.contiguousLastSeq > 0) {",
+   "new": "if (m.seq > data.contiguousLastSeq + 100 && data.contiguousLastSeq > 0) {",
+   "test": "test/features/chat/chat_thread_notifier_test.dart a seq gap triggers a fill",
+   "why": "序號跳號不再觸發補洞"
+  },
+  {
+   "id": "retry-same-request-id",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "    await _dispatch(requestId, job);",
+   "new": "    await _dispatch(const Uuid().v4(), job);",
+   "test": "test/features/chat/chat_thread_notifier_test.dart send failure keeps the message as failed and retry reuses",
+   "why": "重送換了新的 request_id"
+  },
+  {
+   "id": "peer-read-advances",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "if (peerReadSeq > data.peerReadSeq) {",
+   "new": "if (peerReadSeq < data.peerReadSeq) {",
+   "test": "test/features/chat/chat_thread_notifier_test.dart peer read event advances",
+   "why": "對方已讀游標不再前進"
+  },
+  {
+   "id": "mark-read-on-open",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_thread_notifier.dart",
+   "old": "    unawaited(Future<void>(markRead));",
+   "new": "",
+   "test": "test/features/chat/chat_thread_notifier_test.dart markRead pushes the cursor",
+   "why": "開啟對話不再標已讀"
+  },
+  {
+   "id": "read-only-reasons",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/presentation/chat_send_error_dispatch.dart",
+   "old": "readOnly: reason != null && _readOnlyReasons.contains(reason),",
+   "new": "readOnly: false,",
+   "test": "test/features/chat/chat_send_error_dispatch_test.dart makes the thread read-only",
+   "why": "封鎖、停業、帳號刪除不再讓輸入框唯讀"
+  },
+  {
+   "id": "hidden-preview-catalog",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/presentation/chat_preview.dart",
+   "old": "if (p.hidden) return chatPreviewHidden(locale);",
+   "new": "if (p.hidden) return '';",
+   "test": "test/features/chat/chat_preview_test.dart hidden and erased use the catalog sentences",
+   "why": "隱藏訊息的預覽不再用目錄句子"
+  },
+  {
+   "id": "mark-read-upto-seq",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_repository.dart",
+   "old": "uptoSeq: _zero + uptoSeq,",
+   "new": "uptoSeq: _zero + uptoSeq + 1,",
+   "test": "test/features/chat/chat_repository_test.dart markRead sends the conversation id and upto_seq",
+   "why": "已讀游標送錯 seq"
+  },
+  {
+   "id": "gap-fill-after-seq",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/chat/data/chat_repository.dart",
+   "old": "afterSeq: _zero + cursor,",
+   "new": "afterSeq: _zero + afterSeq,",
+   "test": "test/features/chat/chat_repository_test.dart listAfter pages with after_seq",
+   "why": "補洞分頁不再往後推 after_seq"
+  }
+ ]
+}

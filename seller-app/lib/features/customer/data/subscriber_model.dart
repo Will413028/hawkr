@@ -1,6 +1,5 @@
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'dart:collection';
-
-import '../../../shared/models/buyer_card_info.dart';
 
 /// Immutable subscriber data rendered by the presentation layer.
 final class Subscriber {
@@ -20,9 +19,9 @@ final class Subscriber {
   /// The buyer deleted their account (`BuyerCard.deleted`).
   final bool deleted;
 
-  /// 已刪除的買家顯示墓碑字串，與舊 buyer-service 及單體 legacy adapter 的字面值相同。
-  String get displayName {
-    if (deleted) return deletedBuyerLabel;
+  /// 已刪除的買家用目錄的 `buyer.Profile.deleted_name`。
+  String displayName(UiLocale l) {
+    if (deleted) return buyerProfileDeletedName(l);
     return nickname.isNotEmpty ? nickname : '用戶 $buyerId';
   }
 }

@@ -17,6 +17,7 @@ import 'package:hawkr_buyer/features/settings/presentation/my_subscription_scree
 import 'package:hawkr_buyer/features/visit/data/visit_repository.dart';
 import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:flutter/material.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -71,14 +72,13 @@ void main() {
     when(
       () => _visitRepository.batchCheckFavorites(any()),
     ).thenAnswer((_) async => {88});
-    when(
-      () => _reviewRepository.getMerchantProductReviewSummary(any()),
-    ).thenAnswer(
-      (_) async => <String, dynamic>{
-        'hasTotal': true,
-        'total': 18,
-        'rating': 4.8,
-      },
+    when(() => _reviewRepository.getProductReviewStats(any())).thenAnswer(
+      (_) async => (
+        count: 18,
+        average: 4.8,
+        distribution: {5: 18, 4: 0, 3: 0, 2: 0, 1: 0},
+        withImagesCount: 0,
+      ),
     );
   });
 
@@ -505,6 +505,9 @@ Future<void> _pumpRouterScreen(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, __) => MaterialApp.router(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
@@ -545,6 +548,9 @@ Future<void> _pumpScreen(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, __) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),

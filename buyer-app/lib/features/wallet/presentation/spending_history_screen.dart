@@ -1,11 +1,16 @@
+import 'package:hawkr_api/money.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
 import '../../order/data/order_repository.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/utils/amount_utils.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../../l10n/l10n.dart';
+import '../../../shared/time/taipei_display.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 /// 消費紀錄頁面
@@ -120,8 +125,9 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
         totalSpent += amount;
         totalRefund += refund;
 
+        final date = _tryFormatDate(createdAt);
         records.add({
-          'date': _formatDate(createdAt),
+          'date': date ?? createdAt,
           'orderId': _truncateOrderId(orderId),
           'amount': amount,
           'refund': refund,
@@ -203,33 +209,9 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
         compact.contains('cancelled');
   }
 
-  String _formatDate(String raw) {
-    if (raw.isEmpty) return '';
-    try {
-      DateTime? dt;
-      final digits = RegExp(r'^\d+$');
-      if (digits.hasMatch(raw)) {
-        if (raw.length >= 13) {
-          final ms = int.tryParse(raw.substring(0, 13));
-          if (ms != null) {
-            dt = DateTime.fromMillisecondsSinceEpoch(ms).toLocal();
-          }
-        } else if (raw.length >= 10) {
-          final sec = int.tryParse(raw.substring(0, 10));
-          if (sec != null) {
-            dt = DateTime.fromMillisecondsSinceEpoch(sec * 1000).toLocal();
-          }
-        }
-      }
-      dt ??= DateTime.tryParse(
-        raw.replaceFirst(' ', 'T').replaceAll('/', '-'),
-      )?.toLocal();
-      if (dt == null) return raw;
-      String two(int n) => n.toString().padLeft(2, '0');
-      return '${dt.year}/${two(dt.month)}/${two(dt.day)}';
-    } catch (_) {
-      return raw;
-    }
+  /// 解析失敗回 null（呼叫端不為原樣字串附臺北時間標籤）。
+  String? _tryFormatDate(String raw) {
+    return TaipeiDisplay.plainIso(raw, TaipeiFormat.date);
   }
 
   String _truncateOrderId(String orderId) {
@@ -268,9 +250,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
                   ),
                   SizedBox(height: 16.h),
                   // 表格標題
-                  _buildTableHeader(),
-                  // 表格內容
-                  ..._buildTableRows(),
+                  SpendingHistoryTable(records: _records),
                 ],
               ),
             ),
@@ -348,8 +328,34 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
       ),
     );
   }
+}
 
-  Widget _buildTableHeader() {
+/// 消費紀錄表格；裝置偏移不是 +8 時在表格上方附一行台北時間說明。
+class SpendingHistoryTable extends StatelessWidget {
+  const SpendingHistoryTable({super.key, required this.records});
+
+  final List<Map<String, dynamic>> records;
+
+  @override
+  Widget build(BuildContext context) {
+    final showNote = context.taipeiDisplay.labelIfNeeded != null;
+    return Column(
+      children: [
+        if (showNote)
+          Padding(
+            padding: EdgeInsets.only(bottom: 4.h),
+            child: Text(
+              context.l10n.taipeiTimeTableNote,
+              style: TextStyle(fontSize: 12, color: AppColors.textPrimary),
+            ),
+          ),
+        _buildTableHeader(context),
+        ..._buildTableRows(context),
+      ],
+    );
+  }
+
+  Widget _buildTableHeader(BuildContext context) {
     final textStyle = TextStyle(
       color: AppColors.textPrimary,
       fontSize: 14,
@@ -399,8 +405,8 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
     );
   }
 
-  List<Widget> _buildTableRows() {
-    if (_records.isEmpty) {
+  List<Widget> _buildTableRows(BuildContext context) {
+    if (records.isEmpty) {
       return [
         Padding(
           padding: EdgeInsets.all(24.w),
@@ -416,7 +422,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
 
     final textStyle = TextStyle(color: AppColors.textPrimary, fontSize: 14);
 
-    return _records.map((record) {
+    return records.map((record) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 12.w),
         child: Row(
@@ -441,7 +447,7 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
               flex: 1,
               child: Text(
                 // B-109：後端 amount 一律字串，使用 AmountUtils 做容錯解析
-                AmountUtils.formatNTD(record['amount']),
+                formatMoney(AmountUtils.parseToInt(record['amount'])),
                 textAlign: TextAlign.center,
                 style: textStyle,
               ),

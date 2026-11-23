@@ -4,7 +4,7 @@
 # D4）。搬遷中的模組另外起它的舊服務，同一份情境以 REST 經入口與 gateway 打舊服務、以 Connect 打單體。呼叫者的身分
 # 是以 hawkr dev-token 簽的 token（本機的暫時金鑰，不連任何外部 provider）。
 #
-# 只用 docker-compose-infra.yml 的 Postgres 與 Redis（先 make infra-up）；單體的 media 模組連呼叫者以環境變數
+# 只用 docker-compose-infra.yml 的 Postgres 與 Redis（先 make infra-up；舊服務是 Java 的 coupon-service 時還要它的 RabbitMQ）；單體的 media 模組連呼叫者以環境變數
 # MEDIA_S3_ENDPOINT、MEDIA_S3_REGION、MEDIA_S3_BUCKET、MEDIA_S3_ACCESS_KEY_ID、MEDIA_S3_SECRET_ACCESS_KEY 指定的 S3 相容儲存
 # （本機與 CI 的 Garage），KEK 每次執行產生。服務以 env -i 啟動，不讀 .env、不繼承 shell 的環境變數，
 # 不會連到任何外部服務。在 backend/ 執行：
@@ -20,7 +20,7 @@
 # PG_USER、PG_PASSWORD、LOG_DIR，要做的事：
 #   - 建自己的 database、套用舊服務的 migration、起舊服務（start_bg）；
 #   - 把 gateway 連到舊服務要的設定加進 gateway_env 陣列，例如 gateway_env+=(X_SERVICE_HOST=127.0.0.1)。
-#   舊服務呼叫 account-service 與 seller-service 的 gRPC 時，連單體的 legacy listener（127.0.0.1:${LEGACY_PORT}）。
+#   舊服務呼叫 account 與 seller 的 gRPC 時，連單體的 legacy listener（127.0.0.1:${LEGACY_PORT}）。
 # 範本在 make new-module 產生的 legacy.sh。舊服務刪除時連同 legacy.sh 一起刪除。
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -45,10 +45,6 @@ MONOLITH_DB=characterize_monolith
 MONOLITH_PORT=18080
 LEGACY_PORT=19941
 GATEWAY_PORT=19080
-# gateway 的聊天 WebSocket ticket 用 JWT_SECRET。
-JWT_SECRET=$(openssl rand -hex 32)
-# gateway 開機時要求 IM 串流的服務間密鑰（與特性測試無關），給一個只在這次用的值。
-IM_SECRET=$(openssl rand -hex 32)
 LOG_DIR=$(mktemp -d)
 pids=()
 dbs=()
@@ -137,7 +133,7 @@ start_bg monolith \
   MEDIA_S3_BUCKET="${MEDIA_S3_BUCKET:?缺 MEDIA_S3_BUCKET}" MEDIA_S3_ACCESS_KEY_ID="${MEDIA_S3_ACCESS_KEY_ID:?缺 MEDIA_S3_ACCESS_KEY_ID}" \
   MEDIA_S3_SECRET_ACCESS_KEY="${MEDIA_S3_SECRET_ACCESS_KEY:?缺 MEDIA_S3_SECRET_ACCESS_KEY}" MEDIA_KEKS="$MEDIA_KEKS" MEDIA_ORIGIN=https://media.invalid PUBLIC_WEB_ORIGIN=https://web.invalid \
   GATEWAY_URL="http://127.0.0.1:${GATEWAY_PORT}" \
-  PRODUCT_SERVICE_ADDR=127.0.0.1:1 ORDER_SERVICE_ADDR=127.0.0.1:1 CRM_SERVICE_ADDR=127.0.0.1:1 REVIEW_SERVICE_ADDR=127.0.0.1:1 \
+  PRODUCT_SERVICE_ADDR=127.0.0.1:1 ORDER_SERVICE_ADDR=127.0.0.1:1 INVOICE_SERVICE_ADDR=127.0.0.1:1 \
   CORS_ALLOWED_ORIGINS=http://localhost:3000 \
   DEV_AUTH_KEY_FILE="$DEV_AUTH_KEY_FILE" KYC_HASH_KEYS="$KYC_HASH_KEYS" \
   "${LOG_DIR}/hawkr" serve
@@ -171,10 +167,10 @@ fi
 start_bg gateway \
   APP_ENV=local GIN_MODE=release INTERNAL_AUTH_MODE=off \
   PORT="$GATEWAY_PORT" DEBUG_PORT=19901 METRICS_PORT=19902 \
-  JWT_SECRET="$JWT_SECRET" IM_CHAT_STREAM_JWT_SECRET="$IM_SECRET" MEDIA_BASE_URL=http://media.invalid \
+  MEDIA_BASE_URL=http://media.invalid \
   REDIS_HOST=127.0.0.1 REDIS_PORT=6379 REDIS_PASSWORD="$REDIS_PASSWORD" \
   ACCOUNT_SERVICE_HOST=127.0.0.1 ACCOUNT_SERVICE_GRPC_PORT="$LEGACY_PORT" \
-  SELLER_SERVICE_HOST=127.0.0.1 SELLER_SERVICE_GRPC_PORT="$LEGACY_PORT" \
+  LEGACY_SELLER_GRPC_HOST=127.0.0.1 LEGACY_SELLER_GRPC_PORT="$LEGACY_PORT" \
   ${gateway_env[@]+"${gateway_env[@]}"} \
   "${LOG_DIR}/gateway"
 

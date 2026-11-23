@@ -778,8 +778,8 @@ func TestStoreWithoutSellerRoleIsInternalError(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	id, _ := f.account(t)
-	s := f.store(t, id)
-	if err := f.identity.RemoveRole(ctx, identity.RemoveRoleInput{AccountID: id, Role: identity.RoleSeller, SourceID: &s.StoreID}); err != nil {
+	f.store(t, id)
+	if err := f.identity.RemoveRole(ctx, identity.RemoveRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
 		t.Fatal(err)
 	}
 	for _, in := range []RequestInput{{AccountID: id, Requester: AccountOwner}, adminRequest(id)} {

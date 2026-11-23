@@ -8,8 +8,7 @@
 // （wire 型別都還是 string）。其他欄位的值與身分空間不變：receiver_id 收件人是買家時送 buyer_id、
 // 是店家時送店家的 account_id。
 //
-// 這個 package 只在測試中啟用：舊 im-service 仍是聊天唯一的寫入者與發送者，cmd/hawkr 不訂閱事件也不登記 worker
-// （同一時間只能有一個生效的 producer）；舊路由移除時才接上。notification 搬進單體後刪除。
+// cmd/hawkr 在 serve 與 worker 訂閱事件、worker 登記 job。單體的 im 是所有聊天訊息的唯一 producer。notification 搬進單體後刪除。
 package imrelay
 
 import (
@@ -28,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 const (
@@ -35,9 +35,10 @@ const (
 	keySent    = "chat.message.sent"
 	// previewMaxRunes 是舊 PreviewMaxLength：超過時截斷並加上 "..."。
 	previewMaxRunes = 100
-	// 推播預覽的過渡句子：共用文案目錄沒有聊天條目，有了之後改取同一批（見 im 的 CARRYOVER）。
-	imagePreview = "傳送了一張圖片"
 )
+
+// previewText 是推播預覽的句子來源：舊 notification 只認 zh-TW，所以固定取 zh-TW 的共用文案目錄（chat.Preview.image）。
+var previewText = uitext.For(uitext.ZhTW)
 
 // MessageSentArgs 轉成 chat.message.sent。以整組參數（含事件 ID）做 unique：同一則事件只排一個。
 type MessageSentArgs struct {
@@ -107,7 +108,7 @@ func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &typedWorker[MessageSentArgs]{work: w.messageSent})
 }
 
-// chatMessageSent 是舊 ChatMessageSentEvent（im-service/internal/usecase/message.go）：十個欄位全是 string，沒有 BaseEvent 外殼。
+// chatMessageSent 是 chat.message.sent 的 wire 形狀（沿用舊 im-service 的 ChatMessageSentEvent）：十個欄位全是 string，沒有 BaseEvent 外殼。
 type chatMessageSent struct {
 	MessageID      string `json:"message_id"`
 	ConversationID string `json:"conversation_id"`
@@ -248,7 +249,7 @@ func (w *Worker) storeAvatar(ctx context.Context, st seller.Store) (string, erro
 func previewSentence(m im.RelayMessage) (string, error) {
 	switch {
 	case m.Type == im.TypeImage:
-		return imagePreview, nil
+		return previewText.ChatPreviewImage(), nil
 	case m.Type == im.TypeText && m.Text != nil:
 		r := []rune(*m.Text)
 		if len(r) > previewMaxRunes {

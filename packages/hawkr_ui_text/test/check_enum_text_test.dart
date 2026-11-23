@@ -556,6 +556,66 @@ String j(MeasureKind k) => k == $warn ? x.t : '';
     });
   });
 
+  group('ARB 查詢', () {
+    test('context.l10n.x、AppLocalizations.of(context).x、方法呼叫與別名都算產生文字', () {
+      expect(
+        scan('''
+Object f(MeasureKind k, dynamic context) {
+  final l10n = context.l10n;
+  if (k == $warn) return context.l10n.warningText;
+  if (k == $susp) return AppLocalizations.of(context)!.suspText(1);
+  return k == $term ? l10n.termText : null;
+}
+'''),
+        [
+          hit('if', 'WARNING', 3),
+          hit('if', 'SUSPENSION', 4),
+          hit('ternary', 'TERMINATION', 5),
+        ],
+      );
+    });
+
+    test('非受管 enum 的 ARB 查詢不命中', () {
+      expect(
+        scan('''
+enum Local { a, b }
+Object f(Local k, dynamic context) {
+  if (k == Local.a) return context.l10n.aText;
+  return k == Local.b ? context.l10n.bText : null;
+}
+'''),
+        isEmpty,
+      );
+    });
+
+    test('參數或 var 遮住同名的 l10n；不是 l10n 的存取不算', () {
+      expect(
+        scan('''
+Object f(MeasureKind k, dynamic l10n, dynamic context) {
+  if (k == $warn) return l10n.warningText;
+  var v = context.l10n;
+  if (k == $susp) return v.suspText;
+  if (k == $term) return context.theme.title;
+  return null;
+}
+'''),
+        isEmpty,
+      );
+    });
+
+    test('只在條件之外查 ARB：區域外的查詢不命中', () {
+      expect(
+        scan('''
+Object f(MeasureKind k, dynamic context) {
+  final title = context.l10n.title;
+  return k == $warn ? 1 : title;
+}
+'''),
+        isEmpty,
+      );
+    });
+  });
+
   group('manifest 與回報', () {
     test('單端的 enum：任何形式都不失敗；只有對應表（case、key、pair）進 report', () {
       final single = manifest.firstWhere(
@@ -630,7 +690,7 @@ String j(MeasureKind k) => k == $warn ? x.t : '';
 
     test('Dart 版 manifest 不含 hawkr.admin.*', () {
       expect(manifest.where((e) => e.name.startsWith('hawkr.admin.')), isEmpty);
-      expect(manifest.where((e) => e.inCatalog), hasLength(26));
+      expect(manifest.where((e) => e.inCatalog), hasLength(30));
     });
   });
 

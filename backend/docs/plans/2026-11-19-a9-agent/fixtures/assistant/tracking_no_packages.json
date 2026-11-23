@@ -1,0 +1,83 @@
+{
+  "scenario": "tracking_no_packages",
+  "description": "track_my_package returns the Message branch when no status-20 orders exist.",
+  "input": {
+    "rpc": "BuyerTracking",
+    "endpoint_key": "tracking",
+    "message": "我的包裹到哪了",
+    "buyer_id": 4242
+  },
+  "fake_tool_backend": {
+    "orders": [
+      {
+        "OrderNo": "ORD-1002",
+        "Status": "30",
+        "SellerName": "",
+        "Amount": 1,
+        "CreateTimeMs": 0,
+        "ItemCount": 0
+      }
+    ],
+    "details": null
+  },
+  "scripted_llm": [
+    {
+      "agent": "buyer_tracking_specialist",
+      "chunks": [
+        {
+          "function_call": {
+            "name": "track_my_package",
+            "args": {}
+          }
+        }
+      ]
+    },
+    {
+      "agent": "buyer_tracking_specialist",
+      "chunks": [
+        {
+          "text": "目前沒有配送中的包裹。"
+        }
+      ]
+    }
+  ],
+  "observed_llm_requests": [
+    {
+      "agent": "buyer_tracking_specialist",
+      "call_index": 0,
+      "last_user_texts": [
+        "我的包裹到哪了"
+      ],
+      "history_contents": 1
+    },
+    {
+      "agent": "buyer_tracking_specialist",
+      "call_index": 1,
+      "function_responses_fed_back": [
+        {
+          "name": "track_my_package",
+          "response": {
+            "message": "目前沒有配送中的包裹",
+            "packages": null
+          }
+        }
+      ],
+      "history_contents": 3
+    }
+  ],
+  "emitted_events": [
+    {
+      "kind": "text",
+      "order": 0,
+      "text": "目前沒有配送中的包裹。"
+    },
+    {
+      "kind": "done",
+      "order": 1,
+      "session_id": "\u003cSESSION_ID\u003e"
+    }
+  ],
+  "rpc_result": {
+    "status_code": "OK"
+  }
+}

@@ -20,6 +20,7 @@ import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/account_scope.dart';
 import '../data/inquiries.dart';
 import '../data/inquiry_display.dart';
+import '../../../shared/time/taipei_display.dart';
 
 const _refreshFailedNotice = '重新整理失敗，請稍後再試';
 
@@ -153,7 +154,7 @@ class InquiryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chip = inquiryStateChip(inquiry, now, context.uiLocale);
-    final deadline = inquiryDeadlineText(inquiry);
+    final deadline = inquiryDeadlineText(inquiry, context.taipeiDisplay);
     final overdue = isInquiryOverdue(inquiry, now);
     return InkWell(
       onTap: onTap,
@@ -167,7 +168,11 @@ class InquiryCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    inquiryMeta(inquiry, context.uiLocale),
+                    inquiryMeta(
+                      inquiry,
+                      context.uiLocale,
+                      context.taipeiDisplay,
+                    ),
                     style: AppTypography.sectionTitle,
                   ),
                 ),

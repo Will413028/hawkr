@@ -4,7 +4,6 @@ import { errorText } from "@hawkr/api/connect/errors";
 import type { MyReportItem } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import {
 	commonPolicyCategory,
-	moderationReportOutcome,
 	moderationReportTargetKind,
 } from "@hawkr/ui-text/keys";
 import { useTranslations } from "next-intl";
@@ -13,7 +12,10 @@ import { ScEmpty, ScEmptyTitle } from "@/components/shared/ScPrimitives";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import { useMyReports } from "@/features/report/hooks";
-import { storeReportOutcomeMessage } from "@/features/report/report-logic";
+import {
+	communityReportOutcomeMessage,
+	storeReportOutcomeMessage,
+} from "@/features/report/report-logic";
 import {
 	optionalText,
 	useDefaultErrorText,
@@ -42,9 +44,9 @@ function ReportCard({
 	if (!store && !community) return null;
 	const outcome = store
 		? optionalText(ut, storeReportOutcomeMessage(store))
-		: community?.outcome === undefined
-			? undefined
-			: optionalText(ut, moderationReportOutcome(community.outcome));
+		: community
+			? optionalText(ut, communityReportOutcomeMessage(community))
+			: undefined;
 	const category = optionalText(ut, commonPolicyCategory(item.category));
 	const body = (
 		<div className="flex flex-col gap-1.5 rounded-hkui-lg border border-divider bg-content1 p-4">

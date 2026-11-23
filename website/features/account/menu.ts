@@ -16,10 +16,22 @@ import type { AccountMenuIconName } from "@/features/account/components/AccountM
 import { HAWKR_AGENT_ENABLED } from "@/features/procurement-assistant/availability";
 import { ASSISTANT_PROCUREMENT_PATH } from "@/features/procurement-assistant/routes";
 
-export interface BuyerMenuItem {
-	label: string;
+export type BuyerMenuLabelKey = "blocked";
+
+/** 項目文字：寫死的 `label`，或 `account.menu` 訊息的 `labelKey`（新項目走訊息檔）。 */
+export type BuyerMenuItem = {
 	href: string;
 	icon: AccountMenuIconName;
+} & (
+	| { label: string; labelKey?: undefined }
+	| { labelKey: BuyerMenuLabelKey; label?: undefined }
+);
+
+export function buyerMenuLabel(
+	item: BuyerMenuItem,
+	t: (key: BuyerMenuLabelKey) => string,
+): string {
+	return item.labelKey === undefined ? item.label : t(item.labelKey);
 }
 
 const BASE_BUYER_MENU_ITEMS = [
@@ -41,6 +53,7 @@ const BASE_BUYER_MENU_ITEMS = [
 		icon: "invoiceProfiles",
 	},
 	{ label: "我的檢舉", href: "/account/reports", icon: "reports" },
+	{ labelKey: "blocked", href: "/account/blocked", icon: "blocked" },
 ] as const satisfies ReadonlyArray<BuyerMenuItem>;
 
 /**
@@ -109,6 +122,7 @@ export const BUYER_MENU_GROUPS: ReadonlyArray<BuyerMenuGroup> = [
 			BASE_BUYER_MENU_ITEMS[6], // 我的評論
 			BASE_BUYER_MENU_ITEMS[7], // 通知
 			BASE_BUYER_MENU_ITEMS[11], // 我的檢舉
+			BASE_BUYER_MENU_ITEMS[12], // 封鎖名單
 		],
 	},
 	{

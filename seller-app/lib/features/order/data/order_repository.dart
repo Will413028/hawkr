@@ -25,6 +25,7 @@ class OrderRepository with ApiRequestHelper {
     int page = 1,
     int pageSize = 10,
     String? status,
+    String? buyerId,
   }) async {
     HKLog.logD(
       '[OrderRepository] fetchMatchedOrders page=$page pageSize=$pageSize status=$status',
@@ -36,6 +37,7 @@ class OrderRepository with ApiRequestHelper {
         'page': '$page',
         'page_size': '$pageSize',
         'status': ?status,
+        'buyer_id': ?buyerId,
       },
     );
     HKLog.logD(
@@ -218,47 +220,6 @@ class OrderRepository with ApiRequestHelper {
       body['stagedTokens'] = stagedTokens;
     }
     return apiPost('/api/v1/app/shipments/$orderNo/confirm', body: body);
-  }
-
-  /// 反查賣家收到的某筆訂單評論（B-145 完成前的 fallback）。
-  ///
-  /// `/app/orders/{orderNo}` detail 沒回傳 review 欄位，所以走
-  /// `/app/sellers/me/reviews` 列表，依 `order_item_id` 比對找出對應評論。
-  /// 後端 review entity 沒有 orderNo 欄位，所以 caller 必須提供該訂單所有
-  /// OrderItem id 的集合。
-  ///
-  /// 內部分頁掃（最多 [maxPages] 頁），找到第一筆 match 就回傳。
-  /// 沒找到回 null（買家還沒評論）。
-  Future<Map<String, dynamic>?> findReviewByOrderItemIds(
-    Set<String> orderItemIds, {
-    int maxPages = 5,
-    int pageSize = 50,
-  }) async {
-    if (orderItemIds.isEmpty) return null;
-    for (var page = 1; page <= maxPages; page++) {
-      final resp = await apiGet(
-        '/api/v1/app/sellers/me/reviews',
-        queryParams: {'page': '$page', 'size': '$pageSize'},
-      );
-      if ((resp['code'] as int? ?? -1) != 0) return null;
-      final data = resp['data'];
-      final list =
-          (data is Map ? (data['records'] ?? data['list']) : null) as List? ??
-          const [];
-      for (final raw in list) {
-        if (raw is! Map) continue;
-        // 後端這支吐的是 camelCase（`gateway/internal/handler/order_review.go`
-        // 的 `OrderReviewRecord.OrderItemID` tag 為 `orderItemId`）。這裡曾寫成
-        // snake_case，取到的永遠是空字串，於是比對永不成立、賣家在訂單詳情
-        // 一直看不到買家的評論——而且完全無聲，沒有錯誤也沒有空狀態提示。
-        final id = (raw['orderItemId'] ?? '').toString().trim();
-        if (id.isNotEmpty && orderItemIds.contains(id)) {
-          return Map<String, dynamic>.from(raw);
-        }
-      }
-      if (list.length < pageSize) break; // 沒滿一頁 = 沒更多
-    }
-    return null;
   }
 
   /// 賣家取消訂單

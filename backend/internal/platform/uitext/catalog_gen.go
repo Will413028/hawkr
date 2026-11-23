@@ -5,6 +5,41 @@ package uitext
 
 import "strconv"
 
+// AdminModerationCaseReportOutcomeUnset 是 admin.moderation.CaseReport.outcome_unset 的文案。
+func (t Text) AdminModerationCaseReportOutcomeUnset() string {
+	if t.staff {
+		return "處理中"
+	}
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
+}
+
+// AssistantAssistantTool 是 assistant.AssistantTool 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) AssistantAssistantTool(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "GET_MY_ORDERS":
+			return "Looking up your orders", true
+		case "GET_BUYER_ORDER_DETAIL":
+			return "Looking up the order details", true
+		case "TRACK_MY_PACKAGE":
+			return "Checking your package tracking", true
+		}
+	}
+	switch v {
+	case "GET_MY_ORDERS":
+		return "正在查詢你的訂單", true
+	case "GET_BUYER_ORDER_DETAIL":
+		return "正在查詢訂單詳情", true
+	case "TRACK_MY_PACKAGE":
+		return "正在查詢包裹物流", true
+	}
+	return "", false
+}
+
 // BuyerGender 是 buyer.Gender 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) BuyerGender(v string) (string, bool) {
@@ -29,6 +64,14 @@ func (t Text) BuyerGender(v string) (string, bool) {
 	return "", false
 }
 
+// BuyerProfileDeletedName 是 buyer.Profile.deleted_name 的文案。
+func (t Text) BuyerProfileDeletedName() string {
+	if t.Locale() == EN {
+		return "Deleted account"
+	}
+	return "已刪除帳號"
+}
+
 // BuyerProfileGenderUnset 是 buyer.Profile.gender_unset 的文案。
 func (t Text) BuyerProfileGenderUnset() string {
 	if t.Locale() == EN {
@@ -37,11 +80,69 @@ func (t Text) BuyerProfileGenderUnset() string {
 	return "尚未設定"
 }
 
+// ChatMessageUnsupportedKind 是 chat.Message.unsupported_kind 的文案。
+func (t Text) ChatMessageUnsupportedKind() string {
+	if t.Locale() == EN {
+		return "Unsupported message"
+	}
+	return "不支援的訊息"
+}
+
+// ChatPreviewErased 是 chat.Preview.erased 的文案。
+func (t Text) ChatPreviewErased() string {
+	if t.Locale() == EN {
+		return "This message has been removed"
+	}
+	return "此訊息已被移除"
+}
+
+// ChatPreviewHidden 是 chat.Preview.hidden 的文案。
+func (t Text) ChatPreviewHidden() string {
+	if t.Locale() == EN {
+		return "This message has been hidden"
+	}
+	return "此訊息已被隱藏"
+}
+
+// ChatPreviewImage 是 chat.Preview.image 的文案。
+func (t Text) ChatPreviewImage() string {
+	if t.Locale() == EN {
+		return "Sent a photo"
+	}
+	return "傳送了一張圖片"
+}
+
 // CommonPolicyCategory 是 common.PolicyCategory 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) CommonPolicyCategory(v string) (string, bool) {
 	if t.Locale() == EN {
 		switch v {
+		case "FOOD_SAFETY":
+			return "Food safety", true
+		case "PROHIBITED_GOODS":
+			return "Illegal or prohibited goods", true
+		case "UNLICENSED_SALE":
+			return "Unlicensed sale", true
+		case "MISLEADING_INFO":
+			return "False or misleading information", true
+		case "FAKE_CERTIFICATION":
+			return "Fake certification", true
+		case "COUNTERFEIT":
+			return "Counterfeit goods", true
+		case "IP_INFRINGEMENT":
+			return "Intellectual property infringement", true
+		case "FRAUD":
+			return "Fraud or transaction manipulation", true
+		case "OFF_PLATFORM_TRADE":
+			return "Off-platform transactions", true
+		case "PRIVACY":
+			return "Misuse of personal data", true
+		case "IMPERSONATION":
+			return "Impersonation", true
+		case "PLATFORM_ABUSE":
+			return "Platform abuse", true
+		case "OTHER":
+			return "Other", true
 		case "SPAM":
 			return "Spam", true
 		case "HARASSMENT":
@@ -166,6 +267,50 @@ func (t Text) CommonUnknown() string {
 	return "未知"
 }
 
+// CrmCustomerSort 是 crm.CustomerSort 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) CrmCustomerSort(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "FIRST_ORDER_TIME":
+			return "First order date", true
+		case "TOTAL_SPENT":
+			return "Total spent", true
+		case "ORDER_COUNT":
+			return "Order count", true
+		}
+	}
+	switch v {
+	case "FIRST_ORDER_TIME":
+		return "首購時間", true
+	case "TOTAL_SPENT":
+		return "消費金額", true
+	case "ORDER_COUNT":
+		return "訂單數", true
+	}
+	return "", false
+}
+
+// CrmCustomerType 是 crm.CustomerType 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) CrmCustomerType(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NORMAL":
+			return "Regular customer", true
+		case "VIP":
+			return "VIP", true
+		}
+	}
+	switch v {
+	case "NORMAL":
+		return "一般客戶", true
+	case "VIP":
+		return "VIP", true
+	}
+	return "", false
+}
+
 // MediaRejectReason 是 media.RejectReason 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) MediaRejectReason(v string) (string, bool) {
@@ -198,13 +343,19 @@ func (t Text) MediaRejectReason(v string) (string, bool) {
 	return "", false
 }
 
+// ModerationCommunityReportOutcomeUnset 是 moderation.CommunityReport.outcome_unset 的文案。
+func (t Text) ModerationCommunityReportOutcomeUnset() string {
+	if t.Locale() == EN {
+		return "Under review"
+	}
+	return "審核中"
+}
+
 // ModerationReportOutcome 是 moderation.ReportOutcome 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) ModerationReportOutcome(v string) (string, bool) {
 	if t.staff {
 		switch v {
-		case "PENDING":
-			return "處理中", true
 		case "VIOLATION":
 			return "認定違規", true
 		case "NO_VIOLATION":
@@ -214,8 +365,6 @@ func (t Text) ModerationReportOutcome(v string) (string, bool) {
 	}
 	if t.Locale() == EN {
 		switch v {
-		case "PENDING":
-			return "Under review", true
 		case "VIOLATION":
 			return "Resolved (violation)", true
 		case "NO_VIOLATION":
@@ -223,8 +372,6 @@ func (t Text) ModerationReportOutcome(v string) (string, bool) {
 		}
 	}
 	switch v {
-	case "PENDING":
-		return "審核中", true
 	case "VIOLATION":
 		return "已處理（違規）", true
 	case "NO_VIOLATION":
@@ -342,6 +489,118 @@ func (t Text) PaymentRequirementCollection(v string) (string, bool) {
 		return "平台收件（內嵌元件）", true
 	}
 	return "", false
+}
+
+// ProcurementRejectionReason 是 procurement.RejectionReason 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ProcurementRejectionReason(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "EMPTY":
+			return "The content is empty", true
+		case "TRUNCATED":
+			return "Over the length limit, shortened", true
+		case "QUANTITY_RANGE":
+			return "The quantity is out of range", true
+		case "BUDGET_RANGE":
+			return "The budget per unit is out of range", true
+		case "UNIT_NOT_ALLOWED":
+			return "This unit is not supported", true
+		case "CITY_UNRECOGNIZED":
+			return "The city could not be recognized", true
+		case "DATE_FORMAT":
+			return "The date format is not valid", true
+		case "DATE_MISSING_YEAR":
+			return "The date is missing the year", true
+		case "DATE_PAST":
+			return "The date has already passed", true
+		case "DATE_TOO_FAR":
+			return "The date is too far ahead", true
+		case "RESOLUTION_NO_ITEM":
+			return "The item is missing or was rejected, so no item category can be set", true
+		case "RESOLUTION_NO_LABEL":
+			return "The item category has no name", true
+		case "RESOLUTION_UNKNOWN_KIND":
+			return "The way the item category was decided is unknown", true
+		}
+	}
+	switch v {
+	case "EMPTY":
+		return "內容是空的", true
+	case "TRUNCATED":
+		return "超過長度上限，已截斷", true
+	case "QUANTITY_RANGE":
+		return "數量不在可接受的範圍內", true
+	case "BUDGET_RANGE":
+		return "單價預算不在可接受的範圍內", true
+	case "UNIT_NOT_ALLOWED":
+		return "這個單位不支援", true
+	case "CITY_UNRECOGNIZED":
+		return "無法辨識這個縣市", true
+	case "DATE_FORMAT":
+		return "日期格式不正確", true
+	case "DATE_MISSING_YEAR":
+		return "日期缺少西元年份", true
+	case "DATE_PAST":
+		return "日期已經過了", true
+	case "DATE_TOO_FAR":
+		return "日期太久以後", true
+	case "RESOLUTION_NO_ITEM":
+		return "品項未確定，無法指定品項分類", true
+	case "RESOLUTION_NO_LABEL":
+		return "品項分類沒有名稱", true
+	case "RESOLUTION_UNKNOWN_KIND":
+		return "品項分類的判定方式不明", true
+	}
+	return "", false
+}
+
+// ReviewReviewRatingLabel1 是 review.Review.rating_label_1 的文案。
+func (t Text) ReviewReviewRatingLabel1() string {
+	if t.Locale() == EN {
+		return "Very dissatisfied"
+	}
+	return "非常不滿意"
+}
+
+// ReviewReviewRatingLabel2 是 review.Review.rating_label_2 的文案。
+func (t Text) ReviewReviewRatingLabel2() string {
+	if t.Locale() == EN {
+		return "Dissatisfied"
+	}
+	return "不滿意"
+}
+
+// ReviewReviewRatingLabel3 是 review.Review.rating_label_3 的文案。
+func (t Text) ReviewReviewRatingLabel3() string {
+	if t.Locale() == EN {
+		return "Okay"
+	}
+	return "一般"
+}
+
+// ReviewReviewRatingLabel4 是 review.Review.rating_label_4 的文案。
+func (t Text) ReviewReviewRatingLabel4() string {
+	if t.Locale() == EN {
+		return "Satisfied"
+	}
+	return "滿意"
+}
+
+// ReviewReviewRatingLabel5 是 review.Review.rating_label_5 的文案。
+func (t Text) ReviewReviewRatingLabel5() string {
+	if t.Locale() == EN {
+		return "Very satisfied"
+	}
+	return "非常滿意"
+}
+
+// ReviewReviewAuthorAnonymousName 是 review.ReviewAuthor.anonymous_name 的文案。
+func (t Text) ReviewReviewAuthorAnonymousName() string {
+	if t.Locale() == EN {
+		return "Anonymous member"
+	}
+	return "匿名會員"
 }
 
 // SellerContentKind 是 seller.ContentKind 的文案。

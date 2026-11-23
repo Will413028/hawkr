@@ -18,21 +18,10 @@ const storeReportDescriptionMaxRunes = 2000;
 const storeReportOrderNoMaxRunes = 64;
 const storeReportMaxEvidence = 5;
 
-/// 一則檢舉的補充說明上限（`report.proto`；去重補充與主動補充共用）。
-const storeReportMaxSupplements = 10;
-
-/// 檢舉人可選的類別：政策分類除了 UNSPECIFIED 與 PLATFORM_ABUSE（只給平台判定），順序依列舉值。
-final storeReportCategories = List<PolicyCategory>.unmodifiable(
-  PolicyCategory.values.where(
-    (c) =>
-        c != PolicyCategory.POLICY_CATEGORY_UNSPECIFIED &&
-        c != PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE,
-  ),
-);
-
-/// 畫面要顯示的類別與標籤：沒有目錄文字的類別不顯示。
+/// 畫面要顯示的類別與標籤：選項是 `CreateReportRequest.category` 的 accepted_policy_categories（生成的
+/// [sellerCreateReportRequestCategory]，順序即選單順序）；沒有目錄文字的類別不顯示。
 List<(PolicyCategory, String)> storeReportCategoryOptions(UiLocale locale) => [
-  for (final c in storeReportCategories)
+  for (final c in sellerCreateReportRequestCategory)
     if (c.uiText(locale) case final label?) (c, label),
 ];
 
@@ -60,7 +49,7 @@ class StoreReportRepository {
     String orderNo = '',
     List<String> evidenceStagedTokens = const [],
   }) {
-    assert(storeReportCategories.contains(category));
+    assert(sellerCreateReportRequestCategory.contains(category));
     return _client.createReport(
       pb.CreateReportRequest(
         storeId: storeId,

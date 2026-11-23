@@ -129,6 +129,24 @@ func (q *Queries) AllocateSeq(ctx context.Context, arg AllocateSeqParams) (Alloc
 	return i, err
 }
 
+const conversationParties = `-- name: ConversationParties :one
+SELECT id AS conversation_id, buyer_id, store_id FROM im.conversations WHERE id = $1
+`
+
+type ConversationPartiesRow struct {
+	ConversationID uuid.UUID
+	BuyerID        int64
+	StoreID        int64
+}
+
+// 對話的雙方（歸屬）：不鎖列。
+func (q *Queries) ConversationParties(ctx context.Context, id uuid.UUID) (ConversationPartiesRow, error) {
+	row := q.db.QueryRow(ctx, conversationParties, id)
+	var i ConversationPartiesRow
+	err := row.Scan(&i.ConversationID, &i.BuyerID, &i.StoreID)
+	return i, err
+}
+
 const databaseNow = `-- name: DatabaseNow :one
 SELECT clock_timestamp()::timestamptz
 `
@@ -157,6 +175,59 @@ func (q *Queries) GetConversation(ctx context.Context, id uuid.UUID) (ImConversa
 		&i.StoreLastReadSeq,
 		&i.LastMessageAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getConversationStoreBuyer = `-- name: GetConversationStoreBuyer :one
+SELECT c.id, c.buyer_id, c.store_id, c.last_seq, c.store_last_read_seq AS read_seq, c.buyer_last_read_seq AS peer_read_seq, c.last_message_at,
+       m.id AS message_id, m.sender_kind, m.message_type, m.content, m.erased_at,
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
+FROM im.conversations AS c
+JOIN im.messages AS m ON m.conversation_id = c.id AND m.seq = c.last_seq
+LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
+WHERE c.store_id = $1 AND c.buyer_id = $2
+`
+
+type GetConversationStoreBuyerParams struct {
+	StoreID int64
+	BuyerID int64
+}
+
+type GetConversationStoreBuyerRow struct {
+	ID            uuid.UUID
+	BuyerID       int64
+	StoreID       int64
+	LastSeq       int64
+	ReadSeq       int64
+	PeerReadSeq   int64
+	LastMessageAt time.Time
+	MessageID     uuid.UUID
+	SenderKind    string
+	MessageType   string
+	Content       *string
+	ErasedAt      *time.Time
+	Hidden        bool
+}
+
+// 店家依買家取對話：欄位與預覽同 ListConversationsStore；(buyer_id, store_id) 唯一，最多一列。
+func (q *Queries) GetConversationStoreBuyer(ctx context.Context, arg GetConversationStoreBuyerParams) (GetConversationStoreBuyerRow, error) {
+	row := q.db.QueryRow(ctx, getConversationStoreBuyer, arg.StoreID, arg.BuyerID)
+	var i GetConversationStoreBuyerRow
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.StoreID,
+		&i.LastSeq,
+		&i.ReadSeq,
+		&i.PeerReadSeq,
+		&i.LastMessageAt,
+		&i.MessageID,
+		&i.SenderKind,
+		&i.MessageType,
+		&i.Content,
+		&i.ErasedAt,
+		&i.Hidden,
 	)
 	return i, err
 }

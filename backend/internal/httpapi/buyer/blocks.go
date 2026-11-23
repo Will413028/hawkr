@@ -26,14 +26,15 @@ type blockModule interface {
 	BatchDisplay(ctx context.Context, ids []int64) ([]model.Display, error)
 }
 
-// BlockAuthor 封鎖一則內容的作者：參照由 social 以呼叫者的觀看規則解析（讀不到是 not_found），作者是買家走買家封鎖，是店家走店家封鎖。
+// BlockAuthor 封鎖一則內容的作者：參照由擁有它的模組（social 的留言與討論區留言、review 的評價、im 的聊天訊息）以呼叫者的觀看規則解析（讀不到是 not_found），作者是買家走買家封鎖，是店家走店家封鎖；
+// 評價的作者是它的回覆店家；聊天訊息的對象是對話的店家。
 func (h *App) BlockAuthor(ctx context.Context, req *connect.Request[pb.BlockAuthorRequest]) (*connect.Response[pb.BlockAuthorResponse], error) {
 	buyerID, err := h.caller(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ref := blocks.Ref{CommentID: req.Msg.GetCommentId(), ForumEntryID: req.Msg.GetForumEntryId()}
-	author, err := blocks.ResolveAuthor(ctx, h.blocking.Authors, social.Caller{BuyerID: buyerID}, ref)
+	ref := blocks.Ref{CommentID: req.Msg.GetCommentId(), ForumEntryID: req.Msg.GetForumEntryId(), ReviewID: req.Msg.GetReviewId(), MessageID: req.Msg.GetMessageId()}
+	author, err := h.blocking.ResolveAuthor(ctx, social.Caller{BuyerID: buyerID}, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,12 @@ func (h *App) BlockAuthor(ctx context.Context, req *connect.Request[pb.BlockAuth
 	case social.ActorBuyer:
 		changed, err = h.m.BlockBuyer(ctx, buyerID, author.Author.ID)
 	case social.ActorStore:
-		changed, err = h.blockStore(ctx, buyerID, author.Author.ID)
+		if req.Msg.GetMessageId() != "" {
+			// 對話的店已由對話歸屬證明存在；店家卡片不設的對話（從未公開的店也能傳訊給買家）照樣可以封鎖。
+			changed, err = h.blockKnownStore(ctx, buyerID, author.Author.ID)
+		} else {
+			changed, err = h.blockStore(ctx, buyerID, author.Author.ID)
+		}
 	default:
 		return nil, apperr.NotFound("找不到這則內容")
 	}
@@ -78,6 +84,11 @@ func (h *App) blockStore(ctx context.Context, buyerID, storeID int64) (bool, err
 	if cards[storeID] == nil {
 		return false, apperr.NotFound("找不到店家")
 	}
+	return h.blockKnownStore(ctx, buyerID, storeID)
+}
+
+// blockKnownStore 是已確認店存在之後的封鎖：經跨身分規則擋下封鎖自己的店，再交給 buyer 模組。
+func (h *App) blockKnownStore(ctx context.Context, buyerID, storeID int64) (bool, error) {
 	if err := h.blocking.Identities.RejectSamePerson(ctx, buyerID, storeID); err != nil {
 		return false, err
 	}

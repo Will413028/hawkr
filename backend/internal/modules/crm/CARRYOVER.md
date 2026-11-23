@@ -2,7 +2,7 @@
 
 <!-- 決策紀錄：不放進 AGENTS.md，因為 AGENTS.md 每次在這個目錄工作都會載入。模組現行的規則寫在 AGENTS.md。 -->
 
-來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3-design.md` §12 與 §0.4，Will 的決定 A6-D2（黑名單）、A6-D8（只顯示暱稱與訂單統計）、A6-D18（W1–W5）。本檔對應 A6-3b（模組、`legacy/crmconsumer`）；Connect 與 handler 在 A6-5，consumer、worker、訂閱者與 `VIPStatuses` 的接線在 A6-6e。
+來源：`backend/docs/plans/2026-11-19-a6-review-im-crm/step-3-design.md` §12 與 §0.4，Will 的決定 A6-D2（黑名單）、A6-D8（只顯示暱稱與訂單統計）、A6-D18（W1–W5）。本檔對應 A6-3b（模組、`legacy/crmconsumer`）；Connect 與 handler 在 A6-5，consumer、worker、訂閱者與 `VIPStatuses` 已在 A6-6e 接線。
 
 ## 沿用盤點
 
@@ -48,7 +48,7 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 - 儲存的代碼（`customer_type`、清除 job 的 `party_kind`）是 UPPER_SNAKE（`NORMAL`、`VIP`、`BUYER`、`STORE`）。
 - 沒有 `blocklist`；沒有客戶列表的關鍵字搜尋；詳情沒有電話、Email、地址、優惠券數。
 - 退款不建客戶列；同一單號的第二個 `order.completed`（換了 `event_id`）不重複累加。
-- `legacy/crmservice`（只有 `VIPStatuses`）與 `services/crm-service` 不動：並行期單一生效者是舊服務，切換與刪除在 A6-6e。
+- `legacy/crmservice` 已在 A6-6e 刪除（`httpbuyer.Ports.CRM` 換成 `crm.VIPStatuses`）；`services/crm-service` 目錄、compose 項目、`api/proto/crm` 與 `pkg/proto/crm` 已在 A6-6e 刪除。
 
 ## A6-3c 停用身分改由擁有者守門的沿用盤點
 
@@ -64,3 +64,19 @@ crm-service 的每個機制，搬進來時都重新判斷過（遷移計畫「�
 | 投影遇到不存在的買家或店家（W1 (a′)） | 買家、店家列關閉與退場後仍保留，不存在只可能是壞資料 | 行為變更：原本照寫，改後跳過（不重試）；守門回 NotFound 時才多讀一次 `pub_closed_buyers()`／`pub_retired_stores()` 分辨：已關閉、已退場記 info，不存在記 error；transaction 內只記守門的結果並提交空的 transaction，分辨的讀取在 transaction 之後（非 tx 連線，查詢失敗不會中止要提交的 transaction）；分辨查詢失敗記 error 並照樣跳過（Will 2026-11-21 修訂） |
 
 觸發條件（門檻是推測，沒有量測）：(1) 店家 `retired_at` 落後於排定時點超過 1 小時（4 輪）：該店在下一輪不用 `SKIP LOCKED`、改為等待取鎖；(2) `crm.erase_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status = 'CLOSED'` 超過 10 萬列：改為 buyer 加部分索引、seller 加 `WHERE retired_at IS NOT NULL` 的索引（設計 W5 (a)）。
+
+## A6-5d 可見性與讀寫一致（fix round 2）
+
+| 照搬的機制 | 從零設計 | 結論 |
+|---|---|---|
+| handler 在寫入提交後以 `BatchDisplay.deleted` 判斷客戶不可見 | 可見性由擁有資料的模組在寫入前判斷 | 不成立；刪除 handler 檢查。寫入路徑的 `lockCustomerParties` 以 `buyer.LockNotClosed`（與 `pub_closed_buyers` 同一事實）在寫入前回 NotFound，`BatchDisplay` 只做顯示對應；`TestInactiveBuyerIsInvisibleAndReadOnlyToSellers` 驗證 NotFound 且什麼都沒寫 |
+| 讀取在店家關閉或不存在時回空頁或略過檢查，寫入回 NotFound | 讀寫同一個結論 | 改：讀取也回 NotFound（客戶層 `CUSTOMER_NOT_FOUND`，`ListTags` 為 `TAG_NOT_FOUND`）；`TestInactiveStoreIsInvisibleAndReadOnlyToSellers` 期望同步改 |
+| 停權時依 ADR D3 把收縮類方法與必要讀取放行（social 的 `CapContentContract`） | CRM 資料從不公開，停權的店家沒有東西需要收回 | 不適用（Will 2026-11-22）；九個方法全是 `CapMarketing`，停權整體被擋；ADR 修訂記一行；`TestDeclarationsMatchTheModuleChecks` 守宣告與模組一致，`TestSuspendedStoreIsRejectedByTheModuleForWritesAndReads` 守模組九個方法都擋 |
+
+## 公司時期未完成項
+
+舊公司 repo 的 issue 只有一行標題，內文取不到。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| #3367：crm 用模糊搜尋解析訂單、找不到就無限重試；改成直接呼叫後重新設計解析方式 | 已重新設計，單體沒有模糊搜尋：`order.completed` 的 payload 本身帶 `order_no`、`buyer_id`、`store_id`，consumer 驗證後原樣排 job，投影不需要解析訂單；退款事件沒有帶店與買家，worker 以單號直接呼叫舊訂單服務 `OrderParties` 精確解析，訂單不存在是 permanent（`JobCancel`，不重試），其他錯誤由 River 重試，輸入無效或買賣雙方不符也取消。重試上限：這兩個 job 的排入選項沒設 `MaxAttempts`（`crmconsumer` 只設唯一鍵），沒有查到 river client 另設，所以是 River 的預設值（25 次，採自 `seller/CARRYOVER.md` 對 River 預設的描述，沒有在 river 原始碼確認）；沒有無限重試。ordering 搬進單體時兩條路徑都退場，改讀 ordering 的 `pub_*`（計畫「延後」） | `internal/legacy/crmconsumer/consumer.go:84-110`（`OrderCompleted` 只驗證欄位）、`:117-122`（worker 呼叫 `RecordOrderCompleted`）、`:127-131`（`cancelIfHopeless`）、`:214-227`（退款：`OrderParties` 精確解析，`ErrOrderNotFound` → `river.JobCancel`）；`:69-72`（`InsertOpts` 無 `MaxAttempts`）；舊碼的搜尋是 `94796248:backend/services/crm-service/internal/usecase/crm.go` 的關鍵字客戶搜尋（單體已無，見「與 crm-service 的差異」），舊碼沒有找到「模糊解析訂單」的程式，只靠標題判斷 |

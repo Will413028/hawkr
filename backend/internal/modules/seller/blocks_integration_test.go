@@ -99,6 +99,38 @@ func TestStoreBlocksAreDirectedAndBatchedPerBuyer(t *testing.T) {
 	}
 }
 
+// 批次：只含被該店封鎖的買家，不含別家店封鎖的、不存在的；空輸入、超過上限、非正數的店。
+func TestBuyersBlockedByStoreReturnsOnlyThisStoresBlocks(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	_, a := f.open(t)
+	_, b := f.open(t)
+	for _, e := range []struct{ store, buyer int64 }{{a.StoreID, 11}, {a.StoreID, 13}, {b.StoreID, 12}} {
+		if _, err := f.module.BlockBuyer(ctx, e.store, e.buyer); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := f.module.BuyersBlockedByStore(ctx, a.StoreID, []int64{11, 12, 13, 999999})
+	must(t, err)
+	if len(got) != 2 || !got[11] || !got[13] || got[12] {
+		t.Fatalf("批次要只含被該店封鎖的買家：%v", got)
+	}
+	if got, err = f.module.BuyersBlockedByStore(ctx, a.StoreID, nil); err != nil || len(got) != 0 {
+		t.Fatalf("空輸入是空結果：%v %v", got, err)
+	}
+	over := make([]int64, MaxBatchSize+1)
+	for i := range over {
+		over[i] = int64(i + 1)
+	}
+	if _, err := f.module.BuyersBlockedByStore(ctx, a.StoreID, over); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("超過批次上限：%v", err)
+	}
+	if _, err := f.module.BuyersBlockedByStore(ctx, 0, []int64{1}); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("非正數的店：%v", err)
+	}
+}
+
 // 名單新的在前，keyset 分頁跨頁不重不漏；同時間的列以買家 ID 決定順序；只列該店的。
 func TestListBlockedBuyersPaginatesNewestFirst(t *testing.T) {
 	t.Parallel()

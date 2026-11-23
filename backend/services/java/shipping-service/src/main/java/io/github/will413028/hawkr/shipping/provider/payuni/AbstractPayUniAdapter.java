@@ -252,23 +252,6 @@ public abstract class AbstractPayUniAdapter implements FulfillmentProviderAdapte
         return Optional.of(inboundCapability);
     }
 
-    /**
-     * PayUni 軸<b>不透過 API 提供 provider 成本</b> ⇒ 一律 {@link Optional#empty()}。
-     *
-     * <p>🔴 <b>empty 不是 0</b>：0 是合法金額、會讓賣家應收變成 0 而沒有任何訊號；
-     * empty 的語意是「本 provider 這條管道沒有成本事實」⇒ 呼叫端不發
-     * {@code logistics.cost.incurred}。
-     *
-     * <p>⚠️ <b>這不代表超商／宅配沒有物流成本</b>——它們的成本走月結對帳
-     * （70 §6.1 provider 帳單匯入），與本 capability 是兩條路。
-     * 硬要在這裡回一個金額，等於把「對帳才知道的數字」偽裝成「即時已知的事實」。
-     */
-    @Override
-    public Optional<io.github.will413028.hawkr.shipping.provider.capability.CostCapability> cost(
-            io.github.will413028.hawkr.shipping.provider.FulfillmentContext ctx) {
-        return Optional.empty();
-    }
-
     /** 標籤回調帶回的 provider 專屬識別；子類覆寫（只有超商軸有三段碼）。 */
     protected Map<String, String> labelSegmentsOf(Map<String, String> rawPayload) {
         return Map.of();

@@ -96,6 +96,7 @@ type (
 	MessageSent          = model.MessageSent
 	Reason               = model.Reason
 	PresenceState        = model.PresenceState
+	ConversationParties  = model.ConversationParties
 
 	// Subscription 是一個 Party 的一條拉取式事件流（Next、Revalidate、Close）。
 	Subscription = live.Subscription
@@ -166,7 +167,7 @@ func New(d Deps) *Module {
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
-	rd := read.New(read.Deps{DB: d.DB, Buyers: d.Buyers, Stores: d.Stores})
+	rd := read.New(read.Deps{DB: d.DB, Stores: d.Stores})
 	lc := d.Live
 	if lc.NewID == nil {
 		lc.NewID = d.NewID
@@ -209,6 +210,11 @@ func (m *Module) Restore(ctx context.Context, in RestoreInput) (Hide, error) {
 // ListConversations 是呼叫者這一方的對話（新的在前，keyset，不回總數，不因封鎖隱藏對話）。size 為 0 用預設，超過 MaxPageSize 以上限計。
 func (m *Module) ListConversations(ctx context.Context, p Party, after *Cursor, size int32) (ConversationPage, error) {
 	return m.read.ListConversations(ctx, p, after, size)
+}
+
+// StoreConversationByBuyer 是店家方與某位買家的對話；沒有對話回 NotFound。p 必須是店家方。
+func (m *Module) StoreConversationByBuyer(ctx context.Context, p Party, buyerID int64) (Conversation, error) {
+	return m.read.StoreConversationByBuyer(ctx, p, buyerID)
 }
 
 // ListMessages 是對話裡 seq 小於 beforeSeq 的訊息（新的在前；beforeSeq 為 0 從最新開始）。對話不屬於呼叫者回 NotFound。
@@ -256,6 +262,17 @@ func (m *Module) Run(ctx context.Context) error {
 // Presence 回報呼叫者的對話的對方是否在線；沒有最後上線時間。對話不屬於呼叫者回 NotFound，一次最多 MaxPresenceConversations 個。
 func (m *Module) Presence(ctx context.Context, p Party, conversationIDs []uuid.UUID) ([]PresenceState, error) {
 	return m.read.Presence(ctx, p, conversationIDs)
+}
+
+// ConversationParties 回傳對話的雙方（歸屬事實），對話不存在回 NotFound；不套可見性、不鎖列、加入呼叫方的 transaction。
+// 給 httpapi 推導呼叫者是對話的哪一方用：呼叫端必須把「兩邊都不是呼叫者」當 NotFound 回給 client，不得把歸屬回給 client。
+func (m *Module) ConversationParties(ctx context.Context, conversationID uuid.UUID) (ConversationParties, error) {
+	return m.read.ConversationParties(ctx, conversationID)
+}
+
+// MessageParties 回傳訊息所屬對話的雙方，訊息不存在回 NotFound；隱藏與抹除的訊息照樣回歸屬，其餘語意與使用限制同 ConversationParties。
+func (m *Module) MessageParties(ctx context.Context, messageID uuid.UUID) (ConversationParties, error) {
+	return m.read.MessageParties(ctx, messageID)
 }
 
 // OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：排 im.erase_party job，不存狀態（買家關閉的事實在 buyer，

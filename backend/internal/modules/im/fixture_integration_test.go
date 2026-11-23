@@ -204,6 +204,27 @@ func (s *stores) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) {
 	return s.block, s.blockErr
 }
 
+func (s *stores) StoresBlockingBuyer(_ context.Context, _ int64, ids []int64) (map[int64]bool, error) {
+	return s.blockedAll(ids)
+}
+
+func (s *stores) BuyersBlockedByStore(_ context.Context, _ int64, ids []int64) (map[int64]bool, error) {
+	return s.blockedAll(ids)
+}
+
+// blockedAll 依 block 與 blockErr 回答批次封鎖查詢：封鎖時輸入的每個 ID 都算被封鎖。
+func (s *stores) blockedAll(ids []int64) (map[int64]bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[int64]bool{}
+	if s.block {
+		for _, id := range ids {
+			out[id] = true
+		}
+	}
+	return out, s.blockErr
+}
+
 func activeStore(id, account int64) seller.Store {
 	return seller.Store{
 		StoreID: id, AccountID: account, Status: seller.Active, Sanctions: seller.NoSanctions(),
@@ -352,7 +373,7 @@ func (f *fixture) storeParty(t *testing.T, id int64) im.Party {
 // say 以對方的 ID 送出文字（首則訊息或既有對話都是這條路徑：對話由 (buyer_id, store_id) 決定）。
 func (f *fixture) say(t *testing.T, from im.Party, counterpart int64, text string) im.Message {
 	t.Helper()
-	m, err := f.m.Send(context.Background(), im.SendInput{Sender: from, CounterpartID: counterpart, Type: im.TypeText, Text: text})
+	m, err := f.m.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: from, CounterpartID: counterpart, Type: im.TypeText, Text: text})
 	if err != nil {
 		t.Fatalf("send %q: %v", text, err)
 	}

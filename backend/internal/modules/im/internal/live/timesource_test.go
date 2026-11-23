@@ -19,7 +19,7 @@ func TestSharedTimestampsAreNeverParameters(t *testing.T) {
 		store.InsertPresenceStreamParams{},
 		store.ExtendPresenceStreamsParams{},
 		store.CountLivePartyStreamsParams{},
-		store.IsPartyOnlineParams{},
+		store.PresenceForPartyParams{},
 		store.LockPartyStreamsParams{},
 	}
 	timeTypes := []reflect.Type{

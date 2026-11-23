@@ -6,10 +6,6 @@ use (
 	./monitoring/discord-webhook-gateway
 	./pkg
 	./services/ai-service
-	./services/crm-service
-	./services/im-service
 	./services/invoice-service
 	./services/notification-service
-	./services/review-service
-	./services/seller-service
 )

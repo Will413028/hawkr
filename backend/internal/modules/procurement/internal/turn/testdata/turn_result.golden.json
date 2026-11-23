@@ -1,0 +1,82 @@
+{
+  "turn_result": {
+    "requestId": "0192a000-0000-7000-8000-000000000001",
+    "conversationId": "0192a000-0000-7000-8000-000000000002",
+    "revisionId": "0192a000-0000-7000-8000-000000000003",
+    "slots": {
+      "item": "小白菜",
+      "quantity": 50,
+      "unit": "KG",
+      "budgetPerUnit": "30",
+      "deliveryCity": "臺北市",
+      "deliveryDate": {
+        "year": 2026,
+        "month": 12,
+        "day": 1
+      },
+      "itemResolution": {
+        "kind": "ITEM_RESOLUTION_KIND_CATEGORY_CONFIRMED",
+        "label": "小白菜",
+        "displayValue": "小白菜"
+      }
+    },
+    "recordedThisTurn": [
+      {
+        "key": "SLOT_KEY_ITEM",
+        "label": "品項",
+        "value": "小白菜"
+      },
+      {
+        "key": "SLOT_KEY_ITEM_RESOLUTION",
+        "label": "品項分類",
+        "value": "小白菜"
+      },
+      {
+        "key": "SLOT_KEY_QUANTITY",
+        "label": "數量",
+        "value": "50"
+      },
+      {
+        "key": "SLOT_KEY_UNIT",
+        "label": "單位",
+        "value": "公斤"
+      },
+      {
+        "key": "SLOT_KEY_BUDGET_PER_UNIT",
+        "label": "單價預算",
+        "value": "30"
+      },
+      {
+        "key": "SLOT_KEY_DELIVERY_CITY",
+        "label": "配送城市",
+        "value": "臺北市"
+      },
+      {
+        "key": "SLOT_KEY_DELIVERY_DATE",
+        "label": "到貨日期",
+        "value": "2026-12-01"
+      }
+    ],
+    "reply": "好的，主要資訊都到齊了。 包裝上有什麼需求嗎？",
+    "question": {
+      "slotKey": "SLOT_KEY_PACKAGING",
+      "prompt": "包裝上有什麼需求嗎？",
+      "allowFreeText": true,
+      "canSkip": true
+    },
+    "blocks": [
+      {
+        "kind": "BLOCK_KIND_UNDERSTOOD",
+        "text": "好的，主要資訊都到齊了。"
+      },
+      {
+        "kind": "BLOCK_KIND_NEXT_STEP",
+        "text": "包裝上有什麼需求嗎？"
+      }
+    ],
+    "textFallback": "好的，主要資訊都到齊了。 包裝上有什麼需求嗎？",
+    "messageId": "0192a000-0000-7000-8000-000000000004",
+    "createTime": "2026-11-22T03:00:00Z",
+    "runId": "0192a000-0000-7000-8000-000000000005"
+  }
+}

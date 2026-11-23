@@ -24,11 +24,17 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/adminauth"
+	httpassistant "github.com/Will413028/hawkr/backend/internal/httpapi/assistant"
+	httpbizcalendar "github.com/Will413028/hawkr/backend/internal/httpapi/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
+	httpbuyerprocurement "github.com/Will413028/hawkr/backend/internal/httpapi/buyerprocurement"
+	httpchat "github.com/Will413028/hawkr/backend/internal/httpapi/chat"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
+	httpcrm "github.com/Will413028/hawkr/backend/internal/httpapi/crm"
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
+	adminbizcalendarconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
@@ -37,35 +43,47 @@ import (
 	adminreviewqueueconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
 	adminsocialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1/socialv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/assistant/v1alpha1/assistantv1alpha1connect"
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/chat/v1alpha1/chatv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/crm/v1alpha1/crmv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/review/v1alpha1/reviewv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
 	httpmedia "github.com/Will413028/hawkr/backend/internal/httpapi/media"
 	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
+	httpreview "github.com/Will413028/hawkr/backend/internal/httpapi/review"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	httpsocial "github.com/Will413028/hawkr/backend/internal/httpapi/social"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 )
 
 // Deps 是 handler 需要的外部依賴，全部在組裝點提供。
@@ -91,12 +109,24 @@ type Deps struct {
 	Seller   *seller.Module
 	// Payment 是收款帳戶（payment 模組）：賣家的收款帳戶 RPC（seller 確認擁有者之後呼叫）、PaymentAdminService 與收款 webhook。
 	Payment *payment.Module
+	// BizCalendar 是工作日行事曆（platform/bizcalendar）：BizCalendarAdminService 的匯入與涵蓋查詢。
+	BizCalendar *bizcalendar.Store
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
 	Social *social.Module
+	// Review 是評價（ReviewPublicService、ReviewAppService）；封鎖入口也用它解析評價參照的作者。
+	Review *review.Module
+	// IM 是買家與店家之間的聊天（ChatAppService）。
+	IM *im.Module
+	// CRM 是店家的客戶與標籤（CrmAppService）。
+	CRM *crm.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
 	// Media 是公開圖片的暫存上傳（MediaAppService）；nil 時每個方法回 unavailable。
 	Media *media.Module
+	// Assistant 是買家助理（AssistantAppService）。
+	Assistant *assistant.Module
+	// Procurement 是買家採購（BuyerProcurementAppService）。
+	Procurement *procurement.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
 	// httpseller.NewStatsSource 建立。
 	Stats *httpseller.StatsSource
@@ -161,14 +191,35 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	if deps.Payment == nil {
 		return nil, fmt.Errorf("httpapi：PaymentAdminService 與收款 webhook 需要 Payment")
 	}
+	if deps.BizCalendar == nil {
+		return nil, fmt.Errorf("httpapi：BizCalendarAdminService 需要 BizCalendar")
+	}
 	if deps.Social == nil {
 		return nil, fmt.Errorf("httpapi：SellerGovernanceAdminService 需要 Social")
 	}
 	if deps.Buyer == nil {
 		return nil, fmt.Errorf("httpapi：BuyerAppService 與 IdentityAppService.GetSession 需要 Buyer")
 	}
+	if deps.Review == nil {
+		return nil, fmt.Errorf("httpapi：ReviewPublicService、ReviewAppService 與封鎖入口的評價參照需要 Review")
+	}
+	if deps.IM == nil {
+		return nil, fmt.Errorf("httpapi：ChatAppService 需要 IM")
+	}
+	if deps.Identity == nil {
+		return nil, fmt.Errorf("httpapi：ChatAppService 串流的重新驗證需要 Identity")
+	}
+	if deps.CRM == nil {
+		return nil, fmt.Errorf("httpapi：CrmAppService 需要 CRM")
+	}
 	if deps.Moderation == nil {
 		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
+	}
+	if deps.Assistant == nil {
+		return nil, fmt.Errorf("httpapi：AssistantAppService 需要 Assistant")
+	}
+	if deps.Procurement == nil {
+		return nil, fmt.Errorf("httpapi：BuyerProcurementAppService 需要 Procurement")
 	}
 	if deps.Now == nil {
 		deps.Now = time.Now
@@ -339,14 +390,39 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
 	add(mediav1alpha1connect.NewMediaAppServiceHandler(httpmedia.NewApp(deps.Media, deps.Logger), opts...))
-	add(moderationv1alpha1connect.NewModerationAppServiceHandler(httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer), opts...))
+	reviewPublic, err := httpreview.NewPublic(deps.Review, deps.Buyer, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(reviewv1alpha1connect.NewReviewPublicServiceHandler(reviewPublic, opts...))
+	reviewApp, err := httpreview.NewApp(deps.Review, deps.Review, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(reviewv1alpha1connect.NewReviewAppServiceHandler(reviewApp, opts...))
+	chatApp, err := httpchat.NewApp(deps.IM, deps.IM, httpchat.ModuleStreams(deps.IM), deps.Identity, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	chatPath, chatHandler := chatv1alpha1connect.NewChatAppServiceHandler(chatApp, opts...)
+	add(chatPath, httpchat.WithStreamWriter(chatHandler))
+	crmApp, err := httpcrm.NewApp(deps.CRM, deps.CRM, deps.Buyer, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(crmv1alpha1connect.NewCrmAppServiceHandler(crmApp, opts...))
+	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(moderationv1alpha1connect.NewModerationAppServiceHandler(moderationApp, opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
 	if err != nil {
 		return nil, err
 	}
 	add(adminsocialconnect.NewSocialAdminServiceHandler(socialAdmin, opts...))
-	blocking := blocks.Sources{Authors: deps.Social, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
+	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Messages: deps.IM, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err
@@ -407,7 +483,10 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(sellerconnect.NewSellerReportAppServiceHandler(reports, opts...))
 	add(adminsellerconnect.NewSellerProspectAdminServiceHandler(httpseller.NewProspects(deps.Seller, deps.Images), opts...))
 	add(adminpaymentconnect.NewPaymentAdminServiceHandler(httppayment.NewAdmin(deps.Payment), opts...))
+	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(httpbizcalendar.NewAdmin(deps.BizCalendar, deps.Now), opts...))
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
+	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
+	add(procurementv1alpha1connect.NewBuyerProcurementAppServiceHandler(httpbuyerprocurement.NewApp(deps.Procurement, deps.Buyer, deps.Seller, deps.Images, deps.Logger), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
 	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
 	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)

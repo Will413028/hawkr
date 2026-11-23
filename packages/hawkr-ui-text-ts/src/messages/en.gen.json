@@ -1,4 +1,18 @@
 {
+  "admin": {
+    "moderation": {
+      "CaseReport": {
+        "outcome_unset": "Under review"
+      }
+    }
+  },
+  "assistant": {
+    "AssistantTool": {
+      "ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL": "Looking up the order details",
+      "ASSISTANT_TOOL_GET_MY_ORDERS": "Looking up your orders",
+      "ASSISTANT_TOOL_TRACK_MY_PACKAGE": "Checking your package tracking"
+    }
+  },
   "buyer": {
     "Gender": {
       "GENDER_FEMALE": "Female",
@@ -6,28 +20,39 @@
       "GENDER_OTHER": "Other"
     },
     "Profile": {
+      "deleted_name": "Deleted account",
       "gender_unset": "Not set"
+    }
+  },
+  "chat": {
+    "Message": {
+      "unsupported_kind": "Unsupported message"
+    },
+    "Preview": {
+      "erased": "This message has been removed",
+      "hidden": "This message has been hidden",
+      "image": "Sent a photo"
     }
   },
   "common": {
     "PolicyCategory": {
-      "POLICY_CATEGORY_COUNTERFEIT": "仿冒商品",
-      "POLICY_CATEGORY_FAKE_CERTIFICATION": "假認證",
-      "POLICY_CATEGORY_FOOD_SAFETY": "食品安全",
-      "POLICY_CATEGORY_FRAUD": "詐欺或操縱交易",
+      "POLICY_CATEGORY_COUNTERFEIT": "Counterfeit goods",
+      "POLICY_CATEGORY_FAKE_CERTIFICATION": "Fake certification",
+      "POLICY_CATEGORY_FOOD_SAFETY": "Food safety",
+      "POLICY_CATEGORY_FRAUD": "Fraud or transaction manipulation",
       "POLICY_CATEGORY_HARASSMENT": "Harassment or bullying",
       "POLICY_CATEGORY_HATE": "Hate or discriminatory speech",
-      "POLICY_CATEGORY_IMPERSONATION": "冒用或誤導交易主體",
-      "POLICY_CATEGORY_IP_INFRINGEMENT": "侵害智慧財產權",
-      "POLICY_CATEGORY_MISLEADING_INFO": "不實或誤導資訊",
-      "POLICY_CATEGORY_OFF_PLATFORM_TRADE": "繞過平台交易",
-      "POLICY_CATEGORY_OTHER": "其他",
-      "POLICY_CATEGORY_PLATFORM_ABUSE": "干擾或濫用平台",
-      "POLICY_CATEGORY_PRIVACY": "不當使用個人資料",
-      "POLICY_CATEGORY_PROHIBITED_GOODS": "違法或禁售商品",
+      "POLICY_CATEGORY_IMPERSONATION": "Impersonation",
+      "POLICY_CATEGORY_IP_INFRINGEMENT": "Intellectual property infringement",
+      "POLICY_CATEGORY_MISLEADING_INFO": "False or misleading information",
+      "POLICY_CATEGORY_OFF_PLATFORM_TRADE": "Off-platform transactions",
+      "POLICY_CATEGORY_OTHER": "Other",
+      "POLICY_CATEGORY_PLATFORM_ABUSE": "Platform abuse",
+      "POLICY_CATEGORY_PRIVACY": "Misuse of personal data",
+      "POLICY_CATEGORY_PROHIBITED_GOODS": "Illegal or prohibited goods",
       "POLICY_CATEGORY_SEXUAL_CONTENT": "Sexual content",
       "POLICY_CATEGORY_SPAM": "Spam",
-      "POLICY_CATEGORY_UNLICENSED_SALE": "未經許可販售"
+      "POLICY_CATEGORY_UNLICENSED_SALE": "Unlicensed sale"
     },
     "StoreCard": {
       "closed_store": "Closed store"
@@ -56,6 +81,17 @@
     },
     "unknown": "未知"
   },
+  "crm": {
+    "CustomerSort": {
+      "CUSTOMER_SORT_FIRST_ORDER_TIME": "First order date",
+      "CUSTOMER_SORT_ORDER_COUNT": "Order count",
+      "CUSTOMER_SORT_TOTAL_SPENT": "Total spent"
+    },
+    "CustomerType": {
+      "CUSTOMER_TYPE_NORMAL": "Regular customer",
+      "CUSTOMER_TYPE_VIP": "VIP"
+    }
+  },
   "media": {
     "RejectReason": {
       "REJECT_REASON_CHECKSUM_MISMATCH": "The file was corrupted during upload. Please upload it again.",
@@ -66,9 +102,11 @@
     }
   },
   "moderation": {
+    "CommunityReport": {
+      "outcome_unset": "Under review"
+    },
     "ReportOutcome": {
       "REPORT_OUTCOME_NO_VIOLATION": "Resolved (no violation)",
-      "REPORT_OUTCOME_PENDING": "Under review",
       "REPORT_OUTCOME_VIOLATION": "Resolved (violation)"
     },
     "ReportTargetKind": {
@@ -92,6 +130,35 @@
     "RequirementCollection": {
       "REQUIREMENT_COLLECTION_PLATFORM": "Embedded on platform",
       "REQUIREMENT_COLLECTION_PROVIDER": "Provider-hosted"
+    }
+  },
+  "procurement": {
+    "RejectionReason": {
+      "REJECTION_REASON_BUDGET_RANGE": "The budget per unit is out of range",
+      "REJECTION_REASON_CITY_UNRECOGNIZED": "The city could not be recognized",
+      "REJECTION_REASON_DATE_FORMAT": "The date format is not valid",
+      "REJECTION_REASON_DATE_MISSING_YEAR": "The date is missing the year",
+      "REJECTION_REASON_DATE_PAST": "The date has already passed",
+      "REJECTION_REASON_DATE_TOO_FAR": "The date is too far ahead",
+      "REJECTION_REASON_EMPTY": "The content is empty",
+      "REJECTION_REASON_QUANTITY_RANGE": "The quantity is out of range",
+      "REJECTION_REASON_RESOLUTION_NO_ITEM": "The item is missing or was rejected, so no item category can be set",
+      "REJECTION_REASON_RESOLUTION_NO_LABEL": "The item category has no name",
+      "REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": "The way the item category was decided is unknown",
+      "REJECTION_REASON_TRUNCATED": "Over the length limit, shortened",
+      "REJECTION_REASON_UNIT_NOT_ALLOWED": "This unit is not supported"
+    }
+  },
+  "review": {
+    "Review": {
+      "rating_label_1": "Very dissatisfied",
+      "rating_label_2": "Dissatisfied",
+      "rating_label_3": "Okay",
+      "rating_label_4": "Satisfied",
+      "rating_label_5": "Very satisfied"
+    },
+    "ReviewAuthor": {
+      "anonymous_name": "Anonymous member"
     }
   },
   "seller": {

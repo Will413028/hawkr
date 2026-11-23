@@ -1,18 +1,14 @@
 package router
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/Will413028/hawkr/gateway/internal/authz"
-	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
 // 能力集合是單體帶來的輸入（seller 模組推導）；測試以明確的清單當輸入，不在 gateway 重算。
@@ -53,7 +49,7 @@ func TestSellerGuardBehavior(t *testing.T) {
 		}
 	}
 	echo := func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"suspHeader": c.Request.Header.Get(headerSellerSuspended)})
+		c.JSON(http.StatusOK, gin.H{})
 	}
 	build := func(accountID int64, accountType int) *gin.Engine {
 		r := gin.New()
@@ -61,7 +57,6 @@ func TestSellerGuardBehavior(t *testing.T) {
 		r.GET("/block", requireSeller(authz.CapProductManage), echo)  // BLOCK-if-suspended cap
 		r.GET("/white", requireSeller(authz.CapOrderFulfill), echo)   // 白名單 cap (skips Redis)
 		r.GET("/view", sellerViewGuard(authz.CapProductManage), echo) // BLOCK cap to prove deny-path delegation
-		r.GET("/inject", injectSellerSuspension(), echo)
 		return r
 	}
 	do := func(r *gin.Engine, target string, hdr map[string]string) *httptest.ResponseRecorder {
@@ -86,9 +81,6 @@ func TestSellerGuardBehavior(t *testing.T) {
 	if w := do(seller, "/view?view=selling", nil); w.Code != http.StatusOK {
 		t.Fatalf("active view=selling: want 200, got %d", w.Code)
 	}
-	if w := do(seller, "/inject", nil); w.Code != http.StatusOK || strings.Contains(w.Body.String(), "9601") {
-		t.Fatalf("active /inject: want 200 with empty suspHeader, got %d %s", w.Code, w.Body)
-	}
 	reason = "9601"
 	if w := do(seller, "/block", nil); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "9240") {
 		t.Fatalf("suspended /block: want 409 with code 9240, got %d %s", w.Code, w.Body)
@@ -101,10 +93,6 @@ func TestSellerGuardBehavior(t *testing.T) {
 	}
 	if w := do(seller, "/view?view=buyer", nil); w.Code != http.StatusOK {
 		t.Fatalf("suspended view=buyer: must bypass guard, want 200, got %d", w.Code)
-	}
-	if w := do(seller, "/inject", map[string]string{headerSellerSuspended: "SPOOF"}); w.Code != http.StatusOK ||
-		!strings.Contains(w.Body.String(), "9601") || strings.Contains(w.Body.String(), "SPOOF") {
-		t.Fatalf("suspended /inject: want reason 9601 with spoof stripped, got %s", w.Body)
 	}
 	buyer := build(int64(2608240571), middleware.AccountTypeBuyer)
 	if w := do(buyer, "/block", nil); w.Code != http.StatusForbidden {
@@ -173,71 +161,6 @@ func TestSellerSuspensionOnlyGuard(t *testing.T) {
 	}
 
 }
-func TestSuspensionMetadataPropagation(t *testing.T) {
-	middleware.SetRedisClient(nil)
-	reason := ""
-
-	prevSkip := middleware.SkipRoleCheck
-	middleware.SkipRoleCheck = false
-	t.Cleanup(func() { middleware.SkipRoleCheck = prevSkip })
-
-	gin.SetMode(gin.TestMode)
-	const sellerID = int64(777)
-	var gotMD metadata.MD
-	interceptor := grpcclient.AuthMetadataInterceptor()
-	capturingHandler := func(c *gin.Context) {
-		gotMD = nil
-		_ = interceptor(c.Request.Context(), "/im.IMService/SendMessage", nil, nil, nil,
-			func(ctx context.Context, method string, req, reply interface{},
-				cc *grpc.ClientConn, opts ...grpc.CallOption) error {
-				gotMD, _ = metadata.FromOutgoingContext(ctx)
-				return nil
-			})
-		c.JSON(http.StatusOK, gin.H{"header": c.Request.Header.Get(headerSellerSuspended)})
-	}
-
-	r := gin.New()
-	r.Use(func(c *gin.Context) {
-		c.Set("accountId", sellerID)
-		c.Set("accountType", middleware.AccountTypeSeller)
-		c.Set("sellerSuspended", reason)
-		c.Set("sellerCapabilities", capsForReason(reason))
-		c.Next()
-	})
-	r.POST("/chat/messages", injectSellerSuspension(), capturingHandler)
-
-	send := func(spoof string) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodPost, "/chat/messages", nil)
-		if spoof != "" {
-			req.Header.Set(headerSellerSuspended, spoof)
-		}
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		return w
-	}
-	reason = ""
-	send("")
-	if v := gotMD.Get("x-seller-suspended"); len(v) != 0 {
-		t.Fatalf("no suspension: metadata must NOT carry x-seller-suspended, got %v", v)
-	}
-	w := send("FORGED_REASON")
-	if v := gotMD.Get("x-seller-suspended"); len(v) != 0 {
-		t.Fatalf("spoofed header must be stripped, metadata got %v", v)
-	}
-	if strings.Contains(w.Body.String(), "FORGED_REASON") {
-		t.Fatalf("spoofed header must not survive to handler, body %s", w.Body)
-	}
-	reason = "9601"
-	send("")
-	if v := gotMD.Get("x-seller-suspended"); len(v) != 1 || v[0] != "9601" {
-		t.Fatalf("suspended: metadata must carry x-seller-suspended=9601, got %v", v)
-	}
-	send("FORGED_REASON")
-	if v := gotMD.Get("x-seller-suspended"); len(v) != 1 || v[0] != "9601" {
-		t.Fatalf("suspended+spoof: only middleware value may propagate, got %v", v)
-	}
-}
-
 func TestRequireSellerChecksOnlyCapabilityMembership(t *testing.T) {
 	prevSkip := middleware.SkipRoleCheck
 	middleware.SkipRoleCheck = false

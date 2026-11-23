@@ -1,7 +1,6 @@
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -21,7 +20,9 @@ import 'core/observability/sentry_scrub.dart';
 import 'core/analytics/analytics_identity.dart';
 import 'core/analytics/analytics_providers.dart';
 import 'core/layout/app_media_query_policy.dart';
+import 'core/l10n/ui_locale.dart';
 import 'core/layout/app_text_size.dart';
+import 'l10n/gen/app_localizations.dart';
 import 'core/networking/app_version_headers.dart';
 import 'core/routing/app_router.dart';
 import 'core/routing/buyer_navigation_observer.dart';
@@ -35,8 +36,11 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'features/app_update/application/force_update_provider.dart';
 import 'features/chat/data/active_chat_gate.dart';
-import 'features/chat/data/chat_model.dart';
+import 'features/chat/data/chat_display.dart';
+import 'features/chat/data/chat_realtime.dart';
 import 'features/chat/data/chat_repository.dart';
+import 'features/seller/data/store_card_display.dart';
+import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as chat_pb;
 import 'features/notification/data/push/background_handler.dart';
 import 'features/notification/data/push/manager.dart';
 import 'features/notification/data/push/router.dart';
@@ -235,7 +239,7 @@ class MyApp extends ConsumerStatefulWidget {
 }
 
 class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
-  StreamSubscription<ChatMessage>? _messageSub;
+  StreamSubscription<chat_pb.ChatEvent>? _messageSub;
   OverlayEntry? _activeToast;
 
   @override
@@ -247,12 +251,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationRouter.flushPending();
     });
-    // 監聽 WebSocket 新訊息（完整 ChatMessage）
+    // 監聽聊天串流的新訊息事件（StreamEvents）
     // Eagerly create chatRepository (registers WidgetsBindingObserver via constructor).
-    _messageSub = ref
-        .read(chatRepositoryProvider)
-        .onMessage
-        .listen(_onNewChatMessage);
+    _messageSub = ref.read(chatRealtimeProvider).events.listen(_onChatEvent);
   }
 
   @override
@@ -273,18 +274,21 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     }
   }
 
-  void _onNewChatMessage(ChatMessage msg) {
-    // 只通知「收到的訊息」，自己發的不通知
-    // senderId == 對方才觸發通知
-    if (msg.senderId.isEmpty) return;
-    // 如果使用者正在跟這個人聊天，不彈通知。
-    // 雙重比對 senderId / conversationId — merchantId 與 senderId 可能因 namespace
-    // 不同對不上（例：merchantId 為 shop_id，senderId 為 account_id），conversationId
-    // 是 server 端唯一識別，比對最穩。
-    final gate = ref.read(activeChatGateProvider);
-    if (gate.peerId.isNotEmpty && gate.peerId == msg.senderId) return;
-    final convId = msg.conversationId ?? '';
-    if (convId.isNotEmpty && gate.conversationId == convId) return;
+  Future<void> _onChatEvent(chat_pb.ChatEvent event) async {
+    if (event.whichEvent() != chat_pb.ChatEvent_Event.message) return;
+    final msg = event.message.message;
+    // 只通知店家新寄來的訊息：自己發的、可見度改變的都不通知。
+    if (event.message.updated ||
+        msg.sender != chat_pb.ChatParty.CHAT_PARTY_STORE) {
+      return;
+    }
+    // 使用者正在這個對話裡就不彈通知（對話 ID 是推播與串流共同的識別）。
+    final viewing = await activeChatCovers(
+      () => ref.read(activeChatGateProvider),
+      ref.read(chatRepositoryProvider),
+      msg.conversationId,
+    );
+    if (viewing || !mounted) return;
 
     // 震動反饋
     HapticFeedback.mediumImpact();
@@ -293,37 +297,28 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     _showChatBanner(msg);
   }
 
-  void _showChatBanner(ChatMessage msg) {
+  void _showChatBanner(chat_pb.Message msg) {
     final overlay = MyApp.navigatorKey.currentState?.overlay;
     if (overlay == null) return;
 
     // 移除上一個通知
     _activeToast?.remove();
 
-    // 解析訊息預覽文字
-    String preview = msg.messageContent;
-    if (preview.startsWith('{') && preview.endsWith('}')) {
-      try {
-        final m = Map<String, dynamic>.from(
-          const JsonCodec().decode(preview) as Map,
-        );
-        final t = (m['text'] ?? m['content'] ?? '').toString();
-        if (t.isNotEmpty) preview = t;
-        final type = (m['messageType'] ?? m['type'] ?? '').toString();
-        if (type == 'image') preview = '[圖片]';
-        if (type == 'product') preview = '[商品]';
-      } catch (_) {}
-    }
+    final locale = ref.read(uiLocaleProvider);
+    var preview = chatMessagePreview(msg, locale);
     if (preview.length > 40) preview = '${preview.substring(0, 40)}...';
+    final card = ref
+        .read(chatRepositoryProvider)
+        .storeCards[msg.conversationId];
 
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (context) {
         final top = MediaQuery.of(context).padding.top;
         return _ChatNotificationBanner(
-          senderName: msg.senderName ?? '',
-          senderAvatar: msg.senderAvatar,
-          senderId: msg.senderId,
+          senderName: card?.displayName(locale) ?? '',
+          senderAvatar: card?.logoUri,
+          senderId: msg.conversationId,
           preview: preview,
           topPadding: top,
           onTap: () {
@@ -332,9 +327,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
             // 導航到聊天室
             final ctx = MyApp.navigatorKey.currentContext;
             if (ctx != null) {
-              GoRouter.of(
-                ctx,
-              ).push('/chat/room', extra: {'merchantId': msg.senderId});
+              GoRouter.of(ctx).push(
+                '/chat/room',
+                extra: {'conversationId': msg.conversationId},
+              );
             }
           },
           onDismiss: () {
@@ -376,6 +372,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
           title: 'Hawkr',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
+          locale: ref.watch(uiLocaleProvider).flutterLocale,
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
           builder: (context, child) {
             final mq = AppMediaQueryPolicy.apply(
               MediaQuery.of(context),

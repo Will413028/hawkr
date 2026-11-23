@@ -1,0 +1,150 @@
+{
+  "scenario": "tracking_partial_detail_failure",
+  "description": "BuyerTracking button endpoint (empty message -\u003e 查詢包裹狀態): track_my_package lists status 20 orders, one detail lookup fails and is silently skipped.",
+  "input": {
+    "rpc": "BuyerTracking",
+    "endpoint_key": "tracking",
+    "message": "",
+    "buyer_id": 4242
+  },
+  "fake_tool_backend": {
+    "orders": [
+      {
+        "OrderNo": "ORD-1001",
+        "Status": "20",
+        "SellerName": "阿嬤的菜園",
+        "Amount": 580,
+        "CreateTimeMs": 1700000000000,
+        "ItemCount": 2
+      },
+      {
+        "OrderNo": "ORD-1002",
+        "Status": "30",
+        "SellerName": "海味小舖",
+        "Amount": 1200,
+        "CreateTimeMs": 1700100000000,
+        "ItemCount": 1
+      },
+      {
+        "OrderNo": "ORD-1003",
+        "Status": "20",
+        "SellerName": "果園直送",
+        "Amount": 300,
+        "CreateTimeMs": 1700200000000,
+        "ItemCount": 1
+      }
+    ],
+    "details": {
+      "ORD-1001": {
+        "OrderNo": "ORD-1001",
+        "Status": "20",
+        "SellerName": "阿嬤的菜園",
+        "ShippingMethod": "黑貓冷藏",
+        "ShippingStatus": "IN_TRANSIT",
+        "RecipientName": "王小明",
+        "PaymentMethod": "CREDIT_CARD",
+        "Amount": 580,
+        "CreateTimeMs": 0,
+        "ShippingFee": 120
+      },
+      "ORD-1002": {
+        "OrderNo": "ORD-1002",
+        "Status": "30",
+        "SellerName": "海味小舖",
+        "ShippingMethod": "宅配",
+        "ShippingStatus": "DELIVERED",
+        "RecipientName": "王小明",
+        "PaymentMethod": "ATM",
+        "Amount": 1200,
+        "CreateTimeMs": 0,
+        "ShippingFee": 150
+      }
+    },
+    "detail_error_for": {
+      "ORD-1003": "upstream timeout"
+    }
+  },
+  "scripted_llm": [
+    {
+      "agent": "buyer_tracking_specialist",
+      "chunks": [
+        {
+          "function_call": {
+            "name": "track_my_package",
+            "args": {}
+          }
+        }
+      ]
+    },
+    {
+      "agent": "buyer_tracking_specialist",
+      "chunks": [
+        {
+          "partial": true,
+          "text": "ORD-1001 "
+        },
+        {
+          "partial": true,
+          "text": "配送中。"
+        },
+        {
+          "text": "ORD-1001 配送中。"
+        }
+      ]
+    }
+  ],
+  "observed_llm_requests": [
+    {
+      "agent": "buyer_tracking_specialist",
+      "call_index": 0,
+      "last_user_texts": [
+        "查詢包裹狀態"
+      ],
+      "history_contents": 1
+    },
+    {
+      "agent": "buyer_tracking_specialist",
+      "call_index": 1,
+      "function_responses_fed_back": [
+        {
+          "name": "track_my_package",
+          "response": {
+            "packages": [
+              {
+                "amount_twd": 580,
+                "order_no": "ORD-1001",
+                "seller_name": "阿嬤的菜園",
+                "ship_time": "",
+                "shipping_method": "黑貓冷藏",
+                "shipping_status": "IN_TRANSIT",
+                "shipping_status_desc": "",
+                "status": "待出貨（物流單已建立，待出貨）"
+              }
+            ]
+          }
+        }
+      ],
+      "history_contents": 3
+    }
+  ],
+  "emitted_events": [
+    {
+      "kind": "text",
+      "order": 0,
+      "text": "ORD-1001 "
+    },
+    {
+      "kind": "text",
+      "order": 1,
+      "text": "配送中。"
+    },
+    {
+      "kind": "done",
+      "order": 2,
+      "session_id": "\u003cSESSION_ID\u003e"
+    }
+  ],
+  "rpc_result": {
+    "status_code": "OK"
+  }
+}

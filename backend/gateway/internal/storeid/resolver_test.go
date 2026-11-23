@@ -22,7 +22,7 @@ func activeSeller(storeID int64) GetterFunc {
 func fatalGetter(t *testing.T) GetterFunc {
 	t.Helper()
 	return func(context.Context, int64) (int64, error) {
-		t.Fatal("seller-service must not be called")
+		t.Fatal("seller lookup must not be called")
 		return 0, nil
 	}
 }
@@ -56,7 +56,7 @@ func TestCurrentStoreID_WithoutMonolithCallsRPC(t *testing.T) {
 }
 
 func TestCurrentStoreID_UpstreamErrorPropagates(t *testing.T) {
-	boom := fmt.Errorf("seller-service down")
+	boom := fmt.Errorf("seller lookup down")
 	r := New(GetterFunc(func(context.Context, int64) (int64, error) {
 		return 0, boom
 	}))

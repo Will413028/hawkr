@@ -5,8 +5,8 @@ name: mutation
 # - 只在清單、runner 或本 workflow 變動時觸發；push／PR 只跑這次事件改到的清單，
 #   runner 或 workflow 改了就全跑（它們壞了會讓所有清單的結果失真）。
 # - 清單裡用到哪些 stack 就扇出哪些 job：Go integration 要 Docker（testcontainers，ubuntu-latest 內建）、
-#   go-gateway 是獨立 module、website／admin／ts-package 要 pnpm workspace、Flutter 與 dart-package 要對應的 fvm 版本。
-#   沒用到的 stack 不跑。
+#   go:<dir> 是 <dir> 這個獨立 Go 模組（Go 版本仍讀 backend/.go-version）、website、admin 與 ts-package 要 pnpm workspace、
+#   Flutter 與 dart-package 要對應的 fvm 版本。沒用到的 stack 不跑。
 # - mutation 不在開發機跑（機器共用、integration 需要資料庫容器），驗收只看這個 job。
 # - 先在未改動的樹上跑一次基準，紅的基準不能證明什麼（BASELINE-FAILED）。
 
@@ -105,16 +105,16 @@ jobs:
           include = []
           for s in json.loads(os.environ["STACKS"]):
               if s.startswith("flutter:"):
-                  kind, app = "flutter", s.removeprefix("flutter:")
+                kind, app, module = "flutter", s.removeprefix("flutter:"), ""
               elif s.startswith("dart-package:"):
-                  kind, app = "dart", "packages/" + s.removeprefix("dart-package:")
+                kind, app, module = "dart", "packages/" + s.removeprefix("dart-package:"), ""
               elif s.startswith("ts-package:") or s in ("website", "admin"):
-                  kind, app = "pnpm", ""
-              elif s == "go-gateway":
-                  kind, app = "gateway", ""
+                kind, app, module = "pnpm", "", ""
               else:
-                  kind, app = "go", ""
-              include.append({"stack": s, "kind": kind, "app": app})
+                # go、go-integration 是 backend 單體；go:<dir>、go-integration:<dir> 是 <dir> 這個獨立模組。
+                kind, app = "go", ""
+                module = s.split(":", 1)[1] if ":" in s else "backend"
+              include.append({"stack": s, "kind": kind, "app": app, "module": module})
           print("matrix=" + json.dumps({"include": include}))
           PY
 
@@ -139,15 +139,7 @@ jobs:
         if: matrix.kind == 'go'
         with:
           go-version-file: backend/.go-version
-          cache-dependency-path: backend/go.sum
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: matrix.kind == 'gateway'
-        with:
-          go-version-file: backend/.go-version
-          cache-dependency-path: |
-            backend/go.sum
-            backend/gateway/go.sum
+          cache-dependency-path: ${{ matrix.module }}/go.sum
 
       - uses: ./.github/actions/pnpm-install
         if: matrix.kind == 'pnpm'

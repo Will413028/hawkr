@@ -253,7 +253,7 @@ func (s *Service) close(ctx context.Context, q *store.Queries, current store.Sel
 		}
 	}
 	if err := s.d.Identity.RemoveRole(ctx, identity.RemoveRoleInput{
-		AccountID: current.AccountID, Role: identity.RoleSeller, SourceID: &current.StoreID,
+		AccountID: current.AccountID, Role: identity.RoleSeller,
 	}); err != nil {
 		return err
 	}
@@ -384,7 +384,7 @@ func (s *Service) Reopen(ctx context.Context, q *store.Queries, storeID int64, n
 		return model.Error(err)
 	}
 	if err := s.d.Identity.GrantRole(ctx, identity.GrantRoleInput{
-		AccountID: reopened.AccountID, Role: identity.RoleSeller, SourceID: &reopened.StoreID,
+		AccountID: reopened.AccountID, Role: identity.RoleSeller,
 	}); err != nil {
 		return err
 	}

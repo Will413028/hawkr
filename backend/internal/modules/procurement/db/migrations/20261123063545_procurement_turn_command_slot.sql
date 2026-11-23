@@ -1,0 +1,2 @@
+-- Modify "turns" table
+ALTER TABLE "procurement"."turns" ADD CONSTRAINT "turns_command_slot_check" CHECK (((command_slot IS NOT NULL) AND (command_slot = ANY (ARRAY['ITEM'::text, 'QUANTITY'::text, 'PACKAGING'::text, 'BUDGET_PER_UNIT'::text, 'DELIVERY_CITY'::text, 'DELIVERY_DATE'::text])) AND (source = ANY (ARRAY['ANSWER'::text, 'REWIND'::text]))) OR ((command_slot IS NULL) AND (source = ANY (ARRAY['LLM_EXTRACT'::text, 'ANSWER'::text])))), ADD COLUMN "command_slot" text NULL;

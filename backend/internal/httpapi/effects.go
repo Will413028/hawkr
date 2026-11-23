@@ -61,6 +61,34 @@ var customerEffects = map[string]Effect{
 	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers": EffectRead,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores": EffectRead,
 
+	// AssistantAppService：送出會開一輪助理回覆（花 LLM 成本、寫對話），停權的帳號不能；訂閱與讀歷史只讀自己的資料。
+	"/hawkr.assistant.v1alpha1.AssistantAppService/SendAssistantMessage":      EffectWrite,
+	"/hawkr.assistant.v1alpha1.AssistantAppService/WatchAssistantTurn":        EffectRead,
+	"/hawkr.assistant.v1alpha1.AssistantAppService/GetLatestAssistantSession": EffectRead,
+	// BuyerProcurementAppService：送出、搜尋、編修需求、發布詢價、入圍與接受報價都改變狀態（有些會花 LLM 成本），停權的帳號不能；讀取、串流與純計算的價格試算可以。
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/SubmitTurn":              EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/WatchRun":                EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/CancelRun":               EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ResumeRun":               EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/StartCandidateSearch":    EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetCandidateSearch":      EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ToggleSelection":         EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/SubmitAnswer":            EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/Rewind":                  EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PreviewRfqPrice":         EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PreviewRfqPublication":   EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ExecuteRfqPublication":   EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetSnapshot":             EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetRuntimeSnapshot":      EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ListConversations":       EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/GetConversationMessages": EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/RenameConversation":      EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/DeleteConversation":      EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/ListSellerResponses":     EffectRead,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PutShortlistEntry":       EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/DeleteShortlistEntry":    EffectWrite,
+	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/AcceptSellerQuote":       EffectWrite,
+
 	// IdentityAppService
 	"/hawkr.identity.v1alpha1.IdentityAppService/GetSession":           EffectRead,
 	"/hawkr.identity.v1alpha1.IdentityAppService/DeleteAccount":        EffectSelfService,
@@ -91,8 +119,9 @@ var customerEffects = map[string]Effect{
 	"/hawkr.social.v1alpha1.SocialPublicService/RecordPostView":       EffectWrite,
 
 	// ModerationAppService：檢舉是寫入（停權的帳號不能送出）；讀自己的檢舉停權的帳號也可以。
-	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":  EffectWrite,
-	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports": EffectRead,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/SubmitReport":       EffectWrite,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports":      EffectRead,
+	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyStoreReports": EffectRead,
 
 	// MediaAppService：上傳是寫入（停權的帳號不能開始新的上傳）；讀處理狀態停權的帳號也可以。
 	"/hawkr.media.v1alpha1.MediaAppService/BeginUpload":       EffectWrite,
@@ -132,6 +161,49 @@ var customerEffects = map[string]Effect{
 	// 作者讀自己的處分與被隱藏內容的理由（A7-D9）：只讀，停權的帳號也要讀得到。
 	"/hawkr.social.v1alpha1.SocialAppService/ListMySanctions":     EffectRead,
 	"/hawkr.social.v1alpha1.SocialAppService/ListMyHiddenContent": EffectRead,
+
+	// ReviewPublicService：公開的 service 對停權的帳號一律以訪客執行，宣告仍標示方法的性質。
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews":    EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/ListStoreReviews":      EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetStoreReviewStats":   EffectRead,
+	"/hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats": EffectRead,
+
+	// ReviewAppService
+	"/hawkr.review.v1alpha1.ReviewAppService/GetReview":           EffectRead,
+	"/hawkr.review.v1alpha1.ReviewAppService/ReplyReview":         EffectWrite,
+	"/hawkr.review.v1alpha1.ReviewAppService/CreateReview":        EffectWrite,
+	"/hawkr.review.v1alpha1.ReviewAppService/ListMyReviews":       EffectRead,
+	"/hawkr.review.v1alpha1.ReviewAppService/ListOwnStoreReviews": EffectRead,
+
+	// CrmAppService
+	"/hawkr.crm.v1alpha1.CrmAppService/ListCustomers":     EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/GetCustomer":       EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateCustomer":    EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/CreateTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/ListTags":          EffectRead,
+	"/hawkr.crm.v1alpha1.CrmAppService/UpdateTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/DeleteTag":         EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/AddCustomerTags":   EffectWrite,
+	"/hawkr.crm.v1alpha1.CrmAppService/RemoveCustomerTag": EffectWrite,
+
+	// ChatAppService
+	"/hawkr.chat.v1alpha1.ChatAppService/ListConversations":           EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/ListStoreConversations":      EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetStoreConversationByBuyer": EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/ListMessages":                EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/SendMessage":                 EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/SendMessageToStore":          EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/SendMessageToBuyer":          EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/MarkConversationRead":        EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/MarkAllRead":                 EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/MarkAllStoreRead":            EffectWrite,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetUnreadCount":              EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetStoreUnreadCount":         EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetPresence":                 EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/GetStorePresence":            EffectRead,
+	// 串流只讀：停權的帳號可讀，停權不結束串流（A6-D16 W4）。
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamEvents":      EffectRead,
+	"/hawkr.chat.v1alpha1.ChatAppService/StreamStoreEvents": EffectRead,
 
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":        EffectWrite,

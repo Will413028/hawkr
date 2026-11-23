@@ -1094,31 +1094,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     }
 
     @Override
-    public void getOrderByShipTradeNo(GetOrderByShipTradeNoRequest request, StreamObserver<GetOrderByShipTradeNoResponse> responseObserver) {
-        try {
-            OrderEntity order = orderService.getOrderByShipmentNo(request.getShipTradeNo());
-            List<OrderItemEntity> items = orderService.getOrderItems(order.getOrderNo());
-            List<RefundRequestEntity> refunds = orderService.getRefundHistory(order.getOrderNo());
-
-            // 內部呼叫（Shipping→Order），不回查 Shipping 避免循環，不需賣家/買家資訊
-            responseObserver.onNext(GetOrderByShipTradeNoResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .setData(OrderProtoConverter.toDetailView(order, items, refunds, null, null, null, getCdnBaseUrl(), false))
-                    .build());
-            responseObserver.onCompleted();
-        } catch (OrderNotFoundException e) {
-            responseObserver.onNext(GetOrderByShipTradeNoResponse.newBuilder()
-                    .setCode(GrpcResponseCode.NOT_FOUND.code())
-                    .setMessage(e.getMessage())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(responseObserver, GetOrderByShipTradeNoResponse.newBuilder(), e, "OrderGrpcService", "getOrderByShipTradeNo", GrpcResponseCode.INTERNAL_ERROR);
-        }
-    }
-
-    @Override
     public void getOrderForPayment(GetOrderForPaymentRequest request, StreamObserver<GetOrderForPaymentResponse> responseObserver) {
         try {
             String orderNo = request.getOrderNo();
@@ -1537,48 +1512,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             responseObserver.onCompleted();
         } catch (Exception e) {
             GrpcErrorHandler.handleException(responseObserver, SearchOrdersResponse.newBuilder(), e, "OrderGrpcService", "searchOrders", GrpcResponseCode.INTERNAL_ERROR);
-        }
-    }
-
-    @Override
-    public void getOrderAggregates(GetOrderAggregatesRequest request, StreamObserver<GetOrderAggregatesResponse> responseObserver) {
-        try {
-            // Auth：僅 ADMIN，或帶 x-internal-service（GrpcAuthContext.INTERNAL_CALL）自動 bypass —
-            // 與 searchOrders 相同模式，crm-service 走 internalServiceInterceptor 呼叫。
-            GrpcAuthContext.requireAccountType(AccountType.ADMIN);
-
-            int page = ProtoConversionUtils.parseIntRequired(request.getPage().getPage(), "page");
-            int size = ProtoConversionUtils.parseIntRequired(request.getPage().getSize(), "size");
-            long storeId = request.getStoreId();
-
-            List<OrderAggregateResult> rows = orderService.getOrderAggregates(storeId, page, size);
-            long total = orderService.countOrderAggregates(storeId);
-
-            GetOrderAggregatesResponse.Builder builder = GetOrderAggregatesResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .setMeta(OrderProtoConverter.toPageMeta(page, size, total));
-
-            for (OrderAggregateResult r : rows) {
-                builder.addData(OrderAggregateItem.newBuilder()
-                        .setStoreId(String.valueOf(r.getStoreId()))
-                        .setBuyerId(String.valueOf(r.getBuyerId()))
-                        .setOrderCount(String.valueOf(r.getOrderCount()))
-                        .setTotalNetAmount(r.getTotalNetAmount() != null ? String.valueOf(r.getTotalNetAmount().longValue()) : "0")
-                        .build());
-            }
-            responseObserver.onNext(builder.build());
-            responseObserver.onCompleted();
-        } catch (StatusRuntimeException e) {
-            responseObserver.onNext(GetOrderAggregatesResponse.newBuilder()
-                    .setCode(e.getStatus().getCode() == Status.Code.UNAUTHENTICATED
-                            ? GrpcResponseCode.UNAUTHORIZED.code()
-                            : GrpcResponseCode.PERMISSION_DENIED.code())
-                    .setMessage(e.getStatus().getDescription())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(responseObserver, GetOrderAggregatesResponse.newBuilder(), e, "OrderGrpcService", "getOrderAggregates", GrpcResponseCode.INTERNAL_ERROR);
         }
     }
 

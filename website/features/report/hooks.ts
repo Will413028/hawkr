@@ -17,7 +17,7 @@ import { getMyReport, listMyReports } from "./api";
 /** 詳情頁的資料：`GetMyReport` 與 `AddReportSupplement` 的回應共用這個形狀。 */
 export type StoreReportDetail = Pick<
 	GetMyReportResponse,
-	"report" | "supplements" | "evidence"
+	"report" | "supplements" | "evidence" | "canSupplement" | "supplementMax"
 >;
 
 /** 我的檢舉（`ListMyReports`，伺服器合併社群與店家兩種）：分頁讀取，項目原樣保留。 */
@@ -64,6 +64,8 @@ export function useMyReport(reportId: string) {
 				report: latest.report,
 				supplements: latest.supplements,
 				evidence: latest.evidence,
+				canSupplement: latest.canSupplement,
+				supplementMax: latest.supplementMax,
 			});
 		},
 		[queryClient, key],

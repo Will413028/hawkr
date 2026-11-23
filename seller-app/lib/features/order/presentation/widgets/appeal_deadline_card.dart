@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/hk_icon.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 售後申訴時效比對卡。
 ///
@@ -79,7 +80,9 @@ class AppealDeadlineCard extends StatelessWidget {
               Expanded(
                 child: _TimeBlock(
                   label: '商品送達時間',
-                  value: deliveredAt != null ? _fmt(deliveredAt!) : '尚未提供',
+                  value: deliveredAt != null
+                      ? _fmt(deliveredAt!, context.taipeiDisplay)
+                      : '尚未提供',
                   valueColor: deliveredAt != null
                       ? AppColors.gray1
                       : AppColors.gray1_50,
@@ -88,7 +91,7 @@ class AppealDeadlineCard extends StatelessWidget {
               Expanded(
                 child: _TimeBlock(
                   label: '買家申訴時間',
-                  value: _fmt(createdAt),
+                  value: _fmt(createdAt, context.taipeiDisplay),
                   valueColor: accent,
                 ),
               ),
@@ -108,10 +111,8 @@ class AppealDeadlineCard extends StatelessWidget {
     );
   }
 
-  String _fmt(DateTime dt) {
-    final l = dt.toLocal();
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${l.year}/${two(l.month)}/${two(l.day)} ${two(l.hour)}:${two(l.minute)}';
+  String _fmt(DateTime dt, TaipeiDisplay t) {
+    return t.dateTime(dt);
   }
 }
 

@@ -14,6 +14,7 @@ import '../../../../shared/widgets/hk_icon.dart';
 import '../../../../shared/widgets/hk_tap_target.dart';
 import '../../data/order_model.dart';
 import '../../order_color_tokens.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 // 文字色：基底 #565656，最淺不低於 80% 透明度
 // 80% 在白底實際渲染 ≈ #797979（偏淡），改用 100% / 90% 讓視覺貼近實際 #565656
@@ -135,7 +136,10 @@ class OrderBottomRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final orderTime = DateFormatUtils.formatDateTime(order.createTime);
+    final orderTime = DateFormatUtils.formatDateTime(
+      order.createTime,
+      context.taipeiDisplay,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

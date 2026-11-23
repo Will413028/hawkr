@@ -1,9 +1,27 @@
 -- 訊息列：寫入、讀取、抹除。
 
 -- name: InsertMessage :one
-INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, image_asset_id, image_object_key, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(conversation_id), sqlc.arg(seq), sqlc.arg(sender_kind), sqlc.arg(message_type), sqlc.narg(content), sqlc.narg(image_asset_id), sqlc.narg(image_object_key), sqlc.arg(now))
+-- 撞 (對話, 寄件方, request_id) 的唯一鍵時不寫、不回列（pgx.ErrNoRows）：呼叫端把整個 transaction 回滾（連同 AllocateSeq 推進的 seq）再重來，重讀第一則。
+INSERT INTO im.messages (id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(conversation_id), sqlc.arg(seq), sqlc.arg(sender_kind), sqlc.arg(request_id), sqlc.arg(message_type), sqlc.narg(content), sqlc.narg(image_asset_id), sqlc.narg(image_object_key), sqlc.arg(now))
+ON CONFLICT ON CONSTRAINT messages_request_key DO NOTHING
 RETURNING *;
+
+-- name: MessageByRequest :one
+-- 送出冪等的重送判定：這個對話、這一方、這個 request_id 第一次寫入的訊息；對話還不存在或沒有這個 request_id 時沒有列。隱藏的以 hidden 標出（同列表查詢的述詞），內容由呼叫端換成墓碑；不鎖列。
+SELECT m.id, m.conversation_id, m.seq, m.sender_kind, m.message_type, m.content, m.image_asset_id, m.image_object_key, m.created_at, m.erased_at,
+       (h.id IS NOT NULL OR EXISTS (SELECT 1 FROM seller.pub_content_takedowns() AS td WHERE td.content_kind = 'CHAT_MESSAGE' AND td.content_id = m.id))::boolean AS hidden
+FROM im.messages AS m
+JOIN im.conversations AS c ON c.id = m.conversation_id
+LEFT JOIN im.hides AS h ON h.message_id = m.id AND h.restored_at IS NULL
+WHERE c.buyer_id = sqlc.arg(buyer_id) AND c.store_id = sqlc.arg(store_id)
+  AND m.sender_kind = sqlc.arg(sender_kind) AND m.request_id = sqlc.arg(request_id);
+
+-- name: MessageParties :one
+-- 訊息所屬對話的雙方（歸屬）：不套可見性（隱藏、抹除的訊息照樣回），不鎖列。
+SELECT c.id AS conversation_id, c.buyer_id, c.store_id
+FROM im.messages AS m JOIN im.conversations AS c ON c.id = m.conversation_id
+WHERE m.id = sqlc.arg(message_id);
 
 -- name: ListMessagesBefore :many
 -- 以 seq 做 keyset（新的在前）；before_seq 為 0 表示從最新開始。隱藏的以 hidden 標出，內容由呼叫端換成墓碑。

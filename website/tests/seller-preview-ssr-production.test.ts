@@ -78,19 +78,7 @@ function startApiStub(sellerId: string): Server {
 			case `${sellerRoot}/stats`:
 				data = { storeId: sellerId, followers: 7 };
 				break;
-			case `${sellerRoot}/reviews/stats`:
-				data = {
-					avgRating: 0,
-					totalCount: 0,
-					rating1Count: 0,
-					rating2Count: 0,
-					rating3Count: 0,
-					rating4Count: 0,
-					rating5Count: 0,
-				};
-				break;
 			case `${sellerRoot}/products`:
-			case `${sellerRoot}/reviews`:
 				data = { records: [], total: 0, totalPages: 0 };
 				break;
 			case `${sellerRoot}/posts`:
@@ -170,6 +158,26 @@ async function installBrowserApiStub(
 			body: JSON.stringify({ posts: [] }),
 		});
 	});
+	for (const [method, body] of [
+		["ListStoreReviews", { reviews: [], nextPageToken: "" }],
+		["GetStoreReviewStats", { count: 0, average: 0, distribution: [] }],
+	] as const) {
+		await page.route(
+			new RegExp(`ReviewPublicService/${method}(?:\\?|$)`),
+			async (route) => {
+				seenRequests.push(`ReviewPublicService/${method}`);
+				await route.fulfill({
+					status: 200,
+					contentType: "application/json",
+					headers: {
+						"access-control-allow-credentials": "true",
+						"access-control-allow-origin": appOrigin,
+					},
+					body: JSON.stringify(body),
+				});
+			},
+		);
+	}
 	// ⚠️ 店家必須是完成新手引導的：否則 `useSellerIdentity` 判定 setupIncomplete →
 	// `SellerCenterShell` 把整個工作區換成開店申請表單 → 唯讀邊界從未掛載，測試只會說
 	// 「marker 沒出現」，看不出真正原因是 fixture。形狀是 proto3 JSON 的 GetMyStoreResponse。
@@ -523,8 +531,8 @@ test("production Next serves all four seller preview routes and the read-only gu
 	for (const expected of [
 		"/api/v1/app/products",
 		"SocialAppService/ListMyPosts",
-		`${root}/reviews`,
-		`${root}/reviews/stats`,
+		"ReviewPublicService/ListStoreReviews",
+		"ReviewPublicService/GetStoreReviewStats",
 		`${root}/forum`,
 	]) {
 		assert(

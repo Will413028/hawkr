@@ -3,7 +3,7 @@
 | 項目 | 值 |
 |---|---|
 | 狀態 | accepted；D7 superseded by `2026-09-26-external-contract-protobuf-connect.md` |
-| 修訂 | 2026-09-29：A3 盤點更正 seller 往上呼叫的描述；vendor portal 改屬 agent（Will 決定，計畫 `2026-09-29-a3-buyer-seller.md`） |
+| 修訂 | 2026-09-29：A3 盤點更正 seller 往上呼叫的描述；vendor portal 改屬 agent（Will 決定，計畫 `2026-09-29-a3-buyer-seller.md`）；2026-11-23：D9 的 CI denylist gate 不建，改寫現行做法（Will） |
 | 日期 | 2026-09-24 |
 | 影響範圍 | 整個 `backend/`（22 個 deployable ＋ gateway）、`api/proto`、`infra/mq`、`k8s`、前端的 API client |
 | 計畫 | `docs/plans/2026-09-24-go-modular-monolith.md` |
@@ -261,6 +261,8 @@
 - 新單體的路徑零容忍。其他既有路徑以 ratchet baseline 起算，只能減少、不能增加。
 - 本機與 CI 一律使用本機服務或測試替身。
 
+> 2026-11-23 修訂：CI denylist gate 從未建出，也不建（Will）；見檔尾「修訂：D9 的現行做法」。
+
 ## 受影響的既有 ADR
 
 - **整份被取代**：`2026-09-18-rfq-acceptance-order-atomicity.md`。它選 outbox 的前提是「沒有跨服務 transaction」，D4 之後這個前提不存在，接受報價與建單在同一個 transaction 內完成。
@@ -408,3 +410,13 @@
 - 依賴表的方向：`notification` 是訂閱發布方事件的一方，所以 `notification` 依賴 `procurement`（`procurement.*` 事件由 procurement 發布、notification 訂閱），`procurement` 不依賴 `notification`。A9 決定簡報 A9-D3 把 notification 列在 procurement 的依賴裡，與表的語意相反，照表的語意修正；`notification` 列的 `agent` 換成 `procurement`。
 - 全域鎖順序 `platform/lockorder` 的 `Modules` 把三個新模組排在 `discovery` 之後、`delegation` 之前，每個都在它依賴的模組之後。
 - `pricebook` 在 2026-10-28 的修訂已從依賴拿掉，本修訂不恢復。
+
+## 修訂：D9 的現行做法（2026-11-23，Will）
+
+原決策段保留歷史。D9 寫的 CI denylist gate 從未建出（scripts、workflows 與 `backend/scripts` 都沒有 denylist 檢查），也不建。「不連到舊公司端點」的目的不變，現在靠設定面維持，而不是靠掃描：
+
+- 舊端點的設定項已刪除：`TGOS_BASE_URL` 隨 seller-service 一起移除，`backend/docker-compose-local.yml` 不再有它。
+- 媒體網域沒有預設值：`MEDIA_BASE_URL` 在 `backend/docker-compose-local.yml` 是必填（缺少時 compose 直接失敗），在 `backend/.env.template` 留空，不會有舊公司的網域被預設帶入。
+- 本機與 CI 使用本機服務或測試替身的規定不變。
+
+理由：端點只會從設定進來，設定項刪除或不給預設值後，沒有路徑能在沒有人明確填入時連到舊公司；為此再維護一份 denylist 與 baseline，成本高於它防住的風險。

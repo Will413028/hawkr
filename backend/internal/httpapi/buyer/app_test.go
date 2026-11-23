@@ -10,7 +10,6 @@ import (
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
-	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	model "github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -233,10 +232,6 @@ func TestBuyerServiceRequiredRequests(t *testing.T) {
 		if err := call(); err == nil {
 			t.Fatal("required field accepted")
 		}
-	}
-	admin := NewAdmin(nil)
-	if _, err := admin.UpdateMembershipPlan(ctx, connect.NewRequest(&adminpb.UpdateMembershipPlanRequest{})); err == nil {
-		t.Fatal("membership_plan accepted empty")
 	}
 }
 

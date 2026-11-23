@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-11-23-seller-facing-hash-supersedes-snapshot-hash.md`（原則「原像涵蓋賣家實際看到的內容」保留；載體由確認快照改為賣家可見內容，快照於 A9-D35 刪除） |
 | 日期 | 2026-09-18（決策作成於 2026-09-06，落地 2026-09-07） |
 | 影響範圍 | ai-service `internal/procurement/commerce/`、confirmed RFQ snapshot 的 wire 與 golden fixtures、web 消費端 |
 | 路徑基準 | `backend/` |

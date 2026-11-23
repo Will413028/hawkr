@@ -15,6 +15,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../support/measure_fixtures.dart';
 import '../../../support/my_store_fixtures.dart';
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _RecordingSession extends Session {
   int logouts = 0;
@@ -55,16 +57,24 @@ Future<GoRouter> pumpWithRoutes(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        myStoreSnapshotProvider.overrideWithValue(store),
-        currentMyMeasuresProvider(
-          MeasureState.MEASURE_STATE_ACTIVE,
-        ).overrideWithValue(measures),
-      ],
-      child: ScreenUtilInit(
-        designSize: const Size(393, 852),
-        builder: (_, _) => MaterialApp.router(routerConfig: router),
+    TaipeiDisplayScope(
+      deviceOffset: const Duration(hours: 8),
+      child: ProviderScope(
+        overrides: [
+          myStoreSnapshotProvider.overrideWithValue(store),
+          currentMyMeasuresProvider(
+            MeasureState.MEASURE_STATE_ACTIVE,
+          ).overrideWithValue(measures),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(393, 852),
+          builder: (_, _) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
+        ),
       ),
     ),
   );
@@ -86,16 +96,24 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          myStoreSnapshotProvider.overrideWithValue(store),
-          currentMyMeasuresProvider(
-            activeKey,
-          ).overrideWithValue(measures ?? const AsyncData(<Measure>[])),
-        ],
-        child: ScreenUtilInit(
-          designSize: const Size(393, 852),
-          builder: (_, _) => const MaterialApp(home: SuspensionNoticeScreen()),
+      TaipeiDisplayScope(
+        deviceOffset: const Duration(hours: 8),
+        child: ProviderScope(
+          overrides: [
+            myStoreSnapshotProvider.overrideWithValue(store),
+            currentMyMeasuresProvider(
+              activeKey,
+            ).overrideWithValue(measures ?? const AsyncData(<Measure>[])),
+          ],
+          child: ScreenUtilInit(
+            designSize: const Size(393, 852),
+            builder: (_, _) => MaterialApp(
+              locale: const Locale('zh'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: SuspensionNoticeScreen(),
+            ),
+          ),
         ),
       ),
     );
@@ -201,15 +219,22 @@ void main() {
 
     testWidgets('沒有登入帳號（措施列表為 null）：通用說明', (tester) async {
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            myStoreSnapshotProvider.overrideWithValue(suspendedStore()),
-            currentMyMeasuresProvider(activeKey).overrideWithValue(null),
-          ],
-          child: ScreenUtilInit(
-            designSize: const Size(393, 852),
-            builder: (_, _) =>
-                const MaterialApp(home: SuspensionNoticeScreen()),
+        TaipeiDisplayScope(
+          deviceOffset: const Duration(hours: 8),
+          child: ProviderScope(
+            overrides: [
+              myStoreSnapshotProvider.overrideWithValue(suspendedStore()),
+              currentMyMeasuresProvider(activeKey).overrideWithValue(null),
+            ],
+            child: ScreenUtilInit(
+              designSize: const Size(393, 852),
+              builder: (_, _) => MaterialApp(
+                locale: const Locale('zh'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: SuspensionNoticeScreen(),
+              ),
+            ),
           ),
         ),
       );
@@ -396,14 +421,22 @@ void main() {
       );
       addTearDown(router.dispose);
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            myStoreSnapshotProvider.overrideWithValue(store),
-            sessionProvider.overrideWith(() => session),
-          ],
-          child: ScreenUtilInit(
-            designSize: const Size(393, 852),
-            builder: (_, _) => MaterialApp.router(routerConfig: router),
+        TaipeiDisplayScope(
+          deviceOffset: const Duration(hours: 8),
+          child: ProviderScope(
+            overrides: [
+              myStoreSnapshotProvider.overrideWithValue(store),
+              sessionProvider.overrideWith(() => session),
+            ],
+            child: ScreenUtilInit(
+              designSize: const Size(393, 852),
+              builder: (_, _) => MaterialApp.router(
+                locale: const Locale('zh'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                routerConfig: router,
+              ),
+            ),
           ),
         ),
       );

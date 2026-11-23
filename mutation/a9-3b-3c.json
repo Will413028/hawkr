@@ -1,0 +1,283 @@
+{
+ "mutants": [
+  {
+   "id": "rfq-settle-skips-revision-check-price",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/rfq.go",
+   "old": "if !hasActive || active.ID != expected {",
+   "new": "if !hasActive {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPriceBranches$",
+   "why": "The shared step after reading the active revision stops comparing the caller's expected revision, so PreviewRfqPrice accepts a stale revision."
+  },
+  {
+   "id": "rfq-settle-skips-revision-check-preview",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/rfq.go",
+   "old": "if !hasActive || active.ID != expected {",
+   "new": "if !hasActive {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationStaleBranches$",
+   "why": "Same shared step: PreviewRfqPublication accepts a stale revision."
+  },
+  {
+   "id": "rfq-settle-skips-revision-check-execute",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/rfq.go",
+   "old": "if !hasActive || active.ID != expected {",
+   "new": "if !hasActive {",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteStaleBranchesLeaveTheApprovalPending$",
+   "why": "Same shared step: ExecuteRfqPublication accepts a stale revision."
+  },
+  {
+   "id": "rfq-settle-skips-request-status-check-preview",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/rfq.go",
+   "old": "if err := checkPublishable(req); err != nil {",
+   "new": "if err := checkPublishable(req); false && err != nil {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationRequiresAReadyOrMatchingRequestAndAUnit$",
+   "why": "The request status check is skipped, so a request that is not REQUIREMENT_READY or MATCHING can be previewed for publication."
+  },
+  {
+   "id": "rfq-settle-skips-request-status-check-execute",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/rfq.go",
+   "old": "if err := checkPublishable(req); err != nil {",
+   "new": "if err := checkPublishable(req); false && err != nil {",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteRequiresAReadyOrMatchingRequest$",
+   "why": "The request status check is skipped, so ExecuteRfqPublication publishes a request whose status changed after the preview."
+  },
+  {
+   "id": "rfq-approval-cas-skips-pending-state",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": " AND buyer_id = $4 AND state = 'PENDING' AND expires_at > $1::timestamptz",
+   "new": " AND buyer_id = $4 AND expires_at > $1::timestamptz",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteRejectsAnApprovalWhoseVersionMatchesButIsNotPending$",
+   "why": "The approval claim stops requiring state PENDING; the test keeps the version current so only the state predicate can reject it."
+  },
+  {
+   "id": "rfq-approval-cas-skips-version",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": " AND version = $3 AND buyer_id = $4",
+   "new": " AND version > 0 AND $3::int > 0 AND buyer_id = $4",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteRejectsAnApprovalVersionThatIsNotTheOnePreviewReturned$",
+   "why": "The approval claim stops comparing the caller's approval version, so a version the preview never returned can still claim a PENDING approval."
+  },
+  {
+   "id": "rfq-approval-cas-skips-expiry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": " AND state = 'PENDING' AND expires_at > $1::timestamptz",
+   "new": " AND state = 'PENDING'",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteAnExpiredApprovalIsAVersionConflictAndLeavesItPending$",
+   "why": "The approval claim stops checking expires_at, so an expired approval can be executed."
+  },
+  {
+   "id": "rfq-approval-expiry-boundary-is-inclusive",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": "AND expires_at > $1::timestamptz\nRETURNING",
+   "new": "AND expires_at >= $1::timestamptz\nRETURNING",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteApprovalExpiryBoundary$",
+   "why": "An approval is still executable at the exact instant of expires_at, against the documented rule that it is expired from that instant."
+  },
+  {
+   "id": "rfq-execute-skips-payload-hash-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "c.sellerHash != in.PayloadHash || (",
+   "new": "(",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteStaleBranchesLeaveTheApprovalPending$",
+   "why": "Execute no longer compares the caller's payload hash with the recomputed seller-facing hash."
+  },
+  {
+   "id": "rfq-execute-ignores-subscriber-failure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "\t\t}); err != nil {\n\t\t\treturn fmt.Errorf(\"rfq：發布事件：%w\", err)\n\t\t}",
+   "new": "\t\t}); err != nil && false {\n\t\t\treturn fmt.Errorf(\"rfq：發布事件：%w\", err)\n\t\t}",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteIsAtomicWhenTheEventSubscriberFails$",
+   "why": "A failing event subscriber no longer rolls the publication, invites and the approval claim back."
+  },
+  {
+   "id": "rfq-replay-reports-not-replayed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "return publicationOf(pub, approval, c, true), nil",
+   "new": "return publicationOf(pub, approval, c, false), nil",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteReplaysTheFirstPublicationWithoutNewInvitesOrEvents$",
+   "why": "A replayed Execute is reported as a fresh publication."
+  },
+  {
+   "id": "rfq-replay-ignores-approval",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": " || pub.ApprovalID != in.ApprovalID",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteRejectsTheSameKeyWithDifferentContent$",
+   "why": "An Execute replay no longer compares the approval ID."
+  },
+  {
+   "id": "rfq-replay-ignores-approval-version",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": " || pub.ApprovalVersion != in.ApprovalVersion",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteReplayComparesTheApprovalVersion$",
+   "why": "An Execute replay no longer compares the approval version."
+  },
+  {
+   "id": "rfq-execute-skips-candidate-set-recheck",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "if !effective {",
+   "new": "if !effective && false {",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteDirectRechecksTheEffectiveCandidateSet$",
+   "why": "Execute no longer re-checks that the approval's candidate set is still the effective one."
+  },
+  {
+   "id": "rfq-preview-skips-candidate-set-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "if !effective {",
+   "new": "if !effective && false {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationDirectOnlyAcceptsTheEffectiveCandidateSet$",
+   "why": "Preview accepts a candidate set that is no longer the effective one."
+  },
+  {
+   "id": "rfq-execute-skips-deadline-recheck",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "(claimed.ResponseDeadline != nil && deadlinePassed(*claimed.ResponseDeadline, now))",
+   "new": "false",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteRechecksTheResponseDeadlineInTaipei$",
+   "why": "Execute no longer re-checks the response deadline against today in the business timezone."
+  },
+  {
+   "id": "rfq-preview-skips-deadline-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "if in.ResponseDeadline != nil && deadlinePassed(*in.ResponseDeadline, now) {",
+   "new": "if false && in.ResponseDeadline != nil && deadlinePassed(*in.ResponseDeadline, now) {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationResponseDeadlineIsBoundedByTodayInTaipei$",
+   "why": "Preview accepts a response deadline earlier than today."
+  },
+  {
+   "id": "rfq-deadline-day-is-utc",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "dateOnly(deadline).Before(twtime.Day(now))",
+   "new": "dateOnly(deadline).Before(dateOnly(now)) || twtime.Day(now).IsZero()",
+   "test": "internal/modules/procurement/internal/rfq ^TestDeadlinePassedUsesTheTaipeiCalendarDay$",
+   "why": "Today is computed on the UTC calendar instead of the business timezone."
+  },
+  {
+   "id": "rfq-preview-replay-ignores-candidate-set",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": " || !sameUUID(a.CandidateSetID, in.CandidateSetID)",
+   "new": "",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationRejectsTheSameKeyWithDifferentContent$",
+   "why": "A PreviewPublication replay no longer compares the candidate set, so a different set with the same stores replays the first approval."
+  },
+  {
+   "id": "rfq-approval-drops-the-note",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "BuyerNote: note, CandidateSetID: in.CandidateSetID,",
+   "new": "BuyerNote: \"\", CandidateSetID: in.CandidateSetID,",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationStoresTheRangeAndTheTrimmedNote$",
+   "why": "The approval stops storing the buyer note, so sellers would not receive it."
+  },
+  {
+   "id": "rfq-approval-drops-the-candidate-set",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "BuyerNote: note, CandidateSetID: in.CandidateSetID,",
+   "new": "BuyerNote: note, CandidateSetID: nil,",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteDirectStillWorksWhileTheCandidateSetIsEffective$",
+   "why": "The approval stops storing the candidate set, so Execute has nothing to re-check."
+  },
+  {
+   "id": "rfq-seller-hash-drops-delivery-city",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/compile.go",
+   "old": "DeliveryCity: p.DeliveryCity,",
+   "new": "DeliveryCity: \"\",",
+   "test": "internal/modules/procurement/internal/rfq ^TestAssembledSellerHashCoversEveryApprovalAndRevisionField$",
+   "why": "The seller-facing hash input drops the delivery city."
+  },
+  {
+   "id": "rfq-seller-hash-drops-buyer-note",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/compile.go",
+   "old": "ResponseDate: a.ResponseDeadline, BuyerNote: a.BuyerNote,",
+   "new": "ResponseDate: a.ResponseDeadline, BuyerNote: \"\",",
+   "test": "internal/modules/procurement/internal/rfq ^TestAssembledSellerHashCoversEveryApprovalAndRevisionField$",
+   "why": "The seller-facing content is assembled without the approval's buyer note."
+  },
+  {
+   "id": "rfq-seller-hash-drops-range-upper-bound",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/compile.go",
+   "old": "UpperBoundAmount: a.RangeUpperAmount,",
+   "new": "UpperBoundAmount: 0,",
+   "test": "internal/modules/procurement/internal/rfq ^TestAssembledSellerHashCoversEveryApprovalAndRevisionField$",
+   "why": "The seller-facing content is assembled without the approval's upper price bound."
+  },
+  {
+   "id": "rfqhash-seller-drops-basis-unit",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfqhash/parts.go",
+   "old": "Range: sellerRangeV1(in.Range),",
+   "new": "Range: sellerRangeV1(SellerRange{BasisQuantity: in.Range.BasisQuantity, LowerBoundAmount: in.Range.LowerBoundAmount, UpperBoundAmount: in.Range.UpperBoundAmount}),",
+   "test": "internal/modules/procurement/internal/rfqhash ^TestEverySellerFacingFieldChangesTheHash$",
+   "why": "The seller-facing hash preimage drops the price basis unit."
+  },
+  {
+   "id": "planner-stage-ignores-the-approval-revision",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/executor.go",
+   "old": "onCurrentRevision: appr.RequestRevisionID == active.ID}",
+   "new": "onCurrentRevision: appr.RequestRevisionID == active.ID || true}",
+   "test": "internal/modules/procurement/internal/turn ^TestPlannerStageIsStaleWhenTheApprovalIsOnAnEarlierRevision$",
+   "why": "The planner treats a pending approval on an earlier revision as if it were on the current one."
+  },
+  {
+   "id": "planner-stage-ignores-approval-expiry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": "state = 'PENDING' AND expires_at > $3::timestamptz",
+   "new": "state = 'PENDING' AND $3::timestamptz IS NOT NULL",
+   "test": "internal/modules/procurement/internal/turn ^TestPlannerStageFollowsTheUnexpiredPendingApproval$",
+   "why": "The planner still sees an expired approval as pending."
+  },
+  {
+   "id": "planner-stage-ignores-approval-state",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": "WHERE request_id = $1 AND buyer_id = $2 AND state = 'PENDING' AND expires_at",
+   "new": "WHERE request_id = $1 AND buyer_id = $2 AND expires_at",
+   "test": "internal/modules/procurement/internal/turn ^TestPlannerStageFollowsTheUnexpiredPendingApproval$",
+   "why": "The planner treats executed approvals as pending."
+  },
+  {
+   "id": "new-accepts-a-missing-event-bus",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "case d.Events == nil:",
+   "new": "case d.Events == nil && false:",
+   "test": "internal/modules/procurement ^TestNewRejectsMissingRequiredDeps$",
+   "why": "procurement.New no longer fails when the event bus is missing."
+  },
+  {
+   "id": "assembly-drops-the-event-bus",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "Entitlements: entitlements, Events: bus})",
+   "new": "Entitlements: entitlements, Events: nil})",
+   "test": "cmd/hawkr ^TestProcurementAssemblyPassesTheEventBus$",
+   "why": "The serve assembly does not hand the event bus to the procurement module."
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+{
+  "scenario": "tool_error_assistant_still_replies",
+  "description": "get_my_orders fails (order client error); the tool error is fed back to the specialist LLM, which still produces a reply; stream ends with done, no error event.",
+  "input": {
+    "rpc": "BuyerOrders",
+    "endpoint_key": "orders",
+    "message": "查我的訂單",
+    "buyer_id": 4242
+  },
+  "fake_tool_backend": {
+    "orders": null,
+    "orders_error": "order service unavailable",
+    "details": null
+  },
+  "scripted_llm": [
+    {
+      "agent": "buyer_order_specialist",
+      "chunks": [
+        {
+          "function_call": {
+            "name": "get_my_orders",
+            "args": {
+              "date_range": "all"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "agent": "buyer_order_specialist",
+      "chunks": [
+        {
+          "text": "抱歉，目前無法查詢訂單，請稍後再試。"
+        }
+      ]
+    }
+  ],
+  "observed_llm_requests": [
+    {
+      "agent": "buyer_order_specialist",
+      "call_index": 0,
+      "last_user_texts": [
+        "查我的訂單"
+      ],
+      "history_contents": 1
+    },
+    {
+      "agent": "buyer_order_specialist",
+      "call_index": 1,
+      "function_responses_fed_back": [
+        {
+          "name": "get_my_orders",
+          "response": {
+            "error": "查詢訂單失敗: order service unavailable"
+          }
+        }
+      ],
+      "history_contents": 3
+    }
+  ],
+  "emitted_events": [
+    {
+      "kind": "text",
+      "order": 0,
+      "text": "抱歉，目前無法查詢訂單，請稍後再試。"
+    },
+    {
+      "kind": "done",
+      "order": 1,
+      "session_id": "\u003cSESSION_ID\u003e"
+    }
+  ],
+  "rpc_result": {
+    "status_code": "OK"
+  }
+}

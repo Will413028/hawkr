@@ -1,0 +1,34 @@
+// dart format off
+// 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
+
+// ignore_for_file: unused_import, prefer_single_quotes
+
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
+
+/// moderation.SubmitReportRequest.category 接受的類別（hawkr.common.v1alpha1.accepted_policy_categories），順序同 proto。
+const List<hawkr_common_v1alpha1_policy_category.PolicyCategory> moderationSubmitReportRequestCategory = <hawkr_common_v1alpha1_policy_category.PolicyCategory>[
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_SPAM,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_HARASSMENT,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_HATE,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_FRAUD,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_OTHER,
+];
+
+/// seller.CreateReportRequest.category 接受的類別（hawkr.common.v1alpha1.accepted_policy_categories），順序同 proto。
+const List<hawkr_common_v1alpha1_policy_category.PolicyCategory> sellerCreateReportRequestCategory = <hawkr_common_v1alpha1_policy_category.PolicyCategory>[
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_IP_INFRINGEMENT,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_FRAUD,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_OFF_PLATFORM_TRADE,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_PRIVACY,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_IMPERSONATION,
+  hawkr_common_v1alpha1_policy_category.PolicyCategory.POLICY_CATEGORY_OTHER,
+];

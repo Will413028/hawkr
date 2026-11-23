@@ -65,8 +65,7 @@ void main() {
     final rawColor = RegExp(
       r'(?:const\s+)?Color\(0x[0-9A-Fa-f]{8}\)|'
       r'\bColors\.[A-Za-z0-9_]+(?:\.shade\d+|\[\d+\])?|'
-      r'\bAppColors\.[A-Za-z0-9_]+|AppTypography\.color[A-Za-z0-9_]+|'
-      r'ShippingColors\.[A-Za-z0-9_]+',
+      r'\bAppColors\.[A-Za-z0-9_]+|AppTypography\.color[A-Za-z0-9_]+',
     );
 
     for (final entity in Directory('lib').listSync(recursive: true)) {

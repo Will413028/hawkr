@@ -88,12 +88,12 @@ hawkr:
           port: ${COUPON_SERVICE_GRPC_PORT:9951}
           plaintext: true
         seller:
-          host: ${SELLER_SERVICE_HOST:127.0.0.1}
-          port: ${SELLER_SERVICE_GRPC_PORT:9941}
+          host: ${LEGACY_SELLER_GRPC_HOST:127.0.0.1}
+          port: ${LEGACY_SELLER_GRPC_PORT:9941}
           plaintext: true
         buyer:
-          host: ${BUYER_SERVICE_HOST:127.0.0.1}
-          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          host: ${LEGACY_BUYER_GRPC_HOST:127.0.0.1}
+          port: ${LEGACY_BUYER_GRPC_PORT:9941}
           plaintext: true
         shipping:
           host: ${SHIPPING_SERVICE_HOST:127.0.0.1}

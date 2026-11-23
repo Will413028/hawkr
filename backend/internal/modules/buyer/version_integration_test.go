@@ -111,36 +111,6 @@ func TestAddressKeysetPaging(t *testing.T) {
 	}
 }
 
-func TestPlanVersionCAS(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	plans, err := f.module.ListPlans(ctx)
-	must(t, err)
-	if len(plans) == 0 {
-		t.Fatal("missing seed plans")
-	}
-	plan := plans[0]
-	limit := plan.MonthlyAnswerLimit + 1
-	updated, err := f.module.UpdatePlan(ctx, buyer.UpdatePlanInput{PlanCode: plan.PlanCode, ExpectedVersion: plan.Version, MonthlyAnswerLimit: &limit})
-	must(t, err)
-	if updated.Version != plan.Version+1 {
-		t.Fatalf("version=%d", updated.Version)
-	}
-	stale := limit + 1
-	_, err = f.module.UpdatePlan(ctx, buyer.UpdatePlanInput{PlanCode: plan.PlanCode, ExpectedVersion: plan.Version, MonthlyAnswerLimit: &stale})
-	if apperr.KindOf(err) != apperr.KindVersionConflict {
-		t.Fatalf("stale plan error=%v", err)
-	}
-	plans, err = f.module.ListPlans(ctx)
-	must(t, err)
-	for _, got := range plans {
-		if got.PlanCode == plan.PlanCode && (got.MonthlyAnswerLimit != limit || got.Version != updated.Version) {
-			t.Fatalf("stale plan write applied: %+v", got)
-		}
-	}
-}
-
 func TestAvatarVersionCAS(t *testing.T) {
 	t.Parallel()
 	f := setup(t)

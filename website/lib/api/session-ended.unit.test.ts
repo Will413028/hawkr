@@ -2,7 +2,6 @@
 
 import { Code, ConnectError } from "@connectrpc/connect";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { markConversationRead } from "../chat/repo";
 import { checkFavorite, toggleFavorite } from "../favorites/repo";
 import { toggleFollow } from "../follow/repo";
 import { confirmOrderReceipt } from "../orders/repo";
@@ -230,19 +229,6 @@ it("a user REST write with throwOnHttpError false still broadcasts ACCOUNT_SUSPE
 			throwOnEnvelopeError: false,
 		});
 		expect(suspended).toHaveBeenCalledOnce();
-	} finally {
-		window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
-	}
-});
-
-it("the automatic markConversationRead write does not broadcast ACCOUNT_SUSPENDED", async () => {
-	forbid({ code: 403, message: "帳號已停權", reason: "ACCOUNT_SUSPENDED" });
-	const suspended = vi.fn();
-	window.addEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
-	try {
-		await markConversationRead(7).catch(() => {});
-		expect(fetchMock).toHaveBeenCalledOnce();
-		expect(suspended).not.toHaveBeenCalled();
 	} finally {
 		window.removeEventListener(ACCOUNT_SUSPENDED_EVENT, suspended);
 	}

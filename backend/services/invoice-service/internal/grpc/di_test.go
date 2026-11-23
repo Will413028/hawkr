@@ -41,6 +41,7 @@ func TestModule_RegistersInvoiceService(t *testing.T) {
 		fx.Provide(func() *usecase.CorrectionIntake { return nil }),
 		fx.Provide(func() *usecase.NotificationResend { return nil }),
 		fx.Provide(func() *usecase.DocumentFile { return nil }),
+		fx.Provide(func() *usecase.BusinessCalendarMirror { return nil }),
 		fx.Provide(func() SellerNameResolver { return nil }),
 		fx.Provide(func() ShipmentStatusResolver { return nil }),
 		fx.Provide(func() BuyerNameResolver { return nil }),

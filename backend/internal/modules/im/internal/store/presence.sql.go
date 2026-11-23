@@ -89,25 +89,6 @@ func (q *Queries) InsertPresenceStream(ctx context.Context, arg InsertPresenceSt
 	return err
 }
 
-const isPartyOnline = `-- name: IsPartyOnline :one
-SELECT EXISTS (
-    SELECT 1 FROM im.presence_streams
-    WHERE kind = $1 AND party_id = $2 AND expires_at > now()
-)
-`
-
-type IsPartyOnlineParams struct {
-	Kind    string
-	PartyID int64
-}
-
-func (q *Queries) IsPartyOnline(ctx context.Context, arg IsPartyOnlineParams) (bool, error) {
-	row := q.db.QueryRow(ctx, isPartyOnline, arg.Kind, arg.PartyID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const lockPartyStreams = `-- name: LockPartyStreams :exec
 SELECT pg_advisory_xact_lock(hashtextextended('im.streams:' || $1::text || ':' || $2::bigint::text, 0))
 `
@@ -132,6 +113,67 @@ SELECT pg_notify('im_events', $1::text)
 func (q *Queries) Notify(ctx context.Context, payload string) error {
 	_, err := q.db.Exec(ctx, notify, payload)
 	return err
+}
+
+const presenceForParty = `-- name: PresenceForParty :many
+SELECT c.id, c.buyer_id, c.store_id,
+       (CASE WHEN $1::text = 'BUYER'
+             THEN EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
+             ELSE EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
+        END)::boolean AS peer_inactive,
+       EXISTS (SELECT 1 FROM buyer.pub_blocked_stores() AS bs WHERE bs.blocker_buyer_id = c.buyer_id AND bs.store_id = c.store_id)::boolean AS buyer_blocks_store,
+       EXISTS (SELECT 1 FROM im.presence_streams AS ps
+               WHERE ps.kind = CASE WHEN $1::text = 'BUYER' THEN 'STORE' ELSE 'BUYER' END
+                 AND ps.party_id = CASE WHEN $1::text = 'BUYER' THEN c.store_id ELSE c.buyer_id END
+                 AND ps.expires_at > now())::boolean AS peer_online
+FROM im.conversations AS c
+WHERE c.id = ANY($2::uuid[])
+  AND (($1::text = 'BUYER' AND c.buyer_id = $3::bigint)
+    OR ($1::text = 'STORE' AND c.store_id = $3::bigint))
+`
+
+type PresenceForPartyParams struct {
+	Kind    string
+	Ids     []uuid.UUID
+	PartyID int64
+}
+
+type PresenceForPartyRow struct {
+	ID               uuid.UUID
+	BuyerID          int64
+	StoreID          int64
+	PeerInactive     bool
+	BuyerBlocksStore bool
+	PeerOnline       bool
+}
+
+// 一次處理整批對話的在線狀態：只回呼叫者這一方的對話（授權的述詞；缺列由呼叫端判成 NotFound），對方是否已關閉或退場、買家是否封鎖了店、
+// 對方是否有未過期的串流。對方的 kind 由呼叫者的 kind 決定；時間只用資料庫的 now()。店家封鎖買家在 seller，由呼叫端另查。
+func (q *Queries) PresenceForParty(ctx context.Context, arg PresenceForPartyParams) ([]PresenceForPartyRow, error) {
+	rows, err := q.db.Query(ctx, presenceForParty, arg.Kind, arg.Ids, arg.PartyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PresenceForPartyRow{}
+	for rows.Next() {
+		var i PresenceForPartyRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.BuyerID,
+			&i.StoreID,
+			&i.PeerInactive,
+			&i.BuyerBlocksStore,
+			&i.PeerOnline,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const sweepPresenceStreams = `-- name: SweepPresenceStreams :execrows

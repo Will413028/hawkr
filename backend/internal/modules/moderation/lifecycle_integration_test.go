@@ -538,3 +538,42 @@ func TestClosedBuyerCannotSubmitAsReporter(t *testing.T) {
 		}
 	}
 }
+
+// MyStoreReports 只回這家店送出的檢舉（只有聊天訊息），新到舊、keyset 分頁；買家送出的與別家店的都不出現。
+func TestMyStoreReportsListsOnlyTheStoresOwnReportsPaged(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	storeID, _ := f.exposableStore(t)
+	otherStore, _ := f.exposableStore(t)
+	b, _ := f.newBuyer(t)
+	_, ids := f.seedChat(t, b, storeID, 6, 0)
+	_, otherIDs := f.seedChat(t, b, otherStore, 4, 0)
+	chat := func(id uuid.UUID) Target { return Target{Kind: TargetChatMessage, ContentID: id} }
+	first := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterStoreID: storeID, Target: chat(ids[1]), Category: policy.Harassment}))
+	f.advance(time.Second)
+	second := mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterStoreID: storeID, Target: chat(ids[3]), Category: policy.Harassment}))
+	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterStoreID: otherStore, Target: chat(otherIDs[1]), Category: policy.Harassment}))
+	mustV[SubmitResult](t)(f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: b, Target: chat(ids[2]), Category: policy.Harassment}))
+
+	p1, err := f.module.MyStoreReports(ctx, storeID, nil, 1)
+	must(t, err)
+	if len(p1.Items) != 1 || p1.Next == nil || p1.Items[0].Report.ID != second.Report.ID || p1.Items[0].Target != chat(ids[3]) {
+		t.Fatalf("第一頁要是最新一筆且有下一頁：%+v", p1)
+	}
+	p2, err := f.module.MyStoreReports(ctx, storeID, p1.Next, 1)
+	must(t, err)
+	if len(p2.Items) != 1 || p2.Next != nil || p2.Items[0].Report.ID != first.Report.ID {
+		t.Fatalf("第二頁：%+v", p2)
+	}
+	for _, it := range append(p1.Items, p2.Items...) {
+		if it.Report.ReporterStoreID != storeID || it.Report.ReporterBuyerID != 0 {
+			t.Fatalf("只能有這家店送出的檢舉：%+v", it.Report)
+		}
+	}
+	none, err := f.module.MyStoreReports(ctx, otherStore+1000, nil, 50)
+	must(t, err)
+	if len(none.Items) != 0 {
+		t.Fatalf("沒送過檢舉的店：%+v", none)
+	}
+}

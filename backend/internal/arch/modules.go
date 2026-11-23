@@ -40,9 +40,8 @@ var Dependencies = map[string][]string{
 	"assistant":         {"ordering", "catalog", "buyer"},                                            // 買家助理（A9-D3）。
 	"imageai":           {"seller", "media"},                                                         // AI 修圖與配額（A9-D3）。
 	"notification": {
-		"identity", "buyer", "seller", "catalog", "ordering", "fulfillment", "payment", "invoice",
-		"coupon", "aftersales", "review", "im", "social", "procurement", "finance", "delegation",
-	},
+		"identity", "buyer", "seller", "review", "im", "social", "procurement", "delegation", "payment", "accountsuspension", "moderation",
+	}, // 訂閱與讀取已在單體的來源模組；還沒搬的（catalog、ordering、fulfillment、invoice、coupon、aftersales、finance）隨各自搬遷時加（A8 D13）。
 }
 
 // InternalGraph 列出模組內每個 package 可直接 import 的 package。
@@ -52,6 +51,12 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"notification": {Packages: map[string][]string{
+		"model":    {},
+		"registry": {"model", "text"},
+		"store":    {},
+		"text":     {},
+	}},
 	"crm": {Packages: map[string][]string{
 		"model":   {},
 		"project": {"model", "store"},
@@ -86,14 +91,33 @@ var InternalDependencies = map[string]InternalGraph{
 		"store":   {},
 	}},
 	"assistant": {Packages: map[string][]string{
-		"feature": {},
-		"model":   {},
-		"store":   {},
+		"adksession": {},                // ADK session.Service 的 pgx 實作，schema assistant（A9-D27）
+		"buyeragent": {"model", "text"}, // 買家 agent 與 3 支 tool；tool 身分用 model.Tool，coordinator 的退貨流程取共用文案
+		"feature":    {},
+		"history":    {"buyeragent", "model"}, // 買家最近一次對話的歷史（GetLatestAssistantSession）
+		"model":      {},
+		"text":       {},
+		"turn":       {"buyeragent", "model", "text"}, // 輪次執行器、每輪事件緩衝與同對話單一輪次
 	}},
 	"procurement": {Packages: map[string][]string{
-		"feature": {},
-		"model":   {},
-		"store":   {},
+		"candidate":    {},                        // 候選搜尋：翻頁收集、只收 OPEN 且沒封鎖這位買家的店（S9、A9-D29）
+		"conversation": {"model", "run", "store"}, // 買家的對話管理：keyset 列表、改名、刪除並取消進行中的 run（A9-3b-3a、A9-D31 Q7–Q9）
+		"extract":      {"slots"},                 // 一次模型呼叫把買家訊息抽成欄位 patch，呼叫內重試一次（A9-3b-2c、A9-D28(2)）
+		"model":        {},
+		"planner":      {"model", "slots"},                                                   // 一輪釐清要問什麼、說哪一類話：問題挑選、act 優先序（A9-3b-2a）
+		"reply":        {"model", "planner", "slots", "text"},                                // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
+		"resolver":     {},                                                                   // 品項用詞對分類樹，人工同義詞（A9-D7）
+		"rfq":          {"model", "rfqhash", "search", "store"},                              // 詢價發布鏈：價格預覽、確認快照、發布核准、執行發布，hash 由不可變的列重算（A9-3b-3c、A9-D31）
+		"quote":        {"model", "rfq", "rfqhash", "run", "store"},                          // 買家對賣家回價的使用：列出目前版本、入圍清單、接受報價並同 transaction 排入建單 job（A9-3b-3d）
+		"rfqhash":      {},                                                                   // 價格預覽、確認快照、受眾與賣家可見內容的 hash（SHA-256 對固定欄位順序的 JSON，A9-D31 Q5）
+		"retention":    {"store"},                                                            // 買家關閉後刪除與匿名（S10）
+		"run":          {"store"},                                                            // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
+		"search":       {"candidate", "model", "reply", "resolver", "run", "slots", "store"}, // CANDIDATE_SEARCH 的 executor 與開始搜尋的 use case：品項解析定輸入、單一 transaction 提交（A9-3b-2d、A9-D29）
+		"slots":        {"model", "store"},                                                   // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
+		"snapshot":     {"model", "rfq", "run", "slots", "store", "turn"},                    // GetRuntimeSnapshot 的讀取模型：對話、訊息、run、待回答的中斷、發布結果在同一份快照內讀齊（A9-D30(4)）
+		"store":        {},
+		"text":         {},                                                                            // 模組句子（ADR 2026-10-17 多語系）
+		"turn":         {"extract", "model", "planner", "reply", "resolver", "run", "slots", "store"}, // TURN 與 CLARIFICATION_RESUME 的 executor 與 ResumeRun 的 use case：抽取、套用、解析品項、規劃、單一 transaction 提交（A9-3b-2c、A9-3b-2e）
 	}},
 	"moderation": {Packages: map[string][]string{
 		"handle":    {"model", "snapshot", "store", "text", "view"},

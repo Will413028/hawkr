@@ -143,6 +143,12 @@ type RelayReview struct {
 	Public bool
 }
 
+// ReviewStore 是評價所屬的店與它現在是否公開可讀（回覆的店家推導用，不套公開可讀述詞）。
+type ReviewStore struct {
+	StoreID int64
+	Public  bool
+}
+
 // Cursor 是 keyset 的位置：(created_at, id) 由大到小，之後的是比它更舊的。
 type Cursor struct {
 	CreatedAt time.Time
@@ -209,10 +215,13 @@ type Hide struct {
 	Created    bool
 }
 
-// ProductStats 是商品的評價統計（只算公開可讀的評價）。
+// ProductStats 是商品的評價統計（只算公開可讀的評價）；Distribution[i] 是 (i+1) 星的評價數。
 type ProductStats struct {
-	Count   int64
-	Average float64
+	Count int64
+	// WithImagesCount 是公開可讀且帶圖的評價數，與列表的 with_images 篩選同一個條件。
+	WithImagesCount int64
+	Average         float64
+	Distribution    [5]int64
 }
 
 // StoreStats 是店家的評價統計；Distribution[i] 是 (i+1) 星的評價數。

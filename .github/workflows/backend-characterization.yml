@@ -1,28 +1,33 @@
 name: backend characterization
 
-# 搬遷中模組的特性測試：scripts/characterize.sh <模組> 在 runner 上起單體（入口）、舊 gateway 與該模組的舊服務，
-# 以 REST driver 經入口與 gateway 對舊服務跑情境（ADR 2026-09-26-external-contract-protobuf-connect D4、
-# 主計畫 2026-09-24-go-modular-monolith.md 階段 B 開工前條件）。Postgres 與 Redis 用 job 的
-# services:，Java 服務以 mvnw package 後 java -jar 起行程，不用 compose。
+# 特性測試：scripts/characterize.sh <模組> 在 runner 上起單體、gateway 與搬遷中模組的舊服務，
+# 同一份情境以 REST 打舊服務、以 Connect 打單體。
+# 每個有 internal/httpapi/<模組>/characterization/legacy.sh 的模組一個 matrix 項，清單由第一個 job 掃檔案得出，
+# 不手抄。舊服務是 Java 時，legacy.sh 的 `# maven-pl: <模組名>` 行告訴這支 workflow 建哪個 jar（Go 服務沒有這行）。
+# 腳本只用 Docker 的 Postgres、Redis、RabbitMQ 與本機服務，不連外（服務以 env -i 啟動）。
+# 終點：最後一個 legacy.sh 刪除時，連同本 workflow 一起刪除。
 #
-# 加一個舊服務（B2–B10）：在 plan job 的 MATRIX 加一項（module、java_pl；舊服務是 Go 就留空 java_pl），並在
-# internal/httpapi/<模組>/characterization 放情境與 legacy.sh（make new-characterization name=<模組> legacy=<服務>）。
-# media 不接物件儲存（B1-D12），它的舊服務已刪除，目前沒有項目；MATRIX 為空時 characterize 整個 skipped（視為通過）。
-# 舊服務刪除時，它的 MATRIX 項目與 legacy.sh 一起刪除，這支 workflow 留給其他模組。
+# 這裡不設 GOWORK：characterize.sh 自己決定哪一步用 go.work（gateway、舊服務）、哪一步 GOWORK=off（單體）。
 
 on:
   pull_request:
     paths: &characterization_paths
-      - 'backend/scripts/characterize.sh'
-      - 'backend/internal/httpapi/characterize/**'
-      - 'backend/internal/httpapi/*/characterization/**'
+      - 'backend/internal/**'
+      - 'backend/cmd/**'
       - 'backend/gateway/**'
-      - 'backend/services/java/**'
-      - 'backend/.go-version'
+      - 'backend/services/**'
+      - 'backend/pkg/**'
       - 'backend/go.mod'
       - 'backend/go.sum'
-      - 'backend/cmd/**'
-      - 'backend/internal/**'
+      - 'backend/go.work'
+      - 'backend/go.work.sum'
+      - 'backend/.go-version'
+      - 'backend/scripts/characterize.sh'
+      - 'backend/docker-compose-infra.yml'
+      - 'backend/scripts/init-databases.sh'
+      - 'backend/scripts/garage-init.sh'
+      - 'backend/monitoring/garage/**'
+      - 'backend/infra/seed-data/**'
       - '.github/workflows/backend-characterization.yml'
   push:
     branches: [main, dev]
@@ -36,69 +41,46 @@ concurrency:
 permissions:
   contents: read
 
-defaults:
-  run:
-    working-directory: backend
-
 jobs:
-  plan:
-    name: 選模組
+  modules:
+    name: 找出有舊服務的模組
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions: {}
-    defaults:
-      run:
-        working-directory: .
     outputs:
-      matrix: ${{ steps.pick.outputs.matrix }}
-      any: ${{ steps.pick.outputs.any }}
+      modules: ${{ steps.modules.outputs.modules }}
     steps:
-      - name: 決定要跑的舊服務
-        id: pick
-        env:
-          # 每項 {"module": "<模組>", "java_pl": "<maven -pl，Go 服務留空>"}；沒有項目就是 []。
-          MATRIX: '[]'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # 沒有任何 legacy.sh 是合法的空結果（matrix 項為空，下一個 job 略過），不讓 step 變紅。
+      - name: 掃描 legacy.sh
+        id: modules
         run: |
-          python3 - >> "$GITHUB_OUTPUT" <<'PY'
-          import json, os
-          items = json.loads(os.environ["MATRIX"])
-          print("matrix=" + json.dumps({"include": items}))
-          print("any=" + ("true" if items else "false"))
-          PY
+          set -euo pipefail
+          modules=$(
+            for f in backend/internal/httpapi/*/characterization/legacy.sh; do
+              [ -e "$f" ] || continue
+              module=$(basename "$(dirname "$(dirname "$f")")")
+              maven_pl=$(sed -n 's/^# maven-pl: *//p' "$f" | head -n 1)
+              jq -n --arg module "$module" --arg maven_pl "$maven_pl" '{module: $module, maven_pl: $maven_pl}'
+            done | jq -sc .
+          )
+          echo "modules=$modules" >> "$GITHUB_OUTPUT"
+          echo "將跑特性測試：$modules"
 
   characterize:
-    name: characterize (${{ matrix.module }})
-    needs: plan
-    if: needs.plan.outputs.any == 'true'
+    name: ${{ matrix.module }} 特性測試
+    needs: modules
+    if: needs.modules.outputs.modules != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    services:
-      # 與 docker-compose-infra.yml 同一組映像與帳密（本機專用的固定值）。
-      postgres:
-        image: postgres:18-alpine@sha256:0115267ab5a509022df9319c77be365cef335adb71556c75f60f5360ee247e71
-        env:
-          POSTGRES_USER: dbadmin
-          POSTGRES_PASSWORD: Hawkr2024Admin
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U dbadmin"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:8-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+      matrix:
+        include: ${{ fromJSON(needs.modules.outputs.modules) }}
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -108,35 +90,39 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
-          cache-dependency-path: |
-            backend/go.sum
-            backend/gateway/go.sum
+          cache-dependency-path: backend/**/go.sum
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        if: matrix.java_pl != ''
+        if: matrix.maven_pl != ''
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
           cache-dependency-path: backend/services/java/**/pom.xml
       - name: 建 Java 舊服務的 jar
-        if: matrix.java_pl != ''
+        if: matrix.maven_pl != ''
         working-directory: backend/services/java
         env:
-          JAVA_PL: ${{ matrix.java_pl }}
-        run: ./mvnw package -B -q -pl "$JAVA_PL" -am -DskipTests
-      - name: 特性測試（${{ matrix.module }}）
+          MAVEN_PL: ${{ matrix.maven_pl }}
+        run: ./mvnw package -B -q -pl ":$MAVEN_PL" -am -DskipTests
+      # characterize.sh 用 lsof 檢查 port；runner image 沒有時才裝。
+      - name: 確認 lsof
+        run: command -v lsof >/dev/null || { sudo apt-get update && sudo apt-get install -y lsof; }
+      # 只起腳本與舊服務要的 Postgres、Redis、RabbitMQ 與 Garage（單體的 media 模組接 S3 相容儲存，B1-D15；容器名 hawkr-postgres 是腳本 docker exec 的目標）。
+      - name: 起 Postgres、Redis、RabbitMQ 與 Garage
+        run: |
+          docker compose -f docker-compose-infra.yml up -d --wait postgres redis rabbitmq garage
+          bash scripts/garage-init.sh
+      - name: 特性測試
         env:
           MODULE: ${{ matrix.module }}
-          PGHOST: localhost
-          CHARACTERIZE_PSQL_URL: postgres://dbadmin:Hawkr2024Admin@localhost:5432/postgres
-          # job 的 Redis 沒有密碼；本機 compose 的才有。
-          CHARACTERIZE_REDIS_PASSWORD: ''
-        run: scripts/characterize.sh "$MODULE"
-      - name: 服務的 log
-        if: failure()
+          MEDIA_S3_ENDPOINT: http://localhost:3900
+          MEDIA_S3_REGION: garage
+          MEDIA_S3_BUCKET: media-local
         run: |
-          for f in /tmp/tmp.*/*.log; do
-            echo "::group::$f"
-            tail -n 80 "$f" || true
-            echo "::endgroup::"
-          done
+          set -a
+          . .dev/garage.env
+          set +a
+          scripts/characterize.sh "$MODULE"
+      - name: 容器 log（失敗時）
+        if: failure()
+        run: docker compose -f docker-compose-infra.yml logs --no-color postgres redis rabbitmq garage | tail -n 200

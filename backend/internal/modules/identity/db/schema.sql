@@ -161,13 +161,9 @@ CREATE UNIQUE INDEX uidx_account_suspensions_active ON identity.account_suspensi
 CREATE INDEX idx_account_suspensions_account_id_suspended_at ON identity.account_suspensions (account_id, suspended_at DESC);
 
 -- 帳號另外申請的角色：seller 開店時授予。買家不是角色：帳號活著就是買家（ADR 2026-09-30-account-created-provisions-buyer）。
---
--- source_id 是授予這個角色的業務身分（store_id）。舊的 seller-service 以非同步方式移除角色，可能晚於重新入駐：
--- 移除時帶的來源與目前的不同，就不移除（#3189）。A3b seller 搬進單體、在同一個 transaction 內呼叫之後拿掉。
 CREATE TABLE identity.account_roles (
     account_id BIGINT       NOT NULL REFERENCES identity.accounts (id),
     role       TEXT         NOT NULL,
-    source_id  BIGINT,
     granted_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     PRIMARY KEY (account_id, role),
     CONSTRAINT account_roles_role_check CHECK (role::text IN ('SELLER'))

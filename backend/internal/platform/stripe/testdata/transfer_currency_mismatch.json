@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "message": "The currency of source_transaction's balance transaction (usd) must be the same as the transfer currency (twd)",
+      "param": "source_transaction",
+      "request_log_url": "<MASKED>",
+      "type": "invalid_request_error"
+    }
+  }
+}

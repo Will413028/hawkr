@@ -48,31 +48,6 @@ type BuyerFavorite struct {
 	CreatedAt time.Time
 }
 
-type BuyerMembership struct {
-	ID          uuid.UUID
-	BuyerID     int64
-	PlanCode    string
-	PeriodStart time.Time
-	PeriodEnd   time.Time
-	Source      string
-	Status      string
-	RequestID   string
-	GrantedBy   *int64
-	Note        string
-	CreatedAt   time.Time
-}
-
-type BuyerMembershipPlan struct {
-	PlanCode           string
-	DisplayName        string
-	MonthlyAnswerLimit int32
-	MonthlyPriceTwd    int64
-	IsPurchasable      bool
-	Version            int64
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-}
-
 type BuyerRestockSubscription struct {
 	BuyerID   int64
 	ProductID int64

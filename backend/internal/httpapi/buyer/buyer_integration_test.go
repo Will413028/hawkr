@@ -34,17 +34,23 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
+	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
@@ -202,7 +208,7 @@ func setup(t *testing.T) *fixture {
 	}
 	kycMAC := sealtest.MAC(t)
 	sellerModule := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: media.NewFake(), Orders: s, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
-	h, err := httpapi.NewHandler(httpapi.Deps{Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
+	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,32 +376,6 @@ func TestConnectVersionConflicts(t *testing.T) {
 	}
 	newAddress.Etag = ""
 	_, err = f.app.UpdateAddress(ctx, connect.NewRequest(&pb.UpdateAddressRequest{Address: newAddress}))
-	wantCode(t, err, connect.CodeInvalidArgument, "")
-	plans, err := f.admin.ListMembershipPlans(ctx, connect.NewRequest(&adminpb.ListMembershipPlansRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	plan := plans.Msg.GetMembershipPlans()[0]
-	stale := proto.Clone(plan).(*adminpb.MembershipPlan)
-	stale.MonthlyPrice++
-	_, err = f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(&adminpb.UpdateMembershipPlanRequest{MembershipPlan: stale, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"monthly_price"}}}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	stale.MonthlyPrice++
-	_, err = f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(&adminpb.UpdateMembershipPlanRequest{MembershipPlan: stale, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"monthly_price"}}}))
-	wantCode(t, err, connect.CodeAborted, "VERSION_CONFLICT")
-	plans, err = f.admin.ListMembershipPlans(ctx, connect.NewRequest(&adminpb.ListMembershipPlansRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, current := range plans.Msg.GetMembershipPlans() {
-		if current.GetPlanCode() == plan.GetPlanCode() && current.GetMonthlyPrice() != plan.GetMonthlyPrice()+1 {
-			t.Fatalf("plan overwritten: %v", current)
-		}
-	}
-	stale.Etag = ""
-	_, err = f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(&adminpb.UpdateMembershipPlanRequest{MembershipPlan: stale}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
 }
 
@@ -679,10 +659,6 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plans, err := f.admin.ListMembershipPlans(ctx, connect.NewRequest(&adminpb.ListMembershipPlansRequest{}))
-	if err != nil {
-		t.Fatal(err)
-	}
 	cases := []struct {
 		valid func() proto.Message
 		call  func(proto.Message) error
@@ -702,12 +678,6 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 			return &pb.UpdateProfileRequest{Profile: &pb.Profile{DisplayName: "暱稱", Etag: profile.Msg.GetProfile().GetEtag()}}
 		}, func(m proto.Message) error {
 			_, e := f.app.UpdateProfile(ctx, connect.NewRequest(m.(*pb.UpdateProfileRequest)))
-			return e
-		}},
-		{func() proto.Message {
-			return &adminpb.UpdateMembershipPlanRequest{MembershipPlan: proto.Clone(plans.Msg.GetMembershipPlans()[0]).(*adminpb.MembershipPlan)}
-		}, func(m proto.Message) error {
-			_, e := f.admin.UpdateMembershipPlan(ctx, connect.NewRequest(m.(*adminpb.UpdateMembershipPlanRequest)))
 			return e
 		}},
 	}
@@ -733,8 +703,8 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 			checked++
 		}
 	}
-	if checked != 13 {
-		t.Fatalf("want exactly 13 required fields, got %d", checked)
+	if checked != 12 {
+		t.Fatalf("want exactly 12 required fields, got %d", checked)
 	}
 }
 

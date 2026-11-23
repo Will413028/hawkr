@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
+import { SELLER_CREATE_REPORT_REQUEST_CATEGORY } from "@hawkr/ui-text/accepted";
 import {
 	ALL_CATEGORIES,
 	ASSESSABLE_CATEGORIES,
 	COMMUNITY_ASSESSABLE_CATEGORIES,
 	CONTENT_TAKEDOWN_CATEGORIES,
 	policyCategoryText,
-	REPORTER_CATEGORIES,
 } from "../src/lib/policy-category";
 
 /**
@@ -28,15 +28,17 @@ const COMMUNITY = [
 	PolicyCategory.SEXUAL_CONTENT,
 ];
 
-test("檢舉人可選的類別：全部除了 PLATFORM_ABUSE 與社群類別（12 個，含 OTHER）", () => {
+test("檢舉人可選的類別（生成的 accepted 常數）：全部除了 PLATFORM_ABUSE 與社群類別（12 個，含 OTHER）", () => {
 	assert.equal(ALL_VALUES.length, 17);
 	assert.deepEqual(
-		[...REPORTER_CATEGORIES].sort((a, b) => a - b),
+		[...SELLER_CREATE_REPORT_REQUEST_CATEGORY].sort((a, b) => a - b),
 		ALL_VALUES.filter(
 			(v) => v !== PolicyCategory.PLATFORM_ABUSE && !COMMUNITY.includes(v),
 		),
 	);
-	assert.ok(REPORTER_CATEGORIES.includes(PolicyCategory.OTHER));
+	assert.ok(
+		SELLER_CREATE_REPORT_REQUEST_CATEGORY.includes(PolicyCategory.OTHER),
+	);
 });
 
 test("平台判定與認定可用的類別：全部除了 OTHER 與社群類別（12 個，含 PLATFORM_ABUSE）", () => {
@@ -58,7 +60,7 @@ test("全部的類別：店家治理的 13 個值，一個不多一個不少（�
 
 test("三個清單都沒有重複，也不含 UNSPECIFIED；顯示順序同契約的數字", () => {
 	for (const subset of [
-		REPORTER_CATEGORIES,
+		SELLER_CREATE_REPORT_REQUEST_CATEGORY,
 		ASSESSABLE_CATEGORIES,
 		ALL_CATEGORIES,
 	]) {

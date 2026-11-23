@@ -36,7 +36,6 @@ test("message summaries stay scannable and keep both workbench actions", () => {
 		/row\.unreadCount > 0[\s\S]*formatDateTime\(row\.lastMessageAt\)/,
 	);
 	assert.match(messages, /<span>最新訊息<\/span>/);
-	assert.match(messages, /電話 \{row\.phone\}/);
 	assert.match(messages, /<span>下單時間<\/span>/);
 	assert.match(messages, /<span>購買紀錄<\/span>/);
 	assert.match(messages, /<span>上次回覆<\/span>/);
@@ -46,12 +45,15 @@ test("message summaries stay scannable and keep both workbench actions", () => {
 
 test("customer summaries expose order count and classification before details", () => {
 	assert.match(customers, /getKey=\{customerRowKey\}/);
-	assert.match(customers, /meta: `\$\{\(customer\.orderCount \?\? 0\).*筆`/);
 	assert.match(
 		customers,
-		/status: customerTypeLabel\(customer\.customerType\)/,
+		/meta: `\$\{customer\.orderCount\.toLocaleString\(\)\} 筆`/,
 	);
-	assert.match(customers, /customer\.tags\?\.map/);
+	assert.match(
+		customers,
+		/status: customerTypeText\(ut, customer\.customerType\)/,
+	);
+	assert.match(customers, /customer\.tags\.map/);
 	assert.match(customers, /<span>累計消費<\/span>/);
 	assert.match(customers, /<span>最近購買<\/span>/);
 	assert.match(customers, />\s*客戶資料\s*<\/button>/);

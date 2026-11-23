@@ -4,19 +4,26 @@
 // ignore_for_file: unnecessary_parenthesis, unused_import
 
 import 'package:connectrpc/connect.dart' show Code;
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart' as hawkr_assistant_v1alpha1_assistant;
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_buyer_v1alpha1_buyer;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
+import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart' as hawkr_media_v1alpha1_media;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart' as hawkr_seller_v1alpha1_seller;
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.pbenum.dart' as hawkr_social_v1alpha1_social;
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 const _enumNumber = <String, int>{
-  'hawkr.buyer.v1alpha1.Gender.GENDER_FEMALE': 2,
+  'hawkr.assistant.v1alpha1.AssistantTool.ASSISTANT_TOOL_GET_BUYER_ORDER_DETAIL': 2,
+	'hawkr.assistant.v1alpha1.AssistantTool.ASSISTANT_TOOL_GET_MY_ORDERS': 1,
+	'hawkr.assistant.v1alpha1.AssistantTool.ASSISTANT_TOOL_TRACK_MY_PACKAGE': 3,
+	'hawkr.assistant.v1alpha1.AssistantTool.ASSISTANT_TOOL_UNSPECIFIED': 0,
+	'hawkr.buyer.v1alpha1.Gender.GENDER_FEMALE': 2,
 	'hawkr.buyer.v1alpha1.Gender.GENDER_MALE': 1,
 	'hawkr.buyer.v1alpha1.Gender.GENDER_OTHER': 3,
 	'hawkr.buyer.v1alpha1.Gender.GENDER_UNSPECIFIED': 0,
@@ -42,6 +49,13 @@ const _enumNumber = <String, int>{
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_OPEN': 1,
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_PAUSED': 2,
 	'hawkr.common.v1alpha1.StoreCardStatus.STORE_CARD_STATUS_UNSPECIFIED': 0,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_FIRST_ORDER_TIME': 1,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_ORDER_COUNT': 3,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT': 2,
+	'hawkr.crm.v1alpha1.CustomerSort.CUSTOMER_SORT_UNSPECIFIED': 0,
+	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_NORMAL': 1,
+	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_UNSPECIFIED': 0,
+	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_VIP': 2,
 	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH': 3,
 	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_EXPIRED': 5,
 	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_PROCESSING_FAILED': 4,
@@ -49,7 +63,6 @@ const _enumNumber = <String, int>{
 	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT': 1,
 	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION': 3,
-	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_PENDING': 1,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION': 2,
 	'hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_BUYER': 4,
@@ -69,6 +82,20 @@ const _enumNumber = <String, int>{
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM': 2,
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER': 1,
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_UNSPECIFIED': 0,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_BUDGET_RANGE': 4,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED': 6,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_DATE_FORMAT': 7,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_DATE_MISSING_YEAR': 8,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_DATE_PAST': 9,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_DATE_TOO_FAR': 10,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_EMPTY': 1,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_QUANTITY_RANGE': 3,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_RESOLUTION_NO_ITEM': 11,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_RESOLUTION_NO_LABEL': 12,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND': 13,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_TRUNCATED': 2,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED': 5,
+	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_UNSPECIFIED': 0,
 	'hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_CHAT_MESSAGE': 4,
 	'hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_COMMENT': 2,
 	'hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_FORUM_ENTRY': 3,
@@ -218,10 +245,24 @@ int _n(String enumName, Object? name) => _enumNumber['$enumName.$name']!;
 /// 呼叫 fn 對應的生成函式；null 表示「沒有文字」。
 String? goldenText(String fn, String value, Map<String, Object?> params, UiLocale l) {
   switch (fn) {
+    case 'admin.moderation.CaseReport.outcome_unset':
+      return adminModerationCaseReportOutcomeUnset(l);
+    case 'assistant.AssistantTool':
+      return hawkr_assistant_v1alpha1_assistant.AssistantTool.valueOf(_n('hawkr.assistant.v1alpha1.AssistantTool', value))!.uiText(l);
     case 'buyer.Gender':
       return hawkr_buyer_v1alpha1_buyer.Gender.valueOf(_n('hawkr.buyer.v1alpha1.Gender', value))!.uiText(l);
+    case 'buyer.Profile.deleted_name':
+      return buyerProfileDeletedName(l);
     case 'buyer.Profile.gender_unset':
       return buyerProfileGenderUnset(l);
+    case 'chat.Message.unsupported_kind':
+      return chatMessageUnsupportedKind(l);
+    case 'chat.Preview.erased':
+      return chatPreviewErased(l);
+    case 'chat.Preview.hidden':
+      return chatPreviewHidden(l);
+    case 'chat.Preview.image':
+      return chatPreviewImage(l);
     case 'common.PolicyCategory':
       return hawkr_common_v1alpha1_policy_category.PolicyCategory.valueOf(_n('hawkr.common.v1alpha1.PolicyCategory', value))!.uiText(l);
     case 'common.StoreCard.closed_store':
@@ -232,8 +273,14 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return commonErrorText(_codes[value]!, l);
     case 'common.unknown':
       return commonUnknown(l);
+    case 'crm.CustomerSort':
+      return hawkr_crm_v1alpha1_crm.CustomerSort.valueOf(_n('hawkr.crm.v1alpha1.CustomerSort', value))!.uiText(l);
+    case 'crm.CustomerType':
+      return hawkr_crm_v1alpha1_crm.CustomerType.valueOf(_n('hawkr.crm.v1alpha1.CustomerType', value))!.uiText(l);
     case 'media.RejectReason':
       return hawkr_media_v1alpha1_media.RejectReason.valueOf(_n('hawkr.media.v1alpha1.RejectReason', value))!.uiText(l);
+    case 'moderation.CommunityReport.outcome_unset':
+      return moderationCommunityReportOutcomeUnset(l);
     case 'moderation.ReportOutcome':
       return hawkr_moderation_v1alpha1_moderation.ReportOutcome.valueOf(_n('hawkr.moderation.v1alpha1.ReportOutcome', value))!.uiText(l);
     case 'moderation.ReportTargetKind':
@@ -242,6 +289,20 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentAccountStatus', value))!.uiText(l);
     case 'payment.RequirementCollection':
       return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n('hawkr.payment.v1alpha1.RequirementCollection', value))!.uiText(l);
+    case 'procurement.RejectionReason':
+      return hawkr_procurement_v1alpha1_procurement.RejectionReason.valueOf(_n('hawkr.procurement.v1alpha1.RejectionReason', value))!.uiText(l);
+    case 'review.Review.rating_label_1':
+      return reviewReviewRatingLabel1(l);
+    case 'review.Review.rating_label_2':
+      return reviewReviewRatingLabel2(l);
+    case 'review.Review.rating_label_3':
+      return reviewReviewRatingLabel3(l);
+    case 'review.Review.rating_label_4':
+      return reviewReviewRatingLabel4(l);
+    case 'review.Review.rating_label_5':
+      return reviewReviewRatingLabel5(l);
+    case 'review.ReviewAuthor.anonymous_name':
+      return reviewReviewAuthorAnonymousName(l);
     case 'seller.ContentKind':
       return hawkr_seller_v1alpha1_seller.ContentKind.valueOf(_n('hawkr.seller.v1alpha1.ContentKind', value))!.uiText(l);
     case 'seller.InquiryKind':

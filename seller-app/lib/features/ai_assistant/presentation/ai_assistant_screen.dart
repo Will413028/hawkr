@@ -17,6 +17,7 @@ import '../../../shared/widgets/chat_input_bar.dart';
 import 'ai_assistant_controller.dart';
 import 'ai_function_menu.dart';
 import 'widgets/ai_assistant_avatar.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// AI 小幫手全螢幕聊天頁面 (Figma: 7178:45950)
 class AiAssistantScreen extends HookConsumerWidget {
@@ -264,7 +265,10 @@ class AiAssistantScreen extends HookConsumerWidget {
                                   borderRadius: BorderRadius.circular(12.r),
                                 ),
                                 child: Text(
-                                  _formatSeparatorTime(msg.timestamp),
+                                  _formatSeparatorTime(
+                                    msg.timestamp,
+                                    context.taipeiDisplay,
+                                  ),
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
@@ -286,7 +290,7 @@ class AiAssistantScreen extends HookConsumerWidget {
                               right: isUser ? 4.w : 0,
                             ),
                             child: Text(
-                              _formatTime(msg.timestamp),
+                              _formatTime(msg.timestamp, context.taipeiDisplay),
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
@@ -445,25 +449,12 @@ class AiAssistantScreen extends HookConsumerWidget {
     );
   }
 
-  String _formatTime(DateTime dt) {
-    final t = dt.toLocal();
-    final h = t.hour;
-    final m = t.minute.toString().padLeft(2, '0');
-    final period = h < 12 ? '上午' : '下午';
-    final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-    return '$period${h12.toString().padLeft(2, '0')}:$m';
+  String _formatTime(DateTime dt, TaipeiDisplay td) {
+    return td.format(dt, TaipeiFormat.time);
   }
 
-  String _formatSeparatorTime(DateTime dt) {
-    final t = dt.toLocal();
-    final time =
-        '${t.hour.toString().padLeft(2, '0')}:'
-        '${t.minute.toString().padLeft(2, '0')}';
-    final today = DateTime.now();
-    if (t.year == today.year && t.month == today.month && t.day == today.day) {
-      return time;
-    }
-    return '${t.month}/${t.day} $time';
+  String _formatSeparatorTime(DateTime dt, TaipeiDisplay td) {
+    return td.separator(dt);
   }
 }
 
@@ -601,16 +592,18 @@ class _OrderCard extends StatelessWidget {
     );
   }
 
-  String _formatDate() {
+  String _formatDate(TaipeiDisplay t) {
     if (order.createTimeMs <= 0) return '';
-    final d = DateTime.fromMillisecondsSinceEpoch(order.createTimeMs).toLocal();
-    return '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
+    return t.format(
+      DateTime.fromMillisecondsSinceEpoch(order.createTimeMs),
+      TaipeiFormat.date,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final status = _statusStyle();
-    final date = _formatDate();
+    final date = _formatDate(context.taipeiDisplay);
     return Material(
       color: Colors.transparent,
       child: InkWell(

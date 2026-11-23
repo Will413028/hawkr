@@ -171,3 +171,37 @@ func TestCommunityReporterSelectableIsExplicit(t *testing.T) {
 		t.Error("CommunityReporterSelectable() 回傳了共用的切片")
 	}
 }
+
+// 店家檢舉入口可選的子集恰好十二個，順序同 proto 的 accepted_policy_categories；四個社群類別與 PlatformAbuse 不在其中，每個值都是有效的分類。
+func TestReporterSelectableIsExplicit(t *testing.T) {
+	want := []Category{
+		FoodSafety, ProhibitedGoods, UnlicensedSale, MisleadingInfo, FakeCertification, Counterfeit,
+		IPInfringement, Fraud, OffPlatformTrade, Privacy, Impersonation, Other,
+	}
+	got := ReporterSelectable()
+	if !slices.Equal(got, want) {
+		t.Fatalf("ReporterSelectable() = %v，預期 %v", got, want)
+	}
+	for _, v := range got {
+		if !slices.Contains(Values(), v) {
+			t.Errorf("%q 不在 Values()", v)
+		}
+	}
+	got[0] = Spam
+	if ReporterSelectable()[0] != FoodSafety {
+		t.Error("ReporterSelectable() 回傳了共用的切片")
+	}
+}
+
+func TestGeneratedSelectableListsContainOnlyValidCategories(t *testing.T) {
+	for name, list := range map[string][]Category{
+		"seller.CreateReportRequest.category":     acceptedSellerCreateReportRequestCategory,
+		"moderation.SubmitReportRequest.category": acceptedModerationSubmitReportRequestCategory,
+	} {
+		for _, v := range list {
+			if v == "" || !slices.Contains(Values(), v) {
+				t.Errorf("%s 的 %q 不是有效的 Category", name, v)
+			}
+		}
+	}
+}

@@ -27,6 +27,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../support/fake_seller_repository.dart';
 import 'moderation_fakes.dart';
+import 'package:hawkr_buyer/shared/time/taipei_display.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 pb.StoreReport _store({
   String id = 'r1',
@@ -58,9 +60,25 @@ pb.ReportSupplement _supp(String id, List<int> positions) =>
       evidencePositions: positions,
     );
 
+pb.GetMyReportResponse _detail({
+  required pb.StoreReport report,
+  Iterable<pb.ReportSupplement> supplements = const [],
+  Iterable<pb.ReportEvidence> evidence = const [],
+  bool canSupplement = true,
+  int supplementMax = 10,
+}) => pb.GetMyReportResponse(
+  report: report,
+  supplements: supplements,
+  evidence: evidence,
+  canSupplement: canSupplement,
+  supplementMax: supplementMax,
+);
+
 class _FakeSellerReports {
   _FakeSellerReports(this.detail);
   pb.GetMyReportResponse detail;
+  bool? canSupplementAfterAdd;
+  int? supplementMaxAfterAdd;
   int gets = 0;
   Object? getError;
   Object? addError;
@@ -78,13 +96,17 @@ class _FakeSellerReports {
           added.add(req);
           await addGate?.future;
           if (addError != null) throw addError!;
-          detail = pb.GetMyReportResponse(
+          detail = _detail(
             report: detail.report,
             supplements: [...detail.supplements, _supp('new', const [])],
+            canSupplement: canSupplementAfterAdd ?? detail.canSupplement,
+            supplementMax: supplementMaxAfterAdd ?? detail.supplementMax,
           );
           return pb.AddReportSupplementResponse(
             report: detail.report,
             supplements: detail.supplements,
+            canSupplement: detail.canSupplement,
+            supplementMax: detail.supplementMax,
           );
         })
         .build(),
@@ -129,23 +151,31 @@ Future<void> _pump(
   );
   addTearDown(router.dispose);
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        moderationAppClientProvider.overrideWithValue(moderation.client()),
-        sellerReportAppClientProvider.overrideWithValue(reports.client()),
-        sellerRepositoryProvider.overrideWithValue(
-          fakeSellerRepository(
-            cards: [StoreCard(id: 'store-1', name: '好店')],
-            failing: cardsFailing,
+    TaipeiDisplayScope(
+      deviceOffset: const Duration(hours: 8),
+      child: ProviderScope(
+        overrides: [
+          moderationAppClientProvider.overrideWithValue(moderation.client()),
+          sellerReportAppClientProvider.overrideWithValue(reports.client()),
+          sellerRepositoryProvider.overrideWithValue(
+            fakeSellerRepository(
+              cards: [StoreCard(id: 'store-1', name: '好店')],
+              failing: cardsFailing,
+            ),
+          ),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, _) => MaterialApp.router(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            routerConfig: router,
           ),
         ),
-      ],
-      child: ScreenUtilInit(
-        designSize: const Size(390, 844),
-        enableScaleWH: () => false,
-        enableScaleText: () => false,
-        builder: (_, _) =>
-            MaterialApp.router(theme: AppTheme.light, routerConfig: router),
       ),
     ),
   );
@@ -166,12 +196,12 @@ void main() {
     await _pump(
       tester,
       moderation: moderation,
-      reports: _FakeSellerReports(pb.GetMyReportResponse(report: _store())),
+      reports: _FakeSellerReports(_detail(report: _store())),
     );
     expect(find.text('貼文'), findsOneWidget);
     expect(find.text('好店'), findsOneWidget);
     expect(find.text('店家寄來廣告'), findsOneWidget);
-    expect(find.text('審核中'), findsWidgets);
+    expect(find.text('審核中'), findsNWidgets(2));
     expect(find.byKey(const ValueKey('my-report-store-r1')), findsOneWidget);
     expect(find.byKey(const ValueKey('my-report-store-c1')), findsNothing);
   });
@@ -189,7 +219,7 @@ void main() {
     await _pump(
       tester,
       moderation: moderation,
-      reports: _FakeSellerReports(pb.GetMyReportResponse(report: _store())),
+      reports: _FakeSellerReports(_detail(report: _store())),
     );
     expect(find.text('尚無檢舉紀錄'), findsNothing);
     expect(find.text('已處理（不違規）'), findsOneWidget);
@@ -198,7 +228,7 @@ void main() {
 
   testWidgets('詳情：處理中顯示各段落、佐證張數分開計、補充按鈕', (tester) async {
     final reports = _FakeSellerReports(
-      pb.GetMyReportResponse(
+      _detail(
         report: _store(orderNo: 'NO-9'),
         supplements: [
           _supp('a', [2]),
@@ -226,11 +256,12 @@ void main() {
 
   testWidgets('詳情：有結果時隱藏補充按鈕並顯示平台說明', (tester) async {
     final reports = _FakeSellerReports(
-      pb.GetMyReportResponse(
+      _detail(
         report: _store(
           outcome: ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN,
           note: '已下架商品',
         ),
+        canSupplement: false,
       ),
     );
     await _pump(
@@ -247,9 +278,10 @@ void main() {
 
   testWidgets('詳情：補充滿 10 則時隱藏按鈕', (tester) async {
     final reports = _FakeSellerReports(
-      pb.GetMyReportResponse(
+      _detail(
         report: _store(),
         supplements: [for (var i = 0; i < 10; i++) _supp('$i', const [])],
+        canSupplement: false,
       ),
     );
     await _pump(
@@ -268,9 +300,7 @@ void main() {
         [_storeItem(_store())],
       ],
     );
-    final reports = _FakeSellerReports(
-      pb.GetMyReportResponse(report: _store()),
-    );
+    final reports = _FakeSellerReports(_detail(report: _store()));
     await _pump(tester, moderation: moderation, reports: reports);
     await tester.tap(find.byKey(const ValueKey('my-report-store-r1')));
     await tester.pumpAndSettle();
@@ -319,8 +349,38 @@ void main() {
     const ValueKey('store-report-supplement-submit'),
   );
 
+  testWidgets('補充成功後以回應的 can_supplement 與 supplement_max 取代狀態', (tester) async {
+    final reports = _FakeSellerReports(_detail(report: _store()))
+      ..canSupplementAfterAdd = false
+      ..supplementMaxAfterAdd = 1;
+    await openSupplement(tester, reports);
+    await tester.tap(submitFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+    expect(find.text('補充說明（1/1）'), findsOneWidget);
+    expect(_button, findsNothing);
+  });
+
+  testWidgets('詳情：標題的上限取自 supplement_max', (tester) async {
+    final reports = _FakeSellerReports(
+      _detail(
+        report: _store(),
+        supplements: [_supp('a', const [])],
+        supplementMax: 7,
+      ),
+    );
+    await _pump(
+      tester,
+      moderation: FakeModeration(),
+      reports: reports,
+      initial: '/settings/reports/r1',
+    );
+    expect(find.text('補充說明（1/7）'), findsOneWidget);
+  });
+
   testWidgets('補充：送出中擋住返回鈕與返回手勢', (tester) async {
-    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+    final reports = _FakeSellerReports(_detail(report: _store()))
       ..addGate = Completer<void>();
     await openSupplement(tester, reports);
     await tester.tap(submitFinder);
@@ -337,7 +397,7 @@ void main() {
   });
 
   testWidgets('補充：前置條件失敗顯示伺服器文字並關閉後重讀詳情', (tester) async {
-    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+    final reports = _FakeSellerReports(_detail(report: _store()))
       ..addError = ConnectException(
         Code.failedPrecondition,
         'x',
@@ -349,8 +409,9 @@ void main() {
         ],
       );
     await openSupplement(tester, reports);
-    reports.detail = pb.GetMyReportResponse(
+    reports.detail = _detail(
       report: _store(outcome: ReportOutcome.REPORT_OUTCOME_ACTION_TAKEN),
+      canSupplement: false,
     );
     await tester.tap(submitFinder);
     await tester.pump();
@@ -364,7 +425,7 @@ void main() {
   });
 
   testWidgets('詳情：NOT_FOUND 顯示不存在狀態且沒有重試', (tester) async {
-    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+    final reports = _FakeSellerReports(_detail(report: _store()))
       ..getError = ConnectException(
         Code.notFound,
         'x',
@@ -392,7 +453,7 @@ void main() {
   });
 
   testWidgets('詳情：停權錯誤不顯示錯誤訊息', (tester) async {
-    final reports = _FakeSellerReports(pb.GetMyReportResponse(report: _store()))
+    final reports = _FakeSellerReports(_detail(report: _store()))
       ..getError = ConnectException(
         Code.permissionDenied,
         '帳號已停權',
@@ -422,7 +483,7 @@ void main() {
     await _pump(
       tester,
       moderation: FakeModeration(),
-      reports: _FakeSellerReports(pb.GetMyReportResponse(report: _store())),
+      reports: _FakeSellerReports(_detail(report: _store())),
       initial: '/settings/reports/r1',
       cardsFailing: () => failing,
     );
