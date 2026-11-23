@@ -17,13 +17,17 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/announce"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/app"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // jobQueue 依排入順序記下公告派送排的 job；測試以 drain 等同 River 取件。
@@ -94,6 +98,7 @@ type announceFixture struct {
 	db       *db.DB
 	identity *identity.Module
 	svc      *announce.Service
+	inbox    *app.Service
 	jobs     *jobQueue
 	dir      *testDirectory
 	stores   *fakeStores
@@ -120,7 +125,8 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 		DB: d, Locks: intake.Locks{Accounts: id, Buyers: buyers, Stores: stores}, Directory: dir,
 		Audit: adminaudit.New(d, time.Now), Jobs: q, Now: time.Now, NewID: uuid.NewV7, Logger: log, Chunk: chunk,
 	})
-	return &announceFixture{db: d, identity: id, svc: svc, jobs: q, dir: dir, stores: stores}
+	inbox := app.New(app.Deps{DB: d, Accounts: id, Registry: registry.Registry{}, Now: time.Now, Logger: log})
+	return &announceFixture{db: d, identity: id, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores}
 }
 
 func (f *announceFixture) newAccount(t *testing.T) int64 {
@@ -429,5 +435,44 @@ func TestListAnnouncementsPagesNewestFirst(t *testing.T) {
 	}
 	if _, err := f.svc.List(context.Background(), nil, -1); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Errorf("負的 page_size：%v", err)
+	}
+}
+
+// 建立的公告出現在收件人的收件匣：列表（含 category=ANNOUNCEMENT 篩選，total 計入）、未讀數、全部已讀都看得到它；
+// 文字是公告的英文原文，zh-TW 請求也一樣（D17）。公告的收件匣列只存公告 ID，標題與內文在讀取時由公告型別解析。
+// mutation：型別註冊表排除 announcement → 收件匣的型別篩選把公告列藏起來，這個測試紅。
+func TestAnnouncementShowsInTheInboxAndIsRenderedInEnglish(t *testing.T) {
+	f := setupAnnounce(t, 0)
+	ctx := context.Background()
+	acct := f.newAccount(t)
+	a := f.create(t, announce.CreateInput{Audiences: []string{"BUYER"}, Title: "Scheduled maintenance", Body: "Down on Sunday."})
+	f.drain(t)
+	r := app.Recipient{AccountID: acct, Audience: model.AudienceBuyer}
+	announcementCategory := model.CategoryAnnouncement
+
+	for name, category := range map[string]*model.PrefCategory{"不篩選": nil, "ANNOUNCEMENT": &announcementCategory} {
+		page, err := f.inbox.ListInbox(ctx, r, category, uitext.ZhTW, nil, 10)
+		if err != nil {
+			t.Fatalf("%s：%v", name, err)
+		}
+		if page.Total != 1 || len(page.Items) != 1 {
+			t.Fatalf("%s：total = %d、items = %d，預期 1、1", name, page.Total, len(page.Items))
+		}
+		it := page.Items[0]
+		if it.Title != "Scheduled maintenance" || it.Body != "Down on Sunday." || it.Category != model.CategoryAnnouncement || it.Presentation != model.PresentationSystem || it.ReadAt != nil {
+			t.Errorf("%s：項目 %+v", name, it)
+		}
+	}
+	if n, err := f.inbox.UnreadCount(ctx, r); err != nil || n != 1 {
+		t.Fatalf("未讀數 = %d（%v），預期 1", n, err)
+	}
+	if n, err := f.inbox.MarkAllRead(ctx, r); err != nil || n != 1 {
+		t.Fatalf("全部已讀改了 %d 列（%v），預期 1", n, err)
+	}
+	if n, err := f.inbox.UnreadCount(ctx, r); err != nil || n != 0 {
+		t.Errorf("全部已讀之後未讀數 = %d（%v），預期 0", n, err)
+	}
+	if f.inboxRowFor(t, a.ID, acct) != 1 {
+		t.Error("收件匣列不該被已讀刪掉")
 	}
 }

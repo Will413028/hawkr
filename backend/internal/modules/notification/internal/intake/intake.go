@@ -139,7 +139,7 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	}
 	spec := e.Spec()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		gone, err := LockRecipient(ctx, Locks{Accounts: s.d.Accounts, Buyers: s.d.Buyers, Stores: s.d.Stores}, spec.Audience, resolved.Recipient.AccountID, resolved.Recipient.StoreID)
+		gone, err := LockRecipient(ctx, Locks{Accounts: s.d.Accounts, Buyers: s.d.Buyers, Stores: s.d.Stores}, spec.Audience(), resolved.Recipient.AccountID, resolved.Recipient.StoreID)
 		if err != nil {
 			return err
 		}
@@ -191,7 +191,7 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 		storeID = &r.Recipient.StoreID
 	}
 	overrides, err := q.PreferenceOverrides(ctx, store.PreferenceOverridesParams{
-		AccountID: r.Recipient.AccountID, Audience: string(spec.Audience), Category: string(spec.Category),
+		AccountID: r.Recipient.AccountID, Audience: string(spec.Audience()), Category: string(spec.Category),
 	})
 	if err != nil {
 		return fmt.Errorf("讀取偏好：%w", err)
@@ -200,7 +200,7 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 	for _, o := range overrides {
 		override[model.Channel(o.Channel)] = o.Enabled
 	}
-	enabled := func(ch model.Channel) bool { return model.Enabled(spec.Audience, spec.Category, ch, override) }
+	enabled := func(ch model.Channel) bool { return model.Enabled(spec.Audience(), spec.Category, ch, override) }
 	now := s.d.Now()
 	for _, ch := range spec.Channels {
 		if !enabled(ch) {
@@ -210,7 +210,7 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 			// 投遞紀錄是推播與 email 的唯一帳本；每筆新紀錄在同一個 transaction 排一個渠道 job（A8-3 把 adapter 接進它，這一步 job 不送出）。
 			// 紀錄已存在（重試）時 job 已隨第一次的 transaction 排過，不再排。
 			id, err := q.InsertDelivery(ctx, store.InsertDeliveryParams{
-				ID: s.d.NewID(), IntentID: intent.ID, AccountID: r.Recipient.AccountID, Audience: string(spec.Audience),
+				ID: s.d.NewID(), IntentID: intent.ID, AccountID: r.Recipient.AccountID, Audience: string(spec.Audience()),
 				StoreID: storeID, Channel: string(ch), Now: now,
 			})
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -248,7 +248,7 @@ func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store
 		actors = []int64{}
 	}
 	itemID, err := q.UpsertInboxItem(ctx, store.UpsertInboxItemParams{
-		ID: s.d.NewID(), AccountID: r.Recipient.AccountID, Audience: string(spec.Audience), StoreID: storeID, Type: intent.Type,
+		ID: s.d.NewID(), AccountID: r.Recipient.AccountID, Audience: string(spec.Audience()), StoreID: storeID, Type: intent.Type,
 		Params: intent.Params, AggregationKey: aggKey, ActorAccountIds: actors, OccurredAt: intent.OccurredAt, Now: now,
 	})
 	if err != nil {

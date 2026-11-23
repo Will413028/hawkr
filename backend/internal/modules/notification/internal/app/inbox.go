@@ -9,7 +9,6 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
@@ -52,7 +51,7 @@ type Page struct {
 }
 
 // ListInbox 列出收件人的收件匣，新到舊。category 不為 nil 時只列該分類，分類不屬於受眾回 invalid_argument。size 已由呼叫端正規化。
-// 只顯示註冊表裡有型別的列；文字依 l 組，型別自己指定的語系（例如公告只有英文）以型別為準。
+// 只顯示註冊表裡有型別的列；文字依 l 組，型別自己指定的語系（例如公告只有英文）以型別為準；參數只存 ID 的型別（公告）在組字前由型別的 Load 讀取內容。
 // Total 與未讀數只依型別（受眾、分類、註冊表）篩選，不看文字組不組得出來：組不出文字的列會被記錄並略過，所以 Total 可能比所有頁加起來多。
 func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.PrefCategory, l uitext.Locale, after *Cursor, size int32) (Page, error) {
 	if err := r.validate(); err != nil {
@@ -67,7 +66,7 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 	}
 	if after != nil {
 		arg.AfterUpdatedAt = &after.UpdatedAt
-		arg.AfterID = pgtype.UUID{Bytes: after.ID, Valid: true}
+		arg.AfterID = &after.ID
 	}
 	var rows []store.ListInboxItemsRow
 	var page Page
@@ -92,7 +91,7 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 		rows = rows[:size]
 	}
 	for _, row := range rows {
-		item, err := s.render(l, row)
+		item, err := s.render(ctx, l, row)
 		if err != nil {
 			// 一列組不出文字（參數快照壞掉）不拖垮整份收件匣：記錄後略過這一列。
 			s.d.Logger.ErrorContext(ctx, "收件匣列組不出文字，略過", "inbox_item_id", row.ID, "type", row.Type, "error", err)
@@ -103,13 +102,18 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 	return page, nil
 }
 
-func (s *Service) render(l uitext.Locale, row store.ListInboxItemsRow) (Item, error) {
+func (s *Service) render(ctx context.Context, l uitext.Locale, row store.ListInboxItemsRow) (Item, error) {
 	e, ok := s.d.Registry.Lookup(row.Type)
 	if !ok {
 		// types 只含註冊表的型別，查詢之後型別不會消失：走到這裡是註冊表不一致。
 		return Item{}, fmt.Errorf("收件匣列 %s 的型別 %q 沒有註冊", row.ID, row.Type)
 	}
-	out, err := e.Render(l, json.RawMessage(row.Params))
+	params := json.RawMessage(row.Params)
+	loaded, err := e.Load(ctx, s, params)
+	if err != nil {
+		return Item{}, fmt.Errorf("解析收件匣列 %s（%s）的內容：%w", row.ID, row.Type, err)
+	}
+	out, err := e.RenderLoaded(l, params, loaded)
 	if err != nil {
 		return Item{}, fmt.Errorf("組收件匣列 %s（%s）的文字：%w", row.ID, row.Type, err)
 	}
@@ -192,4 +196,13 @@ func (s *Service) BatchDelete(ctx context.Context, accountID int64, ids []uuid.U
 		}
 		return nil
 	})
+}
+
+// Announcement 讀取公告的標題與內文（registry.Sources）：公告型別的收件匣列只存公告 ID，讀取時在這裡解析。
+func (s *Service) Announcement(ctx context.Context, id uuid.UUID) (registry.AnnouncementText, error) {
+	a, err := store.New(s.d.DB.Conn(ctx)).AnnouncementByID(ctx, id)
+	if err != nil {
+		return registry.AnnouncementText{}, fmt.Errorf("讀取公告 %s：%w", id, err)
+	}
+	return registry.AnnouncementText{Title: a.Title, Body: a.Body}, nil
 }

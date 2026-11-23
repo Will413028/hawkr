@@ -98,7 +98,7 @@ type pushParams struct {
 }
 
 var testPush = registry.Define(registry.Definition[pushParams]{
-	Name: "test_push", Audience: model.AudienceBuyer, Category: model.CategoryLike, Presentation: model.PresentationSocial,
+	Name: "test_push", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelPush, model.ChannelEmail},
 	IdempotencySource: "test.Push.EventID",
 	IdempotencyKey:    func(p pushParams) string { return p.EventID },
@@ -111,7 +111,7 @@ var testPush = registry.Define(registry.Definition[pushParams]{
 })
 
 var testLike = registry.Define(registry.Definition[likeParams]{
-	Name: "test_like", Audience: model.AudienceBuyer, Category: model.CategoryLike, Presentation: model.PresentationSocial,
+	Name: "test_like", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox},
 	IdempotencySource: "test.Like.EventID",
 	IdempotencyKey:    func(p likeParams) string { return p.EventID },
@@ -133,7 +133,7 @@ var testLike = registry.Define(registry.Definition[likeParams]{
 
 // testTwin 與 testLike 的原始聚合鍵相同，驗證聚合鍵以型別名稱為前綴。
 var testTwin = registry.Define(registry.Definition[likeParams]{
-	Name: "test_agg_twin", Audience: model.AudienceBuyer, Category: model.CategoryLike, Presentation: model.PresentationSocial,
+	Name: "test_agg_twin", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox},
 	IdempotencySource: "test.Twin.EventID",
 	IdempotencyKey:    func(p likeParams) string { return p.EventID },
@@ -156,7 +156,7 @@ type storeNoteParams struct {
 
 // testStoreNote 是 STORE 受眾、有收件匣與推播的測試型別；testStorePushOnly 只有推播（意圖只經投遞紀錄找得到）。
 var testStoreNote = registry.Define(registry.Definition[storeNoteParams]{
-	Name: "test_store_note", Audience: model.AudienceStore, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
+	Name: "test_store_note", Audiences: []model.Audience{model.AudienceStore}, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelPush},
 	IdempotencySource: "test.StoreNote.EventID",
 	IdempotencyKey:    func(p storeNoteParams) string { return p.EventID },
@@ -171,7 +171,7 @@ var testStoreNote = registry.Define(registry.Definition[storeNoteParams]{
 })
 
 var testStorePushOnly = registry.Define(registry.Definition[storeNoteParams]{
-	Name: "test_store_push_only", Audience: model.AudienceStore, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
+	Name: "test_store_push_only", Audiences: []model.Audience{model.AudienceStore}, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
 	Channels:          []model.Channel{model.ChannelPush},
 	IdempotencySource: "test.StorePushOnly.EventID",
 	IdempotencyKey:    func(p storeNoteParams) string { return p.EventID },

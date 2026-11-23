@@ -40,8 +40,8 @@
    "id": "delivered-ignores-registered-channels",
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/registry/delivery.go",
-   "old": "s.Audience == a && s.Category == c && slices.Contains(s.Channels, ch)",
-   "new": "s.Audience == a && s.Category == c",
+   "old": "s.Reaches(a) && s.Category == c && slices.Contains(s.Channels, ch)",
+   "new": "s.Reaches(a) && s.Category == c",
    "test": "internal/modules/notification/internal/registry ^TestDeliveredFollowsTheRegisteredTypes$",
    "why": "Delivers 的推導不看型別宣告的渠道：有型別的分類就視為所有渠道都送達"
   },

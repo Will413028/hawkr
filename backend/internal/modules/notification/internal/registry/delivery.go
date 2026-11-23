@@ -11,18 +11,13 @@ func (Registry) All() []Entry { return All() }
 
 // Delivered 回報受眾 a 的分類 c 在渠道 ch 實際會不會有型別送達：entries 裡至少有一個型別的受眾、分類與渠道清單都對上，
 // 而且 model.Delivers（分類本身允許的渠道）也放行。偏好 API 只列、只接受這樣的組合，所以沒有型別走 email 的分類沒有 email 那一項。
-//
-// 例外是公告：公告是資料不是型別（有自己的公告表），沒有註冊的型別可推導，送達的渠道（收件匣與推播）就是 model.Delivers 的結果。
 func Delivered(entries []Entry, a model.Audience, c model.PrefCategory, ch model.Channel) bool {
 	if !model.Delivers(a, c, ch) {
 		return false
 	}
-	if c == model.CategoryAnnouncement {
-		return true
-	}
 	return slices.ContainsFunc(entries, func(e Entry) bool {
 		s := e.Spec()
-		return s.Audience == a && s.Category == c && slices.Contains(s.Channels, ch)
+		return s.Reaches(a) && s.Category == c && slices.Contains(s.Channels, ch)
 	})
 }
 
@@ -31,7 +26,7 @@ func TypeNames(entries []Entry, a model.Audience, category *model.PrefCategory) 
 	names := []string{}
 	for _, e := range entries {
 		s := e.Spec()
-		if s.Audience == a && (category == nil || s.Category == *category) {
+		if s.Reaches(a) && (category == nil || s.Category == *category) {
 			names = append(names, s.Name)
 		}
 	}

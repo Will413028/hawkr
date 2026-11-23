@@ -19,9 +19,9 @@ ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: InsertAnnouncementInbox :execrows
--- 把公告寫進一個收件人的收件匣；同一個 (公告, 收件人) 已有列時什麼都不寫（回 0 列，job 重試安全）。文案取自公告列，所以參數是空的。
+-- 把公告寫進一個收件人的收件匣；同一個 (公告, 收件人) 已有列時什麼都不寫（回 0 列，job 重試安全）。參數只有公告 ID，文案讀取時由公告型別解析。
 INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, actor_account_ids, occurred_at, created_at, updated_at, announcement_id)
-VALUES (sqlc.arg(id), sqlc.arg(account_id), sqlc.arg(audience), sqlc.narg(store_id), 'announcement', '{}', '{}', sqlc.arg(occurred_at), sqlc.arg(now), sqlc.arg(now), sqlc.arg(announcement_id)::uuid)
+VALUES (sqlc.arg(id), sqlc.arg(account_id), sqlc.arg(audience), sqlc.narg(store_id), 'announcement', jsonb_build_object('announcement_id', sqlc.arg(announcement_id)::uuid), '{}', sqlc.arg(occurred_at), sqlc.arg(now), sqlc.arg(now), sqlc.arg(announcement_id)::uuid)
 ON CONFLICT (announcement_id, account_id, audience, store_id) WHERE announcement_id IS NOT NULL DO NOTHING;
 
 -- name: AddAnnouncementInboxCount :exec

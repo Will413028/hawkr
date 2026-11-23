@@ -9,7 +9,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"uuid"
 )
 
@@ -139,7 +138,7 @@ type ListInboxItemsParams struct {
 	StoreID        *int64
 	Types          []string
 	AfterUpdatedAt *time.Time
-	AfterID        pgtype.UUID
+	AfterID        *uuid.UUID
 	MaxRows        int32
 }
 

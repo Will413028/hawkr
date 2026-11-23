@@ -8,5 +8,10 @@
    "old": "AdminID: in.Actor.AdminID, RequestID: in.RequestID, CreatedAt: now,",
    "new": "AdminID: in.Actor.AdminID, RequestID: nil, CreatedAt: now,",
    "test": "internal/modules/notification ^TestCreateWithTheSameRequestIDMakesOneAnnouncement$",
-   "why": "建立時不記 request_id：同一個 request_id 重送建出第二則公告，冪等失效"}
+   "why": "建立時不記 request_id：同一個 request_id 重送建出第二則公告，冪等失效"},
+  {"id": "announcement-type-not-registered", "stack": "go-integration", "file": "backend/internal/modules/notification/internal/registry/registry.go",
+   "old": "var all = []Entry{accountSuspended, accountUnsuspended, announcement}",
+   "new": "var all = []Entry{accountSuspended, accountUnsuspended}",
+   "test": "internal/modules/notification ^TestAnnouncementShowsInTheInboxAndIsRenderedInEnglish$",
+   "why": "公告型別不在註冊表：收件匣的型別篩選把公告列藏起來，列表、total、未讀數都看不到（A8-2b 的跨步 blocking finding）"}
 ]}

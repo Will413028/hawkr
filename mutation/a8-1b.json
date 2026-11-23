@@ -30,9 +30,9 @@
   {
    "id": "deleted-account-check-dropped",
    "stack": "go-integration",
-   "file": "backend/internal/modules/notification/internal/intake/intake.go",
-   "old": "if deleted {",
-   "new": "if deleted && false {",
+   "file": "backend/internal/modules/notification/internal/intake/locks.go",
+   "old": "\tif deleted {\n\t\treturn GoneAccountDeleted",
+   "new": "\tif deleted && false {\n\t\treturn GoneAccountDeleted",
    "test": "internal/modules/notification ^TestIntentArrivingAfterAccountDeletionWritesNothing$",
    "why": "The worker no longer stops when the recipient account is already deleted, so an intent arriving after deletion still writes inbox and delivery rows."
   },

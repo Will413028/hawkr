@@ -29,9 +29,9 @@ import (
 )
 
 const (
-	// IntentType 是公告的意圖列型別；它不在型別註冊表，也不排展開意圖的 job。
+	// IntentType 是公告的意圖列型別（註冊表的 announcement，Fanout 型別）；不排展開意圖的 job。
 	IntentType = "announcement"
-	// InboxType 是公告收件匣列的 type；文案取自公告列。
+	// InboxType 是公告收件匣列的 type；參數只有公告 ID，文案讀取時由型別解析。
 	InboxType = "announcement"
 
 	// MaxTitleRunes、MaxBodyRunes 與 schema 的 announcements_title_check、announcements_body_check 一致。

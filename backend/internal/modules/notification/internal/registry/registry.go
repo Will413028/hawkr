@@ -6,6 +6,7 @@
 package registry
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"slices"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -44,8 +46,13 @@ func (c Content) locale() (uitext.Locale, error) {
 type Definition[P any] struct {
 	// Name 是型別名稱（lower_snake），也是 intents.type、inbox_items.type。
 	Name string
-	// Audience 是這個型別的收件人身分面。
-	Audience model.Audience
+	// Audiences 是這個型別能到的受眾身分面：走意圖管線的型別剛好一個（收件人與受眾一一對應）；Fanout 型別可以有多個。
+	Audiences []model.Audience
+	// Fanout 宣告型別不經意圖管線：收件人不在參數快照裡，由型別自己的派送 job 逐一展開（公告）。Fanout 型別不需要 IdempotencyKey、OccurredAt 與 Recipient，
+	// 也不能被意圖管線登記或展開；收件匣列的事件時間由派送寫入。
+	Fanout bool
+	// FixedLocale 非空時，型別的文字永遠是這個語系，不依請求語系（例如公告只有英文，D17）；自檢改為要求每個語系都組出這個語系的文字。
+	FixedLocale uitext.Locale
 	// Category 是偏好分類（D4）。
 	Category model.PrefCategory
 	// Presentation 是收件匣的呈現分類（D6）。
@@ -67,8 +74,13 @@ type Definition[P any] struct {
 	AggregationKey func(P) string
 	// Actors 回傳參數裡的 actor 帳號 ID（只存帳號 ID，名稱與頭像讀取時向擁有模組解析）；沒有 actor 的型別留空。
 	Actors func(P) []int64
-	// Text 依語系組字。
+	// Text 依語系組字。需要讀取時解析的內容（參數只存 ID）的型別改用 Load 與 TextLoaded，兩者擇一。
 	Text func(l uitext.Locale, p P) (Content, error)
+	// Load 在讀取時向擁有資料的地方（Sources）解析參數裡的 ID，結果交給 TextLoaded 組字；有 Load 就一定要有 TextLoaded，反之亦然。
+	Load       func(ctx context.Context, src Sources, p P) (Loaded, error)
+	TextLoaded func(l uitext.Locale, p P, ld Loaded) (Content, error)
+	// ExampleLoaded 是範例參數對應的 Load 結果（自檢與固定輸出測試用）。
+	ExampleLoaded Loaded
 	// DeepLink 回傳深連結；留空表示沒有目的地。
 	DeepLink func(P) string
 	// ImageKey 回傳推播圖片的物件 key（D14，商品類型別帶）；留空表示沒有圖。
@@ -76,6 +88,17 @@ type Definition[P any] struct {
 	// Example 是固定輸出測試與註冊表自檢用的範例參數。
 	Example P
 }
+
+// AnnouncementText 是公告的標題與內文（英文，D17）。
+type AnnouncementText struct{ Title, Body string }
+
+// Sources 是型別在讀取時解析參數裡的 ID 要問的地方；由通知模組自己的用例實作（公告在本模組的資料表）。
+type Sources interface {
+	Announcement(ctx context.Context, id uuid.UUID) (AnnouncementText, error)
+}
+
+// Loaded 是 Load 解析出來的內容；沒有 Load 的型別是零值。
+type Loaded struct{ Announcement *AnnouncementText }
 
 // Recipient 是型別從參數取出的收件人：(帳號, 受眾) 的帳號與 STORE 受眾的店。受眾本身是型別的屬性（Spec.Audience）。
 type Recipient struct {
@@ -93,7 +116,8 @@ type Resolved struct {
 // Spec 是型別的靜態屬性（不含參數相關的函式）。
 type Spec struct {
 	Name              string
-	Audience          model.Audience
+	Audiences         []model.Audience
+	Fanout            bool
 	Category          model.PrefCategory
 	Presentation      model.Presentation
 	StateHint         model.StateHint
@@ -101,6 +125,12 @@ type Spec struct {
 	IdempotencySource string
 	Aggregatable      bool
 }
+
+// Audience 回傳走意圖管線的型別的唯一受眾（Validate 保證非 Fanout 型別剛好一個）。
+func (s Spec) Audience() model.Audience { return s.Audiences[0] }
+
+// Reaches 回報型別是否能到受眾 a。
+func (s Spec) Reaches(a model.Audience) bool { return slices.Contains(s.Audiences, a) }
 
 // Rendered 是一個型別對一份參數快照與一個語系的完整輸出。
 type Rendered struct {
@@ -123,11 +153,18 @@ type Entry interface {
 	IdempotencyKey(params json.RawMessage) (string, error)
 	// OccurredAt 回傳來源事件發生的時間。
 	OccurredAt(params json.RawMessage) (time.Time, error)
+	// Render 依語系組字；需要 Load 的型別請改用 Load 加 RenderLoaded。
 	Render(l uitext.Locale, params json.RawMessage) (Rendered, error)
+	// Load 在讀取時解析參數裡的 ID（沒有 Load 的型別回零值）。
+	Load(ctx context.Context, src Sources, params json.RawMessage) (Loaded, error)
+	// RenderLoaded 以 Load 的結果組字；沒有 Load 的型別等同 Render。
+	RenderLoaded(l uitext.Locale, params json.RawMessage, ld Loaded) (Rendered, error)
 	// Resolve 由參數快照取出收件人、聚合鍵與 actor，不組字。
 	Resolve(params json.RawMessage) (Resolved, error)
 	// ExampleParams 回傳範例參數的 JSON 與解碼後的值（自檢與固定輸出測試用）。
 	ExampleParams() (json.RawMessage, any, error)
+	// ExampleLoaded 回傳範例參數對應的 Load 結果（沒有 Load 的型別是零值）。
+	ExampleLoaded() Loaded
 	// validate 檢查型別定義本身；回傳全部違規。
 	validate() []error
 }
@@ -156,7 +193,7 @@ type entry[P any] struct{ d Definition[P] }
 func (e *entry[P]) Spec() Spec {
 	d := e.d
 	return Spec{
-		Name: d.Name, Audience: d.Audience, Category: d.Category, Presentation: d.Presentation, StateHint: d.StateHint,
+		Name: d.Name, Audiences: slices.Clone(d.Audiences), Fanout: d.Fanout, Category: d.Category, Presentation: d.Presentation, StateHint: d.StateHint,
 		Channels: slices.Clone(d.Channels), IdempotencySource: d.IdempotencySource, Aggregatable: d.Aggregatable,
 	}
 }
@@ -177,7 +214,17 @@ func (e *entry[P]) IdempotencyKey(params json.RawMessage) (string, error) {
 	return e.idempotencyKey(p)
 }
 
+func (e *entry[P]) notFanout() error {
+	if e.d.Fanout {
+		return fmt.Errorf("通知型別 %s 是 fan-out 型別，不經意圖管線", e.d.Name)
+	}
+	return nil
+}
+
 func (e *entry[P]) idempotencyKey(p P) (string, error) {
+	if err := e.notFanout(); err != nil {
+		return "", err
+	}
 	if e.d.IdempotencyKey == nil {
 		return "", fmt.Errorf("通知型別 %s 沒有冪等鍵來源", e.d.Name)
 	}
@@ -197,6 +244,9 @@ func (e *entry[P]) OccurredAt(params json.RawMessage) (time.Time, error) {
 }
 
 func (e *entry[P]) occurredAt(p P) (time.Time, error) {
+	if err := e.notFanout(); err != nil {
+		return time.Time{}, err
+	}
 	if e.d.OccurredAt == nil {
 		return time.Time{}, fmt.Errorf("通知型別 %s 沒有事件時間來源", e.d.Name)
 	}
@@ -208,16 +258,45 @@ func (e *entry[P]) occurredAt(p P) (time.Time, error) {
 }
 
 func (e *entry[P]) Render(l uitext.Locale, params json.RawMessage) (Rendered, error) {
+	return e.RenderLoaded(l, params, Loaded{})
+}
+
+func (e *entry[P]) Load(ctx context.Context, src Sources, params json.RawMessage) (Loaded, error) {
+	if e.d.Load == nil {
+		return Loaded{}, nil
+	}
+	p, err := e.decode(params)
+	if err != nil {
+		return Loaded{}, err
+	}
+	ld, err := e.d.Load(ctx, src, p)
+	if err != nil {
+		return Loaded{}, fmt.Errorf("通知型別 %s 解析參數失敗：%w", e.d.Name, err)
+	}
+	return ld, nil
+}
+
+func (e *entry[P]) RenderLoaded(l uitext.Locale, params json.RawMessage, ld Loaded) (Rendered, error) {
 	p, err := e.decode(params)
 	if err != nil {
 		return Rendered{}, err
 	}
-	return e.render(l, p)
+	return e.render(l, p, ld)
 }
 
-func (e *entry[P]) render(l uitext.Locale, p P) (Rendered, error) {
+func (e *entry[P]) text(l uitext.Locale, p P, ld Loaded) (Content, error) {
+	if e.d.TextLoaded != nil {
+		return e.d.TextLoaded(l, p, ld)
+	}
+	if e.d.Text == nil {
+		return Content{}, fmt.Errorf("通知型別 %s 沒有文案", e.d.Name)
+	}
+	return e.d.Text(l, p)
+}
+
+func (e *entry[P]) render(l uitext.Locale, p P, ld Loaded) (Rendered, error) {
 	d := e.d
-	c, err := d.Text(l, p)
+	c, err := e.text(l, p, ld)
 	if err != nil {
 		return Rendered{}, fmt.Errorf("通知型別 %s 組字失敗：%w", d.Name, err)
 	}
@@ -249,6 +328,9 @@ func (e *entry[P]) Resolve(params json.RawMessage) (Resolved, error) {
 
 func (e *entry[P]) resolve(p P) (Resolved, error) {
 	d := e.d
+	if err := e.notFanout(); err != nil {
+		return Resolved{}, err
+	}
 	if d.Recipient == nil {
 		return Resolved{}, fmt.Errorf("通知型別 %s 沒有收件人解析", d.Name)
 	}
@@ -256,8 +338,8 @@ func (e *entry[P]) resolve(p P) (Resolved, error) {
 	if r.AccountID <= 0 {
 		return Resolved{}, fmt.Errorf("通知型別 %s 的參數沒有收件帳號", d.Name)
 	}
-	if (d.Audience == model.AudienceStore) != (r.StoreID > 0) || r.StoreID < 0 {
-		return Resolved{}, fmt.Errorf("通知型別 %s：受眾 %s 的收件人 StoreID 是 %d（STORE 一定有、BUYER 一定沒有）", d.Name, d.Audience, r.StoreID)
+	if (d.Audiences[0] == model.AudienceStore) != (r.StoreID > 0) || r.StoreID < 0 {
+		return Resolved{}, fmt.Errorf("通知型別 %s：受眾 %s 的收件人 StoreID 是 %d（STORE 一定有、BUYER 一定沒有）", d.Name, d.Audiences[0], r.StoreID)
 	}
 	out := Resolved{Recipient: r}
 	out.AggregationKey = e.aggregationKey(p)
@@ -284,6 +366,8 @@ func (e *entry[P]) ExampleParams() (json.RawMessage, any, error) {
 	return raw, e.d.Example, err
 }
 
+func (e *entry[P]) ExampleLoaded() Loaded { return e.d.ExampleLoaded }
+
 func (e *entry[P]) validate() []error {
 	d := e.d
 	var errs []error
@@ -293,13 +377,27 @@ func (e *entry[P]) validate() []error {
 	if !namePattern.MatchString(d.Name) {
 		bad("名稱要是 lower_snake")
 	}
-	if !slices.Contains(model.Audiences(), d.Audience) {
-		bad("受眾 %q 不是 BUYER 或 STORE", d.Audience)
+	audiencesOK := len(d.Audiences) > 0 && (d.Fanout || len(d.Audiences) == 1)
+	if !audiencesOK {
+		bad("走意圖管線的型別剛好一個受眾，fan-out 型別至少一個（現在 %v）", d.Audiences)
+	}
+	for i, a := range d.Audiences {
+		if !slices.Contains(model.Audiences(), a) {
+			bad("受眾 %q 不是 BUYER 或 STORE", a)
+			audiencesOK = false
+		} else if slices.Contains(d.Audiences[:i], a) {
+			bad("受眾 %q 重複", a)
+			audiencesOK = false
+		}
 	}
 	if !model.ValidCategory(d.Category) {
 		bad("偏好分類 %q 不在 D4 清單", d.Category)
-	} else if !model.ValidCategoryFor(d.Audience, d.Category) {
-		bad("偏好分類 %q 不屬於受眾 %q", d.Category, d.Audience)
+	} else {
+		for _, a := range d.Audiences {
+			if !model.ValidCategoryFor(a, d.Category) {
+				bad("偏好分類 %q 不屬於受眾 %q", d.Category, a)
+			}
+		}
 	}
 	if !slices.Contains(model.Presentations(), d.Presentation) {
 		bad("呈現分類 %q 不在 D6 清單", d.Presentation)
@@ -320,35 +418,50 @@ func (e *entry[P]) validate() []error {
 		}
 		seen[ch] = true
 	}
-	if d.IdempotencySource == "" || d.IdempotencyKey == nil {
-		bad("沒有冪等鍵來源（IdempotencySource 與 IdempotencyKey 都要有）")
-	} else if _, err := e.idempotencyKey(d.Example); err != nil {
-		bad("範例參數取不出冪等鍵：%v", err)
-	}
-	if _, err := e.occurredAt(d.Example); err != nil {
-		bad("範例參數取不出事件時間：%v", err)
-	}
-	if _, err := e.resolve(d.Example); err != nil {
-		bad("範例參數解析不出收件人：%v", err)
+	if d.Fanout {
+		if d.IdempotencyKey != nil || d.OccurredAt != nil || d.Recipient != nil || d.Aggregatable {
+			bad("fan-out 型別不經意圖管線，不能有冪等鍵、事件時間、收件人或聚合")
+		}
+	} else {
+		if d.IdempotencySource == "" || d.IdempotencyKey == nil {
+			bad("沒有冪等鍵來源（IdempotencySource 與 IdempotencyKey 都要有）")
+		} else if _, err := e.idempotencyKey(d.Example); err != nil {
+			bad("範例參數取不出冪等鍵：%v", err)
+		}
+		if _, err := e.occurredAt(d.Example); err != nil {
+			bad("範例參數取不出事件時間：%v", err)
+		}
+		if audiencesOK {
+			if _, err := e.resolve(d.Example); err != nil {
+				bad("範例參數解析不出收件人：%v", err)
+			}
+		}
 	}
 	if d.Aggregatable != (d.AggregationKey != nil) {
 		bad("聚合鍵只能在宣告可聚合的型別，而且可聚合的型別一定要有聚合鍵（Aggregatable=%v、AggregationKey 有值=%v）", d.Aggregatable, d.AggregationKey != nil)
 	} else if d.AggregationKey != nil && d.AggregationKey(d.Example) == "" {
 		bad("範例參數的聚合鍵是空的")
 	}
-	if d.Text == nil {
-		bad("沒有文案")
-	} else {
+	switch {
+	case (d.Text == nil) == (d.TextLoaded == nil):
+		bad("Text 與 TextLoaded 要有且只有一個")
+	case (d.Load != nil) != (d.TextLoaded != nil):
+		bad("Load 與 TextLoaded 要成對")
+	default:
 		for _, l := range []uitext.Locale{uitext.ZhTW, uitext.EN} {
-			c, err := d.Text(l, d.Example)
+			want := l
+			if d.FixedLocale != "" {
+				want = d.FixedLocale
+			}
+			c, err := e.text(l, d.Example, d.ExampleLoaded)
 			if err != nil || c.Title.Text == "" || c.Body.Text == "" {
 				bad("語系 %s 的範例組不出標題與內文（%v）", l, err)
 				continue
 			}
 			if got, err := c.locale(); err != nil {
 				bad("語系 %s 的範例：%v", l, err)
-			} else if got != l {
-				bad("語系 %s 的範例實際用了 %s；en 沒有文字不能退回中文", l, got)
+			} else if got != want {
+				bad("語系 %s 的範例實際用了 %s，預期 %s；en 沒有文字不能退回中文", l, got, want)
 			}
 		}
 	}
@@ -358,7 +471,7 @@ func (e *entry[P]) validate() []error {
 // Validate 檢查一個型別定義，回傳全部違規。
 func Validate(e Entry) []error { return e.validate() }
 
-var all = []Entry{accountSuspended, accountUnsuspended}
+var all = []Entry{accountSuspended, accountUnsuspended, announcement}
 
 // All 回傳全部型別，順序固定。
 func All() []Entry { return slices.Clone(all) }

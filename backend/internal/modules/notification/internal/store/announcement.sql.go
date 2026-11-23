@@ -110,7 +110,7 @@ func (q *Queries) InsertAnnouncement(ctx context.Context, arg InsertAnnouncement
 
 const insertAnnouncementInbox = `-- name: InsertAnnouncementInbox :execrows
 INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, actor_account_ids, occurred_at, created_at, updated_at, announcement_id)
-VALUES ($1, $2, $3, $4, 'announcement', '{}', '{}', $5, $6, $6, $7::uuid)
+VALUES ($1, $2, $3, $4, 'announcement', jsonb_build_object('announcement_id', $5::uuid), '{}', $6, $7, $7, $5::uuid)
 ON CONFLICT (announcement_id, account_id, audience, store_id) WHERE announcement_id IS NOT NULL DO NOTHING
 `
 
@@ -119,21 +119,21 @@ type InsertAnnouncementInboxParams struct {
 	AccountID      int64
 	Audience       string
 	StoreID        *int64
+	AnnouncementID uuid.UUID
 	OccurredAt     time.Time
 	Now            time.Time
-	AnnouncementID uuid.UUID
 }
 
-// 把公告寫進一個收件人的收件匣；同一個 (公告, 收件人) 已有列時什麼都不寫（回 0 列，job 重試安全）。文案取自公告列，所以參數是空的。
+// 把公告寫進一個收件人的收件匣；同一個 (公告, 收件人) 已有列時什麼都不寫（回 0 列，job 重試安全）。參數只有公告 ID，文案讀取時由公告型別解析。
 func (q *Queries) InsertAnnouncementInbox(ctx context.Context, arg InsertAnnouncementInboxParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertAnnouncementInbox,
 		arg.ID,
 		arg.AccountID,
 		arg.Audience,
 		arg.StoreID,
+		arg.AnnouncementID,
 		arg.OccurredAt,
 		arg.Now,
-		arg.AnnouncementID,
 	)
 	if err != nil {
 		return 0, err

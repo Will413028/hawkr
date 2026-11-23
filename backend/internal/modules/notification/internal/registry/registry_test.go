@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +17,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// pipelineTypes 是走意圖管線的型別（排除 Fanout 型別：它們沒有冪等鍵與收件人）。
+func pipelineTypes() []Entry {
+	return slices.DeleteFunc(All(), func(e Entry) bool { return e.Spec().Fanout })
+}
+
 func zhOnly() Content {
 	return Content{Title: uitext.Message{Text: "t", Locale: uitext.ZhTW}, Body: uitext.Message{Text: "b", Locale: uitext.ZhTW}}
 }
@@ -29,8 +35,8 @@ func TestRegistryHoldsTheTypesOfThisStep(t *testing.T) {
 	for _, e := range All() {
 		names = append(names, e.Spec().Name)
 	}
-	if !slices.Equal(names, []string{"account_suspended", "account_unsuspended"}) {
-		t.Fatalf("A8-1a 只有兩個型別，現在 %v", names)
+	if !slices.Equal(names, []string{"account_suspended", "account_unsuspended", "announcement"}) {
+		t.Fatalf("型別清單 %v", names)
 	}
 }
 
@@ -47,7 +53,7 @@ func TestEveryRegisteredTypePassesTheSelfCheck(t *testing.T) {
 			t.Error(err)
 		}
 		s := e.Spec()
-		if s.IdempotencySource == "" {
+		if s.IdempotencySource == "" && !s.Fanout {
 			t.Errorf("%s 沒有冪等鍵來源", name)
 		}
 		if !model.ValidCategory(s.Category) || !slices.Contains(model.Presentations(), s.Presentation) {
@@ -67,7 +73,7 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 	}
 	good := func() Definition[params] {
 		return Definition[params]{
-			Name: "broken", Audience: model.AudienceBuyer, Category: model.CategoryChat, Presentation: model.PresentationMessage,
+			Name: "broken", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryChat, Presentation: model.PresentationMessage,
 			Channels:          []model.Channel{model.ChannelInbox},
 			IdempotencySource: "test.Event.ID",
 			IdempotencyKey:    func(p params) string { return "x" },
@@ -86,7 +92,7 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 		"分類不在 D4":          func(d *Definition[params]) { d.Category = "SMS_ALERTS" },
 		"呈現分類不在 D6":        func(d *Definition[params]) { d.Presentation = "ANNOUNCEMENT" },
 		"提示不在 D6":          func(d *Definition[params]) { d.StateHint = "PAYMENT" },
-		"受眾不存在":            func(d *Definition[params]) { d.Audience = "SELLER" },
+		"受眾不存在":            func(d *Definition[params]) { d.Audiences = []model.Audience{"SELLER"} },
 		"沒有渠道":             func(d *Definition[params]) { d.Channels = nil },
 		"渠道不存在":            func(d *Definition[params]) { d.Channels = []model.Channel{"SMS"} },
 		"聚合鍵出現在未宣告可聚合":     func(d *Definition[params]) { d.AggregationKey = func(params) string { return "k" } },
@@ -98,9 +104,27 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 		"BUYER 帶 StoreID": func(d *Definition[params]) {
 			d.Recipient = func(params) Recipient { return Recipient{AccountID: 1, StoreID: 9} }
 		},
-		"STORE 沒有 StoreID": func(d *Definition[params]) { d.Audience = model.AudienceStore; d.Category = model.CategoryOrder },
-		"沒有文案":             func(d *Definition[params]) { d.Text = nil },
-		"分類不屬於受眾":          func(d *Definition[params]) { d.Category = model.CategoryShipmentAnomaly },
+		"STORE 沒有 StoreID": func(d *Definition[params]) {
+			d.Audiences = []model.Audience{model.AudienceStore}
+			d.Category = model.CategoryOrder
+		},
+		"沒有文案": func(d *Definition[params]) { d.Text = nil },
+		"Text 與 TextLoaded 並存": func(d *Definition[params]) {
+			d.TextLoaded = func(l uitext.Locale, _ params, _ Loaded) (Content, error) { return Content{}, nil }
+		},
+		"Load 沒有 TextLoaded": func(d *Definition[params]) {
+			d.Load = func(context.Context, Sources, params) (Loaded, error) { return Loaded{}, nil }
+		},
+		"走意圖管線卻有多個受眾": func(d *Definition[params]) {
+			d.Audiences = []model.Audience{model.AudienceBuyer, model.AudienceStore}
+		},
+		"受眾重複": func(d *Definition[params]) {
+			d.Fanout = true
+			d.Audiences = []model.Audience{model.AudienceBuyer, model.AudienceBuyer}
+		},
+		"fan-out 型別帶收件人": func(d *Definition[params]) { d.Fanout = true },
+		"固定語系與文字不符":      func(d *Definition[params]) { d.FixedLocale = uitext.EN },
+		"分類不屬於受眾":        func(d *Definition[params]) { d.Category = model.CategoryShipmentAnomaly },
 		"en 退回中文": func(d *Definition[params]) {
 			d.Text = func(_ uitext.Locale, _ params) (Content, error) { return zhOnly(), nil }
 		},
@@ -256,7 +280,7 @@ func TestLongKeysAreHashedToFit(t *testing.T) {
 	e := Define(Definition[params]{
 		IdempotencySource: "x", IdempotencyKey: func(p params) string { return p.K }, Name: "t",
 		Aggregatable: true, AggregationKey: func(p params) string { return p.K },
-		Recipient: func(params) Recipient { return Recipient{AccountID: 1} }, Audience: model.AudienceBuyer,
+		Recipient: func(params) Recipient { return Recipient{AccountID: 1} }, Audiences: []model.Audience{model.AudienceBuyer},
 	})
 	raw := func(k string) json.RawMessage { return json.RawMessage(`{"K":"` + k + `"}`) }
 	exact := strings.Repeat("a", MaxIdempotencyKeyLen-len("t:"))
@@ -280,7 +304,7 @@ func TestLongKeysAreHashedToFit(t *testing.T) {
 	if err != nil || r.AggregationKey != want {
 		t.Errorf("250 字元的聚合鍵 = %q、%v，應該是 %q", r.AggregationKey, err, want)
 	}
-	for _, e := range All() {
+	for _, e := range pipelineTypes() {
 		raw, _, _ := e.ExampleParams()
 		if k, err := e.IdempotencyKey(raw); err != nil || len(k) > MaxIdempotencyKeyLen {
 			t.Errorf("%s 的範例冪等鍵長度 %d（%v）", e.Spec().Name, len(k), err)
@@ -293,7 +317,7 @@ func TestAggregationKeysAreNamespacedByType(t *testing.T) {
 	type params struct{ K string }
 	def := func(name string) Entry {
 		return Define(Definition[params]{
-			Name: name, Audience: model.AudienceBuyer, Aggregatable: true,
+			Name: name, Audiences: []model.Audience{model.AudienceBuyer}, Aggregatable: true,
 			AggregationKey: func(p params) string { return p.K },
 			Recipient:      func(params) Recipient { return Recipient{AccountID: 1} },
 			Text: func(l uitext.Locale, _ params) (Content, error) {
@@ -321,7 +345,7 @@ func TestAggregationKeysAreNamespacedByType(t *testing.T) {
 // 冪等鍵是型別名稱加事件來源身分；同一個事件來源身分在不同型別下不撞。
 func TestIdempotencyKeysAreNamespacedByType(t *testing.T) {
 	keys := map[string]string{}
-	for _, e := range All() {
+	for _, e := range pipelineTypes() {
 		raw, _, err := e.ExampleParams()
 		if err != nil {
 			t.Fatal(err)

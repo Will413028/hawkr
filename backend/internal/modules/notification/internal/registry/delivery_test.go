@@ -13,7 +13,7 @@ type deliveryParams struct{ ID int64 }
 
 func deliveryType(name string, a model.Audience, c model.PrefCategory, channels ...model.Channel) Entry {
 	return Define(Definition[deliveryParams]{
-		Name: name, Audience: a, Category: c, Presentation: model.PresentationMessage, Channels: channels,
+		Name: name, Audiences: []model.Audience{a}, Category: c, Presentation: model.PresentationMessage, Channels: channels,
 		IdempotencySource: "test.Event.ID",
 		IdempotencyKey:    func(p deliveryParams) string { return "x" },
 		OccurredAt:        func(deliveryParams) time.Time { return time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC) },
@@ -30,6 +30,7 @@ func TestDeliveredFollowsTheRegisteredTypes(t *testing.T) {
 	entries := []Entry{
 		deliveryType("chat_message", model.AudienceBuyer, model.CategoryChat, model.ChannelInbox, model.ChannelPush),
 		deliveryType("account_note", model.AudienceBuyer, model.CategoryAccount, model.ChannelInbox, model.ChannelEmail),
+		announcement,
 	}
 	for _, c := range []struct {
 		a    model.Audience
@@ -46,7 +47,7 @@ func TestDeliveredFollowsTheRegisteredTypes(t *testing.T) {
 		{model.AudienceBuyer, model.CategoryAccount, model.ChannelPush, false},
 		// 受眾沒有的分類，型別再怎麼宣告也不送達。
 		{model.AudienceBuyer, model.CategoryPayout, model.ChannelInbox, false},
-		// 公告是資料不是型別：兩個受眾都是收件匣與推播，沒有 email。
+		// 公告是註冊的 fan-out 型別（兩個受眾、收件匣與推播）：由它推導，沒有 email。
 		{model.AudienceBuyer, model.CategoryAnnouncement, model.ChannelInbox, true},
 		{model.AudienceStore, model.CategoryAnnouncement, model.ChannelPush, true},
 		{model.AudienceBuyer, model.CategoryAnnouncement, model.ChannelEmail, false},

@@ -1,9 +1,11 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
 	"regexp"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -134,9 +136,51 @@ func TestEveryRenderableValueHasEnglishText(t *testing.T) {
 	}
 	for _, e := range All() {
 		raw, _, _ := e.ExampleParams()
-		got, err := e.Render(uitext.EN, raw)
+		got, err := e.RenderLoaded(uitext.EN, raw, e.ExampleLoaded())
 		if err != nil || got.Locale != uitext.EN || han.MatchString(got.Title+got.Body) {
 			t.Errorf("%s 的 en 範例：%+v（%v）", e.Spec().Name, got, err)
 		}
+	}
+}
+
+// 公告：參數只有公告 ID，標題與內文來自 Load 解析出來的公告；任何請求語系都是同一份英文，Locale 是 EN。
+func TestGoldenAnnouncementRendering(t *testing.T) {
+	e, ok := Lookup("announcement")
+	if !ok {
+		t.Fatal("沒有型別 announcement")
+	}
+	raw := []byte(`{"announcement_id":"0190a000-0000-7000-8000-0000000000a1"}`)
+	loaded := Loaded{Announcement: &AnnouncementText{Title: "Scheduled maintenance", Body: "Down on Sunday."}}
+	for _, l := range []uitext.Locale{uitext.ZhTW, uitext.EN, uitext.Locale("ja")} {
+		got, err := e.RenderLoaded(l, raw, loaded)
+		if err != nil {
+			t.Fatalf("%s：%v", l, err)
+		}
+		if got.Title != "Scheduled maintenance" || got.Body != "Down on Sunday." || got.Locale != uitext.EN ||
+			got.Presentation != model.PresentationSystem || got.DeepLink != "" || got.AggregationKey != "" || len(got.ActorAccounts) != 0 {
+			t.Errorf("%s 的輸出 %+v", l, got)
+		}
+	}
+	if _, err := e.Render(uitext.EN, raw); err == nil {
+		t.Error("沒有 Load 的結果就組字應該失敗，不該組出空文字")
+	}
+}
+
+type announcementSource struct{ text AnnouncementText }
+
+func (s announcementSource) Announcement(context.Context, uuid.UUID) (AnnouncementText, error) {
+	return s.text, nil
+}
+
+// Load 以參數裡的公告 ID 向 Sources 取文字；沒有 Load 的型別回零值。
+func TestLoadResolvesTheAnnouncementFromItsID(t *testing.T) {
+	e, _ := Lookup("announcement")
+	ld, err := e.Load(context.Background(), announcementSource{AnnouncementText{Title: "t", Body: "b"}}, []byte(`{"announcement_id":"0190a000-0000-7000-8000-0000000000a1"}`))
+	if err != nil || ld.Announcement == nil || ld.Announcement.Title != "t" {
+		t.Fatalf("Load = %+v（%v）", ld, err)
+	}
+	plain, _ := Lookup("account_unsuspended")
+	if ld, err := plain.Load(context.Background(), nil, []byte(`{}`)); err != nil || ld != (Loaded{}) {
+		t.Errorf("沒有 Load 的型別應回零值：%+v（%v）", ld, err)
 	}
 }
