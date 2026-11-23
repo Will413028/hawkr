@@ -249,3 +249,22 @@
 
 - 盤點的缺陷清單（5.1–5.20）裡，沒有 Java 單元測試覆蓋的 SQL 語意（`selectOrphanedAssets`、`claimAssetForGc`、`deleteOrphanedReferences`、`ON CONFLICT`）：Go 版用真 Postgres 的 integration 測試驗，在 CI 跑，結果出來前標「待 CI」（計畫 B1-2 驗收）。
 - 建立上傳會話與完成（公開）兩個端點不在本表：它們有真實的特性測試，情境在 `backend/internal/httpapi/media/characterization/scenarios_test.go`，由 `.github/workflows/backend-characterization.yml` 對 Java 跑。
+
+## 六、B1-3d：Connect driver 對 B1-1 情境的對照
+
+Connect driver（`backend/internal/httpapi/media/characterization/connect_test.go`）對單體的 `MediaAppService` 與機敏段端點跑 B1-1 同一份 `scenarios`（`TestMonolith`），只有單體測得到的機敏分段上傳另跑 `monolithScenarios`（`TestMonolithSecure`）。兩者都是 `integration` tag，由 `backend-monolith` 的 integration 步驟在 CI 跑（單體的 media 要真的 Postgres；`backend-characterization` 的單體在 B1-5 之前還接 Java 的假服務，Go media 未接線）。結果出來前標「待 CI」。
+
+與 Java 刻意不同的情境（`scenarios_test.go` 的 `d.Variant() == Monolith` 分支寫了決策代號與新行為，沒有刪情境）：
+
+| 情境 | 單體的新行為 | 依據 |
+|---|---|---|
+| create public session returns presigned url and 30 minute ttl | session ID 是不透明 staged token；到期時間是 `media.UploadTTL`（1 小時），不是 1800 秒 | B1-D2；B1-D1，CARRYOVER 沿用盤點「暫存 TTL」列 |
+| create secure session has no upload url and allows pdf | 機敏會話是 `BeginSecureUpload`，不收宣告的型別，PDF 在第 0 段依 magic bytes 辨認 | B1-D17；單體情境 `real pdf bytes are accepted`、`declared pdf that is arbitrary bytes is rejected` |
+| complete returns staged token and preview url | 完成後 token 不變（不再簽 JWT）、沒有 previewUrl，`GetUpload` 的狀態是 UPLOADED | B1-D2；B1-D1 |
+| complete twice fails | 重送完成一律成功（冪等，不重複排 job） | B1-D1 補充、proto `CompleteUpload` 註解 |
+| complete rejects secure session | 現況：機敏 token 的 `CompleteUpload` 成功但無作用（只有 PENDING 會轉 UPLOADED）；計畫沒有決定要不要拒絕，情境照現況寫 | B1-D17；`upload.Service.Complete`、`MarkUploadUploaded` |
+| complete rejects malformed session id | 形狀不對的 token 回 not_found（與不存在不可區分），不再是 invalid | B1-D2 |
+
+單體專屬情境對應 U 規則：`declared pdf that is arbitrary bytes is rejected`（B1-3 驗收，補強 U4／U7）、`real pdf bytes are accepted`（B1-D17）、`oversize secure upload is rejected`（U7，缺陷 5.8）、`chunk over segment size is rejected`（U7）、`chunk length that differs from the declared size is rejected`（U7）、`chunk of another accounts session is not found`（U3）、`chunk index gap is a conflict`（B1-D17）。
+
+只有代行（delegated）或後台上傳才有的 B1-1 情境：沒有。B1-1 的 11 個情境都以買家身分呼叫；代行營運上傳的情境隨 B1-3c3 補進同一份清單。

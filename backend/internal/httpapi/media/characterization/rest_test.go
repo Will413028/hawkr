@@ -16,6 +16,8 @@ type restDriver struct {
 
 var _ Driver = (*restDriver)(nil)
 
+func (d *restDriver) Variant() Variant { return Legacy }
+
 const mediaBase = "/api/v1/app/media/upload_sessions"
 
 func (d *restDriver) CreateUploadSession(ctx context.Context, c ch.Caller, in UploadInput) (UploadSession, error) {
