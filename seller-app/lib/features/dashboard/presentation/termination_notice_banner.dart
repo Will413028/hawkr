@@ -12,6 +12,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../seller/data/measure_display.dart';
 import '../../seller/data/measures.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 首頁的終止合作預告提示卡：帳號每一筆預定生效（`SCHEDULED`）的終止合作各一張，顯示生效時間與申覆的提醒，點擊到措施與申覆。
 ///
@@ -27,7 +28,7 @@ class TerminationNoticeBanner extends ConsumerWidget {
         ?.value;
     final notices = measures == null
         ? const <({String measureId, String text})>[]
-        : terminationNotices(measures, context.uiLocale);
+        : terminationNotices(measures, context.uiLocale, context.taipeiDisplay);
     if (notices.isEmpty) return const SizedBox.shrink();
 
     return Column(

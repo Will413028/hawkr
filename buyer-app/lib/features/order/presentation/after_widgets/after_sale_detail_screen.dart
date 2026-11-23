@@ -27,6 +27,8 @@ import '../../data/after_sale_repository.dart';
 import '../../data/order_model.dart';
 import '../../data/order_repository.dart';
 import '../widgets/return_logistics_timeline.dart';
+import '../../../../shared/time/taipei_display.dart';
+
 import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
 
 /// 售後服務詳情頁 — 使用 OpenAPI 定義的 /app/after_sales/{case_no}
@@ -168,7 +170,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildProgressSection(c),
+            _buildProgressSection(context, c),
             if (showBlackcatReturn) ...[
               SizedBox(height: AppSpacing.sm),
               BlackcatReturnLogisticsCard(
@@ -202,7 +204,9 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
             ],
             if (c.resolutions.isNotEmpty) ...[
               SizedBox(height: AppSpacing.sm),
-              _buildSectionCard(_buildResolutionSection(c.resolutions)),
+              _buildSectionCard(
+                _buildResolutionSection(context, c.resolutions),
+              ),
             ],
             if (canShowLogistics && !showBlackcatReturn) ...[
               SizedBox(height: AppSpacing.sm),
@@ -219,7 +223,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildProgressSection(AfterSaleCase c) {
+  Widget _buildProgressSection(BuildContext context, AfterSaleCase c) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -271,7 +275,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
                 ),
                 SizedBox(height: 6.h),
                 Text(
-                  _statusMessage(c),
+                  _statusMessage(c, context.taipeiDisplay),
                   style: AppTypography.meta.copyWith(
                     color: AppTypography.colorPrimary.withValues(alpha: 0.82),
                   ),
@@ -289,9 +293,17 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
         _infoRow(AppIcons.confirmationNumberOutlined, '案件', c.caseNo),
       if (c.orderNo.isNotEmpty) _infoRow(AppIcons.receiptLong, '訂單', c.orderNo),
       if (c.createdAt.isNotEmpty)
-        _infoRow(AppIcons.accessTime, '申請時間', _formatTime(c.createdAt)),
+        _infoRow(
+          AppIcons.accessTime,
+          '申請時間',
+          _formatTime(c.createdAt, context.taipeiDisplay),
+        ),
       if (c.closedAt.isNotEmpty)
-        _infoRow(AppIcons.taskAltOutlined, '結案時間', _formatTime(c.closedAt)),
+        _infoRow(
+          AppIcons.taskAltOutlined,
+          '結案時間',
+          _formatTime(c.closedAt, context.taipeiDisplay),
+        ),
       if (c.refundableAmount.isNotEmpty && c.refundableAmount != '0')
         _infoRow(
           AppIcons.paymentsOutlined,
@@ -321,7 +333,11 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
           const {'25', '30', '40', '50'}.contains(c.status))
         _infoRow(AppIcons.localOfferOutlined, '退貨物流單號', c.shipTradeNo),
       if (c.canAppeal && c.appealDeadline.isNotEmpty)
-        _infoRow(AppIcons.gavelOutlined, '申訴期限', _formatTime(c.appealDeadline)),
+        _infoRow(
+          AppIcons.gavelOutlined,
+          '申訴期限',
+          _formatTime(c.appealDeadline, context.taipeiDisplay),
+        ),
       // PR #983 待寄回 7 天倒數：賣家已同意（status=20）且後端回填 deadline 才顯示
       if (c.status == AfterSaleStatus.awaitingReturn &&
           c.shipBackDeadlineAt.isNotEmpty)
@@ -391,7 +407,10 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildResolutionSection(List<AfterSaleResolution> resolutions) {
+  Widget _buildResolutionSection(
+    BuildContext context,
+    List<AfterSaleResolution> resolutions,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -399,7 +418,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
         SizedBox(height: AppSpacing.md),
         for (var i = 0; i < resolutions.length; i++) ...[
           if (i > 0) SizedBox(height: AppSpacing.sm),
-          _resolutionCard(resolutions[i]),
+          _resolutionCard(resolutions[i], context.taipeiDisplay),
         ],
       ],
     );
@@ -561,7 +580,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
               Padding(
                 padding: EdgeInsets.only(bottom: AppSpacing.xs),
                 child: Text(
-                  '申訴期限至 ${_formatTime(c.appealDeadline)}',
+                  '申訴期限至 ${_formatTime(c.appealDeadline, context.taipeiDisplay)}',
                   textAlign: TextAlign.center,
                   style: AppTypography.meta.copyWith(color: AppColors.gray600),
                 ),
@@ -683,19 +702,19 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
   bool _showShipBackUrgentBanner(AfterSaleCase c) {
     if (c.status != AfterSaleStatus.awaitingReturn) return false;
     if (c.shipBackDeadlineAt.isEmpty) return false;
-    final dt = DateTime.tryParse(c.shipBackDeadlineAt);
+    final dt = tryParseTaipeiInstant(c.shipBackDeadlineAt);
     if (dt == null) return false;
-    final remaining = dt.toLocal().difference(DateTime.now());
+    final remaining = dt.difference(DateTime.now());
     if (remaining.isNegative) return false;
     return remaining < const Duration(hours: 24);
   }
 
   /// PR #983 D-1 警示 banner — 複用既有 `_buildRefundFormBanner` 樣板配色。
   Widget _buildShipBackUrgentBanner(AfterSaleCase c) {
-    final dt = DateTime.tryParse(c.shipBackDeadlineAt);
+    final dt = tryParseTaipeiInstant(c.shipBackDeadlineAt);
     final remaining = dt == null
         ? Duration.zero
-        : dt.toLocal().difference(DateTime.now());
+        : dt.difference(DateTime.now());
     final hoursLeft = remaining.inHours.clamp(0, 23);
 
     return Container(
@@ -888,7 +907,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _resolutionCard(AfterSaleResolution r) {
+  Widget _resolutionCard(AfterSaleResolution r, TaipeiDisplay t) {
     final label =
         AfterSaleResolutionType.fromValue(r.resolutionType)?.label ??
         r.resolutionType;
@@ -910,7 +929,8 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
         _miniLine('協商原因', r.negotiationReason),
       if (r.deductionReason.isNotEmpty) _miniLine('扣款原因', r.deductionReason),
       if (r.inspectionNote.isNotEmpty) _miniLine('驗貨備註', r.inspectionNote),
-      if (r.createdAt.isNotEmpty) _miniLine('處理時間', _formatTime(r.createdAt)),
+      if (r.createdAt.isNotEmpty)
+        _miniLine('處理時間', _formatTime(r.createdAt, t)),
     ];
 
     return Container(
@@ -1064,7 +1084,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
         c.status == AfterSaleStatus.closed;
   }
 
-  String _statusMessage(AfterSaleCase c) {
+  String _statusMessage(AfterSaleCase c, TaipeiDisplay t) {
     if (c.refundTaskStatus.isNotEmpty) {
       final label = RefundTaskStatus.buyerProgressLabel(
         taskStatus: c.refundTaskStatus,
@@ -1078,7 +1098,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     if (c.providerMessage.isNotEmpty) return c.providerMessage;
 
     if (c.status == AfterSaleStatus.pending && c.processDeadline.isNotEmpty) {
-      return '等待賣家回覆中，處理期限 ${_formatTime(c.processDeadline)}';
+      return '等待賣家回覆中，處理期限 ${_formatTime(c.processDeadline, t)}';
     }
 
     return switch (c.status) {
@@ -1152,13 +1172,15 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     _ => AppColors.gray500,
   };
 
-  String _formatTime(String raw) {
+  String _formatTime(String raw, TaipeiDisplay t) {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final local = dt.taipeiWall;
-    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+    );
   }
 }
 

@@ -10,6 +10,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/hk_icon.dart';
 import '../../data/after_sale_model.dart';
 import 'after_sale_vertical_timeline.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 黑貓退貨退款狀態摘要卡。
 ///
@@ -26,7 +27,7 @@ class BlackcatAfterSaleStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final time = _statusTime(caseData);
+    final time = _statusTime(caseData, context.taipeiDisplay);
     final message = _statusMessage(caseData);
 
     return Container(
@@ -76,10 +77,10 @@ class BlackcatAfterSaleStatusCard extends StatelessWidget {
     );
   }
 
-  static String _statusTime(AfterSaleCase c) {
+  static String _statusTime(AfterSaleCase c, TaipeiDisplay t) {
     final decisionTime = _decisionTime(c);
-    if (decisionTime.isNotEmpty) return _formatDateTime(decisionTime);
-    if (c.createdAt.isNotEmpty) return _formatDateTime(c.createdAt);
+    if (decisionTime.isNotEmpty) return _formatDateTime(decisionTime, t);
+    if (c.createdAt.isNotEmpty) return _formatDateTime(c.createdAt, t);
     return '';
   }
 
@@ -108,12 +109,14 @@ class BlackcatAfterSaleStatusCard extends StatelessWidget {
     };
   }
 
-  static String _formatDateTime(String raw) {
+  static String _formatDateTime(String raw, TaipeiDisplay t) {
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final local = dt.taipeiWall;
-    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+    );
   }
 }
 
@@ -304,7 +307,7 @@ class _PickupTimeline extends StatelessWidget {
     final status = int.tryParse(caseData.status) ?? 0;
     final decisionTime = BlackcatAfterSaleStatusCard._decisionTime(caseData);
     final firstTime = decisionTime.isNotEmpty
-        ? _formatShortDateTime(decisionTime)
+        ? _formatShortDateTime(decisionTime, context.taipeiDisplay)
         : '';
 
     final steps = [
@@ -331,12 +334,14 @@ class _PickupTimeline extends StatelessWidget {
     );
   }
 
-  String _formatShortDateTime(String raw) {
+  String _formatShortDateTime(String raw, TaipeiDisplay t) {
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final local = dt.taipeiWall;
-    return '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+    );
   }
 }
 

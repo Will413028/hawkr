@@ -4,6 +4,7 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_seller/features/seller/data/inquiry_display.dart';
 
 import '../../../support/inquiry_fixtures.dart';
+import '../../../support/taipei_display.dart';
 
 void main() {
   final due = DateTime.utc(2026, 11, 27, 2);
@@ -49,9 +50,15 @@ void main() {
   });
 
   test('期限文字是臺北時間；已回覆沒有期限', () {
-    expect(inquiryDeadlineText(inquiryOf(due: due)), '回覆期限：2026/11/27 10:00');
     expect(
-      inquiryDeadlineText(inquiryOf(state: InquiryState.INQUIRY_STATE_REPLIED)),
+      inquiryDeadlineText(inquiryOf(due: due), taipeiDeviceDisplay),
+      '回覆期限：2026/11/27 10:00',
+    );
+    expect(
+      inquiryDeadlineText(
+        inquiryOf(state: InquiryState.INQUIRY_STATE_REPLIED),
+        taipeiDeviceDisplay,
+      ),
       isNull,
     );
   });
@@ -65,7 +72,7 @@ void main() {
         attachmentCount: 2,
       ),
     );
-    expect(inquiryReplyMeta(inquiry, UiLocale.zhTW), '電話');
+    expect(inquiryReplyMeta(inquiry, UiLocale.zhTW, taipeiDeviceDisplay), '電話');
     expect(inquiryAttachmentText(inquiry), '附件 2 份');
     expect(inquiryAttachmentText(inquiryOf()), isNull);
   });

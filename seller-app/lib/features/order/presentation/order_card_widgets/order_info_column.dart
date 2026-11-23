@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/hk_icon.dart';
 import '../../data/order_model.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 卡片右側資訊欄（買家名稱、時間、地址、配送方式）。
 /// 單號與按鈕群已搬至 [OrderBottomRow]。
@@ -18,15 +19,18 @@ class OrderInfoColumn extends ConsumerWidget {
 
   final OrderSummary order;
 
-  String _formatDate(String raw) => formatOrderInfoDate(raw);
+  String _formatDate(String raw, TaipeiDisplay t) {
+    final formatted = tryFormatOrderInfoDate(raw);
+    return formatted == null ? raw : t.labeled(formatted);
+  }
 
-  String _formatShortDate(String raw) {
-    if (raw.isEmpty) return '';
-    final formatted = _formatDate(raw);
+  String _formatShortDate(String raw, TaipeiDisplay t) {
+    final formatted = tryFormatOrderInfoDate(raw);
+    if (formatted == null) return raw;
     final match = RegExp(
       r'^\d{4}/(\d{2}/\d{2} \d{2}:\d{2})$',
     ).firstMatch(formatted);
-    return match?.group(1) ?? formatted;
+    return t.labeled(match?.group(1) ?? formatted);
   }
 
   @override
@@ -34,7 +38,7 @@ class OrderInfoColumn extends ConsumerWidget {
     final displayAddress = order.shippingAddress.isNotEmpty
         ? order.shippingAddress
         : order.address;
-    final displayTime = _formatDate(order.dateTime);
+    final displayTime = _formatDate(order.dateTime, context.taipeiDisplay);
     final shipping = shippingPresentationOf(order.shippingMethod);
     final shippingLabel =
         shipping == ShippingPresentation.cvsStorePickup &&
@@ -46,7 +50,10 @@ class OrderInfoColumn extends ConsumerWidget {
         : order.buyerName.isNotEmpty
         ? order.buyerName
         : '買家';
-    final deadlineText = _formatShortDate(order.autoCancelAt);
+    final deadlineText = _formatShortDate(
+      order.autoCancelAt,
+      context.taipeiDisplay,
+    );
     final isShipmentDeadline = order.statusCode == 10 || order.statusCode == 20;
 
     final nameStyle = AppTypography.body.copyWith(height: 24 / 14);
@@ -201,8 +208,11 @@ class OrderInfoColumn extends ConsumerWidget {
 
 /// 訂單時間字串（ISO、10 位秒數或 13 位毫秒數）轉臺北時間 `yyyy/MM/dd HH:mm`。
 @visibleForTesting
-String formatOrderInfoDate(String raw) {
-  if (raw.isEmpty) return '';
+String formatOrderInfoDate(String raw) => tryFormatOrderInfoDate(raw) ?? raw;
+
+/// 解析失敗回 null；空字串回 null（沒有日期可顯示）。
+String? tryFormatOrderInfoDate(String raw) {
+  if (raw.isEmpty) return null;
   DateTime? dt = DateTime.tryParse(raw);
   if (dt == null) {
     final m = RegExp(r'\d{10,13}').firstMatch(raw);
@@ -215,7 +225,7 @@ String formatOrderInfoDate(String raw) {
       }
     }
   }
-  if (dt == null) return raw;
+  if (dt == null) return null;
   final local = dt.taipeiWall;
   String pad(int v) => v.toString().padLeft(2, '0');
   return '${local.year}/${pad(local.month)}/${pad(local.day)} ${pad(local.hour)}:${pad(local.minute)}';

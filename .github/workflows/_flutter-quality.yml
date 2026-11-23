@@ -125,6 +125,12 @@ jobs:
           fi
           flutter pub get
           dart run tool/check_hardcoded_han.dart --baseline "../../${APP}/tool/han_baseline.json" --check-baseline-against "$old_file"
+      - name: Guard Taipei time display (no toLocal, formatTaipei* only in the helper)
+        id: taipei_display
+        continue-on-error: true
+        env:
+          APP: ${{ inputs.app }}
+        run: python3 ../scripts/check-taipei-display.py "../${APP}/lib"
       - name: Verify gen-l10n output is committed
         id: gen_l10n
         continue-on-error: true
@@ -153,6 +159,7 @@ jobs:
           steps.enum_text.outcome == 'failure' ||
           steps.han_ratchet.outcome == 'failure' ||
           steps.han_baseline.outcome == 'failure' ||
+          steps.taipei_display.outcome == 'failure' ||
           steps.gen_l10n.outcome == 'failure'
         env:
           FORMAT: ${{ steps.format.outcome }}
@@ -162,6 +169,7 @@ jobs:
           ENUM_TEXT: ${{ steps.enum_text.outcome }}
           HAN_RATCHET: ${{ steps.han_ratchet.outcome }}
           HAN_BASELINE: ${{ steps.han_baseline.outcome }}
+          TAIPEI_DISPLAY: ${{ steps.taipei_display.outcome }}
           GEN_L10N: ${{ steps.gen_l10n.outcome }}
         run: |
           echo "One or more static checks failed:"
@@ -172,6 +180,7 @@ jobs:
           echo "  enum_text:   $ENUM_TEXT"
           echo "  han_ratchet: $HAN_RATCHET"
           echo "  han_baseline: $HAN_BASELINE"
+          echo "  taipei_display: $TAIPEI_DISPLAY"
           echo "  gen_l10n:    $GEN_L10N"
           exit 1
 

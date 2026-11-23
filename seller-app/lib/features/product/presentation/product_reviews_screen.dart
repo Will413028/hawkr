@@ -1,3 +1,5 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
 import 'package:hawkr_seller/l10n/l10n.dart';
 import 'dart:async' as async;
 
@@ -145,10 +147,12 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
 
   List<ReviewItem> get _filteredReviews => _reviews;
 
-  static String _formatDate(DateTime? date) {
+  static String _formatDate(DateTime? date, TaipeiDisplay t) {
     if (date == null) return '';
-    final d = date.toLocal();
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final d = date.taipeiWall;
+    return t.labeled(
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+    );
   }
 
   @override
@@ -474,7 +478,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
         : '匿名會員';
     final avatar = review.authorAvatarUrl;
     final content = review.content;
-    final date = _formatDate(review.createTime);
+    final date = _formatDate(review.createTime, context.taipeiDisplay);
     final rating = review.rating.clamp(0, 5);
     final images = review.imageUrls;
     final reviewKey = review.id;

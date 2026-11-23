@@ -12,6 +12,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _Repo extends Mock implements PostRepository {}
 
@@ -54,6 +55,9 @@ void main() {
               enableScaleWH: () => false,
               enableScaleText: () => false,
               builder: (_, _) => MaterialApp(
+                locale: const Locale('zh'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
                 theme: AppTheme.light,
                 home: const PageHomeFeedScreen(
                   initialIndex: 0,
@@ -133,6 +137,9 @@ void main() {
           enableScaleWH: () => false,
           enableScaleText: () => false,
           builder: (_, _) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             theme: AppTheme.light,
             home: const PageHomeFeedScreen(initialIndex: 0, sellerName: '測試商家'),
           ),

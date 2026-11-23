@@ -6,6 +6,10 @@ library;
 
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart';
 
+/// 顯示層的 helper 以 [Timestamp] 當參數型別，從這裡取，各 App 不必直接依賴 protobuf。
+export 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
+    show Timestamp;
+
 const Duration _taipeiUtcOffset = Duration(hours: 8);
 
 String _pad(int n) => n.toString().padLeft(2, '0');
@@ -165,6 +169,27 @@ DateTime? tryParseTaipeiInstant(String raw) {
 /// [offset] 是否為臺北的 +8 時。
 bool isTaipeiOffset(Duration offset) => offset == _taipeiUtcOffset;
 
-/// 裝置目前的時區偏移不是 +8 時；此時顯示臺北時間處要標「台北時間」（ADR 多語系架構 D5）。
+/// 裝置目前的時區偏移是 +8 時 true；false 時顯示臺北時間處要標「台北時間」（ADR 多語系架構 D5）。
 bool isDeviceInTaipeiOffset({DateTime? now}) =>
     isTaipeiOffset((now ?? DateTime.now()).timeZoneOffset);
+
+/// 臺北時間字串 [formatted] 的顯示形：裝置偏移是 +8 時原樣回傳，否則附上 [label]（「台北時間」，取自各 App 的 ARB）成
+/// `2026/07/30 15:05 (台北時間)`。空字串不附標籤。是否附標籤只在這裡決定（ADR 多語系架構 D5）。
+///
+/// 裝置偏移取自 [now]（預設 `DateTime.now()`）；要指定任意偏移（Dart 造不出非裝置時區的 local 時間）用 [withTaipeiLabelAtOffset]。
+String withTaipeiLabel(String formatted, String label, {DateTime? now}) =>
+    withTaipeiLabelAtOffset(
+      formatted,
+      label,
+      (now ?? DateTime.now()).timeZoneOffset,
+    );
+
+/// 同 [withTaipeiLabel]，裝置的 UTC 偏移由 [deviceOffset] 直接給。
+String withTaipeiLabelAtOffset(
+  String formatted,
+  String label,
+  Duration deviceOffset,
+) {
+  if (formatted.isEmpty || isTaipeiOffset(deviceOffset)) return formatted;
+  return '$formatted ($label)';
+}

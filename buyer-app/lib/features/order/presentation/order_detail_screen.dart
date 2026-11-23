@@ -10,15 +10,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/common_snackbar.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/hk_tap_target.dart';
 import '../../../shared/widgets/live_countdown_line.dart';
+
 import 'package:hawkr_buyer/core/codemeta/code_meta.dart'
     hide OrderStatus, OrderItemStatus;
 import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
+
 import '../../seller/data/store_card_display.dart';
 import '../../seller/data/store_card_provider.dart';
 import 'order_detail_controller.dart';
@@ -50,6 +53,8 @@ import 'widgets/order_receipt_photos_section.dart';
 import '../../cart/data/cart_repository.dart';
 import '../../cart/data/cart_error_message.dart';
 import '../../cart/presentation/cart_controller.dart';
+import '../../../shared/time/taipei_display.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
@@ -868,7 +873,10 @@ class _TransactionOverviewCard extends StatelessWidget {
       rows.add(
         _InfoLine(
           label: '出貨處理期限',
-          value: _formatDateTime(order.processingDeadline),
+          value: _formatDateTime(
+            order.processingDeadline,
+            context.taipeiDisplay,
+          ),
         ),
       );
     }
@@ -951,7 +959,7 @@ class _TransactionOverviewCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '下單 ${_formatDateTime(order.createTime).ifEmpty('時間未提供')}',
+                    '下單 ${_formatDateTime(order.createTime, context.taipeiDisplay).ifEmpty('時間未提供')}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.metaMuted,
@@ -1124,7 +1132,10 @@ class _AfterSaleCaseSection extends StatelessWidget {
           if (afterSale.processDeadline.isNotEmpty)
             _InfoLine(
               label: '處理期限',
-              value: _formatDateTime(afterSale.processDeadline),
+              value: _formatDateTime(
+                afterSale.processDeadline,
+                context.taipeiDisplay,
+              ),
               valueColor: OrderColorTokens.attention,
             ),
           if (afterSale.resolutions.isNotEmpty)
@@ -1449,13 +1460,15 @@ String _returnProgressText(AfterSaleCase c) {
   return _afterSaleStatusText(c.status);
 }
 
-String _formatDateTime(String raw) {
+String _formatDateTime(String raw, TaipeiDisplay t) {
   if (raw.isEmpty) return '';
   final dt = DateTime.tryParse(raw);
   if (dt == null) return raw;
   final local = dt.taipeiWall;
-  return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  return t.labeled(
+    '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
+    '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+  );
 }
 
 extension _OrderDetailStringX on String {
@@ -2261,11 +2274,11 @@ class _PaymentHistoryRow extends StatelessWidget {
                   if (amount.isNotEmpty) '金額 NT\$ $amount',
                   if (showAtmAccount) '匯款帳號 $atmVirtualAccount',
                   if (!showAtmAccount && payTime.isNotEmpty)
-                    '付款 ${_formatDateTime(payTime)}',
+                    '付款 ${_formatDateTime(payTime, context.taipeiDisplay)}',
                   if (!showAtmAccount &&
                       payTime.isEmpty &&
                       createdAt.isNotEmpty)
-                    '建立 ${_formatDateTime(createdAt)}',
+                    '建立 ${_formatDateTime(createdAt, context.taipeiDisplay)}',
                 ].join('｜'),
                 style: _smallStyle().copyWith(
                   // ATM 帳號要凸顯方便買家識別

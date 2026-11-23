@@ -4,6 +4,7 @@ import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 /// Pumps a widget with the same ScreenUtil policy as production.
 ///
@@ -32,6 +33,9 @@ Future<void> pumpProductionLayoutTestApp(
       minTextAdapt: false,
       splitScreenMode: true,
       builder: (context, _) => MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData(
           useMaterial3: true,
           platform: platform,

@@ -20,6 +20,7 @@ import 'report_view_parts.dart';
 import 'store_report_detail_provider.dart';
 import 'paged_section_widgets.dart';
 import 'store_report_supplement_screen.dart';
+import '../../../shared/time/taipei_display.dart';
 
 String storeReportDetailRoute(String reportId) =>
     '/settings/reports/${Uri.encodeComponent(reportId)}';
@@ -148,7 +149,12 @@ class StoreReportDetailScreen extends ConsumerWidget {
                 _title('你的檢舉'),
                 SizedBox(height: 8.h),
                 if (r.hasCreateTime())
-                  _meta(formatReportTime(r.createTime.toDateTime())),
+                  _meta(
+                    formatReportTime(
+                      r.createTime.toDateTime(),
+                      context.taipeiDisplay,
+                    ),
+                  ),
                 if (r.description.isNotEmpty) _line(r.description),
                 if (ownEvidence > 0) _meta('已附 $ownEvidence 張佐證'),
                 SizedBox(height: 20.h),
@@ -157,7 +163,10 @@ class StoreReportDetailScreen extends ConsumerWidget {
                 for (final s in d.supplements) ...[
                   _meta(
                     s.hasCreateTime()
-                        ? formatReportTime(s.createTime.toDateTime())
+                        ? formatReportTime(
+                            s.createTime.toDateTime(),
+                            context.taipeiDisplay,
+                          )
                         : '',
                   ),
                   _line(s.description),

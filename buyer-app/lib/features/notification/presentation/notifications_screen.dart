@@ -29,6 +29,8 @@ import '../data/notification_model.dart';
 import '../data/push/manager.dart';
 import 'notification_controller.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
+import '../../../shared/time/taipei_display.dart';
+import '../../../l10n/l10n.dart';
 
 /// Injectable FCM inbox stream so the notification surface can be exercised
 /// without bootstrapping Firebase in widget tests.
@@ -446,7 +448,7 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
         : (fetchedSender?.avatarUrl ?? '');
     final title = _personalize(n.title, senderName);
     final content = _personalize(n.content, senderName);
-    final timeLabel = _formatTime(n.createdAt);
+    final timeLabel = _formatTime(context, n.createdAt);
     final handleTap = widget.isDeleteMode
         ? () => widget.onSelectionChanged?.call(!widget.isSelected)
         : widget.onTap;
@@ -745,14 +747,8 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
     return systemStyle;
   }
 
-  static String _formatTime(DateTime dateTime) {
-    final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 1) return '剛剛';
-    if (diff.inHours < 1) return '${diff.inMinutes} 分鐘前';
-    if (diff.inDays < 1) return '${diff.inHours} 小時前';
-    if (diff.inDays < 7) return '${diff.inDays} 天前';
-    return '${dateTime.month}/${dateTime.day}';
-  }
+  static String _formatTime(BuildContext context, DateTime dateTime) =>
+      context.taipeiDisplay.timeAgo(context.l10n, dateTime);
 
   static String _senderNameFromData(NotificationItem n) {
     return _firstDataString(n.data, const [

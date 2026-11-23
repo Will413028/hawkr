@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:hawkr_api/errors.dart' show errorText;
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as pb;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
@@ -12,7 +11,6 @@ import 'package:hawkr_ui_text/hawkr_ui_text.dart' show UiLocale;
 
 import '../../../core/l10n/ui_locale.dart';
 import 'package:hawkr_buyer/l10n/l10n.dart';
-import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import '../../../core/theme/hk_tokens.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/category_top_bar.dart';
@@ -27,6 +25,7 @@ import '../data/chat_repository.dart';
 import '../data/latest_request.dart';
 import 'chat_focus_policy.dart';
 import 'widgets/chat_list_widgets.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
   const ChatListScreen({super.key});
@@ -319,9 +318,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                     lastMessage: _previewOf(c, locale),
                                     date: time == null
                                         ? ''
-                                        : timeAgoText(
+                                        : context.taipeiDisplay.timeAgo(
                                             context.l10n,
-                                            taipeiTimeAgo(time),
+                                            time,
                                           ),
                                     unread: c.unreadCount.toInt(),
                                     onTap: () async {

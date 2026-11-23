@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/core/theme/app_typography.dart';
 import 'package:hawkr_buyer/core/theme/hk_tokens.dart';
@@ -518,7 +519,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
 
   Widget _buildReviewItem(pb.Review review) {
     final content = review.content;
-    final dateStr = review.createDateText;
+    final dateStr = review.createDateText(context.taipeiDisplay);
     final rating = review.rating.clamp(0, 5);
     final userAvatar = review.authorAvatar;
     final displayName = review.authorName.isNotEmpty

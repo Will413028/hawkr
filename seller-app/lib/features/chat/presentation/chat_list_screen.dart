@@ -28,6 +28,7 @@ import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/optimized_image.dart';
 import 'chat_empty_state.dart';
 import 'chat_preview.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class ChatListScreen extends HookConsumerWidget {
   const ChatListScreen({super.key});
@@ -142,7 +143,10 @@ class ChatListScreen extends HookConsumerWidget {
                   subtitle: item.subtitle,
                   date: item.timeAgo == null
                       ? ''
-                      : timeAgoText(context.l10n, item.timeAgo!),
+                      : context.taipeiDisplay.agoText(
+                          item.timeAgo!,
+                          timeAgoText(context.l10n, item.timeAgo!),
+                        ),
                   unreadCount: item.unreadCount,
                   avatarUrl: item.avatarUrl,
                   onTap: () async {

@@ -5,6 +5,7 @@ import 'package:hawkr_seller/features/order/presentation/order_card_widgets/orde
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 /// 賣家端物流 provider 分派契約（移除二元 fallback）。
 ///
@@ -36,6 +37,9 @@ Future<void> _pump(WidgetTester tester, OrderSummary order) async {
     ScreenUtilInit(
       designSize: const Size(390, 844),
       builder: (_, _) => MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SingleChildScrollView(
             child: OrderExpandedSection(

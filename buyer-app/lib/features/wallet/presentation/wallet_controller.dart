@@ -38,6 +38,7 @@ final class WalletCouponCardState {
     required this.content,
     required this.rule,
     required this.expire,
+    required this.expireIsTime,
     required this.discountLabel,
     required this.sellerName,
     required this.storeId,
@@ -82,6 +83,7 @@ final class WalletCouponCardState {
       content: content,
       rule: ruleParts.join('  '),
       expire: _expiryLabel(coupon.endAt),
+      expireIsTime: _expiryParses(coupon.endAt),
       discountLabel: discountLabel,
       sellerName: (coupon.sellerName ?? '').trim(),
       storeId: (coupon.storeId ?? '').trim(),
@@ -95,6 +97,7 @@ final class WalletCouponCardState {
   final String content;
   final String rule;
   final String expire;
+  final bool expireIsTime;
   final String discountLabel;
   final String sellerName;
   final String storeId;
@@ -119,6 +122,12 @@ final class WalletCouponCardState {
 
   static String _decimal(num value) {
     return value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+  }
+
+  /// [expire] 是解析成功的臺北日期（顯示時要附標籤）；解析失敗的原樣字串不是。
+  static bool _expiryParses(String? raw) {
+    final value = raw?.trim() ?? '';
+    return value.isNotEmpty && DateTime.tryParse(value) != null;
   }
 
   static String _expiryLabel(String? raw) {

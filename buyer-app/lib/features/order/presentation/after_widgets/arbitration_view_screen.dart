@@ -18,6 +18,8 @@ import '../../../../shared/widgets/hk_button_label.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../data/after_sale_repository.dart';
 import '../../data/appeal_data.dart';
+import '../../../../shared/time/taipei_display.dart';
+
 import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
 
 /// PR #983：仲裁進度查詢頁
@@ -82,7 +84,7 @@ class ArbitrationViewScreen extends HookConsumerWidget {
                     child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 32.h),
-                      child: _buildContent(data.value!),
+                      child: _buildContent(context, data.value!),
                     ),
                   ),
           ),
@@ -91,7 +93,7 @@ class ArbitrationViewScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildContent(ArbitrationData d) {
+  Widget _buildContent(BuildContext context, ArbitrationData d) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -116,11 +118,15 @@ class ArbitrationViewScreen extends HookConsumerWidget {
             _buildStateBadge(d.state),
             SizedBox(height: AppSpacing.md),
             if (d.timeline.isNotEmpty) ...[
-              _buildSectionCard(_buildTimelineSection(d.timeline)),
+              _buildSectionCard(
+                _buildTimelineSection(d.timeline, context.taipeiDisplay),
+              ),
               SizedBox(height: AppSpacing.sm),
             ],
             if (d.state == ArbitrationState.resolved && d.decision != null)
-              _buildSectionCard(_buildDecisionSection(d.decision!)),
+              _buildSectionCard(
+                _buildDecisionSection(d.decision!, context.taipeiDisplay),
+              ),
           ],
         ),
       ),
@@ -159,7 +165,7 @@ class ArbitrationViewScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildTimelineSection(List<AppealEvent> events) {
+  Widget _buildTimelineSection(List<AppealEvent> events, TaipeiDisplay t) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -167,13 +173,13 @@ class ArbitrationViewScreen extends HookConsumerWidget {
         SizedBox(height: AppSpacing.md),
         for (var i = 0; i < events.length; i++) ...[
           if (i > 0) SizedBox(height: AppSpacing.sm),
-          _timelineRow(events[i], isLast: i == events.length - 1),
+          _timelineRow(events[i], t, isLast: i == events.length - 1),
         ],
       ],
     );
   }
 
-  Widget _timelineRow(AppealEvent e, {required bool isLast}) {
+  Widget _timelineRow(AppealEvent e, TaipeiDisplay t, {required bool isLast}) {
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,7 +216,7 @@ class ArbitrationViewScreen extends HookConsumerWidget {
                 if (e.timestamp.isNotEmpty) ...[
                   SizedBox(height: 2.h),
                   Text(
-                    _formatTime(e.timestamp),
+                    _formatTime(e.timestamp, t),
                     style: AppTypography.meta.copyWith(
                       color: AppTypography.colorDisabled,
                     ),
@@ -234,7 +240,7 @@ class ArbitrationViewScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildDecisionSection(PlatformDecision d) {
+  Widget _buildDecisionSection(PlatformDecision d, TaipeiDisplay t) {
     final outcomeColor = switch (d.outcome) {
       DecisionOutcome.fullRefund => AppColors.success,
       DecisionOutcome.partialRefund => AppColors.warning,
@@ -270,7 +276,7 @@ class ArbitrationViewScreen extends HookConsumerWidget {
                 ),
               if (d.reason.isNotEmpty) _miniLine('裁決說明', d.reason),
               if (d.decidedAt.isNotEmpty)
-                _miniLine('裁決時間', _formatTime(d.decidedAt)),
+                _miniLine('裁決時間', _formatTime(d.decidedAt, t)),
             ],
           ),
         ),
@@ -364,12 +370,14 @@ class ArbitrationViewScreen extends HookConsumerWidget {
     _ => type,
   };
 
-  String _formatTime(String raw) {
+  String _formatTime(String raw, TaipeiDisplay t) {
     if (raw.isEmpty) return '';
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw;
     final local = dt.taipeiWall;
-    return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
-        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return t.labeled(
+      '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')} '
+      '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+    );
   }
 }

@@ -24,6 +24,7 @@ import 'paged_section.dart';
 import 'paged_section_widgets.dart';
 import 'report_view_parts.dart';
 import 'store_report_detail_screen.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 我的檢舉紀錄列表頁（`ListMyReports` 合併社群與店家兩種；店家檢舉可點進詳情）。
 /// 伺服器狀態在 [myReportsProvider]；這裡只顯示與發動作。
@@ -61,8 +62,8 @@ class MyReportsScreen extends ConsumerWidget {
     }
   }
 
-  String _formatTime(pb.MyReportItem r) =>
-      r.hasCreateTime() ? formatReportTime(r.createTime.toDateTime()) : '';
+  String _formatTime(pb.MyReportItem r, TaipeiDisplay t) =>
+      r.hasCreateTime() ? formatReportTime(r.createTime.toDateTime(), t) : '';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -202,7 +203,7 @@ class MyReportsScreen extends ConsumerWidget {
               ),
               SizedBox(width: 6.w),
               Text(
-                _formatTime(r),
+                _formatTime(r, context.taipeiDisplay),
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
               if (store) ...[

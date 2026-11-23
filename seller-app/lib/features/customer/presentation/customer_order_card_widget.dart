@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/customer_model.dart';
+import '../../../shared/time/taipei_display.dart';
 
 /// 訂單卡片元件 — Figma: 5324:61151
 ///
@@ -84,7 +85,7 @@ class CustomerOrderCardWidget extends StatelessWidget {
                       ),
                       SizedBox(width: 8.w),
                       Text(
-                        order.date,
+                        context.taipeiDisplay.labeled(order.date),
                         style: TextStyle(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w400,

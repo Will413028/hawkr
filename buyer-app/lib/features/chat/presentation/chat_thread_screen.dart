@@ -16,6 +16,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:hawkr_buyer/core/l10n/ui_locale.dart';
+import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -482,7 +483,9 @@ class ChatThreadScreen extends HookConsumerWidget {
                         borderRadius: BorderRadius.circular(12.r),
                       ),
                       child: Text(
-                        isToday ? timeStr : '${t.month}/${t.day} $timeStr',
+                        context.taipeiDisplay.labeled(
+                          isToday ? timeStr : '${t.month}/${t.day} $timeStr',
+                        ),
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -545,8 +548,9 @@ class ChatThreadScreen extends HookConsumerWidget {
               final h12 = t.hour == 0
                   ? 12
                   : (t.hour > 12 ? t.hour - 12 : t.hour);
-              final timeStr =
-                  '${t.hour < 12 ? "上午" : "下午"}${h12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+              final timeStr = context.taipeiDisplay.labeled(
+                '${t.hour < 12 ? "上午" : "下午"}${h12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}',
+              );
               final read =
                   row.message != null && row.message!.seq <= thread.peerReadSeq;
               final failed = row.pending?.failed ?? false;

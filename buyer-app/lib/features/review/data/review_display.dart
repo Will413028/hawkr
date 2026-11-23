@@ -1,5 +1,7 @@
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart' as pb;
 import 'package:hawkr_api/images.dart';
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 
 /// 評價在畫面上的顯示值（只做取值與格式化，不產生文字句子）。
 extension ReviewDisplay on pb.Review {
@@ -10,10 +12,12 @@ extension ReviewDisplay on pb.Review {
   Image? get authorAvatar =>
       hasAuthor() && author.hasAvatar() ? author.avatar : null;
 
-  /// 建立日期 `YYYY-MM-DD`（本地時區）；沒有時是空字串。
-  String get createDateText {
+  /// 建立日期 `YYYY-MM-DD`（臺北日期，裝置偏移不是 +8 時附標籤）；沒有時是空字串。
+  String createDateText(TaipeiDisplay t) {
     if (!hasCreateTime()) return '';
-    final d = createTime.toDateTime().toLocal();
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final d = createTime.toDateTime().taipei;
+    return t.labeled(
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}',
+    );
   }
 }

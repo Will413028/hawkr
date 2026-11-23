@@ -18,6 +18,7 @@ import 'package:hawkr_buyer/shared/widgets/truck_loading_overlay.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'moderation_fakes.dart';
+import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
 Future<void> _pump(
   WidgetTester tester,
@@ -38,6 +39,9 @@ Future<void> _pump(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),

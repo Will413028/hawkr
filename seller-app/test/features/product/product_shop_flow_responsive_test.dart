@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/product/data/product_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_preview_screen.dart';
@@ -126,6 +127,9 @@ Future<void> _pump(
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           theme: AppTheme.light,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(

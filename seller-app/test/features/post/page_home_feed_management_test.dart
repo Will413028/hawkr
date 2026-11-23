@@ -22,6 +22,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../support/my_store_fixtures.dart';
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _Repo extends Mock implements PostRepository {}
 
@@ -71,21 +73,27 @@ Future<_Repo> _pump(
   when(() => repo.listMyPosts()).thenAnswer((_) async => posts());
   when(() => repo.listComments(any())).thenAnswer((_) async => []);
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: [
-        postRepositoryProvider.overrideWithValue(repo),
-        myStoreSnapshotProvider.overrideWithValue(store ?? _store()),
-      ],
-      child: ScreenUtilInit(
-        designSize: const Size(390, 844),
-        enableScaleWH: () => false,
-        enableScaleText: () => false,
-        builder: (_, _) => MaterialApp(
-          theme: AppTheme.light,
-          home: PageHomeFeedScreen(
-            initialIndex: initialIndex,
-            initialPostId: initialPostId,
-            sellerName: '測試店家',
+    TaipeiDisplayScope(
+      deviceOffset: const Duration(hours: 8),
+      child: ProviderScope(
+        overrides: [
+          postRepositoryProvider.overrideWithValue(repo),
+          myStoreSnapshotProvider.overrideWithValue(store ?? _store()),
+        ],
+        child: ScreenUtilInit(
+          designSize: const Size(390, 844),
+          enableScaleWH: () => false,
+          enableScaleText: () => false,
+          builder: (_, _) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AppTheme.light,
+            home: PageHomeFeedScreen(
+              initialIndex: initialIndex,
+              initialPostId: initialPostId,
+              sellerName: '測試店家',
+            ),
           ),
         ),
       ),
@@ -567,27 +575,36 @@ void main() {
         ).thenAnswer((_) async => [_post(publishStatus: _published)]);
         when(() => repo.listComments(any())).thenAnswer((_) async => []);
         await tester.pumpWidget(
-          ProviderScope(
-            key: UniqueKey(),
-            overrides: [
-              postRepositoryProvider.overrideWithValue(repo),
-              myStoreSnapshotProvider.overrideWithValue(
-                _store(capabilities: suspended ? suspendedCapabilities : null),
-              ),
-            ],
-            child: ScreenUtilInit(
-              designSize: const Size(390, 844),
-              enableScaleWH: () => false,
-              enableScaleText: () => false,
-              builder: (_, _) => MaterialApp(
-                theme: AppTheme.light,
-                builder: (context, child) => MediaQuery(
-                  data: MediaQuery.of(
-                    context,
-                  ).copyWith(padding: const EdgeInsets.only(top: 40)),
-                  child: child!,
+          TaipeiDisplayScope(
+            deviceOffset: const Duration(hours: 8),
+            child: ProviderScope(
+              key: UniqueKey(),
+              overrides: [
+                postRepositoryProvider.overrideWithValue(repo),
+                myStoreSnapshotProvider.overrideWithValue(
+                  _store(
+                    capabilities: suspended ? suspendedCapabilities : null,
+                  ),
                 ),
-                home: const PageHomeFeedScreen(sellerName: '測試店家'),
+              ],
+              child: ScreenUtilInit(
+                designSize: const Size(390, 844),
+                enableScaleWH: () => false,
+                enableScaleText: () => false,
+                builder: (_, _) => MaterialApp(
+                  locale: const Locale('zh'),
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  theme: AppTheme.light,
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(padding: const EdgeInsets.only(top: 40)),
+                    child: child!,
+                  ),
+                  home: const PageHomeFeedScreen(sellerName: '測試店家'),
+                ),
               ),
             ),
           ),

@@ -3,11 +3,14 @@ import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+
 import '../../order/data/order_repository.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/utils/amount_utils.dart';
 import '../../../shared/utils/hk_log.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
+import '../../../shared/time/taipei_display.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 /// 消費紀錄頁面
@@ -122,8 +125,10 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
         totalSpent += amount;
         totalRefund += refund;
 
+        final date = _tryFormatDate(createdAt);
         records.add({
-          'date': _formatDate(createdAt),
+          'date': date ?? createdAt,
+          'dateIsTime': date != null,
           'orderId': _truncateOrderId(orderId),
           'amount': amount,
           'refund': refund,
@@ -205,8 +210,9 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
         compact.contains('cancelled');
   }
 
-  String _formatDate(String raw) {
-    if (raw.isEmpty) return '';
+  /// 解析失敗回 null（呼叫端不為原樣字串附臺北時間標籤）。
+  String? _tryFormatDate(String raw) {
+    if (raw.isEmpty) return null;
     try {
       DateTime? dt;
       final digits = RegExp(r'^\d+$');
@@ -226,11 +232,11 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
       dt ??= DateTime.tryParse(
         raw.replaceFirst(' ', 'T').replaceAll('/', '-'),
       )?.taipeiWall;
-      if (dt == null) return raw;
+      if (dt == null) return null;
       String two(int n) => n.toString().padLeft(2, '0');
       return '${dt.year}/${two(dt.month)}/${two(dt.day)}';
     } catch (_) {
-      return raw;
+      return null;
     }
   }
 
@@ -426,7 +432,9 @@ class _SpendingHistoryScreenState extends ConsumerState<SpendingHistoryScreen> {
             Expanded(
               flex: 1,
               child: Text(
-                record['date'] ?? '',
+                record['dateIsTime'] == true
+                    ? context.taipeiDisplay.labeled(record['date'] ?? '')
+                    : record['date'] ?? '',
                 textAlign: TextAlign.center,
                 style: textStyle,
               ),

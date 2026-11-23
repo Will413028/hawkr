@@ -1,6 +1,4 @@
-import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_buyer/l10n/l10n.dart';
-import 'package:hawkr_buyer/l10n/time_ago_text.dart';
 import 'dart:async';
 
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -39,6 +37,7 @@ import '../../../../core/session/session_provider.dart';
 import '../../../../core/session/viewer_scope.dart';
 import '../../../../shared/widgets/login_to_comment_prompt.dart';
 import 'merchant_layout.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 // ---------------------------------------------------------------------------
 // 資料模型
@@ -450,7 +449,8 @@ class _MerchantChatTabState extends ConsumerState<MerchantChatTab>
     Widget commentCard(_CommentNode n) => _CommentCard(
       node: n,
       onReply: () => _setReplyTarget(n),
-      formatTimeAgo: (time) => timeAgoText(context.l10n, taipeiTimeAgo(time)),
+      formatTimeAgo: (time) =>
+          context.taipeiDisplay.timeAgo(context.l10n, time),
       onEdit: _onEditComment,
       onDelete: _onDeleteComment,
       onReportOrBlock: _onReportOrBlock,

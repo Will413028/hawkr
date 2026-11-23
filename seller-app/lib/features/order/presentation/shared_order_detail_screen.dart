@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
 import 'package:hawkr_api/taipei_time.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
@@ -390,7 +391,7 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
                             ),
                             const Spacer(),
                             Text(
-                              _formatDateTime(payTime),
+                              _formatDateTime(payTime, context.taipeiDisplay),
                               style: TextStyle(
                                 fontSize: 14.sp,
                                 color: AppColors.textPrimary,
@@ -602,7 +603,7 @@ class _TransactionOverviewCard extends StatelessWidget {
             SizedBox(height: 10.h),
             _OrderDetailInfoLine(
               label: '出貨處理期限',
-              value: _displayOrderDateTime(deadline),
+              value: _displayOrderDateTime(deadline, context.taipeiDisplay),
               valueColor: AppColors.warningText,
             ),
           ],
@@ -729,7 +730,7 @@ class _OrderInfoCard extends StatelessWidget {
       ),
       _OrderDetailInfoLine(
         label: '建立時間',
-        value: _displayOrderDateTime(dateSource),
+        value: _displayOrderDateTime(dateSource, context.taipeiDisplay),
       ),
       _OrderDetailInfoLine(
         label: switch (shipping) {
@@ -856,14 +857,16 @@ int _resolvedStatusCode(OrderSummary? order, Map<String, dynamic>? raw) {
       0;
 }
 
-String _displayOrderDateTime(String raw) {
+String _displayOrderDateTime(String raw, TaipeiDisplay t) {
   if (raw.trim().isEmpty) return '—';
   final parsed = DateTime.tryParse(raw.trim());
   if (parsed == null) return raw;
   final local = parsed.taipeiWall;
   String pad(int value) => value.toString().padLeft(2, '0');
-  return '${local.year}/${pad(local.month)}/${pad(local.day)} '
-      '${pad(local.hour)}:${pad(local.minute)}';
+  return t.labeled(
+    '${local.year}/${pad(local.month)}/${pad(local.day)} '
+    '${pad(local.hour)}:${pad(local.minute)}',
+  );
 }
 
 String _stringValue(dynamic value) {
@@ -1001,12 +1004,14 @@ String _paymentMethodLabel(String method) {
   return CodeMetaDisplay.paymentMethod(method);
 }
 
-String _formatDateTime(String raw) {
+String _formatDateTime(String raw, TaipeiDisplay t) {
   if (raw.isEmpty) return '';
   final dt = DateTime.tryParse(raw);
   if (dt == null) return raw;
   final local = dt.taipeiWall;
-  return '${local.year}年${local.month.toString().padLeft(2, '0')}月${local.day.toString().padLeft(2, '0')}日 ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  return t.labeled(
+    '${local.year}年${local.month.toString().padLeft(2, '0')}月${local.day.toString().padLeft(2, '0')}日 ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}',
+  );
 }
 
 String _fmt(int number) {
@@ -1218,9 +1223,10 @@ class _PaymentHistoryRow extends StatelessWidget {
               Text(
                 [
                   if (amount.isNotEmpty) '金額 NT\$ $amount',
-                  if (payTime.isNotEmpty) '付款 ${_formatDateTime(payTime)}',
+                  if (payTime.isNotEmpty)
+                    '付款 ${_formatDateTime(payTime, context.taipeiDisplay)}',
                   if (payTime.isEmpty && createdAt.isNotEmpty)
-                    '建立 ${_formatDateTime(createdAt)}',
+                    '建立 ${_formatDateTime(createdAt, context.taipeiDisplay)}',
                 ].join('｜'),
                 style: TextStyle(
                   fontSize: 14.sp,

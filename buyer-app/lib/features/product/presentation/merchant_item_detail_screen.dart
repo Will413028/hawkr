@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -2395,7 +2396,7 @@ class ProductReviewPreviewCardState
         ? review.authorName
         : reviewReviewAuthorAnonymousName(ref.read(uiLocaleProvider));
     final avatar = review.authorAvatar;
-    final dateStr = review.createDateText;
+    final dateStr = review.createDateText(context.taipeiDisplay);
     final reviewId = review.id;
     final rating = review.rating;
     final content = review.content;

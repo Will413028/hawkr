@@ -26,6 +26,8 @@ import '../../member_card/presentation/member_card_controller.dart';
 import 'wallet_controller.dart';
 import 'widgets/coupon_status_tabs.dart';
 import 'widgets/wallet_coupon_ticket.dart';
+import '../../../shared/time/taipei_display.dart';
+
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_skeleton_shimmer.dart';
@@ -1140,6 +1142,7 @@ class _MyCouponTabState extends ConsumerState<_MyCouponTab> {
             content: coupon.content,
             rule: coupon.rule,
             expire: coupon.expire,
+            expireIsTime: coupon.expireIsTime,
             discountLabel: coupon.discountLabel,
             visualStatus: _visualStatus(),
             sellerName: coupon.sellerName,
@@ -1267,6 +1270,7 @@ class _CouponTile extends StatelessWidget {
     required this.content,
     required this.rule,
     required this.expire,
+    required this.expireIsTime,
     required this.visualStatus,
     this.discountLabel = '',
     this.sellerName = '',
@@ -1279,6 +1283,7 @@ class _CouponTile extends StatelessWidget {
   final String content;
   final String rule;
   final String expire;
+  final bool expireIsTime;
   final String discountLabel;
   final WalletCouponVisualStatus visualStatus;
 
@@ -1309,7 +1314,7 @@ class _CouponTile extends StatelessWidget {
       title: normalizedTitle,
       content: content,
       rule: rule,
-      expiry: expire,
+      expiry: expireIsTime ? context.taipeiDisplay.labeled(expire) : expire,
       discountLabel: discountLabel,
       issuerLabel: issuerLabel,
       issuerAvatar: _CouponIssuerAvatar(

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart'
     show PolicyCategory;
-import 'package:hawkr_api/taipei_time.dart';
+
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import '../../../core/l10n/ui_locale.dart';
@@ -14,6 +14,7 @@ import '../../../shared/widgets/danger_alert_badge.dart';
 import '../../../shared/widgets/hk_glass_app_bar.dart';
 import 'profile_account_closure.dart';
 import 'profile_other_options_card.dart' show ProfileLogoutButton;
+import '../../../shared/time/taipei_display.dart';
 
 const accountRestrictedTitle = '帳號已被停權';
 const accountRestrictedBody = '你的帳號目前受平台限制，無法使用賣家功能。';
@@ -45,7 +46,8 @@ class _AccountRestrictedScreenState
           restriction.category != PolicyCategory.POLICY_CATEGORY_UNSPECIFIED &&
           category != null)
         '原因：$category',
-      if (suspendedAt != null) '停權時間：${formatTaipeiDate(suspendedAt)}',
+      if (suspendedAt != null)
+        '停權時間：${context.taipeiDisplay.date(suspendedAt)}',
     ];
 
     return Scaffold(

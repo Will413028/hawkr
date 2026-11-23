@@ -1,5 +1,5 @@
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
-import 'package:hawkr_api/taipei_time.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -23,6 +23,7 @@ import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/account_scope.dart';
 import '../data/measure_display.dart';
 import '../data/measures.dart';
+import '../../../shared/time/taipei_display.dart';
 
 const _emptyTitle = '目前沒有措施紀錄';
 const _emptyDescription = '保持良好營運狀況，這裡會維持空空如也。';
@@ -174,14 +175,14 @@ class MeasureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.uiLocale;
     final meta = measureMeta(measure, l);
-    final effect = measureEffect(measure, l);
+    final effect = measureEffect(measure, l, context.taipeiDisplay);
     final chip = requestChip(measure, l);
     final stateBadge = stateChip(measure, l);
     final appeal = appealAction(measure);
-    final appealNote = appealNoteText(measure, l);
+    final appealNote = appealNoteText(measure, l, context.taipeiDisplay);
     final note = requestNote(measure, l);
     final remediation = remediationAction(measure);
-    final decided = formatTaipeiTimestamp(
+    final decided = context.taipeiDisplay.timestamp(
       measure.hasCreateTime() ? measure.createTime : null,
     );
     return HkContentCard(

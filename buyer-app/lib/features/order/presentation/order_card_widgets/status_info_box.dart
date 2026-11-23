@@ -10,6 +10,7 @@ import '../../../../shared/widgets/oss_image.dart';
 import '../../data/order_model.dart';
 import '../../order_color_tokens.dart';
 import 'pill_button.dart';
+import '../../../../shared/time/taipei_display.dart';
 
 /// 訂單狀態資訊框 — 展開區域底部的狀態卡片
 /// 顯示當前狀態標題、時間、描述文案，已送達/已完成時顯示收據照片或「顧客已取貨」
@@ -90,7 +91,7 @@ class StatusInfoBox extends StatelessWidget {
     }
   }
 
-  String get _statusDesc {
+  String _statusDesc(TaipeiDisplay t) {
     if (order.status == '80') {
       final hint = _cancelDescHint;
       if (hint.isNotEmpty) return hint;
@@ -100,7 +101,7 @@ class StatusInfoBox extends StatelessWidget {
     if (order.statusSummary.isNotEmpty) return order.statusSummary;
     switch (order.status) {
       case '0':
-        final deadline = DateFormatUtils.formatDateTime(order.statusTime);
+        final deadline = DateFormatUtils.formatDateTime(order.statusTime, t);
         if (deadline.isNotEmpty) {
           return '請於 $deadline 前完成付款，逾時訂單將自動取消。';
         }
@@ -128,8 +129,11 @@ class StatusInfoBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.taipeiDisplay;
+    final statusDesc = _statusDesc(t);
     final timeStr = DateFormatUtils.formatDateTime(
       order.statusTime.isNotEmpty ? order.statusTime : order.createTime,
+      t,
     );
     return Container(
       width: double.infinity,
@@ -220,10 +224,10 @@ class StatusInfoBox extends StatelessWidget {
                 ),
               ),
             ],
-          ] else if (_statusDesc.isNotEmpty) ...[
+          ] else if (statusDesc.isNotEmpty) ...[
             SizedBox(height: 6.h),
             Text(
-              _statusDesc,
+              statusDesc,
               style: AppTypography.meta.copyWith(
                 color: AppTypography.colorPrimary.withValues(alpha: 0.8),
               ),

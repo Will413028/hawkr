@@ -1,3 +1,5 @@
+import 'package:hawkr_api/taipei_time.dart';
+import 'package:hawkr_seller/shared/time/taipei_display.dart';
 import '../../../features/seller/data/current_store.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
@@ -824,10 +826,12 @@ class ProductPreviewScreen extends HookConsumerWidget {
           : userName;
       final num rating = review.rating;
       final content = review.content;
-      final createTime = review.createTime?.toLocal().toIso8601String() ?? '';
-      final dateStr = createTime.length >= 10
-          ? createTime.substring(0, 10)
-          : createTime;
+      final createWall = review.createTime?.taipeiWall;
+      final dateStr = createWall == null
+          ? ''
+          : context.taipeiDisplay.labeled(
+              '${createWall.year}-${createWall.month.toString().padLeft(2, '0')}-${createWall.day.toString().padLeft(2, '0')}',
+            );
 
       return Container(
         padding: EdgeInsets.only(bottom: isLast ? 0 : 16),

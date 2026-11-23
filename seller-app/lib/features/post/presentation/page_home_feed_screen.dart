@@ -9,7 +9,7 @@ import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
-import 'package:hawkr_api/taipei_time.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
@@ -48,6 +48,8 @@ import '../../../shared/widgets/app_confirm_dialog.dart';
 import '../../../shared/widgets/hk_disabled_share.dart';
 import '../../../shared/widgets/hk_disabled_with_hint.dart';
 import '../../../shared/widgets/hk_status_badge.dart';
+import '../../../shared/time/taipei_display.dart';
+import '../../../l10n/l10n.dart';
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pbenum.dart'
     show SellerCapability;
@@ -334,21 +336,15 @@ class _PostPage extends HookConsumerWidget {
   final VoidCallback onDeleteTap;
   final VoidCallback? onProductTap;
 
-  String _formatDate(DateTime? d) {
-    if (d == null) return '';
-    final l = d.taipei;
-    final yyyy = l.year.toString().padLeft(4, '0');
-    final mm = l.month.toString().padLeft(2, '0');
-    final dd = l.day.toString().padLeft(2, '0');
-    return '$yyyy/$mm/$dd';
-  }
+  String _formatDate(BuildContext context, DateTime? d) =>
+      d == null ? '' : context.taipeiDisplay.date(d);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // objectKey 直接交給 OptimizedNetworkImage，由 buildImageUrl（唯一組裝入口）
     // 依 postImage 場景組顯示 URL；不要在這裡自行拼域名。
     final imageSource = post.imageUrl;
-    final dateStr = _formatDate(post.createdAt);
+    final dateStr = _formatDate(context, post.createdAt);
     final statusBadge = postStatusBadgeOf(post);
 
     final commentCtrl = useTextEditingController();
@@ -723,7 +719,7 @@ class _PostPage extends HookConsumerWidget {
                                                   if (statusBadge.scheduledAt !=
                                                       null)
                                                     Text(
-                                                      '排程於 ${formatTaipeiDateTime(statusBadge.scheduledAt!)} 發布',
+                                                      '排程於 ${context.taipeiDisplay.dateTime(statusBadge.scheduledAt!)} 發布',
                                                       key: ValueKey(
                                                         'seller-post-scheduled-${post.id}',
                                                       ),
@@ -2052,7 +2048,9 @@ class _CommentGroup extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     Widget rowFor(PostComment c, {required bool isReply}) => _CommentRow(
       comment: c,
-      dateStr: _relativeDate(c.createTime),
+      dateStr: c.createTime == null
+          ? ''
+          : context.taipeiDisplay.timeAgo(context.l10n, c.createTime!),
       isReply: isReply,
       onReply: () => onReply(c),
       onDelete: () => onDelete(c),
@@ -2214,17 +2212,6 @@ class _CommentAvatar extends StatelessWidget {
           : defaultAvatar,
     );
   }
-}
-
-/// 留言用相對時間：剛剛 / N 分鐘前 / N 小時前 / N 天前 / 否則 yyyy/MM/dd
-String _relativeDate(DateTime? dt) {
-  if (dt == null) return '';
-  final diff = DateTime.now().difference(dt);
-  if (diff.inSeconds < 60) return '剛剛';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} 分鐘前';
-  if (diff.inHours < 24) return '${diff.inHours} 小時前';
-  if (diff.inDays < 7) return '${diff.inDays} 天前';
-  return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
 }
 
 /// 把 `#xxx` token 切出來，上品牌深綠 + w700（跟商品上架的 ExtendedTextField

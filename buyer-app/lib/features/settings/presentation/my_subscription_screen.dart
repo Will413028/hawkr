@@ -45,6 +45,7 @@ import '../../../shared/utils/price_display.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_skeleton_shimmer.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_placeholder.dart';
+import '../../../shared/time/taipei_display.dart';
 
 class _SubscriptionGlassBackdrop extends StatelessWidget {
   const _SubscriptionGlassBackdrop();
@@ -1541,7 +1542,10 @@ class _MySubscriptionScreenState extends ConsumerState<MySubscriptionScreen> {
   String _historyLabel(Map<String, dynamic> item) {
     final time = _activityTime(item);
     if (time == null) return context.l10n.viewedRecently;
-    return historyViewedText(context.l10n, time);
+    return context.taipeiDisplay.agoText(
+      taipeiTimeAgo(time),
+      historyViewedText(context.l10n, time),
+    );
   }
 
   void _openMerchant(String storeCode) {
