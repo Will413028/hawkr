@@ -64,7 +64,7 @@ type Client struct {
 // 連線註冊進 fx lifecycle：在 usecase 裡自己撥號的連線沒有 owner，關不掉。
 func NewClient(lc fx.Lifecycle, addr string) (*Client, error) {
 	if addr == "" {
-		return nil, fmt.Errorf("invoice: seller peer addr is empty (SELLER_SERVICE_ADDR)")
+		return nil, fmt.Errorf("invoice: seller peer addr is empty (LEGACY_SELLER_GRPC_ADDR)")
 	}
 	conn, err := grpcclient.Dial(addr,
 		grpc.WithUnaryInterceptor(interceptor.InternalAuthClientInterceptor("invoice-service", false)),

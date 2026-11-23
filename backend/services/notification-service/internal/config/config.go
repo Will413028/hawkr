@@ -106,7 +106,7 @@ func Load() (*Config, error) {
 		MediaBaseURL: pkgconfig.GetEnvOrDefault("MEDIA_BASE_URL", ""),
 
 		BuyerServiceGRPCAddr:  pkgconfig.GetEnvOrDefault("BUYER_SERVICE_GRPC_ADDR", "127.0.0.1:9941"),
-		SellerServiceGRPCAddr: pkgconfig.GetEnvOrDefault("SELLER_SERVICE_GRPC_ADDR", "127.0.0.1:9941"),
+		SellerServiceGRPCAddr: pkgconfig.GetEnvOrDefault("LEGACY_SELLER_GRPC_ADDR", "127.0.0.1:9941"),
 
 		Mail: MailConfig{
 			Provider:          pkgconfig.GetEnvOrDefault("MAIL_PROVIDER", "log"),
