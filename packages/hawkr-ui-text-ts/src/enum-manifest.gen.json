@@ -393,6 +393,55 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.notification.v1alpha1.InboxPresentation",
+      "tsName": "InboxPresentation",
+      "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationApp",
+      "tsName": "NotificationApp",
+      "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationAudience",
+      "tsName": "NotificationAudience",
+      "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationCategory",
+      "tsName": "NotificationCategory",
+      "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationChannel",
+      "tsName": "NotificationChannel",
+      "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.SellerWorkspaceChange",
+      "tsName": "SellerWorkspaceChange",
+      "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.StateRefreshHint",
+      "tsName": "StateRefreshHint",
+      "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
       "tsName": "EmbeddedOnboardingRuntime",
       "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
