@@ -62,5 +62,5 @@
 - 訊息去頭尾空白後不得為空、不得超過 2000 字元（`MaxMessageRunes`，與 `agent_run_inputs.buyer_message` 的 CHECK 一致），不合回 INVALID_ARGUMENT，欄位 `Message`。
 - 沒有 `RequestID`：在同一個 transaction 新建需求與對話（兩者 ID 都是 UUIDv7）；之後送出若失敗（額度、買家上限、同需求進行中），需求與對話一起回滾，不留空需求。
 - 有 `RequestID`：需求不存在、屬於別的買家或需求沒有（未刪除的）對話都回 NOT_FOUND。
-- 額度：transaction 內先取買家的送出鎖（`LockBuyerSubmits`）、再讀買家模組的有效權益（`Deps.Entitlements`，沒給時 SubmitTurn 回內部錯誤，不當成不限額），然後經 `run.Submitter` 建 run、扣一次額度、排入 job；額度用完、買家上限、同需求進行中依 `run.Submitter.Submit`。
-- 重送同一個 `ClientRequestID`：回第一次的需求、對話與 run，不再建需求、不再扣額度；沒指定 `RequestID` 時沿用第一次的，指定了別的需求或內容不同回 INVALID_ARGUMENT；重送時對話已被刪除回 NOT_FOUND（與非重送路徑一致）。
+- 額度：transaction 內先取買家的送出鎖（`LockBuyerSubmits`）、解析需求與對話（含重送偵測），非重送才讀買家模組的有效權益（`Deps.Entitlements`，沒給時 SubmitTurn 回內部錯誤，不當成不限額；重送不讀，所以買家關閉或權益讀取失敗時重送仍回放），然後經 `run.Submitter` 建 run、扣一次額度、排入 job；額度用完、買家上限、同需求進行中依 `run.Submitter.Submit`。
+- 重送同一個 `ClientRequestID`：回第一次的需求、對話與 run，不再建需求、不再扣額度；沒指定 `RequestID` 時沿用第一次的，指定了別的需求或內容不同回 INVALID_ARGUMENT（指定的需求不存在、不屬於買家或沒有對話則回 NOT_FOUND，先於內容比對）；重送時對話已被刪除回 NOT_FOUND（與非重送路徑一致）。
