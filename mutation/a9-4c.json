@@ -211,8 +211,8 @@
    "id": "quota-create-weekly-limit-optional",
    "stack": "go",
    "file": "backend/internal/httpapi/imageai/admin.go",
-   "old": "\tif !cur.Custom {\n",
-   "new": "\tif false && !cur.Custom {\n",
+   "old": "\tif version == 0 && !cur.Custom {\n",
+   "new": "\tif false && version == 0 && !cur.Custom {\n",
    "test": "internal/httpapi/imageai ^TestUpdateAiQuotaCreateRequiresWeeklyLimit$",
    "why": "建立個別額度不檢查 weekly_limit 必填"
   },
