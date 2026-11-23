@@ -119,6 +119,7 @@ order 的 client 呼叫點只有 buyer-app 的 B6；website 的確認收貨（`w
 | im-service | W16、S10、B8 | 同上，單體 im 模組的 client RPC 也還沒切（A6-6） |
 | invoice-service | W25、A3 | B10 才搬；B1 計畫書沒寫這兩條流程在 B1-4 後的處置 |
 | ai-service | A4 | 計畫書「不做」段提到 ai 等舊 Go 服務的 media client 隨服務目錄刪除，但 AI 風格縮圖這條流程的處置沒寫 |
+| invoice-service（下載） | 第二節 `seller-repo.ts:439,1068` | 稅籍證明與收據授權核定文件的 `secure_download`：invoice 的檔案面只服務發票 PDF，沒有擁有者端點；B1-4 刪掉組 media 網址的程式，下載本機失敗到 B10（設計審查 2026-11-23） |
 
 ## 五、統計
 
