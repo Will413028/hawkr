@@ -1,0 +1,1323 @@
+syntax = "proto3";
+
+// procurement 模組給前台的 API：買家的 AI 採購（需求釐清、候選賣家、詢價單發布、比較與接受報價），
+// 與賣家的回價。
+//
+// 提交一輪（SubmitTurn）與觀看（WatchRun）分開（遷移計畫 A9-D4、A9-D12）：SubmitTurn 是 unary，伺服器受理後
+// 回 run ID；WatchRun 是 server streaming，只訂閱、不寫入。伺服器每條串流最長 100 秒就正常結束，client 以
+// 最後收到的 cursor 重新訂閱接續，不漏不重。串流結束時沒有收到 finished 或 error 事件就是被截斷，要接續。
+// cursor 早於保留範圍回 FAILED_PRECONDITION，reason 是 REPLAY_CURSOR_EXPIRED；超前於最新事件也回 FAILED_PRECONDITION，
+// reason 是 REPLAY_CURSOR_AHEAD。client 兩種都改讀 GetRuntimeSnapshot 重建畫面。
+//
+// 冪等：會改變狀態的方法帶 client_request_id（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送回第一次的結果，
+// 內容不同回 INVALID_ARGUMENT。例外是本身可以安全重送的方法：ToggleSelection、PutShortlistEntry、
+// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；UpsertSellerResponseDraft 以 expected_draft_version
+// 把關，重送時版本已前進，回 ABORTED 而不重複生效；CancelRun 依語意冪等（非終態的 run 被取消，終態的 run 回 OK 並以
+// cancel_disposition 說明結果），不帶版本。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
+//
+// 樂觀並發：expected_* 欄位是讀到的版本，與目前不符回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，
+// metadata 的 conflictTarget 說是哪一個物件過時（見 ErrorReason.VERSION_CONFLICT）。版本與 hash 一律是不透明的字串。
+//
+// 金額是新台幣「元」的整數（int64）。候選賣家只給結構化欄位，不含研究摘要等自由文字（遷移計畫 A9-D8）。
+package hawkr.procurement.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/timestamp.proto";
+import "google/type/date.proto";
+import "hawkr/common/v1alpha1/store_card.proto";
+
+// BuyerProcurementAppService 是登入的買家的採購方法。身分取自 session，帳號沒有買家角色時回 permission_denied。
+// 不屬於呼叫者的需求、對話與 run 一律回 not_found。
+service BuyerProcurementAppService {
+  // SubmitTurn 送出買家的一則訊息，開始一輪釐清。request_id 空字串表示新建需求。伺服器受理後立刻回 run ID，
+  // 這一輪的過程與結果（turn_result 事件）從 WatchRun 取得。這個需求已有進行中的 run 回 FAILED_PRECONDITION，
+  // reason 是 PROCUREMENT_RUN_IN_PROGRESS。買家同時進行的 run 已達上限或每分鐘送出已達上限回 resource_exhausted（沒有 reason，帶 RetryInfo，稍後可再試）；
+  // 本期額度用完回 resource_exhausted，reason 是 AGENT_MONTHLY_QUOTA_EXCEEDED。
+  rpc SubmitTurn(SubmitTurnRequest) returns (SubmitTurnResponse);
+
+  // GetSnapshot 回傳一張需求目前的內容與狀態。
+  rpc GetSnapshot(GetSnapshotRequest) returns (GetSnapshotResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // StartCandidateSearch 開始為需求搜尋候選賣家（背景執行，以 GetCandidateSearch 取得結果）。
+  // 需求還沒齊備回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY；這個需求已有進行中的 run 回 FAILED_PRECONDITION，
+  // reason 是 PROCUREMENT_RUN_IN_PROGRESS。買家同時進行的 run 已達上限或每分鐘送出已達上限回 resource_exhausted（沒有 reason，帶 RetryInfo，稍後可再試）。
+  rpc StartCandidateSearch(StartCandidateSearchRequest) returns (StartCandidateSearchResponse);
+
+  // GetCandidateSearch 回傳一次候選搜尋的狀態與目前的候選。
+  rpc GetCandidateSearch(GetCandidateSearchRequest) returns (GetCandidateSearchResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
+  rpc ToggleSelection(ToggleSelectionRequest) returns (ToggleSelectionResponse);
+
+  // SubmitAnswer 回答一個釐清問題。需求有待回覆的中斷時改用 ResumeRun，回 FAILED_PRECONDITION，
+  // reason 是 APPROVAL_PENDING。
+  rpc SubmitAnswer(SubmitAnswerRequest) returns (SubmitAnswerResponse);
+
+  // Rewind 讓需求退回某個欄位重新回答。有待回覆的中斷時規則同 SubmitAnswer。
+  rpc Rewind(RewindRequest) returns (RewindResponse);
+
+  // PreviewRfqPrice 依買家預期的單價範圍與需求數量，算出詢價總額區間並存成預覽（有效 15 分鐘）。
+  // 買家沒有給合法的範圍（下界與上界是正整數、下界不大於上界）回 INVALID_ARGUMENT；
+  // 需求已有數量與單位卻算不出總額回 FAILED_PRECONDITION。
+  rpc PreviewRfqPrice(PreviewRfqPriceRequest) returns (PreviewRfqPriceResponse);
+
+  // ConfirmRfqSnapshot 對一份價格預覽產生不可變的詢價確認快照。預覽或需求版本過時回 ABORTED。
+  rpc ConfirmRfqSnapshot(ConfirmRfqSnapshotRequest) returns (ConfirmRfqSnapshotResponse);
+
+  // PreviewRfqPublication 依確認快照編出要發給賣家的內容並建立不可變的發布核准，不發布、不通知。
+  rpc PreviewRfqPublication(PreviewRfqPublicationRequest) returns (PreviewRfqPublicationResponse);
+
+  // ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到。
+  rpc ExecuteRfqPublication(ExecuteRfqPublicationRequest) returns (ExecuteRfqPublicationResponse);
+
+  // ListConversations 列出買家的對話，最近更新的在前。
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc GetConversationMessages(GetConversationMessagesRequest) returns (GetConversationMessagesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetRuntimeSnapshot 回傳重建一個對話畫面需要的全部事實：訊息、run、待回覆的中斷與發布結果。
+  rpc GetRuntimeSnapshot(GetRuntimeSnapshotRequest) returns (GetRuntimeSnapshotResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListSellerResponses 列出一張需求已發布的詢價收到的賣家回價（每位賣家的目前版本）。
+  rpc ListSellerResponses(ListSellerResponsesRequest) returns (ListSellerResponsesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // PutShortlistEntry 把賣家回價的一個版本加入入圍清單；已在清單時回目前的狀態。
+  rpc PutShortlistEntry(PutShortlistEntryRequest) returns (PutShortlistEntryResponse);
+
+  // DeleteShortlistEntry 把賣家回價從入圍清單移除；不在清單時回目前的狀態。
+  rpc DeleteShortlistEntry(DeleteShortlistEntryRequest) returns (DeleteShortlistEntryResponse);
+
+  // AcceptSellerQuote 接受賣家回價的指定版本並凍結成交價，隨後建立待付款訂單。報價已改版、已撤回回 ABORTED，
+  // conflictTarget 是 seller_response；報價已過有效期回 FAILED_PRECONDITION，reason 是 RFQ_RESPONSE_EXPIRED；
+  // 同一張需求已有進行中的成交回 FAILED_PRECONDITION，reason 是 RFQ_CHECKOUT_ALREADY_ACTIVE（metadata 的 orderNo 是
+  // 既有訂單，買家去付款，不是重新接受）；已經成交回 FAILED_PRECONDITION，reason 是 RFQ_ALREADY_AWARDED。
+  rpc AcceptSellerQuote(AcceptSellerQuoteRequest) returns (AcceptSellerQuoteResponse);
+
+  rpc RenameConversation(RenameConversationRequest) returns (RenameConversationResponse);
+
+  rpc DeleteConversation(DeleteConversationRequest) returns (DeleteConversationResponse);
+
+  // WatchRun 訂閱一個 run 的事件，從 cursor 之後開始（空字串表示從頭）。只讀；伺服器在 run 結束（finished 或 error 事件之後）
+  // 或滿 100 秒時結束串流。每位買家同時訂閱的串流有上限，超過回 resource_exhausted。
+  rpc WatchRun(WatchRunRequest) returns (stream WatchRunResponse);
+
+  // CancelRun 取消一個進行中的 run。run 已不在進行中不會回錯，cancel_disposition 說明結果。
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+
+  // ResumeRun 回覆 run 停下來等待的中斷，從中斷處接續，排入回答 run 後立即回傳 run_id。回覆格式不合
+  // （option_id 與 free_text 要恰一個、文字不可只有空白、選項要在待回答的卡上）回 INVALID_ARGUMENT 並帶欄位違規。中斷已被回覆回 FAILED_PRECONDITION，
+  // reason 是 APPROVAL_ALREADY_RESOLVED；run 不在等待輸入的狀態回 FAILED_PRECONDITION，reason 是 RUN_NOT_ACTIVE；
+  // 這個需求已有進行中的 run（包含另一個正在回答的 run）回 FAILED_PRECONDITION，reason 是 PROCUREMENT_RUN_IN_PROGRESS。
+  // 買家同時進行的 run 已達上限或每分鐘送出已達上限回 resource_exhausted（沒有 reason，帶 RetryInfo，稍後可再試）。
+  rpc ResumeRun(ResumeRunRequest) returns (ResumeRunResponse);
+}
+
+// SellerProcurementAppService 是登入的賣家的回價方法。店家取自呼叫者目前的店家，需要賣家能力 CAP_MARKETING。
+// 只能看到發給自己的詢價，也只能處理自己的回價；其他的一律回 not_found。
+service SellerProcurementAppService {
+  // ListSellerPublications 列出發給呼叫者的詢價，最新的在前。
+  rpc ListSellerPublications(ListSellerPublicationsRequest) returns (ListSellerPublicationsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetSellerPublication 回傳一筆詢價的內容，加上呼叫者自己的草稿與目前的正式回價。只含呼叫者自己的回價。
+  rpc GetSellerPublication(GetSellerPublicationRequest) returns (GetSellerPublicationResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // UpsertSellerResponseDraft 建立或更新回價草稿。草稿不驗金額恆等式，買家讀不到。
+  rpc UpsertSellerResponseDraft(UpsertSellerResponseDraftRequest) returns (UpsertSellerResponseDraftResponse);
+
+  // SubmitSellerResponse 送出正式回價，產生不可變的新版本。詢價已被改版回 ABORTED，conflictTarget 是 publication；
+  // 帶的 expected_seller_response_version 不是目前的版本（賣家已改價或撤回，或空字串卻已有正式回價）回 ABORTED，
+  // conflictTarget 是 seller_response，client 必須明確告知使用者報價已變動，不得改用最新版靜默重送。
+  // 沒有填實際品相、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
+  // FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。
+  rpc SubmitSellerResponse(SubmitSellerResponseRequest) returns (SubmitSellerResponseResponse);
+
+  // WithdrawSellerResponse 撤回正式回價。
+  rpc WithdrawSellerResponse(WithdrawSellerResponseRequest) returns (WithdrawSellerResponseResponse);
+
+  // DeclineRfqPublication 婉拒一筆詢價，之後不能再回價。
+  rpc DeclineRfqPublication(DeclineRfqPublicationRequest) returns (DeclineRfqPublicationResponse);
+}
+
+// SlotKey 是需求的一個欄位。
+enum SlotKey {
+  SLOT_KEY_UNSPECIFIED = 0;
+  // 品項（買家的原話）。
+  SLOT_KEY_ITEM = 1;
+  // 品項被判定成的平台分類。
+  SLOT_KEY_ITEM_RESOLUTION = 2;
+  SLOT_KEY_QUANTITY = 3;
+  SLOT_KEY_UNIT = 4;
+  SLOT_KEY_PACKAGING = 5;
+  SLOT_KEY_BUDGET_PER_UNIT = 6;
+  SLOT_KEY_DELIVERY_CITY = 7;
+  SLOT_KEY_DELIVERY_DATE = 8;
+  SLOT_KEY_EXACT_MATCH_REQUIRED = 9;
+  // 「品項有多個可能的分類，請買家選一個」這個問題。
+  SLOT_KEY_ITEM_DISAMBIGUATION = 10;
+}
+
+// RejectionReason 是一個欄位的內容被丟棄或被修正的原因。顯示文字在共用文案目錄，client 依值查，不用伺服器組好的句子。
+enum RejectionReason {
+  REJECTION_REASON_UNSPECIFIED = 0;
+  // 內容是空的。
+  REJECTION_REASON_EMPTY = 1;
+  // 文字超過長度上限，已截斷後採用（值有保留）。
+  REJECTION_REASON_TRUNCATED = 2;
+  REJECTION_REASON_QUANTITY_RANGE = 3;
+  REJECTION_REASON_BUDGET_RANGE = 4;
+  REJECTION_REASON_UNIT_NOT_ALLOWED = 5;
+  REJECTION_REASON_CITY_UNRECOGNIZED = 6;
+  REJECTION_REASON_DATE_FORMAT = 7;
+  // 日期只有月日、沒有西元年；不替買家補年份。
+  REJECTION_REASON_DATE_MISSING_YEAR = 8;
+  REJECTION_REASON_DATE_PAST = 9;
+  REJECTION_REASON_DATE_TOO_FAR = 10;
+  // 品項被丟棄（或還沒有品項），所以不能附上分類判定。
+  REJECTION_REASON_RESOLUTION_NO_ITEM = 11;
+  REJECTION_REASON_RESOLUTION_NO_LABEL = 12;
+  REJECTION_REASON_RESOLUTION_UNKNOWN_KIND = 13;
+}
+
+// RequestStatus 是採購需求的進度。
+enum RequestStatus {
+  REQUEST_STATUS_UNSPECIFIED = 0;
+  // 還在釐清需求。
+  REQUEST_STATUS_CLARIFYING = 1;
+  // 必填欄位已齊備，可以搜尋候選。
+  REQUEST_STATUS_REQUIREMENT_READY = 2;
+  // 正在比對候選賣家。
+  REQUEST_STATUS_MATCHING = 3;
+}
+
+// RunType 是 run 的種類。
+enum RunType {
+  RUN_TYPE_UNSPECIFIED = 0;
+  // 買家送出一則訊息的一輪。
+  RUN_TYPE_TURN = 1;
+  // 候選搜尋。
+  RUN_TYPE_CANDIDATE_SEARCH = 2;
+  // 回覆中斷之後接續的一輪。
+  RUN_TYPE_CLARIFICATION_RESUME = 3;
+  // 詢價發布。
+  RUN_TYPE_PUBLICATION = 4;
+}
+
+// RunStatus 是 run 的狀態。
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED = 0;
+  // 已受理，還沒取得執行資源。
+  RUN_STATUS_QUEUED = 1;
+  RUN_STATUS_RUNNING = 2;
+  // 停在中斷，等買家回答釐清問題；回答的 run 成功之後轉 SUCCEEDED。
+  RUN_STATUS_WAITING_FOR_INPUT = 3;
+  // 已收到取消，還沒收斂到終態。
+  RUN_STATUS_CANCEL_REQUESTED = 4;
+  // 以下是終態。
+  RUN_STATUS_SUCCEEDED = 5;
+  // 失敗，原因見 RunFailureReason。
+  RUN_STATUS_FAILED = 6;
+  RUN_STATUS_CANCELLED = 7;
+  reserved 8, 9;
+  reserved "RUN_STATUS_RESUMED", "RUN_STATUS_EXPIRED";
+}
+
+// RunFailureReason 是 run 失敗的機器可讀原因，只在 FAILED 時有值。
+enum RunFailureReason {
+  RUN_FAILURE_REASON_UNSPECIFIED = 0;
+  // 執行 run 的 job 消失（程序重啟或被丟棄），由週期 reconciler 標成失敗並退回額度。買家重送。
+  RUN_FAILURE_REASON_WORKER_LOST = 1;
+  // 候選搜尋失敗。
+  RUN_FAILURE_REASON_SEARCH_FAILED = 2;
+  // 一輪釐清的處理流程中途出錯。
+  RUN_FAILURE_REASON_TURN_PIPELINE_ERROR = 3;
+  // 一輪釐清時模型服務沒有給出可用答案（逾時、429、5xx 重試用盡）。買家稍後重送。
+  RUN_FAILURE_REASON_MODEL_UNAVAILABLE = 5;
+  // 候選搜尋時，需求已確認的品項分類不再是末層（分類樹改過）。伺服器已清掉品項解析、需求退回釐清；client 請買家重新選品項。
+  RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE = 6;
+  // 回答中斷的 run 失敗：答案在解析品項時被拒（例如描述的品項格式不收）。中斷仍待回答、沒有還原，client 請買家重新回答。
+  RUN_FAILURE_REASON_ANSWER_REJECTED = 7;
+  reserved 4;
+  reserved "RUN_FAILURE_REASON_EXPIRED";
+}
+
+// StepStatus 是 run 的一個步驟的狀態。
+enum StepStatus {
+  STEP_STATUS_UNSPECIFIED = 0;
+  STEP_STATUS_PENDING = 1;
+  STEP_STATUS_RUNNING = 2;
+  STEP_STATUS_WAITING_FOR_INPUT = 3;
+  STEP_STATUS_SUCCEEDED = 4;
+  STEP_STATUS_FAILED = 5;
+  STEP_STATUS_SKIPPED = 6;
+  STEP_STATUS_CANCELLED = 7;
+}
+
+// InterruptKind 是 run 停下來等待的中斷種類。
+enum InterruptKind {
+  INTERRUPT_KIND_UNSPECIFIED = 0;
+  // 釐清：品項有多個可能的分類，等買家選。
+  INTERRUPT_KIND_CLARIFICATION = 1;
+}
+
+// ItemResolutionKind 是品項被判定的方式。
+enum ItemResolutionKind {
+  ITEM_RESOLUTION_KIND_UNSPECIFIED = 0;
+  // 已確認成平台分類樹的一個分類。
+  ITEM_RESOLUTION_KIND_CATEGORY_CONFIRMED = 1;
+  // 買家在「找不到符合的品項」上自行描述，沒有分類。
+  ITEM_RESOLUTION_KIND_BUYER_DESCRIBED = 2;
+}
+
+// ConversationRole 是對話中一則訊息的發言者。
+enum ConversationRole {
+  CONVERSATION_ROLE_UNSPECIFIED = 0;
+  CONVERSATION_ROLE_USER = 1;
+  CONVERSATION_ROLE_ASSISTANT = 2;
+}
+
+// BlockKind 是回覆的敘述段落種類。
+enum BlockKind {
+  BLOCK_KIND_UNSPECIFIED = 0;
+  BLOCK_KIND_UNDERSTOOD = 1;
+  BLOCK_KIND_CONTEXT = 2;
+  BLOCK_KIND_RATIONALE = 3;
+  BLOCK_KIND_WARNING = 4;
+  BLOCK_KIND_NEXT_STEP = 5;
+  BLOCK_KIND_COMPLETE = 6;
+}
+
+// AudienceMode 是詢價發給誰。
+enum AudienceMode {
+  AUDIENCE_MODE_UNSPECIFIED = 0;
+  // 公開池：不指定對象，全站未停權的賣家。
+  AUDIENCE_MODE_WISH_POOL = 1;
+  // 指定對象：從候選搜尋的結果勾選。
+  AUDIENCE_MODE_DIRECT_RECIPIENTS = 2;
+}
+
+// PublicationState 是一次發布的狀態。
+enum PublicationState {
+  PUBLICATION_STATE_UNSPECIFIED = 0;
+  // 伺服器已建立發布；不代表已投遞或已被看到。
+  PUBLICATION_STATE_PUBLISHED = 1;
+  // 沒有重發與撤回發布的方法，所以目前只有這一個值；新值隨它的寫入方法一起加。
+}
+
+// InviteDeliveryState 是詢價通知投遞給賣家的狀態。
+enum InviteDeliveryState {
+  INVITE_DELIVERY_STATE_UNSPECIFIED = 0;
+  // 已排入投遞，還沒交給投遞管道。
+  INVITE_DELIVERY_STATE_QUEUED = 1;
+  // 已交給投遞管道；不代表賣家已收到或看到。
+  INVITE_DELIVERY_STATE_SENT = 2;
+  // 重試耗盡，投遞失敗。
+  INVITE_DELIVERY_STATE_FAILED = 3;
+}
+
+// SellerResponseType 是賣家回價的方式。
+enum SellerResponseType {
+  SELLER_RESPONSE_TYPE_UNSPECIFIED = 0;
+  // 賣家提出自己的商務條件。
+  SELLER_RESPONSE_TYPE_MANUAL_QUOTE = 1;
+  // 接受買家的非價格條款，但仍須自行填齊品相與全部金額。
+  SELLER_RESPONSE_TYPE_ACCEPT_NON_PRICE_TERMS_WITH_QUOTE = 2;
+}
+
+// TaxInclusionBasis 是報價與稅的關係。
+enum TaxInclusionBasis {
+  TAX_INCLUSION_BASIS_UNSPECIFIED = 0;
+  // total_amount 已含 tax_amount。
+  TAX_INCLUSION_BASIS_TAX_INCLUDED = 1;
+  // tax_amount 另計，仍計入 total_amount。
+  TAX_INCLUSION_BASIS_TAX_EXCLUDED = 2;
+}
+
+// SellerResponseStatus 是賣家回價的一個版本的狀態。
+enum SellerResponseStatus {
+  SELLER_RESPONSE_STATUS_UNSPECIFIED = 0;
+  // 目前最新版、未撤回、未過期。
+  SELLER_RESPONSE_STATUS_ACTIVE = 1;
+  // 賣家已提交更新的版本。
+  SELLER_RESPONSE_STATUS_SUPERSEDED = 2;
+  SELLER_RESPONSE_STATUS_WITHDRAWN = 3;
+  SELLER_RESPONSE_STATUS_EXPIRED = 4;
+}
+
+// QuoteAcceptability 是買家能不能接受一份回價。
+enum QuoteAcceptability {
+  QUOTE_ACCEPTABILITY_UNSPECIFIED = 0;
+  // 唯一能按下接受的狀態。
+  QUOTE_ACCEPTABILITY_ACCEPTABLE = 1;
+  QUOTE_ACCEPTABILITY_EXPIRED = 2;
+  QUOTE_ACCEPTABILITY_WITHDRAWN = 3;
+  QUOTE_ACCEPTABILITY_SUPERSEDED = 4;
+  // 不符合接受條件（例如這張需求已成交）。
+  QUOTE_ACCEPTABILITY_INELIGIBLE = 5;
+}
+
+// OrderProvisioningState 是接受報價之後建立訂單的進度。
+enum OrderProvisioningState {
+  ORDER_PROVISIONING_STATE_UNSPECIFIED = 0;
+  // 已接受、價格已凍結、尚未付款，訂單建立中。
+  ORDER_PROVISIONING_STATE_CREATING_ORDER = 1;
+  // 訂單已建立，order_no 與 payment_deadline 有值。
+  ORDER_PROVISIONING_STATE_ORDER_CREATED = 2;
+  // 建立失敗，由平台前滾或補償；接受本身仍成立。
+  ORDER_PROVISIONING_STATE_ORDER_FAILED = 3;
+}
+
+// CancelDisposition 是取消命令的結果。
+enum CancelDisposition {
+  CANCEL_DISPOSITION_UNSPECIFIED = 0;
+  // 已收到取消，run 已經或會收斂到 CANCELLED（以回應的 run_status 為準）。
+  CANCEL_DISPOSITION_REQUESTED = 1;
+  CANCEL_DISPOSITION_ALREADY_CANCELLED = 2;
+  // run 已經結束，沒有東西可取消。
+  CANCEL_DISPOSITION_ALREADY_TERMINAL = 3;
+  // 已經來不及取消（run 即將結束）。
+  CANCEL_DISPOSITION_TOO_LATE = 4;
+}
+
+// ---- 需求 ----
+
+message QuestionOption {
+  // 回答時帶回的選項 ID。
+  string option_id = 1;
+  string label = 2;
+}
+
+// ClarifyQuestion 是伺服器要買家回答的一個問題。
+message ClarifyQuestion {
+  SlotKey slot_key = 1;
+  string prompt = 2;
+  repeated QuestionOption options = 3;
+  // 數量這類複合欄位的單位選項。
+  repeated QuestionOption unit_options = 4;
+  bool allow_free_text = 5;
+  bool can_skip = 6;
+}
+
+message Step {
+  // 步驟的代碼，client 依它對應固定的顯示。
+  string code = 1;
+  StepStatus status = 2;
+  // 伺服器的固定文字。
+  string label = 3;
+  int64 duration_ms = 4;
+  // 顯示用的動態文案要的少數值，只在部分 code 上有。
+  map<string, string> safe_args = 5;
+  // 這一步實際發生了什麼的一句話；產生逾時或被擋下時為空，client 顯示 label。
+  string text = 6;
+}
+
+message RecordedField {
+  SlotKey key = 1;
+  string label = 2;
+  string value = 3;
+}
+
+message RejectedField {
+  SlotKey key = 1;
+  RejectionReason reason = 2;
+}
+
+// ItemResolution 是買家的品項原話被判定成平台分類樹的哪個節點，以及判定的方式。必須對買家可見且可更正。
+message ItemResolution {
+  ItemResolutionKind kind = 1;
+  // 分類名稱，或買家的描述。
+  string label = 2;
+  // 伺服器組好的顯示字串。client 不用 kind 與 label 自己重拼，slots 面板與本輪記錄的 chip 才是同一套文案。
+  string display_value = 3;
+}
+
+message Slots {
+  optional string item = 1;
+  optional int32 quantity = 2;
+  optional string unit = 3;
+  optional string packaging = 4;
+  // 每單位的預算，新台幣元。
+  optional int64 budget_per_unit = 5;
+  optional string delivery_city = 6;
+  optional google.type.Date delivery_date = 7;
+  optional bool exact_match_required = 8;
+  // 尚未判定時不設。
+  optional ItemResolution item_resolution = 9;
+}
+
+message ItemDisambiguationOption {
+  string label = 1;
+}
+
+// ItemDisambiguation 是品項有多個可能的分類時，可供買家選的分類。
+message ItemDisambiguation {
+  repeated ItemDisambiguationOption candidates = 1;
+}
+
+message Block {
+  BlockKind kind = 1;
+  string text = 2;
+}
+
+// EvidenceRef 是輔助佐證的連結，只會是通過安全檢查的 https 網址。
+message EvidenceRef {
+  string url = 1;
+  string label = 2;
+}
+
+message Interrupt {
+  string interrupt_id = 1;
+  InterruptKind kind = 2;
+}
+
+message QuotaSnapshot {
+  // 買家的會員方案代碼。
+  string plan_code = 1;
+  int32 remaining = 2;
+  int32 limit = 3;
+  // 下一期開始的時間，額度在這時重置。
+  google.protobuf.Timestamp reset_time = 4;
+}
+
+// TurnResult 是一輪釐清結束時的需求狀態。
+message TurnResult {
+  string request_id = 1;
+  string conversation_id = 2;
+  string revision_id = 3;
+  Slots slots = 4;
+  repeated RejectedField rejected = 5;
+  repeated SlotKey missing_required = 6;
+  repeated RecordedField recorded_this_turn = 7;
+  reserved 8, 9;
+  reserved "degraded", "degraded_reason";
+  string reply = 10;
+  repeated Step steps = 11;
+  // 待買家回答的問題；沒有時不設。
+  ClarifyQuestion question = 12;
+  repeated Block blocks = 13;
+  string text_fallback = 14;
+  repeated EvidenceRef evidence_refs = 15;
+  string message_id = 16;
+  google.protobuf.Timestamp create_time = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string run_id = 18;
+  // 這一輪停在等待輸入時設定；client 不把它當成串流中斷。
+  optional Interrupt interrupt = 19;
+  QuotaSnapshot quota = 20;
+}
+
+message RunSummary {
+  string run_id = 1;
+  RunType run_type = 2;
+  RunStatus status = 3;
+  // 這個 run 最新事件的 cursor；還沒有事件時是空字串。
+  string last_cursor = 4;
+  bool terminal = 5;
+}
+
+message OpenConfirmation {
+  string interrupt_id = 1;
+  InterruptKind kind = 2;
+  reserved 3;
+  reserved "expire_time";
+  // 待回答的問題，讓重新載入之後能還原同一個畫面。
+  ClarifyQuestion question = 4;
+  // 這個中斷已有進行中的回答 run（尚未成功或失敗）；client 顯示處理中，並以 active_run_id 訂閱 WatchRun。
+  bool processing = 5;
+}
+
+// PublishedRfq 是已成立的詢價發布結果。
+message PublishedRfq {
+  string publication_id = 1;
+  string version = 2;
+  google.protobuf.Timestamp publish_time = 3;
+  // 發布的對象數；公開池是 0。
+  int32 recipient_count = 4;
+  // 已排入投遞的通知數；公開池是 0。
+  int32 queued_count = 5;
+  // 這次發布依據的詢價確認快照（ConfirmRfqSnapshotResponse.confirmed_rfq_snapshot_id）。
+  string confirmed_rfq_snapshot_id = 6;
+  // 該快照的 hash，與 ConfirmRfqSnapshotResponse.payload_hash 是同一個值，原樣帶進 AcceptSellerQuoteRequest.expected_rfq_snapshot_hash；
+  // 讓買家重新載入之後仍能接受報價。
+  string rfq_snapshot_hash = 7;
+}
+
+message ConversationMessage {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  ConversationRole role = 2;
+  string text = 3;
+  repeated Step steps = 4;
+  repeated RecordedField recorded_this_turn = 5;
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ConversationSummary {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string title = 2;
+  string last_message_preview = 3;
+  google.protobuf.Timestamp update_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message SubmitTurnRequest {
+  // 要接續的需求；空字串表示新建。
+  string request_id = 1;
+  // 買家的訊息，最多 2000 個字元。
+  string message = 2 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message SubmitTurnResponse {
+  // 需求的 ID；新建時是新的。
+  string request_id = 1;
+  string conversation_id = 2;
+  // 這一輪的 run，傳給 WatchRun。
+  string run_id = 3;
+  reserved 4;
+  reserved "run_version";
+}
+
+message GetSnapshotRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetSnapshotResponse {
+  string request_id = 1;
+  string revision_id = 2;
+  RequestStatus status = 3;
+  Slots slots = 4;
+  repeated SlotKey missing_required = 5;
+  // 品項有多個可能的分類，等買家選；沒有時不設。
+  optional ItemDisambiguation item_disambiguation = 6;
+  repeated RunSummary runs = 7;
+  // 進行中的 run；沒有時是空字串。
+  string active_run_id = 8;
+  // 只在進行中的 run 停在等待輸入時設定。
+  optional OpenConfirmation open_confirmation = 9;
+  optional PublishedRfq published_rfq = 10;
+}
+
+// ---- 候選賣家 ----
+
+message MatchedFact {
+  SlotKey slot_key = 1;
+  string label = 2;
+}
+
+message UnverifiableFact {
+  SlotKey slot_key = 1;
+  // 伺服器依買家填的值組出來的具體說明，例如需向賣家確認什麼。
+  string reason = 2;
+}
+
+// Candidate 是一位候選賣家：只有結構化欄位，不含研究摘要、定位等自由文字。
+message Candidate {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 店名不在這裡：名稱只從 store（StoreCard）讀，沒公開過的店家沒有卡片、名稱不能被讀出。
+  reserved 3;
+  reserved "score";
+  repeated MatchedFact matched_facts = 4;
+  repeated UnverifiableFact unverifiable_facts = 5;
+  // 這次搜尋完成的時間；事實依需求的現行版本在讀取時組出，不是入庫的快照。
+  google.protobuf.Timestamp facts_time = 6;
+  bool selected = 7;
+  // 賣家的店家卡片。
+  hawkr.common.v1alpha1.StoreCard store = 8;
+}
+
+message StartCandidateSearchRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message StartCandidateSearchResponse {
+  string request_id = 1;
+  // 這次搜尋的 run；與候選集是不同的 ID。
+  string run_id = 2;
+  RunStatus status = 3;
+  string candidate_set_id = 4;
+  reserved 5;
+  reserved "run_version";
+}
+
+message GetCandidateSearchRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string run_id = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetCandidateSearchResponse {
+  string request_id = 1;
+  string run_id = 2;
+  string candidate_set_id = 3;
+  RunStatus status = 4;
+  // 只在 FAILED 時有值。
+  RunFailureReason failure_reason = 5;
+  repeated Candidate candidates = 6;
+}
+
+message ToggleSelectionRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string candidate_set_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string candidate_id = 3 [(google.api.field_behavior) = REQUIRED];
+  bool selected = 4;
+}
+
+message ToggleSelectionResponse {
+  string request_id = 1;
+  string candidate_set_id = 2;
+  string candidate_id = 3;
+  bool selected = 4;
+}
+
+// ---- 釐清問答 ----
+
+message SubmitAnswerRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  SlotKey slot_key = 2 [(google.api.field_behavior) = REQUIRED];
+  string option_id = 3;
+  string free_text = 4;
+  // 數量這類複合欄位的單位選項。
+  string unit_option_id = 5;
+  // 略過這個問題；必填欄位不能略過。
+  bool skip = 6;
+  string expected_revision_id = 7 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 8 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message SubmitAnswerResponse {
+  TurnResult result = 1;
+}
+
+message RewindRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  SlotKey slot_key = 2 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  // 讀到的需求版本；需求已被改版（別的裝置回答或倒回過）回 ABORTED，reason 是 VERSION_CONFLICT，conflictTarget 是 request_revision。
+  string expected_revision_id = 4 [(google.api.field_behavior) = REQUIRED];
+}
+
+message RewindResponse {
+  TurnResult result = 1;
+}
+
+// ---- 詢價單 ----
+
+// BuyerRequestedRange 是買家預期的單價範圍，單位是新台幣元。
+message BuyerRequestedRange {
+  int64 lower_bound_amount = 1 [(google.api.field_behavior) = REQUIRED];
+  int64 upper_bound_amount = 2 [(google.api.field_behavior) = REQUIRED];
+  // 單價的計價基準：每 basis_quantity 個 basis_unit。由伺服器依需求的單位填，請求不帶。
+  int32 basis_quantity = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string basis_unit = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// QuoteTotalRange 是伺服器依單價範圍與需求數量算出的詢價總額區間。client 不自己乘：計價基準因單位而異。
+message QuoteTotalRange {
+  int64 lower_bound_amount = 1;
+  int64 upper_bound_amount = 2;
+  // 計算採用的數量與單位（取自需求，不是 client 送來的值），讓買家核對。
+  int32 quantity = 3;
+  string quantity_unit = 4;
+}
+
+message PreviewRfqPriceRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string expected_revision_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string delivery_city = 4;
+  BuyerRequestedRange buyer_requested_range = 5 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PreviewRfqPriceResponse {
+  string price_preview_id = 1;
+  reserved 2;
+  reserved "version";
+  BuyerRequestedRange buyer_requested_range = 3;
+  string payload_hash = 4;
+  // 需求沒有填數量時不設；不回 0，也不把單價當總額。
+  optional QuoteTotalRange quote_total_range = 5;
+}
+
+message ConfirmRfqSnapshotRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string expected_revision_id = 3 [(google.api.field_behavior) = REQUIRED];
+  string price_preview_id = 4 [(google.api.field_behavior) = REQUIRED];
+  reserved 5;
+  reserved "price_preview_version";
+  string payload_hash = 6 [(google.api.field_behavior) = REQUIRED];
+  // 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
+  string buyer_note = 7;
+}
+
+message ConfirmRfqSnapshotResponse {
+  string confirmed_rfq_snapshot_id = 1;
+  string payload_hash = 2;
+  // 快照到期的時間；這個欄位加入之前建立的快照沒有。
+  optional google.protobuf.Timestamp expire_time = 3;
+}
+
+message SellerFacingRequestedRange {
+  int32 basis_quantity = 1;
+  string basis_unit = 2;
+  int64 lower_bound_amount = 3;
+  int64 upper_bound_amount = 4;
+}
+
+// SellerFacingRfq 是賣家看到的詢價內容，只含白名單內的欄位。買家端的發布預覽與賣家端的詢價用同一個型別，
+// 兩邊看到的內容才不會分家。
+message SellerFacingRfq {
+  string item = 1;
+  string item_label = 2;
+  optional int32 quantity = 3;
+  optional string unit = 4;
+  optional string packaging = 5;
+  string delivery_city = 6;
+  optional google.type.Date delivery_date = 7;
+  optional google.type.Date response_deadline = 8;
+  // 買家的補充說明，原文。沒有時是空字串。
+  string buyer_note = 9;
+  SellerFacingRequestedRange buyer_requested_range = 10;
+  // 這筆詢價的版本。賣家送出報價時帶回，把報價綁在他看到的那一版。
+  string publication_version = 11;
+}
+
+message PreviewRfqPublicationRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 與 ExecuteRfqPublicationRequest 的 client_request_id 是不同的鍵。
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string expected_revision_id = 3 [(google.api.field_behavior) = REQUIRED];
+  string confirmed_rfq_snapshot_id = 4 [(google.api.field_behavior) = REQUIRED];
+  AudienceMode audience_mode = 5 [(google.api.field_behavior) = REQUIRED];
+  // AUDIENCE_MODE_DIRECT_RECIPIENTS 必填。
+  string candidate_set_id = 6;
+  // AUDIENCE_MODE_DIRECT_RECIPIENTS 必填，順序有意義。
+  repeated string selected_candidate_ids = 7;
+  // 賣家回價的期限；沒有設定表示不設期限。
+  optional google.type.Date response_deadline = 8;
+}
+
+message PreviewRfqPublicationResponse {
+  // 執行時以 approval_id 與 approval_version 做版本檢查，這裡是唯一的來源。
+  string approval_id = 1;
+  string approval_version = 2;
+  string audience_hash = 3;
+  string seller_facing_payload_hash = 4;
+  // 將要發給賣家的內容。
+  SellerFacingRfq seller_facing_payload = 5;
+  google.protobuf.Timestamp expire_time = 6;
+  // 受眾政策的身分，讓買家介面講得出這會發給誰；公開池目前是全站未停權的賣家，沒有分類、地區或分級的限制。
+  // AUDIENCE_MODE_DIRECT_RECIPIENTS 時不設。
+  optional string audience_policy_id = 7;
+  optional int32 audience_policy_version = 8;
+  // 指定對象時是選定的家數；公開池是 0。
+  int32 recipient_count = 9;
+}
+
+message ExecuteRfqPublicationRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string approval_id = 3 [(google.api.field_behavior) = REQUIRED];
+  string approval_version = 4 [(google.api.field_behavior) = REQUIRED];
+  string expected_revision_id = 5 [(google.api.field_behavior) = REQUIRED];
+  // 預覽回應的 seller_facing_payload_hash。
+  string payload_hash = 6 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ExecuteRfqPublicationResponse {
+  string publication_id = 1;
+  string publication_version = 2;
+  PublicationState state = 3;
+  AudienceMode audience_mode = 4;
+  string audience_hash = 5;
+  string seller_facing_payload_hash = 6;
+  google.protobuf.Timestamp publish_time = 7;
+  // 為 true 表示這是冪等的重送，沒有建立新的發布。
+  bool replayed = 8;
+}
+
+// ---- 對話 ----
+
+message ListConversationsRequest {
+  // 每頁最多幾筆。0 表示 20；超過 50 時以 50 計；負數回 INVALID_ARGUMENT。
+  int32 page_size = 1;
+  // 上一頁回應的 next_page_token；第一頁留空。
+  string page_token = 2;
+}
+
+message ListConversationsResponse {
+  repeated ConversationSummary conversations = 1;
+  // 下一頁的 token；空字串表示這是最後一頁。
+  string next_page_token = 2;
+}
+
+message GetConversationMessagesRequest {
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetConversationMessagesResponse {
+  string conversation_id = 1;
+  string request_id = 2;
+  RequestStatus status = 3;
+  string title = 4;
+  // 時間由舊到新。
+  repeated ConversationMessage messages = 5;
+}
+
+message GetRuntimeSnapshotRequest {
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetRuntimeSnapshotResponse {
+  string conversation_id = 1;
+  string request_id = 2;
+  RequestStatus status = 3;
+  string title = 4;
+  repeated ConversationMessage messages = 5;
+  repeated RunSummary runs = 6;
+  string active_run_id = 7;
+  optional OpenConfirmation open_confirmation = 8;
+  // 最新一次的發布結果；還沒有發布時不設。
+  optional PublishedRfq published_rfq = 9;
+}
+
+message RenameConversationRequest {
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 不能是空的，也不能超過長度上限。
+  string title = 2 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message RenameConversationResponse {}
+
+message DeleteConversationRequest {
+  string conversation_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message DeleteConversationResponse {}
+
+// ---- 賣家回價（買家端） ----
+
+message SellerQuote {
+  SellerResponseType response_type = 1 [(google.api.field_behavior) = REQUIRED];
+  // 賣家實際提供的品相，必填；平台與 LLM 不代填。
+  OfferedQuality offered_quality = 2 [(google.api.field_behavior) = REQUIRED];
+  UnitBasis unit_basis = 3;
+  // 十進位字串。
+  string offered_quantity = 4;
+  string offered_quantity_unit = 5;
+  // 賣家的單位換算說明。
+  string conversion_basis = 6;
+  int64 goods_amount = 7;
+  int64 shipping_amount = 8;
+  int64 tax_amount = 9;
+  TaxInclusionBasis tax_inclusion_basis = 10;
+  // 伺服器驗證等於 goods_amount + shipping_amount + tax_amount，不符回 INVALID_ARGUMENT。
+  int64 total_amount = 11;
+  int32 lead_time_days = 12;
+  google.protobuf.Timestamp promised_delivery_time = 13;
+  google.protobuf.Timestamp valid_until_time = 14;
+  string terms_note = 15;
+  string deviation_disclosure = 16;
+}
+
+message OfferedQuality {
+  string grade = 1;
+  string inspection_notes = 2;
+}
+
+message UnitBasis {
+  // 十進位字串。
+  string quantity = 1;
+  string unit = 2;
+}
+
+// BuyerFacingSellerResponse 是買家看到的一份賣家回價；只有公開的店家資料，不含賣家的草稿與聯絡方式。
+message BuyerFacingSellerResponse {
+  string seller_response_id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string seller_response_version = 2;
+  SellerResponseStatus status = 3;
+  string payload_hash = 4;
+  google.protobuf.Timestamp submit_time = 5;
+  hawkr.common.v1alpha1.StoreCard store = 6;
+  SellerQuote quote = 7;
+  // 報價超出買家預期的範圍；只標示，不修改賣家的金額。
+  bool outside_buyer_requested_range = 8;
+  bool shortlisted = 9;
+  QuoteAcceptability acceptability = 10;
+}
+
+message ListSellerResponsesRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string publication_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 每頁最多幾筆。0 表示 50；超過 100 時以 100 計；負數回 INVALID_ARGUMENT。
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListSellerResponsesResponse {
+  repeated BuyerFacingSellerResponse seller_responses = 1;
+  string next_page_token = 2;
+}
+
+message PutShortlistEntryRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string seller_response_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string seller_response_version = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PutShortlistEntryResponse {
+  string seller_response_id = 1;
+  string seller_response_version = 2;
+  bool present = 3;
+}
+
+message DeleteShortlistEntryRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string seller_response_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string seller_response_version = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message DeleteShortlistEntryResponse {
+  string seller_response_id = 1;
+  string seller_response_version = 2;
+  bool present = 3;
+}
+
+message AcceptSellerQuoteRequest {
+  string request_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string seller_response_id = 3 [(google.api.field_behavior) = REQUIRED];
+  string expected_seller_response_version = 4 [(google.api.field_behavior) = REQUIRED];
+  // 需求被別的裝置改過（快照不符）回 ABORTED，conflictTarget 是 rfq_snapshot。
+  string expected_rfq_snapshot_hash = 5 [(google.api.field_behavior) = REQUIRED];
+}
+
+message AcceptSellerQuoteResponse {
+  string buyer_acceptance_id = 1;
+  string seller_response_id = 2;
+  string seller_response_version = 3;
+  // 成交價，新台幣元；來源只有被接受的那一版。
+  int64 accepted_deal_price = 4;
+  google.protobuf.Timestamp accept_time = 5;
+  OrderProvisioningState order_provisioning_state = 6;
+  // 訂單建立之前是空字串。
+  string order_no = 7;
+  // 訂單建立之前不設。
+  optional google.protobuf.Timestamp payment_deadline = 8;
+  bool replayed = 9;
+}
+
+// ---- run ----
+
+message WatchRunRequest {
+  string run_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 上一次收到的事件的 cursor，從它之後接續；空字串表示從 run 的第一個事件開始。client 當成不透明的字串。
+  string cursor = 2;
+}
+
+// WatchRunResponse 是串流上的一個事件。
+message WatchRunResponse {
+  // 這個事件的位置。client 記下最後收到的值，重新訂閱時帶回。
+  string cursor = 1;
+  google.protobuf.Timestamp event_time = 2;
+  oneof event {
+    // run 已受理；run 的第一個事件。
+    RunAccepted run_accepted = 3;
+    // 回覆文字的增量，client 依序串接。
+    TextDelta text = 4;
+    // 一個步驟開始、進行或結束。
+    StepEvent step = 5;
+    // 巢狀的進度列。client 依 row_id 合併：同一個 row_id 的後續事件就地更新那一列。
+    Activity activity = 6;
+    // 完整的一則回覆。
+    MessageEvent message = 7;
+    // 工具執行的結果。
+    ToolResult tool_result = 8;
+    // 這一輪結束時的需求狀態；停在等待輸入時帶 interrupt。
+    TurnResult turn_result = 9;
+    // run 到達終態（成功、失敗、取消都以它收尾）；之後沒有其他事件。
+    RunFinished finished = 10;
+  }
+  reserved 11;
+  reserved "error";
+}
+
+message RunAccepted {
+  string run_id = 1;
+  string conversation_id = 2;
+  reserved 3;
+  reserved "run_version";
+}
+
+message TextDelta {
+  string text = 1;
+}
+
+message StepEvent {
+  // 步驟在這個 run 裡的序號。
+  int32 seq = 1;
+  Step step = 2;
+}
+
+message Activity {
+  string row_id = 1;
+  int32 attempt = 2;
+  int32 max_attempts = 3;
+  string retry_group_key = 4;
+  string code = 5;
+  // 伺服器的固定文字，不為空。
+  string label = 6;
+  // 這一次實際發生了什麼；可為空，空的時候 client 顯示 label。
+  string text = 7;
+  StepStatus status = 8;
+  // 只在巢狀的子列有值。
+  optional string parent_row_id = 9;
+  // 只在這一列有計數的概念時有值；沒有與 0 是不同的意思。
+  optional int32 count = 10;
+}
+
+message MessageEvent {
+  string reply = 1;
+}
+
+// ToolResult 說明 run 呼叫了哪個工具，以及它有沒有成功；工具的回傳內容不對外。
+message ToolResult {
+  string tool_name = 1;
+  bool failed = 2;
+}
+
+message RunFinished {
+  RunStatus status = 1;
+  // 只在 FAILED 時有值。
+  RunFailureReason failure_reason = 2;
+  // 事件不帶失敗說明的文字：client 依 failure_reason 對應顯示。
+  reserved 3;
+  reserved "localized_message";
+}
+
+message CancelRunRequest {
+  string run_id = 1 [(google.api.field_behavior) = REQUIRED];
+  reserved 2;
+  reserved "expected_run_version";
+}
+
+message CancelRunResponse {
+  string run_id = 1;
+  RunStatus run_status = 2;
+  CancelDisposition cancel_disposition = 3;
+  reserved 4;
+  reserved "run_version";
+}
+
+// ClarificationResponse 是對 INTERRUPT_KIND_CLARIFICATION 的回覆：選一個選項，或自填描述。兩者至少要有一個。
+message ClarificationResponse {
+  string option_id = 1;
+  string free_text = 2;
+}
+
+message ResumeRunRequest {
+  string interrupt_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  // 回覆的內容，種類由中斷的 kind 決定。
+  oneof response {
+    ClarificationResponse clarification = 3;
+  }
+}
+
+message ResumeRunResponse {
+  string run_id = 1;
+  // 回答 run 當下的狀態；ResumeRun 在回答 run 排入後立即回傳，client 以 run_id 訂閱 WatchRun 取得結果，
+  // 或重新載入時讀 GetRuntimeSnapshot。
+  RunStatus run_status = 2;
+  reserved 3;
+  reserved "result";
+}
+
+// ---- 賣家回價（賣家端） ----
+
+message SellerPublicationSummary {
+  string publication_id = 1;
+  string publication_version = 2;
+  string seller_facing_payload_hash = 3;
+  InviteDeliveryState delivery_state = 4;
+  google.protobuf.Timestamp publish_time = 5;
+}
+
+// SellerResponseDraft 是賣家自己的回價草稿。
+message SellerResponseDraft {
+  // 修改草稿時帶回；client 當成不透明的字串。
+  string draft_version = 1;
+  google.protobuf.Timestamp update_time = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  SellerQuote draft = 3;
+}
+
+// SellerResponseVersion 是賣家送出的一個正式回價版本，不可變。
+message SellerResponseVersion {
+  string seller_response_id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string seller_response_version = 2;
+  string publication_id = 3;
+  SellerResponseStatus status = 4;
+  string payload_hash = 5;
+  google.protobuf.Timestamp submit_time = 6;
+  // 取代這一版的版本；仍是最新版時是空字串。
+  string superseded_by_version = 7;
+  bool outside_buyer_requested_range = 8;
+  SellerQuote quote = 9;
+  // 為 true 表示這是冪等的重送，沒有建立新的版本。
+  bool replayed = 10;
+}
+
+// SellerResponseClosure 是回價被撤回或婉拒之後的結案狀態。
+message SellerResponseClosure {
+  string seller_response_id = 1;
+  string publication_id = 2;
+  string latest_version = 3;
+  // 沒有撤回時是空字串。
+  string withdrawn_version = 4;
+  // 仍可寫入時不設。
+  optional google.protobuf.Timestamp write_closed_time = 5;
+  string write_closed_reason = 6;
+}
+
+message SellerPublicationListItem {
+  SellerPublicationSummary publication = 1;
+  SellerFacingRfq seller_facing_payload = 2;
+  // 呼叫者還沒有正式回價時不設。
+  optional SellerResponseStatus latest_response_status = 3;
+  bool has_draft = 4;
+}
+
+message ListSellerPublicationsRequest {
+  // 每頁最多幾筆。0 表示 20；超過 50 時以 50 計；負數回 INVALID_ARGUMENT。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListSellerPublicationsResponse {
+  repeated SellerPublicationListItem publications = 1;
+  string next_page_token = 2;
+}
+
+message GetSellerPublicationRequest {
+  string publication_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetSellerPublicationResponse {
+  SellerPublicationSummary publication = 1;
+  // 還沒存過草稿時不設。
+  optional SellerResponseDraft draft = 2;
+  // 還沒有正式回價時不設。
+  optional SellerResponseVersion latest_response = 3;
+  SellerFacingRfq seller_facing_payload = 4;
+}
+
+message UpsertSellerResponseDraftRequest {
+  string publication_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 空字串表示建立第一版；草稿已存在時回 ABORTED，ErrorInfo.reason 是 VERSION_CONFLICT，metadata 的 conflictTarget 是 draft。
+  // 更新時帶讀到的草稿版本，不符同樣回 ABORTED。
+  string expected_draft_version = 2;
+  SellerQuote draft = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message UpsertSellerResponseDraftResponse {
+  SellerResponseDraft draft = 1;
+}
+
+message SubmitSellerResponseRequest {
+  string publication_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string expected_publication_version = 3 [(google.api.field_behavior) = REQUIRED];
+  string expected_seller_facing_payload_hash = 4 [(google.api.field_behavior) = REQUIRED];
+  // 尚無正式回價時是空字串。
+  string expected_seller_response_version = 5;
+  SellerQuote quote = 6 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SubmitSellerResponseResponse {
+  SellerResponseVersion seller_response = 1;
+}
+
+message WithdrawSellerResponseRequest {
+  string publication_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string seller_response_id = 2 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  string expected_seller_response_version = 4 [(google.api.field_behavior) = REQUIRED];
+  // 賣家填的撤回原因代碼，伺服器原樣記錄、不解析。
+  string reason_code = 5;
+}
+
+message WithdrawSellerResponseResponse {
+  SellerResponseClosure closure = 1;
+}
+
+message DeclineRfqPublicationRequest {
+  string publication_id = 1 [(google.api.field_behavior) = REQUIRED];
+  string client_request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+  // 賣家填的婉拒原因代碼，伺服器原樣記錄、不解析。
+  string reason_code = 3;
+}
+
+message DeclineRfqPublicationResponse {
+  SellerResponseClosure closure = 1;
+}

@@ -5,6 +5,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
+	"slices"
 	"strings"
 )
 
@@ -60,6 +62,81 @@ func CheckRestrictedCalls(filename string, src []byte, rule RestrictedCalls) (Re
 				res.Allowed++
 			} else {
 				res.Violations = append(res.Violations, fmt.Sprintf("%s：不得使用 %s：%s", fset.Position(sel.Sel.Pos()), name, rule.Why))
+			}
+		}
+		return true
+	})
+	return res, nil
+}
+
+// RestrictedPackageCalls 規定某個套件的一組函式只能在哪些目錄呼叫；與 RestrictedCalls 不同，它依 import 解析套件名（含別名），
+// 同名的其他套件函式不算，測試檔也要檢查。
+type RestrictedPackageCalls struct {
+	// ImportPath 是受限函式所屬的套件。
+	ImportPath string
+	// Names 是受限的函式名。
+	Names []string
+	// AllowedDirs 是可以呼叫的目錄，單體根目錄起算的斜線路徑；子目錄也算。
+	AllowedDirs []string
+	// Why 說明規則，放進違規訊息。
+	Why string
+}
+
+// LLMClientCalls 守住單一 LLM client 建構點的呼叫面：genai 的型別各處可用，但建構 client 只有 internal/platform/llm。
+var LLMClientCalls = RestrictedPackageCalls{
+	ImportPath:  "google.golang.org/genai",
+	Names:       []string{"NewClient"},
+	AllowedDirs: []string{"internal/platform/llm"},
+	Why:         "LLM client 只能由 internal/platform/llm 建構（A9-D10、AD5）",
+}
+
+// CheckRestrictedPackageCalls 檢查 src 裡對受限套件函式的選取（呼叫或函式值）。filename 是單體根目錄起算的斜線路徑；
+// 呼叫方負責略過生成檔。
+func CheckRestrictedPackageCalls(filename string, src []byte, rule RestrictedPackageCalls) (RestrictedCallsResult, error) {
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, filename, src, 0)
+	if err != nil {
+		return RestrictedCallsResult{}, err
+	}
+	allowed := false
+	for _, dir := range rule.AllowedDirs {
+		if strings.HasPrefix(filename, dir+"/") {
+			allowed = true
+		}
+	}
+	names := map[string]bool{}
+	dot := false
+	for _, imp := range f.Imports {
+		if strings.Trim(imp.Path.Value, "\"`") != rule.ImportPath {
+			continue
+		}
+		switch {
+		case imp.Name == nil:
+			names[path.Base(rule.ImportPath)] = true
+		case imp.Name.Name == ".":
+			dot = true
+		case imp.Name.Name != "_":
+			names[imp.Name.Name] = true
+		}
+	}
+	var res RestrictedCallsResult
+	hit := func(pos token.Pos, name string) {
+		if allowed {
+			res.Allowed++
+			return
+		}
+		res.Violations = append(res.Violations, fmt.Sprintf("%s：不得使用 %s.%s：%s", fset.Position(pos), path.Base(rule.ImportPath), name, rule.Why))
+	}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.SelectorExpr:
+			id, ok := x.X.(*ast.Ident)
+			if ok && names[id.Name] && slices.Contains(rule.Names, x.Sel.Name) {
+				hit(x.Sel.Pos(), x.Sel.Name)
+			}
+		case *ast.CallExpr:
+			if id, ok := x.Fun.(*ast.Ident); ok && dot && slices.Contains(rule.Names, id.Name) {
+				hit(id.Pos(), id.Name)
 			}
 		}
 		return true

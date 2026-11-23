@@ -1,0 +1,319 @@
+{
+ "mutants": [
+  {
+   "id": "p1",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "func ChargesQuota(runType string) bool { return runType == RunTypeTurn }",
+   "new": "func ChargesQuota(runType string) bool { return true }",
+   "test": "internal/modules/procurement/internal/run ^TestOnlyTurnRunsChargeQuota$",
+   "why": "TestOnlyTurnRunsChargeQuota 守住的行為被改掉：`func ChargesQuota(runType string) bool { return runType == R` → `func ChargesQuota(runType string) bool { return true }`。schema CHECK agent_runs_quota_check（quota_period_start 只屬於 TURN）由整合斷言 TestRunsTableTiesTheQuotaPeriodToTurnRuns 守住：測試用 migrations 建庫，改已提交的 migration 只會被 atlas.sum 擋下，不是有意義的 mutation（同 3b-2a 的做法）"
+  },
+  {
+   "id": "p1b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "func ChargesQuota(runType string) bool { return runType == RunTypeTurn }",
+   "new": "func ChargesQuota(runType string) bool { return true }",
+   "test": "internal/modules/procurement/internal/run ^TestOnlyTurnRunsChargeTheQuota$",
+   "why": "TestOnlyTurnRunsChargeTheQuota (integration) 守住的行為被改掉：`func ChargesQuota(runType string) bool { return runType == R` → `func ChargesQuota(runType string) bool { return true }`"
+  },
+  {
+   "id": "p2",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/settle.go",
+   "old": "if r.QuotaPeriodStart == nil {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/run ^TestNonTurnFailureDoesNotRefundAndTurnFailureRefundsOnce$",
+   "why": "TestNonTurnFailureDoesNotRefundAndTurnFailureRefundsOnce (integration) 守住的行為被改掉：`if r.QuotaPeriodStart == nil {` → `if false {`"
+  },
+  {
+   "id": "p4",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if active >= int64(s.Limits.active()) {",
+   "new": "if active >= 1000000 {",
+   "test": "internal/modules/procurement/internal/run ^TestAtMostTwoRunsInProgressPerBuyerUnderConcurrency$",
+   "why": "TestAtMostTwoRunsInProgressPerBuyerUnderConcurrency (integration) 守住的行為被改掉：`if active >= int64(s.Limits.active()) {` → `if active >= 1000000 {`"
+  },
+  {
+   "id": "p5",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "\t\tif n > 0 {",
+   "new": "\t\tif n > 1000000 {",
+   "test": "internal/modules/procurement/internal/run ^TestOneRunInProgressPerRequestUnderConcurrency$",
+   "why": "TestOneRunInProgressPerRequestUnderConcurrency (integration) 守住的行為被改掉：`if n > 0 {` → `if n > 1000000 {`"
+  },
+  {
+   "id": "p6",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "if len(recent) >= int(limit) {",
+   "new": "if len(recent) >= int(limit)*1000000 {",
+   "test": "internal/modules/procurement/internal/run ^TestAtMostTenSubmitsPerBuyerPerMinute$",
+   "why": "TestAtMostTenSubmitsPerBuyerPerMinute (integration) 守住的行為被改掉：`if len(recent) >= int(limit) {` → `if len(recent) >= int(limit)*1000000 {`"
+  },
+  {
+   "id": "p7",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/dispatch.go",
+   "old": "return d.settleFailure(context.WithoutCancel(ctx), run, nil, nil)",
+   "new": "return nil",
+   "test": "internal/modules/procurement/internal/run ^TestRunTypeWithoutAnExecutorIsSettledAsThatTypesPipelineFailure$",
+   "why": "TestRunTypeWithoutAnExecutorIsSettledAsThatTypesPipelineFailure (integration) 守住的行為被改掉：`return d.settleFailure(context.WithoutCancel(ctx), run, nil)` → `return nil`"
+  },
+  {
+   "id": "p8",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/procurement.go",
+   "old": "\tm.dispatcher.AddWorker(workers)\n",
+   "new": "",
+   "test": "internal/modules/procurement ^TestAddWorkersRegistersTheRunReconcilerAndPurgeWorkers$",
+   "why": "TestAddWorkersRegistersTheRunReconcilerAndPurgeWorkers 守住的行為被改掉：`m.dispatcher.AddWorker(workers)` → ``"
+  },
+  {
+   "id": "p9",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\taddProcurementWorkers(workers, procurementModule)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestWorkerRoleRegistersProcurementJobs$",
+   "why": "TestWorkerRoleRegistersProcurementJobs 守住的行為被改掉：`addProcurementWorkers(workers, procurementModule)` → ``"
+  },
+  {
+   "id": "p10",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "stopProcurementHub := startProcurementHub(ctx, procurementModule, log)",
+   "new": "stopProcurementHub := func() { _ = procurementModule }",
+   "test": "cmd/hawkr ^TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot$",
+   "why": "TestServeRoleStartsTheProcurementHubAndWorkerRoleDoesNot 守住的行為被改掉：`stopProcurementHub := startProcurementHub(ctx, procurementMo` → `stopProcurementHub := func() {}`"
+  },
+  {
+   "id": "p3",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/resume.go",
+   "old": "if irq.Status == \"RESOLVED\" {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/run ^TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction$",
+   "why": "TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction (integration) 守住的行為被改掉：`if irq.Status == \"RESOLVED\" {` → `if false {`"
+  },
+  {
+   "id": "p13",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, \"\", allowedFrom(StatusSucceeded)); err != nil {",
+   "new": "if _, err := l.Now(), error(nil); err != nil {",
+   "test": "internal/modules/procurement/internal/run ^TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction$",
+   "why": "TestAnswerRunSuccessResolvesTheInterruptAndSucceedsTheAskingRunInOneTransaction (integration) 守住的行為被改掉：`if _, err := l.transition(ctx, irq.RunID, StatusSucceeded, \"` → `if _, err := l.Now(), error(nil); err != nil {`"
+  },
+  {
+   "id": "p14",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "\t\tif to == StatusCancelled {",
+   "new": "\t\tif false {",
+   "test": "internal/modules/procurement/internal/run ^TestSupersededWaitingRunCancelsItsInterruptAndFreesThePendingSlot$",
+   "why": "TestSupersededWaitingRunCancelsItsInterruptAndFreesThePendingSlot (integration) 守住的行為被改掉：`if to == StatusCancelled {` → `if false {`"
+  },
+  {
+   "id": "p15",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/interrupt.go",
+   "old": "\t\tProcessing: processing,",
+   "new": "\t\tProcessing: false,",
+   "test": "internal/modules/procurement/internal/run ^TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse$",
+   "why": "TestResumeCreatesAnOrdinaryAnswerRunAndChangesNothingElse (integration) 守住的行為被改掉：`Processing: processing,` → `Processing: false,`"
+  },
+  {
+   "id": "p16",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "if r.InterruptID != nil && (to == StatusSucceeded || to == StatusWaitingForInput) {",
+   "new": "if false {",
+   "test": "internal/modules/procurement/internal/run ^TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesOnlyTheNewOnePending$",
+   "why": "TestAnswerRunThatAsksAgainResolvesTheOldInterruptAndLeavesOnlyTheNewOnePending (integration) 守住的行為被改掉：`if r.InterruptID != nil && (to == StatusSucceeded || to == S` → `if false {`"
+  },
+  {
+   "id": "p17",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "\tif to == StatusWaitingForInput {\n",
+   "new": "\tif false {\n",
+   "test": "internal/modules/procurement/internal/run ^TestPublicTransitionRejectsEnteringWaitingForInputWithoutTouchingTheDatabase$",
+   "why": "TestPublicTransitionRejectsEnteringWaitingForInputWithoutTouchingTheDatabase 守住的行為被改掉：`if to == StatusWaitingForInput {` → `if false {`"
+  },
+  {
+   "id": "p18",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/transition.go",
+   "old": "\tif to == StatusSucceeded {\n\t\tfrom = slices.DeleteFunc",
+   "new": "\tif false {\n\t\tfrom = slices.DeleteFunc",
+   "test": "internal/modules/procurement/internal/run ^TestPublicTransitionSourcesExcludeTheAnswerCommitEdge$",
+   "why": "TestPublicTransitionSourcesExcludeTheAnswerCommitEdge 守住的行為被改掉：`if to == StatusSucceeded {` → `if false {`"
+  },
+  {
+   "id": "p19",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/transition.go",
+   "old": "\tif to == StatusSucceeded {\n\t\tfrom = slices.DeleteFunc",
+   "new": "\tif false {\n\t\tfrom = slices.DeleteFunc",
+   "test": "internal/modules/procurement/internal/run ^TestPublicTransitionCannotLeaveWaitingForInputToSucceededWithoutResolvingTheInterrupt$",
+   "why": "TestPublicTransitionCannotLeaveWaitingForInputToSucceededWithoutResolvingTheInterrupt (integration) 守住的行為被改掉：`if to == StatusSucceeded {` → `if false {`"
+  },
+  {
+   "id": "p20",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/runs.sql.go",
+   "old": "AND request_id = $2 AND status = 'WAITING_FOR_INPUT'",
+   "new": "AND request_id = $2 AND status = 'NEVER'",
+   "test": "internal/modules/procurement/internal/run ^TestSubmitSupersedesTheWaitingRunOfTheSameRequestEvenWithoutAConversation$",
+   "why": "TestSubmitSupersedesTheWaitingRunOfTheSameRequestEvenWithoutAConversation (integration) 守住的行為被改掉：`AND request_id = $2 AND status = 'WAITING_FOR_INPUT'` → `AND request_id = $2 AND status = 'NEVER'`"
+  },
+  {
+   "id": "p21",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "\tif requestID != nil {\n\t\tn, err := q.CountRequestActiveRuns(ctx, *requestID)\n\t\tif err != nil {\n\t\t\treturn fmt.Errorf(\"run：數需求進行中的 run：%w\", err)\n\t\t}\n\t\tif n > 0 {\n\t\t\treturn apperr.FailedPrecondition(\"這個需求已有進行中的 run\").WithReason(apperr.ReasonProcurementRunInProgress)\n\t\t}\n\t}\n\tactive, err := q.CountBuyerActiveRuns(ctx, buyerID)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"run：數進行中的 run：%w\", err)\n\t}\n\tif active >= int64(s.Limits.active()) {\n\t\treturn apperr.ResourceExhausted(5*time.Second, \"同時進行中的採購已達上限，請等目前的完成後再送出\")\n\t}\n",
+   "new": "\tactive, err := q.CountBuyerActiveRuns(ctx, buyerID)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"run：數進行中的 run：%w\", err)\n\t}\n\tif active >= int64(s.Limits.active()) {\n\t\treturn apperr.ResourceExhausted(5*time.Second, \"同時進行中的採購已達上限，請等目前的完成後再送出\")\n\t}\n\tif requestID != nil {\n\t\tn, err := q.CountRequestActiveRuns(ctx, *requestID)\n\t\tif err != nil {\n\t\t\treturn fmt.Errorf(\"run：數需求進行中的 run：%w\", err)\n\t\t}\n\t\tif n > 0 {\n\t\t\treturn apperr.FailedPrecondition(\"這個需求已有進行中的 run\").WithReason(apperr.ReasonProcurementRunInProgress)\n\t\t}\n\t}\n",
+   "test": "internal/modules/procurement/internal/run ^TestPerRequestInProgressCheckComesBeforeTheBuyerWideLimit$",
+   "why": "TestPerRequestInProgressCheckComesBeforeTheBuyerWideLimit (integration) 守住的行為被改掉：`if requestID != nil {` → `active, err := q.CountBuyerActiveRuns(ctx, buyerID)`"
+  },
+  {
+   "id": "p23",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/interrupt.go",
+   "old": "\t\tif r.Status != StatusRunning {\n",
+   "new": "\t\tif false {\n",
+   "test": "internal/modules/procurement/internal/run ^TestInterruptOnARunThatIsNotRunningReturnsAnInvalidTransition$",
+   "why": "TestInterruptOnARunThatIsNotRunningReturnsAnInvalidTransition (integration) 守住的行為被改掉：`if r.Status != StatusRunning {` → `if false {`"
+  },
+  {
+   "id": "p24",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/runs.sql.go",
+   "old": "'procurement.run_submit:' || $1::bigint",
+   "new": "'procurement.run_submit_x:' || $1::bigint",
+   "test": "internal/modules/procurement/internal/run ^TestBuyerSubmitLockUsesTheNamespacedKeyOfThatBuyer$",
+   "why": "TestBuyerSubmitLockUsesTheNamespacedKeyOfThatBuyer (integration) 守住的行為被改掉：`'procurement.run_submit:' || $1::bigint` → `'procurement.run_submit_x:' || $1::bigint`"
+  },
+  {
+   "id": "p25",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/jobs/jobs.go",
+   "old": "\tif errors.Is(err, river.ErrNotFound) {\n",
+   "new": "\tif errors.Is(err, river.ErrNotFound) && false {\n",
+   "test": "internal/platform/jobs ^TestCancelJobReportsAMissingJobRowAsNotFound$",
+   "why": "TestCancelJobReportsAMissingJobRowAsNotFound (integration) 守住的行為被改掉：`if errors.Is(err, river.ErrNotFound) {` → `if false {`"
+  },
+  {
+   "id": "p26",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+   "old": "\tfor _, a := range answers {\n",
+   "new": "\tfor _, a := range answers[:0] {\n",
+   "test": "internal/modules/procurement/internal/run ^TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun$",
+   "why": "TestCancellingTheAskingRunWhileItsAnswerRunIsInProgressCancelsTheAnswerRun (integration) 守住的行為被改掉：`for _, a := range answers {` → `for _, a := range answers[:0] {`"
+  },
+  {
+   "id": "p27",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+   "old": "r, err := c.Ledger.lockRun(ctx, runID)",
+   "new": "r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)",
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestRunLockingPathsGoThroughTheOrderedLockHelpers 守住的行為被改掉：`r, err := c.Ledger.lockRun(ctx, runID)` → `r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)`"
+  },
+  {
+   "id": "p27b",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+   "old": "r, err := c.Ledger.lockRun(ctx, runID)",
+   "new": "r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)",
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestAnswerCommitRacingWithEveryLockingPath.../cancel_answer (integration) 守住的行為被改掉：`r, err := c.Ledger.lockRun(ctx, runID)` → `r, err := store.New(c.DB.Conn(ctx)).LockRun(ctx, runID)`。並行測試 TestAnswerCommitRacingWithEveryLockingPath… 能否撞出死結取決於排程（CI 曾讓 p28 存活），mutation 改由鎖順序守門測試判定"
+  },
+  {
+   "id": "p28",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/dispatch.go",
+   "old": "cur, err := d.Ledger.lockRun(ctx, run.ID)",
+   "new": "cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)",
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestAnswerCommitRacingWithEveryLockingPath.../settle_failure (integration) 守住的行為被改掉：`cur, err := d.Ledger.lockRun(ctx, run.ID)` → `cur, err := store.New(d.DB.Conn(ctx)).LockRun(ctx, run.ID)`。並行測試 TestAnswerCommitRacingWithEveryLockingPath… 能否撞出死結取決於排程（CI 曾讓 p28 存活），mutation 改由鎖順序守門測試判定"
+  },
+  {
+   "id": "p29",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/reconcile.go",
+   "old": "if err := r.Ledger.lockAskingOf(ctx, id); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestAnswerCommitRacingWithEveryLockingPath.../reconcile (integration) 守住的行為被改掉：`if err := r.Ledger.lockAskingOf(ctx, id); err != nil {` → `if err := error(nil); err != nil {`。並行測試 TestAnswerCommitRacingWithEveryLockingPath… 能否撞出死結取決於排程（CI 曾讓 p28 存活），mutation 改由鎖順序守門測試判定"
+  },
+  {
+   "id": "p29b",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/reconcile.go",
+   "old": "if err := r.Ledger.lockAskingOf(ctx, id); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/procurement/internal/run ^TestRunLockingPathsGoThroughTheOrderedLockHelpers$",
+   "why": "TestRunLockingPathsGoThroughTheOrderedLockHelpers 守住的行為被改掉：`if err := r.Ledger.lockAskingOf(ctx, id); err != nil {` → `if err := error(nil); err != nil {`"
+  },
+  {
+   "id": "p30",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "func lockErr(err error, what string) error {\n\tif errors.Is(err, pgx.ErrNoRows) {",
+   "new": "func lockErr(err error, what string) error {\n\tif false {",
+   "test": "internal/modules/procurement/internal/run ^TestLockErrMapsAMissingRowToNotFound$",
+   "why": "TestLockErrMapsAMissingRowToNotFound 守住的行為被改掉：`func lockErr(err error, what string) error {` → `func lockErr(err error, what string) error {`"
+  },
+  {
+   "id": "p30b",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/ledger.go",
+   "old": "func lockErr(err error, what string) error {\n\tif errors.Is(err, pgx.ErrNoRows) {",
+   "new": "func lockErr(err error, what string) error {\n\tif false {",
+   "test": "internal/modules/procurement/internal/run ^(TestDispatcherSkipsAnAnswerRunWhoseAskingRunIsGone|TestLockingAnAnswerRunWhoseAskingRunIsGoneIsNotFound)$",
+   "why": "TestLockingAnAnswerRunWhoseAskingRunIsGoneIsNotFound (integration) 守住的行為被改掉：`func lockErr(err error, what string) error {` → `func lockErr(err error, what string) error {`"
+  },
+  {
+   "id": "p31",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/submit.go",
+   "old": "\t\tif in.RunType == RunTypeTurn {\n",
+   "new": "\t\tif true {\n",
+   "test": "internal/modules/procurement/internal/run ^TestOnlyTurnSubmitSupersedesWaitingRuns$",
+   "why": "TestOnlyTurnSubmitSupersedesWaitingRuns (integration) 守住的行為被改掉：`if in.RunType == RunTypeTurn {` → `if true {`"
+  },
+  {
+   "id": "p32",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+   "old": "\tif !found {\n",
+   "new": "\tif !found && false {\n",
+   "test": "internal/modules/procurement/internal/run ^TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler$",
+   "why": "TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler (integration) 守住的行為被改掉：`if !found {` → `if false {`"
+  },
+  {
+   "id": "p33",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+   "old": "case StatusQueued, StatusRunning, StatusCancelRequested:",
+   "new": "case StatusQueued, StatusRunning:",
+   "test": "internal/modules/procurement/internal/run ^TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler$",
+   "why": "TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler/cancel_requested (integration) 守住的行為被改掉：`case StatusQueued, StatusRunning, StatusCancelRequested:` → `case StatusQueued, StatusRunning:`"
+  },
+  {
+   "id": "p34",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/run/cancel.go",
+   "old": "o := decide(r, \"\", false)",
+   "new": "o := decide(store.ProcurementAgentRun{Status: StatusQueued}, \"\", false)",
+   "test": "internal/modules/procurement/internal/run ^TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler$",
+   "why": "TestCancelWhenTheJobRowIsGoneConvergesLikeTheReconciler/cancel_requested (integration) 守住的行為被改掉：`o := decide(r, \"\", false)` → `o := decide(store.ProcurementAgentRun{Status: StatusQueued},`"
+  }
+ ]
+}

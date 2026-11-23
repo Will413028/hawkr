@@ -28,9 +28,10 @@ func ParseID(path, raw string) (int64, error) {
 }
 
 // ParseUUID 解析請求裡的 UUID 字串 ID；path 是請求的欄位路徑，格式不對是 INVALID_ARGUMENT，指向該欄位。
+// 只收 36 字元的標準寫法（伺服器發出的就是這種）：uuid.Parse 也收 urn:uuid:、大括號與沒有連字號的寫法，同一個 ID 會有多種拼法。
 func ParseUUID(path, raw string) (uuid.UUID, error) {
 	id, err := uuid.Parse(raw)
-	if err != nil {
+	if err != nil || len(raw) != 36 {
 		return uuid.UUID{}, RequiredField(path, path+" 必須是有效的 ID")
 	}
 	return id, nil
