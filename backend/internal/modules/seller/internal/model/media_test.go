@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
 	"slices"
 	"testing"
 	"uuid"
@@ -36,15 +37,15 @@ func (s *stubMedia) Confirm(_ context.Context, _ media.Uploader, token string) (
 
 func (*stubMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }
 
-func (s *stubMedia) ReadSecure(_ context.Context, id uuid.UUID) (io.ReadCloser, error) {
+func (s *stubMedia) ReadSecure(_ context.Context, id uuid.UUID) (io.ReadCloser, string, error) {
 	if s.readErr != nil {
-		return nil, s.readErr
+		return nil, "", s.readErr
 	}
 	data, ok := s.files[id]
 	if !ok {
-		return nil, apperr.NotFound("沒有這份檔")
+		return nil, "", apperr.NotFound("沒有這份檔")
 	}
-	return io.NopCloser(bytes.NewReader(data)), nil
+	return io.NopCloser(bytes.NewReader(data)), http.DetectContentType(data), nil
 }
 
 func violationFields(t *testing.T, err error) []string {
@@ -95,14 +96,19 @@ func TestConfirmAllReportsEveryRejectedItemAndStopsOnOtherErrors(t *testing.T) {
 	}
 }
 
-// 機敏檔的型別由內容辨認；media 說沒有是資料不一致（ErrFileMissing），不是機敏資產原樣回，其他錯誤原樣回。
-func TestReadSecureSniffsTheTypeAndClassifiesFailures(t *testing.T) {
+// 機敏檔的型別是 media 上傳時記下的；media 說沒有是資料不一致（ErrFileMissing），不是機敏資產原樣回，其他錯誤原樣回。
+func TestReadSecureReturnsTheRecordedTypeAndClassifiesFailures(t *testing.T) {
 	id := uuid.NewV7()
 	pdf := []byte("%PDF-1.4 x")
 	m := &stubMedia{files: map[uuid.UUID][]byte{id: pdf}}
 	got, err := ReadSecure(context.Background(), m, id)
-	if err != nil || !bytes.Equal(got.Data, pdf) || got.ContentType != "application/pdf" {
-		t.Fatalf("got=%+v err=%v", got, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, rerr := io.ReadAll(got.Body)
+	_ = got.Body.Close()
+	if rerr != nil || !bytes.Equal(data, pdf) || got.ContentType != "application/pdf" {
+		t.Fatalf("data=%q type=%s err=%v", data, got.ContentType, rerr)
 	}
 	if _, err := ReadSecure(context.Background(), m, uuid.NewV7()); !errors.Is(err, ErrFileMissing) {
 		t.Fatalf("media 說沒有：%v", err)

@@ -210,7 +210,7 @@
 
 - 佐證是機敏檔（ADR 2026-10-18-seller-governance-consolidated「決策」的「佐證」）：確認時資產必須是機敏資產，公開上傳的在寫入的 transaction 內回 InvalidInput（`EvidenceTokens`），整筆回滾什麼都不寫（`TestEvidenceMustBeSecureAssets`）。後台以 `ReadEvidence(adminID, kind, refID, position)` 讀（`kind` 是 `REPORT` 以通報 ID、`REQUEST` 以申訴請求 ID、`INQUIRY` 以詢問 ID 定址）：授權是後台的權限（`httpapi/adminauth`），模組只要求管理員 ID，沒有理由或限時授權；紀錄不存在、位置沒有佐證、種類與 ID 對不上都是 NotFound，不寫紀錄、不問 media；transaction 內先寫一列 `evidence_accesses`（`(report_id, position)` 或 `(request_id, position)` 剛好一個，以複合外鍵指向那一張佐證：佐證不可改，所以就是送出的檔；管理員、時間；不含內容），commit 之後才經 `model.ReadSecure`（與 KYC 證件共用，以資產 ID 呼叫 media 的 `ReadSecure`）取內容，紀錄寫不進去就不讀，media 失敗時紀錄仍在；media 讀不到時分成 `ErrFileMissing`（資料庫有這份佐證而 media 說沒有）、`media.ErrNotSecure`。`TestEvidenceReadIsRecordedBeforeTheBytesAreRead`、`TestEvidenceReadFailuresAreDistinguished`。佐證的 asset ID 與 object key 不對外：API 只回位置與檢視網址（`httpapi/seller.AdminEvidence`）。
 
-- 補充文件與佐證的讀取（`model.ReadSecure`）經 media 的 `ReadSecure`（以資產 ID 取得明文串流，型別由內容的 magic bytes 辨認，目前整份讀進記憶體再回應，上限是 media 的機敏上傳上限）。確認時要求資產是機敏資產（草稿存檔拒絕非機敏的證件）；讀取時 media 說不是機敏資產是 `media.ErrNotSecure`，與找不到分開。每次讀取都要記錄，所以由擁有者的端點代理；沒有通用的 admin 機敏下載，後台讀補充文件只經 `/api/files/admin/seller/kyc_applications/…`。賣家讀自己申請的補充文件（B1-D19）：`GET /api/files/seller/kyc/{document}`（`{document}` 是文件在申請裡的位置，顧客 session、授權是帳號目前的店家 `CapAccountSelfRead`，不寫後台的讀取紀錄，`Cache-Control: private, no-store`），`KYCDocument.download_uri` 指向它；`TestSellerReadsOwnKYCDocumentsOnly`、`TestOwnDocumentEndpointAuthorizesAccountsAndMapsErrorsWithoutLeaking`。
+- 補充文件與佐證的讀取（`model.ReadSecure`）經 media 的 `ReadSecure`（以資產 ID 取得明文串流與 media 上傳時記下的型別；端點直接串流回應，不整份讀進記憶體，不在 transaction 內）。確認時要求資產是機敏資產（草稿存檔拒絕非機敏的證件）；讀取時 media 說不是機敏資產是 `media.ErrNotSecure`，與找不到分開。每次讀取都要記錄，所以由擁有者的端點代理；沒有通用的 admin 機敏下載，後台讀補充文件只經 `/api/files/admin/seller/kyc_applications/…`。賣家讀自己申請的補充文件（B1-D19）：`GET /api/files/seller/kyc/{document}`（`{document}` 是文件在申請裡的位置，顧客 session、授權是帳號目前的店家 `CapAccountSelfRead`，不寫後台的讀取紀錄，`Cache-Control: private, no-store`），`KYCDocument.download_uri` 指向它；`TestSellerReadsOwnKYCDocumentsOnly`、`TestOwnDocumentEndpointAuthorizesAccountsAndMapsErrorsWithoutLeaking`。
 
 - 證件與佐證讀取時 media 的失敗（`model.ReadSecure`，兩者共用；`TestKYCDocumentReadFailuresAreDistinguished`）：資料庫有這張證件而 media 說沒有是 `ErrFileMissing`，與 `media.ErrNotSecure` 都是資料不一致，端點回 404 並記 error（要人處理）；其他錯誤依 `apperr` 分類。兩種都已經先寫了讀取紀錄。
 
@@ -486,7 +486,6 @@
 
 - **未結訂單檢查的時間窗**：`Orders` port（§11）在 transaction 外問 ordering 的現況（現在的實作是 `internal/legacy/orderservice`），與之後鎖帳號、關店之間仍可能有新訂單成立，舊服務的訂單不在單體的鎖裡。解除條件：訂單搬進單體，以 ordering 自己的判斷在同一個 transaction 內檢查（`CARRYOVER.md`「7c 審查後的結論」）。
 
-- **機敏檔讀取整份進記憶體**：`model.ReadSecure` 把 media 的串流讀成位元組再回應，機敏上傳上限內的檔案都在記憶體。解除條件：後台與賣家的檔案端點改成串流回應。
 
 - **identity 的 `source_id` 柵欄**：只為 seller-service 的非同步移除而存在，開店與關店照樣帶 `store_id` 當來源。解除條件：seller-service 退場。
 

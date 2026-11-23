@@ -38,7 +38,7 @@
 
 ## 4. 讀取機敏資產
 
-- `ReadSecure(ctx, assetID)` 回傳機敏資產（`SECURE` 且推導為 `ACTIVE`）解密後的串流；公開資產回 `ErrNotSecure`，其餘 NotFound。
+- `ReadSecure(ctx, assetID)` 回傳機敏資產（`SECURE` 且推導為 `ACTIVE`）解密後的串流與上傳時記下的型別；公開資產回 `ErrNotSecure`，其餘 NotFound。
 - 授權與存取紀錄由擁有者先做（KYC 證件、治理佐證在 seller）；media 不認識業務。在 DB transaction 之外呼叫。
 
 ## 5. 不變式

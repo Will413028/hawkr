@@ -225,8 +225,8 @@ func (m *Module) PutPublic(ctx context.Context, uploader Uploader, body io.Reade
 }
 
 // ReadSecure 讀機敏資產的明文（只讀 SECURE 且 ACTIVE；公開資產回 ErrNotSecure，其餘 NotFound）；授權由擁有者先做。
-// 一段的 tag 驗過才交出那一段的明文，呼叫方負責關閉。不得在 transaction 內呼叫。
-func (m *Module) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error) {
+// 回傳明文串流與上傳時記下的型別；一段的 tag 驗過才交出那一段的明文，呼叫方負責關閉。不得在 transaction 內呼叫。
+func (m *Module) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error) {
 	return m.upload.ReadSecure(ctx, assetID)
 }
 

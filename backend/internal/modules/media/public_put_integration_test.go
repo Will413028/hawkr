@@ -119,7 +119,7 @@ func TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm(t *testing.T) {
 		}
 	}
 	a := confirmSecure(t, f, owner, res.Token)
-	rc, err := f.m.ReadSecure(t.Context(), a.ID)
+	rc, _, err := f.m.ReadSecure(t.Context(), a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

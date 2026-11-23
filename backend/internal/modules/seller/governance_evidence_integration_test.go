@@ -117,13 +117,13 @@ func TestEvidenceReadIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 
 	got, err := f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceReport, RefID: report.ID, Position: 1})
 	must(t, err)
-	if !bytes.Equal(got.Data, evidencePDF("r1")) || got.ContentType != "application/pdf" {
-		t.Fatalf("report evidence=%q %s", got.Data, got.ContentType)
+	if !bytes.Equal(fileData(t, got), evidencePDF("r1")) || got.ContentType != "application/pdf" {
+		t.Fatalf("report evidence type=%s", got.ContentType)
 	}
 	got, err = f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 11, Kind: EvidenceRequest, RefID: request, Position: 0})
 	must(t, err)
-	if !bytes.Equal(got.Data, evidencePDF("a0")) || got.ContentType != "application/pdf" {
-		t.Fatalf("appeal evidence=%q %s", got.Data, got.ContentType)
+	if !bytes.Equal(fileData(t, got), evidencePDF("a0")) || got.ContentType != "application/pdf" {
+		t.Fatalf("appeal evidence type=%s", got.ContentType)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.evidence_accesses WHERE report_id = $1 AND request_id IS NULL AND position = 1 AND admin_id = 9 AND accessed_at = $2",
 		report.ID, f.now); n != 1 {
@@ -138,8 +138,8 @@ func TestEvidenceReadIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	must(t, err)
 	calls := f.readSecureCalls()
 	got, err = f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceReport, RefID: report.ID, Position: 0})
-	if err == nil || len(got.Data) != 0 || f.readSecureCalls() != calls {
-		t.Fatalf("紀錄寫不進去就不能讀：err=%v data=%q", err, got.Data)
+	if err == nil || got.Body != nil || f.readSecureCalls() != calls {
+		t.Fatalf("紀錄寫不進去就不能讀：err=%v", err)
 	}
 	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.evidence_accesses DROP CONSTRAINT test_no_writes")
 	must(t, err)

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"uuid"
@@ -44,14 +45,14 @@ func (*stagedMedia) Confirm(_ context.Context, _ media.Uploader, token string) (
 
 func (*stagedMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }
 
-func (m *stagedMedia) ReadSecure(_ context.Context, assetID uuid.UUID) (io.ReadCloser, error) {
+func (m *stagedMedia) ReadSecure(_ context.Context, assetID uuid.UUID) (io.ReadCloser, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, ok := m.files[assetID]
 	if !ok {
-		return nil, apperr.NotFound("找不到資產")
+		return nil, "", apperr.NotFound("找不到資產")
 	}
-	return io.NopCloser(bytes.NewReader(data)), nil
+	return io.NopCloser(bytes.NewReader(data)), http.DetectContentType(data), nil
 }
 
 // put 放一份機敏檔的內容。

@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -299,9 +300,9 @@ type ReadOwnKYCDocumentInput struct {
 	Position  int
 }
 
-// FileContent 是一份機敏檔的內容（證件圖片、治理佐證），由擁有者的端點讀出。
+// FileContent 是一份機敏檔的內容（證件圖片、治理佐證），由擁有者的端點讀出：Body 是明文串流，用完由呼叫方關閉。
 type FileContent struct {
-	Data        []byte
+	Body        io.ReadCloser
 	ContentType string
 }
 

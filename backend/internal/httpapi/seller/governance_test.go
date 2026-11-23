@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -798,7 +799,7 @@ func TestEvidenceEndpointsAuthorizeAdminsAndMapErrorsWithoutLeaking(t *testing.T
 			t.Fatalf("%s：code=%d calls=%d", name, rec.Code, m.calls)
 		}
 	}
-	m := &evidenceModule{content: model.FileContent{Data: []byte("PDF"), ContentType: "application/pdf"}}
+	m := &evidenceModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("PDF")), ContentType: "application/pdf"}}
 	rec := serveEvidence(m, nil, adminCtx(42), reportPath)
 	if rec.Code != 200 || rec.Body.String() != "PDF" || rec.Header().Get("Content-Type") != "application/pdf" || rec.Header().Get("X-Content-Type-Options") != "nosniff" ||
 		m.in != (model.ReadEvidenceInput{AdminID: 42, Kind: model.EvidenceReport, RefID: report, Position: 1}) {

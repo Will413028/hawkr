@@ -250,7 +250,7 @@ func TestSecureUpload_ThreeChunksReadBackIdentical(t *testing.T) {
 		}
 	}
 	a := confirmSecure(t, f, owner, res.Token)
-	rc, err := f.m.ReadSecure(t.Context(), a.ID)
+	rc, _, err := f.m.ReadSecure(t.Context(), a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +657,7 @@ func TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObj
 		t.Fatal(err)
 	}
 	a := confirmSecure(t, f, owner, b.Token)
-	rc, err := f.m.ReadSecure(t.Context(), a.ID)
+	rc, _, err := f.m.ReadSecure(t.Context(), a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -763,7 +763,7 @@ func TestSecureUpload_RefusesWhenKeyringMissing(t *testing.T) {
 	if _, err := m.PutSecure(ctx, owner, bytes.NewReader(pdfOf(10)), int64(len(pdfOf(10)))); !errors.Is(err, media.ErrNoKeyring) {
 		t.Fatalf("PutSecure err = %v", err)
 	}
-	if _, err := m.ReadSecure(ctx, uuid.New()); !errors.Is(err, media.ErrNoKeyring) {
+	if _, _, err := m.ReadSecure(ctx, uuid.New()); !errors.Is(err, media.ErrNoKeyring) {
 		t.Fatalf("ReadSecure err = %v", err)
 	}
 	if _, err := m.ReadStagedSecure(ctx, owner, "x"); !errors.Is(err, media.ErrNoKeyring) {
@@ -845,7 +845,7 @@ func TestReadSecure_ReturnsPlaintextForAssetAcrossSegments(t *testing.T) {
 	data := pdfOf(200_000)
 	res := uploadSecure(t, f, owner, data)
 	a := confirmSecure(t, f, owner, res.Token)
-	rc, err := f.m.ReadSecure(t.Context(), a.ID)
+	rc, _, err := f.m.ReadSecure(t.Context(), a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -858,9 +858,9 @@ func TestReadSecure_NotReadableWhileStagedAndNotFoundForUnknown(t *testing.T) {
 	f := setup(t)
 	res := uploadSecure(t, f, owner, pdfOf(10))
 	_, assetID := secureRow(t, f, res.Token)
-	_, err := f.m.ReadSecure(t.Context(), assetID)
+	_, _, err := f.m.ReadSecure(t.Context(), assetID)
 	wantKind(t, err, apperr.KindNotFound)
-	_, err = f.m.ReadSecure(t.Context(), uuid.New())
+	_, _, err = f.m.ReadSecure(t.Context(), uuid.New())
 	wantKind(t, err, apperr.KindNotFound)
 }
 
@@ -871,7 +871,7 @@ func TestReadSecure_NotFoundAfterOwnerDeletes(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
-	_, err := f.m.ReadSecure(t.Context(), a.ID)
+	_, _, err := f.m.ReadSecure(t.Context(), a.ID)
 	wantKind(t, err, apperr.KindNotFound)
 }
 
@@ -880,7 +880,7 @@ func TestReadSecure_RejectsPublicAsset(t *testing.T) {
 	f := setup(t)
 	res := ready(t, f, owner)
 	a := confirmSecure(t, f, owner, res.Token)
-	if _, err := f.m.ReadSecure(t.Context(), a.ID); !errors.Is(err, media.ErrNotSecure) {
+	if _, _, err := f.m.ReadSecure(t.Context(), a.ID); !errors.Is(err, media.ErrNotSecure) {
 		t.Fatalf("err = %v，預期 ErrNotSecure", err)
 	}
 }
@@ -888,7 +888,7 @@ func TestReadSecure_RejectsPublicAsset(t *testing.T) {
 func TestReadSecure_RefusesTransaction(t *testing.T) {
 	f := setup(t)
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
-		_, err := f.m.ReadSecure(ctx, uuid.New())
+		_, _, err := f.m.ReadSecure(ctx, uuid.New())
 		return err
 	})
 	if !errors.Is(err, media.ErrInTransaction) {
@@ -918,7 +918,7 @@ func replaceChunkObject(t *testing.T, f *fixture, key string, mutate func([]byte
 
 func readFails(t *testing.T, f *fixture, assetID uuid.UUID) (delivered int) {
 	t.Helper()
-	rc, err := f.m.ReadSecure(t.Context(), assetID)
+	rc, _, err := f.m.ReadSecure(t.Context(), assetID)
 	if err != nil {
 		return 0
 	}
@@ -1005,7 +1005,7 @@ func TestReadSecure_SwappedDroppedForeignOrRecountedChunksFailToRead(t *testing.
 			f := setup(t)
 			a := confirmSecure(t, f, owner, uploadSecure(t, f, owner, data).Token)
 			mutate(t, f, a)
-			rc, err := f.m.ReadSecure(t.Context(), a.ID)
+			rc, _, err := f.m.ReadSecure(t.Context(), a.ID)
 			if err != nil {
 				return
 			}
@@ -1051,7 +1051,7 @@ func TestReadSecure_FailsWhenWrappedDEKMovedToAnotherAsset(t *testing.T) {
 	if _, err := f.d.Pool().Exec(t.Context(), `UPDATE media.assets SET wrapped_dek = (SELECT wrapped_dek FROM media.assets WHERE id = $1) WHERE id = $2`, a1.ID, a2.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.ReadSecure(t.Context(), a2.ID); err == nil {
+	if _, _, err := f.m.ReadSecure(t.Context(), a2.ID); err == nil {
 		t.Fatal("wrapped DEK 換到別的資產 ID 仍可讀")
 	}
 }
@@ -1062,7 +1062,7 @@ func TestReadSecure_FailsForUnknownKekID(t *testing.T) {
 	if _, err := f.d.Pool().Exec(t.Context(), `UPDATE media.assets SET kek_id = 'gone' WHERE id = $1`, a.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.ReadSecure(t.Context(), a.ID); err == nil {
+	if _, _, err := f.m.ReadSecure(t.Context(), a.ID); err == nil {
 		t.Fatal("未知的 kek_id 仍可讀")
 	}
 }
@@ -1146,7 +1146,7 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 
 	// 只留新 KEK 仍可讀，物件位元組不變，沒有任何 Put。
 	onlyNew := f.withKeyring(mustKeyring(t, kek("k2", 2)))
-	rc2, err := onlyNew.ReadSecure(t.Context(), old.ID)
+	rc2, _, err := onlyNew.ReadSecure(t.Context(), old.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1157,7 +1157,7 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 	if after := readAll(t, rc3); !bytes.Equal(before, after) {
 		t.Fatal("R2 物件的位元組變了")
 	}
-	if _, onlyOld := f.m.ReadSecure(t.Context(), old.ID); onlyOld == nil {
+	if _, _, onlyOld := f.m.ReadSecure(t.Context(), old.ID); onlyOld == nil {
 		t.Fatal("舊 KEK 不該再解得開 k2 包裹的 DEK")
 	}
 	if len(f.store.puts) != 0 {
@@ -1196,7 +1196,7 @@ func TestRewrapDEKs_UploadingSessionIsRewrappedAndCompletesWithOnlyTheNewKek(t *
 	if err := f.d.Pool().QueryRow(t.Context(), `SELECT kek_id FROM media.assets WHERE id = $1`, a.ID).Scan(&assetKek); err != nil || assetKek != "k2" {
 		t.Fatalf("資產的 kek_id=%s err=%v，預期從暫存列搬來的 k2", assetKek, err)
 	}
-	rc, err := onlyNew.ReadSecure(t.Context(), a.ID)
+	rc, _, err := onlyNew.ReadSecure(t.Context(), a.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1229,7 +1229,7 @@ func TestRewrapAsset_StaleOldKekIDUpdatesNothingAndKeepsTheWrappedDEK(t *testing
 	if !bytes.Equal(before, after) || kekID != "k1" {
 		t.Fatalf("wrapped_dek 或 kek_id 被覆寫：kek_id=%s", kekID)
 	}
-	rc, err := f.m.ReadSecure(t.Context(), asset.ID)
+	rc, _, err := f.m.ReadSecure(t.Context(), asset.ID)
 	if err != nil {
 		t.Fatalf("資產不再可讀：%v", err)
 	}

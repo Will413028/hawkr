@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -109,22 +110,22 @@ func (f *Fake) MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error {
 	return nil
 }
 
-// ReadSecure 是 *Module.ReadSecure 的替身：只讀得到 PutSecure 放的資產，其餘 NotFound。
-func (f *Fake) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error) {
+// ReadSecure 是 *Module.ReadSecure 的替身：只讀得到 PutSecure 放的資產（型別由內容辨認），其餘 NotFound。
+func (f *Fake) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error) {
 	if _, ok := db.TxFrom(ctx); ok {
-		return nil, model.ErrInTransaction
+		return nil, "", model.ErrInTransaction
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, "read-secure "+assetID.String())
 	if f.FailReadSecure != nil {
-		return nil, f.FailReadSecure
+		return nil, "", f.FailReadSecure
 	}
 	data, ok := f.secure[assetID]
 	if !ok || f.deleted[assetID] {
-		return nil, apperr.NotFound("找不到檔案")
+		return nil, "", apperr.NotFound("找不到檔案")
 	}
-	return io.NopCloser(bytes.NewReader(data)), nil
+	return io.NopCloser(bytes.NewReader(data)), http.DetectContentType(data), nil
 }
 
 // PutSecure 放一份機敏資產的明文。

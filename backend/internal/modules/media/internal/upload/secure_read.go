@@ -138,28 +138,32 @@ func (r *chunkedReader) Close() error {
 var errClosed = errors.New("media：機敏讀取已關閉")
 
 // ReadSecure 讀機敏資產的明文：只讀 SECURE 且 ACTIVE 的資產，由擁有者先授權。公開資產回 model.ErrNotSecure，其餘（不存在、STAGED、
-// 已刪除）NotFound。不得在 transaction 內呼叫。
-func (s *Service) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error) {
+// 已刪除）NotFound。回傳明文串流與上傳時記下的型別。不得在 transaction 內呼叫。
+func (s *Service) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error) {
 	if err := model.RequireNoTx(ctx); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if s.d.Keyring == nil {
-		return nil, model.ErrNoKeyring
+		return nil, "", model.ErrNoKeyring
 	}
 	a, err := s.q(ctx).GetAssetView(ctx, assetID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
+		return nil, "", apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
 	if err != nil {
-		return nil, fmt.Errorf("media：讀取資產：%w", err)
+		return nil, "", fmt.Errorf("media：讀取資產：%w", err)
 	}
 	if model.Visibility(a.Visibility) != model.VisibilitySecure {
-		return nil, model.ErrNotSecure
+		return nil, "", model.ErrNotSecure
 	}
 	if deriveState(a) != model.AssetActive {
-		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
+		return nil, "", apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
-	return s.openAsset(ctx, assetFromView(a))
+	rc, err := s.openAsset(ctx, assetFromView(a))
+	if err != nil {
+		return nil, "", err
+	}
+	return rc, a.ContentType, nil
 }
 
 // ReadStagedSecure 是確認前的預覽：憑 token 讀上傳者自己、READY 且未過期的機敏暫存；資產 ID 不外露。

@@ -658,8 +658,8 @@ func TestInquiryEvidenceReadIsRecordedBeforeTheRead(t *testing.T) {
 	}
 	read, err := f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceInquiry, RefID: i.ID, Position: 1})
 	must(t, err)
-	if !bytes.Equal(read.Data, evidencePDF("m1")) || read.ContentType != "application/pdf" {
-		t.Fatalf("read=%q %s", read.Data, read.ContentType)
+	if !bytes.Equal(fileData(t, read), evidencePDF("m1")) || read.ContentType != "application/pdf" {
+		t.Fatalf("read type=%s", read.ContentType)
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.evidence_accesses WHERE inquiry_id = $1 AND report_id IS NULL AND request_id IS NULL AND position = 1 AND admin_id = 9 AND accessed_at = $2", i.ID, f.now); n != 1 {
 		t.Fatalf("讀取紀錄=%d", n)
@@ -669,8 +669,8 @@ func TestInquiryEvidenceReadIsRecordedBeforeTheRead(t *testing.T) {
 	must(t, err)
 	calls := f.readSecureCalls()
 	read, err = f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceInquiry, RefID: i.ID, Position: 0})
-	if err == nil || len(read.Data) != 0 || f.readSecureCalls() != calls {
-		t.Fatalf("紀錄寫不進去就不能讀：err=%v data=%q", err, read.Data)
+	if err == nil || read.Body != nil || f.readSecureCalls() != calls {
+		t.Fatalf("紀錄寫不進去就不能讀：err=%v", err)
 	}
 }
 

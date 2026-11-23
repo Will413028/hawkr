@@ -58,7 +58,7 @@ func (h *OwnDocuments) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fileFailure(w, r, h.log, err, "賣家自己的 KYC 證件")
 		return
 	}
-	writeFile(w, content)
+	writeFile(w, r, h.log, content)
 }
 
 // accountFile 設好機敏檔回應的 header，取出呼叫的顧客帳號；沒有登入回 401、不是顧客帳號回 403。

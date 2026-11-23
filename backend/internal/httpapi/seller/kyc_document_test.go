@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -57,7 +58,7 @@ func TestOwnDocumentEndpointAuthorizesAccountsAndMapsErrorsWithoutLeaking(t *tes
 			t.Fatalf("%q：code=%d calls=%d", bad, rec.Code, m.calls)
 		}
 	}
-	m := &ownDocModule{content: model.FileContent{Data: []byte("IMG"), ContentType: "image/png"}}
+	m := &ownDocModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("IMG")), ContentType: "image/png"}}
 	rec := serveOwnDocument(m, nil, customer, "/api/files/seller/kyc/3")
 	if rec.Code != 200 || rec.Body.String() != "IMG" || m.in.AccountID != 5 || m.in.Position != 3 {
 		t.Fatalf("code=%d in=%+v", rec.Code, m.in)

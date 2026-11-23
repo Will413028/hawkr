@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"regexp"
 	"slices"
@@ -1364,8 +1365,8 @@ func TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	_, err := f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses ADD CONSTRAINT test_no_writes CHECK (false) NOT VALID")
 	must(t, err)
 	got, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: 9, ApplicationID: sub.ID, Position: 0})
-	if err == nil || len(got.Data) != 0 || f.readSecureCalls() != 0 {
-		t.Fatalf("紀錄寫不進去就不能讀：err=%v data=%q mediaCalls=%d", err, got.Data, f.readSecureCalls())
+	if err == nil || got.Body != nil || f.readSecureCalls() != 0 {
+		t.Fatalf("紀錄寫不進去就不能讀：err=%v mediaCalls=%d", err, f.readSecureCalls())
 	}
 	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses DROP CONSTRAINT test_no_writes")
 	must(t, err)
@@ -1400,8 +1401,8 @@ func TestSellerReadsOwnKYCDocumentsOnly(t *testing.T) {
 	for pos := range 2 {
 		got, err := f.module.ReadOwnKYCDocument(ctx, ReadOwnKYCDocumentInput{AccountID: accountID, Position: pos})
 		must(t, err)
-		if !bytes.Equal(got.Data, docBytes(pos)) || got.ContentType != "application/pdf" {
-			t.Fatalf("位置 %d：data=%q type=%s", pos, got.Data, got.ContentType)
+		if !bytes.Equal(fileData(t, got), docBytes(pos)) || got.ContentType != "application/pdf" {
+			t.Fatalf("位置 %d：type=%s", pos, got.ContentType)
 		}
 	}
 	for name, in := range map[string]ReadOwnKYCDocumentInput{
@@ -1951,4 +1952,15 @@ func TestStoreNameAndDescriptionStayEditableWhileSubmittedAndAfterApproval(t *te
 	if cur, err := f.module.Store(ctx, s.StoreID); err != nil || cur.StoreName != "核准後的新店名" {
 		t.Fatalf("讀回：%+v err=%v", cur, err)
 	}
+}
+
+// fileData 讀完並關閉機敏檔的串流，回傳全部內容。
+func fileData(t *testing.T, c FileContent) []byte {
+	t.Helper()
+	defer func() { _ = c.Body.Close() }()
+	data, err := io.ReadAll(c.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

@@ -68,5 +68,5 @@ func (h *AdminEvidence) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fileFailure(w, r, h.log, err, "治理佐證")
 		return
 	}
-	writeFile(w, content)
+	writeFile(w, r, h.log, content)
 }

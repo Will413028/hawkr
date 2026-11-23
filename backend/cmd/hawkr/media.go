@@ -23,7 +23,7 @@ type mediaSettings struct {
 type mediaPort interface {
 	Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error)
 	MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error
-	ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error)
+	ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error)
 	CopyPublic(ctx context.Context, uploader media.Uploader, sourceID uuid.UUID) (media.PutPublicResult, error)
 }
 

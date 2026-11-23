@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -393,7 +394,7 @@ func TestDocumentEndpointAuthorizesAdminsAndMapsErrorsWithoutLeaking(t *testing.
 			t.Fatalf("%s：code=%d calls=%d", name, rec.Code, m.calls)
 		}
 	}
-	m := &docModule{content: model.FileContent{Data: []byte("IMG"), ContentType: "image/png"}}
+	m := &docModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("IMG")), ContentType: "image/png"}}
 	rec := serveDocument(t, m, adminCtx(42), path)
 	if rec.Code != 200 || rec.Body.String() != "IMG" || m.in.AdminID != 42 || m.in.Position != 0 || m.in.ApplicationID.String() != app {
 		t.Fatalf("code=%d in=%+v", rec.Code, m.in)
@@ -436,7 +437,7 @@ func TestDocumentEndpointNeverServesActiveContentTypes(t *testing.T) {
 		"image/jpeg": "image/jpeg", "IMAGE/PNG; charset=x": "image/png", "application/pdf": "application/pdf",
 		"text/html": "application/octet-stream", "image/svg+xml": "application/octet-stream", "": "application/octet-stream",
 	} {
-		rec := serveDocument(t, &docModule{content: model.FileContent{Data: []byte("x"), ContentType: ct}}, adminCtx(1), path)
+		rec := serveDocument(t, &docModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("x")), ContentType: ct}}, adminCtx(1), path)
 		if got := rec.Header().Get("Content-Type"); got != want {
 			t.Errorf("%q → %q，要 %q", ct, got, want)
 		}

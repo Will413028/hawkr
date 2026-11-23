@@ -3,6 +3,7 @@ package seller
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"slices"
 	"strings"
@@ -339,7 +340,7 @@ func TestListCasesAwaitingSellerReachesTheModuleAndBindsThePageToken(t *testing.
 // 詢問附件的端點：以詢問 ID 與位置定址，交給模組的是 EvidenceInquiry。
 func TestInquiryEvidenceEndpointReadsByInquiryID(t *testing.T) {
 	inquiry := uuid.NewV7()
-	m := &evidenceModule{content: model.FileContent{Data: []byte("PDF"), ContentType: "application/pdf"}}
+	m := &evidenceModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("PDF")), ContentType: "application/pdf"}}
 	path := "/api/files/admin/seller/case_inquiries/" + inquiry.String() + "/evidence/1"
 	rec := serveEvidence(m, nil, adminCtx(42), path)
 	if rec.Code != 200 || rec.Body.String() != "PDF" || m.in != (model.ReadEvidenceInput{AdminID: 42, Kind: model.EvidenceInquiry, RefID: inquiry, Position: 1}) {

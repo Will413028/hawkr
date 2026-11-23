@@ -2,6 +2,7 @@ package seller
 
 import (
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -32,12 +33,17 @@ func adminFile(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	return p.ID, true
 }
 
-// writeFile 回應檔案本身；型別只放行圖片與 PDF（safeContentType）。
-func writeFile(w http.ResponseWriter, content model.FileContent) {
+// writeFile 串流回應檔案本身並關閉 Body；型別只放行圖片與 PDF（safeContentType）。送出中途失敗時回應已開始、狀態碼改不了，
+// 中斷連線讓 client 看到截斷而不是一份看似完整的檔。
+func writeFile(w http.ResponseWriter, r *http.Request, log *slog.Logger, content model.FileContent) {
+	defer func() { _ = content.Body.Close() }()
 	w.Header().Set("Content-Type", safeContentType(content.ContentType))
 	w.Header().Set("Content-Disposition", "inline")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(content.Data)
+	if _, err := io.Copy(w, content.Body); err != nil {
+		log.WarnContext(r.Context(), "seller：送出機敏檔中斷", "error", err)
+		panic(http.ErrAbortHandler)
+	}
 }
 
 // fileFailure 把模組的錯誤轉成 HTTP 狀態，不帶任何細節：沒有授權一律 403（不洩漏資源存在與否），查無 404；

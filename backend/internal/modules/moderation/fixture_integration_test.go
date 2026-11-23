@@ -362,7 +362,7 @@ func (o ownerMedia) MarkDeleted(ctx context.Context, ids []uuid.UUID) error {
 	return o.m.MarkDeleted(ctx, ids)
 }
 
-func (o ownerMedia) ReadSecure(ctx context.Context, id uuid.UUID) (io.ReadCloser, error) {
+func (o ownerMedia) ReadSecure(ctx context.Context, id uuid.UUID) (io.ReadCloser, string, error) {
 	return o.m.ReadSecure(ctx, id)
 }
 

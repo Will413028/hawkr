@@ -41,8 +41,8 @@ func (noMedia) Confirm(context.Context, media.Uploader, string) (media.Confirmed
 	return media.ConfirmedAsset{}, errors.New("not used")
 }
 func (noMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }
-func (noMedia) ReadSecure(context.Context, uuid.UUID) (io.ReadCloser, error) {
-	return nil, errors.New("not used")
+func (noMedia) ReadSecure(context.Context, uuid.UUID) (io.ReadCloser, string, error) {
+	return nil, "", errors.New("not used")
 }
 
 type noOrders struct{}

@@ -137,13 +137,13 @@ func (p *mediaProbe) setFailConfirm(token string, err error) {
 	p.failConfirm[token] = err
 }
 
-func (p *mediaProbe) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error) {
+func (p *mediaProbe) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error) {
 	p.mu.Lock()
 	p.reads++
 	fail := p.failRead
 	p.mu.Unlock()
 	if fail != nil {
-		return nil, fail
+		return nil, "", fail
 	}
 	return p.Module.ReadSecure(ctx, assetID)
 }

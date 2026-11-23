@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net/http"
 	"slices"
 	"uuid"
 
@@ -17,29 +16,21 @@ import (
 type Media interface {
 	Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error)
 	MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error
-	ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, error)
+	ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error)
 }
 
-// secureSniffLen 是辨認機敏檔型別讀的位元組數（http.DetectContentType 只看前 512 位元組）。
-const secureSniffLen = 512
-
-// ReadSecure 讀一份機敏檔（KYC 證件、治理佐證）的明文：呼叫方在 transaction 內寫好讀取紀錄並 commit 之後，在 transaction 外呼叫這裡。
-// media 回的是明文串流、沒有型別，型別由內容的 magic bytes 辨認（media 只收 PDF 與圖片）。media 說不是機敏資產（media.ErrNotSecure，
-// 資料或設定錯）原樣回錯誤；NotFound 是我們有這份檔而 media 說沒有，資料不一致，要人處理（ErrFileMissing）。
+// ReadSecure 讀一份機敏檔（KYC 證件、治理佐證）：呼叫方在 transaction 內寫好讀取紀錄並 commit 之後，在 transaction 外呼叫這裡。
+// 回傳的 Body 是 media 的明文串流（呼叫方負責關閉），ContentType 是上傳時 media 依內容記下的型別（media 只收 PDF 與圖片）。media 說不是機敏資產
+// （media.ErrNotSecure，資料或設定錯）原樣回錯誤；NotFound 是我們有這份檔而 media 說沒有，資料不一致，要人處理（ErrFileMissing）。
 func ReadSecure(ctx context.Context, m Media, assetID uuid.UUID) (FileContent, error) {
-	body, err := m.ReadSecure(ctx, assetID)
+	body, contentType, err := m.ReadSecure(ctx, assetID)
 	if err != nil {
 		if errors.Is(err, media.ErrNotSecure) || apperr.KindOf(err) != apperr.KindNotFound {
 			return FileContent{}, err
 		}
 		return FileContent{}, ErrFileMissing
 	}
-	defer func() { _ = body.Close() }()
-	data, err := io.ReadAll(body)
-	if err != nil {
-		return FileContent{}, err
-	}
-	return FileContent{Data: data, ContentType: http.DetectContentType(data[:min(len(data), secureSniffLen)])}, nil
+	return FileContent{Body: body, ContentType: contentType}, nil
 }
 
 // ConfirmItem 是請求裡一個要確認的 staged token，Field 是它在輸入的欄位名（清單元素帶索引）。

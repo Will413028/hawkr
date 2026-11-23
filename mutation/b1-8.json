@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "seller-read-secure-content-type",
+   "stack": "go",
+   "file": "backend/internal/modules/seller/internal/model/media.go",
+   "old": "return FileContent{Body: body, ContentType: contentType}, nil",
+   "new": "return FileContent{Body: body, ContentType: \"\"}, nil",
+   "test": "internal/modules/seller/internal/model ^TestReadSecureReturnsTheRecordedTypeAndClassifiesFailures$",
+   "why": "拿掉 media 上傳時記下的型別，回應型別退回不透明二進位"
+  },
+  {
+   "id": "seller-file-endpoint-streams-body",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/files.go",
+   "old": "io.Copy(w, content.Body)",
+   "new": "io.Copy(io.Discard, content.Body)",
+   "test": "internal/httpapi/seller ^TestDocumentEndpointAuthorizesAdminsAndMapsErrorsWithoutLeaking$",
+   "why": "端點不再把 media 的串流送給 client"
+  }
+ ]
+}
