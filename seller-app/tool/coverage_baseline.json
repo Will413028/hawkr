@@ -407,7 +407,6 @@
     "lib/features/notification/data/push/background_handler.dart",
     "lib/features/order/presentation/order_card_widgets/order_card_widgets.dart",
     "lib/features/settings/presentation/shipping_settings/data/taiwan_cities_data.dart",
-    "lib/features/settings/presentation/shipping_settings/shipping_constants.dart",
     "lib/main.dart",
     "lib/shared/icons/app_icon_colors.dart",
     "lib/shared/icons/app_icons.dart",
