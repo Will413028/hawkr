@@ -12,7 +12,7 @@
 # 不起（連不上時 MEMBER 型的買家資格降級為空，BD28）。Flyway 在啟動時套用 migration。RabbitMQ 與 Redis 用 infra 的那一組
 # （docker-compose-infra.yml）。兩個排程（自動釋放、自動過期）關掉：情境不該被背景的狀態轉換影響。
 #
-# 身分：賣家與買家要有種子的店家與帳號，套用 infra/seed-data/01-account.sql（帳號 9、4 是賣家，店家 1009、1004；2001、2002
+# 身分：BUYER_TOKEN 與 BUYER2_TOKEN 是 characterize.sh 傳給測試的變數，這裡改簽成種子帳號 2001、2002 的 token；賣家與買家要有種子的店家與帳號，套用 infra/seed-data/01-account.sql（帳號 9、4 是賣家，店家 1009、1004；2001、2002
 # 是買家）再跑 hawkr dev-seed，token 以 hawkr dev-token -account <帳號 ID> 簽。
 
 JAVA_HTTP_PORT=19951
@@ -47,10 +47,10 @@ legacy_start() {
     CORS_ALLOWED_ORIGINS=http://localhost:3000 \
     "${LOG_DIR}/hawkr" dev-seed) >"${LOG_DIR}/seed-stores.log" 2>&1
   BUYER_TOKEN=$(dev_token -account 2001)
-  CHARACTERIZE_BUYER2_TOKEN=$(dev_token -account 2002)
+  BUYER2_TOKEN=$(dev_token -account 2002)
   CHARACTERIZE_SELLER_TOKEN=$(dev_token -account 9)
   CHARACTERIZE_SELLER2_TOKEN=$(dev_token -account 4)
-  export CHARACTERIZE_BUYER2_TOKEN CHARACTERIZE_SELLER_TOKEN CHARACTERIZE_SELLER2_TOKEN
+  export CHARACTERIZE_SELLER_TOKEN CHARACTERIZE_SELLER2_TOKEN
 
   create_db coupon_characterization
   start_bg coupon-service \
