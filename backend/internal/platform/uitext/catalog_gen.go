@@ -117,6 +117,32 @@ func (t Text) ChatPreviewImage() string {
 func (t Text) CommonPolicyCategory(v string) (string, bool) {
 	if t.Locale() == EN {
 		switch v {
+		case "FOOD_SAFETY":
+			return "Food safety", true
+		case "PROHIBITED_GOODS":
+			return "Illegal or prohibited goods", true
+		case "UNLICENSED_SALE":
+			return "Unlicensed sale", true
+		case "MISLEADING_INFO":
+			return "False or misleading information", true
+		case "FAKE_CERTIFICATION":
+			return "Fake certification", true
+		case "COUNTERFEIT":
+			return "Counterfeit goods", true
+		case "IP_INFRINGEMENT":
+			return "Intellectual property infringement", true
+		case "FRAUD":
+			return "Fraud or transaction manipulation", true
+		case "OFF_PLATFORM_TRADE":
+			return "Off-platform transactions", true
+		case "PRIVACY":
+			return "Misuse of personal data", true
+		case "IMPERSONATION":
+			return "Impersonation", true
+		case "PLATFORM_ABUSE":
+			return "Platform abuse", true
+		case "OTHER":
+			return "Other", true
 		case "SPAM":
 			return "Spam", true
 		case "HARASSMENT":

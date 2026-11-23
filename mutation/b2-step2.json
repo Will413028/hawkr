@@ -1,0 +1,616 @@
+{
+ "mutants": [
+  {
+   "id": "key-authorization",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"authorization\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^authorization$",
+   "why": "redact.go 的 credential 遮罩表拿掉 authorization，表單與 JSON 的 authorization 欄位值會進記錄。"
+  },
+  {
+   "id": "key-secret",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"secret\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^secret$",
+   "why": "redact.go 的 credential 遮罩表拿掉 secret，表單與 JSON 的 secret 欄位值會進記錄。"
+  },
+  {
+   "id": "key-secret_key",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"secret_key\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^secret_key$",
+   "why": "redact.go 的 credential 遮罩表拿掉 secret_key，表單與 JSON 的 secret_key 欄位值會進記錄。"
+  },
+  {
+   "id": "key-api_key",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"api_key\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^api_key$",
+   "why": "redact.go 的 credential 遮罩表拿掉 api_key，表單與 JSON 的 api_key 欄位值會進記錄。"
+  },
+  {
+   "id": "key-token",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"token\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^token$",
+   "why": "redact.go 的 credential 遮罩表拿掉 token，表單與 JSON 的 token 欄位值會進記錄。"
+  },
+  {
+   "id": "key-password",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"password\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^password$",
+   "why": "redact.go 的 credential 遮罩表拿掉 password，表單與 JSON 的 password 欄位值會進記錄。"
+  },
+  {
+   "id": "key-url",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"url\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^url$",
+   "why": "redact.go 的 credential 遮罩表拿掉 url，表單與 JSON 的 url 欄位值會進記錄。"
+  },
+  {
+   "id": "key-card",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"card\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^card$",
+   "why": "redact.go 的 card 遮罩表拿掉 card，表單與 JSON 的 card 欄位值會進記錄。"
+  },
+  {
+   "id": "key-number",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"number\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^number$",
+   "why": "redact.go 的 card 遮罩表拿掉 number，表單與 JSON 的 number 欄位值會進記錄。"
+  },
+  {
+   "id": "key-cvc",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"cvc\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^cvc$",
+   "why": "redact.go 的 card 遮罩表拿掉 cvc，表單與 JSON 的 cvc 欄位值會進記錄。"
+  },
+  {
+   "id": "key-cvv",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"cvv\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^cvv$",
+   "why": "redact.go 的 card 遮罩表拿掉 cvv，表單與 JSON 的 cvv 欄位值會進記錄。"
+  },
+  {
+   "id": "key-exp_month",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"exp_month\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^exp_month$",
+   "why": "redact.go 的 card 遮罩表拿掉 exp_month，表單與 JSON 的 exp_month 欄位值會進記錄。"
+  },
+  {
+   "id": "key-exp_year",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"exp_year\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^exp_year$",
+   "why": "redact.go 的 card 遮罩表拿掉 exp_year，表單與 JSON 的 exp_year 欄位值會進記錄。"
+  },
+  {
+   "id": "key-last4",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"last4\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^last4$",
+   "why": "redact.go 的 card 遮罩表拿掉 last4，表單與 JSON 的 last4 欄位值會進記錄。"
+  },
+  {
+   "id": "key-bank_account",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"bank_account\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^bank_account$",
+   "why": "redact.go 的 card 遮罩表拿掉 bank_account，表單與 JSON 的 bank_account 欄位值會進記錄。"
+  },
+  {
+   "id": "key-iban",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"iban\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^iban$",
+   "why": "redact.go 的 card 遮罩表拿掉 iban，表單與 JSON 的 iban 欄位值會進記錄。"
+  },
+  {
+   "id": "key-account_number",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"account_number\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^account_number$",
+   "why": "redact.go 的 card 遮罩表拿掉 account_number，表單與 JSON 的 account_number 欄位值會進記錄。"
+  },
+  {
+   "id": "key-routing_number",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"routing_number\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^routing_number$",
+   "why": "redact.go 的 card 遮罩表拿掉 routing_number，表單與 JSON 的 routing_number 欄位值會進記錄。"
+  },
+  {
+   "id": "key-email",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"email\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^email$",
+   "why": "redact.go 的 contact 遮罩表拿掉 email，表單與 JSON 的 email 欄位值會進記錄。"
+  },
+  {
+   "id": "key-phone",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"phone\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^phone$",
+   "why": "redact.go 的 contact 遮罩表拿掉 phone，表單與 JSON 的 phone 欄位值會進記錄。"
+  },
+  {
+   "id": "key-address",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"address\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^address$",
+   "why": "redact.go 的 address 遮罩表拿掉 address，表單與 JSON 的 address 欄位值會進記錄。"
+  },
+  {
+   "id": "key-line1",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"line1\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^line1$",
+   "why": "redact.go 的 address 遮罩表拿掉 line1，表單與 JSON 的 line1 欄位值會進記錄。"
+  },
+  {
+   "id": "key-line2",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"line2\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^line2$",
+   "why": "redact.go 的 address 遮罩表拿掉 line2，表單與 JSON 的 line2 欄位值會進記錄。"
+  },
+  {
+   "id": "key-postal_code",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"postal_code\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^postal_code$",
+   "why": "redact.go 的 address 遮罩表拿掉 postal_code，表單與 JSON 的 postal_code 欄位值會進記錄。"
+  },
+  {
+   "id": "key-zip",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"zip\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^zip$",
+   "why": "redact.go 的 address 遮罩表拿掉 zip，表單與 JSON 的 zip 欄位值會進記錄。"
+  },
+  {
+   "id": "key-city",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"city\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^city$",
+   "why": "redact.go 的 address 遮罩表拿掉 city，表單與 JSON 的 city 欄位值會進記錄。"
+  },
+  {
+   "id": "key-state",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"state\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^state$",
+   "why": "redact.go 的 address 遮罩表拿掉 state，表單與 JSON 的 state 欄位值會進記錄。"
+  },
+  {
+   "id": "key-town",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"town\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^town$",
+   "why": "redact.go 的 address 遮罩表拿掉 town，表單與 JSON 的 town 欄位值會進記錄。"
+  },
+  {
+   "id": "key-name",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"name\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^name$",
+   "why": "redact.go 的 name 遮罩表拿掉 name，表單與 JSON 的 name 欄位值會進記錄。"
+  },
+  {
+   "id": "key-surname",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"surname\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^surname$",
+   "why": "redact.go 的 name 遮罩表拿掉 surname，表單與 JSON 的 surname 欄位值會進記錄。"
+  },
+  {
+   "id": "key-individual",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"individual\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^individual$",
+   "why": "redact.go 的 container 遮罩表拿掉 individual，表單與 JSON 的 individual 欄位值會進記錄。"
+  },
+  {
+   "id": "key-person",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"person\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^person$",
+   "why": "redact.go 的 container 遮罩表拿掉 person，表單與 JSON 的 person 欄位值會進記錄。"
+  },
+  {
+   "id": "key-billing_details",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"billing_details\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^billing_details$",
+   "why": "redact.go 的 container 遮罩表拿掉 billing_details，表單與 JSON 的 billing_details 欄位值會進記錄。"
+  },
+  {
+   "id": "key-shipping",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"shipping\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^shipping$",
+   "why": "redact.go 的 container 遮罩表拿掉 shipping，表單與 JSON 的 shipping 欄位值會進記錄。"
+  },
+  {
+   "id": "key-dob",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"dob\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^dob$",
+   "why": "redact.go 的 identity 遮罩表拿掉 dob，表單與 JSON 的 dob 欄位值會進記錄。"
+  },
+  {
+   "id": "key-id_number",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"id_number\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^id_number$",
+   "why": "redact.go 的 identity 遮罩表拿掉 id_number，表單與 JSON 的 id_number 欄位值會進記錄。"
+  },
+  {
+   "id": "key-ssn_last_4",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"ssn_last_4\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^ssn_last_4$",
+   "why": "redact.go 的 identity 遮罩表拿掉 ssn_last_4，表單與 JSON 的 ssn_last_4 欄位值會進記錄。"
+  },
+  {
+   "id": "key-tax_id",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"tax_id\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^tax_id$",
+   "why": "redact.go 的 identity 遮罩表拿掉 tax_id，表單與 JSON 的 tax_id 欄位值會進記錄。"
+  },
+  {
+   "id": "suffix-secret",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"_secret\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestSensitiveNameSuffixesAreRedacted$/^client_secret$",
+   "why": "拿掉 _secret 後綴規則，client_secret 這類欄位值會進記錄。"
+  },
+  {
+   "id": "suffix-email",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"_email\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestSensitiveNameSuffixesAreRedacted$/^contact_email$",
+   "why": "拿掉 _email 後綴規則，contact_email 這類欄位值會進記錄。"
+  },
+  {
+   "id": "suffix-phone",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"_phone\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestSensitiveNameSuffixesAreRedacted$/^mobile_phone$",
+   "why": "拿掉 _phone 後綴規則，mobile_phone 這類欄位值會進記錄。"
+  },
+  {
+   "id": "suffix-name",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"_name\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestSensitiveNameSuffixesAreRedacted$/^given_name$",
+   "why": "拿掉 _name 後綴規則，given_name 這類欄位值會進記錄。"
+  },
+  {
+   "id": "suffix-address",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"_address\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestSensitiveNameSuffixesAreRedacted$/^billing_address$",
+   "why": "拿掉 _address 後綴規則，billing_address 這類欄位值會進記錄。"
+  },
+  {
+   "id": "suffix-token",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"_token\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestSensitiveNameSuffixesAreRedacted$/^access_token$",
+   "why": "拿掉 _token 後綴規則，access_token 這類欄位值會進記錄。"
+  },
+  {
+   "id": "pattern-sk",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "`\\b[sr]k_[A-Za-z0-9_]+`",
+   "new": "`\\b[sr]k_NEVER[A-Za-z0-9_]+`",
+   "test": "internal/platform/stripe ^TestSecretKeyAndWebhookSecretNeverAppearEvenInsideFreeText$/^secret_key$",
+   "why": "值比對拿掉 sk_／rk_ 密鑰，自由文字裡的金鑰會進記錄。"
+  },
+  {
+   "id": "pattern-whsec",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "`\\bwhsec_[A-Za-z0-9]+`",
+   "new": "`\\bwhsec_NEVER[A-Za-z0-9]+`",
+   "test": "internal/platform/stripe ^TestSecretKeyAndWebhookSecretNeverAppearEvenInsideFreeText$/^webhook_secret$",
+   "why": "值比對拿掉 whsec_，webhook 密鑰會進記錄。"
+  },
+  {
+   "id": "pattern-client-secret",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "`[A-Za-z0-9_]*_secret_[A-Za-z0-9_]+`",
+   "new": "`[A-Za-z0-9_]*_secret_NEVER[A-Za-z0-9_]+`",
+   "test": "internal/platform/stripe ^TestSecretKeyAndWebhookSecretNeverAppearEvenInsideFreeText$/^client_secret_value$",
+   "why": "值比對拿掉 client secret 形狀，無欄位名稱的 client_secret 值會進記錄。"
+  },
+  {
+   "id": "pattern-email",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "`[A-Za-z0-9._%+\\-]+@[A-Za-z0-9\\-]+(?:\\.[A-Za-z0-9\\-]+)+`",
+   "new": "`[A-Za-z0-9._%+\\-]+@NEVER[A-Za-z0-9\\-]+(?:\\.[A-Za-z0-9\\-]+)+`",
+   "test": "internal/platform/stripe ^TestPatternsRedactValuesUnderInnocuousKeys$/^email$",
+   "why": "值比對拿掉信箱，一般欄位裡的信箱會進記錄。"
+  },
+  {
+   "id": "pattern-pan",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "`\\b\\d(?:[ -]?\\d){12,18}\\b`",
+   "new": "`\\b\\d(?:[ -]?\\d){12,18}NEVER\\b`",
+   "test": "internal/platform/stripe ^TestPatternsRedactValuesUnderInnocuousKeys$/^pan$",
+   "why": "值比對拿掉卡號（13 到 19 位數字），一般欄位裡的卡號會進記錄。"
+  },
+  {
+   "id": "pattern-phone",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "`\\+\\d[\\d ()\\-]{7,}\\d`",
+   "new": "`\\+\\d[\\d ()\\-]{7,}\\dNEVER`",
+   "test": "internal/platform/stripe ^TestPatternsRedactValuesUnderInnocuousKeys$/^phone$",
+   "why": "值比對拿掉國際格式電話，一般欄位裡的電話會進記錄。"
+  },
+  {
+   "id": "form-checks-whole-key-only",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "if sensitiveKey(seg) {",
+   "new": "if sensitiveKey(k) {",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$",
+   "why": "表單遮罩只比對整個鍵、不看路徑每一層，a[b][card] 這類巢狀鍵不被遮。"
+  },
+  {
+   "id": "json-no-object-recursion",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "out[scrub(k)] = redactValue(val)\n\t\t}\n\t\treturn out\n\tcase []any:",
+   "new": "out[scrub(k)] = val\n\t\t}\n\t\treturn out\n\tcase []any:",
+   "test": "internal/platform/stripe ^TestUnknownFieldsInsideAPIIdentityContainerAreRedactedWithoutBeingListed$",
+   "why": "JSON 遮罩不遞迴進物件，巢狀值不被遮。"
+  },
+  {
+   "id": "json-no-array-recursion",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "out[i] = redactValue(val)",
+   "new": "out[i] = val",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^email$",
+   "why": "JSON 遮罩不遞迴進陣列，陣列內物件的值不被遮。"
+  },
+  {
+   "id": "json-parse-failure-logs-raw",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "if err := dec.Decode(&v); err != nil {\n\t\treturn omitted(body)",
+   "new": "if err := dec.Decode(&v); err != nil {\n\t\treturn truncate(string(body))",
+   "test": "internal/platform/stripe ^TestNonRedactableBodiesAreOmittedNotLogged$",
+   "why": "解析不了的 JSON 本文改成原文記錄，違反 fail-safe。"
+  },
+  {
+   "id": "unknown-content-type-logs-raw",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "default:\n\t\treturn omitted(body)",
+   "new": "default:\n\t\treturn truncate(string(body))",
+   "test": "internal/platform/stripe ^TestUnknownContentTypesAreOmittedNotLogged$",
+   "why": "不認得的本文類型改成原文記錄，違反 fail-safe。"
+  },
+  {
+   "id": "authorization-header-logged",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "slog.String(\"method\", req.Method),",
+   "new": "slog.String(\"method\", req.Method),\n\t\tslog.String(\"authorization\", req.Header.Get(\"Authorization\")),",
+   "test": "internal/platform/stripe ^TestRecorderLogsTheRequestSummaryAndNeverTheCredential$",
+   "why": "請求摘要把 Authorization 標頭原樣記錄，金鑰進 log。"
+  },
+  {
+   "id": "error-message-unscrubbed",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "slog.String(\"error\", scrub(err.Error())))...)\n\t\treturn nil, err",
+   "new": "slog.String(\"error\", err.Error()))...)\n\t\treturn nil, err",
+   "test": "internal/platform/stripe ^TestTransportErrorsAreLoggedWithoutLeakingTheRequestBody$",
+   "why": "傳輸錯誤訊息不經值比對就記錄。"
+  },
+  {
+   "id": "key-ip",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"ip\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^ip$",
+   "why": "redact.go 的 identity 遮罩表拿掉 ip，表單與 JSON 的 ip 值會進記錄。"
+  },
+  {
+   "id": "key-user_agent",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"user_agent\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^user_agent$",
+   "why": "redact.go 的 identity 遮罩表拿掉 user_agent，值會進記錄。"
+  },
+  {
+   "id": "key-attestations",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"attestations\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$/^attestations$",
+   "why": "個資容器表拿掉 attestations，聲明底下的欄位會進記錄。"
+  },
+  {
+   "id": "attestations-ip-ua-unredacted",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "\t\t\"ip\",\n\t\t\"user_agent\",\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestEveryDeniedFieldNameIsRedactedInFormAndJSON$",
+   "why": "ip 與 user_agent 同時拿掉。"
+  },
+  {
+   "id": "json-keys-unscrubbed",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/redact.go",
+   "old": "out[scrub(k)] = redactValue(val)",
+   "new": "out[k] = redactValue(val)",
+   "test": "internal/platform/stripe ^TestJSONObjectKeysAreScrubbed$",
+   "why": "JSON 物件鍵不經值比對，信箱或密鑰當鍵名時進記錄。"
+  },
+  {
+   "id": "query-unredacted",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "redactForm(req.URL.RawQuery)",
+   "new": "req.URL.RawQuery",
+   "test": "internal/platform/stripe ^TestQueryStringIsRedactedByKey$",
+   "why": "查詢字串原樣記錄，email 與 client_secret 參數進 log。"
+  },
+  {
+   "id": "no-getbody-marker-dropped",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "} else if body == nil && req.Body != nil && req.Body != http.NoBody && req.GetBody == nil {",
+   "new": "} else if false {",
+   "test": "internal/platform/stripe ^TestRequestWithoutGetBodyIsSentIntactAndBodyIsNotLogged$",
+   "why": "沒有 GetBody 時不再標示本文不可用。"
+  },
+  {
+   "id": "no-getbody-body-consumed",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\treturn nil\n}\n\n// call",
+   "new": "\tb, _ := io.ReadAll(req.Body)\n\treq.Body = io.NopCloser(strings.NewReader(\"\"))\n\treturn b\n}\n\n// call",
+   "test": "internal/platform/stripe ^TestRequestWithoutGetBodyIsSentIntactAndBodyIsNotLogged$",
+   "why": "沒有 GetBody 時仍讀走 req.Body，送出的請求本文被改動。"
+  },
+  {
+   "id": "read-failure-unlogged",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\t\tr.logReadFailure(req, reqBody, start, resp.StatusCode, err)\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestResponseReadFailureAndOversizeAreLogged$/^read-error$",
+   "why": "回應讀取失敗時不寫記錄。"
+  },
+  {
+   "id": "oversize-unlogged",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\t\tr.logReadFailure(req, reqBody, start, resp.StatusCode, errors.New(\"response too large\"))\n",
+   "new": "",
+   "test": "internal/platform/stripe ^TestResponseReadFailureAndOversizeAreLogged$/^oversize$",
+   "why": "回應過大時不寫記錄。"
+  },
+  {
+   "id": "read-failure-error-unscrubbed",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "slog.String(\"error\", scrub(err.Error())))...)\n}\n\nfunc (r recorder) requestAttrs",
+   "new": "slog.String(\"error\", err.Error()))...)\n}\n\nfunc (r recorder) requestAttrs",
+   "test": "internal/platform/stripe ^TestResponseReadFailureAndOversizeAreLogged$/^read-error$",
+   "why": "讀取失敗的錯誤訊息不經值比對。"
+  }
+ ]
+}

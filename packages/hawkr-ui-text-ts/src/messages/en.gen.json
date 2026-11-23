@@ -36,23 +36,23 @@
   },
   "common": {
     "PolicyCategory": {
-      "POLICY_CATEGORY_COUNTERFEIT": "仿冒商品",
-      "POLICY_CATEGORY_FAKE_CERTIFICATION": "假認證",
-      "POLICY_CATEGORY_FOOD_SAFETY": "食品安全",
-      "POLICY_CATEGORY_FRAUD": "詐欺或操縱交易",
+      "POLICY_CATEGORY_COUNTERFEIT": "Counterfeit goods",
+      "POLICY_CATEGORY_FAKE_CERTIFICATION": "Fake certification",
+      "POLICY_CATEGORY_FOOD_SAFETY": "Food safety",
+      "POLICY_CATEGORY_FRAUD": "Fraud or transaction manipulation",
       "POLICY_CATEGORY_HARASSMENT": "Harassment or bullying",
       "POLICY_CATEGORY_HATE": "Hate or discriminatory speech",
-      "POLICY_CATEGORY_IMPERSONATION": "冒用或誤導交易主體",
-      "POLICY_CATEGORY_IP_INFRINGEMENT": "侵害智慧財產權",
-      "POLICY_CATEGORY_MISLEADING_INFO": "不實或誤導資訊",
-      "POLICY_CATEGORY_OFF_PLATFORM_TRADE": "繞過平台交易",
-      "POLICY_CATEGORY_OTHER": "其他",
-      "POLICY_CATEGORY_PLATFORM_ABUSE": "干擾或濫用平台",
-      "POLICY_CATEGORY_PRIVACY": "不當使用個人資料",
-      "POLICY_CATEGORY_PROHIBITED_GOODS": "違法或禁售商品",
+      "POLICY_CATEGORY_IMPERSONATION": "Impersonation",
+      "POLICY_CATEGORY_IP_INFRINGEMENT": "Intellectual property infringement",
+      "POLICY_CATEGORY_MISLEADING_INFO": "False or misleading information",
+      "POLICY_CATEGORY_OFF_PLATFORM_TRADE": "Off-platform transactions",
+      "POLICY_CATEGORY_OTHER": "Other",
+      "POLICY_CATEGORY_PLATFORM_ABUSE": "Platform abuse",
+      "POLICY_CATEGORY_PRIVACY": "Misuse of personal data",
+      "POLICY_CATEGORY_PROHIBITED_GOODS": "Illegal or prohibited goods",
       "POLICY_CATEGORY_SEXUAL_CONTENT": "Sexual content",
       "POLICY_CATEGORY_SPAM": "Spam",
-      "POLICY_CATEGORY_UNLICENSED_SALE": "未經許可販售"
+      "POLICY_CATEGORY_UNLICENSED_SALE": "Unlicensed sale"
     },
     "StoreCard": {
       "closed_store": "Closed store"

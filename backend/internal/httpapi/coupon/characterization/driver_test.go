@@ -4,7 +4,7 @@
 // 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 Java coupon-service。
 //
 // 情境鎖定的是 Java coupon-service 當時的行為，沒有驗證那行為是否正確；疑似缺陷處以 BD 編號標明
-// （docs/plans/2026-11-23-b7-coupon/defects.md），另案處理。計畫決定要改的行為（D2、BD 標「修」）寫成修正後的
+// （backend/docs/plans/2026-11-23-b7-coupon/defects.md），另案處理。計畫決定要改的行為（D2、BD 標「修」）寫成修正後的
 // 斷言，在 REST driver 上以 skipOnLegacy 略過並附編號。coupon-service 刪除時，REST driver、legacy.sh 與
 // TestLegacy 一起刪除。
 //

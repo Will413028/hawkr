@@ -248,8 +248,7 @@
   - website 補充說明字數上限（`validateSupplementDescription` 超長分支）與帳號選單「我的檢舉」入口沒有 vitest 測試。觸發：下次改這兩處時補測試並加進 mutation 清單。
   - website 店名讀取失敗時一直顯示佔位（`useStoreCardViews` 的 `settled` 沒有錯誤與重讀）。觸發：改 `useStoreCardViews` 或使用者回報時。
   - dev seed `01-account.sql` 先授 SELLER 後開店的空窗。觸發：改 dev seed 流程時。
-  - #2805（公司時期未完成項，已移交主計畫 B2／Stripe 整合）。觸發：B2 Stripe 整合開工時（觸發由 11d 補）。
-  - D5 outbound client 的遮罩（公司時期未完成項，已移交 B2／Stripe 整合）。觸發：B2 Stripe 整合開工時（觸發由 11d 補）。
+  - [x] #2805 與 D5 outbound client 的遮罩：B2 步驟 2 完成（`97fb901d9`、`a2f4d92e4`；mutation 待 CI）。
   - 根目錄 pnpm workspace 引入 turbo。觸發：CI 時間成為瓶頸時。
 
 A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主鍵照 ID 策略的過渡規則暫用 `bigint GENERATED ALWAYS AS IDENTITY`，不用 TSID；最後一個 Java 消費者改寫後，以一個 migration 換成 uuid。

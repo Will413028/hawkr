@@ -39,17 +39,56 @@
     "chat.Preview.image": {
       "message": "Sent a photo"
     },
+    "common.PolicyCategory.POLICY_CATEGORY_COUNTERFEIT": {
+      "message": "Counterfeit goods"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FAKE_CERTIFICATION": {
+      "message": "Fake certification"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FOOD_SAFETY": {
+      "message": "Food safety"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_FRAUD": {
+      "message": "Fraud or transaction manipulation"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_HARASSMENT": {
       "message": "Harassment or bullying"
     },
     "common.PolicyCategory.POLICY_CATEGORY_HATE": {
       "message": "Hate or discriminatory speech"
     },
+    "common.PolicyCategory.POLICY_CATEGORY_IMPERSONATION": {
+      "message": "Impersonation"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_IP_INFRINGEMENT": {
+      "message": "Intellectual property infringement"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_MISLEADING_INFO": {
+      "message": "False or misleading information"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_OFF_PLATFORM_TRADE": {
+      "message": "Off-platform transactions"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_OTHER": {
+      "message": "Other"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PLATFORM_ABUSE": {
+      "message": "Platform abuse"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PRIVACY": {
+      "message": "Misuse of personal data"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_PROHIBITED_GOODS": {
+      "message": "Illegal or prohibited goods"
+    },
     "common.PolicyCategory.POLICY_CATEGORY_SEXUAL_CONTENT": {
       "message": "Sexual content"
     },
     "common.PolicyCategory.POLICY_CATEGORY_SPAM": {
       "message": "Spam"
+    },
+    "common.PolicyCategory.POLICY_CATEGORY_UNLICENSED_SALE": {
+      "message": "Unlicensed sale"
     },
     "common.StoreCard.closed_store": {
       "message": "Closed store"
