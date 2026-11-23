@@ -78,3 +78,64 @@ type TransformOutput struct {
 	MimeType string
 	Usage    Usage
 }
+
+// AdminStyle 是後台看到的風格（含停用的）。
+type AdminStyle struct {
+	ID                 uuid.UUID
+	Name, Label        string
+	Prompt             string
+	Category           StyleCategory
+	ThumbnailKey       string
+	DisplayOrder       int32
+	IsDefault, Enabled bool
+	// Version 是樂觀鎖的版本，對外是 etag。
+	Version              int64
+	CreatedAt, UpdatedAt time.Time
+}
+
+// Actor 是做後台寫入的管理員與後台 RPC 的 procedure 名稱（handler 組成，寫進 adminaudit）。
+type Actor struct {
+	AdminID int64
+	Action  string
+}
+
+// CreateStyleInput 是新增風格：ThumbnailToken 必填。
+type CreateStyleInput struct {
+	Actor               Actor
+	Name, Label, Prompt string
+	Category            StyleCategory
+	ThumbnailToken      string
+	DisplayOrder        int32
+	Enabled             bool
+}
+
+// UpdateStyleInput 是整筆覆寫風格可改的欄位（name 與 category 建立後不能改，所以不在這裡）。Version 必填；ThumbnailToken 空字串表示沿用目前的圖。
+type UpdateStyleInput struct {
+	Actor          Actor
+	ID             uuid.UUID
+	Version        int64
+	Label, Prompt  string
+	ThumbnailToken string
+	DisplayOrder   int32
+	Enabled        bool
+}
+
+// AdminQuota 是一家店的每週額度（後台）：Custom 為 false 時是預設額度（沒有 Version 與 UpdatedAt）。
+type AdminQuota struct {
+	StoreID     int64
+	WeeklyLimit int32
+	WeeklyUsage int32
+	Memo        string
+	Custom      bool
+	Version     int64
+	UpdatedAt   time.Time
+}
+
+// UpdateQuotaInput 是為一家店個別設定額度：Version 為 0 表示沒帶 etag（只能建立）。
+type UpdateQuotaInput struct {
+	Actor       Actor
+	StoreID     int64
+	WeeklyLimit int32
+	Memo        string
+	Version     int64
+}

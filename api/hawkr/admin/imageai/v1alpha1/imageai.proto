@@ -29,8 +29,13 @@ service ImageAiAdminService {
 
   rpc UpdateAiStyle(UpdateAiStyleRequest) returns (UpdateAiStyleResponse);
 
+  // SetDefaultAiStyle（自訂方法，AIP-136）把風格設成它用途的預設風格：同一個 transaction 內取消同用途原本的預設，
+  // 回傳更新後的風格。目標是停用的回 failed_precondition，不存在回 not_found；已經是預設時成功且不改任何東西（仍回傳該風格）。
+  // 帶了 etag 就必須與目前的版本相符，不符回 ABORTED（VERSION_CONFLICT）。
+  rpc SetDefaultAiStyle(SetDefaultAiStyleRequest) returns (SetDefaultAiStyleResponse);
+
   // DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
-  // 先把另一個風格的 default_style 設成 true。
+  // 先對另一個風格呼叫 SetDefaultAiStyle。
   rpc DeleteAiStyle(DeleteAiStyleRequest) returns (DeleteAiStyleResponse);
 
   // GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
@@ -65,9 +70,9 @@ message AiStyle {
   string thumbnail_staged_token = 6 [(google.api.field_behavior) = INPUT_ONLY];
   // 顯示順序，小的在前。
   int32 display_order = 7;
-  // 是否為該用途的預設風格；同一個用途只有一個預設。只能設成 true（原本的預設自動取消）；
-  // 設成 false 回 invalid_argument，換預設只能把另一個風格設成 true。
-  bool default_style = 8;
+  // 是否為該用途的預設風格；同一個用途只有一個預設。唯讀：新增的風格都不是預設，修改時 update_mask 內的這個欄位會被忽略，
+  // 換預設用 SetDefaultAiStyle。目前的預設風格不能刪除，也不能停用（failed_precondition）。
+  bool default_style = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 停用的風格前台看不到。
   bool enabled = 9;
   // 適用的用途；建立後不能修改。
@@ -126,6 +131,16 @@ message UpdateAiStyleRequest {
 }
 
 message UpdateAiStyleResponse {
+  AiStyle ai_style = 1;
+}
+
+message SetDefaultAiStyleRequest {
+  string id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 選填；帶了就必須與目前的版本相符。
+  string etag = 2;
+}
+
+message SetDefaultAiStyleResponse {
   AiStyle ai_style = 1;
 }
 

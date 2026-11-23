@@ -38,6 +38,14 @@ const (
 	IdentityAccountsList                   Permission = "identity.accounts.list"
 	IdentityAccountsGet                    Permission = "identity.accounts.get"
 	IdentityAccountsDelete                 Permission = "identity.accounts.delete"
+	ImageaiAiStylesList                    Permission = "imageai.ai_styles.list"
+	ImageaiAiStylesCreate                  Permission = "imageai.ai_styles.create"
+	ImageaiAiStylesUpdate                  Permission = "imageai.ai_styles.update"
+	ImageaiAiStylesDelete                  Permission = "imageai.ai_styles.delete"
+	ImageaiAiStylesSetDefault              Permission = "imageai.ai_styles.set_default"
+	ImageaiAiQuotasGet                     Permission = "imageai.ai_quotas.get"
+	ImageaiAiQuotasUpdate                  Permission = "imageai.ai_quotas.update"
+	ImageaiAiQuotasDelete                  Permission = "imageai.ai_quotas.delete"
 	LegacyGatewayForward                   Permission = "legacy.gateway.forward"
 	ModerationCasesList                    Permission = "moderation.cases.list"
 	ModerationCasesGet                     Permission = "moderation.cases.get"
@@ -124,6 +132,8 @@ func Catalog() []Permission {
 		ContentAppVersionGatesList, ContentAppVersionGatesCreate, ContentAppVersionGatesUpdate,
 		DelegationSessionsCreate,
 		IdentityAccountsList, IdentityAccountsGet, IdentityAccountsDelete,
+		ImageaiAiStylesList, ImageaiAiStylesCreate, ImageaiAiStylesUpdate, ImageaiAiStylesDelete, ImageaiAiStylesSetDefault,
+		ImageaiAiQuotasGet, ImageaiAiQuotasUpdate, ImageaiAiQuotasDelete,
 		LegacyGatewayForward,
 		ModerationCasesList, ModerationCasesGet, ModerationCasesDecide, ModerationCasesReverse,
 		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,

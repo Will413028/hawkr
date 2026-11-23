@@ -148,6 +148,55 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.notification.v1alpha1.InboxPresentation",
+      "dartClass": "InboxPresentation",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationApp",
+      "dartClass": "NotificationApp",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationAudience",
+      "dartClass": "NotificationAudience",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationCategory",
+      "dartClass": "NotificationCategory",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.NotificationChannel",
+      "dartClass": "NotificationChannel",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.SellerWorkspaceChange",
+      "dartClass": "SellerWorkspaceChange",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.notification.v1alpha1.StateRefreshHint",
+      "dartClass": "StateRefreshHint",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
       "dartClass": "EmbeddedOnboardingRuntime",
       "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",

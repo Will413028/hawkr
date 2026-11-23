@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
+	imageaiv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
@@ -66,8 +67,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 87 {
-		t.Fatalf("declarations=%d methods=%d，預期 87", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 95 {
+		t.Fatalf("declarations=%d methods=%d，預期 95", got, want)
 	}
 
 	for procedure := range declarations {
@@ -331,6 +332,12 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 	}
 	wantAudited := []string{
 		bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure,
+		imageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure,
+		imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiStyleProcedure,
+		imageaiv1alpha1connect.ImageAiAdminServiceSetDefaultAiStyleProcedure,
+		imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiStyleProcedure,
+		imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiQuotaProcedure,
+		imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiQuotaProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,
