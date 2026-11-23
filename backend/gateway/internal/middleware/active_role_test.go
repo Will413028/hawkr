@@ -54,7 +54,7 @@ func TestRoleInSet(t *testing.T) {
 }
 
 // sanitizeActiveRole is the one rule that decides whether a resolved active role
-// (單體的 X-Login-Role、ws-ticket) may be used:
+// (單體的 X-Login-Role) may be used:
 // only a role the account actually holds survives; everything else collapses to
 // 0 ("no active role"), never to a guess.
 func TestSanitizeActiveRole(t *testing.T) {

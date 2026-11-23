@@ -150,7 +150,8 @@ lib/
 - `GET /public/products` - 商品列表 (分頁)
 - `GET /public/products/{id}` - 商品詳情
 - Connect `hawkr.review.v1alpha1.ReviewPublicService/ListProductReviews` - 商品評論
-- Connect `hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats` - 商品評分
+- `GET /public/products/{id}/rating` - 商品評分
+- Connect `hawkr.review.v1alpha1.ReviewPublicService/GetProductReviewStats` - 商品評分統計
 - `GET /public/search/products` - 搜尋商品
 - `GET /public/search/suggest` - 搜尋建議
 

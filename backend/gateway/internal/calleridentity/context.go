@@ -17,5 +17,5 @@ type key struct{}
 // With 將已驗證的單體身分放入 context。
 func With(ctx context.Context, id Identity) context.Context { return context.WithValue(ctx, key{}, id) }
 
-// From 回傳單體身分與來源標記；ws-ticket 與訪客沒有此標記。
+// From 回傳單體身分與來源標記；訪客沒有此標記。
 func From(ctx context.Context) (Identity, bool) { id, ok := ctx.Value(key{}).(Identity); return id, ok }

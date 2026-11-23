@@ -59,7 +59,6 @@ const (
 	ProductID               = "/:id"
 	ProductBrief            = "/:id/brief"
 	ProductSkus             = "/:id/skus"
-	ProductRating           = "/:id/rating"
 	ProductRelated          = "/:id/related"
 
 	// Aliases with 's' suffix for compatibility

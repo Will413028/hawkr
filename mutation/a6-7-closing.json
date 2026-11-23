@@ -13,7 +13,7 @@
    "id": "preview-date-unbounded",
    "stack": "flutter:seller-app",
    "file": "seller-app/lib/features/product/presentation/product_preview_screen.dart",
-   "old": "maxWidth: MediaQuery.sizeOf(context).width * 0.3,",
+   "old": "maxWidth: constraints.maxWidth * 0.45,",
    "new": "maxWidth: double.infinity,",
    "test": "test/features/product/product_shop_flow_responsive_test.dart preview fits 320.0 at 1.0x text",
    "why": "拿掉預覽頁評價日期的寬度上限，UTC 裝置的臺北時間標籤讓標頭列在 320 寬溢位"

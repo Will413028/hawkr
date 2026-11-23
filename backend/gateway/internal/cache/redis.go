@@ -47,7 +47,7 @@ func InitRedis() {
 	RedisClient = redis.NewClient(opts)
 
 	// 啟動時的 ping 只是健康檢查：go-redis 延遲連線、需要時重連，所以 Redis 短暫中斷時仍保留 client，Redis 恢復後
-	// 自己好。這裡設成 nil 的話，ws-ticket、限流與賣家 guard 會在啟動時的一次中斷之後永遠停在沒有 Redis 的降級
+	// 自己好。這裡設成 nil 的話，限流與賣家 guard 會在啟動時的一次中斷之後永遠停在沒有 Redis 的降級
 	// 路徑（B-199 / #939）。
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
