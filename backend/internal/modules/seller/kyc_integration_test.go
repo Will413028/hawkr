@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"reflect"
 	"regexp"
 	"slices"
@@ -23,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
+	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -1963,4 +1965,28 @@ func fileData(t *testing.T, c FileContent) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+// 公司證件必須是機敏上傳：media.Fake 記著 token 的可見性，公開的 token 放進證件位置回與真的 media 相同的欄位錯誤，沒有認領。
+func TestKYCDocumentRejectsAPublicTokenWithTheMediaVisibilityMismatch(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, _ := f.open(t)
+	fake := media.NewFake()
+	fake.Staged = map[string]media.Visibility{"public-doc": media.VisibilityPublic, "secure-doc": media.VisibilitySecure}
+	m := New(Deps{
+		DB: f.db, Events: f.bus, Jobs: f.jobs, Identity: f.identity, Media: fake, Orders: f.orders, KYCMAC: sealtest.MAC(t), Payment: f.payments, ProductStores: f.products, Registry: f.registry,
+		Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	in := companyDraft(accountID, taxIDOne)
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "public-doc"}}
+	_, err := m.SaveKYCDraft(context.Background(), in)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "CompanyDocuments[0]" {
+		t.Fatalf("公開 token 放進證件位置要是 CompanyDocuments[0] 的欄位錯誤：%v", err)
+	}
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "secure-doc"}}
+	if d, err := m.SaveKYCDraft(context.Background(), in); err != nil || len(d.Documents) != 1 {
+		t.Fatalf("機敏 token：%+v %v", d, err)
+	}
 }

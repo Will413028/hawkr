@@ -15,8 +15,10 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // Fake 是記憶體內、不連儲存與資料庫的 media 模組替身，給擁有者模組的測試用，方法與 *Module 的同名方法同形。
@@ -28,6 +30,8 @@ type Fake struct {
 	Key func(token string) string
 	// FailConfirm、FailMarkDeleted、FailReadSecure 非 nil 時，對應的呼叫回這個錯誤、不生效。
 	FailConfirm, FailMarkDeleted, FailReadSecure error
+	// Staged 是 token 上傳時的可見性；Confirm 的 want 與它不同時回與 *Module 相同的 InvalidInput（可見性不符）。不在表裡的 token 不檢查。
+	Staged map[string]Visibility
 
 	confirmed map[uuid.UUID]ConfirmedAsset
 	deleted   map[uuid.UUID]bool
@@ -67,6 +71,12 @@ func (f *Fake) Confirm(ctx context.Context, u Uploader, token string, want Visib
 	}
 	if u.ID <= 0 || strings.TrimSpace(token) == "" || strings.HasPrefix(token, "bad") {
 		return ConfirmedAsset{}, apperr.InvalidInput("圖片上傳已失效，請重新上傳")
+	}
+	if vis, ok := f.Staged[token]; ok && vis != want {
+		if want == VisibilitySecure {
+			return ConfirmedAsset{}, apperr.InvalidInput("%s", text.MediaVisibilitySecureRequired(uitext.LocaleFrom(ctx)).Text)
+		}
+		return ConfirmedAsset{}, apperr.InvalidInput("%s", text.MediaVisibilityPublicRequired(uitext.LocaleFrom(ctx)).Text)
 	}
 	id := AssetFor(token)
 	key := "public/" + token + ".jpg"
