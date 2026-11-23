@@ -32,12 +32,13 @@ export const SCAN_ROOTS = [
 ] as const;
 
 /**
- * 排除規則集中在這裡：代行工作區 `app/(delegated)` 只有 zh-TW（不發佈 en）；測試不是使用者面文字；
+ * 排除規則集中在這裡：代行工作區 `app/(delegated)` 與只供它使用的 `features/delegated-operations` 只有 zh-TW（不發佈 en）；測試不是使用者面文字；
  * 生成檔（`*.gen.*`、`*.g.*`）不得手改，由各自的 drift 檢查守。`messages/*.json` 不是 ts，本來就不掃。
  */
 export function isExcluded(rel: string): boolean {
 	const path = rel.split("\\").join("/");
 	if (path.startsWith("app/(delegated)/")) return true;
+	if (path.startsWith("features/delegated-operations/")) return true;
 	if (path.split("/").some((s) => s === "tests" || s === "__tests__"))
 		return true;
 	const name = path.slice(path.lastIndexOf("/") + 1);

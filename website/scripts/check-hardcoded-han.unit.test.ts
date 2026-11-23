@@ -47,6 +47,7 @@ export const E = () => <div title="標題">內文 <b>粗體</b>{" "}</div>;`;
 describe("isExcluded", () => {
 	it("代行工作區、測試、生成檔不算；一般檔算", () => {
 		expect(isExcluded("app/(delegated)/x/page.tsx")).toBe(true);
+		expect(isExcluded("features/delegated-operations/labels.ts")).toBe(true);
 		expect(isExcluded("features/a/b.test.tsx")).toBe(true);
 		expect(isExcluded("features/a/b.unit.test.ts")).toBe(true);
 		expect(isExcluded("lib/__tests__/x.ts")).toBe(true);
