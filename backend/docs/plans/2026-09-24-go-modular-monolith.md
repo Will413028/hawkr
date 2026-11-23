@@ -194,11 +194,12 @@
     - D9：baseline 鎖在 317 個檔案、1210 個命中。
     - 獨立設計審查：9 項發現，沒有駁回。改 4：排程的 CHECK 與寫入端不一致（新 migration 與測試）、A7 與 B4 記下 banner 點擊行為要確認商品與貼文存在、設計書 25 與 50 加上單體註記、A1 逐項寫出結論。記 2：盤點表補上 CodeMeta 的 `AccountType`、`AssetReferenceType`；刪掉的兩條告警沒有替代，單體的監控（River job 的狀態、存活）記進 wiki 的 CD 待辦。交給 Will 決定 3 項並照決定做完：快取失效的重試改成退避（§9.5 的單體註記）、特性測試的共用部分抽成 `internal/httpapi/characterize` 並保留經 gateway 的執行到 A2（另一項「只剩一個 driver 的特性測試與 handler 測試重複」併入這個決定：A2 時一起退役）。
 - [x] **A2 identity**（2026-09-29 完成；Clerk 已由自建登入取代，ADR `2026-10-30-identity-self-hosted-federated-login.md`）：來自 account-service，不含代行編排；入口從 gateway 移到單體（見 A0），IM 的 WebSocket 與還沒搬的 SSE、REST 經單體轉給 gateway，直到所屬模組搬遷。A2 計畫已依 D9 分流後刪除：沿用盤點在模組 `CARRYOVER.md`，決定在 ADR `2026-09-27-identity-opaque-sessions.md`、`2026-09-27-identity-clerk.md`（含後台改用 Cloudflare Access 的修訂）與 `2026-10-30-identity-self-hosted-federated-login.md`。
-- [ ] **A3 buyer、seller**：seller 不含推薦排行；buyer 往上的補資料移到 http。步驟、決定與進度在 `2026-09-29-a3-buyer-seller.md`（盤點在同名目錄）；下面兩個子項已併入該檔的步驟 7。
+- [x] **A3 buyer、seller**：seller 不含推薦排行；buyer 往上的補資料移到 http。步驟、決定與進度在 `2026-09-29-a3-buyer-seller.md`（盤點在同名目錄）；下面兩個子項已併入該檔的步驟 7。
   - seller 第一個 `*AppService`：實作錯誤模型 ADR `2026-09-25-api-error-model.md` D10 的賣家停權（`permission_denied` 加 `ErrorInfo.reason` `SELLER_SUSPENDED`，取代 9240 加 HTTP 409），在同一個變更加入 `ErrorReason` 的值、單體裡能力檢查的產生、client 把它轉成賣家身分的停權狀態，並端到端驗證（Connect 試點的通過條件 7）。能力檢查的做法（逐方法宣告、Redis 快取、fail-open）依模組完成的定義重新評估 ADR `2026-09-18-seller-capability-authorization.md`。
   - 申請成為商家：舊 gateway 的 `POST /app/sellers` 在 seller-service 建店並授予 SELLER 之後，才驗證城市代碼，驗證失敗回 400 而商店與角色已經寫入（A2 的 compose 驗收，2026-09-29）。搬進 seller 模組時，輸入驗證放在建店之前，建店與授予角色同一個 transaction。
   - 收款開通改走 payment port（PayUni 換 Stripe Connect，作品集為主）：決定在 ADR `2026-11-13-payment-onboarding-provider-port-stripe.md` 的「決定編號」。改的是 A3b 已完成的 7c、8b、8f（KYC、PayUni 綁定、後台審核）；付款、退款、撥款與物流的部分寫在 B2、B3、B8–B10。
   - A3 延後項（A3 計畫 11d 搬回，來源步驟見各項；觸發由 11d 補的已標明）：
+    - seller-app 物流標籤期限 `labelExpireAt` 由 Java `LocalDateTime.toString()` 產生、不帶時區，App 一律當臺北時間讀；Java 時區不是臺北時會差 8 小時（11h 審查發現，未查 Java 實際時區）。觸發：B8 ordering 搬遷時契約改用帶時區的時間。
   - 商品與訂單側的停權連動（下架、取消待付款訂單）仍由 Java consumer 處理。觸發：B 階段 catalog、ordering 搬進單體時。
   - 賣家儀表板的訂單數據改呼叫 order 模組公開 API、刪 `GetStorePeriodOrderStats`／`GetSellerOrderStatusCounts` 的 legacy client，並重評自買單判斷（`buyer_id <> store_id` 比的是不同業務鍵，兩個區塊口徑不一致）。觸發：B 階段 order 搬進單體時。
   - 儀表板請求帶期間（`from`／`to`）。觸發：UI 要範圍選擇時。
@@ -435,7 +436,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 0 地基 | 進行中 | 已完成：0.1；0.2 的核心機制；0.3 的依賴方向、migration 與 query 隔離檢查；0.4 的 migration 套用器與 Atlas 開發設定；0.6 的 OpenAPI 規格與生成工具（2026-09-26 由 Connect 取代，規格改為現有 API 清單）；0.7 的 D9 gate；0.8 的盤點 gate；0.9 的本機環境；0.10 的指令檔；0.11 的 `backend-monolith` workflow（含 integration 測試）；0.5 的模組模板與 scaffold（2026-09-27，從 content 抽出）。單體統一使用 Postgres 18。前置修正：CodeMeta 的 Go 輸出從 `docs/` 移到 `internal/platform/codemeta`，因為中文目錄名不是合法的 import path，會讓根 module 無法建置 |
-| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3：步驟 1–9、10a、10b、10c、10e 完成，剩 10d 公開讀取（部分併進 A7）與 10f 信任與安全上線前（`2026-09-29-a3-buyer-seller.md`）；收款開通換 Stripe 已完成，決定在 `adr/2026-11-13-payment-onboarding-provider-port-stripe.md`。A7：1a、1b、1c、1d、1d′、1d″、1e、1f 完成，下一步 A7-2 對外 API（`2026-10-18-a7-social.md`）。A6 完成（2026-11-23：review、im、crm 進單體、三個舊服務與 33 條 REST 刪除，四端改 Connect；兩支 App 真機登入驗證延後，延後項見 A6 段，`2026-11-19-a6-review-im-crm.md`）。其餘 A5、A8–A11 未開始 |
+| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3 完成（2026-11-23，`2026-09-29-a3-buyer-seller.md`；延後項見 A 段「A3 延後項」）；收款開通換 Stripe 已完成，決定在 `adr/2026-11-13-payment-onboarding-provider-port-stripe.md`。A7：1a、1b、1c、1d、1d′、1d″、1e、1f 完成，下一步 A7-2 對外 API（`2026-10-18-a7-social.md`）。A6 完成（2026-11-23：review、im、crm 進單體、三個舊服務與 33 條 REST 刪除，四端改 Connect；兩支 App 真機登入驗證延後，延後項見 A6 段，`2026-11-19-a6-review-im-crm.md`）。其餘 A5、A8–A11 未開始 |
 | B Java 改寫 | 未開始 | |
 | C 收尾 | 未開始 | |
 | D 前端 client | 取消（2026-09-26） | 併進模組完成的定義，收尾在階段 C |
