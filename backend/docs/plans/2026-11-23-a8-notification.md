@@ -98,7 +98,7 @@
   - 子步驟（一個 session 做不完，2026-11-23 拆分；各自有驗收，依序做）：
     - **A8-1a 骨架、schema、註冊表**：`make new-module` 產骨架並登記 `cmd/hawkr/modules.go`；上列全部表（`schema.sql`＋migration＋sqlc）；型別註冊表與 `internal/text`（先只有 `account_suspended`、`account_unsuspended` 兩型別）；`modules.go` 依賴改成實際依賴；`CARRYOVER.md`（盤點 §2–§6 每列）、模組 `AGENTS.md`。驗收：兩型別 zh-TW／en 固定輸出比對測試、註冊表自檢測試（每型別有冪等鍵來源、分類在 D4 清單、呈現分類在 D6 清單、聚合鍵只在宣告可聚合的型別、參數不含第三方名稱欄位）、`TestSchemaFileMatchesMigrations` 等既有守門、lint／vet。mutation：不可關分類改成可關 → 註冊表測試紅。
     - **A8-1b 意圖管線與第一個端到端型別**：同步訂閱者→意圖 job→worker（收件人解析、偏好、自我略過、收件匣寫入與聚合 upsert、投遞紀錄；渠道 job 先只排不送，A8-3 接 adapter；寫收件匣的 transaction 內以 `FOR SHARE` 鎖收件帳號列並確認未刪除）；`accountsuspension.Suspended`／`Unsuspended` 訂閱；結構性測試。驗收：下方 integration 的冪等、偏好、自我略過、聚合四項、刪除後到達的意圖不建收件匣與 Suspended→收件匣；mutation 其餘三項。
-    - **A8-1c 保留期與個資清除**：180 天清除 job、三個刪除事件的清除 job（被擋於 D16）。驗收：下方 integration 的清除兩項（刪除事件後清除、到期硬刪）。
+    - **A8-1c 保留期與個資清除**：180 天清除 job、三個刪除事件的清除 job（D16 已決）。驗收：下方 integration 的清除兩項（刪除事件後清除、到期硬刪）。
   - 消費端：`rg -n "accountsuspension\.(Suspended|Unsuspended)" backend/internal`；`internal/arch/modules.go`。
   - 不能動：accountsuspension 的事件型別與發布 transaction。
   - 驗收：每個型別的固定輸出比對測試（zh-TW、en）；結構性測試：notification 的同步訂閱者只呼叫 `jobs.Enqueue`；integration：同一事件投遞兩次只有一列、偏好關閉的分類不建收件匣但不可關的分類仍建、自我通知被略過、同聚合鍵的未讀通知合併成一列、三個刪除事件後收件匣、偏好、投遞送出文字與意圖參數被清、刪除後到達的意圖不建收件匣、180 天到期的收件匣／投遞紀錄／意圖列被硬刪；`make lint-monolith`、`make test-all`、`GOWORK=off go vet -tags integration ./...`。mutation（進 `mutation/`）：拿掉意圖冪等 UNIQUE → 冪等測試紅；自我略過改回比 buyer_id → 略過測試紅；不可關分類改成可關 → 測試紅；聚合 upsert 改成 insert → 合併測試紅。
@@ -189,7 +189,7 @@
 | D14 推播圖片 | 註冊表有可選圖片欄位，商品類型別帶圖；FCM payload 帶圖片 URL；iOS 加 Notification Service Extension（A8-6） | 已決 2026-11-23，Will |
 | D15 投遞紀錄保留期 | 180 天硬刪，與收件匣同一個清除 job（舊系統只刪 failed／skipped 超過 30 天） | 已決 2026-11-23，Will |
 | D13 legacy 通知轉接 | 不做；通知型別隨發送端搬遷 | 已決 2026-11-23，Will |
-| D16 投遞紀錄「實際送出文字」裡的第三方名稱 | 未決。問題：actor 刪帳號後，別人投遞紀錄的送出文字仍含其名稱，最長 180 天。選項：(a) 接受，送出文字是「送了什麼」的事實紀錄，期限受 D15 約束；(b) 不存送出文字，只存型別＋參數（ID）＋locale，需要時重組，代價是重組結果可能與當時不同、客訴時無法證明送了什麼；(c) actor 刪帳號時也掃描清除。建議 (a)：業界（SendGrid、Postmark 的 message activity）保留送出內容到保留期，GDPR 以有限保留期滿足最小化。擋住 A8-1c | 未決，交 Will 2026-11-23 |
+| D16 投遞紀錄「實際送出文字」裡的第三方名稱 | (a) 接受：送出文字是送出時的事實紀錄，受 D15 的 180 天硬刪約束；只有收件人自己刪帳號時提前清。原問題：actor 刪帳號後，別人投遞紀錄的送出文字仍含其名稱，最長 180 天。選項：(a) 接受，送出文字是「送了什麼」的事實紀錄，期限受 D15 約束；(b) 不存送出文字，只存型別＋參數（ID）＋locale，需要時重組，代價是重組結果可能與當時不同、客訴時無法證明送了什麼；(c) actor 刪帳號時也掃描清除。建議 (a)：業界（SendGrid、Postmark 的 message activity）保留送出內容到保留期，GDPR 以有限保留期滿足最小化。 | 已決 2026-11-23，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
 
