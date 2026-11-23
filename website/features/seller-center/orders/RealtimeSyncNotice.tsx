@@ -3,9 +3,9 @@ import type { SseConnectionStatus } from "@/lib/sse/client";
 /**
  * 訂單頁的「即時同步已暫停」狀態列（backend#2040 問題三）。
  *
- * 根 layout 的通知串流（`NotificationUnreadProvider`）在兩種情況會停止供應更新，且
- * **兩種都不會報錯**：連線數達上限被 gateway 以 429 回絕、或斷線超過 30 秒的
- * 重連預算（`lib/sse/client.ts` 的 `unavailable`）；以及瀏覽器離線
+ * 賣家工作區的通知串流（`useSellerWorkspaceRealtime`）在兩種情況會停止供應更新，且
+ * **兩種都不會報錯**：串流數達每帳號上限（resource_exhausted）、或連續重連失敗用盡
+ * 預算（`lib/notifications/watch.ts` 的 `unavailable`）；以及瀏覽器離線
  * （`offline`）。頁面本身仍然正常渲染既有資料，於是賣家看到的是一個「安靜地
  * 不再更新」的訂單列——會誤判成沒有新訂單，而不是察覺同步壞了。功能靜默消失
  * 沒有人會回報，這一行就是把它變成看得見的狀態。

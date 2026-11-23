@@ -3,11 +3,6 @@
 import { act, cleanup, render } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	NOTIFICATION_STREAM_RESYNC_EVENT,
-	SELLER_WORKSPACE_EVENT,
-	type SellerWorkspaceEventDetail,
-} from "./events";
 
 interface FakeHandlers {
 	onEvent: (name: string, data: unknown, id: string | null) => void;
@@ -92,112 +87,41 @@ function mount() {
 	return client.handlers as FakeHandlers;
 }
 
-const removers: Array<() => void> = [];
-function collect<T>(name: string): T[] {
-	const seen: T[] = [];
-	const listener = (event: Event) =>
-		seen.push((event as CustomEvent<T>).detail);
-	window.addEventListener(name, listener);
-	removers.push(() => window.removeEventListener(name, listener));
-	return seen;
-}
-
-describe("NotificationUnreadProvider 持有唯一一條串流並分派全部事件", () => {
+describe("NotificationUnreadProvider 持有通知串流並分派事件", () => {
 	beforeEach(() => {
 		mocks.clients.length = 0;
 		mocks.fetchUnreadCount.mockClear();
 	});
 	afterEach(() => {
 		cleanup();
-		for (const remove of removers.splice(0)) remove();
 	});
 
-	it("整個 provider 只開一條連線", () => {
+	it("整個 provider 只開一條通知連線", () => {
 		mount();
 		expect(mocks.clients).toHaveLength(1);
 	});
 
-	it("seller.order.updated 與 seller.after_sale.updated 發 window 事件", () => {
-		const seen = collect<SellerWorkspaceEventDetail>(SELLER_WORKSPACE_EVENT);
+	it("ready 帶 bufferMiss 時重新讀未讀數", async () => {
 		const stream = mount();
-		act(() => {
-			stream.onEvent(
-				"seller.order.updated",
-				{ orderNo: "O1", status: "PAID", source: "payment" },
-				"e1",
-			);
-			stream.onEvent(
-				"seller.after_sale.updated",
-				{
-					orderNo: "O2",
-					afterSaleCaseNo: "A1",
-					status: "OPEN",
-					source: "buyer",
-				},
-				"e2",
-			);
-		});
-		expect(seen).toEqual([
-			{ kind: "order", orderNo: "O1", status: "PAID" },
-			{
-				kind: "after_sale",
-				orderNo: "O2",
-				afterSaleCaseNo: "A1",
-				status: "OPEN",
-			},
-		]);
-	});
-
-	it("包在 notification.batch 裡的賣家事件也會發", () => {
-		const seen = collect<SellerWorkspaceEventDetail>(SELLER_WORKSPACE_EVENT);
-		const stream = mount();
-		act(() => {
-			stream.onEvent(
-				"notification.batch",
-				{
-					events: [
-						{
-							event: "seller.order.updated",
-							data: { orderNo: "O9", status: "PAID" },
-							id: "b1",
-						},
-						{
-							event: "seller.after_sale.updated",
-							data: { orderNo: "O9", afterSaleCaseNo: "A9" },
-							id: "b2",
-						},
-					],
-				},
-				null,
-			);
-		});
-		expect(seen.map((detail) => detail.kind)).toEqual(["order", "after_sale"]);
-	});
-
-	it("ready 帶 bufferMiss 發一次 resync，並重新讀未讀數", async () => {
-		const resyncs = collect<unknown>(NOTIFICATION_STREAM_RESYNC_EVENT);
-		const stream = mount();
+		await act(async () => stream.onReady({ bufferMiss: false }));
 		const readsBefore = mocks.fetchUnreadCount.mock.calls.length;
-		act(() => stream.onReady({ bufferMiss: false }));
-		expect(resyncs).toHaveLength(0);
 		await act(async () => stream.onReady({ bufferMiss: true }));
-		expect(resyncs).toHaveLength(1);
 		expect(mocks.fetchUnreadCount.mock.calls.length).toBeGreaterThan(
 			readsBefore,
 		);
 	});
 
-	it("連線狀態變成 unavailable 時發一次 resync；狀態 hook 讀得到", () => {
-		const resyncs = collect<unknown>(NOTIFICATION_STREAM_RESYNC_EVENT);
+	it("連線狀態變成 unavailable 時重新讀一次未讀數；狀態 hook 讀得到", async () => {
 		const stream = mount();
 		act(() => stream.onStatusChange("connected"));
 		expect(status).toBe("connected");
-		expect(resyncs).toHaveLength(0);
-		act(() => stream.onStatusChange("unavailable"));
+		const readsBefore = mocks.fetchUnreadCount.mock.calls.length;
+		await act(async () => stream.onStatusChange("unavailable"));
 		expect(status).toBe("unavailable");
-		expect(resyncs).toHaveLength(1);
-		act(() => stream.onStatusChange("unavailable"));
-		expect(resyncs).toHaveLength(1);
+		const readsAfterFirst = mocks.fetchUnreadCount.mock.calls.length;
+		expect(readsAfterFirst).toBeGreaterThan(readsBefore);
+		await act(async () => stream.onStatusChange("unavailable"));
+		expect(mocks.fetchUnreadCount.mock.calls.length).toBe(readsAfterFirst);
 	});
 });
 
