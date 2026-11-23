@@ -53,32 +53,38 @@ String _render(DateTime t, TaipeiFormat format) {
 /// 時間字串解析成臺北牆上時間；無法解析回 null。
 ///
 /// 接受 ISO 8601（帶時區標記的是時間點，沒有標記的本來就是臺北牆上時間）、斜線日期（`2026/07/30 15:05`），
-/// 與純數字的 Unix 時間（13 位以上取前 13 位當毫秒，10 至 12 位取前 10 位當秒），文字裡夾的 10 至 13 位數字也算。純數字先判斷，
-/// 否則 `DateTime.tryParse` 會把 10 位秒數讀成西元 171238 年。
-DateTime? _parseWall(String raw) {
+/// 與整串剛好 10 位（秒）或 13 位（毫秒）的 Unix 時間。純數字先判斷，否則 `DateTime.tryParse` 會把 10 位秒數讀成西元 171238 年。
+/// 其他長度的純數字不是時間，回 null。
+///
+/// [embeddedEpoch] 為 true 時，解析不了的字串裡夾的 10 至 13 位數字也算 Unix 時間（`ts=1785429000`；13 位是毫秒，
+/// 10 至 12 位是秒）。只有賣家訂單卡的兩個呼叫端有這個既有行為，其餘呼叫端不開。
+DateTime? _parseWall(String raw, {bool embeddedEpoch = false}) {
   final text = raw.trim();
   if (text.isEmpty) return null;
-  if (RegExp(r'^\d+$').hasMatch(text)) {
-    if (text.length >= 13) {
-      return DateTime.fromMillisecondsSinceEpoch(
-        int.parse(text.substring(0, 13)),
-        isUtc: true,
-      )._taipei;
-    }
-    if (text.length >= 10) {
-      return DateTime.fromMillisecondsSinceEpoch(
-        int.parse(text.substring(0, 10)) * 1000,
-        isUtc: true,
-      )._taipei;
-    }
+  if (RegExp(r'^\d{10}$').hasMatch(text)) {
+    return DateTime.fromMillisecondsSinceEpoch(
+      int.parse(text) * 1000,
+      isUtc: true,
+    )._taipei;
+  }
+  if (RegExp(r'^\d{13}$').hasMatch(text)) {
+    return DateTime.fromMillisecondsSinceEpoch(
+      int.parse(text),
+      isUtc: true,
+    )._taipei;
   }
   final parsed =
       DateTime.tryParse(text) ??
       DateTime.tryParse(text.replaceFirst(' ', 'T').replaceAll('/', '-'));
   if (parsed != null) return parsed._taipeiWall;
-  // 夾在文字裡的 Unix 時間（`ts=1785429000`）。
+  if (!embeddedEpoch) return null;
   final embedded = RegExp(r'\d{10,13}').firstMatch(text)?.group(0);
-  return embedded == null ? null : _parseWall(embedded);
+  if (embedded == null) return null;
+  final n = int.parse(embedded);
+  return DateTime.fromMillisecondsSinceEpoch(
+    embedded.length == 13 ? n : n * 1000,
+    isUtc: true,
+  )._taipei;
 }
 
 /// 臺北時間的顯示：格式化與「台北時間」標籤都只走這裡（ADR 多語系架構 D5）。
@@ -115,8 +121,14 @@ class TaipeiDisplay {
       _render(instant._taipei, format ?? TaipeiFormat.dateTime);
 
   /// 時間字串 [raw] 的臺北時間（解析規則見 [_parseWall]）；空字串或解析不了回 null。
-  static String? plainIso(String raw, [TaipeiFormat? format]) {
-    final wall = _parseWall(raw);
+  ///
+  /// [embeddedEpoch] 見 [_parseWall]。
+  static String? plainIso(
+    String raw, [
+    TaipeiFormat? format,
+    bool embeddedEpoch = false,
+  ]) {
+    final wall = _parseWall(raw, embeddedEpoch: embeddedEpoch);
     return wall == null ? null : _render(wall, format ?? TaipeiFormat.dateTime);
   }
 
@@ -158,8 +170,12 @@ class TaipeiDisplay {
   String date(DateTime instant) => format(instant, TaipeiFormat.date);
 
   /// 時間字串 [raw]：空字串回空字串，解析不了原樣回傳（不附標籤，它不是臺北時間）。
-  String formatIso(String raw, [TaipeiFormat? format]) {
-    final text = plainIso(raw, format);
+  String formatIso(
+    String raw, [
+    TaipeiFormat? format,
+    bool embeddedEpoch = false,
+  ]) {
+    final text = plainIso(raw, format, embeddedEpoch);
     return text == null ? raw : labeled(text);
   }
 
@@ -182,16 +198,39 @@ class TaipeiDisplay {
   }
 }
 
-/// 日期時間選擇器的起始值：已有值用它，沒有值是 [now] 起算一天後。回傳值的欄位是臺北牆上時間，只餵給選擇器；
-/// 選好的欄位用 [taipeiInstantOfPicked] 換回時間點。不要拿它顯示（顯示走 [TaipeiDisplay]）。
-DateTime taipeiPickerInitial(DateTime? current, DateTime now) =>
-    (current ?? now.toUtc().add(const Duration(days: 1)))._taipeiWall;
+/// 日期時間選擇器的起始值，只用來餵 Flutter 的 `showDatePicker`、`showTimePicker`，再把選出的值換回時間點。
+///
+/// 這個型別存在的原因：選擇器的 API 要 `DateTime` 與時、分，而這些值必須是臺北牆上時間。直接回傳牆上時間的 `DateTime`，
+/// App 就能讀 `.year`、`.hour` 再自己拼字串；所以只公開選擇器需要的欄位，且沒有任何格式化路徑，顯示走 [TaipeiDisplay]。
+/// 建構只在本函式庫內（[taipeiPickerInitial]）。
+class TaipeiPickerInitial {
+  const TaipeiPickerInitial._(this._wall);
 
-/// 選擇器選出的臺北牆上日期與時間對應的時間點（UTC）。
-DateTime taipeiInstantOfPicked(
-  int year,
-  int month,
-  int day,
-  int hour,
-  int minute,
-) => DateTime.utc(year, month, day, hour, minute).subtract(_taipeiUtcOffset);
+  final DateTime _wall;
+
+  /// 給 `showDatePicker` 的 `initialDate`（時間部分不用，選擇器只看日期）。
+  DateTime get initialDate => DateTime(_wall.year, _wall.month, _wall.day);
+
+  /// 給 `showTimePicker` 的 `initialTime`，用 `TimeOfDay(hour:, minute:)` 組。
+  ({int hour, int minute}) get initialTime =>
+      (hour: _wall.hour, minute: _wall.minute);
+
+  /// 選擇器選出的臺北牆上日期與時間對應的時間點（UTC）。[pickedDate] 只取年月日。
+  DateTime instantOf(
+    DateTime pickedDate, {
+    required int hour,
+    required int minute,
+  }) => DateTime.utc(
+    pickedDate.year,
+    pickedDate.month,
+    pickedDate.day,
+    hour,
+    minute,
+  ).subtract(_taipeiUtcOffset);
+}
+
+/// 選擇器的起始值：[current] 有值用它，沒有值是 [now] 起算一天後。
+TaipeiPickerInitial taipeiPickerInitial(DateTime? current, DateTime now) =>
+    TaipeiPickerInitial._(
+      (current ?? now.toUtc().add(const Duration(days: 1)))._taipeiWall,
+    );

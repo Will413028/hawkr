@@ -137,7 +137,7 @@ class _StatusInfoBox extends StatelessWidget {
   }
 
   String _formatDate(String raw, TaipeiDisplay t) {
-    return t.formatIso(raw);
+    return t.formatIso(raw, null, true);
   }
 
   bool _isShipmentUnprocessed(String ss) =>

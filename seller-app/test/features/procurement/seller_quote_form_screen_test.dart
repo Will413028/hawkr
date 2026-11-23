@@ -320,10 +320,12 @@ void main() {
       // 2026-07-30 20:00 UTC is 2026-07-31 04:00 Taipei; one day later is 08-01 04:00 Taipei.
       final now = DateTime.utc(2026, 7, 30, 20);
       final t = quotePickerInitial(null, now);
-      expect([t.year, t.month, t.day, t.hour], [2026, 8, 1, 4]);
+      expect(t.initialDate, DateTime(2026, 8, 1));
+      expect(t.initialTime, (hour: 4, minute: 0));
       // An existing UTC value is shown as Taipei wall clock.
       final c = quotePickerInitial(DateTime.utc(2026, 7, 30, 16), now);
-      expect([c.month, c.day, c.hour], [7, 31, 0]);
+      expect(c.initialDate, DateTime(2026, 7, 31));
+      expect(c.initialTime, (hour: 0, minute: 0));
     },
   );
 }

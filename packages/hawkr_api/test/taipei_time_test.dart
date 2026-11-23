@@ -156,6 +156,41 @@ void main() {
     });
   });
 
+  group('plainIso (non-time digits are not parsed)', () {
+    test('digit runs of other lengths and text with digits are null', () {
+      for (final raw in [
+        '17853984000', // 11 digits
+        '178539840000', // 12 digits
+        '17853984000000', // 14 digits
+        'ts=1785398400',
+        'order 1785398400000 shipped',
+      ]) {
+        expect(TaipeiDisplay.plainIso(raw), isNull, reason: raw);
+      }
+    });
+
+    test('formatIso shows such strings raw, unlabeled', () {
+      const foreign = TaipeiDisplay(
+        label: '台北時間',
+        deviceOffset: Duration(hours: -5),
+      );
+      expect(foreign.formatIso('ts=1785398400'), 'ts=1785398400');
+      expect(foreign.formatIso('17853984000'), '17853984000');
+    });
+
+    test('embeddedEpoch opts in to digits embedded in text', () {
+      expect(
+        TaipeiDisplay.plainIso('ts=1785398400', null, true),
+        '2026/07/30 16:00',
+      );
+      expect(
+        TaipeiDisplay.plainIso('ts=1785398400000', null, true),
+        '2026/07/30 16:00',
+      );
+      expect(TaipeiDisplay.plainIso('no digits', null, true), isNull);
+    });
+  });
+
   group('TaipeiFormat', () {
     final t = DateTime.utc(2026, 7, 4, 16, 5); // Taipei 2026-07-05 00:05
     test('each layout', () {
@@ -260,12 +295,16 @@ void main() {
     test('initial is one day after now in Taipei wall clock', () {
       final now = DateTime.utc(2026, 7, 30, 16, 0); // Taipei 07-31 00:00
       final base = taipeiPickerInitial(null, now);
-      expect([base.year, base.month, base.day, base.hour], [2026, 8, 1, 0]);
+      expect(base.initialDate, DateTime(2026, 8, 1));
+      expect(base.initialTime, (hour: 0, minute: 0));
     });
 
     test('picked wall fields convert back to the instant', () {
       expect(
-        taipeiInstantOfPicked(2026, 8, 1, 0, 0),
+        taipeiPickerInitial(
+          null,
+          DateTime.utc(2026),
+        ).instantOf(DateTime(2026, 8, 1), hour: 0, minute: 0),
         DateTime.utc(2026, 7, 31, 16, 0),
       );
     });

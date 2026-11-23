@@ -211,5 +211,5 @@ String formatOrderInfoDate(String raw) => tryFormatOrderInfoDate(raw) ?? raw;
 
 /// 解析失敗回 null；空字串回 null（沒有日期可顯示）。
 String? tryFormatOrderInfoDate(String raw) {
-  return TaipeiDisplay.plainIso(raw);
+  return TaipeiDisplay.plainIso(raw, null, true);
 }

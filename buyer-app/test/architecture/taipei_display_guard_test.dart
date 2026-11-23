@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +28,20 @@ String get _dart {
   return root == null ? 'dart' : '$root/bin/dart';
 }
 
+/// 探針在系統暫存目錄，要自己的 package_config：把 App 的相對路徑換成絕對路徑，才找得到 `hawkr_api`。
+void _writeAbsolutePackageConfig(Directory dir) {
+  final source = File('.dart_tool/package_config.json');
+  final base = source.parent.absolute.uri;
+  final config = jsonDecode(source.readAsStringSync()) as Map<String, dynamic>;
+  for (final package in config['packages'] as List<dynamic>) {
+    final entry = package as Map<String, dynamic>;
+    entry['rootUri'] = base.resolve(entry['rootUri'] as String).toString();
+  }
+  File('${dir.path}/.dart_tool/package_config.json')
+    ..createSync(recursive: true)
+    ..writeAsStringSync(jsonEncode(config));
+}
+
 void main() {
   test('the app lib has no toLocal', () async {
     final result = await _run('lib');
@@ -40,20 +55,26 @@ void main() {
   });
 
   test('wall-clock accessors of hawkr_api do not compile in an app', () async {
-    final dir = Directory('test/architecture/.taipei_probe')
-      ..createSync(recursive: true);
+    final dir = Directory.systemTemp.createTempSync('taipei_probe_');
     addTearDown(() => dir.deleteSync(recursive: true));
     final probe = File('${dir.path}/probe.dart')
       ..writeAsStringSync('''
 import 'package:hawkr_api/taipei_time.dart';
 
-void probe(DateTime d) {
+void probe(DateTime d, TaipeiPickerInitial p) {
   d.taipei;
   d.taipeiWall;
   formatTaipeiDate(d);
   formatTaipeiDateTime(d);
+  p.year;
+  p.hour;
+  p.minute;
+  p._wall;
+  TaipeiPickerInitial._(d);
+  taipeiInstantOfPicked(2026, 1, 1, 0, 0);
 }
 ''');
+    _writeAbsolutePackageConfig(dir);
     final result = await Process.run(_dart, ['analyze', probe.path]);
     final output = '${result.stdout}${result.stderr}';
     expect(result.exitCode, isNot(0), reason: output);
@@ -64,5 +85,12 @@ void probe(DateTime d) {
       output,
       contains("The function 'formatTaipeiDateTime' isn't defined"),
     );
+    expect(output, isNot(contains("Target of URI")));
+    expect(output, isNot(contains('Undefined class')));
+    expect(output, contains("The getter 'year' isn't defined"));
+    expect(output, contains("The getter 'hour' isn't defined"));
+    expect(output, contains("The getter 'minute' isn't defined"));
+    expect(output, contains("The getter '_wall' isn't defined"));
+    expect(output, contains("taipeiInstantOfPicked' isn't defined"));
   }, timeout: const Timeout(Duration(minutes: 3)));
 }

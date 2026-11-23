@@ -858,9 +858,9 @@ class _QuoteTextField extends HookWidget {
   }
 }
 
-/// 日期時間選擇器的起始臺北牆上時間：已有值用它，沒有值是 [now] 起算一天後。
+/// 日期時間選擇器的起始值：已有值用它，沒有值是 [now] 起算一天後。
 @visibleForTesting
-DateTime quotePickerInitial(DateTime? current, DateTime now) =>
+TaipeiPickerInitial quotePickerInitial(DateTime? current, DateTime now) =>
     taipeiPickerInitial(current, now);
 
 class _DateTimeField extends StatelessWidget {
@@ -907,26 +907,21 @@ class _DateTimeField extends StatelessWidget {
     final base = quotePickerInitial(current, now);
     final date = await showDatePicker(
       context: context,
-      initialDate: base,
+      initialDate: base.initialDate,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 3),
     );
     if (date == null || !context.mounted) return;
     final time = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(base),
+      initialTime: TimeOfDay(
+        hour: base.initialTime.hour,
+        minute: base.initialTime.minute,
+      ),
     );
     if (time == null) return;
     onChanged(
-      toRfc3339Utc(
-        taipeiInstantOfPicked(
-          date.year,
-          date.month,
-          date.day,
-          time.hour,
-          time.minute,
-        ),
-      ),
+      toRfc3339Utc(base.instantOf(date, hour: time.hour, minute: time.minute)),
     );
   }
 }
