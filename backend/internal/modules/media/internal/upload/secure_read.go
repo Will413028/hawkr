@@ -163,6 +163,9 @@ func (s *Service) ReadStagedSecure(ctx context.Context, uploader model.Uploader,
 	if s.d.Keyring == nil {
 		return nil, model.ErrNoKeyring
 	}
+	if err := checkUploader(ctx, uploader); err != nil {
+		return nil, err
+	}
 	row, err := s.own(ctx, uploader, token)
 	if err != nil {
 		return nil, err

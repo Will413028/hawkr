@@ -436,12 +436,13 @@ func delegatedSecureServerWith(t *testing.T, f *fakeSecure, timeout time.Duratio
 func TestDelegatedChunkUploaderComesFromTheSession(t *testing.T) {
 	f := &fakeSecure{}
 	sessions := delegatedSessions()
+	sessions.readStore = 6
 	srv := delegatedSecureServerWith(t, f, time.Minute, sessions)
 	resp := do(t, http.MethodPut, srv.URL+"/api/files/delegated/secure_uploads/tok/chunks/2", "delegated", strings.NewReader("abcde"), 5)
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("狀態 %d，預期 204", resp.StatusCode)
 	}
-	if f.chunkWho != (media.Uploader{ID: 7, Admin: true, Store: 5}) || f.chunkToken != "tok" || f.chunkIndex != 2 || f.chunkLen != 5 || f.chunkRead != 5 {
+	if f.chunkWho != (media.Uploader{ID: 7, Admin: true, Store: 6}) || f.chunkToken != "tok" || f.chunkIndex != 2 || f.chunkLen != 5 || f.chunkRead != 5 {
 		t.Fatalf("模組收到 %+v", f)
 	}
 	if h := resp.Header.Get("Cache-Control"); h != "private, no-store" {
@@ -449,6 +450,9 @@ func TestDelegatedChunkUploaderComesFromTheSession(t *testing.T) {
 	}
 	if len(sessions.touched) != 1 || sessions.touched[0] != 9 {
 		t.Fatalf("順延閒置逾時 %v，預期 [9]", sessions.touched)
+	}
+	if sessions.reads != 1 {
+		t.Fatalf("DelegatedRead 執行 %d 次，預期 1", sessions.reads)
 	}
 	f = &fakeSecure{}
 	sessions = delegatedSessions()
@@ -600,5 +604,8 @@ func TestDelegatedRoutesRejectAStoreThatIsNoLongerDelegable(t *testing.T) {
 	}
 	if len(sessions.denied) != 2 || f.chunkToken != "" || len(sessions.touched) != 0 {
 		t.Errorf("稽核 %d 列、模組被呼叫 %q、順延 %v，預期 2 列、未呼叫、未順延", len(sessions.denied), f.chunkToken, sessions.touched)
+	}
+	if f.previewWho != (media.Uploader{}) {
+		t.Errorf("預覽呼叫了 ReadStagedSecure：%+v", f.previewWho)
 	}
 }

@@ -151,9 +151,9 @@ func (h *SecureUploads) delegatedUploader(w http.ResponseWriter, r *http.Request
 	switch apperr.KindOf(err) {
 	case apperr.KindUnauthenticated:
 		http.Error(w, "unauthenticated", http.StatusUnauthorized)
-	case apperr.KindPermissionDenied, apperr.KindFailedPrecondition, apperr.KindNotFound:
+	case apperr.KindPermissionDenied, apperr.KindFailedPrecondition:
 		http.Error(w, "forbidden", http.StatusForbidden)
-	case apperr.KindInternal, apperr.KindInvalidInput, apperr.KindVersionConflict, apperr.KindAlreadyExists,
+	case apperr.KindNotFound, apperr.KindInternal, apperr.KindInvalidInput, apperr.KindVersionConflict, apperr.KindAlreadyExists,
 		apperr.KindUnavailable, apperr.KindResourceExhausted:
 		h.log.ErrorContext(r.Context(), "media：代行上傳驗證代行 session 失敗", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)

@@ -133,7 +133,7 @@
       "old": "Admin: true, Store: st.StoreID}\n\t\t\treturn nil",
       "new": "Admin: true}\n\t\t\t_ = st\n\t\t\treturn nil",
       "test": "internal/httpapi/media ^TestDelegatedChunkUploaderComesFromTheSession$",
-      "why": "代行段上傳的 Uploader 不帶 session 的店家：續傳對不上綁定的那家店（C1）"
+      "why": "代行段上傳的 Uploader 不帶 DelegatedRead 交回的店家（測試讓它與 session 綁定的店家不同）：續傳對不上授權的那家店（C1）"
     },
     {
       "id": "delegated-preview-uses-customer-uploader",

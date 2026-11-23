@@ -36,6 +36,8 @@ type fakeSessions struct {
 	// storeErr 是 DelegatedRead 的店家檢查結果（nil 是可代行）；reads 是通過檢查、實際執行 read 的次數。
 	storeErr error
 	reads    int
+	// readStore 非 0 時是 DelegatedRead 交回的店家，與 session 綁定的店家不同，用來證明店家取自它的回傳。
+	readStore int64
 }
 
 // DelegatedRead 像 delegation 模組：店家不可代行時寫一列 FAILED 稽核（記進 denied）並回模組的拒絕種類（FailedPrecondition）。
@@ -45,7 +47,11 @@ func (f *fakeSessions) DelegatedRead(ctx context.Context, c moddelegation.Delega
 		return f.storeErr
 	}
 	f.reads++
-	return read(ctx, seller.Store{StoreID: c.Session.Target.StoreID})
+	id := c.Session.Target.StoreID
+	if f.readStore != 0 {
+		id = f.readStore
+	}
+	return read(ctx, seller.Store{StoreID: id})
 }
 
 func (f *fakeSessions) TouchDelegation(_ context.Context, id int64) error {

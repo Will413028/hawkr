@@ -145,3 +145,20 @@ func TestCheckUploader_RejectsStoreWithoutAdmin(t *testing.T) {
 		}
 	}
 }
+
+func TestReadStagedSecure_RejectsMalformedUploaderBeforeAnyLookup(t *testing.T) {
+	ring, err := secure.ParseKeyring("k1:AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{d: Deps{Keyring: ring}}
+	for name, u := range map[string]model.Uploader{
+		"store without admin": {ID: 7, Store: 5},
+		"non-positive id":     {ID: 0},
+	} {
+		_, err := s.ReadStagedSecure(t.Context(), u, "tok")
+		if apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：err=%v，預期 InvalidInput", name, err)
+		}
+	}
+}
