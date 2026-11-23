@@ -14,6 +14,10 @@ import (
 // WebhookRoute 是 Stripe webhook 的入口；簽章就是驗證，所以掛在 Connect、身分與 CSRF 中介層之外。
 const WebhookRoute = "POST /webhooks/stripe"
 
+// ChargeWebhookRoute 是付款事件（PaymentIntent、退款、轉帳）的 webhook 入口：一個 Stripe event destination 一個 endpoint 一把簽章密鑰，付款的 snapshot destination
+// 與收款帳戶的 thin destination 分開（spikes.md「event destination」），所以不與 WebhookRoute 共用路由；一樣掛在 Connect、身分與 CSRF 中介層之外。
+const ChargeWebhookRoute = "POST /webhooks/stripe-payments"
+
 // maxWebhookBytes 是 webhook 本文的上限；thin event 只有幾百 bytes。
 const maxWebhookBytes = 64 << 10
 
@@ -49,4 +53,20 @@ func NewWebhook(events Events, log *slog.Logger) http.Handler {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 		}
 	})
+}
+
+// ChargeEvents 是付款 webhook 入口需要的模組方法：驗簽、同一個 transaction 寫 platform inbox 並排入派送 job（commit 之後才回 2xx）。
+type ChargeEvents interface {
+	ReceivePaymentEvent(ctx context.Context, header http.Header, body []byte) error
+}
+
+type chargeEvents struct{ e ChargeEvents }
+
+func (c chargeEvents) ReceiveEvent(ctx context.Context, header http.Header, body []byte) error {
+	return c.e.ReceivePaymentEvent(ctx, header, body)
+}
+
+// NewChargeWebhook 回傳付款 webhook 入口，回應規則同 NewWebhook。
+func NewChargeWebhook(events ChargeEvents, log *slog.Logger) http.Handler {
+	return NewWebhook(chargeEvents{events}, log)
 }

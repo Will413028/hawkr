@@ -132,7 +132,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"text":      {},
 		"view":      {"model", "snapshot", "store", "text"}, // snapshot：案件的店家取自快照
 	}},
-	"payment": {Packages: map[string][]string{"account": {"model", "store"}, "model": {}, "store": {}}},
+	"payment": {Packages: map[string][]string{"account": {"model", "store"}, "charge": {"model", "store"}, "model": {}, "store": {}}},
 	"social": {Packages: map[string][]string{
 		"actor":      {"model", "text", "visibility"},
 		"comment":    {"actor", "model", "reads", "store", "text", "textcheck", "visibility"},
