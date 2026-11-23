@@ -3,11 +3,12 @@ syntax = "proto3";
 // notification 模組給前台的 API：通知收件匣、未讀數、已讀、刪除、偏好、裝置 token，以及即時訊號串流（NotificationAppService）。
 //
 // 一個帳號同時是買家，也可能有店（Connect 沒有視角）：通知的收件身分是 (帳號, 受眾)，受眾是 BUYER 或 STORE，每支方法的請求以 audience 指名。
-// 收件匣、未讀數、偏好與串流都只屬於一個受眾，不會互相看到；以 STORE 受眾呼叫時，呼叫者必須有店。賣家停權時仍可使用（賣家能力 SELLER_CAPABILITY_NOTIFICATION 在停權白名單內）。
-// 代行營運的管理員不能使用本 service（D9）：代行憑證不走這條，管理員帳號呼叫回 permission_denied。
+// 收件匣、未讀數、偏好與串流都只屬於一個受眾，不會互相看到；以 STORE 受眾呼叫時，呼叫者必須有現任店家，沒有店回 not_found（任何帶 audience 的方法與 WatchNotifications 皆同）。賣家停權時仍可使用（賣家能力 SELLER_CAPABILITY_NOTIFICATION 在停權白名單內）。
+// 代行營運的管理員不能使用本 service：代行憑證不走這條，管理員帳號呼叫回 permission_denied。
 //
 // 收件匣是伺服器依請求語系組好字的：標題、內文與深連結都由伺服器給，client 不依通知型別分支，也不解析深連結以外的資料；
 // 呈現分類（InboxPresentation）只決定圖示與分組。ID 是不透明的字串，client 不解析。
+// 例外：後台公告（NOTIFICATION_CATEGORY_ANNOUNCEMENT）的標題與內文是管理員寫的英文單一份，不依請求語系，所有使用者看到同一份。
 package hawkr.notification.v1alpha1;
 
 import "google/api/field_behavior.proto";
@@ -29,34 +30,50 @@ service NotificationAppService {
   }
 
   // MarkInboxItemRead 把一則通知標成已讀；已經是已讀時成功，不改已讀時間。通知不存在或不是呼叫者的回 not_found，兩者的回應完全相同。
-  rpc MarkInboxItemRead(MarkInboxItemReadRequest) returns (MarkInboxItemReadResponse);
+  rpc MarkInboxItemRead(MarkInboxItemReadRequest) returns (MarkInboxItemReadResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 
   // MarkAllInboxItemsRead 把指定受眾的全部未讀通知標成已讀，回傳這次改成已讀的筆數。
-  rpc MarkAllInboxItemsRead(MarkAllInboxItemsReadRequest) returns (MarkAllInboxItemsReadResponse);
+  rpc MarkAllInboxItemsRead(MarkAllInboxItemsReadRequest) returns (MarkAllInboxItemsReadResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 
-  // DeleteInboxItems 刪除通知。ids 中任何一個不存在或不是呼叫者的，整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
-  rpc DeleteInboxItems(DeleteInboxItemsRequest) returns (DeleteInboxItemsResponse);
+  // BatchDeleteInboxItems 刪除通知。ids 為空、重複或超過 100 個回 invalid_argument。ids 中任何一個不存在或不是呼叫者的，
+  // 整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
+  rpc BatchDeleteInboxItems(BatchDeleteInboxItemsRequest) returns (BatchDeleteInboxItemsResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 
-  // GetNotificationPreferences 列出指定受眾每個分類在每個渠道的開關。只列出該受眾會收到的分類；沒有設定過的是預設開。
+  // GetNotificationPreferences 列出指定受眾的開關。entries 只包含註冊表實際會在該 (受眾, 分類, 渠道) 送達的組合，
+  // 不是分類與渠道的笛卡兒積（例如沒有型別走 email 的分類就沒有 email 那一項）；沒有設定過的是預設開。
   rpc GetNotificationPreferences(GetNotificationPreferencesRequest) returns (GetNotificationPreferencesResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 
-  // UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾，或該 (分類, 渠道) 不可關閉
-  // （PreferenceEntry.can_disable 為 false）而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
-  rpc UpdateNotificationPreference(UpdateNotificationPreferenceRequest) returns (UpdateNotificationPreferenceResponse);
+  // UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾、該 (分類, 渠道) 不在
+  // GetNotificationPreferences 的 entries 內（註冊表不會在這個組合送達），或該組合不可關閉（PreferenceEntry.can_disable 為 false）
+  // 而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
+  rpc UpdateNotificationPreference(UpdateNotificationPreferenceRequest) returns (UpdateNotificationPreferenceResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 
   // RegisterDeviceToken 註冊 App 的推播 token。App 每次啟動都呼叫，伺服器更新最後註冊時間；同一個 token 換帳號登入時改綁給呼叫者。
   // 一個 token 只綁一個帳號與一支 App。
-  rpc RegisterDeviceToken(RegisterDeviceTokenRequest) returns (RegisterDeviceTokenResponse);
+  rpc RegisterDeviceToken(RegisterDeviceTokenRequest) returns (RegisterDeviceTokenResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 
   // DeleteDeviceToken 刪除呼叫者的一個 token（登出時呼叫）。token 不存在或屬於別的帳號也回成功，不洩漏它是否存在。
-  rpc DeleteDeviceToken(DeleteDeviceTokenRequest) returns (DeleteDeviceTokenResponse);
+  rpc DeleteDeviceToken(DeleteDeviceTokenRequest) returns (DeleteDeviceTokenResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
 
   // WatchNotifications 是指定受眾的即時訊號串流（server streaming）。串流只傳「該重讀了」的訊號，不傳通知內容，也沒有續傳游標：
   // 連線建立後先送一則 inbox 訊號（目前的未讀數與最新一則的 ID），之後每有變化再送；client 收到訊號就重新呼叫 ListInboxItems 與其他列表，
   // 斷線重連後也先重讀一次。訊號可能合併或遺漏，資料以列表為準。
-  // STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。每個帳號同時開著的串流有上限，超過回 resource_exhausted。
+  // STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。STORE 受眾但呼叫者沒有現任店家回 not_found；
+  // 每個帳號同時開著的串流有上限，超過回 resource_exhausted。
   rpc WatchNotifications(WatchNotificationsRequest) returns (stream WatchNotificationsResponse);
 }
 
@@ -70,7 +87,7 @@ enum NotificationAudience {
 }
 
 // NotificationCategory 是偏好分類：使用者設定偏好的單位，也是收件匣的篩選單位。
-// 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開。
+// 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開；公告收件匣與 email 不可關、推播可關。
 enum NotificationCategory {
   NOTIFICATION_CATEGORY_UNSPECIFIED = 0;
   // 訂單（交易必要）。
@@ -101,6 +118,8 @@ enum NotificationCategory {
   NOTIFICATION_CATEGORY_COUPON = 13;
   // 補貨（行銷，只有買家）。
   NOTIFICATION_CATEGORY_RESTOCK = 14;
+  // 後台系統公告（兩個受眾都有；收件匣一定收到，推播可在偏好關閉）。
+  NOTIFICATION_CATEGORY_ANNOUNCEMENT = 15;
 }
 
 // NotificationChannel 是通知送達的渠道。
@@ -149,21 +168,22 @@ enum NotificationApp {
   NOTIFICATION_APP_SELLER_APP = 2;
 }
 
-// InboxItem 是收件匣的一則通知，文字已依請求語系組好。
+// InboxItem 是收件匣的一則通知，文字已依請求語系組好；唯一例外是 category 為 ANNOUNCEMENT 的公告，title 與 body
+// 是管理員寫的英文單一份，不依請求語系。
 message InboxItem {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  NotificationCategory category = 2;
-  InboxPresentation presentation = 3;
-  string title = 4;
-  string body = 5;
+  NotificationCategory category = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  InboxPresentation presentation = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string title = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string body = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 點擊後的 App 內目的地；空字串表示沒有目的地。格式由伺服器定義，client 只交給路由，不解析。
-  string deep_link = 6;
+  string deep_link = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 商品類通知的圖片；沒有圖時不設。
-  hawkr.common.v1alpha1.Image image = 7;
-  bool read = 8;
+  hawkr.common.v1alpha1.Image image = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  bool read = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   // 已讀的時間；未讀不設。
-  optional google.protobuf.Timestamp read_time = 9;
-  google.protobuf.Timestamp create_time = 10;
+  optional google.protobuf.Timestamp read_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 message ListInboxItemsRequest {
@@ -205,14 +225,12 @@ message MarkAllInboxItemsReadResponse {
   int32 updated_count = 1;
 }
 
-message DeleteInboxItemsRequest {
-  // 1 到 100 個，不可重複。
+message BatchDeleteInboxItemsRequest {
+  // 1 到 100 個，不可重複；空、重複或超過 100 個回 invalid_argument。
   repeated string ids = 1 [(google.api.field_behavior) = REQUIRED];
 }
 
-message DeleteInboxItemsResponse {
-  int32 deleted_count = 1;
-}
+message BatchDeleteInboxItemsResponse {}
 
 // PreferenceEntry 是一個 (分類, 渠道) 的偏好。
 message PreferenceEntry {
@@ -274,8 +292,9 @@ message InboxSignal {
   int32 unread_count = 1;
   // 最新一則通知的 ID；收件匣是空的時不設。
   optional string latest_inbox_item_id = 2;
-  // 引起這次訊號的通知所帶的狀態重讀提示；UNSPECIFIED 表示不需要重讀（連線建立時的第一則也是）。
-  StateRefreshHint state_refresh_hint = 3;
+  // 引起這次訊號的通知所帶的狀態重讀提示。訊號可能把多則通知合併，所以是這些通知的提示的聯集（不重複）；
+  // 空表示不需要重讀（連線建立時的第一則也是）。不會含 STATE_REFRESH_HINT_UNSPECIFIED。
+  repeated StateRefreshHint state_refresh_hints = 3;
 }
 
 // SellerWorkspaceSignal 是賣家工作區的資料有變化的訊號：client 重讀對應的列表與統計，不帶變化的內容。

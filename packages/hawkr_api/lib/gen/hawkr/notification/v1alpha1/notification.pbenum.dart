@@ -45,7 +45,7 @@ class NotificationAudience extends $pb.ProtobufEnum {
 }
 
 /// NotificationCategory 是偏好分類：使用者設定偏好的單位，也是收件匣的篩選單位。
-/// 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開。
+/// 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開；公告收件匣與 email 不可關、推播可關。
 class NotificationCategory extends $pb.ProtobufEnum {
   static const NotificationCategory NOTIFICATION_CATEGORY_UNSPECIFIED =
       NotificationCategory._(
@@ -121,6 +121,11 @@ class NotificationCategory extends $pb.ProtobufEnum {
       NotificationCategory._(
           14, _omitEnumNames ? '' : 'NOTIFICATION_CATEGORY_RESTOCK');
 
+  /// 後台系統公告（兩個受眾都有；收件匣一定收到，推播可在偏好關閉）。
+  static const NotificationCategory NOTIFICATION_CATEGORY_ANNOUNCEMENT =
+      NotificationCategory._(
+          15, _omitEnumNames ? '' : 'NOTIFICATION_CATEGORY_ANNOUNCEMENT');
+
   static const $core.List<NotificationCategory> values = <NotificationCategory>[
     NOTIFICATION_CATEGORY_UNSPECIFIED,
     NOTIFICATION_CATEGORY_ORDER,
@@ -137,10 +142,11 @@ class NotificationCategory extends $pb.ProtobufEnum {
     NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST,
     NOTIFICATION_CATEGORY_COUPON,
     NOTIFICATION_CATEGORY_RESTOCK,
+    NOTIFICATION_CATEGORY_ANNOUNCEMENT,
   ];
 
   static final $core.List<NotificationCategory?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 14);
+      $pb.ProtobufEnum.$_initByValueList(values, 15);
   static NotificationCategory? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

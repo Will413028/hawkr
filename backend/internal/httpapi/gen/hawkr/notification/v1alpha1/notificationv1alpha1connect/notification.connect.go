@@ -5,11 +5,12 @@
 // notification 模組給前台的 API：通知收件匣、未讀數、已讀、刪除、偏好、裝置 token，以及即時訊號串流（NotificationAppService）。
 //
 // 一個帳號同時是買家，也可能有店（Connect 沒有視角）：通知的收件身分是 (帳號, 受眾)，受眾是 BUYER 或 STORE，每支方法的請求以 audience 指名。
-// 收件匣、未讀數、偏好與串流都只屬於一個受眾，不會互相看到；以 STORE 受眾呼叫時，呼叫者必須有店。賣家停權時仍可使用（賣家能力 SELLER_CAPABILITY_NOTIFICATION 在停權白名單內）。
-// 代行營運的管理員不能使用本 service（D9）：代行憑證不走這條，管理員帳號呼叫回 permission_denied。
+// 收件匣、未讀數、偏好與串流都只屬於一個受眾，不會互相看到；以 STORE 受眾呼叫時，呼叫者必須有現任店家，沒有店回 not_found（任何帶 audience 的方法與 WatchNotifications 皆同）。賣家停權時仍可使用（賣家能力 SELLER_CAPABILITY_NOTIFICATION 在停權白名單內）。
+// 代行營運的管理員不能使用本 service：代行憑證不走這條，管理員帳號呼叫回 permission_denied。
 //
 // 收件匣是伺服器依請求語系組好字的：標題、內文與深連結都由伺服器給，client 不依通知型別分支，也不解析深連結以外的資料；
 // 呈現分類（InboxPresentation）只決定圖示與分組。ID 是不透明的字串，client 不解析。
+// 例外：後台公告（NOTIFICATION_CATEGORY_ANNOUNCEMENT）的標題與內文是管理員寫的英文單一份，不依請求語系，所有使用者看到同一份。
 package notificationv1alpha1connect
 
 import (
@@ -53,9 +54,9 @@ const (
 	// NotificationAppServiceMarkAllInboxItemsReadProcedure is the fully-qualified name of the
 	// NotificationAppService's MarkAllInboxItemsRead RPC.
 	NotificationAppServiceMarkAllInboxItemsReadProcedure = "/hawkr.notification.v1alpha1.NotificationAppService/MarkAllInboxItemsRead"
-	// NotificationAppServiceDeleteInboxItemsProcedure is the fully-qualified name of the
-	// NotificationAppService's DeleteInboxItems RPC.
-	NotificationAppServiceDeleteInboxItemsProcedure = "/hawkr.notification.v1alpha1.NotificationAppService/DeleteInboxItems"
+	// NotificationAppServiceBatchDeleteInboxItemsProcedure is the fully-qualified name of the
+	// NotificationAppService's BatchDeleteInboxItems RPC.
+	NotificationAppServiceBatchDeleteInboxItemsProcedure = "/hawkr.notification.v1alpha1.NotificationAppService/BatchDeleteInboxItems"
 	// NotificationAppServiceGetNotificationPreferencesProcedure is the fully-qualified name of the
 	// NotificationAppService's GetNotificationPreferences RPC.
 	NotificationAppServiceGetNotificationPreferencesProcedure = "/hawkr.notification.v1alpha1.NotificationAppService/GetNotificationPreferences"
@@ -86,12 +87,15 @@ type NotificationAppServiceClient interface {
 	MarkInboxItemRead(context.Context, *connect.Request[v1alpha1.MarkInboxItemReadRequest]) (*connect.Response[v1alpha1.MarkInboxItemReadResponse], error)
 	// MarkAllInboxItemsRead 把指定受眾的全部未讀通知標成已讀，回傳這次改成已讀的筆數。
 	MarkAllInboxItemsRead(context.Context, *connect.Request[v1alpha1.MarkAllInboxItemsReadRequest]) (*connect.Response[v1alpha1.MarkAllInboxItemsReadResponse], error)
-	// DeleteInboxItems 刪除通知。ids 中任何一個不存在或不是呼叫者的，整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
-	DeleteInboxItems(context.Context, *connect.Request[v1alpha1.DeleteInboxItemsRequest]) (*connect.Response[v1alpha1.DeleteInboxItemsResponse], error)
-	// GetNotificationPreferences 列出指定受眾每個分類在每個渠道的開關。只列出該受眾會收到的分類；沒有設定過的是預設開。
+	// BatchDeleteInboxItems 刪除通知。ids 為空、重複或超過 100 個回 invalid_argument。ids 中任何一個不存在或不是呼叫者的，
+	// 整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
+	BatchDeleteInboxItems(context.Context, *connect.Request[v1alpha1.BatchDeleteInboxItemsRequest]) (*connect.Response[v1alpha1.BatchDeleteInboxItemsResponse], error)
+	// GetNotificationPreferences 列出指定受眾的開關。entries 只包含註冊表實際會在該 (受眾, 分類, 渠道) 送達的組合，
+	// 不是分類與渠道的笛卡兒積（例如沒有型別走 email 的分類就沒有 email 那一項）；沒有設定過的是預設開。
 	GetNotificationPreferences(context.Context, *connect.Request[v1alpha1.GetNotificationPreferencesRequest]) (*connect.Response[v1alpha1.GetNotificationPreferencesResponse], error)
-	// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾，或該 (分類, 渠道) 不可關閉
-	// （PreferenceEntry.can_disable 為 false）而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
+	// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾、該 (分類, 渠道) 不在
+	// GetNotificationPreferences 的 entries 內（註冊表不會在這個組合送達），或該組合不可關閉（PreferenceEntry.can_disable 為 false）
+	// 而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
 	UpdateNotificationPreference(context.Context, *connect.Request[v1alpha1.UpdateNotificationPreferenceRequest]) (*connect.Response[v1alpha1.UpdateNotificationPreferenceResponse], error)
 	// RegisterDeviceToken 註冊 App 的推播 token。App 每次啟動都呼叫，伺服器更新最後註冊時間；同一個 token 換帳號登入時改綁給呼叫者。
 	// 一個 token 只綁一個帳號與一支 App。
@@ -101,7 +105,8 @@ type NotificationAppServiceClient interface {
 	// WatchNotifications 是指定受眾的即時訊號串流（server streaming）。串流只傳「該重讀了」的訊號，不傳通知內容，也沒有續傳游標：
 	// 連線建立後先送一則 inbox 訊號（目前的未讀數與最新一則的 ID），之後每有變化再送；client 收到訊號就重新呼叫 ListInboxItems 與其他列表，
 	// 斷線重連後也先重讀一次。訊號可能合併或遺漏，資料以列表為準。
-	// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。每個帳號同時開著的串流有上限，超過回 resource_exhausted。
+	// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。STORE 受眾但呼叫者沒有現任店家回 not_found；
+	// 每個帳號同時開著的串流有上限，超過回 resource_exhausted。
 	WatchNotifications(context.Context, *connect.Request[v1alpha1.WatchNotificationsRequest]) (*connect.ServerStreamForClient[v1alpha1.WatchNotificationsResponse], error)
 }
 
@@ -135,18 +140,21 @@ func NewNotificationAppServiceClient(httpClient connect.HTTPClient, baseURL stri
 			httpClient,
 			baseURL+NotificationAppServiceMarkInboxItemReadProcedure,
 			connect.WithSchema(notificationAppServiceMethods.ByName("MarkInboxItemRead")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		markAllInboxItemsRead: connect.NewClient[v1alpha1.MarkAllInboxItemsReadRequest, v1alpha1.MarkAllInboxItemsReadResponse](
 			httpClient,
 			baseURL+NotificationAppServiceMarkAllInboxItemsReadProcedure,
 			connect.WithSchema(notificationAppServiceMethods.ByName("MarkAllInboxItemsRead")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
-		deleteInboxItems: connect.NewClient[v1alpha1.DeleteInboxItemsRequest, v1alpha1.DeleteInboxItemsResponse](
+		batchDeleteInboxItems: connect.NewClient[v1alpha1.BatchDeleteInboxItemsRequest, v1alpha1.BatchDeleteInboxItemsResponse](
 			httpClient,
-			baseURL+NotificationAppServiceDeleteInboxItemsProcedure,
-			connect.WithSchema(notificationAppServiceMethods.ByName("DeleteInboxItems")),
+			baseURL+NotificationAppServiceBatchDeleteInboxItemsProcedure,
+			connect.WithSchema(notificationAppServiceMethods.ByName("BatchDeleteInboxItems")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		getNotificationPreferences: connect.NewClient[v1alpha1.GetNotificationPreferencesRequest, v1alpha1.GetNotificationPreferencesResponse](
@@ -160,18 +168,21 @@ func NewNotificationAppServiceClient(httpClient connect.HTTPClient, baseURL stri
 			httpClient,
 			baseURL+NotificationAppServiceUpdateNotificationPreferenceProcedure,
 			connect.WithSchema(notificationAppServiceMethods.ByName("UpdateNotificationPreference")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		registerDeviceToken: connect.NewClient[v1alpha1.RegisterDeviceTokenRequest, v1alpha1.RegisterDeviceTokenResponse](
 			httpClient,
 			baseURL+NotificationAppServiceRegisterDeviceTokenProcedure,
 			connect.WithSchema(notificationAppServiceMethods.ByName("RegisterDeviceToken")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		deleteDeviceToken: connect.NewClient[v1alpha1.DeleteDeviceTokenRequest, v1alpha1.DeleteDeviceTokenResponse](
 			httpClient,
 			baseURL+NotificationAppServiceDeleteDeviceTokenProcedure,
 			connect.WithSchema(notificationAppServiceMethods.ByName("DeleteDeviceToken")),
+			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 		watchNotifications: connect.NewClient[v1alpha1.WatchNotificationsRequest, v1alpha1.WatchNotificationsResponse](
@@ -189,7 +200,7 @@ type notificationAppServiceClient struct {
 	getUnreadCount               *connect.Client[v1alpha1.GetUnreadCountRequest, v1alpha1.GetUnreadCountResponse]
 	markInboxItemRead            *connect.Client[v1alpha1.MarkInboxItemReadRequest, v1alpha1.MarkInboxItemReadResponse]
 	markAllInboxItemsRead        *connect.Client[v1alpha1.MarkAllInboxItemsReadRequest, v1alpha1.MarkAllInboxItemsReadResponse]
-	deleteInboxItems             *connect.Client[v1alpha1.DeleteInboxItemsRequest, v1alpha1.DeleteInboxItemsResponse]
+	batchDeleteInboxItems        *connect.Client[v1alpha1.BatchDeleteInboxItemsRequest, v1alpha1.BatchDeleteInboxItemsResponse]
 	getNotificationPreferences   *connect.Client[v1alpha1.GetNotificationPreferencesRequest, v1alpha1.GetNotificationPreferencesResponse]
 	updateNotificationPreference *connect.Client[v1alpha1.UpdateNotificationPreferenceRequest, v1alpha1.UpdateNotificationPreferenceResponse]
 	registerDeviceToken          *connect.Client[v1alpha1.RegisterDeviceTokenRequest, v1alpha1.RegisterDeviceTokenResponse]
@@ -218,9 +229,10 @@ func (c *notificationAppServiceClient) MarkAllInboxItemsRead(ctx context.Context
 	return c.markAllInboxItemsRead.CallUnary(ctx, req)
 }
 
-// DeleteInboxItems calls hawkr.notification.v1alpha1.NotificationAppService.DeleteInboxItems.
-func (c *notificationAppServiceClient) DeleteInboxItems(ctx context.Context, req *connect.Request[v1alpha1.DeleteInboxItemsRequest]) (*connect.Response[v1alpha1.DeleteInboxItemsResponse], error) {
-	return c.deleteInboxItems.CallUnary(ctx, req)
+// BatchDeleteInboxItems calls
+// hawkr.notification.v1alpha1.NotificationAppService.BatchDeleteInboxItems.
+func (c *notificationAppServiceClient) BatchDeleteInboxItems(ctx context.Context, req *connect.Request[v1alpha1.BatchDeleteInboxItemsRequest]) (*connect.Response[v1alpha1.BatchDeleteInboxItemsResponse], error) {
+	return c.batchDeleteInboxItems.CallUnary(ctx, req)
 }
 
 // GetNotificationPreferences calls
@@ -263,12 +275,15 @@ type NotificationAppServiceHandler interface {
 	MarkInboxItemRead(context.Context, *connect.Request[v1alpha1.MarkInboxItemReadRequest]) (*connect.Response[v1alpha1.MarkInboxItemReadResponse], error)
 	// MarkAllInboxItemsRead 把指定受眾的全部未讀通知標成已讀，回傳這次改成已讀的筆數。
 	MarkAllInboxItemsRead(context.Context, *connect.Request[v1alpha1.MarkAllInboxItemsReadRequest]) (*connect.Response[v1alpha1.MarkAllInboxItemsReadResponse], error)
-	// DeleteInboxItems 刪除通知。ids 中任何一個不存在或不是呼叫者的，整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
-	DeleteInboxItems(context.Context, *connect.Request[v1alpha1.DeleteInboxItemsRequest]) (*connect.Response[v1alpha1.DeleteInboxItemsResponse], error)
-	// GetNotificationPreferences 列出指定受眾每個分類在每個渠道的開關。只列出該受眾會收到的分類；沒有設定過的是預設開。
+	// BatchDeleteInboxItems 刪除通知。ids 為空、重複或超過 100 個回 invalid_argument。ids 中任何一個不存在或不是呼叫者的，
+	// 整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
+	BatchDeleteInboxItems(context.Context, *connect.Request[v1alpha1.BatchDeleteInboxItemsRequest]) (*connect.Response[v1alpha1.BatchDeleteInboxItemsResponse], error)
+	// GetNotificationPreferences 列出指定受眾的開關。entries 只包含註冊表實際會在該 (受眾, 分類, 渠道) 送達的組合，
+	// 不是分類與渠道的笛卡兒積（例如沒有型別走 email 的分類就沒有 email 那一項）；沒有設定過的是預設開。
 	GetNotificationPreferences(context.Context, *connect.Request[v1alpha1.GetNotificationPreferencesRequest]) (*connect.Response[v1alpha1.GetNotificationPreferencesResponse], error)
-	// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾，或該 (分類, 渠道) 不可關閉
-	// （PreferenceEntry.can_disable 為 false）而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
+	// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾、該 (分類, 渠道) 不在
+	// GetNotificationPreferences 的 entries 內（註冊表不會在這個組合送達），或該組合不可關閉（PreferenceEntry.can_disable 為 false）
+	// 而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
 	UpdateNotificationPreference(context.Context, *connect.Request[v1alpha1.UpdateNotificationPreferenceRequest]) (*connect.Response[v1alpha1.UpdateNotificationPreferenceResponse], error)
 	// RegisterDeviceToken 註冊 App 的推播 token。App 每次啟動都呼叫，伺服器更新最後註冊時間；同一個 token 換帳號登入時改綁給呼叫者。
 	// 一個 token 只綁一個帳號與一支 App。
@@ -278,7 +293,8 @@ type NotificationAppServiceHandler interface {
 	// WatchNotifications 是指定受眾的即時訊號串流（server streaming）。串流只傳「該重讀了」的訊號，不傳通知內容，也沒有續傳游標：
 	// 連線建立後先送一則 inbox 訊號（目前的未讀數與最新一則的 ID），之後每有變化再送；client 收到訊號就重新呼叫 ListInboxItems 與其他列表，
 	// 斷線重連後也先重讀一次。訊號可能合併或遺漏，資料以列表為準。
-	// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。每個帳號同時開著的串流有上限，超過回 resource_exhausted。
+	// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。STORE 受眾但呼叫者沒有現任店家回 not_found；
+	// 每個帳號同時開著的串流有上限，超過回 resource_exhausted。
 	WatchNotifications(context.Context, *connect.Request[v1alpha1.WatchNotificationsRequest], *connect.ServerStream[v1alpha1.WatchNotificationsResponse]) error
 }
 
@@ -307,18 +323,21 @@ func NewNotificationAppServiceHandler(svc NotificationAppServiceHandler, opts ..
 		NotificationAppServiceMarkInboxItemReadProcedure,
 		svc.MarkInboxItemRead,
 		connect.WithSchema(notificationAppServiceMethods.ByName("MarkInboxItemRead")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	notificationAppServiceMarkAllInboxItemsReadHandler := connect.NewUnaryHandler(
 		NotificationAppServiceMarkAllInboxItemsReadProcedure,
 		svc.MarkAllInboxItemsRead,
 		connect.WithSchema(notificationAppServiceMethods.ByName("MarkAllInboxItemsRead")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
-	notificationAppServiceDeleteInboxItemsHandler := connect.NewUnaryHandler(
-		NotificationAppServiceDeleteInboxItemsProcedure,
-		svc.DeleteInboxItems,
-		connect.WithSchema(notificationAppServiceMethods.ByName("DeleteInboxItems")),
+	notificationAppServiceBatchDeleteInboxItemsHandler := connect.NewUnaryHandler(
+		NotificationAppServiceBatchDeleteInboxItemsProcedure,
+		svc.BatchDeleteInboxItems,
+		connect.WithSchema(notificationAppServiceMethods.ByName("BatchDeleteInboxItems")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	notificationAppServiceGetNotificationPreferencesHandler := connect.NewUnaryHandler(
@@ -332,18 +351,21 @@ func NewNotificationAppServiceHandler(svc NotificationAppServiceHandler, opts ..
 		NotificationAppServiceUpdateNotificationPreferenceProcedure,
 		svc.UpdateNotificationPreference,
 		connect.WithSchema(notificationAppServiceMethods.ByName("UpdateNotificationPreference")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	notificationAppServiceRegisterDeviceTokenHandler := connect.NewUnaryHandler(
 		NotificationAppServiceRegisterDeviceTokenProcedure,
 		svc.RegisterDeviceToken,
 		connect.WithSchema(notificationAppServiceMethods.ByName("RegisterDeviceToken")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	notificationAppServiceDeleteDeviceTokenHandler := connect.NewUnaryHandler(
 		NotificationAppServiceDeleteDeviceTokenProcedure,
 		svc.DeleteDeviceToken,
 		connect.WithSchema(notificationAppServiceMethods.ByName("DeleteDeviceToken")),
+		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	notificationAppServiceWatchNotificationsHandler := connect.NewServerStreamHandler(
@@ -362,8 +384,8 @@ func NewNotificationAppServiceHandler(svc NotificationAppServiceHandler, opts ..
 			notificationAppServiceMarkInboxItemReadHandler.ServeHTTP(w, r)
 		case NotificationAppServiceMarkAllInboxItemsReadProcedure:
 			notificationAppServiceMarkAllInboxItemsReadHandler.ServeHTTP(w, r)
-		case NotificationAppServiceDeleteInboxItemsProcedure:
-			notificationAppServiceDeleteInboxItemsHandler.ServeHTTP(w, r)
+		case NotificationAppServiceBatchDeleteInboxItemsProcedure:
+			notificationAppServiceBatchDeleteInboxItemsHandler.ServeHTTP(w, r)
 		case NotificationAppServiceGetNotificationPreferencesProcedure:
 			notificationAppServiceGetNotificationPreferencesHandler.ServeHTTP(w, r)
 		case NotificationAppServiceUpdateNotificationPreferenceProcedure:
@@ -399,8 +421,8 @@ func (UnimplementedNotificationAppServiceHandler) MarkAllInboxItemsRead(context.
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.notification.v1alpha1.NotificationAppService.MarkAllInboxItemsRead is not implemented"))
 }
 
-func (UnimplementedNotificationAppServiceHandler) DeleteInboxItems(context.Context, *connect.Request[v1alpha1.DeleteInboxItemsRequest]) (*connect.Response[v1alpha1.DeleteInboxItemsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.notification.v1alpha1.NotificationAppService.DeleteInboxItems is not implemented"))
+func (UnimplementedNotificationAppServiceHandler) BatchDeleteInboxItems(context.Context, *connect.Request[v1alpha1.BatchDeleteInboxItemsRequest]) (*connect.Response[v1alpha1.BatchDeleteInboxItemsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.notification.v1alpha1.NotificationAppService.BatchDeleteInboxItems is not implemented"))
 }
 
 func (UnimplementedNotificationAppServiceHandler) GetNotificationPreferences(context.Context, *connect.Request[v1alpha1.GetNotificationPreferencesRequest]) (*connect.Response[v1alpha1.GetNotificationPreferencesResponse], error) {

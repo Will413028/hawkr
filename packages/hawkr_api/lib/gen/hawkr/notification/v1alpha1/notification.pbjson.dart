@@ -55,6 +55,7 @@ const NotificationCategory$json = {
     {'1': 'NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST', '2': 12},
     {'1': 'NOTIFICATION_CATEGORY_COUPON', '2': 13},
     {'1': 'NOTIFICATION_CATEGORY_RESTOCK', '2': 14},
+    {'1': 'NOTIFICATION_CATEGORY_ANNOUNCEMENT', '2': 15},
   ],
 };
 
@@ -70,7 +71,7 @@ final $typed_data.Uint8List notificationCategoryDescriptor = $convert.base64Deco
     'RJRklDQVRJT05fQ0FURUdPUllfTElLRRAKEiAKHE5PVElGSUNBVElPTl9DQVRFR09SWV9GT0xM'
     'T1cQCxItCilOT1RJRklDQVRJT05fQ0FURUdPUllfRk9MTE9XRURfU1RPUkVfUE9TVBAMEiAKHE'
     '5PVElGSUNBVElPTl9DQVRFR09SWV9DT1VQT04QDRIhCh1OT1RJRklDQVRJT05fQ0FURUdPUllf'
-    'UkVTVE9DSxAO');
+    'UkVTVE9DSxAOEiYKIk5PVElGSUNBVElPTl9DQVRFR09SWV9BTk5PVU5DRU1FTlQQDw==');
 
 @$core.Deprecated('Use notificationChannelDescriptor instead')
 const NotificationChannel$json = {
@@ -177,6 +178,7 @@ const InboxItem$json = {
       '4': 1,
       '5': 14,
       '6': '.hawkr.notification.v1alpha1.NotificationCategory',
+      '8': {},
       '10': 'category'
     },
     {
@@ -185,26 +187,29 @@ const InboxItem$json = {
       '4': 1,
       '5': 14,
       '6': '.hawkr.notification.v1alpha1.InboxPresentation',
+      '8': {},
       '10': 'presentation'
     },
-    {'1': 'title', '3': 4, '4': 1, '5': 9, '10': 'title'},
-    {'1': 'body', '3': 5, '4': 1, '5': 9, '10': 'body'},
-    {'1': 'deep_link', '3': 6, '4': 1, '5': 9, '10': 'deepLink'},
+    {'1': 'title', '3': 4, '4': 1, '5': 9, '8': {}, '10': 'title'},
+    {'1': 'body', '3': 5, '4': 1, '5': 9, '8': {}, '10': 'body'},
+    {'1': 'deep_link', '3': 6, '4': 1, '5': 9, '8': {}, '10': 'deepLink'},
     {
       '1': 'image',
       '3': 7,
       '4': 1,
       '5': 11,
       '6': '.hawkr.common.v1alpha1.Image',
+      '8': {},
       '10': 'image'
     },
-    {'1': 'read', '3': 8, '4': 1, '5': 8, '10': 'read'},
+    {'1': 'read', '3': 8, '4': 1, '5': 8, '8': {}, '10': 'read'},
     {
       '1': 'read_time',
       '3': 9,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
+      '8': {},
       '9': 0,
       '10': 'readTime',
       '17': true
@@ -215,6 +220,7 @@ const InboxItem$json = {
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
+      '8': {},
       '10': 'createTime'
     },
   ],
@@ -225,15 +231,16 @@ const InboxItem$json = {
 
 /// Descriptor for `InboxItem`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List inboxItemDescriptor = $convert.base64Decode(
-    'CglJbmJveEl0ZW0SEwoCaWQYASABKAlCA+BBCFICaWQSTQoIY2F0ZWdvcnkYAiABKA4yMS5oYX'
-    'drci5ub3RpZmljYXRpb24udjFhbHBoYTEuTm90aWZpY2F0aW9uQ2F0ZWdvcnlSCGNhdGVnb3J5'
-    'ElIKDHByZXNlbnRhdGlvbhgDIAEoDjIuLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Jbm'
-    'JveFByZXNlbnRhdGlvblIMcHJlc2VudGF0aW9uEhQKBXRpdGxlGAQgASgJUgV0aXRsZRISCgRi'
-    'b2R5GAUgASgJUgRib2R5EhsKCWRlZXBfbGluaxgGIAEoCVIIZGVlcExpbmsSMgoFaW1hZ2UYBy'
-    'ABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VSBWltYWdlEhIKBHJlYWQYCCABKAhS'
-    'BHJlYWQSPAoJcmVhZF90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAUg'
-    'hyZWFkVGltZYgBARI7CgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1l'
-    'c3RhbXBSCmNyZWF0ZVRpbWVCDAoKX3JlYWRfdGltZQ==');
+    'CglJbmJveEl0ZW0SEwoCaWQYASABKAlCA+BBCFICaWQSUgoIY2F0ZWdvcnkYAiABKA4yMS5oYX'
+    'drci5ub3RpZmljYXRpb24udjFhbHBoYTEuTm90aWZpY2F0aW9uQ2F0ZWdvcnlCA+BBA1IIY2F0'
+    'ZWdvcnkSVwoMcHJlc2VudGF0aW9uGAMgASgOMi4uaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaG'
+    'ExLkluYm94UHJlc2VudGF0aW9uQgPgQQNSDHByZXNlbnRhdGlvbhIZCgV0aXRsZRgEIAEoCUID'
+    '4EEDUgV0aXRsZRIXCgRib2R5GAUgASgJQgPgQQNSBGJvZHkSIAoJZGVlcF9saW5rGAYgASgJQg'
+    'PgQQNSCGRlZXBMaW5rEjcKBWltYWdlGAcgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLklt'
+    'YWdlQgPgQQNSBWltYWdlEhcKBHJlYWQYCCABKAhCA+BBA1IEcmVhZBJBCglyZWFkX3RpbWUYCS'
+    'ABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNIAFIIcmVhZFRpbWWIAQESQAoL'
+    'Y3JlYXRlX3RpbWUYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQNSCmNyZW'
+    'F0ZVRpbWVCDAoKX3JlYWRfdGltZQ==');
 
 @$core.Deprecated('Use listInboxItemsRequestDescriptor instead')
 const ListInboxItemsRequest$json = {
@@ -391,32 +398,27 @@ final $typed_data.Uint8List markAllInboxItemsReadResponseDescriptor =
         'Ch1NYXJrQWxsSW5ib3hJdGVtc1JlYWRSZXNwb25zZRIjCg11cGRhdGVkX2NvdW50GAEgASgFUg'
         'x1cGRhdGVkQ291bnQ=');
 
-@$core.Deprecated('Use deleteInboxItemsRequestDescriptor instead')
-const DeleteInboxItemsRequest$json = {
-  '1': 'DeleteInboxItemsRequest',
+@$core.Deprecated('Use batchDeleteInboxItemsRequestDescriptor instead')
+const BatchDeleteInboxItemsRequest$json = {
+  '1': 'BatchDeleteInboxItemsRequest',
   '2': [
     {'1': 'ids', '3': 1, '4': 3, '5': 9, '8': {}, '10': 'ids'},
   ],
 };
 
-/// Descriptor for `DeleteInboxItemsRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List deleteInboxItemsRequestDescriptor =
+/// Descriptor for `BatchDeleteInboxItemsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List batchDeleteInboxItemsRequestDescriptor =
     $convert.base64Decode(
-        'ChdEZWxldGVJbmJveEl0ZW1zUmVxdWVzdBIVCgNpZHMYASADKAlCA+BBAlIDaWRz');
+        'ChxCYXRjaERlbGV0ZUluYm94SXRlbXNSZXF1ZXN0EhUKA2lkcxgBIAMoCUID4EECUgNpZHM=');
 
-@$core.Deprecated('Use deleteInboxItemsResponseDescriptor instead')
-const DeleteInboxItemsResponse$json = {
-  '1': 'DeleteInboxItemsResponse',
-  '2': [
-    {'1': 'deleted_count', '3': 1, '4': 1, '5': 5, '10': 'deletedCount'},
-  ],
+@$core.Deprecated('Use batchDeleteInboxItemsResponseDescriptor instead')
+const BatchDeleteInboxItemsResponse$json = {
+  '1': 'BatchDeleteInboxItemsResponse',
 };
 
-/// Descriptor for `DeleteInboxItemsResponse`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List deleteInboxItemsResponseDescriptor =
-    $convert.base64Decode(
-        'ChhEZWxldGVJbmJveEl0ZW1zUmVzcG9uc2USIwoNZGVsZXRlZF9jb3VudBgBIAEoBVIMZGVsZX'
-        'RlZENvdW50');
+/// Descriptor for `BatchDeleteInboxItemsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List batchDeleteInboxItemsResponseDescriptor =
+    $convert.base64Decode('Ch1CYXRjaERlbGV0ZUluYm94SXRlbXNSZXNwb25zZQ==');
 
 @$core.Deprecated('Use preferenceEntryDescriptor instead')
 const PreferenceEntry$json = {
@@ -686,12 +688,12 @@ const InboxSignal$json = {
       '17': true
     },
     {
-      '1': 'state_refresh_hint',
+      '1': 'state_refresh_hints',
       '3': 3,
-      '4': 1,
+      '4': 3,
       '5': 14,
       '6': '.hawkr.notification.v1alpha1.StateRefreshHint',
-      '10': 'stateRefreshHint'
+      '10': 'stateRefreshHints'
     },
   ],
   '8': [
@@ -702,9 +704,9 @@ const InboxSignal$json = {
 /// Descriptor for `InboxSignal`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List inboxSignalDescriptor = $convert.base64Decode(
     'CgtJbmJveFNpZ25hbBIhCgx1bnJlYWRfY291bnQYASABKAVSC3VucmVhZENvdW50EjQKFGxhdG'
-    'VzdF9pbmJveF9pdGVtX2lkGAIgASgJSABSEWxhdGVzdEluYm94SXRlbUlkiAEBElsKEnN0YXRl'
-    'X3JlZnJlc2hfaGludBgDIAEoDjItLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5TdGF0ZV'
-    'JlZnJlc2hIaW50UhBzdGF0ZVJlZnJlc2hIaW50QhcKFV9sYXRlc3RfaW5ib3hfaXRlbV9pZA==');
+    'VzdF9pbmJveF9pdGVtX2lkGAIgASgJSABSEWxhdGVzdEluYm94SXRlbUlkiAEBEl0KE3N0YXRl'
+    'X3JlZnJlc2hfaGludHMYAyADKA4yLS5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuU3RhdG'
+    'VSZWZyZXNoSGludFIRc3RhdGVSZWZyZXNoSGludHNCFwoVX2xhdGVzdF9pbmJveF9pdGVtX2lk');
 
 @$core.Deprecated('Use sellerWorkspaceSignalDescriptor instead')
 const SellerWorkspaceSignal$json = {
@@ -744,17 +746,20 @@ const $core.Map<$core.String, $core.dynamic> NotificationAppServiceBase$json = {
     {
       '1': 'MarkInboxItemRead',
       '2': '.hawkr.notification.v1alpha1.MarkInboxItemReadRequest',
-      '3': '.hawkr.notification.v1alpha1.MarkInboxItemReadResponse'
+      '3': '.hawkr.notification.v1alpha1.MarkInboxItemReadResponse',
+      '4': {'34': 2},
     },
     {
       '1': 'MarkAllInboxItemsRead',
       '2': '.hawkr.notification.v1alpha1.MarkAllInboxItemsReadRequest',
-      '3': '.hawkr.notification.v1alpha1.MarkAllInboxItemsReadResponse'
+      '3': '.hawkr.notification.v1alpha1.MarkAllInboxItemsReadResponse',
+      '4': {'34': 2},
     },
     {
-      '1': 'DeleteInboxItems',
-      '2': '.hawkr.notification.v1alpha1.DeleteInboxItemsRequest',
-      '3': '.hawkr.notification.v1alpha1.DeleteInboxItemsResponse'
+      '1': 'BatchDeleteInboxItems',
+      '2': '.hawkr.notification.v1alpha1.BatchDeleteInboxItemsRequest',
+      '3': '.hawkr.notification.v1alpha1.BatchDeleteInboxItemsResponse',
+      '4': {'34': 2},
     },
     {
       '1': 'GetNotificationPreferences',
@@ -765,17 +770,20 @@ const $core.Map<$core.String, $core.dynamic> NotificationAppServiceBase$json = {
     {
       '1': 'UpdateNotificationPreference',
       '2': '.hawkr.notification.v1alpha1.UpdateNotificationPreferenceRequest',
-      '3': '.hawkr.notification.v1alpha1.UpdateNotificationPreferenceResponse'
+      '3': '.hawkr.notification.v1alpha1.UpdateNotificationPreferenceResponse',
+      '4': {'34': 2},
     },
     {
       '1': 'RegisterDeviceToken',
       '2': '.hawkr.notification.v1alpha1.RegisterDeviceTokenRequest',
-      '3': '.hawkr.notification.v1alpha1.RegisterDeviceTokenResponse'
+      '3': '.hawkr.notification.v1alpha1.RegisterDeviceTokenResponse',
+      '4': {'34': 2},
     },
     {
       '1': 'DeleteDeviceToken',
       '2': '.hawkr.notification.v1alpha1.DeleteDeviceTokenRequest',
-      '3': '.hawkr.notification.v1alpha1.DeleteDeviceTokenResponse'
+      '3': '.hawkr.notification.v1alpha1.DeleteDeviceTokenResponse',
+      '4': {'34': 2},
     },
     {
       '1': 'WatchNotifications',
@@ -808,10 +816,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       MarkAllInboxItemsReadRequest$json,
   '.hawkr.notification.v1alpha1.MarkAllInboxItemsReadResponse':
       MarkAllInboxItemsReadResponse$json,
-  '.hawkr.notification.v1alpha1.DeleteInboxItemsRequest':
-      DeleteInboxItemsRequest$json,
-  '.hawkr.notification.v1alpha1.DeleteInboxItemsResponse':
-      DeleteInboxItemsResponse$json,
+  '.hawkr.notification.v1alpha1.BatchDeleteInboxItemsRequest':
+      BatchDeleteInboxItemsRequest$json,
+  '.hawkr.notification.v1alpha1.BatchDeleteInboxItemsResponse':
+      BatchDeleteInboxItemsResponse$json,
   '.hawkr.notification.v1alpha1.GetNotificationPreferencesRequest':
       GetNotificationPreferencesRequest$json,
   '.hawkr.notification.v1alpha1.GetNotificationPreferencesResponse':
@@ -845,24 +853,25 @@ final $typed_data.Uint8List notificationAppServiceDescriptor = $convert.base64De
     'dGlvbi52MWFscGhhMS5MaXN0SW5ib3hJdGVtc1Jlc3BvbnNlIgOQAgESfgoOR2V0VW5yZWFkQ2'
     '91bnQSMi5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuR2V0VW5yZWFkQ291bnRSZXF1ZXN0'
     'GjMuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLkdldFVucmVhZENvdW50UmVzcG9uc2UiA5'
-    'ACARKCAQoRTWFya0luYm94SXRlbVJlYWQSNS5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEu'
+    'ACARKHAQoRTWFya0luYm94SXRlbVJlYWQSNS5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEu'
     'TWFya0luYm94SXRlbVJlYWRSZXF1ZXN0GjYuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLk'
-    '1hcmtJbmJveEl0ZW1SZWFkUmVzcG9uc2USjgEKFU1hcmtBbGxJbmJveEl0ZW1zUmVhZBI5Lmhh'
-    'd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5NYXJrQWxsSW5ib3hJdGVtc1JlYWRSZXF1ZXN0Gj'
-    'ouaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLk1hcmtBbGxJbmJveEl0ZW1zUmVhZFJlc3Bv'
-    'bnNlEn8KEERlbGV0ZUluYm94SXRlbXMSNC5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuRG'
-    'VsZXRlSW5ib3hJdGVtc1JlcXVlc3QaNS5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuRGVs'
-    'ZXRlSW5ib3hJdGVtc1Jlc3BvbnNlEqIBChpHZXROb3RpZmljYXRpb25QcmVmZXJlbmNlcxI+Lm'
-    'hhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5HZXROb3RpZmljYXRpb25QcmVmZXJlbmNlc1Jl'
-    'cXVlc3QaPy5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuR2V0Tm90aWZpY2F0aW9uUHJlZm'
-    'VyZW5jZXNSZXNwb25zZSIDkAIBEqMBChxVcGRhdGVOb3RpZmljYXRpb25QcmVmZXJlbmNlEkAu'
-    'aGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLlVwZGF0ZU5vdGlmaWNhdGlvblByZWZlcmVuY2'
-    'VSZXF1ZXN0GkEuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLlVwZGF0ZU5vdGlmaWNhdGlv'
-    'blByZWZlcmVuY2VSZXNwb25zZRKIAQoTUmVnaXN0ZXJEZXZpY2VUb2tlbhI3Lmhhd2tyLm5vdG'
-    'lmaWNhdGlvbi52MWFscGhhMS5SZWdpc3RlckRldmljZVRva2VuUmVxdWVzdBo4Lmhhd2tyLm5v'
-    'dGlmaWNhdGlvbi52MWFscGhhMS5SZWdpc3RlckRldmljZVRva2VuUmVzcG9uc2USggEKEURlbG'
-    'V0ZURldmljZVRva2VuEjUuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLkRlbGV0ZURldmlj'
-    'ZVRva2VuUmVxdWVzdBo2Lmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5EZWxldGVEZXZpY2'
-    'VUb2tlblJlc3BvbnNlEocBChJXYXRjaE5vdGlmaWNhdGlvbnMSNi5oYXdrci5ub3RpZmljYXRp'
-    'b24udjFhbHBoYTEuV2F0Y2hOb3RpZmljYXRpb25zUmVxdWVzdBo3Lmhhd2tyLm5vdGlmaWNhdG'
-    'lvbi52MWFscGhhMS5XYXRjaE5vdGlmaWNhdGlvbnNSZXNwb25zZTAB');
+    '1hcmtJbmJveEl0ZW1SZWFkUmVzcG9uc2UiA5ACAhKTAQoVTWFya0FsbEluYm94SXRlbXNSZWFk'
+    'EjkuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLk1hcmtBbGxJbmJveEl0ZW1zUmVhZFJlcX'
+    'Vlc3QaOi5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuTWFya0FsbEluYm94SXRlbXNSZWFk'
+    'UmVzcG9uc2UiA5ACAhKTAQoVQmF0Y2hEZWxldGVJbmJveEl0ZW1zEjkuaGF3a3Iubm90aWZpY2'
+    'F0aW9uLnYxYWxwaGExLkJhdGNoRGVsZXRlSW5ib3hJdGVtc1JlcXVlc3QaOi5oYXdrci5ub3Rp'
+    'ZmljYXRpb24udjFhbHBoYTEuQmF0Y2hEZWxldGVJbmJveEl0ZW1zUmVzcG9uc2UiA5ACAhKiAQ'
+    'oaR2V0Tm90aWZpY2F0aW9uUHJlZmVyZW5jZXMSPi5oYXdrci5ub3RpZmljYXRpb24udjFhbHBo'
+    'YTEuR2V0Tm90aWZpY2F0aW9uUHJlZmVyZW5jZXNSZXF1ZXN0Gj8uaGF3a3Iubm90aWZpY2F0aW'
+    '9uLnYxYWxwaGExLkdldE5vdGlmaWNhdGlvblByZWZlcmVuY2VzUmVzcG9uc2UiA5ACARKoAQoc'
+    'VXBkYXRlTm90aWZpY2F0aW9uUHJlZmVyZW5jZRJALmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscG'
+    'hhMS5VcGRhdGVOb3RpZmljYXRpb25QcmVmZXJlbmNlUmVxdWVzdBpBLmhhd2tyLm5vdGlmaWNh'
+    'dGlvbi52MWFscGhhMS5VcGRhdGVOb3RpZmljYXRpb25QcmVmZXJlbmNlUmVzcG9uc2UiA5ACAh'
+    'KNAQoTUmVnaXN0ZXJEZXZpY2VUb2tlbhI3Lmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5S'
+    'ZWdpc3RlckRldmljZVRva2VuUmVxdWVzdBo4Lmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS'
+    '5SZWdpc3RlckRldmljZVRva2VuUmVzcG9uc2UiA5ACAhKHAQoRRGVsZXRlRGV2aWNlVG9rZW4S'
+    'NS5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuRGVsZXRlRGV2aWNlVG9rZW5SZXF1ZXN0Gj'
+    'YuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLkRlbGV0ZURldmljZVRva2VuUmVzcG9uc2Ui'
+    'A5ACAhKHAQoSV2F0Y2hOb3RpZmljYXRpb25zEjYuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaG'
+    'ExLldhdGNoTm90aWZpY2F0aW9uc1JlcXVlc3QaNy5oYXdrci5ub3RpZmljYXRpb24udjFhbHBo'
+    'YTEuV2F0Y2hOb3RpZmljYXRpb25zUmVzcG9uc2UwAQ==');

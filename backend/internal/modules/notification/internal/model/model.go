@@ -51,15 +51,19 @@ const (
 	// 行銷。
 	CategoryCoupon  PrefCategory = "COUPON"
 	CategoryRestock PrefCategory = "RESTOCK"
+	// 系統：後台公告（D18）。
+	CategoryAnnouncement PrefCategory = "ANNOUNCEMENT"
 )
 
-// CategoryClass 是 D4 的三大類，決定哪些渠道可以關。
+// CategoryClass 是 D4 的三大類加上 D18 的系統類，決定哪些渠道可以關。
 type CategoryClass string
 
 const (
 	ClassTransactional CategoryClass = "TRANSACTIONAL"
 	ClassInteraction   CategoryClass = "INTERACTION"
 	ClassMarketing     CategoryClass = "MARKETING"
+	// ClassSystem 是後台公告（D18）：收件匣與 email 不可關，推播可關。
+	ClassSystem CategoryClass = "SYSTEM"
 )
 
 type categoryDef struct {
@@ -97,9 +101,10 @@ var categoryDefs = []categoryDef{
 	{CategoryFollowedStorePost, ClassInteraction, buyerOnly, nil},
 	{CategoryCoupon, ClassMarketing, buyerOnly, nil},
 	{CategoryRestock, ClassMarketing, buyerOnly, nil},
+	{CategoryAnnouncement, ClassSystem, bothAudiences, transactionalLocked},
 }
 
-// Categories 回傳 D4 的全部偏好分類；每次回傳新的切片。
+// Categories 回傳全部偏好分類（D4 的 14 個加 D18 的 ANNOUNCEMENT）；每次回傳新的切片。
 func Categories() []PrefCategory {
 	out := make([]PrefCategory, len(categoryDefs))
 	for i, d := range categoryDefs {
@@ -128,7 +133,7 @@ func lookupCategory(c PrefCategory) (categoryDef, bool) {
 	return categoryDef{}, false
 }
 
-// ValidCategory 回報 c 是不是 D4 清單裡的分類。
+// ValidCategory 回報 c 是不是偏好分類清單裡的分類。
 func ValidCategory(c PrefCategory) bool {
 	_, ok := lookupCategory(c)
 	return ok

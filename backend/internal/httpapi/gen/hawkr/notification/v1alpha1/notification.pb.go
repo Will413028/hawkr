@@ -7,11 +7,12 @@
 // notification 模組給前台的 API：通知收件匣、未讀數、已讀、刪除、偏好、裝置 token，以及即時訊號串流（NotificationAppService）。
 //
 // 一個帳號同時是買家，也可能有店（Connect 沒有視角）：通知的收件身分是 (帳號, 受眾)，受眾是 BUYER 或 STORE，每支方法的請求以 audience 指名。
-// 收件匣、未讀數、偏好與串流都只屬於一個受眾，不會互相看到；以 STORE 受眾呼叫時，呼叫者必須有店。賣家停權時仍可使用（賣家能力 SELLER_CAPABILITY_NOTIFICATION 在停權白名單內）。
-// 代行營運的管理員不能使用本 service（D9）：代行憑證不走這條，管理員帳號呼叫回 permission_denied。
+// 收件匣、未讀數、偏好與串流都只屬於一個受眾，不會互相看到；以 STORE 受眾呼叫時，呼叫者必須有現任店家，沒有店回 not_found（任何帶 audience 的方法與 WatchNotifications 皆同）。賣家停權時仍可使用（賣家能力 SELLER_CAPABILITY_NOTIFICATION 在停權白名單內）。
+// 代行營運的管理員不能使用本 service：代行憑證不走這條，管理員帳號呼叫回 permission_denied。
 //
 // 收件匣是伺服器依請求語系組好字的：標題、內文與深連結都由伺服器給，client 不依通知型別分支，也不解析深連結以外的資料；
 // 呈現分類（InboxPresentation）只決定圖示與分組。ID 是不透明的字串，client 不解析。
+// 例外：後台公告（NOTIFICATION_CATEGORY_ANNOUNCEMENT）的標題與內文是管理員寫的英文單一份，不依請求語系，所有使用者看到同一份。
 
 package notificationv1alpha1
 
@@ -86,7 +87,7 @@ func (NotificationAudience) EnumDescriptor() ([]byte, []int) {
 }
 
 // NotificationCategory 是偏好分類：使用者設定偏好的單位，也是收件匣的篩選單位。
-// 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開。
+// 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開；公告收件匣與 email 不可關、推播可關。
 type NotificationCategory int32
 
 const (
@@ -119,6 +120,8 @@ const (
 	NotificationCategory_NOTIFICATION_CATEGORY_COUPON NotificationCategory = 13
 	// 補貨（行銷，只有買家）。
 	NotificationCategory_NOTIFICATION_CATEGORY_RESTOCK NotificationCategory = 14
+	// 後台系統公告（兩個受眾都有；收件匣一定收到，推播可在偏好關閉）。
+	NotificationCategory_NOTIFICATION_CATEGORY_ANNOUNCEMENT NotificationCategory = 15
 )
 
 // Enum value maps for NotificationCategory.
@@ -139,6 +142,7 @@ var (
 		12: "NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST",
 		13: "NOTIFICATION_CATEGORY_COUPON",
 		14: "NOTIFICATION_CATEGORY_RESTOCK",
+		15: "NOTIFICATION_CATEGORY_ANNOUNCEMENT",
 	}
 	NotificationCategory_value = map[string]int32{
 		"NOTIFICATION_CATEGORY_UNSPECIFIED":         0,
@@ -156,6 +160,7 @@ var (
 		"NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST": 12,
 		"NOTIFICATION_CATEGORY_COUPON":              13,
 		"NOTIFICATION_CATEGORY_RESTOCK":             14,
+		"NOTIFICATION_CATEGORY_ANNOUNCEMENT":        15,
 	}
 )
 
@@ -476,7 +481,8 @@ func (SellerWorkspaceChange) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{6}
 }
 
-// InboxItem 是收件匣的一則通知，文字已依請求語系組好。
+// InboxItem 是收件匣的一則通知，文字已依請求語系組好；唯一例外是 category 為 ANNOUNCEMENT 的公告，title 與 body
+// 是管理員寫的英文單一份，不依請求語系。
 type InboxItem struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -984,28 +990,28 @@ func (x *MarkAllInboxItemsReadResponse) GetUpdatedCount() int32 {
 	return 0
 }
 
-type DeleteInboxItemsRequest struct {
+type BatchDeleteInboxItemsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 1 到 100 個，不可重複。
+	// 1 到 100 個，不可重複；空、重複或超過 100 個回 invalid_argument。
 	Ids           []string `protobuf:"bytes,1,rep,name=ids,proto3" json:"ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DeleteInboxItemsRequest) Reset() {
-	*x = DeleteInboxItemsRequest{}
+func (x *BatchDeleteInboxItemsRequest) Reset() {
+	*x = BatchDeleteInboxItemsRequest{}
 	mi := &file_hawkr_notification_v1alpha1_notification_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DeleteInboxItemsRequest) String() string {
+func (x *BatchDeleteInboxItemsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DeleteInboxItemsRequest) ProtoMessage() {}
+func (*BatchDeleteInboxItemsRequest) ProtoMessage() {}
 
-func (x *DeleteInboxItemsRequest) ProtoReflect() protoreflect.Message {
+func (x *BatchDeleteInboxItemsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_notification_v1alpha1_notification_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1017,39 +1023,38 @@ func (x *DeleteInboxItemsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteInboxItemsRequest.ProtoReflect.Descriptor instead.
-func (*DeleteInboxItemsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use BatchDeleteInboxItemsRequest.ProtoReflect.Descriptor instead.
+func (*BatchDeleteInboxItemsRequest) Descriptor() ([]byte, []int) {
 	return file_hawkr_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *DeleteInboxItemsRequest) GetIds() []string {
+func (x *BatchDeleteInboxItemsRequest) GetIds() []string {
 	if x != nil {
 		return x.Ids
 	}
 	return nil
 }
 
-type DeleteInboxItemsResponse struct {
+type BatchDeleteInboxItemsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeletedCount  int32                  `protobuf:"varint,1,opt,name=deleted_count,json=deletedCount,proto3" json:"deleted_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DeleteInboxItemsResponse) Reset() {
-	*x = DeleteInboxItemsResponse{}
+func (x *BatchDeleteInboxItemsResponse) Reset() {
+	*x = BatchDeleteInboxItemsResponse{}
 	mi := &file_hawkr_notification_v1alpha1_notification_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DeleteInboxItemsResponse) String() string {
+func (x *BatchDeleteInboxItemsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DeleteInboxItemsResponse) ProtoMessage() {}
+func (*BatchDeleteInboxItemsResponse) ProtoMessage() {}
 
-func (x *DeleteInboxItemsResponse) ProtoReflect() protoreflect.Message {
+func (x *BatchDeleteInboxItemsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_notification_v1alpha1_notification_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1061,16 +1066,9 @@ func (x *DeleteInboxItemsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteInboxItemsResponse.ProtoReflect.Descriptor instead.
-func (*DeleteInboxItemsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use BatchDeleteInboxItemsResponse.ProtoReflect.Descriptor instead.
+func (*BatchDeleteInboxItemsResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *DeleteInboxItemsResponse) GetDeletedCount() int32 {
-	if x != nil {
-		return x.DeletedCount
-	}
-	return 0
 }
 
 // PreferenceEntry 是一個 (分類, 渠道) 的偏好。
@@ -1646,10 +1644,11 @@ type InboxSignal struct {
 	UnreadCount int32                  `protobuf:"varint,1,opt,name=unread_count,json=unreadCount,proto3" json:"unread_count,omitempty"`
 	// 最新一則通知的 ID；收件匣是空的時不設。
 	LatestInboxItemId *string `protobuf:"bytes,2,opt,name=latest_inbox_item_id,json=latestInboxItemId,proto3,oneof" json:"latest_inbox_item_id,omitempty"`
-	// 引起這次訊號的通知所帶的狀態重讀提示；UNSPECIFIED 表示不需要重讀（連線建立時的第一則也是）。
-	StateRefreshHint StateRefreshHint `protobuf:"varint,3,opt,name=state_refresh_hint,json=stateRefreshHint,proto3,enum=hawkr.notification.v1alpha1.StateRefreshHint" json:"state_refresh_hint,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// 引起這次訊號的通知所帶的狀態重讀提示。訊號可能把多則通知合併，所以是這些通知的提示的聯集（不重複）；
+	// 空表示不需要重讀（連線建立時的第一則也是）。不會含 STATE_REFRESH_HINT_UNSPECIFIED。
+	StateRefreshHints []StateRefreshHint `protobuf:"varint,3,rep,packed,name=state_refresh_hints,json=stateRefreshHints,proto3,enum=hawkr.notification.v1alpha1.StateRefreshHint" json:"state_refresh_hints,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *InboxSignal) Reset() {
@@ -1696,11 +1695,11 @@ func (x *InboxSignal) GetLatestInboxItemId() string {
 	return ""
 }
 
-func (x *InboxSignal) GetStateRefreshHint() StateRefreshHint {
+func (x *InboxSignal) GetStateRefreshHints() []StateRefreshHint {
 	if x != nil {
-		return x.StateRefreshHint
+		return x.StateRefreshHints
 	}
-	return StateRefreshHint_STATE_REFRESH_HINT_UNSPECIFIED
+	return nil
 }
 
 // SellerWorkspaceSignal 是賣家工作區的資料有變化的訊號：client 重讀對應的列表與統計，不帶變化的內容。
@@ -1752,19 +1751,19 @@ var File_hawkr_notification_v1alpha1_notification_proto protoreflect.FileDescrip
 
 const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\n" +
-	".hawkr/notification/v1alpha1/notification.proto\x12\x1bhawkr.notification.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"\xdb\x03\n" +
+	".hawkr/notification/v1alpha1/notification.proto\x12\x1bhawkr.notification.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\"\x88\x04\n" +
 	"\tInboxItem\x12\x13\n" +
-	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12M\n" +
-	"\bcategory\x18\x02 \x01(\x0e21.hawkr.notification.v1alpha1.NotificationCategoryR\bcategory\x12R\n" +
-	"\fpresentation\x18\x03 \x01(\x0e2..hawkr.notification.v1alpha1.InboxPresentationR\fpresentation\x12\x14\n" +
-	"\x05title\x18\x04 \x01(\tR\x05title\x12\x12\n" +
-	"\x04body\x18\x05 \x01(\tR\x04body\x12\x1b\n" +
-	"\tdeep_link\x18\x06 \x01(\tR\bdeepLink\x122\n" +
-	"\x05image\x18\a \x01(\v2\x1c.hawkr.common.v1alpha1.ImageR\x05image\x12\x12\n" +
-	"\x04read\x18\b \x01(\bR\x04read\x12<\n" +
-	"\tread_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampH\x00R\breadTime\x88\x01\x01\x12;\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12R\n" +
+	"\bcategory\x18\x02 \x01(\x0e21.hawkr.notification.v1alpha1.NotificationCategoryB\x03\xe0A\x03R\bcategory\x12W\n" +
+	"\fpresentation\x18\x03 \x01(\x0e2..hawkr.notification.v1alpha1.InboxPresentationB\x03\xe0A\x03R\fpresentation\x12\x19\n" +
+	"\x05title\x18\x04 \x01(\tB\x03\xe0A\x03R\x05title\x12\x17\n" +
+	"\x04body\x18\x05 \x01(\tB\x03\xe0A\x03R\x04body\x12 \n" +
+	"\tdeep_link\x18\x06 \x01(\tB\x03\xe0A\x03R\bdeepLink\x127\n" +
+	"\x05image\x18\a \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x05image\x12\x17\n" +
+	"\x04read\x18\b \x01(\bB\x03\xe0A\x03R\x04read\x12A\n" +
+	"\tread_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03H\x00R\breadTime\x88\x01\x01\x12@\n" +
 	"\vcreate_time\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTimeB\f\n" +
 	"\n" +
 	"_read_time\"\x88\x02\n" +
@@ -1790,11 +1789,10 @@ const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\x1cMarkAllInboxItemsReadRequest\x12R\n" +
 	"\baudience\x18\x01 \x01(\x0e21.hawkr.notification.v1alpha1.NotificationAudienceB\x03\xe0A\x02R\baudience\"D\n" +
 	"\x1dMarkAllInboxItemsReadResponse\x12#\n" +
-	"\rupdated_count\x18\x01 \x01(\x05R\fupdatedCount\"0\n" +
-	"\x17DeleteInboxItemsRequest\x12\x15\n" +
-	"\x03ids\x18\x01 \x03(\tB\x03\xe0A\x02R\x03ids\"?\n" +
-	"\x18DeleteInboxItemsResponse\x12#\n" +
-	"\rdeleted_count\x18\x01 \x01(\x05R\fdeletedCount\"\xe7\x01\n" +
+	"\rupdated_count\x18\x01 \x01(\x05R\fupdatedCount\"5\n" +
+	"\x1cBatchDeleteInboxItemsRequest\x12\x15\n" +
+	"\x03ids\x18\x01 \x03(\tB\x03\xe0A\x02R\x03ids\"\x1f\n" +
+	"\x1dBatchDeleteInboxItemsResponse\"\xe7\x01\n" +
 	"\x0fPreferenceEntry\x12M\n" +
 	"\bcategory\x18\x01 \x01(\x0e21.hawkr.notification.v1alpha1.NotificationCategoryR\bcategory\x12J\n" +
 	"\achannel\x18\x02 \x01(\x0e20.hawkr.notification.v1alpha1.NotificationChannelR\achannel\x12\x18\n" +
@@ -1824,18 +1822,18 @@ const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\x1aWatchNotificationsResponse\x12@\n" +
 	"\x05inbox\x18\x01 \x01(\v2(.hawkr.notification.v1alpha1.InboxSignalH\x00R\x05inbox\x12_\n" +
 	"\x10seller_workspace\x18\x02 \x01(\v22.hawkr.notification.v1alpha1.SellerWorkspaceSignalH\x00R\x0fsellerWorkspaceB\a\n" +
-	"\x05event\"\xdc\x01\n" +
+	"\x05event\"\xde\x01\n" +
 	"\vInboxSignal\x12!\n" +
 	"\funread_count\x18\x01 \x01(\x05R\vunreadCount\x124\n" +
-	"\x14latest_inbox_item_id\x18\x02 \x01(\tH\x00R\x11latestInboxItemId\x88\x01\x01\x12[\n" +
-	"\x12state_refresh_hint\x18\x03 \x01(\x0e2-.hawkr.notification.v1alpha1.StateRefreshHintR\x10stateRefreshHintB\x17\n" +
+	"\x14latest_inbox_item_id\x18\x02 \x01(\tH\x00R\x11latestInboxItemId\x88\x01\x01\x12]\n" +
+	"\x13state_refresh_hints\x18\x03 \x03(\x0e2-.hawkr.notification.v1alpha1.StateRefreshHintR\x11stateRefreshHintsB\x17\n" +
 	"\x15_latest_inbox_item_id\"c\n" +
 	"\x15SellerWorkspaceSignal\x12J\n" +
 	"\x06change\x18\x01 \x01(\x0e22.hawkr.notification.v1alpha1.SellerWorkspaceChangeR\x06change*\x7f\n" +
 	"\x14NotificationAudience\x12%\n" +
 	"!NOTIFICATION_AUDIENCE_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bNOTIFICATION_AUDIENCE_BUYER\x10\x01\x12\x1f\n" +
-	"\x1bNOTIFICATION_AUDIENCE_STORE\x10\x02*\xb4\x04\n" +
+	"\x1bNOTIFICATION_AUDIENCE_STORE\x10\x02*\xdc\x04\n" +
 	"\x14NotificationCategory\x12%\n" +
 	"!NOTIFICATION_CATEGORY_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bNOTIFICATION_CATEGORY_ORDER\x10\x01\x12\"\n" +
@@ -1852,7 +1850,8 @@ const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\x1cNOTIFICATION_CATEGORY_FOLLOW\x10\v\x12-\n" +
 	")NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST\x10\f\x12 \n" +
 	"\x1cNOTIFICATION_CATEGORY_COUPON\x10\r\x12!\n" +
-	"\x1dNOTIFICATION_CATEGORY_RESTOCK\x10\x0e*\x9a\x01\n" +
+	"\x1dNOTIFICATION_CATEGORY_RESTOCK\x10\x0e\x12&\n" +
+	"\"NOTIFICATION_CATEGORY_ANNOUNCEMENT\x10\x0f*\x9a\x01\n" +
 	"\x13NotificationChannel\x12$\n" +
 	" NOTIFICATION_CHANNEL_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aNOTIFICATION_CHANNEL_INBOX\x10\x01\x12\x1d\n" +
@@ -1883,17 +1882,17 @@ const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\x15SellerWorkspaceChange\x12'\n" +
 	"#SELLER_WORKSPACE_CHANGE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dSELLER_WORKSPACE_CHANGE_ORDER\x10\x01\x12&\n" +
-	"\"SELLER_WORKSPACE_CHANGE_AFTER_SALE\x10\x022\x94\v\n" +
+	"\"SELLER_WORKSPACE_CHANGE_AFTER_SALE\x10\x022\xc2\v\n" +
 	"\x16NotificationAppService\x12~\n" +
 	"\x0eListInboxItems\x122.hawkr.notification.v1alpha1.ListInboxItemsRequest\x1a3.hawkr.notification.v1alpha1.ListInboxItemsResponse\"\x03\x90\x02\x01\x12~\n" +
-	"\x0eGetUnreadCount\x122.hawkr.notification.v1alpha1.GetUnreadCountRequest\x1a3.hawkr.notification.v1alpha1.GetUnreadCountResponse\"\x03\x90\x02\x01\x12\x82\x01\n" +
-	"\x11MarkInboxItemRead\x125.hawkr.notification.v1alpha1.MarkInboxItemReadRequest\x1a6.hawkr.notification.v1alpha1.MarkInboxItemReadResponse\x12\x8e\x01\n" +
-	"\x15MarkAllInboxItemsRead\x129.hawkr.notification.v1alpha1.MarkAllInboxItemsReadRequest\x1a:.hawkr.notification.v1alpha1.MarkAllInboxItemsReadResponse\x12\x7f\n" +
-	"\x10DeleteInboxItems\x124.hawkr.notification.v1alpha1.DeleteInboxItemsRequest\x1a5.hawkr.notification.v1alpha1.DeleteInboxItemsResponse\x12\xa2\x01\n" +
-	"\x1aGetNotificationPreferences\x12>.hawkr.notification.v1alpha1.GetNotificationPreferencesRequest\x1a?.hawkr.notification.v1alpha1.GetNotificationPreferencesResponse\"\x03\x90\x02\x01\x12\xa3\x01\n" +
-	"\x1cUpdateNotificationPreference\x12@.hawkr.notification.v1alpha1.UpdateNotificationPreferenceRequest\x1aA.hawkr.notification.v1alpha1.UpdateNotificationPreferenceResponse\x12\x88\x01\n" +
-	"\x13RegisterDeviceToken\x127.hawkr.notification.v1alpha1.RegisterDeviceTokenRequest\x1a8.hawkr.notification.v1alpha1.RegisterDeviceTokenResponse\x12\x82\x01\n" +
-	"\x11DeleteDeviceToken\x125.hawkr.notification.v1alpha1.DeleteDeviceTokenRequest\x1a6.hawkr.notification.v1alpha1.DeleteDeviceTokenResponse\x12\x87\x01\n" +
+	"\x0eGetUnreadCount\x122.hawkr.notification.v1alpha1.GetUnreadCountRequest\x1a3.hawkr.notification.v1alpha1.GetUnreadCountResponse\"\x03\x90\x02\x01\x12\x87\x01\n" +
+	"\x11MarkInboxItemRead\x125.hawkr.notification.v1alpha1.MarkInboxItemReadRequest\x1a6.hawkr.notification.v1alpha1.MarkInboxItemReadResponse\"\x03\x90\x02\x02\x12\x93\x01\n" +
+	"\x15MarkAllInboxItemsRead\x129.hawkr.notification.v1alpha1.MarkAllInboxItemsReadRequest\x1a:.hawkr.notification.v1alpha1.MarkAllInboxItemsReadResponse\"\x03\x90\x02\x02\x12\x93\x01\n" +
+	"\x15BatchDeleteInboxItems\x129.hawkr.notification.v1alpha1.BatchDeleteInboxItemsRequest\x1a:.hawkr.notification.v1alpha1.BatchDeleteInboxItemsResponse\"\x03\x90\x02\x02\x12\xa2\x01\n" +
+	"\x1aGetNotificationPreferences\x12>.hawkr.notification.v1alpha1.GetNotificationPreferencesRequest\x1a?.hawkr.notification.v1alpha1.GetNotificationPreferencesResponse\"\x03\x90\x02\x01\x12\xa8\x01\n" +
+	"\x1cUpdateNotificationPreference\x12@.hawkr.notification.v1alpha1.UpdateNotificationPreferenceRequest\x1aA.hawkr.notification.v1alpha1.UpdateNotificationPreferenceResponse\"\x03\x90\x02\x02\x12\x8d\x01\n" +
+	"\x13RegisterDeviceToken\x127.hawkr.notification.v1alpha1.RegisterDeviceTokenRequest\x1a8.hawkr.notification.v1alpha1.RegisterDeviceTokenResponse\"\x03\x90\x02\x02\x12\x87\x01\n" +
+	"\x11DeleteDeviceToken\x125.hawkr.notification.v1alpha1.DeleteDeviceTokenRequest\x1a6.hawkr.notification.v1alpha1.DeleteDeviceTokenResponse\"\x03\x90\x02\x02\x12\x87\x01\n" +
 	"\x12WatchNotifications\x126.hawkr.notification.v1alpha1.WatchNotificationsRequest\x1a7.hawkr.notification.v1alpha1.WatchNotificationsResponse0\x01B\xad\x02\n" +
 	"\x1fcom.hawkr.notification.v1alpha1B\x11NotificationProtoP\x01Zigithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1;notificationv1alpha1\xa2\x02\x03HNX\xaa\x02\x1bHawkr.Notification.V1alpha1\xca\x02\x1bHawkr\\Notification\\V1alpha1\xe2\x02'Hawkr\\Notification\\V1alpha1\\GPBMetadata\xea\x02\x1dHawkr::Notification::V1alpha1b\x06proto3"
 
@@ -1928,8 +1927,8 @@ var file_hawkr_notification_v1alpha1_notification_proto_goTypes = []any{
 	(*MarkInboxItemReadResponse)(nil),            // 13: hawkr.notification.v1alpha1.MarkInboxItemReadResponse
 	(*MarkAllInboxItemsReadRequest)(nil),         // 14: hawkr.notification.v1alpha1.MarkAllInboxItemsReadRequest
 	(*MarkAllInboxItemsReadResponse)(nil),        // 15: hawkr.notification.v1alpha1.MarkAllInboxItemsReadResponse
-	(*DeleteInboxItemsRequest)(nil),              // 16: hawkr.notification.v1alpha1.DeleteInboxItemsRequest
-	(*DeleteInboxItemsResponse)(nil),             // 17: hawkr.notification.v1alpha1.DeleteInboxItemsResponse
+	(*BatchDeleteInboxItemsRequest)(nil),         // 16: hawkr.notification.v1alpha1.BatchDeleteInboxItemsRequest
+	(*BatchDeleteInboxItemsResponse)(nil),        // 17: hawkr.notification.v1alpha1.BatchDeleteInboxItemsResponse
 	(*PreferenceEntry)(nil),                      // 18: hawkr.notification.v1alpha1.PreferenceEntry
 	(*GetNotificationPreferencesRequest)(nil),    // 19: hawkr.notification.v1alpha1.GetNotificationPreferencesRequest
 	(*GetNotificationPreferencesResponse)(nil),   // 20: hawkr.notification.v1alpha1.GetNotificationPreferencesResponse
@@ -1969,13 +1968,13 @@ var file_hawkr_notification_v1alpha1_notification_proto_depIdxs = []int32{
 	0,  // 19: hawkr.notification.v1alpha1.WatchNotificationsRequest.audience:type_name -> hawkr.notification.v1alpha1.NotificationAudience
 	29, // 20: hawkr.notification.v1alpha1.WatchNotificationsResponse.inbox:type_name -> hawkr.notification.v1alpha1.InboxSignal
 	30, // 21: hawkr.notification.v1alpha1.WatchNotificationsResponse.seller_workspace:type_name -> hawkr.notification.v1alpha1.SellerWorkspaceSignal
-	4,  // 22: hawkr.notification.v1alpha1.InboxSignal.state_refresh_hint:type_name -> hawkr.notification.v1alpha1.StateRefreshHint
+	4,  // 22: hawkr.notification.v1alpha1.InboxSignal.state_refresh_hints:type_name -> hawkr.notification.v1alpha1.StateRefreshHint
 	6,  // 23: hawkr.notification.v1alpha1.SellerWorkspaceSignal.change:type_name -> hawkr.notification.v1alpha1.SellerWorkspaceChange
 	8,  // 24: hawkr.notification.v1alpha1.NotificationAppService.ListInboxItems:input_type -> hawkr.notification.v1alpha1.ListInboxItemsRequest
 	10, // 25: hawkr.notification.v1alpha1.NotificationAppService.GetUnreadCount:input_type -> hawkr.notification.v1alpha1.GetUnreadCountRequest
 	12, // 26: hawkr.notification.v1alpha1.NotificationAppService.MarkInboxItemRead:input_type -> hawkr.notification.v1alpha1.MarkInboxItemReadRequest
 	14, // 27: hawkr.notification.v1alpha1.NotificationAppService.MarkAllInboxItemsRead:input_type -> hawkr.notification.v1alpha1.MarkAllInboxItemsReadRequest
-	16, // 28: hawkr.notification.v1alpha1.NotificationAppService.DeleteInboxItems:input_type -> hawkr.notification.v1alpha1.DeleteInboxItemsRequest
+	16, // 28: hawkr.notification.v1alpha1.NotificationAppService.BatchDeleteInboxItems:input_type -> hawkr.notification.v1alpha1.BatchDeleteInboxItemsRequest
 	19, // 29: hawkr.notification.v1alpha1.NotificationAppService.GetNotificationPreferences:input_type -> hawkr.notification.v1alpha1.GetNotificationPreferencesRequest
 	21, // 30: hawkr.notification.v1alpha1.NotificationAppService.UpdateNotificationPreference:input_type -> hawkr.notification.v1alpha1.UpdateNotificationPreferenceRequest
 	23, // 31: hawkr.notification.v1alpha1.NotificationAppService.RegisterDeviceToken:input_type -> hawkr.notification.v1alpha1.RegisterDeviceTokenRequest
@@ -1985,7 +1984,7 @@ var file_hawkr_notification_v1alpha1_notification_proto_depIdxs = []int32{
 	11, // 35: hawkr.notification.v1alpha1.NotificationAppService.GetUnreadCount:output_type -> hawkr.notification.v1alpha1.GetUnreadCountResponse
 	13, // 36: hawkr.notification.v1alpha1.NotificationAppService.MarkInboxItemRead:output_type -> hawkr.notification.v1alpha1.MarkInboxItemReadResponse
 	15, // 37: hawkr.notification.v1alpha1.NotificationAppService.MarkAllInboxItemsRead:output_type -> hawkr.notification.v1alpha1.MarkAllInboxItemsReadResponse
-	17, // 38: hawkr.notification.v1alpha1.NotificationAppService.DeleteInboxItems:output_type -> hawkr.notification.v1alpha1.DeleteInboxItemsResponse
+	17, // 38: hawkr.notification.v1alpha1.NotificationAppService.BatchDeleteInboxItems:output_type -> hawkr.notification.v1alpha1.BatchDeleteInboxItemsResponse
 	20, // 39: hawkr.notification.v1alpha1.NotificationAppService.GetNotificationPreferences:output_type -> hawkr.notification.v1alpha1.GetNotificationPreferencesResponse
 	22, // 40: hawkr.notification.v1alpha1.NotificationAppService.UpdateNotificationPreference:output_type -> hawkr.notification.v1alpha1.UpdateNotificationPreferenceResponse
 	24, // 41: hawkr.notification.v1alpha1.NotificationAppService.RegisterDeviceToken:output_type -> hawkr.notification.v1alpha1.RegisterDeviceTokenResponse

@@ -24,7 +24,7 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 
 ## 不變量
 
-- 偏好分類只有 D4 的 14 個；交易必要分類的收件匣與 email 不可關、店家 `SHIPMENT_ANOMALY` 的推播也不可關，規則只在 `model.Disableable(受眾, 分類, 渠道)`；每個受眾有自己的分類集合（`model.CategoriesFor`）。守門：`TestDisableableFollowsD4`、`TestCategoriesAreScopedPerAudience`。
+- 偏好分類是 D4 的 14 個加 D18 的 `ANNOUNCEMENT`，與 proto 同步；交易必要與公告的收件匣、email 不可關，店家 `SHIPMENT_ANOMALY` 的推播也不可關，規則只在 `model.Disableable`；受眾的分類集合是 `model.CategoriesFor`。守門：`TestDisableableFollowsD4`、`TestCategoryEnumMatchesRegistry`。
 - 每個型別有冪等鍵來源（意圖冪等鍵＝型別名稱＋事件來源身分）、分類在 D4 清單、呈現分類在 D6 清單、聚合鍵只在宣告可聚合的型別。守門：`registry.Validate`、`TestEveryRegisteredTypePassesTheSelfCheck`、`TestSelfCheckRejectsBrokenDefinitions`。
 - 參數快照只存 ID 與事件事實，不存第三方的名稱、頭像或聯絡方式。守門：`TestParamsDeclareNoThirdPartyNameFields`。
 - 每個型別在 zh-TW、en 有固定輸出，en 沒有執行期退回 zh-TW，文字的語系取自 `Rendered.Locale`、各部分不一致即錯誤；冪等鍵與聚合鍵過長時改存型別名稱加雜湊。守門：`TestGoldenRendering`、`TestGoldenIdempotencyKeys`、`TestEveryRenderableValueHasEnglishText`、`TestRenderRejectsMixedLocales`、`TestLongKeysAreHashedToFit`。

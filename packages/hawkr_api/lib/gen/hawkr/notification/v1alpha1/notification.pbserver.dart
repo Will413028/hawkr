@@ -29,8 +29,8 @@ abstract class NotificationAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $2.MarkInboxItemReadRequest request);
   $async.Future<$2.MarkAllInboxItemsReadResponse> markAllInboxItemsRead(
       $pb.ServerContext ctx, $2.MarkAllInboxItemsReadRequest request);
-  $async.Future<$2.DeleteInboxItemsResponse> deleteInboxItems(
-      $pb.ServerContext ctx, $2.DeleteInboxItemsRequest request);
+  $async.Future<$2.BatchDeleteInboxItemsResponse> batchDeleteInboxItems(
+      $pb.ServerContext ctx, $2.BatchDeleteInboxItemsRequest request);
   $async.Future<$2.GetNotificationPreferencesResponse>
       getNotificationPreferences(
           $pb.ServerContext ctx, $2.GetNotificationPreferencesRequest request);
@@ -54,8 +54,8 @@ abstract class NotificationAppServiceBase extends $pb.GeneratedService {
         return $2.MarkInboxItemReadRequest();
       case 'MarkAllInboxItemsRead':
         return $2.MarkAllInboxItemsReadRequest();
-      case 'DeleteInboxItems':
-        return $2.DeleteInboxItemsRequest();
+      case 'BatchDeleteInboxItems':
+        return $2.BatchDeleteInboxItemsRequest();
       case 'GetNotificationPreferences':
         return $2.GetNotificationPreferencesRequest();
       case 'UpdateNotificationPreference':
@@ -83,8 +83,9 @@ abstract class NotificationAppServiceBase extends $pb.GeneratedService {
       case 'MarkAllInboxItemsRead':
         return markAllInboxItemsRead(
             ctx, request as $2.MarkAllInboxItemsReadRequest);
-      case 'DeleteInboxItems':
-        return deleteInboxItems(ctx, request as $2.DeleteInboxItemsRequest);
+      case 'BatchDeleteInboxItems':
+        return batchDeleteInboxItems(
+            ctx, request as $2.BatchDeleteInboxItemsRequest);
       case 'GetNotificationPreferences':
         return getNotificationPreferences(
             ctx, request as $2.GetNotificationPreferencesRequest);

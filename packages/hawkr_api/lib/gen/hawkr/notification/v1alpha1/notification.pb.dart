@@ -24,7 +24,8 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'notification.pbenum.dart';
 
-/// InboxItem 是收件匣的一則通知，文字已依請求語系組好。
+/// InboxItem 是收件匣的一則通知，文字已依請求語系組好；唯一例外是 category 為 ANNOUNCEMENT 的公告，title 與 body
+/// 是管理員寫的英文單一份，不依請求語系。
 class InboxItem extends $pb.GeneratedMessage {
   factory InboxItem({
     $core.String? id,
@@ -741,120 +742,111 @@ class MarkAllInboxItemsReadResponse extends $pb.GeneratedMessage {
   void clearUpdatedCount() => $_clearField(1);
 }
 
-class DeleteInboxItemsRequest extends $pb.GeneratedMessage {
-  factory DeleteInboxItemsRequest({
+class BatchDeleteInboxItemsRequest extends $pb.GeneratedMessage {
+  factory BatchDeleteInboxItemsRequest({
     $core.Iterable<$core.String>? ids,
   }) {
-    final result = DeleteInboxItemsRequest._();
+    final result = BatchDeleteInboxItemsRequest._();
     if (ids != null) result.ids.addAll(ids);
     return result;
   }
 
-  DeleteInboxItemsRequest._();
+  BatchDeleteInboxItemsRequest._();
 
-  factory DeleteInboxItemsRequest.fromBuffer($core.List<$core.int> data,
+  factory BatchDeleteInboxItemsRequest.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      DeleteInboxItemsRequest()..mergeFromBuffer(data, registry);
-  factory DeleteInboxItemsRequest.fromJson($core.String json,
+      BatchDeleteInboxItemsRequest()..mergeFromBuffer(data, registry);
+  factory BatchDeleteInboxItemsRequest.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      DeleteInboxItemsRequest()..mergeFromJson(json, registry);
+      BatchDeleteInboxItemsRequest()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DeleteInboxItemsRequest',
+      _omitMessageNames ? '' : 'BatchDeleteInboxItemsRequest',
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.notification.v1alpha1'),
-      createEmptyInstance: DeleteInboxItemsRequest.$_createMessage)
+      createEmptyInstance: BatchDeleteInboxItemsRequest.$_createMessage)
     ..pPS(1, _omitFieldNames ? '' : 'ids')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DeleteInboxItemsRequest clone() => deepCopy();
+  BatchDeleteInboxItemsRequest clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DeleteInboxItemsRequest copyWith(
-          void Function(DeleteInboxItemsRequest) updates) =>
-      super.copyWith((message) => updates(message as DeleteInboxItemsRequest))
-          as DeleteInboxItemsRequest;
+  BatchDeleteInboxItemsRequest copyWith(
+          void Function(BatchDeleteInboxItemsRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as BatchDeleteInboxItemsRequest))
+          as BatchDeleteInboxItemsRequest;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   @$core.Deprecated(
-      'Use DeleteInboxItemsRequest() / DeleteInboxItemsRequest.new instead')
-  static DeleteInboxItemsRequest create() => DeleteInboxItemsRequest._();
-  static $pb.GeneratedMessage $_createMessage() => DeleteInboxItemsRequest._();
+      'Use BatchDeleteInboxItemsRequest() / BatchDeleteInboxItemsRequest.new instead')
+  static BatchDeleteInboxItemsRequest create() =>
+      BatchDeleteInboxItemsRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      BatchDeleteInboxItemsRequest._();
   @$core.override
-  DeleteInboxItemsRequest createEmptyInstance() => DeleteInboxItemsRequest._();
+  BatchDeleteInboxItemsRequest createEmptyInstance() =>
+      BatchDeleteInboxItemsRequest._();
   @$core.pragma('dart2js:noInline')
-  static DeleteInboxItemsRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DeleteInboxItemsRequest>(
-          DeleteInboxItemsRequest.$_createMessage);
-  static DeleteInboxItemsRequest? _defaultInstance;
+  static BatchDeleteInboxItemsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BatchDeleteInboxItemsRequest>(
+          BatchDeleteInboxItemsRequest.$_createMessage);
+  static BatchDeleteInboxItemsRequest? _defaultInstance;
 
-  /// 1 到 100 個，不可重複。
+  /// 1 到 100 個，不可重複；空、重複或超過 100 個回 invalid_argument。
   @$pb.TagNumber(1)
   $pb.PbList<$core.String> get ids => $_getList(0);
 }
 
-class DeleteInboxItemsResponse extends $pb.GeneratedMessage {
-  factory DeleteInboxItemsResponse({
-    $core.int? deletedCount,
-  }) {
-    final result = DeleteInboxItemsResponse._();
-    if (deletedCount != null) result.deletedCount = deletedCount;
-    return result;
-  }
+class BatchDeleteInboxItemsResponse extends $pb.GeneratedMessage {
+  factory BatchDeleteInboxItemsResponse() => BatchDeleteInboxItemsResponse._();
 
-  DeleteInboxItemsResponse._();
+  BatchDeleteInboxItemsResponse._();
 
-  factory DeleteInboxItemsResponse.fromBuffer($core.List<$core.int> data,
+  factory BatchDeleteInboxItemsResponse.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      DeleteInboxItemsResponse()..mergeFromBuffer(data, registry);
-  factory DeleteInboxItemsResponse.fromJson($core.String json,
+      BatchDeleteInboxItemsResponse()..mergeFromBuffer(data, registry);
+  factory BatchDeleteInboxItemsResponse.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      DeleteInboxItemsResponse()..mergeFromJson(json, registry);
+      BatchDeleteInboxItemsResponse()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DeleteInboxItemsResponse',
+      _omitMessageNames ? '' : 'BatchDeleteInboxItemsResponse',
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.notification.v1alpha1'),
-      createEmptyInstance: DeleteInboxItemsResponse.$_createMessage)
-    ..aI(1, _omitFieldNames ? '' : 'deletedCount')
+      createEmptyInstance: BatchDeleteInboxItemsResponse.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DeleteInboxItemsResponse clone() => deepCopy();
+  BatchDeleteInboxItemsResponse clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DeleteInboxItemsResponse copyWith(
-          void Function(DeleteInboxItemsResponse) updates) =>
-      super.copyWith((message) => updates(message as DeleteInboxItemsResponse))
-          as DeleteInboxItemsResponse;
+  BatchDeleteInboxItemsResponse copyWith(
+          void Function(BatchDeleteInboxItemsResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as BatchDeleteInboxItemsResponse))
+          as BatchDeleteInboxItemsResponse;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
   @$core.Deprecated(
-      'Use DeleteInboxItemsResponse() / DeleteInboxItemsResponse.new instead')
-  static DeleteInboxItemsResponse create() => DeleteInboxItemsResponse._();
-  static $pb.GeneratedMessage $_createMessage() => DeleteInboxItemsResponse._();
+      'Use BatchDeleteInboxItemsResponse() / BatchDeleteInboxItemsResponse.new instead')
+  static BatchDeleteInboxItemsResponse create() =>
+      BatchDeleteInboxItemsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      BatchDeleteInboxItemsResponse._();
   @$core.override
-  DeleteInboxItemsResponse createEmptyInstance() =>
-      DeleteInboxItemsResponse._();
+  BatchDeleteInboxItemsResponse createEmptyInstance() =>
+      BatchDeleteInboxItemsResponse._();
   @$core.pragma('dart2js:noInline')
-  static DeleteInboxItemsResponse getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DeleteInboxItemsResponse>(
-          DeleteInboxItemsResponse.$_createMessage);
-  static DeleteInboxItemsResponse? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.int get deletedCount => $_getIZ(0);
-  @$pb.TagNumber(1)
-  set deletedCount($core.int value) => $_setSignedInt32(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasDeletedCount() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearDeletedCount() => $_clearField(1);
+  static BatchDeleteInboxItemsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BatchDeleteInboxItemsResponse>(
+          BatchDeleteInboxItemsResponse.$_createMessage);
+  static BatchDeleteInboxItemsResponse? _defaultInstance;
 }
 
 /// PreferenceEntry 是一個 (分類, 渠道) 的偏好。
@@ -1655,12 +1647,13 @@ class InboxSignal extends $pb.GeneratedMessage {
   factory InboxSignal({
     $core.int? unreadCount,
     $core.String? latestInboxItemId,
-    StateRefreshHint? stateRefreshHint,
+    $core.Iterable<StateRefreshHint>? stateRefreshHints,
   }) {
     final result = InboxSignal._();
     if (unreadCount != null) result.unreadCount = unreadCount;
     if (latestInboxItemId != null) result.latestInboxItemId = latestInboxItemId;
-    if (stateRefreshHint != null) result.stateRefreshHint = stateRefreshHint;
+    if (stateRefreshHints != null)
+      result.stateRefreshHints.addAll(stateRefreshHints);
     return result;
   }
 
@@ -1680,8 +1673,11 @@ class InboxSignal extends $pb.GeneratedMessage {
       createEmptyInstance: InboxSignal.$_createMessage)
     ..aI(1, _omitFieldNames ? '' : 'unreadCount')
     ..aOS(2, _omitFieldNames ? '' : 'latestInboxItemId')
-    ..aE<StateRefreshHint>(3, _omitFieldNames ? '' : 'stateRefreshHint',
-        enumValues: StateRefreshHint.values)
+    ..pc<StateRefreshHint>(
+        3, _omitFieldNames ? '' : 'stateRefreshHints', $pb.PbFieldType.KE,
+        valueOf: StateRefreshHint.valueOf,
+        enumValues: StateRefreshHint.values,
+        defaultEnumValue: StateRefreshHint.STATE_REFRESH_HINT_UNSPECIFIED)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1725,15 +1721,10 @@ class InboxSignal extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearLatestInboxItemId() => $_clearField(2);
 
-  /// 引起這次訊號的通知所帶的狀態重讀提示；UNSPECIFIED 表示不需要重讀（連線建立時的第一則也是）。
+  /// 引起這次訊號的通知所帶的狀態重讀提示。訊號可能把多則通知合併，所以是這些通知的提示的聯集（不重複）；
+  /// 空表示不需要重讀（連線建立時的第一則也是）。不會含 STATE_REFRESH_HINT_UNSPECIFIED。
   @$pb.TagNumber(3)
-  StateRefreshHint get stateRefreshHint => $_getN(2);
-  @$pb.TagNumber(3)
-  set stateRefreshHint(StateRefreshHint value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasStateRefreshHint() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearStateRefreshHint() => $_clearField(3);
+  $pb.PbList<StateRefreshHint> get stateRefreshHints => $_getList(2);
 }
 
 /// SellerWorkspaceSignal 是賣家工作區的資料有變化的訊號：client 重讀對應的列表與統計，不帶變化的內容。
@@ -1834,13 +1825,19 @@ class NotificationAppServiceApi {
           request,
           MarkAllInboxItemsReadResponse());
 
-  /// DeleteInboxItems 刪除通知。ids 中任何一個不存在或不是呼叫者的，整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
-  $async.Future<DeleteInboxItemsResponse> deleteInboxItems(
-          $pb.ClientContext? ctx, DeleteInboxItemsRequest request) =>
-      _client.invoke<DeleteInboxItemsResponse>(ctx, 'NotificationAppService',
-          'DeleteInboxItems', request, DeleteInboxItemsResponse());
+  /// BatchDeleteInboxItems 刪除通知。ids 為空、重複或超過 100 個回 invalid_argument。ids 中任何一個不存在或不是呼叫者的，
+  /// 整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
+  $async.Future<BatchDeleteInboxItemsResponse> batchDeleteInboxItems(
+          $pb.ClientContext? ctx, BatchDeleteInboxItemsRequest request) =>
+      _client.invoke<BatchDeleteInboxItemsResponse>(
+          ctx,
+          'NotificationAppService',
+          'BatchDeleteInboxItems',
+          request,
+          BatchDeleteInboxItemsResponse());
 
-  /// GetNotificationPreferences 列出指定受眾每個分類在每個渠道的開關。只列出該受眾會收到的分類；沒有設定過的是預設開。
+  /// GetNotificationPreferences 列出指定受眾的開關。entries 只包含註冊表實際會在該 (受眾, 分類, 渠道) 送達的組合，
+  /// 不是分類與渠道的笛卡兒積（例如沒有型別走 email 的分類就沒有 email 那一項）；沒有設定過的是預設開。
   $async.Future<GetNotificationPreferencesResponse> getNotificationPreferences(
           $pb.ClientContext? ctx, GetNotificationPreferencesRequest request) =>
       _client.invoke<GetNotificationPreferencesResponse>(
@@ -1850,8 +1847,9 @@ class NotificationAppServiceApi {
           request,
           GetNotificationPreferencesResponse());
 
-  /// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾，或該 (分類, 渠道) 不可關閉
-  /// （PreferenceEntry.can_disable 為 false）而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
+  /// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾、該 (分類, 渠道) 不在
+  /// GetNotificationPreferences 的 entries 內（註冊表不會在這個組合送達），或該組合不可關閉（PreferenceEntry.can_disable 為 false）
+  /// 而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
   $async.Future<UpdateNotificationPreferenceResponse>
       updateNotificationPreference($pb.ClientContext? ctx,
               UpdateNotificationPreferenceRequest request) =>
@@ -1878,7 +1876,8 @@ class NotificationAppServiceApi {
   /// WatchNotifications 是指定受眾的即時訊號串流（server streaming）。串流只傳「該重讀了」的訊號，不傳通知內容，也沒有續傳游標：
   /// 連線建立後先送一則 inbox 訊號（目前的未讀數與最新一則的 ID），之後每有變化再送；client 收到訊號就重新呼叫 ListInboxItems 與其他列表，
   /// 斷線重連後也先重讀一次。訊號可能合併或遺漏，資料以列表為準。
-  /// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。每個帳號同時開著的串流有上限，超過回 resource_exhausted。
+  /// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。STORE 受眾但呼叫者沒有現任店家回 not_found；
+  /// 每個帳號同時開著的串流有上限，超過回 resource_exhausted。
   $async.Future<WatchNotificationsResponse> watchNotifications(
           $pb.ClientContext? ctx, WatchNotificationsRequest request) =>
       _client.invoke<WatchNotificationsResponse>(ctx, 'NotificationAppService',

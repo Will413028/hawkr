@@ -83,16 +83,17 @@ extension type NotificationAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// DeleteInboxItems 刪除通知。ids 中任何一個不存在或不是呼叫者的，整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
-  Future<hawkrnotificationv1alpha1notification.DeleteInboxItemsResponse> deleteInboxItems(
-    hawkrnotificationv1alpha1notification.DeleteInboxItemsRequest input, {
+  /// BatchDeleteInboxItems 刪除通知。ids 為空、重複或超過 100 個回 invalid_argument。ids 中任何一個不存在或不是呼叫者的，
+  /// 整個請求回 not_found、一則都不刪（兩種情況的回應相同）。
+  Future<hawkrnotificationv1alpha1notification.BatchDeleteInboxItemsResponse> batchDeleteInboxItems(
+    hawkrnotificationv1alpha1notification.BatchDeleteInboxItemsRequest input, {
     connect.Headers? headers,
     connect.AbortSignal? signal,
     Function(connect.Headers)? onHeader,
     Function(connect.Headers)? onTrailer,
   }) {
     return connect.Client(_transport).unary(
-      specs.NotificationAppService.deleteInboxItems,
+      specs.NotificationAppService.batchDeleteInboxItems,
       input,
       signal: signal,
       headers: headers,
@@ -101,7 +102,8 @@ extension type NotificationAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// GetNotificationPreferences 列出指定受眾每個分類在每個渠道的開關。只列出該受眾會收到的分類；沒有設定過的是預設開。
+  /// GetNotificationPreferences 列出指定受眾的開關。entries 只包含註冊表實際會在該 (受眾, 分類, 渠道) 送達的組合，
+  /// 不是分類與渠道的笛卡兒積（例如沒有型別走 email 的分類就沒有 email 那一項）；沒有設定過的是預設開。
   Future<hawkrnotificationv1alpha1notification.GetNotificationPreferencesResponse> getNotificationPreferences(
     hawkrnotificationv1alpha1notification.GetNotificationPreferencesRequest input, {
     connect.Headers? headers,
@@ -119,8 +121,9 @@ extension type NotificationAppServiceClient (connect.Transport _transport) {
     );
   }
 
-  /// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾，或該 (分類, 渠道) 不可關閉
-  /// （PreferenceEntry.can_disable 為 false）而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
+  /// UpdateNotificationPreference 設定一個 (分類, 渠道) 的開關，回傳更新後的那一項。分類不屬於該受眾、該 (分類, 渠道) 不在
+  /// GetNotificationPreferences 的 entries 內（註冊表不會在這個組合送達），或該組合不可關閉（PreferenceEntry.can_disable 為 false）
+  /// 而 enabled 是 false，回 invalid_argument。重複設定同一個值成功。
   Future<hawkrnotificationv1alpha1notification.UpdateNotificationPreferenceResponse> updateNotificationPreference(
     hawkrnotificationv1alpha1notification.UpdateNotificationPreferenceRequest input, {
     connect.Headers? headers,
@@ -178,7 +181,8 @@ extension type NotificationAppServiceClient (connect.Transport _transport) {
   /// WatchNotifications 是指定受眾的即時訊號串流（server streaming）。串流只傳「該重讀了」的訊號，不傳通知內容，也沒有續傳游標：
   /// 連線建立後先送一則 inbox 訊號（目前的未讀數與最新一則的 ID），之後每有變化再送；client 收到訊號就重新呼叫 ListInboxItems 與其他列表，
   /// 斷線重連後也先重讀一次。訊號可能合併或遺漏，資料以列表為準。
-  /// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。每個帳號同時開著的串流有上限，超過回 resource_exhausted。
+  /// STORE 受眾的串流另外承載賣家工作區事件（seller_workspace）。STORE 受眾但呼叫者沒有現任店家回 not_found；
+  /// 每個帳號同時開著的串流有上限，超過回 resource_exhausted。
   Stream<hawkrnotificationv1alpha1notification.WatchNotificationsResponse> watchNotifications(
     hawkrnotificationv1alpha1notification.WatchNotificationsRequest input, {
     connect.Headers? headers,

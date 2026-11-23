@@ -7,7 +7,9 @@
 // notification 模組給後台的 API：系統公告的建立與列表。前台的 API 在 hawkr.notification.v1alpha1。
 //
 // 公告是資料：建立後寫進公告表，由背景工作分開處理收件匣與推播，沒有裝置 token 的帳號也收得到收件匣那份。
-// 公告的標題與內文是管理員寫的原文，不依收件人的語系翻譯（後台只有 zh-TW）。
+// 公告一律只寫英文：單一 title 與 body，不分語系、不依收件人的語系選擇，所有使用者看到同一份
+// （限公告，是多語系 ADR 的例外；其餘後台文字仍是 zh-TW）。公告在使用者端的分類是 NOTIFICATION_CATEGORY_ANNOUNCEMENT：
+// 收件匣一定收到，推播可在偏好關閉。
 
 package notificationv1alpha1
 
@@ -346,18 +348,18 @@ var File_hawkr_admin_notification_v1alpha1_notification_proto protoreflect.FileD
 
 const file_hawkr_admin_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\n" +
-	"4hawkr/admin/notification/v1alpha1/notification.proto\x12!hawkr.admin.notification.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.hawkr/notification/v1alpha1/notification.proto\"\x9c\x02\n" +
+	"4hawkr/admin/notification/v1alpha1/notification.proto\x12!hawkr.admin.notification.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.hawkr/notification/v1alpha1/notification.proto\"\xab\x02\n" +
 	"\fAnnouncement\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12O\n" +
 	"\taudiences\x18\x02 \x03(\x0e21.hawkr.notification.v1alpha1.NotificationAudienceR\taudiences\x12\x14\n" +
 	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
-	"\x04body\x18\x04 \x01(\tR\x04body\x12;\n" +
-	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"createTime\x12\x1f\n" +
-	"\vinbox_count\x18\x06 \x01(\x05R\n" +
-	"inboxCount\x12\x1e\n" +
+	"\x04body\x18\x04 \x01(\tR\x04body\x12@\n" +
+	"\vcreate_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x12$\n" +
+	"\vinbox_count\x18\x06 \x01(\x05B\x03\xe0A\x03R\n" +
+	"inboxCount\x12#\n" +
 	"\n" +
-	"dispatched\x18\a \x01(\bR\n" +
+	"dispatched\x18\a \x01(\bB\x03\xe0A\x03R\n" +
 	"dispatched\"\xce\x01\n" +
 	"\x19CreateAnnouncementRequest\x12T\n" +
 	"\taudiences\x18\x01 \x03(\x0e21.hawkr.notification.v1alpha1.NotificationAudienceB\x03\xe0A\x02R\taudiences\x12\x19\n" +

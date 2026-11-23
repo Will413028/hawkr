@@ -5,7 +5,9 @@
 // notification 模組給後台的 API：系統公告的建立與列表。前台的 API 在 hawkr.notification.v1alpha1。
 //
 // 公告是資料：建立後寫進公告表，由背景工作分開處理收件匣與推播，沒有裝置 token 的帳號也收得到收件匣那份。
-// 公告的標題與內文是管理員寫的原文，不依收件人的語系翻譯（後台只有 zh-TW）。
+// 公告一律只寫英文：單一 title 與 body，不分語系、不依收件人的語系選擇，所有使用者看到同一份
+// （限公告，是多語系 ADR 的例外；其餘後台文字仍是 zh-TW）。公告在使用者端的分類是 NOTIFICATION_CATEGORY_ANNOUNCEMENT：
+// 收件匣一定收到，推播可在偏好關閉。
 package notificationv1alpha1connect
 
 import (
