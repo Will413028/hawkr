@@ -152,7 +152,7 @@ void main() {
   );
 
   group('failure text', () {
-    final ready = () =>
+    GetUploadResponse ready() =>
         GetUploadResponse(state: UploadState.UPLOAD_STATE_READY);
     final serverError = reasonError(
       Code.failedPrecondition,
