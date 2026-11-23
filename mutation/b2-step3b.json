@@ -14,7 +14,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
    "old": "\t\t\tif n == 1 {\n\t\t\t\tt, err := q.ActiveTransferByPayment(ctx, pay.ID)",
-   "new": "\t\t\tif n == 1 {\n\t\t\t\t_, _ = s.d.Provider.CreateTransfer(ctx, TransferInput{Amount: amount, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: destination, TransferGroup: pay.OrderNo, IdempotencyKey: s.d.NewID().String()})\n\t\t\t\tt, err := q.ActiveTransferByPayment(ctx, pay.ID)",
+   "new": "\t\t\tif n == 1 {\n\t\t\t\t_, _ = s.d.Provider.CreateTransfer(ctx, TransferInput{Amount: terms.amount, SourceChargeID: \"ch_x\", DestinationAccountID: terms.destination, TransferGroup: pay.OrderNo, IdempotencyKey: s.d.NewID().String()})\n\t\t\t\tt, err := q.ActiveTransferByPayment(ctx, pay.ID)",
    "test": "internal/modules/payment ^TestRequestTransferWritesThePendingRowAndTheJobWithoutCallingTheProvider$",
    "why": "寫轉帳列的 transaction 內呼叫 provider：請求內就有 CreateTransfer 呼叫，fake 的 Violations 也記下 transaction 內的呼叫。"
   },
@@ -302,7 +302,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
    "old": "if !found || snap.ExternalID != evidence || snap.Amount != row.Amount {",
-   "new": "if false {",
+   "new": "if false && (!found || snap.ExternalID != evidence || snap.Amount != row.Amount) {",
    "test": "internal/modules/payment ^TestResolvingAPaymentAnomalyAsSucceededRequiresTheProviderToConfirmTheEvidence$",
    "why": "R3：付款的結案證據不經 provider 核對，別張訂單的 PaymentIntent 或金額不符的物件被連上。"
   },
@@ -311,7 +311,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
    "old": "if !found || snap.ExternalID != evidence || snap.Amount != t.Amount {",
-   "new": "if false {",
+   "new": "if false && (!found || snap.ExternalID != evidence || snap.Amount != t.Amount) {",
    "test": "internal/modules/payment ^TestResolvingATransferAnomalyAsSucceededRequiresTheProviderToConfirmTheEvidence$",
    "why": "R3：轉帳的結案證據不經 provider 核對，亂貼的外部轉帳 ID 被記成 SUCCEEDED。"
   },
@@ -320,7 +320,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
    "old": "if !found || snap.ExternalID != evidence || snap.Amount != r.ReversalAmount {",
-   "new": "if false {",
+   "new": "if false && (!found || snap.ExternalID != evidence || snap.Amount != r.ReversalAmount) {",
    "test": "internal/modules/payment ^TestResolvingARefundAnomalyAsSucceededRequiresTheProviderToConfirmTheEvidence$",
    "why": "R3：撤回的結案證據不經 provider 核對，沒有對應撤回的 ID 被記成 REVERSED 並累加轉帳。"
   }

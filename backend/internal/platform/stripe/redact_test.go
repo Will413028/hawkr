@@ -102,13 +102,20 @@ func TestPatternsRedactValuesUnderInnocuousKeys(t *testing.T) {
 	})
 }
 
-// 每個遮罩表裡的名稱，在表單（巢狀路徑）與 JSON（巢狀物件）都要遮掉值；值刻意不符合任何值比對 pattern。
+// 測試自己持有的名稱清單：不從 production 的表讀，否則拿掉表裡一個名稱時對應的子測試也跟著消失，測試不會變紅。
+var expectedDeniedNames = []string{
+	"authorization", "secret", "secret_key", "api_key", "token", "password", "url",
+	"card", "number", "cvc", "cvv", "exp_month", "exp_year", "last4", "bank_account", "iban", "account_number", "routing_number",
+	"email", "phone",
+	"address", "line1", "line2", "postal_code", "zip", "city", "state", "town",
+	"name", "surname",
+	"individual", "person", "billing_details", "shipping", "attestations",
+	"dob", "id_number", "ssn_last_4", "tax_id", "ip", "user_agent",
+}
+
+// 每個遮罩名稱，在表單（巢狀路徑）與 JSON（巢狀物件）都要遮掉值；值刻意不符合任何值比對 pattern。
 func TestEveryDeniedFieldNameIsRedactedInFormAndJSON(t *testing.T) {
-	var all []string
-	for _, list := range [][]string{credentialKeys, cardKeys, contactKeys, addressKeys, nameKeys, containerKeys, identityKeys} {
-		all = append(all, list...)
-	}
-	for _, k := range all {
+	for _, k := range expectedDeniedNames {
 		t.Run(k, func(t *testing.T) {
 			val := "plainvalue-" + k
 			formLogs := roundTrip(t, "POST", "/v1/x", "application/x-www-form-urlencoded", url.QueryEscape("outer["+k+"][inner]")+"="+val, 200, `{}`)
@@ -117,6 +124,30 @@ func TestEveryDeniedFieldNameIsRedactedInFormAndJSON(t *testing.T) {
 			mustNotContain(t, jsonLogs, val)
 			mustContain(t, jsonLogs, redacted)
 		})
+	}
+}
+
+// production 的表新增名稱時，要同步補進 expectedDeniedNames。
+func TestTheDenyTablesAndTheExpectedNamesAgree(t *testing.T) {
+	want := map[string]bool{}
+	for _, k := range expectedDeniedNames {
+		want[k] = true
+	}
+	got := map[string]bool{}
+	for _, list := range [][]string{credentialKeys, cardKeys, contactKeys, addressKeys, nameKeys, containerKeys, identityKeys} {
+		for _, k := range list {
+			got[k] = true
+		}
+	}
+	for k := range got {
+		if !want[k] {
+			t.Errorf("遮罩表有 %q，測試的 expectedDeniedNames 沒有", k)
+		}
+	}
+	for k := range want {
+		if !got[k] {
+			t.Errorf("expectedDeniedNames 有 %q，遮罩表沒有", k)
+		}
 	}
 }
 

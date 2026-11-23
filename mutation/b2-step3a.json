@@ -240,7 +240,7 @@
    "file": "backend/internal/modules/payment/internal/charge/attempt.go",
    "old": "\t\tif hadPrev && prev.ExternalPaymentID != nil && !attemptClosed(prev.State) {\n",
    "new": "\t\tif false && hadPrev && prev.ExternalPaymentID != nil && !attemptClosed(prev.State) {\n",
-   "test": "internal/modules/payment ^TestALateSuccessOfTheOldIntentAfterARepayIsRecordedAndTheNewIntentIsCanceled$",
+   "test": "internal/modules/payment ^TestAdoptingTheLateSuccessOfTheOldIntentSchedulesTheNewIntentCancelInTheSameSync$",
    "why": "R2-2：舊 PaymentIntent 晚到成功之後，原本有效的新 PaymentIntent 沒有排取消，買家還能再付一次。"
   },
   {
