@@ -13,8 +13,8 @@
    "id": "seller-file-endpoint-streams-body",
    "stack": "go",
    "file": "backend/internal/httpapi/seller/files.go",
-   "old": "io.Copy(w, content.Body)",
-   "new": "io.Copy(io.Discard, content.Body)",
+   "old": "io.Copy(cw, br)",
+   "new": "io.Copy(io.Discard, br)",
    "test": "internal/httpapi/seller ^TestDocumentEndpointAuthorizesAdminsAndMapsErrorsWithoutLeaking$",
    "why": "端點不再把 media 的串流送給 client"
   },
@@ -125,6 +125,24 @@
    "new": "`json:\"avatar\"`",
    "test": "internal/modules/moderation/internal/snapshot ^TestBuyerSnapshotStoresOnlyTheAvatarAssetID$",
    "why": "快照又把頭像存成 avatar 欄位，而不是只存資產 ID"
+  },
+  {
+   "id": "seller-file-peeks-before-header",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/files.go",
+   "old": "if _, err := br.Peek(1); err != nil && !errors.Is(err, io.EOF) {\n\t\tfileFailure(w, r, log, err, \"檔案\")\n\t\treturn\n\t}",
+   "new": "_ = br",
+   "test": "internal/httpapi/seller ^TestOwnDocumentFirstSegmentFailureReturns500BeforeAnyHeader$",
+   "why": "拿掉送 header 前的第一段讀取，第一段失敗退回先送 200 再中斷"
+  },
+  {
+   "id": "seller-file-midstream-failure-logs-error",
+   "stack": "go",
+   "file": "backend/internal/httpapi/seller/files.go",
+   "old": "if cw.err != nil {",
+   "new": "if true {",
+   "test": "internal/httpapi/seller ^TestOwnDocumentMidStreamReadFailureAbortsAndLogsError$",
+   "why": "讀取端中途失敗退回只記 warn，和 client 斷線分不出來"
   }
  ]
 }

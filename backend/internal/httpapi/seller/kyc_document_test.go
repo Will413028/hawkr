@@ -90,3 +90,49 @@ func TestOwnDocumentEndpointAuthorizesAccountsAndMapsErrorsWithoutLeaking(t *tes
 		t.Fatalf("uri=%q", got)
 	}
 }
+
+type failingBody struct {
+	head string
+	err  error
+	read bool
+}
+
+func (f *failingBody) Read(p []byte) (int, error) {
+	if f.read || f.head == "" {
+		return 0, f.err
+	}
+	f.read = true
+	return copy(p, f.head), nil
+}
+
+func (f *failingBody) Close() error { return nil }
+
+// 第一段讀不出來（解密、儲存或完整性失敗）時還沒送 header：回 500 加 error log，不是先送 200 再中斷。
+func TestOwnDocumentFirstSegmentFailureReturns500BeforeAnyHeader(t *testing.T) {
+	customer := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAccount, ID: 5})
+	var logs strings.Builder
+	m := &ownDocModule{content: model.FileContent{Body: &failingBody{err: errors.New("secret chunk failure")}, ContentType: "image/png"}}
+	rec := serveOwnDocument(m, slog.New(slog.NewTextHandler(&logs, nil)), customer, "/api/files/seller/kyc/0")
+	if rec.Code != 500 || strings.Contains(rec.Body.String(), "secret") || rec.Header().Get("Content-Type") == "image/png" {
+		t.Fatalf("code=%d body=%q headers=%v", rec.Code, rec.Body.String(), rec.Header())
+	}
+	if !strings.Contains(logs.String(), "level=ERROR") {
+		t.Fatalf("log=%q", logs.String())
+	}
+}
+
+// 送出中途讀取端失敗：狀態碼已是 200、改不了，中斷連線並記 error（不是 client 斷線的 warn）。
+func TestOwnDocumentMidStreamReadFailureAbortsAndLogsError(t *testing.T) {
+	customer := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAccount, ID: 5})
+	var logs strings.Builder
+	m := &ownDocModule{content: model.FileContent{Body: &failingBody{head: "IMG", err: errors.New("segment 2 corrupt")}, ContentType: "image/png"}}
+	defer func() {
+		if r := recover(); r != any(http.ErrAbortHandler) {
+			t.Fatalf("recover=%v，要 http.ErrAbortHandler", r)
+		}
+		if !strings.Contains(logs.String(), "level=ERROR") || strings.Contains(logs.String(), "level=WARN") {
+			t.Fatalf("log=%q", logs.String())
+		}
+	}()
+	serveOwnDocument(m, slog.New(slog.NewTextHandler(&logs, nil)), customer, "/api/files/seller/kyc/0")
+}

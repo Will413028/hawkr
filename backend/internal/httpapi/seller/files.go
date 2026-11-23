@@ -1,6 +1,7 @@
 package seller
 
 import (
+	"bufio"
 	"errors"
 	"io"
 	"log/slog"
@@ -33,17 +34,42 @@ func adminFile(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	return p.ID, true
 }
 
-// writeFile 串流回應檔案本身並關閉 Body；型別只放行圖片與 PDF（safeContentType）。送出中途失敗時回應已開始、狀態碼改不了，
-// 中斷連線讓 client 看到截斷而不是一份看似完整的檔。
+// writeFile 串流回應檔案本身並關閉 Body；型別只放行圖片與 PDF（safeContentType）。先讀出第一段再送 header：第一段的
+// 解密、儲存或完整性失敗還能回 500 加 error log，不會先送 200。送出中途失敗時回應已開始、狀態碼改不了，中斷連線讓 client 看到
+// 截斷而不是一份看似完整的檔；client 斷線記 warn，讀取端（解密、儲存、完整性）的失敗記 error。
 func writeFile(w http.ResponseWriter, r *http.Request, log *slog.Logger, content model.FileContent) {
 	defer func() { _ = content.Body.Close() }()
+	br := bufio.NewReader(content.Body)
+	if _, err := br.Peek(1); err != nil && !errors.Is(err, io.EOF) {
+		fileFailure(w, r, log, err, "檔案")
+		return
+	}
 	w.Header().Set("Content-Type", safeContentType(content.ContentType))
 	w.Header().Set("Content-Disposition", "inline")
 	w.WriteHeader(http.StatusOK)
-	if _, err := io.Copy(w, content.Body); err != nil {
-		log.WarnContext(r.Context(), "seller：送出機敏檔中斷", "error", err)
+	cw := &clientWriter{w: w}
+	if _, err := io.Copy(cw, br); err != nil {
+		if cw.err != nil {
+			log.WarnContext(r.Context(), "seller：送出機敏檔中斷（client 端）", "error", err)
+		} else {
+			log.ErrorContext(r.Context(), "seller：送出機敏檔中斷（讀取端失敗）", "error", err)
+		}
 		panic(http.ErrAbortHandler)
 	}
+}
+
+// clientWriter 記下寫往 client 的錯誤，讓呼叫端分辨中斷來自 client 還是來自讀取端。
+type clientWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (c *clientWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	if err != nil {
+		c.err = err
+	}
+	return n, err
 }
 
 // fileFailure 把模組的錯誤轉成 HTTP 狀態，不帶任何細節：沒有授權一律 403（不洩漏資源存在與否），查無 404；
