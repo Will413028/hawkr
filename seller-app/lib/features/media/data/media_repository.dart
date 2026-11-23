@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hawkr_api/errors.dart' show DefaultErrorText, errorText;
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
-import 'package:hawkr_api/transport.dart' show Code;
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_api/upload.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
@@ -82,9 +82,14 @@ class MediaRepository {
       rethrow;
     } catch (e, st) {
       HKLog.logE('[MediaRepo] Upload error', e, st);
-      throw UnknownException(message: errorText(e, defaults: _defaults));
+      throw UnknownException(message: _failureText(e));
     }
   }
+
+  /// 伺服器回的 [ConnectException] 用它的 LocalizedMessage；傳輸層錯誤（逾時、斷線、壓縮失敗）用 unavailable 預設文字。
+  String _failureText(Object e) => e is ConnectException
+      ? errorText(e, defaults: _defaults)
+      : _defaults(Code.unavailable);
 
   String _rejectText(RejectReason reason) =>
       reason.uiText(_locale()) ?? _defaults(Code.internal);
@@ -195,7 +200,7 @@ class MediaRepository {
       rethrow;
     } catch (e, st) {
       HKLog.logE('[MediaRepo] Private upload error', e, st);
-      throw UnknownException(message: errorText(e, defaults: _defaults));
+      throw UnknownException(message: _failureText(e));
     }
   }
 

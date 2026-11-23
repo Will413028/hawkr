@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -5,10 +6,13 @@ import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.pb.dart';
 import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hawkr_api/upload.dart';
 import 'package:hawkr_seller/core/exceptions/app_exception.dart';
 import 'package:hawkr_seller/features/media/data/media_repository.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
+
+import '../../support/connect_errors.dart';
 
 class _Put {
   _Put(this.url, this.headers);
@@ -17,6 +21,9 @@ class _Put {
 }
 
 class _Http implements UploadHttp {
+  _Http({this.error});
+
+  final Object? error;
   final puts = <_Put>[];
 
   @override
@@ -25,6 +32,7 @@ class _Http implements UploadHttp {
     Map<String, String> headers,
     Uint8List body,
   ) async {
+    if (error != null) throw error!;
     puts.add(_Put(url, headers));
     return const UploadHttpResult(200);
   }
@@ -34,29 +42,32 @@ MediaRepository _repo(
   _Http http, {
   required GetUploadResponse Function() poll,
   String? token = 'sess',
+  void Function()? onBegin,
+  void Function()? onBeginSecure,
+  void Function()? onComplete,
 }) {
   final transport =
       (FakeTransportBuilder()
-              .unary(
-                MediaAppService.beginUpload,
-                (req, ctx) => BeginUploadResponse(
+              .unary(MediaAppService.beginUpload, (req, ctx) {
+                onBegin?.call();
+                return BeginUploadResponse(
                   stagedToken: 'tok',
                   uploadUrl: 'https://store.example/put',
-                ),
-              )
-              .unary(
-                MediaAppService.completeUpload,
-                (req, ctx) => CompleteUploadResponse(),
-              )
+                );
+              })
+              .unary(MediaAppService.completeUpload, (req, ctx) {
+                onComplete?.call();
+                return CompleteUploadResponse();
+              })
               .unary(MediaAppService.getUpload, (req, ctx) => poll())
-              .unary(
-                MediaAppService.beginSecureUpload,
-                (req, ctx) => BeginSecureUploadResponse(
+              .unary(MediaAppService.beginSecureUpload, (req, ctx) {
+                onBeginSecure?.call();
+                return BeginSecureUploadResponse(
                   stagedToken: 'sec',
                   chunkSize: 8,
                   chunkCount: 1,
-                ),
-              ))
+                );
+              }))
           .build();
   return MediaRepository(
     client: MediaAppServiceClient(transport),
@@ -139,4 +150,95 @@ void main() {
       expect(http.puts, isEmpty);
     },
   );
+
+  group('failure text', () {
+    final ready = () =>
+        GetUploadResponse(state: UploadState.UPLOAD_STATE_READY);
+    final serverError = reasonError(
+      Code.failedPrecondition,
+      'SOME_REASON',
+      message: '伺服器說的話',
+    );
+
+    Future<void> expectUnknown(Future<Object?> run, String text) => expectLater(
+      run,
+      throwsA(isA<AppException>().having((e) => e.message, 'message', text)),
+    );
+
+    test('beginUpload ConnectException shows its LocalizedMessage', () async {
+      final repo = _repo(
+        _Http(),
+        poll: ready,
+        onBegin: () => throw serverError,
+      );
+      await expectUnknown(
+        repo.uploadWithSession(
+          bytes: bytes,
+          filename: 'a.jpg',
+          compress: false,
+        ),
+        '伺服器說的話',
+      );
+    });
+
+    test(
+      'completeUpload ConnectException shows its LocalizedMessage',
+      () async {
+        final repo = _repo(
+          _Http(),
+          poll: ready,
+          onComplete: () => throw serverError,
+        );
+        await expectUnknown(
+          repo.uploadWithSession(
+            bytes: bytes,
+            filename: 'a.jpg',
+            compress: false,
+          ),
+          '伺服器說的話',
+        );
+      },
+    );
+
+    test('private beginSecureUpload ConnectException shows its text', () async {
+      final repo = _repo(
+        _Http(),
+        poll: ready,
+        onBeginSecure: () => throw serverError,
+      );
+      await expectUnknown(repo.uploadPrivateDocument(bytes: bytes), '伺服器說的話');
+    });
+
+    test(
+      'transport error on the presigned PUT shows the unavailable default',
+      () async {
+        final repo = _repo(
+          _Http(error: const SocketException('offline')),
+          poll: ready,
+        );
+        await expectUnknown(
+          repo.uploadWithSession(
+            bytes: bytes,
+            filename: 'a.jpg',
+            compress: false,
+          ),
+          'default:unavailable',
+        );
+      },
+    );
+
+    test(
+      'transport error on a private chunk shows the unavailable default',
+      () async {
+        final repo = _repo(
+          _Http(error: const HttpException('reset')),
+          poll: ready,
+        );
+        await expectUnknown(
+          repo.uploadPrivateDocument(bytes: bytes),
+          'default:unavailable',
+        );
+      },
+    );
+  });
 }
