@@ -281,7 +281,7 @@ func (s *Service) advance(ctx context.Context, row store.MediaStagedUpload, inde
 
 // settleLostChunk 處理推進失敗：先看這段的 key 是不是已經記進 secure_chunks（transaction 其實已提交，例如 commit 時連線中斷），
 // 是就回 errChunkCommitted（caller 照成功處理）；只有推進確定 rollback（errLost：條件不成立）才刪自己的物件，commit 結果不明或查不出來就什麼都不刪（刪錯會破壞已提交的段，
-// 沒刪的孤兒由 GC 依前綴回收）。回傳給 client 的錯誤依會話現況：輸給並行的同一段、過期、已被拒。
+// 沒刪的孤兒密文：已確認的資產只在資產被刪除時移除，從未確認的暫存上傳在過期回收時移除）。回傳給 client 的錯誤依會話現況：輸給並行的同一段、過期、已被拒。
 func (s *Service) settleLostChunk(ctx context.Context, row store.MediaStagedUpload, index int, key string, cause error) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()
@@ -292,11 +292,11 @@ func (s *Service) settleLostChunk(ctx context.Context, row store.MediaStagedUplo
 	case (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):
 		s.deleteChunkObject(ctx, row.ID, key)
 	case err == nil || errors.Is(err, pgx.ErrNoRows):
-		// commit 結果不明（errLost 以外的錯誤，例如 commit 時連線中斷）：這次查到沒有記錄，但提交可能還在途，不刪，留給前綴 GC。
-		s.d.Logger.WarnContext(ctx, "media：推進結果不明，物件留給 GC", "upload_id", row.ID, "index", index, "error", cause)
+		// commit 結果不明（errLost 以外的錯誤，例如 commit 時連線中斷）：這次查到沒有記錄，但提交可能還在途，不刪；孤兒密文只在資產被刪除（已確認）或暫存上傳過期回收（從未確認）時移除。
+		s.d.Logger.WarnContext(ctx, "media：推進結果不明，密文不刪，等資產刪除或暫存過期回收時移除", "upload_id", row.ID, "index", index, "error", cause)
 		return cause
 	default:
-		s.d.Logger.WarnContext(ctx, "media：推進失敗後查不出自己的段是否已記錄，物件留給 GC", "upload_id", row.ID, "index", index, "error", err)
+		s.d.Logger.WarnContext(ctx, "media：推進失敗後查不出自己的段是否已記錄，密文不刪，等資產刪除或暫存過期回收時移除", "upload_id", row.ID, "index", index, "error", err)
 		return cause
 	}
 	if !errors.Is(cause, errLost) {
@@ -331,12 +331,12 @@ func (s *Service) chunkResult(row store.MediaStagedUpload, index, count int, sni
 	}, nil
 }
 
-// deleteChunkObject 刪自己這次嘗試寫的物件（key 只屬於這次嘗試）；不受 ctx 取消影響但有時限，失敗只記錄，孤兒由 GC 依前綴回收。
+// deleteChunkObject 刪自己這次嘗試寫的物件（key 只屬於這次嘗試）；不受 ctx 取消影響但有時限，失敗只記錄，孤兒密文不再另有背景清理：已確認的資產只在資產被刪除時移除，從未確認的暫存上傳在過期回收時移除。
 func (s *Service) deleteChunkObject(ctx context.Context, uploadID uuid.UUID, key string) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()
 	if err := s.d.Store.Delete(ctx, key); err != nil {
-		s.d.Logger.WarnContext(ctx, "media：刪除沒推進成功的機敏段失敗，留給 GC", "upload_id", uploadID, "key", key, "error", err)
+		s.d.Logger.WarnContext(ctx, "media：刪除沒推進成功的機敏段失敗，密文等資產刪除或暫存過期回收時移除", "upload_id", uploadID, "key", key, "error", err)
 	}
 }
 

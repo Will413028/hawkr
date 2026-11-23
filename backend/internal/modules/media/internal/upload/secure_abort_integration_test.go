@@ -241,7 +241,7 @@ func TestPutSecure_BuffersOneChunkAtATimeNotTheWholeBody(t *testing.T) {
 	}
 }
 
-// 推進的錯誤不是 errLost（commit 結果不明）時，不刪自己的物件，留給前綴 GC；errLost 才刪。
+// 推進的錯誤不是 errLost（commit 結果不明）時，不刪自己的物件（等資產刪除或暫存過期回收時移除）；errLost 才刪。
 func TestSettleLostChunk_OnlyARollbackDeletesTheObject(t *testing.T) {
 	svc, d, st := secureService(t)
 	data := []byte("%PDF-1.7\nhello")
