@@ -40,8 +40,8 @@
    "id": "review-card-count-shown-on-load-failure",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
-   "old": "_loadError != null || statsCount == null\n        ? '商品評價'\n        : '商品評價 ($statsCount)'",
-   "new": "false\n        ? '商品評價'\n        : '商品評價 (${statsCount ?? 0})'",
+   "old": "_loadError != null || statsCount == null\n        ? context.l10n.productReviewsTitle\n        : context.l10n.productReviewsTitleWithCount(statsCount);",
+   "new": "false\n        ? context.l10n.productReviewsTitle\n        : context.l10n.productReviewsTitleWithCount(statsCount ?? 0);",
    "test": "test/features/product/product_review_preview_card_test.dart 讀取失敗時標題不顯示 (0)",
    "why": "讀取失敗仍顯示商品評價 (0)"
   },
@@ -76,8 +76,8 @@
    "id": "review-header-count-from-first-page",
    "stack": "flutter:buyer-app",
    "file": "buyer-app/lib/features/product/presentation/merchant_item_detail_screen.dart",
-   "old": ": '商品評價 ($statsCount)';",
-   "new": ": '商品評價 ($reviewCount)';",
+   "old": ": context.l10n.productReviewsTitleWithCount(statsCount);",
+   "new": ": context.l10n.productReviewsTitleWithCount(reviewCount);",
    "test": "test/features/product/product_review_preview_card_test.dart 標題的評價數取自統計，不是第一頁的筆數",
    "why": "商品頁標題數量取第一頁長度，超過 100 則時顯示 100"
   },
