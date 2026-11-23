@@ -1,0 +1,12 @@
+{"mutants": [
+  {"id": "inbox-only-for-token-holders", "stack": "go-integration", "file": "backend/internal/modules/notification/internal/announce/fanout.go",
+   "old": "\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tn, err := q.InsertAnnouncementInbox(ctx,",
+   "new": "\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tvar hasToken bool\n\t\tif err := s.d.DB.Conn(ctx).QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notification.device_tokens WHERE account_id = $1)`, r.AccountID).Scan(&hasToken); err != nil || !hasToken {\n\t\t\treturn err\n\t\t}\n\t\tn, err := q.InsertAnnouncementInbox(ctx,",
+   "test": "internal/modules/notification ^TestAccountWithoutDeviceTokenStillGetsTheInboxItem$",
+   "why": "收件匣只寫給有 device token 的帳號（舊系統缺陷 5–7 的 token-only fan-out）：沒有 token 的帳號沒有收件匣列"},
+  {"id": "drop-request-id-dedupe", "stack": "go-integration", "file": "backend/internal/modules/notification/internal/announce/announce.go",
+   "old": "AdminID: in.Actor.AdminID, RequestID: in.RequestID, CreatedAt: now,",
+   "new": "AdminID: in.Actor.AdminID, RequestID: nil, CreatedAt: now,",
+   "test": "internal/modules/notification ^TestCreateWithTheSameRequestIDMakesOneAnnouncement$",
+   "why": "建立時不記 request_id：同一個 request_id 重送建出第二則公告，冪等失效"}
+]}

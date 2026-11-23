@@ -285,16 +285,15 @@ func runServe(ctx context.Context) error {
 	defer stopAssistant()
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Assistant:   assistantModule,
-		Procurement: procurementModule,
-		ImageAI:     imageAIModule,
-		Ready:       d.Ping,
-		Social:      socialModule,
-		Review:      reviewModule,
-		IM:          imModule,
-		CRM:         crmModule,
-		Moderation:  moderationModule,
-
+		Assistant:    assistantModule,
+		Procurement:  procurementModule,
+		ImageAI:      imageAIModule,
+		Ready:        d.Ping,
+		Social:       socialModule,
+		Review:       reviewModule,
+		IM:           imModule,
+		CRM:          crmModule,
+		Moderation:   moderationModule,
 		Notification: notificationModule,
 		Content: content.New(content.Deps{
 			DB:     d,

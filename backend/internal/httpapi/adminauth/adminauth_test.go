@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	imageaiv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
+	notificationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/notification/v1alpha1/notificationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
 	socialv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1/socialv1alpha1connect"
@@ -67,8 +68,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 95 {
-		t.Fatalf("declarations=%d methods=%d，預期 95", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 97 {
+		t.Fatalf("declarations=%d methods=%d，預期 97", got, want)
 	}
 
 	for procedure := range declarations {
@@ -340,6 +341,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 		imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiQuotaProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure,
+		notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure,
@@ -461,6 +463,22 @@ func TestModerationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
 		moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:     {adminperm.ModerationCasesGet, auditReadOnly},
 		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure:  {adminperm.ModerationCasesDecide, auditAudited},
 		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure: {adminperm.ModerationCasesReverse, auditAudited},
+	} {
+		d, ok := declarations[procedure]
+		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {
+			t.Errorf("%s 的宣告 = %+v，預期權限 %s、紀錄模式 %s", procedure, d, want.perm, want.audit)
+		}
+	}
+}
+
+// notification 的後台方法一個方法對一個權限；建立公告是寫入，要留後台動作紀錄。
+func TestNotificationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
+	for procedure, want := range map[string]struct {
+		perm  adminperm.Permission
+		audit auditMode
+	}{
+		notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure: {adminperm.NotificationAnnouncementsCreate, auditAudited},
+		notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:  {adminperm.NotificationAnnouncementsList, auditReadOnly},
 	} {
 		d, ok := declarations[procedure]
 		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {

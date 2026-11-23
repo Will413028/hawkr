@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
 	imageaiv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
+	notificationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/notification/v1alpha1/notificationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
@@ -92,6 +93,9 @@ var declarations = map[string]declaration{
 	moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:     requires(adminperm.ModerationCasesGet, auditReadOnly),
 	moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure:  requires(adminperm.ModerationCasesDecide, auditAudited),
 	moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure: requires(adminperm.ModerationCasesReverse, auditAudited),
+
+	notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure: requires(adminperm.NotificationAnnouncementsCreate, auditAudited),
+	notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:  requires(adminperm.NotificationAnnouncementsList, auditReadOnly),
 
 	socialv1alpha1connect.SocialAdminServiceListPostsProcedure: requires(adminperm.SocialPostsList, auditReadOnly),
 

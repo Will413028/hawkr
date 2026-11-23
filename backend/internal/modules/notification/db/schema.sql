@@ -27,6 +27,31 @@ CREATE TABLE notification.intents (
 );
 CREATE INDEX intents_created ON notification.intents (created_at);
 
+-- 後台公告（A8-2c）：公告是資料，不是事件型別。建立時一列、一個意圖列（id 與公告相同，只為讓 deliveries 的 intent_id 有對象）與兩條派送 job 鏈：
+-- 收件匣與推播分開，各自逐受眾、逐頁（以 keyset 游標）展開，所以沒有 device token 的帳號也收得到收件匣那份，一個 job 的工作量有上限。
+-- audiences 是已排序、不重複的受眾（只有三種合法組合）。title 與 body 一律英文、單一份（D17）。
+-- (admin_id, request_id) UNIQUE 是建立的冪等鍵（AIP-155）：重送回第一次的那一列，內容不同回 invalid_argument；沒有 request_id 的建立不受限。
+-- inbox_count 與收件匣列同 transaction 遞增（只算真正新寫的列）；inbox_done_at、push_done_at 是各自的 job 鏈處理完所有受眾的時間，兩者都有才算派送完成。
+CREATE TABLE notification.announcements (
+    id            UUID        PRIMARY KEY,
+    audiences     TEXT[]      NOT NULL,
+    title         TEXT        NOT NULL,
+    body          TEXT        NOT NULL,
+    admin_id      BIGINT      NOT NULL,
+    request_id    UUID,
+    inbox_count   INTEGER     NOT NULL DEFAULT 0,
+    inbox_done_at TIMESTAMPTZ,
+    push_done_at  TIMESTAMPTZ,
+    created_at    TIMESTAMPTZ NOT NULL,
+    CONSTRAINT announcements_request_key UNIQUE (admin_id, request_id),
+    CONSTRAINT announcements_audiences_check CHECK (audiences IN (ARRAY['BUYER'], ARRAY['STORE'], ARRAY['BUYER', 'STORE'])),
+    CONSTRAINT announcements_title_check CHECK (char_length(title) BETWEEN 1 AND 100 AND title !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT announcements_body_check CHECK (char_length(body) BETWEEN 1 AND 2000 AND body !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT announcements_admin_check CHECK (admin_id > 0),
+    CONSTRAINT announcements_inbox_count_check CHECK (inbox_count >= 0)
+);
+CREATE INDEX announcements_listing ON notification.announcements (created_at DESC, id DESC);
+
 -- 收件匣列：型別＋參數快照＋聚合鍵，讀取時依請求語系組字（收件匣不是投遞渠道，這一列本身就是「已進收件匣」的紀錄）。
 -- 收件人是 (account_id, audience, store_id)：BUYER 沒有 store_id，STORE 一定有。actor_account_ids 只存帳號 ID（讀取時向擁有模組解析名稱）。
 -- 有聚合鍵的未讀列同一個收件人（含 store_id）只有一列（unique index，NULLS NOT DISTINCT 涵蓋 BUYER 的 NULL store_id），後來的意圖合併進去（A8-1b 的 upsert）；已讀之後的新意圖另開一列。
@@ -45,17 +70,21 @@ CREATE TABLE notification.inbox_items (
     read_at           TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL,
     updated_at        TIMESTAMPTZ NOT NULL,
+    announcement_id   UUID REFERENCES notification.announcements (id),
     CONSTRAINT inbox_items_account_check CHECK (account_id > 0),
     CONSTRAINT inbox_items_audience_check CHECK (audience IN ('BUYER', 'STORE')),
     CONSTRAINT inbox_items_store_check CHECK ((audience = 'STORE') = (store_id IS NOT NULL) AND (store_id IS NULL OR store_id > 0)),
     CONSTRAINT inbox_items_type_check CHECK (type ~ '^[a-z][a-z0-9_]{0,62}$'),
     CONSTRAINT inbox_items_aggregation_key_check CHECK (aggregation_key IS NULL OR char_length(aggregation_key) BETWEEN 1 AND 200),
-    CONSTRAINT inbox_items_updated_check CHECK (updated_at >= created_at)
+    CONSTRAINT inbox_items_updated_check CHECK (updated_at >= created_at),
+    CONSTRAINT inbox_items_announcement_check CHECK ((type = 'announcement') = (announcement_id IS NOT NULL))
 );
 CREATE INDEX inbox_items_recipient ON notification.inbox_items (account_id, audience, store_id, updated_at DESC, id DESC);
 CREATE INDEX inbox_items_unread ON notification.inbox_items (account_id, audience, store_id) WHERE read_at IS NULL;
 CREATE UNIQUE INDEX inbox_items_unread_aggregation ON notification.inbox_items (account_id, audience, store_id, aggregation_key) NULLS NOT DISTINCT WHERE aggregation_key IS NOT NULL AND read_at IS NULL;
 CREATE INDEX inbox_items_updated ON notification.inbox_items (updated_at);
+-- 公告的收件匣列：announcement_id 非空時 type 一定是 announcement（文案取自公告列，不經型別註冊表），同一個收件人同一則公告只有一列（派送 job 重試的冪等依據）。
+CREATE UNIQUE INDEX inbox_items_announcement_recipient ON notification.inbox_items (announcement_id, account_id, audience, store_id) NULLS NOT DISTINCT WHERE announcement_id IS NOT NULL;
 
 -- 意圖與收件匣列的連結：一個意圖（只有一個收件人）寫進或合併進哪一列。intent_id 是主鍵，worker 重試時以它判斷這個意圖已經處理過，
 -- 即使它先前合併進的列之後被讀過、不再是聚合目標也不會重複建列。意圖被清除時只刪連結（收件匣列留著），收件匣列被清除時連結跟著刪。

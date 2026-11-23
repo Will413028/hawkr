@@ -61,6 +61,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"voucher":  {"model", "qualify", "rows", "store"},
 	}},
 	"notification": {Packages: map[string][]string{
+		"announce": {"intake", "model", "store"},
 		"app":      {"model", "registry", "store", "text"},
 		"intake":   {"model", "registry", "store"},
 		"model":    {},

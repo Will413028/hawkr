@@ -61,6 +61,8 @@ var trimmedColumns = []trimmedColumn{
 	{table: "social.hides", column: "source_ref", constraint: "hides_source_ref_check", extra: map[string]any{"comment_id": hideTarget}},
 	{table: "social.hides", column: "restore_reason", constraint: "hides_restore_reason_check",
 		extra: map[string]any{"comment_id": hideTarget, "restored_at": time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC), "restored_by": int64(1)}},
+	{table: "notification.announcements", column: "title", constraint: "announcements_title_check"},
+	{table: "notification.announcements", column: "body", constraint: "announcements_body_check"},
 	{table: "social.sanctions", column: "reason_text", constraint: "sanctions_reason_text_check"},
 	{table: "social.sanctions", column: "source_ref", constraint: "sanctions_source_ref_check"},
 	{table: "review.reviews", column: "content", constraint: "reviews_content_check"},

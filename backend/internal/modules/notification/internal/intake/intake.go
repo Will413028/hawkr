@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -140,25 +139,12 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	}
 	spec := e.Spec()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		// 鎖順序：identity 帳號列最先，notification 的列最後（platform/lockorder）。以共享鎖鎖住收件帳號直到 commit：
-		// 只需要帳號不在寫入途中被刪、不改帳號，所以用共享鎖：多個 worker 不互相等待；帳號已刪除時不寫。
-		deleted, err := s.d.Accounts.ShareLockAccount(ctx, resolved.Recipient.AccountID)
-		if err != nil {
-			if apperr.KindOf(err) == apperr.KindNotFound {
-				s.log().WarnContext(ctx, "收件帳號不存在，略過通知", "intent_id", intent.ID, "type", intent.Type)
-				return s.scrubSkipped(ctx, intent.ID)
-			}
-			return fmt.Errorf("鎖定收件帳號：%w", err)
-		}
-		if deleted {
-			s.log().InfoContext(ctx, "收件帳號已刪除，略過通知", "intent_id", intent.ID, "type", intent.Type)
-			return s.scrubSkipped(ctx, intent.ID)
-		}
-		gone, err := s.recipientGone(ctx, intent, spec.Audience, resolved.Recipient)
+		gone, err := LockRecipient(ctx, Locks{Accounts: s.d.Accounts, Buyers: s.d.Buyers, Stores: s.d.Stores}, spec.Audience, resolved.Recipient.AccountID, resolved.Recipient.StoreID)
 		if err != nil {
 			return err
 		}
-		if gone {
+		if gone != GoneNone {
+			s.logGone(ctx, intent, gone)
 			return s.scrubSkipped(ctx, intent.ID)
 		}
 		return s.deliver(ctx, intent, spec, resolved)
@@ -174,35 +160,20 @@ func (s *Service) scrubSkipped(ctx context.Context, intentID uuid.UUID) error {
 	return nil
 }
 
-// recipientGone 接在帳號共享鎖之後（鎖順序：identity、buyer、seller、notification），以 FOR KEY SHARE 鎖住 BUYER 收件人的買家列、
-// STORE 收件人的店家列，回報買家已關閉或店家已退場（BuyerDeleted、StoreRetired 之後不再為這個收件人建列）。買家列不存在記 Warn
-// 並視為不寫；店家已退場與不存在無法區分（同樣回 NotFound），記 Info 並視為不寫。
-func (s *Service) recipientGone(ctx context.Context, intent store.NotificationIntent, audience model.Audience, r registry.Recipient) (bool, error) {
-	switch audience {
-	case model.AudienceBuyer:
-		deleted, err := s.d.Buyers.ShareLockByAccount(ctx, r.AccountID)
-		switch {
-		case apperr.KindOf(err) == apperr.KindNotFound:
-			s.log().WarnContext(ctx, "收件帳號沒有買家列，略過通知", "intent_id", intent.ID, "type", intent.Type)
-			return true, nil
-		case err != nil:
-			return false, fmt.Errorf("鎖定收件買家：%w", err)
-		case deleted:
-			s.log().InfoContext(ctx, "收件買家已關閉，略過通知", "intent_id", intent.ID, "type", intent.Type)
-		}
-		return deleted, nil
-	case model.AudienceStore:
-		err := s.d.Stores.LockNotRetired(ctx, r.StoreID)
-		switch {
-		case apperr.KindOf(err) == apperr.KindNotFound:
-			s.log().InfoContext(ctx, "收件店家已退場，略過通知", "intent_id", intent.ID, "type", intent.Type)
-			return true, nil
-		case err != nil:
-			return false, fmt.Errorf("鎖定收件店家：%w", err)
-		}
-		return false, nil
-	default:
-		return false, fmt.Errorf("通知受眾 %q 不合法", audience)
+// logGone 記下略過的原因：帳號或買家列不存在是資料異常（Warn），已刪除、已關閉、已退場是正常的略過（Info）。店家已退場與不存在無法區分（同樣回 NotFound）。
+func (s *Service) logGone(ctx context.Context, intent store.NotificationIntent, gone Gone) {
+	switch gone {
+	case GoneNone:
+	case GoneNoAccount:
+		s.log().WarnContext(ctx, "收件帳號不存在，略過通知", "intent_id", intent.ID, "type", intent.Type)
+	case GoneAccountDeleted:
+		s.log().InfoContext(ctx, "收件帳號已刪除，略過通知", "intent_id", intent.ID, "type", intent.Type)
+	case GoneNoBuyer:
+		s.log().WarnContext(ctx, "收件帳號沒有買家列，略過通知", "intent_id", intent.ID, "type", intent.Type)
+	case GoneBuyerClosed:
+		s.log().InfoContext(ctx, "收件買家已關閉，略過通知", "intent_id", intent.ID, "type", intent.Type)
+	case GoneStoreRetired:
+		s.log().InfoContext(ctx, "收件店家已退場，略過通知", "intent_id", intent.ID, "type", intent.Type)
 	}
 }
 
@@ -229,15 +200,7 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 	for _, o := range overrides {
 		override[model.Channel(o.Channel)] = o.Enabled
 	}
-	enabled := func(ch model.Channel) bool {
-		if !model.Disableable(spec.Audience, spec.Category, ch) {
-			return true
-		}
-		if v, ok := override[ch]; ok {
-			return v
-		}
-		return model.DefaultEnabled(spec.Category, ch)
-	}
+	enabled := func(ch model.Channel) bool { return model.Enabled(spec.Audience, spec.Category, ch, override) }
 	now := s.d.Now()
 	for _, ch := range spec.Channels {
 		if !enabled(ch) {

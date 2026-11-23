@@ -10,6 +10,19 @@ import (
 	"uuid"
 )
 
+type NotificationAnnouncement struct {
+	ID          uuid.UUID
+	Audiences   []string
+	Title       string
+	Body        string
+	AdminID     int64
+	RequestID   *uuid.UUID
+	InboxCount  int32
+	InboxDoneAt *time.Time
+	PushDoneAt  *time.Time
+	CreatedAt   time.Time
+}
+
 type NotificationDelivery struct {
 	ID            uuid.UUID
 	IntentID      uuid.UUID
@@ -47,6 +60,7 @@ type NotificationInboxItem struct {
 	ReadAt          *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	AnnouncementID  *uuid.UUID
 }
 
 type NotificationInboxItemIntent struct {

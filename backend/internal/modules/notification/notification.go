@@ -16,11 +16,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/announce"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/app"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -53,13 +55,16 @@ type Deps struct {
 	Now      func() time.Time
 	NewID    func() uuid.UUID
 	Logger   *slog.Logger
+	// Directory 列出公告的收件人（*buyer.Module 與 *seller.Module 經 NewDirectory 組成）；只有公告派送用，沒有公告的測試可以不給。
+	Directory announce.Directory
 }
 
 // Module 是 notification 模組。
 type Module struct {
-	intake *intake.Service
-	purge  *purge.Service
-	app    *app.Service
+	intake   *intake.Service
+	purge    *purge.Service
+	app      *app.Service
+	announce *announce.Service
 }
 
 // New 建立模組。
@@ -72,6 +77,10 @@ func newModule(d Deps, reg app.Registry) *Module {
 		}),
 		purge: purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger}),
 		app:   app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Now: d.Now, Logger: d.Logger}),
+		announce: announce.New(announce.Deps{
+			DB: d.DB, Locks: intake.Locks{Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller}, Directory: d.Directory,
+			Audit: adminaudit.New(d.DB, d.Now), Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
+		}),
 	}
 }
 
@@ -104,6 +113,7 @@ func (m *Module) OnStoreRetired(ctx context.Context, e seller.StoreRetired) erro
 func (m *Module) AddWorkers(workers *river.Workers) {
 	m.intake.AddWorkers(workers)
 	purge.AddWorkers(workers, m.purge)
+	m.announce.AddWorkers(workers)
 }
 
 // PeriodicJobs 回傳週期 job：保留期清除。
