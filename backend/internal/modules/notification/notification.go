@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/app"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
@@ -45,7 +46,7 @@ type Stores = intake.Stores
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
 type Deps struct {
 	DB       *db.DB
-	Identity *identity.Module
+	Identity Accounts
 	Buyer    Buyers
 	Seller   Stores
 	Jobs     jobs.Enqueuer
@@ -58,6 +59,7 @@ type Deps struct {
 type Module struct {
 	intake *intake.Service
 	purge  *purge.Service
+	app    *app.Service
 }
 
 // New 建立模組。
@@ -69,6 +71,7 @@ func newModule(d Deps, reg intake.Registry) *Module {
 			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
 		}),
 		purge: purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger}),
+		app:   app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: registry.Registry{}, Now: d.Now}),
 	}
 }
 

@@ -28,6 +28,22 @@
     "account_unsuspended.title": {
       "message": "帳號已解除停權",
       "description": "收件匣與推播的標題：帳號解除停權（account_unsuspended 型別）。"
+    },
+    "inbox_item.batch_invalid": {
+      "message": "一次要刪除 1 到 100 則不重複的通知。",
+      "description": "BatchDeleteInboxItems 的 ids 為空、重複或超過 100 個。"
+    },
+    "inbox_item.not_found": {
+      "message": "找不到這則通知。",
+      "description": "通知不存在或不是呼叫者的（兩者同一句，不洩漏存在與否）：已讀、刪除（NotificationAppService）。"
+    },
+    "preference.cannot_disable": {
+      "message": "這個通知無法關閉。",
+      "description": "偏好設定要關閉不可關閉的 (分類, 渠道)：UpdateNotificationPreference。"
+    },
+    "preference.not_available": {
+      "message": "沒有這個通知設定。",
+      "description": "偏好設定的 (受眾, 分類, 渠道) 不在註冊表實際送達的組合內：UpdateNotificationPreference。"
     }
   }
 }

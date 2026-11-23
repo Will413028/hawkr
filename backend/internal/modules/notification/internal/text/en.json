@@ -11,6 +11,18 @@
     },
     "account_unsuspended.title": {
       "message": "Your account suspension has been lifted"
+    },
+    "inbox_item.batch_invalid": {
+      "message": "Delete between 1 and 100 distinct notifications at a time."
+    },
+    "inbox_item.not_found": {
+      "message": "Notification not found."
+    },
+    "preference.cannot_disable": {
+      "message": "This notification cannot be turned off."
+    },
+    "preference.not_available": {
+      "message": "This notification setting is not available."
     }
   }
 }
