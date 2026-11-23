@@ -173,7 +173,7 @@ const (
 	SellerCapability_SELLER_CAPABILITY_CHAT_SEND SellerCapability = 8
 	// 讀取訊息。
 	SellerCapability_SELLER_CAPABILITY_CHAT_READ SellerCapability = 9
-	// 通知收件箱、偏好與裝置。
+	// 通知收件箱、偏好與裝置（NotificationAppService 的 STORE 受眾）。在停權白名單內：停權的賣家仍要讀到停權通知。代行營運的管理員不能使用通知（走 DelegatedService 的憑證，不經此能力）。
 	SellerCapability_SELLER_CAPABILITY_NOTIFICATION SellerCapability = 10
 	// 關店。
 	SellerCapability_SELLER_CAPABILITY_ACCOUNT_CLOSE SellerCapability = 11

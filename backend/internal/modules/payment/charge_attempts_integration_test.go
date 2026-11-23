@@ -130,6 +130,28 @@ func TestALateSuccessOfTheOldIntentAfterARepayIsRecordedAndTheNewIntentIsCancele
 	f.noViolations(t)
 }
 
+// 舊 PaymentIntent 晚到成功被採用的同一次同步裡，原本有效的新 PaymentIntent 就要排取消：不能靠之後再讀到新 PaymentIntent 的快照才補排
+// （那條路徑只在新的還是等待付款或處理中才會排）。這裡新 PaymentIntent 在 provider 那邊已是 canceled，讀它的快照不會觸發取消，
+// 取消 job 只可能來自採用舊嘗試的那一步（採用時嘗試列上新嘗試還沒結案）。
+// mutation：applyLate 的 lateAdopt 拿掉「原有效嘗試排取消」→ 沒有任何取消 job，失敗。
+func TestAdoptingTheLateSuccessOfTheOldIntentSchedulesTheNewIntentCancelInTheSameSync(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	p, oldExt, newExt := f.repay(t, "O-R2d")
+	must(t, f.fake.Settle(newExt, PaymentStateCanceled, f.now))
+	must(t, f.fake.Settle(oldExt, PaymentStateSucceeded, f.now))
+	f.receive(t, "evt_old_adopt", oldExt)
+	f.sync(t, p.ID)
+	if f.statusOf(t, "O-R2d") != PaymentSucceeded || f.effectiveExternal(t, "O-R2d") != oldExt {
+		t.Fatalf("狀態=%s 有效=%s", f.statusOf(t, "O-R2d"), f.effectiveExternal(t, "O-R2d"))
+	}
+	cancels := slices.Compact(slices.Sorted(slices.Values(f.attemptIDs(t, kindChargeCancel))))
+	newAttempt := f.attemptOf(t, newExt)
+	if len(cancels) != 1 || cancels[0] != newAttempt {
+		t.Fatalf("取消 job=%v，新嘗試=%s", cancels, newAttempt)
+	}
+}
+
 // 兩個 PaymentIntent 都成功：付款列保持第一個入帳的，第二個記成重複入帳（後台查得到、記 error log），不發第二次入帳事件，不自動退款（沒有退款列）。
 // mutation：lateOutcomeOf 把「列已入帳又成功」當成採用 → 第二筆覆蓋第一筆，失敗。
 func TestTwoSucceededIntentsAreFlaggedForTheBackOfficeAndNeverRefundedAutomatically(t *testing.T) {

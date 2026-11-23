@@ -191,3 +191,8 @@ D4「CI 檢查」的第一項原文是「**以檔案為單位**（每個檔案�
 - 理由：依條件判斷的守門（`docs/plans/2026-09-29-a3-buyer-seller/enum-text-guard-design.md`）在 I-app-0 之後連 client 資源查詢也算成文字，這類句子在 client 沒有合法的地方放。
 - 第一批：seller-app 停權效果句三句（`seller.Measure.suspension_*`）。website 的停權期間句不屬於這一類（終止合作提早 return 之後的補集），照 L′ §7(d) 留在 client。
 - 觸發的更正（2026-10-22，守門第 3 刀完成前審查）：上面「理由」的「I-app-0 之後」只對 App 成立。client 資源查詢算成文字的時間是：website 的 next-intl 查詢（`t("…")`、`useTranslations`）與計畫 I-CI 的 website 那一刀同一刀（從那時起 website 的新文字一律放進 messages）；App 的 ARB 查詢與計畫 I-app-0 同一刀。
+
+## 修訂：後台公告只寫英文（2026-11-24，Will）
+
+- 後台的系統公告（通知模組 A8-2，計畫 `backend/docs/plans/2026-11-23-a8-notification.md` D17）一律只寫英文：單一 `title`／`body`，不分語系，不依請求語系選擇，所有使用者看到同一份。
+- 這是「買家與賣家介面是 zh-TW／en」與「admin RPC 固定 zh-TW」兩條規則的例外，只限公告；其餘伺服器文字與 admin 文字不變。

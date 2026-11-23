@@ -106,8 +106,8 @@
 
 - [ ] **A8-2 Connect API 與串流**（被擋於：A8-1、D6）
   - 子步驟（2026-11-23 拆分，各有驗收、各自一個 session；範圍、消費端、不能動、驗收照下方原文分配）：
-    - A8-2a 契約：`api/` 的 notification service 全部方法（含串流與後台公告）、D6 的呈現分類與狀態重讀提示 enum、`ErrorReason`；`seller.proto:306` 白名單註解；backend `make connect`、TS、Dart 生成。驗收：`buf lint`、`buf breaking`、三端生成無 drift；handler 未掛時 `TestEveryServiceInTheContractIsMounted` 的紅是預期，在 A8-2b 消除。
-    - A8-2b 收件匣、偏好、token 的 unary handler：D9 代行者拒絕、`httpapi` 停權放行與限流豁免、掛載。驗收：每支方法的 Connect 特性測試；mutation：`MarkAsRead` 非本人成功、`total` 不套篩選。
+    - A8-2a 契約：`api/` 的 notification service 全部方法（含串流與後台公告）、D6 的呈現分類與狀態重讀提示 enum、`ErrorReason`；`seller.proto:306` 白名單註解；backend `make connect`、TS、Dart 生成。`ErrorReason`：不需新增（標準 code 足夠）。驗收：`buf lint`、`buf breaking`、三端生成無 drift；handler 未掛時 `TestEveryServiceInTheContractIsMounted` 的紅是預期，在 A8-2b 消除。
+    - A8-2b 收件匣、偏好、token 的 unary handler：`model.Delivers` 改由型別註冊表推導每個分類實際送出的渠道（現只排除公告的 email，例：互動類沒有 email），偏好列表與更新依它過濾與拒絕；D9 代行者拒絕、`httpapi` 停權放行與限流豁免、掛載。驗收：每支方法的 Connect 特性測試；mutation：`MarkAsRead` 非本人成功、`total` 不套篩選。
     - A8-2c 後台公告：公告表、建立與列表、收件匣與推播分開的 job。驗收：沒有 token 的帳號也收到；特性測試。
     - A8-2d 串流與賣家工作區：hub、`(account_id, 受眾)` 訂閱與上限、`seller_workspace` 事件與發布端搬遷、website `useSellerWorkspaceRealtime` 改接。驗收：原文的串流 integration 與三個串流 mutation。
   - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到；公告表在本步建）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。推播 payload 與串流訊號帶 D6 的狀態重讀提示 enum。賣家工作區即時通道與通知串流共用路徑、SSE 連線與 topic `notification:user:{storeId}`（A8-0 U10，`fact-checks.md`；`seller_workspace_channel.go:14-34`），一起搬：同一個串流與 hub 承載 `seller_workspace` 事件、其發布端（`ResolveTopic` 讀 `payload.sellerId`）與批次事件名，website `useSellerWorkspaceRealtime` 改接新串流。
@@ -194,6 +194,8 @@
 | D14 推播圖片 | 註冊表有可選圖片欄位，商品類型別帶圖；FCM payload 帶圖片 URL；iOS 加 Notification Service Extension（A8-6） | 已決 2026-11-23，Will |
 | D15 投遞紀錄保留期 | 180 天硬刪，與收件匣同一個清除 job（舊系統只刪 failed／skipped 超過 30 天） | 已決 2026-11-23，Will |
 | D13 legacy 通知轉接 | 不做；通知型別隨發送端搬遷 | 已決 2026-11-23，Will |
+| D17 後台公告語系 | 一律只寫英文：單一 `title`／`body`，不分語系、不依請求語系選擇（偏離多語系 ADR 的 zh-TW／en，限公告） | 已決 2026-11-24，Will |
+| D18 公告的偏好分類 | 新增偏好分類 `ANNOUNCEMENT`（受眾 BUYER 與 STORE）：收件匣不可關，推播可在偏好關閉，不寄 email（註冊表 `model.Delivers` 不列公告的 EMAIL）；proto 的 `NOTIFICATION_CATEGORY_ANNOUNCEMENT` 與註冊表（`internal/model`）同步，偏好分類由 D4 的 14 個變成 15 個。原問題：公告沒有分類會是 UNSPECIFIED，不能篩選也不能設偏好 | 已決 2026-11-24，Will |
 | D16 投遞紀錄「實際送出文字」裡的第三方名稱 | (a) 接受：送出文字是送出時的事實紀錄，受 D15 的 180 天硬刪約束；只有收件人自己刪帳號時提前清。原問題：actor 刪帳號後，別人投遞紀錄的送出文字仍含其名稱，最長 180 天。選項：(a) 接受，送出文字是「送了什麼」的事實紀錄，期限受 D15 約束；(b) 不存送出文字，只存型別＋參數（ID）＋locale，需要時重組，代價是重組結果可能與當時不同、客訴時無法證明送了什麼；(c) actor 刪帳號時也掃描清除。建議 (a)：業界（SendGrid、Postmark 的 message activity）保留送出內容到保留期，GDPR 以有限保留期滿足最小化。 | 已決 2026-11-23，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
