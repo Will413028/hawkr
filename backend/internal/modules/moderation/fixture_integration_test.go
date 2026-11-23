@@ -188,7 +188,7 @@ func setup(t *testing.T) *fixture {
 	f.media = fm
 	owner := ownerMedia{m: fm}
 	f.identity = identity.New(identity.Deps{DB: d, Events: bus, Now: f.clock, Logger: log})
-	f.buyer = buyer.New(buyer.Deps{DB: d, Events: bus, Now: f.clock, Logger: log})
+	f.buyer = buyer.New(buyer.Deps{DB: d, Events: bus, Media: owner, Now: f.clock, Logger: log})
 	f.seller = seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: f.identity, Media: owner, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: f.clock, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, f.clock), Events: bus, Jobs: q, Now: f.clock, Logger: log})})
 	f.sellerRd = seller.NewReader(d, f.clock)
