@@ -4,11 +4,11 @@
 
 ## 職責
 
-賣家的 AI 修圖、修圖配額與後台風格管理。服務 website 與 seller-app 的賣家與 admin 的風格管理。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：seller、media。對外方法 `Transform`、`ListStyles`、`CurrentUsage`（賣家的修圖與風格，handler 在 `internal/httpapi/imageai`）。行為規格的唯一來源是 `backend/docs/modules/imageai.md`。
+賣家的 AI 修圖、修圖配額與後台風格管理。服務 website 與 seller-app 的賣家與 admin 的風格管理。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：seller、media。對外方法 `Transform`、`ListStyles`、`CurrentUsage`（賣家的修圖與風格）與後台維護風格、額度的 7 支（`CreateStyle` 等），handler 在 `internal/httpapi/imageai`。行為規格的唯一來源是 `backend/docs/modules/imageai.md`。
 
 ## 擁有的資料
 
-schema `imageai`：`styles`（風格，UUIDv7）、`quotas`（個別額度）、`usage`（每店一列的計數器，帶所屬週的 `period_start`，新的一週由扣額度的 UPSERT 重設）；沒有預約表（A9-D9）。登記在 `cmd/hawkr/modules.go` 的 `modules()`。讀取模型：無。
+schema `imageai`：`styles`（風格，UUIDv7）、`quotas`（個別額度）、`usage`（每店一列的計數器，帶所屬週的 `period_start`，新的一週由扣額度的 UPSERT 重設）；沒有預約表（A9-D9）；另有風格縮圖在 media 的引用同步狀態 `media_ref_sync`、`retired_assets`。登記在 `cmd/hawkr/modules.go` 的 `modules()`。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -17,7 +17,7 @@ schema `imageai`：`styles`（風格，UUIDv7）、`quotas`（個別額度）、
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與錯誤。
-- `internal/model` 放型別與常數；`internal/quota` 是額度的扣、退與店家退場清除；`internal/limit` 是同時修圖的計數 semaphore；`internal/store` 是 sqlc 的查詢套件；`internal/transform` 是一次修圖的 use case（驗證、名額、扣額度、模型、退回），`internal/style` 讀賣家看到的風格，`internal/text` 是模組句子（`make uitext`）。
+- `internal/model` 放型別與常數；`internal/quota` 是額度的扣、退與店家退場清除；`internal/limit` 是同時修圖的計數 semaphore；`internal/store` 是 sqlc 的查詢套件；`internal/transform` 是一次修圖的 use case（驗證、名額、扣額度、模型、退回），`internal/style` 讀賣家看到的風格，`internal/admin` 是後台風格與額度的維護（規則、etag、稽核；縮圖與 seller 經介面），`internal/mediaref` 是縮圖引用的同步，`internal/text` 是模組句子（`make uitext`）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
@@ -27,6 +27,7 @@ schema `imageai`：`styles`（風格，UUIDv7）、`quotas`（個別額度）、
 - 扣額度只有一個每店條件 UPSERT（新的一週重設為 1；同一週只在 `used < limit` 時加一，`period_start` 不往回移），外部呼叫在額度的 transaction 之外；失敗退回（在呼叫端 transaction 之外，沒有可退回 `ErrNothingToRefund`），扣後程序終止不退是已知限制（A9-D38）。
 - 每個用途恆有一筆啟用的預設風格（migration seed，CHECK 擋停用預設）；`prompt` 1 到 500 字元。
 - 修圖順序固定：驗證輸入、先佔同時修圖的名額（滿了不扣額度）、同 transaction 內 `seller.LockNotRetired` 加扣額度、transaction 之外呼叫模型、扣額度之後的失敗一律退回；改順序先讀 `backend/docs/modules/imageai.md` §6。
+- 後台寫入都在同一個 transaction 內呼叫 `adminaudit.Record`；縮圖引用只由 `imageai.media_sync` job 寫入，業務列寫入只記退場；預設風格不可刪、不可取消或停用（`failed_precondition`／`invalid_argument`，A9-D39）。
 - 模型只經 `internal/platform/llm` 建構；模組內不得出現 Gemini 端點字串（`internal/arch` 守門）。
 - 預設額度 10、後台上限 1000 是模組常數，同時修圖上限讀 `IMAGEAI_MAX_CONCURRENT`；數字與理由在 `backend/docs/modules/imageai.md`。
 

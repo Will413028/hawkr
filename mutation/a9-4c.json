@@ -1,0 +1,175 @@
+{
+ "mutants": [
+  {
+   "id": "no-write-declaration",
+   "stack": "go",
+   "file": "backend/internal/httpapi/adminauth/adminauth.go",
+   "old": "\timageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure:        requires(adminperm.ImageaiAiStylesCreate, auditAudited),\n",
+   "new": "",
+   "test": "internal/httpapi ^TestMountedAdminServicesMatchTheDeclarations$",
+   "why": "拿掉 CreateAiStyle 的 adminauth 宣告：單體啟動檢查失敗"
+  },
+  {
+   "id": "no-admin-mount",
+   "stack": "go",
+   "file": "backend/internal/httpapi/server.go",
+   "old": "\tadd(adminimageaiconnect.NewImageAiAdminServiceHandler(httpimageai.NewAdmin(deps.ImageAI, deps.Images), opts...))\n",
+   "new": "",
+   "test": "internal/httpapi ^TestMountedAdminServicesMatchTheDeclarations$",
+   "why": "不掛載 ImageAiAdminService：宣告與掛載不一致，啟動失敗"
+  },
+  {
+   "id": "audit-outside-tx",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/admin.go",
+   "old": "\treturn s.d.Audit.Record(ctx, adminaudit.Entry{",
+   "new": "\treturn s.d.Audit.Record(context.Background(), adminaudit.Entry{",
+   "test": "internal/modules/imageai/internal/admin ^TestStyleWritesRecordTheAuditInsideTheTransaction$",
+   "why": "稽核在 transaction 之外呼叫（拿不到 transaction，Record 回 ErrNoTransaction）"
+  },
+  {
+   "id": "audit-outside-tx-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/admin/admin.go",
+   "old": "\treturn s.d.Audit.Record(ctx, adminaudit.Entry{",
+   "new": "\treturn s.d.Audit.Record(context.Background(), adminaudit.Entry{",
+   "test": "internal/modules/imageai ^TestEachStyleWriteLeavesExactlyOneAuditRowInTheSameTransaction$",
+   "why": "稽核在 transaction 之外呼叫：真實資料庫沒有稽核列、寫入失敗"
+  },
+  {
+   "id": "no-default-delete-guard",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif old.IsDefault {\n\t\t\treturn apperr.FailedPrecondition(\"%s\", text.AdminStyleDefaultCannotDelete(loc(ctx)))\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestDeleteStyleRefusesTheDefaultStyle$",
+   "why": "拿掉預設風格不可刪的檢查：預設風格被刪除"
+  },
+  {
+   "id": "no-default-delete-guard-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif old.IsDefault {\n\t\t\treturn apperr.FailedPrecondition(\"%s\", text.AdminStyleDefaultCannotDelete(loc(ctx)))\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai ^TestDefaultStyleRulesAgainstTheRealConstraints$",
+   "why": "拿掉預設風格不可刪的檢查：真實資料庫的預設風格被刪除"
+  },
+  {
+   "id": "no-early-etag-check",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\tif cur.Version != in.Version {\n\t\treturn model.AdminStyle{}, styleStale(ctx)\n\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleStaleVersionIsRejectedBeforeFinalizingTheThumbnail$",
+   "why": "拿掉修改前的 etag 比對：過期的 etag 仍先轉正縮圖"
+  },
+  {
+   "id": "no-delete-etag-check",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif version != 0 && old.Version != version {\n\t\t\treturn styleStale(ctx)\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestDeleteStyleChecksTheVersionOnlyWhenGiven$",
+   "why": "拿掉刪除風格的 etag 檢查：帶了過期 etag 仍刪除"
+  },
+  {
+   "id": "no-default-switch",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif in.IsDefault && !old.IsDefault {",
+   "new": "\t\tif false && in.IsDefault && !old.IsDefault {",
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleDefaultRules$",
+   "why": "換預設時不取消原本的預設：同用途出現兩個預設"
+  },
+  {
+   "id": "no-default-switch-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif in.IsDefault && !old.IsDefault {",
+   "new": "\t\tif false && in.IsDefault && !old.IsDefault {",
+   "test": "internal/modules/imageai ^TestSeededDefaultStylesHaveNoThumbnailAndCanBeEditedWithANewOne$",
+   "why": "換預設時不取消原本的預設（partial unique 擋下，改預設失敗）"
+  },
+  {
+   "id": "no-replace-sync",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\t\tif err := s.d.Thumbs.Changed(ctx, now, in.ID, retired...); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "\t\t\t_ = retired\n",
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleReplacingTheThumbnailRetiresTheOldAsset$",
+   "why": "換縮圖不記退場也不排同步：舊縮圖的引用不會釋放"
+  },
+  {
+   "id": "no-replace-sync-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\t\tif err := s.d.Thumbs.Changed(ctx, now, in.ID, retired...); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "\t\t\t_ = retired\n",
+   "test": "internal/modules/imageai ^TestThumbnailIsFinalizedAndLinkedByTheSyncJobAndReleasedOnReplaceAndDelete$",
+   "why": "換縮圖不排同步：新圖不會 Link、舊圖不會 Unlink"
+  },
+  {
+   "id": "no-delete-release",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif err := s.d.Thumbs.Changed(ctx, now, id, retired...); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "\t\t_ = retired\n",
+   "test": "internal/modules/imageai/internal/admin ^TestDeleteStyleReleasesTheThumbnailAndAudits$",
+   "why": "刪除風格不釋放縮圖引用"
+  },
+  {
+   "id": "prompt-limit-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "n == 0 || n > model.MaxPromptRunes {",
+   "new": "n == 0 || n > model.MaxPromptRunes+1000 {",
+   "test": "internal/modules/imageai/internal/admin ^TestCreateStyleRejectsInvalidInputWithoutFinalizingTheThumbnail$",
+   "why": "放寬提示詞的 500 字元上限"
+  },
+  {
+   "id": "no-quota-already-exists",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/quota.go",
+   "old": "\t\tcase in.Version == 0:\n\t\t\treturn apperr.AlreadyExists(\"%s\", text.AdminQuotaExists(l)).WithReason(apperr.ReasonVersionConflict)\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateQuotaWithoutAVersionWhenACustomSettingExistsIsAlreadyExists$",
+   "why": "已有個別設定卻沒帶 etag 不回 ALREADY_EXISTS"
+  },
+  {
+   "id": "no-quota-store-check",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/quota.go",
+   "old": "\tif err := storeNotFound(ctx, s.d.Stores.Exists(ctx, storeID)); err != nil {\n\t\treturn model.AdminQuota{}, err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestQuotaMethodsReturnNotFoundForAStoreThatDoesNotExist$",
+   "why": "GetAiQuota 不確認店家存在（A9-D41）"
+  },
+  {
+   "id": "no-quota-delete-notfound",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/quota.go",
+   "old": "\t\tif notFound(err) {\n\t\t\treturn apperr.NotFound(\"%s\", text.AdminQuotaNotFound(loc(ctx)))\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestDeleteQuotaWithoutACustomSettingIsNotFound$",
+   "why": "DeleteAiQuota 沒有個別設定不回 NOT_FOUND"
+  },
+  {
+   "id": "etag-optional-on-update",
+   "stack": "go",
+   "file": "backend/internal/httpapi/imageai/admin.go",
+   "old": "\tversion, err := rpc.RequiredVersionField(msg.GetEtag(), \"ai_style.etag\")",
+   "new": "\tversion, err := rpc.VersionFromEtag(msg.GetEtag())",
+   "test": "internal/httpapi/imageai ^TestUpdateAiStyleRequiresAnEtag$",
+   "why": "UpdateAiStyle 不要求 etag"
+  },
+  {
+   "id": "no-update-mask",
+   "stack": "go",
+   "file": "backend/internal/httpapi/imageai/admin.go",
+   "old": "\tif err := rpc.ApplyUpdateMask(merged, msg, req.Msg.GetUpdateMask()); err != nil {\n\t\treturn nil, err\n\t}\n\ts, err := h.m.UpdateStyle(",
+   "new": "\ts, err := h.m.UpdateStyle(",
+   "test": "internal/httpapi/imageai ^TestUpdateAiStyleMaskedUpdateKeepsTheOtherFieldsAndPassesTheEtag$",
+   "why": "UpdateAiStyle 忽略 update_mask（欄位不套用，不可變欄位檢查也消失）"
+  }
+ ]
+}

@@ -166,8 +166,8 @@
    "id": "styles-order-by-name",
    "stack": "go-integration",
    "file": "backend/internal/modules/imageai/internal/store/styles.sql.go",
-   "old": "ORDER BY display_order, name",
-   "new": "ORDER BY name",
+   "old": "AND enabled\nORDER BY display_order, name",
+   "new": "AND enabled\nORDER BY name",
    "test": "internal/modules/imageai ^TestListStylesReturnsEnabledNonDefaultStylesOfTheCategoryInOrder$",
    "why": "風格不依 display_order 排序"
   },

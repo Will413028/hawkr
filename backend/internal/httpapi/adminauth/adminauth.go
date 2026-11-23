@@ -18,6 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
+	imageaiv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
@@ -77,6 +78,14 @@ var declarations = map[string]declaration{
 	contentv1alpha1connect.ContentAdminServiceListAppVersionGatesProcedure:  requires(adminperm.ContentAppVersionGatesList, auditReadOnly),
 	contentv1alpha1connect.ContentAdminServiceCreateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesCreate, auditPending),
 	contentv1alpha1connect.ContentAdminServiceUpdateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesUpdate, auditPending),
+
+	imageaiv1alpha1connect.ImageAiAdminServiceListAiStylesForAdminProcedure: requires(adminperm.ImageaiAiStylesList, auditReadOnly),
+	imageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure:        requires(adminperm.ImageaiAiStylesCreate, auditAudited),
+	imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiStyleProcedure:        requires(adminperm.ImageaiAiStylesUpdate, auditAudited),
+	imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiStyleProcedure:        requires(adminperm.ImageaiAiStylesDelete, auditAudited),
+	imageaiv1alpha1connect.ImageAiAdminServiceGetAiQuotaProcedure:           requires(adminperm.ImageaiAiQuotasGet, auditReadOnly),
+	imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiQuotaProcedure:        requires(adminperm.ImageaiAiQuotasUpdate, auditAudited),
+	imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiQuotaProcedure:        requires(adminperm.ImageaiAiQuotasDelete, auditAudited),
 
 	moderationv1alpha1connect.ModerationAdminServiceListCasesProcedure:   requires(adminperm.ModerationCasesList, auditReadOnly),
 	moderationv1alpha1connect.ModerationAdminServiceGetCaseProcedure:     requires(adminperm.ModerationCasesGet, auditReadOnly),

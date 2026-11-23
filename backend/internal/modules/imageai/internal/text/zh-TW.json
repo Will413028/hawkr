@@ -1,5 +1,70 @@
 {
   "default": {
+    "admin.quota_exists": {
+      "message": "這家店已經有個別設定的額度，請重新讀取後再送出",
+      "description": "沒帶 etag 的 UpdateAiQuota 遇到已有的個別設定（ALREADY_EXISTS，VERSION_CONFLICT）。"
+    },
+    "admin.quota_limit_range": {
+      "message": "每週額度必須是 0 到 {max} 的整數",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "weekly_limit 超出 0 到 model.MaxWeeklyLimit。"
+    },
+    "admin.quota_not_found": {
+      "message": "這家店沒有個別設定的額度",
+      "description": "DeleteAiQuota 的店沒有個別設定。"
+    },
+    "admin.quota_stale": {
+      "message": "額度已被別人修改，請重新讀取後再送出",
+      "description": "etag 與目前的版本不符，或帶了 etag 但個別設定已被刪除。"
+    },
+    "admin.quota_store_not_found": {
+      "message": "找不到這家店",
+      "description": "店家不存在（A9-D41）。"
+    },
+    "admin.style_default_cannot_delete": {
+      "message": "預設風格不能刪除，請先把另一個風格設成預設",
+      "description": "刪除用途的預設風格（A9-D39）。"
+    },
+    "admin.style_default_cannot_unset": {
+      "message": "預設風格不能直接取消，請把另一個風格設成預設",
+      "description": "default_style=false 會讓用途沒有預設風格（A9-D39）。"
+    },
+    "admin.style_default_must_be_enabled": {
+      "message": "預設風格必須啟用",
+      "description": "停用中的風格不能是預設，預設風格也不能停用（A9-D39）。"
+    },
+    "admin.style_label_required": {
+      "message": "風格顯示名稱不能空白",
+      "description": "label 去掉頭尾空白後是空的。"
+    },
+    "admin.style_name_required": {
+      "message": "風格識別名稱不能空白",
+      "description": "新增風格時 name 去掉頭尾空白後是空的。"
+    },
+    "admin.style_name_taken": {
+      "message": "這個用途已經有同名的風格",
+      "description": "UNIQUE(category, name) 衝突。"
+    },
+    "admin.style_not_found": {
+      "message": "找不到這個風格",
+      "description": "更新或刪除的風格 ID 不存在。"
+    },
+    "admin.style_stale": {
+      "message": "風格已被別人修改，請重新讀取後再送出",
+      "description": "etag 與目前的版本不符（VERSION_CONFLICT）。"
+    },
+    "admin.style_thumbnail_required": {
+      "message": "新增風格必須上傳縮圖",
+      "description": "CreateAiStyle 沒有 thumbnail_staged_token。"
+    },
+    "admin.style_thumbnail_unusable": {
+      "message": "縮圖無法使用，請重新上傳",
+      "description": "staged token 無效、過期或不屬於上傳者。"
+    },
     "style.category_invalid": {
       "message": "風格用途不合法",
       "description": "風格用途不是 PRODUCT 或 POST。"

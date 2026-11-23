@@ -9,6 +9,146 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// AdminQuotaExists 是模組句子 admin.quota_exists；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminQuotaExists(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This store already has a custom quota. Please reload and try again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這家店已經有個別設定的額度，請重新讀取後再送出", Locale: uitext.ZhTW}
+}
+
+// AdminQuotaLimitRangeArgs 是 AdminQuotaLimitRange 的參數。
+type AdminQuotaLimitRangeArgs struct {
+	Max int
+}
+
+// AdminQuotaLimitRange 是模組句子 admin.quota_limit_range；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminQuotaLimitRange(l uitext.Locale, a AdminQuotaLimitRangeArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The weekly limit must be an integer from 0 to " + strconv.Itoa(a.Max), Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "每週額度必須是 0 到 " + strconv.Itoa(a.Max) + " 的整數", Locale: uitext.ZhTW}
+}
+
+// AdminQuotaNotFound 是模組句子 admin.quota_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminQuotaNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This store has no custom quota", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這家店沒有個別設定的額度", Locale: uitext.ZhTW}
+}
+
+// AdminQuotaStale 是模組句子 admin.quota_stale；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminQuotaStale(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The quota was changed by someone else. Please reload and try again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "額度已被別人修改，請重新讀取後再送出", Locale: uitext.ZhTW}
+}
+
+// AdminQuotaStoreNotFound 是模組句子 admin.quota_store_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminQuotaStoreNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The store was not found", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "找不到這家店", Locale: uitext.ZhTW}
+}
+
+// AdminStyleDefaultCannotDelete 是模組句子 admin.style_default_cannot_delete；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleDefaultCannotDelete(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A default style cannot be deleted. Set another style as the default first", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "預設風格不能刪除，請先把另一個風格設成預設", Locale: uitext.ZhTW}
+}
+
+// AdminStyleDefaultCannotUnset 是模組句子 admin.style_default_cannot_unset；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleDefaultCannotUnset(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A default style cannot be unset directly. Set another style as the default instead", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "預設風格不能直接取消，請把另一個風格設成預設", Locale: uitext.ZhTW}
+}
+
+// AdminStyleDefaultMustBeEnabled 是模組句子 admin.style_default_must_be_enabled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleDefaultMustBeEnabled(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The default style must be enabled", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "預設風格必須啟用", Locale: uitext.ZhTW}
+}
+
+// AdminStyleLabelRequired 是模組句子 admin.style_label_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleLabelRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The style label must not be blank", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "風格顯示名稱不能空白", Locale: uitext.ZhTW}
+}
+
+// AdminStyleNameRequired 是模組句子 admin.style_name_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleNameRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The style name must not be blank", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "風格識別名稱不能空白", Locale: uitext.ZhTW}
+}
+
+// AdminStyleNameTaken 是模組句子 admin.style_name_taken；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleNameTaken(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A style with this name already exists for this category", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這個用途已經有同名的風格", Locale: uitext.ZhTW}
+}
+
+// AdminStyleNotFound 是模組句子 admin.style_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The style was not found", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "找不到這個風格", Locale: uitext.ZhTW}
+}
+
+// AdminStyleStale 是模組句子 admin.style_stale；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleStale(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The style was changed by someone else. Please reload and try again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "風格已被別人修改，請重新讀取後再送出", Locale: uitext.ZhTW}
+}
+
+// AdminStyleThumbnailRequired 是模組句子 admin.style_thumbnail_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleThumbnailRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A thumbnail is required for a new style", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "新增風格必須上傳縮圖", Locale: uitext.ZhTW}
+}
+
+// AdminStyleThumbnailUnusable 是模組句子 admin.style_thumbnail_unusable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleThumbnailUnusable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The thumbnail cannot be used. Please upload it again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "縮圖無法使用，請重新上傳", Locale: uitext.ZhTW}
+}
+
 // StyleCategoryInvalid 是模組句子 style.category_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func StyleCategoryInvalid(l uitext.Locale) uitext.Message {
 	switch l {

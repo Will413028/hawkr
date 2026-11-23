@@ -7,7 +7,38 @@ package store
 
 import (
 	"context"
+	"time"
 )
+
+const deleteQuota = `-- name: DeleteQuota :execrows
+DELETE FROM imageai.quotas WHERE store_id = $1
+`
+
+func (q *Queries) DeleteQuota(ctx context.Context, storeID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteQuota, storeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getQuota = `-- name: GetQuota :one
+SELECT store_id, weekly_limit, memo, version, created_at, updated_at FROM imageai.quotas WHERE store_id = $1
+`
+
+func (q *Queries) GetQuota(ctx context.Context, storeID int64) (ImageaiQuota, error) {
+	row := q.db.QueryRow(ctx, getQuota, storeID)
+	var i ImageaiQuota
+	err := row.Scan(
+		&i.StoreID,
+		&i.WeeklyLimit,
+		&i.Memo,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
 
 const getQuotaLimit = `-- name: GetQuotaLimit :one
 SELECT weekly_limit FROM imageai.quotas WHERE store_id = $1
@@ -18,4 +49,91 @@ func (q *Queries) GetQuotaLimit(ctx context.Context, storeID int64) (int32, erro
 	var weekly_limit int32
 	err := row.Scan(&weekly_limit)
 	return weekly_limit, err
+}
+
+const insertQuota = `-- name: InsertQuota :one
+INSERT INTO imageai.quotas (store_id, weekly_limit, memo, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $4)
+ON CONFLICT (store_id) DO NOTHING
+RETURNING store_id, weekly_limit, memo, version, created_at, updated_at
+`
+
+type InsertQuotaParams struct {
+	StoreID     int64
+	WeeklyLimit int32
+	Memo        string
+	Now         time.Time
+}
+
+// 沒有個別設定時建立；已經有列（有人先建立）時沒有列被寫入（pgx.ErrNoRows）。
+func (q *Queries) InsertQuota(ctx context.Context, arg InsertQuotaParams) (ImageaiQuota, error) {
+	row := q.db.QueryRow(ctx, insertQuota,
+		arg.StoreID,
+		arg.WeeklyLimit,
+		arg.Memo,
+		arg.Now,
+	)
+	var i ImageaiQuota
+	err := row.Scan(
+		&i.StoreID,
+		&i.WeeklyLimit,
+		&i.Memo,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const lockQuota = `-- name: LockQuota :one
+SELECT store_id, weekly_limit, memo, version, created_at, updated_at FROM imageai.quotas WHERE store_id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockQuota(ctx context.Context, storeID int64) (ImageaiQuota, error) {
+	row := q.db.QueryRow(ctx, lockQuota, storeID)
+	var i ImageaiQuota
+	err := row.Scan(
+		&i.StoreID,
+		&i.WeeklyLimit,
+		&i.Memo,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateQuota = `-- name: UpdateQuota :one
+UPDATE imageai.quotas SET weekly_limit = $1, memo = $2, version = version + 1, updated_at = $3
+WHERE store_id = $4 AND version = $5
+RETURNING store_id, weekly_limit, memo, version, created_at, updated_at
+`
+
+type UpdateQuotaParams struct {
+	WeeklyLimit     int32
+	Memo            string
+	Now             time.Time
+	StoreID         int64
+	ExpectedVersion int64
+}
+
+// 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）。
+func (q *Queries) UpdateQuota(ctx context.Context, arg UpdateQuotaParams) (ImageaiQuota, error) {
+	row := q.db.QueryRow(ctx, updateQuota,
+		arg.WeeklyLimit,
+		arg.Memo,
+		arg.Now,
+		arg.StoreID,
+		arg.ExpectedVersion,
+	)
+	var i ImageaiQuota
+	err := row.Scan(
+		&i.StoreID,
+		&i.WeeklyLimit,
+		&i.Memo,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

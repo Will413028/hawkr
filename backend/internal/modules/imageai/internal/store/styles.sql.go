@@ -7,9 +7,121 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"uuid"
 )
+
+const clearDefaultStyle = `-- name: ClearDefaultStyle :execrows
+UPDATE imageai.styles SET is_default = FALSE, version = version + 1, updated_at = $1
+WHERE category = $2 AND is_default AND id <> $3
+`
+
+type ClearDefaultStyleParams struct {
+	Now       time.Time
+	Category  string
+	ExcludeID uuid.UUID
+}
+
+// 把用途目前的預設風格（exclude_id 以外）取消預設；換預設時先清舊的再標新的（部分唯一索引逐列檢查）。
+func (q *Queries) ClearDefaultStyle(ctx context.Context, arg ClearDefaultStyleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearDefaultStyle, arg.Now, arg.Category, arg.ExcludeID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteStyle = `-- name: DeleteStyle :execrows
+DELETE FROM imageai.styles WHERE id = $1
+`
+
+func (q *Queries) DeleteStyle(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteStyle, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getStyle = `-- name: GetStyle :one
+SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at FROM imageai.styles WHERE id = $1
+`
+
+func (q *Queries) GetStyle(ctx context.Context, id uuid.UUID) (ImageaiStyle, error) {
+	row := q.db.QueryRow(ctx, getStyle, id)
+	var i ImageaiStyle
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Label,
+		&i.Prompt,
+		&i.Category,
+		&i.ThumbnailKey,
+		&i.ThumbnailAssetID,
+		&i.DisplayOrder,
+		&i.IsDefault,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertStyle = `-- name: InsertStyle :one
+INSERT INTO imageai.styles (
+    id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, created_at, updated_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+RETURNING id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at
+`
+
+type InsertStyleParams struct {
+	ID               uuid.UUID
+	Name             string
+	Label            string
+	Prompt           string
+	Category         string
+	ThumbnailKey     string
+	ThumbnailAssetID string
+	DisplayOrder     int32
+	IsDefault        bool
+	Enabled          bool
+	Now              time.Time
+}
+
+func (q *Queries) InsertStyle(ctx context.Context, arg InsertStyleParams) (ImageaiStyle, error) {
+	row := q.db.QueryRow(ctx, insertStyle,
+		arg.ID,
+		arg.Name,
+		arg.Label,
+		arg.Prompt,
+		arg.Category,
+		arg.ThumbnailKey,
+		arg.ThumbnailAssetID,
+		arg.DisplayOrder,
+		arg.IsDefault,
+		arg.Enabled,
+		arg.Now,
+	)
+	var i ImageaiStyle
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Label,
+		&i.Prompt,
+		&i.Category,
+		&i.ThumbnailKey,
+		&i.ThumbnailAssetID,
+		&i.DisplayOrder,
+		&i.IsDefault,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
 
 const listEnabledStyles = `-- name: ListEnabledStyles :many
 SELECT id, name, label, prompt, thumbnail_key, display_order, is_default
@@ -55,4 +167,138 @@ func (q *Queries) ListEnabledStyles(ctx context.Context, category string) ([]Lis
 		return nil, err
 	}
 	return items, nil
+}
+
+const listStylesForAdmin = `-- name: ListStylesForAdmin :many
+SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at FROM imageai.styles
+WHERE $1::text = '' OR category = $1::text
+ORDER BY display_order, name, id
+`
+
+// 後台的清單（含停用的）：category 空字串是全部用途；依顯示順序，同值依名稱、id。
+func (q *Queries) ListStylesForAdmin(ctx context.Context, category string) ([]ImageaiStyle, error) {
+	rows, err := q.db.Query(ctx, listStylesForAdmin, category)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ImageaiStyle{}
+	for rows.Next() {
+		var i ImageaiStyle
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Label,
+			&i.Prompt,
+			&i.Category,
+			&i.ThumbnailKey,
+			&i.ThumbnailAssetID,
+			&i.DisplayOrder,
+			&i.IsDefault,
+			&i.Enabled,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockStyle = `-- name: LockStyle :one
+SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at FROM imageai.styles WHERE id = $1 FOR UPDATE
+`
+
+// 鎖住風格列（更新與刪除先鎖，版本與預設的判斷讀同一個快照）。
+func (q *Queries) LockStyle(ctx context.Context, id uuid.UUID) (ImageaiStyle, error) {
+	row := q.db.QueryRow(ctx, lockStyle, id)
+	var i ImageaiStyle
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Label,
+		&i.Prompt,
+		&i.Category,
+		&i.ThumbnailKey,
+		&i.ThumbnailAssetID,
+		&i.DisplayOrder,
+		&i.IsDefault,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const styleThumbnailAsset = `-- name: StyleThumbnailAsset :one
+SELECT thumbnail_asset_id FROM imageai.styles WHERE id = $1
+`
+
+// 同步 job 讀的：風格目前的縮圖資產（沒有列時 pgx.ErrNoRows，也就是終態；沒有縮圖是空字串）。
+func (q *Queries) StyleThumbnailAsset(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, styleThumbnailAsset, id)
+	var thumbnail_asset_id string
+	err := row.Scan(&thumbnail_asset_id)
+	return thumbnail_asset_id, err
+}
+
+const updateStyle = `-- name: UpdateStyle :one
+UPDATE imageai.styles
+SET label = $1, prompt = $2, thumbnail_key = $3, thumbnail_asset_id = $4,
+    display_order = $5, is_default = $6, enabled = $7,
+    version = version + 1, updated_at = $8
+WHERE id = $9 AND version = $10
+RETURNING id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at
+`
+
+type UpdateStyleParams struct {
+	Label            string
+	Prompt           string
+	ThumbnailKey     string
+	ThumbnailAssetID string
+	DisplayOrder     int32
+	IsDefault        bool
+	Enabled          bool
+	Now              time.Time
+	ID               uuid.UUID
+	ExpectedVersion  int64
+}
+
+// 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）；缺圖的 token 為空時 thumbnail_* 沿用（呼叫端傳目前的值）。
+func (q *Queries) UpdateStyle(ctx context.Context, arg UpdateStyleParams) (ImageaiStyle, error) {
+	row := q.db.QueryRow(ctx, updateStyle,
+		arg.Label,
+		arg.Prompt,
+		arg.ThumbnailKey,
+		arg.ThumbnailAssetID,
+		arg.DisplayOrder,
+		arg.IsDefault,
+		arg.Enabled,
+		arg.Now,
+		arg.ID,
+		arg.ExpectedVersion,
+	)
+	var i ImageaiStyle
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Label,
+		&i.Prompt,
+		&i.Category,
+		&i.ThumbnailKey,
+		&i.ThumbnailAssetID,
+		&i.DisplayOrder,
+		&i.IsDefault,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
