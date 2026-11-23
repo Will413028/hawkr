@@ -20,6 +20,7 @@ on:
       - 'backend/go.mod'
       - 'backend/go.sum'
       - 'backend/go.work'
+      - 'backend/go.work.sum'
       - 'backend/.go-version'
       - 'backend/scripts/characterize.sh'
       - 'backend/docker-compose-infra.yml'
@@ -101,7 +102,7 @@ jobs:
         run: ./mvnw package -B -q -pl ":$MAVEN_PL" -am -DskipTests
       # characterize.sh 用 lsof 檢查 port；runner image 沒有時才裝。
       - name: 確認 lsof
-        run: command -v lsof >/dev/null || sudo apt-get install -y lsof
+        run: command -v lsof >/dev/null || { sudo apt-get update && sudo apt-get install -y lsof; }
       # 只起腳本與舊服務要的 Postgres、Redis 與 RabbitMQ（容器名 hawkr-postgres 是腳本 docker exec 的目標）。
       - name: 起 Postgres、Redis 與 RabbitMQ
         run: docker compose -f docker-compose-infra.yml up -d --wait postgres redis rabbitmq

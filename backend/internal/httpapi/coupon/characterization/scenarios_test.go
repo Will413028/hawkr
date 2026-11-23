@@ -10,7 +10,7 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// scenarios 是舊的 Java coupon-service 要通過的情境（B7-3 起單體的 Connect driver 也跑同一份）。資料庫可能已經有別
+// scenarios 是 Java coupon-service 要通過的情境，Driver 的實作各自跑同一份。資料庫可能已經有別
 // 的情境建的模板，所以每個情境只看帶自己 nonce 的那幾筆。期望值來自 CouponGrpcService、CouponTemplateService、
 // CouponClaimService 與 gateway 的 handler/coupon.go，鎖定的是現況，沒有驗證現況是否正確。
 //
@@ -29,6 +29,20 @@ var scenarios = []ch.Scenario[Driver]{
 		ch.WantKind(t, err, ch.ErrUnauthenticated)
 		err = d.AdminPublish(ctx, ch.Anonymous, "1")
 		ch.WantKind(t, err, ch.ErrUnauthenticated)
+	}},
+	{Name: "my coupons list decodes used records", Run: func(ctx context.Context, t ch.T, d Driver) {
+		// 已使用的券只能由 order 內部的 gRPC 產生，REST 造不出來，所以只驗列表的形狀：每筆都有 ID 與模板 ID。
+		for _, status := range []string{"", "USED"} {
+			got := ch.Must(t, ch.Ret(d.ListMyCoupons(ctx, ch.Buyer, ListQuery{Status: status})))
+			if got.Used == nil {
+				t.Errorf("status %q：Used 應是空清單而不是 nil", status)
+			}
+			for _, u := range got.Used {
+				if u.ID == "" || u.TemplateID == "" {
+					t.Errorf("status %q：已使用的券缺 ID 或模板 ID：%+v", status, u)
+				}
+			}
+		}
 	}},
 	{Name: "buyers cannot use seller routes", Run: func(ctx context.Context, t ch.T, d Driver) {
 		_, err := d.SellerCreate(ctx, ch.Buyer, cashInput("coupon-"+ch.Nonce(), TargetAll))
@@ -68,8 +82,8 @@ var scenarios = []ch.Scenario[Driver]{
 		if detail.Used != 0 || detail.Reserved != 0 {
 			t.Errorf("新模板的 used/reserved = %d/%d，預期 0/0", detail.Used, detail.Reserved)
 		}
-		other := ch.Must(t, ch.Ret(d.SellerList(ctx, ch.Seller2, "", Page{Size: 100})))
-		if _, ok := find(other.Records, created.ID); ok {
+		other := sellerTemplates(ctx, t, d, ch.Seller2, "")
+		if _, ok := find(other, created.ID); ok {
 			t.Errorf("別家賣家的列表看得到這張模板")
 		}
 	}},
@@ -148,12 +162,12 @@ var scenarios = []ch.Scenario[Driver]{
 		if got := mustDetail(ctx, t, d, ch.Seller, created.ID).Template; got.Status != StatusRevoked {
 			t.Errorf("收回後 status = %s，預期 REVOKED", got.Status)
 		}
-		revoked := ch.Must(t, ch.Ret(d.SellerList(ctx, ch.Seller, StatusRevoked, Page{Size: 100})))
-		if _, ok := find(revoked.Records, created.ID); !ok {
+		revoked := sellerTemplates(ctx, t, d, ch.Seller, StatusRevoked)
+		if _, ok := find(revoked, created.ID); !ok {
 			t.Errorf("以 REVOKED 篩選的列表看不到模板")
 		}
-		active := ch.Must(t, ch.Ret(d.SellerList(ctx, ch.Seller, StatusActive, Page{Size: 100})))
-		if _, ok := find(active.Records, created.ID); ok {
+		active := sellerTemplates(ctx, t, d, ch.Seller, StatusActive)
+		if _, ok := find(active, created.ID); ok {
 			t.Errorf("以 ACTIVE 篩選的列表還看得到已收回的模板")
 		}
 		if _, ok := find(myCoupons(ctx, t, d, ch.Buyer), created.ID); ok {
@@ -480,9 +494,11 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	if !d.Legacy() {
 		return false
 	}
-	if s, ok := t.(interface{ Skipf(string, ...any) }); ok {
-		s.Skipf("舊的 coupon-service 的行為不同：%s", why)
+	s, ok := t.(interface{ Skipf(string, ...any) })
+	if !ok {
+		panic("skipOnLegacy：這個 T 不能跳過，情境不能在舊的一端靜默通過")
 	}
+	s.Skipf("舊的 coupon-service 的行為不同：%s", why)
 	return true
 }
 
@@ -530,16 +546,36 @@ func mustFindIn(t ch.T, list []Template, id string) Template {
 	return tpl
 }
 
+// myCoupons 翻完整份列表（到筆數達 Total 或遇到空頁），缺席檢查不會因為資料庫已有別的模板而落在第一頁之外。
 func myCoupons(ctx context.Context, t ch.T, d Driver, c ch.Caller) []Template {
 	t.Helper()
-	return ch.Must(t, ch.Ret(d.ListMyCoupons(ctx, c, ListQuery{Page: Page{Size: 100}}))).Available
+	var all []Template
+	for n := 1; ; n++ {
+		got := ch.Must(t, ch.Ret(d.ListMyCoupons(ctx, c, ListQuery{Page: Page{Number: n, Size: 100}})))
+		all = append(all, got.Available...)
+		if len(got.Available) == 0 || len(all) >= got.Total {
+			return all
+		}
+	}
+}
+
+// sellerTemplates 翻完整份賣家的模板列表，status 空字串不篩選。
+func sellerTemplates(ctx context.Context, t ch.T, d Driver, c ch.Caller, status Status) []Template {
+	t.Helper()
+	var all []Template
+	for n := 1; ; n++ {
+		got := ch.Must(t, ch.Ret(d.SellerList(ctx, c, status, Page{Number: n, Size: 100})))
+		all = append(all, got.Records...)
+		if len(got.Records) == 0 || len(all) >= got.Total {
+			return all
+		}
+	}
 }
 
 // mustFind 在 Seller 的模板列表裡找模板。
 func mustFind(ctx context.Context, t ch.T, d Driver, id string) Template {
 	t.Helper()
-	list := ch.Must(t, ch.Ret(d.SellerList(ctx, ch.Seller, "", Page{Size: 100})))
-	return mustFindIn(t, list.Records, id)
+	return mustFindIn(t, sellerTemplates(ctx, t, d, ch.Seller, ""), id)
 }
 
 func mustDetail(ctx context.Context, t ch.T, d Driver, c ch.Caller, id string) SellerDetail {

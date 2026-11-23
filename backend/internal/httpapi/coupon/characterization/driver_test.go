@@ -2,7 +2,6 @@
 // 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
 //
 // 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 Java coupon-service。
-// Connect driver 與直接打單體的一份在 B7-3 隨新契約補上，屆時同一份情境對單體再跑一次。
 //
 // 情境鎖定的是 Java coupon-service 當時的行為，沒有驗證那行為是否正確；疑似缺陷處以 BD 編號標明
 // （docs/plans/2026-11-23-b7-coupon/defects.md），另案處理。計畫決定要改的行為（D2、BD 標「修」）寫成修正後的
@@ -136,9 +135,17 @@ type ListQuery struct {
 	Page   Page
 }
 
-// MyCoupons 是買家的券列表：Available 是買家資格內、可用或可領的模板。
+// Instance 是買家已持有的一張券；Status 原樣保留 wire 的字串。
+type Instance struct {
+	ID         string
+	TemplateID string
+	Status     string
+}
+
+// MyCoupons 是買家的券列表：Available 是買家資格內、可用或可領的模板，Used 是已使用的券。
 type MyCoupons struct {
 	Available []Template
+	Used      []Instance
 	Total     int
 }
 

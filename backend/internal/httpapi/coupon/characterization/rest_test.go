@@ -114,8 +114,15 @@ type wireTemplate struct {
 	} `json:"targetAccounts"`
 }
 
+// wireInt 讀 proto JSON 的 int64 字串；空字串是未設定的 0，其餘解析失敗代表 wire 格式不對，直接 panic 讓測試失敗。
 func wireInt(s string) int64 {
-	n, _ := strconv.ParseInt(s, 10, 64)
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		panic(fmt.Sprintf("wire 的數字欄位不是整數：%q：%v", s, err))
+	}
 	return n
 }
 
@@ -189,11 +196,22 @@ func (d *restDriver) ListMyCoupons(ctx context.Context, c ch.Caller, in ListQuer
 		q.Set("status", in.Status)
 	}
 	pageQuery(q, in.Page)
-	var out wirePage[wireTemplate]
+	var out struct {
+		wirePage[wireTemplate]
+		UsedRecords []struct {
+			InstanceID string `json:"instanceId"`
+			TemplateID string `json:"templateId"`
+			Status     string `json:"status"`
+		} `json:"usedRecords"`
+	}
 	if err := d.rest.Do(ctx, c, http.MethodGet, withQuery(appCoupons, q), nil, &out); err != nil {
 		return MyCoupons{}, err
 	}
-	return MyCoupons{Available: templates(out.Records), Total: int(wireInt(out.Total))}, nil
+	used := make([]Instance, 0, len(out.UsedRecords))
+	for _, u := range out.UsedRecords {
+		used = append(used, Instance{ID: u.InstanceID, TemplateID: u.TemplateID, Status: u.Status})
+	}
+	return MyCoupons{Available: templates(out.Records), Used: used, Total: int(wireInt(out.Total))}, nil
 }
 
 func (d *restDriver) ListAvailable(ctx context.Context, c ch.Caller, in AvailableQuery) (AvailableList, error) {
