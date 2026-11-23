@@ -27,9 +27,6 @@ import (
 const reverseAction = "/test/ReverseHide"
 
 // reviewBy 讓買家對店家寫一則評價（訂單由替身提供，已完成一天）。
-// ctxAsset 是 seedChat 的圖片訊息引用的資產（UUID）。
-const ctxAsset = "01a20787-39c1-7c33-a3c2-ae797cae0a54"
-
 func (f *fixture) reviewBy(t *testing.T, b buyer.Profile, storeID int64, rating int, content string, tokens ...string) review.Review {
 	t.Helper()
 	n := f.next() + 1000
@@ -57,7 +54,7 @@ func (f *fixture) buyerProfile(t *testing.T) buyer.Profile {
 	return p
 }
 
-// seedChat 直接寫一個對話與 n 則訊息（seq 1..n，單數是買家寄、雙數是店家寄，文字是 m<seq>）；imageSeq 大於 0 的那一則改成圖片訊息（資產 ctxAsset）。
+// seedChat 直接寫一個對話與 n 則訊息（seq 1..n，單數是買家寄、雙數是店家寄，文字是 m<seq>）；imageSeq 大於 0 的那一則改成圖片訊息（引用真的 media 裡一筆已確認的資產，ID 放在 f.chatAsset，它是來源，快照指向的是 moderation 自己的複本，B1-D20）。
 func (f *fixture) seedChat(t *testing.T, buyerID, storeID int64, n, imageSeq int) (conv uuid.UUID, ids map[int64]uuid.UUID) {
 	t.Helper()
 	conv = uuid.NewV7()
@@ -74,8 +71,17 @@ func (f *fixture) seedChat(t *testing.T, buyerID, storeID int64, n, imageSeq int
 		}
 		at := base.Add(time.Duration(seq) * time.Second)
 		if seq == int64(imageSeq) {
+			var assetID uuid.UUID
+			if err := f.db.InTx(context.Background(), func(ctx context.Context) error {
+				a, err := f.media.Confirm(ctx, stagedUploader, f.stage(t))
+				assetID = a.ID
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
+			f.chatAsset = assetID
 			f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, image_asset_id, image_object_key, created_at)
-				VALUES ($1, $2, $3, $4, 'IMAGE', '01a20787-39c1-7c33-a3c2-ae797cae0a54', 'chat/ctx.jpg', $5)`, id, conv, seq, kind, at)
+				VALUES ($1, $2, $3, $4, 'IMAGE', $6, 'chat/ctx.jpg', $5)`, id, conv, seq, kind, at, assetID)
 			continue
 		}
 		f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at) VALUES ($1, $2, $3, $4, 'TEXT', $5, $6)`,
@@ -154,14 +160,14 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 		t.Fatalf("評價案件的快照：%+v", snap)
 	}
 	if snap.Review.Rating != 2 || snap.Review.Body != "不好吃" || snap.Review.AuthorID != author.BuyerID || snap.Review.SubjectStoreID != storeID || snap.Review.ProductID != 77 ||
-		len(snap.Review.MediaRefs) != 1 || snap.Review.MediaRefs[0] != r.Images[0].AssetID.String() {
+		len(snap.Review.MediaRefs) != 1 || snap.Review.MediaRefs[0] == r.Images[0].AssetID.String() {
 		t.Fatalf("快照欄位：%+v", snap.Review)
 	}
 	if snap.StoreID() != 0 {
 		t.Fatal("評價所屬的店家不是作者，不能放進歸屬店家")
 	}
-	if got := f.count(t, `SELECT cardinality(asset_ids) FROM moderation.case_snapshots WHERE case_id = $1`, res.Case.ID); got != 1 {
-		t.Fatalf("評價的圖片要被證據保全：%d", got)
+	if got := f.count(t, `SELECT cardinality(asset_ids) FROM moderation.case_snapshots WHERE case_id = $1 AND $2::uuid = ANY(asset_ids)`, res.Case.ID, snap.Review.MediaRefs[0]); got != 1 {
+		t.Fatalf("快照指向 moderation 自己的複本（B1-D20），複本要記在 asset_ids：%d", got)
 	}
 
 	before := f.aggs.Load()
@@ -309,7 +315,7 @@ func TestChatReportFreezesFiveBeforeAndAfterWithTombstones(t *testing.T) {
 				t.Fatalf("被隱藏的前文要是墓碑：%+v", m)
 			}
 		case 9:
-			if m.Type != "IMAGE" || len(m.MediaRefs) != 1 || m.MediaRefs[0] != ctxAsset {
+			if m.Type != "IMAGE" || len(m.MediaRefs) != 1 || m.MediaRefs[0] == f.chatAsset.String() {
 				t.Fatalf("圖片訊息：%+v", m)
 			}
 		default:
@@ -328,7 +334,10 @@ func TestChatReportFreezesFiveBeforeAndAfterWithTombstones(t *testing.T) {
 	if strings.Contains(raw, `"m3"`) {
 		t.Fatal("被隱藏的訊息內容不得寫進證據快照")
 	}
-	if n := f.count(t, "SELECT count(*) FROM moderation.case_snapshots WHERE case_id = $1 AND '01a20787-39c1-7c33-a3c2-ae797cae0a54' = ANY(asset_ids)", res.Case.ID); n != 1 {
+	if n := f.count(t, "SELECT count(*) FROM moderation.case_snapshots WHERE case_id = $1 AND $2::uuid = ANY(asset_ids)", res.Case.ID, f.chatAsset); n != 0 {
+		t.Fatal("快照不得引用來源資產，要指向自己的複本（B1-D20）")
+	}
+	if n := f.count(t, "SELECT cardinality(asset_ids) FROM moderation.case_snapshots WHERE case_id = $1", res.Case.ID); n != 1 {
 		t.Fatal("前後文的圖片也要被證據保全")
 	}
 

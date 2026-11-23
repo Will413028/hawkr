@@ -814,10 +814,10 @@
    "id": "media-claim-upload-no-on-conflict",
    "stack": "go-integration",
    "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
-   "old": "ON CONFLICT (upload_id) DO NOTHING\nRETURNING asset_id\n",
+   "old": "ON CONFLICT DO NOTHING\nRETURNING asset_id\n",
    "new": "RETURNING asset_id\n",
    "test": "internal/modules/media ^TestConfirmBlocksOnUncommittedClaim$",
-   "why": "ClaimUpload 沒有 ON CONFLICT DO NOTHING：同一個 token 並行確認時輸家得到唯一鍵錯誤，而不是 B1-D23 的已確認回應"
+   "why": "ClaimUpload 沒有 ON CONFLICT DO NOTHING（不指定目標）：同一個 token 並行確認時輸家得到唯一鍵錯誤，而不是 B1-D23 的已確認回應"
   },
   {
    "id": "media-settle-is-a-noop",

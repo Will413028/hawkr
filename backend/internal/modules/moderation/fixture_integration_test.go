@@ -128,26 +128,27 @@ func (s chatStores) Store(ctx context.Context, id int64) (seller.Store, error) {
 }
 
 type fixture struct {
-	review   *review.Module
-	im       *im.Module
-	orders   *reviewOrders
-	aggs     atomic.Int64
-	db       *db.DB
-	identity *identity.Module
-	buyer    *buyer.Module
-	seller   *seller.Module
-	sellerRd *seller.Reader
-	social   *social.Module
-	deletion *accountdeletion.Module
-	suspend  *accountsuspension.Module
-	module   *Module
-	media    *media.Module
-	objects  *media.MemoryStore
-	jobs     *testQueue
-	bus      *events.Bus
-	ids      atomic.Int64
-	mu       sync.Mutex
-	now      time.Time
+	review    *review.Module
+	im        *im.Module
+	orders    *reviewOrders
+	aggs      atomic.Int64
+	db        *db.DB
+	identity  *identity.Module
+	buyer     *buyer.Module
+	seller    *seller.Module
+	sellerRd  *seller.Reader
+	social    *social.Module
+	deletion  *accountdeletion.Module
+	suspend   *accountsuspension.Module
+	module    *Module
+	media     *media.Module
+	chatAsset uuid.UUID
+	objects   *media.MemoryStore
+	jobs      *testQueue
+	bus       *events.Bus
+	ids       atomic.Int64
+	mu        sync.Mutex
+	now       time.Time
 }
 
 func (f *fixture) clock() time.Time {
