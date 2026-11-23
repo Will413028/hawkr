@@ -75,15 +75,12 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 ## 公司時期未完成項
 
-A6 對照現行程式碼的結果。以下 5 個 issue 編號（舊公司 repo 的 #3494、#3495、#3497、#3499、#3367）只有編號，議題內文取不到：本 repo 與 `git log --all` 沒有任何引用，舊服務目錄（commit `94796248` 的 `backend/services/{review,im,crm}-service` 與 `backend/docs`）搜不到這些編號。內容不明的項目照實記為不明，不推測內容。
+A6 對照現行程式碼的結果（舊公司 repo 的 issue 只有一行標題，內文取不到；#3497 的標題以外無內容）。
 
 | 項目 | 結論 | 依據 |
 |---|---|---|
-| review `SubmitItemReview` 沒有 transaction | 已修：提交的寫入集中在同一個 transaction。舊碼 `SubmitItemReview` 是 `FinalizeAndLink` 逐張轉正後單句 `repo.Insert`，事件以 best-effort 發布（`94796248:backend/services/review-service/internal/usecase/review_usecase.go:133,200-232`）；現在 `buyer.LockActive`、`InsertReview`、`InsertReviewImage`、媒體同步 job、快取失效 job 與 `ReviewCreated` 事件都在同一個 `DB.InTx` 內，任何一步失敗整體回滾（讀程式碼的推論，沒有找到專門驗回滾的測試）；transaction 外只剩 media 轉正（單體規則 5） | `internal/write/write.go:122`（`InTx` 開始）、`:124`（`LockActive`）、`:132`（`InsertReview`）、`:144`（`InsertReviewImage`）、`:150`（`mediaref.Changed`）、`:154`（`bust`）、`:157`（`events.Publish`）；沿用盤點 M6、M10、M11 |
-| #3494 | 內容不明：編號在舊服務目錄、`backend/docs` 與 git 歷史都沒有任何痕跡，不判定是否已處理 | `git grep -E '(#\|issues/)(3494\|3495\|3497\|3499\|3367)\b' 94796248` 無結果；`git log --all --grep` 無結果；本 repo `rg` 的命中都是雜湊與 ID 數字，與議題無關（`CodeMeta/README.md` 的 3401~3499 是 ShippingArea 碼段） |
-| #3495 | 內容不明，同上 | 同上 |
-| #3497 | 內容不明，同上 | 同上 |
-| #3499 | 內容不明，同上 | 同上 |
-| #3367 | 內容不明，同上 | 同上 |
-
-要補結論時需要 Will 提供各 issue 的標題或內文，再逐項對照模組程式碼。
+| review `SubmitItemReview` 沒有 transaction | 已修：提交的寫入集中在同一個 transaction。舊碼是 `FinalizeAndLink` 逐張轉正後單句 `repo.Insert`，事件以 best-effort 發布（`94796248:backend/services/review-service/internal/usecase/review_usecase.go:133,200-232`）；現在 `buyer.LockActive`、`InsertReview`、`InsertReviewImage`、媒體同步 job、快取失效 job 與 `ReviewCreated` 事件都在同一個 `DB.InTx` 內，任何一步失敗整體回滾（讀程式碼的推論，沒有找到專門驗回滾的測試）；transaction 外只剩 media 轉正（單體規則 5） | `internal/write/write.go:122`（`InTx`）、`:124`（`LockActive`）、`:132`（`InsertReview`）、`:144`（`InsertReviewImage`）、`:150`（`mediaref.Changed`）、`:154`（`bust`）、`:157`（`events.Publish`）；沿用盤點 M6、M10、M11 |
+| #3494：`GetReview` 不過濾 hidden／deleted，已隱藏的評論任何登入者都讀得到 | 已修（RD3）：單筆讀取與列表共用公開可讀述詞，有未還原的隱藏或作者不在營運中都回 NotFound，不洩漏存在性；沒有 `deleted_at`，刪帳是實刪。未讀到專門的「隱藏後單筆讀取回 NotFound」測試名稱，結論依 SQL 與程式碼 | `db/queries/public.sql:65-69`（`GetPublicReviewAnonymous`，`NOT EXISTS review.hides ... restored_at IS NULL` 與 `pub_inactive_buyers()`）、`:71` 起（`GetPublicReviewForViewer` 另加觀看者封鎖）；`internal/read/read.go:156-170`（`GetReview` 只走這兩支，`ErrNoRows` 回 `ReviewNotFound`）；`api/hawkr/review/v1alpha1/review.proto:46` |
+| #3495：`ReviewStats` 對外用 double／int64，違反數字一律 string 的規範 | 不成立：現行規範是〈API 設計規範（Connect）〉§四，`int64` 在 proto3 JSON 是字串、有界的計數用 `int32`（JSON 數字）、金額禁浮點；「數量、計數用字串」只管舊 REST，不管 Connect。現行統計 `count` 是 `int32`（有界筆數，符合）；`average` 是 `double`，是評分平均而非金額，§四沒有禁止；`distribution` 的各星等數量見 `RatingCount`。商品統計與店家統計同形。對外沒有 `int64` | `docs/共通規範/API 設計規範（Connect）.md:100`；`backend/AGENTS.md:65`；`api/hawkr/review/v1alpha1/review.proto:157,162,164,175,177,181`；規範沒寫「平均值」的型別，這裡採 `double` 是現況，不是規範明文 |
+| #3497：review-service 技術債七項 | 標題以外無內容，七項無法逐項對照；舊服務已整體重寫並刪除。舊碼自己盤出的缺陷與機制處置見上方「沿用盤點」，那不等於這七項 | `domain-inventory.md` §6；本檔「沿用盤點」 |
+| #3499：`ReplyReview` 要不要 revalidate product tag | 不需要：`Reply` 只改回覆欄位，不排快取失效，也不改評分與評價數；`bust`（商品與店面 tag）只在提交（`write.go:154`）與隱藏、還原的 `aggregateChanged`（`:362`）呼叫。回覆文字是否出現在被快取的公開頁，未查證（website 只在 `features/seller-center/products/ProductReviewsPanel.tsx` 與 `lib/reviews/repo.ts` 找到 reply 字樣），若公開商品頁顯示店家回覆，這會是缺口，需要時再決定 | `internal/write/write.go:232`（`Reply`，區間內沒有 `bust`）、`:154`、`:362` |
