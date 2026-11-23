@@ -30,6 +30,7 @@ CREATE TABLE imageai.styles (
     CONSTRAINT styles_name_check CHECK (char_length(name) >= 1 AND name !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT styles_label_check CHECK (char_length(label) >= 1 AND label !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT styles_prompt_check CHECK (char_length(prompt) >= 1 AND char_length(prompt) <= 500 AND prompt !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT styles_default_enabled_check CHECK (NOT is_default OR enabled),
     CONSTRAINT styles_category_name_key UNIQUE (category, name)
 );
 CREATE UNIQUE INDEX styles_default_per_category ON imageai.styles (category) WHERE is_default;
@@ -53,13 +54,13 @@ CREATE TABLE imageai.quotas (
 
 COMMENT ON COLUMN imageai.quotas.version IS '樂觀鎖的版本，對外是 etag；每次修改加一';
 
--- 每家店每週的修圖次數：一列計數器加條件 UPDATE（A9-D9），沒有預約表。period_start 是週一 00:00 Asia/Taipei 對應的 UTC 時刻。
+-- 每家店一列的修圖計數器：period_start 是計數所屬那週的週一 00:00 Asia/Taipei 對應的 UTC 時刻，進入新的一週時扣額度的 UPSERT 把 used 重設
+-- （A9-D9：一列計數器加條件 UPDATE，沒有預約表；列數不隨週數成長）。
 CREATE TABLE imageai.usage (
-    store_id     BIGINT      NOT NULL,
+    store_id     BIGINT      PRIMARY KEY,
     period_start TIMESTAMPTZ NOT NULL,
     used         INT         NOT NULL DEFAULT 0,
     updated_at   TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (store_id, period_start),
     CONSTRAINT usage_store_check CHECK (store_id > 0),
     CONSTRAINT usage_used_check CHECK (used >= 0)
 );

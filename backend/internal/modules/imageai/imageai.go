@@ -42,6 +42,9 @@ const (
 // ErrQuotaExhausted 是本週額度用完。
 var ErrQuotaExhausted = model.ErrQuotaExhausted
 
+// ErrNothingToRefund 是 RefundQuota 找不到可退的次數（那一週的計數已不存在或已歸零）。
+var ErrNothingToRefund = model.ErrNothingToRefund
+
 // Usage 是一次扣額度之後的本週狀態。
 type Usage = model.Usage
 
@@ -86,7 +89,7 @@ func New(d Deps) *Module {
 	return &Module{quota: quota.New(d.DB, d.Now), limiter: limit.New(n)}
 }
 
-// AcquireTransformSlot 不等待地佔一個同時修圖的名額；滿了回 ok=false。release 只能呼叫一次。
+// AcquireTransformSlot 不等待地佔一個同時修圖的名額；滿了回 ok=false。release 可重複呼叫，只釋放一次。
 func (m *Module) AcquireTransformSlot() (release func(), ok bool) { return m.limiter.TryAcquire() }
 
 // ConsumeQuota 扣店家本週一次；用完回 ErrQuotaExhausted（Usage 仍帶上限與重置時間）。
@@ -94,7 +97,7 @@ func (m *Module) ConsumeQuota(ctx context.Context, storeID int64) (Usage, error)
 	return m.quota.Consume(ctx, storeID)
 }
 
-// RefundQuota 退回 ConsumeQuota 扣的那一次（用回傳的 Usage.PeriodStart）。
+// RefundQuota 退回 ConsumeQuota 扣的那一次（用回傳的 Usage.PeriodStart）；沒有可退的回 ErrNothingToRefund。永遠在呼叫端的 transaction 之外執行。
 func (m *Module) RefundQuota(ctx context.Context, storeID int64, periodStart time.Time) error {
 	return m.quota.Refund(ctx, storeID, periodStart)
 }

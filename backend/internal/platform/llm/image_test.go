@@ -61,9 +61,6 @@ func adkResponse(t *testing.T, url string) (*model.LLMResponse, error) {
 	return resp, gotErr
 }
 
-// TestADKImagePathKeepsInlineDataAndFinishReasonButDropsBlockReason 是 A9-4a 的 spike：ADK 的 gemini model 非串流時
-// 原樣回 InlineData 與 FinishReason，但 prompt 被擋、沒有候選時只回 "empty response" 錯誤，BlockReason 不見；
-// 所以圖片角色改走 genai client 的窄介面（ImageGenerator）。
 func TestADKImagePathKeepsInlineDataAndFinishReasonButDropsBlockReason(t *testing.T) {
 	resp, err := adkResponse(t, stub(t, imageBody(), nil))
 	if err != nil || resp.Content == nil || len(resp.Content.Parts) != 1 || resp.Content.Parts[0].InlineData == nil ||
@@ -117,6 +114,9 @@ func TestImageRoleOnlyAcceptsImageModels(t *testing.T) {
 	}
 	if m := New(Procurement, cfg, quiet()); m.Enabled() || m.Status() != StatusMisconfigured {
 		t.Fatalf("procurement 選了圖片模型：%v", m.Status())
+	}
+	if m := New(ImageAI, Config{GeminiAPIKey: "k"}, quiet()); m.Enabled() || m.Status() != StatusMisconfigured || m.Name() != "" {
+		t.Fatalf("New 不得為 ImageAI 建 ADK model：%+v", m)
 	}
 	if m := NewImage(cfg, quiet()); m.Enabled() || m.Status() != StatusMisconfigured {
 		t.Fatalf("imageai 選了文字模型：%v", m.Status())

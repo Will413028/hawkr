@@ -27,3 +27,25 @@ func TestNonPositiveLimitFallsBackToOne(t *testing.T) {
 		t.Fatal("上限 0 應取 1")
 	}
 }
+
+func TestReleaseIsIdempotent(t *testing.T) {
+	l := New(1)
+	r, ok := l.TryAcquire()
+	if !ok {
+		t.Fatal("要拿得到")
+	}
+	r()
+	r2, ok := l.TryAcquire()
+	if !ok {
+		t.Fatal("釋放後要能再拿")
+	}
+	r()
+	r()
+	if _, ok := l.TryAcquire(); ok {
+		t.Fatal("重複釋放不得多放出名額")
+	}
+	r2()
+	if _, ok := l.TryAcquire(); !ok {
+		t.Fatal("正常釋放後要能再拿")
+	}
+}

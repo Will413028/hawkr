@@ -18,6 +18,9 @@ const (
 // ErrQuotaExhausted 是本週額度用完。
 var ErrQuotaExhausted = errors.New("imageai：本週修圖額度已用完")
 
+// ErrNothingToRefund 是退額度時找不到可退的次數：那一週的列已不在（店家退場或已進入新的一週）或 used 已是 0。
+var ErrNothingToRefund = errors.New("imageai：沒有可退的修圖額度")
+
 // Usage 是一次扣額度之後的本週狀態；扣失敗時 Used 等於 Limit。
 type Usage struct {
 	Used, Limit int32

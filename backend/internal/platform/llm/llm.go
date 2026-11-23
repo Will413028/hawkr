@@ -196,6 +196,10 @@ func disabled(status Status) Model { return Model{llm: disabledLLM{}, status: st
 
 // build 是全服務唯一的 client 建構點；baseURLOverride 只給測試把 OpenAI 相容的端點指到替身 server。
 func build(role Role, cfg Config, log *slog.Logger, baseURLOverride string) Model {
+	if role == ImageAI {
+		log.Error("ImageAI 角色沒有 ADK model，請用 NewImage，已停用", "role", role)
+		return disabled(StatusMisconfigured)
+	}
 	name, spec, key, status := resolve(role, cfg, log)
 	if status != StatusEnabled {
 		return disabled(status)

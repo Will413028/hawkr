@@ -13,9 +13,12 @@ import (
 const consumeUsage = `-- name: ConsumeUsage :one
 INSERT INTO imageai.usage (store_id, period_start, used, updated_at)
 SELECT $1, $2, 1, $3::timestamptz WHERE $4::int > 0
-ON CONFLICT (store_id, period_start) DO UPDATE
-SET used = imageai.usage.used + 1, updated_at = EXCLUDED.updated_at
-WHERE imageai.usage.used < $4::int
+ON CONFLICT (store_id) DO UPDATE
+SET period_start = EXCLUDED.period_start,
+    used = CASE WHEN imageai.usage.period_start < EXCLUDED.period_start THEN 1 ELSE imageai.usage.used + 1 END,
+    updated_at = EXCLUDED.updated_at
+WHERE imageai.usage.period_start < EXCLUDED.period_start
+   OR (imageai.usage.period_start = EXCLUDED.period_start AND imageai.usage.used < $4::int)
 RETURNING used
 `
 
@@ -26,7 +29,7 @@ type ConsumeUsageParams struct {
 	QuotaLimit  int32
 }
 
-// 一列計數器加條件 UPDATE（A9-D9）：used 達上限就不更新、回 0 列（呼叫端拒絕）；沒有這一期的列時先建。
+// 每店一列計數器加條件 UPSERT（A9-D9）：同一週 used 達上限、或列屬於更新的一週時不更新、回 0 列（呼叫端拒絕）；列屬於較舊的一週時重設為 1；沒有列時先建。
 func (q *Queries) ConsumeUsage(ctx context.Context, arg ConsumeUsageParams) (int32, error) {
 	row := q.db.QueryRow(ctx, consumeUsage,
 		arg.StoreID,
@@ -66,7 +69,7 @@ type RefundUsageParams struct {
 	PeriodStart time.Time
 }
 
-// 外部呼叫失敗時退回一次；used 已是 0 時不動（不會變負）。
+// 外部呼叫失敗時退回一次；只動同一週的列，used 已是 0 時不動（不會變負）；回 0 列代表沒有東西可退。
 func (q *Queries) RefundUsage(ctx context.Context, arg RefundUsageParams) (int64, error) {
 	result, err := q.db.Exec(ctx, refundUsage, arg.Now, arg.StoreID, arg.PeriodStart)
 	if err != nil {

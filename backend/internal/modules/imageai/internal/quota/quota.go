@@ -73,12 +73,18 @@ func (s *Service) Consume(ctx context.Context, storeID int64) (model.Usage, erro
 	return u, nil
 }
 
-// Refund 退回 Consume 扣的那一次。呼叫端的 ctx 取消後（請求被中斷）仍要退，所以不跟著取消，另設 deadline。
+// Refund 退回 Consume 扣的那一次；沒有可退的（那一週的列不在或 used 已是 0）回 model.ErrNothingToRefund。
+// 呼叫端的 ctx 取消後（請求被中斷）仍要退，所以不跟著取消，另設 deadline；也不加入呼叫端的 transaction：
+// 直接走連線池，呼叫端 transaction 回滾時退款仍然生效（扣額度本身也在 transaction 之外）。
 func (s *Service) Refund(ctx context.Context, storeID int64, periodStart time.Time) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), refundTimeout)
 	defer cancel()
-	if _, err := store.New(s.db.Conn(ctx)).RefundUsage(ctx, store.RefundUsageParams{StoreID: storeID, PeriodStart: periodStart, Now: s.now()}); err != nil {
+	n, err := store.New(s.db.Pool()).RefundUsage(ctx, store.RefundUsageParams{StoreID: storeID, PeriodStart: periodStart, Now: s.now()})
+	if err != nil {
 		return fmt.Errorf("quota：退店家 %d 的額度：%w", storeID, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("quota：退店家 %d 的額度：%w", storeID, model.ErrNothingToRefund)
 	}
 	return nil
 }

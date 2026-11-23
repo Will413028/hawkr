@@ -136,8 +136,11 @@ func TestRefundGivesBackOneUnitAndNeverGoesBelowZero(t *testing.T) {
 	if got := used(t, d, 9); got != 0 {
 		t.Fatalf("退回後 used = %d，預期 0", got)
 	}
-	if err := m.RefundQuota(ctx, 9, u.PeriodStart); err != nil || used(t, d, 9) != 0 {
-		t.Fatalf("多退一次不得變負：%v used=%d", err, used(t, d, 9))
+	if err := m.RefundQuota(ctx, 9, u.PeriodStart); !errors.Is(err, imageai.ErrNothingToRefund) || used(t, d, 9) != 0 {
+		t.Fatalf("多退一次要回 ErrNothingToRefund 且不得變負：%v used=%d", err, used(t, d, 9))
+	}
+	if err := m.RefundQuota(ctx, 404, u.PeriodStart); !errors.Is(err, imageai.ErrNothingToRefund) {
+		t.Fatalf("沒有用量列要回 ErrNothingToRefund：%v", err)
 	}
 	setLimit(t, d, 10, 1)
 	u, _ = m.ConsumeQuota(ctx, 10)
@@ -185,6 +188,15 @@ func TestStoreRetiredDeletesThatStoresQuotaAndUsageOnly(t *testing.T) {
 	}
 }
 
+func TestDefaultStyleCannotBeDisabled(t *testing.T) {
+	d, _ := setup(t)
+	_, err := d.Pool().Exec(context.Background(), `UPDATE imageai.styles SET enabled = FALSE WHERE is_default`)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23514" {
+		t.Fatalf("停用預設風格要被 CHECK 擋下：%v", err)
+	}
+}
+
 func TestEveryCategorySeedsExactlyOneDefaultStyleAndAnotherDefaultIsRejected(t *testing.T) {
 	d, _ := setup(t)
 	ctx := context.Background()
@@ -211,4 +223,61 @@ func TestEveryCategorySeedsExactlyOneDefaultStyleAndAnotherDefaultIsRejected(t *
 	if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
 		t.Fatalf("同用途第二個預設要被唯一索引擋下：%v", err)
 	}
+}
+
+func TestRefundIgnoresTheCallersTransaction(t *testing.T) {
+	d, m := setup(t)
+	ctx := context.Background()
+	u, err := m.ConsumeQuota(ctx, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollback := errors.New("rollback")
+	err = d.InTx(ctx, func(ctx context.Context) error {
+		if err := m.RefundQuota(ctx, 30, u.PeriodStart); err != nil {
+			return err
+		}
+		return rollback
+	})
+	if !errors.Is(err, rollback) {
+		t.Fatalf("err = %v", err)
+	}
+	if got := used(t, d, 30); got != 0 {
+		t.Fatalf("呼叫端 transaction 回滾後退款仍要生效：used = %d", got)
+	}
+}
+
+func TestUsageKeepsOneRowPerStoreAndResetsInANewWeek(t *testing.T) {
+	t.Parallel()
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "imageai", Dir: imageai.Migrations()}))
+	ctx := context.Background()
+	now := wednesday
+	m := imageai.New(imageai.Deps{DB: d, Now: func() time.Time { return now }})
+	setLimit(t, d, 40, 2)
+	for range 2 {
+		if _, err := m.ConsumeQuota(ctx, 40); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := m.ConsumeQuota(ctx, 40); !errors.Is(err, imageai.ErrQuotaExhausted) {
+		t.Fatalf("用完要拒絕：%v", err)
+	}
+	first := wednesday
+	now = wednesday.AddDate(0, 0, 7)
+	u, err := m.ConsumeQuota(ctx, 40)
+	if err != nil || u.Used != 1 {
+		t.Fatalf("新的一週要重設為 1：%+v %v", u, err)
+	}
+	var rows int
+	if err := d.Pool().QueryRow(ctx, `SELECT count(*) FROM imageai.usage WHERE store_id = 40`).Scan(&rows); err != nil || rows != 1 {
+		t.Fatalf("每店一列：rows = %d err = %v", rows, err)
+	}
+	if err := m.RefundQuota(ctx, 40, imageaiWeekOf(first)); !errors.Is(err, imageai.ErrNothingToRefund) || used(t, d, 40) != 1 {
+		t.Fatalf("退上一週的額度不得動到本週：%v used = %d", err, used(t, d, 40))
+	}
+}
+
+func imageaiWeekOf(t time.Time) time.Time {
+	d := twtime.Midnight(t)
+	return time.Date(d.Year(), d.Month(), d.Day()-(int(d.Weekday())+6)%7, 0, 0, 0, 0, twtime.Taipei)
 }

@@ -16,7 +16,7 @@ schema `imageai`，三張表，沒有預約表（A9-D9）：
 |---|---|
 | `styles` | 風格。主鍵 UUIDv7；`(category, name)` 唯一；每個用途最多一個預設（partial unique index）；`prompt` 1 到 500 字元（以 Unicode 字元計）；`version` 是 etag；縮圖用 `thumbnail_key` 與 `thumbnail_asset_id`，空字串表示沒有 |
 | `quotas` | 個別設定的每週額度，`store_id` 為主鍵，`weekly_limit >= 0`，`version` 是 etag |
-| `usage` | `(store_id, period_start)` 的 `used` 計數器，`used >= 0` |
+| `usage` | 每店一列（主鍵 `store_id`）：`period_start` 是計數所屬的週，`used` 計數器 `>= 0`；新的一週由扣額度的 UPSERT 重設 |
 
 - migration seed 每個用途（`PRODUCT`、`POST`）一筆中性預設風格（A9-D39）；伺服器沒有寫死的後備提示詞。預設風格不可刪（`failed_precondition`，不新增 ErrorReason），`default_style` 只能設成 true、設成 false 回 `invalid_argument`，換預設只能把另一筆設成 true。
 - `store_id` 是 bigint 外部鍵，沒有跨 schema FK。店家退場（`seller.StoreRetired`）時，同 transaction 刪該店的 `quotas` 與 `usage` 列，冪等。
@@ -26,8 +26,8 @@ schema `imageai`，三張表，沒有預約表（A9-D9）：
 - 週期是週一 00:00 Asia/Taipei 起算的一週，`period_start` 存該時刻；重置時間是下週一 00:00。
 - 預設每週 10 次（`DefaultWeeklyLimit`），後台能設定的上限是 1000（`MaxWeeklyLimit`）。兩個數字是模組常數，不是 config；`quotas.weekly_limit` 的上限由寫入端檢查，資料庫只擋負數。
 - 上限的取法：該店有 `quotas` 列就用它，否則用預設。
-- 扣額度是單一條件 UPDATE：`INSERT ... ON CONFLICT DO UPDATE SET used = used + 1 WHERE used < limit`，回 0 列就是用完。上限為 0 時不建用量列。
-- 退額度是 `used = used - 1 WHERE used > 0`，不會變負；使用 `context.WithoutCancel` 加 5 秒 deadline，請求被中斷後仍會退。
+- 扣額度是單一條件 UPSERT：`INSERT ... ON CONFLICT (store_id) DO UPDATE ... WHERE period_start < 本週 OR (period_start = 本週 AND used < limit)`，列屬於較舊的一週時 `used` 重設為 1，回 0 列就是用完。上限為 0 時不建用量列。
+- 退額度是 `used = used - 1 WHERE period_start = 該週 AND used > 0`，不會變負，回 0 列回 `ErrNothingToRefund`；走連線池（不加入呼叫端 transaction），使用 `context.WithoutCancel` 加 5 秒 deadline，請求被中斷或呼叫端回滾後仍會退。
 - 已知限制（A9-D38）：扣額度之後、退額度之前伺服器程序終止，該次額度不退回。不建預約表或 job 收尾。
 
 ## 4. 圖片模型
