@@ -34,7 +34,7 @@ final class OrderListControllerProvider
 }
 
 String _$orderListControllerHash() =>
-    r'f631a7005273ad904a1b0a6efb13c9718362714d';
+    r'122dc2c33c6c6de2ad6c3d3f42dd6796193fc515';
 
 abstract class _$OrderListController extends $AsyncNotifier<List<Order>> {
   FutureOr<List<Order>> build();
