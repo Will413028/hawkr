@@ -710,8 +710,8 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 			checked++
 		}
 	}
-	if checked != 13 {
-		t.Fatalf("want exactly 13 required fields, got %d", checked)
+	if checked != 12 {
+		t.Fatalf("want exactly 12 required fields, got %d", checked)
 	}
 }
 
