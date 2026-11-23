@@ -4003,11 +4003,11 @@ type ReportTargetType struct {
 }
 
 var (
-	ReportTargetTypeReview      = ReportTargetType{Code: "REVIEW", Value: "REVIEW", Label: "商品評論", Description: "商品評論（review-service 擁有，social 只持 target_id）"}
+	ReportTargetTypeReview      = ReportTargetType{Code: "REVIEW", Value: "REVIEW", Label: "商品評論", Description: "商品評論（內容由 review 模組擁有，檢舉案件只持 target_id）"}
 	ReportTargetTypePost        = ReportTargetType{Code: "POST", Value: "POST", Label: "貼文", Description: "賣家貼文 `cms_post`"}
 	ReportTargetTypePostComment = ReportTargetType{Code: "POST_COMMENT", Value: "POST_COMMENT", Label: "貼文留言", Description: "貼文底下的留言 `cms_comment`"}
 	ReportTargetTypeSellerForum = ReportTargetType{Code: "SELLER_FORUM", Value: "SELLER_FORUM", Label: "討論區", Description: "賣家討論區內容"}
-	ReportTargetTypeChatMessage = ReportTargetType{Code: "CHAT_MESSAGE", Value: "CHAT_MESSAGE", Label: "聊天訊息", Description: "IM 訊息（im-service 擁有）"}
+	ReportTargetTypeChatMessage = ReportTargetType{Code: "CHAT_MESSAGE", Value: "CHAT_MESSAGE", Label: "聊天訊息", Description: "IM 訊息（內容由 im 模組擁有，檢舉案件只持 target_id）"}
 	ReportTargetTypeUser        = ReportTargetType{Code: "USER", Value: "USER", Label: "使用者", Description: "檢舉對象是人而非單一則內容；此類不下架內容，只走警告／停權"}
 )
 
