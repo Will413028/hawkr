@@ -164,6 +164,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # OSV-Scanner 對 backend/go.mod 跑 govulncheck 程式碼分析，需要能載入 media 模組的 cgo 套件。
+      - name: 安裝 libvips（media 模組以 cgo 連結）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - name: 安裝 OSV-Scanner v2.7.0（驗證雜湊）
         run: |
           set -euo pipefail
