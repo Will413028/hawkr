@@ -76,8 +76,8 @@ hawkr:
           port: ${MEDIA_SERVICE_GRPC_PORT:9937}
           plaintext: true
         buyer:
-          host: ${BUYER_SERVICE_HOST:127.0.0.1}
-          port: ${BUYER_SERVICE_GRPC_PORT:9941}
+          host: ${LEGACY_BUYER_GRPC_HOST:127.0.0.1}
+          port: ${LEGACY_BUYER_GRPC_PORT:9941}
           plaintext: true
   tsid:
     enabled: true

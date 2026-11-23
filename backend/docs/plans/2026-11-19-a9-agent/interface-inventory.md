@@ -138,7 +138,7 @@
 
 | # | 目標 | RPC | file:line | 目前由誰服務 | 去向 |
 |---|---|---|---|---|---|
-| C1 | buyer（`BUYER_SERVICE_*`，預設 9941） | GetBuyerEntitlement | `client/buyer/adapter.go:61`；用於 `procurement/module.go:146`（entitlement 閘） | **單體** `M/legacy/buyerserver/server.go:260`（compose 指向 `host.docker.internal:9941`，`docker-compose-local.yml:24-25`）【量】 | in-process：`buyer.Module` 的 entitlement 讀取（A3 已搬進 buyer，`a3-buyer-seller.md:32` 寫明「GetBuyerEntitlement 仍被 ai-service 使用」） |
+| C1 | buyer（`LEGACY_BUYER_GRPC_*`，預設 9941） | GetBuyerEntitlement | `client/buyer/adapter.go:61`；用於 `procurement/module.go:146`（entitlement 閘） | **單體** `M/legacy/buyerserver/server.go:260`（compose 指向 `host.docker.internal:9941`，`docker-compose-local.yml:24-25`）【量】 | in-process：`buyer.Module` 的 entitlement 讀取（A3 已搬進 buyer，`a3-buyer-seller.md:32` 寫明「GetBuyerEntitlement 仍被 ai-service 使用」） |
 | C2 | seller（`SELLER_SERVICE_*`，預設 9941） | GetSellerStats | `client/seller/adapter.go:37` | 單體 `M/legacy/sellerserver/server.go:363`（評分來自 review，經 `cmd/hawkr/seller.go:73` 的 `legacySellerRatings`；ai-service 只讀 rating 與 followers，`server.go:360`） | in-process：seller 模組＋review 的 `StoreRatingStats`（見 §5.3） |
 | C3 | seller | BatchGetSellerMeta | `adapter.go:68` | 單體 `server.go:311` | in-process：seller 模組 |
 | C4 | seller | SearchSellerProspects | `adapter.go:91`（`procurement/usecase/candidate_*` 的 EXTERNAL lane 候選搜尋） | 單體 `server.go:497` | in-process：`seller.SearchProspects`（`M/modules/seller/CARRYOVER.md:170` 已預留：「ai-service 進單體（A9）後直接呼叫 SearchProspects，期間由 internal/legacy 提供那一支 RPC」）；`prospect_id` 是 BIGINT（`CARRYOVER.md:176,370`，最後一個整數 ID 消費者） |

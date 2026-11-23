@@ -28,7 +28,7 @@ review-service 是訂單商品評論的專責微服務，負責「買家對已�
 | 上游（呼叫 review） | social-service | `HideReview`（B-135 內容審核） | gRPC（`x-internal-service`） |
 | 下游（review 呼叫） | order-service | `GetOrderForReview`：訂單資格 + 商品項目 + 權威 product_id | gRPC `ORDER_SERVICE_ADDR` |
 | 下游（review 呼叫） | media-service | `FinalizeAndLink`：評論圖片 staged → permanent + asset_reference | gRPC（`x-internal-service`） |
-| 下游（review 呼叫） | 單體 buyer 模組（legacy gRPC） | `BatchGetBuyerDisplay`：批量取買家顯示名 / 頭像（已註銷者回墓碑，#2830） | gRPC `BUYER_SERVICE_*` |
+| 下游（review 呼叫） | 單體 buyer 模組（legacy gRPC） | `BatchGetBuyerDisplay`：批量取買家顯示名 / 頭像（已註銷者回墓碑，#2830） | gRPC `LEGACY_BUYER_GRPC_*` |
 | 下游（review 呼叫） | hawkr-website | `/api/revalidate`：SSR cache bust（product / seller tag） | HTTP（`go-pkg/revalidate`） |
 | 事件消費者 | order-service | `review.created` → markReviewed + `orders.review` 快照 | MQ |
 | 事件消費者 | product-service | `review.created` / `review.hidden` → 商品 rating / review_count 聚合（#1156） | MQ |
@@ -352,7 +352,7 @@ message OrderReviewInfo {
 |--------|-----|------|---------|
 | order（`ORDER_SERVICE_ADDR`，預設 `order-service:9915`） | `GetOrderForReview` | 訂單資格 + 商品項目 + 權威 product_id + 快照 | → `ErrOrderNotFound`，評論失敗 |
 | media（`MEDIA_SERVICE_HOST:GRPC_PORT`，預設 `media-service:9937`） | `FinalizeAndLink`（`x-internal-service`） | 圖片永久化 | 失敗 → 評論失敗 |
-| buyer（`BUYER_SERVICE_HOST:GRPC_PORT`，預設 `127.0.0.1:9941`，指向單體的 legacy gRPC） | `BatchGetBuyerDisplay` | 買家顯示名 / 頭像 | best-effort，失敗只記 log，欄位留空；**已註銷買家回墓碑字串而非查不到**（#2830） |
+| buyer（`LEGACY_BUYER_GRPC_HOST` / `LEGACY_BUYER_GRPC_PORT`，預設 `127.0.0.1:9941`，指向單體的 legacy gRPC） | `BatchGetBuyerDisplay` | 買家顯示名 / 頭像 | best-effort，失敗只記 log，欄位留空；**已註銷買家回墓碑字串而非查不到**（#2830） |
 
 ### 4.4 MQ 發布事件
 
@@ -645,7 +645,7 @@ sequenceDiagram
 | `GRPC_PORT` / `HTTP_PORT` | 10033 / 10032 | 監聽埠 |
 | `ORDER_SERVICE_ADDR` | `order-service:9915` | order client |
 | `MEDIA_SERVICE_HOST` / `MEDIA_SERVICE_GRPC_PORT` | `media-service` / `9937` | media client |
-| `BUYER_SERVICE_HOST` / `BUYER_SERVICE_GRPC_PORT` | `127.0.0.1` / `9941` | buyer client（單體的 legacy gRPC） |
+| `LEGACY_BUYER_GRPC_HOST` / `LEGACY_BUYER_GRPC_PORT` | `127.0.0.1` / `9941` | buyer client（單體的 legacy gRPC） |
 | `MEDIA_BASE_URL` | `""` | 評論圖 URL 前綴（原 `CDN_BASE_URL`；經 `pkg/mediaurl.BuildURL` 組出 Image Gateway URL，49 號設計書 §8.5） |
 | `WEB_REVALIDATE_BASE_URL` / `WEB_REVALIDATE_SECRET` | `""` | SSR cache bust |
 | `RABBITMQ_URL` | `amqp://guest:guest@localhost:5672/` | MQ |
