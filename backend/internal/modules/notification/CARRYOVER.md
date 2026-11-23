@@ -130,3 +130,4 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 - 裝置 token 以 token 為主鍵、綁一個帳號與一支 App，沒有 `platform`、`is_active`，記 `last_registered_at`。
 - 偏好是 `(account_id, 受眾, 分類, 渠道, enabled)` 覆寫列；分類是 D4 的 14 個，渠道含收件匣與 email，不可關的規則在 `internal/model`。
 - 通知型別、文案、深連結、聚合鍵、冪等鍵來源與渠道在 `internal/registry` 與 `internal/text`，沒有模板表；兩個型別 `account_suspended`、`account_unsuspended` 是舊模板沒有的新型別（舊模板只有店家版）。
+- 已刪除的公告可能被派送期間重試的頁 job 重新建出收件匣或投遞紀錄（窗口只在派送進行中的重試）；接受，不記帳。

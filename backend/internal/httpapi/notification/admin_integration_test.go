@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 	"uuid"
@@ -27,6 +28,23 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
+
+// steppingClock 是注入的時鐘：從固定時刻起，每讀一次前進一毫秒，讓先建立的公告的建立時間一定早於後建立的，排序不靠真實時間或 sleep。
+type steppingClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func newSteppingClock() *steppingClock {
+	return &steppingClock{now: time.Date(2026, 11, 24, 3, 0, 0, 0, time.UTC)}
+}
+
+func (c *steppingClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(time.Millisecond)
+	return c.now
+}
 
 type nopJobs struct{}
 
@@ -61,7 +79,8 @@ func TestAnnouncementAdminRPCs(t *testing.T) {
 		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
 		migrate.Module{Name: "notification", Dir: notification.Migrations()},
 	))
-	m := notification.New(notification.Deps{DB: d, Jobs: nopJobs{}, Now: time.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler)})
+	clock := newSteppingClock()
+	m := notification.New(notification.Deps{DB: d, Jobs: nopJobs{}, Now: clock.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler)})
 	path, handler := notificationv1alpha1connect.NewNotificationAdminServiceHandler(NewAdmin(m), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +132,7 @@ func TestAnnouncementAdminRPCs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	audit := adminaudit.New(d, time.Now)
+	audit := adminaudit.New(d, clock.Now)
 	recs, err := audit.List(ctx, adminaudit.Filter{Action: notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure})
 	if err != nil || len(recs) != 2 {
 		t.Fatalf("稽核紀錄 %d 筆（%v），預期 2（重送與失敗的不記）", len(recs), err)

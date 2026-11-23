@@ -51,7 +51,7 @@ type Definition[P any] struct {
 	// Fanout 宣告型別不經意圖管線：收件人不在參數快照裡，由型別自己的派送 job 逐一展開（公告）。Fanout 型別不需要 IdempotencyKey、OccurredAt 與 Recipient，
 	// 也不能被意圖管線登記或展開；收件匣列的事件時間由派送寫入。
 	Fanout bool
-	// FixedLocale 非空時，型別的文字永遠是這個語系，不依請求語系（例如公告只有英文，D17）；自檢改為要求每個語系都組出這個語系的文字。
+	// FixedLocale 非空時，型別的文字永遠是這個語系，不依請求語系（例如公告只有英文）；自檢改為要求每個語系都組出這個語系的文字。
 	FixedLocale uitext.Locale
 	// Category 是偏好分類（D4）。
 	Category model.PrefCategory
@@ -76,8 +76,9 @@ type Definition[P any] struct {
 	Actors func(P) []int64
 	// Text 依語系組字。需要讀取時解析的內容（參數只存 ID）的型別改用 Load 與 TextLoaded，兩者擇一。
 	Text func(l uitext.Locale, p P) (Content, error)
-	// Load 在讀取時向擁有資料的地方（Sources）解析參數裡的 ID，結果交給 TextLoaded 組字；有 Load 就一定要有 TextLoaded，反之亦然。
-	Load       func(ctx context.Context, src Sources, p P) (Loaded, error)
+	// Load 在讀取時向擁有資料的地方（Sources）一次解析一批參數裡的 ID（一頁一次查詢），回傳與 ps 等長、同序的結果，交給 TextLoaded 組字；
+	// 查不到的 ID 留零值的 Loaded（TextLoaded 會拒絕），讀取本身失敗才回 error。有 Load 就一定要有 TextLoaded，反之亦然。
+	Load       func(ctx context.Context, src Sources, ps []P) ([]Loaded, error)
 	TextLoaded func(l uitext.Locale, p P, ld Loaded) (Content, error)
 	// ExampleLoaded 是範例參數對應的 Load 結果（自檢與固定輸出測試用）。
 	ExampleLoaded Loaded
@@ -89,12 +90,13 @@ type Definition[P any] struct {
 	Example P
 }
 
-// AnnouncementText 是公告的標題與內文（英文，D17）。
+// AnnouncementText 是公告的標題與內文（英文）。
 type AnnouncementText struct{ Title, Body string }
 
 // Sources 是型別在讀取時解析參數裡的 ID 要問的地方；由通知模組自己的用例實作（公告在本模組的資料表）。
 type Sources interface {
-	Announcement(ctx context.Context, id uuid.UUID) (AnnouncementText, error)
+	// Announcements 一次讀多則公告；查不到的 ID 不在結果裡。
+	Announcements(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]AnnouncementText, error)
 }
 
 // Loaded 是 Load 解析出來的內容；沒有 Load 的型別是零值。
@@ -155,8 +157,9 @@ type Entry interface {
 	OccurredAt(params json.RawMessage) (time.Time, error)
 	// Render 依語系組字；需要 Load 的型別請改用 Load 加 RenderLoaded。
 	Render(l uitext.Locale, params json.RawMessage) (Rendered, error)
-	// Load 在讀取時解析參數裡的 ID（沒有 Load 的型別回零值）。
-	Load(ctx context.Context, src Sources, params json.RawMessage) (Loaded, error)
+	// Load 在讀取時一次解析一批參數裡的 ID（沒有 Load 的型別回零值）。回傳與 params 等長：loaded[i] 是第 i 個的結果，rowErrs[i] 非 nil 表示
+	// 第 i 個的參數快照解不開（只影響那一列）；err 是讀取失敗（整批失敗，呼叫端不該略過）。
+	Load(ctx context.Context, src Sources, params []json.RawMessage) (loaded []Loaded, rowErrs []error, err error)
 	// RenderLoaded 以 Load 的結果組字；沒有 Load 的型別等同 Render。
 	RenderLoaded(l uitext.Locale, params json.RawMessage, ld Loaded) (Rendered, error)
 	// Resolve 由參數快照取出收件人、聚合鍵與 actor，不組字。
@@ -261,19 +264,37 @@ func (e *entry[P]) Render(l uitext.Locale, params json.RawMessage) (Rendered, er
 	return e.RenderLoaded(l, params, Loaded{})
 }
 
-func (e *entry[P]) Load(ctx context.Context, src Sources, params json.RawMessage) (Loaded, error) {
+func (e *entry[P]) Load(ctx context.Context, src Sources, params []json.RawMessage) ([]Loaded, []error, error) {
+	loaded := make([]Loaded, len(params))
+	rowErrs := make([]error, len(params))
 	if e.d.Load == nil {
-		return Loaded{}, nil
+		return loaded, rowErrs, nil
 	}
-	p, err := e.decode(params)
+	ps := make([]P, 0, len(params))
+	idx := make([]int, 0, len(params))
+	for i, raw := range params {
+		p, err := e.decode(raw)
+		if err != nil {
+			rowErrs[i] = err
+			continue
+		}
+		ps = append(ps, p)
+		idx = append(idx, i)
+	}
+	if len(ps) == 0 {
+		return loaded, rowErrs, nil
+	}
+	got, err := e.d.Load(ctx, src, ps)
 	if err != nil {
-		return Loaded{}, err
+		return nil, nil, fmt.Errorf("通知型別 %s 解析參數失敗：%w", e.d.Name, err)
 	}
-	ld, err := e.d.Load(ctx, src, p)
-	if err != nil {
-		return Loaded{}, fmt.Errorf("通知型別 %s 解析參數失敗：%w", e.d.Name, err)
+	if len(got) != len(ps) {
+		return nil, nil, fmt.Errorf("通知型別 %s 的 Load 回了 %d 筆，要 %d 筆", e.d.Name, len(got), len(ps))
 	}
-	return ld, nil
+	for k, i := range idx {
+		loaded[i] = got[k]
+	}
+	return loaded, rowErrs, nil
 }
 
 func (e *entry[P]) RenderLoaded(l uitext.Locale, params json.RawMessage, ld Loaded) (Rendered, error) {

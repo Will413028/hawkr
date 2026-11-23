@@ -27,9 +27,9 @@ CREATE TABLE notification.intents (
 );
 CREATE INDEX intents_created ON notification.intents (created_at);
 
--- 後台公告（A8-2c）：公告是資料，型別 `announcement` 是註冊表的 Fanout 型別（收件匣列的參數只存公告 ID，文字讀取時解析）。建立時一列、一個意圖列（id 與公告相同，只為讓 deliveries 的 intent_id 有對象）與兩條派送 job 鏈：
+-- 後台公告：公告是資料，型別 `announcement` 是註冊表的 Fanout 型別（收件匣列的參數只存公告 ID，文字讀取時解析）。建立時一列、一個意圖列（id 與公告相同，只為讓 deliveries 的 intent_id 有對象）與兩條派送 job 鏈：
 -- 收件匣與推播分開，各自逐受眾、逐頁（以 keyset 游標）展開，所以沒有 device token 的帳號也收得到收件匣那份，一個 job 的工作量有上限。
--- audiences 是已排序、不重複的受眾（只有三種合法組合）。title 與 body 一律英文、單一份（D17）。
+-- audiences 是已排序、不重複的受眾（只有三種合法組合）。title 與 body 一律英文、單一份。
 -- (admin_id, request_id) UNIQUE 是建立的冪等鍵（AIP-155）：重送回第一次的那一列，內容不同回 invalid_argument；沒有 request_id 的建立不受限。
 -- inbox_count 與收件匣列同 transaction 遞增（只算真正新寫的列）；inbox_done_at、push_done_at 是各自的 job 鏈處理完所有受眾的時間，兩者都有才算派送完成。
 CREATE TABLE notification.announcements (

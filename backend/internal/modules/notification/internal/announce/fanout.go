@@ -5,22 +5,28 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// ChunkSize 是一個派送 job 處理的收件人數上限。每個收件人自己一個 transaction（鎖順序要求先鎖帳號再鎖買家或店家，一頁合成一個 transaction 會交錯），
+// ChunkSize 是一個派送 job 處理的收件人數預設值；MaxChunk 是 Deps.Chunk 的上限，不得超過名單來源（buyer、seller）一頁的上限。每個收件人自己一個 transaction（鎖順序要求先鎖帳號再鎖買家或店家，一頁合成一個 transaction 會交錯），
 // 所以一個 job 的工作量由它界定。
-const ChunkSize = 200
+const (
+	ChunkSize = 200
+	MaxChunk  = 1000
+)
 
-// InboxArgs 是收件匣派送的一頁：公告、受眾、與上一頁最後一個收件人的排序鍵（0 是從頭）。受眾逐個處理，一頁沒有收件人時換下一個受眾，都處理完就標記完成。
+// InboxArgs 是收件匣派送的一頁：公告、受眾、與上一頁最後一個收件人的排序鍵（0 是從頭）。受眾逐個處理，一頁不足 Chunk 個收件人就是受眾的最後一頁，換下一個受眾，都處理完就標記完成。
 type InboxArgs struct {
 	AnnouncementID uuid.UUID      `json:"announcement_id"`
 	Audience       model.Audience `json:"audience"`
@@ -112,7 +118,7 @@ type pageSpec struct {
 	markDone     func(context.Context, *store.Queries, time.Time) error
 }
 
-// page 處理一頁：讀一頁收件人、逐人寫（各自一個 transaction），再在一個 transaction 內排下一頁；沒有收件人了就換下一個受眾，
+// page 處理一頁：讀一頁收件人、逐人寫（各自一個 transaction），再在一個 transaction 內排下一頁；這一頁不滿 Chunk 個收件人（沒有更多了）就換下一個受眾，
 // 受眾都處理完就標記完成。下一個 job 在寫完整頁之後才排，所以 job 中途失敗重跑，都從同一頁重來，已寫的收件人被唯一鍵略過。
 func (s *Service) page(ctx context.Context, p pageSpec) error {
 	ann, err := store.New(s.d.DB.Conn(ctx)).AnnouncementByID(ctx, p.id)
@@ -127,12 +133,18 @@ func (s *Service) page(ctx context.Context, p pageSpec) error {
 		return err
 	}
 	for _, r := range recipients {
-		if err := p.write(ctx, ann, p.audience, r); err != nil {
+		err := p.write(ctx, ann, p.audience, r)
+		switch {
+		case err == nil:
+		case permanent(err):
+			// 這個收件人永遠寫不進去（重試也一樣）：記錄後略過，游標照常前進，不讓一個人擋住整則公告。
+			s.d.Logger.ErrorContext(ctx, "公告收件人寫入失敗（永久性），略過", "announcement_id", ann.ID, "audience", p.audience, "account_id", r.AccountID, "store_id", r.StoreID, "error", err)
+		default:
 			return err
 		}
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		if len(recipients) > 0 {
+		if len(recipients) >= s.d.Chunk {
 			return s.d.Jobs.Enqueue(ctx, p.nextPage(recipients[len(recipients)-1].Cursor), uniqueByArgs)
 		}
 		if i := slices.Index(ann.Audiences, string(p.audience)); i >= 0 && i+1 < len(ann.Audiences) {
@@ -140,6 +152,16 @@ func (s *Service) page(ctx context.Context, p pageSpec) error {
 		}
 		return p.markDone(ctx, store.New(s.d.DB.Conn(ctx)), s.d.Now())
 	})
+}
+
+// permanent 回報寫入錯誤是不是重試也不會好的：呼叫端給的值不合法、找不到、狀態不允許（apperr），或資料庫的資料例外與完整性違反（SQLSTATE 22、23 類）。
+// 其餘（連線中斷、逾時、取消、死結、未分類）都當暫時性，整頁交給 River 重試。
+func permanent(err error) bool {
+	if slices.Contains([]apperr.Kind{apperr.KindInvalidInput, apperr.KindNotFound, apperr.KindFailedPrecondition, apperr.KindPermissionDenied}, apperr.KindOf(err)) {
+		return true
+	}
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && (strings.HasPrefix(pgErr.Code, "22") || strings.HasPrefix(pgErr.Code, "23"))
 }
 
 func (s *Service) recipients(ctx context.Context, aud model.Audience, after int64) ([]Recipient, error) {
@@ -160,7 +182,7 @@ func storeID(r Recipient) *int64 {
 	return nil
 }
 
-// writeInbox 把公告寫進一個收件人的收件匣。收件匣不可關（D18），所以不看偏好，也不看有沒有 device token。收件人已刪除、已關閉或已退場時略過。
+// writeInbox 把公告寫進一個收件人的收件匣。收件匣不可關，所以不看偏好，也不看有沒有 device token。收件人已刪除、已關閉或已退場時略過。
 func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnouncement, aud model.Audience, r Recipient) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		gone, err := intake.LockRecipient(ctx, s.d.Locks, aud, r.AccountID, r.StoreID)
@@ -185,7 +207,7 @@ func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnounce
 	})
 }
 
-// writePush 為一個收件人寫公告的推播投遞紀錄並排渠道 job；收件人在偏好裡關掉公告推播（D18）時什麼都不寫。紀錄已存在（重試）時不重複排 job。
+// writePush 為一個收件人寫公告的推播投遞紀錄並排渠道 job；收件人在偏好裡關掉公告推播時什麼都不寫。紀錄已存在（重試）時不重複排 job。
 func (s *Service) writePush(ctx context.Context, ann store.NotificationAnnouncement, aud model.Audience, r Recipient) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		gone, err := intake.LockRecipient(ctx, s.d.Locks, aud, r.AccountID, r.StoreID)

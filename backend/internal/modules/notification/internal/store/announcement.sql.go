@@ -75,6 +75,37 @@ func (q *Queries) AnnouncementByRequest(ctx context.Context, arg AnnouncementByR
 	return i, err
 }
 
+const announcementsByIDs = `-- name: AnnouncementsByIDs :many
+SELECT id, title, body FROM notification.announcements WHERE id = ANY($1::uuid[])
+`
+
+type AnnouncementsByIDsRow struct {
+	ID    uuid.UUID
+	Title string
+	Body  string
+}
+
+// 收件匣一頁一次讀多則公告的標題與內文；查不到的 id 不在結果裡。
+func (q *Queries) AnnouncementsByIDs(ctx context.Context, ids []uuid.UUID) ([]AnnouncementsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, announcementsByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AnnouncementsByIDsRow{}
+	for rows.Next() {
+		var i AnnouncementsByIDsRow
+		if err := rows.Scan(&i.ID, &i.Title, &i.Body); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const insertAnnouncement = `-- name: InsertAnnouncement :one
 INSERT INTO notification.announcements (id, audiences, title, body, admin_id, request_id, created_at)
 VALUES ($1, $2::text[], $3, $4, $5, $6, $7)

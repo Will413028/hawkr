@@ -166,21 +166,52 @@ func TestGoldenAnnouncementRendering(t *testing.T) {
 	}
 }
 
-type announcementSource struct{ text AnnouncementText }
-
-func (s announcementSource) Announcement(context.Context, uuid.UUID) (AnnouncementText, error) {
-	return s.text, nil
+type announcementSource struct {
+	texts map[uuid.UUID]AnnouncementText
+	calls int
 }
 
-// Load 以參數裡的公告 ID 向 Sources 取文字；沒有 Load 的型別回零值。
-func TestLoadResolvesTheAnnouncementFromItsID(t *testing.T) {
+func (s *announcementSource) Announcements(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]AnnouncementText, error) {
+	s.calls++
+	out := map[uuid.UUID]AnnouncementText{}
+	for _, id := range ids {
+		if t, ok := s.texts[id]; ok {
+			out[id] = t
+		}
+	}
+	return out, nil
+}
+
+// Load 以一批參數裡的公告 ID 一次向 Sources 取文字：一次呼叫、結果同序、查不到的是零值、壞掉的快照只影響那一列；沒有 Load 的型別回零值。
+func TestLoadResolvesTheAnnouncementsInOneCall(t *testing.T) {
 	e, _ := Lookup("announcement")
-	ld, err := e.Load(context.Background(), announcementSource{AnnouncementText{Title: "t", Body: "b"}}, []byte(`{"announcement_id":"0190a000-0000-7000-8000-0000000000a1"}`))
-	if err != nil || ld.Announcement == nil || ld.Announcement.Title != "t" {
-		t.Fatalf("Load = %+v（%v）", ld, err)
+	known := uuid.MustParse("0190a000-0000-7000-8000-0000000000a1")
+	missing := uuid.MustParse("0190a000-0000-7000-8000-0000000000a2")
+	src := &announcementSource{texts: map[uuid.UUID]AnnouncementText{known: {Title: "t", Body: "b"}}}
+	raws := []json.RawMessage{
+		[]byte(`{"announcement_id":"` + known.String() + `"}`),
+		[]byte(`{"announcement_id":"` + missing.String() + `"}`),
+		[]byte(`not json`),
+	}
+	ld, rowErrs, err := e.Load(context.Background(), src, raws)
+	if err != nil || len(ld) != 3 || len(rowErrs) != 3 {
+		t.Fatalf("Load = %+v %v（%v）", ld, rowErrs, err)
+	}
+	if src.calls != 1 {
+		t.Errorf("Sources 被呼叫 %d 次，一批只該一次", src.calls)
+	}
+	if ld[0].Announcement == nil || ld[0].Announcement.Title != "t" || rowErrs[0] != nil {
+		t.Errorf("第 0 筆 = %+v（%v）", ld[0], rowErrs[0])
+	}
+	if ld[1].Announcement != nil || rowErrs[1] != nil {
+		t.Errorf("查不到的公告應是零值且不是列錯誤：%+v（%v）", ld[1], rowErrs[1])
+	}
+	if rowErrs[2] == nil {
+		t.Error("壞掉的快照應是列錯誤")
 	}
 	plain, _ := Lookup("account_unsuspended")
-	if ld, err := plain.Load(context.Background(), nil, []byte(`{}`)); err != nil || ld != (Loaded{}) {
-		t.Errorf("沒有 Load 的型別應回零值：%+v（%v）", ld, err)
+	pl, pe, err := plain.Load(context.Background(), nil, []json.RawMessage{[]byte(`{}`)})
+	if err != nil || len(pl) != 1 || pl[0] != (Loaded{}) || pe[0] != nil {
+		t.Errorf("沒有 Load 的型別應回零值：%+v %v（%v）", pl, pe, err)
 	}
 }

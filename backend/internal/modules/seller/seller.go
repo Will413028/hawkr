@@ -600,7 +600,7 @@ func (m *Module) LockNotRetired(ctx context.Context, storeID int64) error {
 	return m.closing.LockNotRetired(ctx, storeID)
 }
 
-// StoreAccount 是店家 stint 與所屬帳號的對應（ListLiveStoreAccounts 的元素）。
+// StoreAccount 是店家與所屬帳號的對應（ListLiveStoreAccounts 的元素）。
 type StoreAccount = model.StoreAccount
 
 // MaxLiveStoresPage 是 ListLiveStoreAccounts 一頁的上限。

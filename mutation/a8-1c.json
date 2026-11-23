@@ -66,11 +66,11 @@
   {
    "id": "worker-account-missing-keeps-intent-params",
    "stack": "go-integration",
-   "file": "backend/internal/modules/notification/internal/intake/intake.go",
-   "old": "\t\t\ts.logGone(ctx, intent, gone)\n\t\t\treturn s.scrubSkipped(ctx, intent.ID)",
-   "new": "\t\t\ts.logGone(ctx, intent, gone)\n\t\t\treturn nil",
+   "file": "backend/internal/modules/notification/internal/intake/locks.go",
+   "old": "if apperr.KindOf(err) == apperr.KindNotFound {\n\t\t\treturn GoneNoAccount, nil",
+   "new": "if apperr.KindOf(err) == apperr.KindNotFound && false {\n\t\t\treturn GoneNoAccount, nil",
    "test": "internal/modules/notification ^TestIntentForAMissingAccountWritesNothingAndScrubsParams$",
-   "why": "Process skips an intent whose recipient account does not exist without clearing its params, so the personal data stays for the 180-day retention."
+   "why": "A recipient account that does not exist is no longer classified as gone, so Process fails with a lock error instead of skipping the intent and clearing its params."
   }
  ]
 }

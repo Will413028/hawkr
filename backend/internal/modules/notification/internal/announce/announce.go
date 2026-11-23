@@ -1,6 +1,6 @@
 // Package announce 是後台公告：建立與列表（use case），以及把公告派送給受眾的 job 鏈（fanout.go）。
 // 公告是資料不是事件型別：建立時寫一列公告、一個意圖列（id 與公告相同，讓每筆推播投遞紀錄有 intent_id）與兩條 job 鏈，
-// 收件匣與推播分開處理；沒有 device token 的帳號也收得到收件匣那份（缺陷 5–7）。
+// 收件匣與推播分開處理；沒有 device token 的帳號也收得到收件匣那份。
 package announce
 
 import (
@@ -65,7 +65,7 @@ type Deps struct {
 	Now       func() time.Time
 	NewID     func() uuid.UUID
 	Logger    *slog.Logger
-	// Chunk 是一個派送 job 處理的收件人數上限；0 用 ChunkSize。
+	// Chunk 是一個派送 job 處理的收件人數上限；0 用 ChunkSize，超過 MaxChunk 以 MaxChunk 計。
 	Chunk int
 }
 
@@ -74,8 +74,11 @@ type Service struct{ d Deps }
 
 // New 建立 Service。
 func New(d Deps) *Service {
-	if d.Chunk <= 0 {
+	switch {
+	case d.Chunk <= 0:
 		d.Chunk = ChunkSize
+	case d.Chunk > MaxChunk:
+		d.Chunk = MaxChunk
 	}
 	return &Service{d: d}
 }

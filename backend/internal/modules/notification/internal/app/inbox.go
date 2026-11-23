@@ -90,30 +90,62 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 		page.Next = &Cursor{UpdatedAt: last.UpdatedAt, ID: last.ID}
 		rows = rows[:size]
 	}
-	for _, row := range rows {
-		item, err := s.render(ctx, l, row)
-		if err != nil {
-			// 一列組不出文字（參數快照壞掉）不拖垮整份收件匣：記錄後略過這一列。
-			s.d.Logger.ErrorContext(ctx, "收件匣列組不出文字，略過", "inbox_item_id", row.ID, "type", row.Type, "error", err)
-			continue
-		}
-		page.Items = append(page.Items, item)
+	items, err := s.renderRows(ctx, l, rows)
+	if err != nil {
+		return Page{}, err
 	}
+	page.Items = items
 	return page, nil
 }
 
-func (s *Service) render(ctx context.Context, l uitext.Locale, row store.ListInboxItemsRow) (Item, error) {
-	e, ok := s.d.Registry.Lookup(row.Type)
-	if !ok {
-		// types 只含註冊表的型別，查詢之後型別不會消失：走到這裡是註冊表不一致。
-		return Item{}, fmt.Errorf("收件匣列 %s 的型別 %q 沒有註冊", row.ID, row.Type)
+// renderRows 把一頁的列組成文字，順序不變。每個型別一次 Load（一頁每個型別一次查詢）：讀取失敗（資料庫錯誤、請求取消）整頁失敗回 error，
+// 不能讓暫時性錯誤悄悄藏掉通知；單列的問題（快照解不開、內容查不到、組不出文字）記錄後只略過那一列。
+func (s *Service) renderRows(ctx context.Context, l uitext.Locale, rows []store.ListInboxItemsRow) ([]Item, error) {
+	byType := map[string][]int{}
+	for i, row := range rows {
+		byType[row.Type] = append(byType[row.Type], i)
 	}
-	params := json.RawMessage(row.Params)
-	loaded, err := e.Load(ctx, s, params)
-	if err != nil {
-		return Item{}, fmt.Errorf("解析收件匣列 %s（%s）的內容：%w", row.ID, row.Type, err)
+	loaded := make([]registry.Loaded, len(rows))
+	rowErr := make([]error, len(rows))
+	for typ, idx := range byType {
+		e, ok := s.d.Registry.Lookup(typ)
+		if !ok {
+			// types 只含註冊表的型別，查詢之後型別不會消失：走到這裡是註冊表不一致。
+			for _, i := range idx {
+				rowErr[i] = fmt.Errorf("收件匣列 %s 的型別 %q 沒有註冊", rows[i].ID, typ)
+			}
+			continue
+		}
+		params := make([]json.RawMessage, len(idx))
+		for k, i := range idx {
+			params[k] = json.RawMessage(rows[i].Params)
+		}
+		got, errs, err := e.Load(ctx, s, params)
+		if err != nil {
+			return nil, fmt.Errorf("解析收件匣型別 %s 的內容：%w", typ, err)
+		}
+		for k, i := range idx {
+			loaded[i], rowErr[i] = got[k], errs[k]
+		}
 	}
-	out, err := e.RenderLoaded(l, params, loaded)
+	items := make([]Item, 0, len(rows))
+	for i, row := range rows {
+		item, err := s.render(l, row, loaded[i], rowErr[i])
+		if err != nil {
+			s.d.Logger.ErrorContext(ctx, "收件匣列組不出文字，略過", "inbox_item_id", row.ID, "type", row.Type, "error", err)
+			continue
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (s *Service) render(l uitext.Locale, row store.ListInboxItemsRow, loaded registry.Loaded, loadErr error) (Item, error) {
+	if loadErr != nil {
+		return Item{}, loadErr
+	}
+	e, _ := s.d.Registry.Lookup(row.Type)
+	out, err := e.RenderLoaded(l, json.RawMessage(row.Params), loaded)
 	if err != nil {
 		return Item{}, fmt.Errorf("組收件匣列 %s（%s）的文字：%w", row.ID, row.Type, err)
 	}
@@ -198,11 +230,15 @@ func (s *Service) BatchDelete(ctx context.Context, accountID int64, ids []uuid.U
 	})
 }
 
-// Announcement 讀取公告的標題與內文（registry.Sources）：公告型別的收件匣列只存公告 ID，讀取時在這裡解析。
-func (s *Service) Announcement(ctx context.Context, id uuid.UUID) (registry.AnnouncementText, error) {
-	a, err := store.New(s.d.DB.Conn(ctx)).AnnouncementByID(ctx, id)
+// Announcements 讀取多則公告的標題與內文（registry.Sources）：公告型別的收件匣列只存公告 ID，讀取時在這裡一次解析一頁。
+func (s *Service) Announcements(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]registry.AnnouncementText, error) {
+	rows, err := store.New(s.d.DB.Conn(ctx)).AnnouncementsByIDs(ctx, ids)
 	if err != nil {
-		return registry.AnnouncementText{}, fmt.Errorf("讀取公告 %s：%w", id, err)
+		return nil, fmt.Errorf("讀取公告：%w", err)
 	}
-	return registry.AnnouncementText{Title: a.Title, Body: a.Body}, nil
+	out := make(map[uuid.UUID]registry.AnnouncementText, len(rows))
+	for _, r := range rows {
+		out[r.ID] = registry.AnnouncementText{Title: r.Title, Body: r.Body}
+	}
+	return out, nil
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/app"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -29,6 +30,23 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
+
+// steppingClock 是注入的時鐘：從固定時刻起，每讀一次前進一毫秒，讓先建立的公告的建立時間一定早於後建立的，排序不靠真實時間或 sleep。
+type steppingClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func newSteppingClock() *steppingClock {
+	return &steppingClock{now: time.Date(2026, 11, 24, 3, 0, 0, 0, time.UTC)}
+}
+
+func (c *steppingClock) Now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = c.now.Add(time.Millisecond)
+	return c.now
+}
 
 // jobQueue 依排入順序記下公告派送排的 job；測試以 drain 等同 River 取件。
 type jobQueue struct {
@@ -70,16 +88,26 @@ func (q *jobQueue) count(kind string) int {
 type testDirectory struct {
 	buyers *buyer.Module
 	stores []announce.Recipient
+	// poison 非空時排在買家名單第一頁的最前面：一個永遠寫不進去的收件人（帶不合法的 store_id）。
+	poison *announce.Recipient
 }
 
 func (d testDirectory) Buyers(ctx context.Context, after int64, limit int) ([]announce.Recipient, error) {
-	rows, err := d.buyers.ListLiveAccounts(ctx, after, limit)
+	first := d.poison != nil && after == 0
+	n := limit
+	if first {
+		n = limit - 1
+	}
+	rows, err := d.buyers.ListLiveAccounts(ctx, after, n)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]announce.Recipient, len(rows))
-	for i, r := range rows {
-		out[i] = announce.Recipient{AccountID: r.AccountID, Cursor: r.BuyerID}
+	var out []announce.Recipient
+	if first {
+		out = append(out, *d.poison)
+	}
+	for _, r := range rows {
+		out = append(out, announce.Recipient{AccountID: r.AccountID, Cursor: r.BuyerID})
 	}
 	return out, nil
 }
@@ -102,6 +130,7 @@ type announceFixture struct {
 	jobs     *jobQueue
 	dir      *testDirectory
 	stores   *fakeStores
+	clock    *steppingClock
 }
 
 func setupAnnounce(t *testing.T, chunk int) *announceFixture {
@@ -114,6 +143,7 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 		migrate.Module{Name: "notification", Dir: Migrations()},
 	))
 	log := slog.New(slog.DiscardHandler)
+	clock := newSteppingClock()
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: nopJobs{}, Media: media.NewFake(), Now: time.Now, Logger: log})
@@ -123,10 +153,10 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 	dir := &testDirectory{buyers: buyers}
 	svc := announce.New(announce.Deps{
 		DB: d, Locks: intake.Locks{Accounts: id, Buyers: buyers, Stores: stores}, Directory: dir,
-		Audit: adminaudit.New(d, time.Now), Jobs: q, Now: time.Now, NewID: uuid.NewV7, Logger: log, Chunk: chunk,
+		Audit: adminaudit.New(d, clock.Now), Jobs: q, Now: clock.Now, NewID: uuid.NewV7, Logger: log, Chunk: chunk,
 	})
 	inbox := app.New(app.Deps{DB: d, Accounts: id, Registry: registry.Registry{}, Now: time.Now, Logger: log})
-	return &announceFixture{db: d, identity: id, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores}
+	return &announceFixture{db: d, identity: id, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores, clock: clock}
 }
 
 func (f *announceFixture) newAccount(t *testing.T) int64 {
@@ -211,7 +241,7 @@ func (f *announceFixture) reload(t *testing.T) announce.Announcement {
 	return page.Announcements[0]
 }
 
-// 沒有 device token 的帳號也收到收件匣那份（缺陷 5–7：舊系統只送有 token 的人）；兩個帳號都計入 inbox_count，派送完成後 dispatched 為真。
+// 沒有 device token 的帳號也收到收件匣那份（舊系統只送有 token 的人）；兩個帳號都計入 inbox_count，派送完成後 dispatched 為真。
 // mutation：收件匣加上「只寫給有 token 的帳號」→ 沒有 token 的帳號沒有收件匣列，失敗。
 func TestAccountWithoutDeviceTokenStillGetsTheInboxItem(t *testing.T) {
 	f := setupAnnounce(t, 0)
@@ -236,7 +266,7 @@ func TestAccountWithoutDeviceTokenStillGetsTheInboxItem(t *testing.T) {
 	}
 }
 
-// 推播與收件匣分開：每個收件人（不看 token）寫一筆 PENDING 的推播投遞紀錄並排渠道 job；關掉公告推播的人沒有推播紀錄，收件匣照樣有（D18）。
+// 推播與收件匣分開：每個收件人（不看 token）寫一筆 PENDING 的推播投遞紀錄並排渠道 job；關掉公告推播的人沒有推播紀錄，收件匣照樣有。
 func TestPushRespectsTheAnnouncementPreferenceAndInboxDoesNot(t *testing.T) {
 	f := setupAnnounce(t, 0)
 	on, off := f.newAccount(t), f.newAccount(t)
@@ -420,7 +450,6 @@ func TestListAnnouncementsPagesNewestFirst(t *testing.T) {
 	for i := range 3 {
 		a := f.create(t, announce.CreateInput{Audiences: []string{"STORE"}, Title: string(rune('A' + i)), Body: "b"})
 		ids = append(ids, a.ID)
-		time.Sleep(2 * time.Millisecond)
 	}
 	p1, err := f.svc.List(context.Background(), nil, 2)
 	if err != nil || len(p1.Announcements) != 2 || p1.Next == nil {
@@ -439,7 +468,7 @@ func TestListAnnouncementsPagesNewestFirst(t *testing.T) {
 }
 
 // 建立的公告出現在收件人的收件匣：列表（含 category=ANNOUNCEMENT 篩選，total 計入）、未讀數、全部已讀都看得到它；
-// 文字是公告的英文原文，zh-TW 請求也一樣（D17）。公告的收件匣列只存公告 ID，標題與內文在讀取時由公告型別解析。
+// 文字是公告的英文原文，zh-TW 請求也一樣。公告的收件匣列只存公告 ID，標題與內文在讀取時由公告型別解析。
 // mutation：型別註冊表排除 announcement → 收件匣的型別篩選把公告列藏起來，這個測試紅。
 func TestAnnouncementShowsInTheInboxAndIsRenderedInEnglish(t *testing.T) {
 	f := setupAnnounce(t, 0)
@@ -474,5 +503,114 @@ func TestAnnouncementShowsInTheInboxAndIsRenderedInEnglish(t *testing.T) {
 	}
 	if f.inboxRowFor(t, a.ID, acct) != 1 {
 		t.Error("收件匣列不該被已讀刪掉")
+	}
+}
+
+// 一個永遠寫不進去的收件人（買家帶了 store_id，違反 inbox_items_store_check 與 deliveries_store_check）不擋住整則公告：兩條鏈都略過它、游標照常前進，
+// 同一頁與之後的收件人照常收到，dispatched 為真；略過的收件人沒有任何列。
+// mutation：fanout.go 的 page 對永久性錯誤也直接 return → 派送卡在第一頁，後面的人收不到，dispatched 不會變真，失敗。
+func TestOneRecipientThatCanNeverBeWrittenDoesNotStopTheAnnouncement(t *testing.T) {
+	f := setupAnnounce(t, 2)
+	var accounts []int64
+	for range 4 {
+		accounts = append(accounts, f.newAccount(t))
+	}
+	f.dir.poison = &announce.Recipient{AccountID: accounts[0], StoreID: 99, Cursor: 0}
+	a := f.create(t, announce.CreateInput{Audiences: []string{"BUYER"}})
+	f.drain(t)
+
+	if f.inboxRows(t, a.ID) != 4 || f.pushRows(t, a.ID) != 4 {
+		t.Errorf("收件匣 %d 列、推播 %d 筆，預期各 4（四個真的買家都要收到，毒收件人不多不少）", f.inboxRows(t, a.ID), f.pushRows(t, a.ID))
+	}
+	if n := f.scan(t, `SELECT count(*) FROM notification.inbox_items WHERE announcement_id = $1 AND audience = 'BUYER' AND store_id IS NOT NULL`, a.ID); n != 0 {
+		t.Errorf("毒收件人寫進了 %d 列", n)
+	}
+	for _, acct := range accounts {
+		if f.inboxRowFor(t, a.ID, acct) != 1 {
+			t.Errorf("帳號 %d 沒有收到收件匣列", acct)
+		}
+	}
+	if got := f.reload(t); !got.Dispatched || got.InboxCount != 4 {
+		t.Errorf("dispatched = %v、inbox_count = %d，預期 true、4", got.Dispatched, got.InboxCount)
+	}
+}
+
+// 最後一頁不滿 Chunk 個收件人就直接收尾，不多排一個空頁：3 個買家、一頁 2 人，收件匣與推播各兩個 job（開頭一個加第二頁一個）。
+// mutation：fanout.go 的 `len(recipients) >= s.d.Chunk` 改成 `len(recipients) > 0` → 各多排一個空頁，失敗。
+func TestLastPartialPageFinishesWithoutAnExtraEmptyPage(t *testing.T) {
+	f := setupAnnounce(t, 2)
+	for range 3 {
+		f.newAccount(t)
+	}
+	a := f.create(t, announce.CreateInput{Audiences: []string{"BUYER"}})
+	f.drain(t)
+	if n := f.jobs.count(announce.InboxArgs{}.Kind()); n != 2 {
+		t.Errorf("收件匣派送 job 共 %d 個，預期 2", n)
+	}
+	if n := f.jobs.count(announce.PushArgs{}.Kind()); n != 2 {
+		t.Errorf("推播派送 job 共 %d 個，預期 2", n)
+	}
+	if f.inboxRows(t, a.ID) != 3 || !f.reload(t).Dispatched {
+		t.Errorf("收件匣 %d 列、dispatched = %v，預期 3、true", f.inboxRows(t, a.ID), f.reload(t).Dispatched)
+	}
+}
+
+// 清除一個收件人的個資時，所有推播收件人共用的公告意圖（id 與公告相同，參數只有公告 ID）不被清掉：其他收件人的投遞紀錄仍連得到有內容的意圖，
+// 收件匣照樣組得出公告；被清除的收件人自己的列沒了。
+// mutation：retention.sql 的 ScrubRecipientIntentParams 拿掉 NOT EXISTS announcements 條件 → 共用意圖被換成 '{}'，失敗。
+func TestPurgingOneRecipientKeepsTheSharedAnnouncementIntent(t *testing.T) {
+	f := setupAnnounce(t, 0)
+	ctx := context.Background()
+	gone, kept := f.newAccount(t), f.newAccount(t)
+	a := f.create(t, announce.CreateInput{Audiences: []string{"BUYER"}, Title: "Maintenance", Body: "Tonight."})
+	f.drain(t)
+	if f.pushRows(t, a.ID) != 2 || f.inboxRows(t, a.ID) != 2 {
+		t.Fatalf("前提：兩人各有收件匣列與推播紀錄，現在 %d、%d", f.inboxRows(t, a.ID), f.pushRows(t, a.ID))
+	}
+
+	svc := purge.New(purge.Deps{DB: f.db, Jobs: f.jobs, Now: f.clock.Now, Logger: slog.New(slog.DiscardHandler)})
+	if err := svc.Recipient(ctx, purge.RecipientArgs{AccountID: gone, Audience: "BUYER"}); err != nil {
+		t.Fatal(err)
+	}
+	if f.inboxRowFor(t, a.ID, gone) != 0 || f.inboxRowFor(t, a.ID, kept) != 1 {
+		t.Errorf("被清除的人收件匣 %d 列、另一人 %d 列，預期 0、1", f.inboxRowFor(t, a.ID, gone), f.inboxRowFor(t, a.ID, kept))
+	}
+	if n := f.scan(t, `SELECT count(*) FROM notification.intents WHERE id = $1 AND params <> '{}'::jsonb`, a.ID); n != 1 {
+		t.Errorf("公告的共用意圖參數被清掉了")
+	}
+	if n := f.scan(t, `SELECT count(*) FROM notification.deliveries d JOIN notification.intents i ON i.id = d.intent_id
+		WHERE d.account_id = $1 AND i.params <> '{}'::jsonb`, kept); n != 1 {
+		t.Errorf("另一人的推播紀錄連不到有內容的意圖：%d", n)
+	}
+	page, err := f.inbox.ListInbox(ctx, app.Recipient{AccountID: kept, Audience: model.AudienceBuyer}, nil, uitext.EN, nil, 10)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Title != "Maintenance" {
+		t.Errorf("另一人的收件匣 = %+v（%v）", page.Items, err)
+	}
+}
+
+// 收件匣組文字時，單列的問題（參數快照壞掉）記錄後略過、其他列照常；讀公告內容本身失敗（資料庫錯誤）則整個請求失敗，不能悄悄藏掉通知。
+// mutation：inbox.go 的 renderRows 把 Load 的讀取錯誤也記錄後略過 → 第二段不再回錯誤，失敗。
+func TestInboxSkipsABrokenRowButFailsOnALoadError(t *testing.T) {
+	f := setupAnnounce(t, 0)
+	ctx := context.Background()
+	acct := f.newAccount(t)
+	f.create(t, announce.CreateInput{Audiences: []string{"BUYER"}, Title: "Good", Body: "b"})
+	broken := f.create(t, announce.CreateInput{Audiences: []string{"BUYER"}, Title: "Broken", Body: "b"})
+	f.drain(t)
+	r := app.Recipient{AccountID: acct, Audience: model.AudienceBuyer}
+
+	if _, err := f.db.Pool().Exec(ctx, `UPDATE notification.inbox_items SET params = '{"announcement_id": 7}' WHERE announcement_id = $1`, broken.ID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := f.inbox.ListInbox(ctx, r, nil, uitext.EN, nil, 10)
+	if err != nil || len(page.Items) != 1 || page.Items[0].Title != "Good" || page.Total != 2 {
+		t.Fatalf("壞掉的快照應只略過那一列：items = %+v、total = %d（%v）", page.Items, page.Total, err)
+	}
+
+	if _, err := f.db.Pool().Exec(ctx, `ALTER TABLE notification.announcements RENAME TO announcements_unreachable`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.inbox.ListInbox(ctx, r, nil, uitext.EN, nil, 10); err == nil {
+		t.Fatal("讀公告內容失敗應讓請求失敗，不該回一份少了通知的收件匣")
 	}
 }

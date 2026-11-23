@@ -14,8 +14,8 @@ type AnnouncementParams struct {
 	AnnouncementID uuid.UUID `json:"announcement_id"`
 }
 
-// 公告發給兩個受眾，收件人由公告的派送 job 展開（Fanout），所以沒有冪等鍵與收件人；渠道是收件匣與推播，沒有 email（D18）。
-// 文字只有英文（D17），不依請求語系，所以請求 zh-TW 也是同一份英文。
+// 公告發給兩個受眾，收件人由公告的派送 job 展開（Fanout），所以沒有冪等鍵與收件人；渠道是收件匣與推播，沒有 email。
+// 文字只有英文，不依請求語系，所以請求 zh-TW 也是同一份英文。
 var (
 	exampleAnnouncementID = uuid.MustParse("0190a000-0000-7000-8000-0000000000a1")
 	announcement          = Define(Definition[AnnouncementParams]{
@@ -26,12 +26,22 @@ var (
 		Category:     model.CategoryAnnouncement,
 		Presentation: model.PresentationSystem,
 		Channels:     []model.Channel{model.ChannelInbox, model.ChannelPush},
-		Load: func(ctx context.Context, src Sources, p AnnouncementParams) (Loaded, error) {
-			a, err := src.Announcement(ctx, p.AnnouncementID)
-			if err != nil {
-				return Loaded{}, err
+		Load: func(ctx context.Context, src Sources, ps []AnnouncementParams) ([]Loaded, error) {
+			ids := make([]uuid.UUID, len(ps))
+			for i, p := range ps {
+				ids[i] = p.AnnouncementID
 			}
-			return Loaded{Announcement: &a}, nil
+			found, err := src.Announcements(ctx, ids)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]Loaded, len(ps))
+			for i, id := range ids {
+				if a, ok := found[id]; ok {
+					out[i] = Loaded{Announcement: &a}
+				}
+			}
+			return out, nil
 		},
 		TextLoaded: func(_ uitext.Locale, _ AnnouncementParams, ld Loaded) (Content, error) {
 			if ld.Announcement == nil {

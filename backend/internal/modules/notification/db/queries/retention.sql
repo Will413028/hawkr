@@ -39,11 +39,13 @@ WHERE id = sqlc.arg(id) AND params <> '{}'::jsonb;
 -- name: ScrubRecipientIntentParams :execrows
 -- 個資清除：把該收件人的意圖參數換成 '{}'（意圖經 inbox_item_intents 與 deliveries 找到），分批；已是 '{}' 的不再處理，所以可重跑。
 -- 收件人範圍：audience 為 NULL 是帳號的全部列；store_id 為 NULL 不限店。
+-- 公告的意圖（id 與公告相同）由全部推播收件人共用，參數只有公告 ID、沒有個資，不在單一收件人的清除範圍內。
 UPDATE notification.intents
 SET params = '{}'::jsonb
 WHERE id IN (
     SELECT s.id FROM notification.intents s
     WHERE s.params <> '{}'::jsonb
+      AND NOT EXISTS (SELECT 1 FROM notification.announcements an WHERE an.id = s.id)
       AND s.id IN (
         SELECT l.intent_id
         FROM notification.inbox_item_intents l

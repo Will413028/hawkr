@@ -11,6 +11,10 @@ SELECT * FROM notification.announcements WHERE admin_id = sqlc.arg(admin_id) AND
 -- name: AnnouncementByID :one
 SELECT * FROM notification.announcements WHERE id = sqlc.arg(id);
 
+-- name: AnnouncementsByIDs :many
+-- 收件匣一頁一次讀多則公告的標題與內文；查不到的 id 不在結果裡。
+SELECT id, title, body FROM notification.announcements WHERE id = ANY(sqlc.arg(ids)::uuid[]);
+
 -- name: ListAnnouncements :many
 -- 新到舊（created_at，再依 id），keyset 分頁；after_created_at 為 NULL 是第一頁。呼叫端要 limit + 1 筆來判斷有沒有下一頁。
 SELECT * FROM notification.announcements

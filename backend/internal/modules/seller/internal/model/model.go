@@ -409,7 +409,7 @@ func Error(err error) error {
 	return err
 }
 
-// StoreAccount 是店家 stint 與所屬帳號的對應，只有鍵，不含個資。
+// StoreAccount 是店家與所屬帳號的對應，只有鍵，不含個資。
 type StoreAccount struct{ StoreID, AccountID int64 }
 
 // MaxLiveStoresPage 是 ListLiveStoreAccounts 一頁的上限。

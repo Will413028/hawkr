@@ -102,7 +102,7 @@ func New(deps Deps) *Module {
 // Status stint 的生命週期狀態。
 type Status = model.Status
 
-// AccountRef 是買家 stint 與所屬帳號的對應（ListLiveAccounts 的元素）。
+// AccountRef 是買家與所屬帳號的對應（ListLiveAccounts 的元素）。
 type AccountRef = model.AccountRef
 
 // MaxLiveAccountsPage 是 ListLiveAccounts 一頁的上限。

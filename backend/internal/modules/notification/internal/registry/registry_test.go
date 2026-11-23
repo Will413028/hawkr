@@ -113,7 +113,7 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 			d.TextLoaded = func(l uitext.Locale, _ params, _ Loaded) (Content, error) { return Content{}, nil }
 		},
 		"Load 沒有 TextLoaded": func(d *Definition[params]) {
-			d.Load = func(context.Context, Sources, params) (Loaded, error) { return Loaded{}, nil }
+			d.Load = func(context.Context, Sources, []params) ([]Loaded, error) { return nil, nil }
 		},
 		"走意圖管線卻有多個受眾": func(d *Definition[params]) {
 			d.Audiences = []model.Audience{model.AudienceBuyer, model.AudienceStore}
