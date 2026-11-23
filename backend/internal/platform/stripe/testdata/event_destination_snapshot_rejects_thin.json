@@ -1,0 +1,14 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "message": "Enabled events list contains 'thin' event types when event_payload is 'snapshot'.",
+      "request_log_url": "<MASKED>",
+      "event_type": [
+        "v2.core.account.updated"
+      ],
+      "other_payload": "thin",
+      "selected_payload": "snapshot"
+    }
+  }
+}

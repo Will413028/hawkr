@@ -1,0 +1,11 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "message": "Transfers using this transaction as a source must not exceed the source amount of $60.00. (Source available amount change could be linked to partial/complete refunds of the charge.)",
+      "param": "source_transaction",
+      "request_log_url": "<MASKED>",
+      "type": "invalid_request_error"
+    }
+  }
+}

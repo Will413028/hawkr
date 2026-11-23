@@ -1,0 +1,31 @@
+{
+  "status": 200,
+  "body": {
+    "id": "re_3Uew6dRPCx5baPmE1E7VAYxX",
+    "object": "refund",
+    "amount": 3000,
+    "application": null,
+    "balance_transaction": "txn_3Uew6dRPCx5baPmE1cfvyq8C",
+    "charge": "ch_3Uew6dRPCx5baPmE1wWmgUSM",
+    "created": 1795435946,
+    "currency": "usd",
+    "customer": null,
+    "customer_account": null,
+    "destination_details": {
+      "card": {
+        "reference_status": "pending",
+        "reference_type": "acquirer_reference_number",
+        "type": "refund"
+      },
+      "type": "card"
+    },
+    "metadata": {},
+    "payment_intent": "pi_3Uew6dRPCx5baPmE1eO1Ok5c",
+    "payment_method": "pm_1Uew6dRPCx5baPmEMT62Zejv",
+    "reason": null,
+    "receipt_number": null,
+    "source_transfer_reversal": null,
+    "status": "succeeded",
+    "transfer_reversal": null
+  }
+}

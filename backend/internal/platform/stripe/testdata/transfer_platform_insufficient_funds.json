@@ -1,0 +1,12 @@
+{
+  "status": 400,
+  "body": {
+    "error": {
+      "code": "balance_insufficient",
+      "doc_url": "https://stripe.com/docs/error-codes/balance-insufficient",
+      "message": "You have insufficient available funds in your Stripe account. Try adding funds directly to your available balance by creating Charges using the 4000000000000077 test card. See: https://stripe.com/docs/testing#available-balance",
+      "request_log_url": "<MASKED>",
+      "type": "invalid_request_error"
+    }
+  }
+}
