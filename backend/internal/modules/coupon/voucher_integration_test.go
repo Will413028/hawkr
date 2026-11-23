@@ -65,19 +65,17 @@ func TestClaimIsIdempotent(t *testing.T) {
 	}
 }
 
-// 領券的資格：ALL 只給活動建立之前註冊的買家，MEMBER 只給在該店有消費紀錄的，DESIGNATED 只給名單內的。
+// 領券的資格：ALL 給所有買家（含活動建立之後才註冊的），MEMBER 只給在該店有消費紀錄的，DESIGNATED 只給名單內的。
 func TestClaimChecksTargetEligibility(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.buyers.created[buyer2] = base.Add(time.Hour)
 
 	all := f.campaign()
 	f.claim(all, buyer1)
-	_, err := f.m.Claim(context.Background(), all.ID, buyer2)
-	wantReason(t, err, coupon.ReasonNotEligible)
+	f.claim(all, buyer2)
 
 	member := f.campaign(func(in *coupon.CreateCampaignInput) { in.TargetType, in.StoreID = coupon.TargetMember, storeA })
-	_, err = f.m.Claim(context.Background(), member.ID, buyer1)
+	_, err := f.m.Claim(context.Background(), member.ID, buyer1)
 	wantReason(t, err, coupon.ReasonNotEligible)
 	f.members.members[[2]int64{buyer1, storeA}] = true
 	f.claim(member, buyer1)
@@ -555,4 +553,32 @@ func TestVoidVoucherClearsAStuckLock(t *testing.T) {
 	if err := f.m.VoidVoucher(context.Background(), coupon.VoidVoucherInput{VoucherID: w.ID, AdminID: adminID}); coupon.ReasonOf(err) != coupon.ReasonInvalidStatus {
 		t.Fatalf("作廢已核銷的券 = %v", err)
 	}
+}
+
+// D8 修訂：賣家發行的活動在發行店家停權期間不能領、不能鎖，解除後恢復；平台活動不受影響；已鎖的券停權期間照常核銷。
+func TestSuspendedStoreBlocksClaimAndLockButNotRedeem(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	seller := f.campaign(func(in *coupon.CreateCampaignInput) { in.Issuer = coupon.Issuer{StoreID: storeA} })
+	platform := f.campaign()
+	held := f.claim(seller, buyer3)
+	locked := f.mustLock(f.claim(seller, buyer2), "O-LOCKED")
+
+	f.stores.set(storeA, true)
+	_, err := f.m.Claim(context.Background(), seller.ID, buyer1)
+	wantReason(t, err, coupon.ReasonStoreSuspended)
+	_, err = f.lock(held, "O1")
+	wantReason(t, err, coupon.ReasonStoreSuspended)
+	if got := f.voucherStatus(held.ID); got != "AVAILABLE" {
+		t.Fatalf("被擋下的券狀態 = %s，要維持 AVAILABLE", got)
+	}
+	f.claim(platform, buyer1)
+
+	if r, err := f.m.Redeem(context.Background(), "O-LOCKED"); err != nil || r.VoucherID != locked.Voucher.ID {
+		t.Fatalf("停權期間已鎖的券要能核銷：%+v, %v", r, err)
+	}
+
+	f.stores.set(storeA, false)
+	f.claim(seller, buyer1)
+	f.mustLock(held, "O1")
 }

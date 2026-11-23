@@ -36,7 +36,7 @@ schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_
 ## 不負責
 
 - 結帳與訂單狀態：ordering（B8）；B8 前由 `legacy/couponserver` 以自己的 transaction 包 Lock、Redeem、Release。
-- 買家註冊時間、MEMBER 的消費紀錄：`Buyers`、`Members` port 由組裝點提供（identity 或 buyer 的 API、B7-4 的投影）；本模組不 import `ordering` 與 `internal/legacy`。
+- 店家停權狀態、MEMBER 的消費紀錄：`Stores`、`Members` port 由組裝點提供（seller 的 API、B7-4 的投影）；本模組不 import `ordering` 與 `internal/legacy`。
 - 刪帳、停權事件的訂閱、到期提醒 job 與 `VoucherExpiring` 事件：B7-4。Connect API、買家列表查詢：B7-3。通知：notification 模組訂閱事件。
 
 ## 決策紀錄

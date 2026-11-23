@@ -12,9 +12,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// Buyers 是買家註冊時間的 port（ALL 資格用）。讀取失敗就回錯誤，不降級（BD28）。
-type Buyers interface {
-	BuyerCreatedAt(ctx context.Context, buyerID int64) (time.Time, error)
+// Stores 是「店家目前是否停權」的 port：賣家發行的活動在發行店家停權期間不能領、不能鎖（D8 修訂）。
+// 讀取失敗就回錯誤，不降級（BD28）。
+type Stores interface {
+	StoreSuspended(ctx context.Context, storeID int64) (bool, error)
 }
 
 // Members 是「買家在該店有消費紀錄」的 port（MEMBER 資格用）。B7-4 由 coupon 自己持有的投影實作，B7-2 的測試用假的。
@@ -25,7 +26,7 @@ type Members interface {
 // Deps 是判定的依賴。
 type Deps struct {
 	DB      *db.DB
-	Buyers  Buyers
+	Stores  Stores
 	Members Members
 }
 
@@ -44,6 +45,15 @@ func (s *Service) Check(ctx context.Context, c model.Campaign, buyerID int64, no
 	if now.Before(c.StartAt) || c.Expired(now) {
 		return model.Precondition(model.ReasonOutsideWindow)
 	}
+	if c.IssuerStoreID != nil {
+		suspended, err := s.d.Stores.StoreSuspended(ctx, *c.IssuerStoreID)
+		if err != nil {
+			return fmt.Errorf("coupon：讀店家 %d 的停權狀態：%w", *c.IssuerStoreID, err)
+		}
+		if suspended {
+			return model.Precondition(model.ReasonStoreSuspended)
+		}
+	}
 	ok, err := s.targets(ctx, c, buyerID)
 	if err != nil {
 		return err
@@ -57,11 +67,7 @@ func (s *Service) Check(ctx context.Context, c model.Campaign, buyerID int64, no
 func (s *Service) targets(ctx context.Context, c model.Campaign, buyerID int64) (bool, error) {
 	switch c.TargetType {
 	case model.TargetAll:
-		created, err := s.d.Buyers.BuyerCreatedAt(ctx, buyerID)
-		if err != nil {
-			return false, fmt.Errorf("coupon：讀買家 %d 的註冊時間：%w", buyerID, err)
-		}
-		return !created.After(c.CreatedAt), nil
+		return true, nil
 	case model.TargetMember:
 		if c.StoreID == nil {
 			return false, nil

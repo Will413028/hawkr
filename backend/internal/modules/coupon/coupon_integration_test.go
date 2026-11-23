@@ -37,19 +37,22 @@ const (
 	windowLen = 24 * time.Hour
 )
 
-// fakeBuyers 與 fakeMembers 是 coupon 的 port 的替身（B7-3、B7-4 才接真的）。
-type fakeBuyers struct {
-	mu      sync.Mutex
-	created map[int64]time.Time
+// fakeStores 與 fakeMembers 是 coupon 的 port 的替身（接 seller 的組裝在 B7-3，B7-4 接投影）。
+type fakeStores struct {
+	mu        sync.Mutex
+	suspended map[int64]bool
 }
 
-func (f *fakeBuyers) BuyerCreatedAt(_ context.Context, id int64) (time.Time, error) {
+func (f *fakeStores) StoreSuspended(_ context.Context, id int64) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if t, ok := f.created[id]; ok {
-		return t, nil
-	}
-	return base.Add(-longAgo), nil
+	return f.suspended[id], nil
+}
+
+func (f *fakeStores) set(id int64, v bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.suspended[id] = v
 }
 
 type fakeMembers struct {
@@ -68,7 +71,7 @@ type fixture struct {
 	t       *testing.T
 	db      *db.DB
 	m       *coupon.Module
-	buyers  *fakeBuyers
+	stores  *fakeStores
 	members *fakeMembers
 	clock   atomic.Int64
 }
@@ -79,10 +82,10 @@ func (f *fixture) advance(d time.Duration) { f.clock.Add(int64(d)) }
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, buyers: &fakeBuyers{created: map[int64]time.Time{}}, members: &fakeMembers{members: map[[2]int64]bool{}}}
+	f := &fixture{t: t, stores: &fakeStores{suspended: map[int64]bool{}}, members: &fakeMembers{members: map[[2]int64]bool{}}}
 	f.clock.Store(base.UnixNano())
 	f.db = pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "coupon", Dir: coupon.Migrations()}))
-	f.m = coupon.New(coupon.Deps{DB: f.db, Buyers: f.buyers, Members: f.members, NewID: uuid.NewV7, Now: f.now})
+	f.m = coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Members: f.members, NewID: uuid.NewV7, Now: f.now})
 	return f
 }
 

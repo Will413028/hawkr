@@ -53,6 +53,15 @@
    "new": "",
    "test": "internal/modules/coupon ^TestCompensationResendCreatesOneVoucher$",
    "why": "補償活動的 INSERT 拿掉 ON CONFLICT：重送撞唯一鍵失敗（或重複建立），補償重送只建一張的測試要紅。"
+  },
+  {
+   "id": "drop-suspension-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/qualify/qualify.go",
+   "old": "\t\tif suspended {\n\t\t\treturn model.Precondition(model.ReasonStoreSuspended)\n\t\t}\n",
+   "new": "\t\t_ = suspended\n",
+   "test": "internal/modules/coupon ^TestSuspendedStoreBlocksClaimAndLockButNotRedeem$",
+   "why": "資格判定拿掉停權檢查（D8 修訂）：停權店家的活動仍可領、可鎖，停權測試要紅。"
   }
  ]
 }

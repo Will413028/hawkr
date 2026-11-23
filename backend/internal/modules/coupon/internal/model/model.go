@@ -146,6 +146,7 @@ const (
 	ReasonCampaignNotActive         Reason = "COUPON_CAMPAIGN_NOT_ACTIVE"
 	ReasonOutsideWindow             Reason = "COUPON_OUTSIDE_WINDOW"
 	ReasonNotEligible               Reason = "COUPON_NOT_ELIGIBLE"
+	ReasonStoreSuspended            Reason = "COUPON_STORE_SUSPENDED"
 	ReasonIssueLimitReached         Reason = "COUPON_ISSUE_LIMIT_REACHED"
 	ReasonVoucherUnavailable        Reason = "COUPON_VOUCHER_UNAVAILABLE"
 	ReasonVoucherLockedByOtherOrder Reason = "COUPON_VOUCHER_LOCKED_BY_OTHER_ORDER"

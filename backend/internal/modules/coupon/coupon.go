@@ -32,7 +32,7 @@ func Migrations() fs.FS {
 // Deps 是模組需要的外部依賴，全部在組裝點提供。
 type Deps struct {
 	DB      *db.DB
-	Buyers  Buyers
+	Stores  Stores
 	Members Members
 	// NewID 產生活動與券的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
@@ -104,6 +104,7 @@ const (
 	ReasonCampaignNotActive         = model.ReasonCampaignNotActive
 	ReasonOutsideWindow             = model.ReasonOutsideWindow
 	ReasonNotEligible               = model.ReasonNotEligible
+	ReasonStoreSuspended            = model.ReasonStoreSuspended
 	ReasonIssueLimitReached         = model.ReasonIssueLimitReached
 	ReasonVoucherUnavailable        = model.ReasonVoucherUnavailable
 	ReasonVoucherLockedByOtherOrder = model.ReasonVoucherLockedByOtherOrder
@@ -127,10 +128,10 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Buyers == nil || d.Members == nil || d.NewID == nil || d.Now == nil {
-		panic("coupon：DB、Buyers、Members、NewID 與 Now 是必要的")
+	if d.DB == nil || d.Stores == nil || d.Members == nil || d.NewID == nil || d.Now == nil {
+		panic("coupon：DB、Stores、Members、NewID 與 Now 是必要的")
 	}
-	q := qualify.New(qualify.Deps{DB: d.DB, Buyers: d.Buyers, Members: d.Members})
+	q := qualify.New(qualify.Deps{DB: d.DB, Stores: d.Stores, Members: d.Members})
 	return &Module{
 		campaign: campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
 		voucher:  voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now}),
