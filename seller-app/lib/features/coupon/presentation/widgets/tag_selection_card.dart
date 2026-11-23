@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import '../../../../core/l10n/ui_locale.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -177,7 +178,7 @@ class _CouponTagSelectionCardState extends State<CouponTagSelectionCard> {
             ...widget.matchedCustomers.asMap().entries.map((entry) {
               final customer = entry.value;
               return _CustomerCard(
-                name: customer.displayName(context.uiLocale),
+                name: customer.displayName(context.uiLocale, context.l10n),
                 accountId: customer.id,
                 onRemove: () => widget.onRemoveCustomer(entry.key),
               );

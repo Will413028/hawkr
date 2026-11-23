@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:hawkr_seller/features/customer/data/customer_model.dart';
 import 'package:hawkr_seller/features/customer/data/customer_repository.dart';
 import 'package:hawkr_seller/features/customer/presentation/customer_controller.dart';
 import 'package:hawkr_seller/features/customer/presentation/customer_management_screen.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations_zh.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
@@ -23,7 +25,12 @@ Future<void> _pump(WidgetTester tester, _MockRepo repo) async {
       overrides: [customerRepositoryProvider.overrideWithValue(repo)],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
-        builder: (_, _) => const MaterialApp(home: CustomerManagementScreen()),
+        builder: (_, _) => const MaterialApp(
+          locale: Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: CustomerManagementScreen(),
+        ),
       ),
     ),
   );
@@ -179,7 +186,7 @@ void main() {
   test('a deleted customer shows the catalog deleted name', () {
     const c = Customer(id: 'b1', deleted: true, name: '舊暱稱');
     expect(
-      c.displayName(UiLocale.zhTW),
+      c.displayName(UiLocale.zhTW, AppLocalizationsZh()),
       buyerProfileDeletedName(UiLocale.zhTW),
     );
   });

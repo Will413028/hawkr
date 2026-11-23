@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -29,6 +30,9 @@ void main() {
         child: ScreenUtilInit(
           designSize: const Size(390, 844),
           builder: (_, __) => MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: ValueListenableBuilder<String>(
                 valueListenable: sku,

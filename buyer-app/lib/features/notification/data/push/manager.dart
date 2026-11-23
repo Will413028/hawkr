@@ -359,7 +359,7 @@ class PushNotificationManager {
             conversationId,
           )) {
         HKLog.logD(
-          '[FCM] 跳過 chat_message banner：使用者已在聊天室內 '
+          '[FCM] skip chat_message banner: user is already in the conversation '
           'conversationId=$conversationId',
         );
         return;

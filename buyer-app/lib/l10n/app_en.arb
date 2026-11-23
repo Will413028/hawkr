@@ -14,5 +14,9 @@
   "viewedYesterday": "Viewed yesterday",
   "viewedDays": "{count, plural, =1{Viewed 1 day ago} other{Viewed {count} days ago}}",
   "viewedDate": "Viewed {month}/{day}",
-  "viewedRecently": "Viewed recently"
+  "viewedRecently": "Viewed recently",
+  "commonRetry": "Retry",
+  "productReviewsTitle": "Reviews",
+  "productReviewsTitleWithCount": "Reviews ({count})",
+  "chatStoreFallbackName": "Store"
 }

@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import '../../support/connect_errors.dart';
@@ -79,6 +80,10 @@ void main() {
           enableScaleWH: () => false,
           enableScaleText: () => false,
           builder: (_, _) => const MaterialApp(
+            locale: Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+
             home: ProductReviewsScreen(
               sellerId: '123',
               skuId: 'sku-1',
@@ -146,6 +151,10 @@ void main() {
           child: ScreenUtilInit(
             designSize: const Size(390, 844),
             builder: (_, _) => const MaterialApp(
+              locale: Locale('zh'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+
               home: ProductReviewsScreen(
                 sellerId: '123',
                 skuId: 'sku-1',

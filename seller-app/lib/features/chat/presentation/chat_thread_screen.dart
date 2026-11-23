@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_api/taipei_time.dart';
 import 'dart:async';
 
@@ -140,7 +141,8 @@ class ChatThreadScreen extends HookConsumerWidget {
 
     final peerName = (data?.buyer?.deleted ?? false)
         ? buyerProfileDeletedName(locale)
-        : (data?.buyer?.name ?? (title.isNotEmpty ? title : '顧客'));
+        : (data?.buyer?.name ??
+              (title.isNotEmpty ? title : context.l10n.chatBuyerFallbackName));
     final peerAvatar = data?.buyer?.avatarUri;
 
     void showSendError(Object e) {
@@ -299,7 +301,7 @@ class ChatThreadScreen extends HookConsumerWidget {
               Padding(
                 padding: EdgeInsets.only(top: 2.h),
                 child: Text(
-                  '送出失敗，點一下重送',
+                  context.l10n.chatSendFailedResend,
                   key: const ValueKey('chat-send-failed'),
                   style: TextStyle(fontSize: 12.sp, color: AppColors.danger),
                 ),
@@ -308,7 +310,7 @@ class ChatThreadScreen extends HookConsumerWidget {
               Padding(
                 padding: EdgeInsets.only(top: 2.h),
                 child: Text(
-                  '傳送中…',
+                  context.l10n.chatSending,
                   style: TextStyle(
                     fontSize: 12.sp,
                     color: AppColors.textSecondary,
@@ -319,7 +321,7 @@ class ChatThreadScreen extends HookConsumerWidget {
               Padding(
                 padding: EdgeInsets.only(top: 2.h),
                 child: Text(
-                  '${read ? '已讀 ' : ''}${_hhmm(m.createTime)}',
+                  '${read ? context.l10n.chatReadPrefix : ''}${_hhmm(m.createTime)}',
                   style: TextStyle(
                     fontSize: 12.sp,
                     color: AppColors.textSecondary,
@@ -337,9 +339,9 @@ class ChatThreadScreen extends HookConsumerWidget {
         error: (e, _) => Center(
           child: HkAsyncStatePanel(
             kind: HkAsyncStateKind.error,
-            title: '目前無法載入訊息',
-            description: '請確認網路連線後再試一次。',
-            actionLabel: '重新載入',
+            title: context.l10n.chatLoadFailedTitle,
+            description: context.l10n.chatLoadFailedDescription,
+            actionLabel: context.l10n.commonReload,
             onAction: notifier.reload,
           ),
         ),

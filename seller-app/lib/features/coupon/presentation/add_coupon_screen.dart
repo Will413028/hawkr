@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
@@ -223,7 +224,7 @@ class AddCouponScreen extends HookConsumerWidget {
       selectedUsers.value = [
         ...selectedUsers.value,
         for (final c in picked)
-          {'name': c.displayName(context.uiLocale), 'id': c.id},
+          {'name': c.displayName(context.uiLocale, context.l10n), 'id': c.id},
       ];
     }
 
@@ -932,7 +933,7 @@ class _SpecifyUserSection extends StatelessWidget {
                   ),
                   SizedBox(width: 4.w),
                   Text(
-                    '從客戶名單選擇',
+                    context.l10n.couponPickFromCustomers,
                     style: TextStyle(fontSize: 14.sp, color: themeColor),
                   ),
                 ],

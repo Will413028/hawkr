@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 
@@ -149,7 +150,7 @@ class _ReportSheetContentState extends ConsumerState<_ReportSheetContent> {
               ),
               SizedBox(height: 16.h),
               Text(
-                '檢舉訊息',
+                context.l10n.reportMessageTitle,
                 style: TextStyle(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.w700,

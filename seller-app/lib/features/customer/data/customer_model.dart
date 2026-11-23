@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pb.dart' as pb;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
@@ -69,12 +70,12 @@ class Customer {
 
   bool get isVip => type == CustomerType.CUSTOMER_TYPE_VIP;
 
-  /// 顯示名稱：已刪除的買家用目錄的 `buyer.Profile.deleted_name`，沒有暱稱時用「買家」。
-  String displayName(UiLocale l) => deleted
+  /// 顯示名稱：已刪除的買家用目錄的 `buyer.Profile.deleted_name`，沒有暱稱時用 ARB 的 `customerBuyerFallbackName`。
+  String displayName(UiLocale l, AppLocalizations t) => deleted
       ? buyerProfileDeletedName(l)
       : name.isNotEmpty
       ? name
-      : '買家';
+      : t.customerBuyerFallbackName;
 
   Customer copyWith({CustomerType? type, List<CustomerTag>? tags}) => Customer(
     id: id,

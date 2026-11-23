@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_seller/core/theme/app_colors.dart';
@@ -85,27 +86,29 @@ class _CustomerPickerSheetState extends ConsumerState<_CustomerPickerSheet> {
     return SafeArea(
       child: Column(
         children: [
-          const Padding(
-            padding: EdgeInsets.all(HkSpace.lg),
+          Padding(
+            padding: const EdgeInsets.all(HkSpace.lg),
             child: Text(
-              '選擇客戶',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              context.l10n.customerPickerTitle,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
           ),
           Expanded(
             child: ListView(
               children: [
                 if (_loadedOnce && _customers.isEmpty && error == null)
-                  const Padding(
-                    key: ValueKey('coupon-picker-empty'),
-                    padding: EdgeInsets.all(HkSpace.xl),
-                    child: Center(child: Text('沒有可選的客戶')),
+                  Padding(
+                    key: const ValueKey('coupon-picker-empty'),
+                    padding: const EdgeInsets.all(HkSpace.xl),
+                    child: Center(
+                      child: Text(context.l10n.customerPickerEmpty),
+                    ),
                   ),
                 for (final c in _customers)
                   CheckboxListTile(
                     key: ValueKey('coupon-picker-${c.id}'),
                     value: _selected.containsKey(c.id),
-                    title: Text(c.displayName(context.uiLocale)),
+                    title: Text(c.displayName(context.uiLocale, context.l10n)),
                     subtitle: Text('ID ${c.id}'),
                     onChanged: (v) => setState(() {
                       if (v == true) {
@@ -130,7 +133,7 @@ class _CustomerPickerSheetState extends ConsumerState<_CustomerPickerSheet> {
                         ),
                         TextButton(
                           onPressed: _load,
-                          child: const HkButtonLabel('重試'),
+                          child: HkButtonLabel(context.l10n.commonRetry),
                         ),
                       ],
                     ),
@@ -144,7 +147,7 @@ class _CustomerPickerSheetState extends ConsumerState<_CustomerPickerSheet> {
                   TextButton(
                     key: const ValueKey('coupon-picker-more'),
                     onPressed: _load,
-                    child: const HkButtonLabel('載入更多'),
+                    child: HkButtonLabel(context.l10n.commonLoadMore),
                   ),
               ],
             ),
@@ -159,7 +162,9 @@ class _CustomerPickerSheetState extends ConsumerState<_CustomerPickerSheet> {
                     : () => Navigator.of(
                         context,
                       ).pop(_selected.values.toList(growable: false)),
-                child: HkButtonLabel('加入名單（${_selected.length}）'),
+                child: HkButtonLabel(
+                  context.l10n.customerPickerAdd(_selected.length),
+                ),
               ),
             ),
           ),

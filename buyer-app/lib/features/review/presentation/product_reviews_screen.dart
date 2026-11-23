@@ -7,6 +7,7 @@ import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import '../../../core/l10n/ui_locale.dart';
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:hawkr_api/errors.dart' show errorText;
@@ -187,7 +188,11 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
-      appBar: buildCommonTitleAppBar(context, title: '商品評價', showBack: true),
+      appBar: buildCommonTitleAppBar(
+        context,
+        title: context.l10n.productReviewsTitle,
+        showBack: true,
+      ),
       body: _isLoading
           ? const TruckLoadingOverlay()
           : _loadError != null
@@ -250,7 +255,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
             TextButton(
               key: const ValueKey('product-reviews-retry'),
               onPressed: _loadReviews,
-              child: const HkButtonLabel('重試'),
+              child: HkButtonLabel(context.l10n.commonRetry),
             ),
           ],
         ),

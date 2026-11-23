@@ -35,8 +35,8 @@ class ChatListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen> {
-  static String _nameOf(pb.Conversation c, UiLocale locale) =>
-      c.hasStore() ? c.store.displayName(locale) : '店家';
+  static String _nameOf(pb.Conversation c, UiLocale locale, String fallback) =>
+      c.hasStore() ? c.store.displayName(locale) : fallback;
 
   static String _previewOf(pb.Conversation c, UiLocale locale) =>
       c.hasPreview() ? chatPreviewText(c.preview, locale) : '';
@@ -257,7 +257,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                   ? base
                                   : base.where((c) {
                                       final hay =
-                                          '${_nameOf(c, locale)} ${_previewOf(c, locale)}'
+                                          '${_nameOf(c, locale, context.l10n.chatStoreFallbackName)} ${_previewOf(c, locale)}'
                                               .toLowerCase();
                                       return hay.contains(q);
                                     }).toList();
@@ -302,7 +302,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                                     const SizedBox(height: HkSpace.md),
                                 itemBuilder: (context, index) {
                                   final c = list[index];
-                                  final name = _nameOf(c, locale);
+                                  final name = _nameOf(
+                                    c,
+                                    locale,
+                                    context.l10n.chatStoreFallbackName,
+                                  );
                                   final time = c.hasLastMessageTime()
                                       ? c.lastMessageTime.toDateTime()
                                       : null;

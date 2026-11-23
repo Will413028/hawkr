@@ -116,5 +116,26 @@
   "viewedRecently": "最近看過",
   "@viewedRecently": {
     "description": "Browsing history label when the time is unknown."
+  },
+  "commonRetry": "重試",
+  "@commonRetry": {
+    "description": "Retry button label after a failed load."
+  },
+  "productReviewsTitle": "商品評價",
+  "@productReviewsTitle": {
+    "description": "Title of the product reviews section and screen."
+  },
+  "productReviewsTitleWithCount": "商品評價 ({count})",
+  "@productReviewsTitleWithCount": {
+    "description": "Product reviews title with the total review count.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "chatStoreFallbackName": "店家",
+  "@chatStoreFallbackName": {
+    "description": "Conversation title when the store profile is missing."
   }
 }

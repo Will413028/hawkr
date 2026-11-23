@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
@@ -31,7 +32,10 @@ class CustomerOrdersScreen extends ConsumerWidget {
     final orders = ref.watch(customerOrdersProvider(customerId));
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
-      appBar: HkGlassAppBar(title: Text(customerName), subtitle: '顧客訂單'),
+      appBar: HkGlassAppBar(
+        title: Text(customerName),
+        subtitle: context.l10n.customerOrdersTitle,
+      ),
       body: orders.when(
         loading: () => const TruckLoadingOverlay(),
         error: (e, _) => Center(
@@ -53,7 +57,7 @@ class CustomerOrdersScreen extends ConsumerWidget {
               FilledButton.tonal(
                 onPressed: () =>
                     ref.invalidate(customerOrdersProvider(customerId)),
-                child: const HkButtonLabel('重新載入'),
+                child: HkButtonLabel(context.l10n.commonReload),
               ),
             ],
           ),
@@ -61,9 +65,9 @@ class CustomerOrdersScreen extends ConsumerWidget {
         data: (state) {
           final list = state.orders;
           if (list.isEmpty) {
-            return const HkEmptyState(
+            return HkEmptyState(
               icon: HkIconName.box,
-              message: '暫無訂單',
+              message: context.l10n.customerOrdersEmpty,
               topPadding: 40,
             );
           }

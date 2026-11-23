@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/hk_tokens.dart';
@@ -43,7 +44,7 @@ class _CustomerLoadMoreFooterState extends State<CustomerLoadMoreFooter> {
             Text(error, textAlign: TextAlign.center),
             TextButton(
               onPressed: widget.onLoadMore,
-              child: const HkButtonLabel('重試'),
+              child: HkButtonLabel(context.l10n.commonRetry),
             ),
           ],
         ),

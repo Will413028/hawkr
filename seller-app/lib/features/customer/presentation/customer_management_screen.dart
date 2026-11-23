@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
@@ -282,7 +283,8 @@ class _CustomerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return HkContentCard(
       onTap: onTap,
-      semanticLabel: '查看顧客 ${customer.displayName(context.uiLocale)}',
+      semanticLabel:
+          '查看顧客 ${customer.displayName(context.uiLocale, context.l10n)}',
       padding: const EdgeInsets.symmetric(
         horizontal: HkSpace.lg,
         vertical: HkSpace.md,
@@ -365,7 +367,7 @@ class _CustomerCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        customer.displayName(context.uiLocale),
+                        customer.displayName(context.uiLocale, context.l10n),
                         style: TextStyle(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.w700,

@@ -56,4 +56,63 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get taipeiTimeLabel => '台北時間';
+
+  @override
+  String get commonRetry => '重試';
+
+  @override
+  String get commonReload => '重新載入';
+
+  @override
+  String get commonLoadMore => '載入更多';
+
+  @override
+  String get chatLoadMoreFailedRetry => '載入更多失敗，點此重試';
+
+  @override
+  String get chatBuyerFallbackName => '顧客';
+
+  @override
+  String get chatSendFailedResend => '送出失敗，點一下重送';
+
+  @override
+  String get chatSending => '傳送中…';
+
+  @override
+  String get chatReadPrefix => '已讀 ';
+
+  @override
+  String get chatLoadFailedTitle => '目前無法載入訊息';
+
+  @override
+  String get chatLoadFailedDescription => '請確認網路連線後再試一次。';
+
+  @override
+  String get customerOrdersTitle => '顧客訂單';
+
+  @override
+  String get customerOrdersEmpty => '暫無訂單';
+
+  @override
+  String get customerBuyerFallbackName => '買家';
+
+  @override
+  String get couponPickFromCustomers => '從客戶名單選擇';
+
+  @override
+  String get couponPickFromCustomersHint => '從客戶名單挑選這次發放的會員';
+
+  @override
+  String get reportMessageTitle => '檢舉訊息';
+
+  @override
+  String get customerPickerTitle => '選擇客戶';
+
+  @override
+  String get customerPickerEmpty => '沒有可選的客戶';
+
+  @override
+  String customerPickerAdd(int count) {
+    return '加入名單（$count）';
+  }
 }

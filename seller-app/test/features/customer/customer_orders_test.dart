@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -74,6 +75,10 @@ Future<void> _pump(WidgetTester tester, _FakeOrders repo) async {
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (_, _) => const MaterialApp(
+          locale: Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+
           home: CustomerOrdersScreen(customerId: '42', customerName: '甲'),
         ),
       ),

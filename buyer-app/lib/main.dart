@@ -40,7 +40,6 @@ import 'features/chat/data/chat_display.dart';
 import 'features/chat/data/chat_realtime.dart';
 import 'features/chat/data/chat_repository.dart';
 import 'features/seller/data/store_card_display.dart';
-import 'core/l10n/ui_locale.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as chat_pb;
 import 'features/notification/data/push/background_handler.dart';
 import 'features/notification/data/push/manager.dart';

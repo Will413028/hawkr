@@ -645,7 +645,6 @@
       "訂單資料無效": 2,
       "貼文媒體": 1,
       "顧客": 3,
-      "顧客消費紀錄": 1,
       "顧客訂單": 1
     },
     "lib/core/session/my_store.dart": {
@@ -711,42 +710,6 @@
       "請選擇以下一種方式登入": 1,
       "透過{}繼續": 1
     },
-    "lib/features/chat/data/chat_picker_remote_service.dart": {
-      "無法載入選擇清單，請稍後再試": 1,
-      "請求失敗 ({})": 1,
-      "載入失敗": 1
-    },
-    "lib/features/chat/data/chat_picker_repository.dart": {
-      "載入失敗": 1
-    },
-    "lib/features/chat/data/chat_repository.dart": {
-      "[ChatRepository] liveness timeout — {}s 無入站幀，視為斷線": 1,
-      "[商品]": 1,
-      "[圖片]": 1,
-      "傳送失敗（{}）": 1
-    },
-    "lib/features/chat/data/chat_thread_notifier.dart": {
-      "無法解析聊天對象，請稍候再試": 1
-    },
-    "lib/features/chat/presentation/chat_attachment_picker.dart": {
-      "上傳照片": 1,
-      "無法取得對象資訊": 1,
-      "無法取得買家資訊": 1,
-      "發送商品卡片失敗": 1,
-      "發送訂單卡片失敗": 1,
-      "載入商品中...": 1,
-      "載入商品失敗：{}": 1,
-      "載入訂單中...": 1,
-      "載入訂單失敗：{}": 1,
-      "選擇上架商品": 1,
-      "選擇訂單": 1
-    },
-    "lib/features/chat/presentation/chat_card.dart": {
-      "備註：{}": 1,
-      "圖片已過期": 1,
-      "完成日期：{}": 1,
-      "訂單編號：#{}": 1
-    },
     "lib/features/chat/presentation/chat_empty_state.dart": {
       "找不到相關對話": 1,
       "清除搜尋": 1,
@@ -775,41 +738,11 @@
       "顧客對話，共 {} 則，{} 則未讀": 1,
       "，{} 則未讀": 1
     },
-    "lib/features/chat/presentation/chat_picker_controller.dart": {
-      "無法載入選擇清單，請稍後再試": 1
-    },
-    "lib/features/chat/presentation/chat_preview.dart": {
-      "傳送了一張卡片": 4,
-      "傳送了一張商品卡片": 1,
-      "傳送了一張圖片": 5,
-      "傳送了一張訂單卡片": 1
-    },
-    "lib/features/chat/presentation/chat_send_error_dispatch.dart": {
-      "內容未通過審核，請調整後再試": 1,
-      "對方已將你封鎖，無法傳送訊息": 1
-    },
     "lib/features/chat/presentation/chat_thread_screen.dart": {
-      "(原訊息)": 1,
-      "[ChatThread] 🖼️ 送出圖片: stagedToken={}..., previewUrl={}": 1,
-      "上傳失敗，未取得 stagedToken": 1,
-      "上午": 1,
-      "下午": 1,
-      "刪除": 1,
-      "回覆": 1,
-      "回覆 {}": 1,
-      "回覆卡片": 1,
-      "回覆照片": 1,
       "封鎖此人": 1,
       "尚無訊息": 1,
-      "已複製": 1,
-      "已讀": 1,
-      "找不到原始訊息": 2,
-      "未讀": 1,
       "檢舉訊息": 1,
-      "此使用者": 1,
       "無法取得商家ID，請重新登入後再試": 1,
-      "發送圖片失敗，請稍後再試": 1,
-      "發送失敗，請稍後再試": 1,
       "線上": 1,
       "複製": 1,
       "離線": 1
@@ -817,9 +750,6 @@
     "lib/features/coupon/data/coupon_repository.dart": {
       "建立優惠券失敗": 1,
       "撤銷優惠券失敗": 1,
-      "未找到該用戶": 1,
-      "查無此用戶": 1,
-      "查詢參數錯誤，請確認輸入": 1,
       "無權限執行此操作": 2,
       "請求參數錯誤": 1,
       "載入優惠券詳情失敗": 1
@@ -847,19 +777,12 @@
       "最低消費門檻": 1,
       "有效期限": 1,
       "有效期限：{}": 1,
-      "查詢中": 1,
-      "查詢失敗，請稍後再試": 1,
       "消費過會員": 2,
-      "添加": 1,
       "現金折抵：NT${}": 1,
-      "用戶": 1,
       "發放優惠券": 1,
       "發送失敗，請稍後再試": 1,
       "百分比折扣": 1,
-      "目標用戶群": 1,
-      "該用戶已在列表中": 2,
-      "請輸入手機號碼": 1,
-      "輸入手機號碼": 1
+      "目標用戶群": 1
     },
     "lib/features/coupon/presentation/coupon_card_widget.dart": {
       "{}%折優惠": 1,
@@ -905,14 +828,10 @@
       "折數折抵": 2,
       "拍攝照片": 1,
       "指定會員": 2,
-      "查詢失敗，請稍後再試": 1,
       "消費過會員": 1,
       "無法開啟相機或相簿": 1,
       "現金折抵": 2,
-      "用戶": 1,
-      "該用戶已添加": 2,
       "請輸入優惠券名稱": 1,
-      "請輸入手機號碼": 1,
       "選取圖片失敗，請重試": 1
     },
     "lib/features/coupon/presentation/widgets/date_picker_card.dart": {
@@ -993,12 +912,8 @@
       "移除會員": 1
     },
     "lib/features/coupon/presentation/widgets/specify_user_card.dart": {
-      "加入名單": 1,
       "已選擇 {} 位會員": 1,
-      "建立指定名單": 1,
-      "查找會員並加入這次發放名單": 1,
-      "查詢中": 1,
-      "輸入會員手機號碼": 1
+      "建立指定名單": 1
     },
     "lib/features/coupon/presentation/widgets/submit_button.dart": {
       "儲存並發放優惠券": 1,
@@ -1033,15 +948,10 @@
     "lib/features/coupon/presentation/widgets/top_bar.dart": {
       "返回": 1
     },
-    "lib/features/customer/data/customer_repository.dart": {
-      "商品": 1,
-      "未知": 1
-    },
     "lib/features/customer/data/subscriber_model.dart": {
       "用戶 {}": 1
     },
     "lib/features/customer/presentation/customer_detail_screen.dart": {
-      "優惠卷": 1,
       "升級 VIP": 1,
       "取消 VIP": 1,
       "增加標籤": 1,
@@ -1051,83 +961,41 @@
       "將此標籤加入顧客": 1,
       "將顧客 ID 複製到剪貼簿": 1,
       "尚無標籤": 1,
-      "已加入黑名單": 1,
       "已升級為 VIP": 1,
       "已取消 VIP": 1,
       "已複製 ID": 1,
-      "已解除黑名單": 1,
-      "常購品項": 1,
       "快速標籤": 1,
       "愛退貨": 1,
       "新增": 1,
       "新增快速標籤 {}": 1,
       "新增或移除顧客標籤": 1,
       "新增標籤": 1,
-      "新增標籤失敗": 1,
       "新增輸入的標籤": 1,
       "新增顧客標籤": 1,
       "新客": 1,
-      "更新顧客狀態失敗，請稍後再試": 1,
-      "未填寫": 2,
-      "未填寫 Email": 1,
       "正在更新顧客狀態": 1,
       "此標籤已新增": 1,
       "消費總金額": 1,
       "目前標籤": 1,
       "移除標籤 {}": 4,
-      "移除標籤失敗": 1,
       "管理客戶標籤": 1,
       "管理顧客標籤": 2,
-      "聯絡資訊": 1,
       "聯絡顧客": 2,
       "複製顧客 ID": 2,
-      "解除黑名單": 1,
       "訂單數": 1,
-      "設黑名單": 1,
       "輸入標籤名稱": 1,
       "顧客 360": 1,
       "顧客更多操作": 1,
-      "高消費": 1,
-      "黑名單": 1
+      "高消費": 1
     },
     "lib/features/customer/presentation/customer_management_screen.dart": {
       "{} 次消費": 1,
       "全部顧客": 1,
-      "找不到相關顧客": 1,
-      "搜尋姓名或電話": 1,
       "暫無顧客": 1,
-      "最近光顧": 3,
       "有人下單後會自動加入這份名單。": 1,
       "查看顧客 {}": 1,
-      "消費次數": 4,
-      "消費金額": 3,
-      "試試不同的關鍵字，或清除搜尋條件。": 1,
       "重新載入": 1,
-      "顧客管理": 1,
-      "顧客資料載入失敗": 1,
-      "黑名單": 2
-    },
-    "lib/features/customer/presentation/customer_order_card_widget.dart": {
-      "尚無評論": 1
-    },
-    "lib/features/customer/presentation/customer_spending_history_screen.dart": {
-      "優惠卷": 1,
-      "全部": 2,
-      "售後處理": 2,
-      "日期": 1,
-      "暫無優惠卷": 1,
-      "暫無消費": 1,
-      "暫無訂單": 2,
-      "消費金額": 2,
-      "累積消費總額": 1,
-      "訂單": 1,
-      "訂單取消": 2,
-      "訂單完成": 2,
-      "訂單編號": 1,
-      "訂單進行中": 2,
-      "退回": 1,
-      "退回總額": 1,
-      "顧客消費紀錄": 1
+      "顧客管理": 1
     },
     "lib/features/customer/presentation/subscriber_list_controller.dart": {
       "無法載入訂閱者，請稍後再試": 1
@@ -2647,7 +2515,6 @@
       "整體評分": 1,
       "星": 1,
       "暫無符合條件的評論": 1,
-      "會員 {}": 2,
       "有圖片": 2,
       "篩選評價": 1,
       "評分 {} 分，滿分 5 分": 1,
@@ -2852,12 +2719,6 @@
       "評價圖片檢視": 1,
       "關閉圖片": 1
     },
-    "lib/features/report/data/block_repository.dart": {
-      "封鎖失敗": 1
-    },
-    "lib/features/report/data/report_repository.dart": {
-      "檢舉送出失敗": 1
-    },
     "lib/features/report/data/store_block_repository.dart": {
       "買家": 1
     },
@@ -2871,14 +2732,9 @@
       "解除封鎖": 1,
       "重試": 1
     },
-    "lib/features/report/presentation/report_block_error_dispatch.dart": {
-      "內容未通過審核，請調整後再試": 1,
-      "對方已將你封鎖，無法傳送訊息": 1
-    },
     "lib/features/report/presentation/widgets/block_actions.dart": {
       "封鎖": 1,
       "封鎖「{}」？": 1,
-      "封鎖失敗，請稍後再試": 1,
       "封鎖後，對方將無法傳送訊息或留言給你；你可以隨時在「封鎖名單」解除封鎖。": 1,
       "封鎖後，對方將無法在你的貼文與討論區留言、按讚，也無法傳送訊息給你；對方仍看得到你公開的內容，評價不受影響。你可以隨時在「封鎖名單」解除封鎖。": 1,
       "已封鎖「{}」": 2,
@@ -2888,8 +2744,6 @@
     },
     "lib/features/report/presentation/widgets/report_sheet.dart": {
       "已送出檢舉，感謝你的回報": 1,
-      "檢舉{}": 1,
-      "檢舉送出失敗，請稍後再試": 1,
       "補充說明（選填）": 1,
       "請選擇檢舉原因，我們會盡快處理": 1,
       "送出檢舉": 1
@@ -4078,9 +3932,6 @@
       "預約出貨": 1,
       "預覽": 1
     },
-    "lib/shared/models/buyer_card_info.dart": {
-      "已刪除帳號": 1
-    },
     "lib/shared/utils/text_length_validator.dart": {
       "{}長度過長，最多 {} 個字（中文算 2、英文算 1）": 1,
       "請輸入{}": 1
@@ -4132,43 +3983,6 @@
       "發送訊息": 1,
       "訊息傳送中": 1,
       "輸入訊息...": 1
-    },
-    "lib/shared/widgets/chat_order_bubble.dart": {
-      "全額退款": 1,
-      "共 {} 件商品": 1,
-      "已付款": 1,
-      "已取消": 1,
-      "已完成": 1,
-      "已送達": 1,
-      "待付款": 1,
-      "待出貨": 1,
-      "待取貨": 1,
-      "買家：{}": 1,
-      "賣家：{}": 1,
-      "部分退款": 1,
-      "配送中": 1
-    },
-    "lib/shared/widgets/chat_order_picker_sheet.dart": {
-      "全額退款": 1,
-      "共 {} 件商品": 1,
-      "已付款": 1,
-      "已取消": 1,
-      "已完成": 1,
-      "已送達": 1,
-      "待付款": 1,
-      "待出貨": 1,
-      "待取貨": 1,
-      "暫無訂單": 1,
-      "買家：{}": 1,
-      "賣家：{}": 1,
-      "選擇訂單": 1,
-      "部分退款": 1,
-      "配送中": 1,
-      "配送異常": 1
-    },
-    "lib/shared/widgets/chat_product_picker_sheet.dart": {
-      "暫無上架商品": 1,
-      "選擇商品": 1
     },
     "lib/shared/widgets/comments_bottom_sheet.dart": {
       "刪除": 1,

@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'dart:async' as async;
 
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
@@ -373,7 +374,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
               TextButton(
                 key: const ValueKey('seller-product-reviews-retry'),
                 onPressed: _loadReviews,
-                child: const HkButtonLabel('重新載入'),
+                child: HkButtonLabel(context.l10n.commonReload),
               ),
             ],
           ),
@@ -410,7 +411,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
             return TextButton(
               key: const ValueKey('seller-product-reviews-load-more'),
               onPressed: _loadingMore ? null : _loadMore,
-              child: const HkButtonLabel('載入更多'),
+              child: HkButtonLabel(context.l10n.commonLoadMore),
             );
           }
           return Align(

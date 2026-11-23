@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -144,6 +145,9 @@ void main() {
                 enableScaleWH: () => false,
                 enableScaleText: () => false,
                 builder: (_, __) => MaterialApp.router(
+                  localizationsDelegates:
+                      AppLocalizations.localizationsDelegates,
+                  supportedLocales: AppLocalizations.supportedLocales,
                   theme: AppTheme.light,
                   routerConfig: router,
                   builder: (context, child) => MediaQuery(

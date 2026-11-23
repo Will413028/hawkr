@@ -307,6 +307,8 @@ List<Map<String, dynamic>>? _extraMapList(
   return routeMapList(extra, key);
 }
 
+const _customerOrdersRouteLabel = '顧客訂單';
+
 Widget _invalidRouteData(String label) {
   return Scaffold(
     key: const ValueKey('invalid-route-data'),
@@ -595,7 +597,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final customerId = _extraMapValue<String>(extra, 'customerId');
           final customerName = _extraMapValue<String>(extra, 'customerName');
           if (customerId == null || customerName == null) {
-            return _invalidRouteData('顧客訂單');
+            return _invalidRouteData(_customerOrdersRouteLabel);
           }
           return CustomerOrdersScreen(
             customerId: customerId,
@@ -611,7 +613,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final order = _extraMapValue<OrderRecord>(extra, 'order');
           final customerName = _extraMapValue<String>(extra, 'customerName');
           if (order == null || customerName == null) {
-            return _invalidRouteData('顧客訂單');
+            return _invalidRouteData(_customerOrdersRouteLabel);
           }
           return CustomerOrderDetailScreen(
             order: order,

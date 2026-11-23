@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
@@ -300,7 +301,7 @@ class CouponEditorScreen extends HookConsumerWidget {
         ...selectedUsers.value,
         for (final c in picked)
           {
-            'name': c.displayName(context.uiLocale),
+            'name': c.displayName(context.uiLocale, context.l10n),
             'accountId': c.id,
             'avatarUrl': c.avatarUrl ?? '',
           },

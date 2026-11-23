@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'dart:async';
 
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
@@ -27,6 +28,10 @@ Future<void> _pump(WidgetTester tester, _MockCustomerRepository repo) async {
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (_, _) => MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+
           theme: AppTheme.light,
           home: const CustomerDetailScreen(customer: _normal),
         ),

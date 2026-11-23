@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart';
@@ -108,7 +109,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
       context.push(
         '/customer/orders',
         extra: {
-          'customerName': c.displayName(context.uiLocale),
+          'customerName': c.displayName(context.uiLocale, context.l10n),
           'customerId': customer.id,
         },
       );
@@ -202,7 +203,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
       child: Scaffold(
         backgroundColor: AppColors.bgPrimary,
         appBar: HkGlassAppBar(
-          title: Text(c.displayName(context.uiLocale)),
+          title: Text(c.displayName(context.uiLocale, context.l10n)),
           subtitle: '顧客 360',
           onBackPressed: popWithResult,
           actions: [
@@ -211,7 +212,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
               onPressed: () => context.push(
                 '/chat/thread',
                 extra: {
-                  'title': c.displayName(context.uiLocale),
+                  'title': c.displayName(context.uiLocale, context.l10n),
                   'participantId': c.id,
                 },
               ),
@@ -246,7 +247,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
                       ),
                       TextButton(
                         onPressed: loadDetail,
-                        child: const HkButtonLabel('重試'),
+                        child: HkButtonLabel(context.l10n.commonRetry),
                       ),
                     ],
                   ),
@@ -328,7 +329,7 @@ class CustomerDetailScreen extends HookConsumerWidget {
         ),
         SizedBox(height: 12.h),
         Text(
-          customer.displayName(context.uiLocale),
+          customer.displayName(context.uiLocale, context.l10n),
           style: TextStyle(
             fontSize: 20.sp,
             fontWeight: FontWeight.w700,

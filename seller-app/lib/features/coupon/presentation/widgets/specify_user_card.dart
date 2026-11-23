@@ -1,3 +1,4 @@
+import 'package:hawkr_seller/l10n/l10n.dart';
 import 'package:hawkr_seller/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
@@ -63,7 +64,7 @@ class CouponSpecifyUserCard extends StatelessWidget {
                     const SizedBox(height: HkSpace.xs),
                     Text(
                       selectedCount == 0
-                          ? '從客戶名單挑選這次發放的會員'
+                          ? context.l10n.couponPickFromCustomersHint
                           : '已選擇 $selectedCount 位會員',
                       style: const TextStyle(
                         color: AppColors.textMuted,
@@ -83,7 +84,7 @@ class CouponSpecifyUserCard extends StatelessWidget {
               key: const ValueKey('coupon-pick-customers'),
               onPressed: onPickUsers,
               icon: const HkIcon(HkIconName.add, size: 19),
-              label: const HkButtonLabel('從客戶名單選擇'),
+              label: HkButtonLabel(context.l10n.couponPickFromCustomers),
             ),
           ),
           CouponSelectedUsersList(

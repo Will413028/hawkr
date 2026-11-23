@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'package:dio/dio.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
@@ -47,6 +48,8 @@ void main() {
           enableScaleWH: () => false,
           enableScaleText: () => false,
           builder: (_, __) => const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: ProductReviewsScreen(
               merchantId: 'merchant-1',
               skuId: 'sku-1',
@@ -96,6 +99,8 @@ void main() {
           enableScaleWH: () => false,
           enableScaleText: () => false,
           builder: (_, __) => const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: ProductReviewsScreen(
               merchantId: 'merchant-1',
               skuId: 'sku-1',
@@ -337,6 +342,8 @@ void main() {
           enableScaleWH: () => false,
           enableScaleText: () => false,
           builder: (_, __) => const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: ProductReviewsScreen(
               merchantId: 'merchant-1',
               skuId: 'sku-1',
@@ -377,6 +384,8 @@ Future<void> _pumpScreen(WidgetTester tester, FakeReviewPublic fake) async {
         enableScaleWH: () => false,
         enableScaleText: () => false,
         builder: (_, __) => const MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ProductReviewsScreen(
             merchantId: 'merchant-1',
             skuId: 'sku-1',

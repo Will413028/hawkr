@@ -127,7 +127,9 @@ class ChatListScreen extends HookConsumerWidget {
                   return data.loadMoreFailed
                       ? TextButton(
                           onPressed: notifier.loadMore,
-                          child: const HkButtonLabel('載入更多失敗，點此重試'),
+                          child: HkButtonLabel(
+                            context.l10n.chatLoadMoreFailedRetry,
+                          ),
                         )
                       : const Padding(
                           padding: EdgeInsets.all(HkSpace.md),

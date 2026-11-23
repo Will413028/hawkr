@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -2296,8 +2297,8 @@ class ProductReviewPreviewCardState
     final reviewCount = reviews.length;
     final statsCount = _statsCount;
     final reviewTitle = _loadError != null || statsCount == null
-        ? '商品評價'
-        : '商品評價 ($statsCount)';
+        ? context.l10n.productReviewsTitle
+        : context.l10n.productReviewsTitleWithCount(statsCount);
 
     // 只顯示前2筆評論預覽
     final displayReviews = reviews.take(2).toList();
@@ -2331,7 +2332,9 @@ class ProductReviewPreviewCardState
                     extra: {
                       'merchantId': widget.merchantId ?? '',
                       'skuId': widget.skuId ?? '',
-                      'productName': widget.productName ?? '商品評價',
+                      'productName':
+                          widget.productName ??
+                          context.l10n.productReviewsTitle,
                     },
                   );
                 },
@@ -2364,7 +2367,7 @@ class ProductReviewPreviewCardState
                         setState(() => _isLoading = true);
                         _loadReviews();
                       },
-                      child: const HkButtonLabel('重試'),
+                      child: HkButtonLabel(context.l10n.commonRetry),
                     ),
                   ],
                 )
