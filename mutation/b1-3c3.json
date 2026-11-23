@@ -193,8 +193,8 @@
       "id": "delegated-route-failed-precondition-500",
       "stack": "go",
       "file": "backend/internal/httpapi/media/secure_files.go",
-      "old": "case apperr.KindPermissionDenied, apperr.KindFailedPrecondition, apperr.KindNotFound:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)",
-      "new": "case apperr.KindPermissionDenied, apperr.KindNotFound:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)",
+      "old": "case apperr.KindPermissionDenied, apperr.KindFailedPrecondition:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)",
+      "new": "case apperr.KindPermissionDenied:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)",
       "test": "internal/httpapi/media ^TestDelegatedChunkRequiresALiveDelegationSession$",
       "why": "session 已撤銷或逾時（模組回 FailedPrecondition）又被當成 500 並記 error log，而不是 403"
     }
