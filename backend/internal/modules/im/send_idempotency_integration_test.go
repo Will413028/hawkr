@@ -313,6 +313,10 @@ func TestSecondSendOfTheSameRequestWaitsOnTheEntryLock(t *testing.T) {
 	token, asset := f.stage(t, 1000+b1)
 	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token}
 	held, rel := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(rel) }) }
+	// 失敗路徑（沒有等在入口鎖上）也要放行停住的第一個 Send，否則它的 transaction 一直不結束，資料庫清理會卡住。
+	t.Cleanup(release)
 	var first atomic.Bool
 	f.stores.afterLock = func() {
 		if first.CompareAndSwap(false, true) {
@@ -347,8 +351,16 @@ func TestSecondSendOfTheSameRequestWaitsOnTheEntryLock(t *testing.T) {
 		waiting <- r.err
 	}()
 	f.waitLockWaiter(t, waiting)
-	close(rel)
-	ra, rb := <-a, <-b
+	release()
+	var ra, rb result
+	for got := 0; got < 2; got++ {
+		select {
+		case ra = <-a:
+		case rb = <-b:
+		case <-time.After(30 * time.Second):
+			t.Fatal("放行後兩個 Send 沒有在時限內回傳")
+		}
+	}
 	if ra.err != nil || rb.err != nil {
 		t.Fatalf("兩個 Send 都該成功：%v、%v", ra.err, rb.err)
 	}
