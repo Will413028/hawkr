@@ -125,48 +125,55 @@ func (e Executor) load(ctx context.Context, r store.ProcurementAgentRun) (loaded
 	if _, err := q.GetConversationForBuyer(ctx, store.GetConversationForBuyerParams{ID: ld.conversationID, BuyerID: r.BuyerID}); err != nil {
 		return loaded{}, fmt.Errorf("turn：讀取對話：%w", err)
 	}
-	ld.prior.requestOf = ld.request.Status
-
 	rev, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: r.RequestID, BuyerID: ld.buyerID})
 	switch {
 	case err == nil:
 		ld.active = &rev
-		ld.prior.current = setFromRevision(rev)
 	case !errors.Is(err, pgx.ErrNoRows):
 		return loaded{}, fmt.Errorf("turn：讀取現行版本：%w", err)
 	}
+	if ld.prior, err = loadPrior(ctx, q, ld.request, ld.active, r.BuyerID, e.Now()); err != nil {
+		return loaded{}, err
+	}
+	return ld, nil
+}
 
-	prev, err := q.GetLatestTurnByRequest(ctx, store.GetLatestTurnByRequestParams{RequestID: r.RequestID, BuyerID: r.BuyerID})
+// loadPrior 讀這一輪開始前的狀態：需求狀態、現行版本的內容、上一輪的選填進度、價格預覽與確認快照。run 驅動的 executor 與不經 run 的回答、倒回共用。
+func loadPrior(ctx context.Context, q *store.Queries, req store.ProcurementRequest, active *store.ProcurementRequestRevision, buyerID int64, now time.Time) (priorState, error) {
+	prior := priorState{requestOf: req.Status}
+	buyer := &buyerID
+	prev, err := q.GetLatestTurnByRequest(ctx, store.GetLatestTurnByRequestParams{RequestID: req.ID, BuyerID: buyerID})
 	switch {
 	case err == nil:
 		pt := &prevTurn{optionalStreak: int(prev.OptionalStreak)}
 		for _, k := range prev.SkippedSlots {
 			pt.skipped = append(pt.skipped, model.SlotKey(k))
 		}
-		ld.prior.prevTurn = pt
+		prior.prevTurn = pt
 	case !errors.Is(err, pgx.ErrNoRows):
-		return loaded{}, fmt.Errorf("turn：讀取上一輪：%w", err)
+		return priorState{}, fmt.Errorf("turn：讀取上一輪：%w", err)
 	}
-
-	if ld.active != nil {
-		_, err := q.GetLatestPricePreviewForRevision(ctx, store.GetLatestPricePreviewForRevisionParams{
-			RequestID: r.RequestID, RequestRevisionID: ld.active.ID, BuyerID: ld.buyerID, Now: e.Now(),
-		})
-		switch {
-		case err == nil:
-			ld.prior.preview = true
-		case !errors.Is(err, pgx.ErrNoRows):
-			return loaded{}, fmt.Errorf("turn：讀取價格預覽：%w", err)
-		}
-		snap, err := q.GetLatestConfirmedSnapshotByRequest(ctx, store.GetLatestConfirmedSnapshotByRequestParams{RequestID: r.RequestID, BuyerID: ld.buyerID})
-		switch {
-		case err == nil:
-			ld.prior.snapshot = &snapshotState{onCurrentRevision: snap.RequestRevisionID == ld.active.ID}
-		case !errors.Is(err, pgx.ErrNoRows):
-			return loaded{}, fmt.Errorf("turn：讀取確認快照：%w", err)
-		}
+	if active == nil {
+		return prior, nil
 	}
-	return ld, nil
+	prior.current = setFromRevision(*active)
+	_, err = q.GetLatestPricePreviewForRevision(ctx, store.GetLatestPricePreviewForRevisionParams{
+		RequestID: req.ID, RequestRevisionID: active.ID, BuyerID: buyer, Now: now,
+	})
+	switch {
+	case err == nil:
+		prior.preview = true
+	case !errors.Is(err, pgx.ErrNoRows):
+		return priorState{}, fmt.Errorf("turn：讀取價格預覽：%w", err)
+	}
+	snap, err := q.GetLatestConfirmedSnapshotByRequest(ctx, store.GetLatestConfirmedSnapshotByRequestParams{RequestID: req.ID, BuyerID: buyer})
+	switch {
+	case err == nil:
+		prior.snapshot = &snapshotState{onCurrentRevision: snap.RequestRevisionID == active.ID}
+	case !errors.Is(err, pgx.ErrNoRows):
+		return priorState{}, fmt.Errorf("turn：讀取確認快照：%w", err)
+	}
+	return prior, nil
 }
 
 // commit 在單一 transaction 內寫完這一輪：先鎖自己的 run（之後的轉換不會被取消搶在中間），再寫版本、輪次（含 turn_result）、狀態、標題與預覽，

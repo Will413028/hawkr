@@ -31,6 +31,8 @@ type Module interface {
 	ResumeRun(ctx context.Context, in procurement.ResumeRunInput) (procurement.ResumeRunResult, error)
 	StartCandidateSearch(ctx context.Context, in procurement.StartCandidateSearchInput) (procurement.CandidateSearchStarted, error)
 	ToggleSelection(ctx context.Context, in procurement.ToggleSelectionInput) error
+	SubmitAnswer(ctx context.Context, in procurement.SubmitAnswerInput) ([]byte, error)
+	Rewind(ctx context.Context, in procurement.RewindInput) ([]byte, error)
 	GetRuntimeSnapshot(ctx context.Context, buyerID int64, conversationID uuid.UUID) (procurement.RuntimeSnapshot, error)
 	GetSnapshot(ctx context.Context, buyerID int64, requestID uuid.UUID) (procurement.RequestSnapshot, error)
 	GetConversationMessages(ctx context.Context, buyerID int64, conversationID uuid.UUID) (procurement.ConversationMessages, error)
@@ -74,7 +76,12 @@ var (
 	resumePaths = rpc.FieldPaths{
 		"OptionID": "clarification.option_id", "FreeText": "clarification.free_text", "client_request_id": "client_request_id",
 	}
-	watchPaths = rpc.FieldPaths{"cursor": "cursor"}
+	watchPaths  = rpc.FieldPaths{"cursor": "cursor"}
+	answerPaths = rpc.FieldPaths{
+		"SlotKey": "slot_key", "OptionID": "option_id", "FreeText": "free_text", "UnitOptionID": "unit_option_id", "Skip": "skip",
+		"client_request_id": "client_request_id",
+	}
+	rewindPaths = rpc.FieldPaths{"SlotKey": "slot_key", "client_request_id": "client_request_id"}
 )
 
 // clientRequestID 解析必填的冪等鍵：UUIDv4。
@@ -269,6 +276,88 @@ func (h *App) ToggleSelection(ctx context.Context, req *connect.Request[pb.Toggl
 	return connect.NewResponse(&pb.ToggleSelectionResponse{
 		RequestId: requestID.String(), CandidateSetId: setID.String(), CandidateId: candidateID.String(), Selected: msg.GetSelected(),
 	}), nil
+}
+
+// SubmitAnswer 回答一個釐清問題：同步回這一輪的結果（不建 run）。
+func (h *App) SubmitAnswer(ctx context.Context, req *connect.Request[pb.SubmitAnswerRequest]) (*connect.Response[pb.SubmitAnswerResponse], error) {
+	buyerID, err := h.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	msg := req.Msg
+	requestID, err := rpc.ParseUUID("request_id", msg.GetRequestId())
+	if err != nil {
+		return nil, err
+	}
+	slot, err := slotKeyFromProto(msg.GetSlotKey())
+	if err != nil {
+		return nil, err
+	}
+	expected, err := rpc.ParseUUID("expected_revision_id", msg.GetExpectedRevisionId())
+	if err != nil {
+		return nil, err
+	}
+	cid, err := clientRequestID(msg.GetClientRequestId())
+	if err != nil {
+		return nil, err
+	}
+	raw, err := h.m.SubmitAnswer(ctx, procurement.SubmitAnswerInput{
+		BuyerID: buyerID, RequestID: requestID, Slot: slot, OptionID: msg.GetOptionId(), FreeText: msg.GetFreeText(),
+		UnitOptionID: msg.GetUnitOptionId(), Skip: msg.GetSkip(), ExpectedRevisionID: expected, ClientRequestID: cid, Locale: uitext.LocaleFrom(ctx),
+	})
+	if err != nil {
+		return nil, rpc.WithFieldPaths(err, answerPaths)
+	}
+	result, err := turnResultToProto(raw)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.SubmitAnswerResponse{Result: result}), nil
+}
+
+// Rewind 讓需求退回某個欄位重新回答：同步回這一輪的結果（不建 run）。
+func (h *App) Rewind(ctx context.Context, req *connect.Request[pb.RewindRequest]) (*connect.Response[pb.RewindResponse], error) {
+	buyerID, err := h.caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	msg := req.Msg
+	requestID, err := rpc.ParseUUID("request_id", msg.GetRequestId())
+	if err != nil {
+		return nil, err
+	}
+	slot, err := slotKeyFromProto(msg.GetSlotKey())
+	if err != nil {
+		return nil, err
+	}
+	expected, err := rpc.ParseUUID("expected_revision_id", msg.GetExpectedRevisionId())
+	if err != nil {
+		return nil, err
+	}
+	cid, err := clientRequestID(msg.GetClientRequestId())
+	if err != nil {
+		return nil, err
+	}
+	raw, err := h.m.Rewind(ctx, procurement.RewindInput{
+		BuyerID: buyerID, RequestID: requestID, Slot: slot, ExpectedRevisionID: expected, ClientRequestID: cid, Locale: uitext.LocaleFrom(ctx),
+	})
+	if err != nil {
+		return nil, rpc.WithFieldPaths(err, rewindPaths)
+	}
+	result, err := turnResultToProto(raw)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&pb.RewindResponse{Result: result}), nil
+}
+
+// turnResultToProto 把輪次存下的 TurnResult wire JSON（欄位與值名由模組的 golden 測試守住）解成 proto。
+func turnResultToProto(raw []byte) (*pb.TurnResult, error) {
+	out := &pb.TurnResult{}
+	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(raw, out); err != nil {
+		return nil, fmt.Errorf("buyerprocurement：存下的 turn_result 不是合法的 TurnResult：%w", err)
+	}
+	return out, nil
 }
 
 // GetRuntimeSnapshot 回重建一個對話畫面需要的全部事實。

@@ -164,7 +164,8 @@ type BuyerProcurementAppServiceClient interface {
 	// ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
 	ToggleSelection(context.Context, *connect.Request[v1alpha1.ToggleSelectionRequest]) (*connect.Response[v1alpha1.ToggleSelectionResponse], error)
 	// SubmitAnswer 回答一個釐清問題。需求有待回覆的中斷時改用 ResumeRun，回 FAILED_PRECONDITION，
-	// reason 是 APPROVAL_PENDING。
+	// reason 是 APPROVAL_PENDING。只收確定性的回答（選項、數量、略過；品項文字須唯一對到一個末層分類），
+	// 品項文字對到多個或零個分類回 INVALID_ARGUMENT（field 是 free_text），請改用 SubmitTurn。
 	SubmitAnswer(context.Context, *connect.Request[v1alpha1.SubmitAnswerRequest]) (*connect.Response[v1alpha1.SubmitAnswerResponse], error)
 	// Rewind 讓需求退回某個欄位重新回答。有待回覆的中斷時規則同 SubmitAnswer。
 	Rewind(context.Context, *connect.Request[v1alpha1.RewindRequest]) (*connect.Response[v1alpha1.RewindResponse], error)
@@ -540,7 +541,8 @@ type BuyerProcurementAppServiceHandler interface {
 	// ToggleSelection 勾選或取消勾選一個候選。候選所屬的候選集不是有效的候選集（需求已不在 MATCHING，或有更新的搜尋成功）回 ABORTED，conflictTarget 是 candidate_set。
 	ToggleSelection(context.Context, *connect.Request[v1alpha1.ToggleSelectionRequest]) (*connect.Response[v1alpha1.ToggleSelectionResponse], error)
 	// SubmitAnswer 回答一個釐清問題。需求有待回覆的中斷時改用 ResumeRun，回 FAILED_PRECONDITION，
-	// reason 是 APPROVAL_PENDING。
+	// reason 是 APPROVAL_PENDING。只收確定性的回答（選項、數量、略過；品項文字須唯一對到一個末層分類），
+	// 品項文字對到多個或零個分類回 INVALID_ARGUMENT（field 是 free_text），請改用 SubmitTurn。
 	SubmitAnswer(context.Context, *connect.Request[v1alpha1.SubmitAnswerRequest]) (*connect.Response[v1alpha1.SubmitAnswerResponse], error)
 	// Rewind 讓需求退回某個欄位重新回答。有待回覆的中斷時規則同 SubmitAnswer。
 	Rewind(context.Context, *connect.Request[v1alpha1.RewindRequest]) (*connect.Response[v1alpha1.RewindResponse], error)
