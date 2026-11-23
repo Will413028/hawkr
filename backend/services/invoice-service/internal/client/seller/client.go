@@ -1,4 +1,4 @@
-// Package seller 是 invoice-service 對 seller-service 的出站 peer client（58 §6.2）。
+// Package seller 是 invoice-service 對單體 legacy seller gRPC listener（`LEGACY_SELLER_GRPC_ADDR`）的出站 peer client（58 §6.2）。
 //
 // 只暴露一支 RPC：`store_id → account_id`。多一支就是「賣家是誰」這個問題的第二個
 // 答案來源，而 §6 的身分分離規則只允許一個。
@@ -23,11 +23,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ErrSellerNotFound 表示 seller-service 查無此 store_id（或該列已軟刪）。
+// ErrSellerNotFound 表示 seller 對端查無此 store_id（或該列已軟刪）。
 //
 // 兩者對「這個 store 的登入 principal 是誰」是同一個答案：沒有。呼叫端
 // （`INV.ob` 的 withNotifyRouting）看到任何 error 都會填 `"0"` 並繼續派送，
-// 這個具名 error 的用途是讓「查無此人」與「seller-service 掛了」在 log 上分得開。
+// 這個具名 error 的用途是讓「查無此人」與「seller 對端掛了」在 log 上分得開。
 var ErrSellerNotFound = stderrors.New("invoice: seller not found for store_id")
 
 // DefaultDeadline 是本 client 每一次呼叫的 per-call deadline。
@@ -40,7 +40,7 @@ var ErrSellerNotFound = stderrors.New("invoice: seller not found for store_id")
 // `INVOICE_GRPC_DEADLINE_PEER_MS` 進 config.PeerConfig，然後由 NewClient 帶進來。
 //
 // 🔴 不得改成 0 或拿掉：`grpc.NewClient` 對沒有 deadline 的呼叫不會自己補一個，
-// seller-service 卡住時這一跳會無限期掛住 outbox 派送 goroutine，而 outbox 的
+// seller 對端卡住時這一跳會無限期掛住 outbox 派送 goroutine，而 outbox 的
 // tick 是 5 s ⇒ 一次卡死等於整批出向事件停擺，且沒有任何錯誤訊號。
 const DefaultDeadline = 3 * time.Second
 
@@ -50,7 +50,7 @@ type Client struct {
 	deadline time.Duration
 }
 
-// NewClient 撥號 seller-service。
+// NewClient 撥號 legacy seller gRPC listener。
 //
 // 兩個 interceptor 缺一不可（§5.2）：
 //   - InternalAuthClientInterceptor 帶 52 號 HMAC 四 header。缺它 ⇒ 對端在
@@ -71,7 +71,7 @@ func NewClient(lc fx.Lifecycle, addr string) (*Client, error) {
 		grpc.WithStatsHandler(interceptor.OTelClientStatsHandler()),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("invoice: dial seller-service %s: %w", addr, err)
+		return nil, fmt.Errorf("invoice: dial legacy seller listener %s: %w", addr, err)
 	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return conn.Close() }})
 	return NewClientWithStub(pb.NewSellerServiceClient(conn), DefaultDeadline), nil
@@ -119,7 +119,7 @@ func (c *Client) ResolveSellerAccountID(ctx context.Context, storeID int64) (int
 	// seller.proto 的註解逐字寫明）⇒ 這裡不得去讀 GetCode()。
 	accountID := resp.GetAccountId()
 	if accountID <= 0 {
-		return 0, fmt.Errorf("invoice: seller-service returned non-positive account_id %d for store_id %d",
+		return 0, fmt.Errorf("invoice: legacy seller listener returned non-positive account_id %d for store_id %d",
 			accountID, storeID)
 	}
 	return accountID, nil
@@ -128,7 +128,7 @@ func (c *Client) ResolveSellerAccountID(ctx context.Context, storeID int64) (int
 // BatchGetSellerMeta 批次取店名（58 §6.1.12／§6.1.13 的 ADM 工作台識別欄）。
 //
 // 🔴 **失敗不是錯誤**：店名是 ADM 工作台上的「識別對象」欄，取不到就退回 store_id
-// ——那正是修這件事之前的畫面。把它做成 fail-loud 會讓 seller-service 一次抖動
+// ——那正是修這件事之前的畫面。把它做成 fail-loud 會讓 seller 對端一次抖動
 // 就讓整個稅籍審核佇列打不開，而佇列本身的資料完全健康。
 // ⇒ 回 (nil, err) 由呼叫端自行決定退回空字串，呼叫端**不得**因此中止整個列表。
 //
@@ -149,7 +149,7 @@ func (c *Client) BatchGetSellerMeta(ctx context.Context, storeIDs []int64) (map[
 	}
 	out := make(map[int64]string, len(resp.GetSellers()))
 	for storeID, meta := range resp.GetSellers() {
-		// 空店名照樣放進 map：那是 seller-service 的事實，不是「查不到」。
+		// 空店名照樣放進 map：那是 seller 對端的事實，不是「查不到」。
 		// 兩者對呼叫端的處置相同（顯示 store_id），但混在一起會讓下次查不到時
 		// 以為是店名真的沒設。
 		out[storeID] = meta.GetSellerName()

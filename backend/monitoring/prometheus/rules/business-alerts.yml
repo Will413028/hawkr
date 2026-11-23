@@ -211,7 +211,7 @@ groups:
   #    退避序列 5*3^(n-1) 秒 = 5/15/45/135/405，max-retries=5 ⇒ **最長正常重試鏈 605 秒
   #    （約 10.1 分鐘）**，之後該列轉 DEAD 而離開 backlog 述詞。
   #    ⇒ backlog 仍在且最舊超過 900 秒 = 已超過最長正常重試鏈 + 緩衝，必定異常。
-  #    （對照：buyer_deleted／seller_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
+  #    （對照：buyer_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
   #      直接照抄 3600 會讓本表的告警比實際失效晚一個數量級。）
   #
   # ⚠️ 與 *OutboxTerminalFailure 那兩組的**語意差異**，不要照抄它們的 expr：
