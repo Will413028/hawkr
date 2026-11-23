@@ -56,7 +56,7 @@ type Deps struct {
 	// Charge 是付款的 provider（Stripe adapter 與 ChargeFake）；nil 表示沒有設定付款，付款的呼叫回 FailedPrecondition。設定了它時 Inbox 與 PaymentOrders 必填，
 	// 它的名稱不得與收款帳戶的 Provider 相同（inbox 以 provider 名稱登記，同名會 panic）。
 	Charge ChargeProvider
-	// PaymentOrders 是訂單一方的 port（付款建立時讀應付資訊），由組裝點注入；步驟 4 接 Java order，B8 換 ordering 的 in-process 呼叫。
+	// PaymentOrders 是訂單一方的 port（付款建立時讀應付資訊），由組裝點注入（過渡期接 Java order，之後換 ordering 的 in-process 呼叫）。
 	PaymentOrders PaymentOrders
 }
 
@@ -72,7 +72,7 @@ func New(d Deps) *Module {
 		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Inbox: d.Inbox, Audit: d.Audit, Provider: d.Provider, Owners: d.Owners, Now: d.Now, Logger: d.Logger,
 	})}
 	m.charges = charge.New(charge.Deps{
-		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Inbox: d.Inbox, Provider: d.Charge, Orders: d.PaymentOrders, Now: d.Now, Logger: d.Logger,
+		DB: d.DB, Events: d.Events, Jobs: d.Jobs, Inbox: d.Inbox, Provider: d.Charge, Orders: d.PaymentOrders, Audit: d.Audit, Now: d.Now, Logger: d.Logger,
 	})
 	return m
 }
@@ -325,7 +325,7 @@ func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	return append(m.accounts.PeriodicJobs(), m.charges.PeriodicJobs()...)
 }
 
-// ChargeProvider 是付款的 port（PaymentIntent、退款、轉帳與撤回、付款事件；Stripe adapter 在 3d，Fake 給測試與本機）。
+// ChargeProvider 是付款的 port（PaymentIntent、退款、轉帳與撤回、付款事件；Fake 給測試與本機）。
 type ChargeProvider = charge.Provider
 
 // ChargeFake 是記憶體內的付款 provider，測試與本機用。
@@ -378,7 +378,58 @@ const (
 	PaymentSucceeded       = model.PaymentSucceeded
 	PaymentCanceled        = model.PaymentCanceled
 	PaymentCreateFailed    = model.PaymentCreateFailed
+	PaymentAnomaly         = model.PaymentAnomaly
 )
+
+// ChargeTransferInput 與 ChargeTransferSnapshot 是建立轉帳的 port 型別（測試包裝 provider 用）。
+type (
+	ChargeTransferInput    = charge.TransferInput
+	ChargeTransferSnapshot = charge.TransferSnapshot
+)
+
+// ChargeReversalInput 與 ChargeReversalSnapshot 是撤回轉帳的 port 型別（測試包裝 provider 用）。
+type (
+	ChargeReversalInput    = charge.ReversalInput
+	ChargeReversalSnapshot = charge.ReversalSnapshot
+)
+
+// PaymentTransfer 是付款轉給賣家的轉帳。
+type PaymentTransfer = model.Transfer
+
+// PaymentTransferStatus 是轉帳的狀態。
+type PaymentTransferStatus = model.TransferStatus
+
+// 轉帳的狀態。
+const (
+	TransferPending   = model.TransferPending
+	TransferSucceeded = model.TransferSucceeded
+	TransferFailed    = model.TransferFailed
+	TransferAnomaly   = model.TransferAnomaly
+)
+
+// ErrChargeRetryableRefusal 標示付款 provider 明確拒絕、沒有執行，之後重試可能成功（呼叫方換新冪等鍵）。
+var ErrChargeRetryableRefusal = charge.ErrRetryableRefusal
+
+// AnomalyKind 是進入 ANOMALY 的物件種類，AnomalyOutcome 是人工結案的結果。
+type (
+	AnomalyKind    = model.AnomalyKind
+	AnomalyOutcome = model.AnomalyOutcome
+)
+
+// 進入 ANOMALY 的物件種類與人工結案的結果。
+const (
+	AnomalyPayment   = model.AnomalyPayment
+	AnomalyTransfer  = model.AnomalyTransfer
+	AnomalyRefund    = model.AnomalyRefund
+	AnomalySucceeded = model.AnomalySucceeded
+	AnomalyFailed    = model.AnomalyFailed
+)
+
+// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳或退款的人工結案：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
+// 領域變更與一筆 adminaudit 在同一個 transaction。語意與鎖順序見 charge.Service.ResolveAnomaly。
+func (m *Module) ResolveAnomaly(ctx context.Context, actor AdminActor, kind AnomalyKind, id uuid.UUID, outcome AnomalyOutcome, evidence string) error {
+	return m.charges.ResolveAnomaly(ctx, actor, kind, id, outcome, evidence)
+}
 
 // ErrChargePermanent 標示付款 provider 重試也不會成功的失敗。
 var ErrChargePermanent = charge.ErrPermanent
@@ -389,8 +440,14 @@ var ErrChargeInvalidEvent = charge.ErrInvalidEvent
 // ErrChargeIgnoredEvent 標示驗過簽章但不處理的付款事件。
 var ErrChargeIgnoredEvent = charge.ErrIgnoredEvent
 
-// PaymentUnresolvedDeadline 是建立付款「呼叫過、沒有外部 ID」最久等多久（12 小時），期限內以同一把冪等鍵重送，超過進終局 CREATE_FAILED。
-const PaymentUnresolvedDeadline = charge.UnresolvedDeadline
+// PaymentResendWindow 是搬錢呼叫結果不明時以同一把冪等鍵重送的上限（23 小時，小於冪等鍵保存期），之後只查回。
+const PaymentResendWindow = charge.ResendWindow
+
+// PaymentNotFoundAfter 是從第一次呼叫起，查回「查無」才算確定不存在的時間（24 小時），之後才可以換新鍵重建。
+const PaymentNotFoundAfter = charge.NotFoundAfter
+
+// PaymentLookupFailureLimit 是連續查回失敗幾次之後進 ANOMALY。
+const PaymentLookupFailureLimit = charge.LookupFailureLimit
 
 // PaymentIdempotencyRetention 是本模組依賴的付款冪等鍵保存期（24 小時）；超過的鍵從不重送。
 const PaymentIdempotencyRetention = charge.IdempotencyRetention
@@ -440,4 +497,27 @@ func (m *Module) ExcessPaidPayments(ctx context.Context, afterID uuid.UUID, limi
 // SweepPayments 是付款的定期掃描（payment.charge_sweep）的內容，給 worker 與測試呼叫；回傳排入補做與同步的付款數。
 func (m *Module) SweepPayments(ctx context.Context) (created, synced int, err error) {
 	return m.charges.Sweep(ctx)
+}
+
+// RequestPaymentTransfer 是訂單完成後把這筆付款轉給賣家的入口（D6，訂單一方的 GrantPayment 呼叫）：一個 transaction 內鎖付款列、確認已入帳，
+// 寫 PENDING 轉帳（金額是付款扣掉非失敗退款，賣家收款帳戶必須已開通）並排入轉帳 job；provider 在 transaction 外由 job 呼叫。
+// 已有有效轉帳時回傳它（冪等）；付款不存在回 NotFound，付款未入帳、帳戶未開通或沒有可轉金額回 FailedPrecondition。呼叫方不能在 transaction 內呼叫。
+func (m *Module) RequestPaymentTransfer(ctx context.Context, orderNo string) (PaymentTransfer, error) {
+	return m.charges.RequestTransfer(ctx, orderNo)
+}
+
+// CreatePaymentTransfer 是轉帳 job（payment.transfer_create）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時暫時性失敗只記警示 log，留給週期掃描。
+func (m *Module) CreatePaymentTransfer(ctx context.Context, transferID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Transfer(ctx, transferID, finalAttempt)
+}
+
+// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：撤回 REVERSING 退款的 reversal_amount，
+// 成功後同一個 transaction 累加轉帳的 reversed_amount 並把退款推進到 REVERSED。
+func (m *Module) ReversePaymentTransfer(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Reverse(ctx, refundID, finalAttempt)
+}
+
+// EnqueueRefundReversal 排入退款的撤回 job：退款 use case 在寫下 REVERSING 退款列的同一個 transaction 內呼叫。
+func (m *Module) EnqueueRefundReversal(ctx context.Context, refundID uuid.UUID) error {
+	return m.charges.EnqueueReversal(ctx, refundID)
 }

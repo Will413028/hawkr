@@ -13,6 +13,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -43,25 +44,32 @@ const (
 	createIdle = 10 * time.Minute
 	// readIdle 是已建立、未結案的付款多久沒讀過之後由掃描補排同步（漏掉 webhook 的保底）。
 	readIdle = 30 * time.Minute
-	// IdempotencyRetention 是本模組依賴 provider 保存冪等鍵結果的時間（保守取 24 小時）：超過它的鍵從不重送，因為重送可能建出第二個 PaymentIntent。
+	// IdempotencyRetention 是本模組依賴 provider 保存冪等鍵結果的時間（Stripe 至少 24 小時，取下限）：超過它的鍵從不重送，因為重送可能建出第二個物件。
 	IdempotencyRetention = 24 * time.Hour
-	// UnresolvedDeadline 是「呼叫過、沒有外部 ID」的付款從 create_called_at 起最久等多久：期限內以同一把鍵重送取回 PaymentIntent，超過進終局 CREATE_FAILED，
-	// 鍵不再重送（買家再次建立時換新鍵）。必須小於 IdempotencyRetention，所以任何重送都在保存期內。付款只在訂單的付款期限內有意義，所以比收款帳戶（7 天）短。
-	UnresolvedDeadline = 12 * time.Hour
+	// ResendWindow 是結果不明的呼叫從這把鍵的第一次呼叫起以同一把鍵重送的上限：必須小於 IdempotencyRetention，所以任何重送都在保存期內；
+	// 超過之後只查回（Find*），不再重送。
+	ResendWindow = 23 * time.Hour
+	// NotFoundWait 是查回「查無」要再等多久才算確定不存在：最後一次重送在 ResendWindow 之前，provider 的列表可能晚一點才看得到它，
+	// 所以從第一次呼叫起滿 ResendWindow + NotFoundWait 之後的查無才算數，之後才可以換新鍵重建（FAILED）。
+	NotFoundWait = time.Hour
+	// NotFoundAfter 是從第一次呼叫起，查無才算確定不存在的時間。
+	NotFoundAfter = ResendWindow + NotFoundWait
+	// LookupFailureLimit 是連續查回失敗幾次之後進 ANOMALY。
+	LookupFailureLimit = 5
 	// EventRetention 是付款事件原始 payload 在 inbox 的保存期。
 	EventRetention = 30 * 24 * time.Hour
 	// syncProcessor 與 eventProcessor 是 inbox 的處理者名稱。
 	syncProcessor  = "payment.charge_sync"
 	eventProcessor = "payment.charge_event"
-	// failedUnresolved 與 failedRefused 是建立的終局原因（payments.failure_reason）。
-	failedUnresolved = "unresolved_creation"
-	failedRefused    = "provider_refused"
+	// failedRefused 與 failedNotFound 是終局失敗的原因（failure_reason）：provider 拒絕；查回證明 provider 沒有這筆。
+	failedRefused  = "provider_refused"
+	failedNotFound = "provider_not_found"
 )
 
-// UnresolvedDeadline 必須小於冪等鍵保存期：差值為負時這行無法編譯。
-const _ = uint64(IdempotencyRetention - UnresolvedDeadline - 1)
+// ResendWindow 必須小於冪等鍵保存期：差值為負時這行無法編譯。
+const _ = uint64(IdempotencyRetention - ResendWindow - 1)
 
-// Deps 外部依賴；clock 由組裝點注入。Provider 為 nil 表示沒有設定付款：付款的呼叫回 FailedPrecondition，這時不需要 Inbox 與 Orders；設定了 Provider 時兩者必填。
+// Deps 外部依賴；clock 由組裝點注入。Provider 為 nil 表示沒有設定付款：付款的呼叫回 FailedPrecondition，這時不需要 Inbox、Orders 與 Audit；設定了 Provider 時三者必填。
 type Deps struct {
 	DB       *db.DB
 	Events   *events.Bus
@@ -69,8 +77,10 @@ type Deps struct {
 	Inbox    *inbox.Inbox
 	Provider Provider
 	Orders   Orders
-	Now      func() time.Time
-	Logger   *slog.Logger
+	// Audit 是 platform 的後台動作紀錄：管理員的人工結案在領域變更的同一個 transaction 內寫一筆；設定了 Provider 時必填。
+	Audit  *adminaudit.Log
+	Now    func() time.Time
+	Logger *slog.Logger
 	// NewID 產生付款列的 UUIDv7；測試可以注入固定序列，預設是 uuid.NewV7。
 	NewID func() uuid.UUID
 }
@@ -83,8 +93,8 @@ func New(d Deps) *Service {
 	if d.DB == nil || d.Events == nil || d.Jobs == nil || d.Now == nil || d.Logger == nil {
 		panic("payment/charge: missing dependency")
 	}
-	if d.Provider != nil && (d.Inbox == nil || d.Orders == nil) {
-		panic("payment/charge: Inbox and Orders are required with a provider")
+	if d.Provider != nil && (d.Inbox == nil || d.Orders == nil || d.Audit == nil) {
+		panic("payment/charge: Inbox, Orders and Audit are required with a provider")
 	}
 	if d.NewID == nil {
 		d.NewID = uuid.NewV7

@@ -52,6 +52,7 @@ type PaymentPayment struct {
 	FetchedAt            *time.Time
 	CreateIdempotencyKey uuid.UUID
 	CreateCalledAt       *time.Time
+	CreateLookupFailures int32
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }
@@ -81,6 +82,7 @@ type PaymentRefund struct {
 	ReversalIdempotencyKey uuid.UUID
 	ReversalCalledAt       *time.Time
 	ReversalExternalID     *string
+	ReversalLookupFailures int32
 	IdempotencyKey         uuid.UUID
 	RefundCalledAt         *time.Time
 	ExternalRefundID       *string
@@ -101,6 +103,7 @@ type PaymentTransfer struct {
 	FailureReason        *string
 	IdempotencyKey       uuid.UUID
 	CalledAt             *time.Time
+	LookupFailures       int32
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }

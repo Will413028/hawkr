@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
@@ -69,6 +70,40 @@ func (CancelArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAt
 
 func enqueueCancel(ctx context.Context, jc jobs.Enqueuer, attemptID uuid.UUID) error {
 	args := CancelArgs{AttemptID: attemptID}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
+// TransferArgs 是建立轉帳的 job，以轉帳 ID 為唯一鍵：RequestTransfer 在寫列的同一個 transaction 排入，由它在 transaction 外帶列上的冪等鍵呼叫 provider。
+type TransferArgs struct {
+	TransferID uuid.UUID `json:"transfer_id" river:"unique"`
+}
+
+// Kind 是 River 的 job 種類。
+func (TransferArgs) Kind() string { return "payment.transfer_create" }
+
+// InsertOpts 是轉帳 job 的排入選項。
+func (TransferArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
+
+func enqueueTransfer(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
+	args := TransferArgs{TransferID: id}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
+// ReversalArgs 是撤回轉帳的 job，以退款 ID 為唯一鍵：退款 use case 在寫下 REVERSING 退款列的同一個 transaction 排入。
+type ReversalArgs struct {
+	RefundID uuid.UUID `json:"refund_id" river:"unique"`
+}
+
+// Kind 是 River 的 job 種類。
+func (ReversalArgs) Kind() string { return "payment.transfer_reversal" }
+
+// InsertOpts 是撤回 job 的排入選項。
+func (ReversalArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
+
+func enqueueReversal(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
+	args := ReversalArgs{RefundID: id}
 	opts := args.InsertOpts()
 	return jc.Enqueue(ctx, args, &opts)
 }
@@ -141,6 +176,32 @@ func (w *cancelWorker) Work(ctx context.Context, job *river.Job[CancelArgs]) err
 // Timeout 是一次取消的時間上限。
 func (w *cancelWorker) Timeout(*river.Job[CancelArgs]) time.Duration { return jobTimeout }
 
+type transferWorker struct {
+	river.WorkerDefaults[TransferArgs]
+	service *Service
+}
+
+// Work 執行一次轉帳：provider 的永久拒絕進終局、不重試；平台餘額不足等暫時性失敗回錯誤由 River 重試。
+func (w *transferWorker) Work(ctx context.Context, job *river.Job[TransferArgs]) error {
+	return jobError(w.service.Transfer(ctx, job.Args.TransferID, job.Attempt >= job.MaxAttempts))
+}
+
+// Timeout 是一次轉帳的時間上限。
+func (w *transferWorker) Timeout(*river.Job[TransferArgs]) time.Duration { return jobTimeout }
+
+type reversalWorker struct {
+	river.WorkerDefaults[ReversalArgs]
+	service *Service
+}
+
+// Work 執行一次撤回。
+func (w *reversalWorker) Work(ctx context.Context, job *river.Job[ReversalArgs]) error {
+	return jobError(w.service.Reverse(ctx, job.Args.RefundID, job.Attempt >= job.MaxAttempts))
+}
+
+// Timeout 是一次撤回的時間上限。
+func (w *reversalWorker) Timeout(*river.Job[ReversalArgs]) time.Duration { return jobTimeout }
+
 type sweepWorker struct {
 	river.WorkerDefaults[SweepArgs]
 	service *Service
@@ -160,6 +221,8 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &createWorker{service: s})
 	river.AddWorker(workers, &syncWorker{service: s})
 	river.AddWorker(workers, &cancelWorker{service: s})
+	river.AddWorker(workers, &transferWorker{service: s})
+	river.AddWorker(workers, &reversalWorker{service: s})
 	river.AddWorker(workers, &sweepWorker{service: s})
 }
 
@@ -173,16 +236,20 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 }
 
 // Sweep 是付款自己的補掃（D63 的分工同收款帳戶：platform 只重派沒有派送成功的 inbox 列），每個付款在自己的 transaction 內排入一個 job：
-//   - 建立：還在建立中、閒置超過 createIdle 的列補排補做 job（呼叫過、沒有外部 ID 的列在 UnresolvedDeadline 內以同一把鍵重送，超過由補做 job 進終局）；
+//   - 建立：還在建立中、閒置超過 createIdle 的列補排補做 job（結果不明的列由補做 job 依 ResendWindow 同鍵重送或查回）；
 //   - 狀態：已建立、未結案、超過 readIdle 沒讀過的列補排同步（掉了 webhook 的保底）；
 //   - 舊嘗試：被取代、還沒結案又超過 readIdle 沒讀過的舊 PaymentIntent 所屬的付款補排同步；
-//   - 事件：inbox 有超過 eventGrace 還沒處理的事件的付款補排同步（任何狀態）。
+//   - 事件：inbox 有超過 eventGrace 還沒處理的事件的付款補排同步（任何狀態）；
+//   - 轉帳與撤回：PENDING 的轉帳、REVERSING 的退款閒置超過 createIdle 就補排各自的 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；ANOMALY 的列一律不補排。
 //
-// 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次）。沒有設定 provider 時什麼都不做。
+// 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次；補排的轉帳與撤回算在 created）。沒有設定 provider 時什麼都不做。
 func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 	p := s.d.Provider
 	if p == nil {
 		return 0, 0, nil
+	}
+	if _, ok := db.TxFrom(ctx); ok {
+		return 0, 0, errInTransaction
 	}
 	queue := func(enqueue func(context.Context, jobs.Enqueuer, uuid.UUID) error, id uuid.UUID) error {
 		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return enqueue(ctx, s.d.Jobs, id) })
@@ -197,6 +264,40 @@ func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 		}
 		for _, id := range ids {
 			if err := queue(enqueueCreate, id); err != nil {
+				return created, synced, err
+			}
+			created++
+			after = id
+		}
+		if len(ids) < sweepBatch {
+			break
+		}
+	}
+	after = uuid.Nil()
+	for {
+		ids, err := store.New(s.d.DB.Conn(ctx)).PendingTransferIDs(ctx, store.PendingTransferIDsParams{IdleBefore: createBefore, AfterID: after, Batch: sweepBatch})
+		if err != nil {
+			return created, synced, err
+		}
+		for _, id := range ids {
+			if err := queue(enqueueTransfer, id); err != nil {
+				return created, synced, err
+			}
+			created++
+			after = id
+		}
+		if len(ids) < sweepBatch {
+			break
+		}
+	}
+	after = uuid.Nil()
+	for {
+		ids, err := store.New(s.d.DB.Conn(ctx)).ReversingRefundIDs(ctx, store.ReversingRefundIDsParams{IdleBefore: createBefore, AfterID: after, Batch: sweepBatch})
+		if err != nil {
+			return created, synced, err
+		}
+		for _, id := range ids {
+			if err := queue(enqueueReversal, id); err != nil {
 				return created, synced, err
 			}
 			created++

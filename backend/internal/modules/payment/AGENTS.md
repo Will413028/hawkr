@@ -4,7 +4,7 @@
 
 ## 職責
 
-收款與付款。收款帳戶（收款開通 ADR D28）：外部帳戶快取、建立與同步 job、輪詢、port 與 adapter、收款事件 handler、後台的讀取與重試，給 seller 與後台用。付款（B2 3a）：付款列、PaymentIntent 建立、同步與補掃、事件 handler；轉帳與退款是 3b、3c。行為規格的唯一來源是 `backend/docs/modules/payment.md`。
+收款與付款。收款帳戶（收款開通 ADR D28）：外部帳戶快取、建立與同步 job、輪詢、port 與 adapter、收款事件 handler、後台的讀取與重試，給 seller 與後台用。付款：付款列、PaymentIntent 建立、同步與補掃、事件 handler、轉帳與撤回；退款是 3c。行為規格的唯一來源是 `backend/docs/modules/payment.md`。
 
 ## 擁有的資料
 
