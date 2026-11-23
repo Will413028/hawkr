@@ -38,7 +38,7 @@
 | 測試平台國別 | 平台與 connected account 在支援的國別組合內（脈絡的外部約束） | US | SG、JP、US 平台跨境撥到台灣 |
 | Stripe API 與 client | 新整合用 Accounts v2，事件用 thin events 並重讀物件，client 用官方 SDK（https://docs.stripe.com/connect/accounts-v2、https://docs.stripe.com/webhooks） | v2、官方 stripe-go v87.1.0 釘的 API 版本、收到後一律重讀 | 手寫 HTTP client 加釘 preview 版本；舊 preview；v1 Accounts；信任事件內容 |
 | 狀態模型 | 完成看 `stripe_transfers.status`，行動方看 `status_details` 的 `resolution`（https://docs.stripe.com/connect/marketplace/tasks/onboard） | 5 值，由 `stripe_transfers` 推導 | 加 `ONBOARDING`；自創「已送出」；只存原始 JSON |
-| 閘門與收款模式 | capability 加 requirements 當授權依據（`2026-09-18-seller-capability-authorization.md` 2026-10-08 修訂）；市集用 destination charges 是推論，未核出處（推測） | 平台審核核准且轉帳能力 active；destination charges | 只看平台審核；看 `charges_enabled` |
+| 閘門與收款模式 | capability 加 requirements 當授權依據（`2026-09-18-seller-capability-authorization.md` 2026-10-08 修訂）；付款時還不能轉帳（等履約）且平台承擔負餘額時用 separate charges and transfers（https://docs.stripe.com/connect/charges、https://docs.stripe.com/connect/separate-charges-and-transfers） | 平台審核核准且轉帳能力 active；separate charges and transfers | 只看平台審核；看 `charges_enabled`；destination charges；destination charges 加手動撥款 |
 | 建立時點、冪等與分步 | 隨機 v4 UUID 當冪等鍵，v2 鍵期限 30 天（https://docs.stripe.com/api/idempotent_requests、https://docs.stripe.com/api-v2-overview#idempotency） | 核准後建立，保存的 UUID 當鍵，先寫本地列；建立請求內容固定，信箱與設定另以更新寫入 | 送出即建；首次收款才建；每次新鍵；管理員補件；冪等鍵與信箱一起存、原樣重送 |
 | 聯絡信箱 | 用平台已有的使用者信箱建帳戶，持有人可在開通頁面改（https://docs.stripe.com/connect/marketplace/quickstart、https://docs.stripe.com/connect/hosted-onboarding） | 帳號層級，建立外部帳戶的當下讀取，不存副本 | 直接用登入信箱；KYC 申請欄位；客服信箱；電話；核准時快照到收款帳戶列 |
 | 快取不倒退 | 事件不保證順序，收到後重讀（https://docs.stripe.com/webhooks）；寫入條件沒有統一名稱（推測） | 讀取開始時間不早於 `fetched_at` 才寫 | 排 job 並等結果；整列覆寫不比時間 |
@@ -88,9 +88,11 @@
 - 未採：只存原始 JSON 讓 client 判讀：補漏輪詢要以狀態篩選（索引 `accounts_poll`），後台要列表。
 - 未採：不認得的值猜成拒絕：Stripe 可以解除限制，掉了 webhook 時只有輪詢補得到。
 
-**開通閘門與收款模式**（Will 2026-10-29、2026-11-02）：店家通過閘門要平台審核核准且轉帳能力 active。view `seller.store_requirement_flags` 輸出 `kyc_approved` 與 `transfers_active`，`onboarding_complete` 是兩者的 AND；`transfers_active` 讀 seller 自存的副本（`seller.payout_capabilities`，由 payment 發的 `PayoutAccountChanged` 經 seller 的同 transaction 訂閱者更新）。收款模式是 destination charges（平台收款再轉給賣家）。代理收付的法規前提未確認，只影響上線。
+**開通閘門與收款模式**（Will 2026-10-29、2026-11-02）：店家通過閘門要平台審核核准且轉帳能力 active。view `seller.store_requirement_flags` 輸出 `kyc_approved` 與 `transfers_active`，`onboarding_complete` 是兩者的 AND；`transfers_active` 讀 seller 自存的副本（`seller.payout_capabilities`，由 payment 發的 `PayoutAccountChanged` 經 seller 的同 transaction 訂閱者更新）。收款模式是 separate charges and transfers（2026-11-23 Will 改，原為 destination charges）：買家付款進平台帳戶，付款帶 `transfer_group`（訂單 ID）；訂單完成時才建立帶 `source_transaction` 的 transfer 轉給賣家；完成後的退款先撤回轉帳，賣家餘額不足時由平台吸收。理由：一筆付款只對一家店，但錢要等履約完成才給賣家，destination charges 付款當下就轉；本平台 `losses_collector=application`，符合 Stripe 建議 SCT 的條件。比較與出處：`backend/docs/plans/2026-11-23-b2-payment/charge-model-brief.md`。代理收付的法規前提未確認，只影響上線。
 - 未採：只看平台審核：店家可能在金流商未開通時曝光卻收不了款。
-- 未採：看 `charges_enabled`：v2 的 recipient 帳戶沒有這個欄位，轉帳能力才是 destination charges 的前提。
+- 未採：看 `charges_enabled`：v2 的 recipient 帳戶沒有這個欄位，轉帳能力才是平台轉帳給賣家的前提。
+- 未採：destination charges：付款當下就轉給賣家，賣家可能在出貨前提領，完成前的取消要向賣家追回。
+- 未採：destination charges 加賣家手動撥款：錢已在賣家帳戶，只是凍結；Stripe 明說不是託管，提領時機要另外管。推翻條件：Stripe 對平台持有資金有短於「完成期限加售後期限」的上限。
 
 **建立外部帳戶的時點、冪等與分兩步建立**（時點與冪等 Will 2026-11-02；分兩步 2026-11-14）：平台審核核准後才建立。核准的 transaction 內只 INSERT「建立中」的列（`external_account_id` 為空，`create_idempotency_key` 是寫列時產生並保存的 UUID，`ON CONFLICT DO NOTHING`）並排以 `store_id` 為唯一鍵的建立 job；外部呼叫在 transaction 外，同一家店的每次重試都用列上的鍵。一店一個外部帳戶，關店再開沿用。建立失敗由 River 退避重試，用完記 `create_failed_at`，進後台待辦 `PAYMENT_ACCOUNT_CREATE_FAILED`；管理員只有「重新整理」與「重試建立」，缺件由賣家經新的開通連結補。
 建立分兩步，都在 Stripe adapter 內：第一步只帶不會變的內容（`metadata.store_id` 與 `metadata.hawkr_namespace`，後者來自每個環境不同的必填設定 `STRIPE_ACCOUNT_NAMESPACE`，D61），用列上的冪等鍵，本文固定，同一把鍵永遠得到同一個帳戶；第二步用更新寫入當下的聯絡信箱、recipient 設定、責任歸屬、identity 與 dashboard，可重複送出。第一步拿到外部 ID 就寫進帳戶列（不等第二步），第二步成功才記 `create_completed_at`，「已建立」「可開通」「輪詢」「同步」都看它，不看有沒有外部 ID（D59，2026-11-14 修訂「兩步都成功才寫外部 ID」）；port 因此拆成「取得 ID」（`AcquireAccount`）、「完成設定」（`ConfigureAccount`）（D63 刪除了曾加的只找不建的 `ResolveAccount`：結果不明的列改由同一把冪等鍵在 7 天內重送了結，不列出帳戶）。原因：第 2 輪設計審查指出，兩步都成功才寫 ID、列上又分不出「從沒呼叫」與「結果不明」，且會過期（30 天）的冪等鍵被當成查詢鍵，沒有外部 ID 又問不到 provider 的列被直接刪、丟掉唯一能找回外部帳戶的鍵；現在呼叫前先記 `create_called_at`，從沒呼叫過的列直接刪，呼叫過的列由週期掃描以同一把鍵重送取回 ID，7 天（小於冪等鍵保存期 30 天）仍了結不了就進終局交管理員，不列出帳戶（D63，2026-11-14 修訂 D59 的列出對帳）。原因（兩步本身）：聯絡信箱改成每次嘗試讀當下的值之後，冪等鍵與請求內容不再是一個單位：第一次請求結果未知而信箱又變了，Stripe 回 `idempotency_error`，後台重試沿用同一把鍵，永遠建不出來。sandbox 實測：只帶 `metadata` 建立成功；更新寫入信箱與設定成功、重送成功；更新之後才建得出 Account Link；失敗的請求不重播，同一把鍵改對內容後成功。
@@ -201,7 +203,7 @@
 | D17 | 身分欄位鎖與店名鎖刪除，店名不同步給金流商 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」 |
 | D18 | 舊事件 `merchant.verification.*` 與 PayUni 審核通知停發；通知留給通知模組 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」 |
 | D19 | 一店一個外部帳戶，關店再開沿用；冪等鍵是寫列時產生並保存的 UUID | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
-| D20 | 收款模式是 destination charges，閘門看 `stripe_transfers`；代理收付法規前提未確認 | 本檔「開通閘門與收款模式」 |
+| D20 | 收款模式是 separate charges and transfers（2026-11-23 由 destination charges 改），閘門看 `stripe_transfers`；代理收付法規前提未確認 | 本檔「開通閘門與收款模式」 |
 | D21 | 分支內完成才進 `main`、不留新舊並存：開發流程決定，已執行，沒有持續規則 | 無（已合併的流程決定；migration 部分見 D48） |
 | D22 | 平台自建 KYC 個資管線退場，不收身分證號、銀行帳號與證件；統編仍由平台收；觸發重建：接台灣金流商 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」；本檔「port 的能力描述與 session 的形狀」 |
 | D23 | 聯絡信箱在帳號層級：provider 驗證過的優先，否則自填；送審要求有信箱（`CONTACT_EMAIL_REQUIRED`） | 本檔「聯絡信箱在建立外部帳戶的當下讀取」 |
