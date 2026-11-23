@@ -266,3 +266,72 @@ func TestSellerWithoutQuotaRowGetsTheDefault(t *testing.T) {
 	})
 	wantReason(t, err, coupon.ReasonQuotaExceeded)
 }
+
+// 已過 end_at 的 ACTIVE 活動不佔賣家的同時進行配額。
+func TestExpiredCampaignsDoNotCountTowardTheQuota(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	if err := f.m.SetSellerQuota(context.Background(), storeA, 2); err != nil {
+		t.Fatal(err)
+	}
+	create := func(title string, end time.Time) error {
+		_, err := f.m.CreateCampaign(context.Background(), coupon.CreateCampaignInput{
+			CampaignSpec: coupon.CampaignSpec{Title: title, DiscountType: coupon.DiscountCash, DiscountAmount: 50, StartAt: base, EndAt: end},
+			TargetType:   coupon.TargetAll, Issuer: coupon.Issuer{StoreID: storeA},
+		})
+		return err
+	}
+	for i := range 2 {
+		if err := create(fmt.Sprint("短期", i), base.Add(time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wantReason(t, create("滿額", base.Add(windowLen)), coupon.ReasonQuotaExceeded)
+	f.advance(2 * time.Hour)
+	if err := create("到期後", f.now().Add(windowLen)); err != nil {
+		t.Fatalf("前兩個已到期，配額要空出來：%v", err)
+	}
+}
+
+// 建立與發布都不接受已經結束的期間。
+func TestCreateAndPublishRejectAnEndInThePast(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	in := coupon.CreateCampaignInput{
+		CampaignSpec: coupon.CampaignSpec{Title: "過期", DiscountType: coupon.DiscountCash, DiscountAmount: 50, StartAt: base.Add(-2 * time.Hour), EndAt: base},
+		TargetType:   coupon.TargetAll, Issuer: coupon.Issuer{AdminID: adminID},
+	}
+	if _, err := f.m.CreateCampaign(context.Background(), in); err == nil {
+		t.Fatal("迄日不晚於現在的活動要被擋下")
+	}
+	in.EndAt = base.Add(time.Hour)
+	c, err := f.m.CreateCampaign(context.Background(), in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.advance(2 * time.Hour)
+	if err := f.m.PublishCampaign(context.Background(), c.ID); err == nil || coupon.ReasonOf(err) != "" {
+		t.Fatalf("發布已過期的草稿要回 InvalidInput：%v", err)
+	}
+	if got := f.scalar("SELECT count(*) FROM coupon.coupon_campaigns WHERE id = $1 AND status = 'DRAFT'", c.ID); got != 1 {
+		t.Fatal("被擋下的草稿要維持 DRAFT")
+	}
+}
+
+// 結束活動的稽核：賣家路徑記結束的店家，作廢數記在同一列。
+func TestEndCampaignAuditRecordsTheActorAndVoidedCount(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	c := f.campaign(func(in *coupon.CreateCampaignInput) { in.Issuer = coupon.Issuer{StoreID: storeA} })
+	f.claim(c, buyer1)
+	f.claim(c, buyer2)
+	if _, err := f.m.EndCampaign(context.Background(), coupon.EndCampaignInput{CampaignID: c.ID, StoreID: storeA}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.scalar("SELECT operator_store_id FROM coupon.coupon_redemption_logs WHERE campaign_id = $1 AND action = 'END_CAMPAIGN'", c.ID); got != storeA {
+		t.Fatalf("operator_store_id = %d，要 %d", got, storeA)
+	}
+	if got := f.scalar("SELECT voided_count FROM coupon.coupon_redemption_logs WHERE campaign_id = $1 AND action = 'END_CAMPAIGN'", c.ID); got != 2 {
+		t.Fatalf("voided_count = %d，要 2", got)
+	}
+}

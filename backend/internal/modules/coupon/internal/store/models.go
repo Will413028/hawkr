@@ -44,7 +44,9 @@ type CouponCouponRedemptionLog struct {
 	Action          string
 	OrderNo         *string
 	OperatorAdminID *int64
+	OperatorStoreID *int64
 	Reason          *string
+	VoidedCount     *int32
 	CreatedAt       time.Time
 }
 

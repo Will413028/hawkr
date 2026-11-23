@@ -35,15 +35,16 @@ WHERE id = sqlc.arg(id) AND status = 'ACTIVE'
 
 -- name: PublishCampaign :execrows
 UPDATE coupon.coupon_campaigns SET status = 'ACTIVE', updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND status = 'DRAFT';
+WHERE id = sqlc.arg(id) AND status = 'DRAFT' AND end_at > sqlc.arg(now);
 
 -- name: EndCampaign :execrows
 UPDATE coupon.coupon_campaigns SET status = 'ENDED', ended_at = sqlc.arg(now), updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND status = 'ACTIVE';
 
 -- name: CountActiveSellerCampaigns :one
+-- 已過 end_at 的 ACTIVE 活動不算同時進行中（到期不改狀態，D5）。
 SELECT count(*) FROM coupon.coupon_campaigns
-WHERE issuer_store_id = sqlc.arg(store_id) AND status = 'ACTIVE' AND target_type <> 'COMPENSATION';
+WHERE issuer_store_id = sqlc.arg(store_id) AND status = 'ACTIVE' AND end_at >= sqlc.arg(now) AND target_type <> 'COMPENSATION';
 
 -- name: InsertQuotaIfAbsent :exec
 INSERT INTO coupon.seller_coupon_quotas (store_id, updated_at) VALUES (sqlc.arg(store_id), sqlc.arg(now))

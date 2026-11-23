@@ -14,11 +14,17 @@ import (
 
 const countActiveSellerCampaigns = `-- name: CountActiveSellerCampaigns :one
 SELECT count(*) FROM coupon.coupon_campaigns
-WHERE issuer_store_id = $1 AND status = 'ACTIVE' AND target_type <> 'COMPENSATION'
+WHERE issuer_store_id = $1 AND status = 'ACTIVE' AND end_at >= $2 AND target_type <> 'COMPENSATION'
 `
 
-func (q *Queries) CountActiveSellerCampaigns(ctx context.Context, storeID *int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveSellerCampaigns, storeID)
+type CountActiveSellerCampaignsParams struct {
+	StoreID *int64
+	Now     time.Time
+}
+
+// 已過 end_at 的 ACTIVE 活動不算同時進行中（到期不改狀態，D5）。
+func (q *Queries) CountActiveSellerCampaigns(ctx context.Context, arg CountActiveSellerCampaignsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveSellerCampaigns, arg.StoreID, arg.Now)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -338,7 +344,7 @@ func (q *Queries) LockQuota(ctx context.Context, storeID int64) (int32, error) {
 
 const publishCampaign = `-- name: PublishCampaign :execrows
 UPDATE coupon.coupon_campaigns SET status = 'ACTIVE', updated_at = $1
-WHERE id = $2 AND status = 'DRAFT'
+WHERE id = $2 AND status = 'DRAFT' AND end_at > $1
 `
 
 type PublishCampaignParams struct {

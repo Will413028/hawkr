@@ -54,10 +54,11 @@ type InternalGraph struct {
 var InternalDependencies = map[string]InternalGraph{
 	"coupon": {Packages: map[string][]string{
 		"campaign": {"model", "rows", "store"},
-		"model":    {},
+		"model":    {"text"},
 		"qualify":  {"model", "store"},
 		"rows":     {"model", "store"},
 		"store":    {},
+		"text":     {},
 		"voucher":  {"model", "qualify", "rows", "store"},
 	}},
 	"crm": {Packages: map[string][]string{

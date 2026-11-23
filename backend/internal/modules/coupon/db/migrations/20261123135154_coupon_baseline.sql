@@ -54,11 +54,14 @@ CREATE TABLE "coupon"."coupon_redemption_logs" (
   "action" text NOT NULL,
   "order_no" text NULL,
   "operator_admin_id" bigint NULL,
+  "operator_store_id" bigint NULL,
   "reason" text NULL,
+  "voided_count" integer NULL,
   "created_at" timestamptz NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "redemption_logs_action_check" CHECK (action = ANY (ARRAY['CLAIM'::text, 'ISSUE'::text, 'LOCK'::text, 'REDEEM'::text, 'RELEASE'::text, 'VOID'::text, 'END_CAMPAIGN'::text])),
-  CONSTRAINT "redemption_logs_reason_check" CHECK ((char_length(reason) >= 1) AND (char_length(reason) <= 255) AND (reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'::text))
+  CONSTRAINT "redemption_logs_reason_check" CHECK ((char_length(reason) >= 1) AND (char_length(reason) <= 255) AND (reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'::text)),
+  CONSTRAINT "redemption_logs_voided_count_check" CHECK (voided_count >= 0)
 );
 -- Create index "redemption_logs_by_campaign" to table: "coupon_redemption_logs"
 CREATE INDEX "redemption_logs_by_campaign" ON "coupon"."coupon_redemption_logs" ("campaign_id", "created_at");

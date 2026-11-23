@@ -2,14 +2,17 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"math"
 	"time"
 	"unicode/utf8"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // DiscountType 是折抵方式。值與 DB 的 campaigns_discount_type_check 一致。
@@ -24,7 +27,7 @@ const (
 type TargetType string
 
 const (
-	// TargetAll 是所有在活動建立之前註冊的買家（沿用 Java 的 ALL，見 CARRYOVER.md）。
+	// TargetAll 是每一位買家（與 Java 的 ALL 的差異見 CARRYOVER.md）。
 	TargetAll TargetType = "ALL"
 	// TargetMember 是在該店有消費紀錄的買家。
 	TargetMember TargetType = "MEMBER"
@@ -137,7 +140,7 @@ type Voucher struct {
 // Expired 回報券在 now 是不是已過期（從活動的 EndAt 推導）。
 func (c Campaign) Expired(now time.Time) bool { return now.After(c.EndAt) }
 
-// Reason 是 coupon 的業務原因（Go 端的常數，與 apperr 的分類搭配；對外的 ErrorReason 由 B7-3 加進 proto）。
+// Reason 是 coupon 的業務原因（Go 端的常數，與 apperr 的分類搭配）。
 type Reason string
 
 const (
@@ -157,6 +160,7 @@ const (
 	ReasonNotDesignated             Reason = "COUPON_NOT_DESIGNATED"
 	ReasonInvalidStatus             Reason = "COUPON_INVALID_STATUS"
 	ReasonNoVoucherForOrder         Reason = "COUPON_NO_VOUCHER_FOR_ORDER"
+	ReasonNoDiscount                Reason = "COUPON_NO_DISCOUNT"
 )
 
 type reasoned struct {
@@ -179,11 +183,43 @@ func ReasonOf(err error) Reason {
 	return ""
 }
 
-// NotFound 與 Precondition 建立帶業務原因的錯誤。訊息暫用原因代碼：使用者面的句子在 B7-3 加進模組的 internal/text。
-func NotFound(r Reason) error { return WithReason(apperr.NotFound("%s", string(r)), r) }
+// reasonText 是各原因的使用者面句子（模組的 internal/text）。
+var reasonText = map[Reason]func(uitext.Locale) uitext.Message{
+	ReasonCampaignNotFound:          text.ReasonCampaignNotFound,
+	ReasonVoucherNotFound:           text.ReasonVoucherNotFound,
+	ReasonCampaignNotActive:         text.ReasonCampaignNotActive,
+	ReasonOutsideWindow:             text.ReasonOutsideWindow,
+	ReasonNotEligible:               text.ReasonNotEligible,
+	ReasonStoreSuspended:            text.ReasonStoreSuspended,
+	ReasonIssueLimitReached:         text.ReasonIssueLimitReached,
+	ReasonVoucherUnavailable:        text.ReasonVoucherUnavailable,
+	ReasonVoucherLockedByOtherOrder: text.ReasonVoucherLockedByOtherOrder,
+	ReasonOrderHoldsAnotherVoucher:  text.ReasonOrderHoldsAnotherVoucher,
+	ReasonNotApplicableToStore:      text.ReasonNotApplicableToStore,
+	ReasonBelowThreshold:            text.ReasonBelowThreshold,
+	ReasonQuotaExceeded:             text.ReasonQuotaExceeded,
+	ReasonNotDesignated:             text.ReasonNotDesignated,
+	ReasonInvalidStatus:             text.ReasonInvalidStatus,
+	ReasonNoVoucherForOrder:         text.ReasonNoVoucherForOrder,
+	ReasonNoDiscount:                text.ReasonNoDiscount,
+}
 
-// Precondition 回傳 FailedPrecondition 分類、帶業務原因的錯誤。
-func Precondition(r Reason) error { return WithReason(apperr.FailedPrecondition("%s", string(r)), r) }
+func message(ctx context.Context, r Reason) uitext.Message {
+	if f, ok := reasonText[r]; ok {
+		return f(uitext.LocaleFrom(ctx))
+	}
+	return uitext.Message{Text: string(r), Locale: uitext.ZhTW}
+}
+
+// NotFound 回傳 NotFound 分類、帶業務原因與該原因的句子的錯誤。
+func NotFound(ctx context.Context, r Reason) error {
+	return WithReason(apperr.NotFound("%s", message(ctx, r)), r)
+}
+
+// Precondition 回傳 FailedPrecondition 分類、帶業務原因與該原因的句子的錯誤。
+func Precondition(ctx context.Context, r Reason) error {
+	return WithReason(apperr.FailedPrecondition("%s", message(ctx, r)), r)
+}
 
 // Invalid 回傳指出欄位 field 的 InvalidInput。
 func Invalid(field, msg string) error { return apperr.InvalidInputOn([]string{field}, "%s", msg) }

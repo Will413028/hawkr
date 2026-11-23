@@ -1,0 +1,72 @@
+{
+  "default": {
+    "reason.below_threshold": {
+      "message": "訂單金額未達使用門檻",
+      "description": "訂單金額小於活動門檻（COUPON_BELOW_THRESHOLD）。"
+    },
+    "reason.campaign_not_active": {
+      "message": "這個活動目前沒有進行",
+      "description": "活動不是 ACTIVE（COUPON_CAMPAIGN_NOT_ACTIVE）。"
+    },
+    "reason.campaign_not_found": {
+      "message": "找不到這個活動",
+      "description": "活動不存在（COUPON_CAMPAIGN_NOT_FOUND）。"
+    },
+    "reason.invalid_status": {
+      "message": "目前的狀態不能進行這個操作",
+      "description": "活動或券的狀態不允許這個轉換（COUPON_INVALID_STATUS）。"
+    },
+    "reason.issue_limit_reached": {
+      "message": "這個活動的優惠券已經發完",
+      "description": "發行數達總量上限（COUPON_ISSUE_LIMIT_REACHED）。"
+    },
+    "reason.no_discount": {
+      "message": "這張優惠券對這筆訂單沒有折抵",
+      "description": "百分比折抵算出 0 元，不消耗券（COUPON_NO_DISCOUNT）。"
+    },
+    "reason.no_voucher_for_order": {
+      "message": "這筆訂單沒有使用優惠券",
+      "description": "訂單沒有持有任何券（COUPON_NO_VOUCHER_FOR_ORDER）。"
+    },
+    "reason.not_applicable_to_store": {
+      "message": "這張優惠券不適用於這家店",
+      "description": "活動限定的店家與訂單的店家不同（COUPON_NOT_APPLICABLE_TO_STORE）。"
+    },
+    "reason.not_designated": {
+      "message": "這個活動不是指定對象的活動",
+      "description": "指定發放只適用於 DESIGNATED 活動（COUPON_NOT_DESIGNATED）。"
+    },
+    "reason.not_eligible": {
+      "message": "你不符合這個活動的資格",
+      "description": "買家不符合活動的資格類型（COUPON_NOT_ELIGIBLE）。"
+    },
+    "reason.order_holds_another_voucher": {
+      "message": "這筆訂單已經使用另一張優惠券",
+      "description": "一筆訂單只持有一張券（COUPON_ORDER_HOLDS_ANOTHER_VOUCHER）。"
+    },
+    "reason.outside_window": {
+      "message": "現在不在活動期間內",
+      "description": "現在早於開始或晚於結束（COUPON_OUTSIDE_WINDOW）。"
+    },
+    "reason.quota_exceeded": {
+      "message": "同時進行的活動數已達上限",
+      "description": "賣家同時進行的活動數達配額（COUPON_QUOTA_EXCEEDED）。"
+    },
+    "reason.store_suspended": {
+      "message": "這家店目前無法使用優惠券",
+      "description": "賣家發行的活動在發行店家停權期間不能領、不能鎖（COUPON_STORE_SUSPENDED）。"
+    },
+    "reason.voucher_locked_by_other_order": {
+      "message": "這張優惠券正被另一筆訂單使用",
+      "description": "券已被另一筆訂單鎖定（COUPON_VOUCHER_LOCKED_BY_OTHER_ORDER）。"
+    },
+    "reason.voucher_not_found": {
+      "message": "找不到這張優惠券",
+      "description": "券不存在或不屬於這位買家（COUPON_VOUCHER_NOT_FOUND）。"
+    },
+    "reason.voucher_unavailable": {
+      "message": "這張優惠券已經不能使用",
+      "description": "券已核銷或作廢（COUPON_VOUCHER_UNAVAILABLE）。"
+    }
+  }
+}

@@ -5,6 +5,7 @@ package campaign
 import (
 	"context"
 	"errors"
+	"math"
 	"time"
 	"uuid"
 
@@ -87,6 +88,9 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (model.Campaign, e
 	}
 
 	now := s.d.Now()
+	if !in.EndAt.After(now) {
+		return model.Campaign{}, model.Invalid("EndAt", "end must be in the future")
+	}
 	p := store.InsertCampaignParams{
 		ID: s.d.NewID(), Title: title, DiscountType: string(in.DiscountType), ThresholdAmount: in.ThresholdAmount,
 		TargetType: string(in.TargetType), StartAt: in.StartAt, EndAt: in.EndAt, Status: string(model.StatusDraft), Now: now,
@@ -151,12 +155,12 @@ func (s *Service) checkQuota(ctx context.Context, q *store.Queries, storeID int6
 	if err != nil {
 		return err
 	}
-	active, err := q.CountActiveSellerCampaigns(ctx, &storeID)
+	active, err := q.CountActiveSellerCampaigns(ctx, store.CountActiveSellerCampaignsParams{StoreID: &storeID, Now: now})
 	if err != nil {
 		return err
 	}
 	if active >= int64(maxCount) {
-		return model.Precondition(model.ReasonQuotaExceeded)
+		return model.Precondition(ctx, model.ReasonQuotaExceeded)
 	}
 	return nil
 }
@@ -175,19 +179,25 @@ func (s *Service) SetQuota(ctx context.Context, storeID int64, maxCount int32) e
 func (s *Service) Publish(ctx context.Context, id uuid.UUID) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		n, err := q.PublishCampaign(ctx, store.PublishCampaignParams{ID: id, Now: s.d.Now()})
+		now := s.d.Now()
+		n, err := q.PublishCampaign(ctx, store.PublishCampaignParams{ID: id, Now: now})
 		if err != nil {
 			return err
 		}
 		if n == 1 {
 			return nil
 		}
-		if _, err := q.GetCampaign(ctx, id); errors.Is(err, pgx.ErrNoRows) {
-			return model.NotFound(model.ReasonCampaignNotFound)
-		} else if err != nil {
+		row, err := q.GetCampaign(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
+		}
+		if err != nil {
 			return err
 		}
-		return model.Precondition(model.ReasonInvalidStatus)
+		if model.CampaignStatus(row.Status) == model.StatusDraft && !row.EndAt.After(now) {
+			return model.Invalid("EndAt", "end must be in the future")
+		}
+		return model.Precondition(ctx, model.ReasonInvalidStatus)
 	})
 }
 
@@ -196,7 +206,7 @@ type EndInput struct {
 	CampaignID uuid.UUID
 	// StoreID 不為 0 時只能結束這家店發的活動（賣家路徑）；別人的活動回 NotFound，不洩漏存在與否。
 	StoreID int64
-	// AdminID 與 Reason 只進稽核紀錄。
+	// AdminID、StoreID 與 Reason 進稽核紀錄（StoreID 同時是賣家路徑的範圍限制）。
 	AdminID int64
 	Reason  string
 }
@@ -219,19 +229,19 @@ func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
 		q := s.q(ctx)
 		row, err := q.GetCampaignForUpdate(ctx, in.CampaignID)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return model.NotFound(model.ReasonCampaignNotFound)
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		if err != nil {
 			return err
 		}
 		if in.StoreID > 0 && (row.IssuerStoreID == nil || *row.IssuerStoreID != in.StoreID) {
-			return model.NotFound(model.ReasonCampaignNotFound)
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		if model.CampaignStatus(row.Status) == model.StatusEnded {
 			return nil
 		}
 		if model.CampaignStatus(row.Status) != model.StatusActive {
-			return model.Precondition(model.ReasonInvalidStatus)
+			return model.Precondition(ctx, model.ReasonInvalidStatus)
 		}
 		now := s.d.Now()
 		if n, err := q.EndCampaign(ctx, store.EndCampaignParams{ID: in.CampaignID, Now: rows.TimePtr(now)}); err != nil {
@@ -243,9 +253,13 @@ func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
 		if err != nil {
 			return err
 		}
-		log := store.InsertLogParams{CampaignID: in.CampaignID, Action: "END_CAMPAIGN", Now: now}
+		voided := int32(min(res.Voided, math.MaxInt32)) //nolint:gosec // 夾在 int32 範圍內
+		log := store.InsertLogParams{CampaignID: in.CampaignID, Action: "END_CAMPAIGN", VoidedCount: &voided, Now: now}
 		if in.AdminID > 0 {
 			log.OperatorAdminID = &in.AdminID
+		}
+		if in.StoreID > 0 {
+			log.OperatorStoreID = &in.StoreID
 		}
 		if reason != "" {
 			log.Reason = &reason

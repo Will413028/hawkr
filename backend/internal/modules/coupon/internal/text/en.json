@@ -1,0 +1,55 @@
+{
+  "default": {
+    "reason.below_threshold": {
+      "message": "The order total is below the minimum for this coupon"
+    },
+    "reason.campaign_not_active": {
+      "message": "This campaign is not active"
+    },
+    "reason.campaign_not_found": {
+      "message": "Campaign not found"
+    },
+    "reason.invalid_status": {
+      "message": "This action is not allowed in the current state"
+    },
+    "reason.issue_limit_reached": {
+      "message": "All coupons for this campaign have been issued"
+    },
+    "reason.no_discount": {
+      "message": "This coupon gives no discount on this order"
+    },
+    "reason.no_voucher_for_order": {
+      "message": "This order does not use a coupon"
+    },
+    "reason.not_applicable_to_store": {
+      "message": "This coupon does not apply to this store"
+    },
+    "reason.not_designated": {
+      "message": "This campaign is not for designated buyers"
+    },
+    "reason.not_eligible": {
+      "message": "You are not eligible for this campaign"
+    },
+    "reason.order_holds_another_voucher": {
+      "message": "This order already uses another coupon"
+    },
+    "reason.outside_window": {
+      "message": "This campaign is not running right now"
+    },
+    "reason.quota_exceeded": {
+      "message": "You have reached the limit of concurrent campaigns"
+    },
+    "reason.store_suspended": {
+      "message": "Coupons from this store are unavailable right now"
+    },
+    "reason.voucher_locked_by_other_order": {
+      "message": "This coupon is being used by another order"
+    },
+    "reason.voucher_not_found": {
+      "message": "Coupon not found"
+    },
+    "reason.voucher_unavailable": {
+      "message": "This coupon can no longer be used"
+    }
+  }
+}

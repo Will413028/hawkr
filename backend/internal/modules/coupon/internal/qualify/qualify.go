@@ -18,7 +18,7 @@ type Stores interface {
 	StoreSuspended(ctx context.Context, storeID int64) (bool, error)
 }
 
-// Members 是「買家在該店有消費紀錄」的 port（MEMBER 資格用）。B7-4 由 coupon 自己持有的投影實作，B7-2 的測試用假的。
+// Members 是「買家在該店有消費紀錄」的 port（MEMBER 資格用）。
 type Members interface {
 	IsMember(ctx context.Context, buyerID, storeID int64) (bool, error)
 }
@@ -40,10 +40,10 @@ func New(d Deps) *Service { return &Service{d: d} }
 // 不合格回 FailedPrecondition 與對應的業務原因；port 讀取失敗原樣回傳。
 func (s *Service) Check(ctx context.Context, c model.Campaign, buyerID int64, now time.Time) error {
 	if c.Status != model.StatusActive {
-		return model.Precondition(model.ReasonCampaignNotActive)
+		return model.Precondition(ctx, model.ReasonCampaignNotActive)
 	}
 	if now.Before(c.StartAt) || c.Expired(now) {
-		return model.Precondition(model.ReasonOutsideWindow)
+		return model.Precondition(ctx, model.ReasonOutsideWindow)
 	}
 	if c.IssuerStoreID != nil {
 		suspended, err := s.d.Stores.StoreSuspended(ctx, *c.IssuerStoreID)
@@ -51,7 +51,7 @@ func (s *Service) Check(ctx context.Context, c model.Campaign, buyerID int64, no
 			return fmt.Errorf("coupon：讀店家 %d 的停權狀態：%w", *c.IssuerStoreID, err)
 		}
 		if suspended {
-			return model.Precondition(model.ReasonStoreSuspended)
+			return model.Precondition(ctx, model.ReasonStoreSuspended)
 		}
 	}
 	ok, err := s.targets(ctx, c, buyerID)
@@ -59,7 +59,7 @@ func (s *Service) Check(ctx context.Context, c model.Campaign, buyerID int64, no
 		return err
 	}
 	if !ok {
-		return model.Precondition(model.ReasonNotEligible)
+		return model.Precondition(ctx, model.ReasonNotEligible)
 	}
 	return nil
 }
@@ -84,8 +84,8 @@ func (s *Service) targets(ctx context.Context, c model.Campaign, buyerID int64) 
 	}
 }
 
-// Fit 檢查訂單面的條件並回傳折抵金額：店家在活動的適用範圍內、訂單金額達門檻。orderAmount 必須是正數且不超過 MaxOrderAmount。
-func Fit(c model.Campaign, storeID, orderAmount int64) (int64, error) {
+// Fit 檢查訂單面的條件並回傳折抵金額：店家在活動的適用範圍內、訂單金額達門檻、折抵大於 0（百分比折抵可能算出 0 元，不消耗券）。orderAmount 必須是正數且不超過 MaxOrderAmount。
+func Fit(ctx context.Context, c model.Campaign, storeID, orderAmount int64) (int64, error) {
 	if storeID <= 0 {
 		return 0, model.Invalid("StoreID", "store id")
 	}
@@ -93,10 +93,14 @@ func Fit(c model.Campaign, storeID, orderAmount int64) (int64, error) {
 		return 0, model.Invalid("OrderAmount", "order amount")
 	}
 	if c.StoreID != nil && *c.StoreID != storeID {
-		return 0, model.Precondition(model.ReasonNotApplicableToStore)
+		return 0, model.Precondition(ctx, model.ReasonNotApplicableToStore)
 	}
 	if orderAmount < c.ThresholdAmount {
-		return 0, model.Precondition(model.ReasonBelowThreshold)
+		return 0, model.Precondition(ctx, model.ReasonBelowThreshold)
 	}
-	return model.Discount(c, orderAmount), nil
+	discount := model.Discount(c, orderAmount)
+	if discount <= 0 {
+		return 0, model.Precondition(ctx, model.ReasonNoDiscount)
+	}
+	return discount, nil
 }

@@ -58,10 +58,37 @@
    "id": "drop-suspension-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/qualify/qualify.go",
-   "old": "\t\tif suspended {\n\t\t\treturn model.Precondition(model.ReasonStoreSuspended)\n\t\t}\n",
+   "old": "\t\tif suspended {\n\t\t\treturn model.Precondition(ctx, model.ReasonStoreSuspended)\n\t\t}\n",
    "new": "\t\t_ = suspended\n",
    "test": "internal/modules/coupon ^TestSuspendedStoreBlocksClaimAndLockButNotRedeem$",
    "why": "資格判定拿掉停權檢查（D8 修訂）：停權店家的活動仍可領、可鎖，停權測試要紅。"
+  },
+  {
+   "id": "lock-order-conflict-mapping",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\tif isOrderNoConflict(err) {",
+   "new": "\tif false && isOrderNoConflict(err) {",
+   "test": "internal/modules/coupon ^TestConcurrentLockOfTwoVouchersForOneOrder$",
+   "why": "拿掉 vouchers_order_no_key 唯一鍵衝突的對應：同一筆訂單並發鎖兩張券時後到的回 Internal 而不是 ORDER_HOLDS_ANOTHER_VOUCHER，並發測試要紅。"
+  },
+  {
+   "id": "quota-counts-expired",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "AND end_at >= $2 AND target_type",
+   "new": "AND $2::timestamptz IS NOT NULL AND target_type",
+   "test": "internal/modules/coupon ^TestExpiredCampaignsDoNotCountTowardTheQuota$",
+   "why": "配額計數拿掉 end_at 條件：已到期的 ACTIVE 活動永遠佔配額，到期後建立的測試要紅。"
+  },
+  {
+   "id": "fit-allows-zero-discount",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/qualify/qualify.go",
+   "old": "\tif discount <= 0 {",
+   "new": "\tif false && discount <= 0 {",
+   "test": "internal/modules/coupon ^TestLockRejectsAPercentDiscountThatRoundsToZero$",
+   "why": "Fit 拿掉折抵為 0 的檢查：算出 0 元的百分比券仍被鎖定而消耗，測試要紅。"
   }
  ]
 }

@@ -51,8 +51,8 @@ WHERE id = sqlc.arg(id) AND status IN ('AVAILABLE', 'LOCKED')
 RETURNING id, campaign_id, buyer_id;
 
 -- name: InsertLog :exec
-INSERT INTO coupon.coupon_redemption_logs (campaign_id, voucher_id, buyer_id, action, order_no, operator_admin_id, reason, created_at)
-VALUES (sqlc.arg(campaign_id), sqlc.narg(voucher_id), sqlc.narg(buyer_id), sqlc.arg(action), sqlc.narg(order_no), sqlc.narg(operator_admin_id), sqlc.narg(reason), sqlc.arg(now));
+INSERT INTO coupon.coupon_redemption_logs (campaign_id, voucher_id, buyer_id, action, order_no, operator_admin_id, operator_store_id, reason, voided_count, created_at)
+VALUES (sqlc.arg(campaign_id), sqlc.narg(voucher_id), sqlc.narg(buyer_id), sqlc.arg(action), sqlc.narg(order_no), sqlc.narg(operator_admin_id), sqlc.narg(operator_store_id), sqlc.narg(reason), sqlc.narg(voided_count), sqlc.arg(now));
 
 -- name: GetVoucherBySource :one
 SELECT * FROM coupon.coupon_vouchers WHERE source_type = sqlc.arg(source_type) AND source_id = sqlc.arg(source_id);

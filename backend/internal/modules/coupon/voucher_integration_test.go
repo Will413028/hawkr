@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -581,4 +582,77 @@ func TestSuspendedStoreBlocksClaimAndLockButNotRedeem(t *testing.T) {
 	f.stores.set(storeA, false)
 	f.claim(seller, buyer1)
 	f.mustLock(held, "O1")
+}
+
+// 同一筆訂單並發鎖兩張不同的券：一張成功，另一張回 ORDER_HOLDS_ANOTHER_VOUCHER（不是 Internal）。
+func TestConcurrentLockOfTwoVouchersForOneOrder(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	c := f.campaign()
+	v1, v2 := f.claim(c, buyer1), f.claim(c, buyer2)
+	for i := range 5 {
+		order := fmt.Sprint("O-SAME-", i)
+		errs := parallel(2, func(j int) error {
+			_, err := f.lock([]coupon.Voucher{v1, v2}[j], order)
+			return err
+		})
+		ok := 0
+		for _, err := range errs {
+			if err == nil {
+				ok++
+				continue
+			}
+			wantReason(t, err, coupon.ReasonOrderHoldsAnotherVoucher)
+		}
+		if ok != 1 {
+			t.Fatalf("訂單 %s 成功 %d 筆，要 1", order, ok)
+		}
+		if _, err := f.m.Release(context.Background(), order); err != nil {
+			t.Fatal(err)
+		}
+		if f.voucherStatus(v1.ID) != "AVAILABLE" || f.voucherStatus(v2.ID) != "AVAILABLE" {
+			t.Fatal("釋放後兩張券都要回到 AVAILABLE")
+		}
+	}
+}
+
+// 百分比折抵算出 0 元時不鎖券（不消耗券換不到折扣）。
+func TestLockRejectsAPercentDiscountThatRoundsToZero(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	c := f.campaign(func(in *coupon.CreateCampaignInput) {
+		in.DiscountType, in.DiscountAmount, in.DiscountPercent, in.MaxDiscountAmount = coupon.DiscountPercent, 0, 1, 100
+	})
+	v := f.claim(c, buyer1)
+	in := f.lockInput(v, "O1")
+	in.OrderAmount = 50
+	_, err := f.m.Lock(context.Background(), in)
+	wantReason(t, err, coupon.ReasonNoDiscount)
+	if got := f.voucherStatus(v.ID); got != "AVAILABLE" {
+		t.Fatalf("券狀態 = %s，要維持 AVAILABLE", got)
+	}
+	in.OrderAmount = 1000
+	if r, err := f.m.Lock(context.Background(), in); err != nil || r.Discount != 10 {
+		t.Fatalf("1000 元的 1%% = %+v, %v", r, err)
+	}
+}
+
+// 長度以字元計（與 DB 的 char_length 一致）：128 個中文字的單號合法，129 個不合法；Issue 失敗時不回半成品。
+func TestLengthsCountRunesAndIssueFailureReturnsNoResult(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	v := f.claim(f.campaign(), buyer1)
+	if _, err := f.lock(v, strings.Repeat("單", coupon.MaxOrderNoLen)); err != nil {
+		t.Fatalf("128 個字元的單號要成功：%v", err)
+	}
+	if _, err := f.lock(f.claim(f.campaign(), buyer2), strings.Repeat("單", coupon.MaxOrderNoLen+1)); err == nil {
+		t.Fatal("129 個字元的單號要被擋下")
+	}
+
+	d := f.campaign(func(in *coupon.CreateCampaignInput) { in.TargetType, in.TotalLimit = coupon.TargetDesignated, 1 })
+	r, err := f.m.Issue(context.Background(), coupon.IssueInput{CampaignID: d.ID, BuyerIDs: []int64{buyer1, buyer2}, AdminID: adminID})
+	wantReason(t, err, coupon.ReasonIssueLimitReached)
+	if r != (coupon.IssueResult{}) {
+		t.Fatalf("失敗的 Issue 要回空結果：%+v", r)
+	}
 }

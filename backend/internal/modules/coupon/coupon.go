@@ -115,6 +115,7 @@ const (
 	ReasonNotDesignated             = model.ReasonNotDesignated
 	ReasonInvalidStatus             = model.ReasonInvalidStatus
 	ReasonNoVoucherForOrder         = model.ReasonNoVoucherForOrder
+	ReasonNoDiscount                = model.ReasonNoDiscount
 )
 
 // ReasonOf 回傳 err 帶的 coupon 業務原因；沒有時是空字串。
@@ -139,7 +140,7 @@ func New(d Deps) *Module {
 }
 
 // 下面所有寫入都在 ctx 的 transaction 內執行（ctx 沒有 transaction 時各自開一個），所以呼叫方可以把它們和自己的狀態變更放進同一個
-// transaction：B8 的 ordering 在結帳與訂單狀態轉換的 transaction 內呼叫 Lock、Redeem、Release。
+// transaction：ordering 在結帳與訂單狀態轉換的 transaction 內呼叫 Lock、Redeem、Release。
 
 // CreateCampaign 建立活動：賣家的直接 ACTIVE 並檢查配額，admin 的是 DRAFT。
 func (m *Module) CreateCampaign(ctx context.Context, in CreateCampaignInput) (Campaign, error) {

@@ -139,8 +139,12 @@ CREATE TABLE coupon.coupon_redemption_logs (
     action            TEXT        NOT NULL,
     order_no          TEXT,
     operator_admin_id BIGINT,
+    operator_store_id BIGINT,
     reason            TEXT,
+    -- END_CAMPAIGN 一列記這次作廢的 AVAILABLE 券數。
+    voided_count      INT,
     created_at        TIMESTAMPTZ NOT NULL,
+    CONSTRAINT redemption_logs_voided_count_check CHECK (voided_count >= 0),
     CONSTRAINT redemption_logs_action_check CHECK (action IN ('CLAIM', 'ISSUE', 'LOCK', 'REDEEM', 'RELEASE', 'VOID', 'END_CAMPAIGN')),
     CONSTRAINT redemption_logs_reason_check CHECK (char_length(reason) >= 1 AND char_length(reason) <= 255 AND reason !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );

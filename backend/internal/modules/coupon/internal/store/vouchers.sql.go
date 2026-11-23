@@ -124,8 +124,8 @@ func (q *Queries) GetVoucherBySource(ctx context.Context, arg GetVoucherBySource
 }
 
 const insertLog = `-- name: InsertLog :exec
-INSERT INTO coupon.coupon_redemption_logs (campaign_id, voucher_id, buyer_id, action, order_no, operator_admin_id, reason, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO coupon.coupon_redemption_logs (campaign_id, voucher_id, buyer_id, action, order_no, operator_admin_id, operator_store_id, reason, voided_count, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type InsertLogParams struct {
@@ -135,7 +135,9 @@ type InsertLogParams struct {
 	Action          string
 	OrderNo         *string
 	OperatorAdminID *int64
+	OperatorStoreID *int64
 	Reason          *string
+	VoidedCount     *int32
 	Now             time.Time
 }
 
@@ -147,7 +149,9 @@ func (q *Queries) InsertLog(ctx context.Context, arg InsertLogParams) error {
 		arg.Action,
 		arg.OrderNo,
 		arg.OperatorAdminID,
+		arg.OperatorStoreID,
 		arg.Reason,
+		arg.VoidedCount,
 		arg.Now,
 	)
 	return err

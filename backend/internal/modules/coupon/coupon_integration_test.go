@@ -37,7 +37,7 @@ const (
 	windowLen = 24 * time.Hour
 )
 
-// fakeStores 與 fakeMembers 是 coupon 的 port 的替身（接 seller 的組裝在 B7-3，B7-4 接投影）。
+// fakeStores 與 fakeMembers 是 coupon 的 port 的替身。
 type fakeStores struct {
 	mu        sync.Mutex
 	suspended map[int64]bool

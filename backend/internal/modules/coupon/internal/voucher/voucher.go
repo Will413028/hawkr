@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"time"
+	"unicode/utf8"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/model"
@@ -42,8 +44,15 @@ func (s *Service) logOp(ctx context.Context, q *store.Queries, p store.InsertLog
 	return q.InsertLog(ctx, p)
 }
 
+// isOrderNoConflict 回報 err 是不是 vouchers_order_no_key 的唯一鍵衝突：同一筆訂單並發鎖兩張不同的券時，後到的撞上它。
+// 撞上之後 transaction 已中止，呼叫方不得再下 SQL。
+func isOrderNoConflict(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "23505" && pg.ConstraintName == "vouchers_order_no_key"
+}
+
 func validOrderNo(orderNo string) error {
-	if n := len(orderNo); n < 1 || n > model.MaxOrderNoLen {
+	if n := utf8.RuneCountInString(orderNo); n < 1 || n > model.MaxOrderNoLen {
 		return model.Invalid("OrderNo", "order no")
 	}
 	return nil
@@ -66,7 +75,7 @@ func (s *Service) Claim(ctx context.Context, campaignID uuid.UUID, buyerID int64
 		q := s.q(ctx)
 		crow, err := q.GetCampaignForUpdate(ctx, campaignID)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return model.NotFound(model.ReasonCampaignNotFound)
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		if err != nil {
 			return err
@@ -75,7 +84,7 @@ func (s *Service) Claim(ctx context.Context, campaignID uuid.UUID, buyerID int64
 		held, err := q.GetVoucherByCampaignBuyer(ctx, store.GetVoucherByCampaignBuyerParams{CampaignID: campaignID, BuyerID: buyerID})
 		if err == nil {
 			if model.VoucherStatus(held.Status) == model.VoucherVoided {
-				return model.Precondition(model.ReasonVoucherUnavailable)
+				return model.Precondition(ctx, model.ReasonVoucherUnavailable)
 			}
 			res = ClaimResult{Voucher: rows.Voucher(held)}
 			return nil
@@ -108,7 +117,7 @@ func (s *Service) create(ctx context.Context, q *store.Queries, campaignID uuid.
 		return model.Voucher{}, err
 	}
 	if n != 1 {
-		return model.Voucher{}, model.Precondition(model.ReasonIssueLimitReached)
+		return model.Voucher{}, model.Precondition(ctx, model.ReasonIssueLimitReached)
 	}
 	id := s.d.NewID()
 	n, err = q.InsertVoucher(ctx, store.InsertVoucherParams{
@@ -158,21 +167,21 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 		q := s.q(ctx)
 		crow, err := q.GetCampaignForUpdate(ctx, in.CampaignID)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return model.NotFound(model.ReasonCampaignNotFound)
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		if err != nil {
 			return err
 		}
 		c := rows.Campaign(crow)
 		if c.TargetType != model.TargetDesignated {
-			return model.Precondition(model.ReasonNotDesignated)
+			return model.Precondition(ctx, model.ReasonNotDesignated)
 		}
 		now := s.d.Now()
 		if c.Status != model.StatusActive {
-			return model.Precondition(model.ReasonCampaignNotActive)
+			return model.Precondition(ctx, model.ReasonCampaignNotActive)
 		}
 		if c.Expired(now) {
-			return model.Precondition(model.ReasonOutsideWindow)
+			return model.Precondition(ctx, model.ReasonOutsideWindow)
 		}
 		held, err := q.ListHeldBuyers(ctx, store.ListHeldBuyersParams{CampaignID: c.ID, BuyerIds: buyers})
 		if err != nil {
@@ -200,7 +209,7 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 			return err
 		}
 		if n != 1 {
-			return model.Precondition(model.ReasonIssueLimitReached)
+			return model.Precondition(ctx, model.ReasonIssueLimitReached)
 		}
 		for _, b := range fresh {
 			id := s.d.NewID()
@@ -217,7 +226,10 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 		}
 		return nil
 	})
-	return res, err
+	if err != nil {
+		return IssueResult{}, err
+	}
+	return res, nil
 }
 
 // CompensationInput 是系統補償券的輸入。(SourceType, SourceID) 是冪等鍵（D4）：同一個來源重送只建一張。
@@ -246,7 +258,7 @@ type CompensationResult struct {
 // 不比對其他參數；同一個來源給不同買家回 InvalidInput。
 func (s *Service) IssueCompensation(ctx context.Context, in CompensationInput) (CompensationResult, error) {
 	sourceID := in.SourceID
-	if !in.SourceType.Valid() || len(sourceID) < 1 || len(sourceID) > model.MaxSourceIDLen {
+	if !in.SourceType.Valid() || utf8.RuneCountInString(sourceID) < 1 || utf8.RuneCountInString(sourceID) > model.MaxSourceIDLen {
 		return CompensationResult{}, model.Invalid("SourceID", "source")
 	}
 	if in.BuyerID <= 0 || in.StoreID <= 0 || !in.Issuer.Valid() || (in.Issuer.StoreID > 0 && in.Issuer.StoreID != in.StoreID) {
@@ -370,14 +382,14 @@ func (s *Service) Quote(ctx context.Context, in LockInput) (LockResult, error) {
 			return err
 		}
 		if !heldBy(vrow, in.OrderNo) {
-			if err := availability(vrow); err != nil {
+			if err := availability(ctx, vrow); err != nil {
 				return err
 			}
 			if err := s.d.Qualify.Check(ctx, c, in.BuyerID, s.d.Now()); err != nil {
 				return err
 			}
 		}
-		discount, err := qualify.Fit(c, in.StoreID, in.OrderAmount)
+		discount, err := qualify.Fit(ctx, c, in.StoreID, in.OrderAmount)
 		if err != nil {
 			return err
 		}
@@ -388,13 +400,13 @@ func (s *Service) Quote(ctx context.Context, in LockInput) (LockResult, error) {
 }
 
 // availability 對已經不是 AVAILABLE 的券回對應的原因：被別的訂單鎖著、已核銷或已作廢。AVAILABLE 回 nil。
-func availability(v store.CouponCouponVoucher) error {
+func availability(ctx context.Context, v store.CouponCouponVoucher) error {
 	if st := model.VoucherStatus(v.Status); st == model.VoucherAvailable {
 		return nil
 	} else if st == model.VoucherLocked {
-		return model.Precondition(model.ReasonVoucherLockedByOtherOrder)
+		return model.Precondition(ctx, model.ReasonVoucherLockedByOtherOrder)
 	}
-	return model.Precondition(model.ReasonVoucherUnavailable)
+	return model.Precondition(ctx, model.ReasonVoucherUnavailable)
 }
 
 func (s *Service) load(ctx context.Context, q *store.Queries, in LockInput) (store.CouponCouponVoucher, model.Campaign, error) {
@@ -403,7 +415,7 @@ func (s *Service) load(ctx context.Context, q *store.Queries, in LockInput) (sto
 	}
 	vrow, err := q.GetVoucher(ctx, in.VoucherID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && vrow.BuyerID != in.BuyerID) {
-		return store.CouponCouponVoucher{}, model.Campaign{}, model.NotFound(model.ReasonVoucherNotFound)
+		return store.CouponCouponVoucher{}, model.Campaign{}, model.NotFound(ctx, model.ReasonVoucherNotFound)
 	}
 	if err != nil {
 		return store.CouponCouponVoucher{}, model.Campaign{}, err
@@ -438,7 +450,7 @@ func (s *Service) lock(ctx context.Context, in LockInput) (LockResult, error) {
 		return LockResult{}, err
 	}
 	if heldBy(vrow, in.OrderNo) {
-		discount, err := qualify.Fit(c, in.StoreID, in.OrderAmount)
+		discount, err := qualify.Fit(ctx, c, in.StoreID, in.OrderAmount)
 		if err != nil {
 			return LockResult{}, err
 		}
@@ -448,18 +460,21 @@ func (s *Service) lock(ctx context.Context, in LockInput) (LockResult, error) {
 	if err := s.d.Qualify.Check(ctx, c, in.BuyerID, now); err != nil {
 		return LockResult{}, err
 	}
-	discount, err := qualify.Fit(c, in.StoreID, in.OrderAmount)
+	discount, err := qualify.Fit(ctx, c, in.StoreID, in.OrderAmount)
 	if err != nil {
 		return LockResult{}, err
 	}
 	if other, err := q.GetVoucherByOrderNo(ctx, &in.OrderNo); err == nil && other.ID != vrow.ID {
-		return LockResult{}, model.Precondition(model.ReasonOrderHoldsAnotherVoucher)
+		return LockResult{}, model.Precondition(ctx, model.ReasonOrderHoldsAnotherVoucher)
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return LockResult{}, err
 	}
 	locked, err := q.LockVoucher(ctx, store.LockVoucherParams{ID: vrow.ID, BuyerID: in.BuyerID, OrderNo: &in.OrderNo, Now: rows.TimePtr(now)})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return s.lostLock(ctx, q, vrow.ID, in, discount)
+	}
+	if isOrderNoConflict(err) {
+		return LockResult{}, model.Precondition(ctx, model.ReasonOrderHoldsAnotherVoucher)
 	}
 	if err != nil {
 		return LockResult{}, err
@@ -483,7 +498,7 @@ func (s *Service) lostLock(ctx context.Context, q *store.Queries, id uuid.UUID, 
 	if heldBy(cur, in.OrderNo) {
 		return LockResult{Voucher: rows.Voucher(cur), Discount: discount, Replayed: true}, nil
 	}
-	if err := availability(cur); err != nil {
+	if err := availability(ctx, cur); err != nil {
 		return LockResult{}, err
 	}
 	return LockResult{}, errors.New("coupon：券仍是 AVAILABLE 但條件式鎖定沒有更新任何列")
@@ -509,7 +524,7 @@ func (s *Service) Redeem(ctx context.Context, orderNo string) (RedeemResult, err
 		if errors.Is(err, pgx.ErrNoRows) {
 			cur, err := q.GetVoucherByOrderNo(ctx, &orderNo)
 			if errors.Is(err, pgx.ErrNoRows) {
-				return model.NotFound(model.ReasonNoVoucherForOrder)
+				return model.NotFound(ctx, model.ReasonNoVoucherForOrder)
 			}
 			if err != nil {
 				return err
@@ -599,11 +614,11 @@ func (s *Service) Void(ctx context.Context, in VoidInput) error {
 		row, err := q.VoidVoucher(ctx, store.VoidVoucherParams{ID: in.VoucherID, Now: rows.TimePtr(now)})
 		if errors.Is(err, pgx.ErrNoRows) {
 			if _, err := q.GetVoucher(ctx, in.VoucherID); errors.Is(err, pgx.ErrNoRows) {
-				return model.NotFound(model.ReasonVoucherNotFound)
+				return model.NotFound(ctx, model.ReasonVoucherNotFound)
 			} else if err != nil {
 				return err
 			}
-			return model.Precondition(model.ReasonInvalidStatus)
+			return model.Precondition(ctx, model.ReasonInvalidStatus)
 		}
 		if err != nil {
 			return err
