@@ -701,6 +701,27 @@ func TestConfirm_ConfirmedInAnotherTransactionIsRejected(t *testing.T) {
 func TestConfirm_ReentryAfterMarkDeletedIsRejected(t *testing.T) {
 	f := setup(t)
 	res := ready(t, f, owner)
+	var reentryErr error
+	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
+		a, err := f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic)
+		if err != nil {
+			return err
+		}
+		if err := f.m.MarkDeleted(ctx, []uuid.UUID{a.ID}); err != nil {
+			return err
+		}
+		_, reentryErr = f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantKind(t, reentryErr, apperr.KindFailedPrecondition)
+}
+
+func TestConfirm_ReplayInLaterTransactionAfterMarkDeletedIsRejected(t *testing.T) {
+	f := setup(t)
+	res := ready(t, f, owner)
 	a, err := confirmInTx(f, owner, res.Token)
 	if err != nil {
 		t.Fatal(err)
