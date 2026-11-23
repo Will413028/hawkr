@@ -126,3 +126,25 @@ func TestProcurementModuleIsBuiltWithTheJobClientInBothRoles(t *testing.T) {
 		}
 	}
 }
+
+// SubmitTurn 要讀買家額度：serve 與 worker 組採購模組時都得給買家模組當 Entitlements，不能是 nil（nil 會讓每次送出都回內部錯誤）。
+func TestProcurementModuleIsBuiltWithTheBuyerModuleAsEntitlementsInBothRoles(t *testing.T) {
+	for _, name := range []string{"runServe", "runWorker"} {
+		wired := false
+		ast.Inspect(funcBody(t, name), func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if id, ok := call.Fun.(*ast.Ident); ok && (id.Name == "newProcurement" || id.Name == "newProcurementWorker") && len(call.Args) >= 3 {
+				if a, ok := call.Args[2].(*ast.Ident); ok && a.Name == "buyerModule" {
+					wired = true
+				}
+			}
+			return true
+		})
+		if !wired {
+			t.Errorf("%s：newProcurement 沒有帶 buyerModule 當 Entitlements", name)
+		}
+	}
+}

@@ -418,3 +418,15 @@ func TestFieldPathsExistInTheRequestMessages(t *testing.T) {
 		}
 	}
 }
+
+func TestSubmitTurnAcceptsAServerIssuedUUIDv7RequestID(t *testing.T) {
+	m := &fakeModule{}
+	c := setup(t, m)
+	id := uuid.NewV7()
+	if _, err := c.SubmitTurn(t.Context(), as(connect.NewRequest(&pb.SubmitTurnRequest{Message: "x", ClientRequestId: goodID, RequestId: id.String()}), accountID)); err != nil {
+		t.Fatalf("UUIDv7 的 request_id = %v，要通過", err)
+	}
+	if len(m.submitted) != 1 || m.submitted[0].RequestID == nil || *m.submitted[0].RequestID != id {
+		t.Fatalf("模組收到 %+v，要帶 request_id %s", m.submitted, id)
+	}
+}

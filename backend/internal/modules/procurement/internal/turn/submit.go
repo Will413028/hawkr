@@ -65,15 +65,15 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (Submitted, error
 	case utf8.RuneCountInString(msg) > MaxMessageRunes:
 		return Submitted{}, apperr.InvalidInputOn([]string{"Message"}, "訊息不能超過 %d 個字元", MaxMessageRunes)
 	}
-	quota, err := s.Quota.TurnQuota(ctx, in.BuyerID)
-	if err != nil {
-		return Submitted{}, fmt.Errorf("turn：讀取買家額度：%w", err)
-	}
 	var out Submitted
-	err = s.Submitter.DB.InTx(ctx, func(ctx context.Context) error {
+	err := s.Submitter.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.Submitter.DB.Conn(ctx))
 		if err := q.LockBuyerSubmits(ctx, in.BuyerID); err != nil {
 			return fmt.Errorf("turn：鎖買家的送出：%w", err)
+		}
+		quota, err := s.Quota.TurnQuota(ctx, in.BuyerID)
+		if err != nil {
+			return fmt.Errorf("turn：讀取買家額度：%w", err)
 		}
 		requestID, conversationID, err := s.resolve(ctx, q, in)
 		if err != nil {
@@ -102,6 +102,12 @@ func (s Submitter) resolve(ctx context.Context, q *store.Queries, in SubmitInput
 	first, err := q.GetRunByIdempotencyKey(ctx, store.GetRunByIdempotencyKeyParams{BuyerID: in.BuyerID, ClientRequestID: in.ClientRequestID})
 	switch {
 	case err == nil && first.ConversationID != nil && (in.RequestID == nil || *in.RequestID == first.RequestID):
+		if _, err := q.GetConversationForBuyer(ctx, store.GetConversationForBuyerParams{ID: *first.ConversationID, BuyerID: in.BuyerID}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return uuid.UUID{}, uuid.UUID{}, apperr.NotFound("找不到這張需求的對話")
+			}
+			return uuid.UUID{}, uuid.UUID{}, fmt.Errorf("turn：讀取重送的對話：%w", err)
+		}
 		return first.RequestID, *first.ConversationID, nil
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
 		return uuid.UUID{}, uuid.UUID{}, fmt.Errorf("turn：讀取重送的 run：%w", err)

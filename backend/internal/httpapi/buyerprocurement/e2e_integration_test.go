@@ -396,3 +396,16 @@ func TestSubmitTurnRejectsMessagesAndUnknownRequestsBeforeAnyRun(t *testing.T) {
 		t.Errorf("別人的需求 = %v", err)
 	}
 }
+
+// 新建的需求以 UUIDv7 為 ID：回給 client 的 request_id 要能原樣帶回來做後續的一輪。
+func TestFollowUpSubmitTurnWithTheReturnedRequestIDSucceeds(t *testing.T) {
+	c := newClient(t, &stubLLM{reply: func(int) string { return ready }})
+	first := submit(t, c, "", cid1)
+	if f := finished(t, watch(t, c, first.GetRunId(), accountID)); f.GetStatus() != pb.RunStatus_RUN_STATUS_SUCCEEDED {
+		t.Fatalf("第一輪 finished = %v", f)
+	}
+	second := submit(t, c, first.GetRequestId(), cid2)
+	if second.GetRequestId() != first.GetRequestId() || second.GetConversationId() != first.GetConversationId() || second.GetRunId() == first.GetRunId() {
+		t.Fatalf("後續一輪 = %v，要同需求同對話、新的 run（第一輪 %v）", second, first)
+	}
+}

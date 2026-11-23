@@ -81,9 +81,13 @@ func (h *App) SubmitTurn(ctx context.Context, req *connect.Request[pb.SubmitTurn
 		return nil, err
 	}
 	msg := req.Msg
-	requestID, err := rpc.ParseRequestID(msg.GetRequestId())
-	if err != nil {
-		return nil, err
+	var requestID *uuid.UUID
+	if raw := msg.GetRequestId(); raw != "" {
+		id, err := rpc.ParseUUID("request_id", raw)
+		if err != nil {
+			return nil, err
+		}
+		requestID = &id
 	}
 	if msg.GetMessage() == "" {
 		return nil, rpc.RequiredField("message", "message 不能是空的")

@@ -179,6 +179,42 @@
    "new": "InterruptId: c.InterruptID.String(), Kind: kind,",
    "test": "internal/httpapi/buyerprocurement ^TestSnapshotMapsEveryFieldAndRejectsUnspecified$",
    "why": "快照丟掉 processing"
+  },
+  {
+   "id": "followup-request-id-v4-only",
+   "stack": "go",
+   "file": "backend/internal/httpapi/buyerprocurement/app.go",
+   "old": "id, err := rpc.ParseUUID(\"request_id\", raw)",
+   "new": "id, err := func() (uuid.UUID, error) {\n\t\t\tp, e := rpc.ParseRequestID(raw)\n\t\t\tif e != nil {\n\t\t\t\treturn uuid.UUID{}, e\n\t\t\t}\n\t\t\treturn *p, nil\n\t\t}()",
+   "test": "internal/httpapi/buyerprocurement ^TestSubmitTurnAcceptsAServerIssuedUUIDv7RequestID$",
+   "why": "request_id 又只收 UUIDv4：伺服器以 UUIDv7 建的需求，後續一輪被 INVALID_ARGUMENT 拒絕"
+  },
+  {
+   "id": "serve-no-entitlements",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "newProcurement(d, jc, buyerModule, log)",
+   "new": "newProcurement(d, jc, nil, log)",
+   "test": "cmd/hawkr ^TestProcurementModuleIsBuiltWithTheBuyerModuleAsEntitlementsInBothRoles$",
+   "why": "serve 組採購模組不給 Entitlements：SubmitTurn 每次都回組裝錯誤"
+  },
+  {
+   "id": "submit-replay-skips-live-conversation",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "BuyerID: in.BuyerID}); err != nil {\n\t\t\tif errors.Is(err, pgx.ErrNoRows) {\n\t\t\t\treturn uuid.UUID{}, uuid.UUID{}, apperr.NotFound(\"找不到這張需求的對話\")\n\t\t\t}\n\t\t\treturn uuid.UUID{}, uuid.UUID{}, fmt.Errorf(\"turn：讀取重送的對話",
+   "new": "BuyerID: in.BuyerID}); err != nil && false {\n\t\t\tif errors.Is(err, pgx.ErrNoRows) {\n\t\t\t\treturn uuid.UUID{}, uuid.UUID{}, apperr.NotFound(\"找不到這張需求的對話\")\n\t\t\t}\n\t\t\treturn uuid.UUID{}, uuid.UUID{}, fmt.Errorf(\"turn：讀取重送的對話",
+   "test": "internal/modules/procurement/internal/turn ^TestReplayOfADeletedConversationIsNotFound$",
+   "why": "重送不檢查對話還在：對話刪除後重送仍回第一次的 run"
+  },
+  {
+   "id": "submit-quota-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/submit.go",
+   "old": "quota, err := s.Quota.TurnQuota(ctx, in.BuyerID)",
+   "new": "quota, err := s.Quota.TurnQuota(context.Background(), in.BuyerID)",
+   "test": "internal/modules/procurement/internal/turn ^TestSubmitReadsTheQuotaInsideTheTransaction$",
+   "why": "額度在 transaction 之外讀（買家送出鎖之前），與扣額度不同一個 transaction"
   }
  ]
 }
