@@ -12,7 +12,7 @@ schema `media`（`db/schema.sql`）：`assets`（列上 `state` 只記物理生�
 
 ## 發布的讀取介面
 
-無，沒有 `pub_*`。對外是 `module.go` 的 `Module`（`BeginUpload`、`CompleteUpload`、`GetUpload`、`Confirm`、`MarkDeleted`、`BeginSecureUpload`、`PutSecureChunk`、`PutSecure`、`PutPublic`、`ReadSecure`、`ReadStagedSecure`、`RewrapDEKs`）與確認 helper `ConfirmFields`、`ConfirmField`。`Confirm`、`MarkDeleted` 必須在擁有者的 transaction 內；其餘會碰物件儲存的呼叫不得在 transaction 內。舊 `Media` interface 仍由 Java media-service 實作（`internal/legacy/mediaservice`），隨 B1-5 退場。
+無，沒有 `pub_*`。對外是 `module.go` 的 `Module`（`BeginUpload`、`CompleteUpload`、`GetUpload`、`Confirm`、`MarkDeleted`、`BeginSecureUpload`、`PutSecureChunk`、`PutSecure`、`PutPublic`、`ReadSecure`、`ReadStagedSecure`、`RewrapDEKs`）與確認 helper `ConfirmFields`、`ConfirmField`。`Confirm`、`MarkDeleted` 必須在擁有者的 transaction 內；其餘會碰物件儲存的呼叫不得在 transaction 內。Java media-service 只服務還沒搬進單體的舊服務，單體內沒有它的 client。
 
 ## 模組內部結構
 

@@ -88,3 +88,11 @@
 - 用途（B1-D3）：資產只有 `visibility`（public／secure），object key 不含用途。取代上方的「用途與可見性」：用途已經在擁有者的表裡；media 持有封閉的用途列舉會把業務清單放回 media，自由字串用途只服務 key 前綴與觀測，沒有程式依它決定行為（計畫附件 `spike.md` (b)(d)）。
 - 資產 ID 用 UUID v7（B1-D8），依 ADR `2026-09-25-row-identity-by-data-kind.md`；擁有者的 asset ID 欄位隨 B1-5 改型別。
 - 過渡段的機制（`media_ref_sync`、`retired_assets`、`media_sync`／`media_sweep` job、`internal/refsync`）在 B1-5 刪除；上傳通道與機敏檔格式見 ADR `2026-11-22-media-upload-channels.md`、`2026-11-22-media-secure-stream-aead.md`，Java 呼叫端的切換見 `2026-11-22-media-cutover-without-legacy-path.md`。
+
+## 修訂：擁有者 transaction 內只新增列（2026-11-23，Will 2026-11-23 決定）
+
+本節修訂上方「終點的確認、刪除與用途（2026-11-22）」的 `Confirm` 與 `MarkDeleted` 實作方式；對外語意不變，原決策段保留歷史。決定在計畫 `backend/docs/plans/2026-11-21-b1-media.md` 的 B1-D25，設計見 `backend/docs/plans/2026-11-21-b1-media/media-append-only-design.md`。
+
+**脈絡**：擁有者的 transaction 先鎖自己的列、再更新 media 的列，在單體規則 4 的鎖順序檢查器下是倒退（約 100 筆）。規則 4 與檢查器不改、不加豁免。
+
+**決策**：擁有者 transaction 內對 media 只 INSERT：`Confirm` 新增 token 的認領列（唯一鍵，同 transaction 重入回同一資產），`MarkDeleted` 新增刪除請求列，由 media 的 job 以固定間隔輪詢套用並刪 R2 物件；資產的確認與刪除中狀態由暫存列、認領與刪除請求推導，不在擁有者 transaction 內更新。業界基準：Rails Active Storage（attachment 隨紀錄 INSERT、`purge_later`）。
