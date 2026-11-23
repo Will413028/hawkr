@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -592,15 +593,21 @@ func TestConcurrentLockOfTwoVouchersForOneOrder(t *testing.T) {
 	f := setup(t)
 	c := f.campaign()
 	v1, v2 := f.claim(c, buyer1), f.claim(c, buyer2)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	const order = "O-SAME"
 
-	firstLocked := make(chan error, 1)
+	// 失敗路徑也要放行先到的 transaction：連線池要等它歸還連線才關得掉，否則測試結束時會卡住。
 	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseFirst := func() { releaseOnce.Do(func() { close(release) }) }
+	defer releaseFirst()
+
+	firstLocked := make(chan error, 1)
 	firstDone := make(chan error, 1)
 	go func() {
 		firstDone <- f.db.InTx(ctx, func(ctx context.Context) error {
-			_, err := f.lock(v1, order)
+			_, err := f.m.Lock(ctx, f.lockInput(v1, order))
 			firstLocked <- err
 			if err != nil {
 				return err
@@ -609,8 +616,13 @@ func TestConcurrentLockOfTwoVouchersForOneOrder(t *testing.T) {
 			return nil
 		})
 	}()
-	if err := <-firstLocked; err != nil {
-		t.Fatalf("先到的鎖券：%v", err)
+	select {
+	case err := <-firstLocked:
+		if err != nil {
+			t.Fatalf("先到的鎖券：%v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal("先到的 transaction 在 30 秒內沒有鎖到券")
 	}
 
 	var secondLockErr error
@@ -618,27 +630,44 @@ func TestConcurrentLockOfTwoVouchersForOneOrder(t *testing.T) {
 	go func() {
 		secondDone <- f.db.InTx(ctx, func(ctx context.Context) error {
 			_, secondLockErr = f.m.Lock(ctx, f.lockInput(v2, order))
-			if _, err := f.db.Conn(ctx).Exec(ctx, "SELECT 1"); err != nil {
-				return err
-			}
-			return nil
+			_, err := f.db.Conn(ctx).Exec(ctx, "SELECT 1")
+			return err
 		})
 	}()
 
-	deadline := time.Now().Add(30 * time.Second)
-	for f.scalar("SELECT count(*) FROM pg_locks WHERE NOT granted AND locktype = 'transactionid'") == 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("後到的 transaction 沒有卡在唯一鍵的鎖上")
+	// 只看本測試 database 裡卡在 transactionid 鎖上的連線（每支測試各有自己的 database，pg_locks 卻是整個 cluster 共用）。
+	const blocked = `SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a USING (pid)
+		WHERE NOT l.granted AND l.locktype = 'transactionid' AND a.datname = current_database()`
+	for {
+		var n int64
+		if err := f.db.Pool().QueryRow(ctx, blocked).Scan(&n); err != nil {
+			t.Fatalf("查詢 pg_locks：%v", err)
 		}
-		time.Sleep(5 * time.Millisecond)
+		if n > 0 {
+			break
+		}
+		select {
+		case err := <-secondDone:
+			t.Fatalf("後到的 transaction 沒有卡在唯一鍵的鎖上就結束了（預先檢查已先擋下？）：%v、鎖定結果 %v", err, secondLockErr)
+		case <-ctx.Done():
+			t.Fatal("後到的 transaction 沒有在 30 秒內卡在唯一鍵的鎖上")
+		case <-time.After(5 * time.Millisecond):
+		}
 	}
-	close(release)
+	releaseFirst()
 
-	if err := <-firstDone; err != nil {
-		t.Fatalf("先到的 transaction：%v", err)
-	}
-	if err := <-secondDone; err != nil {
-		t.Fatalf("後到的 transaction 在失敗的鎖定之後要仍可使用並 commit：%v", err)
+	for _, w := range []struct {
+		name string
+		ch   chan error
+	}{{"先到的 transaction", firstDone}, {"後到的 transaction 在失敗的鎖定之後要仍可使用並 commit", secondDone}} {
+		select {
+		case err := <-w.ch:
+			if err != nil {
+				t.Fatalf("%s：%v", w.name, err)
+			}
+		case <-ctx.Done():
+			t.Fatalf("%s：30 秒內沒有結束", w.name)
+		}
 	}
 	wantReason(t, secondLockErr, coupon.ReasonOrderHoldsAnotherVoucher)
 	if f.voucherStatus(v1.ID) != "LOCKED" || f.voucherStatus(v2.ID) != "AVAILABLE" {
