@@ -12,7 +12,7 @@
    "test": "internal/modules/imageai ^TestUsageKeepsOneRowPerStoreAndResetsInANewWeek$",
    "why": "進入新的一週時不重設 used：每店一列的計數器永遠累加，額度不會恢復"},
   {"id": "imageai-refund-ignores-zero-rows", "stack": "go-integration", "file": "backend/internal/modules/imageai/internal/quota/quota.go",
-   "old": "\tif n == 0 {", "new": "\tif false {",
+   "old": "\tif n == 0 {", "new": "\tif n < 0 {",
    "test": "internal/modules/imageai ^TestRefundGivesBackOneUnitAndNeverGoesBelowZero$",
    "why": "退額度影響 0 列時不回 ErrNothingToRefund，呼叫端以為退成功"},
   {"id": "imageai-store-retired-keeps-usage", "stack": "go-integration", "file": "backend/internal/modules/imageai/internal/quota/quota.go",

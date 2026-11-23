@@ -38,7 +38,7 @@ CREATE UNIQUE INDEX styles_default_per_category ON imageai.styles (category) WHE
 COMMENT ON COLUMN imageai.styles.version IS '樂觀鎖的版本，對外是 etag；每次修改加一（ADR 2026-09-25-optimistic-concurrency-etag）';
 COMMENT ON COLUMN imageai.styles.prompt IS '提示詞，最多 500 個字元（A9-D40，以 Unicode 字元計）';
 
--- 個別設定的每週額度（後台）。沒有這一列的店用模組的預設額度（模組常數，見 docs/modules/imageai.md）；weekly_limit 的上限是模組常數，寫入端檢查。
+-- 個別設定的每週額度（後台）。沒有這一列的店用模組的預設額度（模組常數，見 backend/docs/modules/imageai.md）；weekly_limit 的上限是模組常數，寫入端檢查。
 -- store_id 是外部鍵（bigint，沒有跨 schema FK）；店家退場時整列刪除（StoreRetired）。
 CREATE TABLE imageai.quotas (
     store_id     BIGINT      PRIMARY KEY,

@@ -168,7 +168,7 @@ AiStyle（admin）：`name`、`category` IMMUTABLE；`default_style`、`enabled`
 
 **Q3（資料一致性）扣額度後 crash 不退。** A9-D9 選了計數器、不建預約表。選項：(a) 接受：crash 時該賣家少 1 次，寫進模組規格已知限制；(b) 加一張修圖紀錄表＋River job 收尾（等於又建預約表，與 A9-D9 衝突）；(c) 先呼叫 Gemini 成功後才扣（超用風險：併發時可超過上限，且 Gemini 成本已花）。建議 **(a)**【推】，因為 crash 機率×1 次額度的損失遠小於 (b) 的機制成本；但「只有 Will 接受限制」，需確認。
 
-**Q4（產品數字放哪）預設每週 10 次、後台上限 0–1000。** 舊版是程式常數（`domain/usage.go`、`quota_usecase.go:75`），CARRYOVER M9 列誤寫「照現在 config 搬」。選項：模組常數＋規格／`platform/config` 環境變數／隨賣家方案（像 procurement 讀 buyer entitlement）。建議模組常數並寫進 `docs/modules/imageai.md`，順手更正 CARRYOVER 那列【推】。
+**Q4（產品數字放哪）預設每週 10 次、後台上限 0–1000。** 舊版是程式常數（`domain/usage.go`、`quota_usecase.go:75`），CARRYOVER M9 列誤寫「照現在 config 搬」。選項：模組常數＋規格／`platform/config` 環境變數／隨賣家方案（像 procurement 讀 buyer entitlement）。建議模組常數並寫進 `backend/docs/modules/imageai.md`，順手更正 CARRYOVER 那列【推】。
 
 **Q5（設定，AD17）併發上限的形狀。** 舊 byte 預算（256 MiB、×6）。入口上限固定為 2 MiB 後，byte 預算等於「同時 N 張」。建議改成併發數 semaphore，N 由 `platform/config` 讀（預設依 256 MiB／(2 MiB×6) ≈ 21 取整，未量測，4a 以記憶體量測校正；每 pod 各一份，管不到 Gemini 專案層級速率限制，429 轉 `RESOURCE_EXHAUSTED`）【推】；這是實作細節，可不問 Will，列出以免默默沿用。
 
