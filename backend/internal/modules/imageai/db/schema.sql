@@ -11,7 +11,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 CREATE SCHEMA imageai;
 
 -- 修圖風格（後台維護）。category 是 AiStyleCategory 的儲存碼（Go 型別加 CHECK）；每個用途有且只有一個預設風格（A9-D39：migration 為每個用途 seed 一筆，
--- 預設風格不可刪、default_style 不能設成 false，所以每個用途恆有預設）。thumbnail_key 與 thumbnail_asset_id 成對，空字串表示沒有縮圖（seed 的預設風格）。
+-- 預設風格不可刪、不可停用、換預設只有 SetDefaultAiStyle，所以每個用途恆有預設）。thumbnail_key 與 thumbnail_asset_id 成對，空字串表示沒有縮圖（seed 的預設風格）。
 CREATE TABLE imageai.styles (
     id                 UUID        PRIMARY KEY,
     name               TEXT        NOT NULL,

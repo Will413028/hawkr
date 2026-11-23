@@ -29,17 +29,9 @@
       "message": "預設風格不能刪除，請先把另一個風格設成預設",
       "description": "刪除用途的預設風格（A9-D39）。"
     },
-    "admin.style_default_cannot_unset": {
-      "message": "預設風格不能直接取消，請把另一個風格設成預設",
-      "description": "default_style=false 會讓用途沒有預設風格（A9-D39）。"
-    },
-    "admin.style_default_conflict": {
-      "message": "同時有另一個預設風格建立，請重新讀取後再送出",
-      "description": "新增預設風格時，與同用途另一個同時建立的預設風格撞到部分唯一索引（FAILED_PRECONDITION）。"
-    },
     "admin.style_default_must_be_enabled": {
       "message": "預設風格必須啟用",
-      "description": "停用中的風格不能是預設，預設風格也不能停用（A9-D39）。"
+      "description": "停用中的風格不能設成預設（SetDefaultAiStyle），目前的預設風格也不能停用（A9-D39，FAILED_PRECONDITION）。"
     },
     "admin.style_etag_required": {
       "message": "請帶入風格的版本（etag）",

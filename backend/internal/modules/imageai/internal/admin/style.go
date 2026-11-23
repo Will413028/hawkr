@@ -3,7 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
-	"time"
+	"slices"
 	"unicode/utf8"
 	"uuid"
 
@@ -60,7 +60,7 @@ func validateText(ctx context.Context, label, prompt string) (string, string, er
 	return label, prompt, nil
 }
 
-// CreateStyle 新增風格：縮圖必須是新上傳的圖（staged token）。設成預設時，同一個 transaction 內先取消同用途原本的預設。
+// CreateStyle 新增風格：縮圖必須是新上傳的圖（staged token）；新增的風格都不是預設（換預設用 SetDefault）。
 // name 在用途內重複回 AlreadyExists。
 func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (model.AdminStyle, error) {
 	l := loc(ctx)
@@ -74,9 +74,6 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 	label, prompt, err := validateText(ctx, in.Label, in.Prompt)
 	if err != nil {
 		return model.AdminStyle{}, err
-	}
-	if in.IsDefault && !in.Enabled {
-		return model.AdminStyle{}, apperr.InvalidInputOn([]string{"Enabled"}, "%s", text.AdminStyleDefaultMustBeEnabled(l))
 	}
 	if in.ThumbnailToken == "" {
 		return model.AdminStyle{}, apperr.InvalidInputOn([]string{"ThumbnailToken"}, "%s", text.AdminStyleThumbnailRequired(l))
@@ -94,28 +91,21 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 		if err := s.d.Thumbs.Reject(ctx, id, asset); err != nil {
 			return err
 		}
-		if in.IsDefault {
-			if err := s.clearDefault(ctx, in.Actor, now, string(in.Category), id); err != nil {
-				return err
-			}
-		}
 		var err error
 		row, err = q.InsertStyle(ctx, store.InsertStyleParams{
 			ID: id, Name: name, Label: label, Prompt: prompt, Category: string(in.Category), ThumbnailKey: key, ThumbnailAssetID: asset,
-			DisplayOrder: in.DisplayOrder, IsDefault: in.IsDefault, Enabled: in.Enabled, Now: now,
+			DisplayOrder: in.DisplayOrder, Enabled: in.Enabled, Now: now,
 		})
 		switch {
 		case isUnique(err, nameConstraint):
 			return apperr.AlreadyExists("%s", text.AdminStyleNameTaken(l))
-		case isUnique(err, defaultConstraint):
-			return apperr.FailedPrecondition("%s", text.AdminStyleDefaultConflict(l))
 		case err != nil:
 			return fmt.Errorf("admin：新增風格：%w", err)
 		}
 		if err := s.d.Thumbs.Changed(ctx, now, id); err != nil {
 			return err
 		}
-		return s.record(ctx, in.Actor, styleTarget, id.String(), map[string]any{"name": name, "category": string(in.Category), "default_style": in.IsDefault, "enabled": in.Enabled})
+		return s.record(ctx, in.Actor, styleTarget, id.String(), map[string]any{"name": name, "category": string(in.Category), "enabled": in.Enabled})
 	})
 	if err != nil {
 		return model.AdminStyle{}, err
@@ -125,8 +115,7 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 
 // UpdateStyle 整筆覆寫風格可改的欄位（name、category 建立後不能改）。Version 是讀取時拿到的版本，與目前的不符回 VersionConflict、不寫入；
 // 轉正新圖之前先比對一次，少一些注定被拒的轉正，最後以條件式 UPDATE 為準。
-// 預設風格：default_style 只能設成 true（原本的預設在同一個 transaction 內取消），目前是預設的風格設成 false 回 InvalidInput（欄位 IsDefault），
-// 停用目前的預設風格回 FailedPrecondition（A9-D39）。
+// 預設風格不能在這裡改（換預設是 SetDefault）；停用目前的預設風格回 FailedPrecondition（A9-D39）。
 func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (model.AdminStyle, error) {
 	l := loc(ctx)
 	if in.Version <= 0 {
@@ -146,8 +135,8 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 	if cur.Version != in.Version {
 		return model.AdminStyle{}, styleStale(ctx)
 	}
-	if err := checkDefaultRules(ctx, cur.IsDefault, in.IsDefault, in.Enabled); err != nil {
-		return model.AdminStyle{}, err
+	if cur.IsDefault && !in.Enabled {
+		return model.AdminStyle{}, apperr.FailedPrecondition("%s", text.AdminStyleDefaultMustBeEnabled(l))
 	}
 	var newKey, newAsset string
 	if in.ThumbnailToken != "" {
@@ -174,19 +163,15 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 			}
 			key, asset = newKey, newAsset
 		}
-		if in.IsDefault && !old.IsDefault {
-			if err := s.clearDefault(ctx, in.Actor, now, old.Category, in.ID); err != nil {
-				return err
-			}
+		if old.IsDefault && !in.Enabled {
+			return apperr.FailedPrecondition("%s", text.AdminStyleDefaultMustBeEnabled(l))
 		}
 		row, err = q.UpdateStyle(ctx, store.UpdateStyleParams{
 			ID: in.ID, Label: label, Prompt: prompt, ThumbnailKey: key, ThumbnailAssetID: asset, DisplayOrder: in.DisplayOrder,
-			IsDefault: in.IsDefault, Enabled: in.Enabled, Now: now, ExpectedVersion: in.Version,
+			Enabled: in.Enabled, Now: now, ExpectedVersion: in.Version,
 		})
 		switch {
 		case notFound(err):
-			return styleStale(ctx)
-		case isUnique(err, defaultConstraint):
 			return styleStale(ctx)
 		case err != nil:
 			return fmt.Errorf("admin：修改風格 %s：%w", in.ID, err)
@@ -208,32 +193,58 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 	return toStyle(row), nil
 }
 
-// clearDefault 取消用途目前的預設風格（excludeID 以外），被取消的風格（版本會加一）各寫一筆稽核，與呼叫者的寫入在同一個 transaction。
-func (s *Service) clearDefault(ctx context.Context, actor model.Actor, now time.Time, category string, excludeID uuid.UUID) error {
-	cleared, err := s.d.Q(ctx).ClearDefaultStyle(ctx, store.ClearDefaultStyleParams{Now: now, Category: category, ExcludeID: excludeID})
-	if err != nil {
-		return fmt.Errorf("admin：取消 %s 原本的預設風格：%w", category, err)
-	}
-	for _, id := range cleared {
-		if err := s.record(ctx, actor, styleTarget, id.String(), map[string]any{"changed": []string{"default_style"}, "replaced_by": excludeID.String()}); err != nil {
-			return err
+// SetDefault 把風格設成它用途的預設風格（A9-D39，自訂方法）：鎖住該用途的全部風格列（依 id 排序）讓同用途的 SetDefault 串行，
+// 同一個 transaction 內取消原本的預設、標記目標，寫一筆目標的稽核（detail 記原預設的 id）。version 為 0 不檢查版本，不為 0 必須與目標目前的相符（VersionConflict）。
+// 目標停用回 FailedPrecondition，不存在回 NotFound；已經是預設時什麼都不改、不寫稽核，回傳該風格。
+func (s *Service) SetDefault(ctx context.Context, actor model.Actor, id uuid.UUID, version int64) (model.AdminStyle, error) {
+	var out store.ImageaiStyle
+	err := s.d.Tx(ctx, func(ctx context.Context) error {
+		now := s.d.Now().UTC()
+		q := s.d.Q(ctx)
+		cur, err := q.GetStyle(ctx, id)
+		if notFound(err) {
+			return styleNotFound(ctx)
 		}
+		if err != nil {
+			return fmt.Errorf("admin：讀取風格 %s：%w", id, err)
+		}
+		rows, err := q.LockCategoryStyles(ctx, cur.Category)
+		if err != nil {
+			return fmt.Errorf("admin：鎖定用途 %s 的風格：%w", cur.Category, err)
+		}
+		i := slices.IndexFunc(rows, func(r store.ImageaiStyle) bool { return r.ID == id })
+		if i < 0 {
+			return styleNotFound(ctx)
+		}
+		target := rows[i]
+		if version != 0 && target.Version != version {
+			return styleStale(ctx)
+		}
+		if !target.Enabled {
+			return apperr.FailedPrecondition("%s", text.AdminStyleDefaultMustBeEnabled(loc(ctx)))
+		}
+		if target.IsDefault {
+			out = target
+			return nil
+		}
+		previous := ""
+		cleared, err := q.ClearDefaultStyle(ctx, store.ClearDefaultStyleParams{Now: now, Category: target.Category, ExcludeID: id})
+		if err != nil {
+			return fmt.Errorf("admin：取消 %s 原本的預設風格：%w", target.Category, err)
+		}
+		if len(cleared) > 0 {
+			previous = cleared[0].String()
+		}
+		out, err = q.MarkStyleDefault(ctx, store.MarkStyleDefaultParams{ID: id, Now: now})
+		if err != nil {
+			return fmt.Errorf("admin：設定預設風格 %s：%w", id, err)
+		}
+		return s.record(ctx, actor, styleTarget, id.String(), map[string]any{"changed": []string{"default_style"}, "version": out.Version, "previous_default": previous})
+	})
+	if err != nil {
+		return model.AdminStyle{}, err
 	}
-	return nil
-}
-
-// checkDefaultRules 是預設風格的規則（A9-D39）：default_style 只能設成 true；目前的預設不能取消或停用；預設風格必須啟用。
-func checkDefaultRules(ctx context.Context, curDefault, wantDefault, wantEnabled bool) error {
-	l := loc(ctx)
-	switch {
-	case curDefault && !wantDefault:
-		return apperr.InvalidInputOn([]string{"IsDefault"}, "%s", text.AdminStyleDefaultCannotUnset(l))
-	case curDefault && !wantEnabled:
-		return apperr.FailedPrecondition("%s", text.AdminStyleDefaultMustBeEnabled(l))
-	case wantDefault && !wantEnabled:
-		return apperr.InvalidInputOn([]string{"Enabled"}, "%s", text.AdminStyleDefaultMustBeEnabled(l))
-	}
-	return nil
+	return toStyle(out), nil
 }
 
 // changedFields 列出這次修改實際改變的欄位名（稽核的 detail；不放提示詞的內容）。
@@ -244,7 +255,7 @@ func changedFields(old, now store.ImageaiStyle, thumbnail bool) []string {
 		changed bool
 	}{
 		{"label", old.Label != now.Label}, {"prompt", old.Prompt != now.Prompt}, {"display_order", old.DisplayOrder != now.DisplayOrder},
-		{"default_style", old.IsDefault != now.IsDefault}, {"enabled", old.Enabled != now.Enabled}, {"thumbnail", thumbnail},
+		{"enabled", old.Enabled != now.Enabled}, {"thumbnail", thumbnail},
 	} {
 		if c.changed {
 			out = append(out, c.name)

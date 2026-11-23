@@ -85,7 +85,7 @@ func (q *Queries) GetStyle(ctx context.Context, id uuid.UUID) (ImageaiStyle, err
 const insertStyle = `-- name: InsertStyle :one
 INSERT INTO imageai.styles (
     id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, created_at, updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, $9, $10, $10)
 RETURNING id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at
 `
 
@@ -98,11 +98,11 @@ type InsertStyleParams struct {
 	ThumbnailKey     string
 	ThumbnailAssetID string
 	DisplayOrder     int32
-	IsDefault        bool
 	Enabled          bool
 	Now              time.Time
 }
 
+// 新增的風格都不是預設（換預設只有 SetDefaultAiStyle）。
 func (q *Queries) InsertStyle(ctx context.Context, arg InsertStyleParams) (ImageaiStyle, error) {
 	row := q.db.QueryRow(ctx, insertStyle,
 		arg.ID,
@@ -113,7 +113,6 @@ func (q *Queries) InsertStyle(ctx context.Context, arg InsertStyleParams) (Image
 		arg.ThumbnailKey,
 		arg.ThumbnailAssetID,
 		arg.DisplayOrder,
-		arg.IsDefault,
 		arg.Enabled,
 		arg.Now,
 	)
@@ -223,6 +222,45 @@ func (q *Queries) ListStylesForAdmin(ctx context.Context, category string) ([]Im
 	return items, nil
 }
 
+const lockCategoryStyles = `-- name: LockCategoryStyles :many
+SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at FROM imageai.styles WHERE category = $1 ORDER BY id FOR UPDATE
+`
+
+// 鎖住一個用途的全部風格列（依 id 排序，固定鎖順序）：換預設的兩個 SetDefault 因此串行，不會撞部分唯一索引；等鎖之後讀到的是最新的列。
+func (q *Queries) LockCategoryStyles(ctx context.Context, category string) ([]ImageaiStyle, error) {
+	rows, err := q.db.Query(ctx, lockCategoryStyles, category)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ImageaiStyle{}
+	for rows.Next() {
+		var i ImageaiStyle
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Label,
+			&i.Prompt,
+			&i.Category,
+			&i.ThumbnailKey,
+			&i.ThumbnailAssetID,
+			&i.DisplayOrder,
+			&i.IsDefault,
+			&i.Enabled,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockStyle = `-- name: LockStyle :one
 SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at FROM imageai.styles WHERE id = $1 FOR UPDATE
 `
@@ -230,6 +268,39 @@ SELECT id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, dis
 // 鎖住風格列（更新與刪除先鎖，版本與預設的判斷讀同一個快照）。
 func (q *Queries) LockStyle(ctx context.Context, id uuid.UUID) (ImageaiStyle, error) {
 	row := q.db.QueryRow(ctx, lockStyle, id)
+	var i ImageaiStyle
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Label,
+		&i.Prompt,
+		&i.Category,
+		&i.ThumbnailKey,
+		&i.ThumbnailAssetID,
+		&i.DisplayOrder,
+		&i.IsDefault,
+		&i.Enabled,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markStyleDefault = `-- name: MarkStyleDefault :one
+UPDATE imageai.styles SET is_default = TRUE, version = version + 1, updated_at = $1
+WHERE id = $2
+RETURNING id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at
+`
+
+type MarkStyleDefaultParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+// 把風格標成預設（呼叫端已鎖住用途的全部列並清掉舊的）。
+func (q *Queries) MarkStyleDefault(ctx context.Context, arg MarkStyleDefaultParams) (ImageaiStyle, error) {
+	row := q.db.QueryRow(ctx, markStyleDefault, arg.Now, arg.ID)
 	var i ImageaiStyle
 	err := row.Scan(
 		&i.ID,
@@ -264,9 +335,9 @@ func (q *Queries) StyleThumbnailAsset(ctx context.Context, id uuid.UUID) (string
 const updateStyle = `-- name: UpdateStyle :one
 UPDATE imageai.styles
 SET label = $1, prompt = $2, thumbnail_key = $3, thumbnail_asset_id = $4,
-    display_order = $5, is_default = $6, enabled = $7,
-    version = version + 1, updated_at = $8
-WHERE id = $9 AND version = $10
+    display_order = $5, enabled = $6,
+    version = version + 1, updated_at = $7
+WHERE id = $8 AND version = $9
 RETURNING id, name, label, prompt, category, thumbnail_key, thumbnail_asset_id, display_order, is_default, enabled, version, created_at, updated_at
 `
 
@@ -276,7 +347,6 @@ type UpdateStyleParams struct {
 	ThumbnailKey     string
 	ThumbnailAssetID string
 	DisplayOrder     int32
-	IsDefault        bool
 	Enabled          bool
 	Now              time.Time
 	ID               uuid.UUID
@@ -291,7 +361,6 @@ func (q *Queries) UpdateStyle(ctx context.Context, arg UpdateStyleParams) (Image
 		arg.ThumbnailKey,
 		arg.ThumbnailAssetID,
 		arg.DisplayOrder,
-		arg.IsDefault,
 		arg.Enabled,
 		arg.Now,
 		arg.ID,

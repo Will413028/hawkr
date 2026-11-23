@@ -18,12 +18,6 @@
     "admin.style_default_cannot_delete": {
       "message": "A default style cannot be deleted. Set another style as the default first"
     },
-    "admin.style_default_cannot_unset": {
-      "message": "A default style cannot be unset directly. Set another style as the default instead"
-    },
-    "admin.style_default_conflict": {
-      "message": "Another default style was created at the same time. Please reload and try again"
-    },
     "admin.style_default_must_be_enabled": {
       "message": "The default style must be enabled"
     },

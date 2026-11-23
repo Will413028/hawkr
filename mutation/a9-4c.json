@@ -73,24 +73,6 @@
    "why": "拿掉刪除風格的 etag 檢查：帶了過期 etag 仍刪除"
   },
   {
-   "id": "no-default-switch",
-   "stack": "go",
-   "file": "backend/internal/modules/imageai/internal/admin/style.go",
-   "old": "\t\tif in.IsDefault && !old.IsDefault {",
-   "new": "\t\tif false && in.IsDefault && !old.IsDefault {",
-   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleDefaultRules$",
-   "why": "換預設時不取消原本的預設：同用途出現兩個預設"
-  },
-  {
-   "id": "no-default-switch-db",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/imageai/internal/admin/style.go",
-   "old": "\t\tif in.IsDefault && !old.IsDefault {",
-   "new": "\t\tif false && in.IsDefault && !old.IsDefault {",
-   "test": "internal/modules/imageai ^TestSeededDefaultStylesHaveNoThumbnailAndCanBeEditedWithANewOne$",
-   "why": "換預設時不取消原本的預設（partial unique 擋下，改預設失敗）"
-  },
-  {
    "id": "no-replace-sync",
    "stack": "go",
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
@@ -172,13 +154,67 @@
    "why": "UpdateAiStyle 忽略 update_mask（欄位不套用，不可變欄位檢查也消失）"
   },
   {
-   "id": "no-cleared-default-audit",
+   "id": "no-setdefault-audit",
    "stack": "go",
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
-   "old": "\t\tif err := s.record(ctx, actor, styleTarget, id.String(), map[string]any{\"changed\": []string{\"default_style\"}, \"replaced_by\": excludeID.String()}); err != nil {\n\t\t\treturn err\n\t\t}\n",
-   "new": "\t\t_ = id\n",
-   "test": "internal/modules/imageai/internal/admin ^TestReplacingTheDefaultAuditsTheClearedStyleToo$",
-   "why": "換預設時不為被取消預設的舊風格寫稽核：稽核列數少一筆"
+   "old": "\t\treturn s.record(ctx, actor, styleTarget, id.String(), map[string]any{\"changed\": []string{\"default_style\"}, \"version\": out.Version, \"previous_default\": previous})\n",
+   "new": "\t\t_ = previous\n\t\treturn nil\n",
+   "test": "internal/modules/imageai/internal/admin ^TestSetDefaultMovesTheDefaultAndWritesOneAuditRowNamingThePreviousOne$",
+   "why": "SetDefault 不寫稽核：目標的稽核列消失"
+  },
+  {
+   "id": "no-setdefault-clear-step",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "cleared, err := q.ClearDefaultStyle(ctx, store.ClearDefaultStyleParams{Now: now, Category: target.Category, ExcludeID: id})",
+   "new": "cleared, err := []uuid.UUID(nil), error(nil)",
+   "test": "internal/modules/imageai/internal/admin ^TestSetDefaultMovesTheDefaultAndWritesOneAuditRowNamingThePreviousOne$",
+   "why": "SetDefault 不取消原本的預設：標記時撞到部分唯一索引"
+  },
+  {
+   "id": "no-setdefault-clear-step-db",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "cleared, err := q.ClearDefaultStyle(ctx, store.ClearDefaultStyleParams{Now: now, Category: target.Category, ExcludeID: id})",
+   "new": "cleared, err := []uuid.UUID(nil), error(nil)",
+   "test": "internal/modules/imageai ^TestDefaultStyleRulesAgainstTheRealConstraints$",
+   "why": "SetDefault 不取消原本的預設：真實索引擋下標記"
+  },
+  {
+   "id": "no-setdefault-disabled-guard",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif !target.Enabled {\n\t\t\treturn apperr.FailedPrecondition(\"%s\", text.AdminStyleDefaultMustBeEnabled(loc(ctx)))\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestSetDefaultRules$",
+   "why": "SetDefault 不擋停用的目標"
+  },
+  {
+   "id": "no-setdefault-etag-check",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif version != 0 && target.Version != version {\n\t\t\treturn styleStale(ctx)\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestSetDefaultRules$",
+   "why": "SetDefault 不比對 etag"
+  },
+  {
+   "id": "no-setdefault-declaration",
+   "stack": "go",
+   "file": "backend/internal/httpapi/adminauth/adminauth.go",
+   "old": "\timageaiv1alpha1connect.ImageAiAdminServiceSetDefaultAiStyleProcedure:    requires(adminperm.ImageaiAiStylesSetDefault, auditAudited),\n",
+   "new": "",
+   "test": "internal/httpapi ^TestMountedAdminServicesMatchTheDeclarations$",
+   "why": "拿掉 SetDefaultAiStyle 的 adminauth 宣告：單體啟動檢查失敗"
+  },
+  {
+   "id": "quota-create-weekly-limit-optional",
+   "stack": "go",
+   "file": "backend/internal/httpapi/imageai/admin.go",
+   "old": "\tif !cur.Custom {\n",
+   "new": "\tif false && !cur.Custom {\n",
+   "test": "internal/httpapi/imageai ^TestUpdateAiQuotaCreateRequiresWeeklyLimit$",
+   "why": "建立個別額度不檢查 weekly_limit 必填"
   }
  ]
 }

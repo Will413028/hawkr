@@ -82,6 +82,7 @@ var declarations = map[string]declaration{
 	imageaiv1alpha1connect.ImageAiAdminServiceListAiStylesForAdminProcedure: requires(adminperm.ImageaiAiStylesList, auditReadOnly),
 	imageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure:        requires(adminperm.ImageaiAiStylesCreate, auditAudited),
 	imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiStyleProcedure:        requires(adminperm.ImageaiAiStylesUpdate, auditAudited),
+	imageaiv1alpha1connect.ImageAiAdminServiceSetDefaultAiStyleProcedure:    requires(adminperm.ImageaiAiStylesSetDefault, auditAudited),
 	imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiStyleProcedure:        requires(adminperm.ImageaiAiStylesDelete, auditAudited),
 	imageaiv1alpha1connect.ImageAiAdminServiceGetAiQuotaProcedure:           requires(adminperm.ImageaiAiQuotasGet, auditReadOnly),
 	imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiQuotaProcedure:        requires(adminperm.ImageaiAiQuotasUpdate, auditAudited),

@@ -235,7 +235,7 @@ func TestSeededDefaultStylesHaveNoThumbnailAndCanBeEditedWithANewOne(t *testing.
 	if def.ID == (uuid.UUID{}) || def.ThumbnailKey != "" {
 		t.Fatalf("seed 的預設風格 = %+v", def)
 	}
-	got, err := f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: def.ID, Version: def.Version, Label: def.Label, Prompt: def.Prompt, Enabled: true, IsDefault: true, ThumbnailToken: "d1"})
+	got, err := f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: def.ID, Version: def.Version, Label: def.Label, Prompt: def.Prompt, Enabled: true, ThumbnailToken: "d1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,14 +262,22 @@ func TestDefaultStyleRulesAgainstTheRealConstraints(t *testing.T) {
 	if err := f.m.DeleteStyle(ctx, admin, oldDefault.ID, 0); kind(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("刪預設風格：err = %v", err)
 	}
-	if _, err := f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: oldDefault.ID, Version: oldDefault.Version, Label: "x", Prompt: "p", IsDefault: true, Enabled: false}); kind(err) != apperr.KindFailedPrecondition {
+	if _, err := f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: oldDefault.ID, Version: oldDefault.Version, Label: "x", Prompt: "p", Enabled: false}); kind(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("停用預設風格：err = %v", err)
 	}
-	in := newStyle("t1")
-	in.IsDefault = true
-	created, err := f.m.CreateStyle(ctx, in)
+	created, err := f.m.CreateStyle(ctx, newStyle("t1"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if created.IsDefault || f.count(t, `SELECT count(*) FROM imageai.styles WHERE category = 'PRODUCT' AND is_default`) != 1 {
+		t.Fatalf("新增的風格不該是預設：%+v", created)
+	}
+	if _, err := f.m.SetDefaultStyle(ctx, admin, created.ID, created.Version-1); kind(err) != apperr.KindVersionConflict {
+		t.Fatalf("etag 過期：err = %v", err)
+	}
+	got, err := f.m.SetDefaultStyle(ctx, admin, created.ID, created.Version)
+	if err != nil || !got.IsDefault || got.Version != created.Version+1 {
+		t.Fatalf("設成預設：%+v err=%v", got, err)
 	}
 	if n := f.count(t, `SELECT count(*) FROM imageai.styles WHERE category = 'PRODUCT' AND is_default`); n != 1 {
 		t.Fatalf("預設風格數 = %d，預期恰好 1", n)
@@ -278,15 +286,59 @@ func TestDefaultStyleRulesAgainstTheRealConstraints(t *testing.T) {
 	if err != nil || cur.IsDefault || cur.Version != oldDefault.Version+1 {
 		t.Fatalf("舊預設 = %+v err=%v", cur, err)
 	}
-	if n := f.auditRows(t, "ai_style", oldDefault.ID.String()); n != 1 {
-		t.Fatalf("被取消預設的舊風格稽核列數 = %d，預期 1", n)
+	if n := f.auditRows(t, "ai_style", oldDefault.ID.String()); n != 0 {
+		t.Fatalf("被取消預設的舊風格稽核列數 = %d，預期 0（只寫目標的一筆）", n)
+	}
+	if n := f.auditRows(t, "ai_style", created.ID.String()); n != 2 {
+		t.Fatalf("新預設的稽核列數 = %d，預期 2（新增與設成預設）", n)
+	}
+	// 已經是預設：成功、不寫稽核。
+	if _, err := f.m.SetDefaultStyle(ctx, admin, created.ID, 0); err != nil || f.auditRows(t, "ai_style", created.ID.String()) != 2 {
+		t.Fatalf("重複設定：err = %v", err)
+	}
+	// 停用的風格不能設成預設（CHECK 之前就被擋）。
+	other, err := f.m.CreateStyle(ctx, newStyle("t2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabled, err := f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: other.ID, Version: other.Version, Label: "x", Prompt: "p", Enabled: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.SetDefaultStyle(ctx, admin, disabled.ID, 0); kind(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("設定停用的風格：err = %v", err)
 	}
 	// 舊預設現在可以刪。
 	if err := f.m.DeleteStyle(ctx, admin, oldDefault.ID, 0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: created.ID, Version: created.Version, Label: "x", Prompt: "p", IsDefault: false, Enabled: true}); kind(err) != apperr.KindInvalidInput {
-		t.Fatalf("取消預設：err = %v", err)
+}
+
+func TestConcurrentSetDefaultSerializesWithoutAUniqueViolation(t *testing.T) {
+	f := setupAdmin(t)
+	ctx := context.Background()
+	var ids []uuid.UUID
+	for _, tok := range []string{"c1", "c2", "c3", "c4"} {
+		s, err := f.m.CreateStyle(ctx, newStyle(tok))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, s.ID)
+	}
+	errs := make(chan error, len(ids))
+	for _, id := range ids {
+		go func() {
+			_, err := f.m.SetDefaultStyle(ctx, admin, id, 0)
+			errs <- err
+		}()
+	}
+	for range ids {
+		if err := <-errs; err != nil {
+			t.Fatalf("並行 SetDefault：%v", err)
+		}
+	}
+	if n := f.count(t, `SELECT count(*) FROM imageai.styles WHERE category = 'PRODUCT' AND is_default`); n != 1 {
+		t.Fatalf("預設風格數 = %d，預期恰好 1", n)
 	}
 }
 

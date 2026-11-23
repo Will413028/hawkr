@@ -1,4 +1,4 @@
-// Package admin 是後台對修圖風格與店家額度的維護（ImageAiAdminService 的 7 支方法）：規則、樂觀鎖（version 對外是 etag）、縮圖的 media 引用，
+// Package admin 是後台對修圖風格與店家額度的維護（ImageAiAdminService 的 8 支方法）：規則、樂觀鎖（version 對外是 etag）、縮圖的 media 引用，
 // 以及每個寫入在同一個 transaction 內寫的後台動作紀錄（adminaudit）。
 package admin
 
@@ -28,7 +28,9 @@ type Queries interface {
 	LockStyle(ctx context.Context, id uuid.UUID) (store.ImageaiStyle, error)
 	InsertStyle(ctx context.Context, arg store.InsertStyleParams) (store.ImageaiStyle, error)
 	UpdateStyle(ctx context.Context, arg store.UpdateStyleParams) (store.ImageaiStyle, error)
+	LockCategoryStyles(ctx context.Context, category string) ([]store.ImageaiStyle, error)
 	ClearDefaultStyle(ctx context.Context, arg store.ClearDefaultStyleParams) ([]uuid.UUID, error)
+	MarkStyleDefault(ctx context.Context, arg store.MarkStyleDefaultParams) (store.ImageaiStyle, error)
 	DeleteStyle(ctx context.Context, id uuid.UUID) (int64, error)
 	GetQuota(ctx context.Context, storeID int64) (store.ImageaiQuota, error)
 	LockQuota(ctx context.Context, storeID int64) (store.ImageaiQuota, error)
@@ -86,8 +88,7 @@ const (
 	styleTarget = "ai_style"
 	quotaTarget = "ai_quota"
 
-	nameConstraint    = "styles_category_name_key"
-	defaultConstraint = "styles_default_per_category"
+	nameConstraint = "styles_category_name_key"
 )
 
 func validCategory(c model.StyleCategory) bool {

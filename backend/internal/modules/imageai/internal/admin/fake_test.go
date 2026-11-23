@@ -17,14 +17,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
+// defaultConstraint 是 fake 模擬的部分唯一索引名（styles_default_per_category）。
+const defaultConstraint = "styles_default_per_category"
+
 type txKey struct{}
 
 // fakeQ 是記憶體內的 Queries，照 SQL 的語意：條件式 UPDATE、唯一鍵與 ON CONFLICT DO NOTHING。
 type fakeQ struct {
 	styles map[uuid.UUID]store.ImageaiStyle
 	quotas map[int64]store.ImageaiQuota
-	// racingDefault 模擬另一個同時建立預設風格的請求先提交：InsertStyle 的預設風格一律撞到部分唯一索引。
-	racingDefault bool
 }
 
 func newFakeQ() *fakeQ {
@@ -64,20 +65,14 @@ func unique(constraint string) error {
 }
 
 func (f *fakeQ) InsertStyle(_ context.Context, a store.InsertStyleParams) (store.ImageaiStyle, error) {
-	if f.racingDefault && a.IsDefault {
-		return store.ImageaiStyle{}, unique(defaultConstraint)
-	}
 	for _, s := range f.styles {
 		if s.Category == a.Category && s.Name == a.Name {
 			return store.ImageaiStyle{}, unique(nameConstraint)
 		}
-		if a.IsDefault && s.Category == a.Category && s.IsDefault {
-			return store.ImageaiStyle{}, unique(defaultConstraint)
-		}
 	}
 	s := store.ImageaiStyle{
 		ID: a.ID, Name: a.Name, Label: a.Label, Prompt: a.Prompt, Category: a.Category, ThumbnailKey: a.ThumbnailKey, ThumbnailAssetID: a.ThumbnailAssetID,
-		DisplayOrder: a.DisplayOrder, IsDefault: a.IsDefault, Enabled: a.Enabled, Version: 1, CreatedAt: a.Now, UpdatedAt: a.Now,
+		DisplayOrder: a.DisplayOrder, Enabled: a.Enabled, Version: 1, CreatedAt: a.Now, UpdatedAt: a.Now,
 	}
 	f.styles[a.ID] = s
 	return s, nil
@@ -89,7 +84,33 @@ func (f *fakeQ) UpdateStyle(_ context.Context, a store.UpdateStyleParams) (store
 		return store.ImageaiStyle{}, pgx.ErrNoRows
 	}
 	s.Label, s.Prompt, s.ThumbnailKey, s.ThumbnailAssetID = a.Label, a.Prompt, a.ThumbnailKey, a.ThumbnailAssetID
-	s.DisplayOrder, s.IsDefault, s.Enabled, s.Version, s.UpdatedAt = a.DisplayOrder, a.IsDefault, a.Enabled, s.Version+1, a.Now
+	s.DisplayOrder, s.Enabled, s.Version, s.UpdatedAt = a.DisplayOrder, a.Enabled, s.Version+1, a.Now
+	f.styles[a.ID] = s
+	return s, nil
+}
+
+func (f *fakeQ) LockCategoryStyles(_ context.Context, category string) ([]store.ImageaiStyle, error) {
+	var out []store.ImageaiStyle
+	for _, s := range f.styles {
+		if s.Category == category {
+			out = append(out, s)
+		}
+	}
+	slices.SortFunc(out, func(a, b store.ImageaiStyle) int { return strings.Compare(a.ID.String(), b.ID.String()) })
+	return out, nil
+}
+
+func (f *fakeQ) MarkStyleDefault(_ context.Context, a store.MarkStyleDefaultParams) (store.ImageaiStyle, error) {
+	s, ok := f.styles[a.ID]
+	if !ok {
+		return store.ImageaiStyle{}, pgx.ErrNoRows
+	}
+	for _, o := range f.styles {
+		if o.Category == s.Category && o.IsDefault {
+			return store.ImageaiStyle{}, unique(defaultConstraint)
+		}
+	}
+	s.IsDefault, s.Version, s.UpdatedAt = true, s.Version+1, a.Now
 	f.styles[a.ID] = s
 	return s, nil
 }

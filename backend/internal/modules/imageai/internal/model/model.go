@@ -106,18 +106,18 @@ type CreateStyleInput struct {
 	Category            StyleCategory
 	ThumbnailToken      string
 	DisplayOrder        int32
-	IsDefault, Enabled  bool
+	Enabled             bool
 }
 
 // UpdateStyleInput 是整筆覆寫風格可改的欄位（name 與 category 建立後不能改，所以不在這裡）。Version 必填；ThumbnailToken 空字串表示沿用目前的圖。
 type UpdateStyleInput struct {
-	Actor              Actor
-	ID                 uuid.UUID
-	Version            int64
-	Label, Prompt      string
-	ThumbnailToken     string
-	DisplayOrder       int32
-	IsDefault, Enabled bool
+	Actor          Actor
+	ID             uuid.UUID
+	Version        int64
+	Label, Prompt  string
+	ThumbnailToken string
+	DisplayOrder   int32
+	Enabled        bool
 }
 
 // AdminQuota 是一家店的每週額度（後台）：Custom 為 false 時是預設額度（沒有 Version 與 UpdatedAt）。

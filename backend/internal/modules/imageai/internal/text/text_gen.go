@@ -68,24 +68,6 @@ func AdminStyleDefaultCannotDelete(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "預設風格不能刪除，請先把另一個風格設成預設", Locale: uitext.ZhTW}
 }
 
-// AdminStyleDefaultCannotUnset 是模組句子 admin.style_default_cannot_unset；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func AdminStyleDefaultCannotUnset(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "A default style cannot be unset directly. Set another style as the default instead", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "預設風格不能直接取消，請把另一個風格設成預設", Locale: uitext.ZhTW}
-}
-
-// AdminStyleDefaultConflict 是模組句子 admin.style_default_conflict；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func AdminStyleDefaultConflict(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "Another default style was created at the same time. Please reload and try again", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "同時有另一個預設風格建立，請重新讀取後再送出", Locale: uitext.ZhTW}
-}
-
 // AdminStyleDefaultMustBeEnabled 是模組句子 admin.style_default_must_be_enabled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func AdminStyleDefaultMustBeEnabled(l uitext.Locale) uitext.Message {
 	switch l {

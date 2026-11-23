@@ -256,9 +256,15 @@ func (m *Module) CreateStyle(ctx context.Context, in CreateStyleInput) (AdminSty
 }
 
 // UpdateStyle 整筆覆寫風格可改的欄位（Version 必填，不符回 VersionConflict；ThumbnailToken 空字串沿用目前的圖；同 transaction 寫稽核）。
-// 目前是預設的風格設成不預設回 InvalidInput（欄位 IsDefault），停用目前的預設回 FailedPrecondition；風格不存在回 NotFound。
+// 預設風格不在這裡改；停用目前的預設回 FailedPrecondition；風格不存在回 NotFound。
 func (m *Module) UpdateStyle(ctx context.Context, in UpdateStyleInput) (AdminStyle, error) {
 	return m.admin.UpdateStyle(ctx, in)
+}
+
+// SetDefaultStyle 把風格設成它用途的預設風格，同 transaction 取消原本的預設並寫一筆稽核（detail 記原預設的 id）；version 為 0 不檢查版本，不符回 VersionConflict。
+// 目標停用回 FailedPrecondition，不存在回 NotFound；已經是預設時不改任何東西、不寫稽核，回傳該風格。
+func (m *Module) SetDefaultStyle(ctx context.Context, actor Actor, id uuid.UUID, version int64) (AdminStyle, error) {
+	return m.admin.SetDefault(ctx, actor, id, version)
 }
 
 // ReadStyleForAdmin 回傳一個風格（後台），不存在回 NotFound；給 handler 套 update_mask 的基底。

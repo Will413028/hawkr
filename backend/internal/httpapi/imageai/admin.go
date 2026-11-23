@@ -2,6 +2,7 @@ package imageai
 
 import (
 	"context"
+	"slices"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -20,6 +21,7 @@ type AdminModule interface {
 	ReadStyleForAdmin(ctx context.Context, id uuid.UUID) (imageai.AdminStyle, error)
 	CreateStyle(ctx context.Context, in imageai.CreateStyleInput) (imageai.AdminStyle, error)
 	UpdateStyle(ctx context.Context, in imageai.UpdateStyleInput) (imageai.AdminStyle, error)
+	SetDefaultStyle(ctx context.Context, actor imageai.Actor, id uuid.UUID, version int64) (imageai.AdminStyle, error)
 	DeleteStyle(ctx context.Context, actor imageai.Actor, id uuid.UUID, version int64) error
 	GetQuota(ctx context.Context, storeID int64) (imageai.AdminQuota, error)
 	UpdateQuota(ctx context.Context, in imageai.UpdateQuotaInput) (imageai.AdminQuota, error)
@@ -41,7 +43,7 @@ func NewAdmin(m AdminModule, images rpc.Images) *Admin { return &Admin{m: m, ima
 var (
 	stylePaths = rpc.FieldPaths{
 		"Category": "ai_style.category", "Name": "ai_style.name", "Label": "ai_style.label", "Prompt": "ai_style.prompt",
-		"ThumbnailToken": "ai_style.thumbnail_staged_token", "IsDefault": "ai_style.default_style", "Enabled": "ai_style.enabled",
+		"ThumbnailToken": "ai_style.thumbnail_staged_token", "Enabled": "ai_style.enabled",
 		"Version": "ai_style.etag",
 	}
 	listStylePaths = rpc.FieldPaths{"Category": "category"}
@@ -78,7 +80,7 @@ func (h *Admin) CreateAiStyle(ctx context.Context, req *connect.Request[adminpb.
 		Name:  msg.GetName(), Label: msg.GetLabel(), Prompt: msg.GetPrompt(),
 		Category:       rpc.EnumFromProto[imageai.StyleCategory](msg.GetCategory()),
 		ThumbnailToken: msg.GetThumbnailStagedToken(), DisplayOrder: msg.GetDisplayOrder(),
-		IsDefault: msg.GetDefaultStyle(), Enabled: msg.GetEnabled(),
+		Enabled: msg.GetEnabled(),
 	})
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, stylePaths)
@@ -90,7 +92,8 @@ func (h *Admin) CreateAiStyle(ctx context.Context, req *connect.Request[adminpb.
 	return connect.NewResponse(&adminpb.CreateAiStyleResponse{AiStyle: out}), nil
 }
 
-// UpdateAiStyle 把 update_mask 內的欄位套在目前的風格上，再整筆交給模組；name、category 不能改（IMMUTABLE，與目前不同回 invalid_argument）；版本由模組比對。
+// UpdateAiStyle 把 update_mask 內的欄位套在目前的風格上，再整筆交給模組；name、category 不能改（IMMUTABLE，與目前不同回 invalid_argument）；
+// default_style 是 OUTPUT_ONLY，在 mask 裡也略過；版本由模組比對。
 func (h *Admin) UpdateAiStyle(ctx context.Context, req *connect.Request[adminpb.UpdateAiStyleRequest]) (*connect.Response[adminpb.UpdateAiStyleResponse], error) {
 	admin, err := rpc.RequireAdmin(ctx)
 	if err != nil {
@@ -119,7 +122,7 @@ func (h *Admin) UpdateAiStyle(ctx context.Context, req *connect.Request[adminpb.
 	s, err := h.m.UpdateStyle(ctx, imageai.UpdateStyleInput{
 		Actor: imageai.Actor{AdminID: admin, Action: req.Spec().Procedure}, ID: id, Version: version,
 		Label: merged.GetLabel(), Prompt: merged.GetPrompt(), ThumbnailToken: merged.GetThumbnailStagedToken(),
-		DisplayOrder: merged.GetDisplayOrder(), IsDefault: merged.GetDefaultStyle(), Enabled: merged.GetEnabled(),
+		DisplayOrder: merged.GetDisplayOrder(), Enabled: merged.GetEnabled(),
 	})
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, stylePaths)
@@ -129,6 +132,31 @@ func (h *Admin) UpdateAiStyle(ctx context.Context, req *connect.Request[adminpb.
 		return nil, err
 	}
 	return connect.NewResponse(&adminpb.UpdateAiStyleResponse{AiStyle: out}), nil
+}
+
+// SetDefaultAiStyle 把風格設成它用途的預設（自訂方法）；etag 選填，帶了由模組比對。
+func (h *Admin) SetDefaultAiStyle(ctx context.Context, req *connect.Request[adminpb.SetDefaultAiStyleRequest]) (*connect.Response[adminpb.SetDefaultAiStyleResponse], error) {
+	admin, err := rpc.RequireAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := rpc.ParseUUID("id", req.Msg.GetId())
+	if err != nil {
+		return nil, err
+	}
+	version, err := rpc.VersionFromEtag(req.Msg.GetEtag())
+	if err != nil {
+		return nil, err
+	}
+	s, err := h.m.SetDefaultStyle(ctx, imageai.Actor{AdminID: admin, Action: req.Spec().Procedure}, id, version)
+	if err != nil {
+		return nil, err
+	}
+	out, err := h.toStyle(s)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&adminpb.SetDefaultAiStyleResponse{AiStyle: out}), nil
 }
 
 func (h *Admin) DeleteAiStyle(ctx context.Context, req *connect.Request[adminpb.DeleteAiStyleRequest]) (*connect.Response[adminpb.DeleteAiStyleResponse], error) {
@@ -162,7 +190,8 @@ func (h *Admin) GetAiQuota(ctx context.Context, req *connect.Request[adminpb.Get
 	return connect.NewResponse(&adminpb.GetAiQuotaResponse{AiQuota: toQuota(q)}), nil
 }
 
-// UpdateAiQuota 把 update_mask 內的欄位套在目前的額度（沒有個別設定時是預設額度）上，再交給模組；沒帶 etag 只能建立。
+// UpdateAiQuota 把 update_mask 內的欄位套在目前的額度（沒有個別設定時是預設額度）上，再交給模組；沒帶 etag 只能建立，建立時 weekly_limit 必填
+// （在 update_mask 裡，沒有 mask 時要非零），否則 invalid_argument（ai_quota.weekly_limit）。
 func (h *Admin) UpdateAiQuota(ctx context.Context, req *connect.Request[adminpb.UpdateAiQuotaRequest]) (*connect.Response[adminpb.UpdateAiQuotaResponse], error) {
 	admin, err := rpc.RequireAdmin(ctx)
 	if err != nil {
@@ -184,6 +213,15 @@ func (h *Admin) UpdateAiQuota(ctx context.Context, req *connect.Request[adminpb.
 	merged := toQuota(cur)
 	if err := rpc.ApplyUpdateMask(merged, msg, req.Msg.GetUpdateMask()); err != nil {
 		return nil, err
+	}
+	if !cur.Custom {
+		fields, err := rpc.WritableFields(msg, req.Msg.GetUpdateMask())
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(fields, "weekly_limit") {
+			return nil, rpc.RequiredField("ai_quota.weekly_limit", "建立個別額度必須提供 weekly_limit")
+		}
 	}
 	q, err := h.m.UpdateQuota(ctx, imageai.UpdateQuotaInput{
 		Actor: imageai.Actor{AdminID: admin, Action: req.Spec().Procedure}, StoreID: storeID,

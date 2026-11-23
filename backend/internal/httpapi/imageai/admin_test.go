@@ -32,6 +32,11 @@ type fakeAdmin struct {
 	quota   imageai.AdminQuota
 	created []imageai.CreateStyleInput
 	updated []imageai.UpdateStyleInput
+	setDef  []struct {
+		id      uuid.UUID
+		version int64
+		actor   imageai.Actor
+	}
 	deleted []struct {
 		id      uuid.UUID
 		version int64
@@ -59,6 +64,15 @@ func (m *fakeAdmin) CreateStyle(_ context.Context, in imageai.CreateStyleInput) 
 
 func (m *fakeAdmin) UpdateStyle(_ context.Context, in imageai.UpdateStyleInput) (imageai.AdminStyle, error) {
 	m.updated = append(m.updated, in)
+	return m.style, nil
+}
+
+func (m *fakeAdmin) SetDefaultStyle(_ context.Context, a imageai.Actor, id uuid.UUID, v int64) (imageai.AdminStyle, error) {
+	m.setDef = append(m.setDef, struct {
+		id      uuid.UUID
+		version int64
+		actor   imageai.Actor
+	}{id, v, a})
 	return m.style, nil
 }
 
@@ -194,7 +208,7 @@ func TestUpdateAiStyleMaskedUpdateKeepsTheOtherFieldsAndPassesTheEtag(t *testing
 	got := m.updated[0]
 	want := imageai.UpdateStyleInput{
 		Actor: imageai.Actor{AdminID: 99, Action: imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiStyleProcedure}, ID: styleID, Version: 4,
-		Label: "新名", Prompt: "白底", DisplayOrder: 3, IsDefault: true, Enabled: true,
+		Label: "新名", Prompt: "白底", DisplayOrder: 3, Enabled: true,
 	}
 	if got != want {
 		t.Fatalf("模組輸入 = %+v\n預期 %+v", got, want)
@@ -222,17 +236,41 @@ func TestUpdateAiStyleImmutableFieldsCannotChange(t *testing.T) {
 	}
 }
 
-func TestUpdateAiStyleMaskNamingDefaultStyleFalseReachesTheModule(t *testing.T) {
+func TestUpdateAiStyleIgnoresDefaultStyleInTheMaskAndTheBody(t *testing.T) {
 	m := newFakeAdmin()
 	c := setupAdmin(t, m)
-	_, err := c.UpdateAiStyle(context.Background(), connect.NewRequest(&adminpb.UpdateAiStyleRequest{
-		AiStyle: &adminpb.AiStyle{Id: styleID.String(), Etag: "4"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"default_style"}},
+	resp, err := c.UpdateAiStyle(context.Background(), connect.NewRequest(&adminpb.UpdateAiStyleRequest{
+		AiStyle: &adminpb.AiStyle{Id: styleID.String(), Etag: "4", Label: "新名", DefaultStyle: false}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"default_style", "label"}},
 	}))
+	if err != nil {
+		t.Fatalf("OUTPUT_ONLY 在 mask 裡要略過、不回錯：%v", err)
+	}
+	if len(m.updated) != 1 || m.updated[0].Label != "新名" || !resp.Msg.GetAiStyle().GetDefaultStyle() {
+		t.Fatalf("updated=%+v 回應=%v", m.updated, resp.Msg.GetAiStyle())
+	}
+}
+
+func TestSetDefaultAiStyleParsesTheIDAndOptionalEtag(t *testing.T) {
+	m := newFakeAdmin()
+	c := setupAdmin(t, m)
+	ctx := context.Background()
+	resp, err := c.SetDefaultAiStyle(ctx, connect.NewRequest(&adminpb.SetDefaultAiStyleRequest{Id: styleID.String()}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.updated) != 1 || m.updated[0].IsDefault {
-		t.Fatalf("mask 明列 default_style=false 要原樣交給模組（由模組回 invalid_argument）：%+v", m.updated)
+	if _, err := c.SetDefaultAiStyle(ctx, connect.NewRequest(&adminpb.SetDefaultAiStyleRequest{Id: styleID.String(), Etag: "4"})); err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.SetDefaultAiStyle(ctx, connect.NewRequest(&adminpb.SetDefaultAiStyleRequest{Id: styleID.String(), Etag: "x"}))
+	wantCode(t, err, connect.CodeAborted)
+	_, err = c.SetDefaultAiStyle(ctx, connect.NewRequest(&adminpb.SetDefaultAiStyleRequest{Id: "nope"}))
+	wantCode(t, err, connect.CodeInvalidArgument)
+	if len(m.setDef) != 2 || m.setDef[0].version != 0 || m.setDef[1].version != 4 || m.setDef[0].id != styleID ||
+		m.setDef[0].actor != (imageai.Actor{AdminID: 99, Action: imageaiv1alpha1connect.ImageAiAdminServiceSetDefaultAiStyleProcedure}) {
+		t.Fatalf("setDef = %+v", m.setDef)
+	}
+	if s := resp.Msg.GetAiStyle(); s.GetId() != styleID.String() || !s.GetDefaultStyle() {
+		t.Fatalf("回應 = %v", s)
 	}
 }
 
@@ -246,11 +284,12 @@ func TestUpdateAiStyleWithoutAMaskOnlyWritesTheFieldsThatAreSet(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := m.updated[0]
-	if got.Label != "只改名稱" || got.ThumbnailToken != "tok" || got.Prompt != "白底" || got.DisplayOrder != 3 || !got.Enabled || !got.IsDefault {
+	if got.Label != "只改名稱" || got.ThumbnailToken != "tok" || got.Prompt != "白底" || got.DisplayOrder != 3 || !got.Enabled {
 		t.Fatalf("got = %+v", got)
 	}
 }
 
+// default_style 是 OUTPUT_ONLY：Create 帶 true 也被忽略（輸入型別沒有這個欄位）。
 func TestCreateAiStyleMapsEveryField(t *testing.T) {
 	m := newFakeAdmin()
 	c := setupAdmin(t, m)
@@ -263,7 +302,7 @@ func TestCreateAiStyleMapsEveryField(t *testing.T) {
 	}
 	want := imageai.CreateStyleInput{
 		Actor: imageai.Actor{AdminID: 99, Action: imageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure},
-		Name:  "n", Label: "l", Prompt: "p", Category: imageai.CategoryPost, ThumbnailToken: "tok", DisplayOrder: 9, IsDefault: true, Enabled: true,
+		Name:  "n", Label: "l", Prompt: "p", Category: imageai.CategoryPost, ThumbnailToken: "tok", DisplayOrder: 9, Enabled: true,
 	}
 	if len(m.created) != 1 || m.created[0] != want {
 		t.Fatalf("created = %+v\n預期 %+v", m.created, want)
@@ -364,6 +403,36 @@ func TestUpdateAiQuotaWithoutAnEtagSendsVersionZero(t *testing.T) {
 	if m.quotaIn[0].Version != 0 || m.quotaIn[0].WeeklyLimit != 50 {
 		t.Fatalf("quotaIn = %+v", m.quotaIn)
 	}
+}
+
+func TestUpdateAiQuotaCreateRequiresWeeklyLimit(t *testing.T) {
+	for name, req := range map[string]*adminpb.UpdateAiQuotaRequest{
+		"mask 沒有 weekly_limit": {AiQuota: &adminpb.AiQuota{StoreId: "11", Memo: "活動", WeeklyLimit: 50}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"memo"}}},
+		"沒有 mask 且為 0":         {AiQuota: &adminpb.AiQuota{StoreId: "11", Memo: "活動"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m := newFakeAdmin()
+			c := setupAdmin(t, m)
+			_, err := c.UpdateAiQuota(context.Background(), connect.NewRequest(req))
+			ce := connectErr(t, err, connect.CodeInvalidArgument)
+			if got := violationFields(ce); len(got) != 1 || got[0] != "ai_quota.weekly_limit" {
+				t.Fatalf("欄位 = %v", got)
+			}
+			if len(m.quotaIn) != 0 {
+				t.Fatal("缺 weekly_limit 不該呼叫模組")
+			}
+		})
+	}
+	t.Run("沒有 mask 且非零可以建立", func(t *testing.T) {
+		m := newFakeAdmin()
+		c := setupAdmin(t, m)
+		if _, err := c.UpdateAiQuota(context.Background(), connect.NewRequest(&adminpb.UpdateAiQuotaRequest{AiQuota: &adminpb.AiQuota{StoreId: "11", WeeklyLimit: 7}})); err != nil {
+			t.Fatal(err)
+		}
+		if len(m.quotaIn) != 1 || m.quotaIn[0].WeeklyLimit != 7 {
+			t.Fatalf("quotaIn = %+v", m.quotaIn)
+		}
+	})
 }
 
 func TestUpdateAiQuotaStoreIDCannotBeChangedThroughTheMask(t *testing.T) {

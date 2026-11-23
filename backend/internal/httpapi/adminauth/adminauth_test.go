@@ -67,8 +67,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 94 {
-		t.Fatalf("declarations=%d methods=%d，預期 94", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 95 {
+		t.Fatalf("declarations=%d methods=%d，預期 95", got, want)
 	}
 
 	for procedure := range declarations {
@@ -334,6 +334,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 		bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiStyleProcedure,
+		imageaiv1alpha1connect.ImageAiAdminServiceSetDefaultAiStyleProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiStyleProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiQuotaProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceDeleteAiQuotaProcedure,

@@ -4,7 +4,7 @@
 
 ## 職責
 
-賣家的 AI 修圖、修圖配額與後台風格管理。服務 website 與 seller-app 的賣家與 admin 的風格管理。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：seller、media。對外方法 `Transform`、`ListStyles`、`CurrentUsage`（賣家的修圖與風格）與後台維護風格、額度的 7 支（`CreateStyle` 等），handler 在 `internal/httpapi/imageai`。行為規格的唯一來源是 `backend/docs/modules/imageai.md`。
+賣家的 AI 修圖、修圖配額與後台風格管理。服務 website 與 seller-app 的賣家與 admin 的風格管理。來源是 ai-service，搬遷計畫 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）；依賴：seller、media。對外方法 `Transform`、`ListStyles`、`CurrentUsage`（賣家的修圖與風格）與後台維護風格、額度的 8 支（`CreateStyle` 等），handler 在 `internal/httpapi/imageai`。行為規格的唯一來源是 `backend/docs/modules/imageai.md`。
 
 ## 擁有的資料
 
@@ -27,7 +27,7 @@ schema `imageai`：`styles`（風格，UUIDv7）、`quotas`（個別額度）、
 - 扣額度只有一個每店條件 UPSERT（新的一週重設為 1；同一週只在 `used < limit` 時加一，`period_start` 不往回移），外部呼叫在額度的 transaction 之外；失敗退回（在呼叫端 transaction 之外，沒有可退回 `ErrNothingToRefund`），扣後程序終止不退是已知限制（A9-D38）。
 - 每個用途恆有一筆啟用的預設風格（migration seed，CHECK 擋停用預設）；`prompt` 1 到 500 字元。
 - 修圖順序固定：驗證輸入、先佔同時修圖的名額（滿了不扣額度）、同 transaction 內 `seller.LockNotRetired` 加扣額度、transaction 之外呼叫模型、扣額度之後的失敗一律退回；改順序先讀 `backend/docs/modules/imageai.md` §6。
-- 後台寫入都在同一個 transaction 內呼叫 `adminaudit.Record`；縮圖引用只由 `imageai.media_sync` job 寫入，業務列寫入只記退場；預設風格不可刪、不可取消或停用（`failed_precondition`／`invalid_argument`，A9-D39）。
+- 後台寫入都在同一個 transaction 內呼叫 `adminaudit.Record`；縮圖引用只由 `imageai.media_sync` job 寫入，業務列寫入只記退場；預設風格不可刪、不可停用（`failed_precondition`），換預設只有 `SetDefault`（A9-D39）。
 - 模型只經 `internal/platform/llm` 建構；模組內不得出現 Gemini 端點字串（`internal/arch` 守門）。
 - 預設額度 10、後台上限 1000 是模組常數，同時修圖上限讀 `IMAGEAI_MAX_CONCURRENT`；數字與理由在 `backend/docs/modules/imageai.md`。
 
