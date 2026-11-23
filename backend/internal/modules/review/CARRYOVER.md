@@ -39,7 +39,7 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
 | 認證與身分（gateway 驗 JWT、傳 buyer／store ID） | 評價的寫入要知道買家或店家 | 成立 | session 在入口解析，模組只收已解析的身分 | 沿用語意：`Submit` 收 `BuyerID`，`Reply` 收已解析的 `seller.Store` 並以 `seller.Authorize(CapMarketing)` 檢查（停權 fail-closed）；入口在 A6-5 |
-| 錯誤碼（9210 `ModerationRejected`、404／409／428 等舊碼） | client 要能分辨可處理的情境 | 成立 | 錯誤分類＋ reason | 改：`apperr` 分類加模組端的 `Reason` 常數（`REVIEW_ALREADY_EXISTS`、`ORDER_NOT_FOUND`、`ORDER_NOT_REVIEWABLE`、`REVIEW_WINDOW_EXPIRED`、`REVIEW_NOT_REPLYABLE`、`MODERATION_REJECTED`）；proto 的 `ErrorReason` 在 A6-5 定案。句子在 `internal/text` 目錄 |
+| 錯誤碼（9210 `ModerationRejected`、404／409／428 等舊碼） | client 要能分辨可處理的情境 | 成立 | 錯誤分類＋ reason | 改：`apperr` 分類加模組端的 `Reason` 常數（`REVIEW_ALREADY_EXISTS`、`ORDER_NOT_FOUND`、`ORDER_NOT_REVIEWABLE`、`REVIEW_WINDOW_EXPIRED`、`REVIEW_NOT_REPLYABLE`、`MODERATION_REJECTED`）；proto `ErrorReason` 已定案（`REVIEW_ALREADY_EXISTS` 等；9210 沒有對應值）；CodeMeta 的 9210 與 `ReportTargetType` 的 `REVIEW` 已標擁有者（9210 為 im 與 review 的模組內 reason，`ReportTargetType` 為 moderation，ADR `2026-09-25-codemeta-retirement` 過渡第 3 步），舊碼只服務舊契約。句子在 `internal/text` 目錄 |
 | 分頁 page／size＋總數 | 見 M18 | 不成立 | keyset | 改：見 M18 |
 | 下游呼叫的逾時與重試（order-service 無明確逾時） | 訂單查詢不能無限等 | 成立 | 明確 deadline、fail-closed | 改：`orderservice` 的 5 秒逾時；任何失敗不當成「不存在」 |
 | 請求大小與限流 | 防濫用 | 成立 | 入口統一 | 不在模組：沿用 `httpapi` 既有限流（M4）；A6-5 |
@@ -72,3 +72,18 @@ review-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | `ReviewForReport` 是證據讀取，不給顯示用 | 檢舉的快照要證據欄位（作者、評分、店家回覆、圖片 asset ID），顯示投影有 `ItemImageKey` 等，兩者各自演進 | 成立 | 同 | 新增（A6-4b）：可讀規則與 `GetReview` 共用同一個公開可讀述詞與觀看者封鎖（`ReviewForReport` 呼叫同一條讀取路徑，不另寫述詞）；不鎖列、加入呼叫方的 transaction |
 
 觸發條件（改為 buyer 加 `WHERE status <> 'ACTIVE'` 的部分索引；門檻是推測，沒有量測）：`review.purge_sweep` 單輪耗時超過 30 秒，或 `SELECT count(*) FROM buyer.buyers WHERE status <> 'ACTIVE'` 超過 10 萬列。保底掃描從 `pub_inactive_buyers()` 出發逐一 `EXISTS` 評價列（`reviews_buyer` 索引），不加索引（設計 W5 (a)）。
+
+## 公司時期未完成項
+
+A6 對照現行程式碼的結果。以下 5 個 issue 編號（舊公司 repo 的 #3494、#3495、#3497、#3499、#3367）只有編號，議題內文取不到：本 repo 與 `git log --all` 沒有任何引用，舊服務目錄（commit `94796248` 的 `backend/services/{review,im,crm}-service` 與 `backend/docs`）搜不到這些編號。內容不明的項目照實記為不明，不推測內容。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| review `SubmitItemReview` 沒有 transaction | 已修：提交的寫入集中在同一個 transaction。舊碼 `SubmitItemReview` 是 `FinalizeAndLink` 逐張轉正後單句 `repo.Insert`，事件以 best-effort 發布（`94796248:backend/services/review-service/internal/usecase/review_usecase.go:133,200-232`）；現在 `buyer.LockActive`、`InsertReview`、`InsertReviewImage`、媒體同步 job、快取失效 job 與 `ReviewCreated` 事件都在同一個 `DB.InTx` 內，任何一步失敗整體回滾（讀程式碼的推論，沒有找到專門驗回滾的測試）；transaction 外只剩 media 轉正（單體規則 5） | `internal/write/write.go:122`（`InTx` 開始）、`:124`（`LockActive`）、`:132`（`InsertReview`）、`:144`（`InsertReviewImage`）、`:150`（`mediaref.Changed`）、`:154`（`bust`）、`:157`（`events.Publish`）；沿用盤點 M6、M10、M11 |
+| #3494 | 內容不明：編號在舊服務目錄、`backend/docs` 與 git 歷史都沒有任何痕跡，不判定是否已處理 | `git grep -E '(#\|issues/)(3494\|3495\|3497\|3499\|3367)\b' 94796248` 無結果；`git log --all --grep` 無結果；本 repo `rg` 的命中都是雜湊與 ID 數字，與議題無關（`CodeMeta/README.md` 的 3401~3499 是 ShippingArea 碼段） |
+| #3495 | 內容不明，同上 | 同上 |
+| #3497 | 內容不明，同上 | 同上 |
+| #3499 | 內容不明，同上 | 同上 |
+| #3367 | 內容不明，同上 | 同上 |
+
+要補結論時需要 Will 提供各 issue 的標題或內文，再逐項對照模組程式碼。

@@ -94,7 +94,7 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
 | 認證與身分（gateway 驗 JWT、傳 user_id、target_id，模組猜兩種房名） | 送出與讀取要知道呼叫者是買家或店家 | 成立 | session 在入口解析，模組只收已解析的身分，資源以 ID 授權 | 沿用語意、改機制：`Party` 由 httpapi 解析（店家帶 `seller.Store`，讀寫都以 `seller.Authorize` 檢查）；入口在 A6-5 |
-| 錯誤碼（9201、9202、9206、9207、9210、9240） | client 要能分辨可處理的情境 | 成立 | 錯誤分類＋ reason | 改：`apperr` 分類加模組端的 `Reason` 常數（`SELF_MESSAGE_NOT_ALLOWED`、`SELLER_SUSPENDED`、`STORE_CLOSED`、`CHAT_BLOCKED`、`RECEIVER_DELETED`、`MODERATION_REJECTED`）；proto 的 `ErrorReason` 在 A6-5 定案；句子在 `internal/text` |
+| 錯誤碼（9201、9202、9206、9207、9210、9240） | client 要能分辨可處理的情境 | 成立 | 錯誤分類＋ reason | 改：`apperr` 分類加模組端的 `Reason` 常數（`SELF_MESSAGE_NOT_ALLOWED`、`SELLER_SUSPENDED`、`STORE_CLOSED`、`CHAT_BLOCKED`、`RECEIVER_DELETED`、`MODERATION_REJECTED`）；proto `ErrorReason` 已定案：9201 → `SELF_MESSAGE_NOT_ALLOWED`、9202 → `CHAT_BLOCKED`（語意改為任一方向封鎖且無進行中訂單）、9206 → `RECEIVER_DELETED`、9207 → `STORE_CLOSED`；9210 的詞典拒絕是欄位錯誤、不帶 reason（`internal/httpapi/chat/chat.go:87`）；CodeMeta 的 9201、9202、9210 與 `ReportTargetType` 的 `CHAT_MESSAGE` 已標擁有者為 im 與 moderation（ADR `2026-09-25-codemeta-retirement` 過渡第 3 步），舊碼只服務舊契約；句子在 `internal/text` |
 | 分頁 page／size＋總數、OFFSET | 見 M18 | 不成立 | keyset | 改：見 M18 |
 | 下游呼叫的逾時與重試 | 訂單查詢不能無限等 | 成立 | 明確 deadline、fail-closed | 改：`orderservice` 的 5 秒逾時；任何失敗回 Unavailable，不當成「沒有進行中的訂單」 |
 | 請求大小與限流 | 防濫用 | 成立 | 入口統一 | 不在模組：A6-5；文字上限 4096 個字元在模組與 DB CHECK |
