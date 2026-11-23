@@ -540,7 +540,7 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
   }
 
   String _formatDeadline(String raw, TaipeiDisplay t) {
-    return t.formatIso(raw, TaipeiFormat.monthDayTimeUnpadded);
+    return t.formatIso(raw, TaipeiFormat.dateTime);
   }
 }
 

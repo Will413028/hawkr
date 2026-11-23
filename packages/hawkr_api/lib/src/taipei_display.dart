@@ -1,6 +1,8 @@
 part of '../taipei_time.dart';
 
-/// 臺北時間顯示的版面；每個值對應一種 App 既有的版面，不新增樣式。
+/// 臺北時間顯示的版面，只有三種，兩支 App 相同。
+///
+/// 輸出只有數字與符號，不含任何語系的文字（年月日、上午下午由各語系的樣式決定，不寫在這個套件）。
 enum TaipeiFormat {
   /// `2026/07/30 15:05`
   dateTime,
@@ -8,26 +10,8 @@ enum TaipeiFormat {
   /// `2026/07/30`
   date,
 
-  /// `2026-07-30`
-  dashDate,
-
-  /// `2026-07-30 15:05`
-  dashDateTime,
-
-  /// `07/30 15:05`
-  monthDayTime,
-
-  /// `7/30 15:05`（月日不補零）
-  monthDayTimeUnpadded,
-
-  /// `2026年07月30日 15:05`
-  cjkDateTime,
-
-  /// `15:05`
+  /// `15:05`（24 小時制）
   time,
-
-  /// `下午03:05`（12 小時制，午別是中文）
-  meridiemTime,
 }
 
 String _render(DateTime t, TaipeiFormat format) {
@@ -37,16 +21,7 @@ String _render(DateTime t, TaipeiFormat format) {
   return switch (format) {
     TaipeiFormat.dateTime => '${t.year}/$mm/$dd $hm',
     TaipeiFormat.date => '${t.year}/$mm/$dd',
-    TaipeiFormat.dashDate => '${t.year}-$mm-$dd',
-    TaipeiFormat.dashDateTime => '${t.year}-$mm-$dd $hm',
-    TaipeiFormat.monthDayTime => '$mm/$dd $hm',
-    TaipeiFormat.monthDayTimeUnpadded => '${t.month}/${t.day} $hm',
-    TaipeiFormat.cjkDateTime => '${t.year}年$mm月$dd日 $hm',
     TaipeiFormat.time => hm,
-    TaipeiFormat.meridiemTime =>
-      '${t.hour < 12 ? '上午' : '下午'}'
-          '${_pad(t.hour == 0 ? 12 : (t.hour > 12 ? t.hour - 12 : t.hour))}'
-          ':${_pad(t.minute)}',
   };
 }
 
@@ -55,10 +30,7 @@ String _render(DateTime t, TaipeiFormat format) {
 /// 接受 ISO 8601（帶時區標記的是時間點，沒有標記的本來就是臺北牆上時間）、斜線日期（`2026/07/30 15:05`），
 /// 與整串剛好 10 位（秒）或 13 位（毫秒）的 Unix 時間。純數字先判斷，否則 `DateTime.tryParse` 會把 10 位秒數讀成西元 171238 年。
 /// 其他長度的純數字不是時間，回 null。
-///
-/// [embeddedEpoch] 為 true 時，解析不了的字串裡夾的 10 至 13 位數字也算 Unix 時間（`ts=1785429000`；13 位是毫秒，
-/// 10 至 12 位是秒）。只有賣家訂單卡的兩個呼叫端有這個既有行為，其餘呼叫端不開。
-DateTime? _parseWall(String raw, {bool embeddedEpoch = false}) {
+DateTime? _parseWall(String raw) {
   final text = raw.trim();
   if (text.isEmpty) return null;
   if (RegExp(r'^\d{10}$').hasMatch(text)) {
@@ -76,15 +48,7 @@ DateTime? _parseWall(String raw, {bool embeddedEpoch = false}) {
   final parsed =
       DateTime.tryParse(text) ??
       DateTime.tryParse(text.replaceFirst(' ', 'T').replaceAll('/', '-'));
-  if (parsed != null) return parsed._taipeiWall;
-  if (!embeddedEpoch) return null;
-  final embedded = RegExp(r'\d{10,13}').firstMatch(text)?.group(0);
-  if (embedded == null) return null;
-  final n = int.parse(embedded);
-  return DateTime.fromMillisecondsSinceEpoch(
-    embedded.length == 13 ? n : n * 1000,
-    isUtc: true,
-  )._taipei;
+  return parsed?._taipeiWall;
 }
 
 /// 臺北時間的顯示：格式化與「台北時間」標籤都只走這裡（ADR 多語系架構 D5）。
@@ -121,27 +85,18 @@ class TaipeiDisplay {
       _render(instant._taipei, format ?? TaipeiFormat.dateTime);
 
   /// 時間字串 [raw] 的臺北時間（解析規則見 [_parseWall]）；空字串或解析不了回 null。
-  ///
-  /// [embeddedEpoch] 見 [_parseWall]。
-  static String? plainIso(
-    String raw, [
-    TaipeiFormat? format,
-    bool embeddedEpoch = false,
-  ]) {
-    final wall = _parseWall(raw, embeddedEpoch: embeddedEpoch);
+  static String? plainIso(String raw, [TaipeiFormat? format]) {
+    final wall = _parseWall(raw);
     return wall == null ? null : _render(wall, format ?? TaipeiFormat.dateTime);
   }
 
-  /// [time] 是臺北的今天則 `15:05`，否則 `7/30 15:05`。
+  /// [time] 是臺北的今天則 `15:05`，否則 `2026/07/30 15:05`。
   static String plainSeparator(DateTime time, {DateTime? now}) {
     final t = time._taipei;
     final today = (now ?? DateTime.now())._taipei;
     final isToday =
         t.year == today.year && t.month == today.month && t.day == today.day;
-    return _render(
-      t,
-      isToday ? TaipeiFormat.time : TaipeiFormat.monthDayTimeUnpadded,
-    );
+    return _render(t, isToday ? TaipeiFormat.time : TaipeiFormat.dateTime);
   }
 
   /// [raw] 的臺北日期是否早於臺北的今天；解析不了回 false。
@@ -170,12 +125,8 @@ class TaipeiDisplay {
   String date(DateTime instant) => format(instant, TaipeiFormat.date);
 
   /// 時間字串 [raw]：空字串回空字串，解析不了原樣回傳（不附標籤，它不是臺北時間）。
-  String formatIso(
-    String raw, [
-    TaipeiFormat? format,
-    bool embeddedEpoch = false,
-  ]) {
-    final text = plainIso(raw, format, embeddedEpoch);
+  String formatIso(String raw, [TaipeiFormat? format]) {
+    final text = plainIso(raw, format);
     return text == null ? raw : labeled(text);
   }
 
@@ -229,8 +180,6 @@ class TaipeiPickerInitial {
   ).subtract(_taipeiUtcOffset);
 }
 
-/// 選擇器的起始值：[current] 有值用它，沒有值是 [now] 起算一天後。
-TaipeiPickerInitial taipeiPickerInitial(DateTime? current, DateTime now) =>
-    TaipeiPickerInitial._(
-      (current ?? now.toUtc().add(const Duration(days: 1)))._taipeiWall,
-    );
+/// 選擇器的起始值：[initial] 的臺北牆上日期與時間。
+TaipeiPickerInitial taipeiPickerInitial(DateTime initial) =>
+    TaipeiPickerInitial._(initial._taipeiWall);

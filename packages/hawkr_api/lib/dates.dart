@@ -10,7 +10,8 @@ Date? parseDate(String value) {
   final match = _isoDate.firstMatch(value);
   if (match == null) return null;
   final year = int.parse(match[1]!);
-  if (year < 1) return null; // google.type.Date 的 year 0 是「沒有年份」，不是 0000 年
+  if (year < 1)
+    return null; // google.type.Date: year 0 means no year, not year 0000
   final month = int.parse(match[2]!);
   final day = int.parse(match[3]!);
   final check = DateTime.utc(year, month, day);

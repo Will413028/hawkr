@@ -997,7 +997,7 @@ String _paymentMethodLabel(String method) {
 }
 
 String _formatDateTime(String raw, TaipeiDisplay t) {
-  return t.formatIso(raw, TaipeiFormat.cjkDateTime);
+  return t.formatIso(raw, TaipeiFormat.dateTime);
 }
 
 String _fmt(int number) {

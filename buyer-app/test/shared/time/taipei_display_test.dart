@@ -75,6 +75,20 @@ void main() {
     expect(_text(tester, 'timestamp'), expected);
   });
 
+  test('the three layouts: date, date and time, time of day (24-hour)', () {
+    final afternoon = DateTime.utc(2026, 7, 30, 7, 5); // Taipei 15:05
+    expect(
+      taipeiDeviceDisplay.format(afternoon, TaipeiFormat.dateTime),
+      '2026/07/30 15:05',
+    );
+    expect(
+      taipeiDeviceDisplay.format(afternoon, TaipeiFormat.date),
+      '2026/07/30',
+    );
+    expect(taipeiDeviceDisplay.format(afternoon, TaipeiFormat.time), '15:05');
+    expect(TaipeiFormat.values, hasLength(3));
+  });
+
   test('null timestamp stays empty without a label', () {
     expect(foreignDeviceDisplay.timestamp(null), '');
   });

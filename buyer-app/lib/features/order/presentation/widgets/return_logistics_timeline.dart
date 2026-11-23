@@ -328,7 +328,7 @@ class _PickupTimeline extends StatelessWidget {
   }
 
   String _formatShortDateTime(String raw, TaipeiDisplay t) {
-    return t.formatIso(raw, TaipeiFormat.monthDayTime);
+    return t.formatIso(raw, TaipeiFormat.dateTime);
   }
 }
 

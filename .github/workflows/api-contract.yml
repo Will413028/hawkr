@@ -11,6 +11,7 @@ on:
     paths: &api_paths
       - 'api/**'
       - 'packages/hawkr_api/**'
+      - 'packages/hawkr_ui_text/tool/check_hardcoded_han.dart'
       - 'packages/hawkr-api-ts/**'
       # 根目錄的 pnpm workspace（TS 套件的依賴與 lockfile）。
       - 'package.json'
@@ -143,6 +144,14 @@ jobs:
       - name: dart test
         if: always()
         run: dart test
+
+      # 套件不放使用者面文字（ADR 2026-10-17-multi-locale-architecture D4）；baseline 是空的，任何漢字字串字面值都失敗。
+      - name: Guard hardcoded Han literals (ratchet)
+        if: always()
+        working-directory: packages/hawkr_ui_text
+        run: |
+          dart pub get
+          dart run tool/check_hardcoded_han.dart --baseline ../hawkr_api/tool/han_baseline.json ../hawkr_api/lib
 
   ts:
     name: TS 套件（packages/hawkr-api-ts）：生成物 drift、tsc、biome、vitest

@@ -450,7 +450,7 @@ class AiAssistantScreen extends HookConsumerWidget {
   }
 
   String _formatTime(DateTime dt, TaipeiDisplay td) {
-    return td.format(dt, TaipeiFormat.meridiemTime);
+    return td.format(dt, TaipeiFormat.time);
   }
 
   String _formatSeparatorTime(DateTime dt, TaipeiDisplay td) {
