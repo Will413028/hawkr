@@ -105,15 +105,14 @@ void main() {
     final orderPill = File(
       'lib/features/order/presentation/order_card_widgets/pill_button.dart',
     ).readAsStringSync();
-    final address = File(
+    final input = File(
       'lib/features/settings/presentation/shipping_settings/widgets/'
-      'address_autocomplete_field.dart',
+      'common_widgets.dart',
     ).readAsStringSync();
 
     expect(orderCard, contains('excludeFromSemantics: true'));
     expect(orderPill, contains('HkTapTarget('));
     expect(orderPill, contains('semanticLabel: label'));
-    expect(address, contains('minHeight: HkControl.minTap'));
-    expect(address, contains('child: DecoratedBox('));
+    expect(input, contains('minHeight: HkControl.minTap'));
   });
 }

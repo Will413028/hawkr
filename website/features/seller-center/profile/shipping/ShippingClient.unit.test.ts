@@ -24,7 +24,6 @@ import type { ShippingOnboarding } from "@/lib/seller/shipping";
 const h = vi.hoisted(() => ({
 	certGate: {} as Record<string, unknown>,
 	onboardings: {} as Record<string, unknown>,
-	validateAddress: vi.fn(),
 	submitHome: vi.fn(),
 	submitCvs: vi.fn(),
 }));
@@ -35,7 +34,6 @@ vi.mock("@/lib/hooks/useShippingOnboardings", () => ({
 }));
 vi.mock("@/lib/seller/shipping", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@/lib/seller/shipping")>()),
-	validateAddress: h.validateAddress,
 	submitHomeDeliveryOnboarding: h.submitHome,
 	submitCvsOnboarding: h.submitCvs,
 }));
@@ -75,21 +73,6 @@ vi.mock("@/lib/checkout/store-pickups", () => ({
 }));
 vi.mock("next/image", () => ({
 	default: () => null,
-}));
-vi.mock("@/features/seller/components/AddressAutocompleteField", () => ({
-	AddressAutocompleteField: (p: {
-		value: string;
-		onChange: (v: string) => void;
-		onManualEdit: () => void;
-	}) =>
-		React.createElement("input", {
-			"aria-label": "路名門牌",
-			value: p.value,
-			onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-				p.onChange(e.target.value);
-				p.onManualEdit();
-			},
-		}),
 }));
 vi.mock("@/components/ui/Dropdown", () => {
 	const Dropdown = (p: {
@@ -170,7 +153,6 @@ const inputs = (label: string) =>
 const input = (label: string) => inputs(label)[0];
 
 beforeEach(() => {
-	h.validateAddress.mockReset();
 	h.submitHome.mockReset();
 	h.submitCvs.mockReset();
 });
@@ -287,11 +269,6 @@ describe("ShippingClient 黑貓 submit", () => {
 
 	it("derives senderPostalCode from the selected district (台西鄉)", async () => {
 		setData({ townCode: "10009160" });
-		h.validateAddress.mockResolvedValue({
-			valid: true,
-			county: "雲林縣",
-			district: "臺西鄉",
-		});
 		h.submitHome.mockResolvedValue({});
 		render(React.createElement(ShippingClient));
 		await submitHome();
@@ -320,7 +297,6 @@ describe("ShippingClient 黑貓 submit", () => {
 		render(React.createElement(ShippingClient));
 		await submitHome();
 		expect(await screen.findByText("請重新選擇行政區")).toBeTruthy();
-		expect(h.validateAddress).not.toHaveBeenCalled();
 		expect(h.submitHome).not.toHaveBeenCalled();
 	});
 

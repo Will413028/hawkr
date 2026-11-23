@@ -24,7 +24,6 @@ import '../../../../shared/widgets/hk_glass_app_bar.dart';
 import '../../../../shared/widgets/hk_icon.dart';
 import '../../../../shared/widgets/hk_page_section.dart';
 import '../store_map_webview_screen.dart';
-import '../../data/tgos_address_service.dart';
 import 'widgets/common_widgets.dart';
 import 'widgets/cvs_shipping_section.dart';
 import 'widgets/taqbin_shipping_section.dart';
@@ -55,8 +54,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
     final homeCity = useState<String?>(null);
     final homeDistrict = useState<String?>(null);
     final homeAddressCtrl = useTextEditingController();
-    final homeAddressVerified = useState(false);
-    final homeAddressVerifying = useState(false);
 
     // 7-11店到店狀態
     final cvsExpanded = useState(true);
@@ -312,10 +309,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
         FloatingToast.error(context, '請輸入詳細地址');
         return;
       }
-      if (!homeAddressVerified.value) {
-        FloatingToast.error(context, '請先驗證地址');
-        return;
-      }
 
       final postalCode = postalCodeOfSelection(
         homeCity.value,
@@ -490,140 +483,12 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                               city: homeCity,
                               district: homeDistrict,
                               addressCtrl: homeAddressCtrl,
-                              addressVerified: homeAddressVerified,
-                              addressVerifying: homeAddressVerifying,
                               onCitySelected: (val) {
                                 homeCity.value = val;
                                 homeDistrict.value = null;
-                                homeAddressVerified.value = false;
                               },
                               onDistrictSelected: (val) {
                                 homeDistrict.value = val;
-                                homeAddressVerified.value = false;
-                              },
-                              onAddressSelected: (suggestion) {
-                                homeAddressVerified.value = false;
-                              },
-                              onAddressManualEdit: () {
-                                homeAddressVerified.value = false;
-                              },
-                              onVerifyAddress: () async {
-                                final addr = homeAddressCtrl.text.trim();
-                                if (addr.isEmpty ||
-                                    homeCity.value == null ||
-                                    homeDistrict.value == null) {
-                                  return;
-                                }
-                                homeAddressVerifying.value = true;
-                                final tgos = ref.read(
-                                  tgosAddressServiceProvider,
-                                );
-                                final fullAddr =
-                                    '${homeCity.value}${homeDistrict.value}$addr';
-                                final validation = await tgos.validate(
-                                  fullAddr,
-                                );
-                                if (!context.mounted) return;
-                                homeAddressVerifying.value = false;
-                                String norm(String s) =>
-                                    toShippingName(s).replaceAll('　', '');
-                                final countyMatch =
-                                    validation.county == null ||
-                                    norm(validation.county!) ==
-                                        norm(homeCity.value!);
-                                final districtMatch =
-                                    validation.district == null ||
-                                    norm(validation.district!) ==
-                                        norm(homeDistrict.value!);
-                                if (validation.valid &&
-                                    countyMatch &&
-                                    districtMatch) {
-                                  homeAddressVerified.value = true;
-                                  FloatingToast.success(context, '地址驗證通過');
-                                } else {
-                                  homeAddressVerified.value = false;
-                                  showDialog(
-                                    context: context,
-                                    builder: (dCtx) => Dialog(
-                                      backgroundColor: Colors.transparent,
-                                      insetPadding: const EdgeInsets.symmetric(
-                                        horizontal: 48,
-                                      ),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: AppColors.bgCard,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Padding(
-                                              padding: EdgeInsets.fromLTRB(
-                                                20.w,
-                                                24.h,
-                                                20.w,
-                                                16.h,
-                                              ),
-                                              child: Column(
-                                                children: [
-                                                  Text(
-                                                    '地址驗證失敗',
-                                                    style: TextStyle(
-                                                      fontSize: 16.sp,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color:
-                                                          AppColors.textPrimary,
-                                                    ),
-                                                  ),
-                                                  SizedBox(height: 8.h),
-                                                  Text(
-                                                    '找不到此地址，請確認路名及門牌號碼是否正確後重新填寫。',
-                                                    textAlign: TextAlign.center,
-                                                    style: TextStyle(
-                                                      fontSize: 14.sp,
-                                                      color: AppColors
-                                                          .textPrimary
-                                                          .withValues(
-                                                            alpha: 0.8,
-                                                          ),
-                                                      height: 1.5,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Container(
-                                              height: 1,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                            InkWell(
-                                              onTap: () =>
-                                                  Navigator.of(dCtx).pop(),
-                                              child: SizedBox(
-                                                height: 44.h,
-                                                child: Center(
-                                                  child: Text(
-                                                    '重新填寫',
-                                                    style: TextStyle(
-                                                      fontSize: 16.sp,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color:
-                                                          AppColors.textPrimary,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }
                               },
                             ),
                             const SizedBox(height: HkSpace.md),
@@ -685,10 +550,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                                     style: FilledButton.styleFrom(
                                       backgroundColor: AppColors.error,
                                     ),
-                                    onPressed:
-                                        (saving.value ||
-                                            !hasTaqbin ||
-                                            !homeAddressVerified.value)
+                                    onPressed: (saving.value || !hasTaqbin)
                                         ? null
                                         : onActivateTaqbin,
                                     child: saving.value
@@ -705,8 +567,7 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                                 SizedBox(height: 16.h),
                               ] else if (!taqbinLocked.value) ...[
                                 SaveButton(
-                                  canSave:
-                                      hasTaqbin && homeAddressVerified.value,
+                                  canSave: hasTaqbin,
                                   saving: saving.value,
                                   onSave: onActivateTaqbin,
                                   buttonText: '開通黑貓物流',

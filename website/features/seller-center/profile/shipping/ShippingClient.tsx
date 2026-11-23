@@ -8,7 +8,6 @@ import Button from "@/components/ui/Button";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
 import Switch from "@/components/ui/Switch";
-import { AddressAutocompleteField } from "@/features/seller/components/AddressAutocompleteField";
 import { SellerCertGate } from "@/features/seller-center";
 import {
 	createStoreMapSession,
@@ -38,8 +37,6 @@ import {
 	submitHomeDeliveryOnboarding,
 	toggleOnboarding,
 	unsupportedOnboardingTypes,
-	validateAddress,
-	validationMatchesSelection,
 } from "@/lib/seller/shipping";
 import { type MyStore, STORE_STATE_UNKNOWN_MESSAGE } from "@/lib/seller/store";
 import { checkDisplayLength } from "@/lib/validation/display-length";
@@ -72,8 +69,6 @@ import {
  * 但地址資料庫查不到（新社區、村里改編、特殊門牌）。後者賣家再怎麼改
  * 也不會過，所以直接把客服指出來，不要讓人卡在這裡反覆重送。
  */
-const SUPPORT_EMAIL = "supports@example.com";
-const ADDRESS_VERIFY_FAILED_MSG = `地址未通過驗證。請先確認縣市、區域與路名門牌是否一致；若這是真實存在的地址仍無法通過，請聯絡客服 ${SUPPORT_EMAIL}，我們會協助你完成開通。`;
 
 function withCurrentOption(
 	options: readonly string[],
@@ -210,79 +205,10 @@ function HomeDeliverySection({
 		homeFormInitial(row, store),
 	);
 	const [submitting, setSubmitting] = React.useState(false);
-	const [validateMsg, setValidateMsg] = React.useState<string | null>(null);
 	const [submitError, setSubmitError] = useResettableError();
-
-	// Address verification state — drives the 「驗證 / 已驗證」 button
-	// next to 路名門牌 and gates the submit. Approved rows from the
-	// backend are shown as verified so seller doesn't have to
-	// re-verify just to view.
-	const [addressVerified, setAddressVerified] = React.useState(false);
-	const [addressVerifying, setAddressVerifying] = React.useState(false);
-	const [addrVerifyFeedback, setAddrVerifyFeedback] = React.useState<
-		"error" | null
-	>(null);
-	const addrVerifyFeedbackTimerRef = React.useRef<number | null>(null);
-
-	React.useEffect(() => {
-		return () => {
-			if (addrVerifyFeedbackTimerRef.current !== null) {
-				window.clearTimeout(addrVerifyFeedbackTimerRef.current);
-			}
-		};
-	}, []);
 
 	const update = (patch: Partial<HomeForm>) =>
 		setForm((prev) => ({ ...prev, ...patch }));
-
-	// Any change to county / district / address invalidates a previous
-	// verification — the seller must re-trigger TGOS or re-pick from the
-	// suggestions list.
-	const invalidateVerification = React.useCallback(() => {
-		setAddressVerified(false);
-		setValidateMsg(null);
-		setAddrVerifyFeedback(null);
-	}, []);
-
-	const flashAddressVerifyError = React.useCallback(() => {
-		if (addrVerifyFeedbackTimerRef.current !== null) {
-			window.clearTimeout(addrVerifyFeedbackTimerRef.current);
-		}
-		// 紅色閃動只有 1.1 秒，賣家看不出「為什麼不過、接下來要做什麼」。
-		// 真實存在卻驗不過的地址不是賣家自己能解的，直接把客服指出來。
-		setValidateMsg(ADDRESS_VERIFY_FAILED_MSG);
-		setAddrVerifyFeedback("error");
-		addrVerifyFeedbackTimerRef.current = window.setTimeout(() => {
-			setAddrVerifyFeedback(null);
-			addrVerifyFeedbackTimerRef.current = null;
-		}, 1100);
-	}, []);
-
-	const handleVerifyClick = async () => {
-		setValidateMsg(null);
-		setAddressVerifying(true);
-		setAddrVerifyFeedback(null);
-		try {
-			const v = await validateAddress(fullAddress);
-			if (
-				!validationMatchesSelection(v, form.senderCity, form.senderDistrict)
-			) {
-				setAddressVerified(false);
-				flashAddressVerifyError();
-				return;
-			}
-			setAddressVerified(true);
-			setAddrVerifyFeedback(null);
-		} catch (e) {
-			setAddressVerified(false);
-			setValidateMsg(e instanceof Error ? e.message : "驗證失敗，請稍後再試");
-		} finally {
-			setAddressVerifying(false);
-		}
-	};
-
-	const fullAddress =
-		`${form.senderCity}${form.senderDistrict}${form.senderAddressDetail}`.trim();
 
 	// 黑貓寄件人姓名：顯示長度 [1, 30]（中文 1 字算 2、英文 1 字算 1），
 	// 對齊後端 PayUni 物流欄位約束。只有使用者已輸入時才即時提示，避免
@@ -298,7 +224,6 @@ function HomeDeliverySection({
 
 	const submit = async () => {
 		setSubmitError(null);
-		setValidateMsg(null);
 
 		if (
 			!form.senderName.trim() ||
@@ -330,23 +255,6 @@ function HomeDeliverySection({
 
 		setSubmitting(true);
 		try {
-			// 1) Address validation against TGOS — re-runs even if the user
-			//    already clicked 驗證, because the address could have shifted
-			//    in a way that didn't fire `invalidateVerification` (e.g.
-			//    react state race) and we'd rather double-check than ship a
-			//    bad address to PayUni.
-			const v = await validateAddress(fullAddress);
-			if (
-				!validationMatchesSelection(v, form.senderCity, form.senderDistrict)
-			) {
-				setAddressVerified(false);
-				flashAddressVerifyError();
-				return;
-			}
-			setAddressVerified(true);
-			setAddrVerifyFeedback(null);
-
-			// 2) Submit to PayUni
 			await submitHomeDeliveryOnboarding({
 				...form,
 				senderPostalCode: postalCode,
@@ -401,7 +309,6 @@ function HomeDeliverySection({
 			)}
 			<p className="shipping-card__notice">
 				<strong>請填寫正確寄件地址。</strong>
-				黑貓宅急便開通與後續到府收件會使用這個地址；地址需通過系統驗證，才能送出物流開通申請。
 			</p>
 
 			<div className="seller-cert__grid">
@@ -440,7 +347,6 @@ function HomeDeliverySection({
 							senderCity: nextCity,
 							senderDistrict: nextDistrict,
 						});
-						invalidateVerification();
 					}}
 					items={withCurrentOption(TAIWAN_CITY_OPTIONS, cityValue)}
 					searchable
@@ -457,41 +363,23 @@ function HomeDeliverySection({
 					value={districtValue || undefined}
 					onChange={(nextDistrict) => {
 						update({ senderDistrict: nextDistrict });
-						invalidateVerification();
 					}}
 					items={withCurrentOption(districtOptions, districtValue)}
 					searchable
 					noResultsLabel="找不到符合的鄉鎮市區"
 				/>
 				<div className="shipping-form__full">
-					<AddressAutocompleteField
+					<TextField
+						label="路名門牌"
 						value={form.senderAddressDetail}
 						onChange={(v) => update({ senderAddressDetail: v })}
-						county={cityValue || undefined}
-						district={districtValue || undefined}
 						disabled={locked}
-						verified={addressVerified || approved}
-						verifying={addressVerifying}
-						onSuggestionSelected={() => {
-							// Picking a suggestion is itself a TGOS-validated path —
-							// flip the verified flag without re-hitting the server.
-							setAddressVerified(true);
-							setValidateMsg(null);
-							setAddrVerifyFeedback(null);
-						}}
-						onManualEdit={invalidateVerification}
-						onVerifyClick={() => void handleVerifyClick()}
-						verifyFeedback={addrVerifyFeedback}
+						placeholder="例：松仁路 100 號"
 						required
 					/>
 				</div>
 			</div>
 
-			{validateMsg && (
-				<p className="shipping-card__error" role="alert">
-					{validateMsg}
-				</p>
-			)}
 			{submitError && (
 				<p className="shipping-card__error" role="alert">
 					{submitError}
