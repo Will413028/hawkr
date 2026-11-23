@@ -588,14 +588,6 @@ public class OrderService {
         return order;
     }
 
-    public OrderEntity getOrderByShipmentNo(String shipmentNo) {
-        OrderEntity order = orderRepository.findByShipmentNo(shipmentNo);
-        if (order == null) {
-            throw new OrderNotFoundException("shipment_no=" + shipmentNo);
-        }
-        return order;
-    }
-
     public List<OrderItemEntity> getOrderItems(String orderNo) {
         return orderItemRepository.findByOrderNo(orderNo);
     }
@@ -836,15 +828,6 @@ public class OrderService {
             out.add(orderRepository.findStorePeriodOrderStats(storeId, w[0], w[1], QUALIFYING_ORDER_STATUSES));
         }
         return out;
-    }
-
-    public List<OrderAggregateResult> getOrderAggregates(long storeId, int page, int size) {
-        int offset = (page - 1) * size;
-        return orderRepository.findOrderAggregates(storeId, size, offset);
-    }
-
-    public long countOrderAggregates(long storeId) {
-        return orderRepository.countOrderAggregates(storeId);
     }
 
     public List<OrderEntity> searchOrders(String orderNo, long buyerId, long storeId, String status, int page, int size) {

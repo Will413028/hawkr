@@ -5296,520 +5296,6 @@ func (x *PaymentFactsData) GetIsDuplicate() bool {
 	return false
 }
 
-type SubmitAgentFeeRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 被扣款／收款的合作商店代號（`HAWK` + store_id）。
-	// 🔴 與 agent_mer_id 是**兩個 merchant 識別，不得混用**。
-	MerId string `protobuf:"bytes,1,opt,name=mer_id,json=merId,proto3" json:"mer_id,omitempty"`
-	// 🔴 代理商自訂單號，由**呼叫端**生成並保證唯一。
-	// PayUni 官方標「可重複」且查詢回單筆結構非陣列 ⇒ 真的送重複了，用官方 API 也對不出有幾筆。
-	TradeNo string `protobuf:"bytes,2,opt,name=trade_no,json=tradeNo,proto3" json:"trade_no,omitempty"`
-	// 🔴 **Collection Target Net**：呼叫端要讓平台**淨收**多少（元整數的數字字串）。
-	//
-	// 這**不是**要送給通道的金額。gross-up 由本服務的 adapter 依 verified fee policy 反推
-	// （ADR-011）——domain 不得知道費率，而本 RPC 的邊界就是那條界線。
-	// ⚠️ 呼叫端傳 gross 進來，等於把費率知識搬回 domain，那正是 ADR-005 禁止的形狀。
-	TargetNetAmount string `protobuf:"bytes,3,opt,name=target_net_amount,json=targetNetAmount,proto3" json:"target_net_amount,omitempty"`
-	// FeeType 的 PayUni 碼值（物流＝4）。string 以符合 §4 型別規範。
-	FeeType string `protobuf:"bytes,4,opt,name=fee_type,json=feeType,proto3" json:"fee_type,omitempty"`
-	// BalType：1＝正向（向賣家收）、2＝負向（退還賣家）。
-	// 🔴 PayUni 的 Amt 值域是 1~9999999 的正整數、不接受 0 或負數
-	//
-	//	⇒ **正負號只能由本欄表達**，金額欄永遠是正整數。
-	BalType string `protobuf:"bytes,5,opt,name=bal_type,json=balType,proto3" json:"bal_type,omitempty"`
-	// 代理商出入帳商店代號（選填）。未帶則依平台預設。
-	AgentMerId    *string `protobuf:"bytes,6,opt,name=agent_mer_id,json=agentMerId,proto3,oneof" json:"agent_mer_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubmitAgentFeeRequest) Reset() {
-	*x = SubmitAgentFeeRequest{}
-	mi := &file_payment_payment_proto_msgTypes[74]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubmitAgentFeeRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubmitAgentFeeRequest) ProtoMessage() {}
-
-func (x *SubmitAgentFeeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_payment_proto_msgTypes[74]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubmitAgentFeeRequest.ProtoReflect.Descriptor instead.
-func (*SubmitAgentFeeRequest) Descriptor() ([]byte, []int) {
-	return file_payment_payment_proto_rawDescGZIP(), []int{74}
-}
-
-func (x *SubmitAgentFeeRequest) GetMerId() string {
-	if x != nil {
-		return x.MerId
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeRequest) GetTradeNo() string {
-	if x != nil {
-		return x.TradeNo
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeRequest) GetTargetNetAmount() string {
-	if x != nil {
-		return x.TargetNetAmount
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeRequest) GetFeeType() string {
-	if x != nil {
-		return x.FeeType
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeRequest) GetBalType() string {
-	if x != nil {
-		return x.BalType
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeRequest) GetAgentMerId() string {
-	if x != nil && x.AgentMerId != nil {
-		return *x.AgentMerId
-	}
-	return ""
-}
-
-type SubmitAgentFeeResponse struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 統一 envelope：code/message 是**我方**的業務碼，不是 PayUni 的 Status。
-	// 🔴 兩者混在同一欄的話，「PayUni 拒絕」與「我方參數錯誤」在呼叫端分不開，
-	//
-	//	而前者該進退避重送、後者該進人工。
-	Code          int32               `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string              `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Data          *SubmitAgentFeeData `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubmitAgentFeeResponse) Reset() {
-	*x = SubmitAgentFeeResponse{}
-	mi := &file_payment_payment_proto_msgTypes[75]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubmitAgentFeeResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubmitAgentFeeResponse) ProtoMessage() {}
-
-func (x *SubmitAgentFeeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_payment_proto_msgTypes[75]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubmitAgentFeeResponse.ProtoReflect.Descriptor instead.
-func (*SubmitAgentFeeResponse) Descriptor() ([]byte, []int) {
-	return file_payment_payment_proto_rawDescGZIP(), []int{75}
-}
-
-func (x *SubmitAgentFeeResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *SubmitAgentFeeResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeResponse) GetData() *SubmitAgentFeeData {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-type SubmitAgentFeeData struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 🔴 PayUni 的回傳**只有 Status／Message 兩欄**（無單號、無受理序號）。
-	//
-	//	**不得自造「受理單號」欄位**——造一個出來會讓呼叫端以為可以用它對帳。
-	ProviderStatus  string `protobuf:"bytes,1,opt,name=provider_status,json=providerStatus,proto3" json:"provider_status,omitempty"`
-	ProviderMessage string `protobuf:"bytes,2,opt,name=provider_message,json=providerMessage,proto3" json:"provider_message,omitempty"`
-	// 🔴 adapter 實際送出的 Amt（AgentFee Gross Amount，元整數數字字串）。
-	//
-	//	呼叫端要把它存進 logistics_collection_attempts.gross_amount：
-	//	**賣家銀行帳上看到的是它**，而不是我方帳上的應收。
-	GrossAmount string `protobuf:"bytes,3,opt,name=gross_amount,json=grossAmount,proto3" json:"gross_amount,omitempty"`
-	// 反推 gross_amount 時採用的費率政策識別（供事後對帳說明「當時用的是哪一版費率」）。
-	// 🔴 沒有它，費率調整之後就再也解釋不了歷史那幾筆為什麼是那個金額。
-	FeePolicyVersion string `protobuf:"bytes,4,opt,name=fee_policy_version,json=feePolicyVersion,proto3" json:"fee_policy_version,omitempty"`
-	// true ＝ PayUni 明確受理或明確拒絕；
-	// false ＝ 逾時／連線失敗 ⇒ 🔴 **呼叫端不得視為失敗**（可能已經受理），
-	// 必須走「不確定窗口」的處置而不是自動重送。
-	ProviderResponded bool `protobuf:"varint,5,opt,name=provider_responded,json=providerResponded,proto3" json:"provider_responded,omitempty"`
-	// 依**預估**費率算出的手續費（元整數數字字串）。
-	// 🔴 **不是事後帳務憑據**——真正的手續費只有 agent_fee_query 的 Fee 說了算，
-	//
-	//	兩者的差就是 residual 要吸收的東西。
-	EstimatedFee  string `protobuf:"bytes,6,opt,name=estimated_fee,json=estimatedFee,proto3" json:"estimated_fee,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SubmitAgentFeeData) Reset() {
-	*x = SubmitAgentFeeData{}
-	mi := &file_payment_payment_proto_msgTypes[76]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SubmitAgentFeeData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SubmitAgentFeeData) ProtoMessage() {}
-
-func (x *SubmitAgentFeeData) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_payment_proto_msgTypes[76]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SubmitAgentFeeData.ProtoReflect.Descriptor instead.
-func (*SubmitAgentFeeData) Descriptor() ([]byte, []int) {
-	return file_payment_payment_proto_rawDescGZIP(), []int{76}
-}
-
-func (x *SubmitAgentFeeData) GetProviderStatus() string {
-	if x != nil {
-		return x.ProviderStatus
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeData) GetProviderMessage() string {
-	if x != nil {
-		return x.ProviderMessage
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeData) GetGrossAmount() string {
-	if x != nil {
-		return x.GrossAmount
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeData) GetFeePolicyVersion() string {
-	if x != nil {
-		return x.FeePolicyVersion
-	}
-	return ""
-}
-
-func (x *SubmitAgentFeeData) GetProviderResponded() bool {
-	if x != nil {
-		return x.ProviderResponded
-	}
-	return false
-}
-
-func (x *SubmitAgentFeeData) GetEstimatedFee() string {
-	if x != nil {
-		return x.EstimatedFee
-	}
-	return ""
-}
-
-type QueryAgentFeeRequest struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	MerId   string                 `protobuf:"bytes,1,opt,name=mer_id,json=merId,proto3" json:"mer_id,omitempty"`
-	TradeNo string                 `protobuf:"bytes,2,opt,name=trade_no,json=tradeNo,proto3" json:"trade_no,omitempty"`
-	// 查詢的 key 是 (MerID, TradeNo, Amt) 三元組 ⇒ 這裡要帶**當初送出的 gross_amount**，
-	// 不是 target_net。
-	GrossAmount   string `protobuf:"bytes,3,opt,name=gross_amount,json=grossAmount,proto3" json:"gross_amount,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QueryAgentFeeRequest) Reset() {
-	*x = QueryAgentFeeRequest{}
-	mi := &file_payment_payment_proto_msgTypes[77]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QueryAgentFeeRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QueryAgentFeeRequest) ProtoMessage() {}
-
-func (x *QueryAgentFeeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_payment_proto_msgTypes[77]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QueryAgentFeeRequest.ProtoReflect.Descriptor instead.
-func (*QueryAgentFeeRequest) Descriptor() ([]byte, []int) {
-	return file_payment_payment_proto_rawDescGZIP(), []int{77}
-}
-
-func (x *QueryAgentFeeRequest) GetMerId() string {
-	if x != nil {
-		return x.MerId
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeRequest) GetTradeNo() string {
-	if x != nil {
-		return x.TradeNo
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeRequest) GetGrossAmount() string {
-	if x != nil {
-		return x.GrossAmount
-	}
-	return ""
-}
-
-type QueryAgentFeeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Data          *QueryAgentFeeData     `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QueryAgentFeeResponse) Reset() {
-	*x = QueryAgentFeeResponse{}
-	mi := &file_payment_payment_proto_msgTypes[78]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QueryAgentFeeResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QueryAgentFeeResponse) ProtoMessage() {}
-
-func (x *QueryAgentFeeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_payment_proto_msgTypes[78]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QueryAgentFeeResponse.ProtoReflect.Descriptor instead.
-func (*QueryAgentFeeResponse) Descriptor() ([]byte, []int) {
-	return file_payment_payment_proto_rawDescGZIP(), []int{78}
-}
-
-func (x *QueryAgentFeeResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *QueryAgentFeeResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeResponse) GetData() *QueryAgentFeeData {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-type QueryAgentFeeData struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	MerId       string                 `protobuf:"bytes,1,opt,name=mer_id,json=merId,proto3" json:"mer_id,omitempty"`
-	TradeNo     string                 `protobuf:"bytes,2,opt,name=trade_no,json=tradeNo,proto3" json:"trade_no,omitempty"`
-	GrossAmount string                 `protobuf:"bytes,3,opt,name=gross_amount,json=grossAmount,proto3" json:"gross_amount,omitempty"`
-	FeeType     string                 `protobuf:"bytes,4,opt,name=fee_type,json=feeType,proto3" json:"fee_type,omitempty"`
-	BalType     string                 `protobuf:"bytes,5,opt,name=bal_type,json=balType,proto3" json:"bal_type,omitempty"`
-	// 建立日期（PayUni 原值）。
-	TradeDate string `protobuf:"bytes,6,opt,name=trade_date,json=tradeDate,proto3" json:"trade_date,omitempty"`
-	// 🔴 撥款日。PayUni 用 `0000-00-00` 表示尚未撥款
-	//
-	//	⇒ **一律映成未設（optional 不設值），不得回字面值**。
-	//	⚠️ 「還沒到次日」與「次日執行失敗」在 PayUni 這裡長得一模一樣（唯一訊號就是本欄的
-	//	有無），所以呼叫端必須靠 expected_fund_date ＋ 寬限期把兩者分開。
-	FundDate *string `protobuf:"bytes,7,opt,name=fund_date,json=fundDate,proto3,oneof" json:"fund_date,omitempty"`
-	// 🔴 實際手續費（元整數數字字串）。**不得用預估值（含 1%）冒充**——
-	//
-	//	它是「平台到底收到多少」的唯一來源，而 net_proceeds = gross − 本欄。
-	ActualFee  *string `protobuf:"bytes,8,opt,name=actual_fee,json=actualFee,proto3,oneof" json:"actual_fee,omitempty"`
-	AgentMerId *string `protobuf:"bytes,9,opt,name=agent_mer_id,json=agentMerId,proto3,oneof" json:"agent_mer_id,omitempty"`
-	// 🔴 查無此筆（帶錯 trade_no／amt，或 PayUni 根本沒受理）與「尚未撥款」是**兩件事**：
-	//
-	//	前者 found=false、後者 found=true 且 fund_date 未設。
-	//	混在一起的話，呼叫端會把「沒受理」誤讀成「還沒到次日」而一直等下去。
-	Found         bool `protobuf:"varint,10,opt,name=found,proto3" json:"found,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QueryAgentFeeData) Reset() {
-	*x = QueryAgentFeeData{}
-	mi := &file_payment_payment_proto_msgTypes[79]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QueryAgentFeeData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QueryAgentFeeData) ProtoMessage() {}
-
-func (x *QueryAgentFeeData) ProtoReflect() protoreflect.Message {
-	mi := &file_payment_payment_proto_msgTypes[79]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QueryAgentFeeData.ProtoReflect.Descriptor instead.
-func (*QueryAgentFeeData) Descriptor() ([]byte, []int) {
-	return file_payment_payment_proto_rawDescGZIP(), []int{79}
-}
-
-func (x *QueryAgentFeeData) GetMerId() string {
-	if x != nil {
-		return x.MerId
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetTradeNo() string {
-	if x != nil {
-		return x.TradeNo
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetGrossAmount() string {
-	if x != nil {
-		return x.GrossAmount
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetFeeType() string {
-	if x != nil {
-		return x.FeeType
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetBalType() string {
-	if x != nil {
-		return x.BalType
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetTradeDate() string {
-	if x != nil {
-		return x.TradeDate
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetFundDate() string {
-	if x != nil && x.FundDate != nil {
-		return *x.FundDate
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetActualFee() string {
-	if x != nil && x.ActualFee != nil {
-		return *x.ActualFee
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetAgentMerId() string {
-	if x != nil && x.AgentMerId != nil {
-		return *x.AgentMerId
-	}
-	return ""
-}
-
-func (x *QueryAgentFeeData) GetFound() bool {
-	if x != nil {
-		return x.Found
-	}
-	return false
-}
-
 var File_payment_payment_proto protoreflect.FileDescriptor
 
 const file_payment_payment_proto_rawDesc = "" +
@@ -6261,54 +5747,7 @@ const file_payment_payment_proto_rawDesc = "" +
 	"\ttrade_amt\x18\x05 \x01(\tR\btradeAmt\x12!\n" +
 	"\fpayment_type\x18\x06 \x01(\tR\vpaymentType\x12!\n" +
 	"\fis_duplicate\x18\a \x01(\bR\visDuplicateB\x13\n" +
-	"\x11_provider_paid_at\"\xe3\x01\n" +
-	"\x15SubmitAgentFeeRequest\x12\x15\n" +
-	"\x06mer_id\x18\x01 \x01(\tR\x05merId\x12\x19\n" +
-	"\btrade_no\x18\x02 \x01(\tR\atradeNo\x12*\n" +
-	"\x11target_net_amount\x18\x03 \x01(\tR\x0ftargetNetAmount\x12\x19\n" +
-	"\bfee_type\x18\x04 \x01(\tR\afeeType\x12\x19\n" +
-	"\bbal_type\x18\x05 \x01(\tR\abalType\x12%\n" +
-	"\fagent_mer_id\x18\x06 \x01(\tH\x00R\n" +
-	"agentMerId\x88\x01\x01B\x0f\n" +
-	"\r_agent_mer_id\"\x97\x01\n" +
-	"\x16SubmitAgentFeeResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12O\n" +
-	"\x04data\x18\x03 \x01(\v2;.io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeDataR\x04data\"\x8d\x02\n" +
-	"\x12SubmitAgentFeeData\x12'\n" +
-	"\x0fprovider_status\x18\x01 \x01(\tR\x0eproviderStatus\x12)\n" +
-	"\x10provider_message\x18\x02 \x01(\tR\x0fproviderMessage\x12!\n" +
-	"\fgross_amount\x18\x03 \x01(\tR\vgrossAmount\x12,\n" +
-	"\x12fee_policy_version\x18\x04 \x01(\tR\x10feePolicyVersion\x12-\n" +
-	"\x12provider_responded\x18\x05 \x01(\bR\x11providerResponded\x12#\n" +
-	"\restimated_fee\x18\x06 \x01(\tR\festimatedFee\"k\n" +
-	"\x14QueryAgentFeeRequest\x12\x15\n" +
-	"\x06mer_id\x18\x01 \x01(\tR\x05merId\x12\x19\n" +
-	"\btrade_no\x18\x02 \x01(\tR\atradeNo\x12!\n" +
-	"\fgross_amount\x18\x03 \x01(\tR\vgrossAmount\"\x95\x01\n" +
-	"\x15QueryAgentFeeResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12N\n" +
-	"\x04data\x18\x03 \x01(\v2:.io.github.will413028.hawkr.payment.grpc.QueryAgentFeeDataR\x04data\"\xee\x02\n" +
-	"\x11QueryAgentFeeData\x12\x15\n" +
-	"\x06mer_id\x18\x01 \x01(\tR\x05merId\x12\x19\n" +
-	"\btrade_no\x18\x02 \x01(\tR\atradeNo\x12!\n" +
-	"\fgross_amount\x18\x03 \x01(\tR\vgrossAmount\x12\x19\n" +
-	"\bfee_type\x18\x04 \x01(\tR\afeeType\x12\x19\n" +
-	"\bbal_type\x18\x05 \x01(\tR\abalType\x12\x1d\n" +
-	"\n" +
-	"trade_date\x18\x06 \x01(\tR\ttradeDate\x12 \n" +
-	"\tfund_date\x18\a \x01(\tH\x00R\bfundDate\x88\x01\x01\x12\"\n" +
-	"\n" +
-	"actual_fee\x18\b \x01(\tH\x01R\tactualFee\x88\x01\x01\x12%\n" +
-	"\fagent_mer_id\x18\t \x01(\tH\x02R\n" +
-	"agentMerId\x88\x01\x01\x12\x14\n" +
-	"\x05found\x18\n" +
-	" \x01(\bR\x05foundB\f\n" +
-	"\n" +
-	"_fund_dateB\r\n" +
-	"\v_actual_feeB\x0f\n" +
-	"\r_agent_mer_id2\xbe(\n" +
+	"\x11_provider_paid_at2\x99&\n" +
 	"\x0ePaymentService\x12\x8e\x01\n" +
 	"\rCreatePayment\x12=.io.github.will413028.hawkr.payment.grpc.CreatePaymentRequest\x1a>.io.github.will413028.hawkr.payment.grpc.CreatePaymentResponse\x12\x85\x01\n" +
 	"\n" +
@@ -6330,9 +5769,7 @@ const file_payment_payment_proto_rawDesc = "" +
 	" BatchGetProviderStatusByOrderIds\x12P.io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsRequest\x1aQ.io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse\x12\xcd\x01\n" +
 	"%BatchGetRefundProviderStatusByCaseIds\x12U.io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusByCaseIdsRequest\x1aM.io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse\x12\xcf\x01\n" +
 	"&BatchGetRefundProviderStatusByOrderIds\x12V.io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusByOrderIdsRequest\x1aM.io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse\x12\xac\x01\n" +
-	"\x17HandlePaymentPageReturn\x12G.io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnRequest\x1aH.io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnResponse\x12\x91\x01\n" +
-	"\x0eSubmitAgentFee\x12>.io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeRequest\x1a?.io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeResponse\x12\x8e\x01\n" +
-	"\rQueryAgentFee\x12=.io.github.will413028.hawkr.payment.grpc.QueryAgentFeeRequest\x1a>.io.github.will413028.hawkr.payment.grpc.QueryAgentFeeResponse\x12\xa0\x01\n" +
+	"\x17HandlePaymentPageReturn\x12G.io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnRequest\x1aH.io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnResponse\x12\xa0\x01\n" +
 	"\x13DecryptPayUniResult\x12C.io.github.will413028.hawkr.payment.grpc.DecryptPayUniResultRequest\x1aD.io.github.will413028.hawkr.payment.grpc.DecryptPayUniResultResponse\x12\xaf\x01\n" +
 	"\x18ValidateApplePayMerchant\x12H.io.github.will413028.hawkr.payment.grpc.ValidateApplePayMerchantRequest\x1aI.io.github.will413028.hawkr.payment.grpc.ValidateApplePayMerchantResponse\x12\xa3\x01\n" +
 	"\x14AckAtmRefundAccepted\x12D.io.github.will413028.hawkr.payment.grpc.AckAtmRefundAcceptedRequest\x1aE.io.github.will413028.hawkr.payment.grpc.AckAtmRefundAcceptedResponse\x12\xc4\x01\n" +
@@ -6356,7 +5793,7 @@ func file_payment_payment_proto_rawDescGZIP() []byte {
 	return file_payment_payment_proto_rawDescData
 }
 
-var file_payment_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 82)
+var file_payment_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 76)
 var file_payment_payment_proto_goTypes = []any{
 	(*CreatePaymentRequest)(nil),                          // 0: io.github.will413028.hawkr.payment.grpc.CreatePaymentRequest
 	(*CreatePaymentResponse)(nil),                         // 1: io.github.will413028.hawkr.payment.grpc.CreatePaymentResponse
@@ -6432,14 +5869,8 @@ var file_payment_payment_proto_goTypes = []any{
 	(*GetPaymentFactsInternalRequest)(nil),                // 71: io.github.will413028.hawkr.payment.grpc.GetPaymentFactsInternalRequest
 	(*GetPaymentFactsInternalResponse)(nil),               // 72: io.github.will413028.hawkr.payment.grpc.GetPaymentFactsInternalResponse
 	(*PaymentFactsData)(nil),                              // 73: io.github.will413028.hawkr.payment.grpc.PaymentFactsData
-	(*SubmitAgentFeeRequest)(nil),                         // 74: io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeRequest
-	(*SubmitAgentFeeResponse)(nil),                        // 75: io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeResponse
-	(*SubmitAgentFeeData)(nil),                            // 76: io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeData
-	(*QueryAgentFeeRequest)(nil),                          // 77: io.github.will413028.hawkr.payment.grpc.QueryAgentFeeRequest
-	(*QueryAgentFeeResponse)(nil),                         // 78: io.github.will413028.hawkr.payment.grpc.QueryAgentFeeResponse
-	(*QueryAgentFeeData)(nil),                             // 79: io.github.will413028.hawkr.payment.grpc.QueryAgentFeeData
-	nil,                                                   // 80: io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
-	nil,                                                   // 81: io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.EntriesEntry
+	nil,                                                   // 74: io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
+	nil,                                                   // 75: io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.EntriesEntry
 }
 var file_payment_payment_proto_depIdxs = []int32{
 	2,  // 0: io.github.will413028.hawkr.payment.grpc.CreatePaymentResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.PaymentResult
@@ -6451,8 +5882,8 @@ var file_payment_payment_proto_depIdxs = []int32{
 	6,  // 6: io.github.will413028.hawkr.payment.grpc.SyncPaymentStatusResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.PaymentDetail
 	6,  // 7: io.github.will413028.hawkr.payment.grpc.GetActivePaymentStatusByOrderNoResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.PaymentDetail
 	28, // 8: io.github.will413028.hawkr.payment.grpc.CreateRefundResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.RefundDetail
-	80, // 9: io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.entries:type_name -> io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
-	81, // 10: io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.entries:type_name -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.EntriesEntry
+	74, // 9: io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.entries:type_name -> io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry
+	75, // 10: io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.entries:type_name -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.EntriesEntry
 	28, // 11: io.github.will413028.hawkr.payment.grpc.GetRefundResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.RefundDetail
 	28, // 12: io.github.will413028.hawkr.payment.grpc.GetRefundsByTradeNoResponse.refunds:type_name -> io.github.will413028.hawkr.payment.grpc.RefundDetail
 	41, // 13: io.github.will413028.hawkr.payment.grpc.GrantPaymentResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.GrantPaymentResult
@@ -6467,77 +5898,71 @@ var file_payment_payment_proto_depIdxs = []int32{
 	67, // 22: io.github.will413028.hawkr.payment.grpc.ListGrantsForAdminResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.ListGrantsForAdminData
 	68, // 23: io.github.will413028.hawkr.payment.grpc.ListGrantsForAdminData.records:type_name -> io.github.will413028.hawkr.payment.grpc.AdminGrantSummary
 	73, // 24: io.github.will413028.hawkr.payment.grpc.GetPaymentFactsInternalResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.PaymentFactsData
-	76, // 25: io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeData
-	79, // 26: io.github.will413028.hawkr.payment.grpc.QueryAgentFeeResponse.data:type_name -> io.github.will413028.hawkr.payment.grpc.QueryAgentFeeData
-	29, // 27: io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry.value:type_name -> io.github.will413028.hawkr.payment.grpc.ProviderStatusEntry
-	29, // 28: io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.EntriesEntry.value:type_name -> io.github.will413028.hawkr.payment.grpc.ProviderStatusEntry
-	0,  // 29: io.github.will413028.hawkr.payment.grpc.PaymentService.CreatePayment:input_type -> io.github.will413028.hawkr.payment.grpc.CreatePaymentRequest
-	4,  // 30: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPayment:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentRequest
-	7,  // 31: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentHistory:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentHistoryRequest
-	9,  // 32: io.github.will413028.hawkr.payment.grpc.PaymentService.GetSellerPaymentHistory:input_type -> io.github.will413028.hawkr.payment.grpc.GetSellerPaymentHistoryRequest
-	11, // 33: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPublicPaymentStatus:input_type -> io.github.will413028.hawkr.payment.grpc.GetPublicPaymentStatusRequest
-	18, // 34: io.github.will413028.hawkr.payment.grpc.PaymentService.SyncPaymentStatus:input_type -> io.github.will413028.hawkr.payment.grpc.SyncPaymentStatusRequest
-	20, // 35: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePayment:input_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentRequest
-	22, // 36: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePaymentByOrderNo:input_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentByOrderNoRequest
-	24, // 37: io.github.will413028.hawkr.payment.grpc.PaymentService.GetActivePaymentStatusByOrderNo:input_type -> io.github.will413028.hawkr.payment.grpc.GetActivePaymentStatusByOrderNoRequest
-	26, // 38: io.github.will413028.hawkr.payment.grpc.PaymentService.CreateRefund:input_type -> io.github.will413028.hawkr.payment.grpc.CreateRefundRequest
-	35, // 39: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefund:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundRequest
-	37, // 40: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundsByTradeNo:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundsByTradeNoRequest
-	14, // 41: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentReturnPage:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentReturnPageRequest
-	16, // 42: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentRedirectForm:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentRedirectFormRequest
-	39, // 43: io.github.will413028.hawkr.payment.grpc.PaymentService.GrantPayment:input_type -> io.github.will413028.hawkr.payment.grpc.GrantPaymentRequest
-	42, // 44: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundPageUrl:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundPageUrlRequest
-	30, // 45: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetProviderStatusByOrderIds:input_type -> io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsRequest
-	32, // 46: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByCaseIds:input_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusByCaseIdsRequest
-	33, // 47: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByOrderIds:input_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusByOrderIdsRequest
-	45, // 48: io.github.will413028.hawkr.payment.grpc.PaymentService.HandlePaymentPageReturn:input_type -> io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnRequest
-	74, // 49: io.github.will413028.hawkr.payment.grpc.PaymentService.SubmitAgentFee:input_type -> io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeRequest
-	77, // 50: io.github.will413028.hawkr.payment.grpc.PaymentService.QueryAgentFee:input_type -> io.github.will413028.hawkr.payment.grpc.QueryAgentFeeRequest
-	47, // 51: io.github.will413028.hawkr.payment.grpc.PaymentService.DecryptPayUniResult:input_type -> io.github.will413028.hawkr.payment.grpc.DecryptPayUniResultRequest
-	69, // 52: io.github.will413028.hawkr.payment.grpc.PaymentService.ValidateApplePayMerchant:input_type -> io.github.will413028.hawkr.payment.grpc.ValidateApplePayMerchantRequest
-	50, // 53: io.github.will413028.hawkr.payment.grpc.PaymentService.AckAtmRefundAccepted:input_type -> io.github.will413028.hawkr.payment.grpc.AckAtmRefundAcceptedRequest
-	52, // 54: io.github.will413028.hawkr.payment.grpc.PaymentService.ListPaymentTransactionsForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.ListPaymentTransactionsForAdminRequest
-	56, // 55: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentTransactionForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentTransactionForAdminRequest
-	59, // 56: io.github.will413028.hawkr.payment.grpc.PaymentService.ListRefundsForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.ListRefundsForAdminRequest
-	63, // 57: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundForAdminRequest
-	65, // 58: io.github.will413028.hawkr.payment.grpc.PaymentService.ListGrantsForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.ListGrantsForAdminRequest
-	71, // 59: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentFactsInternal:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentFactsInternalRequest
-	1,  // 60: io.github.will413028.hawkr.payment.grpc.PaymentService.CreatePayment:output_type -> io.github.will413028.hawkr.payment.grpc.CreatePaymentResponse
-	5,  // 61: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPayment:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentResponse
-	8,  // 62: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentHistory:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentHistoryResponse
-	10, // 63: io.github.will413028.hawkr.payment.grpc.PaymentService.GetSellerPaymentHistory:output_type -> io.github.will413028.hawkr.payment.grpc.GetSellerPaymentHistoryResponse
-	12, // 64: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPublicPaymentStatus:output_type -> io.github.will413028.hawkr.payment.grpc.GetPublicPaymentStatusResponse
-	19, // 65: io.github.will413028.hawkr.payment.grpc.PaymentService.SyncPaymentStatus:output_type -> io.github.will413028.hawkr.payment.grpc.SyncPaymentStatusResponse
-	21, // 66: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePayment:output_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentResponse
-	23, // 67: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePaymentByOrderNo:output_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentByOrderNoResponse
-	25, // 68: io.github.will413028.hawkr.payment.grpc.PaymentService.GetActivePaymentStatusByOrderNo:output_type -> io.github.will413028.hawkr.payment.grpc.GetActivePaymentStatusByOrderNoResponse
-	27, // 69: io.github.will413028.hawkr.payment.grpc.PaymentService.CreateRefund:output_type -> io.github.will413028.hawkr.payment.grpc.CreateRefundResponse
-	36, // 70: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefund:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundResponse
-	38, // 71: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundsByTradeNo:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundsByTradeNoResponse
-	15, // 72: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentReturnPage:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentReturnPageResponse
-	17, // 73: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentRedirectForm:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentRedirectFormResponse
-	40, // 74: io.github.will413028.hawkr.payment.grpc.PaymentService.GrantPayment:output_type -> io.github.will413028.hawkr.payment.grpc.GrantPaymentResponse
-	43, // 75: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundPageUrl:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundPageUrlResponse
-	31, // 76: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetProviderStatusByOrderIds:output_type -> io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse
-	34, // 77: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByCaseIds:output_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse
-	34, // 78: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByOrderIds:output_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse
-	46, // 79: io.github.will413028.hawkr.payment.grpc.PaymentService.HandlePaymentPageReturn:output_type -> io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnResponse
-	75, // 80: io.github.will413028.hawkr.payment.grpc.PaymentService.SubmitAgentFee:output_type -> io.github.will413028.hawkr.payment.grpc.SubmitAgentFeeResponse
-	78, // 81: io.github.will413028.hawkr.payment.grpc.PaymentService.QueryAgentFee:output_type -> io.github.will413028.hawkr.payment.grpc.QueryAgentFeeResponse
-	48, // 82: io.github.will413028.hawkr.payment.grpc.PaymentService.DecryptPayUniResult:output_type -> io.github.will413028.hawkr.payment.grpc.DecryptPayUniResultResponse
-	70, // 83: io.github.will413028.hawkr.payment.grpc.PaymentService.ValidateApplePayMerchant:output_type -> io.github.will413028.hawkr.payment.grpc.ValidateApplePayMerchantResponse
-	51, // 84: io.github.will413028.hawkr.payment.grpc.PaymentService.AckAtmRefundAccepted:output_type -> io.github.will413028.hawkr.payment.grpc.AckAtmRefundAcceptedResponse
-	53, // 85: io.github.will413028.hawkr.payment.grpc.PaymentService.ListPaymentTransactionsForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.ListPaymentTransactionsForAdminResponse
-	57, // 86: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentTransactionForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentTransactionForAdminResponse
-	60, // 87: io.github.will413028.hawkr.payment.grpc.PaymentService.ListRefundsForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.ListRefundsForAdminResponse
-	64, // 88: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundForAdminResponse
-	66, // 89: io.github.will413028.hawkr.payment.grpc.PaymentService.ListGrantsForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.ListGrantsForAdminResponse
-	72, // 90: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentFactsInternal:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentFactsInternalResponse
-	60, // [60:91] is the sub-list for method output_type
-	29, // [29:60] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	29, // 25: io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse.EntriesEntry.value:type_name -> io.github.will413028.hawkr.payment.grpc.ProviderStatusEntry
+	29, // 26: io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse.EntriesEntry.value:type_name -> io.github.will413028.hawkr.payment.grpc.ProviderStatusEntry
+	0,  // 27: io.github.will413028.hawkr.payment.grpc.PaymentService.CreatePayment:input_type -> io.github.will413028.hawkr.payment.grpc.CreatePaymentRequest
+	4,  // 28: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPayment:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentRequest
+	7,  // 29: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentHistory:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentHistoryRequest
+	9,  // 30: io.github.will413028.hawkr.payment.grpc.PaymentService.GetSellerPaymentHistory:input_type -> io.github.will413028.hawkr.payment.grpc.GetSellerPaymentHistoryRequest
+	11, // 31: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPublicPaymentStatus:input_type -> io.github.will413028.hawkr.payment.grpc.GetPublicPaymentStatusRequest
+	18, // 32: io.github.will413028.hawkr.payment.grpc.PaymentService.SyncPaymentStatus:input_type -> io.github.will413028.hawkr.payment.grpc.SyncPaymentStatusRequest
+	20, // 33: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePayment:input_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentRequest
+	22, // 34: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePaymentByOrderNo:input_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentByOrderNoRequest
+	24, // 35: io.github.will413028.hawkr.payment.grpc.PaymentService.GetActivePaymentStatusByOrderNo:input_type -> io.github.will413028.hawkr.payment.grpc.GetActivePaymentStatusByOrderNoRequest
+	26, // 36: io.github.will413028.hawkr.payment.grpc.PaymentService.CreateRefund:input_type -> io.github.will413028.hawkr.payment.grpc.CreateRefundRequest
+	35, // 37: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefund:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundRequest
+	37, // 38: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundsByTradeNo:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundsByTradeNoRequest
+	14, // 39: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentReturnPage:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentReturnPageRequest
+	16, // 40: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentRedirectForm:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentRedirectFormRequest
+	39, // 41: io.github.will413028.hawkr.payment.grpc.PaymentService.GrantPayment:input_type -> io.github.will413028.hawkr.payment.grpc.GrantPaymentRequest
+	42, // 42: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundPageUrl:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundPageUrlRequest
+	30, // 43: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetProviderStatusByOrderIds:input_type -> io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsRequest
+	32, // 44: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByCaseIds:input_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusByCaseIdsRequest
+	33, // 45: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByOrderIds:input_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusByOrderIdsRequest
+	45, // 46: io.github.will413028.hawkr.payment.grpc.PaymentService.HandlePaymentPageReturn:input_type -> io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnRequest
+	47, // 47: io.github.will413028.hawkr.payment.grpc.PaymentService.DecryptPayUniResult:input_type -> io.github.will413028.hawkr.payment.grpc.DecryptPayUniResultRequest
+	69, // 48: io.github.will413028.hawkr.payment.grpc.PaymentService.ValidateApplePayMerchant:input_type -> io.github.will413028.hawkr.payment.grpc.ValidateApplePayMerchantRequest
+	50, // 49: io.github.will413028.hawkr.payment.grpc.PaymentService.AckAtmRefundAccepted:input_type -> io.github.will413028.hawkr.payment.grpc.AckAtmRefundAcceptedRequest
+	52, // 50: io.github.will413028.hawkr.payment.grpc.PaymentService.ListPaymentTransactionsForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.ListPaymentTransactionsForAdminRequest
+	56, // 51: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentTransactionForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentTransactionForAdminRequest
+	59, // 52: io.github.will413028.hawkr.payment.grpc.PaymentService.ListRefundsForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.ListRefundsForAdminRequest
+	63, // 53: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.GetRefundForAdminRequest
+	65, // 54: io.github.will413028.hawkr.payment.grpc.PaymentService.ListGrantsForAdmin:input_type -> io.github.will413028.hawkr.payment.grpc.ListGrantsForAdminRequest
+	71, // 55: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentFactsInternal:input_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentFactsInternalRequest
+	1,  // 56: io.github.will413028.hawkr.payment.grpc.PaymentService.CreatePayment:output_type -> io.github.will413028.hawkr.payment.grpc.CreatePaymentResponse
+	5,  // 57: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPayment:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentResponse
+	8,  // 58: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentHistory:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentHistoryResponse
+	10, // 59: io.github.will413028.hawkr.payment.grpc.PaymentService.GetSellerPaymentHistory:output_type -> io.github.will413028.hawkr.payment.grpc.GetSellerPaymentHistoryResponse
+	12, // 60: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPublicPaymentStatus:output_type -> io.github.will413028.hawkr.payment.grpc.GetPublicPaymentStatusResponse
+	19, // 61: io.github.will413028.hawkr.payment.grpc.PaymentService.SyncPaymentStatus:output_type -> io.github.will413028.hawkr.payment.grpc.SyncPaymentStatusResponse
+	21, // 62: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePayment:output_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentResponse
+	23, // 63: io.github.will413028.hawkr.payment.grpc.PaymentService.ClosePaymentByOrderNo:output_type -> io.github.will413028.hawkr.payment.grpc.ClosePaymentByOrderNoResponse
+	25, // 64: io.github.will413028.hawkr.payment.grpc.PaymentService.GetActivePaymentStatusByOrderNo:output_type -> io.github.will413028.hawkr.payment.grpc.GetActivePaymentStatusByOrderNoResponse
+	27, // 65: io.github.will413028.hawkr.payment.grpc.PaymentService.CreateRefund:output_type -> io.github.will413028.hawkr.payment.grpc.CreateRefundResponse
+	36, // 66: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefund:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundResponse
+	38, // 67: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundsByTradeNo:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundsByTradeNoResponse
+	15, // 68: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentReturnPage:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentReturnPageResponse
+	17, // 69: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentRedirectForm:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentRedirectFormResponse
+	40, // 70: io.github.will413028.hawkr.payment.grpc.PaymentService.GrantPayment:output_type -> io.github.will413028.hawkr.payment.grpc.GrantPaymentResponse
+	43, // 71: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundPageUrl:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundPageUrlResponse
+	31, // 72: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetProviderStatusByOrderIds:output_type -> io.github.will413028.hawkr.payment.grpc.BatchGetProviderStatusByOrderIdsResponse
+	34, // 73: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByCaseIds:output_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse
+	34, // 74: io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetRefundProviderStatusByOrderIds:output_type -> io.github.will413028.hawkr.payment.grpc.BatchGetRefundProviderStatusResponse
+	46, // 75: io.github.will413028.hawkr.payment.grpc.PaymentService.HandlePaymentPageReturn:output_type -> io.github.will413028.hawkr.payment.grpc.HandlePaymentPageReturnResponse
+	48, // 76: io.github.will413028.hawkr.payment.grpc.PaymentService.DecryptPayUniResult:output_type -> io.github.will413028.hawkr.payment.grpc.DecryptPayUniResultResponse
+	70, // 77: io.github.will413028.hawkr.payment.grpc.PaymentService.ValidateApplePayMerchant:output_type -> io.github.will413028.hawkr.payment.grpc.ValidateApplePayMerchantResponse
+	51, // 78: io.github.will413028.hawkr.payment.grpc.PaymentService.AckAtmRefundAccepted:output_type -> io.github.will413028.hawkr.payment.grpc.AckAtmRefundAcceptedResponse
+	53, // 79: io.github.will413028.hawkr.payment.grpc.PaymentService.ListPaymentTransactionsForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.ListPaymentTransactionsForAdminResponse
+	57, // 80: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentTransactionForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentTransactionForAdminResponse
+	60, // 81: io.github.will413028.hawkr.payment.grpc.PaymentService.ListRefundsForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.ListRefundsForAdminResponse
+	64, // 82: io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.GetRefundForAdminResponse
+	66, // 83: io.github.will413028.hawkr.payment.grpc.PaymentService.ListGrantsForAdmin:output_type -> io.github.will413028.hawkr.payment.grpc.ListGrantsForAdminResponse
+	72, // 84: io.github.will413028.hawkr.payment.grpc.PaymentService.GetPaymentFactsInternal:output_type -> io.github.will413028.hawkr.payment.grpc.GetPaymentFactsInternalResponse
+	56, // [56:85] is the sub-list for method output_type
+	27, // [27:56] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_payment_payment_proto_init() }
@@ -6546,15 +5971,13 @@ func file_payment_payment_proto_init() {
 		return
 	}
 	file_payment_payment_proto_msgTypes[73].OneofWrappers = []any{}
-	file_payment_payment_proto_msgTypes[74].OneofWrappers = []any{}
-	file_payment_payment_proto_msgTypes[79].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_payment_payment_proto_rawDesc), len(file_payment_payment_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   82,
+			NumMessages:   76,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

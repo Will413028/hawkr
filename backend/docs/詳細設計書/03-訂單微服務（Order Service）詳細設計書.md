@@ -1273,7 +1273,6 @@ message FinancialLogView { string type = 1; string amount = 2; string external_t
 rpc GetOrderForPayment(GetOrderForPaymentRequest) returns (GetOrderForPaymentResponse);
 rpc SnapshotPaymentInfo(SnapshotPaymentInfoRequest) returns (SnapshotPaymentInfoResponse);
 rpc GetOrderForShipping(GetOrderForShippingRequest) returns (GetOrderForShippingResponse);
-rpc GetOrderByShipTradeNo(GetOrderByShipTradeNoRequest) returns (GetOrderByShipTradeNoResponse);
 rpc GetOrderForReview(GetOrderForReviewRequest) returns (GetOrderForReviewResponse);
 rpc GetOrderForAfterSales(GetOrderForAfterSalesRequest) returns (GetOrderForAfterSalesResponse);
 rpc CancelOrderInternal(CancelOrderInternalRequest) returns (CancelOrderInternalResponse);
@@ -1295,9 +1294,6 @@ message OrderShippingInfo {
   string shipping_method = 11; string product_name = 12; string mer_id = 13;
   string delivery_temp = 14; string dimension_sum = 15;
 }
-
-message GetOrderByShipTradeNoRequest { string ship_trade_no = 1; }
-message GetOrderByShipTradeNoResponse { int32 code = 1; string message = 2; OrderDetailView data = 3; }
 
 message GetOrderForAfterSalesRequest { string order_no = 1; }
 message GetOrderForAfterSalesResponse { int32 code = 1; string message = 2; OrderAfterSalesView data = 3; }
@@ -1346,7 +1342,7 @@ message GetSellerOrderStatusCountsResponse {
 |---|---|
 | `GetOrder`（買家視角）且 `status == PENDING_PAYMENT` | `PaymentMethodLimitRules.resolveAvailability(total_actual_amount)` |
 | 其他狀態（已付 / 已取消 / …） | 空清單（非 pending 不能再 `CreatePayment`，回付款方式為噪音） |
-| `GetSellerOrderDetail` / `GetAdminOrderDetail` / `GetOrderByShipTradeNo` 等非買家 caller | 空清單（賣家 / 管理員 / 物流不付款；避免污染共用 `OrderDetailView`） |
+| `GetSellerOrderDetail` / `GetAdminOrderDetail` 等非買家 caller | 空清單（賣家 / 管理員 / 物流不付款；避免污染共用 `OrderDetailView`） |
 
 > **實作約束**：`OrderProtoConverter.toDetailView(...)` 為 5 個 caller 共用的 static 組裝方法，**禁止**把 availability 塞進去（會洩漏到賣家 / 管理員 / 物流回應）。比照既有 `OrderGrpcService.enrichProvider(...)` 的 per-caller `toBuilder().build()` pattern，新增 `enrichAvailablePaymentMethods(base, order)`，**僅在 `OrderGrpcService.getOrder`（買家路徑）呼叫**，內部再以 `status == PENDING_PAYMENT` 守門。
 

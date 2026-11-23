@@ -79,8 +79,7 @@ class GetRefundPageUrlBalanceTest {
                 paymentService, paymentCloseService, pageService, refundService,
                 cryptoService, notifyHandler, webhookMapper,
                 transactionTemplate, objectMapper, auditLogger, transactionRepository,
-                refundRepository, adminQueryService, paymentLogMapper, applePayMerchantValidator,
-                mock(io.github.will413028.hawkr.payment.agentfee.AgentFeeService.class));
+                refundRepository, adminQueryService, paymentLogMapper, applePayMerchantValidator);
     }
 
     private PaymentDetailResponse paidAtm(String tradeNo, long amount) {

@@ -6,7 +6,6 @@ import io.github.will413028.hawkr.common.utils.code.ReceiptStatus;
 import io.github.will413028.hawkr.order.constant.OrderConstants;
 import io.github.will413028.hawkr.order.entity.BuyerMerchantSummaryResult;
 import io.github.will413028.hawkr.order.entity.BuyerSellerOrderResult;
-import io.github.will413028.hawkr.order.entity.OrderAggregateResult;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.entity.OrderStatusCountResult;
 import io.github.will413028.hawkr.order.entity.ReviewSnapshot;
@@ -358,9 +357,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
             @Param("fullyRefunded") String fullyRefunded,
             @Param("cancelled") String cancelled
     );
-
-    @Select("SELECT * FROM orders WHERE shipment_no = #{shipmentNo}")
-    OrderEntity findByShipmentNo(@Param("shipmentNo") String shipmentNo);
 
     /**
      * 根據 checkout_id 查詢訂單（冪等檢查用）
@@ -780,8 +776,7 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
      *   <li>更關鍵：FULL 路徑<b>不維護</b> {@code refund_total_amount}（applyFullRefund 只做
      *       狀態 CAS），納入只會顯示「金額 X／退回 0」這種錯誤資訊。crm-service 也是同一個
      *       判斷（{@code crm.go}「FULL_REFUND does not trust order-service's
-     *       refund_total_amount (known unreliable on that path)」），且
-     *       {@link #findOrderAggregates} 對 70 一律淨額計 0。</li>
+     *       refund_total_amount (known unreliable on that path)」）。</li>
      * </ol>
      */
     private static List<String> spendingRecordStatuses() {
@@ -1059,41 +1054,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
             @Param("endMs") long endMs,
             @Param("qualifyingStatuses") List<String> qualifyingStatuses
     );
-
-    /**
-     * CRM 訂單聚合（issue #1519，GetOrderAggregates）：單一 GROUP BY，非逐單掃描。
-     * status 排除 PENDING_PAYMENT('0') 與 CANCELLED('80')；PARTIALLY_REFUNDED('60') 扣
-     * refund_total_amount；FULLY_REFUNDED('70') 淨額計 0。storeId=0 表示不篩選。
-     */
-    @Select("""
-        WITH agg AS (
-          SELECT store_id, buyer_id,
-                 COUNT(*) AS order_count,
-                 SUM(CASE
-                       WHEN status = '70' THEN 0
-                       WHEN status = '60' THEN total_actual_amount - refund_total_amount
-                       ELSE total_actual_amount
-                     END) AS total_net_amount
-          FROM orders
-          WHERE status IN ('10','20','30','32','35','40','50','60','70')
-            AND (#{storeId} = 0 OR store_id = #{storeId})
-          GROUP BY store_id, buyer_id
-        )
-        SELECT * FROM agg ORDER BY store_id, buyer_id LIMIT #{size} OFFSET #{offset}
-        """)
-    List<OrderAggregateResult> findOrderAggregates(
-            @Param("storeId") long storeId, @Param("size") int size, @Param("offset") int offset);
-
-    @Select("""
-        SELECT COUNT(*) FROM (
-          SELECT store_id, buyer_id
-          FROM orders
-          WHERE status IN ('10','20','30','32','35','40','50','60','70')
-            AND (#{storeId} = 0 OR store_id = #{storeId})
-          GROUP BY store_id, buyer_id
-        ) t
-        """)
-    long countOrderAggregates(@Param("storeId") long storeId);
 
     /**
      * 售後內部取消訂單：CAS 狀態更新 + 取消原因/備註/角色 + 清 processing_deadline（03 §5.3.1）

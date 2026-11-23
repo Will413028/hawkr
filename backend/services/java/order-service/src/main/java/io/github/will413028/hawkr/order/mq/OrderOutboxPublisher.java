@@ -133,8 +133,7 @@ public class OrderOutboxPublisher {
      * <p>讀 core payload 的 {@code storeId} / {@code buyerId}（本地事實、原始業務鍵），
      * 反解析成登入 {@code account_id} 填進 {@code notifySellerAccountId} /
      * {@code notifyBuyerAccountId}（notification 路由用）。
-     * {@code storeId} / {@code buyerId} 本身<b>維持原始值不動</b>——crm-service 的統計與
-     * {@code GetOrderAggregates} reconcile 以它們為 key。
+     * {@code storeId} / {@code buyerId} 本身<b>維持原始值不動</b>——crm-service 的統計以它們為 key。
      *
      * <p>反解析失敗帶 0（notification-service 端 skip），與原 TX 外直發的降級行為逐字相同；
      * 不阻斷派送（阻斷會讓整筆事件卡在 outbox 重試，代價高於一則路由不到的通知）。
