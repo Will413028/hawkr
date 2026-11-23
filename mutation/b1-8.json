@@ -143,6 +143,15 @@
    "new": "if true {",
    "test": "internal/httpapi/seller ^TestOwnDocumentMidStreamReadFailureAbortsAndLogsError$",
    "why": "讀取端中途失敗退回只記 warn，和 client 斷線分不出來"
+  },
+  {
+   "id": "report-copy-rounds-gone-source-not-found",
+   "stack": "go",
+   "file": "backend/internal/modules/moderation/internal/report/report.go",
+   "old": "\tif sourceGone {\n\t\treturn apperr.NotFound(",
+   "new": "\tif false {\n\t\treturn apperr.NotFound(",
+   "test": "internal/modules/moderation/internal/report ^TestCopyRoundsExhaustedReportsAGoneSourceAsNotFoundAndOtherwiseAPlainError$",
+   "why": "來源圖片已刪除時複製輪數用盡，退回「內容仍在變動」而不是找不到內容"
   }
  ]
 }

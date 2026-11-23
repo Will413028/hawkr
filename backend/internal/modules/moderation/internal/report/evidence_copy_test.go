@@ -142,3 +142,12 @@ func TestCopySourcesPropagatesTheErrorKindAndRejectsNonUUIDs(t *testing.T) {
 		t.Fatalf("不是 UUID 的資產 ID 是資料錯誤：%v", err)
 	}
 }
+
+func TestCopyRoundsExhaustedReportsAGoneSourceAsNotFoundAndOtherwiseAPlainError(t *testing.T) {
+	if err := copyRoundsExhausted(t.Context(), true); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("來源圖片已刪除要回 NotFound：%v", err)
+	}
+	if err := copyRoundsExhausted(t.Context(), false); err == nil || apperr.KindOf(err) == apperr.KindNotFound {
+		t.Fatalf("內容一直在變動不是 NotFound：%v", err)
+	}
+}

@@ -128,6 +128,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 		return model.SubmitResult{}, err
 	}
 	copies := map[string]string{}
+	sourceGone := false
 	for attempts, rounds := 0, 0; attempts < maxAttempts; {
 		var out model.SubmitResult
 		err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -139,12 +140,13 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 		switch {
 		case errors.As(err, &need):
 			if rounds++; rounds > maxCopyRounds {
-				return model.SubmitResult{}, fmt.Errorf("moderation：送出檢舉連續 %d 輪複製證據圖片，內容仍在變動", maxCopyRounds)
+				return model.SubmitResult{}, copyRoundsExhausted(ctx, sourceGone)
 			}
 			if err := s.copySources(ctx, in, need.sources, copies); err != nil {
 				if apperr.KindOf(err) != apperr.KindNotFound {
 					return model.SubmitResult{}, err
 				}
+				sourceGone = true
 				attempts++
 			}
 		case errors.Is(err, errRetry):
@@ -154,6 +156,14 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 		}
 	}
 	return model.SubmitResult{}, fmt.Errorf("moderation：送出檢舉連續 %d 次遇到並行競爭", maxAttempts)
+}
+
+// copyRoundsExhausted 是複製輪數用盡的錯誤：曾有來源圖片複製時回 NotFound、內容卻仍引用它（圖片已被刪除），對檢舉人而言是內容不存在；否則是內容一直在變動。
+func copyRoundsExhausted(ctx context.Context, sourceGone bool) error {
+	if sourceGone {
+		return apperr.NotFound("%s", moderationtext.ReportContentNotFound(uitext.LocaleFrom(ctx)))
+	}
+	return fmt.Errorf("moderation：送出檢舉連續 %d 輪複製證據圖片，內容仍在變動", maxCopyRounds)
 }
 
 // uploader 是複本在 media 的上傳者：檢舉人本人的帳號 ID（買家由 stint 解析、店家取店家的帳號），複製與 Confirm 用同一個值。
