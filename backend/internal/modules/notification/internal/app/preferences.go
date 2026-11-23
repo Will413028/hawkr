@@ -20,7 +20,7 @@ type Preference struct {
 	CanDisable bool
 }
 
-// Preferences 列出收件人的偏好：只有註冊表實際會在該 (受眾, 分類, 渠道) 送達的組合（registry.Delivered），順序是分類（D4）再渠道。
+// Preferences 列出收件人的偏好：只有註冊表實際會在該 (受眾, 分類, 渠道) 送達的組合（registry.Delivered），順序是分類再渠道。
 func (s *Service) Preferences(ctx context.Context, r Recipient) ([]Preference, error) {
 	if err := r.validate(); err != nil {
 		return nil, err

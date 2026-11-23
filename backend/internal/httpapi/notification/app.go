@@ -1,7 +1,7 @@
 // Package notification 是 NotificationAppService 的 unary handler：登入的帳號讀寫自己的收件匣、未讀數、偏好與裝置 token。
 //
 // 收件身分是 (帳號, 受眾)：BUYER 是登入的帳號，STORE 要有現任店家（沒有回 not_found），賣家能力 CapNotification 在停權白名單內。
-// 管理員與代行的憑證不走這條（service 是 AppService，interceptor 只放行顧客帳號；代行憑證走各模組的 DelegatedService，D9）。
+// 管理員與代行的憑證不走這條（service 是 AppService，interceptor 只放行顧客帳號；代行憑證走各模組的 DelegatedService）。
 // 通知與裝置 token 的擁有者是帳號，已讀、刪除與 token 不帶受眾。
 package notification
 

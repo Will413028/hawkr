@@ -526,7 +526,7 @@ func TestDeviceTokensRebindToTheCallerAndDeleteOnlyOwn(t *testing.T) {
 }
 
 // 這個 service 只給登入的顧客帳號：沒登入是 unauthenticated；管理員（含代行）是 permission_denied；只帶代行憑證（X-HK-Operation-Session）
-// 的請求不是登入，handler 不會被呼叫（D9）。
+// 的請求不是登入，handler 不會被呼叫。
 func TestOnlyCustomerAccountsReachTheService(t *testing.T) {
 	t.Parallel()
 	s := setup(t)
@@ -553,7 +553,7 @@ func TestOnlyCustomerAccountsReachTheService(t *testing.T) {
 	}
 }
 
-// 串流在 A8-2d 之前是 unimplemented。
+// 串流尚未實作，回 unimplemented。
 func TestWatchNotificationsIsNotImplementedYet(t *testing.T) {
 	t.Parallel()
 	s := setup(t)

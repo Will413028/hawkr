@@ -16,11 +16,11 @@ type Accounts = app.Accounts
 type (
 	// Audience 是通知的收件身分面：BUYER 或 STORE。
 	Audience = model.Audience
-	// Category 是偏好分類（D4、D18）。
+	// Category 是偏好分類。
 	Category = model.PrefCategory
 	// Channel 是通知的渠道：INBOX、PUSH、EMAIL。
 	Channel = model.Channel
-	// Presentation 是收件匣的呈現分類（D6）。
+	// Presentation 是收件匣的呈現分類。
 	Presentation = model.Presentation
 	// Recipient 是收件身分：帳號與受眾；STORE 另帶店家 ID。
 	Recipient = app.Recipient
