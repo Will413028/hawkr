@@ -100,15 +100,6 @@
    "why": "重送不比對讀到的版本：同一個鍵換一個讀到的版本也被當成重送"
   },
   {
-   "id": "rewind-replay-slot-comparison-removed",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
-   "old": "return stored.Question != nil && stored.Question.SlotKey == slotKey(k.slot), nil",
-   "new": "return stored.Question != nil, nil",
-   "test": "internal/modules/procurement/internal/turn ^TestRewindReplayReturnsTheStoredResultAndDetectsADifferentSlot$",
-   "why": "倒回重送不比對欄位：同一個鍵換一個欄位也被當成重送"
-  },
-  {
    "id": "item-answer-accepts-several-matches",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/turn/direct.go",
@@ -170,6 +161,42 @@
    "new": "setFromRevision(*target), slot), st.active.ID, nil",
    "test": "internal/modules/procurement/internal/turn ^TestRewindStepsBackAlongTheAncestorChainAndRunsOut$",
    "why": "倒回的新版本祖先記成被取代的現行版，不是目標版：第二次倒回在兩個值之間來回"
+  },
+  {
+   "id": "answer-replay-slot-comparison-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
+   "new": "return t.CommandSlot != nil && (t.Source == sourceRewind || *t.CommandSlot == string(k.slot)), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerReplayWithADifferentSlotIsInvalidArgument$",
+   "why": "SubmitAnswer 重送不比對欄位：同一把鍵、同一段文字換欄位也被當成重送"
+  },
+  {
+   "id": "rewind-replay-slot-comparison-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/turn/direct.go",
+   "old": "return t.CommandSlot != nil && *t.CommandSlot == string(k.slot), nil",
+   "new": "return t.CommandSlot != nil && (t.Source == sourceAnswer || *t.CommandSlot == string(k.slot)), nil",
+   "test": "internal/modules/procurement/internal/turn ^TestRewindReplayReturnsTheStoredResultAndDetectsADifferentSlot$",
+   "why": "倒回重送不比對欄位：同一把鍵換一個欄位也被當成重送"
+  },
+  {
+   "id": "skip-writes-the-empty-value-and-is-rejected",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/direct_answer.go",
+   "old": "\tif p.skip {\n\t\treturn patch, nil\n\t}\n",
+   "new": "\tif p.skip && p.slot == \"\" {\n\t\treturn patch, nil\n\t}\n",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerDecisionSkipIsNotARejectedInput$",
+   "why": "略過又照常寫入空值：PACKAGING 被 slots 以 EMPTY 拒絕，回覆說輸入被拒絕"
+  },
+  {
+   "id": "skipped-slot-not-deduplicated",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/turn/direct_answer.go",
+   "old": "if !slices.Contains(pt.skipped, p.slot) {",
+   "new": "if true {",
+   "test": "internal/modules/procurement/internal/turn ^TestAnswerDecisionSkippingTheSameSlotTwiceStoresItOnce$",
+   "why": "同一欄位略過兩次，skipped_slots 出現重複"
   }
  ]
 }
