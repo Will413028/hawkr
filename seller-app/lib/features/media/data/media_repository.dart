@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hawkr_api/errors.dart' show DefaultErrorText;
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
+import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hawkr_api/upload.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
@@ -24,17 +26,20 @@ class MediaRepository {
     required Uri filesBase,
     required Future<String?> Function() sessionToken,
     required UiLocale Function() locale,
+    required DefaultErrorText defaults,
   }) : _client = client,
        _http = http,
        _filesBase = filesBase,
        _sessionToken = sessionToken,
-       _locale = locale;
+       _locale = locale,
+       _defaults = defaults;
 
   final MediaAppServiceClient _client;
   final UploadHttp _http;
   final Uri _filesBase;
   final Future<String?> Function() _sessionToken;
   final UiLocale Function() _locale;
+  final DefaultErrorText _defaults;
 
   /// 上傳公開圖片，回傳 READY 的 staged token。
   ///
@@ -72,17 +77,17 @@ class MediaRepository {
       throw UploadRejectedException(message: _rejectText(e.reason));
     } on UploadFailure catch (e, st) {
       HKLog.logE('[MediaRepo] Upload failed', e, st);
-      throw UnknownException(message: '上傳失敗，請稍後再試');
+      throw UnknownException(message: _defaults(Code.unavailable));
     } on AppException {
       rethrow;
     } catch (e, st) {
       HKLog.logE('[MediaRepo] Upload error', e, st);
-      throw UnknownException(message: '上傳失敗，請稍後再試');
+      throw UnknownException(message: _defaults(Code.unavailable));
     }
   }
 
   String _rejectText(RejectReason reason) =>
-      reason.uiText(_locale()) ?? '上傳失敗，請稍後再試';
+      reason.uiText(_locale()) ?? _defaults(Code.internal);
 
   // ============================================================
   // 頭像上傳
@@ -174,7 +179,7 @@ class MediaRepository {
     try {
       final token = await _sessionToken();
       if (token == null || token.isEmpty) {
-        throw const UnauthorizedException(message: '登入已過期，請重新登入');
+        throw UnauthorizedException(message: _defaults(Code.unauthenticated));
       }
       return await uploadSecure(
         client: _client,
@@ -185,12 +190,12 @@ class MediaRepository {
       );
     } on UploadFailure catch (e, st) {
       HKLog.logE('[MediaRepo] Private upload failed', e, st);
-      throw UnknownException(message: '私密文件上傳失敗，請稍後再試');
+      throw UnknownException(message: _defaults(Code.unavailable));
     } on AppException {
       rethrow;
     } catch (e, st) {
       HKLog.logE('[MediaRepo] Private upload error', e, st);
-      throw UnknownException(message: '私密文件上傳失敗，請稍後再試');
+      throw UnknownException(message: _defaults(Code.unavailable));
     }
   }
 
@@ -297,5 +302,6 @@ final mediaRepositoryProvider = Provider<MediaRepository>((ref) {
     filesBase: Uri.parse(F.appFlavor.gatewayHost),
     sessionToken: () => currentSessionToken(ref),
     locale: () => ref.read(uiLocaleProvider),
+    defaults: ref.watch(defaultErrorTextProvider),
   );
 });

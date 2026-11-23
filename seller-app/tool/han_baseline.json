@@ -1060,14 +1060,6 @@
       "您有 {} 筆配送異常": 1,
       "點此查看並處理": 1
     },
-    "lib/features/media/data/media_repository.dart": {
-      "OSS 上傳失敗: {}": 1,
-      "上傳失敗: {}": 1,
-      "私密文件上傳失敗: {}": 1
-    },
-    "lib/features/media/data/private_document_uploader.dart": {
-      "上傳沒有回 staged token": 1
-    },
     "lib/features/media/data/protected_media_remote_service.dart": {
       "媒體下載失敗": 1,
       "媒體下載失敗 ({})": 1,

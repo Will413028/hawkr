@@ -12,6 +12,8 @@ import 'package:hawkr_buyer/features/media/data/media_repository.dart';
 import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 class _Http implements UploadHttp {
+  _Http({this.status = 200});
+  final int status;
   int puts = 0;
 
   @override
@@ -21,7 +23,7 @@ class _Http implements UploadHttp {
     Uint8List body,
   ) async {
     puts++;
-    return const UploadHttpResult(200);
+    return UploadHttpResult(status);
   }
 }
 
@@ -45,6 +47,7 @@ MediaRepository _repo(_Http http, GetUploadResponse Function() poll) {
     client: MediaAppServiceClient(transport),
     http: http,
     locale: () => UiLocale.zhTW,
+    defaults: (code) => 'default:${code.name}',
   );
 }
 
@@ -87,4 +90,24 @@ void main() {
       ),
     );
   });
+
+  test(
+    'a failed transfer carries the catalog default text, not a literal',
+    () async {
+      final repo = _repo(
+        _Http(status: 500),
+        () => GetUploadResponse(state: UploadState.UPLOAD_STATE_READY),
+      );
+      await expectLater(
+        repo.uploadImage(file: await _tmpImage()),
+        throwsA(
+          isA<ServerException>().having(
+            (e) => e.message,
+            'message',
+            'default:unavailable',
+          ),
+        ),
+      );
+    },
+  );
 }

@@ -64,6 +64,7 @@ MediaRepository _repo(
     filesBase: Uri.parse('https://app.example'),
     sessionToken: () async => token,
     locale: () => UiLocale.zhTW,
+    defaults: (code) => 'default:${code.name}',
   );
 }
 
@@ -127,7 +128,13 @@ void main() {
       );
       await expectLater(
         repo.uploadPrivateDocument(bytes: bytes),
-        throwsA(isA<UnauthorizedException>()),
+        throwsA(
+          isA<UnauthorizedException>().having(
+            (e) => e.message,
+            'message',
+            'default:unauthenticated',
+          ),
+        ),
       );
       expect(http.puts, isEmpty);
     },

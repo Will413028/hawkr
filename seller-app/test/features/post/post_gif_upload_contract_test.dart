@@ -144,6 +144,7 @@ class _RecordingMediaRepository extends MediaRepository {
         filesBase: Uri.parse('https://example.test'),
         sessionToken: () async => null,
         locale: () => UiLocale.zhTW,
+        defaults: (code) => code.name,
       );
 
   bool? lastCompress;
