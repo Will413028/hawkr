@@ -98,7 +98,7 @@ func TestOwnCopiesPreservesTheBuyerAvatarLikeAnyOtherEvidenceImage(t *testing.T)
 	src, copyID := uuid.NewV7(), uuid.NewV7()
 	m := &fakeMedia{confirms: map[string]uuid.UUID{"tok-a": copyID}, keys: map[uuid.UUID]string{copyID: "public/copy.jpg"}}
 	s := testService(m)
-	content := snapshot.Content{Kind: model.TargetBuyer, Buyer: &snapshot.Buyer{DisplayName: "小明", Avatar: "avatar/old.jpg", AvatarAssetID: src.String()}}
+	content := snapshot.Content{Kind: model.TargetBuyer, Buyer: &snapshot.Buyer{DisplayName: "小明", AvatarAssetID: src.String()}}
 	sources := content.AssetIDs()
 	if !slices.Equal(sources, []string{src.String()}) {
 		t.Fatalf("頭像要進證據保全：%v", sources)
@@ -107,7 +107,7 @@ func TestOwnCopiesPreservesTheBuyerAvatarLikeAnyOtherEvidenceImage(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Buyer.AvatarAssetID != copyID.String() || got.Buyer.Avatar != "public/copy.jpg" || !slices.Equal(owned, []uuid.UUID{copyID}) {
+	if got.Buyer.AvatarAssetID != copyID.String() || !slices.Equal(owned, []uuid.UUID{copyID}) {
 		t.Fatalf("buyer = %+v owned = %v", got.Buyer, owned)
 	}
 	if content.Buyer.AvatarAssetID != src.String() {

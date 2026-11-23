@@ -194,7 +194,7 @@ func snapshotPB(c *moderation.Snapshot) *adminpb.CaseSnapshot {
 			AuthorKind: x.AuthorKind, AuthorId: rpc.FormatID(x.AuthorID), Body: x.Body, AssetIds: x.MediaRefs, AuthoredTime: optionalTime(x.AuthoredAt),
 		}}}
 	case c.Buyer != nil:
-		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Buyer{Buyer: &adminpb.BuyerSnapshot{DisplayName: c.Buyer.DisplayName, Avatar: c.Buyer.Avatar}}}
+		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Buyer{Buyer: &adminpb.BuyerSnapshot{DisplayName: c.Buyer.DisplayName, AvatarAssetId: c.Buyer.AvatarAssetID}}}
 	case c.Review != nil:
 		x := c.Review
 		return &adminpb.CaseSnapshot{Content: &adminpb.CaseSnapshot_Review{Review: &adminpb.ReviewSnapshot{

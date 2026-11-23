@@ -51,10 +51,9 @@ type ReviewReply struct {
 }
 
 // Buyer 是被檢舉買家的公開檔案。AvatarAssetID 是頭像的 media 資產：檢舉當下是買家的頭像資產，快照建好之後是 moderation 自己的複本
-// （與其他證據圖片同一條保全路徑）；Avatar 是同一個資產的 object key，沒有頭像兩者都是空字串。
+// （與其他證據圖片同一條保全路徑）；沒有頭像是空字串。
 type Buyer struct {
 	DisplayName   string `json:"display_name"`
-	Avatar        string `json:"avatar"`
 	AvatarAssetID string `json:"avatar_asset_id,omitempty"`
 }
 
@@ -184,18 +183,6 @@ func (c Content) Validate() error {
 	return nil
 }
 
-// WithObjectKeys 回傳頭像的 object key 依資產 ID 換成 keyOf 對應值的內容（頭像複本確認之後，快照記複本的 key）：keyOf 沒有的資產維持原樣；不修改傳入的內容。
-func (c Content) WithObjectKeys(keyOf map[string]string) Content {
-	if c.Buyer != nil {
-		if key, ok := keyOf[c.Buyer.AvatarAssetID]; ok {
-			b := *c.Buyer
-			b.Avatar = key
-			c.Buyer = &b
-		}
-	}
-	return c
-}
-
 // ReplaceAssets 回傳把圖片資產 ID 依 to 換掉的內容（證據快照改引用自己的複本）：to 沒有的 ID 維持原樣；不修改傳入的內容。
 func (c Content) ReplaceAssets(to map[string]string) Content {
 	swap := func(in []string) []string {
@@ -264,7 +251,7 @@ func Normalize(c Content) Content {
 	}
 	if c.Buyer != nil {
 		b := *c.Buyer
-		b.DisplayName, b.Avatar, b.AvatarAssetID = trimtext.Trim(b.DisplayName), trimtext.Trim(b.Avatar), trimtext.Trim(b.AvatarAssetID)
+		b.DisplayName, b.AvatarAssetID = trimtext.Trim(b.DisplayName), trimtext.Trim(b.AvatarAssetID)
 		c.Buyer = &b
 	}
 	if c.Review != nil {

@@ -107,6 +107,24 @@
    "new": "await slice.arrayBuffer();",
    "test": "tests/upload.test.ts md5Base64 matches the RFC 1321 test vectors",
    "why": "切片的內容沒有餵進 MD5"
+  },
+  {
+   "id": "admin-buyer-snapshot-exposes-avatar-asset-id",
+   "stack": "go",
+   "file": "backend/internal/httpapi/moderation/admin.go",
+   "old": "AvatarAssetId: c.Buyer.AvatarAssetID}",
+   "new": "AvatarAssetId: \"\"}",
+   "test": "internal/httpapi/moderation ^TestGetCaseMapsEachSnapshotKindToTheOneof$",
+   "why": "後台的買家快照不再帶頭像的資產 ID，看不到頭像"
+  },
+  {
+   "id": "snapshot-buyer-stores-avatar-as-asset-id-only",
+   "stack": "go",
+   "file": "backend/internal/modules/moderation/internal/snapshot/snapshot.go",
+   "old": "`json:\"avatar_asset_id,omitempty\"`",
+   "new": "`json:\"avatar\"`",
+   "test": "internal/modules/moderation/internal/snapshot ^TestBuyerSnapshotStoresOnlyTheAvatarAssetID$",
+   "why": "快照又把頭像存成 avatar 欄位，而不是只存資產 ID"
   }
  ]
 }
