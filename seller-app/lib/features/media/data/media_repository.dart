@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hawkr_api/errors.dart' show DefaultErrorText;
+import 'package:hawkr_api/errors.dart' show DefaultErrorText, errorText;
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/transport.dart' show Code;
 import 'package:hawkr_api/upload.dart';
@@ -82,7 +82,7 @@ class MediaRepository {
       rethrow;
     } catch (e, st) {
       HKLog.logE('[MediaRepo] Upload error', e, st);
-      throw UnknownException(message: _defaults(Code.unavailable));
+      throw UnknownException(message: errorText(e, defaults: _defaults));
     }
   }
 
@@ -195,7 +195,7 @@ class MediaRepository {
       rethrow;
     } catch (e, st) {
       HKLog.logE('[MediaRepo] Private upload error', e, st);
-      throw UnknownException(message: _defaults(Code.unavailable));
+      throw UnknownException(message: errorText(e, defaults: _defaults));
     }
   }
 
