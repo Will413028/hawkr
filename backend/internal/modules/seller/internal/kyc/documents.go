@@ -85,9 +85,7 @@ func (s *Service) confirmUploads(ctx context.Context, in model.KYCDraftInput) ([
 	for i, t := range tokens {
 		items[i] = model.ConfirmItem{Field: t.field, Token: t.token}
 	}
-	assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, items, func(_ int, a media.ConfirmedAsset) string {
-		return media.RequireVisibility(ctx, media.VisibilitySecure, a)
-	})
+	assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, items, media.VisibilitySecure)
 	if err != nil {
 		return nil, err
 	}

@@ -139,9 +139,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 		for i, token := range in.StagedTokens {
 			items[i] = media.ConfirmItem{Field: apperr.IndexedField("StagedTokens", i), Token: token}
 		}
-		assets, err := media.ConfirmFields(ctx, s.d.Media, uploader, items, func(_ int, a media.ConfirmedAsset) string {
-			return media.RequireVisibility(ctx, media.VisibilityPublic, a)
-		})
+		assets, err := media.ConfirmFields(ctx, s.d.Media, uploader, items, media.VisibilityPublic)
 		if err != nil {
 			return err
 		}

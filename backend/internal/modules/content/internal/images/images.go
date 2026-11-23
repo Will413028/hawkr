@@ -66,9 +66,7 @@ func (m *Service) Confirm(ctx context.Context, adminID int64, slots ...Slot) ([]
 			out[i] = Resolved{Field: s.Field, Key: s.Current}
 			continue
 		}
-		a, err := media.ConfirmField(ctx, m.Media, adminUploader(adminID), s.Field, s.Token, func(a media.ConfirmedAsset) string {
-			return media.RequireVisibility(ctx, media.VisibilityPublic, a)
-		})
+		a, err := media.ConfirmField(ctx, m.Media, adminUploader(adminID), s.Field, s.Token, media.VisibilityPublic)
 		if err != nil {
 			return nil, err
 		}

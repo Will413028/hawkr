@@ -17,6 +17,33 @@
    "new": "io.Copy(io.Discard, content.Body)",
    "test": "internal/httpapi/seller ^TestDocumentEndpointAuthorizesAdminsAndMapsErrorsWithoutLeaking$",
    "why": "端點不再把 media 的串流送給 client"
+  },
+  {
+   "id": "confirm-checks-visibility-before-claim",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if model.Visibility(row.Visibility) != want {\n\t\treturn ConfirmedAsset{}, visibilityMismatch(ctx, want)\n\t}",
+   "new": "_ = want",
+   "test": "internal/modules/media ^TestConfirm_VisibilityMismatchIsRejectedBeforeAnyClaim$",
+   "why": "Confirm 不再在寫認領之前檢查可見性，不符的暫存被認領"
+  },
+  {
+   "id": "confirm-fields-forwards-visibility",
+   "stack": "go",
+   "file": "backend/internal/modules/media/confirm_fields.go",
+   "old": "m.Confirm(ctx, uploader, it.Token, want)",
+   "new": "m.Confirm(ctx, uploader, it.Token, VisibilitySecure)",
+   "test": "internal/modules/media ^TestConfirmFieldsReportsEveryRejectedTokenOnItsOwnField$",
+   "why": "ConfirmFields 不把擁有者要的可見性交給 Confirm；機敏欄位的呼叫端會被當成公開"
+  },
+  {
+   "id": "seller-confirm-all-forwards-visibility",
+   "stack": "go",
+   "file": "backend/internal/modules/seller/internal/model/media.go",
+   "old": "return media.ConfirmFields(ctx, m, uploader, items, want)",
+   "new": "return media.ConfirmFields(ctx, m, uploader, items, media.VisibilityPublic)",
+   "test": "internal/modules/seller/internal/model ^TestConfirmAllReportsEveryRejectedItemAndStopsOnOtherErrors$",
+   "why": "ConfirmAll 把機敏檔欄位當成公開確認"
   }
  ]
 }

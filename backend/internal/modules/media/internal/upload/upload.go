@@ -302,14 +302,18 @@ func (s *Service) Get(ctx context.Context, uploader model.Uploader, token string
 
 // Confirm 在擁有者的 transaction 內確認暫存（B1-D25）：只接受 READY、未過期、上傳者相符的列，只新增一列 CONFIRMED 認領，不更新任何 media 既有的列。
 // 同一個 transaction 內重入回同一個資產（資產在同 transaction 已被請求刪除則 MediaAssetUnavailable）；token 已在別的 transaction 確認過回
-// FailedPrecondition，避免一個資產被兩個擁有者共用（B1-D23）。與 GC 搶同一個認領鍵，只有一方成功。ctx 必須帶 transaction，確認才會與業務列一起提交或回滾。
-func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token string) (ConfirmedAsset, error) {
+// FailedPrecondition，避免一個資產被兩個擁有者共用（B1-D23）。與 GC 搶同一個認領鍵，只有一方成功。
+// want 是擁有者要的可見性，暫存的可見性不符回 InvalidInput，在寫認領之前拒絕。ctx 必須帶 transaction，確認才會與業務列一起提交或回滾。
+func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token string, want model.Visibility) (ConfirmedAsset, error) {
 	if err := model.RequireTx(ctx); err != nil {
 		return ConfirmedAsset{}, err
 	}
 	row, err := s.own(ctx, uploader, token)
 	if err != nil {
 		return ConfirmedAsset{}, err
+	}
+	if model.Visibility(row.Visibility) != want {
+		return ConfirmedAsset{}, visibilityMismatch(ctx, want)
 	}
 	assetID, err := s.q(ctx).ClaimUpload(ctx, store.ClaimUploadParams{ID: row.ID, Now: s.d.Now()})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -342,6 +346,14 @@ func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token st
 		return ConfirmedAsset{}, fmt.Errorf("media：暫存上傳 %s 的 CONFIRMED 認領沒有資產", row.ID)
 	}
 	return s.assetOf(ctx, *claim.AssetID, true)
+}
+
+// visibilityMismatch 是暫存的可見性不是擁有者要的：訊息指出要的是公開圖片或機敏檔。
+func visibilityMismatch(ctx context.Context, want model.Visibility) error {
+	if want == model.VisibilitySecure {
+		return apperr.InvalidInput("%s", text.MediaVisibilitySecureRequired(loc(ctx)).Text)
+	}
+	return apperr.InvalidInput("%s", text.MediaVisibilityPublicRequired(loc(ctx)).Text)
 }
 
 // notConfirmable 把「不能確認」的暫存列翻成呼叫端看得到的錯誤。

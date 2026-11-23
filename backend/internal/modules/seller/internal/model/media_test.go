@@ -23,7 +23,7 @@ type stubMedia struct {
 	confirms []string
 }
 
-func (s *stubMedia) Confirm(_ context.Context, _ media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (s *stubMedia) Confirm(_ context.Context, _ media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
 	s.confirms = append(s.confirms, token)
 	if err := s.failures[token]; err != nil {
 		return media.ConfirmedAsset{}, err
@@ -31,6 +31,9 @@ func (s *stubMedia) Confirm(_ context.Context, _ media.Uploader, token string) (
 	vis, ok := s.tokens[token]
 	if !ok {
 		return media.ConfirmedAsset{}, apperr.NotFound("沒有這個 token")
+	}
+	if vis != want {
+		return media.ConfirmedAsset{}, apperr.InvalidInput("可見性不符")
 	}
 	return media.ConfirmedAsset{ID: uuid.NewV7(), ObjectKey: "k/" + token, Visibility: vis}, nil
 }
@@ -61,18 +64,13 @@ func violationFields(t *testing.T, err error) []string {
 	return out
 }
 
-// 不合格的 token（media 拒絕、檢查不過）一次全部回報，各指到自己的欄位；其他錯誤立刻停下、原樣回傳；全部合格時與輸入一一對應。
+// 不合格的 token（media 拒絕、可見性不符）一次全部回報，各指到自己的欄位；其他錯誤立刻停下、原樣回傳；全部合格時與輸入一一對應。
 func TestConfirmAllReportsEveryRejectedItemAndStopsOnOtherErrors(t *testing.T) {
 	m := &stubMedia{
 		tokens:   map[string]media.Visibility{"a": media.VisibilitySecure, "b": media.VisibilityPublic, "c": media.VisibilitySecure},
 		failures: map[string]error{"expired": apperr.FailedPrecondition("已過期"), "down": errors.New("media down")},
 	}
-	secureOnly := func(_ int, a media.ConfirmedAsset) string {
-		if a.Visibility != media.VisibilitySecure {
-			return "必須機敏"
-		}
-		return ""
-	}
+	secureOnly := media.VisibilitySecure
 	items := func(tokens ...string) []ConfirmItem {
 		out := make([]ConfirmItem, len(tokens))
 		for i, token := range tokens {

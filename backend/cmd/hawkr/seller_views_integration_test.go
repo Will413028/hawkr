@@ -37,7 +37,7 @@ func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, erro
 // noMedia 是 seller 的 media port 的替身：這些測試不上傳也不讀檔案。
 type noMedia struct{}
 
-func (noMedia) Confirm(context.Context, media.Uploader, string) (media.ConfirmedAsset, error) {
+func (noMedia) Confirm(context.Context, media.Uploader, string, media.Visibility) (media.ConfirmedAsset, error) {
 	return media.ConfirmedAsset{}, errors.New("not used")
 }
 func (noMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }

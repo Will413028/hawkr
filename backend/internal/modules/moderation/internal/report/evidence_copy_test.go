@@ -30,7 +30,7 @@ func (f *fakeMedia) CopyPublic(_ context.Context, u media.Uploader, src uuid.UUI
 	return media.PutPublicResult{Token: "tok-" + src.String()}, nil
 }
 
-func (f *fakeMedia) Confirm(_ context.Context, u media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (f *fakeMedia) Confirm(_ context.Context, u media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
 	f.confirmed = append(f.confirmed, token)
 	f.uploaders = append(f.uploaders, u)
 	id, ok := f.confirms[token]

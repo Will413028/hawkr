@@ -73,7 +73,7 @@ type Deps struct {
 // 快照的複本只由保留期清理在快照過期時刪除（retention）。
 type Media interface {
 	CopyPublic(ctx context.Context, uploader media.Uploader, sourceID uuid.UUID) (media.PutPublicResult, error)
-	Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error)
+	Confirm(ctx context.Context, uploader media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error)
 }
 
 // needCopies 讓 transaction 回滾：要建新快照，而這些來源圖片還沒有複本。
@@ -217,7 +217,7 @@ func (s *Service) ownCopies(ctx context.Context, in model.SubmitInput, content s
 	to := make(map[string]string, len(sources))
 	owned := make([]uuid.UUID, 0, len(sources))
 	for _, src := range sources {
-		a, err := s.d.Media.Confirm(ctx, up, copies[src])
+		a, err := s.d.Media.Confirm(ctx, up, copies[src], media.VisibilityPublic)
 		if err != nil {
 			return snapshot.Content{}, nil, fmt.Errorf("moderation：確認證據圖片 %s 的複本：%w", src, err)
 		}

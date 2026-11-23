@@ -201,7 +201,7 @@ func (noAccountOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) 
 // ownerMedia 是 social 的 media 替身：每個 staged token 都確認成功，資產 ID 每次新產生。
 type ownerMedia struct{}
 
-func (ownerMedia) Confirm(_ context.Context, _ media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (ownerMedia) Confirm(_ context.Context, _ media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
 	return media.ConfirmedAsset{ID: uuid.NewV7(), ObjectKey: "post/" + token + ".jpg", Visibility: media.VisibilityPublic}, nil
 }
 

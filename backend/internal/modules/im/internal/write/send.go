@@ -81,9 +81,7 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 		if in.Type == model.TypeText {
 			p.Content = &body
 		} else {
-			asset, err := media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: uploader}, "StagedToken", in.StagedToken, func(a media.ConfirmedAsset) string {
-				return media.RequireVisibility(ctx, media.VisibilityPublic, a)
-			})
+			asset, err := media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: uploader}, "StagedToken", in.StagedToken, media.VisibilityPublic)
 			if err != nil {
 				return err
 			}

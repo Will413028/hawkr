@@ -58,7 +58,7 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 // fakeMedia 讓每個 staged token 都確認成功，object key 由 token 組成；以 "gone" 開頭的 token 回 media 的「暫存已失效」。
 type fakeMedia struct{}
 
-func (f *fakeMedia) Confirm(_ context.Context, _ media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (f *fakeMedia) Confirm(_ context.Context, _ media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
 	if strings.HasPrefix(token, "gone") {
 		return media.ConfirmedAsset{}, apperr.FailedPrecondition("圖片已失效，請重新上傳")
 	}

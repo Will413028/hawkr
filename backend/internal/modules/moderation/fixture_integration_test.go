@@ -354,8 +354,8 @@ var stagedUploader = media.Uploader{ID: 1}
 // ownerMedia 是擁有媒體的模組的 media 替身：確認真的 media 模組裡由 stage 建立的暫存，上傳者固定是 stagedUploader。
 type ownerMedia struct{ m *media.Module }
 
-func (o ownerMedia) Confirm(ctx context.Context, _ media.Uploader, token string) (media.ConfirmedAsset, error) {
-	return o.m.Confirm(ctx, stagedUploader, token)
+func (o ownerMedia) Confirm(ctx context.Context, _ media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
+	return o.m.Confirm(ctx, stagedUploader, token, want)
 }
 
 func (o ownerMedia) MarkDeleted(ctx context.Context, ids []uuid.UUID) error {

@@ -55,7 +55,7 @@ func (f *fakeMedia) id(token string) uuid.UUID {
 	return f.ids[token]
 }
 
-func (f *fakeMedia) Confirm(_ context.Context, u media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (f *fakeMedia) Confirm(_ context.Context, u media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
 	if strings.HasPrefix(token, "bad") {
 		return media.ConfirmedAsset{}, errors.New("staged token 無效")
 	}

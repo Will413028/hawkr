@@ -55,7 +55,7 @@ func requireTx(ctx context.Context) error {
 }
 
 // Confirm 是 *Module.Confirm 的替身。
-func (f *Fake) Confirm(ctx context.Context, u Uploader, token string) (ConfirmedAsset, error) {
+func (f *Fake) Confirm(ctx context.Context, u Uploader, token string, want Visibility) (ConfirmedAsset, error) {
 	if err := requireTx(ctx); err != nil {
 		return ConfirmedAsset{}, err
 	}
@@ -70,10 +70,14 @@ func (f *Fake) Confirm(ctx context.Context, u Uploader, token string) (Confirmed
 	}
 	id := AssetFor(token)
 	key := "public/" + token + ".jpg"
+	contentType := "image/jpeg"
+	if want == VisibilitySecure {
+		key, contentType = "secure/"+id.String()+"/", "application/pdf"
+	}
 	if f.Key != nil {
 		key = f.Key(token)
 	}
-	a := ConfirmedAsset{ID: id, ObjectKey: key, Visibility: VisibilityPublic, ContentType: "image/jpeg", SizeBytes: 1}
+	a := ConfirmedAsset{ID: id, ObjectKey: key, Visibility: want, ContentType: contentType, SizeBytes: 1}
 	f.confirmed[id] = a
 	return a, nil
 }

@@ -97,11 +97,11 @@ func TestOwnerTransactionIssuesOnlyAppendsAndReads(t *testing.T) {
 	t.Run("Confirm 新確認、同 transaction 重入、MarkDeleted、重複與空清單", func(t *testing.T) {
 		rec.reset()
 		err := d.InTx(t.Context(), func(ctx context.Context) error {
-			asset, err := m.Confirm(ctx, owner, a.Token)
+			asset, err := m.Confirm(ctx, owner, a.Token, media.VisibilityPublic)
 			if err != nil {
 				return err
 			}
-			if _, err = m.Confirm(ctx, owner, a.Token); err != nil {
+			if _, err = m.Confirm(ctx, owner, a.Token, media.VisibilityPublic); err != nil {
 				return err
 			}
 			if err := m.MarkDeleted(ctx, []uuid.UUID{asset.ID, asset.ID, uuid.New()}); err != nil {
@@ -122,14 +122,14 @@ func TestOwnerTransactionIssuesOnlyAppendsAndReads(t *testing.T) {
 		rec.reset()
 		var reentry error
 		err := d.InTx(t.Context(), func(ctx context.Context) error {
-			asset, err := m.Confirm(ctx, owner, b.Token)
+			asset, err := m.Confirm(ctx, owner, b.Token, media.VisibilityPublic)
 			if err != nil {
 				return err
 			}
 			if err := m.MarkDeleted(ctx, []uuid.UUID{asset.ID}); err != nil {
 				return err
 			}
-			_, reentry = m.Confirm(ctx, owner, b.Token)
+			_, reentry = m.Confirm(ctx, owner, b.Token, media.VisibilityPublic)
 			return nil
 		})
 		if err != nil {
@@ -143,7 +143,7 @@ func TestOwnerTransactionIssuesOnlyAppendsAndReads(t *testing.T) {
 		rec.reset()
 		var elsewhere error
 		err := d.InTx(t.Context(), func(ctx context.Context) error {
-			_, elsewhere = m.Confirm(ctx, owner, a.Token)
+			_, elsewhere = m.Confirm(ctx, owner, a.Token, media.VisibilityPublic)
 			return nil
 		})
 		if err != nil {
@@ -163,7 +163,7 @@ func TestOwnerTransactionIssuesOnlyAppendsAndReads(t *testing.T) {
 		rec.reset()
 		err := d.InTx(t.Context(), func(ctx context.Context) error {
 			_, err := media.ConfirmFields(ctx, m, owner, []media.ConfirmItem{{Field: "c", Token: c.Token}, {Field: "e", Token: e.Token}},
-				func(int, media.ConfirmedAsset) string { return "" })
+				media.VisibilityPublic)
 			return err
 		})
 		if err != nil {
@@ -181,13 +181,13 @@ func TestConfirmThenMarkDeletedSameTxDeletionWins(t *testing.T) {
 	var reentry error
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 		var err error
-		if asset, err = f.m.Confirm(ctx, owner, res.Token); err != nil {
+		if asset, err = f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic); err != nil {
 			return err
 		}
 		if err := f.m.MarkDeleted(ctx, []uuid.UUID{asset.ID}); err != nil {
 			return err
 		}
-		_, reentry = f.m.Confirm(ctx, owner, res.Token)
+		_, reentry = f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic)
 		return nil
 	})
 	if err != nil {
@@ -210,7 +210,7 @@ func TestConfirmThenMarkDeletedSameTxDeletionWins(t *testing.T) {
 	res2 := ready(t, f, owner)
 	errRollback := errors.New("rollback")
 	err = f.d.InTx(t.Context(), func(ctx context.Context) error {
-		a, err := f.m.Confirm(ctx, owner, res2.Token)
+		a, err := f.m.Confirm(ctx, owner, res2.Token, media.VisibilityPublic)
 		if err != nil {
 			return err
 		}
@@ -250,7 +250,7 @@ func testConfirmBlocksOnUncommittedClaim(t *testing.T, commit bool) {
 		go func() {
 			defer wg.Done()
 			aErr = f.d.InTx(t.Context(), func(ctx context.Context) error {
-				if _, err := f.m.Confirm(ctx, owner, res.Token); err != nil {
+				if _, err := f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic); err != nil {
 					return err
 				}
 				close(aIn)
@@ -302,7 +302,7 @@ func TestConfirmFieldsAndGCNeverDeadlockOrStall(t *testing.T) {
 	}
 	gcDone := make(chan error, 1)
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
-		if _, err := media.ConfirmFields(ctx, confirmer, owner, items, func(int, media.ConfirmedAsset) string { return "" }); err != nil {
+		if _, err := media.ConfirmFields(ctx, confirmer, owner, items, media.VisibilityPublic); err != nil {
 			return err
 		}
 		// 擁有者握著三個還沒提交的認領：GC 必須在 lock_timeout 內放棄這幾列、不拖住也不死結。

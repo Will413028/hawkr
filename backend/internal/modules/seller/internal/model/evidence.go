@@ -29,9 +29,7 @@ func ConfirmEvidence(ctx context.Context, m Media, uploader media.Uploader, toke
 	for i, token := range tokens {
 		items[i] = ConfirmItem{Field: apperr.IndexedField("EvidenceTokens", i), Token: strings.TrimSpace(token)}
 	}
-	assets, err := ConfirmAll(ctx, m, uploader, items, func(_ int, a media.ConfirmedAsset) string {
-		return media.RequireVisibility(ctx, media.VisibilitySecure, a)
-	})
+	assets, err := ConfirmAll(ctx, m, uploader, items, media.VisibilitySecure)
 	if err != nil {
 		return nil, err
 	}

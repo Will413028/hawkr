@@ -13,8 +13,8 @@
 ## 2. 暫存與確認
 
 - client 以 `BeginUpload` 取得預簽 PUT 與只出現一次的 token（資料表只存雜湊），上傳後 `CompleteUpload`，`GetUpload` 輪詢到 `READY` 或 `REJECTED`（`RejectReason`）。機敏檔案走 `BeginSecureUpload` 與 `PutSecureChunk` 分段上傳；伺服器內部以 `PutPublic`、`PutSecure` 直接寫入，同樣得到 `READY` 的 token。
-- 擁有者在寫入業務列的 transaction 內呼叫 `Confirm(ctx, uploader, token)`：只接受 `READY`、未過期、上傳者相符的暫存，回傳 `ConfirmedAsset`（資產 UUID、object key、可見性、型別、大小）。只在同一個 transaction 內重入冪等（回同一個資產）；token 已在別的 transaction 確認過回 FailedPrecondition（B1-D23），避免一個資產被兩個擁有者共用、一方 `MarkDeleted` 弄壞另一方，所以擁有者以全部欄位的前後差集決定 `MarkDeleted`，client 不重送未變的 token。確認與業務列一起提交或回滾；回滾時認領列一起消失、暫存仍是 `READY`，同一個 token 可以重送。確認只在擁有者的 transaction 內 INSERT 一列 `media.upload_claims`（`CONFIRMED`），不更新 media 既有的列（B1-D25；單體規則 4 的鎖順序檢查器不允許擁有者 transaction 鎖 media 的既有列）。與 GC 搶同一個唯一鍵 `upload_id`：先插入的一方擁有這筆暫存，輸給 GC 的 Confirm 讀到 `RECLAIMED` 回「已過期」。
-- `Confirm` 回 NotFound（不存在或不屬於上傳者，兩者無法分辨）、FailedPrecondition（處理中、被拒、過期）時，擁有者以 `ConfirmFields` 轉成指向該 token 欄位的 InvalidInput，其他錯誤原樣回傳。
+- 擁有者在寫入業務列的 transaction 內呼叫 `Confirm(ctx, uploader, token, want)`：只接受 `READY`、未過期、上傳者相符、可見性等於 `want`（公開圖片或機敏檔，必填）的暫存，可見性不符回 InvalidInput 且不寫認領，回傳 `ConfirmedAsset`（資產 UUID、object key、可見性、型別、大小）。只在同一個 transaction 內重入冪等（回同一個資產）；token 已在別的 transaction 確認過回 FailedPrecondition（B1-D23），避免一個資產被兩個擁有者共用、一方 `MarkDeleted` 弄壞另一方，所以擁有者以全部欄位的前後差集決定 `MarkDeleted`，client 不重送未變的 token。確認與業務列一起提交或回滾；回滾時認領列一起消失、暫存仍是 `READY`，同一個 token 可以重送。確認只在擁有者的 transaction 內 INSERT 一列 `media.upload_claims`（`CONFIRMED`），不更新 media 既有的列（B1-D25；單體規則 4 的鎖順序檢查器不允許擁有者 transaction 鎖 media 的既有列）。與 GC 搶同一個唯一鍵 `upload_id`：先插入的一方擁有這筆暫存，輸給 GC 的 Confirm 讀到 `RECLAIMED` 回「已過期」。
+- `Confirm` 回 NotFound（不存在或不屬於上傳者，兩者無法分辨）、FailedPrecondition（處理中、被拒、過期）、InvalidInput（可見性不符）時，擁有者以 `ConfirmFields` 轉成指向該 token 欄位的 InvalidInput，其他錯誤原樣回傳。
 - `Uploader` 由呼叫方傳入：帳號與管理員的 ID 各自發號、會同號，所以帶上 `Admin`；代行營運帶被代行的店家 `Store`，token 的每個動作都要帶同一個值。
 - 沒有被確認的暫存與資產由 GC 回收：GC 以 `RECLAIMED` 認領過期暫存，每列各用一個 `lock_timeout`（100ms）的 transaction，撞上擁有者還沒提交的認領就跳過、留給下一輪，所以 GC 與多 token 的擁有者 transaction 之間不會死結、也不會被拖住。
 - 狀態由 SQL 推導（B1-D25），列上的 `assets.state` 只記物理生命週期（`STAGED`、`DELETING`、`DELETED`）：

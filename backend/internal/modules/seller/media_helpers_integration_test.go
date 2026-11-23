@@ -118,14 +118,14 @@ type mediaProbe struct {
 }
 
 // Confirm 對 failConfirm 裡的 token 回注入的錯誤（media 的內部錯誤），其餘交給真的模組。
-func (p *mediaProbe) Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (p *mediaProbe) Confirm(ctx context.Context, uploader media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
 	p.mu.Lock()
 	fail := p.failConfirm[token]
 	p.mu.Unlock()
 	if fail != nil {
 		return media.ConfirmedAsset{}, fail
 	}
-	return p.Module.Confirm(ctx, uploader, token)
+	return p.Module.Confirm(ctx, uploader, token, want)
 }
 
 func (p *mediaProbe) setFailConfirm(token string, err error) {

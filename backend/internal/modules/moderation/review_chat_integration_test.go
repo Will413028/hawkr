@@ -16,6 +16,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -73,7 +74,7 @@ func (f *fixture) seedChat(t *testing.T, buyerID, storeID int64, n, imageSeq int
 		if seq == int64(imageSeq) {
 			var assetID uuid.UUID
 			if err := f.db.InTx(context.Background(), func(ctx context.Context) error {
-				a, err := f.media.Confirm(ctx, stagedUploader, f.stage(t))
+				a, err := f.media.Confirm(ctx, stagedUploader, f.stage(t), media.VisibilityPublic)
 				assetID = a.ID
 				return err
 			}); err != nil {

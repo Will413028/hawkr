@@ -436,9 +436,7 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 			version = row.Version
 		}
 		for _, c := range changes {
-			assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: in.UploaderID}, []model.ConfirmItem{{Field: c.field, Token: c.token}}, func(_ int, a media.ConfirmedAsset) string {
-				return media.RequireVisibility(ctx, media.VisibilityPublic, a)
-			})
+			assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: in.UploaderID}, []model.ConfirmItem{{Field: c.field, Token: c.token}}, media.VisibilityPublic)
 			if err != nil {
 				return err
 			}

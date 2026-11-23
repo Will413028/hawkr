@@ -45,7 +45,7 @@ type autoMedia struct {
 	tokens map[string]string
 }
 
-func (m *autoMedia) Confirm(ctx context.Context, u media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (m *autoMedia) Confirm(ctx context.Context, u media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
 	key := fmt.Sprintf("%d/%s", u.ID, token)
 	m.mu.Lock()
 	real, ok := m.tokens[key]
@@ -64,7 +64,7 @@ func (m *autoMedia) Confirm(ctx context.Context, u media.Uploader, token string)
 		m.tokens[key] = real
 	}
 	m.mu.Unlock()
-	return m.Module.Confirm(ctx, u, real)
+	return m.Module.Confirm(ctx, u, real, want)
 }
 
 func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {

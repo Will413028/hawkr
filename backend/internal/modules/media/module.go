@@ -249,9 +249,9 @@ func (m *Module) GetUpload(ctx context.Context, uploader Uploader, token string)
 }
 
 // Confirm 在擁有者的 transaction 內確認暫存（B1-D1）：只接受就緒、未過期、上傳者相符的暫存；重入回同一個資產，而且只回這筆暫存的資產。
-// ctx 必須帶 transaction，確認與業務列一起提交或回滾。
-func (m *Module) Confirm(ctx context.Context, uploader Uploader, token string) (ConfirmedAsset, error) {
-	return m.upload.Confirm(ctx, uploader, token)
+// want 是擁有者要的可見性，暫存的可見性不符回 InvalidInput 而且不寫認領。ctx 必須帶 transaction，確認與業務列一起提交或回滾。
+func (m *Module) Confirm(ctx context.Context, uploader Uploader, token string, want Visibility) (ConfirmedAsset, error) {
+	return m.upload.Confirm(ctx, uploader, token, want)
 }
 
 // MarkDeleted 是擁有者的刪除指令（B1-D9）：在擁有者的 transaction 內把已確認的資產標為刪除並排實體刪除 job。冪等。

@@ -138,7 +138,7 @@ func readAll(t *testing.T, rc io.ReadCloser) []byte {
 
 func confirmSecure(t *testing.T, f *fixture, who media.Uploader, token string) media.ConfirmedAsset {
 	t.Helper()
-	a, err := confirmInTx(f, who, token)
+	a, err := confirmInTxAs(f, who, token, media.VisibilitySecure)
 	if err != nil {
 		t.Fatalf("Confirm：%v", err)
 	}
@@ -1341,7 +1341,7 @@ func TestSecureUpload_DelegatedSessionIsBoundToItsStore(t *testing.T) {
 		"other-store": {ID: 41, Admin: true, Store: 6},
 		"no-store":    {ID: 41, Admin: true},
 	} {
-		if _, err := confirmInTx(f, who, b.Token); err == nil {
+		if _, err := confirmInTxAs(f, who, b.Token, media.VisibilitySecure); err == nil {
 			t.Errorf("%s 轉正：預期被拒絕", name)
 		}
 	}

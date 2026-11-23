@@ -21,7 +21,7 @@ type mediaSettings struct {
 
 // mediaPort 是組裝點交給擁有者模組的 media 方法集合（各擁有者只依賴自己用到的子集）；正式啟動給 *media.Module，測試給 media.Fake。
 type mediaPort interface {
-	Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error)
+	Confirm(ctx context.Context, uploader media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error)
 	MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error
 	ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error)
 	CopyPublic(ctx context.Context, uploader media.Uploader, sourceID uuid.UUID) (media.PutPublicResult, error)

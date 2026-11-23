@@ -129,12 +129,7 @@ func (s *Service) confirmImage(ctx context.Context, st seller.Store, token strin
 	if token == "" {
 		return nil, nil
 	}
-	a, err := media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: st.AccountID}, "ImageToken", token, func(a media.ConfirmedAsset) string {
-		if a.Visibility != media.VisibilityPublic {
-			return text.PostImageUnusable(uitext.LocaleFrom(ctx)).String()
-		}
-		return ""
-	})
+	a, err := media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: st.AccountID}, "ImageToken", token, media.VisibilityPublic)
 	if err != nil {
 		return nil, err
 	}

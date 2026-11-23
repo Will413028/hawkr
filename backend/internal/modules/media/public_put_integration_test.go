@@ -141,7 +141,7 @@ func TestPutSecure_OtherUploaderCannotConfirm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = confirmInTx(f, other, res.Token)
+	_, err = confirmInTxAs(f, other, res.Token, media.VisibilitySecure)
 	wantKind(t, err, apperr.KindNotFound)
 }
 

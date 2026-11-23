@@ -280,10 +280,14 @@ func ready(t *testing.T, f *fixture, who media.Uploader) media.BeginResult {
 }
 
 func confirmInTx(f *fixture, who media.Uploader, token string) (media.ConfirmedAsset, error) {
+	return confirmInTxAs(f, who, token, media.VisibilityPublic)
+}
+
+func confirmInTxAs(f *fixture, who media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
 	var a media.ConfirmedAsset
 	err := f.d.InTx(f.t.Context(), func(ctx context.Context) error {
 		var err error
-		a, err = f.m.Confirm(ctx, who, token)
+		a, err = f.m.Confirm(ctx, who, token, media.VisibilityPublic)
 		return err
 	})
 	return a, err
@@ -641,7 +645,7 @@ func TestConfirm_RollsBackWithTheBusinessRow(t *testing.T) {
 	res := ready(t, f, owner)
 	errBusiness := errors.New("business row failed")
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
-		if _, err := f.m.Confirm(ctx, owner, res.Token); err != nil {
+		if _, err := f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic); err != nil {
 			return err
 		}
 		return errBusiness
@@ -666,10 +670,10 @@ func TestConfirm_ReentryInTheSameTransactionReturnsSameAsset(t *testing.T) {
 	var first, second media.ConfirmedAsset
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 		var err error
-		if first, err = f.m.Confirm(ctx, owner, res.Token); err != nil {
+		if first, err = f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic); err != nil {
 			return err
 		}
-		second, err = f.m.Confirm(ctx, owner, res.Token)
+		second, err = f.m.Confirm(ctx, owner, res.Token, media.VisibilityPublic)
 		return err
 	})
 	if err != nil || second != first {
@@ -715,13 +719,13 @@ func TestConfirm_OnlyReturnsItsOwnAsset(t *testing.T) {
 	var gotA, gotB, again media.ConfirmedAsset
 	err := f.d.InTx(t.Context(), func(ctx context.Context) error {
 		var err error
-		if gotA, err = f.m.Confirm(ctx, owner, a.Token); err != nil {
+		if gotA, err = f.m.Confirm(ctx, owner, a.Token, media.VisibilityPublic); err != nil {
 			return err
 		}
-		if gotB, err = f.m.Confirm(ctx, owner, b.Token); err != nil {
+		if gotB, err = f.m.Confirm(ctx, owner, b.Token, media.VisibilityPublic); err != nil {
 			return err
 		}
-		again, err = f.m.Confirm(ctx, owner, a.Token)
+		again, err = f.m.Confirm(ctx, owner, a.Token, media.VisibilityPublic)
 		return err
 	})
 	if err != nil {
@@ -779,7 +783,7 @@ func TestConfirm_UnknownTokenNotFound(t *testing.T) {
 func TestConfirm_RequiresTheOwnersTransaction(t *testing.T) {
 	f := setup(t)
 	res := ready(t, f, owner)
-	_, err := f.m.Confirm(t.Context(), owner, res.Token)
+	_, err := f.m.Confirm(t.Context(), owner, res.Token, media.VisibilityPublic)
 	if !errors.Is(err, media.ErrNoTransaction) {
 		t.Fatalf("err = %v，預期 ErrNoTransaction", err)
 	}
@@ -806,7 +810,7 @@ func TestConfirmAndGC_ConcurrentOnlyOneSucceeds(t *testing.T) {
 			defer wg.Done()
 			<-start
 			confirmErr = f.d.InTx(t.Context(), func(ctx context.Context) error {
-				_, err := confirmer.Confirm(ctx, owner, res.Token)
+				_, err := confirmer.Confirm(ctx, owner, res.Token, media.VisibilityPublic)
 				return err
 			})
 		}()
@@ -850,7 +854,7 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 			t.Fatalf("GC = %+v, %v", got, err)
 		}
 		err := f.d.InTx(t.Context(), func(ctx context.Context) error {
-			_, err := confirmer.Confirm(ctx, owner, res.Token)
+			_, err := confirmer.Confirm(ctx, owner, res.Token, media.VisibilityPublic)
 			return err
 		})
 		wantKind(t, err, apperr.KindFailedPrecondition)
@@ -866,7 +870,7 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 		res := ready(t, f, owner)
 		_, final, asset := uploadKeys(t, f, res.ID)
 		err := f.d.InTx(t.Context(), func(ctx context.Context) error {
-			if _, err := confirmer.Confirm(ctx, owner, res.Token); err != nil {
+			if _, err := confirmer.Confirm(ctx, owner, res.Token, media.VisibilityPublic); err != nil {
 				return err
 			}
 			// Confirm 的 transaction 還沒提交、持有認領列；GC 的認領等不到（lock_timeout）就跳過這一列。
@@ -889,7 +893,7 @@ func TestConfirmAndGC_DeterministicInterleavings(t *testing.T) {
 			t.Fatal(err)
 		}
 		err := f.d.InTx(t.Context(), func(ctx context.Context) error {
-			_, err := confirmer.Confirm(ctx, owner, res.Token)
+			_, err := confirmer.Confirm(ctx, owner, res.Token, media.VisibilityPublic)
 			return err
 		})
 		wantKind(t, err, apperr.KindFailedPrecondition)
@@ -1081,6 +1085,29 @@ func TestProcess_ShutdownOnLastAttemptDoesNotReject(t *testing.T) {
 	}
 	if got := uploadState(t, f, res.ID); got != "UPLOADED" {
 		t.Fatalf("state = %s，預期仍是 UPLOADED", got)
+	}
+}
+
+// 可見性不符的 Confirm 在寫認領之前被拒絕：回 InvalidInput、沒有認領列，之後以正確的可見性確認仍成功。
+func TestConfirm_VisibilityMismatchIsRejectedBeforeAnyClaim(t *testing.T) {
+	f := setup(t)
+	pub := ready(t, f, owner)
+	_, err := confirmInTxAs(f, owner, pub.Token, media.VisibilitySecure)
+	wantKind(t, err, apperr.KindInvalidInput)
+	if got := claimKind(t, f, pub.ID); got != "" {
+		t.Fatalf("公開暫存被當機敏確認：認領 = %q，預期沒有", got)
+	}
+	sec := uploadSecure(t, f, owner, pdfOf(50))
+	_, err = confirmInTxAs(f, owner, sec.Token, media.VisibilityPublic)
+	wantKind(t, err, apperr.KindInvalidInput)
+	if n := count(t, f, `SELECT count(*) FROM media.upload_claims`); n != 0 {
+		t.Fatalf("可見性不符後有 %d 筆認領，預期 0", n)
+	}
+	if _, err := confirmInTxAs(f, owner, pub.Token, media.VisibilityPublic); err != nil {
+		t.Fatalf("以正確的可見性確認：%v", err)
+	}
+	if _, err := confirmInTxAs(f, owner, sec.Token, media.VisibilitySecure); err != nil {
+		t.Fatalf("以正確的可見性確認機敏：%v", err)
 	}
 }
 

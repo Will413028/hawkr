@@ -32,13 +32,19 @@ func assetFor(token string) uuid.UUID {
 	return uuid.UUID(sum[:16])
 }
 
-func (*stagedMedia) Confirm(_ context.Context, _ media.Uploader, token string) (media.ConfirmedAsset, error) {
+func (*stagedMedia) Confirm(_ context.Context, _ media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
 	if strings.HasPrefix(token, "expired-") {
 		return media.ConfirmedAsset{}, apperr.FailedPrecondition("圖片無法使用，請重新上傳")
 	}
 	id := assetFor(token)
 	if strings.HasPrefix(token, "logo") || strings.HasPrefix(token, "cover") || strings.HasPrefix(token, "t") {
+		if want != media.VisibilityPublic {
+			return media.ConfirmedAsset{}, apperr.InvalidInput("需要機敏檔")
+		}
 		return media.ConfirmedAsset{ID: id, ObjectKey: "public/" + token, Visibility: media.VisibilityPublic}, nil
+	}
+	if want != media.VisibilitySecure {
+		return media.ConfirmedAsset{}, apperr.InvalidInput("需要公開圖片")
 	}
 	return media.ConfirmedAsset{ID: id, ObjectKey: "secure/" + id.String() + "/", Visibility: media.VisibilitySecure}, nil
 }

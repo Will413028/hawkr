@@ -14,7 +14,7 @@ import (
 // Media 是 seller 對 media 的依賴：寫入的 transaction 內 Confirm 新資產，被換掉或終態的資產 MarkDeleted（治理佐證從不 MarkDeleted）；
 // 機敏檔案（KYC 證件、治理佐證）用 ReadSecure 讀。Confirm 與 MarkDeleted 的 ctx 必須帶 transaction。
 type Media interface {
-	Confirm(ctx context.Context, uploader media.Uploader, token string) (media.ConfirmedAsset, error)
+	Confirm(ctx context.Context, uploader media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error)
 	MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error
 	ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadCloser, string, error)
 }
@@ -37,8 +37,8 @@ func ReadSecure(ctx context.Context, m Media, assetID uuid.UUID) (FileContent, e
 type ConfirmItem = media.ConfirmItem
 
 // ConfirmAll 在寫入的 transaction 內依序確認 items 的 staged token，一次回報所有不合格的（語意見 media.ConfirmFields）。
-func ConfirmAll(ctx context.Context, m Media, uploader media.Uploader, items []ConfirmItem, check func(i int, a media.ConfirmedAsset) string) ([]media.ConfirmedAsset, error) {
-	return media.ConfirmFields(ctx, m, uploader, items, check)
+func ConfirmAll(ctx context.Context, m Media, uploader media.Uploader, items []ConfirmItem, want media.Visibility) ([]media.ConfirmedAsset, error) {
+	return media.ConfirmFields(ctx, m, uploader, items, want)
 }
 
 // RetiredAssets 列出退場的資產：寫入之前所有位置的資產減去寫入之後所有位置的資產（集合差，去重）。同一列的多個位置可以指著同一個資產，

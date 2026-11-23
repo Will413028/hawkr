@@ -337,9 +337,7 @@ func (service *Service) UpdateProfile(ctx context.Context, input model.UpdatePro
 		}
 
 		if hasAvatar {
-			asset, err := media.ConfirmField(ctx, service.deps.Media, media.Uploader{ID: current.AccountID}, "AvatarStagedToken", avatarToken, func(a media.ConfirmedAsset) string {
-				return media.RequireVisibility(ctx, media.VisibilityPublic, a)
-			})
+			asset, err := media.ConfirmField(ctx, service.deps.Media, media.Uploader{ID: current.AccountID}, "AvatarStagedToken", avatarToken, media.VisibilityPublic)
 			if err != nil {
 				return err
 			}

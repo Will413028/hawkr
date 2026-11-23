@@ -90,9 +90,7 @@ func (s *Service) confirmUploads(ctx context.Context, adminID int64, uploads []i
 	for i, u := range uploads {
 		items[i] = model.ConfirmItem{Field: u.kind.field + ".StagedToken", Token: u.token}
 	}
-	assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: adminID, Admin: true}, items, func(_ int, a media.ConfirmedAsset) string {
-		return media.RequireVisibility(ctx, media.VisibilityPublic, a)
-	})
+	assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: adminID, Admin: true}, items, media.VisibilityPublic)
 	if err != nil {
 		return err
 	}
