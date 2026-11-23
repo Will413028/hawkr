@@ -504,7 +504,16 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 ),
                 if (date.isNotEmpty) ...[
                   const SizedBox(width: HkSpace.sm),
-                  Text(date, style: AppTypography.caption),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.sizeOf(context).width * 0.4,
+                    ),
+                    child: Text(
+                      date,
+                      textAlign: TextAlign.end,
+                      style: AppTypography.caption,
+                    ),
+                  ),
                 ],
               ],
             ),
