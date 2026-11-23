@@ -390,10 +390,14 @@ class _PickupTimelineStep extends StatelessWidget {
           ),
           if (step.timestamp.isNotEmpty) ...[
             SizedBox(width: AppSpacing.sm),
-            Text(
-              step.timestamp,
-              style: AppTypography.meta.copyWith(color: AppColors.primary),
-              textAlign: TextAlign.right,
+            Flexible(
+              child: Text(
+                step.timestamp,
+                style: AppTypography.meta.copyWith(color: AppColors.primary),
+                textAlign: TextAlign.right,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ],

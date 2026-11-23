@@ -859,7 +859,6 @@ class _QuoteTextField extends HookWidget {
 }
 
 /// 日期時間選擇器的起始時間點：已有值用它，沒有值是 [now] 起算一天後。
-@visibleForTesting
 DateTime quotePickerSeed(DateTime? current, DateTime now) =>
     current ?? now.toUtc().add(const Duration(days: 1));
 
