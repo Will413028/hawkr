@@ -20,8 +20,8 @@ const (
 	PrefixSecure Prefix = "secure"
 )
 
-// PublicCacheControl 是 public/ 物件的 Cache-Control：key 是隨機產生、內容不可變（換圖是新資產與新 key），可以讓 CDN 與瀏覽器永久快取。
-const PublicCacheControl = "public, max-age=31536000, immutable"
+// PublicCacheControl 是 public/ 物件的 Cache-Control：刪除或下架的圖要在約一小時內停止被送出，沒有 CDN purge 機制，所以只快取一小時，不設 immutable。
+const PublicCacheControl = "public, max-age=3600"
 
 // CacheControlFor 是寫入 key 時要設的 Cache-Control：只有 public/ 物件設 PublicCacheControl，tmp/ 與 secure/ 不設（空字串）。
 func CacheControlFor(key string) string {

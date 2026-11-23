@@ -122,14 +122,14 @@ func TestS3PutSendsBodyAndType(t *testing.T) {
 	}
 }
 
-func TestS3PutSetsImmutableCacheControlOnlyOnPublicObjects(t *testing.T) {
+func TestS3PutSetsPublicCacheControlOnlyOnPublicObjects(t *testing.T) {
 	var got string
 	s, _ := newFakeS3(t, func(w http.ResponseWriter, r *http.Request) {
 		got = r.Header.Get("Cache-Control")
 		w.WriteHeader(http.StatusOK)
 	})
 	for key, want := range map[string]string{
-		NewKey(PrefixPublic):                   "public, max-age=31536000, immutable",
+		NewKey(PrefixPublic):                   "public, max-age=3600",
 		NewKey(PrefixTmp):                      "",
 		NewKey(PrefixSecure):                   "",
 		NewSecureChunkKey(uuid.New(), 0):       "",
