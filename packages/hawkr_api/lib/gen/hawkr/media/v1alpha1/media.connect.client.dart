@@ -89,3 +89,30 @@ extension type MediaAppServiceClient (connect.Transport _transport) {
     );
   }
 }
+/// MediaDelegatedService 是代行營運中的平台管理員為代行店家上傳機敏檔：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 admin 的 BFF 轉送，不放在請求訊息），
+/// 不讀顧客或管理員的身分；擁有者是 session 建立當下綁定的那一家店，請求不帶 store_id。
+/// 需要能力 media.upload（B1-D16）：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；session 沒有 media.upload 回 permission_denied；
+/// 店家此刻不可代行回 failed_precondition，只拒絕、不撤銷 session。回應一律不可快取（private, no-store）。
+/// 稽核：上傳只產生會過期的暫存，不改賣家看得到的資料，所以成功的 BeginSecureUpload 與段上傳都不寫代行稽核；稽核留在擁有者確認時的寫入。被拒絕的請求另寫一列 FAILED。
+/// 會話的上傳者是管理員本人（與 Java 一致）；不保留原始檔名。
+extension type MediaDelegatedServiceClient (connect.Transport _transport) {
+  /// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
+  /// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+  /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
+  Future<hawkrmediav1alpha1media.MediaDelegatedServiceBeginSecureUploadResponse> beginSecureUpload(
+    hawkrmediav1alpha1media.MediaDelegatedServiceBeginSecureUploadRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.MediaDelegatedService.beginSecureUpload,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+}

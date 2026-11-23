@@ -198,13 +198,14 @@ type fileRoute struct {
 	permission adminperm.Permission
 }
 
-// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
+// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的後台段上傳（B1-D16，權限 delegation.sessions.create：能開代行的管理員才能上傳）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
 func fileRoutes(deps Deps) []fileRoute {
 	routes := sellerFileRoutes(deps)
 	if deps.Media != nil {
 		secure := httpmedia.NewSecureUploads(deps.Media, deps.Logger)
 		routes = append(routes,
 			fileRoute{pattern: httpmedia.ChunkRoute, handler: secure.Chunk()},
+			fileRoute{pattern: httpmedia.AdminChunkRoute, handler: secure.AdminChunk(), permission: adminperm.DelegationSessionsCreate},
 			fileRoute{pattern: httpmedia.PreviewRoute, handler: secure.Preview()})
 	}
 	return routes
@@ -403,6 +404,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialDelegatedServiceHandler(delegatedSocial, append(slices.Clone(opts), connect.WithInterceptors(socialDelegated))...))
+	mediaDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpmedia.DelegatedDeclaration)
+	if err != nil {
+		return nil, err
+	}
+	add(mediav1alpha1connect.NewMediaDelegatedServiceHandler(httpmedia.NewDelegated(deps.Delegation, deps.Media, deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(mediaDelegated))...))
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}
@@ -510,22 +516,27 @@ func restoreURL(next http.Handler) http.Handler {
 	})
 }
 
-const secureUploadsPrefix = "/api/files/secure_uploads/"
+const (
+	secureUploadsPrefix      = "/api/files/secure_uploads/"
+	adminSecureUploadsPrefix = "/api/files/admin/secure_uploads/"
+)
 
-// redactedTokenPath 把機敏上傳端點路徑裡的暫存 token 換成 {token}；不是這類路徑回 false。token 是持有即可預覽
-// 的憑據，不進 trace。
+// redactedTokenPath 把機敏上傳端點（顧客的 /api/files/secure_uploads/ 與後台代行的 /api/files/admin/secure_uploads/）路徑裡的暫存 token 換成 {token}；
+// 不是這類路徑回 false。token 是持有即可預覽的憑據，不進 trace。
 func redactedTokenPath(path string) (string, bool) {
 	if !strings.Contains(path, "secure_uploads") {
 		return "", false
 	}
-	if rest, ok := strings.CutPrefix(path, secureUploadsPrefix); ok {
-		_, tail, _ := strings.Cut(rest, "/")
-		if idx, isChunk := strings.CutPrefix(tail, "chunks/"); tail == "" || isChunk && idx != "" && !strings.Contains(idx, "/") {
-			return secureUploadsPrefix + "{token}" + strings.TrimSuffix("/"+tail, "/"), true
+	for _, prefix := range []string{secureUploadsPrefix, adminSecureUploadsPrefix} {
+		if rest, ok := strings.CutPrefix(path, prefix); ok {
+			_, tail, _ := strings.Cut(rest, "/")
+			if idx, isChunk := strings.CutPrefix(tail, "chunks/"); tail == "" || isChunk && idx != "" && !strings.Contains(idx, "/") {
+				return prefix + "{token}" + strings.TrimSuffix("/"+tail, "/"), true
+			}
+			return prefix + "{redacted}", true
 		}
-		return secureUploadsPrefix + "{redacted}", true
 	}
-	return "/api/files/secure_uploads/{redacted}", true
+	return secureUploadsPrefix + "{redacted}", true
 }
 
 // spanName 以 procedure 命名 Connect 的請求；其他路徑只用 method，掃描器亂打的路徑不會變成大量的 span 名稱。

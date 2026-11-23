@@ -24,6 +24,8 @@ import (
 const (
 	// ChunkRoute 是段上傳端點的 ServeMux 樣式。
 	ChunkRoute = "PUT /api/files/secure_uploads/{token}/chunks/{index}"
+	// AdminChunkRoute 是代行營運的段上傳端點（B1-D16）：上傳者是開會話的管理員，後台路由，權限由 fileRoute.permission 宣告。
+	AdminChunkRoute = "PUT /api/files/admin/secure_uploads/{token}/chunks/{index}"
 	// PreviewRoute 是確認前暫存預覽端點的 ServeMux 樣式。
 	PreviewRoute = "GET /api/files/secure_uploads/{token}"
 
@@ -61,6 +63,12 @@ func NewSecureUploads(m SecureFiles, log *slog.Logger) *SecureUploads {
 // Chunk 回 PUT 的 handler。
 func (h *SecureUploads) Chunk() http.Handler { return http.HandlerFunc(h.putChunk) }
 
+// AdminChunk 回後台 PUT 的 handler：段請求的語意與 Chunk 完全相同（時限、大小上限、409 與 Hawkr-Next-Index、錯誤分類），只有上傳者不同：
+// 呼叫者是管理員，Uploader 是 {ID: 管理員 ID, Admin: true}，會話只有開它的管理員能續傳。
+func (h *SecureUploads) AdminChunk() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.adminUploader) })
+}
+
 // Preview 回 GET 的 handler。
 func (h *SecureUploads) Preview() http.Handler { return http.HandlerFunc(h.getPreview) }
 
@@ -80,8 +88,26 @@ func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.
 	return media.Uploader{ID: p.ID}, true
 }
 
-func (h *SecureUploads) putChunk(w http.ResponseWriter, r *http.Request) {
-	u, ok := h.uploader(w, r)
+// adminUploader 設好機敏回應的 header 並取出呼叫的管理員；沒有登入 401、不是管理員 403（角色是否允許由 adminauth.GuardFile 先擋）。
+func (h *SecureUploads) adminUploader(w http.ResponseWriter, r *http.Request) (media.Uploader, bool) {
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	p, ok := rpc.PrincipalFrom(r.Context())
+	switch {
+	case !ok:
+		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+		return media.Uploader{}, false
+	case p.Kind != identity.PrincipalAdmin:
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return media.Uploader{}, false
+	}
+	return media.Uploader{ID: p.ID, Admin: true}, true
+}
+
+func (h *SecureUploads) putChunk(w http.ResponseWriter, r *http.Request) { h.chunk(w, r, h.uploader) }
+
+func (h *SecureUploads) chunk(w http.ResponseWriter, r *http.Request, who func(http.ResponseWriter, *http.Request) (media.Uploader, bool)) {
+	u, ok := who(w, r)
 	if !ok {
 		return
 	}

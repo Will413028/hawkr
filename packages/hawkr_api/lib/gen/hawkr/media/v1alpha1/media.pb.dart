@@ -630,6 +630,196 @@ class BeginSecureUploadResponse extends $pb.GeneratedMessage {
   $0.Timestamp ensureExpireTime() => $_ensure(3);
 }
 
+/// MediaDelegatedServiceBeginSecureUploadRequest 與 BeginSecureUploadRequest 的欄位與意義相同（buf 要求每個 RPC 有自己的訊息）；沒有 store_id：店家由代行 session 決定。
+class MediaDelegatedServiceBeginSecureUploadRequest
+    extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceBeginSecureUploadRequest({
+    $fixnum.Int64? size,
+  }) {
+    final result = MediaDelegatedServiceBeginSecureUploadRequest._();
+    if (size != null) result.size = size;
+    return result;
+  }
+
+  MediaDelegatedServiceBeginSecureUploadRequest._();
+
+  factory MediaDelegatedServiceBeginSecureUploadRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginSecureUploadRequest()
+        ..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceBeginSecureUploadRequest.fromJson(
+          $core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginSecureUploadRequest()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceBeginSecureUploadRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceBeginSecureUploadRequest.$_createMessage)
+    ..aInt64(1, _omitFieldNames ? '' : 'size')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginSecureUploadRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginSecureUploadRequest copyWith(
+          void Function(MediaDelegatedServiceBeginSecureUploadRequest)
+              updates) =>
+      super.copyWith((message) =>
+              updates(message as MediaDelegatedServiceBeginSecureUploadRequest))
+          as MediaDelegatedServiceBeginSecureUploadRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceBeginSecureUploadRequest() / MediaDelegatedServiceBeginSecureUploadRequest.new instead')
+  static MediaDelegatedServiceBeginSecureUploadRequest create() =>
+      MediaDelegatedServiceBeginSecureUploadRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceBeginSecureUploadRequest._();
+  @$core.override
+  MediaDelegatedServiceBeginSecureUploadRequest createEmptyInstance() =>
+      MediaDelegatedServiceBeginSecureUploadRequest._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceBeginSecureUploadRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceBeginSecureUploadRequest>(
+          MediaDelegatedServiceBeginSecureUploadRequest.$_createMessage);
+  static MediaDelegatedServiceBeginSecureUploadRequest? _defaultInstance;
+
+  /// 檔案的明文位元組數；必須大於零且不超過伺服器的上限，段總數由它算出。
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get size => $_getI64(0);
+  @$pb.TagNumber(1)
+  set size($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSize() => $_clearField(1);
+}
+
+/// MediaDelegatedServiceBeginSecureUploadResponse 與 BeginSecureUploadResponse 的欄位與意義相同。
+class MediaDelegatedServiceBeginSecureUploadResponse
+    extends $pb.GeneratedMessage {
+  factory MediaDelegatedServiceBeginSecureUploadResponse({
+    $core.String? stagedToken,
+    $core.int? chunkSize,
+    $core.int? chunkCount,
+    $0.Timestamp? expireTime,
+  }) {
+    final result = MediaDelegatedServiceBeginSecureUploadResponse._();
+    if (stagedToken != null) result.stagedToken = stagedToken;
+    if (chunkSize != null) result.chunkSize = chunkSize;
+    if (chunkCount != null) result.chunkCount = chunkCount;
+    if (expireTime != null) result.expireTime = expireTime;
+    return result;
+  }
+
+  MediaDelegatedServiceBeginSecureUploadResponse._();
+
+  factory MediaDelegatedServiceBeginSecureUploadResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginSecureUploadResponse()
+        ..mergeFromBuffer(data, registry);
+  factory MediaDelegatedServiceBeginSecureUploadResponse.fromJson(
+          $core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      MediaDelegatedServiceBeginSecureUploadResponse()
+        ..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MediaDelegatedServiceBeginSecureUploadResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.media.v1alpha1'),
+      createEmptyInstance:
+          MediaDelegatedServiceBeginSecureUploadResponse.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'stagedToken')
+    ..aI(2, _omitFieldNames ? '' : 'chunkSize')
+    ..aI(3, _omitFieldNames ? '' : 'chunkCount')
+    ..aOM<$0.Timestamp>(4, _omitFieldNames ? '' : 'expireTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginSecureUploadResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MediaDelegatedServiceBeginSecureUploadResponse copyWith(
+          void Function(MediaDelegatedServiceBeginSecureUploadResponse)
+              updates) =>
+      super.copyWith((message) => updates(
+              message as MediaDelegatedServiceBeginSecureUploadResponse))
+          as MediaDelegatedServiceBeginSecureUploadResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use MediaDelegatedServiceBeginSecureUploadResponse() / MediaDelegatedServiceBeginSecureUploadResponse.new instead')
+  static MediaDelegatedServiceBeginSecureUploadResponse create() =>
+      MediaDelegatedServiceBeginSecureUploadResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      MediaDelegatedServiceBeginSecureUploadResponse._();
+  @$core.override
+  MediaDelegatedServiceBeginSecureUploadResponse createEmptyInstance() =>
+      MediaDelegatedServiceBeginSecureUploadResponse._();
+  @$core.pragma('dart2js:noInline')
+  static MediaDelegatedServiceBeginSecureUploadResponse getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+              MediaDelegatedServiceBeginSecureUploadResponse>(
+          MediaDelegatedServiceBeginSecureUploadResponse.$_createMessage);
+  static MediaDelegatedServiceBeginSecureUploadResponse? _defaultInstance;
+
+  /// 不透明的憑證，放在後台段上傳的網址路徑裡，交給擁有者的 API 轉正；只出現這一次。
+  @$pb.TagNumber(1)
+  $core.String get stagedToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set stagedToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStagedToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStagedToken() => $_clearField(1);
+
+  /// 每段的位元組數；除最後一段外每段剛好這個大小，最後一段是餘數。client 不寫死。
+  @$pb.TagNumber(2)
+  $core.int get chunkSize => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set chunkSize($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasChunkSize() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearChunkSize() => $_clearField(2);
+
+  /// 段總數；段序號是 0 到 chunk_count - 1。
+  @$pb.TagNumber(3)
+  $core.int get chunkCount => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set chunkCount($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasChunkCount() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearChunkCount() => $_clearField(3);
+
+  /// 會話的到期時間；過了之後 staged token 不能再用。
+  @$pb.TagNumber(4)
+  $0.Timestamp get expireTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set expireTime($0.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasExpireTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearExpireTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $0.Timestamp ensureExpireTime() => $_ensure(3);
+}
+
 /// MediaAppService 是登入的買家與賣家上傳公開圖片；管理員等非顧客帳號的身分不能呼叫（permission_denied）。
 class MediaAppServiceApi {
   final $pb.RpcClient _client;
@@ -667,6 +857,32 @@ class MediaAppServiceApi {
           $pb.ClientContext? ctx, BeginSecureUploadRequest request) =>
       _client.invoke<BeginSecureUploadResponse>(ctx, 'MediaAppService',
           'BeginSecureUpload', request, BeginSecureUploadResponse());
+}
+
+/// MediaDelegatedService 是代行營運中的平台管理員為代行店家上傳機敏檔：憑證是 X-HK-Operation-Session 標頭裡的代行 session（由 admin 的 BFF 轉送，不放在請求訊息），
+/// 不讀顧客或管理員的身分；擁有者是 session 建立當下綁定的那一家店，請求不帶 store_id。
+/// 需要能力 media.upload（B1-D16）：憑證缺少或無效回 unauthenticated；session 已結束、到期或撤銷回 failed_precondition；session 沒有 media.upload 回 permission_denied；
+/// 店家此刻不可代行回 failed_precondition，只拒絕、不撤銷 session。回應一律不可快取（private, no-store）。
+///
+/// 稽核：上傳只產生會過期的暫存，不改賣家看得到的資料，所以成功的 BeginSecureUpload 與段上傳都不寫代行稽核；稽核留在擁有者確認時的寫入。被拒絕的請求另寫一列 FAILED。
+/// 會話的上傳者是管理員本人（與 Java 一致）；不保留原始檔名。
+class MediaDelegatedServiceApi {
+  final $pb.RpcClient _client;
+
+  MediaDelegatedServiceApi(this._client);
+
+  /// BeginSecureUpload 為代行店家開一個機敏檔案的分段上傳會話，回傳與 MediaAppService.BeginSecureUpload 相同的 staged token、段大小與段總數。
+  /// 段以 `PUT /api/files/admin/secure_uploads/{staged_token}/chunks/{index}` 送出（後台路由，原始位元組 body，不經 Connect；規範第十三節），只有開會話的管理員能續傳。
+  /// size 小於一或超過伺服器的上限回 invalid_argument 指向 size；伺服器沒有設定加密金鑰回 unavailable。需要能力 media.upload。
+  $async.Future<MediaDelegatedServiceBeginSecureUploadResponse>
+      beginSecureUpload($pb.ClientContext? ctx,
+              MediaDelegatedServiceBeginSecureUploadRequest request) =>
+          _client.invoke<MediaDelegatedServiceBeginSecureUploadResponse>(
+              ctx,
+              'MediaDelegatedService',
+              'BeginSecureUpload',
+              request,
+              MediaDelegatedServiceBeginSecureUploadResponse());
 }
 
 const $core.bool _omitFieldNames =

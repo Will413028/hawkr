@@ -1,8 +1,33 @@
 {
   "default": {
+    "media.asset_not_found": {
+      "message": "找不到這個資產",
+      "description": "資產不存在，或已不是可讀取的狀態；兩者同一句。"
+    },
     "media.asset_unavailable": {
       "message": "這筆上傳的資產已不可用",
       "description": "資產不是 ACTIVE（例如已被擁有者刪除）。"
+    },
+    "media.image_unusable": {
+      "message": "圖片無法使用，請重新上傳",
+      "description": "轉正時引用的資產已退場（被換掉或刪除），要重新上傳。"
+    },
+    "media.public_content_empty": {
+      "message": "上傳的內容是空的",
+      "description": "伺服器內部直接寫入公開圖片時沒有內容。"
+    },
+    "media.public_content_unsupported": {
+      "message": "公開上傳只接受 JPEG、PNG、WebP、GIF 圖片",
+      "description": "伺服器內部直接寫入的內容辨認不出是支援的圖片格式。"
+    },
+    "media.public_upload_too_large": {
+      "message": "上傳的大小超過上限 {max} 位元組",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "伺服器內部直接寫入的公開圖片超過大小上限。"
     },
     "media.secure_busy": {
       "message": "同時處理的機敏上傳太多，請稍後再試",
@@ -33,6 +58,10 @@
     "media.secure_content_unsupported": {
       "message": "機敏上傳只接受 PDF 與 JPEG、PNG、WebP、GIF 圖片",
       "description": "第一段依 magic bytes 辨認不出 PDF 或支援的圖片。"
+    },
+    "media.secure_preview_unavailable": {
+      "message": "這筆上傳現在不能預覽",
+      "description": "機敏暫存不是 READY、已過期或沒有資產，所以不能預覽。"
     },
     "media.secure_size_mismatch": {
       "message": "上傳的位元組數與宣告的 {size} 位元組不符",

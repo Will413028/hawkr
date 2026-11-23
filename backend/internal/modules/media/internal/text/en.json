@@ -1,7 +1,22 @@
 {
   "default": {
+    "media.asset_not_found": {
+      "message": "Asset not found"
+    },
     "media.asset_unavailable": {
       "message": "The asset of this upload is no longer available"
+    },
+    "media.image_unusable": {
+      "message": "The image cannot be used; please upload it again"
+    },
+    "media.public_content_empty": {
+      "message": "The uploaded content is empty"
+    },
+    "media.public_content_unsupported": {
+      "message": "Public uploads only accept JPEG, PNG, WebP and GIF images"
+    },
+    "media.public_upload_too_large": {
+      "message": "The upload exceeds the {max}-byte limit"
     },
     "media.secure_busy": {
       "message": "Too many secure uploads are being processed; please try again shortly"
@@ -17,6 +32,9 @@
     },
     "media.secure_content_unsupported": {
       "message": "Secure uploads accept only PDF and JPEG, PNG, WebP or GIF images"
+    },
+    "media.secure_preview_unavailable": {
+      "message": "This upload cannot be previewed right now"
     },
     "media.secure_size_mismatch": {
       "message": "The uploaded byte count does not match the declared {size} bytes"

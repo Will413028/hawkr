@@ -219,6 +219,7 @@ const (
 	CapabilityProductsWrite   = model.CapabilityProductsWrite
 	CapabilityProductsPublish = model.CapabilityProductsPublish
 	CapabilityPostsRead       = model.CapabilityPostsRead
+	CapabilityMediaUpload     = model.CapabilityMediaUpload
 	CapabilityPostsWrite      = model.CapabilityPostsWrite
 	CapabilityPostsPublish    = model.CapabilityPostsPublish
 	CapabilityOrdersRead      = model.CapabilityOrdersRead
@@ -278,6 +279,7 @@ const (
 	AuditStorefrontRead        = model.AuditStorefrontRead
 	AuditProductRead           = model.AuditProductRead
 	AuditPostRead              = model.AuditPostRead
+	AuditMediaUpload           = model.AuditMediaUpload
 	AuditOrderRead             = model.AuditOrderRead
 	AuditCorrection            = model.AuditCorrection
 )
@@ -303,6 +305,7 @@ const (
 	ResourceStorefront = model.ResourceStorefront
 	ResourceProduct    = model.ResourceProduct
 	ResourcePost       = model.ResourcePost
+	ResourceMedia      = model.ResourceMedia
 	ResourceOrder      = model.ResourceOrder
 )
 

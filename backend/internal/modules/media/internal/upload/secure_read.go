@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/secure"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -139,7 +140,7 @@ func (s *Service) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadClo
 	}
 	a, err := s.q(ctx).GetAsset(ctx, assetID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, apperr.NotFound("找不到這個資產")
+		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("media：讀取資產：%w", err)
@@ -148,7 +149,7 @@ func (s *Service) ReadSecure(ctx context.Context, assetID uuid.UUID) (io.ReadClo
 		return nil, model.ErrNotSecure
 	}
 	if model.AssetState(a.State) != model.AssetActive {
-		return nil, apperr.NotFound("找不到這個資產")
+		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
 	return s.openAsset(ctx, a)
 }
@@ -170,11 +171,11 @@ func (s *Service) ReadStagedSecure(ctx context.Context, uploader model.Uploader,
 		return nil, model.ErrNotSecure
 	}
 	if model.UploadState(row.State) != model.StateReady || !row.ExpiresAt.After(s.d.Now()) || row.AssetID == nil {
-		return nil, apperr.FailedPrecondition("這筆上傳現在不能預覽")
+		return nil, apperr.FailedPrecondition("%s", text.MediaSecurePreviewUnavailable(loc(ctx)))
 	}
 	a, err := s.q(ctx).GetAsset(ctx, *row.AssetID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, apperr.NotFound("找不到這個資產")
+		return nil, apperr.NotFound("%s", text.MediaAssetNotFound(loc(ctx)))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("media：讀取資產：%w", err)

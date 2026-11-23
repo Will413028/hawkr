@@ -1,0 +1,85 @@
+{
+  "mutants": [
+    {
+      "id": "authorize-no-capability-check",
+      "stack": "go",
+      "file": "backend/internal/modules/delegation/delegated.go",
+      "old": "\terr := model.CheckSession(c.Session, c.Method.Capability)\n\tif err != nil {\n\t\tm.recordFailure(ctx, c, DelegatedWrite{}, err)\n\t}\n\treturn err",
+      "new": "\tvar err error\n\t_ = model.CheckSession(c.Session, c.Method.Capability)\n\tif err != nil {\n\t\tm.recordFailure(ctx, c, DelegatedWrite{}, err)\n\t}\n\treturn err",
+      "test": "internal/modules/delegation ^TestMediaUploadNeedsItsCapabilityAndLeavesNoSuccessAudit$",
+      "why": "AuthorizeDelegated 拿掉能力檢查：缺 media.upload 的代行不再被拒絕、也不寫 FAILED"
+    },
+    {
+      "id": "delegated-read-no-capability-check",
+      "stack": "go",
+      "file": "backend/internal/modules/delegation/delegated.go",
+      "old": "\terr := model.CheckSession(c.Session, c.Method.Capability)\n\tvar st seller.Store",
+      "new": "\tvar err error\n\t_ = model.CheckSession(c.Session, c.Method.Capability)\n\tvar st seller.Store",
+      "test": "internal/modules/delegation ^TestMediaUploadNeedsItsCapabilityAndLeavesNoSuccessAudit$",
+      "why": "DelegatedRead（公開 API 的縱深防禦）拿掉能力檢查：缺 media.upload 的代行讀得到店家、上傳會執行"
+    },
+    {
+      "id": "declaration-wrong-capability",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/delegated.go",
+      "old": "Capability: moddelegation.CapabilityMediaUpload,",
+      "new": "Capability: moddelegation.CapabilityStorefrontRead,",
+      "test": "internal/httpapi/media ^TestDelegatedBeginSecureUploadUploaderIsTheAdmin$",
+      "why": "宣告表的能力不是 media.upload：帶 media.upload 的 session 被 interceptor 拒絕"
+    },
+    {
+      "id": "declaration-wrong-capability-denial",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/delegated.go",
+      "old": "Capability: moddelegation.CapabilityMediaUpload,",
+      "new": "Capability: moddelegation.CapabilityPostsWrite,",
+      "test": "internal/httpapi/media ^TestDelegatedBeginSecureUploadWithoutTheCapabilityIsDenied$",
+      "why": "宣告表要求的能力換成 posts.write：只有貼文、店面與商品寫入能力的 session 不再被拒絕（缺 media.upload 測試紅）"
+    },
+    {
+      "id": "delegated-uploader-not-admin",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/delegated.go",
+      "old": "media.Uploader{ID: c.Session.Actor.AdminID, Admin: true}",
+      "new": "media.Uploader{ID: c.Session.Actor.AdminID}",
+      "test": "internal/httpapi/media ^TestDelegatedBeginSecureUploadUploaderIsTheAdmin$",
+      "why": "會話的 Uploader 不標管理員：管理員 ID 被當成顧客帳號 ID，與同 ID 的買家混淆"
+    },
+    {
+      "id": "admin-chunk-uploader-not-admin",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "return media.Uploader{ID: p.ID, Admin: true}, true",
+      "new": "return media.Uploader{ID: p.ID}, true",
+      "test": "internal/httpapi/media ^TestAdminChunkUploaderIsTheAdmin$",
+      "why": "後台段上傳的 Uploader 不標管理員：續傳對不上開會話的管理員"
+    },
+    {
+      "id": "admin-chunk-accepts-accounts",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "\tcase p.Kind != identity.PrincipalAdmin:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)\n\t\treturn media.Uploader{}, false",
+      "new": "\tcase false:\n\t\thttp.Error(w, \"forbidden\", http.StatusForbidden)\n\t\treturn media.Uploader{}, false",
+      "test": "internal/httpapi/media ^TestAdminChunkUploaderIsTheAdmin$",
+      "why": "後台段路由放行顧客帳號：買家與賣家的 token 打得到後台段路由（handler 層的縱深防禦）"
+    },
+    {
+      "id": "admin-chunk-route-no-permission",
+      "stack": "go",
+      "file": "backend/internal/httpapi/server.go",
+      "old": ", permission: adminperm.DelegationSessionsCreate}",
+      "new": "}",
+      "test": "internal/httpapi ^TestAdminChunkRouteDeclaresAPermissionAndGuardsTheHandler$",
+      "why": "後台段路由拿掉權限宣告：沒有權限檢查擋在 handler 之前（路由表測試紅）"
+    },
+    {
+      "id": "redact-no-admin-prefix",
+      "stack": "go",
+      "file": "backend/internal/httpapi/server.go",
+      "old": "[]string{secureUploadsPrefix, adminSecureUploadsPrefix}",
+      "new": "[]string{secureUploadsPrefix}",
+      "test": "internal/httpapi ^TestRedactedTokenPathKeepsTheRoute$",
+      "why": "token 遮罩不認後台前綴：後台段路由的 trace 路徑退化成不分路由的 {redacted}"
+    }
+  ]
+}

@@ -9,6 +9,15 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
+// MediaAssetNotFound 是模組句子 media.asset_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaAssetNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Asset not found", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "找不到這個資產", Locale: uitext.ZhTW}
+}
+
 // MediaAssetUnavailable 是模組句子 media.asset_unavailable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func MediaAssetUnavailable(l uitext.Locale) uitext.Message {
 	switch l {
@@ -16,6 +25,47 @@ func MediaAssetUnavailable(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "The asset of this upload is no longer available", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "這筆上傳的資產已不可用", Locale: uitext.ZhTW}
+}
+
+// MediaImageUnusable 是模組句子 media.image_unusable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaImageUnusable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The image cannot be used; please upload it again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "圖片無法使用，請重新上傳", Locale: uitext.ZhTW}
+}
+
+// MediaPublicContentEmpty 是模組句子 media.public_content_empty；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaPublicContentEmpty(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The uploaded content is empty", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "上傳的內容是空的", Locale: uitext.ZhTW}
+}
+
+// MediaPublicContentUnsupported 是模組句子 media.public_content_unsupported；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaPublicContentUnsupported(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Public uploads only accept JPEG, PNG, WebP and GIF images", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "公開上傳只接受 JPEG、PNG、WebP、GIF 圖片", Locale: uitext.ZhTW}
+}
+
+// MediaPublicUploadTooLargeArgs 是 MediaPublicUploadTooLarge 的參數。
+type MediaPublicUploadTooLargeArgs struct {
+	Max int
+}
+
+// MediaPublicUploadTooLarge 是模組句子 media.public_upload_too_large；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaPublicUploadTooLarge(l uitext.Locale, a MediaPublicUploadTooLargeArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The upload exceeds the " + strconv.Itoa(a.Max) + "-byte limit", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "上傳的大小超過上限 " + strconv.Itoa(a.Max) + " 位元組", Locale: uitext.ZhTW}
 }
 
 // MediaSecureBusy 是模組句子 media.secure_busy；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
@@ -71,6 +121,15 @@ func MediaSecureContentUnsupported(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "Secure uploads accept only PDF and JPEG, PNG, WebP or GIF images", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "機敏上傳只接受 PDF 與 JPEG、PNG、WebP、GIF 圖片", Locale: uitext.ZhTW}
+}
+
+// MediaSecurePreviewUnavailable 是模組句子 media.secure_preview_unavailable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func MediaSecurePreviewUnavailable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This upload cannot be previewed right now", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這筆上傳現在不能預覽", Locale: uitext.ZhTW}
 }
 
 // MediaSecureSizeMismatchArgs 是 MediaSecureSizeMismatch 的參數。

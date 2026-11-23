@@ -216,7 +216,7 @@ var InternalDependencies = map[string]InternalGraph{
 			"image":   {},
 			"model":   {},
 			"reclaim": {"model", "storage", "store"},
-			"refsync": {"model"},
+			"refsync": {"model", "text"},
 			"secure":  {},
 			"storage": {},
 			"store":   {},

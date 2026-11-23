@@ -14,6 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/storage"
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -31,13 +32,13 @@ type PublicPutResult struct {
 func (s *Service) preparePublic(ctx context.Context, body io.Reader) (image.Result, error) {
 	data, err := io.ReadAll(&capReader{r: body, max: model.MaxPublicUploadSize})
 	if errors.Is(err, errTooLarge) {
-		return image.Result{}, apperr.InvalidInputOn([]string{"body"}, "上傳的大小超過上限 %d 位元組", model.MaxPublicUploadSize)
+		return image.Result{}, apperr.InvalidInputOn([]string{"body"}, "%s", text.MediaPublicUploadTooLarge(loc(ctx), text.MediaPublicUploadTooLargeArgs{Max: int(model.MaxPublicUploadSize)}))
 	}
 	if err != nil {
 		return image.Result{}, fmt.Errorf("media：讀取公開上傳：%w", err)
 	}
 	if len(data) == 0 {
-		return image.Result{}, apperr.InvalidInputOn([]string{"body"}, "上傳的內容是空的")
+		return image.Result{}, apperr.InvalidInputOn([]string{"body"}, "%s", text.MediaPublicContentEmpty(loc(ctx)))
 	}
 	release, err := acquire(ctx, s.publicSlots, true, nil)
 	if err != nil {
@@ -45,16 +46,16 @@ func (s *Service) preparePublic(ctx context.Context, body io.Reader) (image.Resu
 	}
 	defer release()
 	res, err := sanitizePublic(ctx, data)
-	return res, publicErr(err)
+	return res, publicErr(ctx, err)
 }
 
 // publicErr 把 Sanitize 的錯誤分類給 PutPublic 的呼叫方：輸入的問題是 InvalidInput，管線自己的失敗是內部錯誤（不說成輸入的格式不對）。
-func publicErr(err error) error {
+func publicErr(ctx context.Context, err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case isImageRejection(err):
-		return apperr.InvalidInputOn([]string{"body"}, "公開上傳只接受 JPEG、PNG、WebP、GIF 圖片")
+		return apperr.InvalidInputOn([]string{"body"}, "%s", text.MediaPublicContentUnsupported(loc(ctx)))
 	case isProcessingFailure(err):
 		return fmt.Errorf("media：處理公開圖片失敗：%w", err)
 	}
@@ -69,7 +70,7 @@ func (s *Service) PutPublic(ctx context.Context, uploader model.Uploader, body i
 		return PublicPutResult{}, err
 	}
 	if uploader.ID <= 0 {
-		return PublicPutResult{}, apperr.InvalidInputOn([]string{"uploader"}, "上傳者不合法")
+		return PublicPutResult{}, apperr.InvalidInputOn([]string{"uploader"}, "%s", text.MediaUploaderInvalid(loc(ctx)))
 	}
 	res, err := s.preparePublic(ctx, body)
 	if err != nil {

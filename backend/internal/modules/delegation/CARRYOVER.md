@@ -16,7 +16,7 @@
 | PENDING intent、跨服務寫入、confirm | gateway 仍編排且跨庫 | 成立到 A10 | 同庫時單 transaction；跨庫時明確 intent/confirm | 保留兩階段與批次 50 上限；A10 重新收斂。 |
 | 自建 outbox dispatcher、lease 與退避 | account-service 獨立部署 | 不成立 | 同 transaction 發事件，訂閱者排可靠 job | `DelegationOperationCompleted` 同 transaction 發出；legacy 訂閱者排 River/RabbitMQ job。 |
 | hard 1800 秒、idle 900 秒，讀取時推導 | 有短效工作階段 | 成立 | 儲存終態、期限以當前時間計算 | 沿用全部進行中述詞；活動只由資源反查順延。 |
-| 九個 capability；action 無 CHECK | 能力封閉、稽核動作可能擴充 | 能力封閉成立；無 CHECK 違背設計書 §6.5.3 | Go 枚舉與 DB CHECK 一起管儲存碼 | 九能力與 19 個 action 均 CHECK，reason_code 亦 CHECK。 |
+| 九個 capability（B1-D16 加第十個 `media.upload`）；action 無 CHECK | 能力封閉、稽核動作可能擴充 | 能力封閉成立；無 CHECK 違背設計書 §6.5.3 | Go 枚舉與 DB CHECK 一起管儲存碼 | 十能力與 20 個 action 均 CHECK，reason_code 亦 CHECK。 |
 | 店家授權遮蔽全域授權 | 政策可能存在全域列 | 設計書保留語意，營運不建全域列 | 明確優先序、不要過濾無效店家列 | 沿用店家優先的判定與 schema 的 nullable store ID。 |
 | `DELEGATION_*` 行為環境變數 | 各部署需不同業務規則 | 不成立 | 規則為常數，憑證由 CSPRNG 核發 | TTL 等沿用預設值作常數；移除 credential 金鑰與輪替環境變數。 |
 | 稽核保留 730 天只顯示，維運 SQL 清理 | 本期保留承諾 | 成立，系統未上線無舊資料 | 明確保留政策與執行者 | 沿用設計書 §8.5.1 的常數與維運清理，不清 session。 |
