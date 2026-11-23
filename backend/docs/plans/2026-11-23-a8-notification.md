@@ -83,12 +83,12 @@
   - 驗收：基線結果與四份產出在附件；裁決表與 `inventory.md` 去向欄無空格（新增一次性腳本 `2026-11-23-a8-notification/check_dispositions.py`，不進 `scripts/`）。
   - 停止條件：基線有會擋 A8 的失敗；U8 發現 client 依型別做互動（D6 要重議）。
 
-- [ ] **A8-1 模組本體（walking skeleton）**（被擋於：D14、D15）
+- [ ] **A8-1 模組本體（walking skeleton）**（被擋於：無）
   - 範圍：`internal/modules/notification`：
     - schema：收件匣（型別、參數快照、聚合鍵、actor 清單、已讀）、通知意圖、每渠道投遞紀錄（待送／已送／永久失敗、實際送出的文字與 locale）、裝置 token（`last_registered_at`）、偏好覆寫列 `(account_id, 受眾, 分類, 渠道, enabled)`、公告、suppression 名單。
-    - 型別註冊表：typed 參數、受眾、偏好分類（D4）、呈現分類（D6）、渠道、可選聚合鍵（讚、追蹤用）、冪等鍵來源、actor 欄位、文案（模組 `internal/text`，zh-TW／en）、深連結；預設偏好與不可關的分類寫在註冊表。
+    - 型別註冊表：typed 參數、受眾、偏好分類（D4）、呈現分類（D6）、渠道、可選聚合鍵（讚、追蹤用）、冪等鍵來源、actor 欄位、文案（模組 `internal/text`，zh-TW／en）、深連結、可選的推播圖片（商品類型別帶，D14）；預設偏好與不可關的分類寫在註冊表。
     - 入口：同步訂閱者只排意圖 job；worker 解析收件人、套偏好、自我略過（帳號比對）、封鎖略過、寫收件匣（有聚合鍵時未讀列 upsert）與投遞紀錄、排渠道 job。
-    - 保留期清除 job（180 天硬刪）；個資清除：訂閱 `identity.AccountDeleted`（`identity/events.go:9`）、`buyer.BuyerDeleted`（`buyer/events.go:25`）、`seller.StoreRetired`（`seller/events.go:31`），排 job 清收件匣參數與偏好（token 的同步刪除在 A8-3）；未送出的意圖在 worker 執行時先確認收件帳號未刪除，所以刪除後到清除 job 跑完之間不會再送。
+    - 保留期清除 job（收件匣與投遞紀錄都 180 天硬刪，D2、D15）；個資清除：訂閱 `identity.AccountDeleted`（`identity/events.go:9`）、`buyer.BuyerDeleted`（`buyer/events.go:25`）、`seller.StoreRetired`（`seller/events.go:31`），排 job 清收件匣參數與偏好（token 的同步刪除在 A8-3）；未送出的意圖在 worker 執行時先確認收件帳號未刪除，所以刪除後到清除 job 跑完之間不會再送。
     - `internal/arch/modules.go` 的 notification 列加 `accountsuspension`、`moderation`。
     - 一個型別端到端：`accountsuspension.Suspended` → 收件匣。`CARRYOVER.md` 沿用盤點表（盤點 §2、§6 每列）。
   - 消費端：`rg -n "accountsuspension\.(Suspended|Unsuspended)" backend/internal`；`internal/arch/modules.go`。
@@ -102,7 +102,7 @@
   - 不能動：舊 REST 在 A8-7 前仍可用。
   - 驗收：`buf lint`、`buf breaking`、TS／Dart 生成無 drift；Connect 特性測試涵蓋每支方法；串流 integration：建立通知後收到訊號、另一受眾收不到、超過上限被拒、發 `seller.order.updated` 後賣家工作區訂閱者收到事件。mutation：拿掉 `seller_workspace` 事件的轉送 → 賣家工作區測試紅；串流鍵拿掉受眾 → 跨受眾測試紅；`MarkAsRead` 改回非本人也成功 → NotFound 測試紅；`total` 不套分類篩選 → 篩選計數測試紅；拿掉串流上限檢查 → 上限測試紅。
 
-- [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1、D3b；真實 provider 驗收另擋於 Will 的帳號）
+- [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1；真實 provider 驗收另擋於 Will 的帳號）
   - 範圍：
     - FCM adapter（只在 Unregistered、SenderIDMismatch 停用 token；ThirdPartyAuthError 告警；每批最多 500 個 token）；Resend adapter（對外只回暫時性／永久性，不重試；退信與投訴 webhook 寫 suppression）；兩者的本機替身。推播、email job：送出時依帳號 `preferred_locale` 組字。
     - token：登入 upsert 改綁、登出刪、帳號停權（`accountsuspension.Suspended`）與刪帳號（`identity.AccountDeleted`）時由同 transaction 的同步訂閱者刪列，加進 A8-1 結構測試的白名單、每日 job 刪 60 天未更新的 token；店家停權不動。
@@ -125,7 +125,7 @@
   - 驗收：website、admin CI 等價檢查；新增 website 測試：收到訊號後重拉列表、重連後拉一次；e2e 交給 CI。mutation：收到訊號不重拉 → 測試紅；重連後不拉 → 重連測試紅。
 
 - [ ] **A8-6 buyer-app 與 seller-app**（被擋於：A8-2；真機推播驗收另擋於 Firebase 專案）
-  - 範圍：兩支 App 的收件匣、偏好、token 註冊（每次啟動註冊，不送 `platform`）、登出刪 token 改用 `packages/hawkr_api`；換新 Firebase 專案設定。推播改用可見通知（APNs alert，FCM `notification` payload），刪掉以背景 isolate＋`flutter_local_notifications` 顯示 data-only 推播的路徑（iOS 會節流）。每支 App 一個 session。
+  - 範圍：兩支 App 的收件匣、偏好、token 註冊（每次啟動註冊，不送 `platform`）、登出刪 token 改用 `packages/hawkr_api`；換新 Firebase 專案設定。推播改用可見通知（APNs alert，FCM `notification` payload），加 iOS Notification Service Extension 下載推播圖片（D14）；刪掉以背景 isolate＋`flutter_local_notifications` 顯示 data-only 推播的路徑（iOS 會節流）。每支 App 一個 session。
   - 消費端：`rg -n "notification|device_registrar|device-token" buyer-app/lib seller-app/lib`。
   - 驗收：analyze、format、custom_lint、生成檢查與改動到的測試檔（完整 `flutter test` 交 CI）；真機：登入收到推播、登出不再收到、換帳號登入不收前一人的通知。
 
@@ -167,8 +167,8 @@
 | D0b River vs 工作流引擎（Temporal 等） | River | 已決 2026-11-23，Will |
 | D1 文案位置 | 模組 `internal/text`（伺服器組字，client 不需要） | 已決 2026-11-23，Will |
 | D2 收件匣保留期 | 180 天硬刪 | 已決 2026-11-23，Will |
-| D3 事件裁決 | 範圍只有單體事件；原則：有使用者需要知道且有發送端才做型別；`product.viewed` 不做；`MeasureRequestSubmitted` 不進通知（管理員不是收件人）。逐列表見附件 `event-adjudication.md`，開放問題 1–7 照建議：收藏不做；聊天只推播不寫收件匣；`MeasureCreated(SUSPENSION)` 不另發（由 `StoreSuspended` 通知）；解除請求被接受時只送 `MeasureRequestDecided`（worker 對同一 `MeasureID` 去重）；`PayoutAccountChanged` 加首次啟用時間與補件期限欄位，期限提醒另立 `payout_account_deadline`；`content_hidden` 只給買家作者；`rfq_invited` 歸互動。問題 8（`StoreClosed`／`StoreReopened`／`StorePendingDeletion`／`BuyerDeletionRequested` 是否納入）未決 | 已決 2026-11-23，Will（問題 8 未決） |
-| D3b 範圍外的四個 seller／buyer 事件 | `StoreClosed`、`StoreReopened`、`StorePendingDeletion`、`BuyerDeletionRequested` 是否做型別；只影響 A8-3 的型別清單 | 未決，擋 A8-3 |
+| D3 事件裁決 | 範圍只有單體事件；原則：有使用者需要知道且有發送端才做型別；`product.viewed` 不做；`MeasureRequestSubmitted` 不進通知（管理員不是收件人）。逐列表見附件 `event-adjudication.md`，開放問題 1–7 照建議：收藏不做；聊天只推播不寫收件匣；`MeasureCreated(SUSPENSION)` 不另發（由 `StoreSuspended` 通知）；解除請求被接受時只送 `MeasureRequestDecided`（worker 對同一 `MeasureID` 去重）；`PayoutAccountChanged` 加首次啟用時間與補件期限欄位，期限提醒另立 `payout_account_deadline`；`content_hidden` 只給買家作者；`rfq_invited` 歸互動。問題 8 見 D3b | 已決 2026-11-23，Will |
+| D3b 範圍外的四個 seller／buyer 事件 | `StoreClosed`、`StoreReopened` 不做（賣家自己的操作）；`StorePendingDeletion`、`BuyerDeletionRequested` 做 email 確認型別（交易必要，刪帳申請寄確認信是業界基線），A8-3 加入 | 已決 2026-11-23，Will |
 | D4 偏好分類 | 交易必要（訂單、出貨、退款售後、撥款、帳號與治理）：收件匣、email 不可關；互動（聊天、評價、留言、讚、追蹤、追蹤的店發文）：可關；行銷（coupon、restock）：預設開、可關（個資法第 20 條）；賣家 `shipment_anomaly` 推播不可關。只存覆寫列 | 已決 2026-11-23，Will |
 | D5 取貨簡訊 | 刪除（B3 賣家自寄） | 已決 2026-11-23，Will |
 | D6 收件匣回應 | 伺服器組字＋10 個呈現分類 enum（`ORDER`、`REFUND`、`PAYOUT`、`MESSAGE`、`SOCIAL`、`REVIEW`、`PROMOTION`、`PROCUREMENT`、`ACCOUNT`、`SYSTEM`；不是每型別一個值）＋深連結。重議（A8-0 U8：App 推播依型別重讀訂單／售後／賣家狀態、在聊天室時不彈 banner，見 `fact-checks.md`）：推播與串流另帶狀態重讀提示 enum（`ORDER`、`AFTER_SALE`、`SELLER_STATUS`，可為空），聊天抑制以深連結指向的聊天室判斷；不公開每型別 enum | 已決 2026-11-23，Will；重議同日 |
@@ -178,8 +178,8 @@
 | D10 投遞模型 | 來源 tx 只排意圖 job，worker 展開；投遞紀錄保留為唯一帳本 | 已決 2026-11-23，Will |
 | D11 串流內容 | 只傳失效訊號，不做續傳游標 | 已決 2026-11-23，Will |
 | D12 收件匣聚合 | 型別可宣告聚合鍵，未讀時合併；不做時間窗摘要 | 已決 2026-11-23，Will |
-| D14 推播圖片 | 新型別的推播是否帶圖片（舊模板 44 個帶 `image_key_template`；inventory §4 #11） | 未決，擋 A8-1 註冊表屬性與 A8-3 FCM adapter |
-| D15 投遞紀錄保留期 | 投遞紀錄（D10 唯一帳本）保留多久；舊系統刪 failed／skipped 超過 30 天（inventory §6 #3a），D2 只定收件匣 180 天 | 未決，擋 A8-1 清除 job |
+| D14 推播圖片 | 註冊表有可選圖片欄位，商品類型別帶圖；FCM payload 帶圖片 URL；iOS 加 Notification Service Extension（A8-6） | 已決 2026-11-23，Will |
+| D15 投遞紀錄保留期 | 180 天硬刪，與收件匣同一個清除 job（舊系統只刪 failed／skipped 超過 30 天） | 已決 2026-11-23，Will |
 | D13 legacy 通知轉接 | 不做；通知型別隨發送端搬遷 | 已決 2026-11-23，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
@@ -190,7 +190,7 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| A8-0 基線與事實查核 | 完成 | 基線見文末；`event-adjudication.md`、`fact-checks.md`、`inventory.md` 去向；`python3 backend/docs/plans/2026-11-23-a8-notification/check_dispositions.py` → 0 個空格（填表前 243 個） | inventory 去向有 2 列「待決」（D14、D15） | 本次 |
+| A8-0 基線與事實查核 | 完成 | 基線見文末；`event-adjudication.md`、`fact-checks.md`、`inventory.md` 去向；`python3 backend/docs/plans/2026-11-23-a8-notification/check_dispositions.py` → 0 個空格（填表前 243 個） |  | 本次 |
 | A8-1 模組本體 | 未開始 | | | |
 | A8-2 Connect API 與串流 | 未開始 | | | |
 | A8-3 渠道與事件訂閱 | 未開始 | | | |

@@ -147,7 +147,7 @@ migration 統計：`NS/db/migrations/` 107 檔（含 `atlas.sum`）；最後一�
 | 8 | Web Push | 無；web 用 SSE（上面第 3.3 節） | - | 不存在 | - | 不做（範圍：不做 Web Push，通知 ADR 決策 9） |
 | 9 | 站內收件匣 | `notifications` 表 | - | 使用中 | 第 2 節 | 保留→新模組收件匣（A8-1） |
 | 10 | 即時（SSE）到 web | MQ → gateway SSE | `RABBITMQ_URL`（service）；gateway 自己的連線設定 | 使用中 | 第 3.3 節 | 改寫成 Connect server streaming 失效訊號（D11；A8-2） |
-| 11 | 媒體 URL 組裝（push 圖片） | `mediaurl.BuildURL(MediaBaseURL, objectKey)` | `MEDIA_BASE_URL`（無預設，缺值啟動失敗） | 使用中（44 個模板帶 `image_key_template`） | `template_handler.go:175-189`、`config.go:106` | 待決：新型別的推播是否仍帶圖片（舊 44 個模板帶 `image_key_template`），範圍、D6 與 A8-1 型別註冊表屬性清單都沒寫 |
+| 11 | 媒體 URL 組裝（push 圖片） | `mediaurl.BuildURL(MediaBaseURL, objectKey)` | `MEDIA_BASE_URL`（無預設，缺值啟動失敗） | 使用中（44 個模板帶 `image_key_template`） | `template_handler.go:175-189`、`config.go:106` | 改寫成 註冊表可選圖片欄位、商品類型別帶圖（D14；A8-1、A8-3） |
 | 12 | 其他服務設定 | buyer-service / seller-service gRPC | `BUYER_SERVICE_GRPC_ADDR`、`LEGACY_SELLER_GRPC_ADDR`（兩者預設都是 `127.0.0.1:9941`） | 使用中（僅個資清除流程） | `config.go:108-109` | 刪除（個資清除改為單體事件訂閱，不再跨服務 gRPC 列舉歷史 id；A8-1、A8-7） |
 | 13 | 其他 env（service 自己） | - | `ENV`、`DB_HOST`、`DB_PORT`、`DB_POOL_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`、`DB_SSLMODE`、`GRPC_PORT`；otel：`OTEL_EXPORTER_OTLP_ENDPOINT`、`OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`、`TRACING_SAMPLING`、`POD_NAME` | - | `config.go:86-117`、`backend/pkg/database/dsn.go:67-79`、`backend/pkg/otel/*.go` | 刪除（隨 notification-service 刪除；A8-7） |
 
@@ -301,7 +301,7 @@ migration 統計：`NS/db/migrations/` 107 檔（含 `atlas.sum`）；最後一�
 | 1 | MQ 消費（18 個 subscription） | `mq.NewResilientConsumer`（`pkg/mq`），帶 OTel metrics；啟動時先同步 `LoadFromDB` 再建訂閱 | `MaxRetries: 3`；queue 由 infra/mq topology 預先建立（passive declare），每 queue 有 `{queue}.retry` exchange、`.dlq` | handler 回 error → republish 到 `{queue}.retry`、`x-mq-retry-count`+1、原訊息 ack；超過 3 次進 DLQ（`pkg/mq/failure.go`、`resilient_republish_test.go`）。**模板 handler 只在 payload 解碼失敗時回 error**（見 7.1），所以推播／收件匣失敗不會走這條重試；靜態 handler（個資清除）會回 error 重試 | `NS/internal/worker/di.go:26-58`、`consumer.go:93-104`、`infra/mq/topology/topology.yaml:175-283` | 改寫成 單體事件同步訂閱者只排意圖 job，River 重試（D0b、D10；缺陷 #1；A8-1） |
 | 2 | 模板快取刷新 | `outbox.Scheduler`（`pkg/outbox/scheduler.go`）固定間隔，有 panic guard；不重建訂閱，只換 in-memory map | 5 分鐘，無 initial delay | 失敗 log，保留舊快取 | `worker/di.go:60-98` | 刪除（模板退場，沒有快取，缺陷 #25；A8-7） |
 | 3 | 清理 job | 同上 scheduler | 每 6 小時，initial delay 1 分鐘，每批 1000 筆循環到清完 | 單批失敗 log 後該輪結束 | `NS/internal/worker/cleanup.go:15-124` | 改寫成 保留期清除 job（A8-1）；token 清除見 3c（A8-3） |
-| 3a | | 刪 `push_notifications` status in (failed, skipped) 且 >30 天 | | | `cleanup.go:54-62` | 待決：投遞紀錄（含永久失敗、跳過）的保留期，計畫 D2 只定收件匣 180 天 |
+| 3a | | 刪 `push_notifications` status in (failed, skipped) 且 >30 天 | | | `cleanup.go:54-62` | 改寫成 投遞紀錄 180 天硬刪，與收件匣同一 job（D15；A8-1） |
 | 3b | | 刪 `notifications` 已軟刪且 `deleted_at` >90 天 | | | `cleanup.go:67-75` | 改寫成 收件匣 180 天硬刪，不再軟刪（D2；A8-1） |
 | 3c | | 停用 `device_tokens` is_active 且 `updated_at` >90 天（「殭屍 token」） | | | `cleanup.go:80-98` | 改寫成 每日 job 刪 60 天未更新的 token（`last_registered_at`；D7；A8-3） |
 | 4 | 重送／補送 | **無**（沒有 outbox、沒有 re-drive、沒有手動補列；計畫 `:300` 已要求 A8 設計） | - | - | 主計畫 `:300` | 改寫成 依投遞紀錄重排永久失敗的手段與 runbook，加未觸達查詢（A8-3） |
