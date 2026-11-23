@@ -278,6 +278,9 @@ func TestDefaultStyleRulesAgainstTheRealConstraints(t *testing.T) {
 	if err != nil || cur.IsDefault || cur.Version != oldDefault.Version+1 {
 		t.Fatalf("舊預設 = %+v err=%v", cur, err)
 	}
+	if n := f.auditRows(t, "ai_style", oldDefault.ID.String()); n != 1 {
+		t.Fatalf("被取消預設的舊風格稽核列數 = %d，預期 1", n)
+	}
 	// 舊預設現在可以刪。
 	if err := f.m.DeleteStyle(ctx, admin, oldDefault.ID, 0); err != nil {
 		t.Fatal(err)

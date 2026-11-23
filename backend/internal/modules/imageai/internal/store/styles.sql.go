@@ -12,9 +12,10 @@ import (
 	"uuid"
 )
 
-const clearDefaultStyle = `-- name: ClearDefaultStyle :execrows
+const clearDefaultStyle = `-- name: ClearDefaultStyle :many
 UPDATE imageai.styles SET is_default = FALSE, version = version + 1, updated_at = $1
 WHERE category = $2 AND is_default AND id <> $3
+RETURNING id
 `
 
 type ClearDefaultStyleParams struct {
@@ -24,12 +25,24 @@ type ClearDefaultStyleParams struct {
 }
 
 // 把用途目前的預設風格（exclude_id 以外）取消預設；換預設時先清舊的再標新的（部分唯一索引逐列檢查）。
-func (q *Queries) ClearDefaultStyle(ctx context.Context, arg ClearDefaultStyleParams) (int64, error) {
-	result, err := q.db.Exec(ctx, clearDefaultStyle, arg.Now, arg.Category, arg.ExcludeID)
+func (q *Queries) ClearDefaultStyle(ctx context.Context, arg ClearDefaultStyleParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, clearDefaultStyle, arg.Now, arg.Category, arg.ExcludeID)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	return result.RowsAffected(), nil
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const deleteStyle = `-- name: DeleteStyle :execrows

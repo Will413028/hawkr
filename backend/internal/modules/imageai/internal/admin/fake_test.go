@@ -23,6 +23,8 @@ type txKey struct{}
 type fakeQ struct {
 	styles map[uuid.UUID]store.ImageaiStyle
 	quotas map[int64]store.ImageaiQuota
+	// racingDefault 模擬另一個同時建立預設風格的請求先提交：InsertStyle 的預設風格一律撞到部分唯一索引。
+	racingDefault bool
 }
 
 func newFakeQ() *fakeQ {
@@ -62,6 +64,9 @@ func unique(constraint string) error {
 }
 
 func (f *fakeQ) InsertStyle(_ context.Context, a store.InsertStyleParams) (store.ImageaiStyle, error) {
+	if f.racingDefault && a.IsDefault {
+		return store.ImageaiStyle{}, unique(defaultConstraint)
+	}
 	for _, s := range f.styles {
 		if s.Category == a.Category && s.Name == a.Name {
 			return store.ImageaiStyle{}, unique(nameConstraint)
@@ -89,13 +94,13 @@ func (f *fakeQ) UpdateStyle(_ context.Context, a store.UpdateStyleParams) (store
 	return s, nil
 }
 
-func (f *fakeQ) ClearDefaultStyle(_ context.Context, a store.ClearDefaultStyleParams) (int64, error) {
-	var n int64
+func (f *fakeQ) ClearDefaultStyle(_ context.Context, a store.ClearDefaultStyleParams) ([]uuid.UUID, error) {
+	var n []uuid.UUID
 	for id, s := range f.styles {
 		if s.Category == a.Category && s.IsDefault && id != a.ExcludeID {
 			s.IsDefault, s.Version = false, s.Version+1
 			f.styles[id] = s
-			n++
+			n = append(n, id)
 		}
 	}
 	return n, nil

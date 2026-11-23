@@ -28,7 +28,7 @@ type Queries interface {
 	LockStyle(ctx context.Context, id uuid.UUID) (store.ImageaiStyle, error)
 	InsertStyle(ctx context.Context, arg store.InsertStyleParams) (store.ImageaiStyle, error)
 	UpdateStyle(ctx context.Context, arg store.UpdateStyleParams) (store.ImageaiStyle, error)
-	ClearDefaultStyle(ctx context.Context, arg store.ClearDefaultStyleParams) (int64, error)
+	ClearDefaultStyle(ctx context.Context, arg store.ClearDefaultStyleParams) ([]uuid.UUID, error)
 	DeleteStyle(ctx context.Context, id uuid.UUID) (int64, error)
 	GetQuota(ctx context.Context, storeID int64) (store.ImageaiQuota, error)
 	LockQuota(ctx context.Context, storeID int64) (store.ImageaiQuota, error)

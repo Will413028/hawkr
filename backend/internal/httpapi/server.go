@@ -125,7 +125,7 @@ type Deps struct {
 	Assistant *assistant.Module
 	// Procurement 是買家採購（BuyerProcurementAppService）。
 	Procurement *procurement.Module
-	// ImageAI 是賣家修圖（ImageAiAppService）。
+	// ImageAI 是賣家修圖（ImageAiAppService）與營運後台的風格、額度管理（ImageAiAdminService）。
 	ImageAI *imageai.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
 	// httpseller.NewStatsSource 建立。

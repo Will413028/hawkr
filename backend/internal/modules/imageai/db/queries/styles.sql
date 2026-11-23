@@ -33,10 +33,11 @@ SET label = @label, prompt = @prompt, thumbnail_key = @thumbnail_key, thumbnail_
 WHERE id = @id AND version = @expected_version
 RETURNING *;
 
--- name: ClearDefaultStyle :execrows
+-- name: ClearDefaultStyle :many
 -- 把用途目前的預設風格（exclude_id 以外）取消預設；換預設時先清舊的再標新的（部分唯一索引逐列檢查）。
 UPDATE imageai.styles SET is_default = FALSE, version = version + 1, updated_at = @now
-WHERE category = @category AND is_default AND id <> @exclude_id;
+WHERE category = @category AND is_default AND id <> @exclude_id
+RETURNING id;
 
 -- name: DeleteStyle :execrows
 DELETE FROM imageai.styles WHERE id = $1;

@@ -8,7 +8,11 @@ import (
 	"testing"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/text"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 func createInput() model.CreateStyleInput {
@@ -165,6 +169,59 @@ func TestUpdateStyleRequiresTheVersion(t *testing.T) {
 	s := h.seed("a", "PRODUCT", false, "a")
 	_, err := h.s.UpdateStyle(context.Background(), updateInput(s.ID, 0))
 	wantKind(t, err, apperr.KindInvalidInput)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Message != text.AdminStyleEtagRequired(uitext.LocaleFrom(context.Background())).Text || ae.Message == text.AdminStyleStale(uitext.LocaleFrom(context.Background())).Text {
+		t.Fatalf("缺 etag 要用自己的文字，得到 %v", err)
+	}
+}
+
+func TestCreateStyleConcurrentDefaultIsFailedPreconditionWithItsOwnText(t *testing.T) {
+	h := newHarness(t)
+	h.q.racingDefault = true
+	in := createInput()
+	in.IsDefault = true
+	_, err := h.s.CreateStyle(context.Background(), in)
+	wantKind(t, err, apperr.KindFailedPrecondition)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Message != text.AdminStyleDefaultConflict(uitext.LocaleFrom(context.Background())).Text {
+		t.Fatalf("得到 %v", err)
+	}
+	if len(h.audit.entries) != 0 {
+		t.Fatal("失敗時不該有稽核")
+	}
+}
+
+func TestReplacingTheDefaultAuditsTheClearedStyleToo(t *testing.T) {
+	ctx := context.Background()
+	for name, run := range map[string]func(h *harness, old store.ImageaiStyle) error{
+		"create": func(h *harness, _ store.ImageaiStyle) error {
+			in := createInput()
+			in.IsDefault = true
+			_, err := h.s.CreateStyle(ctx, in)
+			return err
+		},
+		"update": func(h *harness, _ store.ImageaiStyle) error {
+			other := h.seed("other", "PRODUCT", false, "a")
+			in := updateInput(other.ID, other.Version)
+			in.IsDefault = true
+			_, err := h.s.UpdateStyle(ctx, in)
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			old := h.seed("old", "PRODUCT", true, "")
+			if err := run(h, old); err != nil {
+				t.Fatal(err)
+			}
+			if len(h.audit.entries) != 2 {
+				t.Fatalf("新預設與被取消的舊預設各一筆稽核，得到 %d", len(h.audit.entries))
+			}
+			if !slices.ContainsFunc(h.audit.entries, func(e adminaudit.Entry) bool { return e.TargetID == old.ID.String() }) {
+				t.Fatalf("沒有被取消預設的風格 %s 的稽核：%v", old.ID, h.audit.entries)
+			}
+		})
+	}
 }
 
 func TestUpdateStyleStaleVersionIsRejectedBeforeFinalizingTheThumbnail(t *testing.T) {

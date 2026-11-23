@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"fmt"
+	"time"
 	"unicode/utf8"
 	"uuid"
 
@@ -94,8 +95,8 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 			return err
 		}
 		if in.IsDefault {
-			if _, err := q.ClearDefaultStyle(ctx, store.ClearDefaultStyleParams{Now: now, Category: string(in.Category), ExcludeID: id}); err != nil {
-				return fmt.Errorf("admin：取消 %s 原本的預設風格：%w", in.Category, err)
+			if err := s.clearDefault(ctx, in.Actor, now, string(in.Category), id); err != nil {
+				return err
 			}
 		}
 		var err error
@@ -107,7 +108,7 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 		case isUnique(err, nameConstraint):
 			return apperr.AlreadyExists("%s", text.AdminStyleNameTaken(l))
 		case isUnique(err, defaultConstraint):
-			return styleStale(ctx)
+			return apperr.FailedPrecondition("%s", text.AdminStyleDefaultConflict(l))
 		case err != nil:
 			return fmt.Errorf("admin：新增風格：%w", err)
 		}
@@ -129,7 +130,7 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (model.AdminStyle, error) {
 	l := loc(ctx)
 	if in.Version <= 0 {
-		return model.AdminStyle{}, apperr.InvalidInputOn([]string{"Version"}, "%s", text.AdminStyleStale(l))
+		return model.AdminStyle{}, apperr.InvalidInputOn([]string{"Version"}, "%s", text.AdminStyleEtagRequired(l))
 	}
 	label, prompt, err := validateText(ctx, in.Label, in.Prompt)
 	if err != nil {
@@ -174,8 +175,8 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 			key, asset = newKey, newAsset
 		}
 		if in.IsDefault && !old.IsDefault {
-			if _, err := q.ClearDefaultStyle(ctx, store.ClearDefaultStyleParams{Now: now, Category: old.Category, ExcludeID: in.ID}); err != nil {
-				return fmt.Errorf("admin：取消 %s 原本的預設風格：%w", old.Category, err)
+			if err := s.clearDefault(ctx, in.Actor, now, old.Category, in.ID); err != nil {
+				return err
 			}
 		}
 		row, err = q.UpdateStyle(ctx, store.UpdateStyleParams{
@@ -205,6 +206,20 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 		return model.AdminStyle{}, err
 	}
 	return toStyle(row), nil
+}
+
+// clearDefault 取消用途目前的預設風格（excludeID 以外），被取消的風格（版本會加一）各寫一筆稽核，與呼叫者的寫入在同一個 transaction。
+func (s *Service) clearDefault(ctx context.Context, actor model.Actor, now time.Time, category string, excludeID uuid.UUID) error {
+	cleared, err := s.d.Q(ctx).ClearDefaultStyle(ctx, store.ClearDefaultStyleParams{Now: now, Category: category, ExcludeID: excludeID})
+	if err != nil {
+		return fmt.Errorf("admin：取消 %s 原本的預設風格：%w", category, err)
+	}
+	for _, id := range cleared {
+		if err := s.record(ctx, actor, styleTarget, id.String(), map[string]any{"changed": []string{"default_style"}, "replaced_by": excludeID.String()}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkDefaultRules 是預設風格的規則（A9-D39）：default_style 只能設成 true；目前的預設不能取消或停用；預設風格必須啟用。

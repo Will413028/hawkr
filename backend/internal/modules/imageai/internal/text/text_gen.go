@@ -77,6 +77,15 @@ func AdminStyleDefaultCannotUnset(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "預設風格不能直接取消，請把另一個風格設成預設", Locale: uitext.ZhTW}
 }
 
+// AdminStyleDefaultConflict 是模組句子 admin.style_default_conflict；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleDefaultConflict(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Another default style was created at the same time. Please reload and try again", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "同時有另一個預設風格建立，請重新讀取後再送出", Locale: uitext.ZhTW}
+}
+
 // AdminStyleDefaultMustBeEnabled 是模組句子 admin.style_default_must_be_enabled；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func AdminStyleDefaultMustBeEnabled(l uitext.Locale) uitext.Message {
 	switch l {
@@ -84,6 +93,15 @@ func AdminStyleDefaultMustBeEnabled(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "The default style must be enabled", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "預設風格必須啟用", Locale: uitext.ZhTW}
+}
+
+// AdminStyleEtagRequired 是模組句子 admin.style_etag_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AdminStyleEtagRequired(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The style version (etag) is required", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "請帶入風格的版本（etag）", Locale: uitext.ZhTW}
 }
 
 // AdminStyleLabelRequired 是模組句子 admin.style_label_required；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

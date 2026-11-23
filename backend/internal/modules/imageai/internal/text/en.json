@@ -21,8 +21,14 @@
     "admin.style_default_cannot_unset": {
       "message": "A default style cannot be unset directly. Set another style as the default instead"
     },
+    "admin.style_default_conflict": {
+      "message": "Another default style was created at the same time. Please reload and try again"
+    },
     "admin.style_default_must_be_enabled": {
       "message": "The default style must be enabled"
+    },
+    "admin.style_etag_required": {
+      "message": "The style version (etag) is required"
     },
     "admin.style_label_required": {
       "message": "The style label must not be blank"

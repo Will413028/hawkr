@@ -170,6 +170,15 @@
    "new": "\ts, err := h.m.UpdateStyle(",
    "test": "internal/httpapi/imageai ^TestUpdateAiStyleMaskedUpdateKeepsTheOtherFieldsAndPassesTheEtag$",
    "why": "UpdateAiStyle 忽略 update_mask（欄位不套用，不可變欄位檢查也消失）"
+  },
+  {
+   "id": "no-cleared-default-audit",
+   "stack": "go",
+   "file": "backend/internal/modules/imageai/internal/admin/style.go",
+   "old": "\t\tif err := s.record(ctx, actor, styleTarget, id.String(), map[string]any{\"changed\": []string{\"default_style\"}, \"replaced_by\": excludeID.String()}); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "\t\t_ = id\n",
+   "test": "internal/modules/imageai/internal/admin ^TestReplacingTheDefaultAuditsTheClearedStyleToo$",
+   "why": "換預設時不為被取消預設的舊風格寫稽核：稽核列數少一筆"
   }
  ]
 }
