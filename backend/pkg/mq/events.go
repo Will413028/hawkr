@@ -43,12 +43,11 @@ const (
 
 	EventTypeAccountDeleted EventType = "ACCOUNT_DELETED"
 
-	EventTypeSellerDeleted           EventType = "SELLER_DELETED"
-	EventTypeSellerOnboarded         EventType = "SELLER_ONBOARDED"
-	EventTypeSellerProfileChanged    EventType = "SELLER_PROFILE_CHANGED"
-	EventTypeSellerMembershipChanged EventType = "SELLER_MEMBERSHIP_CHANGED"
-	EventTypeSellerSuspended         EventType = "SELLER_SUSPENDED"
-	EventTypeSellerUnsuspended       EventType = "SELLER_UNSUSPENDED"
+	EventTypeSellerDeleted        EventType = "SELLER_DELETED"
+	EventTypeSellerOnboarded      EventType = "SELLER_ONBOARDED"
+	EventTypeSellerProfileChanged EventType = "SELLER_PROFILE_CHANGED"
+	EventTypeSellerSuspended      EventType = "SELLER_SUSPENDED"
+	EventTypeSellerUnsuspended    EventType = "SELLER_UNSUSPENDED"
 
 	EventTypeBuyerDeleted EventType = "BUYER_DELETED"
 
@@ -276,15 +275,6 @@ type SellerUnsuspendedEvent struct {
 	SuspensionID int64 `json:"suspensionId,string"`
 	AccountID    int64 `json:"accountId,string"`
 	StoreID      int64 `json:"store_id,string"`
-}
-
-type SellerMembershipChangedEvent struct {
-	BaseEvent
-	StoreID         string `json:"storeId"`
-	PlanCode        string `json:"planCode"`
-	TierRank        int    `json:"tierRank"`
-	MonthlyOrderCap int    `json:"monthlyOrderCap"`
-	EffectiveAt     string `json:"effectiveAt"`
 }
 
 type SellerOrderUpdatedEvent struct {

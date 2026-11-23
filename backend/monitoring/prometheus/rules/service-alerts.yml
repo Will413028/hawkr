@@ -69,7 +69,6 @@ groups:
         expr: |
           absent(server_start_total{job="ai-service", env="prod"})
           or absent(server_start_total{job="notification-service", env="prod"})
-          or absent(server_start_total{job="seller-service", env="prod"})
         for: 5m
         labels:
           severity: critical
@@ -374,69 +373,6 @@ groups:
   # ===========================================================================
   - name: feature-provisioning-alerts
     rules:
-      - alert: SellerAddressLookupDisabled
-        expr: max by (env) (seller_address_lookup_enabled) == 0 and max by (env) (seller_address_lookup_config_incomplete) == 0
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：賣家端地址查詢（TGOS）尚未開通"
-          description: "seller-service 的 SuggestAddress／ValidateAddress 一律回 9700。其餘 89 支 RPC 正常服務。處置：補齊 hawkr-address secret 的 TGOS_QUERYADDR_APPID／TGOS_QUERYADDR_APIKEY、configmap 的 TGOS_BASE_URL／TGOS_PROXY_CALLER_KEY_FILE，以及 tgos-proxy-caller-credentials 這個 secret volume（四者缺一都會落在本條）。⚠️ 刻意不開通地址查詢的環境，本條會長期為真：那是預期行為，不是誤報。"
-
-      - alert: SellerAddressLookupConfigIncomplete
-        expr: max by (env) (seller_address_lookup_config_incomplete) == 1
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：賣家端地址查詢設定只有一半"
-          description: "TGOS 四項設定（TGOS_BASE_URL／TGOS_QUERYADDR_APPID／TGOS_QUERYADDR_APIKEY／TGOS_PROXY_CALLER_KEY_FILE）有設到但不齊全，或 env 齊全而 GCP SA 金鑰檔讀不到。⚠️ 這**不是**「尚未開通」——一定有人打錯字或漏掛 secret volume。seller-service 開機當下的 Error log 會列出哪一項是空的。"
-
-      - alert: SellerPayuniMerchantDisabled
-        expr: max by (env) (seller_payuni_merchant_enabled) == 0 and max by (env) (seller_payuni_merchant_config_incomplete) == 0
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：金流商家建檔（PayUni 代理商）尚未開通"
-          description: "seller-service 的 BindSeller／GetSellerStatus／UpdateMerchant 一律回 9704。賣家看到的是「尚未開通」而不是一個卡在 PENDING 永遠不動的申請——後者是 fail-open 會產生的症狀，本次刻意不做。處置：補齊 hawkr-payuni secret 的 PAYUNI_AGENT_HASH_KEY 與 PAYUNI_AGENT_HASH_IV（兩者必須同批補，只補一半會掉進 SellerPayuniMerchantConfigIncomplete）。"
-
-      - alert: SellerPayuniMerchantConfigIncomplete
-        expr: max by (env) (seller_payuni_merchant_config_incomplete) == 1
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：PayUni 代理商憑證只設了一半"
-          description: "PAYUNI_AGENT_HASH_KEY 與 PAYUNI_AGENT_HASH_IV 必須成對。只有一個 ⇒ 配置錯誤，不是未開通。"
-
-      - alert: PayuniReconciliationFailing
-        expr: sum by (env) (rate(payuni_sync_api_error_total[15m])) > 0
-        for: 30m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：PayUni 實名認證對帳輪詢持續失敗"
-          description: "背景對帳呼叫 search_merchant_status 持續失敗超過 30 分鐘。🔴 這條失效是靜默的：租約在呼叫**之前**就已經前進，失敗的那一筆要等一個完整的節流窗（payuniPollMinInterval）才重試，而 client 端的 freshness 讀的是 last_synced_at——它不會因為失敗而變舊，只是停在原地。⇒ 畫面上一切正常，對帳其實已經停擺。AGENT_NOTIFY webhook 仍是主通道，所以短時間內賣家不一定受影響；但 webhook 一旦也漏收就沒有第二道防線了。處置：先確認 PayUni 端是否故障（seller_payuni_client_degraded_total 有沒有同時在跳），再看 seller-service 的 Warn log『failed to get PAYUNi seller status』。"
-
-      - alert: PayuniClientRateLimitDegraded
-        expr: sum by (env) (increase(seller_payuni_client_degraded_total[1h])) > 0
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：疑似被 PayUni 擋下，本地速率上限已自動砍半"
-          description: "looksRateLimited 判定收到的錯誤像是被上游擋（429／503／連線被拒或重置），限速器已把自訂 QPS 砍半並會在 5 分鐘內線性回升。🔴 PayUni **沒有公開任何速率限制**，所以這個計數器就是我們唯一的實測來源：它從 0 開始跳代表目前的 QPS 設定已經踩到對方的線。處置：(1) 撈當時的錯誤原文，把實際形狀補進 services/seller-service/internal/client/payuni/ratelimit.go 的 looksRateLimited 與 backend/docs/第三方整合/；(2) 調降 maxQPS 或放長 payuniPollMinInterval，並同步更新容量帳。⚠️ 不要用調高上限的方式處理——那是把自訂上限當成可有可無（規範 §7 禁止事項）。"
-
-      - alert: PayuniReconciliationQueueSaturated
-        expr: max by (env) (payuni_pending_registrations) >= 100
-        for: 2h
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：PayUni 對帳佇列取件被批次上限截斷"
-          description: "每個 tick 取件到的 pending 筆數持續貼著 payuniSyncBatchSize（目前 100，⚠️ 這個閾值與該常數耦合，改常數要一起改這裡），代表對帳已經追不上進件速度：穩態吞吐上限是 payuniSyncBatchSize × payuniPollMinInterval ÷ payuniSyncInterval（目前 100 × 2h ÷ 15m = 800 筆），超過就有列開始排不進來。處置：依容量帳調整三個參數之一，或替 seller-service 加副本（⚠️ 加副本前先讀 ratelimit.go 的註記：限速器是每副本上限，replicas = N ⇒ 對 PayUni 的真實上限變成 N × maxQPS）。容量帳寫在 services/seller-service/internal/usecase/payuni.go 的 payuniPollMinInterval 常數註解。"
-
       - alert: AIAssistantProviderDisabled
         expr: max by (env) (ai_assistant_provider_enabled) == 0
         for: 1h

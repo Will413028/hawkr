@@ -11,8 +11,7 @@
         "pkg",
         "services/ai-service",
         "services/invoice-service",
-        "services/notification-service",
-        "services/seller-service"
+        "services/notification-service"
       ],
       "reason": "基準（2026-10-30 首次掃描）：github.com/quic-go/quic-go 修在 v0.59.1，升級需 Will 核准依賴變更；嚴重度 MODERATE。"
     },
@@ -38,8 +37,7 @@
         "pkg",
         "services/ai-service",
         "services/invoice-service",
-        "services/notification-service",
-        "services/seller-service"
+        "services/notification-service"
       ],
       "reason": "基準（2026-10-30 首次掃描）：go.opentelemetry.io/otel/sdk 修在 v1.45.0，升級需 Will 核准依賴變更；嚴重度 LOW。"
     }

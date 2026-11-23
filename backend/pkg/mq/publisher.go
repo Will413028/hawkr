@@ -290,18 +290,6 @@ func (p *Publisher) PublishDelayed(ctx context.Context, exchange, routingKey str
 
 // ==================== Shipping/Fulfillment Events ====================
 
-// ==================== Review Events ====================
-
-// PublishReviewCreated publishes a REVIEW_CREATED event
-func (p *Publisher) PublishReviewCreated(ctx context.Context, event *ReviewCreatedEvent) error {
-	return p.Publish(ctx, ExchangeReview, RoutingKeyReviewCreated, event)
-}
-
-// PublishReviewHidden publishes a REVIEW_HIDDEN event (#1156)
-func (p *Publisher) PublishReviewHidden(ctx context.Context, event *ReviewHiddenEvent) error {
-	return p.Publish(ctx, ExchangeReview, RoutingKeyReviewHidden, event)
-}
-
 // ==================== Marketing Events (Coupon) ====================
 
 // 41 號設計書 §6.2：notification-service 首次成為 producer
@@ -311,49 +299,6 @@ func (p *Publisher) PublishNotificationInboxNew(ctx context.Context, event *Noti
 
 func (p *Publisher) PublishNotificationUnreadChanged(ctx context.Context, event *NotificationUnreadChangedEvent) error {
 	return p.Publish(ctx, ExchangeNotification, RoutingKeyNotificationUnreadChanged, event)
-}
-
-// ==================== Account Events ====================
-
-// PublishAccountDeleted publishes an ACCOUNT_DELETED event
-func (p *Publisher) PublishAccountDeleted(ctx context.Context, event *AccountDeletedEvent) error {
-	return p.Publish(ctx, ExchangeAccount, RoutingKeyAccountDeleted, event)
-}
-
-// ==================== Seller Events ====================
-
-// PublishSellerDeleted publishes a SELLER_DELETED event
-func (p *Publisher) PublishSellerDeleted(ctx context.Context, event *SellerDeletedEvent) error {
-	return p.Publish(ctx, ExchangeSeller, RoutingKeySellerDeleted, event)
-}
-
-// PublishSellerProfileChanged publishes a SELLER_PROFILE_CHANGED event (#1426):
-// seller name/logo/cover changed → cart-service evicts seller:meta:{id}.
-func (p *Publisher) PublishSellerProfileChanged(ctx context.Context, event *SellerProfileChangedEvent) error {
-	return p.Publish(ctx, ExchangeSeller, RoutingKeySellerProfileChanged, event)
-}
-
-// PublishSellerOnboarded publishes a SELLER_ONBOARDED event (first-time onboard
-// AND re-onboard; consumed by the gateway resolver cache).
-func (p *Publisher) PublishSellerOnboarded(ctx context.Context, event *SellerOnboardedEvent) error {
-	return p.Publish(ctx, ExchangeSeller, RoutingKeySellerOnboarded, event)
-}
-
-// PublishSellerSuspended publishes a SELLER_SUSPENDED event (32 §13 / 44 §13.2 /
-// 36 §3.6f admin manual suspension). Multi-consumer: product/order/coupon/
-// notification/im.
-func (p *Publisher) PublishSellerSuspended(ctx context.Context, event *SellerSuspendedEvent) error {
-	return p.Publish(ctx, ExchangeSeller, RoutingKeySellerSuspended, event)
-}
-
-// PublishSellerUnsuspended publishes a SELLER_UNSUSPENDED event (32 §13 / 44 §13.2 /
-// 36 §3.6f admin manual lift).
-func (p *Publisher) PublishSellerUnsuspended(ctx context.Context, event *SellerUnsuspendedEvent) error {
-	return p.Publish(ctx, ExchangeSeller, RoutingKeySellerUnsuspended, event)
-}
-
-func (p *Publisher) PublishSellerMembershipChanged(ctx context.Context, event *SellerMembershipChangedEvent) error {
-	return p.Publish(ctx, ExchangeSeller, RoutingKeySellerMembershipChanged, event)
 }
 
 // Close closes the publisher and stops its reconnect watcher.
