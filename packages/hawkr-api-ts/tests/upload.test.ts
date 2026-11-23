@@ -85,15 +85,43 @@ function publicClient(
 }
 
 describe("md5Base64", () => {
-	it.each([0, 1, 55, 56, 63, 64, 65, 1000])(
-		"matches node crypto for %i bytes",
-		(n) => {
-			const data = new Uint8Array(n).map((_, i) => (i * 31 + 7) & 255);
-			expect(md5Base64(data)).toBe(
-				createHash("md5").update(data).digest("base64"),
-			);
-		},
-	);
+	it("matches the RFC 1321 test vectors", async () => {
+		const vectors: Array<[string, string]> = [
+			["", "1B2M2Y8AsgTpgAmY7PhCfg=="],
+			["a", "DMF1ucDxtqgxw5niaXcmYQ=="],
+			["abc", "kAFQmDzST7DWlj99KOF/cg=="],
+			["message digest", "+WtpfXy3k41SWi8xqvFh0A=="],
+		];
+		for (const [text, want] of vectors) {
+			expect(await md5Base64(new Blob([text]))).toBe(want);
+		}
+	});
+
+	it.each([
+		0,
+		1,
+		55,
+		56,
+		63,
+		64,
+		65,
+		1000,
+		4 * 1024 * 1024,
+		9 * 1024 * 1024 + 5,
+	])("matches node crypto for %i bytes, hashed slice by slice", async (n) => {
+		const data = new Uint8Array(n).map((_, i) => (i * 31 + 7) & 255);
+		expect(await md5Base64(new Blob([data]))).toBe(
+			createHash("md5").update(data).digest("base64"),
+		);
+	});
+
+	it("stops hashing once the signal is aborted", async () => {
+		const ctrl = new AbortController();
+		ctrl.abort();
+		await expect(
+			md5Base64(new Blob([new Uint8Array(10)]), ctrl.signal),
+		).rejects.toMatchObject({ kind: "aborted" });
+	});
 });
 
 describe("uploadPublicFile", () => {
