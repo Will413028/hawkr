@@ -107,7 +107,7 @@
 - [ ] **A8-2 Connect API 與串流**（被擋於：A8-1、D6）
   - 子步驟（2026-11-23 拆分，各有驗收、各自一個 session；範圍、消費端、不能動、驗收照下方原文分配）：
     - A8-2a 契約：`api/` 的 notification service 全部方法（含串流與後台公告）、D6 的呈現分類與狀態重讀提示 enum、`ErrorReason`；`seller.proto:306` 白名單註解；backend `make connect`、TS、Dart 生成。`ErrorReason`：不需新增（標準 code 足夠）。驗收：`buf lint`、`buf breaking`、三端生成無 drift；handler 未掛時 `TestEveryServiceInTheContractIsMounted` 的紅是預期，在 A8-2b 消除。
-    - A8-2b 收件匣、偏好、token 的 unary handler：D9 代行者拒絕、`httpapi` 停權放行與限流豁免、掛載。驗收：每支方法的 Connect 特性測試；mutation：`MarkAsRead` 非本人成功、`total` 不套篩選。
+    - A8-2b 收件匣、偏好、token 的 unary handler：`model.Delivers` 改由型別註冊表推導每個分類實際送出的渠道（現只排除公告的 email，例：互動類沒有 email），偏好列表與更新依它過濾與拒絕；D9 代行者拒絕、`httpapi` 停權放行與限流豁免、掛載。驗收：每支方法的 Connect 特性測試；mutation：`MarkAsRead` 非本人成功、`total` 不套篩選。
     - A8-2c 後台公告：公告表、建立與列表、收件匣與推播分開的 job。驗收：沒有 token 的帳號也收到；特性測試。
     - A8-2d 串流與賣家工作區：hub、`(account_id, 受眾)` 訂閱與上限、`seller_workspace` 事件與發布端搬遷、website `useSellerWorkspaceRealtime` 改接。驗收：原文的串流 integration 與三個串流 mutation。
   - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到；公告表在本步建）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。推播 payload 與串流訊號帶 D6 的狀態重讀提示 enum。賣家工作區即時通道與通知串流共用路徑、SSE 連線與 topic `notification:user:{storeId}`（A8-0 U10，`fact-checks.md`；`seller_workspace_channel.go:14-34`），一起搬：同一個串流與 hub 承載 `seller_workspace` 事件、其發布端（`ResolveTopic` 讀 `payload.sellerId`）與批次事件名，website `useSellerWorkspaceRealtime` 改接新串流。
