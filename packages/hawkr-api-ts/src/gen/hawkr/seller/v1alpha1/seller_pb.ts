@@ -3346,7 +3346,7 @@ export enum SellerCapability {
   CHAT_READ = 9,
 
   /**
-   * 通知收件箱、偏好與裝置。
+   * 通知收件箱、偏好與裝置（NotificationAppService 的 STORE 受眾）。在停權白名單內：停權的賣家仍要讀到停權通知。代行營運的管理員不能使用通知（走 DelegatedService 的憑證，不經此能力）。
    *
    * @generated from enum value: SELLER_CAPABILITY_NOTIFICATION = 10;
    */
