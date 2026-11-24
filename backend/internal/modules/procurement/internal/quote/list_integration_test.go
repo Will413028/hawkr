@@ -175,10 +175,10 @@ func TestListPaginationSurvivesASellerRevisingBetweenPages(t *testing.T) {
 	// 第二頁還沒取之前，後面那一則回價改版，新版本的送出時間晚於其他所有版本。
 	f.exec(`UPDATE procurement.seller_responses SET latest_version = 2 WHERE id = $1`, ids[0])
 	f.exec(`INSERT INTO procurement.seller_response_versions (
-			id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit,
+			id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 			offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
 			valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-		SELECT $2, seller_response_id, 2, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit,
+		SELECT $2, seller_response_id, 2, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 			offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
 			valid_until, outside_buyer_requested_range, publication_version, $3, $4, $4
 		FROM procurement.seller_response_versions WHERE seller_response_id = $1 AND version = 1`, ids[0], uuid.NewV7(), uuid.NewV7(), start.Add(time.Hour))

@@ -64,7 +64,7 @@ func (q *Queries) GetSellerResponseForBuyer(ctx context.Context, arg GetSellerRe
 }
 
 const getSellerResponseVersion = `-- name: GetSellerResponseVersion :one
-SELECT id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit, offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount, lead_time_days, promised_delivery_at, valid_until, terms_note, deviation_disclosure, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at FROM procurement.seller_response_versions WHERE seller_response_id = $1 AND version = $2
+SELECT id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit, offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount, lead_time_days, promised_delivery_at, valid_until, terms_note, deviation_disclosure, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at FROM procurement.seller_response_versions WHERE seller_response_id = $1 AND version = $2
 `
 
 type GetSellerResponseVersionParams struct {
@@ -80,8 +80,7 @@ func (q *Queries) GetSellerResponseVersion(ctx context.Context, arg GetSellerRes
 		&i.SellerResponseID,
 		&i.Version,
 		&i.ResponseType,
-		&i.OfferedQualityGrade,
-		&i.OfferedQualityInspectionNotes,
+		&i.SpecNote,
 		&i.UnitBasisQuantity,
 		&i.UnitBasisUnit,
 		&i.OfferedQuantity,
@@ -108,7 +107,7 @@ func (q *Queries) GetSellerResponseVersion(ctx context.Context, arg GetSellerRes
 }
 
 const listCurrentSellerResponses = `-- name: ListCurrentSellerResponses :many
-SELECT r.id, r.publication_id, r.request_id, r.store_id, r.latest_version, r.withdrawn_version, r.withdrawn_at, r.write_closed_at, r.write_closed_reason, r.created_at, r.updated_at, v.id, v.seller_response_id, v.version, v.response_type, v.offered_quality_grade, v.offered_quality_inspection_notes, v.unit_basis_quantity, v.unit_basis_unit, v.offered_quantity, v.offered_quantity_unit, v.conversion_basis, v.currency, v.goods_amount, v.shipping_amount, v.tax_amount, v.tax_inclusion_basis, v.total_amount, v.lead_time_days, v.promised_delivery_at, v.valid_until, v.terms_note, v.deviation_disclosure, v.outside_buyer_requested_range, v.publication_version, v.client_request_id, v.submitted_at, v.created_at, (s.id IS NOT NULL)::boolean AS shortlisted
+SELECT r.id, r.publication_id, r.request_id, r.store_id, r.latest_version, r.withdrawn_version, r.withdrawn_at, r.write_closed_at, r.write_closed_reason, r.created_at, r.updated_at, v.id, v.seller_response_id, v.version, v.response_type, v.spec_note, v.unit_basis_quantity, v.unit_basis_unit, v.offered_quantity, v.offered_quantity_unit, v.conversion_basis, v.currency, v.goods_amount, v.shipping_amount, v.tax_amount, v.tax_inclusion_basis, v.total_amount, v.lead_time_days, v.promised_delivery_at, v.valid_until, v.terms_note, v.deviation_disclosure, v.outside_buyer_requested_range, v.publication_version, v.client_request_id, v.submitted_at, v.created_at, (s.id IS NOT NULL)::boolean AS shortlisted
 FROM procurement.seller_responses r
 JOIN procurement.rfq_publications p ON p.id = r.publication_id
 JOIN procurement.seller_response_versions v ON v.seller_response_id = r.id AND v.version = r.latest_version
@@ -171,8 +170,7 @@ func (q *Queries) ListCurrentSellerResponses(ctx context.Context, arg ListCurren
 			&i.ProcurementSellerResponseVersion.SellerResponseID,
 			&i.ProcurementSellerResponseVersion.Version,
 			&i.ProcurementSellerResponseVersion.ResponseType,
-			&i.ProcurementSellerResponseVersion.OfferedQualityGrade,
-			&i.ProcurementSellerResponseVersion.OfferedQualityInspectionNotes,
+			&i.ProcurementSellerResponseVersion.SpecNote,
 			&i.ProcurementSellerResponseVersion.UnitBasisQuantity,
 			&i.ProcurementSellerResponseVersion.UnitBasisUnit,
 			&i.ProcurementSellerResponseVersion.OfferedQuantity,

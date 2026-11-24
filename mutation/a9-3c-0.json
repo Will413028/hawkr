@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "response-hash-omits-spec-note",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfqhash/response.go",
+   "old": "ResponseType: in.ResponseType, SpecNote: in.SpecNote,",
+   "new": "ResponseType: in.ResponseType, SpecNote: \"\",",
+   "test": "internal/modules/procurement/internal/rfqhash ^TestEverySellerResponseFieldChangesTheHash$",
+   "why": "The seller response preimage no longer carries spec_note, so changing the note leaves the content hash unchanged."
+  },
+  {
+   "id": "publication-accepts-missing-candidate-set",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "if in.CandidateSetID == (uuid.UUID{}) {\n\t\treturn apperr.InvalidInputOn([]string{\"CandidateSetID\"}",
+   "new": "if false {\n\t\treturn apperr.InvalidInputOn([]string{\"CandidateSetID\"}",
+   "test": "internal/modules/procurement/internal/rfq ^TestAudienceShape$",
+   "why": "checkAudienceShape stops requiring a candidate set, so a publication preview without one passes input validation."
+  },
+  {
+   "id": "seller-response-invite-fk-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/db/migrations/20261124030023_procurement_wish_pool_spec_note.sql",
+   "old": "ALTER TABLE \"procurement\".\"seller_responses\" ADD CONSTRAINT \"seller_responses_invite_fk\" FOREIGN KEY (\"publication_id\", \"store_id\") REFERENCES \"procurement\".\"rfq_publication_invites\" (\"publication_id\", \"store_id\") ON UPDATE NO ACTION ON DELETE NO ACTION;",
+   "new": "SELECT 1;",
+   "test": "internal/modules/procurement ^TestSellerResponseRequiresAnInviteForTheStore$",
+   "why": "Without the composite foreign key a seller response row can exist for a store that has no invite row, so invite rows stop being the sole visibility basis."
+  },
+  {
+   "id": "approval-candidate-set-fk-cascades",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/db/migrations/20261124030023_procurement_wish_pool_spec_note.sql",
+   "old": "REFERENCES \"procurement\".\"candidate_sets\" (\"id\") ON UPDATE NO ACTION ON DELETE RESTRICT",
+   "new": "REFERENCES \"procurement\".\"candidate_sets\" (\"id\") ON UPDATE NO ACTION ON DELETE CASCADE",
+   "test": "internal/modules/procurement ^TestDeletingACandidateSetReferencedByAnApprovalIsRestricted$",
+   "why": "With a cascading foreign key a candidate set delete removes the approval and the seller-visible publication, invite, response and acceptance behind it, so BuyerDeleted loses records S10 requires to keep."
+  }
+ ]
+}

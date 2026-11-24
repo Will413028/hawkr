@@ -33,8 +33,7 @@ const (
 // SellerQuote 是賣家回價一個版本的報價內容；數量是固定三位小數的十進位字串。
 type SellerQuote struct {
 	ResponseType        string
-	QualityGrade        string
-	InspectionNotes     string
+	SpecNote            string
 	UnitBasisQuantity   string
 	UnitBasisUnit       string
 	OfferedQuantity     string

@@ -6,12 +6,6 @@ import (
 	"uuid"
 )
 
-// 發布受眾的模式（等於 rfq_publication_approvals.audience_mode 與 CHECK 的值）。
-const (
-	AudienceWishPool         = "WISH_POOL"
-	AudienceDirectRecipients = "DIRECT_RECIPIENTS"
-)
-
 // PublicationStatePublished 是發布目前唯一的狀態（rfq_publications.state 的 CHECK）。
 const PublicationStatePublished = "PUBLISHED"
 
@@ -52,10 +46,7 @@ type PublicationPreview struct {
 	SellerFacingHash string
 	Payload          SellerFacing
 	ExpiresAt        time.Time
-	// PolicyID 與 PolicyVersion 只有公開池有值。
-	PolicyID       *string
-	PolicyVersion  *int32
-	RecipientCount int32
+	RecipientCount   int32
 }
 
 // Publication 是 ExecuteRfqPublication 的結果；Replayed 為 true 表示這是冪等的重送，沒有建立新的發布。
@@ -63,7 +54,6 @@ type Publication struct {
 	ID               uuid.UUID
 	Version          int32
 	State            string
-	AudienceMode     string
 	AudienceHash     string
 	SellerFacingHash string
 	PublishedAt      time.Time
@@ -77,11 +67,10 @@ type RfqInvite struct {
 }
 
 // RfqPublished 在詢價發布成立的 transaction 內發出（ExecuteRfqPublication）：發布與邀請都已寫入，通知（A9-3c 的 relay 與 A8）消費它。
-// 公開池沒有邀請（收件人在發布後由 relay 決定）。重送冪等的發布不再發。
+// 邀請列就是賣家可見性的唯一依據（A9-D44）。重送冪等的發布不再發。
 type RfqPublished struct {
 	PublicationID, RequestID, ApprovalID uuid.UUID
 	BuyerID                              int64
-	AudienceMode                         string
 	PublishedAt                          time.Time
 	Invites                              []RfqInvite
 }

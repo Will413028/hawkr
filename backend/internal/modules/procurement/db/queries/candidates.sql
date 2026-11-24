@@ -1,10 +1,10 @@
 -- name: InsertCandidateSet :exec
 -- 一次搜尋一列（S1）；冪等鍵在 run（A9-D29），重送由呼叫端以 run 的冪等鍵擋下，不會走到這裡。
 INSERT INTO procurement.candidate_sets (id, request_id, request_revision_id, buyer_id, created_at)
-VALUES (@id, @request_id, @request_revision_id, @buyer_id, @now);
+VALUES (@id, @request_id, @request_revision_id, @buyer_id::bigint, @now);
 
 -- name: GetCandidateSetForBuyer :one
-SELECT * FROM procurement.candidate_sets WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id;
+SELECT * FROM procurement.candidate_sets WHERE id = @id AND request_id = @request_id AND buyer_id = @buyer_id::bigint;
 
 -- name: InsertCandidate :exec
 -- 沒有店名欄位（S9）；呼叫端只給 OPEN 的店。
@@ -14,7 +14,7 @@ VALUES (@id, @candidate_set_id, @store_id, @source_id, @rank, @now);
 -- name: ListCandidates :many
 SELECT c.* FROM procurement.candidates c
 JOIN procurement.candidate_sets s ON s.id = c.candidate_set_id
-WHERE c.candidate_set_id = @candidate_set_id AND s.buyer_id = @buyer_id
+WHERE c.candidate_set_id = @candidate_set_id AND s.buyer_id = @buyer_id::bigint
 ORDER BY c.rank, c.id;
 
 -- name: SetCandidateSelected :execrows
@@ -22,7 +22,7 @@ ORDER BY c.rank, c.id;
 UPDATE procurement.candidates c
 SET selected = @selected::bool, selected_at = CASE WHEN @selected::bool THEN @now::timestamptz ELSE NULL END
 FROM procurement.candidate_sets s
-WHERE c.id = @id AND c.candidate_set_id = s.id AND s.id = @candidate_set_id AND s.request_id = @request_id AND s.buyer_id = @buyer_id;
+WHERE c.id = @id AND c.candidate_set_id = s.id AND s.id = @candidate_set_id AND s.request_id = @request_id AND s.buyer_id = @buyer_id::bigint;
 
 -- name: GetLatestSucceededSearchSet :one
 -- 需求最新一筆成功的候選搜尋所產生的候選集 ID（有效的候選集＝需求在 MATCHING 時的這一個，A9-D29(4)）；沒有成功過的搜尋沒有列。

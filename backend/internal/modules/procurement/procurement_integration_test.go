@@ -15,6 +15,7 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -102,7 +103,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	}
 	c.approval, c.publication, c.invite, c.sellerResponse, c.acceptance = id(), id(), id(), id(), id()
 	n, err = q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600, BuyerNote: "請盡快", CandidateSetID: &c.candidateSet, AudienceMode: "DIRECT_RECIPIENTS",
+		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600, BuyerNote: "請盡快", CandidateSetID: c.candidateSet,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	})
 	rows("InsertApproval", n, err)
@@ -265,7 +266,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	}
 
 	appr, err := q.GetApproval(ctx, store.GetApprovalParams{ID: c.approval, RequestID: c.request, BuyerID: &c.buyer})
-	if err != nil || appr.State != "SUCCEEDED" || appr.Version != 3 || appr.BuyerNote != "請盡快" || appr.RangeLowerAmount != 400 || appr.RangeUpperAmount != 600 || appr.CandidateSetID == nil || *appr.CandidateSetID != c.candidateSet {
+	if err != nil || appr.State != "SUCCEEDED" || appr.Version != 3 || appr.BuyerNote != "請盡快" || appr.RangeLowerAmount != 400 || appr.RangeUpperAmount != 600 || appr.CandidateSetID != c.candidateSet {
 		t.Fatalf("GetApproval = %+v, %v", appr, err)
 	}
 	if got, err := q.GetApprovalByClientRequest(ctx, store.GetApprovalByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: appr.ClientRequestID}); err != nil || got.ID != c.approval {
@@ -330,7 +331,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	}
 	expiredApproval := id()
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: &c.candidateSet, AudienceMode: "DIRECT_RECIPIENTS",
+		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: c.candidateSet,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval（過期測試）n=%d err=%v", n, err)
@@ -500,6 +501,12 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 	q := store.New(d.Pool())
 	published := seed(ctx, t, q, 41, true)
 	draft := seed(ctx, t, q, 41, false)
+	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
+		ID: id(), BuyerID: &draft.buyer, RequestID: draft.request, RequestRevisionID: draft.revision, RangeLowerAmount: 400, RangeUpperAmount: 600,
+		CandidateSetID: draft.candidateSet, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
+	}); err != nil || n != 1 {
+		t.Fatalf("未發布的需求也有一張核准（候選集被它引用）：n=%d err=%v", n, err)
+	}
 	bystander := seed(ctx, t, q, 42, true)
 	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: events.NewBus()})
 
@@ -522,8 +529,16 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 			t.Errorf("%s 保留且 buyer_id 為 NULL，實際 %d 列", tbl, s.anonymized[tbl])
 		}
 	}
-	if s.conversations != 0 || s.turns != 0 || s.candidateSets != 0 || s.runs != 0 || s.usage != 0 {
-		t.Fatalf("已發布的需求的買家專屬資料（對話、輪次、候選、run、額度）要刪除：%+v", s)
+	if s.conversations != 0 || s.turns != 0 || s.runs != 0 || s.usage != 0 {
+		t.Fatalf("已發布的需求的買家專屬資料（對話、輪次、run、額度）要刪除：%+v", s)
+	}
+	if s.candidateSets != 1 || count(ctx, t, d, "candidate_sets", "id = $1 AND buyer_id IS NULL", published.candidateSet) != 1 ||
+		count(ctx, t, d, "candidates", "candidate_set_id = $1", published.candidateSet) != 1 {
+		t.Fatalf("核准引用的候選集（與它的候選列）要保留且 buyer_id 為 NULL：%+v", s)
+	}
+	if count(ctx, t, d, "rfq_publications", "id = $1", published.publication) != 1 || count(ctx, t, d, "buyer_quote_acceptances", "id = $1", published.acceptance) != 1 ||
+		count(ctx, t, d, "rfq_publication_approvals", "id = $1 AND candidate_set_id = $2", published.approval, published.candidateSet) != 1 {
+		t.Fatalf("發布、接受單與核准要保留：%+v", s)
 	}
 	for _, kept := range []struct{ table, where string }{
 		{"rfq_publication_invites", "id = $1"}, {"seller_responses", "id = $1"}, {"rfq_publication_approval_recipients", "approval_id = $1"},
@@ -569,6 +584,19 @@ func TestBuyerDeletedIsAtomicWhenALaterStepFails(t *testing.T) {
 	}
 }
 
+// A9-D44(2)：邀請列是賣家可見性的唯一依據，沒被邀請的店不能有回價列；被邀請的店可以。
+func TestSellerResponseRequiresAnInviteForTheStore(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	q := store.New(d.Pool())
+	c := seed(ctx, t, q, 62, true)
+	err := q.InsertSellerResponse(ctx, store.InsertSellerResponseParams{ID: id(), PublicationID: c.publication, RequestID: c.request, StoreID: storeID + 1, Now: epoch})
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23503" || pgErr.ConstraintName != "seller_responses_invite_fk" {
+		t.Fatalf("沒被邀請的店寫回價列要被外鍵擋下，得到 %v", err)
+	}
+}
+
 // R2-1：conversion_basis 在契約不是必填，空字串要能寫入；超過 500 個字元仍被擋。
 func TestSellerResponseVersionAllowsEmptyConversionBasis(t *testing.T) {
 	ctx := context.Background()
@@ -578,11 +606,11 @@ func TestSellerResponseVersionAllowsEmptyConversionBasis(t *testing.T) {
 	insert := func(version int, basis string) error {
 		_, err := d.Pool().Exec(ctx, `
 			INSERT INTO procurement.seller_response_versions (
-				id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes,
+				id, seller_response_id, version, response_type, spec_note,
 				unit_basis_quantity, unit_basis_unit, offered_quantity, offered_quantity_unit, conversion_basis, currency,
 				goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount, valid_until,
 				outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', 'A', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, false, 1, $6, $5, $5)`,
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, false, 1, $6, $5, $5)`,
 			id(), c.sellerResponse, version, basis, epoch, id())
 		return err
 	}
@@ -601,10 +629,9 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	q := store.New(d.Pool())
 	c := seed(ctx, t, q, 71, false)
 	approval := id()
-	policyID, policyVersion := "wish-pool", int32(1)
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, AudienceMode: "WISH_POOL",
-		AudiencePolicyID: &policyID, AudiencePolicyVersion: &policyVersion, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
+		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: c.candidateSet,
+		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval n=%d err=%v", n, err)
 	}
@@ -620,6 +647,25 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	}
 	if n, _ := q.MarkApprovalSucceeded(ctx, store.MarkApprovalSucceededParams{ID: approval, Version: claimed.Version, Now: epoch}); n != 0 {
 		t.Fatal("已 SUCCEEDED 的核准不能再被標一次（CAS）")
+	}
+}
+
+// 被核准引用的候選集不能被刪：FK 是 RESTRICT，核准、發布與賣家紀錄都保留。
+func TestDeletingACandidateSetReferencedByAnApprovalIsRestricted(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	q := store.New(d.Pool())
+	c := seed(ctx, t, q, 81, true)
+	_, err := d.Pool().Exec(ctx, `DELETE FROM procurement.candidate_sets WHERE id = $1`, c.candidateSet)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23001" || pgErr.ConstraintName != "rfq_publication_approvals_candidate_set_id_fkey" {
+		t.Fatalf("要被 rfq_publication_approvals_candidate_set_id_fkey 以 23001（restrict_violation） 擋下：%v", err)
+	}
+	if n := count(ctx, t, d, "rfq_publication_approvals", "id = $1", c.approval); n != 1 {
+		t.Fatalf("核准要保留，實際 %d 列", n)
+	}
+	if n := count(ctx, t, d, "rfq_publications", "id = $1", c.publication); n != 1 {
+		t.Fatalf("發布要保留，實際 %d 列", n)
 	}
 }
 

@@ -5,7 +5,7 @@ import "testing"
 func ptr[T any](v T) *T { return &v }
 
 func audienceBase() AudienceInput {
-	return AudienceInput{SchemaVersion: SchemaV1, Mode: "DIRECT_RECIPIENTS", StoreIDs: []int64{7, 3}}
+	return AudienceInput{SchemaVersion: SchemaV1, StoreIDs: []int64{7, 3}}
 }
 
 func sellerBase() SellerFacingInput {
@@ -21,7 +21,7 @@ func TestPartsAreDeterministicAndPinned(t *testing.T) {
 		got    func() (string, error)
 		golden string
 	}{
-		"audience": {func() (string, error) { return Audience(audienceBase()) }, "582d828451c11b3f941bf1bb7c80ff980113b5e6785e756a2553e7fa234f707d"},
+		"audience": {func() (string, error) { return Audience(audienceBase()) }, "9ccc7e54e4a53829449f42efa1dca04d549902af5c230f5b28b8d3a08a0c4faf"},
 		"seller":   {func() (string, error) { return SellerFacing(sellerBase()) }, "0a8a0889f0272ec086b0962e56dd5f86e271c6b490083f6430a8d0485762bcc2"},
 	} {
 		a, err := tc.got()
@@ -53,13 +53,10 @@ func TestPartsRejectUnknownSchemaVersions(t *testing.T) {
 func TestEveryAudienceFieldChangesTheHash(t *testing.T) {
 	want, _ := Audience(audienceBase())
 	for name, f := range map[string]func(*AudienceInput){
-		"mode":           func(i *AudienceInput) { i.Mode = "WISH_POOL" },
-		"policy id":      func(i *AudienceInput) { i.PolicyID = ptr("p") },
-		"policy version": func(i *AudienceInput) { i.PolicyVersion = ptr(int32(1)) },
-		"order":          func(i *AudienceInput) { i.StoreIDs = []int64{3, 7} },
-		"one fewer":      func(i *AudienceInput) { i.StoreIDs = []int64{7} },
-		"one more":       func(i *AudienceInput) { i.StoreIDs = []int64{7, 3, 9} },
-		"another store":  func(i *AudienceInput) { i.StoreIDs = []int64{7, 4} },
+		"order":         func(i *AudienceInput) { i.StoreIDs = []int64{3, 7} },
+		"one fewer":     func(i *AudienceInput) { i.StoreIDs = []int64{7} },
+		"one more":      func(i *AudienceInput) { i.StoreIDs = []int64{7, 3, 9} },
+		"another store": func(i *AudienceInput) { i.StoreIDs = []int64{7, 4} },
 	} {
 		in := audienceBase()
 		f(&in)

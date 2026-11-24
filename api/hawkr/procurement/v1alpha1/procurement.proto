@@ -72,18 +72,17 @@ service BuyerProcurementAppService {
   }
 
   // PreviewRfqPublication 依需求現行版本、買家的單價範圍與補充說明編出要發給賣家的內容，並建立不可變、只能執行一次的發布核准（有效 24 小時），
-  // 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與（指定對象時）候選集。
-  // 需求版本過時回 ABORTED，conflictTarget 是 request_revision；指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
+  // 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與候選集。
+  // 需求版本過時回 ABORTED，conflictTarget 是 request_revision；候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
   // 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位，回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
-  // 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、
+  // 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位不合（沒帶候選集或候選、候選重複、候選不在候選集裡）、
   // 回價期限不是合法日期或早於今天（台北時區）回 INVALID_ARGUMENT。
-  // 公開池的收件人在發布時決定，預覽的 recipient_count 是 0。
   rpc PreviewRfqPublication(PreviewRfqPublicationRequest) returns (PreviewRfqPublicationResponse);
 
   // ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
   // 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本、
   // 核准的回價期限已早於今天（台北時區），或 payload_hash 與核准的內容不符回 ABORTED，conflictTarget 是 publication_approval；
-  // 指定對象的候選集已不是有效的候選集回 ABORTED，conflictTarget 是 candidate_set；核准不屬於呼叫者回 NOT_FOUND。
+  // 候選集已不是有效的候選集回 ABORTED，conflictTarget 是 candidate_set；核准不屬於呼叫者回 NOT_FOUND。
   // 需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
   // 重送同一個 client_request_id 回第一次的發布（replayed 為 true），內容不同回 INVALID_ARGUMENT。
   rpc ExecuteRfqPublication(ExecuteRfqPublicationRequest) returns (ExecuteRfqPublicationResponse);
@@ -157,7 +156,7 @@ service SellerProcurementAppService {
   // SubmitSellerResponse 送出正式回價，產生不可變的新版本。詢價已被改版回 ABORTED，conflictTarget 是 publication；
   // 帶的 expected_seller_response_version 不是目前的版本（賣家已改價或撤回，或空字串卻已有正式回價）回 ABORTED，
   // conflictTarget 是 seller_response，client 必須明確告知使用者報價已變動，不得改用最新版靜默重送。
-  // 沒有填實際品相、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
+  // spec_note 超過 1000 字、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
   // FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。
   rpc SubmitSellerResponse(SubmitSellerResponseRequest) returns (SubmitSellerResponseResponse);
 
@@ -314,15 +313,6 @@ enum BlockKind {
   BLOCK_KIND_COMPLETE = 6;
 }
 
-// AudienceMode 是詢價發給誰。
-enum AudienceMode {
-  AUDIENCE_MODE_UNSPECIFIED = 0;
-  // 公開池：不指定對象，全站未停權的賣家。
-  AUDIENCE_MODE_WISH_POOL = 1;
-  // 指定對象：從候選搜尋的結果勾選。
-  AUDIENCE_MODE_DIRECT_RECIPIENTS = 2;
-}
-
 // PublicationState 是一次發布的狀態。
 enum PublicationState {
   PUBLICATION_STATE_UNSPECIFIED = 0;
@@ -347,7 +337,7 @@ enum SellerResponseType {
   SELLER_RESPONSE_TYPE_UNSPECIFIED = 0;
   // 賣家提出自己的商務條件。
   SELLER_RESPONSE_TYPE_MANUAL_QUOTE = 1;
-  // 接受買家的非價格條款，但仍須自行填齊品相與全部金額。
+  // 接受買家的非價格條款，但仍須自行填齊全部金額。
   SELLER_RESPONSE_TYPE_ACCEPT_NON_PRICE_TERMS_WITH_QUOTE = 2;
 }
 
@@ -548,9 +538,9 @@ message PublishedRfq {
   string publication_id = 1;
   string version = 2;
   google.protobuf.Timestamp publish_time = 3;
-  // 發布的對象數；公開池是 0。
+  // 發布的對象數。
   int32 recipient_count = 4;
-  // 已排入投遞的通知數；公開池是 0。
+  // 已排入投遞的通知數。
   int32 queued_count = 5;
   // 賣家實際收到的內容的 hash（SHA-256 小寫十六進位），與 ExecuteRfqPublicationResponse.seller_facing_payload_hash 是同一個值，
   // 原樣帶進 AcceptSellerQuoteRequest.expected_seller_facing_hash；讓買家重新載入之後仍能接受報價。
@@ -795,13 +785,11 @@ message PreviewRfqPublicationRequest {
   BuyerRequestedRange buyer_requested_range = 4 [(google.api.field_behavior) = REQUIRED];
   // 買家自己打的補充說明，原文轉呈給供應商，最多 500 字。伺服器不解析、不用它做候選比對。
   string buyer_note = 5;
-  AudienceMode audience_mode = 6 [(google.api.field_behavior) = REQUIRED];
-  // AUDIENCE_MODE_DIRECT_RECIPIENTS 必填。
-  string candidate_set_id = 7;
-  // AUDIENCE_MODE_DIRECT_RECIPIENTS 必填，順序有意義。
-  repeated string selected_candidate_ids = 8;
+  string candidate_set_id = 6 [(google.api.field_behavior) = REQUIRED];
+  // 順序有意義。
+  repeated string selected_candidate_ids = 7 [(google.api.field_behavior) = REQUIRED];
   // 賣家回價的期限（當日，台北時區），不得早於今天；沒有設定表示不設期限。
-  optional google.type.Date response_deadline = 9;
+  optional google.type.Date response_deadline = 8;
 }
 
 message PreviewRfqPublicationResponse {
@@ -813,12 +801,8 @@ message PreviewRfqPublicationResponse {
   // 將要發給賣家的內容。
   SellerFacingRfq seller_facing_payload = 5;
   google.protobuf.Timestamp expire_time = 6;
-  // 受眾政策的身分，讓買家介面講得出這會發給誰；公開池目前是全站未停權的賣家，沒有分類、地區或分級的限制。
-  // AUDIENCE_MODE_DIRECT_RECIPIENTS 時不設。
-  optional string audience_policy_id = 7;
-  optional int32 audience_policy_version = 8;
-  // 指定對象時是選定的家數；公開池是 0。
-  int32 recipient_count = 9;
+  // 選定的家數。
+  int32 recipient_count = 7;
 }
 
 message ExecuteRfqPublicationRequest {
@@ -838,12 +822,11 @@ message ExecuteRfqPublicationResponse {
   string publication_id = 1;
   string publication_version = 2;
   PublicationState state = 3;
-  AudienceMode audience_mode = 4;
-  string audience_hash = 5;
-  string seller_facing_payload_hash = 6;
-  google.protobuf.Timestamp publish_time = 7;
+  string audience_hash = 4;
+  string seller_facing_payload_hash = 5;
+  google.protobuf.Timestamp publish_time = 6;
   // 為 true 表示這是冪等的重送，沒有建立新的發布。
-  bool replayed = 8;
+  bool replayed = 7;
 }
 
 // ---- 對話 ----
@@ -917,8 +900,8 @@ message DeleteConversationResponse {}
 
 message SellerQuote {
   SellerResponseType response_type = 1 [(google.api.field_behavior) = REQUIRED];
-  // 賣家實際提供的品相，必填；平台與 LLM 不代填。
-  OfferedQuality offered_quality = 2 [(google.api.field_behavior) = REQUIRED];
+  // 賣家對規格的補充說明，選填；最多 1000 字（以 rune 計，頭尾空白由伺服器去除，規則同其他伺服器文字）。平台與 LLM 不代填。
+  string spec_note = 2;
   UnitBasis unit_basis = 3;
   // 十進位字串。
   string offered_quantity = 4;
@@ -936,11 +919,6 @@ message SellerQuote {
   google.protobuf.Timestamp valid_until_time = 14;
   string terms_note = 15;
   string deviation_disclosure = 16;
-}
-
-message OfferedQuality {
-  string grade = 1;
-  string inspection_notes = 2;
 }
 
 message UnitBasis {

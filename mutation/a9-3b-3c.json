@@ -85,8 +85,8 @@
    "id": "rfq-execute-skips-payload-hash-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
-   "old": "c.sellerHash != in.PayloadHash || (",
-   "new": "(",
+   "old": "c.sellerHash != in.PayloadHash || len(c.storeIDs) == 0",
+   "new": "len(c.storeIDs) == 0",
    "test": "internal/modules/procurement/internal/rfq ^TestExecuteStaleBranchesLeaveTheApprovalPending$",
    "why": "Execute no longer compares the caller's payload hash with the recomputed seller-facing hash."
   },
@@ -175,7 +175,7 @@
    "id": "rfq-preview-replay-ignores-candidate-set",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
-   "old": " || !sameUUID(a.CandidateSetID, in.CandidateSetID)",
+   "old": " || a.CandidateSetID != in.CandidateSetID",
    "new": "",
    "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationRejectsTheSameKeyWithDifferentContent$",
    "why": "A PreviewPublication replay no longer compares the candidate set, so a different set with the same stores replays the first approval."
@@ -194,7 +194,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
    "old": "BuyerNote: note, CandidateSetID: in.CandidateSetID,",
-   "new": "BuyerNote: note, CandidateSetID: nil,",
+   "new": "BuyerNote: note, CandidateSetID: uuid.UUID{},",
    "test": "internal/modules/procurement/internal/rfq ^TestExecuteDirectStillWorksWhileTheCandidateSetIsEffective$",
    "why": "The approval stops storing the candidate set, so Execute has nothing to re-check."
   },
