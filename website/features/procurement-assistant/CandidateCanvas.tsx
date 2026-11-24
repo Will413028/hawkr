@@ -101,10 +101,7 @@ export default function CandidateCanvas({
 		[onInteractionLockChange],
 	);
 	const selectedCandidates = candidateSet
-		? [
-				...candidateSet.candidates.platform,
-				...candidateSet.candidates.external,
-			].filter((candidate) => candidate.selected)
+		? candidateSet.candidates.filter((candidate) => candidate.selected)
 		: [];
 	const candidateSelectionIdentity = JSON.stringify([
 		candidateSet?.candidateSetId ?? null,

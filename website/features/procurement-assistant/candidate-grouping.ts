@@ -9,9 +9,8 @@ import type { ProcurementCandidate } from "@/features/procurement-assistant/type
  *
  * ## 為什麼是「收斂成商家」而不是「商家底下掛商品」
  *
- * 候選的單位是**收件人**不是品項（#2377 是 #2450 `DIRECT_RECIPIENTS` 的前置）。而且
- * EXTERNAL lane 的候選來自站外名單、根本沒有平台商品，商品層的呈現對目前的主要 lane
- * 全是空的。買家在這個階段要決定的是「找哪幾家問」，不是「買哪一個 SKU」。
+ * 候選的單位是**收件人**不是品項（#2377 是 #2450 `DIRECT_RECIPIENTS` 的前置）。
+ * 買家在這個階段要決定的是「找哪幾家問」，不是「買哪一個 SKU」。
  *
  * 價格同理不在這裡：買家看到的是自己設定的希望詢價區間，不是某一個平台商品的
  * 標價——設計書 57 §1.1-2 只認四種價格事實，商品標價不在其中。
@@ -22,11 +21,10 @@ import type { ProcurementCandidate } from "@/features/procurement-assistant/type
  * 刻意刪掉一個 disabled 的「預覽」分頁，就是為了這件事。
  *
  * 所以這裡不提供任何開關：**候選實際帶得出商家身分才收斂，帶不出就退回原本的平表**。
- * 這個判準自動涵蓋三種情況，而且不需要 feature flag：
+ * 這個判準自動涵蓋兩種情況，而且不需要 feature flag：
  *
  *   1. backend 尚未部署 #2377 —— 所有候選都沒有 storeId → 不收斂。
  *   2. 部署窗口內新舊 pod 並存 —— 同一次查詢可能混到有／沒有的候選 → 見 `ungrouped`。
- *   3. EXTERNAL lane —— 站外業者沒有平台賣家，`displayName` 本來就是商號名，維持原樣。
  */
 
 /** 一家商家，以及它底下被合併掉的候選。 */
@@ -177,11 +175,11 @@ export function candidatesToToggleForSeller(group: CandidateSellerGroup): {
  * 已勾選的候選代表幾個**收件人**。
  *
  * 底部行動列講的是「已選 N 家」，那個 N 必須跟畫面上被勾起來的列數對得起來：
- * PLATFORM lane 的列已經收斂成商家（見上方 `groupPlatformCandidates`），同一家底下
+ * 候選的列已經收斂成商家（見上方 `groupPlatformCandidates`），同一家底下
  * 選了三個候選在畫面上只是一列，用候選筆數會報成 3。
  *
- * 帶不出 `storeId` 的候選各自算一家——EXTERNAL lane 的站外業者本來就是一家一列，
- * 部署窗口內混進來的舊候選也走 `ungrouped` 各自成列，兩者的畫面單位都是「一列一家」。
+ * 帶不出 `storeId` 的候選各自算一家——部署窗口內混進來的舊候選走 `ungrouped`
+ * 各自成列，畫面單位同樣是「一列一家」。
  *
  * 只餵已勾選的候選；這個函式不自己過濾 `selected`，因為呼叫端手上本來就有那份陣列。
  */

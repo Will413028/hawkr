@@ -13,11 +13,7 @@ import {
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import RfqDraftFlow from "../RfqDraftFlow";
-import type {
-	RfqCommandResult,
-	RfqConfirmation,
-	RfqPricePreview,
-} from "../rfq-price-contract";
+import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
 import type {
 	RfqPublicationApproval,
 	RfqPublicationPreviewCommand,
@@ -39,29 +35,13 @@ const baseSlots = {
 
 function preview(overrides: Partial<RfqPricePreview> = {}): RfqPricePreview {
 	return {
-		pricePreviewId: "1234567890123456799",
-		version: "1",
 		buyerRequestedRange: {
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "58",
 			upperBoundAmount: "70",
 			basisQuantity: "1",
 			basisUnit: "KG",
 		},
-		payloadHash: "a".repeat(64),
 		quoteTotalRange: null,
-		...overrides,
-	} as RfqPricePreview;
-}
-
-function confirmation(
-	overrides: Partial<RfqConfirmation> = {},
-): RfqConfirmation {
-	return {
-		confirmedRfqSnapshotId: "1234567890123456802",
-		payloadHash: "c".repeat(64),
-		expiresAt: "2026-08-22T12:36:00Z",
 		...overrides,
 	};
 }
@@ -74,18 +54,14 @@ function approval(
 		approvalVersion: "1",
 		audienceHash: "d".repeat(64),
 		sellerFacingPayloadHash: "e".repeat(64),
-		sellerFacingPayloadJson: '{"item":"蘋果"}',
 		expiresAt: "2026-08-22T12:36:00Z",
-		audiencePolicyId: "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
-		audiencePolicyVersion: "1",
-		recipientCount: "0",
+		recipientCount: 1,
 		...overrides,
 	};
 }
 
 async function renderAtReconfirm(
 	data: RfqPricePreview,
-	confirmed: RfqConfirmation,
 	onPreviewRfqPublication: PublicationPreview = vi.fn(
 		async () =>
 			({
@@ -103,10 +79,7 @@ async function renderAtReconfirm(
 			candidates: [
 				{
 					candidateId: "seller-green",
-					sourceId: "product-green",
-					lane: "PLATFORM" as const,
 					displayName: "範例鮮果合作社",
-					score: 94,
 					matchedFacts: [],
 					unverifiableFacts: [],
 					factsAsOf: "2026-08-14T12:00:00Z",
@@ -117,10 +90,6 @@ async function renderAtReconfirm(
 			onReturnToConversation: () => {},
 			onPreviewRfqPrice: vi.fn(
 				async () => ({ ok: true, data }) as RfqCommandResult<RfqPricePreview>,
-			),
-			onConfirmRfqSnapshot: vi.fn(
-				async () =>
-					({ ok: true, data: confirmed }) as RfqCommandResult<RfqConfirmation>,
 			),
 			onRefreshSnapshot: async () => true,
 			onPreviewRfqPublication,
@@ -145,8 +114,7 @@ async function renderAtReconfirm(
 	fireEvent.click(
 		screen.getByRole("checkbox", { name: /我已核對這份需求版本與價格範圍/ }),
 	);
-	// P-01 的 CTA 逐字是「檢視不可變 RFQ 快照」（稿 P-01），它同時完成確認並
-	// 前往 R-01——R-01 的⑤要顯示 snapshotHash 與有效至，兩者只有確認後才存在。
+	// P-01 的 CTA 逐字是「檢視不可變 RFQ 快照」（稿 P-01），前往 R-01。
 	fireEvent.click(screen.getByRole("button", { name: "檢視不可變 RFQ 快照" }));
 	await waitFor(() => {
 		expect(screen.getByText("重新確認 RFQ 快照")).toBeTruthy();
@@ -155,34 +123,36 @@ async function renderAtReconfirm(
 
 // docx §V 圖說寫死：「snapshot reconfirm heading 固定為『重新確認 RFQ 快照』」。
 describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
-	it("快照追蹤顯示 pricePreviewId、snapshotHash 與有效至", async () => {
-		await renderAtReconfirm(preview(), confirmation());
+	// 快照追蹤只在取得發布核准之後出現：snapshotHash 與有效至都取自核准。
+	it("取得發布核准後快照追蹤顯示 snapshotHash 與有效至", async () => {
+		await renderAtReconfirm(preview());
+		expect(screen.queryByText("snapshotHash")).toBeNull();
 
-		expect(screen.getByText("pricePreviewId")).toBeTruthy();
-		expect(screen.getByText("snapshotHash")).toBeTruthy();
+		fireEvent.click(
+			screen.getByRole("checkbox", {
+				name: /我已重新檢查需求、希望價格與發布受眾/,
+			}),
+		);
+		fireEvent.click(screen.getByRole("button", { name: "確認並準備發布" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("snapshotHash")).toBeTruthy();
+		});
 		expect(screen.getByText("有效至")).toBeTruthy();
-	});
-
-	// 後端帶出 expiresAt 之前（backend PR #3381）確認的快照沒有這個欄位，整列
-	// 不顯示，不補當下時間假裝快照有到期日。
-	it("有效至為空字串時整列不顯示", async () => {
-		await renderAtReconfirm(preview(), confirmation({ expiresAt: "" }));
-
-		expect(screen.getByText("snapshotHash")).toBeTruthy();
-		expect(screen.queryByText("有效至")).toBeNull();
+		expect(screen.queryByText("pricePreviewId")).toBeNull();
 	});
 
 	// ADR 2026-09-12「confirmed snapshot 不加 version 欄」D2：稿上的「快照版本 v3」
 	// badge 不實作，也不得改用 snapshot id 短碼或前端自行編號替代。
 	it("不顯示稿上的快照版本 badge", async () => {
-		await renderAtReconfirm(preview(), confirmation());
+		await renderAtReconfirm(preview());
 
 		expect(screen.queryByText(/快照版本/)).toBeNull();
 	});
 
 	// 稿 R-01：未勾選時「確認並準備發布」disabled。
 	it("未勾選重新檢查前無法準備發布", async () => {
-		await renderAtReconfirm(preview(), confirmation());
+		await renderAtReconfirm(preview());
 
 		const cta = screen.getByRole("button", { name: "確認並準備發布" });
 		expect(cta.hasAttribute("disabled")).toBe(true);
@@ -201,7 +171,7 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 
 	// docx §V 圖說：CTA 下固定說明，逐字不可改寫。
 	it("CTA 下方帶固定的發布語意說明", async () => {
-		await renderAtReconfirm(preview(), confirmation());
+		await renderAtReconfirm(preview());
 
 		expect(
 			screen.getByText(
@@ -211,12 +181,11 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 	});
 
 	// 稿 R-01 ④。docx V.7.5：publicationAudience 是互斥的 discriminator，
-	// WISH_POOL 不得用空 recipient list 假裝定向邀請，所以兩個模式是 radio 而不是
-	// 兩個各自可填的欄位。預設投入許願池。
+	// 受眾只有直接邀請，沒有可切換的模式。
 	it("發布受眾是唯讀事實，只說明這份名單會收到", async () => {
-		await renderAtReconfirm(preview(), confirmation());
+		await renderAtReconfirm(preview());
 
-		expect(screen.getByText("平台賣家 1 家")).toBeTruthy();
+		expect(screen.getByText("賣家 1 家")).toBeTruthy();
 		expect(screen.getByText("只有這份名單上的候選會收到這筆詢價")).toBeTruthy();
 		expect(screen.queryByRole("radiogroup")).toBeNull();
 	});
@@ -235,7 +204,7 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 					data: approval(),
 				}) as RfqCommandResult<RfqPublicationApproval>,
 		);
-		await renderAtReconfirm(preview(), confirmation(), onPreviewRfqPublication);
+		await renderAtReconfirm(preview(), onPreviewRfqPublication);
 
 		fireEvent.click(
 			screen.getByRole("checkbox", {
@@ -249,18 +218,14 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		});
 		expect(onPreviewRfqPublication).toHaveBeenCalledWith(
 			expect.objectContaining({
-				audience: {
-					mode: "DIRECT_RECIPIENTS",
-					candidateSetId: "1234567890123456790",
-					selectedCandidateIds: ["seller-green"],
-				},
+				candidateSetId: "1234567890123456790",
+				selectedCandidateIds: ["seller-green"],
 			}),
 		);
 	});
 
 	// ⛔ 取得核准 ≠ 已發布。docx §V 圖說：只有 server 回傳可執行 approval 之後，
-	// 最終 execute CTA 才顯示「確認並投入許願池」——那一步（#2450 Scope 4）尚未
-	// 接上，所以這裡只呈現 server 回的受眾事實，不得出現任何宣稱已送出的字樣。
+	// 最終 execute CTA 才出現——這裡只呈現 server 回的受眾事實，不得出現任何宣稱已送出的字樣。
 	it("取得核准後呈現伺服器的受眾事實，且不宣稱已發布", async () => {
 		const onPreviewRfqPublication = vi.fn(
 			async () =>
@@ -269,7 +234,7 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 					data: approval(),
 				}) as RfqCommandResult<RfqPublicationApproval>,
 		);
-		await renderAtReconfirm(preview(), confirmation(), onPreviewRfqPublication);
+		await renderAtReconfirm(preview(), onPreviewRfqPublication);
 
 		fireEvent.click(
 			screen.getByRole("checkbox", {
@@ -279,7 +244,7 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		fireEvent.click(screen.getByRole("button", { name: "確認並準備發布" }));
 
 		await waitFor(() => {
-			expect(screen.getByText("WISH_POOL_ALL_ACTIVE_SELLERS_V1")).toBeTruthy();
+			expect(screen.getByText("1 位候選")).toBeTruthy();
 		});
 		expect(screen.queryByText(/已發布|已送出|已通知/)).toBeNull();
 	});
@@ -289,7 +254,7 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 
 	// 稿 R-01 的警示條：任一事實變更都會使確認失效。
 	it("顯示事實變更會使確認失效的警示", async () => {
-		await renderAtReconfirm(preview(), confirmation());
+		await renderAtReconfirm(preview());
 
 		expect(
 			screen.getByText(

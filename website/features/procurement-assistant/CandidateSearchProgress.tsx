@@ -4,8 +4,6 @@ import AppIcon from "@/components/shared/AppIcon";
 import { Button, Chip } from "@/components/ui";
 import type { ProcurementCandidateSearch } from "./types";
 
-const LANE_LABEL = { PLATFORM: "平台賣家" } as const;
-
 type SearchStatus = "PENDING" | "SUCCEEDED" | "FAILED";
 
 const SEARCH_STATUS_LABEL: Record<SearchStatus, string> = {
@@ -26,7 +24,7 @@ function searchStatusOf(
 }
 
 /** 輪詢掛掉時的重試入口。抽出來是因為 searching 階段有兩種畫面（合併後的軌、
- * 退回的兩列 lane 卡片），兩邊都必須看得到它——留在卡片裡的話，軌取代卡片時
+ * 退回的輪詢進度卡片），兩邊都必須看得到它——留在卡片裡的話，軌取代卡片時
  * 輪詢死掉就沒有任何重試的地方。 */
 export function SearchPollErrorAlert({
 	onRetryPolling,
@@ -58,6 +56,7 @@ export default function CandidateSearchProgress({
 	pollError,
 	onRetryPolling,
 }: CandidateSearchProgressProps) {
+	const status = searchStatusOf(candidateSet);
 	return (
 		<section
 			className="assistant-artifact assistant-progress"
@@ -66,7 +65,6 @@ export default function CandidateSearchProgress({
 			<header className="assistant-artifact__head">
 				<div>
 					<h2 id="progress-title">正在搜尋候選</h2>
-					<p>平台賣家與外部名單分開查詢，兩邊都完成後才會顯示結果。</p>
 				</div>
 				<Chip variant="dot" color="primary" size="sm">
 					搜尋中
@@ -77,25 +75,17 @@ export default function CandidateSearchProgress({
 				<SearchPollErrorAlert onRetryPolling={onRetryPolling} />
 			) : (
 				<ol className="assistant-progress__list">
-					{(["PLATFORM"] as const).map((lane) => {
-						const status = searchStatusOf(candidateSet);
-						return (
-							<li
-								key={lane}
-								data-status={status === "SUCCEEDED" ? "completed" : "current"}
-							>
-								<AppIcon
-									name={status === "SUCCEEDED" ? "check" : "clock"}
-									size={17}
-									aria-hidden="true"
-								/>
-								<div>
-									<strong>{LANE_LABEL[lane]}</strong>
-									<span>{SEARCH_STATUS_LABEL[status]}</span>
-								</div>
-							</li>
-						);
-					})}
+					<li data-status={status === "SUCCEEDED" ? "completed" : "current"}>
+						<AppIcon
+							name={status === "SUCCEEDED" ? "check" : "clock"}
+							size={17}
+							aria-hidden="true"
+						/>
+						<div>
+							<strong>搜尋候選供應商</strong>
+							<span>{SEARCH_STATUS_LABEL[status]}</span>
+						</div>
+					</li>
 				</ol>
 			)}
 		</section>

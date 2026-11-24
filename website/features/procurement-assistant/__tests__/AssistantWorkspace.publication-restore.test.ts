@@ -1,6 +1,9 @@
 /** @vitest-environment jsdom */
 
 import {
+	RunFailureReason,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import {
 	cleanup,
 	fireEvent,
 	render as renderWithoutIntl,
@@ -236,8 +239,8 @@ function candidateOnlyState() {
 		runId: "1234567890123456792",
 		candidateSetId: "1234567890123456790",
 		status: "SUCCEEDED",
-		failureReason: "",
-		candidates: { platform: [], external: [] },
+		failureReason: RunFailureReason.UNSPECIFIED,
+		candidates: [],
 	};
 	// session 內剛跑完搜尋的樣子：stage 是 "candidates"，還沒有任何 publication。
 	return {

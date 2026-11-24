@@ -7,7 +7,7 @@
  *
  * ⛔ 硬界線：本 demo 不呼叫 `POST /quote-batches`。那支會建立
  * `procurement_quote_invites` 並經 outbox 發 `procurement.quote.invite.created`
- * 到 RabbitMQ；PLATFORM lane 是真的會通知賣家的。demo 只呼叫價格試算（純計算、不寫入），
+ * 到 RabbitMQ，是真的會通知賣家的。demo 只呼叫價格試算（純計算、不寫入），
  * 不對任何賣家產生訊息。
  */
 
@@ -43,7 +43,6 @@ export interface DemoRequirement {
 export interface DemoCandidate {
 	candidateId: string;
 	displayName: string;
-	lane: string;
 	matchedFactCount: number;
 	unverifiableFactCount: number;
 }

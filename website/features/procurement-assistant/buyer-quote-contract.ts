@@ -7,6 +7,11 @@ import {
 	SellerResponseStatus,
 	SellerResponseType,
 } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import {
+	commonUnknown,
+	procurementQuoteAcceptability,
+} from "@hawkr/ui-text/keys";
+import { optionalText, type UiText } from "@/lib/i18n/ui-text";
 import type { ProcurementFailure } from "./errors";
 import { timestampIso } from "./proto-map";
 
@@ -58,24 +63,21 @@ export type QuoteAcceptability =
 	| "SUPERSEDED"
 	| "INELIGIBLE";
 
-const QUOTE_ACCEPTABILITY_LABEL: Record<QuoteAcceptability, string> = {
-	ACCEPTABLE: "可接受",
-	EXPIRED: "已逾有效期",
-	WITHDRAWN: "賣家已撤回",
-	SUPERSEDED: "已被新版本取代",
-	INELIGIBLE: "不符合接受資格",
-};
-
 /** 只有恰好等於 ACCEPTABLE 才放行；不認得的值一律不可接受。 */
 export function isAcceptableQuote(acceptability: string): boolean {
 	return acceptability === "ACCEPTABLE";
 }
 
-/** 不可接受的原因文案；不認得的值回不宣稱原因的中性說明。 */
-export function quoteAcceptabilityLabel(acceptability: string): string {
+/** 可接受性的顯示文字（共用文案目錄）。 */
+export function quoteAcceptabilityLabel(
+	ut: UiText,
+	acceptability: QuoteAcceptability,
+): string {
 	return (
-		QUOTE_ACCEPTABILITY_LABEL[acceptability as QuoteAcceptability] ??
-		"目前無法接受這個版本"
+		optionalText(
+			ut,
+			procurementQuoteAcceptability(ProtoAcceptability[acceptability]),
+		) ?? ut(commonUnknown())
 	);
 }
 

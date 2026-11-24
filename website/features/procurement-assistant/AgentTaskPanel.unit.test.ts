@@ -1,5 +1,8 @@
 /** @vitest-environment jsdom */
 
+import {
+	RunFailureReason,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -45,8 +48,8 @@ const searchRows: AgentActivityEvent[] = [
 	},
 	{
 		rowId: "9003",
-		code: "SEARCH_EXTERNAL",
-		label: "查看外部業者",
+		code: "READ_SELLER",
+		label: "讀取賣家資料",
 		status: "RUNNING",
 		parentRowId: "9001",
 		text: "",
@@ -186,8 +189,8 @@ describe("AgentTaskPanel 搜尋狀態", () => {
 			runId: "run-1",
 			candidateSetId: "candidates-1",
 			status: "RUNNING",
-			failureReason: "",
-			candidates: { platform: [], external: [] },
+			failureReason: RunFailureReason.UNSPECIFIED,
+			candidates: [],
 		};
 		const { rerender } = renderPanel({ pending: true, liveActivity: [row] });
 		rerender(
@@ -198,8 +201,8 @@ describe("AgentTaskPanel 搜尋狀態", () => {
 			}),
 		);
 		expect(screen.getByText("正在搜尋候選")).toBeTruthy();
-		expect(screen.getByText("平台賣家")).toBeTruthy();
-		expect(screen.getByText("搜尋中")).toBeTruthy();
+		expect(screen.getByText("搜尋候選供應商")).toBeTruthy();
+		expect(screen.getAllByText("搜尋中").length).toBeGreaterThan(0);
 		expect(screen.queryByTestId("agent-activity-rail")).toBeNull();
 		expect(screen.queryByText("理解採購需求")).toBeNull();
 	});

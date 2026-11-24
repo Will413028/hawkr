@@ -191,7 +191,6 @@ describe("candidates", () => {
 			displayName: "阿水果行",
 			storeId: "store-1",
 			storeCode: "ab12",
-			lane: "PLATFORM",
 			selected: true,
 			factsAsOf: "2026-08-20T00:00:00.000Z",
 		});
@@ -205,7 +204,7 @@ describe("candidates", () => {
 		expect(closed.displayName).toBe("已關閉的店家");
 	});
 
-	it("搜尋結果的失敗原因是列舉名稱，成功時是空字串", () => {
+	it("搜尋結果帶失敗原因的列舉值，成功時是 UNSPECIFIED", () => {
 		const failed = candidateSearchFromProto(
 			create(GetCandidateSearchResponseSchema, {
 				requestId: "r",
@@ -217,7 +216,7 @@ describe("candidates", () => {
 		);
 		expect(failed).toMatchObject({
 			status: "FAILED",
-			failureReason: "WORKER_LOST",
+			failureReason: RunFailureReason.WORKER_LOST,
 		});
 		const ok = candidateSearchFromProto(
 			create(GetCandidateSearchResponseSchema, {
@@ -226,9 +225,8 @@ describe("candidates", () => {
 			}),
 			"x",
 		);
-		expect(ok.failureReason).toBe("");
-		expect(ok.candidates.platform).toHaveLength(1);
-		expect(ok.candidates.external).toEqual([]);
+		expect(ok.failureReason).toBe(RunFailureReason.UNSPECIFIED);
+		expect(ok.candidates).toHaveLength(1);
 	});
 });
 

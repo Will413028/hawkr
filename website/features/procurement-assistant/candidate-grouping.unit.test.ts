@@ -12,7 +12,6 @@ function candidate(
 	overrides: Partial<ProcurementCandidate> & { candidateId: string },
 ): ProcurementCandidate {
 	return {
-		lane: "PLATFORM",
 		displayName: `候選 ${overrides.candidateId}`,
 		matchedFacts: [],
 		unverifiableFacts: [],
@@ -237,12 +236,12 @@ describe("countSelectedRecipients", () => {
 		).toBe(2);
 	});
 
-	// EXTERNAL lane 的站外業者沒有 storeId，畫面上本來就是一家一列。
+	// 帶不出 storeId 的候選畫面上本來就是一家一列。
 	it("帶不出 storeId 的候選各自算一家", () => {
 		expect(
 			countSelectedRecipients([
-				candidate({ candidateId: "1", lane: "EXTERNAL", selected: true }),
-				candidate({ candidateId: "2", lane: "EXTERNAL", selected: true }),
+				candidate({ candidateId: "1", selected: true }),
+				candidate({ candidateId: "2", selected: true }),
 			]),
 		).toBe(2);
 	});

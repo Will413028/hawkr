@@ -14,7 +14,6 @@ import {
 	type Slots as ProtoSlots,
 	type PublishedRfq,
 	RequestStatus,
-	RunFailureReason,
 	RunStatus,
 	type RunSummary,
 	RunType,
@@ -266,7 +265,6 @@ export function candidateFromProto(
 	const store = candidate.store;
 	return {
 		candidateId: candidate.id,
-		lane: "PLATFORM",
 		displayName: store?.name?.trim() || closedStoreName,
 		matchedFacts: candidate.matchedFacts.map((f) => ({
 			key: slotKeyCode(f.slotKey),
@@ -293,16 +291,10 @@ export function candidateSearchFromProto(
 		runId: res.runId,
 		candidateSetId: res.candidateSetId,
 		status: runStatusCode(res.status),
-		failureReason:
-			res.failureReason === RunFailureReason.UNSPECIFIED
-				? ""
-				: (RunFailureReason[res.failureReason] ?? ""),
-		candidates: {
-			platform: res.candidates.map((c) =>
-				candidateFromProto(c, closedStoreName),
-			),
-			external: [],
-		},
+		failureReason: res.failureReason,
+		candidates: res.candidates.map((c) =>
+			candidateFromProto(c, closedStoreName),
+		),
 	};
 }
 

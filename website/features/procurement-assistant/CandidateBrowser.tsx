@@ -1,15 +1,16 @@
 "use client";
 
+import { procurementRunFailureReason } from "@hawkr/ui-text/keys";
 import * as React from "react";
 import AppIcon, { type AppIconName } from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
-import { Button, Chip, Tabs } from "@/components/ui";
+import { Button, Chip } from "@/components/ui";
 import type {
 	ProcurementCandidate,
 	ProcurementCandidateSearch,
-	ProcurementLane,
 } from "@/features/procurement-assistant/types";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
+import { optionalText, useUiText } from "@/lib/i18n/ui-text";
 import Link from "@/lib/intl/native-link";
 import {
 	type CandidateSellerGroup,
@@ -19,28 +20,6 @@ import {
 	groupPlatformCandidates,
 	sellerSelectionState,
 } from "./candidate-grouping";
-
-/** lane 對買家的說法。**只有這一份**——`AssistantWorkspace` 的候選詳情面板
- * 原本各自寫死一組同義字串，清單改了詳情不會跟著改。 */
-export const LANE_LABEL: Record<ProcurementLane, string> = {
-	PLATFORM: "平台賣家",
-	EXTERNAL: "外部業者",
-};
-
-/**
- * 兩條 lane 各自的代號圖示：平台賣家是一間店，站外業者是一只箱子。
- *
- * 兩條 lane 的可信度不同（平台賣家有 KYC，站外業者只有公開商務資訊），而候選列的
- * 其餘欄位對兩者長得一模一樣——沒有這個代號，買家得讀完 badge 文字才分得出來。
- *
- * 字形取自共用 registry 現有的名字。registry 沒有「店面」「紙箱」這兩個字形，
- * 所以這裡不新造字形，取語意最近的
- * 「建物 vs 容器」把兩條 lane 分開。
- */
-const LANE_AVATAR_ICON: Record<ProcurementLane, AppIconName> = {
-	PLATFORM: "home",
-	EXTERNAL: "box",
-};
 
 /**
  * `matchedFacts[].key` 逐列對應的圖示。
@@ -68,19 +47,17 @@ function factGlyph(key: string): AppIconName {
 	return FACT_GLYPH_BY_SLOT[key] ?? "check";
 }
 
-/** 候選列的身分區塊：代號圖示＋名稱。兩種列（單一候選／收斂後的商家）共用同一份，
- * 只有圖示來源不同——商家有 logo 就用 logo，其餘一律用 lane 代號。 */
+/** 候選列的身分區塊：圖示＋名稱。兩種列（單一候選／收斂後的商家）共用同一份，
+ * 只有圖示來源不同——商家有 logo 就用 logo，其餘一律用店面圖示。 */
 function CandidateIdentity({
-	lane,
 	name,
 	logoUrl,
 }: {
-	lane: ProcurementLane;
 	name: string;
 	logoUrl?: string | null;
 }) {
 	return (
-		<span className="assistant-candidate-identity" data-lane={lane}>
+		<span className="assistant-candidate-identity">
 			<span className="assistant-candidate-identity__avatar" aria-hidden="true">
 				{logoUrl ? (
 					<AppImage
@@ -91,7 +68,7 @@ function CandidateIdentity({
 						preset="avatar"
 					/>
 				) : (
-					<AppIcon name={LANE_AVATAR_ICON[lane]} size={19} />
+					<AppIcon name="home" size={19} />
 				)}
 			</span>
 			<strong>{name}</strong>
@@ -176,18 +153,9 @@ function CandidateRow({
 
 			<td className="assistant-candidate-row__identity">
 				<CandidateIdentity
-					lane={candidate.lane}
 					name={candidate.displayName}
 					logoUrl={candidate.logoUrl}
 				/>
-				<span className="assistant-candidate-row__meta">
-					<span
-						className="assistant-candidate-row__lane"
-						data-lane={candidate.lane}
-					>
-						{LANE_LABEL[candidate.lane]}
-					</span>
-				</span>
 			</td>
 
 			<td className="assistant-candidate-row__actions">
@@ -336,15 +304,8 @@ function SellerRow({
 			</td>
 
 			<td className="assistant-candidate-row__identity">
-				<CandidateIdentity
-					lane="PLATFORM"
-					name={group.sellerName}
-					logoUrl={group.logoUrl}
-				/>
+				<CandidateIdentity name={group.sellerName} logoUrl={group.logoUrl} />
 				<span className="assistant-candidate-row__meta">
-					<span className="assistant-candidate-row__lane" data-lane="PLATFORM">
-						{LANE_LABEL.PLATFORM}
-					</span>
 					<span className="assistant-candidate-row__match-count">
 						{group.candidates.length} 項符合的商品
 					</span>
@@ -420,8 +381,7 @@ function SellerRow({
 	);
 }
 
-function LanePanel({
-	lane,
+function CandidatePanel({
 	candidates,
 	disabled,
 	pendingSelectionCandidateIds,
@@ -430,7 +390,6 @@ function LanePanel({
 	query,
 	onQueryChange,
 }: {
-	lane: ProcurementLane;
 	candidates: ProcurementCandidate[];
 	disabled: boolean;
 	pendingSelectionCandidateIds: ReadonlySet<string>;
@@ -449,8 +408,6 @@ function LanePanel({
 			)
 		: candidates;
 	const selectedCount = candidates.filter((c) => c.selected).length;
-	// EXTERNAL lane 的候選來自站外名單，永遠沒有平台賣家可分組——這個判斷由
-	// canGroupBySeller 的資料判準自然涵蓋，不需要另外寫 lane 的特例。
 	const grouped = canGroupBySeller(visibleCandidates)
 		? groupPlatformCandidates(visibleCandidates)
 		: null;
@@ -477,7 +434,7 @@ function LanePanel({
 	};
 
 	return (
-		<div className="assistant-lane" data-lane={lane}>
+		<div className="assistant-lane">
 			<div className="assistant-lane__intro">
 				<div>
 					{/* 收斂成商家之後，「幾筆」講的必須是商家數——沿用候選數會讓標題與
@@ -489,11 +446,7 @@ function LanePanel({
 					</strong>
 					<span>已選 {selectedCount} 筆</span>
 				</div>
-				<p>
-					{lane === "PLATFORM"
-						? "候選不是供貨承諾；正式報價才代表賣家願意承接。"
-						: "外部資料只顯示公開商務資訊；完整聯絡資料不會出現在這個工作台。"}
-				</p>
+				<p>候選不是供貨承諾；正式報價才代表賣家願意承接。</p>
 			</div>
 			<div className="assistant-lane__filter">
 				<AppIcon name="search" size={18} aria-hidden="true" />
@@ -501,8 +454,8 @@ function LanePanel({
 					type="search"
 					value={query}
 					onChange={(event) => onQueryChange(event.currentTarget.value)}
-					placeholder={`搜尋${LANE_LABEL[lane]}候選或條件`}
-					aria-label={`搜尋${LANE_LABEL[lane]}候選`}
+					placeholder="搜尋候選或條件"
+					aria-label="搜尋候選"
 				/>
 				{query ? (
 					<button type="button" onClick={() => onQueryChange("")}>
@@ -512,10 +465,7 @@ function LanePanel({
 			</div>
 
 			{visibleCandidates.length > 0 ? (
-				<table
-					className="assistant-candidate-table"
-					aria-label={`${LANE_LABEL[lane]}候選資料`}
-				>
+				<table className="assistant-candidate-table" aria-label="候選資料">
 					<thead className="assistant-candidate-table__head">
 						<tr>
 							<th scope="col">選取</th>
@@ -553,7 +503,7 @@ function LanePanel({
 			) : (
 				<div className="assistant-lane__empty" role="status">
 					<AppIcon name="search" size={24} aria-hidden="true" />
-					<strong>這個頁籤沒有符合篩選的候選</strong>
+					<strong>沒有符合篩選的候選</strong>
 					<p>已選名單不受影響；清除搜尋即可查看全部候選。</p>
 					<Button
 						variant="bordered"
@@ -579,14 +529,8 @@ export default function CandidateBrowser({
 	rfqDraftEnabled,
 	headingRef,
 }: CandidateBrowserProps) {
-	const [activeLane, setActiveLane] =
-		React.useState<ProcurementLane>("PLATFORM");
-	const [laneQueries, setLaneQueries] = React.useState<
-		Record<ProcurementLane, string>
-	>({
-		PLATFORM: "",
-		EXTERNAL: "",
-	});
+	const ut = useUiText();
+	const [query, setQuery] = React.useState("");
 
 	if (candidateSet.status === "FAILED") {
 		return (
@@ -602,9 +546,13 @@ export default function CandidateBrowser({
 				<div className="assistant-invalidated" role="alert">
 					<AppIcon name="danger" size={20} aria-hidden="true" />
 					<div>
-						{/* failureReason 是機器可讀的失敗原因；缺值時仍要有可讀的替代文案，
-						    否則這塊 alert 會整個空白。 */}
-						<strong>{candidateSet.failureReason || "搜尋失敗"}</strong>
+						{/* failureReason 的文字來自共用文案目錄；沒有值（UNSPECIFIED）時只留標題。 */}
+						<strong>
+							{optionalText(
+								ut,
+								procurementRunFailureReason(candidateSet.failureReason),
+							) ?? null}
+						</strong>
 						<p>請重新搜尋一次候選。</p>
 					</div>
 				</div>
@@ -613,8 +561,8 @@ export default function CandidateBrowser({
 		);
 	}
 
-	const { platform, external } = candidateSet.candidates;
-	const selectedCandidates = [...platform, ...external].filter(
+	const candidates = candidateSet.candidates;
+	const selectedCandidates = candidates.filter(
 		(candidate) => candidate.selected,
 	);
 	const selectedCount = selectedCandidates.length;
@@ -650,61 +598,14 @@ export default function CandidateBrowser({
 				</div>
 			) : null}
 
-			{/* 實心膠囊而不是底線分頁：這兩個頁籤是「要看哪一批候選」的主要切換，
-			    在窄面板裡底線的命中區與選中感都太弱。文字用 LANE_LABEL，不再另寫
-			    一組同義字（兩顆分頁原本各自寫死一份）——那正是本檔頂端那條註解在防的漂移。 */}
-			<Tabs
-				aria-label="候選來源"
-				variant="solid"
-				fullWidth
-				selectedKey={activeLane}
-				onSelectionChange={(key) => setActiveLane(key as ProcurementLane)}
-				items={[
-					{
-						key: "PLATFORM",
-						label: (
-							<span className="assistant-tab-label">
-								{LANE_LABEL.PLATFORM} <b>{platform.length}</b>
-							</span>
-						),
-						content: (
-							<LanePanel
-								lane="PLATFORM"
-								candidates={platform}
-								disabled={candidatesStale}
-								pendingSelectionCandidateIds={pendingSelectionCandidateIds}
-								onToggleSelection={onToggleSelection}
-								onOpenCandidate={onOpenCandidate}
-								query={laneQueries.PLATFORM}
-								onQueryChange={(value) =>
-									setLaneQueries((current) => ({ ...current, PLATFORM: value }))
-								}
-							/>
-						),
-					},
-					{
-						key: "EXTERNAL",
-						label: (
-							<span className="assistant-tab-label">
-								{LANE_LABEL.EXTERNAL} <b>{external.length}</b>
-							</span>
-						),
-						content: (
-							<LanePanel
-								lane="EXTERNAL"
-								candidates={external}
-								disabled={candidatesStale}
-								pendingSelectionCandidateIds={pendingSelectionCandidateIds}
-								onToggleSelection={onToggleSelection}
-								onOpenCandidate={onOpenCandidate}
-								query={laneQueries.EXTERNAL}
-								onQueryChange={(value) =>
-									setLaneQueries((current) => ({ ...current, EXTERNAL: value }))
-								}
-							/>
-						),
-					},
-				]}
+			<CandidatePanel
+				candidates={candidates}
+				disabled={candidatesStale}
+				pendingSelectionCandidateIds={pendingSelectionCandidateIds}
+				onToggleSelection={onToggleSelection}
+				onOpenCandidate={onOpenCandidate}
+				query={query}
+				onQueryChange={setQuery}
 			/>
 
 			<div className="assistant-rfq-action-bar">

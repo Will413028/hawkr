@@ -1,4 +1,7 @@
-import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import type {
+	RejectionReason,
+	RunFailureReason,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { PublicNarrativeBlock } from "./narrative";
 
 export type ProcurementStage =
@@ -47,8 +50,6 @@ export interface ProcurementChatTurn {
 	createdAt: number;
 }
 
-export type ProcurementLane = "PLATFORM" | "EXTERNAL";
-
 export interface ProcurementItemResolution {
 	kind: "CATEGORY_CONFIRMED" | "BUYER_DESCRIBED";
 	label?: string;
@@ -85,7 +86,6 @@ export type ProcurementRunStatus =
 
 export interface ProcurementCandidate {
 	candidateId: string;
-	lane: ProcurementLane;
 	/** 店家卡片的名稱；卡片沒有名稱（個資清除之後）時是「已關閉的店家」。 */
 	displayName: string;
 	matchedFacts: Array<{ key: string; label: string }>;
@@ -103,12 +103,9 @@ export interface ProcurementCandidateSearch {
 	runId: string;
 	candidateSetId: string;
 	status: ProcurementRunStatus;
-	/** 失敗原因的列舉名稱（RunFailureReason），沒有失敗時是空字串。 */
-	failureReason: string;
-	candidates: {
-		platform: ProcurementCandidate[];
-		external: ProcurementCandidate[];
-	};
+	/** 沒有失敗時是 UNSPECIFIED。 */
+	failureReason: RunFailureReason;
+	candidates: ProcurementCandidate[];
 }
 
 export interface ProcurementInterrupt {

@@ -12,7 +12,7 @@ import { optionalText, useUiText } from "@/lib/i18n/ui-text";
 import ClarifyQuestionCard from "./ClarifyQuestionCard";
 import HawkrAgentTypingRow from "./HawkrAgentTypingRow";
 import { legacyReplyToBlocks, narrativeIcon } from "./narrative";
-import { RUN_CANCEL_COPY } from "./runtime-snapshot-contract";
+import { runCancelCopy } from "./runtime-snapshot-contract";
 import { slotLabel } from "./session-logic";
 import { groupLabel, shouldStartGroup } from "./transcript-groups";
 import type { ClarifyQuestion, ProcurementChatTurn } from "./types";
@@ -438,6 +438,7 @@ export function ProcurementClarifyComposer({
 	stopState = { status: "idle" },
 	onStop,
 }: ProcurementClarifyComposerProps) {
+	const ut = useUiText();
 	const [validationError, setValidationError] = React.useState<string | null>(
 		null,
 	);
@@ -455,10 +456,10 @@ export function ProcurementClarifyComposer({
 		stopState.status !== "requesting" &&
 		!stopAnswered;
 	// 四個 disposition 各講各的話：只有 REQUESTED 是「正在停止」，另外三個
-	// 講的是這一輪已經到終點、已完成的結果沒有被作廢（RUN_CANCEL_COPY）。
+	// 講的是這一輪已經到終點、已完成的結果沒有被作廢（runCancelCopy）。
 	const stopNotice =
 		stopState.status === "settled"
-			? RUN_CANCEL_COPY[stopState.disposition]
+			? runCancelCopy(ut, stopState.disposition)
 			: stopState.status === "error"
 				? stopState.detail
 				: null;

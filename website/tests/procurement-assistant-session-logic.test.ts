@@ -93,7 +93,6 @@ test("applyOptimisticSelection flips only the targeted candidate and returns a n
 	const candidates: ProcurementCandidate[] = [
 		{
 			candidateId: "1",
-			lane: "PLATFORM",
 			displayName: "A",
 			matchedFacts: [],
 			unverifiableFacts: [],
@@ -102,7 +101,6 @@ test("applyOptimisticSelection flips only the targeted candidate and returns a n
 		},
 		{
 			candidateId: "2",
-			lane: "PLATFORM",
 			displayName: "B",
 			matchedFacts: [],
 			unverifiableFacts: [],

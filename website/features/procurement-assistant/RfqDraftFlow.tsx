@@ -153,18 +153,8 @@ export default function RfqDraftFlow({
 	const [responseDeadline, setResponseDeadline] = React.useState("");
 	const hasRecipients = candidates.length > 0;
 	const recipientBreakdown = React.useMemo(() => {
-		const platform = countSelectedRecipients(
-			candidates.filter((candidate) => candidate.lane === "PLATFORM"),
-		);
-		const external = countSelectedRecipients(
-			candidates.filter((candidate) => candidate.lane === "EXTERNAL"),
-		);
-		return [
-			platform > 0 ? `平台賣家 ${platform} 家` : "",
-			external > 0 ? `站外業者 ${external} 家` : "",
-		]
-			.filter(Boolean)
-			.join(" · ");
+		const recipients = countSelectedRecipients(candidates);
+		return recipients > 0 ? `賣家 ${recipients} 家` : "";
 	}, [candidates]);
 	const [publicationState, setPublicationState] = React.useState<
 		RemoteState<RfqPublicationApproval>
@@ -223,10 +213,6 @@ export default function RfqDraftFlow({
 	]
 		.filter(Boolean)
 		.join("\n");
-	const platformCount = candidates.filter(
-		(candidate) => candidate.lane === "PLATFORM",
-	).length;
-	const externalCount = candidates.length - platformCount;
 	const hasRequiredContext = Boolean(
 		requestId && revisionId && quantity && unit && deliveryCity,
 	);
@@ -620,9 +606,6 @@ export default function RfqDraftFlow({
 								</span>
 								<div>
 									<h3>預計邀請 {candidates.length} 筆候選</h3>
-									<p>
-										平台 {platformCount} 筆 · 外部 {externalCount} 筆
-									</p>
 								</div>
 								<button type="button" onClick={onBackToCandidates}>
 									調整名單
@@ -632,19 +615,10 @@ export default function RfqDraftFlow({
 								{candidates.map((candidate) => (
 									<article key={candidate.candidateId}>
 										<span className="assistant-rfq-draft__recipient-mark">
-											<AppIcon
-												name={candidate.lane === "PLATFORM" ? "bag" : "goods"}
-												size={19}
-												aria-hidden="true"
-											/>
+											<AppIcon name="bag" size={19} aria-hidden="true" />
 										</span>
 										<div>
 											<strong>{candidate.displayName}</strong>
-											<span>
-												{candidate.lane === "PLATFORM"
-													? "平台候選"
-													: "外部候選"}
-											</span>
 										</div>
 									</article>
 								))}
@@ -655,7 +629,7 @@ export default function RfqDraftFlow({
 							<div>
 								<strong>這份名單尚未固定</strong>
 								<p>
-									本次確認只固定需求版本與價格範圍；正式發布時才會固定邀請對象。
+									正式發布時才會固定邀請對象。
 								</p>
 							</div>
 						</div>

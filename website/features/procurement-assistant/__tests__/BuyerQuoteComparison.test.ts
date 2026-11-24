@@ -49,6 +49,11 @@ vi.mock("@/components/shared/Link", async () => {
 	};
 });
 
+vi.mock("@/lib/i18n/ui-text", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/lib/i18n/ui-text")>();
+	return { ...actual, useUiText: () => actual.uiTextFor("zh-TW") };
+});
+
 afterEach(cleanup);
 
 const SELLER_FACING_HASH = "b".repeat(64);

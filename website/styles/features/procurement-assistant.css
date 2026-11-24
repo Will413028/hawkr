@@ -71,37 +71,6 @@
 	position: relative;
 }
 
-/* 每筆歷史對話用其權威大分類顯示圖示；分類不明時走同一尺寸的中性圓底，
- * 版面不跳動。 */
-.chat-sidebar__category-marble {
-	display: inline-grid;
-	position: relative;
-	place-items: center;
-	flex: 0 0 auto;
-	overflow: visible;
-	background: transparent;
-	transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-@media (hover: hover) and (pointer: fine) {
-	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble {
-		transform: translateY(-1px) scale(1.045);
-	}
-}
-
-.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
-	transform: translateY(-1px) scale(1.045);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.chat-sidebar__category-marble,
-	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble,
-	.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
-		transition: none;
-		transform: none;
-	}
-}
-
 .chat-sidebar__agent-row .chat-sidebar__item {
 	/* 預留右側動作鈕的位置，標題不壓到它。 */
 	padding-right: 40px;
@@ -587,56 +556,9 @@
 	line-height: 1.5;
 }
 
-/* Candidate lanes ------------------------------------------------------ */
+/* Candidates ----------------------------------------------------------- */
 .assistant-candidates {
 	overflow: clip;
-}
-
-/* lane 分頁＝實心膠囊。`Tabs` 的 solid variant 只把選中的分頁換成 elevated 表面，
- * 在這個工作台裡跟未選中幾乎分不出來——這兩顆是「要看哪一批候選」的主要切換，
- * 選中態要用主色實心承擔。選擇器帶了兩層元素，特異度高過 variant 那些
- * `data-[selected=true]:` utility，不需要 !important。 */
-.assistant-candidates > div > div[role="tablist"] {
-	gap: 6px;
-	margin-inline: 22px;
-	padding: 5px;
-	border-radius: var(--radius-pill);
-	background: var(--hkui-content2);
-}
-
-.assistant-candidates > div > div[role="tablist"] button {
-	min-height: 44px;
-	border-radius: var(--radius-pill);
-	color: var(--hkui-foreground-soft);
-	font-weight: 750;
-}
-
-.assistant-candidates > div > div[role="tablist"] button[data-selected="true"] {
-	background: var(--theme-action-primary);
-	color: var(--hkui-primary-foreground);
-	box-shadow: none;
-}
-
-.assistant-candidates > div > div[role="tabpanel"] {
-	padding-top: 0;
-}
-
-.assistant-tab-label {
-	display: inline-flex;
-	align-items: center;
-	gap: 7px;
-}
-
-.assistant-tab-label b {
-	display: inline-grid;
-	place-items: center;
-	min-width: 22px;
-	height: 20px;
-	padding-inline: 6px;
-	border-radius: var(--radius-pill);
-	background: var(--hkui-content1);
-	color: var(--hkui-foreground);
-	font-size: var(--hkui-text-tiny, 0.75rem);
 }
 
 .assistant-lane {
@@ -866,7 +788,7 @@
 /* ---- B-246 / #2377：候選收斂成商家 ---- */
 
 /* 兩種列（單一候選／收斂後的商家）共用同一個身分區塊。原本只有商家列有頭像，
- * 站外業者那一列左邊是空的，兩條 lane 在卡片上長得一樣。 */
+ * 沒有 logo 的候選以店面圖示代替。 */
 .assistant-candidate-identity {
 	display: flex;
 	align-items: center;
@@ -884,14 +806,6 @@
 	border-radius: var(--radius-circle);
 	background: color-mix(in srgb, var(--hkui-primary) 10%, var(--hkui-content2));
 	color: var(--hkui-primary);
-}
-
-/* lane 代號同時用顏色分：平台賣家走品牌色，站外業者走 warning 色階——與底下
- * lane badge 同一套色，卡片上「圖示＋badge」講的是同一件事。 */
-.assistant-candidate-identity[data-lane="EXTERNAL"]
-.assistant-candidate-identity__avatar {
-	background: color-mix(in srgb, var(--hkui-warning) 14%, var(--hkui-content2));
-	color: var(--hkui-warning-700, var(--hkui-warning));
 }
 
 .assistant-candidate-identity__avatar img {
@@ -951,36 +865,6 @@
 	content: "·";
 	margin-right: 4px;
 	color: var(--hkui-foreground-muted);
-}
-
-/* lane badge 與比對分數方塊在**所有**寬度都成立。
- * 這兩塊原本只寫在下面 `@container (max-width: 620px)` 裡，於是寬版的候選表把 lane
- * 印成一段沒有顏色的裸文字——同一個資訊在兩種寬度下講法不一致。顏色鍵在 badge
- * 自己的 `data-lane` 上，不鍵在祖先的 lane 面板上：判準的來源是那一列候選本身。 */
-.assistant-candidate-row__lane {
-	padding: 2px 8px;
-	border-radius: var(--radius-pill);
-	background: color-mix(in srgb, var(--hkui-primary) 12%, transparent);
-	color: var(--hkui-primary);
-	font-size: var(--hkui-text-tiny, 0.75rem);
-	font-weight: 750;
-}
-
-/* 外部業者用 warning 色階跟平台賣家分開——兩條 lane 的可信度不同
- * （站外業者只有公開商務資訊），這個差異要一眼看得出來。 */
-.assistant-candidate-row__lane[data-lane="EXTERNAL"] {
-	background: color-mix(in srgb, var(--hkui-warning) 16%, transparent);
-	color: var(--hkui-warning-700, var(--hkui-warning));
-}
-
-.assistant-candidate-row__score {
-	display: inline-flex;
-	align-items: baseline;
-	gap: 4px;
-}
-
-.assistant-candidate-row__score b {
-	font-weight: 750;
 }
 
 /* 選取狀態的文字（已選／選取／更新中）。寬版只給螢幕閱讀器——那一欄的視覺由
@@ -1175,19 +1059,17 @@
 		white-space: nowrap;
 	}
 
-	/* 卡片頭部：左邊是身分（名稱／lane／符合筆數），右邊是比對分數方框。
-	 * `__meta` 設 display: contents 讓它的三個子元素直接成為 identity 的 grid
-	 * item——這樣分數才貼得到右欄。span 沒有隱含 role，contents 不會從
-	 * accessibility tree 拿掉任何語意（同一招不可以用在 <td> 上）。 */
+	/* 卡片頭部：身分（名稱／符合筆數）。
+	 * `__meta` 設 display: contents 讓它的子元素直接成為 identity 的 grid
+	 * item。span 沒有隱含 role，contents 不會從 accessibility tree 拿掉任何語意
+	 * （同一招不可以用在 <td> 上）。 */
 	.assistant-candidate-row__identity {
 		grid-area: identity;
-		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-columns: minmax(0, 1fr);
 		grid-template-areas:
-			"name score"
-			"lane score"
-			"matches score";
+			"name"
+			"matches";
 		align-items: start;
-		column-gap: 10px;
 	}
 
 	.assistant-candidate-row__identity > .assistant-candidate-identity {
@@ -1203,42 +1085,8 @@
 		content: none;
 	}
 
-	/* 外觀（膠囊、顏色）已在容器查詢外定義，這裡只負責把它放進卡片的 grid。 */
-	.assistant-candidate-row__lane {
-		grid-area: lane;
-		justify-self: start;
-	}
-
 	.assistant-candidate-row__match-count {
 		grid-area: matches;
-	}
-
-	.assistant-candidate-row__score {
-		display: grid;
-		grid-area: score;
-		align-self: start;
-		justify-items: center;
-		gap: 0;
-		min-width: 64px;
-		padding: 6px 10px;
-		border-radius: var(--radius-md);
-		background: var(--hkui-content2);
-		color: var(--hkui-foreground-muted);
-		font-size: var(--hkui-text-tiny, 0.75rem);
-		line-height: 1.2;
-	}
-
-	/* 「94」與「分」要留在同一列——分數方塊只有兩列：標籤在上、數值在下。 */
-	.assistant-candidate-row__score-value {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 3px;
-	}
-
-	.assistant-candidate-row__score b {
-		color: var(--hkui-primary);
-		font-size: var(--hkui-text-large, 1.125rem);
-		font-weight: 750;
 	}
 
 	.assistant-candidate-row__facts {
@@ -2280,25 +2128,6 @@
 	line-height: 1.5;
 }
 
-.assistant-rfq-snapshot__confirmed {
-	display: grid;
-	gap: 4px;
-	padding: 14px 16px;
-	border-top: 1px solid var(--hkui-divider);
-	background: var(--theme-primary-subtle);
-	color: var(--theme-text-accent-on-tint);
-}
-
-.assistant-rfq-snapshot__confirmed strong {
-	font-size: var(--hkui-text-small, 0.875rem);
-}
-
-.assistant-rfq-snapshot__confirmed small {
-	color: var(--theme-text-body);
-	font-size: var(--hkui-text-tiny, 0.75rem);
-	overflow-wrap: anywhere;
-}
-
 .assistant-rfq-draft__readiness li[data-status="neutral"] > svg {
 	color: var(--hkui-foreground-muted);
 }
@@ -2535,15 +2364,6 @@
 	gap: 18px;
 }
 
-.assistant-candidate-detail__status {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	color: var(--hkui-foreground-muted);
-	font-size: var(--hkui-text-small, 0.875rem);
-}
-
 .assistant-candidate-detail > p {
 	margin: 0;
 	color: var(--hkui-foreground-soft);
@@ -2663,10 +2483,6 @@
 	.assistant-lane__intro p {
 		max-width: none;
 		text-align: left;
-	}
-
-	.assistant-candidates > div > div[role="tablist"] {
-		margin-inline: 16px;
 	}
 
 	.assistant-candidate__media {
@@ -3645,26 +3461,10 @@
 	white-space: nowrap;
 }
 
-.hawkr-agent-task-card__scope {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px 18px;
-	margin: 0;
-	padding: 0 18px 16px 70px;
-	color: var(--hkui-foreground-muted);
-	font-size: var(--hkui-text-small);
-	list-style: none;
-}
-
-.hawkr-agent-task-card__scope li,
 .hawkr-agent-task-card__footer > span {
 	display: inline-flex;
 	align-items: center;
 	gap: 7px;
-}
-
-.hawkr-agent-task-card__scope svg {
-	color: var(--theme-action-primary);
 }
 
 .hawkr-agent-task-card__footer {
@@ -3756,10 +3556,6 @@
 		justify-self: start;
 	}
 
-	.hawkr-agent-task-card__scope {
-		padding-left: 70px;
-	}
-
 	.hawkr-agent-task-card__footer {
 		align-items: stretch;
 		flex-direction: column;
@@ -3830,10 +3626,6 @@
 		padding-inline: var(--hkui-space-3, 12px);
 	}
 
-	.hawkr-agent-task-card__scope {
-		padding-inline: var(--hkui-space-3, 12px);
-	}
-
 	.hawkr-agent-task-card__footer > button {
 		min-width: 0;
 		height: auto;
@@ -3864,120 +3656,9 @@
 
 /* Agent avatar and live seller-candidate payloads are the only other
  * surface-specific pieces layered onto the shared Messages components. */
-.hawkr-agent-thread__head-avatar,
-.hawkr-agent-thread__intro-avatar {
-	display: grid;
-	place-items: center;
-	overflow: visible;
-}
-
-.hawkr-agent-thread__head-avatar .assistant-mark,
-.hawkr-agent-thread__intro-avatar .assistant-mark {
-	width: 100%;
-	height: 100%;
-}
 
 .hawkr-agent-thread .thread-page__head-status[data-state="assistant"]::before {
 	display: none;
-}
-
-.hawkr-agent-thread__alert {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--hkui-space-3);
-}
-
-.hawkr-agent-thread__alert button {
-	min-height: 44px;
-	padding: 0 var(--hkui-space-4);
-	border: 1px solid currentColor;
-	border-radius: var(--hkui-radius-md);
-	background: transparent;
-	color: inherit;
-	font: inherit;
-	font-weight: 700;
-	cursor: pointer;
-}
-
-.hawkr-agent-thread__alert button:focus-visible,
-.hawkr-agent-candidate__link:focus-visible {
-	outline: none;
-	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
-}
-
-.hawkr-agent-candidate {
-	width: min(340px, 100%);
-}
-
-.hawkr-agent-candidate__initial {
-	background: color-mix(in srgb, var(--hkui-primary) 12%, var(--hkui-content2));
-	color: var(--hkui-primary);
-	font-size: var(--hkui-text-large);
-	font-weight: 800;
-}
-
-.hawkr-agent-candidate__meta {
-	margin: 0;
-	color: var(--hkui-foreground-muted);
-	font-size: var(--hkui-text-tiny);
-	line-height: 1.4;
-}
-
-.hawkr-agent-candidate .chat-card__status {
-	align-self: flex-start;
-	letter-spacing: 0;
-}
-
-.hawkr-agent-candidate__evidence {
-	display: grid;
-	gap: 6px;
-	padding: 0 13px 11px;
-}
-
-.hawkr-agent-candidate__evidence p {
-	margin: 0;
-	color: inherit;
-	font-size: var(--hkui-text-small);
-	line-height: 1.5;
-}
-
-.hawkr-agent-candidate__evidence p + p {
-	padding-top: 6px;
-	border-top: 1px solid var(--hkui-divider);
-}
-
-.hawkr-agent-candidate__link {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 6px;
-	text-decoration: none;
-}
-
-.hawkr-agent-candidate__link span {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.hawkr-agent-thread__stop svg {
-	pointer-events: none;
-}
-
-[data-theme="dark"] .hawkr-agent-candidate__initial {
-	background: rgb(var(--color-brand-secondary-rgb) / 0.12);
-	color: var(--color-brand-secondary);
-}
-
-[data-theme="dark"] .hawkr-agent-candidate__meta {
-	color: var(--hkui-foreground-soft);
-}
-
-@media (max-width: 959px) {
-	.hawkr-agent-thread__alert {
-		margin-inline: var(--hkui-space-4);
-	}
 }
 
 /* ── 右側畫布（B-244 最終候選）────────────────────────────────────
@@ -4175,14 +3856,10 @@
 	padding: 0;
 }
 
-/* 成果已由外層面板定義邊界；內容與來源篩選只需一層內距。 */
+/* 成果已由外層面板定義邊界；內容只需一層內距。 */
 .hawkr-agent-canvas__body .assistant-candidates > .assistant-artifact__head {
 	padding: 0 0 var(--hkui-space-4, 16px);
 	border-bottom: 0;
-}
-
-.hawkr-agent-canvas__body .assistant-candidates > div > div[role="tablist"] {
-	margin-inline: 0;
 }
 
 .hawkr-agent-canvas__body .assistant-lane {

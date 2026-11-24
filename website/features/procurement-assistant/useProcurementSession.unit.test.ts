@@ -2,15 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { ProcurementSnapshot } from "./types";
 
 describe("deriveSelectedCandidateIds", () => {
-	it("只回傳 selected=true 的 candidateId，platform/external 都算", async () => {
+	it("只回傳 selected=true 的 candidateId", async () => {
 		const { deriveSelectedCandidateIds } = await import("./session-logic");
-		const ids = deriveSelectedCandidateIds({
-			platform: [
-				{ candidateId: "1", selected: true } as never,
-				{ candidateId: "2", selected: false } as never,
-			],
-			external: [{ candidateId: "3", selected: true } as never],
-		});
+		const ids = deriveSelectedCandidateIds([
+			{ candidateId: "1", selected: true } as never,
+			{ candidateId: "2", selected: false } as never,
+			{ candidateId: "3", selected: true } as never,
+		]);
 		expect(ids).toEqual(["1", "3"]);
 	});
 });

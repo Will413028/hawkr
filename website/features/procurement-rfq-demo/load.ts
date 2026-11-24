@@ -64,7 +64,6 @@ async function fetchSelectedCandidates(
 			return {
 				candidateId: view.candidateId,
 				displayName: view.displayName,
-				lane: view.lane,
 				matchedFactCount: view.matchedFacts.length,
 				unverifiableFactCount: view.unverifiableFacts.length,
 			};

@@ -60,12 +60,10 @@ export const STEP_ICON: Record<string, AppIconName> = {
 	SLOTS_REJECTED: "info",
 	PICK_NEXT_QUESTION: "info",
 	REQUIREMENT_READY: "check",
-	// 候選搜尋階段的父列（T23）。兩條 lane 子列各自是 search／discovery，父列
+	// 候選搜尋階段的父列（T23）。子列是 search，父列
 	// 必須明顯不同——三個 glyph 疊在同一組巢狀列裡，長得像就等於沒有分層。
 	SEARCH_CANDIDATES: "people",
 	SEARCH_PLATFORM: "search",
-	// 暫代：discovery 實際是指北針；待靜態地球 glyph 到貨後替換。
-	SEARCH_EXTERNAL: "discovery",
 	READ_SELLER: "user",
 	// 暫代：待天平／比較 glyph。
 	COMPARE: "reorder",
@@ -106,7 +104,6 @@ export const STEP_FALLBACK_LABELS: Record<string, string> = {
 	REQUIREMENT_READY: "需求齊了",
 	SEARCH_CANDIDATES: "搜尋候選供應商",
 	SEARCH_PLATFORM: "找平台內的候選資料",
-	SEARCH_EXTERNAL: "找平台外的公開候選資料",
 	READ_SELLER: "讀這筆候選的公開資料",
 	COMPARE: "把公開條件放在一起比",
 	VERIFY_ORIGIN: "整理產地欄位",

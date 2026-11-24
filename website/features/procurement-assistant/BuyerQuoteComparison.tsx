@@ -4,6 +4,7 @@ import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button, Dialog } from "@/components/ui";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
+import { useUiText } from "@/lib/i18n/ui-text";
 import styles from "@/styles/features/procurement-assistant/buyer-quote-compare.module.css";
 import {
 	type BuyerFacingSellerResponse,
@@ -210,6 +211,7 @@ export default function BuyerQuoteComparison({
 	createClientRequestId,
 	onRefresh,
 }: BuyerQuoteComparisonProps) {
+	const ut = useUiText();
 	const [expanded, setExpanded] = React.useState<string | null>(null);
 	const [flow, setFlow] = React.useState<AcceptFlow>({ status: "idle" });
 	const [shortlistError, setShortlistError] =
@@ -464,7 +466,7 @@ export default function BuyerQuoteComparison({
 													className={styles.acceptability}
 													data-acceptable={acceptable || undefined}
 												>
-													{quoteAcceptabilityLabel(response.acceptability)}
+													{quoteAcceptabilityLabel(ut, response.acceptability)}
 												</span>
 											</td>
 											<td data-label="動作">

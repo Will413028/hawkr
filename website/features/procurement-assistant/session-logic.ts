@@ -163,15 +163,12 @@ export function applyOptimisticSelection(
 	);
 }
 
-/** 從候選清單（platform/external 兩個陣列）derive 出目前勾選的 candidateId 清單，
+/** 從候選清單 derive 出目前勾選的 candidateId 清單，
  * 跟 CandidateBrowser.tsx 既有的 selectedCount 用同一個 filter 邏輯，只是這裡回傳 id 陣列。 */
-export function deriveSelectedCandidateIds(candidates: {
-	platform: ProcurementCandidate[];
-	external: ProcurementCandidate[];
-}): string[] {
-	return [...candidates.platform, ...candidates.external]
-		.filter((c) => c.selected)
-		.map((c) => c.candidateId);
+export function deriveSelectedCandidateIds(
+	candidates: ProcurementCandidate[],
+): string[] {
+	return candidates.filter((c) => c.selected).map((c) => c.candidateId);
 }
 
 /** quantity 複合問題卡／單位追問卡是否帶了單位選項（backend-payuni#2442 §4）。

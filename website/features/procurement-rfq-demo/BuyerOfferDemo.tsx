@@ -238,9 +238,6 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 							{candidates.map((candidate) => (
 								<li key={candidate.candidateId}>
 									<strong>{candidate.displayName}</strong>
-									<span>
-										{candidate.lane === "PLATFORM" ? "平台賣家" : "外部業者"}
-									</span>
 									<small>
 										符合 {candidate.matchedFactCount} 項 · 待確認{" "}
 										{candidate.unverifiableFactCount} 項

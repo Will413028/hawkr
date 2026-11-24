@@ -6,7 +6,10 @@ import {
 	RunStatus,
 } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { parseDate } from "@hawkr/api/proto/date";
-import { commonStoreCardClosedStore } from "@hawkr/ui-text/keys";
+import {
+	commonStoreCardClosedStore,
+	procurementRunFailureReason,
+} from "@hawkr/ui-text/keys";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import {
@@ -15,7 +18,11 @@ import {
 } from "@/lib/connect/procurement";
 import { toast } from "@/lib/feedback/toast";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
-import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
+import {
+	optionalText,
+	useDefaultErrorText,
+	useUiText,
+} from "@/lib/i18n/ui-text";
 import { toBrowserHref } from "@/lib/navigation/resolve-url";
 import { type QueryIdentity, queryKeys } from "@/lib/query/keys";
 import { type AgentActivityEvent, mergeLiveActivity } from "./activity";
@@ -289,7 +296,7 @@ function writeConversationUrl(conversationId: string) {
 
 type TurnWatchEnd =
 	| { kind: "result"; result: ProcurementTurnResult }
-	| { kind: "run-failed"; reason: string }
+	| { kind: "run-failed"; reason: RunFailureReason }
 	| { kind: "cancelled" }
 	| { kind: "invalid" }
 	| { kind: "resync" }
@@ -316,10 +323,7 @@ function endFromOutcome(
 			};
 		case "finished": {
 			if (finished?.status === RunStatus.FAILED) {
-				return {
-					kind: "run-failed",
-					reason: RunFailureReason[finished.failureReason] ?? "",
-				};
+				return { kind: "run-failed", reason: finished.failureReason };
 			}
 			if (finished?.status === RunStatus.CANCELLED) {
 				return { kind: "cancelled" };
@@ -864,8 +868,13 @@ export function useProcurementSession(
 					return;
 				case "run-failed":
 					fail({
-						code: end.reason || "RUN_FAILED",
-						detail: defaults(Code.Internal),
+						code:
+							end.reason === RunFailureReason.UNSPECIFIED
+								? "RUN_FAILED"
+								: (RunFailureReason[end.reason] ?? "RUN_FAILED"),
+						detail:
+							optionalText(ut, procurementRunFailureReason(end.reason)) ??
+							defaults(Code.Internal),
 					});
 					if (dropTurnId) await refreshCurrentSnapshot();
 					return;
@@ -927,6 +936,7 @@ export function useProcurementSession(
 			queryClient,
 			queryIdentity,
 			refreshCurrentSnapshot,
+			ut,
 		],
 	);
 
@@ -1534,10 +1544,9 @@ export function useProcurementSession(
 				return;
 			const requestId = current.requestId;
 			const candidateSetId = current.candidateSet.candidateSetId;
-			const currentCandidate = [
-				...current.candidateSet.candidates.platform,
-				...current.candidateSet.candidates.external,
-			].find((item) => item.candidateId === candidate.candidateId);
+			const currentCandidate = current.candidateSet.candidates.find(
+				(item) => item.candidateId === candidate.candidateId,
+			);
 			if (!currentCandidate) return;
 			const selectionIdentity = selectionGuard.begin(
 				`${candidateSetId}:${currentCandidate.candidateId}`,
@@ -1564,18 +1573,11 @@ export function useProcurementSession(
 				selected: boolean,
 			): ProcurementCandidateSearch => ({
 				...candidateSet,
-				candidates: {
-					platform: applyOptimisticSelection(
-						candidateSet.candidates.platform,
-						currentCandidate.candidateId,
-						selected,
-					),
-					external: applyOptimisticSelection(
-						candidateSet.candidates.external,
-						currentCandidate.candidateId,
-						selected,
-					),
-				},
+				candidates: applyOptimisticSelection(
+					candidateSet.candidates,
+					currentCandidate.candidateId,
+					selected,
+				),
 			});
 
 			setState((s) =>

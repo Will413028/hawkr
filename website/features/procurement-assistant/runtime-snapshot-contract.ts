@@ -1,4 +1,12 @@
-import type { GetRuntimeSnapshotResponse } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import {
+	CancelDisposition,
+	type GetRuntimeSnapshotResponse,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import {
+	commonUnknown,
+	procurementCancelDisposition,
+} from "@hawkr/ui-text/keys";
+import { optionalText, type UiText } from "@/lib/i18n/ui-text";
 import type { BuyerQuoteAcceptanceResponse } from "./buyer-quote-contract";
 import {
 	openConfirmationFromProto,
@@ -86,20 +94,34 @@ export const RUN_CANCEL_DISPOSITIONS = [
 
 export type RunCancelDisposition = (typeof RUN_CANCEL_DISPOSITIONS)[number];
 
+const PROTO_CANCEL_DISPOSITION: Record<
+	RunCancelDisposition,
+	CancelDisposition
+> = {
+	REQUESTED: CancelDisposition.REQUESTED,
+	ALREADY_CANCELLED: CancelDisposition.ALREADY_CANCELLED,
+	ALREADY_TERMINAL: CancelDisposition.ALREADY_TERMINAL,
+	TOO_LATE: CancelDisposition.TOO_LATE,
+};
+
 /**
- * 逐字固定的買家可見文案。
+ * 取消命令處置的買家可見文字（共用文案目錄）。
  *
  * 只有 `REQUESTED` 是「正在停止」。另外三個講的都是**這一輪已經到終點**，
  * 而且都刻意避開「已取消」這個主詞：買家按下停止並不會讓一個已經跑完的
  * 結果作廢，把 `ALREADY_TERMINAL` 寫成「已為您取消」就是謊報。
  */
-export const RUN_CANCEL_COPY: Record<RunCancelDisposition, string> = {
-	REQUESTED: "已送出停止，正在收尾這一輪。",
-	ALREADY_CANCELLED: "這一輪先前已經停止，這次沒有重複送出。",
-	ALREADY_TERMINAL:
-		"這一輪已經跑完了，已完成的結果仍然有效，沒有被這次停止作廢。",
-	TOO_LATE: "這一輪已經完成並送出，來不及停止；已完成的結果仍然有效。",
-};
+export function runCancelCopy(
+	ut: UiText,
+	disposition: RunCancelDisposition,
+): string {
+	return (
+		optionalText(
+			ut,
+			procurementCancelDisposition(PROTO_CANCEL_DISPOSITION[disposition]),
+		) ?? ut(commonUnknown())
+	);
+}
 
 /** 六步驟的識別碼；順序即畫面順序（稿 R-02 ②）。 */
 export type RfqProgressStepKey =

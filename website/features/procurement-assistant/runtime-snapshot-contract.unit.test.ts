@@ -9,11 +9,12 @@ import {
 	RunType,
 } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { describe, expect, it } from "vitest";
+import { uiTextFor } from "@/lib/i18n/ui-text";
 import type { BuyerQuoteAcceptanceResponse } from "./buyer-quote-contract";
 import {
 	deriveRfqProgress,
 	hasLiveRun,
-	RUN_CANCEL_COPY,
+	runCancelCopy,
 	type RuntimeSnapshot,
 	runtimeSnapshotFromProto,
 	selectCancellableRun,
@@ -290,6 +291,14 @@ describe("停止任務：可取消的 run", () => {
 		expect(selectCancellableRun(view)).toBeNull();
 	});
 });
+
+const ut = uiTextFor("zh-TW");
+const RUN_CANCEL_COPY = {
+	REQUESTED: runCancelCopy(ut, "REQUESTED"),
+	ALREADY_CANCELLED: runCancelCopy(ut, "ALREADY_CANCELLED"),
+	ALREADY_TERMINAL: runCancelCopy(ut, "ALREADY_TERMINAL"),
+	TOO_LATE: runCancelCopy(ut, "TOO_LATE"),
+};
 
 describe("取消文案", () => {
 	it("只有 REQUESTED 講「正在停止」；另外三句都不得宣稱已完成的結果被作廢", () => {
