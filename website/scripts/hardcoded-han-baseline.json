@@ -633,8 +633,7 @@
 		"關閉通知": 1
 	},
 	"components/shared/NotificationToastBridge.tsx": {
-		"新訊息": 1,
-		"還有 ${} 則新通知": 1
+		"新訊息": 1
 	},
 	"components/shared/Pagination.tsx": {
 		"上一頁": 1,

@@ -17,6 +17,24 @@
    "new": "\t\t\t\t\tvoid unreadRef.current.refresh();\n",
    "test": "lib/notifications/unread-context.unit.test.ts 異常斷線後重連，補讀一次列表",
    "why": "異常斷線重連後不補拉列表"
+  },
+  {
+   "id": "toast-ignores-new-inbox-item-ids",
+   "stack": "website",
+   "file": "website/components/shared/NotificationToastBridge.tsx",
+   "old": "\t\t\t\t\t\t\twanted.has(n.id) &&\n",
+   "new": "\t\t\t\t\t\t\t!wanted.has(n.id) &&\n",
+   "test": "components/shared/__tests__/NotificationToastBridge.signal.unit.test.ts toasts exactly the ids the signal names, with the server-composed content",
+   "why": "toast 不看 new_inbox_item_ids，改成 toast 其餘的列"
+  },
+  {
+   "id": "toast-ignores-hidden-tab",
+   "stack": "website",
+   "file": "website/components/shared/NotificationToastBridge.tsx",
+   "old": "\t\t\tif (document.visibilityState !== \"visible\") return;\n\t\t\tconst requestedFor",
+   "new": "\t\t\tconst requestedFor",
+   "test": "components/shared/__tests__/NotificationToastBridge.signal.unit.test.ts toasts nothing in a hidden tab",
+   "why": "背景分頁也 toast"
   }
  ]
 }

@@ -9,6 +9,10 @@ export interface NotificationSignalEventDetail {
 	/** 異常斷線後重連的廣播不帶未讀數（沒有伺服器給的值）。 */
 	unreadCount?: number;
 	latestInboxItemId?: string;
+	/** 上一則訊號之後新建或被聚合更新的收件匣項目 ID；toast 只對這些 ID 做。 */
+	newInboxItemIds?: string[];
+	/** 新通知超過伺服器上限：只重讀列表，不 toast。 */
+	newItemsTruncated?: boolean;
 	/** `StateRefreshHint` 的值；空表示不需要重讀。 */
 	hints: number[];
 }

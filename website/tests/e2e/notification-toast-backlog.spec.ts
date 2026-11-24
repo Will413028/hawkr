@@ -6,8 +6,7 @@ import { fulfillConnect, setupGatewayMocks } from "./helpers/mock-gateway";
  * bug: a buyer with a pre-existing unread notification that was never
  * toasted (e.g. an order-cancelled notice missed while offline) must not
  * see it resurface as a toast just because a genuinely new notification
- * arrives afterward. See `NotificationToastBridge.tsx`'s seen-set comment
- * for the mechanism this asserts.
+ * arrives afterward: the bridge toasts only the ids the stream signal names.
  */
 
 const OLD_ID = "inbox-old";
@@ -86,34 +85,20 @@ test("stale unread backlog never resurfaces as a toast alongside a genuinely new
 
 	// Registered after setupGatewayMocks so these win over its empty defaults.
 	//
-	// ListInboxItems — newest first, matching the real inbox order. The first
-	// request is NotificationToastBridge's baseline read: it happens BEFORE the
-	// new notification exists, so the honest answer is OLD_ITEM alone. Every
-	// later request (the one the inbox signal triggers) also holds NEW_ITEM.
-	let inboxReads = 0;
+	// ListInboxItems — newest first, matching the real inbox order. Both the
+	// notifications list and the toast bridge read this page; the bridge picks
+	// only the ids the stream signal names.
 	await page.route(method("ListInboxItems"), (route) => {
-		const items = inboxReads++ === 0 ? [OLD_ITEM] : [NEW_ITEM, OLD_ITEM];
 		void fulfillConnect(route, {
-			items,
+			items: [NEW_ITEM, OLD_ITEM],
 			nextPageToken: "",
-			totalSize: items.length,
+			totalSize: 2,
 		});
 	});
 
-	// The baseline the bridge primes from: only OLD_ITEM is unread at this point.
 	await page.route(method("GetUnreadCount"), (route) => {
-		void fulfillConnect(route, { unreadCount: 1 });
+		void fulfillConnect(route, { unreadCount: 2 });
 	});
-
-	// "The client has finished priming" — as observed FROM THE CLIENT. The
-	// bridge reads the baseline page only after it has flipped its primed flag,
-	// so seeing that request on the wire is a real happens-after edge. The first
-	// stream frame is held until then so the backlog cutoff is deterministic.
-	const clientPrimed = page.waitForRequest(
-		(req) =>
-			req.method() === "POST" && method("ListInboxItems").test(req.url()),
-		{ timeout: 20_000 },
-	);
 
 	// First connection carries the signal for the genuinely new notification and
 	// then ends normally; reconnects get no answer. Replaying the signal on every
@@ -122,13 +107,16 @@ test("stale unread backlog never resurfaces as a toast alongside a genuinely new
 	let streamConnections = 0;
 	await page.route(method("WatchNotifications"), async (route) => {
 		if (streamConnections++ > 0) return;
-		await clientPrimed;
 		void route.fulfill({
 			status: 200,
 			contentType: "application/connect+json",
 			body: Buffer.concat([
 				envelope(0x00, {
-					inbox: { unreadCount: 2, latestInboxItemId: NEW_ID },
+					inbox: {
+						unreadCount: 2,
+						latestInboxItemId: NEW_ID,
+						newInboxItemIds: [NEW_ID],
+					},
 				}),
 				envelope(0x02, {}),
 			]),

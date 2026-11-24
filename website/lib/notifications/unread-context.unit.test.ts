@@ -94,6 +94,8 @@ function mount(...children: React.ReactElement[]) {
 const inbox = (unread: number): NotificationSignal => ({
 	type: "inbox",
 	unreadCount: unread,
+	newInboxItemIds: [],
+	newItemsTruncated: false,
 	hints: [],
 });
 const reconnected = (afterAbnormalEnd: boolean): NotificationSignal => ({
@@ -126,6 +128,29 @@ describe("NotificationUnreadProvider 持有通知串流並分派訊號", () => {
 		expect(mocks.invalidateNotificationLists).toHaveBeenCalledTimes(1);
 		expect(mocks.invalidateNotificationLists.mock.calls[0]?.[2]).toBe("active");
 		expect(unreadCount).toBe(3);
+	});
+
+	it("收件匣訊號的新通知 ID 與截斷旗標原樣轉發給訂閱者", async () => {
+		const details: unknown[] = [];
+		const listener = (e: Event) => details.push((e as CustomEvent).detail);
+		window.addEventListener(NOTIFICATION_SIGNAL_EVENT, listener);
+		try {
+			const watch = mount();
+			await act(async () => {});
+			await act(async () =>
+				watch.onSignal({
+					...inbox(2),
+					newInboxItemIds: ["5", "4"],
+					newItemsTruncated: true,
+				}),
+			);
+			expect(details[0]).toMatchObject({
+				newInboxItemIds: ["5", "4"],
+				newItemsTruncated: true,
+			});
+		} finally {
+			window.removeEventListener(NOTIFICATION_SIGNAL_EVENT, listener);
+		}
 	});
 
 	it("異常斷線後重連，補讀一次列表（連同第一個 frame 也只拉一次）", async () => {

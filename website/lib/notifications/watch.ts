@@ -34,6 +34,8 @@ export type NotificationSignal =
 			type: "inbox";
 			unreadCount: number;
 			latestInboxItemId?: string;
+			newInboxItemIds: string[];
+			newItemsTruncated: boolean;
 			hints: number[];
 	  }
 	| { type: "sellerWorkspace"; change: "order" | "afterSale" }
@@ -149,6 +151,8 @@ export function watchNotifications(
 						type: "inbox",
 						unreadCount: e.value.unreadCount,
 						latestInboxItemId: e.value.latestInboxItemId,
+						newInboxItemIds: [...e.value.newInboxItemIds],
+						newItemsTruncated: e.value.newItemsTruncated,
 						hints: [...e.value.stateRefreshHints],
 					});
 				} else if (e.case === "sellerWorkspace") {

@@ -8,10 +8,10 @@
  *     disconnects it) so toasts fire app-wide, not just on chat pages. Skips
  *     the user's own messages and stays quiet while they're in the messages UI.
  *
- *   • New orders / notifications — watches the notification unread count; when
- *     it climbs (after the initial prime) it pulls the latest inbox items and
- *     toasts the fresh, unread, non-message ones. Message-type inbox rows are
- *     left to the socket path above so a message never double-toasts.
+ *   • New orders / notifications — the notification stream's inbox signal names
+ *     the new inbox item ids; exactly those are toasted (visible tab only).
+ *     Message-type inbox rows are left to the socket path above so a message
+ *     never double-toasts.
  *
  * Renders nothing — mount it once inside the toast + unread providers.
  */
@@ -28,20 +28,20 @@ import { chatSideOf } from "@/lib/chat/workspace";
 import { useUiText } from "@/lib/i18n/ui-text";
 import { stripLocale } from "@/lib/intl/paths";
 import { imageUri } from "@/lib/media/image";
-import { NOTIFICATION_SIGNAL_EVENT } from "@/lib/notifications/events";
+import {
+	NOTIFICATION_SIGNAL_EVENT,
+	type NotificationSignalEventDetail,
+} from "@/lib/notifications/events";
 import {
 	audienceForRole,
 	type InboxItem,
 	listInboxItems,
 } from "@/lib/notifications/inbox";
 import { useNotificationToast } from "@/lib/notifications/toast-context";
-import { useNotificationUnread } from "@/lib/notifications/unread-context";
 import { notificationWorkspaceRole } from "@/lib/notifications/workspace";
 
-/** Cards shown for one burst before the remainder collapses into a summary. */
-const MAX_TOASTS_PER_TICK = 3;
-/** Inbox rows read per signal: enough to cover one burst, the rest collapses. */
-const SIGNAL_PAGE_SIZE = 10;
+/** Inbox rows read per signal: the server sends at most 20 new ids per signal. */
+const SIGNAL_PAGE_SIZE = 20;
 /** Upper bound on the per-effect "already toasted" memo. */
 const SEEN_MESSAGE_LIMIT = 500;
 
@@ -61,7 +61,6 @@ function isMessagesArea(rawPathname: string): boolean {
 export default function NotificationToastBridge() {
 	const { activeRole, status, identity } = useAuth();
 	const signedIn = status === "signedIn";
-	const { baselineReady } = useNotificationUnread();
 	const { show } = useNotificationToast();
 
 	const myId = identity?.accountId != null ? String(identity.accountId) : "";
@@ -142,86 +141,48 @@ export default function NotificationToastBridge() {
 	useChatStream(chatSide, signedIn, onChatEvent);
 
 	/* ── New orders / notifications (via the inbox signal) ───────────────
-	 * The stream's inbox signal carries no row content, so on each signal the
-	 * newest page is read and every unread, non-message row not seen yet is
-	 * toasted with the server-composed title, body and deep link. `seenIdsRef`
-	 * is the single definition of "new": the rows that existed when the
-	 * workspace's baseline was established, plus every row already handled.
-	 * Message rows belong to the chat socket path above and never double-toast.
+	 * The server decides what is new: an inbox signal carries `newInboxItemIds`
+	 * (rows created or aggregated since the previous signal on this stream) and
+	 * only those rows are toasted, with the server-composed title, body and deep
+	 * link. There is no get-by-id RPC, so the newest page is read once per
+	 * signal and the ids picked from it. An aggregated bump repeats an id; the
+	 * toast context replaces the toast that has the same `dedupeKey`.
+	 * A truncated signal (too many new rows), a signal without ids (initial,
+	 * reconnect, read, delete) and a hidden tab toast nothing. Message rows
+	 * belong to the chat socket path above and never double-toast.
 	 */
-	const primedRef = React.useRef(false);
-	// Settles when the workspace's baseline read has finished; a signal that
-	// arrives earlier waits on it so baseline rows are never toasted.
-	const baselineRef = React.useRef<Promise<void>>(Promise.resolve());
-	const seenIdsRef = React.useRef(new Set<string>());
 	const workspaceKeyRef = React.useRef(workspaceKey);
 	workspaceKeyRef.current = workspaceKey;
 	const audience = audienceForRole(activeRole ?? "buyer");
 
 	React.useEffect(() => {
-		void workspaceKey;
-		// Buyer and seller have independent inboxes. A role/account change starts
-		// a fresh baseline instead of reusing the previous inbox's seen set.
-		primedRef.current = false;
-		baselineRef.current = Promise.resolve();
-		seenIdsRef.current = new Set();
-	}, [workspaceKey]);
-
-	React.useEffect(() => {
-		void workspaceKey;
-		if (!signedIn || primedRef.current || !baselineReady) return;
-		// Establish the baseline only once the count is the server's answer for
-		// this workspace: everything that already exists (read or unread)
-		// pre-dates this session and is never toasted — the "dumps everything on
-		// login" bug.
-		primedRef.current = true;
-		const requestedFor = workspaceKey;
-		baselineRef.current = listInboxItems({
-			audience,
-			pageSize: SIGNAL_PAGE_SIZE,
-		})
-			.then((page) => {
-				if (workspaceKeyRef.current !== requestedFor) return;
-				for (const item of page.items) seenIdsRef.current.add(item.id);
-			})
-			.catch(() => {
-				/* best-effort — worst case the backlog can resurface once */
-			});
-	}, [audience, baselineReady, signedIn, workspaceKey]);
-
-	React.useEffect(() => {
 		if (!signedIn) return;
 		let cancelled = false;
-		const onSignal = () => {
-			if (!primedRef.current) return;
+		const onSignal = (event: Event) => {
+			const detail = (event as CustomEvent<NotificationSignalEventDetail>)
+				.detail;
+			const ids = detail?.newInboxItemIds ?? [];
+			if (detail?.newItemsTruncated || ids.length === 0) return;
+			if (document.visibilityState !== "visible") return;
 			const requestedFor = workspaceKeyRef.current;
-			const baseline = baselineRef.current;
 			void (async () => {
 				try {
-					await baseline;
-					if (cancelled || workspaceKeyRef.current !== requestedFor) return;
 					const page = await listInboxItems({
 						audience,
 						pageSize: SIGNAL_PAGE_SIZE,
 					});
 					if (cancelled || workspaceKeyRef.current !== requestedFor) return;
-					const seen = seenIdsRef.current;
+					if (document.visibilityState !== "visible") return;
+					if (isMessagesArea(window.location.pathname)) return;
+					const wanted = new Set(ids);
 					const fresh = page.items.filter(
 						(n: InboxItem) =>
+							wanted.has(n.id) &&
 							!n.read &&
-							n.presentation !== InboxPresentation.MESSAGE &&
-							!seen.has(n.id),
+							n.presentation !== InboxPresentation.MESSAGE,
 					);
-					for (const n of page.items) seen.add(n.id);
-					if (fresh.length === 0) return;
-					if (isMessagesArea(window.location.pathname)) return;
-					// A burst of distinct titles used to stack one full-width card per
-					// row down the screen. Show the newest few and collapse the rest
-					// into a single count line.
-					const shown = fresh.slice(0, MAX_TOASTS_PER_TICK);
-					const overflow = fresh.slice(MAX_TOASTS_PER_TICK);
 					// Oldest first so the newest ends up on top of the stack.
-					for (const n of [...shown].reverse()) {
+					for (const n of [...fresh].reverse()) {
 						show({
 							kind:
 								n.presentation === InboxPresentation.ORDER ? "order" : "system",
@@ -234,22 +195,8 @@ export default function NotificationToastBridge() {
 							groupKey: `notif:${n.title}`,
 						});
 					}
-					if (overflow.length > 0) {
-						const overflowRole =
-							activeRole ?? notificationWorkspaceRole(window.location.pathname);
-						show({
-							kind: "system",
-							title: `還有 ${overflow.length} 則新通知`,
-							href:
-								overflowRole === "seller"
-									? "/seller-center/notifications"
-									: "/account/notifications",
-							dedupeKey: `notif:overflow:${overflow[0].id}`,
-							groupKey: "notif:overflow",
-						});
-					}
 				} catch {
-					/* transient fetch error — the next signal will retry */
+					/* transient fetch error — the list refetch still shows the rows */
 				}
 			})();
 		};
@@ -258,7 +205,7 @@ export default function NotificationToastBridge() {
 			cancelled = true;
 			window.removeEventListener(NOTIFICATION_SIGNAL_EVENT, onSignal);
 		};
-	}, [activeRole, audience, signedIn, show]);
+	}, [audience, signedIn, show]);
 
 	return null;
 }

@@ -125,6 +125,8 @@ export function NotificationUnreadProvider({
 					const detail: NotificationSignalEventDetail = {
 						unreadCount: signal.unreadCount,
 						latestInboxItemId: signal.latestInboxItemId,
+						newInboxItemIds: signal.newInboxItemIds,
+						newItemsTruncated: signal.newItemsTruncated,
 						hints: signal.hints,
 					};
 					window.dispatchEvent(

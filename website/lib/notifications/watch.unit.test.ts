@@ -17,11 +17,20 @@ import {
 	watchNotifications,
 } from "./watch";
 
-const inbox = (unreadCount: number, hints: StateRefreshHint[] = []) =>
+const inbox = (
+	unreadCount: number,
+	hints: StateRefreshHint[] = [],
+	extra: { newInboxItemIds?: string[]; newItemsTruncated?: boolean } = {},
+) =>
 	({
 		event: {
 			case: "inbox",
-			value: { unreadCount, stateRefreshHints: hints },
+			value: {
+				unreadCount,
+				stateRefreshHints: hints,
+				newInboxItemIds: extra.newInboxItemIds ?? [],
+				newItemsTruncated: extra.newItemsTruncated ?? false,
+			},
 		},
 	}) as unknown as WatchNotificationsResponse;
 const workspace = (change: SellerWorkspaceChange) =>
@@ -105,7 +114,10 @@ describe("watchNotifications", () => {
 		const h = harness([
 			{
 				frames: [
-					inbox(2, [StateRefreshHint.ORDER]),
+					inbox(2, [StateRefreshHint.ORDER], {
+						newInboxItemIds: ["9", "7"],
+						newItemsTruncated: true,
+					}),
 					workspace(SellerWorkspaceChange.ORDER),
 					workspace(SellerWorkspaceChange.AFTER_SALE),
 				],
@@ -119,6 +131,8 @@ describe("watchNotifications", () => {
 				type: "inbox",
 				unreadCount: 2,
 				latestInboxItemId: undefined,
+				newInboxItemIds: ["9", "7"],
+				newItemsTruncated: true,
 				hints: [StateRefreshHint.ORDER],
 			},
 			{ type: "sellerWorkspace", change: "order" },

@@ -12,9 +12,9 @@ import {
  * portal so toasts float above the whole app. Triggers live in
  * `NotificationToastBridge`.
  *
- * Keeps at most `MAX_TOTAL` toasts; `dedupeKey` blocks duplicates while an
- * identical toast is still on screen (so a re-delivered socket message or a
- * re-polled notification doesn't stack). Toasts sharing a `groupKey` (same
+ * Keeps at most `MAX_TOTAL` toasts; `dedupeKey` replaces the toast that is
+ * still on screen with the same key (so a re-delivered socket message or an
+ * aggregated notification update doesn't stack). Toasts sharing a `groupKey` (same
  * chat sender / same notification title) are collapsed into one expandable
  * stack by the viewport — `MAX_TOTAL` is raised accordingly so a burst from
  * one source stacks instead of evicting unrelated toasts.
@@ -48,11 +48,18 @@ export function NotificationToastProvider({
 	}, []);
 
 	const show = React.useCallback((toast: ToastInput) => {
-		if (toast.dedupeKey && activeKeys.current.has(toast.dedupeKey)) return;
 		idRef.current += 1;
 		const next: ToastView = { ...toast, id: idRef.current };
+		const replacing =
+			!!toast.dedupeKey && activeKeys.current.has(toast.dedupeKey);
 		if (toast.dedupeKey) activeKeys.current.add(toast.dedupeKey);
 		setToasts((prev) => {
+			if (replacing) {
+				// Same key still on screen: update that toast in place (new id
+				// restarts its timer) instead of stacking a duplicate.
+				const at = prev.findIndex((t) => t.dedupeKey === toast.dedupeKey);
+				if (at >= 0) return prev.map((t, i) => (i === at ? next : t));
+			}
 			const merged = [...prev, next];
 			if (merged.length <= MAX_TOTAL) return merged;
 			// Drop the oldest overflow and release its dedupe key.
