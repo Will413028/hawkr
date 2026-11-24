@@ -256,10 +256,6 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
 
-      # Media Service gRPC（供商品圖片轉正 FinalizeImages + LinkImages）
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_GRPC_PORT: 9937
-
       # Shipping Service gRPC（運費計算）
       SHIPPING_SERVICE_HOST: shipping-service
       SHIPPING_SERVICE_GRPC_PORT: 9931
@@ -287,9 +283,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    depends_on:
-      media-service:
-        condition: service_healthy
     networks:
       - hawkr-network
 
@@ -337,8 +330,6 @@ services:
       COUPON_SERVICE_GRPC_PORT: 9951
       SHIPPING_SERVICE_HOST: shipping-service
       SHIPPING_SERVICE_GRPC_PORT: 9931
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_GRPC_PORT: 9937
       AFTERSALES_SERVICE_HOST: aftersales-service
       AFTERSALES_SERVICE_GRPC_PORT: 9923
 
@@ -469,8 +460,6 @@ services:
       SHIPPING_SERVICE_GRPC_PORT: 9931
       COUPON_SERVICE_HOST: coupon-service
       COUPON_SERVICE_GRPC_PORT: 9951
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_GRPC_PORT: 9937
       LEGACY_BUYER_GRPC_HOST: host.docker.internal
       LEGACY_BUYER_GRPC_PORT: 9941
       LEGACY_SELLER_GRPC_HOST: host.docker.internal
@@ -700,8 +689,6 @@ services:
       ORDER_SERVICE_GRPC_PORT: 9915
       LEGACY_SELLER_GRPC_HOST: host.docker.internal
       LEGACY_SELLER_GRPC_PORT: 9941
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_GRPC_PORT: 9937
       LEGACY_BUYER_GRPC_HOST: host.docker.internal
       LEGACY_BUYER_GRPC_PORT: 9941
 
@@ -845,78 +832,6 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9946/actuator/health"]
       interval: 60s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Media Service (9936/9937)
-  # ==========================================
-
-  media-service:
-    build:
-      context: .
-      dockerfile: services/java/media-service/Dockerfile
-    image: hawkr/media-service:latest
-    container_name: media-service
-    restart: unless-stopped
-    ports:
-      - "9936:9936"
-      - "9937:9937"
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
-      TZ: UTC
-      SERVER_PORT: 9936
-      GRPC_PORT: 9937
-      LEGACY_SELLER_GRPC_HOST: host.docker.internal
-      LEGACY_SELLER_GRPC_PORT: 9941
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_media
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # 儲存後端 R2（49 號設計書 §8.5）；OSS 將刪除，本地不再依賴。憑證走 ${R2_*}（.env）
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-r2}
-      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
-      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
-      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
-      R2_BUCKET_NAME: ${R2_BUCKET_NAME}
-      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
-      FLYWAY_ENABLED: "true"
-      NACOS_ENABLED: "false"
-
-      # gRPC 訊息上限、token、GC、access log、預覽 TTL（application.yml media.*）
-      GRPC_MAX_INBOUND_MSG_SIZE: ${GRPC_MAX_INBOUND_MSG_SIZE:-10485760}
-      TOKEN_SECRET: ${TOKEN_SECRET:-local-only-media-token-secret-not-for-deploy-48ch}
-      TOKEN_ALLOW_EPHEMERAL: ${TOKEN_ALLOW_EPHEMERAL:-true}
-      GC_ENABLED: ${GC_ENABLED:-true}
-      ACCESS_LOG_SAMPLE_RATE: ${ACCESS_LOG_SAMPLE_RATE:-1.0}
-      MEDIA_PREVIEW_TTL: ${MEDIA_PREVIEW_TTL:-3600}
-
-      JAVA_OPTS: ${JAVA_OPTS}
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
-
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9936/actuator/health"]
-      interval: 60s
-      timeout: 5s
       retries: 3
       start_period: 60s
     networks:
@@ -1264,8 +1179,6 @@ services:
       PAYMENT_SERVICE_ADDR: payment-service:9925
       BUYER_SERVICE_ADDR: host.docker.internal:9941
       SHIPPING_SERVICE_ADDR: shipping-service:9931
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_GRPC_PORT: "9937"
       MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
 
       # ── A. 加密與憑證 ──
