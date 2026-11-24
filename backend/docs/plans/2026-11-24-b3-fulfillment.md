@@ -49,8 +49,20 @@
 
 檔案變動類型：步驟 2、3 是新增（seller 模組與 client 設定畫面內）與修改；步驟 4、5、6 是刪除（步驟 4 另修改 Java 結帳為固定 0 運費）；步驟 0、1、7 是修改。
 
-- [ ] **0. 基線**（被擋於：無）
-  - 範圍：在當下 dev 重跑三份盤點 §0 的計數指令，差異補進附件；跑 backend、website、admin、兩支 App 的 CI 等價檢查，記既有失敗。
+**並行軌道（2026-11-24 重排）：** 步驟之間只剩下列相依，四條軌道可各開一個 session 同時做，每個 session 由主 session 派 Sonnet 實作、各用自己的 worktree（`<repo>/.worktrees/<branch>`），合進 dev 時後到者 rebase：
+
+| 軌道 | 步驟 | 開工條件 | 主要檔案範圍（避免撞檔） |
+|---|---|---|---|
+| A 後端刪除 | 0 → 4 → 5（4、5 必須連著做、同一批合進 dev：gateway import 步驟 4 要刪的 `pkg/proto/shipping`） | 現在 | `backend/services`、`backend/gateway`、`backend/pkg`、`backend/internal/{arch,platform,legacy,modules/notification}`、`api/proto`、compose、`.github` |
+| B seller 運費 | 2 → 3（3 要 Will 看過線框） | 現在 | `backend/internal/modules/seller`、`api/hawkr/seller`、生成物；website 與 seller-app 的賣家設定 |
+| C client 刪除 | 6 | 現在（呼叫端先刪、伺服器後刪，符合「呼叫端遷完再刪舊」；系統未上線，順序反過來也不壞） | website、admin、buyer-app、seller-app 的物流畫面（不含 B 軌道的設定頁） |
+| D 文件 | 1 + 7（同一個 session） | 現在 | `backend/docs`（不含 `plans/`）、`docs/adr` |
+
+- 撞檔點：步驟 4 刪 notification 分類與步驟 6 刪 client 開關要同一批合進 dev（步驟 4 已寫）；步驟 3 與步驟 6 都改 seller-app 上手清單，6 只刪「物流設定」步驟、3 加「運費設定」步驟，後到者 rebase；主計畫檔只由 D 軌道改。
+- 步驟 8 在四條軌道都完成後做。
+
+- [ ] **0. 基線**（軌道 A 第一件事；被擋於：無）
+  - 範圍：在當下 dev 重跑三份盤點 §0 的計數指令，差異補進附件；跑 backend 的 CI 等價檢查，記既有失敗。B、C、D 軌道開工時各自跑自己會碰到的檢查當基線，記在進度表。
   - 驗收：進度表記錄基線與計數差異。
 - [ ] **1. 文件前置**（被擋於：R4）
   - 範圍：主計畫 B1、B3、B6、B8、B9 條目依 ADR 2026-11-24 修訂改寫（B8 加出貨、B6 報價來源、B9 退貨物流、B1 的託運單觸發作廢）；對設計書 69 的引用改指 ADR 修訂；假日段修正。
@@ -80,20 +92,20 @@
   - 不能動：`shipping_ambient.go`；溫層值域；Java order 的其他狀態轉換與 payment 呼叫（B2 的轉接依賴它們）。
   - 驗收：`backend-java-tests.yml`、`backend-go-checks.yml`、`backend-monolith.yml`、`backend-migration-inventory.yml` 等價檢查綠（`python3 scripts/check-migration-inventory.py`）；上列消費端 `rg` 的命中只剩「步驟 4 開工時列出的允許清單」：已套用的 migration（只能往前，不改）、步驟 5 才刪的 gateway 檔與測試、步驟 7 的文件；允許清單寫進進度表，每項附理由；Java order 的單元測試斷言結帳運費為 0 且不呼叫任何 shipping client；mutation：結帳運費改成非 0 常數要變紅。
   - 完成後的狀態：Java 訂單不會離開已付款（P3）。
-- [ ] **5. gateway 與 openapi**（被擋於：步驟 4、R5）
+- [ ] **5. gateway 與 openapi**（被擋於：步驟 4、R5；與步驟 4 連著做，同一批合進 dev）
   - 範圍：刪 gateway shipping 路由與 handler、`routes_webhook_simulator.go`、`routes_payment.go` 的 PayUni 物流代理（與 B2 協調：先到者刪）、`reverse_proxy.go` 的 `payuni-webhook` 項、openapi 對應 path；對 `shipping_ambient.go` 的引用隨 handler 刪除，檔案本身留給 B4（R5）。
   - 消費端：`rg -n -i 'shipping|shipment|store_map|payuni-webhook' backend/gateway --glob '*.go' -g '!shipping_ambient.go'`
   - 驗收：`backend-gateway-json-contract.yml` 等價檢查（`scripts/gateway-json-contract-check.py`、`openapi_coverage_test.go`）；上列 `rg` 只剩溫層相關。
-- [ ] **6. client 刪除**（被擋於：步驟 5、R1、R2）
+- [ ] **6. client 刪除**（被擋於：R1、R2，已決）
   - 範圍：R1 第 1、5、6 組與第 4 組的刪除部分——超商取貨、門市地圖與地址簿門市分頁、配送方式分組、物流開通頁與設定畫面、標籤列印與黑貓／叫車／7-11 對話框、異常看板與 badge、admin `shipping` tab、通知偏好的配送異常開關、商品即時報價；訂單畫面的物流貨態區塊刪除（B8 再加出貨資訊）；3003 守門測試依 R2 刪或改寫。
   - 消費端：`client-inventory.md` §1–§6。
   - 不能動：溫層欄位與它所在的邏輯（B4／B6）；同檔衝突依 R5。
   - 驗收：同步驟 3 的 client 檢查；`rg -n 'store_map|storePickup|store-pickups|shipment_anomaly|shipping_quotes|shipping_onboarding' website admin buyer-app seller-app -g '!node_modules' -g '!.next' -g '!**/gen/**'` 為 0；e2e 交 CI。
-- [ ] **7. 文件**（被擋於：R4）
+- [ ] **7. 文件**（被擋於：R4，已決；與步驟 1 同一個 session）
   - 範圍：設計書 65、06、20–23 改寫（自寄、出貨歸訂單、運費設定歸 seller）；03、09、29、36、58 刪物流商與 Uber 段落；`backend/docs/runbooks/uber-quote-retention*` 刪；R4 列出的 ADR 標 superseded。
   - 範圍補充：`backend/docs/開發規範/` 裡描述物流商的段落刪除；`backend/docs/第三方整合/` 的 7-ELEVEN、黑貓、PayUni 物流總覽整份刪除（整合不存在）；R4 名單外仍提到物流商的 ADR 只在文末加一行「物流商已依 ADR 2026-11-15 退場」，不改正文。
   - 驗收：`python3 scripts/check-doc-paths.py`、`python3 scripts/check-payuni-residue.py` 綠；`rg -l -i 'Uber|黑貓|7-ELEVEN|超商取貨' backend/docs docs` 的命中只在 `docs/adr/`（superseded 或加了退場註記的 ADR）與 `backend/docs/plans/`（計畫與盤點的歷史紀錄）。
-- [ ] **8. 收尾**：主計畫「模組完成的定義」逐項核對（seller 運費設定部分）；design-review skill 跑在累積 diff；延後項附觸發條件搬回主計畫 B1、B8、B9；需要 Will 做的事列出。驗收：各 workflow 每個 job 綠、`mutation` CI job 綠、主計畫勾選。
+- [ ] **8. 收尾**（被擋於：步驟 1–7）：主計畫「模組完成的定義」逐項核對（seller 運費設定部分）；design-review skill 跑在累積 diff；延後項附觸發條件搬回主計畫 B1、B8、B9；需要 Will 做的事列出。驗收：各 workflow 每個 job 綠、`mutation` CI job 綠、主計畫勾選。
 
 ## 決定
 
