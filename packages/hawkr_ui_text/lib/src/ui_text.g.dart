@@ -288,6 +288,172 @@ extension PaymentPaymentAccountStatusUiText on hawkr_payment_v1alpha1_payment.Pa
   String? uiText(UiLocale l) => _paymentPaymentAccountStatus(l, value);
 }
 
+String? _paymentPaymentAnomalyKind(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '付款',
+(UiLocale.en, 1) => 'Payment',
+(UiLocale.zhTW, 2) => '轉帳',
+(UiLocale.en, 2) => 'Transfer',
+(UiLocale.zhTW, 3) => '退款',
+(UiLocale.en, 3) => 'Refund',
+(UiLocale.zhTW, 4) => '收回',
+(UiLocale.en, 4) => 'Recovery',
+(UiLocale.zhTW, 5) => '補差額轉帳',
+(UiLocale.en, 5) => 'Top-up transfer',
+_ => null,
+};
+}
+
+extension PaymentPaymentAnomalyKindUiText on hawkr_payment_v1alpha1_payment.PaymentAnomalyKind {
+  /// payment.PaymentAnomalyKind 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentAnomalyKind(l, value);
+}
+
+String? _paymentPaymentAnomalyOutcome(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '金流商已執行',
+(UiLocale.en, 1) => 'Provider executed it',
+(UiLocale.zhTW, 2) => '金流商沒有執行',
+(UiLocale.en, 2) => 'Provider did not execute it',
+_ => null,
+};
+}
+
+extension PaymentPaymentAnomalyOutcomeUiText on hawkr_payment_v1alpha1_payment.PaymentAnomalyOutcome {
+  /// payment.PaymentAnomalyOutcome 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentAnomalyOutcome(l, value);
+}
+
+String? _paymentPaymentAnomalyResolutionReason(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '金流商已執行、本地沒記到',
+(UiLocale.en, 1) => 'Provider executed it, not recorded locally',
+(UiLocale.zhTW, 2) => '金流商沒有執行',
+(UiLocale.en, 2) => 'Provider did not execute the call',
+(UiLocale.zhTW, 3) => '重複',
+(UiLocale.en, 3) => 'Duplicate',
+(UiLocale.zhTW, 4) => '其他',
+(UiLocale.en, 4) => 'Other',
+_ => null,
+};
+}
+
+extension PaymentPaymentAnomalyResolutionReasonUiText on hawkr_payment_v1alpha1_payment.PaymentAnomalyResolutionReason {
+  /// payment.PaymentAnomalyResolutionReason 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentAnomalyResolutionReason(l, value);
+}
+
+String? _paymentPaymentRefundStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '待送出',
+(UiLocale.en, 1) => 'Pending',
+(UiLocale.zhTW, 2) => '退款中',
+(UiLocale.en, 2) => 'Refunding',
+(UiLocale.zhTW, 3) => '已退款',
+(UiLocale.en, 3) => 'Refunded',
+(UiLocale.zhTW, 4) => '退款失敗',
+(UiLocale.en, 4) => 'Refund failed',
+(UiLocale.zhTW, 5) => '待人工處理',
+(UiLocale.en, 5) => 'Needs review',
+_ => null,
+};
+}
+
+extension PaymentPaymentRefundStatusUiText on hawkr_payment_v1alpha1_payment.PaymentRefundStatus {
+  /// payment.PaymentRefundStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentRefundStatus(l, value);
+}
+
+String? _paymentPaymentReversalStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '無需收回',
+(UiLocale.en, 1) => 'Nothing to recover',
+(UiLocale.zhTW, 2) => '等待收回',
+(UiLocale.en, 2) => 'Waiting',
+(UiLocale.zhTW, 3) => '收回中',
+(UiLocale.en, 3) => 'Recovering',
+(UiLocale.zhTW, 4) => '已收回',
+(UiLocale.en, 4) => 'Recovered',
+(UiLocale.zhTW, 5) => '不再收回',
+(UiLocale.en, 5) => 'Not recovered',
+(UiLocale.zhTW, 6) => '待人工處理',
+(UiLocale.en, 6) => 'Needs review',
+_ => null,
+};
+}
+
+extension PaymentPaymentReversalStatusUiText on hawkr_payment_v1alpha1_payment.PaymentReversalStatus {
+  /// payment.PaymentReversalStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentReversalStatus(l, value);
+}
+
+String? _paymentPaymentStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '建立中',
+(UiLocale.en, 1) => 'Setting up',
+(UiLocale.zhTW, 2) => '待付款',
+(UiLocale.en, 2) => 'Awaiting payment',
+(UiLocale.zhTW, 3) => '處理中',
+(UiLocale.en, 3) => 'Processing',
+(UiLocale.zhTW, 4) => '已付款',
+(UiLocale.en, 4) => 'Paid',
+(UiLocale.zhTW, 5) => '已取消',
+(UiLocale.en, 5) => 'Canceled',
+(UiLocale.zhTW, 6) => '建立失敗',
+(UiLocale.en, 6) => 'Could not start',
+(UiLocale.zhTW, 7) => '待人工處理',
+(UiLocale.en, 7) => 'Needs review',
+_ => null,
+};
+}
+
+extension PaymentPaymentStatusUiText on hawkr_payment_v1alpha1_payment.PaymentStatus {
+  /// payment.PaymentStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentStatus(l, value);
+}
+
+String? _paymentPaymentTopupStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '無需補差額',
+(UiLocale.en, 1) => 'No top-up',
+(UiLocale.zhTW, 2) => '等待補差額',
+(UiLocale.en, 2) => 'Waiting',
+(UiLocale.zhTW, 3) => '補差額中',
+(UiLocale.en, 3) => 'Sending',
+(UiLocale.zhTW, 4) => '已補差額',
+(UiLocale.en, 4) => 'Topped up',
+(UiLocale.zhTW, 5) => '不再補差額',
+(UiLocale.en, 5) => 'Not topped up',
+(UiLocale.zhTW, 6) => '待人工處理',
+(UiLocale.en, 6) => 'Needs review',
+_ => null,
+};
+}
+
+extension PaymentPaymentTopupStatusUiText on hawkr_payment_v1alpha1_payment.PaymentTopupStatus {
+  /// payment.PaymentTopupStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentTopupStatus(l, value);
+}
+
+String? _paymentPaymentTransferStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '待轉帳',
+(UiLocale.en, 1) => 'Pending',
+(UiLocale.zhTW, 2) => '已轉帳',
+(UiLocale.en, 2) => 'Transferred',
+(UiLocale.zhTW, 3) => '轉帳失敗',
+(UiLocale.en, 3) => 'Transfer failed',
+(UiLocale.zhTW, 4) => '待人工處理',
+(UiLocale.en, 4) => 'Needs review',
+_ => null,
+};
+}
+
+extension PaymentPaymentTransferStatusUiText on hawkr_payment_v1alpha1_payment.PaymentTransferStatus {
+  /// payment.PaymentTransferStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentTransferStatus(l, value);
+}
+
 String? _paymentRequirementCollection(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW, 1) => '金流商收件（託管頁面）',

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -87,5 +88,31 @@ func TestTypesWithoutStillValidAreAlwaysValid(t *testing.T) {
 	raw, _, _ := e.ExampleParams()
 	if ok, err := e.StillValid(context.Background(), nil, raw); !ok || err != nil {
 		t.Errorf("StillValid = %v（%v）", ok, err)
+	}
+}
+
+func TestVoucherExpiringDeclaresItsExpiryAsTheNotAfterTime(t *testing.T) {
+	e, _ := Lookup("voucher_expiring")
+	got, ok, err := e.NotAfter(json.RawMessage(voucherExpiringParams))
+	want := time.Date(2026, 11, 24, 4, 30, 0, 0, time.UTC)
+	if err != nil || !ok || !got.Equal(want) {
+		t.Errorf("NotAfter = %v、%v（%v），預期 %v", got, ok, err, want)
+	}
+	if _, _, err := e.NotAfter(json.RawMessage(`{`)); !errors.Is(err, ErrBadParams) {
+		t.Errorf("壞參數要是永久錯誤，得到 %v", err)
+	}
+	if !e.Spec().Revalidates {
+		t.Error("voucher_expiring 宣告了 StillValid，Spec.Revalidates 要是 true")
+	}
+}
+
+func TestTypesWithoutNotAfterHaveNoDeadline(t *testing.T) {
+	e, _ := Lookup("product_restocked")
+	raw, _, _ := e.ExampleParams()
+	if _, ok, err := e.NotAfter(raw); ok || err != nil {
+		t.Errorf("NotAfter ok = %v（%v）", ok, err)
+	}
+	if e.Spec().Revalidates {
+		t.Error("沒有 StillValid 的型別 Revalidates 要是 false")
 	}
 }

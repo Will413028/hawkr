@@ -63,7 +63,7 @@ class AutoRefundWorkerTest {
         when(autoRefundTaskRepository.findRetryable(anyInt())).thenReturn(List.of(task));
         when(autoRefundTaskRepository.claimTask(anyLong(), any())).thenReturn(1);
         // wrapper 在 envelope code≠0 時拋 IllegalStateException（修復後行為）
-        when(paymentGrpcClient.createRefund(anyString(), anyLong(), anyString()))
+        when(paymentGrpcClient.createRefund(anyString(), anyLong(), anyString(), anyString()))
                 .thenThrow(new IllegalStateException("createRefund 失敗: code=500, message=退款失敗: PayUni 拒退"));
 
         worker.process();

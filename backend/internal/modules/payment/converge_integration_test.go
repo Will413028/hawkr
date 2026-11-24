@@ -146,8 +146,8 @@ func TestRepeatedLookupFailuresPutTheTransferInAnomalyWhichHoldsTheUniqueSlot(t 
 		t.Fatalf("ANOMALY 沒有佔住位置：%+v", again)
 	}
 	ctx := context.Background()
-	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, created_at, updated_at)
-VALUES ($1, $2, 7, 100, 'acct_seller_7', now(), now())`, uuid.NewV7(), f.idOf(t, "C-3"))
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.transfers (id, payment_order_id, store_id, amount, destination_account_id, created_at, updated_at)
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), 7, 100, 'acct_seller_7', now(), now())`, uuid.NewV7(), f.idOf(t, "C-3"))
 	if err == nil {
 		t.Fatal("ANOMALY 的轉帳存在時又寫入第二筆有效轉帳")
 	}
@@ -201,8 +201,8 @@ func TestATransferWhoseGroundsAreMissingParksInAnomalyAndTheSweepStops(t *testin
 	f.order("C-5", 11, 7, 100)
 	p := f.create(t, 11, "C-5")
 	id := uuid.NewV7()
-	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, created_at, updated_at)
-VALUES ($1, $2, 7, 100, 'acct_seller_7', $3, $3)`, id, p.ID, f.now)
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.transfers (id, payment_order_id, store_id, amount, destination_account_id, created_at, updated_at)
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), 7, 100, 'acct_seller_7', $3, $3)`, id, p.ID, f.now)
 	must(t, err)
 	must(t, f.runTransfer(id, false))
 	if f.transferText(t, "status", id) != "ANOMALY" || f.transferText(t, "failure_reason", id) != "payment_without_charge" || f.fake.TransferCalls() != 0 {
@@ -238,17 +238,17 @@ func TestResolvingATransferAnomalyWritesTheAuditInTheSameTransaction(t *testing.
 			t.Fatalf("沒有進 ANOMALY：%s", f.transferText(t, "status", id))
 		}
 	}
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, a.ID, AnomalySucceeded, " "); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, a.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", " "); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("成功沒有證據：%v", err)
 	}
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, uuid.NewV7(), AnomalyFailed, ""); apperr.KindOf(err) != apperr.KindNotFound {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, uuid.NewV7(), AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("不存在：%v", err)
 	}
 	ids := f.fake.TransferIDs()
 	if len(ids) != 1 {
 		t.Fatalf("provider 的轉帳=%v", ids)
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, a.ID, AnomalySucceeded, ids[0]))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, a.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ids[0]))
 	if f.transferText(t, "status", a.ID) != "SUCCEEDED" || f.transferText(t, "external_transfer_id", a.ID) != ids[0] || f.transferText(t, "failure_reason", a.ID) != "" || f.auditCount(t) != 1 {
 		t.Fatalf("成功結案：%s，稽核 %d 筆", f.transferText(t, "status", a.ID), f.auditCount(t))
 	}
@@ -257,16 +257,16 @@ func TestResolvingATransferAnomalyWritesTheAuditInTheSameTransaction(t *testing.
 		t.Fatalf("稽核內容=%s", detail)
 	}
 	// 證據指到別的轉帳的 provider ID：核對 b 的嘗試 ID 查不到它，結案被擋下，列與稽核都不動。
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, b.ID, AnomalySucceeded, ids[0]); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, b.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ids[0]); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("證據指到別的轉帳：%v", err)
 	}
 	if f.transferText(t, "status", b.ID) != "ANOMALY" || f.auditCount(t) != 1 {
 		t.Fatalf("衝突沒有回滾：%s，稽核 %d 筆", f.transferText(t, "status", b.ID), f.auditCount(t))
 	}
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, a.ID, AnomalyFailed, ""); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, a.ID, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("已不在 ANOMALY：%v", err)
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, b.ID, AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, b.ID, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f.transferText(t, "status", b.ID) != "FAILED" || f.auditCount(t) != 2 {
 		t.Fatalf("失敗結案：%s，稽核 %d 筆", f.transferText(t, "status", b.ID), f.auditCount(t))
 	}
@@ -390,11 +390,11 @@ func TestResolvingARefundReversalAnomalyAccruesTheReversalOnSuccess(t *testing.T
 	f.exec(t, "UPDATE payment.refund_reversals SET reason = 'lookup_failed' WHERE status = 'ANOMALY'")
 	rev, err := f.fake.ReverseTransfer(callDeadline(t, ctx), ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", ok)})
 	must(t, err)
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, ok), AnomalySucceeded, rev.ExternalID))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, ok), AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", rev.ExternalID))
 	if f.refundText(t, "reversal_status", ok) != "REVERSED" || f.segText(t, "external_id", ok) != rev.ExternalID || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 1 {
 		t.Fatalf("成功結案：%s，reversed %d", f.refundText(t, "reversal_status", ok), f.reversedOf(t, tr.ID))
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, bad), AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, bad), AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f.refundText(t, "reversal_status", bad) != "RELEASED" || f.refundText(t, "status", bad) != "REFUNDING" || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 2 {
 		t.Fatalf("失敗結案：%s", f.refundText(t, "reversal_status", bad))
 	}
@@ -478,7 +478,7 @@ func TestACreateAnomalyHoldsTheOrderAndIsResolvedByAnAdmin(t *testing.T) {
 	if len(f.paymentIDs(t, kindChargeCreate)) != 0 {
 		t.Fatal("ANOMALY 的付款被補掃重排")
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f.statusOf(t, "C-12") != PaymentCreateFailed || f.auditCount(t) != 1 {
 		t.Fatalf("失敗結案：%s", f.statusOf(t, "C-12"))
 	}
@@ -490,13 +490,13 @@ func TestACreateAnomalyHoldsTheOrderAndIsResolvedByAnAdmin(t *testing.T) {
 	must(t, f.fake.SetAmount(f.fake.IntentFor("C-13")[0], 1))
 	f.pastResendWindow()
 	must(t, f.module.CreatePaymentIntent(ctx, q.ID, false))
-	if f.statusOf(t, "C-13") != PaymentAnomaly || !strings.HasPrefix(f.text(t, "SELECT failure_reason FROM payment.payments WHERE order_no = 'C-13'"), "reply_mismatch") || f.externalOf(t, "C-13") != "" {
+	if f.statusOf(t, "C-13") != PaymentAnomaly || !strings.HasPrefix(f.text(t, "SELECT failure_reason FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'C-13')"), "reply_mismatch") || f.externalOf(t, "C-13") != "" {
 		t.Fatalf("金額不符：%s", f.statusOf(t, "C-13"))
 	}
 	// 結案成成功：連上證據指的 PaymentIntent（provider 那邊確實有），排同步，重讀後是真實狀態。
 	evidence := f.fake.IntentFor("C-13")[0]
 	must(t, f.fake.SetAmount(evidence, 100))
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, q.ID, AnomalySucceeded, evidence))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, q.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", evidence))
 	if f.statusOf(t, "C-13") != PaymentAwaitingPayment || f.externalOf(t, "C-13") != evidence || !containsID(f.paymentIDs(t, kindChargeSync), q.ID) {
 		t.Fatalf("成功結案：%s", f.statusOf(t, "C-13"))
 	}
@@ -527,7 +527,7 @@ func TestProviderCallingJobMethodsRefuseToRunInsideATransaction(t *testing.T) {
 			return err
 		},
 		"resolve": func(ctx context.Context) error {
-			return f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, uuid.NewV7(), AnomalyFailed, "")
+			return f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, uuid.NewV7(), AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", "")
 		},
 	} {
 		err := f.db.InTx(ctx, func(ctx context.Context) error { return call(ctx) })

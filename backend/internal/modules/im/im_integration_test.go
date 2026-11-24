@@ -325,10 +325,11 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "again"}); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("沒有未還原的隱藏：%v", err)
 	}
-	f.storeRetired(t, s1, 2000+s1)
-	if err := f.m.ErasePartyMessages(ctx, im.PartyStore, s1); err != nil {
+	f.buyerDeleted(t, b1)
+	if err := f.m.ErasePartyMessages(ctx, im.PartyBuyer, b1); err != nil {
 		t.Fatal(err)
 	}
+	p = f.storeParty(t, s1)
 	if pv := preview(); !pv.Erased || pv.Text != nil {
 		t.Fatalf("抹除後的預覽：%+v", pv)
 	}

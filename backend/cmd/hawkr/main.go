@@ -41,10 +41,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/buyer/buyerconnect"
+	"github.com/Will413028/hawkr/backend/internal/legacy/gen/payment/paymentconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/seller/sellerconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/imrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/invoiceservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
+	"github.com/Will413028/hawkr/backend/internal/legacy/paymentserver"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewrelay"
@@ -164,6 +166,8 @@ func runServe(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
+	// 買家付款的 client 初始化用的公開金鑰（不是 secret）；與收款開通的 STRIPE_PUBLISHABLE_KEY 是同一把平台金鑰。
+	paymentPublishableKey := e.StringOr("STRIPE_PUBLISHABLE_KEY", "")
 	notificationConfig := readNotificationProviders(ctx, e, log)
 	registry := readGCIS(e)
 	mediaCfg := readMedia(e)
@@ -226,7 +230,7 @@ func runServe(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -241,6 +245,7 @@ func runServe(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribePaymentRelay(bus, jc)
 	subscribeBizCalendarRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
@@ -307,31 +312,32 @@ func runServe(ctx context.Context) error {
 			Now:    time.Now,
 			Logger: log,
 		}),
-		Media:           med,
-		Identity:        id,
-		WebLogin:        webLogin,
-		AppLogin:        appLogin,
-		Buyer:           buyerModule,
-		Seller:          sellerModule,
-		Payment:         payments,
-		BizCalendar:     calendar,
-		Discovery:       discoveryModule,
-		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
-		Stats:           stats,
-		DashboardOrders: sellerDashboardOrders{orders},
-		SocialProducts:  socialCards{products},
-		BuyerPorts:      httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
-		Deletion:        deletion,
-		Delegation:      del,
-		Images:          images,
-		WebOrigin:       web,
-		Origins:         origins,
-		OriginAuth:      originAuth,
-		ClientIP:        clientIP,
-		Legacy:          gateway,
-		LegacyPrefixes:  gatewayproxy.Prefixes,
-		Now:             time.Now,
-		Logger:          log,
+		Media:                 med,
+		Identity:              id,
+		WebLogin:              webLogin,
+		AppLogin:              appLogin,
+		Buyer:                 buyerModule,
+		Seller:                sellerModule,
+		Payment:               payments,
+		PaymentPublishableKey: paymentPublishableKey,
+		BizCalendar:           calendar,
+		Discovery:             discoveryModule,
+		ReviewQueue:           reviewqueue.New(reviewqueue.Deps{DB: d}),
+		Stats:                 stats,
+		DashboardOrders:       sellerDashboardOrders{orders},
+		SocialProducts:        socialCards{products},
+		BuyerPorts:            httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
+		Deletion:              deletion,
+		Delegation:            del,
+		Images:                images,
+		WebOrigin:             web,
+		Origins:               origins,
+		OriginAuth:            originAuth,
+		ClientIP:              clientIP,
+		Legacy:                gateway,
+		LegacyPrefixes:        gatewayproxy.Prefixes,
+		Now:                   time.Now,
+		Logger:                log,
 	})
 	if err != nil {
 		return err
@@ -347,6 +353,7 @@ func runServe(ctx context.Context) error {
 	legacyMux := http.NewServeMux()
 	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, log)))
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
+	legacyMux.Handle(paymentconnect.NewPaymentServiceHandler(paymentserver.New(payments)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviewModule}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
 	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
@@ -447,7 +454,7 @@ func runWorker(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -462,6 +469,7 @@ func runWorker(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribePaymentRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	subscribeSocialRelay(bus, jc)

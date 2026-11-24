@@ -571,6 +571,258 @@ func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {
 	return "", false
 }
 
+// PaymentPaymentAnomalyKind 是 payment.PaymentAnomalyKind 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAnomalyKind(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PAYMENT":
+			return "Payment", true
+		case "TRANSFER":
+			return "Transfer", true
+		case "REFUND":
+			return "Refund", true
+		case "REVERSAL":
+			return "Recovery", true
+		case "TOPUP":
+			return "Top-up transfer", true
+		}
+	}
+	switch v {
+	case "PAYMENT":
+		return "付款", true
+	case "TRANSFER":
+		return "轉帳", true
+	case "REFUND":
+		return "退款", true
+	case "REVERSAL":
+		return "收回", true
+	case "TOPUP":
+		return "補差額轉帳", true
+	}
+	return "", false
+}
+
+// PaymentPaymentAnomalyOutcome 是 payment.PaymentAnomalyOutcome 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAnomalyOutcome(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "SUCCEEDED":
+			return "Provider executed it", true
+		case "FAILED":
+			return "Provider did not execute it", true
+		}
+	}
+	switch v {
+	case "SUCCEEDED":
+		return "金流商已執行", true
+	case "FAILED":
+		return "金流商沒有執行", true
+	}
+	return "", false
+}
+
+// PaymentPaymentAnomalyResolutionReason 是 payment.PaymentAnomalyResolutionReason 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAnomalyResolutionReason(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROVIDER_EXECUTED_NOT_RECORDED":
+			return "Provider executed it, not recorded locally", true
+		case "PROVIDER_NOT_EXECUTED":
+			return "Provider did not execute the call", true
+		case "DUPLICATE":
+			return "Duplicate", true
+		case "OTHER":
+			return "Other", true
+		}
+	}
+	switch v {
+	case "PROVIDER_EXECUTED_NOT_RECORDED":
+		return "金流商已執行、本地沒記到", true
+	case "PROVIDER_NOT_EXECUTED":
+		return "金流商沒有執行", true
+	case "DUPLICATE":
+		return "重複", true
+	case "OTHER":
+		return "其他", true
+	}
+	return "", false
+}
+
+// PaymentPaymentRefundStatus 是 payment.PaymentRefundStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentRefundStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PENDING":
+			return "Pending", true
+		case "REFUNDING":
+			return "Refunding", true
+		case "SUCCEEDED":
+			return "Refunded", true
+		case "FAILED":
+			return "Refund failed", true
+		case "ANOMALY":
+			return "Needs review", true
+		}
+	}
+	switch v {
+	case "PENDING":
+		return "待送出", true
+	case "REFUNDING":
+		return "退款中", true
+	case "SUCCEEDED":
+		return "已退款", true
+	case "FAILED":
+		return "退款失敗", true
+	case "ANOMALY":
+		return "待人工處理", true
+	}
+	return "", false
+}
+
+// PaymentPaymentReversalStatus 是 payment.PaymentReversalStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentReversalStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NONE":
+			return "Nothing to recover", true
+		case "WAITING":
+			return "Waiting", true
+		case "REVERSING":
+			return "Recovering", true
+		case "REVERSED":
+			return "Recovered", true
+		case "RELEASED":
+			return "Not recovered", true
+		case "ANOMALY":
+			return "Needs review", true
+		}
+	}
+	switch v {
+	case "NONE":
+		return "無需收回", true
+	case "WAITING":
+		return "等待收回", true
+	case "REVERSING":
+		return "收回中", true
+	case "REVERSED":
+		return "已收回", true
+	case "RELEASED":
+		return "不再收回", true
+	case "ANOMALY":
+		return "待人工處理", true
+	}
+	return "", false
+}
+
+// PaymentPaymentStatus 是 payment.PaymentStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "CREATING":
+			return "Setting up", true
+		case "AWAITING_PAYMENT":
+			return "Awaiting payment", true
+		case "PROCESSING":
+			return "Processing", true
+		case "SUCCEEDED":
+			return "Paid", true
+		case "CANCELED":
+			return "Canceled", true
+		case "CREATE_FAILED":
+			return "Could not start", true
+		case "ANOMALY":
+			return "Needs review", true
+		}
+	}
+	switch v {
+	case "CREATING":
+		return "建立中", true
+	case "AWAITING_PAYMENT":
+		return "待付款", true
+	case "PROCESSING":
+		return "處理中", true
+	case "SUCCEEDED":
+		return "已付款", true
+	case "CANCELED":
+		return "已取消", true
+	case "CREATE_FAILED":
+		return "建立失敗", true
+	case "ANOMALY":
+		return "待人工處理", true
+	}
+	return "", false
+}
+
+// PaymentPaymentTopupStatus 是 payment.PaymentTopupStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentTopupStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "NONE":
+			return "No top-up", true
+		case "WAITING":
+			return "Waiting", true
+		case "SENDING":
+			return "Sending", true
+		case "DONE":
+			return "Topped up", true
+		case "RELEASED":
+			return "Not topped up", true
+		case "ANOMALY":
+			return "Needs review", true
+		}
+	}
+	switch v {
+	case "NONE":
+		return "無需補差額", true
+	case "WAITING":
+		return "等待補差額", true
+	case "SENDING":
+		return "補差額中", true
+	case "DONE":
+		return "已補差額", true
+	case "RELEASED":
+		return "不再補差額", true
+	case "ANOMALY":
+		return "待人工處理", true
+	}
+	return "", false
+}
+
+// PaymentPaymentTransferStatus 是 payment.PaymentTransferStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentTransferStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PENDING":
+			return "Pending", true
+		case "SUCCEEDED":
+			return "Transferred", true
+		case "FAILED":
+			return "Transfer failed", true
+		case "ANOMALY":
+			return "Needs review", true
+		}
+	}
+	switch v {
+	case "PENDING":
+		return "待轉帳", true
+	case "SUCCEEDED":
+		return "已轉帳", true
+	case "FAILED":
+		return "轉帳失敗", true
+	case "ANOMALY":
+		return "待人工處理", true
+	}
+	return "", false
+}
+
 // PaymentRequirementCollection 是 payment.RequirementCollection 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) PaymentRequirementCollection(v string) (string, bool) {

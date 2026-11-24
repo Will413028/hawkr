@@ -52,17 +52,6 @@ export interface CheckoutPreviewResult {
 	discountAmount: number;
 	totalPayAmount: number;
 	/**
-	 * 本次交易付款對應的 PayUni MerID（單賣家=seller.mer / 和單=代理商 mer）。
-	 * Google Pay 在 `loadPaymentData()` 開 sheet 前必須用此值填入
-	 * `tokenizationSpec.parameters.gatewayMerchantId`。
-	 */
-	paymentMerId: string;
-	/**
-	 * 後端依 totalActualAmount 算出的各付款方式可用性（20 設計書 §3.4.1）。
-	 * 前端據此 render（禁用 + 理由），不自行用金額判斷。空清單 = 零元（無需付款）。
-	 */
-	availablePaymentMethods: AvailablePaymentMethod[];
-	/**
 	 * 結帳頁的發票區（58 §6.2.4 order ②、58A §B01）。
 	 *
 	 * 🔴 `null` 與「空物件」是兩件事：後端拿不到發票服務時**不回這個 key**，
@@ -193,33 +182,6 @@ export function parseCheckoutInvoicePreview(
 			blocked: v["blocked"] === true,
 		})),
 	};
-}
-
-/** 付款方式可用性（結帳預覽 + 訂單詳情再次付款共用）。後端 availablePaymentMethods 元素 */
-export interface AvailablePaymentMethod {
-	paymentType: string; // PaymentMethod value（2001/2002/2003/2004）
-	eligible: boolean; // 金額是否落在該方式合法區間
-	ineligibleReason: string; // PaymentMethodIneligibleReason value；eligible=true 時空字串
-}
-
-/** 從後端 data 解析 availablePaymentMethods（支援 camel/snake；缺漏回空陣列） */
-export function parseAvailablePaymentMethods(
-	data: Record<string, unknown>,
-): AvailablePaymentMethod[] {
-	const raw =
-		(data["availablePaymentMethods"] as unknown[] | undefined) ??
-		(data["available_payment_methods"] as unknown[] | undefined);
-	if (!Array.isArray(raw)) return [];
-	return raw.map((m) => {
-		const o = (m ?? {}) as Record<string, unknown>;
-		return {
-			paymentType: String(o["paymentType"] ?? o["payment_type"] ?? ""),
-			eligible: Boolean(o["eligible"]),
-			ineligibleReason: String(
-				o["ineligibleReason"] ?? o["ineligible_reason"] ?? "",
-			),
-		};
-	});
 }
 
 export interface CheckoutConfirmRequest extends CheckoutPreviewRequest {
@@ -525,8 +487,6 @@ export async function previewCheckout(
 			"grandTotal",
 			"total",
 		]),
-		paymentMerId: pickString(data, ["paymentMerId", "payment_mer_id"]),
-		availablePaymentMethods: parseAvailablePaymentMethods(data),
 		invoice: parseCheckoutInvoicePreview(data),
 		raw: data,
 	};

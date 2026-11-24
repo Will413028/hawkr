@@ -117,4 +117,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatStoreFallbackName => '店家';
+
+  @override
+  String get paymentProcessing => '處理中...';
+
+  @override
+  String get paymentSucceededTitle => '付款成功';
+
+  @override
+  String get paymentNotCompletedTitle => '付款未完成';
+
+  @override
+  String get paymentSucceededMessage => '付款已完成，感謝你的購買。';
+
+  @override
+  String get paymentPendingMessage => '付款處理中，請稍後到「我的訂單」確認結果。';
+
+  @override
+  String get paymentCanceledMessage => '你已取消付款，訂單仍待付款，可到「我的訂單」重新付款。';
+
+  @override
+  String get paymentFailedMessage => '付款沒有完成，訂單仍待付款，可到「我的訂單」重新付款。';
+
+  @override
+  String get paymentAnomalyMessage => '這筆付款需要客服協助處理，暫時無法重新付款，請聯絡客服。';
 }

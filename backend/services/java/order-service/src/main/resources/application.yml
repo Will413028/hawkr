@@ -80,8 +80,8 @@ hawkr:
           port: ${CART_SERVICE_GRPC_PORT:9927}
           plaintext: true
         payment:  # 目前 Order↔Payment 走 RabbitMQ，此 target 為未來直接 gRPC 呼叫預留
-          host: ${PAYMENT_SERVICE_HOST:127.0.0.1}
-          port: ${PAYMENT_SERVICE_GRPC_PORT:9925}
+          host: ${LEGACY_PAYMENT_GRPC_HOST:127.0.0.1}
+          port: ${LEGACY_PAYMENT_GRPC_PORT:9941}
           plaintext: true
         coupon:
           host: ${COUPON_SERVICE_HOST:127.0.0.1}

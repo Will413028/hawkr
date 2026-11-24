@@ -8,6 +8,7 @@ import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.connect.client.dart';
@@ -115,6 +116,11 @@ SellerReportAppServiceClient sellerReportAppClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 ModerationAppServiceClient moderationAppClient(Ref ref) =>
     ModerationAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 買家的付款（`PaymentAppService`）：建立付款與重讀付款（含 PaymentSheet 的 client secret，不可快取）。
+@Riverpod(keepAlive: true)
+PaymentAppServiceClient paymentAppClient(Ref ref) =>
+    PaymentAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 買家的聊天（`ChatAppService`）：對話、訊息、已讀與即時事件串流（`StreamEvents`，長連線不設逾時）。
 @Riverpod(keepAlive: true)

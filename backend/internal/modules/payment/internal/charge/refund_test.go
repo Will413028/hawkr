@@ -106,7 +106,7 @@ func fakePaid(t *testing.T, f *Fake, amount int64) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	snap, err := f.CreatePayment(ctx, CreateInput{PaymentID: uuid.NewV7(), OrderNo: "O", StoreID: 1, Amount: amount, Description: "d", TransferGroup: "O", IdempotencyKey: uuid.NewV7().String()})
+	snap, err := f.CreatePayment(ctx, CreateInput{PaymentID: uuid.NewV7(), OrderNos: []string{"O"}, Amount: amount, Description: "d", TransferGroup: "O", IdempotencyKey: uuid.NewV7().String()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,14 +145,14 @@ func TestTheFakeDrivesEveryRefundOutcomeAndLookup(t *testing.T) {
 	if _, err := f.CreateRefund(ctx, RefundInput{ExternalPaymentID: pi, Amount: 30, IdempotencyKey: "k5"}); err == nil {
 		t.Fatal("回應遺失沒有回錯誤")
 	}
-	if found, ok, err := f.FindRefund(ctx, pi, "k5"); err != nil || !ok || found.Amount != 30 {
+	if found, ok, err := f.FindRefund(ctx, pi, "k5", time.Time{}); err != nil || !ok || found.Amount != 30 {
 		t.Fatalf("回應遺失之後查回：%+v %v %v", found, ok, err)
 	}
-	if _, ok, _ := f.FindRefund(ctx, pi, "never"); ok {
+	if _, ok, _ := f.FindRefund(ctx, pi, "never", time.Time{}); ok {
 		t.Fatal("沒建立過的鍵被找到")
 	}
 	f.FailLookup(errors.New("查回逾時"))
-	if _, _, err := f.FindRefund(ctx, pi, "k5"); err == nil {
+	if _, _, err := f.FindRefund(ctx, pi, "k5", time.Time{}); err == nil {
 		t.Fatal("注入的查回失敗沒有回錯誤")
 	}
 	f.FailRefund(fmt.Errorf("%w：429", ErrRetryableRefusal))

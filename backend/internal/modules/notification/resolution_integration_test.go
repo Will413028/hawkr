@@ -53,7 +53,7 @@ func setupResolution(t *testing.T) *fixture {
 	resolver := NewResolver(buyers, sl, &fakeReporters{})
 	rec := &recorder{}
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Validity: noVouchers{}, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 	}, testRegistry{})
 	return &fixture{db: d, identity: id, buyer: buyers, sellerMod: sl, bus: bus, jobs: rec, module: m, logs: logs, resolver: resolver}
 }

@@ -1,7 +1,90 @@
 syntax = "proto3";
 
-// payment 模組擁有的收款帳戶列舉：賣家端（hawkr.seller.v1alpha1）與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
+// payment 模組的買家付款 API，以及模組擁有的列舉（收款帳戶、付款、轉帳、退款）：賣家端（hawkr.seller.v1alpha1）、買家與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
+// 付款以訂單（order_no）為鍵：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；一筆付款可以對 N 張訂單（B8 的多店結帳），目前 client 一次付一張；web 以 Stripe Payment Element、App 以 PaymentSheet
+// 用 client_secret 完成付款（計畫 B2 D3、ADR D64），付款結果以 webhook 為準，client 以 GetPayment 重讀，不信任 client 回報的結果。
 package hawkr.payment.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+// PaymentAppService 只有登入的顧客帳號（買家）能呼叫；只讀寫呼叫者自己的付款（他人的訂單回 not_found）。
+service PaymentAppService {
+  // CreatePayment 對買家自己的一張待付款訂單建立付款（冪等：同一張訂單只有一筆付款、同時只有一個有效的 PaymentIntent，重複呼叫回目前的付款）。
+  // 訂單不是呼叫者的回 not_found；訂單不可付（已取消、已付款以外的狀態）、零元訂單、金額或店家與既有付款不同回 failed_precondition；沒有設定付款 provider 回 failed_precondition。
+  // provider 暫時失敗或逾時時回狀態 CREATING 的付款（沒有 session），背景補做之後以 GetPayment 重讀；provider 永久拒絕時回狀態 CREATE_FAILED（不是錯誤），訂單仍可付時再呼叫一次會換新的嘗試。
+  // 狀態 AWAITING_PAYMENT 時帶 session。
+  rpc CreatePayment(CreatePaymentRequest) returns (CreatePaymentResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // GetPayment 讀買家自己的付款（沒有付款或不是呼叫者的回 not_found）。狀態 AWAITING_PAYMENT 時帶 session（client secret 是每次向 provider 讀的，不存）；
+  // provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，不標 NO_SIDE_EFFECTS（那會允許 GET 與快取），所以一律 POST。
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
+}
+
+// PaymentStatus 是付款的狀態，只由金流商回報的 PaymentIntent 狀態推導。
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  // 付款已記錄，金流商那邊的付款物件還沒確認建立（含呼叫過、結果不明）；背景補做，client 稍後重讀。
+  PAYMENT_STATUS_CREATING = 1;
+  // 已建立，等買家付款（含需要 3DS 的額外驗證）。
+  PAYMENT_STATUS_AWAITING_PAYMENT = 2;
+  // 買家已送出付款，金流商處理中。
+  PAYMENT_STATUS_PROCESSING = 3;
+  // 已入帳（終局）。
+  PAYMENT_STATUS_SUCCEEDED = 4;
+  // 已取消（之後的入帳仍勝出）；訂單仍可付時 CreatePayment 會換新的嘗試。
+  PAYMENT_STATUS_CANCELED = 5;
+  // 建立被金流商永久拒絕，或查回證明金流商沒有這筆。
+  PAYMENT_STATUS_CREATE_FAILED = 6;
+  // 建立的結果與金流商對不起來：待營運人工處理，買家不能重試。
+  PAYMENT_STATUS_ANOMALY = 7;
+}
+
+// Payment 是買家對一張訂單的付款（order_no 是請求的那張訂單）。
+message Payment {
+  string order_no = 1;
+  PaymentStatus status = 2;
+  // 付款金額（這筆付款的總額，不帶幣別；一次付一張訂單時就是訂單的金額）。
+  int64 amount = 3;
+  // 入帳時間；沒有入帳時不設。
+  google.protobuf.Timestamp paid_time = 4;
+  // 完成付款所需的初始化資料；只有狀態 AWAITING_PAYMENT 且金流商還在等待付款時才有。
+  PaymentSession session = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// PaymentSession 是完成付款的初始化資料，依金流商分支。
+message PaymentSession {
+  oneof provider {
+    StripePaymentSession stripe = 1;
+  }
+}
+
+// StripePaymentSession 是 Stripe Payment Element（web）與 PaymentSheet（App）的初始化資料。
+message StripePaymentSession {
+  // PaymentIntent 的 client secret；只給這個買家的 client，不記錄、不快取。
+  string client_secret = 1;
+  // 初始化 Stripe.js 與 PaymentSheet 用的公開金鑰（不是 secret）。
+  string publishable_key = 2;
+}
+
+message CreatePaymentRequest {
+  // 要付款的訂單編號。
+  string order_no = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreatePaymentResponse {
+  Payment payment = 1;
+}
+
+message GetPaymentRequest {
+  string order_no = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetPaymentResponse {
+  Payment payment = 1;
+}
 
 // PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。
 enum PaymentAccountStatus {
@@ -32,4 +115,103 @@ enum EmbeddedOnboardingRuntime {
   EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED = 0;
   // Stripe Connect.js（瀏覽器）。
   EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS = 1;
+}
+
+// PaymentRefundStatus 是退款的狀態（只給後台）。
+enum PaymentRefundStatus {
+  PAYMENT_REFUND_STATUS_UNSPECIFIED = 0;
+  // 已記錄，還沒呼叫金流商。
+  PAYMENT_REFUND_STATUS_PENDING = 1;
+  // 已呼叫金流商，等結果。
+  PAYMENT_REFUND_STATUS_REFUNDING = 2;
+  // 退款成功。
+  PAYMENT_REFUND_STATUS_SUCCEEDED = 3;
+  // 退款失敗，不佔累計額度。
+  PAYMENT_REFUND_STATUS_FAILED = 4;
+  // 與金流商對不起來：仍佔額度，待營運人工結案。
+  PAYMENT_REFUND_STATUS_ANOMALY = 5;
+}
+
+// PaymentTransferStatus 是付款轉給賣家的轉帳的狀態（只給後台）。
+enum PaymentTransferStatus {
+  PAYMENT_TRANSFER_STATUS_UNSPECIFIED = 0;
+  // 已記錄，等送出或等結果。
+  PAYMENT_TRANSFER_STATUS_PENDING = 1;
+  // 轉帳成功。
+  PAYMENT_TRANSFER_STATUS_SUCCEEDED = 2;
+  // 轉帳失敗（終局）。
+  PAYMENT_TRANSFER_STATUS_FAILED = 3;
+  // 與金流商對不起來：佔住這筆付款的轉帳，待營運人工結案。
+  PAYMENT_TRANSFER_STATUS_ANOMALY = 4;
+}
+
+// PaymentReversalStatus 是退款向賣家收回款項（撤回轉帳）的狀態，與退款狀態並行（只給後台）。
+enum PaymentReversalStatus {
+  PAYMENT_REVERSAL_STATUS_UNSPECIFIED = 0;
+  // 沒有要向賣家收回的款項。
+  PAYMENT_REVERSAL_STATUS_NONE = 1;
+  // 等退款被金流商接受之後才開始收回。
+  PAYMENT_REVERSAL_STATUS_WAITING = 2;
+  // 收回進行中。
+  PAYMENT_REVERSAL_STATUS_REVERSING = 3;
+  // 已向賣家收回。
+  PAYMENT_REVERSAL_STATUS_REVERSED = 4;
+  // 不再收回（退款失敗或轉帳沒有可收回的額度）。
+  PAYMENT_REVERSAL_STATUS_RELEASED = 5;
+  // 與金流商對不起來：待營運人工結案。
+  PAYMENT_REVERSAL_STATUS_ANOMALY = 6;
+}
+
+// PaymentTopupStatus 是已從轉帳金額扣掉的退款之後失敗，補差額轉帳給賣家的狀態（只給後台）。
+enum PaymentTopupStatus {
+  PAYMENT_TOPUP_STATUS_UNSPECIFIED = 0;
+  // 沒有要補的差額。
+  PAYMENT_TOPUP_STATUS_NONE = 1;
+  // 等補差額轉帳。
+  PAYMENT_TOPUP_STATUS_WAITING = 2;
+  // 補差額轉帳送出中。
+  PAYMENT_TOPUP_STATUS_SENDING = 3;
+  // 已補給賣家。
+  PAYMENT_TOPUP_STATUS_DONE = 4;
+  // 不再補（差額已無需補）。
+  PAYMENT_TOPUP_STATUS_RELEASED = 5;
+  // 與金流商對不起來：待營運人工結案。
+  PAYMENT_TOPUP_STATUS_ANOMALY = 6;
+}
+
+// PaymentAnomalyKind 是進入 ANOMALY 的物件種類（只給後台）。
+enum PaymentAnomalyKind {
+  PAYMENT_ANOMALY_KIND_UNSPECIFIED = 0;
+  // 付款：建立結果與金流商對不起來。
+  PAYMENT_ANOMALY_KIND_PAYMENT = 1;
+  // 轉帳。
+  PAYMENT_ANOMALY_KIND_TRANSFER = 2;
+  // 退款。
+  PAYMENT_ANOMALY_KIND_REFUND = 3;
+  // 退款的收回（撤回轉帳）：id 是撤回列 ID。
+  PAYMENT_ANOMALY_KIND_REVERSAL = 4;
+  // 退款的補差額轉帳：id 是退款 ID。
+  PAYMENT_ANOMALY_KIND_TOPUP = 5;
+}
+
+// PaymentAnomalyOutcome 是人工結案的結果（只給後台）。
+enum PaymentAnomalyOutcome {
+  PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED = 0;
+  // 核對金流商之後確認它確實執行了（要附金流商物件 ID 為證據）。
+  PAYMENT_ANOMALY_OUTCOME_SUCCEEDED = 1;
+  // 核對金流商之後確認它沒有執行。
+  PAYMENT_ANOMALY_OUTCOME_FAILED = 2;
+}
+
+// PaymentAnomalyResolutionReason 是人工結案的原因代碼（只給後台）：ANOMALY 結案時管理員必選，與自由文字備註一起寫進後台動作紀錄。
+enum PaymentAnomalyResolutionReason {
+  PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED = 0;
+  // 金流商已執行、本地沒有記到結果（只搭配結果 SUCCEEDED）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED = 1;
+  // 金流商沒有執行這次呼叫（只搭配結果 FAILED）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED = 2;
+  // 重複：同一件事已由另一筆紀錄處理（搭配任一結果）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE = 3;
+  // 其他原因，細節寫在備註（搭配任一結果）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER = 4;
 }

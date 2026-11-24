@@ -104,7 +104,7 @@ func (s *Service) topUp(ctx context.Context, refundID uuid.UUID) error {
 	if ref.TopupStatus != string(model.TopupSending) {
 		return nil
 	}
-	tr, err := q.SucceededTransferByPayment(ctx, ref.PaymentID)
+	tr, err := q.SucceededTransferByOrder(ctx, ref.PaymentOrderID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return s.anomalyTopup(ctx, ref, "no_succeeded_transfer", "")
 	}
@@ -114,7 +114,7 @@ func (s *Service) topUp(ctx context.Context, refundID uuid.UUID) error {
 	if tr.ExternalTransferID == nil {
 		return s.anomalyTopup(ctx, ref, "transfer_without_external_id", "")
 	}
-	pay, err := q.PaymentByID(ctx, ref.PaymentID)
+	pay, order, err := paymentOfOrder(ctx, q, ref.PaymentOrderID)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (s *Service) topUp(ctx context.Context, refundID uuid.UUID) error {
 	}
 	now := s.d.Now().UTC()
 	if !inResendWindow(ref.TopupCalledAt, now) {
-		return s.lookupTopup(ctx, ref, tr, pay, now)
+		return s.lookupTopup(ctx, ref, tr, pay, order, now)
 	}
 	called, err := s.markTopupCalled(ctx, refundID, now)
 	if err != nil || called == nil {
@@ -133,18 +133,18 @@ func (s *Service) topUp(ctx context.Context, refundID uuid.UUID) error {
 	defer cancel()
 	snap, err := s.d.Provider.CreateTransfer(callCtx, TransferInput{
 		Amount: called.Amount, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: tr.DestinationAccountID,
-		TransferGroup: pay.OrderNo, IdempotencyKey: called.TopupIdempotencyKey.String(),
+		TransferGroup: TransferGroupOf(pay.ID), IdempotencyKey: called.TopupIdempotencyKey.String(),
 	})
-	switch classifyCall(err) {
+	switch s.classify(ctx, "create_topup_transfer", err) {
 	case callRefused:
-		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕補差額轉帳", "refund_id", refundID.String(), "order_no", pay.OrderNo, "err", err)
-		return s.releaseTopup(ctx, refundID, ref.PaymentID, failedRefused)
+		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕補差額轉帳", "refund_id", refundID.String(), "order_no", order.OrderNo, "err", err)
+		return s.releaseTopup(ctx, refundID, ref.PaymentOrderID, failedRefused)
 	case callRetryable:
 		if !firstCall(ref.TopupCalledAt, called.TopupCalledAt, now) {
-			s.d.Logger.WarnContext(ctx, "payment：重送補差額轉帳被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "refund_id", refundID.String(), "order_no", pay.OrderNo, "err", err)
+			s.d.Logger.WarnContext(ctx, "payment：重送補差額轉帳被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "refund_id", refundID.String(), "order_no", order.OrderNo, "err", err)
 			return err
 		}
-		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕補差額轉帳、沒有執行，換新冪等鍵重試", "refund_id", refundID.String(), "order_no", pay.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕補差額轉帳、沒有執行，換新冪等鍵重試", "refund_id", refundID.String(), "order_no", order.OrderNo, "err", err)
 		if rerr := s.rotateTopupKey(ctx, refundID, called.TopupIdempotencyKey, now); rerr != nil {
 			return errors.Join(err, rerr)
 		}
@@ -157,10 +157,10 @@ func (s *Service) topUp(ctx context.Context, refundID uuid.UUID) error {
 }
 
 // lookupTopup 是過了 ResendWindow 的補差額：不再呼叫 provider，只依嘗試 ID 查回。查無滿 NotFoundAfter 證明上一次不存在，換新鍵重送。
-func (s *Service) lookupTopup(ctx context.Context, ref store.PaymentRefund, tr store.PaymentTransfer, pay store.PaymentPayment, now time.Time) error {
+func (s *Service) lookupTopup(ctx context.Context, ref store.PaymentRefund, tr store.PaymentTransfer, pay store.PaymentPayment, order store.PaymentPaymentOrder, now time.Time) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	snap, found, err := s.d.Provider.FindTransfer(callCtx, pay.OrderNo, ref.TopupIdempotencyKey.String())
+	snap, found, err := s.d.Provider.FindTransfer(callCtx, TransferGroupOf(pay.ID), ref.TopupIdempotencyKey.String(), lookupLowerBound(ref.TopupCalledAt, ref.CreatedAt))
 	if err != nil {
 		return s.topupLookupFailed(ctx, ref, err)
 	}
@@ -173,7 +173,7 @@ func (s *Service) lookupTopup(ctx context.Context, ref store.PaymentRefund, tr s
 	if now.Sub(*ref.TopupCalledAt) < NotFoundAfter {
 		return fmt.Errorf("%w：退款 %s 的補差額", errNotFoundYet, ref.ID)
 	}
-	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這次補差額轉帳，換新冪等鍵重送", "refund_id", ref.ID.String(), "order_no", pay.OrderNo)
+	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這次補差額轉帳，換新冪等鍵重送", "refund_id", ref.ID.String(), "order_no", order.OrderNo)
 	if err := s.rotateTopupKey(ctx, ref.ID, ref.TopupIdempotencyKey, now); err != nil {
 		return err
 	}
@@ -190,7 +190,7 @@ func (s *Service) acceptTopup(ctx context.Context, ref store.PaymentRefund, tr s
 	orphan := false
 	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPayment(ctx, ref.PaymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, ref.PaymentOrderID); err != nil {
 			return err
 		}
 		if _, err := q.LockRefund(ctx, ref.ID); err != nil {
@@ -209,13 +209,13 @@ func (s *Service) acceptTopup(ctx context.Context, ref store.PaymentRefund, tr s
 				return nil
 			}
 			orphan = true
-			return s.publishAnomaly(ctx, model.AnomalyTopup, ref.ID, ref.PaymentID, fmt.Sprintf("topped_up_but_topup_%s:%s", cur.TopupStatus, snap.ExternalID))
+			return s.publishOrderAnomaly(ctx, model.AnomalyTopup, ref.ID, ref.PaymentOrderID, fmt.Sprintf("topped_up_but_topup_%s:%s", cur.TopupStatus, snap.ExternalID))
 		}
 		return err
 	})
 	if err == nil && orphan {
 		s.d.Logger.ErrorContext(ctx, "payment：provider 已補差額轉帳，列的補差額狀態卻已不在 SENDING，待人工核對",
-			"refund_id", ref.ID.String(), "payment_id", ref.PaymentID.String(), "topup_external_id", snap.ExternalID)
+			"refund_id", ref.ID.String(), "payment_order_id", ref.PaymentOrderID.String(), "topup_external_id", snap.ExternalID)
 	}
 	return err
 }
@@ -286,7 +286,7 @@ func (s *Service) clearTopupLookupFailures(ctx context.Context, ref store.Paymen
 // anomalyTopup 讓 SENDING 的補差額進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；已不是 SENDING 時什麼都不做。
 // 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件。
 func (s *Service) anomalyTopup(ctx context.Context, ref store.PaymentRefund, reason, detail string) error {
-	s.d.Logger.ErrorContext(ctx, "payment：退款的補差額轉帳進 ANOMALY，待人工核對 provider", "refund_id", ref.ID.String(), "payment_id", ref.PaymentID.String(), "reason", reason, "external_id", detail)
+	s.d.Logger.ErrorContext(ctx, "payment：退款的補差額轉帳進 ANOMALY，待人工核對 provider", "refund_id", ref.ID.String(), "payment_order_id", ref.PaymentOrderID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
@@ -297,18 +297,18 @@ func (s *Service) anomalyTopup(ctx context.Context, ref store.PaymentRefund, rea
 		if err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyTopup, r.ID, r.PaymentID, withDetail(reason, detail))
+		return s.publishOrderAnomaly(ctx, model.AnomalyTopup, r.ID, r.PaymentOrderID, withDetail(reason, detail))
 	})
 }
 
 // releaseTopup 是補差額的終局失敗（provider 永久拒絕）：SENDING 進 RELEASED，賣家少收的錢留在平台，同一個 transaction 發 MoneyAnomaly 交後台；已不是 SENDING 時什麼都不做。
-// 鎖順序：付款列、退款列。
-func (s *Service) releaseTopup(ctx context.Context, refundID, paymentID uuid.UUID, reason string) error {
+// 鎖順序：付款列、訂單應收列、退款列。
+func (s *Service) releaseTopup(ctx context.Context, refundID, paymentOrderID uuid.UUID, reason string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPayment(ctx, paymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, paymentOrderID); err != nil {
 			return err
 		}
 		if _, err := q.LockRefund(ctx, refundID); err != nil {
@@ -321,6 +321,6 @@ func (s *Service) releaseTopup(ctx context.Context, refundID, paymentID uuid.UUI
 		if err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyTopup, r.ID, r.PaymentID, "topup_released:"+reason)
+		return s.publishOrderAnomaly(ctx, model.AnomalyTopup, r.ID, r.PaymentOrderID, "topup_released:"+reason)
 	})
 }

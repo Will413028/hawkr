@@ -1,7 +1,7 @@
 -- name: InsertRefundReversal :one
--- 開始收回時為每個目標寫一列撤回（呼叫端已鎖付款列、轉帳列與相關退款列）。
-INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(refund_id), sqlc.arg(payment_id), sqlc.arg(seq), sqlc.narg(target_refund_id), sqlc.arg(target_external_id), sqlc.arg(amount), sqlc.arg(now), sqlc.arg(now))
+-- 開始收回時為每個目標寫一列撤回（呼叫端已鎖付款列與訂單應收列、轉帳列與相關退款列）。
+INSERT INTO payment.refund_reversals (id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(refund_id), sqlc.arg(payment_order_id), sqlc.arg(seq), sqlc.narg(target_refund_id), sqlc.arg(target_external_id), sqlc.arg(amount), sqlc.arg(now), sqlc.arg(now))
 RETURNING *;
 
 -- name: RefundReversalByID :one
@@ -108,7 +108,7 @@ WHERE id = sqlc.arg(id) AND status = 'ANOMALY'
 RETURNING *;
 
 -- name: SettleRefundReversal :exec
--- 重算退款列上向賣家收回的彙總（呼叫端已鎖付款列與該退款列，撤回列剛改完）：有 ANOMALY 的列是 ANOMALY，其次有 REVERSING 的是 REVERSING，其次有 RELEASED 的是 RELEASED，其餘 REVERSED；
+-- 重算退款列上向賣家收回的彙總（呼叫端已鎖付款列與訂單應收列與該退款列，撤回列剛改完）：有 ANOMALY 的列是 ANOMALY，其次有 REVERSING 的是 REVERSING，其次有 RELEASED 的是 RELEASED，其餘 REVERSED；
 -- reversal_recovered 是 REVERSED 列的加總，reversal_reason 取 ANOMALY 或 RELEASED 列的原因。只改 REVERSING 或 ANOMALY 的彙總（已 RELEASED 或 REVERSED 的不再變）。
 UPDATE payment.refunds AS r
 SET reversal_status = CASE WHEN agg.anomalies > 0 THEN 'ANOMALY' WHEN agg.reversing > 0 THEN 'REVERSING' WHEN agg.released > 0 THEN 'RELEASED' ELSE 'REVERSED' END,
@@ -140,22 +140,22 @@ LIMIT sqlc.arg(batch);
 -- 原轉帳上進行中與 ANOMALY 的撤回列額度（還沒累加到 transfers.reversed_amount，佔住剩餘可撤額）。
 SELECT COALESCE(SUM(amount), 0)::bigint AS total
 FROM payment.refund_reversals
-WHERE payment_id = $1 AND target_refund_id IS NULL AND status IN ('REVERSING', 'ANOMALY');
+WHERE payment_order_id = $1 AND target_refund_id IS NULL AND status IN ('REVERSING', 'ANOMALY');
 
 -- name: ReversibleTopups :many
--- 付款底下成功的補差額轉帳（DONE）與各自的剩餘可撤額度（退款額 - 已撤回 - 進行中與 ANOMALY 的撤回列），依退款 ID 升序；已沒有額度的不列出。呼叫端已鎖付款列與轉帳列。
+-- 訂單應收底下成功的補差額轉帳（DONE）與各自的剩餘可撤額度（退款額 - 已撤回 - 進行中與 ANOMALY 的撤回列），依退款 ID 升序；已沒有額度的不列出。呼叫端已鎖付款列、訂單應收列與轉帳列。
 SELECT r.id, r.topup_external_id AS external_id,
        (r.amount - r.topup_reversed_amount - COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.target_refund_id = r.id AND v.status IN ('REVERSING', 'ANOMALY')), 0))::bigint AS free
 FROM payment.refunds AS r
-WHERE r.payment_id = $1 AND r.topup_status = 'DONE'
+WHERE r.payment_order_id = $1 AND r.topup_status = 'DONE'
   AND r.amount - r.topup_reversed_amount - COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.target_refund_id = r.id AND v.status IN ('REVERSING', 'ANOMALY')), 0) > 0
 ORDER BY r.id;
 
 -- name: DoneTopupCapacity :one
--- 付款底下成功的補差額轉帳的剩餘可撤額度加總（退款額 - 已撤回，不扣預留；預留由 PendingReversalTotal 扣）。
+-- 訂單應收底下成功的補差額轉帳的剩餘可撤額度加總（退款額 - 已撤回，不扣預留；預留由 PendingReversalTotal 扣）。
 SELECT COALESCE(SUM(amount - topup_reversed_amount), 0)::bigint AS total
 FROM payment.refunds
-WHERE payment_id = $1 AND topup_status = 'DONE';
+WHERE payment_order_id = $1 AND topup_status = 'DONE';
 
 -- name: AddTopupReversal :one
 -- 累加補差額轉帳這次撤回的額度（同 transaction 已鎖擁有它的退款列；超過退款額時 CHECK refunds_topup_reversed_check 擋下）。

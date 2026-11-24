@@ -182,6 +182,12 @@ catalogs:
     '@connectrpc/connect-web':
       specifier: 2.3.0
       version: 2.3.0
+    '@stripe/react-stripe-js':
+      specifier: 7.0.1
+      version: 7.0.1
+    '@stripe/stripe-js':
+      specifier: 10.2.1
+      version: 10.2.1
     '@types/node':
       specifier: ^26.6.6
       version: 26.6.6
@@ -532,6 +538,12 @@ importers:
       '@stripe/react-connect-js':
         specifier: 3.5.0
         version: 3.5.0(@stripe/connect-js@3.5.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@stripe/react-stripe-js':
+        specifier: 'catalog:'
+        version: 7.0.1(@stripe/stripe-js@10.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@stripe/stripe-js':
+        specifier: 'catalog:'
+        version: 10.2.1
       '@tanstack/react-query':
         specifier: ^5.107.1
         version: 5.107.1(@types/react@19.3.0)(react@19.3.1)
@@ -3367,6 +3379,17 @@ packages:
       '@stripe/connect-js': '>=3.5.0'
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
+
+  '@stripe/react-stripe-js@7.0.1':
+    resolution: {integrity: sha512-yDVPIS/RcmYqtX0xuNjAlHd/d9B9twmWwzn4GrZcfrlg737yPC/rfnOs2vCwAs40zrZ2qz4VL1r5b1t0gFRjQQ==}
+    peerDependencies:
+      '@stripe/stripe-js': '>=10.0.0 <11.0.0'
+      react: '>=16.8.0 <20.0.0'
+      react-dom: '>=16.8.0 <20.0.0'
+
+  '@stripe/stripe-js@10.2.1':
+    resolution: {integrity: sha512-diHeR1/FeWZZzuFXEvkjRMzydgKEpxUTrKEUxSV8NcpeZY3Kl8C4Gerw/JSMK+3oXsBRJtgkG7ckviQJ651moA==}
+    engines: {node: '>=12.16'}
 
   '@swc/core-darwin-arm64@1.16.21':
     resolution: {integrity: sha512-VRreJpbRygpSD1hj3HBEOIA1xjXYnhB+IfcKsxZRhCIBGRP4UkqxZH4/ipFh/heIRp7EKQ56E8ygwEftLNCWXw==}
@@ -8721,6 +8744,15 @@ snapshots:
       '@stripe/connect-js': 3.5.0
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
+
+  '@stripe/react-stripe-js@7.0.1(@stripe/stripe-js@10.2.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+    dependencies:
+      '@stripe/stripe-js': 10.2.1
+      prop-types: 15.8.1
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
+
+  '@stripe/stripe-js@10.2.1': {}
 
   '@swc/core-darwin-arm64@1.16.21':
     optional: true

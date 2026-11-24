@@ -127,6 +127,13 @@ type Module struct {
 func New(d Deps) *Module { return newModule(d, registry.Registry{}) }
 
 func newModule(d Deps, reg app.Registry) *Module {
+	if d.Validity == nil {
+		for _, e := range reg.All() {
+			if sp := e.Spec(); sp.Revalidates {
+				panic("notification：型別 " + sp.Name + " 宣告了送出前重查，Deps.Validity 必填")
+			}
+		}
+	}
 	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Signals: dbSignals{d.DB}, StoreCodes: d.StoreCodes, Now: d.Now, Logger: d.Logger})
 	hub := stream.NewHub(inboxReader(appSvc), d.Logger, d.Now)
 	locks := intake.Locks{Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller}

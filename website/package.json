@@ -65,6 +65,8 @@
 		"@sentry/vercel-edge": "11.11.0",
 		"@stripe/connect-js": "3.5.0",
 		"@stripe/react-connect-js": "3.5.0",
+		"@stripe/react-stripe-js": "catalog:",
+		"@stripe/stripe-js": "catalog:",
 		"@tanstack/react-query": "^5.107.1",
 		"@tanstack/react-query-devtools": "^5.107.1",
 		"@types/node": "catalog:",

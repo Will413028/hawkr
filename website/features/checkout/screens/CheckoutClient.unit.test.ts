@@ -23,13 +23,6 @@ vi.mock("@/components/shared/Link", () => ({
 	default: (props: { children?: React.ReactNode }) =>
 		React.createElement("a", null, props.children),
 }));
-vi.mock("@/lib/payment/useNativePayAvailability", () => ({
-	useNativePayAvailability: () => ({
-		applePay: false,
-		googlePay: false,
-		loaded: true,
-	}),
-}));
 
 import CheckoutClient, { transientReducer } from "./CheckoutClient";
 

@@ -46,6 +46,10 @@ func (c *steppingClock) Now() time.Time {
 	return c.now
 }
 
+type noVouchers struct{}
+
+func (noVouchers) VoucherAvailable(context.Context, int64, uuid.UUID) (bool, error) { return true, nil }
+
 type nopJobs struct{}
 
 func (nopJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
@@ -80,7 +84,7 @@ func TestAnnouncementAdminRPCs(t *testing.T) {
 		migrate.Module{Name: "notification", Dir: notification.Migrations()},
 	))
 	clock := newSteppingClock()
-	m := notification.New(notification.Deps{DB: d, Jobs: nopJobs{}, Now: clock.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler)})
+	m := notification.New(notification.Deps{DB: d, Validity: noVouchers{}, Jobs: nopJobs{}, Now: clock.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler)})
 	path, handler := notificationv1alpha1connect.NewNotificationAdminServiceHandler(NewAdmin(m), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

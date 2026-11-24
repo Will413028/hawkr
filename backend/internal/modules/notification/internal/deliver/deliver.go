@@ -79,7 +79,7 @@ type Deps struct {
 	Contacts Contacts
 	Locales  Locales
 	Registry Registry
-	// Validity 是送出前重查來源事實（D27）要問的地方；沒有宣告 StillValid 的型別不會用到，但有這類型別的組裝一定要給。
+	// Validity 是送出前重查來源事實（D27）要問的地方；有型別宣告 StillValid 時必填（notification.New 在建構時檢查）。
 	Validity registry.Validity
 	// Sources 解析讀取時才組字的型別（公告）的內容。
 	Sources registry.Sources
@@ -113,7 +113,7 @@ type plan struct {
 	address     string
 }
 
-// Deliver 處理一筆投遞紀錄。暫時性失敗回錯誤（River 退避重試）；final 為 true（最後一次嘗試）時暫時性失敗改記永久失敗，不讓紀錄永遠停在 PENDING。
+// Deliver 處理一筆投遞紀錄。行銷類推播在靜音時段回 river.JobSnooze 錯誤（延到靜音結束，不佔重試次數）；暫時性失敗回錯誤（River 退避重試）；final 為 true（最後一次嘗試）時暫時性失敗改記永久失敗，不讓紀錄永遠停在 PENDING。
 // 投遞紀錄不存在（已被保留期清除）或已是終態時什麼都不做，所以重複執行安全。
 func (s *Service) Deliver(ctx context.Context, id uuid.UUID, final bool) error {
 	head, err := store.New(s.d.DB.Conn(ctx)).DeliveryByID(ctx, id)
@@ -136,7 +136,18 @@ func (s *Service) Deliver(ctx context.Context, id uuid.UUID, final bool) error {
 	if err != nil || done {
 		return err
 	}
-	ok, err := p.entry.StillValid(ctx, s.validity(), p.params)
+	if model.Channel(head.Channel) == model.ChannelPush {
+		wait, err := s.quietWait(p)
+		if errors.Is(err, registry.ErrBadParams) {
+			s.log().WarnContext(ctx, "通知參數快照無法判斷時效，投遞標為永久失敗", "delivery_id", p.delivery.ID, "type", p.typeName, "error", err)
+			return s.settle(ctx, p, false, ReasonRenderFailed)
+		}
+		if wait > 0 {
+			s.log().InfoContext(ctx, "行銷類推播在靜音時段，延到靜音結束再送", "delivery_id", p.delivery.ID, "type", p.typeName, "wait", wait)
+			return river.JobSnooze(wait)
+		}
+	}
+	ok, err := p.entry.StillValid(ctx, s.d.Validity, p.params)
 	switch {
 	case errors.Is(err, registry.ErrBadParams):
 		s.log().WarnContext(ctx, "通知參數快照無法重查，投遞標為永久失敗", "delivery_id", p.delivery.ID, "type", p.typeName, "error", err)
@@ -153,18 +164,25 @@ func (s *Service) Deliver(ctx context.Context, id uuid.UUID, final bool) error {
 	return s.sendEmail(ctx, p, final)
 }
 
-func (s *Service) validity() registry.Validity {
-	if s.d.Validity == nil {
-		return missingValidity{}
+// quietWait 回傳行銷類推播要再等多久才能送（D26）：不在台北 22:00–09:00 的靜音時段、不是行銷類，或內容（型別宣告的 NotAfter）在靜音結束前就失效時回 0。
+// 在每次執行時以注入的時鐘判斷，所以重試落在靜音時段的 job 也會被延後；River 的 snooze 不佔重試次數。
+func (s *Service) quietWait(p plan) (time.Duration, error) {
+	if class, _ := model.ClassOf(p.entry.Spec().Category); class != model.ClassMarketing {
+		return 0, nil
 	}
-	return s.d.Validity
-}
-
-// missingValidity 是沒有組裝 Validity 時的替身：宣告了 StillValid 的型別回錯誤（暫時性，job 重試到用完），而不是 nil 呼叫 panic 或默默當成成立。
-type missingValidity struct{}
-
-func (missingValidity) VoucherAvailable(context.Context, int64, uuid.UUID) (bool, error) {
-	return false, errors.New("沒有組裝送出前重查的來源（Deps.Validity）")
+	now := s.d.Now()
+	end := intake.QuietHoursEnd(now)
+	if end.IsZero() {
+		return 0, nil
+	}
+	notAfter, ok, err := p.entry.NotAfter(p.params)
+	if err != nil {
+		return 0, err
+	}
+	if ok && !notAfter.After(end) {
+		return 0, nil
+	}
+	return end.Sub(now), nil
 }
 
 func recipientStoreID(d store.DeliveryByIDRow) int64 {
