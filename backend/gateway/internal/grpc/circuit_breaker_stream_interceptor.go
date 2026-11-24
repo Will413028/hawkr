@@ -22,13 +22,6 @@ import (
 // but not identical health signals for the same backend.
 var streamBreakers sync.Map // map[string]*gobreaker.TwoStepCircuitBreaker[any]
 
-func resetStreamBreakers() {
-	streamBreakers.Range(func(k, _ any) bool {
-		streamBreakers.Delete(k)
-		return true
-	})
-}
-
 func getStreamBreaker(target string, cfg breakerConfig) *gobreaker.TwoStepCircuitBreaker[any] {
 	if cb, ok := streamBreakers.Load(target); ok {
 		return cb.(*gobreaker.TwoStepCircuitBreaker[any])

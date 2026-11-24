@@ -86,8 +86,7 @@ func TestRateLimiter_ExemptPathsNeverLimited(t *testing.T) {
 
 // TestRateLimiter_AIRoutesEnforce429 is the behavioural half of #2505: the three
 // AI trees are not merely classified as tierDefault, they are actually refused
-// once that tier's quota is spent. The classification table
-// (ratelimit_ai_routes_test.go) proves the verdict; this proves the consequence.
+// once that tier's quota is spent.
 //
 // The three probes are one per tree, and deliberately include the SSE turn
 // endpoint: the exemption existed for its sake, and it is the one that bills a

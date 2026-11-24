@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	aipb "github.com/Will413028/hawkr/go-pkg/proto/ai"
 	buyerpb "github.com/Will413028/hawkr/go-pkg/proto/buyer"
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
@@ -207,7 +206,7 @@ func (m *mockSellerServiceClient) MatchCertificateHolder(ctx context.Context, in
 	return nil, grpcstatus.Error(grpccodes.Unimplemented, "MatchCertificateHolderFn not wired in test")
 }
 
-// SearchSellerProspects 的消費端是 ai-service 的 EXTERNAL lane 與一次性遷移腳本，Gateway 自己不呼叫，mock 只是為了滿足介面。
+// SearchSellerProspects Gateway 自己不呼叫，mock 只是為了滿足介面。
 func (m *mockSellerServiceClient) SearchSellerProspects(ctx context.Context, in *sellerpb.SearchSellerProspectsRequest, opts ...grpc.CallOption) (*sellerpb.SearchSellerProspectsResponse, error) {
 	if m.SearchSellerProspectsFn != nil {
 		return m.SearchSellerProspectsFn(ctx, in, opts...)
@@ -301,42 +300,6 @@ func (m *mockBuyerServiceClient) ResolvePrincipals(_ context.Context, _ *buyerpb
 func (m *mockBuyerServiceClient) GetBuyerEntitlement(ctx context.Context, in *buyerpb.GetBuyerEntitlementRequest, opts ...grpc.CallOption) (*buyerpb.BuyerEntitlement, error) {
 	if m.GetBuyerEntitlementFn != nil {
 		return m.GetBuyerEntitlementFn(ctx, in, opts...)
-	}
-	return nil, nil
-}
-
-// ==================== Mock AIImageServiceClient / RecommendationServiceClient ====================
-//
-// #3519 把 legacy AIService 依授權軸拆成三個 service，所以這裡也跟著拆：一個
-// mock 對一個授權軸。AIAdminServiceClient 目前沒有 handler 測試用得到，等第一個
-// 需要的測試再加，不先放一份沒人用的。
-
-type mockAIImageServiceClient struct {
-	TransformImageFn func(ctx context.Context, in *aipb.TransformImageRequest, opts ...grpc.CallOption) (*aipb.TransformImageResponse, error)
-	ListAiStylesFn   func(ctx context.Context, in *aipb.ListAiStylesRequest, opts ...grpc.CallOption) (*aipb.ListAiStylesResponse, error)
-}
-
-func (m *mockAIImageServiceClient) TransformImage(ctx context.Context, in *aipb.TransformImageRequest, opts ...grpc.CallOption) (*aipb.TransformImageResponse, error) {
-	if m.TransformImageFn != nil {
-		return m.TransformImageFn(ctx, in, opts...)
-	}
-	return nil, nil
-}
-
-func (m *mockAIImageServiceClient) ListAiStyles(ctx context.Context, in *aipb.ListAiStylesRequest, opts ...grpc.CallOption) (*aipb.ListAiStylesResponse, error) {
-	if m.ListAiStylesFn != nil {
-		return m.ListAiStylesFn(ctx, in, opts...)
-	}
-	return nil, nil
-}
-
-type mockRecommendationServiceClient struct {
-	PersonalizedRecommendFn func(ctx context.Context, in *aipb.PersonalizedRequest, opts ...grpc.CallOption) (*aipb.PersonalizedRecommendResponse, error)
-}
-
-func (m *mockRecommendationServiceClient) PersonalizedRecommend(ctx context.Context, in *aipb.PersonalizedRequest, opts ...grpc.CallOption) (*aipb.PersonalizedRecommendResponse, error) {
-	if m.PersonalizedRecommendFn != nil {
-		return m.PersonalizedRecommendFn(ctx, in, opts...)
 	}
 	return nil, nil
 }
