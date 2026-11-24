@@ -309,6 +309,13 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 採購不再依賴 pricebook（執行計畫 `2026-10-27-ecommerce-scope-cut` 已刪除，ADR `2026-10-27-general-ecommerce-scope-cut.md` D2）：品項只解析到平台分類樹與 LLM 召回，報價只看供應商報的價，沒有行情依據與價格冷熱判斷；`procurement_price_previews` 已刪行情欄位。A9 搬採購時不接 pricebook，也不恢復農產行情。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：
     - ai-service `cmd/resolver-eval` 的觀察邏輯（`observe` 仍照拿掉行情前的回應形狀解析），以及 `Unavailable` 與 `categoryDescribeStage` 的命名在拿掉 pricebook 後是否仍名實相符、`cropidentity.GateOption` 以 variadic 保留舊簽章的寫法。觸發：A9 搬採購、或下一次要跑線上 `resolver-eval` 時先審查。
+  - A9 延後項（階段計畫 `2026-11-19-a9-agent.md` 的「延後」搬回，2026-11-25）：
+    - `cmd/new-module` 模板的 integration test 產生無呼叫者的 `setup`，新模組在第一個真實測試前會被 `lint-monolith` 擋。觸發：下次跑 `make new-module`。
+    - notification-service 的 `MailConfig` 已無呼叫者。觸發：A8。
+    - notification 直接訂閱單體採購事件、刪 `procurement` 的 relay。觸發：A8。
+    - 採購建單與商品讀取改 in-process（目前經 `internal/legacy` 的 ordering、catalog client）。觸發：B8 ordering、B4 catalog 搬進單體。
+    - 召回 eval 與別名層。觸發：上線前需要召回率基準（A9-D7）。
+    - LLM 指標接告警，並補回 AI 告警規則（供應商停用、設定不完整、token 預算逼近與用盡、抽取降級）。觸發：單體開始匯出指標（主計畫「單體告警管道」）。
 - [ ] **A10 delegation**：從 gateway 搬出代行編排；session 與稽核資料留在 identity。
   - 代行寫入搬進單體時，在領域寫入的同一個 transaction 以 `FOR SHARE` 讀 session 列檢查狀態，再寫入與寫稽核（撤銷與寫入序列化）。理由：撤銷以 session 為準，gateway 與領域服務不同 DB 時無法保證撤銷前後的順序，同 DB 後成本只是一次加鎖讀取。
   - 代行貼文的 6 條路由排在 A7-2d 改走單體 Connect（A7 計畫 S1），A10 只剩商品與訂單的路由；A7-2d 完成後，代行 Connect 的第一版形狀（credential、能力、`request_id`、限流）記在 ADR `2026-09-27-delegation-module.md` 的修訂段，A10 沿用或修訂。
