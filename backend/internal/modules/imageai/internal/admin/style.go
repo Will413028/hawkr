@@ -107,7 +107,7 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 }
 
 // UpdateStyle 整筆覆寫風格可改的欄位（name、category 建立後不能改）。Version 是讀取時拿到的版本，與目前的不符回 VersionConflict、不寫入；
-// 版本先比對一次，少一些注定被拒的寫入，最後以條件式 UPDATE 為準；新縮圖在鎖住風格列之後的 transaction 內 Confirm，任何一步失敗整筆回滾，新圖仍是暫存。
+// 版本在鎖住風格列後比對，最後以條件式 UPDATE 為準；新縮圖在鎖住風格列之後的 transaction 內 Confirm，任何一步失敗整筆回滾，新圖仍是暫存。
 // 預設風格不能在這裡改（換預設是 SetDefault）；停用目前的預設風格回 FailedPrecondition（A9-D39）。
 func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (model.AdminStyle, error) {
 	l := loc(ctx)
@@ -117,19 +117,6 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 	label, prompt, err := validateText(ctx, in.Label, in.Prompt)
 	if err != nil {
 		return model.AdminStyle{}, err
-	}
-	cur, err := s.d.Q(ctx).GetStyle(ctx, in.ID)
-	if notFound(err) {
-		return model.AdminStyle{}, styleNotFound(ctx)
-	}
-	if err != nil {
-		return model.AdminStyle{}, fmt.Errorf("admin：讀取風格 %s：%w", in.ID, err)
-	}
-	if cur.Version != in.Version {
-		return model.AdminStyle{}, styleStale(ctx)
-	}
-	if cur.IsDefault && !in.Enabled {
-		return model.AdminStyle{}, apperr.FailedPrecondition("%s", text.AdminStyleDefaultMustBeEnabled(l))
 	}
 	var row store.ImageaiStyle
 	err = s.d.Tx(ctx, func(ctx context.Context) error {
