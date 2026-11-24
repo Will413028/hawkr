@@ -658,8 +658,8 @@ func TestDeletingACandidateSetReferencedByAnApprovalIsRestricted(t *testing.T) {
 	c := seed(ctx, t, q, 81, true)
 	_, err := d.Pool().Exec(ctx, `DELETE FROM procurement.candidate_sets WHERE id = $1`, c.candidateSet)
 	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "23503" || pgErr.ConstraintName != "rfq_publication_approvals_candidate_set_id_fkey" {
-		t.Fatalf("要被 rfq_publication_approvals_candidate_set_id_fkey 以 23503 擋下：%v", err)
+	if !errors.As(err, &pgErr) || pgErr.Code != "23001" || pgErr.ConstraintName != "rfq_publication_approvals_candidate_set_id_fkey" {
+		t.Fatalf("要被 rfq_publication_approvals_candidate_set_id_fkey 以 23001（restrict_violation） 擋下：%v", err)
 	}
 	if n := count(ctx, t, d, "rfq_publication_approvals", "id = $1", c.approval); n != 1 {
 		t.Fatalf("核准要保留，實際 %d 列", n)
