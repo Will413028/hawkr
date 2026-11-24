@@ -87,11 +87,6 @@ func TestReviewRelayIsSubscribedByNewReview(t *testing.T) {
 	requireRefs(t, "review.go", "subscribeReviewRelay", "reviewrelay.OnReviewCreated", "reviewrelay.OnReviewAggregateChanged")
 }
 
-func TestIMRelayIsSubscribedByNewIM(t *testing.T) {
-	requireCalls(t, "im.go", "newIM", "subscribeIMRelay")
-	requireRefs(t, "im.go", "subscribeIMRelay", "imrelay.OnMessageSent")
-}
-
 func TestCRMModuleSubscribesTheLifecycleEvents(t *testing.T) {
 	requireRefs(t, "crm.go", "newCRM", "m.OnBuyerDeleted", "m.OnStoreRetired")
 }
@@ -103,11 +98,11 @@ func TestBothRolesBuildReviewIMAndCRM(t *testing.T) {
 	}
 }
 
-// worker 登記三個 relay 與 consumer 的 job worker，並跑 crm 的 RabbitMQ consumer；serve 不跑它們（job 與 consumer 只在 worker）。
+// worker 登記 relay 與 consumer 的 job worker，並跑 crm 的 RabbitMQ consumer；serve 不跑它們（job 與 consumer 只在 worker）。
 func TestWorkerRunsTheRelaysAndTheCRMConsumer(t *testing.T) {
 	requireCalls(t, "main.go", "runWorker",
-		"reviewrelay.NewWorker", "imrelay.NewWorker", "crmModule.AddWorkers", "crmConsumer.AddWorkers", "crmConsumer.Run")
-	for _, name := range []string{"reviewrelay.NewWorker", "imrelay.NewWorker", "crmconsumer.Consumer", "crmConsumer.Run"} {
+		"reviewrelay.NewWorker", "crmModule.AddWorkers", "crmConsumer.AddWorkers", "crmConsumer.Run")
+	for _, name := range []string{"reviewrelay.NewWorker", "crmconsumer.Consumer", "crmConsumer.Run"} {
 		if slices.Contains(callsIn(t, "main.go", "runServe"), name) {
 			t.Errorf("runServe 不該呼叫 %s", name)
 		}

@@ -4,7 +4,6 @@ package delegationservice
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -22,7 +21,6 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/legacy/gen/account"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/grpcclient"
-	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -31,7 +29,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -85,13 +82,12 @@ func (f *fakeStores) Store(_ context.Context, id int64) (seller.Store, error) {
 }
 
 type fixture struct {
-	db        *db.DB
-	m         *delegation.Module
-	identity  *identity.Module
-	dev       *identity.DevAuth
-	stores    *fakeStores
-	client    accountconnect.DelegationServiceClient
-	published []rabbitmq.PublishArgs
+	db       *db.DB
+	m        *delegation.Module
+	identity *identity.Module
+	dev      *identity.DevAuth
+	stores   *fakeStores
+	client   accountconnect.DelegationServiceClient
 }
 
 // setup 起 identity 與 legacy 的 DelegationService，client 以 gateway 的方式（gRPC、h2c）呼叫。
@@ -101,10 +97,6 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
 	))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -116,10 +108,6 @@ func setup(t *testing.T) *fixture {
 		pendingStore:   newStore(pendingStore, seller.PendingDeletion, false),
 	}}}
 	bus := events.NewBus()
-	events.Subscribe(bus, OnDelegationOperationCompleted(func(ctx context.Context, a rabbitmq.PublishArgs) error {
-		f.published = append(f.published, a)
-		return jc.Enqueue(ctx, a, rabbitmq.InsertOpts())
-	}))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.identity = identity.New(identity.Deps{
 		DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()},
@@ -249,16 +237,8 @@ func TestPreflightCreateAndTheWorkspace(t *testing.T) {
 		AuditLogId: intent.Msg.GetData().GetAuditLogId(), Result: "SUCCEEDED", ResourceVersionAfter: "13",
 		ChangedFields: []*pb.ChangedField{{Field: "title", Label: "標題", Before: "", After: "新的"}},
 	}))
-	if err != nil || conf.Msg.GetData().GetResult() != "SUCCEEDED" || len(f.published) != 1 {
-		t.Fatalf("confirm = %v, %v，事件 %d 則", conf, err, len(f.published))
-	}
-	var body map[string]any
-	if err := json.Unmarshal(f.published[0].Body, &body); err != nil || body["audit_log_id"] != intent.Msg.GetData().GetAuditLogId() ||
-		body["session_display_code"] != summary.GetDisplayCode() || body["action_label"] != "編輯商品" || body["correlation_id"] != "corr-a" {
-		t.Fatalf("事件 = %s, %v", f.published[0].Body, err)
-	}
-	if n := f.count(t, `SELECT count(*) FROM river.river_job WHERE kind = 'legacy.rabbitmq_publish'`); n != 1 {
-		t.Fatalf("排入的 job %d 個", n)
+	if err != nil || conf.Msg.GetData().GetResult() != "SUCCEEDED" {
+		t.Fatalf("confirm = %v, %v", conf, err)
 	}
 
 	logs, err := f.client.ListAuditLogs(ctx, connect.NewRequest(&pb.ListAuditLogsRequest{SessionId: summary.GetSessionId()}))
@@ -424,15 +404,6 @@ func TestErrorsKeepTheLegacyWireBehavior(t *testing.T) {
 		b.Msg.GetResults()[1].GetBizCode() != 9277 || b.Msg.GetResults()[1].GetResourceId() != "2" {
 		t.Fatalf("逐項 = %v, %v", b, err)
 	}
-}
-
-func (f *fixture) count(t *testing.T, query string, args ...any) int {
-	t.Helper()
-	var n int
-	if err := f.db.Pool().QueryRow(context.Background(), query, args...).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	return n
 }
 
 func sanctionsOf(suspended bool) *seller.Sanctions {

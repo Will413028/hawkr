@@ -16,7 +16,7 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 
 ## 模組內部結構
 
-- 根套件只保留 `Module`、`New`、`Migrations`、各來源事件的訂閱者入口（`On*`）、治理與交易側的訂閱登記 `SubscribeGovernance`、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建）。
+- 根套件只保留 `Module`、`New`、`Migrations`、各來源事件的訂閱者入口（`On*`）、訂閱表 `subscriptions.go`、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建）。
 - `internal/intake`：意圖管線與 fan-out；`subscribers*.go` 的同步訂閱者只呼叫 `Accept`（插 `intents` 列並排 `notification.process_intent` job），`Process`（worker）解析收件人、鎖收件人、略過封鎖與自己、套偏好、寫收件匣與投遞紀錄；不變量見 `internal/intake/AGENTS.md`。
 - `internal/stream`：串流 hub；不變量見 `internal/stream/AGENTS.md`。
 - `internal/purge`：保留期清除與個資清除；不變量見 `internal/purge/AGENTS.md`。

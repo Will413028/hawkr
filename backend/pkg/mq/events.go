@@ -30,13 +30,6 @@ const (
 	EventTypeReviewCreated EventType = "REVIEW_CREATED"
 	EventTypeReviewHidden  EventType = "REVIEW_HIDDEN"
 
-	EventTypePostCreated          EventType = "POST_CREATED"
-	EventTypePostLiked            EventType = "POST_LIKED"
-	EventTypePostHiddenByPlatform EventType = "POST_HIDDEN_BY_PLATFORM"
-	EventTypeCommentCreated       EventType = "COMMENT_CREATED"
-	EventTypeCommentReplied       EventType = "COMMENT_REPLIED"
-	EventTypeCommentLikeChanged   EventType = "COMMENT_LIKE_CHANGED"
-
 	EventTypeNotificationInboxNew      EventType = "NOTIFICATION_INBOX_NEW"
 	EventTypeNotificationUnreadChanged EventType = "NOTIFICATION_UNREAD_CHANGED"
 	EventTypeCouponIssued              EventType = "COUPON_ISSUED"

@@ -54,14 +54,6 @@ const (
 	RoutingKeyReviewCreated = "review.created"
 	RoutingKeyReviewHidden  = "review.hidden"
 
-	RoutingKeyPostCreated          = "post.created"
-	RoutingKeyPostLiked            = "post.liked"
-	RoutingKeyPostHiddenByPlatform = "post.hidden_by_platform"
-	RoutingKeyCommentCreated       = "comment.created"
-	RoutingKeyCommentReplied       = "comment.replied"
-	RoutingKeyCommentLikeChanged   = "comment.like_changed"
-	RoutingKeyProductViewed        = "product.viewed"
-
 	RoutingKeyNotificationInboxNew      = "notification.inbox.new"
 	RoutingKeyNotificationUnreadChanged = "notification.unread_changed"
 
