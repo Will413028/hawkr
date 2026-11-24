@@ -226,8 +226,7 @@ func isNil(v any) bool {
 		return true
 	}
 	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func, reflect.Interface, reflect.Chan:
+	if k := rv.Kind(); k == reflect.Pointer || k == reflect.Map || k == reflect.Slice || k == reflect.Func || k == reflect.Interface || k == reflect.Chan {
 		return rv.IsNil()
 	}
 	return false

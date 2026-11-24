@@ -363,7 +363,7 @@ func (r Reconciler) Reconcile(ctx context.Context, states run.JobStates) (failed
 				failed++
 			case outcomeCreated:
 				recovered++
-			case outcomeNone:
+			case outcomeNone, outcomeUnrecorded:
 			}
 		}
 		if len(ids) < reconcileBatch {

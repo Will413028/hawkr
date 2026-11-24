@@ -578,7 +578,9 @@ func TestReconcilerKeepsTheTerminalReasonWhenTheMarkFailsOnce(t *testing.T) {
 	f.setJob(nil)
 	f.failUpdatesTo("ORDER_FAILED", 1)
 	f.orders.results = []provisioning.Result{{Code: 9504, Message: "拒絕"}, {Code: 9504, Message: "拒絕"}}
-	f.m.ordersRec.Reconcile(context.Background(), fakeStates{})
+	if _, err := f.m.ordersRec.Reconcile(context.Background(), fakeStates{}); err != nil {
+		t.Fatal(err)
+	}
 	f.wantCreating()
 	if n, err := f.m.ordersRec.Reconcile(context.Background(), fakeStates{}); err != nil || n != 1 {
 		t.Fatalf("n=%d err=%v", n, err)
