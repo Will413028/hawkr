@@ -20,6 +20,7 @@ import io.github.will413028.hawkr.coupon.grpc.CouponValidateResult;
 import io.grpc.StatusRuntimeException;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.*;
 import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.service.CouponReleaseService;
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.common.grpc.UnresolvedPrincipalException;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
@@ -79,6 +80,7 @@ public class CheckoutService {
     private final BuyerGrpcClient buyerGrpcClient;
     private final ShippingGrpcClient shippingGrpcClient;
     private final CheckoutCouponGrpcClient couponGrpcClient;
+    private final CouponReleaseService couponReleaseService;
     private final InvoiceGrpcClient invoiceGrpcClient;
     private final CheckoutValidator checkoutValidator;
     private final OrderService orderService;
@@ -102,7 +104,8 @@ public class CheckoutService {
                            CheckoutValidator checkoutValidator,
                            OrderService orderService,
                            OrderPolicyResolver orderPolicyResolver,
-                           StringRedisTemplate redisTemplate) {
+                           StringRedisTemplate redisTemplate,
+                           CouponReleaseService couponReleaseService) {
         this.productGrpcClient = productGrpcClient;
         this.sellerGrpcClient = sellerGrpcClient;
         this.buyerGrpcClient = buyerGrpcClient;
@@ -113,6 +116,7 @@ public class CheckoutService {
         this.orderService = orderService;
         this.orderPolicyResolver = orderPolicyResolver;
         this.redisTemplate = redisTemplate;
+        this.couponReleaseService = couponReleaseService;
     }
 
     // ==================== 自買防護 ====================
@@ -1084,6 +1088,9 @@ public class CheckoutService {
                 } catch (Exception compensateErr) {
                     log.error("CheckoutService.confirm.compensate.failed", "補償操作失敗", compensateErr);
                 }
+                // reserve 可能在 coupon 端已成功、只是回應遺失或回寫 instance id 失敗：訂單沒有記下 instance id，
+                // 其他釋放路徑都找不到這張券。以 order_no 釋放（冪等；coupon 端沒鎖時是空操作），失敗由任務重試（D3）。
+                couponReleaseService.release(orderNo);
                 throw new OrderBusinessException(GrpcResponseCode.COUPON_LOCK_FAILED, e.getMessage());
             }
         }

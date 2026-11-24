@@ -12,7 +12,7 @@ import io.github.will413028.hawkr.common.utils.code.AccountType;
 import io.github.will413028.hawkr.common.utils.code.ProviderSource;
 import io.github.will413028.hawkr.common.utils.proto.ProtoConversionUtils;
 import io.github.will413028.hawkr.order.checkout.CheckoutService;
-import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.service.CouponReleaseService;
 import io.github.will413028.hawkr.order.entity.*;
 import io.github.will413028.hawkr.order.exception.CheckoutExpiredException;
 import io.github.will413028.hawkr.order.exception.CheckoutPriceChangedException;
@@ -72,7 +72,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
 
     private final OrderService orderService;
     private final CheckoutService checkoutService;
-    private final CheckoutCouponGrpcClient checkoutCouponGrpcClient;
+    private final CouponReleaseService couponReleaseService;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ShippingGrpcClient shippingGrpcClient;
@@ -93,7 +93,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     private final String agentMerId;
 
     public OrderGrpcService(OrderService orderService, CheckoutService checkoutService,
-                            CheckoutCouponGrpcClient checkoutCouponGrpcClient,
+                            CouponReleaseService couponReleaseService,
                             OrderRepository orderRepository, OrderItemRepository orderItemRepository,
                             ShippingGrpcClient shippingGrpcClient, PaymentGrpcClient paymentGrpcClient,
                             SellerGrpcClient sellerGrpcClient, BuyerGrpcClient buyerGrpcClient,
@@ -105,7 +105,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                             @org.springframework.beans.factory.annotation.Value("${payuni.agent.mer-id:}") String agentMerId) {
         this.orderService = orderService;
         this.checkoutService = checkoutService;
-        this.checkoutCouponGrpcClient = checkoutCouponGrpcClient;
+        this.couponReleaseService = couponReleaseService;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.shippingGrpcClient = shippingGrpcClient;
@@ -1455,7 +1455,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             if (order == null) return;
             String couponInstanceId = order.getCouponInstanceId();
             if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
-                checkoutCouponGrpcClient.releaseCoupon(couponInstanceId, orderNo);
+                couponReleaseService.release(orderNo);
             }
         } catch (Exception e) {
             log.error("OrderGrpcService.releaseCoupon.error", "釋放優惠券失敗", e);

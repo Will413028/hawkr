@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.worker;
 
 import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.constant.OrderConstants;
 import io.github.will413028.hawkr.order.entity.CartCleanupRetryTaskEntity;
 import io.github.will413028.hawkr.order.entity.CouponConsumptionTaskEntity;
 import io.github.will413028.hawkr.order.grpc.client.CartGrpcClient;
@@ -98,6 +99,7 @@ class TaskWorkerClaimLeaseTest {
         t.setBuyerId(3001L);
         t.setCouponInstanceId("CI1");
         t.setOrderNo("ORD1");
+        t.setTaskType(OrderConstants.COUPON_TASK_TYPE_CONSUME);
         t.setRetryCount(0);
         t.setMaxRetryCount(3);
         return t;

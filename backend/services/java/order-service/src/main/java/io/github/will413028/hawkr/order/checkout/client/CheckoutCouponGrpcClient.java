@@ -151,36 +151,29 @@ public class CheckoutCouponGrpcClient {
     }
 
     /**
-     * 釋放優惠券（取消/逾時）
-     * 軟依賴：失敗僅記錄警告，不阻斷主流程
+     * 釋放優惠券（取消、逾時、鎖券失敗補償）：以 order_no 為鍵，coupon 端冪等（D3），不送 instance_id。
      *
-     * @param instanceId 優惠券 Instance ID
-     * @param orderNo    訂單編號（僅 match 此 order_no 才釋放）
+     * <p>失敗一律拋出（gRPC 例外，或回應 success=false），由呼叫端重試：這支不吞例外，吞掉就沒有任何重試能補上
+     * 漏掉的釋放。呼叫端是 {@code CouponReleaseService}（當場嘗試一次）與 {@code CouponConsumptionWorker}（任務重試）。
+     *
+     * @param orderNo 訂單編號（coupon 端只釋放持有這筆訂單的券）
      */
-    public void releaseCoupon(String instanceId, String orderNo) {
-        try {
-            log.info("CheckoutCouponGrpcClient.releaseCoupon.start", "釋放優惠券",
-                    "instanceId", instanceId);
+    public void releaseCouponByOrderNo(String orderNo) {
+        log.info("CheckoutCouponGrpcClient.releaseCoupon.start", "釋放優惠券", "orderNo", orderNo);
 
-            ReleaseCouponRequest request = ReleaseCouponRequest.newBuilder()
-                    .setInstanceId(instanceId)
-                    .setOrderNo(orderNo)
-                    .build();
+        ReleaseCouponRequest request = ReleaseCouponRequest.newBuilder()
+                .setOrderNo(orderNo)
+                .build();
 
-            ReleaseCouponResponse response = couponStub
-                    .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
-                    .releaseCoupon(request);
+        ReleaseCouponResponse response = couponStub
+                .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
+                .releaseCoupon(request);
 
-            if (!response.getSuccess()) {
-                log.warn("CheckoutCouponGrpcClient.releaseCoupon.bizError",
-                        "釋放優惠券回傳非成功，instanceId=" + instanceId + ", orderNo=" + orderNo);
-            } else {
-                log.info("CheckoutCouponGrpcClient.releaseCoupon.done", "釋放優惠券完成",
-                        "orderNo", orderNo);
-            }
-        } catch (Exception e) {
-            log.warn("CheckoutCouponGrpcClient.releaseCoupon.error",
-                    "釋放優惠券 gRPC 失敗（訂單已取消），instanceId=" + instanceId);
+        if (!response.getSuccess()) {
+            throw new IllegalStateException(
+                    "釋放優惠券回傳非成功，orderNo=" + orderNo + ", code=" + response.getCode()
+                            + ", message=" + response.getMessage());
         }
+        log.info("CheckoutCouponGrpcClient.releaseCoupon.done", "釋放優惠券完成", "orderNo", orderNo);
     }
 }

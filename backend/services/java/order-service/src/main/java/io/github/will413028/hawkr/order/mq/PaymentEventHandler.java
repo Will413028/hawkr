@@ -198,6 +198,7 @@ public class PaymentEventHandler {
             CouponConsumptionTaskEntity couponTask = new CouponConsumptionTaskEntity();
             couponTask.setTaskId(TsidUtil.generate());
             couponTask.setOrderNo(orderId);
+            couponTask.setTaskType(OrderConstants.COUPON_TASK_TYPE_CONSUME);
             couponTask.setCouponInstanceId(couponInstanceId);
             couponTask.setBuyerId(order.getBuyerId());
             couponTask.setStatus(OrderConstants.TASK_STATUS_PENDING);
