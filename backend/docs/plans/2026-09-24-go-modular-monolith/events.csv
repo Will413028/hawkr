@@ -156,23 +156,23 @@ shipment.return.status_changed,hawkr.shipping,shipping-service,aftersales-servic
 shipment.status.changed,hawkr.shipping,shipping-service,notification-service,notification.shipping,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
 shipment.status.changed,hawkr.shipping,shipping-service,order-service,order.shipping.status,advance order status from shipping status,yes,STATE,
 payment.closed,payment.events,payment-service,order-service,order.payment.result,drive order payment state (paid/failed/expired/closed/conflict),yes,STATE,
-payment.conflict,payment.events,payment-service,order-service,order.payment.result,drive order payment state (paid/failed/expired/closed/conflict),yes,STATE,
+payment.conflict,payment.events,payment-service,order-service,order.payment.result,drive order payment state (paid/failed/expired/closed/conflict),yes,STATE,removed: 單體不保留 CONFLICT 狀態與 payment.conflict（B2 計畫前提）；遲到的成功由 payment 排自動全額退款 job（D5）
 payment.expired,payment.events,payment-service,order-service,order.payment.result,drive order payment state (paid/failed/expired/closed/conflict),yes,STATE,
 payment.failed,payment.events,payment-service,order-service,order.payment.result,drive order payment state (paid/failed/expired/closed/conflict),yes,STATE,
-payment.rescue.refund_completed,payment.events,payment-service,notification-service,notification.payment,push+inbox notification (buyer:normal),yes,SIDE_EFFECT,
+payment.rescue.refund_completed,payment.events,payment-service,notification-service,notification.payment,push+inbox notification (buyer:normal),yes,SIDE_EFFECT,removed: PayUni rescue 流程（B2 計畫前提）；通知改訂閱模組事件 AutoRefundCompleted（D5，A8 notification）
 payment.rescue.refund_initiated,payment.events,payment-service,payment-service,payment.rescue.refund.queue,execute rescue (duplicate-payment) refund,yes,STATE,removed: PayUni rescue 流程（B2 計畫前提）；D5 以自動全額退款 job 取代，完成時發模組事件 AutoRefundCompleted 給 A8 notification
 payment.success,payment.events,payment-service,order-service,order.payment.result,drive order payment state (paid/failed/expired/closed/conflict),yes,STATE,
 refund.failed,payment.events,payment-service,aftersales-service,aftersales.payment.refund.result,apply refund result to refund_tasks/case,yes,STATE,
 refund.failed,payment.events,payment-service,order-service,order.refund.result,apply refund result to order,yes,STATE,
 refund.succeeded,payment.events,payment-service,aftersales-service,aftersales.payment.refund.result,apply refund result to refund_tasks/case,yes,STATE,
 refund.succeeded,payment.events,payment-service,order-service,order.refund.result,apply refund result to order,yes,STATE,
-payuni.payment.recurring,payuni.events,payuni-webhook-service,payment-service,payment.payuni.membership.recurring,apply PayUni recurring (membership) charge,yes,STATE,
-payuni.payment.uop,payuni.events,payuni-webhook-service,payment-service,payment.payuni.webhook,apply PayUni payment webhook to transaction,yes,STATE,
-payuni.refund.accepted,payuni.events,payuni-webhook-service,payment-service,payment.payuni.refund.accepted,record PayUni ATM refund accepted,yes,STATE,
-payuni.refund.notify,payuni.events,payuni-webhook-service,payment-service,payment.payuni.refund.notify,apply PayUni ATM refund result,yes,STATE,
+payuni.payment.recurring,payuni.events,payuni-webhook-service,payment-service,payment.payuni.membership.recurring,apply PayUni recurring (membership) charge,yes,STATE,removed: 會員定期扣款從未上線，程式裡沒有 consumer；PayUni 金流由 Stripe 取代（B2 步驟 6）
+payuni.payment.uop,payuni.events,payuni-webhook-service,payment-service,payment.payuni.webhook,apply PayUni payment webhook to transaction,yes,STATE,removed: PayUni 付款通知由 Stripe webhook inbox 取代（B2 步驟 6）
+payuni.refund.accepted,payuni.events,payuni-webhook-service,payment-service,payment.payuni.refund.accepted,record PayUni ATM refund accepted,yes,STATE,removed: PayUni ATM 退款不做，Stripe 退款狀態走 webhook inbox（B2 步驟 6）
+payuni.refund.notify,payuni.events,payuni-webhook-service,payment-service,payment.payuni.refund.notify,apply PayUni ATM refund result,yes,STATE,removed: PayUni ATM 退款不做，Stripe 退款狀態走 webhook inbox（B2 步驟 6）
 payuni.shipping.status,payuni.events,payuni-webhook-service,shipping-service,shipping.payuni.webhook,apply PayUni logistics status webhook,yes,STATE,
 payuni.unknown.fallback,payuni.events,payuni-webhook-service,aftersales-service,aftersales.payuni.unknown.fallback,conservative fail on unknown webhook (refund side),yes,STATE,
-payuni.unknown.fallback,payuni.events,payuni-webhook-service,payment-service,payment.payuni.unknown.fallback,conservative fail on unknown webhook (payment side),yes,STATE,
+payuni.unknown.fallback,payuni.events,payuni-webhook-service,payment-service,payment.payuni.unknown.fallback,conservative fail on unknown webhook (payment side),yes,STATE,removed: PayUni webhook 不再進 payment，Stripe webhook inbox 依事件類型處理（B2 步驟 6）
 uber.shipping.status,payuni.events,payuni-webhook-service,shipping-service,shipping.uber.webhook,apply Uber Direct delivery status webhook,yes,STATE,
 procurement.rfq_publication_invite.created,procurement.events,ai-service,notification-service,notification.procurement,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 procurement.rfq_publication_invite.external_created,procurement.events,ai-service,notification-service,notification.procurement,email invite to external vendor,yes,SIDE_EFFECT,

@@ -159,8 +159,7 @@ Python 的產物會多一個「忘記重跑 generator」的失效面。兩份的
   type: topic
 ```
 
-`type` 決定路由方式（比對規則見上方「topic exchange 的萬用字元」），這裡幾乎都是 `topic`。
-唯一的例外是 `payment.webhook.dlx`，它是 `direct`。
+`type` 決定路由方式（比對規則見上方「topic exchange 的萬用字元」），這裡全部都是 `topic`。
 
 **命名慣例**：`.dlx` 結尾 = 死信交換機、`.retry` 結尾 = Go 重試框架展開出來的 fanout exchange。
 兩者都不要手寫，由 policy 展開產生。
