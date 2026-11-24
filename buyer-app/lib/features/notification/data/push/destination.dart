@@ -20,19 +20,15 @@ class NotificationAction {
   final Map<String, dynamic> payload;
 }
 
-/// 推播 payload 的解析：深連結缺或空就開收件匣，不是 App 內路徑回 null，不會到 Navigator。
+/// 推播 payload 的解析：深連結缺、空、外部或格式錯誤都落到收件匣（[resolveNotificationLocation]），不會把外部連結交給 Navigator。
 class NotificationDestinationResolver {
   const NotificationDestinationResolver._();
 
-  static NotificationAction? resolve(Map<String, dynamic> rawPayload) {
+  static NotificationAction resolve(Map<String, dynamic> rawPayload) {
     final payload = Map<String, dynamic>.unmodifiable(rawPayload);
     final link = payload[notificationDeepLinkKey]?.toString().trim() ?? '';
-    if (resolveNotificationLocation(link) == null) return null;
     return NotificationAction(deepLink: link, payload: payload);
   }
-
-  static bool isAppDeepLink(String link) =>
-      resolveNotificationLocation(link) != null;
 }
 
 /// Stable identity shared by the foreground and background-open paths.
@@ -98,7 +94,7 @@ class NotificationMessageIdentity {
   }
 }
 
-enum NotificationEnqueueResult { delivered, queued, duplicate, ignored }
+enum NotificationEnqueueResult { delivered, queued, duplicate }
 
 class _QueuedNotificationAction {
   const _QueuedNotificationAction({
@@ -142,7 +138,6 @@ class NotificationNavigationCoordinator {
     String? sourceMessageId,
   }) {
     final action = NotificationDestinationResolver.resolve(payload);
-    if (action == null) return NotificationEnqueueResult.ignored;
 
     final identity = NotificationMessageIdentity.fromPayload(
       payload,

@@ -45,8 +45,6 @@ class NotificationRouter {
         _scheduleFlush();
       case NotificationEnqueueResult.duplicate:
         HKLog.logD('[NotificationRouter] duplicate delivery ignored');
-      case NotificationEnqueueResult.ignored:
-        HKLog.logW('[NotificationRouter] unknown or malformed payload ignored');
     }
     return result;
   }
@@ -70,10 +68,9 @@ class NotificationRouter {
     return pushDeepLink(context, action.deepLink);
   }
 
-  /// 把伺服器給的深連結交給 GoRouter；不是 App 內路徑就不動作並回 false。
+  /// 把伺服器給的深連結交給 GoRouter；外部或格式錯誤的連結開收件匣。
   static bool pushDeepLink(BuildContext context, String deepLink) {
     final location = resolveNotificationLocation(deepLink);
-    if (location == null) return false;
     context.push(location);
     return true;
   }

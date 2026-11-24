@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'refresh_coalescer.dart';
+
 part 'after_sale_status_notifier.g.dart';
 
 /// 售後狀態該重讀的訊號（`StateRefreshHint.AFTER_SALE`）：不帶案件內容，畫面收到就重讀自己顯示的案件。
@@ -27,14 +30,24 @@ class AfterSaleStatusNotifier {
       AfterSaleStatusNotifier._internal();
   static AfterSaleStatusNotifier get instance => _instance;
 
+  late final _coalescer = RefreshCoalescer(
+    () => _eventController.add(AfterSaleStatusEvent()),
+  );
+
   final _eventController = StreamController<AfterSaleStatusEvent>.broadcast();
 
   Stream<AfterSaleStatusEvent> get eventStream => _eventController.stream;
 
-  /// 通知售後相關畫面重讀。
-  void requestRefresh() => _eventController.add(AfterSaleStatusEvent());
+  /// 通知售後相關畫面重讀（合併窗內的多次要求只送一次，見 [RefreshCoalescer]）。
+  void requestRefresh() => _coalescer.request();
 
-  void dispose() => _eventController.close();
+  @visibleForTesting
+  set coalesceWindow(Duration value) => _coalescer.window = value;
+
+  void dispose() {
+    _coalescer.dispose();
+    _eventController.close();
+  }
 }
 
 /// Riverpod bridge — `ref.watch(afterSaleStatusStreamProvider)` 取得事件 Stream。

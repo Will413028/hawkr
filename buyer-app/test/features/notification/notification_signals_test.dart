@@ -10,6 +10,7 @@ import 'package:hawkr_buyer/features/notification/data/notification_signals.dart
 import 'package:hawkr_buyer/features/notification/data/state_refresh.dart';
 import 'package:hawkr_buyer/features/order/data/after_sale_status_notifier.dart';
 import 'package:hawkr_buyer/features/order/data/order_status_notifier.dart';
+import 'package:hawkr_buyer/features/order/data/refresh_coalescer.dart';
 
 pb.WatchNotificationsResponse _inbox({
   int unread = 1,
@@ -57,6 +58,17 @@ class _Harness {
 
 void main() {
   late _Harness h;
+  setUp(() {
+    OrderStatusNotifier.instance.coalesceWindow = Duration.zero;
+    AfterSaleStatusNotifier.instance.coalesceWindow = Duration.zero;
+    addTearDown(() {
+      OrderStatusNotifier.instance.coalesceWindow =
+          RefreshCoalescer.defaultWindow;
+      AfterSaleStatusNotifier.instance.coalesceWindow =
+          RefreshCoalescer.defaultWindow;
+    });
+  });
+
   late List<OrderStatusEvent> orderEvents;
   late List<AfterSaleStatusEvent> afterSaleEvents;
 

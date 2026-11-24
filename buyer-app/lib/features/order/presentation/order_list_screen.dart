@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -41,6 +43,17 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
     with TopBarProvider, WidgetsBindingObserver {
   late int _selectedTab;
   _OrderQuickFilter _quickFilter = _OrderQuickFilter.all;
+
+  Timer? _hintRefresh;
+
+  /// 訂單與售後提示同一批到時只重讀一次（兩個串流各自的回呼落在同一輪事件，零延遲計時器排在它們之後）。
+  void _refreshOnHint() {
+    if (_hintRefresh != null) return;
+    _hintRefresh = Timer(Duration.zero, () {
+      _hintRefresh = null;
+      if (mounted) _refreshCurrentTab();
+    });
+  }
 
   void _refreshCurrentTab() {
     ref
@@ -97,6 +110,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
 
   @override
   void dispose() {
+    _hintRefresh?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -131,14 +145,14 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
     // 訂單狀態變更（賣家出貨、後端推進狀態等）→ 自動刷新列表
     ref.listen(orderStatusStreamProvider, (_, next) {
       next.whenData((_) {
-        if (mounted) _refreshCurrentTab();
+        if (mounted) _refreshOnHint();
       });
     });
 
     // 售後案件狀態變更（賣家回覆售後等）→ 自動刷新列表
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((_) {
-        if (mounted) _refreshCurrentTab();
+        if (mounted) _refreshOnHint();
       });
     });
 

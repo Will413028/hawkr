@@ -4,8 +4,19 @@ import 'package:hawkr_buyer/features/notification/data/push/destination.dart';
 import 'package:hawkr_buyer/features/notification/data/state_refresh.dart';
 import 'package:hawkr_buyer/features/order/data/after_sale_status_notifier.dart';
 import 'package:hawkr_buyer/features/order/data/order_status_notifier.dart';
+import 'package:hawkr_buyer/features/order/data/refresh_coalescer.dart';
 
 void main() {
+  setUp(() {
+    OrderStatusNotifier.instance.coalesceWindow = Duration.zero;
+    AfterSaleStatusNotifier.instance.coalesceWindow = Duration.zero;
+    addTearDown(() {
+      OrderStatusNotifier.instance.coalesceWindow =
+          RefreshCoalescer.defaultWindow;
+      AfterSaleStatusNotifier.instance.coalesceWindow =
+          RefreshCoalescer.defaultWindow;
+    });
+  });
   test('前景推播的 state_refresh_hints 解析：逗號分隔、略過不認得與 UNSPECIFIED', () {
     expect(
       stateRefreshHintsFromPush({

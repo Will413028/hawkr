@@ -61,7 +61,7 @@ void main() {
     }
   });
 
-  test('外部連結、// 與非絕對路徑拒絕', () {
+  test('外部連結、// 與非絕對路徑落到收件匣', () {
     for (final link in [
       'https://example.com/account/orders/O1',
       '//example.com/x',
@@ -69,7 +69,11 @@ void main() {
       r'/\evil.com',
       'javascript:alert(1)',
     ]) {
-      expect(resolveNotificationLocation(link), isNull, reason: link);
+      expect(
+        resolveNotificationLocation(link),
+        notificationInboxLocation,
+        reason: link,
+      );
     }
   });
 
@@ -78,6 +82,10 @@ void main() {
     expect(chatTargetOfDeepLink('/en/account/messages/store-1'), 'store-1');
     expect(chatTargetOfDeepLink('/account/orders/O1'), isNull);
     expect(chatTargetOfDeepLink('/seller-center/messages/u1'), isNull);
+    expect(
+      chatTargetOfDeepLink('https://example.com/account/messages/u1'),
+      isNull,
+    );
     expect(chatTargetOfDeepLink(''), isNull);
   });
 

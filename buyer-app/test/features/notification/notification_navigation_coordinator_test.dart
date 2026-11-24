@@ -1,3 +1,4 @@
+import 'package:hawkr_buyer/features/notification/data/push/deep_link.dart';
 import 'package:hawkr_buyer/features/notification/data/push/destination.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,30 +10,33 @@ void main() {
         'type': 'ignored',
       });
 
-      expect(action?.deepLink, '/orders/ORD-42');
+      expect(action.deepLink, '/orders/ORD-42');
     });
 
     test(
-      'missing and empty deep links open the inbox; external ones are ignored',
+      'missing and empty deep links open the inbox; external ones also open the inbox',
       () {
-        expect(NotificationDestinationResolver.resolve(const {}), isNotNull);
         expect(
           NotificationDestinationResolver.resolve({
             notificationDeepLinkKey: '',
-          })?.deepLink,
+          }).deepLink,
           '',
         );
         expect(
-          NotificationDestinationResolver.resolve({
-            notificationDeepLinkKey: 'https://example.com/x',
-          }),
-          isNull,
+          resolveNotificationLocation(
+            NotificationDestinationResolver.resolve({
+              notificationDeepLinkKey: 'https://example.com/x',
+            }).deepLink,
+          ),
+          notificationInboxLocation,
         );
         expect(
-          NotificationDestinationResolver.resolve({
-            notificationDeepLinkKey: '//example.com/x',
-          }),
-          isNull,
+          resolveNotificationLocation(
+            NotificationDestinationResolver.resolve({
+              notificationDeepLinkKey: '//example.com/x',
+            }).deepLink,
+          ),
+          notificationInboxLocation,
         );
       },
     );
