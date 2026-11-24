@@ -34,6 +34,7 @@
 ## 決定題
 
 ### P1 出貨的擁有者（取代 v1 的 D4、D6，改寫 D1、D5、D11、D15）
+- **狀態：已決 2026-11-24 Will（照建議 A）**；ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 文末修訂。
 - **A：訂單聚合擁有出貨**（建議）。
   - ordering（B8）擁有出貨記錄（0..N 筆，作品集先只開放整單一筆，資料表照多筆設計）。
   - ordering 也擁有由出貨記錄推導的訂單狀態（`AWAITING_SHIPMENT → SHIPPED → COMPLETED／CANCELLED`），以及逾期取消、自動完成、確認收貨、「未收到」回報。
@@ -48,6 +49,7 @@
   - 這份 ADR 要修訂（P5 一起處理）。
 
 ### P2 模組邊界與依賴邊（依 P1；v1 漏的依賴環）
+- **狀態：已決 2026-11-24 Will（照建議 A）**；ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 文末修訂。
 - 問題：invoice 要讀出貨狀態，`invoice-service/internal/client/shipping/client.go`、`grpc/shipment_status.go`【量】。如果改成 invoice 依賴 ordering，而 ordering 已依賴 invoice（`modules.go:26`），就會形成依賴環。
 - **A：出貨相關的下游都由訂單擁有者推或訂閱，不反向讀出貨**（建議；同 B2 D5「saga 的補償由擁有狀態的一方發起」）：
   - **invoice**：開票時點由 ordering 在狀態轉換時以 in-process 呼叫 invoice（ordering→invoice 已存在），invoice 不再讀出貨狀態。
@@ -58,6 +60,7 @@
 - B：保留 fulfillment 模組只放運費設定。代價：多一個只有一張表的模組，以及 cart、ordering 對它的新邊。
 
 ### P3 B3 到 B8 之間的 Java 訂單（取代 v1 的 D15；依 P1-A）
+- **狀態：已決 2026-11-24 Will（照建議 A）**；ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 文末修訂。
 - 事實（已查程式【量】）：
   - Java 訂單要先到 DELIVERED 才能完成（`OrderRepository.java:667-672`），而 DELIVERED 只由 `ShippingEventConsumer` 推進。
   - 刪掉 Java shipping 後，Java 訂單停在已付款。下游因此不會觸發：
@@ -76,6 +79,7 @@
 - 推翻 A 的事實：B8 會晚很久（例如 B6 卡住），而這段期間需要完整的示範鏈。
 
 ### P4 運費設定的形狀與擁有者（改寫 v1 D2；影響 B6）
+- **狀態：已決 2026-11-24 Will（照建議 A）**；ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 文末修訂。
 - 基線：Etsy、Shopify 的 shipping profile 屬於商店，可以有多份，商品引用其中一份；每份含處理天數、運費、免運門檻【文件】。
 - **A：每個賣家一份設定，放在既有的 seller 模組**（建議）。
   - 內容：固定運費（TWD）、免運門檻（可空）、處理天數（預設 3 個工作日，可改 1–7）。
@@ -89,11 +93,13 @@
 - 可逆性：A 改 B 是加一張表和一個參照欄，成本低。
 
 ### P5 物流 port 與模擬 adapter（重提 v1 D9；連同 P1 修訂 ADR）
+- **狀態：已決 2026-11-24 Will（照建議 A）**；ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 文末修訂。
 - 必要條件：「上線時能插真實物流商」。P1-A 下，貨態回寫要進訂單；port 的形狀取決於真實物流商，ADR 自己也寫了模擬只證明形狀。
 - **A：修訂 ADR D3，port 與模擬 adapter 延後到決定上線並簽約時**（建議）。現在寫的 port 沒有生產使用者。inbox 去重的作品集展示已在 B2 做了（B2 計畫第 3、31 行，`internal/platform/inbox`【量】）。
 - B：照 ADR D3，在 B8 的 ordering 內做最小 port。
 
 ### P6 B4 D10 要重開（已拍板，2026-11-24 Will）
+- **狀態：已決 2026-11-24 Will（照建議 A）**；ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 文末修訂。
 - 現況：B4 D10 定為「catalog 存啟用的配送方式代碼集合，經 fulfillment API 驗證」（`2026-11-24-b4-catalog.md:117`【量】）。只剩賣家自寄一種方式時，這個集合沒有內容，前提不成立。
 - **建議**：選 P1-A、P4-A 時，B4 D10 改成「catalog 不存配送方式、不依賴運費設定」，通知 B4 session 修訂。
 

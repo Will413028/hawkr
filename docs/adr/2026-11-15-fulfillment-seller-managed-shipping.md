@@ -45,3 +45,13 @@
 
 - 決定在台灣上線：簽物流合約，寫真實 adapter，並決定超商取貨是否回到主線。
 - 出現能自助開通、測試模式可用的多賣家物流 API。
+
+## 修訂：出貨歸訂單、運費設定歸 seller、物流 port 延後（2026-11-24，Will 決定）
+
+B3 開工前的前提重審（`backend/docs/plans/2026-11-24-b3-fulfillment/premise-review.md` P1–P6）比對了業界做法：Etsy `createReceiptShipment`、eBay `createShippingFulfillment`、Amazon 賣家自配送 `confirmShipment`、Shopee `ship_order` 都把賣家自寄的出貨記在訂單底下（0..N 筆，含承運商與追蹤號碼），訂單狀態由出貨記錄推導；Shopify 的 `FulfillmentOrder` 那一層是為多地點、第三方倉的路由，本專案沒有。獨立出貨模組的必要條件（串多家物流商的建單與貨態）已隨本 ADR 消失，留著它只會重現 Java 訂單與出貨兩份狀態以事件同步的缺陷。
+
+- **D1 修訂**：出貨記錄（0..N 筆，作品集先開放整單一筆）、由它推導的訂單狀態、逾期取消、自動完成、確認收貨與「未收到」回報由 ordering 擁有，在 B8 交付；不建 `fulfillment` 模組，`internal/arch/modules.go` 刪除該模組與指向它的邊。下游（invoice 開票、aftersales、轉帳）由訂單擁有者呼叫或讀訂單，不反向讀出貨狀態。
+- **D2 修訂**：運費設定放在 seller 模組，每個賣家一份：固定運費、免運門檻（可空）、處理天數（預設 3 個工作日、可改 1–7）；報價是純函式，cart 預覽與 ordering 結帳共用，結帳把結果快照進訂單。
+- **D3 修訂**：物流 port 與模擬 adapter 延後到決定上線並簽約時；webhook inbox 去重的示範由 B2 的 payment 承擔。
+- **過渡期**：B3 刪除 Java shipping 與 Java 端所有依賴它的程式（不留 stub、不寫轉接）；B3 到 B8 之間 Java 訂單停在已付款、結帳運費固定 0，訂單完成、轉帳、crm 的完成事件與賣家關店在這段期間不會被觸發（系統未上線）。
+- 「後果」段的作品集重點改為：訂單的狀態機（含出貨）在 B8 交付，B3 交付運費設定與舊物流的清理。
