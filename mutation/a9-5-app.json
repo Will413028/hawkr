@@ -1,0 +1,31 @@
+{
+ "mutants": [
+  {
+   "id": "assistant-reconnect-drops-cursor",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/ai_assistant/data/ai_assistant_repository.dart",
+   "old": "pb.WatchAssistantTurnRequest(turnId: turnId, cursor: cursor),",
+   "new": "pb.WatchAssistantTurnRequest(turnId: turnId, cursor: ''),",
+   "test": "test/features/ai_assistant/ai_assistant_repository_stream_test.dart 150 秒的一輪在 100 秒被截斷後以 cursor 接續，不漏不重",
+   "why": "Reconnect after the 100 s server cutoff restarts from the first event instead of the last cursor."
+  },
+  {
+   "id": "assistant-duplicate-event-not-deduped",
+   "stack": "flutter:buyer-app",
+   "file": "buyer-app/lib/features/ai_assistant/data/ai_assistant_repository.dart",
+   "old": "if (!seen.add(e.cursor)) continue;",
+   "new": "seen.add(e.cursor);",
+   "test": "test/features/ai_assistant/ai_assistant_repository_stream_test.dart 接續時伺服器重送已處理的事件：只處理一次",
+   "why": "An event replayed after reconnect is handled twice."
+  },
+  {
+   "id": "seller-decline-wrong-reason",
+   "stack": "flutter:seller-app",
+   "file": "seller-app/lib/features/procurement/data/seller_quote_repository.dart",
+   "old": "pb.DeclineRfqPublicationRequest(\n        publicationId: publicationId,\n        reasonCode: reasonCode,",
+   "new": "pb.DeclineRfqPublicationRequest(\n        publicationId: publicationId,\n        reasonCode: '',",
+   "test": "test/features/procurement/seller_quote_repository_test.dart 婉拒把原因代碼送到 reason_code",
+   "why": "Decline drops the seller's reason code instead of sending it in reason_code."
+  }
+ ]
+}

@@ -19,7 +19,6 @@ import '../../../shared/widgets/setup_bottom_bar.dart';
 import '../../photo_editor/presentation/photo_editor_args.dart';
 import '../../media/presentation/protected_media_controller.dart';
 import '../data/product_repository.dart';
-import 'ai_assistant_button.dart';
 import 'product_setup_progress_bar.dart';
 import 'product_setup_top_bar.dart';
 
@@ -709,9 +708,6 @@ class ProductSetupImageScreen extends HookConsumerWidget {
           ProductSetupTopBar(
             title: isEditMode ? '編輯商品' : '新增商品',
             subtitle: '商品圖片設定',
-            trailing: kAiProductListingAssistantEnabled
-                ? const AiAssistantButton()
-                : null,
           ),
 
           const ProductSetupProgressBar(currentStep: 3),

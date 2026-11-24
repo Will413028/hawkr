@@ -3,17 +3,24 @@ import 'dart:async';
 import 'package:hawkr_buyer/features/ai_assistant/data/ai_assistant_repository.dart';
 import 'package:hawkr_buyer/features/ai_assistant/data/ai_message_model.dart';
 import 'package:hawkr_buyer/features/ai_assistant/presentation/ai_assistant_controller.dart';
-import 'package:dio/dio.dart';
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart';
+import 'package:hawkr_api/testing.dart';
+import '../../support/default_error_text.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class _Repository extends AiAssistantRepository {
-  _Repository() : super(Dio()) {
-    events = StreamController<AiSseEvent>(onCancel: () => cancelled = true);
+  _Repository()
+    : super(
+        AssistantAppServiceClient(FakeTransportBuilder().build()),
+        defaults: zhDefaultErrorText,
+      ) {
+    events = StreamController<AiTurnEvent>(onCancel: () => cancelled = true);
   }
 
   bool cancelled = false;
-  late final StreamController<AiSseEvent> events;
+  late final StreamController<AiTurnEvent> events;
   final history = Completer<({String sessionId, List<AiMessage> messages})>();
 
   @override
@@ -21,11 +28,10 @@ class _Repository extends AiAssistantRepository {
       history.future;
 
   @override
-  Stream<AiSseEvent> streamChat({
-    BuyerAssistantEndpoint endpoint = BuyerAssistantEndpoint.chat,
-    String? message,
+  Stream<AiTurnEvent> streamChat({
+    required AssistantTopic topic,
+    required String message,
     String? sessionId,
-    String? imageUrl,
   }) => events.stream;
 }
 
@@ -70,14 +76,8 @@ void main() {
     await history;
     expect(controller.sessionId, isNull);
     expect(container.read(aiAssistantControllerProvider).first.content, '最新問題');
-    repository.events.add(const AiSseEvent(type: 'text', data: '最新回覆'));
-    repository.events.add(
-      const AiSseEvent(
-        type: 'done',
-        data: '{"sessionId":"new-session"}',
-        terminal: true,
-      ),
-    );
+    repository.events.add(const AiTextDelta('最新回覆'));
+    repository.events.add(const AiTurnFinished('new-session'));
     await sending;
     expect(controller.sessionId, 'new-session');
     expect(

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart'
+    show AssistantTopic;
 import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
@@ -14,7 +16,6 @@ import '../../../shared/widgets/chat_conversation_chrome.dart';
 import '../../../shared/widgets/chat_input_bar.dart';
 import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/notification_count_badge.dart';
-import '../data/ai_assistant_repository.dart';
 import '../data/ai_message_model.dart';
 import 'ai_assistant_controller.dart';
 import 'ai_function_menu.dart';
@@ -109,17 +110,11 @@ class AiAssistantScreen extends HookConsumerWidget {
       }
     }
 
-    Future<void> triggerQuickAction(
-      BuyerAssistantEndpoint endpoint,
-      String label,
-    ) async {
+    Future<void> triggerQuickAction(AssistantTopic topic, String label) async {
       if (sending.value) return;
       sending.value = true;
       try {
-        await controller.sendQuickAction(
-          endpoint: endpoint,
-          defaultMessage: label,
-        );
+        await controller.sendQuickAction(topic: topic, defaultMessage: label);
       } finally {
         if (context.mounted) sending.value = false;
       }
@@ -133,20 +128,24 @@ class AiAssistantScreen extends HookConsumerWidget {
           AiFunctionMenuItem(
             icon: AppIcons.assignmentOutlined,
             label: '查詢訂單',
-            onTap: () =>
-                triggerQuickAction(BuyerAssistantEndpoint.orders, '查詢訂單'),
+            onTap: () => triggerQuickAction(
+              AssistantTopic.ASSISTANT_TOPIC_ORDERS,
+              '查詢訂單',
+            ),
           ),
           AiFunctionMenuItem(
             icon: AppIcons.localShippingOutlined,
             label: '我的包裹到了嗎？',
-            onTap: () =>
-                triggerQuickAction(BuyerAssistantEndpoint.tracking, '我的包裹到了嗎？'),
+            onTap: () => triggerQuickAction(
+              AssistantTopic.ASSISTANT_TOPIC_TRACKING,
+              '我的包裹到了嗎？',
+            ),
           ),
           AiFunctionMenuItem(
             icon: AppIcons.assignmentReturnOutlined,
             label: '如何申請退貨',
             onTap: () => triggerQuickAction(
-              BuyerAssistantEndpoint.returnPolicy,
+              AssistantTopic.ASSISTANT_TOPIC_RETURN_POLICY,
               '如何申請退貨',
             ),
           ),
@@ -215,33 +214,20 @@ class AiAssistantScreen extends HookConsumerWidget {
                     final hasNext = sameSenderAsNext;
                     final isNew = i >= lastAnimatedCount.value - 1;
 
-                    final hasOrders =
-                        !isUser &&
-                        msg.orderList != null &&
-                        msg.orderList!.isNotEmpty;
-
                     Widget bubble = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (msg.content.isNotEmpty || !hasOrders)
-                          _buildBubble(
-                            context,
-                            msg,
-                            isUser,
-                            isFirst,
-                            hasNext || hasOrders,
-                            isReplying:
-                                sending.value &&
-                                !isUser &&
-                                i == messages.length - 1,
-                          ),
-                        if (hasOrders)
-                          Padding(
-                            padding: EdgeInsets.only(
-                              top: msg.content.isNotEmpty ? 8.h : 0,
-                            ),
-                            child: _OrderCardsBlock(orders: msg.orderList!),
-                          ),
+                        _buildBubble(
+                          context,
+                          msg,
+                          isUser,
+                          isFirst,
+                          hasNext,
+                          isReplying:
+                              sending.value &&
+                              !isUser &&
+                              i == messages.length - 1,
+                        ),
                       ],
                     );
                     if (isNew) {
@@ -526,181 +512,6 @@ class _AssistantReplyLoadingDotsState extends State<_AssistantReplyLoadingDots>
             ),
           );
         }),
-      ),
-    );
-  }
-}
-
-// ── 訂單卡片區塊（AI 訊息中的訂單清單，Figma: 9636:99531）──
-class _OrderCardsBlock extends StatelessWidget {
-  const _OrderCardsBlock({required this.orders});
-  final List<AiOrderItem> orders;
-
-  @override
-  Widget build(BuildContext context) {
-    // 與 _buildBubble AI 頭像槽一致的左側縮排（32 + 6 = 38）
-    return Padding(
-      padding: EdgeInsets.only(left: 32.w + 8.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (int i = 0; i < orders.length; i++)
-            Padding(
-              padding: EdgeInsets.only(top: i == 0 ? 0 : 12.h),
-              child: _OrderCard(order: orders[i]),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order});
-  final AiOrderItem order;
-
-  static const _gray = AppColors.textPrimary;
-
-  ({Color bg, Color fg, String label}) _statusStyle() {
-    final s = order.status.toLowerCase();
-    // 待付款 / unpaid → 紅底白字（買家側強提醒：要付款）
-    final isUnpaid =
-        order.status.contains('待付款') ||
-        s.contains('unpaid') ||
-        s.contains('pending_payment');
-    if (isUnpaid) {
-      return (
-        bg: AppColors.danger,
-        fg: AppColors.bgCard,
-        label: order.status.isEmpty ? '待付款' : order.status,
-      );
-    }
-    // 其他狀態（待出貨/待收貨/已完成…） → 橘底灰字
-    return (
-      bg: const Color(0x80E0C44C),
-      fg: _gray,
-      label: order.status.isEmpty ? '處理中' : order.status,
-    );
-  }
-
-  String _formatDate(TaipeiDisplay t) {
-    if (order.createTimeMs <= 0) return '';
-    return t.format(
-      DateTime.fromMillisecondsSinceEpoch(order.createTimeMs),
-      TaipeiFormat.date,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final status = _statusStyle();
-    final date = _formatDate(context.taipeiDisplay);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          // 引導到訂單列表頁讓買家處理（訂單詳情頁需要 OrderDetail extra,
-          // AI tool_result 目前只有 order_no,故先導到列表頁）
-          GoRouter.of(context).go('/?tab=3');
-        },
-        child: Ink(
-          width: 300.w,
-          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-          decoration: BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.cardBorder),
-            boxShadow: const [
-              BoxShadow(
-                color: AppColors.cardShadow,
-                blurRadius: 3,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Row 1: 訂單編號 + 狀態 badge + 金額
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            '#${order.orderId}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: _gray,
-                              height: 20 / 14,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        SizedBox(width: 8.w),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8.w,
-                            vertical: 4.h,
-                          ),
-                          decoration: BoxDecoration(
-                            color: status.bg,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            status.label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: status.fg,
-                              letterSpacing: 1,
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '\$${order.amountTwd}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _gray,
-                            height: 20 / 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (date.isNotEmpty) ...[
-                      SizedBox(height: 8.h),
-                      // Row: 日期（賣家/品項資訊不在 model 中,backend 補欄位後再加,
-                      // 對應 backend issue #475）
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          date,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: _gray,
-                            height: 1.44,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              SizedBox(width: 4.w),
-              Icon(AppIcons.chevronRight, size: 24.sp, color: _gray),
-            ],
-          ),
-        ),
       ),
     );
   }

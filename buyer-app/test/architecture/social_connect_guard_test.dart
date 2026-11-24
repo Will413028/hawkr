@@ -25,7 +25,6 @@ void main() {
     final offenders = <String>[];
     for (final entity in Directory('lib').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
-      if (entity.path.endsWith('agui_sse.dart')) continue;
       final source = _code(entity.readAsStringSync());
       if (source.contains('CommentStreamService') ||
           source.contains('comment_stream_service')) {

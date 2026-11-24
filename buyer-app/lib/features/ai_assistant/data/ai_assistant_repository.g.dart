@@ -55,4 +55,4 @@ final class AiAssistantRepositoryProvider
 }
 
 String _$aiAssistantRepositoryHash() =>
-    r'885dea1497c25d2d5f1e303eaab36b393fe39046';
+    r'b8896a6afbc5d089079c2b7b93b296bbb7076421';

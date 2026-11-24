@@ -115,4 +115,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String customerPickerAdd(int count) {
     return '加入名單（$count）';
   }
+
+  @override
+  String get quoteResponseTypeHelp => '兩種回應都要填完整的計價基準與金額——「接受非價格條款」不是少填金額的捷徑。';
+
+  @override
+  String get quoteSpecNoteTitle => '規格說明（選填）';
+
+  @override
+  String get quoteSpecNoteHelp => '這一欄只能由你自己填寫，最多 1000 字。';
+
+  @override
+  String get quoteSpecNoteLabel => '規格說明';
+
+  @override
+  String get quoteSpecNoteHint => '例如：產地、等級、包裝方式、驗收條件';
+
+  @override
+  String get quoteCurrencyTwd => '幣別 TWD';
+
+  @override
+  String get quoteStatusActive => '有效';
+
+  @override
+  String get quoteStatusSuperseded => '已被改版取代';
+
+  @override
+  String get quoteStatusWithdrawn => '已撤回';
+
+  @override
+  String get quoteStatusExpired => '已逾有效期';
+
+  @override
+  String quoteAmountNotWholeNumber(String label) {
+    return '$label只能是非負整數（新台幣元），例如 1200';
+  }
 }
