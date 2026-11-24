@@ -39,7 +39,8 @@ rg -n "notification-service|hawkr_notification|notificationpb|notification\.prot
 - 刪 relay 之前，邀請的 `delivery_state`（proto `InviteDeliveryState`，賣家端 summary 顯示）要有新的寫入者，否則永遠 `QUEUED`。
 - 進行中的分支 `a9-6`（另一個 session）在 `ea5a87391` 把 relay 接進 `cmd/hawkr`；dev 上刪 relay 會與它衝突。
 - `notification.procurement` queue 與 relay 同步刪：relay 還在時，`TestPublishedRoutesAreBoundInTopology` 要它（§3）。
-- 去向：列為決定 D30，A8-3f 照決定實作；不在 A8-7a 做。
+- 去向：D30 已決 (b)（Will 2026-11-25）：刪 `delivery_state` 與 relay，由 A8-3f 做；不在 A8-7a 做。
+- 原寫的「與 `a9-6` 分支協調」已不需要：a9-6 已合併進 dev。
 
 ## 3. 拿掉 `notification.*` queue 之後
 
