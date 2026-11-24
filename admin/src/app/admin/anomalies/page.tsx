@@ -1,5 +1,12 @@
 "use client";
 
+import { useQuery as useConnectQuery } from "@connectrpc/connect-query";
+import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1/payment_pb";
+import {
+	PaymentRefundStatus,
+	PaymentStatus,
+	PaymentTransferStatus,
+} from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
 	MaterialSymbol,
 	type MaterialSymbolName,
@@ -18,9 +25,7 @@ import {
 	codeLabel,
 	ORDER_STATUS_LABEL,
 	PAYMENT_METHOD_LABEL,
-	PAYMENT_TRANSACTION_STATUS_LABEL,
 	PROVIDER_SOURCE_LABEL,
-	REFUND_STATUS_LABEL,
 	SHIPMENT_ANOMALY_ACK_ACTION_LABEL,
 	SHIPMENT_ANOMALY_SEVERITY_LABEL,
 	SHIPMENT_ANOMALY_SEVERITY_ORDER,
@@ -29,8 +34,33 @@ import {
 	SHIPPING_STATUS_LABEL,
 	toOptions,
 } from "@/lib/codemeta";
+import { connectErrorText } from "@/lib/error-text";
 import { formatDateTime as formatTaipeiDateTimeShared } from "@/lib/format";
+import {
+	currentPage,
+	currentToken,
+	firstPage,
+	nextPage,
+	previousPage,
+} from "@/lib/keyset-pages";
 import { api } from "@/services/api";
+import {
+	DEFAULT_PAYMENT_FILTERS,
+	DEFAULT_REFUND_FILTERS,
+	DEFAULT_TRANSFER_FILTERS,
+	listPaymentRefundsRequest,
+	listPaymentsRequest,
+	listPaymentTransfersRequest,
+	PAYMENT_STATUS_OPTIONS,
+	paymentRow,
+	paymentStatusText,
+	REFUND_STATUS_OPTIONS,
+	refundRow,
+	refundStatusText,
+	TRANSFER_STATUS_OPTIONS,
+	transferRow,
+	transferStatusText,
+} from "./payment-lists";
 
 // issue #1327：後端 6 群 admin 異常查詢 API 早已存在但前端零串接。本頁補上「異常監控」
 // 多 tab 面板：配送異常 / 異常訂單 / 付款異常 / 退款異常 / 撥款異常。
@@ -43,7 +73,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: MaterialSymbolName }> = [
 	{ key: "orders", label: "異常訂單", icon: "assignment_late" },
 	{ key: "payments", label: "付款異常", icon: "credit_card" },
 	{ key: "refunds", label: "退款異常", icon: "money_off" },
-	{ key: "grants", label: "撥款異常", icon: "paid" },
+	{ key: "grants", label: "轉帳異常", icon: "paid" },
 ];
 
 const PAGE_SIZE = 20;
@@ -705,65 +735,128 @@ function AbnormalOrdersTab({ handoff }: { handoff: AnomalyHandoff }) {
 	);
 }
 
-// ==================== 付款異常 ====================
+// ==================== 付款 / 退款 / 轉帳（PaymentAdminService） ====================
 
-interface PaymentTxn {
-	tradeNo: string;
-	orderNo: string;
-	buyerId: string;
-	merId: string;
-	amount: string;
-	paymentType: string;
-	status: string;
-	providerStatus: string;
-	providerMessage: string;
-	providerTradeNo: string;
-	createdAt: string;
-	updatedAt: string;
+const subTextStyle: React.CSSProperties = { fontSize: 12, color: "#9ca3af" };
+
+function KeysetPagination({
+	page,
+	hasNext,
+	onPrevious,
+	onNext,
+}: {
+	page: number;
+	hasNext: boolean;
+	onPrevious: () => void;
+	onNext: () => void;
+}) {
+	if (page <= 1 && !hasNext) return null;
+	return (
+		<div
+			style={{
+				display: "flex",
+				justifyContent: "center",
+				alignItems: "center",
+				gap: 16,
+				marginTop: 16,
+			}}
+		>
+			<button
+				type="button"
+				onClick={onPrevious}
+				disabled={page <= 1}
+				style={pageBtnStyle(page <= 1)}
+			>
+				<MaterialSymbol name="keyboard_arrow_left" /> 上一頁
+			</button>
+			<span style={{ color: "#6b7280" }}>第 {page} 頁</span>
+			<button
+				type="button"
+				onClick={onNext}
+				disabled={!hasNext}
+				style={pageBtnStyle(!hasNext)}
+			>
+				下一頁 <MaterialSymbol name="keyboard_arrow_right" />
+			</button>
+		</div>
+	);
 }
 
-interface PaymentTxnListResp {
-	code: number;
-	data: {
-		records: PaymentTxn[];
-		total: string;
-		page: string;
-		pageSize: string;
-	};
+/** 錯誤列：讀取失敗不能顯示成「暫無資料」。 */
+function ErrorRow({
+	error,
+	colSpan,
+	onRetry,
+}: {
+	error: unknown;
+	colSpan: number;
+	onRetry: () => void;
+}) {
+	return (
+		<tr>
+			<td
+				colSpan={colSpan}
+				role="alert"
+				style={{ textAlign: "center", padding: 40, color: "#b91c1c" }}
+			>
+				<div>{connectErrorText(error, "讀取失敗")}</div>
+				<button
+					type="button"
+					style={{ ...actionBtnStyle, marginTop: 8 }}
+					onClick={onRetry}
+				>
+					重試
+				</button>
+			</td>
+		</tr>
+	);
+}
+
+function OrderNoFilter({ onApply }: { onApply: (orderNo: string) => void }) {
+	const [value, setValue] = useState("");
+	return (
+		<input
+			className="filter-select"
+			type="text"
+			placeholder="訂單編號"
+			aria-label="訂單編號"
+			value={value}
+			onChange={(e) => setValue(e.target.value)}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") onApply(value.trim());
+			}}
+		/>
+	);
+}
+
+function ReasonCell({ values }: { values: readonly string[] }) {
+	const shown = values.filter((v) => v !== "");
+	if (shown.length === 0) return <>—</>;
+	return (
+		<>
+			{shown.map((v) => (
+				<div key={v} style={{ wordBreak: "break-all" }}>
+					{v}
+				</div>
+			))}
+		</>
+	);
 }
 
 function PaymentAnomaliesTab() {
-	const [page, setPage] = useState(1);
-	const [paymentType, setPaymentType] = useState("");
-	const [orderNo, setOrderNo] = useState("");
-	const [orderNoApplied, setOrderNoApplied] = useState("");
+	const [filters, setFilters] = useState(DEFAULT_PAYMENT_FILTERS);
+	const [pageTokens, setPageTokens] = useState(firstPage);
+	const list = useConnectQuery(
+		PaymentAdminService.method.listPayments,
+		listPaymentsRequest(filters, currentToken(pageTokens)),
+	);
+	const rows = (list.data?.payments ?? []).map(paymentRow);
+	const next = list.data?.nextPageToken ?? "";
 
-	const { data, isLoading } = useQuery({
-		queryKey: [
-			"anomalies",
-			"payments",
-			{ page, paymentType, orderNo: orderNoApplied },
-		],
-		queryFn: async () => {
-			const params = new URLSearchParams({
-				page: String(page),
-				page_size: String(PAGE_SIZE),
-				abnormal_only: "true",
-			});
-			if (paymentType) params.set("payment_type", paymentType);
-			if (orderNoApplied) params.set("order_no", orderNoApplied);
-			const res = await api.get<PaymentTxnListResp>(
-				`/api/v1/admin/payment_transactions?${params}`,
-			);
-			return {
-				records: res?.data?.records || [],
-				total: Number(res?.data?.total) || 0,
-			};
-		},
-	});
-
-	const records = data?.records ?? [];
-	const total = data?.total ?? 0;
+	const change = (patch: Partial<typeof filters>) => {
+		setFilters((f) => ({ ...f, ...patch }));
+		setPageTokens(firstPage());
+	};
 
 	return (
 		<div>
@@ -773,176 +866,137 @@ function PaymentAnomaliesTab() {
 			>
 				<select
 					className="filter-select"
-					value={paymentType}
-					onChange={(e) => {
-						setPaymentType(e.target.value);
-						setPage(1);
-					}}
+					aria-label="付款狀態"
+					value={filters.status}
+					onChange={(e) =>
+						change({ status: Number(e.target.value) as PaymentStatus })
+					}
 				>
-					<option value="">所有付款方式</option>
-					{toOptions(PAYMENT_METHOD_LABEL).map(([v, l]) => (
-						<option key={v} value={v}>
-							{l}
+					<option value={PaymentStatus.UNSPECIFIED}>所有付款狀態</option>
+					{PAYMENT_STATUS_OPTIONS.map((s) => (
+						<option key={s} value={s}>
+							{paymentStatusText(s)}
 						</option>
 					))}
 				</select>
-				<input
-					className="filter-select"
-					type="text"
-					placeholder="訂單編號"
-					value={orderNo}
-					onChange={(e) => setOrderNo(e.target.value)}
-					onKeyDown={(e) => {
-						if (e.key === "Enter") {
-							setOrderNoApplied(orderNo.trim());
-							setPage(1);
-						}
-					}}
-				/>
+				<OrderNoFilter onApply={(orderNo) => change({ orderNo })} />
 			</div>
 
 			<div className="table-container">
 				<table className="data-table">
 					<thead>
 						<tr>
-							<th style={thStyle}>交易編號</th>
+							<th style={thStyle}>付款編號</th>
 							<th style={thStyle}>訂單 / 買家</th>
 							<th style={thStyle}>金額</th>
-							<th style={thStyle}>付款方式</th>
+							<th style={thStyle}>金流商</th>
 							<th style={thStyle}>狀態</th>
-							<th style={thStyle}>Provider 狀態 / 訊息</th>
+							<th style={thStyle}>錯誤 / 原因</th>
 							<th style={thStyle}>建立時間</th>
 						</tr>
 					</thead>
 					<tbody>
-						<StateRow
-							loading={isLoading}
-							empty={records.length === 0}
-							colSpan={7}
-						>
-							{records.map((r) => (
-								<tr key={r.tradeNo}>
-									<td style={tdStyle}>
-										<div style={{ fontWeight: 600 }}>{r.tradeNo}</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											{r.providerTradeNo || ""}
-										</div>
-									</td>
-									<td style={tdStyle}>
-										<div>{r.orderNo || "—"}</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											買 {r.buyerId || "—"}
-										</div>
-									</td>
-									<td style={tdStyle}>{formatAmount(r.amount)}</td>
-									<td style={tdStyle}>
-										{codeLabel(PAYMENT_METHOD_LABEL, r.paymentType)}
-									</td>
-									<td style={tdStyle}>
-										<StatusBadge
-											variant={
-												r.status === "1"
-													? "success"
-													: r.status === "2" || r.status === "4"
-														? "danger"
-														: "warning"
-											}
-										>
-											{codeLabel(PAYMENT_TRANSACTION_STATUS_LABEL, r.status)}
-										</StatusBadge>
-									</td>
-									<td style={tdStyle}>
-										<div>{r.providerStatus || "—"}</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											{r.providerMessage || ""}
-										</div>
-									</td>
-									<td style={tdStyle}>{formatDT(r.createdAt)}</td>
-								</tr>
-							))}
-						</StateRow>
+						{list.error ? (
+							<ErrorRow
+								error={list.error}
+								colSpan={7}
+								onRetry={() => void list.refetch()}
+							/>
+						) : (
+							<StateRow
+								loading={list.isLoading}
+								empty={rows.length === 0}
+								colSpan={7}
+							>
+								{rows.map((r) => (
+									<tr key={r.id}>
+										<td style={tdStyle}>
+											<div style={{ fontWeight: 600 }}>{r.id}</div>
+											<div style={subTextStyle}>{r.externalPaymentId}</div>
+										</td>
+										<td style={tdStyle}>
+											<div>{r.orderNo}</div>
+											<div style={subTextStyle}>買 {r.buyerId}</div>
+										</td>
+										<td style={tdStyle}>{r.amount}</td>
+										<td style={tdStyle}>{r.provider}</td>
+										<td style={tdStyle}>
+											<StatusBadge variant={r.statusVariant}>
+												{r.status}
+											</StatusBadge>
+										</td>
+										<td style={tdStyle}>
+											<ReasonCell values={[r.failureReason, r.lastError]} />
+										</td>
+										<td style={tdStyle}>{r.createTime}</td>
+									</tr>
+								))}
+							</StateRow>
+						)}
 					</tbody>
 				</table>
 			</div>
-			<Pagination page={page} total={total} onPage={setPage} />
+			<KeysetPagination
+				page={currentPage(pageTokens)}
+				hasNext={next !== ""}
+				onPrevious={() => setPageTokens(previousPage)}
+				onNext={() => setPageTokens((t) => nextPage(t, next))}
+			/>
 		</div>
 	);
 }
 
-// ==================== 退款異常 ====================
-
-interface RefundRow {
-	refundNo: string;
-	tradeNo: string;
-	orderNo: string;
-	amount: string;
-	status: string;
-	providerStatus: string;
-	providerMessage: string;
-	providerRefundNo: string;
-	reason: string;
-	completedAt: string;
-	createdAt: string;
-	updatedAt: string;
-}
-
-interface RefundListResp {
-	code: number;
-	data: {
-		records: RefundRow[];
-		total: string;
-		page: string;
-		pageSize: string;
-	};
-}
-
 function RefundAnomaliesTab() {
-	const [page, setPage] = useState(1);
-	const [status, setStatus] = useState("");
+	const [filters, setFilters] = useState(DEFAULT_REFUND_FILTERS);
+	const [pageTokens, setPageTokens] = useState(firstPage);
+	const list = useConnectQuery(
+		PaymentAdminService.method.listPaymentRefunds,
+		listPaymentRefundsRequest(filters, currentToken(pageTokens)),
+	);
+	const rows = (list.data?.refunds ?? []).map(refundRow);
+	const next = list.data?.nextPageToken ?? "";
 
-	const { data, isLoading } = useQuery({
-		queryKey: ["anomalies", "refunds", { page, status }],
-		queryFn: async () => {
-			const params = new URLSearchParams({
-				page: String(page),
-				page_size: String(PAGE_SIZE),
-				abnormal_only: "true",
-			});
-			if (status) params.set("status", status);
-			const res = await api.get<RefundListResp>(
-				`/api/v1/admin/payment_refunds?${params}`,
-			);
-			return {
-				records: res?.data?.records || [],
-				total: Number(res?.data?.total) || 0,
-			};
-		},
-	});
-
-	const records = data?.records ?? [];
-	const total = data?.total ?? 0;
+	const change = (patch: Partial<typeof filters>) => {
+		setFilters((f) => ({ ...f, ...patch }));
+		setPageTokens(firstPage());
+	};
 
 	return (
 		<div>
 			<div
 				className="filters"
-				style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}
+				style={{
+					display: "flex",
+					gap: 12,
+					marginBottom: 16,
+					flexWrap: "wrap",
+					alignItems: "center",
+				}}
 			>
 				<select
 					className="filter-select"
-					value={status}
-					onChange={(e) => {
-						setStatus(e.target.value);
-						setPage(1);
-					}}
+					aria-label="退款狀態"
+					value={filters.status}
+					onChange={(e) =>
+						change({ status: Number(e.target.value) as PaymentRefundStatus })
+					}
 				>
-					<option value="">所有退款狀態</option>
-					{toOptions(REFUND_STATUS_LABEL).map(([v, l]) => (
-						<option key={v} value={v}>
-							{l}
+					<option value={PaymentRefundStatus.UNSPECIFIED}>所有退款狀態</option>
+					{REFUND_STATUS_OPTIONS.map((s) => (
+						<option key={s} value={s}>
+							{refundStatusText(s)}
 						</option>
 					))}
 				</select>
+				<OrderNoFilter onApply={(orderNo) => change({ orderNo })} />
+				<label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+					<input
+						type="checkbox"
+						checked={filters.anomalyOnly}
+						onChange={(e) => change({ anomalyOnly: e.target.checked })}
+					/>
+					只看異常
+				</label>
 			</div>
 
 			<div className="table-container">
@@ -950,196 +1004,169 @@ function RefundAnomaliesTab() {
 					<thead>
 						<tr>
 							<th style={thStyle}>退款編號</th>
-							<th style={thStyle}>交易 / 訂單</th>
+							<th style={thStyle}>訂單</th>
 							<th style={thStyle}>金額</th>
 							<th style={thStyle}>狀態</th>
-							<th style={thStyle}>Provider 狀態 / 訊息</th>
+							<th style={thStyle}>收回 / 補差額</th>
 							<th style={thStyle}>原因</th>
 							<th style={thStyle}>建立時間</th>
 						</tr>
 					</thead>
 					<tbody>
-						<StateRow
-							loading={isLoading}
-							empty={records.length === 0}
-							colSpan={7}
-						>
-							{records.map((r) => (
-								<tr key={r.refundNo}>
-									<td style={tdStyle}>
-										<div style={{ fontWeight: 600 }}>{r.refundNo}</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											{r.providerRefundNo || ""}
-										</div>
-									</td>
-									<td style={tdStyle}>
-										<div>{r.tradeNo || "—"}</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											{r.orderNo || "—"}
-										</div>
-									</td>
-									<td style={tdStyle}>{formatAmount(r.amount)}</td>
-									<td style={tdStyle}>
-										<StatusBadge
-											variant={
-												r.status === "2"
-													? "success"
-													: r.status === "3"
-														? "danger"
-														: "warning"
-											}
-										>
-											{codeLabel(REFUND_STATUS_LABEL, r.status)}
-										</StatusBadge>
-									</td>
-									<td style={tdStyle}>
-										<div>{r.providerStatus || "—"}</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											{r.providerMessage || ""}
-										</div>
-									</td>
-									<td style={tdStyle}>{r.reason || "—"}</td>
-									<td style={tdStyle}>{formatDT(r.createdAt)}</td>
-								</tr>
-							))}
-						</StateRow>
+						{list.error ? (
+							<ErrorRow
+								error={list.error}
+								colSpan={7}
+								onRetry={() => void list.refetch()}
+							/>
+						) : (
+							<StateRow
+								loading={list.isLoading}
+								empty={rows.length === 0}
+								colSpan={7}
+							>
+								{rows.map((r) => (
+									<tr key={r.id}>
+										<td style={tdStyle}>
+											<div style={{ fontWeight: 600 }}>{r.id}</div>
+											<div style={subTextStyle}>{r.externalRefundId}</div>
+										</td>
+										<td style={tdStyle}>
+											<div>{r.orderNo}</div>
+											<div style={subTextStyle}>{r.auto}</div>
+										</td>
+										<td style={tdStyle}>{r.amount}</td>
+										<td style={tdStyle}>
+											<StatusBadge variant={r.statusVariant}>
+												{r.status}
+											</StatusBadge>
+										</td>
+										<td style={tdStyle}>
+											<div>收回 {r.reversalStatus}</div>
+											<div style={subTextStyle}>補差額 {r.topupStatus}</div>
+										</td>
+										<td style={tdStyle}>
+											<ReasonCell values={[r.failureReason]} />
+										</td>
+										<td style={tdStyle}>{r.createTime}</td>
+									</tr>
+								))}
+							</StateRow>
+						)}
 					</tbody>
 				</table>
 			</div>
-			<Pagination page={page} total={total} onPage={setPage} />
+			<KeysetPagination
+				page={currentPage(pageTokens)}
+				hasNext={next !== ""}
+				onPrevious={() => setPageTokens(previousPage)}
+				onNext={() => setPageTokens((t) => nextPage(t, next))}
+			/>
 		</div>
 	);
 }
 
-// ==================== 撥款異常 ====================
-
-interface GrantRow {
-	tradeNo: string;
-	orderNo: string;
-	amount: string;
-	grantStatus: string;
-	grantMessage: string;
-	grantedAt: string;
-	providerTradeNo: string;
-	createdAt: string;
-	updatedAt: string;
-}
-
-interface GrantListResp {
-	code: number;
-	data: {
-		records: GrantRow[];
-		total: string;
-		page: string;
-		pageSize: string;
-	};
-}
-
 function GrantAnomaliesTab() {
-	const qc = useQueryClient();
-	const [page, setPage] = useState(1);
+	const [filters, setFilters] = useState(DEFAULT_TRANSFER_FILTERS);
+	const [pageTokens, setPageTokens] = useState(firstPage);
+	const list = useConnectQuery(
+		PaymentAdminService.method.listPaymentTransfers,
+		listPaymentTransfersRequest(filters, currentToken(pageTokens)),
+	);
+	const rows = (list.data?.transfers ?? []).map(transferRow);
+	const next = list.data?.nextPageToken ?? "";
 
-	const { data, isLoading } = useQuery({
-		queryKey: ["anomalies", "grants", { page }],
-		queryFn: async () => {
-			const params = new URLSearchParams({
-				page: String(page),
-				page_size: String(PAGE_SIZE),
-				abnormal_only: "true",
-			});
-			const res = await api.get<GrantListResp>(
-				`/api/v1/admin/grants?${params}`,
-			);
-			return {
-				records: res?.data?.records || [],
-				total: Number(res?.data?.total) || 0,
-			};
-		},
-	});
-
-	const retry = useMutation({
-		mutationFn: (vars: { orderNo: string; operatorReason: string }) =>
-			api.post(`/api/v1/admin/orders/${vars.orderNo}/retry_grant`, {
-				operatorReason: vars.operatorReason,
-			}),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: ["anomalies", "grants"] });
-			alert("已重新觸發撥款，Worker 下一輪掃描會重試。");
-		},
-		onError: (e: unknown) =>
-			alert(`重試撥款失敗：${e instanceof Error ? e.message : String(e)}`),
-	});
-
-	const handleRetry = (orderNo: string) => {
-		const reason = window.prompt(
-			`重試訂單 ${orderNo} 的撥款？可填重發原因（稽核用，選填）：`,
-			"",
-		);
-		if (reason === null) return; // 取消
-		retry.mutate({ orderNo, operatorReason: reason });
+	const change = (patch: Partial<typeof filters>) => {
+		setFilters((f) => ({ ...f, ...patch }));
+		setPageTokens(firstPage());
 	};
-
-	const records = data?.records ?? [];
-	const total = data?.total ?? 0;
 
 	return (
 		<div>
+			<div
+				className="filters"
+				style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}
+			>
+				<select
+					className="filter-select"
+					aria-label="轉帳狀態"
+					value={filters.status}
+					onChange={(e) =>
+						change({ status: Number(e.target.value) as PaymentTransferStatus })
+					}
+				>
+					<option value={PaymentTransferStatus.UNSPECIFIED}>
+						所有轉帳狀態
+					</option>
+					{TRANSFER_STATUS_OPTIONS.map((s) => (
+						<option key={s} value={s}>
+							{transferStatusText(s)}
+						</option>
+					))}
+				</select>
+				<OrderNoFilter onApply={(orderNo) => change({ orderNo })} />
+			</div>
+
 			<div className="table-container">
 				<table className="data-table">
 					<thead>
 						<tr>
-							<th style={thStyle}>交易編號</th>
-							<th style={thStyle}>訂單編號</th>
+							<th style={thStyle}>轉帳編號</th>
+							<th style={thStyle}>訂單 / 店家</th>
 							<th style={thStyle}>金額</th>
-							<th style={thStyle}>撥款狀態 / 訊息</th>
-							<th style={thStyle}>撥款時間</th>
-							<th style={thStyle}>更新時間</th>
-							<th style={thStyle}>操作</th>
+							<th style={thStyle}>已收回金額</th>
+							<th style={thStyle}>狀態</th>
+							<th style={thStyle}>原因</th>
+							<th style={thStyle}>建立時間</th>
 						</tr>
 					</thead>
 					<tbody>
-						<StateRow
-							loading={isLoading}
-							empty={records.length === 0}
-							colSpan={7}
-						>
-							{records.map((r) => (
-								<tr key={r.tradeNo}>
-									<td style={tdStyle}>
-										<div style={{ fontWeight: 600 }}>{r.tradeNo}</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											{r.providerTradeNo || ""}
-										</div>
-									</td>
-									<td style={tdStyle}>{r.orderNo || "—"}</td>
-									<td style={tdStyle}>{formatAmount(r.amount)}</td>
-									<td style={tdStyle}>
-										<div style={{ fontWeight: 600, color: "#b45309" }}>
-											{r.grantStatus || "—"}
-										</div>
-										<div style={{ fontSize: 12, color: "#9ca3af" }}>
-											{r.grantMessage || ""}
-										</div>
-									</td>
-									<td style={tdStyle}>{formatDT(r.grantedAt)}</td>
-									<td style={tdStyle}>{formatDT(r.updatedAt)}</td>
-									<td style={tdStyle}>
-										<button
-											type="button"
-											style={actionBtnStyle}
-											disabled={retry.isPending || !r.orderNo}
-											onClick={() => handleRetry(r.orderNo)}
-										>
-											重試撥款
-										</button>
-									</td>
-								</tr>
-							))}
-						</StateRow>
+						{list.error ? (
+							<ErrorRow
+								error={list.error}
+								colSpan={7}
+								onRetry={() => void list.refetch()}
+							/>
+						) : (
+							<StateRow
+								loading={list.isLoading}
+								empty={rows.length === 0}
+								colSpan={7}
+							>
+								{rows.map((r) => (
+									<tr key={r.id}>
+										<td style={tdStyle}>
+											<div style={{ fontWeight: 600 }}>{r.id}</div>
+											<div style={subTextStyle}>{r.externalTransferId}</div>
+										</td>
+										<td style={tdStyle}>
+											<div>{r.orderNo}</div>
+											<div style={subTextStyle}>店 {r.storeId}</div>
+										</td>
+										<td style={tdStyle}>{r.amount}</td>
+										<td style={tdStyle}>{r.reversedAmount}</td>
+										<td style={tdStyle}>
+											<StatusBadge variant={r.statusVariant}>
+												{r.status}
+											</StatusBadge>
+										</td>
+										<td style={tdStyle}>
+											<ReasonCell values={[r.failureReason]} />
+										</td>
+										<td style={tdStyle}>{r.createTime}</td>
+									</tr>
+								))}
+							</StateRow>
+						)}
 					</tbody>
 				</table>
 			</div>
-			<Pagination page={page} total={total} onPage={setPage} />
+			<KeysetPagination
+				page={currentPage(pageTokens)}
+				hasNext={next !== ""}
+				onPrevious={() => setPageTokens(previousPage)}
+				onNext={() => setPageTokens((t) => nextPage(t, next))}
+			/>
 		</div>
 	);
 }
@@ -1163,7 +1190,7 @@ export default function AnomaliesPage() {
 				<div>
 					<div className="page-title">異常監控</div>
 					<div className="page-subtitle">
-						配送 / 訂單 / 付款 / 退款 / 撥款 跨服務異常集中處理（issue #1327）
+						配送 / 訂單 / 付款 / 退款 / 轉帳 跨服務異常集中處理（issue #1327）
 					</div>
 				</div>
 			</div>
