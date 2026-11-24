@@ -35,6 +35,15 @@
    "new": "\t\t\tconst requestedFor",
    "test": "components/shared/__tests__/NotificationToastBridge.signal.unit.test.ts toasts nothing in a hidden tab",
    "why": "背景分頁也 toast"
+  },
+  {
+   "id": "toast-fetches-list-for-idless-signal",
+   "stack": "website",
+   "file": "website/components/shared/NotificationToastBridge.tsx",
+   "old": "detail?.newItemsTruncated || ids.length === 0) return;",
+   "new": "detail?.newItemsTruncated) return;",
+   "test": "components/shared/__tests__/NotificationToastBridge.signal.unit.test.ts does not call listInboxItems for an untruncated signal with no ids",
+   "why": "沒有 ID 的訊號也讀收件匣列表"
   }
  ]
 }

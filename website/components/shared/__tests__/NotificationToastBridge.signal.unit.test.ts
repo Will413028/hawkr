@@ -123,6 +123,18 @@ describe("NotificationToastBridge inbox signal", () => {
 		expect(repo.listInboxItems).not.toHaveBeenCalled();
 	});
 
+	it("does not call listInboxItems for an untruncated signal with no ids", async () => {
+		render(React.createElement(NotificationToastBridge));
+		await signal({
+			unreadCount: 3,
+			hints: [],
+			newInboxItemIds: [],
+			newItemsTruncated: false,
+		});
+		expect(repo.listInboxItems).not.toHaveBeenCalled();
+		expect(toast.show).not.toHaveBeenCalled();
+	});
+
 	it("toasts nothing in a hidden tab", async () => {
 		setVisibility("hidden");
 		render(React.createElement(NotificationToastBridge));
