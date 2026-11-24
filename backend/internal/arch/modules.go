@@ -137,6 +137,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"rfqhash":      {},                                                                   // 價格預覽、確認快照、受眾與賣家可見內容的 hash（SHA-256 對固定欄位順序的 JSON，A9-D31 Q5）
 		"retention":    {"store"},                                                            // 買家關閉後刪除與匿名（S10）
 		"run":          {"store"},                                                            // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
+		"sellerside":   {"model", "quote", "rfq", "store"},                                   // 賣家的詢價清單與詳情、回價草稿、送出、撤回與婉拒：邀請列定可見性、冪等重送先於版本檢查、hash 重用 quote.PayloadHash
 		"search":       {"candidate", "model", "reply", "resolver", "run", "slots", "store"}, // CANDIDATE_SEARCH 的 executor 與開始搜尋的 use case：品項解析定輸入、單一 transaction 提交（A9-3b-2d、A9-D29）
 		"slots":        {"model", "store"},                                                   // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
 		"snapshot":     {"model", "rfq", "run", "slots", "store", "turn"},                    // GetRuntimeSnapshot 的讀取模型：對話、訊息、run、待回答的中斷、發布結果在同一份快照內讀齊（A9-D30(4)）

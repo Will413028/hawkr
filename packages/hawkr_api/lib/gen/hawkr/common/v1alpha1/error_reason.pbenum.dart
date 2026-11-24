@@ -190,7 +190,7 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason RFQ_RESPONSE_EXPIRED =
       ErrorReason._(31, _omitEnumNames ? '' : 'RFQ_RESPONSE_EXPIRED');
 
-  /// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
+  /// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒、這張需求已有進行中的成交、買家已刪除，或回價期限已過。
   /// SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
   static const ErrorReason RFQ_RECIPIENT_CLOSED =
       ErrorReason._(32, _omitEnumNames ? '' : 'RFQ_RECIPIENT_CLOSED');

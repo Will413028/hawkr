@@ -433,7 +433,11 @@ extension type BuyerProcurementAppServiceClient (connect.Transport _transport) {
   }
 }
 /// SellerProcurementAppService 是登入的賣家的回價方法。店家取自呼叫者目前的店家，需要賣家能力 CAP_MARKETING。
-/// 只能看到發給自己的詢價，也只能處理自己的回價；其他的一律回 not_found。
+/// 只能看到發給自己的詢價，也只能處理自己的回價；其他的一律回 not_found（包含詢價的買家已刪除：被邀請的店照常讀得到）。
+/// 寫入（UpsertSellerResponseDraft、SubmitSellerResponse、WithdrawSellerResponse）在下列任一情況回 FAILED_PRECONDITION，
+/// reason 是 RFQ_RECIPIENT_CLOSED：賣家已婉拒這筆詢價、這張需求已有進行中的成交（買家已接受某家報價且尚未因建單失敗而解除）、
+/// 買家已刪除帳號（沒有人能再接受報價）、詢價的回價期限（response_deadline，台北時區當日結束）已過。讀取不受影響。
+/// DeclineRfqPublication 不受這些條件限制（婉拒隨時可以，重複婉拒回第一次的結果）。
 extension type SellerProcurementAppServiceClient (connect.Transport _transport) {
   /// ListSellerPublications 列出發給呼叫者的詢價，最新的在前。
   Future<hawkrprocurementv1alpha1procurement.ListSellerPublicationsResponse> listSellerPublications(
@@ -471,7 +475,8 @@ extension type SellerProcurementAppServiceClient (connect.Transport _transport) 
     );
   }
 
-  /// UpsertSellerResponseDraft 建立或更新回價草稿。草稿不驗金額恆等式，買家讀不到。
+  /// UpsertSellerResponseDraft 建立或更新回價草稿。草稿不驗金額恆等式與必填欄位，買家讀不到；只驗形狀與長度：
+  /// 文字欄不得超過正式回價的上限，整份草稿由伺服器存下的 JSON 文字不得超過 16 KiB，超過回 INVALID_ARGUMENT 並指出欄位。
   Future<hawkrprocurementv1alpha1procurement.UpsertSellerResponseDraftResponse> upsertSellerResponseDraft(
     hawkrprocurementv1alpha1procurement.UpsertSellerResponseDraftRequest input, {
     connect.Headers? headers,
@@ -492,8 +497,9 @@ extension type SellerProcurementAppServiceClient (connect.Transport _transport) 
   /// SubmitSellerResponse 送出正式回價，產生不可變的新版本。詢價已被改版回 ABORTED，conflictTarget 是 publication；
   /// 帶的 expected_seller_response_version 不是目前的版本（賣家已改價或撤回，或空字串卻已有正式回價）回 ABORTED，
   /// conflictTarget 是 seller_response，client 必須明確告知使用者報價已變動，不得改用最新版靜默重送。
-  /// spec_note 超過 1000 字、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
-  /// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。
+  /// spec_note 超過 1000 字、金額恆等式不成立、必填欄位缺漏或格式不合回 INVALID_ARGUMENT。已停止寫入（見檔頭）回
+  /// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。重送同一個 client_request_id：內容與 expected_* 欄位都相同回第一次的版本（replayed 為 true、不建新版本，
+  /// 先於版本與停止寫入的檢查），任何請求欄位（內容或 expected_* 欄位）不同回 INVALID_ARGUMENT（client_request_id）。幣別一律是 TWD，伺服器補上。
   Future<hawkrprocurementv1alpha1procurement.SubmitSellerResponseResponse> submitSellerResponse(
     hawkrprocurementv1alpha1procurement.SubmitSellerResponseRequest input, {
     connect.Headers? headers,
@@ -511,7 +517,9 @@ extension type SellerProcurementAppServiceClient (connect.Transport _transport) 
     );
   }
 
-  /// WithdrawSellerResponse 撤回正式回價。
+  /// WithdrawSellerResponse 撤回指定版本的正式回價（目標狀態的方法）：該版已撤回時回目前的結案狀態，不改動。
+  /// expected_seller_response_version 不是目前的版本回 ABORTED，conflictTarget 是 seller_response。已停止寫入回
+  /// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。回價不是呼叫者的回 NOT_FOUND。
   Future<hawkrprocurementv1alpha1procurement.WithdrawSellerResponseResponse> withdrawSellerResponse(
     hawkrprocurementv1alpha1procurement.WithdrawSellerResponseRequest input, {
     connect.Headers? headers,
@@ -529,7 +537,8 @@ extension type SellerProcurementAppServiceClient (connect.Transport _transport) 
     );
   }
 
-  /// DeclineRfqPublication 婉拒一筆詢價，之後不能再回價。
+  /// DeclineRfqPublication 婉拒一筆詢價，之後不能再回價（目標狀態的方法）：已婉拒時回第一次的結案狀態，不改動。已提交的正式回價保留，
+  /// 買家端不能再接受它。
   Future<hawkrprocurementv1alpha1procurement.DeclineRfqPublicationResponse> declineRfqPublication(
     hawkrprocurementv1alpha1procurement.DeclineRfqPublicationRequest input, {
     connect.Headers? headers,
