@@ -237,7 +237,7 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | A8-3a2 worker 端收件人解析與 fan-out | 未開始 | | | |
 | A8-3b content 側型別 | 未開始 | | | |
 | A8-3c 治理與交易側型別 | 未開始 | | | |
-| A8-3e coupon 到期提醒型別 | 未開始 | | | |
+| A8-3e coupon 到期提醒型別 | 程式完成待 CI | 本機只跑 gofmt、make uitext、mutation --validate（機器負載高，未編譯）；依 Will 2026-11-24 指示跳過 code-review | 編譯、lint、單元與 integration、mutation 都待 CI | `4397a8c23` |
 | A8-3d 覆蓋、重送與刪 relay | 未開始 | | | |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |
 | A8-5 website、admin | 完成 | 本機（主 session 重跑）：website lint、test:unit、test（3347，唯一失敗為既有逾時 flake `store-key.unit.test.ts`，單跑通過）、admin lint、test；分類與渠道文字進共用文案目錄（`c686bec9d`）；偏好頁一分類一列＋渠道開關、獨立公告頁（Will 2026-11-24）；D21 網站只對訊號帶的新 ID 彈提示；審查：第 1 輪 4 項全修、code-review 7 項（5 修，CR-1/CR-3 由 D21 根治）、D21 審查 2 項全修；CI `58c4e532d`／`2035d238f`：website CI、website e2e、admin CI、TS packages、mutation 綠 | 未觸達查詢頁屬 A8-3d（RPC 未建）；e2e 只在 CI 跑 | `ac8b4ca4f`..`58c4e532d` |
