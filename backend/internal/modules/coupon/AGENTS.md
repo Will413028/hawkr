@@ -28,7 +28,7 @@ schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_
 - 發行數只經 `IncrementIssued` 的條件式 UPDATE 遞增，DB 的 `campaigns_issued_count_check` 是後備（`TestConcurrentClaimNeverOverIssues`）。
 - 一張券同時只被一筆訂單持有：只有 AVAILABLE 能被鎖；同一筆訂單重送冪等，別單失敗；一筆訂單只持有一張券（`vouchers_order_no_key`）（`TestConcurrentLockSucceedsOnce`、`TestLockIsIdempotentForTheSameOrder`）。
 - Redeem、Release 以 `order_no` 為鍵，重送冪等；Release 在活動已結束時把券作廢而不是回到可用（`TestRedeemAndReleaseReplayAreIdempotent`、`TestReleaseAfterEndVoidsInsteadOfRestoring`）。
-- 結束活動只擋新的領取與鎖定、作廢 AVAILABLE；LOCKED 照常核銷或釋放（`TestEndCampaignKeepsLockedVouchersRedeemable`）。
+- 結束活動只擋新的領取與鎖定、作廢 AVAILABLE；LOCKED 照常核銷或釋放（`TestEndCampaignKeepsLockedVouchersRedeemable`）；店家只能結束自己發的非補償活動，其餘 NotFound（`TestEndCampaignRejectsStoreEndingACompensationCampaign`）。
 - 補償券以 `(source_type, source_id)` 冪等：活動與券各有 UNIQUE，重送只建一張（`TestCompensationResendCreatesOneVoucher`）。
 - 賣家的活動數配額在鎖住配額列之後檢查（BD15）；現金折抵不得超過門檻，門檻 0 是無門檻（BD32，`TestCreateCampaignRejectsDiscountAboveThreshold`、`campaigns_discount_within_threshold_check`）。
 - 每個狀態轉換與稽核紀錄在同一個 transaction，寫入失敗整筆失敗；所有寫入在呼叫方的 transaction 內（`db.InTx` 加入它）。

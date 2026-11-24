@@ -239,9 +239,6 @@ var ReasonCouponIssueLimitReached = newReason("COUPON_ISSUE_LIMIT_REACHED")
 // ReasonCouponQuotaExceeded 表示店家同時進行的優惠券活動數已達上限；搭配 FailedPrecondition。
 var ReasonCouponQuotaExceeded = newReason("COUPON_QUOTA_EXCEEDED")
 
-// ReasonCouponInvalidStatus 表示優惠券活動或券的狀態不允許這個動作；搭配 FailedPrecondition。
-var ReasonCouponInvalidStatus = newReason("COUPON_INVALID_STATUS")
-
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

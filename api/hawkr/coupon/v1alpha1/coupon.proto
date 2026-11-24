@@ -169,7 +169,7 @@ message Checkout {
 }
 
 message ListMyVouchersRequest {
-  // 預設與上限見 page_size 的說明：0 用預設 20，超過 100 以 100 計，負數回 invalid_argument。
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
   int32 page_size = 1;
   string page_token = 2;
   repeated VoucherStatus statuses = 3;
@@ -183,6 +183,7 @@ message ListMyVouchersResponse {
 }
 
 message ListClaimableCampaignsRequest {
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
   int32 page_size = 1;
   string page_token = 2;
   optional string store_id = 3;
@@ -226,14 +227,14 @@ message CampaignInput {
   }
   // 門檻，至少 0；現金折抵的金額不得超過門檻（門檻 0 不套用）。
   int64 threshold_amount = 4;
-  // 店家只能建 ALL、MEMBER、DESIGNATED。
+  // 店家只能建 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument（消費紀錄的資料還沒有接上）。
   TargetType target_type = 5 [(google.api.field_behavior) = REQUIRED];
   google.protobuf.Timestamp start_time = 6 [(google.api.field_behavior) = REQUIRED];
   // 必須晚於現在與 start_time。
   google.protobuf.Timestamp end_time = 7 [(google.api.field_behavior) = REQUIRED];
   // 總發行量；不設是無上限，設了至少 1（0 回 invalid_argument，不當成無上限）。
   optional int32 total_issue_limit = 8;
-  // DESIGNATED 的名單（買家 ID，例如 CRM 客戶的 buyer_id），最多 500 位；其他資格不得帶。
+  // DESIGNATED 的名單（買家 ID），最多 500 位；只能是這家店的 CRM 客戶，不是客戶的 ID 回 invalid_argument；其他資格不得帶。
   repeated string designated_buyer_ids = 9;
 }
 
@@ -246,6 +247,7 @@ message CreateCampaignResponse {
 }
 
 message ListCampaignsRequest {
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
   int32 page_size = 1;
   string page_token = 2;
   // 只列這個狀態；不設是全部。明確送出 CAMPAIGN_STATUS_UNSPECIFIED 回 invalid_argument。

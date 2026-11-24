@@ -154,12 +154,10 @@ enum ErrorReason {
   COUPON_OUTSIDE_WINDOW = 44;
   // 買家不符合活動的資格（搭配 failed_precondition）：不在指定名單、在該店沒有消費紀錄。CouponAppService.ClaimCoupon。
   COUPON_NOT_ELIGIBLE = 45;
-  // 發行活動的店家停權中（搭配 failed_precondition）：領券與使用都暫停，解除後自動恢復。CouponAppService.ClaimCoupon。
+  // 發行活動的店家停權中（搭配 failed_precondition）：領取與鎖定（結帳選用）暫停，解除後自動恢復；已鎖定的券照常核銷或釋放。CouponAppService.ClaimCoupon。
   COUPON_STORE_SUSPENDED = 46;
   // 活動已經領完（搭配 failed_precondition）：總發行量已達上限。CouponAppService.ClaimCoupon。client 顯示已領完。
   COUPON_ISSUE_LIMIT_REACHED = 47;
   // 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
   COUPON_QUOTA_EXCEEDED = 48;
-  // 活動或券的狀態不允許這個動作（搭配 failed_precondition）：保留給需要區分的呼叫端（後台的發放、作廢）。
-  COUPON_INVALID_STATUS = 49;
 }

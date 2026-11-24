@@ -41,9 +41,12 @@ const (
 type fakeStores struct {
 	mu        sync.Mutex
 	suspended map[int64]bool
+	// calls 是 StoreSuspended 被問過的次數。
+	calls atomic.Int64
 }
 
 func (f *fakeStores) StoreSuspended(_ context.Context, id int64) (bool, error) {
+	f.calls.Add(1)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.suspended[id], nil

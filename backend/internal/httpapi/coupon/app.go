@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -41,6 +42,11 @@ type Buyers interface {
 	BatchDisplay(ctx context.Context, ids []int64) ([]buyer.Display, error)
 }
 
+// Customers 是店家的客戶（*crm.Module）：指定發放的名單只收這家店的客戶。
+type Customers interface {
+	GetCustomer(ctx context.Context, storeID, buyerID int64) (crm.Customer, error)
+}
+
 // Stores 是店家的來源（*seller.Module）：賣家方法的店家與能力、券上顯示的店家卡片。
 type Stores interface {
 	ActingStore(ctx context.Context, accountID int64, c seller.Capability) (seller.Store, error)
@@ -49,12 +55,12 @@ type Stores interface {
 
 // App 實作 CouponAppService。
 type App struct {
-	module Module
-	buyers Buyers
-	stores Stores
-	images rpc.Images
-	now    func() time.Time
-	log    *slog.Logger
+	module    Module
+	buyers    Buyers
+	customers Customers
+	stores    Stores
+	images    rpc.Images
+	log       *slog.Logger
 	// reasonOf 取出模組錯誤帶的業務原因；正式組裝是 coupon.ReasonOf，測試換成固定的原因（模組的原因型別不能在模組外建構）。
 	reasonOf func(error) coupon.Reason
 	table    map[string]declaration
@@ -63,28 +69,28 @@ type App struct {
 var _ couponv1alpha1connect.CouponAppServiceHandler = (*App)(nil)
 
 // NewApp 建立券的 handler。能力宣告表（declarations）與 CouponAppService 的方法對不上時回錯誤，不能啟動。
-func NewApp(m Module, buyers Buyers, stores Stores, images rpc.Images, now func() time.Time, log *slog.Logger) (*App, error) {
-	return newApp(declarations, m, buyers, stores, images, now, log)
+func NewApp(m Module, buyers Buyers, customers Customers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
+	return newApp(declarations, m, buyers, customers, stores, images, log)
 }
 
 // newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
-func newApp(table map[string]declaration, m Module, buyers Buyers, stores Stores, images rpc.Images, now func() time.Time, log *slog.Logger) (*App, error) {
+func newApp(table map[string]declaration, m Module, buyers Buyers, customers Customers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
 	switch {
-	case now == nil:
-		return nil, fmt.Errorf("httpapi/coupon：需要時鐘")
 	case log == nil:
 		return nil, fmt.Errorf("httpapi/coupon：需要 logger")
 	case m == nil:
 		return nil, fmt.Errorf("httpapi/coupon：需要 coupon 模組")
 	case buyers == nil:
 		return nil, fmt.Errorf("httpapi/coupon：需要 Buyers")
+	case customers == nil:
+		return nil, fmt.Errorf("httpapi/coupon：需要 Customers")
 	case stores == nil:
 		return nil, fmt.Errorf("httpapi/coupon：需要 Stores")
 	}
 	if err := checkDeclarations(table, serviceDescriptor()); err != nil {
 		return nil, err
 	}
-	return &App{module: m, buyers: buyers, stores: stores, images: images, now: now, log: log, reasonOf: coupon.ReasonOf, table: table}, nil
+	return &App{module: m, buyers: buyers, customers: customers, stores: stores, images: images, log: log, reasonOf: coupon.ReasonOf, table: table}, nil
 }
 
 // buyerID 回傳呼叫者的買家身分；只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員回 permission_denied）。
@@ -122,7 +128,6 @@ var reasons = map[coupon.Reason]apperr.Reason{
 	coupon.ReasonStoreSuspended:    apperr.ReasonCouponStoreSuspended,
 	coupon.ReasonIssueLimitReached: apperr.ReasonCouponIssueLimitReached,
 	coupon.ReasonQuotaExceeded:     apperr.ReasonCouponQuotaExceeded,
-	coupon.ReasonInvalidStatus:     apperr.ReasonCouponInvalidStatus,
 }
 
 // failure 把模組的錯誤轉成對外的錯誤：業務原因附上契約的 ErrorReason，欄位對到請求路徑 paths。
@@ -155,6 +160,20 @@ var (
 		"TargetBuyers[]":    "campaign.designated_buyer_ids[]",
 	}
 )
+
+// requireCustomers 檢查名單裡的每位買家都是這家店的客戶（crm）；不是客戶的回 invalid_argument 並指出是第幾個。
+// crm 讀取失敗（不是「不是客戶」）整個請求失敗。
+func (h *App) requireCustomers(ctx context.Context, storeID int64, raw []string, ids []int64) error {
+	for i, id := range ids {
+		if _, err := h.customers.GetCustomer(ctx, storeID, id); err != nil {
+			if apperr.KindOf(err) == apperr.KindNotFound {
+				return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("TargetBuyers", i)}, "名單只能是這家店的客戶：%s", raw[i]), createPaths)
+			}
+			return err
+		}
+	}
+	return nil
+}
 
 // cursor 是列表的 page token 內容：上一頁最後一筆的建立時間與 ID。
 type cursor struct {
@@ -216,8 +235,8 @@ func (h *App) ListMyVouchers(ctx context.Context, req *connect.Request[pb.ListMy
 		if err != nil {
 			return nil, err
 		}
-		if co.GetOrderAmount() < 1 {
-			return nil, rpc.RequiredField("checkout.order_amount", "order_amount 必須大於 0")
+		if co.GetOrderAmount() < 1 || co.GetOrderAmount() > coupon.MaxOrderAmount {
+			return nil, rpc.RequiredField("checkout.order_amount", "order_amount 必須大於 0，而且不能超過上限")
 		}
 		if len(in.Statuses) > 1 || (len(in.Statuses) == 1 && in.Statuses[0] != coupon.VoucherAvailable) {
 			return nil, rpc.RequiredField("statuses", "帶 checkout 時 statuses 必須為空或只含 AVAILABLE")
@@ -322,6 +341,9 @@ func (h *App) CreateCampaign(ctx context.Context, req *connect.Request[pb.Create
 	if err != nil {
 		return nil, err
 	}
+	if in.GetTargetType() == pb.TargetType_TARGET_TYPE_MEMBER {
+		return nil, rpc.RequiredField("campaign.target_type", "目前不能建立 MEMBER 資格的活動")
+	}
 	st, err := h.actingStore(ctx, procedure)
 	if err != nil {
 		return nil, err
@@ -333,6 +355,9 @@ func (h *App) CreateCampaign(ctx context.Context, req *connect.Request[pb.Create
 		}
 		if slices.Contains(buyers, own) {
 			return nil, rpc.RequiredField("campaign.designated_buyer_ids", "不能指定自己的買家身分")
+		}
+		if err := h.requireCustomers(ctx, st.StoreID, in.GetDesignatedBuyerIds(), buyers); err != nil {
+			return nil, err
 		}
 	}
 	create := coupon.CreateCampaignInput{
@@ -349,7 +374,7 @@ func (h *App) CreateCampaign(ctx context.Context, req *connect.Request[pb.Create
 	if err != nil {
 		return nil, h.failure(err, createPaths)
 	}
-	return connect.NewResponse(&pb.CreateCampaignResponse{Campaign: toSellerCampaign(c, h.now())}), nil
+	return connect.NewResponse(&pb.CreateCampaignResponse{Campaign: toSellerCampaign(c, false)}), nil
 }
 
 func (h *App) ListCampaigns(ctx context.Context, req *connect.Request[pb.ListCampaignsRequest]) (*connect.Response[pb.ListCampaignsResponse], error) {
@@ -383,7 +408,7 @@ func (h *App) ListCampaigns(ctx context.Context, req *connect.Request[pb.ListCam
 	}
 	out := make([]*pb.SellerCampaign, len(page.Campaigns))
 	for i, c := range page.Campaigns {
-		out[i] = toSellerCampaign(c, h.now())
+		out[i] = toSellerCampaign(c.Campaign, c.Expired)
 	}
 	return connect.NewResponse(&pb.ListCampaignsResponse{
 		Campaigns: out, NextPageToken: nextToken(scope, page.Next), MaxActiveCampaigns: page.MaxActive, ActiveCampaigns: page.CurrentActive,
@@ -409,7 +434,7 @@ func (h *App) GetCampaign(ctx context.Context, req *connect.Request[pb.GetCampai
 		return nil, err
 	}
 	return connect.NewResponse(&pb.GetCampaignResponse{
-		Campaign: toSellerCampaign(d.Campaign, h.now()), DesignatedBuyers: buyers,
+		Campaign: toSellerCampaign(d.Campaign, d.Expired), DesignatedBuyers: buyers,
 		AvailableCount: d.Available, LockedCount: d.Locked, RedeemedCount: d.Redeemed, VoidedCount: d.Voided,
 	}), nil
 }
@@ -432,5 +457,5 @@ func (h *App) EndCampaign(ctx context.Context, req *connect.Request[pb.EndCampai
 	if err != nil {
 		return nil, h.failure(err, noFieldPaths)
 	}
-	return connect.NewResponse(&pb.EndCampaignResponse{Campaign: toSellerCampaign(d.Campaign, h.now()), VoidedVouchers: int32(min(res.Voided, 1<<31-1))}), nil //nolint:gosec // 夾在 int32 範圍內
+	return connect.NewResponse(&pb.EndCampaignResponse{Campaign: toSellerCampaign(d.Campaign, d.Expired), VoidedVouchers: int32(min(res.Voided, 1<<31-1))}), nil //nolint:gosec // 夾在 int32 範圍內
 }

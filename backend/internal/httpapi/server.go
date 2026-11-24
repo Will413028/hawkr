@@ -420,11 +420,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(crmv1alpha1connect.NewCrmAppServiceHandler(crmApp, opts...))
-	couponNow := deps.Now
-	if couponNow == nil {
-		couponNow = time.Now
-	}
-	couponApp, err := httpcoupon.NewApp(deps.Coupon, deps.Buyer, deps.Seller, deps.Images, couponNow, deps.Logger)
+	couponApp, err := httpcoupon.NewApp(deps.Coupon, deps.Buyer, deps.CRM, deps.Seller, deps.Images, deps.Logger)
 	if err != nil {
 		return nil, err
 	}

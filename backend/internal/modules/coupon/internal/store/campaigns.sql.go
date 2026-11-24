@@ -392,15 +392,18 @@ func (q *Queries) ListCampaignsByIDs(ctx context.Context, ids []uuid.UUID) ([]Co
 const listClaimCandidates = `-- name: ListClaimCandidates :many
 SELECT c.id, c.title, c.discount_type, c.discount_amount, c.discount_percent, c.max_discount_amount, c.threshold_amount, c.target_type, c.store_id, c.issuer_type, c.issuer_admin_id, c.issuer_store_id, c.start_at, c.end_at, c.total_limit, c.issued_count, c.status, c.source_type, c.source_id, c.ended_at, c.created_at, c.updated_at FROM coupon.coupon_campaigns c
 WHERE c.status = 'ACTIVE' AND c.target_type <> 'COMPENSATION'
+  AND c.start_at <= $1::timestamptz AND c.end_at >= $1::timestamptz
   AND (c.total_limit IS NULL OR c.issued_count < c.total_limit)
-  AND ($1::bigint IS NULL OR c.store_id IS NULL OR c.store_id = $1::bigint)
-  AND NOT EXISTS (SELECT 1 FROM coupon.coupon_vouchers v WHERE v.campaign_id = c.id AND v.buyer_id = $2)
-  AND ($3::timestamptz IS NULL OR (c.created_at, c.id) < ($3::timestamptz, $4::uuid))
+  AND ($2::bigint IS NULL OR c.store_id IS NULL OR c.store_id = $2::bigint)
+  AND (c.target_type <> 'DESIGNATED' OR EXISTS (SELECT 1 FROM coupon.coupon_target_accounts t WHERE t.campaign_id = c.id AND t.buyer_id = $3))
+  AND NOT EXISTS (SELECT 1 FROM coupon.coupon_vouchers v WHERE v.campaign_id = c.id AND v.buyer_id = $3)
+  AND ($4::timestamptz IS NULL OR (c.created_at, c.id) < ($4::timestamptz, $5::uuid))
 ORDER BY c.created_at DESC, c.id DESC
-LIMIT $5
+LIMIT $6
 `
 
 type ListClaimCandidatesParams struct {
+	Now            time.Time
 	StoreID        *int64
 	BuyerID        int64
 	AfterCreatedAt *time.Time
@@ -408,10 +411,11 @@ type ListClaimCandidatesParams struct {
 	MaxRows        int32
 }
 
-// 買家可能領得到的活動：ACTIVE、不是補償、還有名額、買家還沒有這個活動的券；store_id 有值時只留該店與全平台的活動。
-// 時間窗與資格不在這裡：由 qualify.Check 判定（唯一的判定函式）。
+// 買家可能領得到的活動：ACTIVE、時間窗涵蓋 now、不是補償、還有名額、買家還沒有這個活動的券、DESIGNATED 的名單有這位買家；store_id 有值時只留該店與全平台的活動。
+// 店家停權與 MEMBER 資格不在這裡：由 qualify.Check 判定（唯一的判定函式，這裡只是不讓明顯不可能的列進來）。
 func (q *Queries) ListClaimCandidates(ctx context.Context, arg ListClaimCandidatesParams) ([]CouponCouponCampaign, error) {
 	rows, err := q.db.Query(ctx, listClaimCandidates,
+		arg.Now,
 		arg.StoreID,
 		arg.BuyerID,
 		arg.AfterCreatedAt,
@@ -477,7 +481,7 @@ type ListSellerCampaignsParams struct {
 	MaxRows        int32
 }
 
-// 讀取：賣家的活動列表、買家可領的活動、名單與券數（B7-3a）。分頁一律 keyset（created_at, id）由新到舊。
+// 讀取：賣家的活動列表、買家可領的活動、名單與券數。分頁一律 keyset（created_at, id）由新到舊。
 // 賣家自己發的活動，不含系統建立的補償活動；status 為 NULL 是全部。
 func (q *Queries) ListSellerCampaigns(ctx context.Context, arg ListSellerCampaignsParams) ([]CouponCouponCampaign, error) {
 	rows, err := q.db.Query(ctx, listSellerCampaigns,

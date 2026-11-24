@@ -28,8 +28,8 @@ func (s couponStores) StoreSuspended(ctx context.Context, storeID int64) (bool, 
 	return st.Suspended(), nil
 }
 
-// errMembersNotProjected 表示 MEMBER 資格的消費紀錄投影還沒有接上（B7-4）：在那之前 MEMBER 活動的領取與列表整個請求失敗，不降級成「不是會員」（BD28）。
-var errMembersNotProjected = errors.New("coupon：MEMBER 資格的消費紀錄投影尚未接上（B7-4）")
+// errMembersNotProjected 表示 MEMBER 資格的消費紀錄投影還沒有接上：賣家的 API 不能建立 MEMBER 活動，所以正常情形走不到這裡；萬一有 MEMBER 活動，領取與列表整個請求失敗，不降級成「不是會員」（BD28）。
+var errMembersNotProjected = errors.New("coupon：MEMBER 資格的消費紀錄投影尚未接上")
 
 type couponMembers struct{}
 
@@ -37,7 +37,7 @@ func (couponMembers) IsMember(context.Context, int64, int64) (bool, error) {
 	return false, errMembersNotProjected
 }
 
-// newCoupon 組裝 coupon 模組。MEMBER 資格的投影與買家刪帳、到期提醒在 B7-4 接上，這裡只有 Connect 需要的部分。
+// newCoupon 組裝 coupon 模組。這裡只有 Connect 需要的部分：MEMBER 資格的投影、買家刪帳與到期提醒還沒有接上。
 func newCoupon(d *db.DB, sellers *seller.Module) *coupon.Module {
 	return coupon.New(coupon.Deps{DB: d, Stores: couponStores{sellers}, Members: couponMembers{}, NewID: uuid.NewV7, Now: time.Now})
 }

@@ -254,7 +254,7 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason COUPON_NOT_ELIGIBLE =
       ErrorReason._(45, _omitEnumNames ? '' : 'COUPON_NOT_ELIGIBLE');
 
-  /// 發行活動的店家停權中（搭配 failed_precondition）：領券與使用都暫停，解除後自動恢復。CouponAppService.ClaimCoupon。
+  /// 發行活動的店家停權中（搭配 failed_precondition）：領取與鎖定（結帳選用）暫停，解除後自動恢復；已鎖定的券照常核銷或釋放。CouponAppService.ClaimCoupon。
   static const ErrorReason COUPON_STORE_SUSPENDED =
       ErrorReason._(46, _omitEnumNames ? '' : 'COUPON_STORE_SUSPENDED');
 
@@ -265,10 +265,6 @@ class ErrorReason extends $pb.ProtobufEnum {
   /// 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
   static const ErrorReason COUPON_QUOTA_EXCEEDED =
       ErrorReason._(48, _omitEnumNames ? '' : 'COUPON_QUOTA_EXCEEDED');
-
-  /// 活動或券的狀態不允許這個動作（搭配 failed_precondition）：保留給需要區分的呼叫端（後台的發放、作廢）。
-  static const ErrorReason COUPON_INVALID_STATUS =
-      ErrorReason._(49, _omitEnumNames ? '' : 'COUPON_INVALID_STATUS');
 
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
@@ -319,11 +315,10 @@ class ErrorReason extends $pb.ProtobufEnum {
     COUPON_STORE_SUSPENDED,
     COUPON_ISSUE_LIMIT_REACHED,
     COUPON_QUOTA_EXCEEDED,
-    COUPON_INVALID_STATUS,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 49);
+      $pb.ProtobufEnum.$_initByValueList(values, 48);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

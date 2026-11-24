@@ -633,7 +633,7 @@ class ListMyVouchersRequest extends $pb.GeneratedMessage {
           ListMyVouchersRequest.$_createMessage);
   static ListMyVouchersRequest? _defaultInstance;
 
-  /// 預設與上限見 page_size 的說明：0 用預設 20，超過 100 以 100 計，負數回 invalid_argument。
+  /// 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
   @$pb.TagNumber(1)
   $core.int get pageSize => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -795,6 +795,7 @@ class ListClaimableCampaignsRequest extends $pb.GeneratedMessage {
           ListClaimableCampaignsRequest.$_createMessage);
   static ListClaimableCampaignsRequest? _defaultInstance;
 
+  /// 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
   @$pb.TagNumber(1)
   $core.int get pageSize => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -1297,7 +1298,7 @@ class CampaignInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearThresholdAmount() => $_clearField(4);
 
-  /// 店家只能建 ALL、MEMBER、DESIGNATED。
+  /// 店家只能建 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument（消費紀錄的資料還沒有接上）。
   @$pb.TagNumber(5)
   TargetType get targetType => $_getN(4);
   @$pb.TagNumber(5)
@@ -1340,7 +1341,7 @@ class CampaignInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearTotalIssueLimit() => $_clearField(8);
 
-  /// DESIGNATED 的名單（買家 ID，例如 CRM 客戶的 buyer_id），最多 500 位；其他資格不得帶。
+  /// DESIGNATED 的名單（買家 ID），最多 500 位；只能是這家店的 CRM 客戶，不是客戶的 ID 回 invalid_argument；其他資格不得帶。
   @$pb.TagNumber(9)
   $pb.PbList<$core.String> get designatedBuyerIds => $_getList(8);
 }
@@ -1527,6 +1528,7 @@ class ListCampaignsRequest extends $pb.GeneratedMessage {
           ListCampaignsRequest.$_createMessage);
   static ListCampaignsRequest? _defaultInstance;
 
+  /// 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
   @$pb.TagNumber(1)
   $core.int get pageSize => $_getIZ(0);
   @$pb.TagNumber(1)

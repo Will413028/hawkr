@@ -68,7 +68,7 @@ ON CONFLICT (campaign_id, buyer_id) DO NOTHING;
 SELECT EXISTS (
     SELECT 1 FROM coupon.coupon_target_accounts WHERE campaign_id = sqlc.arg(campaign_id) AND buyer_id = sqlc.arg(buyer_id));
 
--- 讀取：賣家的活動列表、買家可領的活動、名單與券數（B7-3a）。分頁一律 keyset（created_at, id）由新到舊。
+-- 讀取：賣家的活動列表、買家可領的活動、名單與券數。分頁一律 keyset（created_at, id）由新到舊。
 
 -- name: ListSellerCampaigns :many
 -- 賣家自己發的活動，不含系統建立的補償活動；status 為 NULL 是全部。
@@ -80,12 +80,14 @@ ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(max_rows);
 
 -- name: ListClaimCandidates :many
--- 買家可能領得到的活動：ACTIVE、不是補償、還有名額、買家還沒有這個活動的券；store_id 有值時只留該店與全平台的活動。
--- 時間窗與資格不在這裡：由 qualify.Check 判定（唯一的判定函式）。
+-- 買家可能領得到的活動：ACTIVE、時間窗涵蓋 now、不是補償、還有名額、買家還沒有這個活動的券、DESIGNATED 的名單有這位買家；store_id 有值時只留該店與全平台的活動。
+-- 店家停權與 MEMBER 資格不在這裡：由 qualify.Check 判定（唯一的判定函式，這裡只是不讓明顯不可能的列進來）。
 SELECT c.* FROM coupon.coupon_campaigns c
 WHERE c.status = 'ACTIVE' AND c.target_type <> 'COMPENSATION'
+  AND c.start_at <= sqlc.arg(now)::timestamptz AND c.end_at >= sqlc.arg(now)::timestamptz
   AND (c.total_limit IS NULL OR c.issued_count < c.total_limit)
   AND (sqlc.narg(store_id)::bigint IS NULL OR c.store_id IS NULL OR c.store_id = sqlc.narg(store_id)::bigint)
+  AND (c.target_type <> 'DESIGNATED' OR EXISTS (SELECT 1 FROM coupon.coupon_target_accounts t WHERE t.campaign_id = c.id AND t.buyer_id = sqlc.arg(buyer_id)))
   AND NOT EXISTS (SELECT 1 FROM coupon.coupon_vouchers v WHERE v.campaign_id = c.id AND v.buyer_id = sqlc.arg(buyer_id))
   AND (sqlc.narg(after_created_at)::timestamptz IS NULL OR (c.created_at, c.id) < (sqlc.narg(after_created_at)::timestamptz, sqlc.narg(after_id)::uuid))
 ORDER BY c.created_at DESC, c.id DESC

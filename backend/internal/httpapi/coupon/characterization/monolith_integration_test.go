@@ -121,7 +121,7 @@ func (s sellerStores) StoreSuspended(ctx context.Context, storeID int64) (bool, 
 	return st.Suspended(), nil
 }
 
-// noMembers 是 MEMBER 資格的 port：投影在 B7-4 才有，這裡的情境不涉及 MEMBER 資格。
+// noMembers 是 MEMBER 資格的 port：投影還沒有接上，這裡的情境不涉及 MEMBER 資格。
 type noMembers struct{}
 
 func (noMembers) IsMember(context.Context, int64, int64) (bool, error) { return false, nil }
@@ -133,6 +133,7 @@ type monolith struct {
 	buyers   *buyer.Module
 	sellers  *seller.Module
 	coupon   *coupon.Module
+	crm      *crm.Module
 	srv      *httptest.Server
 }
 
@@ -145,6 +146,7 @@ func startMonolith(t *testing.T) *monolith {
 		migrate.Module{Name: "accountdeletion", Dir: accountdeletion.Migrations()},
 		migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
 		migrate.Module{Name: "coupon", Dir: coupon.Migrations()},
+		migrate.Module{Name: "crm", Dir: crm.Migrations()},
 	))
 	queue, err := jobs.NewInsertOnly(d)
 	if err != nil {
@@ -165,6 +167,7 @@ func startMonolith(t *testing.T) *monolith {
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noAccountOrders{}, Now: time.Now, Logger: log})
+	crmModule := crm.New(crm.Deps{DB: d, Jobs: queue, Buyers: buyers, Stores: sellers, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	couponModule := coupon.New(coupon.Deps{DB: d, Stores: sellerStores{sellers}, Members: noMembers{}, NewID: uuid.NewV7, Now: time.Now})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
@@ -174,7 +177,7 @@ func startMonolith(t *testing.T) *monolith {
 		Ready: d.Ping, Identity: id, Seller: sellers, Social: &social.Module{}, Buyer: buyers, Images: images, Logger: log, Deletion: deletion,
 		Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellers, Social: &social.Module{}, Now: time.Now, Logger: log}),
 		Stats:      ch.Stats(t), WebOrigin: ch.WebOrigin(t), DashboardOrders: noDashboardOrders{}, DashboardBudget: time.Minute,
-		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, Coupon: couponModule,
+		Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, CRM: crmModule, Coupon: couponModule,
 		IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{},
 		BuyerPorts: httpbuyer.Ports{Stores: sellers},
 	})
@@ -183,7 +186,7 @@ func startMonolith(t *testing.T) *monolith {
 	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &monolith{db: d, identity: id, buyers: buyers, sellers: sellers, coupon: couponModule, srv: srv}
+	return &monolith{db: d, identity: id, buyers: buyers, sellers: sellers, coupon: couponModule, crm: crmModule, srv: srv}
 }
 
 // newCustomer 建立一個 dev session 帳號；withStore 為真時再為它開一家可曝光的店。回傳 token 與身分。
@@ -212,7 +215,7 @@ func (m *monolith) newCustomer(t *testing.T, withStore bool) (string, who) {
 }
 
 // TestMonolith 對單體的 Connect 入口跑同一份情境（D8）。每個情境用自己的一組帳號與店家（買家是 dev session，賣家是 dev session 加一家可曝光的店）；
-// 管理員的準備動作直接呼叫 coupon 模組（admin 的 Connect API 在 B7-3b）。全部情境共用一個資料庫。
+// 管理員的準備動作直接呼叫 coupon 模組（還沒有 admin 的 Connect API）。全部情境共用一個資料庫。
 func TestMonolith(t *testing.T) {
 	m := startMonolith(t)
 	for _, sc := range scenarios {
@@ -221,7 +224,7 @@ func TestMonolith(t *testing.T) {
 		for _, c := range []ch.Caller{ch.Buyer, ch.Buyer2, ch.Seller, ch.Seller2} {
 			tokens[c], ids[c] = m.newCustomer(t, c == ch.Seller || c == ch.Seller2)
 		}
-		d := newConnectDriver(m.srv.Client(), m.srv.URL, tokens, ids, m.coupon, m.db)
+		d := newConnectDriver(m.srv.Client(), m.srv.URL, tokens, ids, m.coupon, m.crm, m.db)
 		ch.Run[Driver](t, d, []ch.Scenario[Driver]{sc})
 	}
 }

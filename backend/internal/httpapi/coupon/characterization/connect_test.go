@@ -18,6 +18,7 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1/couponv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -33,22 +34,23 @@ type who struct{ Account, Buyer, Store string }
 //   - 舊的買家「我的券」是可領模板加已使用的券；單體是可領的活動（ListClaimableCampaigns）加持有的券（ListMyVouchers）。
 //   - 發行張數與上限不在買家的契約裡，driver 直接讀資料庫（只用在驗證計數）。
 //
-// admin 的 Connect API 在 B7-3b：Admin* 直接呼叫 coupon 模組準備資料，錯誤依同一套對應分類。
+// 還沒有 admin 的 Connect API：Admin* 直接呼叫 coupon 模組準備資料，錯誤依同一套對應分類。
 type connectDriver struct {
 	clients map[ch.Caller]couponv1alpha1connect.CouponAppServiceClient
 	ids     map[ch.Caller]who
 	// buyerOf 是帳號 ID 對買家 ID（情境以帳號 ID 指定買家）。
 	buyerOf map[string]string
 	module  *coupon.Module
+	crm     *crm.Module
 	db      *db.DB
 	adminID int64
 }
 
 var _ Driver = (*connectDriver)(nil)
 
-func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller]string, ids map[ch.Caller]who, m *coupon.Module, d *db.DB) *connectDriver {
+func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller]string, ids map[ch.Caller]who, m *coupon.Module, customers *crm.Module, d *db.DB) *connectDriver {
 	drv := &connectDriver{
-		clients: map[ch.Caller]couponv1alpha1connect.CouponAppServiceClient{}, ids: ids, buyerOf: map[string]string{}, module: m, db: d, adminID: 7,
+		clients: map[ch.Caller]couponv1alpha1connect.CouponAppServiceClient{}, ids: ids, buyerOf: map[string]string{}, module: m, crm: customers, db: d, adminID: 7,
 	}
 	for _, w := range ids {
 		drv.buyerOf[w.Account] = w.Buyer
@@ -81,7 +83,6 @@ func (d *connectDriver) Malformed() string               { return "not-a-number"
 var reasonErrors = map[string]error{
 	"COUPON_QUOTA_EXCEEDED":      ErrQuotaExceeded,
 	"COUPON_ISSUE_LIMIT_REACHED": ErrSoldOut,
-	"COUPON_INVALID_STATUS":      ErrWrongStatus,
 	"COUPON_CAMPAIGN_NOT_ACTIVE": ErrNotActive,
 	"COUPON_OUTSIDE_WINDOW":      ErrOutOfWindow,
 	"COUPON_NOT_ELIGIBLE":        ErrNotEligible,
@@ -333,7 +334,32 @@ func (d *connectDriver) Claim(ctx context.Context, c ch.Caller, id string) (Clai
 	return ClaimResult{ClaimedAt: v.GetCreateTime().AsTime().Format(time.RFC3339Nano), VoucherID: v.GetId()}, nil
 }
 
+// ensureCustomers 讓情境指定的買家成為呼叫者這家店的 CRM 客戶（單體只收店家自己的客戶為指定名單；舊服務沒有這個限制）：每位記一筆完成的訂單。
+func (d *connectDriver) ensureCustomers(ctx context.Context, c ch.Caller, accounts []string) error {
+	if len(accounts) == 0 || d.ids[c].Store == "" {
+		return nil
+	}
+	store, err := strconv.ParseInt(d.ids[c].Store, 10, 64)
+	if err != nil {
+		return err
+	}
+	for _, b := range d.buyerIDs(accounts) {
+		buyerID, err := strconv.ParseInt(b, 10, 64)
+		if err != nil {
+			continue
+		}
+		key := "seed-" + d.ids[c].Store + "-" + b
+		if _, err := d.crm.RecordOrderCompleted(ctx, crm.OrderCompleted{EventID: key, OrderNo: key, StoreID: store, BuyerID: buyerID, Amount: 100}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (d *connectDriver) SellerCreate(ctx context.Context, c ch.Caller, in TemplateInput) (Template, error) {
+	if err := d.ensureCustomers(ctx, c, in.BuyerAccounts); err != nil {
+		return Template{}, err
+	}
 	res, err := d.clients[c].CreateCampaign(ctx, connect.NewRequest(&pb.CreateCampaignRequest{Campaign: d.campaignInput(in)}))
 	if err != nil {
 		return Template{}, kindOf(err)
@@ -385,7 +411,7 @@ func (d *connectDriver) SellerRevoke(ctx context.Context, c ch.Caller, id, _ str
 	return kindOf(err)
 }
 
-// 以下是 admin 的準備動作：B7-3b 之前沒有 admin 的 Connect API，直接呼叫 coupon 模組。
+// 以下是 admin 的準備動作：沒有 admin 的 Connect API，直接呼叫 coupon 模組。
 
 func parseID(id string) (uuid.UUID, error) {
 	u, err := uuid.Parse(id)

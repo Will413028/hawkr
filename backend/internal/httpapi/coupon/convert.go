@@ -2,9 +2,9 @@ package coupon
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
-	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -91,13 +91,14 @@ func (h *App) storeCards(ctx context.Context, ids []int64) (map[int64]*commonpb.
 	return out, nil
 }
 
-// designated 把名單的買家 ID 補上暱稱（buyer 的顯示資料）；讀取失敗整個請求失敗。已刪除的買家不設名稱。
+// designated 把名單的買家 ID 補上暱稱（buyer 的顯示資料）；讀取失敗（Unavailable）與買家模組沒有回的買家（名單裡的人必定存在，沒有就是資料不一致）都讓整個請求失敗。
+// buyer 標記為已刪除（Deleted）的買家是契約允許的狀態：不設名稱。
 func (h *App) designated(ctx context.Context, ids []int64) ([]*pb.DesignatedBuyer, error) {
 	displays := make(map[int64]buyer.Display, len(ids))
 	for start := 0; start < len(ids); start += buyer.MaxBatchSize {
 		rows, err := h.buyers.BatchDisplay(ctx, ids[start:min(start+buyer.MaxBatchSize, len(ids))])
 		if err != nil {
-			return nil, err
+			return nil, apperr.WithCause(apperr.Unavailable("暫時無法讀取買家"), err)
 		}
 		for _, d := range rows {
 			displays[d.BuyerID] = d
@@ -105,7 +106,10 @@ func (h *App) designated(ctx context.Context, ids []int64) ([]*pb.DesignatedBuye
 	}
 	out := make([]*pb.DesignatedBuyer, len(ids))
 	for i, id := range ids {
-		d := displays[id]
+		d, ok := displays[id]
+		if !ok {
+			return nil, fmt.Errorf("httpapi/coupon：名單裡的買家 %d 在 buyer 模組沒有資料", id)
+		}
 		b := &pb.DesignatedBuyer{BuyerId: rpc.FormatID(id)}
 		if !d.Deleted {
 			b.Name = d.DisplayName
@@ -148,11 +152,11 @@ func toVoucher(v coupon.VoucherView, cards map[int64]*commonpb.StoreCard, checko
 	return out
 }
 
-// toSellerCampaign 轉成店家看到的活動。店家看的都是自己的活動，不附店家卡片（只有 store_id）；expired 用 Campaign.Expired（到期的唯一定義）對 now 判斷。
-func toSellerCampaign(c coupon.Campaign, now time.Time) *pb.SellerCampaign {
+// toSellerCampaign 轉成店家看到的活動。店家看的都是自己的活動，不附店家卡片（只有 store_id）；expired 由模組用自己的時鐘判斷（到期的唯一定義）。
+func toSellerCampaign(c coupon.Campaign, expired bool) *pb.SellerCampaign {
 	out := &pb.SellerCampaign{
 		Campaign: toCampaign(c, nil), Status: rpc.EnumToProto[pb.CampaignStatus](c.Status),
-		Expired: c.Expired(now), IssuedCount: c.IssuedCount, CreateTime: timestamppb.New(c.CreatedAt),
+		Expired: expired, IssuedCount: c.IssuedCount, CreateTime: timestamppb.New(c.CreatedAt),
 	}
 	if c.TotalLimit != nil {
 		l := *c.TotalLimit

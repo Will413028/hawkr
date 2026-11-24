@@ -120,6 +120,8 @@ func TestListClaimableUsesTheClaimQualification(t *testing.T) {
 	f.campaign(func(in *coupon.CreateCampaignInput) {
 		in.StartAt, in.EndAt = base.Add(-3*windowLen), base.Add(-2*windowLen)
 	})
+	f.sellerCampaign(storeB)
+	f.stores.set(storeB, true)
 	p, err := f.m.ListClaimable(context.Background(), coupon.ClaimableInput{BuyerID: buyer1})
 	if err != nil {
 		t.Fatal(err)
@@ -132,7 +134,7 @@ func TestListClaimableUsesTheClaimQualification(t *testing.T) {
 		}
 	}
 	if !got[open.ID] || got[held.ID] || got[soldOut.ID] || len(p.Campaigns) != 2 {
-		t.Fatalf("可領的活動 = %v，預期只有 open 與一個還有名額的活動", got)
+		t.Fatalf("可領的活動 = %v，預期只有 open 與一個還有名額的活動（停權店家的活動不在內）", got)
 	}
 	f.advance(2 * windowLen)
 	if p, err = f.m.ListClaimable(context.Background(), coupon.ClaimableInput{BuyerID: buyer3}); err != nil || len(p.Campaigns) != 0 {
@@ -180,14 +182,14 @@ func TestSellerCampaignsListAndDetailAreScopedToTheStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Campaigns) != 2 || page.Campaigns[0].ID != a2.ID || page.Campaigns[1].ID != a1.ID {
+	if len(page.Campaigns) != 2 || page.Campaigns[0].Campaign.ID != a2.ID || page.Campaigns[1].Campaign.ID != a1.ID {
 		t.Fatalf("A 店的列表（不含 B 店與補償）：%+v", page.Campaigns)
 	}
 	if page.MaxActive != coupon.DefaultSellerQuota || page.CurrentActive != 2 {
 		t.Fatalf("配額 %d、進行中 %d，預期 %d、2", page.MaxActive, page.CurrentActive, coupon.DefaultSellerQuota)
 	}
-	if page.Campaigns[1].TotalLimit == nil || *page.Campaigns[1].TotalLimit != 3 || page.Campaigns[0].TotalLimit != nil {
-		t.Fatalf("上限 3 與無上限（nil）要分得開：%v / %v", page.Campaigns[1].TotalLimit, page.Campaigns[0].TotalLimit)
+	if page.Campaigns[1].Campaign.TotalLimit == nil || *page.Campaigns[1].Campaign.TotalLimit != 3 || page.Campaigns[0].Campaign.TotalLimit != nil {
+		t.Fatalf("上限 3 與無上限（nil）要分得開：%v / %v", page.Campaigns[1].Campaign.TotalLimit, page.Campaigns[0].Campaign.TotalLimit)
 	}
 	v := f.claim(a1, buyer1)
 	f.mustLock(v, "ORD-9")
@@ -207,5 +209,70 @@ func TestSellerCampaignsListAndDetailAreScopedToTheStore(t *testing.T) {
 	ended, err := f.m.ListSellerCampaigns(context.Background(), coupon.SellerListInput{StoreID: storeA, Status: coupon.StatusEnded})
 	if err != nil || len(ended.Campaigns) != 0 {
 		t.Fatalf("ENDED 篩選：%v %d", err, len(ended.Campaigns))
+	}
+}
+
+// 可領列表的 SQL 先排除別人的 DESIGNATED 活動：它們不該讓列表對 Stores port 發出查詢。
+func TestListClaimableSkipsDesignatedCampaignsOfOtherBuyersBeforeAskingStores(t *testing.T) {
+	f := setup(t)
+	f.sellerCampaign(storeA, func(in *coupon.CreateCampaignInput) {
+		in.TargetType, in.TargetBuyers = coupon.TargetDesignated, []int64{buyer2}
+	})
+	mine := f.sellerCampaign(storeB, func(in *coupon.CreateCampaignInput) {
+		in.TargetType, in.TargetBuyers = coupon.TargetDesignated, []int64{buyer1}
+	})
+	p, err := f.m.ListClaimable(context.Background(), coupon.ClaimableInput{BuyerID: buyer1})
+	if err != nil || len(p.Campaigns) != 1 || p.Campaigns[0].ID != mine.ID {
+		t.Fatalf("可領的活動：err=%v %+v", err, p.Campaigns)
+	}
+	if got := f.stores.calls.Load(); got != 1 {
+		t.Fatalf("Stores 被問了 %d 次，只有 buyer1 在名單內的那一個活動需要問（1 次）", got)
+	}
+}
+
+// 同一頁多張券來自同一家店時，停權狀態只問 Stores 一次。
+func TestListVouchersCheckoutAsksStoresOncePerStore(t *testing.T) {
+	f := setup(t)
+	for range 3 {
+		f.claim(f.sellerCampaign(storeA), buyer1)
+	}
+	f.stores.calls.Store(0)
+	p, err := f.m.ListVouchers(context.Background(), coupon.VoucherListInput{BuyerID: buyer1, Checkout: &coupon.Checkout{StoreID: storeA, OrderAmount: 1000}})
+	if err != nil || len(p.Vouchers) != 3 {
+		t.Fatalf("結帳列表：err=%v %d", err, len(p.Vouchers))
+	}
+	if got := f.stores.calls.Load(); got != 1 {
+		t.Fatalf("Stores 被問了 %d 次，同一家店只該問 1 次", got)
+	}
+	f.stores.calls.Store(0)
+	if _, err := f.m.ListClaimable(context.Background(), coupon.ClaimableInput{BuyerID: buyer2}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.stores.calls.Load(); got != 1 {
+		t.Fatalf("可領列表的 3 個同店活動問了 Stores %d 次，應是 1 次", got)
+	}
+}
+
+// expired 由模組的時鐘判斷：時間窗過了，列表與明細都是 true，之前是 false。
+func TestSellerCampaignExpiredFollowsTheModuleClock(t *testing.T) {
+	f := setup(t)
+	c := f.sellerCampaign(storeA)
+	list := func() (bool, bool) {
+		p, err := f.m.ListSellerCampaigns(context.Background(), coupon.SellerListInput{StoreID: storeA})
+		if err != nil || len(p.Campaigns) != 1 {
+			t.Fatalf("列表：%v %d", err, len(p.Campaigns))
+		}
+		d, err := f.m.GetSellerCampaign(context.Background(), storeA, c.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return p.Campaigns[0].Expired, d.Expired
+	}
+	if l, d := list(); l || d {
+		t.Fatalf("時間窗內：列表 %v、明細 %v，都該是 false", l, d)
+	}
+	f.advance(2 * windowLen)
+	if l, d := list(); !l || !d {
+		t.Fatalf("時間窗過了：列表 %v、明細 %v，都該是 true", l, d)
 	}
 }

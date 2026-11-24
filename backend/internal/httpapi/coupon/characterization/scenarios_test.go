@@ -144,6 +144,12 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 	{Name: "seller member template is accepted", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
+		if !d.Legacy() {
+			// 單體在消費紀錄的資料接上之前，賣家不能建 MEMBER 活動。
+			_, err := d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetMember))
+			ch.WantKind(t, err, ch.ErrInvalid)
+			return
+		}
 		created := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetMember))))
 		if got := mustFind(ctx, t, d, created.ID); got.Target != TargetMember || got.Status != StatusActive {
 			t.Errorf("target/status = %s/%s，預期 MEMBER/ACTIVE", got.Target, got.Status)
@@ -636,7 +642,7 @@ func mustDetail(ctx context.Context, t ch.T, d Driver, c ch.Caller, id string) S
 	return ch.Must(t, ch.Ret(d.SellerDetail(ctx, c, id)))
 }
 
-// skipWithoutAdminRPC 在沒有 admin 對外 API 的 driver 跳過專門驗 admin RPC 行為的情境（Connect 的 admin API 在 B7-3b）。回傳 true 時情境直接結束。
+// skipWithoutAdminRPC 在沒有 admin 對外 API 的 driver 跳過專門驗 admin RPC 行為的情境（Connect 還沒有 admin API）。回傳 true 時情境直接結束。
 func skipWithoutAdminRPC(t ch.T, d Driver) bool {
 	if d.AdminRPC() {
 		return false
@@ -645,7 +651,7 @@ func skipWithoutAdminRPC(t ch.T, d Driver) bool {
 	if !ok {
 		panic("skipWithoutAdminRPC：這個 T 不能跳過，情境不能靜默通過")
 	}
-	s.Skipf("admin 的 Connect API 在 B7-3b：這個情境驗的是 admin RPC 本身")
+	s.Skipf("Connect 還沒有 admin API：這個情境驗的是 admin RPC 本身")
 	return true
 }
 

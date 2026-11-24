@@ -239,7 +239,7 @@ export const CheckoutSchema: GenMessage<Checkout> = /*@__PURE__*/
  */
 export type ListMyVouchersRequest = Message<"hawkr.coupon.v1alpha1.ListMyVouchersRequest"> & {
   /**
-   * 預設與上限見 page_size 的說明：0 用預設 20，超過 100 以 100 計，負數回 invalid_argument。
+   * 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
    *
    * @generated from field: int32 page_size = 1;
    */
@@ -297,6 +297,8 @@ export const ListMyVouchersResponseSchema: GenMessage<ListMyVouchersResponse> = 
  */
 export type ListClaimableCampaignsRequest = Message<"hawkr.coupon.v1alpha1.ListClaimableCampaignsRequest"> & {
   /**
+   * 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+   *
    * @generated from field: int32 page_size = 1;
    */
   pageSize: number;
@@ -470,7 +472,7 @@ export type CampaignInput = Message<"hawkr.coupon.v1alpha1.CampaignInput"> & {
   thresholdAmount: bigint;
 
   /**
-   * 店家只能建 ALL、MEMBER、DESIGNATED。
+   * 店家只能建 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument（消費紀錄的資料還沒有接上）。
    *
    * @generated from field: hawkr.coupon.v1alpha1.TargetType target_type = 5;
    */
@@ -496,7 +498,7 @@ export type CampaignInput = Message<"hawkr.coupon.v1alpha1.CampaignInput"> & {
   totalIssueLimit?: number | undefined;
 
   /**
-   * DESIGNATED 的名單（買家 ID，例如 CRM 客戶的 buyer_id），最多 500 位；其他資格不得帶。
+   * DESIGNATED 的名單（買家 ID），最多 500 位；只能是這家店的 CRM 客戶，不是客戶的 ID 回 invalid_argument；其他資格不得帶。
    *
    * @generated from field: repeated string designated_buyer_ids = 9;
    */
@@ -549,6 +551,8 @@ export const CreateCampaignResponseSchema: GenMessage<CreateCampaignResponse> = 
  */
 export type ListCampaignsRequest = Message<"hawkr.coupon.v1alpha1.ListCampaignsRequest"> & {
   /**
+   * 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+   *
    * @generated from field: int32 page_size = 1;
    */
   pageSize: number;

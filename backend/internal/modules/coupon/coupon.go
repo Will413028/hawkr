@@ -78,6 +78,7 @@ type (
 	CampaignPage       = read.CampaignPage
 	SellerListInput    = read.SellerListInput
 	SellerCampaignPage = read.SellerCampaignPage
+	SellerCampaign     = read.SellerCampaign
 	CampaignDetail     = read.CampaignDetail
 )
 
@@ -112,6 +113,7 @@ const (
 	MaxIssueBatch      = model.MaxIssueBatch
 	MaxTargetBuyers    = model.MaxTargetBuyers
 	MaxOrderNoLen      = model.MaxOrderNoLen
+	MaxOrderAmount     = model.MaxOrderAmount
 	DefaultSellerQuota = model.DefaultSellerQuota
 
 	ReasonCampaignNotFound          = model.ReasonCampaignNotFound

@@ -2,7 +2,7 @@
 // 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
 //
 // 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 Java coupon-service，Connect driver（connect_test.go、
-// monolith_integration_test.go）打單體的 CouponAppService。admin 的 Connect API 在 B7-3b 才有：在那之前 Connect driver 的 Admin* 直接呼叫
+// monolith_integration_test.go）打單體的 CouponAppService。Connect 還沒有 admin 的 API：Connect driver 的 Admin* 直接呼叫
 // coupon 模組（只用來準備資料），涵蓋 admin RPC 本身的情境在 Connect 一端以 AdminRPC() 略過。
 //
 // 情境鎖定的是 Java coupon-service 當時的行為，沒有驗證那行為是否正確；疑似缺陷處以 BD 編號標明
@@ -193,7 +193,7 @@ type IssueResult struct {
 type Driver interface {
 	// Legacy 回報這是不是對舊的 coupon-service 跑（skipOnLegacy 用）。
 	Legacy() bool
-	// AdminRPC 回報這個 driver 是不是經 admin 的對外 API 操作（REST 是，Connect 在 B7-3b 之前不是）；不是的話，專門驗 admin RPC 行為的情境略過。
+	// AdminRPC 回報這個 driver 是不是經 admin 的對外 API 操作（REST 是，Connect 目前不是）；不是的話，專門驗 admin RPC 行為的情境略過。
 	AdminRPC() bool
 
 	// StoreOf 是呼叫者（賣家）的店家 ID；BuyerAccount 與 BuyerID 是呼叫者（買家）的帳號 ID 與買家 ID。REST 是種子帳號的固定值，

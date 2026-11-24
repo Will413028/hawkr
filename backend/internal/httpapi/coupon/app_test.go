@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
+	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -122,6 +123,24 @@ func (f *fakeBuyers) BatchDisplay(context.Context, []int64) ([]buyer.Display, er
 	return f.displays, f.err
 }
 
+// fakeCustomers 是店家的客戶：customers 之外的買家回 NotFound；err 非空時讀取失敗。
+type fakeCustomers struct {
+	customers map[int64]bool
+	err       error
+	asked     []int64
+}
+
+func (f *fakeCustomers) GetCustomer(_ context.Context, storeID, buyerID int64) (crm.Customer, error) {
+	f.asked = append(f.asked, buyerID)
+	if f.err != nil {
+		return crm.Customer{}, f.err
+	}
+	if storeID != callerStoreID || !f.customers[buyerID] {
+		return crm.Customer{}, apperr.NotFound("no customer")
+	}
+	return crm.Customer{BuyerID: buyerID}, nil
+}
+
 // fakeStores 記下 ActingStore 被要求的能力；suspended 時回停權的拒絕。
 type fakeStores struct {
 	suspended bool
@@ -146,6 +165,7 @@ type rig struct {
 	app    *App
 	module *fakeModule
 	buyers *fakeBuyers
+	custs  *fakeCustomers
 	stores *fakeStores
 }
 
@@ -155,8 +175,8 @@ func newRig(t *testing.T) *rig {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := &rig{module: &fakeModule{}, buyers: &fakeBuyers{}, stores: &fakeStores{}}
-	r.app, err = NewApp(r.module, r.buyers, r.stores, im, func() time.Time { return now }, slog.New(slog.DiscardHandler))
+	r := &rig{module: &fakeModule{}, buyers: &fakeBuyers{}, custs: &fakeCustomers{customers: map[int64]bool{9: true, 10: true}}, stores: &fakeStores{}}
+	r.app, err = NewApp(r.module, r.buyers, r.custs, r.stores, im, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +243,7 @@ func TestDeclarationsMatchTheServiceAndDriveTheCapabilityCheck(t *testing.T) {
 		missing[k] = v
 	}
 	delete(missing, couponv1alpha1connect.CouponAppServiceGetCampaignProcedure)
-	if _, err := newApp(missing, r.module, r.buyers, r.stores, r.app.images, r.app.now, r.app.log); err == nil {
+	if _, err := newApp(missing, r.module, r.buyers, r.custs, r.stores, r.app.images, r.app.log); err == nil {
 		t.Fatal("缺宣告要不能啟動")
 	}
 }
@@ -255,12 +275,12 @@ func TestCreateCampaignDistinguishesNoLimitFromZero(t *testing.T) {
 
 func TestSellerCampaignWireKeepsNoLimitUnset(t *testing.T) {
 	c := campaign()
-	if got := toSellerCampaign(c, now); got.TotalIssueLimit != nil {
+	if got := toSellerCampaign(c, false); got.TotalIssueLimit != nil {
 		t.Fatalf("無上限的活動 total_issue_limit 應不設，得到 %d", got.GetTotalIssueLimit())
 	}
 	limit := int32(1)
 	c.TotalLimit = &limit
-	if got := toSellerCampaign(c, now); got.TotalIssueLimit == nil || got.GetTotalIssueLimit() != 1 {
+	if got := toSellerCampaign(c, false); got.TotalIssueLimit == nil || got.GetTotalIssueLimit() != 1 {
 		t.Fatalf("上限 1 的活動 total_issue_limit = %v", got.TotalIssueLimit)
 	}
 }
@@ -293,7 +313,7 @@ func TestCreateCampaignRejectsSelfDesignation(t *testing.T) {
 
 func TestEndCampaignIsScopedToTheActingStore(t *testing.T) {
 	r := newRig(t)
-	r.module.detail = coupon.CampaignDetail{Campaign: campaign()}
+	r.module.detail = coupon.CampaignDetail{SellerCampaign: coupon.SellerCampaign{Campaign: campaign()}}
 	res, err := r.app.EndCampaign(signedIn(), connect.NewRequest(&pb.EndCampaignRequest{CampaignId: campID.String()}))
 	if err != nil || r.module.endIn.StoreID != callerStoreID || r.module.endIn.CampaignID != campID || res.Msg.GetVoidedVouchers() != 3 {
 		t.Fatalf("err=%v in=%+v voided=%d", err, r.module.endIn, res.Msg.GetVoidedVouchers())
@@ -312,10 +332,119 @@ func TestDisplayDataFailureFailsTheRequest(t *testing.T) {
 	if codeOf(err) != connect.CodeUnavailable {
 		t.Fatalf("店家卡片讀取失敗應整個請求失敗（unavailable），得到 %v", err)
 	}
-	r.module.detail = coupon.CampaignDetail{Campaign: campaign(), TargetBuyers: []int64{9}}
+	r.module.detail = coupon.CampaignDetail{SellerCampaign: coupon.SellerCampaign{Campaign: campaign()}, TargetBuyers: []int64{9}}
 	r.buyers.err = errors.New("buyer down")
-	if _, err := r.app.GetCampaign(signedIn(), connect.NewRequest(&pb.GetCampaignRequest{CampaignId: campID.String()})); err == nil {
-		t.Fatal("買家顯示資料讀取失敗應整個請求失敗")
+	if _, err := r.app.GetCampaign(signedIn(), connect.NewRequest(&pb.GetCampaignRequest{CampaignId: campID.String()})); codeOf(err) != connect.CodeUnavailable {
+		t.Fatalf("買家顯示資料讀取失敗應整個請求失敗（unavailable，與店家卡片同一種分類），得到 %v", err)
+	}
+}
+
+// 名單裡的買家：buyer 標為已刪除的不設名稱；buyer 模組沒有回的買家是資料不一致，整個請求失敗，不補成空名稱。
+func TestDesignatedBuyersDeletedIsEmptyNameAndMissingFailsTheRequest(t *testing.T) {
+	r := newRig(t)
+	name := "小明"
+	r.module.detail = coupon.CampaignDetail{SellerCampaign: coupon.SellerCampaign{Campaign: campaign()}, TargetBuyers: []int64{9, 10}}
+	r.buyers.displays = []buyer.Display{{BuyerID: 9, DisplayName: &name}, {BuyerID: 10, Deleted: true}}
+	res, err := r.app.GetCampaign(signedIn(), connect.NewRequest(&pb.GetCampaignRequest{CampaignId: campID.String()}))
+	if err != nil || len(res.Msg.GetDesignatedBuyers()) != 2 {
+		t.Fatalf("err=%v %v", err, res.Msg.GetDesignatedBuyers())
+	}
+	if b := res.Msg.GetDesignatedBuyers(); b[0].GetName() != "小明" || b[1].GetName() != "" {
+		t.Fatalf("名稱 = %q / %q，預期 小明 與 空（已刪除）", b[0].GetName(), b[1].GetName())
+	}
+	r.buyers.displays = []buyer.Display{{BuyerID: 9, DisplayName: &name}}
+	_, err = r.app.GetCampaign(signedIn(), connect.NewRequest(&pb.GetCampaignRequest{CampaignId: campID.String()}))
+	if err == nil || codeOf(err) != connect.CodeInternal {
+		t.Fatalf("buyer 沒有回名單裡的買家要整個請求失敗（internal）：%v", err)
+	}
+}
+
+// expired 取自模組（它的時鐘），handler 不另外判斷。
+func TestSellerCampaignExpiredComesFromTheModule(t *testing.T) {
+	r := newRig(t)
+	r.module.list = coupon.SellerCampaignPage{Campaigns: []coupon.SellerCampaign{{Campaign: campaign(), Expired: true}}}
+	r.module.detail = coupon.CampaignDetail{SellerCampaign: coupon.SellerCampaign{Campaign: campaign(), Expired: true}}
+	list, err := r.app.ListCampaigns(signedIn(), connect.NewRequest(&pb.ListCampaignsRequest{}))
+	if err != nil || !list.Msg.GetCampaigns()[0].GetExpired() {
+		t.Fatalf("列表：err=%v %v", err, list.Msg.GetCampaigns())
+	}
+	got, err := r.app.GetCampaign(signedIn(), connect.NewRequest(&pb.GetCampaignRequest{CampaignId: campID.String()}))
+	if err != nil || !got.Msg.GetCampaign().GetExpired() {
+		t.Fatalf("明細：err=%v %v", err, got.Msg.GetCampaign())
+	}
+	r.module.list = coupon.SellerCampaignPage{Campaigns: []coupon.SellerCampaign{{Campaign: campaign()}}}
+	list, err = r.app.ListCampaigns(signedIn(), connect.NewRequest(&pb.ListCampaignsRequest{}))
+	if err != nil || list.Msg.GetCampaigns()[0].GetExpired() {
+		t.Fatalf("模組說沒到期就不到期：err=%v %v", err, list.Msg.GetCampaigns())
+	}
+}
+
+// MEMBER 的消費紀錄資料還沒有接上：店家不能建 MEMBER 活動，擋在入口，不呼叫模組。
+func TestCreateCampaignRejectsMemberTargetType(t *testing.T) {
+	r := newRig(t)
+	in := cashInput()
+	in.TargetType = pb.TargetType_TARGET_TYPE_MEMBER
+	_, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in}))
+	_, fields := reasonAndFields(err)
+	if codeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fields, []string{"campaign.target_type"}) || len(r.module.calls) != 0 {
+		t.Fatalf("MEMBER：code=%v fields=%v calls=%v", codeOf(err), fields, r.module.calls)
+	}
+}
+
+// 指定發放的名單只收這家店的客戶：不是客戶的回 invalid_argument 並指出第幾個，不呼叫模組；crm 讀取失敗整個失敗。
+func TestCreateCampaignDesignatedListMustBeStoreCustomers(t *testing.T) {
+	r := newRig(t)
+	r.module.created = campaign()
+	in := cashInput()
+	in.TargetType = pb.TargetType_TARGET_TYPE_DESIGNATED
+	in.DesignatedBuyerIds = []string{"9", "77"}
+	_, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in}))
+	_, fields := reasonAndFields(err)
+	if codeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fields, []string{"campaign.designated_buyer_ids[1]"}) || len(r.module.calls) != 0 {
+		t.Fatalf("非客戶：code=%v fields=%v calls=%v", codeOf(err), fields, r.module.calls)
+	}
+	in.DesignatedBuyerIds = []string{"9", "10"}
+	if _, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in})); err != nil || !slices.Equal(r.module.createIn.TargetBuyers, []int64{9, 10}) {
+		t.Fatalf("全是客戶：err=%v in=%+v", err, r.module.createIn)
+	}
+	r.module.calls = nil
+	r.custs.err = errors.New("crm down")
+	if _, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in})); err == nil || codeOf(err) == connect.CodeInvalidArgument || len(r.module.calls) != 0 {
+		t.Fatalf("crm 讀取失敗要整個請求失敗（不是 invalid_argument）：%v calls=%v", err, r.module.calls)
+	}
+}
+
+// 結帳的 order_amount 超過上限：錢包空與不空都回同一個 invalid_argument，欄位是 checkout.order_amount，模組沒被呼叫。
+func TestListMyVouchersRejectsOrderAmountAboveTheMaximum(t *testing.T) {
+	for name, wallet := range map[string]coupon.VoucherPage{
+		"empty wallet": {},
+		"has vouchers": {Vouchers: []coupon.VoucherView{{Voucher: coupon.Voucher{ID: voucherA, CreatedAt: now}, Campaign: campaign()}}},
+	} {
+		r := newRig(t)
+		r.module.vouchers = wallet
+		co := &pb.Checkout{StoreId: "11", OrderAmount: coupon.MaxOrderAmount + 1}
+		_, err := r.app.ListMyVouchers(signedIn(), connect.NewRequest(&pb.ListMyVouchersRequest{Checkout: co}))
+		_, fields := reasonAndFields(err)
+		if codeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fields, []string{"checkout.order_amount"}) || len(r.module.calls) != 0 {
+			t.Errorf("%s：code=%v fields=%v calls=%v", name, codeOf(err), fields, r.module.calls)
+		}
+		co.OrderAmount = coupon.MaxOrderAmount
+		if _, err := r.app.ListMyVouchers(signedIn(), connect.NewRequest(&pb.ListMyVouchersRequest{Checkout: co})); err != nil {
+			t.Errorf("%s：上限本身要接受：%v", name, err)
+		}
+	}
+}
+
+// 賣家的列表與明細宣告收縮類能力：停權的店家仍能找出活動 ID 並結束它。
+func TestSellerReadsDeclareTheContractionCapability(t *testing.T) {
+	r := newRig(t)
+	for _, p := range []string{couponv1alpha1connect.CouponAppServiceListCampaignsProcedure, couponv1alpha1connect.CouponAppServiceGetCampaignProcedure, couponv1alpha1connect.CouponAppServiceEndCampaignProcedure} {
+		if _, err := r.app.actingStore(signedIn(), p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !slices.Equal(r.stores.asked, []seller.Capability{seller.CapContentContract, seller.CapContentContract, seller.CapContentContract}) {
+		t.Fatalf("向 seller 要的能力 = %v，預期三個都是 CAP_CONTENT_CONTRACT", r.stores.asked)
 	}
 }
 
@@ -404,7 +533,7 @@ func TestErrorLocaleFollowsTheRequestLocale(t *testing.T) {
 	r := newRig(t)
 	r.module.err = nil
 	failing := &localizedModule{fakeModule: r.module}
-	app, err := NewApp(failing, r.buyers, r.stores, r.app.images, r.app.now, r.app.log)
+	app, err := NewApp(failing, r.buyers, r.custs, r.stores, r.app.images, r.app.log)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -111,6 +111,7 @@ func (s *Service) ListVouchers(ctx context.Context, in VoucherListInput) (Vouche
 	}
 	want := size(in.Size)
 	now := s.d.Now()
+	qualifier := s.d.Qualify.PerRequest()
 	var out VoucherPage
 	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -131,7 +132,7 @@ func (s *Service) ListVouchers(ctx context.Context, in VoucherListInput) (Vouche
 				c := campaigns[v.CampaignID]
 				view := VoucherView{Voucher: v, Campaign: c, Expired: c.Expired(now)}
 				if in.Checkout != nil {
-					discount, ok, err := s.usable(ctx, c, in.BuyerID, *in.Checkout, now)
+					discount, ok, err := usable(ctx, qualifier, c, in.BuyerID, *in.Checkout, now)
 					if err != nil {
 						return err
 					}
@@ -178,8 +179,8 @@ func (s *Service) campaigns(ctx context.Context, q *store.Queries, vs []store.Co
 
 // usable 回報這張券（的活動）在結帳情境下現在能不能用：與鎖券同一組檢查（Check、Fit、折抵大於 0）。業務上的不合格是 ok=false，
 // 讀不到資料（port 失敗）回錯誤，整個請求失敗。
-func (s *Service) usable(ctx context.Context, c model.Campaign, buyerID int64, co Checkout, now time.Time) (int64, bool, error) {
-	if err := s.d.Qualify.Check(ctx, c, buyerID, now); err != nil {
+func usable(ctx context.Context, qualifier *qualify.Service, c model.Campaign, buyerID int64, co Checkout, now time.Time) (int64, bool, error) {
+	if err := qualifier.Check(ctx, c, buyerID, now); err != nil {
 		return 0, false, rejection(err)
 	}
 	discount, err := qualify.Fit(ctx, c, co.StoreID, co.OrderAmount)
@@ -228,6 +229,7 @@ func (s *Service) ListClaimable(ctx context.Context, in ClaimableInput) (Campaig
 	}
 	want := size(in.Size)
 	now := s.d.Now()
+	qualifier := s.d.Qualify.PerRequest()
 	var out CampaignPage
 	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -235,13 +237,13 @@ func (s *Service) ListClaimable(ctx context.Context, in ClaimableInput) (Campaig
 		for {
 			at, id := after.args()
 			batch, err := q.ListClaimCandidates(ctx, store.ListClaimCandidatesParams{
-				StoreID: storeID, BuyerID: in.BuyerID, AfterCreatedAt: at, AfterID: id, MaxRows: scanBatch})
+				StoreID: storeID, BuyerID: in.BuyerID, Now: now, AfterCreatedAt: at, AfterID: id, MaxRows: scanBatch})
 			if err != nil {
 				return err
 			}
 			for _, row := range batch {
 				c := rows.Campaign(row)
-				if err := s.d.Qualify.Check(ctx, c, in.BuyerID, now); err != nil {
+				if err := qualifier.Check(ctx, c, in.BuyerID, now); err != nil {
 					if rejection(err) != nil {
 						return err
 					}
@@ -274,9 +276,16 @@ type SellerListInput struct {
 
 // SellerCampaignPage 是一頁賣家活動，加上店家的配額與同時進行中的活動數（與建立時的配額檢查同一個口徑）。
 type SellerCampaignPage struct {
-	CampaignPage
+	Campaigns     []SellerCampaign
+	Next          *Cursor
 	MaxActive     int32
 	CurrentActive int32
+}
+
+// SellerCampaign 是賣家看到的一個活動；Expired 用模組的時鐘從 EndAt 推導（與 VoucherView 同一個口徑）。
+type SellerCampaign struct {
+	Campaign model.Campaign
+	Expired  bool
 }
 
 // ListSellerCampaigns 列出店家自己發的活動，新到舊。
@@ -290,6 +299,7 @@ func (s *Service) ListSellerCampaigns(ctx context.Context, in SellerListInput) (
 		status = &v
 	}
 	want := size(in.Size)
+	now := s.d.Now()
 	var out SellerCampaignPage
 	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -301,17 +311,18 @@ func (s *Service) ListSellerCampaigns(ctx context.Context, in SellerListInput) (
 		}
 		for i, row := range batch {
 			if i == want {
-				last := out.Campaigns[len(out.Campaigns)-1]
+				last := out.Campaigns[len(out.Campaigns)-1].Campaign
 				out.Next = &Cursor{At: last.CreatedAt, ID: last.ID}
 				break
 			}
-			out.Campaigns = append(out.Campaigns, rows.Campaign(row))
+			c := rows.Campaign(row)
+			out.Campaigns = append(out.Campaigns, SellerCampaign{Campaign: c, Expired: c.Expired(now)})
 		}
 		out.MaxActive, err = s.quota(ctx, q, in.StoreID)
 		if err != nil {
 			return err
 		}
-		n, err := q.CountActiveSellerCampaigns(ctx, store.CountActiveSellerCampaignsParams{StoreID: &in.StoreID, Now: s.d.Now()})
+		n, err := q.CountActiveSellerCampaigns(ctx, store.CountActiveSellerCampaignsParams{StoreID: &in.StoreID, Now: now})
 		out.CurrentActive = int32(min(n, math.MaxInt32)) //nolint:gosec // 夾在 int32 範圍內
 		return err
 	})
@@ -328,7 +339,7 @@ func (s *Service) quota(ctx context.Context, q *store.Queries, storeID int64) (i
 
 // CampaignDetail 是賣家看到的活動明細：名單（DESIGNATED）與各狀態的券數。
 type CampaignDetail struct {
-	Campaign     model.Campaign
+	SellerCampaign
 	TargetBuyers []int64
 	Available    int32
 	Locked       int32
@@ -355,7 +366,7 @@ func (s *Service) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.
 		if c.IssuerStoreID == nil || *c.IssuerStoreID != storeID || c.TargetType == model.TargetCompensation {
 			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
-		out.Campaign = c
+		out.SellerCampaign = SellerCampaign{Campaign: c, Expired: c.Expired(s.d.Now())}
 		if out.TargetBuyers, err = q.ListTargetBuyers(ctx, id); err != nil {
 			return err
 		}

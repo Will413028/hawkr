@@ -76,7 +76,7 @@
    "id": "buyer-display-failure-degrades",
    "stack": "go",
    "file": "backend/internal/httpapi/coupon/convert.go",
-   "old": "\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tfor _, d := range rows {",
+   "old": "\t\tif err != nil {\n\t\t\treturn nil, apperr.WithCause(apperr.Unavailable(\"暫時無法讀取買家\"), err)\n\t\t}\n\t\tfor _, d := range rows {",
    "new": "\t\tif err != nil {\n\t\t\tcontinue\n\t\t}\n\t\tfor _, d := range rows {",
    "test": "internal/httpapi/coupon ^TestDisplayDataFailureFailsTheRequest$",
    "why": "買家顯示資料讀取失敗時照常回明細（暱稱留空），不整個失敗（D3 出站），測試要紅。"
@@ -94,8 +94,8 @@
    "id": "end-campaign-wrong-capability",
    "stack": "go",
    "file": "backend/internal/httpapi/coupon/declaration.go",
-   "old": "requires(seller.CapContentContract)",
-   "new": "requires(seller.CapMarketing)",
+   "old": "EndCampaignProcedure:    requires(seller.CapContentContract)",
+   "new": "EndCampaignProcedure:    requires(seller.CapMarketing)",
    "test": "internal/httpapi/coupon ^TestDeclarationsMatchTheServiceAndDriveTheCapabilityCheck$",
    "why": "結束活動改成需要 CAP_MARKETING：停權的店家不能再自清活動（收縮型動作要留給停權店家），測試要紅。"
   },
@@ -139,10 +139,10 @@
    "id": "claimable-skips-qualification",
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/read/read.go",
-   "old": "\t\t\t\tif err := s.d.Qualify.Check(ctx, c, in.BuyerID, now); err != nil {\n\t\t\t\t\tif rejection(err) != nil {\n\t\t\t\t\t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\tcontinue\n\t\t\t\t}\n",
+   "old": "\t\t\t\tif err := qualifier.Check(ctx, c, in.BuyerID, now); err != nil {\n\t\t\t\t\tif rejection(err) != nil {\n\t\t\t\t\t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\tcontinue\n\t\t\t\t}\n",
    "new": "\t\t\t\t_ = now\n",
    "test": "internal/modules/coupon ^TestListClaimableUsesTheClaimQualification$",
-   "why": "可領列表不再問資格判定：列出領不到的活動（指定名單以外、時間窗外），列表與領券又成兩份規則（BD1、BD2、BD11），測試要紅。"
+   "why": "可領列表不再問資格判定：列出停權店家的活動等領不到的活動，列表與領券又成兩份規則（BD1、BD2、BD11），測試要紅。"
   },
   {
    "id": "seller-detail-not-scoped",
@@ -161,6 +161,105 @@
    "new": "\tdiscount, err := qualify.Fit(ctx, c, co.StoreID, co.OrderAmount)\n\tif err != nil {\n\t\treturn 0, true, nil\n\t}\n",
    "test": "internal/modules/coupon ^TestListVouchersCheckoutUsesTheLockChecks$",
    "why": "結帳列表不套用店家範圍與門檻：列出鎖不了的券（validate 與 reserve 兩套規則，BD1、BD2），測試要紅。"
+  },
+  {
+   "id": "end-campaign-allows-store-ending-compensation",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/campaign/campaign.go",
+   "old": " || model.TargetType(row.TargetType) == model.TargetCompensation) {",
+   "new": "){",
+   "test": "internal/modules/coupon ^TestEndCampaignRejectsStoreEndingACompensationCampaign$",
+   "why": "店家結束補償活動不再回 NotFound：買家的補償券被作廢，測試要紅。"
+  },
+  {
+   "id": "seller-member-campaign-accepted",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "if in.GetTargetType() == pb.TargetType_TARGET_TYPE_MEMBER {",
+   "new": "if false {",
+   "test": "internal/httpapi/coupon ^TestCreateCampaignRejectsMemberTargetType$",
+   "why": "賣家能建 MEMBER 活動：投影接上之前，所有買家的可領列表與結帳券列表都因 Members port 失敗，測試要紅。"
+  },
+  {
+   "id": "designated-list-accepts-non-customers",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "if err := h.requireCustomers(ctx, st.StoreID, in.GetDesignatedBuyerIds(), buyers); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/httpapi/coupon ^TestCreateCampaignDesignatedListMustBeStoreCustomers$",
+   "why": "指定名單不檢查是不是這家店的客戶：賣家可探測任意買家的暱稱，測試要紅。"
+  },
+  {
+   "id": "order-amount-above-max-not-validated",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": " || co.GetOrderAmount() > coupon.MaxOrderAmount {",
+   "new": " {",
+   "test": "internal/httpapi/coupon ^TestListMyVouchersRejectsOrderAmountAboveTheMaximum$",
+   "why": "超過上限的 order_amount 不在入口擋：結果依錢包有沒有券而不同、錯誤沒有欄位路徑，測試要紅。"
+  },
+  {
+   "id": "seller-reads-require-marketing-capability",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/declaration.go",
+   "old": "ListCampaignsProcedure:  requires(seller.CapContentContract)",
+   "new": "ListCampaignsProcedure:  requires(seller.CapMarketing)",
+   "test": "internal/httpapi/coupon ^TestSellerReadsDeclareTheContractionCapability$",
+   "why": "列表改要 CAP_MARKETING：停權的店家找不到活動 ID 來結束，測試要紅。"
+  },
+  {
+   "id": "expired-computed-by-handler-clock",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/convert.go",
+   "old": "Expired: expired,",
+   "new": "Expired: false,",
+   "test": "internal/httpapi/coupon ^TestSellerCampaignExpiredComesFromTheModule$",
+   "why": "SellerCampaign.expired 不採用模組的判斷，測試要紅。"
+  },
+  {
+   "id": "module-expired-ignores-clock",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/read/read.go",
+   "old": "SellerCampaign{Campaign: c, Expired: c.Expired(now)}",
+   "new": "SellerCampaign{Campaign: c}",
+   "test": "internal/modules/coupon ^TestSellerCampaignExpiredFollowsTheModuleClock$",
+   "why": "列表的 expired 不從模組時鐘推導，時間窗過了仍是 false，測試要紅。"
+  },
+  {
+   "id": "designated-missing-buyer-becomes-empty-name",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/convert.go",
+   "old": "if !ok {\n\t\t\treturn nil, fmt.Errorf(\"httpapi/coupon：名單裡的買家 %d 在 buyer 模組沒有資料\", id)\n\t\t}\n",
+   "new": "_ = ok\n",
+   "test": "internal/httpapi/coupon ^TestDesignatedBuyersDeletedIsEmptyNameAndMissingFailsTheRequest$",
+   "why": "buyer 沒回的名單買家被補成空名稱，與已刪除無法分辨，測試要紅。"
+  },
+  {
+   "id": "designated-display-failure-raw",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/convert.go",
+   "old": "return nil, apperr.WithCause(apperr.Unavailable(\"暫時無法讀取買家\"), err)",
+   "new": "return nil, err",
+   "test": "internal/httpapi/coupon ^TestDisplayDataFailureFailsTheRequest$",
+   "why": "買家顯示資料讀取失敗不分類成 Unavailable（與店家卡片不同），測試要紅。"
+  },
+  {
+   "id": "claimable-sql-lists-other-buyers-designated",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "  AND (c.target_type <> 'DESIGNATED' OR EXISTS",
+   "new": "  AND (TRUE OR EXISTS",
+   "test": "internal/modules/coupon ^TestListClaimableSkipsDesignatedCampaignsOfOtherBuyersBeforeAskingStores$",
+   "why": "可領列表的 SQL 不先排除別人的 DESIGNATED 活動：它們讓列表對 Stores 多發查詢，測試要紅。"
+  },
+  {
+   "id": "per-request-store-cache-bypassed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/qualify/qualify.go",
+   "old": "\td.Stores = &storeCache{inner: s.d.Stores, suspended: map[int64]bool{}}\n",
+   "new": "",
+   "test": "internal/modules/coupon ^TestListVouchersCheckoutAsksStoresOncePerStore$",
+   "why": "列表每一列各問一次店家停權：N 張券 N 次 port 呼叫，測試要紅。"
   }
  ]
 }

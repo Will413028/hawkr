@@ -26,11 +26,12 @@ func exempt(reason string) declaration { return declaration{exemptReason: reason
 const buyerOnlyReason = "只有買家身分能做的動作（店家沒有對應的動作），沒有賣家能力可宣告"
 
 // declarations 是每個 CouponAppService 方法的宣告，key 是生成的 procedure 常數。方法與宣告必須一一對應（NewApp 時檢查，缺了或多了都不能啟動）。
-// 建立、列表、明細是行銷經營（CAP_MARKETING，唯讀也要，同舊 gateway 的路由）；結束活動是收縮型動作，停權的店家仍要能自清（CAP_CONTENT_CONTRACT）。
+// 建立是行銷經營（CAP_MARKETING）；列表、明細與結束活動是收縮型與自清的讀寫（CAP_CONTENT_CONTRACT，同 social 的 StoreReadCapability）：
+// 停權的店家要能找出自己的活動 ID 並結束它，所以列表與明細不能比結束活動更嚴。
 var declarations = map[string]declaration{
 	couponv1alpha1connect.CouponAppServiceCreateCampaignProcedure: requires(seller.CapMarketing),
-	couponv1alpha1connect.CouponAppServiceListCampaignsProcedure:  requires(seller.CapMarketing),
-	couponv1alpha1connect.CouponAppServiceGetCampaignProcedure:    requires(seller.CapMarketing),
+	couponv1alpha1connect.CouponAppServiceListCampaignsProcedure:  requires(seller.CapContentContract),
+	couponv1alpha1connect.CouponAppServiceGetCampaignProcedure:    requires(seller.CapContentContract),
 	couponv1alpha1connect.CouponAppServiceEndCampaignProcedure:    requires(seller.CapContentContract),
 
 	couponv1alpha1connect.CouponAppServiceListMyVouchersProcedure:         exempt(buyerOnlyReason),

@@ -173,14 +173,12 @@ const (
 	ErrorReason_COUPON_OUTSIDE_WINDOW ErrorReason = 44
 	// 買家不符合活動的資格（搭配 failed_precondition）：不在指定名單、在該店沒有消費紀錄。CouponAppService.ClaimCoupon。
 	ErrorReason_COUPON_NOT_ELIGIBLE ErrorReason = 45
-	// 發行活動的店家停權中（搭配 failed_precondition）：領券與使用都暫停，解除後自動恢復。CouponAppService.ClaimCoupon。
+	// 發行活動的店家停權中（搭配 failed_precondition）：領取與鎖定（結帳選用）暫停，解除後自動恢復；已鎖定的券照常核銷或釋放。CouponAppService.ClaimCoupon。
 	ErrorReason_COUPON_STORE_SUSPENDED ErrorReason = 46
 	// 活動已經領完（搭配 failed_precondition）：總發行量已達上限。CouponAppService.ClaimCoupon。client 顯示已領完。
 	ErrorReason_COUPON_ISSUE_LIMIT_REACHED ErrorReason = 47
 	// 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
 	ErrorReason_COUPON_QUOTA_EXCEEDED ErrorReason = 48
-	// 活動或券的狀態不允許這個動作（搭配 failed_precondition）：保留給需要區分的呼叫端（後台的發放、作廢）。
-	ErrorReason_COUPON_INVALID_STATUS ErrorReason = 49
 )
 
 // Enum value maps for ErrorReason.
@@ -234,7 +232,6 @@ var (
 		46: "COUPON_STORE_SUSPENDED",
 		47: "COUPON_ISSUE_LIMIT_REACHED",
 		48: "COUPON_QUOTA_EXCEEDED",
-		49: "COUPON_INVALID_STATUS",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":     0,
@@ -285,7 +282,6 @@ var (
 		"COUPON_STORE_SUSPENDED":       46,
 		"COUPON_ISSUE_LIMIT_REACHED":   47,
 		"COUPON_QUOTA_EXCEEDED":        48,
-		"COUPON_INVALID_STATUS":        49,
 	}
 )
 
@@ -320,7 +316,7 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xc4\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xa9\n" +
 	"\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
@@ -371,8 +367,7 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x13COUPON_NOT_ELIGIBLE\x10-\x12\x1a\n" +
 	"\x16COUPON_STORE_SUSPENDED\x10.\x12\x1e\n" +
 	"\x1aCOUPON_ISSUE_LIMIT_REACHED\x10/\x12\x19\n" +
-	"\x15COUPON_QUOTA_EXCEEDED\x100\x12\x19\n" +
-	"\x15COUPON_INVALID_STATUS\x101\"\x04\b\"\x10\"*\x13RFQ_ALREADY_AWARDEDB\x82\x02\n" +
+	"\x15COUPON_QUOTA_EXCEEDED\x100\"\x04\b\"\x10\"*\x13RFQ_ALREADY_AWARDEDB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

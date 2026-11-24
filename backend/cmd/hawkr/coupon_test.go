@@ -36,7 +36,7 @@ func TestCouponStoresReportsSuspensionAndFailsClosed(t *testing.T) {
 	}
 }
 
-// MEMBER 資格的投影在 B7-4 才接上：在那之前 port 回錯誤，不降級成「不是會員」。
+// MEMBER 資格的投影還沒有接上：port 回錯誤，不降級成「不是會員」。
 func TestCouponMembersFailsUntilTheProjectionIsWired(t *testing.T) {
 	if ok, err := (couponMembers{}).IsMember(context.Background(), 1, 2); ok || !errors.Is(err, errMembersNotProjected) {
 		t.Fatalf("ok=%v err=%v", ok, err)

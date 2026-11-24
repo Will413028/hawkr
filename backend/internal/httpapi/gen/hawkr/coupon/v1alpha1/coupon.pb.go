@@ -719,7 +719,7 @@ func (x *Checkout) GetOrderAmount() int64 {
 
 type ListMyVouchersRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 預設與上限見 page_size 的說明：0 用預設 20，超過 100 以 100 計，負數回 invalid_argument。
+	// 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
 	PageSize      int32           `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken     string          `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	Statuses      []VoucherStatus `protobuf:"varint,3,rep,packed,name=statuses,proto3,enum=hawkr.coupon.v1alpha1.VoucherStatus" json:"statuses,omitempty"`
@@ -840,10 +840,11 @@ func (x *ListMyVouchersResponse) GetNextPageToken() string {
 }
 
 type ListClaimableCampaignsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	StoreId       *string                `protobuf:"bytes,3,opt,name=store_id,json=storeId,proto3,oneof" json:"store_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+	PageSize      int32   `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string  `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	StoreId       *string `protobuf:"bytes,3,opt,name=store_id,json=storeId,proto3,oneof" json:"store_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1148,14 +1149,14 @@ type CampaignInput struct {
 	Discount isCampaignInput_Discount `protobuf_oneof:"discount"`
 	// 門檻，至少 0；現金折抵的金額不得超過門檻（門檻 0 不套用）。
 	ThresholdAmount int64 `protobuf:"varint,4,opt,name=threshold_amount,json=thresholdAmount,proto3" json:"threshold_amount,omitempty"`
-	// 店家只能建 ALL、MEMBER、DESIGNATED。
+	// 店家只能建 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument（消費紀錄的資料還沒有接上）。
 	TargetType TargetType             `protobuf:"varint,5,opt,name=target_type,json=targetType,proto3,enum=hawkr.coupon.v1alpha1.TargetType" json:"target_type,omitempty"`
 	StartTime  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	// 必須晚於現在與 start_time。
 	EndTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
 	// 總發行量；不設是無上限，設了至少 1（0 回 invalid_argument，不當成無上限）。
 	TotalIssueLimit *int32 `protobuf:"varint,8,opt,name=total_issue_limit,json=totalIssueLimit,proto3,oneof" json:"total_issue_limit,omitempty"`
-	// DESIGNATED 的名單（買家 ID，例如 CRM 客戶的 buyer_id），最多 500 位；其他資格不得帶。
+	// DESIGNATED 的名單（買家 ID），最多 500 位；只能是這家店的 CRM 客戶，不是客戶的 ID 回 invalid_argument；其他資格不得帶。
 	DesignatedBuyerIds []string `protobuf:"bytes,9,rep,name=designated_buyer_ids,json=designatedBuyerIds,proto3" json:"designated_buyer_ids,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -1370,9 +1371,10 @@ func (x *CreateCampaignResponse) GetCampaign() *SellerCampaign {
 }
 
 type ListCampaignsRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	PageSize  int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+	PageSize  int32  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// 只列這個狀態；不設是全部。明確送出 CAMPAIGN_STATUS_UNSPECIFIED 回 invalid_argument。
 	Status        *CampaignStatus `protobuf:"varint,3,opt,name=status,proto3,enum=hawkr.coupon.v1alpha1.CampaignStatus,oneof" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
