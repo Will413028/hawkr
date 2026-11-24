@@ -13,11 +13,14 @@ import (
 	"time"
 )
 
-// ErrTransient 標示暫時性失敗（網路、逾時、429、5xx、同一個冪等鍵的請求還在處理）：重試可能成功。
+// ErrTransient 標示暫時性失敗（網路、逾時、429、5xx、同一個冪等鍵的請求還在處理、金鑰被拒）：重試可能成功。
 var ErrTransient = errors.New("resend：暫時性失敗")
 
 // ErrPermanent 標示永久失敗（請求被拒：參數、寄件網域或金鑰有問題）：重試不會成功。
 var ErrPermanent = errors.New("resend：永久失敗")
+
+// ErrAuth 標示金鑰被拒（401、403）：是設定問題，不是這封信的問題；與 ErrTransient 一起回傳（修好設定後重試可能成功），呼叫端以它告警。
+var ErrAuth = errors.New("resend：金鑰被拒")
 
 // Email 是一封純文字信。IdempotencyKey 非空時以 Idempotency-Key 送出，Resend 會合併 24 小時內同鍵的請求（job 在送出後、寫回結果前當掉重試也不重寄）。
 type Email struct {
@@ -97,9 +100,15 @@ func (c *Client) Send(ctx context.Context, e Email) error {
 	return classify(resp.StatusCode, apiErr.Name)
 }
 
+// Resend 對冪等鍵衝突回 409，以錯誤名稱區分：concurrent_idempotent_requests 是同鍵請求還在處理（暫時性）；
+// invalid_idempotent_request 是同鍵卻帶不同內容（永久，重試只會再被拒）。
 func classify(status int, name string) error {
 	detail := fmt.Sprintf("http %d %s", status, name)
 	switch {
+	case status == http.StatusUnauthorized || status == http.StatusForbidden:
+		return fmt.Errorf("%w：%w：%s", ErrTransient, ErrAuth, detail)
+	case status == http.StatusConflict && name == "invalid_idempotent_request":
+		return fmt.Errorf("%w：%s", ErrPermanent, detail)
 	case status == http.StatusTooManyRequests || status == http.StatusRequestTimeout || status == http.StatusConflict || status >= 500:
 		return fmt.Errorf("%w：%s", ErrTransient, detail)
 	default:

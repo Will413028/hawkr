@@ -4,6 +4,8 @@ package notification
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"slices"
@@ -18,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/deliver"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/suppress"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/fcm"
 	"github.com/Will413028/hawkr/backend/internal/platform/resend"
@@ -41,27 +44,6 @@ func (c *fakeContacts) set(id int64, address string, source identity.ContactEmai
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.m[id] = identity.ContactEmail{Address: address, Source: source}
-}
-
-// fakeLocales 取代 identity 的 preferred_locale：沒登記的帳號是預設語系。
-type fakeLocales struct {
-	mu sync.Mutex
-	m  map[int64]uitext.Locale
-}
-
-func (l *fakeLocales) PreferredLocale(_ context.Context, id int64) (uitext.Locale, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if v, ok := l.m[id]; ok {
-		return v, nil
-	}
-	return uitext.DefaultLocale, nil
-}
-
-func (l *fakeLocales) set(id int64, v uitext.Locale) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.m[id] = v
 }
 
 type deliveryState struct {
@@ -404,22 +386,51 @@ func TestStaleDeviceTokensArePurgedAfterSixtyDays(t *testing.T) {
 	}
 }
 
-// 位址在 suppression 名單內不寄（比對的是正規化後的位址），投遞標永久失敗。
+// testAddressHash 是名單裡位址的雜湊（HMAC-SHA256 of 正規化位址）。
+func testAddressHash(key []byte, normalized string) []byte {
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte(normalized))
+	return m.Sum(nil)
+}
+
+// 位址的雜湊在 suppression 名單內不寄（比對的是正規化後位址的雜湊；目前與輪替期間的舊密鑰都查），投遞標永久失敗。
 func TestSuppressedAddressIsNotEmailed(t *testing.T) {
+	for name, key := range map[string][]byte{"目前的密鑰": testSuppressionKeys.Current, "輪替期間的舊密鑰": testSuppressionKeys.Previous} {
+		t.Run(name, func(t *testing.T) {
+			f := setupIntake(t)
+			acct := f.newAccount(t)
+			f.contacts.set(acct, "Buyer@Example.COM", identity.ContactEmailVerified)
+			f.mustExec(t, `INSERT INTO notification.email_suppressions (address_hash, reason, created_at) VALUES ($1, 'HARD_BOUNCE', $2)`, testAddressHash(key, buyerAddress), epoch)
+			id := f.emailDelivery(t, acct)
+
+			if err := f.deliver(id, false); err != nil {
+				t.Fatal(err)
+			}
+			if s := f.state(t, id); s.Status != "FAILED_PERMANENT" || s.Reason == nil || *s.Reason != deliver.ReasonSuppressed {
+				t.Fatalf("狀態 = %+v", s)
+			}
+			if sent := f.mail.Sent(); len(sent) != 0 {
+				t.Fatalf("suppression 名單內的位址收到了信：%+v", sent)
+			}
+		})
+	}
+}
+
+// 沒有設定雜湊密鑰時判斷不了名單：不寄、job 回錯誤重試（fail closed）。
+func TestEmailIsNotSentWithoutSuppressionKeys(t *testing.T) {
 	f := setupIntake(t)
 	acct := f.newAccount(t)
-	f.contacts.set(acct, "Buyer@Example.COM", identity.ContactEmailVerified)
-	f.mustExec(t, `INSERT INTO notification.email_suppressions (address, reason, created_at) VALUES ($1, 'BOUNCE', $2)`, buyerAddress, epoch)
+	f.contacts.set(acct, buyerAddress, identity.ContactEmailVerified)
 	id := f.emailDelivery(t, acct)
-
-	if err := f.deliver(id, false); err != nil {
-		t.Fatal(err)
+	svc := deliver.New(deliver.Deps{
+		DB: f.db, Locks: intake.Locks{Accounts: f.identity, Buyers: f.buyer, Stores: f.stores}, Contacts: f.contacts, Locales: f.identity,
+		Registry: testRegistry{}, Sources: f.module.app, Push: f.push, Mail: f.mail, Suppression: suppress.NewHasher(SuppressionKeys{}), Now: time.Now,
+	})
+	if err := svc.Deliver(context.Background(), id, false); err == nil {
+		t.Fatal("沒有密鑰要回錯誤讓 job 重試")
 	}
-	if s := f.state(t, id); s.Status != "FAILED_PERMANENT" || s.Reason == nil || *s.Reason != deliver.ReasonSuppressed {
-		t.Fatalf("狀態 = %+v", s)
-	}
-	if sent := f.mail.Sent(); len(sent) != 0 {
-		t.Fatalf("suppression 名單內的位址收到了信：%+v", sent)
+	if s := f.state(t, id); s.Status != "PENDING" || len(f.mail.Sent()) != 0 {
+		t.Fatalf("狀態 = %+v，寄出 %d 封", s, len(f.mail.Sent()))
 	}
 }
 
@@ -468,12 +479,109 @@ func TestDeliveryToADeletedRecipientFailsWithoutSentText(t *testing.T) {
 	}
 }
 
-// 推播與 email 依帳號 preferred_locale 在送出時組字：同一個意圖，英文帳號收到英文標題，投遞紀錄記下實際使用的語系。
+// beforeSend 在 provider 收到請求之前先執行 hook（模擬送出途中收件人被刪除）。
+type beforeSend struct {
+	push *fcm.Fake
+	mail *resend.Fake
+	hook func()
+}
+
+func (b beforeSend) Send(ctx context.Context, tokens []string, m fcm.Message) ([]fcm.Result, error) {
+	b.hook()
+	return b.push.Send(ctx, tokens, m)
+}
+
+type beforeMail beforeSend
+
+func (b beforeMail) Send(ctx context.Context, e resend.Email) error {
+	b.hook()
+	return b.mail.Send(ctx, e)
+}
+
+// 有 token 收下之後，失效 token 的刪除失敗不得讓 job 回錯誤（重試會對已收到的裝置重推）：先定案 SENT，刪除失敗只記 log，token 留到下次推送再清（R1-2）。
+func TestTokenDeleteFailureAfterASuccessfulPushStillSettlesSent(t *testing.T) {
+	f := setupIntake(t)
+	acct := f.newAccount(t)
+	f.addToken(t, acct, "BUYER", "tok-ok")
+	f.addToken(t, acct, "BUYER", "tok-gone")
+	id := f.pushDelivery(t, acct, "e1")
+	f.push.Script("tok-gone", fcm.OutcomeUnregistered)
+	f.mustExec(t, `CREATE FUNCTION notification.refuse_token_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'delete refused'; END $$`)
+	f.mustExec(t, `CREATE TRIGGER refuse_token_delete BEFORE DELETE ON notification.device_tokens FOR EACH ROW EXECUTE FUNCTION notification.refuse_token_delete()`)
+
+	if err := f.deliver(id, false); err != nil {
+		t.Fatalf("刪除 token 失敗不該讓 job 回錯誤：%v", err)
+	}
+	if s := f.state(t, id); s.Status != "SENT" {
+		t.Fatalf("狀態 = %+v，預期 SENT", s)
+	}
+	if got := f.push.Delivered(); got != 1 {
+		t.Fatalf("送出 %d 次，預期 1", got)
+	}
+	if err := f.deliver(id, false); err != nil || len(f.push.Calls()) != 1 {
+		t.Fatalf("再執行不得重推：err=%v calls=%d", err, len(f.push.Calls()))
+	}
+	if got := f.tokens(t, acct); !slices.Equal(got, []string{"tok-gone", "tok-ok"}) {
+		t.Fatalf("token = %v，刪除被拒時兩個都該留著", got)
+	}
+}
+
+// deletingService 組一個渠道 job：provider 收到請求之前先刪除帳號（模擬送出途中收件人被刪除）。
+func (f *fixture) deletingService(acct int64) *deliver.Service {
+	hook := beforeSend{push: f.push, mail: f.mail, hook: func() {
+		if err := f.identity.DeleteAccount(context.Background(), acct); err != nil {
+			panic(err)
+		}
+	}}
+	return deliver.New(deliver.Deps{
+		DB: f.db, Locks: intake.Locks{Accounts: f.identity, Buyers: f.buyer, Stores: f.stores}, Contacts: f.contacts, Locales: f.identity,
+		Registry: testRegistry{}, Sources: f.module.app, Push: hook, Mail: beforeMail(hook), Suppression: suppress.NewHasher(testSuppressionKeys), Now: time.Now,
+	})
+}
+
+// 送出之後收件人才被刪除：provider 已收下，投遞照記 SENT，但不留送出文字與語系（D16；settle 的「sent 且收件人已不在」分支）。
+func TestRecipientDeletedAfterSendIsSentWithoutSentText(t *testing.T) {
+	ctx := context.Background()
+	t.Run("push", func(t *testing.T) {
+		f := setupIntake(t)
+		acct := f.newAccount(t)
+		f.addToken(t, acct, "BUYER", "tok-1")
+		id := f.pushDelivery(t, acct, "e1")
+		if err := f.deletingService(acct).Deliver(ctx, id, false); err != nil {
+			t.Fatal(err)
+		}
+		if s := f.state(t, id); s.Status != "SENT" || s.Title != nil || s.Body != nil || s.Locale != nil {
+			t.Fatalf("%+v，預期 SENT 且沒有送出文字", s)
+		}
+		if len(f.push.Calls()) != 1 {
+			t.Fatalf("推播應該已送出一次：%d", len(f.push.Calls()))
+		}
+	})
+	t.Run("email", func(t *testing.T) {
+		f := setupIntake(t)
+		acct := f.newAccount(t)
+		f.contacts.set(acct, buyerAddress, identity.ContactEmailVerified)
+		id := f.emailDelivery(t, acct)
+		if err := f.deletingService(acct).Deliver(ctx, id, false); err != nil {
+			t.Fatal(err)
+		}
+		if s := f.state(t, id); s.Status != "SENT" || s.Title != nil || s.Body != nil || s.Locale != nil {
+			t.Fatalf("%+v，預期 SENT 且沒有送出文字", s)
+		}
+		if len(f.mail.Sent()) != 1 {
+			t.Fatalf("email 應該已寄出一次：%d", len(f.mail.Sent()))
+		}
+	})
+}
+
+// 推播與 email 依帳號 preferred_locale 在送出時組字（讀真的 identity）：同一個意圖，英文帳號收到英文標題，投遞紀錄記下實際使用的語系。
 func TestEmailIsComposedInTheRecipientsPreferredLocale(t *testing.T) {
 	f := setupIntake(t)
 	acct := f.newAccount(t)
 	f.contacts.set(acct, buyerAddress, identity.ContactEmailVerified)
-	f.locales.set(acct, uitext.EN)
+	if changed, err := f.identity.SetPreferredLocale(context.Background(), acct, uitext.EN); err != nil || !changed {
+		t.Fatalf("設定帳號語系：changed=%v err=%v", changed, err)
+	}
 	id := f.emailDelivery(t, acct)
 	var params string
 	if err := f.db.Pool().QueryRow(context.Background(), `SELECT params::text FROM notification.inbox_items WHERE account_id = $1`, acct).Scan(&params); err != nil {
@@ -497,6 +605,70 @@ func TestEmailIsComposedInTheRecipientsPreferredLocale(t *testing.T) {
 	}
 }
 
+// 帶圖片的型別：渠道 job 以注入的 ImageURL 組出絕對網址，送進 FCM 的請求本文有 apns.fcm_options.image；沒有圖的型別不帶。
+func TestPushOfAnImageTypeCarriesTheImageInTheFCMPayload(t *testing.T) {
+	f := setupIntake(t)
+	acct := f.newAccount(t)
+	f.addToken(t, acct, "BUYER", "tok-1")
+	f.accept(t, "test_push_image", pushParams{AccountID: acct, EventID: "img"})
+	f.run(t)
+	id := f.deliveryID(t, acct, "PUSH")
+	if err := f.deliver(id, false); err != nil {
+		t.Fatal(err)
+	}
+	calls := f.push.Calls()
+	if len(calls) != 1 {
+		t.Fatalf("推播 = %+v", calls)
+	}
+	want := "https://media.example/i/card/" + testImageKey
+	if calls[0].Message.ImageURL != want {
+		t.Fatalf("ImageURL = %q，預期 %q", calls[0].Message.ImageURL, want)
+	}
+	body := fcm.Payload("tok-1", calls[0].Message)["message"].(map[string]any)
+	apns := body["apns"].(map[string]any)
+	if got := apns["fcm_options"].(map[string]string)["image"]; got != want {
+		t.Fatalf("apns.fcm_options.image = %q，預期 %q", got, want)
+	}
+	plain := f.pushDelivery(t, acct, "plain")
+	if err := f.deliver(plain, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.push.Calls(); len(got) != 2 || got[1].Message.ImageURL != "" {
+		t.Fatalf("沒有圖的型別不該帶圖：%+v", got)
+	}
+}
+
+// App 啟動時呼叫 RegisterDeviceToken 帶著協商出的語系：不同才更新帳號的 preferred_locale，之後的渠道 job 以新語系組字（整條路徑都是真的 identity）。
+func TestRegisterDeviceTokenRecordsTheRequestLocaleForLaterDeliveries(t *testing.T) {
+	f := setupIntake(t)
+	ctx := context.Background()
+	acct := f.newAccount(t)
+	f.contacts.set(acct, buyerAddress, identity.ContactEmailVerified)
+	id := f.emailDelivery(t, acct)
+	if err := f.module.RegisterDeviceToken(uitext.WithLocale(ctx, uitext.EN), acct, DeviceAppBuyer, "tok-1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := f.identity.PreferredLocale(ctx, acct); err != nil || got != uitext.EN {
+		t.Fatalf("語系 = %q %v，預期 en", got, err)
+	}
+	if err := f.deliver(id, false); err != nil {
+		t.Fatal(err)
+	}
+	if s := f.state(t, id); s.Status != "SENT" || s.Locale == nil || *s.Locale != "en" {
+		t.Fatalf("狀態 = %+v，預期以英文組字", s)
+	}
+	if err := f.module.RegisterDeviceToken(uitext.WithLocale(ctx, uitext.ZhTW), acct, DeviceAppBuyer, "tok-1"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := f.identity.PreferredLocale(ctx, acct); got != uitext.ZhTW {
+		t.Fatalf("回前景改成 zh-TW 後語系 = %q", got)
+	}
+	var tokens int
+	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM notification.device_tokens WHERE account_id = $1`, acct).Scan(&tokens); err != nil || tokens != 1 {
+		t.Fatalf("token 數 = %d %v", tokens, err)
+	}
+}
+
 // 公告的推播文字讀取時才解析（參數只有公告 ID）：渠道 job 讀得到公告內容，推給收件人的 BUYER App。
 func TestAnnouncementPushIsDeliveredWithTheAnnouncementText(t *testing.T) {
 	f := setupAnnounce(t, 0)
@@ -511,7 +683,7 @@ func TestAnnouncementPushIsDeliveredWithTheAnnouncementText(t *testing.T) {
 	push := fcm.NewFake(nil)
 	svc := deliver.New(deliver.Deps{
 		DB: f.db, Locks: intake.Locks{Accounts: f.identity, Buyers: f.buyers, Stores: f.stores}, Contacts: &fakeContacts{m: map[int64]identity.ContactEmail{}},
-		Locales: &fakeLocales{m: map[int64]uitext.Locale{}}, Registry: registry.Registry{}, Sources: f.inbox, Push: push, Mail: resend.NewFake(nil), Now: time.Now,
+		Locales: f.identity, Registry: registry.Registry{}, Sources: f.inbox, Push: push, Mail: resend.NewFake(nil), Now: time.Now,
 	})
 	if err := svc.Deliver(context.Background(), id, false); err != nil {
 		t.Fatal(err)

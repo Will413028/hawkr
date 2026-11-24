@@ -137,6 +137,59 @@ func TestSendOverTheBatchLimitAnswersEveryToken(t *testing.T) {
 	}
 }
 
+type cancelAfter struct {
+	n      int32
+	calls  atomic.Int32
+	cancel context.CancelFunc
+}
+
+func (c *cancelAfter) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(r)
+	if c.calls.Add(1) == c.n {
+		c.cancel()
+	}
+	return resp, err
+}
+
+// 送到一半 ctx 取消：已完成批次的結果要回傳（帶 nil 錯誤），其餘 token 記暫時性失敗，呼叫端才能把已送出的記進帳本、不在重試時重推。
+func TestSendCancelledBetweenBatchesKeepsEarlierResults(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer srv.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	hc := &http.Client{Transport: &cancelAfter{n: MaxBatch, cancel: cancel}}
+	c, err := New(context.Background(), Config{ProjectID: "p", BaseURL: srv.URL, HTTPClient: hc, TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "at"})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := make([]string, MaxBatch+7)
+	for i := range tokens {
+		tokens[i] = strconv.Itoa(i)
+	}
+	res, err := c.Send(ctx, tokens, Message{Title: "T"})
+	if err != nil {
+		t.Fatalf("已有 token 送出時不該回錯誤：%v", err)
+	}
+	if len(res) != len(tokens) {
+		t.Fatalf("results=%d，預期 %d", len(res), len(tokens))
+	}
+	sent := 0
+	for i, r := range res {
+		if r.Token != tokens[i] {
+			t.Fatalf("result %d token = %q", i, r.Token)
+		}
+		if r.Outcome == OutcomeSent {
+			sent++
+		}
+		if i >= MaxBatch && (r.Outcome != OutcomeTransient || r.Detail != "canceled") {
+			t.Fatalf("未送的 token %d = %+v", i, r)
+		}
+	}
+	if sent == 0 {
+		t.Fatal("第一批沒有任何結果被保留")
+	}
+}
+
 func TestNewRequiresCredentials(t *testing.T) {
 	if _, err := New(context.Background(), Config{ProjectID: "p"}); err == nil {
 		t.Fatal("沒有金鑰也建立了")

@@ -20,7 +20,7 @@ func TestSendClassifiesStatuses(t *testing.T) {
 		want   error
 	}{
 		{200, nil}, {429, ErrTransient}, {500, ErrTransient}, {503, ErrTransient}, {409, ErrTransient},
-		{400, ErrPermanent}, {401, ErrPermanent}, {403, ErrPermanent}, {422, ErrPermanent},
+		{400, ErrPermanent}, {422, ErrPermanent},
 	}
 	for _, c := range cases {
 		t.Run(strconv.Itoa(c.status), func(t *testing.T) {
@@ -47,6 +47,26 @@ func TestSendClassifiesStatuses(t *testing.T) {
 				t.Fatalf("key=%q auth=%q", key, auth)
 			}
 		})
+	}
+}
+
+// 401、403 是金鑰設定問題：暫時性（修好設定後重試可能成功）並帶 ErrAuth 讓呼叫端告警。
+func TestSendRejectedKeyIsTransientAndFlagged(t *testing.T) {
+	for _, status := range []int{401, 403} {
+		err := classify(status, "restricted_api_key")
+		if !errors.Is(err, ErrTransient) || !errors.Is(err, ErrAuth) || errors.Is(err, ErrPermanent) {
+			t.Errorf("%d：err = %v", status, err)
+		}
+	}
+}
+
+// 409 以錯誤名稱區分：同鍵請求還在處理是暫時性，同鍵卻帶不同內容是永久性。
+func TestClassifyIdempotencyConflicts(t *testing.T) {
+	if err := classify(409, "concurrent_idempotent_requests"); !errors.Is(err, ErrTransient) {
+		t.Errorf("進行中：%v", err)
+	}
+	if err := classify(409, "invalid_idempotent_request"); !errors.Is(err, ErrPermanent) || errors.Is(err, ErrTransient) {
+		t.Errorf("同鍵不同內容：%v", err)
 	}
 }
 

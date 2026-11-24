@@ -258,7 +258,7 @@ func runServe(ctx context.Context) error {
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, box, notificationConfig, log)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
@@ -382,10 +382,16 @@ func runWorker(ctx context.Context) error {
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
 	notificationConfig := readNotificationProviders(ctx, e, log)
+	// 推播圖片的網域：與 serve 同一個 MEDIA_ORIGIN（ADR 2026-09-25-api-image-uri-template D6：推播由組推播的 worker 組完整的 URL）。
+	mediaOrigin := e.String("MEDIA_ORIGIN")
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
 	imageAIConfig := imageai.ReadConfig(e)
 	if err := e.Err(); err != nil {
+		return err
+	}
+	images, err := rpc.NewImages(mediaOrigin)
+	if err != nil {
 		return err
 	}
 	d, err := db.Open(ctx, dbc)
@@ -481,7 +487,7 @@ func runWorker(ctx context.Context) error {
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), med, jc, log)
 	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, box, notificationConfig, log)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()

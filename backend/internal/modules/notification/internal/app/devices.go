@@ -37,7 +37,9 @@ func (s *Service) lockAccount(ctx context.Context, accountID int64) error {
 	return nil
 }
 
-// RegisterDeviceToken 註冊帳號的推播 token：同一個 token 換帳號登入時改綁給呼叫者，並更新最後註冊時間（App 每次啟動都呼叫）。
+// RegisterDeviceToken 註冊帳號的推播 token：同一個 token 換帳號登入時改綁給呼叫者，並更新最後註冊時間（App 每次啟動、回到前景都呼叫）。
+// 同一個 transaction 也把請求協商出的語系記成帳號的 preferred_locale（只在與目前的值不同時寫；多語系 ADR D1「最後一次生效的 UI 語系」）。
+// 先寫語系再共享鎖帳號：identity 的帳號列最先，且改值的 UPDATE 先取得排他鎖，不會從共享鎖升級而與同帳號的並行請求互相等待。
 func (s *Service) RegisterDeviceToken(ctx context.Context, accountID int64, app App, token string) error {
 	l := uitext.LocaleFrom(ctx)
 	switch {
@@ -47,6 +49,9 @@ func (s *Service) RegisterDeviceToken(ctx context.Context, accountID int64, app 
 		return apperr.InvalidInputOn([]string{"App"}, "%s", text.DeviceAppInvalid(l))
 	}
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if _, err := s.d.Accounts.SetPreferredLocale(ctx, accountID, l); err != nil {
+			return fmt.Errorf("記錄帳號語系：%w", err)
+		}
 		if err := s.lockAccount(ctx, accountID); err != nil {
 			return err
 		}

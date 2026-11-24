@@ -48,9 +48,9 @@ type NotificationDeviceToken struct {
 }
 
 type NotificationEmailSuppression struct {
-	Address   string
-	Reason    string
-	CreatedAt time.Time
+	AddressHash []byte
+	Reason      string
+	CreatedAt   time.Time
 }
 
 type NotificationInboxItem struct {

@@ -61,6 +61,12 @@ type Contacts = deliver.Contacts
 // Locales 回傳帳號的 preferred_locale：推播與 email 在送出時依它組字（identity 擁有這個欄位）。
 type Locales = deliver.Locales
 
+// SuppressionKeys 是 email suppression 名單的位址雜湊密鑰（Current 寫入與查詢，Previous 只在輪替期間查詢）。
+type SuppressionKeys = suppress.Keys
+
+// MinSuppressionKeyBytes 是密鑰的最短長度。
+const MinSuppressionKeyBytes = suppress.MinKeyBytes
+
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
 type Deps struct {
 	DB       *db.DB
@@ -76,6 +82,10 @@ type Deps struct {
 	Locales  Locales
 	Push     fcm.Sender
 	Mail     resend.Sender
+	// ImageURL 把型別的圖片 object key 轉成推播用的絕對網址；nil 表示沒有設定媒體網域，推播不帶圖。
+	ImageURL func(key string) string
+	// SuppressionKeys 是 email suppression 名單的 HMAC 密鑰（Current 必填才寄得出 email；Previous 只在輪替期間給，D22）。
+	SuppressionKeys SuppressionKeys
 	// Inbox 是 platform 的 webhook inbox：給了就登記 Resend 的退信與投訴事件（每個行程只建一個模組）；ResendWebhookSecret 為空時 webhook 回 FailedPrecondition。
 	Inbox               *inbox.Inbox
 	ResendWebhookSecret string
@@ -106,6 +116,7 @@ func newModule(d Deps, reg app.Registry) *Module {
 	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger})
 	hub := stream.NewHub(inboxReader(appSvc), d.Logger, d.Now)
 	locks := intake.Locks{Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller}
+	hasher := suppress.NewHasher(d.SuppressionKeys)
 	return &Module{
 		intake: intake.New(intake.Deps{
 			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Signals: dbSignals{d.DB}, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
@@ -118,9 +129,9 @@ func newModule(d Deps, reg app.Registry) *Module {
 		}),
 		deliver: deliver.New(deliver.Deps{
 			DB: d.DB, Locks: locks, Contacts: d.Contacts, Locales: d.Locales, Registry: reg, Sources: appSvc,
-			Push: d.Push, Mail: d.Mail, Now: d.Now, Logger: d.Logger,
+			Push: d.Push, ImageURL: d.ImageURL, Mail: d.Mail, Suppression: hasher, Now: d.Now, Logger: d.Logger,
 		}),
-		suppress: suppress.New(suppress.Deps{DB: d.DB, Inbox: d.Inbox, WebhookSecret: d.ResendWebhookSecret, Now: d.Now}),
+		suppress: suppress.New(suppress.Deps{DB: d.DB, Inbox: d.Inbox, WebhookSecret: d.ResendWebhookSecret, Hasher: hasher, Now: d.Now}),
 		hub:      hub, pool: d.DB, listenCfg: d.ListenConnConfig,
 	}
 }
@@ -257,6 +268,12 @@ func (m *Module) PurgeTokensOnAccountDeleted(ctx context.Context, e identity.Acc
 // 沒有設定密鑰回 FailedPrecondition，簽章或格式不合回 InvalidInput。
 func (m *Module) ReceiveResendEvent(ctx context.Context, header http.Header, body []byte) error {
 	return m.suppress.Receive(ctx, header, body)
+}
+
+// RemoveEmailSuppression 把位址從 email suppression 名單移除（管理員處理；只有內部方法，沒有 RPC）：只移除永久退信，回傳是否有移除；
+// 位址是投訴回 FailedPrecondition（投訴不可移除）。
+func (m *Module) RemoveEmailSuppression(ctx context.Context, address string) (bool, error) {
+	return m.suppress.RemoveHardBounce(ctx, address)
 }
 
 // AddWorkers 登記 River worker（意圖展開、渠道投遞、保留期清除、個資清除）。由 cmd/hawkr 的 worker 接上。

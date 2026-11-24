@@ -38,20 +38,31 @@ func (s *Service) sendPush(ctx context.Context, p plan, final bool) error {
 	if auth > 0 {
 		s.log().ErrorContext(ctx, "FCM 憑證或 APNs 認證被拒（THIRD_PARTY_AUTH_ERROR 等），推播送不出去，需要修設定", "delivery_id", p.delivery.ID, "tokens", auth)
 	}
-	if len(unregistered) > 0 {
-		if err := s.deleteTokens(ctx, unregistered); err != nil {
-			return err
-		}
+	if sent > 0 {
+		// 先定案再刪 token：定案後 job 不會再被重試，刪除失敗只記 log（下次推到這個 token 時 FCM 會再回失效）；順序反過來，刪除失敗的重試會對已收到的裝置重推。
+		// 取消不影響定案：provider 已經收下，帳本一定要記到。
+		err := s.settle(context.WithoutCancel(ctx), p, true, "")
+		s.dropTokens(ctx, unregistered)
+		return err
 	}
+	s.dropTokens(ctx, unregistered)
 	switch {
-	case sent > 0:
-		return s.settle(ctx, p, true, "")
 	case transient > 0 || auth > 0:
 		return s.retryOrFail(ctx, p, final, fmt.Errorf("推播暫時性失敗：%d 個 token 暫時失敗、%d 個憑證錯誤", transient, auth))
 	case permanent > 0:
 		return s.settle(ctx, p, false, ReasonPushRejected)
 	default:
 		return s.settle(ctx, p, false, ReasonTokenGone)
+	}
+}
+
+// dropTokens 刪除失效的 token；失敗只記 log，不影響投遞結果。
+func (s *Service) dropTokens(ctx context.Context, tokens []string) {
+	if len(tokens) == 0 {
+		return
+	}
+	if err := s.deleteTokens(context.WithoutCancel(ctx), tokens); err != nil {
+		s.log().ErrorContext(ctx, "刪除失效的裝置 token 失敗，下次推送時 FCM 會再回失效", "error", err)
 	}
 }
 

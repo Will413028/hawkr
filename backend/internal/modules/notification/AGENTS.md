@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQUE）、`inbox_items`（收件匣列）、`deliveries`（推播與 email 的投遞紀錄）、`device_tokens`、`preference_overrides`、`announcements`（後台公告）；`email_suppressions`。讀取模型：無。
+schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQUE）、`inbox_items`（收件匣列）、`deliveries`（推播與 email 的投遞紀錄）、`device_tokens`、`preference_overrides`、`announcements`（後台公告）；`email_suppressions`（只存位址 HMAC）。
 
 ## 發布的讀取介面
 

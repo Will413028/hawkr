@@ -25,6 +25,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var pg *testdb.Server
@@ -35,6 +36,10 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 type aliveAccounts struct{}
 
 func (aliveAccounts) ShareLockAccount(context.Context, int64) (bool, error) { return false, nil }
+
+func (aliveAccounts) SetPreferredLocale(context.Context, int64, uitext.Locale) (bool, error) {
+	return false, nil
+}
 
 // fakeStores 是帳號此刻的店：只有 stores 裡的帳號有店，沒有的回 not_found（同 seller.ActingStore）。
 type fakeStores struct{ stores map[int64]int64 }

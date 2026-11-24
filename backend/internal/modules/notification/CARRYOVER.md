@@ -127,20 +127,24 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 | FCM HTTP v1 adapter（`platform/fcm`，net/http 加 oauth2，只停用 UNREGISTERED、SENDER_ID_MISMATCH 的 token；單次呼叫不超過 500 個 token） | 要推播到 iOS，舊服務的 FCM SDK 與 Android 都不沿用 | 成立 | 不重試，結果分已送出、token 失效、暫時、永久、憑證錯誤，重試與停用由渠道 job 決定 |
 | Resend adapter（`platform/resend`）與 Svix 簽章驗證 | 交易 email 與退信、投訴回報 | 成立 | 只回暫時性或永久性；冪等鍵用投遞紀錄 ID，job 當在送出後、寫回前時重試不重寄 |
 | 渠道 job 三階段（鎖收件人準備、transaction 外呼叫 provider、再鎖一次記結果） | 單體規則 5（provider 不在 transaction 內）與 R1-4（清除後才執行的待送 job 不得寫回文字） | 成立 | 送出前收件人已不在：永久失敗不寫文字；送出後才不在：記已送出、不留文字 |
-| `email_suppressions` | 寄給永久退信與投訴的位址會傷寄件網域信譽 | 成立（真實寄信延後到買網域，表與 webhook 先建） | 只存正規化位址、原因與時間；保留期與個資刪除沒有計畫條目，現在不清除 |
+| `email_suppressions` | 寄給永久退信與投訴的位址會傷寄件網域信譽 | 成立（真實寄信延後到買網域，表與 webhook 先建） | D22：只存正規化位址的 HMAC-SHA256（`EMAIL_SUPPRESSION_HMAC_KEY`，輪替期間加 `_PREVIOUS` 一起查）、原因（`HARD_BOUNCE`、`COMPLAINT`）與時間，無明文位址、無限期保留；暫時與未定的退信不進名單；管理員只能經內部方法 `RemoveEmailSuppression` 移除 `HARD_BOUNCE`，投訴不可移除，投訴會把退信列升級成 `COMPLAINT`；webhook 驗簽後把事件縮成「原因加位址雜湊」才寫 `platform/inbox`（payload 從不含位址），inbox 依 `purge_after` 清除已處理的列；沒有密鑰時 dev 用固定 dev 密鑰、其他環境啟動失敗，email job 沒有密鑰不寄（守門：`TestSuppressionKeepsNoPlainAddressAnywhere`、`TestHardBounceIsRemovableButComplaintIsNot`、`TestSuppressedAddressIsNotEmailed`、`TestSuppressionKeysConfig`） |
 | 停權、刪帳號的 token 同步刪除訂閱者 | 通知 ADR 決策 4：之後不能再有推播送到該帳號的裝置 | 成立 | 結構測試白名單，只准刪 token |
 | 每日 60 天 token 清除 | App 每次啟動重新註冊，60 天沒註冊視為不用 | 成立 | `purge.StaleTokenDays` |
 
 渠道 job 的不變量（守門測試在 `deliver_integration_test.go`、`suppression_integration_test.go`）：
 
 - 三階段：transaction 內以 `intake.LockRecipient` 鎖收件人、依帳號 `preferred_locale` 組字、取 token 或已驗證信箱並查 suppression；transaction 外呼叫 provider；再鎖一次收件人並記結果。暫時性錯誤回錯誤讓 River 重試，最後一次嘗試改記永久失敗；推播至少一個 token 收下就算已送出。
+- 送達保證：推播是 at-least-once（FCM 沒有冪等鍵；送出到定案之間程序死掉、或送到一半 ctx 取消而沒有任何 token 收下，重試會再推）；email 以投遞紀錄 ID 當 Resend 的 `Idempotency-Key`，不重複寄。送到一半取消但已有 token 收下時，`fcm.Send` 回傳部分結果、其餘記暫時性失敗，job 先定案 SENT；有 token 收下後先定案再刪失效 token，刪除失敗只記 log（`TestTokenDeleteFailureAfterASuccessfulPushStillSettlesSent`）。
+- provider 金鑰被拒（FCM 401、403、`THIRD_PARTY_AUTH_ERROR`；Resend 401、403）是設定問題：log error 並重試，不記永久失敗。Resend 409 依錯誤名稱分：`concurrent_idempotent_requests` 暫時性、`invalid_idempotent_request` 永久。
+- provider 替身只在 dev 環境（`requireDevEnvironment`）選得到；沒有設定 FCM 或 Resend 且不是 dev 環境時啟動失敗（`TestNotificationProviderFakesOnlyInDevEnvironment`），替身的假成功不會把正式環境的投遞標成 SENT。
+- 推播圖片網址由 worker 以 `MEDIA_ORIGIN` 與 `rpc.PushImagePreset`（`card`）組（ADR 圖片 URI 樣板 D6；worker 與 serve 都要設 `MEDIA_ORIGIN`）。
 - 送出前收件人已刪除、關閉或退場：永久失敗、不寫文字、不呼叫 provider。
 - 推播目標只看受眾對應的 App（BUYER 受眾只推 BUYER App、STORE 受眾只推 SELLER App）；只有 UNREGISTERED、SENDER_ID_MISMATCH 的 token 被刪；憑證錯誤 log error 並重試。
 - 推播 payload：可見 notification（收件人語系）、apns `mutable-content: 1`、有圖時 `apns.fcm_options.image`；data key 只有 `deep_link`、`state_refresh_hints`（逗號分隔的 proto enum 名稱）、`inbox_item_id`，沒有值就省略，常數在 `internal/deliver/payload.go`（`TestPayloadGolden`、`TestPushMessageGolden`）。
 - 停權與刪帳號同 transaction 刪帳號的全部 token（店家停權不動）；`last_registered_at` 超過 60 天的由每日 job 刪。
-- 只寄已驗證的信箱，位址在 suppression 名單內不寄；退信與投訴 webhook（`POST /webhooks/resend`）先寫 `platform/inbox`，只有永久退信與投訴進名單。
+- 只寄已驗證的信箱，位址的雜湊在 suppression 名單內不寄；退信與投訴 webhook（`POST /webhooks/resend`）先寫 `platform/inbox`（縮減後的 payload，無位址），只有永久退信與投訴進名單。
 
-帳號 `preferred_locale`：多語系 ADR 規定由 identity 擁有，identity 目前沒有這個欄位；渠道 job 經 `Locales` 介面讀，`cmd/hawkr` 暫時接固定回預設語系的實作，identity 建欄位時只換那個實作。
+帳號 `preferred_locale`：identity 擁有（`identity.accounts.preferred_locale`，多語系 ADR D1），渠道 job 經 `Locales` 介面讀（`cmd/hawkr` 接 `*identity.Module`）。「最後一次生效的 UI 語系」的更新點：App 登入（`ExchangeIdToken`）與 `RegisterDeviceToken`（App 每次啟動、回前景都呼叫）以請求協商出的語系更新，只在與目前的值不同時寫（`TestRegisterDeviceTokenRecordsTheRequestLocaleForLaterDeliveries`）。網頁的 OAuth 回呼請求不帶 UI 語系，不更新。
 
 ## 與 舊服務的差異
 

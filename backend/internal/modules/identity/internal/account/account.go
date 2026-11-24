@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 func errAccountNotFound(id int64) error { return apperr.NotFound("帳號 %d 不存在", id) }
@@ -100,6 +101,32 @@ func validEmail(raw *string) (string, bool) {
 		return "", false
 	}
 	return emailaddr.Normalize(*raw)
+}
+
+// PreferredLocale 回傳帳號的 preferred_locale（含已刪除的墓碑：欄位不是個資，值照留）；帳號不存在回 NotFound。
+func (m *Service) PreferredLocale(ctx context.Context, accountID int64) (uitext.Locale, error) {
+	r, err := m.q(ctx).GetAccount(ctx, accountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", errAccountNotFound(accountID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("identity：讀取帳號 %d：%w", accountID, err)
+	}
+	return uitext.Locale(r.PreferredLocale), nil
+}
+
+// SetPreferredLocale 把帳號的 preferred_locale 更新為 locale；與目前的值相同、帳號已刪除或不存在時什麼都不做（回 false），有改回 true。
+// 語系不在支援清單（zh-TW、en）內回 InvalidInput（欄位 Locale）。單一條件式 UPDATE：只有真的改值時才取得列鎖，相同值不鎖，
+// 所以可以放在呼叫方的 transaction 最前面（identity 帳號列在鎖順序的最前）而不與之後的共享鎖互相升級。
+func (m *Service) SetPreferredLocale(ctx context.Context, accountID int64, locale uitext.Locale) (bool, error) {
+	if !model.ValidLocale(locale) {
+		return false, apperr.InvalidInputOn([]string{"Locale"}, "不支援的語系 %q", locale)
+	}
+	n, err := m.q(ctx).SetPreferredLocale(ctx, store.SetPreferredLocaleParams{ID: accountID, Locale: string(locale), Now: m.d.Now()})
+	if err != nil {
+		return false, fmt.Errorf("identity：設定帳號 %d 的語系：%w", accountID, err)
+	}
+	return n > 0, nil
 }
 
 // SetSelfEnteredEmail 設定帳號自填的聯絡信箱（正規化後存）。只在帳號沒有可用的已驗證 email（不存在或格式不合）時可設，有的話回 FailedPrecondition；

@@ -2,6 +2,7 @@
 //
 // 一次執行三個階段：先在 transaction 內鎖收件人並準備（確認收件人還在、依帳號 preferred_locale 組字、取 token 或信箱、查 suppression），
 // 再在 transaction 外呼叫 provider（單體規則 5），最後在新的 transaction 內再鎖一次收件人並記下結果。兩次鎖用 intake.LockRecipient，與意圖 worker 同一組鎖與順序。
+// 送達保證：推播是 at-least-once（FCM HTTP v1 沒有冪等鍵，provider 收下之後、帳本定案之前若程序死掉，重試會再推一次）；email 以投遞紀錄 ID 當 Resend 的 Idempotency-Key，重試不會重複寄。
 // 送出之前收件人已刪除、已關閉或已退場，投遞紀錄標為永久失敗、不寫送出文字（D16、A8-1c 審查 R1-4）；送出之後才被刪除，紀錄不留文字。
 package deliver
 
@@ -60,6 +61,11 @@ type Locales interface {
 	PreferredLocale(ctx context.Context, accountID int64) (uitext.Locale, error)
 }
 
+// Suppression 把正規化後的位址轉成 suppression 名單裡的雜湊（目前與輪替期間的舊密鑰各一個）；名單不存位址（D22）。沒有設定密鑰時回錯誤，email 不寄、job 重試。
+type Suppression interface {
+	Lookup(normalized string) ([][]byte, error)
+}
+
 // Registry 是型別註冊表。
 type Registry interface {
 	Lookup(name string) (registry.Entry, bool)
@@ -78,8 +84,10 @@ type Deps struct {
 	// ImageURL 把型別的圖片 key 轉成推播用的絕對網址；nil 表示沒有設定圖片網域，推播不帶圖。
 	ImageURL func(key string) string
 	Mail     resend.Sender
-	Now      func() time.Time
-	Logger   *slog.Logger
+	// Suppression 是 email 查名單的雜湊；email 渠道必填。
+	Suppression Suppression
+	Now         func() time.Time
+	Logger      *slog.Logger
 }
 
 // Service 執行渠道 job。
@@ -248,7 +256,14 @@ func (s *Service) emailTarget(ctx context.Context, q *store.Queries, accountID i
 	if !valid {
 		return "", ReasonNoEmailAddress, nil
 	}
-	suppressed, err := q.EmailSuppressed(ctx, norm)
+	if s.d.Suppression == nil {
+		return "", "", errors.New("email suppression 的雜湊沒有設定")
+	}
+	hashes, err := s.d.Suppression.Lookup(norm)
+	if err != nil {
+		return "", "", err
+	}
+	suppressed, err := q.EmailSuppressed(ctx, hashes)
 	if err != nil {
 		return "", "", fmt.Errorf("查 suppression 名單：%w", err)
 	}

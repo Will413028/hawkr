@@ -61,7 +61,7 @@ type Result struct {
 	Detail  string
 }
 
-// Sender 把一則訊息推給一批 token，回傳與 tokens 等長、同序的結果。error 只用在整個呼叫無法進行（例如 ctx 取消）。
+// Sender 把一則訊息推給一批 token，回傳與 tokens 等長、同序的結果。error 只用在整個呼叫無法進行（例如 ctx 取消、而且還沒有任何 token 被收下）；送到一半被取消、已有 token 被收下時回傳部分結果（其餘 token 記暫時性失敗）而不是錯誤。
 type Sender interface {
 	Send(ctx context.Context, tokens []string, m Message) ([]Result, error)
 }
@@ -137,12 +137,24 @@ func (c *Client) Send(ctx context.Context, tokens []string, m Message) ([]Result
 			}()
 		}
 		wg.Wait()
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
 		out = append(out, res...)
+		if err := ctx.Err(); err != nil {
+			return cancelled(out, tokens, err)
+		}
 	}
 	return out, nil
+}
+
+// cancelled 處理送到一半 ctx 取消：已有 token 被 FCM 收下時回傳已完成批次的結果、其餘 token 記暫時性失敗，
+// 讓呼叫端能把已送出的結果記進帳本，免得重試時對已收到的裝置再推一次；一個都沒送出時回 ctx 的錯誤，重試是安全的。
+func cancelled(done []Result, tokens []string, err error) ([]Result, error) {
+	if !slices.ContainsFunc(done, func(r Result) bool { return r.Outcome == OutcomeSent }) {
+		return nil, err
+	}
+	for _, tok := range tokens[len(done):] {
+		done = append(done, Result{Token: tok, Outcome: OutcomeTransient, Detail: "canceled"})
+	}
+	return done, nil
 }
 
 type fcmError struct {

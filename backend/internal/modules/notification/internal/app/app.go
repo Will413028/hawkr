@@ -20,6 +20,8 @@ import (
 // Accounts 是對 identity 的需求：以共享鎖鎖住存活的帳號列（commit 前不會被刪），並回報帳號是否已刪除。identity.Module 實作它。
 type Accounts interface {
 	ShareLockAccount(ctx context.Context, id int64) (deleted bool, err error)
+	// SetPreferredLocale 在呼叫者的 transaction 內把帳號的 preferred_locale 改成 locale（只在不同時寫）。
+	SetPreferredLocale(ctx context.Context, id int64, locale uitext.Locale) (bool, error)
 }
 
 // Registry 是型別註冊表；正式組裝用 registry.Registry，測試可以換成帶測試型別的版本。

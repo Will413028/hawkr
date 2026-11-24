@@ -38,6 +38,19 @@ func (q *Queries) DeleteDeviceTokensByValue(ctx context.Context, tokens []string
 	return result.RowsAffected(), nil
 }
 
+const deleteHardBounceSuppressions = `-- name: DeleteHardBounceSuppressions :execrows
+DELETE FROM notification.email_suppressions WHERE address_hash = ANY($1::bytea[]) AND reason = 'HARD_BOUNCE'
+`
+
+// 只刪永久退信；投訴的列不在條件內，永遠刪不掉。
+func (q *Queries) DeleteHardBounceSuppressions(ctx context.Context, hashes [][]byte) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteHardBounceSuppressions, hashes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteStaleDeviceTokens = `-- name: DeleteStaleDeviceTokens :execrows
 DELETE FROM notification.device_tokens
 WHERE token IN (
@@ -157,14 +170,39 @@ func (q *Queries) DeviceTokensForRecipient(ctx context.Context, arg DeviceTokens
 }
 
 const emailSuppressed = `-- name: EmailSuppressed :one
-SELECT EXISTS (SELECT 1 FROM notification.email_suppressions WHERE address = $1) AS suppressed
+SELECT EXISTS (SELECT 1 FROM notification.email_suppressions WHERE address_hash = ANY($1::bytea[])) AS suppressed
 `
 
-func (q *Queries) EmailSuppressed(ctx context.Context, address string) (bool, error) {
-	row := q.db.QueryRow(ctx, emailSuppressed, address)
+// hashes 是位址在目前與（輪替期間的）舊密鑰下的雜湊。
+func (q *Queries) EmailSuppressed(ctx context.Context, hashes [][]byte) (bool, error) {
+	row := q.db.QueryRow(ctx, emailSuppressed, hashes)
 	var suppressed bool
 	err := row.Scan(&suppressed)
 	return suppressed, err
+}
+
+const emailSuppressionReasons = `-- name: EmailSuppressionReasons :many
+SELECT reason FROM notification.email_suppressions WHERE address_hash = ANY($1::bytea[])
+`
+
+func (q *Queries) EmailSuppressionReasons(ctx context.Context, hashes [][]byte) ([]string, error) {
+	rows, err := q.db.Query(ctx, emailSuppressionReasons, hashes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var reason string
+		if err := rows.Scan(&reason); err != nil {
+			return nil, err
+		}
+		items = append(items, reason)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const inboxItemForDelivery = `-- name: InboxItemForDelivery :one
@@ -196,20 +234,21 @@ func (q *Queries) InboxItemForDelivery(ctx context.Context, arg InboxItemForDeli
 }
 
 const insertEmailSuppression = `-- name: InsertEmailSuppression :exec
-INSERT INTO notification.email_suppressions (address, reason, created_at)
+INSERT INTO notification.email_suppressions (address_hash, reason, created_at)
 VALUES ($1, $2, $3)
-ON CONFLICT (address) DO NOTHING
+ON CONFLICT (address_hash) DO UPDATE SET reason = 'COMPLAINT'
+WHERE excluded.reason = 'COMPLAINT' AND notification.email_suppressions.reason <> 'COMPLAINT'
 `
 
 type InsertEmailSuppressionParams struct {
-	Address string
-	Reason  string
-	Now     time.Time
+	AddressHash []byte
+	Reason      string
+	Now         time.Time
 }
 
-// 已在名單內的位址不動（保留最早的原因與時間），所以 webhook 重複處理無害。
+// 已在名單內的位址保留最早的時間，webhook 重複處理無害；投訴會把永久退信升級成 COMPLAINT，COMPLAINT 不會被降級。
 func (q *Queries) InsertEmailSuppression(ctx context.Context, arg InsertEmailSuppressionParams) error {
-	_, err := q.db.Exec(ctx, insertEmailSuppression, arg.Address, arg.Reason, arg.Now)
+	_, err := q.db.Exec(ctx, insertEmailSuppression, arg.AddressHash, arg.Reason, arg.Now)
 	return err
 }
 

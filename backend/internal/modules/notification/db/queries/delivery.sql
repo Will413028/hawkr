@@ -45,13 +45,22 @@ WHERE token IN (
 );
 
 -- name: EmailSuppressed :one
-SELECT EXISTS (SELECT 1 FROM notification.email_suppressions WHERE address = sqlc.arg(address)) AS suppressed;
+-- hashes 是位址在目前與（輪替期間的）舊密鑰下的雜湊。
+SELECT EXISTS (SELECT 1 FROM notification.email_suppressions WHERE address_hash = ANY(sqlc.arg(hashes)::bytea[])) AS suppressed;
 
 -- name: InsertEmailSuppression :exec
--- 已在名單內的位址不動（保留最早的原因與時間），所以 webhook 重複處理無害。
-INSERT INTO notification.email_suppressions (address, reason, created_at)
-VALUES (sqlc.arg(address), sqlc.arg(reason), sqlc.arg(now))
-ON CONFLICT (address) DO NOTHING;
+-- 已在名單內的位址保留最早的時間，webhook 重複處理無害；投訴會把永久退信升級成 COMPLAINT，COMPLAINT 不會被降級。
+INSERT INTO notification.email_suppressions (address_hash, reason, created_at)
+VALUES (sqlc.arg(address_hash), sqlc.arg(reason), sqlc.arg(now))
+ON CONFLICT (address_hash) DO UPDATE SET reason = 'COMPLAINT'
+WHERE excluded.reason = 'COMPLAINT' AND notification.email_suppressions.reason <> 'COMPLAINT';
+
+-- name: DeleteHardBounceSuppressions :execrows
+-- 只刪永久退信；投訴的列不在條件內，永遠刪不掉。
+DELETE FROM notification.email_suppressions WHERE address_hash = ANY(sqlc.arg(hashes)::bytea[]) AND reason = 'HARD_BOUNCE';
+
+-- name: EmailSuppressionReasons :many
+SELECT reason FROM notification.email_suppressions WHERE address_hash = ANY(sqlc.arg(hashes)::bytea[]);
 
 -- name: InboxItemForDelivery :one
 -- 推播 data 帶的 inbox_item_id：這筆投遞的收件人在這個意圖下的收件匣列（意圖連結，或公告自己的列）；沒有收件匣列（只推播的型別）回 0 列。

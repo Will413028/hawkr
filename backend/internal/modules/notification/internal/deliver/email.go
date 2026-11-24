@@ -19,6 +19,9 @@ func (s *Service) sendEmail(ctx context.Context, p plan, final bool) error {
 		s.log().WarnContext(ctx, "email 被 provider 永久拒絕", "delivery_id", p.delivery.ID, "error", err)
 		return s.settle(ctx, p, false, ReasonEmailRejected)
 	default:
+		if errors.Is(err, resend.ErrAuth) {
+			s.log().ErrorContext(ctx, "Resend 金鑰被拒（401、403），email 送不出去，需要修設定", "delivery_id", p.delivery.ID)
+		}
 		return s.retryOrFail(ctx, p, final, fmt.Errorf("寄信暫時性失敗：%w", err))
 	}
 }

@@ -1,7 +1,6 @@
 package deliver
 
 import (
-	"strings"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
@@ -38,5 +37,5 @@ func hints(h model.StateHint) string {
 	if h == model.StateHintNone {
 		return ""
 	}
-	return strings.Join([]string{StateRefreshHintPrefix + string(h)}, ",")
+	return StateRefreshHintPrefix + string(h)
 }

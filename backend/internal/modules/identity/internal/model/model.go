@@ -10,6 +10,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // Role 是帳號另外申請的角色。值等於 account_roles.role 的 CHECK（TestCodeValueChecksMatchTheGoTypes）。買家不是角色：
@@ -325,7 +326,15 @@ type LoginInput struct {
 	Client   ClientKind
 	// PreviousToken 是這個請求帶來的登入前 session token（沒有時是空字串）；登入換發新 session 時一併刪除它（防 session fixation）。
 	PreviousToken string
+	// Locale 是這次登入請求協商出的 UI 語系；與帳號的 preferred_locale 不同就更新它（多語系 ADR D1）。空字串是沒有語系資訊（網頁的 OAuth 回呼），不動。
+	Locale uitext.Locale
 }
+
+// ValidLocale 回報 locale 是否在 preferred_locale 的支援清單（zh-TW、en）內；db/schema.sql 的 CHECK 與 Locales 同步（TestCodeValueChecksMatchTheGoTypes）。
+func ValidLocale(l uitext.Locale) bool { return slices.Contains(Locales(), l) }
+
+// Locales 回傳 preferred_locale 的支援清單。
+func Locales() []uitext.Locale { return []uitext.Locale{uitext.ZhTW, uitext.EN} }
 
 // LoginResult 是登入的結果。Token 是新 session 的原文 token，只在這裡出現一次。
 type LoginResult struct {

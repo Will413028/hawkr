@@ -25,6 +25,9 @@ CREATE SCHEMA identity;
 --
 -- email 是 provider 回報的已驗證 email（LINE 可能沒有），登入時更新，是寄件地址，也給後台的清單顯示與搜尋。它不是識別：不唯一。
 --
+-- preferred_locale 是帳號最後一次生效的 UI 語系（多語系 ADR D1）：登入時與 notification 的 RegisterDeviceToken（App 每次啟動、回到前景都呼叫）
+-- 以請求協商出的語系更新，伺服器非同步產生的文字（推播、email）依它組字；一人一個值，預設 zh-TW。
+--
 -- self_entered_email 是帳號自己填的聯絡信箱（D23 2026-11-03 修訂；賣家送審、收款帳戶的聯絡信箱要有）：未驗證，不是寄件地址
 -- （通知只寄已驗證的 email，通知 ADR 決策 8），不是識別，也不寫進 account_identities、不成為自動連結的依據。只在帳號沒有已驗證的
 -- email 時可設（應用層檢查；帳號之後才取得已驗證 email 時保留原值，讀取時已驗證的 email 優先）。格式與長度同收款帳戶的聯絡信箱。
@@ -35,8 +38,11 @@ CREATE TABLE identity.accounts (
     suspended_at  TIMESTAMPTZ,
     deleted_at    TIMESTAMPTZ,
     deletion_pending_at TIMESTAMPTZ,
+    preferred_locale TEXT      NOT NULL DEFAULT 'zh-TW',
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    -- 非同步訊息（推播、email）的語系（多語系 ADR D1）：只准支援清單（zh-TW、en）內的值；清單與 platform/uitext 的 Locale 同步（TestCodeValueChecksMatchTheGoTypes）。
+    CONSTRAINT accounts_preferred_locale_check CHECK (preferred_locale IN ('zh-TW', 'en')),
     -- 刪除的帳號沒有個資，也不再是停權狀態。
     CONSTRAINT accounts_deleted_check CHECK (deleted_at IS NULL OR (email IS NULL AND self_entered_email IS NULL AND suspended_at IS NULL)),
     -- 自填信箱已正規化：小寫、至多 254 字、恰好一個 @ 且兩側非空。
