@@ -2,7 +2,6 @@ package io.github.will413028.hawkr.order.service;
 
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.OrderCancelReason;
-import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.order.mq.PaymentEventHandler;
 import io.github.will413028.hawkr.payment.grpc.GetActivePaymentStatusByOrderNoResponse;
@@ -37,13 +36,13 @@ class OrderExpiryCancellationServiceTest {
 
     @Mock PaymentGrpcClient paymentGrpcClient;
     @Mock PaymentEventHandler paymentEventHandler;
-    @Mock CheckoutCouponGrpcClient checkoutCouponGrpcClient;
+    @Mock CouponReleaseService couponReleaseService;
 
     private static final String ORDER_NO = "O400280260";
 
     private OrderExpiryCancellationService newService() {
         return new OrderExpiryCancellationService(
-                paymentGrpcClient, paymentEventHandler, checkoutCouponGrpcClient);
+                paymentGrpcClient, paymentEventHandler, couponReleaseService);
     }
 
     @Test
@@ -73,7 +72,7 @@ class OrderExpiryCancellationServiceTest {
     }
 
     @Test
-    @DisplayName("非已付款（查無交易）→ 照舊走 CAS 取消（庫存歸還已於 cancelExpiredOrderInTx 內落 outbox）+ best-effort 釋券")
+    @DisplayName("非已付款（查無交易）→ 照舊走 CAS 取消（庫存歸還已於 cancelExpiredOrderInTx 內落 outbox）+ 釋券（寫入重試任務）")
     void cancelsWhenNotPaid() {
         GetActivePaymentStatusByOrderNoResponse response = GetActivePaymentStatusByOrderNoResponse.newBuilder()
                 .setCode(GrpcResponseCode.SUCCESS.code())
@@ -90,8 +89,8 @@ class OrderExpiryCancellationServiceTest {
 
         assertTrue(cancelled);
         verify(paymentEventHandler).cancelExpiredOrderInTx(ORDER_NO, OrderCancelReason.SELLER_SUSPENDED.value());
-        // 庫存歸還已改為 cancelExpiredOrderInTx 事務內落 order.cancelled outbox（#1368），此處只驗 best-effort 釋券
-        verify(checkoutCouponGrpcClient).releaseCoupon("coupon-1", ORDER_NO);
+        // 庫存歸還在 cancelExpiredOrderInTx 事務內落 order.cancelled outbox，此處只驗釋券
+        verify(couponReleaseService).release(ORDER_NO, "coupon-1");
     }
 
     @Test
@@ -105,7 +104,7 @@ class OrderExpiryCancellationServiceTest {
         assertFalse(cancelled);
         // fail-safe：gate 無法判定付款真相 → 不進 CAS 取消，交由下輪 PaymentDeadlineScheduler 重掃自癒
         verify(paymentEventHandler, never()).cancelExpiredOrderInTx(anyString(), anyString());
-        verify(checkoutCouponGrpcClient, never()).releaseCoupon(anyString(), anyString());
+        verify(couponReleaseService, never()).release(anyString(), any());
     }
 
     @Test
@@ -120,7 +119,7 @@ class OrderExpiryCancellationServiceTest {
 
         assertFalse(cancelled);
         verify(paymentEventHandler, never()).cancelExpiredOrderInTx(anyString(), anyString());
-        verify(checkoutCouponGrpcClient, never()).releaseCoupon(anyString(), anyString());
+        verify(couponReleaseService, never()).release(anyString(), any());
     }
 
     @Test
@@ -137,6 +136,6 @@ class OrderExpiryCancellationServiceTest {
 
         assertFalse(cancelled);
         // CAS 0 rows → cancelExpiredOrderInTx 內既不改狀態也不落 outbox，且不做 TX 外釋券補償
-        verify(checkoutCouponGrpcClient, never()).releaseCoupon(anyString(), anyString());
+        verify(couponReleaseService, never()).release(anyString(), any());
     }
 }

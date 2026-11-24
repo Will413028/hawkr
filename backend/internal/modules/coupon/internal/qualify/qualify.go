@@ -18,16 +18,10 @@ type Stores interface {
 	StoreSuspended(ctx context.Context, storeID int64) (bool, error)
 }
 
-// Members 是「買家在該店有消費紀錄」的 port（MEMBER 資格用）。
-type Members interface {
-	IsMember(ctx context.Context, buyerID, storeID int64) (bool, error)
-}
-
 // Deps 是判定的依賴。
 type Deps struct {
-	DB      *db.DB
-	Stores  Stores
-	Members Members
+	DB     *db.DB
+	Stores Stores
 }
 
 // Service 是資格判定。
@@ -97,7 +91,7 @@ func (s *Service) targets(ctx context.Context, c model.Campaign, buyerID int64) 
 		if c.StoreID == nil {
 			return false, nil
 		}
-		ok, err := s.d.Members.IsMember(ctx, buyerID, *c.StoreID)
+		ok, err := store.New(s.d.DB.Conn(ctx)).HasMembership(ctx, store.HasMembershipParams{StoreID: *c.StoreID, BuyerID: buyerID})
 		if err != nil {
 			return false, fmt.Errorf("coupon：讀買家 %d 在店家 %d 的消費紀錄：%w", buyerID, *c.StoreID, err)
 		}

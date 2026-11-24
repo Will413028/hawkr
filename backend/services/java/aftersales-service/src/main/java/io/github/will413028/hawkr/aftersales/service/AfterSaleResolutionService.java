@@ -350,7 +350,9 @@ public class AfterSaleResolutionService {
                 ProtoConversionUtils.formatLong(couponAmount),
                 ProtoConversionUtils.formatLong(couponMinSpend),
                 couponMessage != null ? couponMessage : "",
-                caseNo
+                caseNo,
+                // D4：售後單 id 是 coupon 端補償券的冪等鍵，重送同一張售後單只發一張
+                ProtoConversionUtils.formatLong(caseEntity.getId())
         );
 
         // envelope-code 檢查（依《Java gRPC 錯誤處理規範》§7.0 現行約定）：

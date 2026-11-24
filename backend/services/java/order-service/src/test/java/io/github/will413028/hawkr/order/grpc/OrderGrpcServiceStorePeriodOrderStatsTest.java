@@ -3,7 +3,7 @@ package io.github.will413028.hawkr.order.grpc;
 import io.github.will413028.hawkr.common.config.MediaUrlProperties;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.order.checkout.CheckoutService;
-import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.service.CouponReleaseService;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
 import io.github.will413028.hawkr.order.entity.StorePeriodOrderStatsResult;
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
@@ -41,7 +41,7 @@ class OrderGrpcServiceStorePeriodOrderStatsTest {
 
     private OrderGrpcService buildService() {
         return new OrderGrpcService(orderService, mock(CheckoutService.class),
-                mock(CheckoutCouponGrpcClient.class), mock(OrderRepository.class),
+                mock(CouponReleaseService.class), mock(OrderRepository.class),
                 mock(OrderItemRepository.class), mock(ShippingGrpcClient.class),
                 mock(PaymentGrpcClient.class), mock(SellerGrpcClient.class),
                 mock(BuyerGrpcClient.class), mock(MediaGrpcClient.class),

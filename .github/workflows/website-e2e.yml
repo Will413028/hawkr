@@ -87,6 +87,8 @@ env:
 jobs:
   e2e:
     name: Playwright e2e (${{ matrix.shard }}/8)
+    # 慢的 job：開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: ubuntu-24.04
     # 官方映像已含瀏覽器與系統相依套件，省掉每次 apt 安裝（實測在 runner 上會卡十幾分鐘）。
     container: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
@@ -125,6 +127,8 @@ jobs:
 
   component-browser:
     name: 元件 browser 測試
+    # 慢的 job：開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: ubuntu-24.04
     container: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
     timeout-minutes: 30

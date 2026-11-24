@@ -4,7 +4,7 @@ import io.github.will413028.hawkr.common.config.MediaUrlProperties;
 import io.github.will413028.hawkr.common.grpc.GrpcAuthContext;
 import io.github.will413028.hawkr.common.utils.code.AccountType;
 import io.github.will413028.hawkr.order.checkout.CheckoutService;
-import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.service.CouponReleaseService;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.entity.SellerOrderQuery;
@@ -56,7 +56,7 @@ class OrderGrpcServiceSellerOrdersTest {
 
     @Mock private OrderService orderService;
     @Mock private CheckoutService checkoutService;
-    @Mock private CheckoutCouponGrpcClient checkoutCouponGrpcClient;
+    @Mock private CouponReleaseService couponReleaseService;
     @Mock private OrderRepository orderRepository;
     @Mock private OrderItemRepository orderItemRepository;
     @Mock private ShippingGrpcClient shippingGrpcClient;
@@ -69,7 +69,7 @@ class OrderGrpcServiceSellerOrdersTest {
     @Mock private OrderEventPublisher eventPublisher;
 
     private OrderGrpcService buildService() {
-        return new OrderGrpcService(orderService, checkoutService, checkoutCouponGrpcClient,
+        return new OrderGrpcService(orderService, checkoutService, couponReleaseService,
                 orderRepository, orderItemRepository, shippingGrpcClient, paymentGrpcClient,
                 sellerGrpcClient, buyerGrpcClient, mediaGrpcClient, mediaUrlProperties,
                 grantPaymentTaskRepository,

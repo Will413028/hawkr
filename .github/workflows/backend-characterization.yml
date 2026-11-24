@@ -71,7 +71,8 @@ jobs:
   characterize:
     name: ${{ matrix.module }} 特性測試
     needs: modules
-    if: needs.modules.outputs.modules != '[]'
+    # 開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
+    if: needs.modules.outputs.modules != '[]' && (github.event_name != 'pull_request' || github.base_ref == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:

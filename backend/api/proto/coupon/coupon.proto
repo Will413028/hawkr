@@ -186,6 +186,8 @@ message ReserveCouponRequest {
     string template_id = 1;                     // 優惠券 Template ID
     int64 buyer_id = 2;
     string order_no = 3;                        // 關聯訂單編號
+    string store_id = 4;                        // 必填：賣家 store_id surrogate，Lock 重驗店家範圍（D10）
+    string order_amount = 5;                    // 必填：訂單原價小計（正整數字串，新台幣元），Lock 重驗門檻（D10）
 }
 
 message ReserveCouponResponse {
@@ -435,6 +437,7 @@ message GrantSellerCompensationCouponRequest {
     string min_order_amount = 4;                // 最低消費門檻
     string message = 5;                         // 給買家的訊息
     string ref_case_no = 6;                     // 關聯售後單號（稽核用）
+    string source_id = 7;                       // 必填：售後單 id，與來源型別 AFTERSALES_CASE 組成補償券的冪等鍵，重送同一個 id 只發一張
 }
 
 message GrantSellerCompensationCouponResponse {

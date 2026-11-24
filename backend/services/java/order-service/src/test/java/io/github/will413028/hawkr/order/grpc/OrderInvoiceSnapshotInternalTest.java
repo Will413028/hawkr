@@ -6,7 +6,7 @@ import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceCarrierSelectionMode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceDocumentKind;
 import io.github.will413028.hawkr.order.checkout.CheckoutService;
-import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.service.CouponReleaseService;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.entity.OrderInvoiceSnapshotEntity;
@@ -63,7 +63,7 @@ class OrderInvoiceSnapshotInternalTest {
 
     private OrderGrpcService buildService(String agentMerId) {
         return new OrderGrpcService(
-                mock(OrderService.class), mock(CheckoutService.class), mock(CheckoutCouponGrpcClient.class),
+                mock(OrderService.class), mock(CheckoutService.class), mock(CouponReleaseService.class),
                 orderRepository, orderItemRepository, mock(ShippingGrpcClient.class),
                 mock(PaymentGrpcClient.class), mock(SellerGrpcClient.class), mock(BuyerGrpcClient.class),
                 mock(MediaGrpcClient.class), mock(MediaUrlProperties.class),

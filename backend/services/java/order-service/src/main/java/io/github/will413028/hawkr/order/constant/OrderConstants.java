@@ -79,6 +79,11 @@ public final class OrderConstants {
 
     public static final int DEFAULT_MAX_RETRY_COUNT = 10;
 
+    /** coupon_consumption_tasks.task_type：付款後核銷。 */
+    public static final String COUPON_TASK_TYPE_CONSUME = "CONSUME";
+    /** coupon_consumption_tasks.task_type：取消或補償後以 order_no 釋券（D3）。 */
+    public static final String COUPON_TASK_TYPE_RELEASE = "RELEASE";
+
     // ==================== 確認收貨方式 ====================
 
     /** 買家手動確認 */

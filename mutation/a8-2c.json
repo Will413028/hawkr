@@ -5,7 +5,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/announce/fanout.go",
    "old": "\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tid := s.d.NewID()\n\t\tn, err := q.InsertAnnouncementInbox(ctx,",
-   "new": "\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tvar hasToken bool\n\t\tif err := s.d.DB.Conn(ctx).QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notification.device_tokens WHERE account_id = $1)`, r.AccountID).Scan(&hasToken); err != nil || !hasToken {\n\t\t\treturn err\n\t\t}\n\t\tn, err := q.InsertAnnouncementInbox(ctx,",
+   "new": "\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tid := s.d.NewID()\n\t\tvar hasToken bool\n\t\tif err := s.d.DB.Conn(ctx).QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notification.device_tokens WHERE account_id = $1)`, r.AccountID).Scan(&hasToken); err != nil || !hasToken {\n\t\t\treturn err\n\t\t}\n\t\tn, err := q.InsertAnnouncementInbox(ctx,",
    "test": "internal/modules/notification ^TestAccountWithoutDeviceTokenStillGetsTheInboxItem$",
    "why": "收件匣只寫給有 device token 的帳號（舊系統只送有 token 的人）：沒有 token 的帳號沒有收件匣列"
   },

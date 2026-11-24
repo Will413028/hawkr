@@ -101,9 +101,6 @@ func (h *Admin) CreateCampaign(ctx context.Context, req *connect.Request[adminpb
 	if err != nil {
 		return nil, err
 	}
-	if in.GetTargetType() == pb.TargetType_TARGET_TYPE_MEMBER {
-		return nil, rpc.RequiredField("campaign.target_type", "目前不能建立 MEMBER 資格的活動")
-	}
 	create := coupon.CreateCampaignInput{
 		CampaignSpec: spec, TargetType: rpc.EnumFromProto[coupon.TargetType](in.GetTargetType()), TargetBuyers: buyers,
 	}
