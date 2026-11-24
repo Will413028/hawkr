@@ -3,6 +3,7 @@ package notification
 import (
 	"context"
 	"reflect"
+	"strings"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -17,7 +18,19 @@ type subscription struct {
 	register func(*events.Bus)
 }
 
-func eventName[E any]() string { return reflect.TypeFor[E]().String() }
+// eventName 是「擁有事件的模組.型別名」。模組公開的事件多半是 internal/model 的 alias，reflect 的套件名會是 model，
+// 所以從 PkgPath 取 internal/modules/ 之後的第一段當模組名。
+func eventName[E any]() string {
+	t := reflect.TypeFor[E]()
+	const marker = "/internal/modules/"
+	path := t.PkgPath()
+	i := strings.Index(path, marker)
+	if i < 0 {
+		return t.String()
+	}
+	module, _, _ := strings.Cut(path[i+len(marker):], "/")
+	return module + "." + t.Name()
+}
 
 // notify 是登記通知型別的訂閱者；types 至少一個。
 func notify[E any](h func(context.Context, E) error, types ...string) subscription {
