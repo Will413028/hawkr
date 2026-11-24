@@ -19,4 +19,5 @@ func (w *processWorker) Work(ctx context.Context, job *river.Job[ProcessArgs]) e
 // AddWorkers 登記 River worker。
 func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &processWorker{service: s})
+	river.AddWorker(workers, &fanoutWorker{service: s})
 }

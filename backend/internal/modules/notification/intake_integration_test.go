@@ -38,6 +38,8 @@ import (
 type recorder struct {
 	mu         sync.Mutex
 	args       []intake.ProcessArgs
+	fanouts    []intake.FanoutArgs
+	fanoutOpts []*river.InsertOpts
 	deliveries []intake.DeliverArgs
 	purges     []purge.RecipientArgs
 	// deliverUnique 記錄每個渠道 job 是否以參數（投遞紀錄 ID）唯一。
@@ -50,6 +52,9 @@ func (r *recorder) Enqueue(_ context.Context, a river.JobArgs, opts *river.Inser
 	switch a := a.(type) {
 	case intake.ProcessArgs:
 		r.args = append(r.args, a)
+	case intake.FanoutArgs:
+		r.fanouts = append(r.fanouts, a)
+		r.fanoutOpts = append(r.fanoutOpts, opts)
 	case purge.RecipientArgs:
 		r.purges = append(r.purges, a)
 	case intake.DeliverArgs:
@@ -73,6 +78,14 @@ func (r *recorder) takePurges() []purge.RecipientArgs {
 	out := r.purges
 	r.purges = nil
 	return out
+}
+
+func (r *recorder) takeFanouts() ([]intake.FanoutArgs, []*river.InsertOpts) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out, opts := r.fanouts, r.fanoutOpts
+	r.fanouts, r.fanoutOpts = nil, nil
+	return out, opts
 }
 
 func (r *recorder) take() []intake.ProcessArgs {
@@ -227,11 +240,14 @@ func (testRegistry) Lookup(name string) (registry.Entry, bool) {
 	case "test_store_push_only":
 		return testStorePushOnly, true
 	}
+	if e, ok := resolutionTestTypes[name]; ok {
+		return e, true
+	}
 	return registry.Lookup(name)
 }
 
 func (testRegistry) All() []registry.Entry {
-	return append(registry.All(), testLike, testPush, testPushImage, testTwin, testStoreNote, testStorePushOnly)
+	return append(append(registry.All(), resolutionTestEntries()...), testLike, testPush, testPushImage, testTwin, testStoreNote, testStorePushOnly)
 }
 
 // fakeStores 取代 seller：測試只需要「店家是否已退場」。沒登記的店視為存在、營運中。
@@ -270,6 +286,9 @@ type fixture struct {
 	push     *fcm.Fake
 	mail     *resend.Fake
 	contacts *fakeContacts
+	resolver Resolver
+	// sellerMod 只有 setupResolution 建（真的 seller 模組）；其餘測試用 stores 替身。
+	sellerMod *seller.Module
 }
 
 type syncBuffer struct {

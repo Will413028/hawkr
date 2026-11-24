@@ -21,9 +21,9 @@
   {
    "id": "announcement-type-not-registered",
    "stack": "go-integration",
-   "file": "backend/internal/modules/notification/internal/registry/registry.go",
-   "old": "var all = []Entry{accountSuspended, accountUnsuspended, announcement}",
-   "new": "var all = []Entry{accountSuspended, accountUnsuspended}",
+   "file": "backend/internal/modules/notification/internal/registry/announcement.go",
+   "old": "var announcementTypes = []Entry{announcement}",
+   "new": "var announcementTypes = []Entry{}",
    "test": "internal/modules/notification ^TestAnnouncementShowsInTheInboxAndIsRenderedInEnglish$",
    "why": "公告型別不在註冊表：收件匣的型別篩選把公告列藏起來，列表、total、未讀數都看不到"
   },

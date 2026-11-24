@@ -32,6 +32,8 @@ var (
 	exampleAt           = time.Date(2026, 11, 23, 4, 30, 0, 0, time.UTC)
 )
 
+var accountTypes = []Entry{accountSuspended, accountUnsuspended}
+
 var accountSuspended = Define(Definition[AccountSuspendedParams]{
 	Name:              "account_suspended",
 	Audiences:         []model.Audience{model.AudienceBuyer},
