@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/candidate"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/search"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -36,11 +37,19 @@ const (
 )
 
 // Service 是詢價發布鏈的 use case；Events 是 ExecutePublication 在同 transaction 發布 RfqPublished 的事件匯流排（procurement.New 要求必給）。
+// Blocks 與 Open 是預覽與執行發布時的店家檢查（A9-D45(4)）：封鎖這位買家的店、不是營業中的店都不能發布；兩者都必給，缺一個發布一律回組裝錯誤（不當成沒有封鎖）。
 type Service struct {
 	DB     *db.DB
 	Now    func() time.Time
 	Events *events.Bus
+	Blocks candidate.BlockedStores
+	Open   candidate.OpenStores
 }
+
+const (
+	msgCandidateSetStalePreview = "這個候選集已不是有效的候選集，請重新載入"
+	msgCandidateSetStaleExecute = "這個候選集已不是有效的候選集，請重新預覽"
+)
 
 func versionConflict(msg, target string) error {
 	return apperr.VersionConflict("%s", msg).WithMetadata("conflictTarget", target)
@@ -122,4 +131,29 @@ func lockRequest(ctx context.Context, q *store.Queries, buyerID int64, requestID
 		return store.ProcurementRequest{}, store.ProcurementRequestRevision{}, fmt.Errorf("rfq：鎖需求：%w", err)
 	}
 	return settle(req, active, hasActive, expected)
+}
+
+// checkStores 在預覽與執行時重查受眾：任何一家封鎖這位買家或不是營業中，整筆回 VERSION_CONFLICT（candidate_set），訊息與候選集失效相同、不透露是哪一家（A9-D45(4)）。
+// 任何一個查詢失敗都回一般錯誤（fail-closed），不放行。
+func (s Service) checkStores(ctx context.Context, buyerID int64, storeIDs []int64, conflictMsg string) error {
+	if s.Blocks == nil || s.Open == nil {
+		return errors.New("rfq：Service.Blocks 與 Service.Open 必填：發布要檢查封鎖與營業中")
+	}
+	blocked, err := s.Blocks.StoreIDsBlockingBuyer(ctx, buyerID, storeIDs)
+	if err != nil {
+		return fmt.Errorf("rfq：讀封鎖這位買家的店家：%w", err)
+	}
+	open, err := s.Open.OpenStoreIDs(ctx, storeIDs)
+	if err != nil {
+		return fmt.Errorf("rfq：讀營業中的店家：%w", err)
+	}
+	for _, id := range storeIDs {
+		if _, isBlocked := blocked[id]; isBlocked {
+			return versionConflict(conflictMsg, TargetCandidateSet)
+		}
+		if _, isOpen := open[id]; !isOpen {
+			return versionConflict(conflictMsg, TargetCandidateSet)
+		}
+	}
+	return nil
 }

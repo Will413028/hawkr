@@ -82,6 +82,8 @@ type ProcurementBuyerQuoteAcceptance struct {
 	OrderFailureReason        *string
 	OrderNo                   *string
 	PaymentDeadline           *time.Time
+	OrderRef                  int64
+	OrderJobID                *int64
 	ClientRequestID           uuid.UUID
 	AcceptedAt                time.Time
 	CreatedAt                 time.Time

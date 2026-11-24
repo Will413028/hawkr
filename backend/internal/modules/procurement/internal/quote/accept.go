@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
@@ -96,8 +97,12 @@ func (s Service) Accept(ctx context.Context, in AcceptInput) (model.Acceptance, 
 			}
 			return liveCollision(ctx, q, in)
 		}
-		if _, err := s.Jobs.EnqueueJob(ctx, OrderProvisioningArgs{AcceptanceID: acceptance.ID}, nil); err != nil {
+		jobID, err := s.Jobs.EnqueueJob(ctx, OrderProvisioningArgs{AcceptanceID: acceptance.ID}, &river.InsertOpts{MaxAttempts: OrderMaxAttempts})
+		if err != nil {
 			return err
+		}
+		if err := q.SetAcceptanceOrderJob(ctx, store.SetAcceptanceOrderJobParams{ID: acceptance.ID, JobID: &jobID}); err != nil {
+			return fmt.Errorf("quote：記下建單 job：%w", err)
 		}
 		out = model.Acceptance{
 			ID: acceptance.ID, SellerResponseID: resp.ID, Version: version.Version, AcceptedDealPrice: version.TotalAmount, AcceptedAt: now,

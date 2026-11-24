@@ -124,3 +124,30 @@ JOIN procurement.rfq_publication_approvals a ON a.id = p.approval_id
 WHERE p.request_id = @request_id AND p.buyer_id = @buyer_id
 ORDER BY p.published_at DESC, p.id DESC
 LIMIT 1;
+
+-- name: SetAcceptanceOrderJob :exec
+-- 接受單寫入後、同 transaction 記下排入的建單 job，reconciler 以它判斷 job 是否已死。
+UPDATE procurement.buyer_quote_acceptances SET order_job_id = @job_id WHERE id = @id;
+
+-- name: GetOrderBasis :one
+-- 建單 worker 用（系統內部，免 buyer_id；買家關閉後 buyer_id 為 NULL）：接受單、被接受的版本與當時的需求版本。
+-- 品名由需求版本的品項（解析後的標籤優先）加被接受版本的報價數量與單位組成；數量去尾零。
+SELECT a.id, a.buyer_id, a.store_id, a.goods_amount, a.shipping_amount, a.tax_amount, a.accepted_deal_price,
+    a.order_provisioning_state, a.order_ref,
+    rev.item, rev.item_resolution_label,
+    trim_scale(v.offered_quantity)::text AS offered_quantity, v.offered_quantity_unit
+FROM procurement.buyer_quote_acceptances a
+JOIN procurement.rfq_publications p ON p.id = a.publication_id
+JOIN procurement.rfq_publication_approvals ap ON ap.id = p.approval_id
+JOIN procurement.request_revisions rev ON rev.id = ap.request_revision_id
+JOIN procurement.seller_response_versions v ON v.seller_response_id = a.seller_response_id AND v.version = a.seller_response_version
+WHERE a.id = @id;
+
+-- name: ListCreatingOrderIDsAfter :many
+SELECT id FROM procurement.buyer_quote_acceptances
+WHERE order_provisioning_state = 'CREATING_ORDER' AND id > @after
+ORDER BY id LIMIT @batch;
+
+-- name: LockCreatingAcceptance :one
+SELECT id, order_job_id FROM procurement.buyer_quote_acceptances
+WHERE id = @id AND order_provisioning_state = 'CREATING_ORDER' FOR UPDATE;

@@ -335,6 +335,8 @@ CREATE TABLE procurement.buyer_shortlist_entries (
 );
 CREATE UNIQUE INDEX buyer_shortlist_entries_response ON procurement.buyer_shortlist_entries (request_id, seller_response_id);
 
+-- order_ref 只當呼叫舊 ordering 的 CreateRfqOrder 的冪等鍵（Java orders.acceptance_id 是 BIGINT，A9-D45(1)），ordering 搬進單體時刪；
+-- order_job_id 是建單的 River job，對帳（reconciler）用它判斷 job 是否已死。
 -- 買家接受一份報價。state 只收有寫入者的值（S6，A9-D19 修訂）：ACTIVE，與建單重試用盡後的 ORDER_FAILED；live 鎖只擋 ACTIVE，
 -- 所以建單失敗後買家可以再接受（同家或別家）。成交價（三金額）凍結在這裡；接受當下賣家可見內容的 hash 與回價 hash 是買家 CAS 的對象，留作稽核（S5 的 (c)）。
 CREATE TABLE procurement.buyer_quote_acceptances (
@@ -357,6 +359,8 @@ CREATE TABLE procurement.buyer_quote_acceptances (
     order_failure_reason TEXT,
     order_no TEXT,
     payment_deadline TIMESTAMPTZ,
+    order_ref BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY UNIQUE,
+    order_job_id BIGINT,
     client_request_id UUID NOT NULL,
     accepted_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,

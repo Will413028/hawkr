@@ -1,0 +1,76 @@
+{
+ "mutants": [
+  {
+   "id": "execute-skips-store-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
+   "old": "if err := s.checkStores(ctx, in.BuyerID, c.storeIDs, msgCandidateSetStaleExecute); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/procurement/internal/rfq ^TestExecuteRejectsAStoreThatBlocksTheBuyerOrClosedSinceThePreview$",
+   "why": "ExecutePublication stops checking blocking and closed stores, so a store that blocked the buyer after the preview still gets the invite."
+  },
+  {
+   "id": "preview-skips-store-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "if err := s.checkStores(ctx, in.BuyerID, stores, msgCandidateSetStalePreview); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/procurement/internal/rfq ^TestPreviewRejectsAStoreThatBlocksTheBuyerOrIsNotOpen$",
+   "why": "PreviewPublication stops checking blocking and closed stores, so an approval is created for a blocking store."
+  },
+  {
+   "id": "store-check-fails-open-on-port-error",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/rfq.go",
+   "old": "\tblocked, err := s.Blocks.StoreIDsBlockingBuyer(ctx, buyerID, storeIDs)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"rfq：讀封鎖這位買家的店家：%w\", err)\n\t}\n\topen, err := s.Open.OpenStoreIDs(ctx, storeIDs)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"rfq：讀營業中的店家：%w\", err)\n\t}\n",
+   "new": "\tblocked, err := s.Blocks.StoreIDsBlockingBuyer(ctx, buyerID, storeIDs)\n\t_ = err\n\topen, err := s.Open.OpenStoreIDs(ctx, storeIDs)\n\t_ = err\n",
+   "test": "internal/modules/procurement/internal/rfq ^TestCheckStoresFailsClosedOnAnyPortError$",
+   "why": "A failed blocking or open-store read is ignored instead of failing the publication, so an outage lets blocking stores through."
+  },
+  {
+   "id": "last-attempt-does-not-mark-failed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "if !last || ctx.Err() != nil {",
+   "new": "if true {",
+   "test": "internal/modules/procurement ^TestLastAttemptFailureMarksOrderFailedReleasesTheLockAndTheBuyerCanAcceptAgain$",
+   "why": "The last failed attempt returns the error without marking the acceptance ORDER_FAILED, so the live lock stays and the buyer cannot accept again."
+  },
+  {
+   "id": "order-failed-keeps-the-live-lock",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/store/rfq.sql.go",
+   "old": "SET state = 'ORDER_FAILED', order_provisioning_state = 'ORDER_FAILED', order_failure_reason = $1",
+   "new": "SET order_provisioning_state = 'ORDER_FAILED', order_failure_reason = $1",
+   "test": "internal/modules/procurement ^TestProvisionTerminalRejectionMarksFailedWithoutWaitingForTheLastAttempt$",
+   "why": "MarkOrderFailed no longer moves the acceptance out of ACTIVE, so the live lock is not released."
+  },
+  {
+   "id": "classify-retries-every-error",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "case r.Code == internalErrorCode:",
+   "new": "case r.Code != 0:",
+   "test": "internal/modules/procurement/internal/provisioning ^TestClassify$",
+   "why": "Every non-zero ordering code is retried instead of only 500, so terminal rejections burn all attempts."
+  },
+  {
+   "id": "classify-never-retries",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "case r.Code == internalErrorCode:",
+   "new": "case r.Code == internalErrorCode && false:",
+   "test": "internal/modules/procurement/internal/provisioning ^TestClassify$",
+   "why": "A 500 from ordering is treated as a terminal rejection, so a transient outage fails the acceptance on the first attempt."
+  },
+  {
+   "id": "order-ref-not-stable-across-retries",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "OrderRef: b.OrderRef,",
+   "new": "OrderRef: w.Now().UnixNano(),",
+   "test": "internal/modules/procurement ^TestProvisionRetriesUseTheSameOrderRefAndCreateOnce$",
+   "why": "The idempotency key changes on every attempt, so a retry after a lost response creates a second order."
+  }
+ ]
+}
