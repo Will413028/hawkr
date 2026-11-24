@@ -167,6 +167,14 @@ var customerEffects = map[string]Effect{
 	"/hawkr.review.v1alpha1.ReviewAppService/ListMyReviews":       EffectRead,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListOwnStoreReviews": EffectRead,
 
+	// CouponAppService：領券寫入；結束活動是店家的收縮型寫入，停權的帳號不在這裡放行（店家的停權由賣家能力宣告處理）。
+	"/hawkr.coupon.v1alpha1.CouponAppService/ListMyVouchers":         EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/ListClaimableCampaigns": EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/ClaimCoupon":            EffectWrite,
+	"/hawkr.coupon.v1alpha1.CouponAppService/CreateCampaign":         EffectWrite,
+	"/hawkr.coupon.v1alpha1.CouponAppService/ListCampaigns":          EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/GetCampaign":            EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/EndCampaign":            EffectWrite,
 	// CrmAppService
 	"/hawkr.crm.v1alpha1.CrmAppService/ListCustomers":     EffectRead,
 	"/hawkr.crm.v1alpha1.CrmAppService/GetCustomer":       EffectRead,

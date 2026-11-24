@@ -293,6 +293,7 @@ func runServe(ctx context.Context) error {
 		Review:       reviewModule,
 		IM:           imModule,
 		CRM:          crmModule,
+		Coupon:       newCoupon(d, sellerModule),
 		Moderation:   moderationModule,
 		Notification: notificationModule,
 		Content: content.New(content.Deps{

@@ -18,6 +18,7 @@ schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與 `ports.go` 的 port。
 - `internal/model` 型別、原因與純函式；`internal/store` 是 sqlc 的查詢套件；`internal/rows` 資料列轉型別。
+- `internal/read` 買家的券與可領活動、賣家的活動列表與明細（keyset 分頁；資格只問 `qualify`）。
 - `internal/qualify` 資格判定的唯一實作（`Check`：狀態、時間窗、資格；`Fit`：店家範圍、門檻、折抵）；`internal/campaign` 活動的建立、發布、結束、配額；`internal/voucher` 券的領取、發放、補償、Lock、Redeem、Release、作廢。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
@@ -37,7 +38,8 @@ schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_
 
 - 結帳與訂單狀態：ordering（B8）；B8 前由 `legacy/couponserver` 以自己的 transaction 包 Lock、Redeem、Release。
 - 店家停權狀態、MEMBER 的消費紀錄：`Stores`、`Members` port 由組裝點提供（seller 的 API、B7-4 的投影）；本模組不 import `ordering` 與 `internal/legacy`。
-- 刪帳、停權事件的訂閱、到期提醒 job 與 `VoucherExpiring` 事件：B7-4。Connect API、買家列表查詢：B7-3。通知：notification 模組訂閱事件。
+- 刪帳事件的訂閱、MEMBER 投影、到期提醒 job 與 `VoucherExpiring` 事件：B7-4。admin 的 Connect API：B7-3b。通知：notification 模組訂閱事件。
+- Connect handler 在 `internal/httpapi/coupon`（賣家能力宣告表、顯示資料組裝）；`Stores` 的正式 adapter 在 `cmd/hawkr/coupon.go`。
 
 ## 決策紀錄
 

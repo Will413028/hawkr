@@ -9,6 +9,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"uuid"
 )
 
@@ -191,6 +192,17 @@ func (q *Queries) GetCampaignForUpdate(ctx context.Context, id uuid.UUID) (Coupo
 	return i, err
 }
 
+const getSellerQuota = `-- name: GetSellerQuota :one
+SELECT max_campaign_count FROM coupon.seller_coupon_quotas WHERE store_id = $1
+`
+
+func (q *Queries) GetSellerQuota(ctx context.Context, storeID int64) (int32, error) {
+	row := q.db.QueryRow(ctx, getSellerQuota, storeID)
+	var max_campaign_count int32
+	err := row.Scan(&max_campaign_count)
+	return max_campaign_count, err
+}
+
 const hasTargetAccount = `-- name: HasTargetAccount :one
 SELECT EXISTS (
     SELECT 1 FROM coupon.coupon_target_accounts WHERE campaign_id = $1 AND buyer_id = $2)
@@ -328,6 +340,216 @@ func (q *Queries) InsertTargetAccounts(ctx context.Context, arg InsertTargetAcco
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const listCampaignsByIDs = `-- name: ListCampaignsByIDs :many
+SELECT id, title, discount_type, discount_amount, discount_percent, max_discount_amount, threshold_amount, target_type, store_id, issuer_type, issuer_admin_id, issuer_store_id, start_at, end_at, total_limit, issued_count, status, source_type, source_id, ended_at, created_at, updated_at FROM coupon.coupon_campaigns WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) ListCampaignsByIDs(ctx context.Context, ids []uuid.UUID) ([]CouponCouponCampaign, error) {
+	rows, err := q.db.Query(ctx, listCampaignsByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CouponCouponCampaign{}
+	for rows.Next() {
+		var i CouponCouponCampaign
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.DiscountType,
+			&i.DiscountAmount,
+			&i.DiscountPercent,
+			&i.MaxDiscountAmount,
+			&i.ThresholdAmount,
+			&i.TargetType,
+			&i.StoreID,
+			&i.IssuerType,
+			&i.IssuerAdminID,
+			&i.IssuerStoreID,
+			&i.StartAt,
+			&i.EndAt,
+			&i.TotalLimit,
+			&i.IssuedCount,
+			&i.Status,
+			&i.SourceType,
+			&i.SourceID,
+			&i.EndedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listClaimCandidates = `-- name: ListClaimCandidates :many
+SELECT c.id, c.title, c.discount_type, c.discount_amount, c.discount_percent, c.max_discount_amount, c.threshold_amount, c.target_type, c.store_id, c.issuer_type, c.issuer_admin_id, c.issuer_store_id, c.start_at, c.end_at, c.total_limit, c.issued_count, c.status, c.source_type, c.source_id, c.ended_at, c.created_at, c.updated_at FROM coupon.coupon_campaigns c
+WHERE c.status = 'ACTIVE' AND c.target_type <> 'COMPENSATION'
+  AND (c.total_limit IS NULL OR c.issued_count < c.total_limit)
+  AND ($1::bigint IS NULL OR c.store_id IS NULL OR c.store_id = $1::bigint)
+  AND NOT EXISTS (SELECT 1 FROM coupon.coupon_vouchers v WHERE v.campaign_id = c.id AND v.buyer_id = $2)
+  AND ($3::timestamptz IS NULL OR (c.created_at, c.id) < ($3::timestamptz, $4::uuid))
+ORDER BY c.created_at DESC, c.id DESC
+LIMIT $5
+`
+
+type ListClaimCandidatesParams struct {
+	StoreID        *int64
+	BuyerID        int64
+	AfterCreatedAt *time.Time
+	AfterID        pgtype.UUID
+	MaxRows        int32
+}
+
+// 買家可能領得到的活動：ACTIVE、不是補償、還有名額、買家還沒有這個活動的券；store_id 有值時只留該店與全平台的活動。
+// 時間窗與資格不在這裡：由 qualify.Check 判定（唯一的判定函式）。
+func (q *Queries) ListClaimCandidates(ctx context.Context, arg ListClaimCandidatesParams) ([]CouponCouponCampaign, error) {
+	rows, err := q.db.Query(ctx, listClaimCandidates,
+		arg.StoreID,
+		arg.BuyerID,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CouponCouponCampaign{}
+	for rows.Next() {
+		var i CouponCouponCampaign
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.DiscountType,
+			&i.DiscountAmount,
+			&i.DiscountPercent,
+			&i.MaxDiscountAmount,
+			&i.ThresholdAmount,
+			&i.TargetType,
+			&i.StoreID,
+			&i.IssuerType,
+			&i.IssuerAdminID,
+			&i.IssuerStoreID,
+			&i.StartAt,
+			&i.EndAt,
+			&i.TotalLimit,
+			&i.IssuedCount,
+			&i.Status,
+			&i.SourceType,
+			&i.SourceID,
+			&i.EndedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSellerCampaigns = `-- name: ListSellerCampaigns :many
+
+SELECT id, title, discount_type, discount_amount, discount_percent, max_discount_amount, threshold_amount, target_type, store_id, issuer_type, issuer_admin_id, issuer_store_id, start_at, end_at, total_limit, issued_count, status, source_type, source_id, ended_at, created_at, updated_at FROM coupon.coupon_campaigns
+WHERE issuer_store_id = $1 AND target_type <> 'COMPENSATION'
+  AND ($2::text IS NULL OR status = $2::text)
+  AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $5
+`
+
+type ListSellerCampaignsParams struct {
+	StoreID        *int64
+	Status         *string
+	AfterCreatedAt *time.Time
+	AfterID        pgtype.UUID
+	MaxRows        int32
+}
+
+// 讀取：賣家的活動列表、買家可領的活動、名單與券數（B7-3a）。分頁一律 keyset（created_at, id）由新到舊。
+// 賣家自己發的活動，不含系統建立的補償活動；status 為 NULL 是全部。
+func (q *Queries) ListSellerCampaigns(ctx context.Context, arg ListSellerCampaignsParams) ([]CouponCouponCampaign, error) {
+	rows, err := q.db.Query(ctx, listSellerCampaigns,
+		arg.StoreID,
+		arg.Status,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CouponCouponCampaign{}
+	for rows.Next() {
+		var i CouponCouponCampaign
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.DiscountType,
+			&i.DiscountAmount,
+			&i.DiscountPercent,
+			&i.MaxDiscountAmount,
+			&i.ThresholdAmount,
+			&i.TargetType,
+			&i.StoreID,
+			&i.IssuerType,
+			&i.IssuerAdminID,
+			&i.IssuerStoreID,
+			&i.StartAt,
+			&i.EndAt,
+			&i.TotalLimit,
+			&i.IssuedCount,
+			&i.Status,
+			&i.SourceType,
+			&i.SourceID,
+			&i.EndedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTargetBuyers = `-- name: ListTargetBuyers :many
+SELECT buyer_id FROM coupon.coupon_target_accounts WHERE campaign_id = $1 ORDER BY buyer_id
+`
+
+func (q *Queries) ListTargetBuyers(ctx context.Context, campaignID uuid.UUID) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listTargetBuyers, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var buyer_id int64
+		if err := rows.Scan(&buyer_id); err != nil {
+			return nil, err
+		}
+		items = append(items, buyer_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockQuota = `-- name: LockQuota :one

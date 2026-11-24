@@ -36,8 +36,8 @@ coupon-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | Redis 模板快取 `coupon:tpl:*`、`coupon:avail:*` | 降低讀取延遲 | 不成立：同進程直接查 DB；快取失效不完整且有死 key（BD29、BD30） | 沒有量測前不加快取 | 刪除 |
 | `LocalDateTime` 讀寫 `TIMESTAMPTZ`、JVM 預設時區的 cron | 時間比較正確 | 不成立：BD26 | UTC、`timestamptz`、注入時鐘 | 全 `timestamptz`；模組不呼叫 `time.Now()`，用 `Deps.Now`；比較都在 Go 以同一個 `now` |
 | `updated_at` 觸發器、MyBatis-Plus 整列 `updateById` | 維護更新時間；改狀態 | 不成立：整列覆寫會蓋掉並發遞增（BD5） | 條件式 UPDATE，只改需要的欄 | 沒有觸發器；每個 UPDATE 自己設 `updated_at`；狀態轉換都是條件式 UPDATE |
-| 出站 gRPC：Order 的 MEMBER 集合與訂單狀態、Buyer 與 Seller 的顯示資料；失敗回 -1 或空 | 資格與顯示需要別的服務的資料 | 資料需求成立；降級不成立：BD28 | 同進程直接呼叫模組 API，失敗就失敗 | 資格需要的兩項定義成 port（`Stores` 停權狀態、`Members`）；Account 註冊時間不再需要並失敗即回錯誤；顯示資料在 B7-3 由 httpapi 組裝；訂單狀態不需要（D3 不做對帳） |
-| 賣家 DESIGNATED 的自發自用防護（解析 principal 比對） | 賣家不能發券給自己 | 成立 | 身分比對在入口，核心不重複 | 不在核心：需要 identity 解析，B7-3 在 Connect 的賣家建立活動入口做（`CreateCampaign` 只收已解析的 buyer_id） |
+| 出站 gRPC：Order 的 MEMBER 集合與訂單狀態、Buyer 與 Seller 的顯示資料；失敗回 -1 或空 | 資格與顯示需要別的服務的資料 | 資料需求成立；降級不成立：BD28 | 同進程直接呼叫模組 API，失敗就失敗 | 資格需要的兩項定義成 port（`Stores` 停權狀態、`Members`）；Account 註冊時間不再需要並失敗即回錯誤；顯示資料在 B7-3a 由 `httpapi/coupon` 組裝：店家卡片 `seller.StoreCards`、買家暱稱 `buyer.BatchDisplay`，讀取失敗整個請求失敗（unavailable 或原錯誤）；訂單狀態不需要（D3 不做對帳）；Account 的電話不再顯示（舊明細經 `AccountService` 取電話；CRM 的規則是客戶資料永遠不含電話，賣家用買家 ID 指定名單）；`Stores` 的正式 adapter 在 `cmd/hawkr/coupon.go`（`seller.Store(ctx, id).Suspended()`，讀不到店家就整個失敗）；`Members` 的投影到 B7-4 才有，在那之前 `cmd/hawkr` 接的 port 回錯誤（MEMBER 活動的領取與列表失敗，不降級成「不是會員」） |
+| 賣家 DESIGNATED 的自發自用防護（解析 principal 比對） | 賣家不能發券給自己 | 成立 | 身分比對在入口，核心不重複 | B7-3a 完成：在 `httpapi/coupon.CreateCampaign` 比對名單與呼叫者的買家身分（名單的 ID 是買家 ID，與 CRM 客戶的 `buyer_id` 同一種，不再是帳號 ID，不需要 principal 解析），相同回 invalid_argument 並指出 `campaign.designated_buyer_ids`（`TestCreateCampaignRejectsSelfDesignation`） |
 | `CouponTargetTypeRules`（賣家只能 ALL、MEMBER、DESIGNATED） | 限制賣家可建立的資格 | 成立 | 權限在入口與核心都檢查 | `CreateCampaign` 只接受 ALL、MEMBER、DESIGNATED；COMPENSATION 只經 `IssueCompensation`；賣家的 DESIGNATED 名單不得為空，賣家的活動一律是自己的店 |
 | 無 FK（所有關聯靠應用層） | 避免跨服務耦合 | 同 schema 內不成立：沒有理由不用 FK | 同 schema 用 FK，跨 schema 不建（單體規則 2） | 券與資格名單 FK 到活動（同 schema）；沒有跨 schema FK（`buyer_id`、`store_id` 是業務鍵）；稽核紀錄不設 FK（只追加，不擋刪除） |
 
@@ -47,10 +47,47 @@ coupon-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
-| 認證與身分：`GrpcAuthContext.requireAccountType`、`parseLong` 吞格式錯誤（BD14、BD24） | 只有對的角色與帳號能呼叫 | 成立；吞錯誤不成立 | Connect 入口依 session 取身分，非法值回 InvalidArgument | B7-3 決定；核心的輸入都是已解析的型別，核心自己檢查正數與長度（`Invalid`） |
-| 錯誤：envelope `code`＋`GrpcResponseCode` 7xxx，兩種契約並存（BD22） | client 區分失敗原因 | 不成立：兩種契約並存 | 分類錯誤加 `ErrorInfo.reason`（ADR api-error-model） | 核心回 `apperr` 分類加 `model.Reason`；對外的 `ErrorReason` 與 CodeMeta 錯誤碼去向在 B7-3 逐一決定 |
-| 分頁：SQL 取一頁後在記憶體過濾，`total` 是該頁筆數（BD12） | 列表分頁與總數正確 | 不成立 | keyset 或 SQL 內分頁 | B7-3；`coupon_vouchers` 已有 `vouchers_by_buyer` 索引支援 |
+| 認證與身分：`GrpcAuthContext.requireAccountType`、`parseLong` 吞格式錯誤（BD14、BD24） | 只有對的角色與帳號能呼叫 | 成立；吞錯誤不成立 | Connect 入口依 session 取身分，非法值回 InvalidArgument | B7-3a 完成：Connect 入口依 session 取買家（`CurrentBuyerID`）或店家（`seller.ActingStore`，能力由 `httpapi/coupon` 的宣告表決定：建立、列表、明細 CAP_MARKETING，結束活動 CAP_CONTENT_CONTRACT）；ID 格式錯誤回 invalid_argument 並指出欄位（`rpc.ParseID`、`ParseUUID`），不吞成 0；核心的輸入都是已解析的型別，核心自己檢查正數與長度（`Invalid`） |
+| 錯誤：envelope `code`＋`GrpcResponseCode` 7xxx，兩種契約並存（BD22） | client 區分失敗原因 | 不成立：兩種契約並存 | 分類錯誤加 `ErrorInfo.reason`（ADR api-error-model） | 核心回 `apperr` 分類加 `model.Reason`；B7-3a 完成：對外的 `ErrorReason` 與 CodeMeta 錯誤碼去向見下方「CodeMeta 值域與錯誤碼的去向」；錯誤句子依請求語系產生，`LocalizedMessage.locale` 取錯誤實際的語系（`apperr.Error.Locale()`，測試 `TestErrorLocaleFollowsTheRequestLocale`） |
+| 分頁：SQL 取一頁後在記憶體過濾，`total` 是該頁筆數（BD12） | 列表分頁與總數正確 | 不成立 | keyset 或 SQL 內分頁 | B7-3a 完成：`internal/read` 的 keyset（`created_at`、`id` 由新到舊），分頁與狀態篩選都在 SQL 內，page token 綁住篩選；結帳與可領列表需要 `qualify` 判定的，批次取出後在 Go 以同一個 `Check`／`Fit` 過濾直到湊滿一頁；契約沒有總數（AIP-158，沒有畫面需要） |
 | 下游呼叫的逾時與重試：10 秒 deadline、失敗回降級值 | 外部呼叫有界 | 不成立：BD28 | 同進程呼叫，失敗即失敗 | 沒有外部呼叫；port 由組裝點提供，錯誤原樣回傳 |
+
+## CodeMeta 值域與錯誤碼的去向（B7-3a）
+
+依 ADR `docs/adr/2026-09-25-codemeta-retirement.md`：client 會分支的封閉集合是 proto enum，client 需要在同一個 code 底下分支的錯誤原因是 `ErrorReason`，其餘是模組句子（`internal/text`，`ErrorInfo` 不帶）。CodeMeta 的生成檔不動，隨 B7-5 退場。
+
+| CodeMeta 值域 | 去向 |
+|---|---|
+| `CouponType`（CASH、PERCENT） | proto enum `DiscountType`；Go `model.DiscountType`、DB CHECK 同值 |
+| `CouponTargetType`（ALL、MEMBER、DESIGNATED、COMPENSATION） | proto enum `TargetType`；賣家只能建 ALL、MEMBER、DESIGNATED |
+| `CouponTemplateStatus`（DRAFT、ACTIVE、INACTIVE、EXPIRED、REVOKED） | proto enum `CampaignStatus`（DRAFT、ACTIVE、ENDED）；REVOKED→ENDED，INACTIVE（停權停用）與 EXPIRED（排程）不存在（D8 修訂、BD25）；到期是 `SellerCampaign.expired`（推導） |
+| `CouponInstanceStatus`（UNUSED、RESERVED、USED、REVOKED、EXPIRED…） | proto enum `VoucherStatus`（AVAILABLE、LOCKED、REDEEMED、VOIDED）；EXPIRED→`Voucher.expired`（推導）；來源另有 `VoucherOrigin`（CLAIM、GRANT、COMPENSATION） |
+| `IssuerType` | 不對外：模組的 `Issuer`（`issuer_type` CHECK）；client 從方法知道身分，店家看到的都是自己的活動 |
+| `CouponRedemptionAction` | 不對外：`coupon_redemption_logs.action` 的 CHECK（CLAIM、ISSUE、LOCK、REDEEM、RELEASE、VOID、END_CAMPAIGN） |
+| `CouponEventType`（`coupon.issued`、`coupon.expiring`） | `coupon.issued` 不搬（D7、BD27）；`coupon.expiring` 是 in-process 事件 `VoucherExpiring`（B7-4） |
+
+| 舊錯誤碼 | 去向 |
+|---|---|
+| 7001 `COUPON_NOT_FOUND` | not_found，句子（`ReasonCampaignNotFound`、`ReasonVoucherNotFound`）；別家的與不存在的相同（防枚舉） |
+| 7002 `COUPON_EXPIRED`、7021 `COUPON_CLAIM_OUT_OF_WINDOW` | `ErrorReason.COUPON_OUTSIDE_WINDOW`（failed_precondition） |
+| 7020 `COUPON_CLAIM_REQUIRES_ACTIVE`、7013 `COUPON_PUBLISH_REQUIRES_DRAFT` | `COUPON_CAMPAIGN_NOT_ACTIVE`（領券時活動不是進行中）；發布的 `COUPON_INVALID_STATUS` 屬 B7-3b |
+| 7005 `COUPON_QUOTA_EXCEEDED` | `ErrorReason.COUPON_QUOTA_EXCEEDED` |
+| 7006 `COUPON_ISSUE_LIMIT_REACHED` | `ErrorReason.COUPON_ISSUE_LIMIT_REACHED` |
+| 7009 `COUPON_INVALID_STATUS`、7014 `COUPON_DISABLE_REQUIRES_ACTIVE` | `ErrorReason.COUPON_INVALID_STATUS`（保留給 admin 的作廢與發放，B7-3b）；賣家結束活動冪等，不再有這個錯誤（D5） |
+| 7003、7004、7008、7023、4011、4013（鎖券與驗券） | 模組句子（`ReasonVoucherUnavailable`、`ReasonNotApplicableToStore`、`ReasonVoucherLockedByOtherOrder`…），不進 `ErrorReason`：呼叫者是結帳（B8）與 `legacy/couponserver`（B7-4），不是買家與店家的 Connect |
+| 7007 `COUPON_ALREADY_RECEIVED` | 不再是錯誤：領券冪等，回既有的券 |
+| 7010 `COUPON_SELF_ISSUE_NOT_ALLOWED` | invalid_argument 加 `BadRequest`（`campaign.designated_buyer_ids`） |
+| 7011 `COUPON_NOT_CLAIMED` | 只在 `legacy/couponserver`（B7-4，D1 回「未領取」） |
+| 7012 `COUPON_CLAIM_NOT_REQUIRED`、7022 `COUPON_DISTRIBUTE_REQUIRES_ACTIVE` | 刪除：沒有 claim_required（D2）、沒有代領（D6） |
+| 7015、7016、7017、7019 | invalid_argument 加 `BadRequest`（欄位路徑），句子是模組的 `Invalid*` |
+| 新增（舊契約沒有） | `COUPON_NOT_ELIGIBLE`（不符合資格，舊的是 403）、`COUPON_STORE_SUSPENDED`（D8 修訂） |
+
+## B7-3a 對外契約的決定（計畫沒寫的欄位級取捨）
+
+- 服務名稱 `CouponAppService`（資源被買家與店家共用，API 設計規範 §二），7 支 RPC：買家 `ListMyVouchers`、`ListClaimableCampaigns`、`ClaimCoupon`，賣家 `CreateCampaign`、`ListCampaigns`、`GetCampaign`、`EndCampaign`。賣家的店家一律由呼叫者此刻的店推導，請求不帶 `store_id`。
+- 賣家第 5 支 `ListBuyerCouponsForSeller` 沒有做：計畫的 BD33 與 D6 判為刪除（沒有消費端、對 production 資料永遠不命中），派工的「8 支」與它牴觸，已回報。
+- 「無發放上限」與「上限 0」：`optional int32 total_issue_limit`，不設是無上限、設了至少 1，0 回 invalid_argument（`TestCreateCampaignDistinguishesNoLimitFromZero`、`TestSellerCampaignWireKeepsNoLimitUnset`）。
+- 結帳可用的券是 `ListMyVouchers` 帶 `checkout`（店家、訂單金額）：只回現在鎖得住的券（與 `Lock` 同一組檢查），附 `estimated_discount`；沒有另開 RPC。
 
 ## 與 coupon-service 的差異
 

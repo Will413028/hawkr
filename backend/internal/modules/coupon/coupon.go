@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/campaign"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/qualify"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/voucher"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
@@ -67,6 +68,17 @@ type (
 	RedeemResult       = voucher.RedeemResult
 	ReleaseResult      = voucher.ReleaseResult
 	VoidVoucherInput   = voucher.VoidInput
+
+	Checkout           = read.Checkout
+	Cursor             = read.Cursor
+	VoucherView        = read.VoucherView
+	VoucherListInput   = read.VoucherListInput
+	VoucherPage        = read.VoucherPage
+	ClaimableInput     = read.ClaimableInput
+	CampaignPage       = read.CampaignPage
+	SellerListInput    = read.SellerListInput
+	SellerCampaignPage = read.SellerCampaignPage
+	CampaignDetail     = read.CampaignDetail
 )
 
 const (
@@ -93,6 +105,9 @@ const (
 
 	SourceAftersalesCase    = model.SourceAftersalesCase
 	SourceAdminCompensation = model.SourceAdminCompensation
+
+	DefaultPageSize = read.DefaultPageSize
+	MaxPageSize     = read.MaxPageSize
 
 	MaxIssueBatch      = model.MaxIssueBatch
 	MaxTargetBuyers    = model.MaxTargetBuyers
@@ -125,6 +140,7 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 type Module struct {
 	campaign *campaign.Service
 	voucher  *voucher.Service
+	read     *read.Service
 }
 
 // New 建立模組。
@@ -136,6 +152,7 @@ func New(d Deps) *Module {
 	return &Module{
 		campaign: campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
 		voucher:  voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now}),
+		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
 	}
 }
 
@@ -200,4 +217,29 @@ func (m *Module) Release(ctx context.Context, orderNo string) (ReleaseResult, er
 // VoidVoucher 作廢單張券（admin）。
 func (m *Module) VoidVoucher(ctx context.Context, in VoidVoucherInput) error {
 	return m.voucher.Void(ctx, in)
+}
+
+// ListVouchers 列出買家的券（新到舊）。帶 Checkout 時只回 AVAILABLE 而且現在能用的券，並算預估折抵（與 Lock 同一組檢查）。
+func (m *Module) ListVouchers(ctx context.Context, in VoucherListInput) (VoucherPage, error) {
+	return m.read.ListVouchers(ctx, in)
+}
+
+// ListClaimable 列出買家現在領得到的活動（與 Claim 同一個資格判定）。
+func (m *Module) ListClaimable(ctx context.Context, in ClaimableInput) (CampaignPage, error) {
+	return m.read.ListClaimable(ctx, in)
+}
+
+// ListSellerCampaigns 列出店家自己發的活動，附店家的配額與同時進行中的活動數。
+func (m *Module) ListSellerCampaigns(ctx context.Context, in SellerListInput) (SellerCampaignPage, error) {
+	return m.read.ListSellerCampaigns(ctx, in)
+}
+
+// GetSellerCampaign 讀店家自己的活動明細；不存在與不是這家店的回同一個 NotFound。
+func (m *Module) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.UUID) (CampaignDetail, error) {
+	return m.read.GetSellerCampaign(ctx, storeID, id)
+}
+
+// GetVoucher 讀買家自己的一張券與它的活動；不存在與不是這位買家的回同一個 NotFound。
+func (m *Module) GetVoucher(ctx context.Context, buyerID int64, id uuid.UUID) (VoucherView, error) {
+	return m.read.GetVoucher(ctx, buyerID, id)
 }

@@ -1,0 +1,166 @@
+{
+ "mutants": [
+  {
+   "id": "limit-zero-passes-as-no-limit",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "if in.GetTotalIssueLimit() < 1 {",
+   "new": "if in.GetTotalIssueLimit() < 0 {",
+   "test": "internal/httpapi/coupon ^TestCreateCampaignDistinguishesNoLimitFromZero$",
+   "why": "CreateCampaign 不再擋上限 0：0 傳給模組變成「無上限」，「無發放上限」與「上限 0」又混在一起（B7-3 契約要區分，舊 wire 的 \"null\"），測試要紅。"
+  },
+  {
+   "id": "no-limit-wire-as-zero",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/convert.go",
+   "old": "\tif c.TotalLimit != nil {\n\t\tl := *c.TotalLimit\n\t\tout.TotalIssueLimit = &l\n\t}\n",
+   "new": "\tl := int32(0)\n\tif c.TotalLimit != nil {\n\t\tl = *c.TotalLimit\n\t}\n\tout.TotalIssueLimit = &l\n",
+   "test": "internal/httpapi/coupon ^TestSellerCampaignWireKeepsNoLimitUnset$",
+   "why": "無上限的活動在 wire 上送成 total_issue_limit = 0（舊 gateway 把未設定送成 \"null\"、被讀成 0 的同一個缺陷），測試要紅。"
+  },
+  {
+   "id": "error-locale-label-fixed-zh",
+   "stack": "go",
+   "file": "backend/internal/httpapi/rpc/errors.go",
+   "old": "addDetail(ce, LocalizedMessage(uitext.Message{Text: ae.Message, Locale: ae.Locale()}))",
+   "new": "addDetail(ce, LocalizedMessage(uitext.Message{Text: ae.Message, Locale: uitext.ZhTW}))",
+   "test": "internal/httpapi/coupon ^TestErrorLocaleFollowsTheRequestLocale$",
+   "why": "LocalizedMessage.locale 一律標 zh-TW（B7-2 審查 R2-f）：en 請求拿到 en 句子卻標 zh-TW，測試要紅。"
+  },
+  {
+   "id": "module-sentence-ignores-request-locale",
+   "stack": "go",
+   "file": "backend/internal/modules/coupon/internal/model/model.go",
+   "old": "\treturn f(uitext.LocaleFrom(ctx))\n}\n\n// NotFound",
+   "new": "\treturn f(uitext.ZhTW)\n}\n\n// NotFound",
+   "test": "internal/modules/coupon/internal/model ^TestErrorsCarryTheLocaleTheSentenceWasProducedIn$",
+   "why": "模組的句子不依請求語系產生，en 請求拿到 zh-TW 句子，測試要紅。"
+  },
+  {
+   "id": "seller-suspension-adapter-always-open",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/coupon.go",
+   "old": "\treturn st.Suspended(), nil\n",
+   "new": "\t_ = st\n\treturn false, nil\n",
+   "test": "cmd/hawkr ^TestCouponStoresReportsSuspensionAndFailsClosed$",
+   "why": "正式的停權 port adapter 永遠回「沒有停權」：停權店家的活動仍領得到、鎖得到（D8 修訂），測試要紅。"
+  },
+  {
+   "id": "seller-suspension-adapter-swallows-read-failure",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/coupon.go",
+   "old": "\tif err != nil {\n\t\treturn false, err\n\t}\n\treturn st.Suspended(), nil",
+   "new": "\tif err != nil {\n\t\treturn false, nil\n\t}\n\treturn st.Suspended(), nil",
+   "test": "cmd/hawkr ^TestCouponStoresReportsSuspensionAndFailsClosed$",
+   "why": "port 讀不到店家時回「沒有停權」（降級，BD28）：seller 掛掉時停權店家的券放行，測試要紅。"
+  },
+  {
+   "id": "qualify-ignores-store-suspension",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/qualify/qualify.go",
+   "old": "\t\tif suspended {\n\t\t\treturn model.Precondition(ctx, model.ReasonStoreSuspended)\n\t\t}\n",
+   "new": "\t\tif suspended {\n\t\t\t_ = suspended\n\t\t}\n",
+   "test": "internal/modules/coupon ^TestSuspendedStoreBlocksClaimAndLockButNotRedeem$",
+   "why": "判定看到停權卻不擋：賣家發行的活動在店家停權期間仍可領、可鎖，測試要紅。"
+  },
+  {
+   "id": "store-cards-failure-degrades",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/convert.go",
+   "old": "\t\tif err != nil {\n\t\t\treturn nil, apperr.WithCause(apperr.Unavailable(\"暫時無法讀取店家\"), err)\n\t\t}",
+   "new": "\t\tif err != nil {\n\t\t\tcontinue\n\t\t}",
+   "test": "internal/httpapi/coupon ^TestDisplayDataFailureFailsTheRequest$",
+   "why": "店家卡片讀取失敗時回沒有店家的列表（舊的「失敗回空」，BD28、D3 出站），測試要紅。"
+  },
+  {
+   "id": "buyer-display-failure-degrades",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/convert.go",
+   "old": "\t\tif err != nil {\n\t\t\treturn nil, err\n\t\t}\n\t\tfor _, d := range rows {",
+   "new": "\t\tif err != nil {\n\t\t\tcontinue\n\t\t}\n\t\tfor _, d := range rows {",
+   "test": "internal/httpapi/coupon ^TestDisplayDataFailureFailsTheRequest$",
+   "why": "買家顯示資料讀取失敗時照常回明細（暱稱留空），不整個失敗（D3 出站），測試要紅。"
+  },
+  {
+   "id": "end-campaign-not-scoped-to-store",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "coupon.EndCampaignInput{CampaignID: id, StoreID: st.StoreID}",
+   "new": "coupon.EndCampaignInput{CampaignID: id}",
+   "test": "internal/httpapi/coupon ^TestEndCampaignIsScopedToTheActingStore$",
+   "why": "賣家的結束活動不帶店家範圍：任何賣家能結束別家的活動，測試要紅。"
+  },
+  {
+   "id": "end-campaign-wrong-capability",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/declaration.go",
+   "old": "requires(seller.CapContentContract)",
+   "new": "requires(seller.CapMarketing)",
+   "test": "internal/httpapi/coupon ^TestDeclarationsMatchTheServiceAndDriveTheCapabilityCheck$",
+   "why": "結束活動改成需要 CAP_MARKETING：停權的店家不能再自清活動（收縮型動作要留給停權店家），測試要紅。"
+  },
+  {
+   "id": "self-designation-allowed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "if slices.Contains(buyers, own) {",
+   "new": "if false && slices.Contains(buyers, own) {",
+   "test": "internal/httpapi/coupon ^TestCreateCampaignRejectsSelfDesignation$",
+   "why": "賣家可以把券指定給自己的買家身分（自發自用防護，舊 enforceNoSelfIssueForTest），測試要紅。"
+  },
+  {
+   "id": "issue-limit-reason-unmapped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "\tcoupon.ReasonIssueLimitReached: apperr.ReasonCouponIssueLimitReached,\n",
+   "new": "",
+   "test": "internal/httpapi/coupon ^TestClaimFailureCarriesTheContractReason$",
+   "why": "領完的錯誤不帶 COUPON_ISSUE_LIMIT_REACHED：client 分不出「領完了」，測試要紅。"
+  },
+  {
+   "id": "malformed-store-id-swallowed",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "\t\tif in.StoreID, err = rpc.ParseID(\"store_id\", msg.GetStoreId()); err != nil {\n\t\t\treturn nil, err\n\t\t}",
+   "new": "\t\tif in.StoreID, err = rpc.ParseID(\"store_id\", msg.GetStoreId()); err != nil {\n\t\t\tin.StoreID = 0\n\t\t}",
+   "test": "internal/httpapi/coupon ^TestMalformedIDsAreRejectedNotSwallowed$",
+   "why": "格式錯誤的 store_id 安靜變成「不篩店家」（舊的 parseLongOrNull，BD14、BD24），測試要紅。"
+  },
+  {
+   "id": "voucher-list-order-reversed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/vouchers.sql.go",
+   "old": "ORDER BY created_at DESC, id DESC",
+   "new": "ORDER BY created_at ASC, id ASC",
+   "test": "internal/modules/coupon ^TestListVouchersPagesNewestFirstWithoutGapsOrRepeats$",
+   "why": "券列表的排序與 keyset 條件不一致：翻頁重複或漏掉（舊的分頁在記憶體內，BD12），測試要紅。"
+  },
+  {
+   "id": "claimable-skips-qualification",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/read/read.go",
+   "old": "\t\t\t\tif err := s.d.Qualify.Check(ctx, c, in.BuyerID, now); err != nil {\n\t\t\t\t\tif rejection(err) != nil {\n\t\t\t\t\t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\tcontinue\n\t\t\t\t}\n",
+   "new": "\t\t\t\t_ = now\n",
+   "test": "internal/modules/coupon ^TestListClaimableUsesTheClaimQualification$",
+   "why": "可領列表不再問資格判定：列出領不到的活動（指定名單以外、時間窗外），列表與領券又成兩份規則（BD1、BD2、BD11），測試要紅。"
+  },
+  {
+   "id": "seller-detail-not-scoped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/read/read.go",
+   "old": "c.IssuerStoreID == nil || *c.IssuerStoreID != storeID || c.TargetType == model.TargetCompensation",
+   "new": "c.TargetType == model.TargetCompensation",
+   "test": "internal/modules/coupon ^TestSellerCampaignsListAndDetailAreScopedToTheStore$",
+   "why": "賣家明細不比對發行店家：賣家讀得到別家的活動（防枚舉被破壞），測試要紅。"
+  },
+  {
+   "id": "checkout-list-skips-lock-checks",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/read/read.go",
+   "old": "\tdiscount, err := qualify.Fit(ctx, c, co.StoreID, co.OrderAmount)\n\tif err != nil {\n\t\treturn 0, false, rejection(err)\n\t}\n",
+   "new": "\tdiscount, err := qualify.Fit(ctx, c, co.StoreID, co.OrderAmount)\n\tif err != nil {\n\t\treturn 0, true, nil\n\t}\n",
+   "test": "internal/modules/coupon ^TestListVouchersCheckoutUsesTheLockChecks$",
+   "why": "結帳列表不套用店家範圍與門檻：列出鎖不了的券（validate 與 reserve 兩套規則，BD1、BD2），測試要紅。"
+  }
+ ]
+}

@@ -55,6 +55,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"campaign": {"model", "rows", "store"},
 		"model":    {"text"},
 		"qualify":  {"model", "store"},
+		"read":     {"model", "qualify", "rows", "store"},
 		"rows":     {"model", "store"},
 		"store":    {},
 		"text":     {},

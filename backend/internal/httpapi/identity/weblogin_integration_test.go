@@ -37,6 +37,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
@@ -317,7 +318,7 @@ func setupWeb(t *testing.T) *webFixture {
 	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, ImageAI: &imageai.Module{}, Assistant: &assistant.Module{},
 		Buyer: buyers, Social: &social.Module{}, Legacy: proxy, LegacyPrefixes: gatewayproxy.Prefixes, Ready: d.Ping, Identity: m, WebLogin: webLogin, AppLogin: appLogin, Now: clock.Now,
 		Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t),
-		DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{},
+		DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{},
 		Delegation: del, Origins: []string{webOrigin}, ClientIP: httpapi.ClientIP{Header: "X-Test-Client-IP"}, Logger: log,
 	})
 	if err != nil {
