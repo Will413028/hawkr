@@ -22,6 +22,8 @@
 | S14 | `rg -l -i 'shipping-service\|payuni-webhook\|uber' .github backend/docker-compose*.yml backend/Makefile backend/dev.sh backend/infra backend/scripts backend/monitoring backend/.env.template` | 8 檔 | `docker-compose-local.yml`、`infra/seed-data/06-shipping.sql`、`dev.sh`、`infra/mq/topology/topology.yaml`、`.env.template`、監控的 `load-balance.json`、`business-alerts.yml`、`service-alerts.yml`；`.github` 沒有命中（【量】） |
 | S15 | `git log --diff-filter=D --name-only -- 'backend/docs/詳細設計書/6[6-9]*' …` | 3 次刪除 | 設計書 66、68、69 在 `2c4928740`（2026-10-29）刪除，67 在 `a7d37b97e`，70 在 `d876df987`（2026-11-23）；現在只剩 65（§6） |
 
+**基線重跑（步驟 0，dev `e43d89b87`）：** S1–S7、S10、S12–S14 與快照相同；S8 用同一型樣以 `git grep` 在快照重量是 47（表上 46 是誤記），現況 47；S9 的 `G` 是 `backend/gateway/internal`，現況 31；S11 現況 29，多出的 7 檔全是 procurement 的詢價運費 `shipping_amount`（非履約，不在範圍）。表外新發現：`payment-service` 的 outbox 測試（`PaymentOutboxExchangeContractTest` 等 5 檔）以 `hawkr.shipping`／`fulfillment.responsibility.finalized` 當第二個 exchange 的樣本，主程式只有 V11 migration 的註解提到；`monitoring/sql-exporter/sql_exporter.yml` 與 `monitoring/prometheus/tests/payment-outbox-alerts.test.yml` 把 `hawkr.shipping` 列進 exchange 值域。這三處歸步驟 4。client 計數（`client-inventory.md` C1）用 `git grep` 同型樣比對：buyer-app 少 3 檔（付款重試相關，非物流），其餘相同。
+
 ## 1. Java 端
 
 ### 1.1 shipping gRPC 呼叫點（三個 client、19 行呼叫）
