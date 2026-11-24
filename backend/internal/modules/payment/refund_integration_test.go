@@ -199,103 +199,6 @@ func TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne(t *tes
 	}
 }
 
-// 已轉帳的付款先撤回再退款：退款寫 REVERSING（reversal_amount 是退款額）、排的是撤回 job 而不是退款 job；撤回 job 之前跑退款 job 什麼都不做、provider 沒有收到退款；
-// 撤回成立之後由撤回 job 在同一個 transaction 排退款 job，退款 job 才呼叫 provider 並進 SUCCEEDED。
-// mutation：reservableReversal 永遠回 0（拿掉「先撤回」）→ 退款寫 PENDING，下面 REVERSING 的斷言失敗。
-// mutation：acceptReversal 不排退款 job → 撤回之後沒有退款 job，失敗。
-func TestARefundOnATransferredPaymentReversesFirstAndOnlyThenRefunds(t *testing.T) {
-	t.Parallel()
-	f := setupCharge(t)
-	_, tr := f.transferred(t, "RV-1")
-	ctx := context.Background()
-	f.clearJobs()
-	r := f.createRefund(t, "RV-1", "case-1", 40, false)
-	if r.Status != RefundReversing || r.ReversalAmount != 40 {
-		t.Fatalf("已轉帳的付款：%+v", r)
-	}
-	if ids := f.jobIDs(t, kindTransferReversal, "refund_id"); len(ids) != 1 || ids[0] != r.ID {
-		t.Fatalf("撤回 job=%v", ids)
-	}
-	if len(f.jobIDs(t, kindRefundCreate, "refund_id")) != 0 {
-		t.Fatal("撤回之前就排了退款 job")
-	}
-	must(t, f.runRefund(r.ID, false))
-	if f.fake.RefundCalls() != 0 || f.refundText(t, "status", r.ID) != "REVERSING" {
-		t.Fatalf("撤回之前呼叫了退款：%d 次，%s", f.fake.RefundCalls(), f.refundText(t, "status", r.ID))
-	}
-	must(t, f.module.ReversePaymentTransfer(ctx, r.ID, false))
-	if f.refundText(t, "status", r.ID) != "REVERSED" || f.reversedOf(t, tr.ID) != 40 || f.fake.RefundCalls() != 0 {
-		t.Fatalf("撤回之後：%s，reversed %d，退款呼叫 %d", f.refundText(t, "status", r.ID), f.reversedOf(t, tr.ID), f.fake.RefundCalls())
-	}
-	if ids := f.jobIDs(t, kindRefundCreate, "refund_id"); len(ids) != 1 || ids[0] != r.ID {
-		t.Fatalf("撤回成立之後的退款 job=%v", ids)
-	}
-	must(t, f.runRefund(r.ID, false))
-	if f.refundText(t, "status", r.ID) != "SUCCEEDED" || f.refundText(t, "external_refund_id", r.ID) == "" || f.fake.Refunds() != 1 || f.fake.ReversalCalls() != 1 {
-		t.Fatalf("退款之後：%s", f.refundText(t, "status", r.ID))
-	}
-	if keys := f.fake.RefundKeys(); len(keys) != 1 || keys[0] != f.refundText(t, "idempotency_key", r.ID) {
-		t.Fatalf("退款的冪等鍵=%v", keys)
-	}
-	if len(f.refundChanges) != 1 || f.refundChanges[0].Status != RefundSucceeded || f.refundChanges[0].Previous != RefundReversed || len(f.autoDone) != 0 {
-		t.Fatalf("事件=%+v，自動退款事件 %d", f.refundChanges, len(f.autoDone))
-	}
-	f.noViolations(t)
-}
-
-// 撤回額度是轉帳「還沒預留」的部分：先有一筆 REVERSING 預留了 70，第二筆 30 仍可撤 30；轉帳前就退掉的款（轉帳金額已扣掉）不再撤回；
-// 預留把剩餘額度用光時，下一筆退款（款項在平台手上）直接 PENDING、不撤回。
-func TestTheReversalAmountIsWhatTheTransferHasNotYetReserved(t *testing.T) {
-	t.Parallel()
-	f := setupCharge(t)
-	f.paidPayment(t, "RA-1", 100)
-	f.createRefund(t, "RA-1", "early", 30, false)
-	f.enableAccount(t, 7, "acct_seller_7", true)
-	tr := f.requestTransfer(t, "RA-1")
-	if tr.Amount != 70 {
-		t.Fatalf("轉帳金額=%d", tr.Amount)
-	}
-	must(t, f.runTransfer(tr.ID, false))
-	a := f.createRefund(t, "RA-1", "a", 50, false)
-	b := f.createRefund(t, "RA-1", "b", 20, false)
-	if a.Status != RefundReversing || a.ReversalAmount != 50 || b.Status != RefundReversing || b.ReversalAmount != 20 {
-		t.Fatalf("a=%+v b=%+v", a, b)
-	}
-	f.exec(t, "UPDATE payment.refunds SET status = 'FAILED', failure_reason = 'x', reversal_amount = 0 WHERE id = $1", b.ID)
-	c := f.createRefund(t, "RA-1", "c", 20, false)
-	if c.Status != RefundReversing || c.ReversalAmount != 20 {
-		t.Fatalf("c=%+v", c)
-	}
-	f.exec(t, "UPDATE payment.refunds SET status = 'FAILED', failure_reason = 'x', reversal_amount = 0 WHERE id = $1 OR id = $2", c.ID, a.ID)
-	f.exec(t, "UPDATE payment.transfers SET reversed_amount = 70 WHERE id = $1", tr.ID)
-	d := f.createRefund(t, "RA-1", "d", 20, false)
-	if d.Status != RefundPending || d.ReversalAmount != 0 {
-		t.Fatalf("沒有剩餘額度的退款：%+v", d)
-	}
-}
-
-// 轉帳還在進行（PENDING）或待人工核對（ANOMALY）時退款被擋下（轉帳金額已定，這時退款會讓平台多付）；轉帳成功之後可以退款。
-func TestARefundIsRefusedWhileTheTransferHasNoOutcomeYet(t *testing.T) {
-	t.Parallel()
-	f := setupCharge(t)
-	f.paidPayment(t, "RT-1", 100)
-	f.enableAccount(t, 7, "acct_seller_7", true)
-	tr := f.requestTransfer(t, "RT-1")
-	ctx := context.Background()
-	_, err := f.module.CreatePaymentRefund(ctx, RefundRequest{OrderNo: "RT-1", Amount: 10, RequestKey: "k"})
-	wantKind(t, err, apperr.KindFailedPrecondition, "轉帳 PENDING")
-	f.exec(t, "UPDATE payment.transfers SET status = 'ANOMALY', failure_reason = 'x' WHERE id = $1", tr.ID)
-	_, err = f.module.CreatePaymentRefund(ctx, RefundRequest{OrderNo: "RT-1", Amount: 10, RequestKey: "k"})
-	wantKind(t, err, apperr.KindFailedPrecondition, "轉帳 ANOMALY")
-	if f.refundCount(t, "RT-1") != 0 {
-		t.Fatal("被擋下的退款寫了列")
-	}
-	f.exec(t, "UPDATE payment.transfers SET status = 'FAILED' WHERE id = $1", tr.ID)
-	if r := f.createRefund(t, "RT-1", "k", 10, false); r.Status != RefundPending {
-		t.Fatalf("轉帳 FAILED 之後：%+v", r)
-	}
-}
-
 // 退款 job：provider 在 transaction 外、帶列上的冪等鍵與付款的外部 ID；provider 回成功進 SUCCEEDED 並發 RefundChanged（transaction 內）；已終局的列再跑什麼都不做。
 // 自動退款成功額外發 AutoRefundCompleted（買家與店家、金額），失敗的自動退款只發 RefundChanged。
 // mutation：publishRefundResult 拿掉 AutoRefundCompleted 的發布 → 沒有自動退款事件，失敗。
@@ -577,20 +480,7 @@ func TestARefundThatFailsAtTheProviderAfterBeingAcceptedFreesTheQuota(t *testing
 	f.createRefund(t, "RG-1", "again", 100, false)
 }
 
-// 撤回的終局失敗讓退款進 FAILED 時也發 RefundChanged（Previous 是 REVERSING）。
-func TestAFailedReversalPublishesRefundChanged(t *testing.T) {
-	t.Parallel()
-	f := setupCharge(t)
-	f.transferred(t, "RX-1")
-	r := f.createRefund(t, "RX-1", "k", 40, false)
-	f.fake.FailReversal(fmt.Errorf("%w：不能撤回", ErrChargePermanent))
-	must(t, f.module.ReversePaymentTransfer(context.Background(), r.ID, false))
-	if len(f.refundChanges) != 1 || f.refundChanges[0].Status != RefundFailed || f.refundChanges[0].Previous != RefundReversing || f.refundChanges[0].RefundID != r.ID {
-		t.Fatalf("事件=%+v", f.refundChanges)
-	}
-}
-
-// 補掃：閒置的 PENDING 與 REVERSED 退款補排退款 job、閒置的 REFUNDING 補排退款同步、有舊的未處理事件的退款補排同步；剛寫入的與 ANOMALY、終局的不排。
+// 補掃：閒置的 PENDING 退款補排退款 job、閒置的 REFUNDING 補排退款同步、有舊的未處理事件的退款補排同步；剛寫入的與 ANOMALY、終局的不排。
 // mutation：掃描不查可呼叫的退款（CallableRefundIDs）→ 退款 job 沒有補排，失敗。
 // mutation：掃描不查 REFUNDING（RefundingRefundIDs）→ 同步 job 沒有補排，失敗。
 func TestTheSweepRequeuesIdleCallableAndRefundingRefundsButNotAnomalyOrFinalOnes(t *testing.T) {
@@ -599,7 +489,6 @@ func TestTheSweepRequeuesIdleCallableAndRefundingRefundsButNotAnomalyOrFinalOnes
 	p := f.paidPayment(t, "RS-1", 1000)
 	ctx := context.Background()
 	pending := f.insertRefund(t, p.ID, "PENDING", 10, 0)
-	reversed := f.insertRefund(t, p.ID, "REVERSED", 10, 0)
 	f.insertRefund(t, p.ID, "ANOMALY", 10, 0)
 	done := f.insertRefund(t, p.ID, "PENDING", 10, 0)
 	f.exec(t, "UPDATE payment.refunds SET status = 'SUCCEEDED', refund_called_at = now(), external_refund_id = 'x_done' WHERE id = $1", done)
@@ -617,7 +506,7 @@ func TestTheSweepRequeuesIdleCallableAndRefundingRefundsButNotAnomalyOrFinalOnes
 	for _, id := range f.jobIDs(t, kindRefundCreate, "refund_id") {
 		got[id] = true
 	}
-	if len(got) != 2 || !got[pending] || !got[reversed] {
+	if len(got) != 1 || !got[pending] {
 		t.Fatalf("補排的退款 job=%v", got)
 	}
 	if len(f.jobIDs(t, kindRefundSync, "refund_id")) != 0 {
@@ -647,9 +536,9 @@ func TestTheSweepRequeuesIdleCallableAndRefundingRefundsButNotAnomalyOrFinalOnes
 	}
 }
 
-// 退款階段的 ANOMALY 人工結案：成功之前向 provider 以列上的嘗試 ID 查回證據（FindRefund）：亂貼的 ID、金額不符被擋下、列不動、沒有稽核紀錄；相符才結案成 REFUNDING 並排同步 job，
-// 同 transaction 寫一筆 adminaudit；失敗結案進 FAILED、額度釋出；撤回階段與退款階段互不混用。
-// mutation：resolveRefund 的退款階段拿掉 verifyEvidence 的退款分支（inReversalStage 永遠 true）→ 退款階段的結案走撤回路徑而失敗。
+// 退款的 ANOMALY 人工結案：成功之前向 provider 以列上的嘗試 ID 查回證據（FindRefund）：亂貼的 ID、金額不符被擋下、列不動、沒有稽核紀錄；相符才結案成 REFUNDING 並排同步 job，
+// 同 transaction 寫一筆 adminaudit；失敗結案進 FAILED、額度釋出。
+// mutation：ResolveAnomaly 拿掉 verifyEvidence 的呼叫 → 亂貼的 ID 被記成退款，失敗。
 func TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheSync(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
@@ -695,22 +584,6 @@ func TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheS
 		t.Fatalf("結案成失敗：%s", f.refundText(t, "status", bad.ID))
 	}
 	f.createRefund(t, "RZ-2", "again", 100, false)
-}
-
-// 撤回階段的 ANOMALY 人工結案成功之後，由結案的 transaction 排退款 job（退款要接著往下）。
-func TestResolvingAReversalStageAnomalyQueuesTheRefundJob(t *testing.T) {
-	t.Parallel()
-	f := setupCharge(t)
-	ctx := context.Background()
-	p, tr := f.transferred(t, "RY-1")
-	refund := f.insertRefund(t, p.ID, "ANOMALY", 30, 30)
-	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.refundText(t, "reversal_idempotency_key", refund)})
-	must(t, err)
-	f.clearJobs()
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, refund, AnomalySucceeded, rev.ExternalID))
-	if ids := f.jobIDs(t, kindRefundCreate, "refund_id"); len(ids) != 1 || ids[0] != refund {
-		t.Fatalf("結案之後的退款 job=%v", ids)
-	}
 }
 
 // F1：累計上限的比較不溢位。付款 100、已有一筆 40，再要求 MaxInt64：taken+amount 回繞成負數會通過檢查。
@@ -771,8 +644,8 @@ func (a *afterGetRefund) GetRefund(ctx context.Context, externalID string) (Char
 	return snap, err
 }
 
-// F3：provider 已改成別的（付款屬於舊 provider）時退款在建立就被拒絕，不先撤回賣家的轉帳、不寫退款列也不排 job。
-// mutation：refund-create-no-refundable-check（拿掉 CreateRefund 的 refundable 檢查）→ 寫了 REVERSING 列並排撤回 job，失敗。
+// F3：provider 已改成別的（付款屬於舊 provider）時退款在建立就被拒絕，不預留向賣家收回的額度、不寫退款列也不排 job。
+// mutation：refund-create-no-refundable-check（拿掉 CreateRefund 的 refundable 檢查）→ 寫了退款列並排退款 job，失敗。
 func TestARefundForAPaymentOfAnotherProviderIsRefusedBeforeAnyReversal(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)

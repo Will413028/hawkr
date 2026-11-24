@@ -25,7 +25,7 @@
    "old": "\t\tif _, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: applied.ReversalAmount, Now: s.d.Now().UTC()}); err != nil {\n\t\t\treturn err\n\t\t}",
    "new": "\t\t_ = applied",
    "test": "internal/modules/payment ^TestAReversalUpdatesTheReversedAmountAndTheRefundStatusTogether$",
-   "why": "撤回成功只推進退款狀態、不累加轉帳的 reversed_amount：reversed_amount 仍是 0。"
+   "why": "撤回成功只推進撤回狀態、不累加轉帳的 reversed_amount：reversed_amount 仍是 0。"
   },
   {
    "id": "transfer-amount-ignores-refunds",
@@ -76,10 +76,10 @@
    "id": "transfer-called-at-not-marked",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\tcalled, err := s.markTransferCalled(ctx, transferID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
+   "old": "\tcalled, err := s.claimTransfer(ctx, transferID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
    "new": "\tcalled := &row",
    "test": "internal/modules/payment ^TestAnUnknownTransferIsReplayedWithTheSameKeyWithinTheResendWindow$",
-   "why": "呼叫 provider 之前不記 called_at：結果不明的列沒有起算時刻，期限不成立，不進終局。"
+   "why": "呼叫 provider 之前不 claim（不記 called_at）：結果不明的列沒有起算時刻，期限不成立，不進終局。"
   },
   {
    "id": "reversal-called-at-not-marked",
@@ -220,10 +220,10 @@
    "id": "reversal-orphan-result-silent",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\t\torphan = true\n\t\t\treturn s.publishAnomaly(ctx, model.AnomalyRefund, ref.ID, ref.PaymentID, fmt.Sprintf(\"reversed_but_refund_%s:%s\", cur.Status, snap.ExternalID))",
+   "old": "\t\t\torphan = true\n\t\t\treturn s.publishAnomaly(ctx, model.AnomalyReversal, ref.ID, ref.PaymentID, fmt.Sprintf(\"reversed_but_reversal_%s:%s\", cur.ReversalStatus, snap.ExternalID))",
    "new": "\t\t\treturn nil",
-   "test": "internal/modules/payment ^TestAReversalForARefundThatIsNoLongerReversingIsReportedNotSilent$",
-   "why": "provider 已撤回、退款卻不在 REVERSING 時靜默回 nil：沒有 log 也沒有告警事件。"
+   "test": "internal/modules/payment ^TestAReversalThatIsNoLongerReversingIsReportedNotSilent$",
+   "why": "provider 已撤回、撤回狀態卻不在 REVERSING 時靜默回 nil：沒有 log 也沒有告警事件。"
   },
   {
    "id": "reversal-precondition-anomaly-not-parked",
@@ -321,7 +321,7 @@
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
    "old": "if !found || snap.ExternalID != evidence || snap.Amount != r.ReversalAmount {",
    "new": "if false && (!found || snap.ExternalID != evidence || snap.Amount != r.ReversalAmount) {",
-   "test": "internal/modules/payment ^TestResolvingARefundAnomalyAsSucceededRequiresTheProviderToConfirmTheEvidence$",
+   "test": "internal/modules/payment ^TestResolvingAReversalAnomalyAsSucceededRequiresTheProviderToConfirmTheEvidence$",
    "why": "R3：撤回的結案證據不經 provider 核對，沒有對應撤回的 ID 被記成 REVERSED 並累加轉帳。"
   }
  ]

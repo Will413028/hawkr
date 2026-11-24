@@ -81,6 +81,7 @@ type Fake struct {
 	reversalErrs []error
 	// transferLost 與 reversalLost 是「已建立、回應遺失」的錯誤佇列；transferCalls 與 reversalCalls 計呼叫次數（失敗的也算）。
 	transferSeen  []string
+	transferSums  []int64
 	reversalSeen  []string
 	transferLost  []error
 	reversalLost  []error
@@ -288,6 +289,13 @@ func (f *Fake) TransferKeys() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.transferSeen...)
+}
+
+// TransferAmounts 回傳每次 CreateTransfer 收到的金額（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) TransferAmounts() []int64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]int64(nil), f.transferSums...)
 }
 
 // ReversalKeys 回傳每次 ReverseTransfer 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
@@ -644,10 +652,14 @@ func (f *Fake) CreateTransfer(ctx context.Context, in TransferInput) (TransferSn
 	f.check(ctx, "CreateTransfer")
 	f.transferCalls++
 	f.transferSeen = append(f.transferSeen, in.IdempotencyKey)
+	f.transferSums = append(f.transferSums, in.Amount)
 	if err := pop(&f.transferErrs); err != nil {
 		return TransferSnapshot{}, err
 	}
 	if id, ok := f.transferKeys[in.IdempotencyKey]; ok {
+		if f.transfers[id].in.Amount != in.Amount {
+			return TransferSnapshot{}, fmt.Errorf("%w：同一把冪等鍵送了不同的金額", ErrPermanent)
+		}
 		return f.transfers[id].snap, pop(&f.transferLost)
 	}
 	if in.Amount <= 0 || in.SourceChargeID == "" || in.DestinationAccountID == "" {

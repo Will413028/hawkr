@@ -60,3 +60,21 @@ func TestFakeDrivesTransferAndReversalOutcomes(t *testing.T) {
 		t.Fatalf("違規=%v", v)
 	}
 }
+
+// 同一把冪等鍵送不同的金額是永久失敗（Stripe 比對參數）：轉帳的金額綁著冪等鍵，只有換新鍵才會重算。
+// mutation：Fake.CreateTransfer 拿掉金額比對 → 同鍵不同額被當成重送成功，失敗。
+func TestFakeRefusesTheSameTransferKeyWithAnotherAmount(t *testing.T) {
+	t.Parallel()
+	f, ctx := NewFake(), deadline(t)
+	in := TransferInput{Amount: 100, SourceChargeID: "ch", DestinationAccountID: "acct", TransferGroup: "O1", IdempotencyKey: "t1"}
+	if _, err := f.CreateTransfer(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+	in.Amount = 60
+	if _, err := f.CreateTransfer(ctx, in); !errors.Is(err, ErrPermanent) {
+		t.Fatalf("同鍵不同額：%v", err)
+	}
+	if got := f.TransferAmounts(); len(got) != 2 || got[0] != 100 || got[1] != 60 || f.Transfers() != 1 {
+		t.Fatalf("金額=%v，轉帳 %d 筆", got, f.Transfers())
+	}
+}

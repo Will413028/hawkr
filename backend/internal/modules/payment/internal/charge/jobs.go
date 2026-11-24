@@ -91,7 +91,7 @@ func enqueueTransfer(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error 
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// ReversalArgs 是撤回轉帳的 job，以退款 ID 為唯一鍵：退款 use case 在寫下 REVERSING 退款列的同一個 transaction 排入。
+// ReversalArgs 是撤回轉帳的 job，以退款 ID 為唯一鍵：provider 接受退款與轉帳成立兩個事件中後到的那個，在把退款列的撤回狀態推進到 REVERSING 的同一個 transaction 排入（D11）。
 type ReversalArgs struct {
 	RefundID uuid.UUID `json:"refund_id" river:"unique"`
 }
@@ -108,7 +108,7 @@ func enqueueReversal(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error 
 	return jc.Enqueue(ctx, args, &opts)
 }
 
-// RefundArgs 是呼叫 provider 建立退款的 job，以退款 ID 為唯一鍵：CreateRefund 在寫 PENDING 退款列的同一個 transaction 排入；需要先撤回的退款由撤回成立的 transaction 排入。
+// RefundArgs 是呼叫 provider 建立退款的 job，以退款 ID 為唯一鍵：CreateRefund 在寫 PENDING 退款列的同一個 transaction 排入（轉帳的任何狀態都可以退款，向賣家收回在 provider 接受之後才開始）。
 type RefundArgs struct {
 	RefundID uuid.UUID `json:"refund_id" river:"unique"`
 }
@@ -309,7 +309,7 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 //   - 狀態：已建立、未結案、超過 readIdle 沒讀過的列補排同步（掉了 webhook 的保底）；
 //   - 舊嘗試：被取代、還沒結案又超過 readIdle 沒讀過的舊 PaymentIntent 所屬的付款補排同步；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的付款補排同步（任何狀態）；
-//   - 轉帳、撤回與退款：PENDING 的轉帳、REVERSING 的退款閒置超過 createIdle 就補排各自的 job，PENDING 或 REVERSED 的退款補排退款 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；
+//   - 轉帳、撤回與退款：PENDING 的轉帳、撤回狀態是 REVERSING 的退款閒置超過 createIdle 就補排各自的 job，PENDING 的退款補排退款 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；
 //     REFUNDING 的退款閒置超過 readIdle 補排退款同步；inbox 有超過 eventGrace 還沒處理的退款事件的退款補排退款同步；ANOMALY 的列一律不補排。
 //
 // 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次；補排的轉帳、撤回與退款呼叫算在 created，退款同步算在 synced）。沒有設定 provider 時什麼都不做。

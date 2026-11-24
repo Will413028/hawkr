@@ -17,7 +17,7 @@
 - provider 名稱與收款帳戶不同，webhook 路由（`POST /webhooks/stripe-payments`）、簽章密鑰（`STRIPE_PAYMENT_WEBHOOK_SECRET`）、本文上限與 log 標籤都獨立。守門：`TestAChargeProviderNamedLikeTheAccountProviderPanicsAtAssembly`。
 - 補掃：閒置的建立中列、久未讀的未結案付款、被取代又未結案的舊嘗試、有舊的未處理事件的付款。守門：`TestSweepQueuesIdleCreatesStaleReadsAndOldUnprocessedEvents`。
 - client_secret 不存，`GetPayment` 在等待付款時向 provider 讀。守門：`TestGetPaymentReturnsTheSecretOnlyWhileAwaitingAndOnlyToTheOwner`。
-- 轉帳：transaction 只寫 PENDING 列與 job，一筆付款一筆有效轉帳靠 `transfers_active_payment`（含 ANOMALY）。守門：`TestADuplicateTransferRequestReturnsTheExistingActiveTransfer`。撤回：同一個 transaction 累加 `reversed_amount`；provider 已撤回而退款不在 REVERSING 時記 log 並發告警，不靜默。守門：`TestAReversalForARefundThatIsNoLongerReversingIsReportedNotSilent`。
-- 退款：鎖付款列後以 `(付款, request_key)` 冪等、加總非失敗退款（含 ANOMALY）守累計上限；已轉帳先寫 `REVERSING`、撤回成立才排退款 job，轉帳進行或待核對時拒絕；`REFUNDING` 由 `refund.*` 事件或掃描排的同步重讀到終局，發 `RefundChanged`（自動退款成功再發 `AutoRefundCompleted`）；ANOMALY 分撤回與退款兩階段。守門：`TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne`、`TestARefundOnATransferredPaymentReversesFirstAndOnlyThenRefunds`。
+- 轉帳：transaction 只寫 PENDING 列與 job，一筆付款一筆有效轉帳靠 `transfers_active_payment`（含 ANOMALY）。金額在每把冪等鍵第一次送出時鎖付款列算定（`claimTransfer`，D11），同鍵不變、換新鍵才重算。守門：`TestAConcurrentRefundAndTheTransferSendNeverOverpay`。撤回：同一個 transaction 累加 `reversed_amount`。
+- 退款：鎖付款列後以 `(付款, request_key)` 冪等、加總非失敗退款（含 ANOMALY）守累計上限，不看轉帳狀態；`REFUNDING` 由 `refund.*` 事件或掃描排的同步重讀到終局，發 `RefundChanged`；ANOMALY 分退款與撤回。向賣家收回是退款列的 `reversal_status`：轉帳金額已承諾才預留，provider 接受退款（含 pending）且轉帳成立後才排撤回，預留在退款失敗或撤回終局時釋出（規格 §12）。守門：`TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne`。鎖順序見規格 §7。
 - schema 守轉帳與退款的不變量：`TestTheSchemaGuardsTheTransferAndRefundInvariants`；狀態型別與 CHECK 相同：`TestStatusTypesMatchTheSchemaChecks`、`TestAttemptStatesMatchTheSchemaCheck`。
 - 不負責：訂單狀態與自動退款的判斷（訂單一方，D5 修訂）；逾期付款的取消 use case（步驟 4 的 `ClosePaymentByOrderNo`）。

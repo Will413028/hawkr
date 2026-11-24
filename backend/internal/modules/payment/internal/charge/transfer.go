@@ -113,8 +113,9 @@ func toTransfer(r store.PaymentTransfer) model.Transfer {
 }
 
 // Transfer 是轉帳 job（payment.transfer_create）的內容：列還是 PENDING 時依結果三分收斂（ADR D68）。
-//   - 呼叫前先記 called_at（這把鍵的第一次呼叫，獨立提交），帶列上的冪等鍵與付款的 charge 建立轉帳（source_transaction），成功在新的 transaction 寫外部 ID 與 SUCCEEDED。
-//   - provider 終局拒絕（ErrPermanent）進 FAILED（job 完成，不回錯誤）；可重試拒絕（ErrRetryableRefusal，例如平台餘額不足）換新冪等鍵、清掉 called_at 並回錯誤由 River 重試，不計任何期限。
+//   - 呼叫前先 claim（claimTransfer）：這把鍵的第一次送出在一個獨立的 transaction 內鎖付款列、以「付款金額減非失敗退款」算定金額並與 called_at 一起寫入，算出不大於 0 就不呼叫 provider、
+//     轉帳進 FAILED（fully_refunded）；之後帶列上的冪等鍵與金額、付款的 charge 建立轉帳（source_transaction），成功在新的 transaction 寫外部 ID 與 SUCCEEDED，並讓等待中的退款撤回開始。
+//   - provider 終局拒絕（ErrPermanent）進 FAILED（job 完成，不回錯誤）；可重試拒絕（ErrRetryableRefusal，例如平台餘額不足）換新冪等鍵、清掉 called_at（下一次送出重新 claim、重算金額）並回錯誤由 River 重試，不計任何期限。
 //   - 結果不明回錯誤，River 與週期掃描以同一把鍵重送，直到 ResendWindow；之後不再呼叫 provider，只以 FindTransfer 依嘗試 ID 查回：找到就收下，
 //     查無要滿 NotFoundAfter 才進 FAILED（之後 RequestTransfer 才建得出新的一筆、換新鍵），未滿回錯誤稍後再查；查回連續失敗 LookupFailureLimit 次進 ANOMALY。
 //   - 付款沒有 charge、provider 回的外部 ID 或金額與列不符進 ANOMALY（佔住唯一索引、補掃不再重試、發 MoneyAnomaly；job 完成）。
@@ -158,7 +159,7 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 	if !inResendWindow(row.CalledAt, now) {
 		return s.lookupTransfer(ctx, row, pay, now)
 	}
-	called, err := s.markTransferCalled(ctx, transferID, now)
+	called, err := s.claimTransfer(ctx, transferID, now)
 	if err != nil || called == nil {
 		return err
 	}
@@ -186,7 +187,7 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 		return err
 	case callSucceeded:
 	}
-	return s.acceptTransfer(ctx, row, snap)
+	return s.acceptTransfer(ctx, *called, snap)
 }
 
 // lookupTransfer 是過了 ResendWindow 的轉帳：不再呼叫 provider，只依嘗試 ID 查回。
@@ -224,6 +225,9 @@ func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer,
 			return err
 		}
 		_, err := q.SucceedTransfer(ctx, store.SucceedTransferParams{ID: row.ID, ExternalTransferID: &snap.ExternalID, Now: s.d.Now().UTC()})
+		if err == nil {
+			return s.startReversals(ctx, q, row.PaymentID)
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			cur, rerr := q.TransferByID(ctx, row.ID)
 			if rerr != nil {
@@ -244,18 +248,58 @@ func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer,
 	return err
 }
 
-// markTransferCalled 在獨立的 transaction 記下「呼叫過」的時刻（呼叫 provider 之前提交）；列已不是 PENDING 時回 nil。
-func (s *Service) markTransferCalled(ctx context.Context, transferID uuid.UUID, now time.Time) (*store.PaymentTransfer, error) {
+// claimTransfer 是這把冪等鍵第一次送出前的承諾（D11、ADR D69）：在獨立的 transaction 內依序鎖付款列、轉帳列，called_at 為空時（這把鍵還沒送過）以「付款金額減非失敗退款」算定金額，
+// 與 called_at 一起寫入；called_at 已有值（同一把鍵的重送）金額不變。算定金額時等待中的預留都釋出（退款已從金額扣掉，不必再撤回）；算出不大於 0 時不呼叫 provider，
+// 轉帳直接進 FAILED（fully_refunded，回 nil）。列已不是 PENDING 時回 nil。呼叫 provider 之前提交，之後進來的退款看得到「金額已承諾」。
+func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now time.Time) (*store.PaymentTransfer, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	var row *store.PaymentTransfer
 	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
-		r, err := store.New(s.d.DB.Conn(ctx)).MarkTransferCalled(ctx, store.MarkTransferCalledParams{ID: transferID, Now: now})
+		q := store.New(s.d.DB.Conn(ctx))
+		cur, err := q.TransferByID(ctx, transferID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
+		if err != nil {
+			return err
+		}
+		if cur.Status != string(model.TransferPending) {
+			return nil
+		}
+		pay, err := q.LockPayment(ctx, cur.PaymentID)
+		if err != nil {
+			return err
+		}
+		locked, err := q.LockTransfer(ctx, transferID)
+		if err != nil {
+			return err
+		}
+		if locked.Status != string(model.TransferPending) {
+			return nil
+		}
+		amount := locked.Amount
+		if locked.CalledAt == nil {
+			refunded, err := q.NonFailedRefundTotal(ctx, pay.ID)
+			if err != nil {
+				return err
+			}
+			amount = pay.Amount - refunded
+			if err := s.releaseWaitingReversals(ctx, q, pay.ID, reversalDeducted); err != nil {
+				return err
+			}
+			if amount <= 0 {
+				reason := failedFullyRefunded
+				_, err := q.FailTransfer(ctx, store.FailTransferParams{ID: transferID, FailureReason: &reason, Now: now})
+				return err
+			}
+		}
+		r, err := q.ClaimTransfer(ctx, store.ClaimTransferParams{ID: transferID, Amount: amount, Now: now})
+		if err != nil {
+			return err
+		}
 		row = &r
-		return err
+		return nil
 	})
 	return row, err
 }
@@ -326,15 +370,29 @@ func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer
 	})
 }
 
-// failTransfer 讓 PENDING 的轉帳進終局 FAILED（不佔有效轉帳的位置）；列已不是 PENDING 時什麼都不做。
+// failTransfer 讓 PENDING 的轉帳進終局 FAILED（不佔有效轉帳的位置），並在同一個 transaction 釋出等待中的撤回預留（錢本來就在平台手上）；列已不是 PENDING 時什麼都不做。鎖順序：付款列、轉帳列、退款列。
 func (s *Service) failTransfer(ctx context.Context, transferID uuid.UUID, reason string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
-		_, err := store.New(s.d.DB.Conn(ctx)).FailTransfer(ctx, store.FailTransferParams{ID: transferID, FailureReason: &reason, Now: s.d.Now().UTC()})
+		q := store.New(s.d.DB.Conn(ctx))
+		cur, err := q.TransferByID(ctx, transferID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		if _, err := q.LockPayment(ctx, cur.PaymentID); err != nil {
+			return err
+		}
+		_, err = q.FailTransfer(ctx, store.FailTransferParams{ID: transferID, FailureReason: &reason, Now: s.d.Now().UTC()})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return s.releaseWaitingReversals(ctx, q, cur.PaymentID, reversalTransferFailed)
 	})
 }

@@ -89,26 +89,6 @@ func TestRefundSettledOnlyCoversTheSameProviderRefundInTheSameOrAnEarlierState(t
 	}
 }
 
-// ANOMALY 的兩個階段：要撤回而撤回還沒成立是撤回階段，其餘是退款階段（人工結案走不同的證據與去向）。
-// mutation：inReversalStage 永遠回 true → 退款階段的列被當撤回階段，需要 FindRefund 證據的結案失敗。
-func TestInReversalStageSeparatesTheTwoAnomalyStages(t *testing.T) {
-	t.Parallel()
-	ext := "trr_1"
-	for _, c := range []struct {
-		name string
-		row  store.PaymentRefund
-		want bool
-	}{
-		{"reversal wanted and not yet done", store.PaymentRefund{ReversalAmount: 30}, true},
-		{"reversal done", store.PaymentRefund{ReversalAmount: 30, ReversalExternalID: &ext}, false},
-		{"no reversal needed", store.PaymentRefund{}, false},
-	} {
-		if got := inReversalStage(c.row); got != c.want {
-			t.Errorf("%s：%v，預期 %v", c.name, got, c.want)
-		}
-	}
-}
-
 func TestProviderFailureReasonKeepsTheCodeWithinTheColumnLimit(t *testing.T) {
 	t.Parallel()
 	if got := providerFailureReason(""); got != failedProvider {

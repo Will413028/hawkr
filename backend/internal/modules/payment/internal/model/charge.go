@@ -52,7 +52,7 @@ func TransferStatusValues() []TransferStatus {
 	return []TransferStatus{TransferPending, TransferSucceeded, TransferFailed, TransferAnomaly}
 }
 
-// Transfer 是付款轉給賣家的轉帳（transfers 的對外視圖）；ReversedAmount 是累計已撤回的額度。
+// Transfer 是付款轉給賣家的轉帳（transfers 的對外視圖）；ReversedAmount 是累計已撤回的額度。Amount 在 job 第一次送出（claim）之前只是暫定值（付款金額減寫列當下的非失敗退款），送出時才算定。
 type Transfer struct {
 	ID             uuid.UUID
 	PaymentID      uuid.UUID
@@ -70,25 +70,45 @@ type RefundStatus string
 
 // 退款的狀態。
 const (
-	// RefundPending 已寫列，尚未呼叫任何 provider。
+	// RefundPending 已寫列，尚未呼叫 provider。
 	RefundPending RefundStatus = "PENDING"
-	// RefundReversing 已轉帳的付款先撤回轉帳（reversal_amount，可能是部分撤回），撤回進行中。
-	RefundReversing RefundStatus = "REVERSING"
-	// RefundReversed 撤回完成、尚未呼叫退款：等待撤回與已呼叫退款之間的中間狀態，重啟從這裡接著呼叫退款。
-	RefundReversed RefundStatus = "REVERSED"
 	// RefundRefunding 已呼叫退款，等 provider 的結果。
 	RefundRefunding RefundStatus = "REFUNDING"
 	// RefundSucceeded 退款成功。
 	RefundSucceeded RefundStatus = "SUCCEEDED"
 	// RefundFailed 退款失敗，不佔累計額度。
 	RefundFailed RefundStatus = "FAILED"
-	// RefundAnomaly 與 provider 對不起來或前置條件不成立：仍佔額度，補掃不再重試，由後台人工結案。
+	// RefundAnomaly 退款與 provider 對不起來或前置條件不成立：仍佔額度，補掃不再重試，由後台人工結案。
 	RefundAnomaly RefundStatus = "ANOMALY"
 )
 
 // RefundStatusValues 回傳全部退款狀態，與 refunds_status_check 相同。
 func RefundStatusValues() []RefundStatus {
-	return []RefundStatus{RefundPending, RefundReversing, RefundReversed, RefundRefunding, RefundSucceeded, RefundFailed, RefundAnomaly}
+	return []RefundStatus{RefundPending, RefundRefunding, RefundSucceeded, RefundFailed, RefundAnomaly}
+}
+
+// ReversalStatus 是退款列上向賣家收回（撤回轉帳）的狀態（refunds_reversal_status_check），與退款狀態並行、各自收斂（D11、ADR D69）。
+type ReversalStatus string
+
+// 向賣家收回的狀態。
+const (
+	// ReversalNone 不需要收回（轉帳還沒承諾金額、沒有轉帳或沒有可撤額度）。
+	ReversalNone ReversalStatus = "NONE"
+	// ReversalWaiting 已預留額度、尚未開始：等 provider 接受退款且轉帳成立。
+	ReversalWaiting ReversalStatus = "WAITING"
+	// ReversalReversing 撤回轉帳進行中（結果不明時依 D68 收斂）。
+	ReversalReversing ReversalStatus = "REVERSING"
+	// ReversalReversed 撤回成立。
+	ReversalReversed ReversalStatus = "REVERSED"
+	// ReversalReleased 預留已釋出、沒有撤回（退款在撤回前失敗、轉帳少付或失敗、撤回永久失敗、人工結案）。
+	ReversalReleased ReversalStatus = "RELEASED"
+	// ReversalAnomaly 撤回與 provider 對不起來：預留持續佔住，由後台人工結案。
+	ReversalAnomaly ReversalStatus = "ANOMALY"
+)
+
+// ReversalStatusValues 回傳全部收回狀態，與 refunds_reversal_status_check 相同。
+func ReversalStatusValues() []ReversalStatus {
+	return []ReversalStatus{ReversalNone, ReversalWaiting, ReversalReversing, ReversalReversed, ReversalReleased, ReversalAnomaly}
 }
 
 // Payment 是買家對一張訂單的付款。金額是整數、不帶幣別（D9）。
@@ -141,6 +161,8 @@ const (
 	AnomalyPayment  AnomalyKind = "payment"
 	AnomalyTransfer AnomalyKind = "transfer"
 	AnomalyRefund   AnomalyKind = "refund"
+	// AnomalyReversal 是退款列上的撤回（ObjectID 是退款 ID）。
+	AnomalyReversal AnomalyKind = "reversal"
 )
 
 // MoneyAnomaly 是告警事件：搬錢的物件（付款、轉帳、退款）與 provider 對不起來而進入 ANOMALY，或 provider 已搬錢本地卻已不在可接收的狀態，需要人工核對。
@@ -171,7 +193,7 @@ type RefundRequest struct {
 	Auto       bool
 }
 
-// Refund 是退款的對外視圖。ReversalAmount 是這筆退款要先從賣家轉帳撤回的額度（沒有轉帳或沒有可撤額度時是 0）。
+// Refund 是退款的對外視圖。ReversalAmount 是這筆退款在 provider 接受之後要向賣家收回的額度（轉帳還沒承諾金額、沒有轉帳或沒有可撤額度時是 0），ReversalStatus 是收回的狀態。
 type Refund struct {
 	ID             uuid.UUID
 	PaymentID      uuid.UUID
@@ -180,6 +202,7 @@ type Refund struct {
 	Auto           bool
 	Status         RefundStatus
 	ReversalAmount int64
+	ReversalStatus ReversalStatus
 	// FailureReason 只在 RefundFailed 與 RefundAnomaly 有值。
 	FailureReason string
 	CreatedAt     time.Time

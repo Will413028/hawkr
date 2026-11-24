@@ -421,11 +421,12 @@ const (
 	AnomalyPayment   = model.AnomalyPayment
 	AnomalyTransfer  = model.AnomalyTransfer
 	AnomalyRefund    = model.AnomalyRefund
+	AnomalyReversal  = model.AnomalyReversal
 	AnomalySucceeded = model.AnomalySucceeded
 	AnomalyFailed    = model.AnomalyFailed
 )
 
-// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳或退款的人工結案：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
+// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳、退款或撤回（AnomalyReversal，id 是退款 ID）的人工結案：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
 // 領域變更與一筆 adminaudit 在同一個 transaction。語意與鎖順序見 charge.Service.ResolveAnomaly。
 func (m *Module) ResolveAnomaly(ctx context.Context, actor AdminActor, kind AnomalyKind, id uuid.UUID, outcome AnomalyOutcome, evidence string) error {
 	return m.charges.ResolveAnomaly(ctx, actor, kind, id, outcome, evidence)
@@ -511,13 +512,13 @@ func (m *Module) CreatePaymentTransfer(ctx context.Context, transferID uuid.UUID
 	return m.charges.Transfer(ctx, transferID, finalAttempt)
 }
 
-// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：撤回 REVERSING 退款的 reversal_amount，
-// 成功後同一個 transaction 累加轉帳的 reversed_amount 並把退款推進到 REVERSED。
+// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：撤回狀態是 REVERSING 的退款列的 reversal_amount，
+// 成功後同一個 transaction 累加轉帳的 reversed_amount 並把撤回推進到 REVERSED。
 func (m *Module) ReversePaymentTransfer(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
 	return m.charges.Reverse(ctx, refundID, finalAttempt)
 }
 
-// EnqueueRefundReversal 排入退款的撤回 job：退款 use case 在寫下 REVERSING 退款列的同一個 transaction 內呼叫。
+// EnqueueRefundReversal 排入退款的撤回 job：只在退款列的撤回狀態已是 REVERSING 的同一個 transaction 內呼叫（正常路徑由退款被接受與轉帳成立的 transaction 排入，這裡給測試與補排）。
 func (m *Module) EnqueueRefundReversal(ctx context.Context, refundID uuid.UUID) error {
 	return m.charges.EnqueueReversal(ctx, refundID)
 }
@@ -534,12 +535,23 @@ type PaymentRefundStatus = model.RefundStatus
 // 退款的狀態。
 const (
 	RefundPending   = model.RefundPending
-	RefundReversing = model.RefundReversing
-	RefundReversed  = model.RefundReversed
 	RefundRefunding = model.RefundRefunding
 	RefundSucceeded = model.RefundSucceeded
 	RefundFailed    = model.RefundFailed
 	RefundAnomaly   = model.RefundAnomaly
+)
+
+// PaymentReversalStatus 是退款列上向賣家收回（撤回轉帳）的狀態，與退款狀態並行。
+type PaymentReversalStatus = model.ReversalStatus
+
+// 向賣家收回的狀態。
+const (
+	ReversalNone      = model.ReversalNone
+	ReversalWaiting   = model.ReversalWaiting
+	ReversalReversing = model.ReversalReversing
+	ReversalReversed  = model.ReversalReversed
+	ReversalReleased  = model.ReversalReleased
+	ReversalAnomaly   = model.ReversalAnomaly
 )
 
 // ChargeRefundInput、ChargeRefundSnapshot 與 ChargeRefundState 是退款的 port 型別（測試包裝 provider 用）。
@@ -558,7 +570,7 @@ const (
 )
 
 // CreatePaymentRefund 是建立退款的入口（計畫 D4、D5 修訂；步驟 4 的 legacy CreateRefund 與 Java order 的 AutoRefundWorker 呼叫）：一個 transaction 內鎖付款列、
-// 以 (付款, RequestKey) 冪等、加總非失敗退款守累計上限，已轉帳的付款先寫 REVERSING（先撤回再退款），否則寫 PENDING，並排 job；provider 在 transaction 外由 job 呼叫。
+// 以 (付款, RequestKey) 冪等、加總非失敗退款守累計上限，寫 PENDING 退款列並排退款 job（轉帳的任何狀態都可以退款，向賣家收回在 provider 接受之後才開始，D11）；provider 在 transaction 外由 job 呼叫。
 // 語意與錯誤見 charge.Service.CreateRefund。呼叫方不能在 transaction 內呼叫。
 func (m *Module) CreatePaymentRefund(ctx context.Context, in RefundRequest) (PaymentRefund, error) {
 	return m.charges.CreateRefund(ctx, in)

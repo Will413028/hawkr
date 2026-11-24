@@ -10,15 +10,6 @@
    "why": "拿掉累計上限：第 101 元的退款被接受，併發的兩筆（各 60）都成立。"
   },
   {
-   "id": "refund-reverse-first-removed",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\treturn reversalFor(amount, tr.Amount-tr.ReversedAmount-reserved), nil",
-   "new": "\t_ = reserved\n\treturn 0, nil",
-   "test": "internal/modules/payment ^(TestARefundOnATransferredPaymentReversesFirstAndOnlyThenRefunds|TestTheReversalAmountIsWhatTheTransferHasNotYetReserved)$",
-   "why": "拿掉「先撤回」：已轉帳的付款退款寫成 PENDING、不撤回，退款 job 直接呼叫 provider。"
-  },
-  {
    "id": "refund-rotate-key-before-lookup",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
@@ -71,24 +62,6 @@
    "new": "\t\tif false {\n\t\t\treturn apperr.FailedPrecondition(\"付款尚未入帳，不能退款\")",
    "test": "internal/modules/payment ^(TestCreateRefundRefusesWhatCannotBeRefunded)$",
    "why": "未入帳的付款也能建立退款。"
-  },
-  {
-   "id": "refund-transfer-in-flight-accepted",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\t\treturn 0, apperr.FailedPrecondition(\"付款的轉帳還沒有結果，暫時不能退款，請稍後再試\")",
-   "new": "\t\treturn 0, nil",
-   "test": "internal/modules/payment ^(TestARefundIsRefusedWhileTheTransferHasNoOutcomeYet)$",
-   "why": "轉帳還在進行或待人工核對時放行退款：寫成 PENDING、不撤回。"
-  },
-  {
-   "id": "reversal-does-not-queue-the-refund",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\treturn enqueueRefund(ctx, s.d.Jobs, ref.ID)\n\t})",
-   "new": "\t\treturn nil\n\t})",
-   "test": "internal/modules/payment ^(TestARefundOnATransferredPaymentReversesFirstAndOnlyThenRefunds)$",
-   "why": "撤回成立之後不排退款 job：退款停在 REVERSED。"
   },
   {
    "id": "refund-retryable-refusal-never-rotates",
@@ -178,7 +151,7 @@
    "old": "\t\t\tif err := queue(enqueueRefund, id); err != nil {",
    "new": "\t\t\tif err := queue(func(context.Context, jobs.Enqueuer, uuid.UUID) error { return nil }, id); err != nil {",
    "test": "internal/modules/payment ^(TestTheSweepRequeuesIdleCallableAndRefundingRefundsButNotAnomalyOrFinalOnes)$",
-   "why": "掃描不補排 PENDING、REVERSED 的退款 job。"
+   "why": "掃描不補排 PENDING 的退款 job。"
   },
   {
    "id": "refund-sweep-skips-refunding",
@@ -190,31 +163,13 @@
    "why": "掃描不補排閒置的 REFUNDING 退款同步。"
   },
   {
-   "id": "refund-anomaly-stage-always-reversal",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "\treturn r.ReversalAmount > 0 && r.ReversalExternalID == nil\n}",
-   "new": "\treturn true\n}",
-   "test": "internal/modules/payment ^(TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheSync)$",
-   "why": "退款階段的 ANOMALY 也走撤回階段的結案：沒有 FindRefund 證據的路徑。"
-  },
-  {
    "id": "refund-anomaly-evidence-not-checked",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "\t\t\tif !found || snap.ExternalID != evidence || snap.Amount != r.Amount {",
+   "old": "\t\tif !found || snap.ExternalID != evidence || snap.Amount != r.Amount {",
    "new": "\t\t\tif false {",
    "test": "internal/modules/payment ^(TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheSync)$",
-   "why": "退款階段的結案不核對 provider 證據。"
-  },
-  {
-   "id": "refund-anomaly-reversal-success-does-not-queue-refund",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "\treturn reason, enqueueRefund(ctx, s.d.Jobs, id)\n}",
-   "new": "\treturn reason, nil\n}",
-   "test": "internal/modules/payment ^(TestResolvingAReversalStageAnomalyQueuesTheRefundJob)$",
-   "why": "撤回階段結案成功之後不排退款 job。"
+   "why": "退款的結案不核對 provider 證據。"
   },
   {
    "id": "refund-cap-overflow",
@@ -250,7 +205,7 @@
    "old": "\t\tif !s.refundable(pay) {\n\t\t\treturn apperr.FailedPrecondition(\"付款目前不能退款（沒有外部付款或屬於別的付款服務）\")\n\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^(TestARefundForAPaymentOfAnotherProviderIsRefusedBeforeAnyReversal)$",
-   "why": "CreateRefund 拿掉可退款檢查：別的 provider 的付款仍寫了 REVERSING 列並排撤回 job。"
+   "why": "CreateRefund 拿掉可退款檢查：別的 provider 的付款仍寫了退款列並排退款 job。"
   },
   {
    "id": "refund-event-no-provider-filter",

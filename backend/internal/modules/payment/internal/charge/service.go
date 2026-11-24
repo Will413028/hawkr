@@ -64,6 +64,8 @@ const (
 	// failedRefused 與 failedNotFound 是終局失敗的原因（failure_reason）：provider 拒絕；查回證明 provider 沒有這筆。
 	failedRefused  = "provider_refused"
 	failedNotFound = "provider_not_found"
+	// failedFullyRefunded 是轉帳在送出前算定金額時，付款已全額退款（沒有可轉的金額）而終局的原因。
+	failedFullyRefunded = "fully_refunded"
 )
 
 // ResendWindow 必須小於冪等鍵保存期：差值為負時這行無法編譯。

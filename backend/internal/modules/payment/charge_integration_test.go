@@ -741,21 +741,43 @@ VALUES ($1, $2, 7, 100, 'acct_1', $3::text, CASE WHEN $3::text = 'FAILED' THEN '
 		t.Fatal("撤回累計超過轉帳金額")
 	}
 	must(t, exec("UPDATE payment.transfers SET status = 'SUCCEEDED', external_transfer_id = 'tr_1', called_at = now(), reversed_amount = 60 WHERE status = 'PENDING'"))
-	insertRefund := func(key, status string, reversalAmount int64) error {
-		return exec(`INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_amount, created_at, updated_at)
-VALUES ($1, $2, $3, 50, $4, $5, now(), now())`, uuid.NewV7(), p.ID, key, status, reversalAmount)
+	ptr := func(s string) *string { return &s }
+	// insertRefund 寫一筆退款列：status 與撤回狀態 reversalStatus 各自獨立；ext 是 provider 的退款 ID（有就同時寫呼叫時刻），reason 與 revExt 是撤回的原因與撤回 ID。
+	insertRefund := func(key, status, reversalStatus string, reversalAmount int64, ext, reason, revExt *string) error {
+		return exec(`INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_status, reversal_amount, reversal_reason, reversal_external_id, reversal_called_at,
+	external_refund_id, refund_called_at, failure_reason, created_at, updated_at)
+VALUES ($1, $2, $3, 50, $4::text, $5::text, $6, $7::text, $8::text, CASE WHEN $8::text IS NOT NULL THEN now() END,
+	$9::text, CASE WHEN $9::text IS NOT NULL OR $4::text IN ('REFUNDING', 'SUCCEEDED') THEN now() END, CASE WHEN $4::text IN ('FAILED', 'ANOMALY') THEN 'x' END, now(), now())`,
+			uuid.NewV7(), p.ID, key, status, reversalStatus, reversalAmount, reason, revExt, ext)
 	}
-	must(t, insertRefund("k1", "PENDING", 0))
-	if err := insertRefund("k1", "PENDING", 0); err == nil {
+	must(t, insertRefund("k1", "PENDING", "NONE", 0, nil, nil, nil))
+	if err := insertRefund("k1", "PENDING", "NONE", 0, nil, nil, nil); err == nil {
 		t.Fatal("同一把退款冪等鍵寫了兩列")
 	}
-	if err := insertRefund("k2", "REVERSED", 30); err == nil {
+	if err := insertRefund("k2", "REFUNDING", "REVERSED", 30, ptr("re_k2"), nil, nil); err == nil {
 		t.Fatal("撤回完成卻沒有撤回的外部 ID")
 	}
-	if err := insertRefund("k3", "REVERSING", 0); err == nil {
-		t.Fatal("撤回中卻沒有要撤的額度")
+	if err := insertRefund("k3", "PENDING", "WAITING", 0, nil, nil, nil); err == nil {
+		t.Fatal("有預留的撤回狀態卻沒有要撤的額度")
 	}
-	must(t, insertRefund("k4", "REVERSING", 30))
+	if err := insertRefund("k3b", "PENDING", "NONE", 30, nil, nil, nil); err == nil {
+		t.Fatal("沒有撤回卻有額度")
+	}
+	must(t, insertRefund("k4", "PENDING", "WAITING", 30, nil, nil, nil))
+	if err := insertRefund("k5", "PENDING", "REVERSING", 30, nil, nil, nil); err == nil {
+		t.Fatal("退款還沒被 provider 接受就開始撤回")
+	}
+	must(t, insertRefund("k5b", "REFUNDING", "REVERSING", 30, ptr("re_k5b"), nil, nil))
+	if err := insertRefund("k6", "FAILED", "WAITING", 30, nil, nil, nil); err == nil {
+		t.Fatal("失敗的退款還留著等待中的預留")
+	}
+	if err := insertRefund("k7", "REFUNDING", "RELEASED", 30, ptr("re_k7"), nil, nil); err == nil {
+		t.Fatal("釋出預留卻沒有原因")
+	}
+	must(t, insertRefund("k7b", "FAILED", "RELEASED", 30, nil, ptr("refund_failed"), nil))
+	if err := insertRefund("k8", "REVERSING", "NONE", 0, nil, nil, nil); err == nil {
+		t.Fatal("退款狀態不再有 REVERSING")
+	}
 	if err := exec("UPDATE payment.payments SET status = 'SUCCEEDED' WHERE id = $1", p.ID); err == nil {
 		t.Fatal("入帳的付款沒有 charge 與入帳時間")
 	}

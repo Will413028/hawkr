@@ -173,12 +173,14 @@ CREATE INDEX payment_attempts_payment ON payment.payment_attempts (payment_id);
 CREATE INDEX payment_attempts_excess ON payment.payment_attempts (excess_paid_at) WHERE excess_paid_at IS NOT NULL;
 
 -- 轉帳：訂單完成後平台把這筆付款的款項轉給賣家（separate charges and transfers，D1、D6）。
--- 一筆付款最多一筆有效轉帳：唯一索引 transfers_active_payment 涵蓋 PENDING、SUCCEEDED 與 ANOMALY（FAILED 不佔，失敗後可以重建；ANOMALY 與 provider 對不起來，不能確定沒有搬錢，所以佔位）。amount 是轉給賣家的整數金額
--- （不超過付款金額；累計由轉帳 use case 在鎖付款列後守，Stripe 另外守「轉帳不超過付款扣掉已退款」）。destination_account_id 是寫列當下賣家收款帳戶的外部 ID 快照
--- （帳戶列日後被清理刪除時，轉帳仍查得到去向）。status：PENDING 已寫列、尚未呼叫或結果不明；SUCCEEDED provider 已建立轉帳（external_transfer_id）；FAILED 終局失敗（failure_reason）；ANOMALY 待人工結案（failure_reason 記原因，補掃不再重試）。
+-- 一筆付款最多一筆有效轉帳：唯一索引 transfers_active_payment 涵蓋 PENDING、SUCCEEDED 與 ANOMALY（FAILED 不佔，失敗後可以重建；ANOMALY 與 provider 對不起來，不能確定沒有搬錢，所以佔位）。
+-- amount 是轉給賣家的整數金額，在 job 每把冪等鍵第一次送出前（claim）鎖付款列、以「付款金額減非失敗退款」算定，與 called_at 同一個 transaction 寫入（D11、ADR D69）；
+-- 寫列時的 amount 只是暫定值，called_at 為空時不當成已承諾的金額（退款據此判斷要不要撤回），called_at 不為空時同一把鍵的 amount 不再改。算出來不大於 0 時不呼叫 provider，
+-- 轉帳直接進 FAILED（fully_refunded）。destination_account_id 是寫列當下賣家收款帳戶的外部 ID 快照（帳戶列日後被清理刪除時，轉帳仍查得到去向）。
+-- status：PENDING 已寫列、尚未呼叫或結果不明；SUCCEEDED provider 已建立轉帳（external_transfer_id）；FAILED 終局失敗（failure_reason）；ANOMALY 待人工結案（failure_reason 記原因，補掃不再重試）。
 -- called_at 是這把鍵第一次呼叫 provider 之前寫入的時刻，語意同 payments.create_called_at；idempotency_key 是呼叫 provider 的冪等鍵，結果不明時每次重送沿用，
--- provider 已知拒絕（可重試）時換新鍵並清掉 called_at；它也是寫進 provider 物件的嘗試 ID，查回依它比對。lookup_failures 是連續查回失敗的次數。
--- 部分撤回：完成後退款要先撤回轉帳。一次撤回記在那筆退款列（refunds.reversal_amount、reversal_external_id），累計撤回額 reversed_amount 記在轉帳列，
+-- provider 已知拒絕（可重試）時換新鍵並清掉 called_at（下一次送出重新 claim、重算 amount）；它也是寫進 provider 物件的嘗試 ID，查回依它比對。lookup_failures 是連續查回失敗的次數。
+-- 部分撤回：退款先退買家、provider 接受之後才向賣家收回。一次撤回記在那筆退款列（refunds.reversal_*），累計撤回額 reversed_amount 記在轉帳列，
 -- 同一個 transaction 內鎖轉帳列後更新；reversed_amount 不超過 amount（CHECK transfers_reversed_check），剩餘可撤額是 amount - reversed_amount。賣家餘額不足不是錯誤，所以沒有對應的狀態。
 CREATE TABLE payment.transfers (
     id                     UUID        PRIMARY KEY,
@@ -214,16 +216,15 @@ CREATE UNIQUE INDEX transfers_external ON payment.transfers (external_transfer_i
 CREATE INDEX transfers_pending ON payment.transfers (updated_at, id) WHERE status = 'PENDING';
 
 -- 退款：一筆付款可以同時有多筆進行中的退款（D4），累計上限（非失敗退款加總不超過付款金額，ANOMALY 也算）由退款 use case 在同 transaction 鎖付款列後加總來守
--- （跨列加總，單列 CHECK 守不住；鎖順序：付款列先於退款列與轉帳列）。request_key 是呼叫端給的冪等鍵，(payment_id, request_key) 唯一：同一把鍵重送得到同一列。
+-- （跨列加總，單列 CHECK 守不住；鎖順序：付款列、轉帳列、退款列，同層多列依 ID 升序）。request_key 是呼叫端給的冪等鍵，(payment_id, request_key) 唯一：同一把鍵重送得到同一列。
 -- auto 標示自動退款（D5 修訂：由訂單一方發起，payment 只標記原因，完成時發 AutoRefundCompleted）。
--- 狀態機：PENDING 已寫列；已轉帳的付款要先撤回再退款：REVERSING 撤回中（reversal_amount 是這筆要撤的額度，部分撤回；
--- 撤回的冪等鍵 reversal_idempotency_key，呼叫前記 reversal_called_at），撤回成功記 reversal_external_id 並進 REVERSED（「等待撤回」與「已呼叫退款」之間的中間狀態：
--- 重啟時從這裡接著呼叫退款，不再撤回）；不需要撤回的退款直接 PENDING → REFUNDING。REFUNDING 已呼叫退款（refund_called_at，冪等鍵 idempotency_key），
--- provider 的結果 SUCCEEDED（external_refund_id）或 FAILED（failure_reason，不佔額度）；ANOMALY 待人工結案（failure_reason 記原因，佔額度，補掃不再重試）。
--- reversal_lookup_failures 是撤回連續查回失敗的次數；reversal_idempotency_key 同時是撤回的嘗試 ID。reversal_amount 在 REVERSED 與之後的狀態必須有對應的 reversal_external_id（當 reversal_amount > 0）。
--- 退款呼叫的收斂同轉帳（D68）：PENDING（不需撤回）與 REVERSED 是「可以呼叫退款」的狀態，refund_called_at 是這把退款鍵（idempotency_key，同時是嘗試 ID）第一次呼叫 provider 之前寫入的時刻，
--- 可重試拒絕時換新鍵並清掉它與 refund_lookup_failures（連續查回失敗的次數）；provider 回了物件才有 external_refund_id（REFUNDING 等 provider 的結果、SUCCEEDED、FAILED）。
--- ANOMALY 有兩個階段：撤回階段（reversal_amount > 0 且還沒有 reversal_external_id）與退款階段（其餘）；退款階段從 REFUNDING 進 ANOMALY 時保留已知的 external_refund_id。
+-- 退款狀態機（D11、ADR D69）：PENDING 已寫列、尚未呼叫 provider；REFUNDING 已呼叫（refund_called_at，冪等鍵 idempotency_key，同時是嘗試 ID）、provider 回了物件（external_refund_id）而還沒終局；
+-- SUCCEEDED；FAILED（failure_reason，不佔額度）；ANOMALY 待人工結案（failure_reason 記原因，佔額度，補掃不再重試）。退款不再有撤回的前置狀態：轉帳的任何狀態都可以退款。
+-- 向賣家收回（撤回轉帳）是退款列上並行的另一條狀態 reversal_status，各自收斂：NONE 不需要收回（reversal_amount = 0）；WAITING 已預留 reversal_amount、尚未開始
+-- （等「provider 接受退款（REFUNDING 或 SUCCEEDED）且轉帳 SUCCEEDED」，兩個事件誰後到誰排撤回 job）；REVERSING 撤回進行中（reversal_idempotency_key 同時是嘗試 ID，呼叫前記 reversal_called_at，
+-- 收斂同轉帳，D68）；REVERSED 撤回成立（reversal_external_id，轉帳的 reversed_amount 同 transaction 累加）；RELEASED 預留已釋出、沒有撤回（reversal_reason 記原因）；
+-- ANOMALY 撤回與 provider 對不起來，預留持續佔住直到人工結案（reversal_reason 記原因）。預留額 = WAITING、REVERSING、ANOMALY 的 reversal_amount 加總，
+-- 新退款的 reversal_amount = min(退款額, 轉帳 amount - reversed_amount - 其他預留)。reversal_lookup_failures 是撤回連續查回失敗的次數。
 CREATE TABLE payment.refunds (
     id                       UUID        PRIMARY KEY,
     payment_id               UUID        NOT NULL REFERENCES payment.payments (id),
@@ -231,7 +232,9 @@ CREATE TABLE payment.refunds (
     amount                   BIGINT      NOT NULL,
     auto                     BOOLEAN     NOT NULL DEFAULT false,
     status                   TEXT        NOT NULL DEFAULT 'PENDING',
+    reversal_status          TEXT        NOT NULL DEFAULT 'NONE',
     reversal_amount          BIGINT      NOT NULL DEFAULT 0,
+    reversal_reason          TEXT,
     reversal_idempotency_key UUID        NOT NULL DEFAULT gen_random_uuid(),
     reversal_called_at       TIMESTAMPTZ,
     reversal_external_id     TEXT,
@@ -246,11 +249,15 @@ CREATE TABLE payment.refunds (
     CONSTRAINT refunds_request_key_check CHECK (char_length(request_key) BETWEEN 1 AND 128),
     CONSTRAINT refunds_amount_check CHECK (amount > 0),
     CONSTRAINT refunds_reversal_amount_check CHECK (reversal_amount BETWEEN 0 AND amount),
-    CONSTRAINT refunds_status_check CHECK (status IN ('PENDING', 'REVERSING', 'REVERSED', 'REFUNDING', 'SUCCEEDED', 'FAILED', 'ANOMALY')),
+    CONSTRAINT refunds_status_check CHECK (status IN ('PENDING', 'REFUNDING', 'SUCCEEDED', 'FAILED', 'ANOMALY')),
+    CONSTRAINT refunds_reversal_status_check CHECK (reversal_status IN ('NONE', 'WAITING', 'REVERSING', 'REVERSED', 'RELEASED', 'ANOMALY')),
+    CONSTRAINT refunds_reversal_none_check CHECK ((reversal_status = 'NONE') = (reversal_amount = 0)),
+    CONSTRAINT refunds_reversal_reason_check CHECK ((reversal_status IN ('RELEASED', 'ANOMALY')) = (reversal_reason IS NOT NULL) AND (reversal_reason IS NULL OR char_length(reversal_reason) BETWEEN 1 AND 200)),
+    CONSTRAINT refunds_reversal_external_check CHECK ((reversal_status = 'REVERSED') = (reversal_external_id IS NOT NULL)),
+    CONSTRAINT refunds_reversal_after_acceptance_check CHECK (reversal_status NOT IN ('REVERSING', 'REVERSED') OR external_refund_id IS NOT NULL),
+    CONSTRAINT refunds_failed_releases_waiting_check CHECK (status <> 'FAILED' OR reversal_status <> 'WAITING'),
     CONSTRAINT refunds_lookup_failures_check CHECK (reversal_lookup_failures >= 0),
     CONSTRAINT refunds_refund_lookup_failures_check CHECK (refund_lookup_failures >= 0),
-    CONSTRAINT refunds_reversing_check CHECK (status <> 'REVERSING' OR reversal_amount > 0),
-    CONSTRAINT refunds_reversed_check CHECK (status NOT IN ('REVERSED', 'REFUNDING', 'SUCCEEDED') OR reversal_amount = 0 OR reversal_external_id IS NOT NULL),
     CONSTRAINT refunds_reversal_called_check CHECK (reversal_external_id IS NULL OR reversal_called_at IS NOT NULL),
     CONSTRAINT refunds_reversal_external_id_check CHECK (reversal_external_id IS NULL OR char_length(reversal_external_id) BETWEEN 1 AND 255),
     CONSTRAINT refunds_refund_called_check CHECK (status NOT IN ('REFUNDING', 'SUCCEEDED') OR refund_called_at IS NOT NULL),
@@ -264,5 +271,5 @@ CREATE TABLE payment.refunds (
 CREATE UNIQUE INDEX refunds_request ON payment.refunds (payment_id, request_key);
 CREATE UNIQUE INDEX refunds_external ON payment.refunds (external_refund_id) WHERE external_refund_id IS NOT NULL;
 CREATE INDEX refunds_payment ON payment.refunds (payment_id);
-CREATE INDEX refunds_reversing ON payment.refunds (updated_at, id) WHERE status = 'REVERSING';
-CREATE INDEX refunds_open ON payment.refunds (updated_at, id) WHERE status IN ('PENDING', 'REVERSED', 'REFUNDING');
+CREATE INDEX refunds_reversing ON payment.refunds (updated_at, id) WHERE reversal_status = 'REVERSING';
+CREATE INDEX refunds_open ON payment.refunds (updated_at, id) WHERE status IN ('PENDING', 'REFUNDING');

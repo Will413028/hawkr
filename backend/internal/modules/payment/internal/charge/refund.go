@@ -28,8 +28,8 @@ const (
 // errUnknownRefundState 標示快照的退款狀態不認得：不是有效值，不寫入；暫時性，由 job 重試。
 var errUnknownRefundState = errors.New("charge: provider 回了不認得的退款狀態")
 
-// reversalFor 是一筆退款要先從轉帳撤回的額度：退款額與轉帳剩餘可撤額度（已扣掉進行中的預留）取小，沒有可撤額度時是 0。
-// 賣家已收到的款項先撤回，撤不到的部分由平台手上的款項（轉帳前已退掉的、或之前撤回後退款失敗留在平台的）支付。
+// reversalFor 是一筆退款在 provider 接受之後要向賣家收回的額度：退款額與轉帳剩餘可撤額度（已扣掉其他預留）取小，沒有可撤額度時是 0。
+// 賣家已收到的款項向賣家收回，收不到的部分由平台手上的款項（轉帳前已退掉的、或之前撤回後退款失敗留在平台的）支付。
 func reversalFor(amount, available int64) int64 {
 	if available <= 0 {
 		return 0
@@ -80,11 +80,10 @@ func providerFailureReason(code string) string {
 
 // CreateRefund 是建立退款的入口（D4；售後與訂單一方的 CreateRefund 呼叫，自動退款帶 Auto）：在一個 transaction 內鎖付款列（LockPaymentByOrderNo，FOR UPDATE）、
 // 以 (付款, request_key) 找既有的退款（同一把鍵回同一筆，內容不同回 FailedPrecondition）、確認付款已入帳、加總非失敗的退款（進行中與 ANOMALY 都算）守累計上限，
-// 再依付款的轉帳決定寫哪種列並排 job；provider 在 transaction 外由 job 呼叫（規則 5）。
-//   - 付款沒有有效轉帳（或轉帳都已 FAILED）：寫 PENDING 並排退款 job。
-//   - 轉帳 SUCCEEDED：先撤回再退款：reversal_amount 是退款額與轉帳還沒預留的剩餘可撤額度取小；大於 0 寫 REVERSING 並排撤回 job（撤回成功後由撤回 job 排退款 job），
-//     是 0（剩餘額度已被預留或撤光，款項在平台手上）直接寫 PENDING 並排退款 job。
-//   - 轉帳 PENDING 或 ANOMALY：轉帳金額已定、結果未定，現在退款會讓平台多付，回 FailedPrecondition，呼叫端稍後重試。
+// 寫 PENDING 的退款列並排退款 job；provider 在 transaction 外由 job 呼叫（規則 5）。退款先退買家，轉帳的任何狀態都可以退款（D11、ADR D69），向賣家收回依付款的轉帳決定：
+//   - 沒有有效轉帳（或轉帳都已 FAILED），或轉帳還沒承諾金額（PENDING 且 called_at 為空）：不必收回（reversal_status NONE），轉帳第一次送出時的金額已扣掉這筆退款。
+//   - 轉帳金額已承諾（PENDING 已呼叫、SUCCEEDED 或 ANOMALY）：預留 reversal_amount = min(退款額, 轉帳金額 − 已撤回 − 其他預留)；大於 0 寫 WAITING，等 provider 接受退款且轉帳 SUCCEEDED 才排撤回；
+//     是 0（剩餘額度已被預留或撤光，款項在平台手上）寫 NONE。
 //
 // 付款不存在回 NotFound；付款未入帳、超過累計上限回 FailedPrecondition；金額不是正數或鍵不合回 InvalidInput。呼叫方不能在 transaction 內呼叫。
 func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (model.Refund, error) {
@@ -142,20 +141,17 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 		if err != nil {
 			return err
 		}
-		status := model.RefundPending
+		reversalStatus := model.ReversalNone
 		if reversal > 0 {
-			status = model.RefundReversing
+			reversalStatus = model.ReversalWaiting
 		}
 		row, err := q.InsertRefund(ctx, store.InsertRefundParams{
-			ID: s.d.NewID(), PaymentID: pay.ID, RequestKey: key, Amount: in.Amount, Auto: in.Auto, Status: string(status), ReversalAmount: reversal, Now: s.d.Now().UTC(),
+			ID: s.d.NewID(), PaymentID: pay.ID, RequestKey: key, Amount: in.Amount, Auto: in.Auto, ReversalStatus: string(reversalStatus), ReversalAmount: reversal, Now: s.d.Now().UTC(),
 		})
 		if err != nil {
 			return err
 		}
 		out = row
-		if reversal > 0 {
-			return enqueueReversal(ctx, s.d.Jobs, row.ID)
-		}
 		return enqueueRefund(ctx, s.d.Jobs, row.ID)
 	})
 	if err != nil {
@@ -165,13 +161,13 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 }
 
 // refundable 回傳付款是否能由目前的 provider 退款：已入帳、有外部 ID、屬於目前的 provider。CreateRefund 與退款 job 共用，
-// 不成立時 job 一定把退款送進 ANOMALY，所以建立時就拒絕（不先撤回賣家的轉帳）。
+// 不成立時 job 一定把退款送進 ANOMALY，所以建立時就拒絕（不預留向賣家收回的額度）。
 func (s *Service) refundable(pay store.PaymentPayment) bool {
 	return pay.ExternalPaymentID != nil && pay.Status == string(model.PaymentSucceeded) && pay.Provider == s.d.Provider.Name()
 }
 
-// reservableReversal 在已鎖付款列的 transaction 內依付款的轉帳算這筆退款要撤回的額度；轉帳還在進行或待人工核對時回 FailedPrecondition。
-// 鎖順序：付款列（呼叫方已鎖）、轉帳列、退款列。
+// reservableReversal 在已鎖付款列的 transaction 內依付款的轉帳算這筆退款要預留的收回額度（見 CreateRefund）。轉帳 PENDING 而 called_at 為空時金額還沒承諾，不預留：
+// 轉帳第一次送出時以「付款金額減非失敗退款」重新算定，這筆退款已在其中。鎖順序：付款列（呼叫方已鎖）、轉帳列、退款列。
 func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay store.PaymentPayment, amount int64) (int64, error) {
 	active, err := q.ActiveTransferByPayment(ctx, pay.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -187,9 +183,11 @@ func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay 
 	switch model.TransferStatus(tr.Status) {
 	case model.TransferFailed:
 		return 0, nil
-	case model.TransferPending, model.TransferAnomaly:
-		return 0, apperr.FailedPrecondition("付款的轉帳還沒有結果，暫時不能退款，請稍後再試")
-	case model.TransferSucceeded:
+	case model.TransferPending:
+		if tr.CalledAt == nil {
+			return 0, nil
+		}
+	case model.TransferSucceeded, model.TransferAnomaly:
 	}
 	reserved, err := q.PendingReversalTotal(ctx, pay.ID)
 	if err != nil {
@@ -201,7 +199,7 @@ func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay 
 func toRefund(r store.PaymentRefund) model.Refund {
 	out := model.Refund{
 		ID: r.ID, PaymentID: r.PaymentID, RequestKey: r.RequestKey, Amount: r.Amount, Auto: r.Auto,
-		Status: model.RefundStatus(r.Status), ReversalAmount: r.ReversalAmount, CreatedAt: r.CreatedAt,
+		Status: model.RefundStatus(r.Status), ReversalAmount: r.ReversalAmount, ReversalStatus: model.ReversalStatus(r.ReversalStatus), CreatedAt: r.CreatedAt,
 	}
 	if r.FailureReason != nil {
 		out.FailureReason = *r.FailureReason
@@ -209,13 +207,13 @@ func toRefund(r store.PaymentRefund) model.Refund {
 	return out
 }
 
-// Refund 是退款 job（payment.refund_create）的內容：退款是 PENDING 或 REVERSED（撤回完成）時依結果三分收斂（ADR D68，同 Transfer）。
-//   - 呼叫前先記 refund_called_at（這把鍵的第一次呼叫，獨立提交），帶列上的冪等鍵與付款的外部 ID 呼叫 provider，成功依快照進 REFUNDING、SUCCEEDED 或 FAILED。
+// Refund 是退款 job（payment.refund_create）的內容：退款是 PENDING 時依結果三分收斂（ADR D68，同 Transfer）。
+//   - 呼叫前先記 refund_called_at（這把鍵的第一次呼叫，獨立提交），帶列上的冪等鍵與付款的外部 ID 呼叫 provider，成功依快照進 REFUNDING、SUCCEEDED 或 FAILED；provider 一接受（REFUNDING 或 SUCCEEDED）就讓等待中的撤回開始（轉帳已成立時排撤回 job）。
 //   - 終局拒絕（ErrPermanent）進 FAILED（不佔額度，job 完成）；可重試拒絕（只在這把鍵的第一次呼叫被拒絕）換新鍵並回錯誤由 River 重試，不計期限。
 //   - 結果不明回錯誤，同鍵重送到 ResendWindow，之後只以 FindRefund 查回：找到就收下，查無滿 NotFoundAfter 才進 FAILED，未滿回錯誤稍後再查；查回連續失敗進 ANOMALY。
 //   - 付款沒有外部 ID、不是已入帳或屬於別的 provider、provider 回的外部 ID 或金額與列不符進 ANOMALY（佔額度、補掃不再重試、發 MoneyAnomaly；job 完成）。
 //
-// 已不是 PENDING、REVERSED 的退款什麼都不做。final 為 true 時暫時性失敗只記警示 log 並回 nil，留給週期掃描。呼叫方不能在 transaction 內呼叫。
+// 已不是 PENDING 的退款什麼都不做。final 為 true 時暫時性失敗只記警示 log 並回 nil，留給週期掃描。呼叫方不能在 transaction 內呼叫。
 func (s *Service) Refund(ctx context.Context, refundID uuid.UUID, final bool) error {
 	if _, ok := db.TxFrom(ctx); ok {
 		return errInTransaction
@@ -240,7 +238,7 @@ func (s *Service) refund(ctx context.Context, refundID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if row.Status != string(model.RefundPending) && row.Status != string(model.RefundReversed) {
+	if row.Status != string(model.RefundPending) {
 		return nil
 	}
 	pay, err := q.PaymentByID(ctx, row.PaymentID)
@@ -304,8 +302,10 @@ func (s *Service) lookupRefund(ctx context.Context, row store.PaymentRefund, pay
 }
 
 // acceptRefund 驗證 provider 回的退款（建立的回應、查回找到的或重讀）與列相符後，依快照的狀態在一個 transaction 內寫入（REFUNDING、SUCCEEDED 或 FAILED）；不符進 ANOMALY。
-// 終局（SUCCEEDED、FAILED）同 transaction 發 RefundChanged，自動退款成功再發 AutoRefundCompleted。列已不在可接收的狀態（人工結案成失敗、已 ANOMALY、記了別的退款 ID）時，
-// provider 已搬錢：記 error log 並發 MoneyAnomaly，不靜默；重複寫入與過期的「處理中」讀取除外（refundSettled）。鎖順序：付款列、退款列。
+// 終局（SUCCEEDED、FAILED）同 transaction 發 RefundChanged，自動退款成功再發 AutoRefundCompleted。
+// 同一個 transaction 處理向賣家收回：接受（REFUNDING、SUCCEEDED）時，預留在 WAITING 而轉帳已 SUCCEEDED 就開始撤回（轉帳還沒成立則由轉帳成立的 transaction 開始）；
+// 失敗（FAILED）時預留在 WAITING 就釋出，撤回已落地（REVERSED）發 MoneyAnomaly（買家沒拿到錢、賣家已被收回，錢留在平台），撤回進行中（REVERSING）由撤回落地時發。列已不在可接收的狀態（人工結案成失敗、已 ANOMALY、記了別的退款 ID）時，
+// provider 已搬錢：記 error log 並發 MoneyAnomaly，不靜默；重複寫入與過期的「處理中」讀取除外（refundSettled）。鎖順序：付款列、轉帳列、退款列。
 func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, snap RefundSnapshot) error {
 	if snap.ExternalID == "" || snap.Amount != row.Amount || (row.ExternalRefundID != nil && *row.ExternalRefundID != snap.ExternalID) {
 		return s.anomalyRefund(ctx, row, "reply_mismatch", snap.ExternalID)
@@ -327,6 +327,10 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 		if _, err := q.LockPayment(ctx, row.PaymentID); err != nil {
 			return err
 		}
+		transferSucceeded, err := s.lockActiveTransfer(ctx, q, row.PaymentID)
+		if err != nil {
+			return err
+		}
 		locked, err := q.LockRefund(ctx, row.ID)
 		if err != nil {
 			return err
@@ -344,8 +348,19 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 		if err != nil {
 			return err
 		}
-		if target == model.RefundRefunding {
-			return nil
+		if target != model.RefundFailed {
+			if transferSucceeded {
+				if err := s.startReversals(ctx, q, row.PaymentID); err != nil {
+					return err
+				}
+			}
+			if target == model.RefundRefunding {
+				return nil
+			}
+			return s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))
+		}
+		if err := s.afterRefundFailed(ctx, written); err != nil {
+			return err
 		}
 		return s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))
 	})
@@ -354,6 +369,32 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 			"refund_id", row.ID.String(), "payment_id", row.PaymentID.String(), "refund_external_id", snap.ExternalID)
 	}
 	return err
+}
+
+// lockActiveTransfer 鎖付款的有效轉帳（沒有時不鎖）並回傳它是不是 SUCCEEDED。呼叫方已鎖付款列；鎖順序在轉帳列、退款列之前。
+func (s *Service) lockActiveTransfer(ctx context.Context, q *store.Queries, paymentID uuid.UUID) (succeeded bool, err error) {
+	active, err := q.ActiveTransferByPayment(ctx, paymentID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	tr, err := q.LockTransfer(ctx, active.ID)
+	if err != nil {
+		return false, err
+	}
+	return tr.Status == string(model.TransferSucceeded), nil
+}
+
+// afterRefundFailed 處理退款進入 FAILED 時列上的收回狀態（同一個 transaction，呼叫方已鎖付款列、轉帳列與退款列）。WAITING 的預留已由寫 FAILED 的同一個 statement 釋出（不撤回）；
+// REVERSED 發 MoneyAnomaly（撤回已落地，買家沒拿到錢、賣家已被收回，錢留在平台、reversed_amount 不減）；REVERSING 由撤回落地的 transaction 發；
+// ANOMALY 的預留持續佔住直到人工結案，結案成成功時撤回落地的 transaction 發。
+func (s *Service) afterRefundFailed(ctx context.Context, r store.PaymentRefund) error {
+	if model.ReversalStatus(r.ReversalStatus) == model.ReversalReversed {
+		return s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, "refund_failed_after_reversal")
+	}
+	return nil
 }
 
 // publishRefundResult 在退款進入終局的 transaction 內發 RefundChanged，自動退款成功再發 AutoRefundCompleted。付款列只讀（鎖順序已由呼叫方守）。
@@ -492,7 +533,7 @@ func (s *Service) clearRefundLookupFailures(ctx context.Context, row store.Payme
 	})
 }
 
-// anomalyRefund 讓退款階段的退款進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不在 PENDING、REVERSED、REFUNDING 時什麼都不做。
+// anomalyRefund 讓退款階段的退款進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不在 PENDING、REFUNDING 時什麼都不做。
 // 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件。
 func (s *Service) anomalyRefund(ctx context.Context, row store.PaymentRefund, reason, detail string) error {
 	s.d.Logger.ErrorContext(ctx, "payment：退款進 ANOMALY，待人工核對 provider", "refund_id", row.ID.String(), "payment_id", row.PaymentID.String(), "reason", reason, "external_id", detail)
@@ -510,7 +551,7 @@ func (s *Service) anomalyRefund(ctx context.Context, row store.PaymentRefund, re
 	})
 }
 
-// failRefund 讓可呼叫的退款進終局 FAILED（不佔額度）並發 RefundChanged；列已不是 PENDING、REVERSED 時什麼都不做。
+// failRefund 讓 PENDING 的退款進終局 FAILED（不佔額度）、釋出等待中的收回預留並發 RefundChanged；列已不是 PENDING 時什麼都不做。鎖順序：付款列、轉帳列、退款列。
 func (s *Service) failRefund(ctx context.Context, refundID uuid.UUID, reason string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -520,11 +561,23 @@ func (s *Service) failRefund(ctx context.Context, refundID uuid.UUID, reason str
 		if err != nil {
 			return err
 		}
+		if _, err := q.LockPayment(ctx, prev.PaymentID); err != nil {
+			return err
+		}
+		if _, err := s.lockActiveTransfer(ctx, q, prev.PaymentID); err != nil {
+			return err
+		}
+		if _, err := q.LockRefund(ctx, refundID); err != nil {
+			return err
+		}
 		r, err := q.FailRefundCall(ctx, store.FailRefundCallParams{ID: refundID, FailureReason: &reason, Now: s.d.Now().UTC()})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
 		if err != nil {
+			return err
+		}
+		if err := s.afterRefundFailed(ctx, r); err != nil {
 			return err
 		}
 		return s.publishRefundResult(ctx, q, r, model.RefundStatus(prev.Status))

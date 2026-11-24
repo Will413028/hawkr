@@ -12,11 +12,17 @@ import (
 // checkValues 取出 schema.sql 裡某個 CHECK 的 IN (...) 清單。
 func checkValues(t *testing.T, constraint string) []string {
 	t.Helper()
+	return checkColumnValues(t, constraint, "status")
+}
+
+// checkColumnValues 取出 schema.sql 裡某個欄位的 CHECK IN (...) 清單。
+func checkColumnValues(t *testing.T, constraint, column string) []string {
+	t.Helper()
 	raw, err := os.ReadFile("../../db/schema.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK \(status IN \(([^)]*)\)\)`).FindSubmatch(raw)
+	m := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK \(` + column + ` IN \(([^)]*)\)\)`).FindSubmatch(raw)
 	if m == nil {
 		t.Fatalf("schema.sql 沒有 %s", constraint)
 	}
@@ -49,6 +55,9 @@ func TestStatusTypesMatchTheSchemaChecks(t *testing.T) {
 		if got := checkValues(t, c.constraint); !slices.Equal(got, c.values) {
 			t.Errorf("%s：schema=%v，Go 型別=%v", c.constraint, got, c.values)
 		}
+	}
+	if got, want := checkColumnValues(t, "refunds_reversal_status_check", "reversal_status"), names(model.ReversalStatusValues()); !slices.Equal(got, want) {
+		t.Errorf("refunds_reversal_status_check：schema=%v，Go 型別=%v", got, want)
 	}
 }
 

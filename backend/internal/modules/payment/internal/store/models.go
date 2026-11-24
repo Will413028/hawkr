@@ -78,7 +78,9 @@ type PaymentRefund struct {
 	Amount                 int64
 	Auto                   bool
 	Status                 string
+	ReversalStatus         string
 	ReversalAmount         int64
+	ReversalReason         *string
 	ReversalIdempotencyKey uuid.UUID
 	ReversalCalledAt       *time.Time
 	ReversalExternalID     *string
