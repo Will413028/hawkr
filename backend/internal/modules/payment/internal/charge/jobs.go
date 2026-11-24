@@ -338,6 +338,7 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &createWorker{service: s})
 	river.AddWorker(workers, &syncWorker{service: s})
 	river.AddWorker(workers, &cancelWorker{service: s})
+	river.AddWorker(workers, &closeWorker{service: s})
 	river.AddWorker(workers, &transferWorker{service: s})
 	river.AddWorker(workers, &reversalWorker{service: s})
 	river.AddWorker(workers, &topupWorker{service: s})

@@ -173,9 +173,9 @@ func newInbox(d *db.DB, jc jobs.Enqueuer, log *slog.Logger) *inbox.Inbox {
 
 // newPayment 組裝 payment 模組（收款開通 ADR D28）。回傳的 sellerOwners 要在 seller 組裝之後 bind；PayoutAccountChanged 的訂閱者由
 // subscribeSellerPayout 接上（serve 與 worker 都要：同步 job 在 worker 發布，seller 的種子在子命令發布）。
-func newPayment(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, box *inbox.Inbox, provider payment.Provider, charge payment.ChargeProvider, log *slog.Logger) (*payment.Module, *sellerOwners) {
+func newPayment(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, box *inbox.Inbox, provider payment.Provider, charge payment.ChargeProvider, orders payment.PaymentOrders, log *slog.Logger) (*payment.Module, *sellerOwners) {
 	owners := &sellerOwners{}
-	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Audit: adminaudit.New(d, time.Now), Provider: provider, Charge: charge, Owners: owners, Now: time.Now, Logger: log}), owners
+	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Audit: adminaudit.New(d, time.Now), Provider: provider, Charge: charge, PaymentOrders: orders, Owners: owners, Now: time.Now, Logger: log}), owners
 }
 
 // subscribeSellerPayout 讓 seller 在 payment 同步的 transaction 內更新開通閘門的副本與防詐 hash（收款開通 ADR D12、D28）。seller 依賴 payment，

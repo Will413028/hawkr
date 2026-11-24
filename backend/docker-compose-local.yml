@@ -327,8 +327,8 @@ services:
       PRODUCT_SERVICE_GRPC_PORT: 9913
       CART_SERVICE_HOST: cart-service
       CART_SERVICE_GRPC_PORT: 9927
-      PAYMENT_SERVICE_HOST: payment-service
-      PAYMENT_SERVICE_GRPC_PORT: 9925
+      LEGACY_PAYMENT_GRPC_HOST: host.docker.internal
+      LEGACY_PAYMENT_GRPC_PORT: 9941
       # 58 號 §6.2.4「order-service ①」：checkout preview／confirm 打 invoice-service。
       # application.yml 的 default 是 127.0.0.1（供 IDE 直跑），在 compose 網路裡那是
       # order-service 自己 ⇒ 這兩行必須明列，與同區塊其他 peer 同慣例。
@@ -466,8 +466,8 @@ services:
       # gRPC 依賴服務
       ORDER_SERVICE_HOST: order-service
       ORDER_SERVICE_GRPC_PORT: 9915
-      PAYMENT_SERVICE_HOST: payment-service
-      PAYMENT_SERVICE_GRPC_PORT: 9925
+      LEGACY_PAYMENT_GRPC_HOST: host.docker.internal
+      LEGACY_PAYMENT_GRPC_PORT: 9941
       SHIPPING_SERVICE_HOST: shipping-service
       SHIPPING_SERVICE_GRPC_PORT: 9931
       COUPON_SERVICE_HOST: coupon-service
@@ -1264,7 +1264,7 @@ services:
       # Downstream peer gRPC（key 名與 config.go 一致）
       ORDER_SERVICE_ADDR: order-service:9915
       LEGACY_SELLER_GRPC_ADDR: host.docker.internal:9941
-      PAYMENT_SERVICE_ADDR: payment-service:9925
+      PAYMENT_SERVICE_ADDR: host.docker.internal:9941
       BUYER_SERVICE_ADDR: host.docker.internal:9941
       SHIPPING_SERVICE_ADDR: shipping-service:9931
       MEDIA_SERVICE_HOST: media-service

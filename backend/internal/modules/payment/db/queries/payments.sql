@@ -264,3 +264,9 @@ WHERE superseded_at IS NOT NULL AND external_payment_id IS NOT NULL AND (state I
   AND COALESCE(fetched_at, created_at) <= sqlc.arg(read_before)::timestamptz AND payment_id > sqlc.arg(after_id)
 ORDER BY payment_id
 LIMIT sqlc.arg(batch);
+
+-- name: PaymentsByOrderNos :many
+-- 舊服務（legacy paymentserver）的批次讀取：回找得到的付款，找不到的不出現。
+SELECT *
+FROM payment.payments
+WHERE order_no = ANY(sqlc.arg(order_nos)::text[]);

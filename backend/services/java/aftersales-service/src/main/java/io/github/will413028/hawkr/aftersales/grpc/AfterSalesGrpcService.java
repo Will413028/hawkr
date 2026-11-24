@@ -38,7 +38,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
     private final AfterSaleCaseService caseService;
     private final AfterSaleResolutionService resolutionService;
-    private final RefundPageService refundPageService;
     private final ReturnReceiptService returnReceiptService;
     private final SellerCancelService sellerCancelService;
     private final AfterSaleLabelRetryService labelRetryService;
@@ -68,7 +67,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
     public AfterSalesGrpcService(AfterSaleCaseService caseService,
                                   AfterSaleResolutionService resolutionService,
-                                  RefundPageService refundPageService,
                                   ReturnReceiptService returnReceiptService,
                                   SellerCancelService sellerCancelService,
                                   AfterSaleLabelRetryService labelRetryService,
@@ -91,7 +89,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                                   org.springframework.transaction.PlatformTransactionManager txManager) {
         this.caseService = caseService;
         this.resolutionService = resolutionService;
-        this.refundPageService = refundPageService;
         this.returnReceiptService = returnReceiptService;
         this.sellerCancelService = sellerCancelService;
         this.labelRetryService = labelRetryService;
@@ -268,37 +265,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         } catch (Exception e) {
             GrpcErrorHandler.handleException(observer, CancelAfterSaleCaseResponse.newBuilder(),
                     e, CLASS_NAME, "cancelAfterSaleCase");
-        }
-    }
-
-    @Override
-    public void getRefundPageUrl(io.github.will413028.hawkr.aftersales.grpc.GetRefundPageUrlRequest request,
-                                  StreamObserver<io.github.will413028.hawkr.aftersales.grpc.GetRefundPageUrlResponse> observer) {
-        // #1871 OBS-09：order_no 進 MDC，讓這個方法內所有 log 行都能被 Loki structured
-        // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml）。
-        MDC.put("order_no", request.getOrderNo());
-        try {
-            GrpcAuthContext.requireAccountType(AccountType.BUYER);
-            long buyerId = request.getBuyerId();
-
-            String redirectUrl = refundPageService.getRefundPageUrl(
-                    buyerId, request.getOrderNo(),
-                    request.getClientType(), request.getAppType());
-
-            observer.onNext(io.github.will413028.hawkr.aftersales.grpc.GetRefundPageUrlResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .setData(RefundPageUrlData.newBuilder()
-                            .setRedirectUrl(redirectUrl)
-                            .build())
-                    .build());
-            observer.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(observer,
-                    io.github.will413028.hawkr.aftersales.grpc.GetRefundPageUrlResponse.newBuilder(),
-                    e, CLASS_NAME, "getRefundPageUrl");
-        } finally {
-            MDC.remove("order_no");
         }
     }
 
@@ -548,221 +514,11 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
     // ==================== 內部 RPC ====================
 
-    /**
-     * ATM 退款頁面完成回調。
-     * Gateway 接收 PayUni Form POST → 提取 EncryptInfo + HashInfo → 呼叫此 RPC。
-     * 委派 Payment Service 解密 → 更新退款任務狀態 → 回傳 Deep Link。
-     */
-    @Override
-    public void handleRefundPageReturn(HandleRefundPageReturnRequest request,
-                                        StreamObserver<HandleRefundPageReturnResponse> observer) {
-        try {
-            String encryptInfo = request.getEncryptInfo();
-            String hashInfo = request.getHashInfo();
-
-            // 1. 委派 Payment Service 解密；失敗時 payment-service 會拋 StatusRuntimeException，
-            //    由下方 catch 處理
-            var decryptResp = paymentGrpcClient.decryptPayUniResult(encryptInfo, hashInfo);
-            var data = decryptResp.getData();
-            String payuniStatus = data.getStatus();
-            String merTradeNo = data.getMerTradeNo();
-            String refundAmt = data.getRefundAmt();
-            String estimatedRefundDate = data.getEstimatedRefundDate();
-
-            // Gateway 從 return_url query param 傳的 order_no，作為 MerTradeNo 空字串時的 fallback
-            // Why: PayUni 失敗回傳（如 REF02xxx）MerTradeNo 可能為空，光靠 MerTradeNo 會找不到 refund_task，
-            //      導致 §5.3 UX 持久性（失敗 snapshot）失效
-            String fallbackOrderNo = request.getOrderNo();
-            log.info("AfterSalesGrpcService.handleRefundPageReturn.decrypted",
-                    "解密成功, status=" + payuniStatus + ", merTradeNo=" + merTradeNo
-                            + ", fallbackOrderNo=" + fallbackOrderNo);
-
-            // 2. 查詢退款任務：優先用 MerTradeNo(=transaction_id)；為空時用 order_no fallback
-            LambdaQueryWrapper<RefundTaskEntity> wrapper = new LambdaQueryWrapper<RefundTaskEntity>()
-                    .eq(RefundTaskEntity::getStatus, WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value())
-                    .last("LIMIT 1");
-            if (merTradeNo != null && !merTradeNo.isEmpty()) {
-                wrapper.eq(RefundTaskEntity::getTransactionId, merTradeNo);
-            } else if (fallbackOrderNo != null && !fallbackOrderNo.isEmpty()) {
-                wrapper.eq(RefundTaskEntity::getOrderNo, fallbackOrderNo);
-            } else {
-                // 兩個都沒有：無法定位 refund_task，只能跳過
-                log.warn("AfterSalesGrpcService.handleRefundPageReturn.noIdentifier",
-                        "缺少 MerTradeNo 與 order_no，無法定位退款任務");
-                observer.onNext(HandleRefundPageReturnResponse.newBuilder()
-                        .setCode(GrpcResponseCode.SUCCESS.code()).setMessage(GrpcResponseCode.SUCCESS.message())
-                        .setRedirectUrl(buildRefundErrorRedirectUrl(
-                                ClientType.MOBILE_APP.value(), AppType.BUYER.value(),
-                                "", merTradeNo, payuniStatus, "退款結果遺失，請聯繫客服"))
-                        .build());
-                observer.onCompleted();
-                return;
-            }
-            RefundTaskEntity refundTask = refundTaskMapper.selectOne(wrapper);
-
-            if (refundTask == null) {
-                log.warn("AfterSalesGrpcService.handleRefundPageReturn.noTask",
-                        "找不到等待中的退款任務", "merTradeNo", merTradeNo);
-                observer.onNext(HandleRefundPageReturnResponse.newBuilder()
-                        .setCode(GrpcResponseCode.SUCCESS.code()).setMessage(GrpcResponseCode.SUCCESS.message())
-                        .setRedirectUrl(buildRefundErrorRedirectUrl(
-                                ClientType.MOBILE_APP.value(), AppType.BUYER.value(),
-                                fallbackOrderNo != null ? fallbackOrderNo : "",
-                                merTradeNo, payuniStatus, "找不到退款任務"))
-                        .build());
-                observer.onCompleted();
-                return;
-            }
-
-            String orderNo = refundTask.getOrderNo();
-            String clientType = refundTask.getClientType();
-            String appType = refundTask.getAppType();
-
-            // 3. 依 PayUni 回傳狀態更新退款任務（INV-3 對齊：禁用 updateById 全欄位，走 conditional update SQL）
-            if (AfterSalesConstants.PAYUNI_REFUND_PAGE_SUCCESS.equals(payuniStatus)) {
-                // 成功：買家已填寫銀行資訊 → 推進為「等待 Webhook」
-                // 09 §2.2 INV-3 對齊：transition AWAITING_BUYER_REFUND_PAGE(5) → AWAITING_WEBHOOK(15)
-                java.time.LocalDate estimatedRefundDateParsed = parseEstimatedRefundDate(estimatedRefundDate);
-                int rows = refundTaskMapper.markAtmRefundPageSucceeded(
-                        refundTask.getId(), payuniStatus, estimatedRefundDateParsed);
-                if (rows == 0) {
-                    log.info("AfterSalesGrpcService.handleRefundPageReturn.staleState",
-                            "refundTask 已不在 AWAITING_BUYER_REFUND_PAGE，跳過 transition",
-                            "refundTaskId", String.valueOf(refundTask.getId()));
-                }
-
-                // 收斂規範 §4.4 sync 階段：通知 Payment 推進為 PROCESSING + estimatedRefundDate 落地
-                try {
-                    String refundNo = refundTask.getExternalRefId();
-                    if (refundNo != null && !refundNo.isBlank()) {
-                        paymentGrpcClient.ackAtmRefundAccepted(refundNo, payuniStatus, "",
-                                estimatedRefundDate);
-                    } else {
-                        log.warn("AfterSalesGrpcService.handleRefundPageReturn.missingExternalRefId",
-                                "refund_tasks.external_ref_id 為空，跳過 Payment sync ack",
-                                "refundTaskId", String.valueOf(refundTask.getId()));
-                    }
-                } catch (Exception ackEx) {
-                    log.warn("AfterSalesGrpcService.handleRefundPageReturn.ackFailed",
-                            "Payment ackAtmRefundAccepted 失敗，不阻斷主流程 err=" + ackEx.getMessage());
-                }
-
-                log.info("AfterSalesGrpcService.handleRefundPageReturn.success",
-                        "退款任務推進為等待回調", "refundTaskId", String.valueOf(refundTask.getId()));
-
-                observer.onNext(HandleRefundPageReturnResponse.newBuilder()
-                        .setCode(GrpcResponseCode.SUCCESS.code()).setMessage(GrpcResponseCode.SUCCESS.message())
-                        .setRedirectUrl(buildRefundSuccessRedirectUrl(
-                                clientType, appType, orderNo, merTradeNo, refundAmt, estimatedRefundDate))
-                        .build());
-            } else {
-                // 失敗：issue #1288 健壯化（09 §5.4.3.1）
-                String errMsg = data.getErrorMessage();
-
-                // P1-2：payment 端狀態查詢（含同步 gRPC）在 DB tx 外先執行，只把判定結果帶進 tx 內做 CAS 寫入，
-                //       避免同步 gRPC 佔用 DB tx 連線耗盡連線池。
-                var paymentState = atmRefundReconciler.queryPaymentRefundState(refundTask);
-                final RefundTaskEntity boundTask = refundTask;
-
-                if (AfterSalesConstants.PAYUNI_REFUND_NO_BALANCE.equals(payuniStatus)) {
-                    // 缺陷 C：REF02037（無足夠金額可退款 = 已退過）不 revert，改對帳 payment 端狀態。
-                    // P1-1：多筆寫入（task transition + close case + audit + publish）以 tx 包覆確保原子。
-                    var state = refundReconcileTxTemplate.execute(status ->
-                            atmRefundReconciler.reconcileNoBalance(paymentState, boundTask, payuniStatus, errMsg));
-                    String redirectUrl = switch (state) {
-                        // SUCCEEDED / PROCESSING → 退款完成 / 處理中（success 螢幕不含重填按鈕，打斷迴圈）；
-                        // UNDETERMINED → MANUAL_INTERVENTION，同樣導向非重填螢幕等待客服
-                        case SUCCEEDED, PROCESSING, UNDETERMINED -> buildRefundSuccessRedirectUrl(
-                                clientType, appType, orderNo, merTradeNo, refundAmt, estimatedRefundDate);
-                    };
-                    log.warn("AfterSalesGrpcService.handleRefundPageReturn.noBalance",
-                            "REF02037 對帳處置 state=" + state, "order_no", orderNo);
-                    observer.onNext(HandleRefundPageReturnResponse.newBuilder()
-                            .setCode(GrpcResponseCode.SUCCESS.code()).setMessage(GrpcResponseCode.SUCCESS.message())
-                            .setRedirectUrl(redirectUrl)
-                            .build());
-                } else if (Boolean.TRUE.equals(refundReconcileTxTemplate.execute(status ->
-                        atmRefundReconciler.advanceIfPaymentSucceeded(paymentState, boundTask, payuniStatus, errMsg)))) {
-                    // 缺陷 B：一般失敗碼但 payment 端已 SUCCEEDED → 不 revert，改推進完成（推進寫入包在 tx 內）
-                    observer.onNext(HandleRefundPageReturnResponse.newBuilder()
-                            .setCode(GrpcResponseCode.SUCCESS.code()).setMessage(GrpcResponseCode.SUCCESS.message())
-                            .setRedirectUrl(buildRefundSuccessRedirectUrl(
-                                    clientType, appType, orderNo, merTradeNo, refundAmt, estimatedRefundDate))
-                            .build());
-                } else {
-                    // 一般失敗：state 保持 AWAITING_BUYER_REFUND_PAGE，stamp payuni_status / payuni_message + attempt++
-                    // §2.2 業務 pivot (2026-05-14)：sync return URL 失敗統一走 revertFromAnyAwaitingToAwaitingPage
-                    //   (status=5 → 5，attempt++)，與 async webhook 失敗路徑邏輯一致
-                    refundTaskMapper.revertFromAnyAwaitingToAwaitingPage(refundTask.getId(), payuniStatus, errMsg);
-
-                    log.warn("AfterSalesGrpcService.handleRefundPageReturn.failed",
-                            "PayUni 退款頁面失敗, status=" + payuniStatus, "order_no", orderNo);
-
-                    observer.onNext(HandleRefundPageReturnResponse.newBuilder()
-                            .setCode(GrpcResponseCode.SUCCESS.code()).setMessage(GrpcResponseCode.SUCCESS.message())
-                            .setRedirectUrl(buildRefundErrorRedirectUrl(
-                                    clientType, appType, orderNo, merTradeNo, payuniStatus, errMsg))
-                            .build());
-                }
-            }
-            observer.onCompleted();
-
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(observer, HandleRefundPageReturnResponse.newBuilder(),
-                    e, CLASS_NAME, "handleRefundPageReturn");
-        }
-    }
-
     // ==================== Deep Link 建構 ====================
 
     /**
      * ATM 退款成功 Deep Link。
      */
-    /**
-     * 把 PayUni 回的 estimatedRefundDate（ISO 8601 YYYY-MM-DD）解析為 LocalDate。
-     * 空 / 格式錯誤時回 null（不阻斷流程，markAtmRefundPageSucceeded 容許 NULL）。
-     */
-    private java.time.LocalDate parseEstimatedRefundDate(String s) {
-        if (s == null || s.isBlank()) return null;
-        try {
-            return java.time.LocalDate.parse(s);
-        } catch (Exception e) {
-            log.warn("AfterSalesGrpcService.handleRefundPageReturn.parseDateFailed",
-                    "estimatedRefundDate parse 失敗: " + s);
-            return null;
-        }
-    }
-
-    /**
-     * 依 client_type × app_type 矩陣組裝成功 redirect_url。詳見 09 §5.4.2。
-     * MOBILE_APP 走 deep link，WEB_BROWSER 走 {WEB_FRONTEND_URL}/orders/.../refund。
-     * WEB_BROWSER + SELLER（Phase 1 不支援）fallback 到 WEB_BROWSER + BUYER 並寫日誌。
-     */
-    private String buildRefundSuccessRedirectUrl(String clientType, String appType,
-                                                  String orderNo, String tradeNo,
-                                                  String refundAmount, String estimatedRefundDate) {
-        String safeOrderNo = orderNo != null ? orderNo : "";
-        String safeAmount = refundAmount != null ? refundAmount : "";
-        String safeDate = estimatedRefundDate != null ? estimatedRefundDate : "";
-        String safeTradeNo = tradeNo != null ? tradeNo : "";
-        String resolvedClient = resolveClientType(clientType);
-        String resolvedApp = resolveAppType(appType);
-
-        if (ClientType.WEB_BROWSER.value().equals(resolvedClient)) {
-            resolveWebAppFallback(resolvedApp, safeOrderNo);
-            String base = stripTrailingSlash(webFrontendUrl) + "/orders/" + urlEncode(safeOrderNo) + "/refund";
-            return base + "?status=success"
-                    + "&trade_no=" + urlEncode(safeTradeNo)
-                    + "&estimated_refund_date=" + urlEncode(safeDate);
-        }
-
-        String scheme = AppType.SELLER.value().equals(resolvedApp) ? "hawkrseller" : "hawkrbuyer";
-        return scheme + "://refund/result?orderNo=" + urlEncode(safeOrderNo)
-                + "&status=success"
-                + "&refundAmount=" + urlEncode(safeAmount)
-                + "&estimatedRefundDate=" + urlEncode(safeDate);
-    }
-
     /**
      * 依 client_type × app_type 矩陣組裝失敗 redirect_url。
      */

@@ -221,8 +221,10 @@ type RefundRequest struct {
 
 // Refund 是退款的對外視圖。ReversalAmount 是這筆退款在 provider 接受之後要向賣家收回的額度（轉帳還沒承諾金額、沒有轉帳或沒有可撤額度時是 0），ReversalStatus 是收回的狀態。
 type Refund struct {
-	ID             uuid.UUID
-	PaymentID      uuid.UUID
+	ID        uuid.UUID
+	PaymentID uuid.UUID
+	// OrderNo 是退款所屬付款的訂單編號（建立與讀取時帶上，給只認訂單編號的呼叫方）。
+	OrderNo        string
 	RequestKey     string
 	Amount         int64
 	Auto           bool

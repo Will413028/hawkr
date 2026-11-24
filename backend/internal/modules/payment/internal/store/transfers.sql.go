@@ -587,6 +587,67 @@ func (q *Queries) InsertTransfer(ctx context.Context, arg InsertTransferParams) 
 	return result.RowsAffected(), nil
 }
 
+const latestRefundsByOrderNos = `-- name: LatestRefundsByOrderNos :many
+SELECT DISTINCT ON (p.order_no) r.id, r.payment_id, r.request_key, r.amount, r.auto, r.status, r.reversal_status, r.reversal_amount, r.reversal_recovered, r.reversal_reason, r.transfer_deducted, r.topup_status, r.topup_reason, r.topup_idempotency_key, r.topup_called_at, r.topup_external_id, r.topup_lookup_failures, r.topup_reversed_amount, r.idempotency_key, r.refund_called_at, r.refund_lookup_failures, r.external_refund_id, r.failure_reason, r.created_at, r.updated_at, p.order_no
+FROM payment.refunds r
+JOIN payment.payments p ON p.id = r.payment_id
+WHERE p.order_no = ANY($1::text[])
+ORDER BY p.order_no, r.created_at DESC, r.id DESC
+`
+
+type LatestRefundsByOrderNosRow struct {
+	PaymentRefund PaymentRefund
+	OrderNo       string
+}
+
+// 每張訂單最新的一筆退款（建立時間，同時間依 ID）。
+func (q *Queries) LatestRefundsByOrderNos(ctx context.Context, orderNos []string) ([]LatestRefundsByOrderNosRow, error) {
+	rows, err := q.db.Query(ctx, latestRefundsByOrderNos, orderNos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LatestRefundsByOrderNosRow{}
+	for rows.Next() {
+		var i LatestRefundsByOrderNosRow
+		if err := rows.Scan(
+			&i.PaymentRefund.ID,
+			&i.PaymentRefund.PaymentID,
+			&i.PaymentRefund.RequestKey,
+			&i.PaymentRefund.Amount,
+			&i.PaymentRefund.Auto,
+			&i.PaymentRefund.Status,
+			&i.PaymentRefund.ReversalStatus,
+			&i.PaymentRefund.ReversalAmount,
+			&i.PaymentRefund.ReversalRecovered,
+			&i.PaymentRefund.ReversalReason,
+			&i.PaymentRefund.TransferDeducted,
+			&i.PaymentRefund.TopupStatus,
+			&i.PaymentRefund.TopupReason,
+			&i.PaymentRefund.TopupIdempotencyKey,
+			&i.PaymentRefund.TopupCalledAt,
+			&i.PaymentRefund.TopupExternalID,
+			&i.PaymentRefund.TopupLookupFailures,
+			&i.PaymentRefund.TopupReversedAmount,
+			&i.PaymentRefund.IdempotencyKey,
+			&i.PaymentRefund.RefundCalledAt,
+			&i.PaymentRefund.RefundLookupFailures,
+			&i.PaymentRefund.ExternalRefundID,
+			&i.PaymentRefund.FailureReason,
+			&i.PaymentRefund.CreatedAt,
+			&i.PaymentRefund.UpdatedAt,
+			&i.OrderNo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockPaymentByOrderNo = `-- name: LockPaymentByOrderNo :one
 SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 FROM payment.payments
@@ -994,6 +1055,66 @@ func (q *Queries) RefundingRefundIDs(ctx context.Context, arg RefundingRefundIDs
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const refundsByRequestKeys = `-- name: RefundsByRequestKeys :many
+SELECT r.id, r.payment_id, r.request_key, r.amount, r.auto, r.status, r.reversal_status, r.reversal_amount, r.reversal_recovered, r.reversal_reason, r.transfer_deducted, r.topup_status, r.topup_reason, r.topup_idempotency_key, r.topup_called_at, r.topup_external_id, r.topup_lookup_failures, r.topup_reversed_amount, r.idempotency_key, r.refund_called_at, r.refund_lookup_failures, r.external_refund_id, r.failure_reason, r.created_at, r.updated_at, p.order_no
+FROM payment.refunds r
+JOIN payment.payments p ON p.id = r.payment_id
+WHERE r.request_key = ANY($1::text[])
+`
+
+type RefundsByRequestKeysRow struct {
+	PaymentRefund PaymentRefund
+	OrderNo       string
+}
+
+// 舊服務（legacy paymentserver）以呼叫端的冪等鍵（售後的案件 ID）讀退款：鍵只在同一筆付款內唯一，所以可能回多列，由呼叫方判斷。
+func (q *Queries) RefundsByRequestKeys(ctx context.Context, requestKeys []string) ([]RefundsByRequestKeysRow, error) {
+	rows, err := q.db.Query(ctx, refundsByRequestKeys, requestKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RefundsByRequestKeysRow{}
+	for rows.Next() {
+		var i RefundsByRequestKeysRow
+		if err := rows.Scan(
+			&i.PaymentRefund.ID,
+			&i.PaymentRefund.PaymentID,
+			&i.PaymentRefund.RequestKey,
+			&i.PaymentRefund.Amount,
+			&i.PaymentRefund.Auto,
+			&i.PaymentRefund.Status,
+			&i.PaymentRefund.ReversalStatus,
+			&i.PaymentRefund.ReversalAmount,
+			&i.PaymentRefund.ReversalRecovered,
+			&i.PaymentRefund.ReversalReason,
+			&i.PaymentRefund.TransferDeducted,
+			&i.PaymentRefund.TopupStatus,
+			&i.PaymentRefund.TopupReason,
+			&i.PaymentRefund.TopupIdempotencyKey,
+			&i.PaymentRefund.TopupCalledAt,
+			&i.PaymentRefund.TopupExternalID,
+			&i.PaymentRefund.TopupLookupFailures,
+			&i.PaymentRefund.TopupReversedAmount,
+			&i.PaymentRefund.IdempotencyKey,
+			&i.PaymentRefund.RefundCalledAt,
+			&i.PaymentRefund.RefundLookupFailures,
+			&i.PaymentRefund.ExternalRefundID,
+			&i.PaymentRefund.FailureReason,
+			&i.PaymentRefund.CreatedAt,
+			&i.PaymentRefund.UpdatedAt,
+			&i.OrderNo,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

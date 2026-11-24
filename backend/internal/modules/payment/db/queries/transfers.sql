@@ -340,3 +340,18 @@ FROM payment.refunds
 WHERE status = 'REFUNDING' AND updated_at <= sqlc.arg(idle_before) AND id > sqlc.arg(after_id)
 ORDER BY id
 LIMIT sqlc.arg(batch);
+
+-- name: RefundsByRequestKeys :many
+-- 舊服務（legacy paymentserver）以呼叫端的冪等鍵（售後的案件 ID）讀退款：鍵只在同一筆付款內唯一，所以可能回多列，由呼叫方判斷。
+SELECT sqlc.embed(r), p.order_no
+FROM payment.refunds r
+JOIN payment.payments p ON p.id = r.payment_id
+WHERE r.request_key = ANY(sqlc.arg(request_keys)::text[]);
+
+-- name: LatestRefundsByOrderNos :many
+-- 每張訂單最新的一筆退款（建立時間，同時間依 ID）。
+SELECT DISTINCT ON (p.order_no) sqlc.embed(r), p.order_no
+FROM payment.refunds r
+JOIN payment.payments p ON p.id = r.payment_id
+WHERE p.order_no = ANY(sqlc.arg(order_nos)::text[])
+ORDER BY p.order_no, r.created_at DESC, r.id DESC;

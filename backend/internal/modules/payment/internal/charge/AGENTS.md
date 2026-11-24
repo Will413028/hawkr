@@ -21,4 +21,5 @@
 - 退款：鎖付款列後以 `(付款, request_key)` 冪等、加總非失敗退款（含 ANOMALY）守累計上限，不看轉帳狀態；`REFUNDING` 由 `refund.*` 事件或掃描排的同步重讀到終局，發 `RefundChanged`；ANOMALY 分退款與撤回。收回：`reversal_status` 是彙總，轉帳金額已承諾才預留（含補差額轉帳），接受退款且轉帳成立後分列撤回，退款失敗或撤回終局釋出（規格 §12）。守門：`TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne`。鎖順序見規格 §7。
 - 補差額：退款列 `topup_*`，規格 §10。
 - schema 守轉帳與退款的不變量：`TestTheSchemaGuardsTheTransferAndRefundInvariants`；狀態型別與 CHECK 相同：`TestStatusTypesMatchTheSchemaChecks`、`TestAttemptStatesMatchTheSchemaCheck`。
-- 不負責：訂單狀態與自動退款的判斷（訂單一方，D5 修訂）；逾期付款的取消 use case（步驟 4 的 `ClosePaymentByOrderNo`）。
+- 關閉：`CloseForOrder` 排 `payment.charge_close`，`Close` 在 transaction 外取消。
+- 不負責：訂單狀態、逾期與自動退款的判斷（訂單一方，D5 修訂）。
