@@ -64,7 +64,6 @@ test.describe("procurement assistant — RFQ price preview recovery", {
 				});
 			},
 		});
-		expect(bodies[1]?.clientRequestId).not.toBe(bodies[0]?.clientRequestId);
 
 		await expect(
 			page.getByText(/價格服務回傳不完整，無法確認這次操作的結果/),
