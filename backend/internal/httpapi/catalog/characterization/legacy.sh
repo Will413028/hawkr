@@ -17,7 +17,8 @@
 # seller.exposure.changed 餵入，但這支腳本不起 River worker。所以 product-service 起來後直接寫入兩家種子店可曝光的列，
 # 情境不驗停權與不可曝光（B4-3 integration 覆蓋）。
 #
-# 分類：V1 的種子只有第一層，建立商品要第二層（「分類 ID 無對應的第二層分類」），所以同一步寫入三個第二層分類。
+# 分類：V1 的種子只有第一層，Java 的商品要掛第三層（ProductService.java:304-314 由它推第二、第一層），所以同一步寫入
+# 第二、第三層分類。新的分類是兩層（D8），情境只要求商品掛在最深的葉節點。
 #
 # 身分：CHARACTERIZE_SELLER_TOKEN、CHARACTERIZE_SELLER2_TOKEN 是種子帳號 9、4（店家 1009、1004）的 token；買家用腳本
 # 新建的帳號（沒有賣家角色），管理員是腳本簽的。套用 infra/seed-data/01-account.sql 再跑 hawkr dev-seed 建店家。
@@ -95,9 +96,14 @@ ON CONFLICT (store_id) DO UPDATE SET exposable = true;
 INSERT INTO category (name, parent_id, status)
 SELECT child, p.id, '9004'
 FROM category p
-JOIN (VALUES ('葉菜', '蔬菜'), ('根莖', '蔬菜'), ('柑橘', '水果')) AS c(child, parent) ON c.parent = p.name AND COALESCE(p.parent_id, 0) = 0
+JOIN (VALUES ('葉菜', '蔬菜'), ('柑橘', '水果')) AS c(child, parent) ON c.parent = p.name AND COALESCE(p.parent_id, 0) = 0
 ON CONFLICT DO NOTHING;
-SELECT 1 / count(*) FROM category WHERE COALESCE(parent_id, 0) <> 0;
+INSERT INTO category (name, parent_id, status)
+SELECT child, p.id, '9004'
+FROM category p
+JOIN (VALUES ('菠菜', '葉菜'), ('高麗菜', '葉菜'), ('橘子', '柑橘')) AS c(child, parent) ON c.parent = p.name AND COALESCE(p.parent_id, 0) <> 0
+ON CONFLICT DO NOTHING;
+SELECT 1 / count(*) FROM category c JOIN category p ON p.id = c.parent_id WHERE COALESCE(p.parent_id, 0) <> 0;
 SQL
   # 分類樹整表快取在 Redis 的 cat:all（CategoryCacheService）；寫入後清掉，第一次讀才看得到第二層。
   docker exec hawkr-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DEL cat:all >/dev/null

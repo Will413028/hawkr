@@ -190,7 +190,7 @@ func (d *restDriver) Categories(ctx context.Context, c ch.Caller) ([]Category, e
 	return out, nil
 }
 
-// wireSkuInput 是 CreateSkuInput／UpdateSkuInput：重量、單位與尺寸是 gateway 的必填，情境不看，送固定值。price 是原價、
+// wireSkuInput 是 CreateSkuInput／UpdateSkuInput：重量、單位（CodeMeta WeightUnit 3301）與尺寸是 gateway 的必填，情境不看，送固定值。price 是原價、
 // salePrice 是特價：ListPrice 有值時 price 送 ListPrice、salePrice 送 Price。
 type wireSkuInput struct {
 	ID        string `json:"id,omitempty"`
@@ -207,7 +207,7 @@ type wireSkuInput struct {
 
 func skuInput(id string, in ProductInput) wireSkuInput {
 	s := wireSkuInput{
-		ID: id, SkuName: "預設", Weight: "500", Unit: "g",
+		ID: id, SkuName: "預設", Weight: "500", Unit: "3301",
 		Price: strconv.FormatInt(in.Price, 10), StockQty: strconv.FormatInt(in.Stock, 10),
 		LengthCm: "10", WidthCm: "10", HeightCm: "10",
 	}
