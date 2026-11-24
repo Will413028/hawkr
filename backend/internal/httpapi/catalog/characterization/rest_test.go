@@ -179,6 +179,14 @@ func (d *restDriver) Categories(ctx context.Context, c ch.Caller) ([]Category, e
 		}
 	}
 	walk(tree)
+	// 樹可能以平的清單回（子節點只帶 parentId、沒有 children），葉節點以「沒有別的節點指向它」判斷。
+	parents := map[string]bool{}
+	for _, c := range out {
+		parents[c.ParentID] = true
+	}
+	for i := range out {
+		out[i].Leaf = out[i].Leaf && !parents[out[i].ID]
+	}
 	return out, nil
 }
 

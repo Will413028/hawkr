@@ -308,14 +308,22 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	return true
 }
 
+// leafOf 回傳一個掛得了商品的葉節點：優先有上層的（D8 的兩層分類，商品掛第二層；Java 同樣要第二層）。
 func leafOf(t ch.T, cats []Category) string {
 	t.Helper()
+	top := ""
 	for _, c := range cats {
-		if c.Leaf {
+		if !c.Leaf {
+			continue
+		}
+		if c.ParentID != "" {
 			return c.ID
 		}
+		if top == "" {
+			top = c.ID
+		}
 	}
-	return ""
+	return top
 }
 
 // createWith 建立商品；沒給分類時掛在第一個葉節點。
