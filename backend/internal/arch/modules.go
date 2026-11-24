@@ -40,8 +40,8 @@ var Dependencies = map[string][]string{
 	"assistant":         {"ordering", "catalog", "buyer"},                                            // 買家助理（A9-D3）。
 	"imageai":           {"seller", "media"},                                                         // AI 修圖與配額（A9-D3）。
 	"notification": {
-		"identity", "buyer", "seller", "review", "im", "social", "procurement", "delegation", "payment", "accountsuspension", "moderation",
-	}, // 訂閱與讀取已在單體的來源模組；還沒搬的（catalog、ordering、fulfillment、invoice、coupon、aftersales、finance）隨各自搬遷時加（A8 D13）。
+		"identity", "buyer", "seller", "review", "im", "social", "procurement", "delegation", "payment", "accountsuspension", "moderation", "coupon",
+	}, // 訂閱與讀取已在單體的來源模組；還沒搬的（catalog、ordering、fulfillment、invoice、aftersales、finance）隨各自搬遷時加（A8 D13）。
 }
 
 // InternalGraph 列出模組內每個 package 可直接 import 的 package。

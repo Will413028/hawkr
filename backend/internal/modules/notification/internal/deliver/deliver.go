@@ -44,6 +44,7 @@ const (
 	ReasonSuppressed       = "email_suppressed"
 	ReasonEmailRejected    = "email_rejected"
 	ReasonRetriesExhausted = "retries_exhausted"
+	ReasonNoLongerValid    = "no_longer_valid"
 )
 
 const (
@@ -78,6 +79,8 @@ type Deps struct {
 	Contacts Contacts
 	Locales  Locales
 	Registry Registry
+	// Validity 是送出前重查來源事實（D27）要問的地方；沒有宣告 StillValid 的型別不會用到，但有這類型別的組裝一定要給。
+	Validity registry.Validity
 	// Sources 解析讀取時才組字的型別（公告）的內容。
 	Sources registry.Sources
 	Push    fcm.Sender
@@ -100,6 +103,8 @@ func New(d Deps) *Service { return &Service{d: d} }
 type plan struct {
 	delivery store.DeliveryForUpdateRow
 	typeName string
+	entry    registry.Entry
+	params   json.RawMessage
 	rendered registry.Rendered
 	tokens   []string
 	// inboxItemID 是這筆投遞對應的收件匣列（只推播的型別沒有）；imageURL 是推播圖片（型別沒有圖或沒有設定圖片網域時為空）。
@@ -131,10 +136,35 @@ func (s *Service) Deliver(ctx context.Context, id uuid.UUID, final bool) error {
 	if err != nil || done {
 		return err
 	}
+	ok, err := p.entry.StillValid(ctx, s.validity(), p.params)
+	switch {
+	case errors.Is(err, registry.ErrBadParams):
+		s.log().WarnContext(ctx, "通知參數快照無法重查，投遞標為永久失敗", "delivery_id", p.delivery.ID, "type", p.typeName, "error", err)
+		return s.settle(ctx, p, false, ReasonRenderFailed)
+	case err != nil:
+		return s.retryOrFail(ctx, p, final, fmt.Errorf("送出前重查：%w", err))
+	case !ok:
+		s.log().InfoContext(ctx, "來源事實已不成立，投遞標為永久失敗、不送出", "delivery_id", p.delivery.ID, "type", p.typeName)
+		return s.settle(ctx, p, false, ReasonNoLongerValid)
+	}
 	if model.Channel(head.Channel) == model.ChannelPush {
 		return s.sendPush(ctx, p, final)
 	}
 	return s.sendEmail(ctx, p, final)
+}
+
+func (s *Service) validity() registry.Validity {
+	if s.d.Validity == nil {
+		return missingValidity{}
+	}
+	return s.d.Validity
+}
+
+// missingValidity 是沒有組裝 Validity 時的替身：宣告了 StillValid 的型別回錯誤（暫時性，job 重試到用完），而不是 nil 呼叫 panic 或默默當成成立。
+type missingValidity struct{}
+
+func (missingValidity) VoucherAvailable(context.Context, int64, uuid.UUID) (bool, error) {
+	return false, errors.New("沒有組裝送出前重查的來源（Deps.Validity）")
 }
 
 func recipientStoreID(d store.DeliveryByIDRow) int64 {
@@ -197,7 +227,7 @@ func (s *Service) prepare(ctx context.Context, head store.DeliveryByIDRow) (plan
 		s.log().WarnContext(ctx, "通知組字失敗，投遞標為永久失敗", "delivery_id", d.ID, "type", intent.Type, "error", err)
 		return fail(ReasonRenderFailed)
 	}
-	p := plan{delivery: d, typeName: intent.Type, rendered: rendered}
+	p := plan{delivery: d, typeName: intent.Type, entry: entry, params: intent.Params, rendered: rendered}
 	switch model.Channel(d.Channel) {
 	case model.ChannelPush:
 		tokens, err := q.DeviceTokensForRecipient(ctx, store.DeviceTokensForRecipientParams{AccountID: d.AccountID, App: appFor(model.Audience(d.Audience))})

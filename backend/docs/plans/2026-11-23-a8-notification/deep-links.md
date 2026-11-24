@@ -23,6 +23,7 @@
 | 貼文 | 無獨立路由 | - | 只有店家貼文列表 `/sellers/{storeCode}/posts`；追蹤的店發文、貼文讚、貼文留言、回覆與留言讚都用此列表 |
 | 店家頁 | `/sellers/{storeCode}` | BUYER | |
 | 商品頁 | `/products/{id}` | BUYER | 補貨通知 |
+| 買家優惠券 | `/account/coupons` | BUYER | 券到期提醒（`voucher_expiring`）；頁面是買家券列表，沒有單券路由 |
 | 評價 | 買家端：`/sellers/{storeCode}/reviews`；賣家端：無獨立路由 | BUYER、STORE | 賣家中心只有 `preview/reviews`（預覽），不用 |
 | 賣家訂單詳情 | `/seller-center/orders/{orderNo}` | STORE | |
 | 賣家售後詳情 | 無獨立路由 | - | 賣家中心沒有售後頁 |

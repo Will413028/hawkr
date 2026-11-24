@@ -1223,3 +1223,26 @@ func StoreUnsuspendedTitle(l uitext.Locale) uitext.Message {
 	}
 	return uitext.Message{Text: "店家已解除停權", Locale: uitext.ZhTW}
 }
+
+// VoucherExpiringBodyArgs 是 VoucherExpiringBody 的參數。
+type VoucherExpiringBodyArgs struct {
+	Time string
+}
+
+// VoucherExpiringBody 是模組句子 voucher_expiring.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func VoucherExpiringBody(l uitext.Locale, a VoucherExpiringBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You have a coupon that expires on " + a.Time + ". Use it before then.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你有一張優惠券將於 " + a.Time + " 到期，把握時間使用。", Locale: uitext.ZhTW}
+}
+
+// VoucherExpiringTitle 是模組句子 voucher_expiring.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func VoucherExpiringTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Coupon expiring soon", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "優惠券即將到期", Locale: uitext.ZhTW}
+}
