@@ -691,6 +691,50 @@ func (q *Queries) ListInvites(ctx context.Context, arg ListInvitesParams) ([]Pro
 	return items, nil
 }
 
+const listStaleQueuedInvites = `-- name: ListStaleQueuedInvites :many
+SELECT id, created_at FROM procurement.rfq_publication_invites
+WHERE delivery_state = 'QUEUED' AND created_at < $1 AND (created_at, id) > ($2::timestamptz, $3::uuid)
+ORDER BY created_at, id
+LIMIT $4
+`
+
+type ListStaleQueuedInvitesParams struct {
+	Before         time.Time
+	AfterCreatedAt time.Time
+	AfterID        uuid.UUID
+	MaxRows        int32
+}
+
+type ListStaleQueuedInvitesRow struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+func (q *Queries) ListStaleQueuedInvites(ctx context.Context, arg ListStaleQueuedInvitesParams) ([]ListStaleQueuedInvitesRow, error) {
+	rows, err := q.db.Query(ctx, listStaleQueuedInvites,
+		arg.Before,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaleQueuedInvitesRow{}
+	for rows.Next() {
+		var i ListStaleQueuedInvitesRow
+		if err := rows.Scan(&i.ID, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markApprovalSucceeded = `-- name: MarkApprovalSucceeded :execrows
 UPDATE procurement.rfq_publication_approvals
 SET state = 'SUCCEEDED', version = version + 1, updated_at = $1
