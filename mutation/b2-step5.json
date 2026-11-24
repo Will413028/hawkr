@@ -89,6 +89,51 @@
    "new": "return status;",
    "test": "tests/anomaly-payment-lists.test.ts selecting ANOMALY sends that status; all sends none",
    "why": "選「全部」時送出 UNSPECIFIED：後端回 invalid_argument，清單打不開"
+  },
+  {
+   "id": "admin-resolve-outcome-not-sent",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "outcome: OUTCOME_OF_KEY[draft.outcome],",
+   "new": "outcome: PaymentAnomalyOutcome.UNSPECIFIED,",
+   "test": "tests/resolve-anomaly.test.ts the request carries kind, id, outcome and the trimmed evidence",
+   "why": "結案請求不帶結果：後端回 invalid_argument，異常結不掉"
+  },
+  {
+   "id": "admin-resolve-evidence-leaks-on-failed",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "evidence: draft.outcome === \"succeeded\" ? draft.evidence.trim() : \"\",",
+   "new": "evidence: draft.evidence.trim(),",
+   "test": "tests/resolve-anomaly.test.ts a failed resolution never sends leftover evidence",
+   "why": "失敗結案帶出先前輸入的證據：把沒有執行的物件記成有證據"
+  },
+  {
+   "id": "admin-resolve-success-evidence-optional",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "if (draft.outcome === \"succeeded\" && draft.evidence.trim() === \"\") {",
+   "new": "if (false) {",
+   "test": "tests/resolve-anomaly.test.ts succeeded needs a non-blank evidence id; failed does not",
+   "why": "成功結案不要求證據：沒核對金流商就能把異常結成成功"
+  },
+  {
+   "id": "admin-resolve-reversal-uses-refund-id",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "targets.push({ slot: \"reversal\", id: reversal.id });",
+   "new": "targets.push({ slot: \"reversal\", id: r.id });",
+   "test": "tests/resolve-anomaly.test.ts a refund targets itself, each ANOMALY reversal row by its own id",
+   "why": "收回結案送退款 ID：後端找不到撤回列，收回的異常結不掉"
+  },
+  {
+   "id": "admin-resolve-lists-not-refreshed",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/ResolveAnomalyAction.tsx",
+   "old": "void queryClient.invalidateQueries({ queryKey });",
+   "new": "void queryKey;",
+   "test": "tests/resolve-anomaly-action.test.ts 成功結案",
+   "why": "結案成功後列表不重讀：已結案的異常還留在待辦裡"
   }
  ]
 }

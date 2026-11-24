@@ -19,6 +19,12 @@ import {
 import type { BadgeVariant } from "@/components/UI/StatusBadge";
 import { formatDateTime } from "@/lib/format";
 import { staffTextOrUnknown } from "@/lib/ui-text";
+import {
+	paymentResolveTargets,
+	type ResolveTarget,
+	refundResolveTargets,
+	transferResolveTargets,
+} from "./resolve-anomaly";
 
 // 異常監控的付款、退款、轉帳三個分頁（PaymentAdminService.ListPayments、ListPaymentRefunds、
 // ListPaymentTransfers）的請求與列顯示。page token 綁定篩選條件，換條件時呼叫端回到第一頁。
@@ -191,6 +197,8 @@ function orDash(value: string): string {
 
 export interface PaymentRow {
 	id: string;
+	/** 可人工結案的異常物件；沒有異常時是空陣列。 */
+	resolveTargets: ResolveTarget[];
 	orderNo: string;
 	externalPaymentId: string;
 	buyerId: string;
@@ -208,6 +216,7 @@ export interface PaymentRow {
 export function paymentRow(p: Payment): PaymentRow {
 	return {
 		id: p.id,
+		resolveTargets: paymentResolveTargets(p),
 		orderNo: orDash(p.orderNo),
 		externalPaymentId: p.externalPaymentId,
 		buyerId: orDash(p.buyerId),
@@ -224,6 +233,8 @@ export function paymentRow(p: Payment): PaymentRow {
 
 export interface RefundRow {
 	id: string;
+	/** 可人工結案的異常物件；沒有異常時是空陣列。 */
+	resolveTargets: ResolveTarget[];
 	orderNo: string;
 	amount: string;
 	auto: string;
@@ -239,6 +250,7 @@ export interface RefundRow {
 export function refundRow(r: PaymentRefund): RefundRow {
 	return {
 		id: r.id,
+		resolveTargets: refundResolveTargets(r),
 		orderNo: orDash(r.orderNo),
 		amount: amountText(r.amount),
 		auto: r.auto ? "自動" : "人工",
@@ -256,6 +268,8 @@ export function refundRow(r: PaymentRefund): RefundRow {
 
 export interface TransferRow {
 	id: string;
+	/** 可人工結案的異常物件；沒有異常時是空陣列。 */
+	resolveTargets: ResolveTarget[];
 	orderNo: string;
 	storeId: string;
 	amount: string;
@@ -270,6 +284,7 @@ export interface TransferRow {
 export function transferRow(t: PaymentTransfer): TransferRow {
 	return {
 		id: t.id,
+		resolveTargets: transferResolveTargets(t),
 		orderNo: orDash(t.orderNo),
 		storeId: orDash(t.storeId),
 		amount: amountText(t.amount),

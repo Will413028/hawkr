@@ -61,9 +61,10 @@ import {
 	transferRow,
 	transferStatusText,
 } from "./payment-lists";
+import ResolveAnomalyAction from "./ResolveAnomalyAction";
 
 // issue #1327：後端 6 群 admin 異常查詢 API 早已存在但前端零串接。本頁補上「異常監控」
-// 多 tab 面板：配送異常 / 異常訂單 / 付款異常 / 退款異常 / 撥款異常。
+// 多 tab 面板：配送異常 / 異常訂單 / 付款異常 / 退款異常 / 轉帳異常。
 // 全走既有 BFF（api → /api/bff/[...path]），分頁 envelope {records,total,page,pageSize}（字串）。
 
 type TabKey = "shipping" | "orders" | "payments" | "refunds" | "grants";
@@ -893,20 +894,21 @@ function PaymentAnomaliesTab() {
 							<th style={thStyle}>狀態</th>
 							<th style={thStyle}>錯誤 / 原因</th>
 							<th style={thStyle}>建立時間</th>
+							<th style={thStyle}>操作</th>
 						</tr>
 					</thead>
 					<tbody>
 						{list.error ? (
 							<ErrorRow
 								error={list.error}
-								colSpan={7}
+								colSpan={8}
 								onRetry={() => void list.refetch()}
 							/>
 						) : (
 							<StateRow
 								loading={list.isLoading}
 								empty={rows.length === 0}
-								colSpan={7}
+								colSpan={8}
 							>
 								{rows.map((r) => (
 									<tr key={r.id}>
@@ -929,6 +931,12 @@ function PaymentAnomaliesTab() {
 											<ReasonCell values={[r.failureReason, r.lastError]} />
 										</td>
 										<td style={tdStyle}>{r.createTime}</td>
+										<td style={tdStyle}>
+											<ResolveAnomalyAction
+												targets={r.resolveTargets}
+												displayId={r.id}
+											/>
+										</td>
 									</tr>
 								))}
 							</StateRow>
@@ -1010,20 +1018,21 @@ function RefundAnomaliesTab() {
 							<th style={thStyle}>收回 / 補差額</th>
 							<th style={thStyle}>原因</th>
 							<th style={thStyle}>建立時間</th>
+							<th style={thStyle}>操作</th>
 						</tr>
 					</thead>
 					<tbody>
 						{list.error ? (
 							<ErrorRow
 								error={list.error}
-								colSpan={7}
+								colSpan={8}
 								onRetry={() => void list.refetch()}
 							/>
 						) : (
 							<StateRow
 								loading={list.isLoading}
 								empty={rows.length === 0}
-								colSpan={7}
+								colSpan={8}
 							>
 								{rows.map((r) => (
 									<tr key={r.id}>
@@ -1049,6 +1058,12 @@ function RefundAnomaliesTab() {
 											<ReasonCell values={[r.failureReason]} />
 										</td>
 										<td style={tdStyle}>{r.createTime}</td>
+										<td style={tdStyle}>
+											<ResolveAnomalyAction
+												targets={r.resolveTargets}
+												displayId={r.id}
+											/>
+										</td>
 									</tr>
 								))}
 							</StateRow>
@@ -1118,20 +1133,21 @@ function GrantAnomaliesTab() {
 							<th style={thStyle}>狀態</th>
 							<th style={thStyle}>原因</th>
 							<th style={thStyle}>建立時間</th>
+							<th style={thStyle}>操作</th>
 						</tr>
 					</thead>
 					<tbody>
 						{list.error ? (
 							<ErrorRow
 								error={list.error}
-								colSpan={7}
+								colSpan={8}
 								onRetry={() => void list.refetch()}
 							/>
 						) : (
 							<StateRow
 								loading={list.isLoading}
 								empty={rows.length === 0}
-								colSpan={7}
+								colSpan={8}
 							>
 								{rows.map((r) => (
 									<tr key={r.id}>
@@ -1154,6 +1170,12 @@ function GrantAnomaliesTab() {
 											<ReasonCell values={[r.failureReason]} />
 										</td>
 										<td style={tdStyle}>{r.createTime}</td>
+										<td style={tdStyle}>
+											<ResolveAnomalyAction
+												targets={r.resolveTargets}
+												displayId={r.id}
+											/>
+										</td>
 									</tr>
 								))}
 							</StateRow>
