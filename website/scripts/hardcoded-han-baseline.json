@@ -7710,14 +7710,6 @@
 		"需人工處理": 1,
 		"駁回申訴": 2
 	},
-	"lib/ai-chat/agui-dispatch.ts": {
-		"AI 助手出錯": 1,
-		"AI 回應格式不符 AG-UI 契約：${}": 1
-	},
-	"lib/ai-chat/stream-client.ts": {
-		"AI 對話失敗（HTTP ${}）": 1,
-		"AI 沒有回應，請重新嘗試": 1
-	},
 	"lib/animation/hawkr-agent-season.ts": {
 		"加工食品": 1,
 		"水果": 1,

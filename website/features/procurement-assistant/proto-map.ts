@@ -1,5 +1,6 @@
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import {
+	type Activity,
 	BlockKind,
 	type Candidate,
 	type GetCandidateSearchResponse,
@@ -18,11 +19,15 @@ import {
 	type RunSummary,
 	RunType,
 	SlotKey,
+	type Step,
+	StepStatus,
 	type TurnResult,
 } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { formatDate } from "@hawkr/api/proto/date";
 import { imageUri } from "@/lib/media/image";
+import type { AgentActivityEvent } from "./activity";
 import type { PublicNarrativeBlock, PublicNarrativeKind } from "./narrative";
+import { type AgentStep, type AgentStepStatus, isPublicAgentStepCode } from "./steps";
 import type {
 	ClarifyQuestion,
 	ProcurementCandidate,
@@ -324,5 +329,48 @@ export function snapshotFromProto(
 		activeRunId: res.activeRunId,
 		openConfirmation: openConfirmationFromProto(res.openConfirmation),
 		publishedPublication: publishedRfqFromProto(res.publishedRfq),
+	};
+}
+
+const STEP_STATUS_CODE: Partial<Record<StepStatus, AgentStepStatus>> = {
+	[StepStatus.RUNNING]: "RUNNING",
+	[StepStatus.WAITING_FOR_INPUT]: "RUNNING",
+	[StepStatus.SUCCEEDED]: "SUCCEEDED",
+	[StepStatus.FAILED]: "FAILED",
+	[StepStatus.SKIPPED]: "SKIPPED",
+};
+
+/** 未知的步驟代碼與沒有對應畫面狀態的 status 回 null（不顯示）；伺服器的 label 不採用，固定短句由 `stepLabel` 決定。 */
+export function stepFromProto(step: Step): AgentStep | null {
+	if (!isPublicAgentStepCode(step.code)) return null;
+	const status = STEP_STATUS_CODE[step.status];
+	if (!status) return null;
+	const safeArgs = { ...step.safeArgs };
+	return {
+		code: step.code,
+		status,
+		label: undefined,
+		text: step.text.trim() !== "" ? step.text.trim() : undefined,
+		durationMs: step.durationMs > 0n ? Number(step.durationMs) : undefined,
+		safeArgs: Object.keys(safeArgs).length > 0 ? safeArgs : undefined,
+	};
+}
+
+/** 沒有 row_id 或 code 的事件回 null；status 缺值時當作 PENDING。 */
+export function activityFromProto(
+	activity: Activity,
+): AgentActivityEvent | null {
+	if (activity.rowId === "" || activity.code === "") return null;
+	return {
+		rowId: activity.rowId,
+		code: activity.code,
+		label: activity.label,
+		status:
+			activity.status === StepStatus.UNSPECIFIED
+				? "PENDING"
+				: (StepStatus[activity.status] as AgentActivityEvent["status"]),
+		parentRowId: activity.parentRowId,
+		count: activity.count === undefined ? undefined : String(activity.count),
+		text: activity.text,
 	};
 }

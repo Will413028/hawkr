@@ -5,20 +5,8 @@ import type { AppIconName } from "@/components/shared/AppIcon";
  * 不能用 forward-compat fail-open，否則 private tool code／label 會直接進 DOM。 */
 /**
  * 值域 SSOT 是 backend CodeMeta 的 ProcurementStepStatus（issue #2446 契約凍結）。
- * 這個 union 是手寫的，**不會**隨 lib/api/openapi-types.ts 連動——那份型別描述的是
- * candidate-search 的 run/lane 狀態，step 狀態走的是另一條 wire（SSE 的 step 事件）。
- *
- * 改名前的成功終態 `DONE` 已於本波移除（backend 的 gateway 與 ai-service 都已部署改名版本）。
- *
- * ⚠️ 這個 union **少了** CodeMeta 值域裡的 PENDING／WAITING_FOR_INPUT／CANCELLED
- * 三個值。step_detail 這條 wire 目前不送它們（`ComputeTurnSteps` 只產終態列），
- * 但那是「目前」不是保證——真的送了就會被下面的 deny-by-default 整列丟掉。
- * activity 那條路徑已改成綁 CodeMeta 生成型別（見 activity.ts 的
- * `AgentActivityStatus`），這條的收斂留待接 step_detail 的下一次改動。
- *
- * ⚠️ 下面 normalizeSteps 的白名單是 deny-by-default：漏列一個線上真的會送的值不會報錯、
- * 只會讓那些步驟被整個丟掉，Activity Rail 變空軌且沒有任何錯誤訊息。這個 union 是手寫的、
- * 值是執行期字串，型別層擋不住這種錯——所以增減成員一定要對照 backend 的 CodeMeta。
+ * 這個 union 是手寫的：proto 的 `StepStatus` 另有 PENDING／WAITING_FOR_INPUT／CANCELLED，
+ * `proto-map.ts` 的 `stepFromProto` 把 WAITING_FOR_INPUT 當 RUNNING，其餘沒有對應的值不顯示。
  */
 export type AgentStepStatus = "RUNNING" | "SUCCEEDED" | "SKIPPED" | "FAILED";
 
@@ -167,51 +155,38 @@ export function isPublicAgentStepCode(code: string): boolean {
 	return Object.hasOwn(STEP_FALLBACK_LABELS, code);
 }
 
-/** 把 wire 上的 steps 陣列收斂成可渲染形狀；非陣列、未知 code 與 wire label
- * 都 fail closed。label 只由前端固定字串表解析；後端 guard 過的 text 只供
- * pending Activity Rail 使用，private payload 不得穿透。 */
-export function normalizeSteps(raw: unknown): AgentStep[] {
-	if (!Array.isArray(raw)) return [];
-	const out: AgentStep[] = [];
-	for (const item of raw) {
-		if (!item || typeof item !== "object") continue;
-		const record = item as Record<string, unknown>;
-		if (typeof record.code !== "string" || !isPublicAgentStepCode(record.code))
-			continue;
-		const status = record.status;
-		// deny-by-default：未知 status 一律丟棄。少收一個線上真的會送的值，
-		// 就是整批步驟靜默消失（見 AgentStepStatus 的註解）。
-		if (
-			status !== "RUNNING" &&
-			status !== "SUCCEEDED" &&
-			status !== "SKIPPED" &&
-			status !== "FAILED"
-		)
-			continue;
-		out.push({
-			code: record.code,
-			status,
-			label: undefined,
-			text:
-				typeof record.text === "string" && record.text.trim() !== ""
-					? record.text.trim()
-					: undefined,
-			durationMs:
-				typeof record.durationMs === "number" &&
-				Number.isFinite(record.durationMs)
-					? record.durationMs
-					: undefined,
-			safeArgs: normalizeSafeArgs(record.safeArgs),
-		});
-	}
+/**
+ * 把一個 step 事件併進目前的步驟串。
+ *
+ * 同一個 code 的 RUNNING → SUCCEEDED 都指向同一步，所以以 code 為 key 覆寫既有步驟，而不是 append。
+ * SUCCEEDED 帶著耗時與 narrator 文字，覆寫時要保留；已完成後遲到的 RUNNING 不得把它打回進行中。
+ */
+export function mergeLiveStep(
+	steps: AgentStep[],
+	next: AgentStep,
+): AgentStep[] {
+	const idx = steps.findIndex((s) => s.code === next.code);
+	if (idx === -1) return [...steps, next];
+	const prev = steps[idx];
+	const staleRunning =
+		isStepSucceeded(prev.status) && next.status === "RUNNING";
+	const merged: AgentStep = {
+		...prev,
+		...next,
+		status: isStepSucceeded(prev.status) ? prev.status : next.status,
+		durationMs: staleRunning
+			? prev.durationMs
+			: (next.durationMs ?? prev.durationMs),
+		text: staleRunning ? prev.text : (next.text ?? prev.text),
+		safeArgs: staleRunning ? prev.safeArgs : (next.safeArgs ?? prev.safeArgs),
+	};
+	if (
+		merged.status === prev.status &&
+		merged.durationMs === prev.durationMs &&
+		stepLabel(merged) === stepLabel(prev)
+	)
+		return steps;
+	const out = [...steps];
+	out[idx] = merged;
 	return out;
-}
-
-/** safeArgs 一樣 fail closed：非物件、或任何一個值不是字串，整欄丟棄——
- * 不半殘保留可解析的那幾個鍵，動態文案模板的判斷才不用另外防禦髒資料。 */
-function normalizeSafeArgs(raw: unknown): Record<string, string> | undefined {
-	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-	const entries = Object.entries(raw as Record<string, unknown>);
-	if (entries.some(([, v]) => typeof v !== "string")) return undefined;
-	return entries.length > 0 ? (raw as Record<string, string>) : undefined;
 }

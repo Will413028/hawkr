@@ -117,7 +117,7 @@ const REASON_CODE: Partial<Record<ErrorReason, ProcurementFailureCode>> = {
 	[ErrorReason.REPLAY_CURSOR_AHEAD]: "REPLAY_CURSOR_AHEAD",
 };
 
-function failureCode(err: ConnectError): ProcurementFailureCode {
+export function failureCode(err: ConnectError): ProcurementFailureCode {
 	const facts = factsFromError(err);
 	if (facts.noResponse) return "NETWORK_ERROR";
 	const decision = classifyError(facts);
@@ -152,7 +152,7 @@ function failureCode(err: ConnectError): ProcurementFailureCode {
 	}
 }
 
-function failureRetryable(err: ConnectError): boolean {
+export function failureRetryable(err: ConnectError): boolean {
 	const facts = factsFromError(err);
 	return (
 		facts.noResponse ||

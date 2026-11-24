@@ -1,18 +1,24 @@
 "use client";
 
-import { Code } from "@connectrpc/connect";
+import { Code, ConnectError } from "@connectrpc/connect";
+import {
+	RunFailureReason,
+	RunStatus,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { parseDate } from "@hawkr/api/proto/date";
 import { commonStoreCardClosedStore } from "@hawkr/ui-text/keys";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
-import { ApiClientError, apiClient } from "@/lib/api/client";
-import { buyerProcurementClient } from "@/lib/connect/procurement";
+import {
+	buyerProcurementClient,
+	buyerProcurementStreamClient,
+} from "@/lib/connect/procurement";
 import { toast } from "@/lib/feedback/toast";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { toBrowserHref } from "@/lib/navigation/resolve-url";
 import { type QueryIdentity, queryKeys } from "@/lib/query/keys";
-import type { AgentActivityEvent } from "./activity";
+import { type AgentActivityEvent, mergeLiveActivity } from "./activity";
 import { validateFreeTextAnswer } from "./answer-validation";
 import {
 	type AgentTranscript,
@@ -20,17 +26,16 @@ import {
 	fetchAgentTranscript,
 } from "./conversations";
 import {
-	CONVERSATION_GONE,
 	invalidResponseFailure,
 	type ProcurementError,
 	type ProcurementFailure,
-	procurementErrorFromStatus,
 	procurementFailureFrom,
 } from "./errors";
-import { turnResultFromLegacy } from "./legacy-turn-result";
 import {
+	activityFromProto,
 	candidateSearchFromProto,
 	slotKeyFromCode,
+	stepFromProto,
 	turnResultFromProto,
 } from "./proto-map";
 import {
@@ -58,8 +63,6 @@ import {
 	applyOptimisticSelection,
 	deriveStageFromStatus,
 	isTerminalCandidateStatus,
-	type NormalizedProcurementTurnResult,
-	normalizeProcurementTurnResult,
 	slotLabel,
 } from "./session-logic";
 import {
@@ -72,15 +75,9 @@ import {
 	type SessionOperationGuard,
 } from "./session-operation";
 import { fetchProcurementSnapshot } from "./snapshot";
-import type { AgentStep } from "./steps";
+import { type AgentStep, mergeLiveStep } from "./steps";
 import { monotonicNow, trackHawkrAgentFirstStepLatency } from "./telemetry";
-import {
-	mergeLiveActivity,
-	mergeLiveStep,
-	streamProcurementTurn,
-	TurnStreamEventError,
-	TurnStreamUnavailableError,
-} from "./turn-stream";
+import { type WatchOutcome, watchRun } from "./watch-run";
 import type {
 	ClarifyQuestion,
 	ProcurementCandidate,
@@ -97,11 +94,6 @@ import type {
 const MAX_MESSAGE_RUNES = 2000;
 const POLL_INTERVAL_MS = 1500;
 const POLL_BACKOFF_MS = [1500, 3000, 6000] as const;
-const TURN_IDEMPOTENCY_CONFLICT: ProcurementError = Object.freeze({
-	code: "IDEMPOTENCY_CONFLICT",
-	detail:
-		"這則訊息的識別碼已綁定其他內容，系統沒有建立新的操作。請修改文字後再送出。",
-});
 const TURN_IDENTITY_MISMATCH: ProcurementError = Object.freeze({
 	code: "TURN_IDENTITY_MISMATCH",
 	detail: "伺服器回應不屬於目前這筆需求，已停止套用。請重新整理後再試。",
@@ -175,7 +167,6 @@ interface SessionState {
 	question: ClarifyQuestion | null;
 	pendingTurn: boolean;
 	turnStartObserved: boolean;
-	streamFallback: string | null;
 	liveSteps: AgentStep[];
 	liveActivity: AgentActivityEvent[];
 	runId: string | null;
@@ -210,7 +201,6 @@ export function initialState(): SessionState {
 		turnStartObserved: false,
 		liveSteps: [],
 		liveActivity: [],
-		streamFallback: null,
 		runId: null,
 		candidateSet: null,
 		pollError: false,
@@ -297,105 +287,127 @@ function writeConversationUrl(conversationId: string) {
 	window.history.replaceState(null, "", target);
 }
 
-async function runTurnStream(
-	body: { requestId?: string; message: string; clientRequestId: string },
+type TurnWatchEnd =
+	| { kind: "result"; result: ProcurementTurnResult }
+	| { kind: "run-failed"; reason: string }
+	| { kind: "cancelled" }
+	| { kind: "invalid" }
+	| { kind: "resync" }
+	| { kind: "error"; error: unknown }
+	| { kind: "aborted" };
+
+function endFromOutcome(
+	outcome: WatchOutcome,
+	turnResult: ProcurementTurnResult | null,
+	finished: { status: RunStatus; failureReason: RunFailureReason } | null,
+): TurnWatchEnd {
+	switch (outcome.kind) {
+		case "aborted":
+			return { kind: "aborted" };
+		case "resync":
+			return { kind: "resync" };
+		case "failed":
+			return { kind: "error", error: outcome.error };
+		case "exhausted":
+			return {
+				kind: "error",
+				error:
+					outcome.error ?? new ConnectError("watch ended", Code.Unavailable),
+			};
+		case "finished": {
+			if (finished?.status === RunStatus.FAILED) {
+				return {
+					kind: "run-failed",
+					reason: RunFailureReason[finished.failureReason] ?? "",
+				};
+			}
+			if (finished?.status === RunStatus.CANCELLED) {
+				return { kind: "cancelled" };
+			}
+			return turnResult
+				? { kind: "result", result: turnResult }
+				: { kind: "invalid" };
+		}
+	}
+}
+
+async function watchTurnRun(
+	runId: string,
 	setState: React.Dispatch<React.SetStateAction<SessionState>>,
 	isCurrent: () => boolean,
 	signal: AbortSignal,
 	telemetry: TurnTelemetryAccumulator,
-): Promise<NormalizedProcurementTurnResult | null> {
-	try {
-		const result = await streamProcurementTurn(
-			body,
-			{
-				onStartObserved: (observedAt) => {
-					if (!isCurrent()) return;
-					if (!telemetry.firstStepTracked) {
-						telemetry.firstStepTracked = true;
-						trackHawkrAgentFirstStepLatency({
-							commandInvokedAt: telemetry.commandInvokedAt,
-							firstStepObservedAt: observedAt,
-						});
+): Promise<TurnWatchEnd> {
+	const client = buyerProcurementStreamClient();
+	let turnResult: ProcurementTurnResult | null = null;
+	let finished: { status: RunStatus; failureReason: RunFailureReason } | null =
+		null;
+	let steps: AgentStep[] = [];
+	let activity: AgentActivityEvent[] = [];
+	const observeStart = () => {
+		if (telemetry.firstStepTracked) return;
+		telemetry.firstStepTracked = true;
+		trackHawkrAgentFirstStepLatency({
+			commandInvokedAt: telemetry.commandInvokedAt,
+			firstStepObservedAt: monotonicNow(),
+		});
+	};
+	const outcome = await watchRun({
+		open: (request, openSignal) =>
+			client.watchRun(request, { signal: openSignal }),
+		runId,
+		signal,
+		onEvent: (event) => {
+			if (!isCurrent()) return;
+			switch (event.event.case) {
+				case "step": {
+					const step = event.event.value.step
+						? stepFromProto(event.event.value.step)
+						: null;
+					if (!step) return;
+					observeStart();
+					const merged = mergeLiveStep(steps, step);
+					if (merged === steps) {
+						telemetry.duplicateStepSuppressedCount += 1;
+						return;
 					}
+					steps = merged;
 					setState((s) =>
 						isCurrent() && s.pendingTurn
-							? { ...s, turnStartObserved: true }
+							? { ...s, turnStartObserved: true, liveSteps: merged }
 							: s,
 					);
-				},
-				onStep: (step) => {
-					if (!isCurrent()) return;
+					return;
+				}
+				case "activity": {
+					const row = activityFromProto(event.event.value);
+					if (!row) return;
+					observeStart();
+					activity = mergeLiveActivity(activity, row);
+					const merged = activity;
 					setState((s) =>
 						isCurrent() && s.pendingTurn
-							? {
-									...s,
-									turnStartObserved: true,
-									liveSteps: mergeLiveStep(s.liveSteps, step),
-								}
+							? { ...s, turnStartObserved: true, liveActivity: merged }
 							: s,
 					);
-				},
-				onActivity: (activity) => {
-					if (!isCurrent()) return;
-					setState((s) =>
-						isCurrent() && s.pendingTurn
-							? {
-									...s,
-									turnStartObserved: true,
-									liveActivity: mergeLiveActivity(s.liveActivity, activity),
-								}
-							: s,
-					);
-				},
-				onDuplicateStepSuppressed: () => {
-					if (!isCurrent()) return;
-					telemetry.duplicateStepSuppressedCount += 1;
-				},
-				onTerminalObserved: (observation) => {
-					if (!isCurrent()) return;
-					telemetry.terminalObservedAt = observation.observedAt;
-					telemetry.duplicateStepSuppressedCount =
-						observation.duplicateStepSuppressedCount;
-				},
-			},
-			signal,
-		);
-		if (!isCurrent()) return null;
-		const normalized = normalizeProcurementTurnResult(result);
-		if (normalized) return normalized;
-		setState((s) =>
-			isCurrent()
-				? {
-						...s,
-						streamFallback: "串流終態格式不完整",
-						liveSteps: [],
-						liveActivity: [],
-					}
-				: s,
-		);
-		return null;
-	} catch (err) {
-		if (!isCurrent()) return null;
-		if (err instanceof TurnStreamEventError) throw err;
-		const why =
-			err instanceof TurnStreamUnavailableError
-				? err.reason === "NOT_DEPLOYED"
-					? "gateway／ai-service 沒有 /turns/stream"
-					: "串流忙線或中途斷線"
-				: `串流開場失敗（${err instanceof Error ? err.name : "未知"}）`;
-		setState((s) =>
-			isCurrent()
-				? {
-						...s,
-						streamFallback: why,
-						...(err instanceof TurnStreamUnavailableError
-							? {}
-							: { liveSteps: [], liveActivity: [] }),
-					}
-				: s,
-		);
-		return null;
-	}
+					return;
+				}
+				case "turnResult":
+					turnResult = turnResultFromProto(event.event.value);
+					return;
+				case "finished":
+					telemetry.terminalObservedAt = monotonicNow();
+					finished = {
+						status: event.event.value.status,
+						failureReason: event.event.value.failureReason,
+					};
+					return;
+				default:
+					return;
+			}
+		},
+	});
+	return endFromOutcome(outcome, turnResult, finished);
 }
 
 export function useProcurementSession(
@@ -793,16 +805,23 @@ export function useProcurementSession(
 		],
 	);
 
-	const applyLegacyTurnResult = React.useCallback(
+	const settleTurnWatch = React.useCallback(
 		async (
-			rawData: unknown,
-			assistantTurnId: string,
 			operation: SessionOperation,
-			terminalTelemetry: TerminalTelemetryObservation | null,
+			end: TurnWatchEnd,
+			assistantTurnId: string,
+			turnTelemetry: TurnTelemetryAccumulator,
+			ids: { requestId: string | null; conversationId: string | null },
+			dropTurnId?: string,
 		) => {
-			if (!operationGuard.isCurrent(operation)) return;
-			const normalized = normalizeProcurementTurnResult(rawData);
-			if (!normalized) {
+			if (end.kind === "aborted" || !operationGuard.isCurrent(operation))
+				return;
+			const terminalTelemetry = terminalTelemetryObservation(
+				turnTelemetry.terminalObservedAt ?? monotonicNow(),
+				operation.generation,
+				turnTelemetry.duplicateStepSuppressedCount,
+			);
+			const settle = (extra: Partial<SessionState>) =>
 				setState((s) =>
 					operationGuard.isCurrent(operation)
 						? {
@@ -810,21 +829,105 @@ export function useProcurementSession(
 								pendingTurn: false,
 								liveSteps: [],
 								liveActivity: [],
-								error: TURN_RESULT_INVALID,
 								terminalTelemetry,
+								...extra,
 							}
 						: s,
 				);
-				return;
+			const fail = (error: ProcurementError) =>
+				setState((s) =>
+					operationGuard.isCurrent(operation)
+						? {
+								...s,
+								pendingTurn: false,
+								liveSteps: [],
+								liveActivity: [],
+								terminalTelemetry,
+								error,
+								turns: dropTurnId
+									? s.turns.filter((turn) => turn.id !== dropTurnId)
+									: s.turns,
+							}
+						: s,
+				);
+			switch (end.kind) {
+				case "result":
+					await applyTurnResult(
+						end.result,
+						assistantTurnId,
+						operation,
+						terminalTelemetry,
+					);
+					return;
+				case "invalid":
+					fail(invalidResponseFailure(defaults));
+					return;
+				case "run-failed":
+					fail({
+						code: end.reason || "RUN_FAILED",
+						detail: defaults(Code.Internal),
+					});
+					if (dropTurnId) await refreshCurrentSnapshot();
+					return;
+				case "cancelled":
+					settle({});
+					await refreshCurrentSnapshot();
+					return;
+				case "error":
+					fail(procurementFailureFrom(end.error, defaults));
+					return;
+				case "resync":
+					try {
+						if (ids.conversationId) {
+							await queryClient.invalidateQueries({
+								queryKey: queryKeys.assistant.transcript(
+									queryIdentity,
+									ids.conversationId,
+								),
+							});
+						}
+						const transcript = ids.conversationId
+							? await fetchTranscript(ids.conversationId)
+							: null;
+						const requestId = transcript?.requestId || ids.requestId;
+						if (!requestId) {
+							fail(invalidResponseFailure(defaults));
+							return;
+						}
+						const snapshot = await fetchSnapshot(requestId);
+						if (!operationGuard.isCurrent(operation)) return;
+						const restored = restoredStateFrom(transcript, snapshot);
+						invalidateCandidateSelections();
+						settle({
+							...restored,
+							turns: restored.turns?.length
+								? restored.turns
+								: stateRef.current.turns,
+							error: null,
+						});
+						if (ids.conversationId) {
+							writeConversationUrl(ids.conversationId);
+							void queryClient.invalidateQueries({
+								queryKey: queryKeys.assistant.conversations(queryIdentity),
+							});
+						}
+					} catch (err) {
+						fail(procurementFailureFrom(err, defaults));
+					}
+					return;
 			}
-			await applyTurnResult(
-				turnResultFromLegacy(normalized),
-				assistantTurnId,
-				operation,
-				terminalTelemetry,
-			);
 		},
-		[applyTurnResult, operationGuard],
+		[
+			applyTurnResult,
+			defaults,
+			fetchSnapshot,
+			fetchTranscript,
+			invalidateCandidateSelections,
+			operationGuard,
+			queryClient,
+			queryIdentity,
+			refreshCurrentSnapshot,
+		],
 	);
 
 	const submitTurn = React.useCallback(
@@ -887,154 +990,35 @@ export function useProcurementSession(
 
 			const execute = async (): Promise<void> => {
 				try {
-					setState((s) =>
-						operationGuard.isCurrent(operation) && s.streamFallback
-							? { ...s, streamFallback: null }
-							: s,
-					);
-					const streamed = await runTurnStream(
+					const submitted = await buyerProcurementClient().submitTurn(
 						{
-							requestId: operation.requestId ?? undefined,
+							requestId: operation.requestId ?? "",
 							message: trimmed,
 							clientRequestId: operation.clientRequestId,
 						},
+						{ signal: operation.signal },
+					);
+					if (!operationGuard.isCurrent(operation)) return;
+					const end = await watchTurnRun(
+						submitted.runId,
 						setState,
 						() => operationGuard.isCurrent(operation),
 						operation.signal,
 						turnTelemetry,
 					);
-					if (!operationGuard.isCurrent(operation)) return;
-					if (streamed) {
-						await applyLegacyTurnResult(
-							streamed,
-							`${operation.clientRequestId}-assistant`,
-							operation,
-							turnTelemetry.terminalObservedAt === null
-								? null
-								: terminalTelemetryObservation(
-										turnTelemetry.terminalObservedAt,
-										operation.generation,
-										turnTelemetry.duplicateStepSuppressedCount,
-									),
-						);
-						return;
-					}
-					if (!operationGuard.isCurrent(operation)) return;
-					const env = await apiClient.authed.post<unknown>(
-						"/buyers/me/procurement/turns",
-						{
-							signal: operation.signal,
-							json: {
-								requestId: operation.requestId ?? undefined,
-								message: trimmed,
-								clientRequestId: operation.clientRequestId,
-							},
-						},
-					);
-					if (!operationGuard.isCurrent(operation)) return;
-					const syncTerminalObservedAt = monotonicNow();
-					await applyLegacyTurnResult(
-						env.data,
-						`${operation.clientRequestId}-assistant`,
+					await settleTurnWatch(
 						operation,
-						terminalTelemetryObservation(
-							syncTerminalObservedAt,
-							operation.generation,
-							turnTelemetry.duplicateStepSuppressedCount,
-						),
+						end,
+						`${operation.clientRequestId}-assistant`,
+						turnTelemetry,
+						{
+							requestId: submitted.requestId || null,
+							conversationId: submitted.conversationId || null,
+						},
 					);
 				} catch (err) {
 					if (!operationGuard.isCurrent(operation)) return;
-					const terminalTelemetry = terminalTelemetryObservation(
-						turnTelemetry.terminalObservedAt ?? monotonicNow(),
-						operation.generation,
-						turnTelemetry.duplicateStepSuppressedCount,
-					);
-					if (err instanceof TurnStreamEventError) {
-						if (err.code === 409 && err.reason === "APPROVAL_PENDING") {
-							setState((s) =>
-								operationGuard.isCurrent(operation)
-									? {
-											...s,
-											pendingTurn: false,
-											liveSteps: [],
-											liveActivity: [],
-											error: procurementErrorFromStatus(
-												err.code,
-												err.reason,
-												err.message,
-											),
-											terminalTelemetry,
-										}
-									: s,
-							);
-							await refreshCurrentSnapshot();
-							return;
-						}
-						setState((s) =>
-							operationGuard.isCurrent(operation)
-								? {
-										...s,
-										pendingTurn: false,
-										liveSteps: [],
-										liveActivity: [],
-										error:
-											err.code === 404
-												? CONVERSATION_GONE
-												: err.code === 409
-													? TURN_IDEMPOTENCY_CONFLICT
-													: {
-															code: "TURN_FAILED",
-															detail: err.message,
-														},
-										terminalTelemetry,
-									}
-								: s,
-						);
-						return;
-					}
-					if (err instanceof ApiClientError && err.status === 409) {
-						if (err.reason === "APPROVAL_PENDING") {
-							setState((s) =>
-								operationGuard.isCurrent(operation)
-									? {
-											...s,
-											pendingTurn: false,
-											liveSteps: [],
-											liveActivity: [],
-											error: procurementErrorFromStatus(
-												err.status,
-												err.reason,
-												err.message,
-											),
-											terminalTelemetry,
-										}
-									: s,
-							);
-							await refreshCurrentSnapshot();
-							return;
-						}
-						setState((s) =>
-							operationGuard.isCurrent(operation)
-								? {
-										...s,
-										pendingTurn: false,
-										liveSteps: [],
-										liveActivity: [],
-										error: TURN_IDEMPOTENCY_CONFLICT,
-										terminalTelemetry,
-									}
-								: s,
-						);
-						return;
-					}
-					const detail =
-						err instanceof ApiClientError
-							? procurementErrorFromStatus(err.status, err.reason, err.message)
-							: {
-									code: "NETWORK_ERROR",
-									detail: "訊息送出失敗，請檢查網路連線後重試",
-								};
+					const failure = procurementFailureFrom(err, defaults);
 					setState((s) =>
 						operationGuard.isCurrent(operation)
 							? {
@@ -1042,20 +1026,28 @@ export function useProcurementSession(
 									pendingTurn: false,
 									liveSteps: [],
 									liveActivity: [],
-									error: detail,
-									terminalTelemetry,
+									error: failure,
+									terminalTelemetry: terminalTelemetryObservation(
+										turnTelemetry.terminalObservedAt ?? monotonicNow(),
+										operation.generation,
+										turnTelemetry.duplicateStepSuppressedCount,
+									),
 								}
 							: s,
 					);
+					if (failure.code === "APPROVAL_PENDING") {
+						await refreshCurrentSnapshot();
+					}
 				}
 			};
 			await execute();
 		},
 		[
-			applyLegacyTurnResult,
+			defaults,
 			operationGuard,
 			refreshCurrentSnapshot,
 			sessionGenerationGuard,
+			settleTurnWatch,
 		],
 	);
 
@@ -1129,6 +1121,44 @@ export function useProcurementSession(
 					freeText: answer.freeText,
 				});
 				if (!operationGuard.isCurrent(operation)) return;
+				if (outcome.resolved && outcome.runId) {
+					const resumeTelemetry: TurnTelemetryAccumulator = {
+						commandInvokedAt: monotonicNow(),
+						firstStepTracked: false,
+						duplicateStepSuppressedCount: 0,
+						terminalObservedAt: null,
+					};
+					setState((s) =>
+						operationGuard.isCurrent(operation)
+							? {
+									...s,
+									question: null,
+									turnStartObserved: false,
+									liveSteps: [],
+									liveActivity: [],
+								}
+							: s,
+					);
+					const end = await watchTurnRun(
+						outcome.runId,
+						setState,
+						() => operationGuard.isCurrent(operation),
+						operation.signal,
+						resumeTelemetry,
+					);
+					await settleTurnWatch(
+						operation,
+						end,
+						`${clientRequestId}-assistant`,
+						resumeTelemetry,
+						{
+							requestId: current.requestId,
+							conversationId: current.conversationId,
+						},
+						clientRequestId,
+					);
+					return;
+				}
 				setState((s) =>
 					operationGuard.isCurrent(operation)
 						? {
@@ -1245,6 +1275,7 @@ export function useProcurementSession(
 		},
 		[
 			applyTurnResult,
+			settleTurnWatch,
 			defaults,
 			fetchSnapshot,
 			invalidateCandidateSelections,
