@@ -356,6 +356,30 @@
       "message": "推播",
       "description": "App 推播。"
     },
+    "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED": {
+      "message": "已完成",
+      "description": "已完成。"
+    },
+    "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_FAILED": {
+      "message": "失敗",
+      "description": "失敗（終局）：款項沒有轉出。"
+    },
+    "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_PENDING": {
+      "message": "處理中",
+      "description": "處理中：已記錄，還沒有結果（含待營運人工處理的列，賣家沒有要做的事）。"
+    },
+    "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_REVERSAL": {
+      "message": "扣回",
+      "description": "退款時向賣家收回已轉出的款項（金額為負）。"
+    },
+    "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TOP_UP": {
+      "message": "補差額",
+      "description": "補差額：已從轉帳金額扣掉的退款之後失敗，把少收的款項補給賣家（金額為正）。"
+    },
+    "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TRANSFER": {
+      "message": "入帳",
+      "description": "平台把一張訂單的款項轉給賣家（金額為正）。"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
       "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"

@@ -52,6 +52,10 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $11.CancelKYCRequest request);
   $async.Future<$11.GetMyPaymentAccountResponse> getMyPaymentAccount(
       $pb.ServerContext ctx, $11.GetMyPaymentAccountRequest request);
+  $async.Future<$11.ListMyEarningsResponse> listMyEarnings(
+      $pb.ServerContext ctx, $11.ListMyEarningsRequest request);
+  $async.Future<$11.GetMyOrderEarningsResponse> getMyOrderEarnings(
+      $pb.ServerContext ctx, $11.GetMyOrderEarningsRequest request);
   $async.Future<$11.CreatePaymentOnboardingSessionResponse>
       createPaymentOnboardingSession($pb.ServerContext ctx,
           $11.CreatePaymentOnboardingSessionRequest request);
@@ -111,6 +115,10 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
         return $11.CancelKYCRequest();
       case 'GetMyPaymentAccount':
         return $11.GetMyPaymentAccountRequest();
+      case 'ListMyEarnings':
+        return $11.ListMyEarningsRequest();
+      case 'GetMyOrderEarnings':
+        return $11.GetMyOrderEarningsRequest();
       case 'CreatePaymentOnboardingSession':
         return $11.CreatePaymentOnboardingSessionRequest();
       case 'LookupBusinessRegistration':
@@ -176,6 +184,11 @@ abstract class SellerAppServiceBase extends $pb.GeneratedService {
       case 'GetMyPaymentAccount':
         return getMyPaymentAccount(
             ctx, request as $11.GetMyPaymentAccountRequest);
+      case 'ListMyEarnings':
+        return listMyEarnings(ctx, request as $11.ListMyEarningsRequest);
+      case 'GetMyOrderEarnings':
+        return getMyOrderEarnings(
+            ctx, request as $11.GetMyOrderEarningsRequest);
       case 'CreatePaymentOnboardingSession':
         return createPaymentOnboardingSession(
             ctx, request as $11.CreatePaymentOnboardingSessionRequest);

@@ -219,6 +219,24 @@
     "notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH": {
       "message": "Push"
     },
+    "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED": {
+      "message": "Completed"
+    },
+    "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_FAILED": {
+      "message": "Failed"
+    },
+    "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_PENDING": {
+      "message": "Processing"
+    },
+    "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_REVERSAL": {
+      "message": "Clawback"
+    },
+    "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TOP_UP": {
+      "message": "Top-up"
+    },
+    "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TRANSFER": {
+      "message": "Payout"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "Setup needed"
     },
