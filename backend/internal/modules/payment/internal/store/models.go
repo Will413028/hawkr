@@ -37,8 +37,6 @@ type PaymentAccount struct {
 
 type PaymentPayment struct {
 	ID                   uuid.UUID
-	OrderNo              string
-	StoreID              int64
 	BuyerID              int64
 	Amount               int64
 	Provider             string
@@ -71,9 +69,18 @@ type PaymentPaymentAttempt struct {
 	CreatedAt         time.Time
 }
 
+type PaymentPaymentOrder struct {
+	ID        uuid.UUID
+	PaymentID uuid.UUID
+	OrderNo   string
+	StoreID   int64
+	Amount    int64
+	CreatedAt time.Time
+}
+
 type PaymentRefund struct {
 	ID                   uuid.UUID
-	PaymentID            uuid.UUID
+	PaymentOrderID       uuid.UUID
 	RequestKey           string
 	Amount               int64
 	Auto                 bool
@@ -102,7 +109,7 @@ type PaymentRefund struct {
 type PaymentRefundReversal struct {
 	ID               uuid.UUID
 	RefundID         uuid.UUID
-	PaymentID        uuid.UUID
+	PaymentOrderID   uuid.UUID
 	Seq              int32
 	TargetRefundID   *uuid.UUID
 	TargetExternalID string
@@ -119,7 +126,7 @@ type PaymentRefundReversal struct {
 
 type PaymentTransfer struct {
 	ID                   uuid.UUID
-	PaymentID            uuid.UUID
+	PaymentOrderID       uuid.UUID
 	StoreID              int64
 	Amount               int64
 	ReversedAmount       int64

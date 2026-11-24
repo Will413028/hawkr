@@ -1,5 +1,5 @@
 // Package paymentserver 提供舊服務（Java order、aftersales 與 Go invoice-service）還在呼叫的 PaymentService 方法，由 payment 模組實作（B2 步驟 4）。
-// 其他方法回 Unimplemented：PayUni 專屬的 RPC（導轉表單、回跳頁、解密、ATM 退款頁）隨 PayUni 刪除；gateway 的付款路由在步驟 6 之前仍指向 Java payment-service。
+// 其他方法回 Unimplemented：舊金流商專屬的 RPC（導轉表單、回跳頁、解密、ATM 退款頁）隨舊金流商刪除；gateway 的付款路由在步驟 6 之前仍指向 Java payment-service。
 //
 // 識別對應（過渡期）：舊契約的 trade_no 與 order_id 都是訂單編號（一張訂單一筆付款，D8）；退款的 refund_no 是呼叫端建立退款時給的冪等鍵
 // （售後的案件編號、order 的 AUTO:{訂單}:{交易}），不是 payment 內部的退款 ID。
@@ -60,8 +60,8 @@ type Payments interface {
 	RefundByRequestKey(ctx context.Context, requestKey string) (payment.PaymentRefund, error)
 	RefundsByRequestKeys(ctx context.Context, requestKeys []string) ([]payment.PaymentRefund, error)
 	LatestRefundsByOrderNos(ctx context.Context, orderNos []string) ([]payment.PaymentRefund, error)
-	PaymentByOrderNo(ctx context.Context, orderNo string) (payment.Payment, error)
-	PaymentsByOrderNos(ctx context.Context, orderNos []string) ([]payment.Payment, error)
+	PaymentByOrderNo(ctx context.Context, orderNo string) (payment.OrderPayment, error)
+	PaymentsByOrderNos(ctx context.Context, orderNos []string) ([]payment.OrderPayment, error)
 	CloseOrderPayment(ctx context.Context, orderNo string) (bool, error)
 }
 
@@ -136,15 +136,16 @@ func refundStatus(s payment.PaymentRefundStatus) (string, error) {
 	return "", fmt.Errorf("paymentserver：不認得的退款狀態 %q", s)
 }
 
-func parseAmount(raw string) (int64, error) {
+// parseAmount 解析請求的金額字串；不合法時回 problem（給呼叫端的說明，空字串表示合法）。
+func parseAmount(raw string) (amount int64, problem string) {
 	if len(raw) == 0 || len(raw) > maxAmountDigits {
-		return 0, fmt.Errorf("金額不合法")
+		return 0, "金額不合法"
 	}
 	v, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || v <= 0 {
-		return 0, fmt.Errorf("金額必須是正整數")
+		return 0, "金額必須是正整數"
 	}
-	return v, nil
+	return v, ""
 }
 
 // GrantPayment 對應轉帳：寫轉帳列並排 job（D6），冪等（已有有效轉帳回它）。付款還沒入帳、賣家收款帳戶未開通或沒有可轉金額（FailedPrecondition）回 gRPC 錯誤：
@@ -177,9 +178,9 @@ func (s *Server) CreateRefund(ctx context.Context, req *connect.Request[pb.Creat
 	if key == "" {
 		return connect.NewResponse(&pb.CreateRefundResponse{Code: codeInvalidInput, Message: "refund_no（冪等鍵）必填"}), nil
 	}
-	amount, err := parseAmount(m.GetAmount())
-	if err != nil {
-		return connect.NewResponse(&pb.CreateRefundResponse{Code: codeInvalidInput, Message: err.Error()}), nil
+	amount, problem := parseAmount(m.GetAmount())
+	if problem != "" {
+		return connect.NewResponse(&pb.CreateRefundResponse{Code: codeInvalidInput, Message: problem}), nil
 	}
 	r, err := s.payments.CreatePaymentRefund(ctx, payment.RefundRequest{
 		OrderNo: strings.TrimSpace(m.GetTradeNo()), Amount: amount, RequestKey: key, Auto: strings.HasPrefix(key, autoRefundKeyPrefix),
@@ -200,7 +201,7 @@ func (s *Server) CreateRefund(ctx context.Context, req *connect.Request[pb.Creat
 
 // refundDetail 逐欄位建立 RefundDetail。填的欄位：refund_no（冪等鍵）、trade_no 與 order_id（訂單編號）、amount、status、provider_status（退款狀態名）、
 // provider_message（失敗原因）、created_at。不填的欄位：reason（只在建立的回應回填呼叫端給的原文，不存）、provider_refund_no（port 不外露 provider 的退款 ID）、
-// completed_at（退款列沒有完成時間）、estimated_refund_date 與 bank_date（ATM 專屬，已隨 PayUni 刪除）。
+// completed_at（退款列沒有完成時間）、estimated_refund_date 與 bank_date（ATM 專屬，已隨舊金流商刪除）。
 func refundDetail(r payment.PaymentRefund) (*pb.RefundDetail, error) {
 	status, err := refundStatus(r.Status)
 	if err != nil {
@@ -279,7 +280,7 @@ func (s *Server) BatchGetProviderStatusByOrderIds(ctx context.Context, req *conn
 	}
 	entries := make(map[string]*pb.ProviderStatusEntry, len(rows))
 	for _, p := range rows {
-		entries[p.OrderNo] = &pb.ProviderStatusEntry{ProviderStatus: string(p.Status), ProviderMessage: p.LastError}
+		entries[p.Order.OrderNo] = &pb.ProviderStatusEntry{ProviderStatus: string(p.Status), ProviderMessage: p.LastError}
 	}
 	return connect.NewResponse(&pb.BatchGetProviderStatusByOrderIdsResponse{Code: codeSuccess, Message: successMessage, Entries: entries}), nil
 }
@@ -309,9 +310,9 @@ func (s *Server) GetActivePaymentStatusByOrderNo(ctx context.Context, req *conne
 // provider_message（最近一次嘗試的失敗原因碼）、pay_time（入帳時間）、created_at。不填的欄位：payment_type（付款沒有付款方式欄位，order 端沿用訂單上的）、
 // mer_id（SCT 不需要商店代號）、product_name、provider_trade_no、atm_*（ATM 已刪）、closed_at、expire_at、updated_at（付款列沒有對外的這些時間）、
 // is_duplicate 與 duplicate_sequence（一張訂單一個 PaymentIntent，沒有重複付款列）、granted_at、grant_status、grant_message（轉帳在 admin 的轉帳列表）。
-func paymentDetail(p payment.Payment, status string) *pb.PaymentDetail {
+func paymentDetail(p payment.OrderPayment, status string) *pb.PaymentDetail {
 	d := &pb.PaymentDetail{
-		TradeNo: p.OrderNo, OrderId: p.OrderNo, BuyerId: strconv.FormatInt(p.BuyerID, 10), Amount: strconv.FormatInt(p.Amount, 10),
+		TradeNo: p.Order.OrderNo, OrderId: p.Order.OrderNo, BuyerId: strconv.FormatInt(p.BuyerID, 10), Amount: strconv.FormatInt(p.Order.Amount, 10),
 		Status: status, ProviderStatus: string(p.Status), ProviderMessage: p.LastError, CreatedAt: millis(p.CreatedAt),
 	}
 	if p.PaidAt != nil {
@@ -356,6 +357,6 @@ func (s *Server) GetPaymentFactsInternal(ctx context.Context, req *connect.Reque
 	}
 	paidAt := p.PaidAt.UTC().Format(isoSecondLayout)
 	return connect.NewResponse(&pb.GetPaymentFactsInternalResponse{Code: codeSuccess, Message: successMessage, Data: &pb.PaymentFactsData{
-		OrderNo: orderNo, TradeNo: orderNo, ProviderPaidAt: &paidAt, PayTime: paidAt, TradeAmt: strconv.FormatInt(p.Amount, 10),
+		OrderNo: orderNo, TradeNo: orderNo, ProviderPaidAt: &paidAt, PayTime: paidAt, TradeAmt: strconv.FormatInt(p.Order.Amount, 10),
 	}}), nil
 }

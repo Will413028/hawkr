@@ -56,7 +56,7 @@ service PaymentAdminService {
   }
 
   // ResolvePaymentAnomaly 是對 ANOMALY 的付款、轉帳、退款、撤回或補差額轉帳的人工結案：管理員核對金流商之後結案成成功（附金流商物件 ID 為證據）或失敗。
-  // 領域變更與一筆後台紀錄在同一個交易。物件不存在回 not_found；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
+  // 必填結案原因代碼（reason）與備註（note，去除首尾空白後 1 到 255 個字元），連同領域變更寫進同一個交易的一筆後台紀錄。物件不存在回 not_found；缺原因、原因與結果不相容、備註空白或過長回 invalid_argument（指到出錯的欄位）；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
   rpc ResolvePaymentAnomaly(ResolvePaymentAnomalyRequest) returns (ResolvePaymentAnomalyResponse);
 }
 
@@ -137,13 +137,23 @@ message DeletePaymentAccountMappingRequest {
 
 message DeletePaymentAccountMappingResponse {}
 
-// Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）。
-message Payment {
+// PaymentOrder 是付款底下一張訂單的應收：退款上限與轉帳都以它為單位。
+message PaymentOrder {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
   string order_no = 2;
   string store_id = 3;
+  // 這張訂單的應收金額（訂單的整數金額，不帶幣別）。
+  int64 amount = 4;
+}
+
+// Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）：一筆付款（一個金流商付款物件）對 orders 底下 N 張訂單應收（過渡期 N 是 1）。
+message Payment {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 第一張訂單的訂單編號與店家：N 是 1 時就是這筆付款的訂單；N 大於 1 時看 orders。
+  string order_no = 2;
+  string store_id = 3;
   string buyer_id = 4;
-  // 付款金額（訂單的整數金額，不帶幣別）。
+  // 付款金額（各訂單應收的總額，不帶幣別）。
   int64 amount = 5;
   // 金流商的代碼（例如 stripe）。
   string provider = 6;
@@ -158,6 +168,8 @@ message Payment {
   string failure_reason = 11;
   google.protobuf.Timestamp create_time = 12;
   google.protobuf.Timestamp update_time = 13;
+  // 付款底下的訂單應收，依建立順序，至少一張。
+  repeated PaymentOrder orders = 14;
 }
 
 // PaymentTransfer 是後台看到的轉帳（付款轉給賣家）。
@@ -175,6 +187,8 @@ message PaymentTransfer {
   // 失敗或 ANOMALY 的原因；其餘狀態是空字串。
   string failure_reason = 9;
   google.protobuf.Timestamp create_time = 10;
+  // 這筆轉帳所屬的訂單應收（一張訂單應收最多一筆有效轉帳）。
+  string payment_order_id = 11;
 }
 
 // PaymentReversal 是退款向賣家收回款項的一次金流商撤回呼叫。
@@ -211,6 +225,8 @@ message PaymentRefund {
   string request_key = 12;
   repeated PaymentReversal reversals = 13;
   google.protobuf.Timestamp create_time = 14;
+  // 這筆退款所屬的訂單應收（退款上限以它的應收金額計）。
+  string payment_order_id = 15;
 }
 
 message ListPaymentsRequest {
@@ -265,6 +281,11 @@ message ResolvePaymentAnomalyRequest {
   hawkr.payment.v1alpha1.PaymentAnomalyOutcome outcome = 3 [(google.api.field_behavior) = REQUIRED];
   // 結案成功時必填：核對到的金流商物件 ID；結案成失敗時可省略。
   string evidence = 4 [(google.api.field_behavior) = OPTIONAL];
+  // 結案原因代碼，必填（不得是 UNSPECIFIED）。PROVIDER_EXECUTED_NOT_RECORDED 只搭配結果 SUCCEEDED，PROVIDER_NOT_EXECUTED 只搭配 FAILED；
+  // DUPLICATE 與 OTHER 搭配任一結果。
+  hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason reason = 5 [(google.api.field_behavior) = REQUIRED];
+  // 結案備註，必填：去除首尾空白後 1 到 255 個字元（以 Unicode 字元計）；與原因代碼一起寫進後台動作紀錄。
+  string note = 6 [(google.api.field_behavior) = REQUIRED];
 }
 
 message ResolvePaymentAnomalyResponse {}

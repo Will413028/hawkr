@@ -8,7 +8,7 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "../../../payment/v1alpha1/payment_pb";
+import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentAnomalyResolutionReason, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "../../../payment/v1alpha1/payment_pb";
 import { file_hawkr_payment_v1alpha1_payment } from "../../../payment/v1alpha1/payment_pb";
 import { file_google_api_field_behavior } from "../../../../google/api/field_behavior_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
@@ -19,7 +19,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/payment/v1alpha1/payment.proto.
  */
 export const file_hawkr_admin_payment_v1alpha1_payment: GenFile = /*@__PURE__*/
-  fileDesc("CipoYXdrci9hZG1pbi9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SHGhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEi5wUKDlBheW1lbnRBY2NvdW50EhAKCHN0b3JlX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhsKE2V4dGVybmFsX2FjY291bnRfaWQYAyABKAkSPAoGc3RhdHVzGAQgASgOMiwuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudFN0YXR1cxJNChZyZXF1aXJlbWVudF9jb2xsZWN0aW9uGAUgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5SZXF1aXJlbWVudENvbGxlY3Rpb24SGAoQdHJhbnNmZXJzX2FjdGl2ZRgGIAEoCBIWCg5wYXlvdXRzX2FjdGl2ZRgHIAEoCBItCgxyZXF1aXJlbWVudHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhUKDXN0YXR1c19yZWFzb24YCSABKAkSLgoKZmV0Y2hfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoSY3JlYXRlX2ZhaWxlZF90aW1lGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtjcmVhdGVfdGltZRgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKEnB1cmdlX2Jsb2NrZWRfdGltZRgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcHVyZ2VfYmxvY2tlZF9yZWFzb24YDyABKAkSGQoRY3JlYXRlX3VucmVzb2x2ZWQYECABKAgSNgoScHVyZ2VfcGVuZGluZ190aW1lGBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIcChRwdXJnZV9yZXBsYXlfcGVuZGluZxgSIAEoCCIxChhHZXRQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJaChlHZXRQYXltZW50QWNjb3VudFJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjUKHFJlZnJlc2hQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJeCh1SZWZyZXNoUGF5bWVudEFjY291bnRSZXNwb25zZRI9CgdhY2NvdW50GAEgASgLMiwuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudCJnCiBSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECEiwKH2Fja25vd2xlZGdlX25vX3Byb3ZpZGVyX2FjY291bnQYAiABKAhCA+BBASJiCiFSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVzcG9uc2USPQoHYWNjb3VudBgBIAEoCzIsLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFjY291bnQiOAofUmV0cnlQYXltZW50QWNjb3VudFB1cmdlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECImEKIFJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjsKIkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiIlCiNEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmdSZXNwb25zZSKDAwoHUGF5bWVudBIPCgJpZBgBIAEoCUID4EEIEhAKCG9yZGVyX25vGAIgASgJEhAKCHN0b3JlX2lkGAMgASgJEhAKCGJ1eWVyX2lkGAQgASgJEg4KBmFtb3VudBgFIAEoAxIQCghwcm92aWRlchgGIAEoCRI1CgZzdGF0dXMYByABKA4yJS5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRTdGF0dXMSGwoTZXh0ZXJuYWxfcGF5bWVudF9pZBgIIAEoCRItCglwYWlkX3RpbWUYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmxhc3RfZXJyb3IYCiABKAkSFgoOZmFpbHVyZV9yZWFzb24YCyABKAkSLwoLY3JlYXRlX3RpbWUYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC3VwZGF0ZV90aW1lGA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKpAgoPUGF5bWVudFRyYW5zZmVyEg8KAmlkGAEgASgJQgPgQQgSEgoKcGF5bWVudF9pZBgCIAEoCRIQCghvcmRlcl9ubxgDIAEoCRIQCghzdG9yZV9pZBgEIAEoCRIOCgZhbW91bnQYBSABKAMSFwoPcmV2ZXJzZWRfYW1vdW50GAYgASgDEj0KBnN0YXR1cxgHIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFRyYW5zZmVyU3RhdHVzEhwKFGV4dGVybmFsX3RyYW5zZmVyX2lkGAggASgJEhYKDmZhaWx1cmVfcmVhc29uGAkgASgJEi8KC2NyZWF0ZV90aW1lGAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCLHAQoPUGF5bWVudFJldmVyc2FsEg8KAmlkGAEgASgJQgPgQQgSDgoGYW1vdW50GAIgASgDEj0KBnN0YXR1cxgDIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJldmVyc2FsU3RhdHVzEg4KBnJlYXNvbhgEIAEoCRITCgtleHRlcm5hbF9pZBgFIAEoCRIvCgtjcmVhdGVfdGltZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAigAQKDVBheW1lbnRSZWZ1bmQSDwoCaWQYASABKAlCA+BBCBISCgpwYXltZW50X2lkGAIgASgJEhAKCG9yZGVyX25vGAMgASgJEg4KBmFtb3VudBgEIAEoAxIMCgRhdXRvGAUgASgIEjsKBnN0YXR1cxgGIAEoDjIrLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJlZnVuZFN0YXR1cxIXCg9yZXZlcnNhbF9hbW91bnQYByABKAMSRgoPcmV2ZXJzYWxfc3RhdHVzGAggASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50UmV2ZXJzYWxTdGF0dXMSQAoMdG9wdXBfc3RhdHVzGAkgASgOMiouaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50VG9wdXBTdGF0dXMSGgoSZXh0ZXJuYWxfcmVmdW5kX2lkGAogASgJEhYKDmZhaWx1cmVfcmVhc29uGAsgASgJEhMKC3JlcXVlc3Rfa2V5GAwgASgJEkAKCXJldmVyc2FscxgNIAMoCzItLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJldmVyc2FsEi8KC2NyZWF0ZV90aW1lGA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKVAQoTTGlzdFBheW1lbnRzUmVxdWVzdBI6CgZzdGF0dXMYASABKA4yJS5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRTdGF0dXNIAIgBARIQCghvcmRlcl9ubxgCIAEoCRIRCglwYWdlX3NpemUYAyABKAUSEgoKcGFnZV90b2tlbhgEIAEoCUIJCgdfc3RhdHVzImgKFExpc3RQYXltZW50c1Jlc3BvbnNlEjcKCHBheW1lbnRzGAEgAygLMiUuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSKlAQobTGlzdFBheW1lbnRUcmFuc2ZlcnNSZXF1ZXN0EkIKBnN0YXR1cxgBIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFRyYW5zZmVyU3RhdHVzSACIAQESEAoIb3JkZXJfbm8YAiABKAkSEQoJcGFnZV9zaXplGAMgASgFEhIKCnBhZ2VfdG9rZW4YBCABKAlCCQoHX3N0YXR1cyJ5ChxMaXN0UGF5bWVudFRyYW5zZmVyc1Jlc3BvbnNlEkAKCXRyYW5zZmVycxgBIAMoCzItLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFRyYW5zZmVyEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSK3AQoZTGlzdFBheW1lbnRSZWZ1bmRzUmVxdWVzdBJACgZzdGF0dXMYASABKA4yKy5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRSZWZ1bmRTdGF0dXNIAIgBARIQCghvcmRlcl9ubxgCIAEoCRIUCgxhbm9tYWx5X29ubHkYAyABKAgSEQoJcGFnZV9zaXplGAQgASgFEhIKCnBhZ2VfdG9rZW4YBSABKAlCCQoHX3N0YXR1cyJzChpMaXN0UGF5bWVudFJlZnVuZHNSZXNwb25zZRI8CgdyZWZ1bmRzGAEgAygLMisuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50UmVmdW5kEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSLKAQocUmVzb2x2ZVBheW1lbnRBbm9tYWx5UmVxdWVzdBI9CgRraW5kGAEgASgOMiouaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QW5vbWFseUtpbmRCA+BBAhIPCgJpZBgCIAEoCUID4EECEkMKB291dGNvbWUYAyABKA4yLS5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBbm9tYWx5T3V0Y29tZUID4EECEhUKCGV2aWRlbmNlGAQgASgJQgPgQQEiHwodUmVzb2x2ZVBheW1lbnRBbm9tYWx5UmVzcG9uc2UyxwoKE1BheW1lbnRBZG1pblNlcnZpY2USiQEKEUdldFBheW1lbnRBY2NvdW50EjYuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5HZXRQYXltZW50QWNjb3VudFJlcXVlc3QaNy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkdldFBheW1lbnRBY2NvdW50UmVzcG9uc2UiA5ACARKQAQoVUmVmcmVzaFBheW1lbnRBY2NvdW50EjouaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZWZyZXNoUGF5bWVudEFjY291bnRSZXF1ZXN0GjsuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZWZyZXNoUGF5bWVudEFjY291bnRSZXNwb25zZRKcAQoZUmV0cnlQYXltZW50QWNjb3VudENyZWF0ZRI+Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmV0cnlQYXltZW50QWNjb3VudENyZWF0ZVJlcXVlc3QaPy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRDcmVhdGVSZXNwb25zZRKZAQoYUmV0cnlQYXltZW50QWNjb3VudFB1cmdlEj0uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXRyeVBheW1lbnRBY2NvdW50UHVyZ2VSZXF1ZXN0Gj4uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXRyeVBheW1lbnRBY2NvdW50UHVyZ2VSZXNwb25zZRKiAQobRGVsZXRlUGF5bWVudEFjY291bnRNYXBwaW5nEkAuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5EZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmdSZXF1ZXN0GkEuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5EZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmdSZXNwb25zZRJ6CgxMaXN0UGF5bWVudHMSMS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkxpc3RQYXltZW50c1JlcXVlc3QaMi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkxpc3RQYXltZW50c1Jlc3BvbnNlIgOQAgESkgEKFExpc3RQYXltZW50VHJhbnNmZXJzEjkuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5MaXN0UGF5bWVudFRyYW5zZmVyc1JlcXVlc3QaOi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkxpc3RQYXltZW50VHJhbnNmZXJzUmVzcG9uc2UiA5ACARKMAQoSTGlzdFBheW1lbnRSZWZ1bmRzEjcuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5MaXN0UGF5bWVudFJlZnVuZHNSZXF1ZXN0GjguaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5MaXN0UGF5bWVudFJlZnVuZHNSZXNwb25zZSIDkAIBEpABChVSZXNvbHZlUGF5bWVudEFub21hbHkSOi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlc29sdmVQYXltZW50QW5vbWFseVJlcXVlc3QaOy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlc29sdmVQYXltZW50QW5vbWFseVJlc3BvbnNlYgZwcm90bzM", [file_hawkr_payment_v1alpha1_payment, file_google_api_field_behavior, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("CipoYXdrci9hZG1pbi9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SHGhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEi5wUKDlBheW1lbnRBY2NvdW50EhAKCHN0b3JlX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhsKE2V4dGVybmFsX2FjY291bnRfaWQYAyABKAkSPAoGc3RhdHVzGAQgASgOMiwuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudFN0YXR1cxJNChZyZXF1aXJlbWVudF9jb2xsZWN0aW9uGAUgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5SZXF1aXJlbWVudENvbGxlY3Rpb24SGAoQdHJhbnNmZXJzX2FjdGl2ZRgGIAEoCBIWCg5wYXlvdXRzX2FjdGl2ZRgHIAEoCBItCgxyZXF1aXJlbWVudHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhUKDXN0YXR1c19yZWFzb24YCSABKAkSLgoKZmV0Y2hfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoSY3JlYXRlX2ZhaWxlZF90aW1lGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtjcmVhdGVfdGltZRgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKEnB1cmdlX2Jsb2NrZWRfdGltZRgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcHVyZ2VfYmxvY2tlZF9yZWFzb24YDyABKAkSGQoRY3JlYXRlX3VucmVzb2x2ZWQYECABKAgSNgoScHVyZ2VfcGVuZGluZ190aW1lGBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIcChRwdXJnZV9yZXBsYXlfcGVuZGluZxgSIAEoCCIxChhHZXRQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJaChlHZXRQYXltZW50QWNjb3VudFJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjUKHFJlZnJlc2hQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJeCh1SZWZyZXNoUGF5bWVudEFjY291bnRSZXNwb25zZRI9CgdhY2NvdW50GAEgASgLMiwuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudCJnCiBSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECEiwKH2Fja25vd2xlZGdlX25vX3Byb3ZpZGVyX2FjY291bnQYAiABKAhCA+BBASJiCiFSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVzcG9uc2USPQoHYWNjb3VudBgBIAEoCzIsLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFjY291bnQiOAofUmV0cnlQYXltZW50QWNjb3VudFB1cmdlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECImEKIFJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjsKIkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiIlCiNEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmdSZXNwb25zZSJTCgxQYXltZW50T3JkZXISDwoCaWQYASABKAlCA+BBCBIQCghvcmRlcl9ubxgCIAEoCRIQCghzdG9yZV9pZBgDIAEoCRIOCgZhbW91bnQYBCABKAMivwMKB1BheW1lbnQSDwoCaWQYASABKAlCA+BBCBIQCghvcmRlcl9ubxgCIAEoCRIQCghzdG9yZV9pZBgDIAEoCRIQCghidXllcl9pZBgEIAEoCRIOCgZhbW91bnQYBSABKAMSEAoIcHJvdmlkZXIYBiABKAkSNQoGc3RhdHVzGAcgASgOMiUuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50U3RhdHVzEhsKE2V4dGVybmFsX3BheW1lbnRfaWQYCCABKAkSLQoJcGFpZF90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAogASgJEhYKDmZhaWx1cmVfcmVhc29uGAsgASgJEi8KC2NyZWF0ZV90aW1lGAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgt1cGRhdGVfdGltZRgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoGb3JkZXJzGA4gAygLMiouaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50T3JkZXIiwwIKD1BheW1lbnRUcmFuc2ZlchIPCgJpZBgBIAEoCUID4EEIEhIKCnBheW1lbnRfaWQYAiABKAkSEAoIb3JkZXJfbm8YAyABKAkSEAoIc3RvcmVfaWQYBCABKAkSDgoGYW1vdW50GAUgASgDEhcKD3JldmVyc2VkX2Ftb3VudBgGIAEoAxI9CgZzdGF0dXMYByABKA4yLS5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRUcmFuc2ZlclN0YXR1cxIcChRleHRlcm5hbF90cmFuc2Zlcl9pZBgIIAEoCRIWCg5mYWlsdXJlX3JlYXNvbhgJIAEoCRIvCgtjcmVhdGVfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGAoQcGF5bWVudF9vcmRlcl9pZBgLIAEoCSLHAQoPUGF5bWVudFJldmVyc2FsEg8KAmlkGAEgASgJQgPgQQgSDgoGYW1vdW50GAIgASgDEj0KBnN0YXR1cxgDIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJldmVyc2FsU3RhdHVzEg4KBnJlYXNvbhgEIAEoCRITCgtleHRlcm5hbF9pZBgFIAEoCRIvCgtjcmVhdGVfdGltZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAimgQKDVBheW1lbnRSZWZ1bmQSDwoCaWQYASABKAlCA+BBCBISCgpwYXltZW50X2lkGAIgASgJEhAKCG9yZGVyX25vGAMgASgJEg4KBmFtb3VudBgEIAEoAxIMCgRhdXRvGAUgASgIEjsKBnN0YXR1cxgGIAEoDjIrLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJlZnVuZFN0YXR1cxIXCg9yZXZlcnNhbF9hbW91bnQYByABKAMSRgoPcmV2ZXJzYWxfc3RhdHVzGAggASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50UmV2ZXJzYWxTdGF0dXMSQAoMdG9wdXBfc3RhdHVzGAkgASgOMiouaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50VG9wdXBTdGF0dXMSGgoSZXh0ZXJuYWxfcmVmdW5kX2lkGAogASgJEhYKDmZhaWx1cmVfcmVhc29uGAsgASgJEhMKC3JlcXVlc3Rfa2V5GAwgASgJEkAKCXJldmVyc2FscxgNIAMoCzItLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJldmVyc2FsEi8KC2NyZWF0ZV90aW1lGA4gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIYChBwYXltZW50X29yZGVyX2lkGA8gASgJIpUBChNMaXN0UGF5bWVudHNSZXF1ZXN0EjoKBnN0YXR1cxgBIAEoDjIlLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFN0YXR1c0gAiAEBEhAKCG9yZGVyX25vGAIgASgJEhEKCXBhZ2Vfc2l6ZRgDIAEoBRISCgpwYWdlX3Rva2VuGAQgASgJQgkKB19zdGF0dXMiaAoUTGlzdFBheW1lbnRzUmVzcG9uc2USNwoIcGF5bWVudHMYASADKAsyJS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIqUBChtMaXN0UGF5bWVudFRyYW5zZmVyc1JlcXVlc3QSQgoGc3RhdHVzGAEgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50VHJhbnNmZXJTdGF0dXNIAIgBARIQCghvcmRlcl9ubxgCIAEoCRIRCglwYWdlX3NpemUYAyABKAUSEgoKcGFnZV90b2tlbhgEIAEoCUIJCgdfc3RhdHVzInkKHExpc3RQYXltZW50VHJhbnNmZXJzUmVzcG9uc2USQAoJdHJhbnNmZXJzGAEgAygLMi0uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50VHJhbnNmZXISFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIrcBChlMaXN0UGF5bWVudFJlZnVuZHNSZXF1ZXN0EkAKBnN0YXR1cxgBIAEoDjIrLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJlZnVuZFN0YXR1c0gAiAEBEhAKCG9yZGVyX25vGAIgASgJEhQKDGFub21hbHlfb25seRgDIAEoCBIRCglwYWdlX3NpemUYBCABKAUSEgoKcGFnZV90b2tlbhgFIAEoCUIJCgdfc3RhdHVzInMKGkxpc3RQYXltZW50UmVmdW5kc1Jlc3BvbnNlEjwKB3JlZnVuZHMYASADKAsyKy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRSZWZ1bmQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIqoCChxSZXNvbHZlUGF5bWVudEFub21hbHlSZXF1ZXN0Ej0KBGtpbmQYASABKA4yKi5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBbm9tYWx5S2luZEID4EECEg8KAmlkGAIgASgJQgPgQQISQwoHb3V0Y29tZRgDIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFub21hbHlPdXRjb21lQgPgQQISFQoIZXZpZGVuY2UYBCABKAlCA+BBARJLCgZyZWFzb24YBSABKA4yNi5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBbm9tYWx5UmVzb2x1dGlvblJlYXNvbkID4EECEhEKBG5vdGUYBiABKAlCA+BBAiIfCh1SZXNvbHZlUGF5bWVudEFub21hbHlSZXNwb25zZTLHCgoTUGF5bWVudEFkbWluU2VydmljZRKJAQoRR2V0UGF5bWVudEFjY291bnQSNi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkdldFBheW1lbnRBY2NvdW50UmVxdWVzdBo3Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuR2V0UGF5bWVudEFjY291bnRSZXNwb25zZSIDkAIBEpABChVSZWZyZXNoUGF5bWVudEFjY291bnQSOi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlZnJlc2hQYXltZW50QWNjb3VudFJlcXVlc3QaOy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlZnJlc2hQYXltZW50QWNjb3VudFJlc3BvbnNlEpwBChlSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlEj4uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVxdWVzdBo/Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmV0cnlQYXltZW50QWNjb3VudENyZWF0ZVJlc3BvbnNlEpkBChhSZXRyeVBheW1lbnRBY2NvdW50UHVyZ2USPS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlcXVlc3QaPi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEqIBChtEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmcSQC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QaQS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1Jlc3BvbnNlEnoKDExpc3RQYXltZW50cxIxLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuTGlzdFBheW1lbnRzUmVxdWVzdBoyLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuTGlzdFBheW1lbnRzUmVzcG9uc2UiA5ACARKSAQoUTGlzdFBheW1lbnRUcmFuc2ZlcnMSOS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkxpc3RQYXltZW50VHJhbnNmZXJzUmVxdWVzdBo6Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuTGlzdFBheW1lbnRUcmFuc2ZlcnNSZXNwb25zZSIDkAIBEowBChJMaXN0UGF5bWVudFJlZnVuZHMSNy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkxpc3RQYXltZW50UmVmdW5kc1JlcXVlc3QaOC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkxpc3RQYXltZW50UmVmdW5kc1Jlc3BvbnNlIgOQAgESkAEKFVJlc29sdmVQYXltZW50QW5vbWFseRI6Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmVzb2x2ZVBheW1lbnRBbm9tYWx5UmVxdWVzdBo7Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmVzb2x2ZVBheW1lbnRBbm9tYWx5UmVzcG9uc2ViBnByb3RvMw", [file_hawkr_payment_v1alpha1_payment, file_google_api_field_behavior, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * PaymentAccount 是後台看到的店家收款帳戶（payment 模組擁有，擁有者是店家）。
@@ -325,11 +325,11 @@ export const DeletePaymentAccountMappingResponseSchema: GenMessage<DeletePayment
   messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 10);
 
 /**
- * Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）。
+ * PaymentOrder 是付款底下一張訂單的應收：退款上限與轉帳都以它為單位。
  *
- * @generated from message hawkr.admin.payment.v1alpha1.Payment
+ * @generated from message hawkr.admin.payment.v1alpha1.PaymentOrder
  */
-export type Payment = Message<"hawkr.admin.payment.v1alpha1.Payment"> & {
+export type PaymentOrder = Message<"hawkr.admin.payment.v1alpha1.PaymentOrder"> & {
   /**
    * @generated from field: string id = 1;
    */
@@ -346,12 +346,50 @@ export type Payment = Message<"hawkr.admin.payment.v1alpha1.Payment"> & {
   storeId: string;
 
   /**
+   * 這張訂單的應收金額（訂單的整數金額，不帶幣別）。
+   *
+   * @generated from field: int64 amount = 4;
+   */
+  amount: bigint;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.PaymentOrder.
+ * Use `create(PaymentOrderSchema)` to create a new message.
+ */
+export const PaymentOrderSchema: GenMessage<PaymentOrder> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 11);
+
+/**
+ * Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）：一筆付款（一個金流商付款物件）對 orders 底下 N 張訂單應收（過渡期 N 是 1）。
+ *
+ * @generated from message hawkr.admin.payment.v1alpha1.Payment
+ */
+export type Payment = Message<"hawkr.admin.payment.v1alpha1.Payment"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * 第一張訂單的訂單編號與店家：N 是 1 時就是這筆付款的訂單；N 大於 1 時看 orders。
+   *
+   * @generated from field: string order_no = 2;
+   */
+  orderNo: string;
+
+  /**
+   * @generated from field: string store_id = 3;
+   */
+  storeId: string;
+
+  /**
    * @generated from field: string buyer_id = 4;
    */
   buyerId: string;
 
   /**
-   * 付款金額（訂單的整數金額，不帶幣別）。
+   * 付款金額（各訂單應收的總額，不帶幣別）。
    *
    * @generated from field: int64 amount = 5;
    */
@@ -406,6 +444,13 @@ export type Payment = Message<"hawkr.admin.payment.v1alpha1.Payment"> & {
    * @generated from field: google.protobuf.Timestamp update_time = 13;
    */
   updateTime?: Timestamp | undefined;
+
+  /**
+   * 付款底下的訂單應收，依建立順序，至少一張。
+   *
+   * @generated from field: repeated hawkr.admin.payment.v1alpha1.PaymentOrder orders = 14;
+   */
+  orders: PaymentOrder[];
 };
 
 /**
@@ -413,7 +458,7 @@ export type Payment = Message<"hawkr.admin.payment.v1alpha1.Payment"> & {
  * Use `create(PaymentSchema)` to create a new message.
  */
 export const PaymentSchema: GenMessage<Payment> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 11);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 12);
 
 /**
  * PaymentTransfer 是後台看到的轉帳（付款轉給賣家）。
@@ -476,6 +521,13 @@ export type PaymentTransfer = Message<"hawkr.admin.payment.v1alpha1.PaymentTrans
    * @generated from field: google.protobuf.Timestamp create_time = 10;
    */
   createTime?: Timestamp | undefined;
+
+  /**
+   * 這筆轉帳所屬的訂單應收（一張訂單應收最多一筆有效轉帳）。
+   *
+   * @generated from field: string payment_order_id = 11;
+   */
+  paymentOrderId: string;
 };
 
 /**
@@ -483,7 +535,7 @@ export type PaymentTransfer = Message<"hawkr.admin.payment.v1alpha1.PaymentTrans
  * Use `create(PaymentTransferSchema)` to create a new message.
  */
 export const PaymentTransferSchema: GenMessage<PaymentTransfer> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 12);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 13);
 
 /**
  * PaymentReversal 是退款向賣家收回款項的一次金流商撤回呼叫。
@@ -533,7 +585,7 @@ export type PaymentReversal = Message<"hawkr.admin.payment.v1alpha1.PaymentRever
  * Use `create(PaymentReversalSchema)` to create a new message.
  */
 export const PaymentReversalSchema: GenMessage<PaymentReversal> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 13);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 14);
 
 /**
  * PaymentRefund 是後台看到的退款。
@@ -620,6 +672,13 @@ export type PaymentRefund = Message<"hawkr.admin.payment.v1alpha1.PaymentRefund"
    * @generated from field: google.protobuf.Timestamp create_time = 14;
    */
   createTime?: Timestamp | undefined;
+
+  /**
+   * 這筆退款所屬的訂單應收（退款上限以它的應收金額計）。
+   *
+   * @generated from field: string payment_order_id = 15;
+   */
+  paymentOrderId: string;
 };
 
 /**
@@ -627,7 +686,7 @@ export type PaymentRefund = Message<"hawkr.admin.payment.v1alpha1.PaymentRefund"
  * Use `create(PaymentRefundSchema)` to create a new message.
  */
 export const PaymentRefundSchema: GenMessage<PaymentRefund> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 14);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 15);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentsRequest
@@ -665,7 +724,7 @@ export type ListPaymentsRequest = Message<"hawkr.admin.payment.v1alpha1.ListPaym
  * Use `create(ListPaymentsRequestSchema)` to create a new message.
  */
 export const ListPaymentsRequestSchema: GenMessage<ListPaymentsRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 15);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 16);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentsResponse
@@ -687,7 +746,7 @@ export type ListPaymentsResponse = Message<"hawkr.admin.payment.v1alpha1.ListPay
  * Use `create(ListPaymentsResponseSchema)` to create a new message.
  */
 export const ListPaymentsResponseSchema: GenMessage<ListPaymentsResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 16);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 17);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest
@@ -723,7 +782,7 @@ export type ListPaymentTransfersRequest = Message<"hawkr.admin.payment.v1alpha1.
  * Use `create(ListPaymentTransfersRequestSchema)` to create a new message.
  */
 export const ListPaymentTransfersRequestSchema: GenMessage<ListPaymentTransfersRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 17);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 18);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse
@@ -745,7 +804,7 @@ export type ListPaymentTransfersResponse = Message<"hawkr.admin.payment.v1alpha1
  * Use `create(ListPaymentTransfersResponseSchema)` to create a new message.
  */
 export const ListPaymentTransfersResponseSchema: GenMessage<ListPaymentTransfersResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 18);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 19);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest
@@ -788,7 +847,7 @@ export type ListPaymentRefundsRequest = Message<"hawkr.admin.payment.v1alpha1.Li
  * Use `create(ListPaymentRefundsRequestSchema)` to create a new message.
  */
 export const ListPaymentRefundsRequestSchema: GenMessage<ListPaymentRefundsRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 19);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 20);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse
@@ -810,7 +869,7 @@ export type ListPaymentRefundsResponse = Message<"hawkr.admin.payment.v1alpha1.L
  * Use `create(ListPaymentRefundsResponseSchema)` to create a new message.
  */
 export const ListPaymentRefundsResponseSchema: GenMessage<ListPaymentRefundsResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 20);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 21);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest
@@ -839,6 +898,21 @@ export type ResolvePaymentAnomalyRequest = Message<"hawkr.admin.payment.v1alpha1
    * @generated from field: string evidence = 4;
    */
   evidence: string;
+
+  /**
+   * 結案原因代碼，必填（不得是 UNSPECIFIED）。PROVIDER_EXECUTED_NOT_RECORDED 只搭配結果 SUCCEEDED，PROVIDER_NOT_EXECUTED 只搭配 FAILED；
+   * DUPLICATE 與 OTHER 搭配任一結果。
+   *
+   * @generated from field: hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason reason = 5;
+   */
+  reason: PaymentAnomalyResolutionReason;
+
+  /**
+   * 結案備註，必填：去除首尾空白後 1 到 255 個字元（以 Unicode 字元計）；與原因代碼一起寫進後台動作紀錄。
+   *
+   * @generated from field: string note = 6;
+   */
+  note: string;
 };
 
 /**
@@ -846,7 +920,7 @@ export type ResolvePaymentAnomalyRequest = Message<"hawkr.admin.payment.v1alpha1
  * Use `create(ResolvePaymentAnomalyRequestSchema)` to create a new message.
  */
 export const ResolvePaymentAnomalyRequestSchema: GenMessage<ResolvePaymentAnomalyRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 21);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 22);
 
 /**
  * @generated from message hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyResponse
@@ -859,7 +933,7 @@ export type ResolvePaymentAnomalyResponse = Message<"hawkr.admin.payment.v1alpha
  * Use `create(ResolvePaymentAnomalyResponseSchema)` to create a new message.
  */
 export const ResolvePaymentAnomalyResponseSchema: GenMessage<ResolvePaymentAnomalyResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 22);
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 23);
 
 /**
  * PaymentAdminService 只有管理員能呼叫。
@@ -960,7 +1034,7 @@ export const PaymentAdminService: GenService<{
   },
   /**
    * ResolvePaymentAnomaly 是對 ANOMALY 的付款、轉帳、退款、撤回或補差額轉帳的人工結案：管理員核對金流商之後結案成成功（附金流商物件 ID 為證據）或失敗。
-   * 領域變更與一筆後台紀錄在同一個交易。物件不存在回 not_found；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
+   * 必填結案原因代碼（reason）與備註（note，去除首尾空白後 1 到 255 個字元），連同領域變更寫進同一個交易的一筆後台紀錄。物件不存在回 not_found；缺原因、原因與結果不相容、備註空白或過長回 invalid_argument（指到出錯的欄位）；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
    *
    * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.ResolvePaymentAnomaly
    */

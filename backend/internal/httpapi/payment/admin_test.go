@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"uuid"
 
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1"
@@ -185,6 +187,8 @@ type resolveCall struct {
 	kind     payment.AnomalyKind
 	id       uuid.UUID
 	outcome  payment.AnomalyOutcome
+	reason   payment.AnomalyResolutionReason
+	note     string
 	evidence string
 }
 
@@ -203,8 +207,8 @@ func (m *paymentAdminModule) ListPaymentRefunds(_ context.Context, f payment.Ref
 	return m.refunds, m.err
 }
 
-func (m *paymentAdminModule) ResolveAnomaly(_ context.Context, actor payment.AdminActor, kind payment.AnomalyKind, id uuid.UUID, outcome payment.AnomalyOutcome, evidence string) error {
-	m.resolved = append(m.resolved, resolveCall{actor, kind, id, outcome, evidence})
+func (m *paymentAdminModule) ResolveAnomaly(_ context.Context, actor payment.AdminActor, kind payment.AnomalyKind, id uuid.UUID, outcome payment.AnomalyOutcome, reason payment.AnomalyResolutionReason, note, evidence string) error {
+	m.resolved = append(m.resolved, resolveCall{actor, kind, id, outcome, reason, note, evidence})
 	return m.err
 }
 
@@ -218,7 +222,7 @@ func TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken(t *testing.
 	paid := time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC)
 	m := &paymentAdminModule{payments: payment.PaymentRecordPage{
 		Records: []payment.PaymentRecord{{
-			Payment:           payment.Payment{ID: id, OrderNo: "O1", StoreID: 7, BuyerID: 8, Amount: 120, Provider: "stripe", Status: payment.PaymentSucceeded, PaidAt: &paid, LastError: "card_declined", CreatedAt: paid},
+			Payment:           payment.Payment{ID: id, Orders: []payment.PaymentOrderReceivable{{ID: uuid.MustParse("01930000-0000-7000-8000-0000000000d1"), OrderNo: "O1", StoreID: 7, Amount: 70}, {ID: uuid.MustParse("01930000-0000-7000-8000-0000000000d2"), OrderNo: "O2", StoreID: 9, Amount: 50}}, BuyerID: 8, Amount: 120, Provider: "stripe", Status: payment.PaymentSucceeded, PaidAt: &paid, LastError: "card_declined", CreatedAt: paid},
 			ExternalPaymentID: "pi_1", FailureReason: "", UpdatedAt: paid,
 		}},
 		Next: &payment.RecordCursor{ID: next},
@@ -233,7 +237,10 @@ func TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken(t *testing.
 		t.Fatalf("模組收到 filter=%v after=%v size=%d", m.paymentFilter, m.gotAfter, m.gotSize)
 	}
 	r := got.Msg.GetPayments()[0]
-	if r.GetId() != id.String() || r.GetStoreId() != "7" || r.GetBuyerId() != "8" || r.GetAmount() != 120 || r.GetProvider() != "stripe" || r.GetExternalPaymentId() != "pi_1" ||
+	if len(r.GetOrders()) != 2 || r.GetOrders()[1].GetOrderNo() != "O2" || r.GetOrders()[1].GetStoreId() != "9" || r.GetOrders()[1].GetAmount() != 50 || r.GetOrders()[0].GetId() == "" {
+		t.Fatalf("orders=%v", r.GetOrders())
+	}
+	if r.GetId() != id.String() || r.GetOrderNo() != "O1" || r.GetStoreId() != "7" || r.GetBuyerId() != "8" || r.GetAmount() != 120 || r.GetProvider() != "stripe" || r.GetExternalPaymentId() != "pi_1" ||
 		r.GetStatus() != st || r.GetPaidTime() == nil || r.GetLastError() != "card_declined" || r.GetCreateTime() == nil || r.GetUpdateTime() == nil {
 		t.Fatalf("payment=%v", r)
 	}
@@ -249,7 +256,7 @@ func TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken(t *testing.
 	}
 	// 換了篩選的 token 不能用。
 	_, err = h.ListPayments(adminCtx(1), connect.NewRequest(&adminpb.ListPaymentsRequest{Status: &st, OrderNo: "O2", PageToken: got.Msg.GetNextPageToken()}))
-	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("換篩選的 token err=%v", err)
 	}
 }
@@ -258,7 +265,7 @@ func TestListPaymentsRejectsAnUnspecifiedStatusInsteadOfTreatingItAsNoFilter(t *
 	m := &paymentAdminModule{}
 	un := paymentpb.PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
 	_, err := NewAdmin(m).ListPayments(adminCtx(1), connect.NewRequest(&adminpb.ListPaymentsRequest{Status: &un}))
-	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if codeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("err=%v", err)
 	}
 }
@@ -267,16 +274,18 @@ func TestListRefundsAndTransfersMapStatusesAndReversalIDs(t *testing.T) {
 	rid := uuid.MustParse("01930000-0000-7000-8000-0000000000a1")
 	vid := uuid.MustParse("01930000-0000-7000-8000-0000000000b1")
 	tid := uuid.MustParse("01930000-0000-7000-8000-0000000000c1")
+	oid := uuid.MustParse("01930000-0000-7000-8000-0000000000d1")
+	pid := uuid.MustParse("01930000-0000-7000-8000-0000000000e1")
 	at := time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC)
 	m := &paymentAdminModule{
 		refunds: payment.RefundRecordPage{Records: []payment.RefundRecord{{
-			Refund:  payment.PaymentRefund{ID: rid, PaymentID: tid, RequestKey: "case-1", Amount: 50, Auto: true, Status: payment.RefundSucceeded, ReversalAmount: 40, ReversalStatus: payment.ReversalAnomaly, TopupStatus: payment.TopupNone, FailureReason: "x", CreatedAt: at},
-			OrderNo: "O1", ExternalRefundID: "re_1",
+			Refund:    payment.PaymentRefund{ID: rid, PaymentOrderID: oid, RequestKey: "case-1", Amount: 50, Auto: true, Status: payment.RefundSucceeded, ReversalAmount: 40, ReversalStatus: payment.ReversalAnomaly, TopupStatus: payment.TopupNone, FailureReason: "x", CreatedAt: at},
+			PaymentID: pid, OrderNo: "O1", ExternalRefundID: "re_1",
 			Reversals: []payment.ReversalRecord{{ID: vid, Seq: 0, Amount: 40, Status: payment.ReversalAnomaly, Reason: "lookup", CreatedAt: at}},
 		}}},
 		transfers: payment.TransferRecordPage{Records: []payment.TransferRecord{{
-			Transfer: payment.PaymentTransfer{ID: tid, PaymentID: rid, StoreID: 7, Amount: 100, ReversedAmount: 40, Status: payment.TransferAnomaly, FailureReason: "mismatch", CreatedAt: at},
-			OrderNo:  "O1", ExternalTransferID: "tr_1",
+			Transfer:  payment.PaymentTransfer{ID: tid, PaymentOrderID: oid, StoreID: 7, Amount: 100, ReversedAmount: 40, Status: payment.TransferAnomaly, FailureReason: "mismatch", CreatedAt: at},
+			PaymentID: pid, OrderNo: "O1", ExternalTransferID: "tr_1",
 		}}},
 	}
 	h := NewAdmin(m)
@@ -290,7 +299,7 @@ func TestListRefundsAndTransfersMapStatusesAndReversalIDs(t *testing.T) {
 	r := rr.Msg.GetRefunds()[0]
 	if r.GetId() != rid.String() || r.GetOrderNo() != "O1" || !r.GetAuto() || r.GetStatus() != paymentpb.PaymentRefundStatus_PAYMENT_REFUND_STATUS_SUCCEEDED ||
 		r.GetReversalStatus() != paymentpb.PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_ANOMALY || r.GetTopupStatus() != paymentpb.PaymentTopupStatus_PAYMENT_TOPUP_STATUS_NONE ||
-		r.GetExternalRefundId() != "re_1" || r.GetRequestKey() != "case-1" || len(r.GetReversals()) != 1 || r.GetReversals()[0].GetId() != vid.String() ||
+		r.GetExternalRefundId() != "re_1" || r.GetPaymentOrderId() != oid.String() || r.GetPaymentId() != pid.String() || r.GetRequestKey() != "case-1" || len(r.GetReversals()) != 1 || r.GetReversals()[0].GetId() != vid.String() ||
 		r.GetReversals()[0].GetStatus() != paymentpb.PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_ANOMALY || r.GetReversals()[0].GetReason() != "lookup" {
 		t.Fatalf("refund=%v", r)
 	}
@@ -300,7 +309,7 @@ func TestListRefundsAndTransfersMapStatusesAndReversalIDs(t *testing.T) {
 	}
 	x := tr.Msg.GetTransfers()[0]
 	if x.GetId() != tid.String() || x.GetStoreId() != "7" || x.GetReversedAmount() != 40 || x.GetStatus() != paymentpb.PaymentTransferStatus_PAYMENT_TRANSFER_STATUS_ANOMALY ||
-		x.GetExternalTransferId() != "tr_1" || x.GetFailureReason() != "mismatch" || x.GetOrderNo() != "O1" {
+		x.GetExternalTransferId() != "tr_1" || x.GetPaymentOrderId() != oid.String() || x.GetPaymentId() != pid.String() || x.GetFailureReason() != "mismatch" || x.GetOrderNo() != "O1" {
 		t.Fatalf("transfer=%v", x)
 	}
 	if tr.Msg.GetNextPageToken() != "" {
@@ -308,37 +317,110 @@ func TestListRefundsAndTransfersMapStatusesAndReversalIDs(t *testing.T) {
 	}
 }
 
-func TestResolvePaymentAnomalyPassesKindIDOutcomeAndTheCallingAdmin(t *testing.T) {
+func TestResolvePaymentAnomalyPassesKindIDOutcomeReasonNoteAndTheCallingAdmin(t *testing.T) {
 	id := uuid.MustParse("01930000-0000-7000-8000-0000000000a1")
 	m := &paymentAdminModule{}
-	h := NewAdmin(m)
+	mux := http.NewServeMux()
+	path, handler := paymentv1alpha1connect.NewPaymentAdminServiceHandler(NewAdmin(m))
+	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler.ServeHTTP(w, r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 77})))
+	}))
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	c := paymentv1alpha1connect.NewPaymentAdminServiceClient(srv.Client(), srv.URL)
 	req := &adminpb.ResolvePaymentAnomalyRequest{
 		Kind: paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_REVERSAL, Id: id.String(),
 		Outcome: paymentpb.PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_SUCCEEDED, Evidence: "trr_1",
+		Reason: paymentpb.PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED, Note: "  在 Stripe dashboard 核對過  ",
 	}
-	if _, err := h.ResolvePaymentAnomaly(adminCtx(77), connect.NewRequest(req)); err != nil {
+	if _, err := c.ResolvePaymentAnomaly(context.Background(), connect.NewRequest(req)); err != nil {
 		t.Fatal(err)
 	}
 	if len(m.resolved) != 1 {
 		t.Fatalf("calls=%v", m.resolved)
 	}
-	c := m.resolved[0]
-	if c.kind != payment.AnomalyReversal || c.id != id || c.outcome != payment.AnomalySucceeded || c.evidence != "trr_1" || c.actor.AdminID != 77 || c.actor.Action == "" {
-		t.Fatalf("call=%+v", c)
+	got := m.resolved[0]
+	want := resolveCall{
+		actor: payment.AdminActor{AdminID: 77, Action: paymentv1alpha1connect.PaymentAdminServiceResolvePaymentAnomalyProcedure},
+		kind:  payment.AnomalyReversal, id: id, outcome: payment.AnomalySucceeded, reason: payment.ResolutionProviderExecutedNotRecorded,
+		note: "在 Stripe dashboard 核對過", evidence: "trr_1",
+	}
+	if got != want {
+		t.Fatalf("call=%+v，預期 %+v", got, want)
+	}
+}
+
+// 缺原因代碼、備註空白或超過上限都在進模組之前回 InvalidArgument，而且指到出錯的欄位。
+// mutation：handler 不檢查 reason（或 note）→ 對應的案例失敗；handler 不 trim note → 空白備註的案例失敗；拿掉長度上限 → 過長的案例失敗。
+func TestResolvePaymentAnomalyRequiresAReasonAndANonBlankBoundedNote(t *testing.T) {
+	id := uuid.MustParse("01930000-0000-7000-8000-0000000000a1").String()
+	ok := paymentpb.PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED
+	base := func() *adminpb.ResolvePaymentAnomalyRequest {
+		return &adminpb.ResolvePaymentAnomalyRequest{
+			Kind: paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT, Id: id,
+			Outcome: paymentpb.PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_FAILED, Reason: ok, Note: "確認沒有執行",
+		}
+	}
+	for name, c := range map[string]struct {
+		mutate func(*adminpb.ResolvePaymentAnomalyRequest)
+		field  string
+	}{
+		"reason 沒設": {func(r *adminpb.ResolvePaymentAnomalyRequest) { r.Reason = 0 }, "reason"},
+		"note 是空字串": {func(r *adminpb.ResolvePaymentAnomalyRequest) { r.Note = "" }, "note"},
+		"note 只有空白": {func(r *adminpb.ResolvePaymentAnomalyRequest) { r.Note = " \t\u3000 " }, "note"},
+		"note 超過上限": {func(r *adminpb.ResolvePaymentAnomalyRequest) {
+			r.Note = strings.Repeat("字", payment.AnomalyResolutionNoteMaxRunes+1)
+		}, "note"},
+	} {
+		m := &paymentAdminModule{}
+		req := base()
+		c.mutate(req)
+		_, err := NewAdmin(m).ResolvePaymentAnomaly(adminCtx(1), connect.NewRequest(req))
+		if codeOf(err) != connect.CodeInvalidArgument || len(m.resolved) != 0 {
+			t.Errorf("%s：err=%v 模組呼叫=%v", name, err, m.resolved)
+			continue
+		}
+		if !strings.Contains(fieldViolations(err), c.field) {
+			t.Errorf("%s：錯誤沒有指到 %s：%v", name, c.field, err)
+		}
+	}
+	exact := base()
+	exact.Note = strings.Repeat("字", payment.AnomalyResolutionNoteMaxRunes)
+	m := &paymentAdminModule{}
+	if _, err := NewAdmin(m).ResolvePaymentAnomaly(adminCtx(1), connect.NewRequest(exact)); err != nil || len(m.resolved) != 1 {
+		t.Fatalf("剛好上限應該通過：err=%v 呼叫=%v", err, m.resolved)
 	}
 }
 
 func TestResolvePaymentAnomalyRejectsUnspecifiedKindOutcomeAndBadIDsBeforeTheModule(t *testing.T) {
 	id := uuid.MustParse("01930000-0000-7000-8000-0000000000a1").String()
+	reason := paymentpb.PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER
 	for name, req := range map[string]*adminpb.ResolvePaymentAnomalyRequest{
-		"kind 沒設":    {Id: id, Outcome: paymentpb.PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_FAILED},
-		"outcome 沒設": {Kind: paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT, Id: id},
-		"id 不是 uuid": {Kind: paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT, Id: "1", Outcome: paymentpb.PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_FAILED},
+		"kind 沒設":    {Id: id, Outcome: paymentpb.PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_FAILED, Reason: reason, Note: "n"},
+		"outcome 沒設": {Kind: paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT, Id: id, Reason: reason, Note: "n"},
+		"id 不是 uuid": {Kind: paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT, Id: "1", Outcome: paymentpb.PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_FAILED, Reason: reason, Note: "n"},
 	} {
 		m := &paymentAdminModule{}
 		_, err := NewAdmin(m).ResolvePaymentAnomaly(adminCtx(1), connect.NewRequest(req))
-		if connect.CodeOf(err) != connect.CodeInvalidArgument || len(m.resolved) != 0 {
+		if codeOf(err) != connect.CodeInvalidArgument || len(m.resolved) != 0 {
 			t.Errorf("%s：err=%v 模組呼叫=%v", name, err, m.resolved)
 		}
 	}
+}
+
+// fieldViolations 取出錯誤的 BadRequest 欄位路徑（以空白連接）。
+func fieldViolations(err error) string {
+	var out []string
+	for _, d := range rpc.ConnectError(context.Background(), err).Details() {
+		v, derr := d.Value()
+		if derr != nil {
+			continue
+		}
+		if bad, ok := v.(*errdetails.BadRequest); ok {
+			for _, f := range bad.GetFieldViolations() {
+				out = append(out, f.GetField())
+			}
+		}
+	}
+	return strings.Join(out, " ")
 }

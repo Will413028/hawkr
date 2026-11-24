@@ -32,7 +32,7 @@ func TestCloseOrderPaymentCancelsAnAwaitingIntentThroughAJob(t *testing.T) {
 	if f.statusOf(t, "O-CLOSE") != PaymentAwaitingPayment {
 		t.Fatal("queueing must not change the payment: the provider is called by the job")
 	}
-	must(t, f.module.CloseOrderPaymentAttempt(context.Background(), p.ID, false))
+	must(t, f.module.CloseOrderPaymentAttempt(context.Background(), p.ID))
 	if f.statusOf(t, "O-CLOSE") != PaymentCanceled || f.changesTo(PaymentCanceled) != 1 {
 		t.Fatalf("status=%s canceled changes=%d", f.statusOf(t, "O-CLOSE"), f.changesTo(PaymentCanceled))
 	}
@@ -59,14 +59,15 @@ func TestCloseJobThatLosesTheRaceAgainstAPaymentRecordsTheSuccess(t *testing.T) 
 	f.order("O-RACE", 11, 7, 100)
 	p := f.create(t, 11, "O-RACE")
 	must(t, f.fake.Settle(f.externalOf(t, "O-RACE"), PaymentStateSucceeded, f.now))
-	must(t, f.module.CloseOrderPaymentAttempt(context.Background(), p.ID, false))
+	must(t, f.module.CloseOrderPaymentAttempt(context.Background(), p.ID))
 	if f.statusOf(t, "O-RACE") != PaymentSucceeded || f.changesTo(PaymentSucceeded) != 1 {
 		t.Fatalf("status=%s", f.statusOf(t, "O-RACE"))
 	}
 }
 
-// 付款還在建立中（沒有 PaymentIntent）時 job 重試，最後一次放棄；放棄後留給訂單一方的自動退款處理晚到的入帳。
-func TestCloseJobWaitsForACreatingPaymentAndGivesUpOnTheFinalAttempt(t *testing.T) {
+// 付款還在建立中（沒有 PaymentIntent）時關閉 job 等建立收斂：建立還沒成功就回錯誤（job snooze 重試、不放棄），收斂成等待付款之後同一次呼叫接著取消，不留下沒人取消的 PaymentIntent（D-G）。
+// mutation：Close 在建立中直接放棄（回 nil）→ 付款留在 CREATING，這個測試失敗。
+func TestCloseJobWaitsForACreatingPaymentToConvergeThenCancelsItWithoutAnOrphanIntent(t *testing.T) {
 	f := setupCharge(t)
 	f.order("O-WAIT", 11, 7, 100)
 	f.fake.FailCreate(errors.New("provider 暫時不可用"))
@@ -74,13 +75,18 @@ func TestCloseJobWaitsForACreatingPaymentAndGivesUpOnTheFinalAttempt(t *testing.
 	if p.Status != PaymentCreating || !f.closeOrder(t, "O-WAIT") {
 		t.Fatalf("status=%s", p.Status)
 	}
-	if err := f.module.CloseOrderPaymentAttempt(context.Background(), p.ID, false); err == nil {
-		t.Fatal("a creating payment must make the job retry")
+	f.fake.FailCreate(errors.New("provider 還是不可用"))
+	if err := f.module.CloseOrderPaymentAttempt(context.Background(), p.ID); err == nil {
+		t.Fatal("a creating payment must make the job wait, not finish")
 	}
-	must(t, f.module.CloseOrderPaymentAttempt(context.Background(), p.ID, true))
 	if f.statusOf(t, "O-WAIT") != PaymentCreating {
-		t.Fatal("giving up must not change the payment")
+		t.Fatal("waiting must not change the payment")
 	}
+	must(t, f.module.CloseOrderPaymentAttempt(context.Background(), p.ID))
+	if f.statusOf(t, "O-WAIT") != PaymentCanceled || f.fake.Intents() != 1 {
+		t.Fatalf("status=%s intents=%d, want the created intent canceled", f.statusOf(t, "O-WAIT"), f.fake.Intents())
+	}
+	f.noViolations(t)
 }
 
 func TestLegacyReadsByOrderNoAndRequestKey(t *testing.T) {
@@ -93,7 +99,7 @@ func TestLegacyReadsByOrderNoAndRequestKey(t *testing.T) {
 
 	one, err := f.module.PaymentByOrderNo(ctx, " O-A ")
 	must(t, err)
-	if one.OrderNo != "O-A" || one.Amount != 500 || one.Status != PaymentSucceeded || one.ClientSecret != "" {
+	if one.Order.OrderNo != "O-A" || one.Order.Amount != 500 || one.Amount != 500 || one.Status != PaymentSucceeded || one.ClientSecret != "" {
 		t.Fatalf("payment = %+v", one)
 	}
 	if _, err := f.module.PaymentByOrderNo(ctx, "O-NONE"); apperr.KindOf(err) != apperr.KindNotFound {

@@ -121,12 +121,13 @@ func (s *Service) requireProvider() error {
 // errInTransaction 標示呼叫方在 DB transaction 內呼叫了會呼叫 provider 的方法（規則 5）。
 var errInTransaction = errors.New("charge: 會呼叫 provider 的方法不能在 transaction 內呼叫")
 
-// CreatePayment 是買家對一張訂單的付款建立（D7 修訂、D8）：先在 transaction 外向訂單一方取應付資訊（歸屬、可付、金額），再在一個 transaction 內寫「建立中」的付款列
-// （order_no 唯一：同一張訂單已有列時沿用它，不會有第二個 PaymentIntent）並排入補做 job；提交之後在請求內、transaction 外帶列上的冪等鍵建立 PaymentIntent，
-// 回傳含 client_secret 的付款。provider 失敗或逾時不是錯誤：回傳狀態是 CREATING 的付款（pending），補做 job 以同一把鍵接手，呼叫端用 GetPayment 重讀。
-// 建立的終局（provider 永久拒絕）回傳 CREATE_FAILED。已建立的付款回傳目前狀態（AWAITING_PAYMENT 時含 client_secret）。
-// 訂單不存在或不屬於呼叫者回 NotFound；訂單不可付、金額不是正數或內容和已存在的付款不符回 FailedPrecondition。呼叫方不能在 transaction 內呼叫。
-func (s *Service) CreatePayment(ctx context.Context, buyerID int64, orderNo string) (model.Payment, error) {
+// CreatePayment 是買家一次結帳的付款建立（D7 修訂、D8、D13）：orderNos 是這次結帳的訂單（過渡期 Java 一次一張，B8 之後 N 張）。先在 transaction 外向訂單一方逐張取應付資訊（歸屬、可付、金額），
+// 再在一個 transaction 內寫「建立中」的付款群組列與每張訂單應收一列（order_no 唯一：訂單已屬於一筆付款時沿用它，不會有第二個 PaymentIntent；訂單集合必須與既有付款完全相同）並排入補做 job；
+// 提交之後在請求內、transaction 外帶列上的冪等鍵建立一個 PaymentIntent（金額是各訂單應收的總額），回傳含 client_secret 的付款。
+// provider 失敗或逾時不是錯誤：回傳狀態是 CREATING 的付款（pending），補做 job 以同一把鍵接手，呼叫端用 GetPayment 重讀。建立的終局（provider 永久拒絕）回傳 CREATE_FAILED。
+// 已建立的付款回傳目前狀態（AWAITING_PAYMENT 時含 client_secret）。訂單不存在或不屬於呼叫者回 NotFound；訂單不可付、金額不是正數、訂單集合或內容和已存在的付款不符回 FailedPrecondition。
+// 呼叫方不能在 transaction 內呼叫。
+func (s *Service) CreatePayment(ctx context.Context, buyerID int64, orderNos []string) (model.Payment, error) {
 	if err := s.requireProvider(); err != nil {
 		return model.Payment{}, err
 	}
@@ -136,20 +137,24 @@ func (s *Service) CreatePayment(ctx context.Context, buyerID int64, orderNo stri
 	if err := model.Positive(buyerID); err != nil {
 		return model.Payment{}, err
 	}
-	orderNo = strings.TrimSpace(orderNo)
-	if n := utf8.RuneCountInString(orderNo); n < 1 || n > 64 {
-		return model.Payment{}, apperr.InvalidInput("訂單編號長度不合")
-	}
-	orderCtx, cancel := context.WithTimeout(ctx, callTimeout)
-	order, err := s.d.Orders.OrderForPayment(orderCtx, orderNo)
-	cancel()
+	nos, err := normalizeOrderNos(orderNos)
 	if err != nil {
 		return model.Payment{}, err
 	}
-	if order.OrderNo != orderNo || order.BuyerID != buyerID {
-		return model.Payment{}, apperr.NotFound("找不到這張訂單")
+	orders := make([]Order, len(nos))
+	for i, orderNo := range nos {
+		orderCtx, cancel := context.WithTimeout(ctx, callTimeout)
+		order, err := s.d.Orders.OrderForPayment(orderCtx, orderNo)
+		cancel()
+		if err != nil {
+			return model.Payment{}, err
+		}
+		if order.OrderNo != orderNo || order.BuyerID != buyerID {
+			return model.Payment{}, apperr.NotFound("找不到這張訂單")
+		}
+		orders[i] = order
 	}
-	row, err := s.ensureRow(ctx, order)
+	row, err := s.ensureRow(ctx, buyerID, orders)
 	if err != nil {
 		return model.Payment{}, err
 	}
@@ -159,30 +164,87 @@ func (s *Service) CreatePayment(ctx context.Context, buyerID int64, orderNo stri
 	return s.view(ctx, row)
 }
 
-// ensureRow 在一個 transaction 內取得這張訂單的付款列：沒有就寫「建立中」的列；有就沿用（建立失敗的終局，或已取消而訂單仍可付的列，同一列換新鍵、清掉舊的外部 ID 重設回建立中）；
-// 列還在建立中時同 transaction 排入補做 job（延到請求內建立的上限之後，見 createJobDelay）。
-func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPayment, error) {
+// normalizeOrderNos 去掉頭尾空白、檢查長度，至少一張，重複的訂單編號回 InvalidInput（同一張訂單不能在同一次結帳出現兩次）。
+func normalizeOrderNos(in []string) ([]string, error) {
+	if len(in) == 0 {
+		return nil, apperr.InvalidInput("至少要有一張訂單")
+	}
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, len(in))
+	for i, orderNo := range in {
+		orderNo = strings.TrimSpace(orderNo)
+		if n := utf8.RuneCountInString(orderNo); n < 1 || n > 64 {
+			return nil, apperr.InvalidInput("訂單編號長度不合")
+		}
+		if _, dup := seen[orderNo]; dup {
+			return nil, apperr.InvalidInput("訂單編號重複")
+		}
+		seen[orderNo] = struct{}{}
+		out[i] = orderNo
+	}
+	return out, nil
+}
+
+// errOrderTaken 標示寫訂單應收時訂單已被別的付款搶先佔住（並行的建立）：回滾整個 transaction 再讀既有的付款。
+var errOrderTaken = errors.New("charge: 訂單已屬於另一筆付款")
+
+// ensureRow 取得這次結帳的付款列：訂單都還沒有付款就寫「建立中」的群組列與每張訂單應收一列；有就沿用（訂單集合必須與既有付款完全相同；建立失敗的終局，
+// 或已取消而訂單仍可付的列，同一列換新鍵、清掉舊的外部 ID 重設回建立中，訂單應收的店家與金額以這次讀到的為準）；列還在建立中時同 transaction 排入補做 job（延到請求內建立的上限之後，見 createJobDelay）。
+// 並行的建立搶同一張訂單時，輸的一方回滾後再讀一次既有的付款。
+func (s *Service) ensureRow(ctx context.Context, buyerID int64, orders []Order) (store.PaymentPayment, error) {
+	for attempt := 0; ; attempt++ {
+		row, err := s.ensureRowOnce(ctx, buyerID, orders)
+		if errors.Is(err, errOrderTaken) && attempt == 0 {
+			continue
+		}
+		return row, err
+	}
+}
+
+func (s *Service) ensureRowOnce(ctx context.Context, buyerID int64, orders []Order) (store.PaymentPayment, error) {
 	var row store.PaymentPayment
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		now := s.d.Now().UTC()
-		if order.Payable && order.Amount > 0 {
-			if _, err := q.InsertPayment(ctx, newPaymentParams(s.d.NewID(), order, s.d.Provider.Name(), now)); err != nil {
-				return err
-			}
-		}
-		existing, err := q.PaymentByOrderNo(ctx, order.OrderNo)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return orderRefusal(order)
-		}
+		existing, err := existingGroup(ctx, q, orders)
 		if err != nil {
 			return err
 		}
-		row = existing
+		if existing == nil {
+			for _, order := range orders {
+				if err := orderRefusal(order); err != nil {
+					return err
+				}
+			}
+			paymentID := s.d.NewID()
+			if err := q.InsertPayment(ctx, newPaymentParams(paymentID, buyerID, orders, s.d.Provider.Name(), now)); err != nil {
+				return err
+			}
+			for _, order := range orders {
+				n, err := q.InsertPaymentOrder(ctx, store.InsertPaymentOrderParams{ID: s.d.NewID(), PaymentID: paymentID, OrderNo: order.OrderNo, StoreID: order.StoreID, Amount: order.Amount, Now: now})
+				if err != nil {
+					return err
+				}
+				if n == 0 {
+					return errOrderTaken
+				}
+			}
+			existing = &existingPayment{paymentID: paymentID}
+		}
+		row, err = q.PaymentByID(ctx, existing.paymentID)
+		if err != nil {
+			return err
+		}
 		if row.Status == string(model.PaymentSucceeded) {
 			return nil
 		}
-		if err := orderRefusal(order); err != nil {
+		for _, order := range orders {
+			if err := orderRefusal(order); err != nil {
+				return err
+			}
+		}
+		stored, err := q.PaymentOrdersOfPayment(ctx, row.ID)
+		if err != nil {
 			return err
 		}
 		if row.Status == string(model.PaymentCreateFailed) || row.Status == string(model.PaymentCanceled) {
@@ -190,13 +252,26 @@ func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPaym
 				return err
 			}
 			row, err = q.ResetPayment(ctx, store.ResetPaymentParams{
-				ID: row.ID, StoreID: order.StoreID, BuyerID: order.BuyerID, Amount: order.Amount, Provider: s.d.Provider.Name(), Description: paymentDescription(order), Now: now,
+				ID: row.ID, BuyerID: buyerID, Amount: totalOf(orders), Provider: s.d.Provider.Name(), Description: paymentDescription(orders[0]), Now: now,
 			})
 			if err != nil {
 				return err
 			}
+			byNo := make(map[string]store.PaymentPaymentOrder, len(stored))
+			for _, o := range stored {
+				byNo[o.OrderNo] = o
+			}
+			for _, order := range orders {
+				if _, err := q.UpdatePaymentOrderTerms(ctx, store.UpdatePaymentOrderTermsParams{ID: byNo[order.OrderNo].ID, StoreID: order.StoreID, Amount: order.Amount}); err != nil {
+					return err
+				}
+			}
+			stored, err = q.PaymentOrdersOfPayment(ctx, row.ID)
+			if err != nil {
+				return err
+			}
 		}
-		if row.StoreID != order.StoreID || row.BuyerID != order.BuyerID || row.Amount != order.Amount {
+		if row.BuyerID != buyerID || !sameTerms(stored, orders) {
 			return apperr.FailedPrecondition("訂單內容在付款建立之後變動了")
 		}
 		if row.Status == string(model.PaymentCreating) {
@@ -208,6 +283,54 @@ func (s *Service) ensureRow(ctx context.Context, order Order) (store.PaymentPaym
 		return nil
 	})
 	return row, err
+}
+
+type existingPayment struct{ paymentID uuid.UUID }
+
+// existingGroup 回傳這些訂單已屬於的付款：都還沒有付款回 nil；訂單集合與一筆既有付款不完全相同（部分有付款、分屬不同付款、付款底下還有別的訂單）回 FailedPrecondition。
+func existingGroup(ctx context.Context, q *store.Queries, orders []Order) (*existingPayment, error) {
+	var paymentID uuid.UUID
+	found := 0
+	for _, order := range orders {
+		o, err := q.PaymentOrderByOrderNo(ctx, order.OrderNo)
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if found > 0 && o.PaymentID != paymentID {
+			return nil, apperr.FailedPrecondition("這些訂單已分屬不同的付款")
+		}
+		paymentID = o.PaymentID
+		found++
+	}
+	if found == 0 {
+		return nil, nil
+	}
+	stored, err := q.PaymentOrdersOfPayment(ctx, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if found != len(orders) || len(stored) != len(orders) {
+		return nil, apperr.FailedPrecondition("訂單已屬於另一筆付款，訂單集合不符")
+	}
+	return &existingPayment{paymentID: paymentID}, nil
+}
+
+// sameTerms 回傳已存的訂單應收與這次讀到的訂單是否逐張相同（店家與金額）。
+func sameTerms(stored []store.PaymentPaymentOrder, orders []Order) bool {
+	byNo := make(map[string]store.PaymentPaymentOrder, len(stored))
+	for _, o := range stored {
+		byNo[o.OrderNo] = o
+	}
+	for _, order := range orders {
+		o, ok := byNo[order.OrderNo]
+		if !ok || o.StoreID != order.StoreID || o.Amount != order.Amount {
+			return false
+		}
+	}
+	return len(stored) == len(orders)
 }
 
 // paymentDescription 是送給 provider 的付款說明：訂單給的商品名稱（去頭尾空白、超過上限截斷），沒有就用訂單編號；存在列上，冪等重送時內容不變。
@@ -238,7 +361,7 @@ func orderRefusal(order Order) error {
 func (s *Service) createInRequest(ctx context.Context, row store.PaymentPayment) (model.Payment, error) {
 	res, err := s.create(ctx, row.ID, requestCallTimeout)
 	if err != nil {
-		s.d.Logger.WarnContext(ctx, "payment：請求內建立 PaymentIntent 沒有結果，回 pending 由補做 job 接手", "payment_id", row.ID.String(), "order_no", row.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：請求內建立 PaymentIntent 沒有結果，回 pending 由補做 job 接手", "payment_id", row.ID.String(), "err", err)
 		latest, rerr := store.New(s.d.DB.Conn(ctx)).PaymentByID(ctx, row.ID)
 		if rerr != nil {
 			return model.Payment{}, rerr
@@ -250,9 +373,9 @@ func (s *Service) createInRequest(ctx context.Context, row store.PaymentPayment)
 		if verr == nil {
 			return out, nil
 		}
-		s.d.Logger.WarnContext(ctx, "payment：請求內建立後讀不到 client_secret，由 client 重讀", "payment_id", row.ID.String(), "order_no", row.OrderNo, "err", verr)
+		s.d.Logger.WarnContext(ctx, "payment：請求內建立後讀不到 client_secret，由 client 重讀", "payment_id", row.ID.String(), "err", verr)
 	}
-	return toModel(res.row, res.clientSecret), nil
+	return s.toModelWithOrders(ctx, res.row, res.clientSecret)
 }
 
 // GetPayment 讀買家自己的付款（供 client 在 pending、3DS 之後與重新整理時重讀）；不是呼叫者的付款回 NotFound（與不存在無法區分）。狀態是 AWAITING_PAYMENT 時向 provider 讀 client_secret
@@ -279,7 +402,10 @@ func (s *Service) GetPayment(ctx context.Context, buyerID int64, orderNo string)
 
 // view 把列轉成對外的付款；AWAITING_PAYMENT 時讀 client_secret。
 func (s *Service) view(ctx context.Context, row store.PaymentPayment) (model.Payment, error) {
-	out := toModel(row, "")
+	out, err := s.toModelWithOrders(ctx, row, "")
+	if err != nil {
+		return model.Payment{}, err
+	}
 	if row.Status != string(model.PaymentAwaitingPayment) || row.ExternalPaymentID == nil || row.Provider != s.d.Provider.Name() {
 		return out, nil
 	}
@@ -299,11 +425,29 @@ func (s *Service) view(ctx context.Context, row store.PaymentPayment) (model.Pay
 	return out, nil
 }
 
-// toModel 把列轉成對外的付款。
-func toModel(r store.PaymentPayment, clientSecret string) model.Payment {
+// toModelWithOrders 讀付款底下的訂單應收並把列轉成對外的付款。
+func (s *Service) toModelWithOrders(ctx context.Context, r store.PaymentPayment, clientSecret string) (model.Payment, error) {
+	orders, err := store.New(s.d.DB.Conn(ctx)).PaymentOrdersOfPayment(ctx, r.ID)
+	if err != nil {
+		return model.Payment{}, err
+	}
+	return toModel(r, orders, clientSecret), nil
+}
+
+// toPaymentOrders 把訂單應收列轉成對外的視圖。
+func toPaymentOrders(rows []store.PaymentPaymentOrder) []model.PaymentOrder {
+	out := make([]model.PaymentOrder, len(rows))
+	for i, o := range rows {
+		out[i] = model.PaymentOrder{ID: o.ID, OrderNo: o.OrderNo, StoreID: o.StoreID, Amount: o.Amount}
+	}
+	return out
+}
+
+// toModel 把列與它底下的訂單應收轉成對外的付款。
+func toModel(r store.PaymentPayment, orders []store.PaymentPaymentOrder, clientSecret string) model.Payment {
 	p := model.Payment{
-		ID: r.ID, OrderNo: r.OrderNo, StoreID: r.StoreID, BuyerID: r.BuyerID, Amount: r.Amount, Provider: r.Provider,
-		Status: model.PaymentStatus(r.Status), PaidAt: r.PaidAt, CreatedAt: r.CreatedAt, ClientSecret: clientSecret,
+		ID: r.ID, BuyerID: r.BuyerID, Amount: r.Amount, Provider: r.Provider,
+		Status: model.PaymentStatus(r.Status), PaidAt: r.PaidAt, CreatedAt: r.CreatedAt, ClientSecret: clientSecret, Orders: toPaymentOrders(orders),
 	}
 	if r.LastError != nil {
 		p.LastError = *r.LastError

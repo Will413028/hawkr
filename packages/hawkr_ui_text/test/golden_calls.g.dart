@@ -109,6 +109,11 @@ const _enumNumber = <String, int>{
 	'hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED': 2,
 	'hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED': 1,
 	'hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE': 3,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER': 4,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED': 1,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED': 2,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED': 0,
 	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY': 5,
 	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED': 4,
 	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING': 1,
@@ -358,6 +363,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_payment_v1alpha1_payment.PaymentAnomalyKind.valueOf(_n('hawkr.payment.v1alpha1.PaymentAnomalyKind', value))!.uiText(l);
     case 'payment.PaymentAnomalyOutcome':
       return hawkr_payment_v1alpha1_payment.PaymentAnomalyOutcome.valueOf(_n('hawkr.payment.v1alpha1.PaymentAnomalyOutcome', value))!.uiText(l);
+    case 'payment.PaymentAnomalyResolutionReason':
+      return hawkr_payment_v1alpha1_payment.PaymentAnomalyResolutionReason.valueOf(_n('hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason', value))!.uiText(l);
     case 'payment.PaymentRefundStatus':
       return hawkr_payment_v1alpha1_payment.PaymentRefundStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentRefundStatus', value))!.uiText(l);
     case 'payment.PaymentReversalStatus':

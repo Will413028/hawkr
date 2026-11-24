@@ -26,20 +26,22 @@ const FakeEventHeader = "X-Fake-Charge-Event-Id"
 const FakeIgnoredEventHeader = "X-Fake-Charge-Event-Ignored"
 
 type fakeIntent struct {
-	snap    Snapshot
-	orderNo string
-	storeID int64
-	group   string
+	snap     Snapshot
+	orderNos []string
+	group    string
+	created  time.Time
 }
 
 type fakeRefund struct {
-	in   RefundInput
-	snap RefundSnapshot
+	in      RefundInput
+	snap    RefundSnapshot
+	created time.Time
 }
 
 type fakeTransfer struct {
-	in   TransferInput
-	snap TransferSnapshot
+	in      TransferInput
+	snap    TransferSnapshot
+	created time.Time
 }
 
 // Fake 是記憶體內的 provider：測試與本機用。每個呼叫都檢查不在 DB transaction 內、有 deadline（規則 5），違規記在 Violations。
@@ -51,6 +53,8 @@ type fakeTransfer struct {
 type Fake struct {
 	// OnCreate 在 CreatePayment 進行中（建立之前）執行一次，測試用來製造交錯。
 	OnCreate func()
+	// Clock 不是 nil 時，物件建立時記下 Clock() 當作它在 provider 的 created 時刻，Find* 的 createdAfter 會排除比它早建立的物件（與 provider 的 created 篩選相同）；nil 時不篩。
+	Clock func() time.Time
 
 	mu           sync.Mutex
 	next         int
@@ -89,6 +93,7 @@ type Fake struct {
 	reversalCalls int
 	lookupErrs    []error
 	lookups       int
+	lookupBounds  []time.Time
 	violations    []string
 }
 
@@ -394,13 +399,13 @@ func (f *Fake) Intents() int {
 	return len(f.intents)
 }
 
-// IntentFor 回傳這張訂單（transfer_group）的 PaymentIntent ID 們（依建立順序不保證，測試只用在單一時）。
-func (f *Fake) IntentFor(orderNo string) []string {
+// IntentFor 回傳這筆付款的 PaymentIntent ID 們：key 是 transfer_group（付款群組的 ID，見 TransferGroupOf）或付款底下的訂單編號（依建立順序不保證，測試只用在單一時）。
+func (f *Fake) IntentFor(key string) []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out []string
 	for id, in := range f.intents {
-		if in.group == orderNo {
+		if in.group == key || slices.Contains(in.orderNos, key) {
 			out = append(out, id)
 		}
 	}
@@ -489,8 +494,8 @@ func (f *Fake) CreatePayment(ctx context.Context, in CreateInput) (Snapshot, err
 	id := fmt.Sprintf("fake_pi_%d", f.next)
 	f.byKey[in.IdempotencyKey] = id
 	f.intents[id] = &fakeIntent{
-		snap:    Snapshot{ExternalID: id, State: StateAwaitingPayment, Amount: in.Amount, ClientSecret: id + "_secret_" + uuid.NewV4().String()},
-		orderNo: in.OrderNo, storeID: in.StoreID, group: in.TransferGroup,
+		snap:     Snapshot{ExternalID: id, State: StateAwaitingPayment, Amount: in.Amount, ClientSecret: id + "_secret_" + uuid.NewV4().String()},
+		orderNos: in.OrderNos, group: in.TransferGroup, created: f.stamp(),
 	}
 	if err := pop(&f.lostErrs); err != nil {
 		return Snapshot{}, err
@@ -505,43 +510,66 @@ func (f *Fake) lookup(ctx context.Context, op string) error {
 	return pop(&f.lookupErrs)
 }
 
-// FindPayment 實作 Provider：依建立時的冪等鍵（嘗試 ID）查回。
-func (f *Fake) FindPayment(ctx context.Context, attemptID string) (Snapshot, bool, error) {
+// stamp 回傳新物件的 created 時刻；沒有 Clock 時是零值。要持有 f.mu。
+func (f *Fake) stamp() time.Time {
+	if f.Clock == nil {
+		return time.Time{}
+	}
+	return f.Clock().UTC()
+}
+
+// CreatedAfterSeen 回傳歷次查回（FindPayment、FindRefund、FindTransfer）帶的 createdAfter，依呼叫順序。
+func (f *Fake) CreatedAfterSeen() []time.Time {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	return slices.Clone(f.lookupBounds)
+}
+
+// visible 回傳 created 時刻的物件是否在 createdAfter 之後（含）可見；沒有 Clock 時一律可見，下限是零值也一律可見。要持有 f.mu。
+func (f *Fake) visible(created, createdAfter time.Time) bool {
+	return f.Clock == nil || createdAfter.IsZero() || !created.Before(createdAfter)
+}
+
+// FindPayment 實作 Provider：依建立時的冪等鍵（嘗試 ID）查回；只列 created 不早於 createdAfter 的物件。
+func (f *Fake) FindPayment(ctx context.Context, attemptID string, createdAfter time.Time) (Snapshot, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lookupBounds = append(f.lookupBounds, createdAfter)
 	if err := f.lookup(ctx, "FindPayment"); err != nil {
 		return Snapshot{}, false, err
 	}
 	id, ok := f.byKey[attemptID]
-	if !ok {
+	if !ok || !f.visible(f.intents[id].created, createdAfter) {
 		return Snapshot{}, false, nil
 	}
 	return f.intents[id].snap, true, nil
 }
 
 // FindRefund 實作 Provider：依建立時的冪等鍵（嘗試 ID）查回。
-func (f *Fake) FindRefund(ctx context.Context, externalPaymentID, attemptID string) (RefundSnapshot, bool, error) {
+func (f *Fake) FindRefund(ctx context.Context, externalPaymentID, attemptID string, createdAfter time.Time) (RefundSnapshot, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lookupBounds = append(f.lookupBounds, createdAfter)
 	if err := f.lookup(ctx, "FindRefund"); err != nil {
 		return RefundSnapshot{}, false, err
 	}
 	id, ok := f.refundByKey[attemptID]
-	if !ok || f.refunds[id].in.ExternalPaymentID != externalPaymentID {
+	if !ok || f.refunds[id].in.ExternalPaymentID != externalPaymentID || !f.visible(f.refunds[id].created, createdAfter) {
 		return RefundSnapshot{}, false, nil
 	}
 	return f.refunds[id].snap, true, nil
 }
 
 // FindTransfer 實作 Provider：依 transfer_group 與建立時的冪等鍵（嘗試 ID）查回。
-func (f *Fake) FindTransfer(ctx context.Context, transferGroup, attemptID string) (TransferSnapshot, bool, error) {
+func (f *Fake) FindTransfer(ctx context.Context, transferGroup, attemptID string, createdAfter time.Time) (TransferSnapshot, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lookupBounds = append(f.lookupBounds, createdAfter)
 	if err := f.lookup(ctx, "FindTransfer"); err != nil {
 		return TransferSnapshot{}, false, err
 	}
 	id, ok := f.transferKeys[attemptID]
-	if !ok || f.transfers[id].in.TransferGroup != transferGroup {
+	if !ok || f.transfers[id].in.TransferGroup != transferGroup || !f.visible(f.transfers[id].created, createdAfter) {
 		return TransferSnapshot{}, false, nil
 	}
 	return f.transfers[id].snap, true, nil
@@ -626,7 +654,7 @@ func (f *Fake) CreateRefund(ctx context.Context, in RefundInput) (RefundSnapshot
 	f.next++
 	id := fmt.Sprintf("fake_re_%d", f.next)
 	snap := RefundSnapshot{ExternalID: id, State: f.refundNext, Amount: in.Amount}
-	f.refunds[id], f.refundByKey[in.IdempotencyKey] = &fakeRefund{in: in, snap: snap}, id
+	f.refunds[id], f.refundByKey[in.IdempotencyKey] = &fakeRefund{in: in, snap: snap, created: f.stamp()}, id
 	if err := pop(&f.refundLost); err != nil {
 		return RefundSnapshot{}, err
 	}
@@ -668,7 +696,7 @@ func (f *Fake) CreateTransfer(ctx context.Context, in TransferInput) (TransferSn
 	f.next++
 	id := fmt.Sprintf("fake_tr_%d", f.next)
 	snap := TransferSnapshot{ExternalID: id, Amount: in.Amount}
-	f.transfers[id], f.transferKeys[in.IdempotencyKey] = &fakeTransfer{in: in, snap: snap}, id
+	f.transfers[id], f.transferKeys[in.IdempotencyKey] = &fakeTransfer{in: in, snap: snap, created: f.stamp()}, id
 	if err := pop(&f.transferLost); err != nil {
 		return TransferSnapshot{}, err
 	}

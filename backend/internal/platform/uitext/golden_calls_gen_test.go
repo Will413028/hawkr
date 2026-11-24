@@ -88,6 +88,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentPaymentAnomalyKind(goldenEnum(c.Value, "PAYMENT_ANOMALY_KIND_"))
 	case "payment.PaymentAnomalyOutcome":
 		return t.PaymentPaymentAnomalyOutcome(goldenEnum(c.Value, "PAYMENT_ANOMALY_OUTCOME_"))
+	case "payment.PaymentAnomalyResolutionReason":
+		return t.PaymentPaymentAnomalyResolutionReason(goldenEnum(c.Value, "PAYMENT_ANOMALY_RESOLUTION_REASON_"))
 	case "payment.PaymentRefundStatus":
 		return t.PaymentPaymentRefundStatus(goldenEnum(c.Value, "PAYMENT_REFUND_STATUS_"))
 	case "payment.PaymentReversalStatus":

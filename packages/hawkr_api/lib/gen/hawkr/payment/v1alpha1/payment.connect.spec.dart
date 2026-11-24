@@ -24,12 +24,11 @@ abstract final class PaymentAppService {
   );
 
   /// GetPayment 讀買家自己的付款（沒有付款或不是呼叫者的回 not_found）。狀態 AWAITING_PAYMENT 時帶 session（client secret 是每次向 provider 讀的，不存）；
-  /// provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，一律 POST，不可被快取。
+  /// provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，不標 NO_SIDE_EFFECTS（那會允許 GET 與快取），所以一律 POST。
   static const getPayment = connect.Spec(
     '/$name/GetPayment',
     connect.StreamType.unary,
     hawkrpaymentv1alpha1payment.GetPaymentRequest.new,
     hawkrpaymentv1alpha1payment.GetPaymentResponse.new,
-    idempotency: connect.Idempotency.idempotent,
   );
 }

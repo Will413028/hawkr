@@ -23,8 +23,8 @@ type fakeAppModule struct {
 	orders []string
 }
 
-func (m *fakeAppModule) CreatePayment(_ context.Context, buyerID int64, orderNo string) (payment.Payment, error) {
-	m.buyers, m.orders = append(m.buyers, buyerID), append(m.orders, orderNo)
+func (m *fakeAppModule) CreatePayment(_ context.Context, buyerID int64, orderNos []string) (payment.Payment, error) {
+	m.buyers, m.orders = append(m.buyers, buyerID), append(m.orders, orderNos...)
 	return m.payment, m.err
 }
 
@@ -48,7 +48,7 @@ func accountCtx(id int64) context.Context {
 }
 
 func awaiting(provider, secret string) payment.Payment {
-	return payment.Payment{OrderNo: "O1", Amount: 120, Provider: provider, Status: payment.PaymentAwaitingPayment, ClientSecret: secret}
+	return payment.Payment{Orders: []payment.PaymentOrderReceivable{{OrderNo: "O1", Amount: 120}}, Amount: 120, Provider: provider, Status: payment.PaymentAwaitingPayment, ClientSecret: secret}
 }
 
 func TestPaymentAppUsesTheCallersBuyerIDNotAnythingFromTheRequest(t *testing.T) {
@@ -70,7 +70,7 @@ func TestPaymentAppRejectsACallerThatIsNotACustomerAccount(t *testing.T) {
 	h := NewApp(m, fakeBuyers{map[int64]int64{5: 50}}, "pk")
 	adminCtx := rpc.WithPrincipal(context.Background(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 9})
 	_, err := h.CreatePayment(adminCtx, connect.NewRequest(&paymentpb.CreatePaymentRequest{OrderNo: "O1"}))
-	if connect.CodeOf(err) != connect.CodePermissionDenied || len(m.orders) != 0 {
+	if codeOf(err) != connect.CodePermissionDenied || len(m.orders) != 0 {
 		t.Fatalf("err=%v 模組呼叫=%v", err, m.orders)
 	}
 }
@@ -84,10 +84,10 @@ func TestPaymentAppReturnsTheStripeSessionOnlyWhenTheModuleReturnedASecret(t *te
 		wantKey    string
 	}{
 		{"待付款帶 session", awaiting("stripe", "pi_1_secret_x"), paymentpb.PaymentStatus_PAYMENT_STATUS_AWAITING_PAYMENT, "pk_test_1"},
-		{"待付款但 provider 已往前，沒有 secret", payment.Payment{OrderNo: "O1", Amount: 120, Provider: "stripe", Status: payment.PaymentAwaitingPayment}, paymentpb.PaymentStatus_PAYMENT_STATUS_AWAITING_PAYMENT, ""},
-		{"已入帳", payment.Payment{OrderNo: "O1", Amount: 120, Provider: "stripe", Status: payment.PaymentSucceeded, PaidAt: &paid}, paymentpb.PaymentStatus_PAYMENT_STATUS_SUCCEEDED, ""},
-		{"建立中", payment.Payment{OrderNo: "O1", Amount: 120, Provider: "stripe", Status: payment.PaymentCreating}, paymentpb.PaymentStatus_PAYMENT_STATUS_CREATING, ""},
-		{"建立失敗", payment.Payment{OrderNo: "O1", Amount: 120, Provider: "stripe", Status: payment.PaymentCreateFailed}, paymentpb.PaymentStatus_PAYMENT_STATUS_CREATE_FAILED, ""},
+		{"待付款但 provider 已往前，沒有 secret", payment.Payment{Orders: []payment.PaymentOrderReceivable{{OrderNo: "O1", Amount: 120}}, Amount: 120, Provider: "stripe", Status: payment.PaymentAwaitingPayment}, paymentpb.PaymentStatus_PAYMENT_STATUS_AWAITING_PAYMENT, ""},
+		{"已入帳", payment.Payment{Orders: []payment.PaymentOrderReceivable{{OrderNo: "O1", Amount: 120}}, Amount: 120, Provider: "stripe", Status: payment.PaymentSucceeded, PaidAt: &paid}, paymentpb.PaymentStatus_PAYMENT_STATUS_SUCCEEDED, ""},
+		{"建立中", payment.Payment{Orders: []payment.PaymentOrderReceivable{{OrderNo: "O1", Amount: 120}}, Amount: 120, Provider: "stripe", Status: payment.PaymentCreating}, paymentpb.PaymentStatus_PAYMENT_STATUS_CREATING, ""},
+		{"建立失敗", payment.Payment{Orders: []payment.PaymentOrderReceivable{{OrderNo: "O1", Amount: 120}}, Amount: 120, Provider: "stripe", Status: payment.PaymentCreateFailed}, paymentpb.PaymentStatus_PAYMENT_STATUS_CREATE_FAILED, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -156,4 +156,9 @@ func TestPaymentEnumsMatchTheModuleValues(t *testing.T) {
 		}
 		seen[k] = true
 	}
+}
+
+// codeOf 是 handler 回傳的錯誤經與 interceptor 相同的轉換之後的 Connect 錯誤碼（handler 直接回的是模組的 apperr 或傳輸層錯誤，還不是 connect.Error）。
+func codeOf(err error) connect.Code {
+	return connect.CodeOf(rpc.ConnectError(context.Background(), err))
 }

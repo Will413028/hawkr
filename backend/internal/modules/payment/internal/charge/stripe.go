@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 )
@@ -16,6 +18,9 @@ const StripeName = "stripe_payments"
 
 // StripeCurrency 是付款與轉帳的幣別（ADR D67）：訂單的整數金額當 USD 的最小單位（cent）照搬，不做匯率；port 與資料模型不帶幣別。
 const StripeCurrency = "usd"
+
+// metadataValueMax 是 Stripe metadata 值的長度上限（500 字元）：超過會被拒絕，所以訂單編號串太長就不寫，只留 order_count。
+const metadataValueMax = 500
 
 // stripeBalanceInsufficient 是平台餘額不足的 error code（樣本 transfer_platform_insufficient_funds）：沒有執行，補錢後重試會成功。
 const stripeBalanceInsufficient = "balance_insufficient"
@@ -42,7 +47,8 @@ func (s *Stripe) Name() string { return StripeName }
 // classifyMoney 把搬錢的建立呼叫的錯誤分成三種（D10、ADR D68；依 HTTP 狀態與 error code，訊息只進 log，spikes.md）：
 //   - 429、平台餘額不足（balance_insufficient）：Stripe 明確拒絕、沒有執行，包 ErrRetryableRefusal；
 //   - 其他 4xx（400 參數與狀態不合、404、402，以及 409 idempotency_error：同一把鍵搭配了不同的參數）：包 ErrPermanent；
-//   - 其餘（連線、逾時與 ctx 結束、5xx、408、401／403、其他 409、讀不懂的回應）：原樣回傳，結果不明——不得歸類成可重試拒絕或終局。
+//   - 401／403（金鑰或權限壞了）：結果不明（D60 的金鑰輪替設計，D-F 維持），包成 AuthRejectedError 讓呼叫方告警，分類不變——不得歸類成可重試拒絕或終局；
+//   - 其餘（連線、逾時與 ctx 結束、5xx、408、其他 409、讀不懂的回應）：原樣回傳，結果不明——不得歸類成可重試拒絕或終局。
 func classifyMoney(err error) error {
 	var api *stripe.APIError
 	if !errors.As(err, &api) {
@@ -53,6 +59,8 @@ func classifyMoney(err error) error {
 		return fmt.Errorf("%w：%w", ErrRetryableRefusal, err)
 	case api.Permanent():
 		return fmt.Errorf("%w：%w", ErrPermanent, err)
+	case api.Status == http.StatusUnauthorized || api.Status == http.StatusForbidden:
+		return &AuthRejectedError{Status: api.Status, Code: api.Code, Err: err}
 	}
 	return err
 }
@@ -93,9 +101,13 @@ func (s *Stripe) CreatePayment(ctx context.Context, in CreateInput) (Snapshot, e
 	if in.IdempotencyKey == "" || in.TransferGroup == "" {
 		return Snapshot{}, fmt.Errorf("%w：缺少冪等鍵或 transfer_group", ErrPermanent)
 	}
+	meta := map[string]string{"payment_id": in.PaymentID.String(), "order_count": strconv.Itoa(len(in.OrderNos))}
+	if joined := strings.Join(in.OrderNos, ","); len(joined) <= metadataValueMax {
+		meta["order_nos"] = joined
+	}
 	pi, err := s.client.CreatePaymentIntent(ctx, stripe.PaymentIntentInput{
 		Amount: in.Amount, Currency: StripeCurrency, Description: in.Description, TransferGroup: in.TransferGroup, IdempotencyKey: in.IdempotencyKey,
-		Metadata: map[string]string{"payment_id": in.PaymentID.String(), "store_id": strconv.FormatInt(in.StoreID, 10), "order_no": in.OrderNo},
+		Metadata: meta,
 	})
 	if err != nil {
 		return Snapshot{}, classifyMoney(err)
@@ -103,9 +115,9 @@ func (s *Stripe) CreatePayment(ctx context.Context, in CreateInput) (Snapshot, e
 	return snapshotOf(pi), nil
 }
 
-// FindPayment 實作 Provider：PaymentIntent 的列表沒有 metadata 篩選，由新到舊逐頁比對 attempt_id；翻不完回錯誤，不回「找不到」。
-func (s *Stripe) FindPayment(ctx context.Context, attemptID string) (Snapshot, bool, error) {
-	pi, found, err := s.client.FindPaymentIntentByAttempt(ctx, attemptID)
+// FindPayment 實作 Provider：PaymentIntent 的列表沒有 metadata 篩選，列出 created 不早於 createdAfter 的全部並比對 attempt_id；沒看完回錯誤，不回「找不到」。
+func (s *Stripe) FindPayment(ctx context.Context, attemptID string, createdAfter time.Time) (Snapshot, bool, error) {
+	pi, found, err := s.client.FindPaymentIntentByAttempt(ctx, attemptID, createdAfter)
 	if err != nil || !found {
 		return Snapshot{}, false, err
 	}
@@ -171,9 +183,9 @@ func (s *Stripe) CreateRefund(ctx context.Context, in RefundInput) (RefundSnapsh
 	return refundSnapshotOf(r), nil
 }
 
-// FindRefund 實作 Provider：以 payment_intent 篩選列出退款，依 attempt_id 比對。
-func (s *Stripe) FindRefund(ctx context.Context, externalPaymentID, attemptID string) (RefundSnapshot, bool, error) {
-	r, found, err := s.client.FindRefundByAttempt(ctx, externalPaymentID, attemptID)
+// FindRefund 實作 Provider：以 payment_intent 與 created 下限篩選列出退款，依 attempt_id 比對。
+func (s *Stripe) FindRefund(ctx context.Context, externalPaymentID, attemptID string, createdAfter time.Time) (RefundSnapshot, bool, error) {
+	r, found, err := s.client.FindRefundByAttempt(ctx, externalPaymentID, attemptID, createdAfter)
 	if err != nil || !found {
 		return RefundSnapshot{}, false, err
 	}
@@ -201,9 +213,9 @@ func (s *Stripe) CreateTransfer(ctx context.Context, in TransferInput) (Transfer
 	return TransferSnapshot{ExternalID: t.ID, Amount: t.Amount, ReversedAmount: t.AmountReversed}, nil
 }
 
-// FindTransfer 實作 Provider：以 transfer_group 篩選列出轉帳，依 attempt_id 比對。
-func (s *Stripe) FindTransfer(ctx context.Context, transferGroup, attemptID string) (TransferSnapshot, bool, error) {
-	t, found, err := s.client.FindTransferByAttempt(ctx, transferGroup, attemptID)
+// FindTransfer 實作 Provider：以 transfer_group 與 created 下限篩選列出轉帳，依 attempt_id 比對。
+func (s *Stripe) FindTransfer(ctx context.Context, transferGroup, attemptID string, createdAfter time.Time) (TransferSnapshot, bool, error) {
+	t, found, err := s.client.FindTransferByAttempt(ctx, transferGroup, attemptID, createdAfter)
 	if err != nil || !found {
 		return TransferSnapshot{}, false, err
 	}

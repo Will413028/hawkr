@@ -619,6 +619,34 @@ func (t Text) PaymentPaymentAnomalyOutcome(v string) (string, bool) {
 	return "", false
 }
 
+// PaymentPaymentAnomalyResolutionReason 是 payment.PaymentAnomalyResolutionReason 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentPaymentAnomalyResolutionReason(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PROVIDER_EXECUTED_NOT_RECORDED":
+			return "Provider executed it, not recorded locally", true
+		case "PROVIDER_NOT_EXECUTED":
+			return "Provider did not execute the call", true
+		case "DUPLICATE":
+			return "Duplicate", true
+		case "OTHER":
+			return "Other", true
+		}
+	}
+	switch v {
+	case "PROVIDER_EXECUTED_NOT_RECORDED":
+		return "金流商已執行、本地沒記到", true
+	case "PROVIDER_NOT_EXECUTED":
+		return "金流商沒有執行", true
+	case "DUPLICATE":
+		return "重複", true
+	case "OTHER":
+		return "其他", true
+	}
+	return "", false
+}
+
 // PaymentPaymentRefundStatus 是 payment.PaymentRefundStatus 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) PaymentPaymentRefundStatus(v string) (string, bool) {

@@ -3,7 +3,6 @@ package stripe
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	sdk "github.com/stripe/stripe-go/v87"
@@ -13,11 +12,19 @@ import (
 // 兩邊只在這裡對得上（Stripe 的 Search 是最終一致的，不用；列表是強一致的）。
 const MetaAttemptID = "attempt_id"
 
-const (
-	listPageLimit = 100
-	// maxListPages 是一次查回最多翻的頁數；翻完仍沒有答案時回錯誤，不回「找不到」：沒有看完全部候選就不能證明它不存在。
-	maxListPages = 50
-)
+// listPageLimit 是列表每頁的筆數。查回一律帶 created 下限（見 createdFilter）並翻到列表結束，沒有頁數上限：整份列表沒看完（ctx 的 deadline 到了、某一頁失敗）就回錯誤，不回「找不到」。
+const listPageLimit = 100
+
+// errNoLowerBound 標示查回沒有 created 下限：沒有下限的列表是整個平台的歷史，看不完也不能證明不存在。
+var errNoLowerBound = errors.New("stripe：查回需要 created 下限")
+
+// createdFilter 把 created 下限轉成列表的 created[gte]（Unix 秒，無條件捨去，只會讓範圍變大）；零值是呼叫端的錯。
+func createdFilter(after time.Time) (*sdk.RangeQueryParams, error) {
+	if after.IsZero() {
+		return nil, errNoLowerBound
+	}
+	return &sdk.RangeQueryParams{GreaterThanOrEqual: after.Unix()}, nil
+}
 
 // PaymentIntentInput 是建立 PaymentIntent 的輸入；Currency 由呼叫方決定（D67：USD，金額是 cent）。
 type PaymentIntentInput struct {
@@ -120,12 +127,16 @@ func (c *Client) CancelPaymentIntent(ctx context.Context, id string) (PaymentInt
 	return paymentIntentOf(out)
 }
 
-// FindPaymentIntentByAttempt 由新到舊列出 PaymentIntent，回傳 metadata.attempt_id 相符的那筆。PaymentIntent 的列表沒有 metadata 或 transfer_group 篩選，
-// 所以只能比對；翻到 maxListPages 仍沒找到而且還有更多時回錯誤（不是 found=false）。
-func (c *Client) FindPaymentIntentByAttempt(ctx context.Context, attemptID string) (PaymentIntent, bool, error) {
+// FindPaymentIntentByAttempt 列出 created 不早於 createdAfter 的 PaymentIntent（強一致的列表，不用 Search），回傳 metadata.attempt_id 相符的那筆。PaymentIntent 的列表沒有 metadata 或 transfer_group 篩選，
+// 所以在下限之後的範圍內比對；一直翻到列表結束，沒看完（任何一頁失敗、deadline 到了）回錯誤，不是 found=false。
+func (c *Client) FindPaymentIntentByAttempt(ctx context.Context, attemptID string, createdAfter time.Time) (PaymentIntent, bool, error) {
+	created, err := createdFilter(createdAfter)
+	if err != nil {
+		return PaymentIntent{}, false, err
+	}
 	var found *sdk.PaymentIntent
-	err := listPages(ctx, c, func(ctx context.Context, after string) *sdk.V1List[*sdk.PaymentIntent] {
-		params := &sdk.PaymentIntentListParams{}
+	err = listPages(ctx, c, func(ctx context.Context, after string) *sdk.V1List[*sdk.PaymentIntent] {
+		params := &sdk.PaymentIntentListParams{CreatedRange: created}
 		params.Limit = sdk.Int64(listPageLimit)
 		params.Single = true
 		params.AddExpand("data." + expandLatestCharge)
@@ -193,11 +204,15 @@ func (c *Client) GetRefund(ctx context.Context, id string) (Refund, error) {
 	return refundOf(out)
 }
 
-// FindRefundByAttempt 列出 PaymentIntent 底下的退款（payment_intent 篩選，強一致），回傳 metadata.attempt_id 相符的那筆。
-func (c *Client) FindRefundByAttempt(ctx context.Context, paymentIntentID, attemptID string) (Refund, bool, error) {
+// FindRefundByAttempt 列出 PaymentIntent 底下 created 不早於 createdAfter 的退款（payment_intent 加 created 篩選，強一致），回傳 metadata.attempt_id 相符的那筆。
+func (c *Client) FindRefundByAttempt(ctx context.Context, paymentIntentID, attemptID string, createdAfter time.Time) (Refund, bool, error) {
+	created, err := createdFilter(createdAfter)
+	if err != nil {
+		return Refund{}, false, err
+	}
 	var found *sdk.Refund
-	err := listPages(ctx, c, func(ctx context.Context, after string) *sdk.V1List[*sdk.Refund] {
-		params := &sdk.RefundListParams{PaymentIntent: sdk.String(paymentIntentID)}
+	err = listPages(ctx, c, func(ctx context.Context, after string) *sdk.V1List[*sdk.Refund] {
+		params := &sdk.RefundListParams{PaymentIntent: sdk.String(paymentIntentID), CreatedRange: created}
 		params.Limit = sdk.Int64(listPageLimit)
 		params.Single = true
 		if after != "" {
@@ -264,15 +279,19 @@ func (c *Client) CreateTransfer(ctx context.Context, in TransferInput) (Transfer
 	return transferOf(out)
 }
 
-// FindTransferByAttempt 以 transfer_group 篩選列出轉帳（強一致；Stripe 文件，List Transfers），回傳 metadata.attempt_id 相符的那筆。transferGroup 必填：
+// FindTransferByAttempt 以 transfer_group 與 created 下限篩選列出轉帳（強一致；Stripe 文件，List Transfers），回傳 metadata.attempt_id 相符的那筆。transferGroup 必填：
 // 沒有篩選就會列出整個平台的轉帳。
-func (c *Client) FindTransferByAttempt(ctx context.Context, transferGroup, attemptID string) (Transfer, bool, error) {
+func (c *Client) FindTransferByAttempt(ctx context.Context, transferGroup, attemptID string, createdAfter time.Time) (Transfer, bool, error) {
 	if transferGroup == "" {
 		return Transfer{}, false, errors.New("stripe：查回轉帳需要 transfer_group")
 	}
+	created, err := createdFilter(createdAfter)
+	if err != nil {
+		return Transfer{}, false, err
+	}
 	var found *sdk.Transfer
-	err := listPages(ctx, c, func(ctx context.Context, after string) *sdk.V1List[*sdk.Transfer] {
-		params := &sdk.TransferListParams{TransferGroup: sdk.String(transferGroup)}
+	err = listPages(ctx, c, func(ctx context.Context, after string) *sdk.V1List[*sdk.Transfer] {
+		params := &sdk.TransferListParams{TransferGroup: sdk.String(transferGroup), CreatedRange: created}
 		params.Limit = sdk.Int64(listPageLimit)
 		params.Single = true
 		if after != "" {
@@ -359,11 +378,11 @@ func withAttempt(extra map[string]string, attemptID string) map[string]string {
 	return m
 }
 
-// listPages 逐頁（每頁各是一次有 deadline 的呼叫）列出項目，match 為真就停；翻完回 nil（沒有符合的），
-// 到 maxListPages 仍有更多、或有更多卻沒有可接續的項目時回錯誤。
+// listPages 逐頁（每頁各是一次有 deadline 的呼叫）列出項目，match 為真就停；翻完回 nil（沒有符合的）。沒有頁數上限：範圍由呼叫端的 created 下限界定，
+// 整份列表沒看完（某一頁失敗、ctx 到了 deadline）回錯誤，有更多卻沒有可接續的項目也回錯誤。
 func listPages[T any](ctx context.Context, c *Client, fetch func(ctx context.Context, after string) *sdk.V1List[T], id func(T) string, match func(T) bool) error {
 	after := ""
-	for range maxListPages {
+	for {
 		var data []T
 		var hasMore bool
 		if err := c.call(ctx, func(ctx context.Context) error {
@@ -392,5 +411,4 @@ func listPages[T any](ctx context.Context, c *Client, fetch func(ctx context.Con
 			return errors.New("stripe：列表的最後一項沒有 id")
 		}
 	}
-	return fmt.Errorf("stripe：列表超過 %d 頁仍未看完，不能證明不存在", maxListPages)
 }

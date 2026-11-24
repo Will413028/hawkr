@@ -13,10 +13,10 @@ import (
 )
 
 const adminListPayments = `-- name: AdminListPayments :many
-SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
+SELECT id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
 FROM payment.payments
 WHERE ($1::text = '' OR status = $1::text)
-  AND ($2::text = '' OR order_no = $2::text)
+  AND ($2::text = '' OR EXISTS (SELECT 1 FROM payment.payment_orders o WHERE o.payment_id = payments.id AND o.order_no = $2::text))
   AND id < $3::uuid
 ORDER BY id DESC
 LIMIT $4::int
@@ -46,8 +46,6 @@ func (q *Queries) AdminListPayments(ctx context.Context, arg AdminListPaymentsPa
 		var i PaymentPayment
 		if err := rows.Scan(
 			&i.ID,
-			&i.OrderNo,
-			&i.StoreID,
 			&i.BuyerID,
 			&i.Amount,
 			&i.Provider,
@@ -76,12 +74,12 @@ func (q *Queries) AdminListPayments(ctx context.Context, arg AdminListPaymentsPa
 }
 
 const adminListRefunds = `-- name: AdminListRefunds :many
-SELECT r.id, r.payment_id, p.order_no, r.request_key, r.amount, r.auto, r.status, r.reversal_status, r.reversal_amount, r.topup_status,
+SELECT r.id, o.payment_id, r.payment_order_id, o.order_no, r.request_key, r.amount, r.auto, r.status, r.reversal_status, r.reversal_amount, r.topup_status,
        r.external_refund_id, r.failure_reason, r.created_at
 FROM payment.refunds r
-JOIN payment.payments p ON p.id = r.payment_id
+JOIN payment.payment_orders o ON o.id = r.payment_order_id
 WHERE ($1::text = '' OR r.status = $1::text)
-  AND ($2::text = '' OR p.order_no = $2::text)
+  AND ($2::text = '' OR o.order_no = $2::text)
   AND (NOT $3::boolean OR 'ANOMALY' IN (r.status, r.reversal_status, r.topup_status))
   AND r.id < $4::uuid
 ORDER BY r.id DESC
@@ -99,6 +97,7 @@ type AdminListRefundsParams struct {
 type AdminListRefundsRow struct {
 	ID               uuid.UUID
 	PaymentID        uuid.UUID
+	PaymentOrderID   uuid.UUID
 	OrderNo          string
 	RequestKey       string
 	Amount           int64
@@ -112,7 +111,7 @@ type AdminListRefundsRow struct {
 	CreatedAt        time.Time
 }
 
-// 後台列退款，新的在前（keyset 同 AdminListPayments）；order_no 是所屬付款的訂單編號；status 篩退款本身的狀態，
+// 後台列退款，新的在前（keyset 同 AdminListPayments）；order_no 是所屬訂單應收的訂單編號；status 篩退款本身的狀態，
 // anomaly_only 為真時只列退款、收回或補差額任一個在 ANOMALY 的退款（收回與補差額的人工結案要從這裡找到列）。
 func (q *Queries) AdminListRefunds(ctx context.Context, arg AdminListRefundsParams) ([]AdminListRefundsRow, error) {
 	rows, err := q.db.Query(ctx, adminListRefunds,
@@ -132,6 +131,7 @@ func (q *Queries) AdminListRefunds(ctx context.Context, arg AdminListRefundsPara
 		if err := rows.Scan(
 			&i.ID,
 			&i.PaymentID,
+			&i.PaymentOrderID,
 			&i.OrderNo,
 			&i.RequestKey,
 			&i.Amount,
@@ -155,11 +155,11 @@ func (q *Queries) AdminListRefunds(ctx context.Context, arg AdminListRefundsPara
 }
 
 const adminListTransfers = `-- name: AdminListTransfers :many
-SELECT t.id, t.payment_id, p.order_no, t.store_id, t.amount, t.reversed_amount, t.status, t.external_transfer_id, t.failure_reason, t.created_at
+SELECT t.id, o.payment_id, t.payment_order_id, o.order_no, t.store_id, t.amount, t.reversed_amount, t.status, t.external_transfer_id, t.failure_reason, t.created_at
 FROM payment.transfers t
-JOIN payment.payments p ON p.id = t.payment_id
+JOIN payment.payment_orders o ON o.id = t.payment_order_id
 WHERE ($1::text = '' OR t.status = $1::text)
-  AND ($2::text = '' OR p.order_no = $2::text)
+  AND ($2::text = '' OR o.order_no = $2::text)
   AND t.id < $3::uuid
 ORDER BY t.id DESC
 LIMIT $4::int
@@ -175,6 +175,7 @@ type AdminListTransfersParams struct {
 type AdminListTransfersRow struct {
 	ID                 uuid.UUID
 	PaymentID          uuid.UUID
+	PaymentOrderID     uuid.UUID
 	OrderNo            string
 	StoreID            int64
 	Amount             int64
@@ -185,7 +186,7 @@ type AdminListTransfersRow struct {
 	CreatedAt          time.Time
 }
 
-// 後台列轉帳，新的在前（keyset 同 AdminListPayments）；order_no 是所屬付款的訂單編號，status、order_no 空字串不篩。
+// 後台列轉帳，新的在前（keyset 同 AdminListPayments）；order_no 是所屬訂單應收的訂單編號，status、order_no 空字串不篩。
 func (q *Queries) AdminListTransfers(ctx context.Context, arg AdminListTransfersParams) ([]AdminListTransfersRow, error) {
 	rows, err := q.db.Query(ctx, adminListTransfers,
 		arg.Status,
@@ -203,6 +204,7 @@ func (q *Queries) AdminListTransfers(ctx context.Context, arg AdminListTransfers
 		if err := rows.Scan(
 			&i.ID,
 			&i.PaymentID,
+			&i.PaymentOrderID,
 			&i.OrderNo,
 			&i.StoreID,
 			&i.Amount,
@@ -211,6 +213,48 @@ func (q *Queries) AdminListTransfers(ctx context.Context, arg AdminListTransfers
 			&i.ExternalTransferID,
 			&i.FailureReason,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const adminPaymentOrders = `-- name: AdminPaymentOrders :many
+SELECT id, payment_id, order_no, store_id, amount
+FROM payment.payment_orders
+WHERE payment_id = ANY($1::uuid[])
+ORDER BY payment_id, id
+`
+
+type AdminPaymentOrdersRow struct {
+	ID        uuid.UUID
+	PaymentID uuid.UUID
+	OrderNo   string
+	StoreID   int64
+	Amount    int64
+}
+
+// 一頁付款的全部訂單應收（後台付款列表一筆付款對 N 張訂單），依付款再依 ID 升序。
+func (q *Queries) AdminPaymentOrders(ctx context.Context, paymentIds []uuid.UUID) ([]AdminPaymentOrdersRow, error) {
+	rows, err := q.db.Query(ctx, adminPaymentOrders, paymentIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdminPaymentOrdersRow{}
+	for rows.Next() {
+		var i AdminPaymentOrdersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PaymentID,
+			&i.OrderNo,
+			&i.StoreID,
+			&i.Amount,
 		); err != nil {
 			return nil, err
 		}

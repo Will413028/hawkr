@@ -252,6 +252,18 @@
     "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED": {
       "message": "Provider executed it"
     },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE": {
+      "message": "Duplicate"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER": {
+      "message": "Other"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED": {
+      "message": "Provider executed it, not recorded locally"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED": {
+      "message": "Provider did not execute the call"
+    },
     "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY": {
       "message": "Needs review"
     },

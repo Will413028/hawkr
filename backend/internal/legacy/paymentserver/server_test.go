@@ -22,9 +22,9 @@ type fakePayments struct {
 	refund      payment.PaymentRefund
 	refundErr   error
 	refunds     []payment.PaymentRefund
-	payment     payment.Payment
+	payment     payment.OrderPayment
 	paymentErr  error
-	payments    []payment.Payment
+	payments    []payment.OrderPayment
 	closed      bool
 	closeErr    error
 	gotKeys     []string
@@ -54,11 +54,11 @@ func (f *fakePayments) LatestRefundsByOrderNos(_ context.Context, keys []string)
 	return f.refunds, f.refundErr
 }
 
-func (f *fakePayments) PaymentByOrderNo(context.Context, string) (payment.Payment, error) {
+func (f *fakePayments) PaymentByOrderNo(context.Context, string) (payment.OrderPayment, error) {
 	return f.payment, f.paymentErr
 }
 
-func (f *fakePayments) PaymentsByOrderNos(context.Context, []string) ([]payment.Payment, error) {
+func (f *fakePayments) PaymentsByOrderNos(context.Context, []string) ([]payment.OrderPayment, error) {
 	return f.payments, f.paymentErr
 }
 
@@ -185,13 +185,13 @@ func TestActivePaymentStatusHasNoDataWhenThereIsNoPaymentAndFailsClosedOnAnomaly
 		t.Fatalf("no payment = %v, %v", none, err)
 	}
 	paid := created.Add(time.Minute)
-	got, err := New(&fakePayments{payment: payment.Payment{OrderNo: "O1", BuyerID: 7, Amount: 99, Status: payment.PaymentSucceeded, PaidAt: &paid, CreatedAt: created}}).
+	got, err := New(&fakePayments{payment: payment.OrderPayment{Payment: payment.Payment{BuyerID: 7, Amount: 99, Status: payment.PaymentSucceeded, PaidAt: &paid, CreatedAt: created}, Order: payment.PaymentOrderReceivable{OrderNo: "O1", Amount: 99}}}).
 		GetActivePaymentStatusByOrderNo(context.Background(), connect.NewRequest(&pb.GetActivePaymentStatusByOrderNoRequest{OrderNo: "O1"}))
 	d := got.Msg.GetData()
 	if err != nil || d.GetStatus() != "1" || d.GetTradeNo() != "O1" || d.GetBuyerId() != "7" || d.GetAmount() != "99" || d.GetPayTime() != strconv.FormatInt(paid.UnixMilli(), 10) || d.GetProviderStatus() != "SUCCEEDED" {
 		t.Fatalf("paid = %v, %v", got, err)
 	}
-	if _, err := New(&fakePayments{payment: payment.Payment{OrderNo: "O1", Status: payment.PaymentAnomaly}}).GetActivePaymentStatusByOrderNo(context.Background(), connect.NewRequest(&pb.GetActivePaymentStatusByOrderNoRequest{OrderNo: "O1"})); err == nil {
+	if _, err := New(&fakePayments{payment: payment.OrderPayment{Payment: payment.Payment{Status: payment.PaymentAnomaly}, Order: payment.PaymentOrderReceivable{OrderNo: "O1", Amount: 1}}}).GetActivePaymentStatusByOrderNo(context.Background(), connect.NewRequest(&pb.GetActivePaymentStatusByOrderNoRequest{OrderNo: "O1"})); err == nil {
 		t.Fatal("an ANOMALY payment must be a gRPC error so the order side does not cancel")
 	}
 }
@@ -199,7 +199,7 @@ func TestActivePaymentStatusHasNoDataWhenThereIsNoPaymentAndFailsClosedOnAnomaly
 func TestPaymentFactsOnlyExistForAPaidPaymentAndAlwaysCarryTheProviderTime(t *testing.T) {
 	t.Parallel()
 	paid := time.Date(2026, 11, 24, 9, 30, 15, 987, time.FixedZone("TST", 8*3600))
-	got, err := New(&fakePayments{payment: payment.Payment{OrderNo: "O1", Amount: 250, Status: payment.PaymentSucceeded, PaidAt: &paid}}).
+	got, err := New(&fakePayments{payment: payment.OrderPayment{Payment: payment.Payment{Amount: 250, Status: payment.PaymentSucceeded, PaidAt: &paid}, Order: payment.PaymentOrderReceivable{OrderNo: "O1", Amount: 250}}}).
 		GetPaymentFactsInternal(context.Background(), connect.NewRequest(&pb.GetPaymentFactsInternalRequest{OrderNo: "O1"}))
 	d := got.Msg.GetData()
 	if err != nil || got.Msg.GetCode() != 0 || d.GetTradeNo() != "O1" || d.GetTradeAmt() != "250" || d.GetPayTime() != "2026-11-24T01:30:15Z" || d.ProviderPaidAt == nil || *d.ProviderPaidAt != "2026-11-24T01:30:15Z" || d.GetIsDuplicate() {
@@ -207,8 +207,8 @@ func TestPaymentFactsOnlyExistForAPaidPaymentAndAlwaysCarryTheProviderTime(t *te
 	}
 	for name, f := range map[string]*fakePayments{
 		"no payment": {paymentErr: apperr.NotFound("none")},
-		"unpaid":     {payment: payment.Payment{OrderNo: "O1", Status: payment.PaymentAwaitingPayment, PaidAt: &paid}},
-		"no paid_at": {payment: payment.Payment{OrderNo: "O1", Status: payment.PaymentSucceeded}},
+		"unpaid":     {payment: payment.OrderPayment{Payment: payment.Payment{Status: payment.PaymentAwaitingPayment, PaidAt: &paid}, Order: payment.PaymentOrderReceivable{OrderNo: "O1", Amount: 1}}},
+		"no paid_at": {payment: payment.OrderPayment{Payment: payment.Payment{Status: payment.PaymentSucceeded}, Order: payment.PaymentOrderReceivable{OrderNo: "O1", Amount: 1}}},
 	} {
 		r, err := New(f).GetPaymentFactsInternal(context.Background(), connect.NewRequest(&pb.GetPaymentFactsInternalRequest{OrderNo: "O1"}))
 		if err != nil || r.Msg.GetCode() != 8015 || r.Msg.GetData() != nil {
@@ -230,7 +230,7 @@ func TestBatchEntriesAreKeyedByCaseKeyAndOrderAndOmitMissing(t *testing.T) {
 	if err != nil || len(byOrder.Msg.GetEntries()) != 1 || byOrder.Msg.GetEntries()["O1"] == nil {
 		t.Fatalf("by order = %v, %v", byOrder, err)
 	}
-	pays, err := New(&fakePayments{payments: []payment.Payment{{OrderNo: "O1", Status: payment.PaymentCreateFailed, LastError: "card_declined"}}}).
+	pays, err := New(&fakePayments{payments: []payment.OrderPayment{{Payment: payment.Payment{Status: payment.PaymentCreateFailed, LastError: "card_declined"}, Order: payment.PaymentOrderReceivable{OrderNo: "O1", Amount: 1}}}}).
 		BatchGetProviderStatusByOrderIds(context.Background(), connect.NewRequest(&pb.BatchGetProviderStatusByOrderIdsRequest{OrderIds: []string{"O1", "O2"}}))
 	if err != nil || len(pays.Msg.GetEntries()) != 1 || pays.Msg.GetEntries()["O1"].GetProviderStatus() != "CREATE_FAILED" || pays.Msg.GetEntries()["O1"].GetProviderMessage() != "card_declined" {
 		t.Fatalf("payments = %v, %v", pays, err)

@@ -3,7 +3,7 @@
 // Source: hawkr/payment/v1alpha1/payment.proto
 
 // payment 模組的買家付款 API，以及模組擁有的列舉（收款帳戶、付款、轉帳、退款）：賣家端（hawkr.seller.v1alpha1）、買家與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
-// 付款只對應一張訂單（order_no）：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；web 以 Stripe Payment Element、App 以 PaymentSheet
+// 付款以訂單（order_no）為鍵：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；一筆付款可以對 N 張訂單（B8 的多店結帳），目前 client 一次付一張；web 以 Stripe Payment Element、App 以 PaymentSheet
 // 用 client_secret 完成付款（計畫 B2 D3、ADR D64），付款結果以 webhook 為準，client 以 GetPayment 重讀，不信任 client 回報的結果。
 package paymentv1alpha1connect
 
@@ -52,7 +52,7 @@ type PaymentAppServiceClient interface {
 	// 狀態 AWAITING_PAYMENT 時帶 session。
 	CreatePayment(context.Context, *connect.Request[v1alpha1.CreatePaymentRequest]) (*connect.Response[v1alpha1.CreatePaymentResponse], error)
 	// GetPayment 讀買家自己的付款（沒有付款或不是呼叫者的回 not_found）。狀態 AWAITING_PAYMENT 時帶 session（client secret 是每次向 provider 讀的，不存）；
-	// provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，一律 POST，不可被快取。
+	// provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，不標 NO_SIDE_EFFECTS（那會允許 GET 與快取），所以一律 POST。
 	GetPayment(context.Context, *connect.Request[v1alpha1.GetPaymentRequest]) (*connect.Response[v1alpha1.GetPaymentResponse], error)
 }
 
@@ -78,7 +78,6 @@ func NewPaymentAppServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			httpClient,
 			baseURL+PaymentAppServiceGetPaymentProcedure,
 			connect.WithSchema(paymentAppServiceMethods.ByName("GetPayment")),
-			connect.WithIdempotency(connect.IdempotencyIdempotent),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -109,7 +108,7 @@ type PaymentAppServiceHandler interface {
 	// 狀態 AWAITING_PAYMENT 時帶 session。
 	CreatePayment(context.Context, *connect.Request[v1alpha1.CreatePaymentRequest]) (*connect.Response[v1alpha1.CreatePaymentResponse], error)
 	// GetPayment 讀買家自己的付款（沒有付款或不是呼叫者的回 not_found）。狀態 AWAITING_PAYMENT 時帶 session（client secret 是每次向 provider 讀的，不存）；
-	// provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，一律 POST，不可被快取。
+	// provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，不標 NO_SIDE_EFFECTS（那會允許 GET 與快取），所以一律 POST。
 	GetPayment(context.Context, *connect.Request[v1alpha1.GetPaymentRequest]) (*connect.Response[v1alpha1.GetPaymentResponse], error)
 }
 
@@ -131,7 +130,6 @@ func NewPaymentAppServiceHandler(svc PaymentAppServiceHandler, opts ...connect.H
 		PaymentAppServiceGetPaymentProcedure,
 		svc.GetPayment,
 		connect.WithSchema(paymentAppServiceMethods.ByName("GetPayment")),
-		connect.WithIdempotency(connect.IdempotencyIdempotent),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/hawkr.payment.v1alpha1.PaymentAppService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -41,9 +41,10 @@ type PaymentRecordPage struct {
 	Next    *RecordCursor
 }
 
-// TransferRecord 是後台看到的轉帳：對外視圖加上所屬付款的訂單編號與 provider 的外部 ID。
+// TransferRecord 是後台看到的轉帳：對外視圖加上所屬付款、訂單應收的訂單編號與 provider 的外部 ID。
 type TransferRecord struct {
 	Transfer
+	PaymentID          uuid.UUID
 	OrderNo            string
 	ExternalTransferID string
 }
@@ -71,9 +72,10 @@ type ReversalRecord struct {
 	CreatedAt  time.Time
 }
 
-// RefundRecord 是後台看到的退款：對外視圖加上所屬付款的訂單編號、provider 的外部 ID 與撤回列。
+// RefundRecord 是後台看到的退款：對外視圖加上所屬付款與訂單編號、provider 的外部 ID 與撤回列。
 type RefundRecord struct {
 	Refund
+	PaymentID        uuid.UUID
 	OrderNo          string
 	ExternalRefundID string
 	Reversals        []ReversalRecord

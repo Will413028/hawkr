@@ -16,10 +16,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// RequestTransfer 是訂單完成後把這筆付款的款項轉給賣家的入口（D6；訂單一方的 GrantPayment 呼叫）：在一個 transaction 內鎖付款列、確認已入帳，
-// 寫一筆 PENDING 轉帳（金額是付款金額扣掉非失敗退款，賣家收款帳戶的外部 ID 寫成快照；帳戶必須已開通轉帳）並排入轉帳 job；provider 在 transaction 外由 job 呼叫（規則 5）。
-// 冪等：已有有效（PENDING、SUCCEEDED 或 ANOMALY）轉帳時回傳它，由唯一索引 transfers_active_payment 守，不寫第二筆；只有沒有有效轉帳時，付款未入帳、賣家帳戶未開通
-// 或沒有可轉的金額（退款全部 SUCCEEDED 而涵蓋整筆付款；涵蓋整筆但還有進行中的退款時仍寫列，暫定金額是進行中退款的加總，claim 會重算）才是 FailedPrecondition（FAILED 的轉帳不佔位，之後再呼叫會建新的一筆、換新鍵）。付款不存在回 NotFound。呼叫方不能在 transaction 內呼叫。
+// RequestTransfer 是訂單完成後把這張訂單應收的款項轉給賣家的入口（D6、D13；訂單一方的 GrantPayment 呼叫）：在一個 transaction 內依序鎖付款列與訂單應收列、確認已入帳，
+// 寫一筆 PENDING 轉帳（金額是訂單應收金額扣掉這張訂單的非失敗退款，賣家收款帳戶的外部 ID 寫成快照；帳戶必須已開通轉帳）並排入轉帳 job；provider 在 transaction 外由 job 呼叫（規則 5）。
+// 冪等（D-G）：這張訂單應收已有有效（PENDING、SUCCEEDED 或 ANOMALY）轉帳時一律回傳它（成功，不再檢查付款狀態與賣家帳戶，重複呼叫不會得到 FailedPrecondition），由唯一索引 transfers_active_order 守，不寫第二筆；
+// 同一筆付款別張訂單的轉帳互不影響。只有沒有有效轉帳時，付款未入帳、賣家帳戶未開通或沒有可轉的金額（這張訂單的退款全部 SUCCEEDED 而涵蓋整張應收；涵蓋整張但還有進行中的退款時仍寫列，
+// 暫定金額是進行中退款的加總，claim 會重算）才是 FailedPrecondition（FAILED 的轉帳不佔位，之後再呼叫會建新的一筆、換新鍵）。訂單不存在回 NotFound。呼叫方不能在 transaction 內呼叫。
 func (s *Service) RequestTransfer(ctx context.Context, orderNo string) (model.Transfer, error) {
 	if err := s.requireProvider(); err != nil {
 		return model.Transfer{}, err
@@ -38,18 +39,30 @@ func (s *Service) RequestTransfer(ctx context.Context, orderNo string) (model.Tr
 		if err != nil {
 			return err
 		}
+		order, err := q.LockPaymentOrderByOrderNo(ctx, orderNo)
+		if err != nil {
+			return err
+		}
+		existing, err := q.ActiveTransferByOrder(ctx, order.ID)
+		if err == nil {
+			out = existing
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		now := s.d.Now().UTC()
-		terms, refusal, err := s.transferTerms(ctx, q, pay)
+		terms, refusal, err := s.transferTerms(ctx, q, pay, order)
 		if err != nil {
 			return err
 		}
 		if refusal == nil {
-			n, err := q.InsertTransfer(ctx, store.InsertTransferParams{ID: s.d.NewID(), PaymentID: pay.ID, StoreID: pay.StoreID, Amount: terms.amount, DestinationAccountID: terms.destination, Now: now})
+			n, err := q.InsertTransfer(ctx, store.InsertTransferParams{ID: s.d.NewID(), PaymentOrderID: order.ID, StoreID: order.StoreID, Amount: terms.amount, DestinationAccountID: terms.destination, Now: now})
 			if err != nil {
 				return err
 			}
 			if n == 1 {
-				t, err := q.ActiveTransferByPayment(ctx, pay.ID)
+				t, err := q.ActiveTransferByOrder(ctx, order.ID)
 				if err != nil {
 					return err
 				}
@@ -57,12 +70,12 @@ func (s *Service) RequestTransfer(ctx context.Context, orderNo string) (model.Tr
 				return enqueueTransfer(ctx, s.d.Jobs, t.ID)
 			}
 		}
-		t, err := q.ActiveTransferByPayment(ctx, pay.ID)
+		t, err := q.ActiveTransferByOrder(ctx, order.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			if refusal != nil {
 				return refusal
 			}
-			return fmt.Errorf("charge: 付款 %s 寫轉帳沒有成功卻也沒有有效的轉帳", pay.ID)
+			return fmt.Errorf("charge: 訂單應收 %s 寫轉帳沒有成功卻也沒有有效的轉帳", order.ID)
 		}
 		out = t
 		return err
@@ -80,24 +93,24 @@ type transferTermsResult struct {
 
 // transferTerms 算出這筆付款現在可以轉的金額與賣家帳戶的外部 ID。現在不能轉是 refusal（FailedPrecondition），DB 錯誤是 err：呼叫方在 err 時立刻返回，
 // 因為失敗的查詢已讓 transaction 進入錯誤狀態，不能再下 SQL。
-func (s *Service) transferTerms(ctx context.Context, q *store.Queries, pay store.PaymentPayment) (terms transferTermsResult, refusal error, err error) {
+func (s *Service) transferTerms(ctx context.Context, q *store.Queries, pay store.PaymentPayment, order store.PaymentPaymentOrder) (terms transferTermsResult, refusal error, err error) {
 	if pay.Status != string(model.PaymentSucceeded) {
 		return terms, apperr.FailedPrecondition("付款尚未入帳，不能轉帳"), nil
 	}
-	acct, err := q.PaymentAccountByStore(ctx, pay.StoreID)
+	acct, err := q.PaymentAccountByStore(ctx, order.StoreID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return terms, nil, err
 	}
 	if errors.Is(err, pgx.ErrNoRows) || !acct.TransfersActive || acct.ExternalAccountID == nil {
 		return terms, apperr.FailedPrecondition("賣家的收款帳戶尚未開通"), nil
 	}
-	refunded, err := q.NonFailedRefundTotal(ctx, pay.ID)
+	refunded, err := q.NonFailedRefundTotal(ctx, order.ID)
 	if err != nil {
 		return terms, nil, err
 	}
-	amount := pay.Amount - refunded
+	amount := order.Amount - refunded
 	if amount <= 0 {
-		inFlight, err := q.InFlightRefundTotal(ctx, pay.ID)
+		inFlight, err := q.InFlightRefundTotal(ctx, order.ID)
 		if err != nil {
 			return terms, nil, err
 		}
@@ -111,7 +124,7 @@ func (s *Service) transferTerms(ctx context.Context, q *store.Queries, pay store
 
 func toTransfer(r store.PaymentTransfer) model.Transfer {
 	t := model.Transfer{
-		ID: r.ID, PaymentID: r.PaymentID, StoreID: r.StoreID, Amount: r.Amount, ReversedAmount: r.ReversedAmount,
+		ID: r.ID, PaymentOrderID: r.PaymentOrderID, StoreID: r.StoreID, Amount: r.Amount, ReversedAmount: r.ReversedAmount,
 		Status: model.TransferStatus(r.Status), CreatedAt: r.CreatedAt,
 	}
 	if r.FailureReason != nil {
@@ -166,7 +179,7 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 	if row.Status != string(model.TransferPending) {
 		return nil
 	}
-	pay, err := q.PaymentByID(ctx, row.PaymentID)
+	pay, order, err := paymentOfOrder(ctx, q, row.PaymentOrderID)
 	if err != nil {
 		return err
 	}
@@ -175,7 +188,7 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 	}
 	now := s.d.Now().UTC()
 	if !inResendWindow(row.CalledAt, now) {
-		return s.lookupTransfer(ctx, row, pay, now)
+		return s.lookupTransfer(ctx, row, pay, order, now)
 	}
 	called, err := s.claimTransfer(ctx, transferID, now)
 	if err != nil || called == nil {
@@ -185,18 +198,18 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 	defer cancel()
 	snap, err := s.d.Provider.CreateTransfer(callCtx, TransferInput{
 		Amount: called.Amount, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: called.DestinationAccountID,
-		TransferGroup: pay.OrderNo, IdempotencyKey: called.IdempotencyKey.String(),
+		TransferGroup: TransferGroupOf(pay.ID), IdempotencyKey: called.IdempotencyKey.String(),
 	})
-	switch classifyCall(err) {
+	switch s.classify(ctx, "create_transfer", err) {
 	case callRefused:
-		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立轉帳", "transfer_id", transferID.String(), "order_no", pay.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立轉帳", "transfer_id", transferID.String(), "order_no", order.OrderNo, "err", err)
 		return s.failTransfer(ctx, transferID, failedRefused)
 	case callRetryable:
 		if !firstCall(row.CalledAt, called.CalledAt, now) {
-			s.d.Logger.WarnContext(ctx, "payment：重送轉帳被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "transfer_id", transferID.String(), "order_no", pay.OrderNo, "err", err)
+			s.d.Logger.WarnContext(ctx, "payment：重送轉帳被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "transfer_id", transferID.String(), "order_no", order.OrderNo, "err", err)
 			return err
 		}
-		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立轉帳、沒有執行，換新冪等鍵重試", "transfer_id", transferID.String(), "order_no", pay.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立轉帳、沒有執行，換新冪等鍵重試", "transfer_id", transferID.String(), "order_no", order.OrderNo, "err", err)
 		if rerr := s.rotateTransferKey(ctx, transferID, called.IdempotencyKey, now); rerr != nil {
 			return errors.Join(err, rerr)
 		}
@@ -209,10 +222,10 @@ func (s *Service) transfer(ctx context.Context, transferID uuid.UUID) error {
 }
 
 // lookupTransfer 是過了 ResendWindow 的轉帳：不再呼叫 provider，只依嘗試 ID 查回。
-func (s *Service) lookupTransfer(ctx context.Context, row store.PaymentTransfer, pay store.PaymentPayment, now time.Time) error {
+func (s *Service) lookupTransfer(ctx context.Context, row store.PaymentTransfer, pay store.PaymentPayment, order store.PaymentPaymentOrder, now time.Time) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	snap, found, err := s.d.Provider.FindTransfer(callCtx, pay.OrderNo, row.IdempotencyKey.String())
+	snap, found, err := s.d.Provider.FindTransfer(callCtx, TransferGroupOf(pay.ID), row.IdempotencyKey.String(), lookupLowerBound(row.CalledAt, row.CreatedAt))
 	if err != nil {
 		return s.transferLookupFailed(ctx, row, err)
 	}
@@ -225,7 +238,7 @@ func (s *Service) lookupTransfer(ctx context.Context, row store.PaymentTransfer,
 	if now.Sub(*row.CalledAt) < NotFoundAfter {
 		return fmt.Errorf("%w：轉帳 %s", errNotFoundYet, row.ID)
 	}
-	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這筆轉帳，進 FAILED", "transfer_id", row.ID.String(), "order_no", pay.OrderNo)
+	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這筆轉帳，進 FAILED", "transfer_id", row.ID.String(), "order_no", order.OrderNo)
 	return s.failTransfer(ctx, row.ID, failedNotFound)
 }
 
@@ -239,15 +252,15 @@ func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer,
 	orphan := false
 	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPayment(ctx, row.PaymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, row.PaymentOrderID); err != nil {
 			return err
 		}
 		_, err := q.SucceedTransfer(ctx, store.SucceedTransferParams{ID: row.ID, ExternalTransferID: &snap.ExternalID, Now: s.d.Now().UTC()})
 		if err == nil {
-			if err := s.startReversals(ctx, q, row.PaymentID); err != nil {
+			if err := s.startReversals(ctx, q, row.PaymentOrderID); err != nil {
 				return err
 			}
-			return s.startTopups(ctx, q, row.PaymentID)
+			return s.startTopups(ctx, q, row.PaymentOrderID)
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			cur, rerr := q.TransferByID(ctx, row.ID)
@@ -258,13 +271,13 @@ func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer,
 				return nil
 			}
 			orphan = true
-			return s.publishAnomaly(ctx, model.AnomalyTransfer, row.ID, row.PaymentID, withDetail("transferred_but_transfer_"+cur.Status, snap.ExternalID))
+			return s.publishOrderAnomaly(ctx, model.AnomalyTransfer, row.ID, row.PaymentOrderID, withDetail("transferred_but_transfer_"+cur.Status, snap.ExternalID))
 		}
 		return err
 	})
 	if err == nil && orphan {
 		s.d.Logger.ErrorContext(ctx, "payment：provider 已建立轉帳，轉帳列卻已不在 PENDING，待人工核對",
-			"transfer_id", row.ID.String(), "payment_id", row.PaymentID.String(), "transfer_external_id", snap.ExternalID)
+			"transfer_id", row.ID.String(), "payment_order_id", row.PaymentOrderID.String(), "transfer_external_id", snap.ExternalID)
 	}
 	return err
 }
@@ -288,7 +301,7 @@ func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now t
 		if cur.Status != string(model.TransferPending) {
 			return nil
 		}
-		pay, err := q.LockPayment(ctx, cur.PaymentID)
+		_, order, err := lockOrder(ctx, q, cur.PaymentOrderID)
 		if err != nil {
 			return err
 		}
@@ -301,25 +314,25 @@ func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now t
 		}
 		amount := locked.Amount
 		if locked.CalledAt == nil {
-			refunded, err := q.NonFailedRefundTotal(ctx, pay.ID)
+			refunded, err := q.NonFailedRefundTotal(ctx, order.ID)
 			if err != nil {
 				return err
 			}
-			amount = pay.Amount - refunded
+			amount = order.Amount - refunded
 			if amount <= 0 {
-				inFlight, err := q.InFlightRefundTotal(ctx, pay.ID)
+				inFlight, err := q.InFlightRefundTotal(ctx, order.ID)
 				if err != nil {
 					return err
 				}
 				if inFlight > 0 {
-					blocking, err := q.InFlightRefundIDs(ctx, pay.ID)
+					blocking, err := q.InFlightRefundIDs(ctx, order.ID)
 					if err != nil {
 						return err
 					}
 					return &refundsInFlightError{transferID: transferID, refundIDs: blocking}
 				}
 			}
-			if err := s.releaseWaitingReversals(ctx, q, pay.ID, reversalDeducted); err != nil {
+			if err := s.releaseWaitingReversals(ctx, q, order.ID, reversalDeducted); err != nil {
 				return err
 			}
 			if amount <= 0 {
@@ -327,12 +340,12 @@ func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now t
 				if _, err := q.FailTransfer(ctx, store.FailTransferParams{ID: transferID, FailureReason: &reason, Now: now}); err != nil {
 					return err
 				}
-				return s.settleTopupsWithoutTransfer(ctx, q, pay.ID)
+				return s.settleTopupsWithoutTransfer(ctx, q, order.ID)
 			}
-			if err := s.releaseWaitingTopups(ctx, q, pay.ID, topupCountedInNewAmount); err != nil {
+			if err := s.releaseWaitingTopups(ctx, q, order.ID, topupCountedInNewAmount); err != nil {
 				return err
 			}
-			if err := q.MarkRefundsDeducted(ctx, pay.ID); err != nil {
+			if err := q.MarkRefundsDeducted(ctx, order.ID); err != nil {
 				return err
 			}
 		}
@@ -396,7 +409,7 @@ func (s *Service) clearTransferLookupFailures(ctx context.Context, row store.Pay
 // anomalyTransfer 讓 PENDING 的轉帳進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不是 PENDING 時什麼都不做。
 // 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件（failure_reason 上限 200 字）。
 func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer, reason, detail string) error {
-	s.d.Logger.ErrorContext(ctx, "payment：轉帳進 ANOMALY，待人工核對 provider", "transfer_id", row.ID.String(), "payment_id", row.PaymentID.String(), "reason", reason, "external_id", detail)
+	s.d.Logger.ErrorContext(ctx, "payment：轉帳進 ANOMALY，待人工核對 provider", "transfer_id", row.ID.String(), "payment_order_id", row.PaymentOrderID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
@@ -408,7 +421,7 @@ func (s *Service) anomalyTransfer(ctx context.Context, row store.PaymentTransfer
 		if err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyTransfer, t.ID, t.PaymentID, withDetail(reason, detail))
+		return s.publishOrderAnomaly(ctx, model.AnomalyTransfer, t.ID, t.PaymentOrderID, withDetail(reason, detail))
 	})
 }
 
@@ -425,7 +438,7 @@ func (s *Service) failTransfer(ctx context.Context, transferID uuid.UUID, reason
 		if err != nil {
 			return err
 		}
-		if _, err := q.LockPayment(ctx, cur.PaymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, cur.PaymentOrderID); err != nil {
 			return err
 		}
 		_, err = q.FailTransfer(ctx, store.FailTransferParams{ID: transferID, FailureReason: &reason, Now: s.d.Now().UTC()})
@@ -435,9 +448,9 @@ func (s *Service) failTransfer(ctx context.Context, transferID uuid.UUID, reason
 		if err != nil {
 			return err
 		}
-		if err := s.releaseWaitingReversals(ctx, q, cur.PaymentID, reversalTransferFailed); err != nil {
+		if err := s.releaseWaitingReversals(ctx, q, cur.PaymentOrderID, reversalTransferFailed); err != nil {
 			return err
 		}
-		return s.settleTopupsWithoutTransfer(ctx, q, cur.PaymentID)
+		return s.settleTopupsWithoutTransfer(ctx, q, cur.PaymentOrderID)
 	})
 }

@@ -132,10 +132,10 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int64 {
 func (f *fixture) paid(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
-	p, err := f.module.CreatePayment(ctx, 11, "O-PAID")
+	p, err := f.module.CreatePayment(ctx, 11, []string{"O-PAID"})
 	must(t, err)
 	var external string
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT external_payment_id FROM payment.payments WHERE order_no = 'O-PAID'").Scan(&external))
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT external_payment_id FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-PAID')").Scan(&external))
 	must(t, f.fake.Settle(external, payment.PaymentStateSucceeded, f.now))
 	_, err = f.module.SyncPayment(ctx, p.ID)
 	must(t, err)
@@ -143,7 +143,7 @@ func (f *fixture) paid(t *testing.T) {
 
 func (f *fixture) open(t *testing.T) {
 	t.Helper()
-	_, err := f.module.CreatePayment(context.Background(), 12, "O-OPEN")
+	_, err := f.module.CreatePayment(context.Background(), 12, []string{"O-OPEN"})
 	must(t, err)
 }
 
@@ -308,11 +308,11 @@ func TestClosePaymentByOrderNoQueuesACancelOnlyForAnUnpaidPayment(t *testing.T) 
 
 	// job 在 transaction 外向 provider 取消，結果照一般路徑寫成 CANCELED。
 	var id string
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id::text FROM payment.payments WHERE order_no = 'O-OPEN'").Scan(&id))
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id::text FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-OPEN')").Scan(&id))
 	paymentID, err := uuid.Parse(id)
 	must(t, err)
-	must(t, f.module.CloseOrderPaymentAttempt(ctx, paymentID, false))
-	if n := f.count(t, "SELECT count(*) FROM payment.payments WHERE order_no = 'O-OPEN' AND status = 'CANCELED'"); n != 1 {
+	must(t, f.module.CloseOrderPaymentAttempt(ctx, paymentID))
+	if n := f.count(t, "SELECT count(*) FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-OPEN') AND status = 'CANCELED'"); n != 1 {
 		t.Fatalf("the payment must be CANCELED after the close job runs")
 	}
 }

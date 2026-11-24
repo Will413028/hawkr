@@ -519,6 +519,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason",
+      "tsName": "PaymentAnomalyResolutionReason",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.PaymentRefundStatus",
       "tsName": "PaymentRefundStatus",
       "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",

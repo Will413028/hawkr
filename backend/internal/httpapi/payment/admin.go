@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -16,6 +17,8 @@ import (
 	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
 // AdminModule 是後台 handler 需要的模組方法。
@@ -28,7 +31,7 @@ type AdminModule interface {
 	ListPayments(ctx context.Context, f payment.PaymentFilter, after *payment.RecordCursor, size int32) (payment.PaymentRecordPage, error)
 	ListPaymentTransfers(ctx context.Context, f payment.TransferFilter, after *payment.RecordCursor, size int32) (payment.TransferRecordPage, error)
 	ListPaymentRefunds(ctx context.Context, f payment.RefundFilter, after *payment.RecordCursor, size int32) (payment.RefundRecordPage, error)
-	ResolveAnomaly(ctx context.Context, actor payment.AdminActor, kind payment.AnomalyKind, id uuid.UUID, outcome payment.AnomalyOutcome, evidence string) error
+	ResolveAnomaly(ctx context.Context, actor payment.AdminActor, kind payment.AnomalyKind, id uuid.UUID, outcome payment.AnomalyOutcome, reason payment.AnomalyResolutionReason, note, evidence string) error
 }
 
 // actorFrom 是後台紀錄的操作者：呼叫的管理員 ID 與這個 RPC 的 procedure 名稱（D62）。
@@ -163,17 +166,25 @@ func (h *Admin) DeletePaymentAccountMapping(ctx context.Context, req *connect.Re
 var listPaths = rpc.FieldPaths{"Status": "status", "OrderNo": "order_no", "PageSize": "page_size"}
 
 func toAdminPayment(r payment.PaymentRecord) *adminpb.Payment {
-	return &adminpb.Payment{
-		Id: r.ID.String(), OrderNo: r.OrderNo, StoreId: rpc.FormatID(r.StoreID), BuyerId: rpc.FormatID(r.BuyerID), Amount: r.Amount, Provider: r.Provider,
+	orders := make([]*adminpb.PaymentOrder, len(r.Orders))
+	for i, o := range r.Orders {
+		orders[i] = &adminpb.PaymentOrder{Id: o.ID.String(), OrderNo: o.OrderNo, StoreId: rpc.FormatID(o.StoreID), Amount: o.Amount}
+	}
+	out := &adminpb.Payment{
+		Id: r.ID.String(), Orders: orders, BuyerId: rpc.FormatID(r.BuyerID), Amount: r.Amount, Provider: r.Provider,
 		Status:            rpc.EnumToProto[paymentpb.PaymentStatus](r.Status),
 		ExternalPaymentId: r.ExternalPaymentID, PaidTime: optTimestamp(r.PaidAt), LastError: r.LastError, FailureReason: r.FailureReason,
 		CreateTime: timestamppb.New(r.CreatedAt), UpdateTime: timestamppb.New(r.UpdatedAt),
 	}
+	if len(r.Orders) > 0 {
+		out.OrderNo, out.StoreId = r.Orders[0].OrderNo, rpc.FormatID(r.Orders[0].StoreID)
+	}
+	return out
 }
 
 func toAdminTransfer(r payment.TransferRecord) *adminpb.PaymentTransfer {
 	return &adminpb.PaymentTransfer{
-		Id: r.ID.String(), PaymentId: r.PaymentID.String(), OrderNo: r.OrderNo, StoreId: rpc.FormatID(r.StoreID), Amount: r.Amount, ReversedAmount: r.ReversedAmount,
+		Id: r.ID.String(), PaymentId: r.PaymentID.String(), PaymentOrderId: r.PaymentOrderID.String(), OrderNo: r.OrderNo, StoreId: rpc.FormatID(r.StoreID), Amount: r.Amount, ReversedAmount: r.ReversedAmount,
 		Status:             rpc.EnumToProto[paymentpb.PaymentTransferStatus](r.Status),
 		ExternalTransferId: r.ExternalTransferID, FailureReason: r.FailureReason, CreateTime: timestamppb.New(r.CreatedAt),
 	}
@@ -181,7 +192,7 @@ func toAdminTransfer(r payment.TransferRecord) *adminpb.PaymentTransfer {
 
 func toAdminRefund(r payment.RefundRecord) *adminpb.PaymentRefund {
 	out := &adminpb.PaymentRefund{
-		Id: r.ID.String(), PaymentId: r.PaymentID.String(), OrderNo: r.OrderNo, Amount: r.Amount, Auto: r.Auto,
+		Id: r.ID.String(), PaymentId: r.PaymentID.String(), PaymentOrderId: r.PaymentOrderID.String(), OrderNo: r.OrderNo, Amount: r.Amount, Auto: r.Auto,
 		Status:           rpc.EnumToProto[paymentpb.PaymentRefundStatus](r.Status),
 		ReversalAmount:   r.ReversalAmount,
 		ReversalStatus:   rpc.EnumToProto[paymentpb.PaymentReversalStatus](r.ReversalStatus),
@@ -296,7 +307,7 @@ var anomalyKinds = map[paymentpb.PaymentAnomalyKind]payment.AnomalyKind{
 	paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TOPUP:    payment.AnomalyTopup,
 }
 
-var resolvePaths = rpc.FieldPaths{"Evidence": "evidence"}
+var resolvePaths = rpc.FieldPaths{"Evidence": "evidence", "Reason": "reason", "Note": "note"}
 
 // ResolvePaymentAnomaly 是 ANOMALY 的人工結案：操作的管理員取自呼叫者、動作是 procedure 名稱，後台紀錄與領域變更在模組的同一個 transaction。
 func (h *Admin) ResolvePaymentAnomaly(ctx context.Context, req *connect.Request[adminpb.ResolvePaymentAnomalyRequest]) (*connect.Response[adminpb.ResolvePaymentAnomalyResponse], error) {
@@ -312,11 +323,22 @@ func (h *Admin) ResolvePaymentAnomaly(ctx context.Context, req *connect.Request[
 	if outcome == "" {
 		return nil, rpc.Error(connect.CodeInvalidArgument, "%s", "outcome 不合")
 	}
+	reason := rpc.EnumFromProto[payment.AnomalyResolutionReason](req.Msg.GetReason())
+	if reason == "" {
+		return nil, rpc.RequiredField("reason", "reason 必填")
+	}
+	note := trimtext.Trim(req.Msg.GetNote())
+	if note == "" {
+		return nil, rpc.RequiredField("note", "note 必填")
+	}
+	if utf8.RuneCountInString(note) > payment.AnomalyResolutionNoteMaxRunes {
+		return nil, rpc.WithFieldPaths(apperr.InvalidInputOn([]string{"note"}, "note 不得超過 %d 個字元", payment.AnomalyResolutionNoteMaxRunes), rpc.FieldPaths{"note": "note"})
+	}
 	actor, err := actorFrom(ctx, req.Spec().Procedure)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.m.ResolveAnomaly(ctx, actor, kind, id, outcome, req.Msg.GetEvidence()); err != nil {
+	if err := h.m.ResolveAnomaly(ctx, actor, kind, id, outcome, reason, note, req.Msg.GetEvidence()); err != nil {
 		return nil, rpc.WithFieldPaths(err, resolvePaths)
 	}
 	return connect.NewResponse(&adminpb.ResolvePaymentAnomalyResponse{}), nil

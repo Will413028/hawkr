@@ -13,16 +13,17 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 )
 
-// 新建付款寫列的參數帶說明：payments_description_check 不接受空字串，沒帶說明的列每一筆都寫不進去。
+// 新建付款寫列的參數帶說明：payments_description_check 不接受空字串，沒帶說明的列每一筆都寫不進去；付款金額是各訂單應收的總額。
 // mutation：newPaymentParams 拿掉 Description → 這個測試與 integration 的新建付款測試失敗。
-func TestNewPaymentParamsCarryTheDescription(t *testing.T) {
+func TestNewPaymentParamsCarryTheDescriptionAndTheTotalOfTheOrders(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 11, 23, 4, 0, 0, 0, time.UTC)
-	got := newPaymentParams(uuid.NewV7(), Order{OrderNo: "O-1", StoreID: 7, BuyerID: 11, Amount: 100, Description: " 藍色 T 恤 "}, FakeName, now)
-	if got.Description != "藍色 T 恤" || got.OrderNo != "O-1" || got.StoreID != 7 || got.BuyerID != 11 || got.Amount != 100 || got.Provider != FakeName || !got.Now.Equal(now) {
+	orders := []Order{{OrderNo: "O-1", StoreID: 7, BuyerID: 11, Amount: 100, Description: " 藍色 T 恤 "}, {OrderNo: "O-2", StoreID: 8, BuyerID: 11, Amount: 250}}
+	got := newPaymentParams(uuid.NewV7(), 11, orders, FakeName, now)
+	if got.Description != "藍色 T 恤" || got.BuyerID != 11 || got.Amount != 350 || got.Provider != FakeName || !got.Now.Equal(now) {
 		t.Fatalf("參數=%+v", got)
 	}
-	if empty := newPaymentParams(uuid.NewV7(), Order{OrderNo: "O-2"}, FakeName, now); empty.Description != "O-2" {
+	if empty := newPaymentParams(uuid.NewV7(), 11, []Order{{OrderNo: "O-2", Amount: 5}}, FakeName, now); empty.Description != "O-2" {
 		t.Fatalf("沒有商品名稱時說明=%q", empty.Description)
 	}
 }

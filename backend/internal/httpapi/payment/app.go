@@ -15,7 +15,7 @@ import (
 
 // AppModule 是買家 handler 需要的模組方法：付款只讀寫呼叫者自己的（模組以買家 ID 比對歸屬，他人的訂單回 NotFound）。
 type AppModule interface {
-	CreatePayment(ctx context.Context, buyerID int64, orderNo string) (payment.Payment, error)
+	CreatePayment(ctx context.Context, buyerID int64, orderNos []string) (payment.Payment, error)
 	GetPayment(ctx context.Context, buyerID int64, orderNo string) (payment.Payment, error)
 }
 
@@ -43,9 +43,9 @@ func NewApp(m AppModule, buyers rpc.BuyerLookup, publishableKey string) *App {
 // providerStripe 是 Stripe 付款 provider 的代碼（付款列的 provider 欄）。
 const providerStripe = "stripe"
 
-func (h *App) toPayment(p payment.Payment) (*paymentpb.Payment, error) {
+func (h *App) toPayment(p payment.Payment, orderNo string) (*paymentpb.Payment, error) {
 	out := &paymentpb.Payment{
-		OrderNo: p.OrderNo,
+		OrderNo: orderNo,
 		Status:  rpc.EnumToProto[paymentpb.PaymentStatus](p.Status),
 		Amount:  p.Amount,
 	}
@@ -76,11 +76,11 @@ func (h *App) CreatePayment(ctx context.Context, req *connect.Request[paymentpb.
 	if err != nil {
 		return nil, err
 	}
-	p, err := h.m.CreatePayment(ctx, buyerID, req.Msg.GetOrderNo())
+	p, err := h.m.CreatePayment(ctx, buyerID, []string{req.Msg.GetOrderNo()})
 	if err != nil {
 		return nil, err
 	}
-	out, err := h.toPayment(p)
+	out, err := h.toPayment(p, req.Msg.GetOrderNo())
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (h *App) GetPayment(ctx context.Context, req *connect.Request[paymentpb.Get
 	if err != nil {
 		return nil, err
 	}
-	out, err := h.toPayment(p)
+	out, err := h.toPayment(p, req.Msg.GetOrderNo())
 	if err != nil {
 		return nil, err
 	}

@@ -40,12 +40,12 @@ type reversalTarget struct {
 
 // reversalTargets 依固定順序列出付款可撤的轉帳：原轉帳第一，之後是成功的補差額轉帳（依擁有者退款 ID 升序）。呼叫方已鎖付款列與（成立的）轉帳列。
 func reversalTargets(ctx context.Context, q *store.Queries, tr store.PaymentTransfer) ([]reversalTarget, error) {
-	open, err := q.OpenReversalTotalOnTransfer(ctx, tr.PaymentID)
+	open, err := q.OpenReversalTotalOnTransfer(ctx, tr.PaymentOrderID)
 	if err != nil {
 		return nil, err
 	}
 	targets := []reversalTarget{{externalID: *tr.ExternalTransferID, free: tr.Amount - tr.ReversedAmount - open}}
-	tops, err := q.ReversibleTopups(ctx, tr.PaymentID)
+	tops, err := q.ReversibleTopups(ctx, tr.PaymentOrderID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (s *Service) startReversals(ctx context.Context, q *store.Queries, paymentI
 	if err != nil || len(rows) == 0 {
 		return err
 	}
-	tr, err := q.SucceededTransferByPayment(ctx, paymentID)
+	tr, err := q.SucceededTransferByOrder(ctx, paymentID)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func (s *Service) startReversals(ctx context.Context, q *store.Queries, paymentI
 			legs = append(legs, leg{seq: int32(i), target: targets[i], amount: take})
 		}
 		if left > 0 {
-			if err := s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, reversalExceedsRemaining); err != nil {
+			if err := s.publishOrderAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentOrderID, reversalExceedsRemaining); err != nil {
 				return err
 			}
 			if len(legs) == 0 {
@@ -117,7 +117,7 @@ func (s *Service) startReversals(ctx context.Context, q *store.Queries, paymentI
 		}
 		for _, l := range legs {
 			if _, err := q.InsertRefundReversal(ctx, store.InsertRefundReversalParams{
-				ID: s.d.NewID(), RefundID: r.ID, PaymentID: r.PaymentID, Seq: l.seq, TargetRefundID: l.target.refundID, TargetExternalID: l.target.externalID, Amount: l.amount, Now: now,
+				ID: s.d.NewID(), RefundID: r.ID, PaymentOrderID: r.PaymentOrderID, Seq: l.seq, TargetRefundID: l.target.refundID, TargetExternalID: l.target.externalID, Amount: l.amount, Now: now,
 			}); err != nil {
 				return err
 			}
@@ -194,7 +194,7 @@ type segmentTarget struct {
 // checkSegmentTarget 確認撤回列的目標仍然成立；不成立回原因碼（reason 非空）。
 func (s *Service) checkSegmentTarget(ctx context.Context, q *store.Queries, seg store.PaymentRefundReversal) (segmentTarget, string, error) {
 	if seg.TargetRefundID == nil {
-		tr, err := q.SucceededTransferByPayment(ctx, seg.PaymentID)
+		tr, err := q.SucceededTransferByOrder(ctx, seg.PaymentOrderID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return segmentTarget{}, "no_succeeded_transfer", nil
 		}
@@ -244,7 +244,7 @@ func (s *Service) reverseSegment(ctx context.Context, seg store.PaymentRefundRev
 	snap, err := s.d.Provider.ReverseTransfer(callCtx, ReversalInput{
 		ExternalTransferID: seg.TargetExternalID, Amount: called.Amount, IdempotencyKey: called.IdempotencyKey.String(),
 	})
-	switch classifyCall(err) {
+	switch s.classify(ctx, "reverse_transfer", err) {
 	case callRefused:
 		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕撤回轉帳", "reversal_id", seg.ID.String(), "refund_id", seg.RefundID.String(), "err", err)
 		return s.releaseReversal(ctx, seg, failedRefused)
@@ -288,7 +288,7 @@ func (s *Service) lookupReversal(ctx context.Context, seg store.PaymentRefundRev
 
 // lockReversalRows 依鎖順序鎖一次撤回落地要動的列：付款列、轉帳列（目標是原轉帳時）、退款列（撤回的擁有者與補差額轉帳的擁有者，依 ID 升序）、撤回列。
 func lockReversalRows(ctx context.Context, q *store.Queries, seg store.PaymentRefundReversal, transferID uuid.UUID) error {
-	if _, err := q.LockPayment(ctx, seg.PaymentID); err != nil {
+	if _, _, err := lockOrder(ctx, q, seg.PaymentOrderID); err != nil {
 		return err
 	}
 	if seg.TargetRefundID == nil {
@@ -344,7 +344,7 @@ func (s *Service) acceptReversal(ctx context.Context, seg store.PaymentRefundRev
 				return nil
 			}
 			orphan = true
-			return s.publishAnomaly(ctx, model.AnomalyReversal, seg.ID, seg.PaymentID, fmt.Sprintf("reversed_but_reversal_%s:%s", cur.Status, snap.ExternalID))
+			return s.publishOrderAnomaly(ctx, model.AnomalyReversal, seg.ID, seg.PaymentOrderID, fmt.Sprintf("reversed_but_reversal_%s:%s", cur.Status, snap.ExternalID))
 		}
 		if err := addTargetReversal(ctx, q, seg, target.transferID, now); err != nil {
 			return err
@@ -353,7 +353,7 @@ func (s *Service) acceptReversal(ctx context.Context, seg store.PaymentRefundRev
 	})
 	if err == nil && orphan {
 		s.d.Logger.ErrorContext(ctx, "payment：provider 已撤回轉帳，撤回列的狀態卻已不在 REVERSING，待人工核對",
-			"reversal_id", seg.ID.String(), "refund_id", seg.RefundID.String(), "payment_id", seg.PaymentID.String(), "reversal_external_id", snap.ExternalID)
+			"reversal_id", seg.ID.String(), "refund_id", seg.RefundID.String(), "payment_order_id", seg.PaymentOrderID.String(), "reversal_external_id", snap.ExternalID)
 	}
 	return err
 }
@@ -368,7 +368,7 @@ func (s *Service) settleReversal(ctx context.Context, q *store.Queries, seg stor
 		return err
 	}
 	if cur.Status == string(model.RefundFailed) {
-		return s.publishAnomaly(ctx, model.AnomalyRefund, seg.RefundID, seg.PaymentID, withDetail("refund_failed_after_reversal", detail))
+		return s.publishOrderAnomaly(ctx, model.AnomalyRefund, seg.RefundID, seg.PaymentOrderID, withDetail("refund_failed_after_reversal", detail))
 	}
 	return nil
 }
@@ -439,12 +439,12 @@ func (s *Service) clearReversalLookupFailures(ctx context.Context, seg store.Pay
 // anomalyReversal 讓 REVERSING 的撤回列進 ANOMALY、重算退款的彙總並在同一個 transaction 發 MoneyAnomaly；撤回列已不是 REVERSING 時什麼都不做。
 // 列上只存原因碼 reason（上限 200 字）；provider 的外部 ID（detail）只進 log 與事件。鎖順序：付款列、退款列。
 func (s *Service) anomalyReversal(ctx context.Context, seg store.PaymentRefundReversal, reason, detail string) error {
-	s.d.Logger.ErrorContext(ctx, "payment：退款的撤回進 ANOMALY，待人工核對 provider", "reversal_id", seg.ID.String(), "refund_id", seg.RefundID.String(), "payment_id", seg.PaymentID.String(), "reason", reason, "external_id", detail)
+	s.d.Logger.ErrorContext(ctx, "payment：退款的撤回進 ANOMALY，待人工核對 provider", "reversal_id", seg.ID.String(), "refund_id", seg.RefundID.String(), "payment_order_id", seg.PaymentOrderID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPayment(ctx, seg.PaymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, seg.PaymentOrderID); err != nil {
 			return err
 		}
 		if _, err := q.LockRefund(ctx, seg.RefundID); err != nil {
@@ -461,7 +461,7 @@ func (s *Service) anomalyReversal(ctx context.Context, seg store.PaymentRefundRe
 		if err := q.SettleRefundReversal(ctx, store.SettleRefundReversalParams{ID: seg.RefundID, Now: now}); err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyReversal, r.ID, r.PaymentID, withDetail(reason, detail))
+		return s.publishOrderAnomaly(ctx, model.AnomalyReversal, r.ID, r.PaymentOrderID, withDetail(reason, detail))
 	})
 }
 
@@ -472,7 +472,7 @@ func (s *Service) releaseReversal(ctx context.Context, seg store.PaymentRefundRe
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPayment(ctx, seg.PaymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, seg.PaymentOrderID); err != nil {
 			return err
 		}
 		if _, err := q.LockRefund(ctx, seg.RefundID); err != nil {
@@ -489,6 +489,6 @@ func (s *Service) releaseReversal(ctx context.Context, seg store.PaymentRefundRe
 		if err := q.SettleRefundReversal(ctx, store.SettleRefundReversalParams{ID: seg.RefundID, Now: now}); err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyReversal, r.ID, r.PaymentID, "reversal_released:"+reason)
+		return s.publishOrderAnomaly(ctx, model.AnomalyReversal, r.ID, r.PaymentOrderID, "reversal_released:"+reason)
 	})
 }

@@ -215,6 +215,30 @@ final $typed_data.Uint8List paymentAnomalyOutcomeDescriptor = $convert.base64Dec
     'VDSUZJRUQQABIlCiFQQVlNRU5UX0FOT01BTFlfT1VUQ09NRV9TVUNDRUVERUQQARIiCh5QQVlN'
     'RU5UX0FOT01BTFlfT1VUQ09NRV9GQUlMRUQQAg==');
 
+@$core.Deprecated('Use paymentAnomalyResolutionReasonDescriptor instead')
+const PaymentAnomalyResolutionReason$json = {
+  '1': 'PaymentAnomalyResolutionReason',
+  '2': [
+    {'1': 'PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED', '2': 0},
+    {
+      '1': 'PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED',
+      '2': 1
+    },
+    {'1': 'PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED', '2': 2},
+    {'1': 'PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE', '2': 3},
+    {'1': 'PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER', '2': 4},
+  ],
+};
+
+/// Descriptor for `PaymentAnomalyResolutionReason`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List paymentAnomalyResolutionReasonDescriptor = $convert.base64Decode(
+    'Ch5QYXltZW50QW5vbWFseVJlc29sdXRpb25SZWFzb24SMQotUEFZTUVOVF9BTk9NQUxZX1JFU0'
+    '9MVVRJT05fUkVBU09OX1VOU1BFQ0lGSUVEEAASRApAUEFZTUVOVF9BTk9NQUxZX1JFU09MVVRJ'
+    'T05fUkVBU09OX1BST1ZJREVSX0VYRUNVVEVEX05PVF9SRUNPUkRFRBABEjsKN1BBWU1FTlRfQU'
+    '5PTUFMWV9SRVNPTFVUSU9OX1JFQVNPTl9QUk9WSURFUl9OT1RfRVhFQ1VURUQQAhIvCitQQVlN'
+    'RU5UX0FOT01BTFlfUkVTT0xVVElPTl9SRUFTT05fRFVQTElDQVRFEAMSKwonUEFZTUVOVF9BTk'
+    '9NQUxZX1JFU09MVVRJT05fUkVBU09OX09USEVSEAQ=');
+
 @$core.Deprecated('Use paymentDescriptor instead')
 const Payment$json = {
   '1': 'Payment',
@@ -371,8 +395,7 @@ const $core.Map<$core.String, $core.dynamic> PaymentAppServiceBase$json = {
     {
       '1': 'GetPayment',
       '2': '.hawkr.payment.v1alpha1.GetPaymentRequest',
-      '3': '.hawkr.payment.v1alpha1.GetPaymentResponse',
-      '4': {'34': 2},
+      '3': '.hawkr.payment.v1alpha1.GetPaymentResponse'
     },
   ],
 };
@@ -394,6 +417,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
 final $typed_data.Uint8List paymentAppServiceDescriptor = $convert.base64Decode(
     'ChFQYXltZW50QXBwU2VydmljZRJxCg1DcmVhdGVQYXltZW50EiwuaGF3a3IucGF5bWVudC52MW'
     'FscGhhMS5DcmVhdGVQYXltZW50UmVxdWVzdBotLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuQ3Jl'
-    'YXRlUGF5bWVudFJlc3BvbnNlIgOQAgISaAoKR2V0UGF5bWVudBIpLmhhd2tyLnBheW1lbnQudj'
+    'YXRlUGF5bWVudFJlc3BvbnNlIgOQAgISYwoKR2V0UGF5bWVudBIpLmhhd2tyLnBheW1lbnQudj'
     'FhbHBoYTEuR2V0UGF5bWVudFJlcXVlc3QaKi5oYXdrci5wYXltZW50LnYxYWxwaGExLkdldFBh'
-    'eW1lbnRSZXNwb25zZSIDkAIC');
+    'eW1lbnRSZXNwb25zZQ==');
