@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/rows"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/store"
@@ -46,7 +45,7 @@ type Stores interface {
 type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
-	Media  media.Media
+	Media  model.Media
 	Jobs   jobs.Enqueuer
 	Buyers Buyers
 	Stores Stores
@@ -69,8 +68,8 @@ func orderNotFound(l uitext.Locale) error {
 	return model.WithReason(apperr.NotFound("%s", text.ReviewOrderNotFound(l)), model.ReasonOrderNotFound)
 }
 
-// Submit 提交一則評價。順序：輸入驗證 → 詞典 → 訂單擁有者（別人的訂單等同不存在）→ 訂單狀態（唯一的快照來源）→ 買家是否仍營運（提早擋，省掉轉正圖片）→ 期限 → 項目 → transaction 外轉正圖片 →
-// transaction 內第一句 buyer.LockActive 守門（與刪帳轉移的買家列 FOR UPDATE 互斥，這次才是定論）、寫列、排媒體同步與快取失效、發事件。
+// Submit 提交一則評價。順序：輸入驗證 → 詞典 → 訂單擁有者（別人的訂單等同不存在）→ 訂單狀態（唯一的快照來源）→ 買家是否仍營運（提早擋，省掉轉正圖片）→ 期限 → 項目 → transaction 內第一句 buyer.LockActive 守門（與刪帳轉移的買家列 FOR UPDATE 互斥，這次才是定論）、寫列、Confirm 附圖、快取失效、發事件；
+// 任何一步失敗整筆回滾，附圖仍是暫存。
 func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Review, error) {
 	l := uitext.LocaleFrom(ctx)
 	content, rating, err := s.checkSubmit(l, &in)
@@ -106,16 +105,13 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 		return model.Review{}, apperr.InvalidInputOn([]string{"OrderItemID"}, "%s", text.ReviewItemNotInOrder(l))
 	}
 
-	var assets []media.Asset
+	var uploader media.Uploader
 	if len(in.StagedTokens) > 0 {
 		accountID, err := s.d.Buyers.AccountIDByBuyerID(ctx, in.BuyerID)
 		if err != nil {
 			return model.Review{}, err
 		}
-		assets, err = media.FinalizeList(ctx, s.d.Media, media.Uploader{ID: accountID}, "StagedTokens", in.StagedTokens, media.RefTypeOrderReview, nil)
-		if err != nil {
-			return model.Review{}, err
-		}
+		uploader = media.Uploader{ID: accountID}
 	}
 
 	var out model.Review
@@ -139,17 +135,20 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 		if err != nil {
 			return err
 		}
+		items := make([]media.ConfirmItem, len(in.StagedTokens))
+		for i, token := range in.StagedTokens {
+			items[i] = media.ConfirmItem{Field: apperr.IndexedField("StagedTokens", i), Token: token}
+		}
+		assets, err := media.ConfirmFields(ctx, s.d.Media, uploader, items, media.VisibilityPublic)
+		if err != nil {
+			return err
+		}
 		images := make([]model.Image, len(assets))
 		for i, a := range assets {
 			if err := q.InsertReviewImage(ctx, store.InsertReviewImageParams{ReviewID: id, Position: int16(i), AssetID: a.ID, ObjectKey: a.ObjectKey}); err != nil {
 				return err
 			}
 			images[i] = model.Image{AssetID: a.ID, ObjectKey: a.ObjectKey}
-		}
-		if len(assets) > 0 {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.ReviewRef(id)); err != nil {
-				return err
-			}
 		}
 		if err := s.bust(ctx, order.StoreID, item.ProductID); err != nil {
 			return err

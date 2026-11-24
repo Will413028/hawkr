@@ -4,6 +4,7 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
@@ -49,6 +50,11 @@ ContentPublicServiceClient contentClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 IdentityAppServiceClient identityClient(Ref ref) =>
     IdentityAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 圖片與機敏檔案的上傳會話（MediaAppService），登入後呼叫。
+@Riverpod(keepAlive: true)
+MediaAppServiceClient mediaClient(Ref ref) =>
+    MediaAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 賣家的店家、入駐與 KYC（SellerAppService），登入後呼叫。
 @Riverpod(keepAlive: true)

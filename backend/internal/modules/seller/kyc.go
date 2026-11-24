@@ -8,11 +8,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-// ErrFileNotSynced 表示機敏檔（證件、佐證）在 media 還讀不到，而且它的 media 引用同步還沒結算：稍後重試（ReadKYCDocument、
-// ReadEvidence）。
-var ErrFileNotSynced = model.ErrFileNotSynced
-
-// ErrFileMissing 表示我們的資料庫有這份機敏檔、引用也同步過了，media 卻說沒有（ReadKYCDocument、ReadEvidence）：資料不一致，
+// ErrFileMissing 表示我們的資料庫有這份機敏檔，media 卻說沒有（ReadKYCDocument、ReadEvidence）：資料不一致，
 // 要人處理。
 var ErrFileMissing = model.ErrFileMissing
 
@@ -63,6 +59,9 @@ type KYCDocumentAccessPage = model.KYCDocumentAccessPage
 
 // KYCDocumentAccess 是一筆補充文件的讀取紀錄（誰、哪一張、何時；不含內容）。
 type KYCDocumentAccess = model.KYCDocumentAccess
+
+// ReadOwnKYCDocumentInput 是賣家讀自己申請的一張補充文件的輸入。
+type ReadOwnKYCDocumentInput = model.ReadOwnKYCDocumentInput
 
 // ReadKYCDocumentInput 是讀一張補充文件的輸入。
 type ReadKYCDocumentInput = model.ReadKYCDocumentInput
@@ -237,6 +236,12 @@ func (m *Module) AdminKYCApplication(ctx context.Context, applicationID uuid.UUI
 // 在讀取圖片之前先寫一列 append-only 的讀取紀錄（誰、哪一張、何時；寫不進去就不讀、不回傳）；圖片經 media 的機敏讀取取得。
 func (m *Module) ReadKYCDocument(ctx context.Context, in ReadKYCDocumentInput) (FileContent, error) {
 	return m.kyc.ReadDocument(ctx, in)
+}
+
+// ReadOwnKYCDocument 讀帳號目前店家的申請的一張補充文件（賣家）：授權是帳號擁有這家店（CapAccountSelfRead，與 MyKYC 同一個），申請以帳號目前的店家為準，
+// 不接受別人的申請；沒有申請、已取消、個資已清除或位置沒有文件回 NotFound。圖片經 media 的機敏讀取取得，不寫讀取紀錄（讀取紀錄是後台管理員的稽核）。
+func (m *Module) ReadOwnKYCDocument(ctx context.Context, in ReadOwnKYCDocumentInput) (FileContent, error) {
+	return m.kyc.ReadOwnDocument(ctx, in)
 }
 
 // ListKYCDocumentAccesses 列出一筆申請的補充文件讀取紀錄（新到舊的 keyset）；申請不存在或是草稿回 NotFound。

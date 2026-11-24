@@ -31,13 +31,29 @@ export const SCAN_ROOTS = [
 	"middleware.ts",
 ] as const;
 
+/** `features/delegated-operations` 裡被代行工作區以外的程式（賣家中心的頁面等）匯入的檔，會發佈 en，照樣掃；
+ * 目錄內其餘的檔只有代行工作區用。這份清單由 `check-hardcoded-han.unit.test.ts` 對 import 圖逐檔驗證，漂移會讓測試失敗。 */
+export const DELEGATED_SHARED_FILES: ReadonlySet<string> = new Set([
+	"features/delegated-operations/confirm-content.ts",
+	"features/delegated-operations/load-failure.ts",
+	"features/delegated-operations/state/DelegatedSessionContext.tsx",
+	"features/delegated-operations/state/end-pending-latch.ts",
+	"features/delegated-operations/state/session-client.ts",
+	"features/delegated-operations/state/session.ts",
+]);
+
 /**
- * 排除規則集中在這裡：代行工作區 `app/(delegated)` 只有 zh-TW（不發佈 en）；測試不是使用者面文字；
- * 生成檔（`*.gen.*`、`*.g.*`）不得手改，由各自的 drift 檢查守。`messages/*.json` 不是 ts，本來就不掃。
+ * 排除規則集中在這裡：代行工作區 `app/(delegated)` 與 `features/delegated-operations`（除 [DELEGATED_SHARED_FILES]）只有 zh-TW（不發佈 en）；
+ * 測試不是使用者面文字；生成檔（`*.gen.*`、`*.g.*`）不得手改，由各自的 drift 檢查守。`messages/*.json` 不是 ts，本來就不掃。
  */
 export function isExcluded(rel: string): boolean {
 	const path = rel.split("\\").join("/");
 	if (path.startsWith("app/(delegated)/")) return true;
+	if (
+		path.startsWith("features/delegated-operations/") &&
+		!DELEGATED_SHARED_FILES.has(path)
+	)
+		return true;
 	if (path.split("/").some((s) => s === "tests" || s === "__tests__"))
 		return true;
 	const name = path.slice(path.lastIndexOf("/") + 1);

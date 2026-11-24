@@ -12,12 +12,10 @@ import 'package:hawkr_seller/core/theme/app_theme.dart';
 import 'package:hawkr_seller/features/post/data/post_comment.dart';
 import 'package:hawkr_seller/features/post/data/post_repository.dart';
 import 'package:hawkr_seller/features/post/presentation/widgets/page_echo_tab.dart';
-import 'package:hawkr_seller/features/seller/data/seller_repository.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/widgets/app_bottom_navigation_bar.dart';
 import 'package:hawkr_seller/shared/widgets/hk_frosted_icon_button.dart';
 import 'package:hawkr_seller/shared/widgets/seller_floating_navigation_layout.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -33,29 +31,11 @@ import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 
 class _MockPostRepository extends Mock implements PostRepository {}
 
-class _RecordingAdapter implements HttpClientAdapter {
-  final requests = <String>[];
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    requests.add('${options.method} ${options.path}');
-    return ResponseBody.fromString('{"code":0,"data":{}}', 200);
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
 Finder _iconButton(String tooltip) => find.byWidgetPredicate(
   (widget) => widget is IconButton && widget.tooltip == tooltip,
 );
 
 const _logoTemplate = 'https://img.example.test/logo/{preset}.jpg';
-late _RecordingAdapter _lastAdapter;
 
 class _StoreHolder extends Notifier<MyStore?> {
   @override
@@ -91,7 +71,6 @@ Future<_MockPostRepository> _pumpEcho(
   addTearDown(tester.view.resetPadding);
 
   final repository = _MockPostRepository();
-  final adapter = _RecordingAdapter();
   final ownReplies =
       replies ??
       [
@@ -118,7 +97,6 @@ Future<_MockPostRepository> _pumpEcho(
   when(
     () => repository.listForumEntries('7', parentId: '42'),
   ).thenAnswer((_) async => ownReplies);
-  _lastAdapter = adapter;
   SharedPreferences.setMockInitialValues({});
   await tester.pumpWidget(
     ProviderScope(
@@ -131,9 +109,6 @@ Future<_MockPostRepository> _pumpEcho(
           myStoreSnapshotProvider.overrideWithValue(
             MyStore(myStoreResponse(id: '7', logoTemplate: _logoTemplate)),
           ),
-        sellerRepositoryProvider.overrideWith(
-          (ref) => SellerRepository(Dio()..httpClientAdapter = adapter, ref),
-        ),
       ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
@@ -534,7 +509,6 @@ void main() {
       ],
     );
 
-    expect(_lastAdapter.requests, isEmpty);
     expect(find.text('小明'), findsOneWidget);
     expect(find.text('小華'), findsOneWidget);
     expect(find.text('用戶31'), findsNothing);
@@ -545,7 +519,6 @@ void main() {
   ) async {
     await _pumpEcho(tester, ownReply: true);
 
-    expect(_lastAdapter.requests, isEmpty);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getKeys(), isEmpty);
     expect(

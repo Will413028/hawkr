@@ -5,12 +5,12 @@ import type {
 
 /**
  * 情境列的 capability chips 是**唯讀展示**（mockup §3.2）：mockup 用五組標籤表達
- * 封閉九值（`店面管理`／`商品編輯`／`商品上架 / 下架`／`動態內容`／`訂單唯讀`），
- * 而後端下發的是九個機器名。
+ * 封閉十值（`店面管理`／`商品編輯`／`商品上架 / 下架`／`動態內容`／`訂單唯讀`），
+ * 而後端下發的是十個機器名。
  *
  * 一組的成員**全數核發**才畫該組的 chip；只核發一半時退回逐個 capability 的
  * 標籤，避免一顆 chip 對操作者宣稱他其實沒有的權限。認不得的 capability 直接
- * 略過（不畫、不報錯）——後端擴充第 10 個值時，工作區只會少一顆 chip。
+ * 略過（不畫、不報錯）——第十個 `media.upload`（B1-D16）不在任何一組，逐個顯示「上傳檔案」。
  */
 const CAPABILITY_GROUPS: { label: string; members: DelegatedCapability[] }[] = [
 	{ label: "店面管理", members: ["storefront.read", "storefront.write"] },
@@ -33,6 +33,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
 	"posts.write": "編輯貼文",
 	"posts.publish": "發布與下架貼文",
 	"orders.read": "查看訂單（唯讀）",
+	"media.upload": "上傳檔案",
 };
 
 export function delegatedCapabilityChipLabels(

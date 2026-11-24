@@ -9,14 +9,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// registerDelegatedOperationRoutes mounts the 34 endpoints of 56 號 ADM 代行營運
+// registerDelegatedOperationRoutes mounts the 32 endpoints of 56 號 ADM 代行營運
 // (§6.1.1 ＋ #2444 的授權列治理 ＋ §11.3 P1 的跨工作階段查詢), split across two
 // groups that share the /api/v1/admin prefix:
 //
 //	admin        — 14 支 ADM host 端點，身分＝ADM session（既有 JWTAuth + requireAdmin）
-//	adminNoAuth  — 20 支，身分＝operation credential（A31 起前綴不再蘊含 admin 身分）
+//	adminNoAuth  — 18 支，身分＝operation credential（A31 起前綴不再蘊含 admin 身分）
 //
-// 那 20 支就是 §8.1.2 boot 斷言第 4 條的具名白名單。掛錯 group 的症狀是不對稱的：
+// 那 18 支就是 §8.1.2 boot 斷言第 4 條的具名白名單。掛錯 group 的症狀是不對稱的：
 // 把 www host 組掛回 requireAdmin ⇒ 工作區每一次輪詢 9261（吵，看得見）；反過來把一支
 // 治理端點掛到 credential-only 群組上 ⇒ 一支**沒有任何身分要求**的治理端點，而 review
 // 時它與其他 /admin/ 路由長得一模一樣，差別只在註冊時用了哪一個 group 變數。
@@ -64,7 +64,7 @@ func registerDelegatedOperationRoutes(admin, adminNoAuth *gin.RouterGroup, h *ha
 	// 開一條繞過 parser／safeUpstreamError／no-store 的路，而且不會有東西轉紅。
 	//
 	// 靜態段 `capabilities`／`authorizations` 與同層的 `:session_id` 並存是 gin 支援的
-	// （`current`／`handoff`／`media` 三者早已如此），不會在 tree 註冊時 panic。
+	// （`current`／`handoff` 兩者早已如此），不會在 tree 註冊時 panic。
 	adminHandle(admin, http.MethodGet, "/delegated-operations/capabilities", h.ListDelegationCapabilities)
 	adminHandle(admin, http.MethodGet, "/delegated-operations/authorizations", h.ListDelegationAuthorizations)
 	adminHandle(admin, http.MethodPost, "/delegated-operations/authorizations", h.GrantDelegationAuthorization)
@@ -80,10 +80,6 @@ func registerDelegatedOperationRoutes(admin, adminNoAuth *gin.RouterGroup, h *ha
 
 	// ── S6 交接兌換（1 支）：四個 helper 一個都不掛 ──────────────────────────
 	handoffHandle(adminNoAuth, http.MethodPost, "/delegated-operations/handoff/redeem", h.RedeemDelegationHandoff)
-
-	// ── 媒體 upload session（2 支）：不驗 capability，但一律算活動 ────────────
-	sessionOnlyHandle(adminNoAuth, http.MethodPost, "/delegated-operations/media/upload_sessions", deps, h.CreateDelegatedMediaUploadSession)
-	sessionOnlyHandle(adminNoAuth, http.MethodPost, "/delegated-operations/media/upload_sessions/:session_id/complete", deps, h.CompleteDelegatedMediaUploadSession)
 
 	// ── 14 支代行資源端點：capability 為必填參數，宣告＝掛載合一 ──────────────
 	sellers := "/sellers/:store_id"

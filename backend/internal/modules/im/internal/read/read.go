@@ -313,7 +313,7 @@ func (s *Service) MessageForReport(ctx context.Context, messageID uuid.UUID, rep
 				m.Text = *r.Content
 			}
 			if r.ImageAssetID != nil {
-				m.AssetID = *r.ImageAssetID
+				m.AssetID = r.ImageAssetID.String()
 			}
 		}
 		if r.IsTarget {

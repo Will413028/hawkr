@@ -89,58 +89,8 @@ func TestBodyGuard_UploadRouteGetsLargerLimit(t *testing.T) {
 	}
 }
 
-func TestBodyGuard_MediaSecureUploadRouteGetsKYCLimit(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(middleware.BodyGuard())
-	r.PUT("/api/v1/app/media/secure_upload/:id", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	// 15MiB is over the standard 10MiB upload tier but under the 20MiB KYC
-	// tier — this is the discriminating case: it proves the route gets the
-	// larger kycUploadMaxBodyBytes tier specifically, not just the shared
-	// uploadMaxBodyBytes tier the other two upload routes use.
-	body := strings.NewReader(strings.Repeat("a", 15<<20))
-	req, _ := http.NewRequest(http.MethodPut, "/api/v1/app/media/secure_upload/123", body)
-	req.ContentLength = 15 << 20
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("media/secure_upload should accept a 15MiB body (KYC tier), got %d", w.Code)
-	}
-}
-
-func TestBodyGuard_MediaSecureUploadRejectsOverKYCLimit(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(middleware.BodyGuard())
-	handlerCalled := false
-	r.PUT("/api/v1/app/media/secure_upload/:id", func(c *gin.Context) {
-		handlerCalled = true
-		c.Status(http.StatusOK)
-	})
-
-	body := strings.NewReader(strings.Repeat("a", 21<<20)) // 21MiB > 20MiB KYC tier
-	req, _ := http.NewRequest(http.MethodPut, "/api/v1/app/media/secure_upload/123", body)
-	req.ContentLength = 21 << 20
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("expected 413 for a body over the 20MiB KYC tier, got %d", w.Code)
-	}
-	if handlerCalled {
-		t.Fatal("handler must not run when body exceeds the KYC tier's size guard")
-	}
-}
-
 func TestBodyGuard_OtherUploadRoutesStayAtStandardTier(t *testing.T) {
-	// 15MiB is within the KYC tier but must still be rejected on the other
-	// two upload routes, which stay at the standard 10MiB tier — proves the
-	// KYC tier is scoped to media/secure_upload only, not accidentally
-	// widened for every upload route.
+	// 15MiB is over the 10MiB upload tier and must be rejected.
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.BodyGuard())
@@ -286,30 +236,5 @@ func TestBodyGuard_StillSetsReadDeadlineForChunkedBody(t *testing.T) {
 
 	if len(dw.deadlines) != 1 {
 		t.Fatalf("expected SetReadDeadline to still be called for a chunked (ContentLength==-1) body, got %d call(s)", len(dw.deadlines))
-	}
-}
-
-func TestBodyGuard_MediaSecureUploadGetsKYCReadDeadline(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(middleware.BodyGuard())
-	r.PUT("/api/v1/app/media/secure_upload/:id", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	dw := &deadlineTrackingResponseWriter{ResponseWriter: httptest.NewRecorder()}
-	req, _ := http.NewRequest(http.MethodPut, "/api/v1/app/media/secure_upload/123", strings.NewReader(`{"a":1}`))
-
-	before := time.Now()
-	r.ServeHTTP(dw, req)
-	after := time.Now()
-
-	if len(dw.deadlines) != 1 {
-		t.Fatalf("expected exactly 1 SetReadDeadline call, got %d", len(dw.deadlines))
-	}
-	wantMin := before.Add(240 * time.Second)
-	wantMax := after.Add(240 * time.Second)
-	if got := dw.deadlines[0]; got.Before(wantMin) || got.After(wantMax) {
-		t.Fatalf("media/secure_upload deadline %v not within expected [%v, %v] (want ~240s, i.e. 2x the standard 120s upload deadline to match the doubled 20MiB byte cap)", got, wantMin, wantMax)
 	}
 }

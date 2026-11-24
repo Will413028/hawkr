@@ -1142,7 +1142,7 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 			_, s := f.open(t)
 			r := f.reporterReport(t, s.StoreID)
 			for i := range MaxSupplements - 1 {
-				_, err := f.addSupplement(r.ReportID, fmt.Sprintf("補充 %d", i+1))
+				_, err := f.addSupplement(t, r.ReportID, fmt.Sprintf("補充 %d", i+1))
 				must(t, err)
 			}
 			return r
@@ -1151,7 +1151,7 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 			_, s := f.open(t)
 			r := f.reporterReport(t, s.StoreID)
 			for i := range MaxSupplements {
-				_, err := f.addSupplement(r.ReportID, fmt.Sprintf("補充 %d", i+1))
+				_, err := f.addSupplement(t, r.ReportID, fmt.Sprintf("補充 %d", i+1))
 				must(t, err)
 			}
 			return r
@@ -1166,7 +1166,7 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 			_, s := f.open(t)
 			r := f.reporterReport(t, s.StoreID)
 			for i := range MaxSupplements {
-				_, err := f.addSupplement(r.ReportID, fmt.Sprintf("補充 %d", i+1))
+				_, err := f.addSupplement(t, r.ReportID, fmt.Sprintf("補充 %d", i+1))
 				must(t, err)
 			}
 			f.mustResolve(t, r.ReportID, OutcomeInsufficient)
@@ -1178,7 +1178,7 @@ func TestCanFlagsMatchWhetherTheActionSucceeds(t *testing.T) {
 		before, err := f.module.BuyerReport(ctx, reporterBuyer, r.ReportID)
 		must(t, err)
 		want := before.CanSupplement()
-		after, err := f.addSupplement(r.ReportID, "再補充")
+		after, err := f.addSupplement(t, r.ReportID, "再補充")
 		if (err == nil) != want {
 			t.Errorf("補充／%s：can=%v，方法結果=%v", sc.name, want, err)
 		}
@@ -1880,8 +1880,7 @@ func TestAppealAcceptEndsTheEffectInTheSameTransaction(t *testing.T) {
 	unsuspended := record[StoreUnsuspended](f)
 	accountID, s, m := f.appealable(t)
 	appealed := f.appeal(t, accountID, m, " 已改善 ", "a1")
-	if appealed.Appeal() == nil || appealed.Appeal().State != RequestPending || appealed.Appeal().Reason != "已改善" || !appealed.CanDecideAppeal() ||
-		f.media.finalized[len(f.media.finalized)-1] != media.RefTypeGovernanceEvidence {
+	if appealed.Appeal() == nil || appealed.Appeal().State != RequestPending || appealed.Appeal().Reason != "已改善" || !appealed.CanDecideAppeal() {
 		t.Fatalf("appealed=%+v", appealed.Appeal())
 	}
 	admin := f.measureOf(t, m.ID)
@@ -2235,11 +2234,11 @@ func TestReportSchemaConstraints(t *testing.T) {
 		{"通報掛到別家店的案件", "reports_case_fkey", "UPDATE seller.reports SET case_id = '" + foreignID + "', assessed_category = 'FRAUD', triaged_at = now(), triaged_by_admin_id = 1 WHERE id = '" + report0 + "'"},
 		{"平台判定類別和案件的不同", "reports_case_fkey", "UPDATE seller.reports SET assessed_category = 'COUNTERFEIT' WHERE id = '" + report0 + "'"},
 		{"分案時間早於建立", "reports_triage_check", "UPDATE seller.reports SET triaged_at = created_at - interval '1 day' WHERE id = '" + report0 + "'"},
-		{"佐證的位置是負的", "report_evidence_position_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 0, -1, 'a', 'k')"},
-		{"一次送出的佐證超過 5 張（位置 5）", "report_evidence_position_check", fmt.Sprintf("INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('%s', 0, %d, 'a', 'k')", report0, model.MaxEvidence)},
-		{"補充的佐證沒有指向補充", "report_evidence_supplement_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 1, 0, 'a', 'k')"},
-		{"補充的佐證指向的補充不是這一次送出", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report0 + "', 2, 0, id, 'a', 'k' FROM seller.report_supplements WHERE report_id = '" + report0 + "'"},
-		{"佐證的補充屬於別的通報", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report1 + "', 1, 0, id, 'a', 'k' FROM (SELECT id FROM seller.report_supplements LIMIT 1) x"},
+		{"佐證的位置是負的", "report_evidence_position_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 0, -1, '019c0000-0000-7000-8000-0000000000a1', 'k')"},
+		{"一次送出的佐證超過 5 張（位置 5）", "report_evidence_position_check", fmt.Sprintf("INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('%s', 0, %d, '019c0000-0000-7000-8000-0000000000a1', 'k')", report0, model.MaxEvidence)},
+		{"補充的佐證沒有指向補充", "report_evidence_supplement_check", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ('" + report0 + "', 1, 0, '019c0000-0000-7000-8000-0000000000a1', 'k')"},
+		{"補充的佐證指向的補充不是這一次送出", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report0 + "', 2, 0, id, '019c0000-0000-7000-8000-0000000000a1', 'k' FROM seller.report_supplements WHERE report_id = '" + report0 + "'"},
+		{"佐證的補充屬於別的通報", "report_evidence_supplement_fkey", "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT '" + report1 + "', 1, 0, id, '019c0000-0000-7000-8000-0000000000a1', 'k' FROM (SELECT id FROM seller.report_supplements LIMIT 1) x"},
 		{"補充超過 10 則", "report_supplements_seq_check", fmt.Sprintf("INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '%s', %d, 'x', now())", report0, model.MaxSupplements+1)},
 		{"同一筆通報的補充序號重複", "report_supplements_report_seq_key", "INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '" + report0 + "', 1, 'x', now())"},
 		{"補充是空的", "report_supplements_description_check", "INSERT INTO seller.report_supplements (id, report_id, seq, description, created_at) VALUES (uuidv7(), '" + report0 + "', 2, '', now())"},
@@ -2274,17 +2273,17 @@ func TestReportSchemaConstraints(t *testing.T) {
 	}
 	// 每次送出各自編號：原通報（第 0 次）與第 1 則補充各接受次內位置 0 到 4，同一次送出的同一個位置不能重複。
 	for _, e := range []struct{ seq, position int }{{0, 0}, {0, model.MaxEvidence - 1}} {
-		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, $2, $3, 'a', 'k')", members[0].ID, e.seq, e.position); err != nil {
+		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, $2, $3, '019c0000-0000-7000-8000-0000000000a1', 'k')", members[0].ID, e.seq, e.position); err != nil {
 			t.Errorf("第 %d 次送出的位置 %d 的佐證要接受：%v", e.seq, e.position, err)
 		}
 	}
 	for _, position := range []int{0, model.MaxEvidence - 1} {
-		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT report_id, seq, $2, id, 'a', 'k' FROM seller.report_supplements WHERE report_id = $1 AND seq = 1", members[0].ID, position); err != nil {
+		if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, supplement_id, asset_id, object_key) SELECT report_id, seq, $2, id, '019c0000-0000-7000-8000-0000000000a1', 'k' FROM seller.report_supplements WHERE report_id = $1 AND seq = 1", members[0].ID, position); err != nil {
 			t.Errorf("補充的位置 %d 的佐證要接受：%v", position, err)
 		}
 	}
 	// 同一次送出的同一個位置不能重複（主鍵有 evidence_accesses 的外鍵依賴，wantViolates 的「拿掉再試」做不了，這裡只比對被擋下的約束）。
-	_, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, 0, 0, 'a', 'k')", members[0].ID)
+	_, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.report_evidence (report_id, submission_seq, position, asset_id, object_key) VALUES ($1, 0, 0, '019c0000-0000-7000-8000-0000000000a1', 'k')", members[0].ID)
 	var pg *pgconn.PgError
 	if !errors.As(err, &pg) || pg.ConstraintName != "report_evidence_pkey" {
 		t.Errorf("同一次送出的同一個位置要被 report_evidence_pkey 擋下：%v", err)
@@ -2462,8 +2461,8 @@ func TestMeasureCommandsRequireTheCurrentVersion(t *testing.T) {
 	}
 }
 
-// 申覆遇到後台改過的措施：賣家帶改動前的 etag 是衝突，不轉正新的佐證、不寫入。
-func TestStaleSellerEtagDoesNotFinalizeOrWrite(t *testing.T) {
+// 申覆遇到後台改過的措施：賣家帶改動前的 etag 是衝突，不確認新的佐證、不寫入。
+func TestStaleSellerEtagDoesNotConfirmOrWrite(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -2472,18 +2471,19 @@ func TestStaleSellerEtagDoesNotFinalizeOrWrite(t *testing.T) {
 	statement := "管理員改過的理由"
 	_, err := f.module.UpdateMeasure(ctx, UpdateMeasureInput{MeasureID: m.ID, AdminID: 7, ExpectedVersion: m.Version, StatementToSeller: &statement})
 	must(t, err)
-	finalized := len(f.media.finalized)
+	newToken, newAsset := f.stageSecure(t, media.Uploader{ID: accountID}, evidencePDF("new1"))
 	for _, in := range []SubmitAppealInput{
-		{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "誤判", EvidenceTokens: []string{"new1"}},
+		{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "誤判", EvidenceTokens: []string{newToken}},
 		{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "別的理由"},
 	} {
 		if _, err := f.module.SubmitAppeal(ctx, in); apperr.KindOf(err) != apperr.KindVersionConflict {
 			t.Fatalf("過時的 etag：%v", err)
 		}
 	}
-	if len(submitted.all()) != 0 || len(f.media.finalized) != finalized || f.count(t, "SELECT count(*) FROM seller.measure_requests") != 0 {
-		t.Fatal("過時的 etag 不能轉正佐證或寫入")
+	if len(submitted.all()) != 0 || f.count(t, "SELECT count(*) FROM seller.measure_requests") != 0 {
+		t.Fatal("過時的 etag 不能寫入")
 	}
+	f.wantAsset(t, newAsset, "STAGED")
 }
 
 // can_appeal 與 SubmitAppeal 的前置檢查是同一個規則：未撤銷且沒申覆過才為真；申覆提出後與撤銷後為假。
@@ -2538,24 +2538,31 @@ func TestUpdateMeasureComparesEndTimeAtMicrosecondPrecision(t *testing.T) {
 }
 
 // 單張佐證的問題（空白、media 拒絕 token、不是機敏上傳）指到那一張（EvidenceTokens[i]），整個欄位的問題（張數上限）指 EvidenceTokens；
-// media 的內部錯誤照舊（不是 invalid_argument）。通報與申覆共用同一組檢查與轉正。
+// media 的內部錯誤照舊（不是 invalid_argument）。通報與申覆共用同一組檢查與確認。
 func TestEvidenceFailuresPointAtTheFailingToken(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s, m := f.appealable(t)
 	f.everExposed(t, s.StoreID)
-	f.media.rejected = map[string]error{
-		"expired":  fmt.Errorf("mediaservice：轉正（code=404）：%w：%w", media.ErrStagedTokenRejected, apperr.InvalidInput("圖片無法使用，請重新上傳")),
-		"expired2": fmt.Errorf("mediaservice：轉正（code=404）：%w：%w", media.ErrStagedTokenRejected, apperr.InvalidInput("圖片無法使用，請重新上傳")),
-		"down":     errors.New("mediaservice：轉正失敗（code=500）"),
+	f.media.setFailConfirm("down", errors.New("media：確認失敗（內部錯誤）"))
+	// "ok" 開頭的名字放一份真的機敏佐證；其他名字原樣當 token（無效、空白、注入失敗的）。
+	stage := func(uploader media.Uploader, names []string) []string {
+		tokens := make([]string, len(names))
+		for i, name := range names {
+			tokens[i] = name
+			if strings.HasPrefix(name, "ok") {
+				tokens[i], _ = f.stageSecure(t, uploader, evidencePDF(name))
+			}
+		}
+		return tokens
 	}
-	submitReport := func(tokens ...string) error {
-		_, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: accountID + 1000, Category: policy.Fraud, Description: "附圖", EvidenceTokens: tokens})
+	submitReport := func(names ...string) error {
+		_, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: accountID + 1000, Category: policy.Fraud, Description: "附圖", EvidenceTokens: stage(media.Uploader{ID: accountID + 1000}, names)})
 		return err
 	}
-	submitAppeal := func(tokens ...string) error {
-		_, err := f.module.SubmitAppeal(ctx, SubmitAppealInput{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "已改善", EvidenceTokens: tokens})
+	submitAppeal := func(names ...string) error {
+		_, err := f.module.SubmitAppeal(ctx, SubmitAppealInput{AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "已改善", EvidenceTokens: stage(media.Uploader{ID: accountID}, names)})
 		return err
 	}
 	fields := func(err error) []string {
@@ -2580,19 +2587,26 @@ func TestEvidenceFailuresPointAtTheFailingToken(t *testing.T) {
 				t.Errorf("%s／%s：欄位 = %v，預期 %v", name, c.name, got, c.want)
 			}
 		}
-		// 欄位錯誤的文字（進 log）仍留著 media 的原因（mediaservice 的 code 與訊息）。
-		if err := submit("ok", "expired"); err == nil || !strings.Contains(err.Error(), "mediaservice：轉正（code=404）") {
+		// 欄位錯誤的文字（進 log）仍留著 media 的原因與是哪一張。
+		if err := submit("ok", "expired"); err == nil || !strings.Contains(err.Error(), "確認 EvidenceTokens[1]") {
 			t.Errorf("%s：缺少 media 的原因：%v", name, err)
 		}
 		if err := submit("ok", "down"); err == nil || apperr.KindOf(err) == apperr.KindInvalidInput {
 			t.Errorf("%s：media 的內部錯誤不能變成欄位錯誤：%v", name, err)
 		}
-		f.media.NotSecure = true
-		// 每張都轉正並檢查：兩張都不是機敏上傳時，兩張都回報。
-		if got := fields(submit("a", "b")); !slices.Equal(got, []string{"EvidenceTokens[0]", "EvidenceTokens[1]"}) {
+		// 每張都確認並檢查：兩張都不是機敏上傳時，兩張都回報。
+		var publicTokens []string
+		uploader := media.Uploader{ID: accountID + 1000}
+		if name == "申訴" {
+			uploader = media.Uploader{ID: accountID}
+		}
+		for range 2 {
+			token, _ := f.stagePublic(t, uploader)
+			publicTokens = append(publicTokens, token)
+		}
+		if got := fields(submit(publicTokens...)); !slices.Equal(got, []string{"EvidenceTokens[0]", "EvidenceTokens[1]"}) {
 			t.Errorf("%s：非機敏上傳欄位 = %v", name, got)
 		}
-		f.media.NotSecure = false
 	}
 }
 

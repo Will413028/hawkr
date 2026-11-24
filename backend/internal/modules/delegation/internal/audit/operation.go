@@ -117,7 +117,7 @@ func sameOperation(l store.DelegationAdminOperationAuditLog, in model.OperationA
 
 func validateOperation(in model.OperationAuditInput) error {
 	switch {
-	case !in.Action.Known() || in.Action.ReadDenial():
+	case !in.Action.Known() || in.Action.DenialOnly():
 		return model.Deny(model.DenialInvalidCommand, "action 不是代行的寫入動作")
 	case !in.ResourceType.Valid():
 		return model.Deny(model.DenialInvalidCommand, "resourceType 不正確")

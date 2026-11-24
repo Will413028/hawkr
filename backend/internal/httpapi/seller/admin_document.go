@@ -64,7 +64,7 @@ func (h *AdminDocuments) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fileFailure(w, r, h.log, err, "KYC 證件")
 		return
 	}
-	writeFile(w, content)
+	writeFile(w, r, h.log, content)
 }
 
 // documentRequest 解析路徑；格式不對的位置與一般的找不到同一種回應（404）。

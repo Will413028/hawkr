@@ -151,20 +151,12 @@ type SocialInactiveAuthor struct {
 	Since   time.Time
 }
 
-type SocialMediaRefSync struct {
-	RefType   string
-	RefID     string
-	Seq       int64
-	SyncedSeq int64
-	UpdatedAt time.Time
-}
-
 type SocialPost struct {
 	ID           uuid.UUID
 	StoreID      int64
 	Body         string
 	ImageKey     *string
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 	ProductID    *int64
 	// 貼文狀態：DRAFT、PUBLISHED、UNPUBLISHED（儲存的代碼是 UPPER_SNAKE，舊的 publish_status 4401、4402、4403 依序對應）
 	Status string
@@ -231,14 +223,6 @@ type SocialPostView struct {
 	PostID    uuid.UUID
 	ViewDay   time.Time
 	ViewerKey []byte
-}
-
-type SocialRetiredAsset struct {
-	RefType    string
-	RefID      string
-	AssetID    string
-	RetiredAt  time.Time
-	UnlinkedAt *time.Time
 }
 
 type SocialSanction struct {

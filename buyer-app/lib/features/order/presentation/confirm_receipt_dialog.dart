@@ -12,6 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../shared/widgets/common_snackbar.dart';
+import '../../media/data/local_image_preview.dart';
 import '../../media/data/media_repository.dart';
 import '../data/order_repository.dart';
 import 'receipt_photo_controller.dart';
@@ -95,19 +96,17 @@ class _ConfirmReceiptDialogState extends ConsumerState<ConfirmReceiptDialog> {
       'photoPath=${_selectedPhoto!.path}',
     );
     try {
-      // Step 1: 上傳照片 → 取得 stagedToken + previewUrl
+      // Step 1: 上傳照片 → 取得 stagedToken；預覽用本機檔案
       final uploadResult = await ref
           .read(mediaRepositoryProvider)
           .uploadImage(file: _selectedPhoto!);
       debugPrint(
         '[ConfirmReceipt] uploadImage done '
-        'stagedToken.len=${uploadResult.stagedToken.length} '
-        'previewUrl.len=${uploadResult.previewUrl.length}',
+        'stagedToken.len=${uploadResult.stagedToken.length}',
       );
 
-      // Step 2: 立刻把 previewUrl 交由 receipt-photo controller 暫存，
-      // 不依賴 caller — 即使後續 confirmReceipt 或 caller 出錯，本機也已有暫存。
-      if (uploadResult.previewUrl.trim().isNotEmpty) {
+      final preview = await localImagePreviewDataUri(_selectedPhoto!);
+      if (preview.isNotEmpty) {
         final cached = await ref
             .read(
               receiptPhotoControllerProvider(
@@ -115,14 +114,14 @@ class _ConfirmReceiptDialogState extends ConsumerState<ConfirmReceiptDialog> {
                 backendUrls: const [],
               ).notifier,
             )
-            .cachePreview(uploadResult.previewUrl);
+            .cachePreview(preview);
         debugPrint(
           '[ConfirmReceipt] receipt photo cache ${cached ? 'saved' : 'failed'} '
           'orderSn=${widget.orderSn}',
         );
       }
 
-      // Step 3: 確認收貨 + 把 stagedToken 帶給後端轉正進 order.receiptPhotoUrls
+      // Step 2: 確認收貨 + 把 stagedToken 帶給後端轉正進 order.receiptPhotoUrls
       await ref
           .read(orderRepositoryProvider)
           .confirmReceipt(
@@ -136,7 +135,7 @@ class _ConfirmReceiptDialogState extends ConsumerState<ConfirmReceiptDialog> {
       if (!mounted) return;
       Navigator.of(
         context,
-      ).pop(ConfirmReceiptResult(photoUrl: uploadResult.previewUrl));
+      ).pop(ConfirmReceiptResult(photoUrl: preview.isEmpty ? null : preview));
     } catch (e, st) {
       debugPrint('[ConfirmReceipt] _submit error: $e\n$st');
       if (!mounted) return;

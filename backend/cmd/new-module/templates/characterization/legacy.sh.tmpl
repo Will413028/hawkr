@@ -12,8 +12,8 @@
 #   (cd services/content-service && go build -o "${LOG_DIR}/legacy" ./cmd/content-service)
 #   start_bg legacy ENV=development INTERNAL_AUTH_MODE=off \
 #     DB_HOST="$PGHOST" DB_PORT=5432 DB_USER="$PG_USER" DB_PASSWORD="$PG_PASSWORD" DB_NAME=content_characterization \
-#     DB_SSLMODE=disable GRPC_PORT="$LEGACY_PORT" \
-#     MEDIA_SERVICE_HOST=127.0.0.1 MEDIA_SERVICE_GRPC_PORT="$FAKE_MEDIA_PORT" "${LOG_DIR}/legacy"
+#     DB_SSLMODE=disable GRPC_PORT="$LEGACY_PORT" "${LOG_DIR}/legacy"
+#   舊服務要呼叫 media-service 時，由 legacy_start 起 Java media（B1-D10 的做法），位址設給舊服務。
 #   gateway_env+=(CONTENT_SERVICE_HOST=127.0.0.1 CONTENT_SERVICE_GRPC_PORT="$LEGACY_PORT")
 #
 # Java 的服務以 Flyway 在啟動時套用 migration，建好 database 後直接起服務。

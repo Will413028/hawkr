@@ -84,13 +84,14 @@ CREATE INDEX cases_closed_by_time ON moderation.cases (closed_at) WHERE closed_a
 -- 內容快照（A7-D20）：每案每份內容一列，UNIQUE (case_id, content_sha256)；content 是擁有者模組提供、經正規化的快照（canonical JSON 文字），
 -- content_sha256 是它的 SHA-256（不用各表的 version：留言、討論區留言沒有 version，buyer.version 改任何欄位都加一）。30 筆檢舉同一份內容只存一份，
 -- 內容改過才多一份。結案後 184 天由排程 job 刪除（reports.snapshot_id 是 ON DELETE SET NULL），案件與檢舉列留著、不含內容。
--- asset_ids 是快照引用的圖片資產（A7-D21 證據保全）：快照在 media 以 (GOVERNANCE_EVIDENCE, 快照 ID) 登記引用，快照刪除時才解除。
+-- asset_ids 是快照自己擁有的圖片資產（B1-D20 證據保全）：建快照時把內容的圖片複製成 moderation 自己 Confirm 的新資產，內容裡的圖片參照就是這些複本；
+-- 擁有者之後換圖、刪文或退場都不影響複本，複本只由結案後的保存期限清除（retention purge）MarkDeleted。
 CREATE TABLE moderation.case_snapshots (
     id             UUID        PRIMARY KEY,
     case_id        UUID        NOT NULL REFERENCES moderation.cases (id),
     content_sha256 BYTEA       NOT NULL,
     content        TEXT        NOT NULL,
-    asset_ids      TEXT[]      NOT NULL DEFAULT '{}',
+    asset_ids      UUID[]      NOT NULL DEFAULT '{}',
     captured_at    TIMESTAMPTZ NOT NULL,
     CONSTRAINT case_snapshots_case_content_key UNIQUE (case_id, content_sha256),
     CONSTRAINT case_snapshots_sha256_check CHECK (octet_length(content_sha256) = 32),
@@ -153,26 +154,3 @@ CREATE TABLE moderation.reporter_daily_counts (
     CONSTRAINT reporter_daily_counts_reporter_kind_check CHECK ((reporter_buyer_id IS NOT NULL) <> (reporter_store_id IS NOT NULL)),
     CONSTRAINT reporter_daily_counts_submitted_check CHECK (submitted >= 1 AND submitted <= 20)
 );
-
--- 快照圖片在 media 的引用同步（internal/mediaref，演算法在 media 模組）：引用只由同步 job 寫入。media_ref_sync 的 seq 先於 job 遞增，synced_seq 結算
--- 後才記下；列不刪除（刪掉再建會讓 seq 從頭算）。ref 是 (ref_type, ref_id)：快照的 ID。
-CREATE TABLE moderation.media_ref_sync (
-    ref_type   TEXT        NOT NULL,
-    ref_id     TEXT        NOT NULL,
-    seq        BIGINT      NOT NULL DEFAULT 1,
-    synced_seq BIGINT      NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
-CREATE INDEX media_ref_sync_unsynced ON moderation.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
--- 快照刪除時釋放的資產：同步 job 精確解除它們的引用。unlinked_at 是第一次解除成功的時間。
-CREATE TABLE moderation.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON moderation.retired_assets (retired_at);

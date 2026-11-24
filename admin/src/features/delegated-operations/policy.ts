@@ -13,6 +13,7 @@ export const KNOWN_DELEGATED_OPERATION_CAPABILITIES = [
 	"posts.write",
 	"posts.publish",
 	"orders.read",
+	"media.upload",
 ] as const;
 
 export type DelegatedOperationCapability =
@@ -55,6 +56,7 @@ const CAPABILITY_DEPENDENCIES: Partial<
 	"products.publish": ["products.read", "products.write"],
 	"posts.write": ["posts.read"],
 	"posts.publish": ["posts.read", "posts.write"],
+	"media.upload": [],
 };
 
 export function hasAsciiControlCharacters(value: string): boolean {

@@ -38,9 +38,9 @@ CREATE TABLE seller.stores (
     store_name           TEXT,
     description          TEXT,
     logo_key             TEXT,
-    logo_asset_id        TEXT,
+    logo_asset_id        UUID,
     cover_key            TEXT,
-    cover_asset_id       TEXT,
+    cover_asset_id       UUID,
     contact_phone        TEXT,
     contact_name         TEXT,
     contact_mobile       TEXT,
@@ -78,7 +78,7 @@ CREATE TABLE seller.stores (
         store_name !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'
     ),
     CONSTRAINT stores_description_check CHECK (char_length(description) BETWEEN 1 AND 2000),
-    CONSTRAINT stores_images_check CHECK (logo_key <> '' AND cover_key <> '' AND logo_asset_id <> '' AND cover_asset_id <> ''),
+    CONSTRAINT stores_images_check CHECK (logo_key <> '' AND cover_key <> ''),
     CONSTRAINT stores_image_assets_check CHECK ((logo_key IS NULL) = (logo_asset_id IS NULL) AND (cover_key IS NULL) = (cover_asset_id IS NULL)),
     CONSTRAINT stores_contact_phone_check CHECK (contact_phone ~ '^0[0-9]{8,9}$'),
     CONSTRAINT stores_contact_name_check CHECK (char_length(contact_name) >= 1 AND char_length(contact_name) <= 50 AND contact_name !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
@@ -294,13 +294,13 @@ CREATE TABLE seller.report_evidence (
     submission_seq SMALLINT NOT NULL,
     position       INTEGER NOT NULL,
     supplement_id  UUID,
-    asset_id       TEXT NOT NULL,
+    asset_id       UUID NOT NULL,
     object_key     TEXT NOT NULL,
     PRIMARY KEY (report_id, submission_seq, position),
     CONSTRAINT report_evidence_submission_check CHECK (submission_seq BETWEEN 0 AND 10),
     CONSTRAINT report_evidence_position_check CHECK (position BETWEEN 0 AND 4),
     CONSTRAINT report_evidence_supplement_check CHECK ((submission_seq = 0) = (supplement_id IS NULL)),
-    CONSTRAINT report_evidence_asset_check CHECK (asset_id <> '' AND object_key <> ''),
+    CONSTRAINT report_evidence_asset_check CHECK (object_key <> ''),
     CONSTRAINT report_evidence_supplement_fkey FOREIGN KEY (supplement_id, report_id, submission_seq) REFERENCES seller.report_supplements (id, report_id, seq)
 );
 
@@ -379,11 +379,11 @@ CREATE INDEX case_inquiries_open_due ON seller.case_inquiries (due_at, id) WHERE
 CREATE TABLE seller.case_inquiry_reply_evidence (
     inquiry_id UUID NOT NULL REFERENCES seller.case_inquiries (id),
     position   INTEGER NOT NULL,
-    asset_id   TEXT NOT NULL,
+    asset_id   UUID NOT NULL,
     object_key TEXT NOT NULL,
     PRIMARY KEY (inquiry_id, position),
     CONSTRAINT case_inquiry_reply_evidence_position_check CHECK (position BETWEEN 0 AND 4),
-    CONSTRAINT case_inquiry_reply_evidence_asset_check CHECK (asset_id <> '' AND object_key <> '')
+    CONSTRAINT case_inquiry_reply_evidence_asset_check CHECK (object_key <> '')
 );
 
 -- 認定（違規）：admin 對一次違規事實的認定，只讀的事實，不帶處分。處分（警告與停權）是措施（measures），一個措施依據一筆或
@@ -858,11 +858,11 @@ CREATE INDEX measure_requests_pending ON seller.measure_requests (submitted_at, 
 CREATE TABLE seller.measure_request_evidence (
     request_id UUID NOT NULL REFERENCES seller.measure_requests (id),
     position   INTEGER NOT NULL,
-    asset_id   TEXT NOT NULL,
+    asset_id   UUID NOT NULL,
     object_key TEXT NOT NULL,
     PRIMARY KEY (request_id, position),
     CONSTRAINT measure_request_evidence_position_check CHECK (position >= 0 AND position < 5),
-    CONSTRAINT measure_request_evidence_asset_check CHECK (asset_id <> '' AND object_key <> '')
+    CONSTRAINT measure_request_evidence_asset_check CHECK (object_key <> '')
 );
 
 -- 佐證的讀取紀錄（通報、請求與詢問回覆共用，append-only）：佐證是機敏檔，後台每讀一張，在讀取之前寫一列（誰、哪一張、何時；不含內容）。
@@ -1038,11 +1038,11 @@ CREATE INDEX account_identity_hashes_hash ON seller.account_identity_hashes (has
 CREATE TABLE seller.kyc_documents (
     application_id UUID NOT NULL REFERENCES seller.kyc_applications (application_id),
     position       INTEGER NOT NULL DEFAULT 0,
-    asset_id       TEXT NOT NULL,
+    asset_id       UUID NOT NULL,
     object_key     TEXT NOT NULL,
     PRIMARY KEY (application_id, position),
     CONSTRAINT kyc_documents_position_check CHECK (position >= 0 AND position < 10),
-    CONSTRAINT kyc_documents_asset_check CHECK (asset_id <> '' AND object_key <> '')
+    CONSTRAINT kyc_documents_asset_check CHECK (object_key <> '')
 );
 
 -- 公司型申請送件時對經濟部商業司公開資料的查詢快照（ADR 2026-11-13-seller-platform-review-and-identity-matching「登記資料快照」）：審核時對照的
@@ -1158,7 +1158,7 @@ CREATE TABLE seller.kyc_review_issues (
     review_id          UUID NOT NULL REFERENCES seller.kyc_reviews (review_id),
     position           INTEGER NOT NULL,
     field              TEXT NOT NULL,
-    document_asset_id  TEXT,
+    document_asset_id  UUID,
     code               TEXT NOT NULL,
     message            TEXT NOT NULL,
     resolved_at        TIMESTAMPTZ,
@@ -1178,7 +1178,7 @@ CREATE TABLE seller.kyc_review_issues (
     CONSTRAINT kyc_review_issues_message_check CHECK (char_length(message) BETWEEN 1 AND 500),
     CONSTRAINT kyc_review_issues_asset_check CHECK (
         document_asset_id IS NULL OR
-        (document_asset_id <> '' AND field = 'business.company_documents')
+        field = 'business.company_documents'
     )
 );
 
@@ -1188,11 +1188,10 @@ CREATE TABLE seller.kyc_document_accesses (
     access_id      UUID PRIMARY KEY,
     application_id UUID NOT NULL REFERENCES seller.kyc_applications (application_id),
     position       INTEGER NOT NULL,
-    asset_id       TEXT NOT NULL,
+    asset_id       UUID NOT NULL,
     admin_id       BIGINT NOT NULL,
     accessed_at    TIMESTAMPTZ NOT NULL,
-    CONSTRAINT kyc_document_accesses_asset_check CHECK (asset_id <> ''),
-    CONSTRAINT kyc_document_accesses_position_check CHECK (position >= 0 AND position < 10),
+        CONSTRAINT kyc_document_accesses_position_check CHECK (position >= 0 AND position < 10),
     CONSTRAINT kyc_document_accesses_admin_check CHECK (admin_id > 0)
 );
 CREATE INDEX kyc_document_accesses_application ON seller.kyc_document_accesses (application_id, accessed_at DESC, access_id DESC);
@@ -1205,7 +1204,7 @@ CREATE INDEX kyc_document_accesses_application ON seller.kyc_document_accesses (
 -- prospect_contacts）。
 -- 文字欄位不存空字串（沒有值是 NULL）；聯絡方式在 prospect_contacts（ADR 2026-10-04-prospect-contact-points-and-matching）。
 -- version 是整列的樂觀鎖（文字與圖片共用，etag ADR）；logo、封面存 object key 與 media 的 asset ID，封存或合併時清成 NULL，
--- 清掉的圖記成退場，引用由 seller.media_sync 解除。created_by_admin_id、updated_by_admin_id 是管理員 ID（沒有 FK）。
+-- 清掉的圖由寫入的 transaction 交給 media MarkDeleted。created_by_admin_id、updated_by_admin_id 是管理員 ID（沒有 FK）。
 CREATE TABLE seller.prospects (
     prospect_id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     version                 BIGINT NOT NULL DEFAULT 1,
@@ -1226,10 +1225,10 @@ CREATE TABLE seller.prospects (
     priority_letter         TEXT,
     priority_stars          INTEGER NOT NULL DEFAULT 0,
     logo_key                TEXT,
-    logo_asset_id           TEXT,
+    logo_asset_id           UUID,
     logo_source_url         TEXT,
     cover_key               TEXT,
-    cover_asset_id          TEXT,
+    cover_asset_id          UUID,
     cover_source_url        TEXT,
     created_by_admin_id     BIGINT,
     updated_by_admin_id     BIGINT,
@@ -1357,31 +1356,6 @@ CREATE TABLE seller.product_views_daily (
     PRIMARY KEY (store_id, day),
     CONSTRAINT product_views_daily_views_check CHECK (views >= 1)
 );
-
--- media 引用的同步版本：業務列改變 ref 的資產時在同一個 transaction 遞增 seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變
--- 才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。ref 的列不刪除：
--- 刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。
-CREATE TABLE seller.media_ref_sync (
-    ref_type   TEXT   NOT NULL,
-    ref_id     TEXT   NOT NULL,
-    seq        BIGINT NOT NULL DEFAULT 1,
-    synced_seq BIGINT NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
--- 保底掃描只看還沒同步完的 ref。
-CREATE INDEX media_ref_sync_unsynced ON seller.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
--- 被業務列換掉或終態釋放的資產：同步 job 精確解除它們的引用，寫入端拒絕把它們寫回同一個 ref。unlinked_at 是第一次解除成功的時間。
-CREATE TABLE seller.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON seller.retired_assets (retired_at);
 
 -- 入駐同意紀錄：賣家在開店（SELLER_TERMS）、送出 KYC（KYC_PRIVACY_NOTICE）時同意或確認已閱讀的文件版本，記事實（哪家
 -- 店、哪份文件的哪個版本、誰、何時、來源 IP 與 User-Agent）。每次同意事件一列：沒有 ON CONFLICT，紀錄是一連串事件；開店的 SELLER_TERMS

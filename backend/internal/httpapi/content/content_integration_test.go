@@ -5,7 +5,6 @@ package content_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -57,7 +56,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -66,19 +64,17 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// fakeMedia 讓每個 staged token 都轉正成功，object key 由 ref 與 token 組成；以 "gone" 開頭的 token 回
-// media-service 的「token 無效」。
+// fakeMedia 讓每個 staged token 都確認成功，object key 由 token 組成；以 "gone" 開頭的 token 回 media 的「暫存已失效」。
 type fakeMedia struct{}
 
-func (f *fakeMedia) Finalize(_ context.Context, _ media.Uploader, token, refType string) (media.Asset, error) {
+func (f *fakeMedia) Confirm(_ context.Context, _ media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
 	if strings.HasPrefix(token, "gone") {
-		return media.Asset{}, fmt.Errorf("%w：%w", media.ErrStagedTokenRejected, apperr.InvalidInput("圖片無法使用，請重新上傳"))
+		return media.ConfirmedAsset{}, apperr.FailedPrecondition("圖片已失效，請重新上傳")
 	}
-	return media.Asset{ID: "asset-" + token, ObjectKey: "public/" + refType + "/" + token + ".jpg"}, nil
+	return media.ConfirmedAsset{ID: uuid.NewV7(), ObjectKey: "public/" + token + ".jpg", Visibility: media.VisibilityPublic}, nil
 }
 
-func (f *fakeMedia) Link(context.Context, media.Ref, []string) error   { return nil }
-func (f *fakeMedia) Unlink(context.Context, media.Ref, []string) error { return nil }
+func (f *fakeMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }
 
 type fixture struct {
 	url    string
@@ -97,12 +93,8 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: "content", Dir: content.Migrations()},
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 	))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m := content.New(content.Deps{DB: d, Social: noPosts{}, Media: &fakeMedia{}, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
+	m := content.New(content.Deps{DB: d, Social: noPosts{}, Media: &fakeMedia{}, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -279,7 +271,6 @@ func TestEveryModuleFieldMapsToARequestPath(t *testing.T) {
 		{"banner 行為的貼文", banner(func(b *adminpb.Banner) {
 			b.Action = &contentpb.BannerAction{Kind: &contentpb.BannerAction_PostId{}}
 		}), "banner.action.post_id"},
-		{"banner 被拒的圖", banner(func(b *adminpb.Banner) { b.PopupImageStagedToken = "gone1" }), "banner.popup_image_staged_token"},
 		{"門檻的 App 類型", gate(func(g *adminpb.AppVersionGate) { g.AppType = 0 }), "app_version_gate.app_type"},
 		{"最低版本", gate(func(g *adminpb.AppVersionGate) { g.MinimumVersion = "1.2" }), "app_version_gate.minimum_version"},
 		{"商店網址", gate(func(g *adminpb.AppVersionGate) { g.StoreUrl = "javascript:alert(1)" }), "app_version_gate.store_url"},
@@ -649,11 +640,6 @@ func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWi
 
 func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderStatusCounts, error) {
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
-}
-
-// ReadSecure 實作 media.Media；這些測試不讀機敏資產。
-func (*fakeMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
 }
 
 // noPosts 是沒有任何公開貼文的 social 替身（這裡的 banner 不指向貼文）。

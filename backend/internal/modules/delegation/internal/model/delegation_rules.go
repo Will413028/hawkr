@@ -37,7 +37,7 @@ const (
 	delegationMaxPageSize     = 50
 )
 
-// Capability 是代行的能力：封閉的九個值，沒有任何履約或金流的能力。值等於 DB 的 CHECK
+// Capability 是代行的能力：封閉的十個值，沒有任何履約或金流的能力。值等於 DB 的 CHECK
 // （TestCodeValueChecksMatchTheGoTypes）。比對區分大小寫：它是前端 allow-list 的成員。
 type Capability string
 
@@ -51,15 +51,17 @@ const (
 	CapabilityPostsWrite      Capability = "posts.write"
 	CapabilityPostsPublish    Capability = "posts.publish"
 	CapabilityOrdersRead      Capability = "orders.read"
+	// CapabilityMediaUpload 是代行上傳檔案（B1-D16）：上傳只產生會過期的暫存，不讓檔案生效；掛上時仍由擁有者的寫入能力把關。
+	CapabilityMediaUpload Capability = "media.upload"
 )
 
-// Capabilities 回傳九個能力，順序同設計書 56 §6.1.1。
+// Capabilities 回傳十個能力，前九個順序同設計書 56 §6.1.1，media.upload 附在最後（B1-D16）。
 func Capabilities() []Capability {
 	return []Capability{
 		CapabilityStorefrontRead, CapabilityStorefrontWrite,
 		CapabilityProductsRead, CapabilityProductsWrite, CapabilityProductsPublish,
 		CapabilityPostsRead, CapabilityPostsWrite, CapabilityPostsPublish,
-		CapabilityOrdersRead,
+		CapabilityOrdersRead, CapabilityMediaUpload,
 	}
 }
 

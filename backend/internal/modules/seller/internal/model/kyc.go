@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"io"
 	"regexp"
 	"strings"
 	"time"
@@ -293,16 +294,19 @@ type ReadKYCDocumentInput struct {
 	Position      int
 }
 
-// FileContent 是一份機敏檔的內容（證件圖片、治理佐證），由擁有者的端點讀出。
+// ReadOwnKYCDocumentInput 是賣家讀自己申請的一張補充文件：以 (帳號目前的店家的申請, 位置) 定址，不接受別人的申請 ID 或 asset ID。
+type ReadOwnKYCDocumentInput struct {
+	AccountID int64
+	Position  int
+}
+
+// FileContent 是一份機敏檔的內容（證件圖片、治理佐證），由擁有者的端點讀出：Body 是明文串流，用完由呼叫方關閉。
 type FileContent struct {
-	Data        []byte
+	Body        io.ReadCloser
 	ContentType string
 }
 
-// ErrFileNotSynced 表示機敏檔在我們這邊有、media 還讀不到，而且它的 media 引用同步還沒結算：稍後重試會好。
-var ErrFileNotSynced = errors.New("seller：機敏檔的 media 引用還沒同步完")
-
-// ErrFileMissing 表示我們的資料庫有這份機敏檔、引用也同步過了，media 卻說沒有：資料不一致，要人處理（呼叫方記 error）。
+// ErrFileMissing 表示我們的資料庫有這份機敏檔，media 卻說沒有：資料不一致，要人處理（呼叫方記 error）。
 var ErrFileMissing = errors.New("seller：機敏檔在 media 找不到")
 
 // KYCDraftInput 是草稿的部分更新：nil 保留原值，非 nil 的空字串清成沒有值。ExpectedVersion 是讀取時的版本，

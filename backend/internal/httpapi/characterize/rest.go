@@ -61,7 +61,7 @@ func (r *REST) Do(ctx context.Context, c Caller, method, path string, body, out 
 				kind = k
 			}
 		}
-		return fmt.Errorf("%w：%s %s → HTTP %d、code %d：%s", kind, method, path, resp.StatusCode, env.Code, env.Message)
+		return fmt.Errorf("%w：%w：%s %s → HTTP %d、code %d：%s", ErrRejected, kind, method, path, resp.StatusCode, env.Code, env.Message)
 	}
 	if out == nil || len(env.Data) == 0 || string(env.Data) == "null" {
 		return nil

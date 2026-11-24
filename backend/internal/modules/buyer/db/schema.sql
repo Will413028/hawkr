@@ -15,8 +15,8 @@ CREATE TABLE buyer.buyers (
     phone          TEXT,
     gender         TEXT,
     avatar         TEXT,
-    -- avatar 的 media asset ID：同步 job 登記引用時業務列目前指著的資產。
-    avatar_asset_id TEXT,
+    -- avatar 的 media asset ID（UUID v7）：換頭像在同一個 transaction 內 Confirm 新資產、MarkDeleted 被換掉的資產。
+    avatar_asset_id UUID,
     birth_date     DATE,
     city           TEXT,
     job            TEXT,
@@ -109,27 +109,3 @@ CREATE TABLE buyer.restock_subscriptions (
 );
 CREATE INDEX restock_product ON buyer.restock_subscriptions (product_id, buyer_id);
 
--- media 引用的同步版本：業務列改變 ref 的資產時在同一個 transaction 遞增 seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變
--- 才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。ref 的列不刪除：
--- 刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。
-CREATE TABLE buyer.media_ref_sync (
-    ref_type   TEXT   NOT NULL,
-    ref_id     TEXT   NOT NULL,
-    seq        BIGINT NOT NULL DEFAULT 1,
-    synced_seq BIGINT NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
--- 保底掃描只看還沒同步完的 ref。
-CREATE INDEX media_ref_sync_unsynced ON buyer.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
--- 被業務列換掉或終態釋放的資產：同步 job 精確解除它們的引用，寫入端拒絕把它們寫回同一個 ref。unlinked_at 是第一次解除成功的時間。
-CREATE TABLE buyer.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON buyer.retired_assets (retired_at);

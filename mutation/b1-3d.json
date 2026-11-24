@@ -1,0 +1,49 @@
+{
+  "mutants": [
+    {
+      "id": "secure-no-magic-byte-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+      "old": "\tf, err := image.Detect(head)\n\tif err != nil {\n\t\treturn \"\", apperr.InvalidInputOn([]string{\"body\"}, \"%s\", text.MediaSecureContentUnsupported(loc(ctx)))\n\t}\n\treturn f.ContentType(), nil\n",
+      "new": "\t_ = image.Detect\n\treturn pdfContentType, nil\n",
+      "test": "internal/httpapi/media/characterization ^TestMonolithSecure$/^declared_pdf_that_is_arbitrary_bytes_is_rejected$",
+      "why": "第 0 段不再依 magic bytes 辨認，任何位元組都當成 PDF：宣告 PDF 實為任意位元組的機敏上傳不再回 400"
+    },
+    {
+      "id": "public-no-size-limit",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/media/internal/upload/upload.go",
+      "old": "\tif in.Size > model.MaxPublicUploadSize {",
+      "new": "\tif false {",
+      "test": "internal/httpapi/media/characterization ^TestMonolith$/^create_rejects_declared_size_over_limit$",
+      "why": "拿掉公開上傳的宣告大小上限：宣告超過 10 MiB 的 BeginUpload 仍發出預簽網址"
+    },
+    {
+      "id": "secure-no-size-limit",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+      "old": "\tif size < 1 || size > model.MaxSecureUploadSize {",
+      "new": "\tif size < 1 {",
+      "test": "internal/httpapi/media/characterization ^TestMonolithSecure$/^oversize_secure_upload_is_rejected$",
+      "why": "拿掉機敏上傳的宣告大小上限：宣告超過上限的 BeginSecureUpload 仍建立會話"
+    },
+    {
+      "id": "driver-secure-routes-to-public",
+      "stack": "go-integration",
+      "file": "backend/internal/httpapi/media/characterization/connect_test.go",
+      "old": "\tif in.IsSecure {\n\t\ts, err := d.BeginSecureUpload(ctx, c, size)",
+      "new": "\tif false {\n\t\ts, err := d.BeginSecureUpload(ctx, c, size)",
+      "test": "internal/httpapi/media/characterization ^TestMonolith$/^create_secure_session_has_no_upload_url_and_allows_pdf$",
+      "why": "Connect driver 把機敏會話改走公開的 BeginUpload：證明情境真的經 driver 打單體，機敏 PDF 會話因公開上傳不收 PDF 而紅"
+    },
+    {
+      "id": "driver-wrong-content-type",
+      "stack": "go-integration",
+      "file": "backend/internal/httpapi/media/characterization/connect_test.go",
+      "old": "ContentType: in.ContentType, Md5: anyMD5",
+      "new": "ContentType: \"image/png\", Md5: anyMD5",
+      "test": "internal/httpapi/media/characterization ^TestMonolith$/^create_rejects_unsupported_mime$",
+      "why": "Connect driver 不送情境宣告的 Content-Type（一律 image/png）：不支援型別的情境不再被單體拒絕而紅"
+    }
+  ]
+}

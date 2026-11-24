@@ -24,7 +24,7 @@ import (
 const specPath = "../../../api/openapi/openapi.yaml"
 
 // maxRESTOperations 是清單的端點數上限，只准變少：模組搬遷刪掉 REST 路由後，把它改成新的端點數鎖住新低點。
-const maxRESTOperations = 326
+const maxRESTOperations = 324
 
 // 分類理由；路由隨模組搬遷刪除時從清單移除，不再補進規格。
 const (
@@ -38,40 +38,35 @@ const (
 
 // routesNotInSpec 是沒有寫進清單的既有路由（method + 以 {} 代表參數的 path），只准變短。
 var routesNotInSpec = map[string]string{
-	"GET /api/v1/admin/delegated-operations/{}/audit-logs":                      notAnnotatedDelegated,
-	"GET /api/v1/admin/delegated-operations/{}/summary":                         notAnnotatedDelegated,
-	"GET /api/v1/admin/delegated-operations/current/summary":                    notAnnotatedDelegated,
-	"GET /api/v1/admin/sellers/{}/orders/{}":                                    notAnnotatedDelegated,
-	"GET /api/v1/admin/sellers/{}/orders/{}/recipient-contact":                  notAnnotatedDelegated,
-	"GET /api/v1/admin/sellers/{}/products":                                     notAnnotatedDelegated,
-	"GET /api/v1/admin/sellers/{}/products/{}":                                  notAnnotatedDelegated,
-	"GET /api/v1/admin/sellers/{}/storefront":                                   notAnnotatedDelegated,
-	"PATCH /api/v1/admin/sellers/{}/products/{}":                                notAnnotatedDelegated,
-	"PATCH /api/v1/admin/sellers/{}/storefront":                                 notAnnotatedDelegated,
-	"POST /api/v1/admin/delegated-operations/media/upload_sessions":             notAnnotatedDelegated,
-	"POST /api/v1/admin/delegated-operations/media/upload_sessions/{}/complete": notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/products":                                    notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/products/{}/publish":                         notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/products/{}/unpublish":                       notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/products/batch-unpublish":                    notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/storefront/cover":                            notAnnotatedDelegated,
-	"POST /api/v1/admin/sellers/{}/storefront/logo":                             notAnnotatedDelegated,
-	"GET /api/v1/admin/invoices/documents/{}/file/content":                      binaryProxy,
-	"GET /api/v1/admin/invoices/jobs/{}/manual_unlocks/{}/evidence/content":     binaryProxy,
-	"GET /api/v1/admin/invoices/tax_reviews/{}/documents/{}/content":            binaryProxy,
-	"GET /api/v1/app/media/secure_download/{}":                                  binaryProxy,
-	"GET /api/v1/app/media/secure_preview/{}":                                   binaryProxy,
-	"GET /api/v1/app/orders/{}/invoice_documents/{}/file/content":               binaryProxy,
-	"GET /api/v1/app/seller/invoices/documents/{}/file/content":                 binaryProxy,
-	"PUT /api/v1/app/media/secure_upload/{}":                                    binaryProxy,
-	"GET /api/v1/admin/notification-templates":                                  notAnnotated,
-	"GET /api/v1/app/hashtags":                                                  notAnnotated,
-	"POST /webhook/payuni/notify":                                               payuniWebhookProxy,
-	"GET /dev/webhook-simulator":                                                localDevTool,
-	"GET /dev/webhook-simulator/lookup":                                         localDevTool,
-	"GET /docs/{}":                                                              localDevTool,
-	"POST /dev/webhook-simulator/send":                                          localDevTool,
-	"POST /docs/login":                                                          localDevTool,
+	"GET /api/v1/admin/delegated-operations/{}/audit-logs":                  notAnnotatedDelegated,
+	"GET /api/v1/admin/delegated-operations/{}/summary":                     notAnnotatedDelegated,
+	"GET /api/v1/admin/delegated-operations/current/summary":                notAnnotatedDelegated,
+	"GET /api/v1/admin/sellers/{}/orders/{}":                                notAnnotatedDelegated,
+	"GET /api/v1/admin/sellers/{}/orders/{}/recipient-contact":              notAnnotatedDelegated,
+	"GET /api/v1/admin/sellers/{}/products":                                 notAnnotatedDelegated,
+	"GET /api/v1/admin/sellers/{}/products/{}":                              notAnnotatedDelegated,
+	"GET /api/v1/admin/sellers/{}/storefront":                               notAnnotatedDelegated,
+	"PATCH /api/v1/admin/sellers/{}/products/{}":                            notAnnotatedDelegated,
+	"PATCH /api/v1/admin/sellers/{}/storefront":                             notAnnotatedDelegated,
+	"POST /api/v1/admin/sellers/{}/products":                                notAnnotatedDelegated,
+	"POST /api/v1/admin/sellers/{}/products/{}/publish":                     notAnnotatedDelegated,
+	"POST /api/v1/admin/sellers/{}/products/{}/unpublish":                   notAnnotatedDelegated,
+	"POST /api/v1/admin/sellers/{}/products/batch-unpublish":                notAnnotatedDelegated,
+	"POST /api/v1/admin/sellers/{}/storefront/cover":                        notAnnotatedDelegated,
+	"POST /api/v1/admin/sellers/{}/storefront/logo":                         notAnnotatedDelegated,
+	"GET /api/v1/admin/invoices/documents/{}/file/content":                  binaryProxy,
+	"GET /api/v1/admin/invoices/jobs/{}/manual_unlocks/{}/evidence/content": binaryProxy,
+	"GET /api/v1/admin/invoices/tax_reviews/{}/documents/{}/content":        binaryProxy,
+	"GET /api/v1/app/orders/{}/invoice_documents/{}/file/content":           binaryProxy,
+	"GET /api/v1/app/seller/invoices/documents/{}/file/content":             binaryProxy,
+	"GET /api/v1/admin/notification-templates":                              notAnnotated,
+	"GET /api/v1/app/hashtags":                                              notAnnotated,
+	"POST /webhook/payuni/notify":                                           payuniWebhookProxy,
+	"GET /dev/webhook-simulator":                                            localDevTool,
+	"GET /dev/webhook-simulator/lookup":                                     localDevTool,
+	"GET /docs/{}":                                                          localDevTool,
+	"POST /dev/webhook-simulator/send":                                      localDevTool,
+	"POST /docs/login":                                                      localDevTool,
 }
 
 var pathParam = regexp.MustCompile(`/(?:[:*][^/]+|\{[^}]+\})`)

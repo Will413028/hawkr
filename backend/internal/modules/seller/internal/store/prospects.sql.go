@@ -8,6 +8,8 @@ package store
 import (
 	"context"
 	"time"
+
+	"uuid"
 )
 
 const addProspectCategories = `-- name: AddProspectCategories :exec
@@ -921,24 +923,6 @@ func (q *Queries) ProspectContacts(ctx context.Context, prospectID int64) ([]Pro
 	return items, nil
 }
 
-const prospectImageAssets = `-- name: ProspectImageAssets :one
-SELECT prospect_id, logo_asset_id, cover_asset_id FROM seller.prospects WHERE prospect_id = $1
-`
-
-type ProspectImageAssetsRow struct {
-	ProspectID   int64
-	LogoAssetID  *string
-	CoverAssetID *string
-}
-
-// 同步 job 讀的列：目前那一張 logo、封面的 asset ID；封存的列沒有圖片（CHECK），所以沒有目前的資產。
-func (q *Queries) ProspectImageAssets(ctx context.Context, prospectID int64) (ProspectImageAssetsRow, error) {
-	row := q.db.QueryRow(ctx, prospectImageAssets, prospectID)
-	var i ProspectImageAssetsRow
-	err := row.Scan(&i.ProspectID, &i.LogoAssetID, &i.CoverAssetID)
-	return i, err
-}
-
 const prospectTaxIDMatches = `-- name: ProspectTaxIDMatches :many
 SELECT prospect_id, store_id, store_name, company_name, kyc_status FROM (
     SELECT DISTINCT ON (p.prospect_id, s.store_id)
@@ -1449,10 +1433,10 @@ SET display_name = $1,
     priority_letter = $10,
     priority_stars = $11,
     logo_key = CASE WHEN $12::boolean THEN $13::text ELSE logo_key END,
-    logo_asset_id = CASE WHEN $12::boolean THEN $14::text ELSE logo_asset_id END,
+    logo_asset_id = CASE WHEN $12::boolean THEN $14::uuid ELSE logo_asset_id END,
     logo_source_url = CASE WHEN $12::boolean THEN $15::text ELSE logo_source_url END,
     cover_key = CASE WHEN $16::boolean THEN $17::text ELSE cover_key END,
-    cover_asset_id = CASE WHEN $16::boolean THEN $18::text ELSE cover_asset_id END,
+    cover_asset_id = CASE WHEN $16::boolean THEN $18::uuid ELSE cover_asset_id END,
     cover_source_url = CASE WHEN $16::boolean THEN $19::text ELSE cover_source_url END,
     updated_by_admin_id = $20,
     updated_at = $21,
@@ -1475,11 +1459,11 @@ type UpdateProspectParams struct {
 	PriorityStars   int32
 	SetLogo         bool
 	LogoKey         *string
-	LogoAssetID     *string
+	LogoAssetID     *uuid.UUID
 	LogoSourceUrl   *string
 	SetCover        bool
 	CoverKey        *string
-	CoverAssetID    *string
+	CoverAssetID    *uuid.UUID
 	CoverSourceUrl  *string
 	AdminID         *int64
 	Now             time.Time

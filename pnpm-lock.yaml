@@ -359,6 +359,9 @@ importers:
       '@connectrpc/connect':
         specifier: 'catalog:'
         version: 2.3.0(@bufbuild/protobuf@2.17.0)
+      hash-wasm:
+        specifier: 4.13.0
+        version: 4.13.0
     devDependencies:
       '@biomejs/biome':
         specifier: 'catalog:'
@@ -4682,6 +4685,9 @@ packages:
   has-tostringtag@1.0.2:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
     engines: {node: '>= 0.4'}
+
+  hash-wasm@4.13.0:
+    resolution: {integrity: sha512-GrWl7wsV46fKIXQZB5ebskLZLAmKL6d9RS0fspCxDeQyjoNu1AfTJTMLPOJyfzaQm0ldFiwFN21/w+sE/kgEFQ==}
 
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
@@ -10156,6 +10162,8 @@ snapshots:
   has-tostringtag@1.0.2:
     dependencies:
       has-symbols: 1.1.0
+
+  hash-wasm@4.13.0: {}
 
   hasown@2.0.4:
     dependencies:

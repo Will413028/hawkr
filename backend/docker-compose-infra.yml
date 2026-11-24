@@ -1,5 +1,5 @@
 # =============================================================================
-# 本機的基礎設施：Postgres、Redis、RabbitMQ、OTel collector
+# 本機的基礎設施：Postgres、Redis、RabbitMQ、Garage（S3 相容物件儲存）、OTel collector
 # =============================================================================
 # 單體只需要這個檔，不需要 .env：
 #   make infra-up && make migrate && make serve
@@ -88,6 +88,25 @@ services:
     networks:
       - hawkr-network
 
+  # media 的物件儲存（B1-D24）：單節點 Garage，S3 API 在 3900。映像與 CI 的 Garage 測試同一個（B1-D15，釘 digest）。
+  # 映像沒有 shell，layout、key 與 bucket 由 `make infra-up` 之後執行的 scripts/garage-init.sh 初始化（冪等）。
+  garage:
+    image: dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+    container_name: hawkr-garage
+    restart: unless-stopped
+    ports:
+      - "3900:3900"
+    volumes:
+      - ./monitoring/garage/garage.toml:/etc/garage.toml:ro
+      - garage_data:/var/lib/garage
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hawkr-network
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: hawkr-otel-collector
@@ -109,3 +128,4 @@ volumes:
   postgres18_data:
   redis_data:
   rabbitmq_data:
+  garage_data:

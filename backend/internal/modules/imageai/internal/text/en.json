@@ -39,9 +39,6 @@
     "admin.style_thumbnail_required": {
       "message": "A thumbnail is required for a new style"
     },
-    "admin.style_thumbnail_unusable": {
-      "message": "The thumbnail cannot be used. Please upload it again"
-    },
     "style.category_invalid": {
       "message": "The style category is not valid"
     },

@@ -109,8 +109,7 @@ export interface SellerTaxIdentity {
  * 一份稅籍證明文件（`TaxDocumentInfo`）。
  *
  * ⚠️ **沒有 `fileDownloadPath` 這一欄**——58A §S02 的欄位表寫的是它，實際 DTO 給的
- * 是 `fileAssetId`，下載路徑要由前端用 `sellerTaxDocumentHref()` 組（形狀與
- * `certification.go` 的 `secure_download` 一致）。已回報，未自行改規格。
+ * 是 `fileAssetId`；前端不組下載網址（secure_download 端點已刪，檔案讀取待 B10）。
  *
  * `fileKey` 是 media objectKey：**不顯示、不組 URL**，但必須逐筆回填端點 18 的
  * `evidenceObjectKeys[]` 保留清單（§B-2.0 T07）。
@@ -479,8 +478,8 @@ export interface SellerProviderAccount {
  * radio 或「改用收據」入口。
  *
  * ⚠️ 58A §S05 的 DTO 欄位表寫了 `approvalBasisDownloadPath` 與 `receiptTemplateUrl`
- * 兩個欄位，**契約上都不存在**：後端給的是 `approvalBasisAssetId`（要自己組授權下載
- * 路徑，形狀照 `sellerTaxDocumentHref`）與 `receiptTemplateKey`（objectKey，走
+ * 兩個欄位，**契約上都不存在**：後端給的是 `approvalBasisAssetId`（前端不組下載網址，
+ * 檔案讀取待 B10）與 `receiptTemplateKey`（objectKey，走
  * `resolveCdnUrl`）。以契約為準。
  */
 export interface SellerReceiptAuthorization {

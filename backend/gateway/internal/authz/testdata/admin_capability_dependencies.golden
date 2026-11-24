@@ -7,3 +7,4 @@ posts.read =
 posts.write = posts.read
 posts.publish = posts.read, posts.write
 orders.read =
+media.upload =

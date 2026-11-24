@@ -10,13 +10,11 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -68,11 +66,8 @@ func (s *Service) submitRequest(ctx context.Context, spec requestSpec, in model.
 	if err != nil {
 		return model.Measure{}, err
 	}
-	if err := mediaref.EvidenceTokens(in.EvidenceTokens); err != nil {
+	if err := model.CheckEvidenceTokens(in.EvidenceTokens); err != nil {
 		return model.Measure{}, err
-	}
-	if _, ok := db.TxFrom(ctx); ok {
-		return model.Measure{}, apperr.FailedPrecondition("請求必須在 transaction 外開始")
 	}
 	current, err := s.AccountMeasure(ctx, in.AccountID, in.MeasureID)
 	if err != nil {
@@ -83,10 +78,6 @@ func (s *Service) submitRequest(ctx context.Context, spec requestSpec, in model.
 	}
 	if !spec.allowed(current) {
 		return model.Measure{}, spec.unavailable(uitext.LocaleFrom(ctx), current)
-	}
-	evidence, err := mediaref.FinalizeEvidence(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, in.EvidenceTokens)
-	if err != nil {
-		return model.Measure{}, err
 	}
 	var result model.Measure
 	err = s.retryScope(ctx, func() error {
@@ -134,15 +125,14 @@ func (s *Service) submitRequest(ctx context.Context, spec requestSpec, in model.
 			if err != nil {
 				return err
 			}
+			evidence, err := model.ConfirmEvidence(ctx, s.d.Media, media.Uploader{ID: in.AccountID}, in.EvidenceTokens)
+			if err != nil {
+				return err
+			}
 			for i, e := range evidence {
 				if err := q.InsertRequestEvidence(ctx, store.InsertRequestEvidenceParams{
 					RequestID: request.ID, Position: int32(i), AssetID: e.AssetID, ObjectKey: e.ObjectKey, //nolint:gosec // 佐證最多 MaxEvidence 張
 				}); err != nil {
-					return err
-				}
-			}
-			if len(evidence) > 0 {
-				if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.EvidenceRef(request.ID)); err != nil {
 					return err
 				}
 			}

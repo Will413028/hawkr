@@ -169,6 +169,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.media.v1alpha1.RejectReason",
+      "dartClass": "RejectReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.media.v1alpha1.UploadState",
+      "dartClass": "UploadState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.moderation.v1alpha1.ReportOutcome",
       "dartClass": "ReportOutcome",
       "dartLibrary": "package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart",
@@ -207,14 +221,14 @@
       "name": "hawkr.notification.v1alpha1.NotificationCategory",
       "dartClass": "NotificationCategory",
       "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.notification.v1alpha1.NotificationChannel",
       "dartClass": "NotificationChannel",
       "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

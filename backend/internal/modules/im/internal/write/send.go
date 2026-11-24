@@ -3,7 +3,6 @@ package write
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"unicode/utf8"
 	"uuid"
@@ -11,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
-	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/rows"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/store"
@@ -19,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
-	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/requestid"
 	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
@@ -33,42 +30,14 @@ type target struct {
 	store   seller.Store
 }
 
-// maxSendAttempts 是同一個 RequestID 被並行請求搶先寫入時，整個送出重來的上限。
-const maxSendAttempts = 4
-
-// errRetry 表示同一個 (對話, 寄件方, RequestID) 已被並行的請求寫入：這次 transaction 整個回滾（含 AllocateSeq 推進的 seq），重來後由重送判定回第一則。
-var errRetry = errors.New("im：並行競爭，重來")
-
-// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 重送判定（同一個 RequestID 回第一則）→ 守門 G1..G5（transaction 外的讀取）→ transaction 外轉正圖片 →
-// transaction 內先依序取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、配發 seq 並推進寄件人的已讀游標、寫訊息、排媒體同步、發 MessageSent。
-// 並行的同一個 RequestID 以 messages 的唯一鍵為最終保證：輸家的 transaction 回滾後重來，重讀第一則。
+// Send 送出一則訊息。順序：輸入驗證 → 解析對話與對方（含同一人擋）→ 重送判定的快速路徑（transaction 外，同一個 RequestID 回第一則）→ 守門 G1..G5（transaction 外的讀取）→
+// transaction 內先取 (買家, 店家, 寄件方, RequestID) 的 advisory lock，再在 transaction 內重做重送判定，之後才取買家與店家的守門鎖（FOR KEY SHARE，取到即是這次寫入看到的狀態）、
+// Confirm 圖片、配發 seq 並推進寄件人的已讀游標、寫訊息、發 MessageSent；任何一步失敗整筆回滾，圖片仍是暫存。
 //
-// 加入外層 transaction 時撞到同一個 RequestID 不重試：唯一鍵衝突不會回滾外層，在同一個 transaction 繼續下 SQL 違反單體規則 3，
-// 已推進的 last_seq 也會隨外層 commit 而留下空洞；這時回 errNestedConflict，呼叫方必須整個回滾後重來。
+// 並行的同一個 RequestID 以入口的 advisory lock 序列化（B1-D26）：輸家等到贏家提交後，在 transaction 內的重送判定看到第一則並回傳，不會走到 Confirm。
+// messages 的唯一鍵留作最後防線，撞到就是程式錯誤（Internal）。快速路徑只為「已送出的訊息不因之後才發生的封鎖或停權而重送失敗」：守門在 transaction 之外，
+// 重送判定不能排在它後面。
 func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, error) {
-	_, nested := db.TxFrom(ctx)
-	return retrySend(nested, func() (model.Message, error) { return s.send(ctx, in) })
-}
-
-// errNestedConflict 是加入外層 transaction 的 Send 撞到並行寫入的同一個 RequestID：這個 transaction 已不能再用，呼叫方須回滾後重來。
-var errNestedConflict = errors.New("im：外層 transaction 內遇到並行競爭，呼叫方須回滾後重來")
-
-// retrySend 重試 attempt 直到不再遇到 errRetry；nested 為真時 attempt 的 transaction 不是自己的，不能重試。
-func retrySend(nested bool, attempt func() (model.Message, error)) (model.Message, error) {
-	for range maxSendAttempts {
-		out, err := attempt()
-		if errors.Is(err, errRetry) {
-			if nested {
-				return model.Message{}, errNestedConflict
-			}
-			continue
-		}
-		return out, err
-	}
-	return model.Message{}, fmt.Errorf("im：送出連續 %d 次遇到並行競爭", maxSendAttempts)
-}
-
-func (s *Service) send(ctx context.Context, in model.SendInput) (model.Message, error) {
 	l := uitext.LocaleFrom(ctx)
 	body, err := s.checkInput(l, &in)
 	if err != nil {
@@ -85,23 +54,25 @@ func (s *Service) send(ctx context.Context, in model.SendInput) (model.Message, 
 		return model.Message{}, err
 	}
 
-	var asset media.Asset
-	if in.Type == model.TypeImage {
-		uploader := buyerAccount
-		if in.Sender.Kind == model.PartyStore {
-			uploader = t.store.AccountID
-		}
-		asset, err = media.FinalizeField(ctx, s.d.Media, media.Uploader{ID: uploader}, media.Field{Name: "StagedToken"}, in.StagedToken, media.RefTypeChatMessage)
-		if err != nil {
-			return model.Message{}, err
-		}
+	uploader := buyerAccount
+	if in.Sender.Kind == model.PartyStore {
+		uploader = t.store.AccountID
 	}
 
 	var out model.Message
 	err = s.inTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		sender := in.Sender.Kind
-		// 守門鎖是 transaction 內的第一組語句，在 guard（含 Orders 的網路呼叫，transaction 之外）之後、AllocateSeq 之前：
+		if err := q.LockSendRequest(ctx, store.LockSendRequestParams{
+			BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender), RequestID: in.RequestID,
+		}); err != nil {
+			return err
+		}
+		if first, found, err := s.replay(ctx, l, in, t, body); err != nil || found {
+			out = first
+			return err
+		}
+		// 守門鎖緊接在 LockSendRequest 與 transaction 內的重送判定之後，在 guard（含 Orders 的網路呼叫，transaction 之外）之後、AllocateSeq 之前：
 		// 買家先於店家（鎖序同 accountdeletion），持有到 transaction 結束。取到之後才算這次寫入看到的狀態，不重用 guard 的讀取結果。
 		// 不得把 guard 或 legacy 呼叫搬進這個 transaction（列鎖會跨網路呼叫）。
 		// 兩個守門鎖都取（買家先於店家），再依寄件人優先翻譯 NotFound：雙方都已停用時回「寄件人已停用」，不因取鎖順序變成收件人訊息。
@@ -128,19 +99,15 @@ func (s *Service) send(ctx context.Context, in model.SendInput) (model.Message, 
 		if in.Type == model.TypeText {
 			p.Content = &body
 		} else {
+			asset, err := media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: uploader}, "StagedToken", in.StagedToken, media.VisibilityPublic)
+			if err != nil {
+				return err
+			}
 			p.ImageAssetID, p.ImageObjectKey = &asset.ID, &asset.ObjectKey
 		}
 		row, err := q.InsertMessage(ctx, p)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return errRetry
-		}
 		if err != nil {
 			return err
-		}
-		if in.Type == model.TypeImage {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.MessageRef(msgID)); err != nil {
-				return err
-			}
 		}
 		if err := events.Publish(ctx, s.d.Events, model.MessageSent{
 			EventID: s.d.NewID(), OccurredAt: now, ConversationID: seq.ID, MessageID: msgID, Seq: seq.LastSeq,

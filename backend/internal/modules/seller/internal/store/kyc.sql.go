@@ -437,7 +437,7 @@ VALUES ($1, $2, $3, $4)
 type InsertKYCDocumentParams struct {
 	ApplicationID uuid.UUID
 	Position      int32
-	AssetID       string
+	AssetID       uuid.UUID
 	ObjectKey     string
 }
 
@@ -461,7 +461,7 @@ type InsertKYCDocumentAccessParams struct {
 	AccessID      uuid.UUID
 	ApplicationID uuid.UUID
 	Position      int32
-	AssetID       string
+	AssetID       uuid.UUID
 	AdminID       int64
 	Now           time.Time
 }
@@ -542,7 +542,7 @@ type InsertKYCReviewIssueParams struct {
 	ReviewID        uuid.UUID
 	Position        int32
 	Field           string
-	DocumentAssetID *string
+	DocumentAssetID *uuid.UUID
 	Code            string
 	Message         string
 }
@@ -655,34 +655,6 @@ func (q *Queries) KYCApplicationsMissingHashKey(ctx context.Context, arg KYCAppl
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const kYCDocumentAssets = `-- name: KYCDocumentAssets :many
-SELECT d.asset_id
-FROM seller.kyc_documents d
-JOIN seller.kyc_applications a ON a.application_id = d.application_id
-WHERE d.application_id = $1 AND a.status <> 'CANCELLED'
-`
-
-// 同步 job 讀的：申請目前指著的證件 asset（申請已取消時沒有）。
-func (q *Queries) KYCDocumentAssets(ctx context.Context, applicationID uuid.UUID) ([]string, error) {
-	rows, err := q.db.Query(ctx, kYCDocumentAssets, applicationID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var asset_id string
-		if err := rows.Scan(&asset_id); err != nil {
-			return nil, err
-		}
-		items = append(items, asset_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -869,7 +841,7 @@ type ListKYCDocumentAccessesRow struct {
 	AccessID   uuid.UUID
 	AdminID    int64
 	Position   int32
-	AssetID    string
+	AssetID    uuid.UUID
 	AccessedAt time.Time
 }
 
@@ -1309,7 +1281,7 @@ WHERE r.application_id = $1 AND i.resolved_at IS NULL
 type UnresolvedKYCReviewIssuesRow struct {
 	IssueID         uuid.UUID
 	Field           string
-	DocumentAssetID *string
+	DocumentAssetID *uuid.UUID
 }
 
 // 一筆申請還沒標成已處理的問題：寫入申請的 transaction 用它和新舊值比對（呼叫方已鎖住申請列）。

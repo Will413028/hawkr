@@ -178,12 +178,6 @@ WHERE account_id = $1
 ORDER BY store_id DESC
 LIMIT 1;
 
--- name: ImageAssets :one
--- 同步 job 讀的：店家目前的 logo、封面 asset（沒有圖時是 NULL；關店可逆，已關閉的 stint 到個資清理才釋放，欄位就是引用的來源）。
-SELECT logo_asset_id, cover_asset_id
-FROM seller.stores
-WHERE store_id = $1;
-
 -- name: LockAccountStores :many
 -- 鎖住帳號全部的 stint（含已關閉的），固定依 store_id 的順序，避免兩個重算互鎖。停權的推導與期間的寫入都在這個鎖
 -- 之後才讀處分。

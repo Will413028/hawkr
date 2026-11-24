@@ -414,6 +414,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.media.v1alpha1.RejectReason",
+      "tsName": "RejectReason",
+      "tsModule": "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.media.v1alpha1.UploadState",
+      "tsName": "UploadState",
+      "tsModule": "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.moderation.v1alpha1.ReportOutcome",
       "tsName": "ReportOutcome",
       "tsModule": "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb",
@@ -452,14 +466,14 @@
       "name": "hawkr.notification.v1alpha1.NotificationCategory",
       "tsName": "NotificationCategory",
       "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.notification.v1alpha1.NotificationChannel",
       "tsName": "NotificationChannel",
       "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

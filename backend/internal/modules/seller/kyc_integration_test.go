@@ -8,6 +8,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"reflect"
 	"regexp"
 	"slices"
@@ -22,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
+	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -582,7 +585,7 @@ func TestKYCSchemaConstraints(t *testing.T) {
 		"approved without a decision time":                "UPDATE seller.kyc_applications SET status='APPROVED', submission_seq=1",
 		"landline as mobile":                              "UPDATE seller.stores SET contact_mobile='0229010572'",
 		"unknown status":                                  "UPDATE seller.kyc_applications SET status='FORWARDED'",
-		"document position out of range":                  "INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) SELECT application_id, 10, 'a', 'k' FROM seller.kyc_applications",
+		"document position out of range":                  "INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) SELECT application_id, 10, uuidv7(), 'k' FROM seller.kyc_applications",
 		"review without a reviewer":                       "INSERT INTO seller.kyc_reviews (review_id, application_id, action, decided_at) SELECT uuidv7(), application_id, 'APPROVE', now() FROM seller.kyc_applications",
 		"reject without a reason":                         "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'REJECT', 1, now() FROM seller.kyc_applications",
 		"retired rebind action":                           "INSERT INTO seller.kyc_reviews (review_id, application_id, action, reviewer_admin_id, decided_at) SELECT uuidv7(), application_id, 'REBIND', 1, now() FROM seller.kyc_applications",
@@ -647,95 +650,56 @@ func TestKYCChecksMatchGo(t *testing.T) {
 	}
 }
 
-// 公司文件的 media 引用以申請 ID 為 ref，由同步 job 登記：換圖後只有被換掉的那一張退場，取消後全部退場。
-func TestKYCDocumentsLinkByApplicationIDAndSync(t *testing.T) {
+// 公司文件在寫入申請的同一個 transaction 內確認：換圖後只有被換掉的那一張標為刪除，取消後全部標為刪除。
+func TestKYCDocumentsAreConfirmedWithTheApplicationAndReplacedOnesMarkedDeleted(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
+	tokens, assets := f.stageDocs(t, accountID, 4)
 	in := companyDraft(accountID, taxIDOne)
-	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[1]}}
 	d := f.savedDraft(t, in)
-	if len(f.media.finalized) != 2 {
-		t.Fatalf("finalized=%v", f.media.finalized)
+	if len(d.Documents) != 2 || d.Documents[0].AssetID != assets[0].String() || d.Documents[1].AssetID != assets[1].String() {
+		t.Fatalf("documents=%+v", d.Documents)
 	}
-	for _, refType := range f.media.finalized {
-		if refType != "7111" {
-			t.Fatalf("ref type=%q", refType)
-		}
-	}
-	ref := media.Ref{Type: media.RefTypeCertification, ID: d.ID.String()}
-	if !contains(f.jobs.kinds(), "seller.media_sync") || len(f.media.Referenced(ref)) != 0 {
-		t.Fatalf("jobs=%v references=%v", f.jobs.kinds(), f.media.Referenced(ref))
-	}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); len(got) != 2 {
-		t.Fatalf("references=%v", got)
-	}
+	f.wantAsset(t, assets[0], "ACTIVE")
+	f.wantAsset(t, assets[1], "ACTIVE")
+	f.wantAsset(t, assets[2], "STAGED")
 	// 換第二張。
-	swapped, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: "asset-co1"}, {StagedToken: "co3"}}})
+	swapped, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: assets[0].String()}, {StagedToken: tokens[2]}}})
 	must(t, err)
-	var assets []string
+	var got []string
 	for _, doc := range swapped.Documents {
-		assets = append(assets, doc.AssetID)
+		got = append(got, doc.AssetID)
 	}
-	if !slices.Equal(assets, []string{"asset-co1", "asset-co3"}) {
+	if !slices.Equal(got, []string{assets[0].String(), assets[2].String()}) {
 		t.Fatalf("documents=%+v", swapped.Documents)
 	}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); len(got) != 2 || contains(got, "asset-co2") || !contains(got, "asset-co3") {
-		t.Fatalf("references=%v", got)
-	}
-	// 被換掉的文件不能寫回：同一個 staged token 重新轉正會回到同一個資產。
-	_, err = f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: swapped.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: "asset-co1"}, {StagedToken: "co2"}}})
+	f.wantAsset(t, assets[0], "ACTIVE")
+	f.wantAsset(t, assets[1], "DELETING")
+	f.wantAsset(t, assets[2], "ACTIVE")
+	// 被換掉的文件不能寫回：現有的清單沒有它；同一個 staged token 重新確認會落在已標為刪除的資產上。
+	_, err = f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: swapped.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: assets[0].String()}, {AssetID: assets[1].String()}}})
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
-		t.Fatalf("retired document written back: %v", err)
+		t.Fatalf("deleted document written back by asset id: %v", err)
+	}
+	_, err = f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: swapped.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: assets[0].String()}, {StagedToken: tokens[1]}}})
+	if apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Fatalf("deleted document written back by token: %v", err)
 	}
 	_, err = f.module.CancelKYC(ctx, CancelKYCInput{AccountID: accountID, ExpectedVersion: swapped.Version})
 	must(t, err)
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); len(got) != 0 {
-		t.Fatalf("取消後應該全部解除：%v", got)
-	}
-	// 公司文件只有企業賣家。
+	f.wantAsset(t, assets[0], "DELETING")
+	f.wantAsset(t, assets[2], "DELETING")
+	// 公司文件只有企業賣家：寫入失敗整筆回滾，新資產仍是暫存。
 	individualAccount, _ := f.open(t)
 	individualDraft := f.savedDraft(t, kycDraft(individualAccount))
-	if _, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: individualAccount, ExpectedVersion: individualDraft.Version, CompanyDocuments: &[]KYCDocumentRef{{StagedToken: "co"}}}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	individualTokens, individualAssets := f.stageDocs(t, individualAccount, 1)
+	if _, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: individualAccount, ExpectedVersion: individualDraft.Version, CompanyDocuments: &[]KYCDocumentRef{{StagedToken: individualTokens[0]}}}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("company document for an individual: %v", err)
 	}
-}
-
-// 回歸（CR2-4）：同步 job 在「轉正之後、寫入 commit 之前」執行，不得留下業務列指著卻沒有引用的公司文件。
-func TestSyncBetweenFinalizeAndCommitKeepsKYCDocuments(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	accountID, _ := f.open(t)
-	in := companyDraft(accountID, taxIDOne)
-	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
-	d := f.savedDraft(t, in)
-	ref := media.Ref{Type: media.RefTypeCertification, ID: d.ID.String()}
-	f.syncMedia(t, ref)
-	f.media.AfterFinalize = func(context.Context, media.Asset) {
-		f.media.AfterFinalize = nil
-		f.syncMedia(t, ref)
-	}
-	swapped, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: "asset-co1"}, {StagedToken: "co3"}}})
-	must(t, err)
-	f.syncMedia(t, ref)
-	got := f.media.Referenced(ref)
-	if len(got) != 2 || !contains(got, "asset-co3") || contains(got, "asset-co2") {
-		t.Fatalf("references=%v，swapped=%+v", got, swapped.Documents)
-	}
-}
-
-func contains(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
+	f.wantAsset(t, individualAssets[0], "STAGED")
 }
 
 // 授權由模組做（盤點 D22）：申請以帳號目前的店家為準；停權的賣家不能改申請，已關閉的店家沒有申請。
@@ -804,29 +768,25 @@ func TestKYCSwitchingSellerTypeClearsTheOtherTypesFields(t *testing.T) {
 	}
 }
 
-// 換成個人賣家時公司文件一併清掉，全部記成退場並由同步 job 解除引用。
+// 換成個人賣家時公司文件一併清掉：全部在同一個 transaction 內標為刪除。
 func TestKYCSwitchingToIndividualRetiresTheCompanyDocuments(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
+	tokens, assets := f.stageDocs(t, accountID, 2)
 	in := companyDraft(accountID, taxIDOne)
-	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[1]}}
 	d := f.savedDraft(t, in)
-	ref := media.Ref{Type: media.RefTypeCertification, ID: d.ID.String()}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); len(got) != 2 {
-		t.Fatalf("references=%v", got)
-	}
+	f.wantAsset(t, assets[0], "ACTIVE")
+	f.wantAsset(t, assets[1], "ACTIVE")
 	ind, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, SellerType: individual()})
 	must(t, err)
 	if len(ind.Documents) != 0 {
 		t.Fatalf("documents=%+v", ind.Documents)
 	}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); len(got) != 0 {
-		t.Fatalf("換成個人之後應該全部解除：%v", got)
-	}
+	f.wantAsset(t, assets[0], "DELETING")
+	f.wantAsset(t, assets[1], "DELETING")
 }
 
 func TestKYCInputValidation(t *testing.T) {
@@ -1119,41 +1079,47 @@ func TestStartupChecksThatEveryKeyReferencedByTheDatabaseIsConfigured(t *testing
 }
 
 // 證件是狀態：公司文件整個換成請求的清單（現有的以 asset ID 保留、新的以 staged token）；
-// 指定不是這份申請的證件、重複、超過上限都是 InvalidInput；被換掉的圖片退場並由同步 job 解除；在位置之間移動（順序反過來）的證件不退場。
+// 指定不是這份申請的證件、重複、超過上限都是 InvalidInput；被換掉的圖片標為刪除；在位置之間移動（順序反過來）的證件不刪。
 func TestKYCDocumentsAreReplacedAsState(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
+	tokens, assets := f.stageDocs(t, accountID, 3)
 	in := companyDraft(accountID, taxIDOne)
-	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[1]}}
 	d := f.savedDraft(t, in)
-	kycRef := media.Ref{Type: media.RefTypeCertification, ID: d.ID.String()}
-	f.syncMedia(t, kycRef)
 	company := func(a KYCApplication) (ids []string) {
 		for _, doc := range a.Documents {
 			ids = append(ids, doc.AssetID)
 		}
 		return ids
 	}
-	if got := company(d); len(got) != 2 || got[0] != "asset-co1" || got[1] != "asset-co2" {
+	if got := company(d); len(got) != 2 || got[0] != assets[0].String() || got[1] != assets[1].String() {
 		t.Fatalf("documents=%+v", d.Documents)
 	}
 	// 保留第二張、換上第三張、順序反過來。
 	next, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version,
-		CompanyDocuments: &[]KYCDocumentRef{{StagedToken: "co3"}, {AssetID: "asset-co2"}}})
+		CompanyDocuments: &[]KYCDocumentRef{{StagedToken: tokens[2]}, {AssetID: assets[1].String()}}})
 	must(t, err)
-	if got := company(next); len(got) != 2 || got[0] != "asset-co3" || got[1] != "asset-co2" {
+	if got := company(next); len(got) != 2 || got[0] != assets[2].String() || got[1] != assets[1].String() {
 		t.Fatalf("documents=%+v", next.Documents)
 	}
-	f.syncMedia(t, kycRef)
-	if got := f.media.Referenced(kycRef); contains(got, "asset-co1") || !contains(got, "asset-co2") || !contains(got, "asset-co3") {
-		t.Fatalf("references=%v", got)
+	f.wantAsset(t, assets[0], "DELETING")
+	f.wantAsset(t, assets[1], "ACTIVE")
+	f.wantAsset(t, assets[2], "ACTIVE")
+	// 大寫的 UUID 也是同一個 asset。
+	upper, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: next.Version,
+		CompanyDocuments: &[]KYCDocumentRef{{AssetID: strings.ToUpper(assets[2].String())}, {AssetID: strings.ToUpper(assets[1].String())}}})
+	must(t, err)
+	if got := company(upper); len(got) != 2 || got[0] != assets[2].String() || got[1] != assets[1].String() {
+		t.Fatalf("documents=%+v", upper.Documents)
 	}
+	next = upper
 	for name, refs := range map[string][]KYCDocumentRef{
-		"不是這份申請的證件": {{AssetID: "asset-nope"}},
-		"重複":        {{AssetID: "asset-co2"}, {AssetID: "asset-co2"}},
-		"兩者都給":      {{AssetID: "asset-co2", StagedToken: "x"}},
+		"不是這份申請的證件": {{AssetID: uuid.NewV7().String()}},
+		"重複":        {{AssetID: assets[1].String()}, {AssetID: assets[1].String()}},
+		"兩者都給":      {{AssetID: assets[1].String(), StagedToken: "x"}},
 		"兩者都空":      {{}},
 		"超過上限":      make([]KYCDocumentRef, 11),
 	} {
@@ -1167,6 +1133,8 @@ func TestKYCDocumentsAreReplacedAsState(t *testing.T) {
 	if len(cleared.Documents) != 0 {
 		t.Fatalf("documents=%+v", cleared.Documents)
 	}
+	f.wantAsset(t, assets[1], "DELETING")
+	f.wantAsset(t, assets[2], "DELETING")
 }
 
 // 統編走和登記資料查詢同一個規則（格式加 2023 年起的檢查碼）：格式對、檢查碼不對的統編草稿也收不下，整筆不寫入。
@@ -1185,23 +1153,22 @@ func TestKYCRejectsATaxIDWithABadChecksum(t *testing.T) {
 	}
 }
 
-// 同一個 staged token（同一張圖片）不能放進兩個位置：轉正之前就擋下；現有的圖片也不能在同一份清單出現兩次（保留路徑）。
+// 同一個 staged token（同一張圖片）不能放進兩個位置：確認之前就擋下；現有的圖片也不能在同一份清單出現兩次（保留路徑）。
 func TestKYCSameStagedTokenCannotFillTwoDocumentPositions(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
+	tokens, assets := f.stageDocs(t, accountID, 2)
 	company := companyDraft(accountID, taxIDOne)
-	company.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "front"}, {StagedToken: "front"}}
+	company.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[0]}}
 	if _, err := f.module.SaveKYCDraft(ctx, company); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("兩個位置同一張：err=%v", err)
 	}
-	if len(f.media.finalized) != 0 {
-		t.Fatalf("擋下之前不該轉正：%v", f.media.finalized)
-	}
-	company.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}}
+	f.wantAsset(t, assets[0], "STAGED")
+	company.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[1]}}
 	d := f.savedDraft(t, company)
-	if _, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: "asset-co1"}, {AssetID: "asset-co1"}}}); apperr.KindOf(err) != apperr.KindInvalidInput {
+	if _, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: assets[1].String()}, {AssetID: assets[1].String()}}}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("保留的圖片放到兩個位置：err=%v", err)
 	}
 }
@@ -1371,27 +1338,9 @@ func TestApproveCommentIsValidatedBeforeTheDatabaseSeesIt(t *testing.T) {
 func (f *fixture) submittedWithDocuments(t *testing.T) (int64, Store, KYCApplication) {
 	t.Helper()
 	return f.companySubmission(t, func(in *KYCDraftInput) {
-		in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+		tokens, _ := f.stageDocs(t, in.AccountID, 2)
+		in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[1]}}
 	})
-}
-
-// secureDocuments 把申請的每張補充文件放進 media 的替身（只有 (object_key, 證件的 ref_type, ref_id = 申請 ID) 全等讀得到），
-// 內容是 "bytes:<位置>"。
-func (f *fixture) secureDocuments(a KYCApplication) {
-	for _, d := range a.Documents {
-		f.media.PutSecure(d.ObjectKey, media.Ref{Type: media.RefTypeCertification, ID: a.ID.String()},
-			media.SecureAsset{Data: []byte(fmt.Sprintf("bytes:%d", d.Position)), ContentType: "image/jpeg"})
-	}
-}
-
-func (f *fixture) readSecureCalls() int {
-	n := 0
-	for _, c := range f.media.Calls() {
-		if strings.HasPrefix(c, "read-secure") {
-			n++
-		}
-	}
-	return n
 }
 
 // accessPages 以每頁一筆走完一筆申請的補充文件讀取紀錄（新到舊），確認頁與頁之間不漏不重。
@@ -1418,7 +1367,6 @@ func TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, _, sub := f.submittedWithDocuments(t)
-	f.secureDocuments(sub)
 	_, _, individualSub := f.submitted(t)
 	read := func(a KYCApplication, pos int) error {
 		_, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: 9, ApplicationID: a.ID, Position: pos})
@@ -1440,21 +1388,21 @@ func TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	_, err := f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses ADD CONSTRAINT test_no_writes CHECK (false) NOT VALID")
 	must(t, err)
 	got, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: 9, ApplicationID: sub.ID, Position: 0})
-	if err == nil || len(got.Data) != 0 || f.readSecureCalls() != 0 {
-		t.Fatalf("紀錄寫不進去就不能讀：err=%v data=%q mediaCalls=%d", err, got.Data, f.readSecureCalls())
+	if err == nil || got.Body != nil || f.readSecureCalls() != 0 {
+		t.Fatalf("紀錄寫不進去就不能讀：err=%v mediaCalls=%d", err, f.readSecureCalls())
 	}
 	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses DROP CONSTRAINT test_no_writes")
 	must(t, err)
 
 	// 媒體讀失敗：紀錄還在，錯誤原樣交回。
-	f.media.FailReadSecure = errors.New("media down")
+	f.media.setFailRead(errors.New("media down"))
 	if err := read(sub, 0); err == nil {
 		t.Fatal("media 失敗要回錯誤")
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_document_accesses"); n != 1 || f.readSecureCalls() != 1 {
 		t.Fatalf("accesses=%d mediaCalls=%d", n, f.readSecureCalls())
 	}
-	f.media.FailReadSecure = nil
+	f.media.setFailRead(nil)
 	// 成功的讀取：每一次各寫一列（誰、哪一張、何時）。
 	if err := read(sub, 0); err != nil {
 		t.Fatal(err)
@@ -1467,13 +1415,49 @@ func TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	}
 }
 
+// 賣家讀自己申請的補充文件（B1-D19）：授權是帳號目前的店家，位置定址；不寫後台的讀取紀錄；別的帳號、沒有申請、位置沒有文件、取消之後都是 NotFound。
+func TestSellerReadsOwnKYCDocumentsOnly(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, _, sub := f.submittedWithDocuments(t)
+	for pos := range 2 {
+		got, err := f.module.ReadOwnKYCDocument(ctx, ReadOwnKYCDocumentInput{AccountID: accountID, Position: pos})
+		must(t, err)
+		if !bytes.Equal(fileData(t, got), docBytes(pos)) || got.ContentType != "application/pdf" {
+			t.Fatalf("位置 %d：type=%s", pos, got.ContentType)
+		}
+	}
+	for name, in := range map[string]ReadOwnKYCDocumentInput{
+		"沒有這個位置": {AccountID: accountID, Position: 2}, "位置超出範圍": {AccountID: accountID, Position: 10}, "負的位置": {AccountID: accountID, Position: -1},
+	} {
+		if _, err := f.module.ReadOwnKYCDocument(ctx, in); apperr.KindOf(err) != apperr.KindNotFound {
+			t.Fatalf("%s：%v", name, err)
+		}
+	}
+	otherAccount, _ := f.open(t)
+	if _, err := f.module.ReadOwnKYCDocument(ctx, ReadOwnKYCDocumentInput{AccountID: otherAccount, Position: 0}); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("別的帳號（沒有申請）：%v", err)
+	}
+	if _, err := f.module.ReadOwnKYCDocument(ctx, ReadOwnKYCDocumentInput{AccountID: f.account(t), Position: 0}); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("沒有店的帳號：%v", err)
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.kyc_document_accesses WHERE application_id = $1", sub.ID); n != 0 {
+		t.Fatalf("賣家讀自己的證件不寫後台的讀取紀錄：%d", n)
+	}
+	_, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: accountID, ExpectedVersion: sub.Version, Reason: "改天再申請"})
+	must(t, err)
+	if _, err := f.module.ReadOwnKYCDocument(ctx, ReadOwnKYCDocumentInput{AccountID: accountID, Position: 0}); apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("取消之後：%v", err)
+	}
+}
+
 // 個資清除之後（關店滿保留期）文件不能再讀：NotFound，不寫讀取紀錄、不問媒體。
 func TestKYCDocumentAccessOfAPurgedApplicationIsNotFound(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _, sub := f.submittedWithDocuments(t)
-	f.secureDocuments(sub)
 	_, err := f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
 	f.now = f.now.Add(StoreRetention + time.Second)
@@ -1494,7 +1478,6 @@ func TestKYCAuditListsPageAndCheckTheParent(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, _, sub := f.submittedWithDocuments(t)
-	f.secureDocuments(sub)
 	for i := range 3 {
 		f.now = f.now.Add(time.Minute)
 		if _, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: int64(9 + i), ApplicationID: sub.ID, Position: i % 2}); err != nil {
@@ -1552,15 +1535,15 @@ func TestApproveAndRejectReturnTheAdminViewIncludingTheirOwnReview(t *testing.T)
 	}
 }
 
-// 補充文件必須是機敏上傳：media 回報 is_secure=false 的轉正在寫入之前就被拒絕（invalid_argument，欄位違規指向那個文件），
-// 什麼都不寫。
+// 補充文件必須是機敏上傳：公開的圖片在寫入的 transaction 內就被拒絕（invalid_argument，欄位違規指向那個文件），整筆回滾：
+// 什麼都不寫，公開資產仍是暫存。
 func TestKYCDocumentsMustBeSecureAssets(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	f.media.NotSecure = true
 	accountID, _ := f.open(t)
+	publicToken, publicAsset := f.stagePublic(t, media.Uploader{ID: accountID})
 	in := companyDraft(accountID, taxIDOne)
-	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "doc1"}}
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: publicToken}}
 	_, err := f.module.SaveKYCDraft(context.Background(), in)
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) == 0 || !strings.HasPrefix(ae.FieldViolations()[0].Field, "CompanyDocuments") {
@@ -1569,14 +1552,17 @@ func TestKYCDocumentsMustBeSecureAssets(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_applications"); n != 0 {
 		t.Fatalf("被拒絕的草稿不能留下申請：%d", n)
 	}
-	f.media.NotSecure = false
+	f.wantAsset(t, publicAsset, "STAGED")
+	secureTokens, secureAssets := f.stageDocs(t, accountID, 1)
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: secureTokens[0]}}
 	if _, err := f.module.SaveKYCDraft(context.Background(), in); err != nil {
 		t.Fatalf("機敏的文件可以存：%v", err)
 	}
+	f.wantAsset(t, secureAssets[0], "ACTIVE")
 }
 
-// media 讀不到補充文件時的三種結果：引用的同步還沒結算（暫時，ErrFileNotSynced）、同步過了卻讀不到（資料不一致，ErrFileMissing）、
-// 不是機敏資產（media.ErrNotSecure 原樣）。三種都先寫了讀取紀錄（嘗試也是紀錄）。
+// media 讀不到補充文件時的結果：我們有這份檔而 media 說沒有（資料不一致，ErrFileMissing）、不是機敏資產（media.ErrNotSecure 原樣）。
+// 兩種都先寫了讀取紀錄（嘗試也是紀錄）。
 func TestKYCDocumentReadFailuresAreDistinguished(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -1586,22 +1572,21 @@ func TestKYCDocumentReadFailuresAreDistinguished(t *testing.T) {
 		_, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: 9, ApplicationID: sub.ID, Position: 0})
 		return err
 	}
-	// 圖片沒有放進 media 的替身（讀不到），同步還沒做。
-	if err := read(); !errors.Is(err, ErrFileNotSynced) || errors.Is(err, ErrFileMissing) {
-		t.Fatalf("同步還沒結算：%v", err)
+	if err := read(); err != nil {
+		t.Fatalf("正常讀取：%v", err)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.kyc_document_accesses"); n != 1 {
-		t.Fatalf("accesses=%d", n)
+	// 資產在 media 已經不是有效的機敏資產（被標為刪除），列還指著它。
+	docAsset, err := uuid.Parse(sub.Documents[0].AssetID)
+	must(t, err)
+	f.markAssetDeleted(t, ctx, docAsset)
+	if err := read(); !errors.Is(err, ErrFileMissing) {
+		t.Fatalf("media 說沒有：%v", err)
 	}
-	f.syncMedia(t, media.Ref{Type: media.RefTypeCertification, ID: sub.ID.String()})
-	if err := read(); !errors.Is(err, ErrFileMissing) || errors.Is(err, ErrFileNotSynced) {
-		t.Fatalf("同步過了還讀不到：%v", err)
-	}
-	f.media.FailReadSecure = media.ErrNotSecure
+	f.media.setFailRead(media.ErrNotSecure)
 	if err := read(); !errors.Is(err, media.ErrNotSecure) || errors.Is(err, ErrFileMissing) || apperr.KindOf(err) == apperr.KindNotFound {
 		t.Fatalf("不是機敏資產：%v", err)
 	}
-	f.media.FailReadSecure = nil
+	f.media.setFailRead(nil)
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_document_accesses"); n != 3 {
 		t.Fatalf("三次嘗試都要有紀錄：%d", n)
 	}
@@ -1674,7 +1659,6 @@ func TestCancelledApplicationHasNoReadableDocuments(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _, sub := f.submittedWithDocuments(t)
-	f.secureDocuments(sub)
 	_, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: accountID, ExpectedVersion: sub.Version, Reason: "改天再申請"})
 	must(t, err)
 	if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1", sub.ID) == 0 {
@@ -1687,25 +1671,6 @@ func TestCancelledApplicationHasNoReadableDocuments(t *testing.T) {
 	}
 }
 
-// media 說沒有時，用「呼叫 media 之前」讀到的同步狀態分類：呼叫期間才結算的同步，不會被誤判成資料不一致。
-func TestKYCDocumentClassificationUsesTheSyncStateFromBeforeTheMediaCall(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	ctx := context.Background()
-	_, _, sub := f.submittedWithDocuments(t)
-	ref := media.Ref{Type: media.RefTypeCertification, ID: sub.ID.String()}
-	f.media.BeforeReadSecure = func() { f.syncMedia(t, ref) } // 同步在 media 呼叫進行中結算
-	_, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: 9, ApplicationID: sub.ID, Position: 0})
-	if !errors.Is(err, ErrFileNotSynced) || errors.Is(err, ErrFileMissing) {
-		t.Fatalf("呼叫之前還沒結算：%v", err)
-	}
-	f.media.BeforeReadSecure = nil
-	// 已經結算之後，同樣的讀不到才是不一致。
-	if _, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: 9, ApplicationID: sub.ID, Position: 0}); !errors.Is(err, ErrFileMissing) {
-		t.Fatalf("呼叫之前已結算：%v", err)
-	}
-}
-
 // media 拒絕的 staged token（無效、過期或不屬於這個帳號）是那個證件位置的欄位錯誤：單張的位置指到位置，公司文件指到請求清單的
 // 第幾張（索引是請求裡的位置，不是只算有新 token 的），media 的原因留在錯誤裡給 log。
 func TestKYCRejectedUploadPointsAtTheDocumentPosition(t *testing.T) {
@@ -1713,7 +1678,7 @@ func TestKYCRejectedUploadPointsAtTheDocumentPosition(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
-	f.media.rejected = map[string]error{"gone": fmt.Errorf("mediaservice：轉正（code=404）：%w：%w", media.ErrStagedTokenRejected, apperr.InvalidInput("圖片無法使用，請重新上傳"))}
+	tokens, _ := f.stageDocs(t, accountID, 1)
 	d := f.savedDraft(t, companyDraft(accountID, taxIDOne))
 	fields := func(err error) []string {
 		var ae *apperr.Error
@@ -1726,12 +1691,12 @@ func TestKYCRejectedUploadPointsAtTheDocumentPosition(t *testing.T) {
 		}
 		return out
 	}
-	company := &[]KYCDocumentRef{{AssetID: "keep"}, {StagedToken: "ok"}, {StagedToken: "gone"}}
+	company := &[]KYCDocumentRef{{AssetID: uuid.NewV7().String()}, {StagedToken: tokens[0]}, {StagedToken: "gone"}}
 	_, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: company})
 	if got := fields(err); !slices.Equal(got, []string{"CompanyDocuments[2]"}) {
 		t.Fatalf("公司文件的欄位 = %v（%v）", got, err)
 	}
-	if err == nil || !strings.Contains(err.Error(), "code=404") {
+	if err == nil || !strings.Contains(err.Error(), "CompanyDocuments[2]") {
 		t.Fatalf("缺少 media 的原因：%v", err)
 	}
 	only := &[]KYCDocumentRef{{StagedToken: "gone"}}
@@ -1741,18 +1706,15 @@ func TestKYCRejectedUploadPointsAtTheDocumentPosition(t *testing.T) {
 	}
 }
 
-// 所有被 media 拒絕的 token 一次回報（各指到請求清單的位置）；轉正失敗的請求不寫入任何文件。
+// 所有被 media 拒絕的 token 一次回報（各指到請求清單的位置）；確認失敗的請求不寫入任何文件，其餘的 token 仍是暫存。
 func TestKYCReportsEveryRejectedUploadAtOnce(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
-	gone := func() error {
-		return fmt.Errorf("mediaservice：轉正（code=404）：%w：%w", media.ErrStagedTokenRejected, apperr.InvalidInput("圖片無法使用，請重新上傳"))
-	}
-	f.media.rejected = map[string]error{"gone1": gone(), "gone2": gone()}
+	tokens, assets := f.stageDocs(t, accountID, 1)
 	d := f.savedDraft(t, companyDraft(accountID, taxIDOne))
-	company := &[]KYCDocumentRef{{StagedToken: "gone1"}, {StagedToken: "ok"}, {StagedToken: "gone2"}}
+	company := &[]KYCDocumentRef{{StagedToken: "gone1"}, {StagedToken: tokens[0]}, {StagedToken: "gone2"}}
 	_, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: company})
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput {
@@ -1765,6 +1727,7 @@ func TestKYCReportsEveryRejectedUploadAtOnce(t *testing.T) {
 	if want := []string{"CompanyDocuments[0]", "CompanyDocuments[2]"}; !slices.Equal(got, want) {
 		t.Fatalf("欄位 = %v，預期 %v", got, want)
 	}
+	f.wantAsset(t, assets[0], "STAGED")
 }
 
 // 單一元素的問題（資產與 token 同時指定、空白、重複的 token、不是目前證件的現有圖片）指到那一張（CompanyDocuments[i]）；只有整個清單
@@ -2011,5 +1974,40 @@ func TestStoreNameAndDescriptionStayEditableWhileSubmittedAndAfterApproval(t *te
 	}
 	if cur, err := f.module.Store(ctx, s.StoreID); err != nil || cur.StoreName != "核准後的新店名" {
 		t.Fatalf("讀回：%+v err=%v", cur, err)
+	}
+}
+
+// fileData 讀完並關閉機敏檔的串流，回傳全部內容。
+func fileData(t *testing.T, c FileContent) []byte {
+	t.Helper()
+	defer func() { _ = c.Body.Close() }()
+	data, err := io.ReadAll(c.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// 公司證件必須是機敏上傳：media.Fake 記著 token 的可見性，公開的 token 放進證件位置回與真的 media 相同的欄位錯誤，沒有認領。
+func TestKYCDocumentRejectsAPublicTokenWithTheMediaVisibilityMismatch(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, _ := f.open(t)
+	fake := media.NewFake()
+	fake.Staged = map[string]media.Visibility{"public-doc": media.VisibilityPublic, "secure-doc": media.VisibilitySecure}
+	m := New(Deps{
+		DB: f.db, Events: f.bus, Jobs: f.jobs, Identity: f.identity, Media: fake, Orders: f.orders, KYCMAC: sealtest.MAC(t), Payment: f.payments, ProductStores: f.products, Registry: f.registry,
+		Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	in := companyDraft(accountID, taxIDOne)
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "public-doc"}}
+	_, err := m.SaveKYCDraft(context.Background(), in)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "CompanyDocuments[0]" {
+		t.Fatalf("公開 token 放進證件位置要是 CompanyDocuments[0] 的欄位錯誤：%v", err)
+	}
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "secure-doc"}}
+	if d, err := m.SaveKYCDraft(context.Background(), in); err != nil || len(d.Documents) != 1 {
+		t.Fatalf("機敏 token：%+v %v", d, err)
 	}
 }

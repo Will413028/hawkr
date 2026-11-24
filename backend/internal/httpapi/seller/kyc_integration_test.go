@@ -823,7 +823,7 @@ func TestKYCDocumentsAreStateOverConnect(t *testing.T) {
 	req.UpdateMask.Paths = append(req.UpdateMask.Paths, "business.company_documents")
 	created := saveDraft(t, f.app, req)
 	docs := created.GetBusiness().GetCompanyDocuments()
-	if len(docs) != 2 || docs[0].GetAssetId() != "asset-co1" || docs[1].GetAssetId() != "asset-co2" {
+	if len(docs) != 2 || docs[0].GetAssetId() != assetFor("co1").String() || docs[1].GetAssetId() != assetFor("co2").String() {
 		t.Fatalf("created documents=%v", docs)
 	}
 	next := saveDraft(t, f.app, &pb.SaveKYCDraftRequest{
@@ -836,10 +836,10 @@ func TestKYCDocumentsAreStateOverConnect(t *testing.T) {
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"business.company_documents"}},
 	})
 	got := next.GetBusiness().GetCompanyDocuments()
-	if len(got) != 2 || got[0].GetAssetId() != "asset-co3" || got[1].GetAssetId() != docs[1].GetAssetId() || got[0].GetStagedToken() != "" {
+	if len(got) != 2 || got[0].GetAssetId() != assetFor("co3").String() || got[1].GetAssetId() != docs[1].GetAssetId() || got[0].GetStagedToken() != "" {
 		t.Fatalf("documents=%v", got)
 	}
-	if got[0].GetDownloadUri() != "/api/v1/app/media/secure_download/asset-co3" {
+	if got[0].GetDownloadUri() != "/api/files/seller/kyc/0" {
 		t.Fatalf("download uri=%q", got[0].GetDownloadUri())
 	}
 	// 指定的現有圖片不是這份申請目前的文件。

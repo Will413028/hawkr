@@ -140,7 +140,7 @@ type SellerCaseInquiry struct {
 type SellerCaseInquiryReplyEvidence struct {
 	InquiryID uuid.UUID
 	Position  int32
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }
 
@@ -211,7 +211,7 @@ type SellerKycApplication struct {
 type SellerKycDocument struct {
 	ApplicationID uuid.UUID
 	Position      int32
-	AssetID       string
+	AssetID       uuid.UUID
 	ObjectKey     string
 }
 
@@ -219,7 +219,7 @@ type SellerKycDocumentAccess struct {
 	AccessID      uuid.UUID
 	ApplicationID uuid.UUID
 	Position      int32
-	AssetID       string
+	AssetID       uuid.UUID
 	AdminID       int64
 	AccessedAt    time.Time
 }
@@ -266,7 +266,7 @@ type SellerKycReviewIssue struct {
 	ReviewID        uuid.UUID
 	Position        int32
 	Field           string
-	DocumentAssetID *string
+	DocumentAssetID *uuid.UUID
 	Code            string
 	Message         string
 	ResolvedAt      *time.Time
@@ -352,7 +352,7 @@ type SellerMeasureRequest struct {
 type SellerMeasureRequestEvidence struct {
 	RequestID uuid.UUID
 	Position  int32
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }
 
@@ -364,14 +364,6 @@ type SellerMeasureRevision struct {
 	AdminID           *int64
 	SystemCause       *string
 	CreatedAt         time.Time
-}
-
-type SellerMediaRefSync struct {
-	RefType   string
-	RefID     string
-	Seq       int64
-	SyncedSeq int64
-	UpdatedAt time.Time
 }
 
 type SellerPayoutCapability struct {
@@ -416,10 +408,10 @@ type SellerProspect struct {
 	PriorityLetter   *string
 	PriorityStars    int32
 	LogoKey          *string
-	LogoAssetID      *string
+	LogoAssetID      *uuid.UUID
 	LogoSourceUrl    *string
 	CoverKey         *string
-	CoverAssetID     *string
+	CoverAssetID     *uuid.UUID
 	CoverSourceUrl   *string
 	CreatedByAdminID *int64
 	UpdatedByAdminID *int64
@@ -486,7 +478,7 @@ type SellerReportEvidence struct {
 	SubmissionSeq int16
 	Position      int32
 	SupplementID  *uuid.UUID
-	AssetID       string
+	AssetID       uuid.UUID
 	ObjectKey     string
 }
 
@@ -498,14 +490,6 @@ type SellerReportSupplement struct {
 	CreatedAt   time.Time
 }
 
-type SellerRetiredAsset struct {
-	RefType    string
-	RefID      string
-	AssetID    string
-	RetiredAt  time.Time
-	UnlinkedAt *time.Time
-}
-
 type SellerStore struct {
 	StoreID             int64
 	StoreCode           int64
@@ -515,9 +499,9 @@ type SellerStore struct {
 	StoreName           *string
 	Description         *string
 	LogoKey             *string
-	LogoAssetID         *string
+	LogoAssetID         *uuid.UUID
 	CoverKey            *string
-	CoverAssetID        *string
+	CoverAssetID        *uuid.UUID
 	ContactPhone        *string
 	ContactName         *string
 	ContactMobile       *string

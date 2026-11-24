@@ -25,8 +25,6 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -43,6 +41,8 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
+	// Media 是 media 模組：退場與個資清理的 transaction 內把店家的圖與證件 MarkDeleted。
+	Media model.Media
 	// Payment 是收款帳戶的擁有者（payment 模組）：清理的 transaction 內排入刪除店家收款帳戶列的 job。
 	Payment Payment
 	Now     func() time.Time
@@ -153,22 +153,21 @@ func (s *Service) retireBatch(ctx context.Context, after *int64) (int, int, *int
 			return err
 		}
 		retiredCount = len(retired)
-		// 說明與圖片清掉之後店家頁（與卡片）要失效：同一個 transaction 內排入快取失效；logo 與封面在這時才釋放（記成退場，引用由同步 job 解除）。
+		// 說明與圖片清掉之後店家頁（與卡片）要失效：同一個 transaction 內排入快取失效；logo 與封面在這時才釋放（同一個 transaction 內 MarkDeleted）。
 		// 退場之後恢復營業不可能，下游的資料可以刪除：發出 StoreRetired。
 		for _, id := range retired {
 			row := byID[id]
 			if err := s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: revalidate.StoreTags(row.StoreID, row.StoreCode)}, nil); err != nil {
 				return err
 			}
-			for _, image := range []struct {
-				refType string
-				asset   *string
-			}{{media.RefTypeSellerLogo, row.LogoAssetID}, {media.RefTypeSellerCover, row.CoverAssetID}} {
-				var released []string
-				if image.asset != nil {
-					released = append(released, *image.asset)
+			var released []uuid.UUID
+			for _, asset := range []*uuid.UUID{row.LogoAssetID, row.CoverAssetID} {
+				if asset != nil {
+					released = append(released, *asset)
 				}
-				if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.StoreRef(image.refType, row.StoreID), released...); err != nil {
+			}
+			if len(released) > 0 {
+				if err := s.d.Media.MarkDeleted(ctx, released); err != nil {
 					return err
 				}
 			}
@@ -256,15 +255,12 @@ func (s *Service) purgeBatch(ctx context.Context, after *int64) (int, int, *int6
 		if err != nil {
 			return err
 		}
-		retired := make(map[uuid.UUID][]string, len(applications))
+		retired := make([]uuid.UUID, 0, len(deleted))
 		for _, d := range deleted {
-			retired[d.ApplicationID] = append(retired[d.ApplicationID], d.AssetID)
+			retired = append(retired, d.AssetID)
 		}
-		for _, id := range applications {
-			if len(retired[id]) == 0 {
-				continue
-			}
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.CertificationRef(id), retired[id]...); err != nil {
+		if len(retired) > 0 {
+			if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {
 				return err
 			}
 		}

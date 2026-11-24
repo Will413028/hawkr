@@ -23,6 +23,7 @@ export const DELEGATED_AUDIT_RESOURCE_TYPES = [
 	"product",
 	"post",
 	"order",
+	"media",
 ] as const;
 export type DelegatedAuditResourceType =
 	(typeof DELEGATED_AUDIT_RESOURCE_TYPES)[number];
@@ -33,22 +34,23 @@ export type DelegatedAuditRiskLevel =
 	(typeof DELEGATED_AUDIT_RISK_LEVELS)[number];
 
 /**
- * `DelegationAuditAction` 的封閉十九值（56 §6.5.3）。
+ * `DelegationAuditAction` 的封閉二十值（56 §6.5.3）。
  *
  * 這裡只存**值域**，稽核列的中文由後端逐列下發的 `actionLabel` 決定（同
  * `changedFields[].label` 的理由）。值域留在前端是為了讓篩選送出前就擋掉不合法
  * 值：gateway 對未知篩選值回 9260，靜默送出只會換來一次 400。
  *
- * ⚠️ 篩選下拉是例外，因為它必須在**任何資料到達之前**就列滿這 19 個選項，此時
+ * ⚠️ 篩選下拉是例外，因為它必須在**任何資料到達之前**就列滿這 20 個選項，此時
  * 權威中文還不存在。那一份引導用的中文在 `src/lib/codemeta/generated.ts` 的
  * `DELEGATION_AUDIT_ACTION_LABEL`，且被兩件事綁住：本常數與它的鍵集合必須相等
  * （`tests/delegated-operations-ui-contract.test.ts` 斷言），以及資料一到就以
  * `actionLabel` 就地覆蓋。
  *
  * ⚠️ **新增一個動作時，那一半不能在 admin 手改** —— `generated.ts` 是 backend
- * `generate.sh --admin` 的產物（DO NOT EDIT，CI 檢查 drift）。正解是改
- * `backend/docs/代碼管理（CodeMeta）/內部技術碼.md` → 重新生成；本檔這一半照常手動加。
- * 兩邊鍵集合不等時上面那支測試會紅。
+ * `generate.sh --admin` 的產物（DO NOT EDIT，CI 檢查 drift）。CodeMeta 已凍結、不再新增值域
+ * （ADR 2026-09-25-codemeta-retirement），所以凍結之後新增的動作（`MEDIA_UPLOAD`，B1-D16）的引導
+ * 中文放在 `labels.ts` 的 `DELEGATED_AUDIT_ACTION_POST_FREEZE_LABELS`；
+ * 兩邊鍵集合的聯集與本常數不等時上面那支測試會紅。
  */
 export const DELEGATED_AUDIT_ACTIONS = [
 	"STOREFRONT_UPDATE",
@@ -70,6 +72,7 @@ export const DELEGATED_AUDIT_ACTIONS = [
 	"POST_READ",
 	"ORDER_READ",
 	"AUDIT_CORRECTION",
+	"MEDIA_UPLOAD",
 ] as const;
 export type DelegatedAuditAction = (typeof DELEGATED_AUDIT_ACTIONS)[number];
 

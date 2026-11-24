@@ -7,7 +7,7 @@ import (
 )
 
 // 依賴閉包是 #2444 新增的業務規則，而它在 DB **沒有任何落點**：
-// chk_sda_capabilities_closed 的九個 CASE 是去重加總（PG 的 CHECK 不能用子查詢做
+// chk_sda_capabilities_closed 的十個 CASE 是去重加總（PG 的 CHECK 不能用子查詢做
 // DISTINCT），不是依賴檢查。⇒ 只勾 products.write 不勾 products.read 的組合，DB 照收，
 // 而畫面上「編輯商品」這個入口會憑空少掉一半功能，零錯誤訊號。
 //
@@ -36,7 +36,7 @@ func parseDependencyGolden(t *testing.T) [][2]string {
 	return out
 }
 
-// golden 與 Go 表逐行等值且順序一致。順序也比對的理由與九值那份相同：golden 是給人讀
+// golden 與 Go 表逐行等值且順序一致。順序也比對的理由與十值那份相同：golden 是給人讀
 // 的副本，順序漂掉之後逐行比對就退化成集合比對，少一層保護。
 func TestAdminCapabilityDependenciesMatchGolden(t *testing.T) {
 	golden := parseDependencyGolden(t)
@@ -80,7 +80,7 @@ func TestAdminCapabilityTablesCoverEveryCapability(t *testing.T) {
 	if len(adminCapabilityRisks) != len(AllAdminCapabilities) {
 		t.Errorf("風險表有 %d 條、capability 有 %d 個", len(adminCapabilityRisks), len(AllAdminCapabilities))
 	}
-	// 依賴項本身必須是九值之一，且不得自我依賴——自我依賴會讓閉包展開對它恆為
+	// 依賴項本身必須是十值之一，且不得自我依賴——自我依賴會讓閉包展開對它恆為
 	// 「缺自己」，任何含它的組合都送不出去。
 	for cap, deps := range adminCapabilityDependencies {
 		for _, d := range deps {

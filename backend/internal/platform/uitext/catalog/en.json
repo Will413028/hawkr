@@ -117,6 +117,21 @@
     "crm.CustomerType.CUSTOMER_TYPE_VIP": {
       "message": "VIP"
     },
+    "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH": {
+      "message": "The file was corrupted during upload. Please upload it again."
+    },
+    "media.RejectReason.REJECT_REASON_EXPIRED": {
+      "message": "The upload timed out. Please upload it again."
+    },
+    "media.RejectReason.REJECT_REASON_PROCESSING_FAILED": {
+      "message": "The file could not be processed. Try a different image."
+    },
+    "media.RejectReason.REJECT_REASON_SIZE_MISMATCH": {
+      "message": "The file size does not match what was declared. Please upload it again."
+    },
+    "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT": {
+      "message": "The file format was not recognized. Use a JPEG, PNG, WebP or GIF image."
+    },
     "moderation.CommunityReport.outcome_unset": {
       "message": "Under review"
     },
@@ -146,6 +161,60 @@
     },
     "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY": {
       "message": "Review reply"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT": {
+      "message": "Account and policy"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES": {
+      "message": "Refunds and after-sales"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT": {
+      "message": "Announcements"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_CHAT": {
+      "message": "Chat"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_COMMENT": {
+      "message": "Comments"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_COUPON": {
+      "message": "Coupons"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOW": {
+      "message": "New followers"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST": {
+      "message": "Posts from stores you follow"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_LIKE": {
+      "message": "Likes"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_ORDER": {
+      "message": "Orders"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT": {
+      "message": "Payouts"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK": {
+      "message": "Back in stock"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW": {
+      "message": "Reviews"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT": {
+      "message": "Shipping"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": {
+      "message": "Delivery issues"
+    },
+    "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL": {
+      "message": "Email"
+    },
+    "notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX": {
+      "message": "Inbox"
+    },
+    "notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH": {
+      "message": "Push"
     },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "Setup needed"

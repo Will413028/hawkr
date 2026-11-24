@@ -8,12 +8,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 )
 
-// seller schema 的每一張表都要有種子的處理方式：只因使用而存在的店家子列由 clearChildrenSQL 清除，其餘（店家本身、公告列、media ref、不屬於店家的名單）
+// seller schema 的每一張表都要有種子的處理方式：只因使用而存在的店家子列由 clearChildrenSQL 清除，其餘（店家本身、公告列、不屬於店家的名單）
 // 保留。新增的表沒有分類就失敗，讓維護者決定；漏掉會讓重跑 dev-seed 留下舊的 KYC、停權等，種子店家不再回到 fixture。
 func TestEverySellerTableHasASeedDecision(t *testing.T) {
-	kept := []string{"stores", "store_closures", "store_exposures", "media_ref_sync", "retired_assets", "prospects", "prospect_contacts", "prospect_distinct_pairs", "prospect_categories"}
+	kept := []string{"stores", "store_closures", "store_exposures", "prospects", "prospect_contacts", "prospect_distinct_pairs", "prospect_categories"}
 	schema, err := os.ReadFile("../../db/schema.sql")
 	if err != nil {
 		t.Fatal(err)
@@ -68,7 +69,7 @@ func TestDevSeedHasNoMeasureSQLOfItsOwn(t *testing.T) {
 }
 
 func TestCheckRefusesAStoreOwnerOutsideTheSeedAccounts(t *testing.T) {
-	st := Store{StoreID: 1009, StoreCode: 9, AccountID: 9, Name: "n", TownCode: "63000050", LogoKey: "k", LogoAssetID: "a"}
+	st := Store{StoreID: 1009, StoreCode: 9, AccountID: 9, Name: "n", TownCode: "63000050", LogoKey: "k", LogoAssetID: uuid.MustParse("0192a000-0000-7000-8000-00000000000a")}
 	err := check(context.Background(), nil, []Store{st}, []int64{4, 2001}, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "不在種子帳號清單內") {
 		t.Fatalf("擁有者不在種子帳號清單內時應該回錯誤，got %v", err)

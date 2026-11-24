@@ -46,16 +46,15 @@ CREATE INDEX reviews_product ON review.reviews (product_id, created_at DESC, id 
 CREATE INDEX reviews_store ON review.reviews (store_id, created_at DESC, id DESC);
 CREATE INDEX reviews_buyer ON review.reviews (buyer_id, created_at DESC, id DESC);
 
--- 評價的附圖：張數上限由 position 的範圍保證（不靠截斷）。asset_id 給媒體引用同步，object_key 給顯示。
+-- 評價的附圖：張數上限由 position 的範圍保證（不靠截斷）。asset_id 是 media 的資產 ID（UUID v7，寫入時在同一個 transaction 內 Confirm），object_key 給顯示。
 CREATE TABLE review.review_images (
     review_id  UUID     NOT NULL REFERENCES review.reviews (id) ON DELETE CASCADE,
     position   SMALLINT NOT NULL,
-    asset_id   TEXT     NOT NULL,
+    asset_id   UUID     NOT NULL,
     object_key TEXT     NOT NULL,
     PRIMARY KEY (review_id, position),
     CONSTRAINT review_images_asset_key UNIQUE (review_id, asset_id),
     CONSTRAINT review_images_position_check CHECK (position BETWEEN 0 AND 3),
-    CONSTRAINT review_images_asset_check CHECK (asset_id <> ''),
     CONSTRAINT review_images_key_check CHECK (object_key <> '')
 );
 
@@ -85,24 +84,3 @@ CREATE TABLE review.hides (
 );
 CREATE UNIQUE INDEX hides_active_review ON review.hides (review_id) WHERE restored_at IS NULL;
 CREATE INDEX hides_review ON review.hides (review_id, hidden_at);
-
--- media 引用的同步版本與退場資產：形狀與語意同 social（internal/mediaref）。ref 的列不刪除。
-CREATE TABLE review.media_ref_sync (
-    ref_type   TEXT        NOT NULL,
-    ref_id     TEXT        NOT NULL,
-    seq        BIGINT      NOT NULL DEFAULT 1,
-    synced_seq BIGINT      NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
-CREATE INDEX media_ref_sync_unsynced ON review.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
-CREATE TABLE review.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON review.retired_assets (retired_at);

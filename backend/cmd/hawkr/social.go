@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
@@ -79,7 +78,7 @@ type socialSellers interface {
 
 // newSocial 組裝 social 模組。serve 與 worker 都需要它：serve 要訂閱買家與店家的事件（買家的刪除事件在發布方的 transaction 內記複本並重新求值、排清除 job；店家退場只排清除 job），worker 執行
 // 它的 job（圖片引用、清除、瀏覽資料清理、每日對帳；排程的是 PeriodicJobs）。
-func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers socialSellers, med media.Media, products socialProducts, delegationAuthorizer social.ScheduleAuthorizer, log *slog.Logger) *social.Module {
+func newSocial(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers socialSellers, med mediaPort, products socialProducts, delegationAuthorizer social.ScheduleAuthorizer, log *slog.Logger) *social.Module {
 	m := social.New(social.Deps{
 		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: buyers, Stores: sellers, StoreBlocks: sellers, Products: products,
 		ScheduleAuthorizers: scheduleAuthorizers(delegationAuthorizer),

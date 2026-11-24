@@ -245,10 +245,9 @@ func TestRedactBody_BeyondScanLimit(t *testing.T) {
 	}
 }
 
-// staged token 是 media-service 簽出的 JWT，而 admin_delegated_media.go 與
-// validateStagedToken 都把「never logged」寫成不變式——在補上遮罩之前那個不變式沒有
+// staged token 是 media-service 簽出的 JWT，而 validateStagedToken 把「never logged」寫成不變式——在補上遮罩之前那個不變式沒有
 // 任何機械保證：access log 同時記 req_body 與 resp_body，掛載端點的請求與 complete
-// 端點的回應正好各洩漏一半（56 §6.1.13）。本測試逐一釘住這個家族的每種欄名形態。
+// 端點的回應正好各洩漏一半。本測試逐一釘住這個家族的每種欄名形態。
 func TestRedactBody_StagedTokenFamily(t *testing.T) {
 	cases := []struct{ name, body, secret string }{
 		{"camelCase 單值（logo / cover 的 request）",

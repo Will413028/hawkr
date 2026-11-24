@@ -4,7 +4,6 @@ import (
 	"context"
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -16,7 +15,7 @@ func errEvidenceNotFound() error { return apperr.NotFound("找不到這張佐證
 // 限時授權（看佐證是審案的本體）。通報或請求不存在、位置沒有佐證是 NotFound。
 // 順序是安全性質（與 KYC 證件的讀取相同）：（1）transaction 內寫一列 append-only 的讀取紀錄（誰、哪一張、何時；以外鍵指向
 // 那一張佐證，佐證寫入後不可改，所以就是送出的檔；不含內容），commit 之後才（2）向 media 讀內容。紀錄寫不進去就不讀（fail closed）；讀取失敗時紀錄仍在（嘗試也是紀錄）。
-// media 讀不到時的三種結果見 mediaref.ReadSecure。
+// media 讀不到時的結果見 model.ReadSecure。
 func (s *Service) ReadEvidence(ctx context.Context, in model.ReadEvidenceInput) (model.FileContent, error) {
 	if err := model.Positive(in.AdminID); err != nil {
 		return model.FileContent{}, err
@@ -56,7 +55,7 @@ func (s *Service) ReadEvidence(ctx context.Context, in model.ReadEvidenceInput) 
 	if err != nil {
 		return model.FileContent{}, err
 	}
-	return mediaref.ReadSecure(ctx, store.New(s.d.DB.Conn(ctx)), s.d.Media, mediaref.EvidenceRef(in.RefID), evidence.ObjectKey)
+	return model.ReadSecure(ctx, s.d.Media, evidence.AssetID)
 }
 
 // evidenceRow 是讀到的一張佐證與它在表裡的鍵（讀取紀錄用）：submissionSeq 只有通報的佐證有意義，rowPosition 通報的是次內位置、請求的是位置。

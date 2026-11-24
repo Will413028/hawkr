@@ -28,8 +28,8 @@ type ContentBanner struct {
 	ButtonText          string
 	PreviewImageKey     string
 	PopupImageKey       string
-	PreviewImageAssetID string
-	PopupImageAssetID   string
+	PreviewImageAssetID uuid.UUID
+	PopupImageAssetID   uuid.UUID
 	CanvasJson          string
 	// 點擊行為（設計書 25）：POPUP、URL、PRODUCT、POST；沒有預設值
 	ActionType string
@@ -43,20 +43,4 @@ type ContentBanner struct {
 	Version   int64
 	CreatedAt time.Time
 	UpdatedAt time.Time
-}
-
-type ContentMediaRefSync struct {
-	RefType   string
-	RefID     string
-	Seq       int64
-	SyncedSeq int64
-	UpdatedAt time.Time
-}
-
-type ContentRetiredAsset struct {
-	RefType    string
-	RefID      string
-	AssetID    string
-	RetiredAt  time.Time
-	UnlinkedAt *time.Time
 }

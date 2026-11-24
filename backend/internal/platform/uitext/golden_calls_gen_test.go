@@ -70,12 +70,18 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.CrmCustomerSort(goldenEnum(c.Value, "CUSTOMER_SORT_"))
 	case "crm.CustomerType":
 		return t.CrmCustomerType(goldenEnum(c.Value, "CUSTOMER_TYPE_"))
+	case "media.RejectReason":
+		return t.MediaRejectReason(goldenEnum(c.Value, "REJECT_REASON_"))
 	case "moderation.CommunityReport.outcome_unset":
 		return t.ModerationCommunityReportOutcomeUnset(), true
 	case "moderation.ReportOutcome":
 		return t.ModerationReportOutcome(goldenEnum(c.Value, "REPORT_OUTCOME_"))
 	case "moderation.ReportTargetKind":
 		return t.ModerationReportTargetKind(goldenEnum(c.Value, "REPORT_TARGET_KIND_"))
+	case "notification.NotificationCategory":
+		return t.NotificationNotificationCategory(goldenEnum(c.Value, "NOTIFICATION_CATEGORY_"))
+	case "notification.NotificationChannel":
+		return t.NotificationNotificationChannel(goldenEnum(c.Value, "NOTIFICATION_CHANNEL_"))
 	case "payment.PaymentAccountStatus":
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":

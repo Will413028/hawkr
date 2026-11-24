@@ -339,7 +339,7 @@ VALUES ($1, $2, $3, $4)
 type InsertCaseInquiryEvidenceParams struct {
 	InquiryID uuid.UUID
 	Position  int32
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }
 

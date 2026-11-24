@@ -1,3 +1,7 @@
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, normalize, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript-compiler-api";
 import { describe, expect, it } from "vitest";
 import {
 	buildCounts,
@@ -5,10 +9,12 @@ import {
 	canUpdate,
 	collectHanLiterals,
 	compare,
+	DELEGATED_SHARED_FILES,
 	isExcluded,
 	parseArgs,
 	run,
 	runBaselineAgainst,
+	SCAN_ROOTS,
 } from "./check-hardcoded-han";
 
 const PH = "$" + "{}";
@@ -47,6 +53,16 @@ export const E = () => <div title="標題">內文 <b>粗體</b>{" "}</div>;`;
 describe("isExcluded", () => {
 	it("代行工作區、測試、生成檔不算；一般檔算", () => {
 		expect(isExcluded("app/(delegated)/x/page.tsx")).toBe(true);
+		expect(isExcluded("features/delegated-operations/labels.ts")).toBe(true);
+		expect(isExcluded("features/delegated-operations/orders/repo.ts")).toBe(
+			true,
+		);
+		expect(isExcluded("features/delegated-operations/confirm-content.ts")).toBe(
+			false,
+		);
+		expect(isExcluded("features/delegated-operations/load-failure.ts")).toBe(
+			false,
+		);
 		expect(isExcluded("features/a/b.test.tsx")).toBe(true);
 		expect(isExcluded("features/a/b.unit.test.ts")).toBe(true);
 		expect(isExcluded("lib/__tests__/x.ts")).toBe(true);
@@ -289,5 +305,112 @@ describe("runBaselineAgainst", () => {
 				prev,
 			).code,
 		).toBe(1);
+	});
+});
+
+const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const DELEGATED_DIR = "features/delegated-operations/";
+
+function allSources(): string[] {
+	const out: string[] = [];
+	const walk = (rel: string): void => {
+		const full = join(WEB_ROOT, rel);
+		if (statSync(full).isFile()) {
+			if (/\.[cm]?[jt]sx?$/.test(rel)) out.push(rel);
+			return;
+		}
+		for (const e of readdirSync(full)) {
+			if (e === "node_modules" || e === ".next") continue;
+			walk(`${rel}/${e}`);
+		}
+	};
+	for (const r of SCAN_ROOTS) if (existsSync(join(WEB_ROOT, r))) walk(r);
+	return out;
+}
+
+function importsOf(file: string, known: ReadonlySet<string>): string[] {
+	const sf = ts.createSourceFile(
+		file,
+		readFileSync(join(WEB_ROOT, file), "utf8"),
+		ts.ScriptTarget.Latest,
+		true,
+		file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+	);
+	const specs: string[] = [];
+	const visit = (n: ts.Node): void => {
+		if (
+			(ts.isImportDeclaration(n) || ts.isExportDeclaration(n)) &&
+			n.moduleSpecifier &&
+			ts.isStringLiteral(n.moduleSpecifier)
+		)
+			specs.push(n.moduleSpecifier.text);
+		else if (
+			ts.isCallExpression(n) &&
+			n.expression.kind === ts.SyntaxKind.ImportKeyword &&
+			n.arguments[0] &&
+			ts.isStringLiteral(n.arguments[0])
+		)
+			specs.push(n.arguments[0].text);
+		ts.forEachChild(n, visit);
+	};
+	visit(sf);
+	const out: string[] = [];
+	for (const spec of specs) {
+		let base: string;
+		if (spec.startsWith("@/")) base = spec.slice(2);
+		else if (spec.startsWith(".")) base = normalize(join(dirname(file), spec));
+		else continue;
+		for (const c of [
+			base,
+			`${base}.ts`,
+			`${base}.tsx`,
+			`${base}.js`,
+			`${base}/index.ts`,
+			`${base}/index.tsx`,
+		])
+			if (known.has(c)) {
+				out.push(c);
+				break;
+			}
+	}
+	return out;
+}
+
+describe("features/delegated-operations 的 en 掃描範圍", () => {
+	const files = allSources().map((f) => relative(".", f));
+	const known = new Set(files);
+	const inDelegatedScope = (f: string): boolean =>
+		f.startsWith("app/(delegated)/") || f.startsWith(DELEGATED_DIR);
+	const isTest = (f: string): boolean =>
+		/\.(test|spec|unit\.test)\.[cm]?[jt]sx?$/.test(f) ||
+		f.split("/").includes("__tests__");
+	// 從代行工作區以外、非測試的檔出發，沿 import 可達的檔。
+	const reachable = new Set<string>();
+	const stack = files.filter((f) => !inDelegatedScope(f) && !isTest(f));
+	for (const f of stack) reachable.add(f);
+	while (stack.length > 0) {
+		const f = stack.pop() as string;
+		for (const dep of importsOf(f, known))
+			if (!reachable.has(dep)) {
+				reachable.add(dep);
+				stack.push(dep);
+			}
+	}
+	const delegatedFiles = files.filter(
+		(f) => f.startsWith(DELEGATED_DIR) && !isTest(f),
+	);
+
+	it("排除的檔沒有代行工作區以外的 importer（直接或間接）", () => {
+		const leaked = delegatedFiles.filter(
+			(f) => isExcluded(f) && reachable.has(f),
+		);
+		expect(leaked).toEqual([]);
+	});
+
+	it("DELEGATED_SHARED_FILES 每一檔都存在且確實被代行工作區以外的程式用到", () => {
+		const stale = [...DELEGATED_SHARED_FILES].filter(
+			(f) => !known.has(f) || !reachable.has(f),
+		);
+		expect(stale).toEqual([]);
 	});
 });
