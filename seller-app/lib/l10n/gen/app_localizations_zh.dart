@@ -115,4 +115,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String customerPickerAdd(int count) {
     return '加入名單（$count）';
   }
+
+  @override
+  String get earningsTitle => '入帳紀錄';
+
+  @override
+  String earningsNetAmount(String amount) {
+    return '淨入帳 $amount';
+  }
+
+  @override
+  String get earningsEmpty => '還沒有入帳紀錄';
+
+  @override
+  String get earningsLoadFailed => '無法載入入帳紀錄';
 }

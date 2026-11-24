@@ -44,7 +44,7 @@ final class AfterSaleOrderLookupProvider
 }
 
 String _$afterSaleOrderLookupHash() =>
-    r'5d8be4906be0ae61a6c0a9c6f67b0d0d0bcdcfa9';
+    r'a4dc3a5589e8cc61773ba5896c1484fc6fde2392';
 
 /// 快取「哪些 orderNo 有活躍售後案件」+ 該案件狀態，供 order card 查詢。
 /// keepAlive 避免每次 rebuild 都重撈。

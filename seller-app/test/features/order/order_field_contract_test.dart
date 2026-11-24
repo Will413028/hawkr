@@ -50,13 +50,12 @@ Map<String, dynamic> _liveListOrder() => <String, dynamic>{
   ],
   'isReviewed': false,
   'canReview': false,
-  'needRefundPage': false,
 };
 
 /// `GET /app/orders/{orderNo}?view=seller` → `data`（實打逐字複製）。
 ///
 /// 與列表的差異（omitempty，空值＝整個鍵消失）：
-/// 詳情多了金額細項與 ATM／付款欄位，item 多了
+/// 詳情多了金額細項與付款欄位，item 多了
 /// `actualPayAmount` / `refundStatus` / `shareDiscount`；
 /// 列表獨有 `itemCount` / `statusSummary` / `statusTime`。
 Map<String, dynamic> _liveDetailOrder() => <String, dynamic>{
@@ -305,7 +304,7 @@ void main() {
       // 付款方式就會變成商品被算進金額。
       final payload = _liveDetailOrder()..remove('items');
       payload['availablePaymentMethods'] = [
-        {'method': '2004', 'name': 'ATM 轉帳', 'enabled': true},
+        {'method': '2001', 'name': '信用卡', 'enabled': true},
       ];
       expect(OrderSummary.fromJson(payload).items, isEmpty);
     });

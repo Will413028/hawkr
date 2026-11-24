@@ -29,13 +29,7 @@ const PREVIOUS_PATH_KEY = "hk:previous-pathname";
  * Routes that immediately redirect an arriving user elsewhere. Going "back"
  * onto one of them is never what the user asked for.
  */
-const BOUNCE_PREFIXES = [
-	"/login",
-	"/register",
-	"/checkout/success",
-	"/checkout/fail",
-	"/checkout/submitted",
-];
+const BOUNCE_PREFIXES = ["/login", "/register", "/checkout/success"];
 
 function readStore(): Storage | null {
 	if (typeof window === "undefined") return null;

@@ -437,25 +437,13 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 			"totalActualAmount",
 			"total_actual_amount",
 		]);
-	const atmBankCode = pickFirst<string>(raw, ["atmBankCode", "atm_bank_code"]);
-	const atmVirtualAccount = pickFirst<string>(raw, [
-		"atmVirtualAccount",
-		"atm_virtual_account",
-	]);
-	const atmExpireDate = pickFirst<string>(raw, [
-		"atmExpireDate",
-		"atm_expire_date",
-	]);
 	const hasPayment = Boolean(
 		payment ||
 			paymentTradeNo ||
 			paymentMethod ||
 			paymentStatus ||
 			paymentPaidAt !== undefined ||
-			paymentAmount ||
-			atmVirtualAccount ||
-			atmBankCode ||
-			atmExpireDate,
+			paymentAmount,
 	);
 	// Buyer-side identity — mirrors OrderSummary.fromMap (lines 552-607) in
 	// the seller App. Names come from a long alias chain (商城後端蓋過幾次
@@ -905,9 +893,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 					status: paymentStatus,
 					paidAt: paymentPaidAt,
 					amount: paymentAmount,
-					atmBankCode,
-					atmVirtualAccount,
-					atmExpireDate,
 				}
 			: undefined,
 		// `canCancel` **不 normalize**：後端根本不送這一欄（見 types.ts 的說明）。
@@ -1186,8 +1171,6 @@ export async function cancelOrder(orderNo: string): Promise<boolean> {
 export interface SellerCancelResult {
 	orderNo: string;
 	refundAmount: string;
-	/** Buyer must visit the PayUni ATM refund page to receive the refund. */
-	needRefundPage: boolean;
 }
 
 /**
@@ -1209,7 +1192,6 @@ export async function cancelSellerOrder(
 	return {
 		orderNo: String(data.orderNo ?? orderNo),
 		refundAmount: String(data.refundAmount ?? ""),
-		needRefundPage: Boolean(data.needRefundPage),
 	};
 }
 

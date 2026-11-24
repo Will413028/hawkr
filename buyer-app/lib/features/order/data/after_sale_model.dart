@@ -21,7 +21,6 @@ abstract class AfterSaleCase with _$AfterSaleCase {
 
     /// 寄件交易單號（退貨物流拋單後後端回填，顯示於退貨物流 timeline）
     @Default('') String shipTradeNo,
-    @Default(false) bool needRefundPage,
     @Default('') String createdAt,
     @Default('') String closedAt,
     @Default([]) List<AfterSaleItem> items,
@@ -39,17 +38,11 @@ abstract class AfterSaleCase with _$AfterSaleCase {
     @Default(false) bool autoEscalated,
     @Default(0) int processDeadlineHours,
     // B-125 / B-114 退款進度（對齊 backend issue #568 規格）
-    /// ATM 退款任務狀態（[RefundTaskStatus]）：後端 WorkerTaskStatus，保留舊數字碼相容。
+    /// 退款任務狀態（[RefundTaskStatus]）：後端 WorkerTaskStatus，保留舊數字碼相容。
     @Default('') String refundTaskStatus,
 
-    /// 上次填寫失敗訊息（後端已依狀態收斂，前台可直接顯示）
+    /// 退款失敗訊息（後端已依狀態收斂，前台可直接顯示）
     @Default('') String refundFailureMessage,
-
-    /// 預計入帳日期（YYYY-MM-DD，銀行處理中時顯示）
-    @Default('') String estimatedRefundDate,
-
-    /// 實際匯款日期（YYYY-MM-DD，退款完成時顯示）
-    @Default('') String bankDate,
     @Default('') String providerStatus,
     @Default('') String providerMessage,
     @Default('') String appealDeadline,
@@ -365,20 +358,16 @@ class AfterSaleReturnProgress {
   ];
 }
 
-/// ATM 退款任務狀態（B-125 / backend issue #568）
+/// 退款任務狀態（B-125 / backend issue #568）
 class RefundTaskStatus {
   RefundTaskStatus._();
 
   static const String pending = 'PENDING';
-  static const String awaitingBuyerRefundPage = 'AWAITING_BUYER_REFUND_PAGE';
   static const String processing = 'PROCESSING';
-  static const String awaitingWebhook = 'AWAITING_WEBHOOK';
   static const String done = 'DONE';
   static const String failed = 'FAILED';
   static const String manualIntervention = 'MANUAL_INTERVENTION';
 
-  static const String pendingFormLegacy = '5';
-  static const String bankProcessingLegacy = '15';
   static const String completedLegacy = '20';
   static const String failedLegacy = '30';
 
@@ -386,17 +375,7 @@ class RefundTaskStatus {
 
   static bool isPending(String s) => normalize(s) == pending;
 
-  static bool needsBuyerForm(String s) {
-    final value = normalize(s);
-    return value == awaitingBuyerRefundPage || value == pendingFormLegacy;
-  }
-
-  static bool isBankProcessing(String s) {
-    final value = normalize(s);
-    return value == processing ||
-        value == awaitingWebhook ||
-        value == bankProcessingLegacy;
-  }
+  static bool isBankProcessing(String s) => normalize(s) == processing;
 
   static bool isCompleted(String s) {
     final value = normalize(s);
@@ -414,26 +393,16 @@ class RefundTaskStatus {
   static String buyerProgressLabel({
     required String taskStatus,
     required String failureMessage,
-    required String estimatedRefundDate,
-    required String bankDate,
   }) {
     final value = normalize(taskStatus);
-    if (needsBuyerForm(value)) {
-      if (failureMessage.isNotEmpty) {
-        return '⚠ 上次填寫失敗：$failureMessage';
-      }
-      return '請填寫退款帳號';
-    }
     if (isPending(value)) {
       return '退款排隊中';
     }
     if (isBankProcessing(value)) {
-      return estimatedRefundDate.isNotEmpty
-          ? '銀行處理中，預計 $estimatedRefundDate 入帳'
-          : '銀行處理中';
+      return '銀行處理中';
     }
     if (isCompleted(value)) {
-      return bankDate.isNotEmpty ? '退款成功，已於 $bankDate 匯款' : '退款成功';
+      return '退款成功';
     }
     if (isFailed(value)) {
       if (failureMessage.isNotEmpty) {

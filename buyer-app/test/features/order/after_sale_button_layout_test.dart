@@ -17,13 +17,13 @@ import '../../support/production_layout_test_harness.dart';
 
 const _sourceButtonCounts = <String, int>{
   'lib/features/order/presentation/after_widgets/after_sale_detail_screen.dart':
-      5,
+      4,
   'lib/features/order/presentation/after_widgets/after_sale_view_screen.dart':
       2,
   'lib/features/order/presentation/after_widgets/arbitration_view_screen.dart':
       1,
   'lib/features/order/presentation/order_card_widgets/after_sale_expanded_section.dart':
-      3,
+      2,
 };
 
 void main() {

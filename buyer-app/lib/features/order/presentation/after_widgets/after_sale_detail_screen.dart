@@ -190,10 +190,6 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
               SizedBox(height: AppSpacing.sm),
               _buildShipBackUrgentBanner(c),
             ],
-            if (c.needRefundPage) ...[
-              SizedBox(height: AppSpacing.sm),
-              _buildRefundFormBanner(context, ref, c),
-            ],
             if (_photoGroups(c, order).isNotEmpty) ...[
               SizedBox(height: AppSpacing.sm),
               _buildSectionCard(_buildPhotoComparison(c, order)),
@@ -481,70 +477,6 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Widget _buildRefundFormBanner(
-    BuildContext context,
-    WidgetRef ref,
-    AfterSaleCase c,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.danger),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                AppIcons.priorityHigh,
-                size: 20.w,
-                color: AppIconColors.danger,
-              ),
-              SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  '請填寫退款銀行帳戶',
-                  style: AppTypography.bodyBold.copyWith(
-                    color: AppColors.danger,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            'ATM 訂單退款需買家提供銀行帳戶才能完成匯款。',
-            style: AppTypography.meta.copyWith(
-              color: AppTypography.colorPrimary.withValues(alpha: 0.82),
-            ),
-          ),
-          SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            height: HkControl.minTap,
-            child: ElevatedButton(
-              onPressed: () => _openRefundPage(context, ref, c),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-              ),
-              child: HkButtonLabel(
-                '前往填寫',
-                style: AppTypography.bodyBold.copyWith(color: AppColors.bgCard),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildActionButtons(
     BuildContext context,
     WidgetRef ref,
@@ -705,7 +637,7 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     return remaining < const Duration(hours: 24);
   }
 
-  /// PR #983 D-1 警示 banner — 複用既有 `_buildRefundFormBanner` 樣板配色。
+  /// PR #983 D-1 警示 banner（danger 配色）。
   Widget _buildShipBackUrgentBanner(AfterSaleCase c) {
     final dt = tryParseTaipeiInstant(c.shipBackDeadlineAt);
     final remaining = dt == null
@@ -1039,27 +971,6 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     );
   }
 
-  Future<void> _openRefundPage(
-    BuildContext context,
-    WidgetRef ref,
-    AfterSaleCase c,
-  ) async {
-    try {
-      final url = await ref
-          .read(afterSaleRepositoryProvider)
-          .getRefundPageUrl(c.orderNo);
-      if (!context.mounted) return;
-      await context.push(
-        '/refund/webview',
-        extra: {'redirectUrl': url, 'orderNo': c.orderNo},
-      );
-    } catch (e) {
-      if (context.mounted) {
-        showFloatingToast(context, '載入退款頁面失敗：$e', isSuccess: false);
-      }
-    }
-  }
-
   bool _hasApplicationInfo(AfterSaleCase c) {
     return c.reason.isNotEmpty ||
         c.description.isNotEmpty ||
@@ -1085,8 +996,6 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
       final label = RefundTaskStatus.buyerProgressLabel(
         taskStatus: c.refundTaskStatus,
         failureMessage: c.refundFailureMessage,
-        estimatedRefundDate: c.estimatedRefundDate,
-        bankDate: c.bankDate,
       );
       if (label.isNotEmpty) return label;
     }

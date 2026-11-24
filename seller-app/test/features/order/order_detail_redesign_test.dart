@@ -1,7 +1,11 @@
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pb.dart';
+import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_seller/features/order/data/order_model.dart';
+import 'package:hawkr_seller/features/wallet/data/earnings.dart';
 import 'package:hawkr_seller/features/order/presentation/shared_order_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
@@ -68,16 +72,77 @@ void main() {
     expect(find.text('付款詳情'), findsOneWidget);
     expect(find.text('折扣券'), findsOneWidget);
   });
+
+  testWidgets('入帳紀錄列出這張訂單的入帳列與淨入帳', (tester) async {
+    final earnings = GetMyOrderEarningsResponse(
+      entries: [
+        EarningsEntry(
+          id: 'r1',
+          orderNo: 'O-1',
+          type: EarningsEntryType.EARNINGS_ENTRY_TYPE_REVERSAL,
+          status: EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED,
+        )..mergeFromProto3Json({'amount': '-20'}),
+        EarningsEntry(
+          id: 't1',
+          orderNo: 'O-1',
+          type: EarningsEntryType.EARNINGS_ENTRY_TYPE_TRANSFER,
+          status: EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED,
+        )..mergeFromProto3Json({'amount': '160'}),
+      ],
+    )..mergeFromProto3Json({'netAmount': '140'});
+    await tester.pumpWidget(
+      _TestApp(
+        order: _detailedOrder,
+        orderId: 'O-1',
+        overrides: [
+          myOrderEarningsProvider('O-1').overrideWith((_) async => earnings),
+        ],
+      ),
+    );
+    await tester.pump();
+    await tester.dragUntilVisible(
+      find.byKey(const ValueKey('order-earnings-net')),
+      find.byType(ListView).first,
+      const Offset(0, -260),
+    );
+
+    expect(find.text('入帳紀錄'), findsOneWidget);
+    expect(find.text('扣回'), findsOneWidget);
+    expect(find.text('入帳'), findsOneWidget);
+    expect(find.text('NT\$ -20'), findsOneWidget);
+    expect(find.text('淨入帳 NT\$ 140'), findsOneWidget);
+  });
+
+  testWidgets('訂單沒有付款（not_found）時不顯示入帳紀錄', (tester) async {
+    await tester.pumpWidget(
+      _TestApp(
+        order: _detailedOrder,
+        orderId: 'O-1',
+        overrides: [
+          myOrderEarningsProvider('O-1').overrideWith((_) async => null),
+        ],
+      ),
+    );
+    await tester.pump();
+    expect(find.text('入帳紀錄'), findsNothing);
+  });
 }
 
 class _TestApp extends StatelessWidget {
-  const _TestApp({required this.order});
+  const _TestApp({
+    required this.order,
+    this.orderId = '',
+    this.overrides = const [],
+  });
 
   final OrderSummary order;
+  final String orderId;
+  final List<Override> overrides;
 
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
+      overrides: overrides,
       child: ScreenUtilInit(
         designSize: const Size(390, 844),
         builder: (_, _) => MaterialApp(
@@ -86,7 +151,7 @@ class _TestApp extends StatelessWidget {
           supportedLocales: AppLocalizations.supportedLocales,
           home: SharedOrderDetailScreen(
             // 空 id 可避免 widget test 觸發後端；生產 route 會傳真實單號。
-            orderId: '',
+            orderId: orderId,
             initialSummary: order,
             fallbackDateText: order.dateTime,
             fallbackItemsText: order.productName,

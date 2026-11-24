@@ -17,35 +17,16 @@ const stripComments = (source: string) =>
 	source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
 const SUCCESS = "features/checkout/screens/CheckoutSuccessClient.tsx";
-const SUBMITTED = "features/checkout/screens/CheckoutSubmittedClient.tsx";
-const FAIL = "features/checkout/screens/CheckoutFailClient.tsx";
 const ROWS = "features/invoices/checkout/CheckoutInvoiceRows.tsx";
 
-/* ── B03 掛在哪兩頁、不掛在哪一頁 ───────────────────────────────────────── */
+/* ── B03 掛在哪一頁 ───────────────────────────────────────────────────── */
 
-test("付款成功與 ATM 待轉帳兩頁都掛上發票三列", () => {
-	for (const screen of [SUCCESS, SUBMITTED]) {
-		const source = read(screen);
-		assert.match(
-			source,
-			/<CheckoutInvoiceRows\b/,
-			`${screen} 沒有渲染 CheckoutInvoiceRows`,
-		);
-	}
-});
-
-test("付款成功頁走 paid、ATM 待轉帳頁走 awaiting-payment", () => {
-	// 兩頁的狀態句來源不同：成功頁依 invoiceMode 說「付款完成，…」，而 ATM 頁的錢
-	// 還沒到，只能逐字用後端的 stateNotice。variant 傳錯不會編譯錯、不會測試紅，
-	// 只會讓待轉帳的買家讀到「付款完成」。
-	assert.match(read(SUCCESS), /variant="paid"/);
-	assert.match(read(SUBMITTED), /variant="awaiting-payment"/);
-});
-
-test("付款失敗頁不掛任何發票區塊——付款失敗沒有發票可談", () => {
-	const source = stripComments(read(FAIL));
-	assert.doesNotMatch(source, /CheckoutInvoiceRows/);
-	assert.doesNotMatch(source, /invoices/);
+test("付款成功頁掛上發票三列", () => {
+	assert.match(
+		read(SUCCESS),
+		/<CheckoutInvoiceRows\b/,
+		`${SUCCESS} 沒有渲染 CheckoutInvoiceRows`,
+	);
 });
 
 /* ── 這一頁不得引入刷新機制，也不得把發票資料落地 ─────────────────────── */

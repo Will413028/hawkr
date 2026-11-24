@@ -21,7 +21,6 @@ import '../../member_card/presentation/member_card_controller.dart';
 import '../../seller/data/store_card_display.dart';
 import '../../seller/data/store_card_provider.dart';
 import '../data/after_sale_order_lookup.dart';
-import '../data/after_sale_repository.dart';
 import '../data/order_model.dart';
 import 'order_detail_controller.dart';
 import '../data/order_repository.dart';
@@ -49,7 +48,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
   bool _expanded = false;
   bool _isPayLoading = false;
   final bool _isConfirmLoading = false;
-  bool _detailLoading = false;
   Order? _detailOrder;
   // B-185: 待付款倒數每 30 秒刷新一次（不需要每秒 tick，省電 + 視覺穩定）
   Timer? _paymentDeadlineTicker;
@@ -57,9 +55,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
   Order get order => widget.order;
   bool get _isPendingPayment => order.status == '0';
   bool get _isDelivered => order.status == '40';
-  bool get _isAtmPayment =>
-      (_isPendingPayment ? _detailOrder?.paymentMethod : order.paymentMethod) ==
-      PaymentMethod.atm.value;
   bool get _canExpand => !_isPendingPayment;
   bool get _needsProductImage =>
       order.orderSn.isNotEmpty &&
@@ -264,17 +259,9 @@ class _OrderCardState extends ConsumerState<OrderCard> {
               order: order,
               isPendingPayment: _isPendingPayment,
               isDelivered: _isDelivered,
-              isAtmPayment: _isAtmPayment,
-              detailLoading: _detailLoading,
               isPayLoading: _isPayLoading,
               isConfirmLoading: _isConfirmLoading,
-              onShowAtmInfo: () => showAtmInfoSheet(
-                context,
-                order: order,
-                detailOrder: _detailOrder,
-              ),
               onRetryPayment: () => _executePayment(context),
-              onOpenRefundPage: () => _openRefundPage(context, ref),
               onConfirmReceipt: () => _confirmReceipt(context),
               onReview: () => _handleReview(context),
             ),
@@ -505,16 +492,12 @@ class _OrderCardState extends ConsumerState<OrderCard> {
   // ─── Actions ────────────────────────────────────────────
 
   Future<void> _fetchOrderDetail() async {
-    setState(() => _detailLoading = true);
     try {
       final detail = await ref
           .read(orderRepositoryProvider)
           .getOrderDetail(order.orderSn);
       if (mounted) setState(() => _detailOrder = detail);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _detailLoading = false);
-    }
+    } catch (_) {}
   }
 
   Future<void> _executePayment(BuildContext context) async {
@@ -525,30 +508,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
       if (!mounted) return;
       await _fetchOrderDetail();
       ref.read(orderListControllerProvider.notifier).refresh();
-    } finally {
-      if (mounted) setState(() => _isPayLoading = false);
-    }
-  }
-
-  Future<void> _openRefundPage(BuildContext context, WidgetRef ref) async {
-    if (_isPayLoading) return;
-    setState(() => _isPayLoading = true);
-    try {
-      final url = await ref
-          .read(afterSaleRepositoryProvider)
-          .getRefundPageUrl(order.orderSn);
-      if (!context.mounted) return;
-      await context.push(
-        '/refund/webview',
-        extra: {'redirectUrl': url, 'orderNo': order.orderSn},
-      );
-      if (context.mounted) {
-        ref.invalidate(afterSaleOrderLookupProvider);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showFloatingToast(context, '載入退款頁面失敗：$e', isSuccess: false);
-      }
     } finally {
       if (mounted) setState(() => _isPayLoading = false);
     }

@@ -4,7 +4,6 @@
  * tests pin the defensive coercion the UI gating relies on, in particular:
  *   - `appealState` (the platform-arbitration lock input — once non-empty,
  *     buyer appeal and seller resolve/confirm are gated off in the UI)
- *   - `refundProgress.needRefundPage` derived from refundTaskStatus "5"
  *   - buyer vs seller evidence splitting.
  */
 
@@ -133,32 +132,22 @@ test("normalizeDetail coerces canAppeal/autoEscalated from string and numeric bo
 
 /* ===== normalizeDetail — refund progress ===== */
 
-test("normalizeDetail derives needRefundPage from flat refundTaskStatus 5", () => {
+test("normalizeDetail reads refund progress from flat camel and snake fields", () => {
 	const d = normalizeDetail({
 		case_no: "AS001",
 		status: "40",
-		refundTaskStatus: "5",
+		refundTaskStatus: "10",
 	});
-	assert.equal(d.refundProgress?.refundTaskStatus, "5");
-	assert.equal(d.refundProgress?.needRefundPage, true);
+	assert.equal(d.refundProgress?.refundTaskStatus, "10");
 
-	const processing = normalizeDetail({
+	const failed = normalizeDetail({
 		case_no: "AS001",
 		status: "40",
-		refund_task_status: "10",
-		refund_failure_message: "",
+		refund_task_status: "30",
+		refund_failure_message: "卡號錯誤",
 	});
-	assert.equal(processing.refundProgress?.refundTaskStatus, "10");
-	assert.equal(processing.refundProgress?.needRefundPage, false);
-});
-
-test("normalizeDetail lets an explicit need_refund_page override the derived flag", () => {
-	const d = normalizeDetail({
-		case_no: "AS001",
-		refundTaskStatus: "5",
-		need_refund_page: false,
-	});
-	assert.equal(d.refundProgress?.needRefundPage, false);
+	assert.equal(failed.refundProgress?.refundTaskStatus, "30");
+	assert.equal(failed.refundProgress?.refundFailureMessage, "卡號錯誤");
 });
 
 test("normalizeDetail merges a nested refundProgress block over flat fields", () => {

@@ -159,16 +159,11 @@ function normalizeReturnLogistics(
 	return hasAny ? logistics : undefined;
 }
 
-/** WorkerTaskStatus "5" = AWAITING_BUYER_REFUND_PAGE — the buyer must fill in
- * ATM bank details before the refund runs. */
-const AWAITING_BUYER_REFUND_PAGE = "5";
-
 /**
  * Build the refund-progress block. The real detail response carries
  * `refundTaskStatus` / `refundFailureMessage` as FLAT top-level fields (see
  * Apidog 售後詳情), so we read both the flat `raw` and a nested
- * `refundProgress` object. `needRefundPage` is DERIVED from refundTaskStatus,
- * not a separate boolean.
+ * `refundProgress` object.
  */
 function normalizeRefundProgress(
 	raw: Wire | undefined,
@@ -176,20 +171,12 @@ function normalizeRefundProgress(
 ): AfterSaleRefundProgress | undefined {
 	const src: Wire = { ...(raw ?? {}), ...(nested ?? {}) };
 	const refundTaskStatus = optStr(src.refundTaskStatus, src.refund_task_status);
-	const explicitNeed = bool(src.needRefundPage, src.need_refund_page);
 	const progress: AfterSaleRefundProgress = {
 		refundTaskStatus,
-		estimatedRefundDate: optStr(
-			src.estimatedRefundDate,
-			src.estimated_refund_date,
-		),
-		bankDate: optStr(src.bankDate, src.bank_date),
 		refundFailureMessage: optStr(
 			src.refundFailureMessage,
 			src.refund_failure_message,
 		),
-		needRefundPage:
-			explicitNeed ?? refundTaskStatus === AWAITING_BUYER_REFUND_PAGE,
 	};
 	const hasAny = Object.values(progress).some((v) => v != null);
 	return hasAny ? progress : undefined;

@@ -323,32 +323,4 @@ test.describe("public dynamic route browser health", () => {
 		).toBeVisible();
 		expect(issues).toEqual([]);
 	});
-
-	test("refund callback renders a stable guest result shell", {
-		tag: ["@ui", "@live"],
-	}, async ({ page }) => {
-		await page.route("**/api/v1/app/after_sales**", (route) => {
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: { records: [], total: 0, page: 1, pageSize: 50 },
-				}),
-			});
-		});
-		const entry = DYNAMIC_ROUTE_CATALOG.find(
-			(candidate) => candidate.pattern === "/orders/[orderNo]/refund",
-		);
-		if (!entry) throw new Error("refund callback route is missing");
-		const route = `${materializeDynamicRoute(entry)}?status=success`;
-		await assertRenderedRoute(
-			page,
-			route,
-			"/orders/route-contract-order/refund",
-		);
-		await expect(
-			page.getByRole("heading", { name: "退款資訊已送出" }),
-		).toBeVisible();
-	});
 });

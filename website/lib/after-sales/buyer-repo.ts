@@ -101,44 +101,6 @@ export function appealAfterSale(
 	});
 }
 
-/**
- * ATM refunds need the buyer to supply a bank account on PayUni's hosted
- * refund page. Keyed by ORDER NO (`POST /app/orders/{orderNo}/refund_page`),
- * not the case — there is no after-sale-scoped refund-page endpoint. Returns
- * the redirect URL to bounce to. Soft-fails to an empty result so the banner
- * can show a fallback message rather than throwing.
- *
- * MUST send `clientType: "WEB_BROWSER"` (design doc 09 §5.4.2): the backend
- * persists it on the refund task and uses it to build PayUni's return URL.
- * Omitting it falls back to MOBILE_APP, which returns a
- * `hawkrbuyer://refund/result` deep link the browser can't open.
- *
- * NOTE: the gateway binds the body field as camelCase `clientType`
- * (`GetRefundPageUrlRequest`, json:"clientType"). A snake_case `client_type`
- * is silently dropped by `ShouldBindJSON` → empty → MOBILE_APP fallback.
- * `appType` is NOT sent here — the gateway derives it from the JWT account type.
- */
-export async function fetchRefundPage(
-	orderNo: string,
-): Promise<{ redirectUrl?: string }> {
-	try {
-		const env = await apiClient.authed.post<Record<string, unknown>>(
-			`/app/orders/${encodeURIComponent(orderNo)}/refund_page`,
-			{ json: { clientType: "WEB_BROWSER" }, throwOnHttpError: false },
-		);
-		const data = env.data ?? {};
-		return {
-			redirectUrl:
-				(data.redirectUrl as string) ??
-				(data.redirect_url as string) ??
-				(data.url as string) ??
-				undefined,
-		};
-	} catch {
-		return {};
-	}
-}
-
 /** GET /app/after_sales/{caseNo}/arbitration — buyer arbitration view. */
 export async function fetchAfterSaleArbitration(
 	caseNo: string,

@@ -61,8 +61,8 @@ int64 snowflake (precision-safe). `value` is numeric NT$.
 | `add_to_wishlist` | `components/shared/FavoriteButton.tsx` | `items[1]` | add branch only, after server confirm |
 | `begin_checkout` | `features/checkout/screens/CheckoutClient.tsx` | `items[]`, `value`, `coupon` | once after preview returns |
 | `add_shipping_info` | `features/checkout/screens/CheckoutClient.tsx` | `shipping_tier`, `value`, `coupon` | once per distinct shipping method (when preview value known) |
-| `add_payment_info` | `features/checkout/screens/CheckoutClient.tsx` (3 pay paths) | `payment_type` ∈ {CREDIT_CARD, ATM, APPLE_PAY, GOOGLE_PAY}, `value` | before each `createPayment` |
-| `purchase` | `features/checkout/screens/CheckoutSuccessClient.tsx` → `PurchaseTracker` | `transaction_id=orderNo`, `value=totalActualAmount`, `items[]` | **one per `orderNo`** (multi-seller split); sessionStorage dedup survives the PayUni redirect and refresh. ATM `/checkout/submitted` does **not** fire (pending). |
+| `add_payment_info` | `features/checkout/screens/CheckoutClient.tsx` | `payment_type=stripe`, `value` | after checkout confirm, before the payment step |
+| `purchase` | `features/checkout/screens/CheckoutSuccessClient.tsx` → `PurchaseTracker` | `transaction_id=orderNo`, `value=totalActualAmount`, `items[]` | **one per `orderNo`** (multi-seller split); sessionStorage dedup survives the Stripe return redirect and refresh. |
 | `generate_lead` | `features/seller/pricing/SellerPricingPage.tsx` | `lead_source=seller_pricing`, plan/billing/service categories | only after `/api/public/seller-leads` returns HTTP success and `{ok:true}`; no contact or brand fields |
 | `seller_onboarding_completed` | `features/seller/onboarding/SellerOnboardingClient.tsx` | `completion_source=seller_self_service`, `seller_profile_action` | only after seller persistence and onboarding completion both succeed; custom event because an existing buyer can add a seller role without creating a new account |
 

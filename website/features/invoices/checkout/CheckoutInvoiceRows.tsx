@@ -6,7 +6,6 @@ import { MaskedValue } from "@/features/invoices/components/MaskedValue";
 import { INVOICE_CHECKOUT_TEXT } from "@/features/invoices/i18n";
 import { useOrderInvoice } from "@/lib/hooks/useOrderInvoice";
 import {
-	CHECKOUT_AWAITING_INVOICE_NOTICE,
 	checkoutInvoiceCarrier,
 	checkoutPaidInvoiceNotice,
 } from "@/lib/invoices/checkoutInvoiceNotice";
@@ -17,15 +16,6 @@ const ROW_CLASS =
 	"flex justify-between items-center gap-3 border-t border-divider pt-3";
 const LABEL_CLASS = "text-sm font-medium text-foreground-muted";
 const VALUE_CLASS = "text-sm font-bold text-foreground";
-
-/**
- * 錢的狀態決定狀態句從哪裡來，所以由呼叫頁指定而不是由 `state` 推導。
- *
- * `paid`（`/checkout/success`）走 `invoiceMode` 的四句話；`awaiting-payment`
- * （`/checkout/submitted`，ATM 待轉帳）逐字顯示後端的 `stateNotice`——那三句是
- * 「付款成功」情境的話，錢還沒到就套用是錯的。
- */
-type CheckoutInvoiceVariant = "paid" | "awaiting-payment";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -39,9 +29,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 /**
  * B03｜付款完成頁的發票三列（58A §B03）。
  *
- * 掛在 `/checkout/success` 與 `/checkout/submitted` 既有資訊卡的「應付金額」列之後，
- * 每列與既有列同樣以 `border-t border-divider pt-3` 分隔。`/checkout/fail` **不掛**
- * ——付款失敗沒有發票可談。
+ * 掛在 `/checkout/success` 既有資訊卡的「應付金額」列之後，
+ * 每列與既有列同樣以 `border-t border-divider pt-3` 分隔。
  *
  * 三件事值得先讀：
  *
@@ -57,13 +46,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  *      是網址上的可控參數，落地就等於把個資留在裝置上。本元件只讀 react-query 的
  *      記憶體快取。
  */
-export function CheckoutInvoiceRows({
-	orderNo,
-	variant,
-}: {
-	orderNo: string;
-	variant: CheckoutInvoiceVariant;
-}) {
+export function CheckoutInvoiceRows({ orderNo }: { orderNo: string }) {
 	// 刻意不取 `error`：5xx 與網路失敗在這一頁的處置與「還沒查到」完全相同
 	// （不渲染），拿到手上反而會誘使人在這裡加一段錯誤訊息。
 	const { invoice, loading, notFound } = useOrderInvoice(orderNo);
@@ -92,10 +75,7 @@ export function CheckoutInvoiceRows({
 		return null;
 	}
 
-	const notice =
-		variant === "paid"
-			? checkoutPaidInvoiceNotice(invoice.invoiceMode)
-			: invoice.stateNotice || CHECKOUT_AWAITING_INVOICE_NOTICE;
+	const notice = checkoutPaidInvoiceNotice(invoice.invoiceMode);
 	const carrier = checkoutInvoiceCarrier(invoice.documents);
 
 	return (

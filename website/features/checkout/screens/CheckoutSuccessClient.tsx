@@ -85,9 +85,7 @@ function Inner() {
 								</span>
 							</div>
 						)}
-						{orderNo && (
-							<CheckoutInvoiceRows orderNo={orderNo} variant="paid" />
-						)}
+						{orderNo && <CheckoutInvoiceRows orderNo={orderNo} />}
 					</div>
 				)}
 				<div className="relative z-1 flex gap-2 flex-wrap justify-center mt-4 w-full">

@@ -28,12 +28,8 @@ _AfterSaleCase _$AfterSaleCaseFromJson(
   refundTaskStatus: _readCaseValue(json, 'refundTaskStatus') as String? ?? '',
   refundFailureMessage:
       _readCaseValue(json, 'refundFailureMessage') as String? ?? '',
-  estimatedRefundDate:
-      _readCaseValue(json, 'estimatedRefundDate') as String? ?? '',
-  bankDate: _readCaseValue(json, 'bankDate') as String? ?? '',
   odno: json['odno'] as String?,
   validationNo: json['validationNo'] as String?,
-  needRefundPage: json['needRefundPage'] as bool? ?? false,
   createdAt: json['createdAt'] as String? ?? '',
   closedAt: json['closedAt'] as String? ?? '',
   items:
@@ -82,11 +78,8 @@ Map<String, dynamic> _$AfterSaleCaseToJson(_AfterSaleCase instance) =>
       'providerMessage': instance.providerMessage,
       'refundTaskStatus': instance.refundTaskStatus,
       'refundFailureMessage': instance.refundFailureMessage,
-      'estimatedRefundDate': instance.estimatedRefundDate,
-      'bankDate': instance.bankDate,
       'odno': instance.odno,
       'validationNo': instance.validationNo,
-      'needRefundPage': instance.needRefundPage,
       'createdAt': instance.createdAt,
       'closedAt': instance.closedAt,
       'items': instance.items,
