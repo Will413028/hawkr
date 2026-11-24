@@ -172,8 +172,6 @@ CREATE TABLE procurement.rfq_publication_approvals (
     candidate_set_id UUID REFERENCES procurement.candidate_sets (id) ON DELETE SET NULL,
     response_deadline DATE,
     audience_mode TEXT NOT NULL,
-    audience_policy_id TEXT,
-    audience_policy_version INT,
     state TEXT NOT NULL,
     schema_version TEXT NOT NULL,
     client_request_id UUID NOT NULL,
@@ -183,14 +181,10 @@ CREATE TABLE procurement.rfq_publication_approvals (
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT rfq_publication_approvals_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT rfq_publication_approvals_version_check CHECK (version >= 1),
-    CONSTRAINT rfq_publication_approvals_mode_check CHECK (audience_mode IN ('WISH_POOL', 'DIRECT_RECIPIENTS')),
+    CONSTRAINT rfq_publication_approvals_mode_check CHECK (audience_mode = 'DIRECT_RECIPIENTS'),
     CONSTRAINT rfq_publication_approvals_state_check CHECK (state IN ('PENDING', 'EXECUTING', 'SUCCEEDED')),
     CONSTRAINT rfq_publication_approvals_schema_check CHECK (char_length(schema_version) >= 1),
-    CONSTRAINT rfq_publication_approvals_policy_check CHECK (
-        (audience_mode = 'WISH_POOL') = (audience_policy_id IS NOT NULL AND audience_policy_version IS NOT NULL)
-    ),
     CONSTRAINT rfq_publication_approvals_range_check CHECK (range_lower_amount > 0 AND range_upper_amount >= range_lower_amount),
-    CONSTRAINT rfq_publication_approvals_candidate_set_check CHECK (audience_mode = 'DIRECT_RECIPIENTS' OR candidate_set_id IS NULL),
     CONSTRAINT rfq_publication_approvals_note_check CHECK (char_length(buyer_note) <= 500 AND buyer_note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );
 CREATE UNIQUE INDEX rfq_publication_approvals_idempotency ON procurement.rfq_publication_approvals (buyer_id, client_request_id);
@@ -273,14 +267,13 @@ CREATE UNIQUE INDEX seller_responses_publication_store ON procurement.seller_res
 CREATE INDEX seller_responses_request_submitted ON procurement.seller_responses (request_id, created_at DESC) WHERE latest_version > 0;
 
 -- 賣家回價的一個版本，不可變。沒有驗證欄位（A9-D1）、沒有 hash 複本（S5，由 Go 重算）。
--- 品相欄位與 conversion_basis 的去留是 A9-3c 開工要交 Will 的題目（計畫 A9-3 停止條件），這裡只保留契約必填的形狀。
+-- conversion_basis 的去留是 A9-3c 開工要交 Will 的題目（計畫 A9-3 停止條件），這裡只保留契約必填的形狀；spec_note 是選填的規格說明（A9-D44）。
 CREATE TABLE procurement.seller_response_versions (
     id UUID PRIMARY KEY,
     seller_response_id UUID NOT NULL REFERENCES procurement.seller_responses (id) ON DELETE CASCADE,
     version INT NOT NULL,
     response_type TEXT NOT NULL,
-    offered_quality_grade TEXT NOT NULL,
-    offered_quality_inspection_notes TEXT NOT NULL,
+    spec_note TEXT NOT NULL DEFAULT '',
     unit_basis_quantity NUMERIC(14, 3) NOT NULL,
     unit_basis_unit TEXT NOT NULL,
     offered_quantity NUMERIC(14, 3) NOT NULL,
@@ -309,12 +302,11 @@ CREATE TABLE procurement.seller_response_versions (
     CONSTRAINT seller_response_versions_total_check CHECK (total_amount = goods_amount + shipping_amount + tax_amount),
     CONSTRAINT seller_response_versions_quantities_check CHECK (unit_basis_quantity > 0 AND offered_quantity > 0),
     CONSTRAINT seller_response_versions_publication_version_check CHECK (publication_version >= 1),
-    CONSTRAINT seller_response_versions_notes_check CHECK (char_length(offered_quality_inspection_notes) <= 1000 AND offered_quality_inspection_notes !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
+    CONSTRAINT seller_response_versions_spec_note_check CHECK (char_length(spec_note) <= 1000 AND spec_note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT seller_response_versions_terms_check CHECK (char_length(terms_note) <= 1000 AND terms_note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT seller_response_versions_deviation_check CHECK (char_length(deviation_disclosure) <= 1000 AND deviation_disclosure !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT seller_response_versions_unit_basis_unit_check CHECK (char_length(unit_basis_unit) >= 1 AND char_length(unit_basis_unit) <= 40 AND unit_basis_unit !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT seller_response_versions_offered_unit_check CHECK (char_length(offered_quantity_unit) >= 1 AND char_length(offered_quantity_unit) <= 40 AND offered_quantity_unit !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
-    CONSTRAINT seller_response_versions_quality_grade_check CHECK (char_length(offered_quality_grade) >= 1 AND char_length(offered_quality_grade) <= 100 AND offered_quality_grade !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT seller_response_versions_conversion_basis_check CHECK (char_length(conversion_basis) <= 500 AND conversion_basis !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')
 );
 CREATE UNIQUE INDEX seller_response_versions_version ON procurement.seller_response_versions (seller_response_id, version);

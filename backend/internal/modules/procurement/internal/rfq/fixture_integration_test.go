@@ -45,6 +45,9 @@ type fixture struct {
 	now           time.Time
 	published     []model.RfqPublished
 	subscriberErr error
+	lastSet       uuid.UUID
+	lastCands     []uuid.UUID
+	lastSetRev    uuid.UUID
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -120,6 +123,14 @@ func (f *fixture) revise(edit func(*store.InsertRevisionParams)) {
 // searched 建一次成功的候選搜尋（候選依序是 stores），需求轉 MATCHING，回候選集與每個候選的 ID（依 stores 的順序）。
 func (f *fixture) searched(stores ...int64) (uuid.UUID, []uuid.UUID) {
 	f.t.Helper()
+	set, ids := f.seedSearch(stores...)
+	f.exec(`UPDATE procurement.requests SET status = 'MATCHING' WHERE id = $1`, f.request)
+	return set, ids
+}
+
+// seedSearch 建一次成功的候選搜尋但不動需求狀態，並記住它是現行版本最後一次搜尋（publicationIn 用）。
+func (f *fixture) seedSearch(stores ...int64) (uuid.UUID, []uuid.UUID) {
+	f.t.Helper()
 	ctx := context.Background()
 	q := store.New(f.d.Conn(ctx))
 	set := uuid.NewV7()
@@ -131,7 +142,7 @@ func (f *fixture) searched(stores ...int64) (uuid.UUID, []uuid.UUID) {
 	}
 	f.exec(`INSERT INTO procurement.agent_runs (id, buyer_id, request_id, candidate_set_id, run_type, status, client_request_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, 'CANDIDATE_SEARCH', 'SUCCEEDED', $5, $6, $6)`, uuid.NewV7(), f.buyer, f.request, set, uuid.NewV7(), f.now.Add(time.Duration(f.count("procurement.agent_runs WHERE request_id = $1", f.request))*time.Second))
-	f.exec(`UPDATE procurement.requests SET status = 'MATCHING' WHERE id = $1`, f.request)
+	f.lastSet, f.lastCands, f.lastSetRev = set, ids, f.revision
 	return set, ids
 }
 
@@ -171,16 +182,20 @@ func (f *fixture) priceIn() rfq.PriceInput {
 	return rfq.PriceInput{BuyerID: f.buyer, RequestID: f.request, ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200}
 }
 
+// publicationIn 是指定對象的預設輸入：選現行版本最後一次搜尋的第一個候選；現行版本還沒有搜尋就先搜尋一次（店 10、20），不改需求狀態。
 func (f *fixture) publicationIn() rfq.PreviewPublicationInput {
-	return rfq.PreviewPublicationInput{
-		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
-		AudienceMode: model.AudienceWishPool,
+	f.t.Helper()
+	if f.lastSetRev != f.revision {
+		f.seedSearch(10, 20)
 	}
+	return f.directIn(f.lastSet, f.lastCands[0])
 }
 
 func (f *fixture) directIn(set uuid.UUID, candidates ...uuid.UUID) rfq.PreviewPublicationInput {
-	in := f.publicationIn()
-	in.AudienceMode, in.CandidateSetID, in.SelectedCandidateIDs = model.AudienceDirectRecipients, &set, candidates
+	in := rfq.PreviewPublicationInput{
+		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
+		AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set, SelectedCandidateIDs: candidates,
+	}
 	return in
 }
 

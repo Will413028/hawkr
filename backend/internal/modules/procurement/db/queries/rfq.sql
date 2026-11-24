@@ -1,10 +1,10 @@
 -- name: InsertApproval :execrows
 INSERT INTO procurement.rfq_publication_approvals (
     id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline,
-    audience_mode, audience_policy_id, audience_policy_version, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
+    audience_mode, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
 VALUES (
     @id, @buyer_id, @request_id, @request_revision_id, @range_lower_amount, @range_upper_amount, @buyer_note, @candidate_set_id, @response_deadline,
-    @audience_mode, @audience_policy_id, @audience_policy_version, 'PENDING', @schema_version, @client_request_id, @now, @expires_at, @now, @now)
+    @audience_mode, 'PENDING', @schema_version, @client_request_id, @now, @expires_at, @now, @now)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetApproval :one
@@ -115,7 +115,7 @@ WHERE request_id = @request_id AND buyer_id = @buyer_id AND state = 'PENDING' AN
 ORDER BY created_at DESC, id DESC LIMIT 1;
 
 -- name: GetLatestPublicationByRequest :one
--- 需求最新一次的發布，連同核准的 ID、凍結的受眾數與邀請數（公開池沒有受眾列，recipient_count 為 0），以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
+-- 需求最新一次的發布，連同核准的 ID、凍結的受眾數與邀請數，以及發布的 schema_version（重算 hash 的原像版本）；讀取模型 GetRuntimeSnapshot.published_rfq 用。
 SELECT p.id, p.version, p.published_at, p.schema_version, a.id AS approval_id,
     (SELECT count(*) FROM procurement.rfq_publication_approval_recipients r WHERE r.approval_id = a.id)::int AS recipient_count,
     (SELECT count(*) FROM procurement.rfq_publication_invites i WHERE i.publication_id = p.id)::int AS queued_count

@@ -12,12 +12,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-func wishPool() PreviewPublicationInput {
-	return PreviewPublicationInput{LowerBoundAmount: 100, UpperBoundAmount: 200, AudienceMode: model.AudienceWishPool}
+func directRecipients() PreviewPublicationInput {
+	set := uuid.NewV7()
+	return PreviewPublicationInput{LowerBoundAmount: 100, UpperBoundAmount: 200, AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{uuid.NewV7()}}
 }
 
 func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
-	set := uuid.NewV7()
 	for _, tc := range []struct {
 		name  string
 		edit  func(*PreviewPublicationInput)
@@ -29,10 +29,11 @@ func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
 		{"note at the limit", func(i *PreviewPublicationInput) { i.BuyerNote = strings.Repeat("字", MaxBuyerNoteRunes) }, ""},
 		{"note over the limit", func(i *PreviewPublicationInput) { i.BuyerNote = strings.Repeat("字", MaxBuyerNoteRunes+1) }, "BuyerNote"},
 		{"note only the padding pushes it over", func(i *PreviewPublicationInput) { i.BuyerNote = "  " + strings.Repeat("字", MaxBuyerNoteRunes) + "  " }, ""},
-		{"wish pool with a set", func(i *PreviewPublicationInput) { i.CandidateSetID = &set }, "CandidateSetID"},
+		{"no candidate set", func(i *PreviewPublicationInput) { i.CandidateSetID = nil }, "CandidateSetID"},
+		{"zero mode", func(i *PreviewPublicationInput) { i.AudienceMode = "" }, "AudienceMode"},
 		{"unknown mode", func(i *PreviewPublicationInput) { i.AudienceMode = "ALL" }, "AudienceMode"},
 	} {
-		in := wishPool()
+		in := directRecipients()
 		tc.edit(&in)
 		_, err := checkInput(in)
 		if tc.field == "" {
@@ -49,7 +50,7 @@ func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
 }
 
 func TestCheckInputReturnsTheTrimmedNote(t *testing.T) {
-	in := wishPool()
+	in := directRecipients()
 	in.BuyerNote = "  請盡快 \n"
 	note, err := checkInput(in)
 	if err != nil || note != "請盡快" {

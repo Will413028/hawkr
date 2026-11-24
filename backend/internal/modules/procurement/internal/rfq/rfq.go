@@ -26,9 +26,6 @@ const (
 	ApprovalTTL = 24 * time.Hour
 	// MaxBuyerNoteRunes 是買家補充說明的上限（字元數，proto 與 DB CHECK 同值）。
 	MaxBuyerNoteRunes = 500
-	// WishPoolPolicyID 與 WishPoolPolicyVersion 是公開池目前的受眾政策：全站未停權的賣家，沒有分類、地區或分級的限制。
-	WishPoolPolicyID      = "WISH_POOL_ALL_ACTIVE_SELLERS_V1"
-	WishPoolPolicyVersion = int32(1)
 )
 
 // 衝突目標（ErrorInfo.metadata 的 conflictTarget）。

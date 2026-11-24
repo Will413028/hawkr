@@ -47,9 +47,8 @@ func (f *fakeModule) PreviewRfqPublication(_ context.Context, in procurement.Pre
 	}
 	day := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 	qty, unit := int32(3), "KG"
-	policy, version := "P", int32(1)
 	return procurement.PublicationPreview{
-		ApprovalID: rfqID, ApprovalVersion: 1, AudienceHash: "a", SellerFacingHash: "s", ExpiresAt: rfqTime, PolicyID: &policy, PolicyVersion: &version, RecipientCount: 2,
+		ApprovalID: rfqID, ApprovalVersion: 1, AudienceHash: "a", SellerFacingHash: "s", ExpiresAt: rfqTime, RecipientCount: 2,
 		Payload: procurement.SellerFacing{
 			Item: "小白菜", ItemLabel: "小白菜", Quantity: &qty, Unit: &unit, DeliveryCity: "台北市", DeliveryDate: &day, ResponseDate: &day, BuyerNote: "請盡快",
 			BasisQuantity: 1, BasisUnit: "KG", LowerBoundAmount: 100, UpperBoundAmount: 200,
@@ -98,7 +97,7 @@ func TestRfqMethodsValidateAtTheEntryAndNameTheField(t *testing.T) {
 	}
 	pgood := func() *pb.PreviewRfqPublicationRequest {
 		return &pb.PreviewRfqPublicationRequest{
-			RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_WISH_POOL,
+			RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_DIRECT_RECIPIENTS,
 		}
 	}
 	p := pgood()
@@ -178,7 +177,7 @@ func TestRfqMethodsMapModuleErrors(t *testing.T) {
 	if got := violationFields(t, err); len(got) != 2 || got[0] != "buyer_requested_range.lower_bound_amount" || got[1] != "buyer_requested_range.upper_bound_amount" {
 		t.Fatalf("欄位 = %v", got)
 	}
-	pub := &pb.PreviewRfqPublicationRequest{RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_WISH_POOL}
+	pub := &pb.PreviewRfqPublicationRequest{RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_DIRECT_RECIPIENTS}
 	m.rfq.err = apperr.InvalidInputOn([]string{"client_request_id"}, "內容不同")
 	_, err = c.PreviewRfqPublication(t.Context(), as(connect.NewRequest(pub), accountID))
 	if got := violationFields(t, err); len(got) != 1 || got[0] != "client_request_id" {
@@ -230,7 +229,7 @@ func TestPreviewRfqPublicationPassesTheAudienceAndMapsThePayload(t *testing.T) {
 	r := res.Msg
 	pl := r.GetSellerFacingPayload()
 	if r.GetApprovalId() != rfqID.String() || r.GetApprovalVersion() != "1" || r.GetAudienceHash() != "a" || r.GetSellerFacingPayloadHash() != "s" || r.GetRecipientCount() != 2 ||
-		r.GetAudiencePolicyId() != "P" || r.GetAudiencePolicyVersion() != 1 || !r.GetExpireTime().AsTime().Equal(rfqTime) {
+		!r.GetExpireTime().AsTime().Equal(rfqTime) {
 		t.Fatalf("回應 = %v", r)
 	}
 	if pl.GetItem() != "小白菜" || pl.GetQuantity() != 3 || pl.GetUnit() != "KG" || pl.GetDeliveryCity() != "台北市" || pl.GetDeliveryDate().GetDay() != 1 ||
@@ -242,13 +241,13 @@ func TestPreviewRfqPublicationPassesTheAudienceAndMapsThePayload(t *testing.T) {
 	}
 
 	_, err = c.PreviewRfqPublication(t.Context(), as(connect.NewRequest(&pb.PreviewRfqPublicationRequest{
-		RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_WISH_POOL,
+		RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_DIRECT_RECIPIENTS,
 	}), accountID))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if in := m.rfq.previews[1]; in.CandidateSetID != nil || len(in.SelectedCandidateIDs) != 0 || in.ResponseDeadline != nil || in.AudienceMode != procurement.AudienceWishPool {
-		t.Fatalf("公開池不帶候選也不設期限：%+v", in)
+	if in := m.rfq.previews[1]; in.CandidateSetID != nil || len(in.SelectedCandidateIDs) != 0 || in.ResponseDeadline != nil || in.AudienceMode != procurement.AudienceDirectRecipients {
+		t.Fatalf("沒帶的候選與期限不設值：%+v", in)
 	}
 }
 
@@ -257,7 +256,7 @@ func TestPreviewRfqPublicationMapsModuleFieldErrorsToTheRequestPaths(t *testing.
 	c := setup(t, m)
 	m.rfq.err = apperr.InvalidInputOn([]string{apperr.IndexedField("SelectedCandidateIDs", 1)}, "候選重複")
 	_, err := c.PreviewRfqPublication(t.Context(), as(connect.NewRequest(&pb.PreviewRfqPublicationRequest{
-		RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_WISH_POOL,
+		RequestId: goodID, ClientRequestId: goodID, ExpectedRevisionId: goodID, BuyerRequestedRange: &pb.BuyerRequestedRange{LowerBoundAmount: 1, UpperBoundAmount: 2}, AudienceMode: pb.AudienceMode_AUDIENCE_MODE_DIRECT_RECIPIENTS,
 	}), accountID))
 	if got := violationFields(t, err); len(got) != 1 || got[0] != "selected_candidate_ids[1]" {
 		t.Fatalf("欄位 = %v", got)
@@ -266,7 +265,7 @@ func TestPreviewRfqPublicationMapsModuleFieldErrorsToTheRequestPaths(t *testing.
 
 func TestExecuteRfqPublicationPassesTheCallerAndMapsTheResult(t *testing.T) {
 	m := &fakeModule{rfq: rfqFake{publicaton: procurement.Publication{
-		ID: rfqID, Version: 1, State: "PUBLISHED", AudienceMode: procurement.AudienceWishPool, AudienceHash: "a", SellerFacingHash: "s", PublishedAt: rfqTime, Replayed: true,
+		ID: rfqID, Version: 1, State: "PUBLISHED", AudienceMode: procurement.AudienceDirectRecipients, AudienceHash: "a", SellerFacingHash: "s", PublishedAt: rfqTime, Replayed: true,
 	}}}
 	c := setup(t, m)
 	res, err := c.ExecuteRfqPublication(t.Context(), as(connect.NewRequest(&pb.ExecuteRfqPublicationRequest{
@@ -280,14 +279,14 @@ func TestExecuteRfqPublicationPassesTheCallerAndMapsTheResult(t *testing.T) {
 	}
 	r := res.Msg
 	if r.GetPublicationId() != rfqID.String() || r.GetPublicationVersion() != "1" || r.GetState() != pb.PublicationState_PUBLICATION_STATE_PUBLISHED ||
-		r.GetAudienceMode() != pb.AudienceMode_AUDIENCE_MODE_WISH_POOL || r.GetAudienceHash() != "a" || r.GetSellerFacingPayloadHash() != "s" ||
+		r.GetAudienceMode() != pb.AudienceMode_AUDIENCE_MODE_DIRECT_RECIPIENTS || r.GetAudienceHash() != "a" || r.GetSellerFacingPayloadHash() != "s" ||
 		!r.GetPublishTime().AsTime().Equal(rfqTime) || !r.GetReplayed() {
 		t.Fatalf("回應 = %v", r)
 	}
 }
 
 func TestExecuteRfqPublicationRejectsAResultItCannotRepresent(t *testing.T) {
-	good := procurement.Publication{ID: rfqID, Version: 1, State: "PUBLISHED", AudienceMode: procurement.AudienceWishPool, PublishedAt: rfqTime}
+	good := procurement.Publication{ID: rfqID, Version: 1, State: "PUBLISHED", AudienceMode: procurement.AudienceDirectRecipients, PublishedAt: rfqTime}
 	for name, bad := range map[string]procurement.Publication{
 		"沒有狀態":   {ID: good.ID, Version: 1, AudienceMode: good.AudienceMode},
 		"不認得的狀態": {ID: good.ID, Version: 1, State: "GONE", AudienceMode: good.AudienceMode},

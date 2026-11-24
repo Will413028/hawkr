@@ -14,12 +14,10 @@ import (
 
 // compiled 是一份核准對賣家與受眾的內容，與它的兩個 hash：全部由核准參照的不可變列重算（核准只存參照）。
 type compiled struct {
-	payload       model.SellerFacing
-	sellerHash    string
-	audienceHash  string
-	storeIDs      []int64
-	policyID      *string
-	policyVersion *int32
+	payload      model.SellerFacing
+	sellerHash   string
+	audienceHash string
+	storeIDs     []int64
 }
 
 // compile 讀核准對應的需求版本與受眾名單，連同核准凍結的單價範圍、補充說明與回價期限組出賣家看得到的內容並重算 hash；任何一列讀不到是資料不一致。
@@ -36,7 +34,7 @@ func compile(ctx context.Context, q *store.Queries, buyerID int64, a store.Procu
 	if err != nil {
 		return compiled{}, fmt.Errorf("rfq：讀取核准 %s 的受眾：%w", a.ID, err)
 	}
-	c := compiled{policyID: a.AudiencePolicyID, policyVersion: a.AudiencePolicyVersion, storeIDs: make([]int64, 0, len(recipients))}
+	c := compiled{storeIDs: make([]int64, 0, len(recipients))}
 	for _, r := range recipients {
 		c.storeIDs = append(c.storeIDs, r.StoreID)
 	}
@@ -71,7 +69,7 @@ func SellerFacingHash(ctx context.Context, q *store.Queries, buyerID int64, requ
 }
 
 func audienceInput(a store.ProcurementRfqPublicationApproval, storeIDs []int64) rfqhash.AudienceInput {
-	return rfqhash.AudienceInput{SchemaVersion: a.SchemaVersion, Mode: a.AudienceMode, PolicyID: a.AudiencePolicyID, PolicyVersion: a.AudiencePolicyVersion, StoreIDs: storeIDs}
+	return rfqhash.AudienceInput{SchemaVersion: a.SchemaVersion, Mode: a.AudienceMode, StoreIDs: storeIDs}
 }
 
 func sellerInput(schemaVersion string, p model.SellerFacing) rfqhash.SellerFacingInput {

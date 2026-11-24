@@ -35,11 +35,10 @@ type PreviewPublicationInput struct {
 
 // PreviewPublication 依需求現行版本與買家給的單價區間、補充說明編出賣家看得到的內容，建立不可變的發布核准（ApprovalTTL 有效），不發布、不通知。
 // 輸入檢查先於任何讀取：單價區間不合法（欄位 LowerBoundAmount、UpperBoundAmount）、補充說明去頭尾空白後超過 MaxBuyerNoteRunes（欄位 BuyerNote）、
-// 欄位與模式不合（AudienceMode 不是兩個模式之一、公開池帶了候選、指定對象沒帶候選集或沒選候選、候選重複）、回價期限不是合法日期，都回 INVALID_ARGUMENT 並指出欄位。
+// 欄位不合（AudienceMode 不是 DIRECT_RECIPIENTS、沒帶候選集或沒選候選、候選重複）、回價期限不是合法日期，都回 INVALID_ARGUMENT 並指出欄位。
 // 重送同一個 ClientRequestID 回第一次的核准（先於其餘需要讀取的檢查），內容（需求、讀到的版本、區間、補充說明、模式、期限、候選集、受眾）不同回 INVALID_ARGUMENT（欄位 client_request_id）。
 // 其後：回價期限早於今天（台北時區）回 INVALID_ARGUMENT（欄位 ResponseDeadline）；需求、候選集不屬於買家回 NOT_FOUND；讀到的版本不是現行版本回 ABORTED／VERSION_CONFLICT（request_revision）；
 // 需求狀態不是 REQUIREMENT_READY 或 MATCHING、或沒有單位回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；候選集不是有效的候選集（A9-D29(4)）回 ABORTED／VERSION_CONFLICT（candidate_set）；候選不在候選集裡回 INVALID_ARGUMENT。
-// 公開池的收件人在發布時決定，預覽的受眾是空的（recipient_count 0）。
 func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationInput) (model.PublicationPreview, error) {
 	note, err := checkInput(in)
 	if err != nil {
@@ -63,25 +62,23 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 		if _, err := quote(rev, in.LowerBoundAmount, in.UpperBoundAmount); err != nil {
 			return err
 		}
-		var stores []int64
-		if in.AudienceMode == model.AudienceDirectRecipients {
-			set, err := q.GetCandidateSetForBuyer(ctx, store.GetCandidateSetForBuyerParams{ID: *in.CandidateSetID, RequestID: in.RequestID, BuyerID: in.BuyerID})
-			if errors.Is(err, pgx.ErrNoRows) {
-				return apperr.NotFound("找不到這個候選集")
-			}
-			if err != nil {
-				return fmt.Errorf("rfq：讀取候選集：%w", err)
-			}
-			effective, err := search.IsEffective(ctx, q, req, in.BuyerID, set.ID)
-			if err != nil {
-				return err
-			}
-			if !effective {
-				return versionConflict("這個候選集已不是有效的候選集，請重新載入", TargetCandidateSet)
-			}
-			if stores, err = resolveStores(ctx, q, in); err != nil {
-				return err
-			}
+		set, err := q.GetCandidateSetForBuyer(ctx, store.GetCandidateSetForBuyerParams{ID: *in.CandidateSetID, RequestID: in.RequestID, BuyerID: in.BuyerID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound("找不到這個候選集")
+		}
+		if err != nil {
+			return fmt.Errorf("rfq：讀取候選集：%w", err)
+		}
+		effective, err := search.IsEffective(ctx, q, req, in.BuyerID, set.ID)
+		if err != nil {
+			return err
+		}
+		if !effective {
+			return versionConflict("這個候選集已不是有效的候選集，請重新載入", TargetCandidateSet)
+		}
+		stores, err := resolveStores(ctx, q, in)
+		if err != nil {
+			return err
 		}
 		a := store.InsertApprovalParams{
 			ID: uuid.NewV7(), BuyerID: &in.BuyerID, RequestID: in.RequestID, RequestRevisionID: rev.ID,
@@ -91,10 +88,6 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 		if in.ResponseDeadline != nil {
 			d := dateOnly(*in.ResponseDeadline)
 			a.ResponseDeadline = &d
-		}
-		if in.AudienceMode == model.AudienceWishPool {
-			id, v := WishPoolPolicyID, WishPoolPolicyVersion
-			a.AudiencePolicyID, a.AudiencePolicyVersion = &id, &v
 		}
 		n, err := q.InsertApproval(ctx, a)
 		if err != nil {
@@ -136,19 +129,12 @@ func checkInput(in PreviewPublicationInput) (string, error) {
 // deadlinePassed 回傳回價期限（當日）是否早於 now 在營業時區（台北）的今天；期限就是今天不算過。
 func deadlinePassed(deadline, now time.Time) bool { return dateOnly(deadline).Before(twtime.Day(now)) }
 
-// checkAudienceShape 檢查受眾欄位與模式相合，不讀資料庫：公開池不帶候選；指定對象要有候選集與至少一個候選，且不重複；回價期限要是合法日期（零值不是）。
+// checkAudienceShape 檢查受眾欄位與模式相合，不讀資料庫：指定對象要有候選集與至少一個候選，且不重複；回價期限要是合法日期（零值不是）。
 func checkAudienceShape(in PreviewPublicationInput) error {
 	if in.ResponseDeadline != nil && in.ResponseDeadline.IsZero() {
 		return apperr.InvalidInputOn([]string{"ResponseDeadline"}, "回價期限不是合法的日期")
 	}
 	switch in.AudienceMode {
-	case model.AudienceWishPool:
-		if in.CandidateSetID != nil {
-			return apperr.InvalidInputOn([]string{"CandidateSetID"}, "公開池不指定候選集")
-		}
-		if len(in.SelectedCandidateIDs) > 0 {
-			return apperr.InvalidInputOn([]string{"SelectedCandidateIDs"}, "公開池不指定候選")
-		}
 	case model.AudienceDirectRecipients:
 		if in.CandidateSetID == nil {
 			return apperr.InvalidInputOn([]string{"CandidateSetID"}, "指定對象要帶候選集")
@@ -207,18 +193,16 @@ func replayApproval(ctx context.Context, q *store.Queries, in PreviewPublication
 	if err != nil {
 		return model.PublicationPreview{}, err
 	}
-	if in.AudienceMode == model.AudienceDirectRecipients {
-		stores, err := resolveStores(ctx, q, in)
-		var bad *apperr.Error
-		if errors.As(err, &bad) {
-			return model.PublicationPreview{}, idempotencyMismatch()
-		}
-		if err != nil {
-			return model.PublicationPreview{}, err
-		}
-		if !slices.Equal(stores, c.storeIDs) {
-			return model.PublicationPreview{}, idempotencyMismatch()
-		}
+	stores, err := resolveStores(ctx, q, in)
+	var bad *apperr.Error
+	if errors.As(err, &bad) {
+		return model.PublicationPreview{}, idempotencyMismatch()
+	}
+	if err != nil {
+		return model.PublicationPreview{}, err
+	}
+	if !slices.Equal(stores, c.storeIDs) {
+		return model.PublicationPreview{}, idempotencyMismatch()
 	}
 	return approvalPreviewOf(a, c), nil
 }
@@ -248,6 +232,6 @@ func previewOfApproval(ctx context.Context, q *store.Queries, buyerID int64, a s
 func approvalPreviewOf(a store.ProcurementRfqPublicationApproval, c compiled) model.PublicationPreview {
 	return model.PublicationPreview{
 		ApprovalID: a.ID, ApprovalVersion: a.Version, AudienceHash: c.audienceHash, SellerFacingHash: c.sellerHash, Payload: c.payload,
-		ExpiresAt: a.ExpiresAt, PolicyID: c.policyID, PolicyVersion: c.policyVersion, RecipientCount: int32(len(c.storeIDs)), //nolint:gosec // 受眾數不超過候選數
+		ExpiresAt: a.ExpiresAt, RecipientCount: int32(len(c.storeIDs)), //nolint:gosec // 受眾數不超過候選數
 	}
 }

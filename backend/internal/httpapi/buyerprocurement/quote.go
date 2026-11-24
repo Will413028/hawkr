@@ -207,7 +207,7 @@ func sellerQuoteToProto(q procurement.SellerQuote) (*pb.SellerQuote, error) {
 		return nil, err
 	}
 	out := &pb.SellerQuote{
-		ResponseType: typ, OfferedQuality: &pb.OfferedQuality{Grade: q.QualityGrade, InspectionNotes: q.InspectionNotes},
+		ResponseType: typ, SpecNote: q.SpecNote,
 		UnitBasis: &pb.UnitBasis{Quantity: q.UnitBasisQuantity, Unit: q.UnitBasisUnit}, OfferedQuantity: q.OfferedQuantity, OfferedQuantityUnit: q.OfferedQuantityUnit,
 		ConversionBasis: q.ConversionBasis, GoodsAmount: q.GoodsAmount, ShippingAmount: q.ShippingAmount, TaxAmount: q.TaxAmount, TaxInclusionBasis: tax,
 		TotalAmount: q.TotalAmount, ValidUntilTime: timestamppb.New(q.ValidUntil), TermsNote: q.TermsNote, DeviationDisclosure: q.DeviationDisclosure,

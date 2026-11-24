@@ -578,11 +578,11 @@ func TestSellerResponseVersionAllowsEmptyConversionBasis(t *testing.T) {
 	insert := func(version int, basis string) error {
 		_, err := d.Pool().Exec(ctx, `
 			INSERT INTO procurement.seller_response_versions (
-				id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes,
+				id, seller_response_id, version, response_type, spec_note,
 				unit_basis_quantity, unit_basis_unit, offered_quantity, offered_quantity_unit, conversion_basis, currency,
 				goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount, valid_until,
 				outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', 'A', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, false, 1, $6, $5, $5)`,
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, false, 1, $6, $5, $5)`,
 			id(), c.sellerResponse, version, basis, epoch, id())
 		return err
 	}
@@ -601,10 +601,9 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	q := store.New(d.Pool())
 	c := seed(ctx, t, q, 71, false)
 	approval := id()
-	policyID, policyVersion := "wish-pool", int32(1)
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, AudienceMode: "WISH_POOL",
-		AudiencePolicyID: &policyID, AudiencePolicyVersion: &policyVersion, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
+		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, AudienceMode: "DIRECT_RECIPIENTS",
+		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval n=%d err=%v", n, err)
 	}

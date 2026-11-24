@@ -66,23 +66,21 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		if claimed.RequestRevisionID != rev.ID || (claimed.ResponseDeadline != nil && deadlinePassed(*claimed.ResponseDeadline, now)) {
 			return stale
 		}
-		if claimed.AudienceMode == model.AudienceDirectRecipients {
-			if claimed.CandidateSetID == nil {
-				return stale
-			}
-			effective, err := search.IsEffective(ctx, q, req, in.BuyerID, *claimed.CandidateSetID)
-			if err != nil {
-				return err
-			}
-			if !effective {
-				return versionConflict("這個候選集已不是有效的候選集，請重新預覽", TargetCandidateSet)
-			}
+		if claimed.CandidateSetID == nil {
+			return stale
+		}
+		effective, err := search.IsEffective(ctx, q, req, in.BuyerID, *claimed.CandidateSetID)
+		if err != nil {
+			return err
+		}
+		if !effective {
+			return versionConflict("這個候選集已不是有效的候選集，請重新預覽", TargetCandidateSet)
 		}
 		c, err := compile(ctx, q, in.BuyerID, claimed)
 		if err != nil {
 			return err
 		}
-		if c.sellerHash != in.PayloadHash || (claimed.AudienceMode == model.AudienceDirectRecipients && len(c.storeIDs) == 0) {
+		if c.sellerHash != in.PayloadHash || len(c.storeIDs) == 0 {
 			return stale
 		}
 		pub := store.InsertPublicationParams{

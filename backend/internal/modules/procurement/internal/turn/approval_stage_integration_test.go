@@ -42,8 +42,8 @@ func (f *fixture) approve(ttl time.Duration, state string) uuid.UUID {
 	}
 	id := uuid.NewV7()
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: id, BuyerID: ptr(buyer), RequestID: f.request, RequestRevisionID: active.ID, RangeLowerAmount: 100, RangeUpperAmount: 200, AudienceMode: "WISH_POOL",
-		AudiencePolicyID: ptr("P"), AudiencePolicyVersion: ptr(int32(1)), SchemaVersion: "v1", ClientRequestID: uuid.NewV7(), Now: now, ExpiresAt: now.Add(ttl),
+		ID: id, BuyerID: ptr(buyer), RequestID: f.request, RequestRevisionID: active.ID, RangeLowerAmount: 100, RangeUpperAmount: 200, AudienceMode: "DIRECT_RECIPIENTS",
+		SchemaVersion: "v1", ClientRequestID: uuid.NewV7(), Now: now, ExpiresAt: now.Add(ttl),
 	}); err != nil || n != 1 {
 		f.t.Fatalf("InsertApproval n=%d err=%v", n, err)
 	}

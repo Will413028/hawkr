@@ -7,8 +7,7 @@ import "time"
 type SellerResponseInput struct {
 	SchemaVersion       string
 	ResponseType        string
-	QualityGrade        string
-	InspectionNotes     string
+	SpecNote            string
 	UnitBasisQuantity   string
 	UnitBasisUnit       string
 	OfferedQuantity     string
@@ -30,9 +29,9 @@ type SellerResponseInput struct {
 // SellerResponse 回傳回價版本的內容 hash：SHA-256 的小寫十六進位（A9-D36）。
 func SellerResponse(in SellerResponseInput) (string, error) {
 	switch in.SchemaVersion {
-	case SchemaV1:
-		return sum(responseV1{
-			SchemaVersion: in.SchemaVersion, ResponseType: in.ResponseType, QualityGrade: in.QualityGrade, InspectionNotes: in.InspectionNotes,
+	case SchemaV2:
+		return sum(responseV2{
+			SchemaVersion: in.SchemaVersion, ResponseType: in.ResponseType, SpecNote: in.SpecNote,
 			UnitBasisQuantity: in.UnitBasisQuantity, UnitBasisUnit: in.UnitBasisUnit, OfferedQuantity: in.OfferedQuantity, OfferedQuantityUnit: in.OfferedQuantityUnit,
 			ConversionBasis: in.ConversionBasis, Currency: in.Currency, GoodsAmount: in.GoodsAmount, ShippingAmount: in.ShippingAmount, TaxAmount: in.TaxAmount,
 			TaxInclusionBasis: in.TaxInclusionBasis, TotalAmount: in.TotalAmount, LeadTimeDays: in.LeadTimeDays, PromisedDelivery: instant(in.PromisedDelivery),
@@ -51,11 +50,10 @@ func instant(t *time.Time) *string {
 	return &s
 }
 
-type responseV1 struct {
+type responseV2 struct {
 	SchemaVersion       string  `json:"schemaVersion"`
 	ResponseType        string  `json:"responseType"`
-	QualityGrade        string  `json:"qualityGrade"`
-	InspectionNotes     string  `json:"inspectionNotes"`
+	SpecNote            string  `json:"specNote"`
 	UnitBasisQuantity   string  `json:"unitBasisQuantity"`
 	UnitBasisUnit       string  `json:"unitBasisUnit"`
 	OfferedQuantity     string  `json:"offeredQuantity"`

@@ -176,9 +176,8 @@ type BuyerProcurementAppServiceClient interface {
 	// 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與（指定對象時）候選集。
 	// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
 	// 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位，回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
-	// 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、
+	// 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位不合（沒帶候選集或候選、候選重複、候選不在候選集裡）、
 	// 回價期限不是合法日期或早於今天（台北時區）回 INVALID_ARGUMENT。
-	// 公開池的收件人在發布時決定，預覽的 recipient_count 是 0。
 	PreviewRfqPublication(context.Context, *connect.Request[v1alpha1.PreviewRfqPublicationRequest]) (*connect.Response[v1alpha1.PreviewRfqPublicationResponse], error)
 	// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
 	// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本、
@@ -552,9 +551,8 @@ type BuyerProcurementAppServiceHandler interface {
 	// 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與（指定對象時）候選集。
 	// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
 	// 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位，回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
-	// 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位與模式不合（公開池帶了候選、指定對象沒帶或重複、候選不在候選集裡）、
+	// 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位不合（沒帶候選集或候選、候選重複、候選不在候選集裡）、
 	// 回價期限不是合法日期或早於今天（台北時區）回 INVALID_ARGUMENT。
-	// 公開池的收件人在發布時決定，預覽的 recipient_count 是 0。
 	PreviewRfqPublication(context.Context, *connect.Request[v1alpha1.PreviewRfqPublicationRequest]) (*connect.Response[v1alpha1.PreviewRfqPublicationResponse], error)
 	// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
 	// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本、
@@ -895,7 +893,7 @@ type SellerProcurementAppServiceClient interface {
 	// SubmitSellerResponse 送出正式回價，產生不可變的新版本。詢價已被改版回 ABORTED，conflictTarget 是 publication；
 	// 帶的 expected_seller_response_version 不是目前的版本（賣家已改價或撤回，或空字串卻已有正式回價）回 ABORTED，
 	// conflictTarget 是 seller_response，client 必須明確告知使用者報價已變動，不得改用最新版靜默重送。
-	// 沒有填實際品相、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
+	// spec_note 超過 1000 字、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
 	// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。
 	SubmitSellerResponse(context.Context, *connect.Request[v1alpha1.SubmitSellerResponseRequest]) (*connect.Response[v1alpha1.SubmitSellerResponseResponse], error)
 	// WithdrawSellerResponse 撤回正式回價。
@@ -1015,7 +1013,7 @@ type SellerProcurementAppServiceHandler interface {
 	// SubmitSellerResponse 送出正式回價，產生不可變的新版本。詢價已被改版回 ABORTED，conflictTarget 是 publication；
 	// 帶的 expected_seller_response_version 不是目前的版本（賣家已改價或撤回，或空字串卻已有正式回價）回 ABORTED，
 	// conflictTarget 是 seller_response，client 必須明確告知使用者報價已變動，不得改用最新版靜默重送。
-	// 沒有填實際品相、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
+	// spec_note 超過 1000 字、金額恆等式不成立回 INVALID_ARGUMENT。已停止寫入（賣家已婉拒、詢價已結案或他人成交）回
 	// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。
 	SubmitSellerResponse(context.Context, *connect.Request[v1alpha1.SubmitSellerResponseRequest]) (*connect.Response[v1alpha1.SubmitSellerResponseResponse], error)
 	// WithdrawSellerResponse 撤回正式回價。

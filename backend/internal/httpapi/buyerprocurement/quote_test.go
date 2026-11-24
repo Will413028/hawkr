@@ -52,7 +52,7 @@ func (f *fakeModule) AcceptSellerQuote(_ context.Context, in procurement.AcceptS
 func testQuote() procurement.SellerQuote {
 	lead, day := int32(3), time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 	return procurement.SellerQuote{
-		ResponseType: "MANUAL_QUOTE", QualityGrade: "A", InspectionNotes: "無", UnitBasisQuantity: "1.000", UnitBasisUnit: "KG", OfferedQuantity: "3.000", OfferedQuantityUnit: "KG",
+		ResponseType: "MANUAL_QUOTE", SpecNote: "規格如圖", UnitBasisQuantity: "1.000", UnitBasisUnit: "KG", OfferedQuantity: "3.000", OfferedQuantityUnit: "KG",
 		ConversionBasis: "x", Currency: "TWD", GoodsAmount: 900, ShippingAmount: 100, TaxAmount: 50, TaxInclusionBasis: "TAX_EXCLUDED", TotalAmount: 1050,
 		LeadTimeDays: &lead, PromisedDelivery: &day, ValidUntil: day.Add(96 * time.Hour), TermsNote: "月結", DeviationDisclosure: "無",
 	}
@@ -171,7 +171,7 @@ func TestListSellerResponsesMapsTheRowsAndStoreCards(t *testing.T) {
 	}
 	q := first.GetQuote()
 	if q.GetResponseType() != pb.SellerResponseType_SELLER_RESPONSE_TYPE_MANUAL_QUOTE || q.GetTaxInclusionBasis() != pb.TaxInclusionBasis_TAX_INCLUSION_BASIS_TAX_EXCLUDED ||
-		q.GetUnitBasis().GetQuantity() != "1.000" || q.GetOfferedQuality().GetGrade() != "A" || q.GetTotalAmount() != 1050 || q.GetLeadTimeDays() != 3 ||
+		q.GetUnitBasis().GetQuantity() != "1.000" || q.GetSpecNote() != "規格如圖" || q.GetTotalAmount() != 1050 || q.GetLeadTimeDays() != 3 ||
 		q.GetPromisedDeliveryTime() == nil || q.GetValidUntilTime() == nil || q.GetTermsNote() != "月結" || q.GetDeviationDisclosure() != "無" {
 		t.Fatalf("報價 = %+v", q)
 	}

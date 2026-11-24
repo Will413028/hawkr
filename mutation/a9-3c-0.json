@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "response-hash-omits-spec-note",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfqhash/response.go",
+   "old": "ResponseType: in.ResponseType, SpecNote: in.SpecNote,",
+   "new": "ResponseType: in.ResponseType, SpecNote: \"\",",
+   "test": "internal/modules/procurement/internal/rfqhash ^TestEverySellerResponseFieldChangesTheHash$",
+   "why": "The seller response v2 preimage no longer carries spec_note, so changing the note leaves the content hash unchanged."
+  },
+  {
+   "id": "publication-accepts-unknown-audience-mode",
+   "stack": "go",
+   "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+   "old": "return apperr.InvalidInputOn([]string{\"AudienceMode\"}, \"不支援的發布對象種類\")",
+   "new": "break",
+   "test": "internal/modules/procurement/internal/rfq ^TestAudienceShape$",
+   "why": "checkAudienceShape stops rejecting an unknown or zero audience mode, so a publication preview with a bogus mode passes input validation."
+  }
+ ]
+}

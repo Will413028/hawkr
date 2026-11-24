@@ -173,26 +173,24 @@ type ProcurementRfqPublication struct {
 }
 
 type ProcurementRfqPublicationApproval struct {
-	ID                    uuid.UUID
-	Version               int32
-	BuyerID               *int64
-	RequestID             uuid.UUID
-	RequestRevisionID     uuid.UUID
-	RangeLowerAmount      int64
-	RangeUpperAmount      int64
-	BuyerNote             string
-	CandidateSetID        *uuid.UUID
-	ResponseDeadline      *time.Time
-	AudienceMode          string
-	AudiencePolicyID      *string
-	AudiencePolicyVersion *int32
-	State                 string
-	SchemaVersion         string
-	ClientRequestID       uuid.UUID
-	GeneratedAt           time.Time
-	ExpiresAt             time.Time
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID                uuid.UUID
+	Version           int32
+	BuyerID           *int64
+	RequestID         uuid.UUID
+	RequestRevisionID uuid.UUID
+	RangeLowerAmount  int64
+	RangeUpperAmount  int64
+	BuyerNote         string
+	CandidateSetID    *uuid.UUID
+	ResponseDeadline  *time.Time
+	AudienceMode      string
+	State             string
+	SchemaVersion     string
+	ClientRequestID   uuid.UUID
+	GeneratedAt       time.Time
+	ExpiresAt         time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type ProcurementRfqPublicationApprovalRecipient struct {
@@ -235,33 +233,32 @@ type ProcurementSellerResponseDraft struct {
 }
 
 type ProcurementSellerResponseVersion struct {
-	ID                            uuid.UUID
-	SellerResponseID              uuid.UUID
-	Version                       int32
-	ResponseType                  string
-	OfferedQualityGrade           string
-	OfferedQualityInspectionNotes string
-	UnitBasisQuantity             pgtype.Numeric
-	UnitBasisUnit                 string
-	OfferedQuantity               pgtype.Numeric
-	OfferedQuantityUnit           string
-	ConversionBasis               string
-	Currency                      string
-	GoodsAmount                   int64
-	ShippingAmount                int64
-	TaxAmount                     int64
-	TaxInclusionBasis             string
-	TotalAmount                   int64
-	LeadTimeDays                  *int32
-	PromisedDeliveryAt            *time.Time
-	ValidUntil                    time.Time
-	TermsNote                     string
-	DeviationDisclosure           string
-	OutsideBuyerRequestedRange    bool
-	PublicationVersion            int32
-	ClientRequestID               uuid.UUID
-	SubmittedAt                   time.Time
-	CreatedAt                     time.Time
+	ID                         uuid.UUID
+	SellerResponseID           uuid.UUID
+	Version                    int32
+	ResponseType               string
+	SpecNote                   string
+	UnitBasisQuantity          pgtype.Numeric
+	UnitBasisUnit              string
+	OfferedQuantity            pgtype.Numeric
+	OfferedQuantityUnit        string
+	ConversionBasis            string
+	Currency                   string
+	GoodsAmount                int64
+	ShippingAmount             int64
+	TaxAmount                  int64
+	TaxInclusionBasis          string
+	TotalAmount                int64
+	LeadTimeDays               *int32
+	PromisedDeliveryAt         *time.Time
+	ValidUntil                 time.Time
+	TermsNote                  string
+	DeviationDisclosure        string
+	OutsideBuyerRequestedRange bool
+	PublicationVersion         int32
+	ClientRequestID            uuid.UUID
+	SubmittedAt                time.Time
+	CreatedAt                  time.Time
 }
 
 type ProcurementTurn struct {

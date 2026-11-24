@@ -33,7 +33,7 @@ const buyer int64 = 1
 
 func ptr[T any](v T) *T { return &v }
 
-// fixture 是一位買家的一張需求（現行版本：小白菜、3 KG、台北市）、它的一次發布（公開池，買家預期單價 100 到 200 元每 KG）與一個可注入時間的服務。
+// fixture 是一位買家的一張需求（現行版本：小白菜、3 KG、台北市）、它的一次發布（指定一家店，買家預期單價 100 到 200 元每 KG）與一個可注入時間的服務。
 type fixture struct {
 	t           *testing.T
 	d           *db.DB
@@ -105,14 +105,20 @@ func (f *fixture) revise() {
 	f.exec(`UPDATE procurement.request_revisions SET quantity = 5 WHERE id = $1`, f.revision)
 }
 
-// publish 預覽並執行一次發布（公開池），回發布 ID 與賣家可見內容的 hash。
+// publish 預覽並執行一次發布（指定一家店），回發布 ID 與賣家可見內容的 hash。
 func (f *fixture) publish() (uuid.UUID, string) {
 	f.t.Helper()
 	ctx := context.Background()
 	svc := rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus}
+	q := store.New(f.d.Conn(ctx))
+	set, cand := uuid.NewV7(), uuid.NewV7()
+	must(f.t, q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: set, RequestID: f.request, RequestRevisionID: f.revision, BuyerID: f.buyer, Now: f.now}))
+	must(f.t, q.InsertCandidate(ctx, store.InsertCandidateParams{ID: cand, CandidateSetID: set, StoreID: 10, SourceID: "p", Rank: 0, Now: f.now}))
+	f.exec(`INSERT INTO procurement.agent_runs (id, buyer_id, request_id, candidate_set_id, run_type, status, client_request_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, 'CANDIDATE_SEARCH', 'SUCCEEDED', $5, $6, $6)`, uuid.NewV7(), f.buyer, f.request, set, uuid.NewV7(), f.now)
 	p, err := svc.PreviewPublication(ctx, rfq.PreviewPublicationInput{
 		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
-		AudienceMode: model.AudienceWishPool,
+		AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{cand},
 	})
 	must(f.t, err)
 	pub, err := svc.ExecutePublication(ctx, rfq.ExecuteInput{
@@ -166,10 +172,10 @@ func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID in
 			v.submitted = start.Add(time.Duration(i+1) * time.Minute)
 		}
 		f.exec(`INSERT INTO procurement.seller_response_versions (
-				id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit,
+				id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 				offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
 				valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', 'A', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
 			uuid.NewV7(), id, int32(i+1), v.unitBasis, v.quantity, v.goods, v.goods+15, v.validUntil, uuid.NewV7(), v.submitted, v.unit)
 	}
 	f.exec(`UPDATE procurement.seller_responses SET latest_version = $2 WHERE id = $1`, id, int32(len(versions)))

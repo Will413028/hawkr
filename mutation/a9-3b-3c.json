@@ -85,8 +85,8 @@
    "id": "rfq-execute-skips-payload-hash-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
-   "old": "c.sellerHash != in.PayloadHash || (",
-   "new": "(",
+   "old": "c.sellerHash != in.PayloadHash || len(c.storeIDs) == 0",
+   "new": "len(c.storeIDs) == 0",
    "test": "internal/modules/procurement/internal/rfq ^TestExecuteStaleBranchesLeaveTheApprovalPending$",
    "why": "Execute no longer compares the caller's payload hash with the recomputed seller-facing hash."
   },

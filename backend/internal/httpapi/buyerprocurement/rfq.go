@@ -120,7 +120,7 @@ func (h *App) PreviewRfqPublication(ctx context.Context, req *connect.Request[pb
 	return connect.NewResponse(&pb.PreviewRfqPublicationResponse{
 		ApprovalId: p.ApprovalID.String(), ApprovalVersion: strconv.FormatInt(int64(p.ApprovalVersion), 10), AudienceHash: p.AudienceHash,
 		SellerFacingPayloadHash: p.SellerFacingHash, SellerFacingPayload: sellerFacingToProto(p.Payload), ExpireTime: timestamppb.New(p.ExpiresAt),
-		AudiencePolicyId: p.PolicyID, AudiencePolicyVersion: p.PolicyVersion, RecipientCount: p.RecipientCount,
+		RecipientCount: p.RecipientCount,
 	}), nil
 }
 
@@ -178,8 +178,6 @@ func (h *App) ExecuteRfqPublication(ctx context.Context, req *connect.Request[pb
 // audienceModeFromProto 把 proto 的受眾模式轉成模組的代碼；UNSPECIFIED 與不認得的值是請求錯誤。
 func audienceModeFromProto(m pb.AudienceMode) (string, error) {
 	switch m {
-	case pb.AudienceMode_AUDIENCE_MODE_WISH_POOL:
-		return procurement.AudienceWishPool, nil
 	case pb.AudienceMode_AUDIENCE_MODE_DIRECT_RECIPIENTS:
 		return procurement.AudienceDirectRecipients, nil
 	case pb.AudienceMode_AUDIENCE_MODE_UNSPECIFIED:
