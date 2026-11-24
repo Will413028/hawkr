@@ -321,10 +321,8 @@ class PushNotificationManager {
     );
 
     // 使用者已經在那個聊天室裡：不再彈前景 banner，避免雙重通知。
-    final conversationId = link.chatConversationId;
-    if (conversationId != null &&
-        _container?.read(activeChatGateProvider).conversationId ==
-            conversationId) {
+    final activeChat = _container?.read(activeChatGateProvider);
+    if (activeChat != null && link.isOpenIn(activeChat)) {
       HKLog.logD('[FCM] 跳過 banner：使用者已在該聊天室');
       return;
     }

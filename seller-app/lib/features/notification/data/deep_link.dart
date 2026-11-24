@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app.dart';
 import '../../../core/router/app_router.dart';
+import '../../chat/data/active_chat_gate.dart';
 
 /// 通知的深連結（`InboxItem.deep_link` 與推播 data 的 `deep_link`）是 website 的相對路徑，
 /// 格式與路徑表見 `backend/docs/plans/2026-11-23-a8-notification/deep-links.md`（D20）。
@@ -38,10 +39,15 @@ class NotificationDeepLink {
   /// 會落在收件匣（空字串、被拒絕的外部連結、不認得的路徑）。從收件匣點項目時用它避免再開一個收件匣。
   bool get opensInbox => _destination is _Inbox;
 
-  /// 連結指向的聊天室（`/seller-center/messages/{targetId}` 的 `targetId`）；不是聊天室連結回 null。
-  /// 前景推播用它判斷使用者是否已在那個聊天室。
-  String? get chatConversationId =>
+  /// 連結指向的聊天對象（`/seller-center/messages/{targetId}` 的 `targetId` 是買家帳號 id）；不是聊天室連結回 null。
+  String? get chatBuyerId =>
       _destination is _Chat ? (_destination as _Chat).id : null;
+
+  /// 使用者目前開著的聊天室就是這條連結指向的買家（前景推播據此不彈 banner）。
+  bool isOpenIn(ActiveChat active) {
+    final buyerId = chatBuyerId;
+    return buyerId != null && active.peerId == buyerId;
+  }
 
   _Destination get _destination {
     final s = _segments;
@@ -86,7 +92,7 @@ class NotificationDeepLink {
           ctx,
           MainRoutes.dashboard,
           (c) =>
-              c.push(SettingsRoutes.chatThread, extra: {'conversationId': id}),
+              c.push(SettingsRoutes.chatThread, extra: {'participantId': id}),
         );
       case _Order(:final orderNo):
         _overShell(

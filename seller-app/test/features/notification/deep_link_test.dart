@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hawkr_seller/app.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
+import 'package:hawkr_seller/features/chat/data/active_chat_gate.dart';
 import 'package:hawkr_seller/features/notification/data/deep_link.dart';
 
 /// 伺服器給的深連結是 website 路徑（`deep-links.md`），App 把 STORE 受眾的列對到自己的畫面；
@@ -70,7 +71,7 @@ void main() {
     await open(tester, '/en/seller-center/orders/O1');
     expect(extras[OrderRoutes.matchedDetail], {'orderSn': 'O1'});
     await open(tester, '/seller-center/messages/7');
-    expect(extras[SettingsRoutes.chatThread], {'conversationId': '7'});
+    expect(extras[SettingsRoutes.chatThread], {'participantId': '7'});
   });
 
   for (final link in [
@@ -105,26 +106,36 @@ void main() {
     });
   }
 
-  test('only the seller chat path yields a conversation id', () {
+  test('only the seller chat path yields the buyer id', () {
     expect(
-      NotificationDeepLink.parse(
-        '/seller-center/messages/7',
-      ).chatConversationId,
+      NotificationDeepLink.parse('/seller-center/messages/7').chatBuyerId,
       '7',
     );
     expect(
-      NotificationDeepLink.parse(
-        '/en/seller-center/messages/7',
-      ).chatConversationId,
+      NotificationDeepLink.parse('/en/seller-center/messages/7').chatBuyerId,
       '7',
     );
     expect(
-      NotificationDeepLink.parse('/account/messages/7').chatConversationId,
+      NotificationDeepLink.parse('/account/messages/7').chatBuyerId,
       isNull,
     );
     expect(
-      NotificationDeepLink.parse('/seller-center/wallet').chatConversationId,
+      NotificationDeepLink.parse('/seller-center/wallet').chatBuyerId,
       isNull,
+    );
+  });
+
+  test('foreground banner is suppressed only for the open thread buyer', () {
+    final link = NotificationDeepLink.parse('/seller-center/messages/X');
+    expect(link.isOpenIn(const ActiveChat(peerId: 'X')), isTrue);
+    expect(link.isOpenIn(const ActiveChat(peerId: 'Y')), isFalse);
+    expect(link.isOpenIn(const ActiveChat(conversationId: 'X')), isFalse);
+    expect(link.isOpenIn(const ActiveChat()), isFalse);
+    expect(
+      NotificationDeepLink.parse(
+        '/seller-center/wallet',
+      ).isOpenIn(const ActiveChat(peerId: 'X')),
+      isFalse,
     );
   });
 
