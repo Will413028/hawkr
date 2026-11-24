@@ -1,5 +1,5 @@
 // Package paymentserver 提供舊服務（Java order、aftersales 與 Go invoice-service）還在呼叫的 PaymentService 方法，由 payment 模組實作（B2 步驟 4）。
-// 其他方法回 Unimplemented：舊金流商專屬的 RPC（導轉表單、回跳頁、解密、ATM 退款頁）隨舊金流商刪除；gateway 的付款路由在步驟 6 之前仍指向 Java payment-service。
+// 其他方法回 Unimplemented：舊金流商專屬的 RPC（導轉表單、回跳頁、解密、ATM 退款頁）隨舊金流商刪除。
 //
 // 識別對應（過渡期）：舊契約的 trade_no 與 order_id 都是訂單編號（一張訂單一筆付款，D8）；退款的 refund_no 是呼叫端建立退款時給的冪等鍵
 // （售後的案件編號、order 的 AUTO:{訂單}:{交易}），不是 payment 內部的退款 ID。
