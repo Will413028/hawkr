@@ -14,7 +14,7 @@
 - Java 端依賴 shipping 的程式一律刪除，不留回空的 stub、不寫轉接（P3；已確認）。
 - gateway `shipping_ambient.go` 與配送溫層（`deliveryTemp`、`ShippingTemperature`）歸 B4／B6，B3 不碰（Will 2026-11-24；已確認）。
 - B6 cart 依賴本計畫的報價函式（Will 2026-11-24；已確認）。
-- B4 D10 依 P6 重開（catalog 不存配送方式）：B4 session 尚未改它的計畫（未確認，Will 2026-11-24 轉告 B4 session；擋步驟 4 的 product-service 部分與步驟 6 的商品設定頁）。
+- B4 D10 已依 P6 修訂：catalog 不存配送方式、重量尺寸，不依賴運費設定（`db9d2e5d4`，Will 2026-11-24；已確認）。
 - 設計書 69 已刪，主計畫與 ADR 的引用過期（`caller-inventory.md` §6；已確認）。主計畫假日段的 4 支匯入 RPC 不存在（`interface-inventory.md` D6；已確認）。
 
 **驗收基線：** 未跑；步驟 0 建立。Java shipping-service 沒有整合測試（`interface-inventory.md` §0）。不寫特性測試：新設計裡沒有任何 Java 出貨或運費端點保留同一語意（運費模型與出貨擁有者都換了），主計畫「開工前先有特性測試」的對象在本階段是空集合；出貨的特性測試責任移到 B8。
@@ -64,7 +64,7 @@
   - 範圍：website 賣家設定與 seller-app 設定加「運費設定」（固定運費、免運門檻、處理天數）；先交線框取得 Will 同意；在上手清單取代「物流設定」步驟。
   - 消費端：`client-inventory.md` §4。
   - 驗收：website `pnpm` lint、typecheck、unit；seller-app analyze、format、custom_lint、生成檢查與改到的測試檔（完整 `flutter test` 交 CI）；mutation：送出不帶處理天數、錯誤不顯示伺服器文字，各自要有測試失敗。
-- [ ] **4. 刪 Java shipping 與依賴它的後端程式**（被擋於：步驟 0、R3、R5；product-service 部分被 B4 D10 的修訂擋）
+- [ ] **4. 刪 Java shipping 與依賴它的後端程式**（被擋於：步驟 0、R3、R5）
   - 範圍：
     - 刪 Java shipping-service（含 `HolidayService`、`holidays`）、`payuni-webhook-service`、Uber 全部（主計畫 B3 清單）。
     - Java order：刪 `ShippingEventConsumer`、`AutoCompleteScheduler`、`ShippingFeeGrpcFetcher`、`ShipmentCreationBackstopScheduler`、shipping gRPC client 與它的呼叫點（訂單列表、詳情的物流欄位一起刪）；結帳運費固定 0、配送選項移除。
