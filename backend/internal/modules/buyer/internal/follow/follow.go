@@ -240,3 +240,22 @@ func (service *Service) SubscriberStats(ctx context.Context, storeID int64, wind
 	}
 	return out, nil
 }
+
+// ListLiveFollowerAccounts 回傳追蹤店家 storeID、buyer_id 大於 afterBuyerID、尚未關閉的買家與其帳號，依 buyer_id 由小到大，最多 limit 筆
+// （1 到 MaxLiveAccountsPage）；回傳不足 limit 筆即沒有更多。不加鎖：讀到的買家之後可能被關閉，寫入端要自己用 ShareLockByAccount 守門。
+func (service *Service) ListLiveFollowerAccounts(ctx context.Context, storeID, afterBuyerID int64, limit int) ([]model.AccountRef, error) {
+	if storeID <= 0 || afterBuyerID < 0 || limit < 1 || limit > model.MaxLiveAccountsPage {
+		return nil, apperr.InvalidInput("追蹤者分頁參數不合法")
+	}
+	rows, err := store.New(service.deps.DB.Conn(ctx)).ListLiveFollowerAccounts(ctx, store.ListLiveFollowerAccountsParams{
+		StoreID: storeID, AfterBuyerID: afterBuyerID, PageSize: int32(limit), //nolint:gosec // 上面已限制在 1 到 1000
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.AccountRef, len(rows))
+	for i, r := range rows {
+		out[i] = model.AccountRef{BuyerID: r.BuyerID, AccountID: r.AccountID}
+	}
+	return out, nil
+}

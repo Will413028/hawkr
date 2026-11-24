@@ -74,3 +74,12 @@ CROSS JOIN LATERAL (
     WHERE s.store_id = @store_id
 ) c
 ORDER BY w.idx;
+
+-- name: ListLiveFollowerAccounts :many
+-- 追蹤店家的買家中尚未關閉（營運中與刪除中）的 (buyer_id, account_id)，依 buyer_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知的追蹤者 fan-out）。
+SELECT b.buyer_id, b.account_id
+FROM buyer.seller_subscriptions s
+JOIN buyer.buyers b ON b.buyer_id = s.buyer_id
+WHERE s.store_id = sqlc.arg(store_id) AND s.buyer_id > sqlc.arg(after_buyer_id) AND b.status <> 'CLOSED'
+ORDER BY s.buyer_id
+LIMIT sqlc.arg(page_size);

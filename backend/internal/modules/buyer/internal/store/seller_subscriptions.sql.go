@@ -193,6 +193,47 @@ func (q *Queries) ListFollow(ctx context.Context, arg ListFollowParams) ([]Buyer
 	return items, nil
 }
 
+const listLiveFollowerAccounts = `-- name: ListLiveFollowerAccounts :many
+SELECT b.buyer_id, b.account_id
+FROM buyer.seller_subscriptions s
+JOIN buyer.buyers b ON b.buyer_id = s.buyer_id
+WHERE s.store_id = $1 AND s.buyer_id > $2 AND b.status <> 'CLOSED'
+ORDER BY s.buyer_id
+LIMIT $3
+`
+
+type ListLiveFollowerAccountsParams struct {
+	StoreID      int64
+	AfterBuyerID int64
+	PageSize     int32
+}
+
+type ListLiveFollowerAccountsRow struct {
+	BuyerID   int64
+	AccountID int64
+}
+
+// 追蹤店家的買家中尚未關閉（營運中與刪除中）的 (buyer_id, account_id)，依 buyer_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知的追蹤者 fan-out）。
+func (q *Queries) ListLiveFollowerAccounts(ctx context.Context, arg ListLiveFollowerAccountsParams) ([]ListLiveFollowerAccountsRow, error) {
+	rows, err := q.db.Query(ctx, listLiveFollowerAccounts, arg.StoreID, arg.AfterBuyerID, arg.PageSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveFollowerAccountsRow{}
+	for rows.Next() {
+		var i ListLiveFollowerAccountsRow
+		if err := rows.Scan(&i.BuyerID, &i.AccountID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeFollow = `-- name: RemoveFollow :execrows
 DELETE
 FROM buyer.seller_subscriptions
