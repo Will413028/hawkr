@@ -122,7 +122,7 @@ class NotificationSignalService {
       if (e != null) {
         final code = ConnectException.from(e).code;
         if (code == Code.unauthenticated || code == Code.permissionDenied) {
-          HKLog.logW('[NotificationSignal] 串流停止（$code）');
+          HKLog.logW('[NotificationSignal] Stream stopped ($code)');
           _running = false;
           return;
         }

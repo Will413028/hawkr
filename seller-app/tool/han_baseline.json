@@ -617,9 +617,6 @@
       "請求已取消": 1,
       "連線逾時，請檢查網路後再試": 1
     },
-    "lib/core/extensions/async_value_ui.dart": {
-      "發生未知錯誤，請稍後再試": 1
-    },
     "lib/core/layout/app_text_size.dart": {
       "中": 1,
       "大": 1,
@@ -1064,28 +1061,8 @@
       "媒體下載失敗 ({})": 1,
       "媒體內容為空": 1
     },
-    "lib/features/notification/data/notification_repository.dart": {
-      "刪除通知失敗": 1,
-      "更新偏好設定失敗": 1,
-      "標記全部已讀失敗": 1,
-      "標記已讀失敗": 1,
-      "獲取偏好設定失敗": 1,
-      "獲取未讀數量失敗": 1,
-      "獲取通知列表失敗": 1
-    },
-    "lib/features/notification/data/push/background_handler.dart": {
-      "[FCM-BG] silent push，略過本地通知顯示": 1,
-      "[FCM-BG] title 與 body 均為空，略過顯示": 1,
-      "[FCM-BG] 本地通知已顯示: {}": 1,
-      "[FCM-BG] 重複訊息，跳過: {}": 1,
-      "新訊息": 1
-    },
     "lib/features/notification/data/push/device_registrar.dart": {
       "[NotificationService] device-token 呼叫短路：{}s 內已達 {} 次上限": 1
-    },
-    "lib/features/notification/data/push/local_notifier.dart": {
-      "[LocalNotification] 初始化失敗": 1,
-      "[LocalNotification] 初始化完成": 1
     },
     "lib/features/notification/data/push/manager.dart": {
       "(無標題)": 3,
@@ -1094,96 +1071,37 @@
       "[FCM] Token 已取得": 1,
       "[FCM] Token 已更新": 1,
       "[FCM] Token 更新錯誤": 1,
-      "[FCM] silent push，略過前台 Banner": 1,
       "[FCM] 初始化失敗": 1,
       "[FCM] 初始化完成": 1,
       "[FCM] 從 FCM 通知冷啟動": 1,
-      "[FCM] 從本地通知冷啟動: {}": 1,
-      "[FCM] 本地通知點擊: {}": 1,
       "[FCM] 權限狀態: {}": 1,
       "[FCM] 無登入狀態，跳過裝置註冊": 1,
       "[FCM] 獲取 Token 失敗": 1,
       "[FCM] 監聽器設置完成": 1,
       "[FCM] 裝置註冊尚未初始化": 1,
       "[FCM] 裝置註銷未在 {}ms 內完成，轉背景續跑，不擋登出": 1,
-      "[FCM] 裝置註銷未確認成功（disposition={}, status={}）": 1,
-      "[FCM] 解析本地通知 payload 失敗": 1,
       "[FCM] 請求通知權限失敗": 1,
-      "[FCM] 跳過 chat_message banner：使用者已在聊天室內 senderId={} conversationId={}": 1,
       "[FCM] 跳過裝置註銷（未登入或無有效憑證）": 1,
       "[FCM] 開始初始化": 1,
-      "新訊息": 1,
       "關閉": 1
-    },
-    "lib/features/notification/data/push/router.dart": {
-      "[NotificationRouter] → 代行資源 ({})": 1,
-      "[NotificationRouter] → 售後詳情 ({})": 1,
-      "[NotificationRouter] → 商品 tab ({})": 1,
-      "[NotificationRouter] → 商家貼文 feed ({})": 1,
-      "[NotificationRouter] → 外部 URL ({}): {}": 1,
-      "[NotificationRouter] → 客戶列表 ({})": 1,
-      "[NotificationRouter] → 系統公告 ({})": 1,
-      "[NotificationRouter] → 聊天室: {}": 1,
-      "[NotificationRouter] → 訂單列表（缺 orderSn）": 1,
-      "[NotificationRouter] → 訂單詳情 ({})": 1,
-      "[NotificationRouter] → 訂單詳情: {}": 1,
-      "[NotificationRouter] → 訂閱者 ({})": 1,
-      "[NotificationRouter] → 資訊性通知 ({})": 1,
-      "[NotificationRouter] → 錢包 ({})": 1,
-      "[NotificationRouter] → 錢包 tab ({})": 1,
-      "[NotificationRouter] 代行通知無可落地資源，維持現狀": 1,
-      "[NotificationRouter] 未知類型: {}": 1,
-      "[NotificationRouter] 無效 url: {}": 1,
-      "未提供": 1
-    },
-    "lib/features/notification/data/push/seller_status_push.dart": {
-      "[SellerStatusPush] 取不到 container，略過重讀": 1
-    },
-    "lib/features/notification/presentation/notification_controller.dart": {
-      "[NotificationListController] 伺服器錯誤，降級為空列表: {} {}": 1,
-      "[NotificationListController] 網路不可達，降級為空列表: {}": 1,
-      "[NotificationListController] 連線逾時，降級為空列表: {}": 1
     },
     "lib/features/notification/presentation/notification_settings_screen.dart": {
       "儲存失敗，請稍後再試": 1,
-      "強制接收，無法關閉": 1,
       "通知設定": 1,
       "重試": 1
     },
     "lib/features/notification/presentation/notifications_screen.dart": {
-      "下單": 1,
-      "優惠": 1,
       "全部標為已讀": 1,
-      "出貨": 1,
       "刪除 ({})": 1,
-      "券": 1,
       "取消選取此通知": 1,
-      "售後": 1,
-      "商品": 1,
-      "商機": 1,
       "已將全部通知設為已讀": 1,
       "所有未讀通知已標記完畢": 1,
-      "折價": 1,
-      "按讚": 1,
-      "撥款": 1,
-      "收藏": 1,
       "新訂單、訊息與系統提醒會顯示在這裡。": 1,
       "暫無通知": 1,
       "查看通知：{}，{}，{}": 1,
-      "瀏覽": 1,
-      "留言": 1,
       "確定": 1,
-      "粉絲": 1,
       "結束選取": 1,
-      "聊天": 1,
-      "訂單": 1,
-      "訊息": 1,
       "請選擇要刪除的通知": 1,
-      "買家": 1,
-      "載入失敗，請稍後再試": 1,
-      "追蹤": 1,
-      "退款": 1,
-      "退貨": 1,
       "通知中心": 1,
       "通知：{}，{}": 1,
       "選取此通知": 1,
