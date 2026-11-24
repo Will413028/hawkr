@@ -50,11 +50,13 @@ type OrderProvisioningArgs struct {
 // Kind 是 job 的種類。
 func (OrderProvisioningArgs) Kind() string { return "procurement.order_provisioning" }
 
-func versionConflict(msg, target string) error {
+// VersionConflict 是 ABORTED／VERSION_CONFLICT，conflictTarget 指出哪個物件過時（買家端與賣家端共用）。
+func VersionConflict(msg, target string) error {
 	return apperr.VersionConflict("%s", msg).WithMetadata("conflictTarget", target)
 }
 
-func idempotencyMismatch() error {
+// IdempotencyMismatch 是同一個 client_request_id 帶了不同內容（INVALID_ARGUMENT，欄位 client_request_id）。
+func IdempotencyMismatch() error {
 	return apperr.InvalidInputOn([]string{"client_request_id"}, "同一個 client_request_id 的內容不同")
 }
 

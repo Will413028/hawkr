@@ -183,12 +183,12 @@ func TestPayloadHashIsTheRecomputedContentHash(t *testing.T) {
 func TestPageTokenRoundTripsAndRejectsGarbage(t *testing.T) {
 	id := uuid.NewV7()
 	at := time.Date(2026, 11, 23, 3, 0, 0, 123456000, time.UTC)
-	got, ok := decodeToken(encodeToken(at, id))
+	got, ok := DecodeToken(EncodeToken(at, id))
 	if !ok || got.ID != id || time.UnixMicro(got.CreatedAt).UTC() != at {
 		t.Fatalf("%+v %v", got, ok)
 	}
-	for _, raw := range []string{"x", "!!!", "e30", "eyJpIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwicyI6MX0", encodeToken(time.Date(-5000, 1, 1, 0, 0, 0, 0, time.UTC), id)} {
-		if _, ok := decodeToken(raw); ok {
+	for _, raw := range []string{"x", "!!!", "e30", "eyJpIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwicyI6MX0", EncodeToken(time.Date(-5000, 1, 1, 0, 0, 0, 0, time.UTC), id)} {
+		if _, ok := DecodeToken(raw); ok {
 			t.Errorf("%q 不是有效的 token", raw)
 		}
 	}

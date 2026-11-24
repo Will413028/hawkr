@@ -243,7 +243,7 @@ CREATE UNIQUE INDEX rfq_publication_invites_store ON procurement.rfq_publication
 CREATE UNIQUE INDEX rfq_publication_invites_position ON procurement.rfq_publication_invites (publication_id, position);
 
 -- 一家店對一次發布的回價（身分列）。只有被邀請的店能有回價列：(publication_id, store_id) 參照邀請列，邀請列是賣家可見性的唯一依據（A9-D44）。沒有 buyer_id（由 request 推出）、沒有列版本（回價版次是 latest_version）。
--- write_closed_reason 只收有寫入者的 DECLINED（S6）。
+-- write_closed_reason 只收有寫入者的 DECLINED（S6）。withdrawn_reason_code、write_closed_reason_code 是賣家填的原因代碼，伺服器記錄、不解析（A9-D45(2)；撤回與婉拒是目標狀態的方法，不建收據）。
 CREATE TABLE procurement.seller_responses (
     id UUID PRIMARY KEY,
     publication_id UUID NOT NULL REFERENCES procurement.rfq_publications (id) ON DELETE CASCADE,
@@ -254,6 +254,8 @@ CREATE TABLE procurement.seller_responses (
     withdrawn_at TIMESTAMPTZ,
     write_closed_at TIMESTAMPTZ,
     write_closed_reason TEXT,
+    withdrawn_reason_code TEXT,
+    write_closed_reason_code TEXT,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT seller_responses_invite_fk FOREIGN KEY (publication_id, store_id) REFERENCES procurement.rfq_publication_invites (publication_id, store_id),
@@ -261,7 +263,11 @@ CREATE TABLE procurement.seller_responses (
     CONSTRAINT seller_responses_latest_check CHECK (latest_version >= 0),
     CONSTRAINT seller_responses_withdrawn_pair CHECK ((withdrawn_version IS NULL) = (withdrawn_at IS NULL)),
     CONSTRAINT seller_responses_write_closed_pair CHECK ((write_closed_at IS NULL) = (write_closed_reason IS NULL)),
-    CONSTRAINT seller_responses_write_closed_reason CHECK (write_closed_reason IS NULL OR write_closed_reason IN ('DECLINED'))
+    CONSTRAINT seller_responses_write_closed_reason CHECK (write_closed_reason IS NULL OR write_closed_reason IN ('DECLINED')),
+    CONSTRAINT seller_responses_withdrawn_reason_pair CHECK (withdrawn_reason_code IS NULL OR withdrawn_version IS NOT NULL),
+    CONSTRAINT seller_responses_write_closed_reason_pair CHECK (write_closed_reason_code IS NULL OR write_closed_reason IS NOT NULL),
+    CONSTRAINT seller_responses_withdrawn_reason_code_check CHECK (withdrawn_reason_code IS NULL OR (char_length(withdrawn_reason_code) >= 1 AND char_length(withdrawn_reason_code) <= 64 AND withdrawn_reason_code !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')),
+    CONSTRAINT seller_responses_write_closed_reason_code_check CHECK (write_closed_reason_code IS NULL OR (char_length(write_closed_reason_code) >= 1 AND char_length(write_closed_reason_code) <= 64 AND write_closed_reason_code !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
 );
 CREATE UNIQUE INDEX seller_responses_publication_store ON procurement.seller_responses (publication_id, store_id);
 CREATE INDEX seller_responses_request_submitted ON procurement.seller_responses (request_id, created_at DESC) WHERE latest_version > 0;
@@ -290,7 +296,6 @@ CREATE TABLE procurement.seller_response_versions (
     valid_until TIMESTAMPTZ NOT NULL,
     terms_note TEXT NOT NULL DEFAULT '',
     deviation_disclosure TEXT NOT NULL DEFAULT '',
-    outside_buyer_requested_range BOOLEAN NOT NULL,
     publication_version INT NOT NULL,
     client_request_id UUID NOT NULL,
     submitted_at TIMESTAMPTZ NOT NULL,
@@ -319,7 +324,7 @@ CREATE TABLE procurement.seller_response_drafts (
     version INT NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT seller_response_drafts_payload_check CHECK (jsonb_typeof(payload) = 'object'),
+    CONSTRAINT seller_response_drafts_payload_check CHECK (jsonb_typeof(payload) = 'object' AND octet_length(payload::text) <= 16384),
     CONSTRAINT seller_response_drafts_version_check CHECK (version >= 1)
 );
 

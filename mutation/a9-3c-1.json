@@ -1,0 +1,274 @@
+{
+  "mutants": [
+    {
+      "id": "block-declined-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
+      "old": "case resp.WriteClosedAt != nil:",
+      "new": "case false && resp.WriteClosedAt != nil:",
+      "test": "internal/modules/procurement/internal/sellerside ^TestEveryWriteBlockConditionClosesDraftSubmitAndWithdraw$",
+      "why": "A seller who declined can still write a draft, submit and withdraw."
+    },
+    {
+      "id": "block-buyer-deleted-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
+      "old": "case v.pub.BuyerID == nil:",
+      "new": "case false && v.pub.BuyerID == nil:",
+      "test": "internal/modules/procurement/internal/sellerside ^TestBuyerDeletedKeepsTheInviteReadableButClosesWrites$",
+      "why": "Writes stay open after the buyer is deleted although nobody can accept the quote any more."
+    },
+    {
+      "id": "block-deadline-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
+      "old": "case v.payload.ResponseDate != nil && rfq.DeadlinePassed(*v.payload.ResponseDate, now):",
+      "new": "case false && v.payload.ResponseDate != nil && rfq.DeadlinePassed(*v.payload.ResponseDate, now):",
+      "test": "internal/modules/procurement/internal/sellerside ^TestEveryWriteBlockConditionClosesDraftSubmitAndWithdraw$",
+      "why": "Writes stay open after the response deadline."
+    },
+    {
+      "id": "block-active-acceptance-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
+      "old": "if active {",
+      "new": "if false && active {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestEveryWriteBlockConditionClosesDraftSubmitAndWithdraw$",
+      "why": "Writes stay open while the request has an ACTIVE acceptance."
+    },
+    {
+      "id": "deadline-today-counts-as-passed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
+      "old": "dateOnly(deadline).Before(twtime.Day(now))",
+      "new": "!dateOnly(deadline).After(twtime.Day(now))",
+      "test": "internal/modules/procurement/internal/sellerside ^TestADeadlineOfTodayStillAllowsWritesAndAFailedOrderReopensThem$",
+      "why": "A deadline that is today (Taipei) already counts as passed, so the seller is locked out one day early."
+    },
+    {
+      "id": "view-store-scope-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "WHERE i.publication_id = $1 AND i.store_id = $2",
+      "new": "WHERE i.publication_id = $1 AND $2::bigint > 0",
+      "test": "internal/modules/procurement/internal/sellerside ^TestAnotherStoreAndAnUninvitedStoreSeeNothingAndCannotWrite$",
+      "why": "An uninvited store can read another store's publication."
+    },
+    {
+      "id": "list-store-scope-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "WHERE i.store_id = $1\n",
+      "new": "WHERE $1::bigint > 0\n",
+      "test": "internal/modules/procurement/internal/sellerside ^TestAnotherStoreAndAnUninvitedStoreSeeNothingAndCannotWrite$",
+      "why": "An uninvited store lists every publication."
+    },
+    {
+      "id": "view-requires-live-buyer",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "WHERE i.publication_id = $1 AND i.store_id = $2",
+      "new": "WHERE i.publication_id = $1 AND i.store_id = $2 AND p.buyer_id IS NOT NULL",
+      "test": "internal/modules/procurement/internal/sellerside ^TestBuyerDeletedKeepsTheInviteReadableButClosesWrites$",
+      "why": "The invited store loses the publication once the buyer is deleted."
+    },
+    {
+      "id": "ensure-ignores-invite-store",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "WHERE i.publication_id = $3 AND i.store_id = $4\nON CONFLICT",
+      "new": "WHERE i.publication_id = $3 AND $4::bigint > 0\nON CONFLICT",
+      "test": "internal/modules/procurement/internal/sellerside ^TestStoreCannotTouchAnotherStoresResponse$",
+      "why": "Creating the identity row is no longer tied to the caller's own invite row."
+    },
+    {
+      "id": "withdraw-skips-response-ownership",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/close.go",
+      "old": "if resp.ID != responseID {",
+      "new": "if false && resp.ID != responseID {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestStoreCannotTouchAnotherStoresResponse$",
+      "why": "A store can withdraw through another store's response id."
+    },
+    {
+      "id": "replay-after-writable-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "new": "case err == nil:\n\t\t\tif err := checkWritable(ctx, q, resp, v, now); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck$",
+      "why": "A retry after the seller declined (or the window closed) is rejected instead of replayed."
+    },
+    {
+      "id": "replay-after-publication-cas",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "new": "case err == nil:\n\t\t\tif expectedPublication != v.pub.Version || in.ExpectedSellerFacingHash != v.hash {\n\t\t\t\treturn quote.VersionConflict(\"x\", quote.TargetPublication)\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck$",
+      "why": "Replay is checked after the publication hash CAS."
+    },
+    {
+      "id": "replay-after-response-version-cas",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "new": "case err == nil:\n\t\t\tif expectedResponse != resp.LatestVersion {\n\t\t\t\treturn quote.VersionConflict(\"x\", quote.TargetSellerResponse)\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck$",
+      "why": "Replay is checked after the response version CAS, so a retry is judged as already submitted."
+    },
+    {
+      "id": "replay-content-not-compared",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "if firstHash != hash {",
+      "new": "if false && firstHash != hash {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayWithDifferentContentIsRejected$",
+      "why": "The same client_request_id with different content is replayed instead of rejected."
+    },
+    {
+      "id": "hash-omits-spec-note",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/quote.go",
+      "old": "ResponseType: q.ResponseType, SpecNote: q.SpecNote,\n\t\tUnitBasisQuantity",
+      "new": "ResponseType: q.ResponseType, SpecNote: \"\",\n\t\tUnitBasisQuantity",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayWithDifferentContentIsRejected$",
+      "why": "The shared payload hash ignores spec_note, so a changed spec_note is replayed as the same content."
+    },
+    {
+      "id": "response-hash-not-the-shared-function",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
+      "old": "hash, err := quote.PayloadHash(qt)",
+      "new": "hash, err := quote.PayloadHash(model.SellerQuote{})",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitCreatesAnImmutableVersionWhoseHashMatchesTheBuyersList$",
+      "why": "The seller-side hash is no longer the one the buyer's ListSellerResponses reports."
+    },
+    {
+      "id": "response-version-cas-loosened",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "if expectedResponse != resp.LatestVersion {",
+      "new": "if expectedResponse > resp.LatestVersion {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitVersionAndPublicationChecks$",
+      "why": "A stale or empty expected response version is accepted when a newer version exists."
+    },
+    {
+      "id": "publication-hash-cas-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "if expectedPublication != v.pub.Version || in.ExpectedSellerFacingHash != v.hash {",
+      "new": "if expectedPublication != v.pub.Version {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitVersionAndPublicationChecks$",
+      "why": "A quote bound to a different seller-facing hash is accepted."
+    },
+    {
+      "id": "total-identity-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/input.go",
+      "old": "if !ok || sum != d.TotalAmount {",
+      "new": "if !ok || sum < 0 {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitValidatesTheQuote$",
+      "why": "A total that differs from goods + shipping + tax is accepted."
+    },
+    {
+      "id": "valid-until-future-not-checked",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "if !n.Quote.ValidUntil.After(now) {",
+      "new": "if false {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitValidatesTheQuote$",
+      "why": "A quote that is already expired can be submitted."
+    },
+    {
+      "id": "currency-not-twd",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/input.go",
+      "old": "Currency: model.Currency,",
+      "new": "Currency: \"USD\",",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitCreatesAnImmutableVersionWhoseHashMatchesTheBuyersList$",
+      "why": "The stored currency is not TWD."
+    },
+    {
+      "id": "draft-create-overwrites",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "ON CONFLICT (seller_response_id) DO NOTHING",
+      "new": "ON CONFLICT (seller_response_id) DO UPDATE SET payload = EXCLUDED.payload",
+      "test": "internal/modules/procurement/internal/sellerside ^TestDraftCreateUpdateAndVersionConflicts$",
+      "why": "Creating a draft over an existing one overwrites it instead of reporting a draft version conflict."
+    },
+    {
+      "id": "draft-update-ignores-version",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "WHERE seller_response_id = $3 AND version = $4",
+      "new": "WHERE seller_response_id = $3 AND $4::int > 0",
+      "test": "internal/modules/procurement/internal/sellerside ^TestDraftCreateUpdateAndVersionConflicts$",
+      "why": "A stale draft version overwrites the draft."
+    },
+    {
+      "id": "withdraw-replay-rewrites",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/close.go",
+      "old": "if resp.WithdrawnVersion != nil && *resp.WithdrawnVersion == expected {",
+      "new": "if false && resp.WithdrawnVersion != nil && *resp.WithdrawnVersion == expected {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestWithdrawIsATargetStateMethod$",
+      "why": "A repeated withdraw rewrites the reason code and time instead of returning the first closure."
+    },
+    {
+      "id": "decline-replay-rewrites",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/close.go",
+      "old": "if resp.WriteClosedAt == nil {",
+      "new": "if true {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestDeclineIsIdempotentAndKeepsTheFirstClosure$",
+      "why": "A repeated decline fails or rewrites the first closure."
+    },
+    {
+      "id": "list-order-ascending",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "ORDER BY p.published_at DESC, p.id DESC",
+      "new": "ORDER BY p.published_at ASC, p.id ASC",
+      "test": "internal/modules/procurement/internal/sellerside ^TestListPagesByPublishTimeNewestFirst$",
+      "why": "The publication list is oldest first."
+    },
+    {
+      "id": "list-keyset-skips-ties-and-pages",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "OR p.published_at < $3::timestamptz",
+      "new": "OR p.published_at > $3::timestamptz",
+      "test": "internal/modules/procurement/internal/sellerside ^TestListPagesByPublishTimeNewestFirst$",
+      "why": "The keyset cursor compares in the wrong direction, so the second page is wrong."
+    },
+    {
+      "id": "authorize-ignored",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
+      "old": "return seller.Authorize(st, RequiredCapability)",
+      "new": "_ = seller.Authorize(st, RequiredCapability)\n\treturn nil",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSuspendedAndRetiredStoresAreRefused$",
+      "why": "A suspended store can read and write."
+    },
+    {
+      "id": "write-guard-skips-store-lock",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
+      "old": "if err := s.Stores.LockNotRetired(ctx, storeID); err != nil {",
+      "new": "if err := error(nil); err != nil {",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSuspendedAndRetiredStoresAreRefused$",
+      "why": "A retired store can still write."
+    },
+    {
+      "id": "submit-bump-skipped-cas-key",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": "ID: resp.ID, Version: next, ExpectedVersion: resp.LatestVersion, Now: now",
+      "new": "ID: resp.ID, Version: next, ExpectedVersion: next, Now: now",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitVersionAndPublicationChecks$",
+      "why": "The latest_version bump no longer matches the locked row, so a submit fails."
+    }
+  ]
+}

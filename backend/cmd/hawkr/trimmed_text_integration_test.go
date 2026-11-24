@@ -108,6 +108,10 @@ var trimmedColumns = []trimmedColumn{
 	{table: "procurement.seller_response_versions", column: "conversion_basis", constraint: "seller_response_versions_conversion_basis_check"},
 	{table: "procurement.seller_response_versions", column: "terms_note", constraint: "seller_response_versions_terms_check"},
 	{table: "procurement.seller_response_versions", column: "deviation_disclosure", constraint: "seller_response_versions_deviation_check"},
+	{table: "procurement.seller_responses", column: "withdrawn_reason_code", constraint: "seller_responses_withdrawn_reason_code_check",
+		extra: map[string]any{"withdrawn_version": int32(1), "withdrawn_at": sellerEpoch}},
+	{table: "procurement.seller_responses", column: "write_closed_reason_code", constraint: "seller_responses_write_closed_reason_code_check",
+		extra: map[string]any{"write_closed_reason": "DECLINED", "write_closed_at": sellerEpoch}},
 	{table: "procurement.agent_run_inputs", column: "buyer_message", constraint: "agent_run_inputs_message_check"},
 	{table: "procurement.agent_run_inputs", column: "option_id", constraint: "agent_run_inputs_option_check"},
 }

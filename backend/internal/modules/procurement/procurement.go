@@ -26,6 +26,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfq"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/run"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/search"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/sellerside"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/snapshot"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/turn"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -81,9 +82,14 @@ type Deps struct {
 	Entitlements EntitlementReader
 	// Limits 是每位買家的送出上限，零值取預設（同時進行中 2、每分鐘送出 10）。
 	Limits run.Limits
+	// Stores 是賣家端方法（SellerProcurementAppService）檢查賣家能力要用的 seller 方法（*seller.Module 滿足它）；只跑 worker 或只訂閱事件的程序可以不給，賣家端方法回組裝錯誤。
+	Stores SellerStoreGuard
 	// Events 是 ExecuteRfqPublication 在同 transaction 發布 RfqPublished 的事件匯流排；必給，沒給時 New panic。
 	Events *events.Bus
 }
+
+// SellerStoreGuard 是賣家端寫入的守門要用的 seller 方法：在 transaction 內鎖店家列，並讀店家此刻的狀態檢查賣家能力（*seller.Module 滿足它）。
+type SellerStoreGuard = sellerside.Stores
 
 // EntitlementReader 是 SubmitTurn 取額度要用的 buyer 方法：每月上限與期間（*buyer.Module 滿足它）。
 type EntitlementReader interface {
@@ -151,6 +157,7 @@ type Module struct {
 	candidates search.Reader
 	rfq        rfq.Service
 	quotes     quote.Service
+	sellers    sellerside.Service
 }
 
 // New 建立模組。
@@ -198,6 +205,7 @@ func New(d Deps) *Module {
 	m.candidates = search.Reader{DB: d.DB}
 	m.rfq = rfq.Service{DB: d.DB, Now: d.Now, Events: d.Events}
 	m.quotes = quote.Service{DB: d.DB, Now: d.Now, Jobs: d.Jobs}
+	m.sellers = sellerside.Service{DB: d.DB, Now: d.Now, Stores: d.Stores}
 	return m
 }
 
@@ -586,4 +594,64 @@ func (m *Module) DeleteShortlistEntry(ctx context.Context, buyerID int64, reques
 // hash 不符 ABORTED／VERSION_CONFLICT（publication）；已有進行中的成交 RFQ_CHECKOUT_ALREADY_ACTIVE（metadata 的 orderNo）；重送內容不同 INVALID_ARGUMENT（client_request_id）。
 func (m *Module) AcceptSellerQuote(ctx context.Context, in AcceptSellerQuoteInput) (QuoteAcceptance, error) {
 	return m.quotes.Accept(ctx, in)
+}
+
+// 賣家端（SellerProcurementAppService）的型別。
+type (
+	// SellerPublicationSummary 是賣家看到的一次發布的摘要，SellerPublicationItem 是清單的一列，SellerPublicationPage 是 ListSellerPublications 的一頁，SellerPublicationDetail 是 GetSellerPublication 的結果。
+	SellerPublicationSummary = model.SellerPublicationSummary
+	SellerPublicationItem    = model.SellerPublicationItem
+	SellerPublicationPage    = model.SellerPublicationPage
+	SellerPublicationDetail  = model.SellerPublicationDetail
+	// SellerDraft 是賣家的回價草稿，SellerQuoteInput 是賣家填的報價內容（草稿與正式回價共用），SellerResponseVersion 是送出的一個正式回價版本，SellerResponseClosure 是撤回或婉拒之後的結案狀態。
+	SellerDraft           = model.SellerDraft
+	SellerQuoteInput      = model.QuoteInput
+	SellerResponseVersion = model.SellerResponseVersion
+	SellerResponseClosure = model.ResponseClosure
+	// SubmitSellerResponseInput 是 SubmitSellerResponse 的輸入。
+	SubmitSellerResponseInput = sellerside.SubmitInput
+)
+
+// RequiredSellerCapability 是賣家端方法需要的賣家能力；宣告表引用它，檢查在模組裡（讀取在查詢之前，寫入在 transaction 內）。
+const RequiredSellerCapability = sellerside.RequiredCapability
+
+// 賣家詢價清單的分頁上限，與賣家寫入的上限（字元數，proto 與 DB CHECK 同值）。
+const (
+	DefaultSellerPublicationPageSize = sellerside.DefaultPageSize
+	MaxSellerPublicationPageSize     = sellerside.MaxPageSize
+	MaxSpecNoteRunes                 = model.MaxSpecNoteRunes
+	MaxReasonCodeRunes               = model.MaxReasonCodeRunes
+)
+
+// ListSellerPublications 列出發給這家店的詢價，最新的在前，依 (發布時間, ID) keyset 分頁；PageSize 0 用 20、超過 50 以 50 計，負數與壞的 PageToken 回 INVALID_ARGUMENT。
+// 不建任何列；不過濾已成交與買家已刪的詢價。店家沒有賣家能力回 seller.Authorize 的錯。
+func (m *Module) ListSellerPublications(ctx context.Context, storeID int64, pageSize int32, pageToken string) (SellerPublicationPage, error) {
+	return m.sellers.List(ctx, storeID, pageSize, pageToken)
+}
+
+// GetSellerPublication 回傳一筆發給這家店的詢價，加上這家店的草稿與目前的正式回價。不建任何列；詢價不是發給這家店的（含不存在）回 NOT_FOUND；買家已刪除的詢價照常讀得到（A9-D44(2)）。
+func (m *Module) GetSellerPublication(ctx context.Context, storeID int64, publicationID uuid.UUID) (SellerPublicationDetail, error) {
+	return m.sellers.Get(ctx, storeID, publicationID)
+}
+
+// UpsertSellerResponseDraft 建立或更新回價草稿（整份覆寫）：只驗形狀與長度，不驗必填欄位與金額恆等式。expectedDraftVersion 空字串表示建立第一版；
+// 草稿已存在卻帶空、或版本不是目前的回 ABORTED／VERSION_CONFLICT（draft）。停止寫入（已婉拒、需求有進行中的成交、買家已刪、回價期限已過）回 FAILED_PRECONDITION／RFQ_RECIPIENT_CLOSED。
+func (m *Module) UpsertSellerResponseDraft(ctx context.Context, storeID int64, publicationID uuid.UUID, expectedDraftVersion string, draft SellerQuoteInput) (SellerDraft, error) {
+	return m.sellers.UpsertDraft(ctx, storeID, publicationID, expectedDraftVersion, draft)
+}
+
+// SubmitSellerResponse 送出正式回價，產生不可變的新版本（錯誤與重送規則見 sellerside.Service.Submit）：重送同一個 ClientRequestID 回第一次的版本（Replayed）、內容不同回 INVALID_ARGUMENT；
+// 詢價內容過時回 ABORTED／VERSION_CONFLICT（publication）；回價版本不是目前的回 ABORTED／VERSION_CONFLICT（seller_response）；停止寫入回 RFQ_RECIPIENT_CLOSED。
+func (m *Module) SubmitSellerResponse(ctx context.Context, in SubmitSellerResponseInput) (SellerResponseVersion, error) {
+	return m.sellers.Submit(ctx, in)
+}
+
+// WithdrawSellerResponse 撤回指定版本的正式回價（目標狀態的方法）：該版已撤回回目前的結案狀態；版本不是目前的回 ABORTED／VERSION_CONFLICT（seller_response）；停止寫入回 RFQ_RECIPIENT_CLOSED；回價不是這家店的回 NOT_FOUND。
+func (m *Module) WithdrawSellerResponse(ctx context.Context, storeID int64, publicationID, sellerResponseID uuid.UUID, expectedVersion, reasonCode string) (SellerResponseClosure, error) {
+	return m.sellers.Withdraw(ctx, storeID, publicationID, sellerResponseID, expectedVersion, reasonCode)
+}
+
+// DeclineRfqPublication 婉拒一筆詢價（目標狀態的方法）：已婉拒回第一次的結案狀態；之後這家店不能再寫入，已送出的回價保留、買家端不能再接受。
+func (m *Module) DeclineRfqPublication(ctx context.Context, storeID int64, publicationID uuid.UUID, reasonCode string) (SellerResponseClosure, error) {
+	return m.sellers.Decline(ctx, storeID, publicationID, reasonCode)
 }

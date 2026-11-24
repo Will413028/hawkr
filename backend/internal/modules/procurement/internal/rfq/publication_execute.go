@@ -63,7 +63,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		if err != nil {
 			return fmt.Errorf("rfq：領取發布核准：%w", err)
 		}
-		if claimed.RequestRevisionID != rev.ID || (claimed.ResponseDeadline != nil && deadlinePassed(*claimed.ResponseDeadline, now)) {
+		if claimed.RequestRevisionID != rev.ID || (claimed.ResponseDeadline != nil && DeadlinePassed(*claimed.ResponseDeadline, now)) {
 			return stale
 		}
 		effective, err := search.IsEffective(ctx, q, req, in.BuyerID, claimed.CandidateSetID)
