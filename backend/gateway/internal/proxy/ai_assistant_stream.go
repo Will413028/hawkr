@@ -51,11 +51,11 @@ const streamWriteTimeout = 150 * time.Second
 // deadline (see streamTurnDeadline): SSE is one-way — the server never reads
 // from the client — so once nothing here forces the connection closed, a
 // browser tab that goes away no longer ends this goroutine on its own.
-// gateway/internal/sse/capgroup.go:14-22 documents a real incident from
-// exactly this shape: as long as an intermediary keeps accepting the
-// heartbeat, ctx.Done() never fires and w.Write never errors, so a
-// same-family "keep it alive with heartbeats" fix can turn a closed browser
-// tab into a goroutine that idles for however long nothing else bounds it.
+// A real incident had exactly this shape (the removed notification SSE hub):
+// as long as an intermediary keeps accepting the heartbeat, ctx.Done() never
+// fires and w.Write never errors, so a same-family "keep it alive with
+// heartbeats" fix can turn a closed browser tab into a goroutine that idles
+// for however long nothing else bounds it.
 // streamTurnDeadline is that bound here: this stream is request-scoped, so
 // the deadline is a hard, known ceiling regardless of what the client does.
 // This is why the two must land together — this heartbeat without that

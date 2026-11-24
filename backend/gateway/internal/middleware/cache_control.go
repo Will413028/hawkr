@@ -27,9 +27,6 @@ import (
 // 內若再寫一次 Cache-Control 會覆蓋這裡的值。AI／採購這條路徑上自己寫 SSE header
 // 的兩個地方（proxy.serveAIAssistantStreamWith 與 handler.ProxyBuyerReturnPolicySSE）
 // 因此引用同一個 response.CacheControlPrivateNoStore 常數。
-//
-// internal/sse 的留言／通知 SSE hub 是另一個子系統、有自己的 header 寫入點，仍是
-// no-cache，不在 #2447 範圍內。
 func PrivateNoStore() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Cache-Control", response.CacheControlPrivateNoStore)

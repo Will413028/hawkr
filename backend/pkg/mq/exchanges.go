@@ -8,17 +8,12 @@ const (
 	ExchangeDelayed      = "hawkr.delayed"
 	ExchangeShipping     = "hawkr.shipping"
 	ExchangeReview       = "hawkr.review"
-	ExchangeContent      = "hawkr.content"
-	ExchangeAccount      = "hawkr.account"
 	ExchangeGovernance   = "hawkr.governance"
 	ExchangeBuyer        = "hawkr.buyer"
 	ExchangeSeller       = "hawkr.seller"
 	ExchangeSellerEvents = "seller.events"
 	ExchangeAftersales   = "aftersales.events"
-	ExchangeMerchant     = "hawkr.merchant"
 	ExchangeProcurement  = "procurement.events"
-
-	ExchangeDelegation = "hawkr.delegation"
 )
 
 const (
