@@ -260,6 +260,33 @@
    "new": "",
    "test": "internal/modules/coupon ^TestListVouchersCheckoutAsksStoresOncePerStore$",
    "why": "列表每一列各問一次店家停權：N 張券 N 次 port 呼叫，測試要紅。"
+  },
+  {
+   "id": "designated-list-cap-not-enforced",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "if len(in.GetDesignatedBuyerIds()) > coupon.MaxTargetBuyers {",
+   "new": "if len(in.GetDesignatedBuyerIds()) > coupon.MaxTargetBuyers+1<<20 {",
+   "test": "internal/httpapi/coupon ^TestCreateCampaignDesignatedListAboveTheCapMakesNoCalls$",
+   "why": "超過 500 位的指定名單不在入口擋：先對 crm 做大量查詢才被模組拒絕，測試要紅。"
+  },
+  {
+   "id": "designated-membership-ignores-crm-result",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/app.go",
+   "old": "\t\tif !have[id] {\n",
+   "new": "\t\tif false && !have[id] {\n",
+   "test": "internal/httpapi/coupon ^TestCreateCampaignDesignatedListMustBeStoreCustomers$",
+   "why": "批次查詢的結果被忽略，非客戶也放行，測試要紅。"
+  },
+  {
+   "id": "crm-customers-among-ignores-store",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/crm/db/queries/customers.sql",
+   "old": "WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = ANY(sqlc.arg(buyer_ids)::bigint[])",
+   "new": "WHERE c.buyer_id = ANY(sqlc.arg(buyer_ids)::bigint[])",
+   "test": "internal/modules/crm ^TestCustomersAmong$",
+   "why": "批次成員查詢不限店家：別家店的客戶也算這家的客戶，測試要紅。"
   }
  ]
 }

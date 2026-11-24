@@ -23,6 +23,8 @@ const (
 	MaxTagsPerCustomer = 20
 	// MaxStoreIDs 是 VIPStatuses 一次的店家數上限（同 buyer.MaxBatchSize 的量級）。
 	MaxStoreIDs = 100
+	// MaxBuyerIDs 是 CustomersAmong 一次的買家數上限。
+	MaxBuyerIDs = 500
 	// DefaultPageSize 與 MaxPageSize 是客戶列表的預設與上限（AIP-158）。
 	DefaultPageSize = 20
 	MaxPageSize     = 100

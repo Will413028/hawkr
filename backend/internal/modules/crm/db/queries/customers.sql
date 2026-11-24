@@ -113,3 +113,10 @@ SELECT c.store_id FROM crm.customers AS c
 WHERE c.buyer_id = sqlc.arg(buyer_id) AND c.store_id = ANY(sqlc.arg(store_ids)::bigint[]) AND c.customer_type = 'VIP'
   AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
   AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id);
+
+-- name: ListCustomerBuyerIDs :many
+-- 這些買家裡，是這家店客戶的買家（主鍵點查）。inactive 的買家或店家不回。
+SELECT c.buyer_id FROM crm.customers AS c
+WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = ANY(sqlc.arg(buyer_ids)::bigint[])
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id);

@@ -90,6 +90,7 @@ const (
 	MaxTagsPerStore    = model.MaxTagsPerStore
 	MaxTagsPerCustomer = model.MaxTagsPerCustomer
 	MaxStoreIDs        = model.MaxStoreIDs
+	MaxBuyerIDs        = model.MaxBuyerIDs
 	DefaultPageSize    = model.DefaultPageSize
 	MaxPageSize        = model.MaxPageSize
 	MaxEventKeyLen     = model.MaxEventKeyLen
@@ -145,6 +146,12 @@ func (m *Module) ListCustomers(ctx context.Context, in CustomerListInput) (Custo
 // GetCustomer 是一位客戶與他的標籤；沒有電話、Email、地址。店家沒有這位客戶回 NotFound。
 func (m *Module) GetCustomer(ctx context.Context, storeID, buyerID int64) (Customer, error) {
 	return m.read.GetCustomer(ctx, storeID, buyerID)
+}
+
+// CustomersAmong 回傳這些買家裡是店家客戶的集合（只含是客戶的）；一次授權、一次查詢。空清單回空集合；
+// 超過 MaxBuyerIDs 或含非正整數是呼叫端的錯誤（回一般 error）。
+func (m *Module) CustomersAmong(ctx context.Context, storeID int64, buyerIDs []int64) (map[int64]bool, error) {
+	return m.read.CustomersAmong(ctx, storeID, buyerIDs)
 }
 
 // ListTags 是店家全部的標籤（名稱升序，不分頁，數量受 MaxTagsPerStore 約束）。

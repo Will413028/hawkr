@@ -49,6 +49,39 @@ func (q *Queries) GetCustomer(ctx context.Context, arg GetCustomerParams) (GetCu
 	return i, err
 }
 
+const listCustomerBuyerIDs = `-- name: ListCustomerBuyerIDs :many
+SELECT c.buyer_id FROM crm.customers AS c
+WHERE c.store_id = $1 AND c.buyer_id = ANY($2::bigint[])
+  AND NOT EXISTS (SELECT 1 FROM buyer.pub_closed_buyers() AS cb WHERE cb.buyer_id = c.buyer_id)
+  AND NOT EXISTS (SELECT 1 FROM seller.pub_retired_stores() AS rs WHERE rs.store_id = c.store_id)
+`
+
+type ListCustomerBuyerIDsParams struct {
+	StoreID  int64
+	BuyerIds []int64
+}
+
+// 這些買家裡，是這家店客戶的買家（主鍵點查）。inactive 的買家或店家不回。
+func (q *Queries) ListCustomerBuyerIDs(ctx context.Context, arg ListCustomerBuyerIDsParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listCustomerBuyerIDs, arg.StoreID, arg.BuyerIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var buyer_id int64
+		if err := rows.Scan(&buyer_id); err != nil {
+			return nil, err
+		}
+		items = append(items, buyer_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCustomersByFirstOrderAsc = `-- name: ListCustomersByFirstOrderAsc :many
 SELECT c.store_id, c.buyer_id, c.customer_type, c.total_spent, c.order_count, c.first_order_at
 FROM crm.customers AS c

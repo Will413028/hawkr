@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
-	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -128,17 +128,22 @@ type fakeCustomers struct {
 	customers map[int64]bool
 	err       error
 	asked     []int64
+	calls     int
 }
 
-func (f *fakeCustomers) GetCustomer(_ context.Context, storeID, buyerID int64) (crm.Customer, error) {
-	f.asked = append(f.asked, buyerID)
+func (f *fakeCustomers) CustomersAmong(_ context.Context, storeID int64, ids []int64) (map[int64]bool, error) {
+	f.calls++
+	f.asked = append(f.asked, ids...)
 	if f.err != nil {
-		return crm.Customer{}, f.err
+		return nil, f.err
 	}
-	if storeID != callerStoreID || !f.customers[buyerID] {
-		return crm.Customer{}, apperr.NotFound("no customer")
+	out := map[int64]bool{}
+	for _, id := range ids {
+		if storeID == callerStoreID && f.customers[id] {
+			out[id] = true
+		}
 	}
-	return crm.Customer{BuyerID: buyerID}, nil
+	return out, nil
 }
 
 // fakeStores 記下 ActingStore 被要求的能力；suspended 時回停權的拒絕。
@@ -411,6 +416,26 @@ func TestCreateCampaignDesignatedListMustBeStoreCustomers(t *testing.T) {
 	r.custs.err = errors.New("crm down")
 	if _, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in})); err == nil || codeOf(err) == connect.CodeInvalidArgument || len(r.module.calls) != 0 {
 		t.Fatalf("crm 讀取失敗要整個請求失敗（不是 invalid_argument）：%v calls=%v", err, r.module.calls)
+	}
+}
+
+// 指定名單超過上限在入口擋下：invalid_argument 在 designated_buyer_ids，crm 與模組都沒被呼叫；剛好上限的名單一次 crm 查詢。
+func TestCreateCampaignDesignatedListAboveTheCapMakesNoCalls(t *testing.T) {
+	r := newRig(t)
+	in := cashInput()
+	in.TargetType = pb.TargetType_TARGET_TYPE_DESIGNATED
+	for i := 0; i <= coupon.MaxTargetBuyers; i++ {
+		in.DesignatedBuyerIds = append(in.DesignatedBuyerIds, strconv.Itoa(1000+i))
+	}
+	_, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in}))
+	_, fields := reasonAndFields(err)
+	if codeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fields, []string{"campaign.designated_buyer_ids"}) || r.custs.calls != 0 || len(r.custs.asked) != 0 || len(r.module.calls) != 0 {
+		t.Fatalf("超過上限：code=%v fields=%v crm=%d module=%v", codeOf(err), fields, r.custs.calls, r.module.calls)
+	}
+	in.DesignatedBuyerIds = in.DesignatedBuyerIds[:coupon.MaxTargetBuyers]
+	_, _ = r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in}))
+	if r.custs.calls != 1 {
+		t.Fatalf("上限內的名單要一次 crm 查詢，實際 %d 次", r.custs.calls)
 	}
 }
 

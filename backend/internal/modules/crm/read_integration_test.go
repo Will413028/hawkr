@@ -226,6 +226,38 @@ func TestGetCustomer(t *testing.T) {
 	}
 }
 
+// CustomersAmong：只回是店家客戶的買家；已關閉的買家不算；空清單回空集合；超過上限或非正整數是一般 error。
+func TestCustomersAmong(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.mustOrder("evt-1", "O1", storeA, buyer1, 100)
+	f.mustOrder("evt-2", "O2", storeB, buyer2, 100)
+	got, err := f.m.CustomersAmong(ctx, storeA, []int64{buyer1, buyer2, buyer1})
+	if err != nil || len(got) != 1 || !got[buyer1] {
+		t.Fatalf("got %v err=%v，預期只有 buyer1", got, err)
+	}
+	if got, err := f.m.CustomersAmong(ctx, storeA, nil); err != nil || got == nil || len(got) != 0 {
+		t.Fatalf("空清單：%v %v", got, err)
+	}
+	var tooMany []int64
+	for i := int64(1); i <= crm.MaxBuyerIDs+1; i++ {
+		tooMany = append(tooMany, i)
+	}
+	if _, err := f.m.CustomersAmong(ctx, storeA, tooMany); err == nil {
+		t.Fatal("超過上限要失敗")
+	}
+	if _, err := f.m.CustomersAmong(ctx, storeA, []int64{buyer1, 0}); err == nil {
+		t.Fatal("非正整數要失敗")
+	}
+	f.markInactive("BUYER", buyer1)
+	if got, err := f.m.CustomersAmong(ctx, storeA, []int64{buyer1}); err != nil || len(got) != 0 {
+		t.Fatalf("已關閉的買家：%v %v", got, err)
+	}
+	f.markInactive("STORE", storeB)
+	wantKind(t, errOnly(f.m.CustomersAmong(ctx, storeB, []int64{buyer2})), apperr.KindNotFound, crm.ReasonCustomerNotFound)
+}
+
 // VIPStatuses：混合有無客戶列的店；每個請求的店家都有一筆。
 func TestVIPStatuses(t *testing.T) {
 	t.Parallel()

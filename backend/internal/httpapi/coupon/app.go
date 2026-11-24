@@ -19,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
-	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -44,7 +43,7 @@ type Buyers interface {
 
 // Customers 是店家的客戶（*crm.Module）：指定發放的名單只收這家店的客戶。
 type Customers interface {
-	GetCustomer(ctx context.Context, storeID, buyerID int64) (crm.Customer, error)
+	CustomersAmong(ctx context.Context, storeID int64, buyerIDs []int64) (map[int64]bool, error)
 }
 
 // Stores 是店家的來源（*seller.Module）：賣家方法的店家與能力、券上顯示的店家卡片。
@@ -161,15 +160,16 @@ var (
 	}
 )
 
-// requireCustomers 檢查名單裡的每位買家都是這家店的客戶（crm）；不是客戶的回 invalid_argument 並指出是第幾個。
+// requireCustomers 檢查名單裡的每位買家都是這家店的客戶（crm，一次查詢）；不是客戶的回 invalid_argument 並指出第一個是第幾個。
 // crm 讀取失敗（不是「不是客戶」）整個請求失敗。
 func (h *App) requireCustomers(ctx context.Context, storeID int64, raw []string, ids []int64) error {
+	have, err := h.customers.CustomersAmong(ctx, storeID, ids)
+	if err != nil {
+		return err
+	}
 	for i, id := range ids {
-		if _, err := h.customers.GetCustomer(ctx, storeID, id); err != nil {
-			if apperr.KindOf(err) == apperr.KindNotFound {
-				return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("TargetBuyers", i)}, "名單只能是這家店的客戶：%s", raw[i]), createPaths)
-			}
-			return err
+		if !have[id] {
+			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField("TargetBuyers", i)}, "名單只能是這家店的客戶：%s", raw[i]), createPaths)
 		}
 	}
 	return nil
@@ -332,6 +332,9 @@ func (h *App) CreateCampaign(ctx context.Context, req *connect.Request[pb.Create
 	in := req.Msg.GetCampaign()
 	if in == nil {
 		return nil, rpc.RequiredField("campaign", "campaign 必填")
+	}
+	if len(in.GetDesignatedBuyerIds()) > coupon.MaxTargetBuyers {
+		return nil, rpc.RequiredField("campaign.designated_buyer_ids", fmt.Sprintf("指定名單最多 %d 位買家", coupon.MaxTargetBuyers))
 	}
 	buyers, err := parseBuyerIDs(in.GetDesignatedBuyerIds())
 	if err != nil {
