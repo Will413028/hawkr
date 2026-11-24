@@ -367,16 +367,16 @@ type Reporter struct {
 	StoreID  int64
 }
 
-// ReporterPage 是一頁案件的檢舉人，依 (檢舉時間, 檢舉 ID) 由小到大；Next 是下一頁的游標（沒有下一頁是 nil）。
+// ReporterSide 是案件檢舉人的一邊：買家檢舉人或店家檢舉人（各自依檢舉人號碼分頁）。
+type ReporterSide string
+
+const (
+	ReporterSideBuyer ReporterSide = "BUYER"
+	ReporterSideStore ReporterSide = "STORE"
+)
+
+// ReporterPage 是一頁案件的檢舉人（同一邊），依檢舉人號碼由小到大；Next 是下一頁的游標（這頁最後一位的號碼），沒有下一頁是 0。
 type ReporterPage struct {
 	Items []Reporter
-	Next  *ReportCursor
-}
-
-// AfterKey 回檢舉人清單（由小到大）的游標參數；nil（第一頁）回零值，讓每一頁走同一個 query。
-func (c *ReportCursor) AfterKey() (time.Time, uuid.UUID) {
-	if c == nil {
-		return time.Time{}, uuid.UUID{}
-	}
-	return c.CreatedAt, c.ID
+	Next  int64
 }

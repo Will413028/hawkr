@@ -90,6 +90,45 @@ func (q *Queries) BumpStoreDailyCount(ctx context.Context, arg BumpStoreDailyCou
 	return submitted, err
 }
 
+const buyerReportersOfCase = `-- name: BuyerReportersOfCase :many
+SELECT id, reporter_buyer_id::bigint AS reporter_id FROM moderation.reports
+WHERE case_id = $1 AND reporter_buyer_id > $2::bigint
+ORDER BY reporter_buyer_id
+LIMIT $3::int
+`
+
+type BuyerReportersOfCaseParams struct {
+	CaseID  uuid.UUID
+	AfterID int64
+	MaxRows int32
+}
+
+type BuyerReportersOfCaseRow struct {
+	ID         uuid.UUID
+	ReporterID int64
+}
+
+// 案件的買家檢舉人，依 reporter_buyer_id 由小到大的 keyset（一案一位買家一筆，UNIQUE (case_id, reporter_buyer_id)）；第一頁的游標是 0。
+func (q *Queries) BuyerReportersOfCase(ctx context.Context, arg BuyerReportersOfCaseParams) ([]BuyerReportersOfCaseRow, error) {
+	rows, err := q.db.Query(ctx, buyerReportersOfCase, arg.CaseID, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BuyerReportersOfCaseRow{}
+	for rows.Next() {
+		var i BuyerReportersOfCaseRow
+		if err := rows.Scan(&i.ID, &i.ReporterID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearExpiredDescriptionsBatch = `-- name: ClearExpiredDescriptionsBatch :execrows
 UPDATE moderation.reports SET description = NULL
 WHERE id IN (
@@ -1133,58 +1172,6 @@ func (q *Queries) ReportWithOutcome(ctx context.Context, id uuid.UUID) (ReportWi
 	return i, err
 }
 
-const reportersOfCase = `-- name: ReportersOfCase :many
-SELECT id, created_at, reporter_buyer_id, reporter_store_id FROM moderation.reports
-WHERE case_id = $1 AND (created_at, id) > ($2::timestamptz, $3::uuid)
-ORDER BY created_at, id
-LIMIT $4::int
-`
-
-type ReportersOfCaseParams struct {
-	CaseID       uuid.UUID
-	AfterCreated time.Time
-	AfterID      uuid.UUID
-	MaxRows      int32
-}
-
-type ReportersOfCaseRow struct {
-	ID              uuid.UUID
-	CreatedAt       time.Time
-	ReporterBuyerID *int64
-	ReporterStoreID *int64
-}
-
-// 案件的檢舉人，依 (created_at, id) 由小到大的 keyset；第一頁的游標是零值。
-func (q *Queries) ReportersOfCase(ctx context.Context, arg ReportersOfCaseParams) ([]ReportersOfCaseRow, error) {
-	rows, err := q.db.Query(ctx, reportersOfCase,
-		arg.CaseID,
-		arg.AfterCreated,
-		arg.AfterID,
-		arg.MaxRows,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ReportersOfCaseRow{}
-	for rows.Next() {
-		var i ReportersOfCaseRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.ReporterBuyerID,
-			&i.ReporterStoreID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const reportsOfCase = `-- name: ReportsOfCase :many
 SELECT id, case_id, reporter_buyer_id, reporter_store_id, category, description, snapshot_id, created_at FROM moderation.reports WHERE case_id = $1 ORDER BY created_at, id
 `
@@ -1270,4 +1257,43 @@ func (q *Queries) SnapshotIDByHash(ctx context.Context, arg SnapshotIDByHashPara
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const storeReportersOfCase = `-- name: StoreReportersOfCase :many
+SELECT id, reporter_store_id::bigint AS reporter_id FROM moderation.reports
+WHERE case_id = $1 AND reporter_store_id > $2::bigint
+ORDER BY reporter_store_id
+LIMIT $3::int
+`
+
+type StoreReportersOfCaseParams struct {
+	CaseID  uuid.UUID
+	AfterID int64
+	MaxRows int32
+}
+
+type StoreReportersOfCaseRow struct {
+	ID         uuid.UUID
+	ReporterID int64
+}
+
+// 案件的店家檢舉人，依 reporter_store_id 由小到大的 keyset（一案一家店一筆，UNIQUE (case_id, reporter_store_id)）；第一頁的游標是 0。
+func (q *Queries) StoreReportersOfCase(ctx context.Context, arg StoreReportersOfCaseParams) ([]StoreReportersOfCaseRow, error) {
+	rows, err := q.db.Query(ctx, storeReportersOfCase, arg.CaseID, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []StoreReportersOfCaseRow{}
+	for rows.Next() {
+		var i StoreReportersOfCaseRow
+		if err := rows.Scan(&i.ID, &i.ReporterID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

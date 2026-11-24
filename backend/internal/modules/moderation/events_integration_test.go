@@ -5,6 +5,7 @@ package moderation
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"uuid"
@@ -159,37 +160,30 @@ func TestCaseReportersPagesEveryReporterOnce(t *testing.T) {
 		want[reporter], c = res.Report.ID, res.Case
 		f.advance(1)
 	}
-	detail := mustV[CaseDetail](t)(f.module.Case(ctx, c.ID))
-	var ordered []int64
-	for _, r := range detail.Reports {
-		ordered = append(ordered, r.ReporterBuyerID)
-	}
 	var got []int64
-	var after *ReportCursor
+	var after int64
 	pages := 0
 	for {
-		page := mustV[ReporterPage](t)(f.module.CaseReporters(ctx, c.ID, after, 2))
+		page := mustV[ReporterPage](t)(f.module.CaseReporters(ctx, c.ID, ReporterSideBuyer, after, 2))
 		pages++
 		for _, r := range page.Items {
-			if r.StoreID != 0 || want[r.BuyerID] != r.ReportID {
-				t.Fatalf("reporter=%+v", r)
+			if r.StoreID != 0 || want[r.BuyerID] != r.ReportID || r.BuyerID <= after {
+				t.Fatalf("reporter=%+v after=%d", r, after)
 			}
 			got = append(got, r.BuyerID)
 		}
-		if page.Next == nil {
+		if page.Next == 0 {
 			break
 		}
 		after = page.Next
 	}
-	if pages != 3 || len(got) != len(ordered) {
-		t.Fatalf("pages=%d got=%v ordered=%v", pages, got, ordered)
+	if pages != 3 || len(got) != len(want) || !slices.IsSorted(got) {
+		t.Fatalf("pages=%d got=%v want=%v", pages, got, want)
 	}
-	for i := range got {
-		if got[i] != ordered[i] {
-			t.Fatalf("順序要同檢舉時間：got=%v ordered=%v", got, ordered)
-		}
+	if stores := mustV[ReporterPage](t)(f.module.CaseReporters(ctx, c.ID, ReporterSideStore, 0, 10)); len(stores.Items) != 0 || stores.Next != 0 {
+		t.Fatalf("這個案件沒有店家檢舉人：%+v", stores)
 	}
-	if empty := mustV[ReporterPage](t)(f.module.CaseReporters(ctx, uuid.NewV4(), nil, 10)); len(empty.Items) != 0 || empty.Next != nil {
+	if empty := mustV[ReporterPage](t)(f.module.CaseReporters(ctx, uuid.NewV4(), ReporterSideBuyer, 0, 10)); len(empty.Items) != 0 || empty.Next != 0 {
 		t.Fatalf("不存在的案件回空頁：%+v", empty)
 	}
 }

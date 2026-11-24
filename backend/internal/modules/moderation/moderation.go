@@ -76,6 +76,8 @@ type (
 	Reporter = model.Reporter
 	// ReporterPage 是一頁案件的檢舉人。
 	ReporterPage = model.ReporterPage
+	// ReporterSide 是案件檢舉人的一邊（買家或店家）。
+	ReporterSide = model.ReporterSide
 	// Reversal 是案件上 HIDE 決定的撤銷紀錄。
 	Reversal = model.Reversal
 	// Snapshot 是案件凍結的內容快照（依對象種類的 tagged union：Social、Buyer、Review、Chat 恰好一個有值）。
@@ -128,6 +130,8 @@ const (
 	OutcomeNone         = model.OutcomeNone
 	OutcomeViolation    = model.OutcomeViolation
 	OutcomeNoViolation  = model.OutcomeNoViolation
+	ReporterSideBuyer   = model.ReporterSideBuyer
+	ReporterSideStore   = model.ReporterSideStore
 	CaseOpen            = model.CaseOpen
 	CaseClosed          = model.CaseClosed
 	// ChatContextWindow 是聊天對象的證據快照裡，被檢舉訊息前後各保留的訊息數。
@@ -265,9 +269,9 @@ func (m *Module) ReverseHide(ctx context.Context, in ReverseInput) (CaseDetail, 
 	return m.handle.Reverse(ctx, in)
 }
 
-// CaseReporters 列案件的檢舉人（買家或店家），依 (檢舉時間, 檢舉 ID) 由小到大的 keyset；給結案通知分頁 fan-out，不含檢舉說明。
-func (m *Module) CaseReporters(ctx context.Context, caseID uuid.UUID, after *ReportCursor, size int32) (ReporterPage, error) {
-	return m.view.CaseReporters(ctx, caseID, after, size)
+// CaseReporters 列案件一邊的檢舉人（買家或店家），依檢舉人號碼由小到大的 keyset、從 afterID 之後（不含）讀；給結案通知分頁 fan-out，不含檢舉說明。
+func (m *Module) CaseReporters(ctx context.Context, caseID uuid.UUID, side ReporterSide, afterID int64, size int32) (ReporterPage, error) {
+	return m.view.CaseReporters(ctx, caseID, side, afterID, size)
 }
 
 // CaseReader 是只讀案件資料的入口：worker 的通知 fan-out 讀檢舉人，不需要組出完整的 Module（處置要的 social、seller、accountsuspension 在 worker 用不到）。
@@ -277,8 +281,8 @@ type CaseReader struct{ view view.Reader }
 func NewCaseReader(d *db.DB) *CaseReader { return &CaseReader{view: view.Reader{DB: d}} }
 
 // CaseReporters 同 Module.CaseReporters。
-func (r *CaseReader) CaseReporters(ctx context.Context, caseID uuid.UUID, after *ReportCursor, size int32) (ReporterPage, error) {
-	return r.view.CaseReporters(ctx, caseID, after, size)
+func (r *CaseReader) CaseReporters(ctx context.Context, caseID uuid.UUID, side ReporterSide, afterID int64, size int32) (ReporterPage, error) {
+	return r.view.CaseReporters(ctx, caseID, side, afterID, size)
 }
 
 // Case 讀一個案件與它的全部檢舉；每筆檢舉的結果由案件的決定推導。案件不存在回 NotFound。
