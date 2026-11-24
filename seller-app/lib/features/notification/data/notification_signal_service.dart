@@ -32,7 +32,7 @@ class NotificationSignalService {
     this.slowBackoff = const Duration(minutes: 1),
     Future<void> Function(Duration)? delay,
   }) : _random = random ?? math.Random(),
-       _delay = delay ?? Future<void>.delayed;
+       _injectedDelay = delay;
 
   final Stream<WatchNotificationsResponse> Function() open;
   final void Function(InboxSignal) onInbox;
@@ -44,7 +44,9 @@ class NotificationSignalService {
   final Duration maxBackoff;
   final Duration slowBackoff;
   final math.Random _random;
-  final Future<void> Function(Duration) _delay;
+  final Future<void> Function(Duration)? _injectedDelay;
+  Timer? _backoffTimer;
+  Completer<void>? _backoffWait;
 
   bool _running = false;
   int _generation = 0;
@@ -66,6 +68,21 @@ class NotificationSignalService {
     _sub = null;
     final closed = _closed;
     if (closed != null && !closed.isCompleted) closed.complete();
+    _backoffTimer?.cancel();
+    _backoffTimer = null;
+    final wait = _backoffWait;
+    if (wait != null && !wait.isCompleted) wait.complete();
+  }
+
+  /// 退避等待；[stop] 會取消計時器並立刻喚醒，不留下比服務久的 Timer。
+  Future<void> _delay(Duration d) {
+    final injected = _injectedDelay;
+    if (injected != null) return injected(d);
+    final wait = _backoffWait = Completer<void>();
+    _backoffTimer = Timer(d, () {
+      if (!wait.isCompleted) wait.complete();
+    });
+    return wait.future;
   }
 
   Future<void> _run(int gen) async {
