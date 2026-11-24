@@ -1,4 +1,6 @@
-# B4 初版分類清單草稿（D8）
+# B4 初版分類清單（D8）
+
+**狀態：** Will 2026-11-24 確認結構（自訂兩層＋Shopify 對照）、初版不放受管制品類、葉節點清單；zh-TW 名稱在 B4-2 照術語表校對。
 
 來源：Shopify Standard Product Taxonomy `2026-11-unstable`（MIT，`https://raw.githubusercontent.com/Shopify/product-taxonomy/main/dist/en/categories.txt`，2026-11-24 下載，14,609 行）。每個 Shopify ID 都用 `grep` 從該檔取得【量】。注意：該 repo README 說 `dist/` 已標為 deprecated，正式匯入時改用 release asset（`releases/latest/download/categories.en.json.gz`）並釘版本。
 

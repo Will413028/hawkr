@@ -28,7 +28,7 @@ Java product-service 改寫成單體的 catalog 模組。每個沿用的機制�
 | D5 | 四端都沒有呼叫的端點與 RPC（`client-inventory.md` §6.5）不改寫，隨 Java 刪 | 照搬：為沒有消費者的端點寫契約與測試 |
 | D6 | 商品、SKU、分類用 UUIDv7；content banner 的商品動作同時改 UUID | 沿用 TSID＋BIGSERIAL：同聚合兩種方案（CD10） |
 | D7 | 商品可見性＝賣家狀態 ∧ 無有效 seller 措施 ∧ 店家可曝光（`seller.pub_exposable_stores`）；措施不寫進商品；`seller_deleted_at` 與停權快照不帶 | 把他模組狀態複製進商品欄：雙寫與漂移 |
-| D8 | 平台擁有固定分類法：取 Shopify Standard Product Taxonomy 子集（頂層 8–12、兩層），以版本化種子資料定義；內部 UUIDv7，另存 `shopify_taxonomy_id` 字串對照；名稱 `LocalizedText`（多語 ADR）；商品掛葉節點；不做即時 CRUD 與審核頁。基準：Shopify、Google product taxonomy | 照搬 CRUD＋審核：沒有營運人員，且現有審核頁送錯路徑（CD11）。自編（參考蝦皮類目）：沒有公開穩定 ID、要自己維護版本 |
+| D8 | 平台擁有固定分類法：我們自己的兩層使用者分組（初版 10 個頂層、52 個葉節點，`backend/docs/plans/2026-11-24-b4-catalog/taxonomy-draft.md`），每個葉節點對照一個 Shopify Standard Product Taxonomy 節點（`shopify_taxonomy_id` 字串；Shopify 各分類深度不一，無法直接照搬結構）；以版本化種子資料定義；內部 UUIDv7；名稱 `LocalizedText`（多語 ADR）；商品掛葉節點；不做即時 CRUD 與審核頁；初版不放受管制品類（食品、彩妝保養、保健醫療、菸酒，範圍裁切 ADR 的重評條件）。基準：蝦皮、momo 前台類目自訂並對照 Google 類目；Amazon gated categories | 照搬 CRUD＋審核：沒有營運人員，且現有審核頁送錯路徑（CD11）。照 Shopify 結構：深度 2–4 層不一，使用者分組不一致。自編不對照：沒有對外穩定 ID |
 | D9 | 代行商品路由在 B4 以 catalog 的 `CatalogDelegatedService` 實作，A10 只剩訂單 | 等 A10：B4 無法收尾。gateway 改打轉接：A10 就丟 |
 | D10 | 商品只存啟用的配送方式代碼集合；運費規則、免運門檻、試算歸 fulfillment。基準：Shopify shipping profiles | catalog 存運費規則：兩處擁有 |
 | D11 | 溫層從值域來源刪除，`shipping_ambient.go` 整檔由 B4 刪；動 shipping 部分前與 B3 對齊 | gateway 繼續過濾：補丁留在錯的層 |
@@ -59,11 +59,11 @@ D13 併入 D8。D8、D14、D17 依追加簡報 `backend/docs/plans/2026-11-24-b4
 - 賣家需要行內樣式或連結 → D17 段落改成 span＋marks。
 - 產品要跨貼文與商品的單一熱門排行 → D14 由 discovery 擁有讀取模型。
 - 營運要不經部署改分類 → D8 加管理畫面。
+- 要賣受管制品類 → D8 加對應葉節點與品類資格審核。
 - 搜尋 p95 超標 → D15 換搜尋引擎。
 
 ## Followup
 
-- D8 初版葉節點清單交 Will（B4-2 開工前）。
 - D10、D11 與 B3 session 對齊。
 - B6、B8 完成時刪 `catalogserver`、`catalogconsumer`。
 
