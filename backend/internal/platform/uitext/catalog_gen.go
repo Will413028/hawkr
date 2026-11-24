@@ -446,10 +446,6 @@ func (t Text) NotificationNotificationCategory(v string) (string, bool) {
 		switch v {
 		case "ORDER":
 			return "Orders", true
-		case "SHIPMENT":
-			return "Shipping", true
-		case "SHIPMENT_ANOMALY":
-			return "Delivery issues", true
 		case "AFTERSALES":
 			return "Refunds and after-sales", true
 		case "PAYOUT":
@@ -481,10 +477,6 @@ func (t Text) NotificationNotificationCategory(v string) (string, bool) {
 	switch v {
 	case "ORDER":
 		return "訂單", true
-	case "SHIPMENT":
-		return "出貨", true
-	case "SHIPMENT_ANOMALY":
-		return "配送異常", true
 	case "AFTERSALES":
 		return "退款與售後", true
 	case "PAYOUT":

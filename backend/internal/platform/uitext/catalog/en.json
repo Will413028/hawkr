@@ -204,12 +204,6 @@
     "notification.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW": {
       "message": "Reviews"
     },
-    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT": {
-      "message": "Shipping"
-    },
-    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": {
-      "message": "Delivery issues"
-    },
     "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL": {
       "message": "Email"
     },

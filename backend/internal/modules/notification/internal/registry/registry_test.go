@@ -147,7 +147,7 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 		},
 		"fan-out 型別帶收件人": func(d *Definition[params]) { d.Fanout = true },
 		"固定語系與文字不符":      func(d *Definition[params]) { d.FixedLocale = uitext.EN },
-		"分類不屬於受眾":        func(d *Definition[params]) { d.Category = model.CategoryShipmentAnomaly },
+		"分類不屬於受眾":        func(d *Definition[params]) { d.Category = model.CategoryPayout },
 		"en 退回中文": func(d *Definition[params]) {
 			d.Text = func(_ uitext.Locale, _ params) (Content, error) { return zhOnly(), nil }
 		},

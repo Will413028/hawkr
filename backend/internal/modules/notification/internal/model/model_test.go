@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// D4：交易必要的收件匣與 email 不可關；推播可關，只有店家的 SHIPMENT_ANOMALY 推播不可關；互動與行銷全部可關。
-// 兩個受眾各自驗證：BUYER 沒有 SHIPMENT_ANOMALY，所以那個分類對 BUYER 一律不可關（不存在）。
+// D4：交易必要的收件匣與 email 不可關；推播可關；互動與行銷全部可關。
+// 兩個受眾各自驗證：只列出受眾自己的分類（BUYER 沒有 PAYOUT）。
 func TestDisableableFollowsD4(t *testing.T) {
 	for _, a := range Audiences() {
 		for _, c := range CategoriesFor(a) {
@@ -18,7 +18,7 @@ func TestDisableableFollowsD4(t *testing.T) {
 				var want bool
 				switch class {
 				case ClassTransactional, ClassSystem:
-					want = ch == ChannelPush && (a != AudienceStore || c != CategoryShipmentAnomaly)
+					want = ch == ChannelPush
 				case ClassInteraction, ClassMarketing:
 					want = true
 				}
@@ -36,7 +36,7 @@ func TestUnknownCategoryChannelOrAudienceIsNeverDisableable(t *testing.T) {
 	}
 }
 
-// 受眾的分類集合：每個 D4 分類至少屬於一個受眾；買家沒有 SHIPMENT_ANOMALY，店家沒有 COUPON，所以對方的分類不可關也不算有效。
+// 受眾的分類集合：每個 D4 分類至少屬於一個受眾；買家沒有 PAYOUT，店家沒有 COUPON，所以對方的分類不可關也不算有效。
 func TestCategoriesAreScopedPerAudience(t *testing.T) {
 	covered := map[PrefCategory]bool{}
 	for _, a := range Audiences() {
@@ -52,11 +52,11 @@ func TestCategoriesAreScopedPerAudience(t *testing.T) {
 			t.Errorf("分類 %s 不屬於任何受眾", c)
 		}
 	}
-	if ValidCategoryFor(AudienceBuyer, CategoryShipmentAnomaly) || Disableable(AudienceBuyer, CategoryShipmentAnomaly, ChannelPush) {
-		t.Error("SHIPMENT_ANOMALY 不屬於 BUYER，不能設定它的推播")
+	if ValidCategoryFor(AudienceBuyer, CategoryPayout) || Disableable(AudienceBuyer, CategoryPayout, ChannelPush) {
+		t.Error("PAYOUT 不屬於 BUYER，不能設定它的推播")
 	}
-	if !ValidCategoryFor(AudienceStore, CategoryShipmentAnomaly) || Disableable(AudienceStore, CategoryShipmentAnomaly, ChannelPush) {
-		t.Error("STORE 的 SHIPMENT_ANOMALY 推播不可關")
+	if !ValidCategoryFor(AudienceStore, CategoryPayout) || !Disableable(AudienceStore, CategoryPayout, ChannelPush) {
+		t.Error("STORE 的 PAYOUT 推播可關")
 	}
 	if ValidCategoryFor(AudienceStore, CategoryCoupon) || !ValidCategoryFor(AudienceBuyer, CategoryCoupon) {
 		t.Error("COUPON 只屬於 BUYER")
@@ -84,8 +84,8 @@ func TestEveryCategoryHasAClassAndDefaultsOn(t *testing.T) {
 			}
 		}
 	}
-	if len(Categories()) != 16 {
-		t.Errorf("清單是 D4 的 14 個、D29 的 PROCUREMENT 加 D18 的 ANNOUNCEMENT，共 16 個，現在 %d", len(Categories()))
+	if len(Categories()) != 14 {
+		t.Errorf("清單是 D4 的 12 個、D29 的 PROCUREMENT 加 D18 的 ANNOUNCEMENT，共 14 個，現在 %d", len(Categories()))
 	}
 }
 

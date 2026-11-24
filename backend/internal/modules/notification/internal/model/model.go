@@ -35,12 +35,10 @@ type PrefCategory string
 
 const (
 	// 交易必要。
-	CategoryOrder           PrefCategory = "ORDER"
-	CategoryShipment        PrefCategory = "SHIPMENT"
-	CategoryShipmentAnomaly PrefCategory = "SHIPMENT_ANOMALY"
-	CategoryAftersales      PrefCategory = "AFTERSALES"
-	CategoryPayout          PrefCategory = "PAYOUT"
-	CategoryAccount         PrefCategory = "ACCOUNT"
+	CategoryOrder      PrefCategory = "ORDER"
+	CategoryAftersales PrefCategory = "AFTERSALES"
+	CategoryPayout     PrefCategory = "PAYOUT"
+	CategoryAccount    PrefCategory = "ACCOUNT"
 	// 互動。
 	CategoryChat              PrefCategory = "CHAT"
 	CategoryReview            PrefCategory = "REVIEW"
@@ -78,14 +76,14 @@ type categoryDef struct {
 	undelivered []Channel
 }
 
-// D4：交易必要的收件匣與 email 不可關（推播可關，賣家 SHIPMENT_ANOMALY 的推播也不可關）；互動與行銷全部可關、預設開。
+// D4：交易必要的收件匣與 email 不可關（推播可關）；互動與行銷全部可關、預設開。
 var transactionalLocked = []Channel{ChannelInbox, ChannelEmail}
 
 // D18：公告只有收件匣與推播，收件匣不可關。
 var announcementLocked = []Channel{ChannelInbox}
 
-// 受眾的分類集合：SHIPMENT_ANOMALY 與 PAYOUT、REVIEW、FOLLOW、PROCUREMENT（D29）只有店家會收到；FOLLOWED_STORE_POST、COUPON、RESTOCK 只有買家會收到
-// （舊服務 notification_preference.go 的 SellerCategories／BuyerCategories 同樣如此，後者的註解說明配送異常不對買家開放）。
+// 受眾的分類集合：PAYOUT、REVIEW、FOLLOW、PROCUREMENT（D29）只有店家會收到；FOLLOWED_STORE_POST、COUPON、RESTOCK 只有買家會收到
+// （舊服務 notification_preference.go 的 SellerCategories／BuyerCategories 同樣如此）。
 var (
 	bothAudiences = []Audience{AudienceBuyer, AudienceStore}
 	buyerOnly     = []Audience{AudienceBuyer}
@@ -94,8 +92,6 @@ var (
 
 var categoryDefs = []categoryDef{
 	{CategoryOrder, ClassTransactional, bothAudiences, transactionalLocked, nil},
-	{CategoryShipment, ClassTransactional, bothAudiences, transactionalLocked, nil},
-	{CategoryShipmentAnomaly, ClassTransactional, storeOnly, []Channel{ChannelInbox, ChannelPush, ChannelEmail}, nil},
 	{CategoryAftersales, ClassTransactional, bothAudiences, transactionalLocked, nil},
 	{CategoryPayout, ClassTransactional, storeOnly, transactionalLocked, nil},
 	{CategoryAccount, ClassTransactional, bothAudiences, transactionalLocked, nil},

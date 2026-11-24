@@ -336,14 +336,6 @@
       "message": "評價",
       "description": "評價（互動，只有店家）。"
     },
-    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT": {
-      "message": "出貨",
-      "description": "出貨（交易必要）。"
-    },
-    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": {
-      "message": "配送異常",
-      "description": "配送異常（交易必要，只有店家；推播也不可關）。"
-    },
     "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL": {
       "message": "Email",
       "description": "Email。"

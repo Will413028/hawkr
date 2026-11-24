@@ -89,13 +89,12 @@ enum NotificationAudience {
 // NotificationCategory 是偏好分類：使用者設定偏好的單位，也是收件匣的篩選單位。
 // 交易必要的分類，收件匣與 email 不可關；互動與行銷的分類全部可關、預設開；公告收件匣不可關、推播可關、不寄 email（偏好不列 email）。
 enum NotificationCategory {
+  reserved 2, 3;
+  reserved "NOTIFICATION_CATEGORY_SHIPMENT", "NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY";
+
   NOTIFICATION_CATEGORY_UNSPECIFIED = 0;
   // 訂單（交易必要）。
   NOTIFICATION_CATEGORY_ORDER = 1;
-  // 出貨（交易必要）。
-  NOTIFICATION_CATEGORY_SHIPMENT = 2;
-  // 配送異常（交易必要，只有店家；推播也不可關）。
-  NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY = 3;
   // 退款與售後（交易必要）。
   NOTIFICATION_CATEGORY_AFTERSALES = 4;
   // 撥款（交易必要，只有店家）。
