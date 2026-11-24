@@ -20,6 +20,8 @@ type VoucherExpiringParams struct {
 	ExpiresAt  time.Time `json:"expires_at"`
 }
 
+var exampleCampaignID = uuid.MustParse("0190a000-0000-7000-8000-0000000000d2")
+
 // couponTypes 是 coupon 側型別。
 var couponTypes = []Entry{voucherExpiring}
 
@@ -39,11 +41,12 @@ var voucherExpiring = Define(Definition[VoucherExpiringParams]{
 	StillValid: func(ctx context.Context, v Validity, p VoucherExpiringParams) (bool, error) {
 		return v.VoucherAvailable(ctx, p.BuyerID, p.VoucherID)
 	},
+	NotAfter: func(p VoucherExpiringParams) (time.Time, bool) { return p.ExpiresAt, true },
 	Text: func(l uitext.Locale, p VoucherExpiringParams) (Content, error) {
 		return Content{Title: text.VoucherExpiringTitle(l), Body: text.VoucherExpiringBody(l, text.VoucherExpiringBodyArgs{Time: uitext.FormatDateTime(l, p.ExpiresAt)})}, nil
 	},
 	DeepLink: func(VoucherExpiringParams) string { return "/account/coupons" },
 	Example: VoucherExpiringParams{
-		EventID: exampleEventID, OccurredAt: exampleAt, BuyerID: exampleBuyerID, VoucherID: exampleObject, CampaignID: exampleSuspensionID, ExpiresAt: exampleAt.Add(24 * time.Hour),
+		EventID: exampleEventID, OccurredAt: exampleAt, BuyerID: exampleBuyerID, VoucherID: exampleObject, CampaignID: exampleCampaignID, ExpiresAt: exampleAt.Add(24 * time.Hour),
 	},
 })

@@ -70,7 +70,7 @@ func setupContent(t *testing.T, missing map[int64]bool) *fixture {
 	resolver := NewResolver(buyers, sl, &fakeReporters{})
 	rec := &recorder{}
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, StoreCodes: fakeStoreCodes{missing: missing}, Jobs: rec, Now: contentClock, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, StoreCodes: fakeStoreCodes{missing: missing}, Validity: noVouchers{}, Jobs: rec, Now: contentClock, NewID: uuid.NewV7, Logger: log,
 	}, testRegistry{})
 	events.Subscribe[social.CommentCreated](bus, m.OnCommentCreated)
 	events.Subscribe[social.CommentReplied](bus, m.OnCommentRepliedToBuyer)

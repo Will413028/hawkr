@@ -77,6 +77,9 @@ type Definition[P any] struct {
 	// StillValid 在送出前向來源重查事實是否仍成立（D27：券已被使用或作廢就不該再提醒）；回傳 false 時投遞標為永久跳過、不送出。
 	// 沒有宣告的型別永遠成立。錯誤是暫時性（River 重試）；參數解不開是永久錯誤。
 	StillValid func(ctx context.Context, v Validity, p P) (bool, error)
+	// NotAfter 宣告型別的時效：回傳這份參數對應的內容失效的時間（券的到期時間）。行銷類推播的靜音時段（D26）延後到靜音結束，
+	// 但內容在靜音結束前就失效時延後只會讓它沒機會送出，所以不延後。沒有宣告的型別沒有時效，靜音時段一律延後。
+	NotAfter func(p P) (time.Time, bool)
 	// Broadcast 宣告型別是 fan-out 的母意圖（一對多，例如追蹤的店發文）：不能有收件人、文案、渠道與聚合，只有冪等鍵、事件時間與 Broadcast。
 	Broadcast *Broadcast[P]
 	// Spawned 宣告型別只由 Broadcast 的 fan-out 建立：冪等鍵由派送決定（SpawnedKey），所以沒有 IdempotencyKey、OccurredAt（沿用母意圖的），
@@ -157,6 +160,8 @@ type Spec struct {
 	Broadcast bool
 	Child     string
 	Spawned   bool
+	// Revalidates：型別宣告了送出前重查（StillValid），組裝時一定要提供 Validity。
+	Revalidates bool
 }
 
 // Audience 回傳走意圖管線的型別的唯一受眾（Validate 保證非 Fanout 型別剛好一個）。
@@ -200,6 +205,8 @@ type Entry interface {
 	Expand(ctx context.Context, r Resolver, params json.RawMessage) (x Expanded, ok bool, err error)
 	// StillValid 在送出前重查事實是否仍成立；沒有宣告的型別回 true。回 false 表示不該再送。
 	StillValid(ctx context.Context, v Validity, params json.RawMessage) (bool, error)
+	// NotAfter 回傳內容失效的時間；沒有宣告時效的型別 ok 為 false。參數解不開是 ErrBadParams。
+	NotAfter(params json.RawMessage) (t time.Time, ok bool, err error)
 	// Spawn 分頁展開 fan-out 母意圖的收件人，回傳子型別的參數（每位收件人一筆，依 ID 由小到大）與下一頁的游標、是否結束；不是 Broadcast 型別、
 	// 頁的要求不合法、型別回的游標或 ID 不合法、型別回 InvalidInput 都是 ErrBadParams。
 	Spawn(ctx context.Context, r Resolver, params json.RawMessage, req PageRequest) (SpawnPage, error)
@@ -250,7 +257,7 @@ func (e *entry[P]) Spec() Spec {
 	return Spec{
 		Name: d.Name, Audiences: slices.Clone(d.Audiences), Fanout: d.Fanout, Category: d.Category, Presentation: d.Presentation, StateHint: d.StateHint,
 		Channels: slices.Clone(d.Channels), IdempotencySource: d.IdempotencySource, Aggregatable: d.Aggregatable,
-		Broadcast: d.Broadcast != nil, Child: childName(d.Broadcast), Spawned: d.Spawned,
+		Broadcast: d.Broadcast != nil, Child: childName(d.Broadcast), Spawned: d.Spawned, Revalidates: d.StillValid != nil,
 	}
 }
 
@@ -501,6 +508,18 @@ func (e *entry[P]) StillValid(ctx context.Context, v Validity, params json.RawMe
 	}
 	ok, err := e.d.StillValid(ctx, v, p)
 	return ok, permanent(err)
+}
+
+func (e *entry[P]) NotAfter(params json.RawMessage) (time.Time, bool, error) {
+	if e.d.NotAfter == nil {
+		return time.Time{}, false, nil
+	}
+	p, err := e.decode(params)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	t, ok := e.d.NotAfter(p)
+	return t, ok, nil
 }
 
 func (e *entry[P]) Spawn(ctx context.Context, r Resolver, params json.RawMessage, req PageRequest) (SpawnPage, error) {
@@ -758,7 +777,7 @@ func (e *entry[P]) validateBroadcast() []error {
 	if d.Broadcast.Targets == nil {
 		bad("fan-out 沒有 Targets")
 	}
-	if d.Fanout || d.Spawned || d.Recipient != nil || d.Expand != nil || d.StillValid != nil || d.Actors != nil || d.Aggregatable || d.AggregationKey != nil ||
+	if d.Fanout || d.Spawned || d.Recipient != nil || d.Expand != nil || d.StillValid != nil || d.NotAfter != nil || d.Actors != nil || d.Aggregatable || d.AggregationKey != nil ||
 		len(d.Audiences) > 0 || len(d.Channels) > 0 || d.Text != nil || d.TextLoaded != nil || d.Load != nil || d.DeepLinkLoaded != nil {
 		bad("fan-out 母意圖不產生收件匣列，不能有受眾、渠道、文案、收件人、Expand、actor、聚合、Fanout 或 Spawned")
 	}

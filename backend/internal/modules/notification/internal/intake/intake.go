@@ -255,8 +255,6 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 	}
 	enabled := func(ch model.Channel) bool { return model.Enabled(spec.Audience(), spec.Category, ch, override) }
 	now := s.d.Now()
-	class, _ := model.ClassOf(spec.Category)
-	marketing := class == model.ClassMarketing
 	touchedInbox := false
 	var itemID uuid.UUID
 	for _, ch := range spec.Channels {
@@ -277,9 +275,6 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 				return false, uuid.Nil(), fmt.Errorf("寫入投遞紀錄：%w", err)
 			}
 			opts := &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}
-			if ch == model.ChannelPush && marketing {
-				opts.ScheduledAt = QuietHoursEnd(now)
-			}
 			if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, opts); err != nil {
 				return false, uuid.Nil(), fmt.Errorf("排入渠道 job：%w", err)
 			}
@@ -324,7 +319,7 @@ func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store
 	return itemID, nil
 }
 
-// QuietHoursEnd 回傳行銷類推播的送出時間（D26）：台北時間 22:00（含）到隔天 09:00（不含）之間建立的投遞延到下一個 09:00，其餘時間回零值（立即送出）。
+// QuietHoursEnd 回傳行銷類推播的靜音時段結束時間（D26）：台北時間 22:00（含）到隔天 09:00（不含）之間的送出延到下一個 09:00，其餘時間回零值（立即送出）。
 func QuietHoursEnd(now time.Time) time.Time {
 	local := now.In(twtime.Taipei)
 	y, m, d := local.Date()
