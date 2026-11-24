@@ -691,6 +691,10 @@ func (echoResolver) StoreFollowers(context.Context, int64, int64, int, time.Time
 	return nil, nil
 }
 
+func (echoResolver) CaseReporters(context.Context, uuid.UUID, int64, int) ([]ReporterRef, error) {
+	return nil, nil
+}
+
 // checkExampleExpands 用 echoResolver 展開範例參數：Example 的 ID 要能解出一位形狀合法的收件人（含 actor）。
 func (e *entry[P]) checkExampleExpands() []error {
 	d := e.d

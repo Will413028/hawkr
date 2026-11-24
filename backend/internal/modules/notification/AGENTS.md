@@ -16,7 +16,7 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 
 ## 模組內部結構
 
-- 根套件只保留 `Module`、`New`、`Migrations`、各來源事件的訂閱者入口（`On*`）、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建並訂閱）。
+- 根套件只保留 `Module`、`New`、`Migrations`、各來源事件的訂閱者入口（`On*`）、治理與交易側的訂閱登記 `SubscribeGovernance`、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建並訂閱）。
 - `internal/intake`：意圖管線與 fan-out；`subscribers.go`、`subscribers_content.go` 的同步訂閱者只呼叫 `Accept`（插 `intents` 列並排 `notification.process_intent` job），`Process`（worker）解析收件人、鎖收件人、略過封鎖與自己、套偏好、寫收件匣與投遞紀錄；不變量見 `internal/intake/AGENTS.md`。
 - `internal/stream`：串流 hub；不變量見 `internal/stream/AGENTS.md`。
 - `internal/purge`：保留期清除與個資清除；不變量見 `internal/purge/AGENTS.md`。
@@ -43,6 +43,7 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 ## 不負責
 
 - 事件的發布與停權、解除停權的流程：`accountsuspension`（事件 `Suspended`、`Unsuspended`）。
+- 治理與交易側事件的發布與來源模組的流程（seller 措施與 KYC、moderation、social、review、im、payment 補件期限掃描、delegation、procurement）：各擁有模組；notification 只訂閱、登記意圖。
 - 還沒搬進單體的服務（Java、invoice、ai）的通知型別：隨各發送端搬遷時定義，不經 `internal/legacy`（D13）。
 
 ## 決策紀錄

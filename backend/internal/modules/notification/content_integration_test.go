@@ -67,7 +67,7 @@ func setupContent(t *testing.T, missing map[int64]bool) *fixture {
 		KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: dirNoOrders{}, ProductStores: dirNoProducts{}, Registry: dirNoRegistry{}, Now: time.Now, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: q, Now: time.Now, Logger: log}),
 	})
-	resolver := NewResolver(buyers, sl)
+	resolver := NewResolver(buyers, sl, nil)
 	rec := &recorder{}
 	m := newModule(Deps{
 		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, StoreCodes: fakeStoreCodes{missing: missing}, Jobs: rec, Now: contentClock, NewID: uuid.NewV7, Logger: log,

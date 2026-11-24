@@ -146,6 +146,15 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 
 帳號 `preferred_locale`：identity 擁有（`identity.accounts.preferred_locale`，多語系 ADR D1），渠道 job 經 `Locales` 介面讀（`cmd/hawkr` 接 `*identity.Module`）。「最後一次生效的 UI 語系」的更新點：App 登入（`ExchangeIdToken`）與 `RegisterDeviceToken`（App 每次啟動、回前景都呼叫）以請求協商出的語系更新，只在與目前的值不同時寫（`TestRegisterDeviceTokenRecordsTheRequestLocaleForLaterDeliveries`）。網頁的 OAuth 回呼請求不帶 UI 語系，不更新。
 
+## 治理與交易側型別（A8-3c）
+
+- 舊服務的治理模板（`seller_account`、`content` 等）從未建立，這批型別是新的：店家面（停權、措施、KYC、詢問、撥款、代行）、買家作者（隱藏、還原、警告）、檢舉人（確認與結果）、刪帳確認信、詢價邀請；事件裁決見 `backend/docs/plans/2026-11-23-a8-notification/event-adjudication.md`。
+- 一個意圖型別只有一個受眾、Spawned 型別沒有自己的冪等鍵：檢舉人是買家或店家，所以 `report_received`、`report_resolved` 各拆成買家與店家兩個型別（參數同為 `ReportSource`），`report_resolved` 一律經 fan-out 母意圖建立。計畫 D24 寫「統一為 `report_received`／`report_resolved`」，這裡是統一參數與文案、型別名稱依受眾拆開。
+- 接受的措施請求裁定登記成 `store_measure_revoked`、`store_measure_ended`（同一個 `MeasureID` 的冪等鍵），取代計畫 D3 寫的「worker 對同一 `MeasureID` 去重」：去重是冪等鍵的性質，不需要 worker 端再讀 seller；`store_measure_request_decided` 只有駁回。
+- 補件期限提醒由 payment 的每日掃描發布 `PayoutDeadlineApproaching`、notification 以「店家＋期限＋檔位」去重，取代計畫 D23 的「每日 job 排 `payout_account_deadline`」：期限在 payment 的表裡，notification 不讀別的模組的表。
+- 結案的檢舉人 fan-out 的游標是檢舉人在案件裡的名次（`Resolver.CaseReporters`）；moderation 的 `CaseReporters` 是 `(created_at, id)` keyset，檢舉列結案後不刪（只清說明），所以名次穩定，代價是每頁從頭走到游標。
+- `rfq_invited` 的偏好分類暫用互動的 `CHAT`（D4 沒有詢價分類），待確認；`delegation_operation_completed` 的參數按計畫保留 `Capability`，文案只用動作（`Action`）。
+
 ## 與 舊服務的差異
 
 資料沒有搬移（系統從未上線），schema 是新的 baseline。對外看得到或 schema 上的差異：

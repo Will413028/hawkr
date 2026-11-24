@@ -33,6 +33,35 @@
       "message": "通知的受眾不正確。",
       "description": "請求的 audience 沒給或不認得：NotificationAppService 需要受眾的方法。"
     },
+    "author_warned.body": {
+      "message": "你於 {time} 因「{reason}」收到平台的警告。請留意社群規範。",
+      "params": {
+        "reason": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：reason 是政策分類的顯示文字。"
+    },
+    "author_warned.title": {
+      "message": "你收到一則警告",
+      "description": "標題：買家被警告（author_warned 型別）。"
+    },
+    "buyer_deletion_requested.body": {
+      "message": "我們於 {time} 收到你的帳號刪除申請，待未完成的訂單處理完畢後會刪除帳號，此申請無法撤回。若這不是你的操作，請盡快聯絡客服。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "email 內文：確認信，地址在寄送時才向 identity 讀。"
+    },
+    "buyer_deletion_requested.title": {
+      "message": "已收到帳號刪除申請",
+      "description": "email 標題：買家刪帳申請確認（buyer_deletion_requested 型別，只寄 email）。"
+    },
     "chat_message_buyer.body": {
       "message": "店家傳了一則訊息給你。",
       "description": "收件匣與推播的內文：聊天新訊息的推播（chat_message_buyer 型別，收件人是買家）。"
@@ -89,6 +118,149 @@
       "message": "收到新回覆",
       "description": "收件匣與推播的標題：留言收到回覆（comment_replied_store 型別，收件人是店家）。"
     },
+    "content_hidden.body": {
+      "message": "你的{source}於 {time} 因「{reason}」被隱藏。",
+      "params": {
+        "reason": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：source 是來源（content_source.*），reason 是政策分類的顯示文字，不放管理員說明。"
+    },
+    "content_hidden.title": {
+      "message": "你的內容已被隱藏",
+      "description": "標題：作者的內容被隱藏（content_hidden 型別）。"
+    },
+    "content_restored.body": {
+      "message": "你的{source}已於 {time} 恢復顯示。",
+      "params": {
+        "source": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：source 是來源（content_source.*）。"
+    },
+    "content_restored.title": {
+      "message": "你的內容已恢復顯示",
+      "description": "標題：作者的內容被還原（content_restored 型別）。"
+    },
+    "content_source.message": {
+      "message": "聊天訊息",
+      "description": "被隱藏內容的來源：聊天訊息。"
+    },
+    "content_source.review": {
+      "message": "評價",
+      "description": "被隱藏內容的來源：評價。"
+    },
+    "content_source.social": {
+      "message": "留言",
+      "description": "被隱藏內容的來源：社群留言（討論區留言同）。"
+    },
+    "delegation_action.audit_correction": {
+      "message": "更正代行紀錄",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：AUDIT_CORRECTION。"
+    },
+    "delegation_action.media_upload": {
+      "message": "上傳媒體檔案",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：MEDIA_UPLOAD。"
+    },
+    "delegation_action.order_pii_reveal": {
+      "message": "查看訂單的個人資料",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：ORDER_PII_REVEAL。"
+    },
+    "delegation_action.order_read": {
+      "message": "查看訂單",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：ORDER_READ。"
+    },
+    "delegation_action.post_create": {
+      "message": "建立貼文",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：POST_CREATE。"
+    },
+    "delegation_action.post_publish": {
+      "message": "發布貼文",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：POST_PUBLISH。"
+    },
+    "delegation_action.post_read": {
+      "message": "查看貼文",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：POST_READ。"
+    },
+    "delegation_action.post_schedule": {
+      "message": "排程貼文",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：POST_SCHEDULE。"
+    },
+    "delegation_action.post_unpublish": {
+      "message": "取消發布貼文",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：POST_UNPUBLISH。"
+    },
+    "delegation_action.post_update": {
+      "message": "更新貼文",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：POST_UPDATE。"
+    },
+    "delegation_action.product_batch_unpublish": {
+      "message": "批次下架商品",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：PRODUCT_BATCH_UNPUBLISH。"
+    },
+    "delegation_action.product_create": {
+      "message": "建立商品",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：PRODUCT_CREATE。"
+    },
+    "delegation_action.product_publish": {
+      "message": "上架商品",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：PRODUCT_PUBLISH。"
+    },
+    "delegation_action.product_read": {
+      "message": "查看商品",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：PRODUCT_READ。"
+    },
+    "delegation_action.product_unpublish": {
+      "message": "下架商品",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：PRODUCT_UNPUBLISH。"
+    },
+    "delegation_action.product_update": {
+      "message": "更新商品",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：PRODUCT_UPDATE。"
+    },
+    "delegation_action.storefront_cover_update": {
+      "message": "更新店面封面",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：STOREFRONT_COVER_UPDATE。"
+    },
+    "delegation_action.storefront_logo_update": {
+      "message": "更新店面標誌",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：STOREFRONT_LOGO_UPDATE。"
+    },
+    "delegation_action.storefront_read": {
+      "message": "查看店面資料",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：STOREFRONT_READ。"
+    },
+    "delegation_action.storefront_update": {
+      "message": "更新店面資料",
+      "description": "代行動作的片語（delegation_operation_completed 內文的 action）：STOREFRONT_UPDATE。"
+    },
+    "delegation_operation_completed.body": {
+      "message": "平台人員於 {time} 代行你的店家，{action}。",
+      "params": {
+        "action": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：只由列舉組成，不放名稱或自由文字。action 是動作的片語（delegation_action.*）。"
+    },
+    "delegation_operation_completed.title": {
+      "message": "平台人員已代行操作你的店家",
+      "description": "標題：代行完成（delegation_operation_completed 型別）。"
+    },
     "device_app.invalid": {
       "message": "推播 token 所屬的 App 必須是買家 App 或賣家 App。",
       "description": "RegisterDeviceToken 的 app 沒給或不認得。"
@@ -104,6 +276,71 @@
     "inbox_item.not_found": {
       "message": "找不到這則通知。",
       "description": "通知不存在或不是呼叫者的（兩者同一句，不洩漏存在與否）：已讀、刪除（NotificationAppService）。"
+    },
+    "kyc_approved.body": {
+      "message": "你的店家審核已於 {time} 通過。請到賣家中心繼續設定。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：KYC 核准。"
+    },
+    "kyc_approved.title": {
+      "message": "店家審核已通過",
+      "description": "標題：KYC 核准（kyc_approved 型別）。"
+    },
+    "kyc_rejected.body": {
+      "message": "你的店家審核已於 {time} 被退回。請到賣家中心查看退回原因並重新送出。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：KYC 退回，不放退回理由（理由在賣家中心）。"
+    },
+    "kyc_rejected.title": {
+      "message": "店家審核被退回",
+      "description": "標題：KYC 退回（kyc_rejected 型別）。"
+    },
+    "payout_account_activated.body": {
+      "message": "你的收款帳戶已於 {time} 啟用，之後的訂單款項可以撥入。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：收款帳戶第一次啟用。"
+    },
+    "payout_account_activated.title": {
+      "message": "收款帳戶已啟用",
+      "description": "標題：收款帳戶第一次啟用（payout_account_activated 型別）。"
+    },
+    "payout_account_deadline.one_day.body": {
+      "message": "你的收款帳戶資料請在 {deadline} 前補齊，逾期收款功能可能受到限制。",
+      "params": {
+        "deadline": {
+          "type": "string"
+        }
+      },
+      "description": "內文：deadline 是補件期限。"
+    },
+    "payout_account_deadline.one_day.title": {
+      "message": "收款帳戶補件期限剩不到一天",
+      "description": "標題：補件期限前最後一天（檔位 ONE_DAY）。"
+    },
+    "payout_account_deadline.seven_days.body": {
+      "message": "你的收款帳戶還有資料待補，請在 {deadline} 前補齊，逾期收款功能可能受到限制。",
+      "params": {
+        "deadline": {
+          "type": "string"
+        }
+      },
+      "description": "內文：deadline 是補件期限（台北時間，到分鐘）。"
+    },
+    "payout_account_deadline.seven_days.title": {
+      "message": "收款帳戶補件期限將至",
+      "description": "標題：補件期限前 7 天內（payout_account_deadline 型別，檔位 SEVEN_DAYS）。"
     },
     "post_liked.body": {
       "message": "有人對你的貼文按讚。",
@@ -142,6 +379,47 @@
       "message": "商品補貨通知",
       "description": "收件匣與推播的標題：商品補貨（product_restocked 型別，收件人是買家）。"
     },
+    "report_outcome.abusive": {
+      "message": "這項檢舉不符合受理規定。",
+      "description": "檢舉結果的類別（report_resolved 內文的 outcome）：abusive。"
+    },
+    "report_outcome.action_taken": {
+      "message": "平台已依規定處理。",
+      "description": "檢舉結果的類別（report_resolved 內文的 outcome）：action_taken。"
+    },
+    "report_outcome.duplicate": {
+      "message": "這項檢舉與先前的檢舉重複，已併入處理。",
+      "description": "檢舉結果的類別（report_resolved 內文的 outcome）：duplicate。"
+    },
+    "report_outcome.insufficient": {
+      "message": "資料不足，無法成立。",
+      "description": "檢舉結果的類別（report_resolved 內文的 outcome）：insufficient。"
+    },
+    "report_outcome.no_violation": {
+      "message": "經審查，未發現違規。",
+      "description": "檢舉結果的類別（report_resolved 內文的 outcome）：no_violation。"
+    },
+    "report_received.body": {
+      "message": "我們已收到你提交的檢舉資料，會依規定處理，處理結果會再通知你。",
+      "description": "內文：檢舉確認。"
+    },
+    "report_received.title": {
+      "message": "已收到你的檢舉",
+      "description": "標題：檢舉人收到確認（report_received 型別，買家與店家同文）。"
+    },
+    "report_resolved.body": {
+      "message": "你的檢舉已處理完畢：{outcome}",
+      "params": {
+        "outcome": {
+          "type": "string"
+        }
+      },
+      "description": "內文：只說結果類別（report_outcome.*），不說處置種類與對象。"
+    },
+    "report_resolved.title": {
+      "message": "你的檢舉有結果了",
+      "description": "標題：檢舉有結果（report_resolved 型別，買家與店家同文）。"
+    },
     "review_created.body": {
       "message": "有買家評價了你的商品。",
       "description": "收件匣與推播的內文：商品收到新評價（review_created 型別，收件人是店家）。"
@@ -150,6 +428,52 @@
       "message": "收到新評價",
       "description": "收件匣與推播的標題：商品收到新評價（review_created 型別，收件人是店家）。"
     },
+    "rfq_invited.body": {
+      "message": "有買家發出新的詢價並邀請你的店家回覆。",
+      "description": "內文：不放買家資料與詢價內容。"
+    },
+    "rfq_invited.title": {
+      "message": "有買家邀請你的店家報價",
+      "description": "標題：詢價邀請（rfq_invited 型別）。"
+    },
+    "store_case_inquiry.explanation.body": {
+      "message": "平台請你的店家說明相關情形，請於 {due} 前回覆。詳情請到賣家中心查看。",
+      "params": {
+        "due": {
+          "type": "string"
+        }
+      },
+      "description": "內文：詢問種類 EXPLANATION。due 是回覆期限。"
+    },
+    "store_case_inquiry.records.body": {
+      "message": "平台請你的店家提供相關紀錄，請於 {due} 前回覆。詳情請到賣家中心查看。",
+      "params": {
+        "due": {
+          "type": "string"
+        }
+      },
+      "description": "內文：詢問種類 RECORDS。due 是回覆期限。"
+    },
+    "store_case_inquiry.title": {
+      "message": "平台對你的店家發出詢問",
+      "description": "標題：案件詢問（store_case_inquiry 型別）。"
+    },
+    "store_content_taken_down.body": {
+      "message": "平台已於 {time} 下架你店家的 {count} 項內容。請到賣家中心查看措施詳情與申覆方式。",
+      "params": {
+        "count": {
+          "type": "integer"
+        },
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：內容下架措施。count 是下架的內容數，time 是措施時間。"
+    },
+    "store_content_taken_down.title": {
+      "message": "店家內容已被下架",
+      "description": "標題：平台下架店家的內容（store_content_taken_down 型別）。"
+    },
     "store_followed.body": {
       "message": "有買家開始追蹤你的店家。",
       "description": "收件匣與推播的內文：店家被追蹤（store_followed 型別，收件人是店家）。"
@@ -157,6 +481,139 @@
     "store_followed.title": {
       "message": "新的追蹤者",
       "description": "收件匣與推播的標題：店家被追蹤（store_followed 型別，收件人是店家）。"
+    },
+    "store_measure_ended.body": {
+      "message": "對你的店家的一項措施已於 {time} 結束。請到賣家中心查看。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：措施結束。"
+    },
+    "store_measure_ended.title": {
+      "message": "店家措施已結束",
+      "description": "標題：措施結束（store_measure_ended 型別；接受解除請求時由同一個冪等鍵併入）。"
+    },
+    "store_measure_issued.termination.body": {
+      "message": "平台已於 {time} 對你的店家發出終止合作的措施。請到賣家中心查看事由與申覆方式。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：終止合作措施。"
+    },
+    "store_measure_issued.termination.title": {
+      "message": "平台通知終止合作",
+      "description": "標題：店家收到終止合作措施（store_measure_issued 型別，種類 TERMINATION）。"
+    },
+    "store_measure_issued.warning.body": {
+      "message": "平台已於 {time} 對你的店家發出警告。請到賣家中心查看事由與後續處理。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：警告措施。"
+    },
+    "store_measure_issued.warning.title": {
+      "message": "店家收到警告",
+      "description": "標題：店家收到警告措施（store_measure_issued 型別，種類 WARNING）。"
+    },
+    "store_measure_request_decided.appeal_rejected.body": {
+      "message": "你對店家措施提出的申覆已於 {time} 審理完畢，未獲通過。請到賣家中心查看。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：申覆被駁回。"
+    },
+    "store_measure_request_decided.appeal_rejected.title": {
+      "message": "申覆未獲通過",
+      "description": "標題：申覆被駁回（store_measure_request_decided 型別，種類 APPEAL）。"
+    },
+    "store_measure_request_decided.remediation_rejected.body": {
+      "message": "你提出的措施解除請求已於 {time} 審理完畢，未獲通過。請到賣家中心查看。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：解除請求被駁回。"
+    },
+    "store_measure_request_decided.remediation_rejected.title": {
+      "message": "解除請求未獲通過",
+      "description": "標題：解除請求被駁回（store_measure_request_decided 型別，種類 REMEDIATION）。"
+    },
+    "store_measure_revised.body": {
+      "message": "平台已於 {time} 更新對你的店家的措施內容（第 {revision} 版）。請到賣家中心查看。",
+      "params": {
+        "revision": {
+          "type": "integer"
+        },
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：措施更新。revision 是新的版本。"
+    },
+    "store_measure_revised.title": {
+      "message": "店家措施內容已更新",
+      "description": "標題：措施內容（理由、結束時間）改變（store_measure_revised 型別）。"
+    },
+    "store_measure_revoked.body": {
+      "message": "對你的店家的一項措施已於 {time} 撤銷。請到賣家中心查看。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：措施撤銷。"
+    },
+    "store_measure_revoked.title": {
+      "message": "店家措施已撤銷",
+      "description": "標題：措施撤銷（store_measure_revoked 型別；接受申覆時由同一個冪等鍵併入）。"
+    },
+    "store_pending_deletion.body": {
+      "message": "我們於 {time} 收到你的帳號刪除申請，你的店家已停止經營並進入等待刪除，此申請無法撤回。若這不是你的操作，請盡快聯絡客服。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "email 內文：確認信，地址在寄送時才向 identity 讀，不在任何參數裡。"
+    },
+    "store_pending_deletion.title": {
+      "message": "已收到帳號刪除申請，店家等待刪除",
+      "description": "email 標題：店家隨帳號刪除進入等待（store_pending_deletion 型別，只寄 email）。"
+    },
+    "store_suspended.body": {
+      "message": "你的店家已於 {time} 因平台措施被停權，部分功能受到限制。請到賣家中心查看詳情。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：店家被停權。time 是停權時間（台北時間，到分鐘）。不放措施內容，詳情在賣家中心。"
+    },
+    "store_suspended.title": {
+      "message": "店家已被停權",
+      "description": "收件匣、推播與 email 的標題：店家被停權（store_suspended 型別）。"
+    },
+    "store_unsuspended.body": {
+      "message": "你的店家已於 {time} 解除停權，可以恢復經營。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：店家解除停權。time 是解除時間。"
+    },
+    "store_unsuspended.title": {
+      "message": "店家已解除停權",
+      "description": "標題：店家解除停權（store_unsuspended 型別）。"
     }
   }
 }

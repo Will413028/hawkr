@@ -85,14 +85,14 @@ func funcs(t *testing.T, file string) ([]*ast.FuncDecl, map[string]string) {
 	return out, importNames(f)
 }
 
-// 同步訂閱者在來源的 transaction 內執行，失敗會讓來源 rollback：除了白名單的 token 清除，只准呼叫 Accept。
+// 同步訂閱者在來源的 transaction 內執行，失敗會讓來源 rollback：除了白名單的 token 清除，只准呼叫 Accept（subscribers_governance.go 由 subscribers_governance_test.go 守，它有自己的純函式清單）。
 func TestSynchronousSubscribersOnlyAccept(t *testing.T) {
 	files, err := filepath.Glob("subscribers*.go")
 	if err != nil || len(files) == 0 {
 		t.Fatalf("找不到 subscribers*.go（%v）", err)
 	}
 	total, helpers := 0, 0
-	for _, file := range slices.DeleteFunc(files, func(f string) bool { return strings.HasSuffix(f, "_test.go") }) {
+	for _, file := range slices.DeleteFunc(files, func(f string) bool { return strings.HasSuffix(f, "_test.go") || f == "subscribers_governance.go" }) {
 		fns, imports := funcs(t, file)
 		for _, fn := range fns {
 			if slices.Contains(pureSubscriberHelpers, fn.Name.Name) {

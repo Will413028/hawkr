@@ -4,8 +4,10 @@ import (
 	"context"
 	"slices"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -15,12 +17,20 @@ import (
 type Resolver = registry.Resolver
 
 type resolver struct {
-	buyers *buyer.Module
-	stores *seller.Module
+	buyers    *buyer.Module
+	stores    *seller.Module
+	reporters CaseReporters
 }
 
-// NewResolver 把 buyer 與 seller 組成 worker 端的收件人解析。
-func NewResolver(b *buyer.Module, s *seller.Module) Resolver { return resolver{buyers: b, stores: s} }
+// CaseReporters 是 moderation 案件的檢舉人讀取（*moderation.Module 與 worker 用的 *moderation.CaseReader 都符合）。
+type CaseReporters interface {
+	CaseReporters(ctx context.Context, caseID uuid.UUID, after *moderation.ReportCursor, size int32) (moderation.ReporterPage, error)
+}
+
+// NewResolver 把 buyer、seller 與 moderation 的檢舉人讀取組成 worker 端的收件人解析；reporters 只有結案的檢舉人 fan-out 用到。
+func NewResolver(b *buyer.Module, s *seller.Module, reporters CaseReporters) Resolver {
+	return resolver{buyers: b, stores: s, reporters: reporters}
+}
 
 func (r resolver) BuyerAccounts(ctx context.Context, buyerIDs []int64) (map[int64]int64, error) {
 	return r.buyers.ResolvePrincipals(ctx, buyerIDs)
@@ -87,4 +97,31 @@ func (c storeCodes) StoreCodes(ctx context.Context, storeIDs []int64) (map[int64
 		}
 	}
 	return out, nil
+}
+
+// CaseReporters 以 moderation 的 keyset 從頭走到 afterRank 之後再取 limit 位：檢舉列不會被刪（只清說明），名次穩定；一個案件的檢舉人數有限，重走的成本是已走過的列數。
+func (r resolver) CaseReporters(ctx context.Context, caseID uuid.UUID, afterRank int64, limit int) ([]registry.ReporterRef, error) {
+	var out []registry.ReporterRef
+	var after *moderation.ReportCursor
+	var rank int64
+	for {
+		page, err := r.reporters.CaseReporters(ctx, caseID, after, registry.MaxFollowerPage)
+		if err != nil {
+			return nil, err
+		}
+		for _, it := range page.Items {
+			rank++
+			if rank <= afterRank {
+				continue
+			}
+			out = append(out, registry.ReporterRef{Rank: rank, ReportID: it.ReportID, BuyerID: it.BuyerID, StoreID: it.StoreID})
+			if len(out) == limit {
+				return out, nil
+			}
+		}
+		if page.Next == nil {
+			return out, nil
+		}
+		after = page.Next
+	}
 }

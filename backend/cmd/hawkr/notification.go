@@ -89,9 +89,9 @@ func readNotificationProviders(ctx context.Context, e *config.Env, log *slog.Log
 // newNotification 組裝 notification 模組；serve 與 worker 都要建：serve 訂閱來源事件並排意圖 job，worker 執行意圖 job 與渠道 job。
 // box 是 webhook inbox：模組在這裡登記 Resend 的退信與投訴事件；images 組推播圖片的絕對網址（與 API 回應同一個 MEDIA_ORIGIN 與 URI 樣板，規格用 rpc.PushImagePreset）。
 // 帳號語系讀 identity（preferred_locale，多語系 ADR D1）。
-func newNotification(d *db.DB, id *identity.Module, b *buyer.Module, sl *seller.Module, jc jobs.Enqueuer, box *inbox.Inbox, p notificationProviders, images rpc.Images, log *slog.Logger) *notification.Module {
+func newNotification(d *db.DB, id *identity.Module, b *buyer.Module, sl *seller.Module, reporters notification.CaseReporters, jc jobs.Enqueuer, box *inbox.Inbox, p notificationProviders, images rpc.Images, log *slog.Logger) *notification.Module {
 	return notification.New(notification.Deps{
-		DB: d, Identity: id, Buyer: b, Seller: sl, Directory: notification.NewDirectory(b, sl), Resolver: notification.NewResolver(b, sl), StoreCodes: notification.NewStoreCodes(sl), Jobs: jc, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: b, Seller: sl, Directory: notification.NewDirectory(b, sl), Resolver: notification.NewResolver(b, sl, reporters), StoreCodes: notification.NewStoreCodes(sl), Jobs: jc, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 		Contacts: id, Locales: id, Push: p.push, Mail: p.mail, ImageURL: pushImageURL(images), SuppressionKeys: p.suppression, Inbox: box, ResendWebhookSecret: p.webhookSecret,
 	})
 }
@@ -118,6 +118,7 @@ func subscribeNotification(bus *events.Bus, m *notification.Module) {
 	events.Subscribe[identity.AccountDeleted](bus, m.PurgeTokensOnAccountDeleted)
 	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)
 	events.Subscribe[seller.StoreRetired](bus, m.OnStoreRetired)
+	m.SubscribeGovernance(bus)
 }
 
 func readSuppressionKeys(e *config.Env) notification.SuppressionKeys {

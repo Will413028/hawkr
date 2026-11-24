@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -18,6 +19,7 @@ type fakeResolver struct {
 	buyers    map[int64]int64
 	stores    map[int64]int64
 	followers []FollowerRef
+	reporters map[uuid.UUID][]ReporterRef
 }
 
 func (f fakeResolver) BuyerAccounts(_ context.Context, ids []int64) (map[int64]int64, error) {
@@ -47,6 +49,16 @@ func (fakeResolver) BuyersBlockedBetween(context.Context, int64, int64) (bool, e
 func (fakeResolver) BuyerBlocksStore(context.Context, int64, int64) (bool, error) { return false, nil }
 
 func (fakeResolver) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
+
+func (f fakeResolver) CaseReporters(_ context.Context, caseID uuid.UUID, afterRank int64, limit int) ([]ReporterRef, error) {
+	var out []ReporterRef
+	for _, r := range f.reporters[caseID] {
+		if r.Rank > afterRank && len(out) < limit {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
 
 func (f fakeResolver) StoreFollowers(_ context.Context, _, after int64, limit int, _ time.Time) ([]FollowerRef, error) {
 	var out []FollowerRef
