@@ -4,6 +4,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
@@ -51,6 +52,7 @@ func modules() []migrate.Module {
 		{Name: "coupon", Dir: coupon.Migrations()},
 		{Name: "imageai", Dir: imageai.Migrations()},
 		{Name: "notification", Dir: notification.Migrations()},
+		{Name: "catalog", Dir: catalog.Migrations()},
 	}
 }
 
