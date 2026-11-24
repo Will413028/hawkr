@@ -1307,6 +1307,23 @@ async function mockChatDefaults(page: Page): Promise<void> {
 	}
 }
 
+/**
+ * 通知訊號串流（NotificationAppService/WatchNotifications）：賣家殼層開頁就會連。與 chat 串流同樣以 end-stream 訊框回 not_found
+ * （lib/notifications/watch.ts 視為終止、不重連），e2e 不會留著開著的長連線，也不會有 502 的網路失敗。
+ */
+async function mockNotificationDefaults(page: Page): Promise<void> {
+	await page.route(
+		/\/api\/connect\/hawkr\.notification\.v1alpha1\.NotificationAppService\/WatchNotifications(?:\?|$)/,
+		(route) => {
+			void fulfillConnectStreamError(
+				route,
+				"not_found",
+				"mock: no notification stream",
+			);
+		},
+	);
+}
+
 async function mockSocialDefaults(page: Page): Promise<void> {
 	const empty: Array<[RegExp, unknown]> = [
 		[socialMethod("SocialPublicService", "ListPosts"), { posts: [] }],
@@ -1380,6 +1397,7 @@ export async function setupGatewayMocks(
 	await mockSocialDefaults(page);
 	await mockReviewDefaults(page);
 	await mockChatDefaults(page);
+	await mockNotificationDefaults(page);
 	await mockCrmDefaults(page);
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。
