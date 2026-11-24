@@ -62,11 +62,9 @@
 | 信用卡 | 1 | Visa、MasterCard、JCB、銀聯。一次付清（含國內/外卡）、分期（3/6/9/12/18/24/30 期）、Apple Pay、Google Pay™、Samsung Pay |
 | ATM 轉帳 | 2 | 支援單繳帳號（一次性虛擬帳號） |
 | 超商代碼繳費 | 3 | 持超商代碼至全台統一超商，使用多媒體事務機列印繳費單臨櫃付款 |
-| 貨到付款 | 5 | 7-ELEVEN 門市取貨付款，需開通物流 |
 | 愛金卡 (ICash) | 6 | icash Pay 支付，需申請審核開通 |
 | AFTEE 先享後付 | 7 | 先享後付，需申請審核開通 |
 | LINE Pay | 9 | 需至 LINE Pay 平台申請取得 ID 與 KEY |
-| 宅配貨到付款 | 10 | 黑貓宅配送貨到府付款，需開通物流 |
 | 街口支付 (JKoPay) | 11 | 需申請審核開通 |
 | 信用卡記憶卡號 | — | 付款時選擇記憶卡號，下次自動帶出 |
 | 信用卡 Token | — | 首次交易約定後，後續可幕後授權。需申請審核開通並綁定 IP |
@@ -151,7 +149,6 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 | SamsungPay | C | Int | Samsung Pay |
 | API3D | C | Int | 指定 3D |
 | Union3D | C | Int | 指定銀聯 Unionpay |
-| Ship | C | Int | 貨到付款 |
 | TradeInvoice | C | Int | 電子發票 |
 
 #### 首次信用卡 Token 交易參數
@@ -199,7 +196,7 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 | TradeNo | String | UNi 序號 | |
 | TradeAmt | Int | 訂單金額 | |
 | TradeStatus | Int | 訂單狀態 | 0=取號成功，1=已付款，2=付款失敗，3=付款取消，8=訂單待確認 |
-| PaymentType | Int | 支付工具 | 1=信用卡，2=ATM 轉帳，3=代碼，5=貨到付款（超商取貨付款），6=愛金卡，7=後支付，9=LinePay，10=宅配到付，11=JKoPay |
+| PaymentType | Int | 支付工具 | 1=信用卡，2=ATM 轉帳，3=代碼，6=愛金卡，7=後支付，9=LinePay，11=JKoPay |
 | Gateway | Int | 交易標記 | 固定 2=整合式支付頁 UNiPaypage (UPP) |
 | BuyerHash | String | 買方會員 Token Hash | Token 專用返回參數。需在初次交易帶入 BuyerToken，並由買方登入或註冊買方會員，完成交易後回傳 |
 
@@ -242,24 +239,6 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 | PayNo | String | 繳費代碼 | |
 | ExpireDate | String | 繳費截止時間 | 格式：`YYYY-MM-DD HH:II:SS` |
 
-#### 純取貨（ShipTag=1）/ 貨到付款（PaymentType=5）
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| PartnerId | String | 母代碼 | LgsType=B2C，長度限制 3 |
-| ShipTradeNo | String | UNi 物流序號 | |
-| GoodsType | Int | 寄件型態 | 1=常溫，2=冷凍 |
-| LgsType | String | 物流型態 | `B2C`=大宗寄倉，`C2C`=店到店 |
-| ShipType | Int | 通路類別 | 1=7-ELEVEN |
-| ServiceType | Int | 取貨方式 | 1=取貨付款，3=取貨不付款 |
-| ShipAmt | Int | 取貨付款金額 | |
-| StoreID | String | 取件門市代碼 | |
-| StoreName | String | 取件門市名稱 | |
-| StoreAddr | String | 取件門市地址 | |
-| Consignee | String | 收件人名稱 | 限制長度 10 |
-| ConsigneeMobile | String | 收件人手機號碼 | |
-| ConsigneeMail | String | 收件人電子信箱 | |
-
 #### 愛金卡（PaymentType=6）
 
 | 參數 | 類型 | 說明 | 備註 |
@@ -280,25 +259,6 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 |------|------|------|------|
 | PayNo | String | LINEPay 交易號碼 | |
 | PayTime | String | 付款日期時間 | 格式：`YYYY-MM-DD HH:II:SS` |
-
-#### 宅配到付（PaymentType=10）
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| TradeType | Int | 宅配類別 | 固定 1=正物流 |
-| ShipTradeNo | String | 物流單號 | |
-| GoodsType | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏 |
-| LgsType | String | 物流型態 | `HOME`=黑貓宅配 |
-| ShipType | Int | 通路類別 | 2=黑貓宅配 |
-| ServiceType | Int | 取貨方式 | 1=取貨付款，3=取貨不付款 |
-| ShipAmt | Int | 取貨付款金額 | |
-| Consignee | String | 收件人名稱 | 限制長度 10 |
-| ConsigneeMobile | String | 收件人手機號碼 | |
-| ConsigneeTel | String | 收件人聯絡電話 | 區碼+號碼。若有帶時回 `00-00000000`，若交易當下沒帶時回 `-` |
-| ConsigneeAddress | String | 收件人地址 | |
-| DeliveryTimeTag | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
-| ProductTypeId | String | 商品類別代碼 | 0001~0015（見物流 API 總覽） |
-| ProdDesc | String | 商品名稱 | |
 
 #### 街口支付（PaymentType=11）
 

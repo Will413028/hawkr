@@ -138,4 +138,4 @@ R1–R6 已決 2026-11-24 Will（照建議；R6 選「改成運費設定已填�
 | 盤點與前提重審 | 完成 | 三份盤點（快照 `496b048e2`）；v1 計畫審查 2 輪；前提重審批判 1 輪 | v2 計畫審查 1 輪，修正後未再審（只改驗收文字與補範圍） | `3d8ef0bc0`、`b1bb27a92` |
 | 0 基線 | 未開始 | | | |
 | 1 文件前置 | 完成 | 基線：`check-doc-paths.py` 綠；完成後 `rg -n '設計書 ?69' backend/docs docs` 只剩本計畫與附件 | 無 | 分支 `b3-d-docs` |
-| 7 文件 | 程式完成待驗收 | 基線：`check-doc-paths.py`、`check-payuni-residue.py` 綠，物流商字眼 45 檔（不含 plans、ADR）；完成後兩支腳本綠，剩 16 檔，皆非物流商：`Kubernetes`、`Uber Fx` 子字串，PayUni 金流付款類型（7-ELEVEN ibon），CodeMeta 來源 md 與 `generate.sh`（物流值域歸步驟 4） | CodeMeta 4 份 md 與 `generate.sh` 的物流值等步驟 4；`PayUni 金流官方 API 總覽` 的貨到付款段待 Will 決定 | 分支 `b3-d-docs` |
+| 7 文件 | 程式完成待驗收 | 基線：`check-doc-paths.py`、`check-payuni-residue.py` 綠，物流商字眼 45 檔（不含 plans、ADR）；完成後兩支腳本綠，剩 16 檔，皆非物流商：`Kubernetes`、`Uber Fx` 子字串，PayUni 金流付款類型（7-ELEVEN ibon），CodeMeta 來源 md 與 `generate.sh`（物流值域歸步驟 4） | CodeMeta 4 份 md 與 `generate.sh` 的物流值等步驟 4 | 分支 `b3-d-docs` |
