@@ -107,7 +107,7 @@ func TestAnAuthRejectionIsAlertedAtErrorLevelAndStaysUnknown(t *testing.T) {
 	t.Parallel()
 	var logs bytes.Buffer
 	s := &Service{d: Deps{Logger: slog.New(slog.NewTextHandler(&logs, nil)), Provider: NewFake()}}
-	secret := "sk_live_do_not_print"
+	leakCanary := "sk_live_do_not_print"
 	err := &AuthRejectedError{Status: 401, Code: "invalid_api_key", Err: fmt.Errorf("stripe：HTTP 401 invalid_api_key：%s", "Invalid API Key provided")}
 	if got := s.classify(t.Context(), "create_transfer", err); got != callUnknown {
 		t.Fatalf("classify = %v，預期 callUnknown", got)
@@ -118,7 +118,7 @@ func TestAnAuthRejectionIsAlertedAtErrorLevelAndStaysUnknown(t *testing.T) {
 			t.Errorf("告警 log 缺少 %q：%s", want, out)
 		}
 	}
-	if strings.Contains(out, secret) || strings.Contains(out, "Invalid API Key provided") {
+	if strings.Contains(out, leakCanary) || strings.Contains(out, "Invalid API Key provided") {
 		t.Errorf("告警 log 帶了回應內容：%s", out)
 	}
 	logs.Reset()
