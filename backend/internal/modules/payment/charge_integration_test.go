@@ -153,22 +153,22 @@ func (f *chargeFixture) text(t *testing.T, sql string, args ...any) string {
 
 func (f *chargeFixture) externalOf(t *testing.T, orderNo string) string {
 	t.Helper()
-	return f.text(t, "SELECT external_payment_id FROM payment.payments WHERE order_no = $1", orderNo)
+	return f.text(t, "SELECT external_payment_id FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = $1)", orderNo)
 }
 
 func (f *chargeFixture) statusOf(t *testing.T, orderNo string) PaymentStatus {
 	t.Helper()
-	return PaymentStatus(f.text(t, "SELECT status FROM payment.payments WHERE order_no = $1", orderNo))
+	return PaymentStatus(f.text(t, "SELECT status FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = $1)", orderNo))
 }
 
 func (f *chargeFixture) keyOf(t *testing.T, orderNo string) string {
 	t.Helper()
-	return f.text(t, "SELECT create_idempotency_key::text FROM payment.payments WHERE order_no = $1", orderNo)
+	return f.text(t, "SELECT create_idempotency_key::text FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = $1)", orderNo)
 }
 
 func (f *chargeFixture) create(t *testing.T, buyerID int64, orderNo string) Payment {
 	t.Helper()
-	p, err := f.module.CreatePayment(context.Background(), buyerID, orderNo)
+	p, err := f.module.CreatePayment(context.Background(), buyerID, []string{orderNo})
 	must(t, err)
 	return p
 }
@@ -240,7 +240,7 @@ func TestCreatePaymentCreatesTheIntentAfterCommitOutsideTheTransactionWithTheSto
 	f := setupCharge(t)
 	f.order("O-1", 11, 7, 250)
 	p := f.create(t, 11, "O-1")
-	if p.Status != PaymentAwaitingPayment || p.ClientSecret == "" || p.Amount != 250 || p.StoreID != 7 || p.BuyerID != 11 || p.Provider != ChargeFakeName {
+	if p.Status != PaymentAwaitingPayment || p.ClientSecret == "" || p.Amount != 250 || len(p.Orders) != 1 || p.Orders[0].StoreID != 7 || p.Orders[0].Amount != 250 || p.BuyerID != 11 || p.Provider != ChargeFakeName {
 		t.Fatalf("付款=%+v", p)
 	}
 	f.noViolations(t)
@@ -330,7 +330,7 @@ func TestAnUnresolvedCreateIsLookedUpPastTheResendWindowAndFailsOnlyAfterTheNotF
 	}
 	f.now = start.Add(PaymentNotFoundAfter + time.Minute)
 	must(t, f.module.CreatePaymentIntent(context.Background(), p.ID, false))
-	if f.statusOf(t, "O-4") != PaymentCreateFailed || f.text(t, "SELECT failure_reason FROM payment.payments WHERE order_no = 'O-4'") != "provider_not_found" {
+	if f.statusOf(t, "O-4") != PaymentCreateFailed || f.text(t, "SELECT failure_reason FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-4')") != "provider_not_found" {
 		t.Fatalf("終局=%s", f.statusOf(t, "O-4"))
 	}
 	if after, _, _ := f.fake.Calls(); after != calls {
@@ -387,13 +387,13 @@ func TestASecondCreatePaymentForTheSameOrderProducesNoSecondIntent(t *testing.T)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := f.module.CreatePayment(context.Background(), 11, "O-6b"); err != nil {
+			if _, err := f.module.CreatePayment(context.Background(), 11, []string{"O-6b"}); err != nil {
 				t.Error(err)
 			}
 		}()
 	}
 	wg.Wait()
-	if got := len(f.fake.IntentFor("O-6b")); got != 1 || f.count(t, "SELECT count(*) FROM payment.payments WHERE order_no = 'O-6b'") != 1 {
+	if got := len(f.fake.IntentFor("O-6b")); got != 1 || f.count(t, "SELECT count(*) FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-6b')") != 1 {
 		t.Fatalf("並行建立：PaymentIntent %d 個", got)
 	}
 	f.noViolations(t)
@@ -412,7 +412,7 @@ func TestCreatePaymentRefusesWhatTheOrderOrTheCallerDoesNotAllow(t *testing.T) {
 		no    string
 		kind  apperr.Kind
 	}{{11, "O-7", apperr.KindFailedPrecondition}, {11, "O-7z", apperr.KindFailedPrecondition}, {11, "O-7o", apperr.KindNotFound}, {11, "missing", apperr.KindNotFound}, {0, "O-7", apperr.KindInvalidInput}} {
-		if _, err := f.module.CreatePayment(ctx, c.buyer, c.no); apperr.KindOf(err) != c.kind {
+		if _, err := f.module.CreatePayment(ctx, c.buyer, []string{c.no}); apperr.KindOf(err) != c.kind {
 			t.Fatalf("buyer=%d order=%s：%v，預期 %v", c.buyer, c.no, err, c.kind)
 		}
 	}
@@ -422,11 +422,11 @@ func TestCreatePaymentRefusesWhatTheOrderOrTheCallerDoesNotAllow(t *testing.T) {
 	f.order("O-7c", 11, 7, 100)
 	f.create(t, 11, "O-7c")
 	f.order("O-7c", 11, 7, 999)
-	if _, err := f.module.CreatePayment(ctx, 11, "O-7c"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.CreatePayment(ctx, 11, []string{"O-7c"}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("訂單金額變動之後再次建立：%v", err)
 	}
 	err := f.db.InTx(ctx, func(ctx context.Context) error {
-		_, err := f.module.CreatePayment(ctx, 11, "O-7c")
+		_, err := f.module.CreatePayment(ctx, 11, []string{"O-7c"})
 		return err
 	})
 	if err == nil {
@@ -500,10 +500,10 @@ func TestADuplicatePaymentEventIsRecordedOnceAndPublishesOnce(t *testing.T) {
 		t.Fatalf("PaymentChanged(SUCCEEDED) %d 次，狀態=%s，已處理=%v", f.changesTo(PaymentSucceeded), f.statusOf(t, "O-9"), f.processed(t, "evt_dup"))
 	}
 	last := f.changes[len(f.changes)-1]
-	if last.Previous != PaymentAwaitingPayment || last.OrderNo != "O-9" || last.PaidAt == nil || !last.PaidAt.Equal(f.now) || !f.inTx[len(f.inTx)-1] {
+	if last.Previous != PaymentAwaitingPayment || len(last.Orders) != 1 || last.Orders[0].OrderNo != "O-9" || last.PaidAt == nil || !last.PaidAt.Equal(f.now) || !f.inTx[len(f.inTx)-1] {
 		t.Fatalf("事件=%+v inTx=%v", last, f.inTx)
 	}
-	if f.text(t, "SELECT external_charge_id FROM payment.payments WHERE order_no = 'O-9'") == "" {
+	if f.text(t, "SELECT external_charge_id FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-9')") == "" {
 		t.Fatal("入帳沒有記 charge")
 	}
 	f.noViolations(t)
@@ -577,12 +577,12 @@ func TestAFailedAttemptKeepsTheSameIntentAndRecordsTheReason(t *testing.T) {
 	f.sync(t, p.ID)
 	must(t, f.fake.FailAttempt(ext, "card_declined"))
 	f.sync(t, p.ID)
-	if got := f.text(t, "SELECT last_error FROM payment.payments WHERE order_no = 'O-12'"); got != "card_declined" || f.statusOf(t, "O-12") != PaymentAwaitingPayment {
+	if got := f.text(t, "SELECT last_error FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-12')"); got != "card_declined" || f.statusOf(t, "O-12") != PaymentAwaitingPayment {
 		t.Fatalf("last_error=%q 狀態=%s", got, f.statusOf(t, "O-12"))
 	}
 	must(t, f.fake.Settle(ext, PaymentStateSucceeded, f.now))
 	f.sync(t, p.ID)
-	if f.text(t, "SELECT last_error FROM payment.payments WHERE order_no = 'O-12'") != "" || f.fake.Intents() != 1 {
+	if f.text(t, "SELECT last_error FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-12')") != "" || f.fake.Intents() != 1 {
 		t.Fatal("成功之後 last_error 沒有清除")
 	}
 }
@@ -699,7 +699,7 @@ func TestPaymentCallsWithoutAChargeProviderAreFailedPrecondition(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	if _, err := f.module.CreatePayment(ctx, 1, "O"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.CreatePayment(ctx, 1, []string{"O"}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("CreatePayment：%v", err)
 	}
 	if _, err := f.module.GetPayment(ctx, 1, "O"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
@@ -726,8 +726,8 @@ func TestTheSchemaGuardsTheTransferAndRefundInvariants(t *testing.T) {
 		return err
 	}
 	insertTransfer := func(status string) error {
-		return exec(`INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, status, failure_reason, created_at, updated_at)
-VALUES ($1, $2, 7, 100, 'acct_1', $3::text, CASE WHEN $3::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, status)
+		return exec(`INSERT INTO payment.transfers (id, payment_order_id, store_id, amount, destination_account_id, status, failure_reason, created_at, updated_at)
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), 7, 100, 'acct_1', $3::text, CASE WHEN $3::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, status)
 	}
 	must(t, insertTransfer("FAILED"))
 	must(t, insertTransfer("PENDING"))
@@ -745,9 +745,9 @@ VALUES ($1, $2, 7, 100, 'acct_1', $3::text, CASE WHEN $3::text = 'FAILED' THEN '
 	// insertRefund 寫一筆退款列：status 與撤回彙總狀態 reversalStatus 各自獨立；ext 是 provider 的退款 ID（有就同時寫呼叫時刻），reason 是撤回的原因，
 	// recovered 非 nil 表示撤回額已全部成立（reversal_recovered 等於預留額），nil 是 0。
 	insertRefund := func(key, status, reversalStatus string, reversalAmount int64, ext, reason, recovered *string) error {
-		return exec(`INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_status, reversal_amount, reversal_reason, reversal_recovered,
+		return exec(`INSERT INTO payment.refunds (id, payment_order_id, request_key, amount, status, reversal_status, reversal_amount, reversal_reason, reversal_recovered,
 	external_refund_id, refund_called_at, failure_reason, created_at, updated_at)
-VALUES ($1, $2, $3, 50, $4::text, $5::text, $6, $7::text, CASE WHEN $8::text IS NOT NULL THEN $6::bigint ELSE 0 END,
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), $3, 50, $4::text, $5::text, $6, $7::text, CASE WHEN $8::text IS NOT NULL THEN $6::bigint ELSE 0 END,
 	$9::text, CASE WHEN $9::text IS NOT NULL OR $4::text IN ('REFUNDING', 'SUCCEEDED') THEN now() END, CASE WHEN $4::text IN ('FAILED', 'ANOMALY') THEN 'x' END, now(), now())`,
 			uuid.NewV7(), p.ID, key, status, reversalStatus, reversalAmount, reason, recovered, ext)
 	}
@@ -791,8 +791,8 @@ VALUES ($1, $2, $3, 50, $4::text, $5::text, $6, $7::text, CASE WHEN $8::text IS 
 	var k5b uuid.UUID
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM payment.refunds WHERE request_key = 'k5b'").Scan(&k5b))
 	insertSeg := func(seq int, target *uuid.UUID, amount int64, status string) error {
-		return exec(`INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, 'tr_1', $6, $7::text, CASE WHEN $7::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $7::text = 'REVERSED' THEN now() END, CASE WHEN $7::text = 'REVERSED' THEN 'trr_' || $1::uuid::text END, now(), now())`,
+		return exec(`INSERT INTO payment.refund_reversals (id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
+VALUES ($1, $2, (SELECT id FROM payment.payment_orders WHERE payment_id = $3), $4, $5, 'tr_1', $6, $7::text, CASE WHEN $7::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $7::text = 'REVERSED' THEN now() END, CASE WHEN $7::text = 'REVERSED' THEN 'trr_' || $1::uuid::text END, now(), now())`,
 			uuid.NewV7(), k5b, p.ID, seq, target, amount, status)
 	}
 	must(t, insertSeg(0, nil, 20, "REVERSING"))
@@ -831,8 +831,8 @@ func TestTheSchemaStoresTheExternalIDOfEveryStateThatHasOne(t *testing.T) {
 	}
 	ptr := func(s string) *string { return &s }
 	insertRefund := func(key, status string, ext *string, called bool) error {
-		return exec(`INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, refund_called_at, external_refund_id, failure_reason, created_at, updated_at)
-VALUES ($1, $2, $3, 50, $4::text, CASE WHEN $5::bool THEN now() END, $6::text, CASE WHEN $4::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, key, status, called, ext)
+		return exec(`INSERT INTO payment.refunds (id, payment_order_id, request_key, amount, status, refund_called_at, external_refund_id, failure_reason, created_at, updated_at)
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), $3, 50, $4::text, CASE WHEN $5::bool THEN now() END, $6::text, CASE WHEN $4::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, key, status, called, ext)
 	}
 	must(t, insertRefund("r1", "REFUNDING", ptr("re_1"), true))
 	must(t, insertRefund("r2", "FAILED", ptr("re_2"), true))
@@ -847,8 +847,8 @@ VALUES ($1, $2, $3, 50, $4::text, CASE WHEN $5::bool THEN now() END, $6::text, C
 		t.Fatal("有外部 ID 卻沒有呼叫時刻")
 	}
 	insertTransfer := func(status string, ext *string) error {
-		return exec(`INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, status, external_transfer_id, called_at, failure_reason, created_at, updated_at)
-VALUES ($1, $2, 7, 100, 'acct_1', $3::text, $4::text, CASE WHEN $4::text IS NOT NULL OR $3::text = 'SUCCEEDED' THEN now() END, CASE WHEN $3::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, status, ext)
+		return exec(`INSERT INTO payment.transfers (id, payment_order_id, store_id, amount, destination_account_id, status, external_transfer_id, called_at, failure_reason, created_at, updated_at)
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), 7, 100, 'acct_1', $3::text, $4::text, CASE WHEN $4::text IS NOT NULL OR $3::text = 'SUCCEEDED' THEN now() END, CASE WHEN $3::text = 'FAILED' THEN 'x' END, now(), now())`, uuid.NewV7(), p.ID, status, ext)
 	}
 	must(t, insertTransfer("FAILED", ptr("tr_f")))
 	if err := insertTransfer("SUCCEEDED", nil); err == nil {
@@ -951,7 +951,7 @@ func TestACanceledPaymentOfAStillPayableOrderGetsANewIntentOnTheSameRow(t *testi
 	f.unpayable("O-F5", 11)
 	must(t, f.fake.Settle(newExt, PaymentStateCanceled, f.now))
 	f.sync(t, p.ID)
-	if _, err := f.module.CreatePayment(context.Background(), 11, "O-F5"); apperr.KindOf(err) != apperr.KindFailedPrecondition || f.statusOf(t, "O-F5") != PaymentCanceled {
+	if _, err := f.module.CreatePayment(context.Background(), 11, []string{"O-F5"}); apperr.KindOf(err) != apperr.KindFailedPrecondition || f.statusOf(t, "O-F5") != PaymentCanceled {
 		t.Fatalf("訂單不可付時不能重設：%v %s", err, f.statusOf(t, "O-F5"))
 	}
 }

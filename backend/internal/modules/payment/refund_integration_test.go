@@ -44,7 +44,7 @@ func (f *chargeFixture) syncRefund(t *testing.T, ctx context.Context, id uuid.UU
 
 func (f *chargeFixture) refundCount(t *testing.T, orderNo string) int64 {
 	t.Helper()
-	return f.count(t, "SELECT count(*) FROM payment.refunds r JOIN payment.payments p ON p.id = r.payment_id WHERE p.order_no = $1", orderNo)
+	return f.count(t, "SELECT count(*) FROM payment.refunds r JOIN payment.payment_orders p ON p.id = r.payment_order_id WHERE p.order_no = $1", orderNo)
 }
 
 func wantKind(t *testing.T, err error, kind apperr.Kind, what string) {
@@ -61,10 +61,10 @@ func wantKind(t *testing.T, err error, kind apperr.Kind, what string) {
 func TestCreateRefundWritesThePendingRowAndTheJobEnforcesTheCapAndIsIdempotentByKey(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
-	p := f.paidPayment(t, "RF-1", 100)
+	f.paidPayment(t, "RF-1", 100)
 	f.clearJobs()
 	r := f.createRefund(t, "RF-1", "case-1", 40, false)
-	if r.Status != RefundPending || r.Amount != 40 || r.ReversalAmount != 0 || r.PaymentID != p.ID || r.Auto {
+	if r.Status != RefundPending || r.Amount != 40 || r.ReversalAmount != 0 || r.OrderNo != "RF-1" || r.Auto {
 		t.Fatalf("退款=%+v", r)
 	}
 	if ids := f.jobIDs(t, kindRefundCreate, "refund_id"); len(ids) != 1 || ids[0] != r.ID {
@@ -562,16 +562,16 @@ func TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheS
 		t.Fatalf("前置：%s", f.refundText(t, "status", r.ID))
 	}
 	ext := f.fake.RefundIDs()[0]
-	err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, "re_typo")
+	err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", "re_typo")
 	wantKind(t, err, apperr.KindFailedPrecondition, "亂貼的 ID")
-	err = f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ext)
+	err = f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ext)
 	wantKind(t, err, apperr.KindFailedPrecondition, "金額不符")
 	if f.refundText(t, "status", r.ID) != "ANOMALY" || f.auditCount(t) != 0 {
 		t.Fatalf("被擋下的結案改動了列：%s", f.refundText(t, "status", r.ID))
 	}
 	must(t, f.fake.SetRefundAmount(ext, 100))
 	f.clearJobs()
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ext))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ext))
 	if f.refundText(t, "status", r.ID) != "REFUNDING" || f.refundText(t, "external_refund_id", r.ID) != ext || f.auditCount(t) != 1 {
 		t.Fatalf("相符之後：%s", f.refundText(t, "status", r.ID))
 	}
@@ -586,7 +586,7 @@ func TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheS
 	f.paidPayment(t, "RZ-2", 100)
 	bad := f.createRefund(t, "RZ-2", "k", 100, false)
 	f.exec(t, "UPDATE payment.refunds SET status = 'ANOMALY', failure_reason = 'lookup_failed' WHERE id = $1", bad.ID)
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, bad.ID, AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, bad.ID, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f.refundText(t, "status", bad.ID) != "FAILED" || f.refundText(t, "failure_reason", bad.ID) != "admin_resolved" {
 		t.Fatalf("結案成失敗：%s", f.refundText(t, "status", bad.ID))
 	}
@@ -711,7 +711,7 @@ func TestResolvingARefundStageAnomalyFailsWhenThePaymentExternalIDChangedAfterTh
 	must(t, f.runRefund(r.ID, false))
 	ext := f.fake.RefundIDs()[0]
 	must(t, f.fake.SetRefundAmount(ext, 100))
-	err := f.module.ResolveAnomaly(context.Background(), f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ext)
+	err := f.module.ResolveAnomaly(context.Background(), f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ext)
 	wantKind(t, err, apperr.KindFailedPrecondition, "付款外部 ID 變了")
 	if f.refundText(t, "status", r.ID) != "ANOMALY" || f.auditCount(t) != 0 {
 		t.Fatalf("結案改動了列：%s", f.refundText(t, "status", r.ID))
@@ -723,8 +723,8 @@ type afterFindRefund struct {
 	after func()
 }
 
-func (a *afterFindRefund) FindRefund(ctx context.Context, externalPaymentID, attemptID string) (ChargeRefundSnapshot, bool, error) {
-	snap, found, err := a.ChargeProvider.FindRefund(ctx, externalPaymentID, attemptID)
+func (a *afterFindRefund) FindRefund(ctx context.Context, externalPaymentID, attemptID string, createdAfter time.Time) (ChargeRefundSnapshot, bool, error) {
+	snap, found, err := a.ChargeProvider.FindRefund(ctx, externalPaymentID, attemptID, createdAfter)
 	a.after()
 	return snap, found, err
 }

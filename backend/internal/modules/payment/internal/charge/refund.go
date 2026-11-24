@@ -113,7 +113,11 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 		if err != nil {
 			return err
 		}
-		existing, err := q.RefundByRequestKey(ctx, store.RefundByRequestKeyParams{PaymentID: pay.ID, RequestKey: key})
+		order, err := q.LockPaymentOrderByOrderNo(ctx, orderNo)
+		if err != nil {
+			return err
+		}
+		existing, err := q.RefundByRequestKey(ctx, store.RefundByRequestKeyParams{PaymentOrderID: order.ID, RequestKey: key})
 		if err == nil {
 			if existing.Amount != in.Amount || existing.Auto != in.Auto {
 				return apperr.FailedPrecondition("這把退款冪等鍵已用於內容不同的退款")
@@ -127,17 +131,17 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 		if pay.Status != string(model.PaymentSucceeded) {
 			return apperr.FailedPrecondition("付款尚未入帳，不能退款")
 		}
-		taken, err := q.NonFailedRefundTotal(ctx, pay.ID)
+		taken, err := q.NonFailedRefundTotal(ctx, order.ID)
 		if err != nil {
 			return err
 		}
-		if in.Amount > pay.Amount-taken {
-			return apperr.FailedPrecondition("退款總額超過付款金額")
+		if in.Amount > order.Amount-taken {
+			return apperr.FailedPrecondition("退款總額超過這張訂單的應收金額")
 		}
 		if !s.refundable(pay) {
 			return apperr.FailedPrecondition("付款目前不能退款（沒有外部付款或屬於別的付款服務）")
 		}
-		reversal, err := s.reservableReversal(ctx, q, pay, in.Amount)
+		reversal, err := s.reservableReversal(ctx, q, order, in.Amount)
 		if err != nil {
 			return err
 		}
@@ -146,7 +150,7 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 			reversalStatus = model.ReversalWaiting
 		}
 		row, err := q.InsertRefund(ctx, store.InsertRefundParams{
-			ID: s.d.NewID(), PaymentID: pay.ID, RequestKey: key, Amount: in.Amount, Auto: in.Auto, ReversalStatus: string(reversalStatus), ReversalAmount: reversal, Now: s.d.Now().UTC(),
+			ID: s.d.NewID(), PaymentOrderID: order.ID, RequestKey: key, Amount: in.Amount, Auto: in.Auto, ReversalStatus: string(reversalStatus), ReversalAmount: reversal, Now: s.d.Now().UTC(),
 		})
 		if err != nil {
 			return err
@@ -157,7 +161,9 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 	if err != nil {
 		return model.Refund{}, err
 	}
-	return toRefund(out), nil
+	view := toRefund(out)
+	view.OrderNo = orderNo
+	return view, nil
 }
 
 // refundable 回傳付款是否能由目前的 provider 退款：已入帳、有外部 ID、屬於目前的 provider。CreateRefund 與退款 job 共用，
@@ -168,8 +174,8 @@ func (s *Service) refundable(pay store.PaymentPayment) bool {
 
 // reservableReversal 在已鎖付款列的 transaction 內依付款的轉帳算這筆退款要預留的收回額度（見 CreateRefund）。轉帳 PENDING 而 called_at 為空時金額還沒承諾，不預留：
 // 轉帳第一次送出時以「付款金額減非失敗退款」重新算定，這筆退款已在其中。鎖順序：付款列（呼叫方已鎖）、轉帳列、退款列。
-func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay store.PaymentPayment, amount int64) (int64, error) {
-	active, err := q.ActiveTransferByPayment(ctx, pay.ID)
+func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, order store.PaymentPaymentOrder, amount int64) (int64, error) {
+	active, err := q.ActiveTransferByOrder(ctx, order.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return 0, nil
 	}
@@ -189,11 +195,11 @@ func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay 
 		}
 	case model.TransferSucceeded, model.TransferAnomaly:
 	}
-	reserved, err := q.PendingReversalTotal(ctx, pay.ID)
+	reserved, err := q.PendingReversalTotal(ctx, order.ID)
 	if err != nil {
 		return 0, err
 	}
-	topups, err := q.DoneTopupCapacity(ctx, pay.ID)
+	topups, err := q.DoneTopupCapacity(ctx, order.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -202,7 +208,7 @@ func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay 
 
 func toRefund(r store.PaymentRefund) model.Refund {
 	out := model.Refund{
-		ID: r.ID, PaymentID: r.PaymentID, RequestKey: r.RequestKey, Amount: r.Amount, Auto: r.Auto,
+		ID: r.ID, PaymentOrderID: r.PaymentOrderID, RequestKey: r.RequestKey, Amount: r.Amount, Auto: r.Auto,
 		Status: model.RefundStatus(r.Status), ReversalAmount: r.ReversalAmount, ReversalStatus: model.ReversalStatus(r.ReversalStatus), TopupStatus: model.TopupStatus(r.TopupStatus), CreatedAt: r.CreatedAt,
 	}
 	if r.FailureReason != nil {
@@ -245,7 +251,7 @@ func (s *Service) refund(ctx context.Context, refundID uuid.UUID) error {
 	if row.Status != string(model.RefundPending) {
 		return nil
 	}
-	pay, err := q.PaymentByID(ctx, row.PaymentID)
+	pay, order, err := paymentOfOrder(ctx, q, row.PaymentOrderID)
 	if err != nil {
 		return err
 	}
@@ -254,7 +260,7 @@ func (s *Service) refund(ctx context.Context, refundID uuid.UUID) error {
 	}
 	now := s.d.Now().UTC()
 	if !inResendWindow(row.RefundCalledAt, now) {
-		return s.lookupRefund(ctx, row, pay, now)
+		return s.lookupRefund(ctx, row, pay, order, now)
 	}
 	called, err := s.markRefundCalled(ctx, refundID, now)
 	if err != nil || called == nil {
@@ -263,16 +269,16 @@ func (s *Service) refund(ctx context.Context, refundID uuid.UUID) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
 	snap, err := s.d.Provider.CreateRefund(callCtx, RefundInput{ExternalPaymentID: *pay.ExternalPaymentID, Amount: called.Amount, IdempotencyKey: called.IdempotencyKey.String()})
-	switch classifyCall(err) {
+	switch s.classify(ctx, "create_refund", err) {
 	case callRefused:
-		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立退款", "refund_id", refundID.String(), "order_no", pay.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立退款", "refund_id", refundID.String(), "order_no", order.OrderNo, "err", err)
 		return s.failRefund(ctx, refundID, failedRefused)
 	case callRetryable:
 		if !firstCall(row.RefundCalledAt, called.RefundCalledAt, now) {
-			s.d.Logger.WarnContext(ctx, "payment：重送退款被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "refund_id", refundID.String(), "order_no", pay.OrderNo, "err", err)
+			s.d.Logger.WarnContext(ctx, "payment：重送退款被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "refund_id", refundID.String(), "order_no", order.OrderNo, "err", err)
 			return err
 		}
-		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立退款、沒有執行，換新冪等鍵重試", "refund_id", refundID.String(), "order_no", pay.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立退款、沒有執行，換新冪等鍵重試", "refund_id", refundID.String(), "order_no", order.OrderNo, "err", err)
 		if rerr := s.rotateRefundKey(ctx, refundID, called.IdempotencyKey, now); rerr != nil {
 			return errors.Join(err, rerr)
 		}
@@ -285,10 +291,10 @@ func (s *Service) refund(ctx context.Context, refundID uuid.UUID) error {
 }
 
 // lookupRefund 是過了 ResendWindow 的退款：不再呼叫 provider，只依嘗試 ID 查回。
-func (s *Service) lookupRefund(ctx context.Context, row store.PaymentRefund, pay store.PaymentPayment, now time.Time) error {
+func (s *Service) lookupRefund(ctx context.Context, row store.PaymentRefund, pay store.PaymentPayment, order store.PaymentPaymentOrder, now time.Time) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	snap, found, err := s.d.Provider.FindRefund(callCtx, *pay.ExternalPaymentID, row.IdempotencyKey.String())
+	snap, found, err := s.d.Provider.FindRefund(callCtx, *pay.ExternalPaymentID, row.IdempotencyKey.String(), lookupLowerBound(row.RefundCalledAt, row.CreatedAt))
 	if err != nil {
 		return s.refundLookupFailed(ctx, row, err)
 	}
@@ -301,7 +307,7 @@ func (s *Service) lookupRefund(ctx context.Context, row store.PaymentRefund, pay
 	if now.Sub(*row.RefundCalledAt) < NotFoundAfter {
 		return fmt.Errorf("%w：退款 %s", errNotFoundYet, row.ID)
 	}
-	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這筆退款，進 FAILED", "refund_id", row.ID.String(), "order_no", pay.OrderNo)
+	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這筆退款，進 FAILED", "refund_id", row.ID.String(), "order_no", order.OrderNo)
 	return s.failRefund(ctx, row.ID, failedNotFound)
 }
 
@@ -328,10 +334,10 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 	orphan := false
 	err := s.d.DB.InTx(wctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		if _, err := q.LockPayment(ctx, row.PaymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, row.PaymentOrderID); err != nil {
 			return err
 		}
-		transferSucceeded, err := s.lockActiveTransfer(ctx, q, row.PaymentID)
+		transferSucceeded, err := s.lockActiveTransfer(ctx, q, row.PaymentOrderID)
 		if err != nil {
 			return err
 		}
@@ -347,21 +353,21 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 				return nil
 			}
 			orphan = true
-			return s.publishAnomaly(ctx, model.AnomalyRefund, row.ID, row.PaymentID, withDetail("refunded_but_refund_"+locked.Status, snap.ExternalID))
+			return s.publishOrderAnomaly(ctx, model.AnomalyRefund, row.ID, row.PaymentOrderID, withDetail("refunded_but_refund_"+locked.Status, snap.ExternalID))
 		}
 		if err != nil {
 			return err
 		}
 		if target != model.RefundFailed {
 			if transferSucceeded {
-				if err := s.startReversals(ctx, q, row.PaymentID); err != nil {
+				if err := s.startReversals(ctx, q, row.PaymentOrderID); err != nil {
 					return err
 				}
 			}
 			if target == model.RefundRefunding {
 				return nil
 			}
-			if err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {
+			if err := s.wakeTransfer(ctx, q, row.ID, row.PaymentOrderID); err != nil {
 				return err
 			}
 			return s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))
@@ -370,25 +376,25 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 			return err
 		}
 		if transferSucceeded {
-			if err := s.startTopups(ctx, q, row.PaymentID); err != nil {
+			if err := s.startTopups(ctx, q, row.PaymentOrderID); err != nil {
 				return err
 			}
 		}
-		if err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {
+		if err := s.wakeTransfer(ctx, q, row.ID, row.PaymentOrderID); err != nil {
 			return err
 		}
 		return s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))
 	})
 	if err == nil && orphan {
 		s.d.Logger.ErrorContext(ctx, "payment：provider 已建立退款，退款列卻不在可接收的狀態，待人工核對",
-			"refund_id", row.ID.String(), "payment_id", row.PaymentID.String(), "refund_external_id", snap.ExternalID)
+			"refund_id", row.ID.String(), "payment_order_id", row.PaymentOrderID.String(), "refund_external_id", snap.ExternalID)
 	}
 	return err
 }
 
-// lockActiveTransfer 鎖付款的有效轉帳（沒有時不鎖）並回傳它是不是 SUCCEEDED。呼叫方已鎖付款列；鎖順序在轉帳列、退款列之前。
-func (s *Service) lockActiveTransfer(ctx context.Context, q *store.Queries, paymentID uuid.UUID) (succeeded bool, err error) {
-	active, err := q.ActiveTransferByPayment(ctx, paymentID)
+// lockActiveTransfer 鎖訂單應收的有效轉帳（沒有時不鎖）並回傳它是不是 SUCCEEDED。呼叫方已鎖付款列與訂單應收列；鎖順序在轉帳列、退款列之前。
+func (s *Service) lockActiveTransfer(ctx context.Context, q *store.Queries, paymentOrderID uuid.UUID) (succeeded bool, err error) {
+	active, err := q.ActiveTransferByOrder(ctx, paymentOrderID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -408,15 +414,15 @@ func (s *Service) lockActiveTransfer(ctx context.Context, q *store.Queries, paym
 // ANOMALY 的撤回列持續佔住額度直到人工結案，結案成成功時落地的 transaction 發。
 func (s *Service) afterRefundFailed(ctx context.Context, r store.PaymentRefund) error {
 	if r.ReversalRecovered > 0 {
-		return s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, "refund_failed_after_reversal")
+		return s.publishOrderAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentOrderID, "refund_failed_after_reversal")
 	}
 	return nil
 }
 
 // wakeTransfer 在退款進終局的 transaction 內讓等它的轉帳立刻重新 claim：付款有效的轉帳還是 PENDING、金額沒承諾（called_at 為空）時排入喚醒 job（claimTransfer 的 errRefundsInFlight 在等的就是這個）。
 // 呼叫方已鎖付款列與轉帳列；轉帳不存在、已承諾金額或已終局時什麼都不做。
-func (s *Service) wakeTransfer(ctx context.Context, q *store.Queries, refundID, paymentID uuid.UUID) error {
-	t, err := q.ActiveTransferByPayment(ctx, paymentID)
+func (s *Service) wakeTransfer(ctx context.Context, q *store.Queries, refundID, paymentOrderID uuid.UUID) error {
+	t, err := q.ActiveTransferByOrder(ctx, paymentOrderID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -431,19 +437,19 @@ func (s *Service) wakeTransfer(ctx context.Context, q *store.Queries, refundID, 
 
 // publishRefundResult 在退款進入終局的 transaction 內發 RefundChanged，自動退款成功再發 AutoRefundCompleted。付款列只讀（鎖順序已由呼叫方守）。
 func (s *Service) publishRefundResult(ctx context.Context, q *store.Queries, r store.PaymentRefund, previous model.RefundStatus) error {
-	pay, err := q.PaymentByID(ctx, r.PaymentID)
+	pay, order, err := paymentOfOrder(ctx, q, r.PaymentOrderID)
 	if err != nil {
 		return err
 	}
 	if err := events.Publish(ctx, s.d.Events, model.RefundChanged{
-		OccurredAt: r.UpdatedAt, RefundID: r.ID, PaymentID: r.PaymentID, OrderNo: pay.OrderNo, StoreID: pay.StoreID, BuyerID: pay.BuyerID, Amount: r.Amount,
+		OccurredAt: r.UpdatedAt, RefundID: r.ID, PaymentID: pay.ID, OrderNo: order.OrderNo, StoreID: order.StoreID, BuyerID: pay.BuyerID, Amount: r.Amount,
 		Auto: r.Auto, RequestKey: r.RequestKey, Status: model.RefundStatus(r.Status), Previous: previous, FailureReason: derefString(r.FailureReason),
 	}); err != nil {
 		return err
 	}
 	if r.Auto && r.Status == string(model.RefundSucceeded) {
 		return events.Publish(ctx, s.d.Events, model.AutoRefundCompleted{
-			OccurredAt: r.UpdatedAt, RefundID: r.ID, PaymentID: r.PaymentID, OrderNo: pay.OrderNo, StoreID: pay.StoreID, BuyerID: pay.BuyerID, Amount: r.Amount,
+			OccurredAt: r.UpdatedAt, RefundID: r.ID, PaymentID: pay.ID, OrderNo: order.OrderNo, StoreID: order.StoreID, BuyerID: pay.BuyerID, Amount: r.Amount,
 		})
 	}
 	return nil
@@ -471,7 +477,7 @@ func (s *Service) SyncRefund(ctx context.Context, refundID uuid.UUID) (again boo
 	if row.ExternalRefundID == nil {
 		return false, nil
 	}
-	pay, err := q.PaymentByID(ctx, row.PaymentID)
+	pay, _, err := paymentOfOrder(ctx, q, row.PaymentOrderID)
 	if err != nil {
 		return false, err
 	}
@@ -568,7 +574,7 @@ func (s *Service) clearRefundLookupFailures(ctx context.Context, row store.Payme
 // anomalyRefund 讓退款階段的退款進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不在 PENDING、REFUNDING 時什麼都不做。
 // 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件。
 func (s *Service) anomalyRefund(ctx context.Context, row store.PaymentRefund, reason, detail string) error {
-	s.d.Logger.ErrorContext(ctx, "payment：退款進 ANOMALY，待人工核對 provider", "refund_id", row.ID.String(), "payment_id", row.PaymentID.String(), "reason", reason, "external_id", detail)
+	s.d.Logger.ErrorContext(ctx, "payment：退款進 ANOMALY，待人工核對 provider", "refund_id", row.ID.String(), "payment_order_id", row.PaymentOrderID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
@@ -579,7 +585,7 @@ func (s *Service) anomalyRefund(ctx context.Context, row store.PaymentRefund, re
 		if err != nil {
 			return err
 		}
-		return s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, withDetail(reason, detail))
+		return s.publishOrderAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentOrderID, withDetail(reason, detail))
 	})
 }
 
@@ -593,10 +599,10 @@ func (s *Service) failRefund(ctx context.Context, refundID uuid.UUID, reason str
 		if err != nil {
 			return err
 		}
-		if _, err := q.LockPayment(ctx, prev.PaymentID); err != nil {
+		if _, _, err := lockOrder(ctx, q, prev.PaymentOrderID); err != nil {
 			return err
 		}
-		transferSucceeded, err := s.lockActiveTransfer(ctx, q, prev.PaymentID)
+		transferSucceeded, err := s.lockActiveTransfer(ctx, q, prev.PaymentOrderID)
 		if err != nil {
 			return err
 		}
@@ -614,11 +620,11 @@ func (s *Service) failRefund(ctx context.Context, refundID uuid.UUID, reason str
 			return err
 		}
 		if transferSucceeded {
-			if err := s.startTopups(ctx, q, prev.PaymentID); err != nil {
+			if err := s.startTopups(ctx, q, prev.PaymentOrderID); err != nil {
 				return err
 			}
 		}
-		if err := s.wakeTransfer(ctx, q, refundID, prev.PaymentID); err != nil {
+		if err := s.wakeTransfer(ctx, q, refundID, prev.PaymentOrderID); err != nil {
 			return err
 		}
 		return s.publishRefundResult(ctx, q, r, model.RefundStatus(prev.Status))

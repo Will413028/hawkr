@@ -152,6 +152,61 @@
       "PAYMENT_ACCOUNT_STATUS_NOT_CREATED": "Preparing",
       "PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": "Under review"
     },
+    "PaymentAnomalyKind": {
+      "PAYMENT_ANOMALY_KIND_PAYMENT": "Payment",
+      "PAYMENT_ANOMALY_KIND_REFUND": "Refund",
+      "PAYMENT_ANOMALY_KIND_REVERSAL": "Recovery",
+      "PAYMENT_ANOMALY_KIND_TOPUP": "Top-up transfer",
+      "PAYMENT_ANOMALY_KIND_TRANSFER": "Transfer"
+    },
+    "PaymentAnomalyOutcome": {
+      "PAYMENT_ANOMALY_OUTCOME_FAILED": "Provider did not execute it",
+      "PAYMENT_ANOMALY_OUTCOME_SUCCEEDED": "Provider executed it"
+    },
+    "PaymentAnomalyResolutionReason": {
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE": "Duplicate",
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER": "Other",
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED": "Provider executed it, not recorded locally",
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED": "Provider did not execute the call"
+    },
+    "PaymentRefundStatus": {
+      "PAYMENT_REFUND_STATUS_ANOMALY": "Needs review",
+      "PAYMENT_REFUND_STATUS_FAILED": "Refund failed",
+      "PAYMENT_REFUND_STATUS_PENDING": "Pending",
+      "PAYMENT_REFUND_STATUS_REFUNDING": "Refunding",
+      "PAYMENT_REFUND_STATUS_SUCCEEDED": "Refunded"
+    },
+    "PaymentReversalStatus": {
+      "PAYMENT_REVERSAL_STATUS_ANOMALY": "Needs review",
+      "PAYMENT_REVERSAL_STATUS_NONE": "Nothing to recover",
+      "PAYMENT_REVERSAL_STATUS_RELEASED": "Not recovered",
+      "PAYMENT_REVERSAL_STATUS_REVERSED": "Recovered",
+      "PAYMENT_REVERSAL_STATUS_REVERSING": "Recovering",
+      "PAYMENT_REVERSAL_STATUS_WAITING": "Waiting"
+    },
+    "PaymentStatus": {
+      "PAYMENT_STATUS_ANOMALY": "Needs review",
+      "PAYMENT_STATUS_AWAITING_PAYMENT": "Awaiting payment",
+      "PAYMENT_STATUS_CANCELED": "Canceled",
+      "PAYMENT_STATUS_CREATE_FAILED": "Could not start",
+      "PAYMENT_STATUS_CREATING": "Setting up",
+      "PAYMENT_STATUS_PROCESSING": "Processing",
+      "PAYMENT_STATUS_SUCCEEDED": "Paid"
+    },
+    "PaymentTopupStatus": {
+      "PAYMENT_TOPUP_STATUS_ANOMALY": "Needs review",
+      "PAYMENT_TOPUP_STATUS_DONE": "Topped up",
+      "PAYMENT_TOPUP_STATUS_NONE": "No top-up",
+      "PAYMENT_TOPUP_STATUS_RELEASED": "Not topped up",
+      "PAYMENT_TOPUP_STATUS_SENDING": "Sending",
+      "PAYMENT_TOPUP_STATUS_WAITING": "Waiting"
+    },
+    "PaymentTransferStatus": {
+      "PAYMENT_TRANSFER_STATUS_ANOMALY": "Needs review",
+      "PAYMENT_TRANSFER_STATUS_FAILED": "Transfer failed",
+      "PAYMENT_TRANSFER_STATUS_PENDING": "Pending",
+      "PAYMENT_TRANSFER_STATUS_SUCCEEDED": "Transferred"
+    },
     "RequirementCollection": {
       "REQUIREMENT_COLLECTION_PLATFORM": "Embedded on platform",
       "REQUIREMENT_COLLECTION_PROVIDER": "Provider-hosted"

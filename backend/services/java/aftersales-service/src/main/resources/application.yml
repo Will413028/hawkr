@@ -64,8 +64,8 @@ hawkr:
           port: ${ORDER_SERVICE_GRPC_PORT:9915}
           plaintext: true
         payment:
-          host: ${PAYMENT_SERVICE_HOST:127.0.0.1}
-          port: ${PAYMENT_SERVICE_GRPC_PORT:9925}
+          host: ${LEGACY_PAYMENT_GRPC_HOST:127.0.0.1}
+          port: ${LEGACY_PAYMENT_GRPC_PORT:9941}
           plaintext: true
         shipping:
           host: ${SHIPPING_SERVICE_HOST:127.0.0.1}

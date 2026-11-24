@@ -59,6 +59,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
+	paymentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1/paymentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/review/v1alpha1/reviewv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
@@ -122,6 +123,8 @@ type Deps struct {
 	Seller   *seller.Module
 	// Payment 是收款帳戶（payment 模組）：賣家的收款帳戶 RPC（seller 確認擁有者之後呼叫）、PaymentAdminService 與收款 webhook。
 	Payment *payment.Module
+	// PaymentPublishableKey 是付款 provider（Stripe）的公開金鑰（不是 secret），PaymentAppService 隨待付款的付款回給 client 初始化 Stripe.js 與 PaymentSheet；沒有設定時 Stripe 付款的 session 回 internal。
+	PaymentPublishableKey string
 	// BizCalendar 是工作日行事曆（platform/bizcalendar）：BizCalendarAdminService 的匯入與涵蓋查詢。
 	BizCalendar *bizcalendar.Store
 	// Social 給後台建立內容下架措施前核對內容歸屬（SellerGovernanceAdminService.CreateMeasure）。
@@ -549,6 +552,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(sellerconnect.NewSellerReportAppServiceHandler(reports, opts...))
 	add(adminsellerconnect.NewSellerProspectAdminServiceHandler(httpseller.NewProspects(deps.Seller, deps.Images), opts...))
 	add(adminpaymentconnect.NewPaymentAdminServiceHandler(httppayment.NewAdmin(deps.Payment), opts...))
+	add(paymentconnect.NewPaymentAppServiceHandler(httppayment.NewApp(deps.Payment, deps.Buyer, deps.PaymentPublishableKey), opts...))
 	add(adminbizcalendarconnect.NewBizCalendarAdminServiceHandler(httpbizcalendar.NewAdmin(deps.BizCalendar, deps.Now), opts...))
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))

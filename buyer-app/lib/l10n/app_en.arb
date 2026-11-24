@@ -19,5 +19,13 @@
   "commonRetry": "Retry",
   "productReviewsTitle": "Reviews",
   "productReviewsTitleWithCount": "Reviews ({count})",
-  "chatStoreFallbackName": "Store"
+  "chatStoreFallbackName": "Store",
+  "paymentProcessing": "Processing...",
+  "paymentSucceededTitle": "Payment successful",
+  "paymentNotCompletedTitle": "Payment not completed",
+  "paymentSucceededMessage": "Your payment is complete. Thank you for your purchase.",
+  "paymentPendingMessage": "Your payment is still being processed. Check My Orders in a moment for the result.",
+  "paymentCanceledMessage": "You canceled the payment. The order is still unpaid; you can pay again from My Orders.",
+  "paymentFailedMessage": "The payment did not go through. The order is still unpaid; you can pay again from My Orders.",
+  "paymentAnomalyMessage": "This payment needs help from support and cannot be retried right now. Please contact support."
 }

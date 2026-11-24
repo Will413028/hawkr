@@ -233,5 +233,20 @@
 		"guideCustomerFilter": "用「全部」「VIP」切換類型，並可以依標籤篩選與排序。",
 		"guideCustomerClass": "用「客戶分類」設定「一般」或「VIP」。",
 		"overviewCustomerClass": "分類為一般顧客或 VIP，並使用自訂標籤篩選"
+	},
+	"payment": {
+		"submit": "確認付款",
+		"submitting": "付款處理中…",
+		"preparing": "準備付款中…",
+		"confirming": "確認付款中…",
+		"confirmingHint": "我們正在確認付款結果，請不要關閉這個頁面。",
+		"notCompleted": "付款未完成，請再試一次。",
+		"retry": "重新付款",
+		"anomaly": "這筆付款需要人工處理，請聯絡客服並提供訂單編號。",
+		"timeout": "付款結果還在確認中，請稍後到「我的訂單」查看。",
+		"viewOrders": "查看我的訂單",
+		"orderNo": "訂單編號",
+		"succeeded": "付款成功，正在導向訂單頁。",
+		"title": "付款"
 	}
 }

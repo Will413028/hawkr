@@ -351,9 +351,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   // Payment sheet (swipe-up checkout)
   // ---------------------------------------------------------------------------
 
-  // Payment methods derived from POST /app/payments API spec.
-  // Supported: 2002 (Apple Pay), 2004 (ATM), 2001 (Credit Card).
-  // No list endpoint exists — methods are defined per spec capabilities.
   void _openPaymentSheet() {
     if (_isOpeningSheet) return;
     if (_cartState.checkoutPending) {
@@ -455,38 +452,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         onNavigateHome: () {
           if (mounted) context.go('/?tab=0');
         },
-        onNavigateToPaymentWebview:
-            ({
-              required String redirectUrl,
-              required String tradeNo,
-              required String orderNo,
-              required String amount,
-            }) {
-              if (mounted) {
-                context.go(
-                  '/payment/webview',
-                  extra: {
-                    'redirectUrl': redirectUrl,
-                    'tradeNo': tradeNo,
-                    'orderNo': orderNo,
-                    'amount': amount,
-                  },
-                );
-              }
-            },
         onInvalidateCartCount: () => ref.invalidate(cartCountProvider),
-        onPayMethodChanged: (payType) {
-          // GA4: add_payment_info
-          final checkedItems = _cartItems
-              .where((i) => _checkedSkuIds.contains(i.skuId))
-              .toList();
-          ref
-              .read(analyticsEventsProvider)
-              .trackAddPaymentInfo(
-                checkedItems.map(cartItemToGA4Item).toList(),
-                paymentType: payType,
-              );
-        },
         onPaymentSucceeded: (orderNo) async {
           // GA4 purchase for Apple Pay / Google Pay immediately-paid orders.
           // Deduped (markPurchaseTracked returns false if already tracked).

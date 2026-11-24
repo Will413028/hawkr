@@ -233,5 +233,20 @@
 		"guideCustomerFilter": "Switch between All and VIP, and filter or sort by tag.",
 		"guideCustomerClass": "Use Customer Category to set Regular or VIP.",
 		"overviewCustomerClass": "Classify customers as Regular or VIP and filter by custom tags"
+	},
+	"payment": {
+		"submit": "Pay now",
+		"submitting": "Processing payment…",
+		"preparing": "Preparing payment…",
+		"confirming": "Confirming payment…",
+		"confirmingHint": "We are confirming the payment result. Please keep this page open.",
+		"notCompleted": "The payment was not completed. Please try again.",
+		"retry": "Pay again",
+		"anomaly": "This payment needs manual review. Please contact support with your order number.",
+		"timeout": "The payment result is still being confirmed. Please check My orders shortly.",
+		"viewOrders": "View my orders",
+		"orderNo": "Order number",
+		"succeeded": "Payment received. Taking you to your order.",
+		"title": "Payment"
 	}
 }

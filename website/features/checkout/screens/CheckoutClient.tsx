@@ -7,7 +7,6 @@ import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
 import { BackLink } from "@/components/shared/BackLink";
 import Link from "@/components/shared/Link";
-import PaymentGlyph from "@/components/shared/PaymentGlyph";
 import Button from "@/components/ui/Button";
 import { CheckoutInvoiceSection } from "@/features/invoices/checkout/CheckoutInvoiceSection";
 import {
@@ -43,8 +42,6 @@ import {
 } from "@/lib/checkout/shipping-requirements";
 import {
 	formatUnitLabel,
-	PAYMENT_METHOD_INELIGIBLE_REASON_LABEL,
-	PaymentMethod as PaymentMethodCode,
 	SHIPPING_METHOD_LABEL,
 	ShippingMethod as ShippingMethodCode,
 } from "@/lib/codemeta/enums";
@@ -53,17 +50,7 @@ import { useBFCacheReset } from "@/lib/hooks/useBFCacheReset";
 import { useCart } from "@/lib/hooks/useCart";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { resolveCdnUrl } from "@/lib/media/cdn";
-import { commitDocumentNavigation } from "@/lib/navigation/document-location";
-import { safeRedirectUrl } from "@/lib/navigation/safe-url";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
-import { createPayment } from "@/lib/orders/repo";
-import {
-	type ApplePaySheetHandle,
-	mapApplePayError,
-	openApplePaySheet,
-} from "@/lib/payment/apple-pay";
-import { openGooglePaySheet } from "@/lib/payment/google-pay";
-import { useNativePayAvailability } from "@/lib/payment/useNativePayAvailability";
 import { queryKeys } from "@/lib/query/keys";
 
 // 結帳錯誤狀態：訊息與輔助動作必須同進同出。原本拆成 error / errorAction
@@ -82,17 +69,6 @@ const INITIAL_CHECKOUT_ERROR: CheckoutErrorState = {
 	action: null,
 };
 
-// 訂單已建立但付款被中斷（native sheet 取消 / createPayment 失敗）時記下
-// 的重付資訊。有這個值表示「同一頁再次付款」可行：訂單存在，只差付款,
-// 主按鈕轉為「再次付款」直接重走 createPayment,不必把使用者趕去我的訂單。
-interface PendingPaymentInfo {
-	orderNo: string;
-	// confirm 可能回多張單(和單拆單);付款用第一張,GA4 purchase 要全列。
-	orderNos: string[];
-	amount: number;
-	productName: string;
-}
-
 // 一次「結帳 attempt」內所有 transient state 集中於此型別。
 // ── 新增 transient state 必須加進這個型別 ──
 // 這是強制契約:NEW_ATTEMPT 與 BFCache 還原時透過 INITIAL_TRANSIENT 一次
@@ -101,10 +77,6 @@ interface PendingPaymentInfo {
 //
 // 不歸於此的 state (繼續用獨立 useState):
 //   · draftLoaded / draft  — storage mirror,跨 attempt 仍有意義
-//
-// paymentMethod 也屬 transient:same-attempt retry (draft.createdAt 不變
-// → NEW_ATTEMPT 不 fire) 時保留使用者選擇;new attempt / BFCache 還原時
-// 隨 INITIAL_TRANSIENT 一次清掉,不會殘留上一次結帳的選項。
 interface CheckoutSessionTransient {
 	submitting: boolean;
 	orderConfirmed: boolean;
@@ -113,9 +85,6 @@ interface CheckoutSessionTransient {
 	previewLoading: boolean;
 	previewError: string | null;
 	previewNonce: number;
-	paymentMethod: string;
-	// 同 attempt 內保留(retry 要用);新 attempt / BFCache 還原時清掉。
-	pendingPayment: PendingPaymentInfo | null;
 }
 
 const INITIAL_TRANSIENT: CheckoutSessionTransient = {
@@ -126,8 +95,6 @@ const INITIAL_TRANSIENT: CheckoutSessionTransient = {
 	previewLoading: false,
 	previewError: null,
 	previewNonce: 0,
-	paymentMethod: PaymentMethodCode.CREDIT_CARD,
-	pendingPayment: null,
 };
 
 type CheckoutTransientEvent =
@@ -139,13 +106,6 @@ type CheckoutTransientEvent =
 	| { type: "RESET_ERROR" }
 	| { type: "FAIL"; message: string }
 	| { type: "FAIL_WITH_VIEW_ORDERS"; message: string }
-	// 訂單已建立但付款中斷:警告訊息 + 重付資訊一起設,主按鈕轉「再次付款」。
-	// retry 再失敗 / 再取消時重新 dispatch 同事件更新訊息,pendingPayment 不丟。
-	| {
-			type: "PAYMENT_INTERRUPTED";
-			message: string;
-			pendingPayment: PendingPaymentInfo;
-	  }
 	// previewNonce functional setter — 改 dedicated event 避免 stale closure
 	| { type: "INCREMENT_PREVIEW_NONCE" };
 
@@ -173,45 +133,10 @@ export function transientReducer(
 				...state,
 				error: { message: evt.message, action: "view_orders" },
 			};
-		case "PAYMENT_INTERRUPTED":
-			return {
-				...state,
-				error: { message: evt.message, action: "view_orders" },
-				pendingPayment: evt.pendingPayment,
-			};
 		case "INCREMENT_PREVIEW_NONCE":
 			return { ...state, previewNonce: state.previewNonce + 1 };
 	}
 }
-
-type PaymentOption = {
-	value: string;
-	label: string;
-	desc: string;
-};
-
-const PAYMENT_METHODS: PaymentOption[] = [
-	{
-		value: PaymentMethodCode.CREDIT_CARD,
-		label: "信用卡",
-		desc: "Visa / Master / JCB",
-	},
-	{
-		value: PaymentMethodCode.APPLE_PAY,
-		label: "Apple Pay",
-		desc: "",
-	},
-	{
-		value: PaymentMethodCode.GOOGLE_PAY,
-		label: "Google Pay",
-		desc: "",
-	},
-	{
-		value: PaymentMethodCode.ATM,
-		label: "ATM 轉帳",
-		desc: "產生虛擬帳號付款，請注意ATM轉帳不支援臨櫃轉帳",
-	},
-];
 
 function money(value: number) {
 	return `NT$ ${Math.max(0, Math.round(value)).toLocaleString("zh-TW")}`;
@@ -281,14 +206,6 @@ function recipientZipCode(recipient: CheckoutDraftRecipient | undefined) {
 	return directZip;
 }
 
-function paymentLabel(value: string) {
-	return PAYMENT_METHODS.find((m) => m.value === value)?.label ?? value;
-}
-
-function paymentDesc(value: string) {
-	return PAYMENT_METHODS.find((m) => m.value === value)?.desc ?? "";
-}
-
 function validPreviewTotal(preview: CheckoutPreviewResult | null) {
 	const amount = preview?.totalPayAmount;
 	return typeof amount === "number" && Number.isFinite(amount) && amount >= 0
@@ -310,10 +227,6 @@ export default function CheckoutClient() {
 	const cart = useCart();
 	const queryClient = useQueryClient();
 	const queryIdentity = useQueryIdentity();
-	const nativePay = useNativePayAvailability({
-		applePay: true,
-		googlePay: true,
-	});
 
 	const [draftLoaded, setDraftLoaded] = React.useState(false);
 	const [draft, setDraft] = React.useState<CheckoutDraft | null>(null);
@@ -343,8 +256,6 @@ export default function CheckoutClient() {
 		previewLoading,
 		previewError,
 		previewNonce,
-		paymentMethod,
-		pendingPayment,
 	} = transient;
 	const error = transient.error.message;
 	const errorAction = transient.error.action;
@@ -361,11 +272,8 @@ export default function CheckoutClient() {
 		[],
 	);
 	// 訂單一旦確認成立（confirmCheckout 成功 → orderConfirmed=true），就讓
-	// buyer.orders 這組 query 失效。ATM／零元付款走 router.push soft-nav 進「我的
-	// 訂單」，TanStack in-memory cache 不會重置，30s staleTime 內看不到新單；信用卡
-	// 因 hard-nav（window.location.assign）自然重置，但 Apple／Google Pay 走
-	// router.replace 同樣是 soft-nav。以「orderConfirmed 轉真」為唯一訊號一次涵蓋所有
-	// 確認路徑，invalidate 為冪等，重複觸發無害。
+	// buyer.orders 這組 query 失效：之後都是 router.push soft-nav，TanStack in-memory cache
+	// 不會重置，30s staleTime 內看不到新單。invalidate 為冪等，重複觸發無害。
 	React.useEffect(() => {
 		if (!orderConfirmed) return;
 		void queryClient.invalidateQueries({
@@ -385,11 +293,6 @@ export default function CheckoutClient() {
 	const setPreviewError = React.useCallback(
 		(value: string | null) =>
 			dispatchTransient({ type: "SET", patch: { previewError: value } }),
-		[],
-	);
-	const setPaymentMethod = React.useCallback(
-		(value: string) =>
-			dispatchTransient({ type: "SET", patch: { paymentMethod: value } }),
 		[],
 	);
 	// dispatchError 維持原 API (FAIL / FAIL_WITH_VIEW_ORDERS / RESET),
@@ -673,30 +576,7 @@ export default function CheckoutClient() {
 	const grandTotal = previewTotal;
 	const itemCount = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
 
-	// 付款方式可用性（後端 §3.4.1）。apm 有資料時才 gating；無資料（未載入 / 舊後端）
-	// graceful 視為不限制。零元（grandTotal===0，後端回空 apm）走「無需付款」分支。
-	const availablePaymentMethods = preview?.availablePaymentMethods ?? [];
-	const apmLoaded = availablePaymentMethods.length > 0;
-	// plain Map（非 hook）— 本處位於多個 early return 之後，不可用 useMemo
-	const apmByType = new Map<
-		string,
-		{ eligible: boolean; ineligibleReason: string }
-	>(
-		availablePaymentMethods.map((a) => [
-			a.paymentType,
-			{ eligible: a.eligible, ineligibleReason: a.ineligibleReason },
-		]),
-	);
 	const isZeroPayment = grandTotal === 0;
-	const methodEligible = (value: string): boolean =>
-		!apmLoaded ? true : (apmByType.get(value)?.eligible ?? false);
-	const methodIneligibleReason = (value: string): string =>
-		apmByType.get(value)?.ineligibleReason ?? "";
-	// grandTotal > 0 但全部付款方式都不符（>199,999）→ 擋下確認
-	const paymentBlocked =
-		!isZeroPayment &&
-		apmLoaded &&
-		!availablePaymentMethods.some((m) => m.eligible);
 
 	const canCheckout =
 		!hasInvalidCartItems &&
@@ -704,10 +584,7 @@ export default function CheckoutClient() {
 		!submitting &&
 		errorAction !== "view_orders" &&
 		!!preview?.checkoutId &&
-		grandTotal != null &&
-		!paymentBlocked &&
-		// 非零元時選中的付款方式必須 eligible（防選中方式因金額變動失效後仍送出 → 後端 8021）
-		(isZeroPayment || methodEligible(paymentMethod));
+		grandTotal != null;
 
 	const retryPreview = () => {
 		setPreview(null);
@@ -776,14 +653,6 @@ export default function CheckoutClient() {
 		}
 		return payload;
 	};
-
-	// Apple/Google Pay sheet need the product name at sheet-construction time —
-	// i.e., BEFORE the order is created. Use a stable fallback that doesn't
-	// require orderNo.
-	const deriveProductName = () =>
-		selectedItems.length > 1
-			? `Hawkr ${selectedItems.length} 件商品`
-			: (selectedItems[0]?.name ?? "Hawkr");
 
 	const logFailure = (stage: "confirm" | "payment", e: unknown) => {
 		if (process.env.NODE_ENV === "production") return;
@@ -909,355 +778,33 @@ export default function CheckoutClient() {
 		finishSubmitting();
 	};
 
-	// Post-confirm errors: order IS created but payment failed (Apple Pay
-	// validation, createPayment exception, etc.). 帶得出重付資訊時設
-	// PAYMENT_INTERRUPTED 讓使用者在本頁「再次付款」;拿不到 orderNo 的
-	// 極端情況才退回只給「我的訂單」連結。
-	const handlePostConfirmError = (
-		e: unknown,
-		pending: PendingPaymentInfo | null,
-	) => {
-		logFailure("payment", e);
-		const rawReason = e instanceof Error ? e.message : "未知錯誤";
-		// 8021 付款方式金額不符 → 友善文案（前端 gating 已擋，此為 fallback）
-		const code = (e as { code?: number } | null)?.code;
-		const reason = code === 8021 ? "所選付款方式不適用本訂單金額" : rawReason;
-		const applePayMsg = mapApplePayError(e);
-		if (pending) {
-			dispatchTransient({
-				type: "PAYMENT_INTERRUPTED",
-				message: applePayMsg
-					? `已為你建立訂單 ${pending.orderNo}，但${applePayMsg}。可重新選擇付款方式後按「再次付款」。`
-					: `已為你建立訂單 ${pending.orderNo}，但付款失敗：${reason}。可重新選擇付款方式後按「再次付款」。`,
-				pendingPayment: pending,
-			});
-		} else {
-			dispatchError({
-				type: "FAIL_WITH_VIEW_ORDERS",
-				message: `已為你建立訂單，但付款失敗：${reason}。可至「我的訂單」重新付款。`,
-			});
-		}
-		void cart.refresh();
-		finishSubmitting();
-	};
-
-	// Apple Pay path — opens sheet SYNCHRONOUSLY (gesture-bound) and runs
-	// confirmCheckout in parallel. The driver callbacks await the confirm
-	// result inside the sheet's async lifecycle, so the gesture is never lost.
-	const startApplePayCheckout = (
-		payload: CheckoutConfirmRequest,
-		productName: string,
-		amount: number,
-	) => {
-		const confirmPromise = confirmCheckout(payload);
-		let sheet: ApplePaySheetHandle | null = null;
-		let confirmError: Error | null = null;
-
-		confirmPromise.catch((e) => {
-			// Confirm rejected before user authorized (or while sheet was up).
-			// Dismiss the Apple Pay sheet and surface the confirm-stage error.
-			// Sheet's `errored` flag suppresses the implicit oncancel that
-			// Apple fires on abort(), so the user only sees one message.
-			confirmError = e instanceof Error ? e : new Error(String(e));
-			sheet?.abort();
-			handleConfirmError(confirmError);
-		});
-
-		sheet = openApplePaySheet(
-			{ amount, label: productName },
-			{
-				onAuthorize: async (token) => {
-					let confirm: Awaited<typeof confirmPromise>;
-					try {
-						confirm = await confirmPromise;
-					} catch {
-						// Confirm failed; outer .catch already showed the error.
-						return "failure";
-					}
-					const orderNo = confirm.orderNos[0];
-					if (!orderNo) {
-						handlePostConfirmError(new Error("後端未回傳訂單編號"), null);
-						return "failure";
-					}
-					// Apple Pay routes to /checkout/success (paid) — persist orderNos
-					// so PurchaseTracker fires one GA4 purchase per order.
-					setPendingPurchase(confirm.orderNos);
-					setOrderConfirmed(true);
-					clearCheckoutDraft();
-					try {
-						trackAddPaymentInfo(selectedItems, {
-							value: Number(confirm.totalPayAmount) || 0,
-							paymentType: paymentMethod,
-							coupon: draft.coupon?.title,
-						});
-						await createPayment({
-							orderNo,
-							amount: confirm.totalPayAmount,
-							productName,
-							paymentType: PaymentMethodCode.APPLE_PAY,
-							clientType: "WEB_BROWSER",
-							applePayToken: token,
-						});
-					} catch (e) {
-						handlePostConfirmError(e, {
-							orderNo,
-							orderNos: confirm.orderNos,
-							amount: confirm.totalPayAmount,
-							productName,
-						});
-						return "failure";
-					}
-					void cart.refresh();
-					router.replace(
-						`/checkout/success?order=${encodeURIComponent(orderNo)}`,
-					);
-					return "success";
-				},
-				onCancel: () => {
-					// User dismissed the sheet. If confirm has already resolved, the
-					// order exists but unpaid — keep the user on this page and let
-					// them retry payment in place. If confirm later fails the outer
-					// .catch overrides with the confirm error.
-					confirmPromise
-						.then((confirm) => {
-							const orderNo = confirm.orderNos[0];
-							if (orderNo) {
-								setOrderConfirmed(true);
-								clearCheckoutDraft();
-								dispatchTransient({
-									type: "PAYMENT_INTERRUPTED",
-									message: `付款已取消，訂單 ${orderNo} 已建立但尚未付款。可重新選擇付款方式後按「再次付款」。`,
-									pendingPayment: {
-										orderNo,
-										orderNos: confirm.orderNos,
-										amount: confirm.totalPayAmount,
-										productName,
-									},
-								});
-								void cart.refresh();
-							} else {
-								dispatchError({ type: "FAIL", message: "付款已取消" });
-							}
-							finishSubmitting();
-						})
-						.catch(() => {
-							// Confirm error already handled in outer .catch.
-							finishSubmitting();
-						});
-				},
-				onError: (e) => {
-					// Sheet aborted by an error (merchant validation throw or
-					// authorize callback throw). Caller-initiated abort from the
-					// confirm failure path doesn't reach here — it's already
-					// handled in the outer .catch.
-					if (confirmError) return;
-					const applePayMsg = mapApplePayError(e);
-					dispatchError({
-						type: "FAIL",
-						message: applePayMsg ?? `付款失敗：${e.message}`,
-					});
-					finishSubmitting();
-				},
-			},
-		);
-
-		if (!sheet) {
-			// Apple Pay route disappeared between mount-time detection and now —
-			// very rare. confirmPromise is in-flight; let it complete in the
-			// background (succeeded order will be visible in 我的訂單).
-			dispatchError({
-				type: "FAIL",
-				message: "此瀏覽器無法使用 Apple Pay，請改用其他付款方式",
-			});
-			finishSubmitting();
-		}
-	};
-
-	// Google Pay path — same structure as Apple Pay. Google Pay's
-	// PaymentsClient does NOT expose programmatic abort, so if confirmCheckout
-	// fails while the user is on the sheet, we cannot dismiss it for them —
-	// the user must cancel manually. Documented in handleConfirmError side
-	// effect: error UI is set immediately so user knows.
-	const startGooglePayCheckout = (
-		payload: CheckoutConfirmRequest,
-		productName: string,
-		amount: number,
-	) => {
-		const confirmPromise = confirmCheckout(payload);
-		let confirmError: Error | null = null;
-
-		confirmPromise.catch((e) => {
-			confirmError = e instanceof Error ? e : new Error(String(e));
-			handleConfirmError(confirmError);
-		});
-
-		const sheet = openGooglePaySheet(
-			{
-				amount,
-				label: productName,
-				// paymentMerId 來自 preview response（20 設計書 §4.13）— Google Pay
-				// tokenization 必填；單賣家=seller mer / 和單=代理商 mer。
-				gatewayMerchantId: preview?.paymentMerId ?? "",
-			},
-			{
-				onAuthorize: async (token) => {
-					let confirm: Awaited<typeof confirmPromise>;
-					try {
-						confirm = await confirmPromise;
-					} catch {
-						return;
-					}
-					const orderNo = confirm.orderNos[0];
-					if (!orderNo) {
-						handlePostConfirmError(new Error("後端未回傳訂單編號"), null);
-						return;
-					}
-					// Google Pay routes to /checkout/success (paid) — persist orderNos
-					// so PurchaseTracker fires one GA4 purchase per order.
-					setPendingPurchase(confirm.orderNos);
-					setOrderConfirmed(true);
-					clearCheckoutDraft();
-					try {
-						trackAddPaymentInfo(selectedItems, {
-							value: Number(confirm.totalPayAmount) || 0,
-							paymentType: paymentMethod,
-							coupon: draft.coupon?.title,
-						});
-						await createPayment({
-							orderNo,
-							amount: confirm.totalPayAmount,
-							productName,
-							paymentType: PaymentMethodCode.GOOGLE_PAY,
-							clientType: "WEB_BROWSER",
-							googlePayToken: token,
-						});
-					} catch (e) {
-						handlePostConfirmError(e, {
-							orderNo,
-							orderNos: confirm.orderNos,
-							amount: confirm.totalPayAmount,
-							productName,
-						});
-						return;
-					}
-					void cart.refresh();
-					router.replace(
-						`/checkout/success?order=${encodeURIComponent(orderNo)}`,
-					);
-				},
-				onCancel: () => {
-					confirmPromise
-						.then((confirm) => {
-							const orderNo = confirm.orderNos[0];
-							if (orderNo) {
-								setOrderConfirmed(true);
-								clearCheckoutDraft();
-								dispatchTransient({
-									type: "PAYMENT_INTERRUPTED",
-									message: `付款已取消，訂單 ${orderNo} 已建立但尚未付款。可重新選擇付款方式後按「再次付款」。`,
-									pendingPayment: {
-										orderNo,
-										orderNos: confirm.orderNos,
-										amount: confirm.totalPayAmount,
-										productName,
-									},
-								});
-								void cart.refresh();
-							} else {
-								dispatchError({ type: "FAIL", message: "付款已取消" });
-							}
-							finishSubmitting();
-						})
-						.catch(() => finishSubmitting());
-				},
-				onError: (e) => {
-					if (confirmError) return;
-					dispatchError({ type: "FAIL", message: `付款失敗：${e.message}` });
-					finishSubmitting();
-				},
-			},
-		);
-
-		if (!sheet) {
-			dispatchError({
-				type: "FAIL",
-				message: "此瀏覽器無法使用 Google Pay，請改用其他付款方式",
-			});
-			finishSubmitting();
-		}
-	};
-
-	// Credit card / ATM — no native sheet, no gesture constraint. Existing
-	// sequential async flow (confirm → createPayment → redirect / route).
-	const runAsyncCheckout = async (
-		payload: CheckoutConfirmRequest,
-		productName: string,
-	) => {
-		let confirmedPending: PendingPaymentInfo | null = null;
+	// 確認訂單（舊 REST）之後：金額為零的訂單沒有付款步驟，直接進成功頁；
+	// 其餘進付款步驟（`/orders/{orderNo}`，Stripe Payment Element）。付款結果由付款步驟以 GetPayment 確認。
+	// 一次確認可能拆成多張單，付款只對第一張（`orderNos[0]`）。
+	const runCheckout = async (payload: CheckoutConfirmRequest) => {
 		try {
 			const confirm = await confirmCheckout(payload);
 			const orderNo = confirm.orderNos[0];
 			if (!orderNo) throw new Error("後端未回傳訂單編號");
 			setOrderConfirmed(true);
 			clearCheckoutDraft();
-
-			const finalAmount = confirm.totalPayAmount;
-			confirmedPending = {
-				orderNo,
-				orderNos: confirm.orderNos,
-				amount: finalAmount,
-				productName,
-			};
 			trackAddPaymentInfo(selectedItems, {
 				value: Number(confirm.totalPayAmount) || 0,
-				paymentType: paymentMethod,
+				paymentType: "stripe",
 				coupon: draft.coupon?.title,
 			});
-			const payment = await createPayment({
-				orderNo,
-				amount: finalAmount,
-				productName,
-				paymentType: paymentMethod,
-				clientType: "WEB_BROWSER",
-			});
-			if (payment.redirectUrl) {
-				void cart.refresh();
-				const redirectTarget = safeRedirectUrl(payment.redirectUrl);
-				if (!redirectTarget) {
-					throw new Error("付款連結格式不正確，請聯絡客服");
-				}
-				// Credit card: PayUni hosted page redirects back to
-				// /checkout/success (paid). Persist orderNos in sessionStorage so
-				// PurchaseTracker fires after the cross-origin round-trip.
-				setPendingPurchase(confirm.orderNos);
-				commitDocumentNavigation(redirectTarget);
-				return;
-			}
 			void cart.refresh();
-			// ATM 轉帳 has no inline payment step — backend mints a virtual
-			// account on the order itself. Route to "submitted" landing rather
-			// than "paid success" so the buyer sees the virtual-account info.
-			if (paymentMethod === PaymentMethodCode.ATM) {
-				router.push(`/checkout/submitted?order=${encodeURIComponent(orderNo)}`);
-				return;
-			}
-			// Non-redirect success (e.g. zero-amount / already-paid) routes to
-			// /checkout/success (paid). Persist orderNos for PurchaseTracker.
 			setPendingPurchase(confirm.orderNos);
-			router.push(`/checkout/success?order=${encodeURIComponent(orderNo)}`);
+			router.push(
+				confirm.totalPayAmount === 0
+					? `/checkout/success?order=${encodeURIComponent(orderNo)}`
+					: `/orders/${encodeURIComponent(orderNo)}`,
+			);
 		} catch (e) {
-			if (confirmedPending) {
-				handlePostConfirmError(e, confirmedPending);
-			} else {
-				handleConfirmError(e);
-			}
+			handleConfirmError(e);
 		}
 	};
 
-	// SYNC entry — must remain non-async so the click → openApplePaySheet call
-	// stack stays inside the user gesture on mobile WebKit. The Apple/Google
-	// branches do their own gesture-bound work; only the credit card / ATM
-	// branch goes async via runAsyncCheckout.
 	const handlePlaceOrder = () => {
 		if (
 			submittingRef.current ||
@@ -1290,195 +837,7 @@ export default function CheckoutClient() {
 		setSubmitting(true);
 		dispatchError({ type: "RESET" });
 
-		const payload = buildConfirmPayload(draft, preview);
-		const productName = deriveProductName();
-
-		const wantsApplePay =
-			paymentMethod === PaymentMethodCode.APPLE_PAY && nativePay.applePay;
-		const wantsGooglePay =
-			paymentMethod === PaymentMethodCode.GOOGLE_PAY && nativePay.googlePay;
-
-		if (wantsApplePay) {
-			startApplePayCheckout(payload, productName, grandTotal);
-			return;
-		}
-		if (wantsGooglePay) {
-			startGooglePayCheckout(payload, productName, grandTotal);
-			return;
-		}
-		void runAsyncCheckout(payload, productName);
-	};
-
-	// ── 同頁再次付款 ──
-	// 訂單已建立、只差付款:不重打 confirm,直接以目前選擇的付款方式重走
-	// createPayment(對齊 OrderDetailClient 的 retry 流程)。失敗 / 再取消都
-	// 重新 dispatch PAYMENT_INTERRUPTED,pendingPayment 保留,可一直重試。
-	const retryInterrupted = (pending: PendingPaymentInfo, message: string) => {
-		dispatchTransient({
-			type: "PAYMENT_INTERRUPTED",
-			message,
-			pendingPayment: pending,
-		});
-		finishSubmitting();
-	};
-
-	const startApplePayRetry = (pending: PendingPaymentInfo) => {
-		const sheet = openApplePaySheet(
-			{ amount: pending.amount, label: pending.productName },
-			{
-				onAuthorize: async (token) => {
-					try {
-						await createPayment({
-							orderNo: pending.orderNo,
-							amount: pending.amount,
-							productName: pending.productName,
-							paymentType: PaymentMethodCode.APPLE_PAY,
-							clientType: "WEB_BROWSER",
-							applePayToken: token,
-						});
-					} catch (e) {
-						handlePostConfirmError(e, pending);
-						return "failure";
-					}
-					setPendingPurchase(pending.orderNos);
-					void cart.refresh();
-					router.replace(
-						`/checkout/success?order=${encodeURIComponent(pending.orderNo)}`,
-					);
-					return "success";
-				},
-				onCancel: () => {
-					retryInterrupted(
-						pending,
-						`付款已取消，訂單 ${pending.orderNo} 仍待付款。可再按一次「再次付款」，或改選其他付款方式。`,
-					);
-				},
-				onError: (e) => {
-					const applePayMsg = mapApplePayError(e);
-					retryInterrupted(
-						pending,
-						`${applePayMsg ?? `付款失敗：${e.message}`}。訂單 ${pending.orderNo} 仍待付款，可改選其他付款方式後再按「再次付款」。`,
-					);
-				},
-			},
-		);
-		if (!sheet) {
-			retryInterrupted(
-				pending,
-				"此瀏覽器無法使用 Apple Pay，請改選其他付款方式後再按「再次付款」。",
-			);
-		}
-	};
-
-	const startGooglePayRetry = (pending: PendingPaymentInfo) => {
-		const sheet = openGooglePaySheet(
-			{
-				amount: pending.amount,
-				label: pending.productName,
-				gatewayMerchantId: preview?.paymentMerId ?? "",
-			},
-			{
-				onAuthorize: async (token) => {
-					try {
-						await createPayment({
-							orderNo: pending.orderNo,
-							amount: pending.amount,
-							productName: pending.productName,
-							paymentType: PaymentMethodCode.GOOGLE_PAY,
-							clientType: "WEB_BROWSER",
-							googlePayToken: token,
-						});
-					} catch (e) {
-						handlePostConfirmError(e, pending);
-						return;
-					}
-					setPendingPurchase(pending.orderNos);
-					void cart.refresh();
-					router.replace(
-						`/checkout/success?order=${encodeURIComponent(pending.orderNo)}`,
-					);
-				},
-				onCancel: () => {
-					retryInterrupted(
-						pending,
-						`付款已取消，訂單 ${pending.orderNo} 仍待付款。可再按一次「再次付款」，或改選其他付款方式。`,
-					);
-				},
-				onError: (e) => {
-					retryInterrupted(
-						pending,
-						`付款失敗：${e.message}。訂單 ${pending.orderNo} 仍待付款，可改選其他付款方式後再按「再次付款」。`,
-					);
-				},
-			},
-		);
-		if (!sheet) {
-			retryInterrupted(
-				pending,
-				"此瀏覽器無法使用 Google Pay，請改選其他付款方式後再按「再次付款」。",
-			);
-		}
-	};
-
-	// Credit card / ATM retry — 沿用原下單後的導頁行為:信用卡跳 PayUni、
-	// ATM 進 submitted 看虛擬帳號。
-	const runAsyncRetry = async (pending: PendingPaymentInfo) => {
-		try {
-			const payment = await createPayment({
-				orderNo: pending.orderNo,
-				amount: pending.amount,
-				productName: pending.productName,
-				paymentType: paymentMethod,
-				clientType: "WEB_BROWSER",
-			});
-			if (payment.redirectUrl) {
-				const redirectTarget = safeRedirectUrl(payment.redirectUrl);
-				if (!redirectTarget) {
-					throw new Error("付款連結格式不正確，請聯絡客服");
-				}
-				setPendingPurchase(pending.orderNos);
-				commitDocumentNavigation(redirectTarget);
-				return;
-			}
-			void cart.refresh();
-			if (paymentMethod === PaymentMethodCode.ATM) {
-				router.push(
-					`/checkout/submitted?order=${encodeURIComponent(pending.orderNo)}`,
-				);
-				return;
-			}
-			setPendingPurchase(pending.orderNos);
-			router.push(
-				`/checkout/success?order=${encodeURIComponent(pending.orderNo)}`,
-			);
-		} catch (e) {
-			handlePostConfirmError(e, pending);
-		}
-	};
-
-	// SYNC entry — 同 handlePlaceOrder,native sheet 必須在使用者手勢的
-	// 呼叫堆疊內開啟。
-	const handleRetryPayment = () => {
-		if (!pendingPayment || submittingRef.current) return;
-		submittingRef.current = true;
-		setSubmitting(true);
-		// RESET_ERROR 只清訊息,pendingPayment 保留(retry 失敗時會重設)。
-		dispatchError({ type: "RESET" });
-
-		const wantsApplePay =
-			paymentMethod === PaymentMethodCode.APPLE_PAY && nativePay.applePay;
-		const wantsGooglePay =
-			paymentMethod === PaymentMethodCode.GOOGLE_PAY && nativePay.googlePay;
-
-		if (wantsApplePay) {
-			startApplePayRetry(pendingPayment);
-			return;
-		}
-		if (wantsGooglePay) {
-			startGooglePayRetry(pendingPayment);
-			return;
-		}
-		void runAsyncRetry(pendingPayment);
+		void runCheckout(buildConfirmPayload(draft, preview));
 	};
 
 	return (
@@ -1494,9 +853,6 @@ export default function CheckoutClient() {
 					CHECKOUT
 				</p>
 				<h1>結帳</h1>
-				<p className="text-sm text-foreground-soft m-0 mt-2">
-					商品、配送、收件資料與優惠券已在購物車確認；這裡只選擇付款方式。
-				</p>
 			</header>
 
 			<div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8 items-start">
@@ -1585,10 +941,9 @@ export default function CheckoutClient() {
 						/>
 					) : null}
 
-					<section className="bg-content1 border border-divider rounded-[32px] p-[18px] shadow-hk-card">
-						<SectionTitle index={preview?.invoice ? 4 : 3} title="付款方式" />
-						{isZeroPayment ? (
-							// 零元訂單（全額折抵）：不走 PayUni，無需選付款方式
+					{isZeroPayment ? (
+						<section className="bg-content1 border border-divider rounded-[32px] p-[18px] shadow-hk-card">
+							<SectionTitle index={preview?.invoice ? 4 : 3} title="付款方式" />
 							<div className="flex items-center gap-3 p-[14px_16px] bg-content2 border border-divider rounded-hkui-lg">
 								<span
 									className="text-success-600 text-lg shrink-0"
@@ -1605,79 +960,8 @@ export default function CheckoutClient() {
 									</span>
 								</div>
 							</div>
-						) : (
-							<>
-								{paymentBlocked ? (
-									<p className="mb-2 text-xs font-bold text-warning-700">
-										訂單金額超過單筆付款上限，請減少商品數量或分批結帳。
-									</p>
-								) : null}
-								<ul className="list-none m-0 p-0 flex flex-col gap-2">
-									{PAYMENT_METHODS.map((m) => {
-										const isNativeMethod =
-											m.value === PaymentMethodCode.APPLE_PAY ||
-											m.value === PaymentMethodCode.GOOGLE_PAY;
-										// Wallet methods only appear when the buyer's device/browser
-										// can actually open the native sheet — hide (not grey-out) on
-										// unsupported devices, per Apple/Google wallet guidelines.
-										// 兩層分離：device 決定「顯示與否」、eligible 決定「禁用與否」。
-										if (isNativeMethod) {
-											const usable =
-												m.value === PaymentMethodCode.APPLE_PAY
-													? nativePay.applePay
-													: nativePay.googlePay;
-											if (!nativePay.loaded || !usable) return null;
-										}
-										// 金額 gating（後端 §3.4.1）：不符金額 → 禁用 + 顯示理由
-										const eligible = methodEligible(m.value);
-										const reason = methodIneligibleReason(m.value);
-										return (
-											<li key={m.value}>
-												<label
-													className={`flex items-center gap-3 p-[14px_16px] bg-content2 border border-divider rounded-hkui-lg transition-all duration-150 ${
-														eligible
-															? "cursor-pointer has-[:checked]:border-hk-primary has-[:checked]:bg-hk-primary-subtle has-[:checked]:shadow-[inset_0_0_0_1px_var(--theme-action-primary)]"
-															: "opacity-55 cursor-not-allowed"
-													}`}
-												>
-													<input
-														type="radio"
-														name="pay"
-														checked={paymentMethod === m.value && eligible}
-														disabled={!eligible}
-														className="w-[18px] h-[18px] accent-hkui-primary"
-														onChange={() => setPaymentMethod(m.value)}
-													/>
-													<span
-														className="w-[42px] h-[28px] rounded-hkui-md border border-divider bg-content2 inline-flex items-center justify-center overflow-hidden shrink-0"
-														aria-hidden="true"
-													>
-														<PaymentGlyph value={m.value} />
-													</span>
-													<div className="flex flex-col gap-[2px]">
-														<strong className="text-sm font-bold text-foreground">
-															{m.label}
-														</strong>
-														{!eligible && reason ? (
-															<span className="text-xs text-warning-700 font-normal">
-																{PAYMENT_METHOD_INELIGIBLE_REASON_LABEL[
-																	reason
-																] ?? "此付款方式不適用本訂單金額"}
-															</span>
-														) : m.desc ? (
-															<span className="text-xs text-foreground-soft font-normal">
-																{m.desc}
-															</span>
-														) : null}
-													</div>
-												</label>
-											</li>
-										);
-									})}
-								</ul>
-							</>
-						)}
-					</section>
+						</section>
+					) : null}
 				</div>
 
 				<aside className="bg-content1 border border-divider rounded-[32px] p-6 shadow-hk-card flex flex-col gap-5">
@@ -1746,12 +1030,6 @@ export default function CheckoutClient() {
 								)}
 							</strong>
 						</div>
-						<div className="flex-1 flex flex-col gap-1">
-							<span className="font-bold text-foreground-soft">付款方式</span>
-							<strong className="font-extrabold text-foreground">
-								{paymentLabel(paymentMethod)}
-							</strong>
-						</div>
 					</div>
 					<ul
 						className="list-none m-0 p-0 flex flex-col gap-1.5 border-b border-dashed border-divider pb-4"
@@ -1759,9 +1037,6 @@ export default function CheckoutClient() {
 					>
 						<li className="text-[0.6875rem] font-bold text-foreground-soft flex items-center gap-2 before:content-[''] before:w-1.2 before:h-1.2 before:rounded-full before:bg-hk-accent before:shrink-0">
 							購物車已完成配送與優惠券確認
-						</li>
-						<li className="text-[0.6875rem] font-bold text-foreground-soft flex items-center gap-2 before:content-[''] before:w-1.2 before:h-1.2 before:rounded-full before:bg-hk-accent before:shrink-0">
-							PayUni 安全付款
 						</li>
 						<li className="text-[0.6875rem] font-bold text-foreground-soft flex items-center gap-2 before:content-[''] before:w-1.2 before:h-1.2 before:rounded-full before:bg-hk-accent before:shrink-0">
 							訂單成立後可追蹤狀態
@@ -1827,20 +1102,10 @@ export default function CheckoutClient() {
 					) : null}
 					{error ? (
 						<div
-							className={`p-3 rounded-hkui-md flex flex-col gap-2 border ${
-								pendingPayment
-									? "bg-warning-50 border-warning-600/30"
-									: "bg-danger-50 border-danger-100"
-							}`}
+							className="p-3 rounded-hkui-md flex flex-col gap-2 border bg-danger-50 border-danger-100"
 							role="alert"
 						>
-							<p
-								className={`hkui-login__hint ${
-									pendingPayment
-										? "text-warning-700 font-bold"
-										: "hkui-login__hint--error"
-								}`}
-							>
+							<p className="hkui-login__hint hkui-login__hint--error">
 								{error}
 							</p>
 							{errorAction === "view_orders" ? (
@@ -1855,25 +1120,16 @@ export default function CheckoutClient() {
 						size="lg"
 						fullWidth
 						className="scroll-mb-24"
-						disabled={pendingPayment ? submitting : !canCheckout || submitting}
-						isLoading={submitting || (!pendingPayment && previewLoading)}
-						loadingLabel={
-							submitting
-								? pendingPayment
-									? "付款處理中…"
-									: "建立訂單中…"
-								: "確認金額中…"
-						}
-						onClick={pendingPayment ? handleRetryPayment : handlePlaceOrder}
+						disabled={!canCheckout || submitting}
+						isLoading={submitting || previewLoading}
+						loadingLabel={submitting ? "建立訂單中…" : "確認金額中…"}
+						onClick={handlePlaceOrder}
 					>
-						{pendingPayment ? "再次付款" : "確認下單"}
+						確認下單
 					</Button>
 					<p className="text-[0.625rem] font-bold text-foreground-soft text-center leading-normal m-0 [&_a]:text-hk-accent [&_a]:underline">
 						送出代表你同意 <Link href="/terms">服務條款</Link> 與
 						<Link href="/return-policy">退換貨政策</Link>。
-					</p>
-					<p className="text-[0.625rem] font-bold text-foreground-soft text-center leading-normal m-0 pt-3 border-t border-dashed border-divider">
-						{paymentDesc(paymentMethod)}
 					</p>
 				</aside>
 			</div>

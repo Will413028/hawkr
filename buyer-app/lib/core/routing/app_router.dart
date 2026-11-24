@@ -27,7 +27,6 @@ import '../../features/seller/presentation/merchant_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/order/presentation/order_detail_screen.dart';
 import '../../features/order/data/order_summary.dart';
-import '../../features/order/presentation/payment_webview_screen.dart';
 import '../../features/order/presentation/refund_webview_screen.dart';
 import '../../features/chat/presentation/chat_list_screen.dart';
 import '../../features/chat/presentation/chat_thread_screen.dart';
@@ -492,20 +491,6 @@ GoRouter appRouter(Ref ref) {
           sellerId: state.pathParameters['seller_id']!,
           sellerName: state.extra as String? ?? '',
         ),
-      ),
-
-      // ── Payment ──
-      GoRoute(
-        path: '/payment/webview',
-        builder: (_, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
-          return PaymentWebViewScreen(
-            redirectUrl: extra['redirectUrl'] as String? ?? '',
-            tradeNo: extra['tradeNo'] as String? ?? '',
-            orderNo: extra['orderNo'] as String? ?? '',
-            amount: extra['amount'] as String? ?? '',
-          );
-        },
       ),
 
       // ── ATM Refund WebView（B-104）──

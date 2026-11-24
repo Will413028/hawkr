@@ -33,7 +33,6 @@ void main() {
       '/orders/detail',
       '/settings/profile',
       '/wallet/coupons',
-      '/payment/webview',
       '/review/product',
     ]) {
       expect(

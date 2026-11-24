@@ -4,7 +4,7 @@
    "id": "transfer-amount-computed-at-row-write",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\tamount = pay.Amount - refunded\n",
+   "old": "\t\t\tamount = order.Amount - refunded\n",
    "new": "\t\t\t_ = refunded\n",
    "test": "internal/modules/payment ^(TestARefundBeforeTheTransferIsSentMakesTheTransferPayLessAndNeedsNoReversal|TestAConcurrentRefundAndTheTransferSendNeverOverpay)$",
    "why": "轉帳金額改回寫列時的數字、claim 不重算：送出前的退款沒有讓轉帳少付（provider 收到 100），全額退款的轉帳照樣呼叫 provider。"
@@ -13,8 +13,8 @@
    "id": "reversal-started-before-refund-accepted",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "WHERE payment_id = $1 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')\nORDER BY id\nFOR UPDATE",
-   "new": "WHERE payment_id = $1 AND reversal_status = 'WAITING'\nORDER BY id\nFOR UPDATE",
+   "old": "WHERE payment_order_id = $1 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')\nORDER BY id\nFOR UPDATE",
+   "new": "WHERE payment_order_id = $1 AND reversal_status = 'WAITING'\nORDER BY id\nFOR UPDATE",
    "test": "internal/modules/payment ^(TestARefundAcceptedWhileTheTransferIsPendingStartsTheReversalWhenTheTransferSucceeds)$",
    "why": "撤回改回退款被接受之前就開始：轉帳成立時 provider 還沒接受的退款（PENDING）也被排撤回。"
   },
@@ -22,8 +22,8 @@
    "id": "no-reversal-while-refund-pending",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "WHERE payment_id = $1 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')\nORDER BY id\nFOR UPDATE",
-   "new": "WHERE payment_id = $1 AND reversal_status = 'WAITING' AND status = 'SUCCEEDED'\nORDER BY id\nFOR UPDATE",
+   "old": "WHERE payment_order_id = $1 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')\nORDER BY id\nFOR UPDATE",
+   "new": "WHERE payment_order_id = $1 AND reversal_status = 'WAITING' AND status = 'SUCCEEDED'\nORDER BY id\nFOR UPDATE",
    "test": "internal/modules/payment ^(TestARefundAcceptedWhileTheTransferIsPendingStartsTheReversalWhenTheTransferSucceeds|TestARefundThatFailsAfterTheReversalStartedKeepsTheReversalAndAlertsTheMoneyAnomaly)$",
    "why": "退款 pending（REFUNDING）時不開始撤回、要等退款 SUCCEEDED：平台餘額不足的 pending 退款與撤回互相等待。"
   },
@@ -49,7 +49,7 @@
    "id": "reservation-not-released-when-the-transfer-amount-is-recomputed",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\tif err := s.releaseWaitingReversals(ctx, q, pay.ID, reversalDeducted); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "old": "\t\t\tif err := s.releaseWaitingReversals(ctx, q, order.ID, reversalDeducted); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
    "new": "\t\t\t_ = reversalDeducted\n",
    "test": "internal/modules/payment ^(TestAKeyRotationRecomputesTheTransferAmountAndReleasesTheReservationsItAlreadyCovers)$",
    "why": "換鍵重算金額時不釋出 WAITING 的預留：退款已從金額扣掉，預留卻留著。"
@@ -58,7 +58,7 @@
    "id": "reservation-not-released-when-the-transfer-fails",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\tif err := s.releaseWaitingReversals(ctx, q, cur.PaymentID, reversalTransferFailed); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "old": "\t\tif err := s.releaseWaitingReversals(ctx, q, cur.PaymentOrderID, reversalTransferFailed); err != nil {\n\t\t\treturn err\n\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^(TestATransferThatFailsPermanentlyReleasesTheReservationsOfRefundsMadeAfterItsClaim)$",
    "why": "轉帳終局失敗（failTransfer）不釋出 WAITING 的預留。"
@@ -67,7 +67,7 @@
    "id": "reservation-not-released-when-the-transfer-is-resolved-failed",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "\t\tif err := s.releaseWaitingReversals(ctx, q, t.PaymentID, reversalTransferFailed); err != nil {\n\t\t\treturn reason, err\n\t\t}\n",
+   "old": "\t\tif err := s.releaseWaitingReversals(ctx, q, t.PaymentOrderID, reversalTransferFailed); err != nil {\n\t\t\treturn reason, err\n\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^(TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifiedTransfer)$",
    "why": "轉帳人工結案成失敗不釋出 WAITING 的預留。"
@@ -121,7 +121,7 @@
    "id": "transfer-success-does-not-start-the-reversals",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\tif err := s.startReversals(ctx, q, row.PaymentID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "old": "\t\t\tif err := s.startReversals(ctx, q, row.PaymentOrderID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^(TestARefundAcceptedWhileTheTransferIsPendingStartsTheReversalWhenTheTransferSucceeds)$",
    "why": "轉帳成立的 transaction 不讓已被接受的退款開始撤回：兩個事件裡轉帳後到時沒人排撤回。"
@@ -130,7 +130,7 @@
    "id": "refund-acceptance-does-not-start-the-reversals",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\t\t\tif transferSucceeded {\n\t\t\t\tif err := s.startReversals(ctx, q, row.PaymentID); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t}\n",
+   "old": "\t\t\tif transferSucceeded {\n\t\t\t\tif err := s.startReversals(ctx, q, row.PaymentOrderID); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t}\n",
    "new": "\t\t\t_ = transferSucceeded\n",
    "test": "internal/modules/payment ^(TestARefundAcceptedWhileTheTransferIsPendingStartsTheReversalWhenTheTransferSucceeds|TestARefundThatFailsAfterTheReversalStartedKeepsTheReversalAndAlertsTheMoneyAnomaly)$",
    "why": "退款被接受的 transaction 不開始撤回：兩個事件裡退款後到時沒人排撤回。"
@@ -139,8 +139,8 @@
    "id": "claim-without-payment-lock",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\tpay, err := q.LockPayment(ctx, cur.PaymentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tlocked, err := q.LockTransfer(ctx, transferID)",
-   "new": "\t\tpay, err := q.PaymentByID(ctx, cur.PaymentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tlocked, err := q.LockTransfer(ctx, transferID)",
+   "old": "\t\t_, order, err := lockOrder(ctx, q, cur.PaymentOrderID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tlocked, err := q.LockTransfer(ctx, transferID)",
+   "new": "\t\torder, err := q.PaymentOrderByID(ctx, cur.PaymentOrderID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tlocked, err := q.LockTransfer(ctx, transferID)",
    "test": "internal/modules/payment ^(TestTheTransferClaimWaitsOnThePaymentRowLockAloneAndSeesTheRefundCommittedUnderIt)$",
    "why": "claim 不鎖付款列：只持有付款列鎖、尚未提交退款的 transaction 不再擋住 claim，轉帳看不到未提交的退款而多付（退款走 CreateRefund 時轉帳列的鎖也會擋住 claim，所以由直接持付款列鎖的測試守）。"
   },
@@ -166,7 +166,7 @@
    "id": "reversal-landing-on-a-failed-refund-is-silent",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\tif cur.Status == string(model.RefundFailed) {\n\t\treturn s.publishAnomaly(ctx, model.AnomalyRefund, seg.RefundID, seg.PaymentID, withDetail(\"refund_failed_after_reversal\", detail))\n\t}\n",
+   "old": "\tif cur.Status == string(model.RefundFailed) {\n\t\treturn s.publishOrderAnomaly(ctx, model.AnomalyRefund, seg.RefundID, seg.PaymentOrderID, withDetail(\"refund_failed_after_reversal\", detail))\n\t}\n",
    "new": "\t_ = cur\n",
    "test": "internal/modules/payment ^(TestARefundThatFailsAfterTheReversalStartedKeepsTheReversalAndAlertsTheMoneyAnomaly)$",
    "why": "撤回進行中退款失敗、撤回落地時不發 MoneyAnomaly。"
@@ -175,7 +175,7 @@
    "id": "reversal-permanent-failure-is-silent",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\treturn s.publishAnomaly(ctx, model.AnomalyReversal, r.ID, r.PaymentID, \"reversal_released:\"+reason)",
+   "old": "\t\treturn s.publishOrderAnomaly(ctx, model.AnomalyReversal, r.ID, r.PaymentOrderID, \"reversal_released:\"+reason)",
    "new": "\t\t_ = r\n\t\treturn nil",
    "test": "internal/modules/payment ^(TestAnAnomalousReversalKeepsHoldingItsReservationAndAPermanentFailureReleasesIt|TestAReversalPermanentRefusalLeavesTheTransferUntouchedAndAnUnknownOneIsReplayedWithinTheWindow)$",
    "why": "撤回永久失敗釋出預留時不發 MoneyAnomaly：錢由平台吸收卻沒有告警。"
@@ -202,8 +202,8 @@
    "id": "topup-amount-is-wrong",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/topup.go",
-   "old": "\t\tAmount: called.Amount, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: tr.DestinationAccountID,\n\t\tTransferGroup: pay.OrderNo, IdempotencyKey: called.TopupIdempotencyKey.String(),",
-   "new": "\t\tAmount: called.Amount + 1, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: tr.DestinationAccountID,\n\t\tTransferGroup: pay.OrderNo, IdempotencyKey: called.TopupIdempotencyKey.String(),",
+   "old": "\t\tAmount: called.Amount, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: tr.DestinationAccountID,\n\t\tTransferGroup: TransferGroupOf(pay.ID), IdempotencyKey: called.TopupIdempotencyKey.String(),",
+   "new": "\t\tAmount: called.Amount + 1, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: tr.DestinationAccountID,\n\t\tTransferGroup: TransferGroupOf(pay.ID), IdempotencyKey: called.TopupIdempotencyKey.String(),",
    "test": "internal/modules/payment ^(TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller)$",
    "why": "補差額呼叫 provider 的金額多 1：provider 收到的補差額不是退款額（也與列對不起來進 ANOMALY）。"
   },
@@ -229,7 +229,7 @@
    "id": "topup-not-started-when-the-transfer-succeeds",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\treturn s.startTopups(ctx, q, row.PaymentID)\n",
+   "old": "\t\t\treturn s.startTopups(ctx, q, row.PaymentOrderID)\n",
    "new": "\t\t\treturn nil\n",
    "test": "internal/modules/payment ^(TestATopUpWaitsForTheTransferToSucceedBeforeItStarts|TestConcurrentRefundFailuresAndTransferSuccessNeverTopUpTwice)$",
    "why": "轉帳成立的 transaction 不開始補差額：轉帳結果不明時失敗的退款留在 WAITING，轉帳成立後沒有 job。"
@@ -238,7 +238,7 @@
    "id": "claim-keeps-the-waiting-topup",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\tif err := s.releaseWaitingTopups(ctx, q, pay.ID, topupCountedInNewAmount); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "old": "\t\t\tif err := s.releaseWaitingTopups(ctx, q, order.ID, topupCountedInNewAmount); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^(TestAKeyRotationReleasesTheTopUpOfARefundTheNewAmountNoLongerCounts)$",
    "why": "claim 重新算定金額時不釋出 WAITING 的補差額：失敗的退款已在新金額裡，轉帳成立後又補一次，賣家多收。"
@@ -247,7 +247,7 @@
    "id": "claim-does-not-rewrite-the-deducted-flag",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\tif err := q.MarkRefundsDeducted(ctx, pay.ID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "old": "\t\t\tif err := q.MarkRefundsDeducted(ctx, order.ID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^(TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller|TestAKeyRotationReleasesTheTopUpOfARefundTheNewAmountNoLongerCounts)$",
    "why": "claim 不標記哪些退款已算進轉帳金額：送出前的退款沒有 transfer_deducted，失敗後不補差額。"
@@ -256,7 +256,7 @@
    "id": "failed-transfer-keeps-the-waiting-topup",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\treturn s.settleTopupsWithoutTransfer(ctx, q, cur.PaymentID)\n",
+   "old": "\t\treturn s.settleTopupsWithoutTransfer(ctx, q, cur.PaymentOrderID)\n",
    "new": "\t\treturn nil\n",
    "test": "internal/modules/payment ^(TestAPermanentlyFailedTransferReleasesTheWaitingTopUp)$",
    "why": "轉帳終局失敗不釋出 WAITING 的補差額、不清 transfer_deducted：沒搬錢的轉帳之後仍可能補差額。"
@@ -283,7 +283,7 @@
    "id": "topup-permanent-refusal-does-not-alert",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/topup.go",
-   "old": "\t\treturn s.publishAnomaly(ctx, model.AnomalyTopup, r.ID, r.PaymentID, \"topup_released:\"+reason)\n",
+   "old": "\t\treturn s.publishOrderAnomaly(ctx, model.AnomalyTopup, r.ID, r.PaymentOrderID, \"topup_released:\"+reason)\n",
    "new": "\t\t_ = r\n\t\treturn nil\n",
    "test": "internal/modules/payment ^(TestAPermanentRefusalOfTheTopUpReleasesItAndAlertsTheMoneyAnomaly)$",
    "why": "補差額被永久拒絕只進 RELEASED、不發 MoneyAnomaly：賣家少收沒有人知道。"
@@ -301,8 +301,8 @@
    "id": "waiting-topups-not-filtered-by-status",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/topups.sql.go",
-   "old": "WHERE payment_id = $1 AND topup_status = 'WAITING'\nORDER BY id\nFOR UPDATE",
-   "new": "WHERE payment_id = $1\nORDER BY id\nFOR UPDATE",
+   "old": "WHERE payment_order_id = $1 AND topup_status = 'WAITING'\nORDER BY id\nFOR UPDATE",
+   "new": "WHERE payment_order_id = $1\nORDER BY id\nFOR UPDATE",
    "test": "internal/modules/payment ^(TestConcurrentRefundFailuresAndTransferSuccessNeverTopUpTwice|TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller)$",
    "why": "開始補差額時不只挑 WAITING 的退款：沒有失敗的退款也被排補差額（StartRefundTopup 的條件擋下並回錯誤，交易整個失敗）。"
   },
@@ -319,8 +319,8 @@
    "id": "reversal-cap-counts-non-done-topups",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/reversals.sql.go",
-   "old": "FROM payment.refunds\nWHERE payment_id = $1 AND topup_status = 'DONE'",
-   "new": "FROM payment.refunds\nWHERE payment_id = $1 AND topup_status IN ('DONE', 'SENDING', 'WAITING')",
+   "old": "FROM payment.refunds\nWHERE payment_order_id = $1 AND topup_status = 'DONE'",
+   "new": "FROM payment.refunds\nWHERE payment_order_id = $1 AND topup_status IN ('DONE', 'SENDING', 'WAITING')",
    "test": "internal/modules/payment ^TestATopUpThatIsNotDoneIsNotCountedInTheReversalCap$",
    "why": "預留上限把還沒成功的補差額轉帳也算進去：補差額 SENDING 時全額退款預留 100，超過 provider 上可撤的額度。"
   },
@@ -400,8 +400,8 @@
    "id": "reversal-exceeds-remaining-alert-on-the-reversal-kind",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "model.AnomalyRefund, r.ID, r.PaymentID, reversalExceedsRemaining",
-   "new": "model.AnomalyReversal, r.ID, r.PaymentID, reversalExceedsRemaining",
+   "old": "model.AnomalyRefund, r.ID, r.PaymentOrderID, reversalExceedsRemaining",
+   "new": "model.AnomalyReversal, r.ID, r.PaymentOrderID, reversalExceedsRemaining",
    "test": "internal/modules/payment ^(TestAReservationLargerThanTheTargetsRemainingIsCappedAndAlertsOnTheRefund)$",
    "why": "預留超過目標剩餘額的 MoneyAnomaly 種類改回撤回、物件卻是退款 ID：與 AnomalyReversal 的 ObjectID 是撤回列 ID 的契約衝突。"
   },
@@ -409,8 +409,8 @@
    "id": "pending-reversal-total-aggregate-formula",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "SELECT (\n    COALESCE((SELECT SUM(w.reversal_amount) FROM payment.refunds AS w WHERE w.payment_id = $1 AND w.reversal_status = 'WAITING'), 0)\n    + COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.payment_id = $1 AND v.status IN ('REVERSING', 'ANOMALY')), 0)\n)::bigint AS total\n",
-   "new": "SELECT COALESCE(SUM(reversal_amount - reversal_recovered), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY')\n",
+   "old": "SELECT (\n    COALESCE((SELECT SUM(w.reversal_amount) FROM payment.refunds AS w WHERE w.payment_order_id = $1 AND w.reversal_status = 'WAITING'), 0)\n    + COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.payment_order_id = $1 AND v.status IN ('REVERSING', 'ANOMALY')), 0)\n)::bigint AS total\n",
+   "new": "SELECT COALESCE(SUM(reversal_amount - reversal_recovered), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_order_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY')\n",
    "test": "internal/modules/payment ^(TestAReleasedReversalRowOfAFailedRefundNoLongerReservesCapacity)$",
    "why": "預留改回以退款彙總的 reversal_amount − reversal_recovered 算：已 RELEASED 的撤回列仍佔預留，新退款預留不足。"
   },
@@ -418,7 +418,7 @@
    "id": "claim-ignores-in-flight-refunds-when-nothing-is-left",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\t\tif inFlight > 0 {\n\t\t\t\t\tblocking, err := q.InFlightRefundIDs(ctx, pay.ID)\n\t\t\t\t\tif err != nil {\n\t\t\t\t\t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\treturn &refundsInFlightError{transferID: transferID, refundIDs: blocking}\n\t\t\t\t}\n",
+   "old": "\t\t\t\tif inFlight > 0 {\n\t\t\t\t\tblocking, err := q.InFlightRefundIDs(ctx, order.ID)\n\t\t\t\t\tif err != nil {\n\t\t\t\t\t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\treturn &refundsInFlightError{transferID: transferID, refundIDs: blocking}\n\t\t\t\t}\n",
    "new": "\t\t\t\t_ = inFlight\n",
    "test": "internal/modules/payment ^(TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail|TestARefundBeforeTheTransferIsSentMakesTheTransferPayLessAndNeedsNoReversal)$",
    "why": "退款涵蓋整筆但還有進行中的退款時轉帳仍直接 FAILED（fully_refunded）：那些退款之後失敗，賣家永遠收不到錢。"
@@ -436,7 +436,7 @@
    "id": "wake-skipped-when-a-refund-succeeds",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\t\t\tif err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
+   "old": "\t\t\tif err := s.wakeTransfer(ctx, q, row.ID, row.PaymentOrderID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
    "new": "\t\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
    "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
    "why": "provider 同步到退款 SUCCEEDED 時不喚醒等它的轉帳：沒有為轉帳排 job。"
@@ -445,7 +445,7 @@
    "id": "wake-skipped-when-a-synced-refund-fails",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\t\t}\n\t\tif err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
+   "old": "\t\t}\n\t\tif err := s.wakeTransfer(ctx, q, row.ID, row.PaymentOrderID); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
    "new": "\t\t}\n\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
    "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
    "why": "provider 同步到退款 FAILED 時不喚醒等它的轉帳：沒有為轉帳排 job。"
@@ -454,7 +454,7 @@
    "id": "wake-skipped-when-a-refund-call-is-refused",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\t\tif err := s.wakeTransfer(ctx, q, refundID, prev.PaymentID); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "old": "\t\tif err := s.wakeTransfer(ctx, q, refundID, prev.PaymentOrderID); err != nil {\n\t\t\treturn err\n\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
    "why": "退款呼叫被 provider 永久拒絕（failRefund）時不喚醒等它的轉帳：沒有為轉帳排 job。"
@@ -463,7 +463,7 @@
    "id": "wake-skipped-when-an-anomaly-is-resolved-as-failed",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "\t\tif err := s.wakeTransfer(ctx, q, id, r.PaymentID); err != nil {\n\t\t\treturn reason, err\n\t\t}\n",
+   "old": "\t\tif err := s.wakeTransfer(ctx, q, id, r.PaymentOrderID); err != nil {\n\t\t\treturn reason, err\n\t\t}\n",
    "new": "",
    "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
    "why": "退款異常人工結案成失敗時不喚醒等它的轉帳：沒有為轉帳排 job。"
@@ -517,8 +517,8 @@
    "id": "anomalous-refund-does-not-hold-the-cap",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'FAILED'",
-   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status NOT IN ('FAILED', 'ANOMALY')",
+   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_order_id = $1 AND status <> 'FAILED'",
+   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_order_id = $1 AND status NOT IN ('FAILED', 'ANOMALY')",
    "test": "internal/modules/payment ^(TestAReversalConvergesByLookupAndAnAnomalousRefundStillHoldsItsQuota)$",
    "why": "累計退款額度不計 ANOMALY 的退款：待核對的退款沒有佔額度，超過付款金額的再一筆退款被接受。"
   }

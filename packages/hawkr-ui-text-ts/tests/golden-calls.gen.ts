@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, mediaRejectReason, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, notificationNotificationCategory, notificationNotificationChannel, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, mediaRejectReason, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, notificationNotificationCategory, notificationNotificationChannel, paymentPaymentAccountStatus, paymentPaymentAnomalyKind, paymentPaymentAnomalyOutcome, paymentPaymentAnomalyResolutionReason, paymentPaymentRefundStatus, paymentPaymentReversalStatus, paymentPaymentStatus, paymentPaymentTopupStatus, paymentPaymentTransferStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -96,6 +96,53 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED": 1,
 	"hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": 2,
 	"hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_PAYMENT": 1,
+	"hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REFUND": 3,
+	"hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REVERSAL": 4,
+	"hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TOPUP": 5,
+	"hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TRANSFER": 2,
+	"hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED": 2,
+	"hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED": 1,
+	"hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE": 3,
+	"hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER": 4,
+	"hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED": 1,
+	"hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED": 2,
+	"hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY": 5,
+	"hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED": 4,
+	"hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING": 1,
+	"hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_REFUNDING": 2,
+	"hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_SUCCEEDED": 3,
+	"hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_ANOMALY": 6,
+	"hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_NONE": 1,
+	"hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_RELEASED": 5,
+	"hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSED": 4,
+	"hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSING": 3,
+	"hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_WAITING": 2,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_ANOMALY": 7,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_AWAITING_PAYMENT": 2,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_CANCELED": 5,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_CREATE_FAILED": 6,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_CREATING": 1,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_PROCESSING": 3,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_SUCCEEDED": 4,
+	"hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_ANOMALY": 6,
+	"hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_DONE": 4,
+	"hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_NONE": 1,
+	"hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_RELEASED": 5,
+	"hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_SENDING": 3,
+	"hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_UNSPECIFIED": 0,
+	"hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_WAITING": 2,
+	"hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_ANOMALY": 4,
+	"hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_FAILED": 3,
+	"hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_PENDING": 1,
+	"hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_SUCCEEDED": 2,
+	"hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_UNSPECIFIED": 0,
 	"hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": 2,
 	"hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": 1,
 	"hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_UNSPECIFIED": 0,
@@ -335,6 +382,30 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "payment.PaymentAccountStatus": {
 		return paymentPaymentAccountStatus(num("hawkr.payment.v1alpha1.PaymentAccountStatus", c.value));
+	}
+	case "payment.PaymentAnomalyKind": {
+		return paymentPaymentAnomalyKind(num("hawkr.payment.v1alpha1.PaymentAnomalyKind", c.value));
+	}
+	case "payment.PaymentAnomalyOutcome": {
+		return paymentPaymentAnomalyOutcome(num("hawkr.payment.v1alpha1.PaymentAnomalyOutcome", c.value));
+	}
+	case "payment.PaymentAnomalyResolutionReason": {
+		return paymentPaymentAnomalyResolutionReason(num("hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason", c.value));
+	}
+	case "payment.PaymentRefundStatus": {
+		return paymentPaymentRefundStatus(num("hawkr.payment.v1alpha1.PaymentRefundStatus", c.value));
+	}
+	case "payment.PaymentReversalStatus": {
+		return paymentPaymentReversalStatus(num("hawkr.payment.v1alpha1.PaymentReversalStatus", c.value));
+	}
+	case "payment.PaymentStatus": {
+		return paymentPaymentStatus(num("hawkr.payment.v1alpha1.PaymentStatus", c.value));
+	}
+	case "payment.PaymentTopupStatus": {
+		return paymentPaymentTopupStatus(num("hawkr.payment.v1alpha1.PaymentTopupStatus", c.value));
+	}
+	case "payment.PaymentTransferStatus": {
+		return paymentPaymentTransferStatus(num("hawkr.payment.v1alpha1.PaymentTransferStatus", c.value));
 	}
 	case "payment.RequirementCollection": {
 		return paymentRequirementCollection(num("hawkr.payment.v1alpha1.RequirementCollection", c.value));

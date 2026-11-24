@@ -4,15 +4,15 @@
 
 ## 職責
 
-收款與付款。收款帳戶（收款開通 ADR D28）：外部帳戶快取、建立與同步 job、輪詢、port 與 adapter、收款事件 handler、後台的讀取與重試，給 seller 與後台用。付款：付款列、PaymentIntent 建立、同步與補掃、事件 handler、轉帳與撤回、退款。行為規格的唯一來源是 `backend/docs/modules/payment.md`。
+收款與付款。收款帳戶（ADR D28）：外部帳戶快取、建立與同步 job、輪詢、port 與 adapter、事件 handler、後台的讀取與重試，給 seller 與後台用。付款：PaymentIntent、同步與補掃、事件 handler、轉帳與撤回、退款。行為規格的唯一來源是 `backend/docs/modules/payment.md`。
 
 ## 擁有的資料
 
 schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵 `store_id`，不建跨 schema FK）。
 
-付款四表 `payments`、`payment_attempts`、`transfers`、`refunds`（UUIDv7 主鍵）。
+付款表 `payments`（結帳群組）、`payment_orders`（訂單應收，D13）、`payment_attempts`、`transfers`、`refunds`、`refund_reversals`（UUIDv7 主鍵）。
 
-管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；`Deps.Audit` 必填）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`、httpapi `TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller`。view 與函式在 `db/objects.sql`。webhook inbox 由 platform 擁有（D29）。
+管理員的三個寫入（重試建立、重試關閉、刪除對應）在領域變更的同一個 transaction 內寫 platform 的 `adminaudit` 一筆（D62；`Deps.Audit` 必填）。守門：`TestRetryCreateAndRetryPurgeRecordOneRequestedEntryAndRollBackWithTheDomainChange`。view 與函式在 `db/objects.sql`。webhook inbox 由 platform 擁有（D29）。
 
 ## 發布的讀取介面
 
@@ -31,7 +31,7 @@ schema `payment`（`db/schema.sql`）：`accounts`（收款帳戶，擁有者鍵
 - 擁有者個資清理時先關閉外部帳戶、成功才刪本地列（從沒呼叫過 provider 的列直接刪；呼叫過沒有外部 ID 的列 7 天內重送同一把冪等鍵取回 ID、超過進終局，不列出帳戶，D55、D63）；job 先標每一列的 `purge_pending_at`，失敗留列，不被建立、不進同步輪詢，由週期掃描重排；永久拒絕、結果不明逾期或 7 天仍不成進終局（`purge_blocked_at`，後台待辦 `PAYMENT_ACCOUNT_PURGE_STUCK`，掃描不再重排）；ForgetOwners 的 transaction 仍只排 job。守門：`TestForgetOwnersClosesTheExternalAccountThenDeletesTheRow`、`TestAFailedCloseKeepsTheRowMarkedExcludedFromPollingAndRetriedByTheSweep`、`TestAPermanentCloseRefusalPutsTheRowInTheTerminalStateAndTheSweepStops`。規格 §2。
 - 結果不明的建立（呼叫過、沒有外部 ID）：自動重送到 7 天為止，管理員重試在冪等鍵保存期內重送同一把鍵、超過才確認後換鍵（D63）。守門：`TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverReplayedPastTheRetention`。
 - 「已建立」是第二步成功（`create_completed_at`），不是有外部 ID：半建立的列不可開通、不輪詢、不同步（D59）。守門：`TestTheFirstStepIDIsKeptWhenTheSecondStepFailsAndAHalfCreatedRowIsNotOnboardable`。規格 §2。
-- 同步在寫快照的 transaction 內發 `PayoutAccountChanged`；payload 與明文 fingerprint 不寫 log、不保存。守門：`TestSyncPublishesPayoutAccountChangedInsideTheWrite`、`TestDuplicateProviderEventIsRecordedOnceAndDispatchedOnce`。規格 §3、§5。
+- 同步在寫快照的 transaction 內發 `PayoutAccountChanged`；payload 與明文 fingerprint 不寫 log、不保存。守門：`TestSyncPublishesPayoutAccountChangedInsideTheWrite`。規格 §3、§5。
 - 收款事件的 handler 只排同步、不標記已處理；同步只把讀取開始前收到的事件標為已處理。守門：`TestAnEventArrivingWhileTheAccountIsBeingReadIsNotLostWhenItsSyncIsCoalesced`。規格 §3。
 
 ## 不負責

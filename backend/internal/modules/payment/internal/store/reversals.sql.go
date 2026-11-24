@@ -17,7 +17,7 @@ UPDATE payment.refunds
 SET topup_reversed_amount = topup_reversed_amount + $1,
     updated_at = $2
 WHERE id = $3
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type AddTopupReversalParams struct {
@@ -32,7 +32,7 @@ func (q *Queries) AddTopupReversal(ctx context.Context, arg AddTopupReversalPara
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -66,7 +66,7 @@ SET status = 'ANOMALY',
     reason = $1,
     updated_at = $2
 WHERE id = $3 AND status = 'REVERSING'
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type AnomalyReversalParams struct {
@@ -82,7 +82,7 @@ func (q *Queries) AnomalyReversal(ctx context.Context, arg AnomalyReversalParams
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -105,7 +105,7 @@ SET status = 'REVERSED',
     external_id = $1,
     updated_at = $2
 WHERE id = $3 AND status = 'REVERSING'
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type ApplyRefundReversalParams struct {
@@ -121,7 +121,7 @@ func (q *Queries) ApplyRefundReversal(ctx context.Context, arg ApplyRefundRevers
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -172,27 +172,27 @@ func (q *Queries) ClearReversalLookupFailures(ctx context.Context, id uuid.UUID)
 const doneTopupCapacity = `-- name: DoneTopupCapacity :one
 SELECT COALESCE(SUM(amount - topup_reversed_amount), 0)::bigint AS total
 FROM payment.refunds
-WHERE payment_id = $1 AND topup_status = 'DONE'
+WHERE payment_order_id = $1 AND topup_status = 'DONE'
 `
 
-// 付款底下成功的補差額轉帳的剩餘可撤額度加總（退款額 - 已撤回，不扣預留；預留由 PendingReversalTotal 扣）。
-func (q *Queries) DoneTopupCapacity(ctx context.Context, paymentID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, doneTopupCapacity, paymentID)
+// 訂單應收底下成功的補差額轉帳的剩餘可撤額度加總（退款額 - 已撤回，不扣預留；預留由 PendingReversalTotal 扣）。
+func (q *Queries) DoneTopupCapacity(ctx context.Context, paymentOrderID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, doneTopupCapacity, paymentOrderID)
 	var total int64
 	err := row.Scan(&total)
 	return total, err
 }
 
 const insertRefundReversal = `-- name: InsertRefundReversal :one
-INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, created_at, updated_at)
+INSERT INTO payment.refund_reversals (id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type InsertRefundReversalParams struct {
 	ID               uuid.UUID
 	RefundID         uuid.UUID
-	PaymentID        uuid.UUID
+	PaymentOrderID   uuid.UUID
 	Seq              int32
 	TargetRefundID   *uuid.UUID
 	TargetExternalID string
@@ -200,12 +200,12 @@ type InsertRefundReversalParams struct {
 	Now              time.Time
 }
 
-// 開始收回時為每個目標寫一列撤回（呼叫端已鎖付款列、轉帳列與相關退款列）。
+// 開始收回時為每個目標寫一列撤回（呼叫端已鎖付款列與訂單應收列、轉帳列與相關退款列）。
 func (q *Queries) InsertRefundReversal(ctx context.Context, arg InsertRefundReversalParams) (PaymentRefundReversal, error) {
 	row := q.db.QueryRow(ctx, insertRefundReversal,
 		arg.ID,
 		arg.RefundID,
-		arg.PaymentID,
+		arg.PaymentOrderID,
 		arg.Seq,
 		arg.TargetRefundID,
 		arg.TargetExternalID,
@@ -216,7 +216,7 @@ func (q *Queries) InsertRefundReversal(ctx context.Context, arg InsertRefundReve
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -234,7 +234,7 @@ func (q *Queries) InsertRefundReversal(ctx context.Context, arg InsertRefundReve
 }
 
 const lockRefundReversal = `-- name: LockRefundReversal :one
-SELECT id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+SELECT id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 FROM payment.refund_reversals
 WHERE id = $1
 FOR UPDATE
@@ -246,7 +246,7 @@ func (q *Queries) LockRefundReversal(ctx context.Context, id uuid.UUID) (Payment
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -264,7 +264,7 @@ func (q *Queries) LockRefundReversal(ctx context.Context, id uuid.UUID) (Payment
 }
 
 const lockRefundsByID = `-- name: LockRefundsByID :many
-SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+SELECT id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 FROM payment.refunds
 WHERE id = ANY($1::uuid[])
 ORDER BY id
@@ -283,7 +283,7 @@ func (q *Queries) LockRefundsByID(ctx context.Context, ids []uuid.UUID) ([]Payme
 		var i PaymentRefund
 		if err := rows.Scan(
 			&i.ID,
-			&i.PaymentID,
+			&i.PaymentOrderID,
 			&i.RequestKey,
 			&i.Amount,
 			&i.Auto,
@@ -323,7 +323,7 @@ UPDATE payment.refund_reversals
 SET called_at = COALESCE(called_at, $1::timestamptz),
     updated_at = $1
 WHERE id = $2 AND status = 'REVERSING'
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type MarkRefundReversalCalledParams struct {
@@ -338,7 +338,7 @@ func (q *Queries) MarkRefundReversalCalled(ctx context.Context, arg MarkRefundRe
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -358,19 +358,19 @@ func (q *Queries) MarkRefundReversalCalled(ctx context.Context, arg MarkRefundRe
 const openReversalTotalOnTransfer = `-- name: OpenReversalTotalOnTransfer :one
 SELECT COALESCE(SUM(amount), 0)::bigint AS total
 FROM payment.refund_reversals
-WHERE payment_id = $1 AND target_refund_id IS NULL AND status IN ('REVERSING', 'ANOMALY')
+WHERE payment_order_id = $1 AND target_refund_id IS NULL AND status IN ('REVERSING', 'ANOMALY')
 `
 
 // 原轉帳上進行中與 ANOMALY 的撤回列額度（還沒累加到 transfers.reversed_amount，佔住剩餘可撤額）。
-func (q *Queries) OpenReversalTotalOnTransfer(ctx context.Context, paymentID uuid.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, openReversalTotalOnTransfer, paymentID)
+func (q *Queries) OpenReversalTotalOnTransfer(ctx context.Context, paymentOrderID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, openReversalTotalOnTransfer, paymentOrderID)
 	var total int64
 	err := row.Scan(&total)
 	return total, err
 }
 
 const refundReversalByID = `-- name: RefundReversalByID :one
-SELECT id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+SELECT id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 FROM payment.refund_reversals
 WHERE id = $1
 `
@@ -381,7 +381,7 @@ func (q *Queries) RefundReversalByID(ctx context.Context, id uuid.UUID) (Payment
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -399,7 +399,7 @@ func (q *Queries) RefundReversalByID(ctx context.Context, id uuid.UUID) (Payment
 }
 
 const refundReversalsByRefund = `-- name: RefundReversalsByRefund :many
-SELECT id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+SELECT id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 FROM payment.refund_reversals
 WHERE refund_id = $1
 ORDER BY seq
@@ -418,7 +418,7 @@ func (q *Queries) RefundReversalsByRefund(ctx context.Context, refundID uuid.UUI
 		if err := rows.Scan(
 			&i.ID,
 			&i.RefundID,
-			&i.PaymentID,
+			&i.PaymentOrderID,
 			&i.Seq,
 			&i.TargetRefundID,
 			&i.TargetExternalID,
@@ -448,7 +448,7 @@ SET status = 'RELEASED',
     reason = $1,
     updated_at = $2
 WHERE id = $3 AND status = 'REVERSING'
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type ReleaseReversalParams struct {
@@ -464,7 +464,7 @@ func (q *Queries) ReleaseReversal(ctx context.Context, arg ReleaseReversalParams
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -490,7 +490,7 @@ SET status = 'REVERSED',
     lookup_failures = 0,
     updated_at = $2
 WHERE id = $3 AND status = 'ANOMALY'
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type ResolveReversalDoneParams struct {
@@ -506,7 +506,7 @@ func (q *Queries) ResolveReversalDone(ctx context.Context, arg ResolveReversalDo
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -529,7 +529,7 @@ SET status = 'RELEASED',
     reason = $1,
     updated_at = $2
 WHERE id = $3 AND status = 'ANOMALY'
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type ResolveReversalReleasedParams struct {
@@ -545,7 +545,7 @@ func (q *Queries) ResolveReversalReleased(ctx context.Context, arg ResolveRevers
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -566,7 +566,7 @@ const reversibleTopups = `-- name: ReversibleTopups :many
 SELECT r.id, r.topup_external_id AS external_id,
        (r.amount - r.topup_reversed_amount - COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.target_refund_id = r.id AND v.status IN ('REVERSING', 'ANOMALY')), 0))::bigint AS free
 FROM payment.refunds AS r
-WHERE r.payment_id = $1 AND r.topup_status = 'DONE'
+WHERE r.payment_order_id = $1 AND r.topup_status = 'DONE'
   AND r.amount - r.topup_reversed_amount - COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.target_refund_id = r.id AND v.status IN ('REVERSING', 'ANOMALY')), 0) > 0
 ORDER BY r.id
 `
@@ -577,9 +577,9 @@ type ReversibleTopupsRow struct {
 	Free       int64
 }
 
-// 付款底下成功的補差額轉帳（DONE）與各自的剩餘可撤額度（退款額 - 已撤回 - 進行中與 ANOMALY 的撤回列），依退款 ID 升序；已沒有額度的不列出。呼叫端已鎖付款列與轉帳列。
-func (q *Queries) ReversibleTopups(ctx context.Context, paymentID uuid.UUID) ([]ReversibleTopupsRow, error) {
-	rows, err := q.db.Query(ctx, reversibleTopups, paymentID)
+// 訂單應收底下成功的補差額轉帳（DONE）與各自的剩餘可撤額度（退款額 - 已撤回 - 進行中與 ANOMALY 的撤回列），依退款 ID 升序；已沒有額度的不列出。呼叫端已鎖付款列、訂單應收列與轉帳列。
+func (q *Queries) ReversibleTopups(ctx context.Context, paymentOrderID uuid.UUID) ([]ReversibleTopupsRow, error) {
+	rows, err := q.db.Query(ctx, reversibleTopups, paymentOrderID)
 	if err != nil {
 		return nil, err
 	}
@@ -635,7 +635,7 @@ func (q *Queries) ReversingRefundIDs(ctx context.Context, arg ReversingRefundIDs
 }
 
 const reversingReversalsByRefund = `-- name: ReversingReversalsByRefund :many
-SELECT id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+SELECT id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 FROM payment.refund_reversals
 WHERE refund_id = $1 AND status = 'REVERSING'
 ORDER BY seq
@@ -654,7 +654,7 @@ func (q *Queries) ReversingReversalsByRefund(ctx context.Context, refundID uuid.
 		if err := rows.Scan(
 			&i.ID,
 			&i.RefundID,
-			&i.PaymentID,
+			&i.PaymentOrderID,
 			&i.Seq,
 			&i.TargetRefundID,
 			&i.TargetExternalID,
@@ -685,7 +685,7 @@ SET idempotency_key = gen_random_uuid(),
     lookup_failures = 0,
     updated_at = $1
 WHERE id = $2 AND status = 'REVERSING' AND idempotency_key = $3
-RETURNING id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
+RETURNING id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, idempotency_key, called_at, external_id, lookup_failures, created_at, updated_at
 `
 
 type RotateReversalKeyParams struct {
@@ -701,7 +701,7 @@ func (q *Queries) RotateReversalKey(ctx context.Context, arg RotateReversalKeyPa
 	err := row.Scan(
 		&i.ID,
 		&i.RefundID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.Seq,
 		&i.TargetRefundID,
 		&i.TargetExternalID,
@@ -742,7 +742,7 @@ type SettleRefundReversalParams struct {
 	ID  uuid.UUID
 }
 
-// 重算退款列上向賣家收回的彙總（呼叫端已鎖付款列與該退款列，撤回列剛改完）：有 ANOMALY 的列是 ANOMALY，其次有 REVERSING 的是 REVERSING，其次有 RELEASED 的是 RELEASED，其餘 REVERSED；
+// 重算退款列上向賣家收回的彙總（呼叫端已鎖付款列與訂單應收列與該退款列，撤回列剛改完）：有 ANOMALY 的列是 ANOMALY，其次有 REVERSING 的是 REVERSING，其次有 RELEASED 的是 RELEASED，其餘 REVERSED；
 // reversal_recovered 是 REVERSED 列的加總，reversal_reason 取 ANOMALY 或 RELEASED 列的原因。只改 REVERSING 或 ANOMALY 的彙總（已 RELEASED 或 REVERSED 的不再變）。
 func (q *Queries) SettleRefundReversal(ctx context.Context, arg SettleRefundReversalParams) error {
 	_, err := q.db.Exec(ctx, settleRefundReversal, arg.Now, arg.ID)

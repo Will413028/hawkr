@@ -426,7 +426,7 @@ func TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifie
 	if _, err := f.fake.ReverseTransfer(callDeadline(t, ctx), ChargeReversalInput{ExternalTransferID: ext, Amount: 70, IdempotencyKey: "dashboard-1"}); err != nil {
 		t.Fatal(err)
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, ext))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ext))
 	if f.transferText(t, "status", tr.ID) != "SUCCEEDED" || f.reversedOf(t, tr.ID) != 70 {
 		t.Fatalf("結案之後：%s，reversed %d", f.transferText(t, "status", tr.ID), f.reversedOf(t, tr.ID))
 	}
@@ -463,7 +463,7 @@ func TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifie
 	if r2.ReversalStatus != ReversalWaiting {
 		t.Fatalf("轉帳 ANOMALY 時的退款：%+v", r2)
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr2.ID, AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr2.ID, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f.transferText(t, "status", tr2.ID) != "FAILED" || f.reversalOf(t, r2.ID) != "RELEASED" || f.refundText(t, "reversal_reason", r2.ID) != "transfer_failed" {
 		t.Fatalf("結案成失敗：%s %s", f.transferText(t, "status", tr2.ID), f.reversalOf(t, r2.ID))
 	}
@@ -523,7 +523,7 @@ func TestResolvingARefundAnomalyAsFailedAfterAReversalLandedAlertsTheMoneyAnomal
 	p, _ := f.transferred(t, "RR-11")
 	id := f.insertReversal(t, p.ID, "REFUNDING", "REVERSED", 40, 40)
 	f.exec(t, `UPDATE payment.refunds SET status = 'ANOMALY', failure_reason = 'x' WHERE id = $1`, id)
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, id, AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, id, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f.refundText(t, "status", id) != "FAILED" {
 		t.Fatalf("結案之後：%s", f.refundText(t, "status", id))
 	}
@@ -564,8 +564,8 @@ func TestAReleasedReversalRowOfAFailedRefundNoLongerReservesCapacity(t *testing.
 	p, _ := f.transferred(t, "RR-13")
 	a := f.insertReversal(t, p.ID, "FAILED", "REVERSING", 60, 60)
 	f.exec(t, `UPDATE payment.refund_reversals SET amount = 10 WHERE refund_id = $1`, a)
-	f.exec(t, `INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, created_at, updated_at)
-VALUES (gen_random_uuid(), $1, $2, 1, $1, 'tr_topup', 50, 'RELEASED', 'x', $3, $3)`, a, p.ID, f.now)
+	f.exec(t, `INSERT INTO payment.refund_reversals (id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, created_at, updated_at)
+VALUES (gen_random_uuid(), $1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), 1, $1, 'tr_topup', 50, 'RELEASED', 'x', $3, $3)`, a, p.ID, f.now)
 	b := f.createRefund(t, "RR-13", "b", 100, false)
 	if b.ReversalStatus != ReversalWaiting || b.ReversalAmount != 90 {
 		t.Fatalf("預留應是 100 − 10 = 90：%+v", b)
@@ -600,7 +600,8 @@ func TestTheTransferClaimWaitsOnThePaymentRowLockAloneAndSeesTheRefundCommittedU
 			if _, err := conn.Exec(ctx, `SELECT id FROM payment.payments WHERE id = $1 FOR UPDATE`, payID); err != nil {
 				return err
 			}
-			if _, err := conn.Exec(ctx, `INSERT INTO payment.refunds (id, payment_id, request_key, amount, created_at, updated_at) VALUES (gen_random_uuid(), $1, 'k', 40, $2, $2)`, payID, f.now); err != nil {
+			if _, err := conn.Exec(ctx, `INSERT INTO payment.refunds (id, payment_order_id, request_key, amount, created_at, updated_at)
+VALUES (gen_random_uuid(), (SELECT id FROM payment.payment_orders WHERE payment_id = $1), 'k', 40, $2, $2)`, payID, f.now); err != nil {
 				return err
 			}
 			close(reached)

@@ -101,6 +101,53 @@ const _enumNumber = <String, int>{
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED': 1,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW': 2,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_PAYMENT': 1,
+	'hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REFUND': 3,
+	'hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REVERSAL': 4,
+	'hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TOPUP': 5,
+	'hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TRANSFER': 2,
+	'hawkr.payment.v1alpha1.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED': 2,
+	'hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED': 1,
+	'hawkr.payment.v1alpha1.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE': 3,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER': 4,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED': 1,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED': 2,
+	'hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY': 5,
+	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED': 4,
+	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING': 1,
+	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_REFUNDING': 2,
+	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_SUCCEEDED': 3,
+	'hawkr.payment.v1alpha1.PaymentRefundStatus.PAYMENT_REFUND_STATUS_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_ANOMALY': 6,
+	'hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_NONE': 1,
+	'hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_RELEASED': 5,
+	'hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSED': 4,
+	'hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSING': 3,
+	'hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_WAITING': 2,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_ANOMALY': 7,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_AWAITING_PAYMENT': 2,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_CANCELED': 5,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_CREATE_FAILED': 6,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_CREATING': 1,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_PROCESSING': 3,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_SUCCEEDED': 4,
+	'hawkr.payment.v1alpha1.PaymentStatus.PAYMENT_STATUS_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_ANOMALY': 6,
+	'hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_DONE': 4,
+	'hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_NONE': 1,
+	'hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_RELEASED': 5,
+	'hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_SENDING': 3,
+	'hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_WAITING': 2,
+	'hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_ANOMALY': 4,
+	'hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_FAILED': 3,
+	'hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_PENDING': 1,
+	'hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_SUCCEEDED': 2,
+	'hawkr.payment.v1alpha1.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_UNSPECIFIED': 0,
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM': 2,
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER': 1,
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_UNSPECIFIED': 0,
@@ -313,6 +360,22 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_notification_v1alpha1_notification.NotificationChannel.valueOf(_n('hawkr.notification.v1alpha1.NotificationChannel', value))!.uiText(l);
     case 'payment.PaymentAccountStatus':
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentAccountStatus', value))!.uiText(l);
+    case 'payment.PaymentAnomalyKind':
+      return hawkr_payment_v1alpha1_payment.PaymentAnomalyKind.valueOf(_n('hawkr.payment.v1alpha1.PaymentAnomalyKind', value))!.uiText(l);
+    case 'payment.PaymentAnomalyOutcome':
+      return hawkr_payment_v1alpha1_payment.PaymentAnomalyOutcome.valueOf(_n('hawkr.payment.v1alpha1.PaymentAnomalyOutcome', value))!.uiText(l);
+    case 'payment.PaymentAnomalyResolutionReason':
+      return hawkr_payment_v1alpha1_payment.PaymentAnomalyResolutionReason.valueOf(_n('hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason', value))!.uiText(l);
+    case 'payment.PaymentRefundStatus':
+      return hawkr_payment_v1alpha1_payment.PaymentRefundStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentRefundStatus', value))!.uiText(l);
+    case 'payment.PaymentReversalStatus':
+      return hawkr_payment_v1alpha1_payment.PaymentReversalStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentReversalStatus', value))!.uiText(l);
+    case 'payment.PaymentStatus':
+      return hawkr_payment_v1alpha1_payment.PaymentStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentStatus', value))!.uiText(l);
+    case 'payment.PaymentTopupStatus':
+      return hawkr_payment_v1alpha1_payment.PaymentTopupStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentTopupStatus', value))!.uiText(l);
+    case 'payment.PaymentTransferStatus':
+      return hawkr_payment_v1alpha1_payment.PaymentTransferStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentTransferStatus', value))!.uiText(l);
     case 'payment.RequirementCollection':
       return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n('hawkr.payment.v1alpha1.RequirementCollection', value))!.uiText(l);
     case 'procurement.RejectionReason':

@@ -404,6 +404,50 @@ PayUni client 還有 `offlineRefund`、`cancelOfflineRefund`（`PaymentClient.ja
 
 ---
 
+### 7a. 「保留→Go」的 Go 測試對照（步驟 3d）
+
+33 列各對到一個 Go 測試名（檔案路徑相對 `backend/`，名稱是 `func Test…`）。狀態：**已有**＝測試已存在且斷言該列行為；**近似**＝行為在 Go 的設計下改寫過，最接近的現有測試（差異見 `CARRYOVER.md`「與舊服務的差異」；Go 以列鎖與 job 重試取代 Java 的 CAS 更新 0 列再重讀，沒有逐步對應的測試）；**待步驟 4／5**＝測試屬步驟 4（legacy paymentserver）或步驟 5（Connect handler）的範圍，名稱是約定，步驟完成時以實際名稱回填這格，並把狀態改成已有。
+
+| # | 狀態 | Go 檔案 | Go 測試名 |
+|---|---|---|---|
+| 8 | 待步驟 4 | `internal/legacy/paymentserver` | `TestPaymentFactsCardCarriesProviderPaidAt` |
+| 9 | 待步驟 4 | `internal/legacy/paymentserver` | `TestPaymentFactsUnpaidOmitsProviderPaidAt` |
+| 10 | 待步驟 4 | `internal/legacy/paymentserver` | `TestPaymentFactsWithoutAPaymentIsABusinessErrorWithoutData` |
+| 11 | 待步驟 4 | `internal/legacy/paymentserver` | `TestPaymentFactsKeepsPayTimeAndProviderPaidAtApart` |
+| 12 | 待步驟 4 | `internal/legacy/paymentserver` | `TestPaymentFactsMapsTheRemainingFields` |
+| 14 | 待步驟 4 | `internal/legacy/paymentserver` | `TestPaymentFactsNeverWrites` |
+| 17 | 近似 | `internal/modules/payment/charge_integration_test.go` | `TestGetPaymentReturnsTheSecretOnlyWhileAwaitingAndOnlyToTheOwner` |
+| 18 | 近似 | `internal/modules/payment/charge_integration_test.go` | `TestGetPaymentReturnsTheSecretOnlyWhileAwaitingAndOnlyToTheOwner` |
+| 19 | 待步驟 5 | `internal/httpapi/payment` | `TestBuyerCallWithoutAResolvedBuyerIDFailsLoud` |
+| 20 | 待步驟 5 | `internal/httpapi/payment` | `TestPaymentHistoryWithoutAResolvedBuyerIDFailsLoud` |
+| 21 | 待步驟 5 | `internal/httpapi/payment` | `TestDualRoleCallerIsCheckedAsABuyer` |
+| 22 | 待步驟 5 | `internal/httpapi/payment` | `TestSellerSameStoreSeesPaymentHistoryWithBuyerPIIRedacted` |
+| 23 | 待步驟 5 | `internal/httpapi/payment` | `TestDualRoleSellerSameStoreSucceeds` |
+| 24 | 待步驟 5 | `internal/httpapi/payment` | `TestSellerCrossStoreIsNotFound` |
+| 25 | 待步驟 5 | `internal/httpapi/payment` | `TestSellerUnknownOrderIsNotFoundLikeCrossStore` |
+| 26 | 待步驟 5 | `internal/httpapi/payment` | `TestSellerWithoutStoreIDFailsLoud` |
+| 27 | 待步驟 5 | `internal/httpapi/payment` | `TestPureBuyerCannotCallTheSellerView` |
+| 28 | 待步驟 5 | `internal/httpapi/payment` | `TestSellerCannotCallTheBuyerOnlyGetPayment` |
+| 35 | 近似 | `internal/modules/payment/charge_integration_test.go` | `TestAFailedAttemptKeepsTheSameIntentAndRecordsTheReason` |
+| 36 | 已有 | `internal/modules/payment/charge_integration_test.go` | `TestADuplicatePaymentEventIsRecordedOnceAndPublishesOnce` |
+| 37 | 已有 | `internal/modules/payment/charge_integration_test.go` | `TestSucceededIsNeverOverwrittenAndALateSuccessBeatsACancel` |
+| 38 | 近似 | `internal/modules/payment/charge_attempts_integration_test.go` | `TestAnIncompleteSuccessSnapshotKeepsItsEventsUnprocessedUntilItIsComplete` |
+| 39 | 近似 | `internal/modules/payment/charge_integration_test.go` | `TestSweepQueuesIdleCreatesStaleReadsAndOldUnprocessedEvents` |
+| 85 | 已有 | `internal/modules/payment/transfer_integration_test.go` | `TestADuplicateTransferRequestReturnsTheExistingActiveTransfer` |
+| 86 | 已有 | `internal/modules/payment/transfer_integration_test.go` | `TestTheTransferJobCallsTheProviderOutsideTheTransactionWithTheStoredKey` |
+| 158 | 已有 | `internal/modules/payment/refund_integration_test.go` | `TestCreateRefundWritesThePendingRowAndTheJobEnforcesTheCapAndIsIdempotentByKey` |
+| 165 | 已有 | `internal/modules/payment/refund_integration_test.go` | `TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne` |
+| 166 | 已有 | `internal/modules/payment/refund_integration_test.go` | `TestCreateRefundWritesThePendingRowAndTheJobEnforcesTheCapAndIsIdempotentByKey` |
+| 167 | 已有 | `internal/modules/payment/refund_integration_test.go` | `TestAPermanentRefundRefusalFailsTheRefundFreesTheQuotaAndPublishesOnlyRefundChanged` |
+| 168 | 待步驟 4 | `internal/legacy/paymentserver` | `TestClosePaymentByOrderNoCancelsTheIntentOutsideTheTransactionAndPublishesInTheCASTransaction` |
+| 169 | 待步驟 4 | `internal/legacy/paymentserver` | `TestClosePaymentByOrderNoThatLosesTheCASPublishesNothing` |
+| 170 | 待步驟 4 | `internal/legacy/paymentserver` | `TestClosePaymentByOrderNoRollsBackWhenTheEventWriteFails` |
+| 171 | 待步驟 4 | `internal/legacy/paymentserver` | `TestClosePaymentByOrderNoSkipsAPaymentThatCannotBeClosed` |
+
+檢查（每列都有測試名；預期輸出 33）：`rg -c '^\| [0-9]+ \| (已有|近似|待步驟 [45]) \| `[^`]+` \| `Test[A-Za-z0-9]+` \|$' backend/docs/plans/2026-11-23-b2-payment/inventory.md`。
+狀態「已有」與「近似」的名稱存在：對每個名稱 `rg -c '^func <名稱>\(' <檔案>` 為 1（逐列腳本見該步驟的回報）。
+
+
 ## 8. CodeMeta 值域與錯誤碼
 
 計數：`rg -o -N 'common\.utils\.code\.\w+' $PS | sed 's/.*code\.//' | sort | uniq -c`（14 個值域型別，另外 GrpcResponseCode、CodeMetaValidator、helper 不算值域）；`rg -o -N --no-filename 'GrpcResponseCode\.\w+' $PS | sort -u | wc -l` → 31 個錯誤碼。定義在 `backend/docs/代碼管理（CodeMeta）/`，Java enum 在 `backend/services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/code/`。

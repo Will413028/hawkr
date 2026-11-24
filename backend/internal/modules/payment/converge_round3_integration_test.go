@@ -157,22 +157,22 @@ func TestResolvingATransferAnomalyAsSucceededRequiresTheProviderToConfirmTheEvid
 	f.enableAccount(t, 7, "acct_seller_7", true)
 	tr := f.anomalousTransfer(t, "R3-T", true)
 	real := f.fake.TransferIDs()[0]
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, "tr_typo"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", "tr_typo"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("亂貼的 ID：%v", err)
 	}
 	must(t, f.fake.SetTransferAmount(real, 1))
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, real); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", real); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("金額不符：%v", err)
 	}
 	must(t, f.fake.SetTransferAmount(real, 100))
 	f.fake.FailLookup(errors.New("查回逾時"))
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, real); err == nil || apperr.KindOf(err) == apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", real); err == nil || apperr.KindOf(err) == apperr.KindFailedPrecondition {
 		t.Fatalf("核對失敗應回一般錯誤：%v", err)
 	}
 	if f.transferText(t, "status", tr.ID) != "ANOMALY" || f.auditCount(t) != 0 {
 		t.Fatalf("被擋下的結案改動了列：%s，稽核 %d 筆", f.transferText(t, "status", tr.ID), f.auditCount(t))
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, real))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", real))
 	if f.transferText(t, "status", tr.ID) != "SUCCEEDED" || f.transferText(t, "external_transfer_id", tr.ID) != real || f.auditCount(t) != 1 {
 		t.Fatalf("相符之後：%s", f.transferText(t, "status", tr.ID))
 	}
@@ -198,18 +198,18 @@ func TestResolvingAPaymentAnomalyAsSucceededRequiresTheProviderToConfirmTheEvide
 	f.create(t, 12, "R3-other")
 	other := f.fake.IntentFor("R3-other")[0]
 	must(t, f.fake.SetAmount(own, 100))
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalySucceeded, other); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", other); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("別張訂單的 PaymentIntent：%v", err)
 	}
 	must(t, f.fake.SetAmount(own, 1))
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalySucceeded, own); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", own); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("金額不符：%v", err)
 	}
 	if f.statusOf(t, "R3-P") != PaymentAnomaly || f.externalOf(t, "R3-P") != "" || f.auditCount(t) != 0 {
 		t.Fatalf("被擋下的結案改動了列：%s", f.statusOf(t, "R3-P"))
 	}
 	must(t, f.fake.SetAmount(own, 100))
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalySucceeded, own))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyPayment, p.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", own))
 	if f.externalOf(t, "R3-P") != own || f.auditCount(t) != 1 {
 		t.Fatalf("相符之後：%s", f.externalOf(t, "R3-P"))
 	}
@@ -223,20 +223,20 @@ func TestResolvingAReversalAnomalyAsSucceededRequiresTheProviderToConfirmTheEvid
 	ctx := context.Background()
 	p, tr := f.transferred(t, "R3-R")
 	refund := f.insertReversal(t, p.ID, "REFUNDING", "ANOMALY", 30, 30)
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, "trr_typo"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", "trr_typo"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("亂貼的 ID：%v", err)
 	}
 	rev, err := f.fake.ReverseTransfer(callDeadline(t, ctx), ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", refund)})
 	must(t, err)
 	must(t, f.fake.SetReversalAmount(rev.ExternalID, 5))
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, rev.ExternalID); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", rev.ExternalID); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("金額不符：%v", err)
 	}
 	if f.refundText(t, "reversal_status", refund) != "ANOMALY" || f.reversedOf(t, tr.ID) != 0 || f.auditCount(t) != 0 {
 		t.Fatalf("被擋下的結案改動了列：%s reversed %d", f.refundText(t, "reversal_status", refund), f.reversedOf(t, tr.ID))
 	}
 	must(t, f.fake.SetReversalAmount(rev.ExternalID, 30))
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, rev.ExternalID))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", rev.ExternalID))
 	if f.refundText(t, "reversal_status", refund) != "REVERSED" || f.reversedOf(t, tr.ID) != 30 {
 		t.Fatalf("相符之後：%s", f.refundText(t, "reversal_status", refund))
 	}

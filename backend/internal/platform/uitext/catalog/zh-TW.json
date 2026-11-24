@@ -376,6 +376,162 @@
       "message": "審核中",
       "description": "轉帳能力還沒啟用，等金流商審核，賣家沒有要做的事。"
     },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_PAYMENT": {
+      "message": "付款",
+      "description": "付款：建立結果與金流商對不起來。"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REFUND": {
+      "message": "退款",
+      "description": "退款。"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REVERSAL": {
+      "message": "收回",
+      "description": "退款的收回（撤回轉帳）：id 是撤回列 ID。"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TOPUP": {
+      "message": "補差額轉帳",
+      "description": "退款的補差額轉帳：id 是退款 ID。"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TRANSFER": {
+      "message": "轉帳",
+      "description": "轉帳。"
+    },
+    "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED": {
+      "message": "金流商沒有執行",
+      "description": "核對金流商之後確認它沒有執行。"
+    },
+    "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED": {
+      "message": "金流商已執行",
+      "description": "核對金流商之後確認它確實執行了（要附金流商物件 ID 為證據）。"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE": {
+      "message": "重複",
+      "description": "重複：同一件事已由另一筆紀錄處理（搭配任一結果）。"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER": {
+      "message": "其他",
+      "description": "其他原因，細節寫在備註（搭配任一結果）。"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED": {
+      "message": "金流商已執行、本地沒記到",
+      "description": "金流商已執行、本地沒有記到結果（只搭配結果 SUCCEEDED）。"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED": {
+      "message": "金流商沒有執行",
+      "description": "金流商沒有執行這次呼叫（只搭配結果 FAILED）。"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY": {
+      "message": "待人工處理",
+      "description": "與金流商對不起來：仍佔額度，待營運人工結案。"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED": {
+      "message": "退款失敗",
+      "description": "退款失敗，不佔累計額度。"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING": {
+      "message": "待送出",
+      "description": "已記錄，還沒呼叫金流商。"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_REFUNDING": {
+      "message": "退款中",
+      "description": "已呼叫金流商，等結果。"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_SUCCEEDED": {
+      "message": "已退款",
+      "description": "退款成功。"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_ANOMALY": {
+      "message": "待人工處理",
+      "description": "與金流商對不起來：待營運人工結案。"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_NONE": {
+      "message": "無需收回",
+      "description": "沒有要向賣家收回的款項。"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_RELEASED": {
+      "message": "不再收回",
+      "description": "不再收回（退款失敗或轉帳沒有可收回的額度）。"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSED": {
+      "message": "已收回",
+      "description": "已向賣家收回。"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSING": {
+      "message": "收回中",
+      "description": "收回進行中。"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_WAITING": {
+      "message": "等待收回",
+      "description": "等退款被金流商接受之後才開始收回。"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_ANOMALY": {
+      "message": "待人工處理",
+      "description": "建立的結果與金流商對不起來：待營運人工處理，買家不能重試。"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_AWAITING_PAYMENT": {
+      "message": "待付款",
+      "description": "已建立，等買家付款（含需要 3DS 的額外驗證）。"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_CANCELED": {
+      "message": "已取消",
+      "description": "已取消（之後的入帳仍勝出）；訂單仍可付時 CreatePayment 會換新的嘗試。"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_CREATE_FAILED": {
+      "message": "建立失敗",
+      "description": "建立被金流商永久拒絕，或查回證明金流商沒有這筆。"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_CREATING": {
+      "message": "建立中",
+      "description": "付款已記錄，金流商那邊的付款物件還沒確認建立（含呼叫過、結果不明）；背景補做，client 稍後重讀。"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_PROCESSING": {
+      "message": "處理中",
+      "description": "買家已送出付款，金流商處理中。"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_SUCCEEDED": {
+      "message": "已付款",
+      "description": "已入帳（終局）。"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_ANOMALY": {
+      "message": "待人工處理",
+      "description": "與金流商對不起來：待營運人工結案。"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_DONE": {
+      "message": "已補差額",
+      "description": "已補給賣家。"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_NONE": {
+      "message": "無需補差額",
+      "description": "沒有要補的差額。"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_RELEASED": {
+      "message": "不再補差額",
+      "description": "不再補（差額已無需補）。"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_SENDING": {
+      "message": "補差額中",
+      "description": "補差額轉帳送出中。"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_WAITING": {
+      "message": "等待補差額",
+      "description": "等補差額轉帳。"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_ANOMALY": {
+      "message": "待人工處理",
+      "description": "與金流商對不起來：佔住這筆付款的轉帳，待營運人工結案。"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_FAILED": {
+      "message": "轉帳失敗",
+      "description": "轉帳失敗（終局）。"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_PENDING": {
+      "message": "待轉帳",
+      "description": "已記錄，等送出或等結果。"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_SUCCEEDED": {
+      "message": "已轉帳",
+      "description": "轉帳成功。"
+    },
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
       "message": "平台收件（內嵌元件）",
       "description": "平台收件（金流商的內嵌元件）：資料在網頁上由元件直接送給金流商。"
