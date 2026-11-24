@@ -239,9 +239,6 @@ func TestReserveRechecksStoreScopeAndThreshold(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := f.m.PublishCampaign(context.Background(), scoped.ID); err != nil {
-		t.Fatal(err)
-	}
 	v := f.claim(scoped, buyer1)
 
 	for name, req := range map[string][2]string{

@@ -354,6 +354,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - `createRefund` 依 D5 修正。
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
 - [ ] **B3 fulfillment**
+  - 子計畫與進度：`2026-11-24-b3-fulfillment.md`（前提重審 P1–P6 已決 2026-11-24：出貨歸 B8 ordering、運費設定歸 seller、物流 port 延後；R1–R6 已決；本段以下的條目若與子計畫衝突，以子計畫為準）。
   - 出貨主線改成賣家自寄（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）：設計書 69「商家自有出貨」（`fulfillment_mode = SELLER_MANAGED`）從橫向能力升為唯一上線的出貨方式。賣家回填物流業者與追蹤號碼；出貨狀態由賣家更新或買家確認收貨，逾期未出貨、逾期自動完成與配送異常轉售後由伺服器的狀態機決定。運費只用賣家自訂的固定規則，不做即時報價。
     - 理由：台灣在地物流商的多賣家模式都要簽約（綠界的平台商 PlatformID 要專案合作開通、物流沒有平台商測試編號；PayUni 代理商 API 要簽約，2026-10-29 決定不簽）；國外的 Shippo Platform Account 要人工開通，EasyPost 開子帳號只能用正式金鑰，兩家都不支援台灣超商。作品集要展示的是出貨單與訂單的狀態機、模組分界與事件，自寄就能完整跑通。
     - 保留供應商中立的物流 port（建單、取標籤、貨態 webhook 先寫 inbox、以事件 ID 去重），每個賣家帶一個外部帳戶 ID 欄位；作品集只放模擬 adapter，用來跑建單到貨態回傳的流程與測試。真實物流商（綠界的平台商模式等）在決定上線並簽約後才寫 adapter。
