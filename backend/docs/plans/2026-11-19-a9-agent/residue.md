@@ -3,7 +3,7 @@
 產生指令（在 repo 根目錄，dev `53555604`）：
 
 ```bash
-rg -l "ai-service|aiservice" . | grep -vE "^\./(docs|backend/docs)/|^\./backend/services/ai-service/" | sort
+rg -l --hidden -g '!.git' "ai-service|aiservice" . | grep -vE "^\./(docs|backend/docs)/|^\./backend/services/ai-service/" | sort
 rg -ln "modules/agent|httpapi/agent" backend | grep -v "^backend/internal/modules/agent/" | grep -v "^backend/docs/" | sort
 ```
 
@@ -26,7 +26,7 @@ A9-6 的驗收：第一條指令的輸出等於下方「允許殘留」清單；
 | `backend/cmd/hawkr/{main,main_test,modules}.go`、`backend/internal/httpapi/server.go`、`backend/internal/httpapi/public_services_test.go`、`backend/internal/legacy/gatewayproxy/proxy*.go`、`backend/internal/legacy/sellerserver/{errors,server,server_integration_test}.go`、`backend/internal/arch/modules.go`（第 39、42、97 行）、`backend/cmd/new-module/templates/characterization/monolith_integration_test.go.tmpl`、`httpapi/{buyer,content,identity,moderation,seller,social}` 的 integration test | 拿掉 `agent` 模組與供應商入口的接線 | A9-1 |
 | `backend/gateway/internal/{router/constants.go,router/proxy_failure_status_test.go,middleware/ratelimit.go,handler/testutil_test.go}`、`backend/api/openapi/openapi.yaml`、`website/lib/api/openapi-types.ts` | 刪 AI 路由與 operation | A9-6 |
 | `backend/{go.work,Makefile,dev.sh,.env.template,docker-compose-local.yml}`、`backend/scripts/{README.md,expected-skips.json}`、`scripts/govulncheck-allowlist.json`、`.github/workflows/{backend-go-checks,backend-integration-tests,backend-sqlc-generated-diff}.yml`、`.github/dependabot.yml`、`backend/services/im-service/Makefile` | 拿掉 ai-service | A9-6 |
-| `backend/monitoring/prometheus/{rules/service-alerts.yml,tests/ai-llm-budget-alerts.test.yml}` | job 名改成單體；指標名沿用（A9-D11） | A9-6 |
+| `backend/monitoring/prometheus/{rules/service-alerts.yml,tests/ai-llm-budget-alerts.test.yml}` | 刪除沒有資料來源的 AI 告警規則與其測試（A9-D11 補記，Will 2026-11-24）；新增 `ProdMonolithAbsent` 存活告警與測試 | A9-6 |
 | `backend/monitoring/prometheus/{rules/business-alerts.yml（vendor-portal-alerts 群組）,tests/vendor-portal-alerts.test.yml}` | 刪供應商入口告警（A9-D1） | A9-6 |
 | `backend/tests/contract/golden/event_payload_keys.json` | 依 A9-D1 刪 `external_created`；保留的事件改由 relay 產生 | A9-3c |
 | `website/features/procurement-assistant/*`、`website/lib/seller/ai-image.ts` | 改用生成的 Connect client | A9-5 |
@@ -49,3 +49,4 @@ A9-6 的驗收：第一條指令的輸出等於下方「允許殘留」清單；
 - 刪除與修改 residue 中標 A9-6 的列已完成；`backend/services/im-service/Makefile` 不存在（盤點時的筆誤），無需修改。
 - website 的 `lib/api/openapi-types.ts` 採用 A9-5 的版本（刪除 Procurement 區段），兩邊合併時內容相同。
 - 第一條指令在只有 A9-6 的分支上仍會列出 A9-5 擁有的檔案（`seller-app/lib/features/ai_assistant/`、`seller-app/lib/features/product/data/product_listing_chat_repository.dart`、`website/features/procurement-assistant/*`、`website/lib/buyer/seller-match-chat*`、`website/lib/seller/ai-*.ts`、`website/scripts/hardcoded-han-baseline.json`）；與 A9-5 兩個 PR 合併後只剩 `website/features/procurement-assistant/CandidateBrowser.tsx` 的一行註解，由 A9-5 改寫。
+- 與 A9-5 合併後兩條驗收指令（第一條帶 `--hidden`）的輸出只剩「允許殘留」清單內的檔；`CandidateBrowser.tsx` 的註解已改指 `model.SlotKey`。

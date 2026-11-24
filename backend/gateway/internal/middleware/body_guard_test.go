@@ -13,11 +13,9 @@ import (
 )
 
 // deadlineTrackingResponseWriter records every SetReadDeadline call so tests
-// can assert BodyGuard sets the deadline tiered to the matched route, rather
-// than a single uniform value. httptest.NewRecorder() doesn't itself support
-// deadlines, so this fake embeds it and adds just the method BodyGuard needs
-// — mirrors the deadlineTrackingWriter/deadlineTrackingResponseWriter pattern
-// already used in this branch's sse/stream_test.go and handler/ai_stream_test.go.
+// can assert BodyGuard sets the read deadline. httptest.NewRecorder() doesn't
+// itself support deadlines, so this fake embeds it and adds just the method
+// BodyGuard needs.
 type deadlineTrackingResponseWriter struct {
 	http.ResponseWriter
 	deadlines []time.Time
@@ -66,46 +64,6 @@ func TestBodyGuard_AllowsWithinDefaultLimit(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestBodyGuard_UploadRouteGetsLargerLimit(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(middleware.BodyGuard())
-	r.POST("/api/v1/app/image_transformations", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	// 3MiB is over the 2MiB default but under the 10MiB upload limit.
-	body := strings.NewReader(strings.Repeat("a", 3<<20))
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/image_transformations", body)
-	req.ContentLength = 3 << 20
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("upload route should accept 3MiB body, got %d", w.Code)
-	}
-}
-
-func TestBodyGuard_OtherUploadRoutesStayAtStandardTier(t *testing.T) {
-	// 15MiB is over the 10MiB upload tier and must be rejected.
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(middleware.BodyGuard())
-	r.POST("/api/v1/app/image_transformations", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	body := strings.NewReader(strings.Repeat("a", 15<<20))
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/image_transformations", body)
-	req.ContentLength = 15 << 20
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("image_transformations must stay at the 10MiB standard tier, expected 413 for 15MiB, got %d", w.Code)
 	}
 }
 
@@ -162,31 +120,6 @@ func TestBodyGuard_DefaultRouteGetsDefaultReadDeadline(t *testing.T) {
 	wantMax := after.Add(30 * time.Second)
 	if got := dw.deadlines[0]; got.Before(wantMin) || got.After(wantMax) {
 		t.Fatalf("default route deadline %v not within expected [%v, %v] (want ~30s)", got, wantMin, wantMax)
-	}
-}
-
-func TestBodyGuard_UploadRouteGetsLongerReadDeadline(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.Use(middleware.BodyGuard())
-	r.POST("/api/v1/app/image_transformations", func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})
-
-	dw := &deadlineTrackingResponseWriter{ResponseWriter: httptest.NewRecorder()}
-	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/image_transformations", strings.NewReader(`{"a":1}`))
-
-	before := time.Now()
-	r.ServeHTTP(dw, req)
-	after := time.Now()
-
-	if len(dw.deadlines) != 1 {
-		t.Fatalf("expected exactly 1 SetReadDeadline call, got %d", len(dw.deadlines))
-	}
-	wantMin := before.Add(120 * time.Second)
-	wantMax := after.Add(120 * time.Second)
-	if got := dw.deadlines[0]; got.Before(wantMin) || got.After(wantMax) {
-		t.Fatalf("upload route deadline %v not within expected [%v, %v] (want ~120s, i.e. longer than the 30s default)", got, wantMin, wantMax)
 	}
 }
 

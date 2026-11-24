@@ -24,8 +24,8 @@ import {
 /**
  * `matchedFacts[].key` 逐列對應的圖示。
  *
- * key 的值域是後端的 `domain.SlotKey`（`services/ai-service/internal/procurement/
- * domain/slots.go`），`MatchFactFor` 只會用這些值。整欄共用同一個勾不帶任何資訊——
+ * key 的值域是後端的 `model.SlotKey`（`backend/internal/modules/procurement/
+ * internal/model`），`MatchFactFor` 只會用這些值。整欄共用同一個勾不帶任何資訊——
  * 逐列給字形，買家掃一眼就知道命中的是品項、價格還是配送。
  *
  * ⚠️ 值域外的 key 退回勾，不猜也不隱藏：後端日後擴充 slot 時，多出來的那一列仍要

@@ -20,12 +20,11 @@ const (
 // InjectBuyerIDHeader／InjectStoreIDHeader 只在**反向代理**路徑上使用。
 //
 // 為什麼需要它們：`proxy.CreateProxy` 只注入 `x-account-id` 與 `x-account-type`；
-// `x-buyer-id`／`x-store-id` 只存在於 gRPC 路徑的 metadata_interceptor，HTTP 反代
-// 不經過它。不補注入的話下游只收得到 account_id，只剩兩條路——自己去 buyer／seller
+// `x-buyer-id`／`x-store-id` 不是登入 principal，不在 gRPC metadata 轉發的欄位內。不補注入的話下游只收得到 account_id，只剩兩條路——自己去 buyer／seller
 // service 反解營運鍵（違反 44 號「Gateway 解析、服務端不猜」），或做不出
 // `order_no × buyer_id × document_id` 這個述詞（Tier A 破功）。
 //
-// ⚠️ 走 gRPC 的端點**不要**掛：那條已由 metadata_interceptor 帶，重複注入會有兩個
+// ⚠️ 走 gRPC 的端點**不要**掛：gRPC 路徑的營運鍵由 handler 明確放進請求，重複注入會有兩個
 // 真實來源。
 //
 // header 先刪再設：外部帶進來的同名 header 一律不可信。

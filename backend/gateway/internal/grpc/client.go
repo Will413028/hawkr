@@ -12,10 +12,8 @@ func getEnvOrDefault(key, defaultVal string) string {
 }
 
 // DefaultDialOpts returns the standard gRPC client dial options used by all Gateway clients.
-// Includes: OTel tracing and two interceptor chains —
-//   - unary: auth metadata forwarding, envelope guard, circuit breaker
-//   - stream: auth metadata forwarding, circuit breaker (no envelope guard —
-//     a server-stream has no single response envelope to inspect)
+// Includes: OTel tracing and the unary interceptor chain: auth metadata forwarding,
+// envelope guard, circuit breaker.
 //
 // Transport credentials are supplied by grpcclient.Dial (every call site dials via
 // grpcclient.Dial(target, DefaultDialOpts()...), which prepends insecure creds — same
@@ -26,7 +24,6 @@ func getEnvOrDefault(key, defaultVal string) string {
 // transport errors only. EnvelopeGuard runs in an outer layer, translating business errors
 // (resp.Code != 0) into gRPC errors — keeping those out of the breaker's failure counts.
 func DefaultDialOpts() []grpc.DialOption {
-	streamInterceptors := []grpc.StreamClientInterceptor{AuthMetadataStreamInterceptor(), CircuitBreakerStreamInterceptor()}
 	return []grpc.DialOption{
 		grpc.WithStatsHandler(interceptor.OTelClientStatsHandler()),
 		grpc.WithChainUnaryInterceptor(
@@ -34,6 +31,5 @@ func DefaultDialOpts() []grpc.DialOption {
 			EnvelopeGuardInterceptor(),
 			CircuitBreakerInterceptor(),
 		),
-		grpc.WithChainStreamInterceptor(streamInterceptors...),
 	}
 }

@@ -253,15 +253,6 @@
    "why": "端點數上限放寬，鎖低點的斷言要紅"
   },
   {
-   "id": "b1-4-l6-upload-body-tier",
-   "stack": "go:backend/gateway",
-   "file": "backend/gateway/internal/middleware/body_guard.go",
-   "old": "{uploadMaxBodyBytes, uploadReadDeadline}",
-   "new": "{defaultMaxBodyBytes, uploadReadDeadline}",
-   "test": "internal/middleware ^TestBodyGuard_UploadRouteGetsLargerLimit$",
-   "why": "圖片轉換路由回到預設大小上限"
-  },
-  {
    "id": "b1-4-l6-activity-flag",
    "stack": "go:backend/gateway",
    "file": "backend/gateway/internal/router/delegated_capability.go",
