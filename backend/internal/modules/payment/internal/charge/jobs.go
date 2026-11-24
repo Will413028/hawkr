@@ -108,6 +108,23 @@ func enqueueReversal(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error 
 	return jc.Enqueue(ctx, args, &opts)
 }
 
+// TopupArgs 是補差額轉帳給賣家的 job，以退款 ID 為唯一鍵：已算進轉帳金額的退款失敗與轉帳成立兩個事件中後到的那個，在把退款列的補差額狀態推進到 SENDING 的同一個 transaction 排入（D11 補充）。
+type TopupArgs struct {
+	RefundID uuid.UUID `json:"refund_id" river:"unique"`
+}
+
+// Kind 是 River 的 job 種類。
+func (TopupArgs) Kind() string { return "payment.transfer_topup" }
+
+// InsertOpts 是補差額 job 的排入選項。
+func (TopupArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
+
+func enqueueTopup(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
+	args := TopupArgs{RefundID: id}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
 // RefundArgs 是呼叫 provider 建立退款的 job，以退款 ID 為唯一鍵：CreateRefund 在寫 PENDING 退款列的同一個 transaction 排入（轉帳的任何狀態都可以退款，向賣家收回在 provider 接受之後才開始）。
 type RefundArgs struct {
 	RefundID uuid.UUID `json:"refund_id" river:"unique"`
@@ -236,6 +253,19 @@ func (w *reversalWorker) Work(ctx context.Context, job *river.Job[ReversalArgs])
 // Timeout 是一次撤回的時間上限。
 func (w *reversalWorker) Timeout(*river.Job[ReversalArgs]) time.Duration { return jobTimeout }
 
+type topupWorker struct {
+	river.WorkerDefaults[TopupArgs]
+	service *Service
+}
+
+// Work 執行一次補差額轉帳。
+func (w *topupWorker) Work(ctx context.Context, job *river.Job[TopupArgs]) error {
+	return jobError(w.service.TopUp(ctx, job.Args.RefundID, job.Attempt >= job.MaxAttempts))
+}
+
+// Timeout 是一次補差額轉帳的時間上限。
+func (w *topupWorker) Timeout(*river.Job[TopupArgs]) time.Duration { return jobTimeout }
+
 type refundWorker struct {
 	river.WorkerDefaults[RefundArgs]
 	service *Service
@@ -290,6 +320,7 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &cancelWorker{service: s})
 	river.AddWorker(workers, &transferWorker{service: s})
 	river.AddWorker(workers, &reversalWorker{service: s})
+	river.AddWorker(workers, &topupWorker{service: s})
 	river.AddWorker(workers, &refundWorker{service: s})
 	river.AddWorker(workers, &refundSyncWorker{service: s})
 	river.AddWorker(workers, &sweepWorker{service: s})
@@ -309,7 +340,7 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 //   - 狀態：已建立、未結案、超過 readIdle 沒讀過的列補排同步（掉了 webhook 的保底）；
 //   - 舊嘗試：被取代、還沒結案又超過 readIdle 沒讀過的舊 PaymentIntent 所屬的付款補排同步；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的付款補排同步（任何狀態）；
-//   - 轉帳、撤回與退款：PENDING 的轉帳、撤回狀態是 REVERSING 的退款閒置超過 createIdle 就補排各自的 job，PENDING 的退款補排退款 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；
+//   - 轉帳、撤回、補差額與退款：PENDING 的轉帳、撤回狀態是 REVERSING 或補差額狀態是 SENDING 的退款閒置超過 createIdle 就補排各自的 job，PENDING 的退款補排退款 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；
 //     REFUNDING 的退款閒置超過 readIdle 補排退款同步；inbox 有超過 eventGrace 還沒處理的退款事件的退款補排退款同步；ANOMALY 的列一律不補排。
 //
 // 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次；補排的轉帳、撤回與退款呼叫算在 created，退款同步算在 synced）。沒有設定 provider 時什麼都不做。
@@ -368,6 +399,23 @@ func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 		}
 		for _, id := range ids {
 			if err := queue(enqueueReversal, id); err != nil {
+				return created, synced, err
+			}
+			created++
+			after = id
+		}
+		if len(ids) < sweepBatch {
+			break
+		}
+	}
+	after = uuid.Nil()
+	for {
+		ids, err := store.New(s.d.DB.Conn(ctx)).SendingTopupRefundIDs(ctx, store.SendingTopupRefundIDsParams{IdleBefore: createBefore, AfterID: after, Batch: sweepBatch})
+		if err != nil {
+			return created, synced, err
+		}
+		for _, id := range ids {
+			if err := queue(enqueueTopup, id); err != nil {
 				return created, synced, err
 			}
 			created++

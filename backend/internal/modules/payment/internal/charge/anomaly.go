@@ -29,6 +29,7 @@ const evidenceMax = 255
 //   - 轉帳：成功記 evidence 為外部轉帳 ID 並進 SUCCEEDED，累計已撤回額與等待中的撤回預留都以 provider 核實的轉帳為準（金額減 provider 上已撤回的額度，不用列上的數字，
 //     預留依建立順序重新分配、沒有額度的釋出，之後讓可開始的撤回開始）；失敗進 FAILED（讓出一筆付款一筆有效轉帳的位置、釋出等待中的撤回預留）。
 //   - 退款（ANOMALY 是退款呼叫的異常）：成功表示 provider 確實建立了退款，evidence 是退款 ID，暫記 REFUNDING 並排退款同步 job（真正的狀態由重讀推導，接受後才讓等待中的撤回開始）；失敗進 FAILED（不佔額度、釋出等待中的撤回預留）。
+//   - 補差額轉帳（AnomalyTopup，id 是退款 ID，補差額狀態是 ANOMALY）：成功表示 provider 確實補了差額，evidence 是轉帳 ID，進 DONE；失敗確認沒有補，進 RELEASED（人工另行處理）。
 //   - 撤回（AnomalyReversal，id 是退款 ID，撤回狀態是 ANOMALY）：成功表示撤回確實成立，evidence 是撤回 ID，同一個 transaction 累加轉帳的 reversed_amount、進 REVERSED（退款已 FAILED 時發 MoneyAnomaly）；失敗釋出預留（RELEASED）。
 //
 // 結案成成功之前，先在 transaction 外向 provider 查回證據（依列上的冪等鍵／嘗試 ID 查，不信管理員貼的 ID；退款與撤回分別用 FindRefund 與 FindReversal）：查到的物件 ID、金額必須與證據和列相符，不符回 FailedPrecondition、
@@ -71,6 +72,8 @@ func (s *Service) ResolveAnomaly(ctx context.Context, actor adminaudit.Actor, ki
 			reason, err = s.resolveRefund(ctx, q, id, outcome, evidence, proof)
 		case model.AnomalyReversal:
 			reason, err = s.resolveReversal(ctx, q, id, outcome, evidence, proof)
+		case model.AnomalyTopup:
+			reason, err = s.resolveTopup(ctx, q, id, outcome, evidence, proof)
 		default:
 			return apperr.InvalidInput("不認得的物件種類")
 		}
@@ -204,6 +207,29 @@ func (s *Service) verifyEvidence(ctx context.Context, kind model.AnomalyKind, id
 			return evidenceProof{}, errEvidenceMismatch
 		}
 		return evidenceProof{key: r.ReversalIdempotencyKey, parent: *tr.ExternalTransferID}, nil
+	case model.AnomalyTopup:
+		r, err := q.RefundByID(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return evidenceProof{}, apperr.NotFound("找不到這筆退款")
+		}
+		if err != nil {
+			return evidenceProof{}, err
+		}
+		if r.TopupStatus != string(model.TopupAnomaly) {
+			return evidenceProof{}, errNotAnomaly
+		}
+		pay, err := q.PaymentByID(ctx, r.PaymentID)
+		if err != nil {
+			return evidenceProof{}, err
+		}
+		snap, found, err := s.d.Provider.FindTransfer(callCtx, pay.OrderNo, r.TopupIdempotencyKey.String())
+		if err != nil {
+			return evidenceProof{}, fmt.Errorf("charge: 核對退款 %s 的補差額證據失敗：%w", id, err)
+		}
+		if !found || snap.ExternalID != evidence || snap.Amount != r.Amount {
+			return evidenceProof{}, errEvidenceMismatch
+		}
+		return evidenceProof{key: r.TopupIdempotencyKey}, nil
 	}
 	return evidenceProof{}, apperr.InvalidInput("不認得的物件種類")
 }
@@ -278,7 +304,10 @@ func (s *Service) resolveTransfer(ctx context.Context, q *store.Queries, id uuid
 		if _, err = q.ResolveTransferFailed(ctx, store.ResolveTransferFailedParams{ID: id, FailureReason: &failed, Now: now}); err != nil {
 			return reason, err
 		}
-		return reason, s.releaseWaitingReversals(ctx, q, t.PaymentID, reversalTransferFailed)
+		if err := s.releaseWaitingReversals(ctx, q, t.PaymentID, reversalTransferFailed); err != nil {
+			return reason, err
+		}
+		return reason, s.settleTopupsWithoutTransfer(ctx, q, t.PaymentID)
 	}
 	if locked.IdempotencyKey != proof.key {
 		return "", errEvidenceChanged
@@ -287,7 +316,10 @@ func (s *Service) resolveTransfer(ctx context.Context, q *store.Queries, id uuid
 	if err != nil {
 		return reason, conflictOrErr(err)
 	}
-	return reason, s.reassignWaitingReversals(ctx, q, resolved, proof)
+	if err := s.reassignWaitingReversals(ctx, q, resolved, proof); err != nil {
+		return reason, err
+	}
+	return reason, s.startTopups(ctx, q, resolved.PaymentID)
 }
 
 // reassignWaitingReversals 在轉帳人工結案成成功之後，以 provider 核實的轉帳為準重新分配等待中的撤回預留：剩餘可撤額度 = 核實的金額 − provider 上已撤回的額度 − 其他進行中的預留，
@@ -329,7 +361,7 @@ func (s *Service) reassignWaitingReversals(ctx context.Context, q *store.Queries
 	return s.startReversals(ctx, q, tr.PaymentID)
 }
 
-// resolveRefund 結案退款呼叫的異常（見 ResolveAnomaly）：鎖順序付款列、退款列。失敗時等待中的撤回預留由寫 FAILED 的同一個 statement 釋出。
+// resolveRefund 結案退款呼叫的異常（見 ResolveAnomaly）：鎖順序付款列、轉帳列、退款列。失敗時等待中的撤回預留由寫 FAILED 的同一個 statement 釋出。
 func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.UUID, outcome model.AnomalyOutcome, evidence string, proof evidenceProof) (string, error) {
 	r, err := q.RefundByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -339,6 +371,10 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 		return "", err
 	}
 	pay, err := q.LockPayment(ctx, r.PaymentID)
+	if err != nil {
+		return "", err
+	}
+	transferSucceeded, err := s.lockActiveTransfer(ctx, q, r.PaymentID)
 	if err != nil {
 		return "", err
 	}
@@ -353,8 +389,13 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 	now := s.d.Now().UTC()
 	if outcome == model.AnomalyFailed {
 		failed := failedResolved
-		_, err = q.ResolveRefundCallFailed(ctx, store.ResolveRefundCallFailedParams{ID: id, FailureReason: &failed, Now: now})
-		return reason, err
+		if _, err = q.ResolveRefundCallFailed(ctx, store.ResolveRefundCallFailedParams{ID: id, FailureReason: &failed, Now: now}); err != nil {
+			return reason, err
+		}
+		if transferSucceeded {
+			return reason, s.startTopups(ctx, q, r.PaymentID)
+		}
+		return reason, nil
 	}
 	if locked.IdempotencyKey != proof.key || proof.parent == "" || pay.ExternalPaymentID == nil || *pay.ExternalPaymentID != proof.parent {
 		return "", errEvidenceChanged
@@ -363,6 +404,41 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 		return "", conflictOrErr(err)
 	}
 	return reason, enqueueRefundSync(ctx, s.d.Jobs, id)
+}
+
+// resolveTopup 結案補差額轉帳的異常（見 ResolveAnomaly）：鎖順序付款列、退款列。成功＝provider 確實補了差額（evidence 是轉帳 ID，進 DONE）；失敗＝確認沒有補，不補了（RELEASED，人工另行處理）。
+func (s *Service) resolveTopup(ctx context.Context, q *store.Queries, id uuid.UUID, outcome model.AnomalyOutcome, evidence string, proof evidenceProof) (string, error) {
+	r, err := q.RefundByID(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", apperr.NotFound("找不到這筆退款")
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := q.LockPayment(ctx, r.PaymentID); err != nil {
+		return "", err
+	}
+	locked, err := q.LockRefund(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if locked.TopupStatus != string(model.TopupAnomaly) {
+		return "", errNotAnomaly
+	}
+	reason := derefString(locked.TopupReason)
+	now := s.d.Now().UTC()
+	if outcome == model.AnomalyFailed {
+		failed := failedResolved
+		_, err = q.ResolveRefundTopupReleased(ctx, store.ResolveRefundTopupReleasedParams{ID: id, Reason: &failed, Now: now})
+		return reason, err
+	}
+	if locked.TopupIdempotencyKey != proof.key {
+		return "", errEvidenceChanged
+	}
+	if _, err := q.ResolveRefundTopupDone(ctx, store.ResolveRefundTopupDoneParams{ID: id, TopupExternalID: &evidence, Now: now}); err != nil {
+		return "", conflictOrErr(err)
+	}
+	return reason, nil
 }
 
 // resolveReversal 結案撤回的異常（見 ResolveAnomaly）：鎖順序付款列、轉帳列（成功才鎖）、退款列。

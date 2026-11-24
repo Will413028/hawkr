@@ -85,6 +85,13 @@ type PaymentRefund struct {
 	ReversalCalledAt       *time.Time
 	ReversalExternalID     *string
 	ReversalLookupFailures int32
+	TransferDeducted       bool
+	TopupStatus            string
+	TopupReason            *string
+	TopupIdempotencyKey    uuid.UUID
+	TopupCalledAt          *time.Time
+	TopupExternalID        *string
+	TopupLookupFailures    int32
 	IdempotencyKey         uuid.UUID
 	RefundCalledAt         *time.Time
 	RefundLookupFailures   int32

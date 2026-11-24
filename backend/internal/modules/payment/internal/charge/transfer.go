@@ -226,7 +226,10 @@ func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer,
 		}
 		_, err := q.SucceedTransfer(ctx, store.SucceedTransferParams{ID: row.ID, ExternalTransferID: &snap.ExternalID, Now: s.d.Now().UTC()})
 		if err == nil {
-			return s.startReversals(ctx, q, row.PaymentID)
+			if err := s.startReversals(ctx, q, row.PaymentID); err != nil {
+				return err
+			}
+			return s.startTopups(ctx, q, row.PaymentID)
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			cur, rerr := q.TransferByID(ctx, row.ID)
@@ -290,7 +293,15 @@ func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now t
 			}
 			if amount <= 0 {
 				reason := failedFullyRefunded
-				_, err := q.FailTransfer(ctx, store.FailTransferParams{ID: transferID, FailureReason: &reason, Now: now})
+				if _, err := q.FailTransfer(ctx, store.FailTransferParams{ID: transferID, FailureReason: &reason, Now: now}); err != nil {
+					return err
+				}
+				return s.settleTopupsWithoutTransfer(ctx, q, pay.ID)
+			}
+			if err := s.releaseWaitingTopups(ctx, q, pay.ID, topupCountedInNewAmount); err != nil {
+				return err
+			}
+			if err := q.MarkRefundsDeducted(ctx, pay.ID); err != nil {
 				return err
 			}
 		}
@@ -393,6 +404,9 @@ func (s *Service) failTransfer(ctx context.Context, transferID uuid.UUID, reason
 		if err != nil {
 			return err
 		}
-		return s.releaseWaitingReversals(ctx, q, cur.PaymentID, reversalTransferFailed)
+		if err := s.releaseWaitingReversals(ctx, q, cur.PaymentID, reversalTransferFailed); err != nil {
+			return err
+		}
+		return s.settleTopupsWithoutTransfer(ctx, q, cur.PaymentID)
 	})
 }

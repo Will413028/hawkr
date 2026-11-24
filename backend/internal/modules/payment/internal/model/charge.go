@@ -111,6 +111,30 @@ func ReversalStatusValues() []ReversalStatus {
 	return []ReversalStatus{ReversalNone, ReversalWaiting, ReversalReversing, ReversalReversed, ReversalReleased, ReversalAnomaly}
 }
 
+// TopupStatus 是退款列上補差額轉帳給賣家的狀態（refunds_topup_status_check）：已算進轉帳金額的退款之後失敗，賣家少收的那筆錢補給賣家（D11 補充），與退款、撤回狀態並行、各自收斂。
+type TopupStatus string
+
+// 補差額的狀態。
+const (
+	// TopupNone 不需要補差額：退款沒有算進轉帳金額，或沒有失敗。
+	TopupNone TopupStatus = "NONE"
+	// TopupWaiting 退款已失敗、轉帳金額含它：等轉帳 SUCCEEDED。
+	TopupWaiting TopupStatus = "WAITING"
+	// TopupSending 補差額轉帳進行中（結果不明時依 D68 收斂）。
+	TopupSending TopupStatus = "SENDING"
+	// TopupDone 補差額轉帳已成立。
+	TopupDone TopupStatus = "DONE"
+	// TopupReleased 不補了（轉帳失敗、重新算定的金額已不含這筆退款，或補差額永久被拒絕）。
+	TopupReleased TopupStatus = "RELEASED"
+	// TopupAnomaly 補差額與 provider 對不起來，由後台人工結案。
+	TopupAnomaly TopupStatus = "ANOMALY"
+)
+
+// TopupStatusValues 回傳全部補差額狀態，與 refunds_topup_status_check 相同。
+func TopupStatusValues() []TopupStatus {
+	return []TopupStatus{TopupNone, TopupWaiting, TopupSending, TopupDone, TopupReleased, TopupAnomaly}
+}
+
 // Payment 是買家對一張訂單的付款。金額是整數、不帶幣別（D9）。
 type Payment struct {
 	ID        uuid.UUID
@@ -163,6 +187,8 @@ const (
 	AnomalyRefund   AnomalyKind = "refund"
 	// AnomalyReversal 是退款列上的撤回（ObjectID 是退款 ID）。
 	AnomalyReversal AnomalyKind = "reversal"
+	// AnomalyTopup 是退款列上的補差額轉帳（ObjectID 是退款 ID）。
+	AnomalyTopup AnomalyKind = "topup"
 )
 
 // MoneyAnomaly 是告警事件：搬錢的物件（付款、轉帳、退款）與 provider 對不起來而進入 ANOMALY，或 provider 已搬錢本地卻已不在可接收的狀態，需要人工核對。
@@ -203,6 +229,8 @@ type Refund struct {
 	Status         RefundStatus
 	ReversalAmount int64
 	ReversalStatus ReversalStatus
+	// TopupStatus 是已算進轉帳金額的退款失敗之後，補差額轉帳給賣家的狀態（沒有要補的是 TopupNone）。
+	TopupStatus TopupStatus
 	// FailureReason 只在 RefundFailed 與 RefundAnomaly 有值。
 	FailureReason string
 	CreatedAt     time.Time

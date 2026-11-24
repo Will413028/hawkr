@@ -59,6 +59,9 @@ func TestStatusTypesMatchTheSchemaChecks(t *testing.T) {
 	if got, want := checkColumnValues(t, "refunds_reversal_status_check", "reversal_status"), names(model.ReversalStatusValues()); !slices.Equal(got, want) {
 		t.Errorf("refunds_reversal_status_check：schema=%v，Go 型別=%v", got, want)
 	}
+	if got, want := checkColumnValues(t, "refunds_topup_status_check", "topup_status"), names(model.TopupStatusValues()); !slices.Equal(got, want) {
+		t.Errorf("refunds_topup_status_check：schema=%v，Go 型別=%v", got, want)
+	}
 }
 
 // provider 名稱同時是 payments.provider 與 inbox 的 provider 名稱：必須符合兩邊共同的格式（payments_provider_check、inbox 的 providerPattern）。
@@ -116,4 +119,18 @@ func checkValuesIn(t *testing.T, constraint string) []string {
 		out = append(out, v[1])
 	}
 	return out
+}
+
+// 補差額只存在於已失敗的退款列上（賣家少收的錢才補），而且原因碼、外部 ID 與狀態一一對應：守 schema 的宣告不被放寬。行為由整合測試守。
+func TestTheTopUpColumnsAreOnlyAllowedOnFailedRefundsAndKeepReasonAndExternalIDInStep(t *testing.T) {
+	t.Parallel()
+	if body := constraintBody(t, "refunds_topup_only_failed_check"); !regexp.MustCompile(`topup_status = 'NONE' OR status = 'FAILED'`).MatchString(body) {
+		t.Errorf("refunds_topup_only_failed_check：%s", body)
+	}
+	if body := constraintBody(t, "refunds_topup_reason_check"); !regexp.MustCompile(`topup_status IN \('RELEASED', 'ANOMALY'\)\) = \(topup_reason IS NOT NULL\)`).MatchString(body) {
+		t.Errorf("refunds_topup_reason_check：%s", body)
+	}
+	if body := constraintBody(t, "refunds_topup_external_check"); !regexp.MustCompile(`\(topup_status = 'DONE'\) = \(topup_external_id IS NOT NULL\)`).MatchString(body) {
+		t.Errorf("refunds_topup_external_check：%s", body)
+	}
 }

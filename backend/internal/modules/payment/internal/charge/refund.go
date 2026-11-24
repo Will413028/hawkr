@@ -199,7 +199,7 @@ func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay 
 func toRefund(r store.PaymentRefund) model.Refund {
 	out := model.Refund{
 		ID: r.ID, PaymentID: r.PaymentID, RequestKey: r.RequestKey, Amount: r.Amount, Auto: r.Auto,
-		Status: model.RefundStatus(r.Status), ReversalAmount: r.ReversalAmount, ReversalStatus: model.ReversalStatus(r.ReversalStatus), CreatedAt: r.CreatedAt,
+		Status: model.RefundStatus(r.Status), ReversalAmount: r.ReversalAmount, ReversalStatus: model.ReversalStatus(r.ReversalStatus), TopupStatus: model.TopupStatus(r.TopupStatus), CreatedAt: r.CreatedAt,
 	}
 	if r.FailureReason != nil {
 		out.FailureReason = *r.FailureReason
@@ -362,6 +362,11 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 		if err := s.afterRefundFailed(ctx, written); err != nil {
 			return err
 		}
+		if transferSucceeded {
+			if err := s.startTopups(ctx, q, row.PaymentID); err != nil {
+				return err
+			}
+		}
 		return s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))
 	})
 	if err == nil && orphan {
@@ -388,7 +393,7 @@ func (s *Service) lockActiveTransfer(ctx context.Context, q *store.Queries, paym
 }
 
 // afterRefundFailed 處理退款進入 FAILED 時列上的收回狀態（同一個 transaction，呼叫方已鎖付款列、轉帳列與退款列）。WAITING 的預留已由寫 FAILED 的同一個 statement 釋出（不撤回）；
-// REVERSED 發 MoneyAnomaly（撤回已落地，買家沒拿到錢、賣家已被收回，錢留在平台、reversed_amount 不減）；REVERSING 由撤回落地的 transaction 發；
+// 已算進轉帳金額的退款失敗，補差額的 WAITING 同一個 statement 寫入、轉帳已 SUCCEEDED 時由呼叫方接著開始補差額（startTopups）；REVERSED 發 MoneyAnomaly（撤回已落地，買家沒拿到錢、賣家已被收回，錢留在平台、reversed_amount 不減）；REVERSING 由撤回落地的 transaction 發；
 // ANOMALY 的預留持續佔住直到人工結案，結案成成功時撤回落地的 transaction 發。
 func (s *Service) afterRefundFailed(ctx context.Context, r store.PaymentRefund) error {
 	if model.ReversalStatus(r.ReversalStatus) == model.ReversalReversed {
@@ -564,7 +569,8 @@ func (s *Service) failRefund(ctx context.Context, refundID uuid.UUID, reason str
 		if _, err := q.LockPayment(ctx, prev.PaymentID); err != nil {
 			return err
 		}
-		if _, err := s.lockActiveTransfer(ctx, q, prev.PaymentID); err != nil {
+		transferSucceeded, err := s.lockActiveTransfer(ctx, q, prev.PaymentID)
+		if err != nil {
 			return err
 		}
 		if _, err := q.LockRefund(ctx, refundID); err != nil {
@@ -579,6 +585,11 @@ func (s *Service) failRefund(ctx context.Context, refundID uuid.UUID, reason str
 		}
 		if err := s.afterRefundFailed(ctx, r); err != nil {
 			return err
+		}
+		if transferSucceeded {
+			if err := s.startTopups(ctx, q, prev.PaymentID); err != nil {
+				return err
+			}
 		}
 		return s.publishRefundResult(ctx, q, r, model.RefundStatus(prev.Status))
 	})

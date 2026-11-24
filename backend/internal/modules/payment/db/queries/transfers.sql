@@ -289,12 +289,13 @@ WHERE id = sqlc.arg(id) AND status = 'PENDING'
 RETURNING *;
 
 -- name: ApplyRefundSnapshot :one
--- 退款呼叫的結果（呼叫的回應、查回找到的、或重讀 REFUNDING）：PENDING 與 REFUNDING 依 provider 的狀態進 REFUNDING、SUCCEEDED 或 FAILED，並記 provider 的退款 ID；
+-- 退款呼叫的結果（呼叫的回應、查回找到的、或重讀 REFUNDING）：進 FAILED 時，已算進轉帳金額的退款（transfer_deducted）同一個 statement 進補差額的 WAITING；PENDING 與 REFUNDING 依 provider 的狀態進 REFUNDING、SUCCEEDED 或 FAILED，並記 provider 的退款 ID；
 -- 已記過別的退款 ID 的列不寫（呼叫端當孤兒處理）。終局（SUCCEEDED、FAILED）與 ANOMALY 不在 WHERE 內，不會被倒退。
 UPDATE payment.refunds
 SET status = sqlc.arg(status),
     reversal_status = CASE WHEN sqlc.arg(status)::text = 'FAILED' AND reversal_status = 'WAITING' THEN 'RELEASED' ELSE reversal_status END,
     reversal_reason = CASE WHEN sqlc.arg(status)::text = 'FAILED' AND reversal_status = 'WAITING' THEN 'refund_failed' ELSE reversal_reason END,
+    topup_status = CASE WHEN sqlc.arg(status)::text = 'FAILED' AND transfer_deducted THEN 'WAITING' ELSE topup_status END,
     external_refund_id = sqlc.arg(external_refund_id),
     refund_called_at = COALESCE(refund_called_at, sqlc.arg(now)::timestamptz),
     refund_lookup_failures = 0,
@@ -310,6 +311,7 @@ UPDATE payment.refunds
 SET status = 'FAILED',
     reversal_status = CASE WHEN reversal_status = 'WAITING' THEN 'RELEASED' ELSE reversal_status END,
     reversal_reason = CASE WHEN reversal_status = 'WAITING' THEN 'refund_failed' ELSE reversal_reason END,
+    topup_status = CASE WHEN transfer_deducted THEN 'WAITING' ELSE topup_status END,
     failure_reason = sqlc.arg(failure_reason),
     updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND status = 'PENDING'
@@ -364,6 +366,7 @@ UPDATE payment.refunds
 SET status = 'FAILED',
     reversal_status = CASE WHEN reversal_status = 'WAITING' THEN 'RELEASED' ELSE reversal_status END,
     reversal_reason = CASE WHEN reversal_status = 'WAITING' THEN 'refund_failed' ELSE reversal_reason END,
+    topup_status = CASE WHEN transfer_deducted THEN 'WAITING' ELSE topup_status END,
     failure_reason = sqlc.arg(failure_reason),
     updated_at = sqlc.arg(now)
 WHERE id = sqlc.arg(id) AND status = 'ANOMALY'

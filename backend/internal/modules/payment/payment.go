@@ -422,11 +422,12 @@ const (
 	AnomalyTransfer  = model.AnomalyTransfer
 	AnomalyRefund    = model.AnomalyRefund
 	AnomalyReversal  = model.AnomalyReversal
+	AnomalyTopup     = model.AnomalyTopup
 	AnomalySucceeded = model.AnomalySucceeded
 	AnomalyFailed    = model.AnomalyFailed
 )
 
-// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳、退款或撤回（AnomalyReversal，id 是退款 ID）的人工結案：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
+// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳、退款、撤回（AnomalyReversal）或補差額轉帳（AnomalyTopup）的人工結案；後兩者的 id 是退款 ID：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
 // 領域變更與一筆 adminaudit 在同一個 transaction。語意與鎖順序見 charge.Service.ResolveAnomaly。
 func (m *Module) ResolveAnomaly(ctx context.Context, actor AdminActor, kind AnomalyKind, id uuid.UUID, outcome AnomalyOutcome, evidence string) error {
 	return m.charges.ResolveAnomaly(ctx, actor, kind, id, outcome, evidence)
@@ -518,6 +519,12 @@ func (m *Module) ReversePaymentTransfer(ctx context.Context, refundID uuid.UUID,
 	return m.charges.Reverse(ctx, refundID, finalAttempt)
 }
 
+// TopUpPaymentTransfer 是補差額轉帳 job（payment.transfer_topup）的內容，給 worker 與測試呼叫：補差額狀態是 SENDING 的退款列（已失敗、金額已算進轉帳）的退款額，
+// 以新的冪等鍵轉給賣家，成功後進 DONE。
+func (m *Module) TopUpPaymentTransfer(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
+	return m.charges.TopUp(ctx, refundID, finalAttempt)
+}
+
 // EnqueueRefundReversal 排入退款的撤回 job：只在退款列的撤回狀態已是 REVERSING 的同一個 transaction 內呼叫（正常路徑由退款被接受與轉帳成立的 transaction 排入，這裡給測試與補排）。
 func (m *Module) EnqueueRefundReversal(ctx context.Context, refundID uuid.UUID) error {
 	return m.charges.EnqueueReversal(ctx, refundID)
@@ -552,6 +559,19 @@ const (
 	ReversalReversed  = model.ReversalReversed
 	ReversalReleased  = model.ReversalReleased
 	ReversalAnomaly   = model.ReversalAnomaly
+)
+
+// PaymentTopupStatus 是退款列上補差額轉帳給賣家的狀態（已算進轉帳金額的退款失敗之後，D11 補充），與退款狀態並行。
+type PaymentTopupStatus = model.TopupStatus
+
+// 補差額的狀態。
+const (
+	TopupNone     = model.TopupNone
+	TopupWaiting  = model.TopupWaiting
+	TopupSending  = model.TopupSending
+	TopupDone     = model.TopupDone
+	TopupReleased = model.TopupReleased
+	TopupAnomaly  = model.TopupAnomaly
 )
 
 // ChargeRefundInput、ChargeRefundSnapshot 與 ChargeRefundState 是退款的 port 型別（測試包裝 provider 用）。

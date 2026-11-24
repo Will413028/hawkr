@@ -31,8 +31,8 @@
    "id": "reservation-not-released-when-a-refund-fails",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "SET status = 'FAILED',\n    reversal_status = CASE WHEN reversal_status = 'WAITING' THEN 'RELEASED' ELSE reversal_status END,\n    reversal_reason = CASE WHEN reversal_status = 'WAITING' THEN 'refund_failed' ELSE reversal_reason END,\n    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
-   "new": "SET status = 'FAILED',\n    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
+   "old": "SET status = 'FAILED',\n    reversal_status = CASE WHEN reversal_status = 'WAITING' THEN 'RELEASED' ELSE reversal_status END,\n    reversal_reason = CASE WHEN reversal_status = 'WAITING' THEN 'refund_failed' ELSE reversal_reason END,\n    topup_status = CASE WHEN transfer_deducted THEN 'WAITING' ELSE topup_status END,\n    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
+   "new": "SET status = 'FAILED',\n    topup_status = CASE WHEN transfer_deducted THEN 'WAITING' ELSE topup_status END,\n    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
    "test": "internal/modules/payment ^(TestARefundThatFailsBeforeTheReversalStartsReleasesTheReservationAndNeverReverses)$",
    "why": "provider 拒絕的退款（FailRefundCall）不釋出 WAITING 的預留：預留留在失敗的退款上。"
   },
@@ -58,8 +58,8 @@
    "id": "reservation-not-released-when-the-transfer-fails",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\treturn s.releaseWaitingReversals(ctx, q, cur.PaymentID, reversalTransferFailed)\n",
-   "new": "\t\treturn nil\n",
+   "old": "\t\tif err := s.releaseWaitingReversals(ctx, q, cur.PaymentID, reversalTransferFailed); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
    "test": "internal/modules/payment ^(TestATransferThatFailsPermanentlyReleasesTheReservationsOfRefundsMadeAfterItsClaim)$",
    "why": "轉帳終局失敗（failTransfer）不釋出 WAITING 的預留。"
   },
@@ -67,8 +67,8 @@
    "id": "reservation-not-released-when-the-transfer-is-resolved-failed",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "\t\treturn reason, s.releaseWaitingReversals(ctx, q, t.PaymentID, reversalTransferFailed)",
-   "new": "\t\treturn reason, nil",
+   "old": "\t\tif err := s.releaseWaitingReversals(ctx, q, t.PaymentID, reversalTransferFailed); err != nil {\n\t\t\treturn reason, err\n\t\t}\n",
+   "new": "",
    "test": "internal/modules/payment ^(TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifiedTransfer)$",
    "why": "轉帳人工結案成失敗不釋出 WAITING 的預留。"
   },
@@ -121,8 +121,8 @@
    "id": "transfer-success-does-not-start-the-reversals",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\treturn s.startReversals(ctx, q, row.PaymentID)\n",
-   "new": "\t\t\treturn nil\n",
+   "old": "\t\t\tif err := s.startReversals(ctx, q, row.PaymentID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "",
    "test": "internal/modules/payment ^(TestARefundAcceptedWhileTheTransferIsPendingStartsTheReversalWhenTheTransferSucceeds)$",
    "why": "轉帳成立的 transaction 不讓已被接受的退款開始撤回：兩個事件裡轉帳後到時沒人排撤回。"
   },
@@ -179,6 +179,132 @@
    "new": "\t\t_ = r\n\t\treturn nil",
    "test": "internal/modules/payment ^(TestAnAnomalousReversalKeepsHoldingItsReservationAndAPermanentFailureReleasesIt|TestAReversalPermanentRefusalLeavesTheTransferUntouchedAndAnUnknownOneIsReplayedWithinTheWindow)$",
    "why": "撤回永久失敗釋出預留時不發 MoneyAnomaly：錢由平台吸收卻沒有告警。"
+  },
+  {
+   "id": "topup-not-queued-when-a-deducted-refund-fails",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "    topup_status = CASE WHEN transfer_deducted THEN 'WAITING' ELSE topup_status END,\n    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
+   "new": "    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
+   "test": "internal/modules/payment ^(TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller|TestATopUpWaitsForTheTransferToSucceedBeforeItStarts)$",
+   "why": "provider 拒絕的退款（FailRefundCall）不進補差額 WAITING：已算進轉帳金額的退款失敗後沒有補差額、沒有 job，賣家少收。"
+  },
+  {
+   "id": "topup-for-a-refund-that-was-not-deducted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "    topup_status = CASE WHEN transfer_deducted THEN 'WAITING' ELSE topup_status END,\n    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
+   "new": "    topup_status = CASE WHEN true THEN 'WAITING' ELSE topup_status END,\n    failure_reason = $1,\n    updated_at = $2\nWHERE id = $3 AND status = 'PENDING'",
+   "test": "internal/modules/payment ^(TestARefundThatWasNotDeductedFromTheTransferNeedsNoTopUpWhenItFails)$",
+   "why": "不看 transfer_deducted：轉帳成立之後才建立的退款失敗也補差額，賣家多收。"
+  },
+  {
+   "id": "topup-amount-is-wrong",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/topup.go",
+   "old": "\t\tAmount: called.Amount, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: tr.DestinationAccountID,\n\t\tTransferGroup: pay.OrderNo, IdempotencyKey: called.TopupIdempotencyKey.String(),",
+   "new": "\t\tAmount: called.Amount + 1, SourceChargeID: *pay.ExternalChargeID, DestinationAccountID: tr.DestinationAccountID,\n\t\tTransferGroup: pay.OrderNo, IdempotencyKey: called.TopupIdempotencyKey.String(),",
+   "test": "internal/modules/payment ^(TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller)$",
+   "why": "補差額呼叫 provider 的金額多 1：provider 收到的補差額不是退款額（也與列對不起來進 ANOMALY）。"
+  },
+  {
+   "id": "topup-key-not-rotated",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/topups.sql.go",
+   "old": "SET topup_idempotency_key = gen_random_uuid(),\n    topup_called_at = NULL,",
+   "new": "SET topup_idempotency_key = topup_idempotency_key,\n    topup_called_at = NULL,",
+   "test": "internal/modules/payment ^(TestARetryableRefusalOfTheTopUpRotatesItsIdempotencyKey|TestAnUnknownTopUpThatLookupProvesAbsentIsResentWithANewKeyOnlyAfterTheWait)$",
+   "why": "補差額的換鍵不換鍵：可重試拒絕與查回證明不存在之後，新的呼叫仍帶同一把冪等鍵。"
+  },
+  {
+   "id": "topup-rotation-keeps-called-at",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/topups.sql.go",
+   "old": "SET topup_idempotency_key = gen_random_uuid(),\n    topup_called_at = NULL,",
+   "new": "SET topup_idempotency_key = gen_random_uuid(),\n    topup_called_at = topup_called_at,",
+   "test": "internal/modules/payment ^(TestARetryableRefusalOfTheTopUpRotatesItsIdempotencyKey|TestAnUnknownTopUpThatLookupProvesAbsentIsResentWithANewKeyOnlyAfterTheWait)$",
+   "why": "補差額換鍵後不清 topup_called_at：新鍵被當成已送過、直接走查回，不重送。"
+  },
+  {
+   "id": "topup-not-started-when-the-transfer-succeeds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\t\treturn s.startTopups(ctx, q, row.PaymentID)\n",
+   "new": "\t\t\treturn nil\n",
+   "test": "internal/modules/payment ^(TestATopUpWaitsForTheTransferToSucceedBeforeItStarts|TestConcurrentRefundFailuresAndTransferSuccessNeverTopUpTwice)$",
+   "why": "轉帳成立的 transaction 不開始補差額：轉帳結果不明時失敗的退款留在 WAITING，轉帳成立後沒有 job。"
+  },
+  {
+   "id": "claim-keeps-the-waiting-topup",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\t\tif err := s.releaseWaitingTopups(ctx, q, pay.ID, topupCountedInNewAmount); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "",
+   "test": "internal/modules/payment ^(TestAKeyRotationReleasesTheTopUpOfARefundTheNewAmountNoLongerCounts)$",
+   "why": "claim 重新算定金額時不釋出 WAITING 的補差額：失敗的退款已在新金額裡，轉帳成立後又補一次，賣家多收。"
+  },
+  {
+   "id": "claim-does-not-rewrite-the-deducted-flag",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\t\tif err := q.MarkRefundsDeducted(ctx, pay.ID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "",
+   "test": "internal/modules/payment ^(TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller|TestAKeyRotationReleasesTheTopUpOfARefundTheNewAmountNoLongerCounts)$",
+   "why": "claim 不標記哪些退款已算進轉帳金額：送出前的退款沒有 transfer_deducted，失敗後不補差額。"
+  },
+  {
+   "id": "failed-transfer-keeps-the-waiting-topup",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\treturn s.settleTopupsWithoutTransfer(ctx, q, cur.PaymentID)\n",
+   "new": "\t\treturn nil\n",
+   "test": "internal/modules/payment ^(TestAPermanentlyFailedTransferReleasesTheWaitingTopUp)$",
+   "why": "轉帳終局失敗不釋出 WAITING 的補差額、不清 transfer_deducted：沒搬錢的轉帳之後仍可能補差額。"
+  },
+  {
+   "id": "topup-lookup-rekeys-before-the-wait",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/topup.go",
+   "old": "\tif now.Sub(*ref.TopupCalledAt) < NotFoundAfter {",
+   "new": "\tif now.Sub(*ref.TopupCalledAt) < 0 {",
+   "test": "internal/modules/payment ^(TestAnUnknownTopUpThatLookupProvesAbsentIsResentWithANewKeyOnlyAfterTheWait)$",
+   "why": "補差額查無就換新鍵、不等 NotFoundAfter：上一把鍵的呼叫可能還在 provider 那邊排隊，換鍵有重複補差額的風險。"
+  },
+  {
+   "id": "topup-past-the-resend-window-resends",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/topup.go",
+   "old": "\tif !inResendWindow(ref.TopupCalledAt, now) {\n\t\treturn s.lookupTopup(",
+   "new": "\tif false && !inResendWindow(ref.TopupCalledAt, now) {\n\t\treturn s.lookupTopup(",
+   "test": "internal/modules/payment ^(TestAnUnknownTopUpFoundByLookupCreatesNoSecondTransfer)$",
+   "why": "補差額過了 ResendWindow 仍重送、不查回：provider 的呼叫次數增加（冪等鍵保存期之外有重複補差額的風險）。"
+  },
+  {
+   "id": "topup-permanent-refusal-does-not-alert",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/topup.go",
+   "old": "\t\treturn s.publishAnomaly(ctx, model.AnomalyTopup, r.ID, r.PaymentID, \"topup_released:\"+reason)\n",
+   "new": "\t\t_ = r\n\t\treturn nil\n",
+   "test": "internal/modules/payment ^(TestAPermanentRefusalOfTheTopUpReleasesItAndAlertsTheMoneyAnomaly)$",
+   "why": "補差額被永久拒絕只進 RELEASED、不發 MoneyAnomaly：賣家少收沒有人知道。"
+  },
+  {
+   "id": "topup-evidence-not-checked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "\t\tif !found || snap.ExternalID != evidence || snap.Amount != r.Amount {\n\t\t\treturn evidenceProof{}, errEvidenceMismatch\n\t\t}\n\t\treturn evidenceProof{key: r.TopupIdempotencyKey}, nil",
+   "new": "\t\tif false && (!found || snap.ExternalID != evidence || snap.Amount != r.Amount) {\n\t\t\treturn evidenceProof{}, errEvidenceMismatch\n\t\t}\n\t\treturn evidenceProof{key: r.TopupIdempotencyKey}, nil",
+   "test": "internal/modules/payment ^(TestATopUpAnomalyIsResolvedOnlyAgainstTheProvidersEvidence)$",
+   "why": "補差額異常結案成成功不核對證據：貼別筆轉帳的 ID 也被收下。"
+  },
+  {
+   "id": "waiting-topups-not-filtered-by-status",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/topups.sql.go",
+   "old": "WHERE payment_id = $1 AND topup_status = 'WAITING'\nORDER BY id\nFOR UPDATE",
+   "new": "WHERE payment_id = $1\nORDER BY id\nFOR UPDATE",
+   "test": "internal/modules/payment ^(TestConcurrentRefundFailuresAndTransferSuccessNeverTopUpTwice|TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller)$",
+   "why": "開始補差額時不只挑 WAITING 的退款：沒有失敗的退款也被排補差額（StartRefundTopup 的條件擋下並回錯誤，交易整個失敗）。"
   }
  ]
 }

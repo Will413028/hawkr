@@ -166,8 +166,8 @@
    "id": "refund-anomaly-evidence-not-checked",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "\t\tif !found || snap.ExternalID != evidence || snap.Amount != r.Amount {",
-   "new": "\t\t\tif false {",
+   "old": "核對退款 %s 的證據失敗：%w\", id, err)\n\t\t}\n\t\tif !found || snap.ExternalID != evidence || snap.Amount != r.Amount {",
+   "new": "核對退款 %s 的證據失敗：%w\", id, err)\n\t\t}\n\t\tif false && (!found || snap.ExternalID != evidence || snap.Amount != r.Amount) {",
    "test": "internal/modules/payment ^(TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheSync)$",
    "why": "退款的結案不核對 provider 證據。"
   },
