@@ -108,5 +108,30 @@
     "exchange": "hawkr.seller",
     "routing_key": "seller.unsuspended",
     "package": "internal/legacy/sellerrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "payment.closed",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "payment.failed",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "payment.success",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "refund.failed",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "refund.succeeded",
+    "package": "internal/legacy/paymentrelay"
   }
 ]
