@@ -160,22 +160,10 @@ var services = map[string]ServiceConfig{
 		Port:   getEnvOrDefault("AFTERSALES_SERVICE_PORT", "9922"),
 		Prefix: "",
 	},
-	"shipping": {
-		Name:   "shipping-service",
-		Host:   getEnvOrDefault("SHIPPING_SERVICE_HOST", "127.0.0.1"),
-		Port:   getEnvOrDefault("SHIPPING_SERVICE_PORT", "9930"),
-		Prefix: "",
-	},
 	"payment": {
 		Name:   "payment-service",
 		Host:   getEnvOrDefault("PAYMENT_SERVICE_HOST", "127.0.0.1"),
 		Port:   getEnvOrDefault("PAYMENT_SERVICE_PORT", "9924"),
-		Prefix: "",
-	},
-	"payuni-webhook": {
-		Name:   "payuni-webhook-service",
-		Host:   getEnvOrDefault("PAYUNI_WEBHOOK_SERVICE_HOST", "127.0.0.1"),
-		Port:   getEnvOrDefault("PAYUNI_WEBHOOK_SERVICE_PORT", "9946"),
 		Prefix: "",
 	},
 	// invoice-service 的**檔案串流面**（10042），不是 gRPC 面（10041）。發票 PDF 的

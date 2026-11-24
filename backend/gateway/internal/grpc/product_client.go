@@ -385,16 +385,6 @@ func (c *ProductClient) UpdateSellerProductStatus(ctx context.Context, productID
 	return c.client.UpdateSellerProductStatus(ctx, req)
 }
 
-// ========== 運費計算 ==========
-
-// CalculateShippingOptions 計算可用配送選項與運費（依溫層分組）
-func (c *ProductClient) CalculateShippingOptions(ctx context.Context, req *pb.CalculateShippingOptionsRequest) (*pb.CalculateShippingOptionsResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	return c.client.CalculateShippingOptions(ctx, req)
-}
-
 // ========== 相關商品 ==========
 
 // GetRelatedProducts 取得相關商品（同分類、排除自身、僅 ACTIVE、上限 8 筆）

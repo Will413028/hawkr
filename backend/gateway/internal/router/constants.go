@@ -25,28 +25,11 @@ const (
 	PaymentsApplePayValidateMerchant = "/apple_pay/validate_merchant"
 )
 
-// ==================== PayUni Webhook / 付款回調（頂層路由，不在 /api/v1 下）====================
+// ==================== PayUni 付款回調（頂層路由，不在 /api/v1 下）====================
 
 const (
-	WebhookPayUniNotify  = "/webhook/payuni/notify"
-	ServicePayuniWebhook = "payuni-webhook"
-	PaymentReturnPath    = "/payment/return"
-	PaymentRedirectPath  = "/payment/redirect"
-)
-
-// ==================== 超商門市地圖（/app/store_map_sessions + 頂層回調）====================
-
-const (
-	StoreMapSessionsPath = "/store_map_sessions"
-	StoreMapRedirectPath = "/store_map/redirect"
-	StoreMapReturnPath   = "/store_map/return"
-)
-
-// ==================== 買家常用門市（/app/store_pickups）====================
-
-const (
-	StorePickupsPath = "/store_pickups"
-	StorePickupID    = "/:store_pickup_id"
+	PaymentReturnPath   = "/payment/return"
+	PaymentRedirectPath = "/payment/redirect"
 )
 
 // ==================== Product（/public/products + /app/products）====================
@@ -100,48 +83,8 @@ const (
 	OrderNo                  = "/:order_no"
 	OrderCancellations       = "/:order_no/cancellations"
 	OrderConfirmReceipt      = "/:order_no/confirm_receipt"
-	OrderLogistics           = "/:order_no/logistics"
 	OrderSellerCancellations = "/:order_no/seller_cancellations"
 	OrderRetryGrant          = "/:order_no/retry_grant"
-)
-
-// ==================== Shipments（/app/shipments）====================
-
-const (
-	ShipmentsPath                   = "/shipments"
-	ShipmentsPrintCvsLabel          = "/print_cvs_label"
-	ShipmentsBatchPrintCvsLabel     = "/batch_print_cvs_label"
-	ShipmentsGenerateHomeLabel      = "/generate_home_label"
-	ShipmentsBatchGenerateHomeLabel = "/batch_generate_home_label"
-	ShipmentsCallTcat               = "/call_tcat"
-
-	// §5.21 配送異常賣家通知
-	ShipmentsAnomaliesPath      = "/anomalies"
-	ShipmentsAnomaliesStats     = "/anomalies/stats"
-	ShipmentsAnomalyAcknowledge = "/anomalies/:shipment_id/:anomaly_type/acknowledge"
-	ShipmentsAnomalyIgnore      = "/anomalies/:shipment_id/:anomaly_type/ignore"
-)
-
-// ==================== Shipping Onboardings（/app/shipping_onboardings）====================
-
-const (
-	ShippingOnboardingsPath         = "/shipping_onboardings"
-	ShippingOnboardingsCvs          = "/cvs"
-	ShippingOnboardingsHomeDelivery = "/home_delivery"
-	ShippingOnboardingID            = "/:onboarding_id"
-	ShippingOnboardingToggle        = "/:onboarding_id/toggle"
-)
-
-// ==================== 賣家配送方式（/app/shipping_methods）====================
-
-const (
-	ShippingMethodsPath = "/shipping_methods"
-)
-
-// ==================== 出貨工作天（/app/shipping_business_days）====================
-
-const (
-	ShippingBusinessDaysPath = "/shipping_business_days"
 )
 
 // ==================== Cart（/public/carts + /app/carts）====================
@@ -157,17 +100,10 @@ const (
 // ==================== 結帳（/app/checkout）====================
 
 const (
-	CheckoutPath        = "/checkout"
-	CheckoutValidate    = "/validate"
-	CheckoutShippingFee = "/shipping_fee"
-	CheckoutPreview     = "/preview"
-	CheckoutConfirm     = "/confirm"
-)
-
-// ==================== 配送報價（/app/shipping-quotes）====================
-
-const (
-	ShippingQuotesPath = "/shipping_quotes"
+	CheckoutPath     = "/checkout"
+	CheckoutValidate = "/validate"
+	CheckoutPreview  = "/preview"
+	CheckoutConfirm  = "/confirm"
 )
 
 // ==================== Admin Product ====================
@@ -195,18 +131,6 @@ const (
 	// reverify 一律 POST：它有副作用（打政府 API 消耗配額並寫 DB），GET 會被瀏覽器／
 	// 代理／prefetch 重放（19 §9.3）。
 	AdminProductCertificationReverify = "/product_certification_applications/:id/reverify"
-)
-
-// ==================== Admin Shipping（§29 + §5.21 配送異常）====================
-
-const (
-	AdminShipmentsPath              = "/shipments"
-	AdminShipmentDetail             = "/shipments/:id"
-	AdminSellerShipmentSettingsPath = "/seller_shipment_settings"
-	AdminShipmentsAnomaliesPath     = "/shipments/anomalies" // §5.21 Admin 配送異常監控
-	// issue #1327 Admin 配送異常處置（static prefix，必須在 /shipments/:id 之前註冊）
-	AdminShipmentsAnomalyAcknowledge = "/shipments/anomalies/:shipment_id/:anomaly_type/acknowledge"
-	AdminShipmentsAnomalyIgnore      = "/shipments/anomalies/:shipment_id/:anomaly_type/ignore"
 )
 
 // ==================== Admin Payment（§29）====================
@@ -278,30 +202,25 @@ const (
 	AdminCouponQuotaSeller = "/:store_id"
 )
 
-// 物流 wildcard 死代理 /app/shipping/*path 已於能力層 PR 刪除（46 §3.7）：
-// shipping-service 無 HTTP 面且 port 錯配，為 404 死路由；刪除後 engine.Routes()
-// 即完整攻擊面，boot 斷言才成立。
-
 // ==================== 售後服務相關 ====================
 
 const (
-	AfterSalesPath                       = "/after_sales"
-	AfterSalesCaseNo                     = "/:case_no"
-	AfterSalesSupplement                 = "/:case_no/supplement"
-	AfterSalesCancel                     = "/:case_no/cancel"
-	AfterSalesAppeal                     = "/:case_no/appeal"      // §10 買家提交申訴
-	AfterSalesArbitration                = "/:case_no/arbitration" // §10 買家 / 賣家查裁決
-	SellerAfterSalesPath                 = "/seller/after_sales"
-	SellerAfterSalesResolve              = "/:case_no/resolve"
-	SellerAfterSalesConfirm              = "/:case_no/confirm_receipt"
-	AdminAfterSalesPath                  = "/after_sales"
-	AdminAfterSalesAppeals               = "/appeals"                           // §10 Admin 待裁決列表
-	AdminAfterSalesDecide                = "/:case_no/decide"                   // §10 Admin 裁決
-	AdminAfterSalesDetail                = "/:case_no"                          // §10.6.6 Admin 單案詳情
-	AdminAfterSalesRetryPrintReturnLabel = "/:case_no/retry_print_return_label" // §5.3.6 admin/ops 人工重試 7-11 退貨列印
-	AdminAfterSalesForceConfirmReceipt   = "/:case_no/force_confirm_receipt"    // §5.3.12 Admin 強制確認收貨
-	OrderRefundPage                      = "/:order_no/refund_page"
-	AtmRefundReturnPath                  = "/atm-refund/return"
+	AfterSalesPath                     = "/after_sales"
+	AfterSalesCaseNo                   = "/:case_no"
+	AfterSalesSupplement               = "/:case_no/supplement"
+	AfterSalesCancel                   = "/:case_no/cancel"
+	AfterSalesAppeal                   = "/:case_no/appeal"      // §10 買家提交申訴
+	AfterSalesArbitration              = "/:case_no/arbitration" // §10 買家 / 賣家查裁決
+	SellerAfterSalesPath               = "/seller/after_sales"
+	SellerAfterSalesResolve            = "/:case_no/resolve"
+	SellerAfterSalesConfirm            = "/:case_no/confirm_receipt"
+	AdminAfterSalesPath                = "/after_sales"
+	AdminAfterSalesAppeals             = "/appeals"                        // §10 Admin 待裁決列表
+	AdminAfterSalesDecide              = "/:case_no/decide"                // §10 Admin 裁決
+	AdminAfterSalesDetail              = "/:case_no"                       // §10.6.6 Admin 單案詳情
+	AdminAfterSalesForceConfirmReceipt = "/:case_no/force_confirm_receipt" // §5.3.12 Admin 強制確認收貨
+	OrderRefundPage                    = "/:order_no/refund_page"
+	AtmRefundReturnPath                = "/atm-refund/return"
 )
 
 // ==================== 電子發票 Invoice（58 號設計書 §6.1）====================
@@ -452,14 +371,6 @@ const (
 	CachesFlushService = "/flush/:service"
 )
 
-// ==================== Webhook 模擬器（/dev/webhook-simulator）====================
-
-const (
-	WebhookSimulatorPath       = "/dev/webhook-simulator"
-	WebhookSimulatorSendPath   = "/dev/webhook-simulator/send"
-	WebhookSimulatorLookupPath = "/dev/webhook-simulator/lookup"
-)
-
 // ==================== 聊天相關 ====================
 
 const (
@@ -468,7 +379,6 @@ const (
 	ServiceProduct    = "product"
 	ServiceOrder      = "order"
 	ServicePayment    = "payment"
-	ServiceShipping   = "shipping"
 	ServiceAftersales = "aftersales"
 	ServiceCart       = "cart"
 	ServiceCoupon     = "coupon"

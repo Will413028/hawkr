@@ -136,13 +136,6 @@ func (c *OrderClient) CheckoutValidate(ctx context.Context, req *pb.CheckoutVali
 	return c.orderClient.CheckoutValidate(ctx, req)
 }
 
-// CheckoutShippingFee 結帳運費精算
-func (c *OrderClient) CheckoutShippingFee(ctx context.Context, req *pb.CheckoutShippingFeeRequest) (*pb.CheckoutShippingFeeResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	return c.orderClient.CheckoutShippingFee(ctx, req)
-}
-
 // CheckoutPreview 結帳預覽
 func (c *OrderClient) CheckoutPreview(ctx context.Context, req *pb.CheckoutPreviewRequest) (*pb.CheckoutPreviewResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)

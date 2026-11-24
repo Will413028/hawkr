@@ -2,8 +2,6 @@ package handler
 
 import (
 	pb "github.com/Will413028/hawkr/go-pkg/proto/invoice"
-
-	"github.com/Will413028/hawkr/gateway/internal/response"
 )
 
 // 本檔是 58 號《電子發票服務》§6.1 對外 REST 的 DTO 層。
@@ -44,12 +42,8 @@ type AdminInvoiceJobDetail struct {
 	AmountBreakdown   InvoiceAmountBreakdown `json:"amountBreakdown"`
 	ProviderExchanges []ProviderExchangeItem `json:"providerExchanges"`
 	IdempotencyKey    string                 `json:"idempotencyKey"`
-	ShipmentStatus    string                 `json:"shipmentStatus"`
-	// shipmentStatusDegraded ＝ 這一筆的 shipmentStatus 沒有取到（shipping-service
-	// 不可用）。true ⇒ 空字串是「查不到」不是「還沒出貨」（#3089 第 7 項）。
-	ShipmentStatusDegraded bool                  `json:"shipmentStatusDegraded"`
-	AuditLogs              []InvoiceAuditLogItem `json:"auditLogs"`
-	ManualUnlock           ManualUnlockInfo      `json:"manualUnlock"`
+	AuditLogs         []InvoiceAuditLogItem  `json:"auditLogs"`
+	ManualUnlock      ManualUnlockInfo       `json:"manualUnlock"`
 }
 
 type BuyerInvoiceDocumentItem struct {
@@ -414,14 +408,13 @@ type SellerInvoiceDocumentDetail struct {
 }
 
 type SellerInvoiceDocumentItem struct {
-	Summary        InvoiceDocumentSummary `json:"summary"`
-	OrderNo        string                 `json:"orderNo"`
-	PaidAt         string                 `json:"paidAt"`
-	BuyerKind      string                 `json:"buyerKind"`
-	InvoiceMode    string                 `json:"invoiceMode"`
-	ShipmentStatus string                 `json:"shipmentStatus"`
-	UpdatedAt      string                 `json:"updatedAt"`
-	LatestJobId    string                 `json:"latestJobId"`
+	Summary     InvoiceDocumentSummary `json:"summary"`
+	OrderNo     string                 `json:"orderNo"`
+	PaidAt      string                 `json:"paidAt"`
+	BuyerKind   string                 `json:"buyerKind"`
+	InvoiceMode string                 `json:"invoiceMode"`
+	UpdatedAt   string                 `json:"updatedAt"`
+	LatestJobId string                 `json:"latestJobId"`
 }
 
 type SellerInvoiceOverviewData struct {
@@ -630,8 +623,6 @@ func convInvAdminInvoiceJobDetail(m *pb.AdminInvoiceJobDetail) AdminInvoiceJobDe
 		d.ProviderExchanges = append(d.ProviderExchanges, convInvProviderExchangeItem(it))
 	}
 	d.IdempotencyKey = m.GetIdempotencyKey()
-	d.ShipmentStatus = m.GetShipmentStatus()
-	d.ShipmentStatusDegraded = m.GetShipmentStatusDegraded()
 	d.AuditLogs = make([]InvoiceAuditLogItem, 0, len(m.GetAuditLogs()))
 	for _, it := range m.GetAuditLogs() {
 		d.AuditLogs = append(d.AuditLogs, convInvInvoiceAuditLogItem(it))
@@ -1149,21 +1140,6 @@ func convInvSellerInvoiceDocumentDetail(m *pb.SellerInvoiceDocumentDetail) Selle
 	return d
 }
 
-// InvoiceDocumentsPageData 是端點 30／47 的分頁 data，比標準分頁多一個布林。
-//
-// 🔴 **內嵌 response.PageData 而不是自己列四個欄位**（§16 禁止 handler 自組分頁 gin.H）：
-// records／total／page／pageSize 的 JSON key 全部沿用同一份 struct tag，
-// 不可能漂移出 `page_size` 這種 snake 變體。
-//
-// shipmentStatusDegraded ＝ 這一頁的 shipmentStatus 沒有取到（shipping-service
-// 不可用／逾時），**不是**「這些訂單都還沒出貨」。少了它，兩者在前端塌成同一個畫面：
-// 每一列都是空字串，而空字串在這一欄會被讀成「還沒出貨」（ADM A12 頁面逐字寫過
-// 這件事）——那正是 #3019 的原始症狀換一個形式重演。
-type InvoiceDocumentsPageData struct {
-	response.PageData
-	ShipmentStatusDegraded bool `json:"shipmentStatusDegraded"`
-}
-
 // convInvSellerInvoiceDocumentItem 把 proto payload 轉成對外 DTO。
 func convInvSellerInvoiceDocumentItem(m *pb.SellerInvoiceDocumentItem) SellerInvoiceDocumentItem {
 	var d SellerInvoiceDocumentItem
@@ -1175,7 +1151,6 @@ func convInvSellerInvoiceDocumentItem(m *pb.SellerInvoiceDocumentItem) SellerInv
 	d.PaidAt = m.GetPaidAt()
 	d.BuyerKind = m.GetBuyerKind()
 	d.InvoiceMode = m.GetInvoiceMode()
-	d.ShipmentStatus = m.GetShipmentStatus()
 	d.UpdatedAt = m.GetUpdatedAt()
 	d.LatestJobId = m.GetLatestJobId()
 	return d

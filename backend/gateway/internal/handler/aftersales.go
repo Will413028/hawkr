@@ -28,15 +28,14 @@ type SupplementEvidenceRequest struct {
 
 // ResolveAfterSaleCaseRequest 賣家提交決策請求
 type ResolveAfterSaleCaseRequest struct {
-	ResolutionType       string `json:"resolutionType" binding:"required"` // 決策類型（1=退貨退款, 2=部分退款, 3=全額免退, 4=優惠券補償, 5=拒絕）
-	RefundAmount         string `json:"refundAmount"`                      // 退款金額（resolutionType=2 時必填）
-	ReturnShippingMethod string `json:"returnShippingMethod"`              // 退貨物流方式（3001=黑貓宅急便, 3002=7-11店到店）（resolutionType=1 時必填）
-	CouponAmount         string `json:"couponAmount"`                      // 優惠券金額（resolutionType=4 時必填）
-	CouponMinSpend       string `json:"couponMinSpend"`                    // 優惠券門檻（resolutionType=4 時必填）
-	CouponMessage        string `json:"couponMessage"`                     // 優惠券說明
-	RejectReason         string `json:"rejectReason"`                      // 拒絕原因（AfterSaleRejectReason value: 9101=買家保存不當, 9102=超過申訴時效, 9103=證據不足, 9104=商品狀態正常, 9199=其他）（resolutionType=5 時必填）
-	RejectMessage        string `json:"rejectMessage"`                     // 拒絕說明
-	NegotiationReason    string `json:"negotiationReason"`                 // 協商說明
+	ResolutionType    string `json:"resolutionType" binding:"required"` // 決策類型（1=退貨退款, 2=部分退款, 3=全額免退, 4=優惠券補償, 5=拒絕）
+	RefundAmount      string `json:"refundAmount"`                      // 退款金額（resolutionType=2 時必填）
+	CouponAmount      string `json:"couponAmount"`                      // 優惠券金額（resolutionType=4 時必填）
+	CouponMinSpend    string `json:"couponMinSpend"`                    // 優惠券門檻（resolutionType=4 時必填）
+	CouponMessage     string `json:"couponMessage"`                     // 優惠券說明
+	RejectReason      string `json:"rejectReason"`                      // 拒絕原因（AfterSaleRejectReason value: 9101=買家保存不當, 9102=超過申訴時效, 9103=證據不足, 9104=商品狀態正常, 9199=其他）（resolutionType=5 時必填）
+	RejectMessage     string `json:"rejectMessage"`                     // 拒絕說明
+	NegotiationReason string `json:"negotiationReason"`                 // 協商說明
 }
 
 // CancelShipmentRequest 取消出貨請求
@@ -719,17 +718,16 @@ func (h *Holder) ResolveAfterSaleCase(c *gin.Context) {
 	}
 
 	resp, err := h.Aftersales.ResolveAfterSaleCase(c.Request.Context(), &pb.ResolveAfterSaleCaseRequest{
-		StoreId:              int64(sellerID),
-		CaseNo:               caseNo,
-		ResolutionType:       mapResolutionType(req.ResolutionType),
-		RefundAmount:         req.RefundAmount,
-		ReturnShippingMethod: req.ReturnShippingMethod,
-		CouponAmount:         req.CouponAmount,
-		CouponMinSpend:       req.CouponMinSpend,
-		CouponMessage:        req.CouponMessage,
-		RejectReason:         req.RejectReason,
-		RejectMessage:        req.RejectMessage,
-		NegotiationReason:    req.NegotiationReason,
+		StoreId:           int64(sellerID),
+		CaseNo:            caseNo,
+		ResolutionType:    mapResolutionType(req.ResolutionType),
+		RefundAmount:      req.RefundAmount,
+		CouponAmount:      req.CouponAmount,
+		CouponMinSpend:    req.CouponMinSpend,
+		CouponMessage:     req.CouponMessage,
+		RejectReason:      req.RejectReason,
+		RejectMessage:     req.RejectMessage,
+		NegotiationReason: req.NegotiationReason,
 	})
 	if err != nil {
 		response.GrpcErr(c, "aftersales", err)
@@ -790,46 +788,6 @@ func (h *Holder) ConfirmReturnReceipt(c *gin.Context) {
 		DeductionReason:       req.DeductionReason,
 		InspectionPhotoTokens: req.InspectionPhotoTokens,
 		InspectionNote:        req.InspectionNote,
-	})
-	if err != nil {
-		response.GrpcErr(c, "aftersales", err)
-		return
-	}
-
-	response.GrpcResult(c, resp.Code, resp.Message, nil)
-}
-
-// RetryPrintReturnLabel admin 人工重試 7-11 退貨列印（§5.3.6 ops 介入用）
-// @Summary      人工重試 7-11 退貨出貨便列印（Admin）
-// @Description  用於系統自動重試仍未取得出貨便代碼時的平台管理員介入。重置 label_retry_count 並再次觸發 PayUni print_label。
-// @Description  僅允許 7-11 退貨（returnShippingMethod=3002）、狀態 20/25、尚未回填代碼（partnerId 為空）的案件使用。
-// @Tags         售後 (AfterSales)
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Param        case_no  path  string  true  "案件編號"
-// @Success      200  {object}  object{code=int,message=string}
-// @Failure      401  {object}  object{code=int,message=string}  "未登入或 token 無效"
-// @Failure      403  {object}  object{code=int,message=string}  "非管理員（admin access required）"
-// @Failure      404  {object}  object{code=int,message=string}  "9001 售後單不存在"
-// @Failure      409  {object}  object{code=int,message=string}  "9013 出貨便代碼已產生，無需重試 / 9014 售後案件狀態不允許重試列印"
-// @Router       /admin/after_sales/{case_no}/retry_print_return_label [post]
-func (h *Holder) RetryPrintReturnLabel(c *gin.Context) {
-	accountID, ok := getAccountID(c)
-	if !ok || accountID == 0 {
-		response.Unauthorized(c)
-		return
-	}
-
-	caseNo := c.Param("case_no")
-	if caseNo == "" {
-		response.BadRequest(c, "case_no is required")
-		return
-	}
-
-	resp, err := h.Aftersales.RetryPrintReturnLabel(c.Request.Context(), &pb.RetryPrintReturnLabelRequest{
-		AccountId: accountID,
-		CaseNo:    caseNo,
 	})
 	if err != nil {
 		response.GrpcErr(c, "aftersales", err)

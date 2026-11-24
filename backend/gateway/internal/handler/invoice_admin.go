@@ -635,16 +635,11 @@ func (h *Holder) ListInvoiceDocumentsForAdmin(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvSellerInvoiceDocumentItem(it))
 	}
-	// #3019：同端點 30，多帶 shipmentStatusDegraded（兩支共用 SellerInvoiceDocumentItem，
-	// 降級語意必須一致，否則 A12 會靜默退回舊症狀）。
-	pageData := InvoiceDocumentsPageData{
-		PageData: response.PageData{
-			Records:  records,
-			Total:    data.GetTotal(),
-			Page:     data.GetPage(),
-			PageSize: data.GetPageSize(),
-		},
-		ShipmentStatusDegraded: data.GetShipmentStatusDegraded(),
+	pageData := response.PageData{
+		Records:  records,
+		Total:    data.GetTotal(),
+		Page:     data.GetPage(),
+		PageSize: data.GetPageSize(),
 	}
 	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {

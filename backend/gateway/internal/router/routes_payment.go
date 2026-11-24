@@ -3,7 +3,6 @@ package router
 import (
 	"github.com/Will413028/hawkr/gateway/internal/handler"
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
-	"github.com/Will413028/hawkr/gateway/internal/proxy"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,20 +37,6 @@ func registerPaymentRoutes(app *gin.RouterGroup, admin *gin.RouterGroup, h *hand
 	admin.GET(AdminPaymentRefundsPath, h.ListRefundsForAdmin)
 	admin.GET(AdminPaymentRefundDetail, h.GetRefundForAdmin)
 	admin.GET(AdminGrantsPath, h.ListGrantsForAdmin)
-}
-
-// registerPayUniWebhookRoute 配置 PayUni Webhook 路由
-// POST /webhook/payuni/notify — 外部 PayUni 服務回調，無需 JWT
-// 代理至 payuni-webhook-service（統一解密 + 分發至各微服務 MQ）
-// 路徑改寫：/webhook/payuni/notify → /webhooks/payuni/notify（webhook-service 期望的路徑）
-func registerPayUniWebhookRoute(r *gin.Engine) {
-	// ⚠️ FailThirdPartyWebhook（502）是**唯一一條刻意維持 5xx** 的代理路由，不要跟著
-	// 其他路由改成 424。消費者是 PayUni 而不是我們的前端：5xx 對它是「等一下重送」，
-	// 4xx 是「別再送了」，而 10 號設計書 §4.5.3／§4.5.5.D 的整套失敗回收（T2 失敗
-	// → replay 路徑）就是靠重送觸發的。完整理由見 proxy.UpstreamFailureStatus。
-	r.POST(WebhookPayUniNotify, proxy.CreateProxyWithPathRewrite(
-		ServicePayuniWebhook, "/webhook/payuni/notify", "/webhooks/payuni/notify",
-		proxy.FailThirdPartyWebhook))
 }
 
 // registerPaymentReturnRoute 配置付款結果回調頁面路由

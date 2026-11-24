@@ -134,13 +134,6 @@ func (c *AftersalesClient) HandleRefundPageReturn(ctx context.Context, req *pb.H
 	return c.client.HandleRefundPageReturn(ctx, req)
 }
 
-// RetryPrintReturnLabel 7-11 退貨出貨便代碼人工重試列印（§5.3.7）
-func (c *AftersalesClient) RetryPrintReturnLabel(ctx context.Context, req *pb.RetryPrintReturnLabelRequest) (*pb.RetryPrintReturnLabelResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	return c.client.RetryPrintReturnLabel(ctx, req)
-}
-
 // ==================== §10 申訴與平台裁決 ====================
 
 // SubmitAppeal 買家提交申訴

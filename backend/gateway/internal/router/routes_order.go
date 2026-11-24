@@ -33,9 +33,6 @@ func registerOrderRoutes(app *gin.RouterGroup, admin *gin.RouterGroup, h *handle
 		orders.POST(OrderCancellations, h.CancelOrder)
 		// 確認收貨（買家）
 		orders.POST(OrderConfirmReceipt, h.ConfirmReceipt)
-		// 查看訂單物流追蹤（買家）— 即時同步 PayUni，呼叫 shipping-service（見 06 §5.7.1）
-		orders.GET(OrderLogistics, h.GetOrderLogistics)
-		// 出貨（賣家）已由 Shipping Service 提供，見 routes_shipping.go
 	}
 
 	// ------------------------------------------

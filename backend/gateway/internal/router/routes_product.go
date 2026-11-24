@@ -84,9 +84,6 @@ func registerProductRoutes(public *gin.RouterGroup, app *gin.RouterGroup, admin 
 		sellerHandle(appCategories, "GET", CategoriesTree, authz.CapProductManage, h.GetSellerCategoryTree)
 	}
 
-	// 配送報價 /api/v1/app/shipping-quotes（賣家建商品算運費）
-	sellerHandleAuthed(app, "POST", ShippingQuotesPath, authz.CapProductManage, h.CalculateShippingOptions)
-
 	// 賣家 hashtag auto-complete /api/v1/app/hashtags（02 §5.12；隨發文/上架）
 	appHashtags := app.Group(HashtagsPath)
 	appHashtags.Use(middleware.JWTAuth())

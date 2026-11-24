@@ -80,9 +80,6 @@
 // @tag.name 評論 (Review)
 // @tag.description 商品評論
 //
-// @tag.name 物流 (Shipping)
-// @tag.description 物流出貨、標籤列印、物流建店、運費試算
-//
 // @tag.name AI
 // @tag.description AI 功能
 //

@@ -13,14 +13,13 @@ func registerAdminNonManagedRoutes(app, admin *gin.RouterGroup, h *handler.Holde
 	// ------------------------------------------
 	// 管理員操作（admin 群組已含 JWTAuth + requireAdmin）
 	// ------------------------------------------
-	// §10 申訴與平台裁決（Admin） + §5.3.6 人工重試 7-11 退貨列印 + §29 異常列表
+	// §10 申訴與平台裁決（Admin） + §29 異常列表
 	asAdmin := admin.Group(AdminAfterSalesPath)
 	{
 		// §29 A1 異常列表（必須在 /:case_no 之前註冊，讓 /appeals 靜態路由先於 param 匹配）
 		asAdmin.GET("", h.ListAfterSaleCasesForAdmin)
 		asAdmin.GET(AdminAfterSalesAppeals, h.ListAppealsForAdmin)
 		asAdmin.POST(AdminAfterSalesDecide, h.DecideAppealForAdmin)
-		asAdmin.POST(AdminAfterSalesRetryPrintReturnLabel, h.RetryPrintReturnLabel)
 		asAdmin.POST(AdminAfterSalesForceConfirmReceipt, h.ForceConfirmReceiptForAdmin) // §5.3.12
 		asAdmin.GET(AdminAfterSalesDetail, h.GetAppealDetailForAdmin)                   // §10.6.6
 	}

@@ -39,14 +39,6 @@ type OrderDetailResponse struct {
 	ShippingArea        string `json:"shippingArea,omitempty"`
 	CouponInstanceId    string `json:"couponInstanceId,omitempty"`
 	DiscountAmount      string `json:"discountAmount,omitempty"`
-	ShippingStatus      string `json:"shippingStatus,omitempty"`
-	ShippingStatusDesc  string `json:"shippingStatusDesc,omitempty"`
-	LabelKey            string `json:"labelKey,omitempty"` // 託運單 PDF objectKey（SSOT；49 §6.1）
-	LabelUrl            string `json:"labelUrl,omitempty"` // 託運單 PDF 顯示 URL（Gateway 組）
-	LabelExpireAt       string `json:"labelExpireAt,omitempty"`
-	PartnerId           string `json:"partnerId,omitempty"`
-	Odno                string `json:"odno,omitempty"`
-	ValidationNo        string `json:"validationNo,omitempty"`
 	PaymentMethod       string `json:"paymentMethod,omitempty"`
 	AtmBankCode         string `json:"atmBankCode,omitempty"`
 	AtmVirtualAccount   string `json:"atmVirtualAccount,omitempty"`
@@ -55,34 +47,31 @@ type OrderDetailResponse struct {
 	// 賣家 canonical 短碼（sellers.store_code）；storeId 是內部代理鍵，賣家頁
 	// canonical 網址走 storeCode。與 sellerName 同源自 order-service 的
 	// batchGetSellerMeta，聚合失敗時不輸出。
-	StoreCode          string                    `json:"storeCode,omitempty"`
-	SellerLogoKey      string                    `json:"logoKey,omitempty"` // 商家 logo objectKey（SSOT；49 §6.1）
-	SellerLogoUrl      string                    `json:"logoUrl,omitempty"` // 商家 logo 顯示 URL（Gateway 組）
-	SellerCity         string                    `json:"sellerCity,omitempty"`
-	SellerDistrict     string                    `json:"sellerDistrict,omitempty"`
-	BuyerNickname      string                    `json:"buyerNickname,omitempty"`
-	BuyerAvatarKey     string                    `json:"avatarKey,omitempty"` // 買家頭像 objectKey（SSOT；49 §6.1）
-	BuyerAvatarUrl     string                    `json:"avatarUrl,omitempty"` // 買家頭像顯示 URL（Gateway 組）
-	CancelReason       string                    `json:"cancelReason,omitempty"`
-	CancelRemark       string                    `json:"cancelRemark,omitempty"`
-	CancelByRole       string                    `json:"cancelByRole,omitempty"`
-	ReviewDeadline     string                    `json:"reviewDeadline,omitempty"`
-	Review             *OrderReviewResponse      `json:"review"` // 訂單評論快照（訂單層級單一，取最近一筆商品評論；未評論為 null）
-	AutoCompleteAt     string                    `json:"autoCompleteAt,omitempty"`
-	ProcessingDeadline string                    `json:"processingDeadline,omitempty"`
-	PaymentDeadline    string                    `json:"paymentDeadline,omitempty"` // 付款期限（ISO 8601 UTC，僅 status=0 時有值）
-	ProviderStatus     string                    `json:"providerStatus,omitempty"`
-	ProviderMessage    string                    `json:"providerMessage,omitempty"`
-	PaymentMerID       string                    `json:"paymentMerId,omitempty"`      // 訂單對應 PayUni MerID（給 Google Pay 重試 tokenization）
-	ShipmentPhotoKeys  []string                  `json:"shipmentPhotoKeys,omitempty"` // 出貨照片 objectKey（SSOT，前端 buildImageUrl 組顯示；49 §6.1）
-	ShipmentPhotoUrls  []string                  `json:"shipmentPhotoUrls,omitempty"` // 出貨照片顯示 URL（Gateway 組）
-	ReceiptPhotoKeys   []string                  `json:"receiptPhotoKeys,omitempty"`  // 收貨照片 objectKey（SSOT）
-	ReceiptPhotoUrls   []string                  `json:"receiptPhotoUrls,omitempty"`  // 收貨照片顯示 URL（Gateway 組）
-	Items              []OrderItemDetailResponse `json:"items,omitempty"`
-	RefundHistory      []RefundRequestResponse   `json:"refundHistory,omitempty"`
-	IsReviewed         bool                      `json:"isReviewed"`
-	CanReview          bool                      `json:"canReview"`
-	NeedRefundPage     bool                      `json:"needRefundPage"`
+	StoreCode        string                    `json:"storeCode,omitempty"`
+	SellerLogoKey    string                    `json:"logoKey,omitempty"` // 商家 logo objectKey（SSOT；49 §6.1）
+	SellerLogoUrl    string                    `json:"logoUrl,omitempty"` // 商家 logo 顯示 URL（Gateway 組）
+	SellerCity       string                    `json:"sellerCity,omitempty"`
+	SellerDistrict   string                    `json:"sellerDistrict,omitempty"`
+	BuyerNickname    string                    `json:"buyerNickname,omitempty"`
+	BuyerAvatarKey   string                    `json:"avatarKey,omitempty"` // 買家頭像 objectKey（SSOT；49 §6.1）
+	BuyerAvatarUrl   string                    `json:"avatarUrl,omitempty"` // 買家頭像顯示 URL（Gateway 組）
+	CancelReason     string                    `json:"cancelReason,omitempty"`
+	CancelRemark     string                    `json:"cancelRemark,omitempty"`
+	CancelByRole     string                    `json:"cancelByRole,omitempty"`
+	ReviewDeadline   string                    `json:"reviewDeadline,omitempty"`
+	Review           *OrderReviewResponse      `json:"review"` // 訂單評論快照（訂單層級單一，取最近一筆商品評論；未評論為 null）
+	AutoCompleteAt   string                    `json:"autoCompleteAt,omitempty"`
+	PaymentDeadline  string                    `json:"paymentDeadline,omitempty"` // 付款期限（ISO 8601 UTC，僅 status=0 時有值）
+	ProviderStatus   string                    `json:"providerStatus,omitempty"`
+	ProviderMessage  string                    `json:"providerMessage,omitempty"`
+	PaymentMerID     string                    `json:"paymentMerId,omitempty"`     // 訂單對應 PayUni MerID（給 Google Pay 重試 tokenization）
+	ReceiptPhotoKeys []string                  `json:"receiptPhotoKeys,omitempty"` // 收貨照片 objectKey（SSOT）
+	ReceiptPhotoUrls []string                  `json:"receiptPhotoUrls,omitempty"` // 收貨照片顯示 URL（Gateway 組）
+	Items            []OrderItemDetailResponse `json:"items,omitempty"`
+	RefundHistory    []RefundRequestResponse   `json:"refundHistory,omitempty"`
+	IsReviewed       bool                      `json:"isReviewed"`
+	CanReview        bool                      `json:"canReview"`
+	NeedRefundPage   bool                      `json:"needRefundPage"`
 	// 再次付款可用付款方式（依 totalActualAmount 算）。僅買家 + status=pending_payment 時非空（03 §4.2.1）；前端據此 render（禁用 + 理由）
 	AvailablePaymentMethods []AvailablePaymentMethodResponse `json:"availablePaymentMethods,omitempty"`
 }
@@ -137,53 +126,42 @@ type MyOrderStatusCountsResponse struct {
 }
 
 type OrderSummaryResponse struct {
-	BuyerNickname      string `json:"buyerNickname,omitempty"`
-	ShippingStatusDesc string `json:"shippingStatusDesc,omitempty"`
-	Status             string `json:"status,omitempty"`
-	TotalActualAmount  string `json:"totalActualAmount,omitempty"`
-	ItemCount          string `json:"itemCount,omitempty"`
-	StoreID            string `json:"storeId,omitempty"`
-	SellerName         string `json:"sellerName,omitempty"`
+	BuyerNickname     string `json:"buyerNickname,omitempty"`
+	Status            string `json:"status,omitempty"`
+	TotalActualAmount string `json:"totalActualAmount,omitempty"`
+	ItemCount         string `json:"itemCount,omitempty"`
+	StoreID           string `json:"storeId,omitempty"`
+	SellerName        string `json:"sellerName,omitempty"`
 	// 賣家 canonical 短碼；見 OrderDetailResponse.StoreCode。
-	StoreCode          string                  `json:"storeCode,omitempty"`
-	SellerLogoKey      string                  `json:"logoKey,omitempty"` // 商家 logo objectKey（SSOT；49 §6.1）
-	SellerLogoUrl      string                  `json:"logoUrl,omitempty"` // 商家 logo 顯示 URL（Gateway 組）
-	SellerCity         string                  `json:"sellerCity,omitempty"`
-	SellerDistrict     string                  `json:"sellerDistrict,omitempty"`
-	ShippingMethod     string                  `json:"shippingMethod,omitempty"`
-	DeliveryTemp       string                  `json:"deliveryTemp,omitempty"`
-	PickupStoreName    string                  `json:"pickupStoreName,omitempty"`
-	ShippingStatus     string                  `json:"shippingStatus,omitempty"`
-	BuyerID            string                  `json:"buyerId,omitempty"`
-	StatusTime         string                  `json:"statusTime,omitempty"`
-	StatusSummary      string                  `json:"statusSummary,omitempty"`
-	RecipientName      string                  `json:"recipientName,omitempty"`
-	CreateTime         string                  `json:"createTime,omitempty"`
-	ShippingAddress    string                  `json:"shippingAddress,omitempty"`
-	Odno               string                  `json:"odno,omitempty"`
-	BuyerAvatarKey     string                  `json:"avatarKey,omitempty"` // 買家頭像 objectKey（SSOT；49 §6.1）
-	BuyerAvatarUrl     string                  `json:"avatarUrl,omitempty"` // 買家頭像顯示 URL（Gateway 組）
-	LabelKey           string                  `json:"labelKey,omitempty"`  // 託運單 PDF objectKey（SSOT；49 §6.1）
-	LabelUrl           string                  `json:"labelUrl,omitempty"`  // 託運單 PDF 顯示 URL（Gateway 組）
-	LabelExpireAt      string                  `json:"labelExpireAt,omitempty"`
-	PartnerId          string                  `json:"partnerId,omitempty"`
-	OrderNo            string                  `json:"orderNo,omitempty"`
-	ValidationNo       string                  `json:"validationNo,omitempty"`
-	ReviewDeadline     string                  `json:"reviewDeadline,omitempty"`
-	AutoCompleteAt     string                  `json:"autoCompleteAt,omitempty"`
-	ProcessingDeadline string                  `json:"processingDeadline,omitempty"`
-	PaymentDeadline    string                  `json:"paymentDeadline,omitempty"` // 付款期限（ISO 8601 UTC，僅 status=0 時有值）
-	CancelReason       string                  `json:"cancelReason,omitempty"`
-	CancelRemark       string                  `json:"cancelRemark,omitempty"`
-	CancelByRole       string                  `json:"cancelByRole,omitempty"`
-	ProviderMessage    string                  `json:"providerMessage,omitempty"`
-	ProviderStatus     string                  `json:"providerStatus,omitempty"`
-	Items              []OrderItemViewResponse `json:"items,omitempty"`
-	ShipmentPhotoKeys  []string                `json:"shipmentPhotoKeys,omitempty"` // 出貨照片 objectKey（SSOT）
-	ShipmentPhotoUrls  []string                `json:"shipmentPhotoUrls,omitempty"` // 出貨照片顯示 URL（Gateway 組）
-	IsReviewed         bool                    `json:"isReviewed"`
-	CanReview          bool                    `json:"canReview"`
-	NeedRefundPage     bool                    `json:"needRefundPage"`
+	StoreCode       string                  `json:"storeCode,omitempty"`
+	SellerLogoKey   string                  `json:"logoKey,omitempty"` // 商家 logo objectKey（SSOT；49 §6.1）
+	SellerLogoUrl   string                  `json:"logoUrl,omitempty"` // 商家 logo 顯示 URL（Gateway 組）
+	SellerCity      string                  `json:"sellerCity,omitempty"`
+	SellerDistrict  string                  `json:"sellerDistrict,omitempty"`
+	ShippingMethod  string                  `json:"shippingMethod,omitempty"`
+	DeliveryTemp    string                  `json:"deliveryTemp,omitempty"`
+	PickupStoreName string                  `json:"pickupStoreName,omitempty"`
+	BuyerID         string                  `json:"buyerId,omitempty"`
+	StatusTime      string                  `json:"statusTime,omitempty"`
+	StatusSummary   string                  `json:"statusSummary,omitempty"`
+	RecipientName   string                  `json:"recipientName,omitempty"`
+	CreateTime      string                  `json:"createTime,omitempty"`
+	ShippingAddress string                  `json:"shippingAddress,omitempty"`
+	BuyerAvatarKey  string                  `json:"avatarKey,omitempty"` // 買家頭像 objectKey（SSOT；49 §6.1）
+	BuyerAvatarUrl  string                  `json:"avatarUrl,omitempty"` // 買家頭像顯示 URL（Gateway 組）
+	OrderNo         string                  `json:"orderNo,omitempty"`
+	ReviewDeadline  string                  `json:"reviewDeadline,omitempty"`
+	AutoCompleteAt  string                  `json:"autoCompleteAt,omitempty"`
+	PaymentDeadline string                  `json:"paymentDeadline,omitempty"` // 付款期限（ISO 8601 UTC，僅 status=0 時有值）
+	CancelReason    string                  `json:"cancelReason,omitempty"`
+	CancelRemark    string                  `json:"cancelRemark,omitempty"`
+	CancelByRole    string                  `json:"cancelByRole,omitempty"`
+	ProviderMessage string                  `json:"providerMessage,omitempty"`
+	ProviderStatus  string                  `json:"providerStatus,omitempty"`
+	Items           []OrderItemViewResponse `json:"items,omitempty"`
+	IsReviewed      bool                    `json:"isReviewed"`
+	CanReview       bool                    `json:"canReview"`
+	NeedRefundPage  bool                    `json:"needRefundPage"`
 }
 
 // AdminOrderSummaryResponse Admin 訂單列表單筆（/admin/orders）。
@@ -239,9 +217,6 @@ type CreateOrderRequest struct {
 	TotalActualAmount   string                   `json:"totalActualAmount" binding:"required"`
 	CheckoutID          string                   `json:"checkoutId"`
 	DeliveryTemp        string                   `json:"deliveryTemp"`
-	ShippingMethod      string                   `json:"shippingMethod"`
-	ShippingFee         string                   `json:"shippingFee"`
-	ShippingFeePayer    string                   `json:"shippingFeePayer"`
 	Items               []CreateOrderItemRequest `json:"items" binding:"required"`
 }
 
@@ -295,14 +270,6 @@ func convertOrderDetail(d *pb.OrderDetailView, mediaBase string) *OrderDetailRes
 		ShippingArea:            d.ShippingArea,
 		CouponInstanceId:        d.CouponInstanceId,
 		DiscountAmount:          d.DiscountAmount,
-		ShippingStatus:          d.ShippingStatus,
-		ShippingStatusDesc:      d.ShippingStatusDesc,
-		LabelKey:                d.LabelKey,
-		LabelUrl:                buildURL(mediaBase, d.LabelKey),
-		LabelExpireAt:           d.LabelExpireAt,
-		PartnerId:               d.PartnerId,
-		Odno:                    d.Odno,
-		ValidationNo:            d.ValidationNo,
 		PaymentMethod:           d.PaymentMethod,
 		AtmBankCode:             d.AtmBankCode,
 		AtmVirtualAccount:       d.AtmVirtualAccount,
@@ -319,14 +286,11 @@ func convertOrderDetail(d *pb.OrderDetailView, mediaBase string) *OrderDetailRes
 		CancelReason:            d.CancelReason,
 		CancelRemark:            d.CancelRemark,
 		CancelByRole:            d.GetCancelByRole(),
-		ShipmentPhotoKeys:       d.ShipmentPhotoKeys,
-		ShipmentPhotoUrls:       buildURLs(mediaBase, d.ShipmentPhotoKeys),
 		ReceiptPhotoKeys:        d.ReceiptPhotoKeys,
 		ReceiptPhotoUrls:        buildURLs(mediaBase, d.ReceiptPhotoKeys),
 		IsReviewed:              d.IsReviewed,
 		ReviewDeadline:          d.ReviewDeadline,
 		AutoCompleteAt:          d.AutoCompleteAt,
-		ProcessingDeadline:      d.GetProcessingDeadline(),
 		PaymentDeadline:         d.GetPaymentDeadline(),
 		CanReview:               d.CanReview,
 		NeedRefundPage:          d.GetNeedRefundPage(),
@@ -379,51 +343,40 @@ func convertOrderSummaries(orders []*pb.OrderSummaryView, mediaBase string) []Or
 	result := make([]OrderSummaryResponse, 0, len(orders))
 	for _, o := range orders {
 		s := OrderSummaryResponse{
-			OrderNo:            o.OrderNo,
-			CreateTime:         o.CreateTime,
-			Status:             o.Status,
-			TotalActualAmount:  o.TotalActualAmount,
-			ItemCount:          o.ItemCount,
-			StoreID:            o.StoreId,
-			SellerName:         o.SellerName,
-			StoreCode:          o.StoreCode,
-			SellerLogoKey:      o.SellerAvatarKey,
-			SellerLogoUrl:      buildURL(mediaBase, o.SellerAvatarKey),
-			SellerCity:         o.SellerCity,
-			SellerDistrict:     o.SellerDistrict,
-			ShippingMethod:     o.ShippingMethod,
-			DeliveryTemp:       o.DeliveryTemp,
-			PickupStoreName:    o.PickupStoreName,
-			ShippingStatus:     o.ShippingStatus,
-			ShippingStatusDesc: o.ShippingStatusDesc,
-			StatusTime:         o.StatusTime,
-			StatusSummary:      o.StatusSummary,
-			RecipientName:      o.RecipientName,
-			ShippingAddress:    o.ShippingAddress,
-			BuyerID:            o.BuyerId,
-			BuyerNickname:      o.BuyerNickname,
-			BuyerAvatarKey:     o.BuyerAvatarKey,
-			BuyerAvatarUrl:     buildURL(mediaBase, o.BuyerAvatarKey),
-			LabelKey:           o.LabelKey,
-			LabelUrl:           buildURL(mediaBase, o.LabelKey),
-			LabelExpireAt:      o.LabelExpireAt,
-			PartnerId:          o.PartnerId,
-			Odno:               o.Odno,
-			ValidationNo:       o.ValidationNo,
-			ShipmentPhotoKeys:  o.ShipmentPhotoKeys,
-			ShipmentPhotoUrls:  buildURLs(mediaBase, o.ShipmentPhotoKeys),
-			IsReviewed:         o.IsReviewed,
-			ReviewDeadline:     o.ReviewDeadline,
-			AutoCompleteAt:     o.AutoCompleteAt,
-			ProcessingDeadline: o.GetProcessingDeadline(),
-			PaymentDeadline:    o.GetPaymentDeadline(),
-			CancelReason:       o.GetCancelReason(),
-			CancelRemark:       o.GetCancelRemark(),
-			CancelByRole:       o.GetCancelByRole(),
-			CanReview:          o.CanReview,
-			NeedRefundPage:     o.GetNeedRefundPage(),
-			ProviderStatus:     o.GetProviderStatus(),
-			ProviderMessage:    o.GetProviderMessage(),
+			OrderNo:           o.OrderNo,
+			CreateTime:        o.CreateTime,
+			Status:            o.Status,
+			TotalActualAmount: o.TotalActualAmount,
+			ItemCount:         o.ItemCount,
+			StoreID:           o.StoreId,
+			SellerName:        o.SellerName,
+			StoreCode:         o.StoreCode,
+			SellerLogoKey:     o.SellerAvatarKey,
+			SellerLogoUrl:     buildURL(mediaBase, o.SellerAvatarKey),
+			SellerCity:        o.SellerCity,
+			SellerDistrict:    o.SellerDistrict,
+			ShippingMethod:    o.ShippingMethod,
+			DeliveryTemp:      o.DeliveryTemp,
+			PickupStoreName:   o.PickupStoreName,
+			StatusTime:        o.StatusTime,
+			StatusSummary:     o.StatusSummary,
+			RecipientName:     o.RecipientName,
+			ShippingAddress:   o.ShippingAddress,
+			BuyerID:           o.BuyerId,
+			BuyerNickname:     o.BuyerNickname,
+			BuyerAvatarKey:    o.BuyerAvatarKey,
+			BuyerAvatarUrl:    buildURL(mediaBase, o.BuyerAvatarKey),
+			IsReviewed:        o.IsReviewed,
+			ReviewDeadline:    o.ReviewDeadline,
+			AutoCompleteAt:    o.AutoCompleteAt,
+			PaymentDeadline:   o.GetPaymentDeadline(),
+			CancelReason:      o.GetCancelReason(),
+			CancelRemark:      o.GetCancelRemark(),
+			CancelByRole:      o.GetCancelByRole(),
+			CanReview:         o.CanReview,
+			NeedRefundPage:    o.GetNeedRefundPage(),
+			ProviderStatus:    o.GetProviderStatus(),
+			ProviderMessage:   o.GetProviderMessage(),
 		}
 		for _, item := range o.Items {
 			s.Items = append(s.Items, OrderItemViewResponse{
@@ -518,10 +471,7 @@ func (h *Holder) CreateOrder(c *gin.Context) {
 		TotalOriginalAmount string `json:"totalOriginalAmount" binding:"required"`
 		TotalActualAmount   string `json:"totalActualAmount" binding:"required"`
 		CheckoutID          string `json:"checkoutId"`
-		DeliveryTemp        string `json:"deliveryTemp"`     // 配送溫層 Enum code
-		ShippingMethod      string `json:"shippingMethod"`   // 運送方式 Enum code
-		ShippingFee         string `json:"shippingFee"`      // 運費（新台幣元，數字字串）
-		ShippingFeePayer    string `json:"shippingFeePayer"` // 運費負擔方 Enum code
+		DeliveryTemp        string `json:"deliveryTemp"` // 配送溫層 Enum code
 		Items               []struct {
 			SkuID     string `json:"skuId" binding:"required"`
 			SkuName   string `json:"skuName" binding:"required"`
@@ -559,9 +509,6 @@ func (h *Holder) CreateOrder(c *gin.Context) {
 		TotalActualAmount:   req.TotalActualAmount,
 		CheckoutId:          req.CheckoutID,
 		DeliveryTemp:        req.DeliveryTemp,
-		ShippingMethod:      req.ShippingMethod,
-		ShippingFee:         req.ShippingFee,
-		ShippingFeePayer:    req.ShippingFeePayer,
 	})
 	if err != nil {
 		response.GrpcErr(c, "order", err)

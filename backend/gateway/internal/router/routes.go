@@ -48,19 +48,12 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerOrderRoutes(app, admin, h)
 	registerCheckoutRoutes(app, h)
 	registerCartRoutes(public, app, h)
-	registerShippingRoutes(app, admin, h)
-
-	// PayUni Webhook（頂層路由，外部回調無需 JWT）
-	registerPayUniWebhookRoute(r)
 
 	// 付款結果回調頁面（頂層路由，PayUni 導回無需 JWT）
 	registerPaymentReturnRoute(r, h)
 
 	// PAYUNi 付款頁重導向（頂層路由，供 WebView 開啟無需 JWT）
 	registerPaymentRedirectRoute(r, h)
-
-	// 超商門市地圖回調（頂層路由，PayUni 導回 + WebView 開啟無需 JWT）
-	registerStoreMapReturnRoutes(r, h)
 
 	registerInvoiceRoutes(app, admin, h) // 58 號電子發票（置於 governance 之後）
 	registerSearchRoutes(public, h)
@@ -79,9 +72,6 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 
 	// ADM 代行營運（56 號）：14 支走 ADM session、18 支走 operation credential。
 	registerDelegatedOperationRoutes(admin, adminNoAuth, h)
-
-	// Webhook 模擬器（代理到 payuni-webhook-service，開發測試工具）
-	registerWebhookSimulatorRoutes(r)
 
 	// 文件檢視器（僅 local/dev 環境）
 	registerDocsRoutes(r, h.Docs)

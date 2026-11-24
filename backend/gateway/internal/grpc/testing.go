@@ -12,7 +12,6 @@ import (
 	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
-	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
 	"google.golang.org/grpc"
 )
 
@@ -152,10 +151,3 @@ func NewAftersalesClientForTest(c aftersalespb.AfterSalesServiceClient) *Aftersa
 }
 
 // ==================== Review ====================
-
-// ==================== Shipping ====================
-
-// NewShippingClientForTest creates a ShippingClient with the given mock proto client.
-func NewShippingClientForTest(c shippingpb.ShippingServiceClient) *ShippingClient {
-	return &ShippingClient{shippingClient: c}
-}

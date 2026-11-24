@@ -71,19 +71,17 @@ type DelegatedOrderListRecipient struct {
 // OrderSummaryView.items 不在 applyDelegatedProjection 的 clear 清單內
 // （OrderGrpcService.java:863-885）⇒ 缺口只在這一層。
 type DelegatedOrderListItem struct {
-	OrderNo             string                      `json:"orderNo"`
-	CreatedAt           string                      `json:"createdAt"`
-	Status              string                      `json:"status"`
-	StatusLabel         string                      `json:"statusLabel"`
-	ItemCount           string                      `json:"itemCount"`
-	FirstProductName    string                      `json:"firstProductName"`
-	TotalAmount         string                      `json:"totalAmount"`
-	ShippingStatus      string                      `json:"shippingStatus"`
-	ShippingStatusLabel string                      `json:"shippingStatusLabel"`
-	ShippingMethod      string                      `json:"shippingMethod"`
-	DeliveryTemp        string                      `json:"deliveryTemp"`
-	Buyer               DelegatedOrderBuyer         `json:"buyer"`
-	Recipient           DelegatedOrderListRecipient `json:"recipient"`
+	OrderNo          string                      `json:"orderNo"`
+	CreatedAt        string                      `json:"createdAt"`
+	Status           string                      `json:"status"`
+	StatusLabel      string                      `json:"statusLabel"`
+	ItemCount        string                      `json:"itemCount"`
+	FirstProductName string                      `json:"firstProductName"`
+	TotalAmount      string                      `json:"totalAmount"`
+	ShippingMethod   string                      `json:"shippingMethod"`
+	DeliveryTemp     string                      `json:"deliveryTemp"`
+	Buyer            DelegatedOrderBuyer         `json:"buyer"`
+	Recipient        DelegatedOrderListRecipient `json:"recipient"`
 }
 
 // DelegatedOrderItem is one line of the detail's items[].
@@ -128,29 +126,27 @@ type DelegatedOrderTimelineEntry struct {
 // 反向仍成立：`shipmentNo`／`labelKey`／`odno`／`validationNo`／`transactionId` 那一組
 // 履約與金流欄位一個都不加（admin_delegated_contract_test.go 以欄位名為錨守住）。
 type DelegatedOrderDetail struct {
-	OrderNo             string                        `json:"orderNo"`
-	CreatedAt           string                        `json:"createdAt"`
-	Status              string                        `json:"status"`
-	StatusLabel         string                        `json:"statusLabel"`
-	ShippingStatus      string                        `json:"shippingStatus"`
-	ShippingStatusLabel string                        `json:"shippingStatusLabel"`
-	PaymentMethod       string                        `json:"paymentMethod"`
-	ShippingMethod      string                        `json:"shippingMethod"`
-	DeliveryTemp        string                        `json:"deliveryTemp"`
-	ItemCount           string                        `json:"itemCount"`
-	ItemsSubtotal       string                        `json:"itemsSubtotal"`
-	TotalAmount         string                        `json:"totalAmount"`
-	ShippingFee         string                        `json:"shippingFee"`
-	DiscountAmount      string                        `json:"discountAmount"`
-	CancelReason        string                        `json:"cancelReason"`
-	CancelRemark        string                        `json:"cancelRemark"`
-	CancelByRole        string                        `json:"cancelByRole"`
-	Buyer               DelegatedOrderBuyer           `json:"buyer"`
-	Recipient           DelegatedOrderRecipient       `json:"recipient"`
-	Items               []DelegatedOrderItem          `json:"items"`
-	Timeline            []DelegatedOrderTimelineEntry `json:"timeline"`
-	OrderRemark         string                        `json:"orderRemark"`
-	ShippingNote        string                        `json:"shippingNote"`
+	OrderNo        string                        `json:"orderNo"`
+	CreatedAt      string                        `json:"createdAt"`
+	Status         string                        `json:"status"`
+	StatusLabel    string                        `json:"statusLabel"`
+	PaymentMethod  string                        `json:"paymentMethod"`
+	ShippingMethod string                        `json:"shippingMethod"`
+	DeliveryTemp   string                        `json:"deliveryTemp"`
+	ItemCount      string                        `json:"itemCount"`
+	ItemsSubtotal  string                        `json:"itemsSubtotal"`
+	TotalAmount    string                        `json:"totalAmount"`
+	ShippingFee    string                        `json:"shippingFee"`
+	DiscountAmount string                        `json:"discountAmount"`
+	CancelReason   string                        `json:"cancelReason"`
+	CancelRemark   string                        `json:"cancelRemark"`
+	CancelByRole   string                        `json:"cancelByRole"`
+	Buyer          DelegatedOrderBuyer           `json:"buyer"`
+	Recipient      DelegatedOrderRecipient       `json:"recipient"`
+	Items          []DelegatedOrderItem          `json:"items"`
+	Timeline       []DelegatedOrderTimelineEntry `json:"timeline"`
+	OrderRemark    string                        `json:"orderRemark"`
+	ShippingNote   string                        `json:"shippingNote"`
 }
 
 // DelegatedRecipientContact is the ONLY response that carries unmasked recipient data.
@@ -247,18 +243,16 @@ func (h *Holder) ListDelegatedOrders(c *gin.Context) {
 	for _, o := range resp.GetOrders() {
 		city, district := splitMaskedAddress(o.GetShippingAddress())
 		records = append(records, DelegatedOrderListItem{
-			OrderNo:             o.GetOrderNo(),
-			CreatedAt:           normalizeOrderTime(o.GetCreateTime()),
-			Status:              o.GetStatus(),
-			StatusLabel:         codemeta.OrderStatusLabel(o.GetStatus()),
-			ItemCount:           o.GetItemCount(),
-			FirstProductName:    firstDelegatedProductName(o.GetItems()),
-			TotalAmount:         o.GetTotalActualAmount(),
-			ShippingStatus:      o.GetShippingStatus(),
-			ShippingStatusLabel: o.GetShippingStatusDesc(),
-			ShippingMethod:      o.GetShippingMethod(),
-			DeliveryTemp:        o.GetDeliveryTemp(),
-			Buyer:               DelegatedOrderBuyer{DisplayName: o.GetBuyerNickname()},
+			OrderNo:          o.GetOrderNo(),
+			CreatedAt:        normalizeOrderTime(o.GetCreateTime()),
+			Status:           o.GetStatus(),
+			StatusLabel:      codemeta.OrderStatusLabel(o.GetStatus()),
+			ItemCount:        o.GetItemCount(),
+			FirstProductName: firstDelegatedProductName(o.GetItems()),
+			TotalAmount:      o.GetTotalActualAmount(),
+			ShippingMethod:   o.GetShippingMethod(),
+			DeliveryTemp:     o.GetDeliveryTemp(),
+			Buyer:            DelegatedOrderBuyer{DisplayName: o.GetBuyerNickname()},
 			Recipient: DelegatedOrderListRecipient{
 				Name:     o.GetRecipientName(),
 				City:     city,
@@ -430,24 +424,22 @@ func delegatedOrderDetailDTO(d *orderpb.OrderDetailView) DelegatedOrderDetail {
 	}
 	city, district := splitMaskedAddress(d.GetShippingAddress())
 	return DelegatedOrderDetail{
-		OrderNo:             d.GetOrderNo(),
-		CreatedAt:           normalizeOrderTime(d.GetCreateTime()),
-		Status:              d.GetStatus(),
-		StatusLabel:         codemeta.OrderStatusLabel(d.GetStatus()),
-		ShippingStatus:      d.GetShippingStatus(),
-		ShippingStatusLabel: d.GetShippingStatusDesc(),
-		PaymentMethod:       d.GetPaymentMethod(),
-		ShippingMethod:      d.GetShippingMethod(),
-		DeliveryTemp:        d.GetDeliveryTemp(),
-		ItemCount:           strconv.Itoa(len(items)),
-		ItemsSubtotal:       d.GetTotalOriginalAmount(),
-		TotalAmount:         d.GetTotalActualAmount(),
-		ShippingFee:         d.GetShippingFee(),
-		DiscountAmount:      d.GetDiscountAmount(),
-		CancelReason:        d.GetCancelReason(),
-		CancelRemark:        d.GetCancelRemark(),
-		CancelByRole:        d.GetCancelByRole(),
-		Buyer:               DelegatedOrderBuyer{DisplayName: d.GetBuyerNickname()},
+		OrderNo:        d.GetOrderNo(),
+		CreatedAt:      normalizeOrderTime(d.GetCreateTime()),
+		Status:         d.GetStatus(),
+		StatusLabel:    codemeta.OrderStatusLabel(d.GetStatus()),
+		PaymentMethod:  d.GetPaymentMethod(),
+		ShippingMethod: d.GetShippingMethod(),
+		DeliveryTemp:   d.GetDeliveryTemp(),
+		ItemCount:      strconv.Itoa(len(items)),
+		ItemsSubtotal:  d.GetTotalOriginalAmount(),
+		TotalAmount:    d.GetTotalActualAmount(),
+		ShippingFee:    d.GetShippingFee(),
+		DiscountAmount: d.GetDiscountAmount(),
+		CancelReason:   d.GetCancelReason(),
+		CancelRemark:   d.GetCancelRemark(),
+		CancelByRole:   d.GetCancelByRole(),
+		Buyer:          DelegatedOrderBuyer{DisplayName: d.GetBuyerNickname()},
 		Recipient: DelegatedOrderRecipient{
 			Name: d.GetRecipientName(),
 			// order-service 已在代行讀取時遮罩（前 4 碼＋後 3 碼，長度 < 8 全遮）。

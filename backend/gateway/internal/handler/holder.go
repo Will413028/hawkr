@@ -20,7 +20,6 @@ type Holder struct {
 	Payment       *grpcclient.PaymentClient
 	Cart          *grpcclient.CartClient
 	Notification  *grpcclient.NotificationClient
-	Shipping      *grpcclient.ShippingClient
 	Coupon        *grpcclient.CouponClient
 	AI            *grpcclient.AIClient
 	AIAssistant   *grpcclient.AIAssistantClient

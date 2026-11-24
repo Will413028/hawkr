@@ -738,16 +738,11 @@ func (h *Holder) ListSellerInvoiceDocuments(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvSellerInvoiceDocumentItem(it))
 	}
-	// #3019：分頁 data 多帶一個 shipmentStatusDegraded ⇒ 不能走 response.Page
-	// （它只組四個欄位）。內嵌 response.PageData 讓四個 key 逐字沿用同一份 tag。
-	pageData := InvoiceDocumentsPageData{
-		PageData: response.PageData{
-			Records:  records,
-			Total:    data.GetTotal(),
-			Page:     data.GetPage(),
-			PageSize: data.GetPageSize(),
-		},
-		ShipmentStatusDegraded: data.GetShipmentStatusDegraded(),
+	pageData := response.PageData{
+		Records:  records,
+		Total:    data.GetTotal(),
+		Page:     data.GetPage(),
+		PageSize: data.GetPageSize(),
 	}
 	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {

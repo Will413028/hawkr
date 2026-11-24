@@ -13,7 +13,6 @@ func registerCheckoutRoutes(app *gin.RouterGroup, h *handler.Holder) {
 	checkout.Use(middleware.JWTAuth())
 	{
 		checkout.POST(CheckoutValidate, h.CheckoutValidate)
-		checkout.POST(CheckoutShippingFee, h.CheckoutShippingFee)
 		checkout.POST(CheckoutPreview, h.CheckoutPreview)
 		checkout.POST(CheckoutConfirm, h.CheckoutConfirm)
 	}

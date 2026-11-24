@@ -1,112 +1,25 @@
 package handler
 
 import (
-	"regexp"
-
 	"github.com/Will413028/hawkr/gateway/internal/response"
 	pb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	"github.com/gin-gonic/gin"
 )
-
-// ==================== 超商取貨門市代號（cvsStoreCode） ====================
-
-// shippingMethodCvsPickup 是唯一會用到超商門市代號的配送方式
-// （`ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP`，7-11 店到店）。3001 黑貓宅配送到地址，
-// 沒有門市可指定。
-const shippingMethodCvsPickup = "3002"
-
-// cvsStoreCodePattern：7-11 門市店號固定 6 碼數字（例 `252698`）。目前 CVS 只有
-// 7-11 一家；若日後新增其他超商通路，這條規則要跟著 `ShippingMethod` 一起放寬。
-var cvsStoreCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
-
-// resolveCvsStore 收斂 checkout 三個端點對「超商取貨門市」的解析與驗證。
-//
-// 🔴 這組欄位的歷史包袱：對外 JSON key 一直叫 `storeId`／`storeName`，跟平台的
-// 賣家代理鍵 `store_id` **只有名字相同**——gateway 把它直接映進 proto 的
-// `CvsStoreId`，最後落進 `orders.cvs_store_id`。誰照字面理解都會填成賣家
-// store_id，而後端過去完全不驗：宅配單帶著賣家 store_id 也照收，靜靜寫進去。
-// dev 上 2026-07-18～08-30 就這樣累積了 79 列宅配污染訂單（43 個買家，全部出自
-// 驗證腳本；buyer app 與 website 兩個正式 client 都只在超商取貨時才帶，是對的）。
-//
-// 因此本函式做兩件事：
-//  1. 正名——優先讀新的 `cvsStoreCode`／`cvsStoreName`；舊的 `storeId`／`storeName`
-//     繼續接受（已上架的 App 直接呼叫這些端點，不能拔），只在文件上標 deprecated。
-//  2. 驗證——非超商取貨不得帶門市代號；超商取貨的代號必須是 6 碼數字。兩者都直接
-//     400，不做「靜默丟棄」：靜默丟棄會讓填錯的呼叫端永遠不知道自己填錯了，那正是
-//     這批髒資料累積 6 週沒人發現的原因。
-//
-// 回傳 ok=false 時已經寫過 HTTP 回應，呼叫端直接 return。
-func resolveCvsStore(c *gin.Context, shippingMethod, cvsStoreCode, cvsStoreName, legacyStoreID, legacyStoreName string) (code, name string, ok bool) {
-	code = cvsStoreCode
-	if code == "" {
-		code = legacyStoreID
-	}
-	name = cvsStoreName
-	if name == "" {
-		name = legacyStoreName
-	}
-
-	if shippingMethod != shippingMethodCvsPickup {
-		if code != "" {
-			response.BadRequest(c, "非超商取貨不可指定門市代號（cvsStoreCode）")
-			return "", "", false
-		}
-		// 沒有門市代號時，門市名稱也一併丟掉：留著只會寫出一列「有店名沒店號」的訂單。
-		return "", "", true
-	}
-
-	// 超商取貨允許「還沒選門市」：買家在 App／網站上是先選 3002 看運費、再挑門市，
-	// preview 這一步門市代號本來就可能還是空的（`checkout_legacy_golden_test.go`
-	// 的 legacy fixture 就是這個形狀）。把它變成必填會直接打爛那一段流程。
-	if code == "" {
-		return "", name, true
-	}
-	if !cvsStoreCodePattern.MatchString(code) {
-		response.BadRequest(c, "門市代號（cvsStoreCode）必須是 6 碼數字")
-		return "", "", false
-	}
-	return code, name, true
-}
 
 // ==================== DTO ====================
 
 // CheckoutValidateDataResponse 結帳驗證回應
 type CheckoutValidateDataResponse struct {
 	DeliveryTempIntersection []string                          `json:"deliveryTempIntersection"`
-	AvailableShippingOptions []AvailableShippingOptionResponse `json:"availableShippingOptions"`
 	Errors                   []CheckoutValidationErrorResponse `json:"errors"`
 	UnavailableItems         []UnavailableItemResponse         `json:"unavailableItems"` // row 級不可購買清單（DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）。非空 → valid=false
 	Valid                    bool                              `json:"valid"`
-}
-
-// AvailableShippingOptionResponse 可用配送選項
-type AvailableShippingOptionResponse struct {
-	ShippingMethod        string `json:"shippingMethod"`
-	DeliveryTemp          string `json:"deliveryTemp"`
-	Label                 string `json:"label"`
-	Fee                   string `json:"fee"`
-	FeePayer              string `json:"feePayer"`
-	FreeShippingThreshold string `json:"freeShippingThreshold"`
-	FreeShippingEligible  bool   `json:"freeShippingEligible"`
 }
 
 // CheckoutValidationErrorResponse 驗證錯誤項
 type CheckoutValidationErrorResponse struct {
 	ErrorCode    string `json:"errorCode"`
 	ErrorMessage string `json:"errorMessage"`
-}
-
-// CheckoutShippingFeeDataResponse 運費精算回應
-type CheckoutShippingFeeDataResponse struct {
-	ShippingMethod        string `json:"shippingMethod"`
-	DeliveryTemp          string `json:"deliveryTemp"`
-	ShippingRoute         string `json:"shippingRoute"`
-	ShippingFee           string `json:"shippingFee"`
-	FeePayer              string `json:"feePayer"`
-	FreeShippingThreshold string `json:"freeShippingThreshold"`
-	OrderSubtotal         string `json:"orderSubtotal"`
-	EstimatedTotal        string `json:"estimatedTotal"`
-	FreeShippingEligible  bool   `json:"freeShippingEligible"`
 }
 
 // CheckoutPreviewDataResponse 結帳預覽回應
@@ -261,20 +174,15 @@ func convertAvailablePaymentMethods(items []*pb.AvailablePaymentMethod) []Availa
 
 // OrderGroupPreviewResponse 訂單分組預覽
 type OrderGroupPreviewResponse struct {
-	GroupIndex                    string                        `json:"groupIndex"`
-	StoreID                       string                        `json:"storeId"`
-	SellerName                    string                        `json:"sellerName"`
-	StoreCode                     string                        `json:"storeCode"` // 賣家 canonical 短碼；storeId 是內部代理鍵，賣家頁連結走 store_code。與 sellerName 同源
-	ShippingMethod                string                        `json:"shippingMethod"`
-	DeliveryTemp                  string                        `json:"deliveryTemp"`
-	ShippingLabel                 string                        `json:"shippingLabel"`
-	ShippingFee                   string                        `json:"shippingFee"`
-	ShippingFeePayer              string                        `json:"shippingFeePayer"`
-	SubtotalOriginalAmount        string                        `json:"subtotalOriginalAmount"`
-	DiscountAmount                string                        `json:"discountAmount"`
-	Items                         []CheckoutItemPreviewResponse `json:"items"`
-	FreeShippingEligible          bool                          `json:"freeShippingEligible"`          // 最終免運判定（折扣後）
-	TentativeFreeShippingEligible bool                          `json:"tentativeFreeShippingEligible"` // 暫定免運判定（折扣前；前端比對 tentative != final 提示「使用此券將失去免運」）
+	GroupIndex             string                        `json:"groupIndex"`
+	StoreID                string                        `json:"storeId"`
+	SellerName             string                        `json:"sellerName"`
+	StoreCode              string                        `json:"storeCode"` // 賣家 canonical 短碼；storeId 是內部代理鍵，賣家頁連結走 store_code。與 sellerName 同源
+	DeliveryTemp           string                        `json:"deliveryTemp"`
+	ShippingFee            string                        `json:"shippingFee"`
+	SubtotalOriginalAmount string                        `json:"subtotalOriginalAmount"`
+	DiscountAmount         string                        `json:"discountAmount"`
+	Items                  []CheckoutItemPreviewResponse `json:"items"`
 }
 
 // CheckoutItemPreviewResponse 結帳商品預覽
@@ -325,23 +233,9 @@ type CheckoutValidateRequest struct {
 	Items []CheckoutItemRequest `json:"items" binding:"required"`
 }
 
-// CheckoutShippingFeeRequest 運費精算請求
-type CheckoutShippingFeeRequest struct {
-	ShippingMethod  string                `json:"shippingMethod" binding:"required"`
-	DeliveryTemp    string                `json:"deliveryTemp" binding:"required"`
-	ReceiverZipCode string                `json:"receiverZipCode"`
-	CvsStoreCode    string                `json:"cvsStoreCode"` // 超商取貨門市店號，6 碼數字；僅 shippingMethod=3002 可帶
-	StoreID         string                `json:"storeId"`      // Deprecated：cvsStoreCode 的舊名，語意完全相同（**不是**賣家 store_id）
-	Items           []CheckoutItemRequest `json:"items" binding:"required"`
-}
-
 // CheckoutPreviewRequest 結帳預覽請求
 type CheckoutPreviewRequest struct {
-	ShippingMethod   string                `json:"shippingMethod" binding:"required"`
 	DeliveryTemp     string                `json:"deliveryTemp" binding:"required"`
-	ReceiverZipCode  string                `json:"receiverZipCode"`
-	CvsStoreCode     string                `json:"cvsStoreCode"`     // 超商取貨門市店號，6 碼數字；僅 shippingMethod=3002 可帶
-	StoreID          string                `json:"storeId"`          // Deprecated：cvsStoreCode 的舊名，語意完全相同（**不是**賣家 store_id）
 	CouponTemplateID string                `json:"couponTemplateId"` // 使用者選擇的優惠券模板 ID
 	Items            []CheckoutItemRequest `json:"items" binding:"required"`
 	Consolidated     bool                  `json:"consolidated,omitempty"` // 是否為和單（多賣家代理商代收）。default false=單賣家走 seller mer，true=取 env PAYUNI_AGENT_MER_ID。20 §4.13
@@ -350,18 +244,12 @@ type CheckoutPreviewRequest struct {
 // CheckoutConfirmRequest 確認結帳請求
 type CheckoutConfirmRequest struct {
 	CheckoutID       string                `json:"checkoutId" binding:"required"`
-	ShippingMethod   string                `json:"shippingMethod" binding:"required"`
 	DeliveryTemp     string                `json:"deliveryTemp" binding:"required"`
-	ReceiverZipCode  string                `json:"receiverZipCode"`
 	RecipientName    string                `json:"recipientName" binding:"required"`
 	RecipientPhone   string                `json:"recipientPhone" binding:"required"`
 	ShippingAddress  string                `json:"shippingAddress"`
 	ShippingNote     string                `json:"shippingNote"`
 	OrderRemark      string                `json:"orderRemark"`
-	CvsStoreCode     string                `json:"cvsStoreCode"`     // 超商取貨門市店號，6 碼數字；僅 shippingMethod=3002 可帶
-	CvsStoreName     string                `json:"cvsStoreName"`     // 超商取貨門市名稱
-	StoreID          string                `json:"storeId"`          // Deprecated：cvsStoreCode 的舊名，語意完全相同（**不是**賣家 store_id）
-	StoreName        string                `json:"storeName"`        // Deprecated：cvsStoreName 的舊名
 	CouponTemplateID string                `json:"couponTemplateId"` // 使用者選擇的優惠券模板 ID
 	Items            []CheckoutItemRequest `json:"items" binding:"required"`
 	// Invoice 買家發票選擇（**選填**，58 號 §4.1「03 訂單」）。
@@ -419,18 +307,6 @@ func convertCheckoutValidateData(d *pb.CheckoutValidateData) *CheckoutValidateDa
 	if r.DeliveryTempIntersection == nil {
 		r.DeliveryTempIntersection = []string{}
 	}
-	r.AvailableShippingOptions = make([]AvailableShippingOptionResponse, 0, len(d.AvailableShippingOptions))
-	for _, opt := range d.AvailableShippingOptions {
-		r.AvailableShippingOptions = append(r.AvailableShippingOptions, AvailableShippingOptionResponse{
-			ShippingMethod:        opt.ShippingMethod,
-			DeliveryTemp:          opt.DeliveryTemp,
-			Label:                 opt.Label,
-			Fee:                   opt.Fee,
-			FeePayer:              opt.FeePayer,
-			FreeShippingThreshold: opt.FreeShippingThreshold,
-			FreeShippingEligible:  opt.TentativeFreeShippingEligible,
-		})
-	}
 	r.Errors = make([]CheckoutValidationErrorResponse, 0, len(d.Errors))
 	for _, e := range d.Errors {
 		r.Errors = append(r.Errors, CheckoutValidationErrorResponse{
@@ -457,23 +333,6 @@ func convertUnavailableItems(items []*pb.UnavailableItem) []UnavailableItemRespo
 	return out
 }
 
-func convertCheckoutShippingFeeData(d *pb.CheckoutShippingFeeData) *CheckoutShippingFeeDataResponse {
-	if d == nil {
-		return nil
-	}
-	return &CheckoutShippingFeeDataResponse{
-		ShippingMethod:        d.ShippingMethod,
-		DeliveryTemp:          d.DeliveryTemp,
-		ShippingRoute:         d.ShippingRoute,
-		ShippingFee:           d.ShippingFee,
-		FeePayer:              d.FeePayer,
-		FreeShippingEligible:  d.TentativeFreeShippingEligible,
-		FreeShippingThreshold: d.FreeShippingThreshold,
-		OrderSubtotal:         d.OrderSubtotal,
-		EstimatedTotal:        d.EstimatedTotal,
-	}
-}
-
 func convertCheckoutPreviewData(d *pb.CheckoutPreviewData) *CheckoutPreviewDataResponse {
 	if d == nil {
 		return nil
@@ -492,19 +351,14 @@ func convertCheckoutPreviewData(d *pb.CheckoutPreviewData) *CheckoutPreviewDataR
 	r.OrderGroups = make([]OrderGroupPreviewResponse, 0, len(d.OrderGroups))
 	for _, g := range d.OrderGroups {
 		group := OrderGroupPreviewResponse{
-			GroupIndex:                    g.GroupIndex,
-			StoreID:                       g.StoreId,
-			SellerName:                    g.SellerName,
-			StoreCode:                     g.StoreCode,
-			ShippingMethod:                g.ShippingMethod,
-			DeliveryTemp:                  g.DeliveryTemp,
-			ShippingLabel:                 g.ShippingLabel,
-			ShippingFee:                   g.ShippingFee,
-			ShippingFeePayer:              g.ShippingFeePayer,
-			FreeShippingEligible:          g.FreeShippingEligible,
-			TentativeFreeShippingEligible: g.TentativeFreeShippingEligible,
-			SubtotalOriginalAmount:        g.SubtotalOriginalAmount,
-			DiscountAmount:                g.DiscountAmount,
+			GroupIndex:             g.GroupIndex,
+			StoreID:                g.StoreId,
+			SellerName:             g.SellerName,
+			StoreCode:              g.StoreCode,
+			DeliveryTemp:           g.DeliveryTemp,
+			ShippingFee:            g.ShippingFee,
+			SubtotalOriginalAmount: g.SubtotalOriginalAmount,
+			DiscountAmount:         g.DiscountAmount,
 		}
 		group.Items = make([]CheckoutItemPreviewResponse, 0, len(g.Items))
 		for _, item := range g.Items {
@@ -579,7 +433,7 @@ func convertCheckoutItems(items []CheckoutItemRequest) []*pb.CheckoutItem {
 
 // CheckoutValidate 結帳即時驗證
 // @Summary      結帳即時驗證
-// @Description  購物車勾選商品後呼叫，驗證溫層相容性與可用配送選項
+// @Description  購物車勾選商品後呼叫，驗證溫層相容性與商品可購買性
 // @Tags         結帳 (Checkout)
 // @Accept       json
 // @Produce      json
@@ -622,64 +476,6 @@ func (h *Holder) CheckoutValidate(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, convertCheckoutValidateData(resp.Data))
 }
 
-// CheckoutShippingFee 結帳運費精算
-// @Summary      運費精算
-// @Description  選擇配送方式與填寫地址後呼叫，精確計算運費
-// @Tags         結帳 (Checkout)
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Param        request  body  CheckoutShippingFeeRequest  true  "運費精算請求"
-// @Success      200  {object}  object{code=int,data=CheckoutShippingFeeDataResponse}
-// @Failure      400  {object}  object{code=int,message=string}
-// @Failure      401  {object}  object{code=int,message=string}
-// @Failure      404  {object}  object{code=int,message=string}
-// @Router       /app/checkout/shipping_fee [post]
-func (h *Holder) CheckoutShippingFee(c *gin.Context) {
-	accountID, ok := getAccountID(c)
-	if !ok || accountID == 0 {
-		response.Unauthorized(c)
-		return
-	}
-	buyerID, ok := h.resolveBuyerIDFor(c, accountID)
-	if !ok {
-		return
-	}
-
-	var req struct {
-		ShippingMethod  string                `json:"shippingMethod" binding:"required"`
-		DeliveryTemp    string                `json:"deliveryTemp" binding:"required"`
-		ReceiverZipCode string                `json:"receiverZipCode"`
-		CvsStoreCode    string                `json:"cvsStoreCode"`
-		StoreID         string                `json:"storeId"` // Deprecated：cvsStoreCode 的舊名
-		Items           []CheckoutItemRequest `json:"items" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "invalid request body")
-		return
-	}
-
-	cvsStoreCode, _, ok := resolveCvsStore(c, req.ShippingMethod, req.CvsStoreCode, "", req.StoreID, "")
-	if !ok {
-		return
-	}
-
-	resp, err := h.Order.CheckoutShippingFee(c.Request.Context(), &pb.CheckoutShippingFeeRequest{
-		BuyerId:         int64(buyerID),
-		Items:           convertCheckoutItems(req.Items),
-		ShippingMethod:  req.ShippingMethod,
-		DeliveryTemp:    req.DeliveryTemp,
-		ReceiverZipCode: req.ReceiverZipCode,
-		CvsStoreId:      cvsStoreCode,
-	})
-	if err != nil {
-		response.GrpcErr(c, "order", err)
-		return
-	}
-
-	response.GrpcResult(c, resp.Code, resp.Message, convertCheckoutShippingFeeData(resp.Data))
-}
-
 // CheckoutPreview 結帳預覽
 // @Summary      結帳預覽
 // @Description  完整驗證 + 精算總額，生成 checkout_id，不建單
@@ -707,11 +503,7 @@ func (h *Holder) CheckoutPreview(c *gin.Context) {
 	}
 
 	var req struct {
-		ShippingMethod   string                `json:"shippingMethod" binding:"required"`
 		DeliveryTemp     string                `json:"deliveryTemp" binding:"required"`
-		ReceiverZipCode  string                `json:"receiverZipCode"`
-		CvsStoreCode     string                `json:"cvsStoreCode"`
-		StoreID          string                `json:"storeId"` // Deprecated：cvsStoreCode 的舊名
 		CouponTemplateID string                `json:"couponTemplateId"`
 		Items            []CheckoutItemRequest `json:"items" binding:"required"`
 		Consolidated     bool                  `json:"consolidated,omitempty"`
@@ -721,18 +513,10 @@ func (h *Holder) CheckoutPreview(c *gin.Context) {
 		return
 	}
 
-	cvsStoreCode, _, ok := resolveCvsStore(c, req.ShippingMethod, req.CvsStoreCode, "", req.StoreID, "")
-	if !ok {
-		return
-	}
-
 	resp, err := h.Order.CheckoutPreview(c.Request.Context(), &pb.CheckoutPreviewRequest{
 		BuyerId:          int64(buyerID),
 		Items:            convertCheckoutItems(req.Items),
-		ShippingMethod:   req.ShippingMethod,
 		DeliveryTemp:     req.DeliveryTemp,
-		ReceiverZipCode:  req.ReceiverZipCode,
-		CvsStoreId:       cvsStoreCode,
 		CouponTemplateId: req.CouponTemplateID,
 		Consolidated:     req.Consolidated,
 	})
@@ -787,18 +571,12 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 
 	var req struct {
 		CheckoutID       string                `json:"checkoutId" binding:"required"`
-		ShippingMethod   string                `json:"shippingMethod" binding:"required"`
 		DeliveryTemp     string                `json:"deliveryTemp" binding:"required"`
-		ReceiverZipCode  string                `json:"receiverZipCode"`
 		RecipientName    string                `json:"recipientName" binding:"required"`
 		RecipientPhone   string                `json:"recipientPhone" binding:"required"`
 		ShippingAddress  string                `json:"shippingAddress"`
 		ShippingNote     string                `json:"shippingNote"`
 		OrderRemark      string                `json:"orderRemark"`
-		CvsStoreCode     string                `json:"cvsStoreCode"`
-		CvsStoreName     string                `json:"cvsStoreName"`
-		StoreID          string                `json:"storeId"`   // Deprecated：cvsStoreCode 的舊名
-		StoreName        string                `json:"storeName"` // Deprecated：cvsStoreName 的舊名
 		CouponTemplateID string                `json:"couponTemplateId"`
 		Items            []CheckoutItemRequest `json:"items" binding:"required"`
 		// 選填；nil ⇒ 不設 proto 的 invoice 欄位 ⇒ order-service 走 USE_BUYER_DEFAULT
@@ -809,25 +587,16 @@ func (h *Holder) CheckoutConfirm(c *gin.Context) {
 		return
 	}
 
-	cvsStoreCode, cvsStoreName, ok := resolveCvsStore(c, req.ShippingMethod, req.CvsStoreCode, req.CvsStoreName, req.StoreID, req.StoreName)
-	if !ok {
-		return
-	}
-
 	resp, err := h.Order.CheckoutConfirm(c.Request.Context(), &pb.CheckoutConfirmRequest{
 		BuyerId:          int64(buyerID),
 		CheckoutId:       req.CheckoutID,
 		Items:            convertCheckoutItems(req.Items),
-		ShippingMethod:   req.ShippingMethod,
 		DeliveryTemp:     req.DeliveryTemp,
-		ReceiverZipCode:  req.ReceiverZipCode,
 		RecipientName:    req.RecipientName,
 		RecipientPhone:   req.RecipientPhone,
 		ShippingAddress:  req.ShippingAddress,
 		ShippingNote:     req.ShippingNote,
 		OrderRemark:      req.OrderRemark,
-		CvsStoreId:       cvsStoreCode,
-		CvsStoreName:     cvsStoreName,
 		CouponTemplateId: req.CouponTemplateID,
 		// 🔴 nil 時**不設**這個欄位（proto3 message presence）：order-service 用
 		// hasInvoice() 區分「沒帶」與「帶了空值」，這裡若一律 new 一個空 message，
