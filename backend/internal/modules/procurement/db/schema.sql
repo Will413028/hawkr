@@ -159,7 +159,7 @@ CREATE INDEX candidates_set_rank ON procurement.candidates (candidate_set_id, ra
 
 -- 發布核准（PreviewRfqPublication 建立）：買家對「發給誰、發什麼」的唯一一個同意，不可變、會到期、只能執行一次（A9-D35）。
 -- 賣家看得到的內容由需求版本（不可變）加上這裡凍結的單價範圍、補充說明與回價期限組出；hash 由 Go 重算（S5），表裡沒有 hash 欄。
--- schema_version 保留：hash 要知道 preimage 的版本才能重算（S3）。指定對象時 candidate_set_id 是預覽當下的候選集，Execute 重驗它仍有效（search.IsEffective）。
+-- schema_version 保留：hash 要知道 preimage 的版本才能重算（S3）。candidate_set_id 是預覽當下的候選集，Execute 重驗它仍有效（search.IsEffective）。
 CREATE TABLE procurement.rfq_publication_approvals (
     id UUID PRIMARY KEY,
     version INT NOT NULL DEFAULT 1,
@@ -188,7 +188,7 @@ CREATE TABLE procurement.rfq_publication_approvals (
 CREATE UNIQUE INDEX rfq_publication_approvals_idempotency ON procurement.rfq_publication_approvals (buyer_id, client_request_id);
 CREATE INDEX rfq_publication_approvals_request ON procurement.rfq_publication_approvals (request_id, created_at DESC);
 
--- 核准當下凍結的受眾（指定對象時的店家，順序有意義）。值的集合，主鍵 (approval_id, position)。
+-- 核准當下凍結的受眾（店家，順序有意義）。值的集合，主鍵 (approval_id, position)。
 CREATE TABLE procurement.rfq_publication_approval_recipients (
     approval_id UUID NOT NULL REFERENCES procurement.rfq_publication_approvals (id) ON DELETE CASCADE,
     position INT NOT NULL,

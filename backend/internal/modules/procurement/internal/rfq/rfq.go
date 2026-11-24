@@ -1,5 +1,5 @@
 // Package rfq 是買家詢價發布鏈的 use case（A9-3b-3c、A9-D35）：價格試算（純計算）、發布預覽（建立核准）、執行發布。
-// 發布核准是唯一一個同意物件：不可變、會到期（ApprovalTTL）、只能執行一次；它存單價範圍、補充說明、回價期限、受眾與（指定對象時）候選集，
+// 發布核准是唯一一個同意物件：不可變、會到期（ApprovalTTL）、只能執行一次；它存單價範圍、補充說明、回價期限、受眾與候選集，
 // 賣家看得到的內容由核准與它對應的需求版本組出（compile.go）。寫入的 use case 在單一 transaction 內、鎖著需求列做完所有檢查與寫入；
 // hash 由不可變的列在 Go 重算（rfqhash，S5），表裡沒有 hash 欄。
 // 版本衝突的 conflictTarget：request_revision（讀到的需求版本不是現行版本）、candidate_set（候選集已不是有效的）、publication_approval（核准已不是可執行的那一份）。

@@ -113,7 +113,7 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 	return out, err
 }
 
-// checkInput 檢查不需要讀取的輸入，回去頭尾空白後的補充說明：單價區間、補充說明長度、受眾欄位與模式、回價期限是合法日期。
+// checkInput 檢查不需要讀取的輸入，回去頭尾空白後的補充說明：單價區間、補充說明長度、候選集與候選欄位、回價期限是合法日期。
 func checkInput(in PreviewPublicationInput) (string, error) {
 	if err := checkRange(in.LowerBoundAmount, in.UpperBoundAmount); err != nil {
 		return "", err
@@ -134,10 +134,10 @@ func checkAudienceShape(in PreviewPublicationInput) error {
 		return apperr.InvalidInputOn([]string{"ResponseDeadline"}, "回價期限不是合法的日期")
 	}
 	if in.CandidateSetID == nil {
-		return apperr.InvalidInputOn([]string{"CandidateSetID"}, "指定對象要帶候選集")
+		return apperr.InvalidInputOn([]string{"CandidateSetID"}, "要帶候選集")
 	}
 	if len(in.SelectedCandidateIDs) == 0 {
-		return apperr.InvalidInputOn([]string{"SelectedCandidateIDs"}, "指定對象至少要選一個候選")
+		return apperr.InvalidInputOn([]string{"SelectedCandidateIDs"}, "至少要選一個候選")
 	}
 	seen := make(map[uuid.UUID]bool, len(in.SelectedCandidateIDs))
 	for i, id := range in.SelectedCandidateIDs {

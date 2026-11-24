@@ -13,7 +13,7 @@ import (
 	"fmt"
 )
 
-// AudienceInput 是核准的受眾：指定對象的店家（順序有意義）。
+// AudienceInput 是核准的受眾：店家（順序有意義）。
 type AudienceInput struct {
 	SchemaVersion string
 	StoreIDs      []int64

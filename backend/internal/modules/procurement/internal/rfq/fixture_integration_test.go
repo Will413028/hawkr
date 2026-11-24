@@ -182,7 +182,7 @@ func (f *fixture) priceIn() rfq.PriceInput {
 	return rfq.PriceInput{BuyerID: f.buyer, RequestID: f.request, ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200}
 }
 
-// publicationIn 是指定對象的預設輸入：選現行版本最後一次搜尋的第一個候選；現行版本還沒有搜尋就先搜尋一次（店 10、20），不改需求狀態。
+// publicationIn 是預設輸入：選現行版本最後一次搜尋的第一個候選；現行版本還沒有搜尋就先搜尋一次（店 10、20），不改需求狀態。
 func (f *fixture) publicationIn() rfq.PreviewPublicationInput {
 	f.t.Helper()
 	if f.lastSetRev != f.revision {

@@ -570,7 +570,6 @@ func TestBuyerDeletedIsAtomicWhenALaterStepFails(t *testing.T) {
 	}
 }
 
-// R2-1：conversion_basis 在契約不是必填，空字串要能寫入；超過 500 個字元仍被擋。
 // A9-D44(2)：邀請列是賣家可見性的唯一依據，沒被邀請的店不能有回價列；被邀請的店可以。
 func TestSellerResponseRequiresAnInviteForTheStore(t *testing.T) {
 	ctx := context.Background()
@@ -584,6 +583,7 @@ func TestSellerResponseRequiresAnInviteForTheStore(t *testing.T) {
 	}
 }
 
+// R2-1：conversion_basis 在契約不是必填，空字串要能寫入；超過 500 個字元仍被擋。
 func TestSellerResponseVersionAllowsEmptyConversionBasis(t *testing.T) {
 	ctx := context.Background()
 	d := newDB(t)

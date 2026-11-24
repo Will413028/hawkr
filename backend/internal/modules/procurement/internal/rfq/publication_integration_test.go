@@ -58,7 +58,7 @@ func TestPreviewPublicationDirectKeepsTheSelectionOrderAndAudienceHashDependsOnI
 	forward := f.approved(f.directIn(set, c[0], c[2]))
 	reverse := f.approved(f.directIn(set, c[2], c[0]))
 	if forward.RecipientCount != 2 {
-		t.Fatalf("指定對象：%+v", forward)
+		t.Fatalf("發布：%+v", forward)
 	}
 	if forward.AudienceHash == reverse.AudienceHash {
 		t.Fatal("順序不同，受眾的 hash 要不同")
@@ -570,7 +570,7 @@ func TestExecuteRequiresAReadyOrMatchingRequest(t *testing.T) {
 	}
 }
 
-// 指定對象的核准存候選集，執行時重驗它仍是有效的候選集；預覽之後同一版本又搜尋成功就失效。
+// 核准存候選集，執行時重驗它仍是有效的候選集；預覽之後同一版本又搜尋成功就失效。
 func TestExecuteDirectRechecksTheEffectiveCandidateSet(t *testing.T) {
 	f := newFixture(t)
 	set, c := f.searched(10, 20)

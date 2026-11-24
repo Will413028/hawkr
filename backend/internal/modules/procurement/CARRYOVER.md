@@ -136,7 +136,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | 受眾與賣家可見內容兩種 hash 各自的原像（預覽範圍與確認快照的 hash 隨 A9-D35 刪除） | 各自獨立演進 | 成立 | 同演算法、各自一個型別，欄位不共用 | `rfqhash` 的 `Audience`、`SellerFacing`；`TestEvery*FieldChangesTheHash`、`TestAssembledSellerHashCoversEveryApprovalAndRevisionField` 守欄位覆蓋 |
 | 核准存 `candidate_set_id` 並在執行時重驗（A9-D35 推翻 A9-D29(4) 的「候選集不存進核准」） | 當初的理由是「受眾已凍結在 `_recipients`，有效性在預覽時檢查過」 | 否：這只防到預覽當下，擋不住預覽之後同一版本重新搜尋、產生新的有效候選集 | 同意物件存它同意當時依據的候選集，執行時問它現在還是不是有效的 | 核准存 `rfq_publication_approvals.candidate_set_id`（`ON DELETE SET NULL`：買家關閉刪候選集時，保留的核准不連帶刪除）；`ExecuteRfqPublication` 以 `search.IsEffective` 重驗，失效回 `VERSION_CONFLICT`（`candidate_set`）。受眾 hash 只含有序店家 ID（候選集 ID 不進 hash：它不是賣家看到的內容） |
 | EXTERNAL 站外收件人（prospect lane） | vendor portal | 否（A9-D1 刪） | 只有平台店家 | 邀請只有 `store_id` |
-| 執行的 `canonical_request_hash` 判斷重送是否同一次請求 | 命令表存雜湊 | 否：沒有命令表 | 重送比對冪等鍵所在實體的欄位 | 比對需求、核准、核准版本、讀到的版本與 payload hash；核准版本存在 `rfq_publications.approval_version`（核准本身成功後版本已前進，不能從核准讀回）。發布預覽的重送另比對區間、補充說明、模式、期限、候選集與受眾 |
+| 執行的 `canonical_request_hash` 判斷重送是否同一次請求 | 命令表存雜湊 | 否：沒有命令表 | 重送比對冪等鍵所在實體的欄位 | 比對需求、核准、核准版本、讀到的版本與 payload hash；核准版本存在 `rfq_publications.approval_version`（核准本身成功後版本已前進，不能從核准讀回）。發布預覽的重送另比對區間、補充說明、期限、候選集與受眾 |
 | 單一仲裁者：`ClaimApprovalForExecute` 的 CAS（state、version、buyer、`expires_at`） | exactly-one 與零寫入 | 成立 | 同 | 過期、已執行、版本不符都只由這個 UPDATE 判定，Go 不重複檢查；拒絕路徑整筆 rollback，核准維持 PENDING |
 | 預覽 15 分、快照與核准各 24 小時、`MaxBuyerNoteLen` 200 | 沿用 | 預覽與快照隨 A9-D35 刪除；核准的 24 小時是業界做法（單一同意物件加單一到期時間），不是限制；補充說明上限依 proto 與 DB CHECK 是 500（proto 勝） | 同 | `rfq.ApprovalTTL`、`MaxBuyerNoteRunes`；`expires_at` 之前有效、等於 `expires_at` 已過期（procurement.md §9） |
 | 確認快照與價格預覽（A9-D35 刪除） | 快照原本是「被參照的列可以改，所以要凍結一份複本」；預覽是「伺服器先算總額給買家看」 | 否：參照的列已不可變（S5）；總額只是買家的單價區間乘版本數量，沒有外部價格，沒有會變舊的東西；快照的 `expires_at` 舊碼與新碼都沒人讀 | 可改的草稿（需求現行版本）加一個不可變、會到期、只能執行一次的同意；試算是不寫入的計算 | 刪 `ConfirmRfqSnapshot` RPC、`confirmed_rfq_snapshots` 與 `price_previews` 表；核准存單價區間與 `buyer_note`，賣家可見內容由核准組出；`AcceptSellerQuote` 改比對賣家實際收到內容的 hash（ADR `2026-11-23-seller-facing-hash-supersedes-snapshot-hash`） |
@@ -157,7 +157,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | 確認快照：buyer_note 過長（200）、冪等、過期、預覽不符 | 刪（A9-D35）；補充說明移到發布預覽，INVALID_ARGUMENT 欄位 `buyer_note`，上限 500 字、先去頭尾空白，先於版本檢查 | `TestPreviewPublicationStoresTheRangeAndTheTrimmedNote`、`TestPreviewPublicationValidatesInputsBeforeTheRevisionCheck` |
 | 發布預覽：revision ≠ expected | VERSION_CONFLICT `request_revision` | `TestPreviewPublicationStaleBranches` |
 | 發布預覽：快照不屬於買家、snapshot.request／revision 不符（APPROVAL_STALE） | 刪：沒有快照（A9-D35） | — |
-| 發布預覽：沒帶候選集或候選、候選重複、未知或零值模式 | INVALID_ARGUMENT，指向該欄位（含重複的索引） | `TestAudienceShape`、`TestPreviewPublicationShapeErrorsPointAtTheField` |
+| 發布預覽：沒帶候選集或候選、候選重複 | INVALID_ARGUMENT，指向該欄位（含重複的索引） | `TestAudienceShape`、`TestPreviewPublicationShapeErrorsPointAtTheField` |
 | 發布預覽：候選集不屬於買家或這個需求（舊：INVALID_ARGUMENT） | NOT_FOUND（與 ToggleSelection 一致） | `TestPreviewPublicationDirectBranches` |
 | 發布預覽：候選集不是需求現行版本的（舊：`set.RequestRevisionID` ≠ active） | 改成有效候選集檢查（A9-D29(4)）：VERSION_CONFLICT `candidate_set`；核准存候選集，執行時重驗（A9-D35(4)） | `TestPreviewPublicationDirectOnlyAcceptsTheEffectiveCandidateSet`、`TestExecuteDirectRechecksTheEffectiveCandidateSet` |
 | 發布預覽：候選不在候選集裡 | INVALID_ARGUMENT，欄位 `selected_candidate_ids[i]` | `TestPreviewPublicationDirectBranches` |

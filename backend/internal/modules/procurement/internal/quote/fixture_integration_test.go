@@ -155,11 +155,14 @@ func (f *fixture) respond(publication uuid.UUID, storeID int64, versions ...vers
 	return f.respondAt(start, publication, storeID, versions...)
 }
 
-// respondAt 同 respond，回價身分列的建立時間是 created。
+// respondAt 同 respond，回價身分列的建立時間是 created；店不在發布的邀請裡就補一列邀請（回價列的外鍵要求有邀請列）。
 func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID int64, versions ...version) uuid.UUID {
 	f.t.Helper()
 	ctx := context.Background()
 	id := uuid.NewV7()
+	f.exec(`INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, store_id, delivery_state_at, created_at, updated_at)
+		SELECT $1, $2, COALESCE(max(position), -1) + 1, $3, $4, $4, $4 FROM procurement.rfq_publication_invites WHERE publication_id = $2
+		ON CONFLICT (publication_id, store_id) DO NOTHING`, uuid.NewV7(), publication, storeID, created)
 	must(f.t, store.New(f.d.Conn(ctx)).InsertSellerResponse(ctx, store.InsertSellerResponseParams{ID: id, PublicationID: publication, RequestID: f.request, StoreID: storeID, Now: created}))
 	for i, v := range versions {
 		if v.quantity == "" {
