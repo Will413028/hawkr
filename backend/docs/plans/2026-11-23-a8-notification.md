@@ -210,10 +210,10 @@
 | D23 撥款補件期限提醒 | payment 同步時存 Stripe account 的 `requirements.current_deadline` 與首次啟用時間（`payout_account_activated` 只在首次啟用時建立）；每日 job 在期限前 7 天、1 天各排一次 `payout_account_deadline`，冪等鍵＝帳號＋期限＋檔位 | 已決 2026-11-24，Will |
 | D24 moderation 結果通知的事件分解與欄位 | 被處分者的通知由執行處分的模組發：social、review、im 新增隱藏、警告、恢復事件（在處分的同一個 transaction 發布；只帶處分 ID、內容參照、`policy.Category`、案件參照 `SourceRef`、`AppealPath` enum，不帶管理員說明文字）；停權沿用 `accountsuspension.Suspended`（另寄 email）、店家下架沿用 `seller.MeasureCreated`。檢舉人的通知由擁有案件的模組發：moderation 新增 `ReportReceived` 與 `CaseClosed`（只帶案件 ID、對象種類、結果類別、政策分類，不帶處置種類；worker 分頁讀檢舉人 fan-out），seller 沿用 `ReportReceived`／`ReportResolved`；型別統一為 `report_received`／`report_resolved`（參數 `ReportSource`），檢舉人可為買家或店家。取代計畫原句「內容被隱藏、作者收到警告、案件結案」。簡報：舊句會讓停權與下架重複通知、處分歸屬錯位 | 已決 2026-11-24，Will |
 | D25 買家處分的申訴 | 事件帶 `AppealPath`，買家目前一律 `NONE`；買家申訴流程延後（觸發：上線前產品決定，DSA Art.20 為業界基線） | 已決 2026-11-24，Will |
-| D28 補貨通知的商品名稱 | 參數存商品名稱快照（公開目錄資料，不是個人姓名；受 180 天保留期約束）；守門測試對公開目錄名稱列明確白名單 | 已決 2026-11-24，Will |
 | D16 投遞紀錄「實際送出文字」裡的第三方名稱 | (a) 接受：送出文字是送出時的事實紀錄，受 D15 的 180 天硬刪約束；只有收件人自己刪帳號時提前清。原問題：actor 刪帳號後，別人投遞紀錄的送出文字仍含其名稱，最長 180 天。選項：(a) 接受，送出文字是「送了什麼」的事實紀錄，期限受 D15 約束；(b) 不存送出文字，只存型別＋參數（ID）＋locale，需要時重組，代價是重組結果可能與當時不同、客訴時無法證明送了什麼；(c) actor 刪帳號時也掃描清除。建議 (a)：業界（SendGrid、Postmark 的 message activity）保留送出內容到保留期，GDPR 以有限保留期滿足最小化。 | 已決 2026-11-23，Will |
 | D26 coupon 到期提醒的發送時段 | 行銷類推播在台北時間 22:00–09:00 之間延到 09:00 後送出（收件匣列照常即時建立）；`VoucherExpiring` 屬行銷類。來源：B7 D7 修訂後提醒在到期前 24h 任意時刻產生。歸 A8-3（`voucher_expiring` 型別與推播排程） | 已決 2026-11-24，Will |
 | D27 coupon 到期提醒不聚合 | 每張券一則，不用 D12 的聚合鍵（聚合鍵語意是 actor 清單，放不下多張不同到期時間的券）；通知意圖的冪等鍵取 `voucher_id`；發送前 worker 重查券仍為 `available` | 已決 2026-11-24，Will |
+| D28 補貨通知的商品名稱 | 參數存商品名稱快照（公開目錄資料，不是個人姓名；受 180 天保留期約束）；守門測試對公開目錄名稱列明確白名單 | 已決 2026-11-24，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
 
