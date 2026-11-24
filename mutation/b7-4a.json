@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "release-does-not-clear-the-lock",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/couponserver/server.go",
+   "old": "\t_, err := s.coupon.Release(ctx, req.Msg.GetOrderNo())\n",
+   "new": "\tvar err error\n",
+   "test": "internal/legacy/couponserver ^TestReleaseByOrderNoIsIdempotentWithoutInstanceID$",
+   "why": "ReleaseCoupon 回成功但不呼叫模組的 Release：券留在 LOCKED，別的訂單鎖不到（Java 漏釋放的缺口），測試要紅。"
+  },
+  {
+   "id": "release-matches-instance-id-only",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/couponserver/server.go",
+   "old": "\t_, err := s.coupon.Release(ctx, req.Msg.GetOrderNo())\n",
+   "new": "\tif req.Msg.GetInstanceId() == \"\" {\n\t\treturn connect.NewResponse(&pb.ReleaseCouponResponse{Code: codeOK, Message: \"success\", Success: true}), nil\n\t}\n\t_, err := s.coupon.Release(ctx, req.Msg.GetOrderNo())\n",
+   "test": "internal/legacy/couponserver ^TestReleaseByOrderNoIsIdempotentWithoutInstanceID$",
+   "why": "沒有 instance_id 的釋放被當成已完成而不動券（D3 要求以 order_no 為鍵、instance_id 可省略）：鎖券回應遺失後的釋放釋不掉，測試要紅。"
+  },
+  {
+   "id": "compensation-dedupe-ignores-source-id",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/couponserver/server.go",
+   "old": "SourceType: coupon.SourceAftersalesCase, SourceID: sourceID, BuyerID: buyerID, StoreID: storeID,",
+   "new": "SourceType: coupon.SourceAftersalesCase, SourceID: m.GetRefCaseNo(), BuyerID: buyerID, StoreID: storeID,",
+   "test": "internal/legacy/couponserver ^TestCompensationDedupesBySourceID$",
+   "why": "補償券的冪等鍵不用 source_id（改用 ref_case_no）：不同售後單被誤判成重送、少發券，且 source_id 缺值不再被擋，測試要紅。"
+  },
+  {
+   "id": "validate-issues-voucher-when-not-claimed",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/couponserver/server.go",
+   "old": "\tif coupon.ReasonOf(err) == coupon.ReasonVoucherNotFound {\n\t\treturn reply(codeNotClaimed, \"此優惠券尚未領取\", nil)\n\t}\n",
+   "new": "\tif coupon.ReasonOf(err) == coupon.ReasonVoucherNotFound {\n\t\treturn reply(codeOK, \"success\", &pb.CouponValidateResult{Valid: true, DiscountAmount: \"100\", TemplateId: \"x\"})\n\t}\n",
+   "test": "internal/legacy/couponserver ^TestValidateMapsTemplateToTheBuyersVoucher$",
+   "why": "沒領過的買家驗券回通過而不是「未領取」（D1：client 先領券，不當場發券、也不放行），測試要紅。"
+  }
+ ]
+}

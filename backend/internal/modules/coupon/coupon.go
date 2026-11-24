@@ -229,6 +229,11 @@ func (m *Module) Release(ctx context.Context, orderNo string) (ReleaseResult, er
 	return m.voucher.Release(ctx, orderNo)
 }
 
+// VoucherForCampaign 回傳買家在這個活動持有的券；沒有回 NotFound（ReasonVoucherNotFound）。
+func (m *Module) VoucherForCampaign(ctx context.Context, buyerID int64, campaignID uuid.UUID) (Voucher, error) {
+	return m.voucher.ForCampaign(ctx, buyerID, campaignID)
+}
+
 // VoidVoucher 作廢單張券（admin）。
 func (m *Module) VoidVoucher(ctx context.Context, in VoidVoucherInput) error {
 	return m.voucher.Void(ctx, in)

@@ -1,0 +1,213 @@
+// Package couponserver 在 Java order 與 aftersales 改寫成 Go 之前（B8、B9），以舊的 gRPC 契約把它們對 coupon 的呼叫轉給
+// coupon 模組：order 的驗券、核銷、釋放，aftersales 的補償券。其餘 CouponService 方法一律 Unimplemented：買家、賣家、admin 的
+// 入口已經是 Connect（B7-3）。ReserveCoupon 目前也是 Unimplemented：舊請求沒有店家與訂單金額，模組的 Lock 必須重驗門檻
+// （BD1、BD2），計畫沒有決定這兩個值從哪來（見 B7-4a 回報）。B8、B9 隨 Java 的呼叫端刪除。
+//
+// 契約與舊 coupon-service 相同（業務失敗用 code／message 的 envelope、gRPC 狀態是 OK），只有兩處不同：
+//   - 補償券的 GrantSellerCompensationCoupon 多一個必填的 source_id（售後單 id，D4），與 AFTERSALES_CASE 組成冪等鍵。
+//   - Consume、Release 以 order_no 為鍵（D3），instance_id 不讀；Java 在鎖券回應遺失時沒有 instance_id 也能釋放。
+//
+// Java 送的 couponTemplateId 是活動 id；每位買家在同一個活動至多持有一張券，所以對應是 (活動, 買家) → 券（D1）。沒有領過的
+// 回「未領取」，不當場發券。
+package couponserver
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"strconv"
+	"strings"
+	"time"
+	"uuid"
+
+	"connectrpc.com/connect"
+
+	pb "github.com/Will413028/hawkr/backend/internal/legacy/gen/coupon"
+	"github.com/Will413028/hawkr/backend/internal/legacy/gen/coupon/couponconnect"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+)
+
+// 舊契約的業務碼（`GrpcResponseCode`）。
+const (
+	codeOK            = 0
+	codeInvalidParam  = 400
+	codeNotClaimed    = 7011
+	codeInvalidStatus = 7009
+)
+
+// compensationEndAt 是補償券的到期日：舊 coupon-service 的「無到期日」是 2099-12-31 23:59:59 UTC，轉接層沿用，
+// 因為舊契約沒有到期日欄位。
+var compensationEndAt = time.Date(2099, 12, 31, 23, 59, 59, 0, time.UTC)
+
+// Server 實作 legacy 的 CouponService 中 order 與 aftersales 呼叫的方法。
+type Server struct {
+	couponconnect.UnimplementedCouponServiceHandler
+	coupon *coupon.Module
+	log    *slog.Logger
+}
+
+var _ couponconnect.CouponServiceHandler = (*Server)(nil)
+
+// New 建立 server。
+func New(m *coupon.Module, log *slog.Logger) *Server {
+	if m == nil {
+		panic("couponserver: missing dependency")
+	}
+	if log == nil {
+		log = slog.Default()
+	}
+	return &Server{coupon: m, log: log}
+}
+
+func parseTemplate(s string) (uuid.UUID, error) {
+	id, err := uuid.Parse(strings.TrimSpace(s))
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("template_id 不是有效的活動 id：%q", s)
+	}
+	return id, nil
+}
+
+func parsePositive(field, s string) (int64, error) {
+	n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	if err != nil || n <= 0 {
+		return 0, fmt.Errorf("%s 必須是正整數：%q", field, s)
+	}
+	return n, nil
+}
+
+// ValidateCoupon 驗券不鎖：與 Lock 同一組檢查（模組的 Quote）。回應形狀：
+//   - 通過：valid=true、discount_amount、template_id；discount_type 與 description 不填（Java 只讀 valid、discount_amount 與失敗時的 description）。
+//   - 活動不存在、不可用、不在時間窗、不符資格、店家範圍或門檻、券已被占用：code=0、valid=false、description 是原因（與舊契約同形）。
+//   - 沒領過：envelope code=7011，不當場發券（D1）。
+//   - 參數錯誤：envelope code=400。
+//
+// 其餘錯誤（資料庫、port 讀取失敗）是 gRPC 錯誤，不降級成 valid=false。
+func (s *Server) ValidateCoupon(ctx context.Context, req *connect.Request[pb.ValidateCouponRequest]) (*connect.Response[pb.ValidateCouponResponse], error) {
+	m := req.Msg
+	reply := func(code int32, msg string, data *pb.CouponValidateResult) (*connect.Response[pb.ValidateCouponResponse], error) {
+		return connect.NewResponse(&pb.ValidateCouponResponse{Code: code, Message: msg, Data: data}), nil
+	}
+	campaignID, err := parseTemplate(m.GetTemplateId())
+	if err != nil {
+		return reply(codeInvalidParam, err.Error(), nil)
+	}
+	storeID, err := parsePositive("store_id", m.GetStoreId())
+	if err != nil {
+		return reply(codeInvalidParam, err.Error(), nil)
+	}
+	amount, err := parsePositive("order_amount", m.GetOrderAmount())
+	if err != nil {
+		return reply(codeInvalidParam, err.Error(), nil)
+	}
+	v, err := s.coupon.VoucherForCampaign(ctx, m.GetBuyerId(), campaignID)
+	if err != nil {
+		return s.validateFailure(err, reply)
+	}
+	res, err := s.coupon.Quote(ctx, coupon.LockInput{VoucherID: v.ID, BuyerID: m.GetBuyerId(), StoreID: storeID, OrderAmount: amount})
+	if err != nil {
+		return s.validateFailure(err, reply)
+	}
+	return reply(codeOK, "success", &pb.CouponValidateResult{
+		Valid:          true,
+		DiscountAmount: strconv.FormatInt(res.Discount, 10),
+		TemplateId:     campaignID.String(),
+	})
+}
+
+func (s *Server) validateFailure(err error, reply func(int32, string, *pb.CouponValidateResult) (*connect.Response[pb.ValidateCouponResponse], error)) (*connect.Response[pb.ValidateCouponResponse], error) {
+	if coupon.ReasonOf(err) == coupon.ReasonVoucherNotFound {
+		return reply(codeNotClaimed, "此優惠券尚未領取", nil)
+	}
+	switch apperr.KindOf(err) {
+	case apperr.KindInvalidInput:
+		return reply(codeInvalidParam, err.Error(), nil)
+	case apperr.KindNotFound, apperr.KindFailedPrecondition:
+		return reply(codeOK, "success", &pb.CouponValidateResult{Valid: false, Description: err.Error()})
+	case apperr.KindInternal, apperr.KindVersionConflict, apperr.KindAlreadyExists, apperr.KindUnauthenticated,
+		apperr.KindPermissionDenied, apperr.KindUnavailable, apperr.KindResourceExhausted:
+		return nil, connectError(err)
+	default:
+		return nil, connectError(err)
+	}
+}
+
+// ConsumeCoupon 核銷持有這筆訂單的券，以 order_no 為鍵、冪等（重送回成功）；instance_id 與 buyer_id 不讀。
+// 這筆訂單沒有持有任何券時回 success=false、code=7009（與舊契約的「狀態不允許」相同）。
+func (s *Server) ConsumeCoupon(ctx context.Context, req *connect.Request[pb.ConsumeCouponRequest]) (*connect.Response[pb.ConsumeCouponResponse], error) {
+	_, err := s.coupon.Redeem(ctx, req.Msg.GetOrderNo())
+	switch {
+	case err == nil:
+		return connect.NewResponse(&pb.ConsumeCouponResponse{Code: codeOK, Message: "success", Success: true}), nil
+	case apperr.KindOf(err) == apperr.KindInvalidInput:
+		return connect.NewResponse(&pb.ConsumeCouponResponse{Code: codeInvalidParam, Message: err.Error()}), nil
+	case coupon.ReasonOf(err) == coupon.ReasonNoVoucherForOrder:
+		return connect.NewResponse(&pb.ConsumeCouponResponse{Code: codeInvalidStatus, Message: "消耗失敗"}), nil
+	default:
+		return nil, connectError(err)
+	}
+}
+
+// ReleaseCoupon 釋放持有這筆訂單的券，以 order_no 為鍵、冪等（D3）：重送、回應遺失後的重送、這筆訂單沒有持有任何券
+// （結帳鎖券失敗而沒記下 instance id、或本來就沒用券）都回成功。instance_id 可省略，有值也不讀。
+func (s *Server) ReleaseCoupon(ctx context.Context, req *connect.Request[pb.ReleaseCouponRequest]) (*connect.Response[pb.ReleaseCouponResponse], error) {
+	_, err := s.coupon.Release(ctx, req.Msg.GetOrderNo())
+	switch {
+	case err == nil:
+		return connect.NewResponse(&pb.ReleaseCouponResponse{Code: codeOK, Message: "success", Success: true}), nil
+	case apperr.KindOf(err) == apperr.KindInvalidInput:
+		return connect.NewResponse(&pb.ReleaseCouponResponse{Code: codeInvalidParam, Message: err.Error()}), nil
+	default:
+		return nil, connectError(err)
+	}
+}
+
+// GrantSellerCompensationCoupon 發賣家補償券：source_id（售後單 id，必填）與 AFTERSALES_CASE 是冪等鍵，重送回同一張券的資料，
+// 不重發。到期日是 compensationEndAt（舊契約沒有到期日欄位）；標題是「售後補償券 」加 ref_case_no。
+// 規則與參數錯誤都是 envelope code=400，其他錯誤是 gRPC 錯誤（aftersales 以重送處理）。
+func (s *Server) GrantSellerCompensationCoupon(ctx context.Context, req *connect.Request[pb.GrantSellerCompensationCouponRequest]) (*connect.Response[pb.GrantSellerCompensationCouponResponse], error) {
+	m := req.Msg
+	bad := func(msg string) (*connect.Response[pb.GrantSellerCompensationCouponResponse], error) {
+		return connect.NewResponse(&pb.GrantSellerCompensationCouponResponse{Code: codeInvalidParam, Message: msg}), nil
+	}
+	storeID, err := parsePositive("store_id", m.GetStoreId())
+	if err != nil {
+		return bad(err.Error())
+	}
+	buyerID, err := parsePositive("buyer_id", m.GetBuyerId())
+	if err != nil {
+		return bad(err.Error())
+	}
+	amount, err := parsePositive("amount", m.GetAmount())
+	if err != nil {
+		return bad(err.Error())
+	}
+	minOrder, err := parsePositive("min_order_amount", m.GetMinOrderAmount())
+	if err != nil {
+		return bad(err.Error())
+	}
+	sourceID := strings.TrimSpace(m.GetSourceId())
+	if sourceID == "" {
+		return bad("source_id 必填")
+	}
+	res, err := s.coupon.IssueCompensation(ctx, coupon.CompensationInput{
+		SourceType: coupon.SourceAftersalesCase, SourceID: sourceID, BuyerID: buyerID, StoreID: storeID,
+		Amount: amount, MinOrderAmount: minOrder, EndAt: compensationEndAt,
+		Title:  strings.TrimSpace("售後補償券 " + m.GetRefCaseNo()),
+		Issuer: coupon.Issuer{StoreID: storeID},
+	})
+	if err != nil {
+		if apperr.KindOf(err) == apperr.KindInvalidInput {
+			return bad(err.Error())
+		}
+		return nil, connectError(err)
+	}
+	return connect.NewResponse(&pb.GrantSellerCompensationCouponResponse{
+		Code: codeOK, Message: "success",
+		Data: &pb.SellerCompensationCouponData{
+			TemplateId:     res.Campaign.ID.String(),
+			Amount:         strconv.FormatInt(res.Campaign.DiscountAmount, 10),
+			MinOrderAmount: strconv.FormatInt(res.Campaign.ThresholdAmount, 10),
+		},
+	}), nil
+}
