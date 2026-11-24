@@ -5,6 +5,14 @@ import { createElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentTranscript } from "./conversations";
 import {
+	acceptedEvent,
+	finishedEvent,
+	snapshotResponse,
+	submitTurnResponse,
+	turnResultEvent,
+} from "./testing/watch-events";
+import type { ProcurementSnapshot } from "./types";
+import {
 	initialState,
 	restoredStateFrom,
 	useProcurementSession,
@@ -52,12 +60,16 @@ describe("justCompletedTurnId", () => {
 				},
 			],
 		};
-		const snapshot = {
+		const snapshot: ProcurementSnapshot = {
 			requestId: "req-1",
 			revisionId: "rev-1",
-			status: "CLARIFYING" as const,
+			status: "CLARIFYING",
 			slots: {},
 			missingRequired: ["quantity"],
+			runs: [],
+			activeRunId: "",
+			openConfirmation: null,
+			publishedPublication: null,
 		};
 
 		const restored = restoredStateFrom(transcript, snapshot);
@@ -74,12 +86,8 @@ describe("justCompletedTurnId", () => {
 	});
 });
 
-// `vi.mock` 的 factory 會被吊起到檔案最上面，早於一般的 `const` 賦值——
-// 這幾個 mock function 要用 `vi.hoisted` 宣告，factory 內才存取得到。
-const { postMock, getMock, streamProcurementTurnMock } = vi.hoisted(() => ({
-	postMock: vi.fn(),
-	getMock: vi.fn(),
-	streamProcurementTurnMock: vi.fn(),
+const rpc = vi.hoisted(() => ({
+	handlers: {} as Record<string, (request: never) => unknown>,
 }));
 
 vi.mock("@/lib/auth/context", () => ({
@@ -90,34 +98,24 @@ vi.mock("@/lib/auth/context", () => ({
 	}),
 }));
 
-vi.mock("@/lib/api/client", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@/lib/api/client")>();
+vi.mock("@/lib/connect/procurement", async () => {
+	const { fakeProcurementClient } = await import("./testing/fake-procurement");
+	const client = () => fakeProcurementClient(rpc.handlers);
 	return {
-		...actual,
-		apiClient: {
-			...actual.apiClient,
-			authed: { ...actual.apiClient.authed, post: postMock, get: getMock },
-		},
+		buyerProcurementClient: client,
+		buyerProcurementStreamClient: client,
 	};
 });
 
-// `streamProcurementTurn` 是 `runTurnStream` 唯一的外部 I/O；本專案目前沒有
-// 任何既有測試消費過 `turn-stream.ts` 的 export（`turn-stream.unit.test.ts`
-// 測的是它自己內部行為，不是被別的模組 mock 掉），所以這裡是這個 repo 第一個
-// 「mock `./turn-stream` 給 `useProcurementSession` 用」的用例，沒有既有慣例
-// 可以照抄，寫法對齊上面 `@/lib/api/client` 的 `importOriginal` 局部覆寫模式。
-vi.mock("./turn-stream", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("./turn-stream")>();
-	return { ...actual, streamProcurementTurn: streamProcurementTurnMock };
+vi.mock("@/lib/i18n/ui-text", async () => {
+	const { uiTextStub } = await import("./testing/fake-procurement");
+	return uiTextStub;
 });
 
 function renderProcurementSession() {
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
-	// 這個檔案是 `.unit.test.ts`（vitest.config.ts 的 include 只認這個副檔
-	// 名），不能用 JSX；改用 createElement，對齊
-	// `route-capability-runtime.unit.test.ts` 已有的相同限制與寫法。
 	function wrapper({ children }: { children: ReactNode }) {
 		return createElement(
 			QueryClientProvider,
@@ -129,42 +127,28 @@ function renderProcurementSession() {
 }
 
 /**
- * `applyTurnResult` 寫入 justCompletedTurnId — 用 renderHook 真的掛載這個
- * hook，驗證 submitTurn → runTurnStream → applyTurnResult 這條 closure 鏈
- * 實際觀察得到的結果，取代上面純函式測試的 `已知落差` 註記。
- *
- * `getMock`（`/requests/{id}/snapshot`）刻意 resolve 成功但不斷言它——
- * `applyTurnResult` 落地後打的那次是 best-effort 的 stage 校正，跟這裡驗證
- * 的欄位無關；讓它安靜成功比較不會在測試間留下未處理的 rejection 噪音。
+ * `applyTurnResult` 寫入 justCompletedTurnId：用 renderHook 掛載 hook，驗證
+ * submitTurn → WatchRun → turn_result → applyTurnResult 這條鏈實際觀察得到的結果。
  */
 describe("applyTurnResult 寫入 justCompletedTurnId（renderHook）", () => {
-	it("串流成功落地：justCompletedTurnId 指到新 assistant turn，pendingTurn 回到 false，且沒有退化打同步 /turns 端點", async () => {
-		streamProcurementTurnMock.mockResolvedValueOnce({
-			requestId: "req-1",
-			revisionId: "rev-1",
-			reply: "好的，我幫您確認一下數量。",
-			degraded: false,
-			slots: {},
-			missingRequired: ["quantity"],
-			rejected: [],
-			// 終態仍可能帶 steps；hook 必須剝除，不能把思考過程寫回 turn。
-			steps: [
-				{
-					code: "UNDERSTAND_INPUT",
-					status: "SUCCEEDED",
-					text: "TERMINAL_ONLY_STEP_SENTINEL",
-				},
-			],
-		});
-		getMock.mockResolvedValueOnce({
-			data: {
-				requestId: "req-1",
-				revisionId: "rev-1",
-				status: "CLARIFYING",
-				slots: {},
-				missingRequired: ["quantity"],
-			},
-		});
+	it("WatchRun 帶回 turn_result：justCompletedTurnId 指到新 assistant turn，pendingTurn 回到 false，即時步驟清空", async () => {
+		const submit = vi.fn(() => submitTurnResponse());
+		rpc.handlers.submitTurn = submit;
+		rpc.handlers.watchRun = () => [
+			acceptedEvent("c1"),
+			turnResultEvent("c2", {
+				reply: "好的，我幫您確認一下數量。",
+				steps: [
+					{
+						code: "UNDERSTAND_INPUT",
+						status: 4,
+						text: "TERMINAL_ONLY_STEP_SENTINEL",
+					},
+				],
+			}),
+			finishedEvent("c3"),
+		];
+		rpc.handlers.getSnapshot = () => snapshotResponse();
 
 		const { result } = renderProcurementSession();
 		expect(result.current.justCompletedTurnId).toBeNull();
@@ -187,7 +171,6 @@ describe("applyTurnResult 寫入 justCompletedTurnId（renderHook）", () => {
 		expect(assistantTurn).not.toHaveProperty("steps");
 		expect(result.current.liveSteps).toEqual([]);
 		expect(result.current.liveActivity).toEqual([]);
-		// 串流路徑成功落地：不該退化打同步 POST /buyers/me/procurement/turns。
-		expect(postMock).not.toHaveBeenCalled();
+		expect(submit).toHaveBeenCalledTimes(1);
 	});
 });

@@ -87,12 +87,10 @@
 - 第三方整合
   - [PayUni 金流官方 API 總覽](第三方整合/PayUni%20金流官方%20API%20總覽.md)
   - [PayUni 逆向金流 API 總覽](第三方整合/PayUni%20逆向金流%20API%20總覽.md)
-  - [PayUni 物流官方 API 總覽](第三方整合/PayUni%20物流官方%20API%20總覽.md)
   - [PayUni 代理商專用 API 總覽](第三方整合/PayUni%20代理商專用%20API%20總覽.md)
   - [PayUni 費用一覽](第三方整合/PayUni%20費用一覽.md)
   - [AMEGO 電子發票 API 總覽](第三方整合/AMEGO%20電子發票%20API%20總覽.md)
   - [TGOS API 整合指南](第三方整合/TGOS%20API%20整合指南.md)
-  - [Uber Direct API 總覽](第三方整合/Uber%20Direct%20API%20總覽.md)
 
 - 代碼管理（CodeMeta）
   - [總覽](代碼管理%EF%BC%88CodeMeta%EF%BC%89/README.md)

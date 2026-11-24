@@ -42,7 +42,7 @@ final class AiAssistantControllerProvider
 }
 
 String _$aiAssistantControllerHash() =>
-    r'507c25793920f005716f5212fd6ba501dcc13f6e';
+    r'64887c8e7cc1c0872daf95b37bdaff586ea02204';
 
 abstract class _$AiAssistantController extends $Notifier<List<AiMessage>> {
   List<AiMessage> build();

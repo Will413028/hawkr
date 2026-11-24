@@ -147,6 +147,55 @@
       }
     }
   },
+  "quoteResponseTypeHelp": "兩種回應都要填完整的計價基準與金額——「接受非價格條款」不是少填金額的捷徑。",
+  "@quoteResponseTypeHelp": {
+    "description": "Helper text under the response type heading of the quote form."
+  },
+  "quoteSpecNoteTitle": "規格說明（選填）",
+  "@quoteSpecNoteTitle": {
+    "description": "Section title of the optional specification note on the quote form."
+  },
+  "quoteSpecNoteHelp": "這一欄只能由你自己填寫，最多 1000 字。",
+  "@quoteSpecNoteHelp": {
+    "description": "Helper text under the specification note title."
+  },
+  "quoteSpecNoteLabel": "規格說明",
+  "@quoteSpecNoteLabel": {
+    "description": "Label of the specification note field."
+  },
+  "quoteSpecNoteHint": "例如：產地、等級、包裝方式、驗收條件",
+  "@quoteSpecNoteHint": {
+    "description": "Hint inside the specification note field."
+  },
+  "quoteCurrencyTwd": "幣別 TWD",
+  "@quoteCurrencyTwd": {
+    "description": "Currency caption of the amounts card on the quote form."
+  },
+  "quoteStatusActive": "有效",
+  "@quoteStatusActive": {
+    "description": "Status of the latest seller quote version: in force."
+  },
+  "quoteStatusSuperseded": "已被改版取代",
+  "@quoteStatusSuperseded": {
+    "description": "Status of a seller quote version replaced by a newer version."
+  },
+  "quoteStatusWithdrawn": "已撤回",
+  "@quoteStatusWithdrawn": {
+    "description": "Status of a seller quote version the seller withdrew."
+  },
+  "quoteStatusExpired": "已逾有效期",
+  "@quoteStatusExpired": {
+    "description": "Status of a seller quote version past its validity."
+  },
+  "quoteAmountNotWholeNumber": "{label}只能是非負整數（新台幣元），例如 1200",
+  "@quoteAmountNotWholeNumber": {
+    "description": "Validation error for an amount that is not a non-negative whole number.",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
   "earningsTitle": "入帳紀錄",
   "@earningsTitle": {
     "description": "Title of the seller's earnings ledger (transfers in, reversals, top-ups), on the wallet and on an order's detail."

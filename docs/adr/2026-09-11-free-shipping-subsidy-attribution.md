@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-11-15-fulfillment-seller-managed-shipping.md`（出貨改賣家自寄，物流商與其帳務、Uber 程式已於 B3 退場；本檔保留歷史）；原為 accepted |
 | 日期 | 2026-09-11 |
 | 影響範圍 | shipping-service 免運與補貼成本歸屬 |
 

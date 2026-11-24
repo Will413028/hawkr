@@ -39,10 +39,12 @@ import (
 type fakeReporters struct {
 	items  []moderation.Reporter
 	afters []int64
+	sides  []moderation.ReporterSide
 }
 
 func (f *fakeReporters) CaseReporters(_ context.Context, _ uuid.UUID, side moderation.ReporterSide, after int64, size int32) (moderation.ReporterPage, error) {
 	f.afters = append(f.afters, after)
+	f.sides = append(f.sides, side)
 	var ids []int64
 	byID := map[int64]moderation.Reporter{}
 	for _, r := range f.items {
@@ -99,7 +101,7 @@ func setupGovernance(t *testing.T, reporters CaseReporters) *fixture {
 		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Validity: noVouchers{}, Jobs: rec, Now: clock, NewID: uuid.NewV7, Logger: log,
 		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
 	}, registry.Registry{})
-	m.SubscribeGovernance(bus)
+	m.Subscribe(bus)
 	return &fixture{db: d, identity: id, buyer: buyers, sellerMod: sl, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts, resolver: resolver}
 }
 
@@ -170,7 +172,7 @@ func (f *fixture) storeOwner(t *testing.T) (account, storeID int64) {
 var governanceAt = time.Date(2026, 11, 23, 4, 30, 0, 0, time.UTC)
 
 // 店家面型別：每個來源事件在 worker 解析成店主帳號與店，寫進該店的收件匣，並依型別的渠道排推播與 email 投遞紀錄；停權措施不另發（由 StoreSuspended 通知）。
-// mutation：intake 拿掉任何一個 events.Subscribe（subscribe_governance.go）→ 對應列的收件匣是空的，這個測試紅。
+// mutation：拿掉 subscriptions.go 裡治理側的任何一列 → 對應列的收件匣是空的，這個測試紅。
 func TestStoreSideEventsCreateOneInboxRowForTheStoreOwner(t *testing.T) {
 	f := setupGovernance(t, nil)
 	owner, storeID := f.storeOwner(t)
@@ -530,6 +532,10 @@ func TestCaseClosedFansOutToBuyerAndStoreReportersAcrossPages(t *testing.T) {
 	}
 	if fromStart != 2 || len(reporters.afters) < 4 {
 		t.Fatalf("每個母意圖只有第一頁從頭讀，之後從上一頁最後一位的號碼接著讀：%v", reporters.afters)
+	}
+	// 買家與店家的號碼來自不同序列、會重疊，所以光看收件匣分不出店家母意圖讀錯邊；直接看兩邊都被讀過。
+	if !slices.Contains(reporters.sides, moderation.ReporterSideBuyer) || !slices.Contains(reporters.sides, moderation.ReporterSideStore) {
+		t.Fatalf("兩個母意圖各讀自己那一邊的檢舉人：%v", reporters.sides)
 	}
 	if err := f.db.InTx(context.Background(), func(ctx context.Context) error { return events.Publish(ctx, f.bus, closed) }); err != nil {
 		t.Fatal(err)

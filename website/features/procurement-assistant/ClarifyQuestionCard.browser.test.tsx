@@ -13,9 +13,8 @@ type CardProps = ComponentProps<typeof ClarifyQuestionCard>;
 const customQuestion: ClarifyQuestion = {
 	slotKey: "crop_disambiguation",
 	prompt: "找不到符合的品項，請描述你要的品項：",
-	options: [{ optionId: "crop-other", label: "自行描述品項", value: "OTHER" }],
+	options: [{ optionId: "crop-other", label: "自行描述品項" }],
 	allowFreeText: false,
-	source: "FIXED",
 	canSkip: false,
 };
 
@@ -23,9 +22,9 @@ const choiceQuestion: ClarifyQuestion = {
 	...customQuestion,
 	prompt: "找到幾個相符的品項，麻煩選一下你要的是哪一個：",
 	options: [
-		{ optionId: "crop-LA1", label: "甘藍－初秋", value: "甘藍－初秋" },
-		{ optionId: "crop-LA2", label: "甘藍－改良種", value: "甘藍－改良種" },
-		{ optionId: "crop-other", label: "其他（自己輸入）", value: "OTHER" },
+		{ optionId: "crop-LA1", label: "甘藍－初秋" },
+		{ optionId: "crop-LA2", label: "甘藍－改良種" },
+		{ optionId: "crop-other", label: "其他（自己輸入）" },
 	],
 };
 
@@ -35,9 +34,9 @@ const broadQuestion: ClarifyQuestion = {
 	prompt: "先確認你要採購的大品項，請選擇一項，或輸入品項名稱：",
 	allowFreeText: true,
 	options: [
-		{ optionId: "fixture-group-pork", label: "豬肉", value: "豬肉" },
-		{ optionId: "fixture-group-beef", label: "牛肉", value: "牛肉" },
-		{ optionId: "crop-other", label: "自行描述品項", value: "OTHER" },
+		{ optionId: "fixture-group-pork", label: "豬肉" },
+		{ optionId: "fixture-group-beef", label: "牛肉" },
+		{ optionId: "crop-other", label: "自行描述品項" },
 	],
 };
 
@@ -45,8 +44,8 @@ const narrowQuestion: ClarifyQuestion = {
 	...broadQuestion,
 	prompt: "接著確認「豬肉」的細項，請選擇一項，或輸入更具體的名稱：",
 	options: [
-		{ optionId: "fixture-item-pork-belly", label: "豬五花", value: "豬五花" },
-		{ optionId: "fixture-item-pork-loin", label: "豬里肌", value: "豬里肌" },
+		{ optionId: "fixture-item-pork-belly", label: "豬五花" },
+		{ optionId: "fixture-item-pork-loin", label: "豬里肌" },
 		broadQuestion.options[2],
 	],
 };

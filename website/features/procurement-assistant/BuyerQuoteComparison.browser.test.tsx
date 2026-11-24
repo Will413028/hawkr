@@ -6,8 +6,19 @@ import BuyerQuoteComparison from "./BuyerQuoteComparison";
 import type {
 	BuyerFacingSellerResponse,
 	BuyerQuoteAcceptanceResponse,
+	BuyerQuoteFailure,
 } from "./buyer-quote-contract";
-import { buyerQuoteFailure } from "./buyer-quote-contract";
+
+function buyerQuoteFailure(
+	code: BuyerQuoteFailure["code"],
+	detail: string,
+	orderNo?: string,
+): BuyerQuoteFailure {
+	return { code, detail, retryable: false, ...(orderNo ? { orderNo } : {}) };
+}
+
+const STALE_RESPONSE_DETAIL =
+	"這家賣家已經送出新的報價版本。系統不會自動幫你接受新版本，請重新比較之後再決定。";
 
 // 付款入口是 `Button href`（共用 <Link>），它經 `@/lib/intl/use-router` 取 router；
 // 測試不掛 App Router，改用靜態 router。
@@ -17,7 +28,7 @@ vi.mock("@/lib/intl/use-router", async (importOriginal) => {
 	return { ...actual, useRouter: () => staticRouter };
 });
 
-const SNAPSHOT_HASH = "b".repeat(64);
+const SELLER_FACING_HASH = "b".repeat(64);
 
 function response(
 	overrides: Partial<BuyerFacingSellerResponse> = {},
@@ -36,7 +47,7 @@ function response(
 		},
 		quote: {
 			responseType: "MANUAL_QUOTE",
-			offeredQuality: { grade: "特級", inspectionNotes: "出貨前抽驗三箱" },
+			specNote: "出貨前抽驗三箱",
 			unitBasis: { quantity: "1", unit: "KG" },
 			offeredQuantity: "500",
 			offeredQuantityUnit: "KG",
@@ -126,13 +137,13 @@ function setup(overrides: Partial<Props> = {}) {
 	}));
 	const props: Props = {
 		responses: [response(), externalVendorCatty, supersededVersion],
-		rfqSnapshotHash: SNAPSHOT_HASH,
+		sellerFacingHash: SELLER_FACING_HASH,
 		onToggleShortlist: vi.fn(async (_target, shortlisted: boolean) => ({
 			ok: true as const,
 			data: shortlisted,
 		})),
 		onAcceptQuote,
-		createIdempotencyKey: () => "bqa-test",
+		createClientRequestId: () => "bqa-test",
 		onRefresh: vi.fn(),
 		...overrides,
 	};
@@ -219,9 +230,9 @@ describe("BuyerQuoteComparison", () => {
 		expect(props.onAcceptQuote).toHaveBeenCalledOnce();
 		const command = vi.mocked(props.onAcceptQuote).mock.calls[0][0];
 		expect(Object.keys(command).sort()).toEqual([
-			"expectedRfqSnapshotHash",
+			"clientRequestId",
+			"expectedSellerFacingHash",
 			"expectedSellerResponseVersion",
-			"idempotencyKey",
 			"sellerResponseId",
 		]);
 	});
@@ -231,7 +242,10 @@ describe("BuyerQuoteComparison", () => {
 			responses: [response()],
 			onAcceptQuote: vi.fn(async () => ({
 				ok: false as const,
-				error: buyerQuoteFailure(409, "STALE_SELLER_RESPONSE"),
+				error: buyerQuoteFailure(
+					"STALE_SELLER_RESPONSE",
+					STALE_RESPONSE_DETAIL,
+				),
 			})),
 		});
 		await userEvent.click(acceptButton());

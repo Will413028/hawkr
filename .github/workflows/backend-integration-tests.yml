@@ -12,7 +12,6 @@ on:
   pull_request:
     paths: &integration_paths
       - 'backend/pkg/**'
-      - 'backend/services/ai-service/**'
       - 'backend/services/notification-service/**'
       - 'backend/services/invoice-service/**'
       # notification-service 的 TestPublishedRoutesHaveNotificationHandler 讀這兩個檔。
@@ -47,7 +46,6 @@ jobs:
             all:
               - 'backend/pkg/**'
               - '.github/workflows/backend-integration-tests.yml'
-            ai-service: ['backend/services/ai-service/**']
             notification-service:
               - 'backend/services/notification-service/**'
               - 'backend/internal/legacy/rabbitmq/testdata/routes.json'
@@ -61,7 +59,7 @@ jobs:
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: |
           set -euo pipefail
-          services='["ai-service","notification-service","invoice-service"]'
+          services='["notification-service","invoice-service"]'
           if [ "$ALL" = "true" ]; then
             modules=$(jq -c '["pkg"] + map("services/" + .)' <<<"$services")
           else

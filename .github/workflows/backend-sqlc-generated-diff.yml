@@ -2,7 +2,7 @@ name: backend sqlc generated diff
 
 # 守住 sqlc 生成檔與其源檔（services/*/db/{queries,schema}/*.sql）的同步。
 # 版本唯一宣告在 scripts/gen-sqlc.sh 的 IMAGE。對每個 service 複製到暫存路徑、
-# 從 sqlc.yaml 解析全部 out:（ai-service 有兩個）、生成前先清空 out:（才抓得到孤兒檔）、
+# 從 sqlc.yaml 解析全部 out:（可能不只一個）、生成前先清空 out:（才抓得到孤兒檔）、
 # 逐一與原始路徑對拍，全程零寫入 checkout。
 # 由 backend/.github/workflows/sqlc-generated-diff.yml 搬來。
 

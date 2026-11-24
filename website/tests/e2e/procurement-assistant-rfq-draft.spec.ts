@@ -1,54 +1,32 @@
 import { expect, test } from "@playwright/test";
 import {
 	pricePreviewData,
+	publicationResultJson,
 	RFQ_APPROVAL_ID,
-	RFQ_CONVERSATION_ID,
-	RFQ_PREVIEW_HASH,
-	RFQ_PREVIEW_ID,
 	RFQ_REQUEST_ID,
 	RFQ_REVISION_ID,
 	RFQ_SELLER_PAYLOAD_HASH,
+	runtimeSnapshotJson,
 	setupRfqPriceReview,
 } from "./helpers/mock-procurement-rfq";
 
-test.describe("procurement assistant — RFQ confirmation", {
+test.describe("procurement assistant — RFQ price review", {
 	tag: ["@ui"],
 }, () => {
-	test("confirms a guided server projection without publishing a legacy QuoteBatch", async ({
+	test("price preview carries the buyer range without publishing anything", async ({
 		page,
 	}) => {
 		test.setTimeout(45_000);
 		const previewBodies: Array<Record<string, unknown>> = [];
-		const confirmationBodies: Array<Record<string, unknown>> = [];
-		const { legacy } = await setupRfqPriceReview(page, {
-			previewHandler: (route) => {
-				previewBodies.push(
-					route.request().postDataJSON() as Record<string, unknown>,
-				);
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: pricePreviewData(),
-					}),
-				});
+		const publicationRequests: Array<Record<string, unknown>> = [];
+		await setupRfqPriceReview(page, {
+			previewHandler: (request) => {
+				previewBodies.push(request);
+				return pricePreviewData();
 			},
-			confirmationHandler: (route) => {
-				confirmationBodies.push(
-					route.request().postDataJSON() as Record<string, unknown>,
-				);
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							confirmedRfqSnapshotId: "1234567890123456802",
-							payloadHash: "b".repeat(64),
-						},
-					}),
-				});
+			publicationPreviewHandler: (request) => {
+				publicationRequests.push(request);
+				throw new Error("價格試算階段不應該取得發布核准");
 			},
 		});
 
@@ -67,12 +45,9 @@ test.describe("procurement assistant — RFQ confirmation", {
 			.toBe(true);
 
 		expect(previewBodies[0]).toEqual({
+			requestId: RFQ_REQUEST_ID,
 			expectedRevisionId: RFQ_REVISION_ID,
-			clientRequestId: expect.any(String),
-			deliveryCity: "桃園市",
 			buyerRequestedRange: {
-				currency: "TWD",
-				priceComponent: "GOODS_ONLY",
 				lowerBoundAmount: "30",
 				upperBoundAmount: "42",
 			},
@@ -94,28 +69,14 @@ test.describe("procurement assistant — RFQ confirmation", {
 			page.getByRole("button", { name: "確認並準備發布" }),
 		).toBeDisabled();
 
-		// 鎖定不變式仍然成立，只是要回到價格確認那一步才看得到。
+		// 回到價格那一步：「重新算一次」只有希望詢價卡上的「取得無參考價試算」一顆；
+		// 試算成功後整張卡收起。
 		await page.getByRole("button", { name: "返回調整" }).click();
-		await expect(
-			page.getByText("需求版本與價格範圍已固定，等待發布。"),
-		).toBeVisible();
-		// 「重新算一次」只有希望詢價卡上的「取得無參考價試算」一顆；試算成功後整張卡收起，確認鎖定後不能再試算。
 		await expect(
 			page.getByRole("button", { name: "取得無參考價試算" }),
 		).toHaveCount(0);
-		// toEqual 而不是 toMatchObject 是刻意的：這條擋的是「confirm 的 body 多送了
-		// 買家私有欄位」。⛔ 不要改成寬鬆比對——多一個鍵就該讓它紅。
-		// buyerNote 沒填時送空字串（backend #3410 那側 trim 後視為沒填，
-		// canonical payload 完全不含這個鍵）。
-		expect(confirmationBodies[0]).toEqual({
-			clientRequestId: expect.any(String),
-			expectedRevisionId: RFQ_REVISION_ID,
-			pricePreviewId: RFQ_PREVIEW_ID,
-			pricePreviewVersion: "1",
-			payloadHash: RFQ_PREVIEW_HASH,
-			buyerNote: "",
-		});
-		expect(legacy.calls).toBe(0);
+		// 價格試算是純計算，不建立任何發布核准。
+		expect(publicationRequests).toHaveLength(0);
 	});
 
 	test("成果關閉再開啟保留價格流程與已取得的價格，不產生任務分頁", async ({
@@ -171,27 +132,9 @@ test.describe("procurement assistant — RFQ confirmation", {
 		test.setTimeout(45_000);
 		const executeBodies: Array<Record<string, unknown>> = [];
 		await setupRfqPriceReview(page, {
-			publicationExecuteHandler: (route) => {
-				executeBodies.push(
-					route.request().postDataJSON() as Record<string, unknown>,
-				);
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							publicationId: "1234567890123456804",
-							publicationVersion: "1",
-							state: "PUBLISHED",
-							audienceMode: "DIRECT_RECIPIENTS",
-							audienceHash: "c".repeat(64),
-							sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
-							publishedAt: "2026-08-22T12:40:00Z",
-							replayed: false,
-						},
-					}),
-				});
+			publicationExecuteHandler: (request) => {
+				executeBodies.push(request);
+				return publicationResultJson();
 			},
 		});
 
@@ -222,6 +165,7 @@ test.describe("procurement assistant — RFQ confirmation", {
 
 		expect(executeBodies).toHaveLength(1);
 		expect(executeBodies[0]).toEqual({
+			requestId: RFQ_REQUEST_ID,
 			clientRequestId: expect.any(String),
 			approvalId: RFQ_APPROVAL_ID,
 			approvalVersion: "1",
@@ -269,21 +213,8 @@ test.describe("procurement assistant — RFQ confirmation", {
 		await setupRfqPriceReview(page, {
 			// execute 成功但 artifact 還沒落地——這正是「拿 runtime.publication 當
 			// 入口守衛」會把買家彈回候選的那個時間窗。
-			runtimeSnapshotHandler: (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							conversationId: RFQ_CONVERSATION_ID,
-							requestId: RFQ_REQUEST_ID,
-							messages: [],
-							runs: [],
-							artifacts: [],
-						},
-					}),
-				}),
+			runtimeSnapshotHandler: () =>
+				runtimeSnapshotJson({ publishedRfq: undefined }),
 		});
 
 		await page

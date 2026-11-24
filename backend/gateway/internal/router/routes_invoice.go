@@ -70,8 +70,8 @@ func registerInvoiceRoutes(app, admin *gin.RouterGroup, h *handler.Holder) {
 		orderInvoices.GET(OrderInvoiceDocumentFile, h.GetOrderInvoiceDocumentFile)
 
 		// 買家 PDF 二進位子路由：反代到 invoice-service 10042。營運鍵必須在 proxy 之前
-		// 補注入——CreateProxy 只注入 x-account-id／x-account-type，x-buyer-id 只存在於
-		// gRPC 路徑的 metadata_interceptor。
+		// 補注入——CreateProxy 只注入 x-account-id／x-account-type，x-buyer-id 要由
+		// InjectBuyerIDHeader 補。
 		orderInvoices.GET(OrderInvoiceDocumentContent,
 			middleware.InjectBuyerIDHeader(h.BuyerID), invoicePDFProxy())
 	}

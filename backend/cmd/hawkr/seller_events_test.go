@@ -10,7 +10,7 @@ import (
 )
 
 // subscribeSellerRelay 訂閱的 relay 事件只有店家生命週期、停權、資料與曝光五種：平台審核（核准、退回）與收款開通的結果
-// 都不轉成舊的 merchant.verification.*（舊通知服務沒有部署，結果通知由通知模組承接）。
+// 都不轉成舊的 merchant.verification.*（結果通知由通知模組承接）。
 func TestSellerRelaySubscribesOnlyTheStoreEvents(t *testing.T) {
 	file, err := parser.ParseFile(token.NewFileSet(), "seller_events.go", nil, 0)
 	if err != nil {

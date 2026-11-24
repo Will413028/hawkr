@@ -110,7 +110,6 @@ const STATIC_ANALYTICS_ROUTES = new Set([
 	"/search",
 	"/seller",
 	"/seller-center",
-	"/seller-center/ai",
 	"/seller-center/coupons",
 	"/seller-center/coupons/new",
 	"/seller-center/customers",

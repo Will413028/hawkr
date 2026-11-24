@@ -223,6 +223,19 @@
     }
   },
   "procurement": {
+    "CancelDisposition": {
+      "CANCEL_DISPOSITION_ALREADY_CANCELLED": "這一輪先前已經停止，這次沒有重複送出。",
+      "CANCEL_DISPOSITION_ALREADY_TERMINAL": "這一輪已經跑完了，已完成的結果仍然有效，沒有被這次停止作廢。",
+      "CANCEL_DISPOSITION_REQUESTED": "已送出停止，正在收尾這一輪。",
+      "CANCEL_DISPOSITION_TOO_LATE": "這一輪已經完成並送出，來不及停止；已完成的結果仍然有效。"
+    },
+    "QuoteAcceptability": {
+      "QUOTE_ACCEPTABILITY_ACCEPTABLE": "可接受",
+      "QUOTE_ACCEPTABILITY_EXPIRED": "已逾有效期",
+      "QUOTE_ACCEPTABILITY_INELIGIBLE": "不符合接受資格",
+      "QUOTE_ACCEPTABILITY_SUPERSEDED": "已被新版本取代",
+      "QUOTE_ACCEPTABILITY_WITHDRAWN": "賣家已撤回"
+    },
     "RejectionReason": {
       "REJECTION_REASON_BUDGET_RANGE": "單價預算不在可接受的範圍內",
       "REJECTION_REASON_CITY_UNRECOGNIZED": "無法辨識這個縣市",
@@ -237,6 +250,14 @@
       "REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": "品項分類的判定方式不明",
       "REJECTION_REASON_TRUNCATED": "超過長度上限，已截斷",
       "REJECTION_REASON_UNIT_NOT_ALLOWED": "這個單位不支援"
+    },
+    "RunFailureReason": {
+      "RUN_FAILURE_REASON_ANSWER_REJECTED": "這個回答無法採用，請重新回答。",
+      "RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE": "品項分類已調整，請重新選擇品項。",
+      "RUN_FAILURE_REASON_MODEL_UNAVAILABLE": "Hawkr Agent 暫時無法回覆，請稍後重新送出。",
+      "RUN_FAILURE_REASON_SEARCH_FAILED": "候選搜尋失敗，請重新搜尋。",
+      "RUN_FAILURE_REASON_TURN_PIPELINE_ERROR": "這一輪處理時發生錯誤，請重新送出。",
+      "RUN_FAILURE_REASON_WORKER_LOST": "這一輪處理中斷了，請重新送出。"
     }
   },
   "review": {

@@ -503,6 +503,46 @@ extension PaymentRequirementCollectionUiText on hawkr_payment_v1alpha1_payment.R
   String? uiText(UiLocale l) => _paymentRequirementCollection(l, value);
 }
 
+String? _procurementCancelDisposition(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '已送出停止，正在收尾這一輪。',
+(UiLocale.en, 1) => 'Stop requested. Wrapping up this round.',
+(UiLocale.zhTW, 2) => '這一輪先前已經停止，這次沒有重複送出。',
+(UiLocale.en, 2) => 'This round was already stopped, so nothing was sent again.',
+(UiLocale.zhTW, 3) => '這一輪已經跑完了，已完成的結果仍然有效，沒有被這次停止作廢。',
+(UiLocale.en, 3) => 'This round had already finished. Its completed result is still valid and was not voided by this stop.',
+(UiLocale.zhTW, 4) => '這一輪已經完成並送出，來不及停止；已完成的結果仍然有效。',
+(UiLocale.en, 4) => 'This round already finished and was sent, so it was too late to stop. Its completed result is still valid.',
+_ => null,
+};
+}
+
+extension ProcurementCancelDispositionUiText on hawkr_procurement_v1alpha1_procurement.CancelDisposition {
+  /// procurement.CancelDisposition 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _procurementCancelDisposition(l, value);
+}
+
+String? _procurementQuoteAcceptability(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '可接受',
+(UiLocale.en, 1) => 'Can be accepted',
+(UiLocale.zhTW, 2) => '已逾有效期',
+(UiLocale.en, 2) => 'Past its validity period',
+(UiLocale.zhTW, 3) => '賣家已撤回',
+(UiLocale.en, 3) => 'Withdrawn by the seller',
+(UiLocale.zhTW, 4) => '已被新版本取代',
+(UiLocale.en, 4) => 'Replaced by a newer version',
+(UiLocale.zhTW, 5) => '不符合接受資格',
+(UiLocale.en, 5) => 'Not eligible to be accepted',
+_ => null,
+};
+}
+
+extension ProcurementQuoteAcceptabilityUiText on hawkr_procurement_v1alpha1_procurement.QuoteAcceptability {
+  /// procurement.QuoteAcceptability 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _procurementQuoteAcceptability(l, value);
+}
+
 String? _procurementRejectionReason(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW, 1) => '內容是空的',
@@ -538,6 +578,29 @@ _ => null,
 extension ProcurementRejectionReasonUiText on hawkr_procurement_v1alpha1_procurement.RejectionReason {
   /// procurement.RejectionReason 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _procurementRejectionReason(l, value);
+}
+
+String? _procurementRunFailureReason(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '這一輪處理中斷了，請重新送出。',
+(UiLocale.en, 1) => 'This round was interrupted. Please send it again.',
+(UiLocale.zhTW, 2) => '候選搜尋失敗，請重新搜尋。',
+(UiLocale.en, 2) => 'The candidate search failed. Please search again.',
+(UiLocale.zhTW, 3) => '這一輪處理時發生錯誤，請重新送出。',
+(UiLocale.en, 3) => 'Something went wrong while processing this round. Please send it again.',
+(UiLocale.zhTW, 5) => 'Hawkr Agent 暫時無法回覆，請稍後重新送出。',
+(UiLocale.en, 5) => 'Hawkr Agent can\'t reply right now. Please send it again later.',
+(UiLocale.zhTW, 6) => '品項分類已調整，請重新選擇品項。',
+(UiLocale.en, 6) => 'The item category has changed. Please choose the item again.',
+(UiLocale.zhTW, 7) => '這個回答無法採用，請重新回答。',
+(UiLocale.en, 7) => 'This answer could not be used. Please answer again.',
+_ => null,
+};
+}
+
+extension ProcurementRunFailureReasonUiText on hawkr_procurement_v1alpha1_procurement.RunFailureReason {
+  /// procurement.RunFailureReason 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _procurementRunFailureReason(l, value);
 }
 
 String? _sellerContentKind(UiLocale l, int value) {

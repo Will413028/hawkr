@@ -1,5 +1,7 @@
 # 售後微服務（AfterSales Service）詳細設計書
 
+> 🔴 **B3 退場說明（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂）**：物流商（PayUni 物流等）已退場，退貨物流改為買家自寄並回填追蹤號碼，由 B9 aftersales 改寫時重新設計。本書中以 Shipping Service 建逆物流單、物流貨態事件、出貨便代碼與店到店待取為前提的段落描述 B3 之前的 Java 現況，B9 時由新設計取代。
+
 ---
 
 > ⚠️ **錯誤處理慣例**：本設計書內所有 sequence diagram 之 gRPC client 呼叫，error path 統一依 [`Java gRPC 錯誤處理規範.md §7.0`](../開發規範/Java%20gRPC%20%E9%8C%AF%E8%AA%A4%E8%99%95%E7%90%86%E8%A6%8F%E7%AF%84.md)（現行 envelope-code 約定，最高優先）。個別 diagram 僅繪製 happy path。**寫入型 RPC**（grant / create / refund 等）呼叫後**必須**檢查 `resp.getCode()`，非 `SUCCESS(0)` 時禁止用 `resp.getData()` 推進本地狀態機（失敗動作依 §7.0「有 / 無不可逆前置」分類）；查詢型 RPC 可不檢查。
@@ -525,22 +527,6 @@ refundable_amount = orders.total_actual_amount
 
 🔴 **`refundable_amount` 是單一總額，不得拆項** —— 本服務的退款金額模型自始只有**一個數**。任何情境下的「全額退款」＝ `refundable_amount` 這一個值（它已同時涵蓋商品款與買家實付運費），**不是**「商品款 ＋ 運費」兩項相加。
 
-> 🔴 **即時配送（`UBER_INSTANT(3003)`）不得引入 refund component model。**
-> 3003 的配送失敗政策（§2.5.3）是**責任成因 → 單一總額**的二元決定，**不得**因此在本服務新增下列任何一項：
-> `refundable_product_amount`／`refundable_shipping_amount` 之類的分項欄位、退款扣抵引擎（deduction／offset）、
-> 運費扣除模型（shipping deduction model）、把 provider 成本從退款金額裡扣掉的算式、以負項記帳的沖銷列。
-> 理由與上面「嚴禁再加 `shipping_fee`」同源：**退款金額一旦可拆項，就會出現第二個真相**，而 PayUni 實收永遠只有一個數。
->
-> ⚠️ **必須與既有機制切開，不得混為一談**：本服務的兩個「金額下修」機制——
-> `PARTIAL_REFUND`（§5.2.2，賣家自訂單一金額）與**驗貨扣款**（§2.5.2，確認收貨階段把一個總額下修成另一個總額）——
-> 屬售後需求，與即時配送無關。
-> 兩者都只產生**一個**最終總額、不拆商品款與運費、不記負項 ⇒ **它們不是 component model，不在上述禁令射程內。**
-
-**即時配送 provider 額外成本的歸屬**：`UBER_INSTANT(3003)` 的取消費／等待費／退回費／供應商調整，一律依**責任成因**歸屬，**不進買家退款金額**。
-
-- 🔴 買家原因造成的 provider 額外成本，本服務**不得**向買家建立第二次追加付款；它歸屬到「賣家物流成本」，由平台向賣家的物流費帳務處理。
-- ⚠️ 與「未送達不收**配送服務費**」分層：後者講的是**價金**（計入 `total_actual_amount` 的退款基準），額外成本是另一件事，兩者不得混算。
-
 #### 2.5.1 補償優惠券規則
 
 | 項目 | 規則 | 公式 |
@@ -755,10 +741,6 @@ refundable_amount = orders.total_actual_amount
 | shipping_method | VARCHAR(30) | | 原訂單配送方式快照 |
 | return_shipment_no | VARCHAR(64) | | 退貨物流單號（後端內部 `RS{9位}` 格式，由 Shipping Service 回填，**不對外顯示**） |
 | return_shipping_method | VARCHAR(30) | | 退貨物流方式（ShippingMethod **value**，如 `3001`=TAQBIN、`3002`=SEVEN_ELEVEN_STORE_PICKUP） |
-| ship_trade_no | VARCHAR(64) | | PayUni 物流序號快照（7-11 退貨 Webhook 建單回填，便於追蹤） |
-| partner_id | VARCHAR(10) | | 7-11 出貨便母代碼（3 碼，Print Webhook 回填） |
-| odno | VARCHAR(20) | | 7-11 出貨便單編號（8 碼，Print Webhook 回填） |
-| validation_no | VARCHAR(10) | | 7-11 出貨便 C2C 驗證碼（4 碼，Print Webhook 回填） |
 | label_retry_count | SMALLINT | NOT NULL | DEFAULT 0。出貨便代碼**已確認觸發**的重試預算（0=尚未成功觸發過、1=自動重試已確認觸發、2=已標記耗盡、ops 重置回 0）。🔴 **不是搶佔閘門**——只在 shipping 回報成功之後才寫，詳見 §5.3.6 |
 | return_delivered_at | TIMESTAMPTZ | | 退貨送達賣家時間（PayUni 物流 webhook 回填；宅配於 25→27 stamp；超商於 26→27 stamp，等於 `seller_picked_up_at`） |
 | auto_confirm_at | TIMESTAMPTZ | | 自動確認收貨截止時間（= `return_delivered_at + ${auto-confirm-receipt-hours}`，於進入 27 時 stamp；`AutoConfirmReceiptScheduler` 掃此欄位） |
@@ -771,7 +753,6 @@ refundable_amount = orders.total_actual_amount
 | **ship_back_deadline_at** | **TIMESTAMPTZ** | | 買家寄回退貨逾時截止（= `NOW() + ${return.timeout-days}`，於 0 → 20 流轉當下 stamp；`ReturnTimeoutWorker` 與 `ReturnTwentyFourHourWarnScheduler` 掃此欄位）。僅 `RETURN_PENDING(20)` 狀態有值 |
 | **warned_ship_back_24h_at** | **TIMESTAMPTZ** | | 待寄回剩 24h 預警 FCM 已發送時間戳（**事後記錄，非冪等閘門**；publish 成功後才寫，故 NULL 不保證未發 —— 冪等由 notification 端 `notifications_inbox_dedup_idx` 承擔） |
 | **return_stuck_alerted_at** | **TIMESTAMPTZ** | | RETURN_STUCK 卡死告警的**租約到期時間**（<b>不是</b>「已告警旗標」——卡死沒解除就該一直吵，租約到期會再發）。NULL 或 `<= NOW()` 表示可被搶佔；claim 成功才 publish。租約長度 = `returnStuckDays`。publish 未成功時由 `releaseReturnStuckAlertLease` 還原成 claim 前的值 |
-| **label_retry_at** | **TIMESTAMPTZ** | | 7-11 退貨代碼自動重試的**租約到期時間**（<b>不是</b>「已重試旗標」——旗標是 `label_retry_count`，而它只在 gRPC 確認成功後才寫）。**三態**：`NULL` = 從未嘗試過（可搶佔、**不算耗盡**）／**過去**時間 = 嘗試過但無人持有（可搶佔、**算耗盡**）／**未來**時間 = 嘗試中。租約長度 **6 分鐘**，上界由 `checkExhausted` 的 10 分鐘決定。⚠️ 一旦 claim 過即**不得回到 `NULL`**（唯一例外＝ops `resetLabelRetryCount`），詳見 §5.3.6 與 [§8.5](#85-多副本排程搶佔語意scheduler-claim) |
 | return_provider_status | VARCHAR(20) | | provider 退貨物流原始狀態碼快照（status=28 / RETURN_FAILED 時填入；`SELLER_NOT_PICKED(55)` 賣家未取也會 stamp 但不變狀態）|
 | return_provider_message | TEXT | | PayUni 解密後錯誤訊息原文快照（同上）|
 | delivered_at | TIMESTAMPTZ | | 訂單送達時間快照（用於 60hr 時效計算） |
@@ -1236,27 +1217,12 @@ type AfterSaleCaseDetailResponse struct {
     Evidence          []EvidenceResponse          `json:"evidence"`
     Resolution        *ResolutionResponse         `json:"resolution,omitempty"`
     ReturnShipmentNo  string                     `json:"returnShipmentNo,omitempty"`  // 後端內部 RS{9位} 格式，前端不顯示
-    ShipTradeNo       string                     `json:"shipTradeNo,omitempty"`       // PayUni 物流序號（7-11 退貨可選顯示）
-    PartnerId         string                     `json:"partnerId,omitempty"`         // 7-11 出貨便母代碼（3 碼）
-    Odno              string                     `json:"odno,omitempty"`              // 7-11 出貨便單編號（8 碼）
-    ValidationNo      string                     `json:"validationNo,omitempty"`      // 7-11 出貨便 C2C 驗證碼（4 碼）
     ShipmentPhotoUrls []string                   `json:"shipmentPhotoUrls,omitempty"` // 賣家出貨照片
     NeedRefundPage      bool                       `json:"needRefundPage"`                // ATM 退款需補填
     CreatedAt         string                     `json:"createdAt"`                   // ISO 8601
     ClosedAt          string                     `json:"closedAt,omitempty"`
 }
 ```
-
-> **出貨便代碼欄位說明（前端串接重點）**：
-> - `partnerId` / `odno` / `validationNo` 三欄是 **7-11 出貨便代碼三段組合**，缺一不可。買家持此三段碼至 7-11 ibon 操作列印託運單後，才能到門市寄退件。
-> - 三欄**僅在以下條件同時成立時**才有值：
->   1. `resolution.resolutionType = RETURN_REFUND`（同意退貨退款）
->   2. `returnShippingMethod = 3002`（SEVEN_ELEVEN_STORE_PICKUP）
->   3. `status >= 20`（RETURN_PENDING 以後）
->   4. PayUni Print Webhook 已回填（建單後 55 秒內為常態，偶有延遲）
-> - 其他情境（宅配退貨 3001 / 全額退款免退貨 / 部分退款 / 拒絕等）三欄永遠為空字串。
-> - 決議通過瞬間 Webhook 尚未回填，三欄會短暫為空。前端需處理 loading 狀態或輪詢 refetch（建議進頁面後 10s / 30s / 60s 各一次）。
-> - `returnShipmentNo` 是**後端內部 shipment ID**（`RS{9位}` 格式），不要顯示給買家，前端此欄可忽略。
 
 > DTO 的權威定義在 gateway handler ＋ Swagger 註解；本節列核心欄位。
 
@@ -1283,7 +1249,6 @@ service AfterSalesService {
     rpc GetSellerAfterSaleCaseDetail(GetSellerAfterSaleCaseDetailRequest) returns (GetSellerAfterSaleCaseDetailResponse);
     rpc ResolveAfterSaleCase(ResolveAfterSaleCaseRequest) returns (ResolveAfterSaleCaseResponse);
     rpc ConfirmReturnReceipt(ConfirmReturnReceiptRequest) returns (ConfirmReturnReceiptResponse);
-    rpc RetryPrintReturnLabel(RetryPrintReturnLabelRequest) returns (RetryPrintReturnLabelResponse);  // 人工介入重試 7-11 退貨列印（§5.3.6）
 
     // 取消出貨（從 Order Service 遷移，API 路徑不變）
     rpc CancelShipment(CancelShipmentRequest) returns (CancelShipmentResponse);
@@ -1549,17 +1514,6 @@ message ConfirmReturnReceiptResponse {
     string message = 2;
 }
 
-// 人工介入重試 7-11 退貨列印（§5.3.6，ADMIN 權限）
-message RetryPrintReturnLabelRequest {
-    int64 account_id = 1;                // Gateway 注入（admin）
-    string case_no = 2;
-}
-
-message RetryPrintReturnLabelResponse {
-    int32 code = 1;
-    string message = 2;
-}
-
 message CancelShipmentRequest {
     int64 store_id = 1;
     string order_no = 2;
@@ -1642,10 +1596,6 @@ message AfterSaleCaseDetailView {
     bool need_refund_page = 16;
     string created_at = 17;
     string closed_at = 18;
-    string ship_trade_no = 19;                   // PayUni 物流序號（7-11 退貨可選顯示）
-    string partner_id = 20;                      // 7-11 出貨便母代碼（3 碼，Print Webhook 回填）
-    string odno = 21;                            // 7-11 出貨便單編號（8 碼，Print Webhook 回填）
-    string validation_no = 22;                   // 7-11 出貨便 C2C 驗證碼（4 碼，Print Webhook 回填）
     // §10 申訴狀態與期限
     string appeal_state = 23;                    // AfterSaleAppealState value
     string appeal_deadline = 24;                 // ISO 8601 UTC；status ∈ {REJECTED(60), AUTO_COMPLETED_RETURN_PENDING_TIMEOUT(33)} && appeal_state=NONE 時有值；計算依前置 status：60→last_rejected_at+72h、33→closed_at+72h
@@ -2119,7 +2069,6 @@ message GetOrderPayoutHoldResponse {
 | Routing Key | Exchange | 業務語意 | aftersales-service 處理 |
 |---|---|---|---|
 | `shipment.return.status_changed` | `hawkr.shipping` | 退貨物流狀態更新 | 推進 case status；終態時 publish `aftersales.case.return_delivered` / `return_failed` |
-| `shipment.label.updated` | `hawkr.shipping` | 7-11 退貨出貨便代碼回填（`isReturn=true`） | 快照 `partner_id / odno / validation_no` 至 `aftersale_cases`（詳見 §5.3.5） |
 | `shipment.processing.timeout` | `hawkr.shipping` | 賣家處理期限逾期（§5.9） | 觸發系統取消 + 原路退款 |
 | `refund.succeeded` / `refund.failed` | `payment.events` | 退款結果（信用卡 sync / ATM sync / ATM async webhook） | 成敗依 routing key 判定，再依 payload + task state 推進 refund_task（見下方規則） |
 | `order.fulfillment.failed` | `hawkr.order` | 履約建單失敗／無法受理（貨尚未被取走） | `SellerCancelService.cancelShipmentBySystem(orderNo, OrderCancelReason.FULFILLMENT_FAILED)` → 訂單 `CANCELLED` ＋ 全額退款（§5.7） |
@@ -2241,8 +2190,7 @@ TX:
 1. 驗證 return_shipping_method 為合法 ShippingMethod value（CodeMetaValidator.requireValidValue）
 1.5 Enforce return_shipping_method == caseEntity.shippingMethod（forward 方式）:
    - 不符 → 拋 AFTERSALE_RETURN_METHOD_MISMATCH(9023)「退貨方式須與原出貨方式相同」
-   - caseEntity.shippingMethod == UBER_INSTANT(3003) → 拋 AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER(9024)（known limitation）
-   原則：售後業務政策為「原方式退」，後端 enforce 不靠前端鎖；對 Uber 即時配送暫不支援退貨退款。
+   原則：售後業務政策為「原方式退」，後端 enforce 不靠前端鎖。
 2. 呼叫 Shipping Service（TX 外）:
    - "3001" (TAQBIN) → CreateReturnHomeShipment(...)
    - "3002" (SEVEN_ELEVEN_STORE_PICKUP) → CreateReturnCvsShipment(...)
@@ -2280,9 +2228,7 @@ TX:
 
 **強制規範**：`handleReturnRefund` 在 step 1 (CodeMetaValidator 合法值驗) 後、進入分流前必須做：
 
-1. `caseEntity.shippingMethod == UBER_INSTANT(3003)` → 拋 `AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER(9024)`
-   - **Known limitation**：Uber 即時配送的退貨流程未設計，本服務暫不支援；買賣家若需處理 Uber 訂單退貨，走客服流程
-2. `returnShippingMethod != caseEntity.shippingMethod` → 拋 `AFTERSALE_RETURN_METHOD_MISMATCH(9023)`
+1. `returnShippingMethod != caseEntity.shippingMethod` → 拋 `AFTERSALE_RETURN_METHOD_MISMATCH(9023)`
    - 業務政策：售後退貨路徑限定與原出貨方式相同
    - 🔴 **前端鎖 UI 不算 enforcement**：iOS seller app 雖以原訂單 `order.shippingMethod` 鎖死選項，後端仍**必須**驗，否則可直打 API 繞過
 
@@ -2292,10 +2238,10 @@ TX:
 
 | 層級 | 檔案 | 職責 |
 |---|---|---|
-| Java | `services/java/aftersales-service/.../service/AfterSaleResolutionService.java` | `handleReturnRefund` 的 UBER 拒絕 ＋ returnMethod 對齊 forward method 比對 |
+| Java | `services/java/aftersales-service/.../service/AfterSaleResolutionService.java` | `handleReturnRefund` 的 returnMethod 對齊 forward method 比對 |
 | Java | `services/java/shipping-service/.../service/OnboardingService.java` | `findSettingByMethod(storeId, shippingMethod)`：退件路徑取 historical setting |
 | Java | `services/java/shipping-service/.../service/ShippingService.java` | `createReturnCvsShipment` / `createReturnHomeShipment` 走 `findSettingByMethod`；`printCvsLabel` / `generateHomeLabelPdf` / `batchPrintCvsLabel` 與 `BatchHomeLabelService.batchGenerate` 走 `findActiveSetting` |
-| CodeMeta | `docs/代碼管理（CodeMeta）/錯誤碼.md` | `AFTERSALE_RETURN_METHOD_MISMATCH(9023)` / `AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER(9024)` |
+| CodeMeta | `docs/代碼管理（CodeMeta）/錯誤碼.md` | `AFTERSALE_RETURN_METHOD_MISMATCH(9023)` |
 
 #### 5.2.2 部分退款（PARTIAL_REFUND）
 
@@ -2361,448 +2307,9 @@ TX:
 
 ### 5.3 退貨物流流程
 
-#### 5.3.1 建立逆物流單
+#### 5.3.1–5.3.6 物流商退貨物流（已退場）
 
-由 §5.2.1 觸發。AfterSales 呼叫 Shipping Service 建立退貨物流單：
-
-| 物流方式 | Shipping RPC | PayUni API | 說明 |
-|---------|-------------|-----------|------|
-| 黑貓宅配 | `CreateReturnHomeShipment` | `/api/home_delivery/refund` | 黑貓司機至買家地址收取退件 |
-| 7-11 C2C | `CreateReturnCvsShipment` | `/api/logistics/trade`（**C2C 交貨便**，角色對調） | 買家取得交貨便代碼後自行至 7-11 門市寄件 |
-
-**超商退貨使用 C2C 交貨便（非退貨便）**：退貨便為 B2C 專用，本平台為 C2C 模式，退貨使用正向物流 API（交貨便）並**角色對調**：買家成為寄件人，賣家成為收件人。
-
-> Shipping Service 內部處理：查詢 `seller_shipment_settings` 取得賣家退貨門市 / 退貨地址（**最新資訊**） → 結合 AfterSales 傳入的買家資訊（原訂單快照） → 呼叫 PayUni 物流 API → 建立 `shipments` 紀錄（含完整快照） → 回傳物流單號 + 交貨便代碼。
-
-> **★ 建單失敗不推進狀態**：`handleReturnRefund` 呼叫 `CreateReturnCvsShipment` / `CreateReturnHomeShipment` 後**必須**檢查回應 envelope code（依《Java gRPC 錯誤處理規範》§7.0）：`resp.code != SUCCESS(0)` → `throw AfterSalesBusinessException(RETURN_SHIPMENT_FAILED, resp.message)` 透傳 shipping 失敗原因，`@Transactional` rollback，case 維持 `PENDING(0)`。屬「**無不可逆前置**」情境（建單前無跨服務不可逆動作），rollback 安全。**禁止**忽略 code 直接用 `shipResp.getData().getShipmentNo()` 呼叫 `markReturnPending` 推進至 `RETURN_PENDING(20)` —— 否則退貨物流單實際未建立，買家無法履行退貨、case 卻已推進。
-
-#### 5.3.2 退貨 MerTradeNo 規則
-
-退貨物流單的 `MerTradeNo` 使用 **R 前綴** 區分正向/逆向物流：
-
-| 物流方向 | MerTradeNo 格式 | 範例 | 長度 |
-|---------|----------------|------|------|
-| 正向出貨 | `O{9位數字}` | `O400280260` | 10 碼 |
-| **退貨物流** | `RO{9位數字}` | `RO400280260` | **11 碼** |
-
-Webhook 回調時，Shipping Service 依 MerTradeNo 前綴識別：
-- `O` 開頭 → 正向物流 → 現有出貨物流追蹤邏輯
-- `R` 開頭 → 退貨物流 → 發布 `shipment.return.status_changed` 事件
-
-> MerTradeNo 上限 25 碼，11 碼遠在安全範圍內。
-
-#### 5.3.3 退貨物流參數對調表
-
-**超商 C2C 退貨（角色對調）**：
-
-| PayUni 參數 | 正向出貨（賣家寄→買家收） | **退貨（買家寄→賣家收）** | 退貨資料來源 |
-|-----------|---------------------|---------------------|-----------|
-| MerTradeNo | `O{orderNo}` | `RO{orderNo}` | AfterSales 組裝 |
-| LgsType | `C2C` | `C2C` | 固定值 |
-| ShipType | `1`（7-11） | `1`（7-11） | 固定值 |
-| ServiceType | `1`（代收）或 `3`（免代收） | `3`（免代收，退貨不收款） | 固定值 |
-| TradeAmt | 代收金額 | **退款金額**（遺失時依此金額認賠） | `aftersale_cases.refundable_amount` |
-| GoodsType | 依商品溫層 | **同原訂單配送溫層** | `aftersale_cases.delivery_temp` |
-| **StoreID（取貨門市）** | 買家選的取貨門市 | **賣家退貨門市** | `seller_shipment_settings.return_store_code`（**最新**） |
-| **Consignee（收件人）** | 買家姓名 | **賣家退貨聯絡人** | `seller_shipment_settings.sender_name`（**最新**） |
-| **ConsigneeMobile** | 買家電話 | **賣家退貨聯絡電話** | `seller_shipment_settings.sender_phone`（**最新**） |
-| **SenderName（寄件人）** | 賣家姓名 | **買家姓名** | `aftersale_cases.buyer_name`（訂單快照） |
-| **SenderMobile** | 賣家電話 | **買家電話** | `aftersale_cases.buyer_phone`（訂單快照） |
-| RefundStoreID | 賣家退貨門市 | 不傳（退貨本身就是寄給賣家） | — |
-| NotifyURL | 物流通知 URL | 同正向物流 NotifyURL | 配置注入 |
-
-**宅配退貨（使用 PayUni 退貨 API `/api/home_delivery/refund` v1.0）**：
-
-> **注意**：宅配退貨使用**獨立的退貨 API**，非正向出貨 API 的角色對調。欄位名與出貨 API 不同（Consignor = 退貨人/買家，Consignee = 收件人/賣家）。
-
-| PayUni 參數 | 說明 | 退貨資料來源 |
-|-----------|------|-----------|
-| MerTradeNo | `RO{orderNo}` | Shipping 組裝（R 前綴） |
-| ShipTradeNo | 不傳（避免 PayUni 檢查原單狀態限制） | — |
-| GoodsType | 寄件類型（1=常溫, 2=冷凍, 3=冷藏） | **同原訂單配送溫層**（`aftersale_cases.delivery_temp`） |
-| LgsType | 固定 `HOME` | 固定值 |
-| ShipType | 固定 `2`（黑貓） | 固定值 |
-| ServiceType | 固定 `3`（取貨不付款） | 固定值 |
-| **Consignee（收件人）** | 賣家退貨聯絡人 | `seller_shipment_settings.return_name`（**最新**） |
-| **ConsigneeMobile** | 賣家退貨電話 | `seller_shipment_settings.return_phone`（**最新**） |
-| **ConsigneeAddress** | 賣家退貨地址 | `return_city + return_district + return_address_detail`（**最新**） |
-| **Consignor（退貨人）** | 買家姓名 | `aftersale_cases.buyer_name`（訂單快照） |
-| **ConsignorMobile** | 買家電話 | `aftersale_cases.buyer_phone`（訂單快照） |
-| **ConsignorAddress** | 買家地址 | `buyer_city + buyer_district + buyer_address_detail`（訂單快照） |
-| **Spec** | 規格代碼（1=60cm, 2=90cm, 3=120cm, 4=150cm） | 查原始出貨 shipment，無則預設 `1`（60cm） |
-| **ShipDate** | 取件日期（YYYYMMDD） | **統一 D+2**，週日順延至週一（PayUni 規則：16:25 後建單須 D+2） |
-| DeliveryTimeTag | 配達時間 | 固定 `04`（不指定） |
-| ProdDesc | 商品名稱 | 固定 `退貨商品` |
-| NotifyURL | 物流通知 URL | 配置注入 |
-
-> **PayUni 退貨 API 回傳**：`OBTNumber`（退貨編號）、`ShipTradeNo`（UNi 物流序號）、`TradeType=2`（逆物流）。
-
-> **快照策略**：買家資訊使用建立售後單時的**訂單快照**（固定不變）。賣家退貨資訊使用 `seller_shipment_settings` 的**最新值**（確保退貨寄到賣家當前地址/門市）。Shipping Service 建單時會將所有參數快照到 `shipments` 表。
-
-#### 5.3.4 物流狀態追蹤
-
-兩種退貨物流**均有 webhook 狀態回調**：
-
-| 物流方式 | 狀態追蹤機制 | 說明 |
-|---------|------------|------|
-| **黑貓宅配** | PayUni Webhook → Shipping Service → MQ → AfterSales | 標準 webhook 追蹤 |
-| **超商 C2C** | PayUni Webhook → Shipping Service → MQ → AfterSales | 使用正向物流（交貨便），**有 webhook 追蹤** |
-
-> 超商退貨使用 C2C 交貨便（正向物流 API），因此可收到 PayUni 物流狀態 webhook，與正向出貨的追蹤機制相同。Shipping Service 依 MerTradeNo R 前綴識別為退貨物流。
-
-**AfterSales 消費 `shipment.return.status_changed` 邏輯**：
-
-🔴 **分類基準是已正規化的 `ShippingStatus` 枚舉，不是 provider wire code。** consumer 先以 `ShippingStatus.fromValue(payload.status)` 正規化，再交給 common-core 的 `ReturnShippingRules.dispositionOf(ShippingStatus)` 取得處置分類：
-
-- 入參型別必須是 `ShippingStatus` 枚舉而非裸 `String` —— 裸字串讓「值域外」與「值域內但逆向 leg 沒有語意」這兩件完全不同的事長得一模一樣。
-- `dispositionOf` 是 **exhaustive switch expression，沒有 `default` 分支**：新增 `ShippingStatus` 值而未在其中指派處置 ⇒ **編譯失敗**，不是 runtime 靜默落 `else`。
-- **值域外的值一律 fail-loud**：`fromValue()` 拋例外 → consumer catch → `MqErrorHandler` 重試耗盡進 DLQ。**禁止**以 `else` ＋ `log.info` ＋ ACK 收尾（那是靜默丟棄，連 warn 都不是）。
-- 🔴 **禁止在本服務新增 provider-specific 的狀態集合**（例如 `PAYUNI_RETURN_*`／`UBER_RETURN_*`）。provider 原生值在 shipping-service 就已被正規化，永遠到不了本服務；加一套只會造出第二個真相。
-
-| `Disposition` | 對應 `ShippingStatus` | 賣方物流方式 | 售後單狀態更新 | 寫入欄位 | 說明 |
-|---|---|---|---|---|---|
-| `RETURN_IN_TRANSIT` | `IN_TRANSIT(31)` / `PROCESSING(92)` / `HANDED_OVER(930)` | 不分 | `RETURN_PENDING(20) → RETURN_SHIPPING(25)` | — | 買家已交件、退貨包裹運送中。以 `tryPublishCaseTransitionWithContext(CASE_RETURN_IN_TRANSIT)` 與 CAS 同短 tx 發 `seller.after_sale.updated` realtime ＋ notification template（seller visible「買家已寄出退貨」），見下方「Tx 載體與 publish 失敗語意」 |
-| `RETURN_STORE_ARRIVED` | `WAITING_PICKUP(32)` | **超商 C2C `3002` 才處理；宅配 `3001` 忽略並 ACK** | `RETURN_SHIPPING(25) → RETURN_AT_STORE(26)` | `store_arrived_at = now`、`store_pickup_deadline_at = now + ${store-pickup-timeout-hours}` | 超商到店待賣家領取；前端依 26 顯示「退貨包裹已到門市，等待賣家取貨」+ 倒數 72h；FCM 推「退貨商品已抵達門市」|
-| `RETURN_DELIVERED` | `PICKED_UP(11)` | 不分 | `RETURN_SHIPPING(25) → RETURN_DELIVERED(27)` **或** `RETURN_AT_STORE(26) → RETURN_DELIVERED(27)` | `return_delivered_at = now`、`auto_confirm_at = now + ${auto-confirm-receipt-hours}`、`seller_picked_up_at = now` | 賣家實際取貨完成（超商）或宅配簽收（黑貓）；前端依 27 顯示「等待賣家確認」+ 倒數 48h；FCM 推「退貨商品已送達」|
-| `SELLER_NOT_PICKED` | `SELLER_NOT_PICKED(55)` | 超商 C2C `3002` | **不變狀態**，僅 stamp `return_provider_status='55'` + `return_provider_message`（provider 原文）| `return_provider_status`、`return_provider_message` | PayUni 自身保留期較長，回此碼時我方 72h timer 早已自動完成；本筆訊息僅供 Admin / Seller UI 顯示參考。**72h timer 是賣家未取的唯一真實來源** |
-| `RETURN_ABNORMAL` | `ABNORMAL(33)` / `RETURN_TO_WAREHOUSE(53)` / `PACKAGE_LOST(44)` | 不分 | 任意進行中 → `RETURN_FAILED(28)` | `return_provider_status`、`return_provider_message` | 🔴 `RETURN_TO_WAREHOUSE(53)`（廠退）代表退貨包裹被退回物流中心，**屬異常不屬送達**，不得歸入 `RETURN_DELIVERED` |
-| `NO_OP` | `COURIER_ASSIGNED(933)` 等尚未離開買家手上的狀態（逐值見 `ReturnShippingRules`） | 不分 | 不變狀態 | — | 🔴 **明確的 no-op 分支，不是 `else`**：必須分得出「我們決定不做事」與「我們沒認出這個值」。以 `log.info` 記錄後 ACK |
-| `REQUIRES_MANUAL_REVIEW` | `CANCELLED(41)` | 不分 | **不變狀態、不猜落格** | — | 值域內但逆向 leg 無對應售後語意 ⇒ 以 `log.warn` 誠實標註交人工後 ACK。🔴 **禁止**逕自併入 `RETURN_FAILED(28)`，見下方 |
-
-> **訊息來源**：`providerStatus` / `providerMessage` 來自 Shipping Service 的 `ShippingEventPayload`，原始來源是 `shipments.provider_status` / `shipments.provider_message`（provider 解密後落地的原文）。
-
-**🔴 `CANCELLED(41)`（逆向配送被 provider 取消）的處置**
-
-`CANCELLED(41)` 在值域內，但逆向 leg 沒有對應的售後語意，因此 `ReturnShippingRules` 把它歸為 `REQUIRES_MANUAL_REVIEW`：
-
-- consumer **不推進任何狀態**，以 `log.warn` 標註後 ACK，交人工處置。
-- 🔴 **禁止併入 `RETURN_ABNORMAL`**。`ABNORMAL(33)` / `RETURN_TO_WAREHOUSE(53)` / `PACKAGE_LOST(44)` 是**包裹異常**語意（廠退／遺失／狀態異常），`CANCELLED(41)` 是**配送被取消**；兩者的後續處置（誰負擔、能不能重寄、要不要人工介入）不同，不得因為「都算失敗」就逕自併格。
-- 🔴 **`REQUIRES_MANUAL_REVIEW` 與 `NO_OP` 不得互換**：前者是「值域內但本 leg 沒有對應語意」，後者是「知道它會發生、確定不必做事」。把前者寫成後者，等於把未解的設計缺口偽裝成已處理。
-
-> 落格、退款資格與買賣家文案的裁決見 backend-payuni#3491。
-
-> 🔴 **`9024` reverse lifecycle readiness gate 維持有效。**
-> §5.2.1.2 的 `caseEntity.shippingMethod == UBER_INSTANT(3003)` → `AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER(9024)` ⇒ 正常路徑下**不會**產生即時配送的退貨單。
-
-**Tx 載體與 publish 失敗語意**
-
-`RETURN_IN_TRANSIT` / `RETURN_STORE_ARRIVED` / `RETURN_DELIVERED` / `RETURN_ABNORMAL` 四個分支的形狀一致：**`markReturnXxx` CAS 推進 `status` → publish 對應 `aftersales.case.return_*` 事件**。四者的 CAS 與 publish **必須位於同一個短 tx**。
-
-| 分支 | CAS（allowed-from → 目標） | 事件 | tx 要求 |
-|---|---|---|---|
-| `handleInTransit` | `20` → `RETURN_SHIPPING(25)` | `case.return_in_transit` | `TransactionTemplate` 包覆 CAS ＋ publish |
-| `handleStoreArrived`（僅 3002） | `20,25` → `RETURN_AT_STORE(26)` | `case.return_at_store` | 同上 |
-| `handleDelivered` | `20,25,26` → `RETURN_DELIVERED(27)` | `case.return_delivered` | 同上 |
-| `handleAbnormal` | `20,25,26,27` → `RETURN_FAILED(28)` | `case.return_failed` | 同上 |
-| `handleSellerNotPicked` | **不變狀態**（僅 stamp `return_provider_*`） | **不發事件** | **不開 tx**（見下方） |
-
-> 🚨 **四個分支的失敗語意**
-> 這四個 CAS 都是**單調前進的永久轉換**（allowed-from 集合不含目標狀態自己）⇒ CAS 一旦提交、事件又被吞掉，**重投時同一句 CAS 回 0 走冪等 skip，該則買賣家通知永久遺失且零告警**。因此：`tryPublishCaseTransitionWithContext` 回 `false` 即拋 `EventPublishFailedException` ⇒ rollback ⇒ 狀態沒轉、事件沒發、等下一次重投。發布路徑**必須用會傳遞失敗的變體**，不得用會吞例外的 `publish`。搶佔與失敗語意的通則見[《多副本排程搶佔規範》](../開發規範/多副本排程搶佔規範.md)。
->
-> - **tx 載體是 `TransactionTemplate`（程式式包覆），不是 `@Transactional`**：四個 handler 都由同 class 的 `onReturnStatusChanged` 以 `this.handleXxx(...)` 呼叫，CGLIB proxy 不攔截 self-invocation（§8.1.1 同一條）。實作＝`handleXxx` 只負責「tx 外反解 ＋ 開 tx」，真正的 body 抽成 `xxxBody(...)` 由 `txTemplate` 包覆。
-> - **身分反解在 tx 之外**（硬性邊界：tx 內只准有那一列 CAS 與那一次 publish）：`resolvePrincipals(caseEntity)` 先打完 seller／buyer 兩支反解 gRPC，結果當參數傳進 tx 內的 publish。
-> - **反解走 best-effort（非 strict）**：本路徑是 MQ consumer，`MqErrorHandler` 只重投 3 次就進 DLQ，為了通知路由欄位把整筆物流狀態推進 DLQ 代價過高 ⇒ seller 反解失敗回 `null`、buyer 失敗回 `0L`，照常推進。判準與 [§5.4.3](#543-atm-退款結果消費mq) 的 🚨 相同。
-> - 🚨 **`handleSellerNotPicked` 刻意不開 tx**：它**不變狀態、不發任何事件**，只 stamp `return_provider_status` / `return_provider_message`（單句 UPDATE、天然原子）。**這裡沒有「閘門已提交但副作用沒發生」的窗口可言**，加 tx 只是多一次 commit。⚠️ 日後若有人替它加上狀態轉換或 domain event，**必須同時把 publish 移進同一個短 tx**。
-> - **殘餘窗口**：publish 成功、commit 失敗 ⇒ 事件已發、狀態未轉。該 case 仍滿足重投時的 allowed-from ⇒ 下一次重投重跑並重發，由 notification 端 `notifications_inbox_dedup_idx`（`reference_id`）吸收 ⇒ **暫態不一致，窗口 = 一次重投**。
-
-#### 5.3.5 7-11 出貨便代碼回填（買家取件用）
-
-**背景**：7-11 退貨走 C2C 交貨便，買家須持「出貨便代碼」（`partnerId` 母代碼 3 碼 + `odno` 單編號 8 碼 + `validationNo` 驗證碼 4 碼，缺一不可）至 7-11 ibon 操作列印託運單後交付店員寄件。三段碼由 PayUni Print Webhook 在**後端呼叫 `print_label` API 之後**回傳，Shipping Service 回填 `shipments` 表後發布 `shipment.label.updated` 事件。
-
-**觸發列印的差異（與正向出貨）**：
-
-| 情境 | 列印觸發者 | 原因 |
-|------|-----------|------|
-| 正向出貨 | Seller 於「安排出貨」時手動點 `PrintCvsLabel` | 由 seller 決定出貨時間 |
-| **退貨出貨** | **Shipping Service 於 `createReturnCvsShipment` 建單成功後自動非同步觸發** | 三段碼是給買家用，seller 沒有動機手動點；為縮短買家等待時間，採自動觸發 |
-
-非同步觸發細節：`createReturnCvsShipment()` 先建 `shipments`（`is_return=true`, `status=UNPROCESSED`）並 commit，然後以獨立執行緒呼叫 `labelService.triggerCvsPrint()`，**不等 webhook 回覆**即返回 `ReturnShipmentResult` 給 AfterSales。PayUni 處理完列印後送 Print webhook → 進入既有 `processWebhookPrint()` → publish `shipment.label.updated`，與正向出貨完全共用下游鏈路。
-
-**統一架構**：沿用正向出貨的 MQ snapshot 模式（Shipping publish → Order consume → snapshot 至 `orders`）。退貨方向由 AfterSales Service 消費**相同 routing key 但不同 queue**，snapshot 至 `aftersale_cases`。透過 payload 的 `isReturn` 欄位分流，避免正向與退貨代碼互相覆寫。Payload 格式見 [06-Shipping 設計書 §6.1 / §7.2](06-物流微服務（Shipping%20Service）詳細設計書.md)。
-
-**時序圖**：
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Seller as 賣家端
-    participant AS as AfterSales Service
-    participant Ship as Shipping Service
-    participant PayUni as PayUni
-    participant MQ as RabbitMQ
-    participant Buyer as 買家端
-
-    Note over Seller,AS: 1) 賣家同意退貨退款（7-11）
-    Seller->>AS: ResolveAfterSaleCase (RETURN_REFUND, 3002)
-    AS->>Ship: CreateReturnCvsShipment
-    Ship->>PayUni: /api/logistics/trade (C2C 交貨便, 角色對調)
-    PayUni-->>Ship: shipTradeNo
-    Ship->>Ship: INSERT shipments (is_return=TRUE, status=UNPROCESSED)
-    Ship->>Ship: [非同步執行緒] labelService.triggerCvsPrint()<br/>—— 不等 webhook 即返回
-    Ship-->>AS: shipmentNo (RS{9位})
-    AS->>AS: UPDATE aftersale_cases<br/>SET return_shipment_no, return_shipping_method,<br/>    ship_trade_no, status='20'（RETURN_PENDING）
-
-    Note over Ship,PayUni: 2) Shipping 非同步呼叫 PayUni 觸發列印
-    Ship->>PayUni: /api/print_label (背景執行)
-
-    Note over PayUni,MQ: 3) PayUni Webhook 回填三段碼（約 55 秒內）
-    PayUni->>Ship: Webhook ApiType=Print<br/>(PartnerId, Odno, ValidationNo)
-    Ship->>Ship: UPDATE shipments<br/>SET partner_id, odno, validation_no, status=920
-    Ship->>MQ: publish shipment.label.updated<br/>(orderNo, shipmentNo, partnerId,<br/> odno, validationNo, isReturn=TRUE)
-
-    Note over MQ,AS: 4) AfterSales 消費並快照
-    MQ-->>AS: aftersales.shipping.label queue
-    AS->>AS: isReturn=TRUE 才處理（false 直接 ACK skip）
-    AS->>AS: 以 orderNo 查活躍退貨 case<br/>(status IN 20/25, method=3002)
-    AS->>AS: UPDATE aftersale_cases<br/>SET partner_id, odno, validation_no<br/>WHERE order_no=? AND partner_id IS NULL
-
-    Note over Buyer,AS: 5) 買家查詢售後詳情拿到三段碼
-    Buyer->>AS: GET /app/after_sales/{caseNo}
-    AS-->>Buyer: {partnerId, odno, validationNo, ...}
-    Note over Buyer: 持三段碼至 7-11 ibon 列印託運單<br/>→ 交給店員寄件
-```
-
-**業務流程圖（分流邏輯）**：
-
-```mermaid
-flowchart TD
-    A[Shipping Service<br/>processWebhookPrint] --> B{is_return?}
-    B -->|FALSE 正向| C[publish shipment.label.updated<br/>isReturn=false]
-    B -->|TRUE 退貨| D[publish shipment.label.updated<br/>isReturn=true]
-
-    C --> E[order.shipping.label queue]
-    D --> F[order.shipping.label queue]
-    C --> G[aftersales.shipping.label queue]
-    D --> H[aftersales.shipping.label queue]
-
-    E --> I[Order Consumer<br/>isReturn=false?<br/>是→處理]
-    F --> J[Order Consumer<br/>isReturn=false?<br/>否→ACK skip]
-    G --> K[AfterSales Consumer<br/>isReturn=true?<br/>否→ACK skip]
-    H --> L[AfterSales Consumer<br/>isReturn=true?<br/>是→處理]
-
-    I --> M[UPDATE orders<br/>WHERE partner_id IS NULL]
-    L --> N[UPDATE aftersale_cases<br/>WHERE order_no=? AND<br/>status IN 20/25 AND<br/>partner_id IS NULL]
-```
-
-**Consumer 實作要點**：
-
-| 項目 | 規範 |
-|------|------|
-| Queue | `aftersales.shipping.label`（綁定 `hawkr.shipping` exchange + routing key `shipment.label.updated`） |
-| ACK mode | MANUAL（`manualAckContainerFactory`） |
-| 分流過濾 | Payload `isReturn=false` 直接 ACK skip；僅 `true` 才處理 |
-| 關聯方式 | 以 `orderNo` 查 `aftersale_cases WHERE status IN ('20','25') AND return_shipping_method='3002'`（結合 `uk_aftersale_cases_active_order` 保證單筆活躍） |
-| 冪等 | UPDATE 加 `AND partner_id IS NULL`；`rows=0` 記 info log 後 ACK |
-| DLQ | 沿用服務既有 DLQ 配置，`MqErrorHandler` 重試一次後入 DLQ |
-
-**空值期與前端行為**：
-
-從賣家按「同意退貨退款」到三段碼進入 `aftersale_cases` 約 **10–55 秒**（視 PayUni 負載）。此期間買家打 `GET /app/after_sales/{caseNo}`，`partnerId` / `odno` / `validationNo` 會是空字串。前端顯示「出貨便代碼產生中，請稍候」並 refetch：進頁面後 10s / 30s / 60s 各一次。若超過 5 分鐘仍為空，視為異常，交由 §5.8 例外人工介入流程處理。
-
-**自動觸發列印的失敗語意**：`ShippingService.createReturnCvsShipment` 在建單 commit 後以獨立執行緒呼叫 `labelService.triggerCvsPrint(...)`，**不等 webhook**，立即回傳 `ReturnShipmentResult`。🔴 **觸發失敗只記 error log、不中斷主流程**——退貨單本身已建立，補救走 §5.3.6 重試或 §5.8 人工介入。
-
-**實作位置**：
-
-| 層級 | 位置 | 職責 |
-|------|------|------|
-| Payload record | `shipping-service/.../service/dto/LabelUpdatedPayload.java` | 承載 `shipmentNo` / `isReturn` |
-| Publisher | `shipping-service/.../service/ShippingService#processWebhookPrint` | `publishLabelUpdated` 帶入 `shipmentNo` ＋ `isReturn` |
-| Consumer（正向） | `order-service/.../mq/ShippingEventConsumer#onLabelUpdated` | 入口 `isReturn == true` 即 ACK skip |
-| Consumer（逆向） | `aftersales-service/.../mq/ShipmentLabelConsumer` | 訂 `aftersales.shipping.label`；`isReturn == false` skip，`true` 執行冪等 UPDATE |
-| MQ Config | `aftersales-service/.../mq/AfterSalesEventMqConfig` | `@Bean Queue` / `@Bean Binding` 僅為**意圖宣告**。🔴 broker 上的 exchange／queue／binding 由 `infra/mq/topology/topology.yaml` 佈建，**同一個 PR 必須加 topology 條目**，否則訂閱靜默失效（見 [MQ Topology 管理（Terraform）](../基礎建設/MQ%20Topology%20管理（Terraform）.md)） |
-| MQ Constants | `common-core/.../mq/MqConstants` | `QUEUE_AFTERSALES_SHIPMENT_LABEL = "aftersales.shipping.label"` |
-| Repository | `aftersales-service/.../mapper/AfterSaleCaseMapper#updateLabelInfo` | 冪等 UPDATE，WHERE 含 `partner_id IS NULL` |
-| View 組裝 | `aftersales-service/.../grpc/AfterSalesGrpcService#buildDetailView` | 回填四欄至 `AfterSaleCaseDetailView`（proto tag 19–22） |
-| Gateway | `gateway/internal/handler/aftersales.go` | `AfterSaleCaseDetailResponse` 四欄 ＋ `convertAfterSaleDetail` 映射 ＋ Swagger 註解 |
-
-
-#### 5.3.6 出貨便代碼重試與人工介入
-
-**設計原則**：`§5.3.5` 的非同步觸發列印為第一次嘗試。若 5 分鐘未收到 PayUni Print Webhook，系統**自動再觸發 1 次**。若再過 5 分鐘仍未收到（總計 10 分鐘），**停止自動重試**並記 `LABEL_RETRY_EXHAUSTED` audit log，由 ops 以人工 API 介入。
-
-不採「每 N 分鐘不斷重試」：PayUni 若已故障，頻繁呼叫會在其恢復時形成 thundering herd；單次自動重試＋人工兜底是最平衡的設計。
-
-**時間軸**：
-
-| 時點 | 系統動作 | 前端顯示 |
-|------|---------|---------|
-| T+0 | `createReturnCvsShipment` 建單 + 非同步 `triggerCvsPrint`（第 1 次） | 「產生中」 |
-| T+0 ~ T+5min | 正常情境下 Webhook 回填，結束 | 拿到三段碼 |
-| **T+5min** | **Worker 掃到未回填且預算未用完 → 以 `label_retry_at` 租約 CAS 搶佔 → 再觸發 1 次 `triggerCvsPrint` → shipping 回成功才把 `label_retry_count` 記成 1** | 「產生中」 |
-| T+5min ~ T+10min | 期待第 2 次 Webhook 回填，結束 | 拿到三段碼 |
-| **T+10min** | **Worker 掃到「試過但沒能確認觸發」（`count=1`，或 `count=0` 且 `label_retry_at IS NOT NULL`）且仍為空 → 記 `LABEL_RETRY_EXHAUSTED` audit log → 停手** | 「請聯繫客服」 |
-| ops 介入 | 打 retry API → 重置 `count=0` **並清掉 `label_retry_at` 租約** → 再觸發一次 | 「產生中」→ 拿到代碼 |
-
-> ⚠️ **shipping 觸發失敗時，時間軸不會停在 T+5min**：租約會被**釋放成一個過去的時間**（`releaseLabelRetryLease`），下一個 tick（2 分）就重來，直到 T+10min 的耗盡掃描把它收走。**釋放成過去時間而不是還原成 `NULL`，正是讓那道耗盡掃描收得到它的原因**（釋放成 `NULL` ⇒ 案件無限重試、告警永遠不發）。詳見 [§8.5](#85-多副本排程搶佔語意scheduler-claim) 的 L7 段。
-
-**DB 欄位（`aftersale_cases`）**：
-
-| 欄位 | 類型 | 必填 | 說明 |
-|------|------|------|------|
-| label_retry_count | SMALLINT | NOT NULL DEFAULT 0 | **已確認觸發過的重試預算**（0=尚未成功觸發過、1=自動重試已確認觸發、2=已標記耗盡、ops 重置回 0）。<br>⚠️ 🔴 **它不是搶佔閘門**——只在 shipping `RetryReturnPrintLabel` 回報成功之後才寫 |
-| **label_retry_at** | **TIMESTAMPTZ** | | 自動重試的**租約到期時間**（<b>不是</b>「已重試旗標」）。**三態**：`NULL`＝從未嘗試過（不算耗盡）／**過去**＝嘗試過但無人持有（可搶佔且算耗盡）／**未來**＝嘗試中；claim 成功才呼叫 shipping。租約長度 **6 分鐘**（= auto-interval 2 分 × 3）|
-
-**ReturnLabelRetryWorker（自動重試）**：
-
-```
-排程頻率：每 2 分鐘（aftersales.label-retry.auto-interval-ms，預設 120000）
-DB 掃描（純候選查詢，不加鎖 —— 見下方 ⚠️）：
-  SELECT * FROM aftersale_cases
-   WHERE status IN ('20','25')
-     AND return_shipping_method = '3002'
-     AND partner_id IS NULL
-     AND label_retry_count = 0
-     AND (label_retry_at IS NULL OR label_retry_at <= NOW())   -- 租約述詞
-     AND ship_trade_no IS NOT NULL
-     AND created_at < NOW() - INTERVAL '5 minutes'
-   LIMIT 50;
-
-每筆處理：
-  1. lease claim（搶佔閘門，在 gRPC 副作用之前）：
-     UPDATE aftersale_cases
-        SET label_retry_at = #{leaseUntil}          -- = claim 當下 + 6 分
-      WHERE case_no = #{caseNo}
-        AND label_retry_count = 0
-        AND (label_retry_at IS NULL OR label_retry_at <= #{now});
-  2. rows=0 → 跳過（另一個 pod 已搶走且租約未到期，或預算已用完）
-  3. rows=1 → 呼叫 Shipping RPC `RetryReturnPrintLabel(shipTradeNo)`
-     - 傳輸層例外 / 業務碼非 SUCCESS → releaseLabelRetryLease
-         SET label_retry_at = #{expiredAt}   -- = claim 當下的 now（一個過去的時間），不是還原成舊值
-       WHERE case_no = ? AND label_retry_at = #{expectedLeaseUntil}  -- CAS：租約仍等於我寫進去的值
-       -- 過去時間同時滿足：可立即重搶（<= NOW()）＋ 耗盡掃描看得到（IS NOT NULL）
-       ⇒ 下一個 tick（2 分）就重來，預算未消耗
-     - 成功 → markLabelRetried（count 0→1，「已確認觸發」的事後記錄）+ audit LABEL_RETRY_AUTO
-       webhook 自行經 MQ → consumer 回填
-
-異常掃描（另一組排程，每 10 分鐘一次）：
-  SELECT * FROM aftersale_cases
-   WHERE status IN ('20','25')
-     AND return_shipping_method = '3002'
-     AND partner_id IS NULL
-     AND (label_retry_count = 1
-          OR (label_retry_count = 0 AND label_retry_at IS NOT NULL))   -- 「試過但沒能確認觸發」
-     AND created_at < NOW() - INTERVAL '10 minutes'
-   LIMIT 50;
-
-  → 每筆 INSERT aftersale_audit_logs(action=LABEL_RETRY_EXHAUSTED)
-     + markLabelRetryExhausted（count → 2，述詞與上面逐字相同）
-     後續監控告警，不再自動動作
-```
-
-> ⚠️ **`FOR UPDATE SKIP LOCKED` 已移除，不是遺漏**：`autoRetry()` 沒有 `@Transactional`，自動提交下 SELECT 一回傳鎖就釋放 ⇒ 它從來沒有保護到任何東西（[規範 §一 ②](../開發規範/多副本排程搶佔規範.md)）。搶佔由第 1 步的 lease CAS 負責。
->
-> 🚨 **耗盡述詞的第二個分支為什麼一定要帶 `label_retry_at IS NOT NULL`**：修復後 `count` 只在 gRPC 確認成功之後才寫，所以「shipping 持續打不通」的案件會一直停在 `count = 0`；不放寬的話它每 2 分鐘靜靜重試到天荒地老、而 `LABEL_RETRY_EXHAUSTED` **永遠不會發** —— 那是拿修復換掉一個既有的偵測能力。
-> **但不能只寫 `count IN (0,1)`**：`label_retry_at IS NULL` 的意思是「這個案件**一次都還沒被搶佔過**」（例如服務停機超過 10 分鐘期間堆積的案件），把它判成耗盡等於**讓它一次自動重試都沒做就丟給 ops**。加了這個條件，只有「試過但沒能確認觸發」才算耗盡。
-> ⚠️ `selectExhaustedCandidates` 與 `markLabelRetryExhausted` 的述詞必須**逐字同步**：少了放寬 ⇒ 撈到卻標不動、每 10 分鐘重複記一次 audit log；少了 `IS NOT NULL` ⇒ 誤判從未搶佔過的案件。**兩支不一致的任何一個方向都會壞。**
-
-**流程圖**：
-
-```mermaid
-flowchart TD
-    A[createReturnCvsShipment<br/>第 1 次 triggerCvsPrint] --> B{T+5min 前<br/>partner_id 有值?}
-    B -->|是| Z[✅ 完成]
-    B -->|否| C[Worker 掃到<br/>count=0, 租約可搶, age>5min]
-    C --> D[lease CAS<br/>label_retry_at = now+6min]
-    D -->|rows=0<br/>他人持有| Z2[本輪跳過]
-    D -->|rows=1| E[第 2 次 triggerCvsPrint]
-    E -->|shipping 失敗| R[releaseLabelRetryLease<br/>label_retry_at = 過去時間<br/>下一 tick 2min 重來<br/>預算未消耗<br/>耗盡證據保留]
-    R --> C
-    E -->|shipping 成功| M[markLabelRetried<br/>count 0→1 事後記錄]
-    M --> F{T+10min 前<br/>partner_id 有值?}
-    F -->|是| Z
-    F -->|否| G[Worker 掃到 age>10min 且<br/>count=1 或 count=0 且 label_retry_at 非空]
-    G --> H[記 LABEL_RETRY_EXHAUSTED<br/>count→2，停手等 ops]
-    H --> I[ops 打 retry API]
-    I --> J[UPDATE count=0<br/>+ label_retry_at=NULL<br/>+ 第 3 次 triggerCvsPrint]
-    J --> K{回填?}
-    K -->|是| Z
-    K -->|否| H
-```
-
-**人工介入 API**：
-
-| 項目 | 規範 |
-|------|------|
-| Gateway 路徑 | `POST /api/v1/admin/after_sales/{case_no}/retry_print_return_label` |
-| 角色 | **ADMIN**（Gateway `requireAdmin` + gRPC `requireAccountType(ADMIN)` 雙層驗證）|
-| 前置驗證 | ADMIN 不受 seller ownership 限制 / `return_shipping_method='3002'` / `status IN (20,25)` / `partner_id IS NULL`（已有代碼則拒絕） |
-| 動作 | 1. `UPDATE aftersale_cases SET label_retry_count = 0, label_retry_at = NULL WHERE case_no=?`（🔴 **連租約一起清**——只歸零 count 而留著未到期的租約，ops 的救濟要等滿 6 分鐘才生效）<br>2. 呼叫 Shipping `RetryReturnPrintLabel(shipTradeNo)`<br>3. INSERT audit log `action=LABEL_RETRY_MANUAL` |
-| Response | `{ "code": 0, "message": "success" }`（不同步等 webhook，請 ops 稍後查詢案件） |
-| Rate limit | 同一 case 每分鐘最多 1 次（防 ops 連打） |
-
-**Shipping 端新增內部 RPC**：
-
-```protobuf
-// shipping.proto 新增
-rpc RetryReturnPrintLabel(RetryReturnPrintLabelRequest) returns (RetryReturnPrintLabelResponse);
-
-message RetryReturnPrintLabelRequest {
-    string ship_trade_no = 1;       // 退貨 shipment 的 PayUni 物流序號
-}
-
-message RetryReturnPrintLabelResponse {
-    int32 code = 1;
-    string message = 2;
-}
-```
-
-實作邏輯（必須走 06 §2.4 `ProviderCallExecutor` 框架）：
-
-```
-1. SELECT * FROM shipments WHERE ship_trade_no = ?
-2. 驗證 is_return = TRUE（拒絕正向 shipment 誤用）
-3. 以獨立執行緒透過 ProviderCallExecutor 呼叫：
-   - acquireRequested: UPDATE shipments SET label_print_status='4102', label_print_requested_at=NOW()
-                       WHERE id=? AND label_print_status IN ('4101','4104')
-                       （rows=0 視為「上一輪 REQUESTED 仍在等待」，直接回 SUCCESS 由 webhook 補；
-                        rows=0 不算錯）
-   - invoke: labelService.triggerCvsPrint(...)（不等 webhook）
-   - markFailed: UPDATE shipments SET label_print_status='4104', provider_message=?
-                 WHERE id=? AND label_print_status='4102'
-   - markSucceeded 不在此處 — 由 webhook（06 §5.6 processWebhookPrint）負責 transition
-4. 立即回 SUCCESS（不等 webhook，由 09 §5.3.6 自動 retry worker 與 09 §6.x label updated consumer 補完）
-```
-
-> **與 09 自身 retry 機制（label_retry_count）的關係**：09 端 `aftersale_cases.label_retry_count` 控制「自動再觸發列印」的次數上限（防 thundering herd）；shipping 端 `label_print_status` 控制「該 shipment 列印 transition 是否成功」。兩層互補：09 退貨單視角有自己的觀測；shipping 視角有狀態機保護。
-
-**錯誤碼**（SSOT ＝ `錯誤碼.md`；🔴 改完一律跑 `generate.sh --all`，不得自行判斷哪些輸出會變）：
-
-| 錯誤碼 | 情境 |
-|-------|------|
-| `AFTERSALE_LABEL_ALREADY_GENERATED` | retry API 被呼叫但三段碼已存在 |
-| `AFTERSALE_LABEL_RETRY_NOT_APPLICABLE` | case 狀態不符（非 RETURN_PENDING/RETURN_SHIPPING 或非 3002） |
-| `SHIPMENT_NOT_A_RETURN` | `RetryReturnPrintLabel` 收到正向 shipment 的 ship_trade_no |
-
-**audit log action 新增**：
-
-| action 代碼 | 情境 |
-|------------|------|
-| `LABEL_RETRY_AUTO` | Worker 自動觸發第 2 次列印 |
-| `LABEL_RETRY_EXHAUSTED` | 自動重試也失敗，停手等 ops |
-| `LABEL_RETRY_MANUAL` | ops 透過 retry API 介入 |
-
-**實作位置**：
-
-| 層級 | 位置 | 職責 |
-|------|------|------|
-| DB | `aftersale_cases.label_retry_count SMALLINT NOT NULL DEFAULT 0` | 已確認觸發過的重試預算 |
-| DB | `aftersale_cases.label_retry_at TIMESTAMPTZ` | 租約欄，**不回填**（NULL ＝ 從未嘗試過） |
-| Worker | `aftersales-service/.../scheduler/ReturnLabelRetryWorker` | **同一個類別的兩個 `@Scheduled` 方法**：`autoRetry()`（`fixedDelay` 預設 120s）與 `checkExhausted()`（`fixedDelay` 預設 600s） |
-| Shipping RPC | `api/proto/shipping/shipping.proto` `RetryReturnPrintLabel` → `ShippingService.retryReturnPrintLabel(shipTradeNo)` | 重新觸發 PayUni 列印 |
-| AfterSales RPC | `api/proto/aftersales/aftersales.proto` `RetryPrintReturnLabel`（角色 **ADMIN**） | 人工重試入口 |
-| AfterSales service | `aftersales-service/.../service/AfterSaleLabelRetryService` | 自動 ＋ 人工共用的 retry 邏輯 |
-| Gateway | `POST /api/v1/admin/after_sales/{case_no}/retry_print_return_label` | Admin 端入口 |
-| Repository | `aftersales-service/.../mapper/AfterSaleCaseMapper` | `selectRetryCandidates()` / `markLabelRetried()` / `resetLabelRetryCount()` / `selectExhaustedCandidates()` / `markLabelRetryExhausted()` / `claimLabelRetry()`（搶佔閘門） / `releaseLabelRetryLease()`（失敗釋放） |
-| Audit action | `AfterSaleAuditAction` | `LABEL_RETRY_AUTO` / `LABEL_RETRY_MANUAL` / `LABEL_RETRY_EXHAUSTED` |
-
-**監控告警建議**：
-
-- Audit log 中 `LABEL_RETRY_EXHAUSTED` 計數：每小時 > 5 筆觸發告警（PayUni 可能故障）
-- Audit log 中 `LABEL_RETRY_AUTO` / 新建 case 比率：> 20% 觸發告警（PayUni 延遲高）
-
-> 🔴 **上面第一條告警之所以在「shipping 持續快速失敗」時仍成立**：租約釋放寫的是**一個過去的時間**而非還原成 `NULL`，「試過但沒能確認觸發」的證據因此留在 `label_retry_at` 上，10 分鐘後的耗盡掃描撈得到 ⇒ `LABEL_RETRY_EXHAUSTED` 會被寫。⚠️ **把釋放改成「還原成 claim 之前的值」會讓本條告警實質失效**（證據只在租約被持有的那幾秒存在，而取樣間隔 10 分鐘）——機制與機械保證見 [§8.5](#85-多副本排程搶佔語意scheduler-claim) 的 L7 段 ⑦。輔助偵測來源為 `AfterSaleLabelRetryService.auto.shippingFailed` 的 error log（每 2 分鐘一筆）。
-
-> ⚠️ **多副本搶佔語意**：閘門是 `label_retry_at` **租約** ＋ 預算後移 ＋ 失敗釋放租約（**釋放成過去時間，使耗盡告警的偵測證據不被抹掉**）。🔴 **不得改用 `label_retry_count` 的 0→1 CAS 當閘門**——那是[規範](../開發規範/多副本排程搶佔規範.md)定義的**永久旗標**，配上被吞掉的 gRPC 例外會造成「一次失敗就永久用掉唯一一次自動重試」（與 `replicas` 無關，單副本一樣發生）。租約上下界與三態語意見 [§8.5](#85-多副本排程搶佔語意scheduler-claim) 的 L7 段 —— 本節不重複，避免兩處各記一個版本。
+平台向物流商建立逆物流單、`MerTradeNo` 規則、參數對調表、物流狀態追蹤與出貨便代碼回填／重試，隨 Java shipping 與 PayUni 物流在 B3 刪除（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）。退貨物流改為買家自寄：買家填承運商與追蹤號碼，賣家確認收貨；退貨流程由 B9 aftersales 重新設計，細節在 B9 計畫決定。
 
 #### 5.3.7 賣家確認收貨（含驗貨扣款）
 
@@ -3113,27 +2620,9 @@ flowchart TD
 > **⚠️ 搶佔語意**：`markAutoCompletedFromDelivered` 的 CAS（`WHERE status='27'`）擋得住跨 pod 重複，但 `status='32'` 是**永久轉換** —— row 永久離開候選集合。CAS 與後續 publish **同在 `autoConfirmReceipt` 的 `@Transactional` 內**，因此 🔴 **publish 必須呼叫會傳遞失敗的變體**（[§5.3.10.5 (2)](#53105-24h-預警的搶佔語意例外-b)）：publish 拋例外 ⇒ 連 CAS 一起 rollback ⇒ 下一個 tick 重來。呼叫吞噬版 ⇒ 事件永久遺失且零告警。
 > ⚠️ **這裡的 `@Transactional` 確實有保護作用**，與 [05 號 §5.7](./05-支付服務（Payment%20Service）詳細設計書.md) B4 那個「`@Transactional` 完全沒有保護作用」的情形**相反**。兩者的差別在於例外有沒有穿過 Spring proxy —— 不要從其中一則推出通則。
 
-##### 5.3.10.2 超商待取逾時自動完成（StorePickupTimeoutScheduler，26→30）
+##### 5.3.10.2 超商待取逾時自動完成（已退場）
 
-```mermaid
-flowchart TD
-    Tick[Scheduler 每 10 分鐘 tick] --> Query[SELECT case_no FROM aftersale_cases<br/>WHERE status='26' AND store_pickup_deadline_at <= NOW()]
-    Query --> Loop{有逾時 case?}
-    Loop -->|否| End[結束本輪]
-    Loop -->|是| ForEach[逐筆處理]
-    ForEach --> CallHelper[autoCompleteInternal<br/>actor=SYSTEM<br/>reason=STORE_PICKUP_TIMEOUT<br/>全額退款]
-    CallHelper --> CAS{markAutoCompletedFromAtStore<br/>WHERE status='26'<br/>SET status='31'<br/>SET auto_complete_at_stamp=NOW()<br/>affected > 0?}
-    CAS -->|否（同實例競態 / 賣家剛從超商取貨觸發 26→27）| LogSkip[log skip + 下一筆]
-    CAS -->|是| Standard[同上：建 refund_task / 推進 40 / publish event]
-    Standard --> AuditSys[INSERT audit_log<br/>actor=SYSTEM<br/>action=AUTO_CONFIRM_RECEIPT<br/>extra: reason=STORE_PICKUP_TIMEOUT, storePickupDeadlineAt, storeArrivedAt]
-    AuditSys --> PubAuto[publish<br/>aftersales.case.auto_completed_store_pickup_timeout<br/>actor=system]
-    PubAuto --> ForEach
-    LogSkip --> ForEach
-```
-
-**實作位置**：`services/java/aftersales-service/.../scheduler/StorePickupTimeoutScheduler.java`
-
-> **⚠️ 搶佔語意**：與 §5.3.10.1 **逐字同形** —— `markAutoCompletedFromAtStore` 的 CAS 與 publish 同在 `autoCompleteFromAtStore` 的 `@Transactional` 內，同樣**必須**呼叫會傳遞失敗的 publish 變體。🔴 **兩處的保證等級必須一致**：只有其中一個分支換掉，會讓同一支 service 出現兩種保證。
+`StorePickupTimeoutScheduler` 與超商待取狀態隨 B3 刪除（見 5.3.1–5.3.6 的退場說明）。
 
 ##### 5.3.10.3 24 小時預警 FCM（ReturnTwentyFourHourWarnScheduler）
 
@@ -3154,7 +2643,7 @@ flowchart TD
 ```
 
 > **三個 24h 分支差異**：
-> - A、B（既有）推送目標 = **賣家**，提醒「該去超商取貨 / 該手動確認收貨」
+> - A、B（既有）推送目標 = **賣家**，提醒「該手動確認收貨」
 > - C 推送目標 = **買家**，提醒「再不寄回將喪失退款資格」
 > - 三者共用同一 scheduler class 但走獨立掃描方法，避免 status WHERE 條件混用
 
@@ -3177,7 +2666,6 @@ flowchart TD
 | 觸發路徑 | CAS 條件 | 競態場景 |
 |---|---|---|
 | AutoConfirmReceiptScheduler | `WHERE status='27'` | 賣家剛手動 confirm 搶先 → affected=0 skip |
-| StorePickupTimeoutScheduler | `WHERE status='26'` | 賣家剛從超商取貨觸發 26→27 → affected=0 skip |
 | ReturnTwentyFourHourWarnScheduler (store) | **候選** `status='26' AND warned_store_pickup_24h_at IS NULL`；**stamp CAS 不是閘門**（publish 之後才執行） | 跨 pod 重複 → 由 notification `notifications_inbox_dedup_idx` 吸收；已轉 27 → 候選查詢自然撈不到 |
 | ReturnTwentyFourHourWarnScheduler (confirm) | 同上（`status='27' AND warned_confirm_receipt_24h_at IS NULL`） | 同上（已轉 30 → 候選撈不到） |
 | **ReturnTwentyFourHourWarnScheduler (ship_back)** | 同上（`status='20' AND warned_ship_back_24h_at IS NULL`） | 同上（買家剛寄出 20→25 → 候選撈不到） |
@@ -3202,7 +2690,7 @@ flowchart TD
 |---|---|
 | 候選窗口寬度 | **恰好 24 小時**（`deadline_at - INTERVAL '24h' <= NOW() AND deadline_at > NOW()`，三個分支同形） |
 | cron 週期 | 5 分鐘 ⇒ 窗口內約 288 個 tick |
-| 租約長度取值 | 取短（例：10 分鐘）⇒ 窗口內重發 **≈144 次**；取長（例：24 小時）⇒ 租約與窗口等寬，**退化成永久旗標**（規範 §三 的黑貓反例同形） |
+| 租約長度取值 | 取短（例：10 分鐘）⇒ 窗口內重發 **≈144 次**；取長（例：24 小時）⇒ 租約與窗口等寬，**退化成永久旗標**（規範 §三 的反例同形） |
 
 ⇒ 落在規範 §四 例外 B 的分支 **(b)「語意上只該發一次」**：D-1 預警是**一次性事件**，狀態沒解除時再發一次對收件人**沒有新資訊**（買家已經知道了，再提醒 143 次只是噪音）。這與「卡死告警」相反 —— 那類沒人處理就該一直吵，因此必須 lease、不得走 (b)。
 
@@ -3246,28 +2734,9 @@ flowchart TD
 
 例外 B **不改任何 SQL**：候選述詞仍含 `warned_*_24h_at IS NULL`（它現在的作用是「已成功記錄過的不必再撈」，屬效率優化不是正確性閘門），三支 `stampXxx24hWarned` 的 CAS 也原樣保留。因此既有的兩支部分索引仍完全適配，**不需要新增 migration**。
 
-#### 5.3.11 退貨物流失敗（RETURN_FAILED）
+#### 5.3.11 退貨物流失敗（已退場）
 
-**業務流程圖**：
-
-```mermaid
-flowchart TD
-    PayUni[PayUni 物流 webhook<br/>狀態 ABNORMAL] --> Ship[Shipping Service<br/>UPDATE shipments<br/>provider_status / provider_message]
-    Ship --> Pub[publish shipment.return.status_changed<br/>含 providerStatus / providerMessage]
-    Pub --> Cons[AfterSales 消費]
-    Cons --> Mark[markReturnFailed<br/>status IN 20/25/27 → 28<br/>寫入 return_provider_status / return_provider_message]
-    Mark --> Audit[INSERT audit_log<br/>RETURN_FAILED]
-    Mark --> PubFailed[publish aftersales.case.return_failed]
-    PubFailed --> Buyer[Buyer 推播<br/>"退貨物流異常"]
-    PubFailed --> Seller[Seller 推播<br/>"退貨物流異常"]
-    Mark --> Next{後續處理}
-    Next -->|買家不接受| Appeal[走既有申訴流程 §10]
-    Next -->|平台主動處理| AdminForce[Admin ForceConfirmReceipt §5.3.12]
-```
-
-**前端顯示策略**：
-- Buyer / Seller App 顯示 `returnProviderMessage`（如「客戶拒收，原件退回」）+ 引導申訴或聯絡客服
-- 不主動推退款任務 — 退款是否啟動由買家申訴 / Admin 決定
+物流商建單失敗的 `RETURN_FAILED` 路徑隨物流商退場刪除（見 5.3.1–5.3.6 的退場說明）。
 
 #### 5.3.12 Admin 強制確認收貨（ForceConfirmReceiptForAdmin）
 
@@ -3349,16 +2818,9 @@ Body: {
 
 notification-service 透過 `payload_filter` + template_render 即可從 payload 抽取欄位渲染至 body（既有機制無需擴充）。
 
-#### 5.3.15 `SELLER_NOT_PICKED(55)`（賣家未取）訊息持久化
+#### 5.3.15 `SELLER_NOT_PICKED(55)`（已退場）
 
-**背景**：PayUni 7-11 C2C 退貨於賣家逾期未取後會回傳碼 55（SELLER_NOT_PICKED），但 PayUni 的保留期遠長於本平台規定的 72 小時。當 PayUni 回此碼時，本平台的 `StorePickupTimeoutScheduler` 通常已執行完畢（case status=30 已是終態）。
-
-**處理策略**：
-- 收到碼 55：呼叫 `stampReturnProviderInfo(caseNo, "55", "賣家未取（PayUni）")` 寫入 `return_provider_status` / `return_provider_message`，不變狀態
-- 若 case 還在 26（極端情況下我方 timer 失效或時鐘偏差）：訊息照記，但仍由 timer 走原 STORE_PICKUP_TIMEOUT 流程，不雙重觸發
-- Admin 端 detail 顯示 `return_provider_message` 供查詢時參考 PayUni 原文
-
-🔴 **`SELLER_NOT_PICKED(55)` 不得觸發自動完成**：72h timer 是「賣家未取」的**唯一真實來源**，第二個觸發來源會破壞單一寫入路徑原則（[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)）。碼 55 只當 audit trail。
+物流商貨態碼 55 的訊息持久化隨物流商退場刪除。
 
 #### 5.3.16 一致性邊界（待寄回逾時自動關案）
 
@@ -4037,404 +3499,17 @@ AfterSales 發布 `aftersales.refund.completed` 事件，Order Service 消費後
 
 #### 5.9.1 業務規則
 
-買家完成付款後，賣家必須在期限內處理訂單（安排出貨），否則系統自動取消訂單並將付款原路退回。期限同時暴露給前端展示倒數，買賣雙方皆可見。
+買家完成付款後，賣家必須在期限內處理訂單（回填出貨），否則系統自動取消訂單並將付款原路退回。期限同時暴露給前端展示倒數，買賣雙方皆可見。
 
-| 配送方式 | 期限 | 計算方式 | 「已處理」定義 |
-|---------|------|---------|-------------|
-| 店到店（SEVEN_ELEVEN_STORE_PICKUP） | 3 天（自然日） | `shipment.createdAt + 72 小時` | `label_print_status = '4103'`（賣家已觸發出貨便取號） |
-| 宅配（TAQBIN） | 3 個工作日 | `HolidayService.nextBusinessDay(createdDateTaipei, 3)` 的當天 **23:59:59 台北（＝ 15:59:59 UTC）** | `tcat_call_status = '4203'`（賣家已呼叫黑貓取件） |
-| **Uber 即時配送（UBER_INSTANT）** | 🔴 **公式已定版**；V1 預設值 `seller_prep_sla_default = 15m`、`platform_grace = 15m`，🔴 **兩者皆 configurable**（依 sandbox／production 實測調整），**不得宣稱為 Uber 官方 SLA** | 🔴 **`processing_deadline = paid_at + seller_prep_sla_snapshot + platform_grace`**。<br/>⚠️ **中間有一個非取消的里程碑**：`prep_sla` 到期只做賣家逾期標記／warning／operational alert，🔴 **強制取消點只有 `processing_deadline`**。<br/>🔴 **時鐘一律持續走，不因賣家的不可接單時段暫停**（`service_hours` 管的是「這筆單能不能被受理」，在結帳 eligibility 就判完，**不是履約時鐘開關**）。<br/>⚠️ **`seller_prep_sla_snapshot` 取報價／付款當下的 snapshot**，賣家日後修改不回溯 | 🔴 **賣家已回報備妥**（`REPORT_READY`）——與 3001 的 `tcat_call_status`、3002 的 `label_print_status` 同一種定義：**賣家做完自己那一步**。⚠️ **不是**「Uber 已指派外送員」，那是 provider 的進度不是賣家的動作 |
-
-> **createdAt 近似 payTime**：物流單由 `order.paid` MQ 事件觸發自動建立，`createdAt` 與付款時間差距僅毫秒級，足夠作為期限起算點。
-
-🔴 **`UBER_INSTANT` 必須有處理期限。**
-
-**現行履約模型是 payment-time future-pickup**：付款成功後平台**即刻**向 provider 建立配送，取件時間帶 `pickup_ready_at_snapshot`（報價當下凍結的絕對時間）。
-⇒ **賣家在履約鏈上的必要一步是 `REPORT_READY`（回報備妥）**：配送在付款當下就已建立，provider 會依約定時間前來取件，**賣家不自行發動取件，該做的是在約定時間前把貨備妥並回報**。
-⇒ 賣家仍是履約鏈上的必要一步，而 §5.9 正是「賣家不動作時買家怎麼辦」的唯一出口。
-⚠️ **正因為 provider 會如期前來，賣家不備妥的後果比 3001／3002 更即時**：外送員撲空、產生 provider 成本、買家在等一份永遠不會被取走的訂單。
-
-⚠️ **沒有期限的後果是靜默的**：Uber 訂單會停在 `PENDING_SHIPMENT(20)`，
-掃描述詞 `processing_deadline IS NOT NULL` 永遠不命中 ⇒ **沒有任何排程看得到它、沒有任何告警會響**，
-買家只能自己發現錢付了、貨沒來、也沒有人取消。
-
-🔴 **兩個時鐘、兩個基準，刻意不合併**（不是 duplicate clock，是兩件不同的事）：
-
-| 時鐘 | 基準 | 公式 | 歸誰 |
-|---|---|---|---|
-| **Provider 取件約定** | **報價當下凍結的絕對時間** | `pickup_ready_dt = pickup_ready_at_snapshot` | 66（provider 契約） |
-| **賣家硬處理期限** | **實際付款時間** | `processing_deadline = paid_at + seller_prep_sla_snapshot + platform_grace` | 本節 |
-
-兩者共用**同一份** `seller_prep_sla_snapshot`（賣家中途改設定不回溯），但**起算點不同**。
-🔴 **`processing_deadline` 不得改用 provider 取件時鐘推算，`pickup_ready_dt` 也不得在付款當下用 `paid_at + prep_sla` 重算**——那會讓報價時給買家看到的 ETA 與實際送出去的取件時間分岔。
-
-起算點、「已處理」定義、逾期處置三者皆與既有兩種配送方式**同形**，不新增機制；賣家設 `prep_sla`、**不得直接設 `processing_deadline`**。
-⚠️ **不得沿用 72 小時或 3 工作日**——（那兩個數字本身沒有來源，且營運形態不同）。
-
-🔴 **3003 的逾期取消必須先收斂 provider 側，不得直接退款**：3001／3002 在賣家未處理時**還沒有實體履約**，取消只是不出貨；而 3003 **已經有一筆存在的 delivery**。
-⇒ 逾期取消必須走 provider 取消收斂鏈（`Get Delivery` → `Cancel Delivery` → **再確認 provider terminal**），**確認 terminal 之後**才進本服務的取消退款流程（§5.7）。
-🔴 **provider 取消結果未確定時，不得逕自退款、也不得逕自判定為失敗**——那會在「錢已退、車還在路上」的窗口造成雙重損失。
-⚠️ 本路徑的責任成因是 `SELLER_CAUSED`（賣家未在期限內備妥）⇒ 依 §2.5.3 `refund_to_buyer = full`，與 3001／3002 的既有行為一致。
-
-🔴 **掃描述詞必須涵蓋每一個有處理期限的配送方式**（含 `3003`）：每個配送方式**宣告**自己的「已處理」述詞，由具名 helper 求值，**漏宣告即失敗**而不是靜默不掃。述詞全文見 §5.9.7。
-⚠️ 述詞漏掉某個配送方式的後果：該方式即使寫了 `processing_deadline` 也永遠掃不到 ⇒ **逾期不取消、買家的錢卡住、零告警**。
-
-> `3003` 的候選述詞接線見 backend-payuni#3489。
-
-#### 5.9.2 系統架構
-
-`processing_deadline` 同時存在於兩個服務的兩張表：
-
-- **shipments.processing_deadline**（Shipping Service）：權威來源，由 `ProcessingDeadlineScheduler` 掃描；賣家完成處理或排程通知後設為 NULL
-- **orders.processing_deadline**（Order Service）：純展示快照，由 `shipment.created` 事件寫入、由 `shipment.processing.cleared` 事件清空。前端詳情/列表共用此快照
-
-```
-Shipping Service                          AfterSales Service          Order Service
-┌──────────────────────┐                 ┌──────────────────────┐    ┌──────────────────────┐
-│ shipments 表:        │                 │                      │    │ orders 表:           │
-│ processing_deadline  │                 │                      │    │ processing_deadline  │
-│ ↑ 權威來源            │                 │                      │    │ ↑ 純展示快照          │
-└──────────────────────┘                 └──────────────────────┘    └──────────────────────┘
-   │                                                                     ▲
-   │ shipment.created (含 processingDeadline) ─────────────────────────────┤
-   │                                                                     │
-   │ ProcessingDeadlineScheduler                                         │
-   │  └── 逾期未處理 → publish shipment.processing.timeout ───▶ Consumer   │
-   │                                                            └── cancelShipmentBySystem()
-   │                                                               (複用 §5.7 取消+退款流程)
-   │                                                                     │
-   │ 賣家完成處理（CVS 取號 / 宅配叫件 / 即時配送 REPORT_READY）                │
-   │  └── publish shipment.processing.cleared ──────────────────────────▶ │
-   │                                                       Order 端清空 processing_deadline
-```
-
-#### 5.9.3 時序圖：寫入與清空（正常流程）
-
-```mermaid
-sequenceDiagram
-    participant OS as Order Service
-    participant Ship as Shipping Service
-    participant ShipDB as shipments DB
-    participant MQ as RabbitMQ
-    participant OrdDB as orders DB
-
-    Note over OS,ShipDB: 付款成功 → 自動建單
-    OS->>MQ: publish order.paid
-    MQ-->>Ship: consume order.paid
-    Ship->>ShipDB: INSERT shipments<br/>(processing_deadline = 期限計算結果)
-    Ship->>MQ: publish shipment.created<br/>{orderNo, ..., processingDeadline}
-    MQ-->>OS: consume shipment.created
-    OS->>OrdDB: UPDATE orders<br/>SET processing_deadline = ?
-
-    Note over Ship,OrdDB: 賣家完成處理（CVS 取號 / 宅配叫件 / 即時配送 REPORT_READY）
-    Ship->>ShipDB: UPDATE shipments<br/>SET label_print_status='4103'（或 tcat_call_status='4203'）<br/>+ processing_deadline=NULL
-    Ship->>MQ: publish shipment.processing.cleared<br/>{orderNo}
-    MQ-->>OS: consume shipment.processing.cleared
-    OS->>OrdDB: UPDATE orders<br/>SET processing_deadline = NULL
-```
-
-#### 5.9.4 時序圖：逾期自動取消
-
-```mermaid
-sequenceDiagram
-    participant Scheduler as ProcessingDeadlineScheduler<br/>(Shipping Service)
-    participant ShipDB as shipments DB
-    participant MQ as RabbitMQ
-    participant AS as AfterSales Service
-    participant OS as Order Service
-    participant PS as Payment Service
-
-    loop 每 5 分鐘
-        Scheduler->>ShipDB: 查詢逾期且未處理的物流單<br/>processing_deadline < NOW()<br/>AND 該配送方式宣告的「已處理」述詞未成立<br/>（未取號 / 未叫件 / 未回報備妥）<br/>AND status 非終態
-        ShipDB-->>Scheduler: candidates[]
-
-        loop 逐筆處理
-            Scheduler->>ShipDB: claim：SET processing_deadline = leaseUntil<br/>(= now + 5 分鐘＝一個 tick；CAS 失敗即跳過)
-            Scheduler->>MQ: publish shipment.processing.cleared<br/>再 publish shipment.processing.timeout
-            Scheduler->>ShipDB: SET processing_deadline = NULL<br/>(publish 成功之後才清)
-        end
-    end
-
-    MQ-->>AS: consume shipment.processing.timeout
-
-    AS->>AS: 冪等檢查：seller_cancel_requests<br/>是否已有 orderNo 記錄
-    alt 已存在取消記錄
-        AS->>AS: 跳過（冪等）
-    else 無記錄
-        AS->>OS: GetOrderForAfterSales(orderNo)
-        OS-->>AS: 訂單詳情（狀態、金額、transactionId...）
-
-        alt 訂單狀態不在 PAID/PENDING_SHIPMENT
-            AS->>AS: 跳過（訂單已變更）
-        else 訂單仍可取消
-            AS->>AS: INSERT seller_cancel_requests<br/>(reason=SHIPMENT_TIMEOUT, actor=SYSTEM)
-            AS->>OS: CancelOrderInternal(orderNo, reason, remark)
-            OS-->>AS: 取消成功
-
-            AS->>AS: INSERT refund_tasks(status=PENDING)
-            AS->>AS: UPDATE cancel_requests(status=REFUND_PROCESSING)
-
-            Note over AS,PS: 後續退款由 RefundTaskWorker 執行<br/>流程同 §5.7 步驟 6-7
-        end
-    end
-```
-
-#### 5.9.5 業務流程圖
-
-```mermaid
-flowchart TD
-    A[排程觸發：每 5 分鐘] --> B{查詢逾期物流單}
-    B -->|無結果| Z[結束本輪]
-    B -->|有結果| C[逐筆處理]
-
-    C --> D{配送方式?}
-    D -->|店到店| E{label_print_status = 4103?}
-    D -->|宅配| F{tcat_call_status = 4203?}
-    D -->|即時配送| U{REPORT_READY?}
-
-    E -->|true| G[已處理，跳過]
-    E -->|false| H[逾期未處理]
-
-    F -->|true| G
-    F -->|false| H
-
-    U -->|true| G
-    U -->|false| V[provider 取消收斂鏈<br/>Get Delivery → Cancel Delivery<br/>→ 再確認 provider terminal]
-    V -->|terminal 已確認| H
-    V -->|未確認| W[推遲重試 / 人工介入<br/>不得逕自退款]
-
-    H --> I[publish MQ: shipment.processing.timeout]
-    I --> J[SET processing_deadline = NULL]
-    J --> C
-
-    subgraph AfterSales Consumer
-        K[consume timeout 事件] --> L{seller_cancel_requests<br/>已有記錄?}
-        L -->|是| M[冪等跳過]
-        L -->|否| N[查詢訂單狀態]
-        N --> O{狀態可取消?<br/>PAID / PENDING_SHIPMENT}
-        O -->|否| P[跳過：訂單已變更]
-        O -->|是| Q[建立取消記錄<br/>reason=SHIPMENT_TIMEOUT]
-        Q --> R[CancelOrderInternal]
-        R --> S[建立退款任務]
-        S --> T[RefundTaskWorker 執行退款<br/>流程同 §5.7]
-    end
-```
-
-#### 5.9.6 期限計算邏輯（Shipping Service）
-
-```java
-// 在 ShippingService.createShipmentFromOrder() 中，INSERT 前計算期限
-
-// 店到店：建單時間 + 72 小時
-if (ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value().equals(shippingMethod)) {
-    entity.setProcessingDeadline(DateTimeUtils.nowUtc().plusHours(72));
-}
-
-// 宅配：第 3 個工作日結束（台北時間 23:59:59 → UTC 15:59:59）
-if (ShippingMethod.TAQBIN.value().equals(shippingMethod)) {
-    LocalDate createdDateTaipei = DateTimeUtils.todayInTaipei();
-    LocalDate deadlineDate = holidayService.nextBusinessDay(createdDateTaipei, 3);
-    LocalDateTime deadlineUtc = deadlineDate
-            .atTime(23, 59, 59)
-            .atZone(DateTimeUtils.PAYUNI_ZONE)
-            .withZoneSameInstant(java.time.ZoneOffset.UTC)
-            .toLocalDateTime();
-    entity.setProcessingDeadline(deadlineUtc);
-}
-
-// 🔴 Uber 即時配送：期限由公式推導
-//     processing_deadline = paid_at + seller_prep_sla_snapshot + platform_grace
-//     🔴 seller_prep_sla_snapshot 取「報價／付款當下」的 snapshot，賣家日後修改不回溯
-//     🔴 兩個數值皆 configurable：V1 預設 seller_prep_sla_default = 15m、platform_grace = 15m（見 §5.9.1）
-//     ⚠️ prep SLA 到期不在此取消；它只觸發提醒／告警。強制取消點只有 processing_deadline
-//     🔴 3003 有賣家處理期限，錨在賣家的 REPORT_READY（回報備妥）這一步：
-//        provider 依 pickup_ready_at_snapshot 如期前來取件，賣家沒在期限內備妥就會讓外送員撲空（§5.9.1）
-```
-
-#### 5.9.7 掃描查詢邏輯（Shipping Service）
-
-```sql
-SELECT * FROM shipments
-WHERE processing_deadline IS NOT NULL
-  AND processing_deadline < :now
-  AND is_return = FALSE
-  AND status <> '41'
-  AND (
-    (shipping_method = '3002' AND label_print_status <> '4103')
-    OR
-    (shipping_method = '3001' AND tcat_call_status <> '4203')
-  )
-ORDER BY processing_deadline ASC
-LIMIT :batchSize
-```
-
-> `3001` = TAQBIN value，`3002` = SEVEN_ELEVEN_STORE_PICKUP value，`4103` = 已取號，`4203` = 已叫件。
->
-> 🔴 **每個有處理期限的配送方式都必須在本述詞中宣告自己的「已處理」條件**。漏宣告的配送方式即使寫了 `processing_deadline` 也永遠掃不到 ⇒ **逾期不會被取消、買家的錢卡住、零告警**。⚠️ 修法**不是**把 `OR` 再串一條就算了——新增配送方式時必須有機械保證（漏宣告即失敗），否則下一個 provider 會重複這個缺口。
-
-#### 5.9.8 Order 端 processing_deadline 清空時機
-
-`orders.processing_deadline` 在以下三種情境必須為 NULL（與 §5.9.10 前端曝露策略對齊）：
-
-| 情境 | 觸發點 | Shipping 端動作 | Order 端動作 |
-|------|--------|----------------|-------------|
-| **賣家完成處理** | CVS：`ShippingService.processWebhookPrint()`（PayUni 列印 Webhook 回填代碼後） | `UPDATE shipments SET label_print_status='4103', processing_deadline=NULL` → publish `shipment.processing.cleared` | consumer 收 cleared event → `clearProcessingDeadline(orderNo)` |
-| **賣家完成處理** | 宅配：`ShippingService.callTcat()`（賣家呼叫黑貓成功後） | `UPDATE shipments SET tcat_call_status='4203', processing_deadline=NULL` → publish `shipment.processing.cleared` | 同上 |
-| **賣家完成處理** | 即時配送：賣家 `REPORT_READY`（回報備妥）成功後。⚠️ **不是**「Uber 已指派外送員」——那是 provider 的進度，不是賣家的動作（§5.9.1） | 標記賣家已回報備妥 ＋ `processing_deadline=NULL` → publish `shipment.processing.cleared` | 同上 |
-| **訂單取消**（任何路徑） | buyer/seller cancel / payment expire / processing timeout（aftersales 內部取消）| —（shipments 不必動，由 cancel 流程主導）| cancel SQL 同步 `SET processing_deadline = NULL`（與 status='80' 變更同事務） |
-| **Scheduler 偵測逾期** | `ProcessingDeadlineScheduler.scan()` | claim（`SET processing_deadline = leaseUntil`）→ publish `shipment.processing.cleared` → 再 publish `shipment.processing.timeout` → **publish 成功後才** `SET shipments.processing_deadline = NULL` | consumer 收 cleared event → 清 orders deadline（在 timeout cancel 流程開始前先清，避免暫態） |
-
-**設計理由**：已取消或狀態推進（≥ 20）的訂單擁有「賣家處理期限」是反邏輯，必須清。
-
-> **與 scheduler 的 race**：賣家正常處理會主動清空 deadline，scheduler 下一個 tick 掃不到這筆。即使賣家處理時點與 scheduler 掃描幾乎同時發生，CAS 保護（見 §5.9.16）也能避免重複取消。
-
-#### 5.9.9 系統取消方法（AfterSales Service）
-
-`SellerCancelService.cancelShipmentBySystem(String orderNo)`：
-
-| 項目 | 與 §5.7 `cancelShipment` 的差異 |
-|------|------|
-| 觸發者 | 系統排程（非賣家手動） |
-| 身分驗證 | **跳過**（不驗 storeId） |
-| 取消原因 | 固定 `SHIPMENT_TIMEOUT` |
-| 備註 | 自動生成：`"系統自動取消：賣家逾期未處理訂單"` |
-| 稽核日誌 actor | `SYSTEM(8403)` |
-| 其餘流程 | 完全相同（查訂單 → 建取消記錄 → CancelOrderInternal → 建退款任務） |
-
-#### 5.9.10 前端曝露策略
-
-| 項目 | 規格 |
-|------|-----|
-| 欄位名 | `processing_deadline`（與 DB / proto 一致） |
-| 型別 | `string`（ISO 8601 UTC 絕對時間，如 `"2026-04-15T15:59:59Z"`） |
-| 計算方式 | 後端僅回絕對時間，前端依本地時鐘計算剩餘秒數（與 `review_deadline` / `auto_complete_at` 一致） |
-| 暴露端點 | 訂單詳情 + 訂單列表，**買家視角 + 賣家視角皆暴露**（前端依視角決定文案，例如賣家「請於 X 前出貨」、買家「賣家應於 X 前出貨」） |
-| 有值條件 | `orders.processing_deadline IS NOT NULL`（即賣家未處理 ＋ 訂單未取消）。🔴 **沒有「配送方式非 Uber」這個例外條件**——即時配送同樣有處理期限（§5.9.1） |
-| NULL/空字串條件 | 賣家已處理（取號／叫件／**即時配送的 `REPORT_READY`**）/ 訂單已取消 / 已逾期被排程通知。🔴 **即時配送不是免期限的配送方式** |
-
-> **不分視角差異欄位**：buyer/seller 共用同一欄位語意，避免雙寫同步成本與不一致風險。
-
-#### 5.9.11 CodeMeta
-
-**OrderCancelReason**（`docs/代碼管理（CodeMeta）/業務類型碼.md`）— 涵蓋系統 / 賣家 / 買家三種觸發來源，編碼前綴區分：91xx 系統 / 92xx 賣家 / 93xx 預留買家。
-
-| 觸發 | Name | Code | Value | Label | Description |
-|------|------|------|-------|-------|-------------|
-| 系統 | PAYMENT_TIMEOUT | PAYMENT_TIMEOUT | 9101 | 付款逾時自動取消 | 系統排程：訂單超過付款期限未付款 |
-| 系統 | SHIPMENT_TIMEOUT | SHIPMENT_TIMEOUT | 9102 | 出貨逾時自動取消 | 系統排程：賣家未在 §5.9 期限內安排出貨 |
-| 賣家 | FORCE_MAJEURE | FORCE_MAJEURE | 9201 | 天災因素無法配送 | 天災或不可抗力因素 |
-| 賣家 | OUT_OF_STOCK | OUT_OF_STOCK | 9202 | 商品缺貨 | 庫存不足無法出貨 |
-| 賣家 | QUALITY_ISSUE | QUALITY_ISSUE | 9203 | 商品品質問題 | 商品有品質問題不宜出貨 |
-| 賣家 | SUGGEST_SPLIT | SUGGEST_SPLIT | 9204 | 建議買家拆單重下 | 建議買家拆成多張較小訂單重新下單（生鮮場景常見） |
-| 賣家 | OTHER | OTHER | 9299 | 其他原因（自填） | 賣家自填取消原因，配合 cancel_remark 顯示 |
-
-> **Buyer 自願取消未付款訂單時不寫 reason**（NULL），僅寫 `cancel_by_role=BUYER`。前端依 role 顯示「您已取消此訂單」泛用文案。
-
-**AfterSaleAuditAction**（`docs/代碼管理（CodeMeta）/內部技術碼.md`）：
-
-| Name | Code | Value | Label | Description |
-|------|------|-------|-------|-------------|
-| AUTO_CANCEL_PROCESSING_TIMEOUT | AUTO_CANCEL_PROCESSING_TIMEOUT | 8521 | 逾期自動取消 | 系統排程：賣家逾期未處理訂單，自動取消出貨 |
-
-#### 5.9.12 MQ 事件設計
-
-兩個專用事件，皆掛在既有 `hawkr.shipping` exchange：
-
-| Routing Key | 業務時機 | 下游處理 |
+| 配送方式 | 期限 | 「已處理」定義 |
 |---|---|---|
-| `shipment.processing.timeout` | 賣家處理期限逾期 | AfterSales 觸發系統取消 + 原路退款 |
-| `shipment.processing.cleared` | 賣家完成處理（取號 / 叫件 / 回報備妥）或排程偵測逾期前先清空 | Order 清空 `orders.processing_deadline` |
+| 賣家自寄（唯一方式） | 賣家運費設定的處理天數（1–7 個工作日，預設 3，每個賣家一份） | 賣家回填出貨記錄 |
 
-另：既有 `shipment.created` 事件 payload 補欄位 `processingDeadline`（ISO 8601 UTC 字串）。🔴 **即時配送不是空字串的例外**——3003 同樣有處理期限（§5.9.1），空字串僅代表該筆確實無期限。由 Order Service `onShipmentCreated` 寫入 `orders.processing_deadline`。
+物流商的店到店、宅配與即時配送各自的期限公式（含賣家備貨 SLA 與取件時鐘）隨 B3 刪除（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）。逾期未出貨取消歸 B8 ordering 的狀態機，期限的起算、計算、掃描與排程在 B8 計畫決定。
 
-> 完整 producer / consumer / payload class / DLQ / idempotency 設計見
-> [36-MQ 與事件總覽 §3.3 物流領域](../詳細設計書/36-MQ%20與事件總覽（MQ%20%26%20Event%20Catalog）.md#33-物流領域shipping-domain)。
+#### 5.9.2–5.9.17 Java shipping 的實作（已退場）
 
-#### 5.9.13 DB Schema
-
-**shipments 表**（Shipping Service V1 Migration）：
-
-```sql
-processing_deadline TIMESTAMPTZ  -- 賣家處理期限（UTC），逾期由排程自動取消。NULL = 無期限 / 已處理 / 已通知
-```
-
-部分索引（加速排程掃描）：
-
-```sql
-CREATE INDEX idx_shipments_processing_deadline
-ON shipments (processing_deadline)
-WHERE processing_deadline IS NOT NULL
-  AND is_return = false;
-```
-
-**orders 表**（Order Service V1 Migration）：
-
-```sql
-processing_deadline TIMESTAMPTZ  -- 賣家處理期限快照（UTC），由 shipment.created 寫入、shipment.processing.cleared 清空。NULL = 未付款 / 已處理 / 已取消。即時配送不在此列——3003 同樣有處理期限，見 §5.9.1
-```
-
-> **無索引需求**：本欄位純展示用途，不涉及查詢過濾。掃描邏輯仍以 `shipments.processing_deadline` 為準（Shipping Service 內）。
-
-#### 5.9.14 排程配置
-
-| 配置項 | 預設值 | 說明 |
-|--------|--------|------|
-| `hawkr.shipping.processing-deadline.interval-ms` | `300000`（5 分鐘） | 掃描間隔 |
-| `hawkr.shipping.processing-deadline.batch-size` | `50` | 每次掃描上限 |
-| `hawkr.shipping.processing-deadline.enabled` | `true` | 排程開關 |
-
-#### 5.9.15 實作位置
-
-| 層級 | 位置 | 職責 |
-|------|------|------|
-| CodeMeta | `業務類型碼.md` `OrderCancelReason`；`內部技術碼.md` `OrderCancelByRole`（SYSTEM / SELLER / BUYER）、`AUTO_CANCEL_PROCESSING_TIMEOUT` | 碼值 SSOT |
-| MQ 常數 | `common-core/.../mq/MqConstants.java` | timeout ＋ cleared 兩組 routing key / queue / event type |
-| **Shipping Service** | | |
-| Entity | `shipping/.../entity/ShipmentEntity.java` | `processingDeadline` 欄位 |
-| DB | `shipments.processing_deadline` ＋ 部分索引 | 期限快照與掃描鍵 |
-| Strategy | `shipping/.../strategy/CvsShipmentStrategy.java` | 計算 CVS 期限 |
-| Strategy | `shipping/.../strategy/HomeShipmentStrategy.java` | 計算宅配期限（注入 HolidayService） |
-| Scheduler | `shipping/.../scheduler/ProcessingDeadlineScheduler.java` | 掃描逾期物流單；發 timeout 前先發 cleared 事件確保 orders 端清 deadline |
-| Mapper | `shipping/.../mapper/ShipmentMapper.java` | `findExpiredUnprocessedShipments()`（候選）、`leaseProcessingDeadline()`（claim）、`clearProcessingDeadline()`（publish 成功後才清） |
-| Service | `shipping/.../service/ShippingService.java` | `processWebhookPrint()` / `callTcat()` 成功後清空 deadline + publish cleared |
-| Publisher | `shipping/.../mq/ShippingEventPublisher.java` | `publishProcessingTimeout()`、`publishProcessingCleared()`；`publishShipmentCreated` payload 帶 `processingDeadline` |
-| **AfterSales Service** | | |
-| MQ Config | `aftersales/.../mq/AfterSalesEventMqConfig.java` | 宣告 `aftersales.shipment.processing.timeout` Queue + Binding |
-| Consumer | `aftersales/.../mq/ProcessingTimeoutConsumer.java` | 消費 timeout 事件 |
-| Service | `aftersales/.../service/SellerCancelService.java` | `cancelShipmentBySystem()` |
-| **Order Service** | | |
-| DB | `orders.processing_deadline` | 純展示快照 |
-| Repository | `order/.../repository/OrderRepository.java` | `updateShipmentCreated()` 帶 deadline / `clearProcessingDeadline()`；`cancelOrderWithReasonCas` / `cancelOrderInternalCas` SQL 同步 `SET processing_deadline = NULL` |
-| Consumer | `order/.../mq/ShippingEventConsumer.java` | `onShipmentCreated` 寫入 deadline；新增 `onProcessingCleared` 清空 |
-| RabbitMqConfig | `order/.../config/RabbitMqConfig.java` | 宣告 `order.shipment.processing.cleared` Queue + Binding |
-| PaymentEventHandler | `order/.../mq/PaymentEventHandler.java` | `cancelExpiredOrderInTx` 補呼叫 `clearProcessingDeadline(orderNo)`（payment expire 路徑用通用 status SQL，不便動，補呼叫保持事務內原子性）|
-| Proto | `api/proto/order/order.proto` | `OrderSummaryView.processing_deadline = 37`、`OrderDetailView.processing_deadline = 56` |
-| Converter | `order/.../service/OrderProtoConverter.java` | 將 entity 欄位轉為 ISO 8601 UTC 字串填入兩個 view |
-| **Gateway** | | |
-| DTO | `gateway/.../handler/order/*Response.go` | `processingDeadline` 欄位 + Swagger 註解 |
-
-#### 5.9.16 冪等與安全保護
-
-| 保護機制 | 說明 |
-|---------|------|
-| claim 用租約不用永久標記 | scheduler 撈到候選後先 `SET processing_deadline = leaseUntil`（= claim 當下 ＋ 一個 tick）讓該列退出候選集合，CAS 失敗即跳過。🔴 **不得把 `SET processing_deadline = NULL` 上移到 publish 之前**——那是永久標記，publish 拋例外或 pod 崩潰時 `shipment.processing.timeout` 會**永久遺失**（售後的系統取消＋退款永不觸發，且零告警） |
-| publish 成功後才清 deadline | `SET processing_deadline = NULL` 留在 publish 之後；它的 `IS NOT NULL` 述詞對 leased 值仍成立 |
-| 賣家處理後清除 deadline | shipping service 同步清 `shipments.processing_deadline`，並透過 cleared 事件清 `orders.processing_deadline` |
-| seller_cancel_requests UNIQUE(orderNo) | 同一訂單只能取消一次 |
-| CancelOrderInternal CAS | `WHERE status IN ('0','10','20')` 原子更新，已出貨不可取消 |
-| MQ at-least-once + 冪等 | timeout consumer 先查 cancel_requests 跳過；cleared consumer `UPDATE ... WHERE processing_deadline IS NOT NULL` 自然冪等 |
-
-#### 5.9.17 邊界情境
-
-| 情境 | 系統行為 |
-|------|---------|
-| 賣家在期限截止前一刻處理 | 處理流程主動發 `shipment.processing.cleared`，前端 deadline 立即消失；scheduler 即使同時掃到，shipments 端 `label_print_status='4103'` / `tcat_call_status='4203'` 不符合候選述詞，不觸發 |
-| 賣家處理與排程同時發生（race） | CAS 保護：若訂單已進入 IN_TRANSIT，CancelOrderInternal 失敗，cancel_request 標記 FAILED，不影響已出貨訂單 |
-| 訂單已被買家/賣家取消 | timeout consumer 查訂單狀態 = CANCELLED，不在允許取消狀態，跳過 |
-| 訂單尚在 PENDING_PAYMENT | 理論上不會發生（物流單在 `order.paid` 後才建立），但若出現，cancel 流程同 §5.7 處理未付款取消 |
-| timeout 事件遺失 | 租約到期後該筆重新進入候選集合，下一個 tick 重掃（見 §5.9.4） |
-| cleared 事件遺失 | `orders.processing_deadline` 殘留舊值，前端會誤顯示已逾期。但 `shipments` 端正確（`label_print_status='4103'` / `tcat_call_status='4203'`），不會誤觸發取消。實務影響限於前端展示；前端可額外比對 `shipping_status`（已取號 = 920；已叫件 = 210）作為備援判斷 |
-| 假日資料未匯入 | `HolidayService.nextBusinessDay()` 將所有日期視為工作日，期限可能偏短但不會無限等待 |
+期限計算與掃描（原 Shipping Service）、Order 端 `processing_deadline` 清空時機、`shipment.processing.cleared` 與 `shipment.processing.timeout` 事件、排程配置與邊界情境隨 Java shipping 在 B3 刪除（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）。逾期未出貨取消由 B8 ordering 的狀態機接手，期限用賣家運費設定的處理天數；表、排程與事件名在 B8 計畫決定，不在本書預先設計。
 
 ### 5.10 賣家售後處理期限自動代決（Case Process Timeout Auto-Decision）
 
@@ -4664,7 +3739,7 @@ UPDATE 走 status 變更天然防多實例 race：先到的 worker 把 status �
 3. **不產生「買家已正常收貨」語意**、**不產生收貨確認（receipt confirmation）**。
 4. **payout eligible**：款項正常撥付賣家。本終態**不建立售後單** ⇒ [`GetOrderPayoutHold`](#getorderpayouthold-rpc) 對該訂單**零 case** ⇒ 依其 deny-by-default 判定（逐案評估、零案即無 hold）**不 hold** ⇒ 撥款資格成立。⚠️ 這一點必須在實作時實測，**不得只靠推論**：撥款閘門是 fail-closed 設計，「看不到就擋」的措辭若被擴張解讀，會讓本終態靜默卡在永不撥款。
 5. **不把賣家當 fault party**：責任仍由 `ResponsibilityCause` 表達；`BUYER_CAUSED` 的案件**不計入賣家履約失敗 KPI**。
-6. **provider-neutral**：它是 Order 軸的通用終態，**不得**被實作成 Uber 專屬狀態、也不得要求其他 provider 套用 Uber 的 lifecycle。
+6. **provider-neutral**：它是 Order 軸的通用終態，**不得**被實作成 provider 專屬狀態。
 7. 🔴 **immutable financial terminal**：進入本終態即不可逆。**不存在「申訴成立 ⇒ 從本終態回到退款」這條路徑**；V1 的 automated Order lifecycle 在本終態之後**不提供任何會改變 refund entitlement 的自動 reversal**（不自動退款、不自動重開退款任務、不自動補開售後單、不把款項從賣家追回）。🔴 本服務**不得**因任何後續事件把 `refund_to_buyer` 從 `0` 改回非 `0`。
 
 ⚠️ **既有客服 goodwill coupon ／ 人工補償仍可存在**（§5.5 補償優惠券流程、§5.8 人工介入），但它是**獨立於本退款政策的客服裁量**：🔴 **不改 Order terminal、不改 `refund_to_buyer`、不走本終態回退款路徑、不轉成向賣家追討**。把 goodwill 實作成「變相退款」＝ 繞過整個責任判定。
@@ -4739,7 +3814,7 @@ UPDATE 走 status 變更天然防多實例 race：先到的 worker 把 status �
 
 ## 6. 訊息佇列設計
 
-> 本服務涉及的 routing key 業務語意對應見 §4.4 / §4.5 / §5.9.12 / §10.10。
+> 本服務涉及的 routing key 業務語意對應見 §4.4 / §4.5 / §10.10。
 >
 > 完整 producer / consumer / exchange / queue / DLQ / payload class / Ack 設計見：
 > - [36-MQ 與事件總覽 §3.4 售後領域](./36-MQ%20與事件總覽（MQ%20%26%20Event%20Catalog）.md#34-售後領域aftersales-domain)（AfterSales 發布）
@@ -4827,7 +3902,7 @@ sequenceDiagram
 
     SS->>MQ: shipment.return.status_changed (PICKED_UP)
     MQ->>AS: 消費
-    AS->>AS: 回填 return_delivered_at（僅黑貓有 webhook）
+    AS->>AS: 回填 return_delivered_at
 
     Note over Seller,AS: 賣家驗貨後手動確認（不自動確認，避免撥款風險）
 
@@ -5334,7 +4409,7 @@ MQ 事件發布在 TX 外（best-effort）：若 MQ 發布失敗但 DB 已更新
 
 **規範全文**：[開發規範／多副本排程搶佔規範](../開發規範/多副本排程搶佔規範.md)（判準、六步機械檢查、租約長度算式、例外 A/B 條件皆在該檔）。本節只列 aftersales-service 的逐支套用結果。
 
-> ⚠️ **L 編號（L1、L5、L7…）是各服務各自的盤點序號，全 repo 不唯一。** 本節的 `L7` 是 aftersales 的 7-11 退貨標籤重印路徑；coupon-service 也有一個 `L7`（`CouponExpiringWarningJob`，見 [07 號](./07-優惠券微服務（Coupon%20Service）詳細設計書.md)），兩者無關。**追查排程時一律以「服務＋類名」為準，不要以 L 編號為準**；跨服務引用 L 編號時必須帶服務名。
+> ⚠️ **L 編號（L1、L5、L7…）是各服務各自的盤點序號，全 repo 不唯一。** coupon-service 有一個 `L7`（`CouponExpiringWarningJob`，見 [07 號](./07-優惠券微服務（Coupon%20Service）詳細設計書.md)），兩者無關。**追查排程時一律以「服務＋類名」為準，不要以 L 編號為準**；跨服務引用 L 編號時必須帶服務名。
 
 🔴 **副本數不是本節規格的前提**：本節的每一條搶佔語意都必須成立，**不論當下 `replicas` 是多少**。副本數的現況與查證方式以[《多副本排程搶佔規範》§〇](../開發規範/多副本排程搶佔規範.md)為準，本節不複述（那個值會變，而寫下來的數字不會跟著變）。
 > ⚠️ **單副本不等於單執行者**：rolling update 期間新舊 pod 同時在線（chart 預設 `maxUnavailable: 0` / `maxSurge: 1`）⇒ **每次部署都有一個真實的雙 pod 窗口**。
@@ -5367,7 +4442,6 @@ MQ 事件發布在 TX 外（best-effort）：若 MQ 發布失敗但 DB 已更新
 | `RefundTaskWorker`（**C1**） | [§5.4.2](#542-refundtaskworker背景執行) | gRPC `CreateRefund`（真實退款） | **`SET status=PROCESSING` 型永久旗標** | **lease on `refund_tasks.next_retry_time`**（**120 秒**，下界＝`CreateRefund` 的 100 秒 gRPC deadline，推導見 §5.4.2）＋ 候選述詞放寬含 `PROCESSING` ＋ **PENDING 分支補時間條件**。<br>⚠️ 成功後的 `DONE → publish refund.completed` 由 L5 `RefundSyncWorker` 補發 ⇒ 本支不需要把 publish 收進短 tx，見 §5.4.2 | `refund_tasks.next_retry_time`（既有） |
 | `RefundSyncWorker`（**L5**） | [§8.4](#84-補償與人工修復策略) | publish `aftersales.refund.completed` / `aftersales.cancel.completed` **無條件**補發 | **完全無搶佔**（純 `selectList` → publish） | **lease on `refund_tasks.resync_at`**（3 小時 ＝ 排程週期 × 3）。⚠️ 候選集合永不收斂是相鄰缺陷，見下方 🚨 | `refund_tasks.resync_at` |
 | `ReturnStuckAlertScheduler`（**L6**） | §8.4 | publish `shipment.anomaly.detected`（`RETURN_STUCK`），**走 `publishConfirmed`**；未成功即釋放租約 | **完全無搶佔** | **lease on `aftersale_cases.return_stuck_alerted_at`**，冷卻 = `returnStuckDays`（下界檢查、失敗訊號與釋放見下方 🚨） | `aftersale_cases.return_stuck_alerted_at` |
-| `ReturnLabelRetryWorker.autoRetry`（**L7**） | [§5.3.6](#536-出貨便代碼重試與人工介入) | gRPC `ShippingGrpcClient.retryReturnPrintLabel`（觸發 7-11 代碼列印） | **永久旗標**（`label_retry_count` 0→1） | **lease on `aftersale_cases.label_retry_at`**（**6 分鐘**）＋ 預算寫在副作用之後 ＋ 🔴 **不得用 `FOR UPDATE SKIP LOCKED` 當閘門** ＋ 耗盡述詞含 `label_retry_at IS NOT NULL` ＋ **失敗釋放寫「過去時間」（三態）**（全文見下方 🚨） | `aftersale_cases.label_retry_at` |
 | `ReturnLabelRetryWorker.checkExhausted`（**L7'**） | §5.3.6 | 寫 audit log `LABEL_RETRY_EXHAUSTED`（本地 DB，無外部副作用） | 永久旗標（`label_retry_count` 1→2），但**副作用是本地寫入** | **不加租約**（無外部副作用、CAS 本身即冪等）；述詞與 L7 逐字同步 | — |
 
 
@@ -5885,7 +4959,7 @@ Gateway middleware：既有 `admin` 路由群組已套用 `JWTAuth()` + `require
 
 | 層 | 內容 | 來源 |
 |---|---|---|
-| `caseDetail` | 重用既有 `AfterSaleCaseDetailView`（items / evidence / resolutions / shipment_photo_urls / 7-11 出貨便代碼 等全部） | 既有 |
+| `caseDetail` | 重用既有 `AfterSaleCaseDetailView`（items / evidence / resolutions / shipment_photo_urls 等全部） | 既有 |
 | `arbitration` | 重用 `ArbitrationData`（state / timeline[] / decision） | §10.7 |
 | `adminContext` | Admin-only 欄位：`decidedByAdminId` / `buyerAppealReason` / `buyerAppealDescription` / `sellerRejectReason` / `sellerRejectMessage` / `buyerName` / `avatarKey` / `avatarUrl` / `sellerName` / `logoKey` / `logoUrl` | 本節新增 |
 
@@ -6154,7 +5228,7 @@ message GetAppealDetailForAdminResponse {
 }
 
 message AppealDetailForAdminData {
-    AfterSaleCaseDetailView case_detail = 1;   // 重用既有（含 items / evidence / resolutions / shipment_photo_urls / 7-11 代碼等）
+    AfterSaleCaseDetailView case_detail = 1;   // 重用既有（含 items / evidence / resolutions / shipment_photo_urls 等）
     ArbitrationData arbitration = 2;            // 重用（state / timeline / decision）
     AdminContextView admin_context = 3;         // Admin-only 欄位
 }

@@ -1,64 +1,64 @@
 proto_service,rpc,implementing_deployable,disposition
-AIAdminService,ListAiStylesForAdmin,ai-service,
-AIAdminService,CreateAiStyle,ai-service,
-AIAdminService,UpdateAiStyle,ai-service,
-AIAdminService,DeleteAiStyle,ai-service,
-AIAdminService,GetAiQuota,ai-service,
-AIAdminService,UpdateAiQuota,ai-service,
-AIAdminService,DeleteAiQuota,ai-service,
-AIAssistantService,SellerChat,ai-service,
-AIAssistantService,SellerOrders,ai-service,
-AIAssistantService,SellerInventory,ai-service,
-AIAssistantService,SellerPayment,ai-service,
+AIAdminService,ListAiStylesForAdmin,ai-service,api: ImageAiAdminService.ListAiStylesForAdmin（admin Connect，modules/imageai，A9-4c）
+AIAdminService,CreateAiStyle,ai-service,api: ImageAiAdminService.CreateAiStyle（admin Connect，modules/imageai，A9-4c）
+AIAdminService,UpdateAiStyle,ai-service,api: ImageAiAdminService.UpdateAiStyle（admin Connect，modules/imageai，A9-4c）
+AIAdminService,DeleteAiStyle,ai-service,api: ImageAiAdminService.DeleteAiStyle（admin Connect，modules/imageai，A9-4c）
+AIAdminService,GetAiQuota,ai-service,api: ImageAiAdminService.GetAiQuota（admin Connect，modules/imageai，A9-4c）
+AIAdminService,UpdateAiQuota,ai-service,api: ImageAiAdminService.UpdateAiQuota（admin Connect，modules/imageai，A9-4c）
+AIAdminService,DeleteAiQuota,ai-service,api: ImageAiAdminService.DeleteAiQuota（admin Connect，modules/imageai，A9-4c）
+AIAssistantService,SellerChat,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,SellerOrders,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,SellerInventory,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,SellerPayment,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
 AIAssistantService,SellerPrice,ai-service,removed: 隨 pricebook 刪除（0fca1761）
-AIAssistantService,SellerProductListingChat,ai-service,
-AIAssistantService,SellerProductAutofill,ai-service,
-AIAssistantService,SellerLatestSession,ai-service,
-AIAssistantService,BuyerOrders,ai-service,
-AIAssistantService,BuyerTracking,ai-service,
-AIAssistantService,BuyerReturnPolicy,ai-service,
+AIAssistantService,SellerProductListingChat,ai-service,removed: 刊登助理隨 A9-D2 刪除
+AIAssistantService,SellerProductAutofill,ai-service,removed: product-autofill 隨 A9-D2 刪除
+AIAssistantService,SellerLatestSession,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,BuyerOrders,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（topic ORDERS，modules/assistant，A9-D12）
+AIAssistantService,BuyerTracking,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（topic TRACKING，modules/assistant，A9-D12）
+AIAssistantService,BuyerReturnPolicy,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（topic RETURN_POLICY，固定文案進 text/*.json，modules/assistant）
 AIAssistantService,BuyerSeasonal,ai-service,removed: 隨 pricebook 刪除（0fca1761）
-AIAssistantService,BuyerSellerMatch,ai-service,
-AIAssistantService,BuyerChat,ai-service,
-AIAssistantService,BuyerLatestSession,ai-service,
-AIImageService,TransformImage,ai-service,
-AIImageService,ListAiStyles,ai-service,
-AIProcurementService,SubmitTurn,ai-service,
-AIProcurementService,SubmitTurnStream,ai-service,
-AIProcurementService,GetSnapshot,ai-service,
-AIProcurementService,StartCandidateSearch,ai-service,
-AIProcurementService,GetCandidateSearch,ai-service,
-AIProcurementService,ToggleSelection,ai-service,
-AIProcurementService,SubmitAnswer,ai-service,
-AIProcurementService,Rewind,ai-service,
-AIProcurementService,PreviewRfqPrice,ai-service,
-AIProcurementService,ConfirmRfqSnapshot,ai-service,
-AIProcurementService,PreviewRfqPublication,ai-service,
-AIProcurementService,ExecuteRfqPublication,ai-service,
-AIProcurementService,GetRfqPublicationInviteSellerView,ai-service,
-AIProcurementService,ListConversations,ai-service,
-AIProcurementService,GetConversationMessages,ai-service,
-AIProcurementService,GetRuntimeSnapshot,ai-service,
-AIProcurementService,ListSellerPublications,ai-service,
-AIProcurementService,GetSellerPublication,ai-service,
-AIProcurementService,UpsertSellerResponseDraft,ai-service,
-AIProcurementService,GetVendorPortalResponseDraft,ai-service,
-AIProcurementService,UpsertVendorPortalResponseDraft,ai-service,
-AIProcurementService,SubmitVendorPortalResponse,ai-service,
-AIProcurementService,WithdrawVendorPortalResponse,ai-service,
-AIProcurementService,DeclineVendorPortalRfqPublication,ai-service,
-AIProcurementService,SubmitSellerResponse,ai-service,
-AIProcurementService,WithdrawSellerResponse,ai-service,
-AIProcurementService,DeclineRfqPublication,ai-service,
-AIProcurementService,ListSellerResponses,ai-service,
-AIProcurementService,PutShortlistEntry,ai-service,
-AIProcurementService,DeleteShortlistEntry,ai-service,
-AIProcurementService,AcceptSellerQuote,ai-service,
-AIProcurementService,RenameConversation,ai-service,
-AIProcurementService,DeleteConversation,ai-service,
-AIProcurementService,WatchRunEvents,ai-service,
-AIProcurementService,CancelRun,ai-service,
-AIProcurementService,ResumeRun,ai-service,
+AIAssistantService,BuyerSellerMatch,ai-service,removed: seller-match 隨 A9-D2 刪除
+AIAssistantService,BuyerChat,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（modules/assistant，A9-D12）
+AIAssistantService,BuyerLatestSession,ai-service,api: AssistantAppService.GetLatestAssistantSession（modules/assistant）
+AIImageService,TransformImage,ai-service,api: ImageAiAppService.TransformImage（Connect unary，modules/imageai，A9-4b）
+AIImageService,ListAiStyles,ai-service,api: ImageAiAppService.ListAiStyles（Connect unary，modules/imageai，A9-4b）
+AIProcurementService,SubmitTurn,ai-service,api: BuyerProcurementAppService.SubmitTurn（modules/procurement）
+AIProcurementService,SubmitTurnStream,ai-service,api: BuyerProcurementAppService.SubmitTurn 加 WatchRun（Connect server streaming，A9-D4）
+AIProcurementService,GetSnapshot,ai-service,api: BuyerProcurementAppService.GetSnapshot（modules/procurement）
+AIProcurementService,StartCandidateSearch,ai-service,api: BuyerProcurementAppService.StartCandidateSearch（modules/procurement）
+AIProcurementService,GetCandidateSearch,ai-service,api: BuyerProcurementAppService.GetCandidateSearch（modules/procurement）
+AIProcurementService,ToggleSelection,ai-service,api: BuyerProcurementAppService.ToggleSelection（modules/procurement）
+AIProcurementService,SubmitAnswer,ai-service,api: BuyerProcurementAppService.SubmitAnswer（modules/procurement）
+AIProcurementService,Rewind,ai-service,api: BuyerProcurementAppService.Rewind（modules/procurement）
+AIProcurementService,PreviewRfqPrice,ai-service,api: BuyerProcurementAppService.PreviewRfqPrice（modules/procurement，拿掉 pricebook 後的形狀）
+AIProcurementService,ConfirmRfqSnapshot,ai-service,removed: 確認快照隨 A9-D35 刪除，發布詢價直接用需求版本（PreviewRfqPublication、ExecuteRfqPublication）
+AIProcurementService,PreviewRfqPublication,ai-service,api: BuyerProcurementAppService.PreviewRfqPublication（modules/procurement）
+AIProcurementService,ExecuteRfqPublication,ai-service,api: BuyerProcurementAppService.ExecuteRfqPublication（modules/procurement；同 transaction 發布 RfqPublished，procurementrelay 轉成 notification 的邀請事件）
+AIProcurementService,GetRfqPublicationInviteSellerView,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,ListConversations,ai-service,api: BuyerProcurementAppService.ListConversations（modules/procurement）
+AIProcurementService,GetConversationMessages,ai-service,api: BuyerProcurementAppService.GetConversationMessages（modules/procurement）
+AIProcurementService,GetRuntimeSnapshot,ai-service,api: BuyerProcurementAppService.GetRuntimeSnapshot（modules/procurement）
+AIProcurementService,ListSellerPublications,ai-service,api: SellerProcurementAppService.ListSellerPublications（modules/procurement）
+AIProcurementService,GetSellerPublication,ai-service,api: SellerProcurementAppService.GetSellerPublication（modules/procurement）
+AIProcurementService,UpsertSellerResponseDraft,ai-service,api: SellerProcurementAppService.UpsertSellerResponseDraft（modules/procurement）
+AIProcurementService,GetVendorPortalResponseDraft,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,UpsertVendorPortalResponseDraft,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,SubmitVendorPortalResponse,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,WithdrawVendorPortalResponse,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,DeclineVendorPortalRfqPublication,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,SubmitSellerResponse,ai-service,api: SellerProcurementAppService.SubmitSellerResponse（modules/procurement）
+AIProcurementService,WithdrawSellerResponse,ai-service,api: SellerProcurementAppService.WithdrawSellerResponse（modules/procurement）
+AIProcurementService,DeclineRfqPublication,ai-service,api: SellerProcurementAppService.DeclineRfqPublication（modules/procurement）
+AIProcurementService,ListSellerResponses,ai-service,api: BuyerProcurementAppService.ListSellerResponses（modules/procurement）
+AIProcurementService,PutShortlistEntry,ai-service,api: BuyerProcurementAppService.PutShortlistEntry（modules/procurement）
+AIProcurementService,DeleteShortlistEntry,ai-service,api: BuyerProcurementAppService.DeleteShortlistEntry（modules/procurement）
+AIProcurementService,AcceptSellerQuote,ai-service,api: BuyerProcurementAppService.AcceptSellerQuote（modules/procurement；接受後建單 job 經 legacy ordering 的 CreateRfqOrder）
+AIProcurementService,RenameConversation,ai-service,api: BuyerProcurementAppService.RenameConversation（modules/procurement）
+AIProcurementService,DeleteConversation,ai-service,api: BuyerProcurementAppService.DeleteConversation（modules/procurement）
+AIProcurementService,WatchRunEvents,ai-service,api: BuyerProcurementAppService.WatchRun（Connect server streaming，A9-D4）
+AIProcurementService,CancelRun,ai-service,api: BuyerProcurementAppService.CancelRun（modules/procurement）
+AIProcurementService,ResumeRun,ai-service,api: BuyerProcurementAppService.ResumeRun（modules/procurement）
 AccountService,GoogleOAuth,account-service,http: IdentityPublicService.SignIn（Google）
 AccountService,AppleOAuth,account-service,http: IdentityPublicService.SignIn（Apple）
 AccountService,VerifyGoogleIdToken,account-service,removed: vendor portal 的 Google 驗證搬到單體 VendorPortalInviteeService.VerifySession（計畫 A3b 步驟 8i），舊 gateway 的 step_up 路由與 legacy 的實作一併刪除
@@ -171,13 +171,13 @@ CartService,SetItemQuantity,cart-service,
 CartService,CheckoutLock,cart-service,
 CartService,CheckoutUnlock,cart-service,
 CartService,RemoveItemsByCheckoutId,cart-service,
-CategoryService,GetCategoryTree,product-service,
-CategoryService,GetChildCategories,product-service,
-CategoryService,CreateCategory,product-service,
-CategoryService,CreateCategoryForAdmin,product-service,
-CategoryService,UpdateCategoryForAdmin,product-service,
-CategoryService,BatchSoftDeleteCategoryForAdmin,product-service,
-CategoryService,RestoreCategoryForAdmin,product-service,
+CategoryService,GetCategoryTree,product-service,http: catalog Public 分類樹（版本化種子，D8）；procurement 經模組 API
+CategoryService,GetChildCategories,product-service,removed: 無 client（B4 D5）
+CategoryService,CreateCategory,product-service,removed: 平台固定分類法，賣家不建分類（B4 D8）
+CategoryService,CreateCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
+CategoryService,UpdateCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
+CategoryService,BatchSoftDeleteCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
+CategoryService,RestoreCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
 ContentService,ListActiveBanners,content-service,http: ContentPublicService.ListLiveBanners
 ContentService,ListBanners,content-service,http: ContentAdminService.ListBanners
 ContentService,GetBanner,content-service,http: ContentAdminService.GetBanner
@@ -485,51 +485,51 @@ ProductImportService,BatchUpdateItemsShipping,product-import-service,removed: �
 ProductImportService,BatchUpdateItemsTargetStatus,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductImportService,BatchUpdateItemsCategory,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductImportService,GetCategoryConfirmationToken,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
-ProductService,CreateProduct,product-service,
-ProductService,UpdateProduct,product-service,
-ProductService,GetProduct,product-service,
-ProductService,GetPublicProduct,product-service,
-ProductService,GetProductList,product-service,
-ProductService,GetProductForAdmin,product-service,
-ProductService,UpdateProductStatus,product-service,
-ProductService,UpdateSellerProductStatus,product-service,
-ProductService,BatchUpdateSellerProductStatus,product-service,
-ProductService,BatchGetSellerProductsForDelegation,product-service,
-ProductService,PurgeProductCache,product-service,
-ProductService,DeductStock,product-service,
-ProductService,RestoreStock,product-service,
-ProductService,GetStock,product-service,
-ProductService,GetProductSimple,product-service,
-ProductService,BatchGetSkuCartInfo,product-service,
-ProductService,BatchGetProductForCheckout,product-service,
-ProductService,GetProductsByIDs,product-service,
-ProductService,GetRelatedProducts,product-service,
-ProductService,DeleteProduct,product-service,
-ProductService,CalculateShippingOptions,product-service,
-ProductService,VerifyCertification,product-service,
-ProductService,SubmitProductCertification,product-service,
-ProductService,ListProductCertificationApplications,product-service,
-ProductService,WithdrawProductCertification,product-service,
-ProductService,ListProductCertificationApplicationsForAdmin,product-service,
-ProductService,GetProductCertificationApplicationForAdmin,product-service,
-ProductService,ListProductCertificationAuditLogsForAdmin,product-service,
-ProductService,ApproveProductCertificationForAdmin,product-service,
-ProductService,RejectProductCertificationForAdmin,product-service,
-ProductService,RevokeProductCertificationForAdmin,product-service,
-ProductService,ReverifyProductCertificationForAdmin,product-service,
-ProductService,ListProductsByCategoryForAdmin,product-service,
-ProductService,BatchChangeProductCategoryForAdmin,product-service,
-ProductService,SearchHashtags,product-service,
-ProductService,GetPopularHashtags,product-service,
-ProductService,GetPublicOriginsSummary,product-service,
-ProductService,GetPublicSellerCitiesSummary,product-service,
-ProductService,ListStoreIDsWithPublicProductsInternal,product-service,
+ProductService,CreateProduct,product-service,http: catalog 賣家 App Connect 建立商品（B4-3）
+ProductService,UpdateProduct,product-service,http: catalog 賣家 App Connect 更新商品，etag（B4-3、D4）
+ProductService,GetProduct,product-service,http: catalog 賣家 App Connect 讀自己店的商品，店家由呼叫者推導（B4-3、D4）
+ProductService,GetPublicProduct,product-service,http: catalog Public Connect 商品頁（B4-3）
+ProductService,GetProductList,product-service,http: catalog Public／賣家 App／Admin 的列表與搜尋（B4-3、D15）；procurement 經模組 API
+ProductService,GetProductForAdmin,product-service,http: catalog Admin Connect 商品詳情（B4-3）
+ProductService,UpdateProductStatus,product-service,http: admin 強制下架改成商品限制措施（B4-5、D7）
+ProductService,UpdateSellerProductStatus,product-service,http: catalog 賣家 App 上下架 active／archived（B4-3、D16）
+ProductService,BatchUpdateSellerProductStatus,product-service,http: CatalogDelegatedService 批次下架（B4-5d、D9）
+ProductService,BatchGetSellerProductsForDelegation,product-service,http: CatalogDelegatedService 批次讀取（B4-5d、D9）
+ProductService,PurgeProductCache,product-service,removed: 無 client（B4 D5）
+ProductService,DeductStock,product-service,api: catalog 扣庫存（stock_movements 冪等，D2）；B8 前經 legacy/catalogserver（D1）
+ProductService,RestoreStock,product-service,api: catalog 依原扣減歸還（D2）；B8 前經 legacy/catalogserver 與 catalogconsumer（D1）
+ProductService,GetStock,product-service,removed: 無在用呼叫端（B4 D5、CD8；ai-service 隨 A9 刪，D12）
+ProductService,GetProductSimple,product-service,api: legacy/catalogserver 轉接 cart（D1），B6 刪
+ProductService,BatchGetSkuCartInfo,product-service,api: legacy/catalogserver 轉接 cart（D1），B6 刪
+ProductService,BatchGetProductForCheckout,product-service,api: catalog 結帳快照 API（D20），B8 前經 legacy/catalogserver
+ProductService,GetProductsByIDs,product-service,api: catalog 批次卡片，seller／social／buyer port 改接（B4-4）
+ProductService,GetRelatedProducts,product-service,removed: 無 client（B4 D5）
+ProductService,DeleteProduct,product-service,http: catalog 賣家 App 刪除＝deleted_at（B4-3、D16）
+ProductService,CalculateShippingOptions,product-service,removed: 運費試算不屬 catalog（B4 D10，B3 歸 seller）
+ProductService,VerifyCertification,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,SubmitProductCertification,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductCertificationApplications,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,WithdrawProductCertification,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductCertificationApplicationsForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,GetProductCertificationApplicationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductCertificationAuditLogsForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ApproveProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,RejectProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,RevokeProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ReverifyProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductsByCategoryForAdmin,product-service,removed: 無 client（B4 D5）
+ProductService,BatchChangeProductCategoryForAdmin,product-service,removed: 無 client（B4 D5）
+ProductService,SearchHashtags,product-service,http: catalog Public hashtag 自動完成（B4-3、D14）
+ProductService,GetPopularHashtags,product-service,http: catalog Public 熱門 hashtag（B4-3、D14）
+ProductService,GetPublicOriginsSummary,product-service,removed: 無 client（B4 D5）
+ProductService,GetPublicSellerCitiesSummary,product-service,removed: 無 client（B4 D5）
+ProductService,ListStoreIDsWithPublicProductsInternal,product-service,api: catalog 模組 API 給 discovery（B4-4）
 ProductService,ValidateLeafCategoryInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,CreateProductFromImportInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,BatchCheckSellerProductNames,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,ValidateProductDraft,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,GetProductsBriefInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
-RecommendationService,PersonalizedRecommend,ai-service,
+RecommendationService,PersonalizedRecommend,ai-service,removed: 個人化推薦隨 A9-D2 刪除（gateway 固定傳匿名，沒有個人化接線，沒有 website 或 buyer-app 的消費者）
 ReviewService,GetProductReviews,review-service,api: ReviewPublicService.ListProductReviews
 ReviewService,GetReview,review-service,api: ReviewAppService.GetReview
 ReviewService,ReplyReview,review-service,api: ReviewAppService.ReplyReview

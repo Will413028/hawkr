@@ -3,9 +3,17 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { uiTextFor } from "@/lib/i18n/ui-text";
 import { ProcurementClarifyComposer } from "../ProcurementClarifyChat";
-import { RUN_CANCEL_COPY } from "../runtime-snapshot-contract";
+import { runCancelCopy } from "../runtime-snapshot-contract";
 import type { RunCancelState } from "../useProcurementSession";
+
+vi.mock("@/lib/i18n/ui-text", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/lib/i18n/ui-text")>();
+	return { ...actual, useUiText: () => actual.uiTextFor("zh-TW") };
+});
+
+const ut = uiTextFor("zh-TW");
 
 /**
  * 「停止處理」那顆按鈕。
@@ -130,7 +138,7 @@ describe("composer 的停止鈕", () => {
 		renderComposer({
 			stopState: { status: "settled", disposition: "REQUESTED" },
 		});
-		expect(notice()).toBe(RUN_CANCEL_COPY.REQUESTED);
+		expect(notice()).toBe(runCancelCopy(ut, "REQUESTED"));
 		expect(stopButton().disabled).toBe(true);
 	});
 
@@ -143,19 +151,11 @@ describe("composer 的停止鈕", () => {
 			cleanup();
 			renderComposer({ stopState: { status: "settled", disposition } });
 			const text = notice();
-			expect(text).toBe(RUN_CANCEL_COPY[disposition]);
+			expect(text).toBe(runCancelCopy(ut, disposition));
 			expect(text).not.toContain("正在停止");
 			expect(text).not.toContain("已為您取消");
 			expect(stopButton().disabled).toBe(true);
 		}
-	});
-
-	it("CAS 版本過期且換不到新 token：要買家重新整理確認，不謊報已取消", () => {
-		renderComposer({ stopState: { status: "stale" } });
-		const text = notice();
-		expect(text).toContain("請重新整理確認目前結果");
-		expect(text).not.toContain("已停止");
-		expect(stopButton().disabled).toBe(true);
 	});
 
 	it("命令沒有成立（非 CAS 的錯誤）時可以重試", () => {

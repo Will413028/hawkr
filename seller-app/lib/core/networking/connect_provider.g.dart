@@ -726,6 +726,113 @@ final class NotificationClientProvider
 String _$notificationClientHash() =>
     r'ff4e279d2b0a07465dcf20087d699f25f100cfd1';
 
+/// 賣家的 AI 修圖與風格（ImageAiAppService），登入後呼叫；額度打呼叫者目前的店。
+
+@ProviderFor(imageAiClient)
+final imageAiClientProvider = ImageAiClientProvider._();
+
+/// 賣家的 AI 修圖與風格（ImageAiAppService），登入後呼叫；額度打呼叫者目前的店。
+
+final class ImageAiClientProvider
+    extends
+        $FunctionalProvider<
+          ImageAiAppServiceClient,
+          ImageAiAppServiceClient,
+          ImageAiAppServiceClient
+        >
+    with $Provider<ImageAiAppServiceClient> {
+  /// 賣家的 AI 修圖與風格（ImageAiAppService），登入後呼叫；額度打呼叫者目前的店。
+  ImageAiClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'imageAiClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$imageAiClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<ImageAiAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ImageAiAppServiceClient create(Ref ref) {
+    return imageAiClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ImageAiAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ImageAiAppServiceClient>(value),
+    );
+  }
+}
+
+String _$imageAiClientHash() => r'51d153f0c687bca9a69b5d4f55cf9b9907413af7';
+
+/// 賣家收到的詢價與回價（SellerProcurementAppService），登入後呼叫。
+
+@ProviderFor(sellerProcurementClient)
+final sellerProcurementClientProvider = SellerProcurementClientProvider._();
+
+/// 賣家收到的詢價與回價（SellerProcurementAppService），登入後呼叫。
+
+final class SellerProcurementClientProvider
+    extends
+        $FunctionalProvider<
+          SellerProcurementAppServiceClient,
+          SellerProcurementAppServiceClient,
+          SellerProcurementAppServiceClient
+        >
+    with $Provider<SellerProcurementAppServiceClient> {
+  /// 賣家收到的詢價與回價（SellerProcurementAppService），登入後呼叫。
+  SellerProcurementClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sellerProcurementClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sellerProcurementClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<SellerProcurementAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  SellerProcurementAppServiceClient create(Ref ref) {
+    return sellerProcurementClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(SellerProcurementAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<SellerProcurementAppServiceClient>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$sellerProcurementClientHash() =>
+    r'b86fe8d641f6ff55ad209078464ee59434b35de2';
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 
 @ProviderFor(sellerPublicClient)

@@ -57,7 +57,7 @@ func readGCIS(e *config.Env) *gcis.Client {
 // job（圖片、治理佐證與 KYC 補充文件的引用收斂、處分的到期與對帳、匿名通報人聯絡欄位的清理、關店滿保留期的個資清理、
 // 商家名單圖片的引用收斂、商品瀏覽事件的彙總與清理；排程的是 PeriodicJobs）。orders 是店家未結訂單的 port（自己關店用；刪帳號的
 // accountdeletion 用同一個實作），products 是商品所屬店家的 port（彙總瀏覽事件用，見 sellerProducts）。
-// 它的事件由 subscribeSellerRelay 轉成給舊服務的 RabbitMQ 訊息（sellerrelay），治理事件的通知在 A8。
+// 它的事件由 subscribeSellerRelay 轉成給舊服務的 RabbitMQ 訊息（sellerrelay），治理事件的通知由 notification 模組訂閱。
 func newSeller(d *db.DB, bus *events.Bus, jc jobs.ReportingEnqueuer, id *identity.Module, med mediaPort, orders seller.Orders, products seller.ProductStores, kycMAC *seal.MAC, payments *payment.Module, registry *gcis.Client, log *slog.Logger) *seller.Module {
 	return seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: jc, Identity: id, Media: med, Orders: orders, KYCMAC: kycMAC,

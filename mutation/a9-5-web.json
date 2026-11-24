@@ -1,0 +1,17 @@
+{"mutants": [
+  {"id": "watch-reconnect-drops-cursor", "stack": "website", "file": "website/features/procurement-assistant/watch-run.ts",
+   "old": "\t\t\t\t\tremember(event.cursor);\n\t\t\t\t\tcursor = event.cursor;\n",
+   "new": "\t\t\t\t\tremember(event.cursor);\n",
+   "test": "features/procurement-assistant/watch-run.unit.test.ts 150 秒的一輪被 100 秒的串流切成兩段",
+   "why": "重連時不帶最後收到的 cursor，第二條串流從頭重播，150 秒一輪的事件會重複"},
+  {"id": "watch-duplicate-not-deduped", "stack": "website", "file": "website/features/procurement-assistant/watch-run.ts",
+   "old": "\t\t\t\t\tif (seen.has(event.cursor)) continue;\n",
+   "new": "",
+   "test": "features/procurement-assistant/watch-run.unit.test.ts 重連後伺服器重播已送達的事件",
+   "why": "拿掉以 cursor 去重，重播的事件會被交給畫面第二次"},
+  {"id": "failure-text-hardcoded-fallback", "stack": "website", "file": "website/features/procurement-assistant/errors.ts",
+   "old": "\t\tdetail: errorText(connectErr, defaults),\n",
+   "new": "\t\tdetail: \"hard-coded fallback\",\n",
+   "test": "features/procurement-assistant/errors.unit.test.ts 文字取伺服器的 LocalizedMessage",
+   "why": "錯誤文字改成寫死的後備句，不再取伺服器訊息或目錄預設文字"}
+]}

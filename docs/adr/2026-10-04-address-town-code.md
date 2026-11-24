@@ -74,3 +74,5 @@
 ## 修訂：TS 對照表改成共用套件（2026-10-09，A3b 10e）
 
 admin 的店家與 KYC 審核也要把代碼轉成名稱。TS 的生成物與查詢從 website 搬到 `packages/hawkr-twaddr-ts`（`@hawkr/twaddr`），website 與 admin 共用，和 Dart 的 `packages/hawkr_twaddr` 對稱；不採 admin 複製一份或直接顯示代碼。原決策段保留歷史，基準不變（單一來源生成到各平台）。
+
+物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

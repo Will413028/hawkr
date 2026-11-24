@@ -9,60 +9,30 @@ import (
 )
 
 const (
-	defaultMaxBodyBytes = 2 << 20  // 2MiB — general JSON API routes
-	uploadMaxBodyBytes  = 10 << 20 // 10MiB — image/CSV upload routes with client-side compression
+	defaultMaxBodyBytes = 2 << 20 // 2MiB — general JSON API routes
 
-	defaultReadDeadline = 30 * time.Second  // general routes: small JSON bodies, no reason to need longer
-	uploadReadDeadline  = 120 * time.Second // upload routes: 10MiB must survive slow mobile uplinks
+	defaultReadDeadline = 30 * time.Second // general routes: small JSON bodies, no reason to need longer
 )
-
-// bodyLimits pairs a route's accept-size cap with how long it's allowed to
-// take to arrive — the two must be tiered together, not set independently.
-// A fixed 30s read deadline applied uniformly across every route, including
-// the 10MiB upload tier, would silently abort a legitimate upload before it
-// finishes on a slow mobile connection: SetReadDeadline is an ABSOLUTE
-// deadline for reading the entire remaining body, not a per-chunk/idle
-// timeout, so 10MiB in 30s requires ~2.7 Mbps sustained — routine to miss on
-// congested/rural mobile uplinks. This was caught in whole-branch review,
-// not the per-task review, because judging BodyGuard's deadline in isolation
-// never weighs it against the size tier it simultaneously allows.
-type bodyLimits struct {
-	maxBytes     int64
-	readDeadline time.Duration
-}
-
-// uploadRoutes lists routes that legitimately need a larger body — and
-// correspondingly longer read deadline — than the default tier, keyed by
-// "METHOD fullpath" (c.FullPath()'s route template, not the resolved URL).
-// New routes are covered by the default tier automatically — this map only
-// needs entries for the exceptions.
-var uploadRoutes = map[string]bodyLimits{
-	"POST /api/v1/app/image_transformations": {uploadMaxBodyBytes, uploadReadDeadline},
-}
 
 // BodyGuard bounds request body size and read duration before any handler
 // or downstream middleware (Logger in particular) reads the body. Must run
 // before Logger in the middleware chain (see infrastructure.newEngine).
 func BodyGuard() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		limits := bodyLimits{defaultMaxBodyBytes, defaultReadDeadline}
-		if v, ok := uploadRoutes[c.Request.Method+" "+c.FullPath()]; ok {
-			limits = v
-		}
-		if c.Request.ContentLength > limits.maxBytes {
+		if c.Request.ContentLength > defaultMaxBodyBytes {
 			response.Err(c, http.StatusRequestEntityTooLarge, http.StatusRequestEntityTooLarge, "request body too large")
 			c.Abort()
 			return
 		}
 		// Known, accepted limitation: for chunked/unknown Content-Length
 		// requests, an oversized body is only caught here at read time, and
-		// proxy.CreateProxy (the reverse-proxy handler for upload routes)
+		// proxy.CreateProxy (the reverse-proxy handler)
 		// will likely surface that as a copy error rather than a clean 413.
 		// Bounded memory still holds either way; only status-code cleanliness
 		// differs, and only for this rare chunked-transfer case.
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limits.maxBytes)
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, defaultMaxBodyBytes)
 
-		// Bound slow-body attacks uniformly, tiered per route above — but only
+		// Bound slow-body attacks uniformly — but only
 		// for requests that actually HAVE a body. Calling
 		// ResponseController.SetReadDeadline on a bodyless request (GET, or
 		// any ContentLength==0 request) trips a still-open Go stdlib bug
@@ -80,7 +50,7 @@ func BodyGuard() gin.HandlerFunc {
 		// IS a body there, just of unknown size.
 		// http.NewResponseController never returns nil — no nil check needed.
 		if c.Request.ContentLength != 0 {
-			_ = http.NewResponseController(c.Writer).SetReadDeadline(time.Now().Add(limits.readDeadline))
+			_ = http.NewResponseController(c.Writer).SetReadDeadline(time.Now().Add(defaultReadDeadline))
 		}
 		c.Next()
 	}

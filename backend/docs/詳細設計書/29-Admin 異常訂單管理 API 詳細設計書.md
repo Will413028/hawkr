@@ -703,7 +703,6 @@ message AdminGrantSummary {
 | 參數 | 說明 |
 |---|---|
 | `is_return` | `"true"` / `"false"`（預設不過濾） |
-| `shipping_method` | `TAQBIN` / `SEVEN_ELEVEN_STORE_PICKUP` / `UBER_INSTANT` |
 | `store_id` | 依賣家過濾 |
 | `order_no` | 依訂單號過濾 |
 

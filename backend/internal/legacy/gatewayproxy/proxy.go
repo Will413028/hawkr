@@ -49,9 +49,6 @@ const (
 	headerActiveRole         = "X-Active-Role"
 )
 
-// vendorPortalHeaderPrefix 是 gateway 的供應商入口路由信任的 header 前綴；單體入口一律刪掉 client 帶來的這類 header（不分大小寫）。
-const vendorPortalHeaderPrefix = "X-Vendor-Portal-"
-
 // 連 gateway 的逾時。SSE 與 WebSocket 會長時間佔著連線，所以不設整體的逾時，只限制連線與等到回應 header 的時間。
 const (
 	dialTimeout           = 5 * time.Second
@@ -221,7 +218,6 @@ func New(gatewayURL string, callerOf CallerOf, buyers BuyerLookup, sellers Selle
 			ok := c.Principal.ID > 0
 			StripSessionCredentials(pr.Out.Header)
 			SetIdentity(pr.Out.Header, c, ok)
-			stripVendorPortalHeaders(pr.Out.Header)
 		},
 		// 串流（SSE）逐筆送出。
 		FlushInterval: -1,
@@ -299,14 +295,5 @@ func SetIdentity(h http.Header, c Caller, ok bool) {
 	h.Set(HeaderAccountType, strconv.Itoa(accounttype.OfLiveAccount(c.Principal.Roles)))
 	if v := accounttype.OfLoginRole(c.Principal, hint); v != 0 {
 		h.Set(HeaderLoginRole, strconv.Itoa(v))
-	}
-}
-
-func stripVendorPortalHeaders(h http.Header) {
-	prefix := strings.ToLower(vendorPortalHeaderPrefix)
-	for k := range h {
-		if strings.HasPrefix(strings.ToLower(k), prefix) {
-			delete(h, k)
-		}
 	}
 }

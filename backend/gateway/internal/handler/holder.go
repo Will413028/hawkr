@@ -12,37 +12,30 @@ import (
 // Holder aggregates all gRPC clients needed by HTTP handlers.
 // Constructed via fx DI; each client is lazily-connected by grpc.NewClient.
 type Holder struct {
-	Account       *grpcclient.AccountClient
-	Seller        *grpcclient.SellerClient
-	Buyer         *grpcclient.BuyerClient
-	Product       *grpcclient.ProductClient
-	Order         *grpcclient.OrderClient
-	Cart          *grpcclient.CartClient
-	Notification  *grpcclient.NotificationClient
-	Shipping      *grpcclient.ShippingClient
-	Coupon        *grpcclient.CouponClient
-	AI            *grpcclient.AIClient
-	AIAssistant   *grpcclient.AIAssistantClient
-	AIProcurement *grpcclient.AIProcurementClient
-	Category      *grpcclient.CategoryClient
-	Aftersales    *grpcclient.AftersalesClient
-	Invoice       *grpcclient.InvoiceServiceClient
-	Store         *storeid.Resolver
-	BuyerID       *buyerid.Resolver
-	MediaBaseURL  string
-	WebBaseURL    string
-	Docs          *Docs
+	Account      *grpcclient.AccountClient
+	Seller       *grpcclient.SellerClient
+	Buyer        *grpcclient.BuyerClient
+	Product      *grpcclient.ProductClient
+	Order        *grpcclient.OrderClient
+	Cart         *grpcclient.CartClient
+	Notification *grpcclient.NotificationClient
+	Shipping     *grpcclient.ShippingClient
+	Coupon       *grpcclient.CouponClient
+	Category     *grpcclient.CategoryClient
+	Aftersales   *grpcclient.AftersalesClient
+	Invoice      *grpcclient.InvoiceServiceClient
+	Store        *storeid.Resolver
+	BuyerID      *buyerid.Resolver
+	MediaBaseURL string
+	WebBaseURL   string
+	Docs         *Docs
 	// Delegation carries the per-hop gRPC deadlines for ADM 代行營運 (56 §8.5.1 (A)).
 	// Deadlines belong to the caller, and the caller of every delegated hop is the
 	// Gateway — so the numbers travel with the holder rather than being re-read from
 	// the environment at each call site, where they would drift into a second copy.
-	Delegation config.DelegationConfig
-	// ProcurementReplaySseEnabled 是 config.Config.ProcurementReplaySseEnabled 的
-	// copy-through（同 MediaBaseURL／WebBaseURL／Delegation 既有慣例），gate
-	// ProxyProcurementRunEvents（見 ai.go）。
-	ProcurementReplaySseEnabled bool
-	SSEHub                      *sse.Hub
-	RealtimeReg                 *realtime.Registry
+	Delegation  config.DelegationConfig
+	SSEHub      *sse.Hub
+	RealtimeReg *realtime.Registry
 	// NotifChannel 以介面型別持有（fx 仍注入 *realtime.NotificationChannel）：
 	// serveSSE 本來就吃 realtime.Channel，介面化後測試才注入得了 spy channel 去
 	// 斷言「訂閱時真正送進 Hub 的 topic 字串」——那正是身分空間錯了會壞掉的地方，

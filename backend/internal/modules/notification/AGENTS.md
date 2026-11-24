@@ -2,7 +2,7 @@
 
 ## 職責
 
-站內通知的收件匣、偏好、裝置 token、投遞紀錄與通知型別註冊表，取代 `services/notification-service`（遷移計畫 A8）。來源模組在自己的 transaction 內只排一個通知意圖 job；worker 解析收件人、套偏好、寫收件匣與投遞紀錄，每筆新投遞紀錄同 transaction 排 `notification.deliver` job。已建：資料模型、註冊表、意圖管線、保留期與個資清除、公告、渠道 job（`internal/deliver`）、suppression webhook、token 清除、內容側（A8-3b）與治理側（A8-3c）型別。行為規格的唯一來源是 `backend/docs/plans/2026-11-23-a8-notification.md`（D0–D18）與 ADR `docs/adr/2026-10-05-notification-module.md`。
+站內通知的收件匣、偏好、裝置 token、投遞紀錄與通知型別註冊表，取代 `services/notification-service`。來源模組在自己的 transaction 內只排一個通知意圖 job；worker 解析收件人、套偏好、寫收件匣與投遞紀錄，每筆新投遞紀錄同 transaction 排 `notification.deliver` job。已建：資料模型、註冊表、意圖管線、保留期與個資清除、公告、渠道 job、suppression webhook、token 清除、內容側與治理側型別、重送與未觸達查詢。行為規格的唯一來源是 `backend/docs/plans/2026-11-23-a8-notification.md`（D0–D18）與 ADR `docs/adr/2026-10-05-notification-module.md`。
 
 ## 擁有的資料
 
@@ -10,20 +10,21 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 
 ## 發布的讀取介面
 
-- `Watch`：訂閱 `(帳號, 受眾)` 的訊號串流（STORE 帶現任店）。
+- `Watch`：訂閱 `(帳號, 受眾)` 的訊號串流。
 - `Run(ctx)`：LISTEN 連線，只有 serve 跑。
 - `PublishSellerWorkspace(ctx, storeID, change)`：在呼叫端的 transaction 內呼叫（D19）。
 
 ## 模組內部結構
 
-- 根套件只保留 `Module`、`New`、`Migrations`、各來源事件的訂閱者入口（`On*`）、治理與交易側的訂閱登記 `SubscribeGovernance`、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建）。
+- 根套件只保留 `Module`、`New`、`Migrations`、各來源事件的訂閱者入口（`On*`）、訂閱表 `subscriptions.go`、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建）。
 - `internal/intake`：意圖管線與 fan-out；`subscribers*.go` 的同步訂閱者只呼叫 `Accept`（插 `intents` 列並排 `notification.process_intent` job），`Process`（worker）解析收件人、鎖收件人、略過封鎖與自己、套偏好、寫收件匣與投遞紀錄；不變量見 `internal/intake/AGENTS.md`。
 - `internal/stream`：串流 hub；不變量見 `internal/stream/AGENTS.md`。
 - `internal/purge`：保留期清除與個資清除；不變量見 `internal/purge/AGENTS.md`。
 - `internal/announce`：後台公告與派送 job 鏈；見其 `AGENTS.md`。
+- `internal/reach`：重送永久失敗的投遞、未觸達查詢；見 `RUNBOOK.md`。
 - `internal/model`：受眾、渠道、偏好分類（D4）、呈現分類（D6）與「不可關」規則。
 - `internal/registry`：型別註冊表。每個型別一個 `Definition[P]`（typed 參數、受眾、分類、渠道、冪等鍵、聚合鍵、actor、文案、深連結、圖片），`Define` 變成 `Entry`。
-- `internal/text`：zh-TW、en 文案（`make uitext` 生成 `text_gen.go`）；`internal/store` 是 sqlc 套件（`db/queries/intake.sql`、`retention.sql`）。
+- `internal/text`：zh-TW、en 文案（`make uitext` 生成 `text_gen.go`）；`internal/store` 是 sqlc 套件（`db/queries/`）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 不變量

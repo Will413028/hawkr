@@ -5,6 +5,22 @@
 		"loading": "Processing…",
 		"memberFallback": "Member"
 	},
+	"procurementAssistant": {
+		"candidateSearchLabel": "Search candidates",
+		"candidateSearchPlaceholder": "Search candidates or criteria",
+		"candidateTableLabel": "Candidate data",
+		"candidateNoMatch": "No candidates match the filter",
+		"searchProgressTitle": "Searching for candidate suppliers",
+		"missingSellerFacingHash": "This screen did not receive the verification token for the inquiry content, so the server will reject any accept request. Go back to the inquiry flow and reload.",
+		"priceConfirmedNext": "Price confirmed. Next, confirm who it goes to",
+		"recipientsNotFixed": "Invited sellers are fixed only when the inquiry is officially published.",
+		"snapshotApprovalHint": "After you confirm, this version of the requirements and target range is used to prepare publication approval.",
+		"sellerCount": "{count, plural, one {# seller} other {# sellers}}",
+		"demoFlag": "The buyer half is real: the requirement, the recipient list, and the offer range are all sent to the server for a price preview. The seller half is local state; nothing is sent and nobody is notified.",
+		"demoFinalizeFailed": "Could not finalize. The requirement version has most likely changed. Refresh and try again.",
+		"demoPriceHelp": "The ideal price is the unit price you want to close at; the acceptable range is how far you are willing to give. When you finalize, the range is sent to the server for a price preview, which writes no data.",
+		"demoBoundary": "Pressing this only runs the price preview. It writes no data and notifies no seller. Publishing an inquiry is a publication-approval matter and this demo does not call it."
+	},
 	"validation": {
 		"required": "This field is required",
 		"invalidEmail": "Enter a valid email address"

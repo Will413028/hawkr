@@ -162,7 +162,6 @@ var bizHTTPStatus = map[int32]int{
 	// 等憑證補上之後入口也不會自己回來（與 9503 那一組逐字同源的顧慮）。
 	// 🔴 424 而非 5xx：本表的值一律必須是 4xx，理由見檔頭（CF 會換掉 origin 的 5xx body）。
 	bizcode.FeatureAddressLookupDisabled: http.StatusFailedDependency, // 424
-	bizcode.FeatureAiAssistantDisabled:   http.StatusFailedDependency, // 424
 
 	// 🔴 9705 與 9503 FulfillmentProviderNotEnabled 刻意不同 status：9503 是 403
 	// 「這個賣家沒開通這個配送方式」（賣家自己建店就能解），9705 是 424「我方的 PayUni

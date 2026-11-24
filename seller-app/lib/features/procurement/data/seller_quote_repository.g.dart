@@ -55,4 +55,4 @@ final class SellerQuoteRepositoryProvider
 }
 
 String _$sellerQuoteRepositoryHash() =>
-    r'cf825ed5e12a81bed7119a1511e058453d2945e6';
+    r'536bff5ca3587cf09fbb43079b2647b8cc143084';

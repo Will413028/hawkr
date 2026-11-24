@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { __setEnvForTest, getEnv } from "@/lib/config/env";
 import type { SellerProductDetail } from "@/lib/products/seller-repo";
 import {
-	applyAiPatch,
 	applyImagesUpdate,
 	draftToSubmitBody,
 	emptyDraft,

@@ -1,9 +1,11 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button, Dialog } from "@/components/ui";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
+import { useUiText } from "@/lib/i18n/ui-text";
 import styles from "@/styles/features/procurement-assistant/buyer-quote-compare.module.css";
 import {
 	type BuyerFacingSellerResponse,
@@ -44,10 +46,10 @@ import {
 export interface BuyerQuoteComparisonProps {
 	responses: readonly BuyerFacingSellerResponse[];
 	/**
-	 * 已確認快照本身的 hash（`RfqConfirmation.payloadHash`），接受時原樣回送做
-	 * CAS。空字串＝這個畫面沒有可用的比對權杖，所有接受一律 fail closed。
+	 * 賣家實際收到的詢價內容的 hash（`PublishedRfq.seller_facing_hash`），接受時原樣回送做
+	 * 比對。空字串＝這個畫面沒有可用的比對權杖，所有接受一律 fail closed。
 	 */
-	rfqSnapshotHash: string;
+	sellerFacingHash: string;
 	onToggleShortlist: (
 		target: QuoteShortlistTarget,
 		shortlisted: boolean,
@@ -55,8 +57,8 @@ export interface BuyerQuoteComparisonProps {
 	onAcceptQuote: (
 		command: BuyerQuoteAcceptanceCommand,
 	) => Promise<BuyerQuoteResult<BuyerQuoteAcceptanceResponse>>;
-	/** 一次送出動作一把；重試沿用同一把是本元件的責任。 */
-	createIdempotencyKey: () => string;
+	/** 一次送出動作一個 client_request_id；重試沿用同一個是本元件的責任。 */
+	createClientRequestId: () => string;
 	/** 報價已變動、快照已過期這類錯誤要能讓買家重新載入清單。 */
 	onRefresh?: () => void;
 }
@@ -101,10 +103,17 @@ function quoteTarget(
 	};
 }
 
+const NOT_PROVIDED = "未提供";
+
 /** 時間欄位一律走台北固定偏移；空字串代表沒有這個事實，整格不顯示。 */
 function taipeiOrDash(raw: string): string {
 	const text = formatTaipeiDateTime(raw);
-	return text ? `${text}（Asia/Taipei）` : "未提供";
+	return text ? `${text}（Asia/Taipei）` : NOT_PROVIDED;
+}
+
+/** 空字串＝賣家沒有承諾交期。 */
+function leadTimeText(leadTimeDays: string): string {
+	return leadTimeDays === "" ? NOT_PROVIDED : `${leadTimeDays} 天`;
 }
 
 function unitBasisText(response: BuyerFacingSellerResponse): string {
@@ -133,12 +142,8 @@ function QuoteDetail({ response }: { response: BuyerFacingSellerResponse }) {
 				</dd>
 			</div>
 			<div>
-				<dt>實際品相</dt>
-				<dd>{quote.offeredQuality.grade || "賣家未填"}</dd>
-			</div>
-			<div>
 				<dt>驗貨說明</dt>
-				<dd>{quote.offeredQuality.inspectionNotes || "無"}</dd>
+				<dd>{quote.specNote || "無"}</dd>
 			</div>
 			<div>
 				<dt>計價基準</dt>
@@ -175,7 +180,7 @@ function QuoteDetail({ response }: { response: BuyerFacingSellerResponse }) {
 			</div>
 			<div>
 				<dt>交期</dt>
-				<dd>{`${quote.leadTimeDays} 天`}</dd>
+				<dd>{leadTimeText(quote.leadTimeDays)}</dd>
 			</div>
 			<div>
 				<dt>承諾到貨</dt>
@@ -203,12 +208,14 @@ function QuoteDetail({ response }: { response: BuyerFacingSellerResponse }) {
 
 export default function BuyerQuoteComparison({
 	responses,
-	rfqSnapshotHash,
+	sellerFacingHash,
 	onToggleShortlist,
 	onAcceptQuote,
-	createIdempotencyKey,
+	createClientRequestId,
 	onRefresh,
 }: BuyerQuoteComparisonProps) {
+	const t = useTranslations("procurementAssistant");
+	const ut = useUiText();
 	const [expanded, setExpanded] = React.useState<string | null>(null);
 	const [flow, setFlow] = React.useState<AcceptFlow>({ status: "idle" });
 	const [shortlistError, setShortlistError] =
@@ -216,16 +223,16 @@ export default function BuyerQuoteComparison({
 	const [pendingShortlist, setPendingShortlist] = React.useState<string | null>(
 		null,
 	);
-	// 同一個版本的重試必須沿用同一把冪等鍵，否則伺服器上會多出第二筆接受。
-	// 換一個版本就是換一次送出動作，各自一把。
-	const idempotencyKeys = React.useRef(new Map<string, string>());
+	// 同一個版本的重試必須沿用同一個 client_request_id，否則伺服器上會多出第二筆接受。
+	// 換一個版本就是換一次送出動作，各自一個。
+	const clientRequestIds = React.useRef(new Map<string, string>());
 
 	const accepted = flow.status === "accepted" ? flow.ack : null;
 	// 有一筆接受成立之後這張詢價就鎖住了：伺服器對第二次會回
 	// RFQ_CHECKOUT_ALREADY_ACTIVE／RFQ_ALREADY_AWARDED，畫面先誠實反映。
 	const locked = accepted !== null;
 	const comparable = hasComparableUnitBasis(responses);
-	const missingSnapshotHash = rfqSnapshotHash === "";
+	const missingSellerFacingHash = sellerFacingHash === "";
 
 	const toggleShortlist = React.useCallback(
 		async (response: BuyerFacingSellerResponse) => {
@@ -245,15 +252,15 @@ export default function BuyerQuoteComparison({
 	const submitAccept = React.useCallback(
 		async (response: BuyerFacingSellerResponse) => {
 			const key = responseKey(response);
-			const idempotencyKey =
-				idempotencyKeys.current.get(key) ?? createIdempotencyKey();
-			idempotencyKeys.current.set(key, idempotencyKey);
+			const clientRequestId =
+				clientRequestIds.current.get(key) ?? createClientRequestId();
+			clientRequestIds.current.set(key, clientRequestId);
 			setFlow({ status: "submitting", response });
 			const result = await onAcceptQuote({
-				idempotencyKey,
+				clientRequestId,
 				sellerResponseId: response.sellerResponseId,
 				expectedSellerResponseVersion: response.sellerResponseVersion,
-				expectedRfqSnapshotHash: rfqSnapshotHash,
+				expectedSellerFacingHash: sellerFacingHash,
 			});
 			if (result.ok) {
 				setFlow({ status: "accepted", ack: result.data });
@@ -261,7 +268,7 @@ export default function BuyerQuoteComparison({
 			}
 			setFlow({ status: "failed", response, error: result.error });
 		},
-		[createIdempotencyKey, onAcceptQuote, rfqSnapshotHash],
+		[createClientRequestId, onAcceptQuote, sellerFacingHash],
 	);
 
 	const confirming =
@@ -323,16 +330,12 @@ export default function BuyerQuoteComparison({
 				</div>
 			) : null}
 
-			{missingSnapshotHash ? (
+			{missingSellerFacingHash ? (
 				<div className={styles.notice} data-tone="warning" role="alert">
 					<AppIcon name="warning" size={18} aria-hidden="true" />
 					<div>
 						<strong>目前無法接受任何版本</strong>
-						<p>
-							{
-								"這個畫面沒有取得已確認快照的比對權杖，接受請求一定會被伺服器拒絕。請回到詢價流程重新確認快照。"
-							}
-						</p>
+						<p>{t("missingSellerFacingHash")}</p>
 					</div>
 				</div>
 			) : null}
@@ -452,7 +455,9 @@ export default function BuyerQuoteComparison({
 													}
 												</span>
 											</td>
-											<td data-label="交期">{`${response.quote.leadTimeDays} 天`}</td>
+											<td data-label="交期">
+												{leadTimeText(response.quote.leadTimeDays)}
+											</td>
 											<td data-label="有效至">
 												{taipeiOrDash(response.quote.validUntil)}
 											</td>
@@ -461,7 +466,7 @@ export default function BuyerQuoteComparison({
 													className={styles.acceptability}
 													data-acceptable={acceptable || undefined}
 												>
-													{quoteAcceptabilityLabel(response.acceptability)}
+													{quoteAcceptabilityLabel(ut, response.acceptability)}
 												</span>
 											</td>
 											<td data-label="動作">
@@ -492,7 +497,7 @@ export default function BuyerQuoteComparison({
 													<Button
 														size="sm"
 														disabled={
-															!acceptable || locked || missingSnapshotHash
+															!acceptable || locked || missingSellerFacingHash
 														}
 														onClick={() =>
 															setFlow({ status: "confirming", response })

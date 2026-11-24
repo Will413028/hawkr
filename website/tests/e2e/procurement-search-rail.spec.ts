@@ -1,43 +1,58 @@
 import { expect, type Page, test } from "@playwright/test";
 import {
+	ConnectFailure,
+	mockProcurementUnary,
+	mockWatchRun,
+	turnResultJson,
+	watchFrame,
+} from "./helpers/mock-procurement-connect";
+import {
+	candidateJson,
+	candidateSearchJson,
+	RFQ_CONVERSATION_ID,
+	RFQ_IDS,
 	RFQ_REQUEST_ID,
 	RFQ_RUN_ID,
 	setupRfqPriceReview,
+	snapshotReadyJson,
 } from "./helpers/mock-procurement-rfq";
 
-/** 三列 activity 加上一筆重複 heartbeat，形狀取自 gateway golden fixture
- * custom-activity-candidate-search-rail.sse；`id:` 行是 GET replay 專屬的
- * ledger-seq cursor。中間那個 `: ping` 是 gateway 每 20 秒無條件寫的 keepalive
- * （`ai_run_events_stream.go` 的 sseKeepaliveInterval）：任何超過 20 秒的搜尋
- * 都會收到，它一旦被當成事件分派就會讓整條訂閱在 20 秒死掉，所以第三列收不
- * 收得到就是這條線活著的證據。 */
-const RAIL_SSE = [
-	'id: 1\ndata: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"SEARCH_CANDIDATES","label":"搜尋候選供應商","maxAttempts":1,"retryGroupKey":"9001","rowId":"9001","status":"RUNNING","text":""}}\n\n',
-	'id: 2\ndata: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"SEARCH_PLATFORM","count":"12","label":"翻平台上的賣家","maxAttempts":1,"parentRowId":"9001","retryGroupKey":"9002","rowId":"9002","status":"SUCCEEDED","text":""}}\n\n',
-	": ping\n\n",
-	'id: 3\ndata: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"SEARCH_PLATFORM","count":"12","label":"翻平台上的賣家","maxAttempts":1,"parentRowId":"9001","retryGroupKey":"9002","rowId":"9002","status":"SUCCEEDED","text":""}}\n\n',
-	'id: 4\ndata: {"type":"CUSTOM","name":"activity","value":{"attempt":1,"code":"SUMMARIZE","label":"整理成給你的建議","maxAttempts":1,"retryGroupKey":"9004","rowId":"9004","status":"PENDING","text":""}}\n\n',
-].join("");
+/** 三列 activity 加上一筆重複 heartbeat（同一列同一狀態再來一次，cursor 不同），
+ * 最後以 `finished` 正常結束串流。第三列收不收得到，就是重複的那一筆沒有把列重複畫出來、
+ * 也沒有讓訂閱中斷的證據。 */
+function railFrames() {
+	const searchParent = {
+		rowId: "9001",
+		code: "SEARCH_CANDIDATES",
+		label: "搜尋候選供應商",
+		status: "RUNNING",
+	} as const;
+	const platformRow = {
+		rowId: "9002",
+		code: "SEARCH_PLATFORM",
+		label: "翻平台上的賣家",
+		status: "SUCCEEDED",
+		parentRowId: "9001",
+		count: 12,
+	} as const;
+	return [
+		watchFrame.accepted("s1", RFQ_RUN_ID, RFQ_CONVERSATION_ID),
+		watchFrame.activity("s2", searchParent),
+		watchFrame.activity("s3", platformRow),
+		watchFrame.activity("s4", platformRow),
+		watchFrame.activity("s5", {
+			rowId: "9004",
+			code: "SUMMARIZE",
+			label: "整理成給你的建議",
+			status: "PENDING",
+		}),
+		watchFrame.finished("s6"),
+	];
+}
 
 /** 一直回 RUNNING，讓 searching 階段停得夠久看得到軌。 */
 function runningPoll() {
-	return {
-		status: 200,
-		contentType: "application/json",
-		body: JSON.stringify({
-			code: 0,
-			data: {
-				requestId: "1234567890123456788",
-				runId: "1234567890123456800",
-				candidateSetId: "candidate-set-e2e",
-				status: "RUNNING",
-				platformLaneStatus: "PENDING",
-				externalLaneStatus: "PENDING",
-				failureReason: "",
-				candidates: { platform: [], external: [] },
-			},
-		}),
-	};
+	return candidateSearchJson("RUNNING");
 }
 
 async function settleFiniteAnimations(page: Page) {
@@ -66,13 +81,8 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 		);
 		await setupRfqPriceReview(page, {
 			stopAtSearching: true,
-			candidateSearchPollHandler: (route) => route.fulfill(runningPoll()),
-			runEventsHandler: (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "text/event-stream",
-					body: RAIL_SSE,
-				}),
+			candidateSearchPollHandler: runningPoll,
+			searchWatchFrames: railFrames,
 		});
 
 		// 完整處理區已在主對話，不另留同一狀態的單行泡泡。
@@ -111,9 +121,9 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 			"data-status",
 			"SUCCEEDED",
 		);
-		// 舊的兩列 lane 卡片被子列取代，不並存。
+		// 輪詢進度卡片被子列取代，不並存。
 		await expect(page.getByText("正在搜尋候選")).toHaveCount(0);
-		// lane 子列真的掛在父列底下（一層巢狀），不是攤平的四列。
+		// 子列真的掛在父列底下（一層巢狀），不是攤平的三列。
 		await expect(
 			rail.locator('.hawkr-agent-rail__children [data-row-id="9002"]'),
 		).toHaveCount(1);
@@ -143,29 +153,30 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 		});
 	});
 
-	test("端點回 503 時退回既有的兩列 lane 卡片", async ({ page }) => {
+	test("搜尋 run 沒有 activity 事件時退回輪詢進度卡片", async ({ page }) => {
 		test.setTimeout(45_000);
 		await setupRfqPriceReview(page, {
 			stopAtSearching: true,
-			candidateSearchPollHandler: (route) => route.fulfill(runningPoll()),
-			// runEventsHandler 不傳 → helper 預設 503，等同今天的 prod。
+			candidateSearchPollHandler: runningPoll,
+			// searchWatchFrames 不傳 → helper 預設只有 run_accepted 與 finished（A9-D29）。
 		});
 
 		const processing = page.getByTestId("agent-processing");
 		await expect(processing).toBeVisible();
 		await expect(page.locator("#hawkr-agent-side-panel")).toHaveCount(0);
 
-		// exact: true——兩個 label 都撞到 `CandidateSearchProgress` 自己的說明
-		// 文字：sr-only 的常駐播報退回「正在搜尋候選供應商」（「正在搜尋候選」的
-		// 超字串），「平台賣家」則是「平台賣家與外部名單分開查詢…」那句的子字串，
-		// 鬆散比對都會撞上兩個節點。
+		// exact: true——sr-only 的常駐播報退回「正在搜尋候選供應商」，是「正在搜尋候選」
+		// 與「搜尋候選供應商」的超字串，鬆散比對都會撞上兩個節點。
 		await expect(
 			processing.getByText("正在搜尋候選", { exact: true }),
 		).toBeVisible({
 			timeout: 15_000,
 		});
-		await expect(page.getByText("平台賣家", { exact: true })).toBeVisible();
-		await expect(page.getByText("外部業者")).toBeVisible();
+		await expect(
+			processing.getByText("搜尋候選供應商", { exact: true }),
+		).toBeVisible();
+		// 公開池退場（A9-D44）：沒有外部業者那一條。
+		await expect(page.getByText("外部業者")).toHaveCount(0);
 		await expect(
 			processing.getByRole("heading", { name: "搜尋進度" }),
 		).toHaveCount(0);
@@ -182,47 +193,13 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 		let searchFinished = false;
 		await setupRfqPriceReview(page, {
 			stopAtSearching: true,
-			candidateSearchPollHandler: (route) => {
-				if (!searchFinished) return route.fulfill(runningPoll());
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: RFQ_REQUEST_ID,
-							runId: RFQ_RUN_ID,
-							candidateSetId: "candidate-set-e2e",
-							status: "SUCCEEDED",
-							platformLaneStatus: "SUCCEEDED",
-							externalLaneStatus: "SUCCEEDED",
-							failureReason: "",
-							candidates: {
-								platform: [
-									{
-										candidateId: "seller-green",
-										sourceId: "product-green",
-										lane: "PLATFORM",
-										displayName: "範例鮮果合作社",
-										score: 94,
-										matchedFacts: [{ key: "item", label: "珍珠芭樂" }],
-										unverifiableFacts: [],
-										factsAsOf: "2026-08-14T12:00:00Z",
-										selected: false,
-									},
-								],
-								external: [],
-							},
-						},
-					}),
-				});
-			},
-			runEventsHandler: (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "text/event-stream",
-					body: RAIL_SSE,
-				}),
+			candidateSearchPollHandler: () =>
+				searchFinished
+					? candidateSearchJson("SUCCEEDED", [
+							candidateJson("seller-green", "範例鮮果合作社"),
+						])
+					: runningPoll(),
+			searchWatchFrames: railFrames,
 		});
 
 		const input = page.locator("#procurement-clarify-input");
@@ -321,80 +298,61 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 			.click();
 
 		const revisedRevisionId = "1234567890123456792";
+		const revisedSlots = {
+			item: "珍珠芭樂",
+			quantity: 80,
+			unit: "KG",
+			deliveryCity: "桃園市",
+		};
 		let snapshotRecovered = false;
 		let failedSnapshots = 0;
-		await page.route(
-			`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/snapshot`,
-			(route) => {
-				if (!snapshotRecovered) {
-					failedSnapshots += 1;
-					return route.fulfill({
-						status: 500,
-						contentType: "application/json",
-						body: JSON.stringify({
-							code: 500,
-							message: "snapshot unavailable",
-						}),
-					});
-				}
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: RFQ_REQUEST_ID,
-							revisionId: revisedRevisionId,
-							status: "REQUIREMENT_READY",
-							slots: {
-								item: "珍珠芭樂",
-								quantity: 80,
-								unit: "KG",
-								delivery_city: "桃園市",
-							},
-							missingRequired: [],
-						},
-					}),
-				});
-			},
-		);
-		const turnBodies: Record<string, unknown>[] = [];
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) => {
-			turnBodies.push(route.request().postDataJSON());
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: RFQ_REQUEST_ID,
-						revisionId: revisedRevisionId,
-						conversationId: "9876543210987654321",
-						slots: {
-							item: "珍珠芭樂",
-							quantity: 80,
-							unit: "KG",
-							delivery_city: "桃園市",
-						},
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "已把數量更新為 80 KG。",
-						recordedThisTurn: [],
-						question: {
-							slotKey: "packaging",
-							prompt: "這批芭樂需要分裝嗎？",
-							options: [
-								{ optionId: "pack-box", label: "分箱包裝", value: "分箱包裝" },
-							],
-							allowFreeText: true,
-							canSkip: true,
-							source: "FIXED",
-						},
-					},
-				}),
+		await mockProcurementUnary(page, "GetSnapshot", () => {
+			if (!snapshotRecovered) {
+				failedSnapshots += 1;
+				throw new ConnectFailure("internal", "snapshot unavailable");
+			}
+			return snapshotReadyJson({
+				revisionId: revisedRevisionId,
+				slots: revisedSlots,
 			});
 		});
+		const turnBodies: Record<string, unknown>[] = [];
+		await mockProcurementUnary(page, "SubmitTurn", (request) => {
+			turnBodies.push(request);
+			return {
+				requestId: RFQ_REQUEST_ID,
+				conversationId: RFQ_CONVERSATION_ID,
+				runId: "run-revised",
+			};
+		});
+		await mockWatchRun(page, ({ runId }) =>
+			runId === "run-revised"
+				? [
+						watchFrame.accepted("r1", "run-revised", RFQ_CONVERSATION_ID),
+						watchFrame.turnResult(
+							"r2",
+							turnResultJson(
+								{ ...RFQ_IDS, revisionId: revisedRevisionId },
+								{
+									slots: revisedSlots,
+									reply: "已把數量更新為 80 KG。",
+									question: {
+										slotKey: "SLOT_KEY_PACKAGING",
+										prompt: "這批芭樂需要分裝嗎？",
+										options: [{ optionId: "pack-box", label: "分箱包裝" }],
+										allowFreeText: true,
+										canSkip: true,
+									},
+								},
+							),
+						),
+						watchFrame.finished("r3"),
+					]
+				: [
+						watchFrame.accepted("x1", runId, RFQ_CONVERSATION_ID),
+						watchFrame.finished("x2"),
+					],
+		);
 		await page.getByRole("button", { name: "送出", exact: true }).click();
 		await expect(
 			page.getByText("已把數量更新為 80 KG。", { exact: true }),

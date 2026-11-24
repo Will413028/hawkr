@@ -122,6 +122,44 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get quoteResponseTypeHelp =>
+      'Both response types need the full pricing basis and amounts; accepting the non-price terms is not a shortcut to skip amounts.';
+
+  @override
+  String get quoteSpecNoteTitle => 'Specification note (optional)';
+
+  @override
+  String get quoteSpecNoteHelp =>
+      'Only you can fill this in, up to 1000 characters.';
+
+  @override
+  String get quoteSpecNoteLabel => 'Specification note';
+
+  @override
+  String get quoteSpecNoteHint =>
+      'For example: origin, grade, packaging, acceptance terms';
+
+  @override
+  String get quoteCurrencyTwd => 'Currency TWD';
+
+  @override
+  String get quoteStatusActive => 'Active';
+
+  @override
+  String get quoteStatusSuperseded => 'Superseded';
+
+  @override
+  String get quoteStatusWithdrawn => 'Withdrawn';
+
+  @override
+  String get quoteStatusExpired => 'Expired';
+
+  @override
+  String quoteAmountNotWholeNumber(String label) {
+    return '$label must be a non-negative whole number of TWD, for example 1200';
+  }
+
+  @override
   String get earningsTitle => 'Earnings';
 
   @override

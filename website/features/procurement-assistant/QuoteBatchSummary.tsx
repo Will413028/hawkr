@@ -3,7 +3,6 @@
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button } from "@/components/ui";
-import type { ProcurementSlots } from "@/lib/api/openapi-types";
 import { formatTaipeiDate, formatTaipeiDateTime } from "@/lib/date/taipei";
 import styles from "@/styles/features/procurement-assistant/quote-batch-summary.module.css";
 import {
@@ -13,9 +12,9 @@ import {
 import type { RfqBuyerRequestedRange } from "./rfq-price-contract";
 import {
 	deriveRfqProgress,
-	type PublicationResultView,
 	type RfqProgressStep,
 } from "./runtime-snapshot-contract";
+import type { ProcurementSlots, PublishedRfqPublication } from "./types";
 import type { RfqDealTruthCounts } from "./useRfqRuntimeSnapshot";
 
 interface QuoteBatchSummaryProps {
@@ -34,8 +33,8 @@ interface QuoteBatchSummaryProps {
 	 * buyerRequestedRange」，它也不進 seller-facing 投影。
 	 */
 	buyerRequestedRange?: RfqBuyerRequestedRange | null;
-	/** runtime-snapshot 裡的 `RFQ_PUBLICATION_RESULT`；null＝伺服器沒有發布事實。 */
-	publication?: PublicationResultView | null;
+	/** runtime snapshot 裡的發布結果；null＝伺服器沒有發布事實。 */
+	publication?: PublishedRfqPublication | null;
 	/** 「目前交易真相」的筆數；`null` 欄位代表沒讀到，不是 0。 */
 	counts?: RfqDealTruthCounts;
 	/** 接受回執。這是 acceptedDealPrice 唯一的來源，null＝本畫面沒有成立證據。 */
@@ -154,7 +153,7 @@ export default function QuoteBatchSummary({
 	 * 這個數字，也沒有任何證據支撐「已建立 1 組詢價」——整句不顯示，不補 0。
 	 */
 	const inviteHeadline = publication
-		? `已建立 1 組詢價・${publication.data.recipientCount} 筆邀請${
+		? `已建立 1 組詢價・${publication.recipientCount} 筆邀請${
 				quantityText ? `（${quantityText}）` : ""
 			}`
 		: "";
@@ -169,9 +168,6 @@ export default function QuoteBatchSummary({
 			data-testid="quote-batch-summary"
 		>
 			<header className={styles.head}>
-				{/* ⚠️ 不宣稱通路：稿 R-02 寫「詢價已投入許願池」，但本站只發
-				 * `DIRECT_RECIPIENTS`，而這一層的 payload 不含 `audienceMode`。
-				 * 詳見 `runtime-snapshot-contract.ts` 的 PROGRESS_LABELS 註解。 */}
 				<h2 id="quote-summary-title">
 					{publication ? "詢價已發布" : "詢價建立摘要"}
 				</h2>
@@ -204,7 +200,7 @@ export default function QuoteBatchSummary({
 								<div>
 									<dt>結果版本</dt>
 									<dd>
-										{`v${publication.artifactVersion}`}
+										{`v${publication.version}`}
 										<span className={styles.immutable}>{"・不可變"}</span>
 									</dd>
 								</div>
@@ -227,13 +223,8 @@ export default function QuoteBatchSummary({
 						</p>
 					</section>
 
-					{/* 收件人分布取代了原本逐筆列出邀請（含每筆試算金額）的清單。
-					 *
-					 * ⛔ 三個 count 是**發布當下的意圖分布，不是投遞結果**
-					 * （`publicationResultDataSchema` 的契約：後端刻意不放
-					 * `sentCount`）。所以 `queuedCount` 標的是「已排入處理」而不是
-					 * 「已送出」，`notSentCount` 標的是「未排入處理」。
-					 * WISH_POOL 三欄皆為 0，那不是讀不到——所以照樣顯示 0。 */}
+					{/* 三個 count 是發布當下的意圖分布，不是投遞結果：`queuedCount` 標的是
+					 * 「已排入處理」而不是「已送出」，「未排入處理」是收件人減去已排入處理的數。 */}
 					{publication ? (
 						<section
 							className={styles.card}
@@ -243,15 +234,20 @@ export default function QuoteBatchSummary({
 							<dl className={styles.facts}>
 								<Fact
 									label="收件人"
-									value={String(publication.data.recipientCount)}
+									value={String(publication.recipientCount)}
 								/>
 								<Fact
 									label="已排入處理"
-									value={String(publication.data.queuedCount)}
+									value={String(publication.queuedCount)}
 								/>
 								<Fact
 									label="未排入處理"
-									value={String(publication.data.notSentCount)}
+									value={String(
+										Math.max(
+											0,
+											publication.recipientCount - publication.queuedCount,
+										),
+									)}
 								/>
 							</dl>
 							<p className="assistant-quote-summary__delivery">

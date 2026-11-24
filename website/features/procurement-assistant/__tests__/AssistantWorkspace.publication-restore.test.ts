@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 
+import { RunFailureReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import {
 	cleanup,
 	fireEvent,
@@ -9,7 +10,10 @@ import {
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementCandidateSearch } from "@/lib/api/openapi-types";
+import type {
+	ProcurementCandidateSearch,
+	ProcurementSnapshot,
+} from "@/features/procurement-assistant/types";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import AssistantWorkspace from "../AssistantWorkspace";
 import { hasProcurementResults } from "../session-logic";
@@ -129,23 +133,23 @@ afterEach(cleanup);
  * deriveStageFromStatus，它刻意只回 "clarifying"／"ready"（見該函式註解），永遠不會
  * 是 "candidates"。所以「有 publication、沒有 candidateSet」就是重整後的常態。
  */
-function publicationOnlySnapshot() {
+function publicationOnlySnapshot(): ProcurementSnapshot {
 	return {
 		requestId: "1234567890123456788",
 		revisionId: "1234567890123456791",
-		status: "CANDIDATES_READY" as const,
+		status: "MATCHING",
 		slots: {},
 		missingRequired: [],
+		runs: [],
+		activeRunId: "",
 		openConfirmation: null,
-		cropDisambiguation: null,
-		// ⛔ 形狀照 Gateway 的 ProcurementSnapshotResponseDTO（procurement_response_mapping.go
-		// 的 ProcurementPublishedPublicationDTO）：wire 上就只有這三個欄位。
-		// 不要在 fixture 裡多塞 state／audienceMode 之類不存在的鍵——正規化器會忽略它們，
-		// 測試照樣綠，但後來讀這份 fixture 的人會把它當成契約。
 		publishedPublication: {
 			publicationId: "1234567890123456804",
 			version: "1",
 			publishedAt: "2026-08-22T12:40:00Z",
+			recipientCount: 2,
+			queuedCount: 2,
+			sellerFacingHash: "a".repeat(64),
 		},
 	};
 }
@@ -156,7 +160,14 @@ describe("hasProcurementResults — 成果存在的唯一判準", () => {
 			hasProcurementResults({
 				stage: "ready",
 				candidateSet: null,
-				publishedPublication: { publicationId: "42" },
+				publishedPublication: {
+					publicationId: "42",
+					version: "1",
+					publishedAt: "2026-08-22T12:40:00Z",
+					recipientCount: 1,
+					queuedCount: 1,
+					sellerFacingHash: "a".repeat(64),
+				},
 			}),
 		).toBe(true);
 	});
@@ -196,10 +207,7 @@ describe("重整後的真實還原狀態", () => {
 	it("restoredStateFrom 產出的 publication-only 狀態必須判定為有成果", () => {
 		// ⛔ 不自己拼一個 state：用 production 的還原函式，才測得到
 		// 「candidateSet 固定為 null、stage 永遠不是 candidates」這兩個真實約束。
-		const restored = restoredStateFrom(
-			null,
-			publicationOnlySnapshot() as never,
-		);
+		const restored = restoredStateFrom(null, publicationOnlySnapshot());
 
 		expect(restored.candidateSet).toBeNull();
 		expect(restored.stage).not.toBe("candidates");
@@ -217,7 +225,7 @@ describe("重整後的真實還原狀態", () => {
 function restoredPublicationOnly() {
 	// ⛔ 經過 production 的還原函式，不手捏 state：candidateSet 恆為 null、
 	// stage 永遠不是 "candidates"，這兩個約束正是 A8 踩中的東西。
-	return restoredStateFrom(null, publicationOnlySnapshot() as never);
+	return restoredStateFrom(null, publicationOnlySnapshot());
 }
 
 function candidateOnlyState() {
@@ -226,9 +234,8 @@ function candidateOnlyState() {
 		runId: "1234567890123456792",
 		candidateSetId: "1234567890123456790",
 		status: "SUCCEEDED",
-		platformLaneStatus: "SUCCEEDED",
-		externalLaneStatus: "SUCCEEDED",
-		candidates: { platform: [], external: [] },
+		failureReason: RunFailureReason.UNSPECIFIED,
+		candidates: [],
 	};
 	// session 內剛跑完搜尋的樣子：stage 是 "candidates"，還沒有任何 publication。
 	return {

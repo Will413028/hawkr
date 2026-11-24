@@ -66,6 +66,7 @@ describe("isExcluded", () => {
 		expect(isExcluded("features/a/b.test.tsx")).toBe(true);
 		expect(isExcluded("features/a/b.unit.test.ts")).toBe(true);
 		expect(isExcluded("lib/__tests__/x.ts")).toBe(true);
+		expect(isExcluded("features/a/testing/x.ts")).toBe(true);
 		expect(isExcluded("lib/x.gen.ts")).toBe(true);
 		expect(isExcluded("lib/x.g.ts")).toBe(true);
 		expect(isExcluded("features/a/b.tsx")).toBe(false);

@@ -4,7 +4,6 @@
 
 GO_SERVICES := \
 	gateway \
-	services/ai-service \
 	services/invoice-service \
 	services/notification-service
 

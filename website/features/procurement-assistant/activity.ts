@@ -1,8 +1,4 @@
-import { parseJsonSafe } from "@/lib/api/json";
-import {
-	ProcurementStepStatus,
-	type ProcurementStepStatusValue,
-} from "@/lib/codemeta/enums";
+import type { ProcurementStepStatusValue } from "@/lib/codemeta/enums";
 
 //
 // Graph-path Activity events (T12 sub-project 3c) — a deliberately
@@ -51,27 +47,6 @@ export interface AgentActivityEvent {
 	 * narrator（T23 ADR O1），四列的 text 恆為空。非空時是已通過 backend guard
 	 * 的模型短句，直接信任顯示，不做內容白/黑名單。 */
 	text: string;
-}
-
-/** Fail-closed 解析：非物件或任一必要欄位型別不符就整筆丟棄——同 steps.ts
- * normalizeSteps 的紀律。 */
-export function normalizeActivityEvent(
-	raw: unknown,
-): AgentActivityEvent | null {
-	if (!raw || typeof raw !== "object") return null;
-	const record = raw as Record<string, unknown>;
-	if (typeof record.rowId !== "string" || record.rowId === "") return null;
-	if (typeof record.code !== "string" || record.code === "") return null;
-	if (typeof record.text !== "string") return null;
-	return {
-		rowId: record.rowId,
-		code: record.code,
-		label: optionalString(record.label) ?? "",
-		status: normalizeActivityStatus(record.status, record.text),
-		parentRowId: optionalString(record.parentRowId),
-		count: optionalString(record.count),
-		text: record.text,
-	};
 }
 
 /** 一個 top-level 列，以及掛在它底下的 lane 子列。 */
@@ -144,36 +119,6 @@ export function activityStatusLabel(status: AgentActivityStatus): string {
 	return ACTIVITY_STATUS_LABEL[status];
 }
 
-/** 三個 optional 欄位（label／parentRowId／count）共用的規則：**缺席或型別不符
- * 一律當缺席，整列照樣渲染**。
- *
- * 這跟 rowId／code／text 的 fail-closed 是刻意不同的紀律。那三個缺一個就沒有可
- * 渲染的列了；這三個各自缺席時，這一列只是退回 T23 之前的樣子（沒有巢狀、沒有
- * 家數、文字退回 text），那是一個已知good的渲染。丟掉整列則沒有退路也沒有訊號。
- *
- * 空字串一併當缺席：`parentRowId: ""` 不是「掛在 id 空字串的列」，`count: ""`
- * 不是「0 家」。後端本來就不會送空字串（有值才進 payload），這裡只是不讓一個
- * 壞掉的中間層把語意換掉。 */
-function optionalString(raw: unknown): string | undefined {
-	return typeof raw === "string" && raw !== "" ? raw : undefined;
-}
-
-/** status 缺席或不在值域內時，退回 T23 之前唯一可用的訊號：`text` 空 = 還在跑。
- *
- * 刻意**不** fail closed 丟掉整列。steps.ts 的 deny-by-default 守的是 privacy
- * boundary（未知 code／label 不得進 DOM），status 不是——它只決定這一列畫成什麼
- * 樣子。對它 fail closed 換不到任何安全，卻會讓「後端多加一個狀態值」表現成
- * rail 無聲變短，而那正是 steps.ts 註解警告過的那種無訊號故障。 */
-function normalizeActivityStatus(
-	raw: unknown,
-	text: unknown,
-): AgentActivityStatus {
-	if (typeof raw === "string" && Object.hasOwn(ProcurementStepStatus, raw)) {
-		return raw as AgentActivityStatus;
-	}
-	return text === "" ? "RUNNING" : "SUCCEEDED";
-}
-
 /** 展示層截斷，避免極端長字串撐壞 UI——不是內容白/黑名單，純粹是佈局保護。 */
 const ACTIVITY_TEXT_MAX_DISPLAY_LEN = 80;
 
@@ -229,17 +174,4 @@ export function lastRunningActivity(
 		if (events[i].status === "RUNNING") return events[i];
 	}
 	return null;
-}
-
-/** 一個 CUSTOM activity frame 的 `value`（JSON 字串）解析成列。壞掉的 JSON 與
- * 不合契約的 payload 都回 null，跟 normalizeActivityEvent 同一套 fail-closed
- * 紀律——不讓半個 payload 進 DOM。 */
-export function parseActivityEventJson(raw: string): AgentActivityEvent | null {
-	let parsed: unknown;
-	try {
-		parsed = parseJsonSafe(raw);
-	} catch {
-		return null;
-	}
-	return normalizeActivityEvent(parsed);
 }

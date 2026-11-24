@@ -28,9 +28,7 @@ import {
 	updateProduct,
 	updateProductStatus,
 } from "@/lib/products/seller-repo";
-import type { AiDraftPatch } from "@/lib/seller/ai-listing-chat";
 import {
-	applyAiPatch,
 	applyImagesUpdate,
 	draftToSubmitBody,
 	emptyDraft,
@@ -80,7 +78,6 @@ export interface UseProductFormResult {
 	addSku(): void;
 	removeSku(index: number): void;
 	handleImagesChange(next: ImageGalleryUpdate): void;
-	handleAiPatch(patch: AiDraftPatch): void;
 	/** @returns 成功為 `true`；抽屜可據此決定是否關閉。 */
 	submit(action: ShelfSubmitAction): Promise<boolean>;
 	unshelf(): Promise<void>;
@@ -175,10 +172,6 @@ export function useProductForm({
 
 	const handleImagesChange = React.useCallback((next: ImageGalleryUpdate) => {
 		setDraft((prev) => applyImagesUpdate(prev, next));
-	}, []);
-
-	const handleAiPatch = React.useCallback((patch: AiDraftPatch) => {
-		setDraft((prev) => applyAiPatch(prev, patch));
 	}, []);
 
 	const submit = React.useCallback(
@@ -296,7 +289,6 @@ export function useProductForm({
 		addSku,
 		removeSku,
 		handleImagesChange,
-		handleAiPatch,
 		submit,
 		unshelf,
 		reload: loadDraft,

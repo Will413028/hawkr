@@ -198,7 +198,6 @@ jobs:
           set -e
           for module in \
               gateway pkg \
-              services/ai-service \
               services/invoice-service \
               services/notification-service; do
             echo "=== $module ==="

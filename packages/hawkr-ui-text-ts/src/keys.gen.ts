@@ -9,7 +9,7 @@ import type { RejectReason } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb"
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { NotificationCategory, NotificationChannel } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import type { EarningsEntryStatus, EarningsEntryType, PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentAnomalyResolutionReason, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
-import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import type { CancelDisposition, QuoteAcceptability, RejectionReason, RunFailureReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import type { CommentState } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
@@ -159,6 +159,15 @@ export type UiTextKey =
 	| "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_SUCCEEDED"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
+	| "procurement.CancelDisposition.CANCEL_DISPOSITION_ALREADY_CANCELLED"
+	| "procurement.CancelDisposition.CANCEL_DISPOSITION_ALREADY_TERMINAL"
+	| "procurement.CancelDisposition.CANCEL_DISPOSITION_REQUESTED"
+	| "procurement.CancelDisposition.CANCEL_DISPOSITION_TOO_LATE"
+	| "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_ACCEPTABLE"
+	| "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_EXPIRED"
+	| "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_INELIGIBLE"
+	| "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_SUPERSEDED"
+	| "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_WITHDRAWN"
 	| "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE"
 	| "procurement.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED"
 	| "procurement.RejectionReason.REJECTION_REASON_DATE_FORMAT"
@@ -172,6 +181,12 @@ export type UiTextKey =
 	| "procurement.RejectionReason.REJECTION_REASON_RESOLUTION_UNKNOWN_KIND"
 	| "procurement.RejectionReason.REJECTION_REASON_TRUNCATED"
 	| "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED"
+	| "procurement.RunFailureReason.RUN_FAILURE_REASON_ANSWER_REJECTED"
+	| "procurement.RunFailureReason.RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE"
+	| "procurement.RunFailureReason.RUN_FAILURE_REASON_MODEL_UNAVAILABLE"
+	| "procurement.RunFailureReason.RUN_FAILURE_REASON_SEARCH_FAILED"
+	| "procurement.RunFailureReason.RUN_FAILURE_REASON_TURN_PIPELINE_ERROR"
+	| "procurement.RunFailureReason.RUN_FAILURE_REASON_WORKER_LOST"
 	| "review.Review.rating_label_1"
 	| "review.Review.rating_label_2"
 	| "review.Review.rating_label_3"
@@ -749,6 +764,35 @@ export function paymentRequirementCollection(v: RequirementCollection): UiMessag
 	return { key };
 }
 
+const PROCUREMENT_CANCEL_DISPOSITION: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "procurement.CancelDisposition.CANCEL_DISPOSITION_REQUESTED",
+	2: "procurement.CancelDisposition.CANCEL_DISPOSITION_ALREADY_CANCELLED",
+	3: "procurement.CancelDisposition.CANCEL_DISPOSITION_ALREADY_TERMINAL",
+	4: "procurement.CancelDisposition.CANCEL_DISPOSITION_TOO_LATE",
+};
+
+/** procurement.CancelDisposition 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function procurementCancelDisposition(v: CancelDisposition): UiMessage | undefined {
+	const key = PROCUREMENT_CANCEL_DISPOSITION[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PROCUREMENT_QUOTE_ACCEPTABILITY: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_ACCEPTABLE",
+	2: "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_EXPIRED",
+	3: "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_WITHDRAWN",
+	4: "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_SUPERSEDED",
+	5: "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_INELIGIBLE",
+};
+
+/** procurement.QuoteAcceptability 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function procurementQuoteAcceptability(v: QuoteAcceptability): UiMessage | undefined {
+	const key = PROCUREMENT_QUOTE_ACCEPTABILITY[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 const PROCUREMENT_REJECTION_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "procurement.RejectionReason.REJECTION_REASON_EMPTY",
 	2: "procurement.RejectionReason.REJECTION_REASON_TRUNCATED",
@@ -768,6 +812,22 @@ const PROCUREMENT_REJECTION_REASON: Readonly<Partial<Record<number, UiTextKey>>>
 /** procurement.RejectionReason 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function procurementRejectionReason(v: RejectionReason): UiMessage | undefined {
 	const key = PROCUREMENT_REJECTION_REASON[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PROCUREMENT_RUN_FAILURE_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "procurement.RunFailureReason.RUN_FAILURE_REASON_WORKER_LOST",
+	2: "procurement.RunFailureReason.RUN_FAILURE_REASON_SEARCH_FAILED",
+	3: "procurement.RunFailureReason.RUN_FAILURE_REASON_TURN_PIPELINE_ERROR",
+	5: "procurement.RunFailureReason.RUN_FAILURE_REASON_MODEL_UNAVAILABLE",
+	6: "procurement.RunFailureReason.RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE",
+	7: "procurement.RunFailureReason.RUN_FAILURE_REASON_ANSWER_REJECTED",
+};
+
+/** procurement.RunFailureReason 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function procurementRunFailureReason(v: RunFailureReason): UiMessage | undefined {
+	const key = PROCUREMENT_RUN_FAILURE_REASON[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

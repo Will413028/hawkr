@@ -3,7 +3,6 @@ package grpc
 import (
 	accountpb "github.com/Will413028/hawkr/go-pkg/proto/account"
 	aftersalespb "github.com/Will413028/hawkr/go-pkg/proto/aftersales"
-	aipb "github.com/Will413028/hawkr/go-pkg/proto/ai"
 	buyerpb "github.com/Will413028/hawkr/go-pkg/proto/buyer"
 	cartpb "github.com/Will413028/hawkr/go-pkg/proto/cart"
 	couponpb "github.com/Will413028/hawkr/go-pkg/proto/coupon"
@@ -57,41 +56,6 @@ func NewAccountClientOverConnForTest(conn *grpc.ClientConn) *AccountClient {
 // NewSellerClientForTest creates a SellerClient with the given mock proto client.
 func NewSellerClientForTest(c sellerpb.SellerServiceClient) *SellerClient {
 	return &SellerClient{client: c}
-}
-
-// ==================== AI ====================
-
-// #3519 把 legacy AIService 依授權軸拆成三個 service，AIClient 因此持三個 stub。
-// 每個 stub 各有一個測試建構子，比照 NewAccountClientForTest /
-// NewAccountDelegationClientForTest 的既有分法：注入哪一個軸的 fake，就只有那個
-// 軸可用，拿錯建構子會在 nil stub 上 panic 而不是靜默走到別的軸。
-
-// NewAIImageClientForTest creates an AIClient whose AIImageService half is the
-// given mock（TransformImage／ListAiStyles）。
-func NewAIImageClientForTest(c aipb.AIImageServiceClient) *AIClient {
-	return &AIClient{image: c}
-}
-
-// NewRecommendationClientForTest creates an AIClient whose RecommendationService
-// half is the given mock（PersonalizedRecommend）。
-func NewRecommendationClientForTest(c aipb.RecommendationServiceClient) *AIClient {
-	return &AIClient{recommend: c}
-}
-
-// NewAIAssistantClientForTest creates an AIAssistantClient with the given mock proto client.
-func NewAIAssistantClientForTest(c aipb.AIAssistantServiceClient) *AIAssistantClient {
-	return &AIAssistantClient{client: c}
-}
-
-// NewAIProcurementClientForTest creates an AIProcurementClient with the given
-// mock proto client, mirroring NewAIAssistantClientForTest — Task 11 added
-// AIProcurementClient itself but not this constructor, so Task 13 (the first
-// caller that needs to inject a fake AIProcurementServiceClient into
-// Holder.AIProcurement for a handler test) adds it here rather than in a
-// _test.go file: the `client` field is unexported, and handler package tests
-// (a different package) need an exported constructor to reach it.
-func NewAIProcurementClientForTest(c aipb.AIProcurementServiceClient) *AIProcurementClient {
-	return &AIProcurementClient{client: c}
 }
 
 // ==================== Coupon ====================

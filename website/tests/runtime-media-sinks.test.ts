@@ -48,14 +48,13 @@ test("seller cover, AI style, order review, and product form boundaries normaliz
 
 	assert.match(sellerCover, /const imageSrc = buildImageUrl\(src, "banner"\);/);
 	assert.match(aiDialog, /src=\{buildImageUrl\(s\.thumbnailUrl, "thumb"\)\}/);
-	// #430 D3-S12: the slot is filled from the wire's `thumbnailKey` (objectKey
-	// SSOT), not its Gateway-composed `thumbnailUrl` twin.
+	// The slot is the backend `thumb` preset URL of the style's Image, else the
+	// bundled placeholder.
 	const aiRepo = source("lib/seller/ai-image.ts");
 	assert.match(
 		aiRepo,
-		/thumbnailUrl: resolveStyleThumbnail\(s\.thumbnailKey as string\)/,
+		/thumbnailUrl: resolveStyleThumbnail\(s\.thumbnailUrl\)/,
 	);
-	assert.doesNotMatch(aiRepo, /s\.thumbnailUrl as string/);
 	assert.match(orderDetail, /src=\{resolveCdnUrl\(url\)\}/);
 	// 圖庫與主圖都由 objectKey 經 resolveCdnUrl 組 URL（49 §6.1／§6.5）。
 	// #430 A1 之前這裡釘的是「讀 r.images／raw.main_image」的舊寫法——那兩個欄位後端

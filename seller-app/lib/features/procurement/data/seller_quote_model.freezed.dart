@@ -11,307 +11,38 @@ part of 'seller_quote_model.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
-
 /// @nodoc
-mixin _$OfferedQuality {
-
- String get grade; String get inspectionNotes;
-/// Create a copy of OfferedQuality
-/// with the given fields replaced by the non-null parameter values.
-@JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-$OfferedQualityCopyWith<OfferedQuality> get copyWith => _$OfferedQualityCopyWithImpl<OfferedQuality>(this as OfferedQuality, _$identity);
-
-  /// Serializes this OfferedQuality to a JSON map.
-  Map<String, dynamic> toJson();
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is OfferedQuality&&(identical(other.grade, grade) || other.grade == grade)&&(identical(other.inspectionNotes, inspectionNotes) || other.inspectionNotes == inspectionNotes));
-}
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,grade,inspectionNotes);
-
-@override
-String toString() {
-  return 'OfferedQuality(grade: $grade, inspectionNotes: $inspectionNotes)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class $OfferedQualityCopyWith<$Res>  {
-  factory $OfferedQualityCopyWith(OfferedQuality value, $Res Function(OfferedQuality) _then) = _$OfferedQualityCopyWithImpl;
-@useResult
-$Res call({
- String grade, String inspectionNotes
-});
-
-
-
-
-}
-/// @nodoc
-class _$OfferedQualityCopyWithImpl<$Res>
-    implements $OfferedQualityCopyWith<$Res> {
-  _$OfferedQualityCopyWithImpl(this._self, this._then);
-
-  final OfferedQuality _self;
-  final $Res Function(OfferedQuality) _then;
-
-/// Create a copy of OfferedQuality
-/// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? grade = null,Object? inspectionNotes = null,}) {
-  return _then(_self.copyWith(
-grade: null == grade ? _self.grade : grade // ignore: cast_nullable_to_non_nullable
-as String,inspectionNotes: null == inspectionNotes ? _self.inspectionNotes : inspectionNotes // ignore: cast_nullable_to_non_nullable
-as String,
-  ));
-}
-
-}
-
-
-/// Adds pattern-matching-related methods to [OfferedQuality].
-extension OfferedQualityPatterns on OfferedQuality {
-/// A variant of `map` that fallback to returning `orElse`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _OfferedQuality value)?  $default,{required TResult orElse(),}){
-final _that = this;
-switch (_that) {
-case _OfferedQuality() when $default != null:
-return $default(_that);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// Callbacks receives the raw object, upcasted.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case final Subclass2 value:
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _OfferedQuality value)  $default,){
-final _that = this;
-switch (_that) {
-case _OfferedQuality():
-return $default(_that);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `map` that fallback to returning `null`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _OfferedQuality value)?  $default,){
-final _that = this;
-switch (_that) {
-case _OfferedQuality() when $default != null:
-return $default(_that);case _:
-  return null;
-
-}
-}
-/// A variant of `when` that fallback to an `orElse` callback.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String grade,  String inspectionNotes)?  $default,{required TResult orElse(),}) {final _that = this;
-switch (_that) {
-case _OfferedQuality() when $default != null:
-return $default(_that.grade,_that.inspectionNotes);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// As opposed to `map`, this offers destructuring.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case Subclass2(:final field2):
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String grade,  String inspectionNotes)  $default,) {final _that = this;
-switch (_that) {
-case _OfferedQuality():
-return $default(_that.grade,_that.inspectionNotes);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `when` that fallback to returning `null`
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String grade,  String inspectionNotes)?  $default,) {final _that = this;
-switch (_that) {
-case _OfferedQuality() when $default != null:
-return $default(_that.grade,_that.inspectionNotes);case _:
-  return null;
-
-}
-}
-
-}
-
-/// @nodoc
-@JsonSerializable()
-
-class _OfferedQuality implements OfferedQuality {
-  const _OfferedQuality({this.grade = '', this.inspectionNotes = ''});
-  factory _OfferedQuality.fromJson(Map<String, dynamic> json) => _$OfferedQualityFromJson(json);
-
-@override@JsonKey() final  String grade;
-@override@JsonKey() final  String inspectionNotes;
-
-/// Create a copy of OfferedQuality
-/// with the given fields replaced by the non-null parameter values.
-@override @JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-_$OfferedQualityCopyWith<_OfferedQuality> get copyWith => __$OfferedQualityCopyWithImpl<_OfferedQuality>(this, _$identity);
-
-@override
-Map<String, dynamic> toJson() {
-  return _$OfferedQualityToJson(this, );
-}
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _OfferedQuality&&(identical(other.grade, grade) || other.grade == grade)&&(identical(other.inspectionNotes, inspectionNotes) || other.inspectionNotes == inspectionNotes));
-}
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,grade,inspectionNotes);
-
-@override
-String toString() {
-  return 'OfferedQuality(grade: $grade, inspectionNotes: $inspectionNotes)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class _$OfferedQualityCopyWith<$Res> implements $OfferedQualityCopyWith<$Res> {
-  factory _$OfferedQualityCopyWith(_OfferedQuality value, $Res Function(_OfferedQuality) _then) = __$OfferedQualityCopyWithImpl;
-@override @useResult
-$Res call({
- String grade, String inspectionNotes
-});
-
-
-
-
-}
-/// @nodoc
-class __$OfferedQualityCopyWithImpl<$Res>
-    implements _$OfferedQualityCopyWith<$Res> {
-  __$OfferedQualityCopyWithImpl(this._self, this._then);
-
-  final _OfferedQuality _self;
-  final $Res Function(_OfferedQuality) _then;
-
-/// Create a copy of OfferedQuality
-/// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? grade = null,Object? inspectionNotes = null,}) {
-  return _then(_OfferedQuality(
-grade: null == grade ? _self.grade : grade // ignore: cast_nullable_to_non_nullable
-as String,inspectionNotes: null == inspectionNotes ? _self.inspectionNotes : inspectionNotes // ignore: cast_nullable_to_non_nullable
-as String,
-  ));
-}
-
-
-}
-
-
-/// @nodoc
-mixin _$UnitBasis {
+mixin _$QuoteUnitBasis {
 
  String get quantity; String get unit;
-/// Create a copy of UnitBasis
+/// Create a copy of QuoteUnitBasis
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
-$UnitBasisCopyWith<UnitBasis> get copyWith => _$UnitBasisCopyWithImpl<UnitBasis>(this as UnitBasis, _$identity);
+$QuoteUnitBasisCopyWith<QuoteUnitBasis> get copyWith => _$QuoteUnitBasisCopyWithImpl<QuoteUnitBasis>(this as QuoteUnitBasis, _$identity);
 
-  /// Serializes this UnitBasis to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UnitBasis&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is QuoteUnitBasis&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,quantity,unit);
 
 @override
 String toString() {
-  return 'UnitBasis(quantity: $quantity, unit: $unit)';
+  return 'QuoteUnitBasis(quantity: $quantity, unit: $unit)';
 }
 
 
 }
 
 /// @nodoc
-abstract mixin class $UnitBasisCopyWith<$Res>  {
-  factory $UnitBasisCopyWith(UnitBasis value, $Res Function(UnitBasis) _then) = _$UnitBasisCopyWithImpl;
+abstract mixin class $QuoteUnitBasisCopyWith<$Res>  {
+  factory $QuoteUnitBasisCopyWith(QuoteUnitBasis value, $Res Function(QuoteUnitBasis) _then) = _$QuoteUnitBasisCopyWithImpl;
 @useResult
 $Res call({
  String quantity, String unit
@@ -322,14 +53,14 @@ $Res call({
 
 }
 /// @nodoc
-class _$UnitBasisCopyWithImpl<$Res>
-    implements $UnitBasisCopyWith<$Res> {
-  _$UnitBasisCopyWithImpl(this._self, this._then);
+class _$QuoteUnitBasisCopyWithImpl<$Res>
+    implements $QuoteUnitBasisCopyWith<$Res> {
+  _$QuoteUnitBasisCopyWithImpl(this._self, this._then);
 
-  final UnitBasis _self;
-  final $Res Function(UnitBasis) _then;
+  final QuoteUnitBasis _self;
+  final $Res Function(QuoteUnitBasis) _then;
 
-/// Create a copy of UnitBasis
+/// Create a copy of QuoteUnitBasis
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? quantity = null,Object? unit = null,}) {
   return _then(_self.copyWith(
@@ -342,8 +73,8 @@ as String,
 }
 
 
-/// Adds pattern-matching-related methods to [UnitBasis].
-extension UnitBasisPatterns on UnitBasis {
+/// Adds pattern-matching-related methods to [QuoteUnitBasis].
+extension QuoteUnitBasisPatterns on QuoteUnitBasis {
 /// A variant of `map` that fallback to returning `orElse`.
 ///
 /// It is equivalent to doing:
@@ -356,10 +87,10 @@ extension UnitBasisPatterns on UnitBasis {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _UnitBasis value)?  $default,{required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _QuoteUnitBasis value)?  $default,{required TResult orElse(),}){
 final _that = this;
 switch (_that) {
-case _UnitBasis() when $default != null:
+case _QuoteUnitBasis() when $default != null:
 return $default(_that);case _:
   return orElse();
 
@@ -378,10 +109,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _UnitBasis value)  $default,){
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _QuoteUnitBasis value)  $default,){
 final _that = this;
 switch (_that) {
-case _UnitBasis():
+case _QuoteUnitBasis():
 return $default(_that);case _:
   throw StateError('Unexpected subclass');
 
@@ -399,10 +130,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _UnitBasis value)?  $default,){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _QuoteUnitBasis value)?  $default,){
 final _that = this;
 switch (_that) {
-case _UnitBasis() when $default != null:
+case _QuoteUnitBasis() when $default != null:
 return $default(_that);case _:
   return null;
 
@@ -422,7 +153,7 @@ return $default(_that);case _:
 
 @optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String quantity,  String unit)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
-case _UnitBasis() when $default != null:
+case _QuoteUnitBasis() when $default != null:
 return $default(_that.quantity,_that.unit);case _:
   return orElse();
 
@@ -443,7 +174,7 @@ return $default(_that.quantity,_that.unit);case _:
 
 @optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String quantity,  String unit)  $default,) {final _that = this;
 switch (_that) {
-case _UnitBasis():
+case _QuoteUnitBasis():
 return $default(_that.quantity,_that.unit);case _:
   throw StateError('Unexpected subclass');
 
@@ -463,7 +194,7 @@ return $default(_that.quantity,_that.unit);case _:
 
 @optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String quantity,  String unit)?  $default,) {final _that = this;
 switch (_that) {
-case _UnitBasis() when $default != null:
+case _QuoteUnitBasis() when $default != null:
 return $default(_that.quantity,_that.unit);case _:
   return null;
 
@@ -473,46 +204,43 @@ return $default(_that.quantity,_that.unit);case _:
 }
 
 /// @nodoc
-@JsonSerializable()
 
-class _UnitBasis implements UnitBasis {
-  const _UnitBasis({this.quantity = '', this.unit = ''});
-  factory _UnitBasis.fromJson(Map<String, dynamic> json) => _$UnitBasisFromJson(json);
+
+class _QuoteUnitBasis implements QuoteUnitBasis {
+  const _QuoteUnitBasis({this.quantity = '', this.unit = ''});
+  
 
 @override@JsonKey() final  String quantity;
 @override@JsonKey() final  String unit;
 
-/// Create a copy of UnitBasis
+/// Create a copy of QuoteUnitBasis
 /// with the given fields replaced by the non-null parameter values.
 @override @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
-_$UnitBasisCopyWith<_UnitBasis> get copyWith => __$UnitBasisCopyWithImpl<_UnitBasis>(this, _$identity);
+_$QuoteUnitBasisCopyWith<_QuoteUnitBasis> get copyWith => __$QuoteUnitBasisCopyWithImpl<_QuoteUnitBasis>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$UnitBasisToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UnitBasis&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _QuoteUnitBasis&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,quantity,unit);
 
 @override
 String toString() {
-  return 'UnitBasis(quantity: $quantity, unit: $unit)';
+  return 'QuoteUnitBasis(quantity: $quantity, unit: $unit)';
 }
 
 
 }
 
 /// @nodoc
-abstract mixin class _$UnitBasisCopyWith<$Res> implements $UnitBasisCopyWith<$Res> {
-  factory _$UnitBasisCopyWith(_UnitBasis value, $Res Function(_UnitBasis) _then) = __$UnitBasisCopyWithImpl;
+abstract mixin class _$QuoteUnitBasisCopyWith<$Res> implements $QuoteUnitBasisCopyWith<$Res> {
+  factory _$QuoteUnitBasisCopyWith(_QuoteUnitBasis value, $Res Function(_QuoteUnitBasis) _then) = __$QuoteUnitBasisCopyWithImpl;
 @override @useResult
 $Res call({
  String quantity, String unit
@@ -523,17 +251,17 @@ $Res call({
 
 }
 /// @nodoc
-class __$UnitBasisCopyWithImpl<$Res>
-    implements _$UnitBasisCopyWith<$Res> {
-  __$UnitBasisCopyWithImpl(this._self, this._then);
+class __$QuoteUnitBasisCopyWithImpl<$Res>
+    implements _$QuoteUnitBasisCopyWith<$Res> {
+  __$QuoteUnitBasisCopyWithImpl(this._self, this._then);
 
-  final _UnitBasis _self;
-  final $Res Function(_UnitBasis) _then;
+  final _QuoteUnitBasis _self;
+  final $Res Function(_QuoteUnitBasis) _then;
 
-/// Create a copy of UnitBasis
+/// Create a copy of QuoteUnitBasis
 /// with the given fields replaced by the non-null parameter values.
 @override @pragma('vm:prefer-inline') $Res call({Object? quantity = null,Object? unit = null,}) {
-  return _then(_UnitBasis(
+  return _then(_QuoteUnitBasis(
 quantity: null == quantity ? _self.quantity : quantity // ignore: cast_nullable_to_non_nullable
 as String,unit: null == unit ? _self.unit : unit // ignore: cast_nullable_to_non_nullable
 as String,
@@ -543,33 +271,31 @@ as String,
 
 }
 
-
 /// @nodoc
 mixin _$SellerQuotePayload {
 
- String get responseType;@JsonKey(toJson: _offeredQualityToJson) OfferedQuality get offeredQuality;@JsonKey(toJson: _unitBasisToJson) UnitBasis get unitBasis; String get offeredQuantity; String get offeredQuantityUnit; String get conversionBasis; String get currency; String get goodsAmount; String get shippingAmount; String get taxAmount; String get taxInclusionBasis; String get totalAmount; String get leadTimeDays; String get promisedDeliveryAt; String get validUntil; String get termsNote; String get deviationDisclosure;
+ SellerResponseType get responseType;/// 賣家對規格的補充說明，選填。
+ String get specNote; QuoteUnitBasis get unitBasis; String get offeredQuantity; String get offeredQuantityUnit; String get conversionBasis; String get goodsAmount; String get shippingAmount; String get taxAmount; TaxInclusionBasis get taxInclusionBasis; String get totalAmount; String get leadTimeDays; String get promisedDeliveryAt; String get validUntil; String get termsNote; String get deviationDisclosure;
 /// Create a copy of SellerQuotePayload
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
 $SellerQuotePayloadCopyWith<SellerQuotePayload> get copyWith => _$SellerQuotePayloadCopyWithImpl<SellerQuotePayload>(this as SellerQuotePayload, _$identity);
 
-  /// Serializes this SellerQuotePayload to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerQuotePayload&&(identical(other.responseType, responseType) || other.responseType == responseType)&&(identical(other.offeredQuality, offeredQuality) || other.offeredQuality == offeredQuality)&&(identical(other.unitBasis, unitBasis) || other.unitBasis == unitBasis)&&(identical(other.offeredQuantity, offeredQuantity) || other.offeredQuantity == offeredQuantity)&&(identical(other.offeredQuantityUnit, offeredQuantityUnit) || other.offeredQuantityUnit == offeredQuantityUnit)&&(identical(other.conversionBasis, conversionBasis) || other.conversionBasis == conversionBasis)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.goodsAmount, goodsAmount) || other.goodsAmount == goodsAmount)&&(identical(other.shippingAmount, shippingAmount) || other.shippingAmount == shippingAmount)&&(identical(other.taxAmount, taxAmount) || other.taxAmount == taxAmount)&&(identical(other.taxInclusionBasis, taxInclusionBasis) || other.taxInclusionBasis == taxInclusionBasis)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.leadTimeDays, leadTimeDays) || other.leadTimeDays == leadTimeDays)&&(identical(other.promisedDeliveryAt, promisedDeliveryAt) || other.promisedDeliveryAt == promisedDeliveryAt)&&(identical(other.validUntil, validUntil) || other.validUntil == validUntil)&&(identical(other.termsNote, termsNote) || other.termsNote == termsNote)&&(identical(other.deviationDisclosure, deviationDisclosure) || other.deviationDisclosure == deviationDisclosure));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerQuotePayload&&(identical(other.responseType, responseType) || other.responseType == responseType)&&(identical(other.specNote, specNote) || other.specNote == specNote)&&(identical(other.unitBasis, unitBasis) || other.unitBasis == unitBasis)&&(identical(other.offeredQuantity, offeredQuantity) || other.offeredQuantity == offeredQuantity)&&(identical(other.offeredQuantityUnit, offeredQuantityUnit) || other.offeredQuantityUnit == offeredQuantityUnit)&&(identical(other.conversionBasis, conversionBasis) || other.conversionBasis == conversionBasis)&&(identical(other.goodsAmount, goodsAmount) || other.goodsAmount == goodsAmount)&&(identical(other.shippingAmount, shippingAmount) || other.shippingAmount == shippingAmount)&&(identical(other.taxAmount, taxAmount) || other.taxAmount == taxAmount)&&(identical(other.taxInclusionBasis, taxInclusionBasis) || other.taxInclusionBasis == taxInclusionBasis)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.leadTimeDays, leadTimeDays) || other.leadTimeDays == leadTimeDays)&&(identical(other.promisedDeliveryAt, promisedDeliveryAt) || other.promisedDeliveryAt == promisedDeliveryAt)&&(identical(other.validUntil, validUntil) || other.validUntil == validUntil)&&(identical(other.termsNote, termsNote) || other.termsNote == termsNote)&&(identical(other.deviationDisclosure, deviationDisclosure) || other.deviationDisclosure == deviationDisclosure));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,responseType,offeredQuality,unitBasis,offeredQuantity,offeredQuantityUnit,conversionBasis,currency,goodsAmount,shippingAmount,taxAmount,taxInclusionBasis,totalAmount,leadTimeDays,promisedDeliveryAt,validUntil,termsNote,deviationDisclosure);
+int get hashCode => Object.hash(runtimeType,responseType,specNote,unitBasis,offeredQuantity,offeredQuantityUnit,conversionBasis,goodsAmount,shippingAmount,taxAmount,taxInclusionBasis,totalAmount,leadTimeDays,promisedDeliveryAt,validUntil,termsNote,deviationDisclosure);
 
 @override
 String toString() {
-  return 'SellerQuotePayload(responseType: $responseType, offeredQuality: $offeredQuality, unitBasis: $unitBasis, offeredQuantity: $offeredQuantity, offeredQuantityUnit: $offeredQuantityUnit, conversionBasis: $conversionBasis, currency: $currency, goodsAmount: $goodsAmount, shippingAmount: $shippingAmount, taxAmount: $taxAmount, taxInclusionBasis: $taxInclusionBasis, totalAmount: $totalAmount, leadTimeDays: $leadTimeDays, promisedDeliveryAt: $promisedDeliveryAt, validUntil: $validUntil, termsNote: $termsNote, deviationDisclosure: $deviationDisclosure)';
+  return 'SellerQuotePayload(responseType: $responseType, specNote: $specNote, unitBasis: $unitBasis, offeredQuantity: $offeredQuantity, offeredQuantityUnit: $offeredQuantityUnit, conversionBasis: $conversionBasis, goodsAmount: $goodsAmount, shippingAmount: $shippingAmount, taxAmount: $taxAmount, taxInclusionBasis: $taxInclusionBasis, totalAmount: $totalAmount, leadTimeDays: $leadTimeDays, promisedDeliveryAt: $promisedDeliveryAt, validUntil: $validUntil, termsNote: $termsNote, deviationDisclosure: $deviationDisclosure)';
 }
 
 
@@ -580,11 +306,11 @@ abstract mixin class $SellerQuotePayloadCopyWith<$Res>  {
   factory $SellerQuotePayloadCopyWith(SellerQuotePayload value, $Res Function(SellerQuotePayload) _then) = _$SellerQuotePayloadCopyWithImpl;
 @useResult
 $Res call({
- String responseType,@JsonKey(toJson: _offeredQualityToJson) OfferedQuality offeredQuality,@JsonKey(toJson: _unitBasisToJson) UnitBasis unitBasis, String offeredQuantity, String offeredQuantityUnit, String conversionBasis, String currency, String goodsAmount, String shippingAmount, String taxAmount, String taxInclusionBasis, String totalAmount, String leadTimeDays, String promisedDeliveryAt, String validUntil, String termsNote, String deviationDisclosure
+ SellerResponseType responseType, String specNote, QuoteUnitBasis unitBasis, String offeredQuantity, String offeredQuantityUnit, String conversionBasis, String goodsAmount, String shippingAmount, String taxAmount, TaxInclusionBasis taxInclusionBasis, String totalAmount, String leadTimeDays, String promisedDeliveryAt, String validUntil, String termsNote, String deviationDisclosure
 });
 
 
-$OfferedQualityCopyWith<$Res> get offeredQuality;$UnitBasisCopyWith<$Res> get unitBasis;
+$QuoteUnitBasisCopyWith<$Res> get unitBasis;
 
 }
 /// @nodoc
@@ -597,20 +323,19 @@ class _$SellerQuotePayloadCopyWithImpl<$Res>
 
 /// Create a copy of SellerQuotePayload
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? responseType = null,Object? offeredQuality = null,Object? unitBasis = null,Object? offeredQuantity = null,Object? offeredQuantityUnit = null,Object? conversionBasis = null,Object? currency = null,Object? goodsAmount = null,Object? shippingAmount = null,Object? taxAmount = null,Object? taxInclusionBasis = null,Object? totalAmount = null,Object? leadTimeDays = null,Object? promisedDeliveryAt = null,Object? validUntil = null,Object? termsNote = null,Object? deviationDisclosure = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? responseType = null,Object? specNote = null,Object? unitBasis = null,Object? offeredQuantity = null,Object? offeredQuantityUnit = null,Object? conversionBasis = null,Object? goodsAmount = null,Object? shippingAmount = null,Object? taxAmount = null,Object? taxInclusionBasis = null,Object? totalAmount = null,Object? leadTimeDays = null,Object? promisedDeliveryAt = null,Object? validUntil = null,Object? termsNote = null,Object? deviationDisclosure = null,}) {
   return _then(_self.copyWith(
 responseType: null == responseType ? _self.responseType : responseType // ignore: cast_nullable_to_non_nullable
-as String,offeredQuality: null == offeredQuality ? _self.offeredQuality : offeredQuality // ignore: cast_nullable_to_non_nullable
-as OfferedQuality,unitBasis: null == unitBasis ? _self.unitBasis : unitBasis // ignore: cast_nullable_to_non_nullable
-as UnitBasis,offeredQuantity: null == offeredQuantity ? _self.offeredQuantity : offeredQuantity // ignore: cast_nullable_to_non_nullable
+as SellerResponseType,specNote: null == specNote ? _self.specNote : specNote // ignore: cast_nullable_to_non_nullable
+as String,unitBasis: null == unitBasis ? _self.unitBasis : unitBasis // ignore: cast_nullable_to_non_nullable
+as QuoteUnitBasis,offeredQuantity: null == offeredQuantity ? _self.offeredQuantity : offeredQuantity // ignore: cast_nullable_to_non_nullable
 as String,offeredQuantityUnit: null == offeredQuantityUnit ? _self.offeredQuantityUnit : offeredQuantityUnit // ignore: cast_nullable_to_non_nullable
 as String,conversionBasis: null == conversionBasis ? _self.conversionBasis : conversionBasis // ignore: cast_nullable_to_non_nullable
-as String,currency: null == currency ? _self.currency : currency // ignore: cast_nullable_to_non_nullable
 as String,goodsAmount: null == goodsAmount ? _self.goodsAmount : goodsAmount // ignore: cast_nullable_to_non_nullable
 as String,shippingAmount: null == shippingAmount ? _self.shippingAmount : shippingAmount // ignore: cast_nullable_to_non_nullable
 as String,taxAmount: null == taxAmount ? _self.taxAmount : taxAmount // ignore: cast_nullable_to_non_nullable
 as String,taxInclusionBasis: null == taxInclusionBasis ? _self.taxInclusionBasis : taxInclusionBasis // ignore: cast_nullable_to_non_nullable
-as String,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
+as TaxInclusionBasis,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
 as String,leadTimeDays: null == leadTimeDays ? _self.leadTimeDays : leadTimeDays // ignore: cast_nullable_to_non_nullable
 as String,promisedDeliveryAt: null == promisedDeliveryAt ? _self.promisedDeliveryAt : promisedDeliveryAt // ignore: cast_nullable_to_non_nullable
 as String,validUntil: null == validUntil ? _self.validUntil : validUntil // ignore: cast_nullable_to_non_nullable
@@ -623,18 +348,9 @@ as String,
 /// with the given fields replaced by the non-null parameter values.
 @override
 @pragma('vm:prefer-inline')
-$OfferedQualityCopyWith<$Res> get offeredQuality {
+$QuoteUnitBasisCopyWith<$Res> get unitBasis {
   
-  return $OfferedQualityCopyWith<$Res>(_self.offeredQuality, (value) {
-    return _then(_self.copyWith(offeredQuality: value));
-  });
-}/// Create a copy of SellerQuotePayload
-/// with the given fields replaced by the non-null parameter values.
-@override
-@pragma('vm:prefer-inline')
-$UnitBasisCopyWith<$Res> get unitBasis {
-  
-  return $UnitBasisCopyWith<$Res>(_self.unitBasis, (value) {
+  return $QuoteUnitBasisCopyWith<$Res>(_self.unitBasis, (value) {
     return _then(_self.copyWith(unitBasis: value));
   });
 }
@@ -719,10 +435,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String responseType, @JsonKey(toJson: _offeredQualityToJson)  OfferedQuality offeredQuality, @JsonKey(toJson: _unitBasisToJson)  UnitBasis unitBasis,  String offeredQuantity,  String offeredQuantityUnit,  String conversionBasis,  String currency,  String goodsAmount,  String shippingAmount,  String taxAmount,  String taxInclusionBasis,  String totalAmount,  String leadTimeDays,  String promisedDeliveryAt,  String validUntil,  String termsNote,  String deviationDisclosure)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( SellerResponseType responseType,  String specNote,  QuoteUnitBasis unitBasis,  String offeredQuantity,  String offeredQuantityUnit,  String conversionBasis,  String goodsAmount,  String shippingAmount,  String taxAmount,  TaxInclusionBasis taxInclusionBasis,  String totalAmount,  String leadTimeDays,  String promisedDeliveryAt,  String validUntil,  String termsNote,  String deviationDisclosure)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SellerQuotePayload() when $default != null:
-return $default(_that.responseType,_that.offeredQuality,_that.unitBasis,_that.offeredQuantity,_that.offeredQuantityUnit,_that.conversionBasis,_that.currency,_that.goodsAmount,_that.shippingAmount,_that.taxAmount,_that.taxInclusionBasis,_that.totalAmount,_that.leadTimeDays,_that.promisedDeliveryAt,_that.validUntil,_that.termsNote,_that.deviationDisclosure);case _:
+return $default(_that.responseType,_that.specNote,_that.unitBasis,_that.offeredQuantity,_that.offeredQuantityUnit,_that.conversionBasis,_that.goodsAmount,_that.shippingAmount,_that.taxAmount,_that.taxInclusionBasis,_that.totalAmount,_that.leadTimeDays,_that.promisedDeliveryAt,_that.validUntil,_that.termsNote,_that.deviationDisclosure);case _:
   return orElse();
 
 }
@@ -740,10 +456,10 @@ return $default(_that.responseType,_that.offeredQuality,_that.unitBasis,_that.of
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String responseType, @JsonKey(toJson: _offeredQualityToJson)  OfferedQuality offeredQuality, @JsonKey(toJson: _unitBasisToJson)  UnitBasis unitBasis,  String offeredQuantity,  String offeredQuantityUnit,  String conversionBasis,  String currency,  String goodsAmount,  String shippingAmount,  String taxAmount,  String taxInclusionBasis,  String totalAmount,  String leadTimeDays,  String promisedDeliveryAt,  String validUntil,  String termsNote,  String deviationDisclosure)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( SellerResponseType responseType,  String specNote,  QuoteUnitBasis unitBasis,  String offeredQuantity,  String offeredQuantityUnit,  String conversionBasis,  String goodsAmount,  String shippingAmount,  String taxAmount,  TaxInclusionBasis taxInclusionBasis,  String totalAmount,  String leadTimeDays,  String promisedDeliveryAt,  String validUntil,  String termsNote,  String deviationDisclosure)  $default,) {final _that = this;
 switch (_that) {
 case _SellerQuotePayload():
-return $default(_that.responseType,_that.offeredQuality,_that.unitBasis,_that.offeredQuantity,_that.offeredQuantityUnit,_that.conversionBasis,_that.currency,_that.goodsAmount,_that.shippingAmount,_that.taxAmount,_that.taxInclusionBasis,_that.totalAmount,_that.leadTimeDays,_that.promisedDeliveryAt,_that.validUntil,_that.termsNote,_that.deviationDisclosure);case _:
+return $default(_that.responseType,_that.specNote,_that.unitBasis,_that.offeredQuantity,_that.offeredQuantityUnit,_that.conversionBasis,_that.goodsAmount,_that.shippingAmount,_that.taxAmount,_that.taxInclusionBasis,_that.totalAmount,_that.leadTimeDays,_that.promisedDeliveryAt,_that.validUntil,_that.termsNote,_that.deviationDisclosure);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -760,10 +476,10 @@ return $default(_that.responseType,_that.offeredQuality,_that.unitBasis,_that.of
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String responseType, @JsonKey(toJson: _offeredQualityToJson)  OfferedQuality offeredQuality, @JsonKey(toJson: _unitBasisToJson)  UnitBasis unitBasis,  String offeredQuantity,  String offeredQuantityUnit,  String conversionBasis,  String currency,  String goodsAmount,  String shippingAmount,  String taxAmount,  String taxInclusionBasis,  String totalAmount,  String leadTimeDays,  String promisedDeliveryAt,  String validUntil,  String termsNote,  String deviationDisclosure)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( SellerResponseType responseType,  String specNote,  QuoteUnitBasis unitBasis,  String offeredQuantity,  String offeredQuantityUnit,  String conversionBasis,  String goodsAmount,  String shippingAmount,  String taxAmount,  TaxInclusionBasis taxInclusionBasis,  String totalAmount,  String leadTimeDays,  String promisedDeliveryAt,  String validUntil,  String termsNote,  String deviationDisclosure)?  $default,) {final _that = this;
 switch (_that) {
 case _SellerQuotePayload() when $default != null:
-return $default(_that.responseType,_that.offeredQuality,_that.unitBasis,_that.offeredQuantity,_that.offeredQuantityUnit,_that.conversionBasis,_that.currency,_that.goodsAmount,_that.shippingAmount,_that.taxAmount,_that.taxInclusionBasis,_that.totalAmount,_that.leadTimeDays,_that.promisedDeliveryAt,_that.validUntil,_that.termsNote,_that.deviationDisclosure);case _:
+return $default(_that.responseType,_that.specNote,_that.unitBasis,_that.offeredQuantity,_that.offeredQuantityUnit,_that.conversionBasis,_that.goodsAmount,_that.shippingAmount,_that.taxAmount,_that.taxInclusionBasis,_that.totalAmount,_that.leadTimeDays,_that.promisedDeliveryAt,_that.validUntil,_that.termsNote,_that.deviationDisclosure);case _:
   return null;
 
 }
@@ -772,23 +488,23 @@ return $default(_that.responseType,_that.offeredQuality,_that.unitBasis,_that.of
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _SellerQuotePayload extends SellerQuotePayload {
-  const _SellerQuotePayload({this.responseType = '', @JsonKey(toJson: _offeredQualityToJson) this.offeredQuality = const OfferedQuality(), @JsonKey(toJson: _unitBasisToJson) this.unitBasis = const UnitBasis(), this.offeredQuantity = '', this.offeredQuantityUnit = '', this.conversionBasis = '', this.currency = kQuoteCurrencyTwd, this.goodsAmount = '', this.shippingAmount = '', this.taxAmount = '', this.taxInclusionBasis = '', this.totalAmount = '', this.leadTimeDays = '', this.promisedDeliveryAt = '', this.validUntil = '', this.termsNote = '', this.deviationDisclosure = ''}): super._();
-  factory _SellerQuotePayload.fromJson(Map<String, dynamic> json) => _$SellerQuotePayloadFromJson(json);
+  const _SellerQuotePayload({this.responseType = SellerResponseType.SELLER_RESPONSE_TYPE_UNSPECIFIED, this.specNote = '', this.unitBasis = const QuoteUnitBasis(), this.offeredQuantity = '', this.offeredQuantityUnit = '', this.conversionBasis = '', this.goodsAmount = '', this.shippingAmount = '', this.taxAmount = '', this.taxInclusionBasis = TaxInclusionBasis.TAX_INCLUSION_BASIS_UNSPECIFIED, this.totalAmount = '', this.leadTimeDays = '', this.promisedDeliveryAt = '', this.validUntil = '', this.termsNote = '', this.deviationDisclosure = ''}): super._();
+  
 
-@override@JsonKey() final  String responseType;
-@override@JsonKey(toJson: _offeredQualityToJson) final  OfferedQuality offeredQuality;
-@override@JsonKey(toJson: _unitBasisToJson) final  UnitBasis unitBasis;
+@override@JsonKey() final  SellerResponseType responseType;
+/// 賣家對規格的補充說明，選填。
+@override@JsonKey() final  String specNote;
+@override@JsonKey() final  QuoteUnitBasis unitBasis;
 @override@JsonKey() final  String offeredQuantity;
 @override@JsonKey() final  String offeredQuantityUnit;
 @override@JsonKey() final  String conversionBasis;
-@override@JsonKey() final  String currency;
 @override@JsonKey() final  String goodsAmount;
 @override@JsonKey() final  String shippingAmount;
 @override@JsonKey() final  String taxAmount;
-@override@JsonKey() final  String taxInclusionBasis;
+@override@JsonKey() final  TaxInclusionBasis taxInclusionBasis;
 @override@JsonKey() final  String totalAmount;
 @override@JsonKey() final  String leadTimeDays;
 @override@JsonKey() final  String promisedDeliveryAt;
@@ -802,23 +518,20 @@ class _SellerQuotePayload extends SellerQuotePayload {
 @pragma('vm:prefer-inline')
 _$SellerQuotePayloadCopyWith<_SellerQuotePayload> get copyWith => __$SellerQuotePayloadCopyWithImpl<_SellerQuotePayload>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$SellerQuotePayloadToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerQuotePayload&&(identical(other.responseType, responseType) || other.responseType == responseType)&&(identical(other.offeredQuality, offeredQuality) || other.offeredQuality == offeredQuality)&&(identical(other.unitBasis, unitBasis) || other.unitBasis == unitBasis)&&(identical(other.offeredQuantity, offeredQuantity) || other.offeredQuantity == offeredQuantity)&&(identical(other.offeredQuantityUnit, offeredQuantityUnit) || other.offeredQuantityUnit == offeredQuantityUnit)&&(identical(other.conversionBasis, conversionBasis) || other.conversionBasis == conversionBasis)&&(identical(other.currency, currency) || other.currency == currency)&&(identical(other.goodsAmount, goodsAmount) || other.goodsAmount == goodsAmount)&&(identical(other.shippingAmount, shippingAmount) || other.shippingAmount == shippingAmount)&&(identical(other.taxAmount, taxAmount) || other.taxAmount == taxAmount)&&(identical(other.taxInclusionBasis, taxInclusionBasis) || other.taxInclusionBasis == taxInclusionBasis)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.leadTimeDays, leadTimeDays) || other.leadTimeDays == leadTimeDays)&&(identical(other.promisedDeliveryAt, promisedDeliveryAt) || other.promisedDeliveryAt == promisedDeliveryAt)&&(identical(other.validUntil, validUntil) || other.validUntil == validUntil)&&(identical(other.termsNote, termsNote) || other.termsNote == termsNote)&&(identical(other.deviationDisclosure, deviationDisclosure) || other.deviationDisclosure == deviationDisclosure));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerQuotePayload&&(identical(other.responseType, responseType) || other.responseType == responseType)&&(identical(other.specNote, specNote) || other.specNote == specNote)&&(identical(other.unitBasis, unitBasis) || other.unitBasis == unitBasis)&&(identical(other.offeredQuantity, offeredQuantity) || other.offeredQuantity == offeredQuantity)&&(identical(other.offeredQuantityUnit, offeredQuantityUnit) || other.offeredQuantityUnit == offeredQuantityUnit)&&(identical(other.conversionBasis, conversionBasis) || other.conversionBasis == conversionBasis)&&(identical(other.goodsAmount, goodsAmount) || other.goodsAmount == goodsAmount)&&(identical(other.shippingAmount, shippingAmount) || other.shippingAmount == shippingAmount)&&(identical(other.taxAmount, taxAmount) || other.taxAmount == taxAmount)&&(identical(other.taxInclusionBasis, taxInclusionBasis) || other.taxInclusionBasis == taxInclusionBasis)&&(identical(other.totalAmount, totalAmount) || other.totalAmount == totalAmount)&&(identical(other.leadTimeDays, leadTimeDays) || other.leadTimeDays == leadTimeDays)&&(identical(other.promisedDeliveryAt, promisedDeliveryAt) || other.promisedDeliveryAt == promisedDeliveryAt)&&(identical(other.validUntil, validUntil) || other.validUntil == validUntil)&&(identical(other.termsNote, termsNote) || other.termsNote == termsNote)&&(identical(other.deviationDisclosure, deviationDisclosure) || other.deviationDisclosure == deviationDisclosure));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,responseType,offeredQuality,unitBasis,offeredQuantity,offeredQuantityUnit,conversionBasis,currency,goodsAmount,shippingAmount,taxAmount,taxInclusionBasis,totalAmount,leadTimeDays,promisedDeliveryAt,validUntil,termsNote,deviationDisclosure);
+int get hashCode => Object.hash(runtimeType,responseType,specNote,unitBasis,offeredQuantity,offeredQuantityUnit,conversionBasis,goodsAmount,shippingAmount,taxAmount,taxInclusionBasis,totalAmount,leadTimeDays,promisedDeliveryAt,validUntil,termsNote,deviationDisclosure);
 
 @override
 String toString() {
-  return 'SellerQuotePayload(responseType: $responseType, offeredQuality: $offeredQuality, unitBasis: $unitBasis, offeredQuantity: $offeredQuantity, offeredQuantityUnit: $offeredQuantityUnit, conversionBasis: $conversionBasis, currency: $currency, goodsAmount: $goodsAmount, shippingAmount: $shippingAmount, taxAmount: $taxAmount, taxInclusionBasis: $taxInclusionBasis, totalAmount: $totalAmount, leadTimeDays: $leadTimeDays, promisedDeliveryAt: $promisedDeliveryAt, validUntil: $validUntil, termsNote: $termsNote, deviationDisclosure: $deviationDisclosure)';
+  return 'SellerQuotePayload(responseType: $responseType, specNote: $specNote, unitBasis: $unitBasis, offeredQuantity: $offeredQuantity, offeredQuantityUnit: $offeredQuantityUnit, conversionBasis: $conversionBasis, goodsAmount: $goodsAmount, shippingAmount: $shippingAmount, taxAmount: $taxAmount, taxInclusionBasis: $taxInclusionBasis, totalAmount: $totalAmount, leadTimeDays: $leadTimeDays, promisedDeliveryAt: $promisedDeliveryAt, validUntil: $validUntil, termsNote: $termsNote, deviationDisclosure: $deviationDisclosure)';
 }
 
 
@@ -829,11 +542,11 @@ abstract mixin class _$SellerQuotePayloadCopyWith<$Res> implements $SellerQuoteP
   factory _$SellerQuotePayloadCopyWith(_SellerQuotePayload value, $Res Function(_SellerQuotePayload) _then) = __$SellerQuotePayloadCopyWithImpl;
 @override @useResult
 $Res call({
- String responseType,@JsonKey(toJson: _offeredQualityToJson) OfferedQuality offeredQuality,@JsonKey(toJson: _unitBasisToJson) UnitBasis unitBasis, String offeredQuantity, String offeredQuantityUnit, String conversionBasis, String currency, String goodsAmount, String shippingAmount, String taxAmount, String taxInclusionBasis, String totalAmount, String leadTimeDays, String promisedDeliveryAt, String validUntil, String termsNote, String deviationDisclosure
+ SellerResponseType responseType, String specNote, QuoteUnitBasis unitBasis, String offeredQuantity, String offeredQuantityUnit, String conversionBasis, String goodsAmount, String shippingAmount, String taxAmount, TaxInclusionBasis taxInclusionBasis, String totalAmount, String leadTimeDays, String promisedDeliveryAt, String validUntil, String termsNote, String deviationDisclosure
 });
 
 
-@override $OfferedQualityCopyWith<$Res> get offeredQuality;@override $UnitBasisCopyWith<$Res> get unitBasis;
+@override $QuoteUnitBasisCopyWith<$Res> get unitBasis;
 
 }
 /// @nodoc
@@ -846,20 +559,19 @@ class __$SellerQuotePayloadCopyWithImpl<$Res>
 
 /// Create a copy of SellerQuotePayload
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? responseType = null,Object? offeredQuality = null,Object? unitBasis = null,Object? offeredQuantity = null,Object? offeredQuantityUnit = null,Object? conversionBasis = null,Object? currency = null,Object? goodsAmount = null,Object? shippingAmount = null,Object? taxAmount = null,Object? taxInclusionBasis = null,Object? totalAmount = null,Object? leadTimeDays = null,Object? promisedDeliveryAt = null,Object? validUntil = null,Object? termsNote = null,Object? deviationDisclosure = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? responseType = null,Object? specNote = null,Object? unitBasis = null,Object? offeredQuantity = null,Object? offeredQuantityUnit = null,Object? conversionBasis = null,Object? goodsAmount = null,Object? shippingAmount = null,Object? taxAmount = null,Object? taxInclusionBasis = null,Object? totalAmount = null,Object? leadTimeDays = null,Object? promisedDeliveryAt = null,Object? validUntil = null,Object? termsNote = null,Object? deviationDisclosure = null,}) {
   return _then(_SellerQuotePayload(
 responseType: null == responseType ? _self.responseType : responseType // ignore: cast_nullable_to_non_nullable
-as String,offeredQuality: null == offeredQuality ? _self.offeredQuality : offeredQuality // ignore: cast_nullable_to_non_nullable
-as OfferedQuality,unitBasis: null == unitBasis ? _self.unitBasis : unitBasis // ignore: cast_nullable_to_non_nullable
-as UnitBasis,offeredQuantity: null == offeredQuantity ? _self.offeredQuantity : offeredQuantity // ignore: cast_nullable_to_non_nullable
+as SellerResponseType,specNote: null == specNote ? _self.specNote : specNote // ignore: cast_nullable_to_non_nullable
+as String,unitBasis: null == unitBasis ? _self.unitBasis : unitBasis // ignore: cast_nullable_to_non_nullable
+as QuoteUnitBasis,offeredQuantity: null == offeredQuantity ? _self.offeredQuantity : offeredQuantity // ignore: cast_nullable_to_non_nullable
 as String,offeredQuantityUnit: null == offeredQuantityUnit ? _self.offeredQuantityUnit : offeredQuantityUnit // ignore: cast_nullable_to_non_nullable
 as String,conversionBasis: null == conversionBasis ? _self.conversionBasis : conversionBasis // ignore: cast_nullable_to_non_nullable
-as String,currency: null == currency ? _self.currency : currency // ignore: cast_nullable_to_non_nullable
 as String,goodsAmount: null == goodsAmount ? _self.goodsAmount : goodsAmount // ignore: cast_nullable_to_non_nullable
 as String,shippingAmount: null == shippingAmount ? _self.shippingAmount : shippingAmount // ignore: cast_nullable_to_non_nullable
 as String,taxAmount: null == taxAmount ? _self.taxAmount : taxAmount // ignore: cast_nullable_to_non_nullable
 as String,taxInclusionBasis: null == taxInclusionBasis ? _self.taxInclusionBasis : taxInclusionBasis // ignore: cast_nullable_to_non_nullable
-as String,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
+as TaxInclusionBasis,totalAmount: null == totalAmount ? _self.totalAmount : totalAmount // ignore: cast_nullable_to_non_nullable
 as String,leadTimeDays: null == leadTimeDays ? _self.leadTimeDays : leadTimeDays // ignore: cast_nullable_to_non_nullable
 as String,promisedDeliveryAt: null == promisedDeliveryAt ? _self.promisedDeliveryAt : promisedDeliveryAt // ignore: cast_nullable_to_non_nullable
 as String,validUntil: null == validUntil ? _self.validUntil : validUntil // ignore: cast_nullable_to_non_nullable
@@ -873,50 +585,38 @@ as String,
 /// with the given fields replaced by the non-null parameter values.
 @override
 @pragma('vm:prefer-inline')
-$OfferedQualityCopyWith<$Res> get offeredQuality {
+$QuoteUnitBasisCopyWith<$Res> get unitBasis {
   
-  return $OfferedQualityCopyWith<$Res>(_self.offeredQuality, (value) {
-    return _then(_self.copyWith(offeredQuality: value));
-  });
-}/// Create a copy of SellerQuotePayload
-/// with the given fields replaced by the non-null parameter values.
-@override
-@pragma('vm:prefer-inline')
-$UnitBasisCopyWith<$Res> get unitBasis {
-  
-  return $UnitBasisCopyWith<$Res>(_self.unitBasis, (value) {
+  return $QuoteUnitBasisCopyWith<$Res>(_self.unitBasis, (value) {
     return _then(_self.copyWith(unitBasis: value));
   });
 }
 }
 
-
 /// @nodoc
 mixin _$SellerResponseVersionResponse {
 
- String get sellerResponseId; String get sellerResponseVersion; String get publicationId; String get status; String get payloadHash; String get submittedAt; String get supersededByVersion; bool get outsideBuyerRequestedRange;@JsonKey(toJson: _quoteToJson) SellerQuotePayload get quote; bool get replayed;
+ String get sellerResponseId; String get sellerResponseVersion; String get publicationId; SellerResponseStatus get status; String get payloadHash; String get supersededByVersion; bool get outsideBuyerRequestedRange; SellerQuotePayload get quote; bool get replayed;
 /// Create a copy of SellerResponseVersionResponse
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
 $SellerResponseVersionResponseCopyWith<SellerResponseVersionResponse> get copyWith => _$SellerResponseVersionResponseCopyWithImpl<SellerResponseVersionResponse>(this as SellerResponseVersionResponse, _$identity);
 
-  /// Serializes this SellerResponseVersionResponse to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerResponseVersionResponse&&(identical(other.sellerResponseId, sellerResponseId) || other.sellerResponseId == sellerResponseId)&&(identical(other.sellerResponseVersion, sellerResponseVersion) || other.sellerResponseVersion == sellerResponseVersion)&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.status, status) || other.status == status)&&(identical(other.payloadHash, payloadHash) || other.payloadHash == payloadHash)&&(identical(other.submittedAt, submittedAt) || other.submittedAt == submittedAt)&&(identical(other.supersededByVersion, supersededByVersion) || other.supersededByVersion == supersededByVersion)&&(identical(other.outsideBuyerRequestedRange, outsideBuyerRequestedRange) || other.outsideBuyerRequestedRange == outsideBuyerRequestedRange)&&(identical(other.quote, quote) || other.quote == quote)&&(identical(other.replayed, replayed) || other.replayed == replayed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerResponseVersionResponse&&(identical(other.sellerResponseId, sellerResponseId) || other.sellerResponseId == sellerResponseId)&&(identical(other.sellerResponseVersion, sellerResponseVersion) || other.sellerResponseVersion == sellerResponseVersion)&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.status, status) || other.status == status)&&(identical(other.payloadHash, payloadHash) || other.payloadHash == payloadHash)&&(identical(other.supersededByVersion, supersededByVersion) || other.supersededByVersion == supersededByVersion)&&(identical(other.outsideBuyerRequestedRange, outsideBuyerRequestedRange) || other.outsideBuyerRequestedRange == outsideBuyerRequestedRange)&&(identical(other.quote, quote) || other.quote == quote)&&(identical(other.replayed, replayed) || other.replayed == replayed));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,sellerResponseId,sellerResponseVersion,publicationId,status,payloadHash,submittedAt,supersededByVersion,outsideBuyerRequestedRange,quote,replayed);
+int get hashCode => Object.hash(runtimeType,sellerResponseId,sellerResponseVersion,publicationId,status,payloadHash,supersededByVersion,outsideBuyerRequestedRange,quote,replayed);
 
 @override
 String toString() {
-  return 'SellerResponseVersionResponse(sellerResponseId: $sellerResponseId, sellerResponseVersion: $sellerResponseVersion, publicationId: $publicationId, status: $status, payloadHash: $payloadHash, submittedAt: $submittedAt, supersededByVersion: $supersededByVersion, outsideBuyerRequestedRange: $outsideBuyerRequestedRange, quote: $quote, replayed: $replayed)';
+  return 'SellerResponseVersionResponse(sellerResponseId: $sellerResponseId, sellerResponseVersion: $sellerResponseVersion, publicationId: $publicationId, status: $status, payloadHash: $payloadHash, supersededByVersion: $supersededByVersion, outsideBuyerRequestedRange: $outsideBuyerRequestedRange, quote: $quote, replayed: $replayed)';
 }
 
 
@@ -927,7 +627,7 @@ abstract mixin class $SellerResponseVersionResponseCopyWith<$Res>  {
   factory $SellerResponseVersionResponseCopyWith(SellerResponseVersionResponse value, $Res Function(SellerResponseVersionResponse) _then) = _$SellerResponseVersionResponseCopyWithImpl;
 @useResult
 $Res call({
- String sellerResponseId, String sellerResponseVersion, String publicationId, String status, String payloadHash, String submittedAt, String supersededByVersion, bool outsideBuyerRequestedRange,@JsonKey(toJson: _quoteToJson) SellerQuotePayload quote, bool replayed
+ String sellerResponseId, String sellerResponseVersion, String publicationId, SellerResponseStatus status, String payloadHash, String supersededByVersion, bool outsideBuyerRequestedRange, SellerQuotePayload quote, bool replayed
 });
 
 
@@ -944,14 +644,13 @@ class _$SellerResponseVersionResponseCopyWithImpl<$Res>
 
 /// Create a copy of SellerResponseVersionResponse
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? sellerResponseId = null,Object? sellerResponseVersion = null,Object? publicationId = null,Object? status = null,Object? payloadHash = null,Object? submittedAt = null,Object? supersededByVersion = null,Object? outsideBuyerRequestedRange = null,Object? quote = null,Object? replayed = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? sellerResponseId = null,Object? sellerResponseVersion = null,Object? publicationId = null,Object? status = null,Object? payloadHash = null,Object? supersededByVersion = null,Object? outsideBuyerRequestedRange = null,Object? quote = null,Object? replayed = null,}) {
   return _then(_self.copyWith(
 sellerResponseId: null == sellerResponseId ? _self.sellerResponseId : sellerResponseId // ignore: cast_nullable_to_non_nullable
 as String,sellerResponseVersion: null == sellerResponseVersion ? _self.sellerResponseVersion : sellerResponseVersion // ignore: cast_nullable_to_non_nullable
 as String,publicationId: null == publicationId ? _self.publicationId : publicationId // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,payloadHash: null == payloadHash ? _self.payloadHash : payloadHash // ignore: cast_nullable_to_non_nullable
-as String,submittedAt: null == submittedAt ? _self.submittedAt : submittedAt // ignore: cast_nullable_to_non_nullable
+as SellerResponseStatus,payloadHash: null == payloadHash ? _self.payloadHash : payloadHash // ignore: cast_nullable_to_non_nullable
 as String,supersededByVersion: null == supersededByVersion ? _self.supersededByVersion : supersededByVersion // ignore: cast_nullable_to_non_nullable
 as String,outsideBuyerRequestedRange: null == outsideBuyerRequestedRange ? _self.outsideBuyerRequestedRange : outsideBuyerRequestedRange // ignore: cast_nullable_to_non_nullable
 as bool,quote: null == quote ? _self.quote : quote // ignore: cast_nullable_to_non_nullable
@@ -1050,10 +749,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String sellerResponseId,  String sellerResponseVersion,  String publicationId,  String status,  String payloadHash,  String submittedAt,  String supersededByVersion,  bool outsideBuyerRequestedRange, @JsonKey(toJson: _quoteToJson)  SellerQuotePayload quote,  bool replayed)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String sellerResponseId,  String sellerResponseVersion,  String publicationId,  SellerResponseStatus status,  String payloadHash,  String supersededByVersion,  bool outsideBuyerRequestedRange,  SellerQuotePayload quote,  bool replayed)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SellerResponseVersionResponse() when $default != null:
-return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publicationId,_that.status,_that.payloadHash,_that.submittedAt,_that.supersededByVersion,_that.outsideBuyerRequestedRange,_that.quote,_that.replayed);case _:
+return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publicationId,_that.status,_that.payloadHash,_that.supersededByVersion,_that.outsideBuyerRequestedRange,_that.quote,_that.replayed);case _:
   return orElse();
 
 }
@@ -1071,10 +770,10 @@ return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publica
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String sellerResponseId,  String sellerResponseVersion,  String publicationId,  String status,  String payloadHash,  String submittedAt,  String supersededByVersion,  bool outsideBuyerRequestedRange, @JsonKey(toJson: _quoteToJson)  SellerQuotePayload quote,  bool replayed)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String sellerResponseId,  String sellerResponseVersion,  String publicationId,  SellerResponseStatus status,  String payloadHash,  String supersededByVersion,  bool outsideBuyerRequestedRange,  SellerQuotePayload quote,  bool replayed)  $default,) {final _that = this;
 switch (_that) {
 case _SellerResponseVersionResponse():
-return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publicationId,_that.status,_that.payloadHash,_that.submittedAt,_that.supersededByVersion,_that.outsideBuyerRequestedRange,_that.quote,_that.replayed);case _:
+return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publicationId,_that.status,_that.payloadHash,_that.supersededByVersion,_that.outsideBuyerRequestedRange,_that.quote,_that.replayed);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1091,10 +790,10 @@ return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publica
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String sellerResponseId,  String sellerResponseVersion,  String publicationId,  String status,  String payloadHash,  String submittedAt,  String supersededByVersion,  bool outsideBuyerRequestedRange, @JsonKey(toJson: _quoteToJson)  SellerQuotePayload quote,  bool replayed)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String sellerResponseId,  String sellerResponseVersion,  String publicationId,  SellerResponseStatus status,  String payloadHash,  String supersededByVersion,  bool outsideBuyerRequestedRange,  SellerQuotePayload quote,  bool replayed)?  $default,) {final _that = this;
 switch (_that) {
 case _SellerResponseVersionResponse() when $default != null:
-return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publicationId,_that.status,_that.payloadHash,_that.submittedAt,_that.supersededByVersion,_that.outsideBuyerRequestedRange,_that.quote,_that.replayed);case _:
+return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publicationId,_that.status,_that.payloadHash,_that.supersededByVersion,_that.outsideBuyerRequestedRange,_that.quote,_that.replayed);case _:
   return null;
 
 }
@@ -1103,21 +802,20 @@ return $default(_that.sellerResponseId,_that.sellerResponseVersion,_that.publica
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _SellerResponseVersionResponse extends SellerResponseVersionResponse {
-  const _SellerResponseVersionResponse({this.sellerResponseId = '', this.sellerResponseVersion = '', this.publicationId = '', this.status = '', this.payloadHash = '', this.submittedAt = '', this.supersededByVersion = '', this.outsideBuyerRequestedRange = false, @JsonKey(toJson: _quoteToJson) this.quote = const SellerQuotePayload(), this.replayed = false}): super._();
-  factory _SellerResponseVersionResponse.fromJson(Map<String, dynamic> json) => _$SellerResponseVersionResponseFromJson(json);
+  const _SellerResponseVersionResponse({this.sellerResponseId = '', this.sellerResponseVersion = '', this.publicationId = '', this.status = SellerResponseStatus.SELLER_RESPONSE_STATUS_UNSPECIFIED, this.payloadHash = '', this.supersededByVersion = '', this.outsideBuyerRequestedRange = false, this.quote = const SellerQuotePayload(), this.replayed = false}): super._();
+  
 
 @override@JsonKey() final  String sellerResponseId;
 @override@JsonKey() final  String sellerResponseVersion;
 @override@JsonKey() final  String publicationId;
-@override@JsonKey() final  String status;
+@override@JsonKey() final  SellerResponseStatus status;
 @override@JsonKey() final  String payloadHash;
-@override@JsonKey() final  String submittedAt;
 @override@JsonKey() final  String supersededByVersion;
 @override@JsonKey() final  bool outsideBuyerRequestedRange;
-@override@JsonKey(toJson: _quoteToJson) final  SellerQuotePayload quote;
+@override@JsonKey() final  SellerQuotePayload quote;
 @override@JsonKey() final  bool replayed;
 
 /// Create a copy of SellerResponseVersionResponse
@@ -1126,23 +824,20 @@ class _SellerResponseVersionResponse extends SellerResponseVersionResponse {
 @pragma('vm:prefer-inline')
 _$SellerResponseVersionResponseCopyWith<_SellerResponseVersionResponse> get copyWith => __$SellerResponseVersionResponseCopyWithImpl<_SellerResponseVersionResponse>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$SellerResponseVersionResponseToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerResponseVersionResponse&&(identical(other.sellerResponseId, sellerResponseId) || other.sellerResponseId == sellerResponseId)&&(identical(other.sellerResponseVersion, sellerResponseVersion) || other.sellerResponseVersion == sellerResponseVersion)&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.status, status) || other.status == status)&&(identical(other.payloadHash, payloadHash) || other.payloadHash == payloadHash)&&(identical(other.submittedAt, submittedAt) || other.submittedAt == submittedAt)&&(identical(other.supersededByVersion, supersededByVersion) || other.supersededByVersion == supersededByVersion)&&(identical(other.outsideBuyerRequestedRange, outsideBuyerRequestedRange) || other.outsideBuyerRequestedRange == outsideBuyerRequestedRange)&&(identical(other.quote, quote) || other.quote == quote)&&(identical(other.replayed, replayed) || other.replayed == replayed));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerResponseVersionResponse&&(identical(other.sellerResponseId, sellerResponseId) || other.sellerResponseId == sellerResponseId)&&(identical(other.sellerResponseVersion, sellerResponseVersion) || other.sellerResponseVersion == sellerResponseVersion)&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.status, status) || other.status == status)&&(identical(other.payloadHash, payloadHash) || other.payloadHash == payloadHash)&&(identical(other.supersededByVersion, supersededByVersion) || other.supersededByVersion == supersededByVersion)&&(identical(other.outsideBuyerRequestedRange, outsideBuyerRequestedRange) || other.outsideBuyerRequestedRange == outsideBuyerRequestedRange)&&(identical(other.quote, quote) || other.quote == quote)&&(identical(other.replayed, replayed) || other.replayed == replayed));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,sellerResponseId,sellerResponseVersion,publicationId,status,payloadHash,submittedAt,supersededByVersion,outsideBuyerRequestedRange,quote,replayed);
+int get hashCode => Object.hash(runtimeType,sellerResponseId,sellerResponseVersion,publicationId,status,payloadHash,supersededByVersion,outsideBuyerRequestedRange,quote,replayed);
 
 @override
 String toString() {
-  return 'SellerResponseVersionResponse(sellerResponseId: $sellerResponseId, sellerResponseVersion: $sellerResponseVersion, publicationId: $publicationId, status: $status, payloadHash: $payloadHash, submittedAt: $submittedAt, supersededByVersion: $supersededByVersion, outsideBuyerRequestedRange: $outsideBuyerRequestedRange, quote: $quote, replayed: $replayed)';
+  return 'SellerResponseVersionResponse(sellerResponseId: $sellerResponseId, sellerResponseVersion: $sellerResponseVersion, publicationId: $publicationId, status: $status, payloadHash: $payloadHash, supersededByVersion: $supersededByVersion, outsideBuyerRequestedRange: $outsideBuyerRequestedRange, quote: $quote, replayed: $replayed)';
 }
 
 
@@ -1153,7 +848,7 @@ abstract mixin class _$SellerResponseVersionResponseCopyWith<$Res> implements $S
   factory _$SellerResponseVersionResponseCopyWith(_SellerResponseVersionResponse value, $Res Function(_SellerResponseVersionResponse) _then) = __$SellerResponseVersionResponseCopyWithImpl;
 @override @useResult
 $Res call({
- String sellerResponseId, String sellerResponseVersion, String publicationId, String status, String payloadHash, String submittedAt, String supersededByVersion, bool outsideBuyerRequestedRange,@JsonKey(toJson: _quoteToJson) SellerQuotePayload quote, bool replayed
+ String sellerResponseId, String sellerResponseVersion, String publicationId, SellerResponseStatus status, String payloadHash, String supersededByVersion, bool outsideBuyerRequestedRange, SellerQuotePayload quote, bool replayed
 });
 
 
@@ -1170,14 +865,13 @@ class __$SellerResponseVersionResponseCopyWithImpl<$Res>
 
 /// Create a copy of SellerResponseVersionResponse
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? sellerResponseId = null,Object? sellerResponseVersion = null,Object? publicationId = null,Object? status = null,Object? payloadHash = null,Object? submittedAt = null,Object? supersededByVersion = null,Object? outsideBuyerRequestedRange = null,Object? quote = null,Object? replayed = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? sellerResponseId = null,Object? sellerResponseVersion = null,Object? publicationId = null,Object? status = null,Object? payloadHash = null,Object? supersededByVersion = null,Object? outsideBuyerRequestedRange = null,Object? quote = null,Object? replayed = null,}) {
   return _then(_SellerResponseVersionResponse(
 sellerResponseId: null == sellerResponseId ? _self.sellerResponseId : sellerResponseId // ignore: cast_nullable_to_non_nullable
 as String,sellerResponseVersion: null == sellerResponseVersion ? _self.sellerResponseVersion : sellerResponseVersion // ignore: cast_nullable_to_non_nullable
 as String,publicationId: null == publicationId ? _self.publicationId : publicationId // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,payloadHash: null == payloadHash ? _self.payloadHash : payloadHash // ignore: cast_nullable_to_non_nullable
-as String,submittedAt: null == submittedAt ? _self.submittedAt : submittedAt // ignore: cast_nullable_to_non_nullable
+as SellerResponseStatus,payloadHash: null == payloadHash ? _self.payloadHash : payloadHash // ignore: cast_nullable_to_non_nullable
 as String,supersededByVersion: null == supersededByVersion ? _self.supersededByVersion : supersededByVersion // ignore: cast_nullable_to_non_nullable
 as String,outsideBuyerRequestedRange: null == outsideBuyerRequestedRange ? _self.outsideBuyerRequestedRange : outsideBuyerRequestedRange // ignore: cast_nullable_to_non_nullable
 as bool,quote: null == quote ? _self.quote : quote // ignore: cast_nullable_to_non_nullable
@@ -1198,33 +892,30 @@ $SellerQuotePayloadCopyWith<$Res> get quote {
 }
 }
 
-
 /// @nodoc
 mixin _$SellerResponseDraftResponse {
 
- String get draftVersion; String get updatedAt;@JsonKey(toJson: _quoteToJson) SellerQuotePayload get draft;
+ String get draftVersion; SellerQuotePayload get draft;
 /// Create a copy of SellerResponseDraftResponse
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
 $SellerResponseDraftResponseCopyWith<SellerResponseDraftResponse> get copyWith => _$SellerResponseDraftResponseCopyWithImpl<SellerResponseDraftResponse>(this as SellerResponseDraftResponse, _$identity);
 
-  /// Serializes this SellerResponseDraftResponse to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerResponseDraftResponse&&(identical(other.draftVersion, draftVersion) || other.draftVersion == draftVersion)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&(identical(other.draft, draft) || other.draft == draft));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerResponseDraftResponse&&(identical(other.draftVersion, draftVersion) || other.draftVersion == draftVersion)&&(identical(other.draft, draft) || other.draft == draft));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,draftVersion,updatedAt,draft);
+int get hashCode => Object.hash(runtimeType,draftVersion,draft);
 
 @override
 String toString() {
-  return 'SellerResponseDraftResponse(draftVersion: $draftVersion, updatedAt: $updatedAt, draft: $draft)';
+  return 'SellerResponseDraftResponse(draftVersion: $draftVersion, draft: $draft)';
 }
 
 
@@ -1235,7 +926,7 @@ abstract mixin class $SellerResponseDraftResponseCopyWith<$Res>  {
   factory $SellerResponseDraftResponseCopyWith(SellerResponseDraftResponse value, $Res Function(SellerResponseDraftResponse) _then) = _$SellerResponseDraftResponseCopyWithImpl;
 @useResult
 $Res call({
- String draftVersion, String updatedAt,@JsonKey(toJson: _quoteToJson) SellerQuotePayload draft
+ String draftVersion, SellerQuotePayload draft
 });
 
 
@@ -1252,10 +943,9 @@ class _$SellerResponseDraftResponseCopyWithImpl<$Res>
 
 /// Create a copy of SellerResponseDraftResponse
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? draftVersion = null,Object? updatedAt = null,Object? draft = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? draftVersion = null,Object? draft = null,}) {
   return _then(_self.copyWith(
 draftVersion: null == draftVersion ? _self.draftVersion : draftVersion // ignore: cast_nullable_to_non_nullable
-as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,draft: null == draft ? _self.draft : draft // ignore: cast_nullable_to_non_nullable
 as SellerQuotePayload,
   ));
@@ -1351,10 +1041,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String draftVersion,  String updatedAt, @JsonKey(toJson: _quoteToJson)  SellerQuotePayload draft)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String draftVersion,  SellerQuotePayload draft)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SellerResponseDraftResponse() when $default != null:
-return $default(_that.draftVersion,_that.updatedAt,_that.draft);case _:
+return $default(_that.draftVersion,_that.draft);case _:
   return orElse();
 
 }
@@ -1372,10 +1062,10 @@ return $default(_that.draftVersion,_that.updatedAt,_that.draft);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String draftVersion,  String updatedAt, @JsonKey(toJson: _quoteToJson)  SellerQuotePayload draft)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String draftVersion,  SellerQuotePayload draft)  $default,) {final _that = this;
 switch (_that) {
 case _SellerResponseDraftResponse():
-return $default(_that.draftVersion,_that.updatedAt,_that.draft);case _:
+return $default(_that.draftVersion,_that.draft);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1392,10 +1082,10 @@ return $default(_that.draftVersion,_that.updatedAt,_that.draft);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String draftVersion,  String updatedAt, @JsonKey(toJson: _quoteToJson)  SellerQuotePayload draft)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String draftVersion,  SellerQuotePayload draft)?  $default,) {final _that = this;
 switch (_that) {
 case _SellerResponseDraftResponse() when $default != null:
-return $default(_that.draftVersion,_that.updatedAt,_that.draft);case _:
+return $default(_that.draftVersion,_that.draft);case _:
   return null;
 
 }
@@ -1404,15 +1094,14 @@ return $default(_that.draftVersion,_that.updatedAt,_that.draft);case _:
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _SellerResponseDraftResponse implements SellerResponseDraftResponse {
-  const _SellerResponseDraftResponse({this.draftVersion = '', this.updatedAt = '', @JsonKey(toJson: _quoteToJson) this.draft = const SellerQuotePayload()});
-  factory _SellerResponseDraftResponse.fromJson(Map<String, dynamic> json) => _$SellerResponseDraftResponseFromJson(json);
+  const _SellerResponseDraftResponse({this.draftVersion = '', this.draft = const SellerQuotePayload()});
+  
 
 @override@JsonKey() final  String draftVersion;
-@override@JsonKey() final  String updatedAt;
-@override@JsonKey(toJson: _quoteToJson) final  SellerQuotePayload draft;
+@override@JsonKey() final  SellerQuotePayload draft;
 
 /// Create a copy of SellerResponseDraftResponse
 /// with the given fields replaced by the non-null parameter values.
@@ -1420,23 +1109,20 @@ class _SellerResponseDraftResponse implements SellerResponseDraftResponse {
 @pragma('vm:prefer-inline')
 _$SellerResponseDraftResponseCopyWith<_SellerResponseDraftResponse> get copyWith => __$SellerResponseDraftResponseCopyWithImpl<_SellerResponseDraftResponse>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$SellerResponseDraftResponseToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerResponseDraftResponse&&(identical(other.draftVersion, draftVersion) || other.draftVersion == draftVersion)&&(identical(other.updatedAt, updatedAt) || other.updatedAt == updatedAt)&&(identical(other.draft, draft) || other.draft == draft));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerResponseDraftResponse&&(identical(other.draftVersion, draftVersion) || other.draftVersion == draftVersion)&&(identical(other.draft, draft) || other.draft == draft));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,draftVersion,updatedAt,draft);
+int get hashCode => Object.hash(runtimeType,draftVersion,draft);
 
 @override
 String toString() {
-  return 'SellerResponseDraftResponse(draftVersion: $draftVersion, updatedAt: $updatedAt, draft: $draft)';
+  return 'SellerResponseDraftResponse(draftVersion: $draftVersion, draft: $draft)';
 }
 
 
@@ -1447,7 +1133,7 @@ abstract mixin class _$SellerResponseDraftResponseCopyWith<$Res> implements $Sel
   factory _$SellerResponseDraftResponseCopyWith(_SellerResponseDraftResponse value, $Res Function(_SellerResponseDraftResponse) _then) = __$SellerResponseDraftResponseCopyWithImpl;
 @override @useResult
 $Res call({
- String draftVersion, String updatedAt,@JsonKey(toJson: _quoteToJson) SellerQuotePayload draft
+ String draftVersion, SellerQuotePayload draft
 });
 
 
@@ -1464,10 +1150,9 @@ class __$SellerResponseDraftResponseCopyWithImpl<$Res>
 
 /// Create a copy of SellerResponseDraftResponse
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? draftVersion = null,Object? updatedAt = null,Object? draft = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? draftVersion = null,Object? draft = null,}) {
   return _then(_SellerResponseDraftResponse(
 draftVersion: null == draftVersion ? _self.draftVersion : draftVersion // ignore: cast_nullable_to_non_nullable
-as String,updatedAt: null == updatedAt ? _self.updatedAt : updatedAt // ignore: cast_nullable_to_non_nullable
 as String,draft: null == draft ? _self.draft : draft // ignore: cast_nullable_to_non_nullable
 as SellerQuotePayload,
   ));
@@ -1485,33 +1170,30 @@ $SellerQuotePayloadCopyWith<$Res> get draft {
 }
 }
 
-
 /// @nodoc
 mixin _$SellerFacingPublication {
 
- String get publicationId; String get publicationVersion; String get inviteId; String get lane; String get sellerFacingPayloadHash; String get deliveryState; String get publishedAt;
+ String get publicationId; String get publicationVersion; String get sellerFacingPayloadHash;
 /// Create a copy of SellerFacingPublication
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
 $SellerFacingPublicationCopyWith<SellerFacingPublication> get copyWith => _$SellerFacingPublicationCopyWithImpl<SellerFacingPublication>(this as SellerFacingPublication, _$identity);
 
-  /// Serializes this SellerFacingPublication to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerFacingPublication&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.publicationVersion, publicationVersion) || other.publicationVersion == publicationVersion)&&(identical(other.inviteId, inviteId) || other.inviteId == inviteId)&&(identical(other.lane, lane) || other.lane == lane)&&(identical(other.sellerFacingPayloadHash, sellerFacingPayloadHash) || other.sellerFacingPayloadHash == sellerFacingPayloadHash)&&(identical(other.deliveryState, deliveryState) || other.deliveryState == deliveryState)&&(identical(other.publishedAt, publishedAt) || other.publishedAt == publishedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerFacingPublication&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.publicationVersion, publicationVersion) || other.publicationVersion == publicationVersion)&&(identical(other.sellerFacingPayloadHash, sellerFacingPayloadHash) || other.sellerFacingPayloadHash == sellerFacingPayloadHash));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,publicationId,publicationVersion,inviteId,lane,sellerFacingPayloadHash,deliveryState,publishedAt);
+int get hashCode => Object.hash(runtimeType,publicationId,publicationVersion,sellerFacingPayloadHash);
 
 @override
 String toString() {
-  return 'SellerFacingPublication(publicationId: $publicationId, publicationVersion: $publicationVersion, inviteId: $inviteId, lane: $lane, sellerFacingPayloadHash: $sellerFacingPayloadHash, deliveryState: $deliveryState, publishedAt: $publishedAt)';
+  return 'SellerFacingPublication(publicationId: $publicationId, publicationVersion: $publicationVersion, sellerFacingPayloadHash: $sellerFacingPayloadHash)';
 }
 
 
@@ -1522,7 +1204,7 @@ abstract mixin class $SellerFacingPublicationCopyWith<$Res>  {
   factory $SellerFacingPublicationCopyWith(SellerFacingPublication value, $Res Function(SellerFacingPublication) _then) = _$SellerFacingPublicationCopyWithImpl;
 @useResult
 $Res call({
- String publicationId, String publicationVersion, String inviteId, String lane, String sellerFacingPayloadHash, String deliveryState, String publishedAt
+ String publicationId, String publicationVersion, String sellerFacingPayloadHash
 });
 
 
@@ -1539,15 +1221,11 @@ class _$SellerFacingPublicationCopyWithImpl<$Res>
 
 /// Create a copy of SellerFacingPublication
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? publicationId = null,Object? publicationVersion = null,Object? inviteId = null,Object? lane = null,Object? sellerFacingPayloadHash = null,Object? deliveryState = null,Object? publishedAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? publicationId = null,Object? publicationVersion = null,Object? sellerFacingPayloadHash = null,}) {
   return _then(_self.copyWith(
 publicationId: null == publicationId ? _self.publicationId : publicationId // ignore: cast_nullable_to_non_nullable
 as String,publicationVersion: null == publicationVersion ? _self.publicationVersion : publicationVersion // ignore: cast_nullable_to_non_nullable
-as String,inviteId: null == inviteId ? _self.inviteId : inviteId // ignore: cast_nullable_to_non_nullable
-as String,lane: null == lane ? _self.lane : lane // ignore: cast_nullable_to_non_nullable
 as String,sellerFacingPayloadHash: null == sellerFacingPayloadHash ? _self.sellerFacingPayloadHash : sellerFacingPayloadHash // ignore: cast_nullable_to_non_nullable
-as String,deliveryState: null == deliveryState ? _self.deliveryState : deliveryState // ignore: cast_nullable_to_non_nullable
-as String,publishedAt: null == publishedAt ? _self.publishedAt : publishedAt // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }
@@ -1633,10 +1311,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String publicationId,  String publicationVersion,  String inviteId,  String lane,  String sellerFacingPayloadHash,  String deliveryState,  String publishedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String publicationId,  String publicationVersion,  String sellerFacingPayloadHash)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SellerFacingPublication() when $default != null:
-return $default(_that.publicationId,_that.publicationVersion,_that.inviteId,_that.lane,_that.sellerFacingPayloadHash,_that.deliveryState,_that.publishedAt);case _:
+return $default(_that.publicationId,_that.publicationVersion,_that.sellerFacingPayloadHash);case _:
   return orElse();
 
 }
@@ -1654,10 +1332,10 @@ return $default(_that.publicationId,_that.publicationVersion,_that.inviteId,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String publicationId,  String publicationVersion,  String inviteId,  String lane,  String sellerFacingPayloadHash,  String deliveryState,  String publishedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String publicationId,  String publicationVersion,  String sellerFacingPayloadHash)  $default,) {final _that = this;
 switch (_that) {
 case _SellerFacingPublication():
-return $default(_that.publicationId,_that.publicationVersion,_that.inviteId,_that.lane,_that.sellerFacingPayloadHash,_that.deliveryState,_that.publishedAt);case _:
+return $default(_that.publicationId,_that.publicationVersion,_that.sellerFacingPayloadHash);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1674,10 +1352,10 @@ return $default(_that.publicationId,_that.publicationVersion,_that.inviteId,_tha
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String publicationId,  String publicationVersion,  String inviteId,  String lane,  String sellerFacingPayloadHash,  String deliveryState,  String publishedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String publicationId,  String publicationVersion,  String sellerFacingPayloadHash)?  $default,) {final _that = this;
 switch (_that) {
 case _SellerFacingPublication() when $default != null:
-return $default(_that.publicationId,_that.publicationVersion,_that.inviteId,_that.lane,_that.sellerFacingPayloadHash,_that.deliveryState,_that.publishedAt);case _:
+return $default(_that.publicationId,_that.publicationVersion,_that.sellerFacingPayloadHash);case _:
   return null;
 
 }
@@ -1686,19 +1364,15 @@ return $default(_that.publicationId,_that.publicationVersion,_that.inviteId,_tha
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _SellerFacingPublication implements SellerFacingPublication {
-  const _SellerFacingPublication({this.publicationId = '', this.publicationVersion = '', this.inviteId = '', this.lane = '', this.sellerFacingPayloadHash = '', this.deliveryState = '', this.publishedAt = ''});
-  factory _SellerFacingPublication.fromJson(Map<String, dynamic> json) => _$SellerFacingPublicationFromJson(json);
+  const _SellerFacingPublication({this.publicationId = '', this.publicationVersion = '', this.sellerFacingPayloadHash = ''});
+  
 
 @override@JsonKey() final  String publicationId;
 @override@JsonKey() final  String publicationVersion;
-@override@JsonKey() final  String inviteId;
-@override@JsonKey() final  String lane;
 @override@JsonKey() final  String sellerFacingPayloadHash;
-@override@JsonKey() final  String deliveryState;
-@override@JsonKey() final  String publishedAt;
 
 /// Create a copy of SellerFacingPublication
 /// with the given fields replaced by the non-null parameter values.
@@ -1706,23 +1380,20 @@ class _SellerFacingPublication implements SellerFacingPublication {
 @pragma('vm:prefer-inline')
 _$SellerFacingPublicationCopyWith<_SellerFacingPublication> get copyWith => __$SellerFacingPublicationCopyWithImpl<_SellerFacingPublication>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$SellerFacingPublicationToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerFacingPublication&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.publicationVersion, publicationVersion) || other.publicationVersion == publicationVersion)&&(identical(other.inviteId, inviteId) || other.inviteId == inviteId)&&(identical(other.lane, lane) || other.lane == lane)&&(identical(other.sellerFacingPayloadHash, sellerFacingPayloadHash) || other.sellerFacingPayloadHash == sellerFacingPayloadHash)&&(identical(other.deliveryState, deliveryState) || other.deliveryState == deliveryState)&&(identical(other.publishedAt, publishedAt) || other.publishedAt == publishedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerFacingPublication&&(identical(other.publicationId, publicationId) || other.publicationId == publicationId)&&(identical(other.publicationVersion, publicationVersion) || other.publicationVersion == publicationVersion)&&(identical(other.sellerFacingPayloadHash, sellerFacingPayloadHash) || other.sellerFacingPayloadHash == sellerFacingPayloadHash));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
-int get hashCode => Object.hash(runtimeType,publicationId,publicationVersion,inviteId,lane,sellerFacingPayloadHash,deliveryState,publishedAt);
+int get hashCode => Object.hash(runtimeType,publicationId,publicationVersion,sellerFacingPayloadHash);
 
 @override
 String toString() {
-  return 'SellerFacingPublication(publicationId: $publicationId, publicationVersion: $publicationVersion, inviteId: $inviteId, lane: $lane, sellerFacingPayloadHash: $sellerFacingPayloadHash, deliveryState: $deliveryState, publishedAt: $publishedAt)';
+  return 'SellerFacingPublication(publicationId: $publicationId, publicationVersion: $publicationVersion, sellerFacingPayloadHash: $sellerFacingPayloadHash)';
 }
 
 
@@ -1733,7 +1404,7 @@ abstract mixin class _$SellerFacingPublicationCopyWith<$Res> implements $SellerF
   factory _$SellerFacingPublicationCopyWith(_SellerFacingPublication value, $Res Function(_SellerFacingPublication) _then) = __$SellerFacingPublicationCopyWithImpl;
 @override @useResult
 $Res call({
- String publicationId, String publicationVersion, String inviteId, String lane, String sellerFacingPayloadHash, String deliveryState, String publishedAt
+ String publicationId, String publicationVersion, String sellerFacingPayloadHash
 });
 
 
@@ -1750,22 +1421,17 @@ class __$SellerFacingPublicationCopyWithImpl<$Res>
 
 /// Create a copy of SellerFacingPublication
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? publicationId = null,Object? publicationVersion = null,Object? inviteId = null,Object? lane = null,Object? sellerFacingPayloadHash = null,Object? deliveryState = null,Object? publishedAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? publicationId = null,Object? publicationVersion = null,Object? sellerFacingPayloadHash = null,}) {
   return _then(_SellerFacingPublication(
 publicationId: null == publicationId ? _self.publicationId : publicationId // ignore: cast_nullable_to_non_nullable
 as String,publicationVersion: null == publicationVersion ? _self.publicationVersion : publicationVersion // ignore: cast_nullable_to_non_nullable
-as String,inviteId: null == inviteId ? _self.inviteId : inviteId // ignore: cast_nullable_to_non_nullable
-as String,lane: null == lane ? _self.lane : lane // ignore: cast_nullable_to_non_nullable
 as String,sellerFacingPayloadHash: null == sellerFacingPayloadHash ? _self.sellerFacingPayloadHash : sellerFacingPayloadHash // ignore: cast_nullable_to_non_nullable
-as String,deliveryState: null == deliveryState ? _self.deliveryState : deliveryState // ignore: cast_nullable_to_non_nullable
-as String,publishedAt: null == publishedAt ? _self.publishedAt : publishedAt // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }
 
 
 }
-
 
 /// @nodoc
 mixin _$SellerFacingPayload {
@@ -1777,8 +1443,6 @@ mixin _$SellerFacingPayload {
 @pragma('vm:prefer-inline')
 $SellerFacingPayloadCopyWith<SellerFacingPayload> get copyWith => _$SellerFacingPayloadCopyWithImpl<SellerFacingPayload>(this as SellerFacingPayload, _$identity);
 
-  /// Serializes this SellerFacingPayload to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
@@ -1786,7 +1450,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerFacingPayload&&(identical(other.item, item) || other.item == item)&&(identical(other.itemLabel, itemLabel) || other.itemLabel == itemLabel)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit)&&(identical(other.packaging, packaging) || other.packaging == packaging)&&(identical(other.deliveryCity, deliveryCity) || other.deliveryCity == deliveryCity)&&(identical(other.deliveryDate, deliveryDate) || other.deliveryDate == deliveryDate)&&(identical(other.responseDeadline, responseDeadline) || other.responseDeadline == responseDeadline)&&(identical(other.buyerNote, buyerNote) || other.buyerNote == buyerNote));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,item,itemLabel,quantity,unit,packaging,deliveryCity,deliveryDate,responseDeadline,buyerNote);
 
@@ -1969,11 +1633,11 @@ return $default(_that.item,_that.itemLabel,_that.quantity,_that.unit,_that.packa
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _SellerFacingPayload extends SellerFacingPayload {
   const _SellerFacingPayload({this.item = '', this.itemLabel = '', this.quantity = '', this.unit = '', this.packaging = '', this.deliveryCity = '', this.deliveryDate = '', this.responseDeadline = '', this.buyerNote = ''}): super._();
-  factory _SellerFacingPayload.fromJson(Map<String, dynamic> json) => _$SellerFacingPayloadFromJson(json);
+  
 
 @override@JsonKey() final  String item;
 @override@JsonKey() final  String itemLabel;
@@ -1991,17 +1655,14 @@ class _SellerFacingPayload extends SellerFacingPayload {
 @pragma('vm:prefer-inline')
 _$SellerFacingPayloadCopyWith<_SellerFacingPayload> get copyWith => __$SellerFacingPayloadCopyWithImpl<_SellerFacingPayload>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$SellerFacingPayloadToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerFacingPayload&&(identical(other.item, item) || other.item == item)&&(identical(other.itemLabel, itemLabel) || other.itemLabel == itemLabel)&&(identical(other.quantity, quantity) || other.quantity == quantity)&&(identical(other.unit, unit) || other.unit == unit)&&(identical(other.packaging, packaging) || other.packaging == packaging)&&(identical(other.deliveryCity, deliveryCity) || other.deliveryCity == deliveryCity)&&(identical(other.deliveryDate, deliveryDate) || other.deliveryDate == deliveryDate)&&(identical(other.responseDeadline, responseDeadline) || other.responseDeadline == responseDeadline)&&(identical(other.buyerNote, buyerNote) || other.buyerNote == buyerNote));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,item,itemLabel,quantity,unit,packaging,deliveryCity,deliveryDate,responseDeadline,buyerNote);
 
@@ -2352,7 +2013,7 @@ $SellerFacingPayloadCopyWith<$Res> get sellerFacingPayload {
 /// @nodoc
 mixin _$SellerPublicationListItem {
 
- SellerPublicationSummary get summary; String get latestResponseStatus; bool get hasDraft;
+ SellerPublicationSummary get summary; SellerResponseStatus? get latestResponseStatus; bool get hasDraft;
 /// Create a copy of SellerPublicationListItem
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -2383,7 +2044,7 @@ abstract mixin class $SellerPublicationListItemCopyWith<$Res>  {
   factory $SellerPublicationListItemCopyWith(SellerPublicationListItem value, $Res Function(SellerPublicationListItem) _then) = _$SellerPublicationListItemCopyWithImpl;
 @useResult
 $Res call({
- SellerPublicationSummary summary, String latestResponseStatus, bool hasDraft
+ SellerPublicationSummary summary, SellerResponseStatus? latestResponseStatus, bool hasDraft
 });
 
 
@@ -2400,11 +2061,11 @@ class _$SellerPublicationListItemCopyWithImpl<$Res>
 
 /// Create a copy of SellerPublicationListItem
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? summary = null,Object? latestResponseStatus = null,Object? hasDraft = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? summary = null,Object? latestResponseStatus = freezed,Object? hasDraft = null,}) {
   return _then(_self.copyWith(
 summary: null == summary ? _self.summary : summary // ignore: cast_nullable_to_non_nullable
-as SellerPublicationSummary,latestResponseStatus: null == latestResponseStatus ? _self.latestResponseStatus : latestResponseStatus // ignore: cast_nullable_to_non_nullable
-as String,hasDraft: null == hasDraft ? _self.hasDraft : hasDraft // ignore: cast_nullable_to_non_nullable
+as SellerPublicationSummary,latestResponseStatus: freezed == latestResponseStatus ? _self.latestResponseStatus : latestResponseStatus // ignore: cast_nullable_to_non_nullable
+as SellerResponseStatus?,hasDraft: null == hasDraft ? _self.hasDraft : hasDraft // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -2499,7 +2160,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( SellerPublicationSummary summary,  String latestResponseStatus,  bool hasDraft)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( SellerPublicationSummary summary,  SellerResponseStatus? latestResponseStatus,  bool hasDraft)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SellerPublicationListItem() when $default != null:
 return $default(_that.summary,_that.latestResponseStatus,_that.hasDraft);case _:
@@ -2520,7 +2181,7 @@ return $default(_that.summary,_that.latestResponseStatus,_that.hasDraft);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( SellerPublicationSummary summary,  String latestResponseStatus,  bool hasDraft)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( SellerPublicationSummary summary,  SellerResponseStatus? latestResponseStatus,  bool hasDraft)  $default,) {final _that = this;
 switch (_that) {
 case _SellerPublicationListItem():
 return $default(_that.summary,_that.latestResponseStatus,_that.hasDraft);case _:
@@ -2540,7 +2201,7 @@ return $default(_that.summary,_that.latestResponseStatus,_that.hasDraft);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( SellerPublicationSummary summary,  String latestResponseStatus,  bool hasDraft)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( SellerPublicationSummary summary,  SellerResponseStatus? latestResponseStatus,  bool hasDraft)?  $default,) {final _that = this;
 switch (_that) {
 case _SellerPublicationListItem() when $default != null:
 return $default(_that.summary,_that.latestResponseStatus,_that.hasDraft);case _:
@@ -2555,11 +2216,11 @@ return $default(_that.summary,_that.latestResponseStatus,_that.hasDraft);case _:
 
 
 class _SellerPublicationListItem extends SellerPublicationListItem {
-  const _SellerPublicationListItem({required this.summary, this.latestResponseStatus = '', this.hasDraft = false}): super._();
+  const _SellerPublicationListItem({required this.summary, this.latestResponseStatus, this.hasDraft = false}): super._();
   
 
 @override final  SellerPublicationSummary summary;
-@override@JsonKey() final  String latestResponseStatus;
+@override final  SellerResponseStatus? latestResponseStatus;
 @override@JsonKey() final  bool hasDraft;
 
 /// Create a copy of SellerPublicationListItem
@@ -2592,7 +2253,7 @@ abstract mixin class _$SellerPublicationListItemCopyWith<$Res> implements $Selle
   factory _$SellerPublicationListItemCopyWith(_SellerPublicationListItem value, $Res Function(_SellerPublicationListItem) _then) = __$SellerPublicationListItemCopyWithImpl;
 @override @useResult
 $Res call({
- SellerPublicationSummary summary, String latestResponseStatus, bool hasDraft
+ SellerPublicationSummary summary, SellerResponseStatus? latestResponseStatus, bool hasDraft
 });
 
 
@@ -2609,11 +2270,11 @@ class __$SellerPublicationListItemCopyWithImpl<$Res>
 
 /// Create a copy of SellerPublicationListItem
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? summary = null,Object? latestResponseStatus = null,Object? hasDraft = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? summary = null,Object? latestResponseStatus = freezed,Object? hasDraft = null,}) {
   return _then(_SellerPublicationListItem(
 summary: null == summary ? _self.summary : summary // ignore: cast_nullable_to_non_nullable
-as SellerPublicationSummary,latestResponseStatus: null == latestResponseStatus ? _self.latestResponseStatus : latestResponseStatus // ignore: cast_nullable_to_non_nullable
-as String,hasDraft: null == hasDraft ? _self.hasDraft : hasDraft // ignore: cast_nullable_to_non_nullable
+as SellerPublicationSummary,latestResponseStatus: freezed == latestResponseStatus ? _self.latestResponseStatus : latestResponseStatus // ignore: cast_nullable_to_non_nullable
+as SellerResponseStatus?,hasDraft: null == hasDraft ? _self.hasDraft : hasDraft // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -2628,6 +2289,269 @@ $SellerPublicationSummaryCopyWith<$Res> get summary {
     return _then(_self.copyWith(summary: value));
   });
 }
+}
+
+/// @nodoc
+mixin _$SellerResponseClosure {
+
+ String get sellerResponseId; String get latestVersion; String get withdrawnVersion;
+/// Create a copy of SellerResponseClosure
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$SellerResponseClosureCopyWith<SellerResponseClosure> get copyWith => _$SellerResponseClosureCopyWithImpl<SellerResponseClosure>(this as SellerResponseClosure, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SellerResponseClosure&&(identical(other.sellerResponseId, sellerResponseId) || other.sellerResponseId == sellerResponseId)&&(identical(other.latestVersion, latestVersion) || other.latestVersion == latestVersion)&&(identical(other.withdrawnVersion, withdrawnVersion) || other.withdrawnVersion == withdrawnVersion));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,sellerResponseId,latestVersion,withdrawnVersion);
+
+@override
+String toString() {
+  return 'SellerResponseClosure(sellerResponseId: $sellerResponseId, latestVersion: $latestVersion, withdrawnVersion: $withdrawnVersion)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $SellerResponseClosureCopyWith<$Res>  {
+  factory $SellerResponseClosureCopyWith(SellerResponseClosure value, $Res Function(SellerResponseClosure) _then) = _$SellerResponseClosureCopyWithImpl;
+@useResult
+$Res call({
+ String sellerResponseId, String latestVersion, String withdrawnVersion
+});
+
+
+
+
+}
+/// @nodoc
+class _$SellerResponseClosureCopyWithImpl<$Res>
+    implements $SellerResponseClosureCopyWith<$Res> {
+  _$SellerResponseClosureCopyWithImpl(this._self, this._then);
+
+  final SellerResponseClosure _self;
+  final $Res Function(SellerResponseClosure) _then;
+
+/// Create a copy of SellerResponseClosure
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? sellerResponseId = null,Object? latestVersion = null,Object? withdrawnVersion = null,}) {
+  return _then(_self.copyWith(
+sellerResponseId: null == sellerResponseId ? _self.sellerResponseId : sellerResponseId // ignore: cast_nullable_to_non_nullable
+as String,latestVersion: null == latestVersion ? _self.latestVersion : latestVersion // ignore: cast_nullable_to_non_nullable
+as String,withdrawnVersion: null == withdrawnVersion ? _self.withdrawnVersion : withdrawnVersion // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [SellerResponseClosure].
+extension SellerResponseClosurePatterns on SellerResponseClosure {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _SellerResponseClosure value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _SellerResponseClosure() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _SellerResponseClosure value)  $default,){
+final _that = this;
+switch (_that) {
+case _SellerResponseClosure():
+return $default(_that);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _SellerResponseClosure value)?  $default,){
+final _that = this;
+switch (_that) {
+case _SellerResponseClosure() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String sellerResponseId,  String latestVersion,  String withdrawnVersion)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _SellerResponseClosure() when $default != null:
+return $default(_that.sellerResponseId,_that.latestVersion,_that.withdrawnVersion);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String sellerResponseId,  String latestVersion,  String withdrawnVersion)  $default,) {final _that = this;
+switch (_that) {
+case _SellerResponseClosure():
+return $default(_that.sellerResponseId,_that.latestVersion,_that.withdrawnVersion);case _:
+  throw StateError('Unexpected subclass');
+
+}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String sellerResponseId,  String latestVersion,  String withdrawnVersion)?  $default,) {final _that = this;
+switch (_that) {
+case _SellerResponseClosure() when $default != null:
+return $default(_that.sellerResponseId,_that.latestVersion,_that.withdrawnVersion);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+
+
+class _SellerResponseClosure implements SellerResponseClosure {
+  const _SellerResponseClosure({this.sellerResponseId = '', this.latestVersion = '', this.withdrawnVersion = ''});
+  
+
+@override@JsonKey() final  String sellerResponseId;
+@override@JsonKey() final  String latestVersion;
+@override@JsonKey() final  String withdrawnVersion;
+
+/// Create a copy of SellerResponseClosure
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$SellerResponseClosureCopyWith<_SellerResponseClosure> get copyWith => __$SellerResponseClosureCopyWithImpl<_SellerResponseClosure>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SellerResponseClosure&&(identical(other.sellerResponseId, sellerResponseId) || other.sellerResponseId == sellerResponseId)&&(identical(other.latestVersion, latestVersion) || other.latestVersion == latestVersion)&&(identical(other.withdrawnVersion, withdrawnVersion) || other.withdrawnVersion == withdrawnVersion));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,sellerResponseId,latestVersion,withdrawnVersion);
+
+@override
+String toString() {
+  return 'SellerResponseClosure(sellerResponseId: $sellerResponseId, latestVersion: $latestVersion, withdrawnVersion: $withdrawnVersion)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$SellerResponseClosureCopyWith<$Res> implements $SellerResponseClosureCopyWith<$Res> {
+  factory _$SellerResponseClosureCopyWith(_SellerResponseClosure value, $Res Function(_SellerResponseClosure) _then) = __$SellerResponseClosureCopyWithImpl;
+@override @useResult
+$Res call({
+ String sellerResponseId, String latestVersion, String withdrawnVersion
+});
+
+
+
+
+}
+/// @nodoc
+class __$SellerResponseClosureCopyWithImpl<$Res>
+    implements _$SellerResponseClosureCopyWith<$Res> {
+  __$SellerResponseClosureCopyWithImpl(this._self, this._then);
+
+  final _SellerResponseClosure _self;
+  final $Res Function(_SellerResponseClosure) _then;
+
+/// Create a copy of SellerResponseClosure
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? sellerResponseId = null,Object? latestVersion = null,Object? withdrawnVersion = null,}) {
+  return _then(_SellerResponseClosure(
+sellerResponseId: null == sellerResponseId ? _self.sellerResponseId : sellerResponseId // ignore: cast_nullable_to_non_nullable
+as String,latestVersion: null == latestVersion ? _self.latestVersion : latestVersion // ignore: cast_nullable_to_non_nullable
+as String,withdrawnVersion: null == withdrawnVersion ? _self.withdrawnVersion : withdrawnVersion // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
 }
 
 /// @nodoc

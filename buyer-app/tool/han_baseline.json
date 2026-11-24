@@ -851,18 +851,12 @@
       "，預設地址": 1,
       "，預設門市": 1
     },
-    "lib/features/ai_assistant/presentation/ai_assistant_controller.dart": {
-      "\n\n（無法連接 AI 服務，請稍後再試）": 1,
-      "系統忙碌中，請稍後再試": 1
-    },
     "lib/features/ai_assistant/presentation/ai_assistant_screen.dart": {
       "AI 服務中": 1,
       "如何申請退貨": 2,
-      "待付款": 2,
       "您好！我是您的生鮮買家小幫手 🛍️\n我可以協助您查詢訂單、包裹追蹤、退貨申請等服務。": 1,
       "我的包裹到了嗎？": 2,
       "查詢訂單": 2,
-      "處理中": 1,
       "買家小幫手 ✨": 1
     },
     "lib/features/ai_assistant/presentation/widgets/ai_assistant_avatar.dart": {

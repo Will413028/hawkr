@@ -22,8 +22,7 @@ func subscribeSellerViews(bus *events.Bus, module *seller.Module) {
 	})
 }
 
-// subscribeSellerRelay 把 seller 的模組事件轉給還在 RabbitMQ 上的消費者（Java product、order、coupon、cart，Go 的 im、social、
-// notification）：每個事件在發布的 transaction 內排入一個 relay job，worker 組出舊 publisher 的 payload 再送出。
+// subscribeSellerRelay 把 seller 的模組事件轉給還在 RabbitMQ 上的消費者（Java product、order、coupon、cart）：每個事件在發布的 transaction 內排入一個 relay job，worker 組出舊 publisher 的 payload 再送出。
 // serve 與 worker 兩個角色都要訂閱：可曝光的變化也從 worker 的 job（對帳、處分到期）發出。
 // 不轉送的事件與原因見 sellerrelay 的套件說明。
 func subscribeSellerRelay(bus *events.Bus, queue jobs.Enqueuer) {

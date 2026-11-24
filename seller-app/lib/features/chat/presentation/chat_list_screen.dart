@@ -5,7 +5,6 @@ import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/core/theme/app_typography.dart';
 import 'package:hawkr_seller/core/theme/hk_tokens.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
-import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -221,12 +220,6 @@ class ChatListScreen extends HookConsumerWidget {
                               FocusScope.of(context).unfocus();
                             },
                           ),
-                          if (kAiAssistantChatEntryEnabled) ...[
-                            const SizedBox(height: HkSpace.md),
-                            _AiAssistantEntry(
-                              onTap: () => context.push('/chat/ai-assistant'),
-                            ),
-                          ],
                           const SizedBox(height: HkSpace.xl),
                           _ConversationSectionHeader(
                             count: conversations.value?.items.length ?? 0,
@@ -312,70 +305,6 @@ class _ChatSearchField extends StatelessWidget {
           ),
           onSubmitted: onSubmitted,
         ),
-      ),
-    );
-  }
-}
-
-/// AI 小幫手完成度不足，暫時對 user 隱藏入口；功能補完後改回 true。
-const bool kAiAssistantChatEntryEnabled = false;
-
-class _AiAssistantEntry extends StatelessWidget {
-  const _AiAssistantEntry({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return HkContentCard(
-      onTap: onTap,
-      semanticLabel: '開啟 AI 營運助手，查詢訂單、出貨與金流',
-      elevated: true,
-      padding: const EdgeInsets.symmetric(
-        horizontal: HkSpace.lg,
-        vertical: HkSpace.md,
-      ),
-      child: Row(
-        children: [
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              shape: BoxShape.circle,
-            ),
-            child: SizedBox.square(
-              dimension: HkControl.minTap,
-              child: Center(
-                child: Icon(
-                  AppIcons.smartToyOutlined,
-                  color: AppIconColors.active,
-                  size: HkControl.icon,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: HkSpace.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('AI 營運助手', style: AppTypography.sectionTitle),
-                const SizedBox(height: HkSpace.xs),
-                Text(
-                  '快速查詢訂單、出貨與金流',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.metaMuted,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: HkSpace.sm),
-          const HkIcon(
-            HkIconName.chevronRight,
-            size: 20,
-            color: AppIconColors.muted,
-          ),
-        ],
       ),
     );
   }

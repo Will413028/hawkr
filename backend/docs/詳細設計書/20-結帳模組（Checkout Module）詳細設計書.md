@@ -1,5 +1,7 @@
 # 結帳模組（Checkout Module）詳細設計書
 
+> 🔴 **B3 退場說明（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂）**：Java shipping 已刪除，出貨改賣家自寄，每個賣家的運費設定（固定運費、免運門檻可空、處理天數 1–7 預設 3）歸 seller 模組，報價是 seller 的純函式（cart 預覽與 ordering 結帳共用，結帳把結果快照進訂單）。B3 到 B8 之間 Java 結帳的運費固定為 0；本書的配送方式、溫層、費率表、`ShippingFeeCacheClient`、運費路線與運費降級各節描述 B3 之前的現況，B8 改寫 ordering 時由新設計取代，對外契約不再帶配送方式。
+
 > ⚠️ **錯誤處理慣例**：本設計書內所有 sequence diagram 之 gRPC client 呼叫，error path 統一依 [`Java gRPC 錯誤處理規範.md §7.2.1`](../開發規範/Java%20gRPC%20%E9%8C%AF%E8%AA%A4%E8%99%95%E7%90%86%E8%A6%8F%E7%AF%84.md#721-%E6%AC%8A%E5%A8%81%E6%99%82%E5%BA%8F%E5%9C%96%E6%89%80%E6%9C%89%E8%A8%AD%E8%A8%88%E6%9B%B8%E5%BC%95%E7%94%A8%E6%AD%A4%E5%9C%96%E4%B8%8D%E5%86%8D%E5%80%8B%E5%88%A5%E7%B9%AA%E8%A3%BD)。個別 diagram 僅繪製 happy path，error 分支不重複繪製。Client 禁止 `if (resp.code != 0) throw`、禁止 `throw new RuntimeException`，一律 `GrpcClientErrorTranslator.translate(e, XxxBusinessException::new)`。
 >
 > **錯誤管道（完整鏈路）**：
@@ -217,7 +219,7 @@ message UnavailableItem {
       {
         "shippingMethod": "TAQBIN",
         "deliveryTemp": "AMBIENT",
-        "label": "黑貓宅急便（常溫）",
+        "label": "賣家自寄（常溫）",
         "fee": "0",
         "feePayer": "SELLER",
         "freeShippingThreshold": "800",
@@ -226,7 +228,7 @@ message UnavailableItem {
       {
         "shippingMethod": "TAQBIN",
         "deliveryTemp": "CHILLED",
-        "label": "黑貓宅急便（冷藏）",
+        "label": "賣家自寄（冷藏）",
         "fee": "200",
         "feePayer": "BUYER",
         "freeShippingThreshold": "0",
@@ -305,18 +307,7 @@ message CheckoutShippingFeeData {
 }
 ```
 
-**運費路線推導**：
-- 宅配：`ShippingAreaResolver.resolveRoute(setting.sender_postal_code, receiverZipCode)` → ShippingRoute
-- 店到店：固定 `DOMESTIC`（統一價，不分區域）
-- 🔴 **Uber 即時配送（`3003`）：不走這條路線推導**。
-  它的運費來自 **Uber Create Quote 的即時報價**，寄件點來自 **Uber 專屬門市映射 ＋ 凍結快照**，
-  ⇒ 🔴 **3003 必須在 `getSenderPostalCode()` ／ traditional ShippingRoute 需求之前明確分流**。
-  ⚠️ **沒有分流的後果是靜默的**：`seller_shipment_settings` 依設計**不會有** Uber 的列
-  （`shipping_type` CHECK 只收 `3651`／`3652`、`mer_id` 為 `NOT NULL`）⇒ 該欄恆空
-  ⇒ 結帳在 Uber 資格閘門**之前**就拋 `4010 SELLER_SHIPPING_INCOMPLETE`，
-  而文案「賣家物流設定不完整，請聯繫賣家」指向一個**沒有任何設定可補**的賣家。
-
-> **運費計算委派 Shipping Service**：實際費率由 Shipping Service DB `shipping_fee_tiers` 管理，Order Service 透過 `ShippingFeeCacheClient` 本地快取查找。快取採 lazy load + 5 分鐘 TTL + Resilience4j Circuit Breaker（詳見 §4.9 與 `21 §3.2`）。
+**運費路線推導**：已刪除。宅配與店到店的區域路線與即時報價隨 B3 退場；運費由賣家自訂的固定規則決定（見文首退場說明）。
 
 ### 3.4 CheckoutPreview（結帳預覽）
 

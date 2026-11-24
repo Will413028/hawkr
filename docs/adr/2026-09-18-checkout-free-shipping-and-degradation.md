@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `2026-11-15-fulfillment-seller-managed-shipping.md`（出貨改賣家自寄，物流商與其帳務、Uber 程式已於 B3 退場；本檔保留歷史）；原為 accepted |
 | 日期 | 2026-09-18（決策落地日期見各節） |
 | 影響範圍 | order-service `CheckoutService`、shipping-service、買家結帳前端 |
 | 規格 | [20 號 結帳模組詳細設計書](/backend/docs/詳細設計書/20-結帳模組（Checkout%20Module）詳細設計書.md) §4.7、§4.9、§4.12 |

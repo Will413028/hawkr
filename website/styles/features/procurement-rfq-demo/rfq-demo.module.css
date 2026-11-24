@@ -211,11 +211,6 @@
 	font-weight: 600;
 }
 
-.recipients span {
-	font-size: 0.71875rem;
-	opacity: 0.72;
-}
-
 .recipients small {
 	font-size: 0.75rem;
 	opacity: 0.68;

@@ -62,6 +62,12 @@ type SellerStores interface {
 	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
 }
 
+// SellerModule 是組裝端傳進來的 seller 模組要滿足的全部方法：店家過濾（SellerStores）與賣家端寫入守門（SellerStoreGuard）（*seller.Module 滿足它）。
+type SellerModule interface {
+	SellerStores
+	SellerStoreGuard
+}
+
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
 type Deps struct {
 	DB     *db.DB
@@ -290,7 +296,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 }
 
 // AddOrderWorkers 登記建單的 River worker（procurement.order_provisioning）與它的 reconciler；需要 Deps.Orders，沒給是組裝錯誤，panic。
-// 並行期單一生效者：舊服務處理建單到 A9-6，所以 cmd/hawkr 的 worker 角色不呼叫它，只有測試登記；A9-6 刪路由的同一個變更才接上。
+// cmd/hawkr 的 worker 角色呼叫它，建單的單一生效者是單體。
 func (m *Module) AddOrderWorkers(workers *river.Workers) {
 	if m.orders.Orders == nil {
 		panic("procurement.AddOrderWorkers：Deps.Orders 必填")
@@ -298,7 +304,7 @@ func (m *Module) AddOrderWorkers(workers *river.Workers) {
 	provisioning.AddWorkers(workers, &m.orders, m.ordersRec)
 }
 
-// OrderPeriodicJobs 回傳建單 reconciler 的排程；與 AddOrderWorkers 一起（只有測試）使用。
+// OrderPeriodicJobs 回傳建單 reconciler 的排程；與 AddOrderWorkers 一起使用。
 func (m *Module) OrderPeriodicJobs() []*river.PeriodicJob { return provisioning.PeriodicJobs() }
 
 // RunHub 維持 WatchRun 共用的 LISTEN 連線直到 ctx 結束（回傳 ctx.Err()）；serve 程序啟動時另開 goroutine 跑它。

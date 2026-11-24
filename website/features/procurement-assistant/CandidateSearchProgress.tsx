@@ -1,32 +1,31 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button, Chip } from "@/components/ui";
-import type {
-	ProcurementCandidateSearch,
-	ProcurementLaneStatus,
-} from "@/lib/api/openapi-types";
+import type { ProcurementCandidateSearch } from "./types";
 
-const LANE_LABEL = { PLATFORM: "平台賣家", EXTERNAL: "外部業者" } as const;
+type SearchStatus = "PENDING" | "SUCCEEDED" | "FAILED";
 
-/**
- * key 型別直接引用 ProcurementLaneStatus，不再手寫字面值 union——這樣值域一改，
- * 這張表少一個 key 就是編譯錯誤。之前手寫的版本漏一個值只會在執行期查表回
- * undefined，那一列的文字整個空白，沒有任何訊號。
- */
-const LANE_STATUS_LABEL: Record<ProcurementLaneStatus, string> = {
+const SEARCH_STATUS_LABEL: Record<SearchStatus, string> = {
 	PENDING: "搜尋中",
 	SUCCEEDED: "已完成",
 	FAILED: "失敗",
 };
 
-/** lane 已成功。 */
-function isLaneSucceeded(status: ProcurementLaneStatus): boolean {
-	return status === "SUCCEEDED";
+/** 搜尋 run 的狀態收斂成進度列的三態：還沒有結果、成功、失敗（取消與失敗同樣沒有候選）。 */
+function searchStatusOf(
+	candidateSet: ProcurementCandidateSearch | null,
+): SearchStatus {
+	if (!candidateSet) return "PENDING";
+	if (candidateSet.status === "SUCCEEDED") return "SUCCEEDED";
+	if (candidateSet.status === "FAILED" || candidateSet.status === "CANCELLED")
+		return "FAILED";
+	return "PENDING";
 }
 
 /** 輪詢掛掉時的重試入口。抽出來是因為 searching 階段有兩種畫面（合併後的軌、
- * 退回的兩列 lane 卡片），兩邊都必須看得到它——留在卡片裡的話，軌取代卡片時
+ * 退回的輪詢進度卡片），兩邊都必須看得到它——留在卡片裡的話，軌取代卡片時
  * 輪詢死掉就沒有任何重試的地方。 */
 export function SearchPollErrorAlert({
 	onRetryPolling,
@@ -58,6 +57,8 @@ export default function CandidateSearchProgress({
 	pollError,
 	onRetryPolling,
 }: CandidateSearchProgressProps) {
+	const t = useTranslations("procurementAssistant");
+	const status = searchStatusOf(candidateSet);
 	return (
 		<section
 			className="assistant-artifact assistant-progress"
@@ -66,7 +67,6 @@ export default function CandidateSearchProgress({
 			<header className="assistant-artifact__head">
 				<div>
 					<h2 id="progress-title">正在搜尋候選</h2>
-					<p>平台賣家與外部名單分開查詢，兩邊都完成後才會顯示結果。</p>
 				</div>
 				<Chip variant="dot" color="primary" size="sm">
 					搜尋中
@@ -77,29 +77,17 @@ export default function CandidateSearchProgress({
 				<SearchPollErrorAlert onRetryPolling={onRetryPolling} />
 			) : (
 				<ol className="assistant-progress__list">
-					{(["PLATFORM", "EXTERNAL"] as const).map((lane) => {
-						const status = candidateSet
-							? lane === "PLATFORM"
-								? candidateSet.platformLaneStatus
-								: candidateSet.externalLaneStatus
-							: "PENDING";
-						return (
-							<li
-								key={lane}
-								data-status={isLaneSucceeded(status) ? "completed" : "current"}
-							>
-								<AppIcon
-									name={isLaneSucceeded(status) ? "check" : "clock"}
-									size={17}
-									aria-hidden="true"
-								/>
-								<div>
-									<strong>{LANE_LABEL[lane]}</strong>
-									<span>{LANE_STATUS_LABEL[status]}</span>
-								</div>
-							</li>
-						);
-					})}
+					<li data-status={status === "SUCCEEDED" ? "completed" : "current"}>
+						<AppIcon
+							name={status === "SUCCEEDED" ? "check" : "clock"}
+							size={17}
+							aria-hidden="true"
+						/>
+						<div>
+							<strong>{t("searchProgressTitle")}</strong>
+							<span>{SEARCH_STATUS_LABEL[status]}</span>
+						</div>
+					</li>
 				</ol>
 			)}
 		</section>

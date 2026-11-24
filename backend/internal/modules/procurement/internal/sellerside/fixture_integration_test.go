@@ -127,7 +127,7 @@ func (f *fixture) adopt(buyer int64) {
 func (f *fixture) publish() (uuid.UUID, string) {
 	f.t.Helper()
 	ctx := context.Background()
-	svc := rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus}
+	svc := rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus, Blocks: allStores{}, Open: allStores{}}
 	q := store.New(f.d.Conn(ctx))
 	set := uuid.NewV7()
 	must(f.t, q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: set, RequestID: f.request, RequestRevisionID: f.revision, BuyerID: f.buyer, Now: f.now}))
@@ -230,4 +230,19 @@ func wantClosed(t *testing.T, err error) {
 	if !errors.As(err, &ae) || ae.Kind() != apperr.KindFailedPrecondition || ae.Reason != apperr.ReasonRfqRecipientClosed {
 		t.Fatalf("要 FAILED_PRECONDITION／RFQ_RECIPIENT_CLOSED，得到 %v", err)
 	}
+}
+
+// allStores 是替身的 seller：沒有店封鎖買家，每家店都營業中。
+type allStores struct{}
+
+func (allStores) StoreIDsBlockingBuyer(context.Context, int64, []int64) (map[int64]struct{}, error) {
+	return map[int64]struct{}{}, nil
+}
+
+func (allStores) OpenStoreIDs(_ context.Context, ids []int64) (map[int64]struct{}, error) {
+	out := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		out[id] = struct{}{}
+	}
+	return out, nil
 }

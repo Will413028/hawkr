@@ -209,12 +209,6 @@ const (
 	BuyersPath = "/buyers/me"
 )
 
-// ==================== 推薦（/public/recommendations）====================
-
-const (
-	RecommendationsPath = "/recommendations"
-)
-
 // ==================== 優惠券 Coupon ====================
 
 const (
@@ -368,46 +362,6 @@ const (
 
 const (
 	ShareURLPath = "/share_url"
-)
-
-// ==================== AI 相關 ====================
-
-// AIServicePath 死代理 /app/ai/*path 已於能力層 PR 刪除（46 §3.7）：CreateProxy
-// Director 只 strip /api/v1，path 前綴不匹配 ai-service 一律 404。
-const (
-	AIStylesPath = "/ai_styles"
-	AIQuotasPath = "/ai_quotas"
-)
-
-// ==================== Hawkr 幫找報價單邀請（doc 55 §7）====================
-//
-// 賣家端掛在既有的 /app/sellers/me 命名空間下（同 /app/sellers/me/assistant）；
-// 站外賣家的免登入確認掛 /api/v1/public。兩條路徑與設計書 §7 的
-// `POST /sellers/me/quote-invites/{id}/confirm`／`POST /public/quote-invites/confirm`
-// 逐字對齊。
-const ()
-
-// ==================== #2538 賣家回價（/app/sellers/me/procurement）====================
-//
-// `/procurement/*` 沿用 kebab-case（同既有 rfq-price-previews／rfq-publications），
-// 不新造第三種命名。Action endpoint 依 API 設計規範 §九 `POST /{resource}/{id}/{action}`。
-//
-// 站外業者那半邊（/public/vendor_portal 的四支寫入）刻意不在這裡：wire 形狀已凍結，
-// 但啟用仍 gated on E2 的 Google email step-up，先掛上等於以放寬驗證作為預設修法。
-const (
-	SellerProcurementPath          = "/sellers/me/procurement"
-	SellerProcurementPublications  = "/publications"
-	SellerProcurementPublicationID = "/publications/:publication_id"
-	SellerProcurementResponseDraft = "/publications/:publication_id/response-draft"
-	SellerProcurementResponses     = "/publications/:publication_id/seller-responses"
-	SellerProcurementWithdraw      = "/publications/:publication_id/seller-responses/:seller_response_id/withdraw"
-	SellerProcurementDecline       = "/publications/:publication_id/decline"
-)
-
-// ==================== 站外業者 Vendor Portal（#2539 E1，public/vendor_portal）====================
-
-const (
-	VendorPortalPath = "/vendor_portal"
 )
 
 // ==================== 開發工具（/public/caches）====================

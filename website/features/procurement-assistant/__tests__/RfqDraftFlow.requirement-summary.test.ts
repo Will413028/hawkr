@@ -6,14 +6,18 @@
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderWithoutIntl,
 	screen,
 	waitFor,
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import RfqDraftFlow from "../RfqDraftFlow";
 import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 afterEach(cleanup);
 
@@ -27,17 +31,12 @@ const baseSlots = {
 
 function preview(overrides: Partial<RfqPricePreview> = {}): RfqPricePreview {
 	return {
-		pricePreviewId: "1",
-		version: "1",
 		buyerRequestedRange: {
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "58",
 			upperBoundAmount: "70",
 			basisQuantity: "1",
 			basisUnit: "KG",
 		},
-		payloadHash: "a".repeat(64),
 		quoteTotalRange: null,
 		...overrides,
 	} as RfqPricePreview;
@@ -53,10 +52,7 @@ async function renderAtStep2(data: RfqPricePreview) {
 			candidates: [
 				{
 					candidateId: "seller-green",
-					sourceId: "product-green",
-					lane: "PLATFORM" as const,
 					displayName: "範例鮮果合作社",
-					score: 94,
 					matchedFacts: [],
 					unverifiableFacts: [],
 					factsAsOf: "2026-08-14T12:00:00Z",
@@ -68,7 +64,6 @@ async function renderAtStep2(data: RfqPricePreview) {
 			onPreviewRfqPrice: vi.fn(
 				async () => ({ ok: true, data }) as RfqCommandResult<RfqPricePreview>,
 			),
-			onConfirmRfqSnapshot: vi.fn(),
 			onPreviewRfqPublication: vi.fn(),
 			onExecuteRfqPublication: vi.fn(async () => {
 				throw new Error("這個測試不應該送出發布");

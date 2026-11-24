@@ -180,10 +180,9 @@ func startHTTPServer(lc fx.Lifecycle, cfg *config.Config, l *zap.Logger, h *hand
 		ReadHeaderTimeout: 10 * time.Second,  // slowloris protection on headers
 		IdleTimeout:       120 * time.Second, // keep-alive idle reclaim
 		// No ReadTimeout/WriteTimeout: both would bound the entire connection
-		// lifetime including in-flight SSE/AI-stream responses. Body-read
-		// bounding is per-request via BodyGuard; streaming write duration is
-		// bounded per-write in sse.ServeSSE and the AI stream proxy's
-		// deadlineResponseWriter (proxy.ServeAIAssistantStream).
+		// lifetime including in-flight SSE responses. Body-read bounding is
+		// per-request via BodyGuard; streaming write duration is bounded
+		// per-write in sse.ServeSSE.
 	}
 
 	lc.Append(fx.Hook{
