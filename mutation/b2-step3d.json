@@ -4,8 +4,8 @@
    "id": "429-classified-permanent",
    "stack": "go",
    "file": "backend/internal/modules/payment/internal/charge/stripe.go",
-   "old": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
-   "new": "\tcase api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent(), api.Status == http.StatusTooManyRequests:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
+   "old": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n",
+   "new": "\tcase api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent(), api.Status == http.StatusTooManyRequests:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n",
    "test": "internal/modules/payment/internal/charge ^TestStripeMoneyErrorsAreClassifiedIntoThreeWays$",
    "why": "429 被當成終局拒絕，限流的呼叫永遠不會重試"
   },
@@ -13,8 +13,8 @@
    "id": "5xx-classified-retryable-refusal",
    "stack": "go",
    "file": "backend/internal/modules/payment/internal/charge/stripe.go",
-   "old": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
-   "new": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Status >= 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
+   "old": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n",
+   "new": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Status >= 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n",
    "test": "internal/modules/payment/internal/charge ^TestStripeMoneyErrorsAreClassifiedIntoThreeWays$",
    "why": "5xx（結果不明）被當成沒執行的拒絕，換新鍵重送可能重複搬錢"
   },
@@ -67,8 +67,8 @@
    "id": "find-transfer-ignores-transfer-group",
    "stack": "go",
    "file": "backend/internal/platform/stripe/payment.go",
-   "old": "\t\tparams := &sdk.TransferListParams{TransferGroup: sdk.String(transferGroup)}",
-   "new": "\t\tparams := &sdk.TransferListParams{}",
+   "old": "\t\tparams := &sdk.TransferListParams{TransferGroup: sdk.String(transferGroup), CreatedRange: created}",
+   "new": "\t\tparams := &sdk.TransferListParams{CreatedRange: created}",
    "test": "internal/modules/payment/internal/charge ^TestStripeFindTransferFiltersByTransferGroupAndMatchesTheAttempt$",
    "why": "查回轉帳不依 transfer_group 篩選，會對到別的訂單的轉帳"
   },
@@ -85,8 +85,8 @@
    "id": "find-refund-ignores-payment-intent",
    "stack": "go",
    "file": "backend/internal/platform/stripe/payment.go",
-   "old": "\t\tparams := &sdk.RefundListParams{PaymentIntent: sdk.String(paymentIntentID)}",
-   "new": "\t\tparams := &sdk.RefundListParams{}",
+   "old": "\t\tparams := &sdk.RefundListParams{PaymentIntent: sdk.String(paymentIntentID), CreatedRange: created}",
+   "new": "\t\tparams := &sdk.RefundListParams{CreatedRange: created}",
    "test": "internal/modules/payment/internal/charge ^TestStripeFindRefundAndReversalListTheirParent$",
    "why": "查回退款不依 payment_intent 篩選"
   },
@@ -94,10 +94,10 @@
    "id": "find-payment-unfinished-scan-claims-absence",
    "stack": "go",
    "file": "backend/internal/platform/stripe/payment.go",
-   "old": "\treturn fmt.Errorf(\"stripe：列表超過 %d 頁仍未看完，不能證明不存在\", maxListPages)",
-   "new": "\treturn nil",
+   "old": "\t\t}); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tfor _, item := range data {",
+   "new": "\t\t}); err != nil {\n\t\t\treturn nil\n\t\t}\n\t\tfor _, item := range data {",
    "test": "internal/modules/payment/internal/charge ^TestStripeFindPaymentPagesAndNeverClaimsAbsenceWhenItCannotFinish$",
-   "why": "翻不完就回「找不到」，會讓呼叫方換新鍵重建"
+   "why": "某一頁讀取失敗就回「找不到」：沒看完整份列表就宣稱不存在，會讓呼叫方換新鍵重建。"
   },
   {
    "id": "cancel-paid-intent-is-error",
