@@ -16,6 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 type storedFlow struct {
@@ -755,6 +756,40 @@ func TestRedirectLinkErrorKeepsTheReturnPathsQueryAndFragment(t *testing.T) {
 		redirectLinkError(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/x", nil), returnPath, LinkErrorAlreadyLinked)
 		if got := rec.Header().Get("Location"); got != want {
 			t.Errorf("%q → %q，預期 %q", returnPath, got, want)
+		}
+	}
+}
+
+// web 的語系來自路由：登入依返回網址的語系前綴記成帳號語系，沒有有效的返回網址就不更新。
+func TestCallbackRecordsTheLocaleOfTheReturnPath(t *testing.T) {
+	t.Parallel()
+	for returnTo, want := range map[string]uitext.Locale{
+		"/en":                "en",
+		"/en/account?tab=a":  "en",
+		"/en?x=1":            "en",
+		"/account":           "zh-TW",
+		"/english/account":   "zh-TW",
+		"/":                  "zh-TW",
+		"/en-US/account":     "zh-TW",
+		"//evil.example/en/": "zh-TW",
+	} {
+		e := newEnv(t, 0, identity.ProviderGoogle)
+		state, binding := e.startFlow(t, "google", returnTo)
+		e.do(t, callbackURL("google", url.Values{"state": {state}, "code": {"auth-code"}, "iss": {"https://accounts.google.com"}}), func(r *http.Request) { r.AddCookie(binding) })
+		if len(e.m.logins) != 1 {
+			t.Fatalf("%q：登入 %d 次", returnTo, len(e.m.logins))
+		}
+		if got := e.m.logins[0].Locale; got != want {
+			t.Errorf("返回網址 %q：Locale = %q，預期 %q", returnTo, got, want)
+		}
+	}
+}
+
+func TestReturnPathLocaleSkipsUnsafeOrMissingPaths(t *testing.T) {
+	t.Parallel()
+	for _, p := range []string{"", "//evil.example/en", "https://evil.example/en", "en/account", "/\\en"} {
+		if got := returnPathLocale(p); got != "" {
+			t.Errorf("returnPathLocale(%q) = %q，預期空字串", p, got)
 		}
 	}
 }

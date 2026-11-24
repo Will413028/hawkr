@@ -645,7 +645,7 @@ func TestRegisterDeviceTokenRecordsTheRequestLocaleForLaterDeliveries(t *testing
 	acct := f.newAccount(t)
 	f.contacts.set(acct, buyerAddress, identity.ContactEmailVerified)
 	id := f.emailDelivery(t, acct)
-	if err := f.module.RegisterDeviceToken(uitext.WithLocale(ctx, uitext.EN), acct, DeviceAppBuyer, "tok-1"); err != nil {
+	if err := f.module.RegisterDeviceToken(uitext.WithRequestedLocale(ctx, uitext.EN), acct, DeviceAppBuyer, "tok-1"); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := f.identity.PreferredLocale(ctx, acct); err != nil || got != uitext.EN {
@@ -657,7 +657,7 @@ func TestRegisterDeviceTokenRecordsTheRequestLocaleForLaterDeliveries(t *testing
 	if s := f.state(t, id); s.Status != "SENT" || s.Locale == nil || *s.Locale != "en" {
 		t.Fatalf("狀態 = %+v，預期以英文組字", s)
 	}
-	if err := f.module.RegisterDeviceToken(uitext.WithLocale(ctx, uitext.ZhTW), acct, DeviceAppBuyer, "tok-1"); err != nil {
+	if err := f.module.RegisterDeviceToken(uitext.WithRequestedLocale(ctx, uitext.ZhTW), acct, DeviceAppBuyer, "tok-1"); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := f.identity.PreferredLocale(ctx, acct); got != uitext.ZhTW {
@@ -666,6 +666,25 @@ func TestRegisterDeviceTokenRecordsTheRequestLocaleForLaterDeliveries(t *testing
 	var tokens int
 	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM notification.device_tokens WHERE account_id = $1`, acct).Scan(&tokens); err != nil || tokens != 1 {
 		t.Fatalf("token 數 = %d %v", tokens, err)
+	}
+}
+
+// 請求沒有帶語系（沒有 Accept-Language，ctx 只有預設值）時不得用預設的 zh-TW 蓋掉已存的 en。
+func TestRegisterDeviceTokenWithoutALocaleKeepsTheStoredPreference(t *testing.T) {
+	f := setupIntake(t)
+	ctx := context.Background()
+	acct := f.newAccount(t)
+	if changed, err := f.identity.SetPreferredLocale(ctx, acct, uitext.EN); err != nil || !changed {
+		t.Fatalf("先存 en：changed=%v err=%v", changed, err)
+	}
+	if err := f.module.RegisterDeviceToken(ctx, acct, DeviceAppBuyer, "tok-2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.module.RegisterDeviceToken(uitext.WithLocale(ctx, uitext.ZhTW), acct, DeviceAppBuyer, "tok-2"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := f.identity.PreferredLocale(ctx, acct); err != nil || got != uitext.EN {
+		t.Fatalf("語系 = %q %v，沒帶語系的請求不得改成預設的 zh-TW", got, err)
 	}
 }
 

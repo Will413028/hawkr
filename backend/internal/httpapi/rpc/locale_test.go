@@ -23,11 +23,13 @@ type localeProbe struct {
 	publicconnect.UnimplementedContentPublicServiceHandler
 	contentv1alpha1connect.UnimplementedContentAdminServiceHandler
 	seen       uitext.Locale
+	requested  bool
 	failPublic bool
 }
 
 func (p *localeProbe) ListLiveBanners(ctx context.Context, _ *connect.Request[contentpb.ListLiveBannersRequest]) (*connect.Response[contentpb.ListLiveBannersResponse], error) {
 	p.seen = uitext.LocaleFrom(ctx)
+	_, p.requested = uitext.RequestedLocale(ctx)
 	if p.failPublic {
 		return nil, errors.New("boom")
 	}
@@ -95,6 +97,19 @@ func TestAcceptLanguageDecidesTheRequestLocale(t *testing.T) {
 				t.Fatalf("語系 = %q，要 %q", p.seen, tc.want)
 			}
 		})
+	}
+}
+
+// 只有請求自己帶了、而且協商成功的語系才算「請求的語系」；其餘（沒有 header、不支援、解析失敗）讀到預設值但不得被當成使用者的選擇。
+func TestOnlyANegotiatedAcceptLanguageCountsAsRequested(t *testing.T) {
+	for header, want := range map[string]bool{"en": true, "zh-TW": true, "": false, "fr": false, ";;;not a tag": false} {
+		p := &localeProbe{}
+		if _, err := callPublic(t, localeServer(t, p), header); err != nil {
+			t.Fatal(err)
+		}
+		if p.requested != want {
+			t.Errorf("Accept-Language %q：requested = %v，預期 %v", header, p.requested, want)
+		}
 	}
 }
 

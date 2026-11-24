@@ -120,7 +120,9 @@ func (h *Public) ExchangeIdToken(ctx context.Context, req *connect.Request[pb.Ex
 	if token, source := rpc.CredentialFromHeader(req.Header()); source == rpc.CredentialBearer {
 		previous = token
 	}
-	res, err := h.login.m.Login(ctx, identity.LoginInput{Identity: id, Client: identity.ClientApp, PreviousToken: previous, Locale: uitext.LocaleFrom(ctx)})
+	// 只有請求真的帶了語系（Accept-Language 協商成功）才更新帳號語系；沒帶的請求不用預設值蓋掉已存的偏好。
+	locale, _ := uitext.RequestedLocale(ctx)
+	res, err := h.login.m.Login(ctx, identity.LoginInput{Identity: id, Client: identity.ClientApp, PreviousToken: previous, Locale: locale})
 	if err != nil {
 		return nil, err
 	}

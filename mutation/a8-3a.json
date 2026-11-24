@@ -26,6 +26,78 @@
    "new": "WHERE account_id = $1 AND $2::text <> ''\nORDER BY token",
    "test": "internal/modules/notification ^TestBuyerAudienceNeverPushesToTheSellerApp$",
    "why": "The device token lookup no longer filters by App, so a BUYER-audience push also reaches the account's seller App token (and vice versa)."
+  },
+  {
+   "id": "soft-bounce-enters-the-list",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/suppress/suppress.go",
+   "old": "if !ev.Suppresses() {",
+   "new": "if false && !ev.Suppresses() {",
+   "test": "internal/modules/notification ^TestBounceAndComplaintWebhooksGoThroughTheInboxBeforeSuppression$",
+   "why": "The Suppresses() filter is skipped, so transient and undetermined bounces are written to the inbox and enter the suppression list."
+  },
+  {
+   "id": "complaint-does-not-upgrade-a-bounce",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/delivery.sql.go",
+   "old": "WHERE excluded.reason = 'COMPLAINT' AND",
+   "new": "WHERE false AND",
+   "test": "internal/modules/notification ^TestHardBounceIsRemovableButComplaintIsNot$",
+   "why": "The ON CONFLICT upgrade condition never holds, so a complaint after a hard bounce leaves the row HARD_BOUNCE and it stays removable."
+  },
+  {
+   "id": "complaint-removal-not-refused",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/suppress/suppress.go",
+   "old": "if r == ReasonComplaint {",
+   "new": "if false && r == ReasonComplaint {",
+   "test": "internal/modules/notification ^TestHardBounceIsRemovableButComplaintIsNot$",
+   "why": "RemoveHardBounce no longer refuses an address whose reason is COMPLAINT, so it returns success instead of FailedPrecondition."
+  },
+  {
+   "id": "register-token-skips-locale-record",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/devices.go",
+   "old": "if requested, ok := uitext.RequestedLocale(ctx); ok {",
+   "new": "if requested, ok := uitext.RequestedLocale(ctx); ok && false {",
+   "test": "internal/modules/notification ^TestRegisterDeviceTokenRecordsTheRequestLocaleForLaterDeliveries$",
+   "why": "RegisterDeviceToken no longer records the requested locale as preferred_locale, so later deliveries stay in the old language."
+  },
+  {
+   "id": "register-token-overwrites-with-default-locale",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/devices.go",
+   "old": "if requested, ok := uitext.RequestedLocale(ctx); ok {",
+   "new": "if requested, ok := l, true; ok {",
+   "test": "internal/modules/notification ^TestRegisterDeviceTokenWithoutALocaleKeepsTheStoredPreference$",
+   "why": "A request without Accept-Language writes the default zh-TW over a stored en preference."
+  },
+  {
+   "id": "app-login-overwrites-with-default-locale",
+   "stack": "go",
+   "file": "backend/internal/httpapi/identity/applogin.go",
+   "old": "locale, _ := uitext.RequestedLocale(ctx)",
+   "new": "locale := uitext.LocaleFrom(ctx)",
+   "test": "internal/httpapi/identity ^TestExchangeIdTokenRecordsOnlyARequestedLocale$",
+   "why": "App login always records the context locale, so a request without Accept-Language resets the stored preference to zh-TW."
+  },
+  {
+   "id": "web-login-ignores-the-return-path-locale",
+   "stack": "go",
+   "file": "backend/internal/httpapi/identity/weblogin.go",
+   "old": "PreviousToken: previous, Locale: returnPathLocale(flow.ReturnPath)})",
+   "new": "PreviousToken: previous})",
+   "test": "internal/httpapi/identity ^TestCallbackRecordsTheLocaleOfTheReturnPath$",
+   "why": "Web login no longer passes the locale derived from the return path, so the preference is never updated from the website."
+  },
+  {
+   "id": "provider-fakes-selectable-outside-dev",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/notification.go",
+   "old": "e.Fail(\"FCM_PROJECT_ID 與 FCM_SERVICE_ACCOUNT_JSON 沒有設定：替身只能在 dev 環境選到：%v\", err)\n\t\t\tbreak\n",
+   "new": "_ = err\n",
+   "test": "cmd/hawkr ^TestNotificationProviderFakesOnlyInDevEnvironment$",
+   "why": "The FCM fake is selected even when requireDevEnvironment fails, so a non-dev environment starts with a push provider that only logs."
   }
  ]
 }

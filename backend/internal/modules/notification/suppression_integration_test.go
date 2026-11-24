@@ -222,8 +222,8 @@ func TestHardBounceIsRemovableButComplaintIsNot(t *testing.T) {
 	if removed, err := f.module.RemoveEmailSuppression(ctx, "gone@example.com"); err != nil || removed {
 		t.Fatalf("再移除一次：removed=%v err=%v", removed, err)
 	}
-	if removed, err := f.module.RemoveEmailSuppression(ctx, "not-an-address"); err != nil || removed {
-		t.Fatalf("格式不合：removed=%v err=%v", removed, err)
+	if removed, err := f.module.RemoveEmailSuppression(ctx, "not-an-address"); apperr.KindOf(err) != apperr.KindInvalidInput || removed {
+		t.Fatalf("格式不合：removed=%v err=%v，預期 InvalidInput（不同於「名單裡沒有」的 false, nil）", removed, err)
 	}
 
 	// 舊密鑰寫的退信列：移除找得到。

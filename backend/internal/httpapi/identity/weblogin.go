@@ -13,6 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 // web 的聯合登入入口（ADR 2026-10-30-identity-self-hosted-federated-login D3）：純 HTTP 的 start 與 callback，每家 provider 各一組路徑
@@ -263,7 +264,7 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 	if token, source := rpc.Credential(r); source == rpc.CredentialCookie {
 		previous = token
 	}
-	res, err := w.d.Module.Login(ctx, identity.LoginInput{Identity: id, Client: identity.ClientWeb, PreviousToken: previous})
+	res, err := w.d.Module.Login(ctx, identity.LoginInput{Identity: id, Client: identity.ClientWeb, PreviousToken: previous, Locale: returnPathLocale(flow.ReturnPath)})
 	if err != nil {
 		if apperr.KindOf(err) == apperr.KindUnauthenticated || apperr.KindOf(err) == apperr.KindInvalidInput {
 			log.WarnContext(ctx, "httpapi：這個身分不能登入", "error", err)
@@ -276,6 +277,18 @@ func (w *WebLogin) callback(rw http.ResponseWriter, r *http.Request, p WebProvid
 	}
 	http.SetCookie(rw, w.sessionCookie(res.Token))
 	http.Redirect(rw, r, flow.ReturnPath, http.StatusFound)
+}
+
+// returnPathLocale 是 web 登入記成帳號 preferred_locale 的語系：網站的語系來自路由（多語系 ADR D1），登入時依返回網址的語系前綴決定——
+// `/en` 開頭是 en，其他有效的返回網址是 zh-TW；沒有（或不合格式的）返回網址回空字串，登入不更新語系。
+func returnPathLocale(returnPath string) uitext.Locale {
+	if !identity.ValidReturnPath(returnPath) {
+		return ""
+	}
+	if rest, ok := strings.CutPrefix(returnPath, "/"+string(uitext.EN)); ok && (rest == "" || strings.ContainsRune("/?#", rune(rest[0]))) {
+		return uitext.EN
+	}
+	return uitext.ZhTW
 }
 
 // link 把 provider 驗證過的身分連結到發起流程的帳號，不換發 session；成功回到返回網址，失敗附 link_error。

@@ -129,10 +129,7 @@ func readSuppressionKeys(e *config.Env) notification.SuppressionKeys {
 	return notification.SuppressionKeys{Current: []byte(cur), Previous: []byte(prev)}
 }
 
-// pushImageURL 把型別的圖片 object key 組成推播用的絕對網址；沒有設定媒體網域（零值 Images）回 nil，推播不帶圖。
+// pushImageURL 把型別的圖片 object key 組成推播用的絕對網址；媒體網域由 rpc.NewImages 驗證過，啟動時一定有。
 func pushImageURL(images rpc.Images) func(key string) string {
-	if images.IsZero() {
-		return nil
-	}
 	return func(key string) string { return images.URL(key, rpc.PushImagePreset) }
 }

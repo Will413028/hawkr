@@ -271,7 +271,7 @@ func (m *Module) ReceiveResendEvent(ctx context.Context, header http.Header, bod
 }
 
 // RemoveEmailSuppression 把位址從 email suppression 名單移除（管理員處理；只有內部方法，沒有 RPC）：只移除永久退信，回傳是否有移除；
-// 位址是投訴回 FailedPrecondition（投訴不可移除）。
+// 位址是投訴回 FailedPrecondition（投訴不可移除），位址格式不合回 InvalidInput，不在名單回 false。
 func (m *Module) RemoveEmailSuppression(ctx context.Context, address string) (bool, error) {
 	return m.suppress.RemoveHardBounce(ctx, address)
 }

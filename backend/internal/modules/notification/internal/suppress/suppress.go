@@ -183,11 +183,11 @@ func (s *Service) Handle(ctx context.Context, e inbox.Event) error {
 }
 
 // RemoveHardBounce 把位址從名單移除（管理員處理「退信原因已排除」；只有內部方法，沒有 RPC）：只移除永久退信；位址是投訴時回 FailedPrecondition（投訴永遠不可移除）；
-// 位址不在名單、或不合格式回 false。回傳是否有移除。目前與舊密鑰下的列都處理。
+// 位址不合格式回 InvalidInput（呼叫者打錯位址，不是名單裡沒有）；位址不在名單回 false。回傳是否有移除。目前與舊密鑰下的列都處理。
 func (s *Service) RemoveHardBounce(ctx context.Context, address string) (bool, error) {
 	norm, ok := emailaddr.Normalize(address)
 	if !ok {
-		return false, nil
+		return false, apperr.InvalidInputOn([]string{"Address"}, "email 位址格式不合")
 	}
 	hashes, err := s.d.Hasher.Lookup(norm)
 	if err != nil {

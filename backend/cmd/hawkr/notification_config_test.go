@@ -74,7 +74,7 @@ func TestNotificationProvidersRequireTheirSettingsTogether(t *testing.T) {
 	}
 }
 
-// 推播圖片的網址與 API 回應同一個 MEDIA_ORIGIN，preset 是推播專用的；沒有媒體網域時不帶圖。
+// 推播圖片的網址與 API 回應同一個 MEDIA_ORIGIN，preset 是推播專用的（媒體網域由 rpc.NewImages 驗證，零值不會到這裡）。
 func TestPushImageURLUsesTheMediaOriginAndPushPreset(t *testing.T) {
 	images, err := rpc.NewImages("https://media.example")
 	if err != nil {
@@ -86,9 +86,6 @@ func TestPushImageURLUsesTheMediaOriginAndPushPreset(t *testing.T) {
 	}
 	if got, want := f("public/product/p1/a.jpg"), "https://media.example/i/"+rpc.PushImagePreset+"/public/product/p1/a.jpg"; got != want {
 		t.Fatalf("ImageURL = %q，預期 %q", got, want)
-	}
-	if pushImageURL(rpc.Images{}) != nil {
-		t.Fatal("沒有媒體網域時 ImageURL 該是 nil")
 	}
 }
 
