@@ -71,7 +71,7 @@ func (q *Queries) InsertHide(ctx context.Context, arg InsertHideParams) (ImHide,
 
 const lockMessage = `-- name: LockMessage :one
 
-SELECT m.id, m.conversation_id, c.buyer_id, c.store_id, m.seq FROM im.messages AS m
+SELECT m.id, m.conversation_id, c.buyer_id, c.store_id, m.seq, m.sender_kind FROM im.messages AS m
 JOIN im.conversations AS c ON c.id = m.conversation_id
 WHERE m.id = $1 FOR NO KEY UPDATE OF m
 `
@@ -82,6 +82,7 @@ type LockMessageRow struct {
 	BuyerID        int64
 	StoreID        int64
 	Seq            int64
+	SenderKind     string
 }
 
 // 訊息的隱藏紀錄（可多次隱藏與還原）。可見性只由 im 寫；呼叫者是 moderation 的 transaction，先鎖訊息列（LockMessage）。
@@ -94,6 +95,7 @@ func (q *Queries) LockMessage(ctx context.Context, id uuid.UUID) (LockMessageRow
 		&i.BuyerID,
 		&i.StoreID,
 		&i.Seq,
+		&i.SenderKind,
 	)
 	return i, err
 }

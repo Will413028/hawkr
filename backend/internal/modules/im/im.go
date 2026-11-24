@@ -94,6 +94,8 @@ type (
 	// TakedownContentError 是內容下架的對象不成立；OnMeasureCreated 回這個錯誤讓措施回滾。
 	TakedownContentError = write.TakedownContentError
 	MessageSent          = model.MessageSent
+	MessageHidden        = model.MessageHidden
+	MessageRestored      = model.MessageRestored
 	Reason               = model.Reason
 	PresenceState        = model.PresenceState
 	ConversationParties  = model.ConversationParties

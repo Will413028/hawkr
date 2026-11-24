@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
@@ -28,10 +29,11 @@ import (
 
 // Deps 是處分服務的依賴。
 type Deps struct {
-	DB    *db.DB
-	Cache readcache.Cache
-	NewID func() uuid.UUID
-	Now   func() time.Time
+	DB     *db.DB
+	Events *events.Bus
+	Cache  readcache.Cache
+	NewID  func() uuid.UUID
+	Now    func() time.Time
 }
 
 // Service 是處分與隱藏的 use case。
@@ -335,7 +337,13 @@ func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, err
 		if !out.Created {
 			return nil
 		}
-		return s.bust(ctx, in.Target, o, s.postOf(ctx, in.Target))
+		if err := s.bust(ctx, in.Target, o, s.postOf(ctx, in.Target)); err != nil {
+			return err
+		}
+		return events.Publish(ctx, s.d.Events, model.ContentHidden{
+			EventID: s.d.NewID(), OccurredAt: now, SanctionID: out.ID, Target: in.Target, Author: o.Author,
+			Category: policy.Category(out.Category), SourceRef: out.SourceRef, AppealPath: policy.AppealNone,
+		})
 	})
 	return out, err
 }
@@ -381,7 +389,13 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			return fmt.Errorf("social：還原 %s：%w", in.Target.ID, err)
 		}
 		out = toHide(row, false)
-		return s.bust(ctx, in.Target, o, s.postOf(ctx, in.Target))
+		if err := s.bust(ctx, in.Target, o, s.postOf(ctx, in.Target)); err != nil {
+			return err
+		}
+		return events.Publish(ctx, s.d.Events, model.ContentRestored{
+			EventID: s.d.NewID(), OccurredAt: now, SanctionID: out.ID, Target: in.Target, Author: o.Author,
+			Category: policy.Category(out.Category), SourceRef: out.SourceRef, AppealPath: policy.AppealNone,
+		})
 	})
 	return out, err
 }
@@ -395,14 +409,23 @@ func (s *Service) Warn(ctx context.Context, in model.WarnInput) (model.Sanction,
 	if err := checkReason(in.Category, in.Text, in.SourceRef, in.AdminID); err != nil {
 		return model.Sanction{}, err
 	}
-	row, err := s.q(ctx).InsertSanction(ctx, store.InsertSanctionParams{
-		ID: s.d.NewID(), BuyerID: in.BuyerID, Kind: string(model.SanctionWarning), ReasonCategory: in.Category, ReasonText: in.Text,
-		SourceRef: optional(in.SourceRef), AdminID: in.AdminID, Now: s.d.Now().UTC(),
+	var out model.Sanction
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		now := s.d.Now().UTC()
+		row, err := s.q(ctx).InsertSanction(ctx, store.InsertSanctionParams{
+			ID: s.d.NewID(), BuyerID: in.BuyerID, Kind: string(model.SanctionWarning), ReasonCategory: in.Category, ReasonText: in.Text,
+			SourceRef: optional(in.SourceRef), AdminID: in.AdminID, Now: now,
+		})
+		if err != nil {
+			return fmt.Errorf("social：警告買家 %d：%w", in.BuyerID, err)
+		}
+		out = toSanction(row)
+		return events.Publish(ctx, s.d.Events, model.BuyerWarned{
+			EventID: s.d.NewID(), OccurredAt: now, SanctionID: out.ID, BuyerID: out.BuyerID,
+			Category: policy.Category(out.Category), SourceRef: out.SourceRef, AppealPath: policy.AppealNone,
+		})
 	})
-	if err != nil {
-		return model.Sanction{}, fmt.Errorf("social：警告買家 %d：%w", in.BuyerID, err)
-	}
-	return toSanction(row), nil
+	return out, err
 }
 
 func toSanction(r store.SocialSanction) model.Sanction {

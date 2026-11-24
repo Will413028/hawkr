@@ -179,7 +179,14 @@ func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, err
 		if row.ID != id {
 			return nil
 		}
-		return q.Notify(ctx, live.Visible(msg.ConversationID, msg.BuyerID, msg.StoreID, msg.Seq).Encode())
+		if err := q.Notify(ctx, live.Visible(msg.ConversationID, msg.BuyerID, msg.StoreID, msg.Seq).Encode()); err != nil {
+			return err
+		}
+		kind, authorID := author(msg.SenderKind, msg.BuyerID, msg.StoreID)
+		return events.Publish(ctx, s.d.Events, model.MessageHidden{
+			EventID: s.d.NewID(), OccurredAt: out.HiddenAt, SanctionID: out.ID, ConversationID: msg.ConversationID, MessageID: in.MessageID,
+			AuthorKind: kind, AuthorID: authorID, Category: policy.Category(out.Category), SourceRef: out.SourceRef, AppealPath: policy.AppealNone,
+		})
 	})
 	return out, err
 }
@@ -219,9 +226,24 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			return err
 		}
 		out = rows.Hide(row, false)
-		return q.Notify(ctx, live.Visible(msg.ConversationID, msg.BuyerID, msg.StoreID, msg.Seq).Encode())
+		if err := q.Notify(ctx, live.Visible(msg.ConversationID, msg.BuyerID, msg.StoreID, msg.Seq).Encode()); err != nil {
+			return err
+		}
+		kind, authorID := author(msg.SenderKind, msg.BuyerID, msg.StoreID)
+		return events.Publish(ctx, s.d.Events, model.MessageRestored{
+			EventID: s.d.NewID(), OccurredAt: *out.RestoredAt, SanctionID: out.ID, ConversationID: msg.ConversationID, MessageID: in.MessageID,
+			AuthorKind: kind, AuthorID: authorID, Category: policy.Category(out.Category), SourceRef: out.SourceRef, AppealPath: policy.AppealNone,
+		})
 	})
 	return out, err
+}
+
+// author 是訊息寄件方的 (kind, id)：對話的買家或店家。
+func author(senderKind string, buyerID, storeID int64) (model.PartyKind, int64) {
+	if model.PartyKind(senderKind) == model.PartyStore {
+		return model.PartyStore, storeID
+	}
+	return model.PartyBuyer, buyerID
 }
 
 func checkReason(in model.HideInput) error {

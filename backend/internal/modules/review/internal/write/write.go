@@ -284,7 +284,7 @@ func (s *Service) Reply(ctx context.Context, in model.ReplyInput) (model.Review,
 }
 
 // Hide 隱藏一則評價（moderation 的 transaction 內呼叫）；已有未還原的隱藏時回既有的那一筆（Created 為假，冪等，不發事件）。
-// 新隱藏時同 transaction 發 ReviewAggregateChanged 並排快取失效。
+// 新隱藏時同 transaction 發 ReviewAggregateChanged 與 ReviewHidden 並排快取失效。
 func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, error) {
 	in.Text, in.SourceRef = trimtext.Trim(in.Text), trimtext.Trim(in.SourceRef)
 	if err := checkReason(in); err != nil {
@@ -311,7 +311,13 @@ func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, err
 		if !out.Created {
 			return nil
 		}
-		return s.aggregateChanged(ctx, r.StoreID, r.ProductID, now)
+		if err := s.aggregateChanged(ctx, r.StoreID, r.ProductID, now); err != nil {
+			return err
+		}
+		return events.Publish(ctx, s.d.Events, model.ReviewHidden{
+			EventID: s.d.NewID(), OccurredAt: now, SanctionID: out.ID, ReviewID: in.ReviewID, BuyerID: r.BuyerID,
+			Category: policy.Category(out.Category), SourceRef: out.SourceRef, AppealPath: policy.AppealNone,
+		})
 	})
 	return out, err
 }
@@ -352,7 +358,13 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			return err
 		}
 		out = toHide(row, false)
-		return s.aggregateChanged(ctx, r.StoreID, r.ProductID, now)
+		if err := s.aggregateChanged(ctx, r.StoreID, r.ProductID, now); err != nil {
+			return err
+		}
+		return events.Publish(ctx, s.d.Events, model.ReviewRestored{
+			EventID: s.d.NewID(), OccurredAt: now, SanctionID: out.ID, ReviewID: in.ReviewID, BuyerID: r.BuyerID,
+			Category: policy.Category(out.Category), SourceRef: out.SourceRef, AppealPath: policy.AppealNone,
+		})
 	})
 	return out, err
 }
