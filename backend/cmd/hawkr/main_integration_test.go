@@ -198,6 +198,9 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("INVOICE_SERVICE_ADDR", "127.0.0.1:1")
+	// 通知的 provider 替身只在 dev 環境（DEV_AUTH_KEY_FILE）選到，與 Makefile 的 MONOLITH_ENV 同一組；推播圖片網址要 MEDIA_ORIGIN。
+	t.Setenv("DEV_AUTH_KEY_FILE", writeDevKey(t))
+	t.Setenv("MEDIA_ORIGIN", "http://localhost:8787")
 	ctx := context.Background()
 
 	d, err := db.Open(ctx, db.Config{URL: url, ConnectRetryBudget: 5 * time.Second})
