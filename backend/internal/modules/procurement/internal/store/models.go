@@ -181,7 +181,7 @@ type ProcurementRfqPublicationApproval struct {
 	RangeLowerAmount  int64
 	RangeUpperAmount  int64
 	BuyerNote         string
-	CandidateSetID    *uuid.UUID
+	CandidateSetID    uuid.UUID
 	ResponseDeadline  *time.Time
 	State             string
 	SchemaVersion     string

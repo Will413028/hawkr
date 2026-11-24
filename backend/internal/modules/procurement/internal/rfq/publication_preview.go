@@ -27,7 +27,7 @@ type PreviewPublicationInput struct {
 	RequestID, ClientRequestID, ExpectedRevisionID uuid.UUID
 	LowerBoundAmount, UpperBoundAmount             int64
 	BuyerNote                                      string
-	CandidateSetID                                 *uuid.UUID
+	CandidateSetID                                 uuid.UUID
 	SelectedCandidateIDs                           []uuid.UUID
 	ResponseDeadline                               *time.Time
 }
@@ -61,7 +61,7 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 		if _, err := quote(rev, in.LowerBoundAmount, in.UpperBoundAmount); err != nil {
 			return err
 		}
-		set, err := q.GetCandidateSetForBuyer(ctx, store.GetCandidateSetForBuyerParams{ID: *in.CandidateSetID, RequestID: in.RequestID, BuyerID: in.BuyerID})
+		set, err := q.GetCandidateSetForBuyer(ctx, store.GetCandidateSetForBuyerParams{ID: in.CandidateSetID, RequestID: in.RequestID, BuyerID: in.BuyerID})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperr.NotFound("找不到這個候選集")
 		}
@@ -133,7 +133,7 @@ func checkAudienceShape(in PreviewPublicationInput) error {
 	if in.ResponseDeadline != nil && in.ResponseDeadline.IsZero() {
 		return apperr.InvalidInputOn([]string{"ResponseDeadline"}, "回價期限不是合法的日期")
 	}
-	if in.CandidateSetID == nil {
+	if in.CandidateSetID == (uuid.UUID{}) {
 		return apperr.InvalidInputOn([]string{"CandidateSetID"}, "要帶候選集")
 	}
 	if len(in.SelectedCandidateIDs) == 0 {
@@ -151,7 +151,7 @@ func checkAudienceShape(in PreviewPublicationInput) error {
 
 // resolveStores 依 SelectedCandidateIDs 的順序（契約的一部分）把候選對到店家；候選不在候選集裡回 INVALID_ARGUMENT（指出是第幾個）。
 func resolveStores(ctx context.Context, q *store.Queries, in PreviewPublicationInput) ([]int64, error) {
-	candidates, err := q.ListCandidates(ctx, store.ListCandidatesParams{CandidateSetID: *in.CandidateSetID, BuyerID: in.BuyerID})
+	candidates, err := q.ListCandidates(ctx, store.ListCandidatesParams{CandidateSetID: in.CandidateSetID, BuyerID: in.BuyerID})
 	if err != nil {
 		return nil, fmt.Errorf("rfq：讀取候選：%w", err)
 	}
@@ -180,7 +180,7 @@ func replayApproval(ctx context.Context, q *store.Queries, in PreviewPublication
 		return model.PublicationPreview{}, fmt.Errorf("rfq：讀取發布核准的冪等鍵：%w", err)
 	}
 	if a.RequestID != in.RequestID || a.RequestRevisionID != in.ExpectedRevisionID || a.RangeLowerAmount != in.LowerBoundAmount || a.RangeUpperAmount != in.UpperBoundAmount ||
-		a.BuyerNote != note || !sameDate(a.ResponseDeadline, in.ResponseDeadline) || !sameUUID(a.CandidateSetID, in.CandidateSetID) {
+		a.BuyerNote != note || !sameDate(a.ResponseDeadline, in.ResponseDeadline) || a.CandidateSetID != in.CandidateSetID {
 		return model.PublicationPreview{}, idempotencyMismatch()
 	}
 	c, err := compile(ctx, q, in.BuyerID, a)
@@ -199,13 +199,6 @@ func replayApproval(ctx context.Context, q *store.Queries, in PreviewPublication
 		return model.PublicationPreview{}, idempotencyMismatch()
 	}
 	return approvalPreviewOf(a, c), nil
-}
-
-func sameUUID(a, b *uuid.UUID) bool {
-	if a == nil || b == nil {
-		return a == nil && b == nil
-	}
-	return *a == *b
 }
 
 func sameDate(stored, in *time.Time) bool {

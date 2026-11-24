@@ -123,7 +123,7 @@ func TestPreviewPublicationShapeErrorsPointAtTheField(t *testing.T) {
 	set, c := f.searched(10, 20)
 
 	noSet := f.directIn(set, c[0])
-	noSet.CandidateSetID = nil
+	noSet.CandidateSetID = uuid.UUID{}
 	_, err := f.service().PreviewPublication(ctx, noSet)
 	wantInvalid(t, err, "CandidateSetID")
 	_, err = f.service().PreviewPublication(ctx, f.directIn(set))
@@ -189,7 +189,7 @@ func TestPreviewPublicationStoresTheRangeAndTheTrimmedNote(t *testing.T) {
 	}
 	row, err := store.New(f.d.Conn(ctx)).GetApproval(ctx, store.GetApprovalParams{ID: p.ApprovalID, RequestID: f.request, BuyerID: &f.buyer})
 	must(t, err)
-	if row.BuyerNote != "請盡快" || row.RangeLowerAmount != 100 || row.RangeUpperAmount != 200 || row.CandidateSetID != nil {
+	if row.BuyerNote != "請盡快" || row.RangeLowerAmount != 100 || row.RangeUpperAmount != 200 || row.CandidateSetID != f.lastSet {
 		t.Fatalf("核准存的欄位 = %+v", row)
 	}
 	exact := f.publicationIn()
@@ -292,7 +292,7 @@ func TestPreviewPublicationRejectsTheSameKeyWithDifferentContent(t *testing.T) {
 		"request":  func(i *rfq.PreviewPublicationInput) { i.RequestID = uuid.NewV7() },
 		// 同一批店、同樣的順序，但候選集是另一個：沒有比對候選集本身的話這個重送會被當成同一份
 		"candidate set": func(i *rfq.PreviewPublicationInput) {
-			i.CandidateSetID, i.SelectedCandidateIDs = &set, []uuid.UUID{c[0], c[1]}
+			i.CandidateSetID, i.SelectedCandidateIDs = set, []uuid.UUID{c[0], c[1]}
 		},
 	} {
 		changed := direct
@@ -592,7 +592,7 @@ func TestExecuteDirectStillWorksWhileTheCandidateSetIsEffective(t *testing.T) {
 	p := f.approved(f.directIn(set, c[0], c[1]))
 	row, err := store.New(f.d.Conn(context.Background())).GetApproval(context.Background(), store.GetApprovalParams{ID: p.ApprovalID, RequestID: f.request, BuyerID: &f.buyer})
 	must(t, err)
-	if row.CandidateSetID == nil || *row.CandidateSetID != set {
+	if row.CandidateSetID != set {
 		t.Fatalf("核准要存候選集：%+v", row.CandidateSetID)
 	}
 	if _, err := f.execute(f.executeIn(p)); err != nil {

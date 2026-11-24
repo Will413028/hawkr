@@ -175,7 +175,7 @@
    "id": "rfq-preview-replay-ignores-candidate-set",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
-   "old": " || !sameUUID(a.CandidateSetID, in.CandidateSetID)",
+   "old": " || a.CandidateSetID != in.CandidateSetID",
    "new": "",
    "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationRejectsTheSameKeyWithDifferentContent$",
    "why": "A PreviewPublication replay no longer compares the candidate set, so a different set with the same stores replays the first approval."

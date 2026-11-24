@@ -13,7 +13,7 @@
    "id": "publication-accepts-missing-candidate-set",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
-   "old": "if in.CandidateSetID == nil {\n\t\treturn apperr.InvalidInputOn([]string{\"CandidateSetID\"}",
+   "old": "if in.CandidateSetID == (uuid.UUID{}) {\n\t\treturn apperr.InvalidInputOn([]string{\"CandidateSetID\"}",
    "new": "if false {\n\t\treturn apperr.InvalidInputOn([]string{\"CandidateSetID\"}",
    "test": "internal/modules/procurement/internal/rfq ^TestAudienceShape$",
    "why": "checkAudienceShape stops requiring a candidate set, so a publication preview without one passes input validation."
@@ -21,7 +21,7 @@
   {
    "id": "seller-response-invite-fk-dropped",
    "stack": "go-integration",
-   "file": "backend/internal/modules/procurement/db/migrations/20261124015120_procurement_wish_pool_spec_note.sql",
+   "file": "backend/internal/modules/procurement/db/migrations/20261124025127_procurement_wish_pool_spec_note.sql",
    "old": "ALTER TABLE \"procurement\".\"seller_responses\" ADD CONSTRAINT \"seller_responses_invite_fk\" FOREIGN KEY (\"publication_id\", \"store_id\") REFERENCES \"procurement\".\"rfq_publication_invites\" (\"publication_id\", \"store_id\") ON UPDATE NO ACTION ON DELETE NO ACTION;",
    "new": "SELECT 1;",
    "test": "internal/modules/procurement ^TestSellerResponseRequiresAnInviteForTheStore$",

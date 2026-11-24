@@ -196,7 +196,7 @@ func (f *fixture) publicationIn() rfq.PreviewPublicationInput {
 func (f *fixture) directIn(set uuid.UUID, candidates ...uuid.UUID) rfq.PreviewPublicationInput {
 	in := rfq.PreviewPublicationInput{
 		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
-		CandidateSetID: &set, SelectedCandidateIDs: candidates,
+		CandidateSetID: set, SelectedCandidateIDs: candidates,
 	}
 	return in
 }

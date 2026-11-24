@@ -103,7 +103,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	}
 	c.approval, c.publication, c.invite, c.sellerResponse, c.acceptance = id(), id(), id(), id(), id()
 	n, err = q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600, BuyerNote: "請盡快", CandidateSetID: &c.candidateSet,
+		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600, BuyerNote: "請盡快", CandidateSetID: c.candidateSet,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	})
 	rows("InsertApproval", n, err)
@@ -266,7 +266,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	}
 
 	appr, err := q.GetApproval(ctx, store.GetApprovalParams{ID: c.approval, RequestID: c.request, BuyerID: &c.buyer})
-	if err != nil || appr.State != "SUCCEEDED" || appr.Version != 3 || appr.BuyerNote != "請盡快" || appr.RangeLowerAmount != 400 || appr.RangeUpperAmount != 600 || appr.CandidateSetID == nil || *appr.CandidateSetID != c.candidateSet {
+	if err != nil || appr.State != "SUCCEEDED" || appr.Version != 3 || appr.BuyerNote != "請盡快" || appr.RangeLowerAmount != 400 || appr.RangeUpperAmount != 600 || appr.CandidateSetID != c.candidateSet {
 		t.Fatalf("GetApproval = %+v, %v", appr, err)
 	}
 	if got, err := q.GetApprovalByClientRequest(ctx, store.GetApprovalByClientRequestParams{BuyerID: &c.buyer, ClientRequestID: appr.ClientRequestID}); err != nil || got.ID != c.approval {
@@ -331,7 +331,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	}
 	expiredApproval := id()
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: &c.candidateSet,
+		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: c.candidateSet,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval（過期測試）n=%d err=%v", n, err)

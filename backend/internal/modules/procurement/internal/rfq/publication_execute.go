@@ -66,10 +66,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		if claimed.RequestRevisionID != rev.ID || (claimed.ResponseDeadline != nil && deadlinePassed(*claimed.ResponseDeadline, now)) {
 			return stale
 		}
-		if claimed.CandidateSetID == nil {
-			return stale
-		}
-		effective, err := search.IsEffective(ctx, q, req, in.BuyerID, *claimed.CandidateSetID)
+		effective, err := search.IsEffective(ctx, q, req, in.BuyerID, claimed.CandidateSetID)
 		if err != nil {
 			return err
 		}

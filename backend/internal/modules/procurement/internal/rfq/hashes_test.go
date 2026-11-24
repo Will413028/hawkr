@@ -151,10 +151,10 @@ func TestAudienceShape(t *testing.T) {
 		in    PreviewPublicationInput
 		field string // 空字串表示合法
 	}{
-		{"direct", PreviewPublicationInput{CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{a, b}}, ""},
+		{"direct", PreviewPublicationInput{CandidateSetID: set, SelectedCandidateIDs: []uuid.UUID{a, b}}, ""},
 		{"direct without a set", PreviewPublicationInput{SelectedCandidateIDs: []uuid.UUID{a}}, "CandidateSetID"},
-		{"direct without candidates", PreviewPublicationInput{CandidateSetID: &set}, "SelectedCandidateIDs"},
-		{"direct with a duplicate", PreviewPublicationInput{CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{a, b, a}}, "SelectedCandidateIDs[2]"},
+		{"direct without candidates", PreviewPublicationInput{CandidateSetID: set}, "SelectedCandidateIDs"},
+		{"direct with a duplicate", PreviewPublicationInput{CandidateSetID: set, SelectedCandidateIDs: []uuid.UUID{a, b, a}}, "SelectedCandidateIDs[2]"},
 		{"empty", PreviewPublicationInput{}, "CandidateSetID"},
 		{"zero deadline", PreviewPublicationInput{ResponseDeadline: &zero}, "ResponseDeadline"},
 	} {

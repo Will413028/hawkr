@@ -215,7 +215,7 @@ func TestPreviewRfqPublicationPassesTheAudienceAndMapsThePayload(t *testing.T) {
 		t.Fatal(err)
 	}
 	in := m.rfq.previews[0]
-	if in.BuyerID != buyerID || in.CandidateSetID == nil || in.CandidateSetID.String() != goodID ||
+	if in.BuyerID != buyerID || in.CandidateSetID.String() != goodID ||
 		len(in.SelectedCandidateIDs) != 2 || in.SelectedCandidateIDs[0].String() != second || in.LowerBoundAmount != 100 || in.UpperBoundAmount != 200 || in.BuyerNote != "  請盡快 " ||
 		in.ResponseDeadline == nil || !in.ResponseDeadline.Equal(time.Date(2026, 12, 15, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("模組收到 %+v", in)
@@ -240,7 +240,7 @@ func TestPreviewRfqPublicationPassesTheAudienceAndMapsThePayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if in := m.rfq.previews[1]; in.CandidateSetID != nil || len(in.SelectedCandidateIDs) != 0 || in.ResponseDeadline != nil {
+	if in := m.rfq.previews[1]; in.CandidateSetID != (uuid.UUID{}) || len(in.SelectedCandidateIDs) != 0 || in.ResponseDeadline != nil {
 		t.Fatalf("沒帶的候選與期限不設值：%+v", in)
 	}
 }

@@ -169,7 +169,7 @@ CREATE TABLE procurement.rfq_publication_approvals (
     range_lower_amount BIGINT NOT NULL,
     range_upper_amount BIGINT NOT NULL,
     buyer_note TEXT NOT NULL DEFAULT '',
-    candidate_set_id UUID REFERENCES procurement.candidate_sets (id) ON DELETE SET NULL,
+    candidate_set_id UUID NOT NULL REFERENCES procurement.candidate_sets (id) ON DELETE CASCADE,
     response_deadline DATE,
     state TEXT NOT NULL,
     schema_version TEXT NOT NULL,

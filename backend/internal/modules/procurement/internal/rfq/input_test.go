@@ -13,7 +13,7 @@ import (
 
 func directRecipients() PreviewPublicationInput {
 	set := uuid.NewV7()
-	return PreviewPublicationInput{LowerBoundAmount: 100, UpperBoundAmount: 200, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{uuid.NewV7()}}
+	return PreviewPublicationInput{LowerBoundAmount: 100, UpperBoundAmount: 200, CandidateSetID: set, SelectedCandidateIDs: []uuid.UUID{uuid.NewV7()}}
 }
 
 func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
@@ -28,7 +28,7 @@ func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
 		{"note at the limit", func(i *PreviewPublicationInput) { i.BuyerNote = strings.Repeat("字", MaxBuyerNoteRunes) }, ""},
 		{"note over the limit", func(i *PreviewPublicationInput) { i.BuyerNote = strings.Repeat("字", MaxBuyerNoteRunes+1) }, "BuyerNote"},
 		{"note only the padding pushes it over", func(i *PreviewPublicationInput) { i.BuyerNote = "  " + strings.Repeat("字", MaxBuyerNoteRunes) + "  " }, ""},
-		{"no candidate set", func(i *PreviewPublicationInput) { i.CandidateSetID = nil }, "CandidateSetID"},
+		{"no candidate set", func(i *PreviewPublicationInput) { i.CandidateSetID = uuid.UUID{} }, "CandidateSetID"},
 	} {
 		in := directRecipients()
 		tc.edit(&in)
@@ -75,22 +75,6 @@ func TestDeadlinePassedUsesTheTaipeiCalendarDay(t *testing.T) {
 	} {
 		if got := deadlinePassed(tc.deadline, tc.now); got != tc.want {
 			t.Errorf("%s：deadlinePassed = %v", tc.name, got)
-		}
-	}
-}
-
-func TestSameUUID(t *testing.T) {
-	a, b := uuid.NewV7(), uuid.NewV7()
-	a2 := a
-	for _, tc := range []struct {
-		name string
-		x, y *uuid.UUID
-		want bool
-	}{
-		{"both nil", nil, nil, true}, {"one nil", &a, nil, false}, {"other nil", nil, &a, false}, {"same value", &a, &a2, true}, {"different", &a, &b, false},
-	} {
-		if got := sameUUID(tc.x, tc.y); got != tc.want {
-			t.Errorf("%s：sameUUID = %v", tc.name, got)
 		}
 	}
 }

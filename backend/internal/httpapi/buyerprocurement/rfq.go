@@ -97,7 +97,7 @@ func (h *App) PreviewRfqPublication(ctx context.Context, req *connect.Request[pb
 		if err != nil {
 			return nil, err
 		}
-		in.CandidateSetID = &id
+		in.CandidateSetID = id
 	}
 	for i, raw := range msg.GetSelectedCandidateIds() {
 		id, err := uuid.Parse(raw)

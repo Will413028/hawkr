@@ -123,7 +123,7 @@ func (f *fixture) publish() (uuid.UUID, string) {
 	f.exec(`UPDATE procurement.requests SET status = 'MATCHING' WHERE id = $1`, f.request)
 	p, err := svc.PreviewPublication(ctx, rfq.PreviewPublicationInput{
 		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
-		CandidateSetID: &set, SelectedCandidateIDs: cands,
+		CandidateSetID: set, SelectedCandidateIDs: cands,
 	})
 	must(f.t, err)
 	pub, err := svc.ExecutePublication(ctx, rfq.ExecuteInput{
