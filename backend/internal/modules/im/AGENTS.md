@@ -28,7 +28,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 - `Send` 的 `inTx` 第一組語句：`Buyers.LockNotClosed`、`Stores.LockNotRetired`（買家先於店家，`FOR KEY SHARE`；刪除中的買家放行），在 `guard`（含 `Orders` RPC，tx 外）之後、`AllocateSeq` 之前；NotFound 翻成既有訊息。`guard` 與 legacy 呼叫不得進 tx（`TestSendCallsOrdersOutsideTheWriteTransaction`）。讀取讀 `pub_closed_buyers()`、`pub_retired_stores()`。見 `CARRYOVER.md`。
 - 預覽不存，讀取時由最後一則推導（隱藏與抹除不給任何內容）；隱藏、抹除的訊息在所有讀取路徑都回墓碑；模組不寫中文句子。
 - 刪帳與退場：`OnBuyerDeleted`、`OnStoreRetired` 同 transaction 只排 `im.erase_party`（`EnqueueErase`，以身分為唯一鍵，ByState 含 Running）；只抹該身分寄出的訊息（不依帳號列舉）；不訂 `BuyerDeletionRequested`、不訂 identity 事件。job 依 id 升序每批 200，保留列、清空內容與圖片並把圖標記刪除，可重跑；`im.erase_sweep` 每 15 分鐘補排。
-- 隱藏與還原在同 transaction 發 `MessageHidden`、`MessageRestored`（D24，只帶參照與列舉，作者是寄件方 `(AuthorKind, AuthorID)`）；重複隱藏不發。守門：`TestMessageHideEventFailureRollsBackTheHide`。
+- 隱藏與還原在同 transaction 發 `MessageHidden`、`MessageRestored`（D24，只帶參照與列舉，作者是寄件方 `(AuthorKind, AuthorID)`）；重複隱藏不發。`Hide` 拒絕店家寄的訊息（FailedPrecondition：店家內容走 seller 措施，作者通知走 `seller.MeasureCreated`），所以事件的作者實際上都是買家。守門：`TestMessageHideEventFailureRollsBackTheHide`、`TestHidePublishesMessageHiddenForTheSenderAndRestorePublishesMessageRestored`。
 - 儲存的代碼是 UPPER_SNAKE（`BUYER`、`STORE`、`TEXT`、`IMAGE`）；`message_type` 只有 `TEXT`、`IMAGE`，卡片隨對外契約加。
 - 圖片訊息在送出的 transaction 內（守門鎖與配發 seq 之後）`Confirm`，抹除訊息時同 transaction 把圖 `MarkDeleted`；送出回滾時圖片仍是暫存。守門：`TestImageMessageConfirmsTheAssetAndEraseMarksItDeleted`、`TestRolledBackImageSendLeavesTheAssetStaged`、`TestImageSendRefusesATokenStagedByAnotherAccount`。
 - 即時通知（頻道 `im_events`）由 `write` 在寫入的同一個 transaction 內 `pg_notify`，不經 `events.Publish`；payload 只有業務鍵與 seq。訂閱者的內容一律經 `MessagesAfter` 讀取（授權在讀取），通知只是提示，漏掉的靠游標補洞。

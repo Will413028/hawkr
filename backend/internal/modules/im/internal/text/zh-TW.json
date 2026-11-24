@@ -142,6 +142,10 @@
       },
       "description": "source_ref 超過上限。"
     },
+    "hide.store_message": {
+      "message": "店家寄出的訊息不能由聊天隱藏，店家內容要走店家的處分措施",
+      "description": "隱藏的訊息是店家寄的（店家內容由 seller 的措施處理，作者通知也走措施事件）。"
+    },
     "hide.text_invalid": {
       "message": "理由不是有效的文字",
       "description": "隱藏理由或來源參照不是有效的 UTF-8。"

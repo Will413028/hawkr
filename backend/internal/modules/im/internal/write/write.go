@@ -168,6 +168,9 @@ func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, err
 			}
 			return err
 		}
+		if model.PartyKind(msg.SenderKind) == model.PartyStore {
+			return apperr.FailedPrecondition("%s", text.HideStoreMessage())
+		}
 		id := s.d.NewID()
 		row, err := q.InsertHide(ctx, store.InsertHideParams{
 			ID: id, MessageID: in.MessageID, ReasonCategory: in.Category, ReasonText: in.Text, SourceRef: optional(in.SourceRef), AdminID: in.AdminID, Now: s.d.Now().UTC(),

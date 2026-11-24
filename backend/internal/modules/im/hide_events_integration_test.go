@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
@@ -57,9 +58,11 @@ func TestHidePublishesMessageHiddenForTheSenderAndRestorePublishesMessageRestore
 	if again := mustHide(t)(f.m.Hide(ctx, in)); again.Created || len(hidden.all()) != 1 {
 		t.Fatalf("冪等的重複隱藏不得再發事件：%+v events=%d", again, len(hidden.all()))
 	}
-	mustHide(t)(f.m.Hide(ctx, im.HideInput{MessageID: storeMsg.ID, AdminID: 1, Category: string(policy.Spam)}))
-	if all := hidden.all(); len(all) != 2 || all[1].AuthorKind != im.PartyStore || all[1].AuthorID != s1 {
-		t.Fatalf("店家寄的訊息作者是店家：%+v", all)
+	if _, err := f.m.Hide(ctx, im.HideInput{MessageID: storeMsg.ID, AdminID: 1, Category: string(policy.Spam)}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+		t.Fatalf("店家寄的訊息不能隱藏（店家內容走 seller 措施）：%v", err)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM im.hides WHERE message_id = $1", storeMsg.ID); n != 0 || len(hidden.all()) != 1 {
+		t.Fatalf("被拒的隱藏不得留列或發事件：hides=%d events=%d", n, len(hidden.all()))
 	}
 	mustHide(t)(f.m.Restore(ctx, im.RestoreInput{MessageID: buyerMsg.ID, AdminID: 1, Reason: "誤判", SourceRef: "moderation:case:5"}))
 	gotR := restored.all()

@@ -64,6 +64,11 @@ func HideSourceRefTooLong(a HideSourceRefTooLongArgs) uitext.Message {
 	return uitext.Message{Text: "來源參照不可超過 " + strconv.Itoa(a.Max) + " 個字", Locale: uitext.ZhTW}
 }
 
+// HideStoreMessage 是後台員工受眾的模組句子 hide.store_message（只有 zh-TW）。
+func HideStoreMessage() uitext.Message {
+	return uitext.Message{Text: "店家寄出的訊息不能由聊天隱藏，店家內容要走店家的處分措施", Locale: uitext.ZhTW}
+}
+
 // HideTextInvalid 是後台員工受眾的模組句子 hide.text_invalid（只有 zh-TW）。
 func HideTextInvalid() uitext.Message {
 	return uitext.Message{Text: "理由不是有效的文字", Locale: uitext.ZhTW}
