@@ -12,11 +12,17 @@ import (
 // checkValues 取出 schema.sql 裡某個 CHECK 的 IN (...) 清單。
 func checkValues(t *testing.T, constraint string) []string {
 	t.Helper()
+	return checkColumnValues(t, constraint, "status")
+}
+
+// checkColumnValues 取出 schema.sql 裡某個欄位的 CHECK IN (...) 清單。
+func checkColumnValues(t *testing.T, constraint, column string) []string {
+	t.Helper()
 	raw, err := os.ReadFile("../../db/schema.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK \(status IN \(([^)]*)\)\)`).FindSubmatch(raw)
+	m := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK \(` + column + ` IN \(([^)]*)\)\)`).FindSubmatch(raw)
 	if m == nil {
 		t.Fatalf("schema.sql 沒有 %s", constraint)
 	}
@@ -50,6 +56,15 @@ func TestStatusTypesMatchTheSchemaChecks(t *testing.T) {
 			t.Errorf("%s：schema=%v，Go 型別=%v", c.constraint, got, c.values)
 		}
 	}
+	if got, want := checkColumnValues(t, "refunds_reversal_status_check", "reversal_status"), names(model.ReversalStatusValues()); !slices.Equal(got, want) {
+		t.Errorf("refunds_reversal_status_check：schema=%v，Go 型別=%v", got, want)
+	}
+	if got, want := checkColumnValues(t, "refund_reversals_status_check", "status"), names(model.ReversalStatusValues()[2:]); !slices.Equal(got, want) {
+		t.Errorf("refund_reversals_status_check：schema=%v，Go 型別（REVERSING 起）=%v", got, want)
+	}
+	if got, want := checkColumnValues(t, "refunds_topup_status_check", "topup_status"), names(model.TopupStatusValues()); !slices.Equal(got, want) {
+		t.Errorf("refunds_topup_status_check：schema=%v，Go 型別=%v", got, want)
+	}
 }
 
 // provider 名稱同時是 payments.provider 與 inbox 的 provider 名稱：必須符合兩邊共同的格式（payments_provider_check、inbox 的 providerPattern）。
@@ -80,7 +95,7 @@ func constraintBody(t *testing.T, constraint string) string {
 func TestExternalIDsAreAllowedInEveryStateTheProviderHasAlreadyAnswered(t *testing.T) {
 	t.Parallel()
 	for constraint, want := range map[string][]string{
-		"refunds_external_state_check":   {"REFUNDING", "SUCCEEDED", "FAILED"},
+		"refunds_external_state_check":   {"REFUNDING", "SUCCEEDED", "FAILED", "ANOMALY"},
 		"transfers_external_state_check": {"SUCCEEDED", "FAILED"},
 	} {
 		if got := checkValuesIn(t, constraint); !slices.Equal(got, want) {
@@ -107,4 +122,18 @@ func checkValuesIn(t *testing.T, constraint string) []string {
 		out = append(out, v[1])
 	}
 	return out
+}
+
+// 補差額只存在於已失敗的退款列上（賣家少收的錢才補），而且原因碼、外部 ID 與狀態一一對應：守 schema 的宣告不被放寬。行為由整合測試守。
+func TestTheTopUpColumnsAreOnlyAllowedOnFailedRefundsAndKeepReasonAndExternalIDInStep(t *testing.T) {
+	t.Parallel()
+	if body := constraintBody(t, "refunds_topup_only_failed_check"); !regexp.MustCompile(`topup_status = 'NONE' OR status = 'FAILED'`).MatchString(body) {
+		t.Errorf("refunds_topup_only_failed_check：%s", body)
+	}
+	if body := constraintBody(t, "refunds_topup_reason_check"); !regexp.MustCompile(`topup_status IN \('RELEASED', 'ANOMALY'\)\) = \(topup_reason IS NOT NULL\)`).MatchString(body) {
+		t.Errorf("refunds_topup_reason_check：%s", body)
+	}
+	if body := constraintBody(t, "refunds_topup_external_check"); !regexp.MustCompile(`\(topup_status = 'DONE'\) = \(topup_external_id IS NOT NULL\)`).MatchString(body) {
+		t.Errorf("refunds_topup_external_check：%s", body)
+	}
 }

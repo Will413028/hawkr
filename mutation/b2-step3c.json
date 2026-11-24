@@ -1,0 +1,238 @@
+{
+ "mutants": [
+  {
+   "id": "refund-cap-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\tif in.Amount > pay.Amount-taken {\n\t\t\treturn apperr.FailedPrecondition(\"退款總額超過付款金額\")\n\t\t}",
+   "new": "\t\t_ = taken",
+   "test": "internal/modules/payment ^(TestCreateRefundWritesThePendingRowAndTheJobEnforcesTheCapAndIsIdempotentByKey|TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne)$",
+   "why": "拿掉累計上限：第 101 元的退款被接受，併發的兩筆（各 60）都成立。"
+  },
+  {
+   "id": "refund-rotate-key-before-lookup",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif !inResendWindow(row.RefundCalledAt, now) {\n\t\treturn s.lookupRefund(ctx, row, pay, now)\n\t}",
+   "new": "\tif !inResendWindow(row.RefundCalledAt, now) {\n\t\tif rerr := s.rotateRefundKey(ctx, refundID, row.IdempotencyKey, now); rerr != nil {\n\t\t\treturn rerr\n\t\t}\n\t}",
+   "test": "internal/modules/payment ^(TestAnUnknownRefundIsReplayedInTheWindowAndFoundByLookupAfterItWithoutASecondRefund)$",
+   "why": "結果不明且過了視窗時先換新鍵、不查回就重建：provider 出現第二筆退款，沒有查回。"
+  },
+  {
+   "id": "refund-anomaly-does-not-hold-quota",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'FAILED'",
+   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status NOT IN ('FAILED', 'ANOMALY')",
+   "test": "internal/modules/payment ^(TestRepeatedRefundLookupFailuresPutTheRefundInAnomalyWhichHoldsTheQuotaAndStopsTheSweep)$",
+   "why": "ANOMALY 不算進累計額度：進了 ANOMALY 的退款不再佔額度，新的退款被接受。"
+  },
+  {
+   "id": "refund-failed-still-holds-quota",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'FAILED'",
+   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'NO_SUCH_STATUS'",
+   "test": "internal/modules/payment ^(TestAPermanentRefundRefusalFailsTheRefundFreesTheQuotaAndPublishesOnlyRefundChanged|TestARefundThatFailsAtTheProviderAfterBeingAcceptedFreesTheQuota)$",
+   "why": "FAILED 的退款仍佔額度：失敗之後同額的新退款被擋下。"
+  },
+  {
+   "id": "refund-payment-lock-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "FROM payment.payments\nWHERE order_no = $1\nFOR UPDATE\n`",
+   "new": "FROM payment.payments\nWHERE order_no = $1\n`",
+   "test": "internal/modules/payment ^(TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne)$",
+   "why": "付款列的 FOR UPDATE 拿掉：併發的退款不再互相等待，加總看不到對方未提交的列。"
+  },
+  {
+   "id": "refund-request-key-lookup-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\tif err == nil {\n\t\t\tif existing.Amount != in.Amount",
+   "new": "\t\tif false {\n\t\t\tif existing.Amount != in.Amount",
+   "test": "internal/modules/payment ^(TestCreateRefundWritesThePendingRowAndTheJobEnforcesTheCapAndIsIdempotentByKey)$",
+   "why": "同一把 request_key 重送不再回既有的退款：回空的退款（沒有 ID）。"
+  },
+  {
+   "id": "refund-payment-not-paid-accepted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\tif pay.Status != string(model.PaymentSucceeded) {\n\t\t\treturn apperr.FailedPrecondition(\"付款尚未入帳，不能退款\")",
+   "new": "\t\tif false {\n\t\t\treturn apperr.FailedPrecondition(\"付款尚未入帳，不能退款\")",
+   "test": "internal/modules/payment ^(TestCreateRefundRefusesWhatCannotBeRefunded)$",
+   "why": "未入帳的付款也能建立退款。"
+  },
+  {
+   "id": "refund-retryable-refusal-never-rotates",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\tif !firstCall(row.RefundCalledAt, called.RefundCalledAt, now) {",
+   "new": "\t\tif true {",
+   "test": "internal/modules/payment ^(TestARetryableRefundRefusalRotatesTheKeyOnlyOnTheFirstCallOfAKey)$",
+   "why": "可重試拒絕永遠不換鍵：被拒絕的第一次呼叫沒有換新鍵。"
+  },
+  {
+   "id": "refund-resend-refusal-rotates-the-key",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\tif !firstCall(row.RefundCalledAt, called.RefundCalledAt, now) {",
+   "new": "\t\tif false {",
+   "test": "internal/modules/payment ^(TestARetryableRefundRefusalRotatesTheKeyOnlyOnTheFirstCallOfAKey)$",
+   "why": "重送被可重試拒絕也換鍵：前一次結果不明卻換了鍵，可能重複退款。"
+  },
+  {
+   "id": "refund-not-found-wait-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif now.Sub(*row.RefundCalledAt) < NotFoundAfter {",
+   "new": "\tif false {",
+   "test": "internal/modules/payment ^(TestAnUnknownRefundNotFoundIsFailedOnlyAfterTheNotFoundWait)$",
+   "why": "查無不等 NotFoundAfter：剛過視窗就 FAILED。"
+  },
+  {
+   "id": "refund-lookup-failures-never-anomaly",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif n >= LookupFailureLimit {\n\t\treturn s.anomalyRefund(ctx, row, \"lookup_failed\", \"\")",
+   "new": "\tif n >= LookupFailureLimit+1000 {\n\t\treturn s.anomalyRefund(ctx, row, \"lookup_failed\", \"\")",
+   "test": "internal/modules/payment ^(TestRepeatedRefundLookupFailuresPutTheRefundInAnomalyWhichHoldsTheQuotaAndStopsTheSweep)$",
+   "why": "查回連續失敗不進 ANOMALY。"
+  },
+  {
+   "id": "refund-reply-mismatch-accepted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif snap.ExternalID == \"\" || snap.Amount != row.Amount ||",
+   "new": "\tif snap.ExternalID == \"\" ||",
+   "test": "internal/modules/payment ^(TestARefundReplyThatDoesNotMatchTheRowGoesToAnomaly)$",
+   "why": "provider 回的金額與列不符也收下。"
+  },
+  {
+   "id": "auto-refund-completed-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif r.Auto && r.Status == string(model.RefundSucceeded) {",
+   "new": "\tif false {",
+   "test": "internal/modules/payment ^(TestTheRefundJobCallsTheProviderAndPublishesTheResultAndAutoRefundCompleted|TestARefundEventOnlyQueuesASyncThatRereadsTheProviderAndMarksTheEventProcessed)$",
+   "why": "自動退款成功不發 AutoRefundCompleted。"
+  },
+  {
+   "id": "auto-refund-completed-for-manual-refunds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif r.Auto && r.Status == string(model.RefundSucceeded) {",
+   "new": "\tif r.Status == string(model.RefundSucceeded) {",
+   "test": "internal/modules/payment ^(TestTheRefundJobCallsTheProviderAndPublishesTheResultAndAutoRefundCompleted)$",
+   "why": "手動退款成功也發 AutoRefundCompleted。"
+  },
+  {
+   "id": "refund-sync-does-not-mark-events",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif err := s.markEventsProcessed(ctx, p.Name(), external, startedAt); err != nil {\n\t\treturn false, err\n\t}\n",
+   "new": "\t_ = startedAt\n",
+   "test": "internal/modules/payment ^(TestARefundEventOnlyQueuesASyncThatRereadsTheProviderAndMarksTheEventProcessed)$",
+   "why": "退款同步不標記事件已處理：事件永遠未處理。"
+  },
+  {
+   "id": "refund-event-handler-ignores-refunds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/service.go",
+   "old": "\t\treturn enqueueRefundSync(ctx, s.d.Jobs, refund.ID)",
+   "new": "\t\t_ = refund\n\t\treturn s.d.Inbox.MarkProcessed(ctx, e.Provider, e.EventID, eventProcessor)",
+   "test": "internal/modules/payment ^(TestARefundEventOnlyQueuesASyncThatRereadsTheProviderAndMarksTheEventProcessed)$",
+   "why": "退款事件的 handler 不排同步 job，直接標記已處理。"
+  },
+  {
+   "id": "refund-sweep-skips-callable-refunds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/jobs.go",
+   "old": "\t\t\tif err := queue(enqueueRefund, id); err != nil {",
+   "new": "\t\t\tif err := queue(func(context.Context, jobs.Enqueuer, uuid.UUID) error { return nil }, id); err != nil {",
+   "test": "internal/modules/payment ^(TestTheSweepRequeuesIdleCallableAndRefundingRefundsButNotAnomalyOrFinalOnes)$",
+   "why": "掃描不補排 PENDING 的退款 job。"
+  },
+  {
+   "id": "refund-sweep-skips-refunding",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "WHERE status = 'REFUNDING' AND updated_at <= $1 AND id > $2",
+   "new": "WHERE status = 'NO_SUCH_STATUS' AND updated_at <= $1 AND id > $2",
+   "test": "internal/modules/payment ^(TestTheSweepRequeuesIdleCallableAndRefundingRefundsButNotAnomalyOrFinalOnes)$",
+   "why": "掃描不補排閒置的 REFUNDING 退款同步。"
+  },
+  {
+   "id": "refund-anomaly-evidence-not-checked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "核對退款 %s 的證據失敗：%w\", id, err)\n\t\t}\n\t\tif !found || snap.ExternalID != evidence || snap.Amount != r.Amount {",
+   "new": "核對退款 %s 的證據失敗：%w\", id, err)\n\t\t}\n\t\tif false && (!found || snap.ExternalID != evidence || snap.Amount != r.Amount) {",
+   "test": "internal/modules/payment ^(TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheSync)$",
+   "why": "退款的結案不核對 provider 證據。"
+  },
+  {
+   "id": "refund-cap-overflow",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "if in.Amount > pay.Amount-taken {",
+   "new": "if taken+in.Amount > pay.Amount {",
+   "test": "internal/modules/payment ^(TestARefundOfMaxInt64AfterAnExistingRefundIsRefusedByTheCap)$",
+   "why": "累計上限改回會回繞的加法：MaxInt64 的退款被接受。"
+  },
+  {
+   "id": "fake-refund-cap-overflow",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/fake.go",
+   "old": "if in.Amount > pi.snap.Amount-taken {",
+   "new": "if taken+in.Amount > pi.snap.Amount {",
+   "test": "internal/modules/payment/internal/charge ^(TestTheFakeRefusesAHugeRefundAfterAnExistingOneInsteadOfOverflowing)$",
+   "why": "fake 的累計上限改回加法：巨額退款回繞後被接受。"
+  },
+  {
+   "id": "refund-sync-no-again",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\treturn s.d.Inbox.RoutePending(ctx, p.Name(), external)\n}",
+   "new": "\treturn false, nil\n}",
+   "test": "internal/modules/payment ^(TestARefundEventArrivingWhileTheSyncReadsTheProviderAsksForAnotherRound)$",
+   "why": "同步結尾不看 RoutePending：讀取期間收到的事件沒有再跑一輪。"
+  },
+  {
+   "id": "refund-create-no-refundable-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\tif !s.refundable(pay) {\n\t\t\treturn apperr.FailedPrecondition(\"付款目前不能退款（沒有外部付款或屬於別的付款服務）\")\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/payment ^(TestARefundForAPaymentOfAnotherProviderIsRefusedBeforeAnyReversal)$",
+   "why": "CreateRefund 拿掉可退款檢查：別的 provider 的付款仍寫了退款列並排退款 job。"
+  },
+  {
+   "id": "refund-event-no-provider-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "WHERE p.provider = $1 AND r.external_refund_id = $2\n`\n\ntype RefundByExternalParams",
+   "new": "WHERE $1::text IS NOT NULL AND r.external_refund_id = $2\n`\n\ntype RefundByExternalParams",
+   "test": "internal/modules/payment ^(TestARefundOfAPaymentOfAnotherProviderIsNeitherRoutedNorSynced)$",
+   "why": "事件查退款拿掉 provider 條件：別的 provider 的退款事件排了同步 job。"
+  },
+  {
+   "id": "refund-sync-no-provider-skip",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif pay.Provider != s.d.Provider.Name() {\n\t\treturn false, nil\n\t}\n\texternal, p :=",
+   "new": "\t_ = pay\n\texternal, p :=",
+   "test": "internal/modules/payment ^(TestARefundOfAPaymentOfAnotherProviderIsNeitherRoutedNorSynced)$",
+   "why": "SyncRefund 拿掉 provider 比對：別的 provider 的退款被讀取並改成 SUCCEEDED。"
+  },
+  {
+   "id": "refund-resolve-parent-unchecked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": " || pay.ExternalPaymentID == nil || *pay.ExternalPaymentID != proof.parent {",
+   "new": " || (false && pay.ExternalPaymentID == nil) {",
+   "test": "internal/modules/payment ^(TestResolvingARefundStageAnomalyFailsWhenThePaymentExternalIDChangedAfterTheEvidence)$",
+   "why": "退款階段結案不比對鎖定的付款外部 ID：核對之後被改掉仍結案成功。"
+  }
+ ]
+}

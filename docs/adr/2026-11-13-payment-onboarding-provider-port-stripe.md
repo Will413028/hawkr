@@ -194,6 +194,18 @@
 - 考慮過：不明一律進「待人工核對」（每次網路抖動都要人處理，賣家撥款會卡住）；維持期限後失敗並只補文件（違反一筆付款最多一筆有效轉帳）。業界基線：Stripe 文件 Idempotent requests 與 Error handling、Airbnb 的付款系統 Orpheus（轉述：不明的結果當作可能成功）、一般的對帳例外佇列做法。
 - 決定：Will 2026-11-23（D68）。
 
+### 退款先退買家、再向賣家收回；轉帳金額在送出時才算
+
+修訂本檔「開通閘門與收款模式」的 separate charges and transfers 寫法「完成後的退款先撤回轉帳」。業界基線：Stripe SCT 文件寫明退款從平台餘額出、不影響轉帳，平台以「減少之後的轉帳」或「撤回轉帳」收回（docs.stripe.com/connect/marketplace/tasks/refunds-disputes）；爭議款也是收回跟在退錢之後。
+
+- 轉帳金額在第一次送出時，於同一個 transaction 鎖付款列、以「付款金額減非失敗退款」計算並與呼叫時刻一起寫入；同一把冪等鍵的金額不變，只有換新鍵（D68 的可重試拒絕）時才重算。轉帳送出前的退款不必撤回。
+- 轉帳送出後的退款先退給買家；provider 接受退款（任何非失敗狀態，含 `pending`）時才建立撤回，撤回金額以轉帳已撤回之外的剩餘額為上限，人工結案的轉帳以 provider 核實的金額為準。不等退款成功，避免平台餘額不足時退款 `pending` 與撤回互等。
+- 撤回記在退款列的欄位，不另開表；必要條件（一筆退款撤回多次，或沒有退款也要撤回，例如爭議款）成立時再開表。
+- 接受後才失敗的退款，已撤回的款項留在平台並發 `MoneyAnomaly`，由後台處理（Will 2026-11-24）；撤回永久失敗由平台吸收並發 `MoneyAnomaly`。
+- 平台餘額在「接受退款到撤回落地」之間暫時變低，別的賣家的轉帳以可重試拒絕延後（D68），不另設保留餘額；觸發重審：上線後轉帳的可重試拒絕出現在告警或指標。
+- 未採：先撤回再退款（原 D1；轉帳進行中退款只能拒絕、撤回後退款失敗時賣家被扣）；賣家帳本淨額從下次撥款扣（要跨付款帳本與對帳，等於重做已退場的 B10）。
+- 比較：`backend/docs/plans/2026-11-23-b2-payment/refund-recovery-brief.md`。決定：Will 2026-11-24（D69）。
+
 ## 後果
 
 - 本機的付款與物流端到端在付款、物流模組搬進單體前不通：`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 與物流的 `MerId` 是空值（Stripe 的 `acct_` 不是 PayUni 商店代號）。付款改走 port 時以外部帳戶 ID 取代這個接縫；物流改綠界後恢復建店與出貨（Will 2026-10-29、2026-11-12 接受）。修訂（Will 2026-11-15）：物流不改綠界，B3 改成賣家自寄主線加模擬 adapter（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），物流 `MerId` 隨 Java shipping 退場刪除。
@@ -206,7 +218,7 @@
 - 平台承擔負餘額；要上線且改變損失歸屬時重新評估內嵌元件關掉使用者驗證的決定。
 - 沿用機制與延後項的觸發條件（輪詢沒有上限、inbox 沒有終局狀態（同步讀到已關閉的帳戶已在 9g 處理：列標 `DISABLED`、原因碼 `closed`，不再輪詢，D61）、`provider` 欄位在換 provider 時舊列的去向；清理的終局已在 9g 處理）寫在 `internal/modules/payment/CARRYOVER.md` 與 `docs/modules/payment.md` §8。
 
-## 決定編號（D1–D68）
+## 決定編號（D1–D69）
 
 其他文件與程式註解引用的 `收款開通 ADR Dn` 指這裡的編號。表列的是目前狀態；被後來的決定推翻的部分已註明。
 
@@ -231,7 +243,7 @@
 | D17 | 身分欄位鎖與店名鎖刪除，店名不同步給金流商 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」 |
 | D18 | 舊事件 `merchant.verification.*` 與 PayUni 審核通知停發；通知留給通知模組 | `2026-11-13-seller-platform-review-and-identity-matching.md`「核准與收款開通分開」 |
 | D19 | 一店一個外部帳戶，關店再開沿用；冪等鍵是寫列時產生並保存的 UUID | 本檔「建立外部帳戶的時點、冪等與分兩步建立」 |
-| D20 | 收款模式是 separate charges and transfers（2026-11-23 由 destination charges 改），閘門看 `stripe_transfers`；代理收付法規前提未確認 | 本檔「開通閘門與收款模式」 |
+| D20 | 收款模式是 separate charges and transfers（2026-11-23 由 destination charges 改），閘門看 `stripe_transfers`；代理收付法規前提未確認；退款與收回的順序由 D69 修訂 | 本檔「開通閘門與收款模式」 |
 | D21 | 分支內完成才進 `main`、不留新舊並存：開發流程決定，已執行，沒有持續規則 | 無（已合併的流程決定；migration 部分見 D48） |
 | D22 | 平台自建 KYC 個資管線退場，不收身分證號、銀行帳號與證件；統編仍由平台收；觸發重建：接台灣金流商 | `2026-11-13-seller-platform-review-and-identity-matching.md`「身分比對與比對 hash」；本檔「port 的能力描述與 session 的形狀」 |
 | D23 | 聯絡信箱在帳號層級：provider 驗證過的優先，否則自填；送審要求有信箱（`CONTACT_EMAIL_REQUIRED`） | 本檔「聯絡信箱在建立外部帳戶的當下讀取」 |
@@ -281,3 +293,4 @@
 | D66 | 一張訂單一個 PaymentIntent；只留買家 `GetPayment` 與後台查詢，刪賣家版付款歷程 | 本檔「付款嘗試歷程」 |
 | D67 | Stripe adapter 以 USD 收付，訂單整數金額照搬成 cent；port 與資料模型不帶幣別 | 本檔「付款與轉帳的幣別」 |
 | D68 | 搬錢呼叫的結果三分；換新鍵前以強一致查回證明上一次不存在；異常進 `ANOMALY` 佔位告警、後台人工結案；取代 12 小時後進終局 | 本檔「搬錢呼叫的結果不明：三分結果、查回才收斂」 |
+| D69 | 退款先退買家、provider 接受後才撤回轉帳；轉帳金額在送出時鎖付款列計算；修訂 D20 的「先撤回再退款」 | 本檔「退款先退買家、再向賣家收回；轉帳金額在送出時才算」 |
