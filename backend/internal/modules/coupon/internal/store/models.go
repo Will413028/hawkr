@@ -83,3 +83,8 @@ type CouponStoreBuyerMembership struct {
 	BuyerID   int64
 	CreatedAt time.Time
 }
+
+type CouponVoucherExpiryReminder struct {
+	VoucherID  uuid.UUID
+	RemindedAt time.Time
+}

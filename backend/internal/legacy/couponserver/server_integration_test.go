@@ -47,9 +47,15 @@ type openStores struct{}
 
 func (openStores) StoreSuspended(context.Context, int64) (bool, error) { return false, nil }
 
-type noMembers struct{}
+type allBuyers struct{}
 
-func (noMembers) IsMember(context.Context, int64, int64) (bool, error) { return false, nil }
+func (allBuyers) Existing(_ context.Context, ids []int64) ([]int64, error) { return ids, nil }
+
+type openDirectory struct{}
+
+func (openDirectory) StoreState(context.Context, int64) (coupon.StoreState, error) {
+	return coupon.StoreState{Exists: true}, nil
+}
 
 type fixture struct {
 	t   *testing.T
@@ -61,7 +67,7 @@ type fixture struct {
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "coupon", Dir: coupon.Migrations()}))
-	m := coupon.New(coupon.Deps{DB: d, Stores: openStores{}, Members: noMembers{}, NewID: uuid.NewV7, Now: func() time.Time { return base }})
+	m := coupon.New(coupon.Deps{DB: d, Stores: openStores{}, Buyers: allBuyers{}, StoreDirectory: openDirectory{}, NewID: uuid.NewV7, Now: func() time.Time { return base }})
 	return &fixture{t: t, db: d, m: m, srv: New(m, slog.New(slog.NewTextHandler(io.Discard, nil)))}
 }
 
