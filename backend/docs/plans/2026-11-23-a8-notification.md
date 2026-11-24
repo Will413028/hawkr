@@ -203,6 +203,7 @@
 | D17 後台公告語系 | 一律只寫英文：單一 `title`／`body`，不分語系、不依請求語系選擇（偏離多語系 ADR 的 zh-TW／en，限公告） | 已決 2026-11-24，Will |
 | D18 公告的偏好分類 | 新增偏好分類 `ANNOUNCEMENT`（受眾 BUYER 與 STORE）：收件匣不可關，推播可在偏好關閉，不寄 email（註冊表 `model.Delivers` 不列公告的 EMAIL）；proto 的 `NOTIFICATION_CATEGORY_ANNOUNCEMENT` 與註冊表（`internal/model`）同步，偏好分類由 D4 的 14 個變成 15 個。原問題：公告沒有分類會是 UNSPECIFIED，不能篩選也不能設偏好 | 已決 2026-11-24，Will |
 | D19 賣家工作區事件的發布端 | notification 公開單體內的發布介面 `PublishSellerWorkspace(storeID, change)`，給之後搬進單體的 order、aftersales 模組在自己的 transaction 內呼叫（`pg_notify` 隨 commit 送出、rollback 不送；簽名 `PublishSellerWorkspace(ctx, storeID, change)`）；不寫 RabbitMQ 轉接（`seller.order.updated`、`seller.after_sale.updated` 的發布端是還沒搬的 Java order-service、aftersales-service，與 D13 同理）；website `useSellerWorkspaceRealtime` 現在就改接 `WatchNotifications`（STORE 受眾），order、aftersales 搬進單體之前賣家中心沒有即時同步（系統未上線，接受）。原問題：發布端在還沒搬的服務，單體內沒有可掛鉤的事件 | 已決 2026-11-24，Will |
+| D20 深連結格式 | website 相對路徑＋語系前綴（依多語系 ADR D1：en 帶 `/en`，zh-TW 不帶）；路徑必須是既有 website 路由，沒有路由的目的地不產生連結（`deep_link` 空）；apps 把路徑對應到畫面，不認得的開收件匣；推播 data 的 `deep_link` 同值。路徑表見附件 `deep-links.md`。 | 已決 2026-11-24，依 ADR D1（SSOT 推導） |
 | D16 投遞紀錄「實際送出文字」裡的第三方名稱 | (a) 接受：送出文字是送出時的事實紀錄，受 D15 的 180 天硬刪約束；只有收件人自己刪帳號時提前清。原問題：actor 刪帳號後，別人投遞紀錄的送出文字仍含其名稱，最長 180 天。選項：(a) 接受，送出文字是「送了什麼」的事實紀錄，期限受 D15 約束；(b) 不存送出文字，只存型別＋參數（ID）＋locale，需要時重組，代價是重組結果可能與當時不同、客訴時無法證明送了什麼；(c) actor 刪帳號時也掃描清除。建議 (a)：業界（SendGrid、Postmark 的 message activity）保留送出內容到保留期，GDPR 以有限保留期滿足最小化。 | 已決 2026-11-23，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。

@@ -490,7 +490,11 @@ type InboxItem struct {
 	Presentation InboxPresentation      `protobuf:"varint,3,opt,name=presentation,proto3,enum=hawkr.notification.v1alpha1.InboxPresentation" json:"presentation,omitempty"`
 	Title        string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	Body         string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
-	// 點擊後的 App 內目的地；空字串表示沒有目的地。格式由伺服器定義，client 只交給路由，不解析。
+	// 點擊後的目的地；空字串表示沒有目的地。格式：website 相對路徑（以 `/` 開頭、不含 host），收件人語系是 en 時
+	// 帶 `/en` 前綴、zh-TW 不帶（多語系 ADR D1）；路徑一定是既有的 website 路由。推播 data 的 `deep_link` 鍵是同一個值。
+	// client 把路徑對應到自己的畫面（universal link／App Links 接受 `/en/…`），不認得的路徑開收件匣。
+	// 路徑表（目的地、參數、受眾、沒有 website 路由的目的地）見計畫附件
+	// `backend/docs/plans/2026-11-23-a8-notification/deep-links.md`。
 	DeepLink string `protobuf:"bytes,6,opt,name=deep_link,json=deepLink,proto3" json:"deep_link,omitempty"`
 	// 商品類通知的圖片；沒有圖時不設。
 	Image *v1alpha1.Image `protobuf:"bytes,7,opt,name=image,proto3" json:"image,omitempty"`
