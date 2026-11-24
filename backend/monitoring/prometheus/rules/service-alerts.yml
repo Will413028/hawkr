@@ -66,8 +66,7 @@ groups:
       # 所有 pod 消失 ⇒ 推送停止 ⇒ series 在 staleness 窗後消失 ⇒ absent() 成立，語意與上面一致。
       - alert: ProdOtlpServiceAbsent
         expr: |
-          absent(server_start_total{job="ai-service", env="prod"})
-          or absent(server_start_total{job="notification-service", env="prod"})
+          absent(server_start_total{job="notification-service", env="prod"})
         for: 5m
         labels:
           severity: critical
@@ -94,6 +93,17 @@ groups:
         annotations:
           summary: "Prod workload {{ $labels.deployment }} 沒有任何可用副本"
           description: "{{ $labels.deployment }}(env=prod) 宣告 replicas > 0 但可用副本為 0，已持續 5 分鐘。"
+
+      # Prod Monolith Absent — 單體（job="hawkr"）完全沒有 up series。
+      # 單體不在 ProdServiceAbsent 的手寫清單內，這條是它的存活訊號。
+      - alert: ProdMonolithAbsent
+        expr: absent(up{job="hawkr", env="prod"})
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prod 單體（job=hawkr）完全消失（無任何 up series）"
+          description: "job=hawkr(env=prod) 已 5 分鐘沒有任何 up series（所有 pod 消失或 Prometheus 抓不到 target）。"
 
       # High HTTP Error Rate (5xx) — Gateway
       - alert: HighHttpErrorRate
@@ -372,151 +382,6 @@ groups:
   # ===========================================================================
   - name: feature-provisioning-alerts
     rules:
-      - alert: AIAssistantProviderDisabled
-        expr: max by (env) (ai_assistant_provider_enabled) == 0
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：通用 AI 助理（Gemini）尚未開通"
-          description: "AIAssistantService 的聊天／專家類 RPC（BuyerChat／SellerChat／SellerProductListingChat／SellerProductAutofill 等由 internal/agent 的 runner 驅動、實際呼叫 LLM 的路徑）一律回 9703（fail-closed，不是回空字串——「功能沒開」與「模型沒話說」必須分得出來）。BuyerReturnPolicy（純靜態文案）與 *LatestSession（讀歷史 session）不呼叫 LLM，不受影響；RFQ 詢價、AI 配額 admin、影像處理、AI 推薦等其餘 RPC 也正常服務。⚠️ 在 #3329 之前這個狀態是 fx abort ⇒ 59 支 RPC 全滅；#3519 把當時列舉的 Chat／ProductQA／GenerateRecommendations／GenerateImage 那批死 RPC 連同承載它們的舊 adapter 一併刪除，這支 gauge 現在覆蓋的是上面列的 AIAssistantService 路徑。處置：補 hawkr-ai secret 的 GEMINI_API_KEY。⚠️ 本條為 0 **不代表** Gemini 上游掛了——它只答「憑證有沒有設」。"
-
-      # 🔴 ai-service 有**兩條**獨立的 LLM 路徑，兩支 gauge 缺一不可：
-      #   ai_assistant_provider_enabled  → 通用聊天（internal/llmprovider.NewAssistant，供 AIAssistantService 的聊天／專家類 RPC）
-      #   ai_procurement_llm_enabled     → 採購助手 RFQ（internal/procurement）
-      # #3329 盤點時只列了前者；後者是同一個 class 的第二條中止路徑，
-      # 而且它受 EXTRACTOR_MODEL 影響（預設 gemini-2.5-flash、dev/prod 是 deepseek-flash）。
-      # 只看其中一支會漏掉另一條整條路徑。
-      #
-      # 🔴 #3519 Task 5 fix round 1：ai_assistant_provider_enabled 原本掛在
-      # internal/client/gemini（承載真正呼叫 Gemini SDK 的舊 adapter；那份程式碼
-      # 唯一的 caller 是 Chat／ProductQA／GenerateImage／GenerateRecommendations
-      # 等已刪除的死 RPC，adapter 已隨它們一起刪掉）。gauge 本身仍有效——
-      # NewAssistant 跟舊 adapter 吃同一把 GEMINI_API_KEY——因此隨 NewAssistant
-      # 搬到 internal/llmprovider，指標名稱與 expr 不變。
-      - alert: AIProcurementLLMDisabled
-        expr: max by (env) (ai_procurement_llm_enabled) == 0 and max by (env) (ai_procurement_llm_config_incomplete) == 0
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：採購助手（RFQ）的 LLM 尚未開通"
-          description: "抽取／敘述／控制三條路徑一律回 9703（fail-closed）。⚠️ 停用實作刻意**不回空 patch**——空 patch 是抽取器的合法輸出，回它的話呼叫端會照常續行，買家經歷「問什麼都沒反應」而監控上完全看不出 LLM 沒接上。處置：用 ai_procurement_llm_info 看目前解析出來的是哪顆模型（停用時該序列不存在），補它所屬 provider 的 key（gemini-*→GEMINI_API_KEY／deepseek-*→DEEPSEEK_API_KEY／gemma→OPENROUTER_API_KEY，皆在 hawkr-ai secret）。"
-
-      - alert: AIProcurementLLMConfigIncomplete
-        expr: max by (env) (ai_procurement_llm_config_incomplete) == 1
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：EXTRACTOR_MODEL 設定有誤"
-          description: "兩種情況之一：① EXTRACTOR_MODEL **明確指定**了 deepseek／gemma 系列的模型卻沒有對應的 API key ② EXTRACTOR_MODEL 不在已驗過 quirk 的登記表裡（打錯字，或指定了一個真實存在但沒人驗過的模型——後者放行的話會靜默送出被端點拒絕的 request 形狀）。⚠️ 在 backend#3329 之前這兩種情況都會讓整個 ai-service 起不來（一個 env 的錯字連坐 59 支 RPC）；現在改成降級，代價是**錯字不再自己現形**，只剩這條告警看得到。開機當下的 Error log 會指出是哪一種，並列出登記表裡的合法值。"
-
-      # #3519 刀 C：LLM 是硬上限依賴（provider 額度用盡已經實際發生過，#1979），
-      # 之前只有事後的結果面 counter（procurement_llm_tokens_total）與上面兩支
-      # on/off gauge——三者都答不出「是不是快逼近我們自己設的量了」。
-      #
-      # 🔴 這條與上面兩條（Disabled／ConfigIncomplete）回答的是不同問題：
-      # 那兩條答「LLM 這條路徑現在通不通」，本條答「路徑通，但用量是不是快
-      # 超出我們自訂的治理預算」——兩者互斥觸發時機：LLM 停用時幾乎不會有
-      # token 用量，本條自然不會 fire；本條 fire 時代表 LLM 正常運作、只是
-      # 用得比預期多。不要把本條當成「provider 掛了」的訊號，那是上面兩條
-      # 與下面 AIProcurementLLMExtractionDegraded（接在 TokenBudgetExceeded
-      # 之後，量的是 procurement_degraded_total）的職責。
-      #
-      # 分母 ai_procurement_llm_budget_limit 是我們自己宣告的數字，不是 provider 配額
-      # （LLM_TOKEN_BUDGET_PER_MINUTE，ai-service 的環境變數）；未設定
-      # 時該 gauge 完全缺席（不是 0），這條 expr 就沒有分母、算不出任何結果、
-      # 不會 fire——這是刻意的。⚠️ 若改成 export 0 後果相反於直覺：正數除以 0
-      # 在 PromQL 是 `+Inf`，`+Inf > 0.4` 成立，會讓這條告警**立刻且永久
-      # fire**，不是永遠不 fire；一個假的「已逼近預算」訊號跟長期沒人管的
-      # 告警是同一種缺陷。缺席才誠實：沒有資料就是沒有資料，不是恆假的 0。
-      #
-      # 形狀照 GatewaySSRQuotaUtilizationHigh（同檔 :348）：rate 換算成
-      # 「每分鐘」以對齊 ai_procurement_llm_budget_limit 的單位，40% 門檻、for: 10m
-      # 排除分鐘級抖動，severity 維持 warning——長期貼著這個數字可能只是
-      # 用量成長（好事），不是故障。
-      - alert: AIProcurementLLMTokenBudgetHigh
-        expr: |
-          (
-            sum by (env) (rate(procurement_llm_tokens_total{kind!="cached"}[5m])) * 60
-            /
-            max by (env) (ai_procurement_llm_budget_limit)
-          ) > 0.4
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：採購助手 LLM token 用量達自訂預算的 {{ $value | humanizePercentage }}"
-          description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
-
-      # 這條是同一顆比值換一個更高的門檻（100%），存在的理由是「用量超過
-      # 自己宣告的上限」本身值得比 40% 逼近線更快被看到——但 🔴 2026-09-20
-      # review 糾正了先前這裡的說法：**這條不是**硬上限依賴接入治理規範
-      # §2②要求的「已觸上限的副作用」告警。②要的是拒絕／失敗訊號，證明
-      # 依賴真的回絕了我們；這條與上面那條一樣，回答的仍然是「用量佔我們
-      # 自己設的預算多少」，只是門檻換了。真正落地②的是下面的
-      # AIProcurementLLMExtractionDegraded（量 procurement_degraded_total，
-      # 也就是 provider 真的沒回應成功的那些 turn）。這條本身仍然有價值
-      # （值班的人想更快知道「已經超過自訂上限」跟「快要超過」是兩件事），
-      # 只是不能拿來當②的證據。
-      #
-      # for: 3m 比上面的 10m 短：「已經超過自己宣告的預算」不是分鐘級抖動
-      # 可以合理解釋的狀態（不像「逼近中」需要更長窗排除偶發尖峰），值班的
-      # 人應該更快知道。severity 仍是 warning，理由同上面那條與本檔慣例——
-      # 這是我方自訂數字，沒有强制拒絕行為，長期紅著（用量持續成長中）不等
-      # 於故障。
-      - alert: AIProcurementLLMTokenBudgetExceeded
-        expr: |
-          (
-            sum by (env) (rate(procurement_llm_tokens_total{kind!="cached"}[5m])) * 60
-            /
-            max by (env) (ai_procurement_llm_budget_limit)
-          ) >= 1
-        for: 3m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：採購助手 LLM token 用量已超過自訂預算（{{ $value | humanizePercentage }}）"
-          description: "近 5 分鐘 procurement_llm_tokens_total（不含 cached，理由同 AIProcurementLLMTokenBudgetHigh）換算成的每分鐘 token 用量已達到或超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 100%——不是逼近，是已經超過我們自己定的線。⚠️ 與 AIProcurementLLMTokenBudgetHigh 的差別只在門檻與 for，兩者會同時 fire、不是重複告警。⚠️ 本條**不是**硬上限依賴接入治理規範 §2②要求的「已觸上限副作用」告警——那個角色由 AIProcurementLLMExtractionDegraded（procurement_degraded_total）擔任，本條只是同一顆比值換一個更高門檻。⚠️ 與 AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 的差別同上面那條——LLM 仍在正常回應，這不是 provider 掛了。這是我方自訂、非強制性的治理數字，沒有任何程式路徑會因此拒絕或降級呼叫，所以本條不代表任何請求失敗；但持續超過代表容量帳已經跟不上真實用量。處置：立刻查是否有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
-
-      # 硬上限依賴接入治理規範 §2②「已觸上限的副作用」的真正落地：上面兩條
-      # （TokenBudgetHigh／TokenBudgetExceeded）都是同一顆比值換個門檻，回答
-      # 的是「用量佔我們自己設的預算多少」——2026-09-20 review 指出這兩條都
-      # 不是②要的東西：②要的是**拒絕／失敗訊號**，證明依賴真的回絕了我們，
-      # 不是同一個用量指標的第二個門檻。procurement_llm_tokens_total 描述
-      # 用量，從不描述失敗。
-      #
-      # procurement_degraded_total 才是那個訊號：internal/procurement/usecase/
-      # graph_nodes.go 只在 extractor.Extract(...) 真的回 error（timeout、
-      # provider 錯誤、額度用盡……）時才 +1——這正是 #1979 那類事故的直接
-      # 後果，買家的訊息送出去，LLM 沒有正確回應，抽取器退回固定問法。這支
-      # counter 存在已久（55 號設計書 §4 有列），但從來沒有接過任何告警。
-      #
-      # `and max by (env) (ai_procurement_llm_enabled) == 1` 是刻意的守門：
-      # LLM 尚未開通時 disabledLLM.GenerateContent 對**每一次**呼叫都回
-      # ErrDisabled（llmprovider/provider.go 的 disabledLLM 實作），一樣會讓
-      # extractErr != nil、一樣會讓這支 counter 持續跳——但那個狀態已經由
-      # AIProcurementLLMDisabled（for: 1h）覆蓋，是合法的部署狀態。不加這個
-      # and，本條會在任何刻意不開通 LLM 的環境裡跟 AIProcurementLLMDisabled
-      # 一起長期紅著，變成同一件事的第二份噪音，不是一個新訊號。
-      #
-      # for: 10m 是 rate 視窗（5m）的兩倍，比照 PayuniReconciliationFailing
-      # （rate[15m] 配 for:30m）的同一個比例慣例：單一一次退化事件的
-      # rate(...) > 0 只會撐一個 rate 視窗就自然歸零，湊不到 for: 10m；真正
-      # 持續退化（provider 真的在拒絕，不是單次逾時）才撐得過去。
-      - alert: AIProcurementLLMExtractionDegraded
-        expr: |
-          sum by (env) (rate(procurement_degraded_total[5m])) > 0
-          and
-          max by (env) (ai_procurement_llm_enabled) == 1
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：採購助手 LLM 抽取持續失敗，買家已經在收到降級回應"
-          description: "extractor.Extract 持續回 error（timeout／provider 錯誤／額度用盡等），抽取器退回固定問法而非真正理解買家需求——這不是『快超出預算』，是**現在就在發生**的使用者體驗劣化，且 LLM 本身處於已開通狀態（ai_procurement_llm_enabled==1，排除了由 AIProcurementLLMDisabled 覆蓋、刻意未開通的那個狀態，避免同一件事被兩條告警重複計）。處置：查 EXTRACTOR_MODEL 所屬 provider（gemini／deepseek／gemma）當下的狀態頁與額度儀表板，確認是不是撞到 #1979 那類配額問題；同時看 ai-service log 的『procurement: graph extract_slots degraded』一行，裡面的 timeout 欄位可以分辨是逾時還是 provider 直接拒絕。"
-
       - alert: ShippingPayuniProviderDisabled
         expr: max by (env) (shipping_payuni_credentials_configured) == 0 and max by (env) (shipping_payuni_credentials_incomplete) == 0
         for: 1h

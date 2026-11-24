@@ -64,14 +64,13 @@ test("思考步驟只存在於 Live Activity Rail，不借用 facts pill 變成�
 });
 
 test("allowlisted public steps 逐列呈現，並把完整 liveSteps 交給狀態軌", () => {
-	// normalizeSteps 已先 fail closed；這裡把完整 liveSteps 交給狀態軌，保留
+	// stepFromProto 已先 fail closed；這裡把完整 liveSteps 交給狀態軌，保留
 	// §V.10.6-3 所需的 status。
 	assert.match(taskPanel, /<AgentActivityRail[\s\S]*?steps=\{liveSteps\}/);
 	assert.match(rail, /data-status=\{step\.status\}/);
 	// 停留多久由下一個 step 何時抵達決定，前端不排程。
 	assert.doesNotMatch(source, /holdMs/);
 	assert.doesNotMatch(rail, /holdMs/);
-	assert.match(source, /<CropDisambiguationCard[\s\S]*?<ClarifyQuestionCard/);
 });
 
 test("onSkipOption 未傳時不得讓 ClarifyQuestionCard 長出跳過按鈕——傳給 onSkip 的必須是條件式 undefined，不是恆真的 wrapper function", () => {
@@ -218,21 +217,11 @@ test("當前問題卡的小精靈是靜態 Hawkr 標誌，不播放動畫也不�
 		path.join(root, "features/procurement-assistant/ClarifyQuestionCard.tsx"),
 		"utf8",
 	);
-	const cropCard = readFileSync(
-		path.join(
-			root,
-			"features/procurement-assistant/CropDisambiguationCard.tsx",
-		),
-		"utf8",
-	);
 
 	assert.match(mark, /<BrandLogo variant="mark" size="fill" \/>/);
 	assert.doesNotMatch(mark, /animateOnce|pending|autoplay/);
 
-	for (const [name, card] of [
-		["clarify", questionCard],
-		["crop-disambiguation", cropCard],
-	] as const) {
+	for (const [name, card] of [["clarify", questionCard]] as const) {
 		const avatar = card.match(/<HawkrAgentMark[\s\S]*?\/>/)?.[0];
 		assert.ok(avatar, `${name} question card must render the Agent avatar`);
 		assert.match(avatar, /label="Hawkr Agent"/);

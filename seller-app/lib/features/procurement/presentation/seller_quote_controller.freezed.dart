@@ -17,7 +17,7 @@ mixin _$SellerQuoteNotice {
  String get message; SellerQuoteNoticeTone get tone;/// ⛔ `STALE_SELLER_RESPONSE` 等「依據已過期」的錯誤會把它設成 true：
 /// 必須明確告知賣家報價已變動，並要求他自己重新載入，
 /// **不得靜默改成送最新版**。
- bool get requiresReload;/// CodeMeta 錯誤碼，沒有時是空字串（給測試與紀錄用）。
+ bool get requiresReload;/// 伺服器的錯誤 reason 名稱，沒有時是空字串（給測試與紀錄用）。
  String get code;
 /// Create a copy of SellerQuoteNotice
 /// with the given fields replaced by the non-null parameter values.
@@ -222,7 +222,7 @@ class _SellerQuoteNotice implements SellerQuoteNotice {
 /// 必須明確告知賣家報價已變動，並要求他自己重新載入，
 /// **不得靜默改成送最新版**。
 @override@JsonKey() final  bool requiresReload;
-/// CodeMeta 錯誤碼，沒有時是空字串（給測試與紀錄用）。
+/// 伺服器的錯誤 reason 名稱，沒有時是空字串（給測試與紀錄用）。
 @override@JsonKey() final  String code;
 
 /// Create a copy of SellerQuoteNotice

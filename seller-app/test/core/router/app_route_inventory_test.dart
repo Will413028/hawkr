@@ -66,10 +66,6 @@ void main() {
     (symbol: 'CouponRoutes.detail', path: CouponRoutes.detail),
     (symbol: 'SettingsRoutes.profile', path: SettingsRoutes.profile),
     (symbol: 'SettingsRoutes.chat', path: SettingsRoutes.chat),
-    (
-      symbol: 'SettingsRoutes.chatAiAssistant',
-      path: SettingsRoutes.chatAiAssistant,
-    ),
     (symbol: 'SettingsRoutes.chatThread', path: SettingsRoutes.chatThread),
     (symbol: 'SettingsRoutes.shipping', path: SettingsRoutes.shipping),
     (
@@ -100,9 +96,9 @@ void main() {
     ),
   ];
 
-  test('all 63 seller routes remain unique and declared', () {
-    expect(routes, hasLength(63));
-    expect(routes.map((route) => route.path).toSet(), hasLength(63));
+  test('all 62 seller routes remain unique and declared', () {
+    expect(routes, hasLength(62));
+    expect(routes.map((route) => route.path).toSet(), hasLength(62));
     expect(routes.every((route) => route.path.startsWith('/')), isTrue);
   });
 

@@ -39,11 +39,6 @@ hawkr.account.RecordAuditIntentItemResult.biz_code
 hawkr.account.RevokeSessionData.revision
 hawkr.aftersales.AfterSaleCaseDetailView.process_deadline_hours
 hawkr.aftersales.HasActiveCaseResponse.active_count
-hawkr.ai.RecommendedProduct.price
-hawkr.ai.RecommendedProduct.price_max
-hawkr.ai.RecommendedProduct.price_min
-hawkr.ai.RecommendedProduct.rating
-hawkr.ai.RecommendedProduct.score
 # §6.2 #3 exception — internal-only cross-service batch profile lookup;
 # buyer_id is the native int64 map key and never crosses an HTTP response boundary.
 hawkr.buyer.ListFavoritedProductIdsResponse.product_ids
@@ -117,8 +112,6 @@ hawkr.seller.SellerStats.total_sales
 # JS Number precision loss at 2^53. duration_ms (elapsed milliseconds) would take
 # ~285,616 years to overflow 2^53, same safety category as small bounded counts.
 # NOT Track-1 backlog.
-hawkr.ai.StepEvent.seq
-hawkr.ai.StepEvent.duration_ms
 # §6.2 #3 exception — gateway-exposed AIProcurementService messages (TurnResult,
 # SnapshotResponse, etc. returned from SubmitTurn/SubmitAnswer/Rewind/GetSnapshot
 # and other buyer-facing procurement RPCs). Step.duration_ms (elapsed milliseconds)
@@ -126,5 +119,3 @@ hawkr.ai.StepEvent.duration_ms
 # to overflow 2^53. CandidateItem.score is a recommendation confidence/scoring
 # metric (0-1 range or similar), not an ID subject to JS Number precision loss at
 # 2^53. NOT Track-1 backlog.
-hawkr.ai.Step.duration_ms
-hawkr.ai.CandidateItem.score

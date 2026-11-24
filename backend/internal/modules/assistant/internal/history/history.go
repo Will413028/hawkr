@@ -25,7 +25,7 @@ const eventsPerMessage = 4
 // Latest 回 buyerID 最近更新的對話與它的文字訊息；只列這個買家（user_id）的 session，
 // 所以不可能讀到別人的對話。沒有對話時（含列出後對話被刪除）回空的 History。
 //
-// 規則照舊 ai-service：以最後更新時間挑最新的對話；只取有文字的事件，thought 不外流，tool 的呼叫與回應事件沒有文字所以略過；
+// 規則照舊 AI 服務：以最後更新時間挑最新的對話；只取有文字的事件，thought 不外流，tool 的呼叫與回應事件沒有文字所以略過；
 // 非買家發言一律是助理。
 func Latest(ctx context.Context, sessions session.Service, buyerID int64) (model.History, error) {
 	userID := strconv.FormatInt(buyerID, 10)

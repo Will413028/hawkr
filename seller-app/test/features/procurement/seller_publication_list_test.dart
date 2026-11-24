@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:hawkr_seller/core/router/app_router.dart';
-import 'package:hawkr_seller/features/procurement/data/procurement_error.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_seller/core/l10n/ui_locale.dart';
 import 'package:hawkr_seller/features/procurement/data/seller_quote_model.dart';
 import 'package:hawkr_seller/features/procurement/data/seller_quote_repository.dart';
 import 'package:hawkr_seller/features/procurement/presentation/seller_publication_list_controller.dart';
@@ -14,6 +16,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+
+import '../../support/default_error_text.dart';
 
 class _MockRepo extends Mock implements SellerQuoteRepository {}
 
@@ -33,7 +37,7 @@ SellerPublicationListItem _row({
   String deliveryCity = '臺北市',
   String deliveryDate = '2026-09-20',
   String responseDeadline = '2026-09-18',
-  String latestResponseStatus = '',
+  SellerResponseStatus? latestResponseStatus,
   bool hasDraft = false,
 }) {
   return SellerPublicationListItem(
@@ -41,11 +45,7 @@ SellerPublicationListItem _row({
       publication: SellerFacingPublication(
         publicationId: publicationId,
         publicationVersion: '4',
-        inviteId: 'inv-1',
-        lane: 'PLATFORM',
         sellerFacingPayloadHash: 'hash-4',
-        deliveryState: 'SENT',
-        publishedAt: '2026-09-13T02:00:00Z',
       ),
       sellerFacingPayload: SellerFacingPayload(
         item: item,
@@ -92,7 +92,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [sellerQuoteRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          sellerQuoteRepositoryProvider.overrideWithValue(repo),
+          defaultErrorTextProvider.overrideWithValue(zhDefaultErrorText),
+        ],
         child: ScreenUtilInit(
           designSize: const Size(414, 896),
           builder: (_, _) => MaterialApp.router(routerConfig: router),
@@ -128,12 +131,15 @@ void main() {
       final repo = _MockRepo();
       when(
         repo.listPublications,
-      ).thenThrow(const ProcurementException(message: '目前無法使用回價功能，請稍後再試。'));
+      ).thenThrow(ConnectException(Code.unavailable, 'down'));
 
       await pump(tester, repo);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('目前無法使用回價功能'), findsOneWidget);
+      expect(
+        find.textContaining(zhDefaultErrorText(Code.unavailable)),
+        findsOneWidget,
+      );
       expect(find.byKey(_emptyStateKey), findsNothing);
       expect(find.text('重新載入'), findsOneWidget);
     });
@@ -144,14 +150,17 @@ void main() {
       when(repo.listPublications).thenAnswer((_) async {
         calls++;
         if (calls == 1) {
-          throw const ProcurementException(message: '暫時取不到詢價清單');
+          throw ConnectException(Code.unavailable, 'down');
         }
         return [_row()];
       });
 
       await pump(tester, repo);
       await tester.pumpAndSettle();
-      expect(find.textContaining('暫時取不到詢價清單'), findsOneWidget);
+      expect(
+        find.textContaining(zhDefaultErrorText(Code.unavailable)),
+        findsOneWidget,
+      );
 
       await tester.tap(find.text('重新載入'));
       await tester.pumpAndSettle();
@@ -234,7 +243,15 @@ void main() {
     });
 
     testWidgets('已提交 ACTIVE 就顯示已回價', (tester) async {
-      await pump(tester, repoReturning([_row(latestResponseStatus: 'ACTIVE')]));
+      await pump(
+        tester,
+        repoReturning([
+          _row(
+            latestResponseStatus:
+                SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE,
+          ),
+        ]),
+      );
       await tester.pumpAndSettle();
 
       expect(_badgeLabel(tester, _statusBadgeKey), '已回價');
@@ -244,7 +261,13 @@ void main() {
     testWidgets('🔴 已提交＋又存了新草稿：兩個標籤同時出現，不是二選一', (tester) async {
       await pump(
         tester,
-        repoReturning([_row(latestResponseStatus: 'ACTIVE', hasDraft: true)]),
+        repoReturning([
+          _row(
+            latestResponseStatus:
+                SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE,
+            hasDraft: true,
+          ),
+        ]),
       );
       await tester.pumpAndSettle();
 
@@ -260,12 +283,12 @@ void main() {
       expect(_badgeLabel(tester, _draftBadgeKey), '草稿未送出');
     });
 
-    testWidgets('四個值域各有自己的賣家視角文案，不用 CodeMeta 的營運 label', (tester) async {
-      const cases = <String, String>{
-        'ACTIVE': '已回價',
-        'SUPERSEDED': '已被新版取代',
-        'WITHDRAWN': '已撤回',
-        'EXPIRED': '報價已過期',
+    testWidgets('四個值域各有自己的賣家視角文案，賣家視角', (tester) async {
+      final cases = <SellerResponseStatus, String>{
+        SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE: '已回價',
+        SellerResponseStatus.SELLER_RESPONSE_STATUS_SUPERSEDED: '已被新版取代',
+        SellerResponseStatus.SELLER_RESPONSE_STATUS_WITHDRAWN: '已撤回',
+        SellerResponseStatus.SELLER_RESPONSE_STATUS_EXPIRED: '報價已過期',
       };
       for (final entry in cases.entries) {
         await pump(
@@ -276,7 +299,7 @@ void main() {
         expect(
           _badgeLabel(tester, _statusBadgeKey),
           entry.value,
-          reason: '${entry.key} 的文案不對',
+          reason: '${entry.key.name} 的文案不對',
         );
       }
     });
@@ -284,7 +307,12 @@ void main() {
     testWidgets('🔴 認不得的新 code 仍然是「已回價」，不得退回「還沒回價」', (tester) async {
       await pump(
         tester,
-        repoReturning([_row(latestResponseStatus: 'SOMETHING_NEW')]),
+        repoReturning([
+          _row(
+            latestResponseStatus:
+                SellerResponseStatus.SELLER_RESPONSE_STATUS_UNSPECIFIED,
+          ),
+        ]),
       );
       await tester.pumpAndSettle();
 
@@ -295,7 +323,11 @@ void main() {
       await pump(
         tester,
         repoReturning([
-          _row(publicationId: 'pub-1', latestResponseStatus: 'ACTIVE'),
+          _row(
+            publicationId: 'pub-1',
+            latestResponseStatus:
+                SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE,
+          ),
           _row(publicationId: 'pub-2', hasDraft: true),
           _row(publicationId: 'pub-3'),
         ]),
@@ -309,8 +341,16 @@ void main() {
       await pump(
         tester,
         repoReturning([
-          _row(publicationId: 'pub-1', latestResponseStatus: 'ACTIVE'),
-          _row(publicationId: 'pub-2', latestResponseStatus: 'WITHDRAWN'),
+          _row(
+            publicationId: 'pub-1',
+            latestResponseStatus:
+                SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE,
+          ),
+          _row(
+            publicationId: 'pub-2',
+            latestResponseStatus:
+                SellerResponseStatus.SELLER_RESPONSE_STATUS_WITHDRAWN,
+          ),
         ]),
       );
       await tester.pumpAndSettle();

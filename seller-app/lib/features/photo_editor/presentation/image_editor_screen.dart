@@ -148,8 +148,8 @@ class _ImageEditorScreenState extends ConsumerState<ImageEditorScreen> {
     setState(() {
       _apiStyles = resp.styles;
       _defaultPrompt = resp.defaultPrompt;
-      _aiUsageCount = int.tryParse(resp.weeklyUsage) ?? 0;
-      _aiMaxUsage = int.tryParse(resp.weeklyLimit) ?? 10;
+      _aiUsageCount = resp.weeklyUsage;
+      _aiMaxUsage = resp.weeklyLimit;
     });
   }
 

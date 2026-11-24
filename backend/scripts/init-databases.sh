@@ -88,7 +88,6 @@ DATABASES=(
   "hawkr"
   "hawkr_seller"
   "hawkr_shipping"
-  "hawkr_ai"
   "hawkr_payment"
   "hawkr_aftersales"
   "hawkr_order"

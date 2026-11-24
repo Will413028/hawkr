@@ -5,6 +5,22 @@
 		"loading": "處理中…",
 		"memberFallback": "會員"
 	},
+	"procurementAssistant": {
+		"candidateSearchLabel": "搜尋候選",
+		"candidateSearchPlaceholder": "搜尋候選或條件",
+		"candidateTableLabel": "候選資料",
+		"candidateNoMatch": "沒有符合篩選的候選",
+		"searchProgressTitle": "搜尋候選供應商",
+		"missingSellerFacingHash": "這個畫面沒有取得詢價內容的比對權杖，接受請求一定會被伺服器拒絕。請回到詢價流程重新載入。",
+		"priceConfirmedNext": "價格已確認，接著確認要發給誰",
+		"recipientsNotFixed": "正式發布時才會固定邀請對象。",
+		"snapshotApprovalHint": "確認後會以這一版需求與希望區間準備發布核准。",
+		"sellerCount": "賣家 {count} 家",
+		"demoFlag": "買家那半全部是真的：需求、收件名單，出價區間也真的送去伺服器試算。賣家那半是本機狀態，不會送出、不會通知任何人。",
+		"demoFinalizeFailed": "定稿失敗。多半是這份需求版本已經變了。重新整理再試。",
+		"demoPriceHelp": "理想價是你希望成交的單價；可接受區間是你願意讓步的範圍。定稿時區間會送進伺服器做價格試算，試算不會寫入任何資料。",
+		"demoBoundary": "按下去只會呼叫價格試算，不寫入任何資料，也不會通知任何賣家——發布詢價是發布核准的事，本 demo 不呼叫。"
+	},
 	"validation": {
 		"required": "此欄位必填",
 		"invalidEmail": "請輸入有效的電子郵件"

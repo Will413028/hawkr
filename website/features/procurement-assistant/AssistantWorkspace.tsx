@@ -3,8 +3,8 @@
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Drawer } from "@/components/shared/Drawer";
-import { Button, Chip } from "@/components/ui";
-import type { ProcurementCandidate } from "@/lib/api/openapi-types";
+import { Button } from "@/components/ui";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import { useKeyboardInset } from "@/lib/hooks/useKeyboardInset";
 import Link from "@/lib/intl/native-link";
@@ -16,7 +16,6 @@ import AgentTaskPanel from "./AgentTaskPanel";
 import { activityLabel, lastRunningActivity } from "./activity";
 import { deriveMotionState } from "./agent-motion";
 import { validateFreeTextAnswer } from "./answer-validation";
-import { LANE_LABEL } from "./CandidateBrowser";
 import CandidateCanvas from "./CandidateCanvas";
 import { AGENT_CAPABILITIES_OFF, type AgentCapabilities } from "./capabilities";
 import { ENTRY_COMPOSER_PLACEHOLDER } from "./entry-content";
@@ -81,16 +80,6 @@ function LoadingShell() {
 function CandidateDetail({ candidate }: { candidate: ProcurementCandidate }) {
 	return (
 		<div className="assistant-candidate-detail">
-			<div className="assistant-candidate-detail__status">
-				<Chip
-					variant="flat"
-					color={candidate.lane === "PLATFORM" ? "primary" : "warning"}
-					size="sm"
-				>
-					{LANE_LABEL[candidate.lane]}
-				</Chip>
-				<span>比對分數 {candidate.score}</span>
-			</div>
 			<section>
 				<h3>已確認</h3>
 				{candidate.matchedFacts.length > 0 ? (
@@ -369,8 +358,7 @@ export default function AssistantWorkspace({
 	};
 
 	const candidateTotal = session.candidateSet
-		? session.candidateSet.candidates.platform.length +
-			session.candidateSet.candidates.external.length
+		? session.candidateSet.candidates.length
 		: 0;
 
 	const questionNeedsUnitPick = questionHasUnitOptions(session.question);
@@ -587,13 +575,6 @@ export default function AssistantWorkspace({
 				}}
 			>
 				<ul className="thread-page__list">
-					{}
-					{process.env.NODE_ENV !== "production" && session.streamFallback ? (
-						<li className="thread-page__notice" role="status">
-							思考步驟未即時顯示：{session.streamFallback}（僅開發環境提示）
-						</li>
-					) : null}
-
 					<ProcurementClarifyChat
 						turns={session.turns}
 						restoredSummary={session.restoredSummary}
@@ -614,12 +595,6 @@ export default function AssistantWorkspace({
 							/>
 						}
 						question={canClarify ? session.question : null}
-						cropDisambiguation={session.cropDisambiguation}
-						onChooseCropDisambiguation={
-							session.pendingInterrupt
-								? (option) => void session.resume({ optionId: option.optionId })
-								: undefined
-						}
 						onPickOption={(option) => void session.submitAnswer(option)}
 						onSubmitFreeText={({ slotKey, freeText }) =>
 							void session.submitAnswer({ slotKey, freeText })
@@ -770,7 +745,6 @@ export default function AssistantWorkspace({
 						onInteractionLockChange={setResultInteractionLocked}
 						headingRef={candidateHeadingRef}
 						onPreviewRfqPrice={session.previewRfqPrice}
-						onConfirmRfqSnapshot={session.confirmRfqSnapshot}
 						onPreviewRfqPublication={session.previewRfqPublication}
 						onExecuteRfqPublication={session.executeRfqPublication}
 						onRefreshSnapshot={session.refreshCurrentSnapshot}

@@ -259,6 +259,72 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'加入名單（{count}）'**
   String customerPickerAdd(int count);
+
+  /// Helper text under the response type heading of the quote form.
+  ///
+  /// In zh, this message translates to:
+  /// **'兩種回應都要填完整的計價基準與金額——「接受非價格條款」不是少填金額的捷徑。'**
+  String get quoteResponseTypeHelp;
+
+  /// Section title of the optional specification note on the quote form.
+  ///
+  /// In zh, this message translates to:
+  /// **'規格說明（選填）'**
+  String get quoteSpecNoteTitle;
+
+  /// Helper text under the specification note title.
+  ///
+  /// In zh, this message translates to:
+  /// **'這一欄只能由你自己填寫，最多 1000 字。'**
+  String get quoteSpecNoteHelp;
+
+  /// Label of the specification note field.
+  ///
+  /// In zh, this message translates to:
+  /// **'規格說明'**
+  String get quoteSpecNoteLabel;
+
+  /// Hint inside the specification note field.
+  ///
+  /// In zh, this message translates to:
+  /// **'例如：產地、等級、包裝方式、驗收條件'**
+  String get quoteSpecNoteHint;
+
+  /// Currency caption of the amounts card on the quote form.
+  ///
+  /// In zh, this message translates to:
+  /// **'幣別 TWD'**
+  String get quoteCurrencyTwd;
+
+  /// Status of the latest seller quote version: in force.
+  ///
+  /// In zh, this message translates to:
+  /// **'有效'**
+  String get quoteStatusActive;
+
+  /// Status of a seller quote version replaced by a newer version.
+  ///
+  /// In zh, this message translates to:
+  /// **'已被改版取代'**
+  String get quoteStatusSuperseded;
+
+  /// Status of a seller quote version the seller withdrew.
+  ///
+  /// In zh, this message translates to:
+  /// **'已撤回'**
+  String get quoteStatusWithdrawn;
+
+  /// Status of a seller quote version past its validity.
+  ///
+  /// In zh, this message translates to:
+  /// **'已逾有效期'**
+  String get quoteStatusExpired;
+
+  /// Validation error for an amount that is not a non-negative whole number.
+  ///
+  /// In zh, this message translates to:
+  /// **'{label}只能是非負整數（新台幣元），例如 1200'**
+  String quoteAmountNotWholeNumber(String label);
 }
 
 class _AppLocalizationsDelegate

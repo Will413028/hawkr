@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart'
+    show SellerResponseStatus;
 import '../../../core/router/app_router.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/hk_tokens.dart';
@@ -35,7 +38,10 @@ class SellerPublicationListScreen extends ConsumerWidget {
         child: asyncRows.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _LoadFailure(
-            message: error is Exception ? '$error' : '載入詢價清單失敗',
+            message: errorText(
+              error,
+              defaults: ref.read(defaultErrorTextProvider),
+            ),
             onRetry: () => ref.invalidate(sellerPublicationListProvider),
           ),
           data: (rows) => _PublicationList(
@@ -228,33 +234,29 @@ class _ResponseStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, tone, icon) = switch (row.latestResponseStatusValue) {
-      ProcurementSellerResponseStatus.active => (
+    final (label, tone, icon) = switch (row.latestResponseStatus) {
+      SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE => (
         '已回價',
         HkStatusTone.success,
         HkIconName.check,
       ),
-      ProcurementSellerResponseStatus.superseded => (
+      SellerResponseStatus.SELLER_RESPONSE_STATUS_SUPERSEDED => (
         '已被新版取代',
         HkStatusTone.neutral,
         HkIconName.swap,
       ),
-      ProcurementSellerResponseStatus.withdrawn => (
+      SellerResponseStatus.SELLER_RESPONSE_STATUS_WITHDRAWN => (
         '已撤回',
         HkStatusTone.neutral,
         HkIconName.block,
       ),
-      ProcurementSellerResponseStatus.expired => (
+      SellerResponseStatus.SELLER_RESPONSE_STATUS_EXPIRED => (
         '報價已過期',
         HkStatusTone.warning,
         HkIconName.clock,
       ),
-      null when row.hasSubmittedResponse => (
-        '已回價（請更新 App 看狀態）',
-        HkStatusTone.info,
-        HkIconName.info,
-      ),
       null => ('還沒回價', HkStatusTone.info, HkIconName.edit),
+      _ => ('已回價（請更新 App 看狀態）', HkStatusTone.info, HkIconName.info),
     };
 
     return HkStatusBadge(

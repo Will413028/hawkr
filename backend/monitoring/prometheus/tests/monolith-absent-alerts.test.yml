@@ -1,0 +1,30 @@
+# 單體存活告警 ProdMonolithAbsent。
+# 反面案例：up 存在（即使為 0）時 absent() 為空，不得觸發。
+rule_files:
+  - ../rules/service-alerts.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="hawkr", env="prod"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: ProdMonolithAbsent
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'up{job="gateway", env="prod"}'
+        values: '1+0x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ProdMonolithAbsent
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: ProdMonolithAbsent
+        exp_alerts:
+          - exp_labels: {job: hawkr, env: prod, severity: critical}
+            exp_annotations:
+              summary: "Prod 單體（job=hawkr）完全消失（無任何 up series）"
+              description: "job=hawkr(env=prod) 已 5 分鐘沒有任何 up series（所有 pod 消失或 Prometheus 抓不到 target）。"

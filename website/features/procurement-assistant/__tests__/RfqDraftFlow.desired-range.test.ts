@@ -2,18 +2,22 @@
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderWithoutIntl,
 	screen,
 	waitFor,
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import RfqDraftFlow from "../RfqDraftFlow";
 import type {
 	RfqCommandResult,
 	RfqPricePreview,
 	RfqPricePreviewCommand,
 } from "../rfq-price-contract";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 afterEach(cleanup);
 
@@ -31,10 +35,7 @@ const baseSlots = {
 const candidates = [
 	{
 		candidateId: "seller-green",
-		sourceId: "product-green",
-		lane: "PLATFORM" as const,
 		displayName: "範例鮮果合作社",
-		score: 94,
 		matchedFacts: [],
 		unverifiableFacts: [],
 		factsAsOf: "2026-08-14T12:00:00Z",
@@ -46,18 +47,13 @@ function preview(
 	overrides: Partial<RfqPricePreview["buyerRequestedRange"]> = {},
 ): RfqPricePreview {
 	return {
-		pricePreviewId: "1",
-		version: "1",
 		buyerRequestedRange: {
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "58",
 			upperBoundAmount: "70",
 			basisQuantity: "1",
 			basisUnit: "KG",
 			...overrides,
 		},
-		payloadHash: "a".repeat(64),
 		quoteTotalRange: null,
 	};
 }
@@ -84,7 +80,6 @@ async function renderAtStep2(
 			onBackToCandidates: () => {},
 			onReturnToConversation: () => {},
 			onPreviewRfqPrice,
-			onConfirmRfqSnapshot: vi.fn(),
 			onPreviewRfqPublication: vi.fn(),
 			onExecuteRfqPublication: vi.fn(async () => {
 				throw new Error("這個測試不應該送出發布");
@@ -151,8 +146,6 @@ describe("RfqDraftFlow — 希望詢價區間", () => {
 
 		await waitFor(() => expect(calls.length).toBe(1));
 		expect(calls[0].buyerRequestedRange).toEqual({
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "60",
 			upperBoundAmount: "75",
 		});

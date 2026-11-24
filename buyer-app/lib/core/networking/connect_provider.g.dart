@@ -775,6 +775,59 @@ final class ChatAppClientProvider
 
 String _$chatAppClientHash() => r'82a8a1be2af41db22b2bd53d0758cc34b233d64d';
 
+/// 買家的 AI 助理（`AssistantAppService`）：送出訊息、觀看一輪的回覆串流（每條最長 100 秒，client 以 cursor 接續）、最近的對話。
+
+@ProviderFor(assistantAppClient)
+final assistantAppClientProvider = AssistantAppClientProvider._();
+
+/// 買家的 AI 助理（`AssistantAppService`）：送出訊息、觀看一輪的回覆串流（每條最長 100 秒，client 以 cursor 接續）、最近的對話。
+
+final class AssistantAppClientProvider
+    extends
+        $FunctionalProvider<
+          AssistantAppServiceClient,
+          AssistantAppServiceClient,
+          AssistantAppServiceClient
+        >
+    with $Provider<AssistantAppServiceClient> {
+  /// 買家的 AI 助理（`AssistantAppService`）：送出訊息、觀看一輪的回覆串流（每條最長 100 秒，client 以 cursor 接續）、最近的對話。
+  AssistantAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'assistantAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$assistantAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<AssistantAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  AssistantAppServiceClient create(Ref ref) {
+    return assistantAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(AssistantAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<AssistantAppServiceClient>(value),
+    );
+  }
+}
+
+String _$assistantAppClientHash() =>
+    r'c05ce6ea7362735897b75882017bde20bcdc0697';
+
 /// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
 
 @ProviderFor(notificationAppClient)

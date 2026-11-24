@@ -110,54 +110,6 @@ var exemptExact = map[string]struct{}{
 }
 
 // exemptPrefixes are route trees never rate limited.
-//
-// ⚠️ The three AI groups — /app/sellers/me/assistant/, /app/buyers/me/assistant/
-// and /app/buyers/me/procurement/ — used to be here and are deliberately GONE
-// (#2505). They are now ordinary tierDefault routes, classified one route at a
-// time by classifyTier's fallthrough and pinned by
-// TestAIRoutesAreNotRateLimitExempt.
-//
-// Why they were here: "a prefix keeps every stream covered without enumerating
-// each one (and missing a new one)". The cost of that convenience was never
-// paid by the streams — it was paid by everything else under the same prefix.
-// Of the 31 routes under these three trees only 13 are actual SSE streams; the
-// other 18 are short-lived unary/JSON/CRUD (the synchronous /turns, product
-// autofill, session lookup, snapshot, candidate-search create + poll, selection,
-// answer, rewind, crop disambiguation, three quote-batch endpoints, four
-// conversation endpoints), and a prefix rule handed every one of them an
-// unlimited per-subject budget.
-//
-// Why the exemption rationale does not transfer: exemptExact exists for
-// connections that RECONNECT — a notification SSE or the IM WebSocket drops and
-// the client immediately dials again, so a per-request counter sees a storm
-// where there is one logical session. No AI consumer does that. All three
-// clients issue exactly one request per user turn and never redial it: the
-// website is a one-shot fetch with no EventSource and no Last-Event-ID
-// (lib/ai-chat/stream-client.ts), and both Flutter apps are a single
-// dio.post(responseType: ResponseType.stream) whose non-200 branch surfaces an
-// error and closes the controller, with no retry interceptor registered
-// anywhere (ai_assistant_repository.dart in each app). One turn is one request,
-// so a request counter models these correctly.
-//
-// The precedent is already written down: the app-version check endpoint is
-// not exempt either (/public/app-version-gate) on the grounds that 「豁免等於開一個匿名可無限打 DB
-// 的端點——用一個更大的洞換一個較小的洞」. Same trade, larger stakes here, since
-// the endpoint behind it bills a paid model rather than a DB read.
-//
-// ⚠️ What this does NOT buy — do not read tierDefault as cost control. It is a
-// per-subject REQUEST counter, and the subject is an address (RateLimitSubject),
-// not an account. It bounds turn RATE; it does not bound concurrent streams,
-// model tokens, tool calls or spend, and a subject may hold many 120s streams
-// while spending very few requests. Those axes are #2505's remaining acceptance
-// criteria and are owned elsewhere: the per-account meter is 57 號 §7 (100
-// answers/account/month, keyed on quota_account_id, deducted in the same
-// transaction as the durable turn result), and the per-turn ceiling that DOES
-// exist today is proxy.streamTurnDeadline (120s, propagated to ai-service over
-// the gRPC deadline).
-//
-// No new quota number is introduced here on purpose. 01 號 §3.2.6 forbids
-// shipping an invented ceiling (「不得先猜一個數字上線」); these routes join the
-// existing, measured tierDefault bucket instead of a hand-picked AI tier.
 var exemptPrefixes = []string{
 	"/.well-known/",
 }

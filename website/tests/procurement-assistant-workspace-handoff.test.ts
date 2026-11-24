@@ -116,8 +116,7 @@ test("REQUIREMENT_READY 以真實 candidate-search 任務卡交接，不再只�
 		/session\.stage === "ready" &&\s*!session\.question &&\s*!isProcessing &&\s*!session\.pendingInterrupt \? \(\s*<AgentTaskCard/,
 	);
 	assert.match(taskCard, /搜尋候選供應商/);
-	assert.match(taskCard, /平台賣家/);
-	assert.match(taskCard, /外部業者/);
+	assert.doesNotMatch(taskCard, /外部業者/);
 	assert.match(taskCard, /只整理候選，不會替你下單/);
 	assert.match(taskCard, /isLoading=\{assigning\}/);
 });

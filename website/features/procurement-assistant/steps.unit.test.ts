@@ -1,10 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { create } from "@bufbuild/protobuf";
 import {
+	StepSchema,
+	StepStatus,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import { describe, expect, it } from "vitest";
+import { stepFromProto } from "./proto-map";
+import {
+	type AgentStep,
 	isPublicAgentStepCode,
-	normalizeSteps,
+	mergeLiveStep,
 	stepIcon,
 	stepLabel,
 } from "./steps";
+
+const fromWire = (code: string, extra: Record<string, unknown> = {}) =>
+	stepFromProto(
+		create(StepSchema, { code, status: StepStatus.SUCCEEDED, ...extra }),
+	);
 
 /**
  * 2026-09-03：後端 StepNarrator 的敘述（step.text）開始隨 steps[] 一起送來，
@@ -45,24 +57,39 @@ describe("stepLabel：後端敘述優先，缺席時退回固定短句", () => {
 	});
 });
 
-describe("normalizeSteps：text 的取值與清理", () => {
-	const wire = (extra: Record<string, unknown>) => [
-		{ code: "VALIDATE_SLOTS", status: "SUCCEEDED", ...extra },
-	];
+describe("stepFromProto：text 的取值與清理", () => {
+	const wire = (text: string) => fromWire("VALIDATE_SLOTS", { text });
 
 	it("帶回 text 並去除前後空白", () => {
-		expect(normalizeSteps(wire({ text: "  甘藍條件有效。  " }))[0].text).toBe(
-			"甘藍條件有效。",
-		);
+		expect(wire("  甘藍條件有效。  ")?.text).toBe("甘藍條件有效。");
 	});
 
 	it("空字串／全空白視為沒有敘述（讓 stepLabel 走退路，不顯示空行）", () => {
-		expect(normalizeSteps(wire({ text: "   " }))[0].text).toBeUndefined();
-		expect(normalizeSteps(wire({ text: "" }))[0].text).toBeUndefined();
+		expect(wire("   ")?.text).toBeUndefined();
+		expect(wire("")?.text).toBeUndefined();
 	});
 
-	it("非字串的 text 一律丟棄", () => {
-		expect(normalizeSteps(wire({ text: 42 }))[0].text).toBeUndefined();
+	it("未知的步驟碼與沒有畫面狀態的 status 不顯示", () => {
+		expect(fromWire("NOT_A_STEP")).toBeNull();
+		expect(
+			fromWire("VALIDATE_SLOTS", { status: StepStatus.CANCELLED }),
+		).toBeNull();
+		expect(
+			fromWire("VALIDATE_SLOTS", { status: StepStatus.UNSPECIFIED }),
+		).toBeNull();
+	});
+
+	it("伺服器的 label 不採用，WAITING_FOR_INPUT 當進行中，耗時與 safeArgs 帶過來", () => {
+		const step = fromWire("VALIDATE_SLOTS", {
+			label: "伺服器的字",
+			status: StepStatus.WAITING_FOR_INPUT,
+			durationMs: BigInt(125),
+			safeArgs: { item: "高麗菜" },
+		});
+		expect(step?.label).toBeUndefined();
+		expect(step?.status).toBe("RUNNING");
+		expect(step?.durationMs).toBe(125);
+		expect(step?.safeArgs).toEqual({ item: "高麗菜" });
 	});
 });
 
@@ -76,20 +103,15 @@ describe("stepIcon", () => {
 /**
  * 2026-09-03：後端開始在 steps[] 送出 CROP_GATE（品項分類判定）。這一碼以前
  * 只走即時 Activity 事件、不進持久化的 steps[]，因此不在本檔的兩張表裡——而
- * normalizeSteps 是 deny-by-default，漏列不會報錯、只會讓這一碼被整個丟掉。
+ * stepFromProto 是 deny-by-default，漏列不會報錯、只會讓這一碼被整個丟掉。
  * 這組測試就是釘住「兩張表都補齊了」。
  */
 describe("CROP_GATE：新接進 steps[] 的品項分類判定", () => {
-	it("通過白名單，不被 normalizeSteps 丟掉", () => {
-		const steps = normalizeSteps([
-			{
-				code: "CROP_GATE",
-				status: "SUCCEEDED",
-				text: "品項「高麗菜」的分類判斷已完成。",
-			},
-		]);
-		expect(steps).toHaveLength(1);
-		expect(steps[0].code).toBe("CROP_GATE");
+	it("通過白名單，不被 stepFromProto 丟掉", () => {
+		const step = fromWire("CROP_GATE", {
+			text: "品項「高麗菜」的分類判斷已完成。",
+		});
+		expect(step?.code).toBe("CROP_GATE");
 	});
 
 	it("有後端敘述時顯示敘述，缺席時退回固定短句", () => {
@@ -112,14 +134,14 @@ describe("CROP_GATE：新接進 steps[] 的品項分類判定", () => {
 
 // T23 為候選搜尋階段新增了父列碼 SEARCH_CANDIDATES（backend domain/steps.go），
 // 同一批把 FAILED 移出 code 軸（失敗只住 status 軸，T23 D3）。前端這兩張表當時
-// 沒跟上：SEARCH_CANDIDATES 不在白名單 ⇒ normalizeSteps 靜默丟掉整列；不在
+// 沒跟上：SEARCH_CANDIDATES 不在白名單 ⇒ stepFromProto 靜默丟掉整列；不在
 // STEP_ICON ⇒ 設計稿 01 的「搜尋候選供應商」父列拿到 clock 退化圖示。
 describe("T23 對 step 碼表的增刪", () => {
-	it("SEARCH_CANDIDATES 是公開碼，不會被 normalizeSteps 丟掉", () => {
+	it("SEARCH_CANDIDATES 是公開碼，不會被 stepFromProto 丟掉", () => {
 		expect(isPublicAgentStepCode("SEARCH_CANDIDATES")).toBe(true);
 		expect(
-			normalizeSteps([{ code: "SEARCH_CANDIDATES", status: "RUNNING" }]),
-		).toHaveLength(1);
+			fromWire("SEARCH_CANDIDATES", { status: StepStatus.RUNNING }),
+		).not.toBeNull();
 	});
 
 	it("SEARCH_CANDIDATES 有自己的圖示，不落到 clock 退化", () => {
@@ -128,5 +150,75 @@ describe("T23 對 step 碼表的增刪", () => {
 
 	it("FAILED 不再是 code 軸的成員——失敗只住 status 軸", () => {
 		expect(isPublicAgentStepCode("FAILED")).toBe(false);
+	});
+});
+
+describe("mergeLiveStep", () => {
+	it("相同 status/duration 是語意 no-op，沿用原 array reference", () => {
+		const steps: AgentStep[] = [
+			{ code: "UNDERSTAND_INPUT", status: "RUNNING" },
+		];
+		const merged = mergeLiveStep(steps, {
+			code: "UNDERSTAND_INPUT",
+			status: "RUNNING",
+		});
+
+		expect(merged).toBe(steps);
+	});
+
+	it("相同 RUNNING status 補上 StepNarrator text 時會更新原列", () => {
+		const steps: AgentStep[] = [
+			{ code: "UNDERSTAND_INPUT", status: "RUNNING" },
+		];
+		const merged = mergeLiveStep(steps, {
+			code: "UNDERSTAND_INPUT",
+			status: "RUNNING",
+			text: "已讀懂這一輪的珍珠芭樂需求",
+		});
+
+		expect(merged).not.toBe(steps);
+		expect(stepLabel(merged[0])).toBe("已讀懂這一輪的珍珠芭樂需求");
+	});
+
+	it("SUCCEEDED 後的 RUNNING heartbeat 不退回進行中、不清完成內容，且是 no-op", () => {
+		const steps: AgentStep[] = [
+			{
+				code: "UNDERSTAND_INPUT",
+				status: "SUCCEEDED",
+				durationMs: 125,
+				text: "已完成需求理解",
+			},
+		];
+		const merged = mergeLiveStep(steps, {
+			code: "UNDERSTAND_INPUT",
+			status: "RUNNING",
+			text: "遲到的執行中文案",
+		});
+
+		expect(merged).toBe(steps);
+		expect(merged[0]).toEqual({
+			code: "UNDERSTAND_INPUT",
+			status: "SUCCEEDED",
+			durationMs: 125,
+			text: "已完成需求理解",
+		});
+	});
+
+	it("RUNNING → SUCCEEDED 會改變 UI，不能算 duplicate", () => {
+		const steps: AgentStep[] = [
+			{ code: "UNDERSTAND_INPUT", status: "RUNNING" },
+		];
+		const merged = mergeLiveStep(steps, {
+			code: "UNDERSTAND_INPUT",
+			status: "SUCCEEDED",
+			durationMs: 125,
+		});
+
+		expect(merged).not.toBe(steps);
+		expect(merged[0]).toEqual({
+			code: "UNDERSTAND_INPUT",
+			status: "SUCCEEDED",
+			durationMs: 125,
+		});
 	});
 });

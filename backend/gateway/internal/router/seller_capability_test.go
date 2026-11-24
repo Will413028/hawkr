@@ -49,27 +49,8 @@ var expectedSellerRoutes = []routeCap{
 	{"GET", "/api/v1/app/seller/after_sales/:case_no/arbitration", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/seller/after_sales/:case_no/confirm_receipt", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/seller/after_sales/:case_no/resolve", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/sellers/me/assistant/chat", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/assistant/inventory", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/assistant/orders", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/assistant/payment", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/assistant/product-autofill", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/assistant/product-listing/chat", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/assistant/sessions/latest", authz.CapMarketing},
 	{"GET", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
 	{"PUT", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
-	// Hawkr 幫找 — 賣家確認報價單邀請（doc 55 §5/§7）。承接一筆新生意＝擴張型操作，
-	// 停權賣家不該做得到，所以是 BLOCK 類的 CAP_MARKETING，不是白名單的
-	// CAP_ORDER_CONTRACT（那是「收縮型」，例如取消出貨）。同一個 AI 採購功能的賣家
-	// 面（sellers/me/assistant 整組）本來就掛 CAP_MARKETING。
-	// #2538 賣家回價：與上一列同一個 capability，理由同 routes_procurement_quote.go
-	// 的群組註解——CapMarketing 不在停權白名單，停權賣家送不出正式回價。
-	{"GET", "/api/v1/app/sellers/me/procurement/publications", authz.CapMarketing},
-	{"GET", "/api/v1/app/sellers/me/procurement/publications/:publication_id", authz.CapMarketing},
-	{"PUT", "/api/v1/app/sellers/me/procurement/publications/:publication_id/response-draft", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/procurement/publications/:publication_id/seller-responses", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/procurement/publications/:publication_id/seller-responses/:seller_response_id/withdraw", authz.CapMarketing},
-	{"POST", "/api/v1/app/sellers/me/procurement/publications/:publication_id/decline", authz.CapMarketing},
 	// 賣家市場行情查詢（P6+P7+#2786 categoryId 解析）：8/2 原裁決是唯讀市場資訊、
 	// 非賣家專屬資料，只掛 JWTAuth 不掛 capability——2026-08-27 推翻，改採「其餘
 	// 全鎖含純唯讀查看」原則（46 §3.4 dashboard/CRM 查詢/報表同款裁決）收斂進

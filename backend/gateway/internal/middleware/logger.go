@@ -166,7 +166,7 @@ func isSensitiveKey(normalized string) bool {
 // Whole-branch review for #2506 (fix wave, 2026-08-21) removed "name" and
 // "message" from this map after that pass caught two real leaks the
 // per-task reviews couldn't see: admin_delegated_order.go's
-// DelegatedRecipientContact.Name (a real recipient's name) and ai.go's
+// DelegatedRecipientContact.Name (a real recipient's name) and the
 // buyer/seller AI-assistant request bodies (free-text user prompts under
 // json:"message") — both are exactly the shape this allowlist's own
 // construction rule excludes.

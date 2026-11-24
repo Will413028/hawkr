@@ -45,7 +45,7 @@ test("掛載時同步讀快取，命中就不進骨架態", () => {
 	// 純函式，同步讀 cache，兩份都要有才算命中。
 	assert.match(session, /function readCachedRestore\(/);
 	assert.match(session, /queryClient\.getQueryData<AgentTranscript>\(/);
-	assert.match(session, /queryClient\.getQueryData<RawSnapshot>\(/);
+	assert.match(session, /queryClient\.getQueryData<ProcurementSnapshot>\(/);
 	assert.match(session, /if \(!snapshot\) return null;/);
 	// state 的 lazy initializer 直接套用 → 第一個 frame 就有內容。
 	assert.match(session, /const cached = readCachedRestore\(/);
@@ -59,11 +59,11 @@ test("掛載時同步讀快取，命中就不進骨架態", () => {
 
 test("同步路徑與 effect 路徑共用同一支組裝函式（不得各寫一份）", () => {
 	assert.match(session, /function restoredStateFrom\(/);
-	// 兩個呼叫點：readCachedRestore 與還原 effect。
+	// 三個呼叫點：readCachedRestore、還原 effect、cursor 過期後的重建。
 	assert.equal(
 		(session.match(/restoredStateFrom\(/g) ?? []).length,
-		3,
-		"應為 1 個定義 + 2 個呼叫點",
+		4,
+		"應為 1 個定義 + 3 個呼叫點",
 	);
 });
 

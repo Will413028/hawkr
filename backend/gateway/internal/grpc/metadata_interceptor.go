@@ -3,9 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	"github.com/Will413028/hawkr/go-pkg/identity"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -25,12 +23,6 @@ const (
 	CtxKeyTraceID contextKey = "auth-trace-id"
 	// CtxKeyRequestID 請求 ID（string）
 	CtxKeyRequestID contextKey = "auth-request-id"
-	// CtxKeyBuyerID 買家 ID（identity.BuyerID）。僅 AIAssistantService 目前使用，
-	// 由呼叫端（AI-assistant 買家路由 handler）依路由前綴解析出的 domain id 明確設定，
-	// 不是 auth middleware 全域塞入（跟 CtxKeyAccountID 不同，這不是登入 principal）。
-	CtxKeyBuyerID contextKey = "auth-buyer-id"
-	// CtxKeyStoreID 賣家 store ID（identity.StoreID）。用法同 CtxKeyBuyerID。
-	CtxKeyStoreID contextKey = "auth-store-id"
 )
 
 // ==================== Context 存取工具 ====================
@@ -58,23 +50,6 @@ func WithTraceContext(ctx context.Context, traceID, requestID string) context.Co
 		ctx = context.WithValue(ctx, CtxKeyRequestID, requestID)
 	}
 	return ctx
-}
-
-// WithBuyerID 將買家 domain ID 存入 outgoing context，AuthMetadataInterceptor 讀到後
-// 轉發 x-buyer-id metadata。呼叫端自行解析 buyer_id 後呼叫本函式，不經過 auth middleware。
-func WithBuyerID(ctx context.Context, buyerID identity.BuyerID) context.Context {
-	if buyerID <= 0 {
-		return ctx
-	}
-	return context.WithValue(ctx, CtxKeyBuyerID, buyerID)
-}
-
-// WithStoreID 將賣家 store domain ID 存入 outgoing context，用法同 WithBuyerID。
-func WithStoreID(ctx context.Context, storeID identity.StoreID) context.Context {
-	if storeID <= 0 {
-		return ctx
-	}
-	return context.WithValue(ctx, CtxKeyStoreID, storeID)
 }
 
 // GenerateRequestID 生成 UUID 格式的 Request ID
@@ -112,14 +87,6 @@ func AuthMetadataInterceptor() grpc.UnaryClientInterceptor {
 		}
 		if requestID, ok := ctx.Value(CtxKeyRequestID).(string); ok && requestID != "" {
 			pairs = append(pairs, "x-request-id", requestID)
-		}
-
-		// 買家/賣家 domain ID（僅 AIAssistantService 目前設定，見 WithBuyerID/WithStoreID）
-		if buyerID, ok := ctx.Value(CtxKeyBuyerID).(identity.BuyerID); ok && buyerID > 0 {
-			pairs = append(pairs, "x-buyer-id", strconv.FormatInt(int64(buyerID), 10))
-		}
-		if storeID, ok := ctx.Value(CtxKeyStoreID).(identity.StoreID); ok && storeID > 0 {
-			pairs = append(pairs, "x-store-id", strconv.FormatInt(int64(storeID), 10))
 		}
 
 		// 合併既有 metadata（保留 OTel 等已設定的 metadata）

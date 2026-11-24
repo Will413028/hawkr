@@ -1,24 +1,49 @@
-import type { Page, Route } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { seedStoredActiveRole, setupGatewayMocks } from "./mock-gateway";
+import {
+	mockProcurementUnaryAbortable,
+	mockWatchRun,
+	turnResultJson,
+	watchFrame,
+} from "./mock-procurement-connect";
 import { gotoStreamed } from "./streamed-navigation";
+
+/**
+ * 「一輪釐清 → 候選搜尋 → 價格試算 → 發布核准 → 發布」的 BuyerProcurementAppService Connect mock。
+ * wire 形狀（proto3 JSON、streaming envelope）見 `mock-procurement-connect.ts`；欄位以
+ * `api/hawkr/procurement/v1alpha1/procurement.proto` 為準。沒有確認快照這一步的方法（A9-D35）。
+ */
 
 export const RFQ_PATH = "/account/messages/assistant/demo";
 export const RFQ_REQUEST_ID = "1234567890123456788";
-// ⚠️ 必須是塞得進 signed int64 的正整數字串：runtime-snapshot 的 `idSchema`
-// 會擋掉超出範圍的值，整份快照因此讀不到（發布結果連帶消失）。
 export const RFQ_CONVERSATION_ID = "1234567890123456790";
 export const RFQ_REVISION_ID = "1234567890123456791";
+/** 候選搜尋的 run。 */
 export const RFQ_RUN_ID = "1234567890123456800";
-export const RFQ_PREVIEW_ID = "1234567890123456801";
-export const RFQ_CONFIRMED_ID = "1234567890123456802";
-export const RFQ_PREVIEW_HASH = "a".repeat(64);
-export const RFQ_CONFIRMED_HASH = "b".repeat(64);
+/** 送出需求那一輪的 run。 */
+export const RFQ_TURN_RUN_ID = "1234567890123456799";
+export const RFQ_CANDIDATE_SET_ID = "candidate-set-e2e";
 export const RFQ_APPROVAL_ID = "1234567890123456803";
 export const RFQ_PUBLICATION_ID = "1234567890123456804";
 export const RFQ_AUDIENCE_HASH = "c".repeat(64);
 export const RFQ_SELLER_PAYLOAD_HASH = "d".repeat(64);
 
+export const RFQ_IDS = {
+	requestId: RFQ_REQUEST_ID,
+	conversationId: RFQ_CONVERSATION_ID,
+	revisionId: RFQ_REVISION_ID,
+};
+
+const RFQ_SLOTS = {
+	item: "珍珠芭樂",
+	quantity: 50,
+	unit: "KG",
+	deliveryCity: "桃園市",
+	deliveryDate: { year: 2026, month: 9, day: 1 },
+};
+
+/** `PreviewRfqPriceResponse`。 */
 export function pricePreviewData(
 	overrides: {
 		// 重新試算時 command 帶的是買家剛編輯的區間，不再是預設的 30／42——
@@ -31,105 +56,158 @@ export function pricePreviewData(
 	} = {},
 ) {
 	return {
-		pricePreviewId: RFQ_PREVIEW_ID,
-		version: "1",
 		buyerRequestedRange: {
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: overrides.buyerRequestedRange?.lowerBoundAmount ?? "30",
 			upperBoundAmount: overrides.buyerRequestedRange?.upperBoundAmount ?? "42",
-			basisQuantity: "1",
+			basisQuantity: 1,
 			basisUnit: "KG",
 		},
-		payloadHash: RFQ_PREVIEW_HASH,
 		quoteTotalRange: {
-			currency: "TWD",
 			lowerBoundAmount: "15000",
 			upperBoundAmount: "21000",
-			quantity: "500",
+			quantity: 500,
 			quantityUnit: "KG",
 		},
 	};
 }
 
-export interface RfqMockOptions {
-	previewHandler?: (route: Route) => Promise<void> | void;
-	confirmationHandler?: (route: Route) => Promise<void> | void;
-	/** 停在 searching 階段：不等候選資料出現就回傳。搜尋列的 e2e 用。 */
-	stopAtSearching?: boolean;
-	/** GET candidate-searches/{runId} 的處理器。預設立刻回 SUCCEEDED（既有行為）。 */
-	candidateSearchPollHandler?: (route: Route) => Promise<void> | void;
-	publicationPreviewHandler?: (route: Route) => Promise<void> | void;
-	publicationExecuteHandler?: (route: Route) => Promise<void> | void;
-	/** GET runs/{runId}/events 的處理器。預設 503——那是今天 prod 的真實行為
-	 * （capability flag 關著），所以其他 spec 不必知道這個端點就會走降級路徑。 */
-	runEventsHandler?: (route: Route) => Promise<void> | void;
-	/** GET conversations/{id}/runtime-snapshot 的處理器（稿 R-02 三區版面的
-	 * 發布事實來源）。預設帶一筆 `RFQ_PUBLICATION_RESULT`。 */
-	runtimeSnapshotHandler?: (route: Route) => Promise<void> | void;
-	/** GET requests/{id}/seller-responses 的處理器。預設空清單——「0 筆」是一次
-	 * 成功讀取的結論，跟「尚未取得」是兩件事。 */
-	sellerResponsesHandler?: (route: Route) => Promise<void> | void;
-	/** GET requests/{id}/snapshot 的處理器。重整還原那條路徑要靠它注入
-	 * `publishedPublication`。 */
-	snapshotHandler?: (route: Route) => Promise<void> | void;
+/** `Candidate`：沒有 `store.id`，所以候選表走單一候選那一列（checkbox id `procurement-candidate-{id}`）。 */
+export function candidateJson(
+	id: string,
+	name: string,
+	extra: Record<string, unknown> = {},
+) {
+	return {
+		id,
+		store: { name },
+		matchedFacts: [{ slotKey: "SLOT_KEY_ITEM", label: "珍珠芭樂" }],
+		unverifiableFacts: [],
+		factsTime: "2026-08-14T12:00:00Z",
+		selected: false,
+		...extra,
+	};
+}
+
+/** `GetCandidateSearchResponse`。 */
+export function candidateSearchJson(
+	status: "RUNNING" | "SUCCEEDED" | "FAILED",
+	candidates: readonly Record<string, unknown>[] = [],
+	runId: string = RFQ_RUN_ID,
+) {
+	return {
+		requestId: RFQ_REQUEST_ID,
+		runId,
+		candidateSetId: RFQ_CANDIDATE_SET_ID,
+		status: `RUN_STATUS_${status}`,
+		candidates,
+	};
+}
+
+/** `PreviewRfqPublicationResponse`。 */
+export function publicationApprovalJson(
+	overrides: Record<string, unknown> = {},
+) {
+	return {
+		approvalId: RFQ_APPROVAL_ID,
+		approvalVersion: "1",
+		audienceHash: RFQ_AUDIENCE_HASH,
+		sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
+		expireTime: "2026-08-22T12:36:00Z",
+		recipientCount: 1,
+		...overrides,
+	};
+}
+
+/** `ExecuteRfqPublicationResponse`。 */
+export function publicationResultJson(overrides: Record<string, unknown> = {}) {
+	return {
+		publicationId: RFQ_PUBLICATION_ID,
+		publicationVersion: "1",
+		state: "PUBLICATION_STATE_PUBLISHED",
+		audienceHash: RFQ_AUDIENCE_HASH,
+		sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
+		publishTime: "2026-08-22T12:40:00Z",
+		replayed: false,
+		...overrides,
+	};
 }
 
 /**
- * 重整後 snapshot 帶回來的已發布成果。
- *
- * ⛔ 形狀是 2026-09-19 對 dev 實際擷取的（synthetic buyer 走完 turn→resume→
- * price preview→confirmation→candidate search→selection→publication preview→
- * execute，再 GET snapshot），與 Gateway 的 `ProcurementPublishedPublicationDTO`
- * 逐欄一致：**只有這三個鍵**。不要憑印象多加 state／audienceMode——正規化器會
- * 忽略不認得的鍵，測試照樣綠，但 fixture 會被後來的人當成契約。
- *
- * 同一次擷取另外確認：snapshot 的 top-level **沒有 candidateSet**，所以「重整後
- * 只有 publication、沒有候選」不是假設出來的邊界，是唯一可能的形狀。
+ * `PublishedRfq`：`GetSnapshot` 與 `GetRuntimeSnapshot` 的 `publishedRfq`。三個 count 是發布當下的意圖分布。
  */
-export function publishedPublicationSnapshotFact() {
+export function publishedRfqJson(
+	counts: { recipientCount?: number; queuedCount?: number } = {},
+) {
 	return {
 		publicationId: RFQ_PUBLICATION_ID,
 		version: "1",
-		publishedAt: "2026-08-22T12:40:00Z",
+		publishTime: "2026-08-22T12:40:00Z",
+		recipientCount: counts.recipientCount ?? 1,
+		queuedCount: counts.queuedCount ?? 1,
+		sellerFacingHash: RFQ_SELLER_PAYLOAD_HASH,
 	};
 }
 
-/** 稿 R-02 三區版面讀到的發布結果 artifact。三個 count 是發布當下的意圖分布。 */
-export function publicationResultArtifact(
-	counts: {
-		recipientCount?: number;
-		queuedCount?: number;
-		notSentCount?: number;
-	} = {},
-) {
+/** `GetSnapshotResponse`：需求已整理好、可以開始搜尋。 */
+export function snapshotReadyJson(extra: Record<string, unknown> = {}) {
 	return {
-		artifactId: "1234567890123456810",
-		runId: RFQ_RUN_ID,
-		artifactType: "RFQ_PUBLICATION_RESULT",
-		version: "3",
-		status: "READY",
-		data: {
-			publicationId: RFQ_PUBLICATION_ID,
-			version: "1",
-			sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
-			recipientCount: counts.recipientCount ?? 1,
-			queuedCount: counts.queuedCount ?? 1,
-			notSentCount: counts.notSentCount ?? 0,
-		},
-		checksum: "e".repeat(64),
-		domainRefType: "",
-		domainRefId: "",
-		asOf: "",
-		createdAt: "2026-08-22T12:40:00Z",
+		requestId: RFQ_REQUEST_ID,
+		revisionId: RFQ_REVISION_ID,
+		status: "REQUEST_STATUS_REQUIREMENT_READY",
+		slots: RFQ_SLOTS,
+		missingRequired: [],
+		runs: [],
+		activeRunId: "",
+		...extra,
 	};
+}
+
+/** `GetRuntimeSnapshotResponse`：預設帶一筆已發布的結果（R-02 三區版面的事實來源）。 */
+export function runtimeSnapshotJson(extra: Record<string, unknown> = {}) {
+	return {
+		conversationId: RFQ_CONVERSATION_ID,
+		requestId: RFQ_REQUEST_ID,
+		status: "REQUEST_STATUS_MATCHING",
+		title: "珍珠芭樂 50 KG",
+		messages: [],
+		runs: [],
+		activeRunId: "",
+		publishedRfq: publishedRfqJson(),
+		...extra,
+	};
+}
+
+/**
+ * 每個處理器收到請求訊息（proto3 JSON），回應訊息；丟 `ConnectFailure` 回 Connect 錯誤，
+ * 回 `ABORT_REQUEST` 讓請求在網路層失敗。
+ */
+type Handler = (request: Record<string, unknown>) => unknown;
+
+export interface RfqMockOptions {
+	/** 停在 searching 階段：不等候選資料出現就回傳。搜尋列的 e2e 用。 */
+	stopAtSearching?: boolean;
+	/** `PreviewRfqPrice`。 */
+	previewHandler?: Handler;
+	/** `GetCandidateSearch`。預設立刻回 SUCCEEDED 與一筆候選。 */
+	candidateSearchPollHandler?: Handler;
+	/** `PreviewRfqPublication`。 */
+	publicationPreviewHandler?: Handler;
+	/** `ExecuteRfqPublication`。 */
+	publicationExecuteHandler?: Handler;
+	/** 搜尋 run 的 `WatchRun` 事件。預設只有 `run_accepted` 與 `finished`（A9-D29）；有 `finished` 之後串流正常結束。 */
+	searchWatchFrames?: () => readonly Record<string, unknown>[];
+	/** `GetRuntimeSnapshot`（R-02 三區版面的發布事實來源）。預設帶一筆 `publishedRfq`。 */
+	runtimeSnapshotHandler?: Handler;
+	/** `ListSellerResponses`。預設空清單——「0 筆」是一次成功讀取的結論，跟「尚未取得」是兩件事。 */
+	sellerResponsesHandler?: Handler;
+	/** `GetSnapshot`。重整還原那條路徑要靠它注入 `publishedRfq`。 */
+	snapshotHandler?: Handler;
 }
 
 export async function setupRfqPriceReview(
 	page: Page,
 	options: RfqMockOptions = {},
 ) {
-	const legacy = { calls: 0 };
 	await page.route("**/api/v1/**", (route) =>
 		route.fulfill({
 			status: 200,
@@ -153,283 +231,90 @@ export async function setupRfqPriceReview(
 		},
 	]);
 
-	await page.route(
-		"**/api/v1/app/buyers/me/procurement/turns/stream",
-		(route) =>
-			route.fulfill({
-				status: 503,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 503, message: "stream unavailable" }),
-			}),
+	await mockProcurementUnaryAbortable(page, "ListConversations", () => ({
+		conversations: [],
+		nextPageToken: "",
+	}));
+	await mockProcurementUnaryAbortable(page, "SubmitTurn", () => ({
+		requestId: RFQ_REQUEST_ID,
+		conversationId: RFQ_CONVERSATION_ID,
+		runId: RFQ_TURN_RUN_ID,
+	}));
+	await mockWatchRun(page, ({ runId }) => {
+		if (runId === RFQ_TURN_RUN_ID) {
+			return [
+				watchFrame.accepted("t1", RFQ_TURN_RUN_ID, RFQ_CONVERSATION_ID),
+				watchFrame.turnResult(
+					"t2",
+					turnResultJson(RFQ_IDS, {
+						slots: RFQ_SLOTS,
+						reply: "需求已整理好，可以開始搜尋符合條件的商家。",
+					}),
+				),
+				watchFrame.finished("t3"),
+			];
+		}
+		return (
+			options.searchWatchFrames?.() ?? [
+				watchFrame.accepted("s1", RFQ_RUN_ID, RFQ_CONVERSATION_ID),
+				watchFrame.finished("s2"),
+			]
+		);
+	});
+	await mockProcurementUnaryAbortable(page, "GetSnapshot", (request) =>
+		options.snapshotHandler
+			? options.snapshotHandler(request)
+			: snapshotReadyJson(),
 	);
-	await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-		route.fulfill({
-			status: 200,
-			contentType: "application/json",
-			body: JSON.stringify({
-				code: 0,
-				data: {
-					requestId: RFQ_REQUEST_ID,
-					revisionId: RFQ_REVISION_ID,
-					conversationId: RFQ_CONVERSATION_ID,
-					slots: {
-						item: "珍珠芭樂",
-						quantity: 50,
-						unit: "KG",
-						delivery_city: "桃園市",
-						delivery_date: "2026-09-01",
-					},
-					missingRequired: [],
-					rejected: [],
-					degraded: false,
-					reply: "需求已整理好，可以開始搜尋符合條件的商家。",
-					recordedThisTurn: [],
-					question: null,
-				},
-			}),
-		}),
+	await mockProcurementUnaryAbortable(page, "StartCandidateSearch", () => ({
+		requestId: RFQ_REQUEST_ID,
+		runId: RFQ_RUN_ID,
+		status: "RUN_STATUS_RUNNING",
+		candidateSetId: RFQ_CANDIDATE_SET_ID,
+	}));
+	await mockProcurementUnaryAbortable(page, "GetCandidateSearch", (request) =>
+		options.candidateSearchPollHandler
+			? options.candidateSearchPollHandler(request)
+			: candidateSearchJson("SUCCEEDED", [
+					candidateJson("seller-green", "範例鮮果合作社"),
+				]),
 	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/snapshot`,
-		(route) => {
-			if (options.snapshotHandler) return options.snapshotHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: RFQ_REQUEST_ID,
-						revisionId: RFQ_REVISION_ID,
-						status: "REQUIREMENT_READY",
-						slots: {
-							item: "珍珠芭樂",
-							quantity: 50,
-							unit: "KG",
-							delivery_city: "桃園市",
-							delivery_date: "2026-09-01",
-						},
-						missingRequired: [],
-					},
-				}),
-			});
-		},
+	await mockProcurementUnaryAbortable(page, "ToggleSelection", (request) => ({
+		requestId: RFQ_REQUEST_ID,
+		candidateSetId: request.candidateSetId,
+		candidateId: request.candidateId,
+		selected: request.selected,
+	}));
+	await mockProcurementUnaryAbortable(page, "PreviewRfqPrice", (request) =>
+		options.previewHandler
+			? options.previewHandler(request)
+			: pricePreviewData(),
 	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/candidate-searches`,
-		(route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: RFQ_REQUEST_ID,
-						runId: RFQ_RUN_ID,
-						status: "RUNNING",
-					},
-				}),
-			}),
+	await mockProcurementUnaryAbortable(
+		page,
+		"PreviewRfqPublication",
+		(request) =>
+			options.publicationPreviewHandler
+				? options.publicationPreviewHandler(request)
+				: publicationApprovalJson(),
 	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/candidate-searches/${RFQ_RUN_ID}`,
-		(route) => {
-			if (options.candidateSearchPollHandler)
-				return options.candidateSearchPollHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: RFQ_REQUEST_ID,
-						runId: RFQ_RUN_ID,
-						candidateSetId: "candidate-set-e2e",
-						status: "SUCCEEDED",
-						platformLaneStatus: "SUCCEEDED",
-						externalLaneStatus: "SUCCEEDED",
-						failureReason: "",
-						candidates: {
-							platform: [
-								{
-									candidateId: "seller-green",
-									sourceId: "product-green",
-									lane: "PLATFORM",
-									displayName: "範例鮮果合作社",
-									score: 94,
-									matchedFacts: [{ key: "item", label: "珍珠芭樂" }],
-									unverifiableFacts: [],
-									factsAsOf: "2026-08-14T12:00:00Z",
-									selected: false,
-								},
-							],
-							external: [],
-						},
-					},
-				}),
-			});
-		},
+	await mockProcurementUnaryAbortable(
+		page,
+		"ExecuteRfqPublication",
+		(request) =>
+			options.publicationExecuteHandler
+				? options.publicationExecuteHandler(request)
+				: publicationResultJson(),
 	);
-	await page.route(
-		"**/api/v1/app/buyers/me/procurement/runs/*/events",
-		(route) => {
-			if (options.runEventsHandler) return options.runEventsHandler(route);
-			return route.fulfill({
-				status: 503,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 503,
-					reason: "CAPABILITY_UNAVAILABLE",
-					message: "replay 端點尚未開放",
-				}),
-			});
-		},
+	await mockProcurementUnaryAbortable(page, "GetRuntimeSnapshot", (request) =>
+		options.runtimeSnapshotHandler
+			? options.runtimeSnapshotHandler(request)
+			: runtimeSnapshotJson(),
 	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/selections`,
-		(route) => {
-			const body = route.request().postDataJSON() as {
-				candidateId: string;
-				selected: boolean;
-			};
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: { candidateId: body.candidateId, selected: body.selected },
-				}),
-			});
-		},
-	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/rfq-price-previews`,
-		(route) => {
-			expect(route.request().method()).toBe("POST");
-			if (options.previewHandler) return options.previewHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: pricePreviewData() }),
-			});
-		},
-	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/rfq-confirmations`,
-		(route) => {
-			expect(route.request().method()).toBe("POST");
-			if (options.confirmationHandler)
-				return options.confirmationHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						confirmedRfqSnapshotId: RFQ_CONFIRMED_ID,
-						payloadHash: RFQ_CONFIRMED_HASH,
-					},
-				}),
-			});
-		},
-	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/rfq-publications`,
-		(route) => {
-			expect(route.request().method()).toBe("POST");
-			if (options.publicationExecuteHandler)
-				return options.publicationExecuteHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						publicationId: RFQ_PUBLICATION_ID,
-						publicationVersion: "1",
-						state: "PUBLISHED",
-						audienceMode: "WISH_POOL",
-						audienceHash: RFQ_AUDIENCE_HASH,
-						sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
-						publishedAt: "2026-08-22T12:40:00Z",
-						replayed: false,
-					},
-				}),
-			});
-		},
-	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/rfq-publications/preview`,
-		(route) => {
-			expect(route.request().method()).toBe("POST");
-			if (options.publicationPreviewHandler)
-				return options.publicationPreviewHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						approvalId: RFQ_APPROVAL_ID,
-						approvalVersion: "1",
-						audienceHash: RFQ_AUDIENCE_HASH,
-						sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
-						sellerFacingPayloadJson: '{"item":"蘋果"}',
-						expiresAt: "2026-08-22T12:36:00Z",
-						audiencePolicyId: "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
-						audiencePolicyVersion: "1",
-						recipientCount: "0",
-					},
-				}),
-			});
-		},
-	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/conversations/${RFQ_CONVERSATION_ID}/runtime-snapshot`,
-		(route) => {
-			if (options.runtimeSnapshotHandler)
-				return options.runtimeSnapshotHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						conversationId: RFQ_CONVERSATION_ID,
-						requestId: RFQ_REQUEST_ID,
-						status: "PUBLISHED",
-						title: "珍珠芭樂 50 KG",
-						messages: [],
-						runs: [],
-						activeRunId: "",
-						artifacts: [publicationResultArtifact()],
-					},
-				}),
-			});
-		},
-	);
-	await page.route(
-		`**/api/v1/app/buyers/me/procurement/requests/${RFQ_REQUEST_ID}/seller-responses`,
-		(route) => {
-			if (options.sellerResponsesHandler)
-				return options.sellerResponsesHandler(route);
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: [] }),
-			});
-		},
-	);
-	await page.route(
-		"**/api/v1/app/buyers/me/procurement/requests/*/quote-batches**",
-		(route) => {
-			legacy.calls += 1;
-			return route.fulfill({
-				status: 500,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 500, message: "legacy route forbidden" }),
-			});
-		},
+	await mockProcurementUnaryAbortable(page, "ListSellerResponses", (request) =>
+		options.sellerResponsesHandler
+			? options.sellerResponsesHandler(request)
+			: { sellerResponses: [], nextPageToken: "" },
 	);
 
 	await page.addInitScript(() => {
@@ -442,7 +327,7 @@ export async function setupRfqPriceReview(
 	await page.getByRole("button", { name: "送出" }).click();
 	await page.getByRole("button", { name: "交給 Hawkr Agent 搜尋" }).click();
 
-	if (options.stopAtSearching) return { legacy };
+	if (options.stopAtSearching) return;
 
 	const openCanvas = page.getByRole("button", { name: "查看候選資料" });
 	if ((page.viewportSize()?.width ?? 1200) < 1200) {
@@ -469,6 +354,4 @@ export async function setupRfqPriceReview(
 	await page.getByLabel("希望下限").fill("30");
 	await page.getByLabel("希望上限").fill("42");
 	await page.getByRole("button", { name: "取得無參考價試算" }).click();
-
-	return { legacy };
 }

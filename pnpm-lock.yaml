@@ -466,9 +466,6 @@ importers:
 
   website:
     dependencies:
-      '@ag-ui/core':
-        specifier: 1.0.4
-        version: 1.0.4(zod@4.6.7)
       '@bufbuild/protobuf':
         specifier: 'catalog:'
         version: 2.17.0
@@ -727,14 +724,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
       react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
-
-  '@ag-ui/core@1.0.4':
-    resolution: {integrity: sha512-Z/G3UXYRyZ/1LcOtCCf6RJiFPTjRqaNublW/kQ7wsfiP4Qw5oIVmvO6NkUQYoqCoMXuXggyD3MMH2Td5OVKECQ==}
-    peerDependencies:
-      zod: ^3.25.18 || ^4.0.0
-    peerDependenciesMeta:
-      zod:
-        optional: true
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -6251,10 +6240,6 @@ snapshots:
       react-stately: 3.46.0(react@19.3.1)
       react-transition-group: 4.4.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       use-sync-external-store: 1.6.0(react@19.3.1)
-
-  '@ag-ui/core@1.0.4(zod@4.6.7)':
-    optionalDependencies:
-      zod: 4.6.7
 
   '@alloc/quick-lru@5.2.0': {}
 

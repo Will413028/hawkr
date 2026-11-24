@@ -20,8 +20,6 @@ import '../../../shared/widgets/app_toggle_switch.dart';
 import '../../../shared/widgets/setup_bottom_bar.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../data/product_repository.dart';
-import 'ai_assistant_button.dart';
-import 'product_listing_draft_controller.dart';
 import '../data/product_upload_service.dart';
 import 'product_setup_progress_bar.dart';
 import 'product_setup_top_bar.dart';
@@ -192,36 +190,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
       fetchOnboardedMethods();
       return null;
     }, const []);
-
-    // AI 助手累積的 pending skus：進入時若 specs 還是空白預設值就整批套進來。
-    final pendingDraft = ref.watch(productListingDraftControllerProvider);
-    useEffect(() {
-      if (pendingDraft.skus.isEmpty) return null;
-      final allEmpty = specs.value.every((s) => !s.hasData);
-      if (!allEmpty) return null;
-      for (final s in specs.value) {
-        s.dispose();
-      }
-      final newSpecs = pendingDraft.skus.map((sku) {
-        final s = _SpecData();
-        s.gradeController.text = sku.skuName;
-        if (sku.price > 0) s.priceController.text = sku.price.toString();
-        // PayUni #758: AI 助手帶來的草稿特價
-        if (sku.salePrice > 0 && sku.salePrice < sku.price) {
-          s.salePriceController.text = sku.salePrice.toString();
-          s.saleEnabled = true;
-        }
-        if (sku.weight > 0) s.weightController.text = sku.weight.toString();
-        if (sku.stockQty > 0) s.stockController.text = sku.stockQty.toString();
-        final wu = WeightUnit.fromCode(sku.unit);
-        if (wu != null) s.unitCode = wu.value;
-        return s;
-      }).toList();
-      specs.value = newSpecs;
-      specFeePayers.value = List.generate(newSpecs.length, (_) => {});
-      specFreeThresholds.value = List.generate(newSpecs.length, (_) => {});
-      return null;
-    }, [pendingDraft.patchVersion]);
 
     // Debounce timer for shipping quotes
     final debounceTimer = useRef<Timer?>(null);
@@ -1176,9 +1144,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
               ProductSetupTopBar(
                 title: isEditMode ? '編輯商品' : '新增商品',
                 subtitle: '規格、價格與配送',
-                trailing: kAiProductListingAssistantEnabled
-                    ? const AiAssistantButton()
-                    : null,
               ),
 
               if (!keyboardVisible)

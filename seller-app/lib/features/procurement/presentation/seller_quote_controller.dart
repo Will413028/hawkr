@@ -4,8 +4,12 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/codemeta/code_meta.dart';
-import '../data/procurement_error.dart';
+import 'package:hawkr_api/errors.dart'
+    show ErrorAction, ErrorFacts, classifyError, errorText;
+import 'package:hawkr_api/gen/hawkr/common/v1alpha1/error_reason.pbenum.dart';
+import 'package:hawkr_api/transport.dart' show ConnectException;
+
+import '../../../core/l10n/ui_locale.dart';
 import '../data/seller_quote_model.dart';
 import '../data/seller_quote_repository.dart';
 import 'seller_quote_validation.dart';
@@ -28,7 +32,7 @@ abstract class SellerQuoteNotice with _$SellerQuoteNotice {
     /// **不得靜默改成送最新版**。
     @Default(false) bool requiresReload,
 
-    /// CodeMeta 錯誤碼，沒有時是空字串（給測試與紀錄用）。
+    /// 伺服器的錯誤 reason 名稱，沒有時是空字串（給測試與紀錄用）。
     @Default('') String code,
   }) = _SellerQuoteNotice;
 }
@@ -77,12 +81,11 @@ abstract class SellerQuoteFormState with _$SellerQuoteFormState {
   bool get reloadRequired => notice?.requiresReload ?? false;
 }
 
-/// 冪等鍵配發簿。
+/// 冪等鍵配發簿，只給正式送出（`SubmitSellerResponse` 的 `client_request_id`）。
 ///
-/// 冪等鍵走 HTTP `Idempotency-Key` header，值是 **stable client request id**：
-/// 同一次使用者意圖重送要用同一個值，換一次意圖才換值。這裡把「意圖」寫成一段
-/// 簽章（命令＋CAS＋payload），同簽章回同一把鍵，簽章一變就換新鍵——所以
-/// 「按送出失敗→原封不動再按一次」是重送，「改了金額再送」是新意圖。
+/// 值是 **stable client request id**：同一次使用者意圖重送要用同一個值，換一次意圖才換值。
+/// 這裡把「意圖」寫成一段簽章（CAS＋payload），同簽章回同一把鍵，簽章一變就換新鍵——所以
+/// 「按送出失敗→原封不動再按一次」是重送，「改了金額再送」是新意圖。撤回與婉拒本身冪等，不帶鍵。
 class QuoteIdempotencyKeyBook {
   QuoteIdempotencyKeyBook({String Function()? mint})
     : _mint = mint ?? const Uuid().v4;
@@ -96,7 +99,7 @@ class QuoteIdempotencyKeyBook {
 
   /// 作廢這次意圖的鍵。
   ///
-  /// `IDEMPOTENCY_KEY_CONFLICT` 代表同一把鍵已經綁到另一份 payload，
+  /// 同一把鍵已經綁到另一份內容（`client_request_id` 的欄位錯誤）時，
   /// 重試同一把鍵永遠不會成功，必須換新鍵。
   void invalidate(String signature) => _keys.remove(signature);
 
@@ -263,7 +266,7 @@ class SellerQuoteForm extends _$SellerQuoteForm {
         expectedSellerFacingPayloadHash:
             current.publication.sellerFacingPayloadHash,
         expectedSellerResponseVersion: current.expectedSellerResponseVersion,
-        idempotencyKey: key,
+        clientRequestId: key,
       );
       _keys.clear();
       _set(
@@ -284,29 +287,25 @@ class SellerQuoteForm extends _$SellerQuoteForm {
     }
   }
 
-  /// 撤回目前這一版正式回價。
+  /// 撤回目前這一版正式回價。撤回本身冪等，不帶 request id；成功後重讀詳情取得新狀態。
   Future<bool> withdraw() async {
     final current = _current;
     final response = current?.latestResponse;
     if (current == null || response == null || current.busy) return false;
 
-    final signature =
-        'withdraw|$publicationId|${response.sellerResponseId}|'
-        '${response.sellerResponseVersion}';
-    final key = _keys.keyFor(signature);
     _set(current.copyWith(busy: true, notice: null));
     try {
-      final withdrawn = await _repo.withdrawResponse(
+      await _repo.withdrawResponse(
         publicationId: publicationId,
         sellerResponseId: response.sellerResponseId,
         expectedSellerResponseVersion: response.sellerResponseVersion,
-        idempotencyKey: key,
       );
       _keys.clear();
+      final detail = await _repo.getPublicationDetail(publicationId);
       _set(
         current.copyWith(
           busy: false,
-          latestResponse: withdrawn,
+          latestResponse: detail.latestResponse,
           notice: const SellerQuoteNotice(
             message: '已撤回這一版報價。',
             tone: SellerQuoteNoticeTone.success,
@@ -315,24 +314,21 @@ class SellerQuoteForm extends _$SellerQuoteForm {
       );
       return true;
     } catch (error) {
-      _afterCommandFailure(current, error, signature);
+      _afterCommandFailure(current, error, '');
       return false;
     }
   }
 
-  /// 明確拒絕這則詢價，理由可選。
-  Future<bool> decline({String reason = ''}) async {
+  /// 明確拒絕這則詢價；[reasonCode] 空字串表示沒有填。婉拒本身冪等，不帶 request id。
+  Future<bool> decline({String reasonCode = ''}) async {
     final current = _current;
     if (current == null || current.busy) return false;
 
-    final signature = 'decline|$publicationId|$reason';
-    final key = _keys.keyFor(signature);
     _set(current.copyWith(busy: true, notice: null));
     try {
       await _repo.declinePublication(
         publicationId: publicationId,
-        reason: reason,
-        idempotencyKey: key,
+        reasonCode: reasonCode,
       );
       _set(
         current.copyWith(
@@ -345,7 +341,7 @@ class SellerQuoteForm extends _$SellerQuoteForm {
       );
       return true;
     } catch (error) {
-      _afterCommandFailure(current, error, signature);
+      _afterCommandFailure(current, error, '');
       return false;
     }
   }
@@ -359,37 +355,23 @@ class SellerQuoteForm extends _$SellerQuoteForm {
     Object error,
     String signature,
   ) {
-    if (error is ProcurementException && error.requiresNewIdempotencyKey) {
-      _keys.invalidate(signature);
-    }
+    if (_isRequestIdConflict(error)) _keys.invalidate(signature);
     _set(current.copyWith(busy: false, notice: _noticeFor(error)));
   }
 
-  /// 「這一次意圖」的簽章。命令、CAS 與 payload 任一改變就是新意圖。
+  /// 「這一次意圖」的簽章。CAS 與 payload 任一改變就是新意圖。
   String _submitSignature(SellerQuoteFormState current) {
     return jsonEncode(<String, dynamic>{
-      'command': 'submit',
       'publicationId': publicationId,
       'expectedPublicationVersion': current.publication.publicationVersion,
       'expectedSellerFacingPayloadHash':
           current.publication.sellerFacingPayloadHash,
       'expectedSellerResponseVersion': current.expectedSellerResponseVersion,
-      'quote': current.quote.toJson(),
+      'quote': quoteToProto(current.quote).writeToJson(),
     });
   }
 
   static String _blockedMessage(SellerQuoteValidation validation) {
-    if (validation.fieldErrors.containsKey(SellerQuoteField.qualityGrade) ||
-        validation.fieldErrors.containsKey(
-          SellerQuoteField.qualityInspectionNotes,
-        )) {
-      // 對齊 server 的 QUOTE_QUALITY_REQUIRED，讓賣家兩邊看到同一句話。
-      return kProcurementErrorPresentations[ProcurementErrorReason
-                  .quoteQualityRequired
-                  .code]
-              ?.message ??
-          '請填寫實際品相與驗收說明。';
-    }
     if (!validation.amountIdentityHolds &&
         validation.computedTotal != null &&
         validation.fieldErrors.containsKey(SellerQuoteField.totalAmount)) {
@@ -410,17 +392,25 @@ class SellerQuoteForm extends _$SellerQuoteForm {
   }
 
   SellerQuoteNotice _noticeFor(Object error) {
-    if (error is ProcurementException) {
-      return SellerQuoteNotice(
-        message: error.message,
-        tone: SellerQuoteNoticeTone.error,
-        requiresReload: error.requiresReload,
-        code: error.code,
-      );
-    }
+    final e = ConnectException.from(error);
+    final facts = ErrorFacts.fromException(e);
+    final decision = classifyError(facts);
+    final reason = decision.action == ErrorAction.reason
+        ? decision.reason
+        : null;
     return SellerQuoteNotice(
-      message: error.toString(),
+      message: errorText(e, defaults: ref.read(defaultErrorTextProvider)),
       tone: SellerQuoteNoticeTone.error,
+      // 依據已過期（詢價或報價已改版、報價已過有效期）：必須先重新載入，不得靜默改送最新版。
+      requiresReload:
+          reason == ErrorReason.VERSION_CONFLICT ||
+          reason == ErrorReason.RFQ_RESPONSE_EXPIRED,
+      code: reason?.name ?? '',
     );
   }
+
+  /// 同一個 `client_request_id` 已綁到另一份內容：欄位錯誤指在 `client_request_id`。
+  static bool _isRequestIdConflict(Object error) => ErrorFacts.fromException(
+    ConnectException.from(error),
+  ).fieldErrors.any((f) => f.field == 'client_request_id');
 }

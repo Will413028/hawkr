@@ -68,14 +68,6 @@ type Config struct {
 	// Delegation 是 ADM 代行營運的 per-hop gRPC deadline（56 號設計書 §8.5.1 (A)）。
 	Delegation DelegationConfig
 
-	// ProcurementReplaySseEnabled 是 doc 57 §13 的 capability flag
-	// `PROCUREMENT_REPLAY_SSE_ENABLED`：true 時開放 GET
-	// /buyers/me/procurement/runs/:runId/events（ProxyProcurementRunEvents）；
-	// false 時該端點固定回 503 CAPABILITY_UNAVAILABLE。
-	// Gateway 沒有既有的通用 feature-flag 框架，這裡沿用 Config 既有的
-	// 「一個 bool 欄位 + env 讀取」寫法，不新建一套。預設 false，rollback 就是關掉它。
-	ProcurementReplaySseEnabled bool
-
 	// Docs 的環境變數：DOCS_USERNAME、DOCS_PASSWORD、DOCS_SIGN_KEY。
 	Docs DocsConfig
 }
@@ -189,7 +181,6 @@ func Load() (*Config, error) {
 			AuditConfirmBatchTotalBudgetMs: pkgconfig.GetEnvAsIntOrDefault("DELEGATION_AUDIT_CONFIRM_BATCH_TOTAL_BUDGET_MS", 10000),
 		},
 
-		ProcurementReplaySseEnabled: pkgconfig.GetEnvAsBoolOrDefault("PROCUREMENT_REPLAY_SSE_ENABLED", false),
 		Docs: DocsConfig{
 			Username: os.Getenv("DOCS_USERNAME"),
 			Password: os.Getenv("DOCS_PASSWORD"),

@@ -10,7 +10,6 @@ import 'package:go_router/go_router.dart';
 import 'redirect_logic.dart';
 import '../../app.dart';
 import '../../config/firebase_config.dart';
-import '../../features/ai_assistant/presentation/ai_assistant_screen.dart';
 import '../../features/app_update/application/force_update_provider.dart';
 import '../../features/app_update/presentation/force_update_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
@@ -219,7 +218,6 @@ class CouponRoutes {
 class SettingsRoutes {
   static const profile = '/profile';
   static const chat = '/chat';
-  static const chatAiAssistant = '/chat/ai-assistant';
   static const chatThread = '/chat/thread';
   static const shipping = '/settings/shipping';
   static const notifications = '/notifications';
@@ -543,11 +541,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: SettingsRoutes.chat,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const ChatListScreen(),
-      ),
-      GoRoute(
-        path: SettingsRoutes.chatAiAssistant,
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const AiAssistantScreen(),
       ),
       GoRoute(
         path: SettingsRoutes.chatThread,
