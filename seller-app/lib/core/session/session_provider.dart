@@ -9,10 +9,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../features/chat/data/chat_session.dart';
 import '../../features/order/data/order_status_notifier.dart';
 import '../../features/auth/data/auth_repository.dart';
+import '../../features/notification/data/notification_signal_service.dart';
 import '../../features/notification/data/push/manager.dart';
 import 'store_refresh_signal.dart';
 import '../../shared/utils/hk_log.dart';
-import '../networking/dio_provider.dart';
 import '../storage/auth_storage.dart';
 import 'account_restriction.dart';
 import 'auth_session_provider.dart';
@@ -200,10 +200,9 @@ class Session extends _$Session {
   /// 登出 — 在伺服器撤銷 session（`SignOut`）、清除保存的 token，清空所有 session 資料
   ///
   /// 可重入保護（[_loggingOut]）：登出流程自己會發 API 請求——
-  /// [PushNotificationManager.onUserLoggedOut] 的 removeDevice 走中央
-  /// [dioProvider]。session 此時可能已失效，那個 DELETE 回 401 時若又呼叫本方法，
-  /// 就會 `logout → removeDevice → 401 → logout` 自我循環。removeDevice 已標記
-  /// 401 不登出，這裡再擋一層。
+  /// [PushNotificationManager.onUserLoggedOut] 的 `DeleteDeviceToken` 走登入後的 Connect client。session 此時可能已失效，
+  /// 那個呼叫回 unauthenticated 時 interceptor 會再呼叫本方法，就會 `logout → 註銷 → unauthenticated → logout`
+  /// 自我循環；由這裡的重入保護擋住。
   ///
   /// 順序：先註銷裝置（請求帶 session token），再撤銷伺服器端 session 並清除 token，最後清本機。
   Future<void> logout() async {
@@ -220,8 +219,9 @@ class Session extends _$Session {
       state = const SessionModel();
       ref.read(accountRestrictionStateProvider.notifier).clear();
 
-      // 停止聊天串流與訂單輪詢
+      // 停止聊天串流、通知串流與訂單輪詢
       ref.read(chatSessionProvider).stop();
+      ref.read(notificationSignalServiceProvider).stop();
       OrderStatusNotifier.instance.stopListening();
       await AuthStorage.logout();
 

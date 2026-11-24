@@ -8,29 +8,20 @@ part of 'notification_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 通知列表 AsyncNotifier
-///
-/// 管理通知列表 + 分頁 + 未讀數量。
-/// 使用 `AsyncValue<NotificationListState>` 表示整體狀態。
+/// 收件匣 AsyncNotifier：第一頁、分頁與未讀數都來自伺服器；已讀與刪除成功後以伺服器的答案為準。
 
 @ProviderFor(NotificationListController)
 final notificationListControllerProvider =
     NotificationListControllerProvider._();
 
-/// 通知列表 AsyncNotifier
-///
-/// 管理通知列表 + 分頁 + 未讀數量。
-/// 使用 `AsyncValue<NotificationListState>` 表示整體狀態。
+/// 收件匣 AsyncNotifier：第一頁、分頁與未讀數都來自伺服器；已讀與刪除成功後以伺服器的答案為準。
 final class NotificationListControllerProvider
     extends
         $AsyncNotifierProvider<
           NotificationListController,
           NotificationListState
         > {
-  /// 通知列表 AsyncNotifier
-  ///
-  /// 管理通知列表 + 分頁 + 未讀數量。
-  /// 使用 `AsyncValue<NotificationListState>` 表示整體狀態。
+  /// 收件匣 AsyncNotifier：第一頁、分頁與未讀數都來自伺服器；已讀與刪除成功後以伺服器的答案為準。
   NotificationListControllerProvider._()
     : super(
         from: null,
@@ -51,12 +42,9 @@ final class NotificationListControllerProvider
 }
 
 String _$notificationListControllerHash() =>
-    r'21a00ea50c740f01cb0add38d16c763c2b26e238';
+    r'b9dae0ae67e3fbd2fc55b1b6b35068c76416a461';
 
-/// 通知列表 AsyncNotifier
-///
-/// 管理通知列表 + 分頁 + 未讀數量。
-/// 使用 `AsyncValue<NotificationListState>` 表示整體狀態。
+/// 收件匣 AsyncNotifier：第一頁、分頁與未讀數都來自伺服器；已讀與刪除成功後以伺服器的答案為準。
 
 abstract class _$NotificationListController
     extends $AsyncNotifier<NotificationListState> {
@@ -82,26 +70,20 @@ abstract class _$NotificationListController
   }
 }
 
-/// 通知偏好設定 AsyncNotifier
-///
-/// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+/// 偏好：伺服器回哪些 (分類, 渠道) 就列哪些；不可關的 `canDisable` 為 false。
 
 @ProviderFor(NotificationPreferencesController)
 final notificationPreferencesControllerProvider =
     NotificationPreferencesControllerProvider._();
 
-/// 通知偏好設定 AsyncNotifier
-///
-/// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+/// 偏好：伺服器回哪些 (分類, 渠道) 就列哪些；不可關的 `canDisable` 為 false。
 final class NotificationPreferencesControllerProvider
     extends
         $AsyncNotifierProvider<
           NotificationPreferencesController,
-          List<NotificationPreferenceItem>
+          List<PreferenceEntry>
         > {
-  /// 通知偏好設定 AsyncNotifier
-  ///
-  /// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+  /// 偏好：伺服器回哪些 (分類, 渠道) 就列哪些；不可關的 `canDisable` 為 false。
   NotificationPreferencesControllerProvider._()
     : super(
         from: null,
@@ -124,32 +106,27 @@ final class NotificationPreferencesControllerProvider
 }
 
 String _$notificationPreferencesControllerHash() =>
-    r'd32fd92f5aa408d57d914cf32d6825354e7e3a92';
+    r'e12cb93e87be1a01e6906cd5bbd47889a03463bc';
 
-/// 通知偏好設定 AsyncNotifier
-///
-/// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+/// 偏好：伺服器回哪些 (分類, 渠道) 就列哪些；不可關的 `canDisable` 為 false。
 
 abstract class _$NotificationPreferencesController
-    extends $AsyncNotifier<List<NotificationPreferenceItem>> {
-  FutureOr<List<NotificationPreferenceItem>> build();
+    extends $AsyncNotifier<List<PreferenceEntry>> {
+  FutureOr<List<PreferenceEntry>> build();
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
         this.ref
-            as $Ref<
-              AsyncValue<List<NotificationPreferenceItem>>,
-              List<NotificationPreferenceItem>
-            >;
+            as $Ref<AsyncValue<List<PreferenceEntry>>, List<PreferenceEntry>>;
     final element =
         ref.element
             as $ClassProviderElement<
               AnyNotifier<
-                AsyncValue<List<NotificationPreferenceItem>>,
-                List<NotificationPreferenceItem>
+                AsyncValue<List<PreferenceEntry>>,
+                List<PreferenceEntry>
               >,
-              AsyncValue<List<NotificationPreferenceItem>>,
+              AsyncValue<List<PreferenceEntry>>,
               Object?,
               Object?
             >;

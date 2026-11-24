@@ -279,16 +279,13 @@ void main() {
     expect(find.text('待出貨 2'), findsOneWidget);
   });
 
-  testWidgets('收到訂單推播：重讀一次', (tester) async {
+  testWidgets('收到訂單重讀訊號：重讀一次', (tester) async {
     final server = _Server();
     await _pump(tester, server);
     await _settle(tester);
     expect(server.calls, 1);
 
-    OrderStatusNotifier.instance.handlePushNotification({
-      'eventType': 'ORDER_PAID',
-      'orderSn': 'HK1',
-    });
+    OrderStatusNotifier.instance.emitRefresh();
     await _settle(tester);
 
     expect(server.calls, 2);
@@ -302,9 +299,7 @@ void main() {
     expect(find.text('待出貨 1'), findsOneWidget);
 
     server.failure = ConnectException(Code.unavailable, 'down');
-    OrderStatusNotifier.instance.handlePushNotification({
-      'eventType': 'ORDER_PAID',
-    });
+    OrderStatusNotifier.instance.emitRefresh();
     await _settle(tester);
 
     expect(server.calls, 2);
@@ -365,10 +360,7 @@ void main() {
 
     tickers.value = false;
     await tester.pump();
-    OrderStatusNotifier.instance.handlePushNotification({
-      'eventType': 'ORDER_PAID',
-      'orderSn': 'HK1',
-    });
+    OrderStatusNotifier.instance.emitRefresh();
     await _settle(tester);
     expect(server.calls, 1);
 

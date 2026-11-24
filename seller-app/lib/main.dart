@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -19,7 +18,6 @@ import 'core/observability/sentry_scrub.dart';
 import 'core/session/auth_session_provider.dart';
 import 'package:hawkr_auth/logging.dart';
 import 'features/app_update/application/force_update_provider.dart';
-import 'features/notification/data/push/background_handler.dart';
 import 'features/notification/data/push/manager.dart';
 import 'shared/utils/hk_log.dart';
 import 'shared/widgets/brand_startup_splash.dart';
@@ -157,9 +155,7 @@ Future<Widget> _bootstrapApplication() async {
   }
 
   if (!_e2eModeSeller && isFirebaseInitialized) {
-    // 註冊背景訊息處理器（必須在 Firebase 初始化之後）
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    // 初始化 Firebase Messaging
+    // 初始化 Firebase Messaging（推播是可見通知，由 OS 顯示，不需要背景 isolate 處理）
     await _initializeFirebaseMessaging();
   }
 

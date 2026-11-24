@@ -76,10 +76,10 @@ class AfterSalesDetailScreen extends HookConsumerWidget {
       return null;
     }, [caseNo]);
 
-    // FCM：本案件狀態變更時自動刷新
+    // 本案件狀態變更時自動刷新
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((event) {
-        if (event.caseNo == caseNo) load();
+        if (event.refreshesAll || event.caseNo == caseNo) load();
       });
     });
 

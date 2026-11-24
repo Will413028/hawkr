@@ -7,49 +7,58 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/extensions/async_value_ui.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+
+import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/widgets/app_toggle_switch.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../data/notification_model.dart';
+import '../data/notification_preference_labels.dart';
+import '../data/notification_repository.dart';
 import 'notification_controller.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-/// 通知設定頁面 — 6 個通知類別 toggle（對應 Figma 設計）
+/// 通知設定頁面：每個分類一列，伺服器回哪些渠道就有哪些開關；不可關的開關鎖住。
 class NotificationSettingsScreen extends HookConsumerWidget {
   const NotificationSettingsScreen({super.key});
 
-  // Category → icon + color mapping
-  static const _categoryConfig = {
-    'order_update': _CategoryStyle(
+  static const _defaultStyle = _CategoryStyle(
+    icon: AppIcons.notificationsOutlined,
+    color: AppColors.textPrimary,
+  );
+
+  static const _categoryConfig = <NotificationCategory, _CategoryStyle>{
+    NotificationCategory.NOTIFICATION_CATEGORY_ORDER: _CategoryStyle(
       icon: AppIcons.shoppingBagOutlined,
       color: AppColors.warning,
     ),
-    'refund_update': _CategoryStyle(
+    NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT: _CategoryStyle(
+      icon: AppIcons.shoppingBagOutlined,
+      color: AppColors.warning,
+    ),
+    NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY: _CategoryStyle(
       icon: AppIcons.assignmentReturnOutlined,
       color: AppColors.error,
     ),
-    'system': _CategoryStyle(
-      icon: AppIcons.notificationsOutlined,
-      color: AppColors.textPrimary,
+    NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES: _CategoryStyle(
+      icon: AppIcons.assignmentReturnOutlined,
+      color: AppColors.error,
     ),
-    'chat': _CategoryStyle(
+    NotificationCategory.NOTIFICATION_CATEGORY_CHAT: _CategoryStyle(
       icon: AppIcons.chatBubbleOutline,
       color: AppColors.textPrimary,
     ),
-    'follower': _CategoryStyle(
+    NotificationCategory.NOTIFICATION_CATEGORY_FOLLOW: _CategoryStyle(
       icon: AppIcons.personOutline,
       color: AppColors.primary,
     ),
-    'post': _CategoryStyle(
+    NotificationCategory.NOTIFICATION_CATEGORY_COMMENT: _CategoryStyle(
       icon: AppIcons.descriptionOutlined,
       color: AppColors.primary,
     ),
-    // 配送異常 — 賣家強制 on 不可關（backend §3.1）。
-    // 沿用退款紅色語意。
-    'shipment_anomaly': _CategoryStyle(
-      icon: AppIcons.assignmentReturnOutlined,
-      color: AppColors.error,
+    NotificationCategory.NOTIFICATION_CATEGORY_LIKE: _CategoryStyle(
+      icon: AppIcons.descriptionOutlined,
+      color: AppColors.primary,
     ),
   };
 
@@ -57,25 +66,17 @@ class NotificationSettingsScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncPrefs = ref.watch(notificationPreferencesControllerProvider);
 
-    ref.listen(notificationPreferencesControllerProvider, (_, next) {
-      next.showSnackBarOnError(context);
-    });
-
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
-      appBar: _buildAppBar(context),
+      appBar: HkGlassAppBar(
+        title: const Text('通知設定'),
+        onBackPressed: () => context.pop(),
+      ),
       body: asyncPrefs.when(
         loading: () => const TruckLoadingOverlay(),
         error: (error, _) => _buildErrorState(context, ref, error),
         data: (prefs) => _buildContent(context, ref, prefs),
       ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return HkGlassAppBar(
-      title: const Text('通知設定'),
-      onBackPressed: () => context.pop(),
     );
   }
 
@@ -87,7 +88,7 @@ class NotificationSettingsScreen extends HookConsumerWidget {
           Icon(AppIcons.errorOutline, size: 64.sp, color: AppIconColors.muted),
           SizedBox(height: 16.h),
           Text(
-            error.toString(),
+            errorText(error, defaults: ref.read(defaultErrorTextProvider)),
             style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
@@ -110,39 +111,41 @@ class NotificationSettingsScreen extends HookConsumerWidget {
   Widget _buildContent(
     BuildContext context,
     WidgetRef ref,
-    List<NotificationPreferenceItem> prefs,
+    List<PreferenceEntry> prefs,
   ) {
+    final byCategory = <NotificationCategory, List<PreferenceEntry>>{};
+    for (final e in prefs) {
+      byCategory.putIfAbsent(e.category, () => []).add(e);
+    }
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 40.h),
       child: Column(
-        children: prefs.map((pref) {
-          final style = _categoryConfig[pref.category];
-          return Padding(
-            padding: EdgeInsets.only(bottom: 12.h),
-            child: _buildPreferenceCard(
-              context: context,
-              ref: ref,
-              pref: pref,
-              style: style,
+        children: [
+          for (final entry in byCategory.entries)
+            Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: _buildCategoryCard(
+                context: context,
+                ref: ref,
+                category: entry.key,
+                entries: entry.value,
+              ),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }
 
-  Widget _buildPreferenceCard({
+  Widget _buildCategoryCard({
     required BuildContext context,
     required WidgetRef ref,
-    required NotificationPreferenceItem pref,
-    _CategoryStyle? style,
+    required NotificationCategory category,
+    required List<PreferenceEntry> entries,
   }) {
-    // 強制 on 不可關（賣家 shipment_anomaly）。
-    // 顯示文案改為說明文字；toggle 仍渲染但不接受互動（IgnorePointer + 半透明）。
-    final isForced = pref.forced;
-    final description = isForced ? '強制接收，無法關閉' : pref.description;
+    final style = _categoryConfig[category] ?? _defaultStyle;
     return Container(
-      height: 68.h,
+      constraints: BoxConstraints(minHeight: 68.h),
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(16.r),
@@ -155,67 +158,61 @@ class NotificationSettingsScreen extends HookConsumerWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20.w),
-        child: Row(
-          children: [
-            // Category icon
-            Container(
-              width: 32.w,
-              height: 32.w,
-              decoration: BoxDecoration(
-                color: style?.color ?? AppColors.textPrimary,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                style?.icon ?? AppIcons.notificationsOutlined,
-                size: 18.w,
-                color: AppIconColors.onBrand,
+      child: Row(
+        children: [
+          Container(
+            width: 32.w,
+            height: 32.w,
+            decoration: BoxDecoration(
+              color: style.color,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(style.icon, size: 18.w, color: AppIconColors.onBrand),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Text(
+              notificationCategoryLabel(category),
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w400,
+                color: AppColors.textEmphasis,
               ),
             ),
+          ),
+          for (final e in entries) ...[
             SizedBox(width: 12.w),
-            // Title + description
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    pref.title,
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textEmphasis,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 不可關的 (分類, 渠道)：開關鎖住（IgnorePointer + 半透明，不改 layout）。
+                IgnorePointer(
+                  ignoring: !e.canDisable,
+                  child: Opacity(
+                    opacity: e.canDisable ? 1.0 : 0.5,
+                    child: AppToggleSwitch(
+                      key: ValueKey(
+                        'pref-${category.value}-${e.channel.value}',
+                      ),
+                      value: e.enabled,
+                      height: 16,
+                      onChanged: (v) => _onToggle(context, ref, e, v),
                     ),
                   ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // 品牌滑桿：高度對齊 title 字體大小 (16sp)
-            // forced 時鎖死：IgnorePointer + opacity 半透明（不改 layout）。
-            IgnorePointer(
-              ignoring: isForced,
-              child: Opacity(
-                opacity: isForced ? 0.5 : 1.0,
-                child: AppToggleSwitch(
-                  value: pref.enabled,
-                  height: 16,
-                  onChanged: (v) => _onToggle(context, ref, pref.category, v),
                 ),
-              ),
+                SizedBox(height: 2.h),
+                Text(
+                  notificationChannelLabel(e.channel),
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -223,12 +220,12 @@ class NotificationSettingsScreen extends HookConsumerWidget {
   Future<void> _onToggle(
     BuildContext context,
     WidgetRef ref,
-    String category,
+    PreferenceEntry entry,
     bool enabled,
   ) async {
     final success = await ref
         .read(notificationPreferencesControllerProvider.notifier)
-        .updatePreference(category, enabled);
+        .setEnabled(entry.category, entry.channel, enabled);
 
     if (!success && context.mounted) {
       FloatingToast.error(context, '儲存失敗，請稍後再試');

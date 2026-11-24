@@ -73,10 +73,10 @@ class ProfileScreen extends HookConsumerWidget {
 
     Future<void> loadUnreadCount() async {
       try {
-        final result = await ref
+        final count = await ref
             .read(notificationRepositoryProvider)
-            .getUnreadCount();
-        if (context.mounted) unreadNotifCount.value = result.count;
+            .unreadCount();
+        if (context.mounted) unreadNotifCount.value = count;
       } catch (_) {}
     }
 

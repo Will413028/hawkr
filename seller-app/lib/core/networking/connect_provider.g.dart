@@ -621,6 +621,59 @@ final class ModerationAppClientProvider
 String _$moderationAppClientHash() =>
     r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
 
+/// 通知收件匣、偏好、裝置 token 與即時訊號串流（NotificationAppService，STORE 受眾），登入後呼叫。
+
+@ProviderFor(notificationClient)
+final notificationClientProvider = NotificationClientProvider._();
+
+/// 通知收件匣、偏好、裝置 token 與即時訊號串流（NotificationAppService，STORE 受眾），登入後呼叫。
+
+final class NotificationClientProvider
+    extends
+        $FunctionalProvider<
+          NotificationAppServiceClient,
+          NotificationAppServiceClient,
+          NotificationAppServiceClient
+        >
+    with $Provider<NotificationAppServiceClient> {
+  /// 通知收件匣、偏好、裝置 token 與即時訊號串流（NotificationAppService，STORE 受眾），登入後呼叫。
+  NotificationClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notificationClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$notificationClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<NotificationAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  NotificationAppServiceClient create(Ref ref) {
+    return notificationClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(NotificationAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<NotificationAppServiceClient>(value),
+    );
+  }
+}
+
+String _$notificationClientHash() =>
+    r'ff4e279d2b0a07465dcf20087d699f25f100cfd1';
+
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 
 @ProviderFor(sellerPublicClient)

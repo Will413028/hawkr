@@ -4,8 +4,6 @@ import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'package:hawkr_seller/shared/widgets/hk_glass_app_bar.dart';
 import 'package:hawkr_seller/shared/widgets/hk_tap_target.dart';
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:hawkr_seller/shared/widgets/hk_icon.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -13,38 +11,20 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../../app.dart';
 import '../../../config/image_config.dart';
-import '../../../core/exceptions/app_exception.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_api/images.dart';
+
+import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/widgets/hk_empty_state.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/optimized_image.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../../media/data/media_repository.dart';
-import '../../order/data/order_repository.dart';
-import '../data/delegation_navigation.dart';
-import '../data/notification_model.dart';
-import '../data/push/manager.dart';
+import '../data/deep_link.dart';
+import '../data/notification_repository.dart';
 import 'notification_controller.dart';
 import '../../../shared/time/taipei_display.dart';
 import '../../../l10n/l10n.dart';
-
-final _notificationBuyerMetaProvider =
-    FutureProvider.family<_NotificationBuyerMeta?, String>((
-      ref,
-      orderNo,
-    ) async {
-      final normalized = orderNo.trim();
-      if (normalized.isEmpty) return null;
-      final repo = ref.watch(orderRepositoryProvider);
-      final detail = await repo.fetchMatchedOrderDetails(orderSn: normalized);
-      final avatarUrl = MediaRepository.resolveUrl(detail.buyerAvatar) ?? '';
-      final name = detail.buyerName.trim().isNotEmpty
-          ? detail.buyerName.trim()
-          : detail.recipientName.trim();
-      if (name.isEmpty && avatarUrl.isEmpty) return null;
-      return _NotificationBuyerMeta(name: name, avatarUrl: avatarUrl);
-    });
 
 /// 通知列表頁面
 class NotificationsScreen extends HookConsumerWidget {
@@ -62,21 +42,6 @@ class NotificationsScreen extends HookConsumerWidget {
         ref.read(notificationListControllerProvider.notifier).silentRefresh();
       });
       return null;
-    }, const []);
-
-    // 前景收到 FCM 時即時刷新通知列表，避免賣家停在通知頁時看不到新聊天/訂單。
-    useEffect(() {
-      Timer? debounce;
-      final sub = PushNotificationManager.instance.onInboxMessage.listen((_) {
-        debounce?.cancel();
-        debounce = Timer(const Duration(milliseconds: 250), () {
-          ref.read(notificationListControllerProvider.notifier).silentRefresh();
-        });
-      });
-      return () {
-        debounce?.cancel();
-        sub.cancel();
-      };
     }, const []);
 
     // 分頁滾動
@@ -183,10 +148,10 @@ class NotificationsScreen extends HookConsumerWidget {
                           return _NotificationCard(
                             notification: n,
                             isDeleteMode: isDeleteMode.value,
-                            isSelected: selectedIds.value.contains('${n.id}'),
+                            isSelected: selectedIds.value.contains(n.id),
                             onSelectionChanged: (selected) {
                               final s = Set<String>.from(selectedIds.value);
-                              selected ? s.add('${n.id}') : s.remove('${n.id}');
+                              selected ? s.add(n.id) : s.remove(n.id);
                               selectedIds.value = s;
                             },
                             onTap: () => _navigateToDetail(context, ref, n),
@@ -223,75 +188,23 @@ class NotificationsScreen extends HookConsumerWidget {
   void _navigateToDetail(
     BuildContext context,
     WidgetRef ref,
-    NotificationItem notification,
+    InboxItem notification,
   ) {
-    if (!notification.isRead) {
+    if (!notification.read) {
       ref
           .read(notificationListControllerProvider.notifier)
           .markAsRead(notification.id);
     }
-    final refType = notification.refType?.toUpperCase();
-    final refId = notification.refId;
-    if (refType == null) return;
-    switch (refType) {
-      case 'ORDER':
-        if (refId != null && refId.isNotEmpty) {
-          context.push('/orders/matched/detail', extra: {'orderSn': refId});
-        } else {
-          // 切到 shell 內的訂單 tab（保留 nav bar）
-          context.go('/main/orders');
-        }
-      case 'CHAT':
-        if (refId != null) {
-          // 先切到首頁 tab（保留 nav bar），再 push 聊天室
-          context.go('/main/dashboard');
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            MyApp.navigatorKey.currentContext?.push(
-              '/chat/thread',
-              extra: {'conversationId': refId},
-            );
-          });
-        } else {
-          context.go('/main/dashboard');
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            MyApp.navigatorKey.currentContext?.push('/chat');
-          });
-        }
-      case 'AFTERSALE':
-      case 'AFTER_SALE':
-      case 'REFUND':
-        context.go('/main/orders');
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (refId != null && refId.isNotEmpty) {
-            MyApp.navigatorKey.currentContext?.push(
-              '/after-sales/detail',
-              extra: refId,
-            );
-          } else {
-            MyApp.navigatorKey.currentContext?.go(
-              '/main/orders?filter=after_sale',
-            );
-          }
-        });
-
-      // 代行營運（56 號設計書）。refId 是 audit_log_id，賣家端沒有代行紀錄頁可
-      // 落地，因此改依 data.resourceType 跳到**被操作的資源**；解不出目標就不跳。
-      case 'DELEGATION':
-        navigateDelegation(context, notification.data);
-
-      // 沒有對應分支＝這一則沒有落地頁。不導航是刻意的：跳到一個猜的頁面比不跳更糟。
-      default:
-        break;
-    }
+    // 目的地由伺服器給；空字串或對不到路由就不導航（跳到猜的頁面比不跳更糟）。
+    NotificationDeepLink.parse(notification.deepLink)?.open();
   }
 
   Widget _buildErrorState(BuildContext context, WidgetRef ref, Object error) {
-    final message = error is AppException ? error.message : '載入失敗，請稍後再試';
-    final icon = switch (error) {
-      UnauthorizedException() => AppIcons.lockOutline,
-      NetworkException() || TimeoutException() => AppIcons.wifiOffOutlined,
-      _ => AppIcons.errorOutline,
-    };
+    final message = errorText(
+      error,
+      defaults: ref.read(defaultErrorTextProvider),
+    );
+    const icon = AppIcons.errorOutline;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -340,7 +253,7 @@ class NotificationsScreen extends HookConsumerWidget {
 // ══════════════════════════════════════════════════════════════
 
 class _NotificationCard extends ConsumerStatefulWidget {
-  final NotificationItem notification;
+  final InboxItem notification;
   final bool isDeleteMode;
   final bool isSelected;
   final ValueChanged<bool>? onSelectionChanged;
@@ -378,26 +291,13 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
   @override
   Widget build(BuildContext context) {
     final n = widget.notification;
-    final config = _iconConfig(n);
-    final directBuyerName = _buyerNameFromData(n);
-    final directBuyerAvatar = _buyerAvatarFromData(n);
-    final orderNo = _orderNoFromNotification(n);
-    final shouldFetchBuyerMeta =
-        (directBuyerName.isEmpty || directBuyerAvatar.isEmpty) &&
-        orderNo.isNotEmpty &&
-        _isOrderNotification(n);
-    final fetchedBuyerMeta = shouldFetchBuyerMeta
-        ? ref.watch(_notificationBuyerMetaProvider(orderNo)).value
-        : null;
-    final buyerName = directBuyerName.isNotEmpty
-        ? directBuyerName
-        : (fetchedBuyerMeta?.name ?? '');
-    final buyerAvatar = directBuyerAvatar.isNotEmpty
-        ? directBuyerAvatar
-        : (fetchedBuyerMeta?.avatarUrl ?? '');
-    final title = _personalize(n.title, n, buyerName: buyerName);
-    final body = _personalize(n.body, n, buyerName: buyerName);
-    final time = _formatTime(context, n.createdAt);
+    final config = _iconConfig(n.presentation);
+    final buyerAvatar = n.hasImage() && n.image.uriTemplate.isNotEmpty
+        ? n.image.uri(ImagePreset.avatar)
+        : '';
+    final title = n.title;
+    final body = n.body;
+    final time = _formatTime(context, n.createTime.toDateTime());
     final onActivate = widget.isDeleteMode
         ? () => widget.onSelectionChanged?.call(!widget.isSelected)
         : widget.onTap;
@@ -480,7 +380,7 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
                           color: AppIconColors.onBrand,
                         ),
                       ),
-                      if (!n.isRead)
+                      if (!n.read)
                         Positioned(
                           top: -2,
                           right: -2,
@@ -555,8 +455,10 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
     );
   }
 
-  static ({IconData icon, Color color}) _iconConfig(NotificationItem n) {
-    // 依序嘗試：1) type 精確匹配 → 2) refType → 3) title 關鍵字 → 4) system
+  /// 圖示與顏色只依伺服器給的呈現分類；UNSPECIFIED 與不認得的值用 SYSTEM 的呈現。
+  static ({IconData icon, Color color}) _iconConfig(
+    InboxPresentation presentation,
+  ) {
     const orderStyle = (
       icon: AppIcons.shoppingBagOutlined,
       color: AppColors.warning,
@@ -579,209 +481,22 @@ class _NotificationCardState extends ConsumerState<_NotificationCard>
       icon: AppIcons.notificationsOutlined,
       color: AppColors.textPrimary,
     );
-
-    // 1. type 精確匹配
-    switch (n.type) {
-      case 'CHAT_MESSAGE':
-      case 'CHAT_GROUP_INVITE':
-        return chatStyle;
-      case 'ORDER_CREATED':
-      case 'ORDER_PAID':
-      case 'ORDER_SHIPPED':
-      case 'ORDER_DELIVERED':
-      case 'ORDER_COMPLETED':
-        return orderStyle;
-      case 'AFTER_SALE_STATUS':
-      case 'ORDER_CANCELLED':
-      case 'ORDER_REFUND':
-      case 'ORDER_REFUNDED':
-      case 'RETURN_SHIPPED':
-      case 'REFUND_REQUESTED':
-      case 'REFUND_APPROVED':
-      case 'REFUND_REJECTED':
-      case 'REFUND_COMPLETED':
-        return refundStyle;
-      case 'POST_LIKE':
-      case 'POST_COMMENT':
-      case 'COMMENT_REPLY':
-      case 'PRODUCT_VIEW':
-      case 'PRODUCT_VISIT':
-        return postStyle;
-      case 'NEW_FOLLOWER':
-      case 'NEW_SUBSCRIBER':
-        return userStyle;
-      case 'MENTION':
-        return postStyle;
-      case 'PROMOTION':
-      case 'COUPON_RECEIVED':
-      case 'COUPON_EXPIRING':
-        return couponStyle;
-    }
-
-    // 2. refType 匹配
-    switch ((n.refType ?? '').toUpperCase()) {
-      case 'ORDER':
-        return orderStyle;
-      case 'REFUND':
-      case 'AFTERSALE':
-      case 'AFTER_SALE':
-        return refundStyle;
-      case 'CHAT':
-        return chatStyle;
-      case 'POST':
-      case 'PRODUCT':
-        return postStyle;
-      case 'USER':
-      case 'FOLLOWER':
-        return userStyle;
-      case 'COUPON':
-        return couponStyle;
-    }
-
-    // 3. title 關鍵字 fallback（後端 type 未覆蓋時的最後防線）
-    final title = n.title;
-    if (title.contains('退貨') || title.contains('退款') || title.contains('售後')) {
-      return refundStyle;
-    }
-    if (title.contains('訂單') ||
-        title.contains('下單') ||
-        title.contains('出貨') ||
-        title.contains('撥款')) {
-      return orderStyle;
-    }
-    if (title.contains('瀏覽') ||
-        title.contains('按讚') ||
-        title.contains('留言') ||
-        title.contains('商機') ||
-        title.contains('商品')) {
-      return postStyle;
-    }
-    if (title.contains('聊天') || title.contains('訊息')) {
-      return chatStyle;
-    }
-    if (title.contains('追蹤') || title.contains('粉絲') || title.contains('收藏')) {
-      return userStyle;
-    }
-    if (title.contains('優惠') || title.contains('折價') || title.contains('券')) {
-      return couponStyle;
-    }
-
-    return systemStyle;
+    return switch (presentation) {
+      InboxPresentation.INBOX_PRESENTATION_ORDER ||
+      InboxPresentation.INBOX_PRESENTATION_PAYOUT ||
+      InboxPresentation.INBOX_PRESENTATION_PROCUREMENT => orderStyle,
+      InboxPresentation.INBOX_PRESENTATION_REFUND => refundStyle,
+      InboxPresentation.INBOX_PRESENTATION_MESSAGE => chatStyle,
+      InboxPresentation.INBOX_PRESENTATION_SOCIAL ||
+      InboxPresentation.INBOX_PRESENTATION_REVIEW => postStyle,
+      InboxPresentation.INBOX_PRESENTATION_PROMOTION => couponStyle,
+      InboxPresentation.INBOX_PRESENTATION_ACCOUNT => userStyle,
+      _ => systemStyle,
+    };
   }
 
   static String _formatTime(BuildContext context, DateTime dateTime) =>
       context.taipeiDisplay.timeAgoIn(context.l10n, dateTime);
-
-  /// 從 notification.data 取得買家名稱（多種後端 key fallback）。
-  /// 沒有的話回傳空字串，caller 用原文 fallback。
-  static String _buyerNameFromData(NotificationItem n) {
-    return _firstDataString(n.data, const [
-      'buyerNickname',
-      'buyer_nickname',
-      'buyerName',
-      'buyer_name',
-      'buyerNickName',
-      'buyer_nick_name',
-      'nickname',
-      'userName',
-      'user_name',
-      'senderName',
-      'sender_name',
-      'fromName',
-      'from_name',
-    ]);
-  }
-
-  static String _buyerAvatarFromData(NotificationItem n) {
-    final raw = _firstDataString(n.data, const [
-      'buyerAvatarUrl',
-      'buyer_avatar_url',
-      'buyerAvatar',
-      'buyer_avatar',
-      'userAvatar',
-      'user_avatar',
-      'avatarUrl',
-      'avatar_url',
-      'senderAvatar',
-      'sender_avatar',
-      'senderAvatarUrl',
-      'sender_avatar_url',
-      'fromAvatar',
-      'from_avatar',
-    ]);
-    return MediaRepository.resolveUrl(raw) ?? raw;
-  }
-
-  static String _orderNoFromNotification(NotificationItem n) {
-    final refType = (n.refType ?? '').toUpperCase();
-    if (refType == 'ORDER' && (n.refId ?? '').isNotEmpty) {
-      return n.refId!.trim();
-    }
-    return _firstDataString(n.data, const [
-      'orderNo',
-      'orderSn',
-      'order_sn',
-      'orderId',
-      'refId',
-      'ref_id',
-    ]);
-  }
-
-  static bool _isOrderNotification(NotificationItem n) {
-    final type = n.type.toUpperCase();
-    final refType = (n.refType ?? '').toUpperCase();
-    final category = _firstDataString(n.data, const ['category']).toUpperCase();
-    return refType == 'ORDER' ||
-        type.contains('ORDER') ||
-        category.contains('ORDER');
-  }
-
-  static String _firstDataString(
-    Map<String, dynamic>? data,
-    List<String> keys,
-  ) {
-    if (data == null) return '';
-    for (final source in [
-      data,
-      if (data['payload'] is Map<String, dynamic>)
-        data['payload'] as Map<String, dynamic>,
-      if (data['metadata'] is Map<String, dynamic>)
-        data['metadata'] as Map<String, dynamic>,
-      if (data['meta'] is Map<String, dynamic>)
-        data['meta'] as Map<String, dynamic>,
-    ]) {
-      for (final key in keys) {
-        final v = source[key];
-        if (v == null) continue;
-        final s = v.toString().trim();
-        if (s.isNotEmpty) return s;
-      }
-    }
-    return '';
-  }
-
-  /// 把 notification 文字裡的「買家」替換成具體買家名（如果 data 有提供）。
-  /// 後端通知模板統一寫「買家已下單 / 買家已支付」等通用文字，
-  /// 前端拿 data.buyerNickname 等欄位做 client-side 個人化顯示。
-  /// data 沒給就 fallback 顯示原文。
-  static String _personalize(
-    String text,
-    NotificationItem n, {
-    String? buyerName,
-  }) {
-    if (text.isEmpty) return text;
-    final providedName = buyerName?.trim() ?? '';
-    final name = providedName.isNotEmpty ? providedName : _buyerNameFromData(n);
-    if (name.isEmpty) return text;
-    return text.replaceAll('買家', name);
-  }
-}
-
-class _NotificationBuyerMeta {
-  const _NotificationBuyerMeta({required this.name, required this.avatarUrl});
-
-  final String name;
-  final String avatarUrl;
 }
 
 class _NotificationBuyerAvatar extends StatelessWidget {
@@ -791,7 +506,7 @@ class _NotificationBuyerAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = MediaRepository.resolveUrl(url) ?? url;
+    final imageUrl = url;
     return ClipOval(
       child: OptimizedNetworkImage(
         imageUrl: imageUrl,

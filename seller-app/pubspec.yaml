@@ -45,7 +45,6 @@ dependencies:
   flutter_svg: ^2.2.0
   firebase_core: ^4.3.0
   firebase_messaging: ^16.1.0
-  flutter_local_notifications: ^18.0.0
   logger: ^2.4.0
   # 對外 API（根目錄 api/ 的 Protobuf＋Connect）：生成的 client、transport 與錯誤分派，與 buyer-app 共用。
   hawkr_api:
