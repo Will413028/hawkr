@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, mediaRejectReason, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, notificationNotificationCategory, notificationNotificationChannel, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, mediaRejectReason, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, notificationNotificationCategory, notificationNotificationChannel, paymentPaymentAccountStatus, paymentRequirementCollection, procurementCancelDisposition, procurementQuoteAcceptability, procurementRejectionReason, procurementRunFailureReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -99,6 +99,17 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": 2,
 	"hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": 1,
 	"hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_UNSPECIFIED": 0,
+	"hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_ALREADY_CANCELLED": 2,
+	"hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_ALREADY_TERMINAL": 3,
+	"hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_REQUESTED": 1,
+	"hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_TOO_LATE": 4,
+	"hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_UNSPECIFIED": 0,
+	"hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_ACCEPTABLE": 1,
+	"hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_EXPIRED": 2,
+	"hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_INELIGIBLE": 5,
+	"hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_SUPERSEDED": 4,
+	"hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_UNSPECIFIED": 0,
+	"hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_WITHDRAWN": 3,
 	"hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_BUDGET_RANGE": 4,
 	"hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED": 6,
 	"hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_DATE_FORMAT": 7,
@@ -113,6 +124,13 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_TRUNCATED": 2,
 	"hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": 5,
 	"hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_UNSPECIFIED": 0,
+	"hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_ANSWER_REJECTED": 7,
+	"hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE": 6,
+	"hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_MODEL_UNAVAILABLE": 5,
+	"hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_SEARCH_FAILED": 2,
+	"hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_TURN_PIPELINE_ERROR": 3,
+	"hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_UNSPECIFIED": 0,
+	"hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_WORKER_LOST": 1,
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_CHAT_MESSAGE": 4,
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_COMMENT": 2,
 	"hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_FORUM_ENTRY": 3,
@@ -339,8 +357,17 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "payment.RequirementCollection": {
 		return paymentRequirementCollection(num("hawkr.payment.v1alpha1.RequirementCollection", c.value));
 	}
+	case "procurement.CancelDisposition": {
+		return procurementCancelDisposition(num("hawkr.procurement.v1alpha1.CancelDisposition", c.value));
+	}
+	case "procurement.QuoteAcceptability": {
+		return procurementQuoteAcceptability(num("hawkr.procurement.v1alpha1.QuoteAcceptability", c.value));
+	}
 	case "procurement.RejectionReason": {
 		return procurementRejectionReason(num("hawkr.procurement.v1alpha1.RejectionReason", c.value));
+	}
+	case "procurement.RunFailureReason": {
+		return procurementRunFailureReason(num("hawkr.procurement.v1alpha1.RunFailureReason", c.value));
 	}
 	case "review.Review.rating_label_1": {
 		return reviewReviewRatingLabel1();

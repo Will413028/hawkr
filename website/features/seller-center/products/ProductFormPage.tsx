@@ -15,9 +15,6 @@ import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { BackLink } from "@/components/shared/BackLink";
 import Button from "@/components/ui/Button";
-import AiAssistantPanel, {
-	AI_LISTING_ASSISTANT_ENABLED,
-} from "@/features/seller/components/AiAssistantPanel";
 import ShelfStatusControl from "../components/ShelfStatusControl";
 import { resolveStatusButtons } from "./adapters/productFormAdapter";
 import ProductFormSections, {
@@ -26,10 +23,6 @@ import ProductFormSections, {
 } from "./components/ProductFormSections";
 import ProductLoadFailure from "./components/ProductLoadFailure";
 import { useProductForm } from "./hooks/useProductForm";
-
-function SparkleIcon() {
-	return <AppIcon name="sparkle" size={16} />;
-}
 
 interface Props {
 	mode: "create" | "edit";
@@ -51,7 +44,6 @@ const LAST_STEP = WIZARD_STEPS.length;
 
 export default function ProductFormPage({ mode, productId }: Props) {
 	const form = useProductForm({ mode, productId });
-	const [aiOpen, setAiOpen] = React.useState(false);
 	const [step, setStep] = React.useState(1);
 	const [pendingSubmitAction, setPendingSubmitAction] = React.useState<
 		Parameters<typeof form.submit>[0] | null
@@ -178,33 +170,11 @@ export default function ProductFormPage({ mode, productId }: Props) {
 							草稿
 						</span>
 					)}
-					{AI_LISTING_ASSISTANT_ENABLED && (
-						<button
-							type="button"
-							className="product-form__ai-btn"
-							onClick={() => setAiOpen(true)}
-							aria-describedby="product-form-ai-desc"
-						>
-							<SparkleIcon />
-							<span className="product-form__ai-label">AI 助手</span>
-							<span id="product-form-ai-desc" className="sr-only">
-								開啟 AI 上架助手
-							</span>
-						</button>
-					)}
 				</div>
 				<p className="m-0 text-sm text-hk-muted leading-relaxed max-w-[640px]">
 					左欄填寫商品內容與產地，右欄保留認證與進階設定。必填欄位未填會在儲存時提醒。
 				</p>
 			</header>
-
-			{AI_LISTING_ASSISTANT_ENABLED && (
-				<AiAssistantPanel
-					open={aiOpen}
-					onClose={() => setAiOpen(false)}
-					onPatch={form.handleAiPatch}
-				/>
-			)}
 
 			{/* Mobile-only step indicator. Hidden ≥961px where the full form shows. */}
 			<ol className="min-[961px]:hidden flex items-center gap-1.5 mb-4 list-none p-0">

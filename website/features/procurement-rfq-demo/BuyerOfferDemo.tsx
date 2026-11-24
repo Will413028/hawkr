@@ -3,7 +3,6 @@
 import * as React from "react";
 import styles from "@/styles/features/procurement-rfq-demo/rfq-demo.module.css";
 import {
-	confirmRfqSnapshot,
 	DemoRequirementIncompleteError,
 	loadDemoContext,
 	runPricePreview,
@@ -123,9 +122,8 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 			: null;
 
 	/**
-	 * 定稿：用買家填的區間重跑一次試算（伺服器會原樣保留買家金額、只補基準），
-	 * 再對那一份試算做 confirm。confirm 通過才算真的定稿——它是伺服器側的 CAS，
-	 * 不是前端說了算。
+	 * 定稿：用買家填的區間跑一次試算（伺服器會原樣保留買家金額、只補基準與總額區間）。
+	 * 試算是純計算，需求版本有變時伺服器會拒絕，不是前端說了算。
 	 */
 	async function submitOffer() {
 		if (priceError || submitting) return;
@@ -136,36 +134,24 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 				lower: Number(minPrice),
 				upper: Number(maxPrice),
 			});
-			if (!outcome.preview) {
-				setSubmitError(
-					`伺服器沒有回一份可確認的試算（${outcome.reason ?? "UNKNOWN"}）。`,
-				);
+			if (outcome.reason !== null) {
+				setSubmitError(`伺服器沒有回一份可確認的試算（${outcome.reason}）。`);
 				return;
 			}
-			const confirmed = await confirmRfqSnapshot(requirement, outcome.preview);
 			setContext((prev) =>
-				prev
-					? {
-							...prev,
-							quoteTotalRange: outcome.quoteTotalRange,
-							preview: outcome.preview,
-						}
-					: prev,
+				prev ? { ...prev, quoteTotalRange: outcome.quoteTotalRange } : prev,
 			);
 			setOffer({
 				idealUnitPrice: Number(idealPrice),
 				minUnitPrice: Number(minPrice),
 				maxUnitPrice: Number(maxPrice),
-				confirmedSnapshotId: confirmed.confirmedSnapshotId,
-				snapshotPayloadHash: confirmed.payloadHash,
+				revisionId: requirement.revisionId,
 				confirmedAt: new Date().toISOString(),
 			});
 			setSellerResponse(null);
 			setStep("seller-inbox");
 		} catch {
-			setSubmitError(
-				"定稿失敗。多半是這份需求版本已經變了，或這次試算過期了（15 分鐘）。重新整理再試。",
-			);
+			setSubmitError("定稿失敗。多半是這份需求版本已經變了。重新整理再試。");
 		} finally {
 			setSubmitting(false);
 		}
@@ -192,8 +178,8 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 					<h1>買家出價 → 賣家決定 → 買家確認</h1>
 				</div>
 				<p className={styles.flag}>
-					買家那半全部是真的：需求、收件名單，出價也真的凍結成 confirmed
-					snapshot。賣家那半是本機狀態，不會送出、不會通知任何人。
+					買家那半全部是真的：需求、收件名單，出價區間也真的送去伺服器試算。
+					賣家那半是本機狀態，不會送出、不會通知任何人。
 				</p>
 			</header>
 
@@ -251,12 +237,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 						<ul className={styles.recipients}>
 							{candidates.map((candidate) => (
 								<li key={candidate.candidateId}>
-									<strong>
-										{candidate.sellerName ?? candidate.displayName}
-									</strong>
-									<span>
-										{candidate.lane === "PLATFORM" ? "平台賣家" : "外部業者"}
-									</span>
+									<strong>{candidate.displayName}</strong>
 									<small>
 										符合 {candidate.matchedFactCount} 項 · 待確認{" "}
 										{candidate.unverifiableFactCount} 項
@@ -291,8 +272,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 				<section className={styles.panel}>
 					<h2>買家出價</h2>
 					<p className={styles.panelNote}>
-						理想價是你希望成交的單價；可接受區間是你願意讓步的範圍。定稿時區間會送進伺服器並被凍結進
-						confirmed snapshot。
+						理想價是你希望成交的單價；可接受區間是你願意讓步的範圍。定稿時區間會送進伺服器做價格試算，試算不會寫入任何資料。
 					</p>
 					<div className={styles.priceGrid}>
 						<label>
@@ -332,9 +312,8 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 						{submitting ? "定稿中…" : "定稿並送給賣家"}
 					</button>
 					<p className={styles.boundary}>
-						按下去會真的呼叫 rfq-confirmations，在伺服器上凍結一份 confirmed
-						snapshot。它只鎖定你自己的條件，不會通知任何賣家——發邀請是
-						quote-batches 的事，本 demo 不呼叫。
+						按下去只會呼叫價格試算，不寫入任何資料，也不會通知任何賣家——發布詢價是
+						發布核准的事，本 demo 不呼叫。
 					</p>
 				</section>
 			) : null}
@@ -354,12 +333,8 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 							value={`${money(offer.minUnitPrice)} – ${money(offer.maxUnitPrice)}`}
 						/>
 						<Field label="到貨日期" value={requirement.deliveryDate} />
-						<Field label="條件版本" value={offer.confirmedSnapshotId} />
+						<Field label="條件版本" value={offer.revisionId} />
 					</dl>
-					<p className={styles.panelNote}>
-						payload hash {offer.snapshotPayloadHash.slice(0, 16)}… ——
-						賣家報價時要對它做 CAS，證明看到的是這一版。
-					</p>
 					<div className={styles.sellerActions}>
 						<button
 							type="button"

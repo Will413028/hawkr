@@ -24,6 +24,9 @@ const sessionHook = readSource(
 const priceContract = readSource(
 	"features/procurement-assistant/rfq-price-contract.ts",
 );
+const publicationContract = readSource(
+	"features/procurement-assistant/rfq-publication-contract.ts",
+);
 const procurementCss = readSource("styles/features/procurement-assistant.css");
 
 test("selected candidates open the typed RFQ price confirmation inside the workspace", () => {
@@ -31,15 +34,14 @@ test("selected candidates open the typed RFQ price confirmation inside the works
 	assert.match(candidateBrowser, /onStartRfqDraft\(selectedCandidates\)/);
 	assert.match(candidateCanvas, /<RfqDraftFlow/);
 	assert.match(candidateCanvas, /onPreviewRfqPrice=\{onPreviewRfqPrice\}/);
-	assert.match(
-		candidateCanvas,
-		/onConfirmRfqSnapshot=\{onConfirmRfqSnapshot\}/,
-	);
+	assert.doesNotMatch(candidateCanvas, /onConfirmRfqSnapshot/);
 });
 
-test("the live RFQ flow uses the new preview and confirmation endpoints, never legacy publication", () => {
-	assert.match(sessionHook, /rfq-price-previews`[\s\S]*?\{ json: command \}/);
-	assert.match(sessionHook, /rfq-confirmations`[\s\S]*?\{ json: command \}/);
+test("the live RFQ flow goes through the Connect price preview and publication RPCs, never legacy publication", () => {
+	assert.match(sessionHook, /buyerProcurementClient\(\)\.previewRfqPrice\(/);
+	assert.match(sessionHook, /buyerProcurementClient\(\)\.previewRfqPublication\(/);
+	assert.match(sessionHook, /buyerProcurementClient\(\)\.executeRfqPublication\(/);
+	assert.doesNotMatch(sessionHook, /rfq-confirmations|confirmRfqSnapshot/);
 	assert.doesNotMatch(rfqDraft, /quote-batches|onPublish|onPublished/);
 	assert.doesNotMatch(rfqDraft, /apiClient|\.authed\.|fetch\(/);
 	assert.match(rfqDraft, /確認並準備發布/);
@@ -75,29 +77,29 @@ test("quantity, unit, city and delivery date are persisted-slot read-only fields
 	assert.match(rfqDraft, /回到對話產生新的需求版本/);
 });
 
-test("confirmation stays fail closed without a canonical server basis", () => {
-	assert.match(rfqDraft, /hasConfirmablePriceBasis\(preview,\s*unit\)/);
+test("approval stays fail closed without a canonical server basis", () => {
+	assert.match(rfqDraft, /hasPriceBasis\(preview\)/);
 	assert.match(rfqDraft, /價格資料尚未完整，或與目前需求單位不一致/);
-	assert.match(priceContract, /basisUnit === "KG"/);
-	assert.match(priceContract, /basisUnit === "CATTY"/);
-	assert.match(priceContract, /basisUnit === "GRAM"/);
+	assert.match(
+		priceContract,
+		/basisQuantity !== "" && basisUnit !== ""/,
+	);
 });
 
-test("preview and confirmation exact retries reuse their stored command identity", () => {
+test("publication preview and execute retries reuse their stored client request id", () => {
 	assert.match(
 		rfqDraft,
-		/reuseExistingCommand && existing\?\.fingerprint === fingerprint[\s\S]*?existing\.command/,
+		/stored\?\.fingerprint === fingerprint[\s\S]*?stored\.clientRequestId/,
 	);
 	assert.match(
 		rfqDraft,
-		/previewCommandRef\.current = \{ fingerprint, command \}/,
+		/publicationPreviewIdRef\.current = \{ fingerprint, clientRequestId \}/,
 	);
 	assert.match(
 		rfqDraft,
-		/confirmationCommandRef\.current = \{ fingerprint, command \}/,
+		/executeCommandRef\.current = \{ approvalFingerprint, clientRequestId \}/,
 	);
 	assert.match(rfqDraft, /以原操作重試/);
-	assert.match(rfqDraft, /IDEMPOTENCY_KEY_CONFLICT/);
 	const previewRfqPriceBody = sessionHook.match(
 		/\tconst previewRfqPrice = React\.useCallback\([\s\S]*?\n\t\);/,
 	)?.[0];
@@ -108,15 +110,14 @@ test("preview and confirmation exact retries reuse their stored command identity
 	assert.doesNotMatch(previewRfqPriceBody, /randomUUID/);
 });
 
-test("confirmation is fail-closed and locks navigation while the mutation is in flight", () => {
+test("the price acknowledgement is fail-closed and navigation locks while the publication mutation is in flight", () => {
 	assert.match(
 		rfqDraft,
-		/!approvalEnabled \|\|[\s\S]*?!snapshotReconfirmed \|\|[\s\S]*?confirmationState\.status === "success"/,
+		/!approvalEnabled \|\|[\s\S]*?publicationLocked/,
 	);
-	assert.match(rfqDraft, /confirmationState\.status === "idle"/);
 	assert.match(
 		rfqDraft,
-		/onInteractionLockChange\?\.\(confirmationState\.status === "loading"\)/,
+		/onInteractionLockChange\?\.\(\s*publicationState\.status === "loading" \|\|\s*executionState\.status === "loading",?\s*\)/,
 	);
 	assert.match(candidateCanvas, /disabled=\{rfqInteractionLocked\}/);
 	assert.match(
@@ -130,37 +131,18 @@ test("confirmation is fail-closed and locks navigation while the mutation is in 
 	assert.match(assistantWorkspace, /hidden=\{!resultsVisible\}/);
 });
 
-test("confirmation echoes preview identity and hash but keeps the confirmed hash independent", () => {
-	assert.match(rfqDraft, /pricePreviewId: preview\.pricePreviewId/);
-	assert.match(rfqDraft, /pricePreviewVersion: preview\.version/);
-	assert.match(rfqDraft, /payloadHash: preview\.payloadHash/);
-	assert.match(
-		priceContract,
-		/export const rfqConfirmationSchema = z\.object\(\{[\s\S]*?payloadHash: payloadHashSchema/,
-	);
-	assert.match(rfqDraft, /\? \{ status: "success", data: result\.data \}/);
-	assert.doesNotMatch(
-		rfqDraft,
-		/confirmed\.payloadHash\s*===\s*preview\.payloadHash/,
-	);
-});
-
 test("runtime parsing and stale-session guards fail closed before UI state mutation", () => {
-	assert.match(sessionHook, /rfqPricePreviewSchema\.safeParse\(env\.data\)/);
-	assert.match(sessionHook, /rfqConfirmationSchema\.safeParse\(env\.data\)/);
-	assert.match(sessionHook, /code: "INVALID_RESPONSE"/);
+	assert.match(sessionHook, /pricePreviewFromProto\(res\)/);
+	assert.match(sessionHook, /invalidResponseFailure\(defaults\)/);
 	assert.match(sessionHook, /stateRef\.current\.revisionId === revisionId/);
 	assert.match(sessionHook, /code: "STALE_CONTEXT"/);
-	assert.match(sessionHook, /RESOURCE_NOT_FOUND/);
-	assert.match(sessionHook, /error\.status === 408 \|\| error\.status === 429/);
 });
 
-test("quality context remains server-owned and confirmation success does not claim publication", () => {
+test("quality context remains server-owned and the price acknowledgement does not claim publication", () => {
 	assert.doesNotMatch(
 		rfqDraft,
 		/BUYER_QUALITY_UNKNOWN|data-quality-state|品相狀態|品相未知狀態|以買家品相未知保存/,
 	);
-	assert.match(rfqDraft, /需求版本與價格範圍已固定，等待發布。/);
 	assert.match(rfqDraft, /這次確認不包含候選名單、截止時間與通知設定/);
 	assert.doesNotMatch(rfqDraft, /候選名單已固定|通知已排入處理/);
 });
@@ -169,7 +151,7 @@ test("request or revision remounts price proof while candidate changes only retu
 	assert.match(candidateCanvas, /key=\{rfqDraftIdentity\}/);
 	assert.match(
 		candidateCanvas,
-		/const rfqDraftIdentity = JSON\.stringify\(\[\s*requestId \?\? null,\s*revisionId \?\? null,\s*\]\)/,
+		/const rfqDraftIdentity = JSON\.stringify\(\[\s*requestId \?\? null,\s*revisionId \?\? null,/,
 	);
 	assert.match(
 		candidateCanvas,
@@ -186,7 +168,7 @@ test("request or revision remounts price proof while candidate changes only retu
 	assert.match(rfqDraft, /clearDerivedPriceState/);
 });
 
-test("RFQ capability flags separately gate entry and confirmation", () => {
+test("RFQ capability flags separately gate entry and approval", () => {
 	assert.match(
 		assistantWorkspace,
 		/capabilities\.WEB_PROCUREMENT_RFQ_PRICE_RANGE_V1/,
@@ -200,12 +182,11 @@ test("RFQ capability flags separately gate entry and confirmation", () => {
 	assert.match(rfqDraft, /approvalEnabled &&/);
 });
 
-test("new loading, error, confirmed and mobile states are styled", () => {
+test("new loading, error and mobile states are styled", () => {
 	for (const selector of [
 		"assistant-rfq-guidance__loading",
 		"assistant-rfq-guidance__error",
 		"assistant-rfq-guidance__server-range",
-		"assistant-rfq-snapshot__confirmed",
 	]) {
 		assert.match(procurementCss, new RegExp(`\\.${selector}`), selector);
 	}
@@ -223,10 +204,7 @@ test("總額區間由伺服器供給，前端不自算也不補值", () => {
 	assert.doesNotMatch(rfqDraft, /total\.quantity\s*\*|Number\(total\./);
 	assert.doesNotMatch(rfqDraft, /quantityUnit:\s*"|basisUnit\s*=\s*"/);
 
-	assert.match(
-		priceContract,
-		/quoteTotalRange: rfqQuoteTotalRangeSchema\.nullable\(\)\.default\(null\)/,
-	);
+	assert.match(priceContract, /quoteTotalRange: RfqQuoteTotalRange \| null;/);
 
 	assert.match(procurementCss, /\.assistant-rfq-guidance__quote-total/);
 });
@@ -260,7 +238,7 @@ test("A13：受眾只剩指定候選，沒有候選時 fail closed", () => {
 	assert.doesNotMatch(rfqDraft, /mode: "WISH_POOL"/);
 	assert.doesNotMatch(rfqDraft, /radiogroup/);
 	assert.match(rfqDraft, /!hasRecipients \|\|/);
-	assert.match(rfqDraft, /executionState\.data\.audienceMode === "WISH_POOL"/);
+	assert.doesNotMatch(rfqDraft, /audienceMode|WISH_POOL/);
 });
 
 test("回覆期限的輸入卡有對應樣式", () => {
@@ -268,38 +246,36 @@ test("回覆期限的輸入卡有對應樣式", () => {
 	assert.match(procurementCss, /\.assistant-rfq-reconfirm__deadline/);
 });
 
-test("買家的補充說明進 confirm 的 CAS 指紋，而且不是 slot", () => {
+test("買家的補充說明進發布預覽的 client request id 指紋，而且不是 slot", () => {
 	assert.match(priceContract, /export const BUYER_NOTE_MAX_LENGTH = 200;/);
-	assert.match(priceContract, /buyerNote: string;/);
+	assert.match(publicationContract, /buyerNote: string;/);
 
 	assert.match(rfqDraft, /maxLength=\{BUYER_NOTE_MAX_LENGTH\}/);
 	assert.match(rfqDraft, /placeholder="例如：中大果，不要有壓傷"/);
 
 	assert.match(rfqDraft, /buyerNote: buyerNote\.trim\(\),/);
-	const runConfirmation = rfqDraft.slice(
-		rfqDraft.indexOf("const runConfirmation = React.useCallback("),
+	const runPublicationPreview = rfqDraft.slice(
+		rfqDraft.indexOf("const runPublicationPreview = React.useCallback("),
 	);
-	const commandInput = runConfirmation.slice(
-		runConfirmation.indexOf("const commandInput = {"),
-		runConfirmation.indexOf(
-			"const fingerprint = JSON.stringify(commandInput);",
-		),
+	const commandInput = runPublicationPreview.slice(
+		runPublicationPreview.indexOf("const input = {"),
+		runPublicationPreview.indexOf("const fingerprint = JSON.stringify(input);"),
 	);
 	assert.match(
 		commandInput,
 		/buyerNote/,
-		"補充說明必須在 commandInput 裡：fingerprint 由它算出來，" +
+		"補充說明必須在 input 裡：fingerprint 由它算出來，" +
 			"漏掉的話改了說明卻沿用同一個 clientRequestId，後端會把它當冪等重播而不寫入",
 	);
 
-	assert.match(rfqDraft, /\[\s*approvalEnabled,\s*buyerNote,/);
+	assert.match(rfqDraft, /\[\s*buyerNote,\s*candidateSetId,/);
 });
 
 test("補充說明只從輸入框來，不從對話抽取", () => {
 	assert.doesNotMatch(
 		sessionHook,
-		/buyerNote/,
-		"session hook 不該認得 buyerNote——它不是 slot、不經 LLM 抽取。" +
+		/buyerNote(?!: command\.buyerNote)/,
+		"session hook 只能把發布預覽 command 的 buyerNote 原樣轉給 RPC——它不是 slot、不經 LLM 抽取。" +
 			"2026-08-17 移除的 spec 就是走那條路（backend #2476／website #498）",
 	);
 });

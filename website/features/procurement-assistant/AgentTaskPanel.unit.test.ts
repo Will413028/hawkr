@@ -1,9 +1,12 @@
 /** @vitest-environment jsdom */
 
+import {
+	RunFailureReason,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementCandidateSearch } from "@/lib/api/openapi-types";
+import type { ProcurementCandidateSearch } from "@/features/procurement-assistant/types";
 import AgentTaskPanel from "./AgentTaskPanel";
 import type { AgentActivityEvent } from "./activity";
 
@@ -45,8 +48,8 @@ const searchRows: AgentActivityEvent[] = [
 	},
 	{
 		rowId: "9003",
-		code: "SEARCH_EXTERNAL",
-		label: "查看外部業者",
+		code: "READ_SELLER",
+		label: "讀取賣家資料",
 		status: "RUNNING",
 		parentRowId: "9001",
 		text: "",
@@ -180,15 +183,14 @@ describe("AgentTaskPanel 搜尋狀態", () => {
 		expect(container.querySelector('[role="status"], [aria-live]')).toBeNull();
 	});
 
-	it("沒有搜尋事件時以輪詢的真實 lane 狀態呈現，不回放 turn 列", () => {
+	it("沒有搜尋事件時以輪詢的真實搜尋狀態呈現，不回放 turn 列", () => {
 		const candidateSet: ProcurementCandidateSearch = {
 			requestId: "request-1",
 			runId: "run-1",
 			candidateSetId: "candidates-1",
 			status: "RUNNING",
-			platformLaneStatus: "SUCCEEDED",
-			externalLaneStatus: "PENDING",
-			candidates: { platform: [], external: [] },
+			failureReason: RunFailureReason.UNSPECIFIED,
+			candidates: [],
 		};
 		const { rerender } = renderPanel({ pending: true, liveActivity: [row] });
 		rerender(
@@ -199,8 +201,8 @@ describe("AgentTaskPanel 搜尋狀態", () => {
 			}),
 		);
 		expect(screen.getByText("正在搜尋候選")).toBeTruthy();
-		expect(screen.getByText("已完成")).toBeTruthy();
-		expect(screen.getByText("外部業者")).toBeTruthy();
+		expect(screen.getByText("搜尋候選供應商")).toBeTruthy();
+		expect(screen.getAllByText("搜尋中").length).toBeGreaterThan(0);
 		expect(screen.queryByTestId("agent-activity-rail")).toBeNull();
 		expect(screen.queryByText("理解採購需求")).toBeNull();
 	});

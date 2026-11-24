@@ -1,13 +1,16 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import AiSparkleIcon from "@/components/shared/AiSparkleIcon";
 import AppIcon from "@/components/shared/AppIcon";
 import Button from "@/components/ui/Button";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { buildImageUrl } from "@/lib/media/cdn";
 import {
 	AI_IMAGE_STYLES_BY_CATEGORY,
+	AiEnhanceError,
 	type AiImageStyle,
 	AiQuotaExceededError,
 	type AiStyleCategory,
@@ -30,8 +33,8 @@ interface Props {
  * AI image enhancement dialog — mirrors the seller app's flow: pick a preset
  * style (with an example thumbnail) or type a custom prompt, run it, compare
  * before/after, then apply. Preset styles + the weekly quota come live from
- * `GET /app/ai_styles` (falling back to the bundled list); the transform hits
- * `POST /app/image_transformations`. Operates on raw bytes so callers can hand
+ * `ListAiStyles` (falling back to the bundled list); the transform is
+ * `TransformImage`. Operates on raw bytes so callers can hand
  * it a freshly-picked File (no CDN round-trip / CORS needed).
  */
 export default function AiImageEnhanceDialog({
@@ -41,6 +44,7 @@ export default function AiImageEnhanceDialog({
 	onApply,
 	onClose,
 }: Props) {
+	const defaultErrors = useDefaultErrorText();
 	const fallbackStyles = AI_IMAGE_STYLES_BY_CATEGORY[category];
 	const [styles, setStyles] = React.useState<AiImageStyle[]>(fallbackStyles);
 	const [styleId, setStyleId] = React.useState<string>(fallbackStyles[0].id);
@@ -150,6 +154,7 @@ export default function AiImageEnhanceDialog({
 			const result = await enhanceImage(source, {
 				prompt,
 				signal: ctrl.signal,
+				defaults: defaultErrors,
 			});
 			if (resultUrl) URL.revokeObjectURL(resultUrl);
 			setResultBlob(result.blob);
@@ -160,7 +165,7 @@ export default function AiImageEnhanceDialog({
 		} catch (e) {
 			if ((e as Error)?.name === "AbortError") return;
 			setError(
-				e instanceof Error ? e.message : "這次沒有成功產生圖片，請再試一次",
+				e instanceof AiEnhanceError ? e.message : errorText(e, defaultErrors),
 			);
 			// Quota state otherwise only advances on success (dialog-open fetch or a
 			// prior successful transform) — a quota-exceeded failure never told us

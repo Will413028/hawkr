@@ -64,7 +64,7 @@ test("思考步驟只存在於 Live Activity Rail，不借用 facts pill 變成�
 });
 
 test("allowlisted public steps 逐列呈現，並把完整 liveSteps 交給狀態軌", () => {
-	// normalizeSteps 已先 fail closed；這裡把完整 liveSteps 交給狀態軌，保留
+	// stepFromProto 已先 fail closed；這裡把完整 liveSteps 交給狀態軌，保留
 	// §V.10.6-3 所需的 status。
 	assert.match(taskPanel, /<AgentActivityRail[\s\S]*?steps=\{liveSteps\}/);
 	assert.match(rail, /data-status=\{step\.status\}/);

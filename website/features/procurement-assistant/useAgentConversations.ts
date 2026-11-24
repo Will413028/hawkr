@@ -1,11 +1,12 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api/client";
 import { accountQueryFn } from "@/lib/auth/account-query";
 import { useAccountStatus } from "@/lib/auth/use-account-status";
 import { toast } from "@/lib/feedback/toast";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
 import { queryKeys } from "@/lib/query/keys";
 import {
 	type AgentConversationPage,
@@ -16,6 +17,7 @@ import {
 	fetchAgentTranscript,
 	renameAgentConversation,
 } from "./conversations";
+import { fetchProcurementSnapshot } from "./snapshot";
 
 const EMPTY_PAGE: AgentConversationPage = {
 	records: [],
@@ -25,15 +27,15 @@ const EMPTY_PAGE: AgentConversationPage = {
 };
 
 /**
- * Hawkr Agent 對話列表（B-244 Ask 1）。照 useConversations 的慣例：
+ * Hawkr Agent 對話列表。照 useConversations 的慣例：
  * identity-scoped key、placeholderData（非 initialData）、30s 全域
- * staleTime。端點尚未部署時 fetch 層回 available:false 的空頁——
- * 側欄不長出 agent 區段，不當錯誤呈現。
+ * staleTime。還沒讀到列表時是 available:false 的空頁，側欄不長出 agent 區段。
  */
 export function useAgentConversations(enabled = true) {
 	const status = useAccountStatus();
 	const queryIdentity = useQueryIdentity();
 	const queryClient = useQueryClient();
+	const defaults = useDefaultErrorText();
 	const queryKey = queryKeys.assistant.conversations(queryIdentity);
 	const shouldFetch = enabled && status === "signedIn";
 	const query = useQuery({
@@ -71,12 +73,7 @@ export function useAgentConversations(enabled = true) {
 					queryIdentity,
 					transcript.requestId,
 				),
-				queryFn: async () => {
-					const env = await apiClient.authed.get<unknown>(
-						`/buyers/me/procurement/requests/${transcript.requestId}/snapshot`,
-					);
-					return (env as { data: unknown }).data;
-				},
+				queryFn: () => fetchProcurementSnapshot(transcript.requestId),
 				staleTime: 15_000,
 			})
 			.catch(() => {});
@@ -119,9 +116,9 @@ export function useAgentConversations(enabled = true) {
 			);
 			try {
 				await renameAgentConversation(conversationId, title);
-			} catch {
+			} catch (err) {
 				queryClient.setQueryData(queryKey, previous);
-				toast.error("改名失敗，請重試");
+				toast.error(errorText(err, defaults));
 				return false;
 			}
 			void invalidate();
@@ -151,9 +148,9 @@ export function useAgentConversations(enabled = true) {
 				void (async () => {
 					try {
 						await deleteAgentConversation(conversationId);
-					} catch {
+					} catch (err) {
 						queryClient.setQueryData(queryKey, previous);
-						toast.error("刪除失敗，請重試");
+						toast.error(errorText(err, defaults));
 						return;
 					}
 					void invalidate();

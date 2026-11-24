@@ -1,15 +1,14 @@
 /**
  * 買家出價 → 賣家接受 → 買家確認 的可操作 demo。
  *
- * 買家那半吃真資料——真 request slots、真候選名單，出價也真的落成
- * confirmed snapshot；
+ * 買家那半吃真資料——真 request slots、真候選名單，出價區間也真的送去伺服器試算；
  * 賣家那半仍是 local state，但它顯示的是買家這次真的定稿的那張詢價單，
  * 所以整條流程是連貫的。
  *
  * ⛔ 硬界線：本 demo 不呼叫 `POST /quote-batches`。那支會建立
  * `procurement_quote_invites` 並經 outbox 發 `procurement.quote.invite.created`
- * 到 RabbitMQ；PLATFORM lane 是真的會通知賣家的。demo 停在 confirmed snapshot，
- * 那一步只凍結買家自己的條件，不對任何賣家產生訊息。
+ * 到 RabbitMQ，是真的會通知賣家的。demo 只呼叫價格試算（純計算、不寫入），
+ * 不對任何賣家產生訊息。
  */
 
 /** 三個步驟就是這條線的全部：買家出價、賣家決定、買家確認。 */
@@ -44,9 +43,6 @@ export interface DemoRequirement {
 export interface DemoCandidate {
 	candidateId: string;
 	displayName: string;
-	lane: string;
-	/** 平台賣家才有；外部業者一律缺席，不補空字串。 */
-	sellerName: string | null;
 	matchedFactCount: number;
 	unverifiableFactCount: number;
 }
@@ -64,27 +60,13 @@ export interface DemoQuoteTotalRange {
 	quantityUnit: string;
 }
 
-/**
- * 一次價格試算的身分。confirm 時要原樣回送這三個值做 CAS，缺一不可。
- *
- * ⚠️ 這裡的 `payloadHash` 是「這一份試算」的 hash，跟 confirmed snapshot
- * 自己的 `payloadHash` 同名但不同義，不得互相代入。
- */
-export interface DemoPreviewIdentity {
-	pricePreviewId: string;
-	version: string;
-	payloadHash: string;
-}
-
 /** 買家定稿的出價。理想價與可接受區間都會原樣交給賣家。 */
 export interface DemoBuyerOffer {
 	idealUnitPrice: number;
 	minUnitPrice: number;
 	maxUnitPrice: number;
-	/** 伺服器回寫的 confirmed snapshot 身分——這才是「買家定稿」的證據。 */
-	confirmedSnapshotId: string;
-	/** confirmed snapshot 自己的 payload hash（不是 preview 那個）。 */
-	snapshotPayloadHash: string;
+	/** 這次出價依據的需求版本。 */
+	revisionId: string;
 	confirmedAt: string;
 }
 
@@ -105,5 +87,4 @@ export interface DemoContext {
 	/** 找不到 CANDIDATE_SEARCH run 時的原因，用來誠實說明為何名單是空的。 */
 	candidatesUnavailableReason: string | null;
 	quoteTotalRange: DemoQuoteTotalRange | null;
-	preview: DemoPreviewIdentity | null;
 }

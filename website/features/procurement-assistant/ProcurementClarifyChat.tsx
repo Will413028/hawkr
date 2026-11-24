@@ -1,5 +1,6 @@
 "use client";
 
+import { procurementRejectionReason } from "@hawkr/ui-text/keys";
 import * as React from "react";
 import AppIcon, { type AppIconName } from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
@@ -7,19 +8,14 @@ import Button from "@/components/ui/Button";
 import SendButton from "@/features/messages/components/SendButton";
 import { useAuth } from "@/lib/auth/context";
 import { useComposerScroll } from "@/lib/hooks/useComposerScroll";
+import { optionalText, useUiText } from "@/lib/i18n/ui-text";
 import ClarifyQuestionCard from "./ClarifyQuestionCard";
-import CropDisambiguationCard from "./CropDisambiguationCard";
 import HawkrAgentTypingRow from "./HawkrAgentTypingRow";
 import { legacyReplyToBlocks, narrativeIcon } from "./narrative";
-import { RUN_CANCEL_COPY } from "./runtime-snapshot-contract";
+import { runCancelCopy } from "./runtime-snapshot-contract";
 import { slotLabel } from "./session-logic";
 import { groupLabel, shouldStartGroup } from "./transcript-groups";
-import type {
-	ClarifyQuestion,
-	CropDisambiguation,
-	CropDisambiguationOption,
-	ProcurementChatTurn,
-} from "./types";
+import type { ClarifyQuestion, ProcurementChatTurn } from "./types";
 import type { RunCancelState } from "./useProcurementSession";
 
 const MAX_MESSAGE_LENGTH = 2000;
@@ -116,9 +112,6 @@ interface ProcurementClarifyChatProps {
 		slotKey: string;
 		description: string;
 	}) => void;
-	/** 最新一輪的品項消歧問題卡（B-244 Ask 3.5）；null＝這輪沒有待處理的消歧。 */
-	cropDisambiguation?: CropDisambiguation | null;
-	onChooseCropDisambiguation?: (option: CropDisambiguationOption) => void;
 }
 
 /**
@@ -142,11 +135,10 @@ export default function ProcurementClarifyChat({
 	onSubmitFreeText,
 	onPickUnit,
 	onSubmitCropOther,
-	cropDisambiguation = null,
-	onChooseCropDisambiguation,
 }: ProcurementClarifyChatProps) {
 	const answeredViaChipRef = React.useRef(false);
 	const { identity } = useAuth();
+	const ut = useUiText();
 	const buyerName = identity?.nickname?.trim() || undefined;
 	const buyerAvatarLabel = buyerName ? `${buyerName} 的大頭貼` : "你的大頭貼";
 	// Date.now() 不能直接在 SSR/hydration render 裡呼叫：跨過午夜或只差幾毫秒
@@ -289,7 +281,12 @@ export default function ProcurementClarifyChat({
 												{turn.rejectedThisTurn.map((field) => (
 													<li key={`${field.key}-${field.reason}`}>
 														<span>{slotLabel(field.key)}</span>
-														<span>{field.reason}</span>
+														<span>
+															{optionalText(
+																ut,
+																procurementRejectionReason(field.reason),
+															)}
+														</span>
 													</li>
 												))}
 											</ul>
@@ -329,14 +326,6 @@ export default function ProcurementClarifyChat({
 					label={latestActivityLabel}
 					motion="SUBMITTING"
 					ariaLabel="Hawkr Agent 正在整理"
-				/>
-			) : null}
-
-			{!pending && cropDisambiguation && onChooseCropDisambiguation ? (
-				<CropDisambiguationCard
-					disambiguation={cropDisambiguation}
-					pending={pending}
-					onChoose={onChooseCropDisambiguation}
 				/>
 			) : null}
 
@@ -449,6 +438,7 @@ export function ProcurementClarifyComposer({
 	stopState = { status: "idle" },
 	onStop,
 }: ProcurementClarifyComposerProps) {
+	const ut = useUiText();
 	const [validationError, setValidationError] = React.useState<string | null>(
 		null,
 	);
@@ -456,26 +446,23 @@ export function ProcurementClarifyComposer({
 	const overLimit = draftLength > maxLength;
 	const hasError = overLimit || Boolean(validationError);
 	const canSend = Boolean(value.trim()) && !overLimit && !pending;
-	// 按得下去的唯一條件：伺服器給得出這一輪的 CAS token，而且這次還沒收到過
-	// 回執。已經 settled／stale 之後再按沒有第二件事可做；`error` 是例外——
+	// 按得下去的唯一條件：伺服器指得出這一輪進行中的 run，而且這次還沒收到過
+	// 回執。已經 settled 之後再按沒有第二件事可做；`error` 是例外——
 	// 那一次命令沒有成立，重試是有意義的。
-	const stopAnswered =
-		stopState.status === "settled" || stopState.status === "stale";
+	const stopAnswered = stopState.status === "settled";
 	const canPressStop =
 		Boolean(onStop) &&
 		canStop &&
 		stopState.status !== "requesting" &&
 		!stopAnswered;
 	// 四個 disposition 各講各的話：只有 REQUESTED 是「正在停止」，另外三個
-	// 講的是這一輪已經到終點、已完成的結果沒有被作廢（RUN_CANCEL_COPY）。
+	// 講的是這一輪已經到終點、已完成的結果沒有被作廢（runCancelCopy）。
 	const stopNotice =
 		stopState.status === "settled"
-			? RUN_CANCEL_COPY[stopState.disposition]
-			: stopState.status === "stale"
-				? "這一輪的狀態已經變了，請重新整理確認目前結果。"
-				: stopState.status === "error"
-					? stopState.detail
-					: null;
+			? runCancelCopy(ut, stopState.disposition)
+			: stopState.status === "error"
+				? stopState.detail
+				: null;
 	const fallbackRef = React.useRef<HTMLTextAreaElement | null>(null);
 	const textareaRef = inputRef ?? fallbackRef;
 	React.useLayoutEffect(() => {

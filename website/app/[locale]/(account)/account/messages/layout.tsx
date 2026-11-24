@@ -75,7 +75,6 @@ export default function MessagesLayout({
 			// Legacy/invalid timestamps should not silently pick January 1970's
 			// winter artwork. Keep the row and use the current Taipei season.
 			updatedAt: Date.parse(row.updatedAt) || Date.now(),
-			primaryCategoryId: row.primaryCategoryId,
 			active: row.conversationId === activeAgentConversationId,
 		}));
 	}, [agent.conversations, activeAgentConversationId]);

@@ -4,9 +4,7 @@ import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import Avatar from "@/components/shared/Avatar";
 import ConversationActionsMenu from "@/features/procurement-assistant/ConversationActionsMenu";
-import HawkrAgentConversationMarble from "@/features/procurement-assistant/HawkrAgentConversationMarble";
 import HawkrAgentMark from "@/features/procurement-assistant/HawkrAgentMark";
-import type { HawkrAgentCategoryId } from "@/lib/animation/hawkr-agent-season";
 import { conversationRangeLabel } from "@/lib/chat/list-range";
 import { peerName, previewText } from "@/lib/chat/map";
 import type { Conversation } from "@/lib/chat/types";
@@ -70,8 +68,6 @@ export interface AgentConversationRow {
 	preview: string;
 	/** epoch ms；沿用人類對話列的相對時間格式。 */
 	updatedAt: number;
-	/** 後端依目前需求品項對到的九大分類；舊資料或不明確時不提供。 */
-	primaryCategoryId?: HawkrAgentCategoryId | null;
 	active?: boolean;
 }
 
@@ -697,13 +693,8 @@ export default function ConversationSidebar({
 								// 一則訊息當列標（那是真實內容），並且不再重複印一次預覽。
 								const label = row.title || row.preview || "未命名對話";
 								const showPreview = Boolean(row.title) && Boolean(row.preview);
-								// 大分類真值只決定圖示；舊資料或分類不明確時顯示中性圓底，
-								// 不猜標題。
 								const body = (
 									<>
-										<HawkrAgentConversationMarble
-											primaryCategoryId={row.primaryCategoryId}
-										/>
 										<span className="chat-sidebar__main">
 											<span className="chat-sidebar__item-head">
 												<strong>{label}</strong>

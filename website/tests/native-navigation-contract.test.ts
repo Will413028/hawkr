@@ -22,7 +22,6 @@ function read(path: string): string {
 const NATIVE_LINK_USERS = [
 	"features/procurement-assistant/AssistantWorkspace.tsx",
 	"features/procurement-assistant/CandidateBrowser.tsx",
-	"features/procurement-assistant/HawkrAgentChatWorkspace.tsx",
 	"features/invoices/components/InvoiceDocumentCard.tsx",
 	"features/invoices/screens/InvoiceDocumentDetailClient.tsx",
 ] as const;

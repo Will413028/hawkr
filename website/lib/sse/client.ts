@@ -301,8 +301,8 @@ export class SseClient {
 		}
 		// 註解 frame（`: ping` 之類的 keepalive）沒有任何 data: 行，依 SSE 規格
 		// 「data buffer 是空的就不 dispatch」，它根本不是一個事件。分派出去會讓
-		// 呼叫端收到 data 為空字串的假事件——留言／通知那兩條靠 switch default
-		// 吞掉，但 AG-UI 那條會拿 "" 去跑 schema 驗證、判定契約不符而收線，
+		// 呼叫端收到 data 為空字串的假事件——呼叫端若靠 switch default 吞掉未知事件還好，
+		// 但會拿 "" 去跑 schema 驗證的呼叫端會判定契約不符而收線，
 		// gateway 的 20 秒 keepalive 就足以殺掉整條訂閱。
 		// 注意 `data:`（有這行但值是空的）不算註解，dataLines 會有一個空字串，
 		// 仍然要照常分派——所以判斷的是「有沒有 data: 行」，不是 dataRaw 是否為空。

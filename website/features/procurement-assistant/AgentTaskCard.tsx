@@ -51,17 +51,6 @@ export default function AgentTaskCard({
 					<span className="hawkr-agent-task-card__status">可指派</span>
 				</header>
 
-				<ul className="hawkr-agent-task-card__scope" aria-label="搜尋範圍">
-					<li>
-						<AppIcon name="bag" size={17} aria-hidden="true" />
-						<span>平台賣家</span>
-					</li>
-					<li>
-						<AppIcon name="discovery" size={17} aria-hidden="true" />
-						<span>外部業者</span>
-					</li>
-				</ul>
-
 				<footer className="hawkr-agent-task-card__footer">
 					<span>
 						<AppIcon name="shield" size={17} aria-hidden="true" />

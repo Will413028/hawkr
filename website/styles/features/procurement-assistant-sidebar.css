@@ -74,37 +74,6 @@
 	position: relative;
 }
 
-/* 每筆歷史對話用其權威大分類顯示圖示；分類不明時走同一尺寸的中性圓底，
- * 版面不跳動。 */
-.chat-sidebar__category-marble {
-	display: inline-grid;
-	position: relative;
-	place-items: center;
-	flex: 0 0 auto;
-	overflow: visible;
-	background: transparent;
-	transition: transform 180ms cubic-bezier(0.2, 0, 0, 1);
-}
-
-@media (hover: hover) and (pointer: fine) {
-	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble {
-		transform: translateY(-1px) scale(1.045);
-	}
-}
-
-.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
-	transform: translateY(-1px) scale(1.045);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.chat-sidebar__category-marble,
-	.chat-sidebar__agent-row:hover .chat-sidebar__category-marble,
-	.chat-sidebar__agent-row:focus-within .chat-sidebar__category-marble {
-		transition: none;
-		transform: none;
-	}
-}
-
 .chat-sidebar__agent-row .chat-sidebar__item {
 	/* 預留右側動作鈕的位置，標題不壓到它。 */
 	padding-right: 40px;

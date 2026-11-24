@@ -18,7 +18,17 @@ import type {
 	BuyerQuoteFailure,
 	BuyerQuoteResult,
 } from "../buyer-quote-contract";
-import { buyerQuoteFailure } from "../buyer-quote-contract";
+
+function buyerQuoteFailure(
+	code: BuyerQuoteFailure["code"],
+	detail: string,
+	orderNo?: string,
+): BuyerQuoteFailure {
+	return { code, detail, retryable: false, ...(orderNo ? { orderNo } : {}) };
+}
+
+const STALE_RESPONSE_DETAIL =
+	"這家賣家已經送出新的報價版本。系統不會自動幫你接受新版本，請重新比較之後再決定。";
 
 // `Button href` 會渲染 `@/components/shared/Link`，那支需要 App Router context。
 // 與 MobileBottomNav.unit.test 同樣把它換成一個純 <a>：這裡要驗的是「連到哪裡」，
@@ -39,9 +49,14 @@ vi.mock("@/components/shared/Link", async () => {
 	};
 });
 
+vi.mock("@/lib/i18n/ui-text", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/lib/i18n/ui-text")>();
+	return { ...actual, useUiText: () => actual.uiTextFor("zh-TW") };
+});
+
 afterEach(cleanup);
 
-const SNAPSHOT_HASH = "b".repeat(64);
+const SELLER_FACING_HASH = "b".repeat(64);
 
 function response(
 	overrides: Partial<BuyerFacingSellerResponse> = {},
@@ -60,7 +75,7 @@ function response(
 		},
 		quote: {
 			responseType: "MANUAL_QUOTE",
-			offeredQuality: { grade: "特級", inspectionNotes: "抽驗三箱" },
+			specNote: "抽驗三箱",
 			unitBasis: { quantity: "1", unit: "KG" },
 			offeredQuantity: "500",
 			offeredQuantityUnit: "KG",
@@ -110,13 +125,13 @@ type AcceptHandler = (
 function renderPanel(
 	options: {
 		responses?: BuyerFacingSellerResponse[];
-		rfqSnapshotHash?: string;
+		sellerFacingHash?: string;
 		onAcceptQuote?: AcceptHandler;
 		onToggleShortlist?: (
 			target: { sellerResponseId: string; sellerResponseVersion: string },
 			shortlisted: boolean,
 		) => Promise<BuyerQuoteResult<boolean>>;
-		createIdempotencyKey?: () => string;
+		createClientRequestId?: () => string;
 		onRefresh?: () => void;
 	} = {},
 ) {
@@ -130,8 +145,8 @@ function renderPanel(
 			ok: true as const,
 			data: shortlisted,
 		}));
-	const createIdempotencyKey =
-		options.createIdempotencyKey ??
+	const createClientRequestId =
+		options.createClientRequestId ??
 		(() => {
 			counter += 1;
 			return `bqa-key-${counter}`;
@@ -139,10 +154,10 @@ function renderPanel(
 	render(
 		React.createElement(BuyerQuoteComparison, {
 			responses: options.responses ?? [response()],
-			rfqSnapshotHash: options.rfqSnapshotHash ?? SNAPSHOT_HASH,
+			sellerFacingHash: options.sellerFacingHash ?? SELLER_FACING_HASH,
 			onAcceptQuote,
 			onToggleShortlist,
-			createIdempotencyKey,
+			createClientRequestId,
 			onRefresh: options.onRefresh,
 		}),
 	);
@@ -283,7 +298,7 @@ describe("加入與移出比較", () => {
 	it("失敗時顯示原因，不宣稱已更新", async () => {
 		const onToggleShortlist = vi.fn(async () => ({
 			ok: false as const,
-			error: buyerQuoteFailure(503, ""),
+			error: buyerQuoteFailure("SERVER_ERROR", "伺服器暫時無法完成這次操作"),
 		}));
 		renderPanel({ onToggleShortlist });
 		fireEvent.click(
@@ -307,7 +322,7 @@ describe("接受一個 exact version", () => {
 		await waitFor(() => expect(onAcceptQuote).toHaveBeenCalledTimes(1));
 	});
 
-	it("送出的命令帶 exact version 與快照雜湊，不帶任何金額", async () => {
+	it("送出的命令帶 exact version 與詢價內容雜湊，不帶任何金額", async () => {
 		const onAcceptQuote = vi.fn(async () => ({
 			ok: true as const,
 			data: ack(),
@@ -318,19 +333,14 @@ describe("接受一個 exact version", () => {
 		const command = vi.mocked(onAcceptQuote).mock.calls[0][0];
 		expect(command.sellerResponseId).toBe("1234567890123456788");
 		expect(command.expectedSellerResponseVersion).toBe("1234567890123456791");
-		expect(command.expectedRfqSnapshotHash).toBe(SNAPSHOT_HASH);
-		expect(Object.keys(command).sort()).toEqual([
-			"expectedRfqSnapshotHash",
-			"expectedSellerResponseVersion",
-			"idempotencyKey",
-			"sellerResponseId",
-		]);
+		expect(command.expectedSellerFacingHash).toBe(SELLER_FACING_HASH);
+		expect(Object.keys(command).sort()).toEqual(["clientRequestId", "expectedSellerFacingHash", "expectedSellerResponseVersion", "sellerResponseId"]);
 	});
 
 	it("同一版本重試沿用同一把冪等鍵", async () => {
 		const onAcceptQuote = vi.fn(async () => ({
 			ok: false as const,
-			error: buyerQuoteFailure(503, ""),
+			error: buyerQuoteFailure("SERVER_ERROR", "伺服器暫時無法完成這次操作"),
 		})) as AcceptHandler;
 		renderPanel({ onAcceptQuote });
 		await acceptFirst();
@@ -338,11 +348,11 @@ describe("接受一個 exact version", () => {
 		await acceptFirst();
 		await waitFor(() => expect(onAcceptQuote).toHaveBeenCalledTimes(2));
 		const [first, second] = vi.mocked(onAcceptQuote).mock.calls;
-		expect(second[0].idempotencyKey).toBe(first[0].idempotencyKey);
+		expect(second[0].clientRequestId).toBe(first[0].clientRequestId);
 	});
 
-	it("沒有快照比對權杖時所有接受都鎖住", () => {
-		renderPanel({ rfqSnapshotHash: "" });
+	it("沒有詢價內容比對權杖時所有接受都鎖住", () => {
+		renderPanel({ sellerFacingHash: "" });
 		expect(screen.getByText("目前無法接受任何版本")).toBeTruthy();
 		expect(acceptRowButtons()[0].hasAttribute("disabled")).toBe(true);
 	});
@@ -444,7 +454,7 @@ describe("接受失敗的處置", () => {
 
 	it("報價已變動時明講，而且不自動改成接受最新版", async () => {
 		const { onAcceptQuote } = await failWith(
-			buyerQuoteFailure(409, "STALE_SELLER_RESPONSE"),
+			buyerQuoteFailure("STALE_SELLER_RESPONSE", STALE_RESPONSE_DETAIL),
 		);
 		expect(screen.getByText(/已經送出新的報價版本/)).toBeTruthy();
 		expect(screen.getByText(/系統不會自動幫你接受新版本/)).toBeTruthy();
@@ -456,7 +466,7 @@ describe("接受失敗的處置", () => {
 
 	it("已在結帳中導去付款，並用伺服器給的既有單號", async () => {
 		await failWith(
-			buyerQuoteFailure(409, "RFQ_CHECKOUT_ALREADY_ACTIVE", "HK20260913001"),
+			buyerQuoteFailure("RFQ_CHECKOUT_ALREADY_ACTIVE", "已有進行中的成交", "HK20260913001"),
 		);
 		expect(
 			screen.getByRole("link", { name: "前往付款" }).getAttribute("href"),
@@ -464,21 +474,15 @@ describe("接受失敗的處置", () => {
 	});
 
 	it("已在結帳中但沒拿到單號時退回訂單列表，不猜一個單號", async () => {
-		await failWith(buyerQuoteFailure(409, "RFQ_CHECKOUT_ALREADY_ACTIVE"));
+		await failWith(buyerQuoteFailure("RFQ_CHECKOUT_ALREADY_ACTIVE", "已有進行中的成交"));
 		expect(
 			screen.getByRole("link", { name: "前往付款" }).getAttribute("href"),
 		).toBe("/account/orders");
 	});
 
-	it("已成交結案是另一句話，而且不給付款入口", async () => {
-		await failWith(buyerQuoteFailure(409, "RFQ_ALREADY_AWARDED"));
-		expect(screen.getByText(/這張詢價已經成交結案/)).toBeTruthy();
-		expect(screen.queryByRole("link", { name: "前往付款" })).toBeNull();
-	});
-
-	it("快照過期時提供重新載入", async () => {
+	it("詢價內容過期時提供重新載入", async () => {
 		const { onRefresh } = await failWith(
-			buyerQuoteFailure(409, "STALE_RFQ_SNAPSHOT"),
+			buyerQuoteFailure("STALE_PUBLICATION", "詢價內容已變動"),
 		);
 		fireEvent.click(screen.getByRole("button", { name: "重新載入報價" }));
 		expect(onRefresh).toHaveBeenCalledTimes(1);

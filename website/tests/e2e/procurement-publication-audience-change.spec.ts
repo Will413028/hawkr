@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
 import {
-	pricePreviewData,
+	candidateJson,
+	candidateSearchJson,
+	publicationApprovalJson,
+	publicationResultJson,
 	RFQ_APPROVAL_ID,
-	RFQ_CONFIRMED_HASH,
-	RFQ_CONFIRMED_ID,
-	RFQ_PREVIEW_HASH,
-	RFQ_REQUEST_ID,
 	RFQ_REVISION_ID,
 	RFQ_SELLER_PAYLOAD_HASH,
 	setupRfqPriceReview,
@@ -41,108 +40,26 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 		let approvalCalls = 0;
 
 		await setupRfqPriceReview(page, {
-			candidateSearchPollHandler: (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: RFQ_REQUEST_ID,
-							runId: "1234567890123456800",
-							candidateSetId: "candidate-set-e2e",
-							status: "SUCCEEDED",
-							platformLaneStatus: "SUCCEEDED",
-							externalLaneStatus: "SUCCEEDED",
-							failureReason: "",
-							candidates: {
-								// 第一筆刻意沿用 helper 預設的 id 與店名：setupRfqPriceReview
-								// 的收尾會點那一張把它選起來。另外兩筆才是這條測試加的。
-								platform: [
-									{
-										candidateId: "seller-green",
-										displayName: "範例鮮果合作社",
-									},
-									{ candidateId: "seller-south", displayName: "南方果園" },
-									{ candidateId: "seller-east", displayName: "東岸鮮果" },
-								].map((c, i) => ({
-									candidateId: c.candidateId,
-									sourceId: `product-${i}`,
-									lane: "PLATFORM",
-									displayName: c.displayName,
-									score: 94 - i,
-									matchedFacts: [{ key: "item", label: "珍珠芭樂" }],
-									unverifiableFacts: [],
-									factsAsOf: "2026-08-14T12:00:00Z",
-									selected: false,
-								})),
-								external: [],
-							},
-						},
-					}),
-				}),
-			previewHandler: (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: pricePreviewData() }),
-				}),
-			confirmationHandler: (route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							confirmedRfqSnapshotId: RFQ_CONFIRMED_ID,
-							payloadHash: RFQ_CONFIRMED_HASH,
-							expiresAt: "2026-08-22T12:36:00Z",
-						},
-					}),
-				}),
-			publicationPreviewHandler: (route) => {
+			// 第一筆刻意沿用 helper 預設的 id 與店名：setupRfqPriceReview
+			// 的收尾會點那一張把它選起來。另外兩筆才是這條測試加的。
+			candidateSearchPollHandler: () =>
+				candidateSearchJson("SUCCEEDED", [
+					candidateJson("seller-green", "範例鮮果合作社"),
+					candidateJson("seller-south", "南方果園"),
+					candidateJson("seller-east", "東岸鮮果"),
+				]),
+			publicationPreviewHandler: (request) => {
 				approvalCalls += 1;
-				previewBodies.push(
-					route.request().postDataJSON() as Record<string, unknown>,
-				);
+				previewBodies.push(request);
 				// 第二次核准是針對新受眾的另一份 approval。
-				const approvalId =
-					approvalCalls === 1 ? RFQ_APPROVAL_ID : SECOND_APPROVAL_ID;
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							approvalId,
-							approvalVersion: "1",
-							audienceHash: "c".repeat(64),
-							sellerFacingPayloadHash: RFQ_SELLER_PAYLOAD_HASH,
-							sellerFacingPayloadJson: '{"item":"珍珠芭樂"}',
-							expiresAt: "2026-08-22T12:36:00Z",
-							audiencePolicyId: "",
-							audiencePolicyVersion: "0",
-							recipientCount: approvalCalls === 1 ? "1" : "2",
-						},
-					}),
+				return publicationApprovalJson({
+					approvalId: approvalCalls === 1 ? RFQ_APPROVAL_ID : SECOND_APPROVAL_ID,
+					recipientCount: approvalCalls === 1 ? 1 : 2,
 				});
 			},
-			publicationExecuteHandler: (route) => {
-				executeBodies.push(
-					route.request().postDataJSON() as Record<string, unknown>,
-				);
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							publicationId: "1234567890123456804",
-							version: "1",
-							publishedAt: "2026-08-22T12:40:00Z",
-						},
-					}),
-				});
+			publicationExecuteHandler: (request) => {
+				executeBodies.push(request);
+				return publicationResultJson();
 			},
 		});
 

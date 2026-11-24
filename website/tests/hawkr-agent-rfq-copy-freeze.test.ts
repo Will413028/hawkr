@@ -25,7 +25,7 @@ const summary = stripComments(
 	read("features/procurement-assistant/QuoteBatchSummary.tsx"),
 );
 
-test("price slice names confirmation separately from publication", () => {
+test("price slice names the price acknowledgement separately from publication", () => {
 	assert.match(
 		draft,
 		/<h2 id="assistant-rfq-draft-title">核對需求與價格<\/h2>/,
@@ -39,9 +39,8 @@ test("price slice names confirmation separately from publication", () => {
 	assert.doesNotMatch(draft, /發布詢價（尚未開放）/);
 });
 
-test("confirmation success only claims the server-owned price projection", () => {
-	assert.match(draft, /需求版本與價格範圍已固定，等待發布。/);
-	assert.match(draft, /確認後會固定這一版需求與希望區間/);
+test("the price acknowledgement only claims the requirement version and price range", () => {
+	assert.match(draft, /確認後會以這一版需求與希望區間準備發布核准/);
 	assert.match(draft, /這次確認不包含候選名單、截止時間與通知設定/);
 	assert.doesNotMatch(draft, /候選名單已固定|邀請已建立|通知已排入處理/);
 });
