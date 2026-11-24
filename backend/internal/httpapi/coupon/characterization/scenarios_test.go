@@ -144,12 +144,6 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 	{Name: "seller member template is accepted", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
-		if !d.Legacy() {
-			// 單體在消費紀錄的資料接上之前，賣家不能建 MEMBER 活動。
-			_, err := d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetMember))
-			ch.WantKind(t, err, ch.ErrInvalid)
-			return
-		}
 		created := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetMember))))
 		if got := mustFind(ctx, t, d, created.ID); got.Target != TargetMember || got.Status != StatusActive {
 			t.Errorf("target/status = %s/%s，預期 MEMBER/ACTIVE", got.Target, got.Status)

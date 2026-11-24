@@ -1,0 +1,58 @@
+{
+ "mutants": [
+  {
+   "id": "buyer-deleted-writes-outside-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/purge/purge.go",
+   "old": "q := store.New(s.d.DB.Conn(ctx))",
+   "new": "q := store.New(s.d.DB.Pool())",
+   "test": "internal/modules/coupon ^TestBuyerDeletedSubscriberRunsInTheOuterTransaction$",
+   "why": "刪帳訂閱者改用 transaction 外的連線寫入：外層回滾後券仍被作廢、名單與投影仍被刪，同 transaction 測試要紅。"
+  },
+  {
+   "id": "membership-projection-not-written",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/membership/membership.go",
+   "old": "n, err := store.New(s.d.DB.Conn(ctx)).UpsertMembership(ctx, store.UpsertMembershipParams{StoreID: storeID, BuyerID: buyerID, Now: s.d.Now()})\n\treturn n > 0, err",
+   "new": "_ = store.New(s.d.DB.Conn(ctx))\n\treturn true, nil",
+   "test": "internal/modules/coupon ^TestMemberEligibilityFollowsTheProjection$",
+   "why": "投影不寫入：事件抵達後 MEMBER 資格仍不成立，MEMBER 資格測試要紅。"
+  },
+  {
+   "id": "membership-consumer-projection-not-written",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/membership/membership.go",
+   "old": "n, err := store.New(s.d.DB.Conn(ctx)).UpsertMembership(ctx, store.UpsertMembershipParams{StoreID: storeID, BuyerID: buyerID, Now: s.d.Now()})\n\treturn n > 0, err",
+   "new": "_ = store.New(s.d.DB.Conn(ctx))\n\treturn true, nil",
+   "test": "internal/legacy/couponconsumer ^TestReplayedOrderCompletedProjectsOnceAndDrivesMemberEligibility$",
+   "why": "投影不寫入：consumer 收到事件後投影沒有列、MEMBER 領取仍被擋，consumer 端到端測試要紅。"
+  },
+  {
+   "id": "buyer-deleted-voids-locked-vouchers",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/membership.sql.go",
+   "old": "WHERE buyer_id = $2 AND status = 'AVAILABLE'",
+   "new": "WHERE buyer_id = $2 AND status IN ('AVAILABLE', 'LOCKED')",
+   "test": "internal/modules/coupon ^TestBuyerDeletedSubscriberRunsInTheOuterTransaction$",
+   "why": "刪帳連持鎖訂單的 LOCKED 券一起作廢（會違反狀態約束或吃掉訂單的券），LOCKED 不動的斷言要紅。"
+  },
+  {
+   "id": "consumer-swaps-store-and-buyer",
+   "stack": "go",
+   "file": "backend/internal/legacy/couponconsumer/consumer.go",
+   "old": "c.Coupon.RecordOrderCompleted(ctx, storeID, buyerID)",
+   "new": "c.Coupon.RecordOrderCompleted(ctx, buyerID, storeID)",
+   "test": "internal/legacy/couponconsumer ^TestOrderCompletedRecordsBusinessKeysFromTheJavaPayload$",
+   "why": "consumer 把店家與買家 ID 對調寫入投影，測試要紅。"
+  },
+  {
+   "id": "member-check-ignores-store",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/membership.sql.go",
+   "old": "WHERE store_id = $1 AND buyer_id = $2)",
+   "new": "WHERE buyer_id = $2 AND $1::bigint > 0)",
+   "test": "internal/legacy/couponconsumer ^TestReplayedOrderCompletedProjectsOnceAndDrivesMemberEligibility$",
+   "why": "MEMBER 資格不分店家（在別家店消費也算會員），別家店消費不算的斷言要紅。"
+  }
+ ]
+}

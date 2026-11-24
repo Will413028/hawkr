@@ -145,11 +145,6 @@ func (b buyerExists) Existing(ctx context.Context, ids []int64) ([]int64, error)
 	return out, nil
 }
 
-// noMembers 是 MEMBER 資格的 port：投影還沒有接上，這裡的情境不涉及 MEMBER 資格。
-type noMembers struct{}
-
-func (noMembers) IsMember(context.Context, int64, int64) (bool, error) { return false, nil }
-
 // monolith 是單體的 Connect 入口加它的資料庫、identity 與 coupon 模組：handler 與 production 一樣由 httpapi.NewHandler 組出，資料庫是 testdb 的真實 Postgres。
 type monolith struct {
 	db       *db.DB
@@ -195,7 +190,7 @@ func startMonolith(t *testing.T) *monolith {
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noAccountOrders{}, Now: time.Now, Logger: log})
 	crmModule := crm.New(crm.Deps{DB: d, Jobs: queue, Buyers: buyers, Stores: sellers, NewID: uuid.NewV7, Now: time.Now, Logger: log})
-	couponModule := coupon.New(coupon.Deps{DB: d, Stores: sellerStores{sellers}, Members: noMembers{}, Buyers: buyerExists{buyers}, StoreDirectory: sellerStores{sellers}, NewID: uuid.NewV7, Now: time.Now})
+	couponModule := coupon.New(coupon.Deps{DB: d, Stores: sellerStores{sellers}, Buyers: buyerExists{buyers}, StoreDirectory: sellerStores{sellers}, NewID: uuid.NewV7, Now: time.Now})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)

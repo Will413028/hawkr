@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"time"
 	"uuid"
@@ -65,17 +64,8 @@ func (b couponBuyers) Existing(ctx context.Context, ids []int64) ([]int64, error
 	return out, nil
 }
 
-// errMembersNotProjected 表示 MEMBER 資格的消費紀錄投影還沒有接上：賣家的 API 不能建立 MEMBER 活動，所以正常情形走不到這裡；萬一有 MEMBER 活動，領取與列表整個請求失敗，不降級成「不是會員」（BD28）。
-var errMembersNotProjected = errors.New("coupon：MEMBER 資格的消費紀錄投影尚未接上")
-
-type couponMembers struct{}
-
-func (couponMembers) IsMember(context.Context, int64, int64) (bool, error) {
-	return false, errMembersNotProjected
-}
-
-// newCoupon 組裝 coupon 模組。這裡只有 Connect 需要的部分：MEMBER 資格的投影、買家刪帳與到期提醒還沒有接上。
+// newCoupon 組裝 coupon 模組。這裡只有 Connect 需要的部分：MEMBER 投影的 consumer、買家刪帳訂閱與到期提醒還沒有接上（B7-5）。
 func newCoupon(d *db.DB, sellers *seller.Module, buyers *buyer.Module) *coupon.Module {
 	stores := couponStores{sellers}
-	return coupon.New(coupon.Deps{DB: d, Stores: stores, Members: couponMembers{}, Buyers: couponBuyers{buyers}, StoreDirectory: stores, NewID: uuid.NewV7, Now: time.Now})
+	return coupon.New(coupon.Deps{DB: d, Stores: stores, Buyers: couponBuyers{buyers}, StoreDirectory: stores, NewID: uuid.NewV7, Now: time.Now})
 }

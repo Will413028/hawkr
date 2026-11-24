@@ -8,7 +8,7 @@
 
 ## 擁有的資料
 
-schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_vouchers`（買家的券）、`coupon_target_accounts`（DESIGNATED 與補償的資格名單）、`seller_coupon_quotas`（賣家活動數配額）、`coupon_redemption_logs`（稽核，只追加）。讀取模型：無。
+schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_vouchers`（買家的券）、`coupon_target_accounts`（DESIGNATED 與補償的資格名單）、`seller_coupon_quotas`（賣家活動數配額）、`coupon_redemption_logs`（稽核，只追加）、`store_buyer_membership`（MEMBER 資格的消費紀錄投影）。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -38,8 +38,8 @@ schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_
 ## 不負責
 
 - 結帳與訂單狀態：ordering（B8）；B8 前由 `legacy/couponserver` 以自己的 transaction 包 Lock、Redeem、Release。
-- 店家停權狀態、MEMBER 的消費紀錄：`Stores`、`Members` port 由組裝點提供（seller 的 API、B7-4 的投影）；本模組不 import `ordering` 與 `internal/legacy`。
-- 刪帳事件的訂閱、MEMBER 投影、到期提醒 job 與 `VoucherExpiring` 事件：B7-4。通知：notification 模組訂閱事件。
+- 店家停權狀態、MEMBER 的消費紀錄：`Stores` port 由組裝點提供（seller 的 API）；MEMBER 的消費紀錄是自己的投影，由 `RecordOrderCompleted` 寫入；本模組不 import `ordering` 與 `internal/legacy`。
+- 到期提醒 job 與 `VoucherExpiring` 事件：B7-4c。刪帳訂閱（`OnBuyerDeleted`）與投影的 consumer（`legacy/couponconsumer`）B7-5 才在 `cmd/hawkr` 接上。通知：notification 模組訂閱事件。
 - Connect handler 在 `internal/httpapi/coupon`（賣家能力宣告表、顯示資料組裝）；`Stores` 的正式 adapter 在 `cmd/hawkr/coupon.go`。
 
 ## 決策紀錄

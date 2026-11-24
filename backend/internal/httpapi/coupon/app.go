@@ -349,9 +349,6 @@ func (h *App) CreateCampaign(ctx context.Context, req *connect.Request[pb.Create
 	if err != nil {
 		return nil, err
 	}
-	if in.GetTargetType() == pb.TargetType_TARGET_TYPE_MEMBER {
-		return nil, rpc.RequiredField("campaign.target_type", "目前不能建立 MEMBER 資格的活動")
-	}
 	st, err := h.actingStore(ctx, procedure)
 	if err != nil {
 		return nil, err

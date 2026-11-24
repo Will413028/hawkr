@@ -10,9 +10,12 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/admin"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/campaign"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/membership"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/qualify"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/voucher"
@@ -34,9 +37,8 @@ func Migrations() fs.FS {
 
 // Deps 是模組需要的外部依賴，全部在組裝點提供。
 type Deps struct {
-	DB      *db.DB
-	Stores  Stores
-	Members Members
+	DB     *db.DB
+	Stores Stores
 	// Buyers 與 StoreDirectory 是後台寫入前的存在檢查（admin 建立限店活動與指定發放）。
 	Buyers         Buyers
 	StoreDirectory StoreDirectory
@@ -153,14 +155,16 @@ type Module struct {
 	campaign *campaign.Service
 	voucher  *voucher.Service
 	read     *read.Service
+	member   *membership.Service
+	purge    *purge.Service
 }
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Stores == nil || d.Members == nil || d.Buyers == nil || d.StoreDirectory == nil || d.NewID == nil || d.Now == nil {
+	if d.DB == nil || d.Stores == nil || d.Buyers == nil || d.StoreDirectory == nil || d.NewID == nil || d.Now == nil {
 		panic("coupon：DB、Stores、Members、Buyers、StoreDirectory、NewID 與 Now 是必要的")
 	}
-	q := qualify.New(qualify.Deps{DB: d.DB, Stores: d.Stores, Members: d.Members})
+	q := qualify.New(qualify.Deps{DB: d.DB, Stores: d.Stores})
 	camp := campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now})
 	vouch := voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now})
 	return &Module{
@@ -168,6 +172,8 @@ func New(d Deps) *Module {
 		campaign: camp,
 		voucher:  vouch,
 		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
+		member:   membership.New(membership.Deps{DB: d.DB, Now: d.Now}),
+		purge:    purge.New(purge.Deps{DB: d.DB, Now: d.Now}),
 	}
 }
 
@@ -257,4 +263,15 @@ func (m *Module) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.U
 // GetVoucher 讀買家自己的一張券與它的活動；不存在與不是這位買家的回同一個 NotFound。
 func (m *Module) GetVoucher(ctx context.Context, buyerID int64, id uuid.UUID) (VoucherView, error) {
 	return m.read.GetVoucher(ctx, buyerID, id)
+}
+
+// RecordOrderCompleted 記下買家在該店有完成的訂單（MEMBER 資格的消費紀錄投影，只給 legacy/couponconsumer）。recorded 為 false 表示重放。
+func (m *Module) RecordOrderCompleted(ctx context.Context, storeID, buyerID int64) (recorded bool, err error) {
+	return m.member.Record(ctx, storeID, buyerID)
+}
+
+// OnBuyerDeleted 是買家關閉時同 transaction 的訂閱者（單體規則 4 的原子狀態變更，D8）：作廢該買家 AVAILABLE 的券、刪除指定名單與消費紀錄投影。
+// 冪等；只動 coupon 自己的列。鎖的順序 identity → buyer → seller → coupon：accountdeletion 在派發事件之前先鎖完買家與店家。
+func (m *Module) OnBuyerDeleted(ctx context.Context, e buyer.BuyerDeleted) error {
+	return m.purge.EraseBuyer(ctx, e.BuyerID)
 }
