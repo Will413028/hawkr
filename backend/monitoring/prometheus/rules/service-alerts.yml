@@ -67,7 +67,6 @@ groups:
       - alert: ProdOtlpServiceAbsent
         expr: |
           absent(server_start_total{job="ai-service", env="prod"})
-          or absent(server_start_total{job="notification-service", env="prod"})
         for: 5m
         labels:
           severity: critical

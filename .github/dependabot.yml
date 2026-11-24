@@ -212,16 +212,3 @@ updates:
         update-types:
           - "minor"
           - "patch"
-  - package-ecosystem: "gomod"
-    target-branch: "dev"
-    directory: "/backend/services/notification-service"
-    schedule:
-      interval: "weekly"
-    cooldown:
-      default-days: 14
-      semver-major-days: 30
-    groups:
-      gomod-services-notification-service-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
