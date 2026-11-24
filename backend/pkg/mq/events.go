@@ -86,45 +86,39 @@ type OrderItem struct {
 
 type ReviewCreatedEvent struct {
 	BaseEvent
-	ReviewID              int64    `json:"review_id"`
-	OrderNo               string   `json:"order_no"`
-	OrderItemID           int64    `json:"order_item_id"`
-	StoreID               int64    `json:"store_id"`
-	NotifySellerAccountID int64    `json:"notify_seller_account_id"`
-	BuyerID               int64    `json:"buyer_id"`
-	Rating                int32    `json:"rating"`
-	Content               string   `json:"content,omitempty"`
-	ImageKeys             []string `json:"image_keys,omitempty"`
-	CreatedAt             string   `json:"created_at,omitempty"`
-	AvgRating             float64  `json:"avg_rating"`
-	TotalCount            int64    `json:"total_count"`
-	ProductID             int64    `json:"product_id"`
-	ProductAvgRating      float64  `json:"product_avg_rating"`
-	ProductReviewCount    int64    `json:"product_review_count"`
-	BuyerNickname         string   `json:"buyer_nickname,omitempty"`
-	BuyerAvatarKey        string   `json:"buyer_avatar_key,omitempty"`
+	ReviewID           int64    `json:"review_id"`
+	OrderNo            string   `json:"order_no"`
+	OrderItemID        int64    `json:"order_item_id"`
+	StoreID            int64    `json:"store_id"`
+	BuyerID            int64    `json:"buyer_id"`
+	Rating             int32    `json:"rating"`
+	Content            string   `json:"content,omitempty"`
+	ImageKeys          []string `json:"image_keys,omitempty"`
+	CreatedAt          string   `json:"created_at,omitempty"`
+	AvgRating          float64  `json:"avg_rating"`
+	TotalCount         int64    `json:"total_count"`
+	ProductID          int64    `json:"product_id"`
+	ProductAvgRating   float64  `json:"product_avg_rating"`
+	ProductReviewCount int64    `json:"product_review_count"`
 }
 
-func NewReviewCreatedEvent(reviewID int64, orderNo string, orderItemID int64, storeID, notifySellerAccountID, buyerID int64, rating int32, content string, imageKeys []string, createdAt string, avgRating float64, totalCount int64, productID int64, productAvgRating float64, productReviewCount int64, buyerNickname, buyerAvatar string) *ReviewCreatedEvent {
+func NewReviewCreatedEvent(reviewID int64, orderNo string, orderItemID int64, storeID, buyerID int64, rating int32, content string, imageKeys []string, createdAt string, avgRating float64, totalCount int64, productID int64, productAvgRating float64, productReviewCount int64) *ReviewCreatedEvent {
 	return &ReviewCreatedEvent{
-		BaseEvent:             NewBaseEvent(EventTypeReviewCreated, "review-service"),
-		ReviewID:              reviewID,
-		OrderNo:               orderNo,
-		OrderItemID:           orderItemID,
-		StoreID:               storeID,
-		NotifySellerAccountID: notifySellerAccountID,
-		BuyerID:               buyerID,
-		Rating:                rating,
-		Content:               content,
-		ImageKeys:             imageKeys,
-		CreatedAt:             createdAt,
-		AvgRating:             avgRating,
-		TotalCount:            totalCount,
-		ProductID:             productID,
-		ProductAvgRating:      productAvgRating,
-		ProductReviewCount:    productReviewCount,
-		BuyerNickname:         buyerNickname,
-		BuyerAvatarKey:        buyerAvatar,
+		BaseEvent:          NewBaseEvent(EventTypeReviewCreated, "review-service"),
+		ReviewID:           reviewID,
+		OrderNo:            orderNo,
+		OrderItemID:        orderItemID,
+		StoreID:            storeID,
+		BuyerID:            buyerID,
+		Rating:             rating,
+		Content:            content,
+		ImageKeys:          imageKeys,
+		CreatedAt:          createdAt,
+		AvgRating:          avgRating,
+		TotalCount:         totalCount,
+		ProductID:          productID,
+		ProductAvgRating:   productAvgRating,
+		ProductReviewCount: productReviewCount,
 	}
 }
 

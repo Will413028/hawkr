@@ -205,11 +205,6 @@ func runServe(ctx context.Context) error {
 	}
 	bus := events.NewBus()
 	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
-	// 刪除帳號的寫入時，以同一個 transaction 排入送給舊服務的事件（RabbitMQ 的 account.deleted），由 worker 送出。
-	enqueueLegacy := func(ctx context.Context, a rabbitmq.PublishArgs) error {
-		return jc.Enqueue(ctx, a, rabbitmq.InsertOpts())
-	}
-	events.Subscribe(bus, accountservice.OnAccountDeleted(enqueueLegacy))
 	subscribeBuyerEvents(bus, jc)
 	id := newIdentity(d, bus, idc, log)
 	webLogin, err := newWebLogin(verifierCtx, id, web, idc, log)
@@ -516,7 +511,7 @@ func runWorker(ctx context.Context) error {
 	river.AddWorker(workers, rabbitmq.NewWorker(pub))
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
-	reviewrelay.NewWorker(reviewModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)
+	reviewrelay.NewWorker(reviewModule, jc, log).AddWorkers(workers)
 	bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)

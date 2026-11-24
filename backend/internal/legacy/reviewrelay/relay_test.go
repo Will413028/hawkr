@@ -10,9 +10,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -77,28 +75,6 @@ func (f *fakeReviews) StoreStats(_ context.Context, id int64) (review.StoreStats
 	return f.store[id], nil
 }
 
-type fakeBuyers struct{ display map[int64]buyer.Display }
-
-func (b *fakeBuyers) BatchDisplay(_ context.Context, ids []int64) ([]buyer.Display, error) {
-	var out []buyer.Display
-	for _, id := range ids {
-		if d, ok := b.display[id]; ok {
-			out = append(out, d)
-		}
-	}
-	return out, nil
-}
-
-type fakeStores struct{ stores map[int64]seller.Store }
-
-func (s *fakeStores) Store(_ context.Context, id int64) (seller.Store, error) {
-	st, ok := s.stores[id]
-	if !ok {
-		return seller.Store{}, apperr.NotFound("no store")
-	}
-	return st, nil
-}
-
 var (
 	eventID    = uuid.MustParse("01990000-0000-7000-8000-000000000001")
 	reviewID   = uuid.MustParse("01990000-0000-7000-8000-0000000000a1")
@@ -108,9 +84,7 @@ var (
 	createdAt     = time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC)
 )
 
-func strp(s string) *string { return &s }
-
-func newFixture() (*Worker, *fakeReviews, *fakeBuyers, *fakeStores) {
+func newFixture() (*Worker, *fakeReviews) {
 	r := &fakeReviews{
 		review: review.Review{
 			ID: reviewID, OrderNo: "O1", OrderItemID: 11, BuyerID: 301, StoreID: 91, ProductID: 700, Rating: 5, Content: "很甜",
@@ -119,9 +93,7 @@ func newFixture() (*Worker, *fakeReviews, *fakeBuyers, *fakeStores) {
 		product: map[int64]review.ProductStats{700: {Count: 30, Average: 4.9}},
 		store:   map[int64]review.StoreStats{91: {Count: 120, Average: 4.8}},
 	}
-	b := &fakeBuyers{display: map[int64]buyer.Display{301: {BuyerID: 301, DisplayName: strp("小明"), Avatar: strp("avatars/301")}}}
-	s := &fakeStores{stores: map[int64]seller.Store{91: {StoreID: 91, AccountID: 7001}}}
-	return NewWorker(r, b, s, &recordingJobs{}, nil), r, b, s
+	return NewWorker(r, &recordingJobs{}, nil), r
 }
 
 // run 把模組事件交給 OnX，取出排入的 job，再交給 worker，回傳送出的訊息。
@@ -178,7 +150,7 @@ func created() review.ReviewCreated {
 }
 
 func TestReviewCreatedPayload(t *testing.T) {
-	w, _, _, _ := newFixture()
+	w, _ := newFixture()
 	got := run(t, w, OnReviewCreated, created())
 	if len(got) != 1 || got[0].Exchange != "hawkr.review" || got[0].RoutingKey != "review.created" || got[0].EventID != eventID.String() {
 		t.Fatalf("published = %+v", got)
@@ -186,10 +158,10 @@ func TestReviewCreatedPayload(t *testing.T) {
 	m := body(t, got[0])
 	want := map[string]any{
 		"event_id": eventID.String(), "event_type": "REVIEW_CREATED", "version": "1.0", "timestamp": wireTimestamp, "source": "review-service",
-		"review_id": float64(0), "order_no": "O1", "order_item_id": float64(11), "store_id": float64(91), "notify_seller_account_id": float64(7001),
+		"review_id": float64(0), "order_no": "O1", "order_item_id": float64(11), "store_id": float64(91),
 		"buyer_id": float64(301), "rating": float64(5), "content": "很甜", "image_keys": []any{"review/1.jpg", "review/2.jpg"},
 		"created_at": "2026-11-20T01:00:00Z", "avg_rating": 4.8, "total_count": float64(120), "product_id": float64(700),
-		"product_avg_rating": 4.9, "product_review_count": float64(30), "buyer_nickname": "小明", "buyer_avatar_key": "avatars/301",
+		"product_avg_rating": 4.9, "product_review_count": float64(30),
 	}
 	if len(m) != len(want) {
 		t.Errorf("keys = %d，預期 %d：%v", len(m), len(want), m)
@@ -209,7 +181,7 @@ func equalJSON(a, b any) bool {
 
 // 評價已清除（作者刪帳後清除先於 relay job）：不送。
 func TestReviewCreatedSkipsAPurgedReview(t *testing.T) {
-	w, r, _, _ := newFixture()
+	w, r := newFixture()
 	r.gone = true
 	if got := run(t, w, OnReviewCreated, created()); len(got) != 0 {
 		t.Fatalf("published = %+v", got)
@@ -218,33 +190,16 @@ func TestReviewCreatedSkipsAPurgedReview(t *testing.T) {
 
 // 評價在 job 執行時已被隱藏或作者在刪帳中：不送 review.created（不外送內容、不通知賣家）。
 func TestReviewCreatedSkipsAReviewThatIsNoLongerPublic(t *testing.T) {
-	w, r, _, _ := newFixture()
+	w, r := newFixture()
 	r.hidden = true
 	if got := run(t, w, OnReviewCreated, created()); len(got) != 0 {
 		t.Fatalf("published = %+v", got)
 	}
 }
 
-// 刪帳的買家沒有暱稱與頭像；店家查不到時 notify_seller_account_id 是 0。
-func TestReviewCreatedForDeletedBuyerAndMissingStore(t *testing.T) {
-	w, _, b, s := newFixture()
-	b.display[301] = buyer.Display{BuyerID: 301, Deleted: true}
-	delete(s.stores, 91)
-	m := body(t, run(t, w, OnReviewCreated, created())[0])
-	if _, ok := m["buyer_nickname"]; ok {
-		t.Errorf("刪帳買家不帶暱稱：%v", m)
-	}
-	if _, ok := m["buyer_avatar_key"]; ok {
-		t.Errorf("刪帳買家不帶頭像：%v", m)
-	}
-	if v, ok := m["notify_seller_account_id"]; !ok || v != float64(0) {
-		t.Errorf("notify_seller_account_id = %v", v)
-	}
-}
-
 // 統計在 job 執行當下重算：事件發生到 job 執行之間改變的值，送出的是執行當下的。
 func TestStatsAreRecomputedWhenTheJobRuns(t *testing.T) {
-	w, r, _, _ := newFixture()
+	w, r := newFixture()
 	relayed := &recordingJobs{}
 	if err := OnReviewAggregateChanged(relayed)(context.Background(), review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: 700}); err != nil {
 		t.Fatal(err)
@@ -267,7 +222,7 @@ func TestStatsAreRecomputedWhenTheJobRuns(t *testing.T) {
 
 // 沒有任何可見評價時，聚合是 0 而且仍然是 JSON 數字（Java 的 ReviewStatsConsumer 缺欄位或非數字會進 DLQ，不能省略）。
 func TestZeroAggregatesAreStillNumbers(t *testing.T) {
-	w, r, _, _ := newFixture()
+	w, r := newFixture()
 	r.product = map[int64]review.ProductStats{}
 	r.store = map[int64]review.StoreStats{}
 	m := body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: 700})[0])

@@ -3,29 +3,15 @@ exchanges:
   type: topic
 - name: aftersales.events.dlx
   type: topic
-- name: hawkr.account
-  type: topic
 - name: hawkr.buyer
   type: topic
 - name: hawkr.cart.dlx
   type: topic
-- name: hawkr.content
-  type: topic
 - name: hawkr.coupon.dlx
-  type: topic
-- name: hawkr.delegation
-  type: topic
-- name: hawkr.im
   type: topic
 - name: hawkr.invoice
   type: topic
 - name: hawkr.marketing
-  type: topic
-- name: hawkr.merchant
-  type: topic
-- name: hawkr.notification
-  type: topic
-- name: hawkr.notification.dlx
   type: topic
 - name: hawkr.order
   type: topic
@@ -172,113 +158,11 @@ queues:
   bindings:
   - exchange: hawkr.order
     key: order.cancelled
-- name: notification.account.deleted
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.account
-    key: account.deleted
-- name: notification.aftersales
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: aftersales.events
-    key: '#'
-- name: notification.buyer
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.buyer
-    key: '#'
-- name: notification.buyer.deleted
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.buyer
-    key: buyer.deleted
-- name: notification.content
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.content
-    key: '#'
-- name: notification.delegation
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.delegation
-    key: '#'
-- name: notification.im
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.im
-    key: '#'
-- name: notification.invoice
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.invoice
-    key: '#'
-- name: notification.marketing
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.marketing
-    key: '#'
-- name: notification.merchant
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.merchant
-    key: '#'
-- name: notification.order
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.order
-    key: '#'
 - name: notification.procurement
   retry:
     max_attempts: 3
   bindings:
   - exchange: procurement.events
-    key: '#'
-- name: notification.payment
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: payment.events
-    key: '#'
-- name: notification.product
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.product
-    key: '#'
-- name: notification.review
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.review
-    key: '#'
-- name: notification.seller
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.seller
-    key: '#'
-- name: notification.seller.deleted
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.seller
-    key: seller.deleted
-- name: notification.shipping
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.shipping
     key: '#'
 - name: order.aftersales.awaiting.buyer.page
   dlq:
