@@ -3,6 +3,7 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { mockProcurementUnary } from "./helpers/mock-procurement-connect";
 import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const PATH = "/account/messages/assistant/demo";
@@ -1999,9 +2000,25 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
+		await mockProcurementUnary(page, "SubmitTurn", () => ({
+			requestId: "1234567890123456788",
+			conversationId: "9876543210987654321",
+			runId: "1",
+		}));
+		await mockProcurementUnary(page, "GetSnapshot", () => ({
+			requestId: "1234567890123456788",
+			revisionId: "1234567890123456791",
+			status: "REQUEST_STATUS_CLARIFYING",
+			slots: { item: "番茄" },
+			missingRequired: ["SLOT_KEY_DELIVERY_CITY"],
+			runs: [],
+			activeRunId: "",
+		}));
+
 		// Playwright 的 route.fulfill 一次送完整個 body，無法逐塊推送——而這支
 		// 測的正是「一塊一塊到達時畫面有沒有跟著換行」。所以在瀏覽器端包一層
-		// fetch，對串流端點回一個自己控制節奏的 ReadableStream；其餘請求原樣
+		// fetch，對 WatchRun 回一個自己控制節奏的 ReadableStream（Connect 的
+		// streaming envelope：1 位元組旗標、4 位元組大端長度、JSON）；其餘請求原樣
 		// 放行給上面的 route mock。
 		await page.addInitScript(() => {
 			const nativeFetch = window.fetch.bind(window);
@@ -2012,109 +2029,90 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 						: input instanceof URL
 							? input.href
 							: input.url;
-				if (!url.includes("/procurement/turns/stream"))
+				if (!url.includes("BuyerProcurementAppService/WatchRun"))
 					return nativeFetch(input as RequestInfo, init);
 				const encoder = new TextEncoder();
-				const aguiFrame = (event: Record<string, unknown>) =>
-					`data: ${JSON.stringify(event)}\n\n`;
-				const frames = [
-					aguiFrame({
-						type: "CUSTOM",
-						name: "step_detail",
-						value: {
-							turnId: "1",
-							seq: 1,
-							code: "UNDERSTAND_INPUT",
-							status: "RUNNING",
-							label: "讀你寫的需求",
-						},
-					}),
-					aguiFrame({
-						type: "CUSTOM",
-						name: "step_detail",
-						value: {
-							turnId: "1",
-							seq: 2,
-							code: "UNDERSTAND_INPUT",
-							status: "RUNNING",
-							label: "讀你寫的需求",
-						},
-					}),
-					aguiFrame({
-						type: "CUSTOM",
-						name: "step_detail",
-						value: {
-							turnId: "1",
-							seq: 3,
-							code: "UNDERSTAND_INPUT",
-							status: "SUCCEEDED",
-							label: "讀你寫的需求",
-						},
-					}),
-					aguiFrame({
-						type: "CUSTOM",
-						name: "step_detail",
-						value: {
-							turnId: "1",
-							seq: 4,
-							code: "EXTRACT_SLOTS",
-							status: "RUNNING",
-							label: "抓出品項、數量和交期",
-						},
-					}),
-					aguiFrame({
-						type: "RUN_FINISHED",
-						threadId: "",
-						runId: "1",
-						result: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456791",
-							conversationId: "9876543210987654321",
-							slots: { item: "番茄" },
-							missingRequired: ["delivery_city"],
-							rejected: [],
-							degraded: false,
-							reply: "好的，番茄記下了。請問要配送到哪個城市呢？",
-							steps: [
-								{
-									code: "UNDERSTAND_INPUT",
-									status: "SUCCEEDED",
-									label: "讀你寫的需求",
-									durationMs: 200,
-								},
-								{
-									code: "EXTRACT_SLOTS",
-									status: "SUCCEEDED",
-									label: "抓出品項、數量和交期",
-									durationMs: 5000,
-								},
-								{
-									code: "VALIDATE_SLOTS",
-									status: "SUCCEEDED",
-									text: "TERMINAL_ONLY_STEP_SENTINEL",
-									durationMs: 120,
-								},
-							],
-							recordedThisTurn: [{ key: "item", label: "品項", value: "番茄" }],
-							question: null,
-						},
-					}),
+				const envelope = (flags: number, json: unknown) => {
+					const payload = encoder.encode(JSON.stringify(json));
+					const frame = new Uint8Array(5 + payload.length);
+					frame[0] = flags;
+					new DataView(frame.buffer).setUint32(1, payload.length);
+					frame.set(payload, 5);
+					return frame;
+				};
+				const step = (
+					cursor: string,
+					seq: number,
+					code: string,
+					status: string,
+				) =>
+					envelope(0, {
+						cursor,
+						step: { seq, step: { code, status: `STEP_STATUS_${status}` } },
+					});
+				const frames: Uint8Array[][] = [
+					[step("c1", 1, "UNDERSTAND_INPUT", "RUNNING")],
+					[step("c2", 2, "UNDERSTAND_INPUT", "RUNNING")],
+					[step("c3", 3, "UNDERSTAND_INPUT", "SUCCEEDED")],
+					[step("c4", 4, "EXTRACT_SLOTS", "RUNNING")],
+					[
+						envelope(0, {
+							cursor: "c5",
+							turnResult: {
+								requestId: "1234567890123456788",
+								revisionId: "1234567890123456791",
+								conversationId: "9876543210987654321",
+								slots: { item: "番茄" },
+								missingRequired: ["SLOT_KEY_DELIVERY_CITY"],
+								reply: "好的，番茄記下了。請問要配送到哪個城市呢？",
+								steps: [
+									{
+										code: "VALIDATE_SLOTS",
+										status: "STEP_STATUS_SUCCEEDED",
+										text: "TERMINAL_ONLY_STEP_SENTINEL",
+										durationMs: "120",
+									},
+								],
+								recordedThisTurn: [
+									{ key: "SLOT_KEY_ITEM", label: "品項", value: "番茄" },
+								],
+							},
+						}),
+						envelope(0, {
+							cursor: "c6",
+							finished: { status: "RUN_STATUS_SUCCEEDED" },
+						}),
+					],
 				];
-				// 測試逐塊放行，不靠 600ms 計時搶在下一個 frame 前觀察 DOM。
+				// 測試逐塊放行，不靠計時搶在下一個 frame 前觀察 DOM。
 				const body = new ReadableStream<Uint8Array>({
 					start(controller) {
+						controller.enqueue(
+							envelope(0, {
+								cursor: "c0",
+								runAccepted: {
+									runId: "1",
+									conversationId: "9876543210987654321",
+								},
+							}),
+						);
 						let nextFrame = 0;
 						Object.assign(window, {
 							__advanceProcurementFrame: () => {
-								controller.enqueue(encoder.encode(frames[nextFrame++]));
-								if (nextFrame === frames.length) controller.close();
+								for (const chunk of frames[nextFrame++]) {
+									controller.enqueue(chunk);
+								}
+								if (nextFrame === frames.length) {
+									controller.enqueue(envelope(2, {}));
+									controller.close();
+								}
 							},
 						});
 					},
 				});
 				return new Response(body, {
 					status: 200,
-					headers: { "content-type": "text/event-stream" },
+					headers: { "content-type": "application/connect+json" },
 				});
 			};
 		});
