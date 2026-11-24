@@ -15,7 +15,7 @@ INFRA_SERVICES=(postgres redis rabbitmq otel-collector)
 GO_SERVICES=(gateway ai-service notification-service invoice-service)
 
 # Java 服務（需 rebuild image 才能更新）
-JAVA_SERVICES=(payment-service media-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
+JAVA_SERVICES=(payment-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
 
 # 全部應用服務
 ALL_APP_SERVICES=("${GO_SERVICES[@]}" "${JAVA_SERVICES[@]}")
@@ -498,7 +498,7 @@ cmd_logs() {
     cmd+=" ${services[*]}"
   else
     # 預設只看我們負責的服務 + gateway
-    cmd+=" gateway payment-service media-service product-service order-service cart-service coupon-service shipping-service"
+    cmd+=" gateway payment-service product-service order-service cart-service coupon-service shipping-service"
   fi
 
   title "查看日誌"
@@ -789,7 +789,7 @@ cmd_help() {
       gateway 以 Connect 代理給它（MONOLITH_HOST 預設 host.docker.internal）
 
     Java 服務（改完需 ./dev.sh rebuild）：
-      payment, media, product, order, cart, coupon,
+      payment, product, order, cart, coupon,
       shipping, aftersales, payuni-webhook
 
     基礎設施：

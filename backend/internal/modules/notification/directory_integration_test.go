@@ -63,6 +63,10 @@ func TestNewDirectoryListsBuyersAndStoresWithTheirOwnCursors(t *testing.T) {
 	q := nopReportingJobs{}
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	b := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
+	// 先建一個沒有買家的帳號，讓買家 ID 與帳號 ID 錯開，游標用錯欄位時分頁才會出錯。
+	if _, err := id.DevNewAccount(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	events.Subscribe(bus, b.OnAccountCreated)
 	sl := seller.New(seller.Deps{
 		KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: dirNoOrders{}, ProductStores: dirNoProducts{}, Registry: dirNoRegistry{}, Now: time.Now, Logger: log,

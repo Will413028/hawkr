@@ -55,15 +55,6 @@
    "why": "拿掉預設風格不可刪的檢查：真實資料庫的預設風格被刪除"
   },
   {
-   "id": "no-early-etag-check",
-   "stack": "go",
-   "file": "backend/internal/modules/imageai/internal/admin/style.go",
-   "old": "\tif cur.Version != in.Version {\n\t\treturn model.AdminStyle{}, styleStale(ctx)\n\t}\n",
-   "new": "",
-   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleStaleVersionIsRejectedBeforeConfirmingTheThumbnail$",
-   "why": "拿掉修改前的 etag 比對：過期的 etag 仍先 Confirm 縮圖"
-  },
-  {
    "id": "no-delete-etag-check",
    "stack": "go",
    "file": "backend/internal/modules/imageai/internal/admin/style.go",

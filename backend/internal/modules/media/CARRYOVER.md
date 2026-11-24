@@ -1,6 +1,6 @@
 # media 模組的沿用盤點
 
-從 Java media-service 沿用的每個機制，搬進 Go 時重新判斷的結論（遷移計畫「模組完成的定義」）。計畫與範圍在 `backend/docs/plans/2026-11-21-b1-media.md`；R2 實測事實在 `backend/docs/plans/2026-11-21-b1-media/spike.md` (e)。本表由 B1-2a 建立，B1-2b、B1-2c 落地的機制隨步驟補列（B1-2c2：機敏串流上傳與信封加密的列；B1-2c3：key 後綴、錯誤傳遞方式、機敏上傳的重試補償與內部直接寫入的列，都在表尾）。
+從 Java media-service（B1-10 已刪除，表中的檔案行號指向刪除前的 `b1-media` 分支歷史）沿用的每個機制，搬進 Go 時重新判斷的結論（遷移計畫「模組完成的定義」）。計畫與範圍在 `backend/docs/plans/2026-11-21-b1-media.md`；R2 實測事實在 `backend/docs/plans/2026-11-21-b1-media/spike.md` (e)。本表由 B1-2a 建立，B1-2b、B1-2c 落地的機制隨步驟補列（B1-2c2：機敏串流上傳與信封加密的列；B1-2c3：key 後綴、錯誤傳遞方式、機敏上傳的重試補償與內部直接寫入的列，都在表尾）。
 
 ## 沿用盤點
 
