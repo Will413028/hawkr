@@ -105,8 +105,10 @@ var declarations = map[string]declaration{
 	moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure:  requires(adminperm.ModerationCasesDecide, auditAudited),
 	moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure: requires(adminperm.ModerationCasesReverse, auditAudited),
 
-	notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure: requires(adminperm.NotificationAnnouncementsCreate, auditAudited),
-	notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:  requires(adminperm.NotificationAnnouncementsList, auditReadOnly),
+	notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure:         requires(adminperm.NotificationAnnouncementsCreate, auditAudited),
+	notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:          requires(adminperm.NotificationAnnouncementsList, auditReadOnly),
+	notificationv1alpha1connect.NotificationAdminServiceResendDeliveriesProcedure:           requires(adminperm.NotificationDeliveriesResend, auditAudited),
+	notificationv1alpha1connect.NotificationAdminServiceListUnreachedNotificationsProcedure: requires(adminperm.NotificationUnreachedNotificationsList, auditReadOnly),
 
 	socialv1alpha1connect.SocialAdminServiceListPostsProcedure: requires(adminperm.SocialPostsList, auditReadOnly),
 

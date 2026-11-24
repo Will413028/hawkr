@@ -33,19 +33,28 @@ import (
 
 // 投遞失敗的原因（deliveries.failure_reason）。
 const (
-	ReasonRecipientGone    = "recipient_gone"
-	ReasonIntentMissing    = "intent_missing"
-	ReasonTypeUnregistered = "type_unregistered"
-	ReasonRenderFailed     = "render_failed"
-	ReasonNoDeviceToken    = "no_device_token"
-	ReasonTokenGone        = "token_unregistered"
-	ReasonPushRejected     = "push_rejected"
-	ReasonNoEmailAddress   = "no_email_address"
-	ReasonSuppressed       = "email_suppressed"
-	ReasonEmailRejected    = "email_rejected"
-	ReasonRetriesExhausted = "retries_exhausted"
-	ReasonNoLongerValid    = "no_longer_valid"
+	ReasonRecipientGone      = "recipient_gone"
+	ReasonIntentMissing      = "intent_missing"
+	ReasonTypeUnregistered   = "type_unregistered"
+	ReasonRenderFailed       = "render_failed"
+	ReasonNoDeviceToken      = "no_device_token"
+	ReasonTokenGone          = "token_unregistered"
+	ReasonPushRejected       = "push_rejected"
+	ReasonNoEmailAddress     = "no_email_address"
+	ReasonSuppressed         = "email_suppressed"
+	ReasonEmailRejected      = "email_rejected"
+	ReasonRetriesExhausted   = "retries_exhausted"
+	ReasonNoLongerValid      = "no_longer_valid"
+	ReasonChannelUnsupported = "channel_unsupported"
 )
+
+// Reasons 回傳全部投遞失敗原因（每次回傳新的切片）。
+func Reasons() []string {
+	return []string{
+		ReasonRecipientGone, ReasonIntentMissing, ReasonTypeUnregistered, ReasonRenderFailed, ReasonNoDeviceToken, ReasonTokenGone, ReasonPushRejected,
+		ReasonNoEmailAddress, ReasonSuppressed, ReasonEmailRejected, ReasonRetriesExhausted, ReasonNoLongerValid, ReasonChannelUnsupported,
+	}
+}
 
 const (
 	appBuyer  = "BUYER"
@@ -276,7 +285,7 @@ func (s *Service) prepare(ctx context.Context, head store.DeliveryByIDRow) (plan
 		}
 		p.address = address
 	case model.ChannelInbox:
-		return fail("channel_unsupported")
+		return fail(ReasonChannelUnsupported)
 	}
 	return p, false, nil
 }

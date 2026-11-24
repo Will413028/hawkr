@@ -8,14 +8,16 @@
 // 公告一律只寫英文：單一 title 與 body，不分語系、不依收件人的語系選擇，所有使用者看到同一份
 // （限公告，是多語系 ADR 的例外；其餘後台文字仍是 zh-TW）。公告在使用者端的分類是 NOTIFICATION_CATEGORY_ANNOUNCEMENT：
 // 收件匣一定收到，推播可在偏好關閉。
+//
+// 投遞紀錄是推播與 email 觸達與否的唯一來源（收件匣不是渠道；收件匣列本身就是「已進收件匣」的紀錄），重送與未觸達查詢都只讀它。
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_field_behavior } from "../../../../google/api/field_behavior_pb";
 import { file_google_api_field_info } from "../../../../google/api/field_info_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { NotificationAudience } from "../../../notification/v1alpha1/notification_pb";
+import type { NotificationAudience, NotificationCategory, NotificationChannel } from "../../../notification/v1alpha1/notification_pb";
 import { file_hawkr_notification_v1alpha1_notification } from "../../../notification/v1alpha1/notification_pb";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -23,7 +25,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/notification/v1alpha1/notification.proto.
  */
 export const file_hawkr_admin_notification_v1alpha1_notification: GenFile = /*@__PURE__*/
-  fileDesc("CjRoYXdrci9hZG1pbi9ub3RpZmljYXRpb24vdjFhbHBoYTEvbm90aWZpY2F0aW9uLnByb3RvEiFoYXdrci5hZG1pbi5ub3RpZmljYXRpb24udjFhbHBoYTEi6wEKDEFubm91bmNlbWVudBIPCgJpZBgBIAEoCUID4EEIEkQKCWF1ZGllbmNlcxgCIAMoDjIxLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Ob3RpZmljYXRpb25BdWRpZW5jZRINCgV0aXRsZRgDIAEoCRIMCgRib2R5GAQgASgJEjQKC2NyZWF0ZV90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhgKC2luYm94X2NvdW50GAYgASgFQgPgQQMSFwoKZGlzcGF0Y2hlZBgHIAEoCEID4EEDIqsBChlDcmVhdGVBbm5vdW5jZW1lbnRSZXF1ZXN0EkkKCWF1ZGllbmNlcxgBIAMoDjIxLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Ob3RpZmljYXRpb25BdWRpZW5jZUID4EECEhIKBXRpdGxlGAIgASgJQgPgQQISEQoEYm9keRgDIAEoCUID4EECEhwKCnJlcXVlc3RfaWQYBCABKAlCCOKMz9cIAggBImMKGkNyZWF0ZUFubm91bmNlbWVudFJlc3BvbnNlEkUKDGFubm91bmNlbWVudBgBIAEoCzIvLmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Bbm5vdW5jZW1lbnQiQQoYTGlzdEFubm91bmNlbWVudHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInwKGUxpc3RBbm5vdW5jZW1lbnRzUmVzcG9uc2USRgoNYW5ub3VuY2VtZW50cxgBIAMoCzIvLmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Bbm5vdW5jZW1lbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJMsQCChhOb3RpZmljYXRpb25BZG1pblNlcnZpY2USkQEKEkNyZWF0ZUFubm91bmNlbWVudBI8Lmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5DcmVhdGVBbm5vdW5jZW1lbnRSZXF1ZXN0Gj0uaGF3a3IuYWRtaW4ubm90aWZpY2F0aW9uLnYxYWxwaGExLkNyZWF0ZUFubm91bmNlbWVudFJlc3BvbnNlEpMBChFMaXN0QW5ub3VuY2VtZW50cxI7Lmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5MaXN0QW5ub3VuY2VtZW50c1JlcXVlc3QaPC5oYXdrci5hZG1pbi5ub3RpZmljYXRpb24udjFhbHBoYTEuTGlzdEFubm91bmNlbWVudHNSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_notification_v1alpha1_notification]);
+  fileDesc("CjRoYXdrci9hZG1pbi9ub3RpZmljYXRpb24vdjFhbHBoYTEvbm90aWZpY2F0aW9uLnByb3RvEiFoYXdrci5hZG1pbi5ub3RpZmljYXRpb24udjFhbHBoYTEi6wEKDEFubm91bmNlbWVudBIPCgJpZBgBIAEoCUID4EEIEkQKCWF1ZGllbmNlcxgCIAMoDjIxLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Ob3RpZmljYXRpb25BdWRpZW5jZRINCgV0aXRsZRgDIAEoCRIMCgRib2R5GAQgASgJEjQKC2NyZWF0ZV90aW1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhgKC2luYm94X2NvdW50GAYgASgFQgPgQQMSFwoKZGlzcGF0Y2hlZBgHIAEoCEID4EEDIqsBChlDcmVhdGVBbm5vdW5jZW1lbnRSZXF1ZXN0EkkKCWF1ZGllbmNlcxgBIAMoDjIxLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Ob3RpZmljYXRpb25BdWRpZW5jZUID4EECEhIKBXRpdGxlGAIgASgJQgPgQQISEQoEYm9keRgDIAEoCUID4EECEhwKCnJlcXVlc3RfaWQYBCABKAlCCOKMz9cIAggBImMKGkNyZWF0ZUFubm91bmNlbWVudFJlc3BvbnNlEkUKDGFubm91bmNlbWVudBgBIAEoCzIvLmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Bbm5vdW5jZW1lbnQiQQoYTGlzdEFubm91bmNlbWVudHNSZXF1ZXN0EhEKCXBhZ2Vfc2l6ZRgBIAEoBRISCgpwYWdlX3Rva2VuGAIgASgJInwKGUxpc3RBbm5vdW5jZW1lbnRzUmVzcG9uc2USRgoNYW5ub3VuY2VtZW50cxgBIAMoCzIvLmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Bbm5vdW5jZW1lbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIpYDChdSZXNlbmREZWxpdmVyaWVzUmVxdWVzdBI4Cg9mYWlsX3RpbWVfc3RhcnQYASABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQISNgoNZmFpbF90aW1lX2VuZBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAhJDCghjYXRlZ29yeRgDIAEoDjIxLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Ob3RpZmljYXRpb25DYXRlZ29yeRJBCgdjaGFubmVsGAQgASgOMjAuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLk5vdGlmaWNhdGlvbkNoYW5uZWwSSQoHcmVhc29ucxgFIAMoDjI4Lmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5EZWxpdmVyeUZhaWx1cmVSZWFzb24SEgoKYWNjb3VudF9pZBgGIAEoAxIRCgltYXhfY291bnQYByABKAUSDwoHZHJ5X3J1bhgIIAEoCCJMChhSZXNlbmREZWxpdmVyaWVzUmVzcG9uc2USGQoMcmVzZW5kX2NvdW50GAEgASgFQgPgQQMSFQoIaGFzX21vcmUYAiABKAhCA+BBAyJYCiFMaXN0VW5yZWFjaGVkTm90aWZpY2F0aW9uc1JlcXVlc3QSDAoEZGF5cxgBIAEoBRIRCglwYWdlX3NpemUYAiABKAUSEgoKcGFnZV90b2tlbhgDIAEoCSKnAQoQVW5yZWFjaGVkQ2hhbm5lbBJBCgdjaGFubmVsGAEgASgOMjAuaGF3a3Iubm90aWZpY2F0aW9uLnYxYWxwaGExLk5vdGlmaWNhdGlvbkNoYW5uZWwSUAoOZmFpbHVyZV9yZWFzb24YAiABKA4yOC5oYXdrci5hZG1pbi5ub3RpZmljYXRpb24udjFhbHBoYTEuRGVsaXZlcnlGYWlsdXJlUmVhc29uIv8CChVVbnJlYWNoZWROb3RpZmljYXRpb24SGAoLZGVsaXZlcnlfaWQYASABKAlCA+BBCBIRCglpbnRlbnRfaWQYAiABKAkSDAoEdHlwZRgDIAEoCRJDCghjYXRlZ29yeRgEIAEoDjIxLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Ob3RpZmljYXRpb25DYXRlZ29yeRJDCghhdWRpZW5jZRgFIAEoDjIxLmhhd2tyLm5vdGlmaWNhdGlvbi52MWFscGhhMS5Ob3RpZmljYXRpb25BdWRpZW5jZRISCgphY2NvdW50X2lkGAYgASgDEhAKCHN0b3JlX2lkGAcgASgDEjQKC2NyZWF0ZV90aW1lGAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEkUKCGNoYW5uZWxzGAkgAygLMjMuaGF3a3IuYWRtaW4ubm90aWZpY2F0aW9uLnYxYWxwaGExLlVucmVhY2hlZENoYW5uZWwirAEKIkxpc3RVbnJlYWNoZWROb3RpZmljYXRpb25zUmVzcG9uc2USHAoPdW5yZWFjaGVkX2NvdW50GAEgASgDQgPgQQMSTwoNbm90aWZpY2F0aW9ucxgCIAMoCzI4Lmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5VbnJlYWNoZWROb3RpZmljYXRpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAMgASgJKo8FChVEZWxpdmVyeUZhaWx1cmVSZWFzb24SJwojREVMSVZFUllfRkFJTFVSRV9SRUFTT05fVU5TUEVDSUZJRUQQABIqCiZERUxJVkVSWV9GQUlMVVJFX1JFQVNPTl9SRUNJUElFTlRfR09ORRABEioKJkRFTElWRVJZX0ZBSUxVUkVfUkVBU09OX0lOVEVOVF9NSVNTSU5HEAISLQopREVMSVZFUllfRkFJTFVSRV9SRUFTT05fVFlQRV9VTlJFR0lTVEVSRUQQAxIpCiVERUxJVkVSWV9GQUlMVVJFX1JFQVNPTl9SRU5ERVJfRkFJTEVEEAQSKwonREVMSVZFUllfRkFJTFVSRV9SRUFTT05fTk9fREVWSUNFX1RPS0VOEAUSLgoqREVMSVZFUllfRkFJTFVSRV9SRUFTT05fVE9LRU5fVU5SRUdJU1RFUkVEEAYSKQolREVMSVZFUllfRkFJTFVSRV9SRUFTT05fUFVTSF9SRUpFQ1RFRBAHEiwKKERFTElWRVJZX0ZBSUxVUkVfUkVBU09OX05PX0VNQUlMX0FERFJFU1MQCBIsCihERUxJVkVSWV9GQUlMVVJFX1JFQVNPTl9FTUFJTF9TVVBQUkVTU0VEEAkSKgomREVMSVZFUllfRkFJTFVSRV9SRUFTT05fRU1BSUxfUkVKRUNURUQQChItCilERUxJVkVSWV9GQUlMVVJFX1JFQVNPTl9SRVRSSUVTX0VYSEFVU1RFRBALEisKJ0RFTElWRVJZX0ZBSUxVUkVfUkVBU09OX05PX0xPTkdFUl9WQUxJRBAMEi8KK0RFTElWRVJZX0ZBSUxVUkVfUkVBU09OX0NIQU5ORUxfVU5TVVBQT1JURUQQDTKDBQoYTm90aWZpY2F0aW9uQWRtaW5TZXJ2aWNlEpEBChJDcmVhdGVBbm5vdW5jZW1lbnQSPC5oYXdrci5hZG1pbi5ub3RpZmljYXRpb24udjFhbHBoYTEuQ3JlYXRlQW5ub3VuY2VtZW50UmVxdWVzdBo9Lmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5DcmVhdGVBbm5vdW5jZW1lbnRSZXNwb25zZRKTAQoRTGlzdEFubm91bmNlbWVudHMSOy5oYXdrci5hZG1pbi5ub3RpZmljYXRpb24udjFhbHBoYTEuTGlzdEFubm91bmNlbWVudHNSZXF1ZXN0GjwuaGF3a3IuYWRtaW4ubm90aWZpY2F0aW9uLnYxYWxwaGExLkxpc3RBbm5vdW5jZW1lbnRzUmVzcG9uc2UiA5ACARKLAQoQUmVzZW5kRGVsaXZlcmllcxI6Lmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5SZXNlbmREZWxpdmVyaWVzUmVxdWVzdBo7Lmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5SZXNlbmREZWxpdmVyaWVzUmVzcG9uc2USrgEKGkxpc3RVbnJlYWNoZWROb3RpZmljYXRpb25zEkQuaGF3a3IuYWRtaW4ubm90aWZpY2F0aW9uLnYxYWxwaGExLkxpc3RVbnJlYWNoZWROb3RpZmljYXRpb25zUmVxdWVzdBpFLmhhd2tyLmFkbWluLm5vdGlmaWNhdGlvbi52MWFscGhhMS5MaXN0VW5yZWFjaGVkTm90aWZpY2F0aW9uc1Jlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_notification_v1alpha1_notification]);
 
 /**
  * Announcement 是一則系統公告。
@@ -176,6 +178,358 @@ export const ListAnnouncementsResponseSchema: GenMessage<ListAnnouncementsRespon
   messageDesc(file_hawkr_admin_notification_v1alpha1_notification, 4);
 
 /**
+ * @generated from message hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest
+ */
+export type ResendDeliveriesRequest = Message<"hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest"> & {
+  /**
+   * 失敗時間窗 [fail_time_start, fail_time_end)：兩端必填，start 必須早於 end，end 不可在未來，窗長上限 90 天。
+   *
+   * @generated from field: google.protobuf.Timestamp fail_time_start = 1;
+   */
+  failTimeStart?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp fail_time_end = 2;
+   */
+  failTimeEnd?: Timestamp | undefined;
+
+  /**
+   * 通知分類；UNSPECIFIED 表示不限。
+   *
+   * @generated from field: hawkr.notification.v1alpha1.NotificationCategory category = 3;
+   */
+  category: NotificationCategory;
+
+  /**
+   * 渠道，只能是 PUSH 或 EMAIL；UNSPECIFIED 表示不限，INBOX 回 invalid_argument。
+   *
+   * @generated from field: hawkr.notification.v1alpha1.NotificationChannel channel = 4;
+   */
+  channel: NotificationChannel;
+
+  /**
+   * 失敗原因；空表示全部可重送的原因，含不可重送的原因回 invalid_argument。
+   *
+   * @generated from field: repeated hawkr.admin.notification.v1alpha1.DeliveryFailureReason reasons = 5;
+   */
+  reasons: DeliveryFailureReason[];
+
+  /**
+   * 收件人帳號；0 表示不限。
+   *
+   * @generated from field: int64 account_id = 6;
+   */
+  accountId: bigint;
+
+  /**
+   * 一次最多重排的筆數，預設 100，上限 500。
+   *
+   * @generated from field: int32 max_count = 7;
+   */
+  maxCount: number;
+
+  /**
+   * 為 true 只計算不改資料。
+   *
+   * @generated from field: bool dry_run = 8;
+   */
+  dryRun: boolean;
+};
+
+/**
+ * Describes the message hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest.
+ * Use `create(ResendDeliveriesRequestSchema)` to create a new message.
+ */
+export const ResendDeliveriesRequestSchema: GenMessage<ResendDeliveriesRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_notification_v1alpha1_notification, 5);
+
+/**
+ * @generated from message hawkr.admin.notification.v1alpha1.ResendDeliveriesResponse
+ */
+export type ResendDeliveriesResponse = Message<"hawkr.admin.notification.v1alpha1.ResendDeliveriesResponse"> & {
+  /**
+   * 重排的筆數（dry_run 時是會重排的筆數）。
+   *
+   * @generated from field: int32 resend_count = 1;
+   */
+  resendCount: number;
+
+  /**
+   * 還有符合條件、因 max_count 而沒處理的投遞。
+   *
+   * @generated from field: bool has_more = 2;
+   */
+  hasMore: boolean;
+};
+
+/**
+ * Describes the message hawkr.admin.notification.v1alpha1.ResendDeliveriesResponse.
+ * Use `create(ResendDeliveriesResponseSchema)` to create a new message.
+ */
+export const ResendDeliveriesResponseSchema: GenMessage<ResendDeliveriesResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_notification_v1alpha1_notification, 6);
+
+/**
+ * @generated from message hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsRequest
+ */
+export type ListUnreachedNotificationsRequest = Message<"hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsRequest"> & {
+  /**
+   * 往回看的天數，預設 7，上限 90。
+   *
+   * @generated from field: int32 days = 1;
+   */
+  days: number;
+
+  /**
+   * 預設 20，上限 50。
+   *
+   * @generated from field: int32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsRequest.
+ * Use `create(ListUnreachedNotificationsRequestSchema)` to create a new message.
+ */
+export const ListUnreachedNotificationsRequestSchema: GenMessage<ListUnreachedNotificationsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_notification_v1alpha1_notification, 7);
+
+/**
+ * UnreachedChannel 是一個渠道的失敗結果。
+ *
+ * @generated from message hawkr.admin.notification.v1alpha1.UnreachedChannel
+ */
+export type UnreachedChannel = Message<"hawkr.admin.notification.v1alpha1.UnreachedChannel"> & {
+  /**
+   * @generated from field: hawkr.notification.v1alpha1.NotificationChannel channel = 1;
+   */
+  channel: NotificationChannel;
+
+  /**
+   * @generated from field: hawkr.admin.notification.v1alpha1.DeliveryFailureReason failure_reason = 2;
+   */
+  failureReason: DeliveryFailureReason;
+};
+
+/**
+ * Describes the message hawkr.admin.notification.v1alpha1.UnreachedChannel.
+ * Use `create(UnreachedChannelSchema)` to create a new message.
+ */
+export const UnreachedChannelSchema: GenMessage<UnreachedChannel> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_notification_v1alpha1_notification, 8);
+
+/**
+ * UnreachedNotification 是一個收件人沒有觸達的一則通知。
+ *
+ * @generated from message hawkr.admin.notification.v1alpha1.UnreachedNotification
+ */
+export type UnreachedNotification = Message<"hawkr.admin.notification.v1alpha1.UnreachedNotification"> & {
+  /**
+   * 這個收件人這則通知的投遞參考（其中一筆投遞的 id），也是分頁排序的次要鍵。
+   *
+   * @generated from field: string delivery_id = 1;
+   */
+  deliveryId: string;
+
+  /**
+   * @generated from field: string intent_id = 2;
+   */
+  intentId: string;
+
+  /**
+   * 通知型別的名稱（註冊表的 type）。
+   *
+   * @generated from field: string type = 3;
+   */
+  type: string;
+
+  /**
+   * @generated from field: hawkr.notification.v1alpha1.NotificationCategory category = 4;
+   */
+  category: NotificationCategory;
+
+  /**
+   * @generated from field: hawkr.notification.v1alpha1.NotificationAudience audience = 5;
+   */
+  audience: NotificationAudience;
+
+  /**
+   * @generated from field: int64 account_id = 6;
+   */
+  accountId: bigint;
+
+  /**
+   * STORE 受眾的店家 ID；BUYER 受眾為 0。
+   *
+   * @generated from field: int64 store_id = 7;
+   */
+  storeId: bigint;
+
+  /**
+   * 通知意圖建立的時間。
+   *
+   * @generated from field: google.protobuf.Timestamp create_time = 8;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: repeated hawkr.admin.notification.v1alpha1.UnreachedChannel channels = 9;
+   */
+  channels: UnreachedChannel[];
+};
+
+/**
+ * Describes the message hawkr.admin.notification.v1alpha1.UnreachedNotification.
+ * Use `create(UnreachedNotificationSchema)` to create a new message.
+ */
+export const UnreachedNotificationSchema: GenMessage<UnreachedNotification> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_notification_v1alpha1_notification, 9);
+
+/**
+ * @generated from message hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsResponse
+ */
+export type ListUnreachedNotificationsResponse = Message<"hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsResponse"> & {
+  /**
+   * 窗內未觸達的總筆數（不只這一頁）。
+   *
+   * @generated from field: int64 unreached_count = 1;
+   */
+  unreachedCount: bigint;
+
+  /**
+   * @generated from field: repeated hawkr.admin.notification.v1alpha1.UnreachedNotification notifications = 2;
+   */
+  notifications: UnreachedNotification[];
+
+  /**
+   * @generated from field: string next_page_token = 3;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsResponse.
+ * Use `create(ListUnreachedNotificationsResponseSchema)` to create a new message.
+ */
+export const ListUnreachedNotificationsResponseSchema: GenMessage<ListUnreachedNotificationsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_notification_v1alpha1_notification, 10);
+
+/**
+ * DeliveryFailureReason 是投遞紀錄的永久失敗原因。
+ *
+ * @generated from enum hawkr.admin.notification.v1alpha1.DeliveryFailureReason
+ */
+export enum DeliveryFailureReason {
+  /**
+   * @generated from enum value: DELIVERY_FAILURE_REASON_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 收件人已刪除或退場。不重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_RECIPIENT_GONE = 1;
+   */
+  RECIPIENT_GONE = 1,
+
+  /**
+   * 通知意圖已被保留期清除。不重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_INTENT_MISSING = 2;
+   */
+  INTENT_MISSING = 2,
+
+  /**
+   * 通知型別已不在註冊表。不重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_TYPE_UNREGISTERED = 3;
+   */
+  TYPE_UNREGISTERED = 3,
+
+  /**
+   * 組字失敗或參數快照無法解析。不重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_RENDER_FAILED = 4;
+   */
+  RENDER_FAILED = 4,
+
+  /**
+   * 收件人沒有可推播的裝置 token。可重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_NO_DEVICE_TOKEN = 5;
+   */
+  NO_DEVICE_TOKEN = 5,
+
+  /**
+   * 推播服務回報 token 已失效。可重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_TOKEN_UNREGISTERED = 6;
+   */
+  TOKEN_UNREGISTERED = 6,
+
+  /**
+   * 推播服務拒絕這則推播。可重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_PUSH_REJECTED = 7;
+   */
+  PUSH_REJECTED = 7,
+
+  /**
+   * 收件人沒有已驗證的信箱。可重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_NO_EMAIL_ADDRESS = 8;
+   */
+  NO_EMAIL_ADDRESS = 8,
+
+  /**
+   * 位址在停寄名單。不重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_EMAIL_SUPPRESSED = 9;
+   */
+  EMAIL_SUPPRESSED = 9,
+
+  /**
+   * 寄信服務拒絕這封信。可重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_EMAIL_REJECTED = 10;
+   */
+  EMAIL_REJECTED = 10,
+
+  /**
+   * 暫時性失敗用盡重試次數。可重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_RETRIES_EXHAUSTED = 11;
+   */
+  RETRIES_EXHAUSTED = 11,
+
+  /**
+   * 送出前重查發現來源事實已不成立，刻意不送。不重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_NO_LONGER_VALID = 12;
+   */
+  NO_LONGER_VALID = 12,
+
+  /**
+   * 投遞紀錄的渠道不是推播或 email。不重送。
+   *
+   * @generated from enum value: DELIVERY_FAILURE_REASON_CHANNEL_UNSUPPORTED = 13;
+   */
+  CHANNEL_UNSUPPORTED = 13,
+}
+
+/**
+ * Describes the enum hawkr.admin.notification.v1alpha1.DeliveryFailureReason.
+ */
+export const DeliveryFailureReasonSchema: GenEnum<DeliveryFailureReason> = /*@__PURE__*/
+  enumDesc(file_hawkr_admin_notification_v1alpha1_notification, 0);
+
+/**
  * NotificationAdminService 只有管理員能呼叫。
  *
  * @generated from service hawkr.admin.notification.v1alpha1.NotificationAdminService
@@ -201,6 +555,35 @@ export const NotificationAdminService: GenService<{
     methodKind: "unary";
     input: typeof ListAnnouncementsRequestSchema;
     output: typeof ListAnnouncementsResponseSchema;
+  },
+  /**
+   * ResendDeliveries 把符合條件、永久失敗且失敗原因可重送的推播與 email 投遞改回待送並重新排入渠道 job，一次最多 max_count 筆（依失敗時間由舊到新）。
+   * 冪等：只動狀態是永久失敗的列，已送出或已重排（待送）的投遞不會再被選中，所以重複呼叫不會讓同一筆送出兩次；投遞冪等鍵（意圖、收件人、渠道）不變。
+   * 永遠不重送：失敗原因是來源事實已不成立（NO_LONGER_VALID）、位址在停寄名單（EMAIL_SUPPRESSED）、收件人已刪除或退場（RECIPIENT_GONE）、
+   * 意圖或型別已不存在、組字失敗的投遞。重排後的投遞仍由渠道 job 在送出時重新檢查這些條件與行銷類推播的靜音時段，所以重送不會繞過它們。
+   * 失敗時間窗必須給兩端（fail_time_end 不可在未來）：已重送又再失敗的投遞失敗時間會晚於窗的終點，依 has_more 連續呼叫不會重複選到它們。
+   * 寫稽核紀錄；dry_run 為 true 時只回會重排的筆數，不改資料也不寫稽核紀錄。
+   *
+   * @generated from rpc hawkr.admin.notification.v1alpha1.NotificationAdminService.ResendDeliveries
+   */
+  resendDeliveries: {
+    methodKind: "unary";
+    input: typeof ResendDeliveriesRequestSchema;
+    output: typeof ResendDeliveriesResponseSchema;
+  },
+  /**
+   * ListUnreachedNotifications 列出近 days 天內「交易必要」分類（訂單、出貨、售後、撥款、帳號；使用者不能關閉的分類）的通知中，
+   * 某個收件人在所有渠道都沒有觸達的筆數與明細，新到舊（意圖建立時間，再依投遞參考 id 新到舊）。
+   * 觸達只看投遞紀錄：推播或 email 任一筆已送出（SENT）就算觸達；收件匣不是渠道，寫進收件匣不算觸達。
+   * 未觸達＝該收件人這則通知的所有投遞都已終結為永久失敗：還在待送的不算（尚未失敗），失敗原因是 NO_LONGER_VALID（刻意不送）或
+   * RECIPIENT_GONE（收件人已刪除）的也不算。沒有投遞紀錄的意圖（沒有收件人）不算。回應只帶參考 ID，不帶文字、位址與 token。
+   *
+   * @generated from rpc hawkr.admin.notification.v1alpha1.NotificationAdminService.ListUnreachedNotifications
+   */
+  listUnreachedNotifications: {
+    methodKind: "unary";
+    input: typeof ListUnreachedNotificationsRequestSchema;
+    output: typeof ListUnreachedNotificationsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_admin_notification_v1alpha1_notification, 0);
