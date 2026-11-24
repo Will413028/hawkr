@@ -59,7 +59,7 @@
 | D 文件 | 1 + 7（同一個 session） | 現在 | `backend/docs`（不含 `plans/`）、`docs/adr` |
 
 - 撞檔點：步驟 4 刪 notification 分類與步驟 6 刪 client 開關要同一批合進 dev（步驟 4 已寫）；步驟 3 與步驟 6 都改 seller-app 上手清單，6 只刪「物流設定」步驟、3 加「運費設定」步驟，後到者 rebase；主計畫檔只由 D 軌道改。
-- 步驟 7 刪的 `第三方整合/PayUni 物流官方 API 總覽.md`、`Uber Direct API 總覽.md` 仍被 Java shipping 與 payuni-webhook 的原始碼與測試讀取（`UberWebhookParserTest` 等），D 軌道不得早於 A 軌道的步驟 4 合進 dev。
+- `第三方整合/PayUni 物流官方 API 總覽.md`、`Uber Direct API 總覽.md` 被 `PayUniInboundWireContractTest`、`UberInboundWireContractTest` 讀取，改由步驟 4 與這兩個測試同一個 commit 刪除（Will 2026-11-24，讓 D 軌道先合）；D 軌道已拿掉它們在 `_sidebar.md`、`index.md` 的條目。
 - 步驟 8 在四條軌道都完成後做。
 
 - [ ] **0. 基線**（軌道 A 第一件事；被擋於：無）
@@ -86,6 +86,7 @@
     - notification 依 R3 處理賣家新訂單推播。
     - MQ topology 刪 `hawkr.shipping` 與 `shipping.*` queue；CodeMeta 物流值域（溫層除外）與 bizcode 9024；`sellerserver` 的 `MerId` 與 `GetSellerShippingProfile`；compose、`.env.template`、CI 路徑；`modules.go` 刪 `fulfillment` 與指向它的全部邊（含 catalog→fulfillment，與 B4 協調見 R5），同步刪 `internal/platform/lockorder/lockorder.go` 的 `fulfillment`（`internal/arch` 的 lockorder 測試要求兩者一致）。
     - Java `common-core` 的物流碼值 enum 與 helper、`java-proto` 的 `shipping.proto`、`backend/pkg/proto/shipping` 與 `backend/api/proto/shipping`、`pkg/proto/order` 裡只服務 shipping 的欄位；contract golden 隨之更新。
+    - `backend/docs/第三方整合/PayUni 物流官方 API 總覽.md`、`Uber Direct API 總覽.md`（從步驟 7 移來，見並行軌道段）。
     - 舊種子 `06-shipping.sql`；seller `CARRYOVER.md` 裡「固定 `store_code` 是為了 shipping 的 `mer_id`」那條理由改寫（理由不存在後，重新回答 `store_code` 是否還要固定，寫進 `CARRYOVER.md`）。
     - notification：單體的 `CategoryShipment`、`CategoryShipmentAnomaly` 與舊服務的偏好、`shipment.delivered`／`shipment.anomaly.*` 模板刪除（配送異常不再存在；出貨通知在 B8 隨出貨重建），與步驟 6 刪 client 開關同一批合進 dev。
     - 搬遷清單裡 shipping 與 payuni-webhook 的 RPC、事件、副本填 `disposition`（單體規則 8）。
@@ -104,8 +105,8 @@
   - 驗收：同步驟 3 的 client 檢查；`rg -n 'store_map|storePickup|store-pickups|shipment_anomaly|shipping_quotes|shipping_onboarding' website admin buyer-app seller-app -g '!node_modules' -g '!.next' -g '!**/gen/**'` 為 0；e2e 交 CI。
 - [ ] **7. 文件**（被擋於：R4，已決；與步驟 1 同一個 session）
   - 範圍：設計書 65、06、20–23 改寫（自寄、出貨歸訂單、運費設定歸 seller）；03、09、29、36、58 刪物流商與 Uber 段落；`backend/docs/runbooks/uber-quote-retention*` 刪；R4 列出的 ADR 標 superseded。
-  - 範圍補充：`backend/docs/開發規範/` 裡描述物流商的段落刪除；`backend/docs/第三方整合/` 的 7-ELEVEN、黑貓、PayUni 物流總覽整份刪除（整合不存在）；R4 名單外仍提到物流商的 ADR 只在文末加一行「物流商已依 ADR 2026-11-15 退場」，不改正文。
-  - 驗收：`python3 scripts/check-doc-paths.py`、`python3 scripts/check-payuni-residue.py` 綠；`rg -l -i 'Uber|黑貓|7-ELEVEN|超商取貨' backend/docs docs` 的命中只在 `docs/adr/`（superseded 或加了退場註記的 ADR）與 `backend/docs/plans/`（計畫與盤點的歷史紀錄）。
+  - 範圍補充：`backend/docs/開發規範/` 裡描述物流商的段落刪除；`backend/docs/第三方整合/` 的 7-ELEVEN、黑貓、PayUni 物流總覽整份刪除（整合不存在；PayUni 物流與 Uber 兩份移到步驟 4 刪）；R4 名單外仍提到物流商的 ADR 只在文末加一行「物流商已依 ADR 2026-11-15 退場」，不改正文。
+  - 驗收：`python3 scripts/check-doc-paths.py`、`python3 scripts/check-payuni-residue.py` 綠；`rg -l -i 'Uber|黑貓|7-ELEVEN|超商取貨' backend/docs docs` 的命中（不計步驟 4 才刪的兩份總覽）只在 `docs/adr/`（superseded 或加了退場註記的 ADR）與 `backend/docs/plans/`（計畫與盤點的歷史紀錄）。
 - [ ] **8. 收尾**（被擋於：步驟 1–7）：主計畫「模組完成的定義」逐項核對（seller 運費設定部分）；design-review skill 跑在累積 diff；延後項附觸發條件搬回主計畫 B1、B8、B9；需要 Will 做的事列出。驗收：各 workflow 每個 job 綠、`mutation` CI job 綠、主計畫勾選。
 
 ## 決定
