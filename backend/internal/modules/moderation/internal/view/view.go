@@ -232,3 +232,32 @@ func deref(p *int64) int64 {
 	}
 	return *p
 }
+
+// CaseReporters 是案件的檢舉人（買家或店家），依 (檢舉時間, 檢舉 ID) 由小到大的 keyset，給結案通知分頁 fan-out（worker 只組 Reader，不需要完整的 Module）；案件沒有檢舉或不存在都回空頁。
+func (r Reader) CaseReporters(ctx context.Context, caseID uuid.UUID, after *model.ReportCursor, size int32) (model.ReporterPage, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.ReporterPage{}, err
+	}
+	at, id := after.AfterKey()
+	rows, err := store.New(r.DB.Conn(ctx)).ReportersOfCase(ctx, store.ReportersOfCaseParams{CaseID: caseID, AfterCreated: at, AfterID: id, MaxRows: size + 1})
+	if err != nil {
+		return model.ReporterPage{}, fmt.Errorf("moderation：列出案件 %s 的檢舉人：%w", caseID, err)
+	}
+	rows, more := model.TrimPage(rows, size)
+	out := model.ReporterPage{Items: make([]model.Reporter, len(rows))}
+	for i, r := range rows {
+		out.Items[i] = model.Reporter{ReportID: r.ID}
+		if r.ReporterBuyerID != nil {
+			out.Items[i].BuyerID = *r.ReporterBuyerID
+		}
+		if r.ReporterStoreID != nil {
+			out.Items[i].StoreID = *r.ReporterStoreID
+		}
+	}
+	if more {
+		last := rows[len(rows)-1]
+		out.Next = &model.ReportCursor{CreatedAt: last.CreatedAt, ID: last.ID}
+	}
+	return out, nil
+}

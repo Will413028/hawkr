@@ -267,7 +267,18 @@ func (m *Module) ReverseHide(ctx context.Context, in ReverseInput) (CaseDetail, 
 
 // CaseReporters 列案件的檢舉人（買家或店家），依 (檢舉時間, 檢舉 ID) 由小到大的 keyset；給結案通知分頁 fan-out，不含檢舉說明。
 func (m *Module) CaseReporters(ctx context.Context, caseID uuid.UUID, after *ReportCursor, size int32) (ReporterPage, error) {
-	return m.report.CaseReporters(ctx, caseID, after, size)
+	return m.view.CaseReporters(ctx, caseID, after, size)
+}
+
+// CaseReader 是只讀案件資料的入口：worker 的通知 fan-out 讀檢舉人，不需要組出完整的 Module（處置要的 social、seller、accountsuspension 在 worker 用不到）。
+type CaseReader struct{ view view.Reader }
+
+// NewCaseReader 建立 CaseReader。
+func NewCaseReader(d *db.DB) *CaseReader { return &CaseReader{view: view.Reader{DB: d}} }
+
+// CaseReporters 同 Module.CaseReporters。
+func (r *CaseReader) CaseReporters(ctx context.Context, caseID uuid.UUID, after *ReportCursor, size int32) (ReporterPage, error) {
+	return r.view.CaseReporters(ctx, caseID, after, size)
 }
 
 // Case 讀一個案件與它的全部檢舉；每筆檢舉的結果由案件的決定推導。案件不存在回 NotFound。
