@@ -3,10 +3,12 @@
 package procurement
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,11 +26,22 @@ type scriptedOrders struct {
 	results []provisioning.Result
 	errs    []error
 	got     []provisioning.Command
+	// parties 與 partiesErr 是 OrderParties 的回答；onCreate 在每次 CreateOrder 開頭執行（模擬呼叫期間接受單被別處改了）。
+	parties    provisioning.Parties
+	partiesErr error
+	onCreate   func()
+}
+
+func (s *scriptedOrders) OrderParties(context.Context, string) (provisioning.Parties, error) {
+	return s.parties, s.partiesErr
 }
 
 func (s *scriptedOrders) CreateOrder(_ context.Context, cmd provisioning.Command) (provisioning.Result, error) {
 	i := len(s.got)
 	s.got = append(s.got, cmd)
+	if s.onCreate != nil {
+		s.onCreate()
+	}
 	if i < len(s.errs) && s.errs[i] != nil {
 		return provisioning.Result{}, s.errs[i]
 	}
@@ -51,6 +64,7 @@ type orderFixture struct {
 	m      *Module
 	c      chain
 	orders *scriptedOrders
+	logs   *bytes.Buffer
 }
 
 func newOrderFixture(t *testing.T) *orderFixture {
@@ -66,9 +80,9 @@ func newOrderFixture(t *testing.T) *orderFixture {
 		id(), c.sellerResponse, epoch.Add(time.Hour), id(), epoch); err != nil {
 		t.Fatal(err)
 	}
-	f := &orderFixture{t: t, d: d, c: c, orders: &scriptedOrders{}}
+	f := &orderFixture{t: t, d: d, c: c, orders: &scriptedOrders{parties: provisioning.Parties{BuyerID: 21, StoreID: storeID}}, logs: &bytes.Buffer{}}
 	f.m = New(Deps{
-		DB: d, Now: func() time.Time { return epoch }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Jobs: &fakeJobs{},
+		DB: d, Now: func() time.Time { return epoch }, Logger: slog.New(slog.NewTextHandler(f.logs, nil)), Jobs: &fakeJobs{},
 		Events: events.NewBus(), Orders: f.orders,
 	})
 	return f
@@ -212,7 +226,7 @@ func TestProvisionSuccessWithoutAnOrderNumberIsATerminalRejection(t *testing.T) 
 
 func TestLastAttemptFailureMarksOrderFailedReleasesTheLockAndTheBuyerCanAcceptAgain(t *testing.T) {
 	f := newOrderFixture(t)
-	f.orders.results = []provisioning.Result{{Code: 500}, {Code: 500}, {Code: 500}, {Code: 500}, {Code: 500}}
+	f.orders.results = []provisioning.Result{{Code: 500}, {Code: 500}, {Code: 500}, {Code: 500}, {Code: 500}, {Code: 500}}
 	for attempt := 1; attempt < quote.OrderMaxAttempts; attempt++ {
 		if err := f.workJob(attempt, quote.OrderMaxAttempts); err == nil {
 			t.Fatalf("第 %d 次要回 error", attempt)
@@ -231,11 +245,125 @@ func TestLastAttemptFailureMarksOrderFailedReleasesTheLockAndTheBuyerCanAcceptAg
 
 func TestLastAttemptTransportFailureAlsoMarksOrderFailed(t *testing.T) {
 	f := newOrderFixture(t)
-	f.orders.errs = []error{errors.New("連不上")}
+	f.orders.errs = []error{errors.New("連不上"), errors.New("還是連不上")}
 	if err := f.workJob(quote.OrderMaxAttempts, quote.OrderMaxAttempts); err == nil {
 		t.Fatal("要回 error")
 	}
 	f.wantFailed(provisioning.ReasonRetryExhausted)
+	if len(f.orders.got) != 2 {
+		t.Fatalf("標失敗前要再呼叫一次：呼叫 %d 次", len(f.orders.got))
+	}
+}
+
+// 回應遺失但單已建好：最後一次嘗試的再呼叫用同一個 order_ref 取回既有訂單，不標成失敗。
+func TestLastAttemptRecallRecoversAnOrderWhoseResponseWasLost(t *testing.T) {
+	f := newOrderFixture(t)
+	f.orders.errs = []error{errors.New("回應遺失"), nil}
+	replayed := okResult()
+	replayed.Replayed = true
+	f.orders.results = []provisioning.Result{{}, replayed}
+	if err := f.workJob(quote.OrderMaxAttempts, quote.OrderMaxAttempts); err != nil {
+		t.Fatalf("再呼叫取回訂單就不回 error：%v", err)
+	}
+	state, prov, _, orderNo := f.state()
+	if state != "ACTIVE" || prov != "ORDER_CREATED" || orderNo == nil || *orderNo != "HK1" {
+		t.Fatalf("結果 %s %s %v", state, prov, orderNo)
+	}
+	if len(f.orders.got) != 2 || f.orders.got[0].OrderRef != f.orders.got[1].OrderRef || f.orders.got[1].OrderRef != f.orderRef() {
+		t.Fatalf("兩次要用同一個 order_ref：%+v", f.orders.got)
+	}
+}
+
+// R1-1：order_ref 命中的既有訂單不是這張接受單的買家與店家（舊 order-service 的 acceptance_id 撞號）時不採用。
+func TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore(t *testing.T) {
+	for name, parties := range map[string]provisioning.Parties{
+		"別的買家": {BuyerID: 22, StoreID: storeID},
+		"別的店家": {BuyerID: 21, StoreID: storeID + 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newOrderFixture(t)
+			replayed := okResult()
+			replayed.Replayed = true
+			f.orders.results = []provisioning.Result{replayed}
+			f.orders.parties = parties
+			if err := f.m.orders.Provision(context.Background(), f.c.acceptance, false); err != nil {
+				t.Fatal(err)
+			}
+			f.wantFailed(provisioning.ReasonRejected)
+			if got := f.logs.String(); !strings.Contains(got, "level=ERROR") || !strings.Contains(got, "order_no=HK1") {
+				t.Fatalf("要以 error 等級記下命中的訂單號：%s", got)
+			}
+		})
+	}
+}
+
+func TestProvisionAcceptsAReplayedOrderOfTheSameBuyerAndStore(t *testing.T) {
+	f := newOrderFixture(t)
+	replayed := okResult()
+	replayed.Replayed = true
+	f.orders.results = []provisioning.Result{replayed}
+	if err := f.m.orders.Provision(context.Background(), f.c.acceptance, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, prov, _, orderNo := f.state(); prov != "ORDER_CREATED" || orderNo == nil || *orderNo != "HK1" {
+		t.Fatalf("provisioning %s %v", prov, orderNo)
+	}
+}
+
+func TestProvisionRetriesWhenTheReplayedOrderCannotBeVerified(t *testing.T) {
+	f := newOrderFixture(t)
+	replayed := okResult()
+	replayed.Replayed = true
+	f.orders.results = []provisioning.Result{replayed}
+	f.orders.partiesErr = errors.New("查不到")
+	if err := f.m.orders.Provision(context.Background(), f.c.acceptance, false); err == nil {
+		t.Fatal("確認不了要回 error 讓 River 重試")
+	}
+	f.wantCreating()
+}
+
+// R1-4：job 因逾時（不是關機）結束時，最後一次嘗試仍要用新的 context 標成建單失敗。
+func TestLastAttemptAfterTheJobTimedOutStillMarksOrderFailed(t *testing.T) {
+	f := newOrderFixture(t)
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	if err := f.m.orders.Provision(ctx, f.c.acceptance, true); err == nil {
+		t.Fatal("要回 error")
+	}
+	f.wantFailed(provisioning.ReasonRetryExhausted)
+}
+
+// R1-2：ordering 已建單但接受單已不在 CREATING_ORDER 時，訂單號不能無聲消失。
+func TestProvisionLogsAnErrorWhenTheOrderNumberCannotBeRecorded(t *testing.T) {
+	f := newOrderFixture(t)
+	f.orders.results = []provisioning.Result{okResult()}
+	f.orders.onCreate = func() {
+		if _, err := f.d.Pool().Exec(context.Background(), `UPDATE procurement.buyer_quote_acceptances SET state = 'ORDER_FAILED', order_provisioning_state = 'ORDER_FAILED', order_failure_reason = 'X' WHERE id = $1`, f.c.acceptance); err != nil {
+			t.Error(err)
+		}
+	}
+	if err := f.m.orders.Provision(context.Background(), f.c.acceptance, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.logs.String(); !strings.Contains(got, "level=ERROR") || !strings.Contains(got, "order_no=HK1") || !strings.Contains(got, f.c.acceptance.String()) {
+		t.Fatalf("要以 error 等級記下訂單號與接受單 id：%s", got)
+	}
+}
+
+func TestProvisionLogsAnErrorWhenTheFailureCannotBeRecorded(t *testing.T) {
+	f := newOrderFixture(t)
+	f.orders.results = []provisioning.Result{{Code: 9504, Message: "拒絕"}}
+	f.orders.onCreate = func() {
+		if _, err := f.d.Pool().Exec(context.Background(), `UPDATE procurement.buyer_quote_acceptances SET order_provisioning_state = 'ORDER_CREATED', order_no = 'HK9' WHERE id = $1`, f.c.acceptance); err != nil {
+			t.Error(err)
+		}
+	}
+	if err := f.m.orders.Provision(context.Background(), f.c.acceptance, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.logs.String(); !strings.Contains(got, "level=ERROR") || !strings.Contains(got, f.c.acceptance.String()) {
+		t.Fatalf("要以 error 等級記下接受單 id：%s", got)
+	}
 }
 
 func TestShutdownOnTheLastAttemptDoesNotMarkOrderFailed(t *testing.T) {
@@ -314,6 +442,23 @@ func TestReconcilerMarksOrderFailedWhenTheJobIsDeadAndLeavesLiveJobsAlone(t *tes
 			}
 			f.wantCreating()
 		})
+	}
+}
+
+// reconciler 標成失敗之前也先用同一個 order_ref 再呼叫一次，取回回應遺失的訂單。
+func TestReconcilerRecallsOrderingBeforeMarkingFailed(t *testing.T) {
+	f := newOrderFixture(t)
+	f.setJob(nil)
+	f.orders.results = []provisioning.Result{okResult()}
+	n, err := f.m.ordersRec.Reconcile(context.Background(), fakeStates{})
+	if err != nil || n != 0 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if _, prov, _, orderNo := f.state(); prov != "ORDER_CREATED" || orderNo == nil || *orderNo != "HK1" {
+		t.Fatalf("provisioning %s %v", prov, orderNo)
+	}
+	if len(f.orders.got) != 1 || f.orders.got[0].OrderRef != f.orderRef() {
+		t.Fatalf("呼叫 %+v", f.orders.got)
 	}
 }
 

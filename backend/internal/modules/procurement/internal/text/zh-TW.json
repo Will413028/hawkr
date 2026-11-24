@@ -282,6 +282,10 @@
       },
       "description": "有欄位被拒時的警示句，items 是「欄位：原因」以分隔詞連接。"
     },
+    "rfq.audience_unavailable": {
+      "message": "其中有店家目前無法接收詢價，請重新搜尋候選店家，或調整選擇的店家後再試。",
+      "description": "詢價預覽或發布時，受眾裡有店家封鎖買家或不在營業中：不指出是哪一家，提示重新搜尋候選或調整選擇。"
+    },
     "slot.budget_per_unit": {
       "message": "單價預算",
       "description": "需求欄位名稱：每單位預算。"

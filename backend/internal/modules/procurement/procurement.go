@@ -93,6 +93,7 @@ type (
 	OrderCreator = provisioning.Creator
 	OrderCommand = provisioning.Command
 	OrderResult  = provisioning.Result
+	OrderParties = provisioning.Parties
 )
 
 // EntitlementReader 是 SubmitTurn 取額度要用的 buyer 方法：每月上限與期間（*buyer.Module 滿足它）。
@@ -214,7 +215,7 @@ func New(d Deps) *Module {
 	}
 	m.quotes = quote.Service{DB: d.DB, Now: d.Now, Jobs: d.Jobs}
 	m.orders = provisioning.Worker{DB: d.DB, Orders: d.Orders, Now: d.Now, Logger: d.Logger}
-	m.ordersRec = provisioning.Reconciler{DB: d.DB, Now: d.Now, Logger: d.Logger}
+	m.ordersRec = provisioning.Reconciler{DB: d.DB, Orders: d.Orders, Now: d.Now, Logger: d.Logger}
 	return m
 }
 

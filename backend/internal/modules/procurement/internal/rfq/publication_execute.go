@@ -27,7 +27,7 @@ type ExecuteInput struct {
 // ExecutePublication 以核准的版本建立發布，同一個 transaction 寫入發布、邀請與一則 RfqPublished 事件，任何一步失敗全部還原（核准的 PENDING→EXECUTING 也還原）。不建 run、不發通知。
 // 需求或核准不屬於買家回 NOT_FOUND；讀到的需求版本不是現行版本回 ABORTED／VERSION_CONFLICT（request_revision）；需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；
 // 核准是別的需求的、版本不符、不是 PENDING（已執行過）、已過期（expires_at 當下已過期）、凍結的需求版本已不是現行版本、回價期限已早於今天（台北時區）、PayloadHash 與核准的內容不符、受眾名單是空的，回 ABORTED／VERSION_CONFLICT（publication_approval）；
-// 候選集已不是有效的候選集（search.IsEffective），或受眾裡有封鎖這位買家、不是營業中的店（A9-D45(4)，訊息相同、不透露是哪一家）回 ABORTED／VERSION_CONFLICT（candidate_set）；查封鎖與營業中失敗回一般錯誤（fail-closed）。
+// 候選集已不是有效的候選集（search.IsEffective），或受眾裡有封鎖這位買家、不是營業中的店（A9-D45(4)，不透露是哪一家）回 ABORTED／VERSION_CONFLICT（candidate_set）；查封鎖與營業中失敗回一般錯誤（fail-closed）。
 // 重送同一個 ClientRequestID 回第一次的發布（Replayed 為 true，先於其餘檢查，不重複建邀請與事件），內容（需求、核准、核准版本、讀到的版本、PayloadHash）不同回 INVALID_ARGUMENT（欄位 client_request_id）。
 func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model.Publication, error) {
 	var out model.Publication
@@ -80,7 +80,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 		if c.sellerHash != in.PayloadHash || len(c.storeIDs) == 0 {
 			return stale
 		}
-		if err := s.checkStores(ctx, in.BuyerID, c.storeIDs, msgCandidateSetStaleExecute); err != nil {
+		if err := s.checkStores(ctx, in.BuyerID, c.storeIDs); err != nil {
 			return err
 		}
 		pub := store.InsertPublicationParams{

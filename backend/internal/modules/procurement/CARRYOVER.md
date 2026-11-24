@@ -195,7 +195,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | 買家已刪時的建單 | 舊服務的讀取一律帶買家範圍 | 否：BuyerDeleted 後 `buyer_id` 為 NULL（S10） | 沒有買家就不建單 | 直接標 `BUYER_DELETED`、不呼叫 ordering |
 | 並行期單一生效者 | 舊 ai-service 到 A9-6 仍處理建單 | 成立 | 同 | `Module.AddOrderWorkers`、`OrderPeriodicJobs` 只有測試登記，worker 角色不呼叫（`TestWorkerRoleDoesNotRegisterProcurementOrderProvisioning` 守門）；`Deps.Orders` 在 `cmd/hawkr` 只有轉接器（`procurementOrders`），A9-6 刪路由的同一個變更才接上 |
 
-已知限制（A9-D19 S6 修訂的代價）：最後一次嘗試的回應若在途中遺失而 ordering 其實已建單，接受單標成建單失敗後買家再接受會得到新的 `order_ref`，可能多一張訂單；舊服務的 outbox 路徑同樣如此，不另加補償。
+標失敗之前再呼叫一次（A9-D45(1) 補充，Will 2026-11-24）：最後一次嘗試與 reconciler 在標 `ORDER_FAILED` 之前，先用同一個 `order_ref` 再呼叫一次 `CreateRfqOrder`；舊 order-service 對 `acceptanceId` 冪等（`OrderService.createRfqOrder` 回既有訂單），所以回應遺失而單已建好時取回訂單、標 `ORDER_CREATED`，不再有「標失敗後買家再接受而多一張訂單」。再呼叫仍失敗才標失敗（最後一次嘗試 `RETRY_EXHAUSTED`、reconciler `ORDER_JOB_LOST`）。回 `replayed` 時以 `GetOrderForAfterSales` 核對買家與店家：`order_ref` 從 1 起算，可能撞上舊 `orders.acceptance_id` 的別人的單，不符就標 `ORDER_SERVICE_REJECTED` 並以 error 記錄；買家與店家都相同但屬於別張單的撞號無法由回應判斷（`TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore`、`TestLastAttemptRecallRecoversAnOrderWhoseResponseWasLost`、`TestReconcilerRecallsOrderingBeforeMarkingFailed`）。
 
 ## 與 ai-service 的差異
 

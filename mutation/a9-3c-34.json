@@ -4,7 +4,7 @@
    "id": "execute-skips-store-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
-   "old": "if err := s.checkStores(ctx, in.BuyerID, c.storeIDs, msgCandidateSetStaleExecute); err != nil {",
+   "old": "if err := s.checkStores(ctx, in.BuyerID, c.storeIDs); err != nil {",
    "new": "if err := error(nil); err != nil {",
    "test": "internal/modules/procurement/internal/rfq ^TestExecuteRejectsAStoreThatBlocksTheBuyerOrClosedSinceThePreview$",
    "why": "ExecutePublication stops checking blocking and closed stores, so a store that blocked the buyer after the preview still gets the invite."
@@ -13,7 +13,7 @@
    "id": "preview-skips-store-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
-   "old": "if err := s.checkStores(ctx, in.BuyerID, stores, msgCandidateSetStalePreview); err != nil {",
+   "old": "if err := s.checkStores(ctx, in.BuyerID, stores); err != nil {",
    "new": "if err := error(nil); err != nil {",
    "test": "internal/modules/procurement/internal/rfq ^TestPreviewRejectsAStoreThatBlocksTheBuyerOrIsNotOpen$",
    "why": "PreviewPublication stops checking blocking and closed stores, so an approval is created for a blocking store."
@@ -31,7 +31,7 @@
    "id": "last-attempt-does-not-mark-failed",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
-   "old": "if !last || ctx.Err() != nil {",
+   "old": "if !last || errors.Is(ctx.Err(), context.Canceled) {",
    "new": "if true {",
    "test": "internal/modules/procurement ^TestLastAttemptFailureMarksOrderFailedReleasesTheLockAndTheBuyerCanAcceptAgain$",
    "why": "The last failed attempt returns the error without marking the acceptance ORDER_FAILED, so the live lock stays and the buyer cannot accept again."
@@ -71,6 +71,78 @@
    "new": "OrderRef: w.Now().UnixNano(),",
    "test": "internal/modules/procurement ^TestProvisionRetriesUseTheSameOrderRefAndCreateOnce$",
    "why": "The idempotency key changes on every attempt, so a retry after a lost response creates a second order."
+  },
+  {
+   "id": "last-attempt-skips-the-recall",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "if _, again := w.create(fresh, id); again == nil {",
+   "new": "if again := errors.New(\"skipped\"); again == nil {",
+   "test": "internal/modules/procurement ^TestLastAttemptRecallRecoversAnOrderWhoseResponseWasLost$",
+   "why": "The last attempt marks ORDER_FAILED without calling CreateRfqOrder once more, so an order whose response was lost is reported as failed and a second order can be created on re-acceptance."
+  },
+  {
+   "id": "replayed-order-of-another-buyer-accepted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "if p.BuyerID != *b.BuyerID || p.StoreID != b.StoreID {",
+   "new": "if p.BuyerID == 0 && p.StoreID == 0 {",
+   "test": "internal/modules/procurement ^TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore$",
+   "why": "A replayed order that belongs to another buyer or store is recorded on the acceptance, exposing someone else's order."
+  },
+  {
+   "id": "timeout-is-treated-as-shutdown",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "if !last || errors.Is(ctx.Err(), context.Canceled) {",
+   "new": "if !last || ctx.Err() != nil {",
+   "test": "internal/modules/procurement ^TestLastAttemptAfterTheJobTimedOutStillMarksOrderFailed$",
+   "why": "A job that hit its Worker.Timeout on the last attempt skips marking, leaving the acceptance CREATING_ORDER until the reconciler."
+  },
+  {
+   "id": "unrecorded-order-number-is-silent",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "w.Logger.ErrorContext(ctx, \"procurement：ordering 已建單",
+   "new": "w.Logger.DebugContext(ctx, \"procurement：ordering 已建單",
+   "test": "internal/modules/procurement ^TestProvisionLogsAnErrorWhenTheOrderNumberCannotBeRecorded$",
+   "why": "A created order whose number could not be recorded is no longer logged at error level."
+  },
+  {
+   "id": "unrecorded-failure-is-silent",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "log.ErrorContext(ctx, \"procurement：標記建單失敗沒有更新",
+   "new": "log.DebugContext(ctx, \"procurement：標記建單失敗沒有更新",
+   "test": "internal/modules/procurement ^TestProvisionLogsAnErrorWhenTheFailureCannotBeRecorded$",
+   "why": "A failure mark that updated no row is no longer logged at error level."
+  },
+  {
+   "id": "reconciler-skips-the-recall",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "res, cause := w.create(ctx, id)\n\tif cause == nil {",
+   "new": "res, cause := outcomeNone, errors.New(\"skipped\")\n\tif cause == nil {",
+   "test": "internal/modules/procurement ^TestReconcilerRecallsOrderingBeforeMarkingFailed$",
+   "why": "The reconciler marks a dead job's acceptance ORDER_FAILED without calling CreateRfqOrder once more."
+  },
+  {
+   "id": "serve-procurement-without-seller-module",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "newProcurement(d, jc, buyerModule, sellerModule, bus, log)",
+   "new": "newProcurement(d, jc, buyerModule, nil, bus, log)",
+   "test": "cmd/hawkr ^TestProcurementIsAssembledWithTheSellerModule$",
+   "why": "serve assembles procurement without the seller module, so every publication fails the store check."
+  },
+  {
+   "id": "worker-procurement-without-seller-module",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "categories, products, sellerModule, log)",
+   "new": "categories, products, nil, log)",
+   "test": "cmd/hawkr ^TestProcurementIsAssembledWithTheSellerModule$",
+   "why": "worker assembles procurement without the seller module."
   }
  ]
 }

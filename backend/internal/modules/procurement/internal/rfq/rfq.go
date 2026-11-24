@@ -17,9 +17,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/candidate"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/search"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 const (
@@ -50,6 +52,10 @@ const (
 	msgCandidateSetStalePreview = "這個候選集已不是有效的候選集，請重新載入"
 	msgCandidateSetStaleExecute = "這個候選集已不是有效的候選集，請重新預覽"
 )
+
+func audienceUnavailable(ctx context.Context) error {
+	return versionConflict(text.RfqAudienceUnavailable(uitext.LocaleFrom(ctx)).Text, TargetCandidateSet)
+}
 
 func versionConflict(msg, target string) error {
 	return apperr.VersionConflict("%s", msg).WithMetadata("conflictTarget", target)
@@ -133,9 +139,9 @@ func lockRequest(ctx context.Context, q *store.Queries, buyerID int64, requestID
 	return settle(req, active, hasActive, expected)
 }
 
-// checkStores 在預覽與執行時重查受眾：任何一家封鎖這位買家或不是營業中，整筆回 VERSION_CONFLICT（candidate_set），訊息與候選集失效相同、不透露是哪一家（A9-D45(4)）。
+// checkStores 在預覽與執行時重查受眾：任何一家封鎖這位買家或不是營業中，整筆回 VERSION_CONFLICT（candidate_set），訊息不透露是哪一家，也不叫買家重新載入（重載得到同一個有效集合）：請買家重新搜尋候選或調整選擇（A9-D45(4)）。
 // 任何一個查詢失敗都回一般錯誤（fail-closed），不放行。
-func (s Service) checkStores(ctx context.Context, buyerID int64, storeIDs []int64, conflictMsg string) error {
+func (s Service) checkStores(ctx context.Context, buyerID int64, storeIDs []int64) error {
 	if s.Blocks == nil || s.Open == nil {
 		return errors.New("rfq：Service.Blocks 與 Service.Open 必填：發布要檢查封鎖與營業中")
 	}
@@ -149,10 +155,10 @@ func (s Service) checkStores(ctx context.Context, buyerID int64, storeIDs []int6
 	}
 	for _, id := range storeIDs {
 		if _, isBlocked := blocked[id]; isBlocked {
-			return versionConflict(conflictMsg, TargetCandidateSet)
+			return audienceUnavailable(ctx)
 		}
 		if _, isOpen := open[id]; !isOpen {
-			return versionConflict(conflictMsg, TargetCandidateSet)
+			return audienceUnavailable(ctx)
 		}
 	}
 	return nil

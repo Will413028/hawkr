@@ -379,6 +379,7 @@ CREATE UNIQUE INDEX buyer_quote_acceptances_idempotency ON procurement.buyer_quo
 CREATE UNIQUE INDEX buyer_quote_acceptances_live ON procurement.buyer_quote_acceptances (request_id) WHERE state = 'ACTIVE';
 CREATE UNIQUE INDEX buyer_quote_acceptances_order_no ON procurement.buyer_quote_acceptances (order_no) WHERE order_no IS NOT NULL;
 CREATE INDEX buyer_quote_acceptances_response ON procurement.buyer_quote_acceptances (seller_response_id, seller_response_version);
+CREATE INDEX buyer_quote_acceptances_creating ON procurement.buyer_quote_acceptances (id) WHERE order_provisioning_state = 'CREATING_ORDER';
 
 -- run 帳本：job_id 是執行它的 River job（WAITING_FOR_INPUT 的 run 沒有進行中的 job），quota_period_start 是扣額度的期間（失敗退款用；只有 TURN 扣額度，其餘 run 類型為 NULL，退款只在非 NULL 時做）；沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
 -- 建 run 的方法（SubmitTurn、StartCandidateSearch、ResumeRun）的冪等鍵放在這裡（S4，舊 agent_run_commands 刪除）。

@@ -1,5 +1,6 @@
 // Package provisioning 是接受報價之後的建單（A9-D45(1)、A9-D19 S6 修訂）：River worker 經 Creator 呼叫舊 ordering 的 CreateRfqOrder，
 // 成功記下訂單號、暫時性失敗重試、終態拒絕或最後一次嘗試失敗就把接受單標成建單失敗並解除 live 鎖；Reconciler 是 job 死了的保底。
+// 標成失敗之前（最後一次嘗試、reconciler）先用同一個 order_ref 再呼叫一次：舊 ordering 對 order_ref 冪等，回應遺失而單已建好時這一次取回既有訂單（A9-D45(1) 補充）。
 // 呼叫在 transaction 之外（外部 provider，ADR D5），冪等鍵是接受單的 order_ref。
 package provisioning
 
@@ -52,11 +53,21 @@ type Result struct {
 	Message         string
 	OrderNo         string
 	PaymentDeadline time.Time
+	// Replayed 為真表示 order_ref 命中既有訂單、這次沒有建立新單。
+	Replayed bool
+}
+
+// Parties 是訂單的買家與賣方店家。
+type Parties struct {
+	BuyerID int64
+	StoreID int64
 }
 
 // Creator 呼叫舊 ordering 建單；傳輸層錯誤回 error，業務拒絕以非 0 的 Code 回傳。
+// OrderParties 讀既有訂單的買家與店家：CreateOrder 回 Replayed 時用它確認命中的是這張接受單自己的訂單。
 type Creator interface {
 	CreateOrder(ctx context.Context, cmd Command) (Result, error)
+	OrderParties(ctx context.Context, orderNo string) (Parties, error)
 }
 
 // Outcome 是一個回應的分類。
@@ -122,64 +133,110 @@ func (w *Worker) Work(ctx context.Context, job *river.Job[quote.OrderProvisionin
 
 // Provision 處理一筆接受單；last 表示這是最後一次嘗試。已不是 CREATING_ORDER 的接受單不做事，回 nil。
 func (w *Worker) Provision(ctx context.Context, id uuid.UUID, last bool) error {
+	_, cause := w.create(ctx, id)
+	if cause == nil {
+		return nil
+	}
+	return w.retry(ctx, id, last, cause)
+}
+
+// outcome 是 create 在沒有暫時性錯誤時的結果。
+type outcome int
+
+const (
+	outcomeNone outcome = iota
+	outcomeCreated
+	outcomeFailed
+)
+
+// finalTimeout 是最後一次再呼叫與標記失敗的上限：job 的 context 可能已經因逾時結束，所以另起一個。
+const finalTimeout = 30 * time.Second
+
+// create 嘗試建單一次。終態（已建好、已標失敗、已不是 CREATING_ORDER）回 nil error；暫時性失敗回 cause，由呼叫端決定重試或收尾。
+func (w *Worker) create(ctx context.Context, id uuid.UUID) (outcome, error) {
 	q := store.New(w.DB.Conn(ctx))
 	b, err := q.GetOrderBasis(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return w.fail(ctx, id, ReasonBasisMissing)
+		return outcomeFailed, w.fail(ctx, id, ReasonBasisMissing)
 	}
 	if err != nil {
-		return w.retry(ctx, id, last, fmt.Errorf("provisioning：讀取接受單 %s：%w", id, err))
+		return outcomeNone, fmt.Errorf("provisioning：讀取接受單 %s：%w", id, err)
 	}
 	if b.OrderProvisioningState != "CREATING_ORDER" {
-		return nil
+		return outcomeNone, nil
 	}
 	if b.BuyerID == nil {
-		return w.fail(ctx, id, ReasonBuyerDeleted)
+		return outcomeFailed, w.fail(ctx, id, ReasonBuyerDeleted)
 	}
 	name, err := ItemName(deref(b.Item), deref(b.ItemResolutionLabel), b.OfferedQuantity, b.OfferedQuantityUnit)
 	if err != nil {
 		w.Logger.WarnContext(ctx, "procurement：組不出建單品名", "acceptance_id", id.String(), "error", err)
-		return w.fail(ctx, id, ReasonItemName)
+		return outcomeFailed, w.fail(ctx, id, ReasonItemName)
 	}
 	res, err := w.Orders.CreateOrder(ctx, Command{
 		OrderRef: b.OrderRef, BuyerID: *b.BuyerID, StoreID: b.StoreID, TotalAmount: b.AcceptedDealPrice,
 		ShippingFee: b.ShippingAmount, UnitPrice: b.GoodsAmount + b.TaxAmount, ItemName: name,
 	})
 	if err != nil {
-		return w.retry(ctx, id, last, fmt.Errorf("provisioning：呼叫建單：%w", err))
+		return outcomeNone, fmt.Errorf("provisioning：呼叫建單：%w", err)
 	}
 	switch v := Classify(res); v.Outcome {
 	case OutcomeRetry:
-		return w.retry(ctx, id, last, fmt.Errorf("provisioning：ordering 回暫時性錯誤 %d：%s", res.Code, res.Message))
+		return outcomeNone, fmt.Errorf("provisioning：ordering 回暫時性錯誤 %d：%s", res.Code, res.Message)
 	case OutcomeRejected:
 		w.Logger.WarnContext(ctx, "procurement：ordering 拒絕建單", "acceptance_id", id.String(), "code", res.Code, "message", res.Message)
-		return w.fail(ctx, id, v.Reason)
+		return outcomeFailed, w.fail(ctx, id, v.Reason)
 	case OutcomeCreated:
 	}
-	if _, err := q.MarkOrderCreated(ctx, store.MarkOrderCreatedParams{ID: id, OrderNo: &res.OrderNo, PaymentDeadline: &res.PaymentDeadline, Now: w.Now()}); err != nil {
-		return w.retry(ctx, id, last, fmt.Errorf("provisioning：記下訂單 %s：%w", res.OrderNo, err))
+	if res.Replayed {
+		// order_ref 從 1 起算，舊 order-service 的 orders.acceptance_id 可能已有同值的別人的單：命中既有訂單時要確認買家與店家都對。
+		p, err := w.Orders.OrderParties(ctx, res.OrderNo)
+		if err != nil {
+			return outcomeNone, fmt.Errorf("provisioning：確認既有訂單 %s 的買家與店家：%w", res.OrderNo, err)
+		}
+		if p.BuyerID != *b.BuyerID || p.StoreID != b.StoreID {
+			w.Logger.ErrorContext(ctx, "procurement：order_ref 命中別人的訂單，不採用", "acceptance_id", id.String(), "order_ref", b.OrderRef, "order_no", res.OrderNo)
+			return outcomeFailed, w.fail(ctx, id, ReasonRejected)
+		}
 	}
-	return nil
+	n, err := q.MarkOrderCreated(ctx, store.MarkOrderCreatedParams{ID: id, OrderNo: &res.OrderNo, PaymentDeadline: &res.PaymentDeadline, Now: w.Now()})
+	if err != nil {
+		return outcomeNone, fmt.Errorf("provisioning：記下訂單 %s：%w", res.OrderNo, err)
+	}
+	if n == 0 {
+		w.Logger.ErrorContext(ctx, "procurement：ordering 已建單，但接受單已不是 CREATING_ORDER，訂單號沒有記下", "acceptance_id", id.String(), "order_no", res.OrderNo)
+	}
+	return outcomeCreated, nil
 }
 
-// retry 回傳暫時性錯誤；最後一次嘗試（且不是因為關機取消）先標成建單失敗。標記失敗時回標記的錯誤，留給 reconciler。
+// retry 回傳暫時性錯誤。最後一次嘗試先用同一個 order_ref 再呼叫一次（回應遺失時取回既有訂單），仍失敗才標成建單失敗；
+// 關機取消（context.Canceled）不收尾，逾時則用新的 context 收尾。標記失敗時回標記的錯誤，留給 reconciler。
 func (w *Worker) retry(ctx context.Context, id uuid.UUID, last bool, cause error) error {
-	if !last || ctx.Err() != nil {
+	if !last || errors.Is(ctx.Err(), context.Canceled) {
 		return cause
 	}
-	if err := w.fail(ctx, id, ReasonRetryExhausted); err != nil {
+	fresh, cancel := context.WithTimeout(context.WithoutCancel(ctx), finalTimeout)
+	defer cancel()
+	if _, again := w.create(fresh, id); again == nil {
+		return nil
+	}
+	if err := w.fail(fresh, id, ReasonRetryExhausted); err != nil {
 		return errors.Join(cause, err)
 	}
 	return cause
 }
 
 func (w *Worker) fail(ctx context.Context, id uuid.UUID, reason string) error {
-	return markFailed(ctx, store.New(w.DB.Conn(ctx)), id, reason, w.Now())
+	return markFailed(ctx, w.Logger, store.New(w.DB.Conn(ctx)), id, reason, w.Now())
 }
 
-func markFailed(ctx context.Context, q *store.Queries, id uuid.UUID, reason string, now time.Time) error {
-	if _, err := q.MarkOrderFailed(ctx, store.MarkOrderFailedParams{ID: id, Reason: &reason, Now: now}); err != nil {
+func markFailed(ctx context.Context, log *slog.Logger, q *store.Queries, id uuid.UUID, reason string, now time.Time) error {
+	n, err := q.MarkOrderFailed(ctx, store.MarkOrderFailedParams{ID: id, Reason: &reason, Now: now})
+	if err != nil {
 		return fmt.Errorf("provisioning：標記接受單 %s 建單失敗：%w", id, err)
+	}
+	if n == 0 {
+		log.ErrorContext(ctx, "procurement：標記建單失敗沒有更新任何列，接受單已不是 CREATING_ORDER", "acceptance_id", id.String(), "reason", reason)
 	}
 	return nil
 }
@@ -197,10 +254,12 @@ const (
 	reconcileBatch    = 200
 )
 
-// Reconciler 是建單 job 死了的保底：CREATING_ORDER 的接受單，其 job 已 discarded、cancelled、completed 卻沒收尾或不存在，標成建單失敗並解除 live 鎖。
-// 逐列一個 transaction，一列失敗只記錄；job 還在排隊、重試或執行中一律略過。
+// Reconciler 是建單 job 死了的保底：CREATING_ORDER 的接受單，其 job 已 discarded、cancelled、completed 卻沒收尾或不存在，先用同一個 order_ref 再呼叫一次建單
+// （成功就記下訂單），仍失敗才標成建單失敗並解除 live 鎖。判斷 job 是否已死在一個 transaction 內，呼叫 ordering 在 transaction 之外；
+// 逐列處理，一列失敗只記錄；job 還在排隊、重試或執行中一律略過。
 type Reconciler struct {
 	DB     *db.DB
+	Orders Creator
 	Now    func() time.Time
 	Logger *slog.Logger
 }
@@ -208,6 +267,7 @@ type Reconciler struct {
 // Reconcile 掃過所有 CREATING_ORDER 的接受單，回傳標成失敗的列數。
 func (r Reconciler) Reconcile(ctx context.Context, states run.JobStates) (failed int, err error) {
 	var after uuid.UUID
+	recovered := 0
 	for {
 		ids, err := store.New(r.DB.Conn(ctx)).ListCreatingOrderIDsAfter(ctx, store.ListCreatingOrderIDsAfterParams{After: after, Batch: reconcileBatch})
 		if err != nil {
@@ -217,20 +277,20 @@ func (r Reconciler) Reconcile(ctx context.Context, states run.JobStates) (failed
 			if err := ctx.Err(); err != nil {
 				return failed, err
 			}
-			var marked bool
-			if err := r.DB.InTx(ctx, func(ctx context.Context) error {
-				var err error
-				marked, err = r.reconcileOne(ctx, states, id)
-				return err
-			}); err != nil {
+			res, err := r.reconcileOne(ctx, states, id)
+			if err != nil {
 				if ctx.Err() != nil {
 					return failed, ctx.Err()
 				}
 				r.Logger.ErrorContext(ctx, "procurement：建單對帳失敗，略過這一列", "acceptance_id", id.String(), "error", err)
 				continue
 			}
-			if marked {
+			switch res {
+			case outcomeFailed:
 				failed++
+			case outcomeCreated:
+				recovered++
+			case outcomeNone:
 			}
 		}
 		if len(ids) < reconcileBatch {
@@ -238,31 +298,51 @@ func (r Reconciler) Reconcile(ctx context.Context, states run.JobStates) (failed
 		}
 		after = ids[len(ids)-1]
 	}
-	if failed > 0 {
-		r.Logger.WarnContext(ctx, "procurement：建單對帳把接受單標成建單失敗", "failed", failed)
+	if failed > 0 || recovered > 0 {
+		r.Logger.WarnContext(ctx, "procurement：建單對帳收尾了 job 已死的接受單", "failed", failed, "recovered", recovered)
 	}
 	return failed, nil
 }
 
-func (r Reconciler) reconcileOne(ctx context.Context, states run.JobStates, id uuid.UUID) (bool, error) {
-	q := store.New(r.DB.Conn(ctx))
-	row, err := q.LockCreatingAcceptance(ctx, id)
+func (r Reconciler) reconcileOne(ctx context.Context, states run.JobStates, id uuid.UUID) (outcome, error) {
+	var dead bool
+	if err := r.DB.InTx(ctx, func(ctx context.Context) error {
+		var err error
+		dead, err = r.jobIsDead(ctx, states, id)
+		return err
+	}); err != nil {
+		return outcomeNone, err
+	}
+	if !dead {
+		return outcomeNone, nil
+	}
+	w := Worker{DB: r.DB, Orders: r.Orders, Now: r.Now, Logger: r.Logger}
+	res, cause := w.create(ctx, id)
+	if cause == nil {
+		return res, nil
+	}
+	if err := w.fail(ctx, id, ReasonJobLost); err != nil {
+		return outcomeNone, errors.Join(cause, err)
+	}
+	return outcomeFailed, nil
+}
+
+func (r Reconciler) jobIsDead(ctx context.Context, states run.JobStates, id uuid.UUID) (bool, error) {
+	row, err := store.New(r.DB.Conn(ctx)).LockCreatingAcceptance(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
 		return false, fmt.Errorf("provisioning：鎖定接受單：%w", err)
 	}
-	if row.OrderJobID != nil {
-		state, found, err := states.JobState(ctx, *row.OrderJobID)
-		if err != nil {
-			return false, fmt.Errorf("provisioning：讀取 job %d：%w", *row.OrderJobID, err)
-		}
-		if found && inProgress(state) {
-			return false, nil
-		}
+	if row.OrderJobID == nil {
+		return true, nil
 	}
-	return true, markFailed(ctx, q, id, ReasonJobLost, r.Now())
+	state, found, err := states.JobState(ctx, *row.OrderJobID)
+	if err != nil {
+		return false, fmt.Errorf("provisioning：讀取 job %d：%w", *row.OrderJobID, err)
+	}
+	return !found || !inProgress(state), nil
 }
 
 func inProgress(s rivertype.JobState) bool {

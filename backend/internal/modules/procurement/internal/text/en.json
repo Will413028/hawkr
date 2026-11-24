@@ -141,6 +141,9 @@
     "reply.rejected.warning": {
       "message": "Some of what you entered could not be used: {items}"
     },
+    "rfq.audience_unavailable": {
+      "message": "Some of the selected stores can't receive requests right now. Search for candidates again, or change your selection, and try again."
+    },
     "slot.budget_per_unit": {
       "message": "Budget per unit"
     },

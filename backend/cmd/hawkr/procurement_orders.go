@@ -15,6 +15,7 @@ type procurementOrders struct{ client rfqOrderCreator }
 
 type rfqOrderCreator interface {
 	CreateRfqOrder(ctx context.Context, cmd orderservice.RfqOrderCommand) (orderservice.RfqOrderResult, error)
+	OrderParties(ctx context.Context, orderNo string) (orderservice.OrderParties, error)
 }
 
 var _ procurement.OrderCreator = procurementOrders{}
@@ -27,5 +28,13 @@ func (p procurementOrders) CreateOrder(ctx context.Context, cmd procurement.Orde
 	if err != nil {
 		return procurement.OrderResult{}, err
 	}
-	return procurement.OrderResult{Code: res.Code, Message: res.Message, OrderNo: res.OrderNo, PaymentDeadline: res.PaymentDeadline}, nil
+	return procurement.OrderResult{Code: res.Code, Message: res.Message, OrderNo: res.OrderNo, PaymentDeadline: res.PaymentDeadline, Replayed: res.Replayed}, nil
+}
+
+func (p procurementOrders) OrderParties(ctx context.Context, orderNo string) (procurement.OrderParties, error) {
+	parties, err := p.client.OrderParties(ctx, orderNo)
+	if err != nil {
+		return procurement.OrderParties{}, err
+	}
+	return procurement.OrderParties{BuyerID: parties.BuyerID, StoreID: parties.StoreID}, nil
 }

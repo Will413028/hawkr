@@ -80,7 +80,7 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 		if err != nil {
 			return err
 		}
-		if err := s.checkStores(ctx, in.BuyerID, stores, msgCandidateSetStalePreview); err != nil {
+		if err := s.checkStores(ctx, in.BuyerID, stores); err != nil {
 			return err
 		}
 		a := store.InsertApprovalParams{

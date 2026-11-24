@@ -11,9 +11,14 @@ import (
 )
 
 type fakeRfqOrders struct {
-	got orderservice.RfqOrderCommand
-	res orderservice.RfqOrderResult
-	err error
+	got     orderservice.RfqOrderCommand
+	res     orderservice.RfqOrderResult
+	err     error
+	parties orderservice.OrderParties
+}
+
+func (f *fakeRfqOrders) OrderParties(context.Context, string) (orderservice.OrderParties, error) {
+	return f.parties, f.err
 }
 
 func (f *fakeRfqOrders) CreateRfqOrder(_ context.Context, cmd orderservice.RfqOrderCommand) (orderservice.RfqOrderResult, error) {
@@ -23,7 +28,7 @@ func (f *fakeRfqOrders) CreateRfqOrder(_ context.Context, cmd orderservice.RfqOr
 
 func TestProcurementOrdersMapsTheCommandAndTheResult(t *testing.T) {
 	deadline := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
-	f := &fakeRfqOrders{res: orderservice.RfqOrderResult{Code: 0, OrderNo: "HK1", PaymentDeadline: deadline}}
+	f := &fakeRfqOrders{res: orderservice.RfqOrderResult{Code: 0, OrderNo: "HK1", PaymentDeadline: deadline, Replayed: true}, parties: orderservice.OrderParties{BuyerID: 3, StoreID: 11}}
 	res, err := procurementOrders{f}.CreateOrder(t.Context(), procurement.OrderCommand{
 		OrderRef: 7, BuyerID: 3, StoreID: 11, TotalAmount: 415, ShippingFee: 10, UnitPrice: 405, ItemName: "小白菜 3 KG",
 	})
@@ -34,8 +39,12 @@ func TestProcurementOrdersMapsTheCommandAndTheResult(t *testing.T) {
 	if f.got != want {
 		t.Fatalf("命令 = %+v，要 %+v", f.got, want)
 	}
-	if res.OrderNo != "HK1" || !res.PaymentDeadline.Equal(deadline) || res.Code != 0 {
+	if res.OrderNo != "HK1" || !res.PaymentDeadline.Equal(deadline) || res.Code != 0 || !res.Replayed {
 		t.Fatalf("結果 = %+v", res)
+	}
+	parties, err := procurementOrders{f}.OrderParties(t.Context(), "HK1")
+	if err != nil || parties.BuyerID != 3 || parties.StoreID != 11 {
+		t.Fatalf("買家與店家 = %+v %v", parties, err)
 	}
 }
 
