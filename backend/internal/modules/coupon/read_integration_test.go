@@ -4,7 +4,6 @@ package coupon_test
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -159,10 +158,20 @@ func TestListClaimableScopesToTheStoreAndFailsWhenAPortFails(t *testing.T) {
 	if len(ids) != 2 || !slices.Contains(ids, platform.ID) || !slices.Contains(ids, mine.ID) {
 		t.Fatalf("store_id=A 應是全平台與 A 店的活動：%v", ids)
 	}
-	f.campaign(func(in *coupon.CreateCampaignInput) { in.TargetType, in.StoreID = coupon.TargetMember, storeA })
-	f.members.err = errors.New("projection down")
-	if _, err := f.m.ListClaimable(context.Background(), coupon.ClaimableInput{BuyerID: buyer1}); err == nil {
-		t.Fatal("MEMBER 資格的 port 失敗要讓整個列表失敗，不能降級成不是會員（BD28）")
+	member := f.campaign(func(in *coupon.CreateCampaignInput) { in.TargetType, in.StoreID = coupon.TargetMember, storeA })
+	has := func() bool {
+		p, err := f.m.ListClaimable(context.Background(), coupon.ClaimableInput{BuyerID: buyer1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(p.Campaigns, func(c coupon.Campaign) bool { return c.ID == member.ID })
+	}
+	if has() {
+		t.Fatal("沒有消費紀錄的買家不該看到 MEMBER 活動")
+	}
+	f.member(buyer1, storeA)
+	if !has() {
+		t.Fatal("消費紀錄投影寫入後，MEMBER 活動要出現在可領列表")
 	}
 }
 

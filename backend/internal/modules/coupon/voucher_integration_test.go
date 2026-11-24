@@ -79,15 +79,14 @@ func TestClaimChecksTargetEligibility(t *testing.T) {
 	member := f.campaign(func(in *coupon.CreateCampaignInput) { in.TargetType, in.StoreID = coupon.TargetMember, storeA })
 	_, err := f.m.Claim(context.Background(), member.ID, buyer1)
 	wantReason(t, err, coupon.ReasonNotEligible)
-	f.members.members[[2]int64{buyer1, storeA}] = true
+	f.member(buyer1, storeB)
+	_, err = f.m.Claim(context.Background(), member.ID, buyer1)
+	wantReason(t, err, coupon.ReasonNotEligible)
+	f.member(buyer2, storeA)
+	_, err = f.m.Claim(context.Background(), member.ID, buyer1)
+	wantReason(t, err, coupon.ReasonNotEligible)
+	f.member(buyer1, storeA)
 	f.claim(member, buyer1)
-
-	f.members.err = fmt.Errorf("order 不可用")
-	_, err = f.m.Claim(context.Background(), member.ID, buyer3)
-	if err == nil || coupon.ReasonOf(err) != "" {
-		t.Fatalf("port 讀取失敗要原樣回錯誤（不降級成資格不符）：%v", err)
-	}
-	f.members.err = nil
 
 	des := f.campaign(func(in *coupon.CreateCampaignInput) {
 		in.TargetType, in.TargetBuyers = coupon.TargetDesignated, []int64{buyer1}

@@ -77,3 +77,9 @@ type CouponSellerCouponQuota struct {
 	MaxCampaignCount int32
 	UpdatedAt        time.Time
 }
+
+type CouponStoreBuyerMembership struct {
+	StoreID   int64
+	BuyerID   int64
+	CreatedAt time.Time
+}

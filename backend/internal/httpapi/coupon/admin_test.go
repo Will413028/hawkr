@@ -291,12 +291,27 @@ func TestAdminCreateCampaignDistinguishesNoLimitFromZero(t *testing.T) {
 	}
 }
 
-// 建立只接受平台活動的合法輸入：MEMBER 暫時不能建、折抵必須二選一、時間必填、店家 ID 與名單的格式錯誤指出欄位，全部不呼叫模組。
+// MEMBER 活動可以建立：入口不擋，傳給模組的目標型別是 MEMBER（店家範圍由模組檢查）。
+func TestAdminCreateCampaignAcceptsMemberTargetType(t *testing.T) {
+	r := newAdminRig(t, adminPrincipal())
+	r.module.created = platformCampaign()
+	in := adminCashInput()
+	in.TargetType = pb.TargetType_TARGET_TYPE_MEMBER
+	store := "5"
+	in.StoreId = &store
+	if _, err := r.client.CreateCampaign(context.Background(), connect.NewRequest(&adminpb.CreateCampaignRequest{Campaign: in})); err != nil {
+		t.Fatal(err)
+	}
+	if r.module.createIn.TargetType != coupon.TargetMember {
+		t.Fatalf("target=%q", r.module.createIn.TargetType)
+	}
+}
+
+// 建立只接受平台活動的合法輸入：折抵必須二選一、時間必填、店家 ID 與名單的格式錯誤指出欄位，全部不呼叫模組。
 func TestAdminCreateCampaignRejectsBadInputWithoutCallingTheModule(t *testing.T) {
 	r := newAdminRig(t, adminPrincipal())
 	ctx := context.Background()
 	for name, mod := range map[string]func(*adminpb.AdminCampaignInput){
-		"MEMBER":     func(in *adminpb.AdminCampaignInput) { in.TargetType = pb.TargetType_TARGET_TYPE_MEMBER },
 		"沒有折抵":       func(in *adminpb.AdminCampaignInput) { in.Discount = nil },
 		"沒有開始時間":     func(in *adminpb.AdminCampaignInput) { in.StartTime = nil },
 		"沒有結束時間":     func(in *adminpb.AdminCampaignInput) { in.EndTime = nil },

@@ -11,9 +11,6 @@ import (
 // 平台（admin）發行的活動不受影響，Redeem、Release 不查（D8 修訂）。組裝點由 seller 模組的 `Store(ctx, id)`（`Suspended()`）接上。
 type Stores = qualify.Stores
 
-// Members 是「買家在該店有消費紀錄」的 port：MEMBER 資格用。
-type Members = qualify.Members
-
 // Buyers 是「這些買家存在」的 port：後台建立 DESIGNATED 活動與指定發放寫入前檢查名單。Existing 回傳 ids 之中存在的買家。組裝點由 buyer 模組的 `BatchMeta` 接上。
 type Buyers = admin.Buyers
 

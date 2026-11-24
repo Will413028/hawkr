@@ -39,7 +39,7 @@ const (
 	windowLen = 24 * time.Hour
 )
 
-// fakeStores 與 fakeMembers 是 coupon 的 port 的替身。
+// fakeStores 是 coupon 的 port 的替身。
 type fakeStores struct {
 	mu        sync.Mutex
 	suspended map[int64]bool
@@ -58,18 +58,6 @@ func (f *fakeStores) set(id int64, v bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.suspended[id] = v
-}
-
-type fakeMembers struct {
-	mu      sync.Mutex
-	members map[[2]int64]bool
-	err     error
-}
-
-func (f *fakeMembers) IsMember(_ context.Context, buyerID, storeID int64) (bool, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.members[[2]int64{buyerID, storeID}], f.err
 }
 
 // fakeBuyers 是 Buyers port 的替身：預設每個買家都存在，missing 裡的不存在。
@@ -106,30 +94,37 @@ func (f *fakeDirectory) StoreState(_ context.Context, id int64) (coupon.StoreSta
 }
 
 type fixture struct {
-	t       *testing.T
-	db      *db.DB
-	m       *coupon.Module
-	stores  *fakeStores
-	members *fakeMembers
-	buyers  *fakeBuyers
-	dir     *fakeDirectory
-	clock   atomic.Int64
+	t      *testing.T
+	db     *db.DB
+	m      *coupon.Module
+	stores *fakeStores
+	buyers *fakeBuyers
+	dir    *fakeDirectory
+	clock  atomic.Int64
 }
 
 func (f *fixture) now() time.Time { return time.Unix(0, f.clock.Load()).UTC() }
+
+// member 經模組 API 寫入消費紀錄投影（與 legacy consumer 呼叫的是同一個入口）。
+func (f *fixture) member(buyerID, storeID int64) {
+	f.t.Helper()
+	if _, err := f.m.RecordOrderCompleted(context.Background(), storeID, buyerID); err != nil {
+		f.t.Fatal(err)
+	}
+}
 
 func (f *fixture) advance(d time.Duration) { f.clock.Add(int64(d)) }
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, stores: &fakeStores{suspended: map[int64]bool{}}, members: &fakeMembers{members: map[[2]int64]bool{}},
+	f := &fixture{t: t, stores: &fakeStores{suspended: map[int64]bool{}},
 		buyers: &fakeBuyers{missing: map[int64]bool{}}, dir: &fakeDirectory{missing: map[int64]bool{}, closed: map[int64]bool{}}}
 	f.clock.Store(base.UnixNano())
 	f.db = pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "coupon", Dir: coupon.Migrations()},
 		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
 	))
-	f.m = coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Members: f.members, Buyers: f.buyers, StoreDirectory: f.dir, NewID: uuid.NewV7, Now: f.now})
+	f.m = coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Buyers: f.buyers, StoreDirectory: f.dir, NewID: uuid.NewV7, Now: f.now})
 	return f
 }
 
