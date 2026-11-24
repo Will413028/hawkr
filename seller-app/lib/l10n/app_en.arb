@@ -26,5 +26,16 @@
   "reportMessageTitle": "Report message",
   "customerPickerTitle": "Select customers",
   "customerPickerEmpty": "No customers to select",
-  "customerPickerAdd": "Add to list ({count})"
+  "customerPickerAdd": "Add to list ({count})",
+  "quoteResponseTypeHelp": "Both response types need the full pricing basis and amounts; accepting the non-price terms is not a shortcut to skip amounts.",
+  "quoteSpecNoteTitle": "Specification note (optional)",
+  "quoteSpecNoteHelp": "Only you can fill this in, up to 1000 characters.",
+  "quoteSpecNoteLabel": "Specification note",
+  "quoteSpecNoteHint": "For example: origin, grade, packaging, acceptance terms",
+  "quoteCurrencyTwd": "Currency TWD",
+  "quoteStatusActive": "Active",
+  "quoteStatusSuperseded": "Superseded",
+  "quoteStatusWithdrawn": "Withdrawn",
+  "quoteStatusExpired": "Expired",
+  "quoteAmountNotWholeNumber": "{label} must be a non-negative whole number of TWD, for example 1200"
 }

@@ -7,6 +7,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../core/l10n/ui_locale.dart';
+import '../../../l10n/l10n.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/hk_tokens.dart';
@@ -115,7 +116,7 @@ class _SellerQuoteFormBody extends HookConsumerWidget {
         ref.watch(sellerQuoteFormProvider(publicationId)).value ?? initial;
     final notifier = ref.read(sellerQuoteFormProvider(publicationId).notifier);
     final quote = state.quote;
-    final validation = validateSellerQuote(quote);
+    final validation = validateSellerQuote(quote, l10n: context.l10n);
     final showErrors = state.submitAttempted;
 
     String? errorFor(SellerQuoteField field) =>
@@ -335,7 +336,7 @@ class _ResponseTypeCard extends StatelessWidget {
           const SizedBox(height: HkSpace.xs),
           // ⛔ 兩個值的必填欄位完全相同，UI 不得在選了第二個之後少問任何金額。
           Text(
-            '兩種回應都要填完整的計價基準與金額——「接受非價格條款」不是少填金額的捷徑。',
+            context.l10n.quoteResponseTypeHelp,
             style: AppTypography.metaMuted,
           ),
           const SizedBox(height: HkSpace.md),
@@ -410,14 +411,17 @@ class _SpecNoteCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('規格說明（選填）', style: AppTypography.sectionTitle),
+          Text(
+            context.l10n.quoteSpecNoteTitle,
+            style: AppTypography.sectionTitle,
+          ),
           const SizedBox(height: HkSpace.xs),
           // ⛔ 不得由平台或 LLM 代填，也沒有「帶入上次報價」。
-          Text('這一欄只能由你自己填寫，最多 1000 字。', style: AppTypography.metaMuted),
+          Text(context.l10n.quoteSpecNoteHelp, style: AppTypography.metaMuted),
           const SizedBox(height: HkSpace.md),
           _QuoteTextField(
-            label: '規格說明',
-            hint: '例如：產地、等級、包裝方式、驗收條件',
+            label: context.l10n.quoteSpecNoteLabel,
+            hint: context.l10n.quoteSpecNoteHint,
             initialValue: value,
             maxLines: 3,
             onChanged: onChanged,
@@ -532,7 +536,10 @@ class _AmountCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text('金額', style: AppTypography.sectionTitle)),
-              Text('幣別 TWD', style: AppTypography.metaMuted),
+              Text(
+                context.l10n.quoteCurrencyTwd,
+                style: AppTypography.metaMuted,
+              ),
             ],
           ),
           const SizedBox(height: HkSpace.md),
@@ -717,7 +724,7 @@ class _ActionBar extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: HkSpace.md),
             child: Text(
               '目前是第 ${response.sellerResponseVersion} 版'
-              '（${response.statusValue?.label ?? ''}）'
+              '（${response.statusValue?.localized(context.l10n) ?? ''}）'
               '${response.isLatestVersion ? '' : '，已被第 ${response.supersededByVersion} 版取代'}',
               style: AppTypography.metaMuted,
             ),

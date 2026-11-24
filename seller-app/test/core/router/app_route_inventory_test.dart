@@ -96,9 +96,9 @@ void main() {
     ),
   ];
 
-  test('all 63 seller routes remain unique and declared', () {
-    expect(routes, hasLength(63));
-    expect(routes.map((route) => route.path).toSet(), hasLength(63));
+  test('all 62 seller routes remain unique and declared', () {
+    expect(routes, hasLength(62));
+    expect(routes.map((route) => route.path).toSet(), hasLength(62));
     expect(routes.every((route) => route.path.startsWith('/')), isTrue);
   });
 

@@ -81,8 +81,10 @@ class AiAssistantController extends _$AiAssistantController {
               break;
             case AiTurnFinished(:final sessionId):
               if (sessionId.isNotEmpty) _sessionId = sessionId;
+              return;
             case AiTurnFailed(:final message):
               _appendToLast('\n\n（$message）');
+              return;
           }
         }
       } finally {

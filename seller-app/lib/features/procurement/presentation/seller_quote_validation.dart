@@ -1,3 +1,5 @@
+import '../../../l10n/gen/app_localizations_zh.dart';
+import '../../../l10n/l10n.dart';
 import '../data/seller_quote_model.dart';
 
 /// 回價表單的欄位鍵；[SellerQuoteValidation.fieldErrors] 用它定位錯誤。
@@ -161,7 +163,9 @@ const List<SellerQuoteField> kRequiredQuoteFields = <SellerQuoteField>[
 SellerQuoteValidation validateSellerQuote(
   SellerQuotePayload quote, {
   DateTime? now,
+  AppLocalizations? l10n,
 }) {
+  final text = l10n ?? AppLocalizationsZh();
   final errors = <SellerQuoteField, String>{};
 
   if (quote.responseTypeValue == null) {
@@ -203,7 +207,7 @@ SellerQuoteValidation validateSellerQuote(
     if (raw.trim().isEmpty) {
       errors[field] = '請填寫$label';
     } else if (!RegExp(r'^\d{1,15}$').hasMatch(raw.trim())) {
-      errors[field] = '$label只能是非負整數（新台幣元），例如 1200';
+      errors[field] = text.quoteAmountNotWholeNumber(label);
     }
   });
 

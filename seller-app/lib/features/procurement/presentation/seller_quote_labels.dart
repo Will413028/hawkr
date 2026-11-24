@@ -1,5 +1,7 @@
 import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart';
 
+import '../../../l10n/l10n.dart';
+
 /// 回價表單上的選項文案。
 ///
 /// 值域是契約的 [SellerResponseType]、[TaxInclusionBasis] 與 [SellerResponseStatus]；本檔只提供這張表單要顯示的
@@ -32,16 +34,18 @@ extension SellerQuoteTaxInclusionBasisLabel on TaxInclusionBasis {
 }
 
 extension SellerResponseStatusLabel on SellerResponseStatus {
-  String get label {
-    if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE) return '有效';
+  String localized(AppLocalizations l10n) {
+    if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE) {
+      return l10n.quoteStatusActive;
+    }
     if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_SUPERSEDED) {
-      return '已被改版取代';
+      return l10n.quoteStatusSuperseded;
     }
     if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_WITHDRAWN) {
-      return '已撤回';
+      return l10n.quoteStatusWithdrawn;
     }
     if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_EXPIRED) {
-      return '已逾有效期';
+      return l10n.quoteStatusExpired;
     }
     return '';
   }

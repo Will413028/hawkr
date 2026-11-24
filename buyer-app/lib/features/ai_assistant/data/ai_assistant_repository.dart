@@ -162,7 +162,7 @@ class AiAssistantRepository {
                   : 'assistant',
               content: m.text,
               timestamp: m.hasCreateTime()
-                  ? m.createTime.toDateTime().toLocal()
+                  ? m.createTime.toDateTime()
                   : DateTime.now(),
             ),
         ],

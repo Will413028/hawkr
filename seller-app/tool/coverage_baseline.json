@@ -175,7 +175,6 @@
     "lib/features/photo_editor/data/ai_edit_history_local_service.dart",
     "lib/features/photo_editor/data/ai_edit_history_model.dart",
     "lib/features/photo_editor/data/ai_edit_history_repository.dart",
-    "lib/features/photo_editor/data/ai_image_service.dart",
     "lib/features/photo_editor/presentation/ai_edit_history_controller.dart",
     "lib/features/photo_editor/presentation/image_editor_adjust_tab.dart",
     "lib/features/photo_editor/presentation/image_editor_ai_tab.dart",
