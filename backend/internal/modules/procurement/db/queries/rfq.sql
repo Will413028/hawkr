@@ -70,6 +70,12 @@ WHERE id = @id AND delivery_state = 'QUEUED';
 UPDATE procurement.rfq_publication_invites SET delivery_state = 'FAILED', delivery_state_at = @now, updated_at = @now
 WHERE id = @id AND delivery_state = 'QUEUED';
 
+-- name: ListStaleQueuedInvites :many
+SELECT id, created_at FROM procurement.rfq_publication_invites
+WHERE delivery_state = 'QUEUED' AND created_at < @before AND (created_at, id) > (@after_created_at::timestamptz, @after_id::uuid)
+ORDER BY created_at, id
+LIMIT @max_rows;
+
 -- name: InsertSellerResponse :exec
 INSERT INTO procurement.seller_responses (id, publication_id, request_id, store_id, created_at, updated_at)
 VALUES (@id, @publication_id, @request_id, @store_id, @now, @now);
