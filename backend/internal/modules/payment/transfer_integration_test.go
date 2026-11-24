@@ -58,6 +58,50 @@ VALUES ($1, $2, $3, $4, $5::text, $6, CASE WHEN $5::text IN ('FAILED', 'ANOMALY'
 	return id
 }
 
+// insertReversal 寫一筆退款列並指定向賣家收回的彙總狀態：refundStatus 是 REFUNDING、SUCCEEDED 或 FAILED 時 provider 已接受（寫 external_refund_id 與呼叫時刻），
+// reversalAmount 大於 0 才是有預留的列；彙總狀態是 REVERSING、REVERSED、RELEASED 或 ANOMALY 時再寫一列對原轉帳的撤回列（狀態同彙總，REVERSED 補撤回 ID 與呼叫時刻，
+// RELEASED 與 ANOMALY 補原因），REVERSED 的退款 reversal_recovered 等於預留額。
+// callDeadline 給測試直接呼叫 provider 用：provider 的呼叫規則要求帶 deadline。
+func callDeadline(t *testing.T, ctx context.Context) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	t.Cleanup(cancel)
+	return ctx
+}
+
+func (f *chargeFixture) insertReversal(t *testing.T, paymentID uuid.UUID, refundStatus, reversalStatus string, amount, reversalAmount int64) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	id := uuid.NewV7()
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason,
+	external_refund_id, refund_called_at, failure_reason, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5::text, $6::text, $7, CASE WHEN $6::text = 'REVERSED' THEN $7::bigint ELSE 0 END, CASE WHEN $6::text IN ('RELEASED', 'ANOMALY') THEN 'x' END,
+	CASE WHEN $5::text IN ('REFUNDING', 'SUCCEEDED', 'FAILED') THEN 're_' || $3 END, CASE WHEN $5::text IN ('REFUNDING', 'SUCCEEDED', 'FAILED') THEN $8::timestamptz END,
+	CASE WHEN $5::text IN ('FAILED', 'ANOMALY') THEN 'x' END, $8, $8)`, id, paymentID, id.String(), amount, refundStatus, reversalStatus, reversalAmount, f.now)
+	must(t, err)
+	switch reversalStatus {
+	case "REVERSING", "REVERSED", "RELEASED", "ANOMALY":
+		_, err = f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
+VALUES ($1, $2, $3, 0, NULL, COALESCE((SELECT external_transfer_id FROM payment.transfers WHERE payment_id = $3 AND status = 'SUCCEEDED'), 'tr_none'), $4, $5::text,
+	CASE WHEN $5::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $5::text = 'REVERSED' THEN $6::timestamptz END, CASE WHEN $5::text = 'REVERSED' THEN 'trr_' || $2::uuid::text END, $6, $6)`,
+			uuid.NewV7(), id, paymentID, reversalAmount, reversalStatus, f.now)
+		must(t, err)
+	}
+	return id
+}
+
+// segText 讀退款第一列（seq 最小）撤回列的欄位：一次收回只有一個目標的測試用它看這一次 provider 撤回呼叫的鍵、時刻與撤回 ID。
+func (f *chargeFixture) segText(t *testing.T, col string, refundID uuid.UUID) string {
+	t.Helper()
+	return f.text(t, "SELECT "+col+"::text FROM payment.refund_reversals WHERE refund_id = $1 ORDER BY seq LIMIT 1", refundID)
+}
+
+// reversalID 是退款第一列撤回列的 ID（AnomalyReversal 的物件 ID）。
+func (f *chargeFixture) reversalID(t *testing.T, refundID uuid.UUID) uuid.UUID {
+	t.Helper()
+	return uuid.MustParse(f.segText(t, "id", refundID))
+}
+
 func (f *chargeFixture) jobIDs(t *testing.T, kind, field string) []uuid.UUID {
 	t.Helper()
 	f.jobs.mu.Lock()
@@ -178,13 +222,13 @@ func TestRequestTransferRefusesWhatCannotBeTransferred(t *testing.T) {
 	must(t, f.fake.Settle(f.externalOf(t, "T-3c"), PaymentStateSucceeded, f.now))
 	f.sync(t, f.idOf(t, "T-3c"))
 	f.enableAccount(t, 8, "acct_8", false)
-	// T-3d：已入帳、帳戶開通，但已全額退款（進行中的退款也算）。
+	// T-3d：已入帳、帳戶開通，但已全額退款（退款全部成功；還有進行中的退款時不拒絕，見 TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail）。
 	f.order("T-3d", 11, 9, 100)
 	f.create(t, 11, "T-3d")
 	must(t, f.fake.Settle(f.externalOf(t, "T-3d"), PaymentStateSucceeded, f.now))
 	f.sync(t, f.idOf(t, "T-3d"))
 	f.enableAccount(t, 9, "acct_9", true)
-	f.insertRefund(t, f.idOf(t, "T-3d"), "PENDING", 100, 0)
+	f.insertReversal(t, f.idOf(t, "T-3d"), "SUCCEEDED", "NONE", 100, 0)
 	for _, c := range []struct {
 		no   string
 		kind apperr.Kind
@@ -323,7 +367,7 @@ func TestAnUnknownTransferIsReplayedWithTheSameKeyWithinTheResendWindow(t *testi
 	f.noViolations(t)
 }
 
-// 掃描：閒置超過門檻的 PENDING 轉帳與 REVERSING 退款補排各自的 job；剛寫入的與已結案的不排。
+// 掃描：閒置超過門檻的 PENDING 轉帳與撤回 REVERSING 的退款補排各自的 job；剛寫入的與已結案的不排。
 // mutation：掃描不查 PENDING 轉帳（或 REVERSING 退款）→ 對應的 job 沒有補排，失敗。
 func TestTheSweepRequeuesIdlePendingTransfersAndReversingRefunds(t *testing.T) {
 	t.Parallel()
@@ -343,8 +387,8 @@ func TestTheSweepRequeuesIdlePendingTransfersAndReversingRefunds(t *testing.T) {
 		t.Fatalf("閒置的轉帳沒有補排：%v", ids)
 	}
 	must(t, f.runTransfer(tr.ID, false))
-	reversing := f.insertRefund(t, p.ID, "REVERSING", 40, 40)
-	f.insertRefund(t, p.ID, "REVERSED", 10, 0)
+	reversing := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 40, 40)
+	f.insertReversal(t, p.ID, "SUCCEEDED", "REVERSED", 10, 10)
 	f.clearJobs()
 	f.now = f.now.Add(time.Hour)
 	_, _, err = f.module.SweepPayments(ctx)
@@ -377,7 +421,7 @@ func (f *chargeFixture) reversedOf(t *testing.T, id uuid.UUID) int64 {
 	return f.count(t, "SELECT reversed_amount FROM payment.transfers WHERE id = $1", id)
 }
 
-// 撤回：provider 在 transaction 外、帶退款列的 reversal 冪等鍵；成功後同一個 transaction 累加轉帳的 reversed_amount、退款記撤回 ID 並進 REVERSED；
+// 撤回：provider 在 transaction 外、帶退款列的 reversal 冪等鍵；成功後同一個 transaction 累加轉帳的 reversed_amount、退款列記撤回 ID 並讓撤回進 REVERSED；
 // 已 REVERSED 再跑不重複累加；部分撤回與多筆退款各自累加。
 // mutation：拿掉 reversed_amount 的累加 → 轉帳的 reversed_amount 仍是 0，失敗。
 func TestAReversalUpdatesTheReversedAmountAndTheRefundStatusTogether(t *testing.T) {
@@ -385,23 +429,23 @@ func TestAReversalUpdatesTheReversedAmountAndTheRefundStatusTogether(t *testing.
 	f := setupCharge(t)
 	p, tr := f.transferred(t, "T-9")
 	ctx := context.Background()
-	a := f.insertRefund(t, p.ID, "REVERSING", 50, 30)
-	b := f.insertRefund(t, p.ID, "REVERSING", 20, 20)
+	a := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 50, 30)
+	b := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 20, 20)
 	f.clearJobs()
 	must(t, f.module.EnqueueRefundReversal(ctx, a))
 	if ids := f.jobIDs(t, kindTransferReversal, "refund_id"); len(ids) != 1 || ids[0] != a {
 		t.Fatalf("排入的撤回 job=%v", ids)
 	}
 	must(t, f.module.ReversePaymentTransfer(ctx, a, false))
-	if f.refundText(t, "status", a) != "REVERSED" || f.refundText(t, "reversal_external_id", a) == "" || f.reversedOf(t, tr.ID) != 30 {
-		t.Fatalf("撤回之後：退款 %s，reversed_amount %d", f.refundText(t, "status", a), f.reversedOf(t, tr.ID))
+	if f.refundText(t, "reversal_status", a) != "REVERSED" || f.segText(t, "external_id", a) == "" || f.reversedOf(t, tr.ID) != 30 {
+		t.Fatalf("撤回之後：退款 %s，reversed_amount %d", f.refundText(t, "reversal_status", a), f.reversedOf(t, tr.ID))
 	}
-	if keys := f.fake.ReversalKeys(); len(keys) != 1 || keys[0] != f.refundText(t, "reversal_idempotency_key", a) {
+	if keys := f.fake.ReversalKeys(); len(keys) != 1 || keys[0] != f.segText(t, "idempotency_key", a) {
 		t.Fatalf("撤回的冪等鍵=%v", keys)
 	}
 	must(t, f.module.ReversePaymentTransfer(ctx, a, false))
 	must(t, f.module.ReversePaymentTransfer(ctx, b, false))
-	if f.reversedOf(t, tr.ID) != 50 || f.fake.ReversalCalls() != 2 || f.refundText(t, "status", b) != "REVERSED" {
+	if f.reversedOf(t, tr.ID) != 50 || f.fake.ReversalCalls() != 2 || f.refundText(t, "reversal_status", b) != "REVERSED" {
 		t.Fatalf("累計=%d，呼叫 %d 次", f.reversedOf(t, tr.ID), f.fake.ReversalCalls())
 	}
 	f.noViolations(t)
@@ -413,39 +457,42 @@ func TestAReversalRetriesWithTheSameKeyAfterATransientFailure(t *testing.T) {
 	f := setupCharge(t)
 	p, tr := f.transferred(t, "T-10")
 	ctx := context.Background()
-	a := f.insertRefund(t, p.ID, "REVERSING", 40, 40)
+	a := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 40, 40)
 	f.fake.FailReversal(errors.New("連線逾時"))
-	if err := f.module.ReversePaymentTransfer(ctx, a, false); err == nil || f.refundText(t, "status", a) != "REVERSING" || f.reversedOf(t, tr.ID) != 0 {
-		t.Fatalf("暫時性失敗之後：%v，%s", err, f.refundText(t, "status", a))
+	if err := f.module.ReversePaymentTransfer(ctx, a, false); err == nil || f.refundText(t, "reversal_status", a) != "REVERSING" || f.reversedOf(t, tr.ID) != 0 {
+		t.Fatalf("暫時性失敗之後：%v，%s", err, f.refundText(t, "reversal_status", a))
 	}
 	must(t, f.module.ReversePaymentTransfer(ctx, a, false))
 	keys := f.fake.ReversalKeys()
-	if len(keys) != 2 || keys[0] != keys[1] || f.refundText(t, "status", a) != "REVERSED" || f.reversedOf(t, tr.ID) != 40 {
-		t.Fatalf("重送：%v，%s，%d", keys, f.refundText(t, "status", a), f.reversedOf(t, tr.ID))
+	if len(keys) != 2 || keys[0] != keys[1] || f.refundText(t, "reversal_status", a) != "REVERSED" || f.reversedOf(t, tr.ID) != 40 {
+		t.Fatalf("重送：%v，%s，%d", keys, f.refundText(t, "reversal_status", a), f.reversedOf(t, tr.ID))
 	}
 }
 
-// 永久拒絕與結果不明：永久拒絕讓退款進終局 FAILED（不佔額度），reversed_amount 不動；視窗內以同一把鍵取回同一次撤回。
+// 永久拒絕與結果不明：永久拒絕釋出預留（RELEASED，退款維持原狀、錢由平台吸收）並發 MoneyAnomaly，reversed_amount 不動；視窗內以同一把鍵取回同一次撤回。
 func TestAReversalPermanentRefusalLeavesTheTransferUntouchedAndAnUnknownOneIsReplayedWithinTheWindow(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
 	p, tr := f.transferred(t, "T-11")
 	ctx := context.Background()
-	refused := f.insertRefund(t, p.ID, "REVERSING", 10, 10)
+	refused := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 10, 10)
 	f.fake.FailReversal(fmt.Errorf("%w：不能撤回", ErrChargePermanent))
 	must(t, f.module.ReversePaymentTransfer(ctx, refused, false))
-	if f.refundText(t, "status", refused) != "FAILED" || f.refundText(t, "failure_reason", refused) != "provider_refused" || f.reversedOf(t, tr.ID) != 0 {
-		t.Fatalf("永久拒絕之後：%s", f.refundText(t, "status", refused))
+	if f.refundText(t, "reversal_status", refused) != "RELEASED" || f.refundText(t, "reversal_reason", refused) != "provider_refused" || f.refundText(t, "status", refused) != "REFUNDING" || f.reversedOf(t, tr.ID) != 0 {
+		t.Fatalf("永久拒絕之後：%s", f.refundText(t, "reversal_status", refused))
 	}
-	replayed := f.insertRefund(t, p.ID, "REVERSING", 10, 10)
-	key := f.refundText(t, "reversal_idempotency_key", replayed)
+	if n := len(f.anomalies); n != 1 || f.anomalies[0].Kind != AnomalyReversal || f.anomalies[0].ObjectID != f.reversalID(t, refused) {
+		t.Fatalf("撤回永久失敗沒有發 MoneyAnomaly：%+v", f.anomalies)
+	}
+	replayed := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 10, 10)
+	key := f.segText(t, "idempotency_key", replayed)
 	f.fake.FailReversalAfterCreate(errors.New("回應逾時"))
-	if err := f.module.ReversePaymentTransfer(ctx, replayed, false); err == nil || f.refundText(t, "reversal_called_at", replayed) == "" {
+	if err := f.module.ReversePaymentTransfer(ctx, replayed, false); err == nil || f.segText(t, "called_at", replayed) == "" {
 		t.Fatalf("回應遺失：%v", err)
 	}
 	must(t, f.module.ReversePaymentTransfer(ctx, replayed, false))
-	if f.refundText(t, "status", replayed) != "REVERSED" || f.reversedOf(t, tr.ID) != 10 || f.refundText(t, "reversal_idempotency_key", replayed) != key {
-		t.Fatalf("視窗內重送沒有取回同一次撤回：%s，%d", f.refundText(t, "status", replayed), f.reversedOf(t, tr.ID))
+	if f.refundText(t, "reversal_status", replayed) != "REVERSED" || f.reversedOf(t, tr.ID) != 10 || f.segText(t, "idempotency_key", replayed) != key {
+		t.Fatalf("視窗內重送沒有取回同一次撤回：%s，%d", f.refundText(t, "reversal_status", replayed), f.reversedOf(t, tr.ID))
 	}
 }
 
@@ -457,15 +504,15 @@ func TestAReversalThatCannotMatchTheTransferParksTheRefundInAnomalyAndTheSweepSt
 	f := setupCharge(t)
 	ctx := context.Background()
 	bare := f.paidPayment(t, "T-12a", 100)
-	noTransfer := f.insertRefund(t, bare.ID, "REVERSING", 10, 10)
+	noTransfer := f.insertReversal(t, bare.ID, "REFUNDING", "REVERSING", 10, 10)
 	p, _ := f.transferred(t, "T-12b")
-	tooMuch := f.insertRefund(t, p.ID, "REVERSING", 100, 100)
-	other := f.insertRefund(t, p.ID, "REVERSING", 10, 10)
+	tooMuch := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 100, 100)
+	other := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 10, 10)
 	must(t, f.module.ReversePaymentTransfer(ctx, other, false))
 	for id, reason := range map[uuid.UUID]string{noTransfer: "no_succeeded_transfer", tooMuch: "reversal_exceeds_remaining"} {
 		must(t, f.module.ReversePaymentTransfer(ctx, id, false))
-		if f.refundText(t, "status", id) != "ANOMALY" || f.refundText(t, "failure_reason", id) != reason {
-			t.Fatalf("%s：%s %s", id, f.refundText(t, "status", id), f.refundText(t, "failure_reason", id))
+		if f.refundText(t, "reversal_status", id) != "ANOMALY" || f.refundText(t, "reversal_reason", id) != reason {
+			t.Fatalf("%s：%s %s", id, f.refundText(t, "reversal_status", id), f.refundText(t, "reversal_reason", id))
 		}
 	}
 	if f.fake.ReversalCalls() != 1 || len(f.anomalies) != 2 {
@@ -480,7 +527,7 @@ func TestAReversalThatCannotMatchTheTransferParksTheRefundInAnomalyAndTheSweepSt
 	}
 }
 
-// 寫結果的 transaction 失敗時整筆回滾：退款不會單獨進 REVERSED、轉帳也不會單獨累加（同一個 transaction）。
+// 寫結果的 transaction 失敗時整筆回滾：撤回不會單獨進 REVERSED、轉帳也不會單獨累加（同一個 transaction）。
 // 造法：provider 回成功之後、寫結果之前，另一個寫入把轉帳的 reversed_amount 推到上限，累加違反 CHECK。
 func TestAFailedReversalWriteRollsBackTheRefundStatusToo(t *testing.T) {
 	t.Parallel()
@@ -495,12 +542,12 @@ func TestAFailedReversalWriteRollsBackTheRefundStatusToo(t *testing.T) {
 	})
 	p, tr := f.transferred(t, "T-13")
 	transferID = tr.ID
-	a := f.insertRefund(t, p.ID, "REVERSING", 40, 40)
+	a := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 40, 40)
 	if err := f.module.ReversePaymentTransfer(context.Background(), a, false); err == nil {
 		t.Fatal("寫結果違反 CHECK 卻沒有回錯誤")
 	}
-	if f.refundText(t, "status", a) != "REVERSING" || f.refundText(t, "reversal_external_id", a) != "" || f.reversedOf(t, tr.ID) != 100 {
-		t.Fatalf("回滾之後：退款 %s，reversed %d", f.refundText(t, "status", a), f.reversedOf(t, tr.ID))
+	if f.refundText(t, "reversal_status", a) != "REVERSING" || f.segText(t, "external_id", a) != "" || f.reversedOf(t, tr.ID) != 100 {
+		t.Fatalf("回滾之後：退款 %s，reversed %d", f.refundText(t, "reversal_status", a), f.reversedOf(t, tr.ID))
 	}
 }
 

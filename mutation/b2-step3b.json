@@ -22,16 +22,16 @@
    "id": "reversal-skips-reversed-amount",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\t_, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: applied.ReversalAmount, Now: s.d.Now().UTC()})\n\t\treturn err",
-   "new": "\t\t_ = applied\n\t\treturn nil",
+   "old": "\t\tif err := addTargetReversal(ctx, q, seg, target.transferID, now); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "\t\t_ = target",
    "test": "internal/modules/payment ^TestAReversalUpdatesTheReversedAmountAndTheRefundStatusTogether$",
-   "why": "撤回成功只推進退款狀態、不累加轉帳的 reversed_amount：reversed_amount 仍是 0。"
+   "why": "撤回成功只推進撤回列狀態、不累加目標（原轉帳）的累計撤回額：reversed_amount 仍是 0。"
   },
   {
    "id": "transfer-amount-ignores-refunds",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "transferTermsResult{amount: pay.Amount - refunded, destination:",
+   "old": "transferTermsResult{amount: amount, destination:",
    "new": "transferTermsResult{amount: pay.Amount, destination:",
    "test": "internal/modules/payment ^TestRequestTransferWritesThePendingRowAndTheJobWithoutCallingTheProvider$",
    "why": "轉帳金額不扣非失敗退款：付款 100、退款 30 時轉帳是 100，不是 70。"
@@ -40,8 +40,8 @@
    "id": "transfer-fully-refunded-not-refused",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\tif pay.Amount-refunded <= 0 {",
-   "new": "\tif pay.Amount-refunded < 0 {",
+   "old": "\tamount := pay.Amount - refunded\n\tif amount <= 0 {",
+   "new": "\tamount := pay.Amount - refunded\n\tif amount < 0 {",
    "test": "internal/modules/payment ^TestRequestTransferRefusesWhatCannotBeTransferred$",
    "why": "全額退款的付款可轉金額為 0：不再被拒絕，寫轉帳列違反 amount > 0 的 CHECK，回的不是 FailedPrecondition。"
   },
@@ -76,28 +76,28 @@
    "id": "transfer-called-at-not-marked",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\tcalled, err := s.markTransferCalled(ctx, transferID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
+   "old": "\tcalled, err := s.claimTransfer(ctx, transferID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
    "new": "\tcalled := &row",
    "test": "internal/modules/payment ^TestAnUnknownTransferIsReplayedWithTheSameKeyWithinTheResendWindow$",
-   "why": "呼叫 provider 之前不記 called_at：結果不明的列沒有起算時刻，期限不成立，不進終局。"
+   "why": "呼叫 provider 之前不 claim（不記 called_at）：結果不明的列沒有起算時刻，期限不成立，不進終局。"
   },
   {
    "id": "reversal-called-at-not-marked",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\tcalled, err := s.markReversalCalled(ctx, refundID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
-   "new": "\tcalled := &ref",
+   "old": "\tcalled, err := s.markReversalCalled(ctx, seg.ID, now)\n\tif err != nil || called == nil {\n\t\treturn err\n\t}",
+   "new": "\tcalled := &seg",
    "test": "internal/modules/payment ^TestAReversalPermanentRefusalLeavesTheTransferUntouchedAndAnUnknownOneIsReplayedWithinTheWindow$",
-   "why": "呼叫 provider 之前不記 reversal_called_at：結果不明的撤回沒有起算時刻，期限不成立。"
+   "why": "呼叫 provider 之前不記撤回列的 called_at：結果不明的撤回沒有起算時刻，期限不成立。"
   },
   {
    "id": "reversal-over-remaining-not-checked",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "ref.ReversalAmount > tr.Amount-tr.ReversedAmount",
+   "old": "seg.Amount > target.remaining",
    "new": "false",
    "test": "internal/modules/payment ^TestAReversalThatCannotMatchTheTransferParksTheRefundInAnomalyAndTheSweepStops$",
-   "why": "不檢查撤回額度是否超過轉帳剩餘可撤額度：超額的撤回照樣呼叫 provider。"
+   "why": "不檢查撤回列的額度是否超過目標的剩餘可撤額度：超額的撤回照樣呼叫 provider。"
   },
   {
    "id": "sweep-skips-pending-transfers",
@@ -211,8 +211,8 @@
    "id": "reversal-resend-window-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "if !inResendWindow(ref.ReversalCalledAt, now) {",
-   "new": "if false && !inResendWindow(ref.ReversalCalledAt, now) {",
+   "old": "if !inResendWindow(seg.CalledAt, now) {",
+   "new": "if false && !inResendWindow(seg.CalledAt, now) {",
    "test": "internal/modules/payment ^TestAReversalConvergesByLookupAndAnAnomalousRefundStillHoldsItsQuota$",
    "why": "拿掉重送視窗：過了視窗仍呼叫 ReverseTransfer，不走查回。"
   },
@@ -220,19 +220,19 @@
    "id": "reversal-orphan-result-silent",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\t\torphan = true\n\t\t\treturn s.publishAnomaly(ctx, model.AnomalyRefund, ref.ID, ref.PaymentID, fmt.Sprintf(\"reversed_but_refund_%s:%s\", cur.Status, snap.ExternalID))",
+   "old": "\t\t\torphan = true\n\t\t\treturn s.publishAnomaly(ctx, model.AnomalyReversal, seg.ID, seg.PaymentID, fmt.Sprintf(\"reversed_but_reversal_%s:%s\", cur.Status, snap.ExternalID))",
    "new": "\t\t\treturn nil",
-   "test": "internal/modules/payment ^TestAReversalForARefundThatIsNoLongerReversingIsReportedNotSilent$",
-   "why": "provider 已撤回、退款卻不在 REVERSING 時靜默回 nil：沒有 log 也沒有告警事件。"
+   "test": "internal/modules/payment ^TestAReversalThatIsNoLongerReversingIsReportedNotSilent$",
+   "why": "provider 已撤回、撤回列狀態卻不在 REVERSING 時靜默回 nil：沒有 log 也沒有告警事件。"
   },
   {
    "id": "reversal-precondition-anomaly-not-parked",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\treturn s.anomalyReversal(ctx, ref, \"no_succeeded_transfer\", \"\")",
-   "new": "\t\treturn fmt.Errorf(\"%w：退款 %s 要撤回，付款卻沒有已成立的轉帳\", ErrAnomaly, refundID)",
+   "old": "\t\treturn s.anomalyReversal(ctx, seg, reason, \"\")",
+   "new": "\t\treturn fmt.Errorf(\"%w：撤回 %s 的目標不成立（%s）\", ErrAnomaly, seg.ID, reason)",
    "test": "internal/modules/payment ^TestAReversalThatCannotMatchTheTransferParksTheRefundInAnomalyAndTheSweepStops$",
-   "why": "前置條件異常只取消 job、退款留在 REVERSING：補掃會永遠重排。"
+   "why": "前置條件異常只取消 job、撤回列留在 REVERSING：補掃會永遠重排。"
   },
   {
    "id": "resolve-anomaly-skips-audit",
@@ -283,7 +283,7 @@
    "id": "round3-reversal-resend-refusal-rotates-key",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "if !firstCall(ref.ReversalCalledAt, called.ReversalCalledAt, now) {",
+   "old": "if !firstCall(seg.CalledAt, called.CalledAt, now) {",
    "new": "if false {",
    "test": "internal/modules/payment ^TestARetryableRefusalOnAResendOfAnUnknownReversalKeepsTheKey$",
    "why": "R1：重送被可重試拒絕也換撤回鍵，前一次結果不明的撤回可能已執行、再撤回第二次。"
@@ -319,9 +319,9 @@
    "id": "round3-resolve-refund-trusts-the-evidence",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "if !found || snap.ExternalID != evidence || snap.Amount != r.ReversalAmount {",
-   "new": "if false && (!found || snap.ExternalID != evidence || snap.Amount != r.ReversalAmount) {",
-   "test": "internal/modules/payment ^TestResolvingARefundAnomalyAsSucceededRequiresTheProviderToConfirmTheEvidence$",
+   "old": "if !found || snap.ExternalID != evidence || snap.Amount != seg.Amount {",
+   "new": "if false && (!found || snap.ExternalID != evidence || snap.Amount != seg.Amount) {",
+   "test": "internal/modules/payment ^TestResolvingAReversalAnomalyAsSucceededRequiresTheProviderToConfirmTheEvidence$",
    "why": "R3：撤回的結案證據不經 provider 核對，沒有對應撤回的 ID 被記成 REVERSED 並累加轉帳。"
   }
  ]
