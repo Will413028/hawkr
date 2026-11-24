@@ -43,3 +43,12 @@ type PostUnpublishRepeated = model.PostUnpublishRepeated
 
 // PostWritten 是上面這幾個事件共用的欄位。
 type PostWritten = model.PostWritten
+
+// ContentHidden 買家的留言或討論區留言被隱藏；只帶參照與列舉，隱藏的同一個 transaction 內發布，冪等的重複隱藏不發。
+type ContentHidden = model.ContentHidden
+
+// ContentRestored 一筆隱藏被管理員還原。
+type ContentRestored = model.ContentRestored
+
+// BuyerWarned 買家被警告。
+type BuyerWarned = model.BuyerWarned

@@ -120,6 +120,8 @@ enum NotificationCategory {
   NOTIFICATION_CATEGORY_RESTOCK = 14;
   // 後台系統公告（兩個受眾都有；收件匣一定收到，推播可在偏好關閉）。
   NOTIFICATION_CATEGORY_ANNOUNCEMENT = 15;
+  // 詢價邀請（互動，只有店家）。
+  NOTIFICATION_CATEGORY_PROCUREMENT = 16;
 }
 
 // NotificationChannel 是通知送達的渠道。

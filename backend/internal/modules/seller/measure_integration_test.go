@@ -1527,7 +1527,7 @@ func TestEndingAnOpenRiskMeasureEndsTheEffectAndDeletesItsIdentitySnapshot(t *te
 		t.Fatal("停權措施要快照身分")
 	}
 	f.endRisk(t, risk)
-	if got := unsuspended.all(); len(got) != 1 || f.openPeriods(t) != 0 || len(ended.all()) != 1 || ended.all()[0].MeasureID != risk.ID {
+	if got := unsuspended.all(); len(got) != 1 || f.openPeriods(t) != 0 || len(ended.all()) != 1 || ended.all()[0].MeasureID != risk.ID || ended.all()[0].RequestID != (uuid.UUID{}) {
 		t.Fatalf("unsuspended=%+v open=%d ended=%+v", got, f.openPeriods(t), ended.all())
 	}
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_identities"); n != 0 {

@@ -5,10 +5,16 @@ import (
 	"go/parser"
 	"go/token"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
 // tokenPurgeSubscribers 是 subscribers.go 裡允許做排意圖以外事情的訂閱者：裝置 token 的同步刪除（隨停權、帳號刪除在同一個
@@ -79,22 +85,43 @@ func funcs(t *testing.T, file string) ([]*ast.FuncDecl, map[string]string) {
 	return out, importNames(f)
 }
 
-// 同步訂閱者在來源的 transaction 內執行，失敗會讓來源 rollback：除了白名單的 token 清除，只准呼叫 Accept。
+// 同步訂閱者在來源的 transaction 內執行，失敗會讓來源 rollback：除了白名單的 token 清除，只准呼叫 Accept（subscribers_governance.go 由 subscribers_governance_test.go 守，它有自己的純函式清單）。
 func TestSynchronousSubscribersOnlyAccept(t *testing.T) {
-	fns, imports := funcs(t, "subscribers.go")
-	if len(fns) == 0 {
-		t.Fatal("subscribers.go 沒有訂閱者")
+	files, err := filepath.Glob("subscribers*.go")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("找不到 subscribers*.go（%v）", err)
 	}
-	for _, fn := range fns {
-		if slices.Contains(tokenPurgeSubscribers, fn.Name.Name) {
-			continue
+	total, helpers := 0, 0
+	for _, file := range slices.DeleteFunc(files, func(f string) bool { return strings.HasSuffix(f, "_test.go") || f == "subscribers_governance.go" }) {
+		fns, imports := funcs(t, file)
+		for _, fn := range fns {
+			if slices.Contains(pureSubscriberHelpers, fn.Name.Name) {
+				helpers++
+				if got := calls(fn, imports); len(got) != 0 {
+					t.Errorf("%s 的純函式 helper %s 呼叫了 %v；免檢的 helper 不准呼叫任何函式", file, fn.Name.Name, got)
+				}
+				continue
+			}
+			if slices.Contains(tokenPurgeSubscribers, fn.Name.Name) {
+				continue
+			}
+			total++
+			got := slices.DeleteFunc(calls(fn, imports), func(c string) bool { return slices.Contains(pureSubscriberHelpers, c) })
+			if len(got) != 1 || got[0] != ".Accept" {
+				t.Errorf("%s 的 %s 呼叫了 %v；同步訂閱者只准呼叫 Accept", file, fn.Name.Name, got)
+			}
 		}
-		got := calls(fn, imports)
-		if len(got) != 1 || got[0] != ".Accept" {
-			t.Errorf("%s 呼叫了 %v；同步訂閱者只准呼叫 Accept", fn.Name.Name, got)
-		}
+	}
+	if total == 0 {
+		t.Fatal("subscribers*.go 沒有訂閱者")
+	}
+	if helpers != len(pureSubscriberHelpers) {
+		t.Fatalf("subscribers*.go 只有 %d 個免檢 helper，預期 %d", helpers, len(pureSubscriberHelpers))
 	}
 }
+
+// pureSubscriberHelpers 是訂閱者可以呼叫的純函式（只把事件欄位換成參數欄位，不碰資料）；本身也不算訂閱者。
+var pureSubscriberHelpers = []string{"partyOf"}
 
 // Accept 是同步路徑上唯一碰資料的函式：只登記意圖列、排 job，不讀偏好、不寫收件匣、不鎖帳號。
 func TestAcceptOnlyInsertsTheIntentAndEnqueues(t *testing.T) {
@@ -158,6 +185,23 @@ func TestTokenPurgeSubscribersOnlyDeleteTokens(t *testing.T) {
 			if !slices.Contains(allowed, c) {
 				t.Errorf("%s 呼叫了 %s，不在 token 清除的允許清單 %v", fn.Name.Name, c, allowed)
 			}
+		}
+	}
+}
+
+// 只認買家與店家；不認得的種類不默默當成買家，Side 留空讓 worker 以 ErrBadParams 取消。
+func TestPartyOfDoesNotGuessTheSide(t *testing.T) {
+	for _, c := range []struct {
+		kind social.ActorKind
+		want registry.Party
+	}{
+		{social.ActorBuyer, registry.Party{Side: model.AudienceBuyer, ID: 5}},
+		{social.ActorStore, registry.Party{Side: model.AudienceStore, ID: 5}},
+		{social.ActorKind(""), registry.Party{ID: 5}},
+		{social.ActorKind("ADMIN"), registry.Party{ID: 5}},
+	} {
+		if got := partyOf(c.kind, 5); got != c.want {
+			t.Errorf("partyOf(%q) = %+v，預期 %+v", c.kind, got, c.want)
 		}
 	}
 }

@@ -43,8 +43,8 @@ func (f *chargeFixture) enableAccount(t *testing.T, storeID int64, external stri
 	if !active {
 		status = "DISABLED"
 	}
-	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, create_called_at, create_completed_at, created_at, updated_at)
-VALUES ($1, 'fake', $2, 'PLATFORM', $3, $4, now(), now(), now(), now())`, storeID, external, status, active)
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, first_activated_at, create_called_at, create_completed_at, created_at, updated_at)
+VALUES ($1, 'fake', $2, 'PLATFORM', $3, $4::boolean, CASE WHEN $4::boolean THEN now() END, now(), now(), now(), now())`, storeID, external, status, active)
 	must(t, err)
 }
 

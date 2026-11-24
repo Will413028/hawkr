@@ -105,6 +105,19 @@ type CaseInquiry struct {
 	Withdrawn        *InquiryWithdrawal
 }
 
+// CaseInquiryCreated 在建立詢問的 transaction 內發出（重送回放不發）：通知賣家有詢問與期限。AccountID 是店家所屬帳號；不帶訊息內容
+// （內容留在詢問列，通知讀取時不需要）。
+type CaseInquiryCreated struct {
+	OccurredAt time.Time
+	EventID    uuid.UUID
+	InquiryID  uuid.UUID
+	CaseID     uuid.UUID
+	StoreID    int64
+	AccountID  int64
+	Kind       InquiryKind
+	DueAt      time.Time
+}
+
 // InquiryReply 是賣家的回覆：管理員記下的系統外回覆（RecordedByAdminID 有值），或賣家在賣家中心的回覆（RepliedByAccountID 有值，管道是 SELLER_CENTER），二選一。
 // ReceivedAt 是收到的時間，RecordedAt 是記進系統的時間（不早於收到；賣家中心的回覆兩者相同）；案件的「待決定」從收到的時間重新起算。
 type InquiryReply struct {

@@ -4,6 +4,8 @@
 package text
 
 import (
+	"strconv"
+
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -63,6 +65,459 @@ func AudienceInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "通知的受眾不正確。", Locale: uitext.ZhTW}
 }
 
+// AuthorWarnedBodyArgs 是 AuthorWarnedBody 的參數。
+type AuthorWarnedBodyArgs struct {
+	Reason string
+	Time   string
+}
+
+// AuthorWarnedBody 是模組句子 author_warned.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AuthorWarnedBody(l uitext.Locale, a AuthorWarnedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You received a warning from the platform on " + a.Time + " for the following reason: " + a.Reason + ". Please review the community guidelines.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你於 " + a.Time + " 因「" + a.Reason + "」收到平台的警告。請留意社群規範。", Locale: uitext.ZhTW}
+}
+
+// AuthorWarnedTitle 是模組句子 author_warned.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AuthorWarnedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "You received a warning", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你收到一則警告", Locale: uitext.ZhTW}
+}
+
+// BuyerDeletionRequestedBodyArgs 是 BuyerDeletionRequestedBody 的參數。
+type BuyerDeletionRequestedBodyArgs struct {
+	Time string
+}
+
+// BuyerDeletionRequestedBody 是模組句子 buyer_deletion_requested.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func BuyerDeletionRequestedBody(l uitext.Locale, a BuyerDeletionRequestedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We received your account deletion request on " + a.Time + ". Your account will be deleted once any open orders are settled, and this request cannot be withdrawn. If this was not you, please contact support as soon as possible.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "我們於 " + a.Time + " 收到你的帳號刪除申請，待未完成的訂單處理完畢後會刪除帳號，此申請無法撤回。若這不是你的操作，請盡快聯絡客服。", Locale: uitext.ZhTW}
+}
+
+// BuyerDeletionRequestedTitle 是模組句子 buyer_deletion_requested.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func BuyerDeletionRequestedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We received your account deletion request", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "已收到帳號刪除申請", Locale: uitext.ZhTW}
+}
+
+// ChatMessageBuyerBody 是模組句子 chat_message_buyer.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageBuyerBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store sent you a message.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家傳了一則訊息給你。", Locale: uitext.ZhTW}
+}
+
+// ChatMessageBuyerTitle 是模組句子 chat_message_buyer.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageBuyerTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New message", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "新訊息", Locale: uitext.ZhTW}
+}
+
+// ChatMessageStoreBody 是模組句子 chat_message_store.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageStoreBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer sent you a message.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "買家傳了一則訊息給你。", Locale: uitext.ZhTW}
+}
+
+// ChatMessageStoreTitle 是模組句子 chat_message_store.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageStoreTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New message", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "新訊息", Locale: uitext.ZhTW}
+}
+
+// CommentCreatedBody 是模組句子 comment_created.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentCreatedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone commented on your post.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人在你的貼文下留言。", Locale: uitext.ZhTW}
+}
+
+// CommentCreatedTitle 是模組句子 comment_created.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentCreatedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New comment", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新留言", Locale: uitext.ZhTW}
+}
+
+// CommentLikedBuyerBody 是模組句子 comment_liked_buyer.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedBuyerBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone liked your comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人對你的留言按讚。", Locale: uitext.ZhTW}
+}
+
+// CommentLikedBuyerTitle 是模組句子 comment_liked_buyer.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedBuyerTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your comment got a like", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "留言收到讚", Locale: uitext.ZhTW}
+}
+
+// CommentLikedStoreBody 是模組句子 comment_liked_store.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedStoreBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone liked your store's comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人對貴店的留言按讚。", Locale: uitext.ZhTW}
+}
+
+// CommentLikedStoreTitle 是模組句子 comment_liked_store.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedStoreTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your comment got a like", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "留言收到讚", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedBuyerBody 是模組句子 comment_replied_buyer.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedBuyerBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone replied to your comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人回覆了你的留言。", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedBuyerTitle 是模組句子 comment_replied_buyer.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedBuyerTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New reply", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新回覆", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedStoreBody 是模組句子 comment_replied_store.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedStoreBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone replied to your store's comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人回覆了貴店的留言。", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedStoreTitle 是模組句子 comment_replied_store.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedStoreTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New reply", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新回覆", Locale: uitext.ZhTW}
+}
+
+// ContentHiddenBodyArgs 是 ContentHiddenBody 的參數。
+type ContentHiddenBodyArgs struct {
+	Reason string
+	Source string
+	Time   string
+}
+
+// ContentHiddenBody 是模組句子 content_hidden.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ContentHiddenBody(l uitext.Locale, a ContentHiddenBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your " + a.Source + " was hidden on " + a.Time + " for the following reason: " + a.Reason + ".", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的" + a.Source + "於 " + a.Time + " 因「" + a.Reason + "」被隱藏。", Locale: uitext.ZhTW}
+}
+
+// ContentHiddenTitle 是模組句子 content_hidden.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ContentHiddenTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your content has been hidden", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的內容已被隱藏", Locale: uitext.ZhTW}
+}
+
+// ContentRestoredBodyArgs 是 ContentRestoredBody 的參數。
+type ContentRestoredBodyArgs struct {
+	Source string
+	Time   string
+}
+
+// ContentRestoredBody 是模組句子 content_restored.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ContentRestoredBody(l uitext.Locale, a ContentRestoredBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your " + a.Source + " was restored on " + a.Time + ".", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的" + a.Source + "已於 " + a.Time + " 恢復顯示。", Locale: uitext.ZhTW}
+}
+
+// ContentRestoredTitle 是模組句子 content_restored.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ContentRestoredTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your content has been restored", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的內容已恢復顯示", Locale: uitext.ZhTW}
+}
+
+// ContentSourceMessage 是模組句子 content_source.message；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ContentSourceMessage(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "chat message", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "聊天訊息", Locale: uitext.ZhTW}
+}
+
+// ContentSourceReview 是模組句子 content_source.review；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ContentSourceReview(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "review", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "評價", Locale: uitext.ZhTW}
+}
+
+// ContentSourceSocial 是模組句子 content_source.social；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ContentSourceSocial(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "comment", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "留言", Locale: uitext.ZhTW}
+}
+
+// DelegationActionAuditCorrection 是模組句子 delegation_action.audit_correction；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionAuditCorrection(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "corrected a delegation record", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "更正代行紀錄", Locale: uitext.ZhTW}
+}
+
+// DelegationActionMediaUpload 是模組句子 delegation_action.media_upload；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionMediaUpload(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "uploaded media", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "上傳媒體檔案", Locale: uitext.ZhTW}
+}
+
+// DelegationActionOrderPiiReveal 是模組句子 delegation_action.order_pii_reveal；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionOrderPiiReveal(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "viewed an order's personal data", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "查看訂單的個人資料", Locale: uitext.ZhTW}
+}
+
+// DelegationActionOrderRead 是模組句子 delegation_action.order_read；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionOrderRead(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "viewed orders", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "查看訂單", Locale: uitext.ZhTW}
+}
+
+// DelegationActionPostCreate 是模組句子 delegation_action.post_create；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionPostCreate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "created a post", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "建立貼文", Locale: uitext.ZhTW}
+}
+
+// DelegationActionPostPublish 是模組句子 delegation_action.post_publish；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionPostPublish(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "published a post", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "發布貼文", Locale: uitext.ZhTW}
+}
+
+// DelegationActionPostRead 是模組句子 delegation_action.post_read；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionPostRead(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "viewed posts", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "查看貼文", Locale: uitext.ZhTW}
+}
+
+// DelegationActionPostSchedule 是模組句子 delegation_action.post_schedule；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionPostSchedule(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "scheduled a post", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "排程貼文", Locale: uitext.ZhTW}
+}
+
+// DelegationActionPostUnpublish 是模組句子 delegation_action.post_unpublish；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionPostUnpublish(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "unpublished a post", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "取消發布貼文", Locale: uitext.ZhTW}
+}
+
+// DelegationActionPostUpdate 是模組句子 delegation_action.post_update；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionPostUpdate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "updated a post", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "更新貼文", Locale: uitext.ZhTW}
+}
+
+// DelegationActionProductBatchUnpublish 是模組句子 delegation_action.product_batch_unpublish；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionProductBatchUnpublish(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "unpublished products in bulk", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "批次下架商品", Locale: uitext.ZhTW}
+}
+
+// DelegationActionProductCreate 是模組句子 delegation_action.product_create；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionProductCreate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "created a product", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "建立商品", Locale: uitext.ZhTW}
+}
+
+// DelegationActionProductPublish 是模組句子 delegation_action.product_publish；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionProductPublish(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "published a product", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "上架商品", Locale: uitext.ZhTW}
+}
+
+// DelegationActionProductRead 是模組句子 delegation_action.product_read；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionProductRead(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "viewed products", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "查看商品", Locale: uitext.ZhTW}
+}
+
+// DelegationActionProductUnpublish 是模組句子 delegation_action.product_unpublish；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionProductUnpublish(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "unpublished a product", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "下架商品", Locale: uitext.ZhTW}
+}
+
+// DelegationActionProductUpdate 是模組句子 delegation_action.product_update；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionProductUpdate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "updated a product", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "更新商品", Locale: uitext.ZhTW}
+}
+
+// DelegationActionStorefrontCoverUpdate 是模組句子 delegation_action.storefront_cover_update；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionStorefrontCoverUpdate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "updated the storefront cover", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "更新店面封面", Locale: uitext.ZhTW}
+}
+
+// DelegationActionStorefrontLogoUpdate 是模組句子 delegation_action.storefront_logo_update；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionStorefrontLogoUpdate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "updated the storefront logo", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "更新店面標誌", Locale: uitext.ZhTW}
+}
+
+// DelegationActionStorefrontRead 是模組句子 delegation_action.storefront_read；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionStorefrontRead(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "viewed the storefront profile", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "查看店面資料", Locale: uitext.ZhTW}
+}
+
+// DelegationActionStorefrontUpdate 是模組句子 delegation_action.storefront_update；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationActionStorefrontUpdate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "updated the storefront profile", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "更新店面資料", Locale: uitext.ZhTW}
+}
+
+// DelegationOperationCompletedBodyArgs 是 DelegationOperationCompletedBody 的參數。
+type DelegationOperationCompletedBodyArgs struct {
+	Action string
+	Time   string
+}
+
+// DelegationOperationCompletedBody 是模組句子 delegation_operation_completed.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationOperationCompletedBody(l uitext.Locale, a DelegationOperationCompletedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "On " + a.Time + ", a platform operator acting on your behalf " + a.Action + ".", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台人員於 " + a.Time + " 代行你的店家，" + a.Action + "。", Locale: uitext.ZhTW}
+}
+
+// DelegationOperationCompletedTitle 是模組句子 delegation_operation_completed.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DelegationOperationCompletedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A platform operator acted on your store", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台人員已代行操作你的店家", Locale: uitext.ZhTW}
+}
+
 // DeviceAppInvalid 是模組句子 device_app.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func DeviceAppInvalid(l uitext.Locale) uitext.Message {
 	switch l {
@@ -99,6 +554,157 @@ func InboxItemNotFound(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "找不到這則通知。", Locale: uitext.ZhTW}
 }
 
+// KycApprovedBodyArgs 是 KycApprovedBody 的參數。
+type KycApprovedBodyArgs struct {
+	Time string
+}
+
+// KycApprovedBody 是模組句子 kyc_approved.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycApprovedBody(l uitext.Locale, a KycApprovedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store verification was approved on " + a.Time + ". Continue the setup in the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的店家審核已於 " + a.Time + " 通過。請到賣家中心繼續設定。", Locale: uitext.ZhTW}
+}
+
+// KycApprovedTitle 是模組句子 kyc_approved.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycApprovedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store verification was approved", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家審核已通過", Locale: uitext.ZhTW}
+}
+
+// KycRejectedBodyArgs 是 KycRejectedBody 的參數。
+type KycRejectedBodyArgs struct {
+	Time string
+}
+
+// KycRejectedBody 是模組句子 kyc_rejected.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycRejectedBody(l uitext.Locale, a KycRejectedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store verification was returned on " + a.Time + ". See the seller center for the reason and resubmit.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的店家審核已於 " + a.Time + " 被退回。請到賣家中心查看退回原因並重新送出。", Locale: uitext.ZhTW}
+}
+
+// KycRejectedTitle 是模組句子 kyc_rejected.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycRejectedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store verification was returned", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家審核被退回", Locale: uitext.ZhTW}
+}
+
+// PayoutAccountActivatedBodyArgs 是 PayoutAccountActivatedBody 的參數。
+type PayoutAccountActivatedBodyArgs struct {
+	Time string
+}
+
+// PayoutAccountActivatedBody 是模組句子 payout_account_activated.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PayoutAccountActivatedBody(l uitext.Locale, a PayoutAccountActivatedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account became active on " + a.Time + ". Order proceeds can now be paid out to it.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的收款帳戶已於 " + a.Time + " 啟用，之後的訂單款項可以撥入。", Locale: uitext.ZhTW}
+}
+
+// PayoutAccountActivatedTitle 是模組句子 payout_account_activated.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PayoutAccountActivatedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account is active", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶已啟用", Locale: uitext.ZhTW}
+}
+
+// PayoutAccountDeadlineOneDayBodyArgs 是 PayoutAccountDeadlineOneDayBody 的參數。
+type PayoutAccountDeadlineOneDayBodyArgs struct {
+	Deadline string
+}
+
+// PayoutAccountDeadlineOneDayBody 是模組句子 payout_account_deadline.one_day.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PayoutAccountDeadlineOneDayBody(l uitext.Locale, a PayoutAccountDeadlineOneDayBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Please provide your payout account information by " + a.Deadline + "; after that, payouts may be restricted.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的收款帳戶資料請在 " + a.Deadline + " 前補齊，逾期收款功能可能受到限制。", Locale: uitext.ZhTW}
+}
+
+// PayoutAccountDeadlineOneDayTitle 是模組句子 payout_account_deadline.one_day.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PayoutAccountDeadlineOneDayTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account documents are due within a day", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶補件期限剩不到一天", Locale: uitext.ZhTW}
+}
+
+// PayoutAccountDeadlineSevenDaysBodyArgs 是 PayoutAccountDeadlineSevenDaysBody 的參數。
+type PayoutAccountDeadlineSevenDaysBodyArgs struct {
+	Deadline string
+}
+
+// PayoutAccountDeadlineSevenDaysBody 是模組句子 payout_account_deadline.seven_days.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PayoutAccountDeadlineSevenDaysBody(l uitext.Locale, a PayoutAccountDeadlineSevenDaysBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account still needs information. Please provide it by " + a.Deadline + "; after that, payouts may be restricted.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的收款帳戶還有資料待補，請在 " + a.Deadline + " 前補齊，逾期收款功能可能受到限制。", Locale: uitext.ZhTW}
+}
+
+// PayoutAccountDeadlineSevenDaysTitle 是模組句子 payout_account_deadline.seven_days.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PayoutAccountDeadlineSevenDaysTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your payout account documents are due soon", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收款帳戶補件期限將至", Locale: uitext.ZhTW}
+}
+
+// PostLikedBody 是模組句子 post_liked.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostLikedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone liked your post.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人對你的貼文按讚。", Locale: uitext.ZhTW}
+}
+
+// PostLikedTitle 是模組句子 post_liked.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostLikedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your post got a like", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "貼文收到讚", Locale: uitext.ZhTW}
+}
+
+// PostPublishedItemBody 是模組句子 post_published_item.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostPublishedItemBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store you follow just published a new post.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你追蹤的店家剛發佈了一則貼文。", Locale: uitext.ZhTW}
+}
+
+// PostPublishedItemTitle 是模組句子 post_published_item.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostPublishedItemTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store you follow posted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "追蹤的店家發佈了新貼文", Locale: uitext.ZhTW}
+}
+
 // PreferenceCannotDisable 是模組句子 preference.cannot_disable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PreferenceCannotDisable(l uitext.Locale) uitext.Message {
 	switch l {
@@ -115,4 +721,505 @@ func PreferenceNotAvailable(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "This notification setting is not available.", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "沒有這個通知設定。", Locale: uitext.ZhTW}
+}
+
+// ProductRestockedBodyArgs 是 ProductRestockedBody 的參數。
+type ProductRestockedBodyArgs struct {
+	Product string
+}
+
+// ProductRestockedBody 是模組句子 product_restocked.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ProductRestockedBody(l uitext.Locale, a ProductRestockedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "\"" + a.Product + "\", which you were watching, is back in stock.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你關注的「" + a.Product + "」已補貨。", Locale: uitext.ZhTW}
+}
+
+// ProductRestockedTitle 是模組句子 product_restocked.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ProductRestockedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Back in stock", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商品補貨通知", Locale: uitext.ZhTW}
+}
+
+// ReportOutcomeAbusive 是模組句子 report_outcome.abusive；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportOutcomeAbusive(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "this report does not meet the acceptance rules.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這項檢舉不符合受理規定。", Locale: uitext.ZhTW}
+}
+
+// ReportOutcomeActionTaken 是模組句子 report_outcome.action_taken；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportOutcomeActionTaken(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "the platform has taken action.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台已依規定處理。", Locale: uitext.ZhTW}
+}
+
+// ReportOutcomeDuplicate 是模組句子 report_outcome.duplicate；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportOutcomeDuplicate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "this report duplicates an earlier one and was handled together with it.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這項檢舉與先前的檢舉重複，已併入處理。", Locale: uitext.ZhTW}
+}
+
+// ReportOutcomeInsufficient 是模組句子 report_outcome.insufficient；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportOutcomeInsufficient(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "there was not enough information to proceed.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "資料不足，無法成立。", Locale: uitext.ZhTW}
+}
+
+// ReportOutcomeNoViolation 是模組句子 report_outcome.no_violation；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportOutcomeNoViolation(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "after review, no violation was found.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "經審查，未發現違規。", Locale: uitext.ZhTW}
+}
+
+// ReportReceivedBody 是模組句子 report_received.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportReceivedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We received the report you submitted and will handle it according to our policies. We will notify you of the outcome.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "我們已收到你提交的檢舉資料，會依規定處理，處理結果會再通知你。", Locale: uitext.ZhTW}
+}
+
+// ReportReceivedTitle 是模組句子 report_received.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportReceivedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We received your report", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "已收到你的檢舉", Locale: uitext.ZhTW}
+}
+
+// ReportResolvedBodyArgs 是 ReportResolvedBody 的參數。
+type ReportResolvedBodyArgs struct {
+	Outcome string
+}
+
+// ReportResolvedBody 是模組句子 report_resolved.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportResolvedBody(l uitext.Locale, a ReportResolvedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your report has been handled: " + a.Outcome, Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的檢舉已處理完畢：" + a.Outcome, Locale: uitext.ZhTW}
+}
+
+// ReportResolvedTitle 是模組句子 report_resolved.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReportResolvedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your report has an outcome", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的檢舉有結果了", Locale: uitext.ZhTW}
+}
+
+// ReviewCreatedBody 是模組句子 review_created.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReviewCreatedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer reviewed your product.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有買家評價了你的商品。", Locale: uitext.ZhTW}
+}
+
+// ReviewCreatedTitle 是模組句子 review_created.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReviewCreatedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New review", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新評價", Locale: uitext.ZhTW}
+}
+
+// RfqInvitedBody 是模組句子 rfq_invited.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func RfqInvitedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer published a new request for quotation and invited your store to respond.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有買家發出新的詢價並邀請你的店家回覆。", Locale: uitext.ZhTW}
+}
+
+// RfqInvitedTitle 是模組句子 rfq_invited.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func RfqInvitedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer invited your store to quote", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有買家邀請你的店家報價", Locale: uitext.ZhTW}
+}
+
+// StoreCaseInquiryExplanationBodyArgs 是 StoreCaseInquiryExplanationBody 的參數。
+type StoreCaseInquiryExplanationBodyArgs struct {
+	Due string
+}
+
+// StoreCaseInquiryExplanationBody 是模組句子 store_case_inquiry.explanation.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreCaseInquiryExplanationBody(l uitext.Locale, a StoreCaseInquiryExplanationBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform asked your store for an explanation. Please reply by " + a.Due + ". See the seller center for details.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台請你的店家說明相關情形，請於 " + a.Due + " 前回覆。詳情請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreCaseInquiryRecordsBodyArgs 是 StoreCaseInquiryRecordsBody 的參數。
+type StoreCaseInquiryRecordsBodyArgs struct {
+	Due string
+}
+
+// StoreCaseInquiryRecordsBody 是模組句子 store_case_inquiry.records.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreCaseInquiryRecordsBody(l uitext.Locale, a StoreCaseInquiryRecordsBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform asked your store to provide records. Please reply by " + a.Due + ". See the seller center for details.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台請你的店家提供相關紀錄，請於 " + a.Due + " 前回覆。詳情請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreCaseInquiryTitle 是模組句子 store_case_inquiry.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreCaseInquiryTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform has sent your store an inquiry", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台對你的店家發出詢問", Locale: uitext.ZhTW}
+}
+
+// StoreContentTakenDownBodyArgs 是 StoreContentTakenDownBody 的參數。
+type StoreContentTakenDownBodyArgs struct {
+	Count int
+	Time  string
+}
+
+// StoreContentTakenDownBody 是模組句子 store_content_taken_down.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreContentTakenDownBody(l uitext.Locale, a StoreContentTakenDownBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform took down " + strconv.Itoa(a.Count) + " item(s) of your store's content on " + a.Time + ". See the seller center for the measure and how to appeal.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台已於 " + a.Time + " 下架你店家的 " + strconv.Itoa(a.Count) + " 項內容。請到賣家中心查看措施詳情與申覆方式。", Locale: uitext.ZhTW}
+}
+
+// StoreContentTakenDownTitle 是模組句子 store_content_taken_down.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreContentTakenDownTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Content from your store was taken down", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家內容已被下架", Locale: uitext.ZhTW}
+}
+
+// StoreFollowedBody 是模組句子 store_followed.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreFollowedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer started following your store.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有買家開始追蹤你的店家。", Locale: uitext.ZhTW}
+}
+
+// StoreFollowedTitle 是模組句子 store_followed.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreFollowedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New follower", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "新的追蹤者", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureEndedBodyArgs 是 StoreMeasureEndedBody 的參數。
+type StoreMeasureEndedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureEndedBody 是模組句子 store_measure_ended.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureEndedBody(l uitext.Locale, a StoreMeasureEndedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A measure on your store ended on " + a.Time + ". See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "對你的店家的一項措施已於 " + a.Time + " 結束。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureEndedTitle 是模組句子 store_measure_ended.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureEndedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A measure on your store has ended", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家措施已結束", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureIssuedTerminationBodyArgs 是 StoreMeasureIssuedTerminationBody 的參數。
+type StoreMeasureIssuedTerminationBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureIssuedTerminationBody 是模組句子 store_measure_issued.termination.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureIssuedTerminationBody(l uitext.Locale, a StoreMeasureIssuedTerminationBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform issued a termination measure to your store on " + a.Time + ". See the seller center for the grounds and how to appeal.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台已於 " + a.Time + " 對你的店家發出終止合作的措施。請到賣家中心查看事由與申覆方式。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureIssuedTerminationTitle 是模組句子 store_measure_issued.termination.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureIssuedTerminationTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform has issued a termination notice", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台通知終止合作", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureIssuedWarningBodyArgs 是 StoreMeasureIssuedWarningBody 的參數。
+type StoreMeasureIssuedWarningBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureIssuedWarningBody 是模組句子 store_measure_issued.warning.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureIssuedWarningBody(l uitext.Locale, a StoreMeasureIssuedWarningBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform issued a warning to your store on " + a.Time + ". See the seller center for the grounds and next steps.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台已於 " + a.Time + " 對你的店家發出警告。請到賣家中心查看事由與後續處理。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureIssuedWarningTitle 是模組句子 store_measure_issued.warning.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureIssuedWarningTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store received a warning", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家收到警告", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedAppealAcceptedBodyArgs 是 StoreMeasureRequestDecidedAppealAcceptedBody 的參數。
+type StoreMeasureRequestDecidedAppealAcceptedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureRequestDecidedAppealAcceptedBody 是模組句子 store_measure_request_decided.appeal_accepted.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedAppealAcceptedBody(l uitext.Locale, a StoreMeasureRequestDecidedAppealAcceptedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your appeal against a measure on your store was reviewed on " + a.Time + " and was accepted; the measure has been revoked. See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你對店家措施提出的申覆已於 " + a.Time + " 審理完畢，獲得通過，措施已撤銷。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedAppealAcceptedTitle 是模組句子 store_measure_request_decided.appeal_accepted.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedAppealAcceptedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your appeal was accepted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "申覆已獲通過", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedAppealRejectedBodyArgs 是 StoreMeasureRequestDecidedAppealRejectedBody 的參數。
+type StoreMeasureRequestDecidedAppealRejectedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureRequestDecidedAppealRejectedBody 是模組句子 store_measure_request_decided.appeal_rejected.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedAppealRejectedBody(l uitext.Locale, a StoreMeasureRequestDecidedAppealRejectedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your appeal against a measure on your store was reviewed on " + a.Time + " and was not accepted. See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你對店家措施提出的申覆已於 " + a.Time + " 審理完畢，未獲通過。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedAppealRejectedTitle 是模組句子 store_measure_request_decided.appeal_rejected.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedAppealRejectedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your appeal was not accepted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "申覆未獲通過", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedRemediationAcceptedBodyArgs 是 StoreMeasureRequestDecidedRemediationAcceptedBody 的參數。
+type StoreMeasureRequestDecidedRemediationAcceptedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureRequestDecidedRemediationAcceptedBody 是模組句子 store_measure_request_decided.remediation_accepted.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedRemediationAcceptedBody(l uitext.Locale, a StoreMeasureRequestDecidedRemediationAcceptedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your request to lift a measure was reviewed on " + a.Time + " and was accepted; the measure has ended. See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你提出的措施解除請求已於 " + a.Time + " 審理完畢，獲得通過，措施已結束。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedRemediationAcceptedTitle 是模組句子 store_measure_request_decided.remediation_accepted.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedRemediationAcceptedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your lift request was accepted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "解除請求已獲通過", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedRemediationRejectedBodyArgs 是 StoreMeasureRequestDecidedRemediationRejectedBody 的參數。
+type StoreMeasureRequestDecidedRemediationRejectedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureRequestDecidedRemediationRejectedBody 是模組句子 store_measure_request_decided.remediation_rejected.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedRemediationRejectedBody(l uitext.Locale, a StoreMeasureRequestDecidedRemediationRejectedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your request to lift a measure was reviewed on " + a.Time + " and was not accepted. See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你提出的措施解除請求已於 " + a.Time + " 審理完畢，未獲通過。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedRemediationRejectedTitle 是模組句子 store_measure_request_decided.remediation_rejected.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedRemediationRejectedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your lift request was not accepted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "解除請求未獲通過", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRevisedBodyArgs 是 StoreMeasureRevisedBody 的參數。
+type StoreMeasureRevisedBodyArgs struct {
+	Revision int
+	Time     string
+}
+
+// StoreMeasureRevisedBody 是模組句子 store_measure_revised.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRevisedBody(l uitext.Locale, a StoreMeasureRevisedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The platform updated a measure on your store on " + a.Time + " (revision " + strconv.Itoa(a.Revision) + "). See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "平台已於 " + a.Time + " 更新對你的店家的措施內容（第 " + strconv.Itoa(a.Revision) + " 版）。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRevisedTitle 是模組句子 store_measure_revised.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRevisedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A measure on your store was updated", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家措施內容已更新", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRevokedBodyArgs 是 StoreMeasureRevokedBody 的參數。
+type StoreMeasureRevokedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureRevokedBody 是模組句子 store_measure_revoked.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRevokedBody(l uitext.Locale, a StoreMeasureRevokedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A measure on your store was revoked on " + a.Time + ". See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "對你的店家的一項措施已於 " + a.Time + " 撤銷。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRevokedTitle 是模組句子 store_measure_revoked.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRevokedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A measure on your store has been revoked", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家措施已撤銷", Locale: uitext.ZhTW}
+}
+
+// StorePendingDeletionBodyArgs 是 StorePendingDeletionBody 的參數。
+type StorePendingDeletionBodyArgs struct {
+	Time string
+}
+
+// StorePendingDeletionBody 是模組句子 store_pending_deletion.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StorePendingDeletionBody(l uitext.Locale, a StorePendingDeletionBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We received your account deletion request on " + a.Time + ". Your store has stopped operating and is waiting to be deleted. This request cannot be withdrawn. If this was not you, please contact support as soon as possible.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "我們於 " + a.Time + " 收到你的帳號刪除申請，你的店家已停止經營並進入等待刪除，此申請無法撤回。若這不是你的操作，請盡快聯絡客服。", Locale: uitext.ZhTW}
+}
+
+// StorePendingDeletionTitle 是模組句子 store_pending_deletion.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StorePendingDeletionTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "We received your account deletion request", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "已收到帳號刪除申請，店家等待刪除", Locale: uitext.ZhTW}
+}
+
+// StoreSuspendedBodyArgs 是 StoreSuspendedBody 的參數。
+type StoreSuspendedBodyArgs struct {
+	Time string
+}
+
+// StoreSuspendedBody 是模組句子 store_suspended.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreSuspendedBody(l uitext.Locale, a StoreSuspendedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store was suspended on " + a.Time + " because of a platform measure, and some features are restricted. See the seller center for details.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的店家已於 " + a.Time + " 因平台措施被停權，部分功能受到限制。請到賣家中心查看詳情。", Locale: uitext.ZhTW}
+}
+
+// StoreSuspendedTitle 是模組句子 store_suspended.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreSuspendedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store has been suspended", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家已被停權", Locale: uitext.ZhTW}
+}
+
+// StoreUnsuspendedBodyArgs 是 StoreUnsuspendedBody 的參數。
+type StoreUnsuspendedBodyArgs struct {
+	Time string
+}
+
+// StoreUnsuspendedBody 是模組句子 store_unsuspended.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreUnsuspendedBody(l uitext.Locale, a StoreUnsuspendedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store suspension was lifted on " + a.Time + ". You can run your store normally again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你的店家已於 " + a.Time + " 解除停權，可以恢復經營。", Locale: uitext.ZhTW}
+}
+
+// StoreUnsuspendedTitle 是模組句子 store_unsuspended.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreUnsuspendedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your store suspension has been lifted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家已解除停權", Locale: uitext.ZhTW}
 }

@@ -173,7 +173,21 @@ func TestGoldenAnnouncementRendering(t *testing.T) {
 
 type announcementSource struct {
 	texts map[uuid.UUID]AnnouncementText
+	codes map[int64]int64
 	calls int
+	asked []int64
+}
+
+func (s *announcementSource) StoreCodes(_ context.Context, ids []int64) (map[int64]int64, error) {
+	s.calls++
+	s.asked = append(s.asked, ids...)
+	out := map[int64]int64{}
+	for _, id := range ids {
+		if c, ok := s.codes[id]; ok {
+			out[id] = c
+		}
+	}
+	return out, nil
 }
 
 func (s *announcementSource) Announcements(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]AnnouncementText, error) {

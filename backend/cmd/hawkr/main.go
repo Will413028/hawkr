@@ -61,6 +61,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
@@ -254,7 +255,7 @@ func runServe(ctx context.Context) error {
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, log)
+	moderationModule := newModeration(d, bus, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, log)
 	subscribeProcurement(bus, d, log)
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
@@ -262,7 +263,7 @@ func runServe(ctx context.Context) error {
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, box, notificationConfig, images, log)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, moderationModule, jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
@@ -495,7 +496,7 @@ func runWorker(ctx context.Context) error {
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, box, notificationConfig, images, log)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, moderation.NewCaseReader(d), jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))

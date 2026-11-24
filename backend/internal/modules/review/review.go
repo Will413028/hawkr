@@ -90,6 +90,8 @@ type (
 	Reason                 = model.Reason
 	ReviewCreated          = model.ReviewCreated
 	ReviewAggregateChanged = model.ReviewAggregateChanged
+	ReviewHidden           = model.ReviewHidden
+	ReviewRestored         = model.ReviewRestored
 	Target                 = model.Target
 )
 

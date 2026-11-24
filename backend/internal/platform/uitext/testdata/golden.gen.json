@@ -179,6 +179,8 @@
   {"key":"notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK","fn":"notification.NotificationCategory","value":"NOTIFICATION_CATEGORY_RESTOCK","audience":"default","locale":"en","want":"Back in stock"},
   {"key":"notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT","fn":"notification.NotificationCategory","value":"NOTIFICATION_CATEGORY_ANNOUNCEMENT","audience":"default","locale":"zh-TW","want":"系統公告"},
   {"key":"notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT","fn":"notification.NotificationCategory","value":"NOTIFICATION_CATEGORY_ANNOUNCEMENT","audience":"default","locale":"en","want":"Announcements"},
+  {"key":"notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT","fn":"notification.NotificationCategory","value":"NOTIFICATION_CATEGORY_PROCUREMENT","audience":"default","locale":"zh-TW","want":"詢價邀請"},
+  {"key":"notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT","fn":"notification.NotificationCategory","value":"NOTIFICATION_CATEGORY_PROCUREMENT","audience":"default","locale":"en","want":"Quote requests"},
   {"key":"notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX","fn":"notification.NotificationChannel","value":"NOTIFICATION_CHANNEL_INBOX","audience":"default","locale":"zh-TW","want":"收件匣"},
   {"key":"notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX","fn":"notification.NotificationChannel","value":"NOTIFICATION_CHANNEL_INBOX","audience":"default","locale":"en","want":"Inbox"},
   {"key":"notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH","fn":"notification.NotificationChannel","value":"NOTIFICATION_CHANNEL_PUSH","audience":"default","locale":"zh-TW","want":"推播"},

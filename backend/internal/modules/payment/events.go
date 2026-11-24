@@ -19,3 +19,16 @@ type RefundChanged = model.RefundChanged
 
 // AutoRefundCompleted 在自動退款成功的 transaction 內發布（計畫 D5），供通知模組與後台使用。
 type AutoRefundCompleted = model.AutoRefundCompleted
+
+// PayoutDeadlineApproaching 由 payment.deadline_scan 在待補條件的最早期限進入 7 天窗口後發布（每次掃描對每個帳戶一次；期限與檔位相同的重複發布由消費者去重，D23），供通知模組提醒賣家補件。
+type PayoutDeadlineApproaching = model.PayoutDeadlineApproaching
+
+// DeadlineTier 是 PayoutDeadlineApproaching 的檔位。
+type DeadlineTier = model.DeadlineTier
+
+const (
+	// DeadlineSevenDays 是期限前超過一天的檔位。
+	DeadlineSevenDays = model.DeadlineSevenDays
+	// DeadlineOneDay 是期限前最後一天的檔位。
+	DeadlineOneDay = model.DeadlineOneDay
+)

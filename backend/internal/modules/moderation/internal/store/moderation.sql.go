@@ -90,6 +90,45 @@ func (q *Queries) BumpStoreDailyCount(ctx context.Context, arg BumpStoreDailyCou
 	return submitted, err
 }
 
+const buyerReportersOfCase = `-- name: BuyerReportersOfCase :many
+SELECT id, reporter_buyer_id::bigint AS reporter_id FROM moderation.reports
+WHERE case_id = $1 AND reporter_buyer_id > $2::bigint
+ORDER BY reporter_buyer_id
+LIMIT $3::int
+`
+
+type BuyerReportersOfCaseParams struct {
+	CaseID  uuid.UUID
+	AfterID int64
+	MaxRows int32
+}
+
+type BuyerReportersOfCaseRow struct {
+	ID         uuid.UUID
+	ReporterID int64
+}
+
+// 案件的買家檢舉人，依 reporter_buyer_id 由小到大的 keyset（一案一位買家一筆，UNIQUE (case_id, reporter_buyer_id)）；第一頁的游標是 0。
+func (q *Queries) BuyerReportersOfCase(ctx context.Context, arg BuyerReportersOfCaseParams) ([]BuyerReportersOfCaseRow, error) {
+	rows, err := q.db.Query(ctx, buyerReportersOfCase, arg.CaseID, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BuyerReportersOfCaseRow{}
+	for rows.Next() {
+		var i BuyerReportersOfCaseRow
+		if err := rows.Scan(&i.ID, &i.ReporterID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearExpiredDescriptionsBatch = `-- name: ClearExpiredDescriptionsBatch :execrows
 UPDATE moderation.reports SET description = NULL
 WHERE id IN (
@@ -1218,4 +1257,43 @@ func (q *Queries) SnapshotIDByHash(ctx context.Context, arg SnapshotIDByHashPara
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const storeReportersOfCase = `-- name: StoreReportersOfCase :many
+SELECT id, reporter_store_id::bigint AS reporter_id FROM moderation.reports
+WHERE case_id = $1 AND reporter_store_id > $2::bigint
+ORDER BY reporter_store_id
+LIMIT $3::int
+`
+
+type StoreReportersOfCaseParams struct {
+	CaseID  uuid.UUID
+	AfterID int64
+	MaxRows int32
+}
+
+type StoreReportersOfCaseRow struct {
+	ID         uuid.UUID
+	ReporterID int64
+}
+
+// 案件的店家檢舉人，依 reporter_store_id 由小到大的 keyset（一案一家店一筆，UNIQUE (case_id, reporter_store_id)）；第一頁的游標是 0。
+func (q *Queries) StoreReportersOfCase(ctx context.Context, arg StoreReportersOfCaseParams) ([]StoreReportersOfCaseRow, error) {
+	rows, err := q.db.Query(ctx, storeReportersOfCase, arg.CaseID, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []StoreReportersOfCaseRow{}
+	for rows.Next() {
+		var i StoreReportersOfCaseRow
+		if err := rows.Scan(&i.ID, &i.ReporterID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

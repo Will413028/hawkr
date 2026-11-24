@@ -157,7 +157,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	events.Subscribe(bus, socialModule.OnMeasureRevoked)
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellers, Logger: log})
 	mod := moderation.New(moderation.Deps{
-		DB: d, Social: socialModule, Review: &review.Module{}, IM: &im.Module{}, Seller: sellers, Buyer: buyers, Suspension: suspension,
+		DB: d, Events: bus, Social: socialModule, Review: &review.Module{}, IM: &im.Module{}, Seller: sellers, Buyer: buyers, Suspension: suspension,
 		Media: fakeMedia, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	images, err := rpc.NewImages("https://media.example.test")

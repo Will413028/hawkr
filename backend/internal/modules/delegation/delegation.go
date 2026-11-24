@@ -165,6 +165,10 @@ func New(d Deps) *Module {
 }
 
 type AuditAction = model.AuditAction
+
+// AuditActions 回傳全部登錄的稽核動作（依字串排序）；給需要涵蓋每個動作的消費者（通知文案）逐一檢查。
+func AuditActions() []AuditAction { return model.AuditActions() }
+
 type AdminEligibilityChange = model.AdminEligibilityChange
 type AuditConfirmInput = model.AuditConfirmInput
 type AuditIntent = model.AuditIntent

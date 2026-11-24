@@ -265,7 +265,7 @@ func New(d Deps) *Module {
 		comment:  comment.New(comment.Deps{DB: d.DB, Events: d.Events, Actors: actors, NewID: d.NewID, Now: d.Now}),
 		forum:    forum.New(forum.Deps{DB: d.DB, Actors: actors, NewID: d.NewID, Now: d.Now}),
 		engage:   engage.New(engage.Deps{DB: d.DB, Events: d.Events, Actors: actors, Now: d.Now}),
-		sanction: sanction.New(sanction.Deps{DB: d.DB, Cache: cache, NewID: d.NewID, Now: d.Now}),
+		sanction: sanction.New(sanction.Deps{DB: d.DB, Events: d.Events, Cache: cache, NewID: d.NewID, Now: d.Now}),
 		stats:    st,
 		purge:    purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Media: d.Media, Stats: st, Cache: cache, Cancel: cancel, Now: d.Now}),
 		jobs:     d.Jobs,

@@ -99,6 +99,7 @@ export type UiTextKey =
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_LIKE"
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_ORDER"
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT"
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK"
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW"
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT"
@@ -547,6 +548,7 @@ const NOTIFICATION_NOTIFICATION_CATEGORY: Readonly<Partial<Record<number, UiText
 	13: "notification.NotificationCategory.NOTIFICATION_CATEGORY_COUPON",
 	14: "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK",
 	15: "notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT",
+	16: "notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT",
 };
 
 /** notification.NotificationCategory 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */

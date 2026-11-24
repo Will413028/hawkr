@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -45,6 +46,16 @@ type Resolver interface {
 	// StoreFollowers 列出追蹤店家、未關閉、追蹤時間不晚於 followedBy 的買家：afterBuyerID 之後（不含）依 buyer_id 由小到大最多 limit 筆（1 到 MaxFollowerPage），
 	// 不足 limit 筆表示沒有更多。不加鎖。
 	StoreFollowers(ctx context.Context, storeID, afterBuyerID int64, limit int, followedBy time.Time) ([]FollowerRef, error)
+	// CaseReporters 列出 moderation 案件 audience 那一邊的檢舉人（BUYER 是買家檢舉人、STORE 是店家檢舉人）：檢舉人號碼（buyer_id 或 store_id）
+	// 大於 afterID 的最多 limit 位（1 到 MaxFollowerPage），依號碼由小到大；不足 limit 筆表示沒有更多。一個案件每位檢舉人只有一筆檢舉，
+	// 所以號碼可當 fan-out 的游標。不加鎖。
+	CaseReporters(ctx context.Context, caseID uuid.UUID, audience model.Audience, afterID int64, limit int) ([]ReporterRef, error)
+}
+
+// ReporterRef 是案件一邊的一位檢舉人：ID 是檢舉人號碼（買家那邊是 buyer_id、店家那邊是 store_id），ReportID 是那筆檢舉。
+type ReporterRef struct {
+	ID       int64
+	ReportID uuid.UUID
 }
 
 // Principal 是事件裡的一方：Side 是 BUYER 或 STORE，ID 是該身分面的號碼（buyer_id 或 store_id，兩個號碼空間不可混用）。

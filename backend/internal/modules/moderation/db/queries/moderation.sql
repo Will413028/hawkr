@@ -107,6 +107,20 @@ RETURNING c.submitted;
 -- name: ReportsOfCase :many
 SELECT * FROM moderation.reports WHERE case_id = sqlc.arg(case_id) ORDER BY created_at, id;
 
+-- name: BuyerReportersOfCase :many
+-- 案件的買家檢舉人，依 reporter_buyer_id 由小到大的 keyset（一案一位買家一筆，UNIQUE (case_id, reporter_buyer_id)）；第一頁的游標是 0。
+SELECT id, reporter_buyer_id::bigint AS reporter_id FROM moderation.reports
+WHERE case_id = sqlc.arg(case_id) AND reporter_buyer_id > sqlc.arg(after_id)::bigint
+ORDER BY reporter_buyer_id
+LIMIT sqlc.arg(max_rows)::int;
+
+-- name: StoreReportersOfCase :many
+-- 案件的店家檢舉人，依 reporter_store_id 由小到大的 keyset（一案一家店一筆，UNIQUE (case_id, reporter_store_id)）；第一頁的游標是 0。
+SELECT id, reporter_store_id::bigint AS reporter_id FROM moderation.reports
+WHERE case_id = sqlc.arg(case_id) AND reporter_store_id > sqlc.arg(after_id)::bigint
+ORDER BY reporter_store_id
+LIMIT sqlc.arg(max_rows)::int;
+
 -- name: ReportIDsOfCase :many
 -- 認定引用的來源檢舉（最早的幾筆）。
 SELECT id FROM moderation.reports WHERE case_id = sqlc.arg(case_id) ORDER BY created_at, id LIMIT sqlc.arg(max_rows)::int;

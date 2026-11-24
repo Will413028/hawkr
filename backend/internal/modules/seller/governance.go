@@ -642,7 +642,7 @@ func (m *Module) ChangeCaseSeverity(ctx context.Context, in ChangeCaseSeverityIn
 	return m.governance.ChangeSeverity(ctx, in)
 }
 
-// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限）；不發事件（沒有消費者）。同一位管理員同一個 request_id 的重送回傳原本那一筆。
+// CreateCaseInquiry 對案件的賣家發一筆詢問（提供紀錄或請說明，有期限），同 transaction 發 CaseInquiryCreated。同一位管理員同一個 request_id 的重送回傳原本那一筆。
 func (m *Module) CreateCaseInquiry(ctx context.Context, in CreateCaseInquiryInput) (CreateCaseInquiryResult, error) {
 	return m.governance.CreateInquiry(ctx, in)
 }

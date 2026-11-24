@@ -203,7 +203,7 @@ func setup(t *testing.T) *fixture {
 	f.review = review.New(review.Deps{DB: d, Events: bus, Media: owner, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	f.im = im.New(im.Deps{DB: d, Events: bus, Jobs: q, Media: owner, Buyers: f.buyer, Stores: chatStores{f.seller}, Orders: chatOrders{}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, func(context.Context, review.ReviewAggregateChanged) error { f.aggs.Add(1); return nil })
-	f.module = New(Deps{DB: d, Social: f.social, Review: f.review, IM: f.im, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.module = New(Deps{DB: d, Events: bus, Social: f.social, Review: f.review, IM: f.im, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, f.buyer.OnAccountCreated)
 	events.Subscribe(bus, f.social.OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.social.OnBuyerDeleted)

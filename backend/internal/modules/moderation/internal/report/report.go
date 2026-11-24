@@ -30,6 +30,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
@@ -59,6 +60,7 @@ type Chats interface {
 // Deps 是送出檢舉的依賴，全部必填。
 type Deps struct {
 	DB     *db.DB
+	Events *events.Bus
 	Social *social.Module
 	Review Reviews
 	IM     Chats
@@ -364,6 +366,12 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[
 		return model.SubmitResult{}, fmt.Errorf("moderation：寫入檢舉：%w", err)
 	}
 	if err := s.recordRequest(ctx, q, in, row.ID, hash); err != nil {
+		return model.SubmitResult{}, err
+	}
+	if err := events.Publish(ctx, s.d.Events, model.ReportReceived{
+		EventID: s.d.NewID(), OccurredAt: now, ReportID: row.ID, CaseID: c.ID, Target: in.Target,
+		ReporterBuyerID: in.ReporterBuyerID, ReporterStoreID: in.ReporterStoreID, Category: in.Category,
+	}); err != nil {
 		return model.SubmitResult{}, err
 	}
 	return model.SubmitResult{Report: view.Report(row, nil), Case: view.Case(attached), Created: true}, nil
