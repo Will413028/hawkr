@@ -4,7 +4,7 @@
 
 ## 不變量
 
-- 同步訂閱者（`subscribers.go`）只呼叫 `Accept`：插 `intents` 列並排 `notification.process_intent`；token 清除訂閱者是白名單。`Accept` 不接受 `Spawned` 型別（它沒有自己的冪等鍵）。守門：`TestSynchronousSubscribersOnlyAccept`、`TestAcceptOnlyInsertsTheIntentAndEnqueues`。
+- 同步訂閱者（`subscribers.go`、`subscribers_content.go`）只呼叫 `Accept`：插 `intents` 列並排 `notification.process_intent`；token 清除訂閱者是白名單。`Accept` 不接受 `Spawned` 型別（它沒有自己的冪等鍵）。守門：`TestSynchronousSubscribersOnlyAccept`、`TestAcceptOnlyInsertsTheIntentAndEnqueues`。
 - `Process` 在 transaction 外讀意圖並解析收件人（`Entry.Expand`：參數裡有帳號的型別等同 `Resolve`；只帶 `store_id`、`buyer_id` 的型別經 `registry.Resolver` 讀 buyer、seller）。沒有存活收件人、actor 帳號就是收件人時略過。再開 transaction：鎖帳號、買家或店家，然後 `Blocked` 檢查收件人與 actor 之間的封鎖。略過時同 transaction 把意圖參數換成 `'{}'`（D16）；重試時意圖已有收件匣連結或投遞紀錄就不清（`IntentHasRecipientRows`）。
 - 守門：`TestStoreEventResolvesToTheOwnerAccountAndStore`、`TestSelfNotificationIsSkipped`、`TestRetryAfterABlockDoesNotScrubAnAlreadyDeliveredIntent`。
 - 參數裡的 ID 小於等於 0 或依賴模組回 InvalidInput 是永久錯誤（`ErrBadParams`，取消 job）：`TestProcessCancelsAnIntentWithAnInvalidBuyerID`。

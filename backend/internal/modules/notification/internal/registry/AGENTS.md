@@ -9,4 +9,5 @@
 - 收件人解析有三種寫法，互斥：`Recipient`（參數裡已有帳號）、`Expand`（只帶 `store_id`、`buyer_id`，worker 經 `Resolver` 解析，回 nil 表示沒有存活收件人，形狀不合法是 `ErrBadParams` 永久錯誤）、`Broadcast`＋子型別 `Spawned`（fan-out，冪等鍵由派送決定）。`Expand` 型別的 actor 以 `Principal`（身分面加該面的號碼，買家與店是兩個號碼空間）宣告，供封鎖檢查與自我略過。`Expand` 與 `Spawned` 的範例參數要能經自檢用的 Resolver 展開成合法收件人；母意圖不能有呈現欄位。
 - 整份註冊表的測試同時對正式清單與含一組 Broadcast＋Spawned 的清單跑（`wholeRegistries`）。
 - 守門：`TestSelfCheckRejectsBrokenResolutionDefinitions`、`TestEveryBroadcastChildIsASpawnedRegisteredType`、`TestExpandRejectsAnInvalidShapeAsPermanent`。
+- 內容側型別：深連結的 store_code 在讀取時經 `Load` 批次取得（店家號碼不合法的列留空連結，不讓整頁失敗）；貼文相關通知連到 `/sellers/{storeCode}/posts`；`post_published` 母意圖的冪等鍵是貼文 ID（重新發布不再通知）。守門：`TestGoldenContentRendering`、`TestContentLoadDropsInvalidStoreIDsBeforeTheLookup`、`TestPostPublishedIdempotencyKeyIgnoresTheEventID`。
 - 型別清單按領域分檔（`account.go`、`announcement.go`、`content.go`、`governance.go`），`catalog.go` 的 `all` 只串各領域的清單；新增型別只改自己領域檔。

@@ -20,27 +20,27 @@ const (
 // 內容側每個型別在每個語系的固定輸出（含深連結與聚合鍵）：改文案、路徑或前綴都會紅，要改就連預期一起改。
 func TestGoldenContentRendering(t *testing.T) {
 	const at = `"occurred_at":"2026-11-23T04:30:00Z"`
-	thread := "/sellers/20260001/messages/" + contentPost
+	posts := "/sellers/20260001/posts"
 	cases := []struct {
 		typ, params                      string
 		zhTitle, zhBody, enTitle, enBody string
 		link, agg                        string
 	}{
 		{"comment_created", `{"event_id":"` + contentEvent + `",` + at + `,"comment_id":"` + contentObj + `","post_id":"` + contentPost + `","store_id":7,"actor":{"side":"BUYER","id":9}}`,
-			"收到新留言", "有人在你的貼文下留言。", "New comment", "Someone commented on your post.", thread, ""},
+			"收到新留言", "有人在你的貼文下留言。", "New comment", "Someone commented on your post.", posts, ""},
 		{"comment_replied_buyer", `{"event_id":"` + contentEvent + `",` + at + `,"comment_id":"` + contentObj + `","post_id":"` + contentPost + `","store_id":7,"reply_to":{"side":"BUYER","id":9},"actor":{"side":"STORE","id":7}}`,
-			"收到新回覆", "有人回覆了你的留言。", "New reply", "Someone replied to your comment.", thread, ""},
+			"收到新回覆", "有人回覆了你的留言。", "New reply", "Someone replied to your comment.", posts, ""},
 		{"comment_replied_store", `{"event_id":"` + contentEvent + `",` + at + `,"comment_id":"` + contentObj + `","post_id":"` + contentPost + `","store_id":7,"reply_to":{"side":"STORE","id":7},"actor":{"side":"BUYER","id":9}}`,
-			"收到新回覆", "有人回覆了貴店的留言。", "New reply", "Someone replied to your store's comment.", thread, ""},
+			"收到新回覆", "有人回覆了貴店的留言。", "New reply", "Someone replied to your store's comment.", posts, ""},
 		{"comment_liked_buyer", `{"event_id":"` + contentEvent + `",` + at + `,"comment_id":"` + contentObj + `","post_id":"` + contentPost + `","store_id":7,"author":{"side":"BUYER","id":9},"actor":{"side":"STORE","id":7}}`,
-			"留言收到讚", "有人對你的留言按讚。", "Your comment got a like", "Someone liked your comment.", thread, "comment_liked_buyer:comment_like:" + contentObj},
+			"留言收到讚", "有人對你的留言按讚。", "Your comment got a like", "Someone liked your comment.", posts, "comment_liked_buyer:comment_like:" + contentObj},
 		{"comment_liked_store", `{"event_id":"` + contentEvent + `",` + at + `,"comment_id":"` + contentObj + `","post_id":"` + contentPost + `","store_id":7,"author":{"side":"STORE","id":7},"actor":{"side":"BUYER","id":9}}`,
-			"留言收到讚", "有人對貴店的留言按讚。", "Your comment got a like", "Someone liked your store's comment.", thread, "comment_liked_store:comment_like:" + contentObj},
+			"留言收到讚", "有人對貴店的留言按讚。", "Your comment got a like", "Someone liked your store's comment.", posts, "comment_liked_store:comment_like:" + contentObj},
 		{"post_liked", `{"event_id":"` + contentEvent + `",` + at + `,"post_id":"` + contentPost + `","store_id":7,"buyer_id":9}`,
 			"貼文收到讚", "有人對你的貼文按讚。", "Your post got a like", "Someone liked your post.", "/sellers/20260001/posts", "post_liked:post_like:" + contentPost},
 		{"store_followed", `{"event_id":"` + contentEvent + `",` + at + `,"store_id":7,"buyer_id":9}`,
 			"新的追蹤者", "有買家開始追蹤你的店家。", "New follower", "A buyer started following your store.", "", "store_followed:follow:7"},
-		{"review_created", `{"event_id":"` + contentEvent + `",` + at + `,"review_id":"` + contentObj + `","store_id":7,"product_id":11}`,
+		{"review_created", `{"event_id":"` + contentEvent + `",` + at + `,"review_id":"` + contentObj + `","buyer_id":9,"store_id":7,"product_id":11}`,
 			"收到新評價", "有買家評價了你的商品。", "New review", "A buyer reviewed your product.", "", ""},
 		{"post_published_item", `{"post_id":"` + contentPost + `","store_id":7,"buyer_id":9}`,
 			"追蹤的店家發佈了新貼文", "你追蹤的店家剛發佈了一則貼文。", "A store you follow posted", "A store you follow just published a new post.", "/sellers/20260001/posts", ""},
@@ -48,6 +48,8 @@ func TestGoldenContentRendering(t *testing.T) {
 			"新訊息", "店家傳了一則訊息給你。", "New message", "A store sent you a message.", "/account/messages/7", ""},
 		{"chat_message_store", `{"event_id":"` + contentEvent + `",` + at + `,"conversation_id":"` + contentObj + `","buyer_id":9,"store_id":7}`,
 			"新訊息", "買家傳了一則訊息給你。", "New message", "A buyer sent you a message.", "/seller-center/messages/9", ""},
+		{"product_restocked", `{"event_id":"` + contentEvent + `",` + at + `,"buyer_id":9,"product_id":11,"product_name":"Apple","image_key":"public/apple"}`,
+			"商品補貨通知", "你關注的「Apple」已補貨。", "Back in stock", "\"Apple\", which you were watching, is back in stock.", "/products/11", ""},
 	}
 	ld := Loaded{StoreCode: 20260001}
 	for _, c := range cases {
@@ -138,5 +140,55 @@ func TestDeepLinkGetsTheLocalePrefixCentrally(t *testing.T) {
 	}
 	if !prefixed {
 		t.Error("範例深連結已帶語系前綴應該被自檢擋下")
+	}
+}
+
+// 店家號碼不合法的列（store_id <= 0）不進 StoreCodes 查詢，也不讓整批失敗：該列沒有連結，其餘照常解析。
+func TestContentLoadDropsInvalidStoreIDsBeforeTheLookup(t *testing.T) {
+	e, _ := Lookup("comment_created")
+	src := &announcementSource{codes: map[int64]int64{7: 20260001}}
+	mk := func(store int64) json.RawMessage {
+		raw, _ := json.Marshal(CommentCreatedParams{StoreID: store, Actor: exampleBuyerParty})
+		return raw
+	}
+	ld, _, err := e.Load(context.Background(), src, []json.RawMessage{mk(0), mk(7), mk(-3)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range src.asked {
+		if id <= 0 {
+			t.Errorf("StoreCodes 收到不合法的店家號碼 %d", id)
+		}
+	}
+	if ld[0].StoreCode != 0 || ld[1].StoreCode != 20260001 || ld[2].StoreCode != 0 {
+		t.Errorf("store_code = %+v", ld)
+	}
+}
+
+// 補貨通知的推播圖片取自參數的 image_key（D14）。
+func TestProductRestockedCarriesThePushImageKey(t *testing.T) {
+	e, _ := Lookup("product_restocked")
+	raw, _, err := e.ExampleParams()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := e.Render(uitext.ZhTW, raw)
+	if err != nil || got.ImageKey != "public/apple" {
+		t.Fatalf("%+v（%v）", got, err)
+	}
+}
+
+// 同一則貼文重新發布（公開、取消、再公開）的事件不同、貼文相同：母意圖的冪等鍵只看貼文。
+func TestPostPublishedIdempotencyKeyIgnoresTheEventID(t *testing.T) {
+	e, _ := Lookup("post_published")
+	key := func(event string) string {
+		k, err := e.IdempotencyKey([]byte(`{"event_id":"` + event + `","occurred_at":"2026-11-23T04:30:00Z","post_id":"` + contentPost + `","store_id":7}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return k
+	}
+	if a, b := key(contentEvent), key(contentObj); a != b {
+		t.Errorf("兩次發布的冪等鍵不同：%q、%q", a, b)
 	}
 }

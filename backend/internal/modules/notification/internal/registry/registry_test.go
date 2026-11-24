@@ -47,7 +47,7 @@ func TestRegistryHoldsTheTypesOfThisStep(t *testing.T) {
 	if !slices.Equal(names, []string{
 		"account_suspended", "account_unsuspended", "announcement",
 		"comment_created", "comment_replied_buyer", "comment_replied_store", "comment_liked_buyer", "comment_liked_store", "post_liked", "store_followed",
-		"review_created", "post_published", "post_published_item", "chat_message_buyer", "chat_message_store",
+		"review_created", "post_published", "post_published_item", "chat_message_buyer", "chat_message_store", "product_restocked",
 	}) {
 		t.Fatalf("型別清單 %v", names)
 	}
@@ -170,6 +170,9 @@ var thirdPartyField = regexp.MustCompile(`(?i)(name|nick|avatar|photo|image|pict
 
 var referenceField = regexp.MustCompile(`(ID|IDs|Id|Key)$|_(id|ids|key)$`)
 
+// publicCatalogNames 是明確的例外：商品名稱是公開目錄資料，不是個人姓名（D28）；仍受 180 天保留期約束。只列「型別.欄位」的完整路徑，其他型別的同名欄位照擋。
+var publicCatalogNames = map[string]bool{"ProductRestockedParams.ProductName": true}
+
 func isThirdPartyField(name, tag string) bool {
 	for _, n := range []string{name, tag} {
 		if n != "" && thirdPartyField.MatchString(n) && !referenceField.MatchString(n) {
@@ -207,7 +210,7 @@ func walkParams(t reflect.Type, path string, seen map[reflect.Type]bool, out *[]
 		}
 		tag, _, _ := strings.Cut(f.Tag.Get("json"), ",")
 		at := path + "." + f.Name
-		if isThirdPartyField(f.Name, tag) {
+		if isThirdPartyField(f.Name, tag) && !publicCatalogNames[at] {
 			*out = append(*out, at+" 看起來是第三方的名稱或內容；只存 ID，讀取時向擁有模組解析")
 		}
 		if tag == "" || tag == "-" {
@@ -280,6 +283,15 @@ func TestThirdPartyFieldGuard(t *testing.T) {
 		if got := len(paramsProblems(c.typ)) > 0; got != c.want {
 			t.Errorf("%s：違規=%v，預期 %v（%v）", name, got, c.want, paramsProblems(c.typ))
 		}
+	}
+	type otherProduct struct {
+		ProductName string `json:"product_name"`
+	}
+	if len(paramsProblems(reflect.TypeOf(otherProduct{}))) == 0 {
+		t.Error("白名單只放行 ProductRestockedParams.ProductName，其他型別的同名欄位要被擋")
+	}
+	if !publicCatalogNames["ProductRestockedParams.ProductName"] || len(publicCatalogNames) != 1 {
+		t.Errorf("公開目錄名稱白名單只該有補貨的商品名稱：%v", publicCatalogNames)
 	}
 	for _, bad := range []string{"SenderName", "ActorNickname", "AvatarURL", "Email", "ContentPreview", "ProductTitle", "Image"} {
 		if !isThirdPartyField(bad, "") {

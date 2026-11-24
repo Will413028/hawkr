@@ -279,6 +279,29 @@ func PreferenceNotAvailable(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "沒有這個通知設定。", Locale: uitext.ZhTW}
 }
 
+// ProductRestockedBodyArgs 是 ProductRestockedBody 的參數。
+type ProductRestockedBodyArgs struct {
+	Product string
+}
+
+// ProductRestockedBody 是模組句子 product_restocked.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ProductRestockedBody(l uitext.Locale, a ProductRestockedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "\"" + a.Product + "\", which you were watching, is back in stock.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你關注的「" + a.Product + "」已補貨。", Locale: uitext.ZhTW}
+}
+
+// ProductRestockedTitle 是模組句子 product_restocked.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ProductRestockedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Back in stock", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "商品補貨通知", Locale: uitext.ZhTW}
+}
+
 // ReviewCreatedBody 是模組句子 review_created.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func ReviewCreatedBody(l uitext.Locale) uitext.Message {
 	switch l {

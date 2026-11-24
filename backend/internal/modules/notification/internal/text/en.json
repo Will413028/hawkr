@@ -87,6 +87,12 @@
     "preference.not_available": {
       "message": "This notification setting is not available."
     },
+    "product_restocked.body": {
+      "message": "\"{product}\", which you were watching, is back in stock."
+    },
+    "product_restocked.title": {
+      "message": "Back in stock"
+    },
     "review_created.body": {
       "message": "A buyer reviewed your product."
     },

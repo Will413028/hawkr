@@ -11,6 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
 // tokenPurgeSubscribers 是 subscribers.go 裡允許做排意圖以外事情的訂閱者：裝置 token 的同步刪除（隨停權、帳號刪除在同一個
@@ -87,11 +91,18 @@ func TestSynchronousSubscribersOnlyAccept(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("找不到 subscribers*.go（%v）", err)
 	}
-	total := 0
+	total, helpers := 0, 0
 	for _, file := range slices.DeleteFunc(files, func(f string) bool { return strings.HasSuffix(f, "_test.go") }) {
 		fns, imports := funcs(t, file)
 		for _, fn := range fns {
-			if slices.Contains(tokenPurgeSubscribers, fn.Name.Name) || slices.Contains(pureSubscriberHelpers, fn.Name.Name) {
+			if slices.Contains(pureSubscriberHelpers, fn.Name.Name) {
+				helpers++
+				if got := calls(fn, imports); len(got) != 0 {
+					t.Errorf("%s 的純函式 helper %s 呼叫了 %v；免檢的 helper 不准呼叫任何函式", file, fn.Name.Name, got)
+				}
+				continue
+			}
+			if slices.Contains(tokenPurgeSubscribers, fn.Name.Name) {
 				continue
 			}
 			total++
@@ -103,6 +114,9 @@ func TestSynchronousSubscribersOnlyAccept(t *testing.T) {
 	}
 	if total == 0 {
 		t.Fatal("subscribers*.go 沒有訂閱者")
+	}
+	if helpers != len(pureSubscriberHelpers) {
+		t.Fatalf("subscribers*.go 只有 %d 個免檢 helper，預期 %d", helpers, len(pureSubscriberHelpers))
 	}
 }
 
@@ -171,6 +185,23 @@ func TestTokenPurgeSubscribersOnlyDeleteTokens(t *testing.T) {
 			if !slices.Contains(allowed, c) {
 				t.Errorf("%s 呼叫了 %s，不在 token 清除的允許清單 %v", fn.Name.Name, c, allowed)
 			}
+		}
+	}
+}
+
+// 只認買家與店家；不認得的種類不默默當成買家，Side 留空讓 worker 以 ErrBadParams 取消。
+func TestPartyOfDoesNotGuessTheSide(t *testing.T) {
+	for _, c := range []struct {
+		kind social.ActorKind
+		want registry.Party
+	}{
+		{social.ActorBuyer, registry.Party{Side: model.AudienceBuyer, ID: 5}},
+		{social.ActorStore, registry.Party{Side: model.AudienceStore, ID: 5}},
+		{social.ActorKind(""), registry.Party{ID: 5}},
+		{social.ActorKind("ADMIN"), registry.Party{ID: 5}},
+	} {
+		if got := partyOf(c.kind, 5); got != c.want {
+			t.Errorf("partyOf(%q) = %+v，預期 %+v", c.kind, got, c.want)
 		}
 	}
 }

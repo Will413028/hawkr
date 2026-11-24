@@ -75,6 +75,7 @@ type ReviewCreatedParams struct {
 	EventID    uuid.UUID `json:"event_id"`
 	OccurredAt time.Time `json:"occurred_at"`
 	ReviewID   uuid.UUID `json:"review_id"`
+	BuyerID    int64     `json:"buyer_id"`
 	StoreID    int64     `json:"store_id"`
 	ProductID  int64     `json:"product_id"`
 }
@@ -92,6 +93,16 @@ type PostPublishedItemParams struct {
 	PostID  uuid.UUID `json:"post_id"`
 	StoreID int64     `json:"store_id"`
 	BuyerID int64     `json:"buyer_id"`
+}
+
+// ProductRestockedParams 是 product_restocked 的參數快照，欄位取自 buyer.RestockTargeted；ProductName 是事件當時的商品名稱快照（公開目錄資料，受保留期約束）。
+type ProductRestockedParams struct {
+	EventID     uuid.UUID `json:"event_id"`
+	OccurredAt  time.Time `json:"occurred_at"`
+	BuyerID     int64     `json:"buyer_id"`
+	ProductID   int64     `json:"product_id"`
+	ProductName string    `json:"product_name"`
+	ImageKey    string    `json:"image_key"`
 }
 
 // ChatMessageParams 是 chat_message_buyer 與 chat_message_store 的參數快照，欄位取自 im.MessageSent（訊息內容不存）。
@@ -122,12 +133,14 @@ var (
 
 var interactionChannels = []model.Channel{model.ChannelInbox, model.ChannelPush}
 
-// storeCodeLoad 讀取一批參數裡店家的 store_code（一批一次查詢）；查不到的店留 0，深連結因此留空。
+// storeCodeLoad 讀取一批參數裡店家的 store_code（一批一次查詢）；店家號碼不合法或查不到的店留 0，深連結因此留空，不讓一列壞資料拖垮整頁。
 func storeCodeLoad[P any](storeID func(P) int64) func(context.Context, Sources, []P) ([]Loaded, error) {
 	return func(ctx context.Context, src Sources, ps []P) ([]Loaded, error) {
 		ids := make([]int64, 0, len(ps))
 		for _, p := range ps {
-			ids = append(ids, storeID(p))
+			if id := storeID(p); id > 0 {
+				ids = append(ids, id)
+			}
 		}
 		slices.Sort(ids)
 		codes, err := src.StoreCodes(ctx, slices.Compact(ids))
@@ -149,13 +162,7 @@ func storeCodePath(ld Loaded, suffix string) string {
 	return "/sellers/" + strconv.FormatInt(ld.StoreCode, 10) + suffix
 }
 
-func threadLink(postID uuid.UUID, ld Loaded) string {
-	return storeCodePath(ld, "/messages/"+postID.String())
-}
-
-func contentText(title, body func(uitext.Locale) uitext.Message) func(uitext.Locale) (Content, error) {
-	return func(l uitext.Locale) (Content, error) { return Content{Title: title(l), Body: body(l)}, nil }
-}
+func postsLink(ld Loaded) string { return storeCodePath(ld, "/posts") }
 
 var commentCreated = Define(Definition[CommentCreatedParams]{
 	Name:              "comment_created",
@@ -173,7 +180,7 @@ var commentCreated = Define(Definition[CommentCreatedParams]{
 	Text: func(l uitext.Locale, _ CommentCreatedParams) (Content, error) {
 		return Content{Title: text.CommentCreatedTitle(l), Body: text.CommentCreatedBody(l)}, nil
 	},
-	DeepLinkLoaded: func(p CommentCreatedParams, ld Loaded) string { return threadLink(p.PostID, ld) },
+	DeepLinkLoaded: func(_ CommentCreatedParams, ld Loaded) string { return postsLink(ld) },
 	Example: CommentCreatedParams{
 		EventID: exampleEventID, OccurredAt: exampleAt, CommentID: exampleObject, PostID: examplePostID, StoreID: exampleStoreID, Actor: exampleBuyerParty,
 	},
@@ -197,7 +204,7 @@ func commentReplied(name string, aud model.Audience, recipient func(context.Cont
 		Text: func(l uitext.Locale, _ CommentRepliedParams) (Content, error) {
 			return Content{Title: title(l), Body: body(l)}, nil
 		},
-		DeepLinkLoaded: func(p CommentRepliedParams, ld Loaded) string { return threadLink(p.PostID, ld) },
+		DeepLinkLoaded: func(_ CommentRepliedParams, ld Loaded) string { return postsLink(ld) },
 		Example: CommentRepliedParams{
 			EventID: exampleEventID, OccurredAt: exampleAt, CommentID: exampleObject, PostID: examplePostID, StoreID: exampleStoreID,
 			ReplyTo: replyTo, Actor: otherSide(replyTo),
@@ -248,7 +255,7 @@ func commentLiked(name string, aud model.Audience, recipient func(context.Contex
 		Text: func(l uitext.Locale, _ CommentLikedParams) (Content, error) {
 			return Content{Title: title(l), Body: body(l)}, nil
 		},
-		DeepLinkLoaded: func(p CommentLikedParams, ld Loaded) string { return threadLink(p.PostID, ld) },
+		DeepLinkLoaded: func(_ CommentLikedParams, ld Loaded) string { return postsLink(ld) },
 		Example: CommentLikedParams{
 			EventID: exampleEventID, OccurredAt: exampleAt, CommentID: exampleObject, PostID: examplePostID, StoreID: exampleStoreID,
 			Author: author, Actor: otherSide(author),
@@ -291,7 +298,7 @@ var postLiked = Define(Definition[PostLikedParams]{
 	Text: func(l uitext.Locale, _ PostLikedParams) (Content, error) {
 		return Content{Title: text.PostLikedTitle(l), Body: text.PostLikedBody(l)}, nil
 	},
-	DeepLinkLoaded: func(_ PostLikedParams, ld Loaded) string { return storeCodePath(ld, "/posts") },
+	DeepLinkLoaded: func(_ PostLikedParams, ld Loaded) string { return postsLink(ld) },
 	Example:        PostLikedParams{EventID: exampleEventID, OccurredAt: exampleAt, PostID: examplePostID, StoreID: exampleStoreID, BuyerID: exampleBuyerID},
 	ExampleLoaded:  exampleStore,
 })
@@ -316,7 +323,7 @@ var storeFollowed = Define(Definition[StoreFollowedParams]{
 	Example: StoreFollowedParams{EventID: exampleEventID, OccurredAt: exampleAt, StoreID: exampleStoreID, BuyerID: exampleBuyerID},
 })
 
-// 評價事件沒有評價者的買家號碼，所以沒有 actor：封鎖略過不適用（review.ReviewCreated 要先帶 BuyerID 才做得到）。賣家端沒有評價頁，沒有深連結。
+// 賣家端沒有評價頁，沒有深連結。
 var reviewCreated = Define(Definition[ReviewCreatedParams]{
 	Name:              "review_created",
 	Audiences:         []model.Audience{model.AudienceStore},
@@ -327,18 +334,18 @@ var reviewCreated = Define(Definition[ReviewCreatedParams]{
 	IdempotencyKey:    func(p ReviewCreatedParams) string { return p.EventID.String() },
 	OccurredAt:        func(p ReviewCreatedParams) time.Time { return p.OccurredAt },
 	Expand: func(ctx context.Context, r Resolver, p ReviewCreatedParams) (*Expansion, error) {
-		return StoreRecipient(ctx, r, p.StoreID)
+		return StoreRecipient(ctx, r, p.StoreID, Principal{Side: model.AudienceBuyer, ID: p.BuyerID})
 	},
 	Text: func(l uitext.Locale, _ ReviewCreatedParams) (Content, error) {
 		return Content{Title: text.ReviewCreatedTitle(l), Body: text.ReviewCreatedBody(l)}, nil
 	},
-	Example: ReviewCreatedParams{EventID: exampleEventID, OccurredAt: exampleAt, ReviewID: exampleObject, StoreID: exampleStoreID, ProductID: 11},
+	Example: ReviewCreatedParams{EventID: exampleEventID, OccurredAt: exampleAt, ReviewID: exampleObject, BuyerID: exampleBuyerID, StoreID: exampleStoreID, ProductID: 11},
 })
 
 var postPublished = Define(Definition[PostPublishedParams]{
 	Name:              "post_published",
-	IdempotencySource: "social.PostPublished.EventID",
-	IdempotencyKey:    func(p PostPublishedParams) string { return p.EventID.String() },
+	IdempotencySource: "social.PostPublished.PostID",
+	IdempotencyKey:    func(p PostPublishedParams) string { return p.PostID.String() },
 	OccurredAt:        func(p PostPublishedParams) time.Time { return p.OccurredAt },
 	Broadcast: &Broadcast[PostPublishedParams]{
 		Child: "post_published_item",
@@ -372,7 +379,7 @@ var postPublishedItem = Define(Definition[PostPublishedItemParams]{
 	Text: func(l uitext.Locale, _ PostPublishedItemParams) (Content, error) {
 		return Content{Title: text.PostPublishedItemTitle(l), Body: text.PostPublishedItemBody(l)}, nil
 	},
-	DeepLinkLoaded: func(_ PostPublishedItemParams, ld Loaded) string { return storeCodePath(ld, "/posts") },
+	DeepLinkLoaded: func(_ PostPublishedItemParams, ld Loaded) string { return postsLink(ld) },
 	Example:        PostPublishedItemParams{PostID: examplePostID, StoreID: exampleStoreID, BuyerID: exampleBuyerID},
 	ExampleLoaded:  exampleStore,
 })
@@ -420,8 +427,31 @@ var chatMessageStore = Define(Definition[ChatMessageParams]{
 	},
 })
 
-// contentTypes 是內容側型別（social、buyer 追蹤、review、im）。product_restocked 不在內：它要存商品名稱，被參數守門擋下，等決定。
+var productRestocked = Define(Definition[ProductRestockedParams]{
+	Name:              "product_restocked",
+	Audiences:         []model.Audience{model.AudienceBuyer},
+	Category:          model.CategoryRestock,
+	Presentation:      model.PresentationPromotion,
+	Channels:          interactionChannels,
+	IdempotencySource: "buyer.RestockTargeted.EventID",
+	IdempotencyKey:    func(p ProductRestockedParams) string { return p.EventID.String() },
+	OccurredAt:        func(p ProductRestockedParams) time.Time { return p.OccurredAt },
+	Expand: func(ctx context.Context, r Resolver, p ProductRestockedParams) (*Expansion, error) {
+		return BuyerRecipient(ctx, r, p.BuyerID)
+	},
+	Text: func(l uitext.Locale, p ProductRestockedParams) (Content, error) {
+		return Content{Title: text.ProductRestockedTitle(l), Body: text.ProductRestockedBody(l, text.ProductRestockedBodyArgs{Product: p.ProductName})}, nil
+	},
+	DeepLink: func(p ProductRestockedParams) string { return "/products/" + strconv.FormatInt(p.ProductID, 10) },
+	ImageKey: func(p ProductRestockedParams) string { return p.ImageKey },
+	Example: ProductRestockedParams{
+		EventID: exampleEventID, OccurredAt: exampleAt, BuyerID: exampleBuyerID, ProductID: 11, ProductName: "Apple", ImageKey: "public/apple",
+	},
+})
+
+// contentTypes 是內容側型別（social、buyer 追蹤與補貨、review、im）。
 var contentTypes = []Entry{
 	commentCreated, commentRepliedBuyer, commentRepliedStore, commentLikedBuyer, commentLikedStore, postLiked, storeFollowed,
 	reviewCreated, postPublished, postPublishedItem, chatMessageBuyer, chatMessageStore,
+	productRestocked,
 }

@@ -19,8 +19,8 @@
 | 買家售後詳情 | `/account/after-sales/{caseNo}` | BUYER | |
 | 聊天（買家） | `/account/messages/{targetId}` | BUYER | |
 | 聊天（賣家） | `/seller-center/messages/{targetId}` | STORE | `targetId` 是買家 ID（`website/lib/chat/types.ts` 的 `targetUserId` 說明）；買家端是店家 ID |
-| 店家論壇串（留言、讚） | `/sellers/{storeCode}/messages/{threadId}` | BUYER、STORE | 公開頁 |
-| 貼文 | 無獨立路由 | - | 只有店家貼文列表 `/sellers/{storeCode}/posts`；追蹤的店發文用此列表 |
+| 店家論壇串 | `/sellers/{storeCode}/messages/{threadId}` | BUYER、STORE | 公開頁；`threadId` 是論壇串的 ID，不是貼文 ID。論壇項目不發布事件，通知不使用此路由；貼文的留言、回覆、留言讚用下一列的貼文列表 |
+| 貼文 | 無獨立路由 | - | 只有店家貼文列表 `/sellers/{storeCode}/posts`；追蹤的店發文、貼文讚、貼文留言、回覆與留言讚都用此列表 |
 | 店家頁 | `/sellers/{storeCode}` | BUYER | |
 | 商品頁 | `/products/{id}` | BUYER | 補貨通知 |
 | 評價 | 買家端：`/sellers/{storeCode}/reviews`；賣家端：無獨立路由 | BUYER、STORE | 賣家中心只有 `preview/reviews`（預覽），不用 |

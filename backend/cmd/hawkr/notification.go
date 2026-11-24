@@ -110,6 +110,7 @@ func subscribeNotification(bus *events.Bus, m *notification.Module) {
 	events.Subscribe[social.PostLiked](bus, m.OnPostLiked)
 	events.Subscribe[social.PostPublished](bus, m.OnPostPublished)
 	events.Subscribe[buyer.SellerFollowed](bus, m.OnSellerFollowed)
+	events.Subscribe[buyer.RestockTargeted](bus, m.OnRestockTargeted)
 	events.Subscribe[review.ReviewCreated](bus, m.OnReviewCreated)
 	events.Subscribe[im.MessageSent](bus, m.OnMessageSentToBuyer)
 	events.Subscribe[im.MessageSent](bus, m.OnMessageSentToStore)

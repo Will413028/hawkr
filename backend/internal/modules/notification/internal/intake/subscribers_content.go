@@ -13,12 +13,16 @@ import (
 
 // 內容側的同步訂閱者，規則同 subscribers.go：只做 Accept。收件人可能是買家或店家的事件各有兩個訂閱者，各自只處理自己那一種收件人。
 
+// partyOf 只認買家與店家；不認得的種類留空的 Side，worker 解析 actor 時以 ErrBadParams 永久取消，不默默當成買家。
 func partyOf(kind social.ActorKind, id int64) registry.Party {
-	side := model.AudienceBuyer
-	if kind == social.ActorStore {
-		side = model.AudienceStore
+	switch kind {
+	case social.ActorBuyer:
+		return registry.Party{Side: model.AudienceBuyer, ID: id}
+	case social.ActorStore:
+		return registry.Party{Side: model.AudienceStore, ID: id}
+	default:
+		return registry.Party{ID: id}
 	}
-	return registry.Party{Side: side, ID: id}
 }
 
 // OnCommentCreated 訂閱 social.CommentCreated。
@@ -96,7 +100,14 @@ func (s *Service) OnSellerFollowed(ctx context.Context, e buyer.SellerFollowed) 
 // OnReviewCreated 訂閱 review.ReviewCreated。
 func (s *Service) OnReviewCreated(ctx context.Context, e review.ReviewCreated) error {
 	return s.Accept(ctx, "review_created", registry.ReviewCreatedParams{
-		EventID: e.EventID, OccurredAt: e.OccurredAt, ReviewID: e.ReviewID, StoreID: e.StoreID, ProductID: e.ProductID,
+		EventID: e.EventID, OccurredAt: e.OccurredAt, ReviewID: e.ReviewID, BuyerID: e.BuyerID, StoreID: e.StoreID, ProductID: e.ProductID,
+	})
+}
+
+// OnRestockTargeted 訂閱 buyer.RestockTargeted：每位有意願的買家一個事件。
+func (s *Service) OnRestockTargeted(ctx context.Context, e buyer.RestockTargeted) error {
+	return s.Accept(ctx, "product_restocked", registry.ProductRestockedParams{
+		EventID: e.EventID, OccurredAt: e.OccurredAt, BuyerID: e.BuyerID, ProductID: e.ProductID, ProductName: e.ProductName, ImageKey: e.ImageKey,
 	})
 }
 

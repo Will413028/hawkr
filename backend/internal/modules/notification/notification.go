@@ -290,6 +290,11 @@ func (m *Module) OnSellerFollowed(ctx context.Context, e buyer.SellerFollowed) e
 	return m.intake.OnSellerFollowed(ctx, e)
 }
 
+// OnRestockTargeted 是 buyer.RestockTargeted 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnRestockTargeted(ctx context.Context, e buyer.RestockTargeted) error {
+	return m.intake.OnRestockTargeted(ctx, e)
+}
+
 // OnReviewCreated 是 review.ReviewCreated 的同步訂閱者，同 OnSuspended。
 func (m *Module) OnReviewCreated(ctx context.Context, e review.ReviewCreated) error {
 	return m.intake.OnReviewCreated(ctx, e)

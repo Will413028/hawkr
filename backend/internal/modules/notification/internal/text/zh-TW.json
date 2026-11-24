@@ -129,6 +129,19 @@
       "message": "沒有這個通知設定。",
       "description": "偏好設定的 (受眾, 分類, 渠道) 不在註冊表實際送達的組合內：UpdateNotificationPreference。"
     },
+    "product_restocked.body": {
+      "message": "你關注的「{product}」已補貨。",
+      "params": {
+        "product": {
+          "type": "string"
+        }
+      },
+      "description": "收件匣與推播的內文：商品補貨（product_restocked 型別，收件人是買家）。product 是事件當時的商品名稱快照（公開目錄資料）。"
+    },
+    "product_restocked.title": {
+      "message": "商品補貨通知",
+      "description": "收件匣與推播的標題：商品補貨（product_restocked 型別，收件人是買家）。"
+    },
     "review_created.body": {
       "message": "有買家評價了你的商品。",
       "description": "收件匣與推播的內文：商品收到新評價（review_created 型別，收件人是店家）。"

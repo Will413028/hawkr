@@ -242,6 +242,7 @@ type ReviewCreated struct {
 	EventID    uuid.UUID
 	OccurredAt time.Time
 	ReviewID   uuid.UUID
+	BuyerID    int64
 	StoreID    int64
 	ProductID  int64
 }

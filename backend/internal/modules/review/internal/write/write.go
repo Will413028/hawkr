@@ -153,7 +153,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 		if err := s.bust(ctx, order.StoreID, item.ProductID); err != nil {
 			return err
 		}
-		if err := events.Publish(ctx, s.d.Events, model.ReviewCreated{EventID: s.d.NewID(), OccurredAt: now, ReviewID: id, StoreID: order.StoreID, ProductID: item.ProductID}); err != nil {
+		if err := events.Publish(ctx, s.d.Events, model.ReviewCreated{EventID: s.d.NewID(), OccurredAt: now, ReviewID: id, BuyerID: in.BuyerID, StoreID: order.StoreID, ProductID: item.ProductID}); err != nil {
 			return err
 		}
 		out = rows.Review(row, images)
