@@ -462,9 +462,6 @@ services:
       LEGACY_SELLER_GRPC_HOST: host.docker.internal
       LEGACY_SELLER_GRPC_PORT: 9941
 
-      # ATM 退款頁面完成導回（本地用 ngrok URL，由 dev.sh 自動更新）
-      ATM_REFUND_RETURN_URL: ${ATM_REFUND_RETURN_URL:-http://localhost:8080/atm-refund/return}
-
       # 售後 case 可調參數（application.yml aftersales.case.*）
       AFTERSALE_APPLY_DEADLINE_HOURS: ${AFTERSALE_APPLY_DEADLINE_HOURS:-60}
       AFTERSALE_PROCESS_DEADLINE_HOURS: ${AFTERSALE_PROCESS_DEADLINE_HOURS:-72}
@@ -494,12 +491,6 @@ services:
       OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
       OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-
-      # ATM 退款 return URL（本地開發用 ngrok URL，由 dev.sh 注入）
-      ATM_REFUND_RETURN_URL_BASE: ${GATEWAY_URL:-}
-
-      # Web 前端 base URL（client_type=WEB_BROWSER 時組 redirect_url 用，§5.4.2）
-      WEB_FRONTEND_URL: ${WEB_FRONTEND_URL:-}
 
       FLYWAY_ENABLED: "true"
       NACOS_ENABLED: "false"

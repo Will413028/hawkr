@@ -262,13 +262,13 @@ inject_gateway_url() {
 
   # 檢查服務是否正在運行
   local running
-  running=$(docker ps --format '{{.Names}}' | grep -E '^(shipping-service|aftersales-service)$' || true)
+  running=$(docker ps --format '{{.Names}}' | grep -E '^shipping-service$' || true)
   if [[ -z "$running" ]]; then
     return
   fi
 
-  info "重啟 shipping-service、aftersales-service 套用新 URL..."
-  $COMPOSE up -d --no-deps shipping-service aftersales-service 2>/dev/null
+  info "重啟 shipping-service 套用新 URL..."
+  $COMPOSE up -d --no-deps shipping-service 2>/dev/null
   ok "GATEWAY_URL 已更新：$ngrok_url"
 }
 
