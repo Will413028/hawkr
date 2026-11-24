@@ -106,7 +106,7 @@ final class NotificationPreferencesControllerProvider
 }
 
 String _$notificationPreferencesControllerHash() =>
-    r'e12cb93e87be1a01e6906cd5bbd47889a03463bc';
+    r'9731de9ac396a833e150b339229e647f75f3a3a9';
 
 /// 偏好：伺服器回哪些 (分類, 渠道) 就列哪些；不可關的 `canDisable` 為 false。
 

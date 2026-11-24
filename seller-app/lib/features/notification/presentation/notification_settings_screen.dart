@@ -8,12 +8,12 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:hawkr_api/errors.dart' show errorText;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 
 import '../../../core/l10n/ui_locale.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/widgets/app_toggle_switch.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import '../data/notification_preference_labels.dart';
 import '../data/notification_repository.dart';
 import 'notification_controller.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -143,6 +143,7 @@ class NotificationSettingsScreen extends HookConsumerWidget {
     required List<PreferenceEntry> entries,
   }) {
     final style = _categoryConfig[category] ?? _defaultStyle;
+    final locale = ref.watch(uiLocaleProvider);
     return Container(
       constraints: BoxConstraints(minHeight: 68.h),
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
@@ -173,7 +174,7 @@ class NotificationSettingsScreen extends HookConsumerWidget {
           SizedBox(width: 12.w),
           Expanded(
             child: Text(
-              notificationCategoryLabel(category),
+              category.uiText(locale) ?? commonUnknown(locale),
               style: TextStyle(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w400,
@@ -203,7 +204,7 @@ class NotificationSettingsScreen extends HookConsumerWidget {
                 ),
                 SizedBox(height: 2.h),
                 Text(
-                  notificationChannelLabel(e.channel),
+                  e.channel.uiText(locale) ?? commonUnknown(locale),
                   style: TextStyle(
                     fontSize: 12.sp,
                     color: AppColors.textSecondary,
