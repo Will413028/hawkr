@@ -39,7 +39,7 @@ func TestEarningsStatusCoversEverySourceStatus(t *testing.T) {
 			t.Errorf("%s/%s = %q, %v，預期 %q", tc.kind, tc.raw, got, err, tc.want)
 		}
 	}
-	for _, bad := range []c{{model.EarningsReversal, "RELEASED", ""}, {model.EarningsTopUp, "NONE", ""}, {model.EarningsTopUp, "RELEASED", ""}, {"OTHER", "DONE", ""}} {
+	for _, bad := range []c{{model.EarningsReversal, "RELEASED", ""}, {model.EarningsReversal, "NONE", ""}, {model.EarningsReversal, "WAITING", ""}, {model.EarningsTopUp, "NONE", ""}, {model.EarningsTopUp, "RELEASED", ""}, {"OTHER", "DONE", ""}} {
 		if got, err := earningsStatus(bad.kind, bad.raw); err == nil {
 			t.Errorf("%s/%s 應該回錯誤，得到 %q", bad.kind, bad.raw, got)
 		}

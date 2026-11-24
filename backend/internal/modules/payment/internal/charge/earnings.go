@@ -29,6 +29,8 @@ func earningsStatus(kind model.EarningsType, raw string) (model.EarningsStatus, 
 			return model.EarningsCompleted, nil
 		case model.ReversalReversing, model.ReversalAnomaly:
 			return model.EarningsPending, nil
+		case model.ReversalNone, model.ReversalWaiting, model.ReversalReleased:
+			// 撤回列沒有 NONE 與 WAITING（只是退款列上的彙總值），RELEASED 沒有收回、查詢不列：出現就是 schema 與查詢對不上。
 		}
 	case model.EarningsTopUp:
 		switch model.TopupStatus(raw) {
@@ -36,6 +38,8 @@ func earningsStatus(kind model.EarningsType, raw string) (model.EarningsStatus, 
 			return model.EarningsCompleted, nil
 		case model.TopupWaiting, model.TopupSending, model.TopupAnomaly:
 			return model.EarningsPending, nil
+		case model.TopupNone, model.TopupReleased:
+			// 沒有補差額，查詢不列：出現就是 schema 與查詢對不上。
 		}
 	}
 	return "", fmt.Errorf("charge：入帳帳本不認得的來源狀態 %s/%s", kind, raw)
