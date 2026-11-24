@@ -290,7 +290,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 }
 
 // AddOrderWorkers 登記建單的 River worker（procurement.order_provisioning）與它的 reconciler；需要 Deps.Orders，沒給是組裝錯誤，panic。
-// 並行期單一生效者：舊服務處理建單到 A9-6，所以 cmd/hawkr 的 worker 角色不呼叫它，只有測試登記；A9-6 刪路由的同一個變更才接上。
+// cmd/hawkr 的 worker 角色呼叫它，建單的單一生效者是單體。
 func (m *Module) AddOrderWorkers(workers *river.Workers) {
 	if m.orders.Orders == nil {
 		panic("procurement.AddOrderWorkers：Deps.Orders 必填")
@@ -298,7 +298,7 @@ func (m *Module) AddOrderWorkers(workers *river.Workers) {
 	provisioning.AddWorkers(workers, &m.orders, m.ordersRec)
 }
 
-// OrderPeriodicJobs 回傳建單 reconciler 的排程；與 AddOrderWorkers 一起（只有測試）使用。
+// OrderPeriodicJobs 回傳建單 reconciler 的排程；與 AddOrderWorkers 一起使用。
 func (m *Module) OrderPeriodicJobs() []*river.PeriodicJob { return provisioning.PeriodicJobs() }
 
 // RunHub 維持 WatchRun 共用的 LISTEN 連線直到 ctx 結束（回傳 ctx.Err()）；serve 程序啟動時另開 goroutine 跑它。

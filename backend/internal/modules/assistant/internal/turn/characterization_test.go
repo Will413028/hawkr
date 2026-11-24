@@ -18,7 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 這支測試鎖的是舊 ai-service 買家助理「現在的行為」（錄下來的 fixture），不是判斷那些行為是否正確。
+// 這支測試鎖的是舊 AI 服務 買家助理「現在的行為」（錄下來的 fixture），不是判斷那些行為是否正確。
 // 舊路徑只送 text／done／error 三種事件；新串流多了 tool_result，且 error 是終止事件，所以比對規則是：
 //   - text：種類、順序、每段文字完全相同。
 //   - done → finished（帶 session ID）；error 之後舊路徑還會送 done，新串流 error 之後沒有事件，只比到 error。

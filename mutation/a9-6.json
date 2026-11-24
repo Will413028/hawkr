@@ -1,0 +1,94 @@
+{
+ "mutants": [
+  {
+   "id": "relay-subscribe-removed-serve",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tsubscribeProcurementRelay(bus, jc)\n\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(",
+   "new": "\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(",
+   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
+   "why": "serve 角色不訂 RfqPublished 的 relay：發布詢價不再為邀請排 job，事件永遠不送出"
+  },
+  {
+   "id": "relay-subscribe-removed-worker",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tsubscribeProcurementRelay(bus, jc)\n\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage(",
+   "new": "\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage(",
+   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
+   "why": "worker 角色不訂 relay：在 worker 程序發布的 RfqPublished 沒有訂閱者"
+  },
+  {
+   "id": "relay-subscribe-body-dropped",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "\tevents.Subscribe(bus, procurementrelay.OnRfqPublished(queue))\n",
+   "new": "\t_ = queue\n",
+   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
+   "why": "subscribeProcurementRelay 變成空函式：呼叫點都在，但沒有任何訂閱"
+  },
+  {
+   "id": "relay-worker-not-registered",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tprocurementSweep := addProcurementRelay(workers, procurementModule, publisher, jc)\n",
+   "new": "\tvar procurementSweep []*river.PeriodicJob\n",
+   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
+   "why": "worker 沒登記 relay 的 River worker（送出、狀態寫入、補掃）：排進去的 job 沒有人執行"
+  },
+  {
+   "id": "relay-sweep-not-scheduled",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tperiodic = append(periodic, procurementSweep...)\n",
+   "new": "\t_ = procurementSweep\n",
+   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
+   "why": "補掃排程沒交給 River：job 不見的邀請永遠停在 QUEUED"
+  },
+  {
+   "id": "order-reconciler-periodic-dropped",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tperiodic = append(periodic, procurementModule.OrderPeriodicJobs()...)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestWorkerRoleRegistersProcurementOrderProvisioning$",
+   "why": "建單 reconciler 的排程沒交給 River：建單 job 死了的接受單永遠卡在 CREATING_ORDER"
+  },
+  {
+   "id": "order-workers-not-registered",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "\tm.AddOrderWorkers(workers)\n",
+   "new": "",
+   "test": "cmd/hawkr ^TestWorkerRoleRegistersProcurementOrderProvisioning$",
+   "why": "worker 沒登記建單 worker 與 reconciler：接受報價後沒有人建單"
+  },
+  {
+   "id": "order-port-not-wired",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "procurementOrders{orders}, log)",
+   "new": "nil, log)",
+   "test": "cmd/hawkr ^TestWorkerRoleRegistersProcurementOrderProvisioning$",
+   "why": "worker 組採購模組時沒帶舊 ordering 的轉接：AddOrderWorkers 在啟動時 panic"
+  },
+  {
+   "id": "serve-registers-order-workers",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/main.go",
+   "old": "\tstopProcurementHub := startProcurementHub(ctx, procurementModule, log)\n",
+   "new": "\tprocurementModule.OrderPeriodicJobs()\n\tstopProcurementHub := startProcurementHub(ctx, procurementModule, log)\n",
+   "test": "cmd/hawkr ^TestWorkerRoleRegistersProcurementOrderProvisioning$",
+   "why": "serve 角色也碰建單排程：job 只在 worker 執行，serve 不得登記或排程"
+  },
+  {
+   "id": "gateway-ai-route-resurrected",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/router/routes.go",
+   "old": "\tregisterShareRoutes(app, h)\n",
+   "new": "\tapp.POST(\"/image_transformations\", func(c *gin.Context) {})\n\tregisterShareRoutes(app, h)\n",
+   "test": "internal/router ^TestEveryRouteIsInOpenAPISpec$",
+   "why": "gateway 又註冊一條 AI 路由：AI 已在單體，清單沒有這條，路由與清單對照必須失敗"
+  }
+ ]
+}

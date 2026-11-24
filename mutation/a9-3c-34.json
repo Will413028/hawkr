@@ -139,8 +139,8 @@
    "id": "worker-procurement-without-seller-module",
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
-   "old": "categories, products, sellerModule, log)",
-   "new": "categories, products, nil, log)",
+   "old": "categories, products, sellerModule, procurementOrders{orders}, log)",
+   "new": "categories, products, nil, procurementOrders{orders}, log)",
    "test": "cmd/hawkr ^TestProcurementIsAssembledWithTheSellerModule$",
    "why": "worker assembles procurement without the seller module."
   },
