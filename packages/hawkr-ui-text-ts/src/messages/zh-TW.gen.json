@@ -145,6 +145,16 @@
     }
   },
   "payment": {
+    "EarningsEntryStatus": {
+      "EARNINGS_ENTRY_STATUS_COMPLETED": "已完成",
+      "EARNINGS_ENTRY_STATUS_FAILED": "失敗",
+      "EARNINGS_ENTRY_STATUS_PENDING": "處理中"
+    },
+    "EarningsEntryType": {
+      "EARNINGS_ENTRY_TYPE_REVERSAL": "扣回",
+      "EARNINGS_ENTRY_TYPE_TOP_UP": "補差額",
+      "EARNINGS_ENTRY_TYPE_TRANSFER": "入帳"
+    },
     "PaymentAccountStatus": {
       "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "待設定",
       "PAYMENT_ACCOUNT_STATUS_DISABLED": "無法啟用",

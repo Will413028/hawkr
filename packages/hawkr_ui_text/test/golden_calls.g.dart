@@ -95,6 +95,14 @@ const _enumNumber = <String, int>{
 	'hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_INBOX': 1,
 	'hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_PUSH': 2,
 	'hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED': 2,
+	'hawkr.payment.v1alpha1.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_FAILED': 3,
+	'hawkr.payment.v1alpha1.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_PENDING': 1,
+	'hawkr.payment.v1alpha1.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_UNSPECIFIED': 0,
+	'hawkr.payment.v1alpha1.EarningsEntryType.EARNINGS_ENTRY_TYPE_REVERSAL': 2,
+	'hawkr.payment.v1alpha1.EarningsEntryType.EARNINGS_ENTRY_TYPE_TOP_UP': 3,
+	'hawkr.payment.v1alpha1.EarningsEntryType.EARNINGS_ENTRY_TYPE_TRANSFER': 1,
+	'hawkr.payment.v1alpha1.EarningsEntryType.EARNINGS_ENTRY_TYPE_UNSPECIFIED': 0,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED': 3,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED': 5,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED': 4,
@@ -358,6 +366,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_notification_v1alpha1_notification.NotificationCategory.valueOf(_n('hawkr.notification.v1alpha1.NotificationCategory', value))!.uiText(l);
     case 'notification.NotificationChannel':
       return hawkr_notification_v1alpha1_notification.NotificationChannel.valueOf(_n('hawkr.notification.v1alpha1.NotificationChannel', value))!.uiText(l);
+    case 'payment.EarningsEntryStatus':
+      return hawkr_payment_v1alpha1_payment.EarningsEntryStatus.valueOf(_n('hawkr.payment.v1alpha1.EarningsEntryStatus', value))!.uiText(l);
+    case 'payment.EarningsEntryType':
+      return hawkr_payment_v1alpha1_payment.EarningsEntryType.valueOf(_n('hawkr.payment.v1alpha1.EarningsEntryType', value))!.uiText(l);
     case 'payment.PaymentAccountStatus':
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentAccountStatus', value))!.uiText(l);
     case 'payment.PaymentAnomalyKind':

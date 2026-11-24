@@ -87,6 +87,12 @@ const (
 	// SellerAppServiceGetMyPaymentAccountProcedure is the fully-qualified name of the
 	// SellerAppService's GetMyPaymentAccount RPC.
 	SellerAppServiceGetMyPaymentAccountProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyPaymentAccount"
+	// SellerAppServiceListMyEarningsProcedure is the fully-qualified name of the SellerAppService's
+	// ListMyEarnings RPC.
+	SellerAppServiceListMyEarningsProcedure = "/hawkr.seller.v1alpha1.SellerAppService/ListMyEarnings"
+	// SellerAppServiceGetMyOrderEarningsProcedure is the fully-qualified name of the SellerAppService's
+	// GetMyOrderEarnings RPC.
+	SellerAppServiceGetMyOrderEarningsProcedure = "/hawkr.seller.v1alpha1.SellerAppService/GetMyOrderEarnings"
 	// SellerAppServiceCreatePaymentOnboardingSessionProcedure is the fully-qualified name of the
 	// SellerAppService's CreatePaymentOnboardingSession RPC.
 	SellerAppServiceCreatePaymentOnboardingSessionProcedure = "/hawkr.seller.v1alpha1.SellerAppService/CreatePaymentOnboardingSession"
@@ -205,6 +211,15 @@ type SellerAppServiceClient interface {
 	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、撥款能力是否啟用、最近一次讀取的時間。
 	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
+	// ListMyEarnings 列出呼叫者店家的入帳帳本，新到舊：平台轉給店家的款項（TRANSFER）、退款時收回的款項（REVERSAL，負數）與補差額（TOP_UP）。
+	// 一列對應一張訂單的一次轉入、收回或補差額，不含付款、退款本身與撥款到銀行（撥款由金流商處理，不在帳本內）。order_no 篩單一訂單
+	// （別家店的訂單編號沒有列，回空清單）；from_time（含）與 to_time（不含）篩列的記錄時間，任何一個不設就是不限。from_time 不早於 to_time 回 invalid_argument。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+	ListMyEarnings(context.Context, *connect.Request[v1alpha1.ListMyEarningsRequest]) (*connect.Response[v1alpha1.ListMyEarningsResponse], error)
+	// GetMyOrderEarnings 回傳呼叫者店家一張訂單的入帳列（新到舊，一張訂單的列數很少，不分頁）與已完成列的淨額，給訂單詳情頁。
+	// 訂單不是呼叫者店家的、或沒有付款，一律回 not_found（不洩漏存在與否）；訂單有付款但還沒有任何列時回空清單與淨額 0。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+	GetMyOrderEarnings(context.Context, *connect.Request[v1alpha1.GetMyOrderEarningsRequest]) (*connect.Response[v1alpha1.GetMyOrderEarningsResponse], error)
 	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
 	// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
 	// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。
@@ -362,6 +377,20 @@ func NewSellerAppServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		listMyEarnings: connect.NewClient[v1alpha1.ListMyEarningsRequest, v1alpha1.ListMyEarningsResponse](
+			httpClient,
+			baseURL+SellerAppServiceListMyEarningsProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("ListMyEarnings")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		getMyOrderEarnings: connect.NewClient[v1alpha1.GetMyOrderEarningsRequest, v1alpha1.GetMyOrderEarningsResponse](
+			httpClient,
+			baseURL+SellerAppServiceGetMyOrderEarningsProcedure,
+			connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOrderEarnings")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 		createPaymentOnboardingSession: connect.NewClient[v1alpha1.CreatePaymentOnboardingSessionRequest, v1alpha1.CreatePaymentOnboardingSessionResponse](
 			httpClient,
 			baseURL+SellerAppServiceCreatePaymentOnboardingSessionProcedure,
@@ -461,6 +490,8 @@ type sellerAppServiceClient struct {
 	submitKYC                      *connect.Client[v1alpha1.SubmitKYCRequest, v1alpha1.SubmitKYCResponse]
 	cancelKYC                      *connect.Client[v1alpha1.CancelKYCRequest, v1alpha1.CancelKYCResponse]
 	getMyPaymentAccount            *connect.Client[v1alpha1.GetMyPaymentAccountRequest, v1alpha1.GetMyPaymentAccountResponse]
+	listMyEarnings                 *connect.Client[v1alpha1.ListMyEarningsRequest, v1alpha1.ListMyEarningsResponse]
+	getMyOrderEarnings             *connect.Client[v1alpha1.GetMyOrderEarningsRequest, v1alpha1.GetMyOrderEarningsResponse]
 	createPaymentOnboardingSession *connect.Client[v1alpha1.CreatePaymentOnboardingSessionRequest, v1alpha1.CreatePaymentOnboardingSessionResponse]
 	lookupBusinessRegistration     *connect.Client[v1alpha1.LookupBusinessRegistrationRequest, v1alpha1.LookupBusinessRegistrationResponse]
 	listMyMeasures                 *connect.Client[v1alpha1.ListMyMeasuresRequest, v1alpha1.ListMyMeasuresResponse]
@@ -548,6 +579,16 @@ func (c *sellerAppServiceClient) CancelKYC(ctx context.Context, req *connect.Req
 // GetMyPaymentAccount calls hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount.
 func (c *sellerAppServiceClient) GetMyPaymentAccount(ctx context.Context, req *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error) {
 	return c.getMyPaymentAccount.CallUnary(ctx, req)
+}
+
+// ListMyEarnings calls hawkr.seller.v1alpha1.SellerAppService.ListMyEarnings.
+func (c *sellerAppServiceClient) ListMyEarnings(ctx context.Context, req *connect.Request[v1alpha1.ListMyEarningsRequest]) (*connect.Response[v1alpha1.ListMyEarningsResponse], error) {
+	return c.listMyEarnings.CallUnary(ctx, req)
+}
+
+// GetMyOrderEarnings calls hawkr.seller.v1alpha1.SellerAppService.GetMyOrderEarnings.
+func (c *sellerAppServiceClient) GetMyOrderEarnings(ctx context.Context, req *connect.Request[v1alpha1.GetMyOrderEarningsRequest]) (*connect.Response[v1alpha1.GetMyOrderEarningsResponse], error) {
+	return c.getMyOrderEarnings.CallUnary(ctx, req)
 }
 
 // CreatePaymentOnboardingSession calls
@@ -678,6 +719,15 @@ type SellerAppServiceHandler interface {
 	// GetMyPaymentAccount 回傳呼叫者店家的收款帳戶：中立的狀態（PaymentAccountStatus）、撥款能力是否啟用、最近一次讀取的時間。
 	// 店家還沒有收款帳戶（平台審核還沒核准，或沒有設定收款開通）時回 not_found。
 	GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error)
+	// ListMyEarnings 列出呼叫者店家的入帳帳本，新到舊：平台轉給店家的款項（TRANSFER）、退款時收回的款項（REVERSAL，負數）與補差額（TOP_UP）。
+	// 一列對應一張訂單的一次轉入、收回或補差額，不含付款、退款本身與撥款到銀行（撥款由金流商處理，不在帳本內）。order_no 篩單一訂單
+	// （別家店的訂單編號沒有列，回空清單）；from_time（含）與 to_time（不含）篩列的記錄時間，任何一個不設就是不限。from_time 不早於 to_time 回 invalid_argument。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+	ListMyEarnings(context.Context, *connect.Request[v1alpha1.ListMyEarningsRequest]) (*connect.Response[v1alpha1.ListMyEarningsResponse], error)
+	// GetMyOrderEarnings 回傳呼叫者店家一張訂單的入帳列（新到舊，一張訂單的列數很少，不分頁）與已完成列的淨額，給訂單詳情頁。
+	// 訂單不是呼叫者店家的、或沒有付款，一律回 not_found（不洩漏存在與否）；訂單有付款但還沒有任何列時回空清單與淨額 0。
+	// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+	GetMyOrderEarnings(context.Context, *connect.Request[v1alpha1.GetMyOrderEarningsRequest]) (*connect.Response[v1alpha1.GetMyOrderEarningsResponse], error)
 	// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
 	// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
 	// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。
@@ -831,6 +881,20 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	sellerAppServiceListMyEarningsHandler := connect.NewUnaryHandler(
+		SellerAppServiceListMyEarningsProcedure,
+		svc.ListMyEarnings,
+		connect.WithSchema(sellerAppServiceMethods.ByName("ListMyEarnings")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	sellerAppServiceGetMyOrderEarningsHandler := connect.NewUnaryHandler(
+		SellerAppServiceGetMyOrderEarningsProcedure,
+		svc.GetMyOrderEarnings,
+		connect.WithSchema(sellerAppServiceMethods.ByName("GetMyOrderEarnings")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	sellerAppServiceCreatePaymentOnboardingSessionHandler := connect.NewUnaryHandler(
 		SellerAppServiceCreatePaymentOnboardingSessionProcedure,
 		svc.CreatePaymentOnboardingSession,
@@ -942,6 +1006,10 @@ func NewSellerAppServiceHandler(svc SellerAppServiceHandler, opts ...connect.Han
 			sellerAppServiceCancelKYCHandler.ServeHTTP(w, r)
 		case SellerAppServiceGetMyPaymentAccountProcedure:
 			sellerAppServiceGetMyPaymentAccountHandler.ServeHTTP(w, r)
+		case SellerAppServiceListMyEarningsProcedure:
+			sellerAppServiceListMyEarningsHandler.ServeHTTP(w, r)
+		case SellerAppServiceGetMyOrderEarningsProcedure:
+			sellerAppServiceGetMyOrderEarningsHandler.ServeHTTP(w, r)
 		case SellerAppServiceCreatePaymentOnboardingSessionProcedure:
 			sellerAppServiceCreatePaymentOnboardingSessionHandler.ServeHTTP(w, r)
 		case SellerAppServiceLookupBusinessRegistrationProcedure:
@@ -1033,6 +1101,14 @@ func (UnimplementedSellerAppServiceHandler) CancelKYC(context.Context, *connect.
 
 func (UnimplementedSellerAppServiceHandler) GetMyPaymentAccount(context.Context, *connect.Request[v1alpha1.GetMyPaymentAccountRequest]) (*connect.Response[v1alpha1.GetMyPaymentAccountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyPaymentAccount is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) ListMyEarnings(context.Context, *connect.Request[v1alpha1.ListMyEarningsRequest]) (*connect.Response[v1alpha1.ListMyEarningsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.ListMyEarnings is not implemented"))
+}
+
+func (UnimplementedSellerAppServiceHandler) GetMyOrderEarnings(context.Context, *connect.Request[v1alpha1.GetMyOrderEarningsRequest]) (*connect.Response[v1alpha1.GetMyOrderEarningsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.v1alpha1.SellerAppService.GetMyOrderEarnings is not implemented"))
 }
 
 func (UnimplementedSellerAppServiceHandler) CreatePaymentOnboardingSession(context.Context, *connect.Request[v1alpha1.CreatePaymentOnboardingSessionRequest]) (*connect.Response[v1alpha1.CreatePaymentOnboardingSessionResponse], error) {

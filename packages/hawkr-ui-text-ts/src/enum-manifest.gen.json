@@ -491,6 +491,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.payment.v1alpha1.EarningsEntryStatus",
+      "tsName": "EarningsEntryStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.EarningsEntryType",
+      "tsName": "EarningsEntryType",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
       "tsName": "EmbeddedOnboardingRuntime",
       "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",

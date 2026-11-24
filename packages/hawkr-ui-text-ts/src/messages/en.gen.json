@@ -145,6 +145,16 @@
     }
   },
   "payment": {
+    "EarningsEntryStatus": {
+      "EARNINGS_ENTRY_STATUS_COMPLETED": "Completed",
+      "EARNINGS_ENTRY_STATUS_FAILED": "Failed",
+      "EARNINGS_ENTRY_STATUS_PENDING": "Processing"
+    },
+    "EarningsEntryType": {
+      "EARNINGS_ENTRY_TYPE_REVERSAL": "Clawback",
+      "EARNINGS_ENTRY_TYPE_TOP_UP": "Top-up",
+      "EARNINGS_ENTRY_TYPE_TRANSFER": "Payout"
+    },
     "PaymentAccountStatus": {
       "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Setup needed",
       "PAYMENT_ACCOUNT_STATUS_DISABLED": "Unavailable",

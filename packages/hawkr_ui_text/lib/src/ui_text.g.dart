@@ -267,6 +267,40 @@ extension NotificationNotificationChannelUiText on hawkr_notification_v1alpha1_n
   String? uiText(UiLocale l) => _notificationNotificationChannel(l, value);
 }
 
+String? _paymentEarningsEntryStatus(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '處理中',
+(UiLocale.en, 1) => 'Processing',
+(UiLocale.zhTW, 2) => '已完成',
+(UiLocale.en, 2) => 'Completed',
+(UiLocale.zhTW, 3) => '失敗',
+(UiLocale.en, 3) => 'Failed',
+_ => null,
+};
+}
+
+extension PaymentEarningsEntryStatusUiText on hawkr_payment_v1alpha1_payment.EarningsEntryStatus {
+  /// payment.EarningsEntryStatus 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentEarningsEntryStatus(l, value);
+}
+
+String? _paymentEarningsEntryType(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '入帳',
+(UiLocale.en, 1) => 'Payout',
+(UiLocale.zhTW, 2) => '扣回',
+(UiLocale.en, 2) => 'Clawback',
+(UiLocale.zhTW, 3) => '補差額',
+(UiLocale.en, 3) => 'Top-up',
+_ => null,
+};
+}
+
+extension PaymentEarningsEntryTypeUiText on hawkr_payment_v1alpha1_payment.EarningsEntryType {
+  /// payment.EarningsEntryType 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentEarningsEntryType(l, value);
+}
+
 String? _paymentPaymentAccountStatus(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW, 1) => '準備中',
