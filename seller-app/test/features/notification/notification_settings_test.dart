@@ -66,8 +66,7 @@ void main() {
           ),
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
 
       final chatPush = find.byKey(
         ValueKey(
@@ -93,8 +92,7 @@ void main() {
       expect(locked(orderInbox), isTrue);
 
       await tester.tap(chatPush);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
       expect(updates.single.enabled, isFalse);
       expect(
         updates.single.channel,

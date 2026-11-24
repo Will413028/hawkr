@@ -15,9 +15,12 @@ void main() {
   late List<StreamController<WatchNotificationsResponse>> streams;
   late List<String> events;
 
+  late List<Duration> delays;
+
   NotificationSignalService make() {
     streams = [];
     events = [];
+    delays = [];
     return NotificationSignalService(
       open: () {
         final c = StreamController<WatchNotificationsResponse>();
@@ -29,7 +32,7 @@ void main() {
       ),
       onWorkspace: (c) => events.add('workspace:${c.name}'),
       onResync: () => events.add('resync'),
-      delay: (_) async {},
+      delay: (d) async => delays.add(d),
     );
   }
 
@@ -55,6 +58,7 @@ void main() {
       );
       await _settle();
       expect(events, [
+        'resync',
         'inbox:3:STATE_REFRESH_HINT_ORDER',
         'workspace:SELLER_WORKSPACE_CHANGE_AFTER_SALE',
       ]);
@@ -63,6 +67,7 @@ void main() {
       await _settle();
       expect(streams, hasLength(2), reason: '斷線後重連');
       expect(events.last, 'resync', reason: '重連後先全部重讀一次');
+      expect(events.where((e) => e == 'resync'), hasLength(2));
       service.stop();
     },
   );
@@ -83,5 +88,79 @@ void main() {
     await _settle();
     expect(streams.single.hasListener, isFalse);
     expect(streams, hasLength(1));
+  });
+
+  test('the first connect resyncs before any signal arrives', () async {
+    final service = make()..start();
+    await _settle();
+    expect(events, ['resync']);
+    service.stop();
+  });
+
+  test('repeated start keeps a single stream', () async {
+    final service = make()
+      ..start()
+      ..start();
+    await _settle();
+    service.start();
+    await _settle();
+    expect(streams, hasLength(1));
+    service.stop();
+  });
+
+  test('permission_denied stops the stream without reconnecting', () async {
+    final service = make()..start();
+    await _settle();
+    streams[0].addError(ConnectException(Code.permissionDenied, 'x'));
+    await _settle();
+    expect(streams, hasLength(1));
+    expect(service.isRunning, isFalse);
+    expect(delays, isEmpty);
+  });
+
+  test('not_found and resource_exhausted wait at least slowBackoff', () async {
+    final service = make()..start();
+    await _settle();
+    final codes = [Code.notFound, Code.resourceExhausted, Code.notFound];
+    for (var i = 0; i < codes.length; i++) {
+      streams[i].addError(ConnectException(codes[i], 'slow'));
+      await _settle();
+    }
+    expect(delays, hasLength(3));
+    for (final d in delays) {
+      expect(d, greaterThanOrEqualTo(const Duration(minutes: 1)));
+      expect(d, lessThan(const Duration(seconds: 75)));
+    }
+    service.stop();
+  });
+
+  test(
+    'other errors back off exponentially within [base, min(max, 2^n)]',
+    () async {
+      final service = make()..start();
+      await _settle();
+      for (var i = 0; i < 7; i++) {
+        streams[i].addError(ConnectException(Code.unavailable, 'drop'));
+        await _settle();
+      }
+      expect(delays, hasLength(7));
+      const ceilings = [1, 2, 4, 8, 16, 30, 30];
+      for (var i = 0; i < delays.length; i++) {
+        expect(delays[i], greaterThanOrEqualTo(const Duration(seconds: 1)));
+        expect(delays[i], lessThanOrEqualTo(Duration(seconds: ceilings[i])));
+      }
+      expect(delays[0], const Duration(seconds: 1));
+      service.stop();
+    },
+  );
+
+  test('a stream that ends without any signal counts as a failure', () async {
+    final service = make()..start();
+    await _settle();
+    await streams[0].close();
+    await _settle();
+    expect(delays, hasLength(1));
+    expect(streams, hasLength(2));
+    service.stop();
   });
 }

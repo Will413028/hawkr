@@ -3,83 +3,120 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app.dart';
 import '../../../core/router/app_router.dart';
-import '../../post/data/post_model.dart';
 
-/// 通知的深連結（伺服器在 `InboxItem.deep_link` 與推播的 `deep_link` 給）：App 內路徑加查詢參數，
-/// 例如 `/orders/matched/detail?orderSn=O123`。client 只把它對到現有路由，不依通知型別分支；
-/// 對不到路由或空字串＝沒有目的地，什麼都不做。
+/// 通知的深連結（`InboxItem.deep_link` 與推播 data 的 `deep_link`）是 website 的相對路徑，
+/// 格式與路徑表見 `backend/docs/plans/2026-11-23-a8-notification/deep-links.md`（D20）。
+/// 這個類別把賣家（STORE）受眾的路徑對到 App 的畫面：先去掉語系前綴 `/en`，再依第一段與段數對照；
+/// 空字串、外部連結（含 scheme、host、`//` 開頭）與不認得的路徑都落在收件匣。
 @immutable
 class NotificationDeepLink {
-  const NotificationDeepLink._(this.uri);
+  const NotificationDeepLink._(this._segments, this._rejected);
 
-  final Uri uri;
+  final List<String> _segments;
+  final bool _rejected;
 
-  static NotificationDeepLink? parse(String? link) {
-    if (link == null || link.isEmpty) return null;
+  /// 沒有目的地（空字串、null）。
+  static const empty = NotificationDeepLink._([], false);
+
+  static NotificationDeepLink parse(String? link) {
+    if (link == null || link.isEmpty) return empty;
+    if (!link.startsWith('/') || link.startsWith('//')) return _reject;
     final uri = Uri.tryParse(link);
-    if (uri == null || !uri.path.startsWith('/')) return null;
-    return NotificationDeepLink._(uri);
+    if (uri == null || uri.hasScheme || uri.hasAuthority) return _reject;
+    var segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    if (segments.isNotEmpty && segments.first == 'en') {
+      segments = segments.sublist(1);
+    }
+    return NotificationDeepLink._(segments, false);
   }
 
-  String? get _conversationId => uri.path == SettingsRoutes.chatThread
-      ? _nonEmpty(uri.queryParameters['conversationId'])
-      : null;
+  static const _reject = NotificationDeepLink._([], true);
 
-  /// 連結指向的聊天室；不是聊天室連結回 null。前景推播用它判斷使用者是否已在那個聊天室。
-  String? get chatConversationId => _conversationId;
+  /// 連結本身沒有目的地（空字串）。
+  bool get isEmpty => _segments.isEmpty && !_rejected;
 
-  /// 開啟目的地；回傳是否對到路由。
-  bool open() {
+  /// 會落在收件匣（空字串、被拒絕的外部連結、不認得的路徑）。從收件匣點項目時用它避免再開一個收件匣。
+  bool get opensInbox => _destination is _Inbox;
+
+  /// 連結指向的聊天室（`/seller-center/messages/{targetId}` 的 `targetId`）；不是聊天室連結回 null。
+  /// 前景推播用它判斷使用者是否已在那個聊天室。
+  String? get chatConversationId =>
+      _destination is _Chat ? (_destination as _Chat).id : null;
+
+  _Destination get _destination {
+    final s = _segments;
+    if (_rejected || s.isEmpty) return const _Inbox();
+    switch (s.first) {
+      case 'seller-center':
+        if (s.length == 3 && s[1] == 'messages') return _Chat(s[2]);
+        if (s.length == 3 && s[1] == 'orders') return _Order(s[2]);
+        if (s.length == 2 && s[1] == 'wallet') return const _Wallet();
+        if (s.length == 2 && s[1] == 'suspended') return const _Suspended();
+        return const _Inbox();
+      case 'seller':
+        if (s.length == 2 && s[1] == 'onboarding') return const _Kyc();
+        if (s.length >= 3 && s[1] == 'measures') {
+          final id = s[2];
+          if (s.length == 3) return _Measure(id, remediation: false);
+          if (s.length == 4 && s[3] == 'appeal') {
+            return _Measure(id, remediation: false);
+          }
+          if (s.length == 4 && s[3] == 'remediation') {
+            return _Measure(id, remediation: true);
+          }
+        }
+        if (s.length == 3 && s[1] == 'inquiries') return _Inquiry(s[2]);
+        return const _Inbox();
+      case 'sellers':
+        // 店家論壇串：App 沒有單串頁面，到論壇所在的店家頁籤。
+        if (s.length == 4 && s[2] == 'messages') return const _Forum();
+        return const _Inbox();
+      default:
+        return const _Inbox();
+    }
+  }
+
+  /// 開啟目的地。
+  void open() {
     final ctx = MyApp.navigatorKey.currentContext;
-    if (ctx == null) return false;
-    final q = uri.queryParameters;
-    switch (uri.path) {
-      case MainRoutes.dashboard:
-      case MainRoutes.orders:
-      case MainRoutes.wallet:
-      case MainRoutes.category:
-        ctx.go(uri.hasQuery ? uri.toString() : uri.path);
-      case OrderRoutes.matchedDetail:
-        final orderSn = _nonEmpty(q['orderSn']);
-        if (orderSn == null) return false;
-        _overShell(
-          ctx,
-          MainRoutes.orders,
-          (c) => c.push(OrderRoutes.matchedDetail, extra: {'orderSn': orderSn}),
-        );
-      case ToolRoutes.afterSalesDetail:
-        final caseNo = _nonEmpty(q['caseNo']);
-        if (caseNo == null) return false;
-        _overShell(
-          ctx,
-          MainRoutes.orders,
-          (c) => c.push(ToolRoutes.afterSalesDetail, extra: caseNo),
-        );
-      case SettingsRoutes.chatThread:
-        final id = _conversationId;
-        if (id == null) return false;
+    if (ctx == null) return;
+    switch (_destination) {
+      case _Chat(:final id):
         _overShell(
           ctx,
           MainRoutes.dashboard,
           (c) =>
               c.push(SettingsRoutes.chatThread, extra: {'conversationId': id}),
         );
-      case PostRoutes.feed:
+      case _Order(:final orderNo):
         _overShell(
           ctx,
-          MainRoutes.category,
-          (c) => c.push(
-            PostRoutes.feed,
-            extra: postFeedExtra(_nonEmpty(q['postId'])),
-          ),
+          MainRoutes.orders,
+          (c) => c.push(OrderRoutes.matchedDetail, extra: {'orderSn': orderNo}),
         );
-      case CustomerRoutes.subscribers:
-      case CustomerRoutes.customers:
-        ctx.push(uri.path);
-      default:
-        return false;
+      case _Wallet():
+        ctx.go(MainRoutes.wallet);
+      case _Suspended():
+        ctx.push(SellerRoutes.suspensionNotice);
+      case _Kyc():
+        ctx.push(SellerRoutes.certificationUpload);
+      case _Measure(:final id, :final remediation):
+        ctx.push(
+          remediation
+              ? SellerRoutes.measureRemediationFor(id)
+              : SellerRoutes.measureRequestFor(id),
+        );
+      case _Inquiry(:final id):
+        ctx.push(SellerRoutes.inquiryDetailFor(id));
+      case _Forum():
+        ctx.go(MainRoutes.category);
+      case _Inbox():
+        _overShell(
+          ctx,
+          MainRoutes.dashboard,
+          (c) => c.push(SettingsRoutes.notifications),
+        );
     }
-    return true;
   }
 
   // 先切 shell tab 保留底部導覽列，下一幀再疊子頁。
@@ -94,7 +131,49 @@ class NotificationDeepLink {
       if (next != null) push(next);
     });
   }
+}
 
-  static String? _nonEmpty(String? v) =>
-      (v == null || v.trim().isEmpty) ? null : v.trim();
+sealed class _Destination {
+  const _Destination();
+}
+
+class _Inbox extends _Destination {
+  const _Inbox();
+}
+
+class _Chat extends _Destination {
+  const _Chat(this.id);
+  final String id;
+}
+
+class _Order extends _Destination {
+  const _Order(this.orderNo);
+  final String orderNo;
+}
+
+class _Wallet extends _Destination {
+  const _Wallet();
+}
+
+class _Suspended extends _Destination {
+  const _Suspended();
+}
+
+class _Kyc extends _Destination {
+  const _Kyc();
+}
+
+class _Measure extends _Destination {
+  const _Measure(this.id, {required this.remediation});
+  final String id;
+  final bool remediation;
+}
+
+class _Inquiry extends _Destination {
+  const _Inquiry(this.id);
+  final String id;
+}
+
+class _Forum extends _Destination {
+  const _Forum();
 }

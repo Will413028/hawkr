@@ -5,77 +5,137 @@ import 'package:hawkr_seller/app.dart';
 import 'package:hawkr_seller/core/router/app_router.dart';
 import 'package:hawkr_seller/features/notification/data/deep_link.dart';
 
-/// 伺服器給的深連結（路徑加查詢參數）對到現有路由；空字串與對不到的連結不導航。
+/// 伺服器給的深連結是 website 路徑（`deep-links.md`），App 把 STORE 受眾的列對到自己的畫面；
+/// 語系前綴 `/en` 先去掉，空字串、外部連結與不認得的路徑落在收件匣。
 void main() {
-  Future<Map<String, Object?>> pump(WidgetTester tester, String link) async {
-    final seen = <String, Object?>{};
+  final extras = <String, Object?>{};
+
+  Future<void> open(WidgetTester tester, String? link) async {
+    extras.clear();
     GoRoute route(String path) => GoRoute(
       path: path,
       builder: (context, state) {
-        seen[path] = state.extra;
-        return Text('page:$path');
+        extras[state.uri.toString()] = state.extra;
+        return Text('page:${state.uri}');
       },
     );
     final router = GoRouter(
       navigatorKey: MyApp.navigatorKey,
       routes: [
         GoRoute(path: '/', builder: (_, _) => const Text('home')),
-        route(MainRoutes.orders),
         route(MainRoutes.dashboard),
+        route(MainRoutes.orders),
+        route(MainRoutes.wallet),
         route(MainRoutes.category),
         route(OrderRoutes.matchedDetail),
-        route(ToolRoutes.afterSalesDetail),
         route(SettingsRoutes.chatThread),
-        route(PostRoutes.feed),
+        route(SettingsRoutes.notifications),
+        route(SellerRoutes.suspensionNotice),
+        route(SellerRoutes.certificationUpload),
+        route(SellerRoutes.measureRequest),
+        route(SellerRoutes.inquiryDetail),
       ],
     );
     addTearDown(router.dispose);
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-    NotificationDeepLink.parse(link)?.open();
+    NotificationDeepLink.parse(link).open();
     await tester.pumpAndSettle();
-    return seen;
   }
 
-  testWidgets('訂單詳情帶 orderSn', (tester) async {
-    final seen = await pump(tester, '/orders/matched/detail?orderSn=O1');
-    expect(seen[OrderRoutes.matchedDetail], {'orderSn': 'O1'});
-  });
+  // 路徑（不含語系前綴）→ 最上層頁面的 location。
+  final storeRows = <String, String>{
+    '/seller-center/messages/7': SettingsRoutes.chatThread,
+    '/seller-center/orders/O1': OrderRoutes.matchedDetail,
+    '/seller-center/wallet': MainRoutes.wallet,
+    '/seller-center/suspended': SellerRoutes.suspensionNotice,
+    '/seller/onboarding': SellerRoutes.certificationUpload,
+    '/seller/measures/M1': '/seller/measures/M1',
+    '/seller/measures/M1/appeal': '/seller/measures/M1',
+    '/seller/measures/M1/remediation': '/seller/measures/M1?mode=remediation',
+    '/seller/inquiries/I1': '/seller/inquiries/I1',
+    '/sellers/S1/messages/T1': MainRoutes.category,
+    '/seller-center/notifications': SettingsRoutes.notifications,
+  };
 
-  testWidgets('售後詳情帶 caseNo', (tester) async {
-    final seen = await pump(tester, '/after-sales/detail?caseNo=C9');
-    expect(seen[ToolRoutes.afterSalesDetail], 'C9');
-  });
-
-  testWidgets('聊天室帶 conversationId', (tester) async {
-    final seen = await pump(tester, '/chat/thread?conversationId=7');
-    expect(seen[SettingsRoutes.chatThread], {'conversationId': '7'});
-  });
-
-  testWidgets('貼文動態帶 postId，缺值時沒有 extra', (tester) async {
-    final seen = await pump(tester, '/post/feed?postId=2690000000000002');
-    expect(seen[PostRoutes.feed], {'postId': 2690000000000002});
-    final none = await pump(tester, '/post/feed');
-    expect(none[PostRoutes.feed], isNull);
-  });
-
-  testWidgets('缺必要參數、對不到路由或空字串都不導航', (tester) async {
-    for (final link in ['/orders/matched/detail', '/unknown/page', '']) {
-      final seen = await pump(tester, link);
-      expect(seen, isEmpty, reason: link);
-      expect(find.text('home'), findsOneWidget, reason: link);
+  for (final prefix in ['', '/en']) {
+    for (final row in storeRows.entries) {
+      testWidgets('$prefix${row.key} opens ${row.value}', (tester) async {
+        await open(tester, '$prefix${row.key}');
+        expect(find.text('page:${row.value}'), findsOneWidget);
+      });
     }
+  }
+
+  testWidgets('order and chat load by the id in the path', (tester) async {
+    await open(tester, '/en/seller-center/orders/O1');
+    expect(extras[OrderRoutes.matchedDetail], {'orderSn': 'O1'});
+    await open(tester, '/seller-center/messages/7');
+    expect(extras[SettingsRoutes.chatThread], {'conversationId': '7'});
   });
 
-  test('聊天室連結可取出 conversationId，其他連結不行', () {
+  for (final link in [
+    '/account/orders/O1',
+    '/sellers/S1/reviews',
+    '/seller/measures',
+    '/seller-center/orders',
+    '/unknown/page',
+    '/',
+    '/en',
+    '',
+    null,
+  ]) {
+    testWidgets('unknown or empty "$link" opens the inbox', (tester) async {
+      await open(tester, link);
+      expect(find.text('page:${SettingsRoutes.notifications}'), findsOneWidget);
+    });
+  }
+
+  for (final link in [
+    'https://evil.example/seller-center/wallet',
+    '//evil.example/seller-center/wallet',
+    'javascript:alert(1)',
+    'seller-center/wallet',
+  ]) {
+    testWidgets('external or malformed "$link" is rejected to the inbox', (
+      tester,
+    ) async {
+      await open(tester, link);
+      expect(find.text('page:${SettingsRoutes.notifications}'), findsOneWidget);
+      expect(find.text('page:${MainRoutes.wallet}'), findsNothing);
+    });
+  }
+
+  test('only the seller chat path yields a conversation id', () {
     expect(
       NotificationDeepLink.parse(
-        '/chat/thread?conversationId=7',
-      )?.chatConversationId,
+        '/seller-center/messages/7',
+      ).chatConversationId,
       '7',
     );
     expect(
-      NotificationDeepLink.parse('/main/orders')?.chatConversationId,
+      NotificationDeepLink.parse(
+        '/en/seller-center/messages/7',
+      ).chatConversationId,
+      '7',
+    );
+    expect(
+      NotificationDeepLink.parse('/account/messages/7').chatConversationId,
       isNull,
+    );
+    expect(
+      NotificationDeepLink.parse('/seller-center/wallet').chatConversationId,
+      isNull,
+    );
+  });
+
+  test('inbox-bound links are flagged so the inbox does not reopen itself', () {
+    expect(NotificationDeepLink.parse('').opensInbox, isTrue);
+    expect(NotificationDeepLink.parse('').isEmpty, isTrue);
+    expect(NotificationDeepLink.parse('https://x.example/').opensInbox, isTrue);
+    expect(NotificationDeepLink.parse('https://x.example/').isEmpty, isFalse);
+    expect(
+      NotificationDeepLink.parse('/seller-center/wallet').opensInbox,
+      isFalse,
     );
   });
 }

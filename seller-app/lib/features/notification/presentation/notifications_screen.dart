@@ -195,8 +195,9 @@ class NotificationsScreen extends HookConsumerWidget {
           .read(notificationListControllerProvider.notifier)
           .markAsRead(notification.id);
     }
-    // 目的地由伺服器給；空字串或對不到路由就不導航（跳到猜的頁面比不跳更糟）。
-    NotificationDeepLink.parse(notification.deepLink)?.open();
+    // 目的地由伺服器給；已經在收件匣，所以空字串與落在收件匣的連結不導航。
+    final link = NotificationDeepLink.parse(notification.deepLink);
+    if (!link.opensInbox) link.open();
   }
 
   Widget _buildErrorState(BuildContext context, WidgetRef ref, Object error) {

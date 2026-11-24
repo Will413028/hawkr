@@ -18,6 +18,9 @@ import '../../../../shared/utils/secret_redaction.dart';
 import '../../../../shared/widgets/fcm_debug_overlay.dart';
 import '../../../chat/data/active_chat_gate.dart';
 import '../deep_link.dart';
+import '../../../dashboard/data/dashboard_notification_unread_provider.dart';
+import '../../presentation/notification_controller.dart';
+import '../state_refresh.dart';
 import '../../presentation/notification_banner.dart';
 import 'apns_token_wait.dart';
 import 'device_registrar.dart';
@@ -296,6 +299,17 @@ class PushNotificationManager {
 
   /// 前台訊息處理：顯示 Overlay Banner。文字、圖片與深連結都是伺服器給的；沒有 `notification` 欄位的訊息不顯示。
   void _handleForegroundMessage(RemoteMessage message) {
+    // 串流不通時前景推播是唯一的訊號：先依 `state_refresh_hints` 重讀（和串流同一份對照），不論要不要顯示 banner。
+    final container = _container;
+    if (container != null) {
+      container
+          .read(stateRefreshActionsProvider)
+          .applyInbox(
+            parseStateRefreshHints(
+              message.data['state_refresh_hints']?.toString(),
+            ),
+          );
+    }
     final notification = message.notification;
     if (notification == null) return;
     final title = notification.title ?? '';
@@ -307,7 +321,7 @@ class PushNotificationManager {
     );
 
     // 使用者已經在那個聊天室裡：不再彈前景 banner，避免雙重通知。
-    final conversationId = link?.chatConversationId;
+    final conversationId = link.chatConversationId;
     if (conversationId != null &&
         _container?.read(activeChatGateProvider).conversationId ==
             conversationId) {
@@ -320,6 +334,23 @@ class PushNotificationManager {
       body: body,
       imageUrl: notification.apple?.imageUrl,
       link: link,
+      inboxItemId: message.data['inbox_item_id']?.toString(),
+    );
+  }
+
+  /// 點擊推播：把對應的收件匣項目標為已讀（`inbox_item_id`）；失敗由 `markAsRead` 吞掉，不影響導航。
+  void _markInboxItemRead(String? inboxItemId) {
+    final container = _container;
+    if (container == null || inboxItemId == null || inboxItemId.isEmpty) {
+      return;
+    }
+    unawaited(
+      container
+          .read(notificationListControllerProvider.notifier)
+          .markAsRead(inboxItemId)
+          .then(
+            (_) => container.invalidate(dashboardNotificationUnreadProvider),
+          ),
     );
   }
 
@@ -331,7 +362,8 @@ class PushNotificationManager {
       _showTestDialog(message);
       return;
     }
-    NotificationDeepLink.parse(message.data['deep_link']?.toString())?.open();
+    _markInboxItemRead(message.data['inbox_item_id']?.toString());
+    NotificationDeepLink.parse(message.data['deep_link']?.toString()).open();
   }
 
   // ── Overlay Banner ────────────────────────────────────────
@@ -340,7 +372,8 @@ class PushNotificationManager {
   void _showBanner({
     required String title,
     required String body,
-    required NotificationDeepLink? link,
+    required NotificationDeepLink link,
+    String? inboxItemId,
     String? imageUrl,
   }) {
     final overlay = MyApp.navigatorKey.currentState?.overlay;
@@ -367,7 +400,8 @@ class PushNotificationManager {
         imageUrl: imageUrl,
         onTap: () {
           removeSafely();
-          link?.open();
+          _markInboxItemRead(inboxItemId);
+          link.open();
         },
         onClose: removeSafely,
       ),

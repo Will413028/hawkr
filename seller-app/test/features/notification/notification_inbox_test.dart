@@ -19,7 +19,7 @@ InboxItem _item(String id, String title, String body, {bool read = false}) =>
       presentation: InboxPresentation.INBOX_PRESENTATION_ORDER,
       title: title,
       body: body,
-      deepLink: '/orders/matched/detail?orderSn=O1',
+      deepLink: '/seller-center/orders/O1',
       read: read,
       createTime: Timestamp.fromDateTime(DateTime.now().toUtc()),
     );
@@ -62,8 +62,7 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpAndSettle();
 
     expect(find.text('SERVER-TITLE'), findsOneWidget);
     // 伺服器文字不被 client 改寫（舊版把「買家」換成買家名）。
