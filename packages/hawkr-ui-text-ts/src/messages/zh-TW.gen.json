@@ -110,6 +110,30 @@
       "REPORT_TARGET_KIND_REVIEW_REPLY": "評價回覆"
     }
   },
+  "notification": {
+    "NotificationCategory": {
+      "NOTIFICATION_CATEGORY_ACCOUNT": "帳號與治理",
+      "NOTIFICATION_CATEGORY_AFTERSALES": "退款與售後",
+      "NOTIFICATION_CATEGORY_ANNOUNCEMENT": "系統公告",
+      "NOTIFICATION_CATEGORY_CHAT": "聊天",
+      "NOTIFICATION_CATEGORY_COMMENT": "留言",
+      "NOTIFICATION_CATEGORY_COUPON": "優惠券",
+      "NOTIFICATION_CATEGORY_FOLLOW": "新的追蹤者",
+      "NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST": "追蹤的店家發文",
+      "NOTIFICATION_CATEGORY_LIKE": "讚",
+      "NOTIFICATION_CATEGORY_ORDER": "訂單",
+      "NOTIFICATION_CATEGORY_PAYOUT": "撥款",
+      "NOTIFICATION_CATEGORY_RESTOCK": "補貨通知",
+      "NOTIFICATION_CATEGORY_REVIEW": "評價",
+      "NOTIFICATION_CATEGORY_SHIPMENT": "出貨",
+      "NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": "配送異常"
+    },
+    "NotificationChannel": {
+      "NOTIFICATION_CHANNEL_EMAIL": "Email",
+      "NOTIFICATION_CHANNEL_INBOX": "收件匣",
+      "NOTIFICATION_CHANNEL_PUSH": "推播"
+    }
+  },
   "payment": {
     "PaymentAccountStatus": {
       "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "待設定",

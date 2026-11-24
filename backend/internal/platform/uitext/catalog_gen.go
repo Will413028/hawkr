@@ -407,6 +407,102 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 	return "", false
 }
 
+// NotificationNotificationCategory 是 notification.NotificationCategory 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) NotificationNotificationCategory(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "ORDER":
+			return "Orders", true
+		case "SHIPMENT":
+			return "Shipping", true
+		case "SHIPMENT_ANOMALY":
+			return "Delivery issues", true
+		case "AFTERSALES":
+			return "Refunds and after-sales", true
+		case "PAYOUT":
+			return "Payouts", true
+		case "ACCOUNT":
+			return "Account and policy", true
+		case "CHAT":
+			return "Chat", true
+		case "REVIEW":
+			return "Reviews", true
+		case "COMMENT":
+			return "Comments", true
+		case "LIKE":
+			return "Likes", true
+		case "FOLLOW":
+			return "New followers", true
+		case "FOLLOWED_STORE_POST":
+			return "Posts from stores you follow", true
+		case "COUPON":
+			return "Coupons", true
+		case "RESTOCK":
+			return "Back in stock", true
+		case "ANNOUNCEMENT":
+			return "Announcements", true
+		}
+	}
+	switch v {
+	case "ORDER":
+		return "訂單", true
+	case "SHIPMENT":
+		return "出貨", true
+	case "SHIPMENT_ANOMALY":
+		return "配送異常", true
+	case "AFTERSALES":
+		return "退款與售後", true
+	case "PAYOUT":
+		return "撥款", true
+	case "ACCOUNT":
+		return "帳號與治理", true
+	case "CHAT":
+		return "聊天", true
+	case "REVIEW":
+		return "評價", true
+	case "COMMENT":
+		return "留言", true
+	case "LIKE":
+		return "讚", true
+	case "FOLLOW":
+		return "新的追蹤者", true
+	case "FOLLOWED_STORE_POST":
+		return "追蹤的店家發文", true
+	case "COUPON":
+		return "優惠券", true
+	case "RESTOCK":
+		return "補貨通知", true
+	case "ANNOUNCEMENT":
+		return "系統公告", true
+	}
+	return "", false
+}
+
+// NotificationNotificationChannel 是 notification.NotificationChannel 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) NotificationNotificationChannel(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "INBOX":
+			return "Inbox", true
+		case "PUSH":
+			return "Push", true
+		case "EMAIL":
+			return "Email", true
+		}
+	}
+	switch v {
+	case "INBOX":
+		return "收件匣", true
+	case "PUSH":
+		return "推播", true
+	case "EMAIL":
+		return "Email", true
+	}
+	return "", false
+}
+
 // PaymentPaymentAccountStatus 是 payment.PaymentAccountStatus 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {

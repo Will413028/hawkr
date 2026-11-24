@@ -10,6 +10,7 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart'
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart' as hawkr_notification_v1alpha1_notification;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
@@ -183,6 +184,63 @@ _ => null,
 extension ModerationReportTargetKindUiText on hawkr_moderation_v1alpha1_moderation.ReportTargetKind {
   /// moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
   String? uiText(UiLocale l) => _moderationReportTargetKind(l, value);
+}
+
+String? _notificationNotificationCategory(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '訂單',
+(UiLocale.en, 1) => 'Orders',
+(UiLocale.zhTW, 2) => '出貨',
+(UiLocale.en, 2) => 'Shipping',
+(UiLocale.zhTW, 3) => '配送異常',
+(UiLocale.en, 3) => 'Delivery issues',
+(UiLocale.zhTW, 4) => '退款與售後',
+(UiLocale.en, 4) => 'Refunds and after-sales',
+(UiLocale.zhTW, 5) => '撥款',
+(UiLocale.en, 5) => 'Payouts',
+(UiLocale.zhTW, 6) => '帳號與治理',
+(UiLocale.en, 6) => 'Account and policy',
+(UiLocale.zhTW, 7) => '聊天',
+(UiLocale.en, 7) => 'Chat',
+(UiLocale.zhTW, 8) => '評價',
+(UiLocale.en, 8) => 'Reviews',
+(UiLocale.zhTW, 9) => '留言',
+(UiLocale.en, 9) => 'Comments',
+(UiLocale.zhTW, 10) => '讚',
+(UiLocale.en, 10) => 'Likes',
+(UiLocale.zhTW, 11) => '新的追蹤者',
+(UiLocale.en, 11) => 'New followers',
+(UiLocale.zhTW, 12) => '追蹤的店家發文',
+(UiLocale.en, 12) => 'Posts from stores you follow',
+(UiLocale.zhTW, 13) => '優惠券',
+(UiLocale.en, 13) => 'Coupons',
+(UiLocale.zhTW, 14) => '補貨通知',
+(UiLocale.en, 14) => 'Back in stock',
+(UiLocale.zhTW, 15) => '系統公告',
+(UiLocale.en, 15) => 'Announcements',
+_ => null,
+};
+}
+
+extension NotificationNotificationCategoryUiText on hawkr_notification_v1alpha1_notification.NotificationCategory {
+  /// notification.NotificationCategory 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _notificationNotificationCategory(l, value);
+}
+
+String? _notificationNotificationChannel(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '收件匣',
+(UiLocale.en, 1) => 'Inbox',
+(UiLocale.zhTW, 2) => '推播',
+(UiLocale.en, 2) => 'Push',
+(UiLocale.zhTW || UiLocale.en, 3) => 'Email',
+_ => null,
+};
+}
+
+extension NotificationNotificationChannelUiText on hawkr_notification_v1alpha1_notification.NotificationChannel {
+  /// notification.NotificationChannel 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _notificationNotificationChannel(l, value);
 }
 
 String? _paymentPaymentAccountStatus(UiLocale l, int value) {

@@ -417,14 +417,14 @@
       "name": "hawkr.notification.v1alpha1.NotificationCategory",
       "tsName": "NotificationCategory",
       "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.notification.v1alpha1.NotificationChannel",
       "tsName": "NotificationChannel",
       "tsModule": "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
