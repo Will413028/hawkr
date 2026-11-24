@@ -32,7 +32,7 @@ public class AfterSalesGrpcClient {
      * <p><b>為什麼非有不可</b>：{@code GrpcStubFactory} / {@code GrpcChannelRegistry}
      * （observability-common）全域<b>零</b> deadline，Java {@code ManagedChannelBuilder} 也沒有
      * 預設 keepalive ⇒ 下游若是「掛住」而非「失敗」，blocking stub <b>永不返回</b>。
-     * {@link #hasActiveCase} 由 {@code AutoCompleteScheduler} 逐筆呼叫，而 Spring Boot 的
+     * {@link #hasActiveCase} 由 {@code OrderCountdownService} 呼叫，而 Spring Boot 的
      * {@code spring.task.scheduling.pool.size} 預設是 <b>1</b> ⇒ 一次掛住就讓 order-service 的
      * <b>所有</b>排程停擺且永不恢復。
      *
@@ -46,7 +46,7 @@ public class AfterSalesGrpcClient {
      * <p>取 10 秒而非 {@link #PAYOUT_HOLD_DEADLINE_SEC} 的 5 秒：後者的值被
      * {@code GrantPaymentWorkerPayoutHoldTest.leaseCoversBothExternalCallDeadlines} 綁進租約
      * 下界的不等式，語意專屬於撥款資格反查，不應被無關呼叫點共用。這三支都不在任何租約窗口內
-     * （{@code AutoCompleteScheduler} 無 claim／lease；另兩支走使用者同步路徑）。
+     * （三支都沒有 claim／lease）。
      *
      * <p>deadline 加在<b>呼叫點</b>而非 {@code GrpcStubFactory}（共用元件，動它會一次改掉全 repo
      * 所有 Java gRPC 呼叫的逾時語意）。⚠️ {@code withDeadlineAfter} 換算<b>絕對</b>時間，

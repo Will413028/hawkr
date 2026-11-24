@@ -55,7 +55,6 @@ final class OrderServiceTestHarness {
                 mock(OrderCreationTxHandler.class),
                 mock(OrderOutboxMapper.class),
                 new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
-                new io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard(),
                 couponReleaseService,
                 new SimpleMeterRegistry()
         );
@@ -92,7 +91,6 @@ final class OrderServiceTestHarness {
                 mock(OrderCreationTxHandler.class),
                 mock(OrderOutboxMapper.class),
                 new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
-                new io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard(),
                 mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new SimpleMeterRegistry()
         );
@@ -169,7 +167,6 @@ final class OrderServiceTestHarness {
                 mock(OrderCreationTxHandler.class),
                 orderOutboxMapper,
                 new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
-                new io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard(),
                 mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new SimpleMeterRegistry()
         );

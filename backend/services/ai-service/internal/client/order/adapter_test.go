@@ -58,7 +58,6 @@ func (f *fakeOrderServiceClient) GetSellerOrderDetail(_ context.Context, in *ord
 			TotalActualAmount: "1000",
 			BuyerId:           "99",
 			ShipmentNo:        "SHIP123",
-			ShippingStatus:    "pending",
 		},
 	}, nil
 }

@@ -8,7 +8,6 @@ import io.github.will413028.hawkr.common.utils.code.OrderEventType;
 import io.github.will413028.hawkr.common.utils.code.SellerWorkspaceEventType;
 import io.github.will413028.hawkr.order.mq.dto.PayoutCompletedPayload;
 import io.github.will413028.hawkr.order.mq.dto.OrderPaidPayload;
-import io.github.will413028.hawkr.order.mq.dto.OrderShipmentBackstopPayload;
 import io.github.will413028.hawkr.order.mq.dto.SellerOrderUpdatedPayload;
 import io.github.will413028.hawkr.order.repository.OrderRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,15 +19,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * 訂單事件 MQ 發布者
  *
  * 發布事件：
- * 1. order.paid              — 付款成功（觸發 Shipping Service 自動建單；改走 order_outbox 可靠投遞）
+ * 1. order.paid              — 付款成功（改走 order_outbox 可靠投遞）
  * 2. payout.completed        — 撥款完成（#1286）
- * 3. order.shipment.create_requested / creation_failed — 建單兜底（03 §8.11）
- * 4. seller.order.updated    — 賣家工作區 realtime（41 §四之二）
+ * 3. seller.order.updated    — 賣家工作區 realtime（41 §四之二）
  *
  * 已改走 order_outbox（例外 A）而本類不再持有對應方法者：
  * order.cancelled（#1368，OrderService.insertCancelledOutbox）、
  * order.completed / order.receipt.confirmed（issue #2294 B8，OrderCompletionTxHandler）、
- * order.delivered（ShippingEventConsumer.deliveredInTx）、
+ * order.delivered（無寫入端，B8 出貨設計重建）、
  * order.sales.accumulated（PaymentEventHandler.handlePendingPaymentOrder）——見下方移除註記。
  */
 @Component
@@ -46,7 +44,7 @@ public class OrderEventPublisher {
     }
 
     /**
-     * 發布訂單付款成功事件（觸發 Shipping Service 自動建單）
+     * 發布訂單付款成功事件
      */
     public void publishOrderPaid(OrderPaidPayload payload) {
         publish(MqConstants.EXCHANGE_ORDER,
@@ -80,40 +78,17 @@ public class OrderEventPublisher {
 
     // order.delivered / order.sales.accumulated 的 best-effort 直發已移除（副作用失敗無訊號修復）：
     // 兩者改走**例外 A**（狀態變更同事務落 order_outbox）——
-    //   order.delivered        → ShippingEventConsumer.deliveredInTx + OrderOutboxPublisher.enrichDelivered
+    //   order.delivered        → OrderOutboxPublisher.enrichDelivered（寫入端隨 Java shipping 刪除，B8 重建）
     //   order.sales.accumulated→ PaymentEventHandler.handlePendingPaymentOrder（與 order.paid 同一事務）
     // 移除當下全 repo 零生產呼叫端。
     // ⚠️ 不要「為了對稱」把它們加回來：本類的 publish 吞掉所有例外（見本檔最下方），
     //    而這兩個事件的前置狀態轉換都是永久的（DELIVERED 的 allowed-from 不含自己、
     //    sales.accumulated 由 payment dedup 表擋住重投）——走回這條路就是永久遺失。
 
-    /**
-     * 發布重試建單事件（Backstop：付款後逾期仍無物流單，請 Shipping 冪等重建，03 §8.11）
-     */
-    public void publishShipmentCreateRequested(String orderNo) {
-        publish(MqConstants.EXCHANGE_ORDER,
-                MqConstants.ROUTING_KEY_ORDER_SHIPMENT_CREATE_REQUESTED,
-                new OrderShipmentBackstopPayload(orderNo),
-                OrderEventType.ORDER_SHIPMENT_CREATE_REQUESTED.value(),
-                orderNo);
-    }
-
-    /**
-     * 發布建單逾時取消事件（Backstop：重試上限仍無物流單，請 AfterSales 系統取消+退款，03 §8.11）
-     */
-    public void publishShipmentCreationFailed(String orderNo) {
-        publish(MqConstants.EXCHANGE_ORDER,
-                MqConstants.ROUTING_KEY_ORDER_SHIPMENT_CREATION_FAILED,
-                new OrderShipmentBackstopPayload(orderNo),
-                OrderEventType.ORDER_SHIPMENT_CREATION_FAILED.value(),
-                orderNo);
-    }
-
     // ==================== Seller Workspace realtime（[B-207] #1181） ====================
 
     /** seller.order.updated 事件來源（seller workspace SSE，41 §4b.5 source 欄位） */
     public static final String SRC_PAYUNI_WEBHOOK = "payuni_webhook";
-    public static final String SRC_SHIPPING_WEBHOOK = "shipping_webhook";
     public static final String SRC_AFTER_SALE = "after_sale";
     public static final String SRC_SYSTEM = "system";
 

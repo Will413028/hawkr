@@ -27,16 +27,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class CheckoutServiceSelfPurchaseTest {
 
-    // ResolvedItem field order (CheckoutValidator.java:260-277): skuId, skuName,
-    // quantity, unitPrice, listPrice, stockQty, lengthCm, widthCm, heightCm,
-    // weightGram, storeId, productId, productName, shippingOptions,
-    // imageObjectKey, isActive — storeId is position 11, NOT 6
-    // (verify against the record before reusing this helper elsewhere).
+    // ResolvedItem field order: skuId, skuName, quantity, unitPrice, listPrice, stockQty,
+    // storeId, productId, productName, shippingOptions, imageObjectKey, isActive
+    // — storeId is position 7 (verify against the record before reusing this helper elsewhere).
     private ResolvedItem item(long skuId, long storeId) {
         return new ResolvedItem(
                 skuId, "sku-" + skuId, 1, 100L, 100L, 999L,
-                10, 10, 10, 1000L, storeId, "p-" + skuId, "product-" + skuId,
-                List.of(new SkuShippingOption("3001", "3201", 0L, "3102")),
+                storeId, "p-" + skuId, "product-" + skuId,
+                List.of(new SkuShippingOption("3201")),
                 "img", true);
     }
 
@@ -190,6 +188,6 @@ class CheckoutServiceSelfPurchaseTest {
     }
 
     private CheckoutService newService(SellerGrpcClient sellerGrpcClient, BuyerGrpcClient buyerGrpcClient) {
-        return new CheckoutService(null, sellerGrpcClient, buyerGrpcClient, null, null, null, null, null, new OrderPolicyResolver(), null, null);
+        return new CheckoutService(null, sellerGrpcClient, buyerGrpcClient, null, null, null, null, new OrderPolicyResolver(), null, null);
     }
 }

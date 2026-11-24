@@ -74,7 +74,6 @@ type fixtureDetail struct {
 	Status         string
 	SellerName     string
 	ShippingMethod string
-	ShippingStatus string
 	RecipientName  string
 	PaymentMethod  string
 	Amount         int64
@@ -262,7 +261,7 @@ func (f fixture) orders() *fakeOrders {
 	for k, d := range f.Backend.Details {
 		d.Status = remap(d.Status)
 		o.details[k] = buyeragent.OrderDetail{
-			OrderNo: d.OrderNo, Status: d.Status, SellerName: d.SellerName, ShippingMethod: d.ShippingMethod, ShippingStatus: d.ShippingStatus,
+			OrderNo: d.OrderNo, Status: d.Status, SellerName: d.SellerName, ShippingMethod: d.ShippingMethod,
 			RecipientName: d.RecipientName, PaymentMethod: d.PaymentMethod, Amount: d.Amount, CreateTime: time.UnixMilli(d.CreateTimeMs), ShippingFee: d.ShippingFee,
 		}
 	}

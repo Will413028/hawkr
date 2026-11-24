@@ -28,7 +28,6 @@ type BuyerOrderDetail struct {
 	Status         string
 	SellerName     string
 	ShippingMethod string
-	ShippingStatus string
 	RecipientName  string
 	PaymentMethod  string
 	Amount         int64
@@ -154,8 +153,8 @@ func (c *Client) BuyerOrderDetail(ctx context.Context, buyerID int64, orderNo st
 	}
 	return BuyerOrderDetail{
 		OrderNo: d.GetOrderNo(), Status: d.GetStatus(), SellerName: d.GetSellerName(),
-		ShippingMethod: d.GetShippingMethod(), ShippingStatus: d.GetShippingStatus(),
-		RecipientName: d.GetRecipientName(), PaymentMethod: d.GetPaymentMethod(),
+		ShippingMethod: d.GetShippingMethod(),
+		RecipientName:  d.GetRecipientName(), PaymentMethod: d.GetPaymentMethod(),
 		Amount: amount, CreateTime: created, ShippingFee: fee,
 	}, nil
 }

@@ -1,7 +1,6 @@
 package io.github.will413028.hawkr.order.service;
 
 import io.github.will413028.hawkr.common.utils.TsidUtil;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.order.checkout.InvoiceIntakeResolver;
 import io.github.will413028.hawkr.order.checkout.OrderPolicyResolver;
 import io.github.will413028.hawkr.order.checkout.OrderPolicySnapshot;
@@ -72,41 +71,24 @@ class OrderPolicyPersistenceOnCreationPathsTest {
     @Test
     @DisplayName("結帳路徑（createOrderInTxExtended）：五欄全部設在送進 insert 的那個 entity 上")
     void checkoutPathWritesAllSixPolicyColumns() {
-        OrderPolicySnapshot policy =
-                new OrderPolicyResolver().resolve(ShippingMethod.TAQBIN.value());
+        OrderPolicySnapshot policy = new OrderPolicyResolver().resolve();
 
         handler.createOrderInTxExtended(
-                100L, 2001L, items(), 1000L, 1060L, "STX1", "CHK1",
-                "3201", ShippingMethod.TAQBIN.value(), 60L, "BUYER",
+                100L, 2001L, items(), 1000L, 1000L, "STX1", "CHK1",
+                "3201", 0L,
                 "王小明", "0912345678", "台北市中正區忠孝東路一段 1 號", "",
-                "", "", "", "TAIPEI", "台北市", "中正區",
-                0, "HAWK2001", 0L, InvoiceIntakeResolver.defaultSnapshot(), policy);
+                "", "HAWK2001", 0L, InvoiceIntakeResolver.defaultSnapshot(), policy);
 
-        assertSixColumns(capturedOrder(), "PLATFORM_LOGISTICS");
+        assertSixColumns(capturedOrder(), "SELLER_MANAGED");
     }
 
     @Test
     @DisplayName("gRPC CreateOrder 路徑（createOrderInTx）：同樣五欄——只修結帳那一條等於修一半")
     void legacyGrpcPathWritesAllSixPolicyColumns() {
-        OrderPolicySnapshot policy =
-                new OrderPolicyResolver().resolve(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
+        OrderPolicySnapshot policy = new OrderPolicyResolver().resolve();
 
         handler.createOrderInTx(100L, 2001L, items(), 1000L, 1000L,
-                "STX2", "CHK2", "3201", ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value(),
-                0L, "BUYER", policy);
-
-        assertSixColumns(capturedOrder(), "PLATFORM_LOGISTICS");
-    }
-
-    @Test
-    @DisplayName("陰性對照：3005 商家自送寫 SELLER_MANAGED——證明本檔讀得到差異，不是恆等斷言")
-    void merchantDeliveryWritesSellerManaged() {
-        OrderPolicySnapshot policy =
-                new OrderPolicyResolver().resolve(ShippingMethod.MERCHANT_DELIVERY.value());
-
-        handler.createOrderInTx(100L, 2001L, items(), 1000L, 1000L,
-                "STX3", "CHK3", "3201", ShippingMethod.MERCHANT_DELIVERY.value(),
-                0L, "BUYER", policy);
+                "STX2", "CHK2", "3201", policy);
 
         assertSixColumns(capturedOrder(), "SELLER_MANAGED");
     }

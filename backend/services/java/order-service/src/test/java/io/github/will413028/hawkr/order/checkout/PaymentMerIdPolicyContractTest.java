@@ -5,7 +5,6 @@ import io.github.will413028.hawkr.common.utils.code.CommerceModel;
 import io.github.will413028.hawkr.common.utils.code.FulfillmentMode;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceModel;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.order.exception.OrderBusinessException;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
 import org.junit.jupiter.api.DisplayName;
@@ -190,12 +189,10 @@ class PaymentMerIdPolicyContractTest {
         @Test
         @DisplayName("一律推導出賣家直營（費率未定案 ＋ 進項發票軸未落地 ⇒ fail-closed）")
         void alwaysSellerDirectInThisWave() {
-            for (ShippingMethod m : ShippingMethod.values()) {
-                OrderPolicySnapshot p = resolver.resolve(m.value());
-                assertThat(p.commerceModel()).isEqualTo(CommerceModel.SELLER_DIRECT.value());
-                assertThat(p.collectionModel()).isEqualTo(CollectionModel.SELLER_MERCHANT.value());
-                assertThat(p.invoiceModel()).isEqualTo(InvoiceModel.SELLER_TO_BUYER.value());
-            }
+            OrderPolicySnapshot p = resolver.resolve();
+            assertThat(p.commerceModel()).isEqualTo(CommerceModel.SELLER_DIRECT.value());
+            assertThat(p.collectionModel()).isEqualTo(CollectionModel.SELLER_MERCHANT.value());
+            assertThat(p.invoiceModel()).isEqualTo(InvoiceModel.SELLER_TO_BUYER.value());
         }
 
         /**
@@ -206,54 +203,20 @@ class PaymentMerIdPolicyContractTest {
         @Test
         @DisplayName("推導結果必須滿足 DB 的政策矩陣雙條件式")
         void resolvedPolicySatisfiesDbMatrix() {
-            for (ShippingMethod m : ShippingMethod.values()) {
-                OrderPolicySnapshot p = resolver.resolve(m.value());
-                boolean consignment = CommerceModel.PLATFORM_CONSIGNMENT.value().equals(p.commerceModel());
-                boolean platformCollected = CollectionModel.PLATFORM_AGENT_MERCHANT.value().equals(p.collectionModel());
-                assertThat(consignment).isEqualTo(platformCollected);
+            OrderPolicySnapshot p = resolver.resolve();
+            boolean consignment = CommerceModel.PLATFORM_CONSIGNMENT.value().equals(p.commerceModel());
+            boolean platformCollected = CollectionModel.PLATFORM_AGENT_MERCHANT.value().equals(p.collectionModel());
+            assertThat(consignment).isEqualTo(platformCollected);
 
-                boolean platformInvoice = InvoiceModel.PLATFORM_TO_BUYER.value().equals(p.invoiceModel());
-                assertThat(platformInvoice).isEqualTo(platformCollected);
-            }
+            boolean platformInvoice = InvoiceModel.PLATFORM_TO_BUYER.value().equals(p.invoiceModel());
+            assertThat(platformInvoice).isEqualTo(platformCollected);
         }
 
         @Test
-        @DisplayName("商家自送必然是賣家履約（與 chk_orders_fulfillment_mode_consistent 同一條規則）")
-        void merchantDeliveryIsSellerManaged() {
-            assertThat(resolver.resolve(ShippingMethod.MERCHANT_DELIVERY.value()).fulfillmentMode())
+        @DisplayName("賣家自寄必然是賣家履約（與 chk_orders_fulfillment_mode_consistent 相容）")
+        void fulfillmentIsSellerManaged() {
+            assertThat(resolver.resolve().fulfillmentMode())
                     .isEqualTo(FulfillmentMode.SELLER_MANAGED.value());
-        }
-
-        @Test
-        @DisplayName("未知配送方式 fail-closed：不得 default 成平台履約")
-        void unknownShippingMethodFailsClosed() {
-            // 🔴 BLOCKER 6：「Missing / unknown / inconsistent → BLOCK」。
-            //    舊版對任何非 3005 的輸入一律回 PLATFORM_LOGISTICS，包含打錯的字串與未來新增的碼。
-            //    這一欄會成為撥款與開票的法源，猜錯不會有任何東西發現。
-            for (String bogus : new String[]{"3099", "", "  ", "TAQBIN", "9999"}) {
-                assertThatThrownBy(() -> resolver.resolve(bogus))
-                        .as("配送方式 '" + bogus + "' 應被擋下")
-                        .isInstanceOf(OrderBusinessException.class)
-                        .satisfies(e -> assertThat(((OrderBusinessException) e).code())
-                                .isEqualTo(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN.code()));
-            }
-            assertThatThrownBy(() -> resolver.resolve(null))
-                    .as("null 也要回業務碼，不能是 NPE（NPE 會被翻成 500，指不到真正的原因）")
-                    .isInstanceOf(OrderBusinessException.class)
-                    .satisfies(e -> assertThat(((OrderBusinessException) e).code())
-                            .isEqualTo(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN.code()));
-        }
-
-        @Test
-        @DisplayName("平台物流通道推導為平台履約")
-        void platformChannelsAreePlatformLogistics() {
-            for (ShippingMethod m : new ShippingMethod[]{
-                    ShippingMethod.TAQBIN, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP,
-                    ShippingMethod.UBER_INSTANT}) {
-                assertThat(resolver.resolve(m.value()).fulfillmentMode())
-                        .as("配送方式 " + m.value())
-                        .isEqualTo(FulfillmentMode.PLATFORM_LOGISTICS.value());
-            }
         }
     }
 }

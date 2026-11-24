@@ -59,9 +59,6 @@ service OrderService {
     // 查詢訂單評論資格（review-service 用）
     rpc GetOrderForReview(GetOrderForReviewRequest) returns (GetOrderForReviewResponse);
 
-    // 取得物流建單所需訂單資訊（shipping-service 用）
-    rpc GetOrderForShipping(GetOrderForShippingRequest) returns (GetOrderForShippingResponse);
-
     // 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
     rpc GetBuyerMerchantSummary(GetBuyerMerchantSummaryRequest) returns (GetBuyerMerchantSummaryResponse);
 
@@ -82,9 +79,6 @@ service OrderService {
 
     // 即時驗證（購物車勾選時呼叫，輕量級，預設運費 Grid）
     rpc CheckoutValidate(CheckoutValidateRequest) returns (CheckoutValidateResponse);
-
-    // 運費精算（選配送方式 + 填地址/選門市後呼叫）
-    rpc CheckoutShippingFee(CheckoutShippingFeeRequest) returns (CheckoutShippingFeeResponse);
 
     // 結帳預覽（完整驗證 + 精算總額，不建單）
     rpc CheckoutPreview(CheckoutPreviewRequest) returns (CheckoutPreviewResponse);
@@ -143,18 +137,6 @@ service OrderService {
     // 只能複製本 RPC 的回傳值、不得自行 +1。append-only：每次成功都 INSERT 一列新版本。
     // 走 52 號 HMAC 內部授權四 header。
     rpc ReviseOrderInvoiceSnapshotInternal(ReviseOrderInvoiceSnapshotInternalRequest) returns (ReviseOrderInvoiceSnapshotInternalResponse);
-
-    // ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
-    //
-    // 🔴 為什麼要經過 order-service 而不是 Gateway 直接打 shipping：
-    //    報價需要「這一車的賣家是誰、每一件的尺寸重量單價是多少」，而那些是
-    //    CheckoutService.resolveItems() 已經在做的事（批次打 product-service）。
-    //    讓 Gateway 直接打 shipping 的話，那段解析要在 Gateway 重寫一份，
-    //    而 Gateway 是 thin proxy、不該持有商品解析邏輯。
-    //
-    // ⚠️ 呼叫端只送 address_id 與 items：賣家由伺服端從 SKU 推導（66 §6.1.3 逐字
-    //    「不收 externalStoreId」）。前端傳賣家 id 等於讓前端決定跟誰叫車。
-    rpc GetUberQuoteForCheckout(OrderUberQuoteRequest) returns (OrderUberQuoteResponse);
 }
 
 // ==================== 共用訊息結構 ====================
@@ -189,14 +171,12 @@ message OrderSummaryView {
     // batchGetSellerMeta，聚合失敗時為空字串。
     string store_code = 44;
     // 配送資訊（訂單快照）
-    string shipping_method = 12;  // 運送方式 value（3001=黑貓 / 3002=7-11店到店 / 3003=Uber）
+    string shipping_method = 12;  // 運送方式 value（訂單快照；B8 出貨前新訂單為空字串）
     string delivery_temp = 13;    // 配送溫層 value（3201=常溫 / 3202=冷藏 / 3203=冷凍）
     string pickup_store_name = 14; // 超商取貨門市名稱（僅 7-11店到店(3002) 時有值）
     // 狀態摘要（後端計算，前端直接渲染）
-    string shipping_status = 15;  // 物流狀態 ShippingStatus value = PayUni 狀態碼（""=未建物流單, "91"=未處理, "92"=處理中, "21"=待出貨, "31"=配送中, "32"=待取貨, "11"=已取貨...）
-    string shipping_status_desc = 29; // 物流狀態描述（PayUni ShipStatusDesc 或 ShippingStatus displayName）
     string status_time = 16;      // 當前狀態的關鍵時間點（ISO 8601），依 OrderStatus 自動選取
-    string status_summary = 17;   // 狀態摘要文案（後端依 OrderStatus + ShippingStatus 組合產生）
+    string status_summary = 17;   // 狀態摘要文案（後端依 OrderStatus 產生）
     // 賣家訂單列表擴充欄位（卡片顯示用）
     string recipient_name = 18;   // 收件人姓名
     string shipping_address = 19; // 收件地址（宅配）
@@ -204,13 +184,6 @@ message OrderSummaryView {
     // 買家資訊（gRPC 聚合自 Buyer Service，僅賣家/管理員視角填充）
     string buyer_nickname = 21;     // 買家暱稱（空字串表示未設定或聚合失敗）
     string buyer_avatar_key = 22;   // 買家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 buyerAvatarUrl；http 值 passthrough）
-    // 物流出貨資訊（MQ 事件快照自 Shipping Service）
-    string label_key = 23;          // 宅配託運單 PDF objectKey（49 §6.6：Gateway 組 labelUrl；僅宅配有值）
-    string label_expire_at = 28;    // 宅配託運單 PDF 下載期限（ISO 8601，取號時 NOW()+24h，僅賣家視角）
-    string partner_id = 24;         // 超商出貨便母代碼（3 碼，shipment.label.updated 事件快照）
-    string odno = 25;               // 超商出貨單編號（8 碼，shipment.label.updated 事件快照）
-    string validation_no = 26;      // 超商 C2C 驗證碼（4 碼，shipment.label.updated 事件快照，B2C 時為空）
-    repeated string shipment_photo_keys = 27; // 出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；僅賣家視角，選填）
     bool need_refund_page = 30;               // ATM 退款等待買家前往 PayUni 頁面
     bool is_reviewed = 31;                    // 該訂單是否已有評論（任一商品已評即 true）
     string review_deadline = 32;              // 評論截止時間（confirmed_at + 30 天，ISO 8601 UTC，僅 status=50 時有值）
@@ -218,7 +191,6 @@ message OrderSummaryView {
     string auto_complete_at = 34;             // 送達後自動完成時間（ISO 8601 UTC，僅 status=40 時有值；送達時 = delivered_at + auto-complete-hours，倒數恢復時 += 累計暫停時長，03 §5.8）
     string provider_status = 35;              // 聚合 PayUni 原始狀態碼（收斂規範 §6.2；依 order 當下 status 取源）
     string provider_message = 36;             // 聚合 PayUni 原始訊息
-    string processing_deadline = 37;          // 賣家處理期限（ISO 8601 UTC，09 §5.9）；空字串表示無期限/已處理/已取消/Uber
     // 取消資訊（僅 status=80 時有值，03 §5.3）
     string cancel_reason = 38;                // OrderCancelReason value（91xx 系統 / 92xx 賣家）；buyer 自願取消為空字串
     string cancel_remark = 39;                // 賣家自填備註（OTHER / SUGGEST_SPLIT 場景；其他為空字串）
@@ -227,6 +199,8 @@ message OrderSummaryView {
     // 付款期限（03 §8.5；買家列表「待付款倒數」卡片用，免再逐筆打詳情 API）
     string payment_deadline = 42;             // ISO 8601 UTC，僅 status=0 時有值；建單時 = createdAt + payment-deadline-seconds
     string payment_method = 43;               // 付款方式 PaymentMethod value（CodeMeta 2001-2004；orders.payment_method 快照，未付款為空字串）
+    reserved 15, 23, 24, 25, 26, 27, 28, 29, 37;
+    reserved "shipping_status", "label_key", "partner_id", "odno", "validation_no", "shipment_photo_keys", "label_expire_at", "shipping_status_desc", "processing_deadline";
 }
 
 message OrderItemView {
@@ -273,15 +247,6 @@ message OrderDetailView {
     string shipping_area = 24;      // 配送區域 value（3401=本島 / 3402=離島）
     string coupon_instance_id = 25; // 訂單綁定的優惠券**實例** ID（建單後 reserveCoupon 取得；空字串表示未使用）
     string discount_amount = 26;    // 優惠券折扣金額（數字字串）
-    // 物流狀態（Shipping Service 引入後新增）
-    string shipping_status = 27;    // 物流狀態碼（ShippingStatus value，數字字串，空字串表示尚未建單）
-    string shipping_status_desc = 46; // 物流狀態描述（PayUni ShipStatusDesc 或 ShippingStatus displayName）
-    string label_key = 28;          // 宅配託運單 PDF objectKey（49 §6.6：Gateway 組 labelUrl；空字串表示無）
-    string label_expire_at = 45;    // 宅配託運單 PDF 下載期限（ISO 8601，僅賣家視角）
-    // 超商出貨便代碼（Shipping Service Webhook 回填，聚合至訂單詳情）
-    string partner_id = 29;         // 出貨便母代碼（3 碼）
-    string odno = 30;               // 出貨單編號（8 碼）
-    string validation_no = 31;      // C2C 驗證碼（4 碼，B2C 時為空）
     // 付款資訊（Order DB 快照 + Payment Service 聚合）
     string payment_method = 32;     // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
     string atm_bank_code = 33;      // ATM 銀行代碼（僅 ATM 付款時有值，如 "822"）
@@ -302,7 +267,6 @@ message OrderDetailView {
     string cancel_reason = 42;      // 取消原因（空字串表示非賣家取消）
     string cancel_remark = 43;      // 取消備註（空字串表示無備註）
     // 出貨照片（賣家上傳，雙方詳情頁可見，統一從 orders.shipment_photo_urls 快照取）
-    repeated string shipment_photo_keys = 44; // 賣家出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；選填）
     bool need_refund_page = 47;               // ATM 退款等待買家前往 PayUni 頁面
     // 訂單備註
     string order_remark = 48;                 // 訂單備註（買家下單時留言給賣家，選填）
@@ -319,7 +283,6 @@ message OrderDetailView {
     string provider_status = 54;              // 依 order 當下 status 取自 payment_transactions / payment_refunds / shipments
     string provider_message = 55;             // 聚合 PayUni 原始訊息
     // 賣家處理期限（09 §5.9）
-    string processing_deadline = 56;          // ISO 8601 UTC；空字串表示無期限/已處理/已取消/Uber
     // 取消角色（cancel_reason / cancel_remark 已分別在 field 42/43，03 §5.3）
     string cancel_by_role = 57;               // OrderCancelByRole value（SYSTEM / SELLER / BUYER；僅 status=80 時有值）
     // 自動完成倒數暫停（03 §5.8）
@@ -343,6 +306,8 @@ message OrderDetailView {
     string completed_at = 64;                 // 訂單完成時間（= orders.confirmed_at；僅 status=50 時有值）
     string cancelled_at = 65;                 // 訂單取消時間（僅 status=80 時有值）
     string delivered_at = 66;                 // 訂單送達時間（status>=40 時有值）
+    reserved 27, 28, 29, 30, 31, 44, 45, 46, 56;
+    reserved "shipping_status", "label_key", "partner_id", "odno", "validation_no", "shipment_photo_keys", "label_expire_at", "shipping_status_desc", "processing_deadline";
 }
 
 message OrderItemDetail {
@@ -387,22 +352,18 @@ message CreateOrderRequest {
     string total_actual_amount = 5;
     string checkout_id = 6;       // 購物車結帳批次 ID（UUID 字串，非購物車下單可不填）
     string delivery_temp = 7;     // 配送溫層 value（如 3201、3202、3203）
-    string shipping_method = 8;   // 運送方式 value（如 3001、3002）
-    string shipping_fee = 9;      // 運費（新台幣元，數字字串）
-    string shipping_fee_payer = 10; // 運費負擔方 value（如 3101、3102）
     // 收件人資訊
     string recipient_name = 11;    // 收件人姓名
     string recipient_phone = 12;   // 收件人電話
     string shipping_address = 13;  // 收件地址（宅配）
     string shipping_note = 14;     // 配送備註（選填）
     // 超商取貨資訊
-    string cvs_store_id = 15;      // 超商門市代號（店到店；與賣家 store_id surrogate 無關）
-    string cvs_store_name = 16;    // 超商門市名稱（店到店）
     // 結帳模組新增
-    string shipping_area = 17;     // 配送區域（MAIN_ISLAND / OFFSHORE_ISLAND）
     string mer_id = 18;            // PayUni 商家編號（Confirm 時從 Seller Service 取得）
     string coupon_instance_id = 19; // 訂單綁定的優惠券**實例** ID（空字串表示未使用）
     string discount_amount = 20;   // 優惠券折扣金額（數字字串，由 Coupon Service 計算）
+    reserved 8, 9, 10, 15, 16, 17;
+    reserved "shipping_method", "shipping_fee", "shipping_fee_payer", "cvs_store_id", "cvs_store_name", "shipping_area";
 }
 
 message CreateRfqOrderRequest {
@@ -646,37 +607,6 @@ message FinancialLogView {
 
 // ==================== 服務間呼叫訊息 ====================
 
-// ==================== 物流建單查詢（Shipping Service 內部呼叫）====================
-
-message GetOrderForShippingRequest {
-    string order_no = 1;              // 訂單編號
-    int64 store_id = 2;      // 賣家 store_id surrogate（Shipping Service 內部呼叫傳入所有權檢查用）
-}
-
-message GetOrderForShippingResponse {
-    int32 code = 1;
-    string message = 2;
-    OrderShippingInfo data = 3;
-}
-
-message OrderShippingInfo {
-    string order_no = 1;               // 訂單編號
-    string status = 2;                 // 訂單狀態（OrderStatus value）
-    string store_id = 3;      // 賣家 store_id surrogate（TSID 數字字串）
-    string buyer_id = 4;       // 買家帳號 ID（TSID 數字字串）
-    string total_actual_amount = 5;    // 實付金額（數字字串，新台幣元）
-    string recipient_name = 6;         // 收件人姓名
-    string recipient_phone = 7;        // 收件人電話
-    string shipping_address = 8;       // 收件地址（宅配用）
-    string cvs_store_id = 9;          // 超商門市代號（與賣家 store_id surrogate 無關）
-    string cvs_store_name = 10;        // 超商門市名稱
-    string shipping_method = 11;       // 配送方式 value（3001/3002/3003）
-    string product_name = 12;          // 商品描述（第一筆 sku_name，供物流商顯示）
-    string mer_id = 13;                // PayUni 商家編號（從訂單表取）
-    string delivery_temp = 14;          // 配送溫層 value（3201/3202/3203）
-    string dimension_sum = 15;          // 訂單最大 SKU 材積和（L+W+H cm）
-}
-
 // ==================== 付款查詢訊息（Payment Service 內部呼叫）====================
 
 message GetOrderForPaymentRequest {
@@ -724,13 +654,14 @@ message CheckoutValidateResponse {
 message CheckoutValidateData {
     bool valid = 1;                                              // 是否可進入結帳 = unavailable_items.isEmpty() && errors.isEmpty()
     repeated string delivery_temp_intersection = 2;              // 溫層交集 value（如 ["3202"]）
-    repeated AvailableShippingOption available_shipping_options = 3; // 可用配送選項（已排除超限）
-    repeated CheckoutValidationError errors = 4;                 // 整單級錯誤（DIFFERENT_SELLER / TEMP_ZONE_INCOMPATIBLE / ALL_SHIPPING_EXCEEDED / INVALID_ITEM）
+    repeated CheckoutValidationError errors = 4;                 // 整單級錯誤（DIFFERENT_SELLER / TEMP_ZONE_INCOMPATIBLE / INVALID_ITEM）
     repeated UnavailableItem unavailable_items = 5;              // row 級不可購買清單（DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）
+    reserved 3;
+    reserved "available_shipping_options";
 }
 
 message CheckoutValidationError {
-    string error_code = 1;                     // 整單級錯誤碼（DIFFERENT_SELLER / TEMP_ZONE_INCOMPATIBLE / ALL_SHIPPING_EXCEEDED / INVALID_ITEM）。注意：row 級「商品不可購買」已廢棄 PRODUCT_UNAVAILABLE，改走 unavailable_items
+    string error_code = 1;                     // 整單級錯誤碼（DIFFERENT_SELLER / TEMP_ZONE_INCOMPATIBLE / INVALID_ITEM）。注意：row 級「商品不可購買」已廢棄 PRODUCT_UNAVAILABLE，改走 unavailable_items
     string error_message = 2;                  // 繁體中文錯誤訊息
 }
 
@@ -743,71 +674,16 @@ message UnavailableItem {
     string available_qty = 5;                  // 即時可購買量；reason=INSUFFICIENT_STOCK 時 0 < available_qty < requested_qty；OUT_OF_STOCK 時 "0"；DELISTED / LOOKUP_FAILED 時空字串
 }
 
-// 可用的配送選項（配送方式 × 溫層 × 運費），前端以 radio button grid 呈現
-message AvailableShippingOption {
-    string shipping_method = 1;                // ShippingMethod value（如 3001）
-    string delivery_temp = 2;                  // ShippingTemperature value（如 3202）
-    string label = 3;                          // 顯示名稱（如「黑貓宅急便（冷藏）」）
-    string fee = 4;                            // 運費（級距查找結果，數字字串；免運時為 "0"）
-    string fee_payer = 5;                      // 運費負擔方 value（3101=買方 / 3102=賣方）
-    string free_shipping_threshold = 6;        // 免運門檻（數字字串，"0" 表示無免運）
-    bool tentative_free_shipping_eligible = 7; // **語意變更**（原 free_shipping_eligible 重命名）：暫定免運判定（基於商品 unit_price × qty，不含優惠券折扣）。最終免運資格須等 CheckoutPreview 階段以折扣後金額重判定（20 設計書 §4.7）
-}
-
-// --- CheckoutShippingFee（運費精算）---
-
-message CheckoutShippingFeeRequest {
-    int64 buyer_id = 1;                      // Gateway 注入的 buyer_id（E.5.5 int64 例外；原 account_id，已改名對齊語意）
-    repeated CheckoutItem items = 2;           // 當前已勾選的商品
-    string shipping_method = 3;                // 已選的配送方式 value（如 3001）
-    string delivery_temp = 4;                  // 已選的配送溫層 value（如 3202）
-    string receiver_zip_code = 5;              // 收件人郵遞區號（宅配必填，如 "880"；店到店可空）
-    string cvs_store_id = 6;                   // 超商門市代號（店到店時填，宅配時空字串）
-}
-
-message CheckoutShippingFeeResponse {
-    int32 code = 1;
-    string message = 2;
-    CheckoutShippingFeeData data = 3;
-}
-
-message CheckoutShippingFeeData {
-    string shipping_method = 1;                // 配送方式（回顯）
-    string delivery_temp = 2;                  // 配送溫層（回顯）
-    string shipping_route = 3;                 // 運費路線（後端推導，如 DOMESTIC / TO_OFFSHORE）
-    string shipping_fee = 4;                   // 精確運費（數字字串；免運時為 "0"）
-    string fee_payer = 5;                      // 運費負擔方 value（3101/3102）
-    bool tentative_free_shipping_eligible = 6; // **語意變更**（原 free_shipping_eligible 重命名）：暫定免運判定（未套優惠券）。20 設計書 §4.7
-    string free_shipping_threshold = 7;        // 免運門檻（數字字串）
-    string order_subtotal = 8;                 // 商品實際成交小計（基於 unit_price 彙總，數字字串）
-    string estimated_total = 9;                // 預估總額 = 小計 + 運費（數字字串）
-}
-
 // --- CheckoutPreview（結帳預覽）---
 
 message CheckoutPreviewRequest {
     int64 buyer_id = 1;                      // Gateway 注入的 buyer_id（E.5.5 int64 例外；原 account_id，已改名對齊語意）
     repeated CheckoutItem items = 2;           // 購物車勾選的商品
-    string shipping_method = 3;                // 用戶已選的配送方式 value（如 3001）
     string delivery_temp = 4;                  // 用戶已選的配送溫層 value（如 3202）
-    string receiver_zip_code = 5;              // 收件人郵遞區號（宅配必填，如 "880"；店到店可空）
-    string cvs_store_id = 6;                   // 超商門市代號（店到店時填）
     string coupon_template_id = 7;             // 使用者選擇的優惠券**模板** ID（空字串表示不使用）
     bool consolidated = 8;                     // 是否為和單（多賣家走代理商代收）。default false=單賣家走 seller.payuni_mer_id；true=取 env PAYUNI_AGENT_MER_ID。詳見 20 設計書 §4.13
-
-    // ─── Uber Direct（shipping_method = 3003）專用，其餘配送方式一律空字串 ───
-    //
-    // 🔴 這兩欄是 3003 **唯一**的過關條件。Uber 的資格判定需要「結構化收件地址 ＋
-    // 買家手上那筆報價」，而本 message 原本只有 receiver_zip_code 與一串 shipping_address
-    // ⇒ 組不出 UberQuoteDropoff ⇒ UberOrderEligibilityGuard 依 deny-by-default 回 9503。
-    // 買家在購物車**選得到** Uber 而 preview 一律失敗，就是那個缺口。
-    //
-    // ⚠️ 為什麼不攤平字串讓 shipping 反解：shipping.proto 的 UberQuoteDropoff 逐字禁止，
-    // 每一筆解不出來的就是一個看不到選項的買家。address_id 讓 order-service 走
-    // buyer 模組取回 city／district／detail_address 三欄——與 /app/checkout/uber_quote
-    // 同一個來源，兩邊不會給出不同的答案。
-    string address_id = 9;                     // 買家地址簿的 shipping_addresses.id（TSID 數字字串）
-    string uber_quote_id = 10;                 // 買家手上那筆報價（uber_quotes.quote_id，dqt_ 前綴）；空 ⇒ 重新取價
+    reserved 3, 5, 6, 9, 10;
+    reserved "shipping_method", "receiver_zip_code", "cvs_store_id", "address_id", "uber_quote_id";
 }
 
 message CheckoutPreviewResponse {
@@ -851,20 +727,17 @@ message OrderGroupPreview {
     string group_index = 1;                        // 分組序號（"0", "1", ...）
     string store_id = 2;                  // 賣家 store_id surrogate（TSID 數字字串）
     string seller_name = 3;                        // 賣家名稱（快照，供前端顯示）
-    string shipping_method = 4;                    // 用戶已選的配送方式（回顯）
     string delivery_temp = 5;                      // 用戶已選的配送溫層（回顯）
-    string shipping_label = 6;                     // 配送方式顯示名稱（如「黑貓宅急便（冷藏）」）
     string shipping_fee = 7;                       // 運費（已計算，數字字串；免運時為 "0"）
-    string shipping_fee_payer = 8;                 // 運費負擔方 value（3101/3102）
-    bool free_shipping_eligible = 9;               // **最終免運判定**（基於 unit_price × qty − share_discount，折扣後判定）
     repeated CheckoutItemPreview items = 10;       // 商品明細
     string subtotal_original_amount = 11;          // 分組實際成交小計（Σ unit_price × qty，數字字串）
     string discount_amount = 12;                   // 該分組折扣金額（數字字串）
-    bool tentative_free_shipping_eligible = 13;    // **新增**：未套優惠券前的暫定免運判定。前端比對 `tentative != final` 提示「使用此優惠券將失去免運資格」（20 設計書 §4.7.2）
     // 賣家 canonical 短碼（sellers.store_code）；store_id 是內部代理鍵，賣家頁
     // canonical 網址走 store_code。與 seller_name 同源自本次 preview 已呼叫的
     // getSellerMeta，聚合失敗為空字串。
     string store_code = 14;
+    reserved 4, 6, 8, 9, 13;
+    reserved "shipping_method", "shipping_label", "shipping_fee_payer", "free_shipping_eligible", "tentative_free_shipping_eligible";
 }
 
 message CheckoutItemPreview {
@@ -888,17 +761,13 @@ message CheckoutConfirmRequest {
     int64 buyer_id = 1;                          // Gateway 注入的 buyer_id（E.5.5 int64 例外；原 account_id，已改名對齊語意）
     string checkout_id = 2;                        // 結帳批次 ID（Preview 回傳的）
     repeated CheckoutItem items = 3;               // 商品列表（與 Preview 相同）
-    string shipping_method = 4;                    // 用戶選擇的配送方式 value（3001/3002/3003）
     string delivery_temp = 5;                      // 用戶選擇的配送溫層 value（3201/3202/3203）
-    string receiver_zip_code = 6;                  // 收件人郵遞區號（宅配必填；店到店可空）
     // 收件人資訊
     string recipient_name = 7;                     // 收件人姓名（必填）
     string recipient_phone = 8;                    // 收件人電話（必填）
     string shipping_address = 9;                   // 收件地址（宅配必填）
     string shipping_note = 10;                     // 配送備註（選填）
     // 超商取貨
-    string cvs_store_id = 11;                      // 超商門市代號（店到店必填）
-    string cvs_store_name = 12;                    // 超商門市名稱（店到店必填）
     string coupon_template_id = 13;                // 使用者選擇的優惠券**模板** ID（與 Preview 相同，空字串表示不使用）
     string order_remark = 14;                      // 訂單備註（選填，買家留言給賣家，最長 500 字）
     // 🔴 **選填**（58 號 §4.1「03 訂單」逐字定案 ＋ §6.1.2(b)）：`hawkr_buyer` 已上架 App
@@ -906,18 +775,8 @@ message CheckoutConfirmRequest {
     // 整包省略 ⇒ carrier_selection_mode = USE_BUYER_DEFAULT，由 invoice-service 在建立文件時
     // 依 D6 fallback 鏈解析（買家指定的預設 → 無載具發票），order-service 不在 hot path 打那支 gRPC。
     CheckoutInvoiceRequest invoice = 15;
-
-    // ─── Uber Direct（shipping_method = 3003）專用，其餘配送方式一律空字串 ───
-    // 語意與欄位來源同 CheckoutPreviewRequest 的同名欄位（見那裡的紅字）。
-    //
-    // 🔴 confirm 是 INV-U1 的收斂點（66 §8「訂單 Uber 運費 ＝ 被 CHECKOUT_ACCEPTED 的那筆
-    // quote 的 fee_amount，永不補收」）：它拿 uber_quote_id 重驗一次拿到運費，
-    // 建單成功後再把同一筆 CAS 成 CHECKOUT_ACCEPTED（66 §9 的
-    // 「確認 → 重驗 TTL>180s ＋ hash → CHECKOUT_ACCEPTED → 收款」）。
-    // 少了 CAS 那一步，建單時 UberDirectAdapter.acceptedQuote() 找不到報價 ⇒
-    // markCreateFailed("UBER_QUOTE_NOT_ACCEPTED") ⇒ 收了錢建不出單。
-    string address_id = 16;
-    string uber_quote_id = 17;
+    reserved 4, 6, 11, 12, 16, 17;
+    reserved "shipping_method", "receiver_zip_code", "cvs_store_id", "cvs_store_name", "address_id", "uber_quote_id";
 }
 
 // 結帳時採集的買家發票選擇（58 號 §7.1.2 步驟 1、§6.2.4 order-service ⑤）。
@@ -1490,30 +1349,4 @@ message OrderInvoiceSnapshotItem {
     // share_discount，那兩欄的既有分攤器用浮點四捨五入、尾差歸最後一筆、負值夾 0，
     // 收了就會有人拿去算發票金額（58 號 domain.OrderItem 的同一條理由）。
     string unit_price = 6;
-}
-
-// ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
-
-message OrderUberQuoteRequest {
-    int64 buyer_id = 1;                    // Gateway 注入（E.5.5 int64 例外，與 CheckoutValidateRequest 同）
-    string address_id = 2;                 // 買家收件地址 id（buyer 模組的 shipping_addresses.id）
-    repeated CheckoutItem items = 3;       // 當前已勾選的商品，與 CheckoutValidate 同一個型別
-}
-
-// 🔴 形狀與 shipping.UberQuoteData 對齊但**不共用**：跨服務共用 message 會讓
-//    order 與 shipping 的契約綁死，而它們的演進節奏不同（10 檔 §3）。
-//    欄位語意逐字相同，轉換點只有一處（OrderGrpcService）。
-message OrderUberQuoteData {
-    bool available = 1;
-    string unavailable_reason = 2;         // available=false 時必填，可寫進 UI 的理由碼
-    string quote_id = 3;
-    string fee_amount = 4;                 // 運費（元整數；🔴 string）
-    string currency = 5;
-    string expires_at = 6;                 // ISO 8601 UTC
-}
-
-message OrderUberQuoteResponse {
-    int32 code = 1;
-    string message = 2;
-    OrderUberQuoteData data = 3;
 }

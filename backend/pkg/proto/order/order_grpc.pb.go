@@ -29,14 +29,12 @@ const (
 	OrderService_GetSellerOrders_FullMethodName                    = "/hawkr.order.OrderService/GetSellerOrders"
 	OrderService_GetSellerOrderDetail_FullMethodName               = "/hawkr.order.OrderService/GetSellerOrderDetail"
 	OrderService_GetOrderForReview_FullMethodName                  = "/hawkr.order.OrderService/GetOrderForReview"
-	OrderService_GetOrderForShipping_FullMethodName                = "/hawkr.order.OrderService/GetOrderForShipping"
 	OrderService_GetBuyerMerchantSummary_FullMethodName            = "/hawkr.order.OrderService/GetBuyerMerchantSummary"
 	OrderService_GetBuyerOrdersForSeller_FullMethodName            = "/hawkr.order.OrderService/GetBuyerOrdersForSeller"
 	OrderService_GetOrderForAfterSales_FullMethodName              = "/hawkr.order.OrderService/GetOrderForAfterSales"
 	OrderService_CancelOrderInternal_FullMethodName                = "/hawkr.order.OrderService/CancelOrderInternal"
 	OrderService_HasOrderBetween_FullMethodName                    = "/hawkr.order.OrderService/HasOrderBetween"
 	OrderService_CheckoutValidate_FullMethodName                   = "/hawkr.order.OrderService/CheckoutValidate"
-	OrderService_CheckoutShippingFee_FullMethodName                = "/hawkr.order.OrderService/CheckoutShippingFee"
 	OrderService_CheckoutPreview_FullMethodName                    = "/hawkr.order.OrderService/CheckoutPreview"
 	OrderService_CheckoutConfirm_FullMethodName                    = "/hawkr.order.OrderService/CheckoutConfirm"
 	OrderService_GetOrderForPayment_FullMethodName                 = "/hawkr.order.OrderService/GetOrderForPayment"
@@ -51,7 +49,6 @@ const (
 	OrderService_ListAbnormalOrdersForAdmin_FullMethodName         = "/hawkr.order.OrderService/ListAbnormalOrdersForAdmin"
 	OrderService_GetOrderInvoiceSnapshotInternal_FullMethodName    = "/hawkr.order.OrderService/GetOrderInvoiceSnapshotInternal"
 	OrderService_ReviseOrderInvoiceSnapshotInternal_FullMethodName = "/hawkr.order.OrderService/ReviseOrderInvoiceSnapshotInternal"
-	OrderService_GetUberQuoteForCheckout_FullMethodName            = "/hawkr.order.OrderService/GetUberQuoteForCheckout"
 )
 
 // OrderServiceClient is the client API for OrderService service.
@@ -94,8 +91,6 @@ type OrderServiceClient interface {
 	GetSellerOrderDetail(ctx context.Context, in *GetSellerOrderDetailRequest, opts ...grpc.CallOption) (*GetSellerOrderDetailResponse, error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(ctx context.Context, in *GetOrderForReviewRequest, opts ...grpc.CallOption) (*GetOrderForReviewResponse, error)
-	// 取得物流建單所需訂單資訊（shipping-service 用）
-	GetOrderForShipping(ctx context.Context, in *GetOrderForShippingRequest, opts ...grpc.CallOption) (*GetOrderForShippingResponse, error)
 	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(ctx context.Context, in *GetBuyerMerchantSummaryRequest, opts ...grpc.CallOption) (*GetBuyerMerchantSummaryResponse, error)
 	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
@@ -109,8 +104,6 @@ type OrderServiceClient interface {
 	HasOrderBetween(ctx context.Context, in *HasOrderBetweenRequest, opts ...grpc.CallOption) (*HasOrderBetweenResponse, error)
 	// 即時驗證（購物車勾選時呼叫，輕量級，預設運費 Grid）
 	CheckoutValidate(ctx context.Context, in *CheckoutValidateRequest, opts ...grpc.CallOption) (*CheckoutValidateResponse, error)
-	// 運費精算（選配送方式 + 填地址/選門市後呼叫）
-	CheckoutShippingFee(ctx context.Context, in *CheckoutShippingFeeRequest, opts ...grpc.CallOption) (*CheckoutShippingFeeResponse, error)
 	// 結帳預覽（完整驗證 + 精算總額，不建單）
 	CheckoutPreview(ctx context.Context, in *CheckoutPreviewRequest, opts ...grpc.CallOption) (*CheckoutPreviewResponse, error)
 	// 確認結帳（建單 + 回傳付款資訊）
@@ -149,19 +142,6 @@ type OrderServiceClient interface {
 	// 只能複製本 RPC 的回傳值、不得自行 +1。append-only：每次成功都 INSERT 一列新版本。
 	// 走 52 號 HMAC 內部授權四 header。
 	ReviseOrderInvoiceSnapshotInternal(ctx context.Context, in *ReviseOrderInvoiceSnapshotInternalRequest, opts ...grpc.CallOption) (*ReviseOrderInvoiceSnapshotInternalResponse, error)
-	// ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
-	//
-	// 🔴 為什麼要經過 order-service 而不是 Gateway 直接打 shipping：
-	//
-	//	報價需要「這一車的賣家是誰、每一件的尺寸重量單價是多少」，而那些是
-	//	CheckoutService.resolveItems() 已經在做的事（批次打 product-service）。
-	//	讓 Gateway 直接打 shipping 的話，那段解析要在 Gateway 重寫一份，
-	//	而 Gateway 是 thin proxy、不該持有商品解析邏輯。
-	//
-	// ⚠️ 呼叫端只送 address_id 與 items：賣家由伺服端從 SKU 推導（66 §6.1.3 逐字
-	//
-	//	「不收 externalStoreId」）。前端傳賣家 id 等於讓前端決定跟誰叫車。
-	GetUberQuoteForCheckout(ctx context.Context, in *OrderUberQuoteRequest, opts ...grpc.CallOption) (*OrderUberQuoteResponse, error)
 }
 
 type orderServiceClient struct {
@@ -272,16 +252,6 @@ func (c *orderServiceClient) GetOrderForReview(ctx context.Context, in *GetOrder
 	return out, nil
 }
 
-func (c *orderServiceClient) GetOrderForShipping(ctx context.Context, in *GetOrderForShippingRequest, opts ...grpc.CallOption) (*GetOrderForShippingResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetOrderForShippingResponse)
-	err := c.cc.Invoke(ctx, OrderService_GetOrderForShipping_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *orderServiceClient) GetBuyerMerchantSummary(ctx context.Context, in *GetBuyerMerchantSummaryRequest, opts ...grpc.CallOption) (*GetBuyerMerchantSummaryResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetBuyerMerchantSummaryResponse)
@@ -336,16 +306,6 @@ func (c *orderServiceClient) CheckoutValidate(ctx context.Context, in *CheckoutV
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CheckoutValidateResponse)
 	err := c.cc.Invoke(ctx, OrderService_CheckoutValidate_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *orderServiceClient) CheckoutShippingFee(ctx context.Context, in *CheckoutShippingFeeRequest, opts ...grpc.CallOption) (*CheckoutShippingFeeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CheckoutShippingFeeResponse)
-	err := c.cc.Invoke(ctx, OrderService_CheckoutShippingFee_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -492,16 +452,6 @@ func (c *orderServiceClient) ReviseOrderInvoiceSnapshotInternal(ctx context.Cont
 	return out, nil
 }
 
-func (c *orderServiceClient) GetUberQuoteForCheckout(ctx context.Context, in *OrderUberQuoteRequest, opts ...grpc.CallOption) (*OrderUberQuoteResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(OrderUberQuoteResponse)
-	err := c.cc.Invoke(ctx, OrderService_GetUberQuoteForCheckout_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // OrderServiceServer is the server API for OrderService service.
 // All implementations must embed UnimplementedOrderServiceServer
 // for forward compatibility.
@@ -542,8 +492,6 @@ type OrderServiceServer interface {
 	GetSellerOrderDetail(context.Context, *GetSellerOrderDetailRequest) (*GetSellerOrderDetailResponse, error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(context.Context, *GetOrderForReviewRequest) (*GetOrderForReviewResponse, error)
-	// 取得物流建單所需訂單資訊（shipping-service 用）
-	GetOrderForShipping(context.Context, *GetOrderForShippingRequest) (*GetOrderForShippingResponse, error)
 	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(context.Context, *GetBuyerMerchantSummaryRequest) (*GetBuyerMerchantSummaryResponse, error)
 	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
@@ -557,8 +505,6 @@ type OrderServiceServer interface {
 	HasOrderBetween(context.Context, *HasOrderBetweenRequest) (*HasOrderBetweenResponse, error)
 	// 即時驗證（購物車勾選時呼叫，輕量級，預設運費 Grid）
 	CheckoutValidate(context.Context, *CheckoutValidateRequest) (*CheckoutValidateResponse, error)
-	// 運費精算（選配送方式 + 填地址/選門市後呼叫）
-	CheckoutShippingFee(context.Context, *CheckoutShippingFeeRequest) (*CheckoutShippingFeeResponse, error)
 	// 結帳預覽（完整驗證 + 精算總額，不建單）
 	CheckoutPreview(context.Context, *CheckoutPreviewRequest) (*CheckoutPreviewResponse, error)
 	// 確認結帳（建單 + 回傳付款資訊）
@@ -597,19 +543,6 @@ type OrderServiceServer interface {
 	// 只能複製本 RPC 的回傳值、不得自行 +1。append-only：每次成功都 INSERT 一列新版本。
 	// 走 52 號 HMAC 內部授權四 header。
 	ReviseOrderInvoiceSnapshotInternal(context.Context, *ReviseOrderInvoiceSnapshotInternalRequest) (*ReviseOrderInvoiceSnapshotInternalResponse, error)
-	// ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
-	//
-	// 🔴 為什麼要經過 order-service 而不是 Gateway 直接打 shipping：
-	//
-	//	報價需要「這一車的賣家是誰、每一件的尺寸重量單價是多少」，而那些是
-	//	CheckoutService.resolveItems() 已經在做的事（批次打 product-service）。
-	//	讓 Gateway 直接打 shipping 的話，那段解析要在 Gateway 重寫一份，
-	//	而 Gateway 是 thin proxy、不該持有商品解析邏輯。
-	//
-	// ⚠️ 呼叫端只送 address_id 與 items：賣家由伺服端從 SKU 推導（66 §6.1.3 逐字
-	//
-	//	「不收 externalStoreId」）。前端傳賣家 id 等於讓前端決定跟誰叫車。
-	GetUberQuoteForCheckout(context.Context, *OrderUberQuoteRequest) (*OrderUberQuoteResponse, error)
 	mustEmbedUnimplementedOrderServiceServer()
 }
 
@@ -650,9 +583,6 @@ func (UnimplementedOrderServiceServer) GetSellerOrderDetail(context.Context, *Ge
 func (UnimplementedOrderServiceServer) GetOrderForReview(context.Context, *GetOrderForReviewRequest) (*GetOrderForReviewResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOrderForReview not implemented")
 }
-func (UnimplementedOrderServiceServer) GetOrderForShipping(context.Context, *GetOrderForShippingRequest) (*GetOrderForShippingResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetOrderForShipping not implemented")
-}
 func (UnimplementedOrderServiceServer) GetBuyerMerchantSummary(context.Context, *GetBuyerMerchantSummaryRequest) (*GetBuyerMerchantSummaryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBuyerMerchantSummary not implemented")
 }
@@ -670,9 +600,6 @@ func (UnimplementedOrderServiceServer) HasOrderBetween(context.Context, *HasOrde
 }
 func (UnimplementedOrderServiceServer) CheckoutValidate(context.Context, *CheckoutValidateRequest) (*CheckoutValidateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CheckoutValidate not implemented")
-}
-func (UnimplementedOrderServiceServer) CheckoutShippingFee(context.Context, *CheckoutShippingFeeRequest) (*CheckoutShippingFeeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CheckoutShippingFee not implemented")
 }
 func (UnimplementedOrderServiceServer) CheckoutPreview(context.Context, *CheckoutPreviewRequest) (*CheckoutPreviewResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CheckoutPreview not implemented")
@@ -715,9 +642,6 @@ func (UnimplementedOrderServiceServer) GetOrderInvoiceSnapshotInternal(context.C
 }
 func (UnimplementedOrderServiceServer) ReviseOrderInvoiceSnapshotInternal(context.Context, *ReviseOrderInvoiceSnapshotInternalRequest) (*ReviseOrderInvoiceSnapshotInternalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReviseOrderInvoiceSnapshotInternal not implemented")
-}
-func (UnimplementedOrderServiceServer) GetUberQuoteForCheckout(context.Context, *OrderUberQuoteRequest) (*OrderUberQuoteResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetUberQuoteForCheckout not implemented")
 }
 func (UnimplementedOrderServiceServer) mustEmbedUnimplementedOrderServiceServer() {}
 func (UnimplementedOrderServiceServer) testEmbeddedByValue()                      {}
@@ -920,24 +844,6 @@ func _OrderService_GetOrderForReview_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _OrderService_GetOrderForShipping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetOrderForShippingRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrderServiceServer).GetOrderForShipping(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrderService_GetOrderForShipping_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrderServiceServer).GetOrderForShipping(ctx, req.(*GetOrderForShippingRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _OrderService_GetBuyerMerchantSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetBuyerMerchantSummaryRequest)
 	if err := dec(in); err != nil {
@@ -1042,24 +948,6 @@ func _OrderService_CheckoutValidate_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(OrderServiceServer).CheckoutValidate(ctx, req.(*CheckoutValidateRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _OrderService_CheckoutShippingFee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CheckoutShippingFeeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrderServiceServer).CheckoutShippingFee(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrderService_CheckoutShippingFee_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrderServiceServer).CheckoutShippingFee(ctx, req.(*CheckoutShippingFeeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1316,24 +1204,6 @@ func _OrderService_ReviseOrderInvoiceSnapshotInternal_Handler(srv interface{}, c
 	return interceptor(ctx, in, info, handler)
 }
 
-func _OrderService_GetUberQuoteForCheckout_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(OrderUberQuoteRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrderServiceServer).GetUberQuoteForCheckout(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrderService_GetUberQuoteForCheckout_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrderServiceServer).GetUberQuoteForCheckout(ctx, req.(*OrderUberQuoteRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // OrderService_ServiceDesc is the grpc.ServiceDesc for OrderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1382,10 +1252,6 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _OrderService_GetOrderForReview_Handler,
 		},
 		{
-			MethodName: "GetOrderForShipping",
-			Handler:    _OrderService_GetOrderForShipping_Handler,
-		},
-		{
 			MethodName: "GetBuyerMerchantSummary",
 			Handler:    _OrderService_GetBuyerMerchantSummary_Handler,
 		},
@@ -1408,10 +1274,6 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckoutValidate",
 			Handler:    _OrderService_CheckoutValidate_Handler,
-		},
-		{
-			MethodName: "CheckoutShippingFee",
-			Handler:    _OrderService_CheckoutShippingFee_Handler,
 		},
 		{
 			MethodName: "CheckoutPreview",
@@ -1468,10 +1330,6 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReviseOrderInvoiceSnapshotInternal",
 			Handler:    _OrderService_ReviseOrderInvoiceSnapshotInternal_Handler,
-		},
-		{
-			MethodName: "GetUberQuoteForCheckout",
-			Handler:    _OrderService_GetUberQuoteForCheckout_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

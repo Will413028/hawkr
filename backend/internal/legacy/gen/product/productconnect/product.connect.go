@@ -92,9 +92,6 @@ const (
 	// ProductServiceDeleteProductProcedure is the fully-qualified name of the ProductService's
 	// DeleteProduct RPC.
 	ProductServiceDeleteProductProcedure = "/hawkr.product.ProductService/DeleteProduct"
-	// ProductServiceCalculateShippingOptionsProcedure is the fully-qualified name of the
-	// ProductService's CalculateShippingOptions RPC.
-	ProductServiceCalculateShippingOptionsProcedure = "/hawkr.product.ProductService/CalculateShippingOptions"
 	// ProductServiceVerifyCertificationProcedure is the fully-qualified name of the ProductService's
 	// VerifyCertification RPC.
 	ProductServiceVerifyCertificationProcedure = "/hawkr.product.ProductService/VerifyCertification"
@@ -199,8 +196,6 @@ type ProductServiceClient interface {
 	GetRelatedProducts(context.Context, *connect.Request[product.GetRelatedProductsRequest]) (*connect.Response[product.GetRelatedProductsResponse], error)
 	// 軟刪除商品（僅限擁有者，僅草稿(4001)/未上架(4003)狀態）
 	DeleteProduct(context.Context, *connect.Request[product.DeleteProductRequest]) (*connect.Response[product.DeleteProductResponse], error)
-	// 計算可用配送選項與運費（依溫層分組）
-	CalculateShippingOptions(context.Context, *connect.Request[product.CalculateShippingOptionsRequest]) (*connect.Response[product.CalculateShippingOptionsResponse], error)
 	// 驗證認證編號是否存在於政府開放資料平台 — 僅限 Seller (account_type: 2, 3)
 	VerifyCertification(context.Context, *connect.Request[product.VerifyCertificationRequest]) (*connect.Response[product.VerifyCertificationResponse], error)
 	// 送出認證申請；同步階段只讀快取不發外部呼叫，命中「有效」即自動核准
@@ -374,12 +369,6 @@ func NewProductServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(productServiceMethods.ByName("DeleteProduct")),
 			connect.WithClientOptions(opts...),
 		),
-		calculateShippingOptions: connect.NewClient[product.CalculateShippingOptionsRequest, product.CalculateShippingOptionsResponse](
-			httpClient,
-			baseURL+ProductServiceCalculateShippingOptionsProcedure,
-			connect.WithSchema(productServiceMethods.ByName("CalculateShippingOptions")),
-			connect.WithClientOptions(opts...),
-		),
 		verifyCertification: connect.NewClient[product.VerifyCertificationRequest, product.VerifyCertificationResponse](
 			httpClient,
 			baseURL+ProductServiceVerifyCertificationProcedure,
@@ -513,7 +502,6 @@ type productServiceClient struct {
 	getProductsByIDs                             *connect.Client[product.GetProductsByIDsRequest, product.GetProductsByIDsResponse]
 	getRelatedProducts                           *connect.Client[product.GetRelatedProductsRequest, product.GetRelatedProductsResponse]
 	deleteProduct                                *connect.Client[product.DeleteProductRequest, product.DeleteProductResponse]
-	calculateShippingOptions                     *connect.Client[product.CalculateShippingOptionsRequest, product.CalculateShippingOptionsResponse]
 	verifyCertification                          *connect.Client[product.VerifyCertificationRequest, product.VerifyCertificationResponse]
 	submitProductCertification                   *connect.Client[product.SubmitProductCertificationRequest, product.ProductCertificationApplicationResponse]
 	listProductCertificationApplications         *connect.Client[product.ListProductCertificationApplicationsRequest, product.ListProductCertificationApplicationsResponse]
@@ -633,11 +621,6 @@ func (c *productServiceClient) GetRelatedProducts(ctx context.Context, req *conn
 // DeleteProduct calls hawkr.product.ProductService.DeleteProduct.
 func (c *productServiceClient) DeleteProduct(ctx context.Context, req *connect.Request[product.DeleteProductRequest]) (*connect.Response[product.DeleteProductResponse], error) {
 	return c.deleteProduct.CallUnary(ctx, req)
-}
-
-// CalculateShippingOptions calls hawkr.product.ProductService.CalculateShippingOptions.
-func (c *productServiceClient) CalculateShippingOptions(ctx context.Context, req *connect.Request[product.CalculateShippingOptionsRequest]) (*connect.Response[product.CalculateShippingOptionsResponse], error) {
-	return c.calculateShippingOptions.CallUnary(ctx, req)
 }
 
 // VerifyCertification calls hawkr.product.ProductService.VerifyCertification.
@@ -788,8 +771,6 @@ type ProductServiceHandler interface {
 	GetRelatedProducts(context.Context, *connect.Request[product.GetRelatedProductsRequest]) (*connect.Response[product.GetRelatedProductsResponse], error)
 	// 軟刪除商品（僅限擁有者，僅草稿(4001)/未上架(4003)狀態）
 	DeleteProduct(context.Context, *connect.Request[product.DeleteProductRequest]) (*connect.Response[product.DeleteProductResponse], error)
-	// 計算可用配送選項與運費（依溫層分組）
-	CalculateShippingOptions(context.Context, *connect.Request[product.CalculateShippingOptionsRequest]) (*connect.Response[product.CalculateShippingOptionsResponse], error)
 	// 驗證認證編號是否存在於政府開放資料平台 — 僅限 Seller (account_type: 2, 3)
 	VerifyCertification(context.Context, *connect.Request[product.VerifyCertificationRequest]) (*connect.Response[product.VerifyCertificationResponse], error)
 	// 送出認證申請；同步階段只讀快取不發外部呼叫，命中「有效」即自動核准
@@ -959,12 +940,6 @@ func NewProductServiceHandler(svc ProductServiceHandler, opts ...connect.Handler
 		connect.WithSchema(productServiceMethods.ByName("DeleteProduct")),
 		connect.WithHandlerOptions(opts...),
 	)
-	productServiceCalculateShippingOptionsHandler := connect.NewUnaryHandler(
-		ProductServiceCalculateShippingOptionsProcedure,
-		svc.CalculateShippingOptions,
-		connect.WithSchema(productServiceMethods.ByName("CalculateShippingOptions")),
-		connect.WithHandlerOptions(opts...),
-	)
 	productServiceVerifyCertificationHandler := connect.NewUnaryHandler(
 		ProductServiceVerifyCertificationProcedure,
 		svc.VerifyCertification,
@@ -1115,8 +1090,6 @@ func NewProductServiceHandler(svc ProductServiceHandler, opts ...connect.Handler
 			productServiceGetRelatedProductsHandler.ServeHTTP(w, r)
 		case ProductServiceDeleteProductProcedure:
 			productServiceDeleteProductHandler.ServeHTTP(w, r)
-		case ProductServiceCalculateShippingOptionsProcedure:
-			productServiceCalculateShippingOptionsHandler.ServeHTTP(w, r)
 		case ProductServiceVerifyCertificationProcedure:
 			productServiceVerifyCertificationHandler.ServeHTTP(w, r)
 		case ProductServiceSubmitProductCertificationProcedure:
@@ -1240,10 +1213,6 @@ func (UnimplementedProductServiceHandler) GetRelatedProducts(context.Context, *c
 
 func (UnimplementedProductServiceHandler) DeleteProduct(context.Context, *connect.Request[product.DeleteProductRequest]) (*connect.Response[product.DeleteProductResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.DeleteProduct is not implemented"))
-}
-
-func (UnimplementedProductServiceHandler) CalculateShippingOptions(context.Context, *connect.Request[product.CalculateShippingOptionsRequest]) (*connect.Response[product.CalculateShippingOptionsResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.product.ProductService.CalculateShippingOptions is not implemented"))
 }
 
 func (UnimplementedProductServiceHandler) VerifyCertification(context.Context, *connect.Request[product.VerifyCertificationRequest]) (*connect.Response[product.VerifyCertificationResponse], error) {

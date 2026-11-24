@@ -83,6 +83,6 @@ class CheckoutServiceSellerSuspensionTest {
     }
 
     private CheckoutService newServiceWithSellerClient(SellerGrpcClient sellerGrpcClient) {
-        return new CheckoutService(null, sellerGrpcClient, null, null, null, null, null, null, new OrderPolicyResolver(), null, null);
+        return new CheckoutService(null, sellerGrpcClient, null, null, null, null, null, new OrderPolicyResolver(), null, null);
     }
 }

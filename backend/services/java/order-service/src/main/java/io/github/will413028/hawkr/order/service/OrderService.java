@@ -1,16 +1,9 @@
 package io.github.will413028.hawkr.order.service;
 
-import io.github.will413028.hawkr.common.utils.code.CollectionModel;
-import io.github.will413028.hawkr.common.utils.code.CommerceModel;
-import io.github.will413028.hawkr.common.utils.code.FulfillmentMode;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
-import io.github.will413028.hawkr.common.utils.code.InvoiceModel;
-import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.common.utils.code.StockOperationStatus;
-import io.github.will413028.hawkr.common.utils.validation.InputValidator;
-import io.github.will413028.hawkr.common.utils.validation.PayUniShippingConstraints;
 import io.github.will413028.hawkr.order.exception.OrderBusinessException;
+import io.github.will413028.hawkr.order.util.ColumnWidth;
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
 import io.github.will413028.hawkr.common.mq.MqConstants;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
@@ -83,15 +76,6 @@ public class OrderService {
     private final OrderCreationTxHandler orderCreationTxHandler;
     private final OrderOutboxMapper orderOutboxMapper;
     private final io.github.will413028.hawkr.order.checkout.OrderPolicyResolver orderPolicyResolver;
-    /**
-     * Uber Direct 資格閘門——<b>建單路徑的最後防線</b>。
-     *
-     * <p>結帳鏈（{@code CheckoutValidator}）是源頭防線，能讓買家在選項階段就看不到／立刻知道原因；
-     * 本類別的兩支 {@code createOrder} 才是<b>所有建單路徑的共同出口</b>：
-     * gRPC {@code CreateOrder}（購物車外建單）根本不經過 {@code CheckoutService}，
-     * 只守結帳鏈等於把那條入口整個放掉。與上方 {@code recipientName} 縱深防禦同一個理由。
-     */
-    private final io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard uberOrderEligibilityGuard;
     // issue #1369 業務健康 metric：建單成功計數（Prometheus 對 Counter 自動補 _total →
     // 暴露為 hawkr_orders_created_total，供 business-alerts.yml ZeroOrders 規則）
     private final Counter ordersCreatedCounter;
@@ -117,7 +101,6 @@ public class OrderService {
             OrderCreationTxHandler orderCreationTxHandler,
             OrderOutboxMapper orderOutboxMapper,
             io.github.will413028.hawkr.order.checkout.OrderPolicyResolver orderPolicyResolver,
-            io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard uberOrderEligibilityGuard,
             CouponReleaseService couponReleaseService,
             MeterRegistry meterRegistry
     ) {
@@ -141,7 +124,6 @@ public class OrderService {
         this.orderCreationTxHandler = orderCreationTxHandler;
         this.orderOutboxMapper = orderOutboxMapper;
         this.orderPolicyResolver = orderPolicyResolver;
-        this.uberOrderEligibilityGuard = uberOrderEligibilityGuard;
         this.ordersCreatedCounter = Counter.builder("hawkr_orders_created")
                 .description("訂單建立成功總數（business health，issue #1369）")
                 .register(meterRegistry);
@@ -160,19 +142,8 @@ public class OrderService {
             long totalOriginalAmount,
             long totalActualAmount,
             String checkoutId,
-            String deliveryTemp,
-            String shippingMethod,
-            long shippingFee,
-            String shippingFeePayer
+            String deliveryTemp
     ) {
-        // 🔴 Uber Direct 資格閘門（建單入口 1／2：gRPC CreateOrder，購物車外建單）。
-        //    位置刻意在**購物車鎖定與扣庫存之前**：閘門拒絕時什麼副作用都還沒發生，
-        //    不必走 checkoutUnlock／compensateStock 的補償路徑。
-        //    ⚠️ methodOnly（無報價 context）：CreateOrderItemParam 不帶尺寸重量、本入口也沒有
-        //    收件地址的結構化三欄 ⇒ 組不出 Probe ⇒ deny-by-default。詳見閘門 javadoc「誰供得起 probe」。
-        uberOrderEligibilityGuard.requireEligible(
-                io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Context.methodOnly(shippingMethod));
-
         // 1. 依 skuId 升冪排序（避免 Product 端 deadlock）
         items = new ArrayList<>(items);
         items.sort(Comparator.comparingLong(CreateOrderItemParam::skuId));
@@ -253,8 +224,8 @@ public class OrderService {
                 // 🔴 政策五欄同樣要寫——這條路徑（gRPC CreateOrder，購物車外建單）沒有 preview 快照，
                 //    所以就地走**同一支** OrderPolicyResolver 推導，不是另一套規則、也不是預設值。
                 //    不補這一段的話，訂單政策的修復只做了一半：這條入口仍會持續產出吃 DB DEFAULT 的列。
-                orderNo = orderCreationTxHandler.createOrderInTx(buyerId, storeId, items, totalOriginalAmount, totalActualAmount, stockTxId, checkoutId, deliveryTemp, shippingMethod, shippingFee, shippingFeePayer,
-                        orderPolicyResolver.resolve(shippingMethod));
+                orderNo = orderCreationTxHandler.createOrderInTx(buyerId, storeId, items, totalOriginalAmount, totalActualAmount, stockTxId, checkoutId, deliveryTemp,
+                        orderPolicyResolver.resolve());
             } catch (Exception e) {
                 log.error("OrderService.createOrder.dbTx.error", "建單 DB 交易失敗，執行庫存補償", e);
                 compensateStock(stockTxId, stockItems);
@@ -311,10 +282,7 @@ public class OrderService {
      *
      * <p>⇒ lane 的差別只有兩件事：賣方是誰（{@code storeId}）、政策五欄走哪一組。
      *
-     * <p><b>政策五欄刻意不走 {@link OrderPolicyResolver}</b>：resolver 的輸入是「配送方式」，
-     * 而 RFQ 的政策來自「賣方是誰」。⚠️ 用錯值<b>不會被 CHECK 擋下</b>——三條 CHECK 只驗
-     * 五欄彼此一致，不驗它對不對這張訂單；錯的代價是撥款與開票的法源整組錯掉而沒有任何
-     * 東西會發現。
+     * <p>政策五欄與結帳路徑走同一支 {@link OrderPolicyResolver}。
      */
     public RfqOrderResult createRfqOrder(
             long buyerId, long storeId, long acceptanceId,
@@ -334,31 +302,11 @@ public class OrderService {
             throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
         }
 
-        // 🔴 兩條 lane 的政策五欄**相同**：賣家直營、款項進賣家子商店、賣家對買家開票。
-        //    lane 的差別只剩「賣方是誰」，而那已經由投遞端解成 storeId 傳進來了
-        //    （PLATFORM ＝ 回價的平台賣家，EXTERNAL ＝ 平台結算 store）。
-        //
-        // ⚠️ EXTERNAL lane 曾經寫 PLATFORM_CONSIGNMENT／PLATFORM_AGENT_MERCHANT／
-        //    PLATFORM_TO_BUYER（受託代銷），2026-09-21 退場。理由不是「改主意」：
-        //    OrderPolicyResolver 的 javadoc 逐字寫著受託代銷「**刻意尚未啟用**，這不是
-        //    還沒寫而是 fail-closed」——撥款指示費的費率未經正式契約確認、賣家→平台的
-        //    進項發票軸尚未落地，兩個理由到今天都還成立。結帳路徑因此一律推導
-        //    SELLER_DIRECT，而**本方法曾是全系統唯一繞過那道閘門的地方**。
-        //
-        // ⚠️ 退場的是**帳務形狀不是值域**：PLATFORM_CONSIGNMENT 等三個仍是 DB CHECK 的
-        //    合法值，只是再也沒有寫入路徑。
-        //    要啟用受託代銷，改的是 OrderPolicyResolver（加賣家契約查詢），不是這裡
-        //    ——否則就會重演「一條路徑偷偷啟用了另一條路徑刻意關掉的東西」。
-        //
-        // ⚠️ 這組值與 OrderPolicyResolver 對 3005 算出來的相同，但這裡明寫而不呼叫它
-        //    ——resolver 的輸入是配送方式，這裡的依據是賣方身分，兩者只是碰巧同值。
-        //    哪天 resolver 為了別的理由改了，RFQ 不該跟著漂。
-        OrderPolicySnapshot policySnapshot = new OrderPolicySnapshot(
-                CommerceModel.SELLER_DIRECT.value(),
-                CollectionModel.SELLER_MERCHANT.value(),
-                FulfillmentMode.SELLER_MANAGED.value(),
-                InvoiceModel.SELLER_TO_BUYER.value(),
-                OrderPolicyResolver.POLICY_VERSION);
+        // 兩條 lane 的政策五欄相同，與結帳路徑走同一支 OrderPolicyResolver：
+        // 賣家直營、款項進賣家子商店、賣家自寄、賣家對買家開票。
+        // lane 的差別只剩「賣方是誰」，那已經由投遞端解成 storeId 傳進來了
+        // （PLATFORM ＝ 回價的平台賣家，EXTERNAL ＝ 平台結算 store）。
+        OrderPolicySnapshot policySnapshot = orderPolicyResolver.resolve();
 
         // 收款主體是賣家子商店 ⇒ mer_id 取該 store 的 PayUni MerID，與結帳路徑同一個來源。
         // EXTERNAL lane 的「賣方」是結算 store，所以同一行對兩條 lane 都成立。
@@ -389,13 +337,6 @@ public class OrderService {
                     buyerId, storeId, acceptanceId, items,
                     totalAmount, shippingFee,
                     deliveryTemp,
-                    // 站外業者自己出貨，平台不安排物流。連帶好處是 Uber 資格閘門只在
-                    // 3003 適用 ⇒ 本路徑不受影響。3005 必然 SELLER_MANAGED
-                    // （chk_orders_fulfillment_mode_consistent）。
-                    ShippingMethod.MERCHANT_DELIVERY.value(),
-                    // 賣家報價已把運費計入 totalAmount ⇒ 買方負擔，03 §3.2 的對帳式
-                    // 「sum(actual_pay_amount) + shipping_fee（買方負擔時）」因此成立。
-                    ShippingFeePayer.BUYER.value(),
                     merId,
                     policySnapshot);
             log.info("OrderService.createRfqOrder.success",
@@ -747,7 +688,6 @@ public class OrderService {
      *   <li>terminal-override（case status∈{33,50} 無申訴）售後的訂單若 order.status 未達終態則補入第三桶；</li>
      *   <li>三桶互斥、PENDING_PAYMENT(0) 不計入。</li>
      * </ul>
-     * isTcatCalled（已出貨）窗口不在此處理：order.status 由 ShippingEventConsumer 在 210/921 推進到 30，最終一致。
      * <p>
      * ⚠️ <b>第三桶是「已結束」不是「已完成」</b>：它的語意是「賣家無需再動作」，成員含
      * CANCELLED(80) 與 FULLY_REFUNDED(70)，因此<b>不是成交數</b>。賣家面（web 狀態卡 / App tab 與
@@ -856,23 +796,6 @@ public class OrderService {
 
     public long countSearchOrders(String orderNo, long buyerId, long storeId, String status) {
         return orderRepository.countSearchOrders(orderNo != null ? orderNo : "", buyerId, storeId, status);
-    }
-
-    // ==================== 物流建單查詢 ====================
-
-    /**
-     * 取得物流建單所需訂單資訊（純內部呼叫）
-     *
-     * 授權由 HMAC internal-auth（server interceptor 驗簽 → INTERNAL_CALL）＋ netpol 保證，
-     * 不再依賴 storeId==0 哨兵繞歸屬（#1366：魔數繞歸屬移除）。此 RPC 無 Gateway 入口、
-     * 無帶真實 storeId 的活躍 caller，屬純內部讀。
-     */
-    public OrderEntity getOrderForShipping(String orderNo) {
-        OrderEntity order = orderRepository.findByOrderNo(orderNo);
-        if (order == null) {
-            throw new OrderNotFoundException(orderNo);
-        }
-        return order;
     }
 
     // ==================== 確認收貨 / 訂單完成 ====================
@@ -1080,13 +1003,12 @@ public class OrderService {
         return createOrder(
                 params.buyerId(), params.storeId(), params.items(),
                 params.totalOriginalAmount(), params.totalActualAmount(),
-                params.checkoutId(), params.deliveryTemp(), params.shippingMethod(),
-                params.shippingFee(), params.shippingFeePayer(),
+                params.checkoutId(), params.deliveryTemp(),
+                params.shippingFee(),
                 params.recipientName(), params.recipientPhone(),
                 params.shippingAddress(), params.shippingNote(),
-                params.orderRemark(), params.cvsStoreId(), params.cvsStoreName(),
-                params.shippingArea(), params.senderCity(), params.senderDistrict(),
-                params.dimensionSum(), params.merId(), params.discountAmount(),
+                params.orderRemark(),
+                params.merId(), params.discountAmount(),
                 params.invoiceSnapshot(), params.policySnapshot()
         );
     }
@@ -1098,42 +1020,20 @@ public class OrderService {
             long buyerId, long storeId,
             List<CreateOrderItemParam> items,
             long totalOriginalAmount, long totalActualAmount,
-            String checkoutId, String deliveryTemp, String shippingMethod,
-            long shippingFee, String shippingFeePayer,
+            String checkoutId, String deliveryTemp,
+            long shippingFee,
             String recipientName, String recipientPhone,
             String shippingAddress, String shippingNote,
-            String orderRemark, String cvsStoreId, String cvsStoreName,
-            String shippingArea, String senderCity, String senderDistrict,
-            int dimensionSum, String merId, long discountAmount,
+            String orderRemark,
+            String merId, long discountAmount,
             io.github.will413028.hawkr.order.checkout.InvoiceIntakeResolver.Snapshot invoiceSnapshot,
             io.github.will413028.hawkr.order.checkout.OrderPolicySnapshot policySnapshot
     ) {
-        // 🔴 Uber Direct 資格閘門（建單入口 2／2：結帳主路徑 createOrderFromCheckout）。
-        //    CheckoutService.confirm 已經擋過一次，這裡是同一條規則的第二個位置——
-        //    理由與下方 recipientName 縱深防禦逐字相同：未來新增繞過 confirm 的入口
-        //    （admin 補單 / 訂單複製 / 客服改單重建）時，此處仍是共同收斂點。
-        //    ⚠️ methodOnly（無報價 context）：同上，本入口拿不到結構化收件地址與逐件尺寸。
-        uberOrderEligibilityGuard.requireEligible(
-                io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Context.methodOnly(shippingMethod));
-
-        // 建單收斂點最後防線（縱深防禦，#1187）：收件人姓名 / 地址符合 PayUni 物流約束。
+        // 建單收斂點最後防線（縱深防禦）：收件人姓名 / 地址不得超過 orders 欄寬。
         // CheckoutService.confirm 是源頭防線（能讓使用者即時修正），但此處才是所有「帶收件人建單」
-        // 路徑的共同收斂點。即使未來新增繞過 confirm 的入口（admin 補單 / 訂單複製 / 客服改單重建），
-        // 此處仍攔截不合規 recipientName，避免落 CREATE_FAILED 空殼（PayUni SHIP02114）。
-        if (recipientName != null && shippingMethod != null && !shippingMethod.isEmpty()) {
-            if (ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value().equals(shippingMethod)) {
-                InputValidator.requireDisplayLengthBetween(recipientName,
-                        PayUniShippingConstraints.CVS_RECIPIENT_NAME_MIN,
-                        PayUniShippingConstraints.CVS_RECIPIENT_NAME_MAX, "收件人姓名");
-            } else {
-                InputValidator.requireDisplayLengthBetween(recipientName,
-                        1, PayUniShippingConstraints.HOME_RECIPIENT_NAME_MAX, "收件人姓名");
-                if (shippingAddress != null && !shippingAddress.isEmpty()) {
-                    InputValidator.requireDisplayLengthBetween(shippingAddress,
-                            1, PayUniShippingConstraints.RECIPIENT_ADDRESS_MAX, "收件地址");
-                }
-            }
-        }
+        // 路徑的共同收斂點。
+        ColumnWidth.requireWithin(recipientName, ColumnWidth.RECIPIENT_NAME, "收件人姓名");
+        ColumnWidth.requireWithin(shippingAddress, ColumnWidth.SHIPPING_ADDRESS, "收件地址");
 
         // 與原始 createOrder 相同流程，新增欄位傳遞至 createOrderInTx
         // 注意：couponInstanceId 不在此處寫入，由 CheckoutService 在 reserveCoupon 成功後透過 updateCouponInstanceId 回寫
@@ -1212,10 +1112,9 @@ public class OrderService {
             try {
                 orderNo = orderCreationTxHandler.createOrderInTxExtended(buyerId, storeId, items,
                         totalOriginalAmount, totalActualAmount, stockTxId, checkoutId,
-                        deliveryTemp, shippingMethod, shippingFee, shippingFeePayer,
+                        deliveryTemp, shippingFee,
                         recipientName, recipientPhone, shippingAddress, shippingNote,
-                        orderRemark, cvsStoreId, cvsStoreName, shippingArea, senderCity, senderDistrict,
-                        dimensionSum, merId, discountAmount, invoiceSnapshot, policySnapshot);
+                        orderRemark, merId, discountAmount, invoiceSnapshot, policySnapshot);
             } catch (Exception e) {
                 log.error("OrderService.createOrder.dbTx.error", "建單 DB 交易失敗，執行庫存補償", e);
                 compensateStock(stockTxId, stockItems);
@@ -1289,20 +1188,12 @@ public class OrderService {
             long totalActualAmount,
             String checkoutId,
             String deliveryTemp,
-            String shippingMethod,
             long shippingFee,
-            String shippingFeePayer,
             String recipientName,
             String recipientPhone,
             String shippingAddress,
             String shippingNote,
             String orderRemark,
-            String cvsStoreId,
-            String cvsStoreName,
-            String shippingArea,
-            String senderCity,
-            String senderDistrict,
-            int dimensionSum,
             String merId,
             long discountAmount,
             /**

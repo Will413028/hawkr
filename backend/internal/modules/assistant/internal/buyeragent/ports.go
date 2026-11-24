@@ -40,7 +40,6 @@ type OrderDetail struct {
 	Status         string
 	SellerName     string
 	ShippingMethod string
-	ShippingStatus string
 	RecipientName  string
 	PaymentMethod  string
 	Amount         int64

@@ -6,7 +6,6 @@ import io.github.will413028.hawkr.order.grpc.OrderAfterSalesView;
 import io.github.will413028.hawkr.order.grpc.OrderDetailView;
 import io.github.will413028.hawkr.order.grpc.OrderSummaryView;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
-import io.github.will413028.hawkr.shipping.grpc.ShipmentDetailView;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -15,42 +14,6 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OrderProtoConverterTest {
-
-    @Test
-    void summaryViewUsesLiveShipmentLabelCodesForSellerView() {
-        OrderEntity order = baseOrder();
-        ShipmentDetailView liveShipment = ShipmentDetailView.newBuilder()
-                .setLabelKey("https://cdn.example/label.pdf")
-                .setPartnerId("777")
-                .setOdno("ODNO1234")
-                .setValidationNo("9876")
-                .build();
-
-        OrderSummaryView summary = OrderProtoConverter.toSummaryView(
-                order, List.of(), null, null, "", true, liveShipment);
-
-        assertThat(summary.getLabelKey()).isEqualTo("https://cdn.example/label.pdf");
-        assertThat(summary.getPartnerId()).isEqualTo("777");
-        assertThat(summary.getOdno()).isEqualTo("ODNO1234");
-        assertThat(summary.getValidationNo()).isEqualTo("9876");
-    }
-
-    @Test
-    void summaryViewFallsBackToOrderSnapshotWhenLiveShipmentCodesAreBlank() {
-        OrderEntity order = baseOrder();
-        order.setLabelUrl("https://cdn.example/snapshot-label.pdf");
-        order.setPartnerId("123");
-        order.setOdno("SNAP5678");
-        order.setValidationNo("4321");
-
-        OrderSummaryView summary = OrderProtoConverter.toSummaryView(
-                order, List.of(), null, null, "", true, ShipmentDetailView.getDefaultInstance());
-
-        assertThat(summary.getLabelKey()).isEqualTo("https://cdn.example/snapshot-label.pdf");
-        assertThat(summary.getPartnerId()).isEqualTo("123");
-        assertThat(summary.getOdno()).isEqualTo("SNAP5678");
-        assertThat(summary.getValidationNo()).isEqualTo("4321");
-    }
 
     /**
      * #2137：訂單列表／詳情的賣家連結先前只有 store_id（內部代理鍵），前端連
@@ -75,7 +38,7 @@ class OrderProtoConverterTest {
         assertThat(summary.getStoreCode()).isEqualTo("2649605557");
 
         OrderDetailView detail = OrderProtoConverter.toDetailView(
-                order, List.of(), List.of(), null, sellerMeta, null, "", false);
+                order, List.of(), List.of(), sellerMeta, null, "", false);
         assertThat(detail.getStoreCode()).isEqualTo("2649605557");
     }
 
@@ -106,12 +69,12 @@ class OrderProtoConverterTest {
         OrderItemEntity item = nonCatalogItem();
 
         OrderSummaryView summary = OrderProtoConverter.toSummaryView(
-                order, List.of(item), null, null, "", false, null);
+                order, List.of(item), null, null, "", false);
         assertThat(summary.getItems(0).getSkuId()).isEmpty();
         assertThat(summary.getItems(0).getSkuName()).isEqualTo("文旦柚 200 公斤");
 
         OrderDetailView detail = OrderProtoConverter.toDetailView(
-                order, List.of(item), List.of(), null, null, null, "", false);
+                order, List.of(item), List.of(), null, null, "", false);
         assertThat(detail.getItems(0).getSkuId()).isEmpty();
 
         OrderAfterSalesView afterSales = OrderProtoConverter.toAfterSalesView(
@@ -128,7 +91,7 @@ class OrderProtoConverterTest {
         item.setSkuId(5150L);
 
         OrderSummaryView summary = OrderProtoConverter.toSummaryView(
-                order, List.of(item), null, null, "", false, null);
+                order, List.of(item), null, null, "", false);
         assertThat(summary.getItems(0).getSkuId()).isEqualTo("5150");
     }
 

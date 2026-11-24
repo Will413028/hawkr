@@ -13,8 +13,8 @@ import java.util.UUID;
  * （36 §7.4 Idempotency Conformance Contract）。
  *
  * <p><b>{@code buyerId}</b>：買家的 {@code buyer_id} 業務值（原始值，非登入
- * account_id）。由 consumer 端查詢自己的 order 記錄取得（{@code orders.buyer_id}），
- * 不採信上游 shipping-service {@code shipment.delivered} payload 傳入的同名欄位——
+ * account_id）。由寫入端查詢自己的 order 記錄取得（{@code orders.buyer_id}），
+ * 不採信上游 payload 傳入的同名欄位——
  * 跨服務身份欄位不可信，一律以自己 DB 為準（鏡像 OrderService.completeOrder /
  * OrderOutboxPublisher.enrich 的查自己 order 記錄再解析模式）。
  *

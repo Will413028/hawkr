@@ -53,14 +53,12 @@ type orderDetailOutput struct {
 type trackingInput struct{}
 
 type trackingItem struct {
-	OrderNo            string `json:"order_no"`
-	Status             string `json:"status"`
-	ShippingMethod     string `json:"shipping_method"`
-	ShippingStatus     string `json:"shipping_status"`
-	ShippingStatusDesc string `json:"shipping_status_desc"`
-	SellerName         string `json:"seller_name"`
-	ShipTime           string `json:"ship_time"`
-	Amount             int64  `json:"amount_twd"`
+	OrderNo        string `json:"order_no"`
+	Status         string `json:"status"`
+	ShippingMethod string `json:"shipping_method"`
+	SellerName     string `json:"seller_name"`
+	ShipTime       string `json:"ship_time"`
+	Amount         int64  `json:"amount_twd"`
 }
 
 type trackingOutput struct {
@@ -155,7 +153,6 @@ func (d Deps) orderDetailTool() (*guardedTool, error) {
 				"amount_twd":      detail.Amount,
 				"seller_name":     detail.SellerName,
 				"shipping_method": detail.ShippingMethod,
-				"shipping_status": detail.ShippingStatus,
 				"shipping_fee":    detail.ShippingFee,
 				"recipient_name":  detail.RecipientName,
 				"payment_method":  detail.PaymentMethod,
@@ -194,7 +191,7 @@ func (d Deps) trackingTool() (*guardedTool, error) {
 				}
 				packages = append(packages, trackingItem{
 					OrderNo: detail.OrderNo, Status: detail.Status, ShippingMethod: detail.ShippingMethod,
-					ShippingStatus: detail.ShippingStatus, SellerName: detail.SellerName, Amount: detail.Amount,
+					SellerName: detail.SellerName, Amount: detail.Amount,
 				})
 			}
 			if len(packages) == 0 {

@@ -30,7 +30,6 @@ const (
 	AfterSalesService_ResolveAfterSaleCase_FullMethodName             = "/hawkr.aftersales.AfterSalesService/ResolveAfterSaleCase"
 	AfterSalesService_ConfirmReturnReceipt_FullMethodName             = "/hawkr.aftersales.AfterSalesService/ConfirmReturnReceipt"
 	AfterSalesService_CancelShipment_FullMethodName                   = "/hawkr.aftersales.AfterSalesService/CancelShipment"
-	AfterSalesService_RetryPrintReturnLabel_FullMethodName            = "/hawkr.aftersales.AfterSalesService/RetryPrintReturnLabel"
 	AfterSalesService_SubmitAppeal_FullMethodName                     = "/hawkr.aftersales.AfterSalesService/SubmitAppeal"
 	AfterSalesService_GetArbitration_FullMethodName                   = "/hawkr.aftersales.AfterSalesService/GetArbitration"
 	AfterSalesService_GetSellerArbitration_FullMethodName             = "/hawkr.aftersales.AfterSalesService/GetSellerArbitration"
@@ -74,8 +73,6 @@ type AfterSalesServiceClient interface {
 	ConfirmReturnReceipt(ctx context.Context, in *ConfirmReturnReceiptRequest, opts ...grpc.CallOption) (*ConfirmReturnReceiptResponse, error)
 	// 取消出貨（從 Order Service 遷移，API 路徑不變）
 	CancelShipment(ctx context.Context, in *CancelShipmentRequest, opts ...grpc.CallOption) (*CancelShipmentResponse, error)
-	// 7-11 退貨出貨便代碼人工重試列印（§5.3.6 admin/ops 介入用）
-	RetryPrintReturnLabel(ctx context.Context, in *RetryPrintReturnLabelRequest, opts ...grpc.CallOption) (*RetryPrintReturnLabelResponse, error)
 	// 買家提交申訴
 	SubmitAppeal(ctx context.Context, in *SubmitAppealRequest, opts ...grpc.CallOption) (*SubmitAppealResponse, error)
 	// 買家查詢裁決進度 / 結果
@@ -225,16 +222,6 @@ func (c *afterSalesServiceClient) CancelShipment(ctx context.Context, in *Cancel
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CancelShipmentResponse)
 	err := c.cc.Invoke(ctx, AfterSalesService_CancelShipment_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *afterSalesServiceClient) RetryPrintReturnLabel(ctx context.Context, in *RetryPrintReturnLabelRequest, opts ...grpc.CallOption) (*RetryPrintReturnLabelResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RetryPrintReturnLabelResponse)
-	err := c.cc.Invoke(ctx, AfterSalesService_RetryPrintReturnLabel_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -399,8 +386,6 @@ type AfterSalesServiceServer interface {
 	ConfirmReturnReceipt(context.Context, *ConfirmReturnReceiptRequest) (*ConfirmReturnReceiptResponse, error)
 	// 取消出貨（從 Order Service 遷移，API 路徑不變）
 	CancelShipment(context.Context, *CancelShipmentRequest) (*CancelShipmentResponse, error)
-	// 7-11 退貨出貨便代碼人工重試列印（§5.3.6 admin/ops 介入用）
-	RetryPrintReturnLabel(context.Context, *RetryPrintReturnLabelRequest) (*RetryPrintReturnLabelResponse, error)
 	// 買家提交申訴
 	SubmitAppeal(context.Context, *SubmitAppealRequest) (*SubmitAppealResponse, error)
 	// 買家查詢裁決進度 / 結果
@@ -478,9 +463,6 @@ func (UnimplementedAfterSalesServiceServer) ConfirmReturnReceipt(context.Context
 }
 func (UnimplementedAfterSalesServiceServer) CancelShipment(context.Context, *CancelShipmentRequest) (*CancelShipmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelShipment not implemented")
-}
-func (UnimplementedAfterSalesServiceServer) RetryPrintReturnLabel(context.Context, *RetryPrintReturnLabelRequest) (*RetryPrintReturnLabelResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method RetryPrintReturnLabel not implemented")
 }
 func (UnimplementedAfterSalesServiceServer) SubmitAppeal(context.Context, *SubmitAppealRequest) (*SubmitAppealResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SubmitAppeal not implemented")
@@ -736,24 +718,6 @@ func _AfterSalesService_CancelShipment_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AfterSalesServiceServer).CancelShipment(ctx, req.(*CancelShipmentRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AfterSalesService_RetryPrintReturnLabel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RetryPrintReturnLabelRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AfterSalesServiceServer).RetryPrintReturnLabel(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AfterSalesService_RetryPrintReturnLabel_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AfterSalesServiceServer).RetryPrintReturnLabel(ctx, req.(*RetryPrintReturnLabelRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1042,10 +1006,6 @@ var AfterSalesService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelShipment",
 			Handler:    _AfterSalesService_CancelShipment_Handler,
-		},
-		{
-			MethodName: "RetryPrintReturnLabel",
-			Handler:    _AfterSalesService_RetryPrintReturnLabel_Handler,
 		},
 		{
 			MethodName: "SubmitAppeal",

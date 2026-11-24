@@ -13,7 +13,6 @@ import io.github.will413028.hawkr.order.entity.OrderInvoiceSnapshotEntity;
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.MediaGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
-import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.order.mq.OrderEventPublisher;
 import io.github.will413028.hawkr.order.repository.GrantPaymentTaskRepository;
 import io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository;
@@ -87,7 +86,7 @@ class OrderInvoiceSnapshotReviseTest {
     private OrderGrpcService buildService() {
         return new OrderGrpcService(
                 mock(OrderService.class), mock(CheckoutService.class), mock(CouponReleaseService.class),
-                mock(OrderRepository.class), mock(OrderItemRepository.class), mock(ShippingGrpcClient.class),
+                mock(OrderRepository.class), mock(OrderItemRepository.class), 
                 mock(PaymentGrpcClient.class), mock(SellerGrpcClient.class), mock(BuyerGrpcClient.class),
                 mock(MediaGrpcClient.class), mock(MediaUrlProperties.class),
                 mock(GrantPaymentTaskRepository.class), invoiceSnapshotRepository,

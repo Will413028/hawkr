@@ -8,7 +8,6 @@ import io.github.will413028.hawkr.order.grpc.*;
 import io.github.will413028.hawkr.payment.grpc.PaymentDetail;
 import io.github.will413028.hawkr.buyer.grpc.BuyerDisplay;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
-import io.github.will413028.hawkr.shipping.grpc.ShipmentDetailView;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -29,18 +28,6 @@ public final class OrderProtoConverter {
     public static OrderSummaryView toSummaryView(OrderEntity order, List<OrderItemEntity> items,
                                                    SellerMeta sellerMeta, BuyerDisplay buyerDisplay,
                                                    String cdnBaseUrl, boolean isSellerView) {
-        return toSummaryView(order, items, sellerMeta, buyerDisplay, cdnBaseUrl, isSellerView, null);
-    }
-
-    /**
-     * 賣家列表頁專用：傳入即時 shipment（避免快照延遲）
-     *
-     * @param liveShipment 由賣家列表 handler 透過 batch RPC 取得，null 時 fallback 到快照
-     */
-    public static OrderSummaryView toSummaryView(OrderEntity order, List<OrderItemEntity> items,
-                                                   SellerMeta sellerMeta, BuyerDisplay buyerDisplay,
-                                                   String cdnBaseUrl, boolean isSellerView,
-                                                   ShipmentDetailView liveShipment) {
         OrderSummaryView.Builder builder = OrderSummaryView.newBuilder()
                 .setOrderNo(order.getOrderNo())
                 .setCreateTime(formatIso8601(order.getCreatedAt()))
@@ -54,38 +41,12 @@ public final class OrderProtoConverter {
                 // 付款方式（PaymentMethod value 2001-2004；未付款為空字串。admin 交易列表顯示用）
                 .setPaymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod() : "")
                 // 狀態摘要
-                .setShippingStatus(order.getShippingStatus() != null
-                        ? order.getShippingStatus() : "")
-                .setShippingStatusDesc(order.getShippingStatusDesc() != null ? order.getShippingStatusDesc() : "")
                 .setStatusTime(resolveStatusTime(order))
                 .setStatusSummary(resolveStatusSummary(order))
                 // 賣家訂單列表擴充欄位
                 .setRecipientName(order.getRecipientName() != null ? order.getRecipientName() : "")
                 .setShippingAddress(order.getShippingAddress() != null ? order.getShippingAddress() : "")
                 .setBuyerId(ProtoConversionUtils.formatLong(order.getBuyerId()));
-
-        // 物流出貨資訊（僅賣家/管理員視角，買家不可見）
-        if (isSellerView) {
-            String liveLabelKey = liveShipment != null ? liveShipment.getLabelKey() : "";
-            String livePartnerId = liveShipment != null ? liveShipment.getPartnerId() : "";
-            String liveOdno = liveShipment != null ? liveShipment.getOdno() : "";
-            String liveValidationNo = liveShipment != null ? liveShipment.getValidationNo() : "";
-
-            // 49 §6.6：只填 objectKey，Gateway 組 labelUrl（order.labelUrl 欄快照值為 key，見 ShippingEventConsumer）
-            builder.setLabelKey(firstNonBlank(liveLabelKey, order.getLabelUrl()))
-                    .setLabelExpireAt(order.getLabelExpireAt() != null ? order.getLabelExpireAt().toString() : "")
-                    .setPartnerId(firstNonBlank(livePartnerId, order.getPartnerId()))
-                    .setOdno(firstNonBlank(liveOdno, order.getOdno()))
-                    .setValidationNo(firstNonBlank(liveValidationNo, order.getValidationNo()));
-        }
-
-        // 出貨照片：賣家視角優先用 liveShipment（即時，避免賣家剛上傳的延遲），其餘走快照。
-        // proto shipment_photo_urls 欄名沿用、值一律 objectKey（liveShipment 與快照皆已改帶 key，49 §6.2）；Gateway 組顯示 URL
-        if (isSellerView && liveShipment != null && liveShipment.getShipmentPhotoKeysCount() > 0) {
-            builder.addAllShipmentPhotoKeys(liveShipment.getShipmentPhotoKeysList());
-        } else if (order.getShipmentPhotoKeys() != null && !order.getShipmentPhotoKeys().isEmpty()) {
-            builder.addAllShipmentPhotoKeys(order.getShipmentPhotoKeys());
-        }
 
         // 賣家資訊聚合（即時從 Seller Service 取得）
         if (sellerMeta != null) {
@@ -132,11 +93,6 @@ public final class OrderProtoConverter {
             builder.setCountdownPausedAt(formatIso8601(order.getCountdownPausedAt()));
         }
 
-        // §5.9 賣家處理期限（賣家未處理 + 配送方式非 Uber + 訂單未取消時有值）
-        if (order.getProcessingDeadline() != null) {
-            builder.setProcessingDeadline(formatIso8601(order.getProcessingDeadline()));
-        }
-
         // 03 §8.5 付款期限（僅 PENDING_PAYMENT(0) 時對外暴露；買家列表「待付款倒數」卡片用，免逐筆打詳情 API）
         if (OrderStatus.PENDING_PAYMENT.value().equals(order.getStatus()) && order.getPaymentDeadline() != null) {
             builder.setPaymentDeadline(formatIso8601(order.getPaymentDeadline()));
@@ -176,7 +132,7 @@ public final class OrderProtoConverter {
     // ==================== OrderDetailView ====================
 
     public static OrderDetailView toDetailView(OrderEntity order, List<OrderItemEntity> items,
-                                                List<RefundRequestEntity> refunds, ShipmentDetailView shipment,
+                                                List<RefundRequestEntity> refunds,
                                                 SellerMeta sellerMeta, BuyerDisplay buyerDisplay,
                                                 String cdnBaseUrl, boolean isSellerView) {
         OrderDetailView.Builder builder = OrderDetailView.newBuilder()
@@ -209,34 +165,10 @@ public final class OrderProtoConverter {
                 .setShippingArea(order.getShippingArea() != null ? order.getShippingArea() : "")
                 .setCouponInstanceId(order.getCouponInstanceId() != null ? order.getCouponInstanceId() : "")
                 .setDiscountAmount(ProtoConversionUtils.formatAmount(order.getDiscountAmount()))
-                // 物流狀態（field 27-28，Order 快照 fallback）
-                .setShippingStatus(order.getShippingStatus() != null
-                        ? order.getShippingStatus() : "")
-                .setShippingStatusDesc(order.getShippingStatusDesc() != null ? order.getShippingStatusDesc() : "")
-                .setLabelKey(order.getLabelUrl() != null ? order.getLabelUrl() : "") // 49 §6.6：labelUrl 欄快照值為 key，Gateway 組
                 // 付款方式 code（field 32，來自 Order DB payment_method，如 CREDIT_CARD / ATM）
                 .setPaymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod() : "")
                 // 付款 PayUni MerID（field 61，給 Web/Mobile Google Pay 重試動態取得 gatewayMerchantId，20 §4.13）
                 .setPaymentMerId(order.getMerId() != null ? order.getMerId() : "");
-
-        // 物流資訊聚合（以 Shipping Service 即時資料為準，覆蓋 Order 快照）
-        // shippingStatusDesc 不從 shipment 覆蓋，統一用 orders 快照值（MQ 事件已即時更新）
-        if (shipment != null) {
-            builder.setShippingStatus(shipment.getStatus());
-            // 出貨單號 / PDF / 超商出貨便代碼僅賣家視角填充（不給買家看）
-            if (isSellerView) {
-                builder.setLabelKey(shipment.getLabelKey())
-                        .setPartnerId(shipment.getPartnerId())
-                        .setOdno(shipment.getOdno())
-                        .setValidationNo(shipment.getValidationNo());
-            }
-        }
-
-        // 出貨照片（雙方詳情頁可見，統一從 orders 快照取，不再走 shipment 即時值）
-        // proto 欄名沿用、值為 objectKey；Gateway 組顯示 URL（49 §6.2）
-        if (order.getShipmentPhotoKeys() != null && !order.getShipmentPhotoKeys().isEmpty()) {
-            builder.addAllShipmentPhotoKeys(order.getShipmentPhotoKeys());
-        }
 
         // 買家收貨照片（雙方詳情頁可見，於 ConfirmReceipt 寫入快照；值為 objectKey）
         if (order.getReceiptPhotoKeys() != null && !order.getReceiptPhotoKeys().isEmpty()) {
@@ -318,11 +250,6 @@ public final class OrderProtoConverter {
         // 倒數暫停時刻（03 §5.8；NULL=倒數中=空字串）
         if (order.getCountdownPausedAt() != null) {
             builder.setCountdownPausedAt(formatIso8601(order.getCountdownPausedAt()));
-        }
-
-        // §5.9 賣家處理期限（賣家未處理 + 配送方式非 Uber + 訂單未取消時有值）
-        if (order.getProcessingDeadline() != null) {
-            builder.setProcessingDeadline(formatIso8601(order.getProcessingDeadline()));
         }
 
         // 03 §8.5 付款期限（僅 PENDING_PAYMENT(0) 時對外暴露；買家詳情頁顯示「待付款倒數」用）
@@ -543,19 +470,11 @@ public final class OrderProtoConverter {
     }
 
     /**
-     * 依 OrderStatus + ShippingStatus 組合產生文案
+     * 依 OrderStatus 產生文案
      */
     private static String resolveStatusSummary(OrderEntity order) {
         String status = order.getStatus();
-        String ss = order.getShippingStatus();
         if (status == null) return "";
-
-        // 物流異常狀態優先判斷（不論 OrderStatus）
-        if (ss != null) {
-            if ("50".equals(ss)) return "物流異常，請聯繫客服處理。";
-            if ("60".equals(ss) || "70".equals(ss)) return "退貨處理中。";
-            if ("90".equals(ss)) return "物流需人工處理，請聯繫客服。";
-        }
 
         return switch (status) {
             case "0" -> {  // PENDING_PAYMENT
@@ -608,12 +527,5 @@ public final class OrderProtoConverter {
         String base = cdnBaseUrl.endsWith("/") ? cdnBaseUrl.substring(0, cdnBaseUrl.length() - 1) : cdnBaseUrl;
         String key = objectKey.startsWith("/") ? objectKey : "/" + objectKey;
         return base + key;
-    }
-
-    private static String firstNonBlank(String preferred, String fallback) {
-        if (preferred != null && !preferred.isBlank()) {
-            return preferred;
-        }
-        return fallback != null ? fallback : "";
     }
 }

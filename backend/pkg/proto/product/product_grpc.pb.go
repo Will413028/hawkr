@@ -39,7 +39,6 @@ const (
 	ProductService_GetProductsByIDs_FullMethodName                             = "/hawkr.product.ProductService/GetProductsByIDs"
 	ProductService_GetRelatedProducts_FullMethodName                           = "/hawkr.product.ProductService/GetRelatedProducts"
 	ProductService_DeleteProduct_FullMethodName                                = "/hawkr.product.ProductService/DeleteProduct"
-	ProductService_CalculateShippingOptions_FullMethodName                     = "/hawkr.product.ProductService/CalculateShippingOptions"
 	ProductService_VerifyCertification_FullMethodName                          = "/hawkr.product.ProductService/VerifyCertification"
 	ProductService_SubmitProductCertification_FullMethodName                   = "/hawkr.product.ProductService/SubmitProductCertification"
 	ProductService_ListProductCertificationApplications_FullMethodName         = "/hawkr.product.ProductService/ListProductCertificationApplications"
@@ -115,8 +114,6 @@ type ProductServiceClient interface {
 	GetRelatedProducts(ctx context.Context, in *GetRelatedProductsRequest, opts ...grpc.CallOption) (*GetRelatedProductsResponse, error)
 	// 軟刪除商品（僅限擁有者，僅草稿(4001)/未上架(4003)狀態）
 	DeleteProduct(ctx context.Context, in *DeleteProductRequest, opts ...grpc.CallOption) (*DeleteProductResponse, error)
-	// 計算可用配送選項與運費（依溫層分組）
-	CalculateShippingOptions(ctx context.Context, in *CalculateShippingOptionsRequest, opts ...grpc.CallOption) (*CalculateShippingOptionsResponse, error)
 	// 驗證認證編號是否存在於政府開放資料平台 — 僅限 Seller (account_type: 2, 3)
 	VerifyCertification(ctx context.Context, in *VerifyCertificationRequest, opts ...grpc.CallOption) (*VerifyCertificationResponse, error)
 	// 送出認證申請；同步階段只讀快取不發外部呼叫，命中「有效」即自動核准
@@ -367,16 +364,6 @@ func (c *productServiceClient) DeleteProduct(ctx context.Context, in *DeleteProd
 	return out, nil
 }
 
-func (c *productServiceClient) CalculateShippingOptions(ctx context.Context, in *CalculateShippingOptionsRequest, opts ...grpc.CallOption) (*CalculateShippingOptionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CalculateShippingOptionsResponse)
-	err := c.cc.Invoke(ctx, ProductService_CalculateShippingOptions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *productServiceClient) VerifyCertification(ctx context.Context, in *VerifyCertificationRequest, opts ...grpc.CallOption) (*VerifyCertificationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifyCertificationResponse)
@@ -612,8 +599,6 @@ type ProductServiceServer interface {
 	GetRelatedProducts(context.Context, *GetRelatedProductsRequest) (*GetRelatedProductsResponse, error)
 	// 軟刪除商品（僅限擁有者，僅草稿(4001)/未上架(4003)狀態）
 	DeleteProduct(context.Context, *DeleteProductRequest) (*DeleteProductResponse, error)
-	// 計算可用配送選項與運費（依溫層分組）
-	CalculateShippingOptions(context.Context, *CalculateShippingOptionsRequest) (*CalculateShippingOptionsResponse, error)
 	// 驗證認證編號是否存在於政府開放資料平台 — 僅限 Seller (account_type: 2, 3)
 	VerifyCertification(context.Context, *VerifyCertificationRequest) (*VerifyCertificationResponse, error)
 	// 送出認證申請；同步階段只讀快取不發外部呼叫，命中「有效」即自動核准
@@ -723,9 +708,6 @@ func (UnimplementedProductServiceServer) GetRelatedProducts(context.Context, *Ge
 }
 func (UnimplementedProductServiceServer) DeleteProduct(context.Context, *DeleteProductRequest) (*DeleteProductResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteProduct not implemented")
-}
-func (UnimplementedProductServiceServer) CalculateShippingOptions(context.Context, *CalculateShippingOptionsRequest) (*CalculateShippingOptionsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CalculateShippingOptions not implemented")
 }
 func (UnimplementedProductServiceServer) VerifyCertification(context.Context, *VerifyCertificationRequest) (*VerifyCertificationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method VerifyCertification not implemented")
@@ -1162,24 +1144,6 @@ func _ProductService_DeleteProduct_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ProductService_CalculateShippingOptions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CalculateShippingOptionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ProductServiceServer).CalculateShippingOptions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ProductService_CalculateShippingOptions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProductServiceServer).CalculateShippingOptions(ctx, req.(*CalculateShippingOptionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _ProductService_VerifyCertification_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VerifyCertificationRequest)
 	if err := dec(in); err != nil {
@@ -1590,10 +1554,6 @@ var ProductService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteProduct",
 			Handler:    _ProductService_DeleteProduct_Handler,
-		},
-		{
-			MethodName: "CalculateShippingOptions",
-			Handler:    _ProductService_CalculateShippingOptions_Handler,
 		},
 		{
 			MethodName: "VerifyCertification",

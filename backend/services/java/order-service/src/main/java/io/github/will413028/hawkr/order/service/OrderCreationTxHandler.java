@@ -66,9 +66,6 @@ public class OrderCreationTxHandler {
             String stockTxId,
             String checkoutId,
             String deliveryTemp,
-            String shippingMethod,
-            long shippingFee,
-            String shippingFeePayer,
             OrderPolicySnapshot policySnapshot
     ) {
         String orderNo = orderNoGenerator.generateOrderNo();
@@ -84,9 +81,7 @@ public class OrderCreationTxHandler {
         order.setStatus(OrderStatus.PENDING_PAYMENT.value());
         order.setCheckoutId(checkoutId);
         order.setDeliveryTemp(deliveryTemp);
-        order.setShippingMethod(shippingMethod);
-        order.setShippingFee(shippingFee);
-        order.setShippingFeePayer(shippingFeePayer);
+        order.setShippingFee(OrderConstants.CHECKOUT_SHIPPING_FEE);
         order.setPaymentDeadline(DateTimeUtils.nowUtc().plusSeconds(orderConfig.getPaymentDeadlineSeconds()));
         order.setPaymentAttempts(0);
         applyPolicySnapshot(order, policySnapshot);
@@ -112,13 +107,11 @@ public class OrderCreationTxHandler {
             List<CreateOrderItemParam> items,
             long totalOriginalAmount, long totalActualAmount,
             String stockTxId, String checkoutId,
-            String deliveryTemp, String shippingMethod,
-            long shippingFee, String shippingFeePayer,
+            String deliveryTemp,
+            long shippingFee,
             String recipientName, String recipientPhone,
             String shippingAddress, String shippingNote,
-            String orderRemark, String cvsStoreId, String cvsStoreName,
-            String shippingArea, String senderCity, String senderDistrict,
-            int dimensionSum, String merId,
+            String orderRemark, String merId,
             long discountAmount,
             InvoiceIntakeResolver.Snapshot invoiceSnapshot,
             OrderPolicySnapshot policySnapshot
@@ -135,23 +128,13 @@ public class OrderCreationTxHandler {
         order.setStatus(OrderStatus.PENDING_PAYMENT.value());
         order.setCheckoutId(checkoutId);
         order.setDeliveryTemp(deliveryTemp);
-        order.setShippingMethod(shippingMethod);
         order.setShippingFee(shippingFee);
-        order.setShippingFeePayer(shippingFeePayer);
         // 結帳模組新增欄位
         order.setRecipientName(recipientName);
         order.setRecipientPhone(recipientPhone);
         order.setShippingAddress(shippingAddress);
         order.setShippingNote(shippingNote);
         order.setOrderRemark(orderRemark);
-        order.setCvsStoreId(cvsStoreId);
-        order.setCvsStoreName(cvsStoreName);
-        order.setShippingArea(shippingArea);
-        order.setSenderCity(senderCity);
-        order.setSenderDistrict(senderDistrict);
-        if (dimensionSum > 0) {
-            order.setDimensionSum(dimensionSum);
-        }
         order.setMerId(merId);
         // couponInstanceId 不在建單時寫入，由 CheckoutService.reserveCoupon 成功後 updateCouponInstanceId 回寫
         order.setDiscountAmount(discountAmount);
@@ -195,7 +178,7 @@ public class OrderCreationTxHandler {
             long buyerId, long storeId, long acceptanceId,
             List<CreateOrderItemParam> items,
             long totalAmount, long shippingFee,
-            String deliveryTemp, String shippingMethod, String shippingFeePayer,
+            String deliveryTemp,
             String merId,
             OrderPolicySnapshot policySnapshot
     ) {
@@ -212,9 +195,7 @@ public class OrderCreationTxHandler {
         order.setTotalActualAmount(totalAmount);
         order.setStatus(OrderStatus.PENDING_PAYMENT.value());
         order.setDeliveryTemp(deliveryTemp);
-        order.setShippingMethod(shippingMethod);
         order.setShippingFee(shippingFee);
-        order.setShippingFeePayer(shippingFeePayer);
         order.setMerId(merId);
         // 64 號 §6.4.11：RFQ 的付款期限是建單 +12h，不是結帳路徑的 24h。
         order.setPaymentDeadline(DateTimeUtils.nowUtc().plusSeconds(orderConfig.getRfqPaymentDeadlineSeconds()));

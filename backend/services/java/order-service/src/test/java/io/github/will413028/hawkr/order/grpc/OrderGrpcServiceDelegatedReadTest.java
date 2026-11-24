@@ -12,7 +12,6 @@ import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.MediaGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
-import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.order.mq.OrderEventPublisher;
 import io.github.will413028.hawkr.order.repository.GrantPaymentTaskRepository;
 import io.github.will413028.hawkr.order.repository.OrderItemRepository;
@@ -52,7 +51,6 @@ class OrderGrpcServiceDelegatedReadTest {
     @Mock private CouponReleaseService couponReleaseService;
     @Mock private OrderRepository orderRepository;
     @Mock private OrderItemRepository orderItemRepository;
-    @Mock private ShippingGrpcClient shippingGrpcClient;
     @Mock private PaymentGrpcClient paymentGrpcClient;
     @Mock private SellerGrpcClient sellerGrpcClient;
     @Mock private BuyerGrpcClient buyerGrpcClient;
@@ -63,7 +61,7 @@ class OrderGrpcServiceDelegatedReadTest {
 
     private OrderGrpcService buildService() {
         return new OrderGrpcService(orderService, checkoutService, couponReleaseService,
-                orderRepository, orderItemRepository, shippingGrpcClient, paymentGrpcClient,
+                orderRepository, orderItemRepository, paymentGrpcClient,
                 sellerGrpcClient, buyerGrpcClient, mediaGrpcClient, mediaUrlProperties,
                 grantPaymentTaskRepository,
                 org.mockito.Mockito.mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),
@@ -89,8 +87,6 @@ class OrderGrpcServiceDelegatedReadTest {
         order.setShippingAddress("台北市大安區信義路四段 123 號 5 樓之 3");
         order.setTransactionId("TXN-0001");
         order.setAtmVirtualAccount("9988776655");
-        order.setLabelUrl("labels/ORD1.pdf");
-        order.setOdno("12345678");
         when(orderService.getOrderByNo("ORD1")).thenReturn(order);
         return order;
     }
@@ -133,8 +129,6 @@ class OrderGrpcServiceDelegatedReadTest {
 
         assertTrue(detail.getTransactionId().isEmpty(), "金流交易明細不得外流");
         assertTrue(detail.getAtmVirtualAccount().isEmpty(), "ATM 虛擬帳號不得外流");
-        assertTrue(detail.getLabelKey().isEmpty(), "託運單不得外流");
-        assertTrue(detail.getOdno().isEmpty(), "出貨單編號不得外流");
     }
 
     @Test
@@ -155,7 +149,6 @@ class OrderGrpcServiceDelegatedReadTest {
             assertEquals("0912341234", detail.getRecipientPhone());
             assertEquals("台北市大安區信義路四段 123 號 5 樓之 3", detail.getShippingAddress());
             assertEquals("TXN-0001", detail.getTransactionId());
-            assertEquals("labels/ORD1.pdf", detail.getLabelKey());
         } finally {
             ctx.detach(previous);
         }
@@ -176,7 +169,6 @@ class OrderGrpcServiceDelegatedReadTest {
         assertEquals("台北市大安區信義路四段 123 號 5 樓之 3", detail.getShippingAddress());
         // 揭露的是收件資訊，不是履約與金流
         assertTrue(detail.getTransactionId().isEmpty());
-        assertTrue(detail.getLabelKey().isEmpty());
     }
 
     @Test

@@ -41,115 +41,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
     @Select("SELECT store_id FROM orders WHERE order_no = #{orderNo}")
     Long findStoreIdByOrderNo(@Param("orderNo") String orderNo);
 
-    /**
-     * 取買家 buyer_id（order.delivered 的 notify_buyer_account_id 解析用，scalar projection 非 Entity）。
-     * 一律查自己 order 記錄取得，不採信上游 shipping-service shipment.delivered payload 同名欄位
-     * （跨服務身份欄位不可信；鏡像上方 findStoreIdByOrderNo）。
-     */
-    @Select("SELECT buyer_id FROM orders WHERE order_no = #{orderNo}")
-    Long findBuyerIdByOrderNo(@Param("orderNo") String orderNo);
-
-    /**
-     * Backstop（03 §8.11）：付款後逾寬限期仍無物流單的待出貨訂單。
-     * status='10' = OrderStatus.PAID；shipment_no 空 ⟺ 尚未建立物流單。
-     */
-    @Select("""
-            SELECT * FROM orders
-            WHERE status = '10'
-              AND (shipment_no IS NULL OR shipment_no = '')
-              AND pay_time < #{graceCutoff}
-              AND (shipment_create_next_retry_at IS NULL OR shipment_create_next_retry_at <= #{now})
-            ORDER BY pay_time ASC, id ASC
-            LIMIT #{limit}
-            """)
-    List<OrderEntity> findPaidOrdersWithoutShipmentPastGrace(
-            @Param("now") LocalDateTime now,
-            @Param("graceCutoff") LocalDateTime graceCutoff,
-            @Param("limit") int limit);
-
-    /**
-     * Backstop（03 §8.11）：<b>搶佔</b>一筆待重試建單的訂單，同時累加重試次數並推進下次重試時間。
-     *
-     * <p><b>issue #2294 H4 缺陷 A</b>：原述詞是 {@code WHERE order_no=?} 純 PK 更新 ⇒
-     * 兩個 pod <b>各得 affected=1</b>、各自 publish 一次 {@code shipment.create.requested}，
-     * 且 {@code attempts} 一次 tick 跳 +2（重試預算被腰斬）。
-     *
-     * <p>改為 <b>lease on {@code shipment_create_next_retry_at}</b>：述詞就是候選 SQL
-     * （{@link #findPaidOrdersWithoutShipmentPastGrace}）的第 4 條，SET 的也是同一欄
-     * ⇒ claim 成功即暫時離開候選集合，{@code backoffMinutes} 到期自動回來
-     * （《多副本排程搶佔規範》§二 六步 → lease）。
-     *
-     * <p>另加 {@code status = PAID} 守住業務前提（訂單已離開 PAID 就不該再重試建單）。
-     *
-     * <p><b>為什麼不用 {@code AND shipment_create_attempts = #{expectedAttempts}}</b>：
-     * 兩者都擋得住第二個 pod，但 lease 與其餘命中同形、且能表達「租約到期自動回來」；
-     * 計數器 CAS 的讀值來自 SELECT 快照，多一次 ABA 推理。
-     *
-     * @return 1 = 搶到（呼叫端才可以 publish）；0 = 已被另一個 pod 認領或訂單已離開 PAID
-     */
-    default int bumpShipmentCreateAttempt(String orderNo, LocalDateTime nextRetryAt, LocalDateTime now) {
-        return bumpShipmentCreateAttemptByStatus(orderNo, nextRetryAt, now, OrderStatus.PAID.value());
-    }
-
-    @Update("""
-            UPDATE orders
-            SET shipment_create_attempts = shipment_create_attempts + 1,
-                shipment_create_next_retry_at = #{nextRetryAt},
-                updated_at = NOW()
-            WHERE order_no = #{orderNo}
-              AND status = #{paid}
-              AND (shipment_create_next_retry_at IS NULL
-                   OR shipment_create_next_retry_at <= #{now})
-            """)
-    int bumpShipmentCreateAttemptByStatus(
-            @Param("orderNo") String orderNo,
-            @Param("nextRetryAt") LocalDateTime nextRetryAt,
-            @Param("now") LocalDateTime now,
-            @Param("paid") String paid);
-
-    /**
-     * Backstop（03 §8.11）：<b>搶佔</b>一筆「重試上限已耗盡、要送取消+退款」的訂單。
-     *
-     * <p><b>issue #2294 H4 缺陷 B（單 pod 也壞，issue 原文未列）</b>：give-up 分支原本
-     * <b>完全不寫任何狀態</b> ⇒ 候選 SQL 的四個條件全部維持成立 ⇒ 該列
-     * <b>每 5 分鐘、每個 pod 各發一次「取消 + 退款」請求</b>，直到訂單狀態離開 PAID 為止。
-     *
-     * <p><b>為什麼 give-up 也走租約而不是永久旗標</b>（本案的核心取捨）：
-     * <ul>
-     *   <li>永久旗標版：publish 拋例外或 pod 在兩者之間崩潰 ⇒ 該訂單<b>永遠停在 PAID、
-     *       永遠沒有物流單、永遠不會被取消退款，且沒有任何告警</b>——那正是本 issue 要修的
-     *       靜默失效，只是換了位置。</li>
-     *   <li>租約版<b>會自己終止</b>，不需要任何旗標：取消一旦生效，訂單 {@code status} 就離開
-     *       {@code '10'}(PAID)，候選 SQL 第一個條件即不成立 ⇒ 該列自然退出。
-     *       1 天的租約只在「取消沒生效」時才會再響一次——那正是我們想知道的事。</li>
-     * </ul>
-     *
-     * <p>{@code shipment_backstop_given_up_at} 是<b>純觀測欄</b>（{@code COALESCE} 只寫第一次），
-     * <b>不進候選述詞</b>；用途是給 {@code sql_exporter} 一條「{@code given_up_at IS NOT NULL}
-     * 且 {@code status='10'}」的告警。
-     *
-     * @return 1 = 搶到（呼叫端才可以 publish）；0 = 已被另一個 pod 認領或訂單已離開 PAID
-     */
-    default int claimShipmentBackstopGiveUp(String orderNo, LocalDateTime giveUpRetryAt, LocalDateTime now) {
-        return claimShipmentBackstopGiveUpByStatus(orderNo, giveUpRetryAt, now, OrderStatus.PAID.value());
-    }
-
-    @Update("""
-            UPDATE orders
-            SET shipment_create_next_retry_at = #{giveUpRetryAt},
-                shipment_backstop_given_up_at = COALESCE(shipment_backstop_given_up_at, #{now}),
-                updated_at = NOW()
-            WHERE order_no = #{orderNo}
-              AND status = #{paid}
-              AND (shipment_create_next_retry_at IS NULL
-                   OR shipment_create_next_retry_at <= #{now})
-            """)
-    int claimShipmentBackstopGiveUpByStatus(
-            @Param("orderNo") String orderNo,
-            @Param("giveUpRetryAt") LocalDateTime giveUpRetryAt,
-            @Param("now") LocalDateTime now,
-            @Param("paid") String paid);
-
     @Select("""
         <script>
         SELECT * FROM orders
@@ -423,31 +314,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
     List<OrderEntity> findExpiredPendingOrders();
 
     /**
-     * 物流建單事件：更新物流單號、發貨時間、物流狀態、託運單 URL、賣家處理期限
-     * 訂單狀態維持不變（PAID），由後續 callTcat / 物流狀態變更事件推進
-     * 冪等：僅當 shipment_no IS NULL 時才更新
-     * processing_deadline：09 §5.9，由 shipment.created event payload 帶入。Uber 即時配送時為 NULL
-     */
-    @Update("""
-        UPDATE orders
-        SET shipment_no = #{shipmentNo},
-            ship_time = NOW(),
-            shipping_status = #{shippingStatus},
-            label_url = #{labelUrl},
-            processing_deadline = #{processingDeadline},
-            updated_at = NOW()
-        WHERE order_no = #{orderNo}
-          AND shipment_no IS NULL
-        """)
-    int updateShipmentCreated(
-            @Param("orderNo") String orderNo,
-            @Param("shipmentNo") String shipmentNo,
-            @Param("shippingStatus") String shippingStatus,
-            @Param("labelUrl") String labelUrl,
-            @Param("processingDeadline") LocalDateTime processingDeadline
-    );
-
-    /**
      * §5.9 賣家完成處理（CVS 取號 / 宅配叫件成功）→ 清空 processing_deadline
      * 冪等：僅當 processing_deadline IS NOT NULL 時才更新（避免無謂寫入）
      */
@@ -461,81 +327,16 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
     int clearProcessingDeadline(@Param("orderNo") String orderNo);
 
     /**
-     * 出貨照片更新事件：覆蓋寫入 shipment_photo_keys JSONB（存 objectKey，49 §5.3）
-     */
-    @Update("UPDATE orders SET shipment_photo_keys = #{photoKeys}::jsonb WHERE order_no = #{orderNo}")
-    int updateShipmentPhotoKeys(
-            @Param("orderNo") String orderNo,
-            @Param("photoKeys") String photoKeys
-    );
-
-    /**
-     * 物流狀態變更事件：更新物流狀態
-     * PayUni 狀態碼不遞增（91→92→21→31），不可用數值比較防併發。
-     * 直接覆蓋更新（Shipping Service 已在 Java 層驗證轉移合法性）。
-     */
-    @Update("""
-        UPDATE orders
-        SET shipping_status = #{shippingStatus},
-            shipping_status_desc = #{shippingStatusDesc},
-            updated_at = NOW()
-        WHERE order_no = #{orderNo}
-        """)
-    int updateShippingStatus(
-            @Param("orderNo") String orderNo,
-            @Param("shippingStatus") String shippingStatus,
-            @Param("shippingStatusDesc") String shippingStatusDesc
-    );
-
-    /**
-     * 物流狀態變更事件：更新物流狀態 + labelUrl + labelExpireAt（宅配取號後帶 PDF URL 和下載期限）
-     */
-    @Update("""
-        UPDATE orders
-        SET shipping_status = #{shippingStatus},
-            shipping_status_desc = #{shippingStatusDesc},
-            label_url = #{labelUrl},
-            label_expire_at = #{labelExpireAt},
-            updated_at = NOW()
-        WHERE order_no = #{orderNo}
-        """)
-    int updateShippingStatusAndLabel(
-            @Param("orderNo") String orderNo,
-            @Param("shippingStatus") String shippingStatus,
-            @Param("shippingStatusDesc") String shippingStatusDesc,
-            @Param("labelUrl") String labelUrl,
-            @Param("labelExpireAt") LocalDateTime labelExpireAt
-    );
-
-    /**
-     * 超商出貨便代碼回填：更新 partner_id/odno/validation_no
-     * 冪等：僅當 partner_id IS NULL 時才更新
-     */
-    @Update("""
-        UPDATE orders
-        SET partner_id = #{partnerId},
-            odno = #{odno},
-            validation_no = #{validationNo}
-        WHERE order_no = #{orderNo}
-          AND partner_id IS NULL
-        """)
-    int updateLabelInfo(
-            @Param("orderNo") String orderNo,
-            @Param("partnerId") String partnerId,
-            @Param("odno") String odno,
-            @Param("validationNo") String validationNo
-    );
-
-    /**
-     * 物流送達事件：更新訂單狀態為已送達 + 設定自動完成時間
-     * 冪等：僅當 status 在 allowedStatuses 清單中時才更新
+     * 訂單轉為已送達 + 設定自動完成時間。
+     * 冪等：僅當 status 在 allowedStatuses 清單中時才更新。
+     *
+     * <p>Java shipping 刪除後沒有呼叫端（B8 的出貨設計重建寫入端）；SQL 保留是因為 E 軸入口不變式
+     * （{@code chk_orders_receipt_axis_present}）由 {@code ReceiptAxisContractTest} 守在這條 SQL 上。
      */
     @Update("""
         <script>
         UPDATE orders
         SET status = #{status},
-            shipping_status = #{shippingStatus},
-            shipping_status_desc = #{shippingStatusDesc},
             auto_complete_at = #{autoCompleteAt},
             countdown_paused_at = NULL,
             delivered_at = NOW(),
@@ -558,24 +359,21 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
     int updateOrderDelivered(
             @Param("orderNo") String orderNo,
             @Param("status") String status,
-            @Param("shippingStatus") String shippingStatus,
-            @Param("shippingStatusDesc") String shippingStatusDesc,
             @Param("autoCompleteAt") LocalDateTime autoCompleteAt,
             @Param("allowedStatuses") List<String> allowedStatuses,
             @Param("receiptStatusPending") String receiptStatusPending
     );
 
     /**
-     * 物流送達事件（E 軸入口值由 CodeMeta 供給）。
+     * 送達（E 軸入口值由 CodeMeta 供給）。
      *
      * <p>🔴 這個多載的存在是為了讓呼叫端<b>不必知道 E 軸的初始值是什麼</b>——
      * 值域的權威是 {@link ReceiptStatus}，不是散在各處的字串。
      */
-    default int updateOrderDelivered(String orderNo, String status, String shippingStatus,
-                                     String shippingStatusDesc, LocalDateTime autoCompleteAt,
+    default int updateOrderDelivered(String orderNo, String status, LocalDateTime autoCompleteAt,
                                      List<String> allowedStatuses) {
-        return updateOrderDelivered(orderNo, status, shippingStatus, shippingStatusDesc,
-                autoCompleteAt, allowedStatuses, ReceiptStatus.PENDING.value());
+        return updateOrderDelivered(orderNo, status, autoCompleteAt, allowedStatuses,
+                ReceiptStatus.PENDING.value());
     }
 
     /**
@@ -603,21 +401,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
             @Param("atmVirtualAccount") String atmVirtualAccount,
             @Param("atmExpireDate") String atmExpireDate
     );
-
-    /**
-     * 查詢已到期的已送達訂單（待自動完成）。
-     * 暫停中（countdown_paused_at IS NOT NULL）的訂單跳過，03 §5.8。
-     */
-    @Select("""
-        SELECT * FROM orders
-        WHERE status = '40'
-          AND auto_complete_at IS NOT NULL
-          AND auto_complete_at <= NOW()
-          AND countdown_paused_at IS NULL
-        ORDER BY auto_complete_at ASC, id ASC
-        LIMIT #{limit}
-        """)
-    List<OrderEntity> findAutoCompleteOrders(@Param("limit") int limit);
 
     /**
      * 暫停自動完成倒數（03 §5.8）。

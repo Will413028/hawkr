@@ -62,9 +62,6 @@ const (
 	// OrderServiceGetOrderForReviewProcedure is the fully-qualified name of the OrderService's
 	// GetOrderForReview RPC.
 	OrderServiceGetOrderForReviewProcedure = "/hawkr.order.OrderService/GetOrderForReview"
-	// OrderServiceGetOrderForShippingProcedure is the fully-qualified name of the OrderService's
-	// GetOrderForShipping RPC.
-	OrderServiceGetOrderForShippingProcedure = "/hawkr.order.OrderService/GetOrderForShipping"
 	// OrderServiceGetBuyerMerchantSummaryProcedure is the fully-qualified name of the OrderService's
 	// GetBuyerMerchantSummary RPC.
 	OrderServiceGetBuyerMerchantSummaryProcedure = "/hawkr.order.OrderService/GetBuyerMerchantSummary"
@@ -83,9 +80,6 @@ const (
 	// OrderServiceCheckoutValidateProcedure is the fully-qualified name of the OrderService's
 	// CheckoutValidate RPC.
 	OrderServiceCheckoutValidateProcedure = "/hawkr.order.OrderService/CheckoutValidate"
-	// OrderServiceCheckoutShippingFeeProcedure is the fully-qualified name of the OrderService's
-	// CheckoutShippingFee RPC.
-	OrderServiceCheckoutShippingFeeProcedure = "/hawkr.order.OrderService/CheckoutShippingFee"
 	// OrderServiceCheckoutPreviewProcedure is the fully-qualified name of the OrderService's
 	// CheckoutPreview RPC.
 	OrderServiceCheckoutPreviewProcedure = "/hawkr.order.OrderService/CheckoutPreview"
@@ -127,9 +121,6 @@ const (
 	// OrderServiceReviseOrderInvoiceSnapshotInternalProcedure is the fully-qualified name of the
 	// OrderService's ReviseOrderInvoiceSnapshotInternal RPC.
 	OrderServiceReviseOrderInvoiceSnapshotInternalProcedure = "/hawkr.order.OrderService/ReviseOrderInvoiceSnapshotInternal"
-	// OrderServiceGetUberQuoteForCheckoutProcedure is the fully-qualified name of the OrderService's
-	// GetUberQuoteForCheckout RPC.
-	OrderServiceGetUberQuoteForCheckoutProcedure = "/hawkr.order.OrderService/GetUberQuoteForCheckout"
 )
 
 // OrderServiceClient is a client for the hawkr.order.OrderService service.
@@ -166,8 +157,6 @@ type OrderServiceClient interface {
 	GetSellerOrderDetail(context.Context, *connect.Request[order.GetSellerOrderDetailRequest]) (*connect.Response[order.GetSellerOrderDetailResponse], error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(context.Context, *connect.Request[order.GetOrderForReviewRequest]) (*connect.Response[order.GetOrderForReviewResponse], error)
-	// 取得物流建單所需訂單資訊（shipping-service 用）
-	GetOrderForShipping(context.Context, *connect.Request[order.GetOrderForShippingRequest]) (*connect.Response[order.GetOrderForShippingResponse], error)
 	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(context.Context, *connect.Request[order.GetBuyerMerchantSummaryRequest]) (*connect.Response[order.GetBuyerMerchantSummaryResponse], error)
 	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
@@ -181,8 +170,6 @@ type OrderServiceClient interface {
 	HasOrderBetween(context.Context, *connect.Request[order.HasOrderBetweenRequest]) (*connect.Response[order.HasOrderBetweenResponse], error)
 	// 即時驗證（購物車勾選時呼叫，輕量級，預設運費 Grid）
 	CheckoutValidate(context.Context, *connect.Request[order.CheckoutValidateRequest]) (*connect.Response[order.CheckoutValidateResponse], error)
-	// 運費精算（選配送方式 + 填地址/選門市後呼叫）
-	CheckoutShippingFee(context.Context, *connect.Request[order.CheckoutShippingFeeRequest]) (*connect.Response[order.CheckoutShippingFeeResponse], error)
 	// 結帳預覽（完整驗證 + 精算總額，不建單）
 	CheckoutPreview(context.Context, *connect.Request[order.CheckoutPreviewRequest]) (*connect.Response[order.CheckoutPreviewResponse], error)
 	// 確認結帳（建單 + 回傳付款資訊）
@@ -221,17 +208,6 @@ type OrderServiceClient interface {
 	// 只能複製本 RPC 的回傳值、不得自行 +1。append-only：每次成功都 INSERT 一列新版本。
 	// 走 52 號 HMAC 內部授權四 header。
 	ReviseOrderInvoiceSnapshotInternal(context.Context, *connect.Request[order.ReviseOrderInvoiceSnapshotInternalRequest]) (*connect.Response[order.ReviseOrderInvoiceSnapshotInternalResponse], error)
-	// ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
-	//
-	// 🔴 為什麼要經過 order-service 而不是 Gateway 直接打 shipping：
-	//    報價需要「這一車的賣家是誰、每一件的尺寸重量單價是多少」，而那些是
-	//    CheckoutService.resolveItems() 已經在做的事（批次打 product-service）。
-	//    讓 Gateway 直接打 shipping 的話，那段解析要在 Gateway 重寫一份，
-	//    而 Gateway 是 thin proxy、不該持有商品解析邏輯。
-	//
-	// ⚠️ 呼叫端只送 address_id 與 items：賣家由伺服端從 SKU 推導（66 §6.1.3 逐字
-	//    「不收 externalStoreId」）。前端傳賣家 id 等於讓前端決定跟誰叫車。
-	GetUberQuoteForCheckout(context.Context, *connect.Request[order.OrderUberQuoteRequest]) (*connect.Response[order.OrderUberQuoteResponse], error)
 }
 
 // NewOrderServiceClient constructs a client for the hawkr.order.OrderService service. By default,
@@ -305,12 +281,6 @@ func NewOrderServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(orderServiceMethods.ByName("GetOrderForReview")),
 			connect.WithClientOptions(opts...),
 		),
-		getOrderForShipping: connect.NewClient[order.GetOrderForShippingRequest, order.GetOrderForShippingResponse](
-			httpClient,
-			baseURL+OrderServiceGetOrderForShippingProcedure,
-			connect.WithSchema(orderServiceMethods.ByName("GetOrderForShipping")),
-			connect.WithClientOptions(opts...),
-		),
 		getBuyerMerchantSummary: connect.NewClient[order.GetBuyerMerchantSummaryRequest, order.GetBuyerMerchantSummaryResponse](
 			httpClient,
 			baseURL+OrderServiceGetBuyerMerchantSummaryProcedure,
@@ -345,12 +315,6 @@ func NewOrderServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+OrderServiceCheckoutValidateProcedure,
 			connect.WithSchema(orderServiceMethods.ByName("CheckoutValidate")),
-			connect.WithClientOptions(opts...),
-		),
-		checkoutShippingFee: connect.NewClient[order.CheckoutShippingFeeRequest, order.CheckoutShippingFeeResponse](
-			httpClient,
-			baseURL+OrderServiceCheckoutShippingFeeProcedure,
-			connect.WithSchema(orderServiceMethods.ByName("CheckoutShippingFee")),
 			connect.WithClientOptions(opts...),
 		),
 		checkoutPreview: connect.NewClient[order.CheckoutPreviewRequest, order.CheckoutPreviewResponse](
@@ -437,12 +401,6 @@ func NewOrderServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(orderServiceMethods.ByName("ReviseOrderInvoiceSnapshotInternal")),
 			connect.WithClientOptions(opts...),
 		),
-		getUberQuoteForCheckout: connect.NewClient[order.OrderUberQuoteRequest, order.OrderUberQuoteResponse](
-			httpClient,
-			baseURL+OrderServiceGetUberQuoteForCheckoutProcedure,
-			connect.WithSchema(orderServiceMethods.ByName("GetUberQuoteForCheckout")),
-			connect.WithClientOptions(opts...),
-		),
 	}
 }
 
@@ -458,14 +416,12 @@ type orderServiceClient struct {
 	getSellerOrders                    *connect.Client[order.GetSellerOrdersRequest, order.GetSellerOrdersResponse]
 	getSellerOrderDetail               *connect.Client[order.GetSellerOrderDetailRequest, order.GetSellerOrderDetailResponse]
 	getOrderForReview                  *connect.Client[order.GetOrderForReviewRequest, order.GetOrderForReviewResponse]
-	getOrderForShipping                *connect.Client[order.GetOrderForShippingRequest, order.GetOrderForShippingResponse]
 	getBuyerMerchantSummary            *connect.Client[order.GetBuyerMerchantSummaryRequest, order.GetBuyerMerchantSummaryResponse]
 	getBuyerOrdersForSeller            *connect.Client[order.GetBuyerOrdersForSellerRequest, order.GetBuyerOrdersForSellerResponse]
 	getOrderForAfterSales              *connect.Client[order.GetOrderForAfterSalesRequest, order.GetOrderForAfterSalesResponse]
 	cancelOrderInternal                *connect.Client[order.CancelOrderInternalRequest, order.CancelOrderInternalResponse]
 	hasOrderBetween                    *connect.Client[order.HasOrderBetweenRequest, order.HasOrderBetweenResponse]
 	checkoutValidate                   *connect.Client[order.CheckoutValidateRequest, order.CheckoutValidateResponse]
-	checkoutShippingFee                *connect.Client[order.CheckoutShippingFeeRequest, order.CheckoutShippingFeeResponse]
 	checkoutPreview                    *connect.Client[order.CheckoutPreviewRequest, order.CheckoutPreviewResponse]
 	checkoutConfirm                    *connect.Client[order.CheckoutConfirmRequest, order.CheckoutConfirmResponse]
 	getOrderForPayment                 *connect.Client[order.GetOrderForPaymentRequest, order.GetOrderForPaymentResponse]
@@ -480,7 +436,6 @@ type orderServiceClient struct {
 	listAbnormalOrdersForAdmin         *connect.Client[order.ListAbnormalOrdersForAdminRequest, order.ListAbnormalOrdersForAdminResponse]
 	getOrderInvoiceSnapshotInternal    *connect.Client[order.GetOrderInvoiceSnapshotInternalRequest, order.GetOrderInvoiceSnapshotInternalResponse]
 	reviseOrderInvoiceSnapshotInternal *connect.Client[order.ReviseOrderInvoiceSnapshotInternalRequest, order.ReviseOrderInvoiceSnapshotInternalResponse]
-	getUberQuoteForCheckout            *connect.Client[order.OrderUberQuoteRequest, order.OrderUberQuoteResponse]
 }
 
 // CreateOrder calls hawkr.order.OrderService.CreateOrder.
@@ -533,11 +488,6 @@ func (c *orderServiceClient) GetOrderForReview(ctx context.Context, req *connect
 	return c.getOrderForReview.CallUnary(ctx, req)
 }
 
-// GetOrderForShipping calls hawkr.order.OrderService.GetOrderForShipping.
-func (c *orderServiceClient) GetOrderForShipping(ctx context.Context, req *connect.Request[order.GetOrderForShippingRequest]) (*connect.Response[order.GetOrderForShippingResponse], error) {
-	return c.getOrderForShipping.CallUnary(ctx, req)
-}
-
 // GetBuyerMerchantSummary calls hawkr.order.OrderService.GetBuyerMerchantSummary.
 func (c *orderServiceClient) GetBuyerMerchantSummary(ctx context.Context, req *connect.Request[order.GetBuyerMerchantSummaryRequest]) (*connect.Response[order.GetBuyerMerchantSummaryResponse], error) {
 	return c.getBuyerMerchantSummary.CallUnary(ctx, req)
@@ -566,11 +516,6 @@ func (c *orderServiceClient) HasOrderBetween(ctx context.Context, req *connect.R
 // CheckoutValidate calls hawkr.order.OrderService.CheckoutValidate.
 func (c *orderServiceClient) CheckoutValidate(ctx context.Context, req *connect.Request[order.CheckoutValidateRequest]) (*connect.Response[order.CheckoutValidateResponse], error) {
 	return c.checkoutValidate.CallUnary(ctx, req)
-}
-
-// CheckoutShippingFee calls hawkr.order.OrderService.CheckoutShippingFee.
-func (c *orderServiceClient) CheckoutShippingFee(ctx context.Context, req *connect.Request[order.CheckoutShippingFeeRequest]) (*connect.Response[order.CheckoutShippingFeeResponse], error) {
-	return c.checkoutShippingFee.CallUnary(ctx, req)
 }
 
 // CheckoutPreview calls hawkr.order.OrderService.CheckoutPreview.
@@ -644,11 +589,6 @@ func (c *orderServiceClient) ReviseOrderInvoiceSnapshotInternal(ctx context.Cont
 	return c.reviseOrderInvoiceSnapshotInternal.CallUnary(ctx, req)
 }
 
-// GetUberQuoteForCheckout calls hawkr.order.OrderService.GetUberQuoteForCheckout.
-func (c *orderServiceClient) GetUberQuoteForCheckout(ctx context.Context, req *connect.Request[order.OrderUberQuoteRequest]) (*connect.Response[order.OrderUberQuoteResponse], error) {
-	return c.getUberQuoteForCheckout.CallUnary(ctx, req)
-}
-
 // OrderServiceHandler is an implementation of the hawkr.order.OrderService service.
 type OrderServiceHandler interface {
 	// 建立訂單
@@ -683,8 +623,6 @@ type OrderServiceHandler interface {
 	GetSellerOrderDetail(context.Context, *connect.Request[order.GetSellerOrderDetailRequest]) (*connect.Response[order.GetSellerOrderDetailResponse], error)
 	// 查詢訂單評論資格（review-service 用）
 	GetOrderForReview(context.Context, *connect.Request[order.GetOrderForReviewRequest]) (*connect.Response[order.GetOrderForReviewResponse], error)
-	// 取得物流建單所需訂單資訊（shipping-service 用）
-	GetOrderForShipping(context.Context, *connect.Request[order.GetOrderForShippingRequest]) (*connect.Response[order.GetOrderForShippingResponse], error)
 	// 查詢買家在各賣家的累計消費總額（buyer 模組用，會員卡清單）
 	GetBuyerMerchantSummary(context.Context, *connect.Request[order.GetBuyerMerchantSummaryRequest]) (*connect.Response[order.GetBuyerMerchantSummaryResponse], error)
 	// 查詢買家在特定賣家的消費紀錄（buyer 模組用，消費紀錄明細）
@@ -698,8 +636,6 @@ type OrderServiceHandler interface {
 	HasOrderBetween(context.Context, *connect.Request[order.HasOrderBetweenRequest]) (*connect.Response[order.HasOrderBetweenResponse], error)
 	// 即時驗證（購物車勾選時呼叫，輕量級，預設運費 Grid）
 	CheckoutValidate(context.Context, *connect.Request[order.CheckoutValidateRequest]) (*connect.Response[order.CheckoutValidateResponse], error)
-	// 運費精算（選配送方式 + 填地址/選門市後呼叫）
-	CheckoutShippingFee(context.Context, *connect.Request[order.CheckoutShippingFeeRequest]) (*connect.Response[order.CheckoutShippingFeeResponse], error)
 	// 結帳預覽（完整驗證 + 精算總額，不建單）
 	CheckoutPreview(context.Context, *connect.Request[order.CheckoutPreviewRequest]) (*connect.Response[order.CheckoutPreviewResponse], error)
 	// 確認結帳（建單 + 回傳付款資訊）
@@ -738,17 +674,6 @@ type OrderServiceHandler interface {
 	// 只能複製本 RPC 的回傳值、不得自行 +1。append-only：每次成功都 INSERT 一列新版本。
 	// 走 52 號 HMAC 內部授權四 header。
 	ReviseOrderInvoiceSnapshotInternal(context.Context, *connect.Request[order.ReviseOrderInvoiceSnapshotInternalRequest]) (*connect.Response[order.ReviseOrderInvoiceSnapshotInternalResponse], error)
-	// ==================== Uber 即時報價中繼（66 §6.1.3；Stage 8B W2-2）====================
-	//
-	// 🔴 為什麼要經過 order-service 而不是 Gateway 直接打 shipping：
-	//    報價需要「這一車的賣家是誰、每一件的尺寸重量單價是多少」，而那些是
-	//    CheckoutService.resolveItems() 已經在做的事（批次打 product-service）。
-	//    讓 Gateway 直接打 shipping 的話，那段解析要在 Gateway 重寫一份，
-	//    而 Gateway 是 thin proxy、不該持有商品解析邏輯。
-	//
-	// ⚠️ 呼叫端只送 address_id 與 items：賣家由伺服端從 SKU 推導（66 §6.1.3 逐字
-	//    「不收 externalStoreId」）。前端傳賣家 id 等於讓前端決定跟誰叫車。
-	GetUberQuoteForCheckout(context.Context, *connect.Request[order.OrderUberQuoteRequest]) (*connect.Response[order.OrderUberQuoteResponse], error)
 }
 
 // NewOrderServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -818,12 +743,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(orderServiceMethods.ByName("GetOrderForReview")),
 		connect.WithHandlerOptions(opts...),
 	)
-	orderServiceGetOrderForShippingHandler := connect.NewUnaryHandler(
-		OrderServiceGetOrderForShippingProcedure,
-		svc.GetOrderForShipping,
-		connect.WithSchema(orderServiceMethods.ByName("GetOrderForShipping")),
-		connect.WithHandlerOptions(opts...),
-	)
 	orderServiceGetBuyerMerchantSummaryHandler := connect.NewUnaryHandler(
 		OrderServiceGetBuyerMerchantSummaryProcedure,
 		svc.GetBuyerMerchantSummary,
@@ -858,12 +777,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 		OrderServiceCheckoutValidateProcedure,
 		svc.CheckoutValidate,
 		connect.WithSchema(orderServiceMethods.ByName("CheckoutValidate")),
-		connect.WithHandlerOptions(opts...),
-	)
-	orderServiceCheckoutShippingFeeHandler := connect.NewUnaryHandler(
-		OrderServiceCheckoutShippingFeeProcedure,
-		svc.CheckoutShippingFee,
-		connect.WithSchema(orderServiceMethods.ByName("CheckoutShippingFee")),
 		connect.WithHandlerOptions(opts...),
 	)
 	orderServiceCheckoutPreviewHandler := connect.NewUnaryHandler(
@@ -950,12 +863,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(orderServiceMethods.ByName("ReviseOrderInvoiceSnapshotInternal")),
 		connect.WithHandlerOptions(opts...),
 	)
-	orderServiceGetUberQuoteForCheckoutHandler := connect.NewUnaryHandler(
-		OrderServiceGetUberQuoteForCheckoutProcedure,
-		svc.GetUberQuoteForCheckout,
-		connect.WithSchema(orderServiceMethods.ByName("GetUberQuoteForCheckout")),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/hawkr.order.OrderService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OrderServiceCreateOrderProcedure:
@@ -978,8 +885,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 			orderServiceGetSellerOrderDetailHandler.ServeHTTP(w, r)
 		case OrderServiceGetOrderForReviewProcedure:
 			orderServiceGetOrderForReviewHandler.ServeHTTP(w, r)
-		case OrderServiceGetOrderForShippingProcedure:
-			orderServiceGetOrderForShippingHandler.ServeHTTP(w, r)
 		case OrderServiceGetBuyerMerchantSummaryProcedure:
 			orderServiceGetBuyerMerchantSummaryHandler.ServeHTTP(w, r)
 		case OrderServiceGetBuyerOrdersForSellerProcedure:
@@ -992,8 +897,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 			orderServiceHasOrderBetweenHandler.ServeHTTP(w, r)
 		case OrderServiceCheckoutValidateProcedure:
 			orderServiceCheckoutValidateHandler.ServeHTTP(w, r)
-		case OrderServiceCheckoutShippingFeeProcedure:
-			orderServiceCheckoutShippingFeeHandler.ServeHTTP(w, r)
 		case OrderServiceCheckoutPreviewProcedure:
 			orderServiceCheckoutPreviewHandler.ServeHTTP(w, r)
 		case OrderServiceCheckoutConfirmProcedure:
@@ -1022,8 +925,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 			orderServiceGetOrderInvoiceSnapshotInternalHandler.ServeHTTP(w, r)
 		case OrderServiceReviseOrderInvoiceSnapshotInternalProcedure:
 			orderServiceReviseOrderInvoiceSnapshotInternalHandler.ServeHTTP(w, r)
-		case OrderServiceGetUberQuoteForCheckoutProcedure:
-			orderServiceGetUberQuoteForCheckoutHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1073,10 +974,6 @@ func (UnimplementedOrderServiceHandler) GetOrderForReview(context.Context, *conn
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetOrderForReview is not implemented"))
 }
 
-func (UnimplementedOrderServiceHandler) GetOrderForShipping(context.Context, *connect.Request[order.GetOrderForShippingRequest]) (*connect.Response[order.GetOrderForShippingResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetOrderForShipping is not implemented"))
-}
-
 func (UnimplementedOrderServiceHandler) GetBuyerMerchantSummary(context.Context, *connect.Request[order.GetBuyerMerchantSummaryRequest]) (*connect.Response[order.GetBuyerMerchantSummaryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetBuyerMerchantSummary is not implemented"))
 }
@@ -1099,10 +996,6 @@ func (UnimplementedOrderServiceHandler) HasOrderBetween(context.Context, *connec
 
 func (UnimplementedOrderServiceHandler) CheckoutValidate(context.Context, *connect.Request[order.CheckoutValidateRequest]) (*connect.Response[order.CheckoutValidateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.CheckoutValidate is not implemented"))
-}
-
-func (UnimplementedOrderServiceHandler) CheckoutShippingFee(context.Context, *connect.Request[order.CheckoutShippingFeeRequest]) (*connect.Response[order.CheckoutShippingFeeResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.CheckoutShippingFee is not implemented"))
 }
 
 func (UnimplementedOrderServiceHandler) CheckoutPreview(context.Context, *connect.Request[order.CheckoutPreviewRequest]) (*connect.Response[order.CheckoutPreviewResponse], error) {
@@ -1159,8 +1052,4 @@ func (UnimplementedOrderServiceHandler) GetOrderInvoiceSnapshotInternal(context.
 
 func (UnimplementedOrderServiceHandler) ReviseOrderInvoiceSnapshotInternal(context.Context, *connect.Request[order.ReviseOrderInvoiceSnapshotInternalRequest]) (*connect.Response[order.ReviseOrderInvoiceSnapshotInternalResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.ReviseOrderInvoiceSnapshotInternal is not implemented"))
-}
-
-func (UnimplementedOrderServiceHandler) GetUberQuoteForCheckout(context.Context, *connect.Request[order.OrderUberQuoteRequest]) (*connect.Response[order.OrderUberQuoteResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetUberQuoteForCheckout is not implemented"))
 }

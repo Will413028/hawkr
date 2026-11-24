@@ -81,7 +81,7 @@ class OrderCreationTxHandlerRfqLineTest {
                         null, "文旦柚 200 公斤", 1, 30000L, 30000L, 0L, "", null, null));
         return handler.createRfqOrderInTx(
                 100L, 9001L, 7505210956461375488L, items,
-                30800L, 800L, "3201", "3005", "3101", "HAWKAGENT01",
+                30800L, 800L, "3201", "HAWKAGENT01",
                 new OrderPolicySnapshot("PLATFORM_CONSIGNMENT", "PLATFORM_AGENT_MERCHANT",
                         "SELLER_MANAGED", "PLATFORM_TO_BUYER", "v1-foundation"));
     }

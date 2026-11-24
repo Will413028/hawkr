@@ -74,12 +74,11 @@ type OrderDetailInput struct {
 
 // OrderDetailOutput 訂單詳情
 type OrderDetailOutput struct {
-	OrderNo        string `json:"order_no"`
-	Status         string `json:"status"`
-	BuyerID        string `json:"buyer_id"`
-	ShipmentNo     string `json:"shipment_no"`
-	ShippingStatus string `json:"shipping_status"`
-	Amount         int64  `json:"amount_twd"`
+	OrderNo    string `json:"order_no"`
+	Status     string `json:"status"`
+	BuyerID    string `json:"buyer_id"`
+	ShipmentNo string `json:"shipment_no"`
+	Amount     int64  `json:"amount_twd"`
 }
 
 // InventoryCheckInput 庫存檢查（無參數）
@@ -207,12 +206,11 @@ func NewGetOrderDetailTool(deps *ToolDeps) tool.Tool {
 			return OrderDetailOutput{}, fmt.Errorf("查詢訂單 %s 失敗: %w", input.OrderNo, err)
 		}
 		return OrderDetailOutput{
-			OrderNo:        detail.OrderNo,
-			Status:         StatusLabel(detail.Status),
-			Amount:         detail.Amount,
-			BuyerID:        detail.BuyerID,
-			ShipmentNo:     detail.ShipmentNo,
-			ShippingStatus: detail.ShippingStatus,
+			OrderNo:    detail.OrderNo,
+			Status:     StatusLabel(detail.Status),
+			Amount:     detail.Amount,
+			BuyerID:    detail.BuyerID,
+			ShipmentNo: detail.ShipmentNo,
 		}, nil
 	})
 	if err != nil {
@@ -403,7 +401,6 @@ func NewGetBuyerOrderDetailTool(deps *ToolDeps) tool.Tool {
 			"amount_twd":      detail.Amount,
 			"seller_name":     detail.SellerName,
 			"shipping_method": detail.ShippingMethod,
-			"shipping_status": detail.ShippingStatus,
 			"shipping_fee":    detail.ShippingFee,
 			"recipient_name":  detail.RecipientName,
 			"payment_method":  detail.PaymentMethod,
@@ -424,14 +421,12 @@ type TrackingInput struct{}
 
 // TrackingItem 單筆物流資訊
 type TrackingItem struct {
-	OrderNo            string `json:"order_no"`
-	Status             string `json:"status"`
-	ShippingMethod     string `json:"shipping_method"`
-	ShippingStatus     string `json:"shipping_status"`
-	ShippingStatusDesc string `json:"shipping_status_desc"`
-	SellerName         string `json:"seller_name"`
-	ShipTime           string `json:"ship_time"`
-	Amount             int64  `json:"amount_twd"`
+	OrderNo        string `json:"order_no"`
+	Status         string `json:"status"`
+	ShippingMethod string `json:"shipping_method"`
+	SellerName     string `json:"seller_name"`
+	ShipTime       string `json:"ship_time"`
+	Amount         int64  `json:"amount_twd"`
 }
 
 // TrackingOutput 包裹追蹤結果
@@ -465,13 +460,11 @@ func NewTrackMyPackageTool(deps *ToolDeps) tool.Tool {
 				continue
 			}
 			packages = append(packages, TrackingItem{
-				OrderNo:            detail.OrderNo,
-				Status:             StatusLabel(detail.Status),
-				ShippingMethod:     detail.ShippingMethod,
-				ShippingStatus:     detail.ShippingStatus,
-				ShippingStatusDesc: "", // proto 未直接暴露，由 LLM 從 ShippingStatus 描述
-				SellerName:         detail.SellerName,
-				Amount:             detail.Amount,
+				OrderNo:        detail.OrderNo,
+				Status:         StatusLabel(detail.Status),
+				ShippingMethod: detail.ShippingMethod,
+				SellerName:     detail.SellerName,
+				Amount:         detail.Amount,
 			})
 		}
 

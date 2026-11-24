@@ -86,12 +86,11 @@ class OrderCreationTxHandlerInvoiceSnapshotTest {
 
     private String createExtended(InvoiceIntakeResolver.Snapshot snapshot) {
         return handler.createOrderInTxExtended(
-                100L, 2001L, items(), 1000L, 1060L, "STX1", "CHK1",
-                "3201", "3001", 60L, "BUYER",
+                100L, 2001L, items(), 1000L, 1000L, "STX1", "CHK1",
+                "3201", 0L,
                 "王小明", "0912345678", "台北市中正區忠孝東路一段 1 號", "",
-                "", "", "", "TAIPEI", "台北市", "中正區",
-                0, "HAWK2001", 0L, snapshot,
-                new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver().resolve("3001"));
+                "", "HAWK2001", 0L, snapshot,
+                new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver().resolve());
     }
 
     @Test
@@ -142,8 +141,8 @@ class OrderCreationTxHandlerInvoiceSnapshotTest {
     @DisplayName("購物車外建單（gRPC CreateOrder）也落一列缺省快照——否則那條路徑的每張訂單都會誤觸發 invoice 端的 fail-loud")
     void legacyCreateOrderPathAlsoWritesADefaultSnapshot() {
         handler.createOrderInTx(100L, 2001L, items(), 1000L, 1000L,
-                "STX2", "CHK2", "3201", "3001", 0L, "BUYER",
-                new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver().resolve("3001"));
+                "STX2", "CHK2", "3201",
+                new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver().resolve());
 
         ArgumentCaptor<OrderInvoiceSnapshotEntity> captor =
                 ArgumentCaptor.forClass(OrderInvoiceSnapshotEntity.class);

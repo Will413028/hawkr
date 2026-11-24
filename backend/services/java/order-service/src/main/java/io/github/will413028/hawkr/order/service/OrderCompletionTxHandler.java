@@ -55,7 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 而 {@code OrderEventPublisher.publish} <b>吞掉所有例外</b>
  * ⇒ 訂單已是 COMPLETED、錢照撥（撥款任務在 tx 內建立所以安全），但
  * <b>買家沒收到通知、CRM 統計短少、物流單永遠沒被標記收貨確認</b>，且無告警無重試。
- * order-service prod {@code replicas=2}、{@code AutoCompleteScheduler} 1 小時一跑。
+ * order-service prod {@code replicas=2}。
  *
  * <p><b>tx 內零 gRPC</b>：兩筆事件都只寫「core payload」（本地事實），
  * {@code notifyBuyerAccountId} / {@code notifySellerAccountId} 的身分反解<b>延到派送時</b>
@@ -133,7 +133,7 @@ public class OrderCompletionTxHandler {
      * （鏡像 {@code order.paid} / {@code order.cancelled}，避免在完成事務內做 gRPC）。
      *
      * <p>序列化失敗拋例外讓事務 rollback ⇒ 狀態沒轉、撥款任務沒建、事件沒發，
-     * 下一 tick（{@code AutoCompleteScheduler} 1 小時 / 買家再按一次確認收貨）重來。
+     * 買家再按一次確認收貨即重來。
      * 查無訂單同樣拋例外——CAS 剛剛才成功，此時讀不到代表資料層出了更嚴重的問題，
      * 不能靜默跳過（那會退回「狀態已轉、事件遺失」的原缺陷）。
      */

@@ -4,11 +4,7 @@ import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceCarrierSelectionMode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceDocumentKind;
-import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.common.utils.code.ShippingTemperature;
-import io.github.will413028.hawkr.order.checkout.CheckoutValidator.AvailableOption;
-import io.github.will413028.hawkr.order.checkout.CheckoutValidator.FreeShippingResult;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.ValidationResult;
 import io.github.will413028.hawkr.coupon.grpc.CouponValidateResult;
 import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
@@ -22,13 +18,10 @@ import io.github.will413028.hawkr.invoice.grpc.ValidateOrderInvoiceInputInternal
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.InvoiceGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.ProductGrpcClient;
-import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.order.service.OrderService;
 import io.github.will413028.hawkr.product.grpc.BatchGetProductForCheckoutResponse;
 import io.github.will413028.hawkr.product.grpc.ProductForCheckoutInfo;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
-import io.github.will413028.hawkr.shipping.grpc.GetSellerShippingConfigResponse;
-import io.github.will413028.hawkr.shipping.grpc.SellerShippingConfigItem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,14 +59,12 @@ class CheckoutConfirmCouponCompensationTest {
     private static final long BUYER_ID = 2623900520L;
     private static final String SKU_ID = "5001";
     private static final String CHECKOUT_ID = "CHK-COUPON-1";
-    private static final String METHOD = ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value();
     private static final String TEMP = ShippingTemperature.CHILLED.value();
 
     @Mock private ProductGrpcClient productGrpcClient;
     @Mock private SellerGrpcClient sellerGrpcClient;
     @Mock private InvoiceGrpcClient invoiceGrpcClient;
     @Mock private BuyerGrpcClient buyerGrpcClient;
-    @Mock private ShippingGrpcClient shippingGrpcClient;
     @Mock private CheckoutValidator checkoutValidator;
     @Mock private OrderService orderService;
     @Mock private CheckoutCouponGrpcClient couponGrpcClient;
@@ -102,28 +93,13 @@ class CheckoutConfirmCouponCompensationTest {
                 .thenReturn(PrincipalResolution.allResolved(Map.of(STORE_ID, STORE_ID)));
         when(buyerGrpcClient.resolvePrincipals(anyList()))
                 .thenReturn(PrincipalResolution.allResolved(Map.of(BUYER_ID, BUYER_ID)));
-        when(shippingGrpcClient.getSellerShippingConfig(anyLong()))
-                .thenReturn(GetSellerShippingConfigResponse.newBuilder()
-                        .setCode(0)
-                        .addConfigs(SellerShippingConfigItem.newBuilder()
-                                .setShippingMethod(METHOD)
-                                .setGoodsType(TEMP)
-                                .setAvailable(true)
-                                .build())
-                        .build());
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(SellerMeta.newBuilder()
                 .setSellerName("測試賣家")
                 .setPayuniMerId("HAWK" + STORE_ID)
                 .setCanAcceptOrders(true)
                 .build());
-        when(checkoutValidator.validate(anyList(), any()))
-                .thenReturn(new ValidationResult(true, java.util.Set.of(TEMP), List.of(), List.of(), 0));
-        when(checkoutValidator.lookupSingleOption(anyList(), any(), any(), any(), any()))
-                .thenReturn(new AvailableOption(
-                        ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP, ShippingTemperature.CHILLED,
-                        "7-11店到店（冷藏）", 60L, 60L, ShippingFeePayer.BUYER.value(), 0L, false));
-        when(checkoutValidator.checkFreeShipping(anyList(), anyString(), anyString(), any()))
-                .thenReturn(new FreeShippingResult(false, ShippingFeePayer.BUYER.value(), 0L));
+        when(checkoutValidator.validate(anyList()))
+                .thenReturn(new ValidationResult(true, java.util.Set.of(TEMP), List.of()));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(orderService.createOrderFromCheckout(any())).thenReturn("O20260830001");
 
@@ -132,15 +108,15 @@ class CheckoutConfirmCouponCompensationTest {
                 .thenReturn(ValidateOrderInvoiceInputInternalResponse.newBuilder().setCode(0).build());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
-                shippingGrpcClient, couponGrpcClient, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, couponReleaseService);
+                couponGrpcClient, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, couponReleaseService);
 
         // 🔴 快照用**產線那一支** buildPriceSnapshot 組，不手寫 JSON。
         //    舊版這裡餵的是 "1"（舊格式哨兵），而 confirm 現在對「快照沒有政策五欄」一律 fail-closed
         //    ——那正是要防的東西，所以測試必須餵一份真的快照，不是繞過檢查。
         OrderPolicySnapshot policy =
-                new OrderPolicyResolver().resolve(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
+                new OrderPolicyResolver().resolve();
         when(valueOperations.getAndDelete(anyString())).thenReturn(
-                service.buildPriceSnapshot(1000L, 60L, 0L, 1060L, false, false, "HAWK123", policy));
+                service.buildPriceSnapshot(1000L, 0L, 0L, 1000L, "HAWK123", policy));
     }
 
     private static CheckoutConfirmRequest.Builder baseRequest() {
@@ -149,12 +125,10 @@ class CheckoutConfirmCouponCompensationTest {
                 .setCheckoutId(CHECKOUT_ID)
                 .addItems(CheckoutItem.newBuilder()
                         .setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build())
-                .setShippingMethod(METHOD)
                 .setDeliveryTemp(TEMP)
                 .setRecipientName("王小明")
                 .setRecipientPhone("0912345678")
-                .setCvsStoreId("252698")
-                .setCvsStoreName("測試門市")
+                .setShippingAddress("台北市信義區測試路1號")
                 .setCouponTemplateId("TPL-1");
     }
 

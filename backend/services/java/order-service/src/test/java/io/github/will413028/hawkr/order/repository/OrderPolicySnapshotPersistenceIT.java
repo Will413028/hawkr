@@ -2,7 +2,6 @@ package io.github.will413028.hawkr.order.repository;
 
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusAutoConfiguration;
 import io.github.will413028.hawkr.common.config.MyBatisPlusAutoConfiguration;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.order.checkout.OrderPolicyResolver;
 import io.github.will413028.hawkr.order.checkout.OrderPolicySnapshot;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
@@ -107,24 +106,14 @@ class OrderPolicySnapshotPersistenceIT {
     // ==================== 契約 ====================
 
     @Test
-    @DisplayName("3001 黑貓：五欄逐欄等於 resolver 的輸出，且 fulfillment_mode 不是 DB DEFAULT")
-    void taqbinOrderPersistsResolvedPolicy() {
-        assertPersisted(ShippingMethod.TAQBIN.value(), "ITPOL0001", "PLATFORM_LOGISTICS");
-    }
+    @DisplayName("新單：五欄逐欄等於 resolver 的輸出，出貨欄位為 NULL 時 chk_orders_fulfillment_mode_consistent 成立")
+    void newOrderPersistsResolvedPolicyWithNullShipmentColumns() {
+        assertPersisted("ITPOL0001", "SELLER_MANAGED");
 
-    @Test
-    @DisplayName("3002 超商：同上——這兩條是本波唯一啟用的配送方式，也是 V14 回填的那 1093 列")
-    void cvsOrderPersistsResolvedPolicy() {
-        assertPersisted(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value(), "ITPOL0002", "PLATFORM_LOGISTICS");
-    }
-
-    @Test
-    @DisplayName("3005 商家自送：fulfillment_mode = SELLER_MANAGED（與 DB DEFAULT 同值，但來源是 resolver 不是 DEFAULT）")
-    void merchantDeliveryPersistsSellerManaged() {
-        // ⚠️ 這一格的值恰好等於 DB DEFAULT ⇒ 它單獨無鑑別力，
-        //    真正的鑑別力來自上面兩支（值與 DEFAULT 不同）。列在這裡是為了覆蓋
-        //    chk_orders_fulfillment_mode_consistent：3005 若被寫成 PLATFORM_LOGISTICS，DB 會擋。
-        assertPersisted(ShippingMethod.MERCHANT_DELIVERY.value(), "ITPOL0005", "SELLER_MANAGED");
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT shipping_method, shipping_fee_payer FROM orders WHERE order_no = ?", "ITPOL0001");
+        assertThat(row.get("shipping_method")).isNull();
+        assertThat(row.get("shipping_fee_payer")).isNull();
     }
 
     @Test
@@ -132,7 +121,7 @@ class OrderPolicySnapshotPersistenceIT {
     void withoutExplicitWriteTheRowFallsBackToDbDefault() {
         // 🔴 這支是「量測有鑑別力」的對照組：它刻意重現修復前的行為。
         //    若哪天 DB DEFAULT 被移除或改掉，這支會先紅，提醒上面三支的前提變了。
-        OrderEntity order = baseOrder("ITPOL9999", ShippingMethod.TAQBIN.value());
+        OrderEntity order = baseOrder("ITPOL9999");
         orderRepository.insert(order);
 
         Map<String, Object> row = readPolicy("ITPOL9999");
@@ -142,10 +131,10 @@ class OrderPolicySnapshotPersistenceIT {
 
     // ==================== helpers ====================
 
-    private void assertPersisted(String shippingMethod, String orderNo, String expectedFulfillmentMode) {
-        OrderPolicySnapshot policy = resolver.resolve(shippingMethod);
+    private void assertPersisted(String orderNo, String expectedFulfillmentMode) {
+        OrderPolicySnapshot policy = resolver.resolve();
 
-        OrderEntity order = baseOrder(orderNo, shippingMethod);
+        OrderEntity order = baseOrder(orderNo);
         // 與 OrderCreationTxHandler.applyPolicySnapshot 同一組 setter。
         order.setCommerceModel(policy.commerceModel());
         order.setCollectionModel(policy.collectionModel());
@@ -179,19 +168,17 @@ class OrderPolicySnapshotPersistenceIT {
                 """, orderNo);
     }
 
-    private static OrderEntity baseOrder(String orderNo, String shippingMethod) {
+    private static OrderEntity baseOrder(String orderNo) {
         OrderEntity order = new OrderEntity();
         order.setId(Math.abs(orderNo.hashCode()) + 1_000_000L);
         order.setOrderNo(orderNo);
         order.setBuyerId(2623900520L);
         order.setStoreId(2675237784L);
         order.setTotalOriginalAmount(1000L);
-        order.setTotalActualAmount(1060L);
+        order.setTotalActualAmount(1000L);
         order.setStatus("3001");
         order.setDeliveryTemp("3201");
-        order.setShippingMethod(shippingMethod);
-        order.setShippingFee(60L);
-        order.setShippingFeePayer("BUYER");
+        order.setShippingFee(0L);
         order.setPaymentDeadline(LocalDateTime.now().plusDays(3));
         order.setPaymentAttempts(0);
         return order;

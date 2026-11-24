@@ -104,7 +104,6 @@ class OrderServiceCreateRfqOrderTest {
                 mock(OrderCompletionTxHandler.class), txHandler,
                 mock(io.github.will413028.hawkr.order.repository.OrderOutboxMapper.class),
                 new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
-                mock(io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.class),
                 mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new SimpleMeterRegistry());
 
@@ -112,7 +111,7 @@ class OrderServiceCreateRfqOrderTest {
         created.setOrderNo("RFQ20260914001");
         created.setPaymentDeadline(LocalDateTime.of(2026, 9, 17, 10, 0));
         when(txHandler.createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(), anyLong(), anyLong(),
-                any(), any(), any(), any(), any())).thenReturn(created);
+                any(), any(), any())).thenReturn(created);
     }
 
     @Test
@@ -143,7 +142,7 @@ class OrderServiceCreateRfqOrderTest {
 
         verify(sellerGrpcClient).getSellerMeta(SETTLEMENT_STORE_ID);
         verify(txHandler).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
-                anyLong(), anyLong(), any(), anyString(), anyString(),
+                anyLong(), anyLong(), any(),
                 org.mockito.ArgumentMatchers.eq("HAWK2001"), any());
     }
 
@@ -200,8 +199,8 @@ class OrderServiceCreateRfqOrderTest {
     }
 
     @Test
-    @DisplayName("配送走 3005／運費買方負擔，且 acceptance_id 有落到命令上")
-    void writesMerchantDeliveryAndBuyerBorneShipping() {
+    @DisplayName("運費照報價帶入，且 acceptance_id 有落到命令上")
+    void writesQuotedShippingFeeAndAcceptanceId() {
         orderService.createRfqOrder(100L, SETTLEMENT_STORE_ID, ACCEPTANCE_ID,
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "EXTERNAL");
 
@@ -213,8 +212,6 @@ class OrderServiceCreateRfqOrderTest {
                 org.mockito.ArgumentMatchers.eq(30800L),
                 org.mockito.ArgumentMatchers.eq(800L),
                 org.mockito.ArgumentMatchers.eq("3201"),
-                org.mockito.ArgumentMatchers.eq("3005"),
-                org.mockito.ArgumentMatchers.eq("3101"),
                 org.mockito.ArgumentMatchers.eq("HAWK2001"),
                 any());
     }
@@ -234,7 +231,7 @@ class OrderServiceCreateRfqOrderTest {
         assertThat(result.replayed()).isTrue();
         assertThat(result.orderNo()).isEqualTo("RFQ20260913009");
         verify(txHandler, never()).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
-                anyLong(), anyLong(), any(), any(), any(), any(), any());
+                anyLong(), anyLong(), any(), any(), any());
     }
 
     @Test
@@ -250,7 +247,7 @@ class OrderServiceCreateRfqOrderTest {
                 .isInstanceOf(OrderBusinessException.class);
 
         verify(txHandler, never()).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
-                anyLong(), anyLong(), any(), any(), any(), any(), any());
+                anyLong(), anyLong(), any(), any(), any());
     }
 
     @Test
@@ -264,7 +261,7 @@ class OrderServiceCreateRfqOrderTest {
                 .isInstanceOf(OrderBusinessException.class);
 
         verify(txHandler, never()).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
-                anyLong(), anyLong(), any(), any(), any(), any(), any());
+                anyLong(), anyLong(), any(), any(), any());
     }
 
     @Test
@@ -297,7 +294,7 @@ class OrderServiceCreateRfqOrderTest {
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "PLATFORM");
 
         verify(txHandler).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
-                anyLong(), anyLong(), any(), anyString(), anyString(),
+                anyLong(), anyLong(), any(),
                 org.mockito.ArgumentMatchers.eq("HAWK2001"), any());
     }
 
@@ -309,7 +306,7 @@ class OrderServiceCreateRfqOrderTest {
                 .isInstanceOf(OrderBusinessException.class);
 
         verify(txHandler, never()).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
-                anyLong(), anyLong(), any(), any(), any(), any(), any());
+                anyLong(), anyLong(), any(), any(), any());
     }
 
     // ==================== helpers ====================
@@ -318,14 +315,14 @@ class OrderServiceCreateRfqOrderTest {
     private List<OrderService.CreateOrderItemParam> capturedItems() {
         ArgumentCaptor<List<OrderService.CreateOrderItemParam>> captor = ArgumentCaptor.forClass(List.class);
         verify(txHandler).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), captor.capture(),
-                anyLong(), anyLong(), any(), anyString(), anyString(), anyString(), any());
+                anyLong(), anyLong(), any(), anyString(), any());
         return captor.getValue();
     }
 
     private OrderPolicySnapshot capturedPolicy() {
         ArgumentCaptor<OrderPolicySnapshot> captor = ArgumentCaptor.forClass(OrderPolicySnapshot.class);
         verify(txHandler).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
-                anyLong(), anyLong(), any(), anyString(), anyString(), anyString(), captor.capture());
+                anyLong(), anyLong(), any(), anyString(), captor.capture());
         return captor.getValue();
     }
 }

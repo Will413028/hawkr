@@ -169,26 +169,6 @@ public class OrderEntity {
 
     private String shipmentNo;
 
-    /** 物流狀態碼（ShippingStatus value） */
-    private String shippingStatus;
-
-    /** 物流狀態描述（PayUni ShipStatusDesc 或 ShippingStatus.displayName） */
-    private String shippingStatusDesc;
-
-    /** 宅配託運單 PDF CDN URL（Shipping Service MQ 事件快照，僅宅配有值） */
-    private String labelUrl;
-    /** 宅配託運單 PDF 下載期限（取號時 NOW()+24h，僅前端按鈕判斷用） */
-    private LocalDateTime labelExpireAt;
-
-    /** 超商出貨便代碼（PartnerId，超商取貨用） */
-    private String partnerId;
-
-    /** 超商訂單編號（odno，超商取貨用） */
-    private String odno;
-
-    /** 超商驗證碼（validationNo，超商取貨用） */
-    private String validationNo;
-
     /** 出貨照片 objectKey 陣列（Shipping Service MQ 事件快照，JSONB；顯示 URL 由 Gateway 組，49 §5.3/§6.2） */
     @TableField(typeHandler = StringListTypeHandler.class)
     private List<String> shipmentPhotoKeys;
@@ -256,15 +236,6 @@ public class OrderEntity {
 
     /** 累計暫停次數（觀測用） */
     private Integer countdownPauseCount;
-
-    /** 賣家處理期限快照（UTC，09 §5.9）；shipment.created 寫入、shipment.processing.cleared 清空。NULL = Uber/未付款/已處理/已取消 */
-    private LocalDateTime processingDeadline;
-
-    /** 付款後建單重試次數（Backstop，03 §8.11） */
-    private Integer shipmentCreateAttempts;
-
-    /** 下次建單重試時間（backoff，Backstop，03 §8.11） */
-    private LocalDateTime shipmentCreateNextRetryAt;
 
     /** 取消原因 value（OrderCancelReason，91xx 系統 / 92xx 賣家；buyer 自願取消為 NULL，03 §5.3.1） */
     private String cancelReason;

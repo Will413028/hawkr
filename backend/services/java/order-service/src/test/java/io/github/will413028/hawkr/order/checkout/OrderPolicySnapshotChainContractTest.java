@@ -1,13 +1,11 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
-import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.common.utils.code.ShippingTemperature;
-import io.github.will413028.hawkr.order.checkout.CheckoutValidator.AvailableOption;
-import io.github.will413028.hawkr.order.checkout.CheckoutValidator.FreeShippingResult;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.ValidationResult;
+import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
+import io.github.will413028.hawkr.coupon.grpc.CouponValidateResult;
 import io.github.will413028.hawkr.order.config.OrderConfig;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.grpc.CheckoutConfirmRequest;
@@ -15,7 +13,6 @@ import io.github.will413028.hawkr.order.grpc.CheckoutItem;
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.InvoiceGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.ProductGrpcClient;
-import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.order.repository.OrderOutboxMapper;
 import io.github.will413028.hawkr.order.mq.OrderEventPublisher;
 import io.github.will413028.hawkr.order.repository.AutoRefundTaskRepository;
@@ -34,8 +31,6 @@ import io.github.will413028.hawkr.invoice.grpc.ValidateOrderInvoiceInputInternal
 import io.github.will413028.hawkr.product.grpc.BatchGetProductForCheckoutResponse;
 import io.github.will413028.hawkr.product.grpc.ProductForCheckoutInfo;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
-import io.github.will413028.hawkr.shipping.grpc.GetSellerShippingConfigResponse;
-import io.github.will413028.hawkr.shipping.grpc.SellerShippingConfigItem;
 import io.github.will413028.hawkr.order.grpc.client.CartGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.AfterSalesGrpcClient;
 import org.junit.jupiter.api.BeforeAll;
@@ -110,14 +105,14 @@ class OrderPolicySnapshotChainContractTest {
     private static final long BUYER_ID = 2623900520L;
     private static final String SKU_ID = "5001";
     private static final String CHECKOUT_ID = "CHK-POLICY-CHAIN";
-    private static final String METHOD = ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value();
     private static final String TEMP = ShippingTemperature.CHILLED.value();
 
     @Mock private ProductGrpcClient productGrpcClient;
     @Mock private SellerGrpcClient sellerGrpcClient;
     @Mock private InvoiceGrpcClient invoiceGrpcClient;
     @Mock private BuyerGrpcClient buyerGrpcClient;
-    @Mock private ShippingGrpcClient shippingGrpcClient;
+    @Mock private CheckoutCouponGrpcClient couponGrpcClient;
+    @Mock private SellerGrpcClient orderServiceSellerClient;
     @Mock private CheckoutValidator checkoutValidator;
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ValueOperations<String, String> valueOperations;
@@ -153,28 +148,13 @@ class OrderPolicySnapshotChainContractTest {
                 .thenReturn(PrincipalResolution.allResolved(Map.of(STORE_ID, STORE_ID)));
         when(buyerGrpcClient.resolvePrincipals(anyList()))
                 .thenReturn(PrincipalResolution.allResolved(Map.of(BUYER_ID, BUYER_ID)));
-        when(shippingGrpcClient.getSellerShippingConfig(anyLong()))
-                .thenReturn(GetSellerShippingConfigResponse.newBuilder()
-                        .setCode(0)
-                        .addConfigs(SellerShippingConfigItem.newBuilder()
-                                .setShippingMethod(METHOD)
-                                .setGoodsType(TEMP)
-                                .setAvailable(true)
-                                .build())
-                        .build());
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(SellerMeta.newBuilder()
                 .setSellerName("測試賣家")
                 .setPayuniMerId("HAWK" + STORE_ID)
                 .setCanAcceptOrders(true)
                 .build());
-        when(checkoutValidator.validate(anyList(), any()))
-                .thenReturn(new ValidationResult(true, java.util.Set.of(TEMP), List.of(), List.of(), 0));
-        when(checkoutValidator.lookupSingleOption(anyList(), any(), any(), any(), any()))
-                .thenReturn(new AvailableOption(
-                        ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP, ShippingTemperature.CHILLED,
-                        "7-11店到店（冷藏）", 60L, 60L, ShippingFeePayer.BUYER.value(), 0L, false));
-        when(checkoutValidator.checkFreeShipping(anyList(), anyString(), anyString(), any()))
-                .thenReturn(new FreeShippingResult(false, ShippingFeePayer.BUYER.value(), 0L));
+        when(checkoutValidator.validate(anyList()))
+                .thenReturn(new ValidationResult(true, java.util.Set.of(TEMP), List.of()));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         // 發票前置驗證預設放行（code=0）。要測「被擋下」的分支就在該支測試裡改 stub。
@@ -194,15 +174,15 @@ class OrderPolicySnapshotChainContractTest {
                 mock(FinancialLogRepository.class), mock(StockTxRecordRepository.class),
                 mock(CartCleanupRetryTaskRepository.class), mock(AutoRefundTaskRepository.class),
                 orderNoGenerator, stockDeductingProductClient(), mock(CartGrpcClient.class),
-                orderConfig, mock(OrderEventPublisher.class), mock(SellerGrpcClient.class),
+                orderConfig, mock(OrderEventPublisher.class), orderServiceSellerClient,
                 mock(BuyerGrpcClient.class), mock(AfterSalesGrpcClient.class),
                 mock(OrderCompletionTxHandler.class), txHandler, mock(OrderOutboxMapper.class),
-                new OrderPolicyResolver(), new UberOrderEligibilityGuard(),
+                new OrderPolicyResolver(),
                 mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
-                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
+                couponGrpcClient, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
     }
 
 
@@ -216,7 +196,7 @@ class OrderPolicySnapshotChainContractTest {
     @Test
     @DisplayName("preview → Redis 快照 → confirm → 建單：政策五欄一路到 INSERT 的 entity 上")
     void policySurvivesTheWholeChainFromPreviewToInsert() {
-        OrderEntity inserted = confirmAndCaptureInsertedOrder(METHOD);
+        OrderEntity inserted = confirmAndCaptureInsertedOrder();
 
         // 🔴 五欄逐一硬寫字面值。任何一欄為 null ⇒ MyBatis insertStrategy=NOT_NULL 會把它
         //    排除在 INSERT 之外 ⇒ DB DEFAULT 生效 ⇒ B1 原樣重演，而且完全無聲。
@@ -225,24 +205,85 @@ class OrderPolicySnapshotChainContractTest {
         assertThat(inserted.getCollectionModel())
                 .as("collection_model 掉棒 ⇒ 收款主體判定失去權威來源").isEqualTo("SELLER_MERCHANT");
         assertThat(inserted.getFulfillmentMode())
-                .as("3002 是平台物流；吃到 DB DEFAULT 會變成 SELLER_MANAGED").isEqualTo("PLATFORM_LOGISTICS");
+                .as("賣家自寄；fulfillment_mode 掉棒會吃 DB DEFAULT").isEqualTo("SELLER_MANAGED");
         assertThat(inserted.getInvoiceModel()).isEqualTo("SELLER_TO_BUYER");
         assertThat(inserted.getPolicyVersion())
                 .as("policy_version 掉棒 ⇒ 新單與 DB DEFAULT 的 v0-legacy 無法區分").isEqualTo("v1-foundation");
     }
 
     /**
-     * 陰性對照：換一個配送方式，結果必須<b>不同</b>。
-     *
-     * <p>沒有這一支的話，「政策一律回同一組常數」也會讓上面那支全綠——
-     * 那時測到的是「有值」而不是「值對」。
+     * 結帳運費一律 0：preview 回應、confirm 重算的總額、落庫的訂單三處都必須是 0。
+     * 期望值一律硬寫字面值（500 × 2 − 100 = 900），不從被測的常數取。
      */
     @Test
-    @DisplayName("陰性對照：3005 商家自送走完同一條鏈得到 SELLER_MANAGED")
-    void merchantDeliveryTakesADifferentPathThroughTheSameChain() {
-        OrderEntity inserted = confirmAndCaptureInsertedOrder(ShippingMethod.MERCHANT_DELIVERY.value());
+    @DisplayName("preview 與 confirm 的運費固定 0：總額 = 商品小計 − 折扣，落庫的 shipping_fee 也是 0")
+    void checkoutShippingFeeIsAlwaysZero() {
+        when(couponGrpcClient.validateCoupon(anyString(), anyLong(), anyLong(), anyLong()))
+                .thenReturn(CouponValidateResult.newBuilder().setValid(true).setDiscountAmount("100").build());
+
+        // preview：運費 0，實付 = 1000 − 100
+        io.github.will413028.hawkr.order.grpc.CheckoutPreviewData preview = service.preview(
+                List.of(CheckoutItem.newBuilder().setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build()),
+                TEMP, "TPL-1", BUYER_ID, false);
+        assertThat(preview.getTotalShippingFee()).isEqualTo("0");
+        assertThat(preview.getOrderGroups(0).getShippingFee()).isEqualTo("0");
+        assertThat(preview.getTotalOriginalAmount()).isEqualTo("1000");
+        assertThat(preview.getTotalDiscount()).isEqualTo("100");
+        assertThat(preview.getTotalActualAmount()).isEqualTo("900");
+
+        // preview 存進 Redis 的快照原樣餵回 confirm
+        ArgumentCaptor<String> stored = ArgumentCaptor.forClass(String.class);
+        verify(valueOperations).set(anyString(), stored.capture(), any(java.time.Duration.class));
+        when(valueOperations.getAndDelete(anyString())).thenReturn(stored.getValue());
+        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString(), anyLong(), anyLong()))
+                .thenReturn("INSTANCE-1");
+        when(orderRepository.updateCouponInstanceIdIfAbsent(anyString(), anyString())).thenReturn(1);
+
+        CheckoutConfirmRequest request = baseRequest().setCouponTemplateId("TPL-1").build();
+        service.confirm(request);
+
+        ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);
+        verify(orderRepository).insert(captor.capture());
+        OrderEntity inserted = captor.getValue();
+        assertThat(inserted.getShippingFee()).as("落庫的運費").isEqualTo(0L);
+        assertThat(inserted.getTotalOriginalAmount()).isEqualTo(1000L);
+        assertThat(inserted.getTotalActualAmount()).as("實付 = 小計 − 折扣 + 運費 0").isEqualTo(900L);
+        assertThat(inserted.getDiscountAmount()).isEqualTo(100L);
+        // 出貨欄位不再寫入（DB 欄位留給 B8）
+        assertThat(inserted.getShippingMethod()).isNull();
+        assertThat(inserted.getShippingFeePayer()).isNull();
+        assertThat(inserted.getCvsStoreId()).isNull();
+        assertThat(inserted.getShippingArea()).isNull();
+        assertThat(inserted.getSenderCity()).isNull();
+        assertThat(inserted.getDimensionSum()).isNull();
+    }
+
+    /**
+     * RFQ 建單與結帳走同一支 resolver：兩條路徑都得到 SELLER_MANAGED。
+     */
+    @Test
+    @DisplayName("RFQ 建單的政策與結帳同一支 resolver：SELLER_MANAGED")
+    void rfqCreationUsesTheSameResolver() {
+        when(orderServiceSellerClient.getSellerMeta(anyLong()))
+                .thenReturn(SellerMeta.newBuilder().setPayuniMerId("HAWK" + STORE_ID).build());
+
+        orderService.createRfqOrder(BUYER_ID, STORE_ID, 7001L, 3000L, 100L,
+                null, "雞蛋 12 公斤", 2900L, TEMP, "PLATFORM");
+
+        ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);
+        verify(orderRepository).insert(captor.capture());
+        OrderEntity inserted = captor.getValue();
         assertThat(inserted.getFulfillmentMode()).isEqualTo("SELLER_MANAGED");
+        assertThat(inserted.getCommerceModel()).isEqualTo("SELLER_DIRECT");
         assertThat(inserted.getPolicyVersion()).isEqualTo("v1-foundation");
+        assertThat(inserted.getShippingMethod()).isNull();
+        assertThat(inserted.getShippingFeePayer()).isNull();
+    }
+
+    @Test
+    @DisplayName("resolver 不收配送方式，一律回 SELLER_MANAGED")
+    void resolverAlwaysReturnsSellerManaged() {
+        assertThat(new OrderPolicyResolver().resolve().fulfillmentMode()).isEqualTo("SELLER_MANAGED");
     }
 
     /**
@@ -255,10 +296,10 @@ class OrderPolicySnapshotChainContractTest {
     @DisplayName("快照缺政策區塊 ⇒ confirm 中止，不得用預設值建單")
     void missingPolicyInSnapshotAbortsInsteadOfDefaulting() {
         when(valueOperations.getAndDelete(anyString()))
-                .thenReturn("{\"subtotal\":1000,\"shippingFee\":60,\"totalAmount\":1060,\"paymentMerId\":\"HAWK123\"}");
+                .thenReturn("{\"subtotal\":1000,\"shippingFee\":0,\"totalAmount\":1000,\"paymentMerId\":\"HAWK123\"}");
 
         try {
-            service.confirm(baseRequest(METHOD).build());
+            service.confirm(baseRequest().build());
             org.junit.jupiter.api.Assertions.fail("快照缺政策卻建單成功——那正是 fail-closed 要擋的");
         } catch (io.github.will413028.hawkr.order.exception.OrderBusinessException expected) {
             // 期望路徑
@@ -268,57 +309,32 @@ class OrderPolicySnapshotChainContractTest {
 
     // ==================== harness ====================
 
-    private OrderEntity confirmAndCaptureInsertedOrder(String shippingMethod) {
-        // setUp 的預設 stub 綁死 3002；陰性對照要換配送方式，這裡覆寫成當次的那一個。
-        // （賣家開通與可選方案都是 confirm 的前置檢查，不是本測試要驗的東西。）
-        when(shippingGrpcClient.getSellerShippingConfig(anyLong()))
-                .thenReturn(GetSellerShippingConfigResponse.newBuilder()
-                        .setCode(0)
-                        .addConfigs(SellerShippingConfigItem.newBuilder()
-                                .setShippingMethod(shippingMethod)
-                                .setGoodsType(TEMP)
-                                .setAvailable(true)
-                                // 宅配／自送會回頭讀寄件郵遞區號（3002 走不到這條路徑）
-                                .setSenderPostalCode("100")
-                                .build())
-                        .build());
-        when(checkoutValidator.lookupSingleOption(anyList(), any(), any(), any(), any()))
-                .thenReturn(new AvailableOption(
-                        ShippingMethod.fromValue(shippingMethod), ShippingTemperature.CHILLED,
-                        "測試方案", 60L, 60L, ShippingFeePayer.BUYER.value(), 0L, false));
-
-        OrderPolicySnapshot policy = new OrderPolicyResolver().resolve(shippingMethod);
+    private OrderEntity confirmAndCaptureInsertedOrder() {
+        OrderPolicySnapshot policy = new OrderPolicyResolver().resolve();
         // ②：產線的快照組裝，不手寫 JSON——欄名改了要在這裡就爆
         String snapshot = service.buildPriceSnapshot(
-                1000L, 60L, 0L, 1060L, false, false, "HAWK" + STORE_ID, policy);
+                1000L, 0L, 0L, 1000L, "HAWK" + STORE_ID, policy);
         // Redis 的往返就是字串往返
         when(valueOperations.getAndDelete(anyString())).thenReturn(snapshot);
 
-        service.confirm(baseRequest(shippingMethod).build());
+        service.confirm(baseRequest().build());
 
         ArgumentCaptor<OrderEntity> captor = ArgumentCaptor.forClass(OrderEntity.class);
         verify(orderRepository).insert(captor.capture());
         return captor.getValue();
     }
 
-    private CheckoutConfirmRequest.Builder baseRequest(String shippingMethod) {
-        CheckoutConfirmRequest.Builder b = CheckoutConfirmRequest.newBuilder()
+    private CheckoutConfirmRequest.Builder baseRequest() {
+        return CheckoutConfirmRequest.newBuilder()
                 .setBuyerId(BUYER_ID)
                 .setCheckoutId(CHECKOUT_ID)
                 .addItems(CheckoutItem.newBuilder()
                         .setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build())
-                .setShippingMethod(shippingMethod)
                 .setDeliveryTemp(TEMP)
                 .setRecipientName("王小明")
-                .setRecipientPhone("0912345678");
-        // 超商取貨要門市代號、宅配／自送要地址——兩者是不同的必填集合。
-        if (ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value().equals(shippingMethod)) {
-            b.setCvsStoreId("252698").setCvsStoreName("測試門市");
-        } else {
-            // 位址驗證只收 CJK ＋ 半形數字 ＋ - ＋ 之（InputValidator.ADDRESS_ALLOWED_CHARS）
-            b.setShippingAddress("台北市中正區忠孝東路一段1號");
-        }
-        return b;
+                .setRecipientPhone("0912345678")
+                // 位址驗證只收 CJK ＋ 半形數字 ＋ - ＋ 之（InputValidator.ADDRESS_ALLOWED_CHARS）
+                .setShippingAddress("台北市中正區忠孝東路一段1號");
     }
 
     /**

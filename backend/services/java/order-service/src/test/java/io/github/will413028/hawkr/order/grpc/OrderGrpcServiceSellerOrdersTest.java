@@ -11,7 +11,6 @@ import io.github.will413028.hawkr.order.entity.SellerOrderQuery;
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.MediaGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
-import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.order.mq.OrderEventPublisher;
 import io.github.will413028.hawkr.order.repository.GrantPaymentTaskRepository;
 import io.github.will413028.hawkr.order.repository.OrderItemRepository;
@@ -59,7 +58,6 @@ class OrderGrpcServiceSellerOrdersTest {
     @Mock private CouponReleaseService couponReleaseService;
     @Mock private OrderRepository orderRepository;
     @Mock private OrderItemRepository orderItemRepository;
-    @Mock private ShippingGrpcClient shippingGrpcClient;
     @Mock private PaymentGrpcClient paymentGrpcClient;
     @Mock private SellerGrpcClient sellerGrpcClient;
     @Mock private BuyerGrpcClient buyerGrpcClient;
@@ -70,7 +68,7 @@ class OrderGrpcServiceSellerOrdersTest {
 
     private OrderGrpcService buildService() {
         return new OrderGrpcService(orderService, checkoutService, couponReleaseService,
-                orderRepository, orderItemRepository, shippingGrpcClient, paymentGrpcClient,
+                orderRepository, orderItemRepository, paymentGrpcClient,
                 sellerGrpcClient, buyerGrpcClient, mediaGrpcClient, mediaUrlProperties,
                 grantPaymentTaskRepository,
                 org.mockito.Mockito.mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),

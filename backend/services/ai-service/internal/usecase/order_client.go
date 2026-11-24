@@ -25,12 +25,11 @@ type SellerOrderItem struct {
 }
 
 type OrderDetailSummary struct {
-	OrderNo        string
-	Status         string
-	BuyerID        string
-	ShipmentNo     string
-	ShippingStatus string
-	Amount         int64
+	OrderNo    string
+	Status     string
+	BuyerID    string
+	ShipmentNo string
+	Amount     int64
 }
 
 // BuyerOrder is an order summary for the buyer AI assistant.
@@ -49,7 +48,6 @@ type BuyerOrderDetail struct {
 	Status         string
 	SellerName     string
 	ShippingMethod string
-	ShippingStatus string
 	RecipientName  string
 	PaymentMethod  string
 	Amount         int64

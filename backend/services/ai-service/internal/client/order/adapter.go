@@ -187,7 +187,6 @@ func (c *Client) GetBuyerOrderDetail(ctx context.Context, buyerID identity.Buyer
 		CreateTimeMs:   createMs,
 		SellerName:     d.GetSellerName(),
 		ShippingMethod: d.GetShippingMethod(),
-		ShippingStatus: d.GetShippingStatus(),
 		ShippingFee:    shippingFee,
 		RecipientName:  d.GetRecipientName(),
 		PaymentMethod:  d.GetPaymentMethod(),
@@ -221,12 +220,11 @@ func (c *Client) GetSellerOrderDetail(ctx context.Context, storeID identity.Stor
 
 	amt, _ := strconv.ParseInt(d.GetTotalActualAmount(), 10, 64)
 	return &usecase.OrderDetailSummary{
-		OrderNo:        d.GetOrderNo(),
-		Status:         d.GetStatus(),
-		Amount:         amt,
-		BuyerID:        d.GetBuyerId(),
-		ShipmentNo:     d.GetShipmentNo(),
-		ShippingStatus: d.GetShippingStatus(),
+		OrderNo:    d.GetOrderNo(),
+		Status:     d.GetStatus(),
+		Amount:     amt,
+		BuyerID:    d.GetBuyerId(),
+		ShipmentNo: d.GetShipmentNo(),
 	}, nil
 }
 

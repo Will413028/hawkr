@@ -11,6 +11,13 @@ public final class OrderConstants {
 
     private OrderConstants() {}
 
+    // ==================== 運費 ====================
+
+    /**
+     * 結帳運費（新台幣元）。賣家自寄，B8 的出貨設計落地前一律 0。
+     */
+    public static final long CHECKOUT_SHIPPING_FEE = 0L;
+
     // ==================== order_no 前綴 ====================
 
     /**

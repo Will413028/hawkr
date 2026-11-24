@@ -4,11 +4,7 @@ import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceCarrierSelectionMode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceDocumentKind;
-import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.common.utils.code.ShippingTemperature;
-import io.github.will413028.hawkr.order.checkout.CheckoutValidator.AvailableOption;
-import io.github.will413028.hawkr.order.checkout.CheckoutValidator.FreeShippingResult;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.ValidationResult;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
 import io.github.will413028.hawkr.order.exception.OrderBusinessException;
@@ -19,13 +15,10 @@ import io.github.will413028.hawkr.invoice.grpc.ValidateOrderInvoiceInputInternal
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.InvoiceGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.ProductGrpcClient;
-import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.order.service.OrderService;
 import io.github.will413028.hawkr.product.grpc.BatchGetProductForCheckoutResponse;
 import io.github.will413028.hawkr.product.grpc.ProductForCheckoutInfo;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
-import io.github.will413028.hawkr.shipping.grpc.GetSellerShippingConfigResponse;
-import io.github.will413028.hawkr.shipping.grpc.SellerShippingConfigItem;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,9 +53,7 @@ import static org.mockito.Mockito.when;
  * （{@code lib/features/cart/presentation/widgets/checkout_payment_sheet.dart}）。
  * 把 invoice 區塊改成必填 ⇒ {@link #confirmWithoutInvoiceBlockStillCreatesTheOrder} 轉紅。
  *
- * <p>fixture 走 7-11 店到店（3002）：{@code getSenderPostalCode} 對超商短路回空字串、
- * {@code resolveRoute} 固定 DOMESTIC，省掉與本案無關的郵遞區號推導；
- * Redis 快照由產線的 {@code buildPriceSnapshot} 組出（含政策五欄）——confirm 對缺政策的快照 fail-closed。
+ * <p>Redis 快照由產線的 {@code buildPriceSnapshot} 組出（含政策五欄）——confirm 對缺政策的快照 fail-closed。
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -72,14 +63,12 @@ class CheckoutConfirmInvoiceIntakeTest {
     private static final long BUYER_ID = 2623900520L;
     private static final String SKU_ID = "5001";
     private static final String CHECKOUT_ID = "CHK-INVOICE-1";
-    private static final String METHOD = ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value();
     private static final String TEMP = ShippingTemperature.CHILLED.value();
 
     @Mock private ProductGrpcClient productGrpcClient;
     @Mock private SellerGrpcClient sellerGrpcClient;
     @Mock private InvoiceGrpcClient invoiceGrpcClient;
     @Mock private BuyerGrpcClient buyerGrpcClient;
-    @Mock private ShippingGrpcClient shippingGrpcClient;
     @Mock private CheckoutValidator checkoutValidator;
     @Mock private OrderService orderService;
     @Mock private StringRedisTemplate redisTemplate;
@@ -104,28 +93,13 @@ class CheckoutConfirmInvoiceIntakeTest {
                 .thenReturn(PrincipalResolution.allResolved(Map.of(STORE_ID, STORE_ID)));
         when(buyerGrpcClient.resolvePrincipals(anyList()))
                 .thenReturn(PrincipalResolution.allResolved(Map.of(BUYER_ID, BUYER_ID)));
-        when(shippingGrpcClient.getSellerShippingConfig(anyLong()))
-                .thenReturn(GetSellerShippingConfigResponse.newBuilder()
-                        .setCode(0)
-                        .addConfigs(SellerShippingConfigItem.newBuilder()
-                                .setShippingMethod(METHOD)
-                                .setGoodsType(TEMP)
-                                .setAvailable(true)
-                                .build())
-                        .build());
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(SellerMeta.newBuilder()
                 .setSellerName("測試賣家")
                 .setPayuniMerId("HAWK" + STORE_ID)
                 .setCanAcceptOrders(true)
                 .build());
-        when(checkoutValidator.validate(anyList(), any()))
-                .thenReturn(new ValidationResult(true, java.util.Set.of(TEMP), List.of(), List.of(), 0));
-        when(checkoutValidator.lookupSingleOption(anyList(), any(), any(), any(), any()))
-                .thenReturn(new AvailableOption(
-                        ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP, ShippingTemperature.CHILLED,
-                        "7-11店到店（冷藏）", 60L, 60L, ShippingFeePayer.BUYER.value(), 0L, false));
-        when(checkoutValidator.checkFreeShipping(anyList(), anyString(), anyString(), any()))
-                .thenReturn(new FreeShippingResult(false, ShippingFeePayer.BUYER.value(), 0L));
+        when(checkoutValidator.validate(anyList()))
+                .thenReturn(new ValidationResult(true, java.util.Set.of(TEMP), List.of()));
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(orderService.createOrderFromCheckout(any())).thenReturn("O20260830001");
 
@@ -134,15 +108,15 @@ class CheckoutConfirmInvoiceIntakeTest {
                 .thenReturn(ValidateOrderInvoiceInputInternalResponse.newBuilder().setCode(0).build());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
-                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
+                null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
 
         // 🔴 快照用**產線那一支** buildPriceSnapshot 組，不手寫 JSON。
         //    舊版這裡餵的是 "1"（舊格式哨兵），而 confirm 現在對「快照沒有政策五欄」一律 fail-closed
         //    ——那正是要防的東西，所以測試必須餵一份真的快照，不是繞過檢查。
         OrderPolicySnapshot policy =
-                new OrderPolicyResolver().resolve(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
+                new OrderPolicyResolver().resolve();
         when(valueOperations.getAndDelete(anyString())).thenReturn(
-                service.buildPriceSnapshot(1000L, 60L, 0L, 1060L, false, false, "HAWK123", policy));
+                service.buildPriceSnapshot(1000L, 0L, 0L, 1000L, "HAWK123", policy));
     }
 
     private static CheckoutConfirmRequest.Builder baseRequest() {
@@ -151,12 +125,10 @@ class CheckoutConfirmInvoiceIntakeTest {
                 .setCheckoutId(CHECKOUT_ID)
                 .addItems(CheckoutItem.newBuilder()
                         .setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build())
-                .setShippingMethod(METHOD)
                 .setDeliveryTemp(TEMP)
                 .setRecipientName("王小明")
                 .setRecipientPhone("0912345678")
-                .setCvsStoreId("252698")
-                .setCvsStoreName("測試門市");
+                .setShippingAddress("台北市信義區測試路1號");
     }
 
     private OrderService.CreateOrderParams confirmAndCaptureParams(CheckoutConfirmRequest request) {
@@ -175,11 +147,8 @@ class CheckoutConfirmInvoiceIntakeTest {
      * 的那一行<b>就是</b>那個「不遺失」的實體。
      *
      * <p>⚠️ 這一格在 2026-09-10 的對抗驗證中被指出**零守衛**，並實測坐實：
-     * 把那一行換成寫死的 {@code SELLER_MANAGED} 政策，order-service 的 <b>287 支測試全綠</b>
-     * ——既有的兩支新測試都繞過它（一支直呼 {@code OrderCreationTxHandler}、
-     * 一支直接呼叫六個 setter），而 DB 的
-     * {@code chk_orders_fulfillment_mode_consistent} 只約束 {@code shipping_method='3005'}
-     * ⇒ 「3002 配 SELLER_MANAGED」是合法列，PostgreSQL 不會叫。
+     * 把那一行換成 {@code null}，既有的兩支測試（一支直呼 {@code OrderCreationTxHandler}、
+     * 一支直接呼叫六個 setter）都繞過它而全綠。
      *
      * <p>期望值一律硬寫字面字串——用 {@code new OrderPolicyResolver().resolve(...)} 當期望值，
      * resolver 被改壞時測試會跟著一起變，那種寫法零鑑別力。
@@ -193,8 +162,9 @@ class CheckoutConfirmInvoiceIntakeTest {
                 .as("政策快照必須傳下去，null 代表這一段被拿掉了")
                 .isNotNull();
         assertThat(params.policySnapshot().fulfillmentMode())
-                .as("本測試的配送方式是 3002（平台物流）——寫死成 SELLER_MANAGED 會在這裡被抓到")
-                .isEqualTo("PLATFORM_LOGISTICS");
+                .as("履約一律賣家自寄")
+                .isEqualTo("SELLER_MANAGED");
+        assertThat(params.policySnapshot().policyVersion()).isEqualTo("v1-foundation");
         assertThat(params.policySnapshot().commerceModel()).isEqualTo("SELLER_DIRECT");
         assertThat(params.policySnapshot().collectionModel()).isEqualTo("SELLER_MERCHANT");
         assertThat(params.policySnapshot().invoiceModel()).isEqualTo("SELLER_TO_BUYER");

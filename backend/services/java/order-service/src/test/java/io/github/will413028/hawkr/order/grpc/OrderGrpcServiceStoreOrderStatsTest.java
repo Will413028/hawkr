@@ -9,7 +9,6 @@ import io.github.will413028.hawkr.order.entity.StoreOrderStatsResult;
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.MediaGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
-import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.order.mq.OrderEventPublisher;
 import io.github.will413028.hawkr.order.repository.GrantPaymentTaskRepository;
 import io.github.will413028.hawkr.order.repository.OrderItemRepository;
@@ -40,7 +39,7 @@ class OrderGrpcServiceStoreOrderStatsTest {
     private OrderGrpcService buildService() {
         return new OrderGrpcService(orderService, mock(CheckoutService.class),
                 mock(CouponReleaseService.class), mock(OrderRepository.class),
-                mock(OrderItemRepository.class), mock(ShippingGrpcClient.class),
+                mock(OrderItemRepository.class), 
                 mock(PaymentGrpcClient.class), mock(SellerGrpcClient.class),
                 mock(BuyerGrpcClient.class), mock(MediaGrpcClient.class),
                 mock(MediaUrlProperties.class), mock(GrantPaymentTaskRepository.class),

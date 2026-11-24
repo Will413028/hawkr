@@ -43,7 +43,7 @@ func (a assistantOrders) OrderDetail(ctx context.Context, buyerID int64, orderNo
 		return assistant.BuyerOrderDetail{}, err
 	}
 	return assistant.BuyerOrderDetail{
-		OrderNo: d.OrderNo, Status: d.Status, SellerName: d.SellerName, ShippingMethod: d.ShippingMethod, ShippingStatus: d.ShippingStatus,
+		OrderNo: d.OrderNo, Status: d.Status, SellerName: d.SellerName, ShippingMethod: d.ShippingMethod,
 		RecipientName: d.RecipientName, PaymentMethod: d.PaymentMethod, Amount: d.Amount, CreateTime: d.CreateTime, ShippingFee: d.ShippingFee,
 	}, nil
 }

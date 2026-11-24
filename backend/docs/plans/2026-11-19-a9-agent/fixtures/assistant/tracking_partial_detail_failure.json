@@ -40,7 +40,6 @@
         "Status": "20",
         "SellerName": "阿嬤的菜園",
         "ShippingMethod": "黑貓冷藏",
-        "ShippingStatus": "IN_TRANSIT",
         "RecipientName": "王小明",
         "PaymentMethod": "CREDIT_CARD",
         "Amount": 580,
@@ -52,7 +51,6 @@
         "Status": "30",
         "SellerName": "海味小舖",
         "ShippingMethod": "宅配",
-        "ShippingStatus": "DELIVERED",
         "RecipientName": "王小明",
         "PaymentMethod": "ATM",
         "Amount": 1200,
@@ -116,8 +114,6 @@
                 "seller_name": "阿嬤的菜園",
                 "ship_time": "",
                 "shipping_method": "黑貓冷藏",
-                "shipping_status": "IN_TRANSIT",
-                "shipping_status_desc": "",
                 "status": "待出貨（物流單已建立，待出貨）"
               }
             ]

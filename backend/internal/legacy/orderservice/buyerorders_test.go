@@ -125,13 +125,13 @@ func TestBuyerOrderDetail(t *testing.T) {
 	seen := &seenBuyerCalls{}
 	f := fakeBuyerOrders{seen: seen, detail: &orderpb.GetOrderResponse{Data: &orderpb.OrderDetailView{
 		OrderNo: "O1", Status: "20", TotalActualAmount: "900", ShippingFee: "100", CreateTime: "2023-11-14T22:13:20Z",
-		SellerName: "店", ShippingMethod: "3001", ShippingStatus: "S", RecipientName: "收", PaymentMethod: "card",
+		SellerName: "店", ShippingMethod: "3001", RecipientName: "收", PaymentMethod: "card",
 	}}}
 	d, err := (&Client{rpc: f}).BuyerOrderDetail(context.Background(), 7, "O1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := BuyerOrderDetail{OrderNo: "O1", Status: "20", SellerName: "店", ShippingMethod: "3001", ShippingStatus: "S", RecipientName: "收", PaymentMethod: "card", Amount: 900, CreateTime: d.CreateTime, ShippingFee: 100}
+	want := BuyerOrderDetail{OrderNo: "O1", Status: "20", SellerName: "店", ShippingMethod: "3001", RecipientName: "收", PaymentMethod: "card", Amount: 900, CreateTime: d.CreateTime, ShippingFee: 100}
 	if d != want || d.CreateTime.UnixMilli() != 1700000000000 {
 		t.Fatalf("detail = %+v", d)
 	}
