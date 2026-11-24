@@ -69,8 +69,6 @@ services:
       COUPON_SERVICE_GRPC_PORT: 9951
       AFTERSALES_SERVICE_HOST: aftersales-service
       AFTERSALES_SERVICE_GRPC_PORT: 9923
-      PAYMENT_SERVICE_HOST: payment-service
-      PAYMENT_SERVICE_PORT: 9924
       SHIPPING_SERVICE_HOST: shipping-service
       SHIPPING_SERVICE_GRPC_PORT: 9931
       # 圖片 objectKey → 顯示 URL 的域名唯一來源（49 號 §6.1）；Gateway 組 {語意}Url 欄位
@@ -177,7 +175,6 @@ services:
         product-service=http://product-service:9912/actuator/health,
         order-service=http://order-service:9914/actuator/health,
         aftersales-service=http://aftersales-service:9922/actuator/health,
-        payment-service=http://payment-service:9924/actuator/health,
         shipping-service=http://shipping-service:9930/actuator/health
 
     volumes:
@@ -519,123 +516,6 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9922/actuator/health"]
       interval: 60s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Payment Service (9924/9925)
-  # ==========================================
-
-  payment-service:
-    build:
-      context: .
-      dockerfile: services/java/payment-service/Dockerfile
-    image: hawkr/payment-service:latest
-    container_name: payment-service
-    restart: unless-stopped
-    ports:
-      - "9924:9924"
-      - "9925:9925"
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      SERVER_PORT: 9924
-      GRPC_PORT: 9925
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_payment
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
-
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
-      OSS_ENDPOINT: ${OSS_ENDPOINT}
-      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
-      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
-      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
-      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-
-      # gRPC clients
-      ORDER_SERVICE_HOST: order-service
-      ORDER_SERVICE_GRPC_PORT: 9915
-
-      PAYUNI_AGENT_ID: ${PAYUNI_AGENT_ID}
-      # 代理商出入帳商店代號（agent_fee 的 AgentMerID）。空 ＝ 依平台預設，是官方定義的合法行為。
-      PAYUNI_AGENT_MER_ID: ${PAYUNI_AGENT_MER_ID:-}
-      PAYUNI_AGENT_KEY: ${PAYUNI_AGENT_KEY}
-      PAYUNI_AGENT_IV: ${PAYUNI_AGENT_IV}
-      PAYUNI_SANDBOX: ${PAYUNI_SANDBOX}
-
-      # §2A.2 / §2A.5 金額與 ATM 期限
-      PAYMENT_MIN_AMOUNT: ${PAYMENT_MIN_AMOUNT:-15}
-      PAYMENT_ATM_EXPIRE_DAYS: ${PAYMENT_ATM_EXPIRE_DAYS:-2}
-
-      # Gateway URL（ngrok URL，由 dev.sh 注入）
-      GATEWAY_URL: ${GATEWAY_URL:-}
-
-      # PayUni 回調 URL（從 .env 讀取，本地開發用 ngrok 時只需改 .env）
-      # 帶值 = 覆蓋 PayUni 後台設定，空值 = 使用後台設定
-      PAYUNI_NOTIFY_URL: ${PAYUNI_NOTIFY_URL:-}
-      PAYUNI_RETURN_URL: ${PAYUNI_RETURN_URL:-}
-      PAYUNI_API_URL: ${PAYUNI_API_URL:-https://sandbox-api.payuni.com.tw}
-      PAYUNI_STORE_MAP_RETURN_URL: ${PAYUNI_STORE_MAP_RETURN_URL:-}
-
-      # Web 前端 base URL（client_type=WEB_BROWSER 時組 redirect_url 用，§5.9）
-      WEB_FRONTEND_URL: ${WEB_FRONTEND_URL:-}
-
-      # L2 待付款補收排程（application.yml hawkr.payment.reconcile.pending.*）
-      RECONCILE_PENDING_ENABLED: ${RECONCILE_PENDING_ENABLED:-true}
-      RECONCILE_PENDING_FIXED_DELAY_MS: ${RECONCILE_PENDING_FIXED_DELAY_MS:-300000}
-      RECONCILE_PENDING_BATCH_SIZE: ${RECONCILE_PENDING_BATCH_SIZE:-50}
-      RECONCILE_PENDING_INITIAL_DELAY_MIN: ${RECONCILE_PENDING_INITIAL_DELAY_MIN:-3}
-      RECONCILE_PENDING_RETRY_INTERVAL_MIN: ${RECONCILE_PENDING_RETRY_INTERVAL_MIN:-5}
-      RECONCILE_PENDING_GRACE_MIN: ${RECONCILE_PENDING_GRACE_MIN:-30}
-      RECONCILE_PENDING_PER_ITEM_SLEEP_MS: ${RECONCILE_PENDING_PER_ITEM_SLEEP_MS:-100}
-
-      # Apple Pay on Web Merchant Validation（05 號設計書 §5.11）
-      APPLE_PAY_MERCHANT_ID: ${APPLE_PAY_MERCHANT_ID:-}
-      APPLE_PAY_DISPLAY_NAME: ${APPLE_PAY_DISPLAY_NAME:-Hawkr}
-      APPLE_PAY_MERCHANT_CERT_PATH: ${APPLE_PAY_MERCHANT_CERT_PATH:-}
-      APPLE_PAY_MERCHANT_KEY_PATH: ${APPLE_PAY_MERCHANT_KEY_PATH:-}
-      APPLE_PAY_DOMAIN_ALLOWLIST: ${APPLE_PAY_DOMAIN_ALLOWLIST:-}
-      APPLE_PAY_CONNECT_TIMEOUT_SEC: ${APPLE_PAY_CONNECT_TIMEOUT_SEC:-5}
-      APPLE_PAY_REQUEST_TIMEOUT_SEC: ${APPLE_PAY_REQUEST_TIMEOUT_SEC:-10}
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
-
-    volumes:
-      # Apple Pay Merchant Identity Certificate + Private Key（mount 整個目錄保留原檔名）
-      # 未設定 APPLE_PAY_CERT_DIR 時 fallback 到 repo 內空目錄（避免暴露宿主機 /tmp，
-      # validator lazy-load 時找不到 cert/key 回 8029，不影響其他結帳流程）
-      - "${APPLE_PAY_CERT_DIR:-./infra/apple-pay-empty}:/secrets/apple-pay:ro"
-
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:9924/actuator/health"]
-      interval: 60s
-      timeout: 5s
       retries: 3
       start_period: 60s
     networks:

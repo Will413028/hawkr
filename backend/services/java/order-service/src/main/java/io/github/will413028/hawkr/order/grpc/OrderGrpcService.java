@@ -1953,51 +1953,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 快照付款資訊 ====================
-
-    /**
-     * 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-     *
-     * 將 trade_no、payment_method、ATM 虛擬帳號等資訊寫入 orders 表，
-     * 讓訂單明細 API 可直接從 DB 讀取，無需聚合 Payment Service。
-     */
-    @Override
-    public void snapshotPaymentInfo(SnapshotPaymentInfoRequest request,
-                                     StreamObserver<SnapshotPaymentInfoResponse> responseObserver) {
-        try {
-            String orderNo = request.getOrderNo();
-            if (orderNo.isEmpty()) {
-                responseObserver.onNext(SnapshotPaymentInfoResponse.newBuilder()
-                        .setCode(GrpcResponseCode.INVALID_PARAM.code())
-                        .setMessage(GrpcResponseCode.INVALID_PARAM.message())
-                        .build());
-                responseObserver.onCompleted();
-                return;
-            }
-
-            // 使用自訂 SQL 只更新快照欄位，避免 updateById 全欄位覆蓋導致 race condition
-            // （與 PaymentEventHandler 的 @Transactional updateById 併發時，會把 status 覆蓋回舊值）
-            orderRepository.snapshotPaymentInfo(
-                    orderNo,
-                    request.getTradeNo(),
-                    request.getPaymentMethod(),
-                    request.getAtmBankCode(),
-                    request.getAtmVirtualAccount(),
-                    request.getAtmExpireDate()
-            );
-            log.info("OrderGrpcService.snapshotPaymentInfo.success",
-                    "付款資訊已快照: orderNo=" + orderNo + ", tradeNo=" + request.getTradeNo());
-
-            responseObserver.onNext(SnapshotPaymentInfoResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(responseObserver, SnapshotPaymentInfoResponse.newBuilder(), e, "OrderGrpcService", "snapshotPaymentInfo", GrpcResponseCode.INTERNAL_ERROR);
-        }
-    }
-
     // ==================== 服務間呼叫（aftersales-service）====================
 
     /**

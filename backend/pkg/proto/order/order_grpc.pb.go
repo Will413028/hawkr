@@ -40,7 +40,6 @@ const (
 	OrderService_CheckoutPreview_FullMethodName                    = "/hawkr.order.OrderService/CheckoutPreview"
 	OrderService_CheckoutConfirm_FullMethodName                    = "/hawkr.order.OrderService/CheckoutConfirm"
 	OrderService_GetOrderForPayment_FullMethodName                 = "/hawkr.order.OrderService/GetOrderForPayment"
-	OrderService_SnapshotPaymentInfo_FullMethodName                = "/hawkr.order.OrderService/SnapshotPaymentInfo"
 	OrderService_SearchOrders_FullMethodName                       = "/hawkr.order.OrderService/SearchOrders"
 	OrderService_GetAdminOrderDetail_FullMethodName                = "/hawkr.order.OrderService/GetAdminOrderDetail"
 	OrderService_GetSellerOrderStatusCounts_FullMethodName         = "/hawkr.order.OrderService/GetSellerOrderStatusCounts"
@@ -117,8 +116,6 @@ type OrderServiceClient interface {
 	CheckoutConfirm(ctx context.Context, in *CheckoutConfirmRequest, opts ...grpc.CallOption) (*CheckoutConfirmResponse, error)
 	// 取得訂單付款資訊（Payment Service 內部呼叫）
 	GetOrderForPayment(ctx context.Context, in *GetOrderForPaymentRequest, opts ...grpc.CallOption) (*GetOrderForPaymentResponse, error)
-	// 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-	SnapshotPaymentInfo(ctx context.Context, in *SnapshotPaymentInfoRequest, opts ...grpc.CallOption) (*SnapshotPaymentInfoResponse, error)
 	// 搜尋訂單（後台）
 	SearchOrders(ctx context.Context, in *SearchOrdersRequest, opts ...grpc.CallOption) (*SearchOrdersResponse, error)
 	// 查詢訂單詳情（後台，含資金流水）
@@ -382,16 +379,6 @@ func (c *orderServiceClient) GetOrderForPayment(ctx context.Context, in *GetOrde
 	return out, nil
 }
 
-func (c *orderServiceClient) SnapshotPaymentInfo(ctx context.Context, in *SnapshotPaymentInfoRequest, opts ...grpc.CallOption) (*SnapshotPaymentInfoResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SnapshotPaymentInfoResponse)
-	err := c.cc.Invoke(ctx, OrderService_SnapshotPaymentInfo_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *orderServiceClient) SearchOrders(ctx context.Context, in *SearchOrdersRequest, opts ...grpc.CallOption) (*SearchOrdersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SearchOrdersResponse)
@@ -565,8 +552,6 @@ type OrderServiceServer interface {
 	CheckoutConfirm(context.Context, *CheckoutConfirmRequest) (*CheckoutConfirmResponse, error)
 	// 取得訂單付款資訊（Payment Service 內部呼叫）
 	GetOrderForPayment(context.Context, *GetOrderForPaymentRequest) (*GetOrderForPaymentResponse, error)
-	// 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-	SnapshotPaymentInfo(context.Context, *SnapshotPaymentInfoRequest) (*SnapshotPaymentInfoResponse, error)
 	// 搜尋訂單（後台）
 	SearchOrders(context.Context, *SearchOrdersRequest) (*SearchOrdersResponse, error)
 	// 查詢訂單詳情（後台，含資金流水）
@@ -682,9 +667,6 @@ func (UnimplementedOrderServiceServer) CheckoutConfirm(context.Context, *Checkou
 }
 func (UnimplementedOrderServiceServer) GetOrderForPayment(context.Context, *GetOrderForPaymentRequest) (*GetOrderForPaymentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOrderForPayment not implemented")
-}
-func (UnimplementedOrderServiceServer) SnapshotPaymentInfo(context.Context, *SnapshotPaymentInfoRequest) (*SnapshotPaymentInfoResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method SnapshotPaymentInfo not implemented")
 }
 func (UnimplementedOrderServiceServer) SearchOrders(context.Context, *SearchOrdersRequest) (*SearchOrdersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SearchOrders not implemented")
@@ -1118,24 +1100,6 @@ func _OrderService_GetOrderForPayment_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _OrderService_SnapshotPaymentInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SnapshotPaymentInfoRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrderServiceServer).SnapshotPaymentInfo(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: OrderService_SnapshotPaymentInfo_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrderServiceServer).SnapshotPaymentInfo(ctx, req.(*SnapshotPaymentInfoRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _OrderService_SearchOrders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SearchOrdersRequest)
 	if err := dec(in); err != nil {
@@ -1424,10 +1388,6 @@ var OrderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetOrderForPayment",
 			Handler:    _OrderService_GetOrderForPayment_Handler,
-		},
-		{
-			MethodName: "SnapshotPaymentInfo",
-			Handler:    _OrderService_SnapshotPaymentInfo_Handler,
 		},
 		{
 			MethodName: "SearchOrders",

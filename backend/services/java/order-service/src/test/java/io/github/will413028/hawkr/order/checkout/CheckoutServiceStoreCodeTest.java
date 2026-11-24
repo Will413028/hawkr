@@ -164,6 +164,6 @@ class CheckoutServiceStoreCodeTest {
         when(invoiceGrpcClient.resolveOrderInvoiceMode(any())).thenReturn(null);
 
         return new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient, shippingGrpcClient,
-                null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
+                null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null, null);
     }
 }

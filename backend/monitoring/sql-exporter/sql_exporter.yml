@@ -6,7 +6,6 @@
 # DSN：不寫死於此檔；由環境變數注入（含密碼，走各主機 infra/.env），本檔以 ${VAR} 引用：
 #   AFTERSALES_DSN 例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_aftersales?sslmode=disable（dev）
 #   SHIPPING_DSN   例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_shipping?sslmode=disable（dev）
-#   PAYMENT_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_payment?sslmode=disable（dev）
 #   ACCOUNT_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_account?sslmode=disable（dev）
 #   INVOICE_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_invoice?sslmode=disable（dev）
 #                  prod 改 host=<rds> 且 sslmode=require。
@@ -35,15 +34,6 @@ jobs:
     static_configs:
       - targets:
           shipping: '${SHIPPING_DSN}'
-
-  - job_name: payment
-    collectors:
-      - rescue_manual_pending
-      # 36 §3.3.1 Outbox persisted exchange 的可觀測性（WP1）。⚠️ V11 migration 要先套用。
-      - payment_outbox
-    static_configs:
-      - targets:
-          payment: '${PAYMENT_DSN}'
 
   - job_name: account
     collectors:
@@ -89,113 +79,6 @@ collectors:
         query: |
           SELECT COALESCE(MAX(holiday_date) - CURRENT_DATE, -1)::float8 AS coverage_days
           FROM holidays
-
-  # #1369：ATM rescue 待人工退款積壓（取代原孤兒事件 payment.rescue.requires_manual）。
-  # rescue_action='8902'（REFUND_PENDING_MANUAL）表 ATM rescue 需人工頁面版完成退款；
-  # 排除已有成功退款（payment_refunds.status='2'=SUCCEEDED）者 → 只計真正待處理筆數。
-  - collector_name: rescue_manual_pending
-    metrics:
-      - metric_name: hawkr_payment_rescue_manual_pending
-        type: gauge
-        help: 'Count of ATM rescue refunds pending manual completion (payment_transactions.rescue_action=8902, no succeeded refund) (issue #1369)'
-        values:
-          - pending
-        query: |
-          SELECT count(*)::float8 AS pending
-          FROM payment_transactions pt
-          WHERE pt.rescue_action = '8902'
-            AND NOT EXISTS (
-              SELECT 1 FROM payment_refunds r
-              WHERE r.trade_no = pt.trade_no AND r.status = '2'
-            )
-
-  # ── outbox_events 積壓／DEAD 偵測（36 §3.3.1 Outbox persisted exchange 的可觀測性）──
-  #
-  # 🔴 為什麼必須有這一支：WP0 盤點坐實 outbox_events 的 DEAD（8224）是**無人推走的終態
-  #    且零偵測** —— markDeadGuarded 把 next_retry_at 設 NULL，而候選述詞 findPendingEvents
-  #    是 status IN ('8221','8223') 不含 8224 ⇒ 一列進 DEAD 就永久靜止，而在此之前沒有
-  #    任何指標、任何告警在看它。36 §3.3.1 自己寫著：rollout 順序錯的症狀是「一路重試到
-  #    DEAD，沒有任何一層會說出發錯 exchange」——那是它明文承認的失效模式。
-  #
-  # 🔴 為什麼 backlog 與 DEAD 要分成兩支（本檔下方 invoice M31 踩過同一個形狀）：
-  #    backlog 的述詞（'8221','8223'）與 DEAD **互斥** ⇒ 一列落到 DEAD 的同一刻就退出
-  #    backlog 指標 ⇒ 只看 backlog age 的話，告警會在事件真正卡死那一刻由 firing 轉
-  #    resolved。DEAD 必須自己一支，判準是「> 0」而不是「久久沒推進」：結構上沒有
-  #    任何查詢會再撈它。
-  #
-  # ── .claude/rules/06-no-small-tails.md §3.10 四問 ──
-  #
-  # ① **觀測窗**：hawkr_payment 的 outbox_events 全表，依 status 分兩類——
-  #    backlog ＝ 候選集合（'8221' PENDING ＋ '8223' FAILED）、dead ＝ '8224'。
-  #    '8222' SENT 不在窗內：已完成，且目前無任何清理路徑（application.yml 的
-  #    outbox-sent-retention-days 是孤兒設定，DataCleanupScheduler 沒碰這張表）⇒
-  #    它只會單調累積，數它是噪音不是訊號。
-  # ② **窗外發生的事輸出什麼**：🔴 **輸出 0，不輸出空集合**。三支都從 VALUES 清單長出
-  #    series 再 JOIN ⇒ 一列都沒有時仍有值為 0 的 series。少了這一步，「沒有積壓」與
-  #    「exporter 瞎了」在 `> 0` 的表達式上完全一樣。
-  # ③ **誰能把東西移到窗外**：(a) 新增 status 值——今天由 chk_payment_outbox_status 限定
-  #    四值，加值必須同時回來加這裡；(b) 新增 exchange 值——dead 那支用 FULL OUTER JOIN
-  #    而非 LEFT JOIN，**清單外的 exchange 仍會被數到**（只是零值時沒有 series），
-  #    漏登記不會造成靜默漏數；(c) 表改名。
-  #    述詞一律**正面列舉**狀態碼，不用 `status <> '8222'`：否定述詞會讓日後新增的終態
-  #    永遠留在桶子裡 ⇒ 永久紅 ⇒ 被靜音 ⇒ 等於沒有。
-  # ④ **對「目標不存在」FAIL 還是 SKIP**：表或欄位不存在 ⇒ SQL 出錯 ⇒ scrape 失敗 ⇒
-  #    infra-alerts.yml 的 SqlExporterScrapeErrors 轉紅。刻意不加存在性保護。
-  #    ⚠️ **部署順序**：payment-service 的 V11 migration 要**先**套用到該環境，再部署本設定
-  #    （exchange 欄在 V11 才存在）。做反的話 dead 那支查不到欄位 ⇒ 該 job 每次 scrape 出錯。
-  #
-  # ⚠️ exchange 當 label：值域由 36 §3.3.1 界定（payment.events／hawkr.shipping），
-  #    有界且正是本波要看的維度。routing_key 不當 label（十種以上且會再長）。
-  - collector_name: payment_outbox
-    metrics:
-      - metric_name: payment_outbox_backlog_rows
-        type: gauge
-        help: 'outbox_events rows still awaiting dispatch, by status (8221=PENDING, 8223=FAILED); 0-valued series always present (36 3.3.1)'
-        key_labels:
-          - status
-        values:
-          - cnt
-        query: |
-          SELECT v.status AS status,
-                 COALESCE(o.cnt, 0)::float8 AS cnt
-          FROM (VALUES ('8221'), ('8223')) AS v(status)
-          LEFT JOIN (
-            SELECT status, count(*) AS cnt
-            FROM outbox_events
-            WHERE status IN ('8221', '8223')
-            GROUP BY status
-          ) o ON o.status = v.status
-
-      - metric_name: payment_outbox_oldest_backlog_age_seconds
-        type: gauge
-        help: 'Age in seconds of the oldest outbox_events row still awaiting dispatch (0 when none) (36 3.3.1)'
-        values:
-          - age_seconds
-        query: |
-          SELECT COALESCE(
-                   EXTRACT(EPOCH FROM (now() - min(created_at))),
-                   0
-                 )::float8 AS age_seconds
-          FROM outbox_events
-          WHERE status IN ('8221', '8223')
-
-      - metric_name: payment_outbox_dead_rows
-        type: gauge
-        help: 'outbox_events rows in DEAD (8224) - a terminal state nothing will ever retry - by exchange (36 3.3.1)'
-        key_labels:
-          - exchange
-        values:
-          - cnt
-        query: |
-          SELECT COALESCE(o.exchange, v.exchange) AS exchange,
-                 COALESCE(o.cnt, 0)::float8 AS cnt
-          FROM (VALUES ('payment.events'), ('hawkr.shipping')) AS v(exchange)
-          FULL OUTER JOIN (
-            SELECT exchange, count(*) AS cnt
-            FROM outbox_events
-            WHERE status = '8224'
-            GROUP BY exchange
-          ) o ON o.exchange = v.exchange
 
   # 56 號 ADM 代行營運 §8.2.3：OBS2/3/4/9/12/13 ＋ OBS14（本案唯一資料源）。
   # 這七支沒有其他來源——漏掉本 collector 的後果是六條告警 PromQL 回 no data、

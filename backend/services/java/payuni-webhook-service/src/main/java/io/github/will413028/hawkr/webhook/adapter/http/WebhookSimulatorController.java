@@ -31,7 +31,7 @@ import java.util.TreeMap;
 /**
  * PayUni Webhook 模擬器
  *
- * 提供 Web UI 讓測試人員手動推進訂單狀態（付款/退款/物流）。
+ * 提供 Web UI 讓測試人員手動推進訂單狀態（物流）。
  * 使用既有 PayUniCryptoService 加密後 POST 到目標 webhook endpoint，
  * 走完整 pipeline（解密 → inbox → outbox → MQ → consumer）。
  *
@@ -200,7 +200,7 @@ public class WebhookSimulatorController {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PayUni Webhook 模擬器</title>
+    <title>PayUni 物流 Webhook 模擬器</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; padding: 20px; }
@@ -246,8 +246,6 @@ public class WebhookSimulatorController {
         .history-section h3 { font-size: 15px; color: #555; margin-bottom: 8px; }
         .history-item { background: #fff; border-radius: 6px; padding: 10px 14px; margin-bottom: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
         .history-item .tag { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-        .history-item .tag.payment { background: #e3f2fd; color: #1565c0; }
-        .history-item .tag.refund { background: #fce4ec; color: #c62828; }
         .history-item .tag.aftersales { background: #fff3e0; color: #ef6c00; }
         .history-item .tag.shipping { background: #e8f5e9; color: #2e7d32; }
         .history-item .time { color: #999; font-size: 11px; }
@@ -255,8 +253,8 @@ public class WebhookSimulatorController {
 </head>
 <body>
 <div class="container">
-    <h1>PayUni Webhook 模擬器</h1>
-    <p class="subtitle">模擬 PayUni 回調通知，推進訂單付款 / 退款 / 物流狀態</p>
+    <h1>PayUni 物流 Webhook 模擬器</h1>
+    <p class="subtitle">模擬 PayUni 回調通知，推進訂單物流狀態</p>
 
     <div class="config-section">
         <h3>基本設定</h3>
@@ -279,51 +277,10 @@ public class WebhookSimulatorController {
     </div>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('payment')">付款通知</button>
-        <button class="tab-btn" onclick="switchTab('refund')">退款轉匯結果</button>
-        <button class="tab-btn" onclick="switchTab('shipping')">物流 / 退貨貨態</button>
+        <button class="tab-btn active" onclick="switchTab('shipping')">物流 / 退貨貨態</button>
     </div>
 
-    <div class="tab-content active" id="tab-payment">
-        <div class="form-row"><label>MerTradeNo *</label><input type="text" id="p_merTradeNo" placeholder="系統交易編號（必填）"></div>
-        <div class="form-row"><label>TradeNo</label><input type="text" id="p_tradeNo" placeholder="PayUni 交易編號（留空自動生成）"></div>
-        <div class="form-row"><label>交易狀態</label>
-            <select id="p_tradeStatus" onchange="onTradeStatusChange()">
-                <option value="1">1 — 付款成功</option>
-                <option value="2">2 — 付款失敗</option>
-                <option value="0">0 — 取號成功（處理中）</option>
-                <option value="3">3 — 付款取消</option>
-            </select>
-        </div>
-        <div class="form-row"><label>交易金額</label><input type="text" id="p_tradeAmt" value="100" placeholder="新台幣元"></div>
-        <div class="form-row"><label>支付方式</label>
-            <select id="p_payType">
-                <option value="Credit">Credit — 信用卡</option>
-                <option value="ATM">ATM — ATM 轉帳</option>
-                <option value="ApplePay">ApplePay — Apple Pay</option>
-                <option value="GooglePay">GooglePay — Google Pay</option>
-            </select>
-        </div>
-        <div class="form-row"><label>訊息</label><input type="text" id="p_message" value="付款成功"></div>
-        <div class="submit-row"><button class="submit-btn" onclick="sendWebhook('payment')">送出付款通知</button></div>
-    </div>
-
-    <div class="tab-content" id="tab-refund">
-        <div class="form-row"><label>MerTradeNo *</label><input type="text" id="r_merTradeNo" placeholder="原交易的商店訂單編號（必填）"></div>
-        <div class="form-row"><label>TradeNo</label><input type="text" id="r_tradeNo" placeholder="PayUni 交易編號"></div>
-        <div class="form-row"><label>退款金額</label><input type="text" id="r_refundAmt" value="100" placeholder="新台幣元"></div>
-        <div class="form-row"><label>原支付方式</label><select id="r_paymentType" disabled><option value="2">2 — ATM 轉帳</option></select></div>
-        <div class="form-row"><label>退款結果</label>
-            <select id="r_refundStatus" onchange="onRefundStatusChange()">
-                <option value="1">1 — 轉匯成功</option>
-                <option value="2">2 — 轉匯失敗</option>
-            </select>
-        </div>
-        <div class="form-row"><label>到帳日</label><input type="text" id="r_bankDate" placeholder="YYYY-MM-DD"></div>
-        <div class="submit-row"><button class="submit-btn" onclick="sendWebhook('refund')">送出退款通知</button></div>
-    </div>
-
-    <div class="tab-content" id="tab-shipping">
+    <div class="tab-content active" id="tab-shipping">
         <div class="radio-group">
             <label><input type="radio" name="shipDirection" value="forward" checked onchange="onShipDirectionChange()"> 正向物流</label>
             <label><input type="radio" name="shipDirection" value="reverse" onchange="onShipDirectionChange()"> 售後退貨物流</label>
@@ -394,12 +351,11 @@ function getWebhookUrl() {
 function switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    const tabs = ['payment', 'refund', 'shipping'];
+    const tabs = ['shipping'];
     document.querySelectorAll('.tab-btn')[tabs.indexOf(tabName)].classList.add('active');
     document.getElementById('tab-' + tabName).classList.add('active');
 }
 
-const tradeStatusMessages = { '0': '取號成功', '1': '付款成功', '2': '付款失敗', '3': '付款取消' };
 const forwardShipStatuses = [
     ['21', '21 — 待出貨'],
     ['31', '31 — 配送中'],
@@ -420,13 +376,6 @@ const shipStatusMessages = {
     reverse: { '92': '退貨處理中', '31': '退貨運送中', '11': '退貨已取件', '53': '退貨已送達', '33': '退貨物流異常' }
 };
 
-function onTradeStatusChange() {
-    document.getElementById('p_message').value = tradeStatusMessages[document.getElementById('p_tradeStatus').value] || '';
-}
-function onRefundStatusChange() {
-    const s = document.getElementById('r_refundStatus').value;
-    document.getElementById('r_bankDate').value = s === '1' ? new Date().toISOString().split('T')[0] : '-';
-}
 function currentShipDirection() {
     return document.querySelector('input[name="shipDirection"]:checked').value;
 }
@@ -445,8 +394,6 @@ function onShipStatusChange() {
     document.getElementById('s_message').value = (shipStatusMessages[direction] || {})[document.getElementById('s_shipStatus').value] || '';
 }
 function initDefaults() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('r_bankDate').value = today;
     onShipDirectionChange();
 }
 
@@ -485,20 +432,7 @@ async function sendWebhook(type) {
     const merId = document.getElementById('merIdInput').value.trim();
     let params = {}, typeName = '';
 
-    if (type === 'payment') {
-        const merTradeNo = document.getElementById('p_merTradeNo').value.trim();
-        if (!merTradeNo) { alert('請輸入 MerTradeNo'); return; }
-        let tradeNo = document.getElementById('p_tradeNo').value.trim();
-        if (!tradeNo) tradeNo = 'T' + Date.now();
-        params = { MerID: merId, MerTradeNo: merTradeNo, TradeNo: tradeNo, TradeStatus: document.getElementById('p_tradeStatus').value, TradeAmt: document.getElementById('p_tradeAmt').value, PayType: document.getElementById('p_payType').value, Message: document.getElementById('p_message').value, TradeDate: new Date().toISOString().replace('T', ' ').substring(0, 19) };
-        typeName = '付款通知';
-    } else if (type === 'refund') {
-        const merTradeNo = document.getElementById('r_merTradeNo').value.trim();
-        if (!merTradeNo) { alert('請輸入 MerTradeNo'); return; }
-        const rs = document.getElementById('r_refundStatus').value;
-        params = { Status: rs === '1' ? 'SUCCESS' : 'FAIL', Message: rs === '1' ? 'SUCCESS' : 'FAIL', MerID: merId, MerTradeNo: merTradeNo, TradeNo: document.getElementById('r_tradeNo').value.trim(), RefundAmt: document.getElementById('r_refundAmt').value, PaymentType: '2', RefundStatus: rs, BankDate: document.getElementById('r_bankDate').value };
-        typeName = '退款轉匯';
-    } else if (type === 'shipping') {
+    if (type === 'shipping') {
         const shipTradeNo = document.getElementById('s_shipTradeNo').value.trim();
         if (!shipTradeNo) { alert('請先查詢 ShipTradeNo'); return; }
         const direction = currentShipDirection();
@@ -541,11 +475,7 @@ const history = [];
 function addHistory(type, typeName, params, ok) {
     const key = type === 'shipping' ? params.ShipTradeNo : params.MerTradeNo;
     const tagType = type === 'shipping' && typeName.includes('售後') ? 'aftersales' : type;
-    const statusText = type === 'payment'
-        ? tradeStatusMessages[params.TradeStatus]
-        : type === 'refund'
-            ? (params.RefundStatus === '1' ? '轉匯成功' : '轉匯失敗')
-            : (params.Message || params.ShipStatusDesc || params.ShipStatus);
+    const statusText = params.Message || params.ShipStatusDesc || params.ShipStatus;
     history.unshift({ type, typeName, key, statusText, ok, time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) });
     history[0].tagType = tagType;
     if (history.length > 20) history.pop();

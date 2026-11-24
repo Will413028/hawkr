@@ -118,6 +118,32 @@ class PaymentEventHandlerSalesOutboxTest {
     }
 
     @Test
+    @DisplayName("零元訂單由訂單方直接完成：不經 payment，以 ZERO_AMOUNT 轉為已付款並落 order.paid")
+    void zeroAmountOrderIsCompletedByOrderWithoutPayment() {
+        when(dedupRepository.insertIdempotent(eq("ZERO-O1"), eq("O1"), anyString(), anyString())).thenReturn(1);
+        OrderEntity order = new OrderEntity();
+        order.setOrderNo("O1");
+        order.setStatus(OrderStatus.PENDING_PAYMENT.value());
+        order.setBuyerId(3001L);
+        order.setStoreId(7001L);
+        order.setTotalActualAmount(0L);
+        order.setShippingMethod("3001");
+        when(orderRepository.findByOrderNoForUpdate("O1")).thenReturn(order);
+        when(orderRepository.updatePaymentConfirmed(
+                eq("O1"), anyString(), anyString(), anyString(), any(), anyString())).thenReturn(1);
+
+        handler.completeZeroAmountOrder("O1");
+
+        verify(orderRepository).updatePaymentConfirmed(
+                eq("O1"), eq(OrderStatus.PENDING_PAYMENT.value()), eq(OrderStatus.PAID.value()),
+                eq("ZERO-O1"), any(), eq(PaymentMethod.ZERO_AMOUNT.value()));
+        ArgumentCaptor<OrderOutboxEntity> captor = ArgumentCaptor.forClass(OrderOutboxEntity.class);
+        verify(outboxMapper, org.mockito.Mockito.atLeastOnce()).insert(captor.capture());
+        assertThat(captor.getAllValues()).extracting(OrderOutboxEntity::getEventType)
+                .contains(OrderEventType.ORDER_PAID.value());
+    }
+
+    @Test
     @DisplayName("付款成功事務內落兩筆 outbox：order.paid ＋ order.sales.accumulated（不再走 afterCommit best-effort）")
     void salesAccumulatedGoesThroughOutboxInSameTransaction() throws Exception {
         stubPaidOrder();

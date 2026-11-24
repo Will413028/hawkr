@@ -51,7 +51,6 @@ groups:
           or absent(up{job="product-service", env="prod"})
           or absent(up{job="order-service", env="prod"})
           or absent(up{job="aftersales-service", env="prod"})
-          or absent(up{job="payment-service", env="prod"})
           or absent(up{job="invoice-service", env="prod"})
         for: 5m
         labels:

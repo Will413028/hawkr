@@ -24,7 +24,6 @@
         <module>shared/payuni-java-client</module>
 
         <!-- microservices（清單以本區塊為準，新增服務時同步追加 module） -->
-        <module>payment-service</module>
         <module>product-service</module>
         <module>order-service</module>
         <module>cart-service</module>

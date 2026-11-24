@@ -95,9 +95,6 @@ service OrderService {
     // 取得訂單付款資訊（Payment Service 內部呼叫）
     rpc GetOrderForPayment(GetOrderForPaymentRequest) returns (GetOrderForPaymentResponse);
 
-    // 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-    rpc SnapshotPaymentInfo(SnapshotPaymentInfoRequest) returns (SnapshotPaymentInfoResponse);
-
     // ==================== 管理端 ====================
 
     // 搜尋訂單（後台）
@@ -1196,22 +1193,6 @@ message StorePeriodOrderStats {
     string qualifying_orders = 1;    // 成立訂單數：已付款、未取消、未全額退款，付款時間落在窗內（狀態集合同 ListStoreOrderStats；自買單不排除）
     string distinct_buyers = 2;      // 成立訂單的不重複買家數
     string revenue = 3;              // 營收（新台幣元，數字字串）：成立訂單的實付金額（total_actual_amount）減去已完成的退款金額（refund_total_amount）加總；之後才發生的退款會使過去的窗變小
-}
-
-// ==================== 快照付款資訊 ====================
-
-message SnapshotPaymentInfoRequest {
-    string order_no = 1;             // 訂單編號
-    string trade_no = 2;             // 交易編號（Payment Service trade_no）
-    string payment_method = 3;       // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
-    string atm_bank_code = 4;        // ATM 銀行代碼（僅 ATM 有值）
-    string atm_virtual_account = 5;  // ATM 虛擬帳號（僅 ATM 有值）
-    string atm_expire_date = 6;      // ATM 繳費期限（僅 ATM 有值，ISO 8601）
-}
-
-message SnapshotPaymentInfoResponse {
-    int32 code = 1;
-    string message = 2;
 }
 
 // ==================== 售後用：查詢訂單 ====================
