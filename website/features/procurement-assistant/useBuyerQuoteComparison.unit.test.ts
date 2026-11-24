@@ -56,11 +56,11 @@ function protoRow(init: { shortlisted?: boolean; payloadHash?: string } = {}) {
 			unitBasis: { quantity: "1", unit: "KG" },
 			offeredQuantity: "500",
 			offeredQuantityUnit: "KG",
-			goodsAmount: 18000n,
-			shippingAmount: 0n,
-			taxAmount: 900n,
+			goodsAmount: BigInt(18000),
+			shippingAmount: BigInt(0),
+			taxAmount: BigInt(900),
 			taxInclusionBasis: TaxInclusionBasis.TAX_EXCLUDED,
-			totalAmount: 18900n,
+			totalAmount: BigInt(18900),
 		},
 		shortlisted: init.shortlisted ?? false,
 		acceptability: QuoteAcceptability.ACCEPTABLE,
@@ -144,7 +144,7 @@ describe("比較清單讀取", () => {
 describe("加入與移出比較", () => {
 	it("加入帶需求與版本，不帶 client_request_id", async () => {
 		const { result } = await mountLoaded();
-		const put = vi.fn(() => ({}));
+		const put = vi.fn((_request: Record<string, unknown>) => ({}));
 		rpc.handlers.putShortlistEntry = put;
 		await result.current.setShortlisted(target, true);
 		expect(put.mock.calls[0][0]).toMatchObject({
@@ -188,12 +188,12 @@ describe("接受一個 exact version", () => {
 
 	it("請求只有版本、內容雜湊與 client_request_id，不夾帶金額", async () => {
 		const { result } = await mountLoaded();
-		const accept = vi.fn(() =>
+		const accept = vi.fn((_request: Record<string, unknown>) =>
 			create(AcceptSellerQuoteResponseSchema, {
 				buyerAcceptanceId: "acc-1",
 				sellerResponseId: RESPONSE_ID,
 				sellerResponseVersion: VERSION_ID,
-				acceptedDealPrice: 18900n,
+				acceptedDealPrice: BigInt(18900),
 				orderProvisioningState: OrderProvisioningState.CREATING_ORDER,
 			}),
 		);

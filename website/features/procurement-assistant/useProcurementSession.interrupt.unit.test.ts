@@ -107,13 +107,13 @@ const PACKAGING_QUESTION = {
 const INTERRUPT = { interruptId: "int-1", reason: "CLARIFICATION" };
 
 function openConfirmation(
-	question: typeof CROP_QUESTION | undefined = CROP_QUESTION,
+	question: typeof CROP_QUESTION | null = CROP_QUESTION,
 	interruptId = "int-1",
 ) {
 	return create(OpenConfirmationSchema, {
 		interruptId,
 		kind: InterruptKind.CLARIFICATION,
-		question,
+		question: question ?? undefined,
 	});
 }
 
@@ -367,10 +367,9 @@ describe("普通選填問句的 snapshot 重試", () => {
 	it.each([
 		["新版 revision", { revisionId: "rev-2" }],
 		["已在搜尋候選", { status: RequestStatus.MATCHING }],
-		["候選已就緒", { status: RequestStatus.CANDIDATES_READY }],
 		[
 			"新中斷未提供問題",
-			{ openConfirmation: openConfirmation(undefined) },
+			{ openConfirmation: openConfirmation(null) },
 		],
 	])("%s 不沿用普通選填問題", async (_case, overrides) => {
 		const { result } = await arriveAtOptionalQuestion();

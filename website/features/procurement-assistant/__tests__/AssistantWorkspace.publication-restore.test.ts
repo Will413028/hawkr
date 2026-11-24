@@ -139,7 +139,7 @@ function publicationOnlySnapshot(): ProcurementSnapshot {
 	return {
 		requestId: "1234567890123456788",
 		revisionId: "1234567890123456791",
-		status: "CANDIDATES_READY",
+		status: "MATCHING",
 		slots: {},
 		missingRequired: [],
 		runs: [],

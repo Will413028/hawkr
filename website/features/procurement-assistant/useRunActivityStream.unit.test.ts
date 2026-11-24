@@ -56,7 +56,7 @@ vi.mock("@/lib/connect/procurement", () => ({
 
 function activityEvent(
 	cursor: string,
-	activity: Partial<Activity>,
+	activity: Partial<Omit<Activity, "$typeName" | "$unknown">>,
 ): WatchRunResponse {
 	return create(WatchRunResponseSchema, {
 		cursor,

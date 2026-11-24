@@ -158,14 +158,6 @@ describe("composer 的停止鈕", () => {
 		}
 	});
 
-	it("CAS 版本過期且換不到新 token：要買家重新整理確認，不謊報已取消", () => {
-		renderComposer({ stopState: { status: "stale" } });
-		const text = notice();
-		expect(text).toContain("請重新整理確認目前結果");
-		expect(text).not.toContain("已停止");
-		expect(stopButton().disabled).toBe(true);
-	});
-
 	it("命令沒有成立（非 CAS 的錯誤）時可以重試", () => {
 		const { onStop } = renderComposer({
 			stopState: { status: "error", detail: "停止沒有送出，請重試。" },

@@ -78,7 +78,7 @@ describe("pendingInterrupt", () => {
 describe("publishedPublication", () => {
 	const base: ProcurementSnapshot = {
 		...baseSnapshot,
-		status: "CANDIDATES_READY",
+		status: "MATCHING",
 		missingRequired: [],
 	};
 	const publication = {

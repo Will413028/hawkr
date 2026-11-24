@@ -575,13 +575,6 @@ export default function AssistantWorkspace({
 				}}
 			>
 				<ul className="thread-page__list">
-					{}
-					{process.env.NODE_ENV !== "production" && session.streamFallback ? (
-						<li className="thread-page__notice" role="status">
-							思考步驟未即時顯示：{session.streamFallback}（僅開發環境提示）
-						</li>
-					) : null}
-
 					<ProcurementClarifyChat
 						turns={session.turns}
 						restoredSummary={session.restoredSummary}

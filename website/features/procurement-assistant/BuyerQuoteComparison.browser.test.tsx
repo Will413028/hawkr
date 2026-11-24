@@ -6,6 +6,7 @@ import BuyerQuoteComparison from "./BuyerQuoteComparison";
 import type {
 	BuyerFacingSellerResponse,
 	BuyerQuoteAcceptanceResponse,
+	BuyerQuoteFailure,
 } from "./buyer-quote-contract";
 
 function buyerQuoteFailure(

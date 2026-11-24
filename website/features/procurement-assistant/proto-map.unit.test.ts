@@ -58,7 +58,7 @@ describe("slotsFromProto", () => {
 			create(SlotsSchema, {
 				item: "高麗菜",
 				quantity: 10,
-				budgetPerUnit: 800n,
+				budgetPerUnit: BigInt(800),
 				deliveryDate: { year: 2026, month: 8, day: 20 },
 				itemResolution: {
 					kind: ItemResolutionKind.CATEGORY_CONFIRMED,

@@ -83,7 +83,7 @@ describe("stepFromProto：text 的取值與清理", () => {
 		const step = fromWire("VALIDATE_SLOTS", {
 			label: "伺服器的字",
 			status: StepStatus.WAITING_FOR_INPUT,
-			durationMs: 125n,
+			durationMs: BigInt(125),
 			safeArgs: { item: "高麗菜" },
 		});
 		expect(step?.label).toBeUndefined();

@@ -343,7 +343,8 @@ export function stepFromProto(step: Step): AgentStep | null {
 		status,
 		label: undefined,
 		text: step.text.trim() !== "" ? step.text.trim() : undefined,
-		durationMs: step.durationMs > 0n ? Number(step.durationMs) : undefined,
+		durationMs:
+			step.durationMs > BigInt(0) ? Number(step.durationMs) : undefined,
 		safeArgs: Object.keys(safeArgs).length > 0 ? safeArgs : undefined,
 	};
 }
