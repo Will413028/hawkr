@@ -501,6 +501,12 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 	q := store.New(d.Pool())
 	published := seed(ctx, t, q, 41, true)
 	draft := seed(ctx, t, q, 41, false)
+	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
+		ID: id(), BuyerID: &draft.buyer, RequestID: draft.request, RequestRevisionID: draft.revision, RangeLowerAmount: 400, RangeUpperAmount: 600,
+		CandidateSetID: draft.candidateSet, SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
+	}); err != nil || n != 1 {
+		t.Fatalf("未發布的需求也有一張核准（候選集被它引用）：n=%d err=%v", n, err)
+	}
 	bystander := seed(ctx, t, q, 42, true)
 	m := New(Deps{DB: d, Now: time.Now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: events.NewBus()})
 
@@ -523,8 +529,16 @@ func TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords(t *testing.T)
 			t.Errorf("%s 保留且 buyer_id 為 NULL，實際 %d 列", tbl, s.anonymized[tbl])
 		}
 	}
-	if s.conversations != 0 || s.turns != 0 || s.candidateSets != 0 || s.runs != 0 || s.usage != 0 {
-		t.Fatalf("已發布的需求的買家專屬資料（對話、輪次、候選、run、額度）要刪除：%+v", s)
+	if s.conversations != 0 || s.turns != 0 || s.runs != 0 || s.usage != 0 {
+		t.Fatalf("已發布的需求的買家專屬資料（對話、輪次、run、額度）要刪除：%+v", s)
+	}
+	if s.candidateSets != 1 || count(ctx, t, d, "candidate_sets", "id = $1 AND buyer_id IS NULL", published.candidateSet) != 1 ||
+		count(ctx, t, d, "candidates", "candidate_set_id = $1", published.candidateSet) != 1 {
+		t.Fatalf("核准引用的候選集（與它的候選列）要保留且 buyer_id 為 NULL：%+v", s)
+	}
+	if count(ctx, t, d, "rfq_publications", "id = $1", published.publication) != 1 || count(ctx, t, d, "buyer_quote_acceptances", "id = $1", published.acceptance) != 1 ||
+		count(ctx, t, d, "rfq_publication_approvals", "id = $1 AND candidate_set_id = $2", published.approval, published.candidateSet) != 1 {
+		t.Fatalf("發布、接受單與核准要保留：%+v", s)
 	}
 	for _, kept := range []struct{ table, where string }{
 		{"rfq_publication_invites", "id = $1"}, {"seller_responses", "id = $1"}, {"rfq_publication_approval_recipients", "approval_id = $1"},

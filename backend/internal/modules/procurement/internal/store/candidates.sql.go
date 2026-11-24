@@ -13,7 +13,7 @@ import (
 )
 
 const getCandidateSetForBuyer = `-- name: GetCandidateSetForBuyer :one
-SELECT id, request_id, request_revision_id, buyer_id, created_at FROM procurement.candidate_sets WHERE id = $1 AND request_id = $2 AND buyer_id = $3
+SELECT id, request_id, request_revision_id, buyer_id, created_at FROM procurement.candidate_sets WHERE id = $1 AND request_id = $2 AND buyer_id = $3::bigint
 `
 
 type GetCandidateSetForBuyerParams struct {
@@ -84,7 +84,7 @@ func (q *Queries) InsertCandidate(ctx context.Context, arg InsertCandidateParams
 
 const insertCandidateSet = `-- name: InsertCandidateSet :exec
 INSERT INTO procurement.candidate_sets (id, request_id, request_revision_id, buyer_id, created_at)
-VALUES ($1, $2, $3, $4, $5)
+VALUES ($1, $2, $3, $4::bigint, $5)
 `
 
 type InsertCandidateSetParams struct {
@@ -110,7 +110,7 @@ func (q *Queries) InsertCandidateSet(ctx context.Context, arg InsertCandidateSet
 const listCandidates = `-- name: ListCandidates :many
 SELECT c.id, c.candidate_set_id, c.store_id, c.source_id, c.rank, c.selected, c.selected_at, c.created_at FROM procurement.candidates c
 JOIN procurement.candidate_sets s ON s.id = c.candidate_set_id
-WHERE c.candidate_set_id = $1 AND s.buyer_id = $2
+WHERE c.candidate_set_id = $1 AND s.buyer_id = $2::bigint
 ORDER BY c.rank, c.id
 `
 
@@ -152,7 +152,7 @@ const setCandidateSelected = `-- name: SetCandidateSelected :execrows
 UPDATE procurement.candidates c
 SET selected = $1::bool, selected_at = CASE WHEN $1::bool THEN $2::timestamptz ELSE NULL END
 FROM procurement.candidate_sets s
-WHERE c.id = $3 AND c.candidate_set_id = s.id AND s.id = $4 AND s.request_id = $5 AND s.buyer_id = $6
+WHERE c.id = $3 AND c.candidate_set_id = s.id AND s.id = $4 AND s.request_id = $5 AND s.buyer_id = $6::bigint
 `
 
 type SetCandidateSelectedParams struct {

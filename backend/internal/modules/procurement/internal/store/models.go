@@ -112,7 +112,7 @@ type ProcurementCandidateSet struct {
 	ID                uuid.UUID
 	RequestID         uuid.UUID
 	RequestRevisionID uuid.UUID
-	BuyerID           int64
+	BuyerID           *int64
 	CreatedAt         time.Time
 }
 

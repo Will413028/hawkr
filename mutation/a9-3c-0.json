@@ -21,11 +21,20 @@
   {
    "id": "seller-response-invite-fk-dropped",
    "stack": "go-integration",
-   "file": "backend/internal/modules/procurement/db/migrations/20261124025127_procurement_wish_pool_spec_note.sql",
+   "file": "backend/internal/modules/procurement/db/migrations/20261124030023_procurement_wish_pool_spec_note.sql",
    "old": "ALTER TABLE \"procurement\".\"seller_responses\" ADD CONSTRAINT \"seller_responses_invite_fk\" FOREIGN KEY (\"publication_id\", \"store_id\") REFERENCES \"procurement\".\"rfq_publication_invites\" (\"publication_id\", \"store_id\") ON UPDATE NO ACTION ON DELETE NO ACTION;",
    "new": "SELECT 1;",
    "test": "internal/modules/procurement ^TestSellerResponseRequiresAnInviteForTheStore$",
    "why": "Without the composite foreign key a seller response row can exist for a store that has no invite row, so invite rows stop being the sole visibility basis."
+  },
+  {
+   "id": "approval-candidate-set-fk-cascades",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/db/migrations/20261124030023_procurement_wish_pool_spec_note.sql",
+   "old": "REFERENCES \"procurement\".\"candidate_sets\" (\"id\") ON UPDATE NO ACTION ON DELETE RESTRICT",
+   "new": "REFERENCES \"procurement\".\"candidate_sets\" (\"id\") ON UPDATE NO ACTION ON DELETE CASCADE",
+   "test": "internal/modules/procurement ^TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords$",
+   "why": "With a cascading foreign key a candidate set delete removes the approval and the seller-visible publication, invite, response and acceptance behind it, so BuyerDeleted loses records S10 requires to keep."
   }
  ]
 }

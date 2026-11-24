@@ -8,8 +8,9 @@
 -- 31 張舊表依 A9-D19（table-audit.md 的 S1–S11）收斂：沒有 candidate_leads（AD4）、controller_kind（AD12）、external lane 與 prospect（A9-D1）、
 -- 預約表（A9-D9）、outbox 與 *_commands（M11、S4）。頭尾不得有空白的文字欄用 `trimtext.Check` 展開（單體規則 9），登記在 cmd/hawkr 的 trimmedColumns。
 --
--- 買家刪除（S10）：requests、approvals、publications、acceptances 的 buyer_id 可為 NULL：已發布的詢價與賣家
--- 看得到的紀錄保留（匿名，保留期跟詢價的生命週期），其餘買家資料（對話、輪次、候選、run、額度）刪除。
+-- 買家刪除（S10）：requests、candidate_sets（被核准引用的）、approvals、publications、acceptances 的 buyer_id 可為 NULL：已發布的詢價與賣家
+-- 看得到的紀錄保留（匿名，保留期跟詢價的生命週期），其餘買家資料（對話、輪次、沒被核准引用的候選集、run、額度）刪除。
+-- approvals.candidate_set_id 是 RESTRICT：核准連到發布與賣家紀錄，候選集被誤刪時要明確失敗，不得連帶刪掉賣家看得到的資料。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
@@ -134,7 +135,7 @@ CREATE TABLE procurement.candidate_sets (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES procurement.requests (id) ON DELETE CASCADE,
     request_revision_id UUID NOT NULL REFERENCES procurement.request_revisions (id) ON DELETE CASCADE,
-    buyer_id BIGINT NOT NULL,
+    buyer_id BIGINT,
     created_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT candidate_sets_buyer_check CHECK (buyer_id > 0)
 );
@@ -169,7 +170,7 @@ CREATE TABLE procurement.rfq_publication_approvals (
     range_lower_amount BIGINT NOT NULL,
     range_upper_amount BIGINT NOT NULL,
     buyer_note TEXT NOT NULL DEFAULT '',
-    candidate_set_id UUID NOT NULL REFERENCES procurement.candidate_sets (id) ON DELETE CASCADE,
+    candidate_set_id UUID NOT NULL REFERENCES procurement.candidate_sets (id) ON DELETE RESTRICT,
     response_deadline DATE,
     state TEXT NOT NULL,
     schema_version TEXT NOT NULL,
