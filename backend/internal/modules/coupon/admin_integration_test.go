@@ -337,3 +337,98 @@ func TestAdminEndCampaignAuditUsesTheNormalizedReason(t *testing.T) {
 		}
 	}
 }
+
+// 指定發放對補償活動（無論發行者）回 NOT_FOUND，不建券：補償券只由系統依來源冪等發放。
+func TestAdminIssueRejectsACompensationCampaignWhoeverIssuedIt(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	comp, err := f.m.IssueCompensation(ctx, coupon.CompensationInput{
+		SourceType: coupon.SourceAdminCompensation, SourceID: "ADM-2", BuyerID: buyer1, StoreID: storeA, Amount: 100, MinOrderAmount: 500,
+		EndAt: base.Add(30 * windowLen), Title: "補償", Issuer: coupon.Issuer{AdminID: adminID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.m.AdminIssue(ctx, actor("grant"), coupon.IssueInput{CampaignID: comp.Campaign.ID, BuyerIDs: []int64{buyer2}})
+	wantReason(t, err, coupon.ReasonCampaignNotFound)
+	if n := f.scalar("SELECT count(*) FROM coupon.coupon_vouchers WHERE campaign_id = $1", comp.Campaign.ID); n != 1 {
+		t.Fatalf("補償活動的券 %d 張，預期仍是原本的 1 張", n)
+	}
+	if n := f.auditRows("grant"); n != 0 {
+		t.Fatalf("失敗的發放不該留紀錄，有 %d 筆", n)
+	}
+}
+
+// 稽核紀錄的 granted_buyers 是去重後的人數，不是請求的原始個數。
+func TestAdminIssueAuditRecordsTheDeduplicatedBuyerCount(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	c := f.platformDesignated(buyer1)
+	if _, err := f.m.AdminIssue(ctx, actor("grant"), coupon.IssueInput{CampaignID: c.ID, BuyerIDs: []int64{buyer2, buyer3, buyer2, buyer3, buyer2}}); err != nil {
+		t.Fatal(err)
+	}
+	if n := f.scalar("SELECT (detail->>'granted_buyers')::bigint FROM adminaudit.records WHERE action = 'grant'"); n != 2 {
+		t.Fatalf("granted_buyers = %d，預期去重後的 2", n)
+	}
+}
+
+// 後台發布只限平台發的非補償活動：店家發的 DRAFT 活動回 NOT_FOUND 且狀態不變、不留紀錄；平台的照常發布。
+func TestAdminPublishRejectsAStoreCampaign(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	shop := f.sellerCampaign(storeA)
+	if err := f.exec("UPDATE coupon.coupon_campaigns SET status = 'DRAFT' WHERE id = $1", shop.ID); err != nil {
+		t.Fatal(err)
+	}
+	wantReason(t, f.m.AdminPublishCampaign(ctx, actor("publish"), shop.ID), coupon.ReasonCampaignNotFound)
+	if n := f.scalar("SELECT count(*) FROM coupon.coupon_campaigns WHERE id = $1 AND status = 'DRAFT'", shop.ID); n != 1 {
+		t.Fatal("店家活動不該被後台發布")
+	}
+	if n := f.auditRows("publish"); n != 0 {
+		t.Fatalf("失敗的發布不該留紀錄，有 %d 筆", n)
+	}
+	wantReason(t, f.m.AdminPublishCampaign(ctx, actor("publish"), uuid.New()), coupon.ReasonCampaignNotFound)
+	f.platformDesignated(buyer1)
+}
+
+// 限店的平台活動：店家不存在或已關閉回 InvalidInput 指出 StoreID 且不建活動；存在的（含停權的）照常建立。
+func TestAdminCreateCampaignChecksTheStoreBeforeWriting(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	f.dir.missing[storeB+1] = true
+	f.dir.closed[storeB] = true
+	for name, store := range map[string]int64{"不存在": storeB + 1, "已關閉": storeB} {
+		_, err := f.m.AdminCreateCampaign(ctx, actor("create"), coupon.CreateCampaignInput{
+			CampaignSpec: coupon.CampaignSpec{Title: "限店", DiscountType: coupon.DiscountCash, DiscountAmount: 100, StartAt: base.Add(-time.Hour), EndAt: base.Add(windowLen)},
+			TargetType:   coupon.TargetAll, StoreID: store,
+		})
+		if err == nil || !strings.Contains(err.Error(), "店家") {
+			t.Fatalf("店家%s：err=%v，預期店家的欄位錯誤", name, err)
+		}
+	}
+	if n := f.scalar("SELECT count(*) FROM coupon.coupon_campaigns"); n != 0 {
+		t.Fatalf("被拒的建立不該寫入活動，有 %d 個", n)
+	}
+	f.stores.set(storeA, true)
+	f.adminDraft(func(in *coupon.CreateCampaignInput) { in.StoreID = storeA })
+}
+
+// 非 DESIGNATED 的活動帶名單：不查買家，維持「名單只給 DESIGNATED」的錯誤。
+func TestAdminCreateCampaignLooksUpBuyersOnlyForDesignated(t *testing.T) {
+	f := setup(t)
+	f.buyers.missing[buyer1] = true
+	_, err := f.m.AdminCreateCampaign(context.Background(), actor("create"), coupon.CreateCampaignInput{
+		CampaignSpec: coupon.CampaignSpec{Title: "全平台", DiscountType: coupon.DiscountCash, DiscountAmount: 100, StartAt: base.Add(-time.Hour), EndAt: base.Add(windowLen)},
+		TargetType:   coupon.TargetAll, TargetBuyers: []int64{buyer1},
+	})
+	if err == nil || strings.Contains(err.Error(), "買家不存在") || len(f.buyers.calls) != 0 {
+		t.Fatalf("err=%v 買家查詢=%d 次，預期不查買家且不是買家不存在", err, len(f.buyers.calls))
+	}
+	_, err = f.m.AdminCreateCampaign(context.Background(), actor("create"), coupon.CreateCampaignInput{
+		CampaignSpec: coupon.CampaignSpec{Title: "指定", DiscountType: coupon.DiscountCash, DiscountAmount: 100, StartAt: base.Add(-time.Hour), EndAt: base.Add(windowLen)},
+		TargetType:   coupon.TargetDesignated, TargetBuyers: []int64{buyer2, buyer1},
+	})
+	if err == nil || !strings.Contains(err.Error(), "買家不存在") {
+		t.Fatalf("DESIGNATED 的未知買家：err=%v", err)
+	}
+}

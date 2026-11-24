@@ -31,8 +31,8 @@
    "id": "audit-failure-does-not-roll-back-domain",
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/admin/admin.go",
-   "old": "\t\tif err := s.d.Campaign.Publish(ctx, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.record(ctx, actor, auditCampaign, id.String(), nil)",
-   "new": "\t\tif err := m.campaign.Publish(ctx, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\t_ = m.record(ctx, actor, auditCampaign, id.String(), nil)\n\t\treturn nil",
+   "old": "\t\tif err := s.d.Campaign.PublishPlatform(ctx, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.record(ctx, actor, auditCampaign, id.String(), nil)",
+   "new": "\t\tif err := s.d.Campaign.PublishPlatform(ctx, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\t_ = s.record(ctx, actor, auditCampaign, id.String(), nil)\n\t\treturn nil",
    "test": "internal/modules/coupon ^TestAdminAuditAndDomainChangeCommitOrRollBackTogether$",
    "why": "紀錄寫失敗被吞掉：發布照常提交、沒有稽核紀錄（紀錄與領域變更不再一起成敗），測試要紅。"
   },
@@ -184,7 +184,7 @@
    "id": "issue-allows-store-campaign",
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
-   "old": "\t\tif c.IssuerStoreID != nil {\n\t\t\treturn model.NotFound(ctx, model.ReasonCampaignNotFound)\n\t\t}\n",
+   "old": "\t\tif c.IssuerStoreID != nil || c.TargetType == model.TargetCompensation {\n\t\t\treturn model.NotFound(ctx, model.ReasonCampaignNotFound)\n\t\t}\n",
    "new": "",
    "test": "internal/modules/coupon ^TestAdminIssueRejectsAStoreCampaign$",
    "why": "指定發放不再擋店家發的活動：後台能對店家的 DESIGNATED 活動發券，測試要紅。"
@@ -217,40 +217,94 @@
    "why": "上限在去重前檢查：500 個不重複加 1 個重複被拒，測試要紅。"
   },
   {
-   "id": "grant-limit-before-dedup",
-   "stack": "go",
-   "file": "backend/internal/httpapi/coupon/admin.go",
-   "old": "\t\tif !slices.Contains(buyers, b) {\n\t\t\tbuyers, index = append(buyers, b), append(index, i)\n\t\t}",
-   "new": "\t\tbuyers, index = append(buyers, b), append(index, i)",
-   "test": "internal/httpapi/coupon ^TestAdminGrantDeduplicatesBeforeTheBatchLimit$",
-   "why": "handler 不去重就檢查上限：500 個不重複加 1 個重複被拒，測試要紅。"
-  },
-  {
    "id": "end-audit-uses-raw-reason",
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/admin/admin.go",
-   "old": "map[string]any{\"voided_vouchers\": res.Voided, \"reason\": reason}",
-   "new": "map[string]any{\"voided_vouchers\": res.Voided, \"reason\": in.Reason + \" \"}",
+   "old": "reason, err := model.NormalizeReason(ctx, in.Reason)",
+   "new": "reason, err := in.Reason, error(nil)",
    "test": "internal/modules/coupon ^TestAdminEndCampaignAuditUsesTheNormalizedReason$",
-   "why": "稽核紀錄的 reason 不是去空白後的那個，與活動操作紀錄不一致，測試要紅。"
+   "why": "後台路徑不正規化 reason：稽核紀錄用未去空白的原始 reason，與活動操作紀錄不一致，測試要紅。"
+  },
+  {
+   "id": "grant-limit-before-dedup",
+   "stack": "go",
+   "file": "backend/internal/modules/coupon/internal/admin/admin.go",
+   "old": "len(buyers) == 0 || len(buyers) > model.MaxIssueBatch",
+   "new": "len(in.BuyerIDs) == 0 || len(in.BuyerIDs) > model.MaxIssueBatch",
+   "test": "internal/modules/coupon/internal/admin ^TestIssueBoundsTheRawListAndDeduplicatesBeforeTheBatchLimit$",
+   "why": "上限在去重前檢查：500 個不重複加重複被拒，測試要紅。"
+  },
+  {
+   "id": "grant-raw-list-unbounded",
+   "stack": "go",
+   "file": "backend/internal/modules/coupon/internal/admin/admin.go",
+   "old": "in.BuyerIDs, model.MaxIssueRequestBuyers)",
+   "new": "in.BuyerIDs, 1<<30)",
+   "test": "internal/modules/coupon/internal/admin ^TestIssueBoundsTheRawListAndDeduplicatesBeforeTheBatchLimit$",
+   "why": "原始名單長度沒有上限：超大的請求照樣去重與查買家，測試要紅。"
   },
   {
    "id": "grant-skips-buyer-existence",
    "stack": "go",
-   "file": "backend/internal/httpapi/coupon/admin.go",
-   "old": "\tif err := h.requireBuyers(ctx, \"BuyerIDs\", buyers, index, raw, adminGrantPaths); err != nil {\n\t\treturn nil, err\n\t}\n",
+   "file": "backend/internal/modules/coupon/internal/admin/admin.go",
+   "old": "\tif err := s.requireBuyers(ctx, \"BuyerIDs\", buyers, index); err != nil {\n\t\treturn voucher.IssueResult{}, err\n\t}\n",
    "new": "",
-   "test": "internal/httpapi/coupon ^TestAdminRejectsUnknownBuyersWithTheFirstIndex$",
+   "test": "internal/modules/coupon/internal/admin ^TestIssueRejectsAnUnknownBuyerAtTheFirstRequestIndex$",
    "why": "發放不檢查買家是否存在：不存在的買家被發券，測試要紅。"
+  },
+  {
+   "id": "grant-audit-counts-raw-buyers",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/admin/admin.go",
+   "old": "\tin.BuyerIDs = buyers\n",
+   "new": "",
+   "test": "internal/modules/coupon ^TestAdminIssueAuditRecordsTheDeduplicatedBuyerCount$",
+   "why": "稽核紀錄的 granted_buyers 數的是請求的原始個數而不是去重後的人數，測試要紅。"
   },
   {
    "id": "create-skips-store-existence",
    "stack": "go",
-   "file": "backend/internal/httpapi/coupon/admin.go",
-   "old": "\t\tif err := h.requireStore(ctx, create.StoreID, in.GetStoreId()); err != nil {\n\t\t\treturn nil, err\n\t\t}\n",
+   "file": "backend/internal/modules/coupon/internal/admin/admin.go",
+   "old": "\tif in.StoreID > 0 {\n\t\tif err := s.requireOpenStore(ctx, in.StoreID); err != nil {\n\t\t\treturn model.Campaign{}, err\n\t\t}\n\t}\n",
    "new": "",
-   "test": "internal/httpapi/coupon ^TestAdminCreateCampaignRequiresAnExistingStore$",
+   "test": "internal/modules/coupon/internal/admin ^TestCreateCampaignChecksTheTargetListAndTheStoreBeforeWriting$",
    "why": "建立不檢查店家是否存在：限店活動指向不存在的店家，測試要紅。"
+  },
+  {
+   "id": "create-allows-closed-store",
+   "stack": "go",
+   "file": "backend/internal/modules/coupon/internal/admin/admin.go",
+   "old": "\tif st.Closed {",
+   "new": "\tif false {",
+   "test": "internal/modules/coupon/internal/admin ^TestCreateCampaignChecksTheTargetListAndTheStoreBeforeWriting$",
+   "why": "限店活動的店家已關閉仍可建立，測試要紅。"
+  },
+  {
+   "id": "create-looks-up-buyers-for-any-target",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/admin/admin.go",
+   "old": "in.TargetType == model.TargetDesignated && len(in.TargetBuyers) > 0",
+   "new": "len(in.TargetBuyers) > 0",
+   "test": "internal/modules/coupon ^TestAdminCreateCampaignLooksUpBuyersOnlyForDesignated$",
+   "why": "非 DESIGNATED 帶名單也查買家：錯誤變成買家不存在而不是名單只給 DESIGNATED，測試要紅。"
+  },
+  {
+   "id": "issue-allows-compensation-campaign",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": " || c.TargetType == model.TargetCompensation {",
+   "new": " {",
+   "test": "internal/modules/coupon ^TestAdminIssueRejectsACompensationCampaignWhoeverIssuedIt$",
+   "why": "指定發放對補償活動不回 NotFound，測試要紅。"
+  },
+  {
+   "id": "publish-allows-store-campaign",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/campaign/campaign.go",
+   "old": "\t\t\tif row.IssuerStoreID != nil || row.TargetType == string(model.TargetCompensation) {",
+   "new": "\t\t\tif row.TargetType == string(model.TargetCompensation) {",
+   "test": "internal/modules/coupon ^TestAdminPublishRejectsAStoreCampaign$",
+   "why": "後台發布店家發的活動，測試要紅。"
   }
  ]
 }

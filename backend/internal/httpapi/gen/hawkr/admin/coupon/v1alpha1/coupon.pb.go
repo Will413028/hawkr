@@ -392,7 +392,7 @@ type AdminCampaignInput struct {
 	ThresholdAmount int64 `protobuf:"varint,4,opt,name=threshold_amount,json=thresholdAmount,proto3" json:"threshold_amount,omitempty"`
 	// 可以是 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument，COMPENSATION 只由系統建立。
 	TargetType v1alpha1.TargetType `protobuf:"varint,5,opt,name=target_type,json=targetType,proto3,enum=hawkr.coupon.v1alpha1.TargetType" json:"target_type,omitempty"`
-	// 適用的店家；不設是全平台。店家不存在回 invalid_argument。
+	// 適用的店家；不設是全平台。店家不存在或已關閉（CLOSED）回 invalid_argument，指出 campaign.store_id；停權的店家不擋。
 	StoreId   *string                `protobuf:"bytes,6,opt,name=store_id,json=storeId,proto3,oneof" json:"store_id,omitempty"`
 	StartTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	// 必須晚於現在與 start_time。
@@ -817,7 +817,7 @@ func (x *EndCampaignResponse) GetVoidedVouchers() int32 {
 type GrantVouchersRequest struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	CampaignId string                 `protobuf:"bytes,1,opt,name=campaign_id,json=campaignId,proto3" json:"campaign_id,omitempty"`
-	// 要發給的買家 ID，去重後 1 到 500 位，重複的只算一次（500 個不重複加一個重複的是合法的）。
+	// 要發給的買家 ID，去重後 1 到 500 位，重複的只算一次（500 個不重複加一個重複的是合法的）；原始個數最多 1000 個，超過回 invalid_argument。
 	BuyerIds      []string `protobuf:"bytes,2,rep,name=buyer_ids,json=buyerIds,proto3" json:"buyer_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

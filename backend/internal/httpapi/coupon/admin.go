@@ -14,11 +14,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
-	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
@@ -35,61 +32,18 @@ type AdminModule interface {
 	ListVouchers(ctx context.Context, in coupon.VoucherListInput) (coupon.VoucherPage, error)
 }
 
-// AdminBuyers 是買家的來源（*buyer.Module）：指定名單與發放對象必須是存在的買家。
-type AdminBuyers interface {
-	BatchMeta(ctx context.Context, ids []int64) ([]buyer.Profile, error)
-}
-
-// AdminStores 是店家的來源（*seller.Module）：限店的平台活動的店家必須存在。
-type AdminStores interface {
-	Store(ctx context.Context, storeID int64) (seller.Store, error)
-}
-
 // Admin 實作 CouponAdminService。授權（只有管理員、逐方法的權限、audited）由 rpc 的 interceptor 與 adminauth 的宣告表檢查；
-// 這裡只做欄位的轉換與錯誤對應，規則與稽核紀錄在 internal/modules/coupon。
+// 這裡只做欄位的轉換與錯誤對應，規則、存在檢查與稽核紀錄在 internal/modules/coupon。
 type Admin struct {
 	m        AdminModule
-	buyers   AdminBuyers
-	stores   AdminStores
 	reasonOf func(error) coupon.Reason
 }
 
 var _ couponv1alpha1connect.CouponAdminServiceHandler = (*Admin)(nil)
 
 // NewAdmin 建立後台的 handler。
-func NewAdmin(m AdminModule, buyers AdminBuyers, stores AdminStores) *Admin {
-	return &Admin{m: m, buyers: buyers, stores: stores, reasonOf: coupon.ReasonOf}
-}
-
-// requireBuyers 檢查每個買家都存在（存活的 profile，分批查）；不存在的回 invalid_argument 並指出第一個是第幾個（index[i] 是 ids[i] 在請求陣列的位置）。
-// 讀取失敗（不是「不存在」）整個請求失敗。
-func (h *Admin) requireBuyers(ctx context.Context, field string, ids []int64, index []int, raw []string, paths rpc.FieldPaths) error {
-	have := make(map[int64]struct{}, len(ids))
-	for chunk := range slices.Chunk(ids, buyer.MaxBatchSize) {
-		ps, err := h.buyers.BatchMeta(ctx, chunk)
-		if err != nil {
-			return err
-		}
-		for _, p := range ps {
-			have[p.BuyerID] = struct{}{}
-		}
-	}
-	for i, id := range ids {
-		if _, ok := have[id]; !ok {
-			at := index[i]
-			return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{apperr.IndexedField(field, at)}, "買家不存在：%s", raw[at]), paths)
-		}
-	}
-	return nil
-}
-
-// requireStore 檢查店家存在（含停權與已關閉的：不存在才拒絕，與 coupon 的 Stores port 一樣只在資格判定時看停權）。
-func (h *Admin) requireStore(ctx context.Context, storeID int64, raw string) error {
-	_, err := h.stores.Store(ctx, storeID)
-	if apperr.KindOf(err) == apperr.KindNotFound {
-		return rpc.WithFieldPaths(apperr.InvalidInputOn([]string{"StoreID"}, "店家不存在：%s", raw), adminCreatePaths)
-	}
-	return err
+func NewAdmin(m AdminModule) *Admin {
+	return &Admin{m: m, reasonOf: coupon.ReasonOf}
 }
 
 var (
@@ -155,14 +109,6 @@ func (h *Admin) CreateCampaign(ctx context.Context, req *connect.Request[adminpb
 	}
 	if in.StoreId != nil {
 		if create.StoreID, err = rpc.ParseID("campaign.store_id", in.GetStoreId()); err != nil {
-			return nil, err
-		}
-		if err := h.requireStore(ctx, create.StoreID, in.GetStoreId()); err != nil {
-			return nil, err
-		}
-	}
-	if len(buyers) > 0 {
-		if err := h.requireBuyers(ctx, "TargetBuyers", buyers, identityIndex(len(buyers)), in.GetDesignatedBuyerIds(), adminCreatePaths); err != nil {
 			return nil, err
 		}
 	}
@@ -251,21 +197,14 @@ func (h *Admin) GrantVouchers(ctx context.Context, req *connect.Request[adminpb.
 		return nil, err
 	}
 	raw := req.Msg.GetBuyerIds()
-	buyers, index := make([]int64, 0, len(raw)), make([]int, 0, len(raw))
+	if len(raw) == 0 || len(raw) > coupon.MaxIssueRequestBuyers {
+		return nil, rpc.RequiredField("buyer_ids", fmt.Sprintf("buyer_ids 必須是 1 到 %d 個（去重後最多 %d 位買家）", coupon.MaxIssueRequestBuyers, coupon.MaxIssueBatch))
+	}
+	buyers := make([]int64, len(raw))
 	for i, r := range raw {
-		b, err := rpc.ParseID("buyer_ids["+strconv.Itoa(i)+"]", r)
-		if err != nil {
+		if buyers[i], err = rpc.ParseID("buyer_ids["+strconv.Itoa(i)+"]", r); err != nil {
 			return nil, err
 		}
-		if !slices.Contains(buyers, b) {
-			buyers, index = append(buyers, b), append(index, i)
-		}
-	}
-	if len(buyers) == 0 || len(buyers) > coupon.MaxIssueBatch {
-		return nil, rpc.RequiredField("buyer_ids", fmt.Sprintf("buyer_ids 去重後必須是 1 到 %d 位買家", coupon.MaxIssueBatch))
-	}
-	if err := h.requireBuyers(ctx, "BuyerIDs", buyers, index, raw, adminGrantPaths); err != nil {
-		return nil, err
 	}
 	res, err := h.m.AdminIssue(ctx, actor, coupon.IssueInput{CampaignID: id, BuyerIDs: buyers})
 	if err != nil {
@@ -444,14 +383,6 @@ func toAdminVoucher(v coupon.VoucherView) *adminpb.AdminVoucher {
 	}
 	if v.Voucher.VoidedAt != nil {
 		out.VoidedTime = timestamppb.New(*v.Voucher.VoidedAt)
-	}
-	return out
-}
-
-func identityIndex(n int) []int {
-	out := make([]int, n)
-	for i := range out {
-		out[i] = i
 	}
 	return out
 }

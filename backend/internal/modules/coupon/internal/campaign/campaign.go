@@ -179,10 +179,29 @@ func (s *Service) SetQuota(ctx context.Context, storeID int64, maxCount int32) e
 }
 
 // Publish 把 DRAFT 的活動發布成 ACTIVE。
-func (s *Service) Publish(ctx context.Context, id uuid.UUID) error {
+func (s *Service) Publish(ctx context.Context, id uuid.UUID) error { return s.publish(ctx, id, false) }
+
+// PublishPlatform 只發布平台發的非補償活動（後台路徑）；店家發的與補償活動回 NotFound，不洩漏存在與否。
+func (s *Service) PublishPlatform(ctx context.Context, id uuid.UUID) error {
+	return s.publish(ctx, id, true)
+}
+
+func (s *Service) publish(ctx context.Context, id uuid.UUID, platformOnly bool) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		now := s.d.Now()
+		if platformOnly {
+			row, err := q.GetCampaign(ctx, id)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return model.NotFound(ctx, model.ReasonCampaignNotFound)
+			}
+			if err != nil {
+				return err
+			}
+			if row.IssuerStoreID != nil || row.TargetType == string(model.TargetCompensation) {
+				return model.NotFound(ctx, model.ReasonCampaignNotFound)
+			}
+		}
 		n, err := q.PublishCampaign(ctx, store.PublishCampaignParams{ID: id, Now: now})
 		if err != nil {
 			return err

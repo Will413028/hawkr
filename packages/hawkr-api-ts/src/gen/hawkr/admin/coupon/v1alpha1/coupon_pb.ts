@@ -238,7 +238,7 @@ export type AdminCampaignInput = Message<"hawkr.admin.coupon.v1alpha1.AdminCampa
   targetType: TargetType;
 
   /**
-   * 適用的店家；不設是全平台。店家不存在回 invalid_argument。
+   * 適用的店家；不設是全平台。店家不存在或已關閉（CLOSED）回 invalid_argument，指出 campaign.store_id；停權的店家不擋。
    *
    * @generated from field: optional string store_id = 6;
    */
@@ -404,7 +404,7 @@ export type GrantVouchersRequest = Message<"hawkr.admin.coupon.v1alpha1.GrantVou
   campaignId: string;
 
   /**
-   * 要發給的買家 ID，去重後 1 到 500 位，重複的只算一次（500 個不重複加一個重複的是合法的）。
+   * 要發給的買家 ID，去重後 1 到 500 位，重複的只算一次（500 個不重複加一個重複的是合法的）；原始個數最多 1000 個，超過回 invalid_argument。
    *
    * @generated from field: repeated string buyer_ids = 2;
    */
@@ -719,7 +719,7 @@ export const CouponAdminService: GenService<{
     output: typeof CreateCampaignResponseSchema;
   },
   /**
-   * PublishCampaign 把 DRAFT 的活動發布成 ACTIVE。活動不存在回 not_found；不是 DRAFT 或結束時間已過回 failed_precondition。
+   * PublishCampaign 把平台發的 DRAFT 活動發布成 ACTIVE。活動不存在、是店家發的活動、是系統建立的補償活動都回 not_found；不是 DRAFT 或結束時間已過回 failed_precondition。
    *
    * @generated from rpc hawkr.admin.coupon.v1alpha1.CouponAdminService.PublishCampaign
    */
@@ -741,7 +741,7 @@ export const CouponAdminService: GenService<{
   },
   /**
    * GrantVouchers 對平台的 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
-   * 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在或是店家發的活動回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。買家不存在回 invalid_argument，指出第一個不存在的 buyer_ids 位置。
+   * 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在、是店家發的活動、是系統建立的補償活動（無論發行者）都回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。買家不存在回 invalid_argument，指出第一個不存在的 buyer_ids 位置。
    *
    * @generated from rpc hawkr.admin.coupon.v1alpha1.CouponAdminService.GrantVouchers
    */

@@ -5,6 +5,7 @@ package coupon_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -71,12 +72,47 @@ func (f *fakeMembers) IsMember(_ context.Context, buyerID, storeID int64) (bool,
 	return f.members[[2]int64{buyerID, storeID}], f.err
 }
 
+// fakeBuyers 是 Buyers port 的替身：預設每個買家都存在，missing 裡的不存在。
+type fakeBuyers struct {
+	mu      sync.Mutex
+	missing map[int64]bool
+	calls   [][]int64
+}
+
+func (f *fakeBuyers) Existing(_ context.Context, ids []int64) ([]int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, slices.Clone(ids))
+	var out []int64
+	for _, id := range ids {
+		if !f.missing[id] {
+			out = append(out, id)
+		}
+	}
+	return out, nil
+}
+
+// fakeDirectory 是 StoreDirectory port 的替身：預設每家店都存在且營業中，missing、closed 裡的各是不存在與已關閉。
+type fakeDirectory struct {
+	mu      sync.Mutex
+	missing map[int64]bool
+	closed  map[int64]bool
+}
+
+func (f *fakeDirectory) StoreState(_ context.Context, id int64) (coupon.StoreState, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return coupon.StoreState{Exists: !f.missing[id], Closed: f.closed[id]}, nil
+}
+
 type fixture struct {
 	t       *testing.T
 	db      *db.DB
 	m       *coupon.Module
 	stores  *fakeStores
 	members *fakeMembers
+	buyers  *fakeBuyers
+	dir     *fakeDirectory
 	clock   atomic.Int64
 }
 
@@ -86,13 +122,14 @@ func (f *fixture) advance(d time.Duration) { f.clock.Add(int64(d)) }
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	f := &fixture{t: t, stores: &fakeStores{suspended: map[int64]bool{}}, members: &fakeMembers{members: map[[2]int64]bool{}}}
+	f := &fixture{t: t, stores: &fakeStores{suspended: map[int64]bool{}}, members: &fakeMembers{members: map[[2]int64]bool{}},
+		buyers: &fakeBuyers{missing: map[int64]bool{}}, dir: &fakeDirectory{missing: map[int64]bool{}, closed: map[int64]bool{}}}
 	f.clock.Store(base.UnixNano())
 	f.db = pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "coupon", Dir: coupon.Migrations()},
 		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
 	))
-	f.m = coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Members: f.members, NewID: uuid.NewV7, Now: f.now})
+	f.m = coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Members: f.members, Buyers: f.buyers, StoreDirectory: f.dir, NewID: uuid.NewV7, Now: f.now})
 	return f
 }
 

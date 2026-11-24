@@ -469,7 +469,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(couponv1alpha1connect.NewCouponAppServiceHandler(couponApp, opts...))
-	add(admincouponconnect.NewCouponAdminServiceHandler(httpcoupon.NewAdmin(deps.Coupon, deps.Buyer, deps.Seller), opts...))
+	add(admincouponconnect.NewCouponAdminServiceHandler(httpcoupon.NewAdmin(deps.Coupon), opts...))
 	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
 	if err != nil {
 		return nil, err

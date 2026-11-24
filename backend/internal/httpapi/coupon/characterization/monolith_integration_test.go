@@ -37,6 +37,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -117,6 +118,33 @@ func (s sellerStores) StoreSuspended(ctx context.Context, storeID int64) (bool, 
 	return st.Suspended(), nil
 }
 
+// StoreState 與 cmd/hawkr 的 couponStores 同一個做法：店家不存在回 Exists=false。
+func (s sellerStores) StoreState(ctx context.Context, storeID int64) (coupon.StoreState, error) {
+	st, err := s.sellers.Store(ctx, storeID)
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return coupon.StoreState{}, nil
+	}
+	if err != nil {
+		return coupon.StoreState{}, err
+	}
+	return coupon.StoreState{Exists: true, Closed: st.Status == seller.Closed}, nil
+}
+
+// buyerExists 是 coupon 的 Buyers port 的 adapter（與 cmd/hawkr 的 couponBuyers 同一個做法）。
+type buyerExists struct{ buyers *buyer.Module }
+
+func (b buyerExists) Existing(ctx context.Context, ids []int64) ([]int64, error) {
+	ps, err := b.buyers.BatchMeta(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int64, 0, len(ps))
+	for _, p := range ps {
+		out = append(out, p.BuyerID)
+	}
+	return out, nil
+}
+
 // noMembers 是 MEMBER 資格的 port：投影還沒有接上，這裡的情境不涉及 MEMBER 資格。
 type noMembers struct{}
 
@@ -167,7 +195,7 @@ func startMonolith(t *testing.T) *monolith {
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noAccountOrders{}, Now: time.Now, Logger: log})
 	crmModule := crm.New(crm.Deps{DB: d, Jobs: queue, Buyers: buyers, Stores: sellers, NewID: uuid.NewV7, Now: time.Now, Logger: log})
-	couponModule := coupon.New(coupon.Deps{DB: d, Stores: sellerStores{sellers}, Members: noMembers{}, NewID: uuid.NewV7, Now: time.Now})
+	couponModule := coupon.New(coupon.Deps{DB: d, Stores: sellerStores{sellers}, Members: noMembers{}, Buyers: buyerExists{buyers}, StoreDirectory: sellerStores{sellers}, NewID: uuid.NewV7, Now: time.Now})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)
