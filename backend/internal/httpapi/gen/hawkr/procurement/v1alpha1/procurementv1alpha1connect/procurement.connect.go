@@ -890,14 +890,14 @@ type SellerProcurementAppServiceClient interface {
 	// GetSellerPublication 回傳一筆詢價的內容，加上呼叫者自己的草稿與目前的正式回價。只含呼叫者自己的回價。
 	GetSellerPublication(context.Context, *connect.Request[v1alpha1.GetSellerPublicationRequest]) (*connect.Response[v1alpha1.GetSellerPublicationResponse], error)
 	// UpsertSellerResponseDraft 建立或更新回價草稿。草稿不驗金額恆等式與必填欄位，買家讀不到；只驗形狀與長度：
-	// 文字欄不得超過正式回價的上限，整份草稿序列化後不得超過 16 KiB，超過回 INVALID_ARGUMENT 並指出欄位。
+	// 文字欄不得超過正式回價的上限，整份草稿由伺服器存下的 JSON 文字不得超過 16 KiB，超過回 INVALID_ARGUMENT 並指出欄位。
 	UpsertSellerResponseDraft(context.Context, *connect.Request[v1alpha1.UpsertSellerResponseDraftRequest]) (*connect.Response[v1alpha1.UpsertSellerResponseDraftResponse], error)
 	// SubmitSellerResponse 送出正式回價，產生不可變的新版本。詢價已被改版回 ABORTED，conflictTarget 是 publication；
 	// 帶的 expected_seller_response_version 不是目前的版本（賣家已改價或撤回，或空字串卻已有正式回價）回 ABORTED，
 	// conflictTarget 是 seller_response，client 必須明確告知使用者報價已變動，不得改用最新版靜默重送。
 	// spec_note 超過 1000 字、金額恆等式不成立、必填欄位缺漏或格式不合回 INVALID_ARGUMENT。已停止寫入（見檔頭）回
-	// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。重送同一個 client_request_id：內容相同回第一次的版本（replayed 為 true、不建新版本，
-	// 先於版本與停止寫入的檢查），內容不同回 INVALID_ARGUMENT。幣別一律是 TWD，伺服器補上。
+	// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。重送同一個 client_request_id：內容與 expected_* 欄位都相同回第一次的版本（replayed 為 true、不建新版本，
+	// 先於版本與停止寫入的檢查），任何請求欄位（內容或 expected_* 欄位）不同回 INVALID_ARGUMENT（client_request_id）。幣別一律是 TWD，伺服器補上。
 	SubmitSellerResponse(context.Context, *connect.Request[v1alpha1.SubmitSellerResponseRequest]) (*connect.Response[v1alpha1.SubmitSellerResponseResponse], error)
 	// WithdrawSellerResponse 撤回指定版本的正式回價（目標狀態的方法）：該版已撤回時回目前的結案狀態，不改動。
 	// expected_seller_response_version 不是目前的版本回 ABORTED，conflictTarget 是 seller_response。已停止寫入回
@@ -1015,14 +1015,14 @@ type SellerProcurementAppServiceHandler interface {
 	// GetSellerPublication 回傳一筆詢價的內容，加上呼叫者自己的草稿與目前的正式回價。只含呼叫者自己的回價。
 	GetSellerPublication(context.Context, *connect.Request[v1alpha1.GetSellerPublicationRequest]) (*connect.Response[v1alpha1.GetSellerPublicationResponse], error)
 	// UpsertSellerResponseDraft 建立或更新回價草稿。草稿不驗金額恆等式與必填欄位，買家讀不到；只驗形狀與長度：
-	// 文字欄不得超過正式回價的上限，整份草稿序列化後不得超過 16 KiB，超過回 INVALID_ARGUMENT 並指出欄位。
+	// 文字欄不得超過正式回價的上限，整份草稿由伺服器存下的 JSON 文字不得超過 16 KiB，超過回 INVALID_ARGUMENT 並指出欄位。
 	UpsertSellerResponseDraft(context.Context, *connect.Request[v1alpha1.UpsertSellerResponseDraftRequest]) (*connect.Response[v1alpha1.UpsertSellerResponseDraftResponse], error)
 	// SubmitSellerResponse 送出正式回價，產生不可變的新版本。詢價已被改版回 ABORTED，conflictTarget 是 publication；
 	// 帶的 expected_seller_response_version 不是目前的版本（賣家已改價或撤回，或空字串卻已有正式回價）回 ABORTED，
 	// conflictTarget 是 seller_response，client 必須明確告知使用者報價已變動，不得改用最新版靜默重送。
 	// spec_note 超過 1000 字、金額恆等式不成立、必填欄位缺漏或格式不合回 INVALID_ARGUMENT。已停止寫入（見檔頭）回
-	// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。重送同一個 client_request_id：內容相同回第一次的版本（replayed 為 true、不建新版本，
-	// 先於版本與停止寫入的檢查），內容不同回 INVALID_ARGUMENT。幣別一律是 TWD，伺服器補上。
+	// FAILED_PRECONDITION，reason 是 RFQ_RECIPIENT_CLOSED。重送同一個 client_request_id：內容與 expected_* 欄位都相同回第一次的版本（replayed 為 true、不建新版本，
+	// 先於版本與停止寫入的檢查），任何請求欄位（內容或 expected_* 欄位）不同回 INVALID_ARGUMENT（client_request_id）。幣別一律是 TWD，伺服器補上。
 	SubmitSellerResponse(context.Context, *connect.Request[v1alpha1.SubmitSellerResponseRequest]) (*connect.Response[v1alpha1.SubmitSellerResponseResponse], error)
 	// WithdrawSellerResponse 撤回指定版本的正式回價（目標狀態的方法）：該版已撤回時回目前的結案狀態，不改動。
 	// expected_seller_response_version 不是目前的版本回 ABORTED，conflictTarget 是 seller_response。已停止寫入回

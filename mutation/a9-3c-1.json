@@ -105,8 +105,8 @@
       "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
       "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
       "new": "case err == nil:\n\t\t\tif expectedPublication != v.pub.Version || in.ExpectedSellerFacingHash != v.hash {\n\t\t\t\treturn quote.VersionConflict(\"x\", quote.TargetPublication)\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
-      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck$",
-      "why": "Replay is checked after the publication hash CAS."
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayWithDifferentExpectedFieldsIsRejected$",
+      "why": "Replay is checked after the publication CAS, so a retry with a stale expected_publication_version is judged as a version conflict instead of a client_request_id mismatch."
     },
     {
       "id": "replay-after-response-version-cas",
@@ -323,6 +323,24 @@
       "new": "",
       "test": "internal/modules/procurement/internal/sellerside ^TestListPageTokensAreBoundToTheirList$",
       "why": "A page token from another list is accepted."
+    },
+    {
+      "id": "publication-lock-not-for-share",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
+      "old": "FROM procurement.rfq_publications WHERE id = $1 FOR SHARE",
+      "new": "FROM procurement.rfq_publications WHERE id = $1",
+      "test": "internal/modules/procurement/internal/sellerside ^TestBuyerDeletionWaitsForTheSellerWriteTransaction$",
+      "why": "A buyer deletion can slip between the writable check and the seller write because the publication row is only read, not share-locked."
+    },
+    {
+      "id": "draft-create-skips-existing-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/draft.go",
+      "old": "\t\t\t\treturn quote.VersionConflict(\"草稿已經被更新過，請重新載入\", TargetDraft)\n\t\t\t} else if",
+      "new": "\t\t\t\t_ = 0\n\t\t\t} else if",
+      "test": "internal/modules/procurement/internal/sellerside ^TestDraftSizeIsMeasuredByTheDatabase$",
+      "why": "An oversized create against an existing draft reports the size error instead of the version conflict."
     }
   ]
 }

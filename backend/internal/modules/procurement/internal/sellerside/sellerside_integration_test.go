@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/quote"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/retention"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/sellerside"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
@@ -331,6 +332,9 @@ func TestDraftSizeIsMeasuredByTheDatabase(t *testing.T) {
 	if _, err := svc.UpsertDraft(ctx, invitedStore, f.publication, "", amp); err != nil {
 		t.Fatalf("& 很多但 jsonb 在上限內的草稿要收下：%v", err)
 	}
+	// 草稿已存在時，帶空版本又太大的請求先是版本衝突：衝突先於大小。
+	_, err = svc.UpsertDraft(ctx, invitedStore, f.publication, "", over)
+	wantConflict(t, err, sellerside.TargetDraft)
 }
 
 // 正式回價不受草稿大小限制：各欄位都在自己的上限內就收。
@@ -669,5 +673,51 @@ func TestSubmitAndAcceptSerializeOnTheResponseRow(t *testing.T) {
 		}
 	default:
 		t.Fatalf("兩邊要恰好一個成功：送出 %v、接受 %v", submitErr, acceptErr)
+	}
+}
+
+// 賣家寫入交易持有發布列的 FOR SHARE 時，買家刪除的 UPDATE 要等它提交：檢查與寫入之間不會插進買家刪除。
+// 用 pg_stat_activity 的 Lock 等待判斷「被擋住」，不靠時間長短。
+func TestBuyerDeletionWaitsForTheSellerWriteTransaction(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	seller, err := f.d.Pool().Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = seller.Rollback(context.Background()) }()
+	buyerID, err := store.New(seller).LockPublicationBuyer(ctx, f.publication)
+	must(t, err)
+	if buyerID == nil {
+		t.Fatal("買家還在，buyer_id 不該是 NULL")
+	}
+	deleted := make(chan error, 1)
+	go func() {
+		deleted <- f.d.InTx(ctx, func(ctx context.Context) error { return retention.New(f.d).OnBuyerDeleted(ctx, f.buyer) })
+	}()
+	blocked := func() bool {
+		return f.count("pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query ILIKE '%rfq_publications%'") > 0
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for !blocked() {
+		select {
+		case err := <-deleted:
+			t.Fatalf("賣家寫入交易還沒提交，買家刪除就完成了：%v", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("買家刪除沒有在發布列上等鎖")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if n := f.count("procurement.rfq_publications WHERE buyer_id IS NULL AND id = $1", f.publication); n != 0 {
+		t.Fatal("賣家寫入交易提交前，buyer_id 不該被改")
+	}
+	must(t, seller.Commit(ctx))
+	if err := <-deleted; err != nil {
+		t.Fatalf("買家刪除：%v", err)
+	}
+	if n := f.count("procurement.rfq_publications WHERE buyer_id IS NULL AND id = $1", f.publication); n != 1 {
+		t.Fatal("賣家提交後買家刪除要完成")
 	}
 }

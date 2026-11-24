@@ -324,7 +324,8 @@ CREATE TABLE procurement.seller_response_drafts (
     version INT NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT seller_response_drafts_payload_check CHECK (jsonb_typeof(payload) = 'object' AND octet_length(payload::text) <= 16384),
+    CONSTRAINT seller_response_drafts_payload_check CHECK (jsonb_typeof(payload) = 'object'),
+    CONSTRAINT seller_response_drafts_payload_size_check CHECK (octet_length(payload::text) <= 16384),
     CONSTRAINT seller_response_drafts_version_check CHECK (version >= 1)
 );
 

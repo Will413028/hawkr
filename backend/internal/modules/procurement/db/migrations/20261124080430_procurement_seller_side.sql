@@ -1,5 +1,5 @@
 -- Modify "seller_response_drafts" table
-ALTER TABLE "procurement"."seller_response_drafts" DROP CONSTRAINT "seller_response_drafts_payload_check", ADD CONSTRAINT "seller_response_drafts_payload_check" CHECK ((jsonb_typeof(payload) = 'object'::text) AND (octet_length((payload)::text) <= 16384));
+ALTER TABLE "procurement"."seller_response_drafts" ADD CONSTRAINT "seller_response_drafts_payload_size_check" CHECK (octet_length((payload)::text) <= 16384);
 -- Modify "seller_response_versions" table
 ALTER TABLE "procurement"."seller_response_versions" DROP COLUMN "outside_buyer_requested_range";
 -- Modify "seller_responses" table

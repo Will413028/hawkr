@@ -69,7 +69,7 @@ func nonNegative(field string, v int64) error {
 }
 
 // NormalizeDraft 檢查草稿的形狀與長度（不驗必填欄位與金額恆等式）並正規化：文字去頭尾空白、時間取 UTC 微秒，回傳存進 JSONB 的內容。
-// 列舉只收空字串（沒填）或已知的值；金額不可為負。整份草稿的大小上限只由 seller_response_drafts_payload_check 量（jsonb 的文字長度），UpsertDraft 把它的違規對成 INVALID_ARGUMENT。
+// 列舉只收空字串（沒填）或已知的值；金額不可為負。整份草稿的大小上限只由 seller_response_drafts_payload_size_check 量（jsonb 的文字長度），UpsertDraft 把它的違規對成 INVALID_ARGUMENT。
 func NormalizeDraft(in model.QuoteInput) (model.QuoteInput, []byte, error) {
 	out := in
 	var err error

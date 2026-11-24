@@ -32,7 +32,7 @@ func ParseVersion(field, raw string) (int32, error) {
 }
 
 // draftSizeConstraint 是草稿大小上限的 CHECK（jsonb 轉文字的位元組數 <= 16384）；大小只由它量，Go 端不重算（序列化格式不同，邊界會對不上）。
-const draftSizeConstraint = "seller_response_drafts_payload_check"
+const draftSizeConstraint = "seller_response_drafts_payload_size_check"
 
 func isDraftTooLarge(err error) bool {
 	var pg *pgconn.PgError
@@ -73,6 +73,11 @@ func (s Service) UpsertDraft(ctx context.Context, storeID int64, publicationID u
 		}
 		var row store.ProcurementSellerResponseDraft
 		if expected == 0 {
+			if _, err := q.GetSellerDraft(ctx, resp.ID); err == nil {
+				return quote.VersionConflict("草稿已經被更新過，請重新載入", TargetDraft)
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("sellerside：讀取草稿：%w", err)
+			}
 			row, err = q.InsertSellerDraft(ctx, store.InsertSellerDraftParams{SellerResponseID: resp.ID, Payload: payload, Now: s.Now()})
 		} else {
 			row, err = q.UpdateSellerDraft(ctx, store.UpdateSellerDraftParams{SellerResponseID: resp.ID, Payload: payload, ExpectedVersion: expected, Now: s.Now()})
