@@ -138,7 +138,7 @@
   - 範圍：主計畫「模組完成的定義」加一條：搬進單體的模組，舊服務發往 notification 的每個事件逐一裁決（定義通知型別並訂閱，或不做附理由），不經 `internal/legacy`。通知 ADR 加 2026-11-23 修訂。
   - 驗收：`rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中新條目；ADR 修訂段存在。
 
-- [ ] **A8-5 website 與 admin**（被擋於：A8-2）
+- [x] **A8-5 website 與 admin**（被擋於：A8-2）
   - 範圍：website 收件匣、未讀數、串流（收到訊號重拉列表；重連後先拉一次）、偏好改用 `@hawkr/api`，刪手寫呼叫與 SSE hook；admin 公告頁改 Connect、新增未觸達查詢頁（照既有後台列表元件），刪模板管理頁。版面不動。
   - 消費端：`rg -n "notification" website/ admin/ -g '!node_modules' -l`。
   - 驗收：website、admin CI 等價檢查；新增 website 測試：收到訊號後重拉列表、重連後拉一次；e2e 交給 CI。mutation：收到訊號不重拉 → 測試紅；重連後不拉 → 重連測試紅。
@@ -224,13 +224,13 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | A8-2b unary handler | 完成 | 本機：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／notification／cmd unit -race（只剩預期的 `TestEveryServiceInTheContractIsMounted`：NotificationAdminService 屬 A8-2c、SellerProcurementAppService 屬 A9）、mutation --validate；契約審查＋code-review 兩輪（findings 13，blocking 1 屬跨步：公告列被收件匣隱藏，於 A8-2c 註冊公告型別解決；fixed 8、recorded 2、rejected 3）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
 | A8-2c 後台公告 | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok；跨步 blocking（A8-2b 收件匣隱藏公告列）以註冊 Fanout 型別 `announcement` 解決；契約審查＋code-review 兩輪（findings 13，blocking 0；fixed 11、recorded 1：派送中重試可能重建使用者剛刪的公告（CARRYOVER）、rejected 1 nit：FailedPrecondition／PermissionDenied 視為永久略過）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
 | A8-2d 串流與賣家工作區 | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok、website lint 與 test:unit；前提更正（serve／worker 分開，改 LISTEN/NOTIFY，2026-11-24）；契約審查＋code-review 兩輪（findings 15，blocking 0；fixed 11、rejected 4：S3 依 D19 接受、3 nit）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
-| A8-3a 渠道與 token | 未開始 | | 真實推播：擋於 Firebase 專案（Will） | |
+| A8-3a 渠道與 token | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、notification／identity／httpapi／platform／arch／cmd unit（只剩 A9 的 `TestEveryServiceInTheContractIsMounted`）、mutation --validate；另含 identity `preferred_locale`（多語系 ADR D1）、推播圖片網址、D22 停寄名單只存 HMAC；審查兩輪＋最後修正（第 1 輪 8 項：blocking 1、fixed 7、rejected 1 nit；第 2 輪 5 項全修，以測試與 mutation 收尾）；CI `58c4e532d`：backend monolith 只剩 A9 既有失敗（notification integration ok），supply chain、mutation（`2035d238f`）綠 | 真實推播：擋於 Firebase 專案（Will）；真實寄信：擋於網域；部署需 `EMAIL_SUPPRESSION_HMAC_KEY`、worker `MEDIA_ORIGIN` | `4af1d1043`..`58c4e532d` |
 | A8-3b content 側型別 | 未開始 | | | |
 | A8-3c 治理與交易側型別 | 未開始 | | | |
 | A8-3d 覆蓋、重送與刪 relay | 未開始 | | | |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |
-| A8-5 website、admin | 未開始 | | | |
-| A8-6 兩支 App | 未開始 | | | |
+| A8-5 website、admin | 完成 | 本機（主 session 重跑）：website lint、test:unit、test（3347，唯一失敗為既有逾時 flake `store-key.unit.test.ts`，單跑通過）、admin lint、test；分類與渠道文字進共用文案目錄（`c686bec9d`）；偏好頁一分類一列＋渠道開關、獨立公告頁（Will 2026-11-24）；D21 網站只對訊號帶的新 ID 彈提示；審查：第 1 輪 4 項全修、code-review 7 項（5 修，CR-1/CR-3 由 D21 根治）、D21 審查 2 項全修；CI `58c4e532d`／`2035d238f`：website CI、website e2e、admin CI、TS packages、mutation 綠 | 未觸達查詢頁屬 A8-3d（RPC 未建）；e2e 只在 CI 跑 | `ac8b4ca4f`..`58c4e532d` |
+| A8-6 兩支 App | 程式完成待驗收 | 本機（主 session 重跑）：兩支 App analyze、format、custom_lint、通知測試、hardcoded_han；深連結依 D20 路徑表（`deep-links.md`）；狀態重讀提示接串流與推播（D6）；iOS Notification Service Extension（D14）；審查兩輪＋最後修正（buyer 第 1 輪 10 項：blocking 2、fixed 8、rejected 2；seller 8 項：blocking 2；第 2 輪 seller 聊天連結 blocking 經 Will 同意以測試收尾）；CI `58c4e532d`：buyer-app CI、seller-app CI 綠 | 真機推播：擋於 Firebase 專案（`GoogleService-Info.plist` ×2 App ×3 環境、APNs key）與 Apple Developer 的 NSE App ID（Will）；完整 `flutter test` 只在 CI | `7c7832d9d`..`58c4e532d` |
 | A8-7 刪舊 | 未開始 | | | |
 | A8-8 收尾 | 未開始 | | | |
 
