@@ -14,13 +14,11 @@ AfterSaleRepository afterSaleRepository(Ref ref) =>
 class ResolveResult {
   final String caseNo;
   final String status;
-  final bool needRefundPage;
   final String returnShipmentNo; // 退貨物流單號（7-11退貨代碼 / 黑貓託運單號）
 
   const ResolveResult({
     required this.caseNo,
     required this.status,
-    required this.needRefundPage,
     required this.returnShipmentNo,
   });
 }
@@ -99,7 +97,7 @@ class AfterSaleRepository {
   }
 
   /// POST /app/seller/after_sales/:case_no/resolve — 提交決策
-  /// 回傳 ResolveResultResponse: { caseNo, status, needRefundPage, returnShipmentNo }
+  /// 回傳 ResolveResultResponse: { caseNo, status, returnShipmentNo }
   Future<ResolveResult> resolve(
     String caseNo, {
     required String resolutionType,
@@ -135,7 +133,6 @@ class AfterSaleRepository {
       return ResolveResult(
         caseNo: (d['caseNo'] ?? '').toString(),
         status: (d['status'] ?? '').toString(),
-        needRefundPage: d['needRefundPage'] == true,
         returnShipmentNo: (d['returnShipmentNo'] ?? '').toString(),
       );
     } on DioException catch (e) {
@@ -202,8 +199,7 @@ class AfterSaleRepository {
   }
 
   /// POST /app/orders/:order_no/seller_cancellations — 賣家取消出貨
-  Future<({String orderNo, String refundAmount, bool needRefundPage})>
-  cancelShipment(
+  Future<({String orderNo, String refundAmount})> cancelShipment(
     String orderNo, {
     required String reason,
     String? remark,
@@ -231,7 +227,6 @@ class AfterSaleRepository {
       return (
         orderNo: (d['orderNo'] ?? orderNo).toString(),
         refundAmount: (d['refundAmount'] ?? '0').toString(),
-        needRefundPage: d['needRefundPage'] == true,
       );
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {

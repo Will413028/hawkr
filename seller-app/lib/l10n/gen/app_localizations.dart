@@ -259,6 +259,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'加入名單（{count}）'**
   String customerPickerAdd(int count);
+
+  /// Title of the seller's earnings ledger (transfers in, reversals, top-ups), on the wallet and on an order's detail.
+  ///
+  /// In zh, this message translates to:
+  /// **'入帳紀錄'**
+  String get earningsTitle;
+
+  /// Net earnings of one order: the sum of completed ledger rows, already formatted as money.
+  ///
+  /// In zh, this message translates to:
+  /// **'淨入帳 {amount}'**
+  String earningsNetAmount(String amount);
+
+  /// Empty state of the wallet earnings ledger.
+  ///
+  /// In zh, this message translates to:
+  /// **'還沒有入帳紀錄'**
+  String get earningsEmpty;
+
+  /// Error shown when the wallet earnings ledger fails to load.
+  ///
+  /// In zh, this message translates to:
+  /// **'無法載入入帳紀錄'**
+  String get earningsLoadFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -26,5 +26,9 @@
   "reportMessageTitle": "Report message",
   "customerPickerTitle": "Select customers",
   "customerPickerEmpty": "No customers to select",
-  "customerPickerAdd": "Add to list ({count})"
+  "customerPickerAdd": "Add to list ({count})",
+  "earningsTitle": "Earnings",
+  "earningsNetAmount": "Net earnings {amount}",
+  "earningsEmpty": "No earnings yet",
+  "earningsLoadFailed": "Could not load earnings"
 }

@@ -62,7 +62,6 @@ Map<String, dynamic> _liveListOrder() => <String, dynamic>{
   ],
   'isReviewed': false,
   'canReview': false,
-  'needRefundPage': false,
 };
 
 /// `GET /app/orders/{orderNo}?view=seller` → `data`（實打逐字複製；只留與本契約

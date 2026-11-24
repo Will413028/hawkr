@@ -146,5 +146,26 @@
         "type": "int"
       }
     }
+  },
+  "earningsTitle": "入帳紀錄",
+  "@earningsTitle": {
+    "description": "Title of the seller's earnings ledger (transfers in, reversals, top-ups), on the wallet and on an order's detail."
+  },
+  "earningsNetAmount": "淨入帳 {amount}",
+  "@earningsNetAmount": {
+    "description": "Net earnings of one order: the sum of completed ledger rows, already formatted as money.",
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "earningsEmpty": "還沒有入帳紀錄",
+  "@earningsEmpty": {
+    "description": "Empty state of the wallet earnings ledger."
+  },
+  "earningsLoadFailed": "無法載入入帳紀錄",
+  "@earningsLoadFailed": {
+    "description": "Error shown when the wallet earnings ledger fails to load."
   }
 }

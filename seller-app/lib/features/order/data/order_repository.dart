@@ -103,26 +103,6 @@ class OrderRepository with ApiRequestHelper {
     return data is Map<String, dynamic> ? data : resp;
   }
 
-  /// 查詢訂單付款歷程，含切換付款方式關閉的舊交易與重複付款紀錄。
-  ///
-  /// #2501：付款歷程一般路徑已收斂為買家專用；賣家必須帶 view=seller，後端以現任
-  /// store_id 驗自己店家的訂單歸屬並遮蔽買家 PII。少了這個參數會落入買家路徑而回 404。
-  Future<List<Map<String, dynamic>>> fetchPaymentHistory(String orderSn) async {
-    final resp = await apiGet(
-      '/api/v1/app/payments/orders/$orderSn/history',
-      queryParams: {'view': 'seller'},
-    );
-    final data = resp['data'];
-    final records = data is Map ? data['records'] : data;
-    if (records is List) {
-      return records
-          .whereType<Map>()
-          .map((m) => Map<String, dynamic>.from(m))
-          .toList(growable: false);
-    }
-    return const [];
-  }
-
   @Deprecated(
     'Legacy endpoint /order/order/reservation/status does not exist in gateway',
   )
@@ -241,7 +221,6 @@ class OrderRepository with ApiRequestHelper {
     return CancelOrderResult(
       orderNo: (data['orderNo'] ?? orderNo).toString(),
       refundAmount: (data['refundAmount'] ?? '0').toString(),
-      needRefundPage: data['needRefundPage'] == true,
     );
   }
 
@@ -464,20 +443,13 @@ class HomeLabelResult {
 
 /// 賣家取消訂單結果（seller_cancellations 回傳）
 class CancelOrderResult {
-  const CancelOrderResult({
-    required this.orderNo,
-    required this.refundAmount,
-    required this.needRefundPage,
-  });
+  const CancelOrderResult({required this.orderNo, required this.refundAmount});
 
   /// 訂單編號
   final String orderNo;
 
   /// 退款金額（字串，如 "255"）
   final String refundAmount;
-
-  /// 是否需要跳轉退款頁
-  final bool needRefundPage;
 
   /// 退款金額數值（0 表示無退款）
   int get refundAmountInt => int.tryParse(refundAmount) ?? 0;
