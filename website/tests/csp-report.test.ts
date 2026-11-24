@@ -148,25 +148,16 @@ test("connect-src takes the app's own origins from its input, deduplicated, with
 	);
 });
 
-// Apple Pay JS SDK 的能力偵測（applePayCapabilities → checkStatus/merchant）。
-// 拿掉它 enforce 會擋掉這支請求，結帳頁在第三方瀏覽器的 Apple Pay 判定會靜默退化
-// 成 legacy 分支——沒有錯誤訊息、只有錢收不到，所以用測試釘住。
-test("connect-src lists the Apple Pay capability endpoint", () => {
-	assert.ok(
-		directive(policy(), "connect-src").includes(
-			"https://smp-paymentservices.apple.com",
-		),
-	);
-});
-
-// Apple Pay JS SDK 在第三方瀏覽器（非 Safari 桌機）的掃碼流程用
-// applepay.cdn-apple.com 渲染付款 sheet 的 iframe（lib/payment/apple-pay.ts
-// 的 sdk-session 路線）。拿掉它 enforce 會直接擋掉該 iframe——結帳頁 Apple Pay
-// 永遠顯示空白/破圖，訂單只能「已取消」。2026-08-13 web-dev 實測攔到（console:
-// Framing 'https://applepay.cdn-apple.com/' violates ... frame-src），用測試釘住。
-test("frame-src lists the Apple Pay sheet iframe host", () => {
-	assert.ok(
-		directive(policy(), "frame-src").includes("https://applepay.cdn-apple.com"),
+// Stripe Payment Element：Stripe.js 連 api.stripe.com，3DS 驗證 frame 在 hooks.stripe.com；
+// wallet 由 Stripe 的 iframe 承載，CSP 不留 PayUni 時期原生 Apple／Google Pay 的來源。
+test("CSP allows the Payment Element hosts and none of the native wallet hosts", () => {
+	const value = policy();
+	assert.ok(directive(value, "connect-src").includes("https://api.stripe.com"));
+	assert.ok(directive(value, "frame-src").includes("https://hooks.stripe.com"));
+	assert.ok(directive(value, "frame-src").includes("https://js.stripe.com"));
+	assert.doesNotMatch(
+		value,
+		/pay\.google\.com|applepay\.cdn-apple\.com|smp-paymentservices\.apple\.com/,
 	);
 });
 

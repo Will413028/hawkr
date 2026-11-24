@@ -1,101 +1,256 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import * as React from "react";
-import AppIcon from "@/components/shared/AppIcon";
-import { useObservedRouter } from "@/lib/navigation/use-observed-router";
+import { errorText } from "@hawkr/api/connect/errors";
 import {
-	readPaymentStatusHint,
-	readPaymentTradeNo,
-} from "@/lib/payments/query";
-import { usePaymentResolution } from "@/lib/payments/usePaymentResolution";
+	Elements,
+	PaymentElement,
+	useElements,
+	useStripe,
+} from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+import { useTranslations } from "next-intl";
+import * as React from "react";
+import Button from "@/components/ui/Button";
+import PaymentStatusCard from "@/features/payments/components/PaymentStatusCard";
+import { useAuth } from "@/lib/auth/context";
+import { useDefaultErrorText } from "@/lib/i18n/ui-text";
+import { activeLocale } from "@/lib/intl/active-locale";
+import { useObservedRouter } from "@/lib/navigation/use-observed-router";
+import { getPayment, openPayment } from "@/lib/payments/api";
+import { PAYMENT_ELEMENT_APPEARANCE } from "@/lib/payments/appearance";
+import {
+	type ConfirmOutcome,
+	confirmAndSettle,
+	paymentReturnUrl,
+} from "@/lib/payments/confirm";
+import type { PollResult } from "@/lib/payments/poll";
 
 interface PaymentLandingClientProps {
 	orderNo: string;
 }
 
+type Step =
+	| { kind: "loading" }
+	| {
+			kind: "pay";
+			clientSecret: string;
+			publishableKey: string;
+			notice?: string;
+	  }
+	| { kind: "retry" }
+	| { kind: "anomaly" }
+	| { kind: "timeout" }
+	| { kind: "succeeded" }
+	| { kind: "error"; message: string };
+
 /**
- * PayUni Web redirect target per issue #760. PayUni sends buyers back
- * to `/orders/{orderNo}?status=...&trade_no=...&code=...` after the
- * payment flow; this client resolves the real status (the `status` /
- * `code` query params are UI hints only and can be forged) and routes
- * to the existing checkout success / fail surfaces.
- *
- * Direct visits (no `trade_no` query) — buyer typed the URL or hit a
- * bookmark — bounce to `/account/orders/{orderNo}`, the canonical
- * order detail page.
+ * 結帳確認後的付款步驟（`/orders/{orderNo}`）：CreatePayment 取得 session，以 Stripe Payment Element 收款。
+ * 付款結果只認 GetPayment；`confirmPayment` 的回報不是結果（見 `lib/payments/confirm.ts`）。
  */
 export default function PaymentLandingClient({
 	orderNo,
 }: PaymentLandingClientProps) {
-	return (
-		<React.Suspense fallback={null}>
-			<Inner orderNo={orderNo} />
-		</React.Suspense>
-	);
-}
-
-function Inner({ orderNo }: PaymentLandingClientProps) {
 	const router = useObservedRouter("payment_landing");
-	const params = useSearchParams();
-	const tradeNo = readPaymentTradeNo(params);
-	const initialStatus = readPaymentStatusHint(params);
+	const { status } = useAuth();
+	const t = useTranslations("payment");
+	const defaultErrors = useDefaultErrorText();
+	const defaultErrorsRef = React.useRef(defaultErrors);
+	defaultErrorsRef.current = defaultErrors;
+	const [step, setStep] = React.useState<Step>({ kind: "loading" });
+	const [attempt, setAttempt] = React.useState(0);
 
-	// No trade_no → not a PayUni redirect. Bounce to the canonical
-	// order detail page so this surface stays purely for the redirect
-	// flow. Guards against typed URLs / bookmarks.
+	const apply = React.useCallback(
+		(result: PollResult | ConfirmOutcome, notice?: string) => {
+			if (result.kind === "timeout") return setStep({ kind: "timeout" });
+			if (result.kind === "declined") {
+				return setStep((prev) =>
+					prev.kind === "pay" ? { ...prev, notice: result.message } : prev,
+				);
+			}
+			const view = result.view;
+			if (view.kind === "pay") {
+				return setStep({
+					kind: "pay",
+					clientSecret: view.clientSecret,
+					publishableKey: view.publishableKey,
+					notice,
+				});
+			}
+			setStep({ kind: view.kind });
+		},
+		[],
+	);
+
+	// 訪客不付款：導到訂單詳情，由受保護區帶去登入，登入後從那裡的「再次付款」回到這一步。
 	React.useEffect(() => {
-		if (!tradeNo) {
+		if (status === "guest") {
 			router.replace(`/account/orders/${encodeURIComponent(orderNo)}`);
 		}
-	}, [tradeNo, orderNo, router]);
+	}, [status, orderNo, router]);
 
-	const { outcome, reason, isPolling } = usePaymentResolution({
-		tradeNo,
-		initialStatus,
-	});
+	// biome-ignore lint/correctness/useExhaustiveDependencies: attempt 只用來重跑
+	React.useEffect(() => {
+		if (status !== "signedIn") return;
+		const abort = new AbortController();
+		setStep({ kind: "loading" });
+		openPayment(orderNo, abort.signal)
+			.then((result) => {
+				if (!abort.signal.aborted) apply(result);
+			})
+			.catch((e) => {
+				if (!abort.signal.aborted) {
+					setStep({
+						kind: "error",
+						message: errorText(e, defaultErrorsRef.current),
+					});
+				}
+			});
+		return () => abort.abort();
+	}, [status, orderNo, attempt, apply]);
 
 	React.useEffect(() => {
-		if (!tradeNo || outcome === "pending") return;
-		const url =
-			outcome === "paid"
-				? `/checkout/success?order=${encodeURIComponent(orderNo)}`
-				: `/checkout/fail?order=${encodeURIComponent(orderNo)}${
-						reason ? `&reason=${encodeURIComponent(reason)}` : ""
-					}`;
-		router.replace(url);
-	}, [tradeNo, outcome, reason, orderNo, router]);
+		if (step.kind === "succeeded") {
+			router.replace(`/checkout/success?order=${encodeURIComponent(orderNo)}`);
+		}
+	}, [step.kind, orderNo, router]);
 
-	if (!tradeNo) {
-		// useEffect above is mid-flight redirecting; render nothing to
-		// avoid a flash of the "確認付款中" card during the bounce.
-		return null;
+	const publishableKey = step.kind === "pay" ? step.publishableKey : null;
+	const stripePromise = React.useMemo(
+		() => (publishableKey ? loadStripe(publishableKey) : null),
+		[publishableKey],
+	);
+
+	if (step.kind === "loading") {
+		return (
+			<PaymentStatusCard kind="waiting" orderNo={orderNo} message={undefined} />
+		);
+	}
+	if (step.kind === "succeeded") {
+		return <PaymentStatusCard kind="succeeded" orderNo={orderNo} />;
+	}
+	if (step.kind === "anomaly" || step.kind === "timeout") {
+		return <PaymentStatusCard kind={step.kind} orderNo={orderNo} />;
+	}
+	if (step.kind === "error") {
+		return (
+			<section className="max-w-[580px] mx-auto py-10 px-5 flex flex-col gap-4">
+				<PaymentStatusCard
+					kind="error"
+					orderNo={orderNo}
+					message={step.message}
+				/>
+				<Button type="button" onClick={() => setAttempt((n) => n + 1)}>
+					{t("retry")}
+				</Button>
+			</section>
+		);
+	}
+	if (step.kind === "retry") {
+		return (
+			<section className="max-w-[580px] mx-auto py-10 px-5 flex flex-col gap-4">
+				<h1 className="font-display text-xl md:text-2xl m-0 text-foreground">
+					{t("title")}
+				</h1>
+				<p role="alert" className="m-0 text-sm text-foreground-soft">
+					{t("notCompleted")}
+				</p>
+				<Button type="button" onClick={() => setAttempt((n) => n + 1)}>
+					{t("retry")}
+				</Button>
+			</section>
+		);
 	}
 
 	return (
-		<div className="min-h-[calc(100vh-200px)] max-w-[580px] mx-auto py-10 px-5 pb-12 flex items-center justify-center">
-			<div className="relative w-full bg-content1/90 border border-divider rounded-3xl p-10 px-7 pb-8 text-center flex flex-col items-center gap-3 shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_18px_40px_-22px_rgb(var(--color-ink-950-rgb)/0.12),0_6px_18px_-12px_rgb(var(--color-ink-950-rgb)/0.08)] backdrop-blur-md overflow-hidden dark:bg-content1/86 animate-checkout-pop">
-				<span
-					className="m-0 my-4 inline-block text-hk-primary"
-					aria-hidden="true"
-				>
-					{isPolling ? (
-						<AppIcon name="spinner" size={52} className="animate-spin" />
-					) : (
-						<AppIcon name="check" size={52} />
-					)}
-				</span>
-				<h1 className="relative z-1 font-display text-xl md:text-2xl m-0 text-foreground">
-					{isPolling ? "確認付款中…" : "處理完成"}
-				</h1>
-				<p className="relative z-1 m-0 text-foreground-soft text-sm max-w-[38ch]">
-					{isPolling
-						? "我們正在向銀行確認結果，請不要關閉這個頁面。"
-						: outcome === "paid"
-							? "付款成功，導向訂單頁。"
-							: reason || "未付款成功，導向重試頁。"}
+		<section className="max-w-[580px] mx-auto py-10 px-5 flex flex-col gap-4">
+			<h1 className="font-display text-xl md:text-2xl m-0 text-foreground">
+				{t("title")}
+			</h1>
+			<p className="m-0 text-xs font-bold text-foreground-muted">
+				{t("orderNo")} {orderNo}
+			</p>
+			<Elements
+				stripe={stripePromise}
+				options={{
+					clientSecret: step.clientSecret,
+					appearance: PAYMENT_ELEMENT_APPEARANCE,
+					locale: activeLocale() === "en" ? "en" : "zh-TW",
+				}}
+			>
+				<PayForm
+					orderNo={orderNo}
+					notice={step.notice}
+					onOutcome={(outcome) => apply(outcome, t("notCompleted"))}
+					onError={(e) =>
+						setStep({
+							kind: "error",
+							message: errorText(e, defaultErrorsRef.current),
+						})
+					}
+				/>
+			</Elements>
+		</section>
+	);
+}
+
+function PayForm({
+	orderNo,
+	notice,
+	onOutcome,
+	onError,
+}: {
+	orderNo: string;
+	notice: string | undefined;
+	onOutcome: (outcome: ConfirmOutcome) => void;
+	onError: (e: unknown) => void;
+}) {
+	const t = useTranslations("payment");
+	const stripe = useStripe();
+	const elements = useElements();
+	const [busy, setBusy] = React.useState(false);
+
+	const submit = async (event: React.FormEvent) => {
+		event.preventDefault();
+		if (!stripe || !elements || busy) return;
+		setBusy(true);
+		try {
+			onOutcome(
+				await confirmAndSettle({
+					stripe,
+					elements,
+					returnUrl: paymentReturnUrl(
+						window.location.origin,
+						activeLocale(),
+						orderNo,
+					),
+					read: () => getPayment(orderNo),
+				}),
+			);
+		} catch (e) {
+			onError(e);
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<form onSubmit={submit} className="flex flex-col gap-4">
+			<PaymentElement />
+			{notice ? (
+				<p role="alert" className="m-0 text-sm text-danger-600">
+					{notice}
 				</p>
-			</div>
-		</div>
+			) : null}
+			<Button
+				type="submit"
+				size="lg"
+				fullWidth
+				disabled={!stripe || !elements || busy}
+				isLoading={busy}
+				loadingLabel={t("submitting")}
+			>
+				{t("submit")}
+			</Button>
+		</form>
 	);
 }

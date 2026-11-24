@@ -16,7 +16,7 @@ import {
 const PENDING_KEY = "hawkr:pending_purchase";
 const ORDER_NO = "O-FAIL-GA4-1";
 
-test("landing on /checkout/fail clears the pending purchase carried across the PayUni redirect", {
+test("landing on /checkout/fail clears the pending purchase carried across the payment redirect", {
 	// 斷言全在我們自己的 client 行為（頁面掛載時清 sessionStorage），
 	// gateway 由 mock 承接 ⇒ hermetic，不加 @live。
 	tag: ["@ui"],

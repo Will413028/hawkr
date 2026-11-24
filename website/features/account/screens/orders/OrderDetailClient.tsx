@@ -1,11 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { createPortal } from "react-dom";
 import AppImage from "@/components/shared/AppImage";
 import Avatar from "@/components/shared/Avatar";
 import Link from "@/components/shared/Link";
-import PaymentGlyph from "@/components/shared/PaymentGlyph";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import OrderAfterSaleSummary from "@/features/account/screens/orders/OrderAfterSaleSummary";
@@ -13,10 +11,8 @@ import OrderPaymentCountdown from "@/features/account/screens/orders/OrderPaymen
 import { buyerOrderStatusBadgeClass } from "@/features/account/screens/orders/statusBadgeStyles";
 import { OrderInvoiceSection } from "@/features/invoices/order/OrderInvoiceSection";
 import OrderStatusTimeline from "@/features/orders/components/OrderStatusTimeline";
-import { acquireBodyScrollLock } from "@/lib/browser/body-scroll-lock";
 import {
 	formatShippingMethodLabel,
-	PAYMENT_METHOD_INELIGIBLE_REASON_LABEL,
 	PAYMENT_METHOD_LABEL,
 	PAYMENT_STATUS_LABEL,
 	PaymentMethod,
@@ -28,15 +24,12 @@ import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import { useMyAfterSales } from "@/lib/hooks/useMyAfterSales";
 import { useOrder } from "@/lib/hooks/useOrders";
 import { resolveCdnUrl } from "@/lib/media/cdn";
-import { commitDocumentNavigation } from "@/lib/navigation/document-location";
-import { safeRedirectUrl } from "@/lib/navigation/safe-url";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 import { useNotificationToast } from "@/lib/notifications/toast-context";
 import {
 	canBuyerCancelOrder,
 	cancelOrder,
 	confirmOrderReceipt,
-	createPayment,
 } from "@/lib/orders/repo";
 import {
 	canWriteOrderReview,
@@ -44,12 +37,6 @@ import {
 	type OrderReview,
 	STATUS_LABEL,
 } from "@/lib/orders/types";
-import { mapApplePayError, openApplePaySheet } from "@/lib/payment/apple-pay";
-import { openGooglePaySheet } from "@/lib/payment/google-pay";
-import {
-	type NativePayAvailability,
-	useNativePayAvailability,
-} from "@/lib/payment/useNativePayAvailability";
 import { useStoreCardViews } from "@/lib/seller/useStoreCardViews";
 
 /**
@@ -128,26 +115,16 @@ function OrderSellerRow({ order }: { order: Order }) {
 	);
 }
 
-type OrderPendingAction = "cancel" | "retry" | "confirm" | null;
+type OrderPendingAction = "cancel" | "confirm" | null;
 
 export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 	const router = useObservedRouter("buyer_order_detail");
 	const { order, loading, error, refresh } = useOrder(orderNo);
 	const afterSales = useMyAfterSales();
-	const nativePay = useNativePayAvailability({
-		applePay: true,
-		googlePay: true,
-	});
 	const [pendingAction, setPendingAction] =
 		React.useState<OrderPendingAction>(null);
 	const busy = pendingAction !== null;
-	const [retrySheetOpen, setRetrySheetOpen] = React.useState(false);
-	// 所有錯誤訊息走頂部下拉 toast — 既有 inline actionError 位置在訂單詳情
-	// 主體下方容易被忽略 (sheet 關閉後 user 焦點不在頁面),已移除。Apple/
-	// Google Pay retry 五個 outcome (createPayment fail / 成功 / 取消 / sheet
-	// onError / 此瀏覽器無法使用) + cancelOrder / confirmReceipt / runAsync
-	// Retry 兩條 fallback 各自 push 對應 toast。信用卡 retry 走 PayUni 跳轉,
-	// 有自己的 PaymentReturnClient landing,不在這裡 toast。
+	// 所有錯誤訊息走頂部下拉 toast（cancelOrder / confirmReceipt）。
 	const notify = useNotificationToast();
 
 	if (loading && !order) {
@@ -225,276 +202,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 		}
 	};
 
-	// 「再次付款」開啟付款方式選擇 sheet(對齊 App 的 showRetryPaymentSheet):
-	// 讓卡在 Apple Pay 的買家能改選信用卡/ATM,而不是被原付款方式綁死。
-	const openRetrySheet = () => {
-		if (!order || order.status !== "pending_payment") return;
-		setRetrySheetOpen(true);
-	};
-
-	// Apple Pay retry — opens sheet SYNCHRONOUSLY (gesture-bound). Order
-	// already exists, so the driver only needs to call createPayment with the
-	// returned token.
-	const startApplePayRetry = (
-		orderNo: string,
-		amount: number,
-		productName: string,
-	) => {
-		const sheet = openApplePaySheet(
-			{ amount, label: productName },
-			{
-				onAuthorize: async (token) => {
-					try {
-						await createPayment({
-							orderNo,
-							amount,
-							productName,
-							paymentType: PaymentMethod.APPLE_PAY,
-							clientType: "WEB_BROWSER",
-							applePayToken: token,
-						});
-					} catch (e) {
-						notify.show({
-							variant: "error",
-							kind: "order",
-							title: "付款失敗",
-							body:
-								mapApplePayError(e) ??
-								(e instanceof Error
-									? `付款失敗：${e.message}`
-									: "付款失敗，請稍後再試。"),
-							dedupeKey: `retry-pay-error:${orderNo}`,
-						});
-						setPendingAction(null);
-						return "failure";
-					}
-					await refresh();
-					notify.show({
-						variant: "success",
-						kind: "order",
-						title: "付款成功",
-						body: `訂單 ${orderNo} 已完成付款`,
-						dedupeKey: `retry-pay-success:${orderNo}`,
-					});
-					setPendingAction(null);
-					return "success";
-				},
-				onCancel: () => {
-					notify.show({
-						variant: "warning",
-						kind: "order",
-						title: "已取消付款",
-						body: "可再試一次或選擇其他付款方式。",
-						dedupeKey: `retry-pay-cancel:${orderNo}`,
-					});
-					setPendingAction(null);
-				},
-				onError: (e) => {
-					notify.show({
-						variant: "error",
-						kind: "order",
-						title: "付款失敗",
-						body: mapApplePayError(e) ?? `付款失敗：${e.message}`,
-						dedupeKey: `retry-pay-error:${orderNo}`,
-					});
-					setPendingAction(null);
-				},
-			},
-		);
-
-		if (!sheet) {
-			notify.show({
-				variant: "error",
-				kind: "order",
-				title: "無法使用 Apple Pay",
-				body: "此裝置或瀏覽器無法使用 Apple Pay。請改用 Safari(或已設定 Apple Pay 的 iPhone)再付款,或聯絡客服協助改用其他付款方式。",
-				dedupeKey: `retry-pay-unavailable:${orderNo}`,
-			});
-			setPendingAction(null);
-		}
-	};
-
-	const startGooglePayRetry = (
-		orderNo: string,
-		amount: number,
-		productName: string,
-	) => {
-		const sheet = openGooglePaySheet(
-			{
-				amount,
-				label: productName,
-				// paymentMerId 從 order 物件取（後端 orderDetail response 帶回，20 §4.13）
-				gatewayMerchantId: order?.paymentMerId ?? "",
-			},
-			{
-				onAuthorize: async (token) => {
-					try {
-						await createPayment({
-							orderNo,
-							amount,
-							productName,
-							paymentType: PaymentMethod.GOOGLE_PAY,
-							clientType: "WEB_BROWSER",
-							googlePayToken: token,
-						});
-					} catch (e) {
-						notify.show({
-							variant: "error",
-							kind: "order",
-							title: "付款失敗",
-							body:
-								e instanceof Error
-									? `付款失敗：${e.message}`
-									: "付款失敗，請稍後再試。",
-							dedupeKey: `retry-pay-error:${orderNo}`,
-						});
-						setPendingAction(null);
-						return;
-					}
-					await refresh();
-					notify.show({
-						variant: "success",
-						kind: "order",
-						title: "付款成功",
-						body: `訂單 ${orderNo} 已完成付款`,
-						dedupeKey: `retry-pay-success:${orderNo}`,
-					});
-					setPendingAction(null);
-				},
-				onCancel: () => {
-					notify.show({
-						variant: "warning",
-						kind: "order",
-						title: "已取消付款",
-						body: "可再試一次或選擇其他付款方式。",
-						dedupeKey: `retry-pay-cancel:${orderNo}`,
-					});
-					setPendingAction(null);
-				},
-				onError: (e) => {
-					notify.show({
-						variant: "error",
-						kind: "order",
-						title: "付款失敗",
-						body: `付款失敗：${e.message}`,
-						dedupeKey: `retry-pay-error:${orderNo}`,
-					});
-					setPendingAction(null);
-				},
-			},
-		);
-
-		if (!sheet) {
-			notify.show({
-				variant: "error",
-				kind: "order",
-				title: "無法使用 Google Pay",
-				body: "此裝置或瀏覽器無法使用 Google Pay。請改用支援的瀏覽器再付款,或聯絡客服協助改用其他付款方式。",
-				dedupeKey: `retry-pay-unavailable:${orderNo}`,
-			});
-			setPendingAction(null);
-		}
-	};
-
-	// Credit card / ATM — no gesture constraint, existing async flow.
-	const runAsyncRetry = async (
-		orderNo: string,
-		amount: number,
-		productName: string,
-		paymentType: string,
-	) => {
-		try {
-			const result = await createPayment({
-				orderNo,
-				amount,
-				productName,
-				paymentType,
-				clientType: "WEB_BROWSER",
-			});
-			// ATM: backend swaps the virtual account in-place — just refresh
-			// the order and surface a hint. Card: bounce to PayUni's hosted
-			// page via the returned `redirectUrl`. Mirrors APP's
-			// `order_card._executePayment`.
-			if (paymentType === PaymentMethod.ATM) {
-				await refresh();
-				return;
-			}
-			const redirectTarget = safeRedirectUrl(result.redirectUrl);
-			if (redirectTarget) {
-				commitDocumentNavigation(redirectTarget);
-				return;
-			}
-			notify.show({
-				variant: "error",
-				kind: "order",
-				title: "付款失敗",
-				body: "無法取得付款頁面，請稍後再試。",
-				dedupeKey: `retry-pay-no-redirect:${orderNo}`,
-			});
-		} catch (e) {
-			notify.show({
-				variant: "error",
-				kind: "order",
-				title: "付款失敗",
-				body:
-					e instanceof Error
-						? `付款失敗：${e.message}`
-						: "付款失敗，請稍後再試。",
-				dedupeKey: `retry-pay-error:${orderNo}`,
-			});
-		} finally {
-			setPendingAction(null);
-		}
-	};
-
-	// SYNC entry — must remain non-async so the native-pay branches stay
-	// inside the user gesture's call stack on mobile WebKit.
-	const executeRetryPayment = (paymentType: string) => {
-		if (!order || order.status !== "pending_payment") return;
-		setRetrySheetOpen(false);
-		setPendingAction("retry");
-
-		const amount = Number(order.totalActualAmount) || 0;
-		const productName = order.items[0]?.name
-			? order.items.length > 1
-				? `${order.items[0].name} 等 ${order.items.length} 項`
-				: order.items[0].name
-			: `訂單 ${order.orderNo}`;
-		const orderNo = order.orderNo;
-
-		if (paymentType === PaymentMethod.APPLE_PAY) {
-			if (!nativePay.applePay) {
-				notify.show({
-					variant: "error",
-					kind: "order",
-					title: "無法使用 Apple Pay",
-					body: "此裝置或瀏覽器無法使用 Apple Pay。請改用 Safari(或已設定 Apple Pay 的 iPhone)再付款,或聯絡客服協助改用其他付款方式。",
-					dedupeKey: `retry-pay-unavailable:${orderNo}`,
-				});
-				setPendingAction(null);
-				return;
-			}
-			startApplePayRetry(orderNo, amount, productName);
-			return;
-		}
-		if (paymentType === PaymentMethod.GOOGLE_PAY) {
-			if (!nativePay.googlePay) {
-				notify.show({
-					variant: "error",
-					kind: "order",
-					title: "無法使用 Google Pay",
-					body: "此裝置或瀏覽器無法使用 Google Pay。請改用支援的瀏覽器再付款,或聯絡客服協助改用其他付款方式。",
-					dedupeKey: `retry-pay-unavailable:${orderNo}`,
-				});
-				setPendingAction(null);
-				return;
-			}
-			startGooglePayRetry(orderNo, amount, productName);
-			return;
-		}
-		void runAsyncRetry(orderNo, amount, productName, paymentType);
-	};
-
 	const handleConfirm = async () => {
 		// 已送達訂單一律可確認收貨（後端 confirm_receipt 的語意），其餘狀態才看
 		// canConfirm 旗標。
@@ -563,15 +270,16 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 
 					{/* Pending-payment surface — mirrors APP order_card.dart's
 					    待付款 layout: a prominent "尚未付款" banner with 再次付款
-					    + 取消訂單 CTAs, plus an ATM remittance hint when the
-					    chosen method is ATM. Card / wallet retries open
-					    PayUni's hosted page via `redirectUrl`. */}
+					    + 取消訂單 CTAs. 再次付款 goes to the payment step
+					    (`/orders/{orderNo}`), which creates or resumes the payment. */}
 					{order.status === "pending_payment" ? (
 						<PendingPaymentBanner
 							order={order}
 							busy={busy}
 							pendingAction={pendingAction}
-							onRetry={openRetrySheet}
+							onRetry={() =>
+								router.push(`/orders/${encodeURIComponent(order.orderNo)}`)
+							}
 							onCancel={handleCancel}
 						/>
 					) : null}
@@ -616,16 +324,6 @@ export default function OrderDetailClient({ orderNo }: { orderNo: string }) {
 								</Button>
 							</div>
 						</section>
-					) : null}
-
-					{retrySheetOpen ? (
-						<RetryPaymentSheet
-							order={order}
-							currentPayType={resolvePaymentType(order)}
-							nativePay={nativePay}
-							onClose={() => setRetrySheetOpen(false)}
-							onConfirm={executeRetryPayment}
-						/>
 					) : null}
 
 					<section className="bg-content1 border border-divider rounded-hkui-lg p-5 mb-0">
@@ -1011,272 +709,6 @@ function formatAutoCompleteRemaining(deadline: number, now: number): string {
 	return `${seconds} 秒後自動完成。`;
 }
 
-/* ============================================================
- *   再次付款 — 付款方式選擇 sheet(對齊 App retry_payment_sheet）
- * ============================================================ */
-
-/**
- * 再次付款支援的方式。web 跨瀏覽器環境比 App 多 Google Pay(App 是純 iOS
- * 不需要,故 `_kRetryPayMethods` 沒列;web 沿用時若遺漏則 Android/Chrome
- * 使用者無法再次付款只能客服協助,UX 差)。Apple Pay / Google Pay 在不支
- * 援的瀏覽器由下方 `nativeUsable` 判斷置灰,跟主結帳 PAYMENT_METHODS 邏輯
- * 對齊。順序:wallet 類 (Apple/Google Pay) 在前,銀行/卡別在後。
- */
-const RETRY_PAY_METHODS: Array<{ label: string; payType: string }> = [
-	{ label: "Apple Pay", payType: PaymentMethod.APPLE_PAY },
-	{ label: "Google Pay", payType: PaymentMethod.GOOGLE_PAY },
-	{ label: "ATM 虛擬轉帳", payType: PaymentMethod.ATM },
-	{ label: "信用卡", payType: PaymentMethod.CREDIT_CARD },
-];
-
-function retryAmountText(value?: string) {
-	if (!value) return "—";
-	const n = Number(value);
-	return Number.isFinite(n) ? n.toLocaleString() : value;
-}
-
-interface RetryPaymentSheetProps {
-	order: Order;
-	currentPayType: string;
-	nativePay: NativePayAvailability;
-	onClose: () => void;
-	onConfirm: (payType: string) => void;
-}
-
-/**
- * 對齊 App 的 `showRetryPaymentSheet`:價格區(商品/運費/總額,不含折扣券)
- * + 付款方式選擇 + 確認付款。差異是 web 為多瀏覽器環境,所以:
- *   - 原方式為 ATM → ATM 置灰「不可選」(同 App)。
- *   - Apple/Google Pay 在不支援的瀏覽器 → 置灰並註明,且預設不會選到它
- *     (App 是純 iOS 不需要;web 必須避免把卡住的買家又綁回原生付款)。
- */
-function RetryPaymentSheet({
-	order,
-	currentPayType,
-	nativePay,
-	onClose,
-	onConfirm,
-}: RetryPaymentSheetProps) {
-	const [mounted, setMounted] = React.useState(false);
-	React.useEffect(() => setMounted(true), []);
-	React.useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") onClose();
-		};
-		const releaseScrollLock = acquireBodyScrollLock();
-		document.addEventListener("keydown", onKey);
-		return () => {
-			document.removeEventListener("keydown", onKey);
-			releaseScrollLock();
-		};
-	}, [onClose]);
-
-	const isAtmOriginal = currentPayType === PaymentMethod.ATM;
-	const nativeUsable = React.useCallback(
-		(payType: string) => {
-			if (payType === PaymentMethod.APPLE_PAY) return nativePay.applePay;
-			if (payType === PaymentMethod.GOOGLE_PAY) return nativePay.googlePay;
-			return true;
-		},
-		[nativePay],
-	);
-	// 金額 gating（後端 §3.4.1）：依訂單金額算出的付款方式可用性。
-	// 空清單（未載入 / 舊後端）graceful 視為不限制。
-	const apmByType = React.useMemo(() => {
-		const m = new Map<string, { eligible: boolean; reason: string }>();
-		for (const a of order.availablePaymentMethods ?? [])
-			m.set(a.paymentType, {
-				eligible: a.eligible,
-				reason: a.ineligibleReason,
-			});
-		return m;
-	}, [order.availablePaymentMethods]);
-	const apmLoaded = (order.availablePaymentMethods ?? []).length > 0;
-	const amountEligible = React.useCallback(
-		(payType: string) =>
-			!apmLoaded || (apmByType.get(payType)?.eligible ?? false),
-		[apmLoaded, apmByType],
-	);
-	const amountReason = React.useCallback(
-		(payType: string) => apmByType.get(payType)?.reason ?? "",
-		[apmByType],
-	);
-	const isDisabled = React.useCallback(
-		(payType: string) =>
-			(isAtmOriginal && payType === PaymentMethod.ATM) ||
-			!nativeUsable(payType) ||
-			!amountEligible(payType),
-		[isAtmOriginal, nativeUsable, amountEligible],
-	);
-
-	// 預設選原付款方式;若它被 disable(原 ATM、或原生付款在此瀏覽器不可用),
-	// 退而選第一個可用方式(通常是信用卡 → 任何瀏覽器都能跳轉付款)。
-	const initialIdx = React.useMemo(() => {
-		const preferred = RETRY_PAY_METHODS.findIndex(
-			(m) => m.payType === currentPayType && !isDisabled(m.payType),
-		);
-		if (preferred >= 0) return preferred;
-		const firstUsable = RETRY_PAY_METHODS.findIndex(
-			(m) => !isDisabled(m.payType),
-		);
-		return firstUsable >= 0 ? firstUsable : 0;
-	}, [currentPayType, isDisabled]);
-	const [selectedIdx, setSelectedIdx] = React.useState(initialIdx);
-
-	if (!mounted) return null;
-
-	const selectedDisabled = isDisabled(RETRY_PAY_METHODS[selectedIdx]?.payType);
-
-	return createPortal(
-		<div
-			className="fixed inset-0 z-[1100] flex items-end justify-center sm:items-center"
-			role="dialog"
-			aria-modal="true"
-			aria-label="再次付款"
-		>
-			<button
-				type="button"
-				className="absolute inset-0 cursor-pointer border-0 bg-[rgb(var(--color-ink-950-rgb)/0.42)] backdrop-blur-[6px]"
-				onClick={onClose}
-				aria-label="關閉"
-			/>
-			<section className="relative w-full sm:w-[min(440px,100%)] max-h-[88vh] overflow-y-auto rounded-t-[20px] sm:rounded-[20px] border border-divider bg-content1 shadow-hk-card">
-				<div className="flex justify-center pt-3 pb-1 sm:hidden">
-					<span className="h-1 w-10 rounded-full bg-default-300" />
-				</div>
-
-				{/* 付款詳情(不含折扣券,與 App 一致) */}
-				<div className="px-5 pt-3">
-					<h2 className="text-base font-semibold text-hk-heading mb-3">
-						付款詳情
-					</h2>
-					<dl className="rounded-hkui-lg border border-divider p-4 grid gap-2.5 text-sm">
-						<div className="flex justify-between">
-							<dt className="text-foreground-soft">商品總金額</dt>
-							<dd className="m-0 tabular-nums">
-								NT$ {retryAmountText(order.totalOriginalAmount)}
-							</dd>
-						</div>
-						<div className="flex justify-between">
-							<dt className="text-foreground-soft">運費總金額</dt>
-							<dd className="m-0 tabular-nums">
-								NT$ {retryAmountText(order.shippingFee)}
-							</dd>
-						</div>
-						<div className="border-t border-dashed border-divider pt-2.5 flex justify-between items-center">
-							<dt className="font-semibold text-hk-heading">總付款金額</dt>
-							<dd className="m-0 font-display text-xl font-bold text-hk-danger tabular-nums">
-								NT$ {retryAmountText(order.totalActualAmount)}
-							</dd>
-						</div>
-					</dl>
-				</div>
-
-				{/* 付款方式 */}
-				<div className="px-5 pt-5">
-					<h2 className="text-base font-semibold text-hk-heading mb-2">
-						付款方式
-					</h2>
-					<ul className="list-none m-0 p-0 rounded-hkui-lg border border-divider divide-y divide-divider">
-						{RETRY_PAY_METHODS.map((m, idx) => {
-							const disabled = isDisabled(m.payType);
-							const selected = idx === selectedIdx;
-							const reason =
-								isAtmOriginal && m.payType === PaymentMethod.ATM
-									? "不可選"
-									: !amountEligible(m.payType)
-										? (PAYMENT_METHOD_INELIGIBLE_REASON_LABEL[
-												amountReason(m.payType)
-											] ?? "金額不符")
-										: disabled
-											? "此瀏覽器無法使用"
-											: null;
-							return (
-								<li key={m.payType}>
-									<button
-										type="button"
-										disabled={disabled}
-										onClick={() => setSelectedIdx(idx)}
-										className="w-full flex items-center gap-3 px-4 py-3 text-left bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed"
-									>
-										<span
-											className={`shrink-0 inline-grid place-items-center w-4 h-4 rounded-full border ${
-												selected ? "border-hk-primary" : "border-default-300"
-											} ${disabled ? "opacity-40" : ""}`}
-											aria-hidden="true"
-										>
-											{selected ? (
-												<span className="w-2 h-2 rounded-full bg-hk-primary" />
-											) : null}
-										</span>
-										<span
-											className={`w-[42px] h-[28px] rounded-hkui-md border border-divider bg-content2 inline-flex items-center justify-center overflow-hidden shrink-0 ${
-												disabled ? "opacity-40" : ""
-											}`}
-											aria-hidden="true"
-										>
-											<PaymentGlyph value={m.payType} />
-										</span>
-										<span
-											className={`flex-1 text-[0.9375rem] ${
-												disabled ? "text-foreground-soft/60" : "text-hk-heading"
-											}`}
-										>
-											{m.label}
-										</span>
-										{reason ? (
-											<span className="text-xs text-foreground-soft">
-												{reason}
-											</span>
-										) : null}
-									</button>
-								</li>
-							);
-						})}
-					</ul>
-					<p className="mt-2 text-xs text-foreground-soft leading-relaxed">
-						{selectedIdx ===
-						RETRY_PAY_METHODS.findIndex((m) => m.payType === PaymentMethod.ATM)
-							? "虛擬帳號只能用網路銀行或 ATM 轉帳,不能臨櫃匯款。"
-							: "選擇後將完成這筆訂單的付款。"}
-					</p>
-				</div>
-
-				<div className="px-5 py-5 flex gap-3">
-					<Button
-						variant="bordered"
-						color="default"
-						className="flex-1"
-						onClick={onClose}
-					>
-						取消
-					</Button>
-					<Button
-						className="flex-1 bg-hk-primary border-hk-primary text-hk-inverse hover:bg-hk-primary-hover hover:border-hk-primary-hover"
-						disabled={selectedDisabled}
-						onClick={() => onConfirm(RETRY_PAY_METHODS[selectedIdx].payType)}
-					>
-						確認付款
-					</Button>
-				</div>
-			</section>
-		</div>,
-		document.body,
-	);
-}
-
-/**
- * Pick the payment method to retry with. Prefer whatever the order
- * was originally created with (so ATM stays ATM, card stays card);
- * fall back to credit card if the field is missing. Mirrors APP's
- * `_isAtmPayment` / `currentPayType` plumbing in retry_payment_sheet.
- */
-function resolvePaymentType(order: Order): string {
-	return (
-		normalizePaymentMethod(order.payment?.method) ?? PaymentMethod.CREDIT_CARD
-	);
-}
-
 interface PendingPaymentBannerProps {
 	order: Order;
 	busy: boolean;
@@ -1288,14 +720,10 @@ interface PendingPaymentBannerProps {
 /**
  * Buyer-facing "your order is created but payment hasn't completed"
  * surface. Mirrors the APP's 待付款 card actions:
- *   - 尚未付款 red badge + payment-method label (ATM / 信用卡 / etc.)
- *   - 再次付款 (primary CTA — re-creates a payment intent and either
- *     redirects to PayUni's hosted page or refreshes the order with a
- *     new ATM virtual account)
- *   - 取消訂單 (gated by `order.canCancel`)
- * Background story: PayUni's hosted card page can be abandoned mid-flow
- * (browser tab closed, 3DS timeout, bank rejection). Backend keeps the
- * order at status=0 so the buyer can retry without re-checkout.
+ *   - 尚未付款 red badge
+ *   - 再次付款 (primary CTA — goes to the payment step, which creates or
+ *     resumes the payment for this order)
+ *   - 取消訂單 (gated by `canBuyerCancelOrder`)
  */
 function PendingPaymentBanner({
 	order,
@@ -1304,15 +732,7 @@ function PendingPaymentBanner({
 	onRetry,
 	onCancel,
 }: PendingPaymentBannerProps) {
-	const methodRaw = order.payment?.method;
-	const methodCode = resolvePaymentType(order) as PaymentMethodValue;
-	const methodLabel = PAYMENT_METHOD_LABEL[methodCode] ?? methodRaw ?? "未指定";
-	const isAtm = methodCode === PaymentMethod.ATM;
 	const amount = Number(order.totalActualAmount).toLocaleString();
-	const atmVirtualAccount = order.payment?.atmVirtualAccount ?? "";
-	const atmBankCode = order.payment?.atmBankCode ?? "";
-	const atmExpireDate = order.payment?.atmExpireDate ?? "";
-	const showAtmInfo = isAtm && atmVirtualAccount !== "";
 	// 走共用判準而不是 `order.canCancel`（後端不送那一欄，見 `lib/orders/repo.ts`）。
 	// 本 banner 只在待付款時渲染，所以這裡恆為 true——但判準只留一份，才不會在
 	// banner 的渲染條件哪天放寬時，這一顆鍵默默跟著出現在不能取消的訂單上。
@@ -1357,14 +777,6 @@ function PendingPaymentBanner({
 			<dl className="flex gap-8 mt-5 pt-4 border-t border-[rgb(var(--color-status-danger-rgb)/0.18)] dark:border-[rgb(var(--color-status-danger-rgb)/0.28)] max-[600px]:flex-col max-[600px]:gap-3">
 				<div className="flex flex-col gap-1 min-w-0">
 					<dt className="text-xs text-[#565656] dark:text-[rgb(var(--color-ink-100-rgb)/0.7)] font-medium tracking-wide">
-						付款方式
-					</dt>
-					<dd className="m-0 text-[0.9375rem] font-semibold text-hk-heading dark:text-[#f5e9c3]">
-						{methodLabel}
-					</dd>
-				</div>
-				<div className="flex flex-col gap-1 min-w-0">
-					<dt className="text-xs text-[#565656] dark:text-[rgb(var(--color-ink-100-rgb)/0.7)] font-medium tracking-wide">
 						付款狀態
 					</dt>
 					<dd className="m-0 text-[0.9375rem] font-semibold text-hk-danger dark:text-[color:var(--color-brand-secondary)]">
@@ -1372,18 +784,6 @@ function PendingPaymentBanner({
 					</dd>
 				</div>
 			</dl>
-			{showAtmInfo ? (
-				<AtmPaymentInfo
-					virtualAccount={atmVirtualAccount}
-					bankCode={atmBankCode}
-					expireDate={atmExpireDate}
-					amount={order.totalActualAmount}
-				/>
-			) : isAtm ? (
-				<p className="mt-3 text-xs leading-relaxed text-[#565656] dark:text-[rgb(var(--color-ink-100-rgb)/0.7)]">
-					ATM 轉帳：點「再次付款」會重新建立虛擬帳號。請於繳款期限內完成轉帳。
-				</p>
-			) : null}
 			<div className="flex gap-3 justify-end mt-5 flex-wrap">
 				{canCancel ? (
 					<Button
@@ -1401,188 +801,12 @@ function PendingPaymentBanner({
 					className="bg-hk-danger border-hk-danger text-hk-cream hover:bg-[color-mix(in_oklch,var(--color-status-danger)_88%,black_12%)] hover:border-[color-mix(in_oklch,var(--color-status-danger)_88%,black_12%)]"
 					onClick={onRetry}
 					disabled={busy}
-					isLoading={pendingAction === "retry"}
-					loadingLabel="建立付款中"
 				>
 					再次付款
 				</Button>
 			</div>
 		</section>
 	);
-}
-
-/**
- * Common Taiwan bank codes used by virtual-account payment gateways, mapped
- * to short names so the buyer can sanity-check they're transferring to the
- * right bank. Unknown codes simply render the number alone.
- */
-const TW_BANK_NAMES: Record<string, string> = {
-	"004": "臺灣銀行",
-	"005": "土地銀行",
-	"006": "合作金庫",
-	"007": "第一銀行",
-	"008": "華南銀行",
-	"009": "彰化銀行",
-	"011": "上海商業儲蓄銀行",
-	"012": "台北富邦",
-	"013": "國泰世華",
-	"017": "兆豐銀行",
-	"700": "中華郵政",
-	"803": "聯邦銀行",
-	"805": "遠東商銀",
-	"806": "元大銀行",
-	"807": "永豐銀行",
-	"808": "玉山銀行",
-	"809": "凱基銀行",
-	"812": "台新銀行",
-	"822": "中國信託",
-};
-
-/**
- * ATM virtual-account panel shown inside the 待付款 banner when the buyer
- * chose ATM at checkout and the backend has minted an account.
- *
- * Laid out as a numbered checklist in the EXACT order a buyer keys the
- * fields into a Taiwan 網銀 / ATM 轉帳 screen — ① 銀行代碼 → ② 匯款帳號 →
- * ③ 轉帳金額 — so the screen reads like the bank flow itself. Each field
- * has its own copy button (digits only) to save a transcription step.
- *
- * The "再次付款" button still appears below so a buyer who lets the account
- * expire can mint a new one without re-checkout.
- */
-function AtmPaymentInfo({
-	virtualAccount,
-	bankCode,
-	expireDate,
-	amount,
-}: {
-	virtualAccount: string;
-	bankCode: string;
-	expireDate: string;
-	amount: number | string;
-}) {
-	const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
-	const copy = async (key: string, value: string) => {
-		try {
-			await navigator.clipboard.writeText(value);
-			setCopiedKey(key);
-			window.setTimeout(() => setCopiedKey(null), 1500);
-		} catch {
-			/* clipboard may be denied — silently no-op */
-		}
-	};
-
-	const bankName = TW_BANK_NAMES[bankCode.trim()] ?? "";
-	const amountNumber = Number(amount) || 0;
-	const amountDigits = String(Math.round(amountNumber));
-
-	// Step list, conditionally numbered so the sequence stays 1/2/3 even when
-	// the backend omits a bank code (then it's just 匯款帳號 → 轉帳金額).
-	const steps = [
-		bankCode
-			? {
-					key: "bank",
-					label: "銀行代碼",
-					value: (
-						<>
-							{bankCode}
-							{bankName ? (
-								<span className="ml-2.5 text-sm font-semibold text-hk-muted tracking-normal">
-									{bankName}
-								</span>
-							) : null}
-						</>
-					),
-					copyValue: bankCode.trim(),
-				}
-			: null,
-		{
-			key: "account",
-			label: "匯款帳號",
-			value: virtualAccount,
-			copyValue: virtualAccount,
-		},
-		{
-			key: "amount",
-			label: "轉帳金額",
-			value: <>NT$ {amountNumber.toLocaleString()}</>,
-			copyValue: amountDigits,
-		},
-	].filter(Boolean) as {
-		key: string;
-		label: string;
-		value: React.ReactNode;
-		copyValue: string;
-	}[];
-
-	return (
-		<section
-			className="mt-4 p-4 rounded-hkui-md bg-hk-surface-page border border-[rgb(var(--color-status-danger-rgb)/0.22)] dark:border-[rgb(var(--color-status-danger-rgb)/0.4)]"
-			aria-label="ATM 轉帳資訊"
-		>
-			<header className="flex items-center gap-3">
-				<span
-					className="inline-flex items-center justify-center px-2.5 py-1 rounded bg-hk-danger text-hk-cream font-bold text-sm tracking-wide"
-					aria-hidden="true"
-				>
-					ATM
-				</span>
-				<strong className="text-[0.9375rem] font-bold text-hk-heading leading-tight min-w-0">
-					ATM / 網路銀行轉帳
-				</strong>
-			</header>
-
-			<ul className="flex flex-col gap-2 mt-4">
-				{steps.map((s) => (
-					<li
-						key={s.key}
-						className="flex items-center gap-3 p-3 rounded-hkui-md bg-hk-surface-card border border-[rgb(var(--color-status-danger-rgb)/0.14)]"
-					>
-						<div className="flex-1 min-w-0">
-							<small className="block text-xs text-hk-muted font-medium">
-								{s.label}
-							</small>
-							<strong className="block text-lg font-extrabold text-hk-heading tracking-wider break-all tabular-nums leading-snug">
-								{s.value}
-							</strong>
-						</div>
-						<button
-							type="button"
-							className="shrink-0 px-3 py-1.5 rounded-full border border-hk-danger bg-transparent text-hk-danger text-xs font-bold cursor-pointer transition-colors duration-150 hover:bg-hk-danger hover:text-hk-cream whitespace-nowrap"
-							onClick={() => void copy(s.key, s.copyValue)}
-							aria-label={`複製${s.label}`}
-						>
-							{copiedKey === s.key ? "已複製" : "複製"}
-						</button>
-					</li>
-				))}
-			</ul>
-
-			<div className="flex items-center gap-2 mt-4 pt-3 border-t border-[rgb(var(--color-status-danger-rgb)/0.12)]">
-				<span className="text-xs text-hk-muted font-medium">繳費截止</span>
-				<strong className="text-sm font-bold text-hk-heading tabular-nums">
-					{formatAtmExpire(expireDate)}
-				</strong>
-			</div>
-			<p className="mt-2 text-xs leading-relaxed text-hk-muted">
-				逾期未繳費此虛擬帳號將失效，可重新點「再次付款」取得新帳號。
-			</p>
-		</section>
-	);
-}
-
-function formatAtmExpire(raw: string): string {
-	if (!raw) return "—";
-	// Backend sends compact digit strings (YYYYMMDD or YYYYMMDDHHmm) that the
-	// Date constructor can't parse — format them by slicing.
-	const digits = raw.replace(/\D/g, "");
-	if (digits.length === 8) {
-		return `${digits.slice(0, 4)}/${digits.slice(4, 6)}/${digits.slice(6, 8)}`;
-	}
-	if (digits.length === 12) {
-		return `${digits.slice(0, 4)}/${digits.slice(4, 6)}/${digits.slice(6, 8)} ${digits.slice(8, 10)}:${digits.slice(10, 12)}`;
-	}
-	return formatTaipeiDateTime(raw) || raw;
 }
 
 /** 我的評價：訂單已評論時顯示買家對此訂單的評分與評論（後端 orders.review 快照，取最近一筆商品評論）。 */
