@@ -1,8 +1,8 @@
 {
-  "backend/internal/legacy/gen/order/order.pb.go": 18,
+  "backend/internal/legacy/gen/order/order.pb.go": 14,
   "backend/internal/legacy/gen/payment/payment.pb.go": 70,
   "backend/internal/legacy/gen/payment/paymentconnect/payment.connect.go": 29,
-  "backend/internal/legacy/gen/seller/seller.pb.go": 7,
+  "backend/internal/legacy/gen/seller/seller.pb.go": 6,
   "backend/internal/legacy/paymentrelay/relay.go": 4,
   "backend/internal/legacy/paymentrelay/relay_test.go": 2,
   "backend/internal/legacy/sellerserver/server.go": 1,
