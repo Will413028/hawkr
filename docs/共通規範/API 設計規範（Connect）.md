@@ -129,6 +129,7 @@
   - `Update`：資源裡的 `etag` 必填，沒帶回 `INVALID_ARGUMENT`；與目前版本不符回 `ABORTED`，`ErrorInfo.reason` 是 `VERSION_CONFLICT`，不寫入。
   - `Delete`：請求的 `etag` 選填，帶了就同樣檢查。
   - 改變狀態的自訂方法（核准、合併、封存等）：決定依據的內容在狀態不變時仍可能被改的，請求的 `etag` 必填，檢查同 `Update`；決定只依據狀態機已經檢查的狀態、或依據不可變的內容的，不帶 etag（ADR `2026-09-25-optimistic-concurrency-etag.md` 修訂）。
+  - 同一組裡只能有一筆的標記（預設、主要）不做成資源上可寫的布林：該欄位 `OUTPUT_ONLY`，改由自訂方法（`SetDefault<資源>`）設定，在同一個 transaction 鎖住整組的列、取消舊的再設定新的，稽核一筆。可寫布林會讓「設成 false」語意不明，並發設定時撞唯一索引。
   - 以 key 識別的資源（ADR 的 D3）：`Create` 與 `Update` 分開。`Create` 不帶 etag、只建立，已經存在回 `ALREADY_EXISTS`（AIP-133），`ErrorInfo.reason` 同樣是 `VERSION_CONFLICT`；`Update` 必須帶 etag。
   - client 依 `reason` 是 `VERSION_CONFLICT` 處理，不看是 `ABORTED` 還是 `ALREADY_EXISTS`：保留使用者的輸入，並顯示最新版本讓使用者對照後再送出，不直接重新載入。
   - 以呼叫者為範圍、可以取消後重建的資源（例如店家的 KYC 申請：每個店家同時最多一筆，沒有 ID 的定址）只有一支 `Save<資源>`，沒有 `Create`。這與 AIP-156 的單例資源不同（AIP-156 的單例隨父資源隱含存在：Get 一定成功、只有 Update、沒有建立與刪除）；它是以呼叫者為範圍的 upsert，近似 AIP-134 的 `allow_missing`：還沒有資源時，不帶 etag 的呼叫建立它（建立必填的欄位在方法說明寫明）；已經有資源卻沒帶 etag 是 `ALREADY_EXISTS`（`VERSION_CONFLICT`，與以 key 建立撞到既有同形狀）；帶了過期的 etag 是 `ABORTED`（`VERSION_CONFLICT`）。取消是狀態（取消後 Get 回 `NOT_FOUND`），之後可以再建立。
