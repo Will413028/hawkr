@@ -1,6 +1,7 @@
 "use client";
 
 import { procurementRunFailureReason } from "@hawkr/ui-text/keys";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon, { type AppIconName } from "@/components/shared/AppIcon";
 import AppImage from "@/components/shared/AppImage";
@@ -398,6 +399,7 @@ function CandidatePanel({
 	query: string;
 	onQueryChange: (value: string) => void;
 }) {
+	const t = useTranslations("procurementAssistant");
 	const normalizedQuery = query.trim().toLocaleLowerCase("zh-Hant");
 	const visibleCandidates = normalizedQuery
 		? candidates.filter((candidate) =>
@@ -454,8 +456,8 @@ function CandidatePanel({
 					type="search"
 					value={query}
 					onChange={(event) => onQueryChange(event.currentTarget.value)}
-					placeholder="搜尋候選或條件"
-					aria-label="搜尋候選"
+					placeholder={t("candidateSearchPlaceholder")}
+					aria-label={t("candidateSearchLabel")}
 				/>
 				{query ? (
 					<button type="button" onClick={() => onQueryChange("")}>
@@ -465,7 +467,10 @@ function CandidatePanel({
 			</div>
 
 			{visibleCandidates.length > 0 ? (
-				<table className="assistant-candidate-table" aria-label="候選資料">
+				<table
+					className="assistant-candidate-table"
+					aria-label={t("candidateTableLabel")}
+				>
 					<thead className="assistant-candidate-table__head">
 						<tr>
 							<th scope="col">選取</th>
@@ -503,7 +508,7 @@ function CandidatePanel({
 			) : (
 				<div className="assistant-lane__empty" role="status">
 					<AppIcon name="search" size={24} aria-hidden="true" />
-					<strong>沒有符合篩選的候選</strong>
+					<strong>{t("candidateNoMatch")}</strong>
 					<p>已選名單不受影響；清除搜尋即可查看全部候選。</p>
 					<Button
 						variant="bordered"

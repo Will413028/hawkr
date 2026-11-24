@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button, Chip } from "@/components/ui";
 import type { ProcurementCandidateSearch } from "./types";
@@ -56,6 +57,7 @@ export default function CandidateSearchProgress({
 	pollError,
 	onRetryPolling,
 }: CandidateSearchProgressProps) {
+	const t = useTranslations("procurementAssistant");
 	const status = searchStatusOf(candidateSet);
 	return (
 		<section
@@ -82,7 +84,7 @@ export default function CandidateSearchProgress({
 							aria-hidden="true"
 						/>
 						<div>
-							<strong>搜尋候選供應商</strong>
+							<strong>{t("searchProgressTitle")}</strong>
 							<span>{SEARCH_STATUS_LABEL[status]}</span>
 						</div>
 					</li>

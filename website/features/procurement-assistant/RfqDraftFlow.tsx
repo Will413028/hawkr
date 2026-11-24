@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button } from "@/components/ui";
@@ -139,6 +140,7 @@ export default function RfqDraftFlow({
 	onPublicationExecuted,
 	approvalEnabled,
 }: RfqDraftFlowProps) {
+	const t = useTranslations("procurementAssistant");
 	const [step, setStep] = React.useState(0);
 	const [furthestStep, setFurthestStep] = React.useState(0);
 	const [desiredPriceLower, setDesiredPriceLower] = React.useState("");
@@ -154,8 +156,8 @@ export default function RfqDraftFlow({
 	const hasRecipients = candidates.length > 0;
 	const recipientBreakdown = React.useMemo(() => {
 		const recipients = countSelectedRecipients(candidates);
-		return recipients > 0 ? `賣家 ${recipients} 家` : "";
-	}, [candidates]);
+		return recipients > 0 ? t("sellerCount", { count: recipients }) : "";
+	}, [candidates, t]);
 	const [publicationState, setPublicationState] = React.useState<
 		RemoteState<RfqPublicationApproval>
 	>({ status: "idle" });
@@ -628,7 +630,7 @@ export default function RfqDraftFlow({
 							<AppIcon name="info" size={18} aria-hidden="true" />
 							<div>
 								<strong>這份名單尚未固定</strong>
-								<p>正式發布時才會固定邀請對象。</p>
+								<p>{t("recipientsNotFixed")}</p>
 							</div>
 						</div>
 					</div>
@@ -706,14 +708,10 @@ export default function RfqDraftFlow({
 									<p>{activeError.detail}</p>
 									<div>
 										{isStaleRevision(activeError) ? (
-											<Button
-												variant="bordered"
-												isLoading={refreshingSnapshot}
-												loadingLabel="讀取中…"
-												onClick={() => void handleRefreshSnapshot()}
-											>
-												讀取最新需求
-											</Button>
+											<RefreshSnapshotButton
+												loading={refreshingSnapshot}
+												onRefresh={() => void handleRefreshSnapshot()}
+											/>
 										) : null}
 										{activeError.retryable ? (
 											<Button
@@ -864,7 +862,7 @@ export default function RfqDraftFlow({
 								</span>
 								<div>
 									<h3 id="assistant-rfq-snapshot-title">確認本次需求與價格</h3>
-									<p>確認後會以這一版需求與希望區間準備發布核准。</p>
+									<p>{t("snapshotApprovalHint")}</p>
 								</div>
 								<span className="assistant-rfq-snapshot__state">
 									{snapshotReconfirmed
@@ -1219,7 +1217,7 @@ export default function RfqDraftFlow({
 								: step === RECONFIRM_STEP
 									? "這一步只取得發布核准，還不會送出"
 									: canProceed
-										? "價格已確認，接著確認要發給誰"
+										? t("priceConfirmedNext")
 										: "先取得並確認價格試算"}
 					</strong>
 					<small>重新整理後目前無法還原價格確認，需要重新核對。</small>

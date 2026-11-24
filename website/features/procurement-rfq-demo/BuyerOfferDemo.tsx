@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import styles from "@/styles/features/procurement-rfq-demo/rfq-demo.module.css";
 import {
@@ -43,6 +44,7 @@ function Field({ label, value }: { label: string; value: string | null }) {
 }
 
 export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
+	const t = useTranslations("procurementAssistant");
 	const [context, setContext] = React.useState<DemoContext | null>(null);
 	const [loadError, setLoadError] = React.useState<string | null>(null);
 	const [step, setStep] = React.useState<DemoStep>("buyer-offer");
@@ -151,7 +153,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 			setSellerResponse(null);
 			setStep("seller-inbox");
 		} catch {
-			setSubmitError("定稿失敗。多半是這份需求版本已經變了。重新整理再試。");
+			setSubmitError(t("demoFinalizeFailed"));
 		} finally {
 			setSubmitting(false);
 		}
@@ -177,11 +179,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 					<p className={styles.eyebrow}>Hawkr Agent · 商務線 demo</p>
 					<h1>買家出價 → 賣家決定 → 買家確認</h1>
 				</div>
-				<p className={styles.flag}>
-					{
-						"買家那半全部是真的：需求、收件名單，出價區間也真的送去伺服器試算。賣家那半是本機狀態，不會送出、不會通知任何人。"
-					}
-				</p>
+				<p className={styles.flag}>{t("demoFlag")}</p>
 			</header>
 
 			<ol className={styles.steps}>
@@ -272,9 +270,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 			{step === "buyer-offer" ? (
 				<section className={styles.panel}>
 					<h2>買家出價</h2>
-					<p className={styles.panelNote}>
-						理想價是你希望成交的單價；可接受區間是你願意讓步的範圍。定稿時區間會送進伺服器做價格試算，試算不會寫入任何資料。
-					</p>
+					<p className={styles.panelNote}>{t("demoPriceHelp")}</p>
 					<div className={styles.priceGrid}>
 						<label>
 							<span>可接受下限</span>
@@ -312,11 +308,7 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 					>
 						{submitting ? "定稿中…" : "定稿並送給賣家"}
 					</button>
-					<p className={styles.boundary}>
-						{
-							"按下去只會呼叫價格試算，不寫入任何資料，也不會通知任何賣家——發布詢價是發布核准的事，本 demo 不呼叫。"
-						}
-					</p>
+					<p className={styles.boundary}>{t("demoBoundary")}</p>
 				</section>
 			) : null}
 

@@ -44,7 +44,7 @@ export const DELEGATED_SHARED_FILES: ReadonlySet<string> = new Set([
 
 /**
  * 排除規則集中在這裡：代行工作區 `app/(delegated)` 與 `features/delegated-operations`（除 [DELEGATED_SHARED_FILES]）只有 zh-TW（不發佈 en）；
- * 測試不是使用者面文字；生成檔（`*.gen.*`、`*.g.*`）不得手改，由各自的 drift 檢查守。`messages/*.json` 不是 ts，本來就不掃。
+ * 測試（`tests`、`__tests__`、`testing` 目錄與 `*.test.*`）不是使用者面文字；生成檔（`*.gen.*`、`*.g.*`）不得手改，由各自的 drift 檢查守。`messages/*.json` 不是 ts，本來就不掃。
  */
 export function isExcluded(rel: string): boolean {
 	const path = rel.split("\\").join("/");
@@ -54,7 +54,11 @@ export function isExcluded(rel: string): boolean {
 		!DELEGATED_SHARED_FILES.has(path)
 	)
 		return true;
-	if (path.split("/").some((s) => s === "tests" || s === "__tests__"))
+	if (
+		path
+			.split("/")
+			.some((s) => s === "tests" || s === "__tests__" || s === "testing")
+	)
 		return true;
 	const name = path.slice(path.lastIndexOf("/") + 1);
 	if (DECLARATION.test(name)) return true;

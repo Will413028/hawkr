@@ -3,13 +3,14 @@
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderWithoutIntl,
 	screen,
 	waitFor,
 	within,
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import BuyerQuoteComparison from "../BuyerQuoteComparison";
 import type {
 	BuyerFacingSellerResponse,
@@ -18,6 +19,9 @@ import type {
 	BuyerQuoteFailure,
 	BuyerQuoteResult,
 } from "../buyer-quote-contract";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 function buyerQuoteFailure(
 	code: BuyerQuoteFailure["code"],

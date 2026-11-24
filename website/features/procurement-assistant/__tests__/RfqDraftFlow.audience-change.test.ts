@@ -13,6 +13,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import RfqDraftFlow from "../RfqDraftFlow";
 import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
 import type {
@@ -101,23 +102,27 @@ function element(
 		onPreviewRfqPublication: PublicationPreview;
 	},
 ) {
-	return React.createElement(RfqDraftFlow, {
-		requestId: "1234567890123456788",
-		revisionId: "1234567890123456791",
-		candidateSetId: "1234567890123456790",
-		slots: baseSlots,
-		candidates,
-		onBackToCandidates: () => {},
-		onReturnToConversation: () => {},
-		onPreviewRfqPrice: vi.fn(
-			async () =>
-				({ ok: true, data: preview() }) as RfqCommandResult<RfqPricePreview>,
-		),
-		onRefreshSnapshot: async () => true,
-		onPreviewRfqPublication: handlers.onPreviewRfqPublication,
-		onExecuteRfqPublication: handlers.onExecuteRfqPublication,
-		approvalEnabled: true,
-	});
+	return React.createElement(
+		IntlTestWrapper,
+		null,
+		React.createElement(RfqDraftFlow, {
+			requestId: "1234567890123456788",
+			revisionId: "1234567890123456791",
+			candidateSetId: "1234567890123456790",
+			slots: baseSlots,
+			candidates,
+			onBackToCandidates: () => {},
+			onReturnToConversation: () => {},
+			onPreviewRfqPrice: vi.fn(
+				async () =>
+					({ ok: true, data: preview() }) as RfqCommandResult<RfqPricePreview>,
+			),
+			onRefreshSnapshot: async () => true,
+			onPreviewRfqPublication: handlers.onPreviewRfqPublication,
+			onExecuteRfqPublication: handlers.onExecuteRfqPublication,
+			approvalEnabled: true,
+		}),
+	);
 }
 
 /**

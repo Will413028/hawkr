@@ -101,7 +101,9 @@ export function useBuyerQuoteComparison(
 					if (view) responses.push(view);
 				}
 				if (res.nextPageToken !== "" && res.nextPageToken === pageToken) {
-					throw new Error("ListSellerResponses 的 next_page_token 沒有前進");
+					throw new Error(
+						"ListSellerResponses next_page_token did not advance",
+					);
 				}
 				pageToken = res.nextPageToken;
 			} while (pageToken !== "");

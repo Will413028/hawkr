@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProcurementCandidateSearch } from "@/features/procurement-assistant/types";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import AgentTaskPanel from "./AgentTaskPanel";
 import type { AgentActivityEvent } from "./activity";
 
@@ -78,6 +79,7 @@ function renderPanel(
 ) {
 	return render(
 		React.createElement(AgentTaskPanel, { ...baseProps, ...overrides }),
+		{ wrapper: IntlTestWrapper },
 	);
 }
 

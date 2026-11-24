@@ -6,18 +6,22 @@
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderWithoutIntl,
 	screen,
 	waitFor,
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import RfqDraftFlow from "../RfqDraftFlow";
 import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
 import type {
 	RfqPublicationApproval,
 	RfqPublicationPreviewCommand,
 } from "../rfq-publication-contract";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 type PublicationPreview = (
 	command: RfqPublicationPreviewCommand,

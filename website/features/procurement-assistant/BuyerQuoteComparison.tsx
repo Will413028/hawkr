@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button, Dialog } from "@/components/ui";
@@ -102,15 +103,17 @@ function quoteTarget(
 	};
 }
 
+const NOT_PROVIDED = "未提供";
+
 /** 時間欄位一律走台北固定偏移；空字串代表沒有這個事實，整格不顯示。 */
 function taipeiOrDash(raw: string): string {
 	const text = formatTaipeiDateTime(raw);
-	return text ? `${text}（Asia/Taipei）` : "未提供";
+	return text ? `${text}（Asia/Taipei）` : NOT_PROVIDED;
 }
 
 /** 空字串＝賣家沒有承諾交期。 */
 function leadTimeText(leadTimeDays: string): string {
-	return leadTimeDays === "" ? "未提供" : `${leadTimeDays} 天`;
+	return leadTimeDays === "" ? NOT_PROVIDED : `${leadTimeDays} 天`;
 }
 
 function unitBasisText(response: BuyerFacingSellerResponse): string {
@@ -211,6 +214,7 @@ export default function BuyerQuoteComparison({
 	createClientRequestId,
 	onRefresh,
 }: BuyerQuoteComparisonProps) {
+	const t = useTranslations("procurementAssistant");
 	const ut = useUiText();
 	const [expanded, setExpanded] = React.useState<string | null>(null);
 	const [flow, setFlow] = React.useState<AcceptFlow>({ status: "idle" });
@@ -331,11 +335,7 @@ export default function BuyerQuoteComparison({
 					<AppIcon name="warning" size={18} aria-hidden="true" />
 					<div>
 						<strong>目前無法接受任何版本</strong>
-						<p>
-							{
-								"這個畫面沒有取得詢價內容的比對權杖，接受請求一定會被伺服器拒絕。請回到詢價流程重新載入。"
-							}
-						</p>
+						<p>{t("missingSellerFacingHash")}</p>
 					</div>
 				</div>
 			) : null}

@@ -3,13 +3,14 @@
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderWithoutIntl,
 	screen,
 	waitFor,
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import RfqDraftFlow from "../RfqDraftFlow";
 import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
 import type {
@@ -17,6 +18,9 @@ import type {
 	RfqPublicationExecuteCommand,
 	RfqPublicationResult,
 } from "../rfq-publication-contract";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 type PublicationExecute = (
 	command: RfqPublicationExecuteCommand,
