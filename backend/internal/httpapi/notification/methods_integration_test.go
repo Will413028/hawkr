@@ -371,6 +371,7 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 		procC = pb.NotificationCategory_NOTIFICATION_CATEGORY_PROCUREMENT
 		fspC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST
 		rstC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_RESTOCK
+		coupC = pb.NotificationCategory_NOTIFICATION_CATEGORY_COUPON
 	)
 	both := func(c pb.NotificationCategory) []pair { return []pair{{c, inbox}, {c, push}} }
 	join := func(parts ...[]pair) []pair {
@@ -410,7 +411,7 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 		}
 	}
 	b := get(9, buyer)
-	check("買家", b, join([]pair{{acct, inbox}, {acct, push}, {acct, email}, {chatC, push}}, both(cmtC), both(likeC), both(fspC), both(rstC), both(ann)),
+	check("買家", b, join([]pair{{acct, inbox}, {acct, push}, {acct, email}, {chatC, push}}, both(cmtC), both(likeC), both(fspC), both(rstC), both(coupC), both(ann)),
 		map[pair]bool{{acct, inbox}: true, {acct, email}: true, {ann, inbox}: true})
 	check("店家", get(9, store), join([]pair{{acct, inbox}, {acct, push}, {acct, email}, {payC, inbox}, {payC, push}, {payC, email}, {chatC, push}},
 		both(revC), both(cmtC), both(likeC), both(folC), both(procC), both(ann)),
