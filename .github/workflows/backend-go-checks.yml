@@ -90,7 +90,7 @@ jobs:
           all_mods() {
             for d in gateway pkg services/*/; do
               d=${d%/}
-              [ -f "$d/go.mod" ] && echo "$d"
+              if [ -f "$d/go.mod" ]; then echo "$d"; fi
             done
           }
 
