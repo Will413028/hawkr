@@ -6,7 +6,7 @@
 // 買家與店家的 API 在 hawkr.coupon.v1alpha1。
 //
 // 後台可以看到平台與店家的所有活動（不含系統替買家建立的補償活動），但只能建立與發布平台的活動；店家的活動由店家自己管理，
-// 後台對它們的動作只有提前結束與作廢單張券。寫入都留後台動作紀錄（與領域變更同一個 transaction）；唯讀方法不留。
+// 後台對它們的動作只有作廢單張券；提前結束與指定發放只能用在平台的活動。寫入都留後台動作紀錄（與領域變更同一個 transaction）；唯讀方法不留。
 //
 // ID 是不透明的字串（活動與券是 UUID，買家與店家是過渡期的十進位整數字串），client 不解析、不轉數字
 // （ADR 2026-09-25-row-identity-by-data-kind D5）。金額是新台幣元的整數。
@@ -78,11 +78,11 @@ type CouponAdminServiceClient interface {
 	CreateCampaign(context.Context, *connect.Request[v1alpha1.CreateCampaignRequest]) (*connect.Response[v1alpha1.CreateCampaignResponse], error)
 	// PublishCampaign 把 DRAFT 的活動發布成 ACTIVE。活動不存在回 not_found；不是 DRAFT 或結束時間已過回 failed_precondition。
 	PublishCampaign(context.Context, *connect.Request[v1alpha1.PublishCampaignRequest]) (*connect.Response[v1alpha1.PublishCampaignResponse], error)
-	// EndCampaign 提前結束活動（平台與店家的都可以）：之後不能再領取與鎖定，AVAILABLE 的券作廢，LOCKED 的券照常完成或釋放。
-	// 已結束的活動重送是成功（voided_vouchers 是 0）；DRAFT 的活動回 failed_precondition；活動不存在回 not_found。
+	// EndCampaign 提前結束平台的活動：之後不能再領取與鎖定，AVAILABLE 的券作廢，LOCKED 的券照常完成或釋放。
+	// 已結束的活動重送是成功（voided_vouchers 是 0）；DRAFT 的活動回 failed_precondition；活動不存在、是店家發的活動、是系統建立的補償活動都回 not_found。
 	EndCampaign(context.Context, *connect.Request[v1alpha1.EndCampaignRequest]) (*connect.Response[v1alpha1.EndCampaignResponse], error)
-	// GrantVouchers 對 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
-	// 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。
+	// GrantVouchers 對平台的 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
+	// 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在或是店家發的活動回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。買家不存在回 invalid_argument，指出第一個不存在的 buyer_ids 位置。
 	GrantVouchers(context.Context, *connect.Request[v1alpha1.GrantVouchersRequest]) (*connect.Response[v1alpha1.GrantVouchersResponse], error)
 	// VoidVoucher 作廢單張券：AVAILABLE，或因釋放漏送而卡住的 LOCKED。已核銷與已作廢的券回 failed_precondition；券不存在回 not_found。
 	VoidVoucher(context.Context, *connect.Request[v1alpha1.VoidVoucherRequest]) (*connect.Response[v1alpha1.VoidVoucherResponse], error)
@@ -237,11 +237,11 @@ type CouponAdminServiceHandler interface {
 	CreateCampaign(context.Context, *connect.Request[v1alpha1.CreateCampaignRequest]) (*connect.Response[v1alpha1.CreateCampaignResponse], error)
 	// PublishCampaign 把 DRAFT 的活動發布成 ACTIVE。活動不存在回 not_found；不是 DRAFT 或結束時間已過回 failed_precondition。
 	PublishCampaign(context.Context, *connect.Request[v1alpha1.PublishCampaignRequest]) (*connect.Response[v1alpha1.PublishCampaignResponse], error)
-	// EndCampaign 提前結束活動（平台與店家的都可以）：之後不能再領取與鎖定，AVAILABLE 的券作廢，LOCKED 的券照常完成或釋放。
-	// 已結束的活動重送是成功（voided_vouchers 是 0）；DRAFT 的活動回 failed_precondition；活動不存在回 not_found。
+	// EndCampaign 提前結束平台的活動：之後不能再領取與鎖定，AVAILABLE 的券作廢，LOCKED 的券照常完成或釋放。
+	// 已結束的活動重送是成功（voided_vouchers 是 0）；DRAFT 的活動回 failed_precondition；活動不存在、是店家發的活動、是系統建立的補償活動都回 not_found。
 	EndCampaign(context.Context, *connect.Request[v1alpha1.EndCampaignRequest]) (*connect.Response[v1alpha1.EndCampaignResponse], error)
-	// GrantVouchers 對 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
-	// 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。
+	// GrantVouchers 對平台的 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
+	// 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在或是店家發的活動回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。買家不存在回 invalid_argument，指出第一個不存在的 buyer_ids 位置。
 	GrantVouchers(context.Context, *connect.Request[v1alpha1.GrantVouchersRequest]) (*connect.Response[v1alpha1.GrantVouchersResponse], error)
 	// VoidVoucher 作廢單張券：AVAILABLE，或因釋放漏送而卡住的 LOCKED。已核銷與已作廢的券回 failed_precondition；券不存在回 not_found。
 	VoidVoucher(context.Context, *connect.Request[v1alpha1.VoidVoucherRequest]) (*connect.Response[v1alpha1.VoidVoucherResponse], error)

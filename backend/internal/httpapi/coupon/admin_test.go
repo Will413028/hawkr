@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 	"uuid"
@@ -20,8 +21,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -94,9 +97,50 @@ func (f *fakeAdminModule) ListVouchers(_ context.Context, in coupon.VoucherListI
 	return f.page, f.err
 }
 
+// fakeAdminBuyers 回 BatchMeta：unknown 裡的買家不存在；每次呼叫的批次記在 batches。
+type fakeAdminBuyers struct {
+	unknown map[int64]bool
+	err     error
+	batches [][]int64
+}
+
+func (f *fakeAdminBuyers) BatchMeta(_ context.Context, ids []int64) ([]buyer.Profile, error) {
+	f.batches = append(f.batches, slices.Clone(ids))
+	if f.err != nil {
+		return nil, f.err
+	}
+	var out []buyer.Profile
+	for _, id := range ids {
+		if !f.unknown[id] {
+			out = append(out, buyer.Profile{BuyerID: id})
+		}
+	}
+	return out, nil
+}
+
+// fakeAdminStores 回 Store：missing 裡的店家不存在（NotFound）；suspended 的店家照樣回傳。
+type fakeAdminStores struct {
+	missing map[int64]bool
+	err     error
+	asked   []int64
+}
+
+func (f *fakeAdminStores) Store(_ context.Context, id int64) (seller.Store, error) {
+	f.asked = append(f.asked, id)
+	if f.err != nil {
+		return seller.Store{}, f.err
+	}
+	if f.missing[id] {
+		return seller.Store{}, apperr.NotFound("store")
+	}
+	return seller.Store{StoreID: id}, nil
+}
+
 type adminRig struct {
 	admin  *Admin
 	module *fakeAdminModule
+	buyers *fakeAdminBuyers
+	stores *fakeAdminStores
 	client couponv1alpha1connect.CouponAdminServiceClient
 }
 
@@ -111,15 +155,15 @@ func adminAs(p identity.Principal) func(http.Handler) http.Handler {
 // newAdminRig 把 Admin 掛在真的 Connect handler 後面（req.Spec().Procedure 才有值），呼叫者由 principal 決定。
 func newAdminRig(t *testing.T, p identity.Principal) *adminRig {
 	t.Helper()
-	m := &fakeAdminModule{}
-	a := NewAdmin(m)
+	m, b, st := &fakeAdminModule{}, &fakeAdminBuyers{}, &fakeAdminStores{}
+	a := NewAdmin(m, b, st)
 	opts := connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler)))
 	path, h := couponv1alpha1connect.NewCouponAdminServiceHandler(a, opts)
 	mux := http.NewServeMux()
 	mux.Handle(path, h)
 	srv := httptest.NewServer(adminAs(p)(mux))
 	t.Cleanup(srv.Close)
-	return &adminRig{admin: a, module: m, client: couponv1alpha1connect.NewCouponAdminServiceClient(srv.Client(), srv.URL)}
+	return &adminRig{admin: a, module: m, buyers: b, stores: st, client: couponv1alpha1connect.NewCouponAdminServiceClient(srv.Client(), srv.URL)}
 }
 
 func adminPrincipal() identity.Principal {
@@ -339,7 +383,7 @@ func TestAdminWriteInputValidation(t *testing.T) {
 	id, voucher := campaignIDString(), voucherA.String()
 	many := make([]string, coupon.MaxIssueBatch+1)
 	for i := range many {
-		many[i] = "9"
+		many[i] = strconv.Itoa(i + 1)
 	}
 	for name, call := range map[string]func() error{
 		"作廢沒有理由": func() error {
@@ -578,5 +622,103 @@ func TestAdminFieldNamesMapToRequestPaths(t *testing.T) {
 		if missing := rpc.CheckFieldPaths(c.msg.ProtoReflect().Descriptor(), c.paths); len(missing) != 0 {
 			t.Errorf("%s：對應表的路徑在請求裡不存在：%v", name, missing)
 		}
+	}
+}
+
+func fieldViolations(t *testing.T, err error) []string {
+	t.Helper()
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		t.Fatalf("不是 connect 錯誤：%v", err)
+	}
+	var out []string
+	for _, d := range ce.Details() {
+		v, e := d.Value()
+		if e != nil {
+			continue
+		}
+		if br, ok := v.(*errdetails.BadRequest); ok {
+			for _, fv := range br.GetFieldViolations() {
+				out = append(out, fv.GetField())
+			}
+		}
+	}
+	return out
+}
+
+// 指定名單與發放對象必須是存在的買家：不存在的回 invalid_argument 並指出第一個在請求陣列的位置，不呼叫模組。
+func TestAdminRejectsUnknownBuyersWithTheFirstIndex(t *testing.T) {
+	r := newAdminRig(t, adminPrincipal())
+	ctx := context.Background()
+	r.buyers.unknown = map[int64]bool{12: true, 13: true}
+
+	in := adminCashInput()
+	in.TargetType, in.DesignatedBuyerIds = pb.TargetType_TARGET_TYPE_DESIGNATED, []string{"9", "10", "13", "12"}
+	_, err := r.client.CreateCampaign(ctx, connect.NewRequest(&adminpb.CreateCampaignRequest{Campaign: in}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fieldViolations(t, err), []string{"campaign.designated_buyer_ids[2]"}) {
+		t.Fatalf("建立：err=%v 欄位=%v，預期 invalid_argument 指出 designated_buyer_ids[2]", err, fieldViolations(t, err))
+	}
+
+	_, err = r.client.GrantVouchers(ctx, connect.NewRequest(&adminpb.GrantVouchersRequest{CampaignId: campaignIDString(), BuyerIds: []string{"9", "9", "12", "13"}}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fieldViolations(t, err), []string{"buyer_ids[2]"}) {
+		t.Fatalf("發放：err=%v 欄位=%v，預期 invalid_argument 指出 buyer_ids[2]（重複的不影響位置）", err, fieldViolations(t, err))
+	}
+	if len(r.module.calls) != 0 {
+		t.Fatalf("不存在的買家不能呼叫模組：%v", r.module.calls)
+	}
+
+	r.buyers.err = errors.New("db down")
+	_, err = r.client.GrantVouchers(ctx, connect.NewRequest(&adminpb.GrantVouchersRequest{CampaignId: campaignIDString(), BuyerIds: []string{"9"}}))
+	if connect.CodeOf(err) == connect.CodeInvalidArgument || err == nil || len(r.module.calls) != 0 {
+		t.Fatalf("買家讀取失敗要整個失敗而不是當成不存在：err=%v calls=%v", err, r.module.calls)
+	}
+}
+
+// 發放的名單先去重再檢查 1 到 500 位：500 個不重複加 1 個重複是合法的；買家分批（每批不超過 buyer.MaxBatchSize）查。
+func TestAdminGrantDeduplicatesBeforeTheBatchLimit(t *testing.T) {
+	r := newAdminRig(t, adminPrincipal())
+	ids := make([]string, 0, coupon.MaxIssueBatch+1)
+	for i := range coupon.MaxIssueBatch {
+		ids = append(ids, strconv.Itoa(i+1))
+	}
+	ids = append(ids, "1")
+	if _, err := r.client.GrantVouchers(context.Background(), connect.NewRequest(&adminpb.GrantVouchersRequest{CampaignId: campaignIDString(), BuyerIds: ids})); err != nil {
+		t.Fatalf("500 個不重複加 1 個重複：%v", err)
+	}
+	if len(r.module.issueIn.BuyerIDs) != coupon.MaxIssueBatch {
+		t.Fatalf("交給模組 %d 位，預期去重後 %d 位", len(r.module.issueIn.BuyerIDs), coupon.MaxIssueBatch)
+	}
+	if len(r.buyers.batches) != (coupon.MaxIssueBatch+buyer.MaxBatchSize-1)/buyer.MaxBatchSize {
+		t.Fatalf("買家查了 %d 批：%d", len(r.buyers.batches), len(r.buyers.batches))
+	}
+	for _, b := range r.buyers.batches {
+		if len(b) > buyer.MaxBatchSize {
+			t.Fatalf("一批 %d 位，超過 %d", len(b), buyer.MaxBatchSize)
+		}
+	}
+}
+
+// 限店的平台活動的店家必須存在：不存在回 invalid_argument 指出 campaign.store_id，不呼叫模組；停權的店家不在這裡擋（沿用 Stores port：只有領券與鎖券看停權）。
+func TestAdminCreateCampaignRequiresAnExistingStore(t *testing.T) {
+	r := newAdminRig(t, adminPrincipal())
+	ctx := context.Background()
+	r.stores.missing = map[int64]bool{99: true}
+	in := adminCashInput()
+	missing := "99"
+	in.StoreId = &missing
+	_, err := r.client.CreateCampaign(ctx, connect.NewRequest(&adminpb.CreateCampaignRequest{Campaign: in}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fieldViolations(t, err), []string{"campaign.store_id"}) || len(r.module.calls) != 0 {
+		t.Fatalf("不存在的店家：err=%v 欄位=%v calls=%v", err, fieldViolations(t, err), r.module.calls)
+	}
+	r.stores.err = errors.New("db down")
+	if _, err = r.client.CreateCampaign(ctx, connect.NewRequest(&adminpb.CreateCampaignRequest{Campaign: in})); err == nil || connect.CodeOf(err) == connect.CodeInvalidArgument || len(r.module.calls) != 0 {
+		t.Fatalf("店家讀取失敗要整個失敗：err=%v calls=%v", err, r.module.calls)
+	}
+	r.stores.err = nil
+	r.module.created = platformCampaign()
+	known := "11"
+	in.StoreId = &known
+	if _, err = r.client.CreateCampaign(ctx, connect.NewRequest(&adminpb.CreateCampaignRequest{Campaign: in})); err != nil || r.module.createIn.StoreID != 11 {
+		t.Fatalf("存在的店家：err=%v storeID=%d", err, r.module.createIn.StoreID)
 	}
 }

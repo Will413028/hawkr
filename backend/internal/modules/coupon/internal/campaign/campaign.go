@@ -212,6 +212,8 @@ type EndInput struct {
 	// AdminID、StoreID 與 Reason 進稽核紀錄（StoreID 同時是賣家路徑的範圍限制）。
 	AdminID int64
 	Reason  string
+	// PlatformOnly 為 true 時只能結束平台發的非補償活動（後台路徑）；店家發的與補償活動回 NotFound。
+	PlatformOnly bool
 }
 
 // EndResult 是提前結束的結果。
@@ -239,6 +241,9 @@ func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
 			return err
 		}
 		if in.StoreID > 0 && (row.IssuerStoreID == nil || *row.IssuerStoreID != in.StoreID || model.TargetType(row.TargetType) == model.TargetCompensation) {
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
+		}
+		if in.PlatformOnly && (row.IssuerStoreID != nil || row.TargetType == string(model.TargetCompensation)) {
 			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		if model.CampaignStatus(row.Status) == model.StatusEnded {

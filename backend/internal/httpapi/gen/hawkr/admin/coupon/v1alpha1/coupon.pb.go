@@ -8,7 +8,7 @@
 // 買家與店家的 API 在 hawkr.coupon.v1alpha1。
 //
 // 後台可以看到平台與店家的所有活動（不含系統替買家建立的補償活動），但只能建立與發布平台的活動；店家的活動由店家自己管理，
-// 後台對它們的動作只有提前結束與作廢單張券。寫入都留後台動作紀錄（與領域變更同一個 transaction）；唯讀方法不留。
+// 後台對它們的動作只有作廢單張券；提前結束與指定發放只能用在平台的活動。寫入都留後台動作紀錄（與領域變更同一個 transaction）；唯讀方法不留。
 //
 // ID 是不透明的字串（活動與券是 UUID，買家與店家是過渡期的十進位整數字串），client 不解析、不轉數字
 // （ADR 2026-09-25-row-identity-by-data-kind D5）。金額是新台幣元的整數。
@@ -392,14 +392,14 @@ type AdminCampaignInput struct {
 	ThresholdAmount int64 `protobuf:"varint,4,opt,name=threshold_amount,json=thresholdAmount,proto3" json:"threshold_amount,omitempty"`
 	// 可以是 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument，COMPENSATION 只由系統建立。
 	TargetType v1alpha1.TargetType `protobuf:"varint,5,opt,name=target_type,json=targetType,proto3,enum=hawkr.coupon.v1alpha1.TargetType" json:"target_type,omitempty"`
-	// 適用的店家；不設是全平台。
+	// 適用的店家；不設是全平台。店家不存在回 invalid_argument。
 	StoreId   *string                `protobuf:"bytes,6,opt,name=store_id,json=storeId,proto3,oneof" json:"store_id,omitempty"`
 	StartTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	// 必須晚於現在與 start_time。
 	EndTime *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
 	// 總發行量；不設是無上限，設了至少 1（0 回 invalid_argument，不當成無上限）。
 	TotalIssueLimit *int32 `protobuf:"varint,9,opt,name=total_issue_limit,json=totalIssueLimit,proto3,oneof" json:"total_issue_limit,omitempty"`
-	// DESIGNATED 的名單（買家 ID），最多 500 位；其他資格不得帶。
+	// DESIGNATED 的名單（買家 ID），最多 500 位；其他資格不得帶。買家不存在回 invalid_argument，指出第一個不存在的位置。
 	DesignatedBuyerIds []string `protobuf:"bytes,10,rep,name=designated_buyer_ids,json=designatedBuyerIds,proto3" json:"designated_buyer_ids,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -817,7 +817,7 @@ func (x *EndCampaignResponse) GetVoidedVouchers() int32 {
 type GrantVouchersRequest struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	CampaignId string                 `protobuf:"bytes,1,opt,name=campaign_id,json=campaignId,proto3" json:"campaign_id,omitempty"`
-	// 要發給的買家 ID，1 到 500 位，重複的只算一次。
+	// 要發給的買家 ID，去重後 1 到 500 位，重複的只算一次（500 個不重複加一個重複的是合法的）。
 	BuyerIds      []string `protobuf:"bytes,2,rep,name=buyer_ids,json=buyerIds,proto3" json:"buyer_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

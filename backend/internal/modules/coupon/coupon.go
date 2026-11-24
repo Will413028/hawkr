@@ -10,6 +10,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/admin"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/campaign"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/qualify"
@@ -143,8 +144,7 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 
 // Module 是 coupon 模組。
 type Module struct {
-	db       *db.DB
-	audit    *adminaudit.Log
+	admin    *admin.Service
 	campaign *campaign.Service
 	voucher  *voucher.Service
 	read     *read.Service
@@ -156,11 +156,12 @@ func New(d Deps) *Module {
 		panic("coupon：DB、Stores、Members、NewID 與 Now 是必要的")
 	}
 	q := qualify.New(qualify.Deps{DB: d.DB, Stores: d.Stores, Members: d.Members})
+	camp := campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now})
+	vouch := voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now})
 	return &Module{
-		db:       d.DB,
-		audit:    adminaudit.New(d.DB, d.Now),
-		campaign: campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
-		voucher:  voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now}),
+		admin:    admin.New(admin.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Campaign: camp, Voucher: vouch}),
+		campaign: camp,
+		voucher:  vouch,
 		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
 	}
 }

@@ -6,7 +6,7 @@
 // 買家與店家的 API 在 hawkr.coupon.v1alpha1。
 //
 // 後台可以看到平台與店家的所有活動（不含系統替買家建立的補償活動），但只能建立與發布平台的活動；店家的活動由店家自己管理，
-// 後台對它們的動作只有提前結束與作廢單張券。寫入都留後台動作紀錄（與領域變更同一個 transaction）；唯讀方法不留。
+// 後台對它們的動作只有作廢單張券；提前結束與指定發放只能用在平台的活動。寫入都留後台動作紀錄（與領域變更同一個 transaction）；唯讀方法不留。
 //
 // ID 是不透明的字串（活動與券是 UUID，買家與店家是過渡期的十進位整數字串），client 不解析、不轉數字
 // （ADR 2026-09-25-row-identity-by-data-kind D5）。金額是新台幣元的整數。
@@ -238,7 +238,7 @@ export type AdminCampaignInput = Message<"hawkr.admin.coupon.v1alpha1.AdminCampa
   targetType: TargetType;
 
   /**
-   * 適用的店家；不設是全平台。
+   * 適用的店家；不設是全平台。店家不存在回 invalid_argument。
    *
    * @generated from field: optional string store_id = 6;
    */
@@ -264,7 +264,7 @@ export type AdminCampaignInput = Message<"hawkr.admin.coupon.v1alpha1.AdminCampa
   totalIssueLimit?: number | undefined;
 
   /**
-   * DESIGNATED 的名單（買家 ID），最多 500 位；其他資格不得帶。
+   * DESIGNATED 的名單（買家 ID），最多 500 位；其他資格不得帶。買家不存在回 invalid_argument，指出第一個不存在的位置。
    *
    * @generated from field: repeated string designated_buyer_ids = 10;
    */
@@ -404,7 +404,7 @@ export type GrantVouchersRequest = Message<"hawkr.admin.coupon.v1alpha1.GrantVou
   campaignId: string;
 
   /**
-   * 要發給的買家 ID，1 到 500 位，重複的只算一次。
+   * 要發給的買家 ID，去重後 1 到 500 位，重複的只算一次（500 個不重複加一個重複的是合法的）。
    *
    * @generated from field: repeated string buyer_ids = 2;
    */
@@ -729,8 +729,8 @@ export const CouponAdminService: GenService<{
     output: typeof PublishCampaignResponseSchema;
   },
   /**
-   * EndCampaign 提前結束活動（平台與店家的都可以）：之後不能再領取與鎖定，AVAILABLE 的券作廢，LOCKED 的券照常完成或釋放。
-   * 已結束的活動重送是成功（voided_vouchers 是 0）；DRAFT 的活動回 failed_precondition；活動不存在回 not_found。
+   * EndCampaign 提前結束平台的活動：之後不能再領取與鎖定，AVAILABLE 的券作廢，LOCKED 的券照常完成或釋放。
+   * 已結束的活動重送是成功（voided_vouchers 是 0）；DRAFT 的活動回 failed_precondition；活動不存在、是店家發的活動、是系統建立的補償活動都回 not_found。
    *
    * @generated from rpc hawkr.admin.coupon.v1alpha1.CouponAdminService.EndCampaign
    */
@@ -740,8 +740,8 @@ export const CouponAdminService: GenService<{
     output: typeof EndCampaignResponseSchema;
   },
   /**
-   * GrantVouchers 對 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
-   * 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。
+   * GrantVouchers 對平台的 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
+   * 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在或是店家發的活動回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。買家不存在回 invalid_argument，指出第一個不存在的 buyer_ids 位置。
    *
    * @generated from rpc hawkr.admin.coupon.v1alpha1.CouponAdminService.GrantVouchers
    */

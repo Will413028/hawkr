@@ -5,6 +5,7 @@ package coupon_test
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -228,5 +229,111 @@ func TestAdminGetCampaignShowsLimitIssuedAndCounts(t *testing.T) {
 	}
 	if _, err := f.m.AdminGetCampaign(ctx, uuid.UUID{9}); coupon.ReasonOf(err) != coupon.ReasonCampaignNotFound {
 		t.Fatalf("不存在的活動：%v", err)
+	}
+}
+
+func (f *fixture) platformDesignated(buyers ...int64) coupon.Campaign {
+	f.t.Helper()
+	c := f.adminDraft(func(in *coupon.CreateCampaignInput) {
+		in.TargetType, in.TargetBuyers = coupon.TargetDesignated, buyers
+	})
+	if err := f.m.AdminPublishCampaign(context.Background(), actor("publish"), c.ID); err != nil {
+		f.t.Fatal(err)
+	}
+	return c
+}
+
+// 指定發放只能用在平台的活動：店家發的 DESIGNATED 活動回 NOT_FOUND，不建券、不留紀錄。
+func TestAdminIssueRejectsAStoreCampaign(t *testing.T) {
+	f := setup(t)
+	shop := f.sellerCampaign(storeA, func(in *coupon.CreateCampaignInput) {
+		in.TargetType, in.TargetBuyers = coupon.TargetDesignated, []int64{buyer1}
+	})
+	_, err := f.m.AdminIssue(context.Background(), actor("grant"), coupon.IssueInput{CampaignID: shop.ID, BuyerIDs: []int64{buyer2}})
+	wantReason(t, err, coupon.ReasonCampaignNotFound)
+	if n := f.scalar("SELECT count(*) FROM coupon.coupon_vouchers WHERE campaign_id = $1", shop.ID); n != 0 {
+		t.Fatalf("店家活動不該被發出券，有 %d 張", n)
+	}
+	if n := f.auditRows("grant"); n != 0 {
+		t.Fatalf("失敗的發放不該留紀錄，有 %d 筆", n)
+	}
+}
+
+// 後台只能結束平台發的非補償活動：店家活動與補償活動都回 NOT_FOUND，活動、券與紀錄都不變。
+func TestAdminEndCampaignRejectsStoreAndCompensationCampaigns(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	shop := f.sellerCampaign(storeA)
+	shopVoucher := f.claim(shop, buyer1)
+	comp, err := f.m.IssueCompensation(ctx, coupon.CompensationInput{
+		SourceType: coupon.SourceAdminCompensation, SourceID: "ADM-1", BuyerID: buyer1, StoreID: storeA, Amount: 100, MinOrderAmount: 500,
+		EndAt: base.Add(30 * windowLen), Title: "補償", Issuer: coupon.Issuer{AdminID: adminID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, id := range map[string]uuid.UUID{"店家活動": shop.ID, "補償活動": comp.Campaign.ID} {
+		_, err := f.m.AdminEndCampaign(ctx, actor("end"), coupon.EndCampaignInput{CampaignID: id, Reason: "x"})
+		if coupon.ReasonOf(err) != coupon.ReasonCampaignNotFound {
+			t.Errorf("%s：原因 = %q（%v），預期 %s", name, coupon.ReasonOf(err), err, coupon.ReasonCampaignNotFound)
+		}
+	}
+	if n := f.scalar("SELECT count(*) FROM coupon.coupon_campaigns WHERE id = ANY($1) AND status = 'ACTIVE'", []uuid.UUID{shop.ID, comp.Campaign.ID}); n != 2 {
+		t.Fatalf("兩個活動都不該被結束，ACTIVE 的有 %d 個", n)
+	}
+	if got := f.voucherStatus(shopVoucher.ID); got != "AVAILABLE" {
+		t.Fatalf("店家活動的券 = %s，預期 AVAILABLE", got)
+	}
+	if n := f.auditRows("end"); n != 0 {
+		t.Fatalf("失敗的結束不該留紀錄，有 %d 筆", n)
+	}
+}
+
+// 發放先去重再檢查 1 到 500 位：500 個不重複加 1 個重複成功且只發 500 張；501 個不重複被拒。
+func TestAdminIssueDeduplicatesBeforeTheBatchLimit(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	c := f.platformDesignated(buyer1)
+	ids := make([]int64, 0, coupon.MaxIssueBatch+1)
+	for i := range coupon.MaxIssueBatch {
+		ids = append(ids, int64(10000+i))
+	}
+	res, err := f.m.AdminIssue(ctx, actor("grant"), coupon.IssueInput{CampaignID: c.ID, BuyerIDs: append(slices.Clone(ids), ids[0])})
+	if err != nil || res.Issued != coupon.MaxIssueBatch {
+		t.Fatalf("500 不重複加 1 重複：%+v %v，預期發出 %d", res, err, coupon.MaxIssueBatch)
+	}
+	if n := f.scalar("SELECT count(*) FROM coupon.coupon_vouchers WHERE campaign_id = $1", c.ID); n != coupon.MaxIssueBatch {
+		t.Fatalf("券 %d 張，預期 %d", n, coupon.MaxIssueBatch)
+	}
+	_, err = f.m.AdminIssue(ctx, actor("grant"), coupon.IssueInput{CampaignID: c.ID, BuyerIDs: append(slices.Clone(ids), 99999)})
+	if err == nil {
+		t.Fatal("501 個不重複要被拒")
+	}
+}
+
+// 結束活動的稽核紀錄與活動操作紀錄用同一個去空白後的 reason：全空白的理由兩邊都是空。
+func TestAdminEndCampaignAuditUsesTheNormalizedReason(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+	for action, reason := range map[string]string{"end-blank": " \t ", "end-padded": "  收尾  "} {
+		c := f.platformDesignated(buyer1)
+		if _, err := f.m.AdminEndCampaign(ctx, actor(action), coupon.EndCampaignInput{CampaignID: c.ID, Reason: reason}); err != nil {
+			t.Fatal(err)
+		}
+		want := strings.TrimSpace(reason)
+		var got string
+		if err := f.db.Pool().QueryRow(ctx, "SELECT detail->>'reason' FROM adminaudit.records WHERE action = $1", action).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("%s：稽核 reason = %q，預期 %q", action, got, want)
+		}
+		var logged *string
+		if err := f.db.Pool().QueryRow(ctx, "SELECT reason FROM coupon.coupon_redemption_logs WHERE campaign_id = $1 AND action = 'END_CAMPAIGN'", c.ID).Scan(&logged); err != nil {
+			t.Fatal(err)
+		}
+		if (want == "") != (logged == nil) || (logged != nil && *logged != want) {
+			t.Errorf("%s：活動操作紀錄 reason = %v，預期 %q", action, logged, want)
+		}
 	}
 }
