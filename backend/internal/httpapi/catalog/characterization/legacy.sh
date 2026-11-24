@@ -17,6 +17,8 @@
 # seller.exposure.changed 餵入，但這支腳本不起 River worker。所以 product-service 起來後直接寫入兩家種子店可曝光的列，
 # 情境不驗停權與不可曝光（B4-3 integration 覆蓋）。
 #
+# 分類：V1 的種子只有第一層，建立商品要第二層（「分類 ID 無對應的第二層分類」），所以同一步寫入三個第二層分類。
+#
 # 身分：CHARACTERIZE_SELLER_TOKEN、CHARACTERIZE_SELLER2_TOKEN 是種子帳號 9、4（店家 1009、1004）的 token；買家用腳本
 # 新建的帳號（沒有賣家角色），管理員是腳本簽的。套用 infra/seed-data/01-account.sql 再跑 hawkr dev-seed 建店家。
 
@@ -90,6 +92,11 @@ legacy_start() {
 INSERT INTO store_exposure (store_id, exposable, version, updated_at)
 VALUES (1009, true, 1, now()), (1004, true, 1, now())
 ON CONFLICT (store_id) DO UPDATE SET exposable = true;
+INSERT INTO category (name, parent_id, status)
+SELECT child, p.id, '9004'
+FROM category p
+JOIN (VALUES ('葉菜', '蔬菜'), ('根莖', '蔬菜'), ('柑橘', '水果')) AS c(child, parent) ON c.parent = p.name AND p.parent_id IS NULL
+ON CONFLICT DO NOTHING;
 SQL
   gateway_env+=(
     PRODUCT_SERVICE_HOST=127.0.0.1 PRODUCT_SERVICE_GRPC_PORT="$JAVA_GRPC_PORT" PRODUCT_SERVICE_PORT="$JAVA_HTTP_PORT"
