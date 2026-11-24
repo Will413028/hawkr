@@ -148,10 +148,11 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 				return err
 			}
 		}
-		if err := s.close(ctx, q, in, res.measureID); err != nil {
+		now := s.d.Now().UTC()
+		if err := s.close(ctx, q, in, res.measureID, now); err != nil {
 			return err
 		}
-		if err := s.publishClosed(ctx, c, in); err != nil {
+		if err := s.publishClosed(ctx, c, in, now); err != nil {
 			return err
 		}
 		if err := s.audit(ctx, c, in, res); err != nil {
@@ -181,8 +182,7 @@ func (s *Service) audit(ctx context.Context, c model.Case, in model.DecideInput,
 }
 
 // close 是最後一步：結案轉移。
-func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideInput, measureID *uuid.UUID) error {
-	now := s.d.Now().UTC()
+func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideInput, measureID *uuid.UUID, now time.Time) error {
 	p := store.CloseCaseParams{
 		ID: in.CaseID, Version: in.Version, Decision: ptr(string(in.Decision)), AdminID: &in.Actor.AdminID, ClosedAt: &now, MeasureID: measureID,
 	}
@@ -199,11 +199,11 @@ func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideIn
 	return nil
 }
 
-// publishClosed 在結案的同一個 transaction 發 CaseClosedEvent：結果由決定推導，政策分類只在違規時帶。
-func (s *Service) publishClosed(ctx context.Context, c model.Case, in model.DecideInput) error {
+// publishClosed 在結案的同一個 transaction 發 CaseClosedEvent：結果由決定推導，政策分類只在違規時帶；OccurredAt 是 close 寫入 closed_at 的同一個 now。
+func (s *Service) publishClosed(ctx context.Context, c model.Case, in model.DecideInput, now time.Time) error {
 	decision := string(in.Decision)
 	e := model.CaseClosedEvent{
-		EventID: s.d.NewID(), OccurredAt: s.d.Now().UTC(), CaseID: c.ID, TargetKind: c.Target.Kind, Outcome: model.OutcomeOf(&decision),
+		EventID: s.d.NewID(), OccurredAt: now, CaseID: c.ID, TargetKind: c.Target.Kind, Outcome: model.OutcomeOf(&decision),
 	}
 	if in.Decision == model.DecisionViolation {
 		category := policy.Category(in.Category)
