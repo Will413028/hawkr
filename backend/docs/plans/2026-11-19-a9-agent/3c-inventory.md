@@ -206,7 +206,7 @@ proto 的 `int32 lead_time_days`（非 optional）無法區分「未填」與「
 - 版本推導狀態（持久層沒有 status 欄）：成立（版本不可變）；沿用 `quote.VersionStatus`。
 - 目前版本只靠 `withdrawn_version` 單值：版本 1 撤回、版本 2 送出後撤回，版本 1 會顯示成 SUPERSEDED 而不是 WITHDRAWN（只剩最後一次撤回的版本）。買家端只看目前版本，沒有讀取者，不處理，列在 CARRYOVER 即可【推】。
 - 正式回價後保留草稿（舊行為，GetSellerPublication 同時回草稿與最新版）：沿用。
-- 能力 `CAP_MARKETING`：`docs/modules/seller.md:238` 的能力表沒有列「賣家採購回價」，文件要補一行（它列的是舊的行銷經營）。
+- 能力 `CAP_MARKETING`：`backend/docs/modules/seller.md:238` 的能力表沒有列「賣家採購回價」，文件要補一行（它列的是舊的行銷經營）。
 
 ## 7. 建議的子步驟切分
 
@@ -219,7 +219,7 @@ proto 的 `int32 lead_time_days`（非 optional）無法區分「未填」與「
 | **A9-3c-3　發布時封鎖檢查**（Q5） | `rfq.Service` 加 `BlockedStores`／`OpenStores` port；Preview 與 Execute 檢查；失敗為 candidate_set 衝突 | integration（假 seller 實作）：封鎖／歇業的店在 Preview 與 Execute 都失敗、讀取失敗 fail-closed、不洩漏是哪一家；mutation：Execute 略過檢查要失敗 |
 | **A9-3c-4　建單 worker 與 ordering port**（Q1、Q2、Q9） | `order_ref` 欄與 migration；`OrderCreator` port（`cmd/hawkr` 的 adapter 包 `legacy/orderservice.Client`）；`procurement.order_provisioning` worker：組品名、呼叫、分類（500／transport 重試，其餘終態）、`MarkOrderCreated`；用盡與 reconciler 路徑 `MarkOrderFailed`；只在測試註冊 | unit：品名、分類表、`UnitPrice = goods+tax`；integration（假 `OrderCreator`）：成功、`replayed` 成功、終態拒絕、**注入失敗到用盡→acceptance `ORDER_FAILED`、live 鎖解除、同一需求可再接受（PLAN:209 的驗收）**、買家已刪；mutation：用盡時不標失敗、分類把 500 當終態 |
 | **A9-3c-5　relay 與 fixture** | `LEG/procurementrelay`（`OnRfqPublished` 在 tx 內排 job；worker 發 E1；Q8 的 `MarkInviteSent／Failed`）；`fixtures/events/invite_created.json`（Q11）；`wire_test`、`golden_test`（對 `event_payload_keys.json`）；`routes.json` 以 `-update` 重生；不在 `cmd/hawkr` 接線（A9-6） | 測試內啟用 relay，產生的 payload 與 fixture 逐欄比對（鍵名、字串型別、無多餘鍵）；`publish_routes_test` 通過；mutation：改一個鍵名（`storeId`→`store_id`）比對要失敗；`python3 backend/scripts/check-migration-inventory.py` 不受影響（舊服務 3c 不刪） |
-| **A9-3c-6　收尾** | CARRYOVER（M1 補 acceptance_id、M11、Q3／Q6／Q8 的結論、`withdrawn_version` 單值）、模組 AGENTS.md、PLAN 進度列與 D44(3) 更正、`docs/modules/seller.md:238` 能力表、`docs/modules/procurement.md` | 設計審查（design-review，大型遷移前後各一次）；`/code-review`；CI 全綠（逐 job） |
+| **A9-3c-6　收尾** | CARRYOVER（M1 補 acceptance_id、M11、Q3／Q6／Q8 的結論、`withdrawn_version` 單值）、模組 AGENTS.md、PLAN 進度列與 D44(3) 更正、`backend/docs/modules/seller.md:238` 能力表、`backend/docs/modules/procurement.md` | 設計審查（design-review，大型遷移前後各一次）；`/code-review`；CI 全綠（逐 job） |
 
 可並行：3c-1 與 3c-3；3c-4 與 3c-5 互不依賴，但都等 Q 決定。mutation 清單寫在 `mutation/a9-3c.json`（CI 跑，hawkr 規則）。
 

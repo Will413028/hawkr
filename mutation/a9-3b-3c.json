@@ -194,7 +194,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
    "old": "BuyerNote: note, CandidateSetID: in.CandidateSetID,",
-   "new": "BuyerNote: note, CandidateSetID: nil,",
+   "new": "BuyerNote: note, CandidateSetID: uuid.UUID{},",
    "test": "internal/modules/procurement/internal/rfq ^TestExecuteDirectStillWorksWhileTheCandidateSetIsEffective$",
    "why": "The approval stops storing the candidate set, so Execute has nothing to re-check."
   },
