@@ -60,8 +60,8 @@
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
    "old": "\tif cur.Version != in.Version {\n\t\treturn model.AdminStyle{}, styleStale(ctx)\n\t}\n",
    "new": "",
-   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleStaleVersionIsRejectedBeforeFinalizingTheThumbnail$",
-   "why": "拿掉修改前的 etag 比對：過期的 etag 仍先轉正縮圖"
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleStaleVersionIsRejectedBeforeConfirmingTheThumbnail$",
+   "why": "拿掉修改前的 etag 比對：過期的 etag 仍先 Confirm 縮圖"
   },
   {
    "id": "no-delete-etag-check",
@@ -105,7 +105,7 @@
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
    "old": "n == 0 || n > model.MaxPromptRunes {",
    "new": "n == 0 || n > model.MaxPromptRunes+1000 {",
-   "test": "internal/modules/imageai/internal/admin ^TestCreateStyleRejectsInvalidInputWithoutFinalizingTheThumbnail$",
+   "test": "internal/modules/imageai/internal/admin ^TestCreateStyleRejectsInvalidInputWithoutConfirmingTheThumbnail$",
    "why": "放寬提示詞的 500 字元上限"
   },
   {
