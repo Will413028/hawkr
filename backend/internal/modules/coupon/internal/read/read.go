@@ -352,6 +352,18 @@ func (s *Service) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.
 	if storeID <= 0 {
 		return CampaignDetail{}, model.Invalid(ctx, "StoreID", model.InvalidStoreInvalid)
 	}
+	return s.detail(ctx, id, func(c model.Campaign) bool {
+		return c.IssuerStoreID == nil || *c.IssuerStoreID != storeID || c.TargetType == model.TargetCompensation
+	})
+}
+
+// GetCampaign 讀任一個活動的明細（後台）：平台、店家與補償活動都讀得到；不存在回 NotFound。
+func (s *Service) GetCampaign(ctx context.Context, id uuid.UUID) (CampaignDetail, error) {
+	return s.detail(ctx, id, func(model.Campaign) bool { return false })
+}
+
+// detail 在一致的快照內讀活動、名單與各狀態的券數；hidden 回 true 的活動回 NotFound（防枚舉：與不存在同一個錯誤）。
+func (s *Service) detail(ctx context.Context, id uuid.UUID, hidden func(model.Campaign) bool) (CampaignDetail, error) {
 	var out CampaignDetail
 	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -363,7 +375,7 @@ func (s *Service) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.
 			return err
 		}
 		c := rows.Campaign(row)
-		if c.IssuerStoreID == nil || *c.IssuerStoreID != storeID || c.TargetType == model.TargetCompensation {
+		if hidden(c) {
 			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		out.SellerCampaign = SellerCampaign{Campaign: c, Expired: c.Expired(s.d.Now())}
@@ -385,6 +397,60 @@ func (s *Service) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.
 			case model.VoucherVoided:
 				out.Voided = n.N
 			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// AdminListInput 是後台活動列表的輸入：Status 為空是全部；PlatformOnly 只列平台（管理員）發的，StoreID 大於 0 只列這家店發的，兩者不能同時設。
+type AdminListInput struct {
+	Status       model.CampaignStatus
+	PlatformOnly bool
+	StoreID      int64
+	Size         int32
+	After        *Cursor
+}
+
+// AdminCampaignPage 是一頁後台的活動。
+type AdminCampaignPage struct {
+	Campaigns []SellerCampaign
+	Next      *Cursor
+}
+
+// ListCampaigns 列出平台與店家的活動，新到舊，不含系統建立的補償活動（後台）。
+func (s *Service) ListCampaigns(ctx context.Context, in AdminListInput) (AdminCampaignPage, error) {
+	if in.StoreID < 0 || (in.PlatformOnly && in.StoreID > 0) {
+		return AdminCampaignPage{}, model.Invalid(ctx, "StoreID", model.InvalidStoreInvalid)
+	}
+	p := store.ListAdminCampaignsParams{MaxRows: rowLimit(size(in.Size))}
+	if in.Status != "" {
+		p.Status = rows.Ptr(string(in.Status))
+	}
+	switch {
+	case in.PlatformOnly:
+		p.IssuerType = rows.Ptr("ADMIN")
+	case in.StoreID > 0:
+		p.IssuerType = rows.Ptr("SELLER")
+		p.IssuerStoreID = rows.Ptr(in.StoreID)
+	}
+	p.AfterCreatedAt, p.AfterID = in.After.args()
+	want := size(in.Size)
+	now := s.d.Now()
+	var out AdminCampaignPage
+	err := s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
+		batch, err := s.q(ctx).ListAdminCampaigns(ctx, p)
+		if err != nil {
+			return err
+		}
+		for i, row := range batch {
+			if i == want {
+				last := out.Campaigns[len(out.Campaigns)-1].Campaign
+				out.Next = &Cursor{At: last.CreatedAt, ID: last.ID}
+				break
+			}
+			c := rows.Campaign(row)
+			out.Campaigns = append(out.Campaigns, SellerCampaign{Expired: c.Expired(now), Campaign: c})
 		}
 		return nil
 	})

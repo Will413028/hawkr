@@ -37,6 +37,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -117,6 +118,33 @@ func (s sellerStores) StoreSuspended(ctx context.Context, storeID int64) (bool, 
 	return st.Suspended(), nil
 }
 
+// StoreState 與 cmd/hawkr 的 couponStores 同一個做法：店家不存在回 Exists=false。
+func (s sellerStores) StoreState(ctx context.Context, storeID int64) (coupon.StoreState, error) {
+	st, err := s.sellers.Store(ctx, storeID)
+	if apperr.KindOf(err) == apperr.KindNotFound {
+		return coupon.StoreState{}, nil
+	}
+	if err != nil {
+		return coupon.StoreState{}, err
+	}
+	return coupon.StoreState{Exists: true, Closed: st.Status == seller.Closed}, nil
+}
+
+// buyerExists 是 coupon 的 Buyers port 的 adapter（與 cmd/hawkr 的 couponBuyers 同一個做法）。
+type buyerExists struct{ buyers *buyer.Module }
+
+func (b buyerExists) Existing(ctx context.Context, ids []int64) ([]int64, error) {
+	ps, err := b.buyers.BatchMeta(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int64, 0, len(ps))
+	for _, p := range ps {
+		out = append(out, p.BuyerID)
+	}
+	return out, nil
+}
+
 // noMembers 是 MEMBER 資格的 port：投影還沒有接上，這裡的情境不涉及 MEMBER 資格。
 type noMembers struct{}
 
@@ -131,6 +159,8 @@ type monolith struct {
 	coupon   *coupon.Module
 	crm      *crm.Module
 	srv      *httptest.Server
+	// adminToken 是已授予 OWNER 的 dev 管理員 token。
+	adminToken string
 }
 
 func startMonolith(t *testing.T) *monolith {
@@ -143,6 +173,7 @@ func startMonolith(t *testing.T) *monolith {
 		migrate.Module{Name: "delegation", Dir: delegation.Migrations()},
 		migrate.Module{Name: "coupon", Dir: coupon.Migrations()},
 		migrate.Module{Name: "crm", Dir: crm.Migrations()},
+		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
 	))
 	queue, err := jobs.NewInsertOnly(d)
 	if err != nil {
@@ -164,7 +195,7 @@ func startMonolith(t *testing.T) *monolith {
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noAccountOrders{}, Now: time.Now, Logger: log})
 	crmModule := crm.New(crm.Deps{DB: d, Jobs: queue, Buyers: buyers, Stores: sellers, NewID: uuid.NewV7, Now: time.Now, Logger: log})
-	couponModule := coupon.New(coupon.Deps{DB: d, Stores: sellerStores{sellers}, Members: noMembers{}, NewID: uuid.NewV7, Now: time.Now})
+	couponModule := coupon.New(coupon.Deps{DB: d, Stores: sellerStores{sellers}, Members: noMembers{}, Buyers: buyerExists{buyers}, StoreDirectory: sellerStores{sellers}, NewID: uuid.NewV7, Now: time.Now})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +213,12 @@ func startMonolith(t *testing.T) *monolith {
 	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &monolith{db: d, identity: id, buyers: buyers, sellers: sellers, coupon: couponModule, crm: crmModule, srv: srv}
+	adminToken, err := dev.AdminToken("dev_admin_coupon")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch.GrantAdminOwner(t, id, adminToken)
+	return &monolith{db: d, identity: id, buyers: buyers, sellers: sellers, coupon: couponModule, crm: crmModule, srv: srv, adminToken: adminToken}
 }
 
 // newCustomer 建立一個 dev session 帳號；withStore 為真時再為它開一家可曝光的店。回傳 token 與身分。
@@ -211,7 +247,7 @@ func (m *monolith) newCustomer(t *testing.T, withStore bool) (string, who) {
 }
 
 // TestMonolith 對單體的 Connect 入口跑同一份情境（D8）。每個情境用自己的一組帳號與店家（買家是 dev session，賣家是 dev session 加一家可曝光的店）；
-// 管理員的準備動作直接呼叫 coupon 模組（還沒有 admin 的 Connect API）。全部情境共用一個資料庫。
+// 管理員的動作經 CouponAdminService（dev 管理員，OWNER）。全部情境共用一個資料庫。
 func TestMonolith(t *testing.T) {
 	m := startMonolith(t)
 	for _, sc := range scenarios {
@@ -220,7 +256,8 @@ func TestMonolith(t *testing.T) {
 		for _, c := range []ch.Caller{ch.Buyer, ch.Buyer2, ch.Seller, ch.Seller2} {
 			tokens[c], ids[c] = m.newCustomer(t, c == ch.Seller || c == ch.Seller2)
 		}
-		d := newConnectDriver(m.srv.Client(), m.srv.URL, tokens, ids, m.coupon, m.crm, m.db)
+		tokens[ch.Admin] = m.adminToken
+		d := newConnectDriver(m.srv.Client(), m.srv.URL, tokens, ids, m.crm, m.db)
 		ch.Run[Driver](t, d, []ch.Scenario[Driver]{sc})
 	}
 }

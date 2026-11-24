@@ -16,6 +16,10 @@
       "message": "買家不正確",
       "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
     },
+    "invalid.buyer_not_found": {
+      "message": "買家不存在",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
     "invalid.buyer_store_issuer_invalid": {
       "message": "買家、店家或發行者不正確",
       "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
@@ -108,8 +112,16 @@
       "message": "這個補償來源已經發給另一位買家",
       "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
     },
+    "invalid.store_closed": {
+      "message": "店家已關閉，不能建立限定這家店的活動",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
     "invalid.store_invalid": {
       "message": "店家不正確",
+      "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
+    },
+    "invalid.store_not_found": {
+      "message": "店家不存在",
       "description": "欄位檢查失敗的使用者面句子（InvalidInput）。"
     },
     "invalid.store_or_target_invalid": {
