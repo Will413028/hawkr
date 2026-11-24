@@ -3139,6 +3139,7 @@ type GrantSellerCompensationCouponRequest struct {
 	MinOrderAmount string                 `protobuf:"bytes,4,opt,name=min_order_amount,json=minOrderAmount,proto3" json:"min_order_amount,omitempty"` // 最低消費門檻
 	Message        string                 `protobuf:"bytes,5,opt,name=message,proto3" json:"message,omitempty"`                                       // 給買家的訊息
 	RefCaseNo      string                 `protobuf:"bytes,6,opt,name=ref_case_no,json=refCaseNo,proto3" json:"ref_case_no,omitempty"`                // 關聯售後單號（稽核用）
+	SourceId       string                 `protobuf:"bytes,7,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`                     // 必填：售後單 id，與來源型別 AFTERSALES_CASE 組成補償券的冪等鍵，重送同一個 id 只發一張
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -3211,6 +3212,13 @@ func (x *GrantSellerCompensationCouponRequest) GetMessage() string {
 func (x *GrantSellerCompensationCouponRequest) GetRefCaseNo() string {
 	if x != nil {
 		return x.RefCaseNo
+	}
+	return ""
+}
+
+func (x *GrantSellerCompensationCouponRequest) GetSourceId() string {
+	if x != nil {
+		return x.SourceId
 	}
 	return ""
 }
@@ -3880,14 +3888,15 @@ const file_coupon_coupon_proto_rawDesc = "" +
 	"\x12max_template_count\x18\x03 \x01(\tR\x10maxTemplateCount\"N\n" +
 	"\x1eAdminUpdateSellerQuotaResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xd8\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xf5\x01\n" +
 	"$GrantSellerCompensationCouponRequest\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x19\n" +
 	"\bbuyer_id\x18\x02 \x01(\tR\abuyerId\x12\x16\n" +
 	"\x06amount\x18\x03 \x01(\tR\x06amount\x12(\n" +
 	"\x10min_order_amount\x18\x04 \x01(\tR\x0eminOrderAmount\x12\x18\n" +
 	"\amessage\x18\x05 \x01(\tR\amessage\x12\x1e\n" +
-	"\vref_case_no\x18\x06 \x01(\tR\trefCaseNo\"\x95\x01\n" +
+	"\vref_case_no\x18\x06 \x01(\tR\trefCaseNo\x12\x1b\n" +
+	"\tsource_id\x18\a \x01(\tR\bsourceId\"\x95\x01\n" +
 	"%GrantSellerCompensationCouponResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12>\n" +

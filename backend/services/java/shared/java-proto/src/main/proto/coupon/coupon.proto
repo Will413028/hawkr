@@ -435,6 +435,7 @@ message GrantSellerCompensationCouponRequest {
     string min_order_amount = 4;                // 最低消費門檻
     string message = 5;                         // 給買家的訊息
     string ref_case_no = 6;                     // 關聯售後單號（稽核用）
+    string source_id = 7;                       // 必填：售後單 id，與來源型別 AFTERSALES_CASE 組成補償券的冪等鍵，重送同一個 id 只發一張
 }
 
 message GrantSellerCompensationCouponResponse {

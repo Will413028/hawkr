@@ -29,12 +29,21 @@ public class CouponGrpcClient {
         this.grpcStubFactory = grpcStubFactory;
     }
 
+    /**
+     * @param sourceId 售後單 id（{@code after_sale_cases.id}）：coupon 端以 (AFTERSALES_CASE, sourceId) 去重，
+     *                 重送同一張售後單只發一張券
+     */
     public GrantSellerCompensationCouponResponse grantSellerCompensationCoupon(String storeId,
                                                                                String buyerId,
                                                                                String amount,
                                                                                String minOrderAmount,
                                                                                String message,
-                                                                               String refCaseNo) {
+                                                                               String refCaseNo,
+                                                                               String sourceId) {
+        if (sourceId == null || sourceId.isBlank()) {
+            // source_id 是補償券的冪等鍵（D4）：空值不能送出去，否則重送會重複發券。
+            throw new IllegalArgumentException("source_id（售後單 id）必填");
+        }
         log.info("CouponGrpcClient.grantSellerCompensationCoupon.start", "發放補償優惠券", "caseNo", refCaseNo);
         var stub = grpcStubFactory.blocking("coupon", CouponServiceGrpc::newBlockingStub)
                 .withDeadlineAfter(INTERNAL_DEADLINE_SEC, TimeUnit.SECONDS);
@@ -46,6 +55,7 @@ public class CouponGrpcClient {
                 .setMinOrderAmount(minOrderAmount)
                 .setMessage(message)
                 .setRefCaseNo(refCaseNo)
+                .setSourceId(sourceId)
                 .build()
         );
         log.info("CouponGrpcClient.grantSellerCompensationCoupon.done", "發放補償優惠券完成, code=" + resp.getCode(), "caseNo", refCaseNo);
