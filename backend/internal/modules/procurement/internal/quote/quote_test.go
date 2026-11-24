@@ -180,15 +180,29 @@ func TestPayloadHashIsTheRecomputedContentHash(t *testing.T) {
 	}
 }
 
+func TestPageTokenIsBoundToItsList(t *testing.T) {
+	id := uuid.NewV7()
+	at := time.Date(2026, 11, 23, 3, 0, 0, 0, time.UTC)
+	if _, ok := DecodeToken(TokenSellerPublications, EncodeToken(TokenSellerResponses, at, id)); ok {
+		t.Error("買家列表的 token 不能給賣家列表用")
+	}
+	if _, ok := DecodeToken(TokenSellerResponses, EncodeToken(TokenSellerPublications, at, id)); ok {
+		t.Error("賣家列表的 token 不能給買家列表用")
+	}
+	if _, ok := DecodeToken(TokenSellerPublications, EncodeToken(TokenSellerPublications, at, id)); !ok {
+		t.Error("自己發的 token 要收")
+	}
+}
+
 func TestPageTokenRoundTripsAndRejectsGarbage(t *testing.T) {
 	id := uuid.NewV7()
 	at := time.Date(2026, 11, 23, 3, 0, 0, 123456000, time.UTC)
-	got, ok := decodeToken(encodeToken(at, id))
+	got, ok := DecodeToken(TokenSellerResponses, EncodeToken(TokenSellerResponses, at, id))
 	if !ok || got.ID != id || time.UnixMicro(got.CreatedAt).UTC() != at {
 		t.Fatalf("%+v %v", got, ok)
 	}
-	for _, raw := range []string{"x", "!!!", "e30", "eyJpIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwicyI6MX0", encodeToken(time.Date(-5000, 1, 1, 0, 0, 0, 0, time.UTC), id)} {
-		if _, ok := decodeToken(raw); ok {
+	for _, raw := range []string{"x", "!!!", "e30", "eyJpIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwicyI6MX0", EncodeToken(TokenSellerResponses, time.Date(-5000, 1, 1, 0, 0, 0, 0, time.UTC), id), EncodeToken(TokenSellerPublications, at, id)} {
+		if _, ok := DecodeToken(TokenSellerResponses, raw); ok {
 			t.Errorf("%q 不是有效的 token", raw)
 		}
 	}

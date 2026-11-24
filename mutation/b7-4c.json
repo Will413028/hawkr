@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "expiry-reminder-row-not-written",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/expiry/expiry.go",
+   "old": "if err := q.InsertExpiryReminder(ctx, store.InsertExpiryReminderParams{VoucherID: v.ID, RemindedAt: now}); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/coupon ^TestExpiryReminderEmitsOncePerVoucherWhenItEntersTheWindow$",
+   "why": "不寫提醒紀錄：重跑會重發同一張券的 VoucherExpiring，重跑測試要紅。"
+  },
+  {
+   "id": "expiry-status-filter-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/expiry.sql.go",
+   "old": "WHERE v.status = 'AVAILABLE'",
+   "new": "WHERE v.status IS NOT NULL",
+   "test": "internal/modules/coupon ^TestExpiryReminderSkipsLockedAndVoidedVouchers$",
+   "why": "掃描不看狀態：LOCKED 與 VOIDED 的券也被提醒，作廢與鎖定券測試要紅（改的是生成檔內的 SQL 字串，與 expiry.sql 同文）。"
+  },
+  {
+   "id": "expiry-claimed-early-condition-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/expiry.sql.go",
+   "old": "AND v.created_at <= c.end_at - make_interval(secs => $2::float8)",
+   "new": "AND v.created_at IS NOT NULL",
+   "test": "internal/modules/coupon ^TestExpiryReminderCoversLateClaimsWithEnoughLeadButNotShortWindowClaims$",
+   "why": "拿掉「領券時距到期不少於提前量」：領到時只剩 12 小時的券也被提醒，晚領短窗測試要紅（改的是生成檔內的 SQL 字串）。"
+  },
+  {
+   "id": "expiry-stops-after-first-batch",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/expiry/expiry.go",
+   "old": "if len(ids) < int(s.d.BatchSize) {",
+   "new": "if len(ids) < int(s.d.BatchSize) || true {",
+   "test": "internal/modules/coupon ^TestExpiryReminderProcessesEveryBatch$",
+   "why": "滿批後不再取下一批：批次大小 2 的五張券只提醒第一批，多批測試要紅。"
+  }
+ ]
+}

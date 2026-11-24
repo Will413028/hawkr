@@ -25,28 +25,35 @@ type ListInput struct {
 	PageToken                string
 }
 
-// token 是 next_page_token 的內容：上一頁最後一列的 (回價 created_at, 回價 ID)，base64url 的 JSON，對 client 不透明。
-type token struct {
+// 分頁 token 的列表種類。
+const (
+	TokenSellerResponses    = "seller_responses"
+	TokenSellerPublications = "seller_publications"
+)
+
+// Token 是 next_page_token 的內容：列表種類與上一頁最後一列的 (排序時間, ID)，base64url 的 JSON，對 client 不透明。
+type Token struct {
+	Kind      string    `json:"k"` // 發出這個 token 的列表；別的列表的 token 不收
 	CreatedAt int64     `json:"c"` // Unix 微秒（與 timestamptz 同精度）
 	ID        uuid.UUID `json:"i"`
 }
 
-func encodeToken(t time.Time, id uuid.UUID) string {
-	b, _ := json.Marshal(token{CreatedAt: t.UnixMicro(), ID: id})
+func EncodeToken(kind string, t time.Time, id uuid.UUID) string {
+	b, _ := json.Marshal(Token{Kind: kind, CreatedAt: t.UnixMicro(), ID: id})
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
 // minTokenMicro 是 Postgres timestamptz 的下界（4713 BC）；範圍外的值送進查詢會變成 INTERNAL。上界不用檢查：int64 微秒最多到 294247 AD，在 timestamptz 的上界之內。
 var minTokenMicro = time.Date(-4712, 1, 2, 0, 0, 0, 0, time.UTC).UnixMicro()
 
-func decodeToken(raw string) (token, bool) {
+func DecodeToken(kind, raw string) (Token, bool) {
 	b, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
-		return token{}, false
+		return Token{}, false
 	}
-	var t token
-	if err := json.Unmarshal(b, &t); err != nil || t.ID == (uuid.UUID{}) || t.CreatedAt < minTokenMicro {
-		return token{}, false
+	var t Token
+	if err := json.Unmarshal(b, &t); err != nil || t.Kind != kind || t.ID == (uuid.UUID{}) || t.CreatedAt < minTokenMicro {
+		return Token{}, false
 	}
 	return t, true
 }
@@ -66,7 +73,7 @@ func (s Service) List(ctx context.Context, in ListInput) (model.SellerResponsePa
 	}
 	params := store.ListCurrentSellerResponsesParams{RequestID: in.RequestID, PublicationID: in.PublicationID, BuyerID: &in.BuyerID, PageSize: pageSize + 1}
 	if in.PageToken != "" {
-		t, ok := decodeToken(in.PageToken)
+		t, ok := DecodeToken(TokenSellerResponses, in.PageToken)
 		if !ok {
 			return model.SellerResponsePage{}, apperr.InvalidInputOn([]string{"page_token"}, "page_token 不是有效的分頁 token")
 		}
@@ -129,7 +136,7 @@ func (s Service) List(ctx context.Context, in ListInput) (model.SellerResponsePa
 		}
 		if more {
 			last := rows[len(rows)-1]
-			out.NextPageToken = encodeToken(last.ProcurementSellerResponse.CreatedAt, last.ProcurementSellerResponse.ID)
+			out.NextPageToken = EncodeToken(TokenSellerResponses, last.ProcurementSellerResponse.CreatedAt, last.ProcurementSellerResponse.ID)
 		}
 		return nil
 	})

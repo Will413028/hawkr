@@ -73,8 +73,8 @@ func TestDeadlinePassedUsesTheTaipeiCalendarDay(t *testing.T) {
 		{"first second of the next taipei day", day(11, 23), time.Date(2026, 11, 23, 16, 0, 0, 0, time.UTC), true},
 		{"deadline carrying a time of day is compared by its date", time.Date(2026, 11, 23, 18, 0, 0, 0, time.UTC), time.Date(2026, 11, 23, 3, 0, 0, 0, time.UTC), false},
 	} {
-		if got := deadlinePassed(tc.deadline, tc.now); got != tc.want {
-			t.Errorf("%s：deadlinePassed = %v", tc.name, got)
+		if got := DeadlinePassed(tc.deadline, tc.now); got != tc.want {
+			t.Errorf("%s：DeadlinePassed = %v", tc.name, got)
 		}
 	}
 }
