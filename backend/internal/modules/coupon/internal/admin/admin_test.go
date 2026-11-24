@@ -78,7 +78,8 @@ func TestIssueBoundsTheRawListAndDeduplicatesBeforeTheBatchLimit(t *testing.T) {
 	b := &fakeBuyers{stop: true}
 	s := newService(b, &fakeDirectory{})
 
-	_, err := s.Issue(context.Background(), actor, voucher.IssueInput{BuyerIDs: ids(model.MaxIssueRequestBuyers + 1)})
+	// 全是同一個買家：去重後只剩 1 位，只有原始長度上限能擋下它。
+	_, err := s.Issue(context.Background(), actor, voucher.IssueInput{BuyerIDs: slices.Repeat([]int64{1}, model.MaxIssueRequestBuyers+1)})
 	if apperr.KindOf(err) != apperr.KindInvalidInput || len(b.calls) != 0 {
 		t.Fatalf("原始長度超過上限：err=%v 查詢=%d 次", err, len(b.calls))
 	}
@@ -118,8 +119,12 @@ func TestCreateCampaignChecksTheTargetListAndTheStoreBeforeWriting(t *testing.T)
 	if !slices.Equal(fields(t, err), []string{"TargetBuyers[2]"}) {
 		t.Fatalf("名單：err=%v 欄位=%v", err, fields(t, err))
 	}
-	for name, store := range map[string]int64{"不存在": 99, "已關閉": 12} {
-		_, err = s.CreateCampaign(context.Background(), actor, campaign.CreateInput{CampaignSpec: spec, TargetType: model.TargetAll, StoreID: store})
+	for _, c := range []struct {
+		name  string
+		store int64
+	}{{"不存在", 99}, {"已關閉", 12}} {
+		name := c.name
+		_, err = s.CreateCampaign(context.Background(), actor, campaign.CreateInput{CampaignSpec: spec, TargetType: model.TargetAll, StoreID: c.store})
 		if apperr.KindOf(err) != apperr.KindInvalidInput || !slices.Equal(fields(t, err), []string{"StoreID"}) {
 			t.Fatalf("店家%s：err=%v 欄位=%v，預期 invalid_input 指出 StoreID", name, err, fields(t, err))
 		}

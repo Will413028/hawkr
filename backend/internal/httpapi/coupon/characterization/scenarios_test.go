@@ -409,7 +409,7 @@ var scenarios = []ch.Scenario[Driver]{
 			return
 		}
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetDesignated))
-		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, false)))
+		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)))
 		if res.Issued != 1 || res.Distributed != 0 {
 			t.Errorf("issued/distributed = %d/%d，預期 1/0", res.Issued, res.Distributed)
 		}
@@ -430,7 +430,7 @@ var scenarios = []ch.Scenario[Driver]{
 			return
 		}
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetDesignated))
-		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, true)))
+		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, true)))
 		if res.Issued != 1 || res.Distributed != 1 {
 			t.Errorf("issued/distributed = %d/%d，預期 1/1", res.Issued, res.Distributed)
 		}
@@ -447,8 +447,8 @@ var scenarios = []ch.Scenario[Driver]{
 			return
 		}
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetDesignated))
-		first := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, false)))
-		again := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, false)))
+		first := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)))
+		again := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)))
 		if first.Issued != 1 || again.Issued != 0 {
 			t.Errorf("第一次 %d、重複 %d，預期 1、0", first.Issued, again.Issued)
 		}
@@ -458,7 +458,7 @@ var scenarios = []ch.Scenario[Driver]{
 			return
 		}
 		draft := ch.Must(t, ch.Ret(d.AdminCreate(ctx, ch.Admin, cashInput("coupon-"+ch.Nonce(), TargetDesignated))))
-		_, err := d.AdminIssue(ctx, ch.Admin, draft.ID, []string{AccountBuyer2}, false)
+		_, err := d.AdminIssue(ctx, ch.Admin, draft.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)
 		// 舊的只回「狀態不允許」；單體帶 COUPON_CAMPAIGN_NOT_ACTIVE。
 		want := ErrWrongStatus
 		if !d.Legacy() {

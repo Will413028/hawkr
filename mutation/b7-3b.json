@@ -208,15 +208,6 @@
    "why": "後台結束不再擋補償活動：能結束系統建立的補償活動並作廢買家的券，測試要紅。"
   },
   {
-   "id": "issue-limit-before-dedup",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
-   "old": "len(buyers) == 0 || len(buyers) > model.MaxIssueBatch",
-   "new": "len(in.BuyerIDs) == 0 || len(in.BuyerIDs) > model.MaxIssueBatch",
-   "test": "internal/modules/coupon ^TestAdminIssueDeduplicatesBeforeTheBatchLimit$",
-   "why": "上限在去重前檢查：500 個不重複加 1 個重複被拒，測試要紅。"
-  },
-  {
    "id": "end-audit-uses-raw-reason",
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/admin/admin.go",
@@ -248,7 +239,7 @@
    "stack": "go",
    "file": "backend/internal/modules/coupon/internal/admin/admin.go",
    "old": "\tif err := s.requireBuyers(ctx, \"BuyerIDs\", buyers, index); err != nil {\n\t\treturn voucher.IssueResult{}, err\n\t}\n",
-   "new": "",
+   "new": "\t_ = index\n",
    "test": "internal/modules/coupon/internal/admin ^TestIssueRejectsAnUnknownBuyerAtTheFirstRequestIndex$",
    "why": "發放不檢查買家是否存在：不存在的買家被發券，測試要紅。"
   },

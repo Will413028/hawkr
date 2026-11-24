@@ -153,7 +153,7 @@ func TestAdminListCampaignsFiltersAndPages(t *testing.T) {
 	shopB := f.sellerCampaign(storeA + 1)
 	f.advance(time.Second)
 	draft := f.adminDraft()
-	if _, err := f.m.AdminEndCampaign(ctx, actor("end"), coupon.EndCampaignInput{CampaignID: shopB.ID}); err != nil {
+	if _, err := f.m.EndCampaign(ctx, coupon.EndCampaignInput{CampaignID: shopB.ID, StoreID: storeA + 1}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.IssueCompensation(ctx, coupon.CompensationInput{
