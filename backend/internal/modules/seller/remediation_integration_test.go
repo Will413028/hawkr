@@ -347,7 +347,7 @@ func TestAcceptingARemediationEndsTheMeasureWithoutRevokingIt(t *testing.T) {
 	if f.isSuspended(t, s.StoreID) || len(unsuspended.all()) != 1 {
 		t.Fatalf("效果解除：suspended=%v events=%+v", f.isSuspended(t, s.StoreID), unsuspended.all())
 	}
-	if got := ended.all(); len(got) != 1 || got[0].MeasureID != m.ID || got[0].AccountID != accountID {
+	if got := ended.all(); len(got) != 1 || got[0].MeasureID != m.ID || got[0].AccountID != accountID || got[0].RequestID != r.ID {
 		t.Fatalf("ended=%+v", got)
 	}
 	if got := decided.all(); len(got) != 1 || got[0].Kind != RequestKindRemediation || got[0].Outcome != RequestAccepted || got[0].RequestID != r.ID {
