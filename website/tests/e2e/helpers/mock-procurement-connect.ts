@@ -182,3 +182,41 @@ export function turnResultJson(
 		...extra,
 	};
 }
+
+// ---- RFQ／發布流程 e2e 用的補充 helper（mock-procurement-rfq.ts 與相關 spec 使用）----
+
+/** 一元方法的處理器回傳它，代表這個請求要在網路層中斷（沒有回應）。 */
+export const ABORT_REQUEST = Symbol("abort-request");
+
+/**
+ * 同 `mockProcurementUnary`，另外允許處理器回傳 `ABORT_REQUEST` 讓請求在網路層失敗。
+ * 後註冊的 route 優先，所以 spec 可以在 helper 的預設之後再覆寫某個方法。
+ */
+export async function mockProcurementUnaryAbortable(
+	page: Page,
+	method: string,
+	handler: (request: Record<string, unknown>) => unknown | typeof ABORT_REQUEST,
+): Promise<void> {
+	await page.route(procurementMethod(method), (route) => {
+		try {
+			const out = handler(connectRequestMessage(route));
+			if (out === ABORT_REQUEST) {
+				void route.abort("failed");
+				return;
+			}
+			void fulfillConnect(route, out);
+		} catch (error) {
+			if (!(error instanceof ConnectFailure)) throw error;
+			void fulfillConnectError(
+				route,
+				error.code,
+				error.message,
+				undefined,
+				[
+					...(error.reason ? [errorInfoDetail(error.reason)] : []),
+					localizedMessageDetail(error.message),
+				],
+			);
+		}
+	});
+}

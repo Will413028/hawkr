@@ -1,18 +1,149 @@
-import { expect, type Request, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
-import { mockProcurementUnary } from "./helpers/mock-procurement-connect";
+import {
+	ConnectFailure,
+	mockProcurementUnary,
+	mockWatchRun,
+	turnResultJson,
+	watchFrame,
+} from "./helpers/mock-procurement-connect";
 import { gotoStreamed } from "./helpers/streamed-navigation";
 
 const PATH = "/account/messages/assistant/demo";
 const PROCUREMENT_PATH = "/account/messages/assistant/procurement";
 const HANDOFF_STORAGE_KEY = "hawkr:hawkr-agent:search-handoff:v1";
-/** doc 55 §8.1 哨兵：後端過渡期仍會送 reasoning，這串字任何一層命中
- * （DOM/a11y tree）都是上線阻斷。 */
+/** doc 55 §8.1 哨兵：raw chain-of-thought 任何一層命中（DOM/a11y tree）都是上線阻斷。
+ * Connect 契約的 `TurnResult` 已沒有 reasoning 欄位，所以 mock 不再送它；斷言保留，
+ * 守的是「client 不會自己把這類文字畫出來」。 */
 const REASONING_SENTINEL =
 	"SENTINEL-RAW-COT-品項已知，城市未知且為必填，優先詢問。";
+
+const REQUEST_ID = "1234567890123456788";
+const CONVERSATION_ID = "9876543210987654321";
+
+const SLOT = {
+	item: "SLOT_KEY_ITEM",
+	quantity: "SLOT_KEY_QUANTITY",
+	unit: "SLOT_KEY_UNIT",
+	packaging: "SLOT_KEY_PACKAGING",
+	city: "SLOT_KEY_DELIVERY_CITY",
+} as const;
+
+type Wire = Record<string, unknown>;
+
+/** 第 n 次命令（送出一輪或答題）之後的需求版本。 */
+function revisionOf(n: number): string {
+	return `123456789012345679${n}`;
+}
+
+/** 與前面所有 Messages 外殼請求無關的 REST 預設回應、買家身分與 session。 */
+async function setupShell(page: Page, appBaseURL: string) {
+	await page.route("**/api/v1/**", (route) =>
+		route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({ code: 0, data: {} }),
+		}),
+	);
+	await seedStoredActiveRole(page, "buyer");
+	await setupGatewayMocks(page, {
+		identity: { accountId: "300", roles: ["buyer"] },
+		session: "identity",
+	});
+	await page
+		.context()
+		.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
+}
+
+interface ClarifyFlow {
+	/** SubmitTurn 收到的請求訊息。 */
+	submitTurnRequests: Wire[];
+	/** SubmitAnswer 收到的請求訊息。 */
+	answerRequests: Wire[];
+}
+
+/**
+ * 釐清對話的 Connect 流程：`SubmitTurn` 受理後由 `WatchRun` 送出 `turn_result`，`SubmitAnswer` 直接回
+ * `TurnResult`，`GetSnapshot` 回最近一次結果的需求狀態（必填都齊備才是 REQUIREMENT_READY）。
+ * `turn(n)`／`answer(n, request)` 回 `TurnResult` 的欄位（ID 與版本由這裡補）；n 是命令的序號（送出與答題共用）。
+ */
+async function mockClarifyFlow(
+	page: Page,
+	handlers: {
+		turn?: (n: number, request: Wire) => Wire;
+		answer?: (n: number, request: Wire) => Wire;
+	},
+): Promise<ClarifyFlow> {
+	const flow: ClarifyFlow = { submitTurnRequests: [], answerRequests: [] };
+	let commands = 0;
+	const results = new Map<string, Wire>();
+	let latest: Wire = turnResultJson({
+		requestId: REQUEST_ID,
+		conversationId: CONVERSATION_ID,
+		revisionId: revisionOf(1),
+	});
+	const build = (n: number, extra: Wire): Wire => {
+		const result = turnResultJson(
+			{
+				requestId: REQUEST_ID,
+				conversationId: CONVERSATION_ID,
+				revisionId: revisionOf(n),
+			},
+			extra,
+		);
+		latest = result;
+		return result;
+	};
+
+	if (handlers.turn) {
+		const turn = handlers.turn;
+		await mockProcurementUnary(page, "SubmitTurn", (request) => {
+			commands += 1;
+			flow.submitTurnRequests.push(request);
+			const runId = `run-${commands}`;
+			results.set(runId, build(commands, turn(commands, request)));
+			return { requestId: REQUEST_ID, conversationId: CONVERSATION_ID, runId };
+		});
+		await mockWatchRun(page, ({ runId }) => [
+			watchFrame.accepted(`${runId}-1`, runId, CONVERSATION_ID),
+			watchFrame.turnResult(`${runId}-2`, results.get(runId) ?? {}),
+			watchFrame.finished(`${runId}-3`),
+		]);
+	}
+	const answer = handlers.answer;
+	await mockProcurementUnary(page, "SubmitAnswer", (request) => {
+		commands += 1;
+		flow.answerRequests.push(request);
+		if (!answer) {
+			throw new ConnectFailure("invalid_argument", "答題端點沒有預期被呼叫");
+		}
+		if (!request.expectedRevisionId || !request.clientRequestId) {
+			throw new ConnectFailure("invalid_argument", "bad request");
+		}
+		return { result: build(commands, answer(commands, request)) };
+	});
+	await mockProcurementUnary(page, "GetSnapshot", () => {
+		const missing = (latest.missingRequired as unknown[] | undefined) ?? [];
+		return {
+			requestId: REQUEST_ID,
+			revisionId: latest.revisionId,
+			status:
+				missing.length === 0
+					? "REQUEST_STATUS_REQUIREMENT_READY"
+					: "REQUEST_STATUS_CLARIFYING",
+			slots: latest.slots ?? {},
+			missingRequired: missing,
+			runs: [],
+			activeRunId: "",
+		};
+	});
+	return flow;
+}
+
+const HANDOFF_ITEM_ONLY = { slots: { item: "水果禮盒" } } as const;
 
 test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 	tag: ["@ui"],
@@ -28,170 +159,60 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		isMobile,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		let turnCount = 0;
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		// Lowest-priority response for unrelated Messages shell requests.
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
-		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) => {
-			turnCount += 1;
-			const ready = turnCount >= 2;
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					// B-244 契約：conversationId/steps/recordedThisTurn/question 為
-					// 新欄位；reasoning 是過渡期後端仍會送的舊欄位，前端必須
-					// 完全不渲染（哨兵斷言在下面）。
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: `123456789012345679${turnCount}`,
-						conversationId: "9876543210987654321",
-						slots: ready
-							? { item: "水果禮盒", delivery_city: "桃園市" }
-							: { item: "水果禮盒" },
-						missingRequired: ready ? [] : ["delivery_city"],
-						rejected: [],
-						degraded: false,
-						reply: ready
-							? "好的，那我先幫您找桃園能送水果禮盒的賣家，馬上開始搜尋！"
-							: "好的，記下水果禮盒了。方便告訴我要送到哪個城市嗎？",
-						reasoning: REASONING_SENTINEL,
-						steps: [
-							{
-								code: "UNDERSTAND_INPUT",
-								status: "SUCCEEDED",
-								label: "正在理解你的需求",
-								durationMs: 120,
-							},
-							{
-								code: "EXTRACT_SLOTS",
-								status: "SUCCEEDED",
-								label: "正在整理採購條件",
-								durationMs: 800,
-							},
-						],
-						recordedThisTurn: ready
-							? [{ key: "delivery_city", label: "配送城市", value: "桃園市" }]
-							: [{ key: "item", label: "品項", value: "水果禮盒" }],
-						question: ready
-							? null
-							: {
-									slotKey: "delivery_city",
-									prompt: "要送到哪個城市呢？",
-									options: [
-										{
-											optionId: "city-taoyuan",
-											label: "桃園市",
-											value: "桃園市",
-										},
-										{
-											optionId: "city-taipei",
-											label: "台北市",
-											value: "台北市",
-										},
-									],
-									allowFreeText: true,
-									source: "FIXED",
-								},
+		await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒" },
+				missingRequired: [SLOT.city],
+				reply: "好的，記下水果禮盒了。方便告訴我要送到哪個城市嗎？",
+				steps: [
+					{
+						code: "UNDERSTAND_INPUT",
+						status: "STEP_STATUS_SUCCEEDED",
+						label: "正在理解你的需求",
+						durationMs: "120",
 					},
-				}),
-			});
+					{
+						code: "EXTRACT_SLOTS",
+						status: "STEP_STATUS_SUCCEEDED",
+						label: "正在整理採購條件",
+						durationMs: "800",
+					},
+				],
+				recordedThisTurn: [{ key: SLOT.item, label: "品項", value: "水果禮盒" }],
+				question: {
+					slotKey: SLOT.city,
+					prompt: "要送到哪個城市呢？",
+					options: [
+						{ optionId: "city-taoyuan", label: "桃園市" },
+						{ optionId: "city-taipei", label: "台北市" },
+					],
+					allowFreeText: true,
+				},
+			}),
+			answer: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "好的，那我先幫您找桃園能送水果禮盒的賣家，馬上開始搜尋！",
+				steps: [
+					{
+						code: "VALIDATE_SLOTS",
+						status: "STEP_STATUS_SUCCEEDED",
+						label: "正在檢查條件",
+						durationMs: "40",
+					},
+					{
+						code: "REQUIREMENT_READY",
+						status: "STEP_STATUS_SUCCEEDED",
+						label: "必填條件已齊備",
+						durationMs: "10",
+					},
+				],
+				recordedThisTurn: [
+					{ key: SLOT.city, label: "配送城市", value: "桃園市" },
+				],
+			}),
 		});
-
-		// B-244 Ask 3：問題卡答題端點——回應與 turns 完全同構。
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) => {
-				turnCount += 1;
-				const body = route.request().postDataJSON() as Record<string, unknown>;
-				if (!body.expectedRevisionId || !body.clientRequestId) {
-					return route.fulfill({
-						status: 400,
-						contentType: "application/json",
-						body: JSON.stringify({ code: 400, message: "bad request" }),
-					});
-				}
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: `123456789012345679${turnCount}`,
-							conversationId: "9876543210987654321",
-							slots: { item: "水果禮盒", delivery_city: "桃園市" },
-							missingRequired: [],
-							rejected: [],
-							degraded: false,
-							reply: "好的，那我先幫您找桃園能送水果禮盒的賣家，馬上開始搜尋！",
-							reasoning: REASONING_SENTINEL,
-							steps: [
-								{
-									code: "VALIDATE_SLOTS",
-									status: "SUCCEEDED",
-									label: "正在檢查條件",
-									durationMs: 40,
-								},
-								{
-									code: "REQUIREMENT_READY",
-									status: "SUCCEEDED",
-									label: "必填條件已齊備",
-									durationMs: 10,
-								},
-							],
-							recordedThisTurn: [
-								{ key: "delivery_city", label: "配送城市", value: "桃園市" },
-							],
-							question: null,
-						},
-					}),
-				});
-			},
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) => {
-				const ready = turnCount >= 2;
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: `123456789012345679${turnCount}`,
-							status: ready ? "REQUIREMENT_READY" : "CLARIFYING",
-							slots: ready
-								? { item: "水果禮盒", delivery_city: "桃園市" }
-								: { item: "水果禮盒" },
-							missingRequired: ready ? [] : ["delivery_city"],
-						},
-					}),
-				});
-			},
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -280,7 +301,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			questionCard.getByRole("button", { name: "跳過" }),
 		).toHaveCount(0);
 		// 「其他」在原問題卡內展開對應 freeText 欄位，不把使用者丟到底部
-		// composer，回答仍會走同一支 /answers contract。
+		// composer，回答仍會走同一支 SubmitAnswer。
 		await questionCard.getByRole("button", { name: "其他…" }).click();
 		const customCity = questionCard.getByRole("textbox", {
 			name: "要送到哪個城市呢？的答案",
@@ -292,7 +313,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(page.getByText("需求快照")).toHaveCount(0);
 		await expect(page.locator(".assistant-snapshot")).toHaveCount(0);
 
-		// Turn 2 — 點選項答題（走 answers 端點；mock 在下方登記）。
+		// Turn 2 — 點選項答題（走 SubmitAnswer；mock 在上方登記）。
 		await questionCard.getByRole("button", { name: "桃園市" }).click();
 		await expect(
 			page.getByText(
@@ -346,127 +367,41 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		const answerRequests: Request[] = [];
-
-		// Lowest-priority response for unrelated Messages shell requests.
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
-		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
 		// B-244 Ask 3/5 設計核心：REQUIREMENT_READY 之後 question 仍可非
 		// null——pickNextSlot 可以繼續問選填欄位，同時「開始搜尋候選」CTA
-		// 也已可見，兩者不再互斥。
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply:
-							"好的，那我先幫您找桃園能送水果禮盒的賣家！方便說一下大概數量嗎？",
-						reasoning: REASONING_SENTINEL,
-						steps: [
-							{
-								code: "REQUIREMENT_READY",
-								status: "SUCCEEDED",
-								label: "必填條件已齊備",
-								durationMs: 10,
-							},
-						],
-						recordedThisTurn: [
-							{ key: "delivery_city", label: "配送城市", value: "桃園市" },
-						],
-						question: {
-							slotKey: "quantity",
-							prompt: "大概需要多少數量？",
-							options: [],
-							allowFreeText: true,
-							source: "FIXED",
-						},
+		// 也已可見，兩者不再互斥。stage 的權威來源是 GetSnapshot（必填都齊備 →
+		// REQUIREMENT_READY），讓這個 case 真的驗證到「stage===ready 時 question 與 CTA 並存」。
+		const flow = await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply:
+					"好的，那我先幫您找桃園能送水果禮盒的賣家！方便說一下大概數量嗎？",
+				steps: [
+					{
+						code: "REQUIREMENT_READY",
+						status: "STEP_STATUS_SUCCEEDED",
+						label: "必填條件已齊備",
+						durationMs: "10",
 					},
-				}),
+				],
+				recordedThisTurn: [
+					{ key: SLOT.city, label: "配送城市", value: "桃園市" },
+				],
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "大概需要多少數量？",
+					options: [],
+					allowFreeText: true,
+				},
 			}),
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) => {
-				answerRequests.push(route.request());
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456792",
-							conversationId: "9876543210987654321",
-							slots: {
-								item: "水果禮盒",
-								delivery_city: "桃園市",
-								quantity: 30,
-							},
-							missingRequired: [],
-							rejected: [],
-							degraded: false,
-							reply: "收到，數量先記為 30。",
-							recordedThisTurn: [
-								{ key: "quantity", label: "數量", value: "30" },
-							],
-							question: null,
-						},
-					}),
-				});
-			},
-		);
-
-		// stage 的權威來源是 snapshot（不是 turns 回應的 missingRequired——見
-		// useProcurementSession.ts applyTurnResult 的註解），沿用第一個 test
-		// 的模式明確 mock REQUIREMENT_READY，讓這個 case 真的驗證到
-		// 「stage===ready 時 question 與 CTA 並存」，而不是巧合命中
-		// deriveStageFromStatus 對未知 status 的預設 fallthrough。
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456791",
-							status: "REQUIREMENT_READY",
-							slots: { item: "水果禮盒", delivery_city: "桃園市" },
-							missingRequired: [],
-						},
-					}),
-				}),
-		);
+			answer: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市", quantity: 30 },
+				reply: "收到，數量先記為 30。",
+				recordedThisTurn: [{ key: SLOT.quantity, label: "數量", value: "30" }],
+			}),
+		});
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -493,19 +428,19 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await inlineAnswer.fill("30 箱");
 		await questionCard.getByRole("button", { name: "送出答案" }).click();
 		await expect(page.getByText("數量請只輸入數字，例如 50。")).toBeVisible();
-		expect(answerRequests).toHaveLength(0);
+		expect(flow.answerRequests).toHaveLength(0);
 		await inlineAnswer.fill("30");
 		await questionCard.getByRole("button", { name: "送出答案" }).click();
 		await expect(
 			page.getByText("收到，數量先記為 30。", { exact: true }),
 		).toBeVisible();
-		expect(answerRequests).toHaveLength(1);
-		const answerBody = answerRequests[0].postDataJSON();
-		expect(answerBody.slotKey).toBe("quantity");
+		expect(flow.answerRequests).toHaveLength(1);
+		const answerBody = flow.answerRequests[0];
+		expect(answerBody.slotKey).toBe(SLOT.quantity);
 		expect(answerBody.freeText).toBe("30");
-		expect(answerBody.optionId).toBeUndefined();
+		expect(answerBody.optionId).toBeFalsy();
 
-		// 問完了（後端回 question: null）→ 派工卡這時候才出現。
+		// 問完了（後端回 question 不設）→ 派工卡這時候才出現。
 		await expect(page.getByTestId("clarify-question-card")).toHaveCount(0);
 		await expect(
 			page.getByRole("button", { name: "交給 Hawkr Agent 搜尋" }),
@@ -517,111 +452,35 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		const answerRequests: Request[] = [];
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
-		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		// 必填已齊備、question 是選填欄位 quantity（無 options，純自由輸入型——
+		// 必填已齊備、question 是選填欄位 packaging（無 options，純自由輸入型——
 		// 6 個選填欄位裡的多數屬此類，正是「fieldset gate 只認 options.length」
 		// 那個 bug 會讓跳過按鈕整個不出現的情境）。
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply:
-							"好的，那我先幫您找桃園能送水果禮盒的賣家！方便說一下大概數量嗎？",
-						recordedThisTurn: [
-							{ key: "delivery_city", label: "配送城市", value: "桃園市" },
-						],
-						question: {
-							// 用 packaging 而不是 quantity：quantity／delivery_date 是後端的
-							// QuoteRequiredOptionalSlots，canSkip 恆為 false，所以前端本來就
-							// 不該渲染跳過按鈕（另一支測試釘住那件事）。原本這裡用 quantity，
-							// 等於把「按了必定失敗的按鈕」當成正常行為釘住。
-							slotKey: "packaging",
-							prompt: "包裝上有什麼需求嗎？",
-							options: [],
-							allowFreeText: true,
-							canSkip: true,
-							source: "FIXED",
-						},
-					},
-				}),
+		const flow = await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply:
+					"好的，那我先幫您找桃園能送水果禮盒的賣家！方便說一下大概數量嗎？",
+				recordedThisTurn: [
+					{ key: SLOT.city, label: "配送城市", value: "桃園市" },
+				],
+				// 用 packaging 而不是 quantity：quantity／delivery_date 是後端的
+				// QuoteRequiredOptionalSlots，canSkip 恆為 false，所以前端本來就
+				// 不該渲染跳過按鈕（另一支測試釘住那件事）。
+				question: {
+					slotKey: SLOT.packaging,
+					prompt: "包裝上有什麼需求嗎？",
+					options: [],
+					allowFreeText: true,
+					canSkip: true,
+				},
 			}),
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) => {
-				answerRequests.push(route.request());
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456792",
-							conversationId: "9876543210987654321",
-							slots: { item: "水果禮盒", delivery_city: "桃園市" },
-							missingRequired: [],
-							rejected: [],
-							degraded: false,
-							reply: "了解，那我先不記包裝，其他資訊都齊了。",
-							recordedThisTurn: [],
-							question: null,
-						},
-					}),
-				});
-			},
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456791",
-							status: "REQUIREMENT_READY",
-							slots: { item: "水果禮盒", delivery_city: "桃園市" },
-							missingRequired: [],
-						},
-					}),
-				}),
-		);
+			answer: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "了解，那我先不記包裝，其他資訊都齊了。",
+			}),
+		});
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -646,12 +505,12 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			}),
 		).toBeVisible({ timeout: 10_000 });
 
-		expect(answerRequests).toHaveLength(1);
-		const answerBody = answerRequests[0].postDataJSON();
+		expect(flow.answerRequests).toHaveLength(1);
+		const answerBody = flow.answerRequests[0];
 		expect(answerBody.skip).toBe(true);
-		expect(answerBody.slotKey).toBe("packaging");
-		expect(answerBody.optionId).toBeUndefined();
-		expect(answerBody.freeText).toBeUndefined();
+		expect(answerBody.slotKey).toBe(SLOT.packaging);
+		expect(answerBody.optionId).toBeFalsy();
+		expect(answerBody.freeText).toBeFalsy();
 	});
 
 	test("報價單前提欄位（quantity／delivery_date）不得渲染跳過按鈕——後端對它們的 skip 一律 422", async ({
@@ -659,57 +518,22 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		// canSkip 不設（false）——quantity 是後端 QuoteRequiredOptionalSlots，
+		// SubmitAnswer 對它的 skip:true 一律被拒。
+		await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "好的，方便說一下大概數量嗎？",
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "大概需要多少數量？",
+					options: [],
+					allowFreeText: true,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "好的，方便說一下大概數量嗎？",
-						recordedThisTurn: [],
-						// canSkip:false——quantity 是後端 QuoteRequiredOptionalSlots，
-						// /answers 對它的 skip:true 一律回 422 SLOT_NOT_SKIPPABLE。
-						question: {
-							slotKey: "quantity",
-							prompt: "大概需要多少數量？",
-							options: [],
-							allowFreeText: true,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			}),
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -737,115 +561,39 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		const answerRequests: Request[] = [];
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		// quantity 未填時（Unit 也未填）：複合問題卡型態，unitOptions 帶單位選項，
+		// allowFreeText:true（數字欄仍要收）。
+		const flow = await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "好的，方便說一下大概數量嗎？",
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "大概需要多少數量？",
+					options: [],
+					unitOptions: [
+						{ optionId: "unit-basket", label: "籃" },
+						{ optionId: "unit-box", label: "箱" },
+					],
+					allowFreeText: true,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
+			answer: () => ({
+				slots: {
+					item: "水果禮盒",
+					deliveryCity: "桃園市",
+					quantity: 50,
+					unit: "箱",
+				},
+				reply: "收到，50 箱先記下了。",
+				recordedThisTurn: [
+					{ key: SLOT.quantity, label: "數量", value: "50" },
+					{ key: SLOT.unit, label: "單位", value: "箱" },
+				],
+			}),
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		// quantity 未填時（Unit 也未填）：backend-payuni#2442 §4 的複合問題卡
-		// 型態，unitOptions 帶單位選項，allowFreeText:true（數字欄仍要收）。
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "好的，方便說一下大概數量嗎？",
-						recordedThisTurn: [],
-						question: {
-							slotKey: "quantity",
-							prompt: "大概需要多少數量？",
-							options: [],
-							unitOptions: [
-								{ optionId: "unit-basket", label: "籃", value: "BASKET" },
-								{ optionId: "unit-box", label: "箱", value: "BOX" },
-							],
-							allowFreeText: true,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			}),
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) => {
-				answerRequests.push(route.request());
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456792",
-							conversationId: "9876543210987654321",
-							slots: {
-								item: "水果禮盒",
-								delivery_city: "桃園市",
-								quantity: 50,
-								unit: "箱",
-							},
-							missingRequired: [],
-							rejected: [],
-							degraded: false,
-							reply: "收到，50 箱先記下了。",
-							recordedThisTurn: [
-								{ key: "quantity", label: "數量", value: "50" },
-								{ key: "unit", label: "單位", value: "箱" },
-							],
-							question: null,
-						},
-					}),
-				});
-			},
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456791",
-							status: "REQUIREMENT_READY",
-							slots: { item: "水果禮盒", delivery_city: "桃園市" },
-							missingRequired: [],
-						},
-					}),
-				}),
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -884,12 +632,12 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		).toBeVisible();
 		await expect(page.getByText("50 箱", { exact: true })).toBeVisible();
 
-		expect(answerRequests).toHaveLength(1);
-		const answerBody = answerRequests[0].postDataJSON();
-		expect(answerBody.slotKey).toBe("quantity");
+		expect(flow.answerRequests).toHaveLength(1);
+		const answerBody = flow.answerRequests[0];
+		expect(answerBody.slotKey).toBe(SLOT.quantity);
 		expect(answerBody.freeText).toBe("50");
 		expect(answerBody.unitOptionId).toBe("unit-box");
-		expect(answerBody.optionId).toBeUndefined();
+		expect(answerBody.optionId).toBeFalsy();
 
 		await expect(page.getByTestId("clarify-question-card")).toHaveCount(0);
 	});
@@ -899,117 +647,37 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		const answerRequests: Request[] = [];
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		// 買家自由對話讓模型只抓到數字、沒抓到單位：Quantity 已填、Unit 未填，
+		// 回「單位追問」型態（allowFreeText:false，只問單位）。
+		const flow = await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市", quantity: 50 },
+				reply: "50 先記下了，這批貨要用什麼單位計算？",
+				recordedThisTurn: [{ key: SLOT.quantity, label: "數量", value: "50" }],
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "這批貨要用什麼單位計算？",
+					options: [],
+					unitOptions: [
+						{ optionId: "unit-basket", label: "籃" },
+						{ optionId: "unit-box", label: "箱" },
+					],
+					allowFreeText: false,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
+			answer: () => ({
+				slots: {
+					item: "水果禮盒",
+					deliveryCity: "桃園市",
+					quantity: 50,
+					unit: "箱",
+				},
+				reply: "收到，單位記為箱。",
+				recordedThisTurn: [{ key: SLOT.unit, label: "單位", value: "箱" }],
+			}),
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		// 買家自由對話讓 LLM Extract 只抓到數字、沒抓到單位（backend-payuni#2442
-		// §3 邊界情況）：Quantity 已填、Unit 未填，backend 回「單位追問」型態
-		// （allowFreeText:false，只問單位）。
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市", quantity: 50 },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "50 先記下了，這批貨要用什麼單位計算？",
-						recordedThisTurn: [{ key: "quantity", label: "數量", value: "50" }],
-						question: {
-							slotKey: "quantity",
-							prompt: "這批貨要用什麼單位計算？",
-							options: [],
-							unitOptions: [
-								{ optionId: "unit-basket", label: "籃", value: "BASKET" },
-								{ optionId: "unit-box", label: "箱", value: "BOX" },
-							],
-							allowFreeText: false,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			}),
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) => {
-				answerRequests.push(route.request());
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456792",
-							conversationId: "9876543210987654321",
-							slots: {
-								item: "水果禮盒",
-								delivery_city: "桃園市",
-								quantity: 50,
-								unit: "箱",
-							},
-							missingRequired: [],
-							rejected: [],
-							degraded: false,
-							reply: "收到，單位記為箱。",
-							recordedThisTurn: [{ key: "unit", label: "單位", value: "箱" }],
-							question: null,
-						},
-					}),
-				});
-			},
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456791",
-							status: "REQUIREMENT_READY",
-							slots: {
-								item: "水果禮盒",
-								delivery_city: "桃園市",
-								quantity: 50,
-							},
-							missingRequired: [],
-						},
-					}),
-				}),
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -1045,125 +713,49 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			latestRecordedConditions.getByText("箱", { exact: true }),
 		).toBeVisible();
 
-		expect(answerRequests).toHaveLength(1);
-		const answerBody = answerRequests[0].postDataJSON();
-		expect(answerBody.slotKey).toBe("quantity");
+		expect(flow.answerRequests).toHaveLength(1);
+		const answerBody = flow.answerRequests[0];
+		expect(answerBody.slotKey).toBe(SLOT.quantity);
 		expect(answerBody.unitOptionId).toBe("unit-box");
-		expect(answerBody.freeText).toBeUndefined();
-		expect(answerBody.optionId).toBeUndefined();
+		expect(answerBody.freeText).toBeFalsy();
+		expect(answerBody.optionId).toBeFalsy();
 	});
 
-	test("複合問題卡活躍時，底部 composer 打字送出走一般 /turns（不是 /answers）——避免缺單位觸發 422", async ({
+	test("複合問題卡活躍時，底部 composer 打字送出走一般 SubmitTurn（不是 SubmitAnswer）——避免缺單位被拒", async ({
 		page,
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		const answerRequests: Request[] = [];
-		let turnCount = 0;
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
-		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) => {
-			turnCount += 1;
-			const answered = turnCount >= 2;
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: `123456789012345679${turnCount}`,
-						conversationId: "9876543210987654321",
-						slots: answered
-							? {
-									item: "水果禮盒",
-									delivery_city: "桃園市",
-									quantity: 50,
-									unit: "箱",
-								}
-							: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: answered
-							? "收到，50 箱先記下了。"
-							: "好的，方便說一下大概數量嗎？",
-						recordedThisTurn: answered
-							? [
-									{ key: "quantity", label: "數量", value: "50" },
-									{ key: "unit", label: "單位", value: "箱" },
-								]
-							: [],
-						question: answered
-							? null
-							: {
-									slotKey: "quantity",
-									prompt: "大概需要多少數量？",
-									options: [],
-									unitOptions: [
-										{ optionId: "unit-box", label: "箱", value: "BOX" },
-									],
-									allowFreeText: true,
-									canSkip: false,
-									source: "FIXED",
-								},
-					},
-				}),
-			});
-		});
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) => {
-				answerRequests.push(route.request());
-				return route.fulfill({
-					status: 422,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: "SLOT_NOT_SKIPPABLE",
-						message: "unit missing",
-					}),
-				});
-			},
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456791",
-							status: "REQUIREMENT_READY",
-							slots: { item: "水果禮盒", delivery_city: "桃園市" },
-							missingRequired: [],
+		const flow = await mockClarifyFlow(page, {
+			turn: (n) =>
+				n >= 2
+					? {
+							slots: {
+								item: "水果禮盒",
+								deliveryCity: "桃園市",
+								quantity: 50,
+								unit: "箱",
+							},
+							reply: "收到，50 箱先記下了。",
+							recordedThisTurn: [
+								{ key: SLOT.quantity, label: "數量", value: "50" },
+								{ key: SLOT.unit, label: "單位", value: "箱" },
+							],
+						}
+					: {
+							slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+							reply: "好的，方便說一下大概數量嗎？",
+							question: {
+								slotKey: SLOT.quantity,
+								prompt: "大概需要多少數量？",
+								options: [],
+								unitOptions: [{ optionId: "unit-box", label: "箱" }],
+								allowFreeText: true,
+							},
 						},
-					}),
-				}),
-		);
+		});
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -1185,8 +777,8 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(
 			page.getByText("收到，50 箱先記下了。", { exact: true }),
 		).toBeVisible();
-		expect(turnCount).toBe(2);
-		expect(answerRequests).toHaveLength(0);
+		expect(flow.submitTurnRequests).toHaveLength(2);
+		expect(flow.answerRequests).toHaveLength(0);
 	});
 
 	test("複合問題卡／單位追問卡的單位 chips 群組不會長出「其他」按鈕——後端沒有自由輸入單位的路徑", async ({
@@ -1194,58 +786,21 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "好的，方便說一下大概數量嗎？",
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "大概需要多少數量？",
+					options: [],
+					unitOptions: [{ optionId: "unit-box", label: "箱" }],
+					allowFreeText: true,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "好的，方便說一下大概數量嗎？",
-						recordedThisTurn: [],
-						question: {
-							slotKey: "quantity",
-							prompt: "大概需要多少數量？",
-							options: [],
-							unitOptions: [
-								{ optionId: "unit-box", label: "箱", value: "BOX" },
-							],
-							allowFreeText: true,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			}),
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -1269,98 +824,38 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒" },
+				missingRequired: [SLOT.city],
+				reply: "要送到哪個城市呢？",
+				question: {
+					slotKey: SLOT.city,
+					prompt: "要送到哪個城市呢？",
+					options: [{ optionId: "city-taoyuan", label: "桃園市" }],
+					allowFreeText: true,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
+			answer: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市", quantity: 50 },
+				reply: "50 先記下了，這批貨要用什麼單位計算？",
+				recordedThisTurn: [
+					{ key: SLOT.city, label: "配送城市", value: "桃園市" },
+				],
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "這批貨要用什麼單位計算？",
+					options: [],
+					unitOptions: [
+						{ optionId: "unit-box", label: "箱" },
+						{ optionId: "unit-kg", label: "公斤" },
+					],
+					allowFreeText: false,
+				},
+			}),
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) => {
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "要送到哪個城市呢？",
-						recordedThisTurn: [],
-						question: {
-							slotKey: "delivery_city",
-							prompt: "要送到哪個城市呢？",
-							options: [
-								{ optionId: "city-taoyuan", label: "桃園市", value: "桃園市" },
-							],
-							allowFreeText: true,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			});
-		});
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456792",
-							conversationId: "9876543210987654321",
-							slots: {
-								item: "水果禮盒",
-								delivery_city: "桃園市",
-								quantity: 50,
-							},
-							missingRequired: [],
-							rejected: [],
-							degraded: false,
-							reply: "50 先記下了，這批貨要用什麼單位計算？",
-							recordedThisTurn: [
-								{ key: "delivery_city", label: "配送城市", value: "桃園市" },
-							],
-							question: {
-								slotKey: "quantity",
-								prompt: "這批貨要用什麼單位計算？",
-								options: [],
-								unitOptions: [
-									{ optionId: "unit-box", label: "箱", value: "BOX" },
-									{ optionId: "unit-kg", label: "公斤", value: "KG" },
-								],
-								allowFreeText: false,
-								canSkip: false,
-								source: "FIXED",
-							},
-						},
-					}),
-				}),
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -1391,58 +886,21 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "好的，方便說一下大概數量嗎？",
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "大概需要多少數量？",
+					options: [],
+					unitOptions: [{ optionId: "unit-box", label: "箱" }],
+					allowFreeText: true,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "好的，方便說一下大概數量嗎？",
-						recordedThisTurn: [],
-						question: {
-							slotKey: "quantity",
-							prompt: "大概需要多少數量？",
-							options: [],
-							unitOptions: [
-								{ optionId: "unit-box", label: "箱", value: "BOX" },
-							],
-							allowFreeText: true,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			}),
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -1474,95 +932,38 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		const answerRequests: Request[] = [];
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		const flow = await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "好的，方便說一下大概數量嗎？",
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "大概需要多少數量？",
+					options: [],
+					unitOptions: [
+						{ optionId: "unit-box", label: "箱" },
+						{ optionId: "unit-kg", label: "公斤" },
+						{ optionId: "unit-catty", label: "台斤" },
+					],
+					allowFreeText: true,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
-			},
-			session: "identity",
+			answer: () => ({
+				slots: {
+					item: "水果禮盒",
+					deliveryCity: "桃園市",
+					quantity: 50,
+					unit: "台斤",
+				},
+				reply: "收到，50 台斤先記下了。",
+				recordedThisTurn: [
+					{ key: SLOT.quantity, label: "數量", value: "50" },
+					{ key: SLOT.unit, label: "單位", value: "台斤" },
+				],
+			}),
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "好的，方便說一下大概數量嗎？",
-						recordedThisTurn: [],
-						question: {
-							slotKey: "quantity",
-							prompt: "大概需要多少數量？",
-							options: [],
-							unitOptions: [
-								{ optionId: "unit-box", label: "箱", value: "BOX" },
-								{ optionId: "unit-kg", label: "公斤", value: "KG" },
-								{ optionId: "unit-catty", label: "台斤", value: "CATTY" },
-							],
-							allowFreeText: true,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			}),
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) => {
-				answerRequests.push(route.request());
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456792",
-							conversationId: "9876543210987654321",
-							slots: {
-								item: "水果禮盒",
-								delivery_city: "桃園市",
-								quantity: 50,
-								unit: "台斤",
-							},
-							missingRequired: [],
-							rejected: [],
-							degraded: false,
-							reply: "收到，50 台斤先記下了。",
-							recordedThisTurn: [
-								{ key: "quantity", label: "數量", value: "50" },
-								{ key: "unit", label: "單位", value: "台斤" },
-							],
-							question: null,
-						},
-					}),
-				});
-			},
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -1589,82 +990,38 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			page.getByText("收到，50 台斤先記下了。", { exact: true }),
 		).toBeVisible();
 
-		expect(answerRequests).toHaveLength(1);
-		const answerBody = answerRequests[0].postDataJSON();
+		expect(flow.answerRequests).toHaveLength(1);
+		const answerBody = flow.answerRequests[0];
 		expect(answerBody.unitOptionId).toBe("unit-catty");
 		expect(answerBody.freeText).toBe("50");
 	});
 
-	test("複合問題卡送出後端回 422 ANSWER_SCHEMA_INVALID——錯誤顯示在對話尾端，問題卡不會憑空消失", async ({
+	test("複合問題卡送出後端回 INVALID_ARGUMENT——錯誤顯示在對話尾端，問題卡不會憑空消失", async ({
 		page,
 		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
+		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
+				reply: "好的，方便說一下大概數量嗎？",
+				question: {
+					slotKey: SLOT.quantity,
+					prompt: "大概需要多少數量？",
+					options: [],
+					unitOptions: [{ optionId: "unit-box", label: "箱" }],
+					allowFreeText: true,
+				},
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: {
-				accountId: "300",
-				roles: ["buyer"],
+			answer: () => {
+				throw new ConnectFailure(
+					"invalid_argument",
+					"答案不符合這個欄位的格式",
+				);
 			},
-			session: "identity",
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456791",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒", delivery_city: "桃園市" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply: "好的，方便說一下大概數量嗎？",
-						recordedThisTurn: [],
-						question: {
-							slotKey: "quantity",
-							prompt: "大概需要多少數量？",
-							options: [],
-							unitOptions: [
-								{ optionId: "unit-box", label: "箱", value: "BOX" },
-							],
-							allowFreeText: true,
-							canSkip: false,
-							source: "FIXED",
-						},
-					},
-				}),
-			}),
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/answers",
-			(route) =>
-				route.fulfill({
-					status: 422,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 422,
-						message: "ANSWER_SCHEMA_INVALID: 答案不符合這個欄位的格式",
-					}),
-				}),
-		);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -1685,7 +1042,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await questionCard.getByRole("button", { name: "箱" }).click();
 
 		await expect(
-			page.getByText("ANSWER_SCHEMA_INVALID", { exact: false }),
+			page.getByText("答案不符合這個欄位的格式", { exact: false }),
 		).toBeVisible();
 		const questionCardAfterError = page.getByTestId("clarify-question-card");
 		await expect(questionCardAfterError).toBeVisible();
@@ -1706,31 +1063,9 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		isMobile,
 	}) => {
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-		let turnRequests = 0;
-
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: { accountId: "300", roles: ["buyer"] },
-			session: "identity",
-		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) => {
-			turnRequests += 1;
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			});
+		await setupShell(page, baseURL ?? "http://localhost:3000");
+		const flow = await mockClarifyFlow(page, {
+			turn: () => ({ ...HANDOFF_ITEM_ONLY }),
 		});
 
 		await page.addInitScript(
@@ -1760,7 +1095,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		} else {
 			await expect(textarea).toBeFocused();
 		}
-		expect(turnRequests).toBe(0);
+		expect(flow.submitTurnRequests).toHaveLength(0);
 	});
 
 	test("「開新對話」在 procurement 入口對話開始（URL 已被 replaceState 改寫）後真正開出新對話", async ({
@@ -1777,60 +1112,14 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		// 以看不出來，main 會連 mobile 一起跑。
 		test.skip(!!isMobile, "側欄控制項在手機的 thread 視圖不存在");
 		test.setTimeout(30_000);
-		const appBaseURL = baseURL ?? "http://localhost:3000";
-
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		await setupShell(page, baseURL ?? "http://localhost:3000");
+		await mockClarifyFlow(page, {
+			turn: () => ({
+				slots: { item: "水果禮盒" },
+				missingRequired: [SLOT.city],
+				reply: "好的，記下水果禮盒了。方便告訴我要送到哪個城市嗎？",
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: { accountId: "300", roles: ["buyer"] },
-			session: "identity",
 		});
-		await page
-			.context()
-			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: "1234567890123456790",
-						conversationId: "9876543210987654321",
-						slots: { item: "水果禮盒" },
-						missingRequired: ["delivery_city"],
-						rejected: [],
-						degraded: false,
-						reply: "好的，記下水果禮盒了。方便告訴我要送到哪個城市嗎？",
-					},
-				}),
-			}),
-		);
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456790",
-							status: "CLARIFYING",
-							slots: { item: "水果禮盒" },
-							missingRequired: ["delivery_city"],
-						},
-					}),
-				}),
-		);
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
@@ -1869,55 +1158,20 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(page.locator("#procurement-clarify-input")).toHaveCount(1);
 		await expect(textarea).toHaveValue("");
 	});
+
 	test("對話 composer 支援換行與中文組字；44–120px 自動高度且長文不水平溢出", async ({
 		page,
+		baseURL,
 	}) => {
 		test.setTimeout(30_000);
-		const turnBodies: Record<string, unknown>[] = [];
-		await page.route("**/api/v1/**", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
+		await setupShell(page, baseURL ?? "http://localhost:3000");
+		const flow = await mockClarifyFlow(page, {
+			turn: (n) => ({
+				slots: { item: "番茄" },
+				reply: n === 1 ? "已記下番茄需求。" : "已更新採購需求。",
 			}),
-		);
-		await seedStoredActiveRole(page, "buyer");
-		await setupGatewayMocks(page, {
-			identity: { accountId: "300", roles: ["buyer"] },
-			session: "identity",
 		});
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/turns/stream",
-			(route) =>
-				route.fulfill({
-					status: 503,
-					contentType: "application/json",
-					body: JSON.stringify({ code: 503, message: "stream unavailable" }),
-				}),
-		);
-		await page.route("**/api/v1/app/buyers/me/procurement/turns", (route) => {
-			turnBodies.push(route.request().postDataJSON());
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					code: 0,
-					data: {
-						requestId: "1234567890123456788",
-						revisionId: `123456789012345679${turnBodies.length}`,
-						conversationId: "9876543210987654321",
-						slots: { item: "番茄" },
-						missingRequired: [],
-						rejected: [],
-						degraded: false,
-						reply:
-							turnBodies.length === 1 ? "已記下番茄需求。" : "已更新採購需求。",
-						recordedThisTurn: [],
-						question: null,
-					},
-				}),
-			});
-		});
+		const turnBodies = flow.submitTurnRequests;
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 		});
@@ -1973,6 +1227,7 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		expect(turnBodies).toHaveLength(2);
 		expect(turnBodies[1].message).toBe("明天配送到桃園");
 	});
+
 
 	test("主對話獨立處理區顯示 N 列；heartbeat 與 step 完成不清軌，terminal 不留快照", async ({
 		page,

@@ -3,7 +3,11 @@ import {
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
-import { publishedPublicationSnapshotFact } from "./helpers/mock-procurement-rfq";
+import { mockProcurementUnary } from "./helpers/mock-procurement-connect";
+import {
+	publishedRfqJson,
+	snapshotReadyJson,
+} from "./helpers/mock-procurement-rfq";
 import { gotoStreamed } from "./helpers/streamed-navigation";
 
 /**
@@ -14,14 +18,12 @@ import { gotoStreamed } from "./helpers/streamed-navigation";
  * 只看 candidateSet，於是面板掛得起來卻永遠 `hidden`、開啟鈕也不 render。
  * 只驗 DOM 有沒有掛載會漏掉整個缺陷。
  *
- * ⛔ snapshot 的 `publishedPublication` 形狀是 2026-09-19 對 dev 實際擷取的
- * （見 helpers 的 publishedPublicationSnapshotFact 註解），不是憑印象編的。
- * 同一次擷取確認 snapshot 的 top-level **沒有 candidateSet**——所以「重整後
- * 只有 publication、沒有候選」不是假想的邊界，是唯一可能的形狀。
+ * ⛔ GetSnapshot 的 `publishedRfq` 形狀以 procurement.proto 的 `PublishedRfq` 為準。
+ * `GetSnapshotResponse` 沒有候選集欄位——所以「重整後只有 publication、沒有候選」
+ * 不是假想的邊界，是唯一可能的形狀。
  */
 const PROCUREMENT_PATH = "/account/messages/assistant/procurement";
 const REQUEST_ID = "1234567890123456788";
-const REVISION_ID = "1234567890123456791";
 
 test.describe("procurement assistant — 已發布成果的重整還原", {
 	tag: ["@ui"],
@@ -51,55 +53,24 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-		// ⛔ 這兩個端點在這條路徑上一次都不該被呼叫：買家只是重整看成果，
+		// ⛔ 這兩個方法在這條路徑上一次都不該被呼叫：買家只是重整看成果，
 		// 不是要重跑搜尋，也不是要再發布一次。
-		await page.route(
-			"**/procurement/requests/*/candidate-searches*",
-			(route) => {
-				calls.candidateSearches += 1;
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: {} }),
-				});
-			},
-		);
-		await page.route("**/procurement/requests/*/rfq-publications*", (route) => {
-			calls.publications += 1;
-			return route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ code: 0, data: {} }),
-			});
+		await mockProcurementUnary(page, "StartCandidateSearch", () => {
+			calls.candidateSearches += 1;
+			return {};
 		});
+		await mockProcurementUnary(page, "ExecuteRfqPublication", () => {
+			calls.publications += 1;
+			return {};
+		});
+		await mockProcurementUnary(page, "ListConversations", () => ({
+			conversations: [],
+			nextPageToken: "",
+		}));
 
-		await page.route(
-			`**/api/v1/app/buyers/me/procurement/requests/${REQUEST_ID}/snapshot`,
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: REQUEST_ID,
-							revisionId: REVISION_ID,
-							// dev 實測：發布完成後 status 仍是需求層的狀態，
-							// 而且 top-level 沒有 candidateSet。
-							status: "REQUIREMENT_READY",
-							slots: {
-								item: "珍珠芭樂",
-								quantity: 50,
-								unit: "KG",
-								delivery_city: "桃園市",
-							},
-							missingRequired: [],
-							cropResolution: { candidates: [] },
-							runs: [],
-							publishedPublication: publishedPublicationSnapshotFact(),
-						},
-					}),
-				}),
+		await mockProcurementUnary(page, "GetSnapshot", () =>
+			// 發布完成後 status 仍是需求層的狀態，而且沒有候選集。
+			snapshotReadyJson({ publishedRfq: publishedRfqJson() }),
 		);
 
 		await page.addInitScript(() => {
