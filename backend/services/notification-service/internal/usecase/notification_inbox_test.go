@@ -277,7 +277,7 @@ func TestCreateInboxItem_NewRowPublishesInboxNew(t *testing.T) {
 	pub := &mockInboxPublisher{}
 	uc := NewNotificationInboxUseCase(repo, pub, nil, nil, nil)
 
-	item := &domain.InboxItem{UserID: 42, UserType: "seller", EventType: "shipment.anomaly.detected.seller", ReferenceID: "O123|DELIVERY_OVERDUE", Title: "配送異常通知", Body: "..."}
+	item := &domain.InboxItem{UserID: 42, UserType: "seller", EventType: "order.paid.seller", ReferenceID: "O123", Title: "買家已下單", Body: "..."}
 	if err := uc.CreateInboxItem(context.Background(), item); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestCreateInboxItem_DedupedDoesNotPublishInboxNew(t *testing.T) {
 	pub := &mockInboxPublisher{}
 	uc := NewNotificationInboxUseCase(repo, pub, nil, nil, nil)
 
-	item := &domain.InboxItem{UserID: 42, UserType: "seller", EventType: "shipment.anomaly.detected.seller", ReferenceID: "O123|DELIVERY_OVERDUE", Title: "配送異常通知", Body: "..."}
+	item := &domain.InboxItem{UserID: 42, UserType: "seller", EventType: "order.paid.seller", ReferenceID: "O123", Title: "買家已下單", Body: "..."}
 	if err := uc.CreateInboxItem(context.Background(), item); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

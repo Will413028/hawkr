@@ -415,10 +415,9 @@ func TestTemplateHandler_InboxWrittenEvenWhenNoTokens(t *testing.T) {
 	_ = sendPush
 }
 
-func TestTemplateHandler_BuyerOrderPaidAndSellerShipmentCreatedRouteIndependently(t *testing.T) {
-	// 對齊 2026-05-31 binding 調整：buyer 推播由 hawkr.order:order.paid 觸發、
-	// seller「新訂單」推播改由 hawkr.shipping:shipment.created 觸發；
-	// 兩者 queue 名稱不同，handler 必須以 (queue, routing_key) 為 key 獨立分派。
+func TestTemplateHandler_BuyerAndSellerOrderPaidTemplatesBothFire(t *testing.T) {
+	// buyer 與 seller「新訂單」兩張 template 都綁 hawkr.order:order.paid，
+	// 同一則 order.paid 訊息要各自依 target_user_field 派給買家與賣家。
 	buyerTmpl := &domain.NotificationTemplate{
 		ID: 1, Exchange: "hawkr.order", RoutingKey: "order.paid",
 		EventType:      "order.paid",
@@ -427,63 +426,47 @@ func TestTemplateHandler_BuyerOrderPaidAndSellerShipmentCreatedRouteIndependentl
 		DataType: "ORDER_PAID", Enabled: true,
 	}
 	sellerTmpl := &domain.NotificationTemplate{
-		ID: 2, Exchange: "hawkr.shipping", RoutingKey: "shipment.created",
-		EventType:      "shipment.created",
-		TargetUserType: "seller", TargetUserField: "seller_account_id",
+		ID: 2, Exchange: "hawkr.order", RoutingKey: "order.paid",
+		EventType:      "order.paid.seller",
+		TargetUserType: "seller", TargetUserField: "store_id",
 		TitleTemplate: "賣家通知", BodyTemplate: "賣家收到新訂單",
 		DataType: "ORDER_CREATED", Enabled: true,
 	}
 
 	cache := buildTestCache([]*domain.NotificationTemplate{buyerTmpl, sellerTmpl})
-
-	// buyer queue 應只命中 buyerTmpl
 	sendPush, pushRepo := newTestSendPushWithRepo()
 	inboxUC, _ := newTestInboxUC()
-	buyerHandler := newTemplateHandler(cache, sendPush, inboxUC, "hawkr.order", "https://test-media.example.com", zap.NewNop())
+	handler := newTemplateHandler(cache, sendPush, inboxUC, "hawkr.order", "https://test-media.example.com", zap.NewNop())
 
-	payload := makePayload("buyer_id", float64(10), "seller_account_id", float64(20), "orderNo", "ORD-001")
+	payload := makePayload("buyer_id", float64(10), "store_id", float64(20), "orderNo", "ORD-001")
 	body, _ := json.Marshal(payload)
 
-	if err := buyerHandler(context.Background(), "order.paid", body); err != nil {
-		t.Fatalf("buyer handler error: %v", err)
+	if err := handler(context.Background(), "order.paid", body); err != nil {
+		t.Fatalf("handler error: %v", err)
 	}
-	if pushRepo.record == nil {
-		t.Fatal("expected buyer push record")
+	if len(pushRepo.records) != 2 {
+		t.Fatalf("expected 2 push records (buyer + seller), got %d", len(pushRepo.records))
 	}
-	if pushRepo.record.UserType != "buyer" {
-		t.Errorf("expected buyer notification, got user_type=%q", pushRepo.record.UserType)
+	byType := map[string]*domain.PushNotificationRecord{}
+	for _, r := range pushRepo.records {
+		byType[r.UserType] = r
 	}
-	if pushRepo.record.EventType != "order.paid" {
-		t.Errorf("expected EventType=order.paid, got %q", pushRepo.record.EventType)
+	if r := byType["buyer"]; r == nil || r.EventType != "order.paid" || r.UserID != 10 {
+		t.Errorf("buyer record = %+v, want EventType=order.paid UserID=10", r)
 	}
-
-	// seller queue 走獨立的 shipment.created routing key
-	sellerSendPush, sellerPushRepo := newTestSendPushWithRepo()
-	sellerInboxUC, _ := newTestInboxUC()
-	sellerHandler := newTemplateHandler(cache, sellerSendPush, sellerInboxUC, "hawkr.shipping", "https://test-media.example.com", zap.NewNop())
-
-	if err := sellerHandler(context.Background(), "shipment.created", body); err != nil {
-		t.Fatalf("seller handler error: %v", err)
-	}
-	if sellerPushRepo.record == nil {
-		t.Fatal("expected seller push record")
-	}
-	if sellerPushRepo.record.UserType != "seller" {
-		t.Errorf("expected seller notification, got user_type=%q", sellerPushRepo.record.UserType)
-	}
-	if sellerPushRepo.record.EventType != "shipment.created" {
-		t.Errorf("expected EventType=shipment.created, got %q", sellerPushRepo.record.EventType)
+	if r := byType["seller"]; r == nil || r.EventType != "order.paid.seller" || r.UserID != 20 {
+		t.Errorf("seller record = %+v, want EventType=order.paid.seller UserID=20", r)
 	}
 }
 
-func TestTemplateHandler_SellerNewOrderViaShipmentCreated(t *testing.T) {
+func TestTemplateHandler_SellerNewOrderViaOrderPaid(t *testing.T) {
 	tmpl := &domain.NotificationTemplate{
 		ID:              1,
-		Exchange:        "hawkr.shipping",
-		RoutingKey:      "shipment.created",
-		EventType:       "shipment.created",
+		Exchange:        "hawkr.order",
+		RoutingKey:      "order.paid",
+		EventType:       "order.paid.seller",
 		TargetUserType:  "seller",
-		TargetUserField: "seller_account_id",
+		TargetUserField: "store_id",
 		Category:        "order_update",
 		TitleTemplate:   "買家已下單",
 		BodyTemplate:    "🧧 您有新訂單！買家已支付，請儘速準備商品並在 2 天內出貨。",
@@ -493,7 +476,7 @@ func TestTemplateHandler_SellerNewOrderViaShipmentCreated(t *testing.T) {
 			"refId":         fieldSpec("order_no"),
 			"order_id":      fieldSpec("order_no"),
 			"buyerNickname": fieldSpec("buyer_nickname"),
-			"buyerAvatar":   fieldSpec("buyer_avatar"),
+			"buyerAvatar":   fieldSpec("buyer_avatar_key"),
 		},
 		SchemaURL:           strPtr("hawkr://orders/{order_id}"),
 		ReferenceIDTemplate: strPtr("#{order_no}"),
@@ -504,27 +487,22 @@ func TestTemplateHandler_SellerNewOrderViaShipmentCreated(t *testing.T) {
 	sendPush, pushRepo := newTestSendPushWithRepo()
 	inboxUC, inboxRepo := newTestInboxUC()
 
-	handler := newTemplateHandler(cache, sendPush, inboxUC, "hawkr.shipping", "https://test-media.example.com", zap.NewNop())
+	handler := newTemplateHandler(cache, sendPush, inboxUC, "hawkr.order", "https://test-media.example.com", zap.NewNop())
 
-	// 模擬 ShipmentCreatedPayload（含 2026-05-31 新增 5 欄；buyerNickname/buyerAvatar
-	// 由 shipping-service BuyerGrpcClient best-effort enrich 取得）
+	// 模擬 OrderPaidPayload（buyerNickname / buyerAvatarKey 由 order-service
+	// 付款當下 best-effort 取得）
 	payload := map[string]interface{}{
-		"order_no":            "ORD-SHIP-001",
-		"shipment_no":         "SHP-001",
-		"ship_trade_no":       "TRK-001",
+		"order_no":            "ORD-PAID-001",
 		"shipping_method":     "3001",
-		"status":              "91",
-		"label_url":           "",
-		"processing_deadline": "2026-06-03T00:00:00Z",
-		"seller_account_id":   "1001",
-		"buyer_account_id":    "2001",
-		"total_actual_amount": "1200",
+		"store_id":            1001,
+		"buyer_id":            2001,
+		"total_actual_amount": 1200,
 		"buyer_nickname":      "小明",
-		"buyer_avatar":        "https://cdn.example/u/2001.jpg",
+		"buyer_avatar_key":    "avatars/2001.jpg",
 	}
 	body, _ := json.Marshal(payload)
 
-	if err := handler(context.Background(), "shipment.created", body); err != nil {
+	if err := handler(context.Background(), "order.paid", body); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
@@ -532,16 +510,16 @@ func TestTemplateHandler_SellerNewOrderViaShipmentCreated(t *testing.T) {
 		t.Fatal("expected seller push record")
 	}
 	if pushRepo.record.UserID != 1001 {
-		t.Errorf("expected UserID=1001 (seller_account_id), got %d", pushRepo.record.UserID)
+		t.Errorf("expected UserID=1001 (store_id), got %d", pushRepo.record.UserID)
 	}
 	if pushRepo.record.UserType != "seller" {
 		t.Errorf("expected UserType=seller, got %q", pushRepo.record.UserType)
 	}
-	if pushRepo.record.EventType != "shipment.created" {
-		t.Errorf("expected EventType=shipment.created, got %q", pushRepo.record.EventType)
+	if pushRepo.record.EventType != "order.paid.seller" {
+		t.Errorf("expected EventType=order.paid.seller, got %q", pushRepo.record.EventType)
 	}
-	if pushRepo.record.ReferenceID != "ORD-SHIP-001" {
-		t.Errorf("expected ReferenceID=ORD-SHIP-001, got %q", pushRepo.record.ReferenceID)
+	if pushRepo.record.ReferenceID != "ORD-PAID-001" {
+		t.Errorf("expected ReferenceID=ORD-PAID-001, got %q", pushRepo.record.ReferenceID)
 	}
 	if pushRepo.record.Data["type"] != "ORDER_CREATED" {
 		t.Errorf("expected data[type]=ORDER_CREATED, got %q", pushRepo.record.Data["type"])
@@ -549,40 +527,40 @@ func TestTemplateHandler_SellerNewOrderViaShipmentCreated(t *testing.T) {
 	if pushRepo.record.Data["refType"] != "ORDER" {
 		t.Errorf("expected data[refType]=ORDER, got %q", pushRepo.record.Data["refType"])
 	}
-	if pushRepo.record.Data["refId"] != "ORD-SHIP-001" {
-		t.Errorf("expected data[refId]=ORD-SHIP-001, got %q", pushRepo.record.Data["refId"])
+	if pushRepo.record.Data["refId"] != "ORD-PAID-001" {
+		t.Errorf("expected data[refId]=ORD-PAID-001, got %q", pushRepo.record.Data["refId"])
 	}
-	if pushRepo.record.Data["url"] != "hawkr://orders/ORD-SHIP-001" {
-		t.Errorf("expected data[url]=hawkr://orders/ORD-SHIP-001, got %q", pushRepo.record.Data["url"])
+	if pushRepo.record.Data["url"] != "hawkr://orders/ORD-PAID-001" {
+		t.Errorf("expected data[url]=hawkr://orders/ORD-PAID-001, got %q", pushRepo.record.Data["url"])
 	}
 	// issue #686：buyerNickname / buyerAvatar 必須帶到 FCM data，供前端 _personalize 替換通用「買家」字
 	if pushRepo.record.Data["buyerNickname"] != "小明" {
 		t.Errorf("expected data[buyerNickname]=小明, got %q", pushRepo.record.Data["buyerNickname"])
 	}
-	if pushRepo.record.Data["buyerAvatar"] != "https://cdn.example/u/2001.jpg" {
-		t.Errorf("expected data[buyerAvatar]=https://cdn.example/u/2001.jpg, got %q", pushRepo.record.Data["buyerAvatar"])
+	if pushRepo.record.Data["buyerAvatar"] != "avatars/2001.jpg" {
+		t.Errorf("expected data[buyerAvatar]=avatars/2001.jpg, got %q", pushRepo.record.Data["buyerAvatar"])
 	}
 
 	if inboxRepo.createdItem == nil {
 		t.Fatal("expected seller inbox item to be written")
 	}
-	if inboxRepo.createdItem.UserType != "seller" || inboxRepo.createdItem.EventType != "shipment.created" {
+	if inboxRepo.createdItem.UserType != "seller" || inboxRepo.createdItem.EventType != "order.paid.seller" {
 		t.Errorf("inbox UserType=%q, EventType=%q", inboxRepo.createdItem.UserType, inboxRepo.createdItem.EventType)
 	}
 }
 
 func TestTemplateHandler_SellerNewOrderEnrichFallback(t *testing.T) {
-	// shipping-service BuyerGrpcClient enrich 失敗時，buyerNickname / buyerAvatar
+	// order-service 取不到買家顯示資料時，buyer_nickname / buyer_avatar_key
 	// 為 null；FieldSpec.Resolve 略過該欄位 → FCM data 不含這兩個 key →
 	// 前端 _personalize helper 取不到 → fallback 至通用「買家」字樣。
 	// title/body 主文不受影響，refType/refId 等 const/必要欄位仍正常渲染。
 	tmpl := &domain.NotificationTemplate{
 		ID:              1,
-		Exchange:        "hawkr.shipping",
-		RoutingKey:      "shipment.created",
-		EventType:       "shipment.created",
+		Exchange:        "hawkr.order",
+		RoutingKey:      "order.paid",
+		EventType:       "order.paid.seller",
 		TargetUserType:  "seller",
-		TargetUserField: "seller_account_id",
+		TargetUserField: "store_id",
 		TitleTemplate:   "買家已下單",
 		BodyTemplate:    "🧧 您有新訂單！買家已支付，請儘速準備商品並在 2 天內出貨。",
 		DataType:        "ORDER_CREATED",
@@ -591,7 +569,7 @@ func TestTemplateHandler_SellerNewOrderEnrichFallback(t *testing.T) {
 			"refId":         fieldSpec("order_no"),
 			"order_id":      fieldSpec("order_no"),
 			"buyerNickname": fieldSpec("buyer_nickname"),
-			"buyerAvatar":   fieldSpec("buyer_avatar"),
+			"buyerAvatar":   fieldSpec("buyer_avatar_key"),
 		},
 		ReferenceIDTemplate: strPtr("#{order_no}"),
 		Enabled:             true,
@@ -600,18 +578,18 @@ func TestTemplateHandler_SellerNewOrderEnrichFallback(t *testing.T) {
 	cache := buildTestCache([]*domain.NotificationTemplate{tmpl})
 	sendPush, pushRepo := newTestSendPushWithRepo()
 	inboxUC, _ := newTestInboxUC()
-	handler := newTemplateHandler(cache, sendPush, inboxUC, "hawkr.shipping", "https://test-media.example.com", zap.NewNop())
+	handler := newTemplateHandler(cache, sendPush, inboxUC, "hawkr.order", "https://test-media.example.com", zap.NewNop())
 
-	// 模擬 enrich 失敗：payload 無 buyer_nickname / buyer_avatar
+	// 模擬取不到買家顯示資料：payload 無 buyer_nickname / buyer_avatar_key
 	payload := map[string]interface{}{
-		"order_no":            "ORD-SHIP-002",
-		"seller_account_id":   "1001",
-		"buyer_account_id":    "2001",
-		"total_actual_amount": "888",
+		"order_no":            "ORD-PAID-002",
+		"store_id":            1001,
+		"buyer_id":            2001,
+		"total_actual_amount": 888,
 	}
 	body, _ := json.Marshal(payload)
 
-	if err := handler(context.Background(), "shipment.created", body); err != nil {
+	if err := handler(context.Background(), "order.paid", body); err != nil {
 		t.Fatalf("handler error: %v", err)
 	}
 	if pushRepo.record == nil {
@@ -1032,9 +1010,9 @@ func TestTemplateHandler_PayloadFilterDispatch(t *testing.T) {
 	// Two templates share queue + routing_key but differ in payload_filter.
 	// Only the one matching payload.status should fire.
 	tmplShipped := &domain.NotificationTemplate{
-		ID: 1, Exchange: "hawkr.shipping",
-		RoutingKey:      "shipment.status.changed",
-		EventType:       "shipment.shipped",
+		ID: 1, Exchange: "hawkr.order",
+		RoutingKey:      "order.status.changed",
+		EventType:       "order.status.first",
 		TargetUserType:  "buyer",
 		TargetUserField: "buyer_id",
 		Category:        "order_update",
@@ -1046,9 +1024,9 @@ func TestTemplateHandler_PayloadFilterDispatch(t *testing.T) {
 		PayloadFilter:   map[string]domain.FilterCondition{"status": domain.Eq("IN_TRANSIT")},
 	}
 	tmplArrived := &domain.NotificationTemplate{
-		ID: 2, Exchange: "hawkr.shipping",
-		RoutingKey:      "shipment.status.changed",
-		EventType:       "shipment.arrived",
+		ID: 2, Exchange: "hawkr.order",
+		RoutingKey:      "order.status.changed",
+		EventType:       "order.status.second",
 		TargetUserType:  "buyer",
 		TargetUserField: "buyer_id",
 		Category:        "order_update",
@@ -1065,7 +1043,7 @@ func TestTemplateHandler_PayloadFilterDispatch(t *testing.T) {
 	inboxUC, _ := newTestInboxUC()
 
 	handler := newTemplateHandler(cache, sendPush, inboxUC,
-		"hawkr.shipping", "https://test-media.example.com", zap.NewNop())
+		"hawkr.order", "https://test-media.example.com", zap.NewNop())
 
 	body, _ := json.Marshal(makePayload(
 		"buyer_id", float64(999),
@@ -1073,7 +1051,7 @@ func TestTemplateHandler_PayloadFilterDispatch(t *testing.T) {
 		"status", "IN_TRANSIT",
 	))
 
-	if err := handler(context.Background(), "shipment.status.changed", body); err != nil {
+	if err := handler(context.Background(), "order.status.changed", body); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
@@ -1081,7 +1059,7 @@ func TestTemplateHandler_PayloadFilterDispatch(t *testing.T) {
 	if len(pushRepo.records) != 1 {
 		t.Fatalf("expected 1 push record (ORDER_SHIPPED only), got %d", len(pushRepo.records))
 	}
-	if pushRepo.records[0].EventType != "shipment.shipped" {
+	if pushRepo.records[0].EventType != "order.status.first" {
 		t.Errorf("expected ORDER_SHIPPED template fired, got EventType=%q", pushRepo.records[0].EventType)
 	}
 }
@@ -1164,72 +1142,6 @@ func TestTemplateHandler_OrderCancelledBuyerExcludesSellerSuspended(t *testing.T
 		}
 		if pushRepo.records[0].UserID != 999 {
 			t.Errorf("expected UserID=999 (buyer_id), got %d — read notify_buyer_account_id instead?", pushRepo.records[0].UserID)
-		}
-	})
-}
-
-func TestTemplateHandler_ShipmentStatusChangedBuyerFiresOnlyOnInTransit(t *testing.T) {
-	tmpl := &domain.NotificationTemplate{
-		ID: 3, Exchange: "hawkr.shipping",
-		RoutingKey:      "shipment.status.changed",
-		EventType:       "shipment.status.changed",
-		TargetUserType:  "buyer",
-		TargetUserField: "buyer_id",
-		Category:        "order_update",
-		DataType:        "ORDER_SHIPPED",
-		TitleTemplate:   "出貨通知",
-		BodyTemplate:    "🚚 您的商品出貨囉！包裹已交給物流，請留意簡訊通知。",
-		Enabled:         true,
-		PushMode:        "visible",
-		PayloadFilter:   map[string]domain.FilterCondition{"status": domain.Eq("31")},
-	}
-	cache := buildTestCache([]*domain.NotificationTemplate{tmpl})
-
-	run := func(t *testing.T, status string) *capturingPushRepo {
-		t.Helper()
-		sendPush, pushRepo := newTestSendPushWithRepo()
-		inboxUC, _ := newTestInboxUC()
-		handler := newTemplateHandler(cache, sendPush, inboxUC,
-			"hawkr.shipping", "https://test-media.example.com", zap.NewNop())
-
-		body, _ := json.Marshal(makePayload(
-			"buyer_id", float64(999),
-			"notify_buyer_account_id", float64(1234567890123456789),
-			"order_no", "O100",
-			"status", status,
-		))
-		if err := handler(context.Background(), "shipment.status.changed", body); err != nil {
-			t.Fatalf("handler returned error: %v", err)
-		}
-		return pushRepo
-	}
-
-	t.Run("in_transit_31_fires", func(t *testing.T) {
-		pushRepo := run(t, "31")
-		if len(pushRepo.records) != 1 {
-			t.Fatalf("expected exactly 1 push for IN_TRANSIT (\"31\"), got %d", len(pushRepo.records))
-		}
-		if pushRepo.records[0].EventType != "shipment.status.changed" {
-			t.Errorf("expected shipment.status.changed template fired, got EventType=%q", pushRepo.records[0].EventType)
-		}
-		if pushRepo.records[0].UserID != 999 {
-			t.Errorf("expected UserID=999 (buyer_id), got %d — read notify_buyer_account_id instead?", pushRepo.records[0].UserID)
-		}
-	})
-
-	t.Run("pending_shipment_21_does_not_fire", func(t *testing.T) {
-		pushRepo := run(t, "21")
-		if len(pushRepo.records) != 0 {
-			t.Fatalf("expected 0 pushes for non-IN_TRANSIT status (\"21\"), got %d", len(pushRepo.records))
-		}
-	})
-
-	t.Run("legacy_enum_name_no_longer_matches", func(t *testing.T) {
-		// 防止有人「修好」migration 又手滑改回列舉名字串——這個值從未真正出現在
-		// wire payload 上，filter 不該對它放行。
-		pushRepo := run(t, "IN_TRANSIT")
-		if len(pushRepo.records) != 0 {
-			t.Fatalf("expected 0 pushes for the old broken filter value (\"IN_TRANSIT\", never emitted on the real wire), got %d", len(pushRepo.records))
 		}
 	})
 }

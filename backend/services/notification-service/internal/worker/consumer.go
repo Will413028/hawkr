@@ -51,7 +51,6 @@ var notificationQueueByExchange = map[string]string{
 	"hawkr.product":        "notification.product",
 	"hawkr.review":         "notification.review",
 	"hawkr.seller":         "notification.seller",
-	"hawkr.shipping":       "notification.shipping",
 	"payment.events":       "notification.payment",
 	mq.ExchangeProcurement: "notification.procurement",
 }

@@ -83,7 +83,7 @@ func (s *Server) GetNotificationPreferences(ctx context.Context, req *pb.GetNoti
 			Enabled:     p.Enabled,
 			Title:       p.Title,
 			Description: p.Description,
-			// 議題 6：forced 由 domain 層判斷（賣家 shipment_anomaly = true）。
+			// 議題 6：forced 由 domain 層判斷。
 			// 前端據此 disable toggle，避免 PUT 後才收 400 的 UX 缺口。
 			Forced: domain.IsForcedCategory(req.UserType, p.Category),
 		}

@@ -3,16 +3,15 @@ package domain
 import "context"
 
 const (
-	CategoryOrderUpdate     = "order_update"
-	CategoryRefundUpdate    = "refund_update"
-	CategorySystem          = "system"
-	CategoryChat            = "chat"
-	CategoryFollower        = "follower"
-	CategoryPost            = "post"
-	CategoryCoupon          = "coupon"
-	CategoryMessage         = "message"
-	CategoryShipmentAnomaly = "shipment_anomaly" // §5.21 配送異常（賣家強制 on 不可關，買家可關）
-	CategoryRestock         = "restock"          // 02 §5.13b / 12 §3.1 / #942 補貨通知（買家可關）
+	CategoryOrderUpdate  = "order_update"
+	CategoryRefundUpdate = "refund_update"
+	CategorySystem       = "system"
+	CategoryChat         = "chat"
+	CategoryFollower     = "follower"
+	CategoryPost         = "post"
+	CategoryCoupon       = "coupon"
+	CategoryMessage      = "message"
+	CategoryRestock      = "restock" // 02 §5.13b / 12 §3.1 / #942 補貨通知（買家可關）
 )
 
 var AllCategories = []string{
@@ -24,7 +23,6 @@ var AllCategories = []string{
 	CategoryPost,
 	CategoryCoupon,
 	CategoryMessage,
-	CategoryShipmentAnomaly,
 	CategoryRestock,
 }
 
@@ -34,7 +32,6 @@ var SellerCategories = []string{
 	CategorySystem,
 	CategoryChat,
 	CategoryFollower,
-	CategoryShipmentAnomaly,
 }
 
 var BuyerCategories = []string{
@@ -46,15 +43,12 @@ var BuyerCategories = []string{
 	CategoryPost,
 	CategoryMessage,
 	CategoryRestock, // #942：補貨通知（買家可關；fall-open default）
-	// shipment_anomaly 不對 buyer 開放：notification_templates 中對應 row 為
-	// target_user_type='seller'，buyer 永遠不會收到此推送，加入 buyer category
-	// 只會產生 dead toggle（按了沒效果）。設計書 12 §3.1：賣家獨用。
 }
 
 // forcedCategoriesByUserType records categories the user is NOT allowed to disable.
-// 設計書 12 §3.1：賣家對 shipment_anomaly 強制 on（配送異常會直接造成買家投訴，不允許遺漏）。
+// 目前沒有任何分類強制 on；機制保留給 gRPC 的 forced 欄位。
 var forcedCategoriesByUserType = map[string][]string{
-	"seller": {CategoryShipmentAnomaly},
+	"seller": {},
 	"buyer":  {},
 }
 

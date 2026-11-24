@@ -23,13 +23,12 @@ type categoryMetaInfo struct {
 // categoryMetaByUserType holds per-user-type display info for each category.
 var categoryMetaByUserType = map[string]map[string]categoryMetaInfo{
 	"seller": {
-		domain.CategoryOrderUpdate:     {Title: "新訂單更新", Description: "新訂單與款項撥付通知"},
-		domain.CategoryRefundUpdate:    {Title: "退貨訂單更新", Description: "退貨申請與商品寄回通知"},
-		domain.CategorySystem:          {Title: "系統公告", Description: "平台規範與重要通知"},
-		domain.CategoryChat:            {Title: "聊天通知", Description: "聊天訊息提醒"},
-		domain.CategoryFollower:        {Title: "追蹤/收藏/瀏覽通知", Description: "潛在商機提醒"},
-		domain.CategoryPost:            {Title: "顧客貼文通知", Description: "追蹤賣家發文與貼文提醒"},
-		domain.CategoryShipmentAnomaly: {Title: "配送異常通知", Description: "出貨/配送異常即時提醒（強制接收，無法關閉）"},
+		domain.CategoryOrderUpdate:  {Title: "新訂單更新", Description: "新訂單與款項撥付通知"},
+		domain.CategoryRefundUpdate: {Title: "退貨訂單更新", Description: "退貨申請與商品寄回通知"},
+		domain.CategorySystem:       {Title: "系統公告", Description: "平台規範與重要通知"},
+		domain.CategoryChat:         {Title: "聊天通知", Description: "聊天訊息提醒"},
+		domain.CategoryFollower:     {Title: "追蹤/收藏/瀏覽通知", Description: "潛在商機提醒"},
+		domain.CategoryPost:         {Title: "顧客貼文通知", Description: "追蹤賣家發文與貼文提醒"},
 	},
 	"buyer": {
 		domain.CategoryOrderUpdate:  {Title: "新訂單更新", Description: "當訂單狀態改變時發送通知"},
@@ -40,7 +39,6 @@ var categoryMetaByUserType = map[string]map[string]categoryMetaInfo{
 		domain.CategoryPost:         {Title: "賣家貼文通知", Description: "追蹤賣家發文與貼文提醒"},
 		domain.CategoryMessage:      {Title: "賣家留言通知", Description: "留言提醒"},
 		domain.CategoryRestock:      {Title: "補貨通知", Description: "追蹤的售完商品補貨時通知"},
-		// shipment_anomaly 不對 buyer 開放（template target_user_type='seller'）
 	},
 }
 
@@ -93,7 +91,7 @@ func (uc *NotificationPreferenceUseCase) GetPreferences(ctx context.Context, use
 
 // UpdatePreference updates a single category's enabled state.
 //
-// 設計書 12 §3.1：賣家對 forced category（如 shipment_anomaly）強制 on，
+// 設計書 12 §3.1：forced category 強制 on，
 // 嘗試關閉時回 InvalidInput（gRPC INVALID_ARGUMENT）並不寫入 DB；允許重複設成 enabled=true。
 func (uc *NotificationPreferenceUseCase) UpdatePreference(ctx context.Context, userID int64, userType, category string, enabled bool) error {
 	if !enabled && domain.IsForcedCategory(userType, category) {

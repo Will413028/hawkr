@@ -1186,6 +1186,30 @@
       "buyer_id": "buyer_id"
     }
   },
+  "order.paid.seller": {
+    "publisher": "order-service",
+    "lang": "java",
+    "routing_key": "order.paid",
+    "emitted_keys": [
+      "buyer_avatar_key",
+      "buyer_id",
+      "buyer_nickname",
+      "correlation_id",
+      "event_id",
+      "invoice_snapshot_id",
+      "notify_buyer_account_id",
+      "occurred_at",
+      "order_no",
+      "seller_avatar_key",
+      "seller_name",
+      "shipping_method",
+      "store_id",
+      "total_actual_amount"
+    ],
+    "identity_spaces": {
+      "store_id": "store_id"
+    }
+  },
   "payment.rescue.refund_completed": {
     "publisher": "payment-service",
     "lang": "java",
@@ -1474,82 +1498,6 @@
     "identity_spaces": {
       "accountId": "account_id",
       "store_id": "store_id"
-    }
-  },
-  "shipment.anomaly.detected.seller": {
-    "publisher": "shipping-service",
-    "lang": "java",
-    "routing_key": "shipment.anomaly.detected",
-    "emitted_keys": [
-      "anomaly_type",
-      "anomaly_type_label",
-      "order_no",
-      "seller_account_id",
-      "severity",
-      "store_id"
-    ],
-    "identity_spaces": {
-      "seller_account_id": "account_id",
-      "store_id": "store_id"
-    }
-  },
-  "shipment.created": {
-    "publisher": "shipping-service",
-    "lang": "java",
-    "routing_key": "shipment.created",
-    "emitted_keys": [
-      "buyer_avatar_key",
-      "buyer_nickname",
-      "order_no",
-      "seller_account_id",
-      "store_id"
-    ],
-    "identity_spaces": {
-      "seller_account_id": "account_id",
-      "store_id": "store_id"
-    }
-  },
-  "shipment.delivered": {
-    "publisher": "shipping-service",
-    "lang": "java",
-    "routing_key": "shipment.delivered",
-    "emitted_keys": [
-      "buyer_id",
-      "notify_buyer_account_id",
-      "order_no",
-      "seller_avatar_key"
-    ],
-    "identity_spaces": {
-      "buyer_id": "buyer_id"
-    }
-  },
-  "shipment.delivered.seller": {
-    "publisher": "shipping-service",
-    "lang": "java",
-    "routing_key": "shipment.delivered",
-    "emitted_keys": [
-      "order_no",
-      "seller_account_id",
-      "store_id"
-    ],
-    "identity_spaces": {
-      "seller_account_id": "account_id",
-      "store_id": "store_id"
-    }
-  },
-  "shipment.status.changed": {
-    "publisher": "shipping-service",
-    "lang": "java",
-    "routing_key": "shipment.status.changed",
-    "emitted_keys": [
-      "buyer_id",
-      "notify_buyer_account_id",
-      "order_no",
-      "seller_avatar_key",
-      "status"
-    ],
-    "identity_spaces": {
-      "buyer_id": "buyer_id"
     }
   },
   "invoice.voided.buyer": {

@@ -48,7 +48,7 @@ message NotificationPreferenceItem {
     string title = 3;
     string description = 4;
     // forced=true 表示後端強制 enabled=true，前端 UI 應 disable 該 toggle。
-    // 賣家對 shipment_anomaly 為 forced。對應 backend `domain.IsForcedCategory(userType, category)`。
+    // 目前沒有分類為 forced。對應 backend `domain.IsForcedCategory(userType, category)`。
     // 12 §3.1：✓ 可選 / 🔒 forced / — 不開放
     bool forced = 5;
 }

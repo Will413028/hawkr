@@ -29,7 +29,7 @@ type NotificationPreferenceItem struct {
 	Title       string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
 	Description string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	// forced=true 表示後端強制 enabled=true，前端 UI 應 disable 該 toggle。
-	// 賣家對 shipment_anomaly 為 forced。對應 backend `domain.IsForcedCategory(userType, category)`。
+	// 目前沒有分類為 forced。對應 backend `domain.IsForcedCategory(userType, category)`。
 	// 12 §3.1：✓ 可選 / 🔒 forced / — 不開放
 	Forced        bool `protobuf:"varint,5,opt,name=forced,proto3" json:"forced,omitempty"`
 	unknownFields protoimpl.UnknownFields
