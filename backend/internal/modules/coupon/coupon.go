@@ -46,6 +46,8 @@ type Deps struct {
 	StoreDirectory StoreDirectory
 	// Events 是 VoucherExpiring 的發布點；只有到期提醒需要，沒給時 AddWorkers 與 PeriodicJobs 會 panic。
 	Events *events.Bus
+	// ExpiryBatchSize 是到期提醒每批的券數；0 用預設值。
+	ExpiryBatchSize int32
 	// NewID 產生活動與券的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
@@ -173,11 +175,12 @@ func New(d Deps) *Module {
 	camp := campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now})
 	vouch := voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now})
 	return &Module{
-		admin:    admin.New(admin.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Campaign: camp, Voucher: vouch, Buyers: d.Buyers, Directory: d.StoreDirectory}),
-		campaign: camp,
-		voucher:  vouch,
-		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
-		expiry:   expiry.New(expiry.Deps{DB: d.DB, Events: d.Events, NewID: d.NewID, Now: d.Now}), expiryReady: d.Events != nil,
+		admin:       admin.New(admin.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Campaign: camp, Voucher: vouch, Buyers: d.Buyers, Directory: d.StoreDirectory}),
+		campaign:    camp,
+		voucher:     vouch,
+		read:        read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
+		expiry:      expiry.New(expiry.Deps{DB: d.DB, Events: d.Events, NewID: d.NewID, Now: d.Now, BatchSize: d.ExpiryBatchSize}),
+		expiryReady: d.Events != nil,
 	}
 }
 
@@ -269,7 +272,7 @@ func (m *Module) GetVoucher(ctx context.Context, buyerID int64, id uuid.UUID) (V
 	return m.read.GetVoucher(ctx, buyerID, id)
 }
 
-// AddWorkers 登記到期提醒的 River worker。由組裝點接上（B7-4c 只在測試接線，cmd/hawkr 隨 B7-5 與 A8-3）。
+// AddWorkers 登記到期提醒的 River worker；沒給 Deps.Events 時 panic。
 func (m *Module) AddWorkers(workers *river.Workers) {
 	if !m.expiryReady {
 		panic("coupon：到期提醒需要 Deps.Events")
@@ -277,7 +280,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	expiry.AddWorkers(workers, m.expiry)
 }
 
-// PeriodicJobs 回傳到期提醒的排程（啟動即跑、每小時；窗以 UTC 日計，游標讓重跑不重發）。
+// PeriodicJobs 回傳到期提醒的排程（啟動即跑、每小時）；沒給 Deps.Events 時 panic。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	if !m.expiryReady {
 		panic("coupon：到期提醒需要 Deps.Events")
@@ -285,5 +288,5 @@ func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	return expiry.PeriodicJobs()
 }
 
-// RunExpiryReminder 立即處理一次到期提醒並回傳發布的事件數；給測試與維運補跑，job 呼叫的是同一個方法。
+// RunExpiryReminder 立即處理一次到期提醒並回傳發布的事件數；沒給 Deps.Events 時回錯誤。job 呼叫的是同一個方法。
 func (m *Module) RunExpiryReminder(ctx context.Context) (int, error) { return m.expiry.Run(ctx) }

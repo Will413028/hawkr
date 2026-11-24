@@ -33,7 +33,7 @@ schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_
 - 賣家的活動數配額在鎖住配額列之後檢查（BD15）；現金折抵不得超過門檻，門檻 0 是無門檻（BD32，`TestCreateCampaignRejectsDiscountAboveThreshold`、`campaigns_discount_within_threshold_check`）。
 - 後台寫入只經 `Admin*` 方法（帶 `adminaudit.Actor`）：領域變更與 `adminaudit.Record` 同一個 transaction，管理員身分取自 actor、不取自輸入（`TestAdminWritesRecordOneAuditRowEach`、`TestAdminAuditAndDomainChangeCommitOrRollBackTogether`）；後台列表不含補償活動（`TestAdminListCampaignsFiltersAndPages`）。
 - 每個狀態轉換與稽核紀錄在同一個 transaction，寫入失敗整筆失敗；所有寫入在呼叫方的 transaction 內（`db.InTx` 加入它）。
-- 到期提醒（`internal/expiry`）：週期 job 把 UTC 日窗內的 AVAILABLE 券在 transaction 內發 `VoucherExpiring`，單列游標 `expiry_reminder_cursor` 同 tx 前進，重跑不重發；註冊只在測試，`cmd/hawkr` 隨 B7-5、A8-3 接（`TestExpiryReminderEmitsOncePerVoucherAcrossAUTCDayBoundary`）。
+- 到期提醒（`internal/expiry`）：每小時的週期 job 以 `FOR UPDATE SKIP LOCKED` 分批找「AVAILABLE、未提醒、`end_at` 在 (now, now+24h]、領券時距到期不少於 24h」的券，每張券在同一個 transaction 內寫 `voucher_expiry_reminders` 並以 `events.PublishRequired`（handler 名 `ExpiringHandler`）發 `VoucherExpiring`，至多一次，下游冪等鍵是 `voucher_id`；整批失敗時逐張重試，單張失敗不擋其他券；註冊只在測試，`cmd/hawkr` 隨 B7-5、A8-3 接（`TestExpiryReminderEmitsOncePerVoucherWhenItEntersTheWindow`、`TestExpiryReminderIsolatesAFailingVoucher`、`TestExpiryReminderFailsClosedWithoutTheNamedSubscriber`）。
 - 時間用注入的 `Now`，欄位一律 `timestamptz`；到期從 `end_at` 推導，沒有改狀態的排程。
 
 ## 不負責

@@ -153,11 +153,11 @@ CREATE TABLE coupon.coupon_redemption_logs (
 CREATE INDEX redemption_logs_by_voucher ON coupon.coupon_redemption_logs (voucher_id, created_at) WHERE voucher_id IS NOT NULL;
 CREATE INDEX redemption_logs_by_campaign ON coupon.coupon_redemption_logs (campaign_id, created_at);
 
--- 到期提醒的游標（單列）：(end_at, voucher_id) 以前的券都處理過，重跑不再發 VoucherExpiring。
--- 領券時活動已落在游標以前的券不補提醒（領到時離到期不到一個提醒窗）。
-CREATE TABLE coupon.expiry_reminder_cursor (
-    singleton  BOOLEAN     PRIMARY KEY DEFAULT TRUE,
-    end_at     TIMESTAMPTZ NOT NULL,
-    voucher_id UUID        NOT NULL,
-    CONSTRAINT expiry_reminder_cursor_singleton_check CHECK (singleton)
+-- 到期提醒的紀錄：每張券一列，與 VoucherExpiring 同一個 transaction 寫入，主鍵讓同一張券至多提醒一次。
+-- 不含 end_at：活動的 end_at 沒有修改路徑（提前結束會作廢 AVAILABLE 券）。券不在這裡刪除，紀錄不設 FK（只追加）。
+CREATE TABLE coupon.voucher_expiry_reminders (
+    voucher_id  UUID        PRIMARY KEY,
+    reminded_at TIMESTAMPTZ NOT NULL
 );
+-- 必要條件：到期提醒的掃描以 end_at 的短窗（now, now+24h] 找活動，再經 vouchers_by_campaign 找券；沒有它只能掃全部活動。
+CREATE INDEX campaigns_by_end_at ON coupon.coupon_campaigns (end_at);

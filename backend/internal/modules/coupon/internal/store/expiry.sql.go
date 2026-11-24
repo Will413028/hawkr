@@ -9,61 +9,36 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"uuid"
 )
 
-const advanceExpiryCursor = `-- name: AdvanceExpiryCursor :exec
-UPDATE coupon.expiry_reminder_cursor SET end_at = $1, voucher_id = $2 WHERE singleton
-`
+const claimExpiringVouchers = `-- name: ClaimExpiringVouchers :many
 
-type AdvanceExpiryCursorParams struct {
-	EndAt     time.Time
-	VoucherID uuid.UUID
-}
-
-func (q *Queries) AdvanceExpiryCursor(ctx context.Context, arg AdvanceExpiryCursorParams) error {
-	_, err := q.db.Exec(ctx, advanceExpiryCursor, arg.EndAt, arg.VoucherID)
-	return err
-}
-
-const ensureExpiryCursor = `-- name: EnsureExpiryCursor :exec
-
-INSERT INTO coupon.expiry_reminder_cursor (end_at, voucher_id) VALUES ($1, $2)
-ON CONFLICT (singleton) DO NOTHING
-`
-
-type EnsureExpiryCursorParams struct {
-	EndAt     time.Time
-	VoucherID uuid.UUID
-}
-
-// 到期提醒：單列游標與落在提醒窗的 AVAILABLE 券。
-func (q *Queries) EnsureExpiryCursor(ctx context.Context, arg EnsureExpiryCursorParams) error {
-	_, err := q.db.Exec(ctx, ensureExpiryCursor, arg.EndAt, arg.VoucherID)
-	return err
-}
-
-const listExpiringVouchers = `-- name: ListExpiringVouchers :many
 SELECT v.id, v.campaign_id, v.buyer_id, c.title, c.end_at
 FROM coupon.coupon_vouchers v
 JOIN coupon.coupon_campaigns c ON c.id = v.campaign_id
 WHERE v.status = 'AVAILABLE'
+  AND NOT EXISTS (SELECT 1 FROM coupon.voucher_expiry_reminders r WHERE r.voucher_id = v.id)
   AND c.end_at > $1::timestamptz
-  AND c.end_at <= $2::timestamptz
-  AND (c.end_at, v.id) > ($3::timestamptz, $4::uuid)
-ORDER BY c.end_at, v.id
+  AND c.end_at <= $1::timestamptz + make_interval(secs => $2::float8)
+  AND v.created_at <= c.end_at - make_interval(secs => $2::float8)
+  AND v.id > $3::uuid
+  AND ($4::uuid IS NULL OR v.id = $4::uuid)
+ORDER BY v.id
 LIMIT $5::int
+FOR UPDATE OF v SKIP LOCKED
 `
 
-type ListExpiringVouchersParams struct {
-	Now        time.Time
-	Horizon    time.Time
-	AfterEndAt time.Time
-	AfterID    uuid.UUID
-	BatchSize  int32
+type ClaimExpiringVouchersParams struct {
+	Now         time.Time
+	LeadSeconds float64
+	AfterID     uuid.UUID
+	OnlyID      pgtype.UUID
+	BatchSize   int32
 }
 
-type ListExpiringVouchersRow struct {
+type ClaimExpiringVouchersRow struct {
 	ID         uuid.UUID
 	CampaignID uuid.UUID
 	BuyerID    int64
@@ -71,22 +46,25 @@ type ListExpiringVouchersRow struct {
 	EndAt      time.Time
 }
 
-// 只有 AVAILABLE 的券：LOCKED 已有訂單、REDEEMED 與 VOIDED 已結束。到期從活動的 end_at 推導；(end_at, id) 是穩定的鍵集順序。
-func (q *Queries) ListExpiringVouchers(ctx context.Context, arg ListExpiringVouchersParams) ([]ListExpiringVouchersRow, error) {
-	rows, err := q.db.Query(ctx, listExpiringVouchers,
+// 到期提醒：落在提醒窗、領券時距到期不少於提前量、尚未提醒的 AVAILABLE 券。
+// 只有 AVAILABLE 的券：LOCKED 已有訂單、REDEEMED 與 VOIDED 已結束；LOCKED 之後釋放回 AVAILABLE 的券下一輪照樣算。
+// 到期從活動的 end_at 推導；「領券時距到期不少於提前量」排除領到時已進窗的券。FOR UPDATE SKIP LOCKED：
+// 同時有別的 job 或鎖定（Lock）在處理的券這一輪略過，下一輪再算。以 v.id 的鍵集分批；only_id 非 NULL 時只處理那一張（失敗隔離重試用）。
+func (q *Queries) ClaimExpiringVouchers(ctx context.Context, arg ClaimExpiringVouchersParams) ([]ClaimExpiringVouchersRow, error) {
+	rows, err := q.db.Query(ctx, claimExpiringVouchers,
 		arg.Now,
-		arg.Horizon,
-		arg.AfterEndAt,
+		arg.LeadSeconds,
 		arg.AfterID,
+		arg.OnlyID,
 		arg.BatchSize,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListExpiringVouchersRow{}
+	items := []ClaimExpiringVouchersRow{}
 	for rows.Next() {
-		var i ListExpiringVouchersRow
+		var i ClaimExpiringVouchersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CampaignID,
@@ -104,18 +82,16 @@ func (q *Queries) ListExpiringVouchers(ctx context.Context, arg ListExpiringVouc
 	return items, nil
 }
 
-const lockExpiryCursor = `-- name: LockExpiryCursor :one
-SELECT end_at, voucher_id FROM coupon.expiry_reminder_cursor WHERE singleton FOR UPDATE
+const insertExpiryReminder = `-- name: InsertExpiryReminder :exec
+INSERT INTO coupon.voucher_expiry_reminders (voucher_id, reminded_at) VALUES ($1, $2)
 `
 
-type LockExpiryCursorRow struct {
-	EndAt     time.Time
-	VoucherID uuid.UUID
+type InsertExpiryReminderParams struct {
+	VoucherID  uuid.UUID
+	RemindedAt time.Time
 }
 
-func (q *Queries) LockExpiryCursor(ctx context.Context) (LockExpiryCursorRow, error) {
-	row := q.db.QueryRow(ctx, lockExpiryCursor)
-	var i LockExpiryCursorRow
-	err := row.Scan(&i.EndAt, &i.VoucherID)
-	return i, err
+func (q *Queries) InsertExpiryReminder(ctx context.Context, arg InsertExpiryReminderParams) error {
+	_, err := q.db.Exec(ctx, insertExpiryReminder, arg.VoucherID, arg.RemindedAt)
+	return err
 }
