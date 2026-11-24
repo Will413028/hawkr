@@ -290,7 +290,7 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.say(t, f.buyerParty(b1), s1, "first")
-	last := f.say(t, f.storeParty(t, s1), b1, "秘密內容")
+	last := f.say(t, f.buyerParty(b1), s1, "秘密內容")
 	p := f.buyerParty(b1)
 	preview := func() im.Preview {
 		page, err := f.m.ListConversations(ctx, p, nil, 10)
@@ -299,7 +299,7 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 		}
 		return page.Items[0].Preview
 	}
-	if pv := preview(); pv.Text == nil || *pv.Text != "秘密內容" || pv.SenderKind != im.PartyStore {
+	if pv := preview(); pv.Text == nil || *pv.Text != "秘密內容" || pv.SenderKind != im.PartyBuyer {
 		t.Fatalf("可見的預覽：%+v", pv)
 	}
 	h, err := f.m.Hide(ctx, im.HideInput{MessageID: last.ID, AdminID: 1, Category: string(policy.CommunityAssessable()[0])})
@@ -325,10 +325,11 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "again"}); kindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("沒有未還原的隱藏：%v", err)
 	}
-	f.storeRetired(t, s1, 2000+s1)
-	if err := f.m.ErasePartyMessages(ctx, im.PartyStore, s1); err != nil {
+	f.buyerDeleted(t, b1)
+	if err := f.m.ErasePartyMessages(ctx, im.PartyBuyer, b1); err != nil {
 		t.Fatal(err)
 	}
+	p = f.storeParty(t, s1)
 	if pv := preview(); !pv.Erased || pv.Text != nil {
 		t.Fatalf("抹除後的預覽：%+v", pv)
 	}
@@ -796,7 +797,7 @@ func TestRestoreSourceMismatchIsDistinctFromNotHidden(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	f.say(t, f.buyerParty(b1), s1, "first")
-	last := f.say(t, f.storeParty(t, s1), b1, "內容")
+	last := f.say(t, f.buyerParty(b1), s1, "內容")
 	if _, err := f.m.Restore(ctx, im.RestoreInput{MessageID: last.ID, AdminID: 1, Reason: "誤判", SourceRef: "case-1"}); kindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "沒有被隱藏") {
 		t.Fatalf("沒有隱藏：%v", err)
 	}

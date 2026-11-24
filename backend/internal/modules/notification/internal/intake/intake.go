@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
 // Accounts 是 worker 對 identity 的需求：以共享鎖鎖住存活的帳號列（commit 前不會被刪），並回報帳號是否已刪除。identity.Module 實作它。
@@ -273,7 +274,8 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 			if err != nil {
 				return false, uuid.Nil(), fmt.Errorf("寫入投遞紀錄：%w", err)
 			}
-			if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {
+			opts := &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}
+			if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, opts); err != nil {
 				return false, uuid.Nil(), fmt.Errorf("排入渠道 job：%w", err)
 			}
 			continue
@@ -316,3 +318,22 @@ func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store
 	}
 	return itemID, nil
 }
+
+// QuietHoursEnd 回傳行銷類推播的靜音時段結束時間（D26）：台北時間 22:00（含）到隔天 09:00（不含）之間的送出延到下一個 09:00，其餘時間回零值（立即送出）。
+func QuietHoursEnd(now time.Time) time.Time {
+	local := now.In(twtime.Taipei)
+	y, m, d := local.Date()
+	switch h := local.Hour(); {
+	case h >= quietFromHour:
+		return time.Date(y, m, d+1, quietUntilHour, 0, 0, 0, twtime.Taipei)
+	case h < quietUntilHour:
+		return time.Date(y, m, d, quietUntilHour, 0, 0, 0, twtime.Taipei)
+	default:
+		return time.Time{}
+	}
+}
+
+const (
+	quietFromHour  = 22
+	quietUntilHour = 9
+)

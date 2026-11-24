@@ -353,6 +353,12 @@
     },
     "store_unsuspended.title": {
       "message": "Your store suspension has been lifted"
+    },
+    "voucher_expiring.body": {
+      "message": "You have a coupon that expires on {time}. Use it before then."
+    },
+    "voucher_expiring.title": {
+      "message": "Coupon expiring soon"
     }
   }
 }

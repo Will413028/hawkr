@@ -18,6 +18,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/announce"
@@ -100,6 +101,8 @@ type Deps struct {
 	// Resolver 是 worker 端解析收件人、封鎖檢查與追蹤者展開要問的地方（*buyer.Module 與 *seller.Module 經 NewResolver 組成）；
 	// 只有宣告 Expand 或 Broadcast 的型別用到，沒有這類型別的測試可以不給。
 	Resolver Resolver
+	// Validity 是送出前重查來源事實（D27）要問的地方（*coupon.Module 經 NewValidity 組成）；沒有宣告重查的型別的測試可以不給。
+	Validity Validity
 	// StoreCodes 讀取店家的 store_code，內容型別的深連結讀取時用（*seller.Module 經 NewStoreCodes 組成）；沒有內容型別的測試可以不給。
 	StoreCodes StoreCodes
 	// ListenConnConfig 是串流 LISTEN 專用連線的設定，必須指向直連或 session 模式的 Postgres，不能經 transaction pooling；nil 時以主連線池的設定另開（不從池借）。
@@ -124,6 +127,13 @@ type Module struct {
 func New(d Deps) *Module { return newModule(d, registry.Registry{}) }
 
 func newModule(d Deps, reg app.Registry) *Module {
+	if d.Validity == nil {
+		for _, e := range reg.All() {
+			if sp := e.Spec(); sp.Revalidates {
+				panic("notification：型別 " + sp.Name + " 宣告了送出前重查，Deps.Validity 必填")
+			}
+		}
+	}
 	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Signals: dbSignals{d.DB}, StoreCodes: d.StoreCodes, Now: d.Now, Logger: d.Logger})
 	hub := stream.NewHub(inboxReader(appSvc), d.Logger, d.Now)
 	locks := intake.Locks{Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller}
@@ -139,7 +149,7 @@ func newModule(d Deps, reg app.Registry) *Module {
 			Audit: adminaudit.New(d.DB, d.Now), Signals: dbSignals{d.DB}, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
 		}),
 		deliver: deliver.New(deliver.Deps{
-			DB: d.DB, Locks: locks, Contacts: d.Contacts, Locales: d.Locales, Registry: reg, Sources: appSvc,
+			DB: d.DB, Locks: locks, Contacts: d.Contacts, Locales: d.Locales, Registry: reg, Validity: d.Validity, Sources: appSvc,
 			Push: d.Push, ImageURL: d.ImageURL, Mail: d.Mail, Suppression: hasher, Now: d.Now, Logger: d.Logger,
 		}),
 		suppress: suppress.New(suppress.Deps{DB: d.DB, Inbox: d.Inbox, WebhookSecret: d.ResendWebhookSecret, Hasher: hasher, Now: d.Now}),
@@ -293,6 +303,11 @@ func (m *Module) OnSellerFollowed(ctx context.Context, e buyer.SellerFollowed) e
 // OnRestockTargeted 是 buyer.RestockTargeted 的同步訂閱者，同 OnSuspended。
 func (m *Module) OnRestockTargeted(ctx context.Context, e buyer.RestockTargeted) error {
 	return m.intake.OnRestockTargeted(ctx, e)
+}
+
+// OnVoucherExpiring 是 coupon.VoucherExpiring 的同步訂閱者，同 OnSuspended；組裝時要以 coupon.ExpiringHandler 登記（SubscribeNamed），發布方才會要求它存在。
+func (m *Module) OnVoucherExpiring(ctx context.Context, e coupon.VoucherExpiring) error {
+	return m.intake.OnVoucherExpiring(ctx, e)
 }
 
 // OnReviewCreated 是 review.ReviewCreated 的同步訂閱者，同 OnSuspended。

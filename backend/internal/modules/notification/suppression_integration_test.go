@@ -80,7 +80,7 @@ func setupWebhook(t *testing.T, secret string) *webhookFixture {
 	jobs := &dispatchJobs{}
 	box := inbox.New(inbox.Deps{DB: d, Jobs: jobs, Now: time.Now, Logger: log})
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: &fakeStores{retired: map[int64]bool{}}, Jobs: &jobQueue{}, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: &fakeStores{retired: map[int64]bool{}}, Validity: noVouchers{}, Jobs: &jobQueue{}, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 		Contacts: &fakeContacts{m: map[int64]identity.ContactEmail{}}, Locales: id,
 		Push: fcm.NewFake(nil), Mail: resend.NewFake(nil), Inbox: box, ResendWebhookSecret: secret, SuppressionKeys: testSuppressionKeys,
 	}, testRegistry{})

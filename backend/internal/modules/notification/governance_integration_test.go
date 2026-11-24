@@ -96,7 +96,7 @@ func setupGovernance(t *testing.T, reporters CaseReporters) *fixture {
 	rec := &recorder{}
 	push, mail, contacts := fcm.NewFake(nil), resend.NewFake(nil), &fakeContacts{m: map[int64]identity.ContactEmail{}}
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Jobs: rec, Now: clock, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Validity: noVouchers{}, Jobs: rec, Now: clock, NewID: uuid.NewV7, Logger: log,
 		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
 	}, registry.Registry{})
 	m.SubscribeGovernance(bus)
