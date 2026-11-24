@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-// 每一個真的被傳進 CreateProxy／proxyToPath 的 service name，都必須是
+// 每一個真的被傳進 CreateProxy／CreateProxyWithPathRewrite 的 service name，都必須是
 // proxy/reverse_proxy.go 的 `services` map 的 key。
 //
 // **為什麼需要這一支**：2026-08-29 的獨立驗收實測——把 `proxy/reverse_proxy.go` 的
@@ -32,7 +32,7 @@ func TestProxiedServiceNamesExistInServicesMap(t *testing.T) {
 	mapKeys := parseProxyServicesMapKeys(t)
 
 	if len(called) == 0 {
-		t.Fatal("掃不到任何 CreateProxy／proxyToPath 呼叫端——掃描器壞了，不是「沒有反代路由」")
+		t.Fatal("掃不到任何 CreateProxy／CreateProxyWithPathRewrite 呼叫端——掃描器壞了，不是「沒有反代路由」")
 	}
 	if len(mapKeys) == 0 {
 		t.Fatal("解析不到任何 services map key——解析器壞了")
@@ -44,7 +44,7 @@ func TestProxiedServiceNamesExistInServicesMap(t *testing.T) {
 	}
 	for _, name := range called {
 		if !inMap[name] {
-			t.Errorf("service name %q 被傳進 CreateProxy／proxyToPath，但 proxy/reverse_proxy.go 的 "+
+			t.Errorf("service name %q 被傳進 CreateProxy／CreateProxyWithPathRewrite，但 proxy/reverse_proxy.go 的 "+
 				"services map 沒有它——CreateProxy 查不到 name 會回一個永遠 response.NotFound 的 "+
 				"handler，該服務的反代路由全部靜默 404（不編譯錯、也沒有別的測試會轉紅）", name)
 		}
@@ -52,7 +52,7 @@ func TestProxiedServiceNamesExistInServicesMap(t *testing.T) {
 }
 
 // scanProxiedServiceNames 掃 router 的非測試檔，取 CreateProxy／
-// CreateProxyWithPathRewrite／proxyToPath 第一個參數的**值**。
+// CreateProxyWithPathRewrite 第一個參數的**值**。
 // 參數是 Service* 常數時解析成它在 constants.go 的字面值；是字串字面值時直接取。
 func scanProxiedServiceNames(t *testing.T) []string {
 	t.Helper()
@@ -79,7 +79,7 @@ func scanProxiedServiceNames(t *testing.T) []string {
 				return true
 			}
 			switch calleeName(call.Fun) {
-			case "proxy.CreateProxy", "proxy.CreateProxyWithPathRewrite", "proxyToPath":
+			case "proxy.CreateProxy", "proxy.CreateProxyWithPathRewrite":
 			default:
 				return true
 			}

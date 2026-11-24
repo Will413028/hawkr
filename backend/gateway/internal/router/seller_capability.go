@@ -78,14 +78,6 @@ func sellerHandle(g *gin.RouterGroup, method, relPath string, cap authz.Capabili
 	g.Handle(method, relPath, requireSeller(cap), h)
 }
 
-// sellerHandleAuthed is sellerHandle for a route mounted directly on a group that
-// does NOT carry JWTAuth via .Use() — it prepends JWTAuth then requireSeller(cap).
-func sellerHandleAuthed(g *gin.RouterGroup, method, relPath string, cap authz.Capability, h gin.HandlerFunc) {
-	full := ginJoinPath(g.BasePath(), relPath)
-	authz.Register(method, full, cap)
-	g.Handle(method, relPath, middleware.JWTAuth(), requireSeller(cap), h)
-}
-
 // ginJoinPath replicates gin's internal joinPaths so a registered full path matches
 // engine.Routes()[i].Path exactly (used by the boot assertion cross-check).
 func ginJoinPath(absolutePath, relativePath string) string {

@@ -41,7 +41,7 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 		}
 		got := scan(t, ".", func(fn string, call *ast.CallExpr, file, enclosing string) (string, string, bool) {
 			switch fn {
-			case "proxy.CreateProxy", "proxy.CreateProxyWithPathRewrite", "proxyToPath":
+			case "proxy.CreateProxy", "proxy.CreateProxyWithPathRewrite":
 			default:
 				return "", "", false
 			}
@@ -52,12 +52,7 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 			short := strings.TrimPrefix(fn, "proxy.")
 			return file + ":" + short + ":" + exprString(call.Args[0]),
 				exprString(call.Args[len(call.Args)-1]), true
-		}, map[string]bool{
-			// proxyToPath 是把模式原樣往下傳的泛用 wrapper，本身不是一條路由——
-			// 要檢查的是它的呼叫端。其他 wrapper 若出現，其內部呼叫會以參數名被
-			// 記成「未登記」而轉紅，那是刻意的：新 wrapper 必須被看見。
-			"proxyToPath": true,
-		})
+		}, nil)
 		compare(t, "router 路由", got, expected)
 	})
 

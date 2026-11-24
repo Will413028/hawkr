@@ -8,7 +8,6 @@ import (
 	"go/token"
 	"path/filepath"
 	"reflect"
-	"sort"
 	"strings"
 	"testing"
 )
@@ -103,15 +102,6 @@ func TestDelegatedDTOs_CarryNoFulfilmentOrFinanceFields(t *testing.T) {
 			t.Errorf("例外 %q 已不對應任何 DTO 欄位，請一併移除", key)
 		}
 	}
-}
-
-func delegatedSortedKeys(m map[string]json.RawMessage) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }
 
 // 反向的鑑別力：唯一允許回未遮罩收件資訊的 DTO 必須確實帶著那些欄位。少了它，
