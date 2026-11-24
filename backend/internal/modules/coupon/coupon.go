@@ -15,6 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/qualify"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/voucher"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
@@ -80,6 +81,8 @@ type (
 	SellerCampaignPage = read.SellerCampaignPage
 	SellerCampaign     = read.SellerCampaign
 	CampaignDetail     = read.CampaignDetail
+	AdminListInput     = read.AdminListInput
+	AdminCampaignPage  = read.AdminCampaignPage
 )
 
 const (
@@ -140,6 +143,8 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 
 // Module 是 coupon 模組。
 type Module struct {
+	db       *db.DB
+	audit    *adminaudit.Log
 	campaign *campaign.Service
 	voucher  *voucher.Service
 	read     *read.Service
@@ -152,6 +157,8 @@ func New(d Deps) *Module {
 	}
 	q := qualify.New(qualify.Deps{DB: d.DB, Stores: d.Stores, Members: d.Members})
 	return &Module{
+		db:       d.DB,
+		audit:    adminaudit.New(d.DB, d.Now),
 		campaign: campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
 		voucher:  voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now}),
 		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),

@@ -131,11 +131,16 @@ var reasons = map[coupon.Reason]apperr.Reason{
 
 // failure 把模組的錯誤轉成對外的錯誤：業務原因附上契約的 ErrorReason，欄位對到請求路徑 paths。
 func (h *App) failure(err error, paths rpc.FieldPaths) error {
+	return failure(h.reasonOf, err, paths)
+}
+
+// failure 是 App 與 Admin 共用的轉換：reasonOf 取出模組錯誤帶的業務原因。
+func failure(reasonOf func(error) coupon.Reason, err error, paths rpc.FieldPaths) error {
 	if err == nil {
 		return nil
 	}
 	var ae *apperr.Error
-	if r, ok := reasons[h.reasonOf(err)]; ok && errors.As(err, &ae) {
+	if r, ok := reasons[reasonOf(err)]; ok && errors.As(err, &ae) {
 		ae.Reason = r
 	}
 	return rpc.WithFieldPaths(err, paths)

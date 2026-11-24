@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -87,7 +88,10 @@ func setup(t *testing.T) *fixture {
 	t.Helper()
 	f := &fixture{t: t, stores: &fakeStores{suspended: map[int64]bool{}}, members: &fakeMembers{members: map[[2]int64]bool{}}}
 	f.clock.Store(base.UnixNano())
-	f.db = pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "coupon", Dir: coupon.Migrations()}))
+	f.db = pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: "coupon", Dir: coupon.Migrations()},
+		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
+	))
 	f.m = coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Members: f.members, NewID: uuid.NewV7, Now: f.now})
 	return f
 }

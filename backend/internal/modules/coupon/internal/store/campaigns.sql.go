@@ -342,6 +342,77 @@ func (q *Queries) InsertTargetAccounts(ctx context.Context, arg InsertTargetAcco
 	return result.RowsAffected(), nil
 }
 
+const listAdminCampaigns = `-- name: ListAdminCampaigns :many
+SELECT id, title, discount_type, discount_amount, discount_percent, max_discount_amount, threshold_amount, target_type, store_id, issuer_type, issuer_admin_id, issuer_store_id, start_at, end_at, total_limit, issued_count, status, source_type, source_id, ended_at, created_at, updated_at FROM coupon.coupon_campaigns
+WHERE target_type <> 'COMPENSATION'
+  AND ($1::text IS NULL OR status = $1::text)
+  AND ($2::text IS NULL OR issuer_type = $2::text)
+  AND ($3::bigint IS NULL OR issuer_store_id = $3::bigint)
+  AND ($4::timestamptz IS NULL OR (created_at, id) < ($4::timestamptz, $5::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $6
+`
+
+type ListAdminCampaignsParams struct {
+	Status         *string
+	IssuerType     *string
+	IssuerStoreID  *int64
+	AfterCreatedAt *time.Time
+	AfterID        pgtype.UUID
+	MaxRows        int32
+}
+
+// 後台的活動列表：平台與店家發的活動，不含系統建立的補償活動；status、issuer_type（ADMIN 或 SELLER）、issuer_store_id 為 NULL 是不篩選。
+func (q *Queries) ListAdminCampaigns(ctx context.Context, arg ListAdminCampaignsParams) ([]CouponCouponCampaign, error) {
+	rows, err := q.db.Query(ctx, listAdminCampaigns,
+		arg.Status,
+		arg.IssuerType,
+		arg.IssuerStoreID,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CouponCouponCampaign{}
+	for rows.Next() {
+		var i CouponCouponCampaign
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.DiscountType,
+			&i.DiscountAmount,
+			&i.DiscountPercent,
+			&i.MaxDiscountAmount,
+			&i.ThresholdAmount,
+			&i.TargetType,
+			&i.StoreID,
+			&i.IssuerType,
+			&i.IssuerAdminID,
+			&i.IssuerStoreID,
+			&i.StartAt,
+			&i.EndAt,
+			&i.TotalLimit,
+			&i.IssuedCount,
+			&i.Status,
+			&i.SourceType,
+			&i.SourceID,
+			&i.EndedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCampaignsByIDs = `-- name: ListCampaignsByIDs :many
 SELECT id, title, discount_type, discount_amount, discount_percent, max_discount_amount, threshold_amount, target_type, store_id, issuer_type, issuer_admin_id, issuer_store_id, start_at, end_at, total_limit, issued_count, status, source_type, source_id, ended_at, created_at, updated_at FROM coupon.coupon_campaigns WHERE id = ANY($1::uuid[])
 `

@@ -1,0 +1,228 @@
+syntax = "proto3";
+
+// coupon 模組給後台的 API：平台活動的建立、發布與提前結束，指定發放、作廢單張券、賣家配額，以及找活動與找買家的券的唯讀方法。
+// 買家與店家的 API 在 hawkr.coupon.v1alpha1。
+//
+// 後台可以看到平台與店家的所有活動（不含系統替買家建立的補償活動），但只能建立與發布平台的活動；店家的活動由店家自己管理，
+// 後台對它們的動作只有提前結束與作廢單張券。寫入都留後台動作紀錄（與領域變更同一個 transaction）；唯讀方法不留。
+//
+// ID 是不透明的字串（活動與券是 UUID，買家與店家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。金額是新台幣元的整數。
+package hawkr.admin.coupon.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/coupon/v1alpha1/coupon.proto";
+
+// CouponAdminService 只有管理員能呼叫。
+service CouponAdminService {
+  // CreateCampaign 建立平台活動，狀態是 DRAFT（不能領、不能發放），經 PublishCampaign 才生效。發行者是呼叫的管理員。
+  // 不帶 store_id 是全平台的活動。目前不能建立 MEMBER 資格的活動（消費紀錄的資料還沒有接上），回 invalid_argument；COMPENSATION 只由系統建立。
+  rpc CreateCampaign(CreateCampaignRequest) returns (CreateCampaignResponse);
+
+  // PublishCampaign 把 DRAFT 的活動發布成 ACTIVE。活動不存在回 not_found；不是 DRAFT 或結束時間已過回 failed_precondition。
+  rpc PublishCampaign(PublishCampaignRequest) returns (PublishCampaignResponse);
+
+  // EndCampaign 提前結束活動（平台與店家的都可以）：之後不能再領取與鎖定，AVAILABLE 的券作廢，LOCKED 的券照常完成或釋放。
+  // 已結束的活動重送是成功（voided_vouchers 是 0）；DRAFT 的活動回 failed_precondition；活動不存在回 not_found。
+  rpc EndCampaign(EndCampaignRequest) returns (EndCampaignResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // GrantVouchers 對 DESIGNATED 活動指定發放：把買家加進資格名單並各建一張券。全部或全不發：新建的券會超過總量就整筆回 failed_precondition。
+  // 已持有這個活動的券的買家不再發（已持有的人數見 already_held）。活動不存在回 not_found，不是 DESIGNATED、不是 ACTIVE、時間窗已過回 failed_precondition。
+  rpc GrantVouchers(GrantVouchersRequest) returns (GrantVouchersResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // VoidVoucher 作廢單張券：AVAILABLE，或因釋放漏送而卡住的 LOCKED。已核銷與已作廢的券回 failed_precondition；券不存在回 not_found。
+  rpc VoidVoucher(VoidVoucherRequest) returns (VoidVoucherResponse);
+
+  // SetSellerQuota 設定店家同時進行的活動數上限（沒有設定的店家用預設值）。
+  rpc SetSellerQuota(SetSellerQuotaRequest) returns (SetSellerQuotaResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListCampaigns 列出平台與店家的活動，新到舊，不含系統建立的補償活動。可依狀態與發行者篩選；page_token 只能用在同一組篩選。
+  rpc ListCampaigns(ListCampaignsRequest) returns (ListCampaignsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetCampaign 讀一個活動的明細：規則、發行者、已發數量、上限、狀態、DESIGNATED 的名單與各狀態的券數。補償活動也讀得到。
+  rpc GetCampaign(GetCampaignRequest) returns (GetCampaignResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListBuyerVouchers 列出某位買家持有的券（含補償券），新到舊，用來找要作廢的券 ID。
+  rpc ListBuyerVouchers(ListBuyerVouchersRequest) returns (ListBuyerVouchersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// AdminCampaign 是後台看到的活動：店家看到的內容（規則、狀態、上限、已發數量）加上發行者。
+message AdminCampaign {
+  // 規則、狀態與數量。total_issue_limit 不設是無上限（與 0 不同：上限至少 1）。
+  hawkr.coupon.v1alpha1.SellerCampaign campaign = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 發行者：平台活動是建立它的管理員，店家活動是店家。
+  oneof issuer {
+    // 建立活動的管理員 ID。
+    string issuer_admin_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+    // 發行活動的店家 ID。
+    string issuer_store_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  }
+}
+
+// AdminVoucher 是買家持有的一張券，附活動的公開規則。
+message AdminVoucher {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  hawkr.coupon.v1alpha1.Campaign campaign = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string buyer_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.coupon.v1alpha1.VoucherStatus status = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.coupon.v1alpha1.VoucherOrigin origin = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 活動的時間窗已過（只對 AVAILABLE 有意義）。
+  bool expired = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 持有（鎖定或核銷）這張券的訂單編號；其他狀態不設。
+  optional string order_no = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp locked_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp redeemed_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional google.protobuf.Timestamp voided_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// PlatformIssuer 表示發行者是平台（管理員）。
+message PlatformIssuer {}
+
+// IssuerFilter 依發行者篩選，必須設定其中一個。
+message IssuerFilter {
+  oneof issuer {
+    // 只列平台（管理員）發行的活動。
+    PlatformIssuer platform = 1;
+    // 只列這家店發行的活動。
+    string store_id = 2;
+  }
+}
+
+// AdminCampaignInput 是建立平台活動的內容。
+message AdminCampaignInput {
+  // 1 到 100 個字元（去掉前後空白後）。
+  string title = 1 [(google.api.field_behavior) = REQUIRED];
+  oneof discount {
+    hawkr.coupon.v1alpha1.CashDiscount cash = 2;
+    hawkr.coupon.v1alpha1.PercentDiscount percent = 3;
+  }
+  // 門檻，至少 0；現金折抵的金額不得超過門檻（門檻 0 不套用）。
+  int64 threshold_amount = 4;
+  // 可以是 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument，COMPENSATION 只由系統建立。
+  hawkr.coupon.v1alpha1.TargetType target_type = 5 [(google.api.field_behavior) = REQUIRED];
+  // 適用的店家；不設是全平台。
+  optional string store_id = 6;
+  google.protobuf.Timestamp start_time = 7 [(google.api.field_behavior) = REQUIRED];
+  // 必須晚於現在與 start_time。
+  google.protobuf.Timestamp end_time = 8 [(google.api.field_behavior) = REQUIRED];
+  // 總發行量；不設是無上限，設了至少 1（0 回 invalid_argument，不當成無上限）。
+  optional int32 total_issue_limit = 9;
+  // DESIGNATED 的名單（買家 ID），最多 500 位；其他資格不得帶。
+  repeated string designated_buyer_ids = 10;
+}
+
+message CreateCampaignRequest {
+  AdminCampaignInput campaign = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateCampaignResponse {
+  AdminCampaign campaign = 1;
+}
+
+message PublishCampaignRequest {
+  string campaign_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message PublishCampaignResponse {
+  AdminCampaign campaign = 1;
+}
+
+message EndCampaignRequest {
+  string campaign_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 選填；最多 255 個字元，進活動的操作紀錄。
+  string reason = 2;
+}
+
+message EndCampaignResponse {
+  AdminCampaign campaign = 1;
+  // 這次作廢的券數。
+  int32 voided_vouchers = 2;
+}
+
+message GrantVouchersRequest {
+  string campaign_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 要發給的買家 ID，1 到 500 位，重複的只算一次。
+  repeated string buyer_ids = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GrantVouchersResponse {
+  // 這次新建的券數。
+  int32 issued = 1;
+  // 原本就持有這個活動的券、所以沒有再發的買家數。
+  int32 already_held = 2;
+}
+
+message VoidVoucherRequest {
+  string voucher_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 必填（去掉前後空白後不得為空）；最多 255 個字元，進活動的操作紀錄與後台動作紀錄。
+  string reason = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message VoidVoucherResponse {}
+
+message SetSellerQuotaRequest {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 店家同時進行的活動數上限，至少 1。
+  int32 max_active_campaigns = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SetSellerQuotaResponse {}
+
+message ListCampaignsRequest {
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態；不設是全部。明確送出 CAMPAIGN_STATUS_UNSPECIFIED 回 invalid_argument。
+  optional hawkr.coupon.v1alpha1.CampaignStatus status = 3;
+  // 只列這個發行者；不設是全部。
+  optional IssuerFilter issuer = 4;
+}
+
+message ListCampaignsResponse {
+  repeated AdminCampaign campaigns = 1;
+  // 空字串表示最後一頁。
+  string next_page_token = 2;
+}
+
+message GetCampaignRequest {
+  string campaign_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetCampaignResponse {
+  AdminCampaign campaign = 1;
+  // DESIGNATED 的名單（買家 ID）。
+  repeated string designated_buyer_ids = 2;
+  // 各狀態的券數。
+  int32 available_count = 3;
+  int32 locked_count = 4;
+  int32 redeemed_count = 5;
+  int32 voided_count = 6;
+}
+
+message ListBuyerVouchersRequest {
+  string buyer_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+  int32 page_size = 2;
+  string page_token = 3;
+  // 只列這些狀態；空是全部。
+  repeated hawkr.coupon.v1alpha1.VoucherStatus statuses = 4;
+}
+
+message ListBuyerVouchersResponse {
+  repeated AdminVoucher vouchers = 1;
+  string next_page_token = 2;
+}

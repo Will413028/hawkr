@@ -414,8 +414,9 @@ var scenarios = []ch.Scenario[Driver]{
 			t.Errorf("issued/distributed = %d/%d，預期 1/0", res.Issued, res.Distributed)
 		}
 		got := mustFindIn(t, myCoupons(ctx, t, d, ch.Buyer2), tpl.ID)
-		if got.Claimed {
-			t.Errorf("只指定不代領，買家不該顯示已領取")
+		// 舊的只指定名單、不代領；單體的指定發放就是建立買家的券（D2、D6），買家的錢包裡已經有這張券。
+		if got.Claimed == d.Legacy() {
+			t.Errorf("claimed = %v，預期 %v（舊的只指定不代領；單體發的是買家持有的券）", got.Claimed, !d.Legacy())
 		}
 		if _, ok := find(myCoupons(ctx, t, d, ch.Buyer), tpl.ID); ok {
 			t.Errorf("沒被指定的買家看得到模板")
@@ -423,6 +424,9 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 	{Name: "admin issue with immediate distribution claims for the buyers", Run: func(ctx context.Context, t ch.T, d Driver) {
 		if skipWithoutAdminRPC(t, d) {
+			return
+		}
+		if skipOnMonolith(t, d, "D6：不保留代領（Distribute）；指定發放本身就建立買家的券") {
 			return
 		}
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetDesignated))
@@ -455,13 +459,23 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 		draft := ch.Must(t, ch.Ret(d.AdminCreate(ctx, ch.Admin, cashInput("coupon-"+ch.Nonce(), TargetDesignated))))
 		_, err := d.AdminIssue(ctx, ch.Admin, draft.ID, []string{AccountBuyer2}, false)
-		ch.WantKind(t, err, ErrWrongStatus)
+		// 舊的只回「狀態不允許」；單體帶 COUPON_CAMPAIGN_NOT_ACTIVE。
+		want := ErrWrongStatus
+		if !d.Legacy() {
+			want = ErrNotActive
+		}
+		ch.WantKind(t, err, want)
 	}},
 	{Name: "admin void rejects unknown vouchers and a missing reason", Run: func(ctx context.Context, t ch.T, d Driver) {
 		if skipWithoutAdminRPC(t, d) {
 			return
 		}
-		ch.WantKind(t, d.AdminVoid(ctx, ch.Admin, d.Unknown(), "test"), ErrWrongStatus)
+		// 舊的對不存在的券回「狀態不允許」；單體回 not_found。
+		want := ErrWrongStatus
+		if !d.Legacy() {
+			want = ch.ErrNotFound
+		}
+		ch.WantKind(t, d.AdminVoid(ctx, ch.Admin, d.Unknown(), "test"), want)
 		ch.WantKind(t, d.AdminVoid(ctx, ch.Admin, d.Unknown(), ""), ch.ErrInvalid)
 	}},
 	{Name: "available coupons apply the threshold and estimate the discount", Run: func(ctx context.Context, t ch.T, d Driver) {
@@ -642,7 +656,20 @@ func mustDetail(ctx context.Context, t ch.T, d Driver, c ch.Caller, id string) S
 	return ch.Must(t, ch.Ret(d.SellerDetail(ctx, c, id)))
 }
 
-// skipWithoutAdminRPC 在沒有 admin 對外 API 的 driver 跳過專門驗 admin RPC 行為的情境（Connect 還沒有 admin API）。回傳 true 時情境直接結束。
+// skipOnMonolith 在單體（Connect）一端跳過情境：計畫刪掉了舊實作的這個能力，情境只驗舊的一端。回傳 true 時情境直接結束。
+func skipOnMonolith(t ch.T, d Driver, why string) bool {
+	if d.Legacy() {
+		return false
+	}
+	s, ok := t.(interface{ Skipf(string, ...any) })
+	if !ok {
+		panic("skipOnMonolith：這個 T 不能跳過，情境不能在單體的一端靜默通過")
+	}
+	s.Skipf("單體不保留這個能力：%s", why)
+	return true
+}
+
+// skipWithoutAdminRPC 在沒有 admin 對外 API 的 driver 跳過專門驗 admin RPC 行為的情境。回傳 true 時情境直接結束。
 func skipWithoutAdminRPC(t ch.T, d Driver) bool {
 	if d.AdminRPC() {
 		return false
@@ -651,7 +678,7 @@ func skipWithoutAdminRPC(t ch.T, d Driver) bool {
 	if !ok {
 		panic("skipWithoutAdminRPC：這個 T 不能跳過，情境不能靜默通過")
 	}
-	s.Skipf("Connect 還沒有 admin API：這個情境驗的是 admin RPC 本身")
+	s.Skipf("這個 driver 沒有 admin 對外 API：這個情境驗的是 admin RPC 本身")
 	return true
 }
 

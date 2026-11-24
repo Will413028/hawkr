@@ -1,0 +1,184 @@
+{
+ "mutants": [
+  {
+   "id": "void-audit-record-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/admin.go",
+   "old": "return m.record(ctx, actor, auditVoucher, in.VoucherID.String(), map[string]any{\"reason\": in.Reason})",
+   "new": "return nil",
+   "test": "internal/modules/coupon ^TestAdminWritesRecordOneAuditRowEach$",
+   "why": "AdminVoidVoucher 作廢後不寫後台動作紀錄：營運作廢單張券沒有稽核紀錄，測試要紅。"
+  },
+  {
+   "id": "create-audit-record-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/admin.go",
+   "old": "\t\treturn m.record(ctx, actor, auditCampaign, c.ID.String(), map[string]any{\n\t\t\t\"title\": c.Title, \"target_type\": string(c.TargetType), \"store_id\": c.StoreID, \"total_limit\": c.TotalLimit,\n\t\t})",
+   "new": "\t\treturn nil",
+   "test": "internal/modules/coupon ^TestAdminWritesRecordOneAuditRowEach$",
+   "why": "AdminCreateCampaign 建立活動不寫後台動作紀錄，測試要紅。"
+  },
+  {
+   "id": "grant-audit-record-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/admin.go",
+   "old": "\t\treturn m.record(ctx, actor, auditCampaign, in.CampaignID.String(), map[string]any{\n\t\t\t\"granted_buyers\": len(in.BuyerIDs), \"issued\": res.Issued, \"already_held\": res.AlreadyHeld,\n\t\t})",
+   "new": "\t\treturn nil",
+   "test": "internal/modules/coupon ^TestAdminWritesRecordOneAuditRowEach$",
+   "why": "AdminIssue 指定發放不寫後台動作紀錄，測試要紅。"
+  },
+  {
+   "id": "audit-failure-does-not-roll-back-domain",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/admin.go",
+   "old": "\t\tif err := m.campaign.Publish(ctx, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn m.record(ctx, actor, auditCampaign, id.String(), nil)",
+   "new": "\t\tif err := m.campaign.Publish(ctx, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\t_ = m.record(ctx, actor, auditCampaign, id.String(), nil)\n\t\treturn nil",
+   "test": "internal/modules/coupon ^TestAdminAuditAndDomainChangeCommitOrRollBackTogether$",
+   "why": "紀錄寫失敗被吞掉：發布照常提交、沒有稽核紀錄（紀錄與領域變更不再一起成敗），測試要紅。"
+  },
+  {
+   "id": "list-declared-audited",
+   "stack": "go",
+   "file": "backend/internal/httpapi/adminauth/adminauth.go",
+   "old": "requires(adminperm.CouponCampaignsList, auditReadOnly)",
+   "new": "requires(adminperm.CouponCampaignsList, auditAudited)",
+   "test": "internal/httpapi/adminauth ^TestCouponAdminMethodsDeclareTheirOwnPermission$",
+   "why": "ListCampaigns 唯讀方法被宣告成 audited：唯讀要求寫後台紀錄卻沒人寫，測試要紅。"
+  },
+  {
+   "id": "write-declared-read-only",
+   "stack": "go",
+   "file": "backend/internal/httpapi/adminauth/adminauth.go",
+   "old": "requires(adminperm.CouponVouchersGrant, auditAudited)",
+   "new": "requires(adminperm.CouponVouchersGrant, auditReadOnly)",
+   "test": "internal/httpapi/adminauth ^TestCouponAdminMethodsDeclareTheirOwnPermission$",
+   "why": "GrantVouchers 寫入方法被宣告成唯讀：不要求留紀錄，測試要紅。"
+  },
+  {
+   "id": "void-wrong-permission",
+   "stack": "go",
+   "file": "backend/internal/httpapi/adminauth/adminauth.go",
+   "old": "requires(adminperm.CouponVouchersVoid, auditAudited)",
+   "new": "requires(adminperm.CouponCampaignsEnd, auditAudited)",
+   "test": "internal/httpapi/adminauth ^TestCouponAdminMethodsDeclareTheirOwnPermission$",
+   "why": "VoidVoucher 宣告成結束活動的權限：作廢券與結束活動共用權限，測試要紅。"
+  },
+  {
+   "id": "buyer-vouchers-wrong-permission",
+   "stack": "go",
+   "file": "backend/internal/httpapi/adminauth/adminauth.go",
+   "old": "requires(adminperm.CouponVouchersList, auditReadOnly)",
+   "new": "requires(adminperm.CouponCampaignsGet, auditReadOnly)",
+   "test": "internal/httpapi/adminauth ^TestCouponAdminMethodsDeclareTheirOwnPermission$",
+   "why": "ListBuyerVouchers 宣告成讀活動明細的權限，測試要紅。"
+  },
+  {
+   "id": "admin-limit-zero-passes-as-no-limit",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/admin.go",
+   "old": "if in.GetTotalIssueLimit() < 1 {",
+   "new": "if in.GetTotalIssueLimit() < 0 {",
+   "test": "internal/httpapi/coupon ^TestAdminCreateCampaignDistinguishesNoLimitFromZero$",
+   "why": "後台 CreateCampaign 不再擋上限 0：0 傳給模組變成「無上限」，「無發放上限」與「上限 0」混在一起，測試要紅。"
+  },
+  {
+   "id": "admin-no-limit-wire-as-zero",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/convert.go",
+   "old": "\tif c.TotalLimit != nil {\n\t\tl := *c.TotalLimit\n\t\tout.TotalIssueLimit = &l\n\t}\n",
+   "new": "\tl := int32(0)\n\tif c.TotalLimit != nil {\n\t\tl = *c.TotalLimit\n\t}\n\tout.TotalIssueLimit = &l\n",
+   "test": "internal/httpapi/coupon ^TestAdminCreateCampaignDistinguishesNoLimitFromZero$",
+   "why": "後台看到的無上限活動 total_issue_limit 送成 0，測試要紅。"
+  },
+  {
+   "id": "list-platform-filter-ignored",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/admin.go",
+   "old": "in.PlatformOnly, issuerKey = true, \"platform\"",
+   "new": "in.PlatformOnly, issuerKey = false, \"platform\"",
+   "test": "internal/httpapi/coupon ^TestAdminListCampaignsFiltersAndBindsThePageTokenToThem$",
+   "why": "ListCampaigns 的「只列平台」條件沒有交給模組，篩選失效，測試要紅。"
+  },
+  {
+   "id": "list-store-filter-ignored",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/admin.go",
+   "old": "in.StoreID, err = rpc.ParseID(\"issuer.store_id\", i.StoreId); err != nil {",
+   "new": "_, err = rpc.ParseID(\"issuer.store_id\", i.StoreId); err != nil {",
+   "test": "internal/httpapi/coupon ^TestAdminListCampaignsFiltersAndBindsThePageTokenToThem$",
+   "why": "ListCampaigns 的店家篩選沒有交給模組，篩選失效，測試要紅。"
+  },
+  {
+   "id": "list-status-filter-ignored",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/admin.go",
+   "old": "\t\tin.Status = rpc.EnumFromProto[coupon.CampaignStatus](msg.GetStatus())\n\t\tif in.Status != coupon.StatusDraft && in.Status != coupon.StatusActive && in.Status != coupon.StatusEnded {\n\t\t\treturn nil, rpc.RequiredField(\"status\", \"status 必須是已知的活動狀態\")\n\t\t}\n\t\tstatusKey = string(in.Status)",
+   "new": "\t\tstatus := rpc.EnumFromProto[coupon.CampaignStatus](msg.GetStatus())\n\t\tif status != coupon.StatusDraft && status != coupon.StatusActive && status != coupon.StatusEnded {\n\t\t\treturn nil, rpc.RequiredField(\"status\", \"status 必須是已知的活動狀態\")\n\t\t}\n\t\tstatusKey = string(status)",
+   "test": "internal/httpapi/coupon ^TestAdminListCampaignsFiltersAndBindsThePageTokenToThem$",
+   "why": "ListCampaigns 的狀態條件沒有交給模組，篩選失效，測試要紅。"
+  },
+  {
+   "id": "list-sql-issuer-filter-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "AND ($2::text IS NULL OR issuer_type = $2::text)",
+   "new": "AND ($2::text IS NULL OR TRUE)",
+   "test": "internal/modules/coupon ^TestAdminListCampaignsFiltersAndPages$",
+   "why": "後台列表的 SQL 忽略發行者種類：平台篩選回出店家活動，測試要紅。"
+  },
+  {
+   "id": "list-sql-status-filter-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "AND ($1::text IS NULL OR status = $1::text)\n  AND ($2::text IS NULL OR issuer_type",
+   "new": "AND ($1::text IS NULL OR TRUE)\n  AND ($2::text IS NULL OR issuer_type",
+   "test": "internal/modules/coupon ^TestAdminListCampaignsFiltersAndPages$",
+   "why": "後台列表的 SQL 忽略狀態：ENDED 篩選回出所有活動，測試要紅。"
+  },
+  {
+   "id": "list-sql-includes-compensation",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "WHERE target_type <> 'COMPENSATION'\n  AND ($1::text IS NULL OR status = $1::text)",
+   "new": "WHERE TRUE\n  AND ($1::text IS NULL OR status = $1::text)",
+   "test": "internal/modules/coupon ^TestAdminListCampaignsFiltersAndPages$",
+   "why": "後台列表混進系統建立的補償活動，測試要紅。"
+  },
+  {
+   "id": "end-campaign-calls-publish",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/admin.go",
+   "old": "res, err := h.m.AdminEndCampaign(ctx, actor, coupon.EndCampaignInput{CampaignID: id, Reason: req.Msg.GetReason()})",
+   "new": "err = h.m.AdminPublishCampaign(ctx, actor, id)\n\tres := coupon.EndCampaignResult{}",
+   "test": "internal/httpapi/coupon ^TestAdminWritesCarryTheActorToTheModule$",
+   "why": "EndCampaign 改呼叫 PublishCampaign：結束活動變成發布，測試要紅。"
+  },
+  {
+   "id": "void-reason-optional",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/admin.go",
+   "old": "if reason == \"\" {",
+   "new": "if false {",
+   "test": "internal/httpapi/coupon ^TestAdminWriteInputValidation$",
+   "why": "VoidVoucher 不再要求理由：作廢沒有理由也成功，測試要紅。"
+  },
+  {
+   "id": "quota-zero-accepted",
+   "stack": "go",
+   "file": "backend/internal/httpapi/coupon/admin.go",
+   "old": "if req.Msg.GetMaxActiveCampaigns() < 1 {",
+   "new": "if req.Msg.GetMaxActiveCampaigns() < 0 {",
+   "test": "internal/httpapi/coupon ^TestAdminWriteInputValidation$",
+   "why": "SetSellerQuota 接受 0：配額必須是正值，測試要紅。"
+  },
+  {
+   "id": "end-ignores-admin-scope",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/admin.go",
+   "old": "in.AdminID, in.StoreID = actor.AdminID, 0",
+   "new": "in.AdminID, in.StoreID = actor.AdminID, 501",
+   "test": "internal/modules/coupon ^TestAdminWritesRecordOneAuditRowEach$",
+   "why": "後台結束被限制在某家店的範圍：結束別人的活動回 not_found，測試要紅。"
+  }
+ ]
+}

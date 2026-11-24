@@ -1738,7 +1738,7 @@ class InboxSignal extends $pb.GeneratedMessage {
 
   /// 上一則訊號之後在這條串流上新建的通知、或被聚合更新（合併進同一則未讀通知）的收件匣項目 ID，依到達順序、不重複；
   /// client 只對這些 ID 做 toast，不比對列表。聚合更新會讓同一個 ID 再出現，client 以 ID 去重並更新既有的 toast。
-  /// 連線建立與重連的第一則、只有已讀或刪除變化時為空。每個 ID 在一條串流上至多送達一次：斷線期間的缺口不補送，收件匣與未讀數仍以列表為準。
+  /// 連線建立與重連的第一則、只有已讀或刪除變化時為空。每次新建或聚合更新在一條串流上至多送達一次：斷線期間的缺口不補送，收件匣與未讀數仍以列表為準。
   @$pb.TagNumber(4)
   $pb.PbList<$core.String> get newInboxItemIds => $_getList(3);
 
