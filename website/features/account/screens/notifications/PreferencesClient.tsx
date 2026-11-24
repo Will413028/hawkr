@@ -82,7 +82,9 @@ function PreferencesContent({
 	const ut = useUiText();
 	const defaults = useDefaultErrorText();
 	const [entries, setEntries] = React.useState<PreferenceEntry[]>([]);
-	const [pendingKey, setPendingKey] = React.useState<string | null>(null);
+	const [pendingKeys, setPendingKeys] = React.useState<ReadonlySet<string>>(
+		new Set(),
+	);
 	const [error, setError] = React.useState<string | null>(null);
 	const [savedAt, setSavedAt] = React.useState<number | null>(null);
 
@@ -101,9 +103,10 @@ function PreferencesContent({
 	// the source of truth for the NEXT mount.
 	const seededRoleRef = React.useRef<string | null>(null);
 	React.useEffect(() => {
-		if (loading || seededRoleRef.current === role) return;
+		if (loading || remoteEntries == null || seededRoleRef.current === role)
+			return;
 		seededRoleRef.current = role;
-		setEntries(remoteEntries ?? []);
+		setEntries(remoteEntries);
 	}, [remoteEntries, loading, role]);
 
 	const setEnabled = (target: PreferenceEntry, enabled: boolean) =>
@@ -125,7 +128,8 @@ function PreferencesContent({
 		// re-render could still call this; bail out before hitting the API.
 		if (!target.canDisable) return;
 		setEnabled(target, nextEnabled);
-		setPendingKey(entryKey(target.category, target.channel));
+		const key = entryKey(target.category, target.channel);
+		setPendingKeys((prev) => new Set(prev).add(key));
 		setError(null);
 		setSavedAt(null);
 		try {
@@ -143,7 +147,11 @@ function PreferencesContent({
 			setEnabled(target, !nextEnabled);
 			setError(errorText(e, defaults));
 		} finally {
-			setPendingKey(null);
+			setPendingKeys((prev) => {
+				const next = new Set(prev);
+				next.delete(key);
+				return next;
+			});
 		}
 	};
 
@@ -174,7 +182,7 @@ function PreferencesContent({
 					<>
 						<ul className="list-none m-0 p-0 flex flex-col gap-[var(--hkui-space-2)]">
 							{groups.map((group) => {
-								const locked = group.entries.some((e) => !e.canDisable);
+								const locked = group.entries.every((e) => !e.canDisable);
 								return (
 									<li
 										key={group.category}
@@ -202,10 +210,9 @@ function PreferencesContent({
 														ut,
 														notificationNotificationChannel(entry.channel),
 													)}
-													pending={
-														pendingKey ===
-														entryKey(entry.category, entry.channel)
-													}
+													pending={pendingKeys.has(
+														entryKey(entry.category, entry.channel),
+													)}
 													onToggle={(next) => void handleToggle(entry, next)}
 												/>
 											))}

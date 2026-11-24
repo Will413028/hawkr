@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
 	update: vi.fn(),
 	invalidate: vi.fn(async () => {}),
-	entries: [] as unknown[],
+	entries: [] as unknown[] | null,
 }));
 
 vi.mock("@/lib/intl/navigation", () => ({
@@ -47,6 +47,16 @@ afterEach(() => {
 	cleanup();
 	vi.clearAllMocks();
 });
+
+function deferred() {
+	let resolve!: () => void;
+	let reject!: (e: unknown) => void;
+	const promise = new Promise<void>((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+	return { promise, resolve, reject };
+}
 
 const entry = (
 	category: NotificationCategory,
@@ -139,5 +149,76 @@ describe("PreferencesClient", () => {
 			fireEvent.click(box);
 		});
 		expect(box.checked).toBe(true);
+	});
+
+	it("分類層的「強制接收」只在全部渠道都不可關閉時出現", () => {
+		mocks.entries = [
+			entry(
+				NotificationCategory.ANNOUNCEMENT,
+				NotificationChannel.INBOX,
+				false,
+			),
+			entry(NotificationCategory.ANNOUNCEMENT, NotificationChannel.PUSH, true),
+			entry(
+				NotificationCategory.SHIPMENT_ANOMALY,
+				NotificationChannel.PUSH,
+				false,
+			),
+		];
+		const view = mount();
+		const rows = view.container.querySelectorAll("li");
+		expect(rows[0]?.textContent).not.toContain("強制接收，無法關閉");
+		expect(rows[0]?.textContent).toContain("強制開啟");
+		expect(rows[1]?.textContent).toContain("強制接收，無法關閉");
+	});
+
+	it("第一次讀取失敗、重讀成功後開關用讀到的資料填入", () => {
+		mocks.entries = null;
+		const view = mount();
+		expect(
+			view.container.querySelectorAll("input[type=checkbox]"),
+		).toHaveLength(0);
+		mocks.entries = [
+			entry(NotificationCategory.ORDER, NotificationChannel.INBOX),
+		];
+		view.rerender(
+			h(
+				NextIntlClientProvider,
+				{ locale: "zh-TW", messages: messagesFor("zh-TW") },
+				h(PreferencesClient, null),
+			),
+		);
+		expect(
+			view.container.querySelectorAll("input[type=checkbox]"),
+		).toHaveLength(1);
+	});
+
+	it("連續切換兩個開關，各自在自己的請求完成前維持停用", async () => {
+		mocks.entries = [
+			entry(NotificationCategory.ORDER, NotificationChannel.INBOX),
+			entry(NotificationCategory.ORDER, NotificationChannel.PUSH),
+		];
+		const first = deferred();
+		const second = deferred();
+		mocks.update
+			.mockReturnValueOnce(first.promise)
+			.mockReturnValueOnce(second.promise);
+		const view = mount();
+		const boxes = view.container.querySelectorAll<HTMLInputElement>(
+			"input[type=checkbox]",
+		);
+		await act(async () => {
+			fireEvent.click(boxes[0] as HTMLInputElement);
+		});
+		await act(async () => {
+			fireEvent.click(boxes[1] as HTMLInputElement);
+		});
+		expect(boxes[0]?.disabled).toBe(true);
+		expect(boxes[1]?.disabled).toBe(true);
+		await act(async () => first.resolve());
+		expect(boxes[0]?.disabled).toBe(false);
+		expect(boxes[1]?.disabled).toBe(true);
+		await act(async () => second.resolve());
+		expect(boxes[1]?.disabled).toBe(false);
 	});
 });

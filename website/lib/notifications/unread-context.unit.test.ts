@@ -4,7 +4,10 @@ import { StateRefreshHint } from "@hawkr/api/gen/hawkr/notification/v1alpha1/not
 import { act, cleanup, render } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NOTIFICATION_SIGNAL_EVENT } from "@/lib/notifications/events";
+import {
+	NOTIFICATION_SIGNAL_EVENT,
+	SELLER_WORKSPACE_SIGNAL_EVENT,
+} from "@/lib/notifications/events";
 import type { NotificationSignal } from "@/lib/notifications/watch";
 
 const mocks = vi.hoisted(() => ({
@@ -156,6 +159,7 @@ describe("NotificationUnreadProvider 持有通知串流並分派訊號", () => {
 			expect(detail).toHaveLength(0);
 			await act(async () => watch.onSignal(reconnected(true)));
 			expect(detail).toHaveLength(1);
+			expect(detail[0]).not.toHaveProperty("unreadCount");
 			expect([...detail[0].hints].sort()).toEqual(
 				[
 					StateRefreshHint.ORDER,
@@ -165,6 +169,26 @@ describe("NotificationUnreadProvider 持有通知串流並分派訊號", () => {
 			);
 		} finally {
 			window.removeEventListener(NOTIFICATION_SIGNAL_EVENT, listener);
+		}
+	});
+
+	it("賣家工作區訊號與異常重連由同一條串流轉發，且只開一條", async () => {
+		const kinds: string[] = [];
+		const listener = (e: Event) =>
+			kinds.push((e as CustomEvent<{ kind: string }>).detail.kind);
+		window.addEventListener(SELLER_WORKSPACE_SIGNAL_EVENT, listener);
+		try {
+			const watch = mount();
+			await act(async () => {});
+			await act(async () => {
+				watch.onSignal({ type: "sellerWorkspace", change: "order" });
+				watch.onSignal(reconnected(false));
+				watch.onSignal(reconnected(true));
+			});
+			expect(kinds).toEqual(["change", "reconnected"]);
+			expect(mocks.watches).toHaveLength(1);
+		} finally {
+			window.removeEventListener(SELLER_WORKSPACE_SIGNAL_EVENT, listener);
 		}
 	});
 

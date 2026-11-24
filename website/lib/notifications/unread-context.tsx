@@ -9,6 +9,8 @@ import { invalidateNotificationLists } from "@/lib/notifications/cache";
 import {
 	NOTIFICATION_SIGNAL_EVENT,
 	type NotificationSignalEventDetail,
+	SELLER_WORKSPACE_SIGNAL_EVENT,
+	type SellerWorkspaceSignalEventDetail,
 } from "@/lib/notifications/events";
 import { audienceForRole } from "@/lib/notifications/inbox";
 import {
@@ -41,7 +43,7 @@ import type { SseConnectionStatus } from "@/lib/sse/client";
  *   - the stream giving up (`unavailable`) → one recovery read, not polling.
  *
  * Connection status is read with `useNotificationStreamStatus`. The seller
- * workspace has its own connection (`useSellerWorkspaceRealtime`).
+ * workspace signals are forwarded on `SELLER_WORKSPACE_SIGNAL_EVENT` (no second stream).
  */
 
 const ALL_STATE_REFRESH_HINTS: number[] = [
@@ -49,6 +51,15 @@ const ALL_STATE_REFRESH_HINTS: number[] = [
 	StateRefreshHint.AFTER_SALE,
 	StateRefreshHint.SELLER_STATUS,
 ];
+
+function dispatchSellerWorkspace(
+	kind: SellerWorkspaceSignalEventDetail["kind"],
+) {
+	const detail: SellerWorkspaceSignalEventDetail = { kind };
+	window.dispatchEvent(
+		new CustomEvent(SELLER_WORKSPACE_SIGNAL_EVENT, { detail }),
+	);
+}
 
 const NotificationUnreadContext = React.createContext<UnreadCountState | null>(
 	null,
@@ -119,18 +130,20 @@ export function NotificationUnreadProvider({
 					window.dispatchEvent(
 						new CustomEvent(NOTIFICATION_SIGNAL_EVENT, { detail }),
 					);
+				} else if (signal.type === "sellerWorkspace") {
+					dispatchSellerWorkspace("change");
 				} else if (signal.type === "reconnected" && signal.afterAbnormalEnd) {
 					void unreadRef.current.refresh();
 					invalidateRef.current();
 					// Signals during the gap may be lost: tell every state-refresh
 					// subscriber to re-read, as the backend does on reconnect.
 					const detail: NotificationSignalEventDetail = {
-						unreadCount: unreadRef.current.count,
 						hints: ALL_STATE_REFRESH_HINTS,
 					};
 					window.dispatchEvent(
 						new CustomEvent(NOTIFICATION_SIGNAL_EVENT, { detail }),
 					);
+					dispatchSellerWorkspace("reconnected");
 				}
 			},
 			setStreamStatus,
