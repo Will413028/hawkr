@@ -39,13 +39,13 @@ catalog:
   "@types/react": 19.3.0
   "@types/react-dom": 19.3.0
   next: 16.4.5
-  next-intl: 4.14.9
+  next-intl: 4.14.10
   react: 19.3.1
   react-dom: 19.3.1
   tsx: ^4.23.15
   typescript: 7.0.2
   typescript-compiler-api: npm:@typescript/typescript6@6.0.2
-  use-intl: 4.14.9
+  use-intl: 4.14.10
   vitest: 5.1.0
 
 # 依賴發佈滿兩週才安裝（根目錄 AGENTS.md 的供應鏈規則），單位是分鐘。
