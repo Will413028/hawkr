@@ -527,6 +527,15 @@ func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublica
 	return m.rfq.ExecutePublication(ctx, in)
 }
 
+// MarkInviteSent 與 MarkInviteFailed 由邀請事件的投遞者（A9-3c-5 的 relay，A8-3 起換成 notification 的意圖 job）寫入邀請的投遞狀態：QUEUED 轉 SENT 或 FAILED，已是終態或不存在時不做事。
+func (m *Module) MarkInviteSent(ctx context.Context, inviteID uuid.UUID) error {
+	return m.rfq.MarkInviteSent(ctx, inviteID)
+}
+
+func (m *Module) MarkInviteFailed(ctx context.Context, inviteID uuid.UUID) error {
+	return m.rfq.MarkInviteFailed(ctx, inviteID)
+}
+
 // 買家對賣家回價的使用的型別。
 type (
 	// SellerResponse 是買家看到的一份賣家回價（目前版本），SellerQuote 是它的報價內容，SellerResponsePage 是 ListSellerResponses 的一頁。

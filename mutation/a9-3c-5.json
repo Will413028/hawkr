@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "payload-store-key-renamed",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "StoreID       string `json:\"storeId\"`",
+   "new": "StoreID       string `json:\"store_id\"`",
+   "test": "internal/legacy/procurementrelay ^TestPayloadMatchesTheGoldenFixtureFieldByField$",
+   "why": "The invite payload renames storeId to store_id, which the notification template cannot resolve (silent zero deliveries)."
+  },
+  {
+   "id": "invite-never-marked-sent",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "\t\treturn w.Invites.MarkInviteSent(ctx, a.InviteID)\n",
+   "new": "\t\treturn nil\n",
+   "test": "internal/legacy/procurementrelay ^TestPublishEnqueuesJobsThatSendTheEventAndMarkTheInvitesSent$",
+   "why": "A sent invite event never moves the invite from QUEUED to SENT."
+  },
+  {
+   "id": "exhausted-invite-not-marked-failed",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "\tif !last {\n\t\treturn sendErr\n\t}\n",
+   "new": "\tif true {\n\t\treturn sendErr\n\t}\n",
+   "test": "internal/legacy/procurementrelay ^TestExhaustedRetriesMarkTheInviteFailed$",
+   "why": "An invite whose event could not be sent after the last attempt stays QUEUED instead of FAILED."
+  },
+  {
+   "id": "enqueue-outside-the-publish-tx",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "q.Enqueue(ctx, InviteCreatedArgs{",
+   "new": "q.Enqueue(context.Background(), InviteCreatedArgs{",
+   "test": "internal/legacy/procurementrelay ^TestRolledBackPublishEnqueuesNothing$",
+   "why": "The relay job is enqueued outside the publish transaction, so a rolled-back publish still queues invite events."
+  }
+ ]
+}

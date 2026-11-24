@@ -135,5 +135,10 @@ type Worker struct {
 func NewWorker(s Sender) *Worker { return &Worker{s: s} }
 
 func (w *Worker) Work(ctx context.Context, job *river.Job[PublishArgs]) error {
-	return w.s.Publish(ctx, job.Args.Exchange, job.Args.RoutingKey, job.Args.Body)
+	return w.Send(ctx, job.Args)
+}
+
+// Send 同步送出一則 PublishArgs，不經 River：呼叫端要在送出成功或失敗時寫自己的狀態（採購邀請的投遞狀態）。
+func (w *Worker) Send(ctx context.Context, a PublishArgs) error {
+	return w.s.Publish(ctx, a.Exchange, a.RoutingKey, a.Body)
 }
