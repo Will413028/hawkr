@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/announce"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/app"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/deliver"
@@ -28,7 +29,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/stream"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/suppress"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/fcm"
@@ -54,6 +57,9 @@ type Buyers = intake.Buyers
 
 // Stores 是 worker 對 seller 的需求（*seller.Module 滿足它）：以 FOR KEY SHARE 鎖住收件店家列，店家已退場回 NotFound。
 type Stores = intake.Stores
+
+// StoreCodes 讀取多家店的 store_code（store_id 到 store_code）。
+type StoreCodes = app.StoreCodes
 
 // Contacts 是渠道 job 對 identity 的需求（*identity.Module 滿足它）：帳號的聯絡信箱與來源，只寄已驗證的信箱。
 type Contacts = deliver.Contacts
@@ -94,6 +100,8 @@ type Deps struct {
 	// Resolver 是 worker 端解析收件人、封鎖檢查與追蹤者展開要問的地方（*buyer.Module 與 *seller.Module 經 NewResolver 組成）；
 	// 只有宣告 Expand 或 Broadcast 的型別用到，沒有這類型別的測試可以不給。
 	Resolver Resolver
+	// StoreCodes 讀取店家的 store_code，內容型別的深連結讀取時用（*seller.Module 經 NewStoreCodes 組成）；沒有內容型別的測試可以不給。
+	StoreCodes StoreCodes
 	// ListenConnConfig 是串流 LISTEN 專用連線的設定，必須指向直連或 session 模式的 Postgres，不能經 transaction pooling；nil 時以主連線池的設定另開（不從池借）。
 	ListenConnConfig *pgx.ConnConfig
 }
@@ -116,7 +124,7 @@ type Module struct {
 func New(d Deps) *Module { return newModule(d, registry.Registry{}) }
 
 func newModule(d Deps, reg app.Registry) *Module {
-	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger})
+	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Signals: dbSignals{d.DB}, StoreCodes: d.StoreCodes, Now: d.Now, Logger: d.Logger})
 	hub := stream.NewHub(inboxReader(appSvc), d.Logger, d.Now)
 	locks := intake.Locks{Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller}
 	hasher := suppress.NewHasher(d.SuppressionKeys)
@@ -240,6 +248,66 @@ func (m *Module) OnSuspended(ctx context.Context, e accountsuspension.Suspended)
 // OnUnsuspended 是 accountsuspension.Unsuspended 的同步訂閱者，同 OnSuspended。
 func (m *Module) OnUnsuspended(ctx context.Context, e accountsuspension.Unsuspended) error {
 	return m.intake.OnUnsuspended(ctx, e)
+}
+
+// OnCommentCreated 是 social.CommentCreated 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnCommentCreated(ctx context.Context, e social.CommentCreated) error {
+	return m.intake.OnCommentCreated(ctx, e)
+}
+
+// OnCommentRepliedToBuyer 是 social.CommentReplied 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnCommentRepliedToBuyer(ctx context.Context, e social.CommentReplied) error {
+	return m.intake.OnCommentRepliedToBuyer(ctx, e)
+}
+
+// OnCommentRepliedToStore 是 social.CommentReplied 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnCommentRepliedToStore(ctx context.Context, e social.CommentReplied) error {
+	return m.intake.OnCommentRepliedToStore(ctx, e)
+}
+
+// OnCommentLikedBuyerAuthor 是 social.CommentLiked 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnCommentLikedBuyerAuthor(ctx context.Context, e social.CommentLiked) error {
+	return m.intake.OnCommentLikedBuyerAuthor(ctx, e)
+}
+
+// OnCommentLikedStoreAuthor 是 social.CommentLiked 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnCommentLikedStoreAuthor(ctx context.Context, e social.CommentLiked) error {
+	return m.intake.OnCommentLikedStoreAuthor(ctx, e)
+}
+
+// OnPostLiked 是 social.PostLiked 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnPostLiked(ctx context.Context, e social.PostLiked) error {
+	return m.intake.OnPostLiked(ctx, e)
+}
+
+// OnPostPublished 是 social.PostPublished 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnPostPublished(ctx context.Context, e social.PostPublished) error {
+	return m.intake.OnPostPublished(ctx, e)
+}
+
+// OnSellerFollowed 是 buyer.SellerFollowed 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnSellerFollowed(ctx context.Context, e buyer.SellerFollowed) error {
+	return m.intake.OnSellerFollowed(ctx, e)
+}
+
+// OnRestockTargeted 是 buyer.RestockTargeted 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnRestockTargeted(ctx context.Context, e buyer.RestockTargeted) error {
+	return m.intake.OnRestockTargeted(ctx, e)
+}
+
+// OnReviewCreated 是 review.ReviewCreated 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnReviewCreated(ctx context.Context, e review.ReviewCreated) error {
+	return m.intake.OnReviewCreated(ctx, e)
+}
+
+// OnMessageSentToBuyer 是 im.MessageSent 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnMessageSentToBuyer(ctx context.Context, e im.MessageSent) error {
+	return m.intake.OnMessageSentToBuyer(ctx, e)
+}
+
+// OnMessageSentToStore 是 im.MessageSent 的同步訂閱者，同 OnSuspended。
+func (m *Module) OnMessageSentToStore(ctx context.Context, e im.MessageSent) error {
+	return m.intake.OnMessageSentToStore(ctx, e)
 }
 
 // OnAccountDeleted 是 identity.AccountDeleted 的同步訂閱者：只在發布的 transaction 內排個資清除 job。

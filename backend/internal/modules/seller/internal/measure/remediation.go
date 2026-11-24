@@ -85,7 +85,7 @@ func (s *Service) DecideRemediation(ctx context.Context, in model.DecideRemediat
 		}
 		var after store.SellerMeasure
 		if in.Outcome == model.RequestAccepted {
-			if after, err = s.endNow(ctx, q, locked, row, current.StatementToSeller, in.AdminID, now); err != nil {
+			if after, err = s.endNow(ctx, q, locked, row, current.StatementToSeller, in.AdminID, decided.ID, now); err != nil {
 				return err
 			}
 		} else {

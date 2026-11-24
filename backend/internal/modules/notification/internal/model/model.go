@@ -48,6 +48,7 @@ const (
 	CategoryLike              PrefCategory = "LIKE"
 	CategoryFollow            PrefCategory = "FOLLOW"
 	CategoryFollowedStorePost PrefCategory = "FOLLOWED_STORE_POST"
+	CategoryProcurement       PrefCategory = "PROCUREMENT"
 	// 行銷。
 	CategoryCoupon  PrefCategory = "COUPON"
 	CategoryRestock PrefCategory = "RESTOCK"
@@ -83,7 +84,7 @@ var transactionalLocked = []Channel{ChannelInbox, ChannelEmail}
 // D18：公告只有收件匣與推播，收件匣不可關。
 var announcementLocked = []Channel{ChannelInbox}
 
-// 受眾的分類集合：SHIPMENT_ANOMALY 與 PAYOUT、REVIEW、FOLLOW 只有店家會收到；FOLLOWED_STORE_POST、COUPON、RESTOCK 只有買家會收到
+// 受眾的分類集合：SHIPMENT_ANOMALY 與 PAYOUT、REVIEW、FOLLOW、PROCUREMENT（D29）只有店家會收到；FOLLOWED_STORE_POST、COUPON、RESTOCK 只有買家會收到
 // （舊服務 notification_preference.go 的 SellerCategories／BuyerCategories 同樣如此，後者的註解說明配送異常不對買家開放）。
 var (
 	bothAudiences = []Audience{AudienceBuyer, AudienceStore}
@@ -104,12 +105,13 @@ var categoryDefs = []categoryDef{
 	{CategoryLike, ClassInteraction, bothAudiences, nil, nil},
 	{CategoryFollow, ClassInteraction, storeOnly, nil, nil},
 	{CategoryFollowedStorePost, ClassInteraction, buyerOnly, nil, nil},
+	{CategoryProcurement, ClassInteraction, storeOnly, nil, nil},
 	{CategoryCoupon, ClassMarketing, buyerOnly, nil, nil},
 	{CategoryRestock, ClassMarketing, buyerOnly, nil, nil},
 	{CategoryAnnouncement, ClassSystem, bothAudiences, announcementLocked, []Channel{ChannelEmail}},
 }
 
-// Categories 回傳全部偏好分類（D4 的 14 個加 D18 的 ANNOUNCEMENT）；每次回傳新的切片。
+// Categories 回傳全部偏好分類（D4 的 14 個、D29 的 PROCUREMENT 加 D18 的 ANNOUNCEMENT）；每次回傳新的切片。
 func Categories() []PrefCategory {
 	out := make([]PrefCategory, len(categoryDefs))
 	for i, d := range categoryDefs {

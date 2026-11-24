@@ -72,6 +72,9 @@ type PaymentAccount struct {
 	// StatusReason 是導出目前狀態的金流商原因碼（只給後台）。
 	StatusReason *string
 	FetchedAt    *time.Time
+	// RequirementsDeadline 是待補條件最早的期限（同步時覆寫，沒有時是 nil）；FirstActivatedAt 是轉帳能力第一次啟用的同步時間（沒啟用過是 nil，之後不改）。
+	RequirementsDeadline *time.Time
+	FirstActivatedAt     *time.Time
 	// CreateFailedAt 是建立重試用完的時刻；只有還沒完成建立的列才有。
 	CreateFailedAt *time.Time
 	// PurgeBlockedAt 與 PurgeBlockedReason 是清理進終局的時刻與原因（D59）；沒有進終局時是 nil。
@@ -112,12 +115,33 @@ func (StripeEmbeddedSession) onboardingSession() {}
 // PayoutAccountChanged 是同步 job 寫入帳戶快照的 transaction 內發布的事件（收款開通 ADR D28）：seller 以同 transaction 的訂閱者更新開通閘門讀的
 // transfers_active 副本，並把 BankFingerprints 寫成防詐比對 hash（D12）。每次同步都發布（fingerprint 可能在轉帳能力不變時改變）。
 // BankFingerprints 是 provider 的外部銀行帳號識別碼明文：發布方與訂閱者都不保存、不寫 log。
+//
+// FirstActivation 只在轉帳能力第一次啟用的那一次同步為真（之後停用再啟用不再為真，D23）；RequirementsDeadline 是這次同步讀到的待補條件最早期限，沒有時是 nil。
 type PayoutAccountChanged struct {
-	OccurredAt       time.Time
-	StoreID          int64
-	Provider         string
-	TransfersActive  bool
-	BankFingerprints []string
+	OccurredAt           time.Time
+	StoreID              int64
+	Provider             string
+	TransfersActive      bool
+	BankFingerprints     []string
+	FirstActivation      bool
+	RequirementsDeadline *time.Time
+}
+
+// DeadlineTier 是補件期限提醒的檔位：期限前超過一天是 SEVEN_DAYS（提醒窗口 7 天），最後一天是 ONE_DAY。
+type DeadlineTier string
+
+const (
+	DeadlineSevenDays DeadlineTier = "SEVEN_DAYS"
+	DeadlineOneDay    DeadlineTier = "ONE_DAY"
+)
+
+// PayoutDeadlineApproaching 由每小時的掃描在待補條件的最早期限進入 7 天窗口之後、每次掃描對每個帳戶發布一次（同一個期限與檔位會重複發布，消費者以「店家＋期限＋檔位」去重）：
+// 事件只帶店家、期限與檔位，不帶待補條件的內容（D23）。
+type PayoutDeadlineApproaching struct {
+	OccurredAt time.Time
+	StoreID    int64
+	Deadline   time.Time
+	Tier       DeadlineTier
 }
 
 // Positive 檢查 ID 都是正數。

@@ -203,7 +203,7 @@ func (s *Service) End(ctx context.Context, in model.EndMeasureInput) (model.Meas
 		if !current.CanEnd() {
 			return errActionUnavailable(current, model.MeasureActionEnd)
 		}
-		updated, err := s.endNow(ctx, q, locked, row, current.StatementToSeller, in.AdminID, now)
+		updated, err := s.endNow(ctx, q, locked, row, current.StatementToSeller, in.AdminID, uuid.UUID{}, now)
 		if err != nil {
 			return err
 		}
@@ -214,8 +214,8 @@ func (s *Service) End(ctx context.Context, in model.EndMeasureInput) (model.Meas
 }
 
 // endNow 是結束措施在同一個 transaction 要做的事（End 與接受解除請求共用，不經 CanEnd）：寫一版結束時間是現在的新版本（給賣家的
-// 理由 statement 不變，作者是 adminID）、重算帳號的停權期間、發 MeasureEnded。呼叫方已鎖住帳號與措施列，且已確認版本與狀態。
-func (s *Service) endNow(ctx context.Context, q *store.Queries, locked store.SellerStore, row store.SellerMeasure, statement string, adminID int64, now time.Time) (store.SellerMeasure, error) {
+// 理由 statement 不變，作者是 adminID）、重算帳號的停權期間、發 MeasureEnded（requestID 是接受的解除請求，End 是零值）。呼叫方已鎖住帳號與措施列，且已確認版本與狀態。
+func (s *Service) endNow(ctx context.Context, q *store.Queries, locked store.SellerStore, row store.SellerMeasure, statement string, adminID int64, requestID uuid.UUID, now time.Time) (store.SellerMeasure, error) {
 	updated, err := q.AdvanceMeasureRevision(ctx, store.AdvanceMeasureRevisionParams{
 		ID: row.ID, ExpectedVersion: row.Version, StatementToSeller: statement, EndsAt: &now, AdminID: &adminID, Now: now,
 	})
@@ -229,7 +229,7 @@ func (s *Service) endNow(ctx context.Context, q *store.Queries, locked store.Sel
 		return store.SellerMeasure{}, err
 	}
 	if err := events.Publish(ctx, s.d.Events, model.MeasureEnded{
-		EventID: uuid.NewV7(), OccurredAt: now, MeasureID: row.ID, StoreID: row.StoreID, AccountID: locked.AccountID,
+		EventID: uuid.NewV7(), OccurredAt: now, MeasureID: row.ID, StoreID: row.StoreID, AccountID: locked.AccountID, RequestID: requestID,
 	}); err != nil {
 		return store.SellerMeasure{}, err
 	}

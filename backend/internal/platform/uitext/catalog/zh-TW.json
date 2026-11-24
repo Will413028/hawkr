@@ -324,6 +324,10 @@
       "message": "撥款",
       "description": "撥款（交易必要，只有店家）。"
     },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT": {
+      "message": "詢價邀請",
+      "description": "詢價邀請（互動，只有店家）。"
+    },
     "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK": {
       "message": "補貨通知",
       "description": "補貨（行銷，只有買家）。"

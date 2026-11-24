@@ -92,6 +92,7 @@ const DEFAULT: Readonly<Partial<Record<UiTextKey, Formatter>>> = {
 	"notification.NotificationCategory.NOTIFICATION_CATEGORY_COUPON": () => "優惠券",
 	"notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK": () => "補貨通知",
 	"notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT": () => "系統公告",
+	"notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT": () => "詢價邀請",
 	"notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX": () => "收件匣",
 	"notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH": () => "推播",
 	"notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL": () => "Email",

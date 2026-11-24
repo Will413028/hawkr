@@ -362,7 +362,7 @@ func TestSubmitRules(t *testing.T) {
 	in := review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: 5, Content: "  好喝  "}
 	f.jobs.reset()
 	r := must[review.Review](t)(f.module.Submit(ctx, in))
-	if r.Content != "好喝" || len(f.created) != 1 || f.created[0].ReviewID != r.ID || f.created[0].ProductID != 700 || len(revalidations(f.jobs)) != 1 {
+	if r.Content != "好喝" || len(f.created) != 1 || f.created[0].ReviewID != r.ID || f.created[0].ProductID != 700 || f.created[0].BuyerID != b.BuyerID || len(revalidations(f.jobs)) != 1 {
 		t.Fatalf("提交：%+v events=%v jobs=%v", r, f.created, f.jobs.kinds())
 	}
 	if _, err := f.module.Submit(ctx, in); kindOf(err) != apperr.KindAlreadyExists || review.ReasonOf(err) != review.ReasonAlreadyExists {

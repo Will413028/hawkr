@@ -80,10 +80,11 @@ func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again 
 			reason = &reasonCode
 		}
 		enabled := status == model.PaymentEnabled
-		if _, err := q.ApplyPaymentSnapshot(ctx, store.ApplyPaymentSnapshotParams{
+		applied, err := q.ApplyPaymentSnapshot(ctx, store.ApplyPaymentSnapshotParams{
 			StoreID: storeID, Status: string(status), TransfersActive: enabled, PayoutsActive: snap.PayoutsActive && enabled,
-			Requirements: raw, StatusReason: reason, FetchedAt: &startedAt, Now: now,
-		}); errors.Is(err, pgx.ErrNoRows) {
+			Requirements: raw, RequirementsDeadline: snap.RequirementsDeadline, StatusReason: reason, FetchedAt: &startedAt, Now: now,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
 			// 較晚開始的讀取已經寫入：這次的快照較舊，不寫、不發布、不標記；只唯讀地回答還有沒有未處理的事件。
 			again, err = s.d.Inbox.RoutePending(ctx, before.Provider, external)
 			return err
@@ -92,6 +93,7 @@ func (s *Service) syncRow(ctx context.Context, row store.PaymentAccount) (again 
 		}
 		err = events.Publish(ctx, s.d.Events, model.PayoutAccountChanged{
 			OccurredAt: now, StoreID: storeID, Provider: before.Provider, TransfersActive: enabled, BankFingerprints: snap.BankFingerprints,
+			FirstActivation: before.FirstActivatedAt == nil && applied.FirstActivatedAt != nil, RequirementsDeadline: snap.RequirementsDeadline,
 		})
 		if err != nil {
 			return err

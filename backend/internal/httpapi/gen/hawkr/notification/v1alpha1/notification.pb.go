@@ -122,6 +122,8 @@ const (
 	NotificationCategory_NOTIFICATION_CATEGORY_RESTOCK NotificationCategory = 14
 	// 後台系統公告（兩個受眾都有；收件匣一定收到，推播可在偏好關閉）。
 	NotificationCategory_NOTIFICATION_CATEGORY_ANNOUNCEMENT NotificationCategory = 15
+	// 詢價邀請（互動，只有店家）。
+	NotificationCategory_NOTIFICATION_CATEGORY_PROCUREMENT NotificationCategory = 16
 )
 
 // Enum value maps for NotificationCategory.
@@ -143,6 +145,7 @@ var (
 		13: "NOTIFICATION_CATEGORY_COUPON",
 		14: "NOTIFICATION_CATEGORY_RESTOCK",
 		15: "NOTIFICATION_CATEGORY_ANNOUNCEMENT",
+		16: "NOTIFICATION_CATEGORY_PROCUREMENT",
 	}
 	NotificationCategory_value = map[string]int32{
 		"NOTIFICATION_CATEGORY_UNSPECIFIED":         0,
@@ -161,6 +164,7 @@ var (
 		"NOTIFICATION_CATEGORY_COUPON":              13,
 		"NOTIFICATION_CATEGORY_RESTOCK":             14,
 		"NOTIFICATION_CATEGORY_ANNOUNCEMENT":        15,
+		"NOTIFICATION_CATEGORY_PROCUREMENT":         16,
 	}
 )
 
@@ -1859,7 +1863,7 @@ const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\x14NotificationAudience\x12%\n" +
 	"!NOTIFICATION_AUDIENCE_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bNOTIFICATION_AUDIENCE_BUYER\x10\x01\x12\x1f\n" +
-	"\x1bNOTIFICATION_AUDIENCE_STORE\x10\x02*\xdc\x04\n" +
+	"\x1bNOTIFICATION_AUDIENCE_STORE\x10\x02*\x83\x05\n" +
 	"\x14NotificationCategory\x12%\n" +
 	"!NOTIFICATION_CATEGORY_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bNOTIFICATION_CATEGORY_ORDER\x10\x01\x12\"\n" +
@@ -1877,7 +1881,8 @@ const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	")NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST\x10\f\x12 \n" +
 	"\x1cNOTIFICATION_CATEGORY_COUPON\x10\r\x12!\n" +
 	"\x1dNOTIFICATION_CATEGORY_RESTOCK\x10\x0e\x12&\n" +
-	"\"NOTIFICATION_CATEGORY_ANNOUNCEMENT\x10\x0f*\x9a\x01\n" +
+	"\"NOTIFICATION_CATEGORY_ANNOUNCEMENT\x10\x0f\x12%\n" +
+	"!NOTIFICATION_CATEGORY_PROCUREMENT\x10\x10*\x9a\x01\n" +
 	"\x13NotificationChannel\x12$\n" +
 	" NOTIFICATION_CHANNEL_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aNOTIFICATION_CHANNEL_INBOX\x10\x01\x12\x1d\n" +

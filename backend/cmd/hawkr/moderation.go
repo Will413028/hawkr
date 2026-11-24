@@ -23,9 +23,9 @@ func newModerationRetention(d *db.DB, buyers *buyer.Module, med mediaPort, log *
 }
 
 // newModeration 組裝 moderation 模組；serve 以 Module.Retention() 訂閱買家的刪除事件。
-func newModeration(d *db.DB, soc *social.Module, rev *review.Module, chat *im.Module, sel *seller.Module, buyers *buyer.Module, suspension *accountsuspension.Module, med mediaPort, log *slog.Logger) *moderation.Module {
+func newModeration(d *db.DB, bus *events.Bus, soc *social.Module, rev *review.Module, chat *im.Module, sel *seller.Module, buyers *buyer.Module, suspension *accountsuspension.Module, med mediaPort, log *slog.Logger) *moderation.Module {
 	return moderation.New(moderation.Deps{
-		DB: d, Social: soc, Review: rev, IM: chat, Seller: sel, Buyer: buyers, Suspension: suspension,
+		DB: d, Events: bus, Social: soc, Review: rev, IM: chat, Seller: sel, Buyer: buyers, Suspension: suspension,
 		Media: med, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 }

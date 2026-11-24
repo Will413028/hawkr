@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -926,4 +927,46 @@ func decisionStartOf(t *testing.T, c AdminCase) time.Time {
 		return time.Time{}
 	}
 	return c.DecideDeadline.Start
+}
+
+func TestCreateInquiryPublishesCaseInquiryCreatedOnceInTheSameTransaction(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	accountID, s := f.open(t)
+	c := f.foodCase(t, s.StoreID)
+	created := record[CaseInquiryCreated](f)
+	req := uuid.NewV4()
+	due := f.now.Add(25 * time.Hour)
+	in := CreateCaseInquiryInput{CaseID: c.ID, AdminID: inquiryCreator, Kind: InquiryKindRecords, Message: "提供紀錄", DueAt: &due, RequestID: &req}
+	first, err := f.module.CreateCaseInquiry(ctx, in)
+	must(t, err)
+	got := created.all()
+	if len(got) != 1 {
+		t.Fatalf("events=%d", len(got))
+	}
+	e := got[0]
+	if e.InquiryID != first.Inquiry.ID || e.CaseID != c.ID || e.StoreID != s.StoreID || e.AccountID != accountID || e.Kind != InquiryKindRecords ||
+		!e.DueAt.Equal(first.Inquiry.DueAt) || e.EventID == uuid.Nil() || e.OccurredAt.IsZero() {
+		t.Fatalf("event=%+v inquiry=%+v", e, first.Inquiry)
+	}
+	again, err := f.module.CreateCaseInquiry(ctx, in)
+	must(t, err)
+	if !again.Replayed || len(created.all()) != 1 {
+		t.Fatalf("重送不得再發事件：replayed=%v events=%d", again.Replayed, len(created.all()))
+	}
+}
+
+func TestCreateInquiryEventFailureRollsBackTheInquiry(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	_, s := f.open(t)
+	c := f.foodCase(t, s.StoreID)
+	events.Subscribe(f.bus, func(context.Context, CaseInquiryCreated) error { return errors.New("reject") })
+	if _, err := f.inquire(t, c.ID, InquiryKindRecords, "提供紀錄"); err == nil {
+		t.Fatal("event failure lost")
+	}
+	if n := f.count(t, "SELECT count(*) FROM seller.case_inquiries"); n != 0 {
+		t.Fatalf("inquiries=%d", n)
+	}
 }

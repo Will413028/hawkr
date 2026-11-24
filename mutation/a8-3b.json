@@ -1,0 +1,166 @@
+{
+  "mutants": [
+    {
+      "id": "comment-created-no-block-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "StoreRecipient(ctx, r, p.StoreID, p.Actor.principal())",
+      "new": "StoreRecipient(ctx, r, p.StoreID)",
+      "test": "internal/modules/notification ^TestContentTypesSkipBlockedPairsInBothDirections$",
+      "why": "comment_created 的收件店家不再把留言者當 actor，買家封鎖店與店封鎖買家都不再略過"
+    },
+    {
+      "id": "comment-replied-buyer-no-block-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "BuyerRecipient(ctx, r, p.ReplyTo.ID, p.Actor.principal())",
+      "new": "BuyerRecipient(ctx, r, p.ReplyTo.ID)",
+      "test": "internal/modules/notification ^TestContentTypesSkipBlockedPairsInBothDirections$",
+      "why": "comment_replied_buyer 的收件買家不再把回覆者當 actor，買家之間的封鎖不再略過"
+    },
+    {
+      "id": "comment-like-key-removed",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "\"comment_like:\" + p.CommentID.String()",
+      "new": "\"comment_liked:\" + p.CommentID.String()",
+      "test": "internal/modules/notification/internal/registry ^TestGoldenContentRendering$",
+      "why": "留言讚的聚合鍵改了形狀（同一則留言的讚不再以固定鍵合併）"
+    },
+    {
+      "id": "post-like-key-removed",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "\"post_like:\" + p.PostID.String()",
+      "new": "\"post_liked:\" + p.PostID.String()",
+      "test": "internal/modules/notification/internal/registry ^TestGoldenContentRendering$",
+      "why": "貼文讚的聚合鍵改了形狀"
+    },
+    {
+      "id": "follow-key-removed",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "\"follow:\" + strconv.FormatInt(p.StoreID, 10)",
+      "new": "\"followed:\" + strconv.FormatInt(p.StoreID, 10)",
+      "test": "internal/modules/notification/internal/registry ^TestGoldenContentRendering$",
+      "why": "追蹤的聚合鍵改了形狀"
+    },
+    {
+      "id": "review-subscription-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/notification.go",
+      "old": "return m.intake.OnReviewCreated(ctx, e)",
+      "new": "return nil",
+      "test": "internal/modules/notification ^TestEachContentEventReachesItsRecipient$",
+      "why": "拿掉 review.ReviewCreated 的訂閱：評價事件不再變成通知"
+    },
+    {
+      "id": "follow-subscription-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/notification.go",
+      "old": "return m.intake.OnSellerFollowed(ctx, e)",
+      "new": "return nil",
+      "test": "internal/modules/notification ^TestEachContentEventReachesItsRecipient$",
+      "why": "拿掉 buyer.SellerFollowed 的訂閱：追蹤事件不再變成通知"
+    },
+    {
+      "id": "locale-prefix-dropped",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/registry.go",
+      "old": "return \"/en\" + link",
+      "new": "return link",
+      "test": "internal/modules/notification/internal/registry ^TestDeepLinkGetsTheLocalePrefixCentrally$",
+      "why": "en 文字的深連結不再加 /en 前綴"
+    },
+    {
+      "id": "store-id-instead-of-store-code",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "Loaded{StoreCode: codes[storeID(p)]}",
+      "new": "Loaded{StoreCode: storeID(p)}",
+      "test": "internal/modules/notification/internal/registry ^TestContentLoadResolvesStoreCodesInOneCall$",
+      "why": "深連結改用 store_id 當路徑段，不經 store_code 對照"
+    },
+    {
+      "id": "store-id-instead-of-store-code-e2e",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "Loaded{StoreCode: codes[storeID(p)]}",
+      "new": "Loaded{StoreCode: storeID(p)}",
+      "test": "internal/modules/notification ^TestContentDeepLinkUsesTheStoreCodeAndLocalePrefix$",
+      "why": "同上，整合層：收件匣的深連結要是 store_code 而不是 store_id"
+    },
+    {
+      "id": "chat-gains-inbox",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "Name:              \"chat_message_buyer\",\n\tAudiences:         []model.Audience{model.AudienceBuyer},\n\tCategory:          model.CategoryChat,\n\tPresentation:      model.PresentationMessage,\n\tChannels:          []model.Channel{model.ChannelPush},",
+      "new": "Name:              \"chat_message_buyer\",\n\tAudiences:         []model.Audience{model.AudienceBuyer},\n\tCategory:          model.CategoryChat,\n\tPresentation:      model.PresentationMessage,\n\tChannels:          interactionChannels,",
+      "test": "internal/modules/notification ^TestEachContentEventReachesItsRecipient$",
+      "why": "聊天通知多了收件匣渠道（D3：聊天只推播）"
+    },
+    {
+      "id": "post-published-subscription-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/notification.go",
+      "old": "return m.intake.OnPostPublished(ctx, e)",
+      "new": "return nil",
+      "test": "internal/modules/notification ^TestEachContentEventReachesItsRecipient$",
+      "why": "拿掉 social.PostPublished 的訂閱：追蹤的店發文不再 fan-out"
+    },
+    {
+      "id": "restock-subscription-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/notification.go",
+      "old": "return m.intake.OnRestockTargeted(ctx, e)",
+      "new": "return nil",
+      "test": "internal/modules/notification ^TestEachContentEventReachesItsRecipient$",
+      "why": "拿掉 buyer.RestockTargeted 的訂閱：補貨事件不再變成通知"
+    },
+    {
+      "id": "posts-link-to-forum-route",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "func postsLink(ld Loaded) string { return storeCodePath(ld, \"/posts\") }",
+      "new": "func postsLink(ld Loaded) string { return storeCodePath(ld, \"/messages\") }",
+      "test": "internal/modules/notification/internal/registry ^TestGoldenContentRendering$",
+      "why": "貼文相關通知的連結改指論壇路由（貼文 ID 不是論壇串 ID）"
+    },
+    {
+      "id": "post-published-key-by-event",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "IdempotencyKey:    func(p PostPublishedParams) string { return p.PostID.String() },",
+      "new": "IdempotencyKey:    func(p PostPublishedParams) string { return p.EventID.String() },",
+      "test": "internal/modules/notification/internal/registry ^TestPostPublishedIdempotencyKeyIgnoresTheEventID$",
+      "why": "母意圖冪等鍵改回事件 ID：重新發布會再通知所有追蹤者"
+    },
+    {
+      "id": "review-no-block-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "return StoreRecipient(ctx, r, p.StoreID, Principal{Side: model.AudienceBuyer, ID: p.BuyerID})\n\t},\n\tText: func(l uitext.Locale, _ ReviewCreatedParams)",
+      "new": "return StoreRecipient(ctx, r, p.StoreID)\n\t},\n\tText: func(l uitext.Locale, _ ReviewCreatedParams)",
+      "test": "internal/modules/notification ^TestReviewCreatedSkipsABuyerTheStoreBlocked$",
+      "why": "評價通知不再把評價者當 actor，店家封鎖買家不再略過"
+    },
+    {
+      "id": "store-code-lookup-keeps-invalid-ids",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "if id := storeID(p); id > 0 {",
+      "new": "if id := storeID(p); id >= 0 {",
+      "test": "internal/modules/notification/internal/registry ^TestContentLoadDropsInvalidStoreIDsBeforeTheLookup$",
+      "why": "store_id 為 0 的列也送去查 store_code"
+    },
+    {
+      "id": "party-of-guesses-buyer",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/intake/subscribers_content.go",
+      "old": "default:\n\t\treturn registry.Party{ID: id}",
+      "new": "default:\n\t\treturn registry.Party{Side: model.AudienceBuyer, ID: id}",
+      "test": "internal/modules/notification/internal/intake ^TestPartyOfDoesNotGuessTheSide$",
+      "why": "不認得的 actor 種類又被默默當成買家"
+    }
+  ]
+}

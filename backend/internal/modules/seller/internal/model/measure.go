@@ -1499,6 +1499,8 @@ type MeasureEnded struct {
 	EventID            uuid.UUID
 	MeasureID          uuid.UUID
 	StoreID, AccountID int64
+	// RequestID 是接受的解除請求（因接受解除請求而結束時）；admin 直接結束與關店是零值。
+	RequestID uuid.UUID
 }
 
 // MeasureRevoked 在措施撤銷的 transaction 內發出（admin 撤銷、接受申覆或連帶撤銷）；效果的解除另由 StoreUnsuspended 表示。

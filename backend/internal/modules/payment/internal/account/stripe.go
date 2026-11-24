@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
@@ -123,6 +124,8 @@ func (s *Stripe) FetchAccount(ctx context.Context, externalID string) (Snapshot,
 		Transfers:        capabilityState(acct.Transfers),
 		PayoutsActive:    capabilityState(acct.Payouts) == CapabilityActive,
 		Requirements:     requirementsObject(acct.Requirements),
+
+		RequirementsDeadline: requirementsDeadline(acct.Requirements),
 	}
 	for _, d := range acct.Transfers.Details {
 		snap.Details = append(snap.Details, StatusDetail{Resolution: resolutionOf(d.Resolution), Reason: d.Code})
@@ -185,4 +188,20 @@ func requirementsObject(raw json.RawMessage) json.RawMessage {
 		return json.RawMessage(`{}`)
 	}
 	return raw
+}
+
+// requirementsDeadline 取 requirements 原始 JSON 的 summary.minimum_deadline.time（Stripe v2 帳戶「最早會讓帳戶受影響的時間」）；沒有這個欄位、不是時間或是零值回 nil。
+func requirementsDeadline(raw json.RawMessage) *time.Time {
+	var env struct {
+		Summary struct {
+			MinimumDeadline struct {
+				Time time.Time `json:"time"`
+			} `json:"minimum_deadline"`
+		} `json:"summary"`
+	}
+	if json.Unmarshal(raw, &env) != nil || env.Summary.MinimumDeadline.Time.IsZero() {
+		return nil
+	}
+	t := env.Summary.MinimumDeadline.Time.UTC()
+	return &t
 }

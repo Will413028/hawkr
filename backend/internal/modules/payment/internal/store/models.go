@@ -33,6 +33,8 @@ type PaymentAccount struct {
 	PurgeBlockedAt         *time.Time
 	PurgeBlockedReason     *string
 	PurgeReplayRequestedAt *time.Time
+	RequirementsDeadline   *time.Time
+	FirstActivatedAt       *time.Time
 }
 
 type PaymentPayment struct {

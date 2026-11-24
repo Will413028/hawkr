@@ -4,6 +4,7 @@ package payment_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -345,7 +346,7 @@ func TestRequestQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccoun
 		t.Fatalf("建立後排入的同步 job=%v", got)
 	}
 	must(t, f.module.EnsureAccount(ctx, s, false))
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED' WHERE store_id = $1", s)
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED', requirements_deadline = NULL, first_activated_at = NULL WHERE store_id = $1", s)
 	must(t, err)
 	second := f.ensure(t, s)
 	var stored string
@@ -704,8 +705,8 @@ func TestSweepQueuesSyncForOpenAndLiftableStatusesOnly(t *testing.T) {
 	f := setup(t)
 	insert := func(storeID int64, status, external, reason any) {
 		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts
-			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, status_reason, create_called_at, create_completed_at, created_at, updated_at)
-			VALUES ($1, 'fake', $2, 'PROVIDER', $3, $3 = 'ENABLED', $4, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
+			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, first_activated_at, status_reason, create_called_at, create_completed_at, created_at, updated_at)
+			VALUES ($1, 'fake', $2, 'PROVIDER', $3, $3 = 'ENABLED', CASE WHEN $3 = 'ENABLED' THEN $5::timestamptz END, $4, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
 		must(t, err)
 	}
 	byStatus := map[AccountStatus]int64{}
@@ -2693,5 +2694,136 @@ func TestAPermanentRefusalOfAResolveOnAnAlreadyFailedRowStopsTheSweepAndKeepsThe
 	}
 	if f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1 AND create_failed_at IS NULL AND create_refused_at IS NULL", s) != 1 {
 		t.Fatal("管理員重試建立應清除失敗與拒絕標記")
+	}
+}
+
+// 同步存待補條件的最早期限（每次整列覆寫）與第一次啟用的時間（只寫一次）；事件帶這次讀到的期限，FirstActivation 只在第一次啟用的那一次為真。
+// mutation：FirstActivation 改成 applied.FirstActivatedAt != nil → 之後每次啟用都為真；first_activated_at 拿掉 COALESCE → 再啟用時被重設。
+func TestSyncStoresTheDeadlineAndFirstActivationAndPublishesThem(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	s := f.newStore(t)
+	deadline := f.now.Add(7 * 24 * time.Hour).UTC()
+
+	needs := needsSellerSnapshot
+	needs.RequirementsDeadline = &deadline
+	f.set(t, s, needs)
+	if a := f.account(t, s); a.RequirementsDeadline == nil || !a.RequirementsDeadline.Equal(deadline) || a.FirstActivatedAt != nil {
+		t.Fatalf("補件中：%+v", a)
+	}
+
+	f.now = f.now.Add(time.Hour)
+	activatedAt := f.now
+	f.set(t, s, enabledSnapshot)
+	if a := f.account(t, s); a.RequirementsDeadline != nil || a.FirstActivatedAt == nil || !a.FirstActivatedAt.Equal(activatedAt) {
+		t.Fatalf("第一次啟用：%+v", a)
+	}
+
+	f.now = f.now.Add(time.Hour)
+	f.set(t, s, needs)
+	f.now = f.now.Add(time.Hour)
+	f.set(t, s, enabledSnapshot)
+	if a := f.account(t, s); a.FirstActivatedAt == nil || !a.FirstActivatedAt.Equal(activatedAt) {
+		t.Fatalf("再啟用不得重設第一次啟用的時間：%+v", a)
+	}
+
+	if len(f.changes) != 4 {
+		t.Fatalf("events=%+v", f.changes)
+	}
+	type view struct {
+		first    bool
+		deadline *time.Time
+	}
+	var got []view
+	for _, e := range f.changes {
+		got = append(got, view{e.FirstActivation, e.RequirementsDeadline})
+	}
+	if got[0].first || got[0].deadline == nil || !got[0].deadline.Equal(deadline) ||
+		!got[1].first || got[1].deadline != nil ||
+		got[2].first || got[2].deadline == nil || !got[2].deadline.Equal(deadline) ||
+		got[3].first || got[3].deadline != nil {
+		t.Fatalf("事件欄位：%+v", got)
+	}
+}
+
+// 訂閱者失敗時整筆同步 rollback：期限與第一次啟用的時間都不寫，重試後仍是第一次啟用。
+// mutation：Publish 的錯誤被吞掉 → 帳戶已寫入第一次啟用的時間，失敗。
+func TestSyncRollbackKeepsTheFirstActivationForTheRetry(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	boom := errors.New("訂閱者失敗")
+	failing := true
+	events.Subscribe(f.bus, func(context.Context, PayoutAccountChanged) error {
+		if failing {
+			return boom
+		}
+		return nil
+	})
+	f.fake.Set(external, enabledSnapshot)
+	if _, err := f.module.SyncAccount(ctx, s); !errors.Is(err, boom) {
+		t.Fatalf("err=%v", err)
+	}
+	if a := f.account(t, s); a.FirstActivatedAt != nil || a.TransfersActive {
+		t.Fatalf("rollback 後的帳戶=%+v", a)
+	}
+	failing = false
+	f.changes = nil
+	if _, err := f.module.SyncAccount(ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.changes) != 1 || !f.changes[0].FirstActivation {
+		t.Fatalf("重試要是第一次啟用：%+v", f.changes)
+	}
+}
+
+// 每日掃描對期限落在未來 7 天內的帳戶各發布一次 PayoutDeadlineApproaching：超過一天是 SEVEN_DAYS，一天以內是 ONE_DAY；窗口外、已過期與沒有期限的帳戶不發布；
+// 事件在 transaction 內發布，重跑掃描對同一組帳戶發布同樣的事件（去重在消費者）。
+// mutation：TierFor 的門檻拿掉（一律 SEVEN_DAYS）→ 第二個帳戶的檔位不符；查詢的上界改成 30 天 → 窗口外的帳戶也發布。
+func TestScanPayoutDeadlinesPublishesTheTierForAccountsInsideTheWindow(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	type seen struct {
+		store    int64
+		deadline time.Time
+		tier     DeadlineTier
+		inTx     bool
+	}
+	var got []seen
+	events.Subscribe(f.bus, func(ctx context.Context, e PayoutDeadlineApproaching) error {
+		_, ok := db.TxFrom(ctx)
+		got = append(got, seen{e.StoreID, e.Deadline, e.Tier, ok})
+		return nil
+	})
+	withDeadline := func(d time.Duration) (int64, time.Time) {
+		s := f.newStore(t)
+		deadline := f.now.Add(d).UTC()
+		snap := needsSellerSnapshot
+		snap.RequirementsDeadline = &deadline
+		f.set(t, s, snap)
+		return s, deadline
+	}
+	week, weekAt := withDeadline(5 * 24 * time.Hour)
+	last, lastAt := withDeadline(12 * time.Hour)
+	withDeadline(10 * 24 * time.Hour)
+	withDeadline(-time.Hour)
+	none := f.newStore(t)
+	f.set(t, none, needsSellerSnapshot)
+
+	for run := 1; run <= 2; run++ {
+		got = nil
+		n, err := f.module.ScanPayoutDeadlines(ctx)
+		if err != nil || n != 2 {
+			t.Fatalf("第 %d 次掃描：published=%d err=%v", run, n, err)
+		}
+		want := []seen{{week, weekAt, DeadlineSevenDays, true}, {last, lastAt, DeadlineOneDay, true}}
+		slices.SortFunc(got, func(a, b seen) int { return cmp.Compare(a.store, b.store) })
+		slices.SortFunc(want, func(a, b seen) int { return cmp.Compare(a.store, b.store) })
+		if !slices.Equal(got, want) {
+			t.Fatalf("第 %d 次掃描的事件：\n got  %+v\n want %+v", run, got, want)
+		}
 	}
 }
