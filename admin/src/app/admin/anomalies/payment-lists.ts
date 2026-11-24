@@ -17,7 +17,7 @@ import {
 	paymentPaymentTransferStatus,
 } from "@hawkr/ui-text/keys";
 import type { BadgeVariant } from "@/components/UI/StatusBadge";
-import { formatDateTime } from "@/lib/format";
+import { formatAmount, formatDateTime } from "@/lib/format";
 import { staffTextOrUnknown } from "@/lib/ui-text";
 import {
 	paymentResolveTargets,
@@ -184,7 +184,7 @@ export function transferStatusVariant(
 
 /** 金額是 int64（bigint），顯示千分位。 */
 export function amountText(amount: bigint): string {
-	return `NT$ ${amount.toLocaleString("en-US")}`;
+	return formatAmount(amount.toString());
 }
 
 function timeText(ts: Payment["createTime"]): string {
@@ -195,14 +195,19 @@ function orDash(value: string): string {
 	return value === "" ? "—" : value;
 }
 
+export interface PaymentOrderRow {
+	orderNo: string;
+	storeId: string;
+}
+
 export interface PaymentRow {
 	id: string;
 	/** 可人工結案的異常物件；沒有異常時是空陣列。 */
 	resolveTargets: ResolveTarget[];
-	orderNo: string;
+	/** 付款底下的訂單，依建立順序。 */
+	orders: PaymentOrderRow[];
 	externalPaymentId: string;
 	buyerId: string;
-	storeId: string;
 	amount: string;
 	provider: string;
 	status: string;
@@ -217,10 +222,12 @@ export function paymentRow(p: Payment): PaymentRow {
 	return {
 		id: p.id,
 		resolveTargets: paymentResolveTargets(p),
-		orderNo: orDash(p.orderNo),
+		orders: p.orders.map((o) => ({
+			orderNo: orDash(o.orderNo),
+			storeId: orDash(o.storeId),
+		})),
 		externalPaymentId: p.externalPaymentId,
 		buyerId: orDash(p.buyerId),
-		storeId: orDash(p.storeId),
 		amount: amountText(p.amount),
 		provider: orDash(p.provider),
 		status: paymentStatusText(p.status),

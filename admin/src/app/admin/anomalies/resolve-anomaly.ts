@@ -6,12 +6,16 @@ import type {
 import {
 	PaymentAnomalyKind,
 	PaymentAnomalyOutcome,
+	PaymentAnomalyResolutionReason,
 	PaymentRefundStatus,
 	PaymentReversalStatus,
 	PaymentStatus,
 	PaymentTopupStatus,
 	PaymentTransferStatus,
 } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
+import { paymentPaymentAnomalyResolutionReason } from "@hawkr/ui-text/keys";
+import { staffTextOrUnknown } from "@/lib/ui-text";
 
 // 異常的人工結案（PaymentAdminService.ResolvePaymentAnomaly）：哪些物件可以結案、表單的驗證與請求。
 // 契約：id 是付款、轉帳、退款的 ID；收回是撤回列 ID；補差額是退款 ID。成功結案要附金流商物件 ID，失敗結案可省略。
@@ -52,15 +56,55 @@ export type ResolveOutcomeKey = "" | "succeeded" | "failed";
 export interface ResolveDraft {
 	outcome: ResolveOutcomeKey;
 	evidence: string;
+	/** UNSPECIFIED 是還沒選。 */
+	reason: PaymentAnomalyResolutionReason;
+	note: string;
 }
 
-export const EMPTY_RESOLVE_DRAFT: ResolveDraft = { outcome: "", evidence: "" };
+export const EMPTY_RESOLVE_DRAFT: ResolveDraft = {
+	outcome: "",
+	evidence: "",
+	reason: PaymentAnomalyResolutionReason.UNSPECIFIED,
+	note: "",
+};
 
-export type ResolveInvalid = "outcome" | "evidence";
+/** 契約的備註長度：去除首尾空白後 1 到 255 個字元（以 Unicode 字元計）。 */
+export const NOTE_MAX_RUNES = 255;
+
+export type ResolveInvalid =
+	| "outcome"
+	| "evidence"
+	| "reason"
+	| "note"
+	| "noteTooLong";
+
+/**
+ * 契約的原因與結果相容規則：PROVIDER_EXECUTED_NOT_RECORDED 只搭配成功，PROVIDER_NOT_EXECUTED 只搭配失敗，
+ * DUPLICATE 與 OTHER 搭配任一結果。還沒選結果時列出全部。
+ */
+export function reasonOptions(
+	outcome: ResolveOutcomeKey,
+): PaymentAnomalyResolutionReason[] {
+	const R = PaymentAnomalyResolutionReason;
+	return [
+		...(outcome !== "failed" ? [R.PROVIDER_EXECUTED_NOT_RECORDED] : []),
+		...(outcome !== "succeeded" ? [R.PROVIDER_NOT_EXECUTED] : []),
+		R.DUPLICATE,
+		R.OTHER,
+	];
+}
+
+/** 原因的顯示文字，取自共用文案目錄。 */
+export function reasonText(reason: PaymentAnomalyResolutionReason): string {
+	return staffTextOrUnknown(paymentPaymentAnomalyResolutionReason(reason));
+}
 
 export const RESOLVE_INVALID_TEXT: Readonly<Record<ResolveInvalid, string>> = {
 	outcome: "請選擇核對的結果。",
 	evidence: "結案成功要填金流商的物件 ID。",
+	reason: "請選擇結案原因。",
+	note: "請填寫說明。",
+	noteTooLong: `說明最多 ${NOTE_MAX_RUNES} 字。`,
 };
 
 export function paymentResolveTargets(p: Payment): ResolveTarget[] {
@@ -92,7 +136,7 @@ export function refundResolveTargets(r: PaymentRefund): ResolveTarget[] {
 	return targets;
 }
 
-/** 回傳第一個不合的欄位；合法回 null。證據只在成功結案時必填。 */
+/** 回傳第一個不合的欄位；合法回 null。證據只在成功結案時必填；原因必須與結果相容。 */
 export function validateResolveDraft(
 	draft: ResolveDraft,
 ): ResolveInvalid | null {
@@ -100,6 +144,10 @@ export function validateResolveDraft(
 	if (draft.outcome === "succeeded" && draft.evidence.trim() === "") {
 		return "evidence";
 	}
+	if (!reasonOptions(draft.outcome).includes(draft.reason)) return "reason";
+	const noteLength = goTrimmedRuneCount(draft.note);
+	if (noteLength === 0) return "note";
+	if (noteLength > NOTE_MAX_RUNES) return "noteTooLong";
 	return null;
 }
 
@@ -121,5 +169,7 @@ export function resolveAnomalyRequest(
 		id: target.id,
 		outcome: OUTCOME_OF_KEY[draft.outcome],
 		evidence: draft.outcome === "succeeded" ? draft.evidence.trim() : "",
+		reason: draft.reason,
+		note: trimGoSpace(draft.note),
 	};
 }

@@ -1,15 +1,19 @@
 "use client";
 
+import { PaymentAnomalyResolutionReason } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import { type FormEvent, useState } from "react";
 import { Button, Dialog } from "@/components/UI";
 import type { ActionResult } from "@/lib/connect-action";
 import { GovernanceNoticeBanner } from "../merchants/[id]/GovernanceNotice";
 import {
 	EMPTY_RESOLVE_DRAFT,
+	NOTE_MAX_RUNES,
 	RESOLVE_INVALID_TEXT,
 	type ResolveDraft,
 	type ResolveOutcomeKey,
 	type ResolveTarget,
+	reasonOptions,
+	reasonText,
 	TARGET_NOUN,
 	validateResolveDraft,
 } from "./resolve-anomaly";
@@ -42,7 +46,7 @@ const OUTCOMES = [
 
 /**
  * 人工結案（ResolvePaymentAnomaly）：管理員先到金流商核對，再選結果；成功結案要填核對到的金流商物件 ID。
- * 契約只有結果與證據兩個欄位，沒有理由欄；操作者與時間由伺服器與領域變更一起記下。
+ * 還要選結案原因（選項依結果過濾，與伺服器的相容規則一致）並填說明；操作者與時間由伺服器與領域變更一起記下。
  */
 export default function ResolveAnomalyDialog({
 	target,
@@ -121,7 +125,13 @@ export default function ResolveAnomalyDialog({
 								checked={draft.outcome === o.value}
 								disabled={submitting}
 								onChange={() => {
-									setDraft((d) => ({ ...d, outcome: o.value }));
+									setDraft((d) => ({
+										...d,
+										outcome: o.value,
+										reason: reasonOptions(o.value).includes(d.reason)
+											? d.reason
+											: PaymentAnomalyResolutionReason.UNSPECIFIED,
+									}));
 									setError(null);
 								}}
 							/>
@@ -160,6 +170,58 @@ export default function ResolveAnomalyDialog({
 					</p>
 				</>
 			)}
+
+			<label
+				className="form-label"
+				htmlFor="resolve-reason"
+				style={{ marginTop: 16 }}
+			>
+				原因 <span className="required">*</span>
+			</label>
+			<select
+				id="resolve-reason"
+				className="form-select"
+				value={draft.reason}
+				disabled={submitting}
+				onChange={(e) => {
+					setDraft((d) => ({
+						...d,
+						reason: Number(e.target.value) as PaymentAnomalyResolutionReason,
+					}));
+					setError(null);
+				}}
+			>
+				<option value={PaymentAnomalyResolutionReason.UNSPECIFIED}>
+					請選擇
+				</option>
+				{reasonOptions(draft.outcome).map((reason) => (
+					<option key={reason} value={reason}>
+						{reasonText(reason)}
+					</option>
+				))}
+			</select>
+
+			<label
+				className="form-label"
+				htmlFor="resolve-note"
+				style={{ marginTop: 16 }}
+			>
+				說明 <span className="required">*</span>
+			</label>
+			<textarea
+				id="resolve-note"
+				className="form-textarea"
+				rows={3}
+				value={draft.note}
+				disabled={submitting}
+				onChange={(e) => {
+					setDraft((d) => ({ ...d, note: e.target.value }));
+					setError(null);
+				}}
+			/>
+			<p className="adm-operation-field-note">
+				寫進後台動作紀錄；最多 {NOTE_MAX_RUNES} 字。
+			</p>
 
 			<GovernanceNoticeBanner
 				notice={error ? { tone: "error", text: error } : null}

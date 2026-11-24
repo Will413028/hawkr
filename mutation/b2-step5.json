@@ -134,6 +134,33 @@
    "new": "void queryKey;",
    "test": "tests/resolve-anomaly-action.test.ts 成功結案",
    "why": "結案成功後列表不重讀：已結案的異常還留在待辦裡"
+  },
+  {
+   "id": "admin-resolve-reason-not-sent",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "\t\treason: draft.reason,\n",
+   "new": "\t\treason: PaymentAnomalyResolutionReason.UNSPECIFIED,\n",
+   "test": "tests/resolve-anomaly.test.ts the request carries kind, id, outcome and the trimmed evidence",
+   "why": "結案請求不帶原因：後端以 invalid_argument 拒絕，所有結案都送不出去"
+  },
+  {
+   "id": "admin-resolve-note-not-trimmed",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "note: trimGoSpace(draft.note),",
+   "new": "note: draft.note,",
+   "test": "tests/resolve-anomaly.test.ts the request carries kind, id, outcome and the trimmed evidence",
+   "why": "備註沒有去除首尾空白就送出：後動作紀錄寫進前後空白，且與伺服器的字數規則不一致"
+  },
+  {
+   "id": "admin-payment-orders-not-rendered",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/payment-lists.ts",
+   "old": "\t\torders: p.orders.map((o) => ({",
+   "new": "\t\torders: p.orders.slice(0, 1).map((o) => ({",
+   "test": "tests/anomaly-payment-lists.test.ts payment row shows int64 amount",
+   "why": "付款列只顯示第一張訂單：一筆付款含多張訂單時，後面的訂單與店家在後台看不到"
   }
  ]
 }

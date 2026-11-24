@@ -3,6 +3,7 @@ import test from "node:test";
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import {
+	PaymentOrderSchema,
 	PaymentRefundSchema,
 	PaymentSchema,
 	PaymentTransferSchema,
@@ -89,7 +90,10 @@ test("payment row shows int64 amount with separators and dashes for empty fields
 	const row = paymentRow(
 		create(PaymentSchema, {
 			id: "p1",
-			orderNo: "",
+			orders: [
+				create(PaymentOrderSchema, { orderNo: "O1", storeId: "7" }),
+				create(PaymentOrderSchema, { orderNo: "", storeId: "9" }),
+			],
 			amount: BigInt(1234567),
 			status: PaymentStatus.ANOMALY,
 			failureReason: "mismatch",
@@ -97,7 +101,10 @@ test("payment row shows int64 amount with separators and dashes for empty fields
 		}),
 	);
 	assert.equal(row.amount, "NT$ 1,234,567");
-	assert.equal(row.orderNo, "—");
+	assert.deepEqual(row.orders, [
+		{ orderNo: "O1", storeId: "7" },
+		{ orderNo: "—", storeId: "9" },
+	]);
 	assert.equal(row.statusVariant, "danger");
 	assert.equal(row.failureReason, "mismatch");
 	assert.equal(row.createTime, "2026/01/01 08:00:00");

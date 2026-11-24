@@ -5,6 +5,7 @@ import { PaymentAdminService } from "@hawkr/api/gen/hawkr/admin/payment/v1alpha1
 import {
 	PaymentAnomalyKind,
 	PaymentAnomalyOutcome,
+	PaymentAnomalyResolutionReason,
 } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import {
 	bodyText,
@@ -49,6 +50,8 @@ function setup(resolve: (call: number) => ConnectError | undefined) {
 		id: string;
 		outcome: number;
 		evidence: string;
+		reason: number;
+		note: string;
 	}> = [];
 	const transport = createRouterTransport(({ service }) => {
 		service(PaymentAdminService, {
@@ -71,6 +74,8 @@ function setup(resolve: (call: number) => ConnectError | undefined) {
 					id: req.id,
 					outcome: req.outcome,
 					evidence: req.evidence,
+					reason: req.reason,
+					note: req.note,
 				});
 				const failure = resolve(calls.resolve);
 				if (failure) throw failure;
@@ -85,6 +90,15 @@ function setup(resolve: (call: number) => ConnectError | undefined) {
 	return { calls, requests, view };
 }
 
+const fillReason = async (
+	reason: PaymentAnomalyResolutionReason,
+	note: string,
+) =>
+	React.act(async () => {
+		setValue(byId("resolve-reason"), String(reason));
+		setValue(byId("resolve-note"), note);
+	});
+
 const radio = (outcome: "succeeded" | "failed") =>
 	dom.window.document.querySelector(
 		`input[name="resolve-outcome"][value="${outcome}"]`,
@@ -98,6 +112,10 @@ test("成功結案：送出 kind、id、結果與去空白的證據，之後三�
 	await React.act(async () => {
 		setValue(byId("resolve-evidence"), "  tr_123 ");
 	});
+	await fillReason(
+		PaymentAnomalyResolutionReason.PROVIDER_EXECUTED_NOT_RECORDED,
+		"  verified in dashboard  ",
+	);
 	await click("確認結案");
 	await until(() => calls.resolve === 1, "結案已送出");
 	assert.deepEqual(requests, [
@@ -106,6 +124,8 @@ test("成功結案：送出 kind、id、結果與去空白的證據，之後三�
 			id: "t1",
 			outcome: PaymentAnomalyOutcome.SUCCEEDED,
 			evidence: "tr_123",
+			reason: PaymentAnomalyResolutionReason.PROVIDER_EXECUTED_NOT_RECORDED,
+			note: "verified in dashboard",
 		},
 	]);
 	await until(
@@ -128,6 +148,14 @@ test("沒選結果或成功卻沒證據：不送出、對話框顯示原因", as
 	await clickElement(radio("succeeded"));
 	await click("確認結案");
 	assert.match(bodyText(), /結案成功要填金流商的物件 ID/);
+	await React.act(async () => {
+		setValue(byId("resolve-evidence"), "tr_1");
+	});
+	await click("確認結案");
+	assert.match(bodyText(), /請選擇結案原因/);
+	await fillReason(PaymentAnomalyResolutionReason.OTHER, "   ");
+	await click("確認結案");
+	assert.match(bodyText(), /請填寫說明/);
 	assert.equal(calls.resolve, 0);
 });
 
@@ -140,6 +168,7 @@ test("失敗結案：不帶證據，即使先選過成功並輸入", async () =>
 		setValue(byId("resolve-evidence"), "tr_typed");
 	});
 	await clickElement(radio("failed"));
+	await fillReason(PaymentAnomalyResolutionReason.PROVIDER_NOT_EXECUTED, "n");
 	await click("確認結案");
 	await until(() => calls.resolve === 1, "結案已送出");
 	assert.equal(requests[0]?.outcome, PaymentAnomalyOutcome.FAILED);
@@ -156,6 +185,7 @@ test("伺服器拒絕：對話框留著、顯示錯誤分類的文字、輸入�
 	await React.act(async () => {
 		setValue(byId("resolve-evidence"), "tr_bad");
 	});
+	await fillReason(PaymentAnomalyResolutionReason.OTHER, "note kept");
 	await click("確認結案");
 	await until(
 		() => dom.window.document.querySelector(".adm-operation-error") !== null,
@@ -164,7 +194,35 @@ test("伺服器拒絕：對話框留著、顯示錯誤分類的文字、輸入�
 	assert.match(bodyText(), /參數錯誤/);
 	assert.doesNotMatch(bodyText(), new RegExp(actionModule.RESOLVED_TEXT));
 	assert.equal((byId("resolve-evidence") as HTMLInputElement).value, "tr_bad");
+	assert.equal(
+		(byId("resolve-note") as HTMLTextAreaElement).value,
+		"note kept",
+	);
 	assert.equal(calls.payments, 1);
 	assert.equal(calls.transfers, 1);
 	assert.equal(calls.refunds, 1);
+});
+
+test("改選結果會清掉不相容的原因，原因選項只列相容的", async () => {
+	const { view } = setup(() => undefined);
+	await view.render();
+	await click("結案");
+	await clickElement(radio("succeeded"));
+	await fillReason(
+		PaymentAnomalyResolutionReason.PROVIDER_EXECUTED_NOT_RECORDED,
+		"n",
+	);
+	await clickElement(radio("failed"));
+	const select = byId("resolve-reason") as HTMLSelectElement;
+	assert.equal(
+		select.value,
+		String(PaymentAnomalyResolutionReason.UNSPECIFIED),
+	);
+	const values = Array.from(select.options).map((o) => o.value);
+	assert.equal(
+		values.includes(
+			String(PaymentAnomalyResolutionReason.PROVIDER_EXECUTED_NOT_RECORDED),
+		),
+		false,
+	);
 });

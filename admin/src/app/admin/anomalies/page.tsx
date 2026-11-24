@@ -917,7 +917,12 @@ function PaymentAnomaliesTab() {
 											<div style={subTextStyle}>{r.externalPaymentId}</div>
 										</td>
 										<td style={tdStyle}>
-											<div>{r.orderNo}</div>
+											{r.orders.map((o) => (
+												<div key={`${o.orderNo}:${o.storeId}`}>
+													<div>{o.orderNo}</div>
+													<div style={subTextStyle}>店 {o.storeId}</div>
+												</div>
+											))}
 											<div style={subTextStyle}>買 {r.buyerId}</div>
 										</td>
 										<td style={tdStyle}>{r.amount}</td>
