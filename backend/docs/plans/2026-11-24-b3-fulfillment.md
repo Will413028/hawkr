@@ -138,5 +138,19 @@ R1–R6 已決 2026-11-24 Will（照建議；R6 選「改成運費設定已填�
 |---|---|---|---|---|
 | 盤點與前提重審 | 完成 | 三份盤點（快照 `496b048e2`）；v1 計畫審查 2 輪；前提重審批判 1 輪 | v2 計畫審查 1 輪，修正後未再審（只改驗收文字與補範圍） | `3d8ef0bc0`、`b1bb27a92` |
 | 0 基線 | 完成 | dev `e43d89b87`。計數：三份盤點 §0 重跑，後端數字與快照相同（差異見 `caller-inventory.md` §0 末）。檢查：`./mvnw test -B -fae` 綠；go.work 6 個模組 `go vet`（含 `-tags integration`）與 `go test` 綠；`make lint-monolith` 0 issues；單體 `go vet`（三種 tag）綠；`check-migration-inventory.py`、`gateway-json-contract-check.py`、`TestEveryRouteIsInOpenAPISpec` 綠；`gofmt -l` 空。既有失敗（A8-3d 合進 dev 帶來，非本計畫）：單體 `go test` 的 `internal/modules/notification` `TestSubscriptionsMatchTheEventAdjudication`、`TestErasureSubscriptionsCoverTheDeletionEvents`，`internal/httpapi/adminauth` `TestDeclarationsMatchTheServiceDescriptors`（112≠110）、`TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited`（多 `ResendDeliveries`） | Java `-Dgroups=integration`、Go integration、`backend-integration-tests.yml`：起容器，交 CI | |
+| 4 刪 Java shipping | 進行中 | 已做（分支 `b3-a-backend-delete`）：刪 shipping-service、payuni-webhook-service、`api/proto/shipping`、`pkg/proto/shipping`、java-proto 副本；product：刪 shipping client、`CalculateShippingOptions`（含 proto）、上架時的配送方式驗證、公開讀取的賣家開通過濾與快取鍵裡的開通指紋；aftersales：刪 shipping client、退貨標籤重試（含 `RetryPrintReturnLabel` RPC 與 worker）、四個 shipping 事件 consumer 與 queue、退貨物流 provider 狀態聚合，`RETURN_REFUND` 決議回 `INVALID_PARAM`（只有已送達訂單能開售後，P3 期間不會發生），`return_shipping_method` 請求欄 reserved。product、aftersales `mvn compile` 綠 | order-service 未改（編譯紅）；其餘範圍全部未做；測試未跑 | 見下方「步驟 4 交接」 |
 | 1 文件前置 | 完成 | 基線：`check-doc-paths.py` 綠；完成後 `rg -n '設計書 ?69' backend/docs docs` 只剩本計畫與附件 | 無 | 分支 `b3-d-docs` |
 | 7 文件 | 程式完成待驗收 | 基線：`check-doc-paths.py`、`check-payuni-residue.py` 綠，物流商字眼 45 檔（不含 plans、ADR）；完成後兩支腳本綠，剩 16 檔，皆非物流商：`Kubernetes`、`Uber Fx` 子字串，PayUni 金流付款類型（7-ELEVEN ibon），CodeMeta 來源 md 與 `generate.sh`（物流值域歸步驟 4） | CodeMeta 4 份 md 與 `generate.sh` 的物流值等步驟 4 | 分支 `b3-d-docs` |
+
+
+### 步驟 4 交接（2026-11-24）
+
+order-service 的設計已定，下個 session 照做：
+
+- 結帳：`CheckoutShippingFee`、`GetUberQuoteForCheckout`、`GetOrderForShipping` 三支 RPC 與其訊息刪除；`CheckoutValidate` 不回 `available_shipping_options`（`AvailableShippingOption` 刪除），保留溫層交集與整單錯誤（`ALL_SHIPPING_EXCEEDED` 刪）；preview／confirm 不收配送方式與超商欄位、運費固定 0、沒有免運判定，preview 回應的 `shipping_method`、`shipping_label`、`shipping_fee_payer`、免運兩欄刪除（欄號 reserved）。溫層欄位留給 B4／B6。
+- `OrderPolicyResolver.resolve()` 不再收配送方式，一律 `SELLER_MANAGED`（賣家自寄）；confirm 的政策漂移比對隨之刪除。RFQ 建單同一支。
+- 收件人姓名與地址長度改以 `orders` 欄寬（`recipient_name` 50、`shipping_address` 255）為上限，不再用 `PayUniShippingConstraints`；地址一律必填。
+- `CreateOrderParams` 刪 `shippingMethod`、`feePayer`、`cvsStoreId／Name`、`shippingArea`、`senderCity／District`、`dimensionSum`；新訂單這些欄位寫 NULL（欄位可空，`chk_orders_fulfillment_mode_consistent` 對 NULL 成立）。DB 欄位本身留給 B8。
+- 刪：`ShippingGrpcClient`、`ShippingUberQuoteAssessor`、`UberOrderEligibilityGuard`、`ShippingFeeCacheClient`、`ShippingFeeGrpcFetcher`、`ShipmentCreationBackstopScheduler`、`AutoCompleteScheduler`、`ShippingEventConsumer` 與其 queue、只服務它們的 `OrderShippingProgress`；`OrderGrpcService` 列表與詳情的物流欄（`shipping_status`、`label_*`、`partner_id`、`odno`、`validation_no`、`shipment_photo_keys`、`processing_deadline`）從 proto 刪除。
+- 之後依計畫步驟 4 範圍繼續：invoice-service、notification（R3）、MQ topology、common-core 物流碼值、CodeMeta、compose 與 CI、`modules.go`／`lockorder.go`、種子、seller `MerId`／`GetSellerShippingProfile`、搬遷清單 disposition；`payment-service` outbox 測試與 `monitoring` 的 `hawkr.shipping`（`caller-inventory.md` §0 末）。每改一個 proto 都要跑 `scripts/gen-java-proto.sh`、`scripts/gen-go-proto.sh`（docker 裡的 protoc）、`make connect`。
+- 步驟 5 要跟著刪 gateway 的 `RetryPrintReturnLabel`、`ReturnShippingMethod` 對應、`CalculateShippingOptions` 路由（`/app/shipping_quotes`）。
