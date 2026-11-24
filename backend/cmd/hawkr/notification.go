@@ -88,7 +88,7 @@ func readNotificationProviders(ctx context.Context, e *config.Env, log *slog.Log
 // 帳號語系讀 identity（preferred_locale，多語系 ADR D1）。
 func newNotification(d *db.DB, id *identity.Module, b *buyer.Module, sl *seller.Module, jc jobs.Enqueuer, box *inbox.Inbox, p notificationProviders, images rpc.Images, log *slog.Logger) *notification.Module {
 	return notification.New(notification.Deps{
-		DB: d, Identity: id, Buyer: b, Seller: sl, Directory: notification.NewDirectory(b, sl), Jobs: jc, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: b, Seller: sl, Directory: notification.NewDirectory(b, sl), Resolver: notification.NewResolver(b, sl), Jobs: jc, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 		Contacts: id, Locales: id, Push: p.push, Mail: p.mail, ImageURL: pushImageURL(images), SuppressionKeys: p.suppression, Inbox: box, ResendWebhookSecret: p.webhookSecret,
 	})
 }

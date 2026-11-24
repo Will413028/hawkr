@@ -38,6 +38,8 @@ import (
 type recorder struct {
 	mu         sync.Mutex
 	args       []intake.ProcessArgs
+	fanouts    []intake.FanoutArgs
+	fanoutOpts []*river.InsertOpts
 	deliveries []intake.DeliverArgs
 	purges     []purge.RecipientArgs
 	// deliverUnique 記錄每個渠道 job 是否以參數（投遞紀錄 ID）唯一。
@@ -50,6 +52,9 @@ func (r *recorder) Enqueue(_ context.Context, a river.JobArgs, opts *river.Inser
 	switch a := a.(type) {
 	case intake.ProcessArgs:
 		r.args = append(r.args, a)
+	case intake.FanoutArgs:
+		r.fanouts = append(r.fanouts, a)
+		r.fanoutOpts = append(r.fanoutOpts, opts)
 	case purge.RecipientArgs:
 		r.purges = append(r.purges, a)
 	case intake.DeliverArgs:
@@ -73,6 +78,14 @@ func (r *recorder) takePurges() []purge.RecipientArgs {
 	out := r.purges
 	r.purges = nil
 	return out
+}
+
+func (r *recorder) takeFanouts() ([]intake.FanoutArgs, []*river.InsertOpts) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out, opts := r.fanouts, r.fanoutOpts
+	r.fanouts, r.fanoutOpts = nil, nil
+	return out, opts
 }
 
 func (r *recorder) take() []intake.ProcessArgs {
@@ -227,11 +240,14 @@ func (testRegistry) Lookup(name string) (registry.Entry, bool) {
 	case "test_store_push_only":
 		return testStorePushOnly, true
 	}
+	if e, ok := resolutionTestTypes[name]; ok {
+		return e, true
+	}
 	return registry.Lookup(name)
 }
 
 func (testRegistry) All() []registry.Entry {
-	return append(registry.All(), testLike, testPush, testPushImage, testTwin, testStoreNote, testStorePushOnly)
+	return append(append(registry.All(), resolutionTestEntries()...), testLike, testPush, testPushImage, testTwin, testStoreNote, testStorePushOnly)
 }
 
 // fakeStores 取代 seller：測試只需要「店家是否已退場」。沒登記的店視為存在、營運中。
@@ -270,6 +286,7 @@ type fixture struct {
 	push     *fcm.Fake
 	mail     *resend.Fake
 	contacts *fakeContacts
+	resolver *fakeResolver
 }
 
 type syncBuffer struct {
@@ -304,10 +321,11 @@ func setupIntake(t *testing.T) *fixture {
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
 	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
 	stores := &fakeStores{retired: map[int64]bool{}}
+	resolver := &fakeResolver{buyers: buyers, storeAccounts: map[int64]int64{}, storeBlocks: map[[2]int64]bool{}}
 	rec := &recorder{}
 	push, mail, contacts := fcm.NewFake(nil), resend.NewFake(nil), &fakeContacts{m: map[int64]identity.ContactEmail{}}
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: stores, Resolver: resolver, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
 	}, testRegistry{})
 	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)
@@ -317,7 +335,7 @@ func setupIntake(t *testing.T) *fixture {
 	events.Subscribe[identity.AccountDeleted](bus, m.PurgeTokensOnAccountDeleted)
 	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)
 	events.Subscribe[seller.StoreRetired](bus, m.OnStoreRetired)
-	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts}
+	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts, resolver: resolver}
 }
 
 func (f *fixture) newAccount(t *testing.T) int64 {

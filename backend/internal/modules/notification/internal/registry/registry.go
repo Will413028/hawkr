@@ -69,6 +69,15 @@ type Definition[P any] struct {
 	OccurredAt func(P) time.Time
 	// Recipient 由參數取出收件人：帳號 ID（事件來源身分之外，事件的對象帳號也要進參數快照），STORE 受眾另帶 StoreID；BUYER 受眾的 StoreID 一定是 0。
 	Recipient func(P) Recipient
+	// Expand 在 worker 端解析收件人：事件只帶 store_id、buyer_id、沒有 account_id 的型別用它取代 Recipient（兩者擇一，Expand 與 Recipient、Actors 互斥）。
+	// 回傳 nil 表示沒有存活的收件人（買家或店家已關閉），Process 略過；解析結果的形狀不合法是永久錯誤。收件人與 actor 只在這裡解析，
+	// 封鎖略過與自我略過由 Process 依回傳的 Expansion 套用。
+	Expand func(ctx context.Context, r Resolver, p P) (*Expansion, error)
+	// Broadcast 宣告型別是 fan-out 的母意圖（一對多，例如追蹤的店發文）：不能有收件人、文案、渠道與聚合，只有冪等鍵、事件時間與 Broadcast。
+	Broadcast *Broadcast[P]
+	// Spawned 宣告型別只由 Broadcast 的 fan-out 建立：冪等鍵由派送決定（SpawnedKey），所以沒有 IdempotencyKey、OccurredAt（沿用母意圖的），
+	// 也不能被同步訂閱者 Accept。必須有 Expand。
+	Spawned bool
 	// Aggregatable 宣告型別可聚合（D12：讚、追蹤）；為 true 才可以有 AggregationKey，而且一定要有。
 	Aggregatable   bool
 	AggregationKey func(P) string
@@ -126,6 +135,10 @@ type Spec struct {
 	Channels          []model.Channel
 	IdempotencySource string
 	Aggregatable      bool
+	// Broadcast 與 Child：型別是 fan-out 的母意圖與它的子型別名稱。Spawned：型別只由 fan-out 建立。
+	Broadcast bool
+	Child     string
+	Spawned   bool
 }
 
 // Audience 回傳走意圖管線的型別的唯一受眾（Validate 保證非 Fanout 型別剛好一個）。
@@ -162,14 +175,25 @@ type Entry interface {
 	Load(ctx context.Context, src Sources, params []json.RawMessage) (loaded []Loaded, rowErrs []error, err error)
 	// RenderLoaded 以 Load 的結果組字；沒有 Load 的型別等同 Render。
 	RenderLoaded(l uitext.Locale, params json.RawMessage, ld Loaded) (Rendered, error)
-	// Resolve 由參數快照取出收件人、聚合鍵與 actor，不組字。
+	// Resolve 由參數快照取出收件人、聚合鍵與 actor，不組字；只適用參數裡已有帳號的型別（沒有 Expand 的型別）。
 	Resolve(params json.RawMessage) (Resolved, error)
+	// Expand 在 worker 端解析收件人：有 Expand 的型別向 Resolver 讀 buyer、seller，其餘型別等同 Resolve（Self 與 Actors 是空的，不做封鎖檢查）。
+	// ok 為 false 表示沒有存活的收件人。錯誤是 ErrBadParams 時永久不合法，其餘是暫時性。fan-out 的母意圖與 Fanout 型別回 ErrBadParams。
+	Expand(ctx context.Context, r Resolver, params json.RawMessage) (x Expanded, ok bool, err error)
+	// Spawn 分頁展開 fan-out 母意圖的收件人，回傳子型別的參數（每位收件人一筆，依 ID 由小到大）；不是 Broadcast 型別回 ErrBadParams。
+	Spawn(ctx context.Context, r Resolver, params json.RawMessage, afterID int64, limit int) ([]Spawned, error)
 	// ExampleParams 回傳範例參數的 JSON 與解碼後的值（自檢與固定輸出測試用）。
 	ExampleParams() (json.RawMessage, any, error)
 	// ExampleLoaded 回傳範例參數對應的 Load 結果（沒有 Load 的型別是零值）。
 	ExampleLoaded() Loaded
 	// validate 檢查型別定義本身；回傳全部違規。
 	validate() []error
+}
+
+// Spawned 是 fan-out 展開出來的一位收件人：ID 同 Target.ID，Params 是子型別參數的 JSON。
+type Spawned struct {
+	ID     int64
+	Params json.RawMessage
 }
 
 // MaxIdempotencyKeyLen 是冪等鍵與聚合鍵的長度上限，與 db/schema.sql 的 CHECK（intents.idempotency_key、inbox_items.aggregation_key）一致。
@@ -198,13 +222,21 @@ func (e *entry[P]) Spec() Spec {
 	return Spec{
 		Name: d.Name, Audiences: slices.Clone(d.Audiences), Fanout: d.Fanout, Category: d.Category, Presentation: d.Presentation, StateHint: d.StateHint,
 		Channels: slices.Clone(d.Channels), IdempotencySource: d.IdempotencySource, Aggregatable: d.Aggregatable,
+		Broadcast: d.Broadcast != nil, Child: childName(d.Broadcast), Spawned: d.Spawned,
 	}
+}
+
+func childName[P any](b *Broadcast[P]) string {
+	if b == nil {
+		return ""
+	}
+	return b.Child
 }
 
 func (e *entry[P]) decode(params json.RawMessage) (P, error) {
 	var p P
 	if err := json.Unmarshal(params, &p); err != nil {
-		return p, fmt.Errorf("通知型別 %s 的參數快照解碼失敗：%w", e.d.Name, err)
+		return p, fmt.Errorf("%w：通知型別 %s 的參數快照解碼失敗：%w", ErrBadParams, e.d.Name, err)
 	}
 	return p, nil
 }
@@ -228,6 +260,9 @@ func (e *entry[P]) idempotencyKey(p P) (string, error) {
 	if err := e.notFanout(); err != nil {
 		return "", err
 	}
+	if e.d.Spawned {
+		return "", fmt.Errorf("通知型別 %s 只由 fan-out 建立，冪等鍵由派送決定，不能直接登記", e.d.Name)
+	}
 	if e.d.IdempotencyKey == nil {
 		return "", fmt.Errorf("通知型別 %s 沒有冪等鍵來源", e.d.Name)
 	}
@@ -249,6 +284,9 @@ func (e *entry[P]) OccurredAt(params json.RawMessage) (time.Time, error) {
 func (e *entry[P]) occurredAt(p P) (time.Time, error) {
 	if err := e.notFanout(); err != nil {
 		return time.Time{}, err
+	}
+	if e.d.Spawned {
+		return time.Time{}, fmt.Errorf("通知型別 %s 只由 fan-out 建立，事件時間沿用母意圖", e.d.Name)
 	}
 	if e.d.OccurredAt == nil {
 		return time.Time{}, fmt.Errorf("通知型別 %s 沒有事件時間來源", e.d.Name)
@@ -370,6 +408,74 @@ func (e *entry[P]) resolve(p P) (Resolved, error) {
 	return out, nil
 }
 
+func (e *entry[P]) Expand(ctx context.Context, r Resolver, params json.RawMessage) (Expanded, bool, error) {
+	p, err := e.decode(params)
+	if err != nil {
+		return Expanded{}, false, err
+	}
+	d := e.d
+	if d.Expand == nil {
+		res, err := e.resolve(p)
+		if err != nil {
+			return Expanded{}, false, fmt.Errorf("%w：%w", ErrBadParams, err)
+		}
+		return Expanded{Resolved: res}, true, nil
+	}
+	if err := e.notFanout(); err != nil {
+		return Expanded{}, false, fmt.Errorf("%w：%w", ErrBadParams, err)
+	}
+	x, err := d.Expand(ctx, r, p)
+	if err != nil {
+		return Expanded{}, false, err
+	}
+	if x == nil {
+		return Expanded{}, false, nil
+	}
+	if err := x.validate(d.Audiences[0]); err != nil {
+		return Expanded{}, false, fmt.Errorf("通知型別 %s：%w", d.Name, err)
+	}
+	out := Expanded{Resolved: Resolved{Recipient: x.Recipient, AggregationKey: e.aggregationKey(p)}, Actors: x.Actors}
+	out.Self = Principal{Side: d.Audiences[0], ID: x.BuyerID}
+	if d.Audiences[0] == model.AudienceStore {
+		out.Self.ID = x.Recipient.StoreID
+	}
+	for _, a := range x.Actors {
+		if a.AccountID > 0 {
+			out.ActorAccounts = append(out.ActorAccounts, a.AccountID)
+		}
+	}
+	return out, true, nil
+}
+
+func (e *entry[P]) Spawn(ctx context.Context, r Resolver, params json.RawMessage, afterID int64, limit int) ([]Spawned, error) {
+	p, err := e.decode(params)
+	if err != nil {
+		return nil, err
+	}
+	b := e.d.Broadcast
+	if b == nil {
+		return nil, fmt.Errorf("%w：通知型別 %s 不是 fan-out 母意圖", ErrBadParams, e.d.Name)
+	}
+	targets, err := b.Targets(ctx, r, p, afterID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("通知型別 %s 展開收件人失敗：%w", e.d.Name, err)
+	}
+	out := make([]Spawned, len(targets))
+	prev := afterID
+	for i, t := range targets {
+		if t.ID <= prev {
+			return nil, fmt.Errorf("%w：通知型別 %s 的收件人 ID 要大於游標且遞增（%d 之後是 %d）", ErrBadParams, e.d.Name, prev, t.ID)
+		}
+		prev = t.ID
+		raw, err := json.Marshal(t.Params)
+		if err != nil {
+			return nil, fmt.Errorf("%w：通知型別 %s 的子參數無法序列化：%w", ErrBadParams, e.d.Name, err)
+		}
+		out[i] = Spawned{ID: t.ID, Params: raw}
+	}
+	return out, nil
+}
+
 // aggregationKey 是儲存用的聚合鍵：型別內的鍵加型別名稱前綴（兩個型別的同名鍵不會合併成一列），沒有聚合鍵時是空字串。
 func (e *entry[P]) aggregationKey(p P) string {
 	if e.d.AggregationKey == nil {
@@ -397,6 +503,9 @@ func (e *entry[P]) validate() []error {
 	}
 	if !namePattern.MatchString(d.Name) {
 		bad("名稱要是 lower_snake")
+	}
+	if d.Broadcast != nil {
+		return append(errs, e.validateBroadcast()...)
 	}
 	audiencesOK := len(d.Audiences) > 0 && (d.Fanout || len(d.Audiences) == 1)
 	if !audiencesOK {
@@ -439,11 +548,19 @@ func (e *entry[P]) validate() []error {
 		}
 		seen[ch] = true
 	}
-	if d.Fanout {
-		if d.IdempotencyKey != nil || d.OccurredAt != nil || d.Recipient != nil || d.Aggregatable {
-			bad("fan-out 型別不經意圖管線，不能有冪等鍵、事件時間、收件人或聚合")
+	switch {
+	case d.Fanout:
+		if d.IdempotencyKey != nil || d.OccurredAt != nil || d.Recipient != nil || d.Expand != nil || d.Spawned || d.Aggregatable {
+			bad("fan-out 型別不經意圖管線，不能有冪等鍵、事件時間、收件人、Expand、Spawned 或聚合")
 		}
-	} else {
+	case d.Spawned:
+		if d.Expand == nil {
+			bad("Spawned 型別的收件人在 worker 端解析，一定要有 Expand")
+		}
+		if d.IdempotencyKey != nil || d.OccurredAt != nil || d.IdempotencySource != "" || d.Recipient != nil || d.Actors != nil {
+			bad("Spawned 型別的冪等鍵由派送決定、事件時間沿用母意圖，不能有 IdempotencyKey、IdempotencySource、OccurredAt、Recipient 或 Actors")
+		}
+	default:
 		if d.IdempotencySource == "" || d.IdempotencyKey == nil {
 			bad("沒有冪等鍵來源（IdempotencySource 與 IdempotencyKey 都要有）")
 		} else if _, err := e.idempotencyKey(d.Example); err != nil {
@@ -452,7 +569,12 @@ func (e *entry[P]) validate() []error {
 		if _, err := e.occurredAt(d.Example); err != nil {
 			bad("範例參數取不出事件時間：%v", err)
 		}
-		if audiencesOK {
+		switch {
+		case d.Expand != nil:
+			if d.Recipient != nil || d.Actors != nil {
+				bad("有 Expand 的型別收件人與 actor 都在 worker 端解析，不能同時有 Recipient 或 Actors")
+			}
+		case audiencesOK:
 			if _, err := e.resolve(d.Example); err != nil {
 				bad("範例參數解析不出收件人：%v", err)
 			}
@@ -489,10 +611,36 @@ func (e *entry[P]) validate() []error {
 	return errs
 }
 
+// validateBroadcast 檢查 fan-out 母意圖：只有冪等鍵、事件時間與 Broadcast，沒有收件人、文案、渠道與聚合。
+func (e *entry[P]) validateBroadcast() []error {
+	d := e.d
+	var errs []error
+	bad := func(format string, a ...any) {
+		errs = append(errs, fmt.Errorf("通知型別 %q："+format, append([]any{d.Name}, a...)...))
+	}
+	if d.IdempotencySource == "" || d.IdempotencyKey == nil {
+		bad("沒有冪等鍵來源（IdempotencySource 與 IdempotencyKey 都要有）")
+	} else if _, err := e.idempotencyKey(d.Example); err != nil {
+		bad("範例參數取不出冪等鍵：%v", err)
+	}
+	if _, err := e.occurredAt(d.Example); err != nil {
+		bad("範例參數取不出事件時間：%v", err)
+	}
+	if !namePattern.MatchString(d.Broadcast.Child) || d.Broadcast.Child == d.Name {
+		bad("子型別名稱 %q 不合法（要是另一個 lower_snake 型別）", d.Broadcast.Child)
+	}
+	if d.Broadcast.Targets == nil {
+		bad("fan-out 沒有 Targets")
+	}
+	if d.Fanout || d.Spawned || d.Recipient != nil || d.Expand != nil || d.Actors != nil || d.Aggregatable || d.AggregationKey != nil ||
+		len(d.Audiences) > 0 || len(d.Channels) > 0 || d.Text != nil || d.TextLoaded != nil || d.Load != nil {
+		bad("fan-out 母意圖不產生收件匣列，不能有受眾、渠道、文案、收件人、Expand、actor、聚合、Fanout 或 Spawned")
+	}
+	return errs
+}
+
 // Validate 檢查一個型別定義，回傳全部違規。
 func Validate(e Entry) []error { return e.validate() }
-
-var all = []Entry{accountSuspended, accountUnsuspended, announcement}
 
 // All 回傳全部型別，順序固定。
 func All() []Entry { return slices.Clone(all) }

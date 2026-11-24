@@ -56,3 +56,4 @@ var (
 		ExampleLoaded: Loaded{Announcement: &AnnouncementText{Title: "Scheduled maintenance", Body: "The service will be unavailable on Sunday from 02:00 to 03:00."}},
 	})
 )
+var announcementTypes = []Entry{announcement}

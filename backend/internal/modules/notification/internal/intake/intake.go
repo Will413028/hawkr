@@ -55,11 +55,16 @@ type Deps struct {
 	Buyers   Buyers
 	Stores   Stores
 	Registry Registry
+	// Resolver 是 worker 端解析收件人、封鎖檢查與追蹤者展開要問的地方（*buyer.Module 與 *seller.Module 經 notification.NewResolver 組成）；
+	// 只有宣告 Expand 或 Broadcast 的型別用到，沒有這類型別的測試可以不給。
+	Resolver registry.Resolver
 	Signals  Signals
 	Jobs     jobs.Enqueuer
-	Now      func() time.Time
-	NewID    func() uuid.UUID
-	Logger   *slog.Logger
+	// FanoutChunk 是 fan-out 一頁的收件人數；0 用 DefaultFanoutChunk。
+	FanoutChunk int
+	Now         func() time.Time
+	NewID       func() uuid.UUID
+	Logger      *slog.Logger
 }
 
 // Service 是意圖管線。
@@ -116,7 +121,8 @@ func (s *Service) Accept(ctx context.Context, typeName string, params any) error
 	return s.d.Jobs.Enqueue(ctx, ProcessArgs{IntentID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}})
 }
 
-// Process 展開一個意圖。意圖已被清除、收件帳號不存在或已刪除、收件人就是 actor 時什麼都不寫（回 nil）；意圖型別或快照壞掉是永久錯誤（取消，不重試）。
+// Process 展開一個意圖。意圖已被清除、收件帳號不存在或已刪除、沒有存活的收件人、收件人就是 actor、收件人與 actor 之間有封鎖時什麼都不寫（回 nil）；
+// 意圖型別或快照壞掉是永久錯誤（取消，不重試）；fan-out 的母意圖只排展開的 job（startFanout）。
 // 重試安全：意圖與收件匣列的連結（inbox_item_intents）判斷已寫過，聚合合併取 actor 聯集且只讓較新的事件換參數，
 // 投遞紀錄有 (意圖, 收件人, 渠道) 唯一鍵、已存在時不重複排渠道 job。
 func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
@@ -133,17 +139,28 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 		s.log().WarnContext(ctx, "通知意圖的型別沒有註冊，取消 job", "intent_id", intent.ID, "type", intent.Type)
 		return river.JobCancel(err)
 	}
-	resolved, err := e.Resolve(intent.Params)
-	if err != nil {
+	spec := e.Spec()
+	if spec.Broadcast {
+		return s.startFanout(ctx, intent)
+	}
+	x, ok, err := e.Expand(ctx, s.d.Resolver, intent.Params)
+	if errors.Is(err, registry.ErrBadParams) {
 		s.log().WarnContext(ctx, "通知意圖的參數快照無法解析，取消 job", "intent_id", intent.ID, "type", intent.Type, "error", err)
 		return river.JobCancel(err)
 	}
+	if err != nil {
+		return fmt.Errorf("解析通知收件人：%w", err)
+	}
+	if !ok {
+		s.log().InfoContext(ctx, "沒有存活的收件人，略過通知", "intent_id", intent.ID, "type", intent.Type)
+		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return s.scrubSkipped(ctx, intent.ID) })
+	}
+	resolved := x.Resolved
 	if slices.Contains(resolved.ActorAccounts, resolved.Recipient.AccountID) {
 		// 自己觸發的事不通知自己；比的是帳號，不是店或買家 ID。
 		s.log().InfoContext(ctx, "收件人就是 actor，略過通知", "intent_id", intent.ID, "type", intent.Type)
 		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return s.scrubSkipped(ctx, intent.ID) })
 	}
-	spec := e.Spec()
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		gone, err := LockRecipient(ctx, Locks{Accounts: s.d.Accounts, Buyers: s.d.Buyers, Stores: s.d.Stores}, spec.Audience(), resolved.Recipient.AccountID, resolved.Recipient.StoreID)
 		if err != nil {
@@ -151,6 +168,14 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 		}
 		if gone != GoneNone {
 			s.logGone(ctx, intent, gone)
+			return s.scrubSkipped(ctx, intent.ID)
+		}
+		blocked, err := Blocked(ctx, s.d.Resolver, x.Self, x.Actors)
+		if err != nil {
+			return fmt.Errorf("檢查封鎖：%w", err)
+		}
+		if blocked {
+			s.log().InfoContext(ctx, "收件人與 actor 之間有封鎖，略過通知", "intent_id", intent.ID, "type", intent.Type)
 			return s.scrubSkipped(ctx, intent.ID)
 		}
 		wroteInbox, itemID, err := s.deliver(ctx, intent, spec, resolved)

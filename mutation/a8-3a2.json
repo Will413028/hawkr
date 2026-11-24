@@ -1,0 +1,49 @@
+{
+ "mutants": [
+  {
+   "id": "block-skip-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "\t\tif blocked {\n",
+   "new": "\t\tif false && blocked {\n",
+   "test": "internal/modules/notification ^TestBlockedPairsAreSkippedInBothDirections$",
+   "why": "Process no longer skips an intent when the recipient and an actor block each other, so a blocked pair still gets an inbox row."
+  },
+  {
+   "id": "block-store-direction-dropped",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/intake/blocks.go",
+   "old": "\treturn r.StoreBlocksBuyer(ctx, storeID, buyerID)\n}",
+   "new": "\t_, err = r.StoreBlocksBuyer(ctx, storeID, buyerID)\n\treturn false, err\n}",
+   "test": "internal/modules/notification/internal/intake ^TestBlockedCoversEveryPairAndDirection$",
+   "why": "A store that blocks a buyer is no longer treated as a block between the two, so only the buyer-blocks-store direction is skipped."
+  },
+  {
+   "id": "fanout-key-drops-recipient-unit",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/resolve.go",
+   "old": "parentKey+\"/\"+strconv.FormatInt(targetID, 10)",
+   "new": "parentKey+\"/\"+strconv.FormatInt(0*targetID, 10)",
+   "test": "internal/modules/notification/internal/registry ^TestSpawnedKeyIsPerParentAndPerRecipient$",
+   "why": "The fan-out child idempotency key no longer includes the recipient, so every follower of one post maps to the same key."
+  },
+  {
+   "id": "fanout-key-drops-recipient",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/registry/resolve.go",
+   "old": "parentKey+\"/\"+strconv.FormatInt(targetID, 10)",
+   "new": "parentKey+\"/\"+strconv.FormatInt(0*targetID, 10)",
+   "test": "internal/modules/notification ^TestFanoutPagesFollowersAndRerunningCreatesNoDuplicates$",
+   "why": "With the recipient missing from the child key only the first follower gets a child intent, so the fan-out creates one inbox row instead of one per follower."
+  },
+  {
+   "id": "expand-drops-actor-accounts",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/registry.go",
+   "old": "out.ActorAccounts = append(out.ActorAccounts, a.AccountID)",
+   "new": "_ = a",
+   "test": "internal/modules/notification/internal/registry ^TestExpandResolvesRecipientSelfAndActorAccounts$",
+   "why": "Worker-resolved actors no longer contribute their accounts, so the self-skip and the inbox actor list lose them."
+  }
+ ]
+}
