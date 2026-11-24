@@ -128,6 +128,11 @@
   - 驗收：測試證明每個被訂閱的事件都有對應型別、每個型別都有訂閱或明列為公告；integration（替身）：暫時性錯誤重試後只送一次、永久性錯誤不重試、Unregistered 停用 token、BUYER 受眾不推 seller App、停權與刪帳號後 token 在同一個 transaction 消失、60 天未更新的 token 被清、suppression 名單內不寄、確認信地址不在任何 job 參數裡、每個型別一個「事件 → 收件匣」案例、封鎖雙方不送；relay 刪除後 `rg` 0 hit。mutation：永久錯誤改暫時 → 測試紅；拿掉受眾 App 過濾 → 測試紅；拿掉封鎖略過 → A7-3 測試紅；移除一個訂閱 → 覆蓋測試紅。真實 provider：Firebase 就緒後送一則推播到測試裝置，結果貼進度表；真實寄信見「延後」。
   - 需要人做的事：Firebase 專案（Will）。
   - 完成後的狀態：單體模組的通知改由新模組送。
+  - 子步驟（2026-11-24 拆分：一個 session 做不完；範圍、驗收與 mutation 以上方為準，各子步驟只取屬於它的那幾項）：
+    - **A8-3a 渠道與 token**（被擋於：無；真實推播另擋於 Firebase 專案）：FCM、Resend adapter 與替身；推播與 email job（送出前同鎖確認收件人未刪除未退場，R1-4）；suppression 表與退信／投訴 webhook（經 `platform/inbox`）；token 登入改綁、登出刪、停權與刪帳號同 tx 刪（結構測試白名單）、60 天清除。驗收：上方 integration 的重試只送一次、永久錯誤不重試、Unregistered 停用、BUYER 受眾不推 seller App、停權與刪帳號 token 同 tx 消失、60 天清除、suppression 不寄；mutation：永久改暫時、拿掉受眾 App 過濾。
+    - **A8-3b content 側型別**（被擋於：A8-3a）：social（留言、讚、追蹤的店發文）、buyer 追蹤店家、review、im（只推播）的型別與訂閱；封鎖雙方不送。驗收：每型別一個「事件 → 收件匣」案例、封鎖略過 mutation。
+    - **A8-3c 治理與交易側型別**（被擋於：A8-3a）：seller（含新事件 `CaseInquiryCreated`、`StorePendingDeletion` 確認信）、buyer `BuyerDeletionRequested` 確認信、moderation 新事件、`ReportReceived` 確認信（參數只放參照）、payment `PayoutAccountChanged` 與 `payout_account_deadline`、accountsuspension、delegation、procurement `RfqPublished`。驗收：每型別一個案例、確認信地址不在任何 job 參數裡。
+    - **A8-3d 覆蓋、重送與刪 relay**（被擋於：A8-3b、A8-3c）：事件↔型別覆蓋測試（移除一個訂閱 → 紅）、重送手段與 runbook、未觸達查詢、刪除上方列出的 relay 與 wire（`rg` 0 hit）。
 
 - [x] **A8-4 主計畫承接條目**（被擋於：無；可與 A8-1 並行）
   - 範圍：主計畫「模組完成的定義」加一條：搬進單體的模組，舊服務發往 notification 的每個事件逐一裁決（定義通知型別並訂閱，或不做附理由），不經 `internal/legacy`。通知 ADR 加 2026-11-23 修訂。
@@ -216,7 +221,10 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | A8-2b unary handler | 完成 | 本機：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／notification／cmd unit -race（只剩預期的 `TestEveryServiceInTheContractIsMounted`：NotificationAdminService 屬 A8-2c、SellerProcurementAppService 屬 A9）、mutation --validate；契約審查＋code-review 兩輪（findings 13，blocking 1 屬跨步：公告列被收件匣隱藏，於 A8-2c 註冊公告型別解決；fixed 8、recorded 2、rejected 3）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
 | A8-2c 後台公告 | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok；跨步 blocking（A8-2b 收件匣隱藏公告列）以註冊 Fanout 型別 `announcement` 解決；契約審查＋code-review 兩輪（findings 13，blocking 0；fixed 11、recorded 1：派送中重試可能重建使用者剛刪的公告（CARRYOVER）、rejected 1 nit：FailedPrecondition／PermissionDenied 視為永久略過）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
 | A8-2d 串流與賣家工作區 | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok、website lint 與 test:unit；前提更正（serve／worker 分開，改 LISTEN/NOTIFY，2026-11-24）；契約審查＋code-review 兩輪（findings 15，blocking 0；fixed 11、rejected 4：S3 依 D19 接受、3 nit）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
-| A8-3 渠道與事件訂閱 | 未開始 | | | |
+| A8-3a 渠道與 token | 未開始 | | 真實推播：擋於 Firebase 專案（Will） | |
+| A8-3b content 側型別 | 未開始 | | | |
+| A8-3c 治理與交易側型別 | 未開始 | | | |
+| A8-3d 覆蓋、重送與刪 relay | 未開始 | | | |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |
 | A8-5 website、admin | 未開始 | | | |
 | A8-6 兩支 App | 未開始 | | | |
