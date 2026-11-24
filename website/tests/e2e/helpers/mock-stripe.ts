@@ -39,6 +39,9 @@ export async function installStripeStub(page: Page): Promise<void> {
     return {
       registerAppInfo: function () {},
       _registerWrapper: function () {},
+      createToken: function () { return Promise.resolve({}); },
+      createPaymentMethod: function () { return Promise.resolve({}); },
+      confirmCardPayment: function () { return Promise.resolve({}); },
       elements: function () {
         return {
           create: element,
