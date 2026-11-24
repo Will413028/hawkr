@@ -334,6 +334,18 @@ type ChargeFake = charge.Fake
 // NewChargeFake 建立 ChargeFake。
 func NewChargeFake() *ChargeFake { return charge.NewFake() }
 
+// NewChargeStripe 建立 Stripe 的付款 provider；client 的 WebhookSecret 必須是付款 event destination 的密鑰（與收款帳戶的不同）。
+func NewChargeStripe(client *stripe.Client) (ChargeProvider, error) {
+	p, err := charge.NewStripe(client)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// ChargeStripeName 是 Stripe 付款 provider 的代碼（與收款帳戶的 "stripe" 不同，inbox 各自登記）。
+const ChargeStripeName = charge.StripeName
+
 // ChargeFakeName 是 ChargeFake 的 provider 代碼。
 const ChargeFakeName = charge.FakeName
 
