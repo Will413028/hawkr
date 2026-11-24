@@ -59,7 +59,7 @@
    "stack": "go",
    "file": "backend/internal/legacy/procurementrelay/relay.go",
    "old": "if live {",
-   "new": "if false {",
+   "new": "if _ = live; false {",
    "test": "internal/legacy/procurementrelay ^TestSweepMarksOnlyStaleInvitesWithoutALiveJob$",
    "why": "The sweep fails invites that still have a running or retrying job."
   },
