@@ -53,6 +53,7 @@ func TestRegistryHoldsTheTypesOfThisStep(t *testing.T) {
 		"comment_created", "comment_replied_buyer", "comment_replied_store", "comment_liked_buyer", "comment_liked_store", "post_liked", "store_followed",
 		"review_created", "post_published", "post_published_item", "chat_message_buyer", "chat_message_store", "product_restocked",
 	}, governance...)
+	want = append(want, "voucher_expiring")
 	if !slices.Equal(names, want) {
 		t.Fatalf("型別清單 %v", names)
 	}

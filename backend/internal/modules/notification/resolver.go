@@ -111,7 +111,7 @@ func (r resolver) CaseReporters(ctx context.Context, caseID uuid.UUID, audience 
 	}
 	var out []registry.ReporterRef
 	for after := afterID; len(out) < limit; {
-		page, err := r.reporters.CaseReporters(ctx, caseID, side, after, int32(min(limit-len(out), int(moderation.MyReportsMaxPageSize))))
+		page, err := r.reporters.CaseReporters(ctx, caseID, side, after, int32(min(limit-len(out), int(moderation.MyReportsMaxPageSize)))) //nolint:gosec // 上限是 moderation 的每頁上限
 		if err != nil {
 			return nil, err
 		}

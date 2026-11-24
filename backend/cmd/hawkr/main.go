@@ -259,7 +259,8 @@ func runServe(ctx context.Context) error {
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, moderationModule, jc, box, notificationConfig, images, log)
+	couponModule := newCoupon(d, sellerModule, buyerModule)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, couponModule, moderationModule, jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
@@ -295,7 +296,7 @@ func runServe(ctx context.Context) error {
 		Review:       reviewModule,
 		IM:           imModule,
 		CRM:          crmModule,
-		Coupon:       newCoupon(d, sellerModule, buyerModule),
+		Coupon:       couponModule,
 		Moderation:   moderationModule,
 		Notification: notificationModule,
 		Content: content.New(content.Deps{
@@ -490,7 +491,7 @@ func runWorker(ctx context.Context) error {
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, moderation.NewCaseReader(d), jc, box, notificationConfig, images, log)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, newCoupon(d, sellerModule, buyerModule), moderation.NewCaseReader(d), jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))

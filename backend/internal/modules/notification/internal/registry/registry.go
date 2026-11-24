@@ -74,6 +74,9 @@ type Definition[P any] struct {
 	// 回傳 nil 表示沒有存活的收件人（買家或店家已關閉），Process 略過；解析結果的形狀不合法是永久錯誤。收件人與 actor 只在這裡解析，
 	// 封鎖略過與自我略過由 Process 依回傳的 Expansion 套用。
 	Expand func(ctx context.Context, r Resolver, p P) (*Expansion, error)
+	// StillValid 在送出前向來源重查事實是否仍成立（D27：券已被使用或作廢就不該再提醒）；回傳 false 時投遞標為永久跳過、不送出。
+	// 沒有宣告的型別永遠成立。錯誤是暫時性（River 重試）；參數解不開是永久錯誤。
+	StillValid func(ctx context.Context, v Validity, p P) (bool, error)
 	// Broadcast 宣告型別是 fan-out 的母意圖（一對多，例如追蹤的店發文）：不能有收件人、文案、渠道與聚合，只有冪等鍵、事件時間與 Broadcast。
 	Broadcast *Broadcast[P]
 	// Spawned 宣告型別只由 Broadcast 的 fan-out 建立：冪等鍵由派送決定（SpawnedKey），所以沒有 IdempotencyKey、OccurredAt（沿用母意圖的），
@@ -111,6 +114,12 @@ type Sources interface {
 	Announcements(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]AnnouncementText, error)
 	// StoreCodes 一次讀多家店的 store_code（store_id 到 store_code）；不存在與沒有公開頁的店不在結果裡。
 	StoreCodes(ctx context.Context, storeIDs []int64) (map[int64]int64, error)
+}
+
+// Validity 是型別在送出前重查來源要問的地方（由通知模組向擁有資料的模組讀取）。
+type Validity interface {
+	// VoucherAvailable 回報買家的券是否仍可使用（狀態為 AVAILABLE 且活動未過期）；券不存在或不屬於這位買家回 false。
+	VoucherAvailable(ctx context.Context, buyerID int64, voucherID uuid.UUID) (bool, error)
 }
 
 // Loaded 是 Load 解析出來的內容；沒有 Load 的型別是零值。
@@ -189,6 +198,8 @@ type Entry interface {
 	// Expand 在 worker 端解析收件人：有 Expand 的型別向 Resolver 讀 buyer、seller，其餘型別等同 Resolve（Self 與 Actors 是空的，不做封鎖檢查）。
 	// ok 為 false 表示沒有存活的收件人。錯誤是 ErrBadParams 時永久不合法，其餘是暫時性。fan-out 的母意圖與 Fanout 型別回 ErrBadParams。
 	Expand(ctx context.Context, r Resolver, params json.RawMessage) (x Expanded, ok bool, err error)
+	// StillValid 在送出前重查事實是否仍成立；沒有宣告的型別回 true。回 false 表示不該再送。
+	StillValid(ctx context.Context, v Validity, params json.RawMessage) (bool, error)
 	// Spawn 分頁展開 fan-out 母意圖的收件人，回傳子型別的參數（每位收件人一筆，依 ID 由小到大）與下一頁的游標、是否結束；不是 Broadcast 型別、
 	// 頁的要求不合法、型別回的游標或 ID 不合法、型別回 InvalidInput 都是 ErrBadParams。
 	Spawn(ctx context.Context, r Resolver, params json.RawMessage, req PageRequest) (SpawnPage, error)
@@ -480,6 +491,18 @@ func (e *entry[P]) Expand(ctx context.Context, r Resolver, params json.RawMessag
 	return out, true, nil
 }
 
+func (e *entry[P]) StillValid(ctx context.Context, v Validity, params json.RawMessage) (bool, error) {
+	if e.d.StillValid == nil {
+		return true, nil
+	}
+	p, err := e.decode(params)
+	if err != nil {
+		return false, err
+	}
+	ok, err := e.d.StillValid(ctx, v, p)
+	return ok, permanent(err)
+}
+
 func (e *entry[P]) Spawn(ctx context.Context, r Resolver, params json.RawMessage, req PageRequest) (SpawnPage, error) {
 	p, err := e.decode(params)
 	if err != nil {
@@ -735,7 +758,7 @@ func (e *entry[P]) validateBroadcast() []error {
 	if d.Broadcast.Targets == nil {
 		bad("fan-out 沒有 Targets")
 	}
-	if d.Fanout || d.Spawned || d.Recipient != nil || d.Expand != nil || d.Actors != nil || d.Aggregatable || d.AggregationKey != nil ||
+	if d.Fanout || d.Spawned || d.Recipient != nil || d.Expand != nil || d.StillValid != nil || d.Actors != nil || d.Aggregatable || d.AggregationKey != nil ||
 		len(d.Audiences) > 0 || len(d.Channels) > 0 || d.Text != nil || d.TextLoaded != nil || d.Load != nil || d.DeepLinkLoaded != nil {
 		bad("fan-out 母意圖不產生收件匣列，不能有受眾、渠道、文案、收件人、Expand、actor、聚合、Fanout 或 Spawned")
 	}

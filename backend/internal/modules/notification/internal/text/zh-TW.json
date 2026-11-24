@@ -640,6 +640,19 @@
     "store_unsuspended.title": {
       "message": "店家已解除停權",
       "description": "標題：店家解除停權（store_unsuspended 型別）。"
+    },
+    "voucher_expiring.body": {
+      "message": "你有一張優惠券將於 {time} 到期，把握時間使用。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "收件匣與推播的內文：優惠券即將到期（voucher_expiring 型別，收件人是買家）。time 是活動結束時間（台北時間，到分鐘）。"
+    },
+    "voucher_expiring.title": {
+      "message": "優惠券即將到期",
+      "description": "收件匣與推播的標題：優惠券即將到期（voucher_expiring 型別，收件人是買家）。"
     }
   }
 }
