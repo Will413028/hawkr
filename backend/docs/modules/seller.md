@@ -235,7 +235,7 @@
 | `CAP_PRODUCT_MANAGE` | 供給定義：商品建立、編輯、上下架、匯入、分類、運費試算、認證、hashtag；物流方案供給 | ✓ | ✗ |
 | `CAP_ORDER_FULFILL` | 既有契約的履約：出貨、物流、售後、訂單查詢；結算與撥款檢視 | ✓ | ✓ |
 | `CAP_ORDER_CONTRACT` | 收縮型：取消出貨與退款受理 | ✓ | ✓ |
-| `CAP_MARKETING` | 行銷經營：優惠券建立、CRM、貼文發佈、AI 助理、dashboard、報表、市場行情查詢、雷達與追蹤增刪 | ✓ | ✗ |
+| `CAP_MARKETING` | 行銷經營：優惠券建立、CRM、貼文發佈、AI 助理、dashboard、報表、市場行情查詢、雷達與追蹤增刪；採購詢價的賣家端（`SellerProcurementAppService` 六支，`procurement.RequiredSellerCapability`；讀取在查詢前檢查、寫入在 transaction 內鎖店家列後讀店家此刻狀態檢查，停權的店讀得到、寫不了） | ✓ | ✗ |
 | `CAP_CONTENT_CONTRACT` | 收縮型：刪自己貼文、自行下架貼文、撤自己券 | ✓ | ✓ |
 | `CAP_CHAT_SEND` | IM 送訊（停權時 IM 再做訂單關聯細分） | ✓ | ✓（受限） |
 | `CAP_CHAT_READ` | IM 讀取 | ✓ | ✓ |

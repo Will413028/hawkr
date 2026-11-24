@@ -288,7 +288,7 @@ type MessageSent struct {
 }
 
 // MessageHidden 一則訊息被隱藏（只在真的新增一筆隱藏時發，冪等的重複隱藏不發），在隱藏的同一個 transaction 內發布。只帶參照與列舉，不帶管理員說明文字；
-// SanctionID 是隱藏紀錄的 ID，作者是 (AuthorKind, AuthorID)（買家是 buyer_id、店家是 store_id），SourceRef 是案件的不透明參照（沒有案件時空字串）。
+// SanctionID 是隱藏紀錄的 ID，作者是 (AuthorKind, AuthorID)：Hide 拒絕店家寄的訊息，所以一律是買家與 buyer_id，SourceRef 是案件的不透明參照（沒有案件時空字串）。
 type MessageHidden struct {
 	EventID        uuid.UUID
 	OccurredAt     time.Time

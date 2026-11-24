@@ -62,6 +62,12 @@ type SellerStores interface {
 	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
 }
 
+// SellerModule 是組裝端傳進來的 seller 模組要滿足的全部方法：店家過濾（SellerStores）與賣家端寫入守門（SellerStoreGuard）（*seller.Module 滿足它）。
+type SellerModule interface {
+	SellerStores
+	SellerStoreGuard
+}
+
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
 type Deps struct {
 	DB     *db.DB

@@ -39,10 +39,12 @@ import (
 type fakeReporters struct {
 	items  []moderation.Reporter
 	afters []int64
+	sides  []moderation.ReporterSide
 }
 
 func (f *fakeReporters) CaseReporters(_ context.Context, _ uuid.UUID, side moderation.ReporterSide, after int64, size int32) (moderation.ReporterPage, error) {
 	f.afters = append(f.afters, after)
+	f.sides = append(f.sides, side)
 	var ids []int64
 	byID := map[int64]moderation.Reporter{}
 	for _, r := range f.items {
@@ -530,6 +532,10 @@ func TestCaseClosedFansOutToBuyerAndStoreReportersAcrossPages(t *testing.T) {
 	}
 	if fromStart != 2 || len(reporters.afters) < 4 {
 		t.Fatalf("每個母意圖只有第一頁從頭讀，之後從上一頁最後一位的號碼接著讀：%v", reporters.afters)
+	}
+	// 買家與店家的號碼來自不同序列、會重疊，所以光看收件匣分不出店家母意圖讀錯邊；直接看兩邊都被讀過。
+	if !slices.Contains(reporters.sides, moderation.ReporterSideBuyer) || !slices.Contains(reporters.sides, moderation.ReporterSideStore) {
+		t.Fatalf("兩個母意圖各讀自己那一邊的檢舉人：%v", reporters.sides)
 	}
 	if err := f.db.InTx(context.Background(), func(ctx context.Context) error { return events.Publish(ctx, f.bus, closed) }); err != nil {
 		t.Fatal(err)

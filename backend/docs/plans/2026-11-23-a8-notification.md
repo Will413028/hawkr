@@ -16,6 +16,7 @@
 | 檔 | 內容 |
 |---|---|
 | `inventory.md` | 16 支 RPC＋SSE 與四端呼叫點、6 張表、消費 18／發布 2 個事件、渠道 13 列、94 列模板（重放 migration 量得）、背景工作 10 列、缺陷 #1–#27、單體橋接 8 套件與預留事件 12 項、守門測試 4 組、不確定 U1–U13 |
+| `a8-7-removal.md` | A8-7 刪除盤點（2026-11-25，dev `668e789c3`）：舊服務、gateway 的通知路由與 SSE 平台、設定、CI、監控的去向；A8-3 漏掉的採購邀請交接；拿掉 `notification.*` queue 的後果；payload golden 契約退場；允許的殘留 |
 | `baseline-brief.md` | 業界基線對照（自建 vs SaaS、River vs 工作流引擎、投遞模型、收件匣、偏好、串流、token、聚合）與前提問題（legacy 轉接 100% 重工）；Will 2026-11-23 同意全部建議 |
 
 - 盤點由唯讀 subagent 起草，每項附 `file:line`；主 session 抽查了缺陷 #1、#10、#19 與 identity 的寄件地址 API。簡報由沒參與草案的 subagent 起草；主 session 核對了 B3 刪超商取貨（主計畫 B3 段）與 `internal/legacy` 只放暫時轉接（主計畫規則）。簡報的外部連結是依公開文件記憶寫的【推】，實作引用前核對。
@@ -135,6 +136,7 @@
     - **A8-3c 治理與交易側型別**（被擋於：A8-3a；需要收件人解析的型別另擋於 A8-3a2）：seller（含新事件 `CaseInquiryCreated`、`StorePendingDeletion` 確認信）、buyer `BuyerDeletionRequested` 確認信、moderation 與 social、review、im 的處分及檢舉事件（依 D24；開工時同步改 `event-adjudication.md` §8.3#7a-c）、檢舉確認與結果 `report_received`／`report_resolved`（參數只放參照）、payment `PayoutAccountChanged` 與 `payout_account_deadline`、accountsuspension、delegation、procurement `RfqPublished`。驗收：每型別一個案例、確認信地址不在任何 job 參數裡。
     - **A8-3e coupon 到期提醒型別**（2026-11-24 加：D26、D27 歸 A8-3 但未列入 3b／3c）（被擋於：A8-3a2、B7-4c）：`voucher_expiring` 型別與訂閱、行銷類推播的靜音時段延後（D26）、每券一則與送出前重查（D27）。驗收：見下。
     - **A8-3d1 覆蓋測試與刪 relay**（2026-11-24 拆分：一個 session 做不完；被擋於：A8-3b、A8-3c、A8-3e）：事件↔型別覆蓋測試（每個被訂閱的單體事件都有對應型別、每個型別都有訂閱或明列為公告；移除一個訂閱 → 紅）、刪除上方列出的 relay 與 wire 及其 wire／golden 測試與 `pkg/mq` social 常數（`rg` 0 hit）。實作結果：`socialrelay`、`imrelay`、`delegationservice/events.go` 的通知 wire、`buyerrelay` 的追蹤、`product.viewed`、`product.restock.target` 已刪；`sellerrelay` 的五種事件都有 Java 消費者（product、order、coupon、cart），沒有可分離的通知部分，整個保留；`reviewrelay` 的 `review.created` 也有 Java order 與 product 消費者，且它的 `notify_seller_account_id`、`buyer_nickname`、`buyer_avatar_key` 受 golden 與舊 notification-service 模板契約約束，整個保留到 A8-7。覆蓋測試是 `internal/modules/notification/subscriptions_test.go`，與 `Subscribe` 讀同一張訂閱表（`subscriptions.go`）。
+    - **A8-3f 採購邀請的投遞狀態交接與刪 `procurementrelay`**（2026-11-25 加：A8-7 開工盤點發現 A8-3c 漏做 `procurement/CARRYOVER.md` relay 列寫的交接「`rfq_invited` 意圖 job 接手 `MarkInviteSent`／`MarkInviteFailed`，刪 `procurementrelay`」，`rg -n "MarkInvite" backend/internal/modules/notification` 0 hit；`a8-7-removal.md` §2）（被擋於：D30；與進行中的分支 `a9-6` 協調，它在 `ea5a87391` 把 relay 接進 `cmd/hawkr`）：照 D30 處理邀請 `delivery_state` 的寫入者，刪 `internal/legacy/procurementrelay`、它在 `cmd/hawkr` 的接線、topology 的 `notification.procurement` queue 與 `procurement.events` 上已無發送者的 key。消費端：`rg -n "procurementrelay|MarkInvite(Sent|Failed)|InviteDeliveryState|delivery_state" backend/ api/ seller-app/lib website admin -g '!**/gen/**' -g '!node_modules'`。驗收：依 D30 的結果寫（狀態寫入的 integration 與 mutation，或刪欄位後的契約與生成無 drift）；`rg -n procurementrelay backend` 0 hit。
     - **A8-3d2 重送與未觸達查詢**（被擋於：A8-3a；可與 A8-3d1 並行）：依投遞紀錄重排永久失敗投遞的手段與 runbook；未觸達查詢 RPC（近 N 天交易必要型別沒有任何渠道送達的數量，後台唯讀，`api/` 契約與 TS／Dart 生成）與 admin 頁（照既有後台列表元件，A8-5 範圍寫的那頁）。
 
 - [x] **A8-4 主計畫承接條目**（被擋於：無；可與 A8-1 並行）
@@ -151,11 +153,14 @@
   - 消費端：`rg -n "notification|device_registrar|device-token" buyer-app/lib seller-app/lib`。
   - 驗收：analyze、format、custom_lint、生成檢查與改動到的測試檔（完整 `flutter test` 交 CI）；真機：登入收到推播、登出不再收到、換帳號登入不收前一人的通知。
 
-- [ ] **A8-7 刪除舊服務與舊路由**（被擋於：A8-3、A8-5、A8-6）
-  - 範圍：（全部是刪除或修改）刪 `backend/services/notification-service`、compose 項目、gateway 通知路由與 handler、`openapi.yaml` 對應 operation、`backend/api/proto/notification` 與 Java `java-proto` 副本（先 diff 確認無其他使用，U11）、只為舊通知存在的守門測試（§8.4 #1、#2）、`notifyAllowlist`、沒人讀的 `MAIL_*`／`RESEND_API_KEY`。
-  - 消費端：`rg -n "notification-service|hawkr_notification|notificationpb|notification\.proto" --hidden -g '!.git' -g '!**/docs/**' -g '!**/*.md'`。
-  - 驗收：上述 `rg` 0 hit（附輸出）；賣家工作台即時通道的既有測試仍綠（U10）；全部 workflow 的 CI 等價檢查；gateway 對 openapi 的對齊檢查通過。
-  - 完成後的狀態：還沒搬的服務的事件沒有通知，到各自搬遷為止。
+- [ ] **A8-7 刪除舊服務與舊路由**（被擋於：A8-3、A8-5、A8-6。A8-6 只剩真機推播驗收：兩支 App 已不呼叫舊路由（`rg -n "v1/notification|device-token|notification-preferences" buyer-app/lib seller-app/lib` 0 hit，2026-11-25），真機驗收走新的 Connect 與 FCM，不靠舊服務，系統不在線也不需要舊服務當後備，所以不擋 A8-7；主 session 依 Will 2026-11-25「下個 session 做 A8-7」開工，推論級，待 Will 確認）
+  - 範圍：全部是刪除或修改，逐項去向見 `a8-7-removal.md`。2026-11-25 開工盤點發現原範圍只列了服務、compose、gateway 路由、openapi、proto、守門測試與死設定，漏了 gateway 的 SSE 平台與 MQ consumer（只服務通知與賣家工作區兩個 channel）、`account.deleted` relay（盤點 §8.2 #7 以「im 還在訂閱」保留，但 im-service 已刪）、只給舊服務的 payload golden 契約、CodeMeta `NotificationEventType`、topology、監控與供應鏈設定；採購邀請的 relay 歸 A8-3f。拆成兩個子步驟：
+    - **A8-7a 舊服務、gateway 與設定**（`a8-7-removal.md` §1 #1–#17）。
+    - **A8-7b payload golden 契約退場**（§4；被擋於 A8-7a、A8-3f：procurementrelay 的 golden_test 隨 A8-3f 刪）。
+  - 消費端：`rg -n "notification-service|hawkr_notification|notificationpb|notification\.proto" --hidden -g '!.git' -g '!**/docs/**' -g '!**/*.md' -g '!.worktrees/**' -g '!**/node_modules/**' -g '!**/target/**'`；`rg -n "tests/contract/golden|event_payload_keys|known_pending" backend .github`；`rg -n "ExchangeNotification|ExchangeSellerWorkspace|QueueNotification|NotificationInboxNew|NotificationUnreadChanged" backend`。
+  - 不能動：`reviewrelay`、`buyerrelay`、`sellerrelay` 給 Java 消費者的 wire；`TestPublishedRoutesAreBoundInTopology`；發票的 `notification_resends` 路由；還沒搬的服務的註解（§5 允許的殘留）。
+  - 驗收：第一條 `rg` 只命中 `a8-7-removal.md` §5 列的允許殘留（附輸出；原寫的「0 hit」不成立：樣式 `notification\.proto` 也命中 A8-2 的新契約與生成碼）；第二、三條 A8-7b 後 0 hit；website 的 `useSellerWorkspaceRealtime` 測試與單體的串流 integration 仍綠（U10：gateway 的 SSE 平台已刪，賣家工作區的即時通道只剩 A8-2d 的新串流）；gateway `go build`、`go vet`、unit 與 `openapi_coverage_test`、`scripts/gateway-json-contract-check.py`；`go work sync` 後各舊 Go module build；Java 改到的 module 交 CI；`python3 scripts/mutation/run.py --validate`；全部受影響 workflow 的 CI。純刪除沒有新行為，不加 mutation；刪掉的 mutation 條目從 `mutation/` 拿掉。
+  - 完成後的狀態：還沒搬的服務的事件沒有通知，到各自搬遷為止。只有 `notification.*` 綁定的 key 變成無人接收：Go 與 Java `publish` 不報錯，Java `publishConfirmed` 的兩個呼叫者（payment outbox、aftersales 退貨停滞告警）把它當失敗重試（`a8-7-removal.md` §3；只影響本機與 CI，不改舊服務）。
 
 - [ ] **A8-8 收尾**（被擋於：A8-7）：主計畫「模組完成的定義」逐項核對；`inventory.md` 去向欄與缺陷 #1–#27 處置無空格（`check_dispositions.py`）；design-review skill 對整體 diff；長期檢查（訂閱↔型別覆蓋、同步訂閱者只排 job、notification 不 import `internal/legacy`）接進 CI；設計書 12、13 改寫；主計畫 A8 段打勾；延後項附觸發搬回主計畫；需要人做的事列給 Will。
 
@@ -216,6 +221,7 @@
 | D26 coupon 到期提醒的發送時段 | 行銷類推播在台北時間 22:00–09:00 之間延到 09:00 後送出（收件匣列照常即時建立）；`VoucherExpiring` 屬行銷類。來源：B7 D7 修訂後提醒在到期前 24h 任意時刻產生。歸 A8-3（`voucher_expiring` 型別與推播排程）。送出當下才判斷（渠道 job 每次執行都查，重試落在靜音時段也延後；snooze 不佔重試次數）。券在靜音時段結束前就到期時不延後，立即送出（時效性例外，Will 2026-11-24 同意修正） | 已決 2026-11-24，Will |
 | D27 coupon 到期提醒不聚合 | 每張券一則，不用 D12 的聚合鍵（聚合鍵語意是 actor 清單，放不下多張不同到期時間的券）；通知意圖的冪等鍵取 `voucher_id`；發送前 worker 重查券仍為 `available` | 已決 2026-11-24，Will |
 | D28 補貨通知的商品名稱 | 參數存商品名稱快照（公開目錄資料，不是個人姓名；受 180 天保留期約束）；守門測試對公開目錄名稱列明確白名單 | 已決 2026-11-24，Will |
+| D30 採購邀請 `delivery_state` 在 relay 刪除後的寫入者 | 未決。問題：舊 relay 送出 MQ 後標 `SENT`、用盡標 `FAILED`；relay 的唯一消費者（notification-service）刪掉後，狀態要有新的寫入者，否則永遠 `QUEUED`。選項：(a) 照 `procurement/CARRYOVER.md` 的交接點：notification 的 `rfq_invited` 意圖 worker 寫入收件匣的同一個 transaction 呼叫 `procurement.MarkInviteSent`，意圖用盡或收件人略過時 `MarkInviteFailed`；要在 notification 加「依型別回寫來源」的機制，鎖順序先 procurement 後 notification；(b) 刪 `delivery_state`（欄位、proto `InviteDeliveryState` 與 `SellerPublicationSummary.delivery_state`、CodeMeta `ProcurementRfqInviteDeliveryState`、seller-app 讀取）：投遞事實只在 notification 的投遞紀錄（本計畫不變量「投遞紀錄是唯一來源」），賣家在自己的詢價列表看得到邀請與通知有沒有送到無關；(c) 發布時直接標 `SENT`（沒有意義，不建議）。建議 (b)：領域物件不複製通知投遞狀態是業界做法（通知系統的 message log 是唯一紀錄），且「收件匣已寫入」不等於舊的「MQ 已送出」，(a) 的 `SENT` 語意會變。(b) 改 A9 的對外契約，需與 `a9-6` 分支協調 | 未決，擋 A8-3f |
 | D29 詢價邀請的偏好分類 | 新增 `PROCUREMENT`（STORE、預設開、可關）；`rfq_invited` 用它 | 已決 2026-11-24，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
@@ -235,16 +241,18 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | A8-2c 後台公告 | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok；跨步 blocking（A8-2b 收件匣隱藏公告列）以註冊 Fanout 型別 `announcement` 解決；契約審查＋code-review 兩輪（findings 13，blocking 0；fixed 11、recorded 1：派送中重試可能重建使用者剛刪的公告（CARRYOVER）、rejected 1 nit：FailedPrecondition／PermissionDenied 視為永久略過）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
 | A8-2d 串流與賣家工作區 | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok、website lint 與 test:unit；前提更正（serve／worker 分開，改 LISTEN/NOTIFY，2026-11-24）；契約審查＋code-review 兩輪（findings 15，blocking 0；fixed 11、rejected 4：S3 依 D19 接受、3 nit）；CI `7755ea085`（backend monolith 只剩既有 A9 的 `TestEveryServiceInTheContractIsMounted`：SellerProcurementAppService；integration、sqlc drift、mutation 綠）＋ `18d781688`（website e2e 綠）；CI 修正 `746460e91`..`18d781688` | | 本次 |
 | A8-3a 渠道與 token | 完成 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、notification／identity／httpapi／platform／arch／cmd unit（只剩 A9 的 `TestEveryServiceInTheContractIsMounted`）、mutation --validate；另含 identity `preferred_locale`（多語系 ADR D1）、推播圖片網址、D22 停寄名單只存 HMAC；審查兩輪＋最後修正（第 1 輪 8 項：blocking 1、fixed 7、rejected 1 nit；第 2 輪 5 項全修，以測試與 mutation 收尾）；CI `58c4e532d`：backend monolith 只剩 A9 既有失敗（notification integration ok），supply chain、mutation（`2035d238f`）綠 | 真實推播：擋於 Firebase 專案（Will）；真實寄信：擋於網域；部署需 `EMAIL_SUPPRESSION_HMAC_KEY`、worker `MEDIA_ORIGIN` | `4af1d1043`..`58c4e532d` |
-| A8-3a2 worker 端收件人解析與 fan-out | 未開始 | | | |
-| A8-3b content 側型別 | 未開始 | | | |
-| A8-3c 治理與交易側型別 | 未開始 | | | |
-| A8-3e coupon 到期提醒型別 | 程式完成待 CI | 本機只跑 gofmt、make uitext、mutation --validate（機器負載高，未編譯）；依 Will 2026-11-24 指示跳過 code-review | 編譯、lint、單元與 integration、mutation 都待 CI | `4397a8c23` |
-| A8-3d1 覆蓋測試與刪 relay | 未開始 | | | |
-| A8-3d2 重送與未觸達查詢 | 未開始 | | | |
+| A8-3a2 worker 端收件人解析與 fan-out | 完成 | 本機：gofmt、mutation --validate；獨立審查一輪（修正 `c58655e4b`）；CI：mutation 綠（`a859d0b72` 修掉 1 條編譯失敗、1 條存活），lint、integration（notification）綠 | | `3069af40b`、`c58655e4b`、`a859d0b72` |
+| A8-3b content 側型別 | 完成 | 本機：gofmt、make uitext、mutation --validate；獨立審查一輪（`5718804fd`，含 D28 `product_restocked`）；CI：lint、integration（notification）、mutation 綠 | | `b5bd026a6`、`5718804fd` |
+| A8-3c 治理與交易側型別 | 完成 | 本機：gofmt、make uitext、mutation --validate；獨立審查一輪（`6fc3588f7`）；D23–D25、D29；CI：lint、integration（notification、moderation、im、seller）綠；整份 mutation 在 `1b4e230a4` 首次完整跑出 1 條編譯失敗、2 條存活，`8dc1704bc` 修正後全 KILLED（im 隱藏事件的店家作者分支因 `Hide` 拒絕店家訊息而走不到，已刪） | | `ec3bf9a9e`、`936fb7d31`、`6fc3588f7`、`8dc1704bc` |
+| A8-3e coupon 到期提醒型別 | 完成 | 本機只跑 gofmt、make uitext、mutation --validate（機器負載高，未編譯）；依 Will 2026-11-24 指示跳過 code-review，審查的前兩項行為風險已修（`f5ce10d69`：靜音時段改在送出時判斷、到期例外）；CI：lint、integration（notification、coupon）、mutation 綠 | | `4397a8c23`、`f5ce10d69` |
+| A8-3d1 覆蓋測試與刪 relay | 完成 | 本機：gofmt、go build、vet integration、mutation --validate；獨立審查 0 important、3 nit 已修（`b8577b8c3`）；CI 首輪抓到覆蓋測試以 `model.X` 為事件名（alias 型別）而全紅，`6db83de89` 改以擁有模組命名；`ci/a8-verify` 上 monolith（`8dc1704bc`）lint、unit 綠，integration 只剩 B2 payment 與 A9 procurement 的既有失敗；mutation 綠。`sellerrelay`、`reviewrelay` 有 Java 消費端而保留，`reviewrelay` 只給舊服務的 3 個欄位留到 A8-7 | | `6c75eba1b`、`b8577b8c3`、`6db83de89` |
+| A8-3d2 重送與未觸達查詢 | 完成 | 本機：gofmt、buf lint／breaking、vet integration、admin lint 與 test、mutation --validate；獨立審查 0 important、3 nit 接受（再失敗以 SQL 模擬、`SKIP LOCKED` 無並行測試、admin 失敗原因對照無守門）；CI 首輪 adminauth 宣告數與 audited 清單未更新，`6db83de89` 修正；之後同 A8-3d1 的 monolith 結果，API contract、admin、TS packages 綠 | 重送按鈕與天數選擇器未做（新 UI 需 Will 同意），重送走 RPC，步驟在 `backend/internal/modules/notification/RUNBOOK.md` | `085c60492`、`eae6a04fa`、`6db83de89` |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |
 | A8-5 website、admin | 完成 | 本機（主 session 重跑）：website lint、test:unit、test（3347，唯一失敗為既有逾時 flake `store-key.unit.test.ts`，單跑通過）、admin lint、test；分類與渠道文字進共用文案目錄（`c686bec9d`）；偏好頁一分類一列＋渠道開關、獨立公告頁（Will 2026-11-24）；D21 網站只對訊號帶的新 ID 彈提示；審查：第 1 輪 4 項全修、code-review 7 項（5 修，CR-1/CR-3 由 D21 根治）、D21 審查 2 項全修；CI `58c4e532d`／`2035d238f`：website CI、website e2e、admin CI、TS packages、mutation 綠 | 未觸達查詢頁屬 A8-3d（RPC 未建）；e2e 只在 CI 跑 | `ac8b4ca4f`..`58c4e532d` |
 | A8-6 兩支 App | 程式完成待驗收 | 本機（主 session 重跑）：兩支 App analyze、format、custom_lint、通知測試、hardcoded_han；深連結依 D20 路徑表（`deep-links.md`）；狀態重讀提示接串流與推播（D6）；iOS Notification Service Extension（D14）；審查兩輪＋最後修正（buyer 第 1 輪 10 項：blocking 2、fixed 8、rejected 2；seller 8 項：blocking 2；第 2 輪 seller 聊天連結 blocking 經 Will 同意以測試收尾）；CI `58c4e532d`：buyer-app CI、seller-app CI 綠 | 真機推播：擋於 Firebase 專案（`GoogleService-Info.plist` ×2 App ×3 環境、APNs key）與 Apple Developer 的 NSE App ID（Will）；完整 `flutter test` 只在 CI | `7c7832d9d`..`58c4e532d` |
-| A8-7 刪舊 | 未開始 | | | |
+| A8-3f 採購邀請交接與刪 relay | 未開始 | | 擋於 D30 | |
+| A8-7a 舊服務、gateway 與設定 | 進行中 | 盤點 `a8-7-removal.md` | | |
+| A8-7b payload golden 契約退場 | 未開始 | | 擋於 A8-7a、A8-3f | |
 | A8-8 收尾 | 未開始 | | | |
 
 ## 基線

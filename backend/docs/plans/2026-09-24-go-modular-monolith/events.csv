@@ -46,8 +46,8 @@ buyer.deleted,hawkr.buyer,buyer-service,im-service,im.buyer.deleted,cleanup buye
 buyer.deleted,hawkr.buyer,buyer-service,notification-service,notification.buyer.deleted,purge buyer inbox/devices,yes,STATE,
 buyer.deleted,hawkr.buyer,buyer-service,social-service,social.buyer.deleted,cleanup buyer posts/comments,yes,STATE,in-tx-event: social 訂閱 buyer.BuyerDeletionRequested 與 BuyerDeleted，同 transaction 記 inactive_authors 並 Enqueue 清除 job（A7-D11）
 buyer.favorite.added,hawkr.buyer,buyer-service,notification-service,notification.buyer,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
-buyer.favorite.added,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.added,sync product favorite count,yes,PROJECTION,
-buyer.favorite.removed,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.removed,sync product favorite count,yes,PROJECTION,
+buyer.favorite.added,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.added,sync product favorite count,yes,PROJECTION,in-tx-event: buyer 的收藏事件在同 transaction 由 catalog 訂閱更新收藏數（B4 D3）；buyerrelay 轉發刪（B4-4）
+buyer.favorite.removed,hawkr.buyer,buyer-service,product-service,product.buyer.favorite.removed,sync product favorite count,yes,PROJECTION,in-tx-event: 同 buyer.favorite.added（B4 D3）
 comment.created,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,removed: 留言 SSE 隨 gateway 社群路由刪除，留言不即時推（A7-D10 不做、Q3）
 comment.created,hawkr.content,social-service,notification-service,notification.content,"push+inbox notification (buyer:visible,seller:visible)",yes,SIDE_EFFECT,in-tx-event: social.CommentCreated 在寫入的 transaction 內發布，internal/legacy/socialrelay 補欄位轉成舊 wire 送 notification；notification 搬進單體（A8）後改為直接訂閱
 comment.deleted,hawkr.content,social-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,removed: 留言 SSE 隨 gateway 社群路由刪除，留言不即時推（A7-D10 不做、Q3）；pkg/mq 的建構子已於 82369b78 移除，relay 不轉送
@@ -89,7 +89,7 @@ notification.inbox.new,hawkr.notification,notification-service,gateway,gateway.s
 notification.unread_changed,hawkr.notification,notification-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
 order.cancelled,hawkr.order,order-service,invoice-service,invoice.order.cancelled,record order cancelled for invoice read path,yes,PROJECTION,
 order.cancelled,hawkr.order,order-service,notification-service,notification.order,"push+inbox notification (buyer:visible,buyer:visible,seller:silent)",yes,SIDE_EFFECT,
-order.cancelled,hawkr.order,order-service,product-service,product.order.cancelled,restore stock on cancellation,yes,STATE,
+order.cancelled,hawkr.order,order-service,product-service,product.order.cancelled,restore stock on cancellation,yes,STATE,call: B8 前由 legacy/catalogconsumer 轉呼叫 catalog 依原扣減歸還（B4 D1、D2）；B8 由 ordering 同 transaction 呼叫
 order.completed,hawkr.order,order-service,ai-service,ai_service.order.completed,update ranking facts,yes,PROJECTION,removed: ai-service 的排名事實投影已刪（migration 20261028100000_drop_seller_ranking_facts）
 order.completed,hawkr.order,order-service,buyer-service,buyer.order.completed,complete pending buyer account deletion,yes,STATE,job: 單體的 legacy consumer（queue hawkr.monolith.buyer.order.completed，取代 buyer.order.completed）排 River job 呼叫 accountdeletion.CompletePending，另有每小時對帳；order 搬進單體時改成模組事件
 order.completed,hawkr.order,order-service,crm-service,crm.order.completed,accumulate CRM customer total_spent,yes,PROJECTION,job: internal/legacy/crmconsumer 訂閱 RabbitMQ（queue hawkr.monolith.crm.order.completed）驗證後排 legacy.crm_order_completed job，job 呼叫 crm.RecordOrderCompleted 入帳（event_id 冪等）；ordering 搬進單體時改讀 ordering 的 pub_* 並刪此 consumer（計畫 A6「延後」第 2 條）
@@ -99,15 +99,15 @@ order.paid,hawkr.order,order-service,notification-service,notification.order,pus
 order.paid,hawkr.order,order-service,shipping-service,shipping.order.paid,create shipment after order paid (FL-1),yes,STATE,
 order.receipt.confirmed,hawkr.order,order-service,shipping-service,shipping.order.receipt.confirmed,close shipment on buyer receipt confirm,yes,STATE,
 order.refund.finalized,hawkr.order,order-service,invoice-service,invoice.order.refund.finalized,issue allowance/void invoice on final refund,yes,STATE,
-order.sales.accumulated,hawkr.order,order-service,product-service,product.order.sales.accumulated,accumulate product sales_count,yes,PROJECTION,
+order.sales.accumulated,hawkr.order,order-service,product-service,product.order.sales.accumulated,accumulate product sales_count,yes,PROJECTION,call: B8 前由 legacy/catalogconsumer 以 order_no 冪等加銷量（B4 D3）；B8 由 ordering 在訂單完成的同 transaction 呼叫
 order.shipment.create_requested,hawkr.order,order-service,shipping-service,shipping.shipment.create_requested,backstop retry create shipment,yes,STATE,
 order.shipment.creation_failed,hawkr.order,order-service,aftersales-service,aftersales.shipment.creation_failed,system-cancel order after shipment create timeout,yes,STATE,
 payout.completed,hawkr.order,order-service,notification-service,notification.order,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 product.certification.approved,hawkr.product,product-service,notification-service,notification.product,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 product.certification.rejected,hawkr.product,product-service,notification-service,notification.product,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 product.certification.revoked,hawkr.product,product-service,notification-service,notification.product,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
-product.certification.verify.requested,hawkr.product,product-service,product-service,product.certification.verify,background certification verification,yes,STATE,
-product.restock,hawkr.product,product-service,buyer-service,buyer.product.restock,fan-out restock subscribers -> product.restock.target,yes,SIDE_EFFECT,job: 單體的 legacy consumer（queue hawkr.monolith.buyer.product.restock，取代 buyer.product.restock）以 event_id 為 River 唯一 job，分批送出 product.restock.target；catalog 搬進單體時改成模組事件
+product.certification.verify.requested,hawkr.product,product-service,product-service,product.certification.verify,background certification verification,yes,STATE,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+product.restock,hawkr.product,product-service,buyer-service,buyer.product.restock,fan-out restock subscribers -> product.restock.target,yes,SIDE_EFFECT,in-tx-event: catalog 補貨時發模組事件，buyer 同 transaction 排 fan-out job（B4-3）；legacy consumer 與 queue 刪（B4-4）
 product.restock.target,hawkr.product,buyer-service,notification-service,notification.product,push+inbox notification (buyer:visible),yes,SIDE_EFFECT,
 asset.download,hawkr.product.import,product-import-service,product-import-service,product.import.asset.download,import job pipeline step,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 commit,hawkr.product.import,product-import-service,product-import-service,product.import.commit,import job pipeline step,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
@@ -116,15 +116,15 @@ gc.expire_job,hawkr.product.import,product-import-service,media-service,media.pr
 html.fetch,hawkr.product.import,product-import-service,product-import-service,product.import.html.fetch,import job pipeline step,yes,STATE,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 review.created,hawkr.review,review-service,notification-service,notification.review,push+inbox notification (seller:visible),yes,SIDE_EFFECT,in-tx-event: review.ReviewCreated 在 submit 的 transaction 內發布，internal/legacy/reviewrelay 的 OnReviewCreated 同 transaction 排 legacy.review_created job，worker 在 transaction 外讀現況組舊 wire 再排 rabbitmq.PublishArgs 送 hawkr.review/review.created；notification 搬進單體（A8）後刪 relay
 review.created,hawkr.review,review-service,order-service,order.review.created,mark order reviewed + review snapshot,yes,PROJECTION,in-tx-event: review.ReviewCreated 在 submit 的 transaction 內發布，internal/legacy/reviewrelay 的 OnReviewCreated 同 transaction 排 legacy.review_created job，worker 在 transaction 外讀現況組舊 wire 再排 rabbitmq.PublishArgs 送 hawkr.review/review.created（wire 形狀不變，Java order 的 ReviewEventConsumer 照舊消費）；ordering 搬進單體時改 in-process 並刪 relay
-review.created,hawkr.review,review-service,product-service,product.review.stats,overwrite product rating/review_count,yes,PROJECTION,in-tx-event: review.ReviewCreated 在 submit 的 transaction 內發布，internal/legacy/reviewrelay 的 OnReviewCreated 同 transaction 排 legacy.review_created job，worker 在 transaction 外讀現況組舊 wire 再排 rabbitmq.PublishArgs 送 hawkr.review/review.created（帶 product_avg_rating、product_review_count，Java product 全量覆寫）；catalog 搬進單體時改讀 review 的統計並刪 relay
+review.created,hawkr.review,review-service,product-service,product.review.stats,overwrite product rating/review_count,yes,PROJECTION,call: review 在同 transaction 呼叫 catalog SetRating 傳重算後的絕對值（B4 D3）；reviewrelay 轉發刪（B4-4）
 review.created,hawkr.review,review-service,seller-service,seller.review.created,overwrite seller rating aggregate,yes,PROJECTION,removed: 單體 seller 不存評分，單體不新增 review.created 的 consumer（internal/legacy/sellerrelay/relay.go:12）；wire 仍由 reviewrelay 送出，舊 seller-service 的 consumer 隨該目錄刪除；replicas.csv 的 sellers.rating 已 removed
-review.hidden,hawkr.review,review-service,product-service,product.review.stats,overwrite product rating/review_count,yes,PROJECTION,in-tx-event: review.ReviewAggregateChanged 在隱藏、還原或刪帳清除的 transaction 內發布，reviewrelay 的 OnReviewAggregateChanged 同 transaction 排 legacy.review_aggregate_changed job，worker 執行時重算店與商品聚合再送 hawkr.review/review.hidden；catalog 搬進單體時改讀 review 的統計並刪 relay
+review.hidden,hawkr.review,review-service,product-service,product.review.stats,overwrite product rating/review_count,yes,PROJECTION,call: 同 review.created（B4 D3）
 review.hidden,hawkr.review,review-service,seller-service,seller.review.hidden,overwrite seller rating aggregate,yes,PROJECTION,removed: 同 review.created→seller-service（單體 seller 不存評分，不新增 consumer；舊 consumer 隨 seller-service 目錄刪除）
 seller.deleted,hawkr.seller,seller-service,gateway,gateway.sse.<pod> (dynamic),invalidate store resolver cache,yes,PROJECTION,
 seller.deleted,hawkr.seller,seller-service,im-service,im.seller.deleted,cleanup seller chat data,yes,STATE,"in-tx-event: im 訂閱 seller.StoreRetired（cmd/hawkr/im.go 的 events.Subscribe(bus, m.OnStoreRetired)），同 transaction 排 im.erase_party job 抹除店家身分寄出的訊息；舊 wire 的 seller.deleted 仍由 sellerrelay 送給其他未搬遷的消費者，im 不再收"
 seller.deleted,hawkr.seller,seller-service,notification-service,notification.seller.deleted,purge seller inbox/devices,yes,STATE,
 seller.deleted,hawkr.seller,seller-service,pricebook-service,pricebook.seller.deleted,cleanup market-watch data,yes,STATE,removed: pricebook-service 已刪除
-seller.deleted,hawkr.seller,seller-service,product-service,product.seller.deleted,delist seller products,yes,STATE,
+seller.deleted,hawkr.seller,seller-service,product-service,product.seller.deleted,delist seller products,yes,STATE,removed: catalog 可見性改讀 seller.pub_exposable_stores(at)，不複製店家狀態（B4 D7）
 seller.deleted,hawkr.seller,seller-service,social-service,social.seller.deleted,cleanup seller posts/comments/media,yes,STATE,in-tx-event: social 訂閱 seller 的 OnStoreRetired，同 transaction 只 Enqueue 清除 job（M23，TestStoreRetirementEnqueuesAnIdempotentPurge）
 seller.membership_changed,hawkr.seller,seller-service,ai-service,ai_service.seller.membership_changed,update ranking facts,yes,PROJECTION,removed: ai-service 的排名事實投影已刪（migration 20261028100000_drop_seller_ranking_facts）
 seller.onboarded,hawkr.seller,seller-service,gateway,gateway.sse.<pod> (dynamic),invalidate store resolver cache,yes,PROJECTION,
@@ -133,10 +133,10 @@ seller.suspended,hawkr.seller,seller-service,coupon-service,coupon.seller.suspen
 seller.suspended,hawkr.seller,seller-service,im-service,im.seller.suspended,force-disconnect seller WS,yes,SIDE_EFFECT,removed: im 不訂閱 seller.StoreSuspended；聊天串流只讀不需強制斷線，送出時 write/send.go 以 sender.Store.Suspended() 逐則擋下（modules/im/CARRYOVER.md H16）
 seller.suspended,hawkr.seller,seller-service,notification-service,notification.seller,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
 seller.suspended,hawkr.seller,seller-service,order-service,order.seller.suspended,cancel seller pending-payment orders,yes,STATE,
-seller.suspended,hawkr.seller,seller-service,product-service,product.seller.suspended,deactivate seller products (reversible),yes,STATE,
+seller.suspended,hawkr.seller,seller-service,product-service,product.seller.suspended,deactivate seller products (reversible),yes,STATE,removed: 同 seller.deleted（B4 D7）
 seller.unsuspended,hawkr.seller,seller-service,coupon-service,coupon.seller.unsuspended,restore seller coupon templates,yes,STATE,
 seller.unsuspended,hawkr.seller,seller-service,notification-service,notification.seller,push+inbox notification (seller:visible),yes,SIDE_EFFECT,
-seller.unsuspended,hawkr.seller,seller-service,product-service,product.seller.unsuspended,restore seller products,yes,STATE,
+seller.unsuspended,hawkr.seller,seller-service,product-service,product.seller.unsuspended,restore seller products,yes,STATE,removed: 同 seller.deleted（B4 D7）
 seller.after_sale.updated,hawkr.seller_workspace,aftersales-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
 seller.order.updated,hawkr.seller_workspace,order-service,gateway,gateway.sse.<pod> (dynamic),SSE realtime push to web,yes,SIDE_EFFECT,
 fulfillment.responsibility.finalized,hawkr.shipping,payment-service,order-service,order.fulfillment.responsibility_finalized,order -> DELIVERY_FAILED_NO_REFUND(54) + payout task,yes,STATE,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the event producer and consumers are deleted

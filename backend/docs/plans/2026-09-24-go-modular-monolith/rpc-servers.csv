@@ -171,13 +171,13 @@ CartService,SetItemQuantity,cart-service,
 CartService,CheckoutLock,cart-service,
 CartService,CheckoutUnlock,cart-service,
 CartService,RemoveItemsByCheckoutId,cart-service,
-CategoryService,GetCategoryTree,product-service,
-CategoryService,GetChildCategories,product-service,
-CategoryService,CreateCategory,product-service,
-CategoryService,CreateCategoryForAdmin,product-service,
-CategoryService,UpdateCategoryForAdmin,product-service,
-CategoryService,BatchSoftDeleteCategoryForAdmin,product-service,
-CategoryService,RestoreCategoryForAdmin,product-service,
+CategoryService,GetCategoryTree,product-service,http: catalog Public 分類樹（版本化種子，D8）；procurement 經模組 API
+CategoryService,GetChildCategories,product-service,removed: 無 client（B4 D5）
+CategoryService,CreateCategory,product-service,removed: 平台固定分類法，賣家不建分類（B4 D8）
+CategoryService,CreateCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
+CategoryService,UpdateCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
+CategoryService,BatchSoftDeleteCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
+CategoryService,RestoreCategoryForAdmin,product-service,removed: 分類不做即時 CRUD（B4 D8）
 ContentService,ListActiveBanners,content-service,http: ContentPublicService.ListLiveBanners
 ContentService,ListBanners,content-service,http: ContentAdminService.ListBanners
 ContentService,GetBanner,content-service,http: ContentAdminService.GetBanner
@@ -485,45 +485,45 @@ ProductImportService,BatchUpdateItemsShipping,product-import-service,removed: �
 ProductImportService,BatchUpdateItemsTargetStatus,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductImportService,BatchUpdateItemsCategory,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductImportService,GetCategoryConfirmationToken,product-import-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
-ProductService,CreateProduct,product-service,
-ProductService,UpdateProduct,product-service,
-ProductService,GetProduct,product-service,
-ProductService,GetPublicProduct,product-service,
-ProductService,GetProductList,product-service,
-ProductService,GetProductForAdmin,product-service,
-ProductService,UpdateProductStatus,product-service,
-ProductService,UpdateSellerProductStatus,product-service,
-ProductService,BatchUpdateSellerProductStatus,product-service,
-ProductService,BatchGetSellerProductsForDelegation,product-service,
-ProductService,PurgeProductCache,product-service,
-ProductService,DeductStock,product-service,
-ProductService,RestoreStock,product-service,
-ProductService,GetStock,product-service,
-ProductService,GetProductSimple,product-service,
-ProductService,BatchGetSkuCartInfo,product-service,
-ProductService,BatchGetProductForCheckout,product-service,
-ProductService,GetProductsByIDs,product-service,
-ProductService,GetRelatedProducts,product-service,
-ProductService,DeleteProduct,product-service,
-ProductService,CalculateShippingOptions,product-service,
-ProductService,VerifyCertification,product-service,
-ProductService,SubmitProductCertification,product-service,
-ProductService,ListProductCertificationApplications,product-service,
-ProductService,WithdrawProductCertification,product-service,
-ProductService,ListProductCertificationApplicationsForAdmin,product-service,
-ProductService,GetProductCertificationApplicationForAdmin,product-service,
-ProductService,ListProductCertificationAuditLogsForAdmin,product-service,
-ProductService,ApproveProductCertificationForAdmin,product-service,
-ProductService,RejectProductCertificationForAdmin,product-service,
-ProductService,RevokeProductCertificationForAdmin,product-service,
-ProductService,ReverifyProductCertificationForAdmin,product-service,
-ProductService,ListProductsByCategoryForAdmin,product-service,
-ProductService,BatchChangeProductCategoryForAdmin,product-service,
-ProductService,SearchHashtags,product-service,
-ProductService,GetPopularHashtags,product-service,
-ProductService,GetPublicOriginsSummary,product-service,
-ProductService,GetPublicSellerCitiesSummary,product-service,
-ProductService,ListStoreIDsWithPublicProductsInternal,product-service,
+ProductService,CreateProduct,product-service,http: catalog 賣家 App Connect 建立商品（B4-3）
+ProductService,UpdateProduct,product-service,http: catalog 賣家 App Connect 更新商品，etag（B4-3、D4）
+ProductService,GetProduct,product-service,http: catalog 賣家 App Connect 讀自己店的商品，店家由呼叫者推導（B4-3、D4）
+ProductService,GetPublicProduct,product-service,http: catalog Public Connect 商品頁（B4-3）
+ProductService,GetProductList,product-service,http: catalog Public／賣家 App／Admin 的列表與搜尋（B4-3、D15）；procurement 經模組 API
+ProductService,GetProductForAdmin,product-service,http: catalog Admin Connect 商品詳情（B4-3）
+ProductService,UpdateProductStatus,product-service,http: admin 強制下架改成商品限制措施（B4-5、D7）
+ProductService,UpdateSellerProductStatus,product-service,http: catalog 賣家 App 上下架 active／archived（B4-3、D16）
+ProductService,BatchUpdateSellerProductStatus,product-service,http: CatalogDelegatedService 批次下架（B4-5d、D9）
+ProductService,BatchGetSellerProductsForDelegation,product-service,http: CatalogDelegatedService 批次讀取（B4-5d、D9）
+ProductService,PurgeProductCache,product-service,removed: 無 client（B4 D5）
+ProductService,DeductStock,product-service,api: catalog 扣庫存（stock_movements 冪等，D2）；B8 前經 legacy/catalogserver（D1）
+ProductService,RestoreStock,product-service,api: catalog 依原扣減歸還（D2）；B8 前經 legacy/catalogserver 與 catalogconsumer（D1）
+ProductService,GetStock,product-service,removed: 無在用呼叫端（B4 D5、CD8；ai-service 隨 A9 刪，D12）
+ProductService,GetProductSimple,product-service,api: legacy/catalogserver 轉接 cart（D1），B6 刪
+ProductService,BatchGetSkuCartInfo,product-service,api: legacy/catalogserver 轉接 cart（D1），B6 刪
+ProductService,BatchGetProductForCheckout,product-service,api: catalog 結帳快照 API（D20），B8 前經 legacy/catalogserver
+ProductService,GetProductsByIDs,product-service,api: catalog 批次卡片，seller／social／buyer port 改接（B4-4）
+ProductService,GetRelatedProducts,product-service,removed: 無 client（B4 D5）
+ProductService,DeleteProduct,product-service,http: catalog 賣家 App 刪除＝deleted_at（B4-3、D16）
+ProductService,CalculateShippingOptions,product-service,removed: 運費試算不屬 catalog（B4 D10，B3 歸 seller）
+ProductService,VerifyCertification,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,SubmitProductCertification,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductCertificationApplications,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,WithdrawProductCertification,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductCertificationApplicationsForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,GetProductCertificationApplicationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductCertificationAuditLogsForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ApproveProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,RejectProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,RevokeProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ReverifyProductCertificationForAdmin,product-service,removed: 範圍裁切（認證，ADR 2026-10-27-general-ecommerce-scope-cut）
+ProductService,ListProductsByCategoryForAdmin,product-service,removed: 無 client（B4 D5）
+ProductService,BatchChangeProductCategoryForAdmin,product-service,removed: 無 client（B4 D5）
+ProductService,SearchHashtags,product-service,http: catalog Public hashtag 自動完成（B4-3、D14）
+ProductService,GetPopularHashtags,product-service,http: catalog Public 熱門 hashtag（B4-3、D14）
+ProductService,GetPublicOriginsSummary,product-service,removed: 無 client（B4 D5）
+ProductService,GetPublicSellerCitiesSummary,product-service,removed: 無 client（B4 D5）
+ProductService,ListStoreIDsWithPublicProductsInternal,product-service,api: catalog 模組 API 給 discovery（B4-4）
 ProductService,ValidateLeafCategoryInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,CreateProductFromImportInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,BatchCheckSellerProductNames,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
