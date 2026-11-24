@@ -71,6 +71,9 @@ func (h *Hub) Run(ctx context.Context, dial Dial) error {
 		jitter = rand.Float64
 	}
 	now, sleep := h.now, h.sleep
+	if now == nil {
+		now = func() time.Time { return time.Time{} }
+	}
 	if sleep == nil {
 		sleep = sleepCtx
 	}

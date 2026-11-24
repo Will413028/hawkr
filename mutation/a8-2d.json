@@ -73,6 +73,24 @@
    "why": "Every processed intent signals the inbox stream, even ones that wrote no inbox row."
   },
   {
+   "id": "notify-outside-the-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/stream/signal.go",
+   "old": "store.New(d.Conn(ctx)).NotifySignal(",
+   "new": "store.New(d.Pool()).NotifySignal(",
+   "test": "internal/modules/notification ^TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers$",
+   "why": "The pg_notify goes through the pool instead of the caller's transaction, so a rolled back change still wakes subscribers."
+  },
+  {
+   "id": "run-nil-clock-not-defaulted",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "\tif now == nil {\n\t\tnow = func() time.Time { return time.Time{} }\n\t}\n",
+   "new": "",
+   "test": "internal/modules/notification/internal/stream ^TestRunWithoutInjectedClockDoesNotPanic$",
+   "why": "Run keeps a nil clock and panics on the first connection."
+  },
+  {
    "id": "inbox-signal-notify-dropped-same-hub",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/intake/intake.go",
@@ -157,8 +175,8 @@
    "id": "watch-uses-default-tier",
    "stack": "go",
    "file": "backend/internal/httpapi/ratelimit.go",
-   "old": "\n\tnotificationconnect.NotificationAppServiceWatchNotificationsProcedure: tierWatch,",
-   "new": "",
+   "old": "\tnotificationconnect.NotificationAppServiceWatchNotificationsProcedure: tierWatch,",
+   "new": "\tnotificationconnect.NotificationAppServiceWatchNotificationsProcedure: tierDefault,",
    "test": "internal/httpapi ^TestWatchNotificationsHasItsOwnGenerousLimit$",
    "why": "WatchNotifications falls back to the default tier, so the stream shares the account's general counter and the burst is not throttled at its own limit."
   },

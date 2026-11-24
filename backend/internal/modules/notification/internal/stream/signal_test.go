@@ -199,3 +199,27 @@ func TestRunBackoffResetsAfterAStableConnection(t *testing.T) {
 		t.Fatalf("等待 = %v，預期 %v", got, want)
 	}
 }
+
+// 時鐘與等待都不注入（nil）時 Run 不會 panic（連線一律不算穩定）。
+// mutation：Run 不在 now 為 nil 時給預設時鐘 → 第一次連線後呼叫 nil 函式而 panic。
+func TestRunWithoutInjectedClockDoesNotPanic(t *testing.T) {
+	h := NewHub(fakeRead, nil, nil)
+	h.backoffBase, h.backoffMax = time.Millisecond, time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	n := 0
+	dial := func(context.Context) (Conn, error) {
+		n++
+		if n > 2 {
+			cancel()
+			return nil, ctx.Err()
+		}
+		return &flapConn{advance: func() {}}, nil
+	}
+	if err := h.Run(ctx, dial); err != nil {
+		t.Fatal(err)
+	}
+	if n < 3 {
+		t.Fatalf("應重連到第 3 次撥號：%d", n)
+	}
+}

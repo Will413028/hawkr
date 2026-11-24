@@ -64,7 +64,7 @@ type Hub struct {
 
 	backoffBase, backoffMax time.Duration
 	jitter                  func() float64
-	// now 與 sleep 讓測試不用真的等；nil 是真實時間。
+	// now 與 sleep 讓測試不用真的等；sleep 為 nil 是可被 ctx 取消的真實等待；now 為 nil（模組不得呼叫 time.Now，沒有注入時鐘可用）時連線一律不算穩定，退避只遞增。
 	now        func() time.Time
 	sleep      func(ctx context.Context, d time.Duration)
 	listening  chan struct{}

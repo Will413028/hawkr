@@ -10,6 +10,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/app"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/stream"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -312,10 +314,31 @@ func TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers(t *testing.T) {
 		}
 		wantUnread(t, 0)
 	})
-	t.Run("a rolled back batch delete signals nothing", func(t *testing.T) {
-		if err := f.module.BatchDeleteInboxItems(ctx, acct, []uuid.UUID{ids[2], uuid.New()}); err == nil {
-			t.Fatal("有不存在的 ID 應整批失敗")
+	t.Run("a rollback after the signal call delivers nothing", func(t *testing.T) {
+		failing := app.New(app.Deps{
+			DB: f.db, Accounts: f.identity, Registry: testRegistry{}, Now: time.Now,
+			Signals: failAfterNotify{dbSignals{f.db}},
+		})
+		if err := failing.BatchDelete(ctx, acct, []uuid.UUID{ids[2]}); !errors.Is(err, errAfterNotify) {
+			t.Fatalf("通知之後的失敗應讓整個 transaction 回滾並回傳：%v", err)
 		}
 		noEvent(t, buyerSub)
+		var n int
+		if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM notification.inbox_items WHERE id = $1`, ids[2]).Scan(&n); err != nil || n != 1 {
+			t.Fatalf("回滾後通知應還在：%d %v", n, err)
+		}
 	})
+}
+
+var errAfterNotify = errors.New("notify issued, then the transaction fails")
+
+// failAfterNotify 先發出 pg_notify 再回錯誤，讓 transaction 在訊號之後才回滾。
+// mutation：stream 的 notify 不走 ctx 的 transaction（改用連線池）→ 訊號在回滾前就送出，上面的 subtest 收到訊號而失敗。
+type failAfterNotify struct{ dbSignals }
+
+func (s failAfterNotify) InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint) error {
+	if err := s.dbSignals.InboxChanged(ctx, accountID, audience, storeID, hint); err != nil {
+		return err
+	}
+	return errAfterNotify
 }
