@@ -274,8 +274,8 @@
    "id": "assembly-drops-the-event-bus",
    "stack": "go",
    "file": "backend/cmd/hawkr/procurement.go",
-   "old": "Entitlements: entitlements, Sellers: sellers, Stores: stores, Events: bus})",
-   "new": "Entitlements: entitlements, Sellers: sellers, Stores: stores, Events: nil})",
+   "old": "Entitlements: entitlements, Sellers: sellers, Stores: sellers, Events: bus})",
+   "new": "Entitlements: entitlements, Sellers: sellers, Stores: sellers, Events: nil})",
    "test": "cmd/hawkr ^TestProcurementAssemblyPassesTheEventBus$",
    "why": "The serve assembly does not hand the event bus to the procurement module."
   }
