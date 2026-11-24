@@ -689,6 +689,38 @@ func (q *Queries) ListInvites(ctx context.Context, arg ListInvitesParams) ([]Pro
 	return items, nil
 }
 
+const listStaleQueuedInvites = `-- name: ListStaleQueuedInvites :many
+SELECT id FROM procurement.rfq_publication_invites
+WHERE delivery_state = 'QUEUED' AND created_at < $1
+ORDER BY created_at, id
+LIMIT $2
+`
+
+type ListStaleQueuedInvitesParams struct {
+	Before  time.Time
+	MaxRows int32
+}
+
+func (q *Queries) ListStaleQueuedInvites(ctx context.Context, arg ListStaleQueuedInvitesParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listStaleQueuedInvites, arg.Before, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markApprovalSucceeded = `-- name: MarkApprovalSucceeded :execrows
 UPDATE procurement.rfq_publication_approvals
 SET state = 'SUCCEEDED', version = version + 1, updated_at = $1

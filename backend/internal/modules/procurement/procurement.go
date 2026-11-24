@@ -527,13 +527,18 @@ func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublica
 	return m.rfq.ExecutePublication(ctx, in)
 }
 
-// MarkInviteSent 與 MarkInviteFailed 由邀請事件的投遞者（A9-3c-5 的 relay，A8-3 起換成 notification 的意圖 job）寫入邀請的投遞狀態：QUEUED 轉 SENT 或 FAILED，已是終態或不存在時不做事。
+// MarkInviteSent 與 MarkInviteFailed 由邀請事件的投遞者（`legacy/procurementrelay`）寫入邀請的投遞狀態：QUEUED 轉 SENT 或 FAILED，已是終態或不存在時不做事。
 func (m *Module) MarkInviteSent(ctx context.Context, inviteID uuid.UUID) error {
 	return m.rfq.MarkInviteSent(ctx, inviteID)
 }
 
 func (m *Module) MarkInviteFailed(ctx context.Context, inviteID uuid.UUID) error {
 	return m.rfq.MarkInviteFailed(ctx, inviteID)
+}
+
+// StaleQueuedInvites 回傳建立時間早於 before、仍是 QUEUED 的邀請 ID（最舊的先，至多 limit 個），給投遞者的補掃找出沒人在處理的邀請。
+func (m *Module) StaleQueuedInvites(ctx context.Context, before time.Time, limit int32) ([]uuid.UUID, error) {
+	return m.rfq.StaleQueuedInvites(ctx, before, limit)
 }
 
 // 買家對賣家回價的使用的型別。

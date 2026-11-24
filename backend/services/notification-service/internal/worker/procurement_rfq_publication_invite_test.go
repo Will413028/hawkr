@@ -212,7 +212,7 @@ func TestProcurementRfqPublicationInviteMigrationBindsReferenceIDToInviteID(t *t
 		"本列必須 enabled = true、push_mode = visible、identity_migrated = true")
 }
 
-// 單體的 procurement relay（A9-3c-5）把 inviteId 與 publicationId 換成 UUID 字串（A9-D45(6)），storeId 仍是十進位字串：
+// 單體的 procurement relay 把 inviteId 與 publicationId 換成 UUID 字串，storeId 仍是十進位字串：
 // inviteId 只當不透明字串（reference_id 與推播 data），只有 target_user_field 的 storeId 會被解析成 int64。
 func TestTemplateHandler_ProcurementRfqPublicationInviteAcceptsUUIDIDs(t *testing.T) {
 	handler, pushRepo, inboxRepo := newRfqPublicationInviteHandler(t)

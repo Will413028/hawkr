@@ -13,7 +13,7 @@
    "id": "invite-never-marked-sent",
    "stack": "go-integration",
    "file": "backend/internal/legacy/procurementrelay/relay.go",
-   "old": "\t\treturn w.Invites.MarkInviteSent(ctx, a.InviteID)\n",
+   "old": "\t\treturn writeState(ctx, last, w.Invites.MarkInviteSent, a.InviteID)\n",
    "new": "\t\treturn nil\n",
    "test": "internal/legacy/procurementrelay ^TestPublishEnqueuesJobsThatSendTheEventAndMarkTheInvitesSent$",
    "why": "A sent invite event never moves the invite from QUEUED to SENT."
@@ -35,6 +35,69 @@
    "new": "q.Enqueue(context.Background(), InviteCreatedArgs{",
    "test": "internal/legacy/procurementrelay ^TestRolledBackPublishEnqueuesNothing$",
    "why": "The relay job is enqueued outside the publish transaction, so a rolled-back publish still queues invite events."
+  },
+  {
+   "id": "state-write-shares-the-send-context",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "context.WithTimeout(context.WithoutCancel(ctx), stateTimeout)",
+   "new": "context.WithTimeout(ctx, stateTimeout)",
+   "test": "internal/legacy/procurementrelay ^TestStateIsWrittenEvenWhenTheSendContextIsGone$",
+   "why": "A slow or cancelled send leaves no time for the delivery-state write, so the invite stays QUEUED."
+  },
+  {
+   "id": "last-attempt-state-write-failure-discards-the-job",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "\tif last {\n\t\treturn river.JobSnooze(stateRetryDelay)\n\t}\n",
+   "new": "\tif last {\n\t\treturn err\n\t}\n",
+   "test": "internal/legacy/procurementrelay ^TestStateWriteFailureOnTheLastAttemptSnoozesInsteadOfDiscarding$",
+   "why": "A failed state write on the last attempt discards the job and the invite stays QUEUED."
+  },
+  {
+   "id": "last-attempt-write-failure-never-ends-failed",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "\tif last {\n\t\treturn river.JobSnooze(stateRetryDelay)\n\t}\n",
+   "new": "\tif last {\n\t\treturn nil\n\t}\n",
+   "test": "internal/legacy/procurementrelay ^TestLastAttemptStateWriteFailureStillEndsFailed$",
+   "why": "After a failed state write on the last attempt the invite never converges to FAILED."
+  },
+  {
+   "id": "sweep-skipped",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "ids, err := w.Invites.StaleQueuedInvites(ctx, w.Now().Add(-staleAfter()), sweepBatch)",
+   "new": "ids, err := []uuid.UUID(nil), error(nil)",
+   "test": "internal/legacy/procurementrelay ^TestSweepFailsStaleQueuedInvitesWithoutALiveJob$",
+   "why": "A lost job leaves its invite QUEUED forever."
+  },
+  {
+   "id": "sweep-ignores-live-jobs",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "if live {",
+   "new": "if false {",
+   "test": "internal/legacy/procurementrelay ^TestSweepMarksOnlyStaleInvitesWithoutALiveJob$",
+   "why": "The sweep fails invites that still have a running or retrying job."
+  },
+  {
+   "id": "exhaustion-off-by-one",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "job.Attempt >= job.MaxAttempts",
+   "new": "job.Attempt > job.MaxAttempts",
+   "test": "internal/legacy/procurementrelay ^TestWorkTreatsAttemptEqualToMaxAttemptsAsTheLast$",
+   "why": "The invite is never marked FAILED because the last attempt is not recognised as last."
+  },
+  {
+   "id": "retry-budget-changed",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "maxAttempts = 5",
+   "new": "maxAttempts = 20",
+   "test": "internal/legacy/procurementrelay ^TestRetryScheduleMatchesTheLegacyOutbox$",
+   "why": "The invite stays QUEUED for days instead of the legacy outbox's ~30 minutes."
   }
  ]
 }

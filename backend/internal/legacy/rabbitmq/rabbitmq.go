@@ -98,8 +98,8 @@ func (p *Publisher) Close() error {
 	return p.cn.Close()
 }
 
-// PublishArgs 是送一則事件的 job：body 在排入時就決定（含 event_id），重試送的是同一則。EventID 必須等於 body 的
-// event_id：InsertOpts 以它做 River unique，同一則事件不論排入幾次（例如 relay job 在排入後才失敗而重試）都只有一個
+// PublishArgs 是送一則事件的 job：body 在排入時就決定（含 event_id），重試送的是同一則。排入時 EventID 必須等於 body 的
+// event_id（經 Send 同步送出的不排入，EventID 不使用）：InsertOpts 以它做 River unique，同一則事件不論排入幾次（例如 relay job 在排入後才失敗而重試）都只有一個
 // 送出的 job。
 type PublishArgs struct {
 	EventID    string          `json:"event_id" river:"unique"`
