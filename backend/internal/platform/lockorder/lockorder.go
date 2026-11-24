@@ -38,7 +38,6 @@ var Modules = []string{
 	"payment",
 	"buyer",
 	"seller",
-	"fulfillment",
 	"catalog",
 	"invoice",
 	"cart",

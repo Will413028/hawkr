@@ -18,17 +18,16 @@ var Dependencies = map[string][]string{
 	"buyer":             {"identity", "media"},
 	"seller":            {"identity", "media", "payment"},
 	"content":           {"media", "social"}, // banner 的貼文目標：建立時經 social 確認公開可讀，讀取時隱藏失效的（A7-D28、A7-D23 O5）；social 不得依賴 content。
-	"fulfillment":       {"buyer", "seller", "media"},
-	"catalog":           {"seller", "buyer", "media", "fulfillment"},
-	"invoice":           {"payment", "fulfillment", "buyer", "seller", "media"},
+	"catalog":           {"seller", "buyer", "media"},
+	"invoice":           {"payment", "buyer", "seller", "media"},
 	"cart":              {"catalog", "buyer", "seller"},
 	"coupon":            {"identity", "buyer", "seller"},
-	"ordering":          {"cart", "coupon", "catalog", "fulfillment", "payment", "invoice", "buyer", "seller", "identity", "media"},
-	"aftersales":        {"ordering", "coupon", "payment", "fulfillment", "buyer", "seller", "media"},
+	"ordering":          {"cart", "coupon", "catalog", "payment", "invoice", "buyer", "seller", "identity", "media"},
+	"aftersales":        {"ordering", "coupon", "payment", "buyer", "seller", "media"},
 	"review":            {"ordering", "catalog", "buyer", "seller", "media"},
 	"im":                {"ordering", "buyer", "seller", "media"},
 	"crm":               {"buyer", "seller"}, // 訂閱 buyer.BuyerDeleted、seller.StoreRetired。
-	"finance":           {"aftersales", "ordering", "payment", "fulfillment"},
+	"finance":           {"aftersales", "ordering", "payment"},
 	"social":            {"buyer", "seller", "media"},
 	"discovery":         {"ordering", "catalog", "buyer", "seller", "review"},
 	"delegation":        {"identity", "seller", "ordering", "catalog", "social", "media"},            // 授權、session、稽核與編排全由 delegation 擁有。
@@ -41,7 +40,7 @@ var Dependencies = map[string][]string{
 	"imageai":           {"seller", "media"},                                                         // AI 修圖與配額（A9-D3）。
 	"notification": {
 		"identity", "buyer", "seller", "review", "im", "social", "procurement", "delegation", "payment", "accountsuspension", "moderation", "coupon",
-	}, // 訂閱與讀取已在單體的來源模組；還沒搬的（catalog、ordering、fulfillment、invoice、aftersales、finance）隨各自搬遷時加（A8 D13）。
+	}, // 訂閱與讀取已在單體的來源模組；還沒搬的（catalog、ordering、invoice、aftersales、finance）隨各自搬遷時加（A8 D13）。
 }
 
 // InternalGraph 列出模組內每個 package 可直接 import 的 package。
