@@ -637,62 +637,62 @@ SellerService,ExchangeVendorPortalInvite,seller-service,removed: 供應商入口
 SellerService,ValidateVendorPortalSession,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
 SellerService,StepUpVendorPortalSession,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
 SellerService,PreviewVendorPortalInvite,seller-service,removed: 供應商入口隨 A9-D1 刪除（ADR 2026-11-19-ai-service-monolith-scope、A9-1a）
-ShippingService,PrintCvsLabel,shipping-service,
-ShippingService,BatchPrintCvsLabel,shipping-service,
-ShippingService,GenerateHomeLabelPdf,shipping-service,
-ShippingService,BatchGenerateHomeLabelPdf,shipping-service,
-ShippingService,CallTcat,shipping-service,
-ShippingService,ConfirmCvsShipment,shipping-service,
-ShippingService,GetShipmentByOrderNo,shipping-service,
-ShippingService,GetShipmentsByOrderNos,shipping-service,
-ShippingService,BatchGetProviderStatusByOrderIds,shipping-service,
-ShippingService,QueryShipmentStatus,shipping-service,
-ShippingService,GetShipmentTracking,shipping-service,
-ShippingService,GetSellerShipmentTracking,shipping-service,
-ShippingService,OnboardCvsShipping,shipping-service,
-ShippingService,OnboardHomeDeliveryShipping,shipping-service,
-ShippingService,ListShippingOnboardings,shipping-service,
-ShippingService,GetShippingOnboarding,shipping-service,
-ShippingService,ToggleShippingOnboarding,shipping-service,
-ShippingService,ListSellerShippingMethods,shipping-service,
-ShippingService,AddBuyerStorePickup,shipping-service,
-ShippingService,UpdateBuyerStorePickup,shipping-service,
-ShippingService,ListBuyerStorePickups,shipping-service,
-ShippingService,DeleteBuyerStorePickup,shipping-service,
-ShippingService,GetStoreMapParams,shipping-service,
-ShippingService,GetStoreMapRedirectForm,shipping-service,
-ShippingService,DecryptStoreMapResult,shipping-service,
-ShippingService,GetSellerShippingConfig,shipping-service,
-ShippingService,GetShippingFeeConfigs,shipping-service,
-ShippingService,LookupShippingFee,shipping-service,
-ShippingService,CalculateShippingOptions,shipping-service,
-ShippingService,ValidateProductShipping,shipping-service,
+ShippingService,PrintCvsLabel,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,BatchPrintCvsLabel,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GenerateHomeLabelPdf,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,BatchGenerateHomeLabelPdf,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,CallTcat,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ConfirmCvsShipment,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetShipmentByOrderNo,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetShipmentsByOrderNos,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,BatchGetProviderStatusByOrderIds,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,QueryShipmentStatus,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetShipmentTracking,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetSellerShipmentTracking,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,OnboardCvsShipping,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,OnboardHomeDeliveryShipping,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ListShippingOnboardings,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetShippingOnboarding,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ToggleShippingOnboarding,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ListSellerShippingMethods,shipping-service,removed: 運費改由 seller 運費設定（B3 步驟 2）
+ShippingService,AddBuyerStorePickup,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,UpdateBuyerStorePickup,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ListBuyerStorePickups,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,DeleteBuyerStorePickup,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetStoreMapParams,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetStoreMapRedirectForm,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,DecryptStoreMapResult,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetSellerShippingConfig,shipping-service,removed: 運費改由 seller 運費設定（B3 步驟 2）
+ShippingService,GetShippingFeeConfigs,shipping-service,removed: 運費改由 seller 運費設定（B3 步驟 2）
+ShippingService,LookupShippingFee,shipping-service,removed: 運費改由 seller 運費設定（B3 步驟 2）
+ShippingService,CalculateShippingOptions,shipping-service,removed: 運費改由 seller 運費設定（B3 步驟 2）
+ShippingService,ValidateProductShipping,shipping-service,removed: 運費改由 seller 運費設定（B3 步驟 2）
 ShippingService,ImportHolidays,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
 ShippingService,ImportHolidaysFromContent,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
 ShippingService,GetHolidayCoverage,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
-ShippingService,ListBusinessDays,shipping-service,
+ShippingService,ListBusinessDays,shipping-service,removed: 營業日曆已移到 internal/platform/bizcalendar（B3），物流端的查詢沒有呼叫者
 ShippingService,GetHolidaysInternal,shipping-service,removed: no callers after holiday ownership moved to internal/platform/bizcalendar (plan B3)
-ShippingService,CreateReturnCvsShipment,shipping-service,
-ShippingService,CreateReturnHomeShipment,shipping-service,
-ShippingService,GetSellerReturnConfig,shipping-service,
-ShippingService,RetryReturnPrintLabel,shipping-service,
-ShippingService,LookupShipTradeNo,shipping-service,
-ShippingService,ListShipmentsForAdmin,shipping-service,
-ShippingService,GetShipmentForAdmin,shipping-service,
-ShippingService,ListSellerShipmentSettingsForAdmin,shipping-service,
-ShippingService,ListSellerShipmentAnomalies,shipping-service,
-ShippingService,GetSellerShipmentAnomalyStats,shipping-service,
-ShippingService,AcknowledgeShipmentAnomaly,shipping-service,
-ShippingService,IgnoreShipmentAnomaly,shipping-service,
-ShippingService,ListShipmentAnomaliesForAdmin,shipping-service,
-ShippingService,AcknowledgeShipmentAnomalyForAdmin,shipping-service,
-ShippingService,IgnoreShipmentAnomalyForAdmin,shipping-service,
-ShippingService,GetUberQuoteForCheckout,shipping-service,
-ShippingService,ValidateUberQuoteForCheckout,shipping-service,
-ShippingService,ListSellerUberDeliveries,shipping-service,
-ShippingService,GetSellerUberDelivery,shipping-service,
-ShippingService,ListUberDeliveriesForAdmin,shipping-service,
-ShippingService,GetUberDeliveryForAdmin,shipping-service,
+ShippingService,CreateReturnCvsShipment,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,CreateReturnHomeShipment,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetSellerReturnConfig,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,RetryReturnPrintLabel,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,LookupShipTradeNo,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ListShipmentsForAdmin,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetShipmentForAdmin,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ListSellerShipmentSettingsForAdmin,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ListSellerShipmentAnomalies,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetSellerShipmentAnomalyStats,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,AcknowledgeShipmentAnomaly,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,IgnoreShipmentAnomaly,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,ListShipmentAnomaliesForAdmin,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,AcknowledgeShipmentAnomalyForAdmin,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,IgnoreShipmentAnomalyForAdmin,shipping-service,removed: 物流商退場，賣家自寄（ADR 2026-11-15 修訂 2026-11-24）；出貨記錄由 B8 ordering 重建
+ShippingService,GetUberQuoteForCheckout,shipping-service,removed: Uber 即時配送退場（ADR 2026-11-15 D4）
+ShippingService,ValidateUberQuoteForCheckout,shipping-service,removed: Uber 即時配送退場（ADR 2026-11-15 D4）
+ShippingService,ListSellerUberDeliveries,shipping-service,removed: Uber 即時配送退場（ADR 2026-11-15 D4）
+ShippingService,GetSellerUberDelivery,shipping-service,removed: Uber 即時配送退場（ADR 2026-11-15 D4）
+ShippingService,ListUberDeliveriesForAdmin,shipping-service,removed: Uber 即時配送退場（ADR 2026-11-15 D4）
+ShippingService,GetUberDeliveryForAdmin,shipping-service,removed: Uber 即時配送退場（ADR 2026-11-15 D4）
 SocialService,GetPostList,social-service,http: SocialPublicService.ListPosts（可帶店家篩選）
 SocialService,GetPostDetail,social-service,http: SocialPublicService.GetPost 與 SocialAppService.GetMyPost；代行讀取走 SocialDelegatedService.GetStorePost
 SocialService,CreatePost,social-service,http: SocialAppService.CreatePost；代行走 SocialDelegatedService.CreateStorePost
