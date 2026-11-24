@@ -738,7 +738,7 @@ cmd_help() {
     rebuild <服務>  手動指定要 rebuild 的服務（Java 或 Go 皆可）
                     例：./dev.sh rebuild payment shipping
                     例：./dev.sh rebuild order  (自動補 -service)
-                    例：./dev.sh rebuild notification-service    (Go：重建 dev image)
+                    例：./dev.sh rebuild invoice-service         (Go：重建 dev image)
 
                     Go 服務何時需要手動 rebuild：./dev.sh status 報
                     「Up 但 Air build 失敗」時——dev image 烘進 layer 的
