@@ -6,7 +6,6 @@ import io.github.will413028.hawkr.aftersales.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.aftersales.grpc.client.OrderGrpcClient;
 import io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.aftersales.grpc.client.SellerGrpcClient;
-import io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleCaseItemMapper;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleCaseMapper;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleEvidenceMapper;
@@ -15,7 +14,6 @@ import io.github.will413028.hawkr.aftersales.mapper.RefundTaskMapper;
 import io.github.will413028.hawkr.aftersales.mapper.SellerCancelRequestMapper;
 import io.github.will413028.hawkr.aftersales.service.AfterSaleAppealService;
 import io.github.will413028.hawkr.aftersales.service.AfterSaleCaseService;
-import io.github.will413028.hawkr.aftersales.service.AfterSaleLabelRetryService;
 import io.github.will413028.hawkr.aftersales.service.AfterSaleResolutionService;
 import io.github.will413028.hawkr.aftersales.service.PlatformDecisionService;
 import io.github.will413028.hawkr.aftersales.service.ReturnReceiptService;
@@ -56,7 +54,6 @@ class AfterSalesGrpcServiceFieldMappingTest {
     @Mock private AfterSaleResolutionService resolutionService;
     @Mock private ReturnReceiptService returnReceiptService;
     @Mock private SellerCancelService sellerCancelService;
-    @Mock private AfterSaleLabelRetryService labelRetryService;
     @Mock private AfterSaleAppealService appealService;
     @Mock private PlatformDecisionService platformDecisionService;
     @Mock private AfterSaleCaseMapper caseMapper;
@@ -68,7 +65,6 @@ class AfterSalesGrpcServiceFieldMappingTest {
     @Mock private PaymentGrpcClient paymentGrpcClient;
     @Mock private BuyerGrpcClient buyerGrpcClient;
     @Mock private SellerGrpcClient sellerGrpcClient;
-    @Mock private ShippingGrpcClient shippingGrpcClient;
     @Mock private OrderGrpcClient orderGrpcClient;
     @Mock private io.github.will413028.hawkr.aftersales.service.AtmRefundReconciler atmRefundReconciler;
 
@@ -94,11 +90,11 @@ class AfterSalesGrpcServiceFieldMappingTest {
 
         service = new AfterSalesGrpcService(
                 caseService, resolutionService, returnReceiptService,
-                sellerCancelService, labelRetryService, appealService, platformDecisionService,
+                sellerCancelService, appealService, platformDecisionService,
                 org.mockito.Mockito.mock(io.github.will413028.hawkr.aftersales.service.AfterSalePayoutHoldService.class),
                 caseMapper, caseItemMapper, evidenceMapper, resolutionMapper, refundTaskMapper,
                 cancelMapper, properties,
-                paymentGrpcClient, buyerGrpcClient, sellerGrpcClient, shippingGrpcClient, orderGrpcClient,
+                paymentGrpcClient, buyerGrpcClient, sellerGrpcClient, orderGrpcClient,
                 atmRefundReconciler,
                 org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class));
 

@@ -278,7 +278,6 @@ class StoreExposureVisibilityIT extends AbstractProductPostgresIT {
                 Mockito.mock(io.github.will413028.hawkr.product.service.ProductCacheService.class),
                 Mockito.mock(io.github.will413028.hawkr.product.service.CategoryService.class),
                 Mockito.mock(io.github.will413028.hawkr.product.grpc.client.SellerGrpcClient.class),
-                Mockito.mock(io.github.will413028.hawkr.product.grpc.client.ShippingGrpcClient.class),
                 Mockito.mock(io.github.will413028.hawkr.product.service.HashtagService.class),
                 Mockito.mock(io.github.will413028.hawkr.product.service.ProductCascadeService.class),
                 Mockito.mock(io.github.will413028.hawkr.product.service.SellerInfoAssembler.class),

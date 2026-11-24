@@ -39,7 +39,6 @@ class ProductGrpcServiceGetProductOwnerTest {
     @Mock private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
     @Mock private io.github.will413028.hawkr.product.service.StockService stockService;
     @Mock private SellerGrpcClient sellerGrpcClient;
-    @Mock private io.github.will413028.hawkr.product.grpc.client.ShippingGrpcClient shippingGrpcClient;
     @Mock private io.github.will413028.hawkr.product.repository.ProductSkuRepository skuRepository;
     @Mock private io.github.will413028.hawkr.product.service.GovCertificationService govCertificationService;
     @Mock private io.github.will413028.hawkr.product.service.HashtagService hashtagService;
@@ -61,7 +60,7 @@ class ProductGrpcServiceGetProductOwnerTest {
 
         ProductGrpcService service = new ProductGrpcService(
                 productService, protoConverter, cacheService, categoryCacheService,
-                redisTemplate, stockService, sellerGrpcClient, shippingGrpcClient,
+                redisTemplate, stockService, sellerGrpcClient,
                 skuRepository, govCertificationService, hashtagService, popularHashtagService,
                 productRepository,
                 certificationApplicationService, certificationConverter);

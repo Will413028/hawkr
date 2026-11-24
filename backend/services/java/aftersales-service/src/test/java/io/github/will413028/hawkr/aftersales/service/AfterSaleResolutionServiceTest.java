@@ -5,7 +5,6 @@ import io.github.will413028.hawkr.aftersales.entity.AfterSaleCaseEntity;
 import io.github.will413028.hawkr.aftersales.exception.AfterSalesBusinessException;
 import io.github.will413028.hawkr.aftersales.grpc.client.CouponGrpcClient;
 import io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient;
-import io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleCaseMapper;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleResolutionMapper;
 import io.github.will413028.hawkr.aftersales.mapper.RefundTaskMapper;
@@ -14,13 +13,10 @@ import io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus;
 import io.github.will413028.hawkr.common.utils.code.AfterSaleResolutionType;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
-import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.coupon.grpc.GrantSellerCompensationCouponResponse;
 import io.github.will413028.hawkr.coupon.grpc.SellerCompensationCouponData;
 import io.github.will413028.hawkr.payment.grpc.CreateRefundResponse;
 import io.github.will413028.hawkr.payment.grpc.RefundDetail;
-import io.github.will413028.hawkr.shipping.grpc.CreateReturnShipmentResponse;
-import io.github.will413028.hawkr.shipping.grpc.ReturnShipmentData;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +40,7 @@ import static org.mockito.Mockito.*;
  * <ul>
  *   <li>handleCouponCompensation：coupon grant 回 code≠0（如 amount=0 被擋）→ throw + 不 insert resolution + 不關案</li>
  *   <li>handleCouponCompensation：grant 成功 → 正常 insert + 關案（success path）</li>
- *   <li>handleReturnRefund：shipping 建單回 code≠0 → throw + 不 insert resolution + 不推進 RETURN_PENDING</li>
+ *   <li>RETURN_REFUND：平台沒有退貨物流 → INVALID_PARAM + 不 insert resolution + 不推進 RETURN_PENDING</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -54,7 +50,6 @@ class AfterSaleResolutionServiceTest {
     @Mock private AfterSaleCaseMapper caseMapper;
     @Mock private AfterSaleResolutionMapper resolutionMapper;
     @Mock private RefundTaskMapper refundTaskMapper;
-    @Mock private ShippingGrpcClient shippingGrpcClient;
     @Mock private CouponGrpcClient couponGrpcClient;
     @Mock private AfterSaleAuditService auditService;
     @Mock private AfterSalesProperties properties;
@@ -83,7 +78,6 @@ class AfterSaleResolutionServiceTest {
         c.setBuyerId(BUYER);
         c.setStatus(AfterSaleCaseStatus.PENDING.value());
         c.setPaymentMethod(PaymentMethod.CREDIT_CARD.value());
-        c.setShippingMethod(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
         c.setRefundableAmount(500L);
         c.setMerId("HAWK2683382637");
         c.setDeliveryTemp("NORMAL");
@@ -109,7 +103,7 @@ class AfterSaleResolutionServiceTest {
 
         AfterSalesBusinessException ex = assertThrows(AfterSalesBusinessException.class, () ->
                 service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.COUPON_COMPENSATION.value(),
-                        null, null, null, null, 0L, 500L, "補償"));
+                        null, null, null, 0L, 500L, "補償"));
 
         assertEquals(GrpcResponseCode.AFTERSALE_COUPON_COMPENSATION_FAILED.code(), ex.code());
         // 關鍵：不 insert resolution、不關案
@@ -130,7 +124,7 @@ class AfterSaleResolutionServiceTest {
         when(caseMapper.closeByCouponCompensation(anyString(), any())).thenReturn(1);
 
         service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.COUPON_COMPENSATION.value(),
-                null, null, null, null, 100L, 600L, "補償");
+                null, null, null, 100L, 600L, "補償");
 
         verify(resolutionMapper, times(1)).insert(any());
         verify(caseMapper, times(1)).closeByCouponCompensation(eq(CASE_NO), any());
@@ -148,28 +142,21 @@ class AfterSaleResolutionServiceTest {
         when(caseMapper.closeByCouponCompensation(anyString(), any())).thenReturn(1);
 
         service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.COUPON_COMPENSATION.value(),
-                null, null, null, null, 100L, 600L, "補償");
+                null, null, null, 100L, 600L, "補償");
 
         verify(couponGrpcClient).grantSellerCompensationCoupon(
                 eq(String.valueOf(SELLER)), eq(String.valueOf(BUYER)), eq("100"), eq("600"), eq("補償"),
                 eq(CASE_NO), eq(String.valueOf(CASE_ID)));
     }
 
-    // ---- #1150 同類：退貨建單失敗不推進 ----
+    // ---- 平台沒有退貨物流：RETURN_REFUND 一律擋下，不寫決議、不推進 ----
     @Test
-    void returnRefund_shipmentFailed_throwsAndDoesNotAdvance() {
-        when(shippingGrpcClient.createReturnCvsShipment(
-                anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(CreateReturnShipmentResponse.newBuilder()
-                        .setCode(GrpcResponseCode.INTERNAL_ERROR.code())
-                        .setMessage("PayUni 物流建單失敗 SHIP02080")
-                        .build());  // envelope-code 失敗
-
+    void returnRefund_isRejectedAsInvalidParamAndDoesNotAdvance() {
         AfterSalesBusinessException ex = assertThrows(AfterSalesBusinessException.class, () ->
                 service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.RETURN_REFUND.value(),
-                        null, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value(), null, null, null, null, null));
+                        null, null, null, null, null, null));
 
-        assertEquals(GrpcResponseCode.RETURN_SHIPMENT_FAILED.code(), ex.code());
+        assertEquals(GrpcResponseCode.INVALID_PARAM.code(), ex.code());
         verify(resolutionMapper, never()).insert(any());
         verify(caseMapper, never()).markReturnPending(anyString(), any(), anyString(), any(), any());
     }
@@ -185,7 +172,7 @@ class AfterSaleResolutionServiceTest {
         AfterSalesBusinessException ex = assertThrows(
                 AfterSalesBusinessException.class,
                 () -> service.resolve(wrongCallerId, CASE_NO, AfterSaleResolutionType.FULL_REFUND_NO_RETURN.value(),
-                        null, null, null, null, null, null, null));
+                        null, null, null, null, null, null));
         assertEquals(GrpcResponseCode.AFTERSALE_NOT_OWNER.code(), ex.code());
     }
 
@@ -239,7 +226,7 @@ class AfterSaleResolutionServiceTest {
         stubAtmRefundPrebuildSuccess();
 
         service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.FULL_REFUND_NO_RETURN.value(),
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null);
 
         assertAwaitingBuyerRefundPagePublishedWithBuyerId();
     }
@@ -250,7 +237,7 @@ class AfterSaleResolutionServiceTest {
         stubAtmRefundPrebuildSuccess();
 
         service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.PARTIAL_REFUND.value(),
-                300L, null, null, null, null, null, null);
+                300L, null, null, null, null, null);
 
         assertAwaitingBuyerRefundPagePublishedWithBuyerId();
     }
@@ -272,7 +259,7 @@ class AfterSaleResolutionServiceTest {
         when(caseMapper.markRefundProcessingFromResolution(CASE_NO)).thenReturn(1);
 
         service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.FULL_REFUND_NO_RETURN.value(),
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null);
 
         verify(afterSalesEventPublisher, never())
                 .publishAwaitingBuyerRefundPage(any(), any(), any(), any());
