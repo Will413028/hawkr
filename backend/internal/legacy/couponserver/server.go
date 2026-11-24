@@ -1,9 +1,10 @@
 // Package couponserver 在 Java order 與 aftersales 改寫成 Go 之前（B8、B9），以舊的 gRPC 契約把它們對 coupon 的呼叫轉給
 // coupon 模組：order 的驗券、核銷、釋放，aftersales 的補償券。其餘 CouponService 方法一律 Unimplemented：買家、賣家、admin 的
-// 入口已經是 Connect（B7-3）。ReserveCoupon 目前也是 Unimplemented：舊請求沒有店家與訂單金額，模組的 Lock 必須重驗門檻
-// （BD1、BD2），計畫沒有決定這兩個值從哪來（見 B7-4a 回報）。B8、B9 隨 Java 的呼叫端刪除。
+// 入口已經是 Connect（B7-3）。B8、B9 隨 Java 的呼叫端刪除。
 //
-// 契約與舊 coupon-service 相同（業務失敗用 code／message 的 envelope、gRPC 狀態是 OK），只有兩處不同：
+// 契約與舊 coupon-service 相同（業務失敗用 code／message 的 envelope、gRPC 狀態是 OK），只有三處不同：
+//   - ReserveCoupon 多兩個必填欄位 store_id 與 order_amount（D10），讓模組的 Lock 照常重驗店家範圍與門檻（BD1、BD2）；
+//     缺值是 gRPC InvalidArgument，不略過檢查。
 //   - 補償券的 GrantSellerCompensationCoupon 多一個必填的 source_id（售後單 id，D4），與 AFTERSALES_CASE 組成冪等鍵。
 //   - Consume、Release 以 order_no 為鍵（D3），instance_id 不讀；Java 在鎖券回應遺失時沒有 instance_id 也能釋放。
 //
@@ -34,6 +35,7 @@ const (
 	codeInvalidParam  = 400
 	codeNotClaimed    = 7011
 	codeInvalidStatus = 7009
+	codeReserveFailed = 7008
 )
 
 // compensationEndAt 是補償券的到期日：舊 coupon-service 的「無到期日」是 2099-12-31 23:59:59 UTC，轉接層沿用，
@@ -124,6 +126,57 @@ func (s *Server) validateFailure(err error, reply func(int32, string, *pb.Coupon
 		return reply(codeInvalidParam, err.Error(), nil)
 	case apperr.KindNotFound, apperr.KindFailedPrecondition:
 		return reply(codeOK, "success", &pb.CouponValidateResult{Valid: false, Description: err.Error()})
+	case apperr.KindInternal, apperr.KindVersionConflict, apperr.KindAlreadyExists, apperr.KindUnauthenticated,
+		apperr.KindPermissionDenied, apperr.KindUnavailable, apperr.KindResourceExhausted:
+		return nil, connectError(err)
+	default:
+		return nil, connectError(err)
+	}
+}
+
+// ReserveCoupon 把買家在這個活動持有的券鎖給 order_no：與 Validate 同一個 (活動, 買家) → 券的對應（D1），再以 store_id 與
+// order_amount 呼叫模組的 Lock，店家範圍與門檻每次重驗（D10）。同一筆訂單重送冪等，instance_id 是券 id。
+//   - template_id、store_id、order_amount、order_no 缺值或格式錯誤：gRPC InvalidArgument（不略過檢查、不降級成 envelope）。
+//   - 沒領過：success=false、code=7011（與 Validate 同）。
+//   - 不可用、不在時間窗、不符資格、店家範圍、門檻、被別單鎖住、這筆訂單已持有別張券：success=false、code=7008、message 是原因。
+//
+// 其餘錯誤（資料庫、port 讀取失敗）是 gRPC 錯誤，Java 當鎖券失敗補償。
+func (s *Server) ReserveCoupon(ctx context.Context, req *connect.Request[pb.ReserveCouponRequest]) (*connect.Response[pb.ReserveCouponResponse], error) {
+	m := req.Msg
+	invalid := func(err error) (*connect.Response[pb.ReserveCouponResponse], error) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	campaignID, err := parseTemplate(m.GetTemplateId())
+	if err != nil {
+		return invalid(err)
+	}
+	storeID, err := parsePositive("store_id", m.GetStoreId())
+	if err != nil {
+		return invalid(err)
+	}
+	amount, err := parsePositive("order_amount", m.GetOrderAmount())
+	if err != nil {
+		return invalid(err)
+	}
+	fail := func(code int32, msg string) (*connect.Response[pb.ReserveCouponResponse], error) {
+		return connect.NewResponse(&pb.ReserveCouponResponse{Code: code, Message: msg}), nil
+	}
+	v, err := s.coupon.VoucherForCampaign(ctx, m.GetBuyerId(), campaignID)
+	if err == nil {
+		var res coupon.LockResult
+		res, err = s.coupon.Lock(ctx, coupon.LockInput{VoucherID: v.ID, BuyerID: m.GetBuyerId(), OrderNo: m.GetOrderNo(), StoreID: storeID, OrderAmount: amount})
+		if err == nil {
+			return connect.NewResponse(&pb.ReserveCouponResponse{Code: codeOK, Message: "success", Success: true, InstanceId: res.Voucher.ID.String()}), nil
+		}
+	}
+	if coupon.ReasonOf(err) == coupon.ReasonVoucherNotFound {
+		return fail(codeNotClaimed, "此優惠券尚未領取")
+	}
+	switch apperr.KindOf(err) {
+	case apperr.KindInvalidInput:
+		return invalid(err)
+	case apperr.KindNotFound, apperr.KindFailedPrecondition:
+		return fail(codeReserveFailed, err.Error())
 	case apperr.KindInternal, apperr.KindVersionConflict, apperr.KindAlreadyExists, apperr.KindUnauthenticated,
 		apperr.KindPermissionDenied, apperr.KindUnavailable, apperr.KindResourceExhausted:
 		return nil, connectError(err)

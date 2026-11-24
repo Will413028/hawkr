@@ -35,6 +35,24 @@
    "new": "\tif coupon.ReasonOf(err) == coupon.ReasonVoucherNotFound {\n\t\treturn reply(codeOK, \"success\", &pb.CouponValidateResult{Valid: true, DiscountAmount: \"100\", TemplateId: \"x\"})\n\t}\n",
    "test": "internal/legacy/couponserver ^TestValidateMapsTemplateToTheBuyersVoucher$",
    "why": "沒領過的買家驗券回通過而不是「未領取」（D1：client 先領券，不當場發券、也不放行），測試要紅。"
+  },
+  {
+   "id": "reserve-lock-ignores-request-store",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/couponserver/server.go",
+   "old": "OrderNo: m.GetOrderNo(), StoreID: storeID, OrderAmount: amount})",
+   "new": "OrderNo: m.GetOrderNo(), StoreID: 501 + 0*storeID, OrderAmount: amount})",
+   "test": "internal/legacy/couponserver ^TestReserveRechecksStoreScopeAndThreshold$",
+   "why": "ReserveCoupon 不把請求的 store_id 傳給 Lock（寫死店家 501）：範圍外的店家也鎖得到，BD1 的重驗被繞過，測試要紅。"
+  },
+  {
+   "id": "reserve-lock-ignores-request-amount",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/couponserver/server.go",
+   "old": "OrderNo: m.GetOrderNo(), StoreID: storeID, OrderAmount: amount})",
+   "new": "OrderNo: m.GetOrderNo(), StoreID: storeID, OrderAmount: 1000000 + 0*amount})",
+   "test": "internal/legacy/couponserver ^TestReserveRechecksStoreScopeAndThreshold$",
+   "why": "ReserveCoupon 不把請求的 order_amount 傳給 Lock（寫死大金額）：低於門檻也鎖得到，BD2 的重驗被繞過，測試要紅。"
   }
  ]
 }

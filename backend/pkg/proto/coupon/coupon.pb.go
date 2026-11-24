@@ -1086,7 +1086,9 @@ type ReserveCouponRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TemplateId    string                 `protobuf:"bytes,1,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"` // 優惠券 Template ID
 	BuyerId       int64                  `protobuf:"varint,2,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`
-	OrderNo       string                 `protobuf:"bytes,3,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"` // 關聯訂單編號
+	OrderNo       string                 `protobuf:"bytes,3,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`             // 關聯訂單編號
+	StoreId       string                 `protobuf:"bytes,4,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`             // 必填：賣家 store_id surrogate，Lock 重驗店家範圍（D10）
+	OrderAmount   string                 `protobuf:"bytes,5,opt,name=order_amount,json=orderAmount,proto3" json:"order_amount,omitempty"` // 必填：訂單原價小計（正整數字串，新台幣元），Lock 重驗門檻（D10）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1138,6 +1140,20 @@ func (x *ReserveCouponRequest) GetBuyerId() int64 {
 func (x *ReserveCouponRequest) GetOrderNo() string {
 	if x != nil {
 		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *ReserveCouponRequest) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *ReserveCouponRequest) GetOrderAmount() string {
+	if x != nil {
+		return x.OrderAmount
 	}
 	return ""
 }
@@ -3713,12 +3729,14 @@ const file_coupon_coupon_proto_rawDesc = "" +
 	"\rdiscount_type\x18\x03 \x01(\tR\fdiscountType\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1f\n" +
 	"\vtemplate_id\x18\x05 \x01(\tR\n" +
-	"templateId\"m\n" +
+	"templateId\"\xab\x01\n" +
 	"\x14ReserveCouponRequest\x12\x1f\n" +
 	"\vtemplate_id\x18\x01 \x01(\tR\n" +
 	"templateId\x12\x19\n" +
 	"\bbuyer_id\x18\x02 \x01(\x03R\abuyerId\x12\x19\n" +
-	"\border_no\x18\x03 \x01(\tR\aorderNo\"\x80\x01\n" +
+	"\border_no\x18\x03 \x01(\tR\aorderNo\x12\x19\n" +
+	"\bstore_id\x18\x04 \x01(\tR\astoreId\x12!\n" +
+	"\forder_amount\x18\x05 \x01(\tR\vorderAmount\"\x80\x01\n" +
 	"\x15ReserveCouponResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x18\n" +

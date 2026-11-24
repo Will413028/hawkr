@@ -186,6 +186,8 @@ message ReserveCouponRequest {
     string template_id = 1;                     // 優惠券 Template ID
     int64 buyer_id = 2;
     string order_no = 3;                        // 關聯訂單編號
+    string store_id = 4;                        // 必填：賣家 store_id surrogate，Lock 重驗店家範圍（D10）
+    string order_amount = 5;                    // 必填：訂單原價小計（正整數字串，新台幣元），Lock 重驗門檻（D10）
 }
 
 message ReserveCouponResponse {

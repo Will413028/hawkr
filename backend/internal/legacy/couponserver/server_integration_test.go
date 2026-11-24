@@ -113,6 +113,24 @@ func (f *fixture) validate(template string, buyer int64, store, amount string) *
 	return r.Msg
 }
 
+func (f *fixture) reserveReq(template string, buyer int64, order, store, amount string) (*pb.ReserveCouponResponse, error) {
+	f.t.Helper()
+	r, err := f.srv.ReserveCoupon(context.Background(), connect.NewRequest(&pb.ReserveCouponRequest{TemplateId: template, BuyerId: buyer, OrderNo: order, StoreId: store, OrderAmount: amount}))
+	if err != nil {
+		return nil, err
+	}
+	return r.Msg, nil
+}
+
+func (f *fixture) reserve(template string, buyer int64, order, store, amount string) *pb.ReserveCouponResponse {
+	f.t.Helper()
+	r, err := f.reserveReq(template, buyer, order, store, amount)
+	if err != nil {
+		f.t.Fatalf("ReserveCoupon：%v", err)
+	}
+	return r
+}
+
 func (f *fixture) release(order, instance string) *pb.ReleaseCouponResponse {
 	f.t.Helper()
 	r, err := f.srv.ReleaseCoupon(context.Background(), connect.NewRequest(&pb.ReleaseCouponRequest{OrderNo: order, InstanceId: instance}))
@@ -163,6 +181,108 @@ func TestValidateMapsTemplateToTheBuyersVoucher(t *testing.T) {
 	// 不存在的活動：買家在該活動沒有券，同樣是未領取，不是通過。
 	if r := f.validate(uuid.New().String(), buyer1, "501", "1000"); r.GetCode() != 7011 {
 		t.Fatalf("不存在的活動 code = %d，要 7011", r.GetCode())
+	}
+}
+
+// 鎖券：活動 id 對到買家的券後以 order_no 鎖定，instance_id 是券 id；同一筆訂單重送冪等；別的訂單鎖不到已鎖住的券。
+func TestReserveLocksTheBuyersVoucherForTheOrder(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	c := f.campaign(0)
+	v := f.claim(c, buyer1)
+
+	got := f.reserve(c.ID.String(), buyer1, "ORDER-1", "501", "1000")
+	if got.GetCode() != 0 || !got.GetSuccess() || got.GetInstanceId() != v.ID.String() {
+		t.Fatalf("要鎖成功並回券 id：%+v", got)
+	}
+	if st := f.status(v.ID); st != "LOCKED" {
+		t.Fatalf("券狀態 = %s，要 LOCKED", st)
+	}
+	if again := f.reserve(c.ID.String(), buyer1, "ORDER-1", "501", "1000"); !again.GetSuccess() || again.GetInstanceId() != v.ID.String() {
+		t.Fatalf("同一筆訂單重送要冪等成功：%+v", again)
+	}
+	other := f.reserve(c.ID.String(), buyer1, "ORDER-2", "501", "1000")
+	if other.GetSuccess() || other.GetCode() != 7008 || other.GetMessage() == "" {
+		t.Fatalf("別的訂單鎖已鎖住的券要失敗並說明原因：%+v", other)
+	}
+	if n := f.count("SELECT count(*) FROM coupon.coupon_vouchers WHERE order_no = 'ORDER-2'"); n != 0 {
+		t.Fatalf("別的訂單不可以持有這張券")
+	}
+}
+
+// BD1、BD2：Lock 用請求的店家與金額重驗；範圍外的店家、低於門檻都鎖不到，券維持可用。
+func TestReserveRechecksStoreScopeAndThreshold(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	scoped, err := f.m.CreateCampaign(context.Background(), coupon.CreateCampaignInput{
+		CampaignSpec: coupon.CampaignSpec{Title: "店家券", DiscountType: coupon.DiscountCash, DiscountAmount: 100, ThresholdAmount: 500, StartAt: base.Add(-time.Hour), EndAt: base.Add(24 * time.Hour)},
+		TargetType:   coupon.TargetAll, Issuer: coupon.Issuer{StoreID: storeA},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.PublishCampaign(context.Background(), scoped.ID); err != nil {
+		t.Fatal(err)
+	}
+	v := f.claim(scoped, buyer1)
+
+	for name, req := range map[string][2]string{
+		"店家不在範圍": {"999", "1000"},
+		"低於門檻":   {"501", "499"},
+	} {
+		r := f.reserve(scoped.ID.String(), buyer1, "ORDER-1", req[0], req[1])
+		if r.GetSuccess() || r.GetCode() != 7008 || r.GetMessage() == "" {
+			t.Fatalf("%s：要失敗並說明原因：%+v", name, r)
+		}
+		if st := f.status(v.ID); st != "AVAILABLE" {
+			t.Fatalf("%s：券狀態 = %s，要維持 AVAILABLE", name, st)
+		}
+	}
+	if r := f.reserve(scoped.ID.String(), buyer1, "ORDER-1", "501", "500"); !r.GetSuccess() {
+		t.Fatalf("剛好達門檻、店家在範圍要成功：%+v", r)
+	}
+}
+
+func TestReserveNotClaimedIsTheSameAsValidate(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	c := f.campaign(0)
+	f.claim(c, buyer1)
+
+	r := f.reserve(c.ID.String(), buyer2, "ORDER-1", "501", "1000")
+	v := f.validate(c.ID.String(), buyer2, "501", "1000")
+	if r.GetSuccess() || r.GetCode() != 7011 || r.GetCode() != v.GetCode() || r.GetMessage() != v.GetMessage() {
+		t.Fatalf("沒領過要與 Validate 同碼同訊息（7011）：reserve=%+v validate=%+v", r, v)
+	}
+	if n := f.count("SELECT count(*) FROM coupon.coupon_vouchers WHERE buyer_id = $1", buyer2); n != 0 {
+		t.Fatalf("鎖券不可以當場發券，買家 2 有 %d 張", n)
+	}
+}
+
+// 缺 store_id、order_amount、order_no、template_id 或格式錯誤都是 InvalidArgument：不略過店家與門檻檢查，也不鎖券。
+func TestReserveRejectsMissingFieldsAsInvalidArgument(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	c := f.campaign(0)
+	v := f.claim(c, buyer1)
+
+	for name, req := range map[string][4]string{
+		"template 不是 UUID": {"12345", "ORDER-1", "501", "1000"},
+		"store 空":          {c.ID.String(), "ORDER-1", "", "1000"},
+		"store 空白":         {c.ID.String(), "ORDER-1", "  ", "1000"},
+		"store 0":          {c.ID.String(), "ORDER-1", "0", "1000"},
+		"金額空":              {c.ID.String(), "ORDER-1", "501", ""},
+		"金額 0":             {c.ID.String(), "ORDER-1", "501", "0"},
+		"金額負":              {c.ID.String(), "ORDER-1", "501", "-5"},
+		"order_no 空":       {c.ID.String(), "", "501", "1000"},
+	} {
+		_, err := f.reserveReq(req[0], buyer1, req[1], req[2], req[3])
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("%s：err = %v，要 InvalidArgument", name, err)
+		}
+	}
+	if st := f.status(v.ID); st != "AVAILABLE" {
+		t.Fatalf("被拒的請求不可以鎖券：%s", st)
 	}
 }
 
