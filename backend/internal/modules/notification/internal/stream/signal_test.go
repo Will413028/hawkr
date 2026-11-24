@@ -136,7 +136,9 @@ func TestRunDeliversNotificationsAndResyncsOnReconnect(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatalf("ctx 結束 Run 應回 nil：%v", err)
 	}
-	if _, err := st.Next(context.Background()); !errors.Is(err, ErrClosed) {
+	closedCtx, stop := context.WithTimeout(context.Background(), 2*time.Second)
+	defer stop()
+	if _, err := st.Next(closedCtx); !errors.Is(err, ErrClosed) {
 		t.Fatalf("Run 結束後開著的訂閱應以 ErrClosed 結束：%v", err)
 	}
 	if _, err := h.Subscribe(buyer(1), 0); !errors.Is(err, ErrClosed) {
