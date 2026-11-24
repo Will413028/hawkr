@@ -96,7 +96,7 @@ func nrServer(windowOpen bool) *InvoiceServer {
 	}}
 	uc := usecase.NewNotificationResend(nopTx{}, docs, nrIssuers{}, nrOutbox{}, zap.NewNop()).
 		WithClock(func() time.Time { return nrNow })
-	return NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, zap.NewNop())
+	return NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, zap.NewNop())
 }
 
 func TestResend_SellerHandlerSuccess(t *testing.T) {

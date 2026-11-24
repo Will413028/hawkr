@@ -392,43 +392,20 @@ func (s *InvoiceServer) ListSellerInvoiceDocuments(
 		}
 		return nil, s.internal(ctx, "invoice.query.list_seller_documents.failed", err)
 	}
-	shipments, degraded := s.resolveShipmentStatuses(ctx, orderNosOf(out.Records))
 	return &pb.ListSellerInvoiceDocumentsResponse{
 		Code: 0, Message: msgSuccess,
 		Data: &pb.ListSellerInvoiceDocumentsData{
-			Records: s.toSellerDocumentItems(out.Records, shipments), Total: fmtInt32(out.Total),
+			Records: s.toSellerDocumentItems(out.Records), Total: fmtInt32(out.Total),
 			Page: fmtInt32(out.Page), PageSize: fmtInt32(out.PageSize),
-			ShipmentStatusDegraded: degraded,
 		},
 	}, nil
 }
 
-// orderNosOf 折出這一頁所有訂單編號，供出貨狀態批次查詢（#3019）。
-//
-// 只取 source_type=ORDER 的列：平台代製收據與 ADM 手動開票沒有訂單，
-// 把它們的空字串送進批次查詢只是白費，`dedupeStrings` 會濾掉。
-func orderNosOf(rows []usecase.DocumentListItem) []string {
-	out := make([]string, 0, len(rows))
-	for _, item := range rows {
-		if item.Document.SourceType == sourceTypeOrder {
-			out = append(out, str(item.Document.SourceRef))
-		}
-	}
-	return out
-}
-
 // toSellerDocumentItems 折出 S06／A12 共用的列。
-//
-// shipments ＝ order_no ⇒ 物流狀態碼（ShippingStatus CodeMeta 的 value）。
-// 不在 map 內的訂單回空字串 ＝「這張訂單還沒有物流單」。
-//
-// 🔴 「整批查不到」**不在這裡**表達：它是 data 層的 `shipment_status_degraded`。
-// 在這一層用哨兵值區分，等於往 ShippingStatus 的值域裡塞一個 CodeMeta 沒有的碼
-// （§8 禁止硬編碼），而且逐列重複同一個整批性質的事實。
 //
 // buyer_kind 由 recipient_tax_id 推導，見下方。
 func (s *InvoiceServer) toSellerDocumentItems(
-	rows []usecase.DocumentListItem, shipments map[string]string,
+	rows []usecase.DocumentListItem,
 ) []*pb.SellerInvoiceDocumentItem {
 	out := make([]*pb.SellerInvoiceDocumentItem, 0, len(rows))
 	for _, item := range rows {
@@ -458,10 +435,6 @@ func (s *InvoiceServer) toSellerDocumentItems(
 			// 2026-09-02 之前建的列這一欄是 NULL ⇒ 回空字串。那是誠實的「不知道」，
 			// 回填是一次性維運 SQL（§22），不進 application code。
 			PaidAt: fmtTime(doc.PaidAt),
-			// #3019：同樣是「proto 有、gateway 透傳、生產者從來沒填」。
-			// 空字串 ＝ 這張訂單還沒有物流單（合法且常見：付款後尚未出貨）。
-			// **整批查不到**走 data 層的 shipment_status_degraded，不在這裡塞哨兵值。
-			ShipmentStatus: shipments[orderNo],
 		})
 	}
 	return out
@@ -968,13 +941,11 @@ func (s *InvoiceServer) ListInvoiceDocumentsForAdmin(
 		}
 		return nil, s.internal(ctx, "invoice.query.list_documents_admin.failed", err)
 	}
-	shipments, degraded := s.resolveShipmentStatuses(ctx, orderNosOf(out.Records))
 	return &pb.ListInvoiceDocumentsForAdminResponse{
 		Code: 0, Message: msgSuccess,
 		Data: &pb.ListInvoiceDocumentsForAdminData{
-			Records: s.toSellerDocumentItems(out.Records, shipments), Total: fmtInt32(out.Total),
+			Records: s.toSellerDocumentItems(out.Records), Total: fmtInt32(out.Total),
 			Page: fmtInt32(out.Page), PageSize: fmtInt32(out.PageSize),
-			ShipmentStatusDegraded: degraded,
 		},
 	}, nil
 }

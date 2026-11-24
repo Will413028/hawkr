@@ -161,11 +161,10 @@ type PeerConfig struct {
 	// `PAYMENT_SERVICE_ADDR` 已登記在 k8s/values/invoice-service.yaml 與
 	// docker-compose-local.yml 的 invoice 區塊；`.env.template` 依既有慣例
 	// 不放任何 `*_SERVICE_ADDR`（全檔零命中），故不需補。
-	PaymentAddr  string
-	SellerAddr   string
-	BuyerAddr    string
-	ShippingAddr string
-	MediaAddr    string
+	PaymentAddr string
+	SellerAddr  string
+	BuyerAddr   string
+	MediaAddr   string
 }
 
 // Load loads configuration from environment variables and validates it.
@@ -250,11 +249,10 @@ func Load() (*Config, error) {
 			AllowanceB2CSplitTax:      envBool("INVOICE_ALLOWANCE_B2C_SPLIT_TAX", true),
 		},
 		Peers: PeerConfig{
-			OrderAddr:    pkgconfig.GetEnvOrDefault("ORDER_SERVICE_ADDR", "order-service:9915"),
-			PaymentAddr:  pkgconfig.GetEnvOrDefault("PAYMENT_SERVICE_ADDR", "payment-service:9925"),
-			SellerAddr:   pkgconfig.GetEnvOrDefault("LEGACY_SELLER_GRPC_ADDR", "127.0.0.1:9941"),
-			BuyerAddr:    pkgconfig.GetEnvOrDefault("BUYER_SERVICE_ADDR", "127.0.0.1:9941"),
-			ShippingAddr: pkgconfig.GetEnvOrDefault("SHIPPING_SERVICE_ADDR", "shipping-service:9931"),
+			OrderAddr:   pkgconfig.GetEnvOrDefault("ORDER_SERVICE_ADDR", "order-service:9915"),
+			PaymentAddr: pkgconfig.GetEnvOrDefault("PAYMENT_SERVICE_ADDR", "payment-service:9925"),
+			SellerAddr:  pkgconfig.GetEnvOrDefault("LEGACY_SELLER_GRPC_ADDR", "127.0.0.1:9941"),
+			BuyerAddr:   pkgconfig.GetEnvOrDefault("BUYER_SERVICE_ADDR", "127.0.0.1:9941"),
 			MediaAddr: pkgconfig.GetEnvOrDefault("MEDIA_SERVICE_HOST", "media-service") + ":" +
 				pkgconfig.GetEnvOrDefault("MEDIA_SERVICE_GRPC_PORT", "9937"),
 		},

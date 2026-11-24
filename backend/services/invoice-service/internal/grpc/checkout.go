@@ -63,11 +63,6 @@ type InvoiceServer struct {
 	// sellerNames 只服務 ADM 工作台的識別欄（#3017）。它可以是 nil：
 	// 店名取不到時退回 store_id，而那不影響任何一筆資料的正確性。
 	sellerNames SellerNameResolver
-	// shipmentStatuses 只服務 S06／A12 的出貨狀態欄（#3019）。它可以是 nil：
-	// 取不到時退回空字串，而那不影響任何一筆發票資料的正確性。
-	// ⚠️ 但「取不到」必須傳達出去（shipment_status_degraded），理由見
-	// shipment_status.go 的檔頭——空字串在這一欄會被讀成「還沒出貨」。
-	shipmentStatuses ShipmentStatusResolver
 	// buyerNames 只服務申訴畫面的「是誰提的」欄（#3017 後半）。它可以是 nil：
 	// 取不到時退回空字串，那不影響任何一筆申訴資料的正確性。
 	// ⚠️ resolveBuyerNames 回的**已經是遮罩後的值**，本層拿不到明碼。
@@ -97,7 +92,6 @@ func NewInvoiceServer(
 	correctionIntake *usecase.CorrectionIntake,
 	files *usecase.DocumentFile,
 	sellerNames SellerNameResolver,
-	shipmentStatuses ShipmentStatusResolver,
 	buyerNames BuyerNameResolver,
 	evidenceMeta EvidenceMetadataResolver,
 	log *zap.Logger,
@@ -108,7 +102,7 @@ func NewInvoiceServer(
 		adminComplaints: adminComplaints, providerAccounts: providerAccounts,
 		sellerComplaints: sellerComplaints, sellerJobs: sellerJobs, resends: resends,
 		correctionIntake: correctionIntake, files: files,
-		sellerNames: sellerNames, shipmentStatuses: shipmentStatuses,
+		sellerNames:  sellerNames,
 		buyerNames:   buyerNames,
 		evidenceMeta: evidenceMeta, log: log,
 	}

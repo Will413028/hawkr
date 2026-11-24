@@ -1344,233 +1344,6 @@ func (x *ListStoreIDsByAccountResponse) GetStoreIds() []int64 {
 	return nil
 }
 
-type GetSellerShippingProfileRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// 登入 account_id。名字原為 seller_account_id，2026-08-05 正名 —— 值一直都是
-	// login account_id（不是 store surrogate），但 seller_account_id 這個名字在本
-	// repo 的歷史意義正好相反（sellers.seller_account_id 欄位已於 migration
-	// 20260711155335 更名為 store_id），是整份 proto 裡最容易接錯線的欄位。
-	// 現況：全 monorepo 零生產端 —— 唯一呼叫者 shipping-service SellerGrpcClient
-	// 只設 store_id，所以這個欄位實際上永遠是 0，server 端一律走 store_id 分支。
-	AccountId int64 `protobuf:"varint,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// ② store re-key：> 0 時改用 PK sellers.store_id 查。與 account_id 互斥。
-	StoreId       int64 `protobuf:"varint,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetSellerShippingProfileRequest) Reset() {
-	*x = GetSellerShippingProfileRequest{}
-	mi := &file_seller_seller_proto_msgTypes[17]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetSellerShippingProfileRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetSellerShippingProfileRequest) ProtoMessage() {}
-
-func (x *GetSellerShippingProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[17]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetSellerShippingProfileRequest.ProtoReflect.Descriptor instead.
-func (*GetSellerShippingProfileRequest) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{17}
-}
-
-func (x *GetSellerShippingProfileRequest) GetAccountId() int64 {
-	if x != nil {
-		return x.AccountId
-	}
-	return 0
-}
-
-func (x *GetSellerShippingProfileRequest) GetStoreId() int64 {
-	if x != nil {
-		return x.StoreId
-	}
-	return 0
-}
-
-type GetSellerShippingProfileResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Data          *SellerShippingProfile `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetSellerShippingProfileResponse) Reset() {
-	*x = GetSellerShippingProfileResponse{}
-	mi := &file_seller_seller_proto_msgTypes[18]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetSellerShippingProfileResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetSellerShippingProfileResponse) ProtoMessage() {}
-
-func (x *GetSellerShippingProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[18]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetSellerShippingProfileResponse.ProtoReflect.Descriptor instead.
-func (*GetSellerShippingProfileResponse) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{18}
-}
-
-func (x *GetSellerShippingProfileResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *GetSellerShippingProfileResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *GetSellerShippingProfileResponse) GetData() *SellerShippingProfile {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-type SellerShippingProfile struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	StoreId       string                 `protobuf:"bytes,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`                   // 數字字串
-	SenderName    string                 `protobuf:"bytes,2,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`          // 寄件人名稱（= 商家名稱）
-	SenderPhone   string                 `protobuf:"bytes,3,opt,name=sender_phone,json=senderPhone,proto3" json:"sender_phone,omitempty"`       // 寄件人電話
-	City          string                 `protobuf:"bytes,4,opt,name=city,proto3" json:"city,omitempty"`                                        // 城市
-	District      string                 `protobuf:"bytes,5,opt,name=district,proto3" json:"district,omitempty"`                                // 區域
-	AddressDetail string                 `protobuf:"bytes,6,opt,name=address_detail,json=addressDetail,proto3" json:"address_detail,omitempty"` // 詳細地址
-	ZipCode       string                 `protobuf:"bytes,7,opt,name=zip_code,json=zipCode,proto3" json:"zip_code,omitempty"`                   // 郵遞區號
-	MerId         string                 `protobuf:"bytes,8,opt,name=mer_id,json=merId,proto3" json:"mer_id,omitempty"`                         // PayUni 商家編號（建立物流單用）
-	ContactEmail  string                 `protobuf:"bytes,9,opt,name=contact_email,json=contactEmail,proto3" json:"contact_email,omitempty"`    // 聯絡人信箱
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SellerShippingProfile) Reset() {
-	*x = SellerShippingProfile{}
-	mi := &file_seller_seller_proto_msgTypes[19]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SellerShippingProfile) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SellerShippingProfile) ProtoMessage() {}
-
-func (x *SellerShippingProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[19]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SellerShippingProfile.ProtoReflect.Descriptor instead.
-func (*SellerShippingProfile) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{19}
-}
-
-func (x *SellerShippingProfile) GetStoreId() string {
-	if x != nil {
-		return x.StoreId
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetSenderName() string {
-	if x != nil {
-		return x.SenderName
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetSenderPhone() string {
-	if x != nil {
-		return x.SenderPhone
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetCity() string {
-	if x != nil {
-		return x.City
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetDistrict() string {
-	if x != nil {
-		return x.District
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetAddressDetail() string {
-	if x != nil {
-		return x.AddressDetail
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetZipCode() string {
-	if x != nil {
-		return x.ZipCode
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetMerId() string {
-	if x != nil {
-		return x.MerId
-	}
-	return ""
-}
-
-func (x *SellerShippingProfile) GetContactEmail() string {
-	if x != nil {
-		return x.ContactEmail
-	}
-	return ""
-}
-
 // Appended to keep all existing protoc message indices stable.
 type ListPublicStoreIDsByCityRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1581,7 +1354,7 @@ type ListPublicStoreIDsByCityRequest struct {
 
 func (x *ListPublicStoreIDsByCityRequest) Reset() {
 	*x = ListPublicStoreIDsByCityRequest{}
-	mi := &file_seller_seller_proto_msgTypes[20]
+	mi := &file_seller_seller_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1593,7 +1366,7 @@ func (x *ListPublicStoreIDsByCityRequest) String() string {
 func (*ListPublicStoreIDsByCityRequest) ProtoMessage() {}
 
 func (x *ListPublicStoreIDsByCityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[20]
+	mi := &file_seller_seller_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1606,7 +1379,7 @@ func (x *ListPublicStoreIDsByCityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPublicStoreIDsByCityRequest.ProtoReflect.Descriptor instead.
 func (*ListPublicStoreIDsByCityRequest) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{20}
+	return file_seller_seller_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListPublicStoreIDsByCityRequest) GetCity() string {
@@ -1629,7 +1402,7 @@ type ListPublicStoreIDsByCityResponse struct {
 
 func (x *ListPublicStoreIDsByCityResponse) Reset() {
 	*x = ListPublicStoreIDsByCityResponse{}
-	mi := &file_seller_seller_proto_msgTypes[21]
+	mi := &file_seller_seller_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1641,7 +1414,7 @@ func (x *ListPublicStoreIDsByCityResponse) String() string {
 func (*ListPublicStoreIDsByCityResponse) ProtoMessage() {}
 
 func (x *ListPublicStoreIDsByCityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[21]
+	mi := &file_seller_seller_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1654,7 +1427,7 @@ func (x *ListPublicStoreIDsByCityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPublicStoreIDsByCityResponse.ProtoReflect.Descriptor instead.
 func (*ListPublicStoreIDsByCityResponse) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{21}
+	return file_seller_seller_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListPublicStoreIDsByCityResponse) GetCode() int32 {
@@ -1700,7 +1473,7 @@ type ListPublicStoresByCityRequest struct {
 
 func (x *ListPublicStoresByCityRequest) Reset() {
 	*x = ListPublicStoresByCityRequest{}
-	mi := &file_seller_seller_proto_msgTypes[22]
+	mi := &file_seller_seller_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1712,7 +1485,7 @@ func (x *ListPublicStoresByCityRequest) String() string {
 func (*ListPublicStoresByCityRequest) ProtoMessage() {}
 
 func (x *ListPublicStoresByCityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[22]
+	mi := &file_seller_seller_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1725,7 +1498,7 @@ func (x *ListPublicStoresByCityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPublicStoresByCityRequest.ProtoReflect.Descriptor instead.
 func (*ListPublicStoresByCityRequest) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{22}
+	return file_seller_seller_proto_rawDescGZIP(), []int{19}
 }
 
 type ListPublicStoresByCityResponse struct {
@@ -1739,7 +1512,7 @@ type ListPublicStoresByCityResponse struct {
 
 func (x *ListPublicStoresByCityResponse) Reset() {
 	*x = ListPublicStoresByCityResponse{}
-	mi := &file_seller_seller_proto_msgTypes[23]
+	mi := &file_seller_seller_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1751,7 +1524,7 @@ func (x *ListPublicStoresByCityResponse) String() string {
 func (*ListPublicStoresByCityResponse) ProtoMessage() {}
 
 func (x *ListPublicStoresByCityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[23]
+	mi := &file_seller_seller_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1764,7 +1537,7 @@ func (x *ListPublicStoresByCityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPublicStoresByCityResponse.ProtoReflect.Descriptor instead.
 func (*ListPublicStoresByCityResponse) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{23}
+	return file_seller_seller_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ListPublicStoresByCityResponse) GetCode() int32 {
@@ -1800,7 +1573,7 @@ type PublicCityStores struct {
 
 func (x *PublicCityStores) Reset() {
 	*x = PublicCityStores{}
-	mi := &file_seller_seller_proto_msgTypes[24]
+	mi := &file_seller_seller_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1812,7 +1585,7 @@ func (x *PublicCityStores) String() string {
 func (*PublicCityStores) ProtoMessage() {}
 
 func (x *PublicCityStores) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[24]
+	mi := &file_seller_seller_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1825,7 +1598,7 @@ func (x *PublicCityStores) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicCityStores.ProtoReflect.Descriptor instead.
 func (*PublicCityStores) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{24}
+	return file_seller_seller_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *PublicCityStores) GetCityCode() string {
@@ -1865,7 +1638,7 @@ type GetCurrentStoreIDRequest struct {
 
 func (x *GetCurrentStoreIDRequest) Reset() {
 	*x = GetCurrentStoreIDRequest{}
-	mi := &file_seller_seller_proto_msgTypes[25]
+	mi := &file_seller_seller_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1877,7 +1650,7 @@ func (x *GetCurrentStoreIDRequest) String() string {
 func (*GetCurrentStoreIDRequest) ProtoMessage() {}
 
 func (x *GetCurrentStoreIDRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[25]
+	mi := &file_seller_seller_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1890,7 +1663,7 @@ func (x *GetCurrentStoreIDRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentStoreIDRequest.ProtoReflect.Descriptor instead.
 func (*GetCurrentStoreIDRequest) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{25}
+	return file_seller_seller_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetCurrentStoreIDRequest) GetAccountId() int64 {
@@ -1909,7 +1682,7 @@ type GetCurrentStoreIDResponse struct {
 
 func (x *GetCurrentStoreIDResponse) Reset() {
 	*x = GetCurrentStoreIDResponse{}
-	mi := &file_seller_seller_proto_msgTypes[26]
+	mi := &file_seller_seller_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1921,7 +1694,7 @@ func (x *GetCurrentStoreIDResponse) String() string {
 func (*GetCurrentStoreIDResponse) ProtoMessage() {}
 
 func (x *GetCurrentStoreIDResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[26]
+	mi := &file_seller_seller_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1934,7 +1707,7 @@ func (x *GetCurrentStoreIDResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentStoreIDResponse.ProtoReflect.Descriptor instead.
 func (*GetCurrentStoreIDResponse) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{26}
+	return file_seller_seller_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetCurrentStoreIDResponse) GetStoreId() int64 {
@@ -1957,7 +1730,7 @@ type MatchCertificateHolderRequest struct {
 
 func (x *MatchCertificateHolderRequest) Reset() {
 	*x = MatchCertificateHolderRequest{}
-	mi := &file_seller_seller_proto_msgTypes[27]
+	mi := &file_seller_seller_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1969,7 +1742,7 @@ func (x *MatchCertificateHolderRequest) String() string {
 func (*MatchCertificateHolderRequest) ProtoMessage() {}
 
 func (x *MatchCertificateHolderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[27]
+	mi := &file_seller_seller_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1982,7 +1755,7 @@ func (x *MatchCertificateHolderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MatchCertificateHolderRequest.ProtoReflect.Descriptor instead.
 func (*MatchCertificateHolderRequest) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{27}
+	return file_seller_seller_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *MatchCertificateHolderRequest) GetStoreId() int64 {
@@ -2013,7 +1786,7 @@ type MatchCertificateHolderResponse struct {
 
 func (x *MatchCertificateHolderResponse) Reset() {
 	*x = MatchCertificateHolderResponse{}
-	mi := &file_seller_seller_proto_msgTypes[28]
+	mi := &file_seller_seller_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2025,7 +1798,7 @@ func (x *MatchCertificateHolderResponse) String() string {
 func (*MatchCertificateHolderResponse) ProtoMessage() {}
 
 func (x *MatchCertificateHolderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[28]
+	mi := &file_seller_seller_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2038,7 +1811,7 @@ func (x *MatchCertificateHolderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MatchCertificateHolderResponse.ProtoReflect.Descriptor instead.
 func (*MatchCertificateHolderResponse) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{28}
+	return file_seller_seller_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *MatchCertificateHolderResponse) GetMatched() bool {
@@ -2082,7 +1855,7 @@ type SearchSellerProspectsRequest struct {
 
 func (x *SearchSellerProspectsRequest) Reset() {
 	*x = SearchSellerProspectsRequest{}
-	mi := &file_seller_seller_proto_msgTypes[29]
+	mi := &file_seller_seller_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2094,7 +1867,7 @@ func (x *SearchSellerProspectsRequest) String() string {
 func (*SearchSellerProspectsRequest) ProtoMessage() {}
 
 func (x *SearchSellerProspectsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[29]
+	mi := &file_seller_seller_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2107,7 +1880,7 @@ func (x *SearchSellerProspectsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchSellerProspectsRequest.ProtoReflect.Descriptor instead.
 func (*SearchSellerProspectsRequest) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{29}
+	return file_seller_seller_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SearchSellerProspectsRequest) GetCategory() string {
@@ -2180,7 +1953,7 @@ type SellerProspectItem struct {
 
 func (x *SellerProspectItem) Reset() {
 	*x = SellerProspectItem{}
-	mi := &file_seller_seller_proto_msgTypes[30]
+	mi := &file_seller_seller_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2192,7 +1965,7 @@ func (x *SellerProspectItem) String() string {
 func (*SellerProspectItem) ProtoMessage() {}
 
 func (x *SellerProspectItem) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[30]
+	mi := &file_seller_seller_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2205,7 +1978,7 @@ func (x *SellerProspectItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerProspectItem.ProtoReflect.Descriptor instead.
 func (*SellerProspectItem) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{30}
+	return file_seller_seller_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SellerProspectItem) GetId() string {
@@ -2343,7 +2116,7 @@ type SellerProspectHit struct {
 
 func (x *SellerProspectHit) Reset() {
 	*x = SellerProspectHit{}
-	mi := &file_seller_seller_proto_msgTypes[31]
+	mi := &file_seller_seller_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2355,7 +2128,7 @@ func (x *SellerProspectHit) String() string {
 func (*SellerProspectHit) ProtoMessage() {}
 
 func (x *SellerProspectHit) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[31]
+	mi := &file_seller_seller_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2368,7 +2141,7 @@ func (x *SellerProspectHit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SellerProspectHit.ProtoReflect.Descriptor instead.
 func (*SellerProspectHit) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{31}
+	return file_seller_seller_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SellerProspectHit) GetProspect() *SellerProspectItem {
@@ -2417,7 +2190,7 @@ type SearchSellerProspectsResponse struct {
 
 func (x *SearchSellerProspectsResponse) Reset() {
 	*x = SearchSellerProspectsResponse{}
-	mi := &file_seller_seller_proto_msgTypes[32]
+	mi := &file_seller_seller_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2429,7 +2202,7 @@ func (x *SearchSellerProspectsResponse) String() string {
 func (*SearchSellerProspectsResponse) ProtoMessage() {}
 
 func (x *SearchSellerProspectsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_seller_seller_proto_msgTypes[32]
+	mi := &file_seller_seller_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2442,7 +2215,7 @@ func (x *SearchSellerProspectsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchSellerProspectsResponse.ProtoReflect.Descriptor instead.
 func (*SearchSellerProspectsResponse) Descriptor() ([]byte, []int) {
-	return file_seller_seller_proto_rawDescGZIP(), []int{32}
+	return file_seller_seller_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SearchSellerProspectsResponse) GetCode() int32 {
@@ -2600,26 +2373,7 @@ const file_seller_seller_proto_rawDesc = "" +
 	"\x1dListStoreIDsByAccountResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1b\n" +
-	"\tstore_ids\x18\x03 \x03(\x03R\bstoreIds\"[\n" +
-	"\x1fGetSellerShippingProfileRequest\x12\x1d\n" +
-	"\n" +
-	"account_id\x18\x01 \x01(\x03R\taccountId\x12\x19\n" +
-	"\bstore_id\x18\x02 \x01(\x03R\astoreId\"\x89\x01\n" +
-	" GetSellerShippingProfileResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
-	"\x04data\x18\x03 \x01(\v2#.hawkr.seller.SellerShippingProfileR\x04data\"\xa4\x02\n" +
-	"\x15SellerShippingProfile\x12\x19\n" +
-	"\bstore_id\x18\x01 \x01(\tR\astoreId\x12\x1f\n" +
-	"\vsender_name\x18\x02 \x01(\tR\n" +
-	"senderName\x12!\n" +
-	"\fsender_phone\x18\x03 \x01(\tR\vsenderPhone\x12\x12\n" +
-	"\x04city\x18\x04 \x01(\tR\x04city\x12\x1a\n" +
-	"\bdistrict\x18\x05 \x01(\tR\bdistrict\x12%\n" +
-	"\x0eaddress_detail\x18\x06 \x01(\tR\raddressDetail\x12\x19\n" +
-	"\bzip_code\x18\a \x01(\tR\azipCode\x12\x15\n" +
-	"\x06mer_id\x18\b \x01(\tR\x05merId\x12#\n" +
-	"\rcontact_email\x18\t \x01(\tR\fcontactEmail\"5\n" +
+	"\tstore_ids\x18\x03 \x03(\x03R\bstoreIds\"5\n" +
 	"\x1fListPublicStoreIDsByCityRequest\x12\x12\n" +
 	"\x04city\x18\x01 \x01(\tR\x04city\"\x9e\x01\n" +
 	" ListPublicStoreIDsByCityResponse\x12\x12\n" +
@@ -2688,7 +2442,7 @@ const file_seller_seller_proto_rawDesc = "" +
 	"\x1dSearchSellerProspectsResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x123\n" +
-	"\x04data\x18\x03 \x03(\v2\x1f.hawkr.seller.SellerProspectHitR\x04data2\xfc\n" +
+	"\x04data\x18\x03 \x03(\v2\x1f.hawkr.seller.SellerProspectHitR\x04data2\x81\n" +
 	"\n" +
 	"\rSellerService\x12I\n" +
 	"\tGetSeller\x12\x1e.hawkr.seller.GetSellerRequest\x1a\x1c.hawkr.seller.SellerResponse\x12s\n" +
@@ -2701,8 +2455,7 @@ const file_seller_seller_proto_rawDesc = "" +
 	"\x18ListPublicStoreIDsByCity\x12-.hawkr.seller.ListPublicStoreIDsByCityRequest\x1a..hawkr.seller.ListPublicStoreIDsByCityResponse\x12s\n" +
 	"\x16ListPublicStoresByCity\x12+.hawkr.seller.ListPublicStoresByCityRequest\x1a,.hawkr.seller.ListPublicStoresByCityResponse\x12d\n" +
 	"\x11ResolvePrincipals\x12&.hawkr.seller.ResolvePrincipalsRequest\x1a'.hawkr.seller.ResolvePrincipalsResponse\x12p\n" +
-	"\x15ListStoreIDsByAccount\x12*.hawkr.seller.ListStoreIDsByAccountRequest\x1a+.hawkr.seller.ListStoreIDsByAccountResponse\x12y\n" +
-	"\x18GetSellerShippingProfile\x12-.hawkr.seller.GetSellerShippingProfileRequest\x1a..hawkr.seller.GetSellerShippingProfileResponse\x12p\n" +
+	"\x15ListStoreIDsByAccount\x12*.hawkr.seller.ListStoreIDsByAccountRequest\x1a+.hawkr.seller.ListStoreIDsByAccountResponse\x12p\n" +
 	"\x15SearchSellerProspects\x12*.hawkr.seller.SearchSellerProspectsRequest\x1a+.hawkr.seller.SearchSellerProspectsResponseB\xb0\x01\n" +
 	"\x10com.hawkr.sellerB\vSellerProtoP\x01Z>github.com/Will413028/hawkr/backend/internal/legacy/gen/seller\xa2\x02\x03HSX\xaa\x02\fHawkr.Seller\xca\x02\fHawkr\\Seller\xe2\x02\x18Hawkr\\Seller\\GPBMetadata\xea\x02\rHawkr::Sellerb\x06proto3"
 
@@ -2718,7 +2471,7 @@ func file_seller_seller_proto_rawDescGZIP() []byte {
 	return file_seller_seller_proto_rawDescData
 }
 
-var file_seller_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_seller_seller_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_seller_seller_proto_goTypes = []any{
 	(*GetSellerRequest)(nil),                 // 0: hawkr.seller.GetSellerRequest
 	(*ResolveSellerAccountIDRequest)(nil),    // 1: hawkr.seller.ResolveSellerAccountIDRequest
@@ -2737,69 +2490,63 @@ var file_seller_seller_proto_goTypes = []any{
 	(*ResolvePrincipalsResponse)(nil),        // 14: hawkr.seller.ResolvePrincipalsResponse
 	(*ListStoreIDsByAccountRequest)(nil),     // 15: hawkr.seller.ListStoreIDsByAccountRequest
 	(*ListStoreIDsByAccountResponse)(nil),    // 16: hawkr.seller.ListStoreIDsByAccountResponse
-	(*GetSellerShippingProfileRequest)(nil),  // 17: hawkr.seller.GetSellerShippingProfileRequest
-	(*GetSellerShippingProfileResponse)(nil), // 18: hawkr.seller.GetSellerShippingProfileResponse
-	(*SellerShippingProfile)(nil),            // 19: hawkr.seller.SellerShippingProfile
-	(*ListPublicStoreIDsByCityRequest)(nil),  // 20: hawkr.seller.ListPublicStoreIDsByCityRequest
-	(*ListPublicStoreIDsByCityResponse)(nil), // 21: hawkr.seller.ListPublicStoreIDsByCityResponse
-	(*ListPublicStoresByCityRequest)(nil),    // 22: hawkr.seller.ListPublicStoresByCityRequest
-	(*ListPublicStoresByCityResponse)(nil),   // 23: hawkr.seller.ListPublicStoresByCityResponse
-	(*PublicCityStores)(nil),                 // 24: hawkr.seller.PublicCityStores
-	(*GetCurrentStoreIDRequest)(nil),         // 25: hawkr.seller.GetCurrentStoreIDRequest
-	(*GetCurrentStoreIDResponse)(nil),        // 26: hawkr.seller.GetCurrentStoreIDResponse
-	(*MatchCertificateHolderRequest)(nil),    // 27: hawkr.seller.MatchCertificateHolderRequest
-	(*MatchCertificateHolderResponse)(nil),   // 28: hawkr.seller.MatchCertificateHolderResponse
-	(*SearchSellerProspectsRequest)(nil),     // 29: hawkr.seller.SearchSellerProspectsRequest
-	(*SellerProspectItem)(nil),               // 30: hawkr.seller.SellerProspectItem
-	(*SellerProspectHit)(nil),                // 31: hawkr.seller.SellerProspectHit
-	(*SearchSellerProspectsResponse)(nil),    // 32: hawkr.seller.SearchSellerProspectsResponse
-	nil,                                      // 33: hawkr.seller.BatchGetSellerMetaResponse.SellersEntry
-	nil,                                      // 34: hawkr.seller.ResolvePrincipalsResponse.PrincipalsEntry
-	(*common.DelegationContext)(nil),         // 35: hawkr.common.DelegationContext
+	(*ListPublicStoreIDsByCityRequest)(nil),  // 17: hawkr.seller.ListPublicStoreIDsByCityRequest
+	(*ListPublicStoreIDsByCityResponse)(nil), // 18: hawkr.seller.ListPublicStoreIDsByCityResponse
+	(*ListPublicStoresByCityRequest)(nil),    // 19: hawkr.seller.ListPublicStoresByCityRequest
+	(*ListPublicStoresByCityResponse)(nil),   // 20: hawkr.seller.ListPublicStoresByCityResponse
+	(*PublicCityStores)(nil),                 // 21: hawkr.seller.PublicCityStores
+	(*GetCurrentStoreIDRequest)(nil),         // 22: hawkr.seller.GetCurrentStoreIDRequest
+	(*GetCurrentStoreIDResponse)(nil),        // 23: hawkr.seller.GetCurrentStoreIDResponse
+	(*MatchCertificateHolderRequest)(nil),    // 24: hawkr.seller.MatchCertificateHolderRequest
+	(*MatchCertificateHolderResponse)(nil),   // 25: hawkr.seller.MatchCertificateHolderResponse
+	(*SearchSellerProspectsRequest)(nil),     // 26: hawkr.seller.SearchSellerProspectsRequest
+	(*SellerProspectItem)(nil),               // 27: hawkr.seller.SellerProspectItem
+	(*SellerProspectHit)(nil),                // 28: hawkr.seller.SellerProspectHit
+	(*SearchSellerProspectsResponse)(nil),    // 29: hawkr.seller.SearchSellerProspectsResponse
+	nil,                                      // 30: hawkr.seller.BatchGetSellerMetaResponse.SellersEntry
+	nil,                                      // 31: hawkr.seller.ResolvePrincipalsResponse.PrincipalsEntry
+	(*common.DelegationContext)(nil),         // 32: hawkr.common.DelegationContext
 }
 var file_seller_seller_proto_depIdxs = []int32{
-	35, // 0: hawkr.seller.GetSellerRequest.delegation:type_name -> hawkr.common.DelegationContext
+	32, // 0: hawkr.seller.GetSellerRequest.delegation:type_name -> hawkr.common.DelegationContext
 	6,  // 1: hawkr.seller.SellerResponse.data:type_name -> hawkr.seller.SellerInfo
 	6,  // 2: hawkr.seller.SellerBatchResponse.data:type_name -> hawkr.seller.SellerInfo
 	9,  // 3: hawkr.seller.SellerStatsResponse.data:type_name -> hawkr.seller.SellerStats
-	33, // 4: hawkr.seller.BatchGetSellerMetaResponse.sellers:type_name -> hawkr.seller.BatchGetSellerMetaResponse.SellersEntry
-	34, // 5: hawkr.seller.ResolvePrincipalsResponse.principals:type_name -> hawkr.seller.ResolvePrincipalsResponse.PrincipalsEntry
-	19, // 6: hawkr.seller.GetSellerShippingProfileResponse.data:type_name -> hawkr.seller.SellerShippingProfile
-	24, // 7: hawkr.seller.ListPublicStoresByCityResponse.cities:type_name -> hawkr.seller.PublicCityStores
-	30, // 8: hawkr.seller.SellerProspectHit.prospect:type_name -> hawkr.seller.SellerProspectItem
-	31, // 9: hawkr.seller.SearchSellerProspectsResponse.data:type_name -> hawkr.seller.SellerProspectHit
-	11, // 10: hawkr.seller.BatchGetSellerMetaResponse.SellersEntry.value:type_name -> hawkr.seller.SellerMeta
-	0,  // 11: hawkr.seller.SellerService.GetSeller:input_type -> hawkr.seller.GetSellerRequest
-	1,  // 12: hawkr.seller.SellerService.ResolveSellerAccountID:input_type -> hawkr.seller.ResolveSellerAccountIDRequest
-	25, // 13: hawkr.seller.SellerService.GetCurrentStoreID:input_type -> hawkr.seller.GetCurrentStoreIDRequest
-	3,  // 14: hawkr.seller.SellerService.GetSellerBatch:input_type -> hawkr.seller.GetSellerBatchRequest
-	7,  // 15: hawkr.seller.SellerService.GetSellerStats:input_type -> hawkr.seller.GetSellerStatsRequest
-	27, // 16: hawkr.seller.SellerService.MatchCertificateHolder:input_type -> hawkr.seller.MatchCertificateHolderRequest
-	10, // 17: hawkr.seller.SellerService.BatchGetSellerMeta:input_type -> hawkr.seller.BatchGetSellerMetaRequest
-	20, // 18: hawkr.seller.SellerService.ListPublicStoreIDsByCity:input_type -> hawkr.seller.ListPublicStoreIDsByCityRequest
-	22, // 19: hawkr.seller.SellerService.ListPublicStoresByCity:input_type -> hawkr.seller.ListPublicStoresByCityRequest
-	13, // 20: hawkr.seller.SellerService.ResolvePrincipals:input_type -> hawkr.seller.ResolvePrincipalsRequest
-	15, // 21: hawkr.seller.SellerService.ListStoreIDsByAccount:input_type -> hawkr.seller.ListStoreIDsByAccountRequest
-	17, // 22: hawkr.seller.SellerService.GetSellerShippingProfile:input_type -> hawkr.seller.GetSellerShippingProfileRequest
-	29, // 23: hawkr.seller.SellerService.SearchSellerProspects:input_type -> hawkr.seller.SearchSellerProspectsRequest
-	4,  // 24: hawkr.seller.SellerService.GetSeller:output_type -> hawkr.seller.SellerResponse
-	2,  // 25: hawkr.seller.SellerService.ResolveSellerAccountID:output_type -> hawkr.seller.ResolveSellerAccountIDResponse
-	26, // 26: hawkr.seller.SellerService.GetCurrentStoreID:output_type -> hawkr.seller.GetCurrentStoreIDResponse
-	5,  // 27: hawkr.seller.SellerService.GetSellerBatch:output_type -> hawkr.seller.SellerBatchResponse
-	8,  // 28: hawkr.seller.SellerService.GetSellerStats:output_type -> hawkr.seller.SellerStatsResponse
-	28, // 29: hawkr.seller.SellerService.MatchCertificateHolder:output_type -> hawkr.seller.MatchCertificateHolderResponse
-	12, // 30: hawkr.seller.SellerService.BatchGetSellerMeta:output_type -> hawkr.seller.BatchGetSellerMetaResponse
-	21, // 31: hawkr.seller.SellerService.ListPublicStoreIDsByCity:output_type -> hawkr.seller.ListPublicStoreIDsByCityResponse
-	23, // 32: hawkr.seller.SellerService.ListPublicStoresByCity:output_type -> hawkr.seller.ListPublicStoresByCityResponse
-	14, // 33: hawkr.seller.SellerService.ResolvePrincipals:output_type -> hawkr.seller.ResolvePrincipalsResponse
-	16, // 34: hawkr.seller.SellerService.ListStoreIDsByAccount:output_type -> hawkr.seller.ListStoreIDsByAccountResponse
-	18, // 35: hawkr.seller.SellerService.GetSellerShippingProfile:output_type -> hawkr.seller.GetSellerShippingProfileResponse
-	32, // 36: hawkr.seller.SellerService.SearchSellerProspects:output_type -> hawkr.seller.SearchSellerProspectsResponse
-	24, // [24:37] is the sub-list for method output_type
-	11, // [11:24] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	30, // 4: hawkr.seller.BatchGetSellerMetaResponse.sellers:type_name -> hawkr.seller.BatchGetSellerMetaResponse.SellersEntry
+	31, // 5: hawkr.seller.ResolvePrincipalsResponse.principals:type_name -> hawkr.seller.ResolvePrincipalsResponse.PrincipalsEntry
+	21, // 6: hawkr.seller.ListPublicStoresByCityResponse.cities:type_name -> hawkr.seller.PublicCityStores
+	27, // 7: hawkr.seller.SellerProspectHit.prospect:type_name -> hawkr.seller.SellerProspectItem
+	28, // 8: hawkr.seller.SearchSellerProspectsResponse.data:type_name -> hawkr.seller.SellerProspectHit
+	11, // 9: hawkr.seller.BatchGetSellerMetaResponse.SellersEntry.value:type_name -> hawkr.seller.SellerMeta
+	0,  // 10: hawkr.seller.SellerService.GetSeller:input_type -> hawkr.seller.GetSellerRequest
+	1,  // 11: hawkr.seller.SellerService.ResolveSellerAccountID:input_type -> hawkr.seller.ResolveSellerAccountIDRequest
+	22, // 12: hawkr.seller.SellerService.GetCurrentStoreID:input_type -> hawkr.seller.GetCurrentStoreIDRequest
+	3,  // 13: hawkr.seller.SellerService.GetSellerBatch:input_type -> hawkr.seller.GetSellerBatchRequest
+	7,  // 14: hawkr.seller.SellerService.GetSellerStats:input_type -> hawkr.seller.GetSellerStatsRequest
+	24, // 15: hawkr.seller.SellerService.MatchCertificateHolder:input_type -> hawkr.seller.MatchCertificateHolderRequest
+	10, // 16: hawkr.seller.SellerService.BatchGetSellerMeta:input_type -> hawkr.seller.BatchGetSellerMetaRequest
+	17, // 17: hawkr.seller.SellerService.ListPublicStoreIDsByCity:input_type -> hawkr.seller.ListPublicStoreIDsByCityRequest
+	19, // 18: hawkr.seller.SellerService.ListPublicStoresByCity:input_type -> hawkr.seller.ListPublicStoresByCityRequest
+	13, // 19: hawkr.seller.SellerService.ResolvePrincipals:input_type -> hawkr.seller.ResolvePrincipalsRequest
+	15, // 20: hawkr.seller.SellerService.ListStoreIDsByAccount:input_type -> hawkr.seller.ListStoreIDsByAccountRequest
+	26, // 21: hawkr.seller.SellerService.SearchSellerProspects:input_type -> hawkr.seller.SearchSellerProspectsRequest
+	4,  // 22: hawkr.seller.SellerService.GetSeller:output_type -> hawkr.seller.SellerResponse
+	2,  // 23: hawkr.seller.SellerService.ResolveSellerAccountID:output_type -> hawkr.seller.ResolveSellerAccountIDResponse
+	23, // 24: hawkr.seller.SellerService.GetCurrentStoreID:output_type -> hawkr.seller.GetCurrentStoreIDResponse
+	5,  // 25: hawkr.seller.SellerService.GetSellerBatch:output_type -> hawkr.seller.SellerBatchResponse
+	8,  // 26: hawkr.seller.SellerService.GetSellerStats:output_type -> hawkr.seller.SellerStatsResponse
+	25, // 27: hawkr.seller.SellerService.MatchCertificateHolder:output_type -> hawkr.seller.MatchCertificateHolderResponse
+	12, // 28: hawkr.seller.SellerService.BatchGetSellerMeta:output_type -> hawkr.seller.BatchGetSellerMetaResponse
+	18, // 29: hawkr.seller.SellerService.ListPublicStoreIDsByCity:output_type -> hawkr.seller.ListPublicStoreIDsByCityResponse
+	20, // 30: hawkr.seller.SellerService.ListPublicStoresByCity:output_type -> hawkr.seller.ListPublicStoresByCityResponse
+	14, // 31: hawkr.seller.SellerService.ResolvePrincipals:output_type -> hawkr.seller.ResolvePrincipalsResponse
+	16, // 32: hawkr.seller.SellerService.ListStoreIDsByAccount:output_type -> hawkr.seller.ListStoreIDsByAccountResponse
+	29, // 33: hawkr.seller.SellerService.SearchSellerProspects:output_type -> hawkr.seller.SearchSellerProspectsResponse
+	22, // [22:34] is the sub-list for method output_type
+	10, // [10:22] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_seller_seller_proto_init() }
@@ -2813,7 +2560,7 @@ func file_seller_seller_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_seller_seller_proto_rawDesc), len(file_seller_seller_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   35,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

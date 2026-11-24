@@ -161,7 +161,7 @@ func newComplaintServer(rows ...domain.Complaint) *InvoiceServer {
 	uc := usecase.NewComplaint(xTx{}, repo, xDocs{owner: xBuyerA}, xIssuers{}, xOutbox{},
 		xBiz{synced: &synced}, nil, func() int64 { seq++; return seq }, nil).
 		WithClock(func() time.Time { return xNow })
-	return NewInvoiceServer(nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	return NewInvoiceServer(nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
 // xIssuers 回一列 issuer_ref_id ≠ id 的 issuer：出向事件的 store_id 必須是前者。

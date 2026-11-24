@@ -55,10 +55,6 @@ service SellerService {
     // gateway 暴露，僅供服務間 gRPC 呼叫。
     rpc ListStoreIDsByAccount(ListStoreIDsByAccountRequest) returns (ListStoreIDsByAccountResponse);
 
-    // ========== Cross-Service: Shipping Profile ==========
-    // 取得賣家寄件資訊（Shipping Service 建立物流單用）
-    rpc GetSellerShippingProfile(GetSellerShippingProfileRequest) returns (GetSellerShippingProfileResponse);
-
     // ========== 站外業者主檔（招商名單） ==========
     // 供 ai-service 的 EXTERNAL lane 與舊「AI 找貨」工具查詢站外業者。
     //
@@ -253,38 +249,6 @@ message ListStoreIDsByAccountResponse {
     int32 code = 1;
     string message = 2;
     repeated int64 store_ids = 3;
-}
-
-// ========== Cross-Service: Shipping Profile Messages ==========
-
-message GetSellerShippingProfileRequest {
-    // 登入 account_id。名字原為 seller_account_id，2026-08-05 正名 —— 值一直都是
-    // login account_id（不是 store surrogate），但 seller_account_id 這個名字在本
-    // repo 的歷史意義正好相反（sellers.seller_account_id 欄位已於 migration
-    // 20260711155335 更名為 store_id），是整份 proto 裡最容易接錯線的欄位。
-    // 現況：全 monorepo 零生產端 —— 唯一呼叫者 shipping-service SellerGrpcClient
-    // 只設 store_id，所以這個欄位實際上永遠是 0，server 端一律走 store_id 分支。
-    int64 account_id = 1;
-    // ② store re-key：> 0 時改用 PK sellers.store_id 查。與 account_id 互斥。
-    int64 store_id = 2;
-}
-
-message GetSellerShippingProfileResponse {
-    int32 code = 1;
-    string message = 2;
-    SellerShippingProfile data = 3;
-}
-
-message SellerShippingProfile {
-    string store_id = 1;            // 數字字串
-    string sender_name = 2;         // 寄件人名稱（= 商家名稱）
-    string sender_phone = 3;        // 寄件人電話
-    string city = 4;                // 城市
-    string district = 5;            // 區域
-    string address_detail = 6;      // 詳細地址
-    string zip_code = 7;            // 郵遞區號
-    string mer_id = 8;              // PayUni 商家編號（建立物流單用）
-    string contact_email = 9;       // 聯絡人信箱
 }
 
 // Appended to keep all existing protoc message indices stable.

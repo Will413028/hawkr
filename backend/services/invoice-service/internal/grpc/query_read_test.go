@@ -472,7 +472,7 @@ func newReadServerWithCorrections(t *testing.T, corrs qCorrections, mut func(*rF
 		usecase.IssuanceConfig{MaxAttempts: 13, BaseBackoff: 30 * time.Second, MaxBackoff: 30 * time.Minute},
 		nil,
 	)
-	fx.server = NewInvoiceServer(nil, q, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	fx.server = NewInvoiceServer(nil, q, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	if mut != nil {
 		mut(fx)
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/client/order"
 	"github.com/Will413028/hawkr/invoice-service/internal/client/payment"
 	"github.com/Will413028/hawkr/invoice-service/internal/client/seller"
-	"github.com/Will413028/hawkr/invoice-service/internal/client/shipping"
 	"github.com/Will413028/hawkr/invoice-service/internal/config"
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 	invoicegrpc "github.com/Will413028/hawkr/invoice-service/internal/grpc"
@@ -69,8 +68,6 @@ var Module = fx.Module("client",
 	// binding 由提供端做，是這個 repo 既有的方向。
 	fx.Provide(fx.Annotate(newOrderClient, fx.As(new(usecase.OrderSnapshotReviser)))),
 	fx.Provide(fx.Annotate(newPaymentClient, fx.As(new(invoicemq.PaymentFactsClient)))),
-	// SHIP peer：S06／A12 的出貨狀態欄（#3019）。binding 在提供端，同上。
-	fx.Provide(fx.Annotate(newShippingClient, fx.As(new(invoicegrpc.ShipmentStatusResolver)))),
 	// BUY peer：申訴畫面的「是誰提的」欄（#3017 後半）。binding 在提供端，同上。
 	fx.Provide(fx.Annotate(newBuyerClient, fx.As(new(invoicegrpc.BuyerNameResolver)))),
 )
@@ -89,16 +86,6 @@ func newOrderClient(lc fx.Lifecycle, cfg *config.Config, prefs domain.BuyerPrefe
 // newPaymentClient 建出 PAY peer client（§7.1.2 步驟 5 ②、註 2）。
 func newPaymentClient(lc fx.Lifecycle, cfg *config.Config) (*payment.Client, error) {
 	return payment.NewClient(lc, cfg.Peers.PaymentAddr)
-}
-
-// newShippingClient 建出 SHIP peer client（#3019）。
-//
-// 位址走既有的 `SHIPPING_SERVICE_ADDR`（`config.PeerConfig.ShippingAddr`，
-// k8s/values/invoice-service.yaml 已有此鍵）⇒ 本波不需要新增任何 env var。
-// NetworkPolicy 也已放行（`k8s/external-services/networkpolicy.yaml` 的
-// `shipping-service-ingress` 已列 invoice-service ⇒ §14.5.0c 三問全部已滿足）。
-func newShippingClient(lc fx.Lifecycle, cfg *config.Config) (*shipping.Client, error) {
-	return shipping.NewClient(lc, cfg.Peers.ShippingAddr)
 }
 
 // newBuyerClient 建出 BUY peer client（#3017 後半）。

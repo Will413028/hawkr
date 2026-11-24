@@ -63,7 +63,7 @@ func newPrefServer(rows ...domain.BuyerPreference) *InvoiceServer {
 	}
 	var seq int64 = 8000000000
 	uc := usecase.NewPreference(pfxTx{}, repo, nil, func() int64 { seq++; return seq }, nil)
-	return NewInvoiceServer(nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	return NewInvoiceServer(nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
 func prefRow(id, buyerID int64, isDefault bool) domain.BuyerPreference {
@@ -216,7 +216,7 @@ func TestPreference_MissingBuyerIDIsRejected(t *testing.T) {
 func TestPreference_CreateReturnsMaskedValue(t *testing.T) {
 	repo := &pfxCreateRepo{}
 	uc := usecase.NewPreference(pfxTx{}, repo, nil, func() int64 { return 8000000001 }, nil)
-	s := NewInvoiceServer(nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := NewInvoiceServer(nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	resp, err := s.CreateBuyerInvoiceProfile(context.Background(), &pb.CreateBuyerInvoiceProfileRequest{
 		BuyerId:     pBuyerA,

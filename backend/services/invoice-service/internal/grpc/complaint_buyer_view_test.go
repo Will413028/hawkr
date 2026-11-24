@@ -197,7 +197,7 @@ func bvServer(status string, version int64) *InvoiceServer {
 	q := usecase.NewQuery(nil, nil, nil, nil, nil, nil, repo, nil, nil, nil, nil,
 		xBiz{synced: &synced}, nil, nil, qCancelled{}, usecase.IssuanceConfig{}, nil).WithClock(clock)
 
-	return NewInvoiceServer(nil, q, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	return NewInvoiceServer(nil, q, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
 // ---------------------------------------------------------------------------

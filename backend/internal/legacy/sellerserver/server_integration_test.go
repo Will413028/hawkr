@@ -351,33 +351,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 			t.Fatalf("%v %v", r, e)
 		}
 	})
-	t.Run("GetSellerShippingProfile", func(t *testing.T) {
-		r, e := s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: exposed.StoreID}))
-		d := r.Msg.GetData()
-		if e != nil || d.GetContactEmail() != "owner@example.com" || d.GetZipCode() != "100" || d.GetMerId() != "" || d.GetSenderPhone() != "0912345678" {
-			t.Fatalf("%v %v", r, e)
-		}
-		// 已關閉的店找不到（舊 server 的 store_id 路徑濾掉 deleted_at）。
-		r, e = s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: closed.StoreID}))
-		if e != nil || r.Msg.GetCode() != 404 || r.Msg.GetData() != nil {
-			t.Fatalf("closed: %v %v", r, e)
-		}
-		// 沒有 KYC 申請的店也給店家的客服信箱（email 不經 KYC）。
-		r, e = s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: pending.StoreID}))
-		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetContactEmail() != "owner@example.com" {
-			t.Fatalf("%v %v", r, e)
-		}
-		// 商店電話是選填：沒有填電話的店仍回資料，contact_email 照給，不回 428。
-		noPhone, err := m.Apply(ctx, seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: account(), StoreName: "沒填電話", TownCode: "63000050", AddressDetail: "測試路三號"})
-		must(err)
-		email := "nophone@example.com"
-		_, err = m.UpdateProfile(ctx, seller.UpdateProfileInput{StoreID: noPhone.StoreID, ExpectedVersion: noPhone.Version, SupportEmail: &email})
-		must(err)
-		r, e = s.GetSellerShippingProfile(ctx, connect.NewRequest(&pb.GetSellerShippingProfileRequest{StoreId: noPhone.StoreID}))
-		if e != nil || r.Msg.GetCode() != 0 || r.Msg.GetData().GetContactEmail() != email || r.Msg.GetData().GetSenderPhone() != "" || r.Msg.GetData().GetZipCode() != "100" {
-			t.Fatalf("no phone: %v %v", r, e)
-		}
-	})
 	t.Run("MatchCertificateHolder", func(t *testing.T) {
 		// 比對基準是核准的公司名稱（D37：平台不收本名）；個人賣家沒有基準，交人工判斷。
 		companyName, taxID, companyKind := "範例小農有限公司", "33330333", seller.KYCCompany

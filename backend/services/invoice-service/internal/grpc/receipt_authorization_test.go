@@ -88,7 +88,7 @@ func raServer(p domain.SellerTaxProfile) *InvoiceServer {
 	tp := usecase.NewTaxProfile(nopTx{}, issuers, profiles, raAudit{}, nil, nil,
 		func() int64 { return 1 }, zap.NewNop()).
 		WithClock(func() time.Time { return raNow })
-	return NewInvoiceServer(nil, q, nil, nil, tp, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
+	return NewInvoiceServer(nil, q, nil, nil, tp, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 }
 
 // ---------------------------------------------------------------------------

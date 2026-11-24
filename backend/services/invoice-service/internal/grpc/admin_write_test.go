@@ -20,7 +20,7 @@ import (
 // 那是契約破了，不是「有一位 id 為 0 的管理員」。放行的話，一支需要 ADM 身分的寫入端點
 // 會在沒有身分的情況下真的執行下去，而稽核列會記成 actor 0。
 func TestAdminWrite_RejectsMissingActor(t *testing.T) {
-	s := NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
+	s := NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 	ctx := context.Background()
 
 	cases := map[string]func() error{
@@ -58,7 +58,7 @@ func TestAdminWrite_RejectsMissingActor(t *testing.T) {
 // expected_version 是 §6.1.0(10) 的必填欄。缺席不是「用 0 試試看」——0 會是一件從未被
 // 更新過的作業的合法版本，那時 CAS 會通過而 ADM 看到的是三分鐘前那一版。
 func TestAdminWrite_RequiresExpectedVersion(t *testing.T) {
-	s := NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
+	s := NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 	if _, err := s.RetryInvoiceJobForAdmin(context.Background(), &pb.RetryInvoiceJobForAdminRequest{
 		ActorAccountId: 42, JobId: "7001",
 	}); status.Code(err) != codes.InvalidArgument {
@@ -89,7 +89,7 @@ func (nopTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) err
 func TestAdminWrite_JobNotFoundIsByteIdentical(t *testing.T) {
 	uc := usecase.NewAdminJob(nopTx{}, notFoundOps{}, nil, nil, nil, nil, nil, nil, nil, nil, usecase.IssuanceConfig{}, func() int64 { return 1 }, zap.NewNop()).
 		WithClock(func() time.Time { return time.Unix(0, 0).UTC() })
-	s := NewInvoiceServer(nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
+	s := NewInvoiceServer(nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 	ctx := context.Background()
 
 	retry, err := s.RetryInvoiceJobForAdmin(ctx, &pb.RetryInvoiceJobForAdminRequest{

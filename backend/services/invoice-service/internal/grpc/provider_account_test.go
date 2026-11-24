@@ -172,7 +172,7 @@ func newProviderServer(exists bool, status string) (*InvoiceServer, *pxAccounts)
 		// 「有沒有真的呼叫它」變得看不出來。
 		pxOps{}, nil, pxAudit{}, pxCutovers{}, pxProvider{}, func() int64 { return 4242 }, zap.NewNop()).
 		WithClock(func() time.Time { return pxNow })
-	return NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil), accounts
+	return NewInvoiceServer(nil, nil, nil, nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil), accounts
 }
 
 // ---------------------------------------------------------------------------

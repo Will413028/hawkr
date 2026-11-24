@@ -56,7 +56,7 @@ func TestListProviderCutovers_Success(t *testing.T) {
 			CutoverAt: pcNow.Add(-48 * time.Hour), DeactivatedAt: &deactivated, Mode: "AMEGO_AUTO",
 			CreatedByAccountID: pcStoreID, CreatedAt: pcNow.Add(-72 * time.Hour)},
 	}
-	s := NewInvoiceServer(nil, pcQuery(rows, true), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := NewInvoiceServer(nil, pcQuery(rows, true), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	resp, err := s.ListProviderCutoversForAdmin(context.Background(), &pb.ListProviderCutoversForAdminRequest{
 		ActorAccountId: 90001, StoreId: "2685914682", Page: "1", PageSize: "20",
@@ -92,7 +92,7 @@ func TestListProviderCutovers_Success(t *testing.T) {
 // 🔴 沒有 provider account ⇒ 9330，不是空清單：兩者對 ADM 的下一步不同
 // （前者去看 A04 串接狀態，後者等賣家自己按端點 26）。
 func TestListProviderCutovers_NoAccountReturns9330(t *testing.T) {
-	s := NewInvoiceServer(nil, pcQuery(nil, false), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := NewInvoiceServer(nil, pcQuery(nil, false), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	resp, err := s.ListProviderCutoversForAdmin(context.Background(), &pb.ListProviderCutoversForAdminRequest{
 		ActorAccountId: 90001, StoreId: "2685914682",
@@ -110,7 +110,7 @@ func TestListProviderCutovers_NoAccountReturns9330(t *testing.T) {
 
 // 帳戶存在但一次都沒設過切點 ⇒ 空 records ＋ total=0，**那是正常結果不是 9330**。
 func TestListProviderCutovers_AccountWithoutHistoryIsEmptyNotError(t *testing.T) {
-	s := NewInvoiceServer(nil, pcQuery(nil, true), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := NewInvoiceServer(nil, pcQuery(nil, true), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	resp, err := s.ListProviderCutoversForAdmin(context.Background(), &pb.ListProviderCutoversForAdminRequest{
 		ActorAccountId: 90001, StoreId: "2685914682",
@@ -127,7 +127,7 @@ func TestListProviderCutovers_AccountWithoutHistoryIsEmptyNotError(t *testing.T)
 }
 
 func TestListProviderCutovers_RejectsMissingActor(t *testing.T) {
-	s := NewInvoiceServer(nil, pcQuery(nil, true), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := NewInvoiceServer(nil, pcQuery(nil, true), nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	if _, err := s.ListProviderCutoversForAdmin(context.Background(), &pb.ListProviderCutoversForAdminRequest{
 		StoreId: "2685914682",

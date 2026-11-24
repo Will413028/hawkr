@@ -286,7 +286,7 @@ func newQueryServer(t *testing.T, mut func(*qFixture)) *qFixture {
 		nil,
 	)
 	_ = issuerB
-	fx.server = NewInvoiceServer(nil, q, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	fx.server = NewInvoiceServer(nil, q, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	if mut != nil {
 		mut(fx)
 	}

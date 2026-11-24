@@ -15,7 +15,7 @@ import (
 // ---------------------------------------------------------------------------
 // 「proto 有這一欄、gateway 照實透傳、生產者從來沒填」——本服務重複三次的缺陷類
 //
-// #3017（store_name／buyer_masked_name）、#3019（paid_at／shipment_status）、
+// #3017（store_name／buyer_masked_name）、#3019（paid_at）、
 // 以及 #3017 順帶挖出的 A04 店名，全部是同一個形狀：
 //
 //	欄位在 proto 上存在 → gateway 的 conv 函式照實 GetXxx() → **沒有任何生產者賦值**
@@ -38,7 +38,7 @@ import (
 //	        ④ 欄位在 gateway DTO 被漏掉（那是 gateway-json-contract 的守備範圍）
 //
 // ⇒ 它是**下界不是上界**：綠燈只代表「至少有人填過」，不代表「填對了」。
-// 逐欄的正確性仍然要靠各自的行為測試（見 buyer_names_test.go／shipment_status_test.go）。
+// 逐欄的正確性仍然要靠各自的行為測試（見 buyer_names_test.go）。
 // ---------------------------------------------------------------------------
 
 // knownEmptyFields 是「確實沒有生產者，而且那是對的」的登記表。

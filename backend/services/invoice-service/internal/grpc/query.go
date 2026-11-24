@@ -882,17 +882,6 @@ func (s *InvoiceServer) toAdminJobDetail(ctx context.Context, v usecase.AdminJob
 	for _, l := range v.AuditLogs {
 		out.AuditLogs = append(out.AuditLogs, toAuditLogItem(l))
 	}
-	// #3089 第 7 項：shipment_status 在此之前**零賦值恆空**——resolver 是活的
-	// （S06／A12 的列表面實測回得出值），只有這支詳情 mapper 沒接。
-	//
-	// 🔴 **必須同時帶 degraded**：A12 逐字寫著「這一欄尤其不能畫：空白會被讀成
-	// 『還沒出貨』」。取不到時只回空字串等於讓畫面說謊，那正是 #3019 修列表面時
-	// already 付過的學費（見 shipment_status.go 檔頭）。
-	if orderNo := out.Job.GetOrderNo(); orderNo != "" {
-		statuses, degraded := s.resolveShipmentStatuses(ctx, []string{orderNo})
-		out.ShipmentStatus = statuses[orderNo]
-		out.ShipmentStatusDegraded = degraded
-	}
 	// manual_unlock 為 nil ＝ **從未發起過解鎖**（proto 逐字「null = 尚無解鎖請求」）。
 	// 🔴 不要在這裡回一個空物件補位：58A §A06 用 `manualUnlock === null` 決定
 	// 「申請解鎖」按鈕的可見性，空物件會讓那顆按鈕消失，而 A4 就沒有任何入口。

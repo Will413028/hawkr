@@ -400,45 +400,6 @@ func clamp32(n int64) int32 {
 	return int32(min(max(n, 0), math.MaxInt32))
 }
 
-// GetSellerShippingProfile 只有 contact_email 有讀者（shipping-service）。已關閉的店回找不到（舊 seller-service 的 store_id 路徑濾掉 deleted_at，關店一定寫它）。
-// 商店電話、地址是選填，缺的欄位照實回空字串，不因此拒絕：contact_email 讀店家的 support_email（沒有填時空字串）。
-func (s *Server) GetSellerShippingProfile(ctx context.Context, req *connect.Request[pb.GetSellerShippingProfileRequest]) (*connect.Response[pb.GetSellerShippingProfileResponse], error) {
-	var (
-		st  seller.Store
-		err error
-	)
-	if req.Msg.GetStoreId() > 0 {
-		st, err = s.seller.Store(ctx, req.Msg.GetStoreId())
-	} else {
-		st, err = s.currentStore(ctx, req.Msg.GetAccountId())
-	}
-	if err == nil && st.Status == seller.Closed {
-		err = apperr.NotFound("商家不存在或已關閉")
-	}
-	if err != nil {
-		code, msg, fatal := failure(err)
-		if fatal != nil {
-			return nil, connectError(fatal)
-		}
-		return connect.NewResponse(&pb.GetSellerShippingProfileResponse{Code: code, Message: msg}), nil
-	}
-	return connect.NewResponse(&pb.GetSellerShippingProfileResponse{Data: shippingProfile(st)}), nil
-}
-
-func shippingProfile(st seller.Store) *pb.SellerShippingProfile {
-	cityName, district, postal := location(st.TownCode)
-	return &pb.SellerShippingProfile{
-		StoreId:       format(st.StoreID),
-		SenderName:    st.StoreName,
-		SenderPhone:   deref(st.ContactPhone),
-		City:          cityName,
-		District:      district,
-		AddressDetail: deref(st.AddressDetail),
-		ZipCode:       postal,
-		ContactEmail:  deref(st.SupportEmail),
-	}
-}
-
 func (s *Server) MatchCertificateHolder(ctx context.Context, req *connect.Request[pb.MatchCertificateHolderRequest]) (*connect.Response[pb.MatchCertificateHolderResponse], error) {
 	res, err := s.seller.MatchCertificateHolder(ctx, req.Msg.GetStoreId(), req.Msg.GetHolderName())
 	if err != nil {

@@ -128,7 +128,7 @@ func muServer(op domain.Operation, unlocks *muUnlocks) (*InvoiceServer, *muOps) 
 	uc := usecase.NewAdminJob(nopTx{}, ops, nil, nil, muAudit{}, nil, unlocks, nil, nil,
 		nil, usecase.IssuanceConfig{}, func() int64 { return muUnlockID }, zap.NewNop()).
 		WithClock(func() time.Time { return muNow })
-	return NewInvoiceServer(nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop()), ops
+	return NewInvoiceServer(nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop()), ops
 }
 
 func muCancelledOp() domain.Operation {
@@ -318,7 +318,7 @@ func TestManualUnlock_JobNotFoundIsByteIdentical(t *testing.T) {
 	uc := usecase.NewAdminJob(nopTx{}, ops, nil, nil, muAudit{}, nil, &muUnlocks{}, nil, nil,
 		nil, usecase.IssuanceConfig{}, func() int64 { return muUnlockID }, zap.NewNop()).
 		WithClock(func() time.Time { return muNow })
-	s := NewInvoiceServer(nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
+	s := NewInvoiceServer(nil, nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 	ctx := context.Background()
 
 	req, err := s.RequestManualUnlockForAdmin(ctx, muRequestReq())

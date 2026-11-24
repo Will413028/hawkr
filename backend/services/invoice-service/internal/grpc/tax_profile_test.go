@@ -121,7 +121,7 @@ func newTaxServer(present bool, row domain.SellerTaxProfile) *InvoiceServer {
 		yAudit{}, yOutbox{}, yEvidence{},
 		func() int64 { return 99001 }, nil,
 	).WithClock(func() time.Time { return yNow })
-	return NewInvoiceServer(nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	return NewInvoiceServer(nil, nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
 func yProfile(status string) domain.SellerTaxProfile {

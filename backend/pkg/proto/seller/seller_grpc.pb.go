@@ -30,7 +30,6 @@ const (
 	SellerService_ListPublicStoresByCity_FullMethodName   = "/hawkr.seller.SellerService/ListPublicStoresByCity"
 	SellerService_ResolvePrincipals_FullMethodName        = "/hawkr.seller.SellerService/ResolvePrincipals"
 	SellerService_ListStoreIDsByAccount_FullMethodName    = "/hawkr.seller.SellerService/ListStoreIDsByAccount"
-	SellerService_GetSellerShippingProfile_FullMethodName = "/hawkr.seller.SellerService/GetSellerShippingProfile"
 	SellerService_SearchSellerProspects_FullMethodName    = "/hawkr.seller.SellerService/SearchSellerProspects"
 )
 
@@ -75,9 +74,6 @@ type SellerServiceClient interface {
 	// store_id 清 messages.sender_id（買家 store-stint rekey W2/W3 D8）。不透過
 	// gateway 暴露，僅供服務間 gRPC 呼叫。
 	ListStoreIDsByAccount(ctx context.Context, in *ListStoreIDsByAccountRequest, opts ...grpc.CallOption) (*ListStoreIDsByAccountResponse, error)
-	// ========== Cross-Service: Shipping Profile ==========
-	// 取得賣家寄件資訊（Shipping Service 建立物流單用）
-	GetSellerShippingProfile(ctx context.Context, in *GetSellerShippingProfileRequest, opts ...grpc.CallOption) (*GetSellerShippingProfileResponse, error)
 	// ========== 站外業者主檔（招商名單） ==========
 	// 供 ai-service 的 EXTERNAL lane 與舊「AI 找貨」工具查詢站外業者。
 	//
@@ -209,16 +205,6 @@ func (c *sellerServiceClient) ListStoreIDsByAccount(ctx context.Context, in *Lis
 	return out, nil
 }
 
-func (c *sellerServiceClient) GetSellerShippingProfile(ctx context.Context, in *GetSellerShippingProfileRequest, opts ...grpc.CallOption) (*GetSellerShippingProfileResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetSellerShippingProfileResponse)
-	err := c.cc.Invoke(ctx, SellerService_GetSellerShippingProfile_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sellerServiceClient) SearchSellerProspects(ctx context.Context, in *SearchSellerProspectsRequest, opts ...grpc.CallOption) (*SearchSellerProspectsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SearchSellerProspectsResponse)
@@ -270,9 +256,6 @@ type SellerServiceServer interface {
 	// store_id 清 messages.sender_id（買家 store-stint rekey W2/W3 D8）。不透過
 	// gateway 暴露，僅供服務間 gRPC 呼叫。
 	ListStoreIDsByAccount(context.Context, *ListStoreIDsByAccountRequest) (*ListStoreIDsByAccountResponse, error)
-	// ========== Cross-Service: Shipping Profile ==========
-	// 取得賣家寄件資訊（Shipping Service 建立物流單用）
-	GetSellerShippingProfile(context.Context, *GetSellerShippingProfileRequest) (*GetSellerShippingProfileResponse, error)
 	// ========== 站外業者主檔（招商名單） ==========
 	// 供 ai-service 的 EXTERNAL lane 與舊「AI 找貨」工具查詢站外業者。
 	//
@@ -326,9 +309,6 @@ func (UnimplementedSellerServiceServer) ResolvePrincipals(context.Context, *Reso
 }
 func (UnimplementedSellerServiceServer) ListStoreIDsByAccount(context.Context, *ListStoreIDsByAccountRequest) (*ListStoreIDsByAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListStoreIDsByAccount not implemented")
-}
-func (UnimplementedSellerServiceServer) GetSellerShippingProfile(context.Context, *GetSellerShippingProfileRequest) (*GetSellerShippingProfileResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetSellerShippingProfile not implemented")
 }
 func (UnimplementedSellerServiceServer) SearchSellerProspects(context.Context, *SearchSellerProspectsRequest) (*SearchSellerProspectsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SearchSellerProspects not implemented")
@@ -552,24 +532,6 @@ func _SellerService_ListStoreIDsByAccount_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SellerService_GetSellerShippingProfile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetSellerShippingProfileRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SellerServiceServer).GetSellerShippingProfile(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SellerService_GetSellerShippingProfile_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SellerServiceServer).GetSellerShippingProfile(ctx, req.(*GetSellerShippingProfileRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SellerService_SearchSellerProspects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SearchSellerProspectsRequest)
 	if err := dec(in); err != nil {
@@ -638,10 +600,6 @@ var SellerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListStoreIDsByAccount",
 			Handler:    _SellerService_ListStoreIDsByAccount_Handler,
-		},
-		{
-			MethodName: "GetSellerShippingProfile",
-			Handler:    _SellerService_GetSellerShippingProfile_Handler,
 		},
 		{
 			MethodName: "SearchSellerProspects",

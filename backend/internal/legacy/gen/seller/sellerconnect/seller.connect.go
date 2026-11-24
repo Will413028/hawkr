@@ -65,9 +65,6 @@ const (
 	// SellerServiceListStoreIDsByAccountProcedure is the fully-qualified name of the SellerService's
 	// ListStoreIDsByAccount RPC.
 	SellerServiceListStoreIDsByAccountProcedure = "/hawkr.seller.SellerService/ListStoreIDsByAccount"
-	// SellerServiceGetSellerShippingProfileProcedure is the fully-qualified name of the SellerService's
-	// GetSellerShippingProfile RPC.
-	SellerServiceGetSellerShippingProfileProcedure = "/hawkr.seller.SellerService/GetSellerShippingProfile"
 	// SellerServiceSearchSellerProspectsProcedure is the fully-qualified name of the SellerService's
 	// SearchSellerProspects RPC.
 	SellerServiceSearchSellerProspectsProcedure = "/hawkr.seller.SellerService/SearchSellerProspects"
@@ -109,9 +106,6 @@ type SellerServiceClient interface {
 	// store_id 清 messages.sender_id（買家 store-stint rekey W2/W3 D8）。不透過
 	// gateway 暴露，僅供服務間 gRPC 呼叫。
 	ListStoreIDsByAccount(context.Context, *connect.Request[seller.ListStoreIDsByAccountRequest]) (*connect.Response[seller.ListStoreIDsByAccountResponse], error)
-	// ========== Cross-Service: Shipping Profile ==========
-	// 取得賣家寄件資訊（Shipping Service 建立物流單用）
-	GetSellerShippingProfile(context.Context, *connect.Request[seller.GetSellerShippingProfileRequest]) (*connect.Response[seller.GetSellerShippingProfileResponse], error)
 	// ========== 站外業者主檔（招商名單） ==========
 	// 供 ai-service 的 EXTERNAL lane 與舊「AI 找貨」工具查詢站外業者。
 	//
@@ -201,12 +195,6 @@ func NewSellerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(sellerServiceMethods.ByName("ListStoreIDsByAccount")),
 			connect.WithClientOptions(opts...),
 		),
-		getSellerShippingProfile: connect.NewClient[seller.GetSellerShippingProfileRequest, seller.GetSellerShippingProfileResponse](
-			httpClient,
-			baseURL+SellerServiceGetSellerShippingProfileProcedure,
-			connect.WithSchema(sellerServiceMethods.ByName("GetSellerShippingProfile")),
-			connect.WithClientOptions(opts...),
-		),
 		searchSellerProspects: connect.NewClient[seller.SearchSellerProspectsRequest, seller.SearchSellerProspectsResponse](
 			httpClient,
 			baseURL+SellerServiceSearchSellerProspectsProcedure,
@@ -229,7 +217,6 @@ type sellerServiceClient struct {
 	listPublicStoresByCity   *connect.Client[seller.ListPublicStoresByCityRequest, seller.ListPublicStoresByCityResponse]
 	resolvePrincipals        *connect.Client[seller.ResolvePrincipalsRequest, seller.ResolvePrincipalsResponse]
 	listStoreIDsByAccount    *connect.Client[seller.ListStoreIDsByAccountRequest, seller.ListStoreIDsByAccountResponse]
-	getSellerShippingProfile *connect.Client[seller.GetSellerShippingProfileRequest, seller.GetSellerShippingProfileResponse]
 	searchSellerProspects    *connect.Client[seller.SearchSellerProspectsRequest, seller.SearchSellerProspectsResponse]
 }
 
@@ -288,11 +275,6 @@ func (c *sellerServiceClient) ListStoreIDsByAccount(ctx context.Context, req *co
 	return c.listStoreIDsByAccount.CallUnary(ctx, req)
 }
 
-// GetSellerShippingProfile calls hawkr.seller.SellerService.GetSellerShippingProfile.
-func (c *sellerServiceClient) GetSellerShippingProfile(ctx context.Context, req *connect.Request[seller.GetSellerShippingProfileRequest]) (*connect.Response[seller.GetSellerShippingProfileResponse], error) {
-	return c.getSellerShippingProfile.CallUnary(ctx, req)
-}
-
 // SearchSellerProspects calls hawkr.seller.SellerService.SearchSellerProspects.
 func (c *sellerServiceClient) SearchSellerProspects(ctx context.Context, req *connect.Request[seller.SearchSellerProspectsRequest]) (*connect.Response[seller.SearchSellerProspectsResponse], error) {
 	return c.searchSellerProspects.CallUnary(ctx, req)
@@ -334,9 +316,6 @@ type SellerServiceHandler interface {
 	// store_id 清 messages.sender_id（買家 store-stint rekey W2/W3 D8）。不透過
 	// gateway 暴露，僅供服務間 gRPC 呼叫。
 	ListStoreIDsByAccount(context.Context, *connect.Request[seller.ListStoreIDsByAccountRequest]) (*connect.Response[seller.ListStoreIDsByAccountResponse], error)
-	// ========== Cross-Service: Shipping Profile ==========
-	// 取得賣家寄件資訊（Shipping Service 建立物流單用）
-	GetSellerShippingProfile(context.Context, *connect.Request[seller.GetSellerShippingProfileRequest]) (*connect.Response[seller.GetSellerShippingProfileResponse], error)
 	// ========== 站外業者主檔（招商名單） ==========
 	// 供 ai-service 的 EXTERNAL lane 與舊「AI 找貨」工具查詢站外業者。
 	//
@@ -422,12 +401,6 @@ func NewSellerServiceHandler(svc SellerServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(sellerServiceMethods.ByName("ListStoreIDsByAccount")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sellerServiceGetSellerShippingProfileHandler := connect.NewUnaryHandler(
-		SellerServiceGetSellerShippingProfileProcedure,
-		svc.GetSellerShippingProfile,
-		connect.WithSchema(sellerServiceMethods.ByName("GetSellerShippingProfile")),
-		connect.WithHandlerOptions(opts...),
-	)
 	sellerServiceSearchSellerProspectsHandler := connect.NewUnaryHandler(
 		SellerServiceSearchSellerProspectsProcedure,
 		svc.SearchSellerProspects,
@@ -458,8 +431,6 @@ func NewSellerServiceHandler(svc SellerServiceHandler, opts ...connect.HandlerOp
 			sellerServiceResolvePrincipalsHandler.ServeHTTP(w, r)
 		case SellerServiceListStoreIDsByAccountProcedure:
 			sellerServiceListStoreIDsByAccountHandler.ServeHTTP(w, r)
-		case SellerServiceGetSellerShippingProfileProcedure:
-			sellerServiceGetSellerShippingProfileHandler.ServeHTTP(w, r)
 		case SellerServiceSearchSellerProspectsProcedure:
 			sellerServiceSearchSellerProspectsHandler.ServeHTTP(w, r)
 		default:
@@ -513,10 +484,6 @@ func (UnimplementedSellerServiceHandler) ResolvePrincipals(context.Context, *con
 
 func (UnimplementedSellerServiceHandler) ListStoreIDsByAccount(context.Context, *connect.Request[seller.ListStoreIDsByAccountRequest]) (*connect.Response[seller.ListStoreIDsByAccountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.SellerService.ListStoreIDsByAccount is not implemented"))
-}
-
-func (UnimplementedSellerServiceHandler) GetSellerShippingProfile(context.Context, *connect.Request[seller.GetSellerShippingProfileRequest]) (*connect.Response[seller.GetSellerShippingProfileResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.seller.SellerService.GetSellerShippingProfile is not implemented"))
 }
 
 func (UnimplementedSellerServiceHandler) SearchSellerProspects(context.Context, *connect.Request[seller.SearchSellerProspectsRequest]) (*connect.Response[seller.SearchSellerProspectsResponse], error) {

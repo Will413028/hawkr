@@ -111,15 +111,11 @@ func TestSellerMetaTruthTable(t *testing.T) {
 	}
 }
 
-// 舊契約的商店代號欄位（付款的 payuni_mer_id 與物流的 mer_id）一律是空字串，不由 store_code 組出。
+// 舊契約的商店代號欄位（付款的 payuni_mer_id）一律是空字串，不由 store_code 組出。
 func TestMerchantIDFieldsAreEmpty(t *testing.T) {
 	s := seller.Store{Status: seller.Active, Sanctions: seller.NoSanctions(), StoreID: 7, StoreCode: 2600000001, AccountID: 3, StoreName: "範例小農"}
 	if got := sellerMeta(seller.StoreExposure{Store: s, Exposable: true}).GetPayuniMerId(); got != "" {
 		t.Errorf("SellerMeta.payuni_mer_id=%q", got)
-	}
-	p := shippingProfile(s)
-	if p.GetMerId() != "" || p.GetStoreId() != "7" || p.GetSenderName() != "範例小農" {
-		t.Errorf("shipping profile=%v：mer_id 必須是空字串，其餘欄位照舊", p)
 	}
 }
 

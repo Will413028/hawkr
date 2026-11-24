@@ -48,7 +48,7 @@ func ocServer(t *testing.T, cancelled qCancelled) *InvoiceServer {
 		usecase.IssuanceConfig{MaxAttempts: 13, BaseBackoff: 30 * time.Second, MaxBackoff: 30 * time.Minute},
 		zap.NewNop(),
 	)
-	return NewInvoiceServer(nil, q, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
+	return NewInvoiceServer(nil, q, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 }
 
 func ocGet(t *testing.T, s *InvoiceServer, buyerID int64) *pb.OrderInvoiceData {

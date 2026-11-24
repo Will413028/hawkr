@@ -5943,14 +5943,13 @@ func (x *ConfirmSellerReceiptAuthorizationRequest) GetIdempotencyKey() string {
 }
 
 type SellerInvoiceDocumentItem struct {
-	state          protoimpl.MessageState  `protogen:"open.v1"`
-	Summary        *InvoiceDocumentSummary `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
-	OrderNo        string                  `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
-	PaidAt         string                  `protobuf:"bytes,3,opt,name=paid_at,json=paidAt,proto3" json:"paid_at,omitempty"`          // ISO 8601 UTC
-	BuyerKind      string                  `protobuf:"bytes,4,opt,name=buyer_kind,json=buyerKind,proto3" json:"buyer_kind,omitempty"` // B2C/B2B
-	InvoiceMode    string                  `protobuf:"bytes,5,opt,name=invoice_mode,json=invoiceMode,proto3" json:"invoice_mode,omitempty"`
-	ShipmentStatus string                  `protobuf:"bytes,6,opt,name=shipment_status,json=shipmentStatus,proto3" json:"shipment_status,omitempty"` // 與發票狀態分開，禁止後端合成綜合狀態
-	UpdatedAt      string                  `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	state       protoimpl.MessageState  `protogen:"open.v1"`
+	Summary     *InvoiceDocumentSummary `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	OrderNo     string                  `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	PaidAt      string                  `protobuf:"bytes,3,opt,name=paid_at,json=paidAt,proto3" json:"paid_at,omitempty"`          // ISO 8601 UTC
+	BuyerKind   string                  `protobuf:"bytes,4,opt,name=buyer_kind,json=buyerKind,proto3" json:"buyer_kind,omitempty"` // B2C/B2B
+	InvoiceMode string                  `protobuf:"bytes,5,opt,name=invoice_mode,json=invoiceMode,proto3" json:"invoice_mode,omitempty"`
+	UpdatedAt   string                  `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	// 這份文件最近一次 operation 的 id；沒有任何 operation 時為空字串（不是 null）。
 	//
 	//	S06／S07 的「查看異常 → S08」唯一 href 來源。少了它那條 CTA 組不出連結，
@@ -6021,13 +6020,6 @@ func (x *SellerInvoiceDocumentItem) GetBuyerKind() string {
 func (x *SellerInvoiceDocumentItem) GetInvoiceMode() string {
 	if x != nil {
 		return x.InvoiceMode
-	}
-	return ""
-}
-
-func (x *SellerInvoiceDocumentItem) GetShipmentStatus() string {
-	if x != nil {
-		return x.ShipmentStatus
 	}
 	return ""
 }
@@ -6155,20 +6147,13 @@ func (x *ListSellerInvoiceDocumentsRequest) GetPageSize() string {
 }
 
 type ListSellerInvoiceDocumentsData struct {
-	state    protoimpl.MessageState       `protogen:"open.v1"`
-	Records  []*SellerInvoiceDocumentItem `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
-	Total    string                       `protobuf:"bytes,2,opt,name=total,proto3" json:"total,omitempty"`
-	Page     string                       `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize string                       `protobuf:"bytes,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// true ＝ 這一頁的 shipment_status 沒有取到（shipping-service 不可用／逾時），
-	//
-	//	**不是**「這些訂單都還沒出貨」。少了這一欄，兩者在前端塌成同一個畫面：
-	//	每一列都是空字串，而空字串會被讀成「還沒出貨」——那正是 #3019 的原始症狀
-	//	換一個形式重演。降級是**整批**的性質（一次 RPC 涵蓋整頁）⇒ 放在 data 層
-	//	而不是逐列，也因此不必往 shipment_status 的值域裡塞 CodeMeta 以外的哨兵值。
-	ShipmentStatusDegraded bool `protobuf:"varint,5,opt,name=shipment_status_degraded,json=shipmentStatusDegraded,proto3" json:"shipment_status_degraded,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Records       []*SellerInvoiceDocumentItem `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
+	Total         string                       `protobuf:"bytes,2,opt,name=total,proto3" json:"total,omitempty"`
+	Page          string                       `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      string                       `protobuf:"bytes,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListSellerInvoiceDocumentsData) Reset() {
@@ -6227,13 +6212,6 @@ func (x *ListSellerInvoiceDocumentsData) GetPageSize() string {
 		return x.PageSize
 	}
 	return ""
-}
-
-func (x *ListSellerInvoiceDocumentsData) GetShipmentStatusDegraded() bool {
-	if x != nil {
-		return x.ShipmentStatusDegraded
-	}
-	return false
 }
 
 type ListSellerInvoiceDocumentsResponse struct {
@@ -10357,17 +10335,13 @@ func (x *ListInvoiceDocumentsForAdminRequest) GetPageSize() string {
 }
 
 type ListInvoiceDocumentsForAdminData struct {
-	state    protoimpl.MessageState       `protogen:"open.v1"`
-	Records  []*SellerInvoiceDocumentItem `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
-	Total    string                       `protobuf:"bytes,2,opt,name=total,proto3" json:"total,omitempty"`
-	Page     string                       `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
-	PageSize string                       `protobuf:"bytes,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	// 同 ListSellerInvoiceDocumentsData.shipment_status_degraded（兩支端點共用
-	//
-	//	SellerInvoiceDocumentItem，降級語意也必須一致，否則 A12 會靜默退回舊症狀）。
-	ShipmentStatusDegraded bool `protobuf:"varint,5,opt,name=shipment_status_degraded,json=shipmentStatusDegraded,proto3" json:"shipment_status_degraded,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Records       []*SellerInvoiceDocumentItem `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
+	Total         string                       `protobuf:"bytes,2,opt,name=total,proto3" json:"total,omitempty"`
+	Page          string                       `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      string                       `protobuf:"bytes,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListInvoiceDocumentsForAdminData) Reset() {
@@ -10426,13 +10400,6 @@ func (x *ListInvoiceDocumentsForAdminData) GetPageSize() string {
 		return x.PageSize
 	}
 	return ""
-}
-
-func (x *ListInvoiceDocumentsForAdminData) GetShipmentStatusDegraded() bool {
-	if x != nil {
-		return x.ShipmentStatusDegraded
-	}
-	return false
 }
 
 type ListInvoiceDocumentsForAdminResponse struct {
@@ -11165,16 +11132,10 @@ type AdminInvoiceJobDetail struct {
 	AmountBreakdown   *InvoiceAmountBreakdown `protobuf:"bytes,3,opt,name=amount_breakdown,json=amountBreakdown,proto3" json:"amount_breakdown,omitempty"`
 	ProviderExchanges []*ProviderExchangeItem `protobuf:"bytes,4,rep,name=provider_exchanges,json=providerExchanges,proto3" json:"provider_exchanges,omitempty"`
 	IdempotencyKey    string                  `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	ShipmentStatus    string                  `protobuf:"bytes,6,opt,name=shipment_status,json=shipmentStatus,proto3" json:"shipment_status,omitempty"`
 	AuditLogs         []*InvoiceAuditLogItem  `protobuf:"bytes,7,rep,name=audit_logs,json=auditLogs,proto3" json:"audit_logs,omitempty"`
 	ManualUnlock      *ManualUnlockInfo       `protobuf:"bytes,8,opt,name=manual_unlock,json=manualUnlock,proto3" json:"manual_unlock,omitempty"` // null = 尚無解鎖請求
-	// #3089 第 7 項：shipment_status 在此之前**零賦值恆空**（列表面 S06／A12 有值、
-	// 詳情頁沒接）。接上時必須同時帶降級旗標——A12 逐字寫著「這一欄尤其不能畫：
-	// 空白會被讀成『還沒出貨』」，所以取不到時不能只回空字串。
-	// 語意與 ListSellerInvoiceDocumentsData.shipment_status_degraded 相同（單筆版）。
-	ShipmentStatusDegraded bool `protobuf:"varint,9,opt,name=shipment_status_degraded,json=shipmentStatusDegraded,proto3" json:"shipment_status_degraded,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AdminInvoiceJobDetail) Reset() {
@@ -11242,13 +11203,6 @@ func (x *AdminInvoiceJobDetail) GetIdempotencyKey() string {
 	return ""
 }
 
-func (x *AdminInvoiceJobDetail) GetShipmentStatus() string {
-	if x != nil {
-		return x.ShipmentStatus
-	}
-	return ""
-}
-
 func (x *AdminInvoiceJobDetail) GetAuditLogs() []*InvoiceAuditLogItem {
 	if x != nil {
 		return x.AuditLogs
@@ -11261,13 +11215,6 @@ func (x *AdminInvoiceJobDetail) GetManualUnlock() *ManualUnlockInfo {
 		return x.ManualUnlock
 	}
 	return nil
-}
-
-func (x *AdminInvoiceJobDetail) GetShipmentStatusDegraded() bool {
-	if x != nil {
-		return x.ShipmentStatusDegraded
-	}
-	return false
 }
 
 type GetInvoiceJobForAdminResponse struct {
@@ -14886,18 +14833,17 @@ const file_invoice_invoice_proto_rawDesc = "" +
 	"authorized\x18\x03 \x01(\bR\n" +
 	"authorized\x12)\n" +
 	"\x10expected_version\x18\x04 \x01(\tR\x0fexpectedVersion\x12'\n" +
-	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\"\xbe\x02\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\"\xac\x02\n" +
 	"\x19SellerInvoiceDocumentItem\x12?\n" +
 	"\asummary\x18\x01 \x01(\v2%.hawkr.invoice.InvoiceDocumentSummaryR\asummary\x12\x19\n" +
 	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x17\n" +
 	"\apaid_at\x18\x03 \x01(\tR\x06paidAt\x12\x1d\n" +
 	"\n" +
 	"buyer_kind\x18\x04 \x01(\tR\tbuyerKind\x12!\n" +
-	"\finvoice_mode\x18\x05 \x01(\tR\vinvoiceMode\x12'\n" +
-	"\x0fshipment_status\x18\x06 \x01(\tR\x0eshipmentStatus\x12\x1d\n" +
+	"\finvoice_mode\x18\x05 \x01(\tR\vinvoiceMode\x12\x1d\n" +
 	"\n" +
 	"updated_at\x18\a \x01(\tR\tupdatedAt\x12\"\n" +
-	"\rlatest_job_id\x18\b \x01(\tR\vlatestJobId\"\x91\x02\n" +
+	"\rlatest_job_id\x18\b \x01(\tR\vlatestJobIdJ\x04\b\x06\x10\aR\x0fshipment_status\"\x91\x02\n" +
 	"!ListSellerInvoiceDocumentsRequest\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\x03R\astoreId\x12\x1b\n" +
 	"\tdate_from\x18\x02 \x01(\tR\bdateFrom\x12\x17\n" +
@@ -14907,13 +14853,12 @@ const file_invoice_invoice_proto_rawDesc = "" +
 	"\rabnormal_only\x18\x06 \x01(\bR\fabnormalOnly\x12\x19\n" +
 	"\border_no\x18\a \x01(\tR\aorderNo\x12\x12\n" +
 	"\x04page\x18\b \x01(\tR\x04page\x12\x1b\n" +
-	"\tpage_size\x18\t \x01(\tR\bpageSize\"\xe5\x01\n" +
+	"\tpage_size\x18\t \x01(\tR\bpageSize\"\xcb\x01\n" +
 	"\x1eListSellerInvoiceDocumentsData\x12B\n" +
 	"\arecords\x18\x01 \x03(\v2(.hawkr.invoice.SellerInvoiceDocumentItemR\arecords\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\tR\x05total\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\tR\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\tR\bpageSize\x128\n" +
-	"\x18shipment_status_degraded\x18\x05 \x01(\bR\x16shipmentStatusDegraded\"\x95\x01\n" +
+	"\tpage_size\x18\x04 \x01(\tR\bpageSizeJ\x04\b\x05\x10\x06R\x18shipment_status_degraded\"\x95\x01\n" +
 	"\"ListSellerInvoiceDocumentsResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12A\n" +
@@ -15250,13 +15195,12 @@ const file_invoice_invoice_proto_rawDesc = "" +
 	"\tdate_from\x18\x06 \x01(\tR\bdateFrom\x12\x17\n" +
 	"\adate_to\x18\a \x01(\tR\x06dateTo\x12\x12\n" +
 	"\x04page\x18\b \x01(\tR\x04page\x12\x1b\n" +
-	"\tpage_size\x18\t \x01(\tR\bpageSize\"\xe7\x01\n" +
+	"\tpage_size\x18\t \x01(\tR\bpageSize\"\xcd\x01\n" +
 	" ListInvoiceDocumentsForAdminData\x12B\n" +
 	"\arecords\x18\x01 \x03(\v2(.hawkr.invoice.SellerInvoiceDocumentItemR\arecords\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\tR\x05total\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\tR\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\tR\bpageSize\x128\n" +
-	"\x18shipment_status_degraded\x18\x05 \x01(\bR\x16shipmentStatusDegraded\"\x99\x01\n" +
+	"\tpage_size\x18\x04 \x01(\tR\bpageSizeJ\x04\b\x05\x10\x06R\x18shipment_status_degraded\"\x99\x01\n" +
 	"$ListInvoiceDocumentsForAdminResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12C\n" +
@@ -15316,18 +15260,17 @@ const file_invoice_invoice_proto_rawDesc = "" +
 	"\x04data\x18\x03 \x01(\v2*.hawkr.invoice.ListInvoiceJobsForAdminDataR\x04data\"_\n" +
 	"\x1cGetInvoiceJobForAdminRequest\x12(\n" +
 	"\x10actor_account_id\x18\x01 \x01(\x03R\x0eactorAccountId\x12\x15\n" +
-	"\x06job_id\x18\x02 \x01(\tR\x05jobId\"\xb3\x04\n" +
+	"\x06job_id\x18\x02 \x01(\tR\x05jobId\"\x87\x04\n" +
 	"\x15AdminInvoiceJobDetail\x12/\n" +
 	"\x03job\x18\x01 \x01(\v2\x1d.hawkr.invoice.InvoiceJobInfoR\x03job\x12.\n" +
 	"\x13order_snapshot_json\x18\x02 \x01(\tR\x11orderSnapshotJson\x12P\n" +
 	"\x10amount_breakdown\x18\x03 \x01(\v2%.hawkr.invoice.InvoiceAmountBreakdownR\x0famountBreakdown\x12R\n" +
 	"\x12provider_exchanges\x18\x04 \x03(\v2#.hawkr.invoice.ProviderExchangeItemR\x11providerExchanges\x12'\n" +
-	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\x12'\n" +
-	"\x0fshipment_status\x18\x06 \x01(\tR\x0eshipmentStatus\x12A\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\x12A\n" +
 	"\n" +
 	"audit_logs\x18\a \x03(\v2\".hawkr.invoice.InvoiceAuditLogItemR\tauditLogs\x12D\n" +
-	"\rmanual_unlock\x18\b \x01(\v2\x1f.hawkr.invoice.ManualUnlockInfoR\fmanualUnlock\x128\n" +
-	"\x18shipment_status_degraded\x18\t \x01(\bR\x16shipmentStatusDegraded\"\x87\x01\n" +
+	"\rmanual_unlock\x18\b \x01(\v2\x1f.hawkr.invoice.ManualUnlockInfoR\fmanualUnlockJ\x04\b\x06\x10\aJ\x04\b\t\x10\n" +
+	"R\x0fshipment_statusR\x18shipment_status_degraded\"\x87\x01\n" +
 	"\x1dGetInvoiceJobForAdminResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x128\n" +
