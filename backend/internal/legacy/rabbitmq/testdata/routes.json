@@ -108,5 +108,10 @@
     "exchange": "hawkr.seller",
     "routing_key": "seller.unsuspended",
     "package": "internal/legacy/sellerrelay"
+  },
+  {
+    "exchange": "procurement.events",
+    "routing_key": "procurement.rfq_publication_invite.created",
+    "package": "internal/legacy/procurementrelay"
   }
 ]

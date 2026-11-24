@@ -42,8 +42,15 @@ type Deps struct {
 	Accounts Accounts
 	Registry Registry
 	Signals  Signals
-	Now      func() time.Time
-	Logger   *slog.Logger
+	// StoreCodes 讀取店家的 store_code（深連結要用）；沒有內容型別的組裝可以不給。
+	StoreCodes StoreCodes
+	Now        func() time.Time
+	Logger     *slog.Logger
+}
+
+// StoreCodes 讀取多家店的 store_code（store_id 到 store_code）；沒有公開頁的店不在結果裡。
+type StoreCodes interface {
+	StoreCodes(ctx context.Context, storeIDs []int64) (map[int64]int64, error)
 }
 
 // Service 是登入帳號的通知用例。

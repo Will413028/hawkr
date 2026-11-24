@@ -9,6 +9,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
 const (
@@ -284,4 +285,33 @@ type MessageSent struct {
 	SenderKind     PartyKind
 	BuyerID        int64
 	StoreID        int64
+}
+
+// MessageHidden 一則訊息被隱藏（只在真的新增一筆隱藏時發，冪等的重複隱藏不發），在隱藏的同一個 transaction 內發布。只帶參照與列舉，不帶管理員說明文字；
+// SanctionID 是隱藏紀錄的 ID，作者是 (AuthorKind, AuthorID)（買家是 buyer_id、店家是 store_id），SourceRef 是案件的不透明參照（沒有案件時空字串）。
+type MessageHidden struct {
+	EventID        uuid.UUID
+	OccurredAt     time.Time
+	SanctionID     uuid.UUID
+	ConversationID uuid.UUID
+	MessageID      uuid.UUID
+	AuthorKind     PartyKind
+	AuthorID       int64
+	Category       policy.Category
+	SourceRef      string
+	AppealPath     policy.AppealPath
+}
+
+// MessageRestored 一筆隱藏被管理員還原（同一個 transaction 內發布）；欄位同 MessageHidden，SanctionID 是被還原的隱藏紀錄。
+type MessageRestored struct {
+	EventID        uuid.UUID
+	OccurredAt     time.Time
+	SanctionID     uuid.UUID
+	ConversationID uuid.UUID
+	MessageID      uuid.UUID
+	AuthorKind     PartyKind
+	AuthorID       int64
+	Category       policy.Category
+	SourceRef      string
+	AppealPath     policy.AppealPath
 }

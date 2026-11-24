@@ -520,6 +520,15 @@ func ReplyRejectedWarning(l uitext.Locale, a ReplyRejectedWarningArgs) uitext.Me
 	return uitext.Message{Text: "有幾個內容我沒辦法直接採用：" + a.Items, Locale: uitext.ZhTW}
 }
 
+// RfqAudienceUnavailable 是模組句子 rfq.audience_unavailable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func RfqAudienceUnavailable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Some of the selected stores can't receive requests right now. Search for candidates again, or change your selection, and try again.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "其中有店家目前無法接收詢價，請重新搜尋候選店家，或調整選擇的店家後再試。", Locale: uitext.ZhTW}
+}
+
 // SlotBudgetPerUnit 是模組句子 slot.budget_per_unit；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func SlotBudgetPerUnit(l uitext.Locale) uitext.Message {
 	switch l {

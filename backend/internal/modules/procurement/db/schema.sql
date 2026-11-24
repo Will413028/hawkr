@@ -241,6 +241,8 @@ CREATE TABLE procurement.rfq_publication_invites (
 );
 CREATE UNIQUE INDEX rfq_publication_invites_store ON procurement.rfq_publication_invites (publication_id, store_id);
 CREATE UNIQUE INDEX rfq_publication_invites_position ON procurement.rfq_publication_invites (publication_id, position);
+-- 補掃只掃還沒有結果的邀請，終態的列不進索引。
+CREATE INDEX rfq_publication_invites_queued ON procurement.rfq_publication_invites (created_at, id) WHERE delivery_state = 'QUEUED';
 
 -- 一家店對一次發布的回價（身分列）。只有被邀請的店能有回價列：(publication_id, store_id) 參照邀請列，邀請列是賣家可見性的唯一依據（A9-D44）。沒有 buyer_id（由 request 推出）、沒有列版本（回價版次是 latest_version）。
 -- write_closed_reason 只收有寫入者的 DECLINED（S6）。withdrawn_reason_code、write_closed_reason_code 是賣家填的原因代碼，伺服器記錄、不解析（A9-D45(2)；撤回與婉拒是目標狀態的方法，不建收據）。
@@ -341,6 +343,8 @@ CREATE TABLE procurement.buyer_shortlist_entries (
 );
 CREATE UNIQUE INDEX buyer_shortlist_entries_response ON procurement.buyer_shortlist_entries (request_id, seller_response_id);
 
+-- order_ref 只當呼叫舊 ordering 的 CreateRfqOrder 的冪等鍵（Java orders.acceptance_id 是 BIGINT，A9-D45(1)），ordering 搬進單體時刪；
+-- order_job_id 是建單的 River job，對帳（reconciler）用它判斷 job 是否已死。
 -- 買家接受一份報價。state 只收有寫入者的值（S6，A9-D19 修訂）：ACTIVE，與建單重試用盡後的 ORDER_FAILED；live 鎖只擋 ACTIVE，
 -- 所以建單失敗後買家可以再接受（同家或別家）。成交價（三金額）凍結在這裡；接受當下賣家可見內容的 hash 與回價 hash 是買家 CAS 的對象，留作稽核（S5 的 (c)）。
 CREATE TABLE procurement.buyer_quote_acceptances (
@@ -363,6 +367,8 @@ CREATE TABLE procurement.buyer_quote_acceptances (
     order_failure_reason TEXT,
     order_no TEXT,
     payment_deadline TIMESTAMPTZ,
+    order_ref BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY UNIQUE,
+    order_job_id BIGINT,
     client_request_id UUID NOT NULL,
     accepted_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
@@ -381,6 +387,7 @@ CREATE UNIQUE INDEX buyer_quote_acceptances_idempotency ON procurement.buyer_quo
 CREATE UNIQUE INDEX buyer_quote_acceptances_live ON procurement.buyer_quote_acceptances (request_id) WHERE state = 'ACTIVE';
 CREATE UNIQUE INDEX buyer_quote_acceptances_order_no ON procurement.buyer_quote_acceptances (order_no) WHERE order_no IS NOT NULL;
 CREATE INDEX buyer_quote_acceptances_response ON procurement.buyer_quote_acceptances (seller_response_id, seller_response_version);
+CREATE INDEX buyer_quote_acceptances_creating ON procurement.buyer_quote_acceptances (id) WHERE order_provisioning_state = 'CREATING_ORDER';
 
 -- run 帳本：job_id 是執行它的 River job（WAITING_FOR_INPUT 的 run 沒有進行中的 job），quota_period_start 是扣額度的期間（失敗退款用；只有 TURN 扣額度，其餘 run 類型為 NULL，退款只在非 NULL 時做）；沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
 -- 建 run 的方法（SubmitTurn、StartCandidateSearch、ResumeRun）的冪等鍵放在這裡（S4，舊 agent_run_commands 刪除）。

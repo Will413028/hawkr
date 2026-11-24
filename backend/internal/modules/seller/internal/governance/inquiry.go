@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -128,8 +129,8 @@ func inquiryRequestHash(in model.CreateCaseInquiryInput, message string, due *ti
 // CreateInquiry 對案件的賣家發一筆詢問。冪等重送（帶 request_id）先於有狀態的驗證：同一位管理員、同一個 request_id、同樣的內容回傳原本那一筆詢問的目前狀態
 // （AIP-155 的 stale success 例外），內容不同回 InvalidInput；鎖住案件之後再查一次，兩個並行的重送後到的回到查詢。
 // 發詢問必須在 CaseAvailability.CreateInquiry 裡可做（案件進行中、店家的個資還沒清除、沒有還沒結束的詢問；只是關店不擋：帳號還在，條款第 11.3 條的義務與案件都還在）。
-// 期限不設時是建立後 InquiryDefaultDue，設定時必須在建立後 InquiryMinDue 到 InquiryMaxDue 之間。同一個 transaction 讓案件的版本前進。不發事件：
-// 還沒有消費者（A8 要通知賣家時，依 CARRYOVER「消費者出現時再加它需要的事件」加上）。
+// 期限不設時是建立後 InquiryDefaultDue，設定時必須在建立後 InquiryMinDue 到 InquiryMaxDue 之間。同一個 transaction 讓案件的版本前進。在同一個 transaction 發
+// CaseInquiryCreated（重送回放不發）。
 // 鎖順序：店家列 → 案件列。
 func (s *Service) CreateInquiry(ctx context.Context, in model.CreateCaseInquiryInput) (model.CreateCaseInquiryResult, error) {
 	if err := model.Positive(in.AdminID); err != nil {
@@ -165,7 +166,8 @@ func (s *Service) CreateInquiry(ctx context.Context, in model.CreateCaseInquiryI
 		if err != nil {
 			return err
 		}
-		if _, err := stint.LockAccountOf(ctx, q, found.StoreID); err != nil {
+		storeRow, err := stint.LockAccountOf(ctx, q, found.StoreID)
+		if err != nil {
 			return err
 		}
 		locked, err := lockCase(ctx, q, in.CaseID, 0)
@@ -212,6 +214,12 @@ func (s *Service) CreateInquiry(ctx context.Context, in model.CreateCaseInquiryI
 			return err
 		}
 		if err := q.BumpCase(ctx, store.BumpCaseParams{ID: locked.ID, Now: now}); err != nil {
+			return err
+		}
+		if err := events.Publish(ctx, s.d.Events, model.CaseInquiryCreated{
+			EventID: uuid.NewV7(), OccurredAt: now, InquiryID: row.ID, CaseID: locked.ID, StoreID: locked.StoreID,
+			AccountID: storeRow.AccountID, Kind: in.Kind, DueAt: dueAt,
+		}); err != nil {
 			return err
 		}
 		inquiry, err := readInquiry(ctx, q, row.ID)

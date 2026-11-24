@@ -205,3 +205,16 @@ func TestGeneratedSelectableListsContainOnlyValidCategories(t *testing.T) {
 		}
 	}
 }
+
+func TestAppealPathsAreDistinctUpperSnakeCodes(t *testing.T) {
+	seen := map[AppealPath]bool{}
+	for _, p := range AppealPaths() {
+		if !upperSnake.MatchString(string(p)) || seen[p] || !p.Valid() {
+			t.Errorf("申訴途徑 %q 不合法或重複", p)
+		}
+		seen[p] = true
+	}
+	if AppealPath("").Valid() {
+		t.Error("空字串不該是合法的申訴途徑")
+	}
+}

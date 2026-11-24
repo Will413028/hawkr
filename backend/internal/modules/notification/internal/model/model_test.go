@@ -84,8 +84,8 @@ func TestEveryCategoryHasAClassAndDefaultsOn(t *testing.T) {
 			}
 		}
 	}
-	if len(Categories()) != 15 {
-		t.Errorf("清單是 D4 的 14 個加 D18 的 ANNOUNCEMENT，共 15 個，現在 %d", len(Categories()))
+	if len(Categories()) != 16 {
+		t.Errorf("清單是 D4 的 14 個、D29 的 PROCUREMENT 加 D18 的 ANNOUNCEMENT，共 16 個，現在 %d", len(Categories()))
 	}
 }
 

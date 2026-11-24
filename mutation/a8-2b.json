@@ -130,8 +130,8 @@
    "id": "app-ignores-injected-registry",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/notification.go",
-   "old": "Registry: reg, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger}",
-   "new": "Registry: registry.Registry{}, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger}",
+   "old": "Registry: reg, Signals: dbSignals{d.DB}, StoreCodes: d.StoreCodes, Now: d.Now, Logger: d.Logger}",
+   "new": "Registry: registry.Registry{}, Signals: dbSignals{d.DB}, StoreCodes: d.StoreCodes, Now: d.Now, Logger: d.Logger}",
    "test": "internal/modules/notification ^TestListInboxUsesTheInjectedRegistry$",
    "why": "收件匣用寫死的正式註冊表，不用注入的"
   },

@@ -36,6 +36,9 @@ type ReportReceived = model.ReportReceived
 // ReportResolved 在通報有了結果的 transaction 內發出，每筆通報一次：個別設定、直接結掉或案件結案帶入都算。
 type ReportResolved = model.ReportResolved
 
+// CaseInquiryCreated 在 CreateCaseInquiry 建立詢問的 transaction 內發出（冪等重送不發）；帶店家、帳號、案件、詢問種類與期限。
+type CaseInquiryCreated = model.CaseInquiryCreated
+
 // MeasureCreated 在建立措施的 transaction 內發出，帶開始時間（StartsAt）與終止合作的事由；沒有獨立的「終止預告」事件。
 type MeasureCreated = model.MeasureCreated
 

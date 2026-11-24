@@ -15,6 +15,147 @@
     "audience.invalid": {
       "message": "The notification audience is not valid."
     },
+    "author_warned.body": {
+      "message": "You received a warning from the platform on {time} for the following reason: {reason}. Please review the community guidelines."
+    },
+    "author_warned.title": {
+      "message": "You received a warning"
+    },
+    "buyer_deletion_requested.body": {
+      "message": "We received your account deletion request on {time}. Your account will be deleted once any open orders are settled, and this request cannot be withdrawn. If this was not you, please contact support as soon as possible."
+    },
+    "buyer_deletion_requested.title": {
+      "message": "We received your account deletion request"
+    },
+    "chat_message_buyer.body": {
+      "message": "A store sent you a message."
+    },
+    "chat_message_buyer.title": {
+      "message": "New message"
+    },
+    "chat_message_store.body": {
+      "message": "A buyer sent you a message."
+    },
+    "chat_message_store.title": {
+      "message": "New message"
+    },
+    "comment_created.body": {
+      "message": "Someone commented on your post."
+    },
+    "comment_created.title": {
+      "message": "New comment"
+    },
+    "comment_liked_buyer.body": {
+      "message": "Someone liked your comment."
+    },
+    "comment_liked_buyer.title": {
+      "message": "Your comment got a like"
+    },
+    "comment_liked_store.body": {
+      "message": "Someone liked your store's comment."
+    },
+    "comment_liked_store.title": {
+      "message": "Your comment got a like"
+    },
+    "comment_replied_buyer.body": {
+      "message": "Someone replied to your comment."
+    },
+    "comment_replied_buyer.title": {
+      "message": "New reply"
+    },
+    "comment_replied_store.body": {
+      "message": "Someone replied to your store's comment."
+    },
+    "comment_replied_store.title": {
+      "message": "New reply"
+    },
+    "content_hidden.body": {
+      "message": "Your {source} was hidden on {time} for the following reason: {reason}."
+    },
+    "content_hidden.title": {
+      "message": "Your content has been hidden"
+    },
+    "content_restored.body": {
+      "message": "Your {source} was restored on {time}."
+    },
+    "content_restored.title": {
+      "message": "Your content has been restored"
+    },
+    "content_source.message": {
+      "message": "chat message"
+    },
+    "content_source.review": {
+      "message": "review"
+    },
+    "content_source.social": {
+      "message": "comment"
+    },
+    "delegation_action.audit_correction": {
+      "message": "corrected a delegation record"
+    },
+    "delegation_action.media_upload": {
+      "message": "uploaded media"
+    },
+    "delegation_action.order_pii_reveal": {
+      "message": "viewed an order's personal data"
+    },
+    "delegation_action.order_read": {
+      "message": "viewed orders"
+    },
+    "delegation_action.post_create": {
+      "message": "created a post"
+    },
+    "delegation_action.post_publish": {
+      "message": "published a post"
+    },
+    "delegation_action.post_read": {
+      "message": "viewed posts"
+    },
+    "delegation_action.post_schedule": {
+      "message": "scheduled a post"
+    },
+    "delegation_action.post_unpublish": {
+      "message": "unpublished a post"
+    },
+    "delegation_action.post_update": {
+      "message": "updated a post"
+    },
+    "delegation_action.product_batch_unpublish": {
+      "message": "unpublished products in bulk"
+    },
+    "delegation_action.product_create": {
+      "message": "created a product"
+    },
+    "delegation_action.product_publish": {
+      "message": "published a product"
+    },
+    "delegation_action.product_read": {
+      "message": "viewed products"
+    },
+    "delegation_action.product_unpublish": {
+      "message": "unpublished a product"
+    },
+    "delegation_action.product_update": {
+      "message": "updated a product"
+    },
+    "delegation_action.storefront_cover_update": {
+      "message": "updated the storefront cover"
+    },
+    "delegation_action.storefront_logo_update": {
+      "message": "updated the storefront logo"
+    },
+    "delegation_action.storefront_read": {
+      "message": "viewed the storefront profile"
+    },
+    "delegation_action.storefront_update": {
+      "message": "updated the storefront profile"
+    },
+    "delegation_operation_completed.body": {
+      "message": "On {time}, a platform operator acting on your behalf {action}."
+    },
+    "delegation_operation_completed.title": {
+      "message": "A platform operator acted on your store"
+    },
     "device_app.invalid": {
       "message": "The app for the push token must be the buyer app or the seller app."
     },
@@ -27,11 +168,191 @@
     "inbox_item.not_found": {
       "message": "Notification not found."
     },
+    "kyc_approved.body": {
+      "message": "Your store verification was approved on {time}. Continue the setup in the seller center."
+    },
+    "kyc_approved.title": {
+      "message": "Your store verification was approved"
+    },
+    "kyc_rejected.body": {
+      "message": "Your store verification was returned on {time}. See the seller center for the reason and resubmit."
+    },
+    "kyc_rejected.title": {
+      "message": "Your store verification was returned"
+    },
+    "payout_account_activated.body": {
+      "message": "Your payout account became active on {time}. Order proceeds can now be paid out to it."
+    },
+    "payout_account_activated.title": {
+      "message": "Your payout account is active"
+    },
+    "payout_account_deadline.one_day.body": {
+      "message": "Please provide your payout account information by {deadline}; after that, payouts may be restricted."
+    },
+    "payout_account_deadline.one_day.title": {
+      "message": "Your payout account documents are due within a day"
+    },
+    "payout_account_deadline.seven_days.body": {
+      "message": "Your payout account still needs information. Please provide it by {deadline}; after that, payouts may be restricted."
+    },
+    "payout_account_deadline.seven_days.title": {
+      "message": "Your payout account documents are due soon"
+    },
+    "post_liked.body": {
+      "message": "Someone liked your post."
+    },
+    "post_liked.title": {
+      "message": "Your post got a like"
+    },
+    "post_published_item.body": {
+      "message": "A store you follow just published a new post."
+    },
+    "post_published_item.title": {
+      "message": "A store you follow posted"
+    },
     "preference.cannot_disable": {
       "message": "This notification cannot be turned off."
     },
     "preference.not_available": {
       "message": "This notification setting is not available."
+    },
+    "product_restocked.body": {
+      "message": "\"{product}\", which you were watching, is back in stock."
+    },
+    "product_restocked.title": {
+      "message": "Back in stock"
+    },
+    "report_outcome.abusive": {
+      "message": "this report does not meet the acceptance rules."
+    },
+    "report_outcome.action_taken": {
+      "message": "the platform has taken action."
+    },
+    "report_outcome.duplicate": {
+      "message": "this report duplicates an earlier one and was handled together with it."
+    },
+    "report_outcome.insufficient": {
+      "message": "there was not enough information to proceed."
+    },
+    "report_outcome.no_violation": {
+      "message": "after review, no violation was found."
+    },
+    "report_received.body": {
+      "message": "We received the report you submitted and will handle it according to our policies. We will notify you of the outcome."
+    },
+    "report_received.title": {
+      "message": "We received your report"
+    },
+    "report_resolved.body": {
+      "message": "Your report has been handled: {outcome}"
+    },
+    "report_resolved.title": {
+      "message": "Your report has an outcome"
+    },
+    "review_created.body": {
+      "message": "A buyer reviewed your product."
+    },
+    "review_created.title": {
+      "message": "New review"
+    },
+    "rfq_invited.body": {
+      "message": "A buyer published a new request for quotation and invited your store to respond."
+    },
+    "rfq_invited.title": {
+      "message": "A buyer invited your store to quote"
+    },
+    "store_case_inquiry.explanation.body": {
+      "message": "The platform asked your store for an explanation. Please reply by {due}. See the seller center for details."
+    },
+    "store_case_inquiry.records.body": {
+      "message": "The platform asked your store to provide records. Please reply by {due}. See the seller center for details."
+    },
+    "store_case_inquiry.title": {
+      "message": "The platform has sent your store an inquiry"
+    },
+    "store_content_taken_down.body": {
+      "message": "The platform took down {count} item(s) of your store's content on {time}. See the seller center for the measure and how to appeal."
+    },
+    "store_content_taken_down.title": {
+      "message": "Content from your store was taken down"
+    },
+    "store_followed.body": {
+      "message": "A buyer started following your store."
+    },
+    "store_followed.title": {
+      "message": "New follower"
+    },
+    "store_measure_ended.body": {
+      "message": "A measure on your store ended on {time}. See the seller center."
+    },
+    "store_measure_ended.title": {
+      "message": "A measure on your store has ended"
+    },
+    "store_measure_issued.termination.body": {
+      "message": "The platform issued a termination measure to your store on {time}. See the seller center for the grounds and how to appeal."
+    },
+    "store_measure_issued.termination.title": {
+      "message": "The platform has issued a termination notice"
+    },
+    "store_measure_issued.warning.body": {
+      "message": "The platform issued a warning to your store on {time}. See the seller center for the grounds and next steps."
+    },
+    "store_measure_issued.warning.title": {
+      "message": "Your store received a warning"
+    },
+    "store_measure_request_decided.appeal_accepted.body": {
+      "message": "Your appeal against a measure on your store was reviewed on {time} and was accepted; the measure has been revoked. See the seller center."
+    },
+    "store_measure_request_decided.appeal_accepted.title": {
+      "message": "Your appeal was accepted"
+    },
+    "store_measure_request_decided.appeal_rejected.body": {
+      "message": "Your appeal against a measure on your store was reviewed on {time} and was not accepted. See the seller center."
+    },
+    "store_measure_request_decided.appeal_rejected.title": {
+      "message": "Your appeal was not accepted"
+    },
+    "store_measure_request_decided.remediation_accepted.body": {
+      "message": "Your request to lift a measure was reviewed on {time} and was accepted; the measure has ended. See the seller center."
+    },
+    "store_measure_request_decided.remediation_accepted.title": {
+      "message": "Your lift request was accepted"
+    },
+    "store_measure_request_decided.remediation_rejected.body": {
+      "message": "Your request to lift a measure was reviewed on {time} and was not accepted. See the seller center."
+    },
+    "store_measure_request_decided.remediation_rejected.title": {
+      "message": "Your lift request was not accepted"
+    },
+    "store_measure_revised.body": {
+      "message": "The platform updated a measure on your store on {time} (revision {revision}). See the seller center."
+    },
+    "store_measure_revised.title": {
+      "message": "A measure on your store was updated"
+    },
+    "store_measure_revoked.body": {
+      "message": "A measure on your store was revoked on {time}. See the seller center."
+    },
+    "store_measure_revoked.title": {
+      "message": "A measure on your store has been revoked"
+    },
+    "store_pending_deletion.body": {
+      "message": "We received your account deletion request on {time}. Your store has stopped operating and is waiting to be deleted. This request cannot be withdrawn. If this was not you, please contact support as soon as possible."
+    },
+    "store_pending_deletion.title": {
+      "message": "We received your account deletion request"
+    },
+    "store_suspended.body": {
+      "message": "Your store was suspended on {time} because of a platform measure, and some features are restricted. See the seller center for details."
+    },
+    "store_suspended.title": {
+      "message": "Your store has been suspended"
+    },
+    "store_unsuspended.body": {
+      "message": "Your store suspension was lifted on {time}. You can run your store normally again."
+    },
+    "store_unsuspended.title": {
+      "message": "Your store suspension has been lifted"
     }
   }
 }

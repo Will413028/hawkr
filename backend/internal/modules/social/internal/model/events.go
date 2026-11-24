@@ -5,6 +5,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
 // 模組事件只帶領域鍵（內容 ID、互動者 (kind, id)、store_id、以 rune 截斷的預覽），不帶名稱、頭像、account_id 或留言快照：legacy
@@ -113,3 +114,39 @@ type PostPublishRepeated struct{ PostWritten }
 
 // PostUnpublishRepeated 對已經是 UNPUBLISHED 的貼文再呼叫下架（冪等的 no-op），理由同 PostPublishRepeated。
 type PostUnpublishRepeated struct{ PostWritten }
+
+// ContentHidden 買家寫的留言或討論區留言被隱藏（只在真的新增一筆隱藏時發，冪等的重複隱藏不發），在隱藏的同一個 transaction 內發布。只帶參照與列舉，
+// 不帶管理員說明文字；SanctionID 是隱藏紀錄的 ID，SourceRef 是案件的不透明參照（沒有案件時空字串），Author 是內容作者（買家）。
+type ContentHidden struct {
+	EventID    uuid.UUID
+	OccurredAt time.Time
+	SanctionID uuid.UUID
+	Target     Target
+	Author     Actor
+	Category   policy.Category
+	SourceRef  string
+	AppealPath policy.AppealPath
+}
+
+// ContentRestored 管理員還原了一筆隱藏（同一個 transaction 內發布）；欄位同 ContentHidden，SanctionID 是被還原的隱藏紀錄。
+type ContentRestored struct {
+	EventID    uuid.UUID
+	OccurredAt time.Time
+	SanctionID uuid.UUID
+	Target     Target
+	Author     Actor
+	Category   policy.Category
+	SourceRef  string
+	AppealPath policy.AppealPath
+}
+
+// BuyerWarned 買家被警告（每寫一筆警告發一次，在同一個 transaction 內發布）；SanctionID 是警告紀錄的 ID，沒有內容參照。
+type BuyerWarned struct {
+	EventID    uuid.UUID
+	OccurredAt time.Time
+	SanctionID uuid.UUID
+	BuyerID    int64
+	Category   policy.Category
+	SourceRef  string
+	AppealPath policy.AppealPath
+}

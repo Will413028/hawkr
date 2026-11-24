@@ -288,3 +288,11 @@ func (s *Service) Announcements(ctx context.Context, ids []uuid.UUID) (map[uuid.
 	}
 	return out, nil
 }
+
+// StoreCodes 讀取店家的 store_code（registry.Sources）：內容型別的深連結讀取時才組，一頁一次批次查詢。
+func (s *Service) StoreCodes(ctx context.Context, storeIDs []int64) (map[int64]int64, error) {
+	if s.d.StoreCodes == nil {
+		return nil, fmt.Errorf("沒有設定店家 store_code 的來源")
+	}
+	return s.d.StoreCodes.StoreCodes(ctx, storeIDs)
+}

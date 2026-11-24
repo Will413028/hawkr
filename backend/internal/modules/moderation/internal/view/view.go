@@ -232,3 +232,43 @@ func deref(p *int64) int64 {
 	}
 	return *p
 }
+
+// CaseReporters 是案件一邊的檢舉人（買家或店家），依檢舉人號碼由小到大的 keyset，從 afterID 之後（不含）讀，給結案通知分頁 fan-out（worker 只組 Reader，
+// 不需要完整的 Module）；案件沒有這邊的檢舉人或不存在都回空頁。
+func (r Reader) CaseReporters(ctx context.Context, caseID uuid.UUID, side model.ReporterSide, afterID int64, size int32) (model.ReporterPage, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.ReporterPage{}, err
+	}
+	q := store.New(r.DB.Conn(ctx))
+	var rows []store.BuyerReportersOfCaseRow
+	switch side {
+	case model.ReporterSideBuyer:
+		rows, err = q.BuyerReportersOfCase(ctx, store.BuyerReportersOfCaseParams{CaseID: caseID, AfterID: afterID, MaxRows: size + 1})
+	case model.ReporterSideStore:
+		var stores []store.StoreReportersOfCaseRow
+		stores, err = q.StoreReportersOfCase(ctx, store.StoreReportersOfCaseParams{CaseID: caseID, AfterID: afterID, MaxRows: size + 1})
+		for _, s := range stores {
+			rows = append(rows, store.BuyerReportersOfCaseRow(s))
+		}
+	default:
+		return model.ReporterPage{}, fmt.Errorf("moderation：檢舉人的一邊 %q 不是 BUYER 或 STORE", side)
+	}
+	if err != nil {
+		return model.ReporterPage{}, fmt.Errorf("moderation：列出案件 %s 的檢舉人：%w", caseID, err)
+	}
+	rows, more := model.TrimPage(rows, size)
+	out := model.ReporterPage{Items: make([]model.Reporter, len(rows))}
+	for i, row := range rows {
+		out.Items[i] = model.Reporter{ReportID: row.ID}
+		if side == model.ReporterSideBuyer {
+			out.Items[i].BuyerID = row.ReporterID
+		} else {
+			out.Items[i].StoreID = row.ReporterID
+		}
+	}
+	if more {
+		out.Next = rows[len(rows)-1].ReporterID
+	}
+	return out, nil
+}

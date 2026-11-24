@@ -335,3 +335,48 @@ type CasePage struct {
 	Cases []Case
 	Next  *CaseCursor
 }
+
+// ReportReceived 在新增一筆檢舉的 transaction 內發布（對象、檢舉人與類別；說明文字不在事件裡）。併入進行中案件而回傳既有檢舉、以及同一個 request_id 的重送都沒有新檢舉，不發。
+// 檢舉人是買家或店家，恰好一個是正數。
+type ReportReceived struct {
+	EventID         uuid.UUID
+	OccurredAt      time.Time
+	ReportID        uuid.UUID
+	CaseID          uuid.UUID
+	Target          Target
+	ReporterBuyerID int64
+	ReporterStoreID int64
+	Category        policy.Category
+}
+
+// CaseClosedEvent 在案件結案的 transaction 內發布（違規處置與不違規都發）。只帶案件 ID、對象種類、結果類別與認定的政策分類，不帶處置種類，也不帶檢舉人清單：
+// 消費端用 CaseReporters 分頁讀。Outcome 只有 OutcomeViolation 與 OutcomeNoViolation；Category 只在違規時有值，不違規是 nil。
+type CaseClosedEvent struct {
+	EventID    uuid.UUID
+	OccurredAt time.Time
+	CaseID     uuid.UUID
+	TargetKind TargetKind
+	Outcome    Outcome
+	Category   *policy.Category
+}
+
+// Reporter 是案件的一位檢舉人（買家或店家，恰好一個是正數）；ReportID 是那筆檢舉。
+type Reporter struct {
+	ReportID uuid.UUID
+	BuyerID  int64
+	StoreID  int64
+}
+
+// ReporterSide 是案件檢舉人的一邊：買家檢舉人或店家檢舉人（各自依檢舉人號碼分頁）。
+type ReporterSide string
+
+const (
+	ReporterSideBuyer ReporterSide = "BUYER"
+	ReporterSideStore ReporterSide = "STORE"
+)
+
+// ReporterPage 是一頁案件的檢舉人（同一邊），依檢舉人號碼由小到大；Next 是下一頁的游標（這頁最後一位的號碼），沒有下一頁是 0。
+type ReporterPage struct {
+	Items []Reporter
+	Next  int64
+}

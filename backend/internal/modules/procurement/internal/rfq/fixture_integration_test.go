@@ -41,6 +41,7 @@ type fixture struct {
 	revision      uuid.UUID
 	revisionNo    int32
 	bus           *events.Bus
+	stores        stores
 	mu            sync.Mutex
 	now           time.Time
 	published     []model.RfqPublished
@@ -91,7 +92,45 @@ func (f *fixture) setStatus(status string) {
 }
 
 func (f *fixture) service() rfq.Service {
-	return rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus}
+	return rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus, Blocks: &f.stores, Open: &f.stores}
+}
+
+// stores 是替身的 seller：blocked 的店封鎖買家，closed 的店不是營業中，err 不為空時兩個查詢都失敗。
+type stores struct {
+	mu      sync.Mutex
+	blocked map[int64]bool
+	closed  map[int64]bool
+	err     error
+}
+
+func (s *stores) StoreIDsBlockingBuyer(_ context.Context, _ int64, ids []int64) (map[int64]struct{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[int64]struct{}{}
+	for _, id := range ids {
+		if s.blocked[id] {
+			out[id] = struct{}{}
+		}
+	}
+	return out, s.err
+}
+
+func (s *stores) OpenStoreIDs(_ context.Context, ids []int64) (map[int64]struct{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := map[int64]struct{}{}
+	for _, id := range ids {
+		if !s.closed[id] {
+			out[id] = struct{}{}
+		}
+	}
+	return out, s.err
+}
+
+func (s *stores) set(blocked, closed map[int64]bool, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.blocked, s.closed, s.err = blocked, closed, err
 }
 
 // revise 把現行版本取代成新的一版（預設內容：小白菜、3 KG、台北市），f.revision 指向新版。

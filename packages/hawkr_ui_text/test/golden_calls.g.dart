@@ -85,6 +85,7 @@ const _enumNumber = <String, int>{
 	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_LIKE': 10,
 	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_ORDER': 1,
 	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT': 5,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT': 16,
 	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK': 14,
 	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW': 8,
 	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT': 2,

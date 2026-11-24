@@ -212,7 +212,7 @@ func TestDevSeedPaymentAccountsKeepsAnotherProvidersRowWithoutExternalID(t *test
 	if err := runDevSeed(ctx, nil, &out); err != nil {
 		t.Fatalf("dev-seed：%v", err)
 	}
-	if _, err := d.Pool().Exec(ctx, `UPDATE payment.accounts SET provider = 'stripe', external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED', transfers_active = false, payouts_active = false, fetched_at = NULL, status_reason = NULL WHERE store_id = $1`, devSeedStoreA); err != nil {
+	if _, err := d.Pool().Exec(ctx, `UPDATE payment.accounts SET provider = 'stripe', external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED', transfers_active = false, payouts_active = false, fetched_at = NULL, status_reason = NULL, first_activated_at = NULL, requirements_deadline = NULL WHERE store_id = $1`, devSeedStoreA); err != nil {
 		t.Fatal(err)
 	}
 	c, err := openSeller(ctx, requireDevEnvironment)
