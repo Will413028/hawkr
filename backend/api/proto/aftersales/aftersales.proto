@@ -26,9 +26,6 @@ service AfterSalesService {
     // 取消售後
     rpc CancelAfterSaleCase(CancelAfterSaleCaseRequest) returns (CancelAfterSaleCaseResponse);
 
-    // ATM 退款：取得 PayUni 退款頁面 URL（通用：售後退款 + 賣家取消出貨）
-    rpc GetRefundPageUrl(GetRefundPageUrlRequest) returns (GetRefundPageUrlResponse);
-
     // ==================== 賣家端 ====================
 
     // 賣家售後列表
@@ -70,10 +67,6 @@ service AfterSalesService {
     rpc GetAppealDetailForAdmin(GetAppealDetailForAdminRequest) returns (GetAppealDetailForAdminResponse);
 
     // ==================== 內部 RPC ====================
-
-    // PayUni ATM 退款頁面完成回調（Gateway 接收 Form POST 後呼叫）
-    // 解密（委派 Payment Service）→ 更新退款任務 → 組裝 Deep Link
-    rpc HandleRefundPageReturn(HandleRefundPageReturnRequest) returns (HandleRefundPageReturnResponse);
 
     // 訂單是否有活躍 case（Order Service 訂單自動完成倒數恢復前反查，03 §5.8 / 09 §4.4.1）
     rpc HasActiveCase(HasActiveCaseRequest) returns (HasActiveCaseResponse);
@@ -168,23 +161,6 @@ message CancelAfterSaleCaseResponse {
     string message = 2;
 }
 
-message GetRefundPageUrlRequest {
-    int64 buyer_id = 1;
-    string order_no = 2;
-    string client_type = 3;              // CodeMeta ClientType value（MOBILE_APP / WEB_BROWSER）；空字串視為 MOBILE_APP（向下相容）
-    string app_type = 4;                 // CodeMeta AppType value（BUYER / SELLER）；空字串視為 BUYER（向下相容）。Gateway 由 JWT AccountType 推導後注入
-}
-
-message GetRefundPageUrlResponse {
-    int32 code = 1;
-    string message = 2;
-    RefundPageUrlData data = 3;
-}
-
-message RefundPageUrlData {
-    string redirect_url = 1;             // PayUni 退款頁面 URL（前端用 WebView 開啟）
-}
-
 // ==================== 賣家端 Request/Response ====================
 
 message GetSellerAfterSaleCasesRequest {
@@ -239,7 +215,7 @@ message ResolveResultData {
     string case_no = 1;
     string status = 2;
     string return_shipment_no = 3;
-    bool need_refund_page = 4;
+    reserved 4;
 }
 
 message ConfirmReturnReceiptRequest {
@@ -284,7 +260,7 @@ message CancelShipmentResponse {
 message CancelShipmentResultData {
     string order_no = 1;
     string refund_amount = 2;
-    bool need_refund_page = 3;
+    reserved 3;
 }
 
 // ==================== 共用 Data Message ====================
@@ -296,7 +272,7 @@ message AfterSaleCaseSummary {
     string reason = 4;
     string refundable_amount = 5;
     string created_at = 6;
-    bool need_refund_page = 7;
+    reserved 7;
     string buyer_name = 8;
     string buyer_avatar_key = 9;              // 買家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 buyerAvatarUrl）
     string shipping_address = 10;
@@ -306,11 +282,11 @@ message AfterSaleCaseSummary {
     string appeal_state = 13;
     // §2.2 退款任務欄位（snapshot from refund_tasks，前端依此顯示 UX 情境；無 refund_task 時全部為空字串）
     string refund_task_status = 14;              // WorkerTaskStatus value（"5"/"10"/"15"/"20"/"31"/"40"...）
-    string refund_failure_message = 15;          // 退款失敗訊息，直接透傳 refund_tasks.payuni_message（PayUni 原話）
-    string estimated_refund_date = 16;           // 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 受理後有值）
-    string bank_date = 17;                       // 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM 成功匯款後有值）
-    string provider_status = 18;                 // 聚合 PayUni 原始狀態碼（收斂規範 §6.2 / §9.4；依 case status 取自 refund_tasks.payuni_status 或 shipments.provider_status）
-    string provider_message = 19;                // 聚合 PayUni 原始訊息
+    string refund_failure_message = 15;          // 退款失敗訊息（僅終態 FAILED），透傳 refund_tasks.provider_message
+    reserved 16;
+    reserved 17;
+    string provider_status = 18;                 // provider 原始狀態碼（依 case status 取自 refund_tasks.provider_status 或 shipments.provider_status）
+    string provider_message = 19;                // provider 原始訊息
     string auto_confirm_at = 20;                 // 自動確認收貨截止時間 ISO 8601 UTC（僅 status=27 RETURN_DELIVERED 時有值，scheduler 到期自動完成）
     // 2026-05-22 逆物流退貨政策修訂新增欄位
     string store_pickup_deadline_at = 21;        // 超商待取逾時截止 ISO 8601 UTC（僅 status=26 RETURN_AT_STORE 時有值，72h scheduler 到期自動完成）
@@ -342,7 +318,7 @@ message AfterSaleCaseDetailView {
     string return_shipment_no = 13;              // 後端內部 shipment ID（RS{9位}），非對外顯示
     string return_shipping_method = 14;
     repeated string shipment_photo_keys = 15;    // 出貨照片 objectKey（49 §6.6：Gateway 組 shipmentPhotoUrls）
-    bool need_refund_page = 16;
+    reserved 16;
     string created_at = 17;
     string closed_at = 18;
     string ship_trade_no = 19;                   // PayUni 物流序號（7-11 退貨可選顯示）
@@ -355,11 +331,11 @@ message AfterSaleCaseDetailView {
     bool can_appeal = 25;                        // service layer compute 結果
     // §2.2 退款任務欄位（snapshot from refund_tasks，前端依此顯示 UX 情境；無 refund_task 時全部為空字串）
     string refund_task_status = 26;              // WorkerTaskStatus value（"5"/"10"/"15"/"20"/"31"/"40"...）
-    string refund_failure_message = 27;          // 退款失敗訊息，直接透傳 refund_tasks.payuni_message（PayUni 原話）
-    string estimated_refund_date = 28;           // 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 受理後有值）
-    string bank_date = 29;                       // 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM 成功匯款後有值）
-    string provider_status = 30;                 // 聚合 PayUni 原始狀態碼（收斂規範 §6.2 / §9.4；依 case status 取自 refund_tasks.payuni_status 或 shipments.provider_status）
-    string provider_message = 31;                // 聚合 PayUni 原始訊息
+    string refund_failure_message = 27;          // 退款失敗訊息（僅終態 FAILED），透傳 refund_tasks.provider_message
+    reserved 28;
+    reserved 29;
+    string provider_status = 30;                 // provider 原始狀態碼（依 case status 取自 refund_tasks.provider_status 或 shipments.provider_status）
+    string provider_message = 31;                // provider 原始訊息
     // §5.10 賣家處理期限自動升級
     string process_deadline = 32;                // ISO 8601 UTC；僅 status=PENDING 才有值
     bool auto_escalated = 33;                    // 是否系統自動升級（PROCESS_TIMEOUT）
@@ -412,19 +388,6 @@ message ResolutionView {
 }
 
 // ==================== 內部 RPC Message ====================
-
-message HandleRefundPageReturnRequest {
-    string encrypt_info = 1;             // PayUni Form POST 的 EncryptInfo（AES 加密）
-    string hash_info = 2;               // PayUni Form POST 的 HashInfo（SHA256 簽章）
-    reserved 3;                          // 原 app_type 已移除：service 端從 refund_tasks DB lookup 取得 client_type / app_type（SoT 在 DB），詳見設計書 09 §5.4.2
-    string order_no = 4;                // Gateway fallback：從 return_url query param 取，PayUni 失敗時 MerTradeNo 可能為空，用此欄位 lookup refund_task
-}
-
-message HandleRefundPageReturnResponse {
-    int32 code = 1;
-    string message = 2;
-    string redirect_url = 3;            // 完整 Deep Link URL（Gateway 302 redirect 用）
-}
 
 message HasActiveCaseRequest {
     string order_no = 1;

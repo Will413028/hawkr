@@ -173,14 +173,6 @@ order:
     enabled: ${CLEANUP_ENABLED:true}
     cron: "0 0 2 * * SUN"      # 每週日凌晨 02:00
     task-retention-days: 30      # 已完成任務保留天數
-    bank-info-retention-days: 14  # 退款銀行資訊保留天數（DONE 後 14 天清除）
-
-# PayUni 代理商 MerID（多賣家和單代收）
-# 詳見 20 設計書 §4.13 和單與 paymentMerId 決策
-# 空字串時 CheckoutPreview 接到 consolidated=true 會拒絕請求
-payuni:
-  agent:
-    mer-id: ${PAYUNI_AGENT_MER_ID:}
 
 logging:
   level:

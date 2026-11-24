@@ -713,12 +713,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
     int incrementPaymentAttempts(@Param("orderNo") String orderNo);
 
     /**
-     * 更新 ATM 退款頁面標記
-     */
-    @Update("UPDATE orders SET need_refund_page = #{needRefundPage}, updated_at = NOW() WHERE order_no = #{orderNo}")
-    int updateNeedRefundPage(@Param("orderNo") String orderNo, @Param("needRefundPage") boolean needRefundPage);
-
-    /**
      * 標記訂單已評論（冪等：僅 is_reviewed = FALSE 時更新）
      */
     @Update("UPDATE orders SET is_reviewed = TRUE, updated_at = NOW() WHERE order_no = #{orderNo} AND is_reviewed = FALSE")

@@ -19,9 +19,7 @@ import io.github.will413028.hawkr.aftersales.mapper.RefundTaskMapper;
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
 import io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
-import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
 import io.github.will413028.hawkr.common.utils.code.WorkerTaskStatus;
-import io.github.will413028.hawkr.payment.grpc.CreateRefundResponse;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -47,10 +45,7 @@ import java.util.Set;
  *
  * <h2>issue #2294 B5/B6/B7：tx 內不得有<b>身分反解</b>的 gRPC</h2>
  *
- * <p>⚠️ <b>標題的限定詞是認真的（issue #2294 P1-B）</b>：本批達成的是「tx 內零<b>身分反解</b> gRPC」，
- * <b>不是</b>「tx 內零 gRPC」。ATM 路徑的
- * {@code createRefundTaskAndAdvanceStatus → paymentGrpcClient.createRefund} 仍在 tx 內，
- * 剩餘邊界寫在該方法的 javadoc。
+ * <p>退款由 {@code RefundTaskWorker} 在 tx 之外呼叫 payment，本 service 的 tx 內沒有 payment 呼叫。
  *
  * <p>本 service 的四個進入點<b>全部</b>是 {@code @Transactional}，而它們發的事件（case transition／
  * awaiting_buyer_refund_page）payload 需要 {@code store_id → seller account_id}、
@@ -84,10 +79,6 @@ public class ReturnReceiptService {
     private final AfterSalesEventPublisher afterSalesEventPublisher;
     private final EvidenceService evidenceService;
     private final AfterSaleCaseService caseService;
-    private final io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient paymentGrpcClient;
-
-    /** ATM 付款方式（Order DB 存 value） */
-    private static final String ATM_PAYMENT_METHOD = PaymentMethod.ATM.value();
 
     /** §5.3.12 Admin 強制確認收貨允許的前置 status（2026-05-22 擴增 RETURN_AT_STORE） */
     private static final Set<String> ADMIN_FORCE_ALLOWED_STATUSES = Set.of(
@@ -105,8 +96,7 @@ public class ReturnReceiptService {
      *
      * <p><b>刻意沒有 {@code @Transactional}</b>：整個重點就是這兩次無 deadline 的 gRPC
      * 不能發生在持有 row lock 的交易裡。多一次 {@code SELECT} 載入 case 是這個做法的成本，
-     * 換來的是「tx 內零<b>身分反解</b>呼叫」（非 ATM 路徑即等於零網路呼叫；ATM 路徑仍有一次
-     * 有 deadline 封頂的 {@code createRefund}，見 {@link #createRefundTaskAndAdvanceStatus}）
+     * 換來的是「tx 內零<b>身分反解</b>呼叫」
      * ——case 的 {@code store_id}／{@code buyer_id} 在
      * 這一刻與 tx 內讀到的必然相同（兩者都是不可變欄位），所以先讀不影響正確性；
      * 狀態競態仍由 tx 內的 CAS 兜住。
@@ -184,8 +174,7 @@ public class ReturnReceiptService {
         AfterSalePlatformDecisionOutcome outcome = hasDeduction
                 ? AfterSalePlatformDecisionOutcome.PARTIAL_REFUND
                 : AfterSalePlatformDecisionOutcome.FULL_REFUND;
-        String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, finalRefundAmount, outcome,
-                principals);
+        String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, finalRefundAmount, outcome);
 
         // §5.3.7 audit + event（SELLER 路徑）
         Map<String, Object> auditExtra = baseAuditExtra(originalRefundAmount, finalRefundAmount, hasDeduction,
@@ -199,8 +188,7 @@ public class ReturnReceiptService {
 
         // issue #2294 B5/B6/B7：改用帶 principals 的零 gRPC 多載（反解已在 tx 外做完）。
         // 回傳值<b>刻意忽略</b>＝維持既有 best-effort 語意：CASE_RETURN_RECEIVED 遺失只是少一則通知，
-        // 不值得讓賣家的確認收貨整筆失敗（與同 tx 內 ATM 退款頁事件的 fail-closed 裁決不同，
-        // 那一個遺失是「錢退不出去且沒人知道」，理由見 createRefundTaskAndAdvanceStatus）。
+        // 不值得讓賣家的確認收貨整筆失敗。
         afterSalesEventPublisher.tryPublishCaseTransitionWithContext(
                 AfterSalesEventType.CASE_RETURN_RECEIVED.value(),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_RECEIVED,
@@ -244,7 +232,7 @@ public class ReturnReceiptService {
 
         // 系統自動確認固定全額退款（§5.3.10.1）
         String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, originalRefundAmount,
-                AfterSalePlatformDecisionOutcome.FULL_REFUND, principals);
+                AfterSalePlatformDecisionOutcome.FULL_REFUND);
 
         Map<String, Object> auditExtra = new HashMap<>();
         auditExtra.put("finalRefundAmount", originalRefundAmount);
@@ -309,7 +297,7 @@ public class ReturnReceiptService {
 
         // 超商門市逾時自動完成固定全額退款（§5.3.10.2）
         String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, originalRefundAmount,
-                AfterSalePlatformDecisionOutcome.FULL_REFUND, principals);
+                AfterSalePlatformDecisionOutcome.FULL_REFUND);
 
         Map<String, Object> auditExtra = new HashMap<>();
         auditExtra.put("finalRefundAmount", originalRefundAmount);
@@ -386,8 +374,7 @@ public class ReturnReceiptService {
         AfterSalePlatformDecisionOutcome outcome = hasDeduction
                 ? AfterSalePlatformDecisionOutcome.PARTIAL_REFUND
                 : AfterSalePlatformDecisionOutcome.FULL_REFUND;
-        String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, finalRefundAmount, outcome,
-                principals);
+        String refundTaskId = createRefundTaskAndAdvanceStatus(caseEntity, finalRefundAmount, outcome);
 
         Map<String, Object> auditExtra = new HashMap<>();
         auditExtra.put("reason", reason);
@@ -475,72 +462,14 @@ public class ReturnReceiptService {
     }
 
     /**
-     * 建立退款任務 + 推進 status 30→40 + ATM publish。
+     * 建立退款任務（PENDING，由 {@code RefundTaskWorker} 呼叫 payment 的 CreateRefund）+ 推進 status 30→40。
      * 四條路徑共用（兩條排程 ＋ 兩條 API）：金額差異交由 caller 計算後傳入。
      *
-     * <h3>⚠️ 已知邊界：ATM 分支的 {@code createRefund} 仍在 tx 內（issue #2294 P1-B，本批不治本）</h3>
-     *
-     * <p>本方法被四個 {@code @Transactional} 進入點共用，因此下面這一次 gRPC 是<b>在交易內</b>發生的：
-     * {@code isAtm} 為真時的 {@code paymentGrpcClient.createRefund}（ATM 退款預建）。
-     * 此時 {@code loadCase} 早已把連線綁定在本交易上，所以這次呼叫的耗時<b>就是</b>
-     * 「{@code aftersale_cases} row lock ＋ 一條 Hikari 連線」被持有的時間。
-     *
-     * <p><b>現況是嚴格改善，不是回歸</b>：這條路徑在 issue #2294 之前<b>無界</b>
-     * （{@code GrpcStubFactory} 全域零 deadline），P1-1 把它壓到
-     * {@link io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient#CREATE_REFUND_DEADLINE_SEC}
-     * （100 秒）封頂。但 100 秒與《多副本排程搶佔規範》§四出路 4 想要的「短 tx」仍差一個數量級，
-     * 所以它是<b>剩餘邊界</b>而非已解問題。
-     *
-     * <p><b>治本方向（本批刻意不做）</b>：把 ATM 退款預建移到 tx 之外——與 P1-2 對身分反解做的事同形
-     * （呼叫端先做、結果當參數傳入）。不在本批做的理由：它會改變「預建失敗」的失敗語意與
-     * §2.3.1 INV-5 的 refund_task 落地時機，屬於獨立的行為變更，不該搭載在本批的技術性修正上。
-     *
-     * <p>⚠️ 這條也是既有測試的<b>盲區</b>：{@code verifyNoInteractions} 只涵蓋 seller／buyer 兩個
-     * client，量不到 payment。不要因為那些斷言是綠的就以為 tx 內已經沒有 gRPC。
-     *
-     * @param principals 呼叫端在 tx 之外解好的身分欄位——排程走 strict、API 走 best-effort，
-     *                   差別在<b>解析失敗怎麼辦</b>，不在本方法內（本方法只是使用者）
      * @return refundTaskId（TSID 字串）
      */
     private String createRefundTaskAndAdvanceStatus(AfterSaleCaseEntity caseEntity, Long finalRefundAmount,
-                                                     AfterSalePlatformDecisionOutcome outcome,
-                                                     EventPrincipals principals) {
+                                                     AfterSalePlatformDecisionOutcome outcome) {
         String caseNo = caseEntity.getCaseNo();
-        boolean isAtm = ATM_PAYMENT_METHOD.equals(caseEntity.getPaymentMethod());
-        short initialAttempt = 1;
-        String externalRefId = null;
-        // §2.3.1 INV-5：ATM createRefund 預建失敗時不 throw，建終態 FAILED refund_task 持久化 PayUni 原話
-        boolean refundPrebuildFailed = false;
-        String payuniStatus = null;
-        String payuniMessage = null;
-        String lastError = null;
-        if (isAtm) {
-            String idempotencyKey = "CASE:" + caseNo + ":RECEIPT:" + initialAttempt;
-            CreateRefundResponse resp = null;
-            try {
-                resp = paymentGrpcClient.createRefund(
-                        caseEntity.getTransactionId(),
-                        String.valueOf(finalRefundAmount),
-                        "退貨確認退款",
-                        idempotencyKey);
-            } catch (io.grpc.StatusRuntimeException e) {
-                refundPrebuildFailed = true;
-                lastError = "createRefund StatusRuntimeException: " + e.getMessage();
-                log.warn("ReturnReceiptService.createRefundTaskAndAdvanceStatus.createRefundUnavailable",
-                        "ATM 預建退款 payment 不可用, caseNo=" + caseNo + ", " + e.getMessage(), "caseNo", caseNo);
-            }
-            if (!refundPrebuildFailed && resp.getCode() != 0) {
-                refundPrebuildFailed = true;
-                payuniStatus = resp.getData().getProviderStatus();
-                payuniMessage = resp.getData().getProviderMessage();
-                lastError = resp.getMessage();
-                log.warn("ReturnReceiptService.createRefundTaskAndAdvanceStatus.createRefundFailed",
-                        "ATM 預建退款失敗, caseNo=" + caseNo + ", code=" + resp.getCode()
-                                + ", msg=" + resp.getMessage(), "caseNo", caseNo);
-            } else if (!refundPrebuildFailed) {
-                externalRefId = resp.getData().getRefundNo();
-            }
-        }
         RefundTaskEntity refundTask = new RefundTaskEntity();
         Long tsid = TsidUtil.generate();
         refundTask.setId(tsid);
@@ -549,45 +478,14 @@ public class ReturnReceiptService {
         refundTask.setTransactionId(caseEntity.getTransactionId());
         refundTask.setRefundAmount(finalRefundAmount);
         refundTask.setPaymentMethod(caseEntity.getPaymentMethod());
-        refundTask.setMerId(caseEntity.getMerId());
         refundTask.setRefundOutcome(outcome.value());
-        refundTask.setExternalRefId(externalRefId);
-        if (refundPrebuildFailed) {
-            // 終態 FAILED：Worker 不再撈，持久化 PayUni 原話進 admin 異常清單
-            refundTask.setStatus(WorkerTaskStatus.FAILED.value());
-            refundTask.setNextRetryTime(null);
-            refundTask.setPayuniStatus(payuniStatus);
-            refundTask.setPayuniMessage(payuniMessage);
-            refundTask.setLastError(lastError);
-        } else {
-            refundTask.setStatus(isAtm
-                    ? WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value()
-                    : WorkerTaskStatus.PENDING.value());
-        }
+        refundTask.setStatus(WorkerTaskStatus.PENDING.value());
         refundTask.setRetryCount(0);
         refundTask.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
-        refundTask.setCurrentAttempt(initialAttempt);
         refundTaskMapper.insert(refundTask);
 
         if (caseMapper.markRefundProcessingFromReceived(caseNo) == 0) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
-        }
-
-        // §2.3.1 INV-5：createRefund 預建失敗時 task=FAILED，不發等待頁事件（退款進 admin 異常清單）
-        if (isAtm && WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value().equals(refundTask.getStatus())) {
-            // issue #2294 B7：status='40' 是永久轉換，事件遺失＝買家永遠拿不到退款頁連結、
-            // 退款卡在 AWAITING_BUYER_REFUND_PAGE ⇒ 改用會傳遞失敗的變體，失敗即 rollback。
-            // ⚠️ 本 helper 同時被兩條排程與兩條 API（gRPC confirmReceipt / admin force）共用，
-            // 所以這是本 issue 唯一使用者可見的行為變更：MQ 故障時賣家按「確認收貨」會整筆失敗並看到錯誤。
-            // 裁決（09 §5.3.7）：接受 fail-closed —— 少了這個事件是「錢退不出去且沒人知道」，
-            // 代價高於「賣家在 MQ 故障期間看到一次錯誤並重試」；tx 邊界保證失敗時 DB 不留半套狀態。
-            // issue #2294 B7：帶 principals 的多載＝tx 內零 gRPC（buyer_id 反解已在 tx 外做完）
-            boolean published = afterSalesEventPublisher.tryPublishAwaitingBuyerRefundPage(
-                    caseEntity.getOrderNo(), caseNo, tsid, caseEntity.getBuyerId(), principals);
-            if (!published) {
-                throw new EventPublishFailedException(
-                        AfterSalesEventType.AWAITING_BUYER_PAGE.value(), caseNo);
-            }
         }
 
         return String.valueOf(tsid);
@@ -604,7 +502,6 @@ public class ReturnReceiptService {
         extra.put("deductionReason", hasDeduction ? deductionReason : null);
         extra.put("inspectionPhotoCount",
                 inspectionPhotoTokens == null ? 0 : inspectionPhotoTokens.size());
-        extra.put("isAtm", ATM_PAYMENT_METHOD.equals(caseEntity.getPaymentMethod()));
         return extra;
     }
 }

@@ -726,15 +726,11 @@ enum AfterSaleAppealState {
 enum WorkerTaskStatus {
   /// 待執行 — 任務已建立，等待 Worker 處理
   pending(code: 'PENDING', value: '0', label: '待執行'),
-  /// 等待買家操作退款頁面 — ATM 退款，等待買家填寫銀行帳號（僅退款任務使用）
-  awaitingBuyerRefundPage(code: 'AWAITING_BUYER_REFUND_PAGE', value: '5', label: '等待買家操作退款頁面'),
   /// 執行中 — Worker 已 Claim，執行任務中
   processing(code: 'PROCESSING', value: '10', label: '執行中'),
-  /// 等待回調 — ATM 退款已受理，等待 PayUni Webhook 匯款結果（僅退款任務使用）
-  awaitingWebhook(code: 'AWAITING_WEBHOOK', value: '15', label: '等待回調'),
   /// 已完成 — 任務成功完成
   done(code: 'DONE', value: '20', label: '已完成'),
-  /// 失敗 — 任務失敗（信用卡路徑經 Worker retry 1 次後仍失敗 / ATM 路徑 webhook 回報匯款失敗）
+  /// 失敗 — 任務失敗（Worker retry 後仍失敗）
   failed(code: 'FAILED', value: '30', label: '失敗'),
   /// 人工介入 — 業務策略明確轉人工（Phase 1 退款任務目前不寫此值，既有歷史資料保留）
   manualIntervention(code: 'MANUAL_INTERVENTION', value: '40', label: '人工介入'),
@@ -2300,8 +2296,6 @@ enum PaymentMethod {
   applePay(code: 'APPLE_PAY', value: '2002', label: 'Apple Pay'),
   /// Google Pay — Google 行動支付
   googlePay(code: 'GOOGLE_PAY', value: '2003', label: 'Google Pay'),
-  /// ATM 轉帳 — 銀行虛擬帳戶轉帳
-  atm(code: 'ATM', value: '2004', label: 'ATM 轉帳'),
   /// 零元訂單 — 全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 [05-支付服務設計書 §2A.1](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）
   zeroAmount(code: 'ZERO_AMOUNT', value: '2900', label: '零元訂單');
 

@@ -70,7 +70,7 @@ func (x CancelActiveCaseOnConfirmReceiptResponse_Result) Number() protoreflect.E
 
 // Deprecated: Use CancelActiveCaseOnConfirmReceiptResponse_Result.Descriptor instead.
 func (CancelActiveCaseOnConfirmReceiptResponse_Result) EnumDescriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{38, 0}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{33, 0}
 }
 
 type GetOrderPayoutHoldResponse_Reason int32
@@ -127,7 +127,7 @@ func (x GetOrderPayoutHoldResponse_Reason) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GetOrderPayoutHoldResponse_Reason.Descriptor instead.
 func (GetOrderPayoutHoldResponse_Reason) EnumDescriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{40, 0}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{35, 0}
 }
 
 type CreateAfterSaleCaseRequest struct {
@@ -730,178 +730,6 @@ func (x *CancelAfterSaleCaseResponse) GetMessage() string {
 	return ""
 }
 
-type GetRefundPageUrlRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BuyerId       int64                  `protobuf:"varint,1,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`
-	OrderNo       string                 `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
-	ClientType    string                 `protobuf:"bytes,3,opt,name=client_type,json=clientType,proto3" json:"client_type,omitempty"` // CodeMeta ClientType value（MOBILE_APP / WEB_BROWSER）；空字串視為 MOBILE_APP（向下相容）
-	AppType       string                 `protobuf:"bytes,4,opt,name=app_type,json=appType,proto3" json:"app_type,omitempty"`          // CodeMeta AppType value（BUYER / SELLER）；空字串視為 BUYER（向下相容）。Gateway 由 JWT AccountType 推導後注入
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetRefundPageUrlRequest) Reset() {
-	*x = GetRefundPageUrlRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetRefundPageUrlRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetRefundPageUrlRequest) ProtoMessage() {}
-
-func (x *GetRefundPageUrlRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetRefundPageUrlRequest.ProtoReflect.Descriptor instead.
-func (*GetRefundPageUrlRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *GetRefundPageUrlRequest) GetBuyerId() int64 {
-	if x != nil {
-		return x.BuyerId
-	}
-	return 0
-}
-
-func (x *GetRefundPageUrlRequest) GetOrderNo() string {
-	if x != nil {
-		return x.OrderNo
-	}
-	return ""
-}
-
-func (x *GetRefundPageUrlRequest) GetClientType() string {
-	if x != nil {
-		return x.ClientType
-	}
-	return ""
-}
-
-func (x *GetRefundPageUrlRequest) GetAppType() string {
-	if x != nil {
-		return x.AppType
-	}
-	return ""
-}
-
-type GetRefundPageUrlResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	Data          *RefundPageUrlData     `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetRefundPageUrlResponse) Reset() {
-	*x = GetRefundPageUrlResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetRefundPageUrlResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetRefundPageUrlResponse) ProtoMessage() {}
-
-func (x *GetRefundPageUrlResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetRefundPageUrlResponse.ProtoReflect.Descriptor instead.
-func (*GetRefundPageUrlResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *GetRefundPageUrlResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *GetRefundPageUrlResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *GetRefundPageUrlResponse) GetData() *RefundPageUrlData {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-type RefundPageUrlData struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RedirectUrl   string                 `protobuf:"bytes,1,opt,name=redirect_url,json=redirectUrl,proto3" json:"redirect_url,omitempty"` // PayUni 退款頁面 URL（前端用 WebView 開啟）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RefundPageUrlData) Reset() {
-	*x = RefundPageUrlData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RefundPageUrlData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RefundPageUrlData) ProtoMessage() {}
-
-func (x *RefundPageUrlData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RefundPageUrlData.ProtoReflect.Descriptor instead.
-func (*RefundPageUrlData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *RefundPageUrlData) GetRedirectUrl() string {
-	if x != nil {
-		return x.RedirectUrl
-	}
-	return ""
-}
-
 type GetSellerAfterSaleCasesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StoreId       int64                  `protobuf:"varint,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -914,7 +742,7 @@ type GetSellerAfterSaleCasesRequest struct {
 
 func (x *GetSellerAfterSaleCasesRequest) Reset() {
 	*x = GetSellerAfterSaleCasesRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[13]
+	mi := &file_aftersales_aftersales_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -926,7 +754,7 @@ func (x *GetSellerAfterSaleCasesRequest) String() string {
 func (*GetSellerAfterSaleCasesRequest) ProtoMessage() {}
 
 func (x *GetSellerAfterSaleCasesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[13]
+	mi := &file_aftersales_aftersales_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -939,7 +767,7 @@ func (x *GetSellerAfterSaleCasesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerAfterSaleCasesRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerAfterSaleCasesRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{13}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetSellerAfterSaleCasesRequest) GetStoreId() int64 {
@@ -981,7 +809,7 @@ type GetSellerAfterSaleCasesResponse struct {
 
 func (x *GetSellerAfterSaleCasesResponse) Reset() {
 	*x = GetSellerAfterSaleCasesResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[14]
+	mi := &file_aftersales_aftersales_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -993,7 +821,7 @@ func (x *GetSellerAfterSaleCasesResponse) String() string {
 func (*GetSellerAfterSaleCasesResponse) ProtoMessage() {}
 
 func (x *GetSellerAfterSaleCasesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[14]
+	mi := &file_aftersales_aftersales_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1006,7 +834,7 @@ func (x *GetSellerAfterSaleCasesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerAfterSaleCasesResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerAfterSaleCasesResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{14}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetSellerAfterSaleCasesResponse) GetCode() int32 {
@@ -1040,7 +868,7 @@ type GetSellerAfterSaleCaseDetailRequest struct {
 
 func (x *GetSellerAfterSaleCaseDetailRequest) Reset() {
 	*x = GetSellerAfterSaleCaseDetailRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[15]
+	mi := &file_aftersales_aftersales_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1052,7 +880,7 @@ func (x *GetSellerAfterSaleCaseDetailRequest) String() string {
 func (*GetSellerAfterSaleCaseDetailRequest) ProtoMessage() {}
 
 func (x *GetSellerAfterSaleCaseDetailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[15]
+	mi := &file_aftersales_aftersales_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1065,7 +893,7 @@ func (x *GetSellerAfterSaleCaseDetailRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GetSellerAfterSaleCaseDetailRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerAfterSaleCaseDetailRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{15}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetSellerAfterSaleCaseDetailRequest) GetStoreId() int64 {
@@ -1093,7 +921,7 @@ type GetSellerAfterSaleCaseDetailResponse struct {
 
 func (x *GetSellerAfterSaleCaseDetailResponse) Reset() {
 	*x = GetSellerAfterSaleCaseDetailResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[16]
+	mi := &file_aftersales_aftersales_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1105,7 +933,7 @@ func (x *GetSellerAfterSaleCaseDetailResponse) String() string {
 func (*GetSellerAfterSaleCaseDetailResponse) ProtoMessage() {}
 
 func (x *GetSellerAfterSaleCaseDetailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[16]
+	mi := &file_aftersales_aftersales_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1118,7 +946,7 @@ func (x *GetSellerAfterSaleCaseDetailResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use GetSellerAfterSaleCaseDetailResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerAfterSaleCaseDetailResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{16}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetSellerAfterSaleCaseDetailResponse) GetCode() int32 {
@@ -1165,7 +993,7 @@ type ResolveAfterSaleCaseRequest struct {
 
 func (x *ResolveAfterSaleCaseRequest) Reset() {
 	*x = ResolveAfterSaleCaseRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[17]
+	mi := &file_aftersales_aftersales_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1177,7 +1005,7 @@ func (x *ResolveAfterSaleCaseRequest) String() string {
 func (*ResolveAfterSaleCaseRequest) ProtoMessage() {}
 
 func (x *ResolveAfterSaleCaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[17]
+	mi := &file_aftersales_aftersales_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1190,7 +1018,7 @@ func (x *ResolveAfterSaleCaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveAfterSaleCaseRequest.ProtoReflect.Descriptor instead.
 func (*ResolveAfterSaleCaseRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{17}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ResolveAfterSaleCaseRequest) GetStoreId() int64 {
@@ -1281,7 +1109,7 @@ type ResolveAfterSaleCaseResponse struct {
 
 func (x *ResolveAfterSaleCaseResponse) Reset() {
 	*x = ResolveAfterSaleCaseResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[18]
+	mi := &file_aftersales_aftersales_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1293,7 +1121,7 @@ func (x *ResolveAfterSaleCaseResponse) String() string {
 func (*ResolveAfterSaleCaseResponse) ProtoMessage() {}
 
 func (x *ResolveAfterSaleCaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[18]
+	mi := &file_aftersales_aftersales_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1306,7 +1134,7 @@ func (x *ResolveAfterSaleCaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveAfterSaleCaseResponse.ProtoReflect.Descriptor instead.
 func (*ResolveAfterSaleCaseResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{18}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ResolveAfterSaleCaseResponse) GetCode() int32 {
@@ -1335,14 +1163,13 @@ type ResolveResultData struct {
 	CaseNo           string                 `protobuf:"bytes,1,opt,name=case_no,json=caseNo,proto3" json:"case_no,omitempty"`
 	Status           string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	ReturnShipmentNo string                 `protobuf:"bytes,3,opt,name=return_shipment_no,json=returnShipmentNo,proto3" json:"return_shipment_no,omitempty"`
-	NeedRefundPage   bool                   `protobuf:"varint,4,opt,name=need_refund_page,json=needRefundPage,proto3" json:"need_refund_page,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ResolveResultData) Reset() {
 	*x = ResolveResultData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[19]
+	mi := &file_aftersales_aftersales_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1354,7 +1181,7 @@ func (x *ResolveResultData) String() string {
 func (*ResolveResultData) ProtoMessage() {}
 
 func (x *ResolveResultData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[19]
+	mi := &file_aftersales_aftersales_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1367,7 +1194,7 @@ func (x *ResolveResultData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveResultData.ProtoReflect.Descriptor instead.
 func (*ResolveResultData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{19}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ResolveResultData) GetCaseNo() string {
@@ -1391,13 +1218,6 @@ func (x *ResolveResultData) GetReturnShipmentNo() string {
 	return ""
 }
 
-func (x *ResolveResultData) GetNeedRefundPage() bool {
-	if x != nil {
-		return x.NeedRefundPage
-	}
-	return false
-}
-
 type ConfirmReturnReceiptRequest struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	StoreId int64                  `protobuf:"varint,1,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -1413,7 +1233,7 @@ type ConfirmReturnReceiptRequest struct {
 
 func (x *ConfirmReturnReceiptRequest) Reset() {
 	*x = ConfirmReturnReceiptRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[20]
+	mi := &file_aftersales_aftersales_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1425,7 +1245,7 @@ func (x *ConfirmReturnReceiptRequest) String() string {
 func (*ConfirmReturnReceiptRequest) ProtoMessage() {}
 
 func (x *ConfirmReturnReceiptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[20]
+	mi := &file_aftersales_aftersales_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1438,7 +1258,7 @@ func (x *ConfirmReturnReceiptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmReturnReceiptRequest.ProtoReflect.Descriptor instead.
 func (*ConfirmReturnReceiptRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{20}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ConfirmReturnReceiptRequest) GetStoreId() int64 {
@@ -1493,7 +1313,7 @@ type ConfirmReturnReceiptResponse struct {
 
 func (x *ConfirmReturnReceiptResponse) Reset() {
 	*x = ConfirmReturnReceiptResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[21]
+	mi := &file_aftersales_aftersales_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1505,7 +1325,7 @@ func (x *ConfirmReturnReceiptResponse) String() string {
 func (*ConfirmReturnReceiptResponse) ProtoMessage() {}
 
 func (x *ConfirmReturnReceiptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[21]
+	mi := &file_aftersales_aftersales_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1518,7 +1338,7 @@ func (x *ConfirmReturnReceiptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmReturnReceiptResponse.ProtoReflect.Descriptor instead.
 func (*ConfirmReturnReceiptResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{21}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ConfirmReturnReceiptResponse) GetCode() int32 {
@@ -1546,7 +1366,7 @@ type RetryPrintReturnLabelRequest struct {
 
 func (x *RetryPrintReturnLabelRequest) Reset() {
 	*x = RetryPrintReturnLabelRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[22]
+	mi := &file_aftersales_aftersales_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1558,7 +1378,7 @@ func (x *RetryPrintReturnLabelRequest) String() string {
 func (*RetryPrintReturnLabelRequest) ProtoMessage() {}
 
 func (x *RetryPrintReturnLabelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[22]
+	mi := &file_aftersales_aftersales_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1571,7 +1391,7 @@ func (x *RetryPrintReturnLabelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryPrintReturnLabelRequest.ProtoReflect.Descriptor instead.
 func (*RetryPrintReturnLabelRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{22}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *RetryPrintReturnLabelRequest) GetAccountId() int64 {
@@ -1598,7 +1418,7 @@ type RetryPrintReturnLabelResponse struct {
 
 func (x *RetryPrintReturnLabelResponse) Reset() {
 	*x = RetryPrintReturnLabelResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[23]
+	mi := &file_aftersales_aftersales_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1610,7 +1430,7 @@ func (x *RetryPrintReturnLabelResponse) String() string {
 func (*RetryPrintReturnLabelResponse) ProtoMessage() {}
 
 func (x *RetryPrintReturnLabelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[23]
+	mi := &file_aftersales_aftersales_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1623,7 +1443,7 @@ func (x *RetryPrintReturnLabelResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RetryPrintReturnLabelResponse.ProtoReflect.Descriptor instead.
 func (*RetryPrintReturnLabelResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{23}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *RetryPrintReturnLabelResponse) GetCode() int32 {
@@ -1652,7 +1472,7 @@ type CancelShipmentRequest struct {
 
 func (x *CancelShipmentRequest) Reset() {
 	*x = CancelShipmentRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[24]
+	mi := &file_aftersales_aftersales_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1664,7 +1484,7 @@ func (x *CancelShipmentRequest) String() string {
 func (*CancelShipmentRequest) ProtoMessage() {}
 
 func (x *CancelShipmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[24]
+	mi := &file_aftersales_aftersales_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1677,7 +1497,7 @@ func (x *CancelShipmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelShipmentRequest.ProtoReflect.Descriptor instead.
 func (*CancelShipmentRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{24}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *CancelShipmentRequest) GetStoreId() int64 {
@@ -1719,7 +1539,7 @@ type CancelShipmentResponse struct {
 
 func (x *CancelShipmentResponse) Reset() {
 	*x = CancelShipmentResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[25]
+	mi := &file_aftersales_aftersales_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1731,7 +1551,7 @@ func (x *CancelShipmentResponse) String() string {
 func (*CancelShipmentResponse) ProtoMessage() {}
 
 func (x *CancelShipmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[25]
+	mi := &file_aftersales_aftersales_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1744,7 +1564,7 @@ func (x *CancelShipmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelShipmentResponse.ProtoReflect.Descriptor instead.
 func (*CancelShipmentResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{25}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *CancelShipmentResponse) GetCode() int32 {
@@ -1769,17 +1589,16 @@ func (x *CancelShipmentResponse) GetData() *CancelShipmentResultData {
 }
 
 type CancelShipmentResultData struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OrderNo        string                 `protobuf:"bytes,1,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
-	RefundAmount   string                 `protobuf:"bytes,2,opt,name=refund_amount,json=refundAmount,proto3" json:"refund_amount,omitempty"`
-	NeedRefundPage bool                   `protobuf:"varint,3,opt,name=need_refund_page,json=needRefundPage,proto3" json:"need_refund_page,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrderNo       string                 `protobuf:"bytes,1,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	RefundAmount  string                 `protobuf:"bytes,2,opt,name=refund_amount,json=refundAmount,proto3" json:"refund_amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CancelShipmentResultData) Reset() {
 	*x = CancelShipmentResultData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[26]
+	mi := &file_aftersales_aftersales_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1791,7 +1610,7 @@ func (x *CancelShipmentResultData) String() string {
 func (*CancelShipmentResultData) ProtoMessage() {}
 
 func (x *CancelShipmentResultData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[26]
+	mi := &file_aftersales_aftersales_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1804,7 +1623,7 @@ func (x *CancelShipmentResultData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelShipmentResultData.ProtoReflect.Descriptor instead.
 func (*CancelShipmentResultData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{26}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CancelShipmentResultData) GetOrderNo() string {
@@ -1821,13 +1640,6 @@ func (x *CancelShipmentResultData) GetRefundAmount() string {
 	return ""
 }
 
-func (x *CancelShipmentResultData) GetNeedRefundPage() bool {
-	if x != nil {
-		return x.NeedRefundPage
-	}
-	return false
-}
-
 type AfterSaleCaseSummary struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	CaseNo               string                 `protobuf:"bytes,1,opt,name=case_no,json=caseNo,proto3" json:"case_no,omitempty"`
@@ -1836,7 +1648,6 @@ type AfterSaleCaseSummary struct {
 	Reason               string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
 	RefundableAmount     string                 `protobuf:"bytes,5,opt,name=refundable_amount,json=refundableAmount,proto3" json:"refundable_amount,omitempty"`
 	CreatedAt            string                 `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	NeedRefundPage       bool                   `protobuf:"varint,7,opt,name=need_refund_page,json=needRefundPage,proto3" json:"need_refund_page,omitempty"`
 	BuyerName            string                 `protobuf:"bytes,8,opt,name=buyer_name,json=buyerName,proto3" json:"buyer_name,omitempty"`
 	BuyerAvatarKey       string                 `protobuf:"bytes,9,opt,name=buyer_avatar_key,json=buyerAvatarKey,proto3" json:"buyer_avatar_key,omitempty"` // 買家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 buyerAvatarUrl）
 	ShippingAddress      string                 `protobuf:"bytes,10,opt,name=shipping_address,json=shippingAddress,proto3" json:"shipping_address,omitempty"`
@@ -1846,11 +1657,9 @@ type AfterSaleCaseSummary struct {
 	AppealState string `protobuf:"bytes,13,opt,name=appeal_state,json=appealState,proto3" json:"appeal_state,omitempty"`
 	// §2.2 退款任務欄位（snapshot from refund_tasks，前端依此顯示 UX 情境；無 refund_task 時全部為空字串）
 	RefundTaskStatus     string `protobuf:"bytes,14,opt,name=refund_task_status,json=refundTaskStatus,proto3" json:"refund_task_status,omitempty"`             // WorkerTaskStatus value（"5"/"10"/"15"/"20"/"31"/"40"...）
-	RefundFailureMessage string `protobuf:"bytes,15,opt,name=refund_failure_message,json=refundFailureMessage,proto3" json:"refund_failure_message,omitempty"` // 退款失敗訊息，直接透傳 refund_tasks.payuni_message（PayUni 原話）
-	EstimatedRefundDate  string `protobuf:"bytes,16,opt,name=estimated_refund_date,json=estimatedRefundDate,proto3" json:"estimated_refund_date,omitempty"`    // 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 受理後有值）
-	BankDate             string `protobuf:"bytes,17,opt,name=bank_date,json=bankDate,proto3" json:"bank_date,omitempty"`                                       // 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM 成功匯款後有值）
-	ProviderStatus       string `protobuf:"bytes,18,opt,name=provider_status,json=providerStatus,proto3" json:"provider_status,omitempty"`                     // 聚合 PayUni 原始狀態碼（收斂規範 §6.2 / §9.4；依 case status 取自 refund_tasks.payuni_status 或 shipments.provider_status）
-	ProviderMessage      string `protobuf:"bytes,19,opt,name=provider_message,json=providerMessage,proto3" json:"provider_message,omitempty"`                  // 聚合 PayUni 原始訊息
+	RefundFailureMessage string `protobuf:"bytes,15,opt,name=refund_failure_message,json=refundFailureMessage,proto3" json:"refund_failure_message,omitempty"` // 退款失敗訊息（僅終態 FAILED），透傳 refund_tasks.provider_message
+	ProviderStatus       string `protobuf:"bytes,18,opt,name=provider_status,json=providerStatus,proto3" json:"provider_status,omitempty"`                     // provider 原始狀態碼（依 case status 取自 refund_tasks.provider_status 或 shipments.provider_status）
+	ProviderMessage      string `protobuf:"bytes,19,opt,name=provider_message,json=providerMessage,proto3" json:"provider_message,omitempty"`                  // provider 原始訊息
 	AutoConfirmAt        string `protobuf:"bytes,20,opt,name=auto_confirm_at,json=autoConfirmAt,proto3" json:"auto_confirm_at,omitempty"`                      // 自動確認收貨截止時間 ISO 8601 UTC（僅 status=27 RETURN_DELIVERED 時有值，scheduler 到期自動完成）
 	// 2026-05-22 逆物流退貨政策修訂新增欄位
 	StorePickupDeadlineAt string `protobuf:"bytes,21,opt,name=store_pickup_deadline_at,json=storePickupDeadlineAt,proto3" json:"store_pickup_deadline_at,omitempty"` // 超商待取逾時截止 ISO 8601 UTC（僅 status=26 RETURN_AT_STORE 時有值，72h scheduler 到期自動完成）
@@ -1862,7 +1671,7 @@ type AfterSaleCaseSummary struct {
 
 func (x *AfterSaleCaseSummary) Reset() {
 	*x = AfterSaleCaseSummary{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[27]
+	mi := &file_aftersales_aftersales_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1874,7 +1683,7 @@ func (x *AfterSaleCaseSummary) String() string {
 func (*AfterSaleCaseSummary) ProtoMessage() {}
 
 func (x *AfterSaleCaseSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[27]
+	mi := &file_aftersales_aftersales_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1887,7 +1696,7 @@ func (x *AfterSaleCaseSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterSaleCaseSummary.ProtoReflect.Descriptor instead.
 func (*AfterSaleCaseSummary) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{27}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *AfterSaleCaseSummary) GetCaseNo() string {
@@ -1930,13 +1739,6 @@ func (x *AfterSaleCaseSummary) GetCreatedAt() string {
 		return x.CreatedAt
 	}
 	return ""
-}
-
-func (x *AfterSaleCaseSummary) GetNeedRefundPage() bool {
-	if x != nil {
-		return x.NeedRefundPage
-	}
-	return false
 }
 
 func (x *AfterSaleCaseSummary) GetBuyerName() string {
@@ -1995,20 +1797,6 @@ func (x *AfterSaleCaseSummary) GetRefundFailureMessage() string {
 	return ""
 }
 
-func (x *AfterSaleCaseSummary) GetEstimatedRefundDate() string {
-	if x != nil {
-		return x.EstimatedRefundDate
-	}
-	return ""
-}
-
-func (x *AfterSaleCaseSummary) GetBankDate() string {
-	if x != nil {
-		return x.BankDate
-	}
-	return ""
-}
-
 func (x *AfterSaleCaseSummary) GetProviderStatus() string {
 	if x != nil {
 		return x.ProviderStatus
@@ -2056,7 +1844,7 @@ type AfterSaleCaseListData struct {
 
 func (x *AfterSaleCaseListData) Reset() {
 	*x = AfterSaleCaseListData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[28]
+	mi := &file_aftersales_aftersales_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2068,7 +1856,7 @@ func (x *AfterSaleCaseListData) String() string {
 func (*AfterSaleCaseListData) ProtoMessage() {}
 
 func (x *AfterSaleCaseListData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[28]
+	mi := &file_aftersales_aftersales_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2081,7 +1869,7 @@ func (x *AfterSaleCaseListData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterSaleCaseListData.ProtoReflect.Descriptor instead.
 func (*AfterSaleCaseListData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{28}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *AfterSaleCaseListData) GetRecords() []*AfterSaleCaseSummary {
@@ -2128,7 +1916,6 @@ type AfterSaleCaseDetailView struct {
 	ReturnShipmentNo     string                   `protobuf:"bytes,13,opt,name=return_shipment_no,json=returnShipmentNo,proto3" json:"return_shipment_no,omitempty"` // 後端內部 shipment ID（RS{9位}），非對外顯示
 	ReturnShippingMethod string                   `protobuf:"bytes,14,opt,name=return_shipping_method,json=returnShippingMethod,proto3" json:"return_shipping_method,omitempty"`
 	ShipmentPhotoKeys    []string                 `protobuf:"bytes,15,rep,name=shipment_photo_keys,json=shipmentPhotoKeys,proto3" json:"shipment_photo_keys,omitempty"` // 出貨照片 objectKey（49 §6.6：Gateway 組 shipmentPhotoUrls）
-	NeedRefundPage       bool                     `protobuf:"varint,16,opt,name=need_refund_page,json=needRefundPage,proto3" json:"need_refund_page,omitempty"`
 	CreatedAt            string                   `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	ClosedAt             string                   `protobuf:"bytes,18,opt,name=closed_at,json=closedAt,proto3" json:"closed_at,omitempty"`
 	ShipTradeNo          string                   `protobuf:"bytes,19,opt,name=ship_trade_no,json=shipTradeNo,proto3" json:"ship_trade_no,omitempty"`  // PayUni 物流序號（7-11 退貨可選顯示）
@@ -2141,11 +1928,9 @@ type AfterSaleCaseDetailView struct {
 	CanAppeal      bool   `protobuf:"varint,25,opt,name=can_appeal,json=canAppeal,proto3" json:"can_appeal,omitempty"`               // service layer compute 結果
 	// §2.2 退款任務欄位（snapshot from refund_tasks，前端依此顯示 UX 情境；無 refund_task 時全部為空字串）
 	RefundTaskStatus     string `protobuf:"bytes,26,opt,name=refund_task_status,json=refundTaskStatus,proto3" json:"refund_task_status,omitempty"`             // WorkerTaskStatus value（"5"/"10"/"15"/"20"/"31"/"40"...）
-	RefundFailureMessage string `protobuf:"bytes,27,opt,name=refund_failure_message,json=refundFailureMessage,proto3" json:"refund_failure_message,omitempty"` // 退款失敗訊息，直接透傳 refund_tasks.payuni_message（PayUni 原話）
-	EstimatedRefundDate  string `protobuf:"bytes,28,opt,name=estimated_refund_date,json=estimatedRefundDate,proto3" json:"estimated_refund_date,omitempty"`    // 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 受理後有值）
-	BankDate             string `protobuf:"bytes,29,opt,name=bank_date,json=bankDate,proto3" json:"bank_date,omitempty"`                                       // 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM 成功匯款後有值）
-	ProviderStatus       string `protobuf:"bytes,30,opt,name=provider_status,json=providerStatus,proto3" json:"provider_status,omitempty"`                     // 聚合 PayUni 原始狀態碼（收斂規範 §6.2 / §9.4；依 case status 取自 refund_tasks.payuni_status 或 shipments.provider_status）
-	ProviderMessage      string `protobuf:"bytes,31,opt,name=provider_message,json=providerMessage,proto3" json:"provider_message,omitempty"`                  // 聚合 PayUni 原始訊息
+	RefundFailureMessage string `protobuf:"bytes,27,opt,name=refund_failure_message,json=refundFailureMessage,proto3" json:"refund_failure_message,omitempty"` // 退款失敗訊息（僅終態 FAILED），透傳 refund_tasks.provider_message
+	ProviderStatus       string `protobuf:"bytes,30,opt,name=provider_status,json=providerStatus,proto3" json:"provider_status,omitempty"`                     // provider 原始狀態碼（依 case status 取自 refund_tasks.provider_status 或 shipments.provider_status）
+	ProviderMessage      string `protobuf:"bytes,31,opt,name=provider_message,json=providerMessage,proto3" json:"provider_message,omitempty"`                  // provider 原始訊息
 	// §5.10 賣家處理期限自動升級
 	ProcessDeadline      string `protobuf:"bytes,32,opt,name=process_deadline,json=processDeadline,proto3" json:"process_deadline,omitempty"`                   // ISO 8601 UTC；僅 status=PENDING 才有值
 	AutoEscalated        bool   `protobuf:"varint,33,opt,name=auto_escalated,json=autoEscalated,proto3" json:"auto_escalated,omitempty"`                        // 是否系統自動升級（PROCESS_TIMEOUT）
@@ -2168,7 +1953,7 @@ type AfterSaleCaseDetailView struct {
 
 func (x *AfterSaleCaseDetailView) Reset() {
 	*x = AfterSaleCaseDetailView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[29]
+	mi := &file_aftersales_aftersales_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2180,7 +1965,7 @@ func (x *AfterSaleCaseDetailView) String() string {
 func (*AfterSaleCaseDetailView) ProtoMessage() {}
 
 func (x *AfterSaleCaseDetailView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[29]
+	mi := &file_aftersales_aftersales_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2193,7 +1978,7 @@ func (x *AfterSaleCaseDetailView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterSaleCaseDetailView.ProtoReflect.Descriptor instead.
 func (*AfterSaleCaseDetailView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{29}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *AfterSaleCaseDetailView) GetCaseNo() string {
@@ -2294,13 +2079,6 @@ func (x *AfterSaleCaseDetailView) GetShipmentPhotoKeys() []string {
 	return nil
 }
 
-func (x *AfterSaleCaseDetailView) GetNeedRefundPage() bool {
-	if x != nil {
-		return x.NeedRefundPage
-	}
-	return false
-}
-
 func (x *AfterSaleCaseDetailView) GetCreatedAt() string {
 	if x != nil {
 		return x.CreatedAt
@@ -2374,20 +2152,6 @@ func (x *AfterSaleCaseDetailView) GetRefundTaskStatus() string {
 func (x *AfterSaleCaseDetailView) GetRefundFailureMessage() string {
 	if x != nil {
 		return x.RefundFailureMessage
-	}
-	return ""
-}
-
-func (x *AfterSaleCaseDetailView) GetEstimatedRefundDate() string {
-	if x != nil {
-		return x.EstimatedRefundDate
-	}
-	return ""
-}
-
-func (x *AfterSaleCaseDetailView) GetBankDate() string {
-	if x != nil {
-		return x.BankDate
 	}
 	return ""
 }
@@ -2505,7 +2269,7 @@ type AfterSaleCaseItemView struct {
 
 func (x *AfterSaleCaseItemView) Reset() {
 	*x = AfterSaleCaseItemView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[30]
+	mi := &file_aftersales_aftersales_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2517,7 +2281,7 @@ func (x *AfterSaleCaseItemView) String() string {
 func (*AfterSaleCaseItemView) ProtoMessage() {}
 
 func (x *AfterSaleCaseItemView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[30]
+	mi := &file_aftersales_aftersales_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2530,7 +2294,7 @@ func (x *AfterSaleCaseItemView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AfterSaleCaseItemView.ProtoReflect.Descriptor instead.
 func (*AfterSaleCaseItemView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{30}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AfterSaleCaseItemView) GetOrderItemId() string {
@@ -2594,7 +2358,7 @@ type EvidenceView struct {
 
 func (x *EvidenceView) Reset() {
 	*x = EvidenceView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[31]
+	mi := &file_aftersales_aftersales_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2606,7 +2370,7 @@ func (x *EvidenceView) String() string {
 func (*EvidenceView) ProtoMessage() {}
 
 func (x *EvidenceView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[31]
+	mi := &file_aftersales_aftersales_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2619,7 +2383,7 @@ func (x *EvidenceView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EvidenceView.ProtoReflect.Descriptor instead.
 func (*EvidenceView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{31}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *EvidenceView) GetAssetId() string {
@@ -2670,7 +2434,7 @@ type ResolutionView struct {
 
 func (x *ResolutionView) Reset() {
 	*x = ResolutionView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[32]
+	mi := &file_aftersales_aftersales_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2682,7 +2446,7 @@ func (x *ResolutionView) String() string {
 func (*ResolutionView) ProtoMessage() {}
 
 func (x *ResolutionView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[32]
+	mi := &file_aftersales_aftersales_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2695,7 +2459,7 @@ func (x *ResolutionView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolutionView.ProtoReflect.Descriptor instead.
 func (*ResolutionView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{32}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ResolutionView) GetResolutionType() string {
@@ -2775,126 +2539,6 @@ func (x *ResolutionView) GetInspectionNote() string {
 	return ""
 }
 
-type HandleRefundPageReturnRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	EncryptInfo   string                 `protobuf:"bytes,1,opt,name=encrypt_info,json=encryptInfo,proto3" json:"encrypt_info,omitempty"` // PayUni Form POST 的 EncryptInfo（AES 加密）
-	HashInfo      string                 `protobuf:"bytes,2,opt,name=hash_info,json=hashInfo,proto3" json:"hash_info,omitempty"`          // PayUni Form POST 的 HashInfo（SHA256 簽章）
-	OrderNo       string                 `protobuf:"bytes,4,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`             // Gateway fallback：從 return_url query param 取，PayUni 失敗時 MerTradeNo 可能為空，用此欄位 lookup refund_task
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *HandleRefundPageReturnRequest) Reset() {
-	*x = HandleRefundPageReturnRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[33]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HandleRefundPageReturnRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HandleRefundPageReturnRequest) ProtoMessage() {}
-
-func (x *HandleRefundPageReturnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[33]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HandleRefundPageReturnRequest.ProtoReflect.Descriptor instead.
-func (*HandleRefundPageReturnRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{33}
-}
-
-func (x *HandleRefundPageReturnRequest) GetEncryptInfo() string {
-	if x != nil {
-		return x.EncryptInfo
-	}
-	return ""
-}
-
-func (x *HandleRefundPageReturnRequest) GetHashInfo() string {
-	if x != nil {
-		return x.HashInfo
-	}
-	return ""
-}
-
-func (x *HandleRefundPageReturnRequest) GetOrderNo() string {
-	if x != nil {
-		return x.OrderNo
-	}
-	return ""
-}
-
-type HandleRefundPageReturnResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`
-	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	RedirectUrl   string                 `protobuf:"bytes,3,opt,name=redirect_url,json=redirectUrl,proto3" json:"redirect_url,omitempty"` // 完整 Deep Link URL（Gateway 302 redirect 用）
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *HandleRefundPageReturnResponse) Reset() {
-	*x = HandleRefundPageReturnResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[34]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *HandleRefundPageReturnResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*HandleRefundPageReturnResponse) ProtoMessage() {}
-
-func (x *HandleRefundPageReturnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[34]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use HandleRefundPageReturnResponse.ProtoReflect.Descriptor instead.
-func (*HandleRefundPageReturnResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{34}
-}
-
-func (x *HandleRefundPageReturnResponse) GetCode() int32 {
-	if x != nil {
-		return x.Code
-	}
-	return 0
-}
-
-func (x *HandleRefundPageReturnResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
-func (x *HandleRefundPageReturnResponse) GetRedirectUrl() string {
-	if x != nil {
-		return x.RedirectUrl
-	}
-	return ""
-}
-
 type HasActiveCaseRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrderNo       string                 `protobuf:"bytes,1,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
@@ -2904,7 +2548,7 @@ type HasActiveCaseRequest struct {
 
 func (x *HasActiveCaseRequest) Reset() {
 	*x = HasActiveCaseRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[35]
+	mi := &file_aftersales_aftersales_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2916,7 +2560,7 @@ func (x *HasActiveCaseRequest) String() string {
 func (*HasActiveCaseRequest) ProtoMessage() {}
 
 func (x *HasActiveCaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[35]
+	mi := &file_aftersales_aftersales_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2929,7 +2573,7 @@ func (x *HasActiveCaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HasActiveCaseRequest.ProtoReflect.Descriptor instead.
 func (*HasActiveCaseRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{35}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *HasActiveCaseRequest) GetOrderNo() string {
@@ -2951,7 +2595,7 @@ type HasActiveCaseResponse struct {
 
 func (x *HasActiveCaseResponse) Reset() {
 	*x = HasActiveCaseResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[36]
+	mi := &file_aftersales_aftersales_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2963,7 +2607,7 @@ func (x *HasActiveCaseResponse) String() string {
 func (*HasActiveCaseResponse) ProtoMessage() {}
 
 func (x *HasActiveCaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[36]
+	mi := &file_aftersales_aftersales_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2976,7 +2620,7 @@ func (x *HasActiveCaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HasActiveCaseResponse.ProtoReflect.Descriptor instead.
 func (*HasActiveCaseResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{36}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *HasActiveCaseResponse) GetCode() int32 {
@@ -3017,7 +2661,7 @@ type CancelActiveCaseOnConfirmReceiptRequest struct {
 
 func (x *CancelActiveCaseOnConfirmReceiptRequest) Reset() {
 	*x = CancelActiveCaseOnConfirmReceiptRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[37]
+	mi := &file_aftersales_aftersales_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3029,7 +2673,7 @@ func (x *CancelActiveCaseOnConfirmReceiptRequest) String() string {
 func (*CancelActiveCaseOnConfirmReceiptRequest) ProtoMessage() {}
 
 func (x *CancelActiveCaseOnConfirmReceiptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[37]
+	mi := &file_aftersales_aftersales_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3042,7 +2686,7 @@ func (x *CancelActiveCaseOnConfirmReceiptRequest) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use CancelActiveCaseOnConfirmReceiptRequest.ProtoReflect.Descriptor instead.
 func (*CancelActiveCaseOnConfirmReceiptRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{37}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *CancelActiveCaseOnConfirmReceiptRequest) GetOrderNo() string {
@@ -3073,7 +2717,7 @@ type CancelActiveCaseOnConfirmReceiptResponse struct {
 
 func (x *CancelActiveCaseOnConfirmReceiptResponse) Reset() {
 	*x = CancelActiveCaseOnConfirmReceiptResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[38]
+	mi := &file_aftersales_aftersales_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3085,7 +2729,7 @@ func (x *CancelActiveCaseOnConfirmReceiptResponse) String() string {
 func (*CancelActiveCaseOnConfirmReceiptResponse) ProtoMessage() {}
 
 func (x *CancelActiveCaseOnConfirmReceiptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[38]
+	mi := &file_aftersales_aftersales_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3098,7 +2742,7 @@ func (x *CancelActiveCaseOnConfirmReceiptResponse) ProtoReflect() protoreflect.M
 
 // Deprecated: Use CancelActiveCaseOnConfirmReceiptResponse.ProtoReflect.Descriptor instead.
 func (*CancelActiveCaseOnConfirmReceiptResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{38}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *CancelActiveCaseOnConfirmReceiptResponse) GetCode() int32 {
@@ -3145,7 +2789,7 @@ type GetOrderPayoutHoldRequest struct {
 
 func (x *GetOrderPayoutHoldRequest) Reset() {
 	*x = GetOrderPayoutHoldRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[39]
+	mi := &file_aftersales_aftersales_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3157,7 +2801,7 @@ func (x *GetOrderPayoutHoldRequest) String() string {
 func (*GetOrderPayoutHoldRequest) ProtoMessage() {}
 
 func (x *GetOrderPayoutHoldRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[39]
+	mi := &file_aftersales_aftersales_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3170,7 +2814,7 @@ func (x *GetOrderPayoutHoldRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrderPayoutHoldRequest.ProtoReflect.Descriptor instead.
 func (*GetOrderPayoutHoldRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{39}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetOrderPayoutHoldRequest) GetOrderNo() string {
@@ -3198,7 +2842,7 @@ type GetOrderPayoutHoldResponse struct {
 
 func (x *GetOrderPayoutHoldResponse) Reset() {
 	*x = GetOrderPayoutHoldResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[40]
+	mi := &file_aftersales_aftersales_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3210,7 +2854,7 @@ func (x *GetOrderPayoutHoldResponse) String() string {
 func (*GetOrderPayoutHoldResponse) ProtoMessage() {}
 
 func (x *GetOrderPayoutHoldResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[40]
+	mi := &file_aftersales_aftersales_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3223,7 +2867,7 @@ func (x *GetOrderPayoutHoldResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetOrderPayoutHoldResponse.ProtoReflect.Descriptor instead.
 func (*GetOrderPayoutHoldResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{40}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetOrderPayoutHoldResponse) GetCode() int32 {
@@ -3277,7 +2921,7 @@ type GetSellerCaseClassificationRequest struct {
 
 func (x *GetSellerCaseClassificationRequest) Reset() {
 	*x = GetSellerCaseClassificationRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[41]
+	mi := &file_aftersales_aftersales_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3289,7 +2933,7 @@ func (x *GetSellerCaseClassificationRequest) String() string {
 func (*GetSellerCaseClassificationRequest) ProtoMessage() {}
 
 func (x *GetSellerCaseClassificationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[41]
+	mi := &file_aftersales_aftersales_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3302,7 +2946,7 @@ func (x *GetSellerCaseClassificationRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetSellerCaseClassificationRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerCaseClassificationRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{41}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetSellerCaseClassificationRequest) GetStoreId() int64 {
@@ -3325,7 +2969,7 @@ type GetSellerCaseClassificationResponse struct {
 
 func (x *GetSellerCaseClassificationResponse) Reset() {
 	*x = GetSellerCaseClassificationResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[42]
+	mi := &file_aftersales_aftersales_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3337,7 +2981,7 @@ func (x *GetSellerCaseClassificationResponse) String() string {
 func (*GetSellerCaseClassificationResponse) ProtoMessage() {}
 
 func (x *GetSellerCaseClassificationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[42]
+	mi := &file_aftersales_aftersales_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3350,7 +2994,7 @@ func (x *GetSellerCaseClassificationResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GetSellerCaseClassificationResponse.ProtoReflect.Descriptor instead.
 func (*GetSellerCaseClassificationResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{42}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetSellerCaseClassificationResponse) GetCode() int32 {
@@ -3401,7 +3045,7 @@ type SubmitAppealRequest struct {
 
 func (x *SubmitAppealRequest) Reset() {
 	*x = SubmitAppealRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[43]
+	mi := &file_aftersales_aftersales_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3413,7 +3057,7 @@ func (x *SubmitAppealRequest) String() string {
 func (*SubmitAppealRequest) ProtoMessage() {}
 
 func (x *SubmitAppealRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[43]
+	mi := &file_aftersales_aftersales_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3426,7 +3070,7 @@ func (x *SubmitAppealRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitAppealRequest.ProtoReflect.Descriptor instead.
 func (*SubmitAppealRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{43}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *SubmitAppealRequest) GetBuyerId() int64 {
@@ -3475,7 +3119,7 @@ type SubmitAppealResponse struct {
 
 func (x *SubmitAppealResponse) Reset() {
 	*x = SubmitAppealResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[44]
+	mi := &file_aftersales_aftersales_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3487,7 +3131,7 @@ func (x *SubmitAppealResponse) String() string {
 func (*SubmitAppealResponse) ProtoMessage() {}
 
 func (x *SubmitAppealResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[44]
+	mi := &file_aftersales_aftersales_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3500,7 +3144,7 @@ func (x *SubmitAppealResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitAppealResponse.ProtoReflect.Descriptor instead.
 func (*SubmitAppealResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{44}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SubmitAppealResponse) GetCode() int32 {
@@ -3534,7 +3178,7 @@ type SubmitAppealData struct {
 
 func (x *SubmitAppealData) Reset() {
 	*x = SubmitAppealData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[45]
+	mi := &file_aftersales_aftersales_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3546,7 +3190,7 @@ func (x *SubmitAppealData) String() string {
 func (*SubmitAppealData) ProtoMessage() {}
 
 func (x *SubmitAppealData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[45]
+	mi := &file_aftersales_aftersales_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3559,7 +3203,7 @@ func (x *SubmitAppealData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmitAppealData.ProtoReflect.Descriptor instead.
 func (*SubmitAppealData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{45}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *SubmitAppealData) GetAppealId() string {
@@ -3586,7 +3230,7 @@ type GetArbitrationRequest struct {
 
 func (x *GetArbitrationRequest) Reset() {
 	*x = GetArbitrationRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[46]
+	mi := &file_aftersales_aftersales_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3598,7 +3242,7 @@ func (x *GetArbitrationRequest) String() string {
 func (*GetArbitrationRequest) ProtoMessage() {}
 
 func (x *GetArbitrationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[46]
+	mi := &file_aftersales_aftersales_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3611,7 +3255,7 @@ func (x *GetArbitrationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetArbitrationRequest.ProtoReflect.Descriptor instead.
 func (*GetArbitrationRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{46}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetArbitrationRequest) GetBuyerId() int64 {
@@ -3638,7 +3282,7 @@ type GetSellerArbitrationRequest struct {
 
 func (x *GetSellerArbitrationRequest) Reset() {
 	*x = GetSellerArbitrationRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[47]
+	mi := &file_aftersales_aftersales_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3650,7 +3294,7 @@ func (x *GetSellerArbitrationRequest) String() string {
 func (*GetSellerArbitrationRequest) ProtoMessage() {}
 
 func (x *GetSellerArbitrationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[47]
+	mi := &file_aftersales_aftersales_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3663,7 +3307,7 @@ func (x *GetSellerArbitrationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSellerArbitrationRequest.ProtoReflect.Descriptor instead.
 func (*GetSellerArbitrationRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{47}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GetSellerArbitrationRequest) GetStoreId() int64 {
@@ -3691,7 +3335,7 @@ type GetArbitrationResponse struct {
 
 func (x *GetArbitrationResponse) Reset() {
 	*x = GetArbitrationResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[48]
+	mi := &file_aftersales_aftersales_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3703,7 +3347,7 @@ func (x *GetArbitrationResponse) String() string {
 func (*GetArbitrationResponse) ProtoMessage() {}
 
 func (x *GetArbitrationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[48]
+	mi := &file_aftersales_aftersales_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3716,7 +3360,7 @@ func (x *GetArbitrationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetArbitrationResponse.ProtoReflect.Descriptor instead.
 func (*GetArbitrationResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{48}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GetArbitrationResponse) GetCode() int32 {
@@ -3751,7 +3395,7 @@ type ArbitrationData struct {
 
 func (x *ArbitrationData) Reset() {
 	*x = ArbitrationData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[49]
+	mi := &file_aftersales_aftersales_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3763,7 +3407,7 @@ func (x *ArbitrationData) String() string {
 func (*ArbitrationData) ProtoMessage() {}
 
 func (x *ArbitrationData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[49]
+	mi := &file_aftersales_aftersales_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3776,7 +3420,7 @@ func (x *ArbitrationData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArbitrationData.ProtoReflect.Descriptor instead.
 func (*ArbitrationData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{49}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ArbitrationData) GetState() string {
@@ -3812,7 +3456,7 @@ type AppealEventView struct {
 
 func (x *AppealEventView) Reset() {
 	*x = AppealEventView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[50]
+	mi := &file_aftersales_aftersales_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3824,7 +3468,7 @@ func (x *AppealEventView) String() string {
 func (*AppealEventView) ProtoMessage() {}
 
 func (x *AppealEventView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[50]
+	mi := &file_aftersales_aftersales_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3837,7 +3481,7 @@ func (x *AppealEventView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppealEventView.ProtoReflect.Descriptor instead.
 func (*AppealEventView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{50}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *AppealEventView) GetEventType() string {
@@ -3880,7 +3524,7 @@ type PlatformDecisionView struct {
 
 func (x *PlatformDecisionView) Reset() {
 	*x = PlatformDecisionView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[51]
+	mi := &file_aftersales_aftersales_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3892,7 +3536,7 @@ func (x *PlatformDecisionView) String() string {
 func (*PlatformDecisionView) ProtoMessage() {}
 
 func (x *PlatformDecisionView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[51]
+	mi := &file_aftersales_aftersales_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3905,7 +3549,7 @@ func (x *PlatformDecisionView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlatformDecisionView.ProtoReflect.Descriptor instead.
 func (*PlatformDecisionView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{51}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *PlatformDecisionView) GetOutcome() string {
@@ -3948,7 +3592,7 @@ type ListAppealsForAdminRequest struct {
 
 func (x *ListAppealsForAdminRequest) Reset() {
 	*x = ListAppealsForAdminRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[52]
+	mi := &file_aftersales_aftersales_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3960,7 +3604,7 @@ func (x *ListAppealsForAdminRequest) String() string {
 func (*ListAppealsForAdminRequest) ProtoMessage() {}
 
 func (x *ListAppealsForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[52]
+	mi := &file_aftersales_aftersales_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3973,7 +3617,7 @@ func (x *ListAppealsForAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAppealsForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListAppealsForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{52}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ListAppealsForAdminRequest) GetAccountId() int64 {
@@ -4015,7 +3659,7 @@ type ListAppealsForAdminResponse struct {
 
 func (x *ListAppealsForAdminResponse) Reset() {
 	*x = ListAppealsForAdminResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[53]
+	mi := &file_aftersales_aftersales_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4027,7 +3671,7 @@ func (x *ListAppealsForAdminResponse) String() string {
 func (*ListAppealsForAdminResponse) ProtoMessage() {}
 
 func (x *ListAppealsForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[53]
+	mi := &file_aftersales_aftersales_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4040,7 +3684,7 @@ func (x *ListAppealsForAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAppealsForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListAppealsForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{53}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *ListAppealsForAdminResponse) GetCode() int32 {
@@ -4076,7 +3720,7 @@ type ListAppealsForAdminData struct {
 
 func (x *ListAppealsForAdminData) Reset() {
 	*x = ListAppealsForAdminData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[54]
+	mi := &file_aftersales_aftersales_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4088,7 +3732,7 @@ func (x *ListAppealsForAdminData) String() string {
 func (*ListAppealsForAdminData) ProtoMessage() {}
 
 func (x *ListAppealsForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[54]
+	mi := &file_aftersales_aftersales_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4101,7 +3745,7 @@ func (x *ListAppealsForAdminData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAppealsForAdminData.ProtoReflect.Descriptor instead.
 func (*ListAppealsForAdminData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{54}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *ListAppealsForAdminData) GetRecords() []*AppealSummaryView {
@@ -4153,7 +3797,7 @@ type AppealSummaryView struct {
 
 func (x *AppealSummaryView) Reset() {
 	*x = AppealSummaryView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[55]
+	mi := &file_aftersales_aftersales_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4165,7 +3809,7 @@ func (x *AppealSummaryView) String() string {
 func (*AppealSummaryView) ProtoMessage() {}
 
 func (x *AppealSummaryView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[55]
+	mi := &file_aftersales_aftersales_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4178,7 +3822,7 @@ func (x *AppealSummaryView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppealSummaryView.ProtoReflect.Descriptor instead.
 func (*AppealSummaryView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{55}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *AppealSummaryView) GetCaseNo() string {
@@ -4278,7 +3922,7 @@ type DecideAppealForAdminRequest struct {
 
 func (x *DecideAppealForAdminRequest) Reset() {
 	*x = DecideAppealForAdminRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[56]
+	mi := &file_aftersales_aftersales_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4290,7 +3934,7 @@ func (x *DecideAppealForAdminRequest) String() string {
 func (*DecideAppealForAdminRequest) ProtoMessage() {}
 
 func (x *DecideAppealForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[56]
+	mi := &file_aftersales_aftersales_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4303,7 +3947,7 @@ func (x *DecideAppealForAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideAppealForAdminRequest.ProtoReflect.Descriptor instead.
 func (*DecideAppealForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{56}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *DecideAppealForAdminRequest) GetAccountId() int64 {
@@ -4352,7 +3996,7 @@ type DecideAppealForAdminResponse struct {
 
 func (x *DecideAppealForAdminResponse) Reset() {
 	*x = DecideAppealForAdminResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[57]
+	mi := &file_aftersales_aftersales_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4364,7 +4008,7 @@ func (x *DecideAppealForAdminResponse) String() string {
 func (*DecideAppealForAdminResponse) ProtoMessage() {}
 
 func (x *DecideAppealForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[57]
+	mi := &file_aftersales_aftersales_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4377,7 +4021,7 @@ func (x *DecideAppealForAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideAppealForAdminResponse.ProtoReflect.Descriptor instead.
 func (*DecideAppealForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{57}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *DecideAppealForAdminResponse) GetCode() int32 {
@@ -4412,7 +4056,7 @@ type DecideAppealForAdminData struct {
 
 func (x *DecideAppealForAdminData) Reset() {
 	*x = DecideAppealForAdminData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[58]
+	mi := &file_aftersales_aftersales_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4424,7 +4068,7 @@ func (x *DecideAppealForAdminData) String() string {
 func (*DecideAppealForAdminData) ProtoMessage() {}
 
 func (x *DecideAppealForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[58]
+	mi := &file_aftersales_aftersales_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4437,7 +4081,7 @@ func (x *DecideAppealForAdminData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideAppealForAdminData.ProtoReflect.Descriptor instead.
 func (*DecideAppealForAdminData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{58}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *DecideAppealForAdminData) GetCaseNo() string {
@@ -4472,7 +4116,7 @@ type GetAppealDetailForAdminRequest struct {
 
 func (x *GetAppealDetailForAdminRequest) Reset() {
 	*x = GetAppealDetailForAdminRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[59]
+	mi := &file_aftersales_aftersales_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4484,7 +4128,7 @@ func (x *GetAppealDetailForAdminRequest) String() string {
 func (*GetAppealDetailForAdminRequest) ProtoMessage() {}
 
 func (x *GetAppealDetailForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[59]
+	mi := &file_aftersales_aftersales_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4497,7 +4141,7 @@ func (x *GetAppealDetailForAdminRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAppealDetailForAdminRequest.ProtoReflect.Descriptor instead.
 func (*GetAppealDetailForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{59}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *GetAppealDetailForAdminRequest) GetAccountId() int64 {
@@ -4525,7 +4169,7 @@ type GetAppealDetailForAdminResponse struct {
 
 func (x *GetAppealDetailForAdminResponse) Reset() {
 	*x = GetAppealDetailForAdminResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[60]
+	mi := &file_aftersales_aftersales_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4537,7 +4181,7 @@ func (x *GetAppealDetailForAdminResponse) String() string {
 func (*GetAppealDetailForAdminResponse) ProtoMessage() {}
 
 func (x *GetAppealDetailForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[60]
+	mi := &file_aftersales_aftersales_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4550,7 +4194,7 @@ func (x *GetAppealDetailForAdminResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAppealDetailForAdminResponse.ProtoReflect.Descriptor instead.
 func (*GetAppealDetailForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{60}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *GetAppealDetailForAdminResponse) GetCode() int32 {
@@ -4586,7 +4230,7 @@ type AppealDetailForAdminData struct {
 
 func (x *AppealDetailForAdminData) Reset() {
 	*x = AppealDetailForAdminData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[61]
+	mi := &file_aftersales_aftersales_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4598,7 +4242,7 @@ func (x *AppealDetailForAdminData) String() string {
 func (*AppealDetailForAdminData) ProtoMessage() {}
 
 func (x *AppealDetailForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[61]
+	mi := &file_aftersales_aftersales_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4611,7 +4255,7 @@ func (x *AppealDetailForAdminData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppealDetailForAdminData.ProtoReflect.Descriptor instead.
 func (*AppealDetailForAdminData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{61}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *AppealDetailForAdminData) GetCaseDetail() *AfterSaleCaseDetailView {
@@ -4656,7 +4300,7 @@ type AdminProviderContext struct {
 
 func (x *AdminProviderContext) Reset() {
 	*x = AdminProviderContext{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[62]
+	mi := &file_aftersales_aftersales_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4668,7 +4312,7 @@ func (x *AdminProviderContext) String() string {
 func (*AdminProviderContext) ProtoMessage() {}
 
 func (x *AdminProviderContext) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[62]
+	mi := &file_aftersales_aftersales_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4681,7 +4325,7 @@ func (x *AdminProviderContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminProviderContext.ProtoReflect.Descriptor instead.
 func (*AdminProviderContext) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{62}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *AdminProviderContext) GetProviderSource() string {
@@ -4736,7 +4380,7 @@ type AdminContextView struct {
 
 func (x *AdminContextView) Reset() {
 	*x = AdminContextView{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[63]
+	mi := &file_aftersales_aftersales_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4748,7 +4392,7 @@ func (x *AdminContextView) String() string {
 func (*AdminContextView) ProtoMessage() {}
 
 func (x *AdminContextView) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[63]
+	mi := &file_aftersales_aftersales_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4761,7 +4405,7 @@ func (x *AdminContextView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminContextView.ProtoReflect.Descriptor instead.
 func (*AdminContextView) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{63}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *AdminContextView) GetDecidedByAdminId() string {
@@ -4847,7 +4491,7 @@ type ListAfterSaleCasesForAdminRequest struct {
 
 func (x *ListAfterSaleCasesForAdminRequest) Reset() {
 	*x = ListAfterSaleCasesForAdminRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[64]
+	mi := &file_aftersales_aftersales_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4859,7 +4503,7 @@ func (x *ListAfterSaleCasesForAdminRequest) String() string {
 func (*ListAfterSaleCasesForAdminRequest) ProtoMessage() {}
 
 func (x *ListAfterSaleCasesForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[64]
+	mi := &file_aftersales_aftersales_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4872,7 +4516,7 @@ func (x *ListAfterSaleCasesForAdminRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListAfterSaleCasesForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ListAfterSaleCasesForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{64}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *ListAfterSaleCasesForAdminRequest) GetAccountId() int64 {
@@ -4970,7 +4614,7 @@ type ListAfterSaleCasesForAdminResponse struct {
 
 func (x *ListAfterSaleCasesForAdminResponse) Reset() {
 	*x = ListAfterSaleCasesForAdminResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[65]
+	mi := &file_aftersales_aftersales_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4982,7 +4626,7 @@ func (x *ListAfterSaleCasesForAdminResponse) String() string {
 func (*ListAfterSaleCasesForAdminResponse) ProtoMessage() {}
 
 func (x *ListAfterSaleCasesForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[65]
+	mi := &file_aftersales_aftersales_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4995,7 +4639,7 @@ func (x *ListAfterSaleCasesForAdminResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ListAfterSaleCasesForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ListAfterSaleCasesForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{65}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *ListAfterSaleCasesForAdminResponse) GetCode() int32 {
@@ -5031,7 +4675,7 @@ type ListAfterSaleCasesForAdminData struct {
 
 func (x *ListAfterSaleCasesForAdminData) Reset() {
 	*x = ListAfterSaleCasesForAdminData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[66]
+	mi := &file_aftersales_aftersales_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5043,7 +4687,7 @@ func (x *ListAfterSaleCasesForAdminData) String() string {
 func (*ListAfterSaleCasesForAdminData) ProtoMessage() {}
 
 func (x *ListAfterSaleCasesForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[66]
+	mi := &file_aftersales_aftersales_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5056,7 +4700,7 @@ func (x *ListAfterSaleCasesForAdminData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAfterSaleCasesForAdminData.ProtoReflect.Descriptor instead.
 func (*ListAfterSaleCasesForAdminData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{66}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *ListAfterSaleCasesForAdminData) GetRecords() []*AdminAfterSaleCaseSummary {
@@ -5106,7 +4750,7 @@ type AdminAfterSaleCaseSummary struct {
 
 func (x *AdminAfterSaleCaseSummary) Reset() {
 	*x = AdminAfterSaleCaseSummary{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[67]
+	mi := &file_aftersales_aftersales_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5118,7 +4762,7 @@ func (x *AdminAfterSaleCaseSummary) String() string {
 func (*AdminAfterSaleCaseSummary) ProtoMessage() {}
 
 func (x *AdminAfterSaleCaseSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[67]
+	mi := &file_aftersales_aftersales_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5131,7 +4775,7 @@ func (x *AdminAfterSaleCaseSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdminAfterSaleCaseSummary.ProtoReflect.Descriptor instead.
 func (*AdminAfterSaleCaseSummary) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{67}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *AdminAfterSaleCaseSummary) GetCaseNo() string {
@@ -5224,7 +4868,7 @@ type ForceConfirmReceiptForAdminRequest struct {
 
 func (x *ForceConfirmReceiptForAdminRequest) Reset() {
 	*x = ForceConfirmReceiptForAdminRequest{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[68]
+	mi := &file_aftersales_aftersales_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5236,7 +4880,7 @@ func (x *ForceConfirmReceiptForAdminRequest) String() string {
 func (*ForceConfirmReceiptForAdminRequest) ProtoMessage() {}
 
 func (x *ForceConfirmReceiptForAdminRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[68]
+	mi := &file_aftersales_aftersales_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5249,7 +4893,7 @@ func (x *ForceConfirmReceiptForAdminRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ForceConfirmReceiptForAdminRequest.ProtoReflect.Descriptor instead.
 func (*ForceConfirmReceiptForAdminRequest) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{68}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *ForceConfirmReceiptForAdminRequest) GetAccountId() int64 {
@@ -5298,7 +4942,7 @@ type ForceConfirmReceiptForAdminResponse struct {
 
 func (x *ForceConfirmReceiptForAdminResponse) Reset() {
 	*x = ForceConfirmReceiptForAdminResponse{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[69]
+	mi := &file_aftersales_aftersales_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5310,7 +4954,7 @@ func (x *ForceConfirmReceiptForAdminResponse) String() string {
 func (*ForceConfirmReceiptForAdminResponse) ProtoMessage() {}
 
 func (x *ForceConfirmReceiptForAdminResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[69]
+	mi := &file_aftersales_aftersales_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5323,7 +4967,7 @@ func (x *ForceConfirmReceiptForAdminResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use ForceConfirmReceiptForAdminResponse.ProtoReflect.Descriptor instead.
 func (*ForceConfirmReceiptForAdminResponse) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{69}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *ForceConfirmReceiptForAdminResponse) GetCode() int32 {
@@ -5359,7 +5003,7 @@ type ForceConfirmReceiptForAdminData struct {
 
 func (x *ForceConfirmReceiptForAdminData) Reset() {
 	*x = ForceConfirmReceiptForAdminData{}
-	mi := &file_aftersales_aftersales_proto_msgTypes[70]
+	mi := &file_aftersales_aftersales_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5371,7 +5015,7 @@ func (x *ForceConfirmReceiptForAdminData) String() string {
 func (*ForceConfirmReceiptForAdminData) ProtoMessage() {}
 
 func (x *ForceConfirmReceiptForAdminData) ProtoReflect() protoreflect.Message {
-	mi := &file_aftersales_aftersales_proto_msgTypes[70]
+	mi := &file_aftersales_aftersales_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5384,7 +5028,7 @@ func (x *ForceConfirmReceiptForAdminData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForceConfirmReceiptForAdminData.ProtoReflect.Descriptor instead.
 func (*ForceConfirmReceiptForAdminData) Descriptor() ([]byte, []int) {
-	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{70}
+	return file_aftersales_aftersales_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *ForceConfirmReceiptForAdminData) GetCaseNo() string {
@@ -5459,19 +5103,7 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\acase_no\x18\x02 \x01(\tR\x06caseNo\"K\n" +
 	"\x1bCancelAfterSaleCaseResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x8b\x01\n" +
-	"\x17GetRefundPageUrlRequest\x12\x19\n" +
-	"\bbuyer_id\x18\x01 \x01(\x03R\abuyerId\x12\x19\n" +
-	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x1f\n" +
-	"\vclient_type\x18\x03 \x01(\tR\n" +
-	"clientType\x12\x19\n" +
-	"\bapp_type\x18\x04 \x01(\tR\aappType\"\x81\x01\n" +
-	"\x18GetRefundPageUrlResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
-	"\x04data\x18\x03 \x01(\v2#.hawkr.aftersales.RefundPageUrlDataR\x04data\"6\n" +
-	"\x11RefundPageUrlData\x12!\n" +
-	"\fredirect_url\x18\x01 \x01(\tR\vredirectUrl\"\x84\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x84\x01\n" +
 	"\x1eGetSellerAfterSaleCasesRequest\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\x03R\astoreId\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\tR\x04page\x12\x1b\n" +
@@ -5504,12 +5136,11 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\x1cResolveAfterSaleCaseResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x127\n" +
-	"\x04data\x18\x03 \x01(\v2#.hawkr.aftersales.ResolveResultDataR\x04data\"\x9c\x01\n" +
+	"\x04data\x18\x03 \x01(\v2#.hawkr.aftersales.ResolveResultDataR\x04data\"x\n" +
 	"\x11ResolveResultData\x12\x17\n" +
 	"\acase_no\x18\x01 \x01(\tR\x06caseNo\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12,\n" +
-	"\x12return_shipment_no\x18\x03 \x01(\tR\x10returnShipmentNo\x12(\n" +
-	"\x10need_refund_page\x18\x04 \x01(\bR\x0eneedRefundPage\"\x8f\x02\n" +
+	"\x12return_shipment_no\x18\x03 \x01(\tR\x10returnShipmentNoJ\x04\b\x04\x10\x05\"\x8f\x02\n" +
 	"\x1bConfirmReturnReceiptRequest\x12\x19\n" +
 	"\bstore_id\x18\x01 \x01(\x03R\astoreId\x12\x17\n" +
 	"\acase_no\x18\x02 \x01(\tR\x06caseNo\x120\n" +
@@ -5535,11 +5166,10 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\x16CancelShipmentResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12>\n" +
-	"\x04data\x18\x03 \x01(\v2*.hawkr.aftersales.CancelShipmentResultDataR\x04data\"\x84\x01\n" +
+	"\x04data\x18\x03 \x01(\v2*.hawkr.aftersales.CancelShipmentResultDataR\x04data\"`\n" +
 	"\x18CancelShipmentResultData\x12\x19\n" +
 	"\border_no\x18\x01 \x01(\tR\aorderNo\x12#\n" +
-	"\rrefund_amount\x18\x02 \x01(\tR\frefundAmount\x12(\n" +
-	"\x10need_refund_page\x18\x03 \x01(\bR\x0eneedRefundPage\"\x91\a\n" +
+	"\rrefund_amount\x18\x02 \x01(\tR\frefundAmountJ\x04\b\x03\x10\x04\"\xa8\x06\n" +
 	"\x14AfterSaleCaseSummary\x12\x17\n" +
 	"\acase_no\x18\x01 \x01(\tR\x06caseNo\x12\x19\n" +
 	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x16\n" +
@@ -5547,8 +5177,7 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\x12+\n" +
 	"\x11refundable_amount\x18\x05 \x01(\tR\x10refundableAmount\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\tR\tcreatedAt\x12(\n" +
-	"\x10need_refund_page\x18\a \x01(\bR\x0eneedRefundPage\x12\x1d\n" +
+	"created_at\x18\x06 \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
 	"buyer_name\x18\b \x01(\tR\tbuyerName\x12(\n" +
 	"\x10buyer_avatar_key\x18\t \x01(\tR\x0ebuyerAvatarKey\x12)\n" +
@@ -5558,19 +5187,17 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\x10temperature_code\x18\f \x01(\tR\x0ftemperatureCode\x12!\n" +
 	"\fappeal_state\x18\r \x01(\tR\vappealState\x12,\n" +
 	"\x12refund_task_status\x18\x0e \x01(\tR\x10refundTaskStatus\x124\n" +
-	"\x16refund_failure_message\x18\x0f \x01(\tR\x14refundFailureMessage\x122\n" +
-	"\x15estimated_refund_date\x18\x10 \x01(\tR\x13estimatedRefundDate\x12\x1b\n" +
-	"\tbank_date\x18\x11 \x01(\tR\bbankDate\x12'\n" +
+	"\x16refund_failure_message\x18\x0f \x01(\tR\x14refundFailureMessage\x12'\n" +
 	"\x0fprovider_status\x18\x12 \x01(\tR\x0eproviderStatus\x12)\n" +
 	"\x10provider_message\x18\x13 \x01(\tR\x0fproviderMessage\x12&\n" +
 	"\x0fauto_confirm_at\x18\x14 \x01(\tR\rautoConfirmAt\x127\n" +
 	"\x18store_pickup_deadline_at\x18\x15 \x01(\tR\x15storePickupDeadlineAt\x121\n" +
-	"\x15ship_back_deadline_at\x18\x18 \x01(\tR\x12shipBackDeadlineAtJ\x04\b\x16\x10\x17J\x04\b\x17\x10\x18\"\xa0\x01\n" +
+	"\x15ship_back_deadline_at\x18\x18 \x01(\tR\x12shipBackDeadlineAtJ\x04\b\a\x10\bJ\x04\b\x10\x10\x11J\x04\b\x11\x10\x12J\x04\b\x16\x10\x17J\x04\b\x17\x10\x18\"\xa0\x01\n" +
 	"\x15AfterSaleCaseListData\x12@\n" +
 	"\arecords\x18\x01 \x03(\v2&.hawkr.aftersales.AfterSaleCaseSummaryR\arecords\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\tR\x05total\x12\x12\n" +
 	"\x04page\x18\x03 \x01(\tR\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\tR\bpageSize\"\x8b\x0e\n" +
+	"\tpage_size\x18\x04 \x01(\tR\bpageSize\"\xa2\r\n" +
 	"\x17AfterSaleCaseDetailView\x12\x17\n" +
 	"\acase_no\x18\x01 \x01(\tR\x06caseNo\x12\x19\n" +
 	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x19\n" +
@@ -5586,8 +5213,7 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\vresolutions\x18\f \x03(\v2 .hawkr.aftersales.ResolutionViewR\vresolutions\x12,\n" +
 	"\x12return_shipment_no\x18\r \x01(\tR\x10returnShipmentNo\x124\n" +
 	"\x16return_shipping_method\x18\x0e \x01(\tR\x14returnShippingMethod\x12.\n" +
-	"\x13shipment_photo_keys\x18\x0f \x03(\tR\x11shipmentPhotoKeys\x12(\n" +
-	"\x10need_refund_page\x18\x10 \x01(\bR\x0eneedRefundPage\x12\x1d\n" +
+	"\x13shipment_photo_keys\x18\x0f \x03(\tR\x11shipmentPhotoKeys\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x11 \x01(\tR\tcreatedAt\x12\x1b\n" +
 	"\tclosed_at\x18\x12 \x01(\tR\bclosedAt\x12\"\n" +
@@ -5601,9 +5227,7 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\n" +
 	"can_appeal\x18\x19 \x01(\bR\tcanAppeal\x12,\n" +
 	"\x12refund_task_status\x18\x1a \x01(\tR\x10refundTaskStatus\x124\n" +
-	"\x16refund_failure_message\x18\x1b \x01(\tR\x14refundFailureMessage\x122\n" +
-	"\x15estimated_refund_date\x18\x1c \x01(\tR\x13estimatedRefundDate\x12\x1b\n" +
-	"\tbank_date\x18\x1d \x01(\tR\bbankDate\x12'\n" +
+	"\x16refund_failure_message\x18\x1b \x01(\tR\x14refundFailureMessage\x12'\n" +
 	"\x0fprovider_status\x18\x1e \x01(\tR\x0eproviderStatus\x12)\n" +
 	"\x10provider_message\x18\x1f \x01(\tR\x0fproviderMessage\x12)\n" +
 	"\x10process_deadline\x18  \x01(\tR\x0fprocessDeadline\x12%\n" +
@@ -5618,7 +5242,7 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\x13seller_picked_up_at\x18) \x01(\tR\x10sellerPickedUpAt\x123\n" +
 	"\x16auto_complete_at_stamp\x18, \x01(\tR\x13autoCompleteAtStamp\x121\n" +
 	"\x15ship_back_deadline_at\x18. \x01(\tR\x12shipBackDeadlineAtJ\x04\b\t\x10\n" +
-	"J\x04\b*\x10+J\x04\b+\x10,J\x04\b-\x10.\"\xf9\x01\n" +
+	"J\x04\b\x10\x10\x11J\x04\b\x1c\x10\x1dJ\x04\b\x1d\x10\x1eJ\x04\b*\x10+J\x04\b+\x10,J\x04\b-\x10.\"\xf9\x01\n" +
 	"\x15AfterSaleCaseItemView\x12\"\n" +
 	"\rorder_item_id\x18\x01 \x01(\tR\vorderItemId\x12\x15\n" +
 	"\x06sku_id\x18\x02 \x01(\tR\x05skuId\x12\x19\n" +
@@ -5646,15 +5270,7 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\tR\tcreatedAt\x12)\n" +
 	"\x10deduction_reason\x18\n" +
 	" \x01(\tR\x0fdeductionReason\x12'\n" +
-	"\x0finspection_note\x18\v \x01(\tR\x0einspectionNote\"\x80\x01\n" +
-	"\x1dHandleRefundPageReturnRequest\x12!\n" +
-	"\fencrypt_info\x18\x01 \x01(\tR\vencryptInfo\x12\x1b\n" +
-	"\thash_info\x18\x02 \x01(\tR\bhashInfo\x12\x19\n" +
-	"\border_no\x18\x04 \x01(\tR\aorderNoJ\x04\b\x03\x10\x04\"q\n" +
-	"\x1eHandleRefundPageReturnResponse\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\x12!\n" +
-	"\fredirect_url\x18\x03 \x01(\tR\vredirectUrl\"1\n" +
+	"\x0finspection_note\x18\v \x01(\tR\x0einspectionNote\"1\n" +
 	"\x14HasActiveCaseRequest\x12\x19\n" +
 	"\border_no\x18\x01 \x01(\tR\aorderNo\"\x87\x01\n" +
 	"\x15HasActiveCaseResponse\x12\x12\n" +
@@ -5874,14 +5490,13 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\acase_no\x18\x01 \x01(\tR\x06caseNo\x12!\n" +
 	"\fprior_status\x18\x02 \x01(\tR\vpriorStatus\x12$\n" +
 	"\x0erefund_task_id\x18\x03 \x01(\tR\frefundTaskId\x12.\n" +
-	"\x13final_refund_amount\x18\x04 \x01(\tR\x11finalRefundAmount2\xd5\x17\n" +
+	"\x13final_refund_amount\x18\x04 \x01(\tR\x11finalRefundAmount2\xed\x15\n" +
 	"\x11AfterSalesService\x12r\n" +
 	"\x13CreateAfterSaleCase\x12,.hawkr.aftersales.CreateAfterSaleCaseRequest\x1a-.hawkr.aftersales.CreateAfterSaleCaseResponse\x12r\n" +
 	"\x13GetMyAfterSaleCases\x12,.hawkr.aftersales.GetMyAfterSaleCasesRequest\x1a-.hawkr.aftersales.GetMyAfterSaleCasesResponse\x12{\n" +
 	"\x16GetAfterSaleCaseDetail\x12/.hawkr.aftersales.GetAfterSaleCaseDetailRequest\x1a0.hawkr.aftersales.GetAfterSaleCaseDetailResponse\x12o\n" +
 	"\x12SupplementEvidence\x12+.hawkr.aftersales.SupplementEvidenceRequest\x1a,.hawkr.aftersales.SupplementEvidenceResponse\x12r\n" +
-	"\x13CancelAfterSaleCase\x12,.hawkr.aftersales.CancelAfterSaleCaseRequest\x1a-.hawkr.aftersales.CancelAfterSaleCaseResponse\x12i\n" +
-	"\x10GetRefundPageUrl\x12).hawkr.aftersales.GetRefundPageUrlRequest\x1a*.hawkr.aftersales.GetRefundPageUrlResponse\x12~\n" +
+	"\x13CancelAfterSaleCase\x12,.hawkr.aftersales.CancelAfterSaleCaseRequest\x1a-.hawkr.aftersales.CancelAfterSaleCaseResponse\x12~\n" +
 	"\x17GetSellerAfterSaleCases\x120.hawkr.aftersales.GetSellerAfterSaleCasesRequest\x1a1.hawkr.aftersales.GetSellerAfterSaleCasesResponse\x12\x8d\x01\n" +
 	"\x1cGetSellerAfterSaleCaseDetail\x125.hawkr.aftersales.GetSellerAfterSaleCaseDetailRequest\x1a6.hawkr.aftersales.GetSellerAfterSaleCaseDetailResponse\x12u\n" +
 	"\x14ResolveAfterSaleCase\x12-.hawkr.aftersales.ResolveAfterSaleCaseRequest\x1a..hawkr.aftersales.ResolveAfterSaleCaseResponse\x12u\n" +
@@ -5893,8 +5508,7 @@ const file_aftersales_aftersales_proto_rawDesc = "" +
 	"\x14GetSellerArbitration\x12-.hawkr.aftersales.GetSellerArbitrationRequest\x1a(.hawkr.aftersales.GetArbitrationResponse\x12r\n" +
 	"\x13ListAppealsForAdmin\x12,.hawkr.aftersales.ListAppealsForAdminRequest\x1a-.hawkr.aftersales.ListAppealsForAdminResponse\x12u\n" +
 	"\x14DecideAppealForAdmin\x12-.hawkr.aftersales.DecideAppealForAdminRequest\x1a..hawkr.aftersales.DecideAppealForAdminResponse\x12~\n" +
-	"\x17GetAppealDetailForAdmin\x120.hawkr.aftersales.GetAppealDetailForAdminRequest\x1a1.hawkr.aftersales.GetAppealDetailForAdminResponse\x12{\n" +
-	"\x16HandleRefundPageReturn\x12/.hawkr.aftersales.HandleRefundPageReturnRequest\x1a0.hawkr.aftersales.HandleRefundPageReturnResponse\x12`\n" +
+	"\x17GetAppealDetailForAdmin\x120.hawkr.aftersales.GetAppealDetailForAdminRequest\x1a1.hawkr.aftersales.GetAppealDetailForAdminResponse\x12`\n" +
 	"\rHasActiveCase\x12&.hawkr.aftersales.HasActiveCaseRequest\x1a'.hawkr.aftersales.HasActiveCaseResponse\x12\x99\x01\n" +
 	" CancelActiveCaseOnConfirmReceipt\x129.hawkr.aftersales.CancelActiveCaseOnConfirmReceiptRequest\x1a:.hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse\x12o\n" +
 	"\x12GetOrderPayoutHold\x12+.hawkr.aftersales.GetOrderPayoutHoldRequest\x1a,.hawkr.aftersales.GetOrderPayoutHoldResponse\x12\x8a\x01\n" +
@@ -5916,7 +5530,7 @@ func file_aftersales_aftersales_proto_rawDescGZIP() []byte {
 }
 
 var file_aftersales_aftersales_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_aftersales_aftersales_proto_msgTypes = make([]protoimpl.MessageInfo, 71)
+var file_aftersales_aftersales_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
 var file_aftersales_aftersales_proto_goTypes = []any{
 	(CancelActiveCaseOnConfirmReceiptResponse_Result)(0), // 0: hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse.Result
 	(GetOrderPayoutHoldResponse_Reason)(0),               // 1: hawkr.aftersales.GetOrderPayoutHoldResponse.Reason
@@ -5930,153 +5544,143 @@ var file_aftersales_aftersales_proto_goTypes = []any{
 	(*SupplementEvidenceResponse)(nil),                   // 9: hawkr.aftersales.SupplementEvidenceResponse
 	(*CancelAfterSaleCaseRequest)(nil),                   // 10: hawkr.aftersales.CancelAfterSaleCaseRequest
 	(*CancelAfterSaleCaseResponse)(nil),                  // 11: hawkr.aftersales.CancelAfterSaleCaseResponse
-	(*GetRefundPageUrlRequest)(nil),                      // 12: hawkr.aftersales.GetRefundPageUrlRequest
-	(*GetRefundPageUrlResponse)(nil),                     // 13: hawkr.aftersales.GetRefundPageUrlResponse
-	(*RefundPageUrlData)(nil),                            // 14: hawkr.aftersales.RefundPageUrlData
-	(*GetSellerAfterSaleCasesRequest)(nil),               // 15: hawkr.aftersales.GetSellerAfterSaleCasesRequest
-	(*GetSellerAfterSaleCasesResponse)(nil),              // 16: hawkr.aftersales.GetSellerAfterSaleCasesResponse
-	(*GetSellerAfterSaleCaseDetailRequest)(nil),          // 17: hawkr.aftersales.GetSellerAfterSaleCaseDetailRequest
-	(*GetSellerAfterSaleCaseDetailResponse)(nil),         // 18: hawkr.aftersales.GetSellerAfterSaleCaseDetailResponse
-	(*ResolveAfterSaleCaseRequest)(nil),                  // 19: hawkr.aftersales.ResolveAfterSaleCaseRequest
-	(*ResolveAfterSaleCaseResponse)(nil),                 // 20: hawkr.aftersales.ResolveAfterSaleCaseResponse
-	(*ResolveResultData)(nil),                            // 21: hawkr.aftersales.ResolveResultData
-	(*ConfirmReturnReceiptRequest)(nil),                  // 22: hawkr.aftersales.ConfirmReturnReceiptRequest
-	(*ConfirmReturnReceiptResponse)(nil),                 // 23: hawkr.aftersales.ConfirmReturnReceiptResponse
-	(*RetryPrintReturnLabelRequest)(nil),                 // 24: hawkr.aftersales.RetryPrintReturnLabelRequest
-	(*RetryPrintReturnLabelResponse)(nil),                // 25: hawkr.aftersales.RetryPrintReturnLabelResponse
-	(*CancelShipmentRequest)(nil),                        // 26: hawkr.aftersales.CancelShipmentRequest
-	(*CancelShipmentResponse)(nil),                       // 27: hawkr.aftersales.CancelShipmentResponse
-	(*CancelShipmentResultData)(nil),                     // 28: hawkr.aftersales.CancelShipmentResultData
-	(*AfterSaleCaseSummary)(nil),                         // 29: hawkr.aftersales.AfterSaleCaseSummary
-	(*AfterSaleCaseListData)(nil),                        // 30: hawkr.aftersales.AfterSaleCaseListData
-	(*AfterSaleCaseDetailView)(nil),                      // 31: hawkr.aftersales.AfterSaleCaseDetailView
-	(*AfterSaleCaseItemView)(nil),                        // 32: hawkr.aftersales.AfterSaleCaseItemView
-	(*EvidenceView)(nil),                                 // 33: hawkr.aftersales.EvidenceView
-	(*ResolutionView)(nil),                               // 34: hawkr.aftersales.ResolutionView
-	(*HandleRefundPageReturnRequest)(nil),                // 35: hawkr.aftersales.HandleRefundPageReturnRequest
-	(*HandleRefundPageReturnResponse)(nil),               // 36: hawkr.aftersales.HandleRefundPageReturnResponse
-	(*HasActiveCaseRequest)(nil),                         // 37: hawkr.aftersales.HasActiveCaseRequest
-	(*HasActiveCaseResponse)(nil),                        // 38: hawkr.aftersales.HasActiveCaseResponse
-	(*CancelActiveCaseOnConfirmReceiptRequest)(nil),      // 39: hawkr.aftersales.CancelActiveCaseOnConfirmReceiptRequest
-	(*CancelActiveCaseOnConfirmReceiptResponse)(nil),     // 40: hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse
-	(*GetOrderPayoutHoldRequest)(nil),                    // 41: hawkr.aftersales.GetOrderPayoutHoldRequest
-	(*GetOrderPayoutHoldResponse)(nil),                   // 42: hawkr.aftersales.GetOrderPayoutHoldResponse
-	(*GetSellerCaseClassificationRequest)(nil),           // 43: hawkr.aftersales.GetSellerCaseClassificationRequest
-	(*GetSellerCaseClassificationResponse)(nil),          // 44: hawkr.aftersales.GetSellerCaseClassificationResponse
-	(*SubmitAppealRequest)(nil),                          // 45: hawkr.aftersales.SubmitAppealRequest
-	(*SubmitAppealResponse)(nil),                         // 46: hawkr.aftersales.SubmitAppealResponse
-	(*SubmitAppealData)(nil),                             // 47: hawkr.aftersales.SubmitAppealData
-	(*GetArbitrationRequest)(nil),                        // 48: hawkr.aftersales.GetArbitrationRequest
-	(*GetSellerArbitrationRequest)(nil),                  // 49: hawkr.aftersales.GetSellerArbitrationRequest
-	(*GetArbitrationResponse)(nil),                       // 50: hawkr.aftersales.GetArbitrationResponse
-	(*ArbitrationData)(nil),                              // 51: hawkr.aftersales.ArbitrationData
-	(*AppealEventView)(nil),                              // 52: hawkr.aftersales.AppealEventView
-	(*PlatformDecisionView)(nil),                         // 53: hawkr.aftersales.PlatformDecisionView
-	(*ListAppealsForAdminRequest)(nil),                   // 54: hawkr.aftersales.ListAppealsForAdminRequest
-	(*ListAppealsForAdminResponse)(nil),                  // 55: hawkr.aftersales.ListAppealsForAdminResponse
-	(*ListAppealsForAdminData)(nil),                      // 56: hawkr.aftersales.ListAppealsForAdminData
-	(*AppealSummaryView)(nil),                            // 57: hawkr.aftersales.AppealSummaryView
-	(*DecideAppealForAdminRequest)(nil),                  // 58: hawkr.aftersales.DecideAppealForAdminRequest
-	(*DecideAppealForAdminResponse)(nil),                 // 59: hawkr.aftersales.DecideAppealForAdminResponse
-	(*DecideAppealForAdminData)(nil),                     // 60: hawkr.aftersales.DecideAppealForAdminData
-	(*GetAppealDetailForAdminRequest)(nil),               // 61: hawkr.aftersales.GetAppealDetailForAdminRequest
-	(*GetAppealDetailForAdminResponse)(nil),              // 62: hawkr.aftersales.GetAppealDetailForAdminResponse
-	(*AppealDetailForAdminData)(nil),                     // 63: hawkr.aftersales.AppealDetailForAdminData
-	(*AdminProviderContext)(nil),                         // 64: hawkr.aftersales.AdminProviderContext
-	(*AdminContextView)(nil),                             // 65: hawkr.aftersales.AdminContextView
-	(*ListAfterSaleCasesForAdminRequest)(nil),            // 66: hawkr.aftersales.ListAfterSaleCasesForAdminRequest
-	(*ListAfterSaleCasesForAdminResponse)(nil),           // 67: hawkr.aftersales.ListAfterSaleCasesForAdminResponse
-	(*ListAfterSaleCasesForAdminData)(nil),               // 68: hawkr.aftersales.ListAfterSaleCasesForAdminData
-	(*AdminAfterSaleCaseSummary)(nil),                    // 69: hawkr.aftersales.AdminAfterSaleCaseSummary
-	(*ForceConfirmReceiptForAdminRequest)(nil),           // 70: hawkr.aftersales.ForceConfirmReceiptForAdminRequest
-	(*ForceConfirmReceiptForAdminResponse)(nil),          // 71: hawkr.aftersales.ForceConfirmReceiptForAdminResponse
-	(*ForceConfirmReceiptForAdminData)(nil),              // 72: hawkr.aftersales.ForceConfirmReceiptForAdminData
+	(*GetSellerAfterSaleCasesRequest)(nil),               // 12: hawkr.aftersales.GetSellerAfterSaleCasesRequest
+	(*GetSellerAfterSaleCasesResponse)(nil),              // 13: hawkr.aftersales.GetSellerAfterSaleCasesResponse
+	(*GetSellerAfterSaleCaseDetailRequest)(nil),          // 14: hawkr.aftersales.GetSellerAfterSaleCaseDetailRequest
+	(*GetSellerAfterSaleCaseDetailResponse)(nil),         // 15: hawkr.aftersales.GetSellerAfterSaleCaseDetailResponse
+	(*ResolveAfterSaleCaseRequest)(nil),                  // 16: hawkr.aftersales.ResolveAfterSaleCaseRequest
+	(*ResolveAfterSaleCaseResponse)(nil),                 // 17: hawkr.aftersales.ResolveAfterSaleCaseResponse
+	(*ResolveResultData)(nil),                            // 18: hawkr.aftersales.ResolveResultData
+	(*ConfirmReturnReceiptRequest)(nil),                  // 19: hawkr.aftersales.ConfirmReturnReceiptRequest
+	(*ConfirmReturnReceiptResponse)(nil),                 // 20: hawkr.aftersales.ConfirmReturnReceiptResponse
+	(*RetryPrintReturnLabelRequest)(nil),                 // 21: hawkr.aftersales.RetryPrintReturnLabelRequest
+	(*RetryPrintReturnLabelResponse)(nil),                // 22: hawkr.aftersales.RetryPrintReturnLabelResponse
+	(*CancelShipmentRequest)(nil),                        // 23: hawkr.aftersales.CancelShipmentRequest
+	(*CancelShipmentResponse)(nil),                       // 24: hawkr.aftersales.CancelShipmentResponse
+	(*CancelShipmentResultData)(nil),                     // 25: hawkr.aftersales.CancelShipmentResultData
+	(*AfterSaleCaseSummary)(nil),                         // 26: hawkr.aftersales.AfterSaleCaseSummary
+	(*AfterSaleCaseListData)(nil),                        // 27: hawkr.aftersales.AfterSaleCaseListData
+	(*AfterSaleCaseDetailView)(nil),                      // 28: hawkr.aftersales.AfterSaleCaseDetailView
+	(*AfterSaleCaseItemView)(nil),                        // 29: hawkr.aftersales.AfterSaleCaseItemView
+	(*EvidenceView)(nil),                                 // 30: hawkr.aftersales.EvidenceView
+	(*ResolutionView)(nil),                               // 31: hawkr.aftersales.ResolutionView
+	(*HasActiveCaseRequest)(nil),                         // 32: hawkr.aftersales.HasActiveCaseRequest
+	(*HasActiveCaseResponse)(nil),                        // 33: hawkr.aftersales.HasActiveCaseResponse
+	(*CancelActiveCaseOnConfirmReceiptRequest)(nil),      // 34: hawkr.aftersales.CancelActiveCaseOnConfirmReceiptRequest
+	(*CancelActiveCaseOnConfirmReceiptResponse)(nil),     // 35: hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse
+	(*GetOrderPayoutHoldRequest)(nil),                    // 36: hawkr.aftersales.GetOrderPayoutHoldRequest
+	(*GetOrderPayoutHoldResponse)(nil),                   // 37: hawkr.aftersales.GetOrderPayoutHoldResponse
+	(*GetSellerCaseClassificationRequest)(nil),           // 38: hawkr.aftersales.GetSellerCaseClassificationRequest
+	(*GetSellerCaseClassificationResponse)(nil),          // 39: hawkr.aftersales.GetSellerCaseClassificationResponse
+	(*SubmitAppealRequest)(nil),                          // 40: hawkr.aftersales.SubmitAppealRequest
+	(*SubmitAppealResponse)(nil),                         // 41: hawkr.aftersales.SubmitAppealResponse
+	(*SubmitAppealData)(nil),                             // 42: hawkr.aftersales.SubmitAppealData
+	(*GetArbitrationRequest)(nil),                        // 43: hawkr.aftersales.GetArbitrationRequest
+	(*GetSellerArbitrationRequest)(nil),                  // 44: hawkr.aftersales.GetSellerArbitrationRequest
+	(*GetArbitrationResponse)(nil),                       // 45: hawkr.aftersales.GetArbitrationResponse
+	(*ArbitrationData)(nil),                              // 46: hawkr.aftersales.ArbitrationData
+	(*AppealEventView)(nil),                              // 47: hawkr.aftersales.AppealEventView
+	(*PlatformDecisionView)(nil),                         // 48: hawkr.aftersales.PlatformDecisionView
+	(*ListAppealsForAdminRequest)(nil),                   // 49: hawkr.aftersales.ListAppealsForAdminRequest
+	(*ListAppealsForAdminResponse)(nil),                  // 50: hawkr.aftersales.ListAppealsForAdminResponse
+	(*ListAppealsForAdminData)(nil),                      // 51: hawkr.aftersales.ListAppealsForAdminData
+	(*AppealSummaryView)(nil),                            // 52: hawkr.aftersales.AppealSummaryView
+	(*DecideAppealForAdminRequest)(nil),                  // 53: hawkr.aftersales.DecideAppealForAdminRequest
+	(*DecideAppealForAdminResponse)(nil),                 // 54: hawkr.aftersales.DecideAppealForAdminResponse
+	(*DecideAppealForAdminData)(nil),                     // 55: hawkr.aftersales.DecideAppealForAdminData
+	(*GetAppealDetailForAdminRequest)(nil),               // 56: hawkr.aftersales.GetAppealDetailForAdminRequest
+	(*GetAppealDetailForAdminResponse)(nil),              // 57: hawkr.aftersales.GetAppealDetailForAdminResponse
+	(*AppealDetailForAdminData)(nil),                     // 58: hawkr.aftersales.AppealDetailForAdminData
+	(*AdminProviderContext)(nil),                         // 59: hawkr.aftersales.AdminProviderContext
+	(*AdminContextView)(nil),                             // 60: hawkr.aftersales.AdminContextView
+	(*ListAfterSaleCasesForAdminRequest)(nil),            // 61: hawkr.aftersales.ListAfterSaleCasesForAdminRequest
+	(*ListAfterSaleCasesForAdminResponse)(nil),           // 62: hawkr.aftersales.ListAfterSaleCasesForAdminResponse
+	(*ListAfterSaleCasesForAdminData)(nil),               // 63: hawkr.aftersales.ListAfterSaleCasesForAdminData
+	(*AdminAfterSaleCaseSummary)(nil),                    // 64: hawkr.aftersales.AdminAfterSaleCaseSummary
+	(*ForceConfirmReceiptForAdminRequest)(nil),           // 65: hawkr.aftersales.ForceConfirmReceiptForAdminRequest
+	(*ForceConfirmReceiptForAdminResponse)(nil),          // 66: hawkr.aftersales.ForceConfirmReceiptForAdminResponse
+	(*ForceConfirmReceiptForAdminData)(nil),              // 67: hawkr.aftersales.ForceConfirmReceiptForAdminData
 }
 var file_aftersales_aftersales_proto_depIdxs = []int32{
-	29, // 0: hawkr.aftersales.CreateAfterSaleCaseResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseSummary
-	30, // 1: hawkr.aftersales.GetMyAfterSaleCasesResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseListData
-	31, // 2: hawkr.aftersales.GetAfterSaleCaseDetailResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseDetailView
-	14, // 3: hawkr.aftersales.GetRefundPageUrlResponse.data:type_name -> hawkr.aftersales.RefundPageUrlData
-	30, // 4: hawkr.aftersales.GetSellerAfterSaleCasesResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseListData
-	31, // 5: hawkr.aftersales.GetSellerAfterSaleCaseDetailResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseDetailView
-	21, // 6: hawkr.aftersales.ResolveAfterSaleCaseResponse.data:type_name -> hawkr.aftersales.ResolveResultData
-	28, // 7: hawkr.aftersales.CancelShipmentResponse.data:type_name -> hawkr.aftersales.CancelShipmentResultData
-	29, // 8: hawkr.aftersales.AfterSaleCaseListData.records:type_name -> hawkr.aftersales.AfterSaleCaseSummary
-	32, // 9: hawkr.aftersales.AfterSaleCaseDetailView.items:type_name -> hawkr.aftersales.AfterSaleCaseItemView
-	33, // 10: hawkr.aftersales.AfterSaleCaseDetailView.evidence:type_name -> hawkr.aftersales.EvidenceView
-	34, // 11: hawkr.aftersales.AfterSaleCaseDetailView.resolutions:type_name -> hawkr.aftersales.ResolutionView
-	0,  // 12: hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse.result:type_name -> hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse.Result
-	1,  // 13: hawkr.aftersales.GetOrderPayoutHoldResponse.reason:type_name -> hawkr.aftersales.GetOrderPayoutHoldResponse.Reason
-	47, // 14: hawkr.aftersales.SubmitAppealResponse.data:type_name -> hawkr.aftersales.SubmitAppealData
-	51, // 15: hawkr.aftersales.GetArbitrationResponse.data:type_name -> hawkr.aftersales.ArbitrationData
-	52, // 16: hawkr.aftersales.ArbitrationData.timeline:type_name -> hawkr.aftersales.AppealEventView
-	53, // 17: hawkr.aftersales.ArbitrationData.decision:type_name -> hawkr.aftersales.PlatformDecisionView
-	56, // 18: hawkr.aftersales.ListAppealsForAdminResponse.data:type_name -> hawkr.aftersales.ListAppealsForAdminData
-	57, // 19: hawkr.aftersales.ListAppealsForAdminData.records:type_name -> hawkr.aftersales.AppealSummaryView
-	60, // 20: hawkr.aftersales.DecideAppealForAdminResponse.data:type_name -> hawkr.aftersales.DecideAppealForAdminData
-	63, // 21: hawkr.aftersales.GetAppealDetailForAdminResponse.data:type_name -> hawkr.aftersales.AppealDetailForAdminData
-	31, // 22: hawkr.aftersales.AppealDetailForAdminData.case_detail:type_name -> hawkr.aftersales.AfterSaleCaseDetailView
-	51, // 23: hawkr.aftersales.AppealDetailForAdminData.arbitration:type_name -> hawkr.aftersales.ArbitrationData
-	65, // 24: hawkr.aftersales.AppealDetailForAdminData.admin_context:type_name -> hawkr.aftersales.AdminContextView
-	64, // 25: hawkr.aftersales.AppealDetailForAdminData.provider_context:type_name -> hawkr.aftersales.AdminProviderContext
-	68, // 26: hawkr.aftersales.ListAfterSaleCasesForAdminResponse.data:type_name -> hawkr.aftersales.ListAfterSaleCasesForAdminData
-	69, // 27: hawkr.aftersales.ListAfterSaleCasesForAdminData.records:type_name -> hawkr.aftersales.AdminAfterSaleCaseSummary
-	72, // 28: hawkr.aftersales.ForceConfirmReceiptForAdminResponse.data:type_name -> hawkr.aftersales.ForceConfirmReceiptForAdminData
-	2,  // 29: hawkr.aftersales.AfterSalesService.CreateAfterSaleCase:input_type -> hawkr.aftersales.CreateAfterSaleCaseRequest
-	4,  // 30: hawkr.aftersales.AfterSalesService.GetMyAfterSaleCases:input_type -> hawkr.aftersales.GetMyAfterSaleCasesRequest
-	6,  // 31: hawkr.aftersales.AfterSalesService.GetAfterSaleCaseDetail:input_type -> hawkr.aftersales.GetAfterSaleCaseDetailRequest
-	8,  // 32: hawkr.aftersales.AfterSalesService.SupplementEvidence:input_type -> hawkr.aftersales.SupplementEvidenceRequest
-	10, // 33: hawkr.aftersales.AfterSalesService.CancelAfterSaleCase:input_type -> hawkr.aftersales.CancelAfterSaleCaseRequest
-	12, // 34: hawkr.aftersales.AfterSalesService.GetRefundPageUrl:input_type -> hawkr.aftersales.GetRefundPageUrlRequest
-	15, // 35: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCases:input_type -> hawkr.aftersales.GetSellerAfterSaleCasesRequest
-	17, // 36: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCaseDetail:input_type -> hawkr.aftersales.GetSellerAfterSaleCaseDetailRequest
-	19, // 37: hawkr.aftersales.AfterSalesService.ResolveAfterSaleCase:input_type -> hawkr.aftersales.ResolveAfterSaleCaseRequest
-	22, // 38: hawkr.aftersales.AfterSalesService.ConfirmReturnReceipt:input_type -> hawkr.aftersales.ConfirmReturnReceiptRequest
-	26, // 39: hawkr.aftersales.AfterSalesService.CancelShipment:input_type -> hawkr.aftersales.CancelShipmentRequest
-	24, // 40: hawkr.aftersales.AfterSalesService.RetryPrintReturnLabel:input_type -> hawkr.aftersales.RetryPrintReturnLabelRequest
-	45, // 41: hawkr.aftersales.AfterSalesService.SubmitAppeal:input_type -> hawkr.aftersales.SubmitAppealRequest
-	48, // 42: hawkr.aftersales.AfterSalesService.GetArbitration:input_type -> hawkr.aftersales.GetArbitrationRequest
-	49, // 43: hawkr.aftersales.AfterSalesService.GetSellerArbitration:input_type -> hawkr.aftersales.GetSellerArbitrationRequest
-	54, // 44: hawkr.aftersales.AfterSalesService.ListAppealsForAdmin:input_type -> hawkr.aftersales.ListAppealsForAdminRequest
-	58, // 45: hawkr.aftersales.AfterSalesService.DecideAppealForAdmin:input_type -> hawkr.aftersales.DecideAppealForAdminRequest
-	61, // 46: hawkr.aftersales.AfterSalesService.GetAppealDetailForAdmin:input_type -> hawkr.aftersales.GetAppealDetailForAdminRequest
-	35, // 47: hawkr.aftersales.AfterSalesService.HandleRefundPageReturn:input_type -> hawkr.aftersales.HandleRefundPageReturnRequest
-	37, // 48: hawkr.aftersales.AfterSalesService.HasActiveCase:input_type -> hawkr.aftersales.HasActiveCaseRequest
-	39, // 49: hawkr.aftersales.AfterSalesService.CancelActiveCaseOnConfirmReceipt:input_type -> hawkr.aftersales.CancelActiveCaseOnConfirmReceiptRequest
-	41, // 50: hawkr.aftersales.AfterSalesService.GetOrderPayoutHold:input_type -> hawkr.aftersales.GetOrderPayoutHoldRequest
-	43, // 51: hawkr.aftersales.AfterSalesService.GetSellerCaseClassification:input_type -> hawkr.aftersales.GetSellerCaseClassificationRequest
-	66, // 52: hawkr.aftersales.AfterSalesService.ListAfterSaleCasesForAdmin:input_type -> hawkr.aftersales.ListAfterSaleCasesForAdminRequest
-	70, // 53: hawkr.aftersales.AfterSalesService.ForceConfirmReceiptForAdmin:input_type -> hawkr.aftersales.ForceConfirmReceiptForAdminRequest
-	3,  // 54: hawkr.aftersales.AfterSalesService.CreateAfterSaleCase:output_type -> hawkr.aftersales.CreateAfterSaleCaseResponse
-	5,  // 55: hawkr.aftersales.AfterSalesService.GetMyAfterSaleCases:output_type -> hawkr.aftersales.GetMyAfterSaleCasesResponse
-	7,  // 56: hawkr.aftersales.AfterSalesService.GetAfterSaleCaseDetail:output_type -> hawkr.aftersales.GetAfterSaleCaseDetailResponse
-	9,  // 57: hawkr.aftersales.AfterSalesService.SupplementEvidence:output_type -> hawkr.aftersales.SupplementEvidenceResponse
-	11, // 58: hawkr.aftersales.AfterSalesService.CancelAfterSaleCase:output_type -> hawkr.aftersales.CancelAfterSaleCaseResponse
-	13, // 59: hawkr.aftersales.AfterSalesService.GetRefundPageUrl:output_type -> hawkr.aftersales.GetRefundPageUrlResponse
-	16, // 60: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCases:output_type -> hawkr.aftersales.GetSellerAfterSaleCasesResponse
-	18, // 61: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCaseDetail:output_type -> hawkr.aftersales.GetSellerAfterSaleCaseDetailResponse
-	20, // 62: hawkr.aftersales.AfterSalesService.ResolveAfterSaleCase:output_type -> hawkr.aftersales.ResolveAfterSaleCaseResponse
-	23, // 63: hawkr.aftersales.AfterSalesService.ConfirmReturnReceipt:output_type -> hawkr.aftersales.ConfirmReturnReceiptResponse
-	27, // 64: hawkr.aftersales.AfterSalesService.CancelShipment:output_type -> hawkr.aftersales.CancelShipmentResponse
-	25, // 65: hawkr.aftersales.AfterSalesService.RetryPrintReturnLabel:output_type -> hawkr.aftersales.RetryPrintReturnLabelResponse
-	46, // 66: hawkr.aftersales.AfterSalesService.SubmitAppeal:output_type -> hawkr.aftersales.SubmitAppealResponse
-	50, // 67: hawkr.aftersales.AfterSalesService.GetArbitration:output_type -> hawkr.aftersales.GetArbitrationResponse
-	50, // 68: hawkr.aftersales.AfterSalesService.GetSellerArbitration:output_type -> hawkr.aftersales.GetArbitrationResponse
-	55, // 69: hawkr.aftersales.AfterSalesService.ListAppealsForAdmin:output_type -> hawkr.aftersales.ListAppealsForAdminResponse
-	59, // 70: hawkr.aftersales.AfterSalesService.DecideAppealForAdmin:output_type -> hawkr.aftersales.DecideAppealForAdminResponse
-	62, // 71: hawkr.aftersales.AfterSalesService.GetAppealDetailForAdmin:output_type -> hawkr.aftersales.GetAppealDetailForAdminResponse
-	36, // 72: hawkr.aftersales.AfterSalesService.HandleRefundPageReturn:output_type -> hawkr.aftersales.HandleRefundPageReturnResponse
-	38, // 73: hawkr.aftersales.AfterSalesService.HasActiveCase:output_type -> hawkr.aftersales.HasActiveCaseResponse
-	40, // 74: hawkr.aftersales.AfterSalesService.CancelActiveCaseOnConfirmReceipt:output_type -> hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse
-	42, // 75: hawkr.aftersales.AfterSalesService.GetOrderPayoutHold:output_type -> hawkr.aftersales.GetOrderPayoutHoldResponse
-	44, // 76: hawkr.aftersales.AfterSalesService.GetSellerCaseClassification:output_type -> hawkr.aftersales.GetSellerCaseClassificationResponse
-	67, // 77: hawkr.aftersales.AfterSalesService.ListAfterSaleCasesForAdmin:output_type -> hawkr.aftersales.ListAfterSaleCasesForAdminResponse
-	71, // 78: hawkr.aftersales.AfterSalesService.ForceConfirmReceiptForAdmin:output_type -> hawkr.aftersales.ForceConfirmReceiptForAdminResponse
-	54, // [54:79] is the sub-list for method output_type
-	29, // [29:54] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	26, // 0: hawkr.aftersales.CreateAfterSaleCaseResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseSummary
+	27, // 1: hawkr.aftersales.GetMyAfterSaleCasesResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseListData
+	28, // 2: hawkr.aftersales.GetAfterSaleCaseDetailResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseDetailView
+	27, // 3: hawkr.aftersales.GetSellerAfterSaleCasesResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseListData
+	28, // 4: hawkr.aftersales.GetSellerAfterSaleCaseDetailResponse.data:type_name -> hawkr.aftersales.AfterSaleCaseDetailView
+	18, // 5: hawkr.aftersales.ResolveAfterSaleCaseResponse.data:type_name -> hawkr.aftersales.ResolveResultData
+	25, // 6: hawkr.aftersales.CancelShipmentResponse.data:type_name -> hawkr.aftersales.CancelShipmentResultData
+	26, // 7: hawkr.aftersales.AfterSaleCaseListData.records:type_name -> hawkr.aftersales.AfterSaleCaseSummary
+	29, // 8: hawkr.aftersales.AfterSaleCaseDetailView.items:type_name -> hawkr.aftersales.AfterSaleCaseItemView
+	30, // 9: hawkr.aftersales.AfterSaleCaseDetailView.evidence:type_name -> hawkr.aftersales.EvidenceView
+	31, // 10: hawkr.aftersales.AfterSaleCaseDetailView.resolutions:type_name -> hawkr.aftersales.ResolutionView
+	0,  // 11: hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse.result:type_name -> hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse.Result
+	1,  // 12: hawkr.aftersales.GetOrderPayoutHoldResponse.reason:type_name -> hawkr.aftersales.GetOrderPayoutHoldResponse.Reason
+	42, // 13: hawkr.aftersales.SubmitAppealResponse.data:type_name -> hawkr.aftersales.SubmitAppealData
+	46, // 14: hawkr.aftersales.GetArbitrationResponse.data:type_name -> hawkr.aftersales.ArbitrationData
+	47, // 15: hawkr.aftersales.ArbitrationData.timeline:type_name -> hawkr.aftersales.AppealEventView
+	48, // 16: hawkr.aftersales.ArbitrationData.decision:type_name -> hawkr.aftersales.PlatformDecisionView
+	51, // 17: hawkr.aftersales.ListAppealsForAdminResponse.data:type_name -> hawkr.aftersales.ListAppealsForAdminData
+	52, // 18: hawkr.aftersales.ListAppealsForAdminData.records:type_name -> hawkr.aftersales.AppealSummaryView
+	55, // 19: hawkr.aftersales.DecideAppealForAdminResponse.data:type_name -> hawkr.aftersales.DecideAppealForAdminData
+	58, // 20: hawkr.aftersales.GetAppealDetailForAdminResponse.data:type_name -> hawkr.aftersales.AppealDetailForAdminData
+	28, // 21: hawkr.aftersales.AppealDetailForAdminData.case_detail:type_name -> hawkr.aftersales.AfterSaleCaseDetailView
+	46, // 22: hawkr.aftersales.AppealDetailForAdminData.arbitration:type_name -> hawkr.aftersales.ArbitrationData
+	60, // 23: hawkr.aftersales.AppealDetailForAdminData.admin_context:type_name -> hawkr.aftersales.AdminContextView
+	59, // 24: hawkr.aftersales.AppealDetailForAdminData.provider_context:type_name -> hawkr.aftersales.AdminProviderContext
+	63, // 25: hawkr.aftersales.ListAfterSaleCasesForAdminResponse.data:type_name -> hawkr.aftersales.ListAfterSaleCasesForAdminData
+	64, // 26: hawkr.aftersales.ListAfterSaleCasesForAdminData.records:type_name -> hawkr.aftersales.AdminAfterSaleCaseSummary
+	67, // 27: hawkr.aftersales.ForceConfirmReceiptForAdminResponse.data:type_name -> hawkr.aftersales.ForceConfirmReceiptForAdminData
+	2,  // 28: hawkr.aftersales.AfterSalesService.CreateAfterSaleCase:input_type -> hawkr.aftersales.CreateAfterSaleCaseRequest
+	4,  // 29: hawkr.aftersales.AfterSalesService.GetMyAfterSaleCases:input_type -> hawkr.aftersales.GetMyAfterSaleCasesRequest
+	6,  // 30: hawkr.aftersales.AfterSalesService.GetAfterSaleCaseDetail:input_type -> hawkr.aftersales.GetAfterSaleCaseDetailRequest
+	8,  // 31: hawkr.aftersales.AfterSalesService.SupplementEvidence:input_type -> hawkr.aftersales.SupplementEvidenceRequest
+	10, // 32: hawkr.aftersales.AfterSalesService.CancelAfterSaleCase:input_type -> hawkr.aftersales.CancelAfterSaleCaseRequest
+	12, // 33: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCases:input_type -> hawkr.aftersales.GetSellerAfterSaleCasesRequest
+	14, // 34: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCaseDetail:input_type -> hawkr.aftersales.GetSellerAfterSaleCaseDetailRequest
+	16, // 35: hawkr.aftersales.AfterSalesService.ResolveAfterSaleCase:input_type -> hawkr.aftersales.ResolveAfterSaleCaseRequest
+	19, // 36: hawkr.aftersales.AfterSalesService.ConfirmReturnReceipt:input_type -> hawkr.aftersales.ConfirmReturnReceiptRequest
+	23, // 37: hawkr.aftersales.AfterSalesService.CancelShipment:input_type -> hawkr.aftersales.CancelShipmentRequest
+	21, // 38: hawkr.aftersales.AfterSalesService.RetryPrintReturnLabel:input_type -> hawkr.aftersales.RetryPrintReturnLabelRequest
+	40, // 39: hawkr.aftersales.AfterSalesService.SubmitAppeal:input_type -> hawkr.aftersales.SubmitAppealRequest
+	43, // 40: hawkr.aftersales.AfterSalesService.GetArbitration:input_type -> hawkr.aftersales.GetArbitrationRequest
+	44, // 41: hawkr.aftersales.AfterSalesService.GetSellerArbitration:input_type -> hawkr.aftersales.GetSellerArbitrationRequest
+	49, // 42: hawkr.aftersales.AfterSalesService.ListAppealsForAdmin:input_type -> hawkr.aftersales.ListAppealsForAdminRequest
+	53, // 43: hawkr.aftersales.AfterSalesService.DecideAppealForAdmin:input_type -> hawkr.aftersales.DecideAppealForAdminRequest
+	56, // 44: hawkr.aftersales.AfterSalesService.GetAppealDetailForAdmin:input_type -> hawkr.aftersales.GetAppealDetailForAdminRequest
+	32, // 45: hawkr.aftersales.AfterSalesService.HasActiveCase:input_type -> hawkr.aftersales.HasActiveCaseRequest
+	34, // 46: hawkr.aftersales.AfterSalesService.CancelActiveCaseOnConfirmReceipt:input_type -> hawkr.aftersales.CancelActiveCaseOnConfirmReceiptRequest
+	36, // 47: hawkr.aftersales.AfterSalesService.GetOrderPayoutHold:input_type -> hawkr.aftersales.GetOrderPayoutHoldRequest
+	38, // 48: hawkr.aftersales.AfterSalesService.GetSellerCaseClassification:input_type -> hawkr.aftersales.GetSellerCaseClassificationRequest
+	61, // 49: hawkr.aftersales.AfterSalesService.ListAfterSaleCasesForAdmin:input_type -> hawkr.aftersales.ListAfterSaleCasesForAdminRequest
+	65, // 50: hawkr.aftersales.AfterSalesService.ForceConfirmReceiptForAdmin:input_type -> hawkr.aftersales.ForceConfirmReceiptForAdminRequest
+	3,  // 51: hawkr.aftersales.AfterSalesService.CreateAfterSaleCase:output_type -> hawkr.aftersales.CreateAfterSaleCaseResponse
+	5,  // 52: hawkr.aftersales.AfterSalesService.GetMyAfterSaleCases:output_type -> hawkr.aftersales.GetMyAfterSaleCasesResponse
+	7,  // 53: hawkr.aftersales.AfterSalesService.GetAfterSaleCaseDetail:output_type -> hawkr.aftersales.GetAfterSaleCaseDetailResponse
+	9,  // 54: hawkr.aftersales.AfterSalesService.SupplementEvidence:output_type -> hawkr.aftersales.SupplementEvidenceResponse
+	11, // 55: hawkr.aftersales.AfterSalesService.CancelAfterSaleCase:output_type -> hawkr.aftersales.CancelAfterSaleCaseResponse
+	13, // 56: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCases:output_type -> hawkr.aftersales.GetSellerAfterSaleCasesResponse
+	15, // 57: hawkr.aftersales.AfterSalesService.GetSellerAfterSaleCaseDetail:output_type -> hawkr.aftersales.GetSellerAfterSaleCaseDetailResponse
+	17, // 58: hawkr.aftersales.AfterSalesService.ResolveAfterSaleCase:output_type -> hawkr.aftersales.ResolveAfterSaleCaseResponse
+	20, // 59: hawkr.aftersales.AfterSalesService.ConfirmReturnReceipt:output_type -> hawkr.aftersales.ConfirmReturnReceiptResponse
+	24, // 60: hawkr.aftersales.AfterSalesService.CancelShipment:output_type -> hawkr.aftersales.CancelShipmentResponse
+	22, // 61: hawkr.aftersales.AfterSalesService.RetryPrintReturnLabel:output_type -> hawkr.aftersales.RetryPrintReturnLabelResponse
+	41, // 62: hawkr.aftersales.AfterSalesService.SubmitAppeal:output_type -> hawkr.aftersales.SubmitAppealResponse
+	45, // 63: hawkr.aftersales.AfterSalesService.GetArbitration:output_type -> hawkr.aftersales.GetArbitrationResponse
+	45, // 64: hawkr.aftersales.AfterSalesService.GetSellerArbitration:output_type -> hawkr.aftersales.GetArbitrationResponse
+	50, // 65: hawkr.aftersales.AfterSalesService.ListAppealsForAdmin:output_type -> hawkr.aftersales.ListAppealsForAdminResponse
+	54, // 66: hawkr.aftersales.AfterSalesService.DecideAppealForAdmin:output_type -> hawkr.aftersales.DecideAppealForAdminResponse
+	57, // 67: hawkr.aftersales.AfterSalesService.GetAppealDetailForAdmin:output_type -> hawkr.aftersales.GetAppealDetailForAdminResponse
+	33, // 68: hawkr.aftersales.AfterSalesService.HasActiveCase:output_type -> hawkr.aftersales.HasActiveCaseResponse
+	35, // 69: hawkr.aftersales.AfterSalesService.CancelActiveCaseOnConfirmReceipt:output_type -> hawkr.aftersales.CancelActiveCaseOnConfirmReceiptResponse
+	37, // 70: hawkr.aftersales.AfterSalesService.GetOrderPayoutHold:output_type -> hawkr.aftersales.GetOrderPayoutHoldResponse
+	39, // 71: hawkr.aftersales.AfterSalesService.GetSellerCaseClassification:output_type -> hawkr.aftersales.GetSellerCaseClassificationResponse
+	62, // 72: hawkr.aftersales.AfterSalesService.ListAfterSaleCasesForAdmin:output_type -> hawkr.aftersales.ListAfterSaleCasesForAdminResponse
+	66, // 73: hawkr.aftersales.AfterSalesService.ForceConfirmReceiptForAdmin:output_type -> hawkr.aftersales.ForceConfirmReceiptForAdminResponse
+	51, // [51:74] is the sub-list for method output_type
+	28, // [28:51] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_aftersales_aftersales_proto_init() }
@@ -6090,7 +5694,7 @@ func file_aftersales_aftersales_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_aftersales_aftersales_proto_rawDesc), len(file_aftersales_aftersales_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   71,
+			NumMessages:   66,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

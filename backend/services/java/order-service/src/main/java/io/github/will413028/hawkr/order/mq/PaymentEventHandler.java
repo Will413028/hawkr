@@ -54,7 +54,6 @@ public class PaymentEventHandler {
     private final AutoRefundTaskRepository autoRefundTaskRepository;
     private final CouponConsumptionTaskRepository couponConsumptionTaskRepository;
     private final OrderEventPublisher orderEventPublisher;
-    private final io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient paymentGrpcClient;
     private final OrderOutboxMapper orderOutboxMapper;
     private final OrderInvoiceSnapshotRepository orderInvoiceSnapshotRepository;
     private final io.github.will413028.hawkr.order.service.OrderService orderService;
@@ -68,7 +67,6 @@ public class PaymentEventHandler {
             AutoRefundTaskRepository autoRefundTaskRepository,
             CouponConsumptionTaskRepository couponConsumptionTaskRepository,
             OrderEventPublisher orderEventPublisher,
-            io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient paymentGrpcClient,
             OrderOutboxMapper orderOutboxMapper,
             OrderInvoiceSnapshotRepository orderInvoiceSnapshotRepository,
             io.github.will413028.hawkr.order.service.OrderService orderService,
@@ -81,7 +79,6 @@ public class PaymentEventHandler {
         this.autoRefundTaskRepository = autoRefundTaskRepository;
         this.couponConsumptionTaskRepository = couponConsumptionTaskRepository;
         this.orderEventPublisher = orderEventPublisher;
-        this.paymentGrpcClient = paymentGrpcClient;
         this.orderOutboxMapper = orderOutboxMapper;
         this.orderInvoiceSnapshotRepository = orderInvoiceSnapshotRepository;
         this.orderService = orderService;
@@ -329,45 +326,19 @@ public class PaymentEventHandler {
             return;
         }
 
-        // 依付款方式決定初始狀態：ATM 等待買家操作 PayUni 頁面，非 ATM 由 Worker 自動退款
-        boolean isAtm = PaymentMethod.ATM.value().equals(paymentType);
-        String taskStatus = isAtm
-                ? OrderConstants.TASK_STATUS_AWAITING_BUYER_REFUND_PAGE
-                : OrderConstants.TASK_STATUS_PENDING;
-
-        // ATM 路徑：預建 payment_refunds row（idempotency key = AUTO:{orderNo}:{tradeNo}）
-        // 非 ATM 由 AutoRefundWorker 呼叫 createRefund 時才建（既有流程）
-        if (isAtm) {
-            String idempotencyKey = "AUTO:" + orderId + ":" + tradeNo;
-            try {
-                paymentGrpcClient.createRefund(tradeNo, amount, "訂單已取消但收到付款自動退款", idempotencyKey);
-            } catch (Exception e) {
-                log.error("PaymentEventHandler.cancelledOrderPayment.createRefundFailed",
-                        "預建 payment_refunds 失敗 orderNo=" + orderId, e);
-                // 不中斷主流程：auto_refund_task 仍建立，後續 async webhook 會用 tradeNo lookup
-            }
-        }
-
         AutoRefundTaskEntity task = new AutoRefundTaskEntity();
         task.setTaskId(TsidUtil.generate());
         task.setOrderNo(orderId);
         task.setTransactionId(tradeNo);
         task.setAmount(amount);
         task.setPaymentMethod(paymentType);
-        task.setStatus(taskStatus);
+        task.setStatus(OrderConstants.TASK_STATUS_PENDING);
         task.setRetryCount(0);
         task.setMaxRetryCount(OrderConstants.DEFAULT_MAX_RETRY_COUNT);
         task.setNextRetryTime(DateTimeUtils.nowUtc());
         autoRefundTaskRepository.insert(task);
-
-        // ATM：設定 need_refund_page 標記
-        if (isAtm) {
-            orderRepository.updateNeedRefundPage(orderId, true);
-            // TODO: 發布通知 MQ 事件，通知買家前往退款頁面
-        }
-
         log.info("PaymentEventHandler.paymentSuccess.cancelled",
-                "訂單已取消但收到付款，建立自動退款任務: paymentType=" + paymentType + ", taskStatus=" + taskStatus,
+                "訂單已取消但收到付款，建立自動退款任務: paymentType=" + paymentType,
                 "orderNo", orderId);
     }
 

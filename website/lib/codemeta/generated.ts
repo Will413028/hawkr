@@ -386,9 +386,7 @@ export const AFTER_SALE_APPEAL_STATE_LABEL: Record<string, string> = {
 /** 通用 Worker 任務執行狀態。所有非同步重試任務（退款、清車、券核銷、撥款等）共用同一套狀態流：待執行 → 執行中 → 完成 / 失敗 / 人工介入。 */
 export const WorkerTaskStatus = {
 	PENDING: "0",
-	AWAITING_BUYER_REFUND_PAGE: "5",
 	PROCESSING: "10",
-	AWAITING_WEBHOOK: "15",
 	DONE: "20",
 	FAILED: "30",
 	MANUAL_INTERVENTION: "40",
@@ -399,9 +397,7 @@ export type WorkerTaskStatusValue = (typeof WorkerTaskStatus)[WorkerTaskStatusCo
 
 export const WORKER_TASK_STATUS_LABEL: Record<string, string> = {
 	"0": "待執行",
-	"5": "等待買家操作退款頁面",
 	"10": "執行中",
-	"15": "等待回調",
 	"20": "已完成",
 	"30": "失敗",
 	"40": "人工介入",
@@ -1223,7 +1219,6 @@ export const PaymentMethod = {
 	CREDIT_CARD: "2001",
 	APPLE_PAY: "2002",
 	GOOGLE_PAY: "2003",
-	ATM: "2004",
 	ZERO_AMOUNT: "2900",
 } as const;
 export type PaymentMethodCode = keyof typeof PaymentMethod;
@@ -1233,7 +1228,6 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
 	"2001": "信用卡",
 	"2002": "Apple Pay",
 	"2003": "Google Pay",
-	"2004": "ATM 轉帳",
 	"2900": "零元訂單",
 };
 

@@ -176,7 +176,6 @@ type OrderSummaryView struct {
 	Odno               string   `protobuf:"bytes,25,opt,name=odno,proto3" json:"odno,omitempty"`                                                       // 超商出貨單編號（8 碼，shipment.label.updated 事件快照）
 	ValidationNo       string   `protobuf:"bytes,26,opt,name=validation_no,json=validationNo,proto3" json:"validation_no,omitempty"`                   // 超商 C2C 驗證碼（4 碼，shipment.label.updated 事件快照，B2C 時為空）
 	ShipmentPhotoKeys  []string `protobuf:"bytes,27,rep,name=shipment_photo_keys,json=shipmentPhotoKeys,proto3" json:"shipment_photo_keys,omitempty"`  // 出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；僅賣家視角，選填）
-	NeedRefundPage     bool     `protobuf:"varint,30,opt,name=need_refund_page,json=needRefundPage,proto3" json:"need_refund_page,omitempty"`          // ATM 退款等待買家前往 PayUni 頁面
 	IsReviewed         bool     `protobuf:"varint,31,opt,name=is_reviewed,json=isReviewed,proto3" json:"is_reviewed,omitempty"`                        // 該訂單是否已有評論（任一商品已評即 true）
 	ReviewDeadline     string   `protobuf:"bytes,32,opt,name=review_deadline,json=reviewDeadline,proto3" json:"review_deadline,omitempty"`             // 評論截止時間（confirmed_at + 30 天，ISO 8601 UTC，僅 status=50 時有值）
 	CanReview          bool     `protobuf:"varint,33,opt,name=can_review,json=canReview,proto3" json:"can_review,omitempty"`                           // 是否可評論（status=50 且未超過評論截止時間）
@@ -436,13 +435,6 @@ func (x *OrderSummaryView) GetShipmentPhotoKeys() []string {
 	return nil
 }
 
-func (x *OrderSummaryView) GetNeedRefundPage() bool {
-	if x != nil {
-		return x.NeedRefundPage
-	}
-	return false
-}
-
 func (x *OrderSummaryView) GetIsReviewed() bool {
 	if x != nil {
 		return x.IsReviewed
@@ -685,10 +677,7 @@ type OrderDetailView struct {
 	Odno         string `protobuf:"bytes,30,opt,name=odno,proto3" json:"odno,omitempty"`                                     // 出貨單編號（8 碼）
 	ValidationNo string `protobuf:"bytes,31,opt,name=validation_no,json=validationNo,proto3" json:"validation_no,omitempty"` // C2C 驗證碼（4 碼，B2C 時為空）
 	// 付款資訊（Order DB 快照 + Payment Service 聚合）
-	PaymentMethod     string `protobuf:"bytes,32,opt,name=payment_method,json=paymentMethod,proto3" json:"payment_method,omitempty"`               // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
-	AtmBankCode       string `protobuf:"bytes,33,opt,name=atm_bank_code,json=atmBankCode,proto3" json:"atm_bank_code,omitempty"`                   // ATM 銀行代碼（僅 ATM 付款時有值，如 "822"）
-	AtmVirtualAccount string `protobuf:"bytes,34,opt,name=atm_virtual_account,json=atmVirtualAccount,proto3" json:"atm_virtual_account,omitempty"` // ATM 虛擬帳號（僅 ATM 付款時有值）
-	AtmExpireDate     string `protobuf:"bytes,35,opt,name=atm_expire_date,json=atmExpireDate,proto3" json:"atm_expire_date,omitempty"`             // ATM 繳費期限（僅 ATM 付款時有值，格式 "yyyy-MM-dd"）
+	PaymentMethod string `protobuf:"bytes,32,opt,name=payment_method,json=paymentMethod,proto3" json:"payment_method,omitempty"` // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
 	// 賣家資訊（即時聚合自 Seller Service）
 	SellerName      string `protobuf:"bytes,36,opt,name=seller_name,json=sellerName,proto3" json:"seller_name,omitempty"`                  // 賣家店名
 	SellerAvatarKey string `protobuf:"bytes,37,opt,name=seller_avatar_key,json=sellerAvatarKey,proto3" json:"seller_avatar_key,omitempty"` // 賣家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 sellerAvatarUrl；http 值 passthrough）
@@ -705,7 +694,6 @@ type OrderDetailView struct {
 	CancelRemark string `protobuf:"bytes,43,opt,name=cancel_remark,json=cancelRemark,proto3" json:"cancel_remark,omitempty"` // 取消備註（空字串表示無備註）
 	// 出貨照片（賣家上傳，雙方詳情頁可見，統一從 orders.shipment_photo_urls 快照取）
 	ShipmentPhotoKeys []string `protobuf:"bytes,44,rep,name=shipment_photo_keys,json=shipmentPhotoKeys,proto3" json:"shipment_photo_keys,omitempty"` // 賣家出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；選填）
-	NeedRefundPage    bool     `protobuf:"varint,47,opt,name=need_refund_page,json=needRefundPage,proto3" json:"need_refund_page,omitempty"`         // ATM 退款等待買家前往 PayUni 頁面
 	// 訂單備註
 	OrderRemark string `protobuf:"bytes,48,opt,name=order_remark,json=orderRemark,proto3" json:"order_remark,omitempty"` // 訂單備註（買家下單時留言給賣家，選填）
 	// 評論狀態
@@ -1017,27 +1005,6 @@ func (x *OrderDetailView) GetPaymentMethod() string {
 	return ""
 }
 
-func (x *OrderDetailView) GetAtmBankCode() string {
-	if x != nil {
-		return x.AtmBankCode
-	}
-	return ""
-}
-
-func (x *OrderDetailView) GetAtmVirtualAccount() string {
-	if x != nil {
-		return x.AtmVirtualAccount
-	}
-	return ""
-}
-
-func (x *OrderDetailView) GetAtmExpireDate() string {
-	if x != nil {
-		return x.AtmExpireDate
-	}
-	return ""
-}
-
 func (x *OrderDetailView) GetSellerName() string {
 	if x != nil {
 		return x.SellerName
@@ -1106,13 +1073,6 @@ func (x *OrderDetailView) GetShipmentPhotoKeys() []string {
 		return x.ShipmentPhotoKeys
 	}
 	return nil
-}
-
-func (x *OrderDetailView) GetNeedRefundPage() bool {
-	if x != nil {
-		return x.NeedRefundPage
-	}
-	return false
 }
 
 func (x *OrderDetailView) GetOrderRemark() string {
@@ -7934,7 +7894,6 @@ type OrderAfterSalesView struct {
 	BuyerDistrict      string `protobuf:"bytes,19,opt,name=buyer_district,json=buyerDistrict,proto3" json:"buyer_district,omitempty"`
 	BuyerAddressDetail string `protobuf:"bytes,20,opt,name=buyer_address_detail,json=buyerAddressDetail,proto3" json:"buyer_address_detail,omitempty"`
 	BuyerPostalCode    string `protobuf:"bytes,21,opt,name=buyer_postal_code,json=buyerPostalCode,proto3" json:"buyer_postal_code,omitempty"`
-	NeedRefundPage     bool   `protobuf:"varint,22,opt,name=need_refund_page,json=needRefundPage,proto3" json:"need_refund_page,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -8114,13 +8073,6 @@ func (x *OrderAfterSalesView) GetBuyerPostalCode() string {
 		return x.BuyerPostalCode
 	}
 	return ""
-}
-
-func (x *OrderAfterSalesView) GetNeedRefundPage() bool {
-	if x != nil {
-		return x.NeedRefundPage
-	}
-	return false
 }
 
 type OrderItemForAfterSales struct {
@@ -9838,7 +9790,7 @@ const file_order_order_proto_rawDesc = "" +
 	"\vtotal_pages\x18\x02 \x01(\tR\n" +
 	"totalPages\x12\x1f\n" +
 	"\vtotal_items\x18\x03 \x01(\tR\n" +
-	"totalItems\"\x94\r\n" +
+	"totalItems\"\xf0\f\n" +
 	"\x10OrderSummaryView\x12\x19\n" +
 	"\border_no\x18\x01 \x01(\tR\aorderNo\x12\x1f\n" +
 	"\vcreate_time\x18\x02 \x01(\tR\n" +
@@ -9877,8 +9829,7 @@ const file_order_order_proto_rawDesc = "" +
 	"partner_id\x18\x18 \x01(\tR\tpartnerId\x12\x12\n" +
 	"\x04odno\x18\x19 \x01(\tR\x04odno\x12#\n" +
 	"\rvalidation_no\x18\x1a \x01(\tR\fvalidationNo\x12.\n" +
-	"\x13shipment_photo_keys\x18\x1b \x03(\tR\x11shipmentPhotoKeys\x12(\n" +
-	"\x10need_refund_page\x18\x1e \x01(\bR\x0eneedRefundPage\x12\x1f\n" +
+	"\x13shipment_photo_keys\x18\x1b \x03(\tR\x11shipmentPhotoKeys\x12\x1f\n" +
 	"\vis_reviewed\x18\x1f \x01(\bR\n" +
 	"isReviewed\x12'\n" +
 	"\x0freview_deadline\x18  \x01(\tR\x0ereviewDeadline\x12\x1d\n" +
@@ -9893,7 +9844,7 @@ const file_order_order_proto_rawDesc = "" +
 	"\x0ecancel_by_role\x18( \x01(\tR\fcancelByRole\x12.\n" +
 	"\x13countdown_paused_at\x18) \x01(\tR\x11countdownPausedAt\x12)\n" +
 	"\x10payment_deadline\x18* \x01(\tR\x0fpaymentDeadline\x12%\n" +
-	"\x0epayment_method\x18+ \x01(\tR\rpaymentMethod\"\x8a\x02\n" +
+	"\x0epayment_method\x18+ \x01(\tR\rpaymentMethodJ\x04\b\x1e\x10\x1f\"\x8a\x02\n" +
 	"\rOrderItemView\x12\x15\n" +
 	"\x06sku_id\x18\x01 \x01(\tR\x05skuId\x12\x19\n" +
 	"\bsku_name\x18\x02 \x01(\tR\askuName\x12\x1a\n" +
@@ -9906,7 +9857,7 @@ const file_order_order_proto_rawDesc = "" +
 	"\n" +
 	"list_price\x18\b \x01(\tR\tlistPrice\x12\x1d\n" +
 	"\n" +
-	"unit_price\x18\t \x01(\tR\tunitPrice\"\xd9\x14\n" +
+	"unit_price\x18\t \x01(\tR\tunitPrice\"\xcb\x13\n" +
 	"\x0fOrderDetailView\x12\x19\n" +
 	"\border_no\x18\x01 \x01(\tR\aorderNo\x12\x1f\n" +
 	"\vcreate_time\x18\x02 \x01(\tR\n" +
@@ -9946,10 +9897,7 @@ const file_order_order_proto_rawDesc = "" +
 	"partner_id\x18\x1d \x01(\tR\tpartnerId\x12\x12\n" +
 	"\x04odno\x18\x1e \x01(\tR\x04odno\x12#\n" +
 	"\rvalidation_no\x18\x1f \x01(\tR\fvalidationNo\x12%\n" +
-	"\x0epayment_method\x18  \x01(\tR\rpaymentMethod\x12\"\n" +
-	"\ratm_bank_code\x18! \x01(\tR\vatmBankCode\x12.\n" +
-	"\x13atm_virtual_account\x18\" \x01(\tR\x11atmVirtualAccount\x12&\n" +
-	"\x0fatm_expire_date\x18# \x01(\tR\ratmExpireDate\x12\x1f\n" +
+	"\x0epayment_method\x18  \x01(\tR\rpaymentMethod\x12\x1f\n" +
 	"\vseller_name\x18$ \x01(\tR\n" +
 	"sellerName\x12*\n" +
 	"\x11seller_avatar_key\x18% \x01(\tR\x0fsellerAvatarKey\x12\x1f\n" +
@@ -9962,8 +9910,7 @@ const file_order_order_proto_rawDesc = "" +
 	"\x10buyer_avatar_key\x18) \x01(\tR\x0ebuyerAvatarKey\x12#\n" +
 	"\rcancel_reason\x18* \x01(\tR\fcancelReason\x12#\n" +
 	"\rcancel_remark\x18+ \x01(\tR\fcancelRemark\x12.\n" +
-	"\x13shipment_photo_keys\x18, \x03(\tR\x11shipmentPhotoKeys\x12(\n" +
-	"\x10need_refund_page\x18/ \x01(\bR\x0eneedRefundPage\x12!\n" +
+	"\x13shipment_photo_keys\x18, \x03(\tR\x11shipmentPhotoKeys\x12!\n" +
 	"\forder_remark\x180 \x01(\tR\vorderRemark\x12\x1f\n" +
 	"\vis_reviewed\x181 \x01(\bR\n" +
 	"isReviewed\x12,\n" +
@@ -9983,7 +9930,7 @@ const file_order_order_proto_rawDesc = "" +
 	"\x19available_payment_methods\x18> \x03(\v2#.hawkr.order.AvailablePaymentMethodR\x17availablePaymentMethods\x12!\n" +
 	"\fcompleted_at\x18@ \x01(\tR\vcompletedAt\x12!\n" +
 	"\fcancelled_at\x18A \x01(\tR\vcancelledAt\x12!\n" +
-	"\fdelivered_at\x18B \x01(\tR\vdeliveredAt\"\x84\x03\n" +
+	"\fdelivered_at\x18B \x01(\tR\vdeliveredAtJ\x04\b!\x10\"J\x04\b\"\x10#J\x04\b#\x10$J\x04\b/\x100\"\x84\x03\n" +
 	"\x0fOrderItemDetail\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x15\n" +
 	"\x06sku_id\x18\x02 \x01(\tR\x05skuId\x12\x19\n" +
@@ -10549,7 +10496,7 @@ const file_order_order_proto_rawDesc = "" +
 	"\x1dGetOrderForAfterSalesResponse\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x124\n" +
-	"\x04data\x18\x03 \x01(\v2 .hawkr.order.OrderAfterSalesViewR\x04data\"\xce\x06\n" +
+	"\x04data\x18\x03 \x01(\v2 .hawkr.order.OrderAfterSalesViewR\x04data\"\xaa\x06\n" +
 	"\x13OrderAfterSalesView\x12\x19\n" +
 	"\border_no\x18\x01 \x01(\tR\aorderNo\x12\x19\n" +
 	"\bbuyer_id\x18\x02 \x01(\tR\abuyerId\x12\x19\n" +
@@ -10575,8 +10522,7 @@ const file_order_order_proto_rawDesc = "" +
 	"buyer_city\x18\x12 \x01(\tR\tbuyerCity\x12%\n" +
 	"\x0ebuyer_district\x18\x13 \x01(\tR\rbuyerDistrict\x120\n" +
 	"\x14buyer_address_detail\x18\x14 \x01(\tR\x12buyerAddressDetail\x12*\n" +
-	"\x11buyer_postal_code\x18\x15 \x01(\tR\x0fbuyerPostalCode\x12(\n" +
-	"\x10need_refund_page\x18\x16 \x01(\bR\x0eneedRefundPage\"\xaf\x02\n" +
+	"\x11buyer_postal_code\x18\x15 \x01(\tR\x0fbuyerPostalCodeJ\x04\b\x16\x10\x17\"\xaf\x02\n" +
 	"\x16OrderItemForAfterSales\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x15\n" +
 	"\x06sku_id\x18\x02 \x01(\tR\x05skuId\x12\x19\n" +

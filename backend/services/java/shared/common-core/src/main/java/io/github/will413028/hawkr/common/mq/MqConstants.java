@@ -147,13 +147,6 @@ public final class MqConstants {
     public static final String ROUTING_KEY_PAYMENT_EXPIRED = "payment.expired";
     public static final String ROUTING_KEY_PAYMENT_CLOSED = "payment.closed";
     public static final String ROUTING_KEY_PAYMENT_CONFLICT = "payment.conflict";
-    public static final String ROUTING_KEY_PAYMENT_RESCUE_REFUND_INITIATED = "payment.rescue.refund_initiated";
-    public static final String ROUTING_KEY_PAYMENT_RESCUE_REFUND_COMPLETED = "payment.rescue.refund_completed";
-
-    /** §2A.6 RescueRefundConsumer 監聽 queue */
-    public static final String QUEUE_PAYMENT_RESCUE_REFUND = "payment.rescue.refund.queue";
-    /** §2A.6 RescueRefundConsumer DLQ */
-    public static final String QUEUE_PAYMENT_RESCUE_REFUND_DLQ = "payment.rescue.refund.dlq";
 
     // Seller routing keys (PAYUNi integration)
     public static final String ROUTING_KEY_SELLER_PAYUNI_REGISTER = "seller.payuni.register";
@@ -185,7 +178,6 @@ public final class MqConstants {
     // Refund routing keys
     public static final String ROUTING_KEY_REFUND_SUCCEEDED = "refund.succeeded";
     public static final String ROUTING_KEY_REFUND_FAILED = "refund.failed";
-    public static final String ROUTING_KEY_REFUND_COMPLETED = "refund.completed";
 
     // Fulfillment routing keys (Shipping)
     public static final String EXCHANGE_SHIPPING = "hawkr.shipping";
@@ -315,18 +307,7 @@ public final class MqConstants {
 
     // PayUni Webhook Events（由 payuni-webhook-service 發布）
     public static final String EXCHANGE_PAYUNI_WEBHOOK = "payuni.events";
-    public static final String ROUTING_KEY_PAYUNI_PAYMENT_UOP = "payuni.payment.uop";
     public static final String ROUTING_KEY_PAYUNI_SHIPPING_STATUS = "payuni.shipping.status";
-    // AGENT_NOTIFY 的 payuni.events 路由常數已於 #1757 移除（無 consumer 的過渡期冗餘路由）；
-    // AGENT_NOTIFY 改單通道走 seller.events/seller.review.result。
-    public static final String ROUTING_KEY_PAYUNI_REFUND_NOTIFY = "payuni.refund.notify";
-    public static final String ROUTING_KEY_PAYUNI_REFUND_ACCEPTED = "payuni.refund.accepted";
-    /**
-     * §2.2 業務 pivot (2026-05-14)：UNKNOWN webhook 保守失敗處理。
-     * 當 PayUni 推送的 webhook 無法被 parser 識別（含 MerID 但缺類型 key），投遞此路由給
-     * aftersales / payment 兩個 fallback consumer 同時訂閱，依當下 awaiting/pending task 上下文做保守失敗處理。
-     */
-    public static final String ROUTING_KEY_PAYUNI_UNKNOWN_FALLBACK = "payuni.unknown.fallback";
 
     /**
      * Uber Direct 貨態回調（本波唯一新增的 routing key）。
@@ -345,31 +326,10 @@ public final class MqConstants {
      */
     public static final String ROUTING_KEY_UBER_SHIPPING_STATUS = "uber.shipping.status";
 
-    // PayUni Webhook Event Types
-    public static final String EVENT_TYPE_PAYUNI_PAYMENT_UOP = "PAYUNI_PAYMENT_UOP";
     public static final String EVENT_TYPE_PAYUNI_SHIPPING_STATUS = "PAYUNI_SHIPPING_STATUS";
     public static final String EVENT_TYPE_PAYUNI_AGENT_NOTIFY = "PAYUNI_AGENT_NOTIFY";
-    public static final String EVENT_TYPE_PAYUNI_REFUND_NOTIFY = "PAYUNI_REFUND_NOTIFY";
-    public static final String EVENT_TYPE_PAYUNI_REFUND_ACCEPTED = "PAYUNI_REFUND_ACCEPTED";
-    public static final String EVENT_TYPE_PAYUNI_UNKNOWN_FALLBACK = "PAYUNI_UNKNOWN_FALLBACK";
 
     // ==================== Queues ====================
-
-    // PayUni Webhook 下游消費 Queue
-    public static final String QUEUE_PAYMENT_PAYUNI_WEBHOOK = "payment.payuni.webhook";
-    public static final String QUEUE_PAYMENT_PAYUNI_REFUND_NOTIFY = "payment.payuni.refund.notify";
-    public static final String QUEUE_PAYMENT_PAYUNI_REFUND_NOTIFY_DLQ = "payment.payuni.refund.notify.dlq";
-    public static final String QUEUE_PAYMENT_PAYUNI_REFUND_ACCEPTED = "payment.payuni.refund.accepted";
-    public static final String QUEUE_PAYMENT_PAYUNI_REFUND_ACCEPTED_DLQ = "payment.payuni.refund.accepted.dlq";
-    /** §2.2 pivot (2026-05-14): payment-service 訂閱 UNKNOWN fallback。*/
-    public static final String QUEUE_PAYMENT_PAYUNI_UNKNOWN_FALLBACK = "payment.payuni.unknown.fallback";
-    public static final String QUEUE_PAYMENT_PAYUNI_UNKNOWN_FALLBACK_DLQ = "payment.payuni.unknown.fallback.dlq";
-    /** §2.2 pivot (2026-05-14): aftersales-service 訂閱 UNKNOWN fallback。*/
-    public static final String QUEUE_AFTERSALES_PAYUNI_UNKNOWN_FALLBACK = "aftersales.payuni.unknown.fallback";
-
-    // PayUni Webhook DLQ
-    public static final String EXCHANGE_PAYMENT_WEBHOOK_DLX = "payment.webhook.dlx";
-    public static final String QUEUE_PAYMENT_WEBHOOK_DLQ = "payment.payuni.webhook.dlq";
 
     // Order service queues
     public static final String QUEUE_ORDER_PAYMENT_RESULT = "order.payment.result";
@@ -390,7 +350,6 @@ public final class MqConstants {
     // order-service AfterSales consumer DLQ（§23 P2.3-2，2026-05-20）
     public static final String QUEUE_ORDER_AFTERSALES_REFUND_COMPLETED_DLQ = "order.aftersales.refund.completed.dlq";
     public static final String QUEUE_ORDER_AFTERSALES_CANCEL_COMPLETED_DLQ = "order.aftersales.cancel.completed.dlq";
-    public static final String QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE_DLQ = "order.aftersales.awaiting.buyer.page.dlq";
     public static final String QUEUE_ORDER_AFTERSALES_COUNTDOWN_DLQ = "order.aftersales.countdown.dlq";
     // order-service Review consumer DLQ（§23 P2.3-3，2026-05-20）
     public static final String QUEUE_ORDER_REVIEW_CREATED_DLQ = "order.review.created.dlq";
@@ -483,7 +442,6 @@ public final class MqConstants {
     // Order Service 消費 AfterSales 事件 Queue
     public static final String QUEUE_ORDER_AFTERSALES_REFUND_COMPLETED = "order.aftersales.refund.completed";
     public static final String QUEUE_ORDER_AFTERSALES_CANCEL_COMPLETED = "order.aftersales.cancel.completed";
-    public static final String QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE = "order.aftersales.awaiting.buyer.page";
     // 自動完成 60h 倒數的暫停/恢復事件（03 §5.8）
     public static final String QUEUE_ORDER_AFTERSALES_COUNTDOWN = "order.aftersales.countdown";
 
@@ -492,13 +450,11 @@ public final class MqConstants {
 
     // AfterSales Service 消費其他服務事件 Queue
     public static final String QUEUE_AFTERSALES_RETURN_SHIPMENT_STATUS = "aftersales.shipping.return.status";
-    public static final String QUEUE_AFTERSALES_REFUND_RESULT = "aftersales.payment.refund.result";
     public static final String QUEUE_AFTERSALES_SHIPMENT_LABEL = "aftersales.shipping.label";
 
     // AfterSales 事件類型
     public static final String EVENT_TYPE_AFTERSALES_REFUND_COMPLETED = "AFTERSALES_REFUND_COMPLETED";
     public static final String EVENT_TYPE_AFTERSALES_CANCEL_COMPLETED = "AFTERSALES_CANCEL_COMPLETED";
-    public static final String EVENT_TYPE_AFTERSALES_AWAITING_BUYER_REFUND_PAGE = "AFTERSALES_AWAITING_BUYER_REFUND_PAGE";
 
     // AfterSales routing keys 已全部遷至 AfterSalesEventType enum（取用方式：AfterSalesEventType.XXX.value()）
     // EVENT_TYPE_AFTERSALES_* metadata 仍保留作為 publish 第 4 個參數的 event_type 字串

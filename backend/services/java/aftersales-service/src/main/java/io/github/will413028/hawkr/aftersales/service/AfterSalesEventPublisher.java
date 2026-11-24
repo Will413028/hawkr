@@ -19,16 +19,6 @@ package io.github.will413028.hawkr.aftersales.service;
 public interface AfterSalesEventPublisher {
 
     /**
-     * 發佈「等待買家操作 ATM 退款頁面」事件。
-     *
-     * @param orderNo      訂單編號
-     * @param caseNo       售後單編號（賣家取消時為 null）
-     * @param refundTaskId 退款任務 ID
-     * @param buyerId      買家 ID，用於反解 notify_buyer_account_id（#1626）
-     */
-    void publishAwaitingBuyerRefundPage(String orderNo, String caseNo, Long refundTaskId, Long buyerId);
-
-    /**
      * 發佈「賣家取消出貨完成」事件（未付款訂單直接完成）。
      *
      * @param orderNo  訂單編號
@@ -111,19 +101,6 @@ public interface AfterSalesEventPublisher {
                                            java.util.Map<String, Object> extraPayload);
 
     // ==================== issue #2294 前置 (i)：會傳遞失敗的變體 ====================
-
-    /**
-     * {@link #publishAwaitingBuyerRefundPage} 的會傳遞失敗 ＋ <b>零 gRPC</b> 變體。
-     *
-     * <p>issue #2294 B7：唯一呼叫點 {@code ReturnReceiptService.createRefundTaskAndAdvanceStatus}
-     * 在 {@code @Transactional} 內，所以本方法<b>不得</b>自己反解 {@code buyer_id}——
-     * {@code principals} 必須由最外層呼叫端在 tx 之外備好
-     * （排程走 {@link #resolveEventPrincipals}、API 走 {@link #resolveEventPrincipalsBestEffort}）。
-     *
-     * @return true = domain event 已送出；false = 送出失敗（已記 error log）
-     */
-    boolean tryPublishAwaitingBuyerRefundPage(String orderNo, String caseNo, Long refundTaskId,
-                                               Long buyerId, EventPrincipals principals);
 
     /**
      * {@link #publishCancelCompleted} 的會傳遞失敗變體。

@@ -2,9 +2,9 @@ package io.github.will413028.hawkr.aftersales.service;
 
 import io.github.will413028.hawkr.aftersales.config.AfterSalesProperties;
 import io.github.will413028.hawkr.aftersales.entity.AfterSaleCaseEntity;
+import io.github.will413028.hawkr.aftersales.entity.RefundTaskEntity;
 import io.github.will413028.hawkr.aftersales.exception.AfterSalesBusinessException;
 import io.github.will413028.hawkr.aftersales.grpc.client.CouponGrpcClient;
-import io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleCaseMapper;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleResolutionMapper;
@@ -15,10 +15,9 @@ import io.github.will413028.hawkr.common.utils.code.AfterSaleResolutionType;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
+import io.github.will413028.hawkr.common.utils.code.WorkerTaskStatus;
 import io.github.will413028.hawkr.coupon.grpc.GrantSellerCompensationCouponResponse;
 import io.github.will413028.hawkr.coupon.grpc.SellerCompensationCouponData;
-import io.github.will413028.hawkr.payment.grpc.CreateRefundResponse;
-import io.github.will413028.hawkr.payment.grpc.RefundDetail;
 import io.github.will413028.hawkr.shipping.grpc.CreateReturnShipmentResponse;
 import io.github.will413028.hawkr.shipping.grpc.ReturnShipmentData;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,7 +59,6 @@ class AfterSaleResolutionServiceTest {
     @Mock private AfterSalesProperties properties;
     @Mock private AfterSalesEventPublisher afterSalesEventPublisher;
     @Mock private AfterSaleCaseService caseService;
-    @Mock private PaymentGrpcClient paymentGrpcClient;
 
     @InjectMocks private AfterSaleResolutionService service;
 
@@ -189,92 +187,24 @@ class AfterSaleResolutionServiceTest {
         assertEquals(GrpcResponseCode.AFTERSALE_NOT_OWNER.code(), ex.code());
     }
 
-    // ==================== issue #1626: publishAwaitingBuyerRefundPage 參數位置 ====================
-    //
-    // publishAwaitingBuyerRefundPage(orderNo, caseNo, refundTaskId, buyerId) 的第 4 個參數是
-    // 這次新加的 buyerId，與第 3 個 refundTaskId 同為 Long，寫反照樣編譯過。下面兩支測試把
-    // ATM 決議路徑（handleFullRefundNoReturn / handlePartialRefund 兩個 call site）跑到底，
-    // 綁死第 4 個參數 = caseEntity.getBuyerId()。BUYER / SELLER / refundAmount 三者值皆不同，
-    // 任何錯位都會 fail。
+    // ==================== 退款決議：建 PENDING 退款任務，交給 RefundTaskWorker ====================
 
-    private AfterSaleCaseEntity atmPendingCase() {
+    @Test
+    @DisplayName("全額退款（免退貨）→ 建 PENDING 退款任務，不發額外的買家操作事件")
+    void fullRefundNoReturn_insertsPendingRefundTask() {
         AfterSaleCaseEntity c = pendingCase();
-        c.setPaymentMethod(PaymentMethod.ATM.value());
         c.setTransactionId("TXN1");
-        return c;
-    }
-
-    private void stubAtmRefundPrebuildSuccess() {
-        when(caseMapper.selectOne(any())).thenReturn(atmPendingCase());
-        when(paymentGrpcClient.createRefund(any(), any(), any(), any()))
-                .thenReturn(CreateRefundResponse.newBuilder()
-                        .setCode(0)
-                        .setData(RefundDetail.newBuilder().setRefundNo("RFD_1").build())
-                        .build());
-        when(properties.getRefund()).thenReturn(new AfterSalesProperties.RefundConfig());
-        when(caseMapper.markRefundProcessingFromResolution(CASE_NO)).thenReturn(1);
-    }
-
-    private void assertAwaitingBuyerRefundPagePublishedWithBuyerId() {
-        ArgumentCaptor<String> orderNoCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> caseNoCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<Long> refundTaskIdCaptor = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<Long> buyerIdCaptor = ArgumentCaptor.forClass(Long.class);
-        verify(afterSalesEventPublisher).publishAwaitingBuyerRefundPage(
-                orderNoCaptor.capture(), caseNoCaptor.capture(),
-                refundTaskIdCaptor.capture(), buyerIdCaptor.capture());
-
-        assertEquals("O400280260", orderNoCaptor.getValue());
-        assertEquals(CASE_NO, caseNoCaptor.getValue());
-        assertNotNull(refundTaskIdCaptor.getValue());
-        assertEquals(BUYER, buyerIdCaptor.getValue(),
-                "第 4 個參數必須是 caseEntity.buyerId，不可與 storeId/refundTaskId 錯位");
-        assertNotEquals(SELLER, buyerIdCaptor.getValue());
-        assertNotEquals(refundTaskIdCaptor.getValue(), buyerIdCaptor.getValue());
-    }
-
-    @Test
-    @DisplayName("ATM 全額退款（免退貨）→ publishAwaitingBuyerRefundPage 第 4 參數 = caseEntity.buyerId")
-    void fullRefundNoReturn_atm_publishesAwaitingBuyerRefundPageWithBuyerId() {
-        stubAtmRefundPrebuildSuccess();
-
-        service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.FULL_REFUND_NO_RETURN.value(),
-                null, null, null, null, null, null, null);
-
-        assertAwaitingBuyerRefundPagePublishedWithBuyerId();
-    }
-
-    @Test
-    @DisplayName("ATM 部分退款 → publishAwaitingBuyerRefundPage 第 4 參數 = caseEntity.buyerId")
-    void partialRefund_atm_publishesAwaitingBuyerRefundPageWithBuyerId() {
-        stubAtmRefundPrebuildSuccess();
-
-        service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.PARTIAL_REFUND.value(),
-                300L, null, null, null, null, null, null);
-
-        assertAwaitingBuyerRefundPagePublishedWithBuyerId();
-    }
-
-    /**
-     * 對照組：§2.3.1 INV-5——ATM createRefund 預建失敗時 task 直接 FAILED，
-     * 不該發等待頁事件（守住 {@code isAtm && status==AWAITING_BUYER_REFUND_PAGE} 這個 and 條件）。
-     */
-    @Test
-    @DisplayName("ATM createRefund 預建失敗 → 不發 publishAwaitingBuyerRefundPage")
-    void fullRefundNoReturn_atmPrebuildFailed_doesNotPublishAwaitingBuyerRefundPage() {
-        when(caseMapper.selectOne(any())).thenReturn(atmPendingCase());
-        when(paymentGrpcClient.createRefund(any(), any(), any(), any()))
-                .thenReturn(CreateRefundResponse.newBuilder()
-                        .setCode(GrpcResponseCode.INTERNAL_ERROR.code())
-                        .setMessage("PayUni 預建退款失敗")
-                        .build());
+        when(caseMapper.selectOne(any())).thenReturn(c);
         when(properties.getRefund()).thenReturn(new AfterSalesProperties.RefundConfig());
         when(caseMapper.markRefundProcessingFromResolution(CASE_NO)).thenReturn(1);
 
         service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.FULL_REFUND_NO_RETURN.value(),
                 null, null, null, null, null, null, null);
 
-        verify(afterSalesEventPublisher, never())
-                .publishAwaitingBuyerRefundPage(any(), any(), any(), any());
+        ArgumentCaptor<RefundTaskEntity> taskCaptor = ArgumentCaptor.forClass(RefundTaskEntity.class);
+        verify(refundTaskMapper).insert(taskCaptor.capture());
+        assertEquals(CASE_NO, taskCaptor.getValue().getCaseNo());
+        assertEquals("TXN1", taskCaptor.getValue().getTransactionId());
+        assertEquals(WorkerTaskStatus.PENDING.value(), taskCaptor.getValue().getStatus());
     }
 }

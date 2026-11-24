@@ -87,17 +87,15 @@ type paymentClosed struct {
 // refundSucceeded 是舊 RefundSucceeded 的 payload（camelCase）。
 type refundSucceeded struct {
 	envelope
-	RefundNo            string `json:"refundNo"`
-	TradeNo             string `json:"tradeNo"`
-	OrderID             string `json:"orderId"`
-	Amount              int64  `json:"amount"`
-	ProviderRefundNo    string `json:"providerRefundNo"`
-	ProviderStatus      string `json:"payuniStatus"`
-	ProviderMessage     string `json:"payuniMessage"`
-	EstimatedRefundDate string `json:"estimatedRefundDate"`
-	BankDate            string `json:"bankDate"`
-	CompletedAt         string `json:"completedAt"`
-	OccurredAtCamel     string `json:"occurredAt"`
+	RefundNo         string `json:"refundNo"`
+	TradeNo          string `json:"tradeNo"`
+	OrderID          string `json:"orderId"`
+	Amount           int64  `json:"amount"`
+	ProviderRefundNo string `json:"providerRefundNo"`
+	ProviderStatus   string `json:"payuniStatus"`
+	ProviderMessage  string `json:"payuniMessage"`
+	CompletedAt      string `json:"completedAt"`
+	OccurredAtCamel  string `json:"occurredAt"`
 }
 
 // refundFailed 是舊 RefundFailed 的 payload（camelCase，沒有 status：消費端依 routing key 判斷成敗）；失敗原因放在舊的訊息欄位。
