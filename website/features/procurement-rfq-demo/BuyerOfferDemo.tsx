@@ -178,8 +178,9 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 					<h1>買家出價 → 賣家決定 → 買家確認</h1>
 				</div>
 				<p className={styles.flag}>
-					買家那半全部是真的：需求、收件名單，出價區間也真的送去伺服器試算。
-					賣家那半是本機狀態，不會送出、不會通知任何人。
+					{
+						"買家那半全部是真的：需求、收件名單，出價區間也真的送去伺服器試算。賣家那半是本機狀態，不會送出、不會通知任何人。"
+					}
 				</p>
 			</header>
 
@@ -312,8 +313,9 @@ export default function BuyerOfferDemo({ requestId }: { requestId: string }) {
 						{submitting ? "定稿中…" : "定稿並送給賣家"}
 					</button>
 					<p className={styles.boundary}>
-						按下去只會呼叫價格試算，不寫入任何資料，也不會通知任何賣家——發布詢價是
-						發布核准的事，本 demo 不呼叫。
+						{
+							"按下去只會呼叫價格試算，不寫入任何資料，也不會通知任何賣家——發布詢價是發布核准的事，本 demo 不呼叫。"
+						}
 					</p>
 				</section>
 			) : null}
