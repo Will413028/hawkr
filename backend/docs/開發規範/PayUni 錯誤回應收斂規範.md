@@ -30,7 +30,7 @@
 | 層 | 欄位命名前綴 | 語意 | 擁有者 | 典型例子 |
 |---|---|---|---|---|
 | **平台層** | 無前綴（`status` / `order_status` / `case_status`）| 我們平台業務狀態機，使用 CodeMeta | 各聚合服務 | `orders.status`、`aftersales_cases.status` |
-| **Provider SoT 層** | `provider_*` | PayUni 原始狀態碼與訊息的**唯一真實來源** | 擁有該 PayUni 操作的服務 | `payment_transactions.provider_status`、`shipments.provider_status` |
+| **Provider SoT 層** | `provider_*` | PayUni 原始狀態碼與訊息的**唯一真實來源** | 擁有該 PayUni 操作的服務 | `payment_transactions.provider_status` |
 | **Provider Snapshot 層** | `payuni_*` | 跨服務 event-driven 快照，**非 SoT** | 訂閱 event 的服務 | `refund_tasks.payuni_status` |
 
 **三層不可混用**。讀 schema 名稱就要能知道欄位所屬層級。
@@ -61,8 +61,6 @@
 | 情境 | 正確 | 錯誤 | 理由 |
 |---|---|---|---|
 | 退款 PayUni 狀態（SoT）| `payment_refunds.provider_status` | ~~`payment_refunds.payuni_code`~~、~~`payment_refunds.refund_result`~~ | SoT 層強制 `provider_*` 前綴 |
-| 物流 PayUni 狀態（SoT） | `shipments.provider_status` | ~~`shipments.provider_status_desc`~~、~~`set_status`~~ | `desc` 命名語意不清、`set_status` 無 `provider_` 前綴 |
-| 建店 PayUni 狀態（SoT） | `seller_shipment_settings.provider_status` | ~~`set_status`~~ | 同上，歷史遺留需改名 |
 | AfterSales 退款 snapshot | `refund_tasks.payuni_status` | ~~`refund_tasks.provider_status`~~ | AfterSales 非 SoT，用 `payuni_*` 區別 |
 | 平台業務狀態 | `orders.status`、`aftersales_cases.status` | ~~`orders.provider_status`~~ | 平台層不加前綴 |
 | 聚合 API 回應 DTO | `data.providerStatus`、`data.providerMessage` | ~~`data.payuniStatus`~~ | 聚合服務對外用 SoT 語意（最終可信來源）|
@@ -148,8 +146,6 @@ PayUni 原始 payload、完整請求/回應、重試過程等歷史資訊，**�
 |---|---|---|
 | Payment | `payment_logs` | 狀態變更、衝突、webhook、手動介入等事件序列 |
 | Payment | `payment_webhooks` | PayUni webhook 原始加密/解密 payload |
-| Shipping | `shipment_status_logs` | 物流狀態變更歷史 + raw webhook payload |
-| Shipping | `seller_shipment_onboarding_logs` | 建店 request/response snapshot（JSONB）|
 | PayUni Webhook | `webhook_inbox` | 第一落地點，原始 envelope + decrypted JSONB |
 
 ### 4.4 單一狀態欄位的雙階段寫入規則
@@ -195,10 +191,6 @@ message PaymentDetail {
     string provider_message = 21;  // PayUni 原始訊息
 }
 
-message ShipmentDetail {
-    string provider_status  = 10;
-    string provider_message = 11;
-}
 ```
 
 ### 5.2 MQ Event Payload
@@ -274,10 +266,10 @@ message PaymentRefundResultEvent {
 
 ```json
 {
-  "orderStatus": "SHIPPING_FAILED",    // 平台業務碼
-  "statusMessage": "物流建單失敗",        // 平台中文
-  "providerStatus": "E001",             // PayUni 原始（聚合自 shipments）
-  "providerMessage": "門市不存在"         // PayUni 原始
+  "orderStatus": "PAYMENT_FAILED",     // 平台業務碼
+  "statusMessage": "付款失敗",            // 平台中文
+  "providerStatus": "E001",             // PayUni 原始（聚合自 payment_transactions）
+  "providerMessage": "交易失敗"           // PayUni 原始
 }
 ```
 
@@ -287,8 +279,6 @@ message PaymentRefundResultEvent {
 |---|---|---|
 | 付款相關（PENDING_PAYMENT / PAYMENT_FAILED）| `payment_transactions`（最新一筆）| App + Admin |
 | 退款相關（REFUND_PROCESSING / REFUND_FAILED）| `payment_refunds`（最新一筆）| App + Admin |
-| 物流建單相關（SHIPPING / SHIPPING_FAILED）| `shipments`（is_return=false）| App + Admin |
-| 退貨物流相關（RETURN_SHIPPING / RETURN_SHIPPING_FAILED）| `shipments`（is_return=true）| App + Admin |
 | **撥款相關（後台結算）** | `payment_transactions.grant_status` / `grant_message` / `granted_at` | **僅 Admin API** |
 | 平台成功終態 | `null` | — |
 
@@ -311,7 +301,6 @@ message PaymentRefundResultEvent {
 | Payment | `BatchGetProviderStatusByOrderIds(orderIds[])` | `Map<orderId, {status, message}>` | Order 聚合（付款相關）|
 | Payment | `BatchGetRefundProviderStatusByCaseIds(caseIds[])` | `Map<caseId, {status, message}>` | AfterSales 聚合（退款相關，以售後 case 為鍵）|
 | Payment | `BatchGetRefundProviderStatusByOrderIds(orderIds[])` | `Map<orderId, {status, message}>` | Order 聚合（退款相關，以 order 為鍵取最新一筆 payment_refunds）|
-| Shipping | `BatchGetProviderStatusByOrderIds(orderIds[], isReturn)` | `Map<orderId, {status, message}>` | Order / AfterSales 聚合（物流相關，以 is_return 切換正向/退貨）|
 
 聚合服務列表流程：
 
@@ -380,7 +369,7 @@ Swagger 註解依 [Gateway Swagger 註解規範](./Gateway%20Swagger%20註解規
 |---|---|---|
 | **主流程同步 PayUni 呼叫** | 呼叫當下同步 retry **最多一次** | 失敗立即寫入 `provider_status` / `provider_message` 並拋業務例外 |
 | **非同步 PayUni webhook 失敗** | 依既有 webhook 重送機制 | 不新增 retry 機制 |
-| **L2 補救路徑（既有）** | 允許保留 | `PendingPaymentReconcileScheduler` / `ShipmentStatusReconcileScheduler` 等既有補救排程屬合理機制，本規範不禁止 |
+| **L2 補救路徑（既有）** | 允許保留 | `PendingPaymentReconcileScheduler` 等既有補救排程屬合理機制，本規範不禁止 |
 | **Task worker 冪等重試（既有）** | 允許保留 | `auto_refund_tasks` / `refund_tasks` 的 worker 重試屬 orchestration，非本規範管轄 |
 
 ### 8.2 State 表 vs Task 表的欄位規範
@@ -389,7 +378,7 @@ Swagger 註解依 [Gateway Swagger 註解規範](./Gateway%20Swagger%20註解規
 
 | 表類型 | 職責 | 允許 retry 欄位？ |
 |---|---|---|
-| **State 表**（`payment_transactions` / `payment_refunds` / `shipments` / `aftersales_cases` 等）| 記錄實體的當下狀態 | ❌ **禁止** `retry_count` / `next_retry_at` / `*_error_type` |
+| **State 表**（`payment_transactions` / `payment_refunds` / `aftersales_cases` 等）| 記錄實體的當下狀態 | ❌ **禁止** `retry_count` / `next_retry_at` / `*_error_type` |
 | **Task 表**（`auto_refund_tasks` / `refund_tasks` / `outbox_events` 等）| 任務 orchestration，記錄「下一步要做什麼」 | ✅ **允許** `retry_count` / `next_retry_time` / `last_error`（既有欄位，本規範不動）|
 
 State 表記錄「是什麼」，Task 表記錄「要做什麼」。混淆兩者就會出現「state 表塞 retry_count」的反模式。
@@ -421,7 +410,7 @@ State 表記錄「是什麼」，Task 表記錄「要做什麼」。混淆兩者
 sequenceDiagram
     autonumber
     participant User as 買家/賣家
-    participant SVC as 擁有者服務<br/>(Payment/Shipping)
+    participant SVC as 擁有者服務<br/>(Payment)
     participant PAY as PayUni
     participant DB as SoT 表
     participant ADMIN as Admin API<br/>(各服務)
@@ -476,7 +465,6 @@ sequenceDiagram
 | 機制 | 位置 | 用途 |
 |---|---|---|
 | `PendingPaymentReconcileScheduler` | payment-service | 掃 INIT/EXPIRED 交易補救查詢 |
-| `ShipmentStatusReconcileScheduler` | shipping-service | 掃漏收 webhook 的物流單補查 |
 | `RescueRefundConsumer` | payment-service | 補救衝突退款 |
 | Outbox/Inbox pattern retry | 各服務 `outbox_events` / `webhook_inbox` | MQ 可靠投遞冪等重試 |
 | 退款 Task Worker 重試 | order-service / aftersales-service | 任務型 orchestration |
@@ -501,16 +489,6 @@ sequenceDiagram
 | `payment_refunds` | `provider_status` | `VARCHAR(4)` | `VARCHAR(20)` |
 | `payment_refunds` | `provider_message` | `VARCHAR(500)` | `TEXT` |
 
-### 9.2 Shipping Service
-
-| 表 | 欄位 | 原狀 | 調整後 |
-|---|---|---|---|
-| `shipments` | `provider_status` | `VARCHAR(10)` | `VARCHAR(20)` |
-| `shipments` | `provider_status_desc` | `VARCHAR(200)` | **改名** `provider_message` + `TEXT` |
-| `shipment_status_logs` | `provider_status_desc` | `VARCHAR(200)` | **改名** `provider_message` + `TEXT` |
-| `seller_shipment_settings` | `set_status` | `VARCHAR(10)` | **改名** `provider_status` + `VARCHAR(20)` |
-| `seller_shipment_settings` | `provider_message` | 不存在 | **新增** `TEXT` |
-
 ### 9.3 AfterSales Service
 
 | 表 | 欄位 | 原狀 | 調整後 |
@@ -524,7 +502,7 @@ sequenceDiagram
 |---|---|
 | `order.proto` `OrderDetail` / `OrderListItem` | 新增 `provider_status` / `provider_message` |
 | `aftersales.proto` `AfterSaleCaseDetail` / `AfterSaleCaseListItem` | 新增 `provider_status` / `provider_message` |
-| Gateway `payment.go` / `shipping.go` / `order.go` / `aftersales.go` handler DTO | 新增 `ProviderStatus` / `ProviderMessage` |
+| Gateway `payment.go` / `order.go` / `aftersales.go` handler DTO | 新增 `ProviderStatus` / `ProviderMessage` |
 
 ### 9.5 MQ Event Payload
 
@@ -539,7 +517,6 @@ sequenceDiagram
 | 服務 | API 範圍 | 負責設計書 |
 |---|---|---|
 | Payment | `/api/v1/admin/payment_transactions`、`/api/v1/admin/payment_refunds`、`/api/v1/admin/grants` | Admin 異常訂單管理 API 詳細設計書 |
-| Shipping | `/api/v1/admin/shipments`、`/api/v1/admin/seller_shipment_settings` | 同上 |
 | AfterSales | `/api/v1/admin/aftersales_cases` | 同上 |
 | Order | `/api/v1/admin/orders`（聚合） | 同上 |
 
@@ -553,7 +530,7 @@ sequenceDiagram
 | Rescue 路徑的 event | 極少數異常路徑，過度防禦 |
 | `payment_refunds.provider_status` 拆分「同步」與「非同步」兩欄位 | 狀態機已排除並存場景，單一欄位足夠 |
 | 既有 L2 補救 scheduler / task worker | 不在本規範管轄，見 [§8.5](#85-既有-l2-補救機制允許保留的例外) |
-| 「手動重試 PayUni 呼叫」API（**付款 / 退款 / 物流 / 建店**）| 恢復權威入口是 PayUni 後台 + webhook 回流（見 [§8.4 閉環前提](#閉環前提)）|
+| 「手動重試 PayUni 呼叫」API（**付款 / 退款**）| 恢復權威入口是 PayUni 後台 + webhook 回流（見 [§8.4 閉環前提](#閉環前提)）|
 
 **例外 — 撥款（Grant）的 Admin 重發 API 納入本次改造**：
 
@@ -615,6 +592,5 @@ PayUni 撥款 API（`/api/merchant/grant`）**沒有對應的 webhook 回流機�
 - [Go gRPC 錯誤處理規範](./Go%20gRPC%20錯誤處理規範.md)
 - [PostgreSQL 設計規範與最佳實踐](./PostgreSQL%20設計規範與最佳實踐.md)
 - [05-支付服務 詳細設計書](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)
-- [06-物流微服務 詳細設計書](../詳細設計書/06-物流微服務（Shipping%20Service）詳細設計書.md)
 - [09-售後微服務 詳細設計書](../詳細設計書/09-售後微服務（AfterSales%20Service）詳細設計書.md)
 - [CodeMeta 體系總覽（禁止硬編碼）](../代碼管理（CodeMeta）/README.md)
