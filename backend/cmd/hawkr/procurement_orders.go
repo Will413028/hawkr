@@ -36,5 +36,5 @@ func (p procurementOrders) OrderParties(ctx context.Context, orderNo string) (pr
 	if err != nil {
 		return procurement.OrderParties{}, err
 	}
-	return procurement.OrderParties{BuyerID: parties.BuyerID, StoreID: parties.StoreID}, nil
+	return procurement.OrderParties{BuyerID: parties.BuyerID, StoreID: parties.StoreID, Status: parties.Status}, nil
 }

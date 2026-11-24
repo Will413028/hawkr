@@ -28,7 +28,7 @@ func (f *fakeRfqOrders) CreateRfqOrder(_ context.Context, cmd orderservice.RfqOr
 
 func TestProcurementOrdersMapsTheCommandAndTheResult(t *testing.T) {
 	deadline := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
-	f := &fakeRfqOrders{res: orderservice.RfqOrderResult{Code: 0, OrderNo: "HK1", PaymentDeadline: deadline, Replayed: true}, parties: orderservice.OrderParties{BuyerID: 3, StoreID: 11}}
+	f := &fakeRfqOrders{res: orderservice.RfqOrderResult{Code: 0, OrderNo: "HK1", PaymentDeadline: deadline, Replayed: true}, parties: orderservice.OrderParties{BuyerID: 3, StoreID: 11, Status: "0"}}
 	res, err := procurementOrders{f}.CreateOrder(t.Context(), procurement.OrderCommand{
 		OrderRef: 7, BuyerID: 3, StoreID: 11, TotalAmount: 415, ShippingFee: 10, UnitPrice: 405, ItemName: "小白菜 3 KG",
 	})
@@ -43,7 +43,7 @@ func TestProcurementOrdersMapsTheCommandAndTheResult(t *testing.T) {
 		t.Fatalf("結果 = %+v", res)
 	}
 	parties, err := procurementOrders{f}.OrderParties(t.Context(), "HK1")
-	if err != nil || parties.BuyerID != 3 || parties.StoreID != 11 {
+	if err != nil || parties.BuyerID != 3 || parties.StoreID != 11 || parties.Status != "0" {
 		t.Fatalf("買家與店家 = %+v %v", parties, err)
 	}
 }

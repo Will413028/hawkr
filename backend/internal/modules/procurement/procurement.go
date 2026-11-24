@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"reflect"
 	"time"
 
 	"github.com/riverqueue/river"
@@ -210,13 +211,26 @@ func New(d Deps) *Module {
 	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
 	m.candidates = search.Reader{DB: d.DB}
 	m.rfq = rfq.Service{DB: d.DB, Now: d.Now, Events: d.Events}
-	if d.Sellers != nil { // 沒給 Sellers 時兩個 port 留 nil：發布回組裝錯誤，不當成沒有封鎖
+	if !isNil(d.Sellers) { // 沒給 Sellers 時兩個 port 留 nil：發布回組裝錯誤，不當成沒有封鎖
 		m.rfq.Blocks, m.rfq.Open = blockingStores{d.Sellers}, openStores{d.Sellers}
 	}
 	m.quotes = quote.Service{DB: d.DB, Now: d.Now, Jobs: d.Jobs}
 	m.orders = provisioning.Worker{DB: d.DB, Orders: d.Orders, Now: d.Now, Logger: d.Logger}
 	m.ordersRec = provisioning.Reconciler{DB: d.DB, Orders: d.Orders, Now: d.Now, Logger: d.Logger}
 	return m
+}
+
+// isNil 回報介面是 nil 或裝著 nil 指標：後者 != nil，卻會在第一次呼叫時 nil dereference，要當成沒給。
+func isNil(v any) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func, reflect.Interface, reflect.Chan:
+		return rv.IsNil()
+	}
+	return false
 }
 
 // executors 在呼叫端給的登記之外補上 TURN、CANDIDATE_SEARCH 與 CLARIFICATION_RESUME 的 executor。
@@ -226,7 +240,7 @@ func executors(d Deps, ledger run.Ledger, rs *resolver.Resolver) map[string]Exec
 	switch {
 	case hasLLM && d.Taxonomy == nil:
 		panic("procurement.New：Deps.LLM 要與 Deps.Taxonomy 一起給")
-	case d.Search != nil && d.Sellers == nil:
+	case d.Search != nil && isNil(d.Sellers):
 		panic("procurement.New：Deps.Search 要與 Deps.Sellers 一起給")
 	case d.Search != nil && d.Taxonomy == nil:
 		panic("procurement.New：Deps.Search 要與 Deps.Taxonomy 一起給")

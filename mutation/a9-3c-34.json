@@ -31,8 +31,8 @@
    "id": "last-attempt-does-not-mark-failed",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
-   "old": "if !last || errors.Is(ctx.Err(), context.Canceled) {",
-   "new": "if true {",
+   "old": "if !last {\n\t\treturn cause\n\t}",
+   "new": "if true {\n\t\treturn cause\n\t}",
    "test": "internal/modules/procurement ^TestLastAttemptFailureMarksOrderFailedReleasesTheLockAndTheBuyerCanAcceptAgain$",
    "why": "The last failed attempt returns the error without marking the acceptance ORDER_FAILED, so the live lock stays and the buyer cannot accept again."
   },
@@ -76,8 +76,8 @@
    "id": "last-attempt-skips-the-recall",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
-   "old": "if _, again := w.create(fresh, id); again == nil {",
-   "new": "if again := errors.New(\"skipped\"); again == nil {",
+   "old": "o, again := w.create(fresh, id)\n\tif again == nil {",
+   "new": "o, again := outcomeNone, errors.New(\"skipped\")\n\tif again == nil {",
    "test": "internal/modules/procurement ^TestLastAttemptRecallRecoversAnOrderWhoseResponseWasLost$",
    "why": "The last attempt marks ORDER_FAILED without calling CreateRfqOrder once more, so an order whose response was lost is reported as failed and a second order can be created on re-acceptance."
   },
@@ -85,8 +85,8 @@
    "id": "replayed-order-of-another-buyer-accepted",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
-   "old": "if p.BuyerID != *b.BuyerID || p.StoreID != b.StoreID {",
-   "new": "if p.BuyerID == 0 && p.StoreID == 0 {",
+   "old": "p.BuyerID != *b.BuyerID || p.StoreID != b.StoreID",
+   "new": "p.BuyerID == 0 && p.StoreID == 0",
    "test": "internal/modules/procurement ^TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore$",
    "why": "A replayed order that belongs to another buyer or store is recorded on the acceptance, exposing someone else's order."
   },
@@ -94,8 +94,8 @@
    "id": "timeout-is-treated-as-shutdown",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
-   "old": "if !last || errors.Is(ctx.Err(), context.Canceled) {",
-   "new": "if !last || ctx.Err() != nil {",
+   "old": "if o == outcomeUnrecorded || errors.Is(ctx.Err(), context.Canceled) {\n\t\treturn cause",
+   "new": "if o == outcomeUnrecorded || ctx.Err() != nil {\n\t\treturn cause",
    "test": "internal/modules/procurement ^TestLastAttemptAfterTheJobTimedOutStillMarksOrderFailed$",
    "why": "A job that hit its Worker.Timeout on the last attempt skips marking, leaving the acceptance CREATING_ORDER until the reconciler."
   },
@@ -121,8 +121,8 @@
    "id": "reconciler-skips-the-recall",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
-   "old": "res, cause := w.create(ctx, id)\n\tif cause == nil {",
-   "new": "res, cause := outcomeNone, errors.New(\"skipped\")\n\tif cause == nil {",
+   "old": "o, cause := w.create(ctx, id)\n\t\tif cause == nil {",
+   "new": "o, cause := outcomeNone, errors.New(\"skipped\")\n\t\tif cause == nil {",
    "test": "internal/modules/procurement ^TestReconcilerRecallsOrderingBeforeMarkingFailed$",
    "why": "The reconciler marks a dead job's acceptance ORDER_FAILED without calling CreateRfqOrder once more."
   },
@@ -143,6 +143,42 @@
    "new": "categories, products, nil, log)",
    "test": "cmd/hawkr ^TestProcurementIsAssembledWithTheSellerModule$",
    "why": "worker assembles procurement without the seller module."
+  },
+  {
+   "id": "reconciler-drops-the-claim",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "\t\tif !locked {\n\t\t\treturn nil\n\t\t}\n",
+   "new": "\t\t_ = locked\n",
+   "test": "internal/modules/procurement ^TestOverlappingReconcilersTransitionTheAcceptanceExactlyOnce$",
+   "why": "The reconciler ignores the per-acceptance lock, so an overlapping run calls ordering again, hits a transport error and marks a created order ORDER_FAILED."
+  },
+  {
+   "id": "obtained-not-recorded-marks-failed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "return outcomeUnrecorded, fmt.Errorf(\"provisioning：確認既有訂單",
+   "new": "return outcomeNone, fmt.Errorf(\"provisioning：確認既有訂單",
+   "test": "internal/modules/procurement ^TestLastAttemptNeverMarksFailedWhenTheOrderWasObtainedButNotRecorded$",
+   "why": "An order that ordering already returned but that could not be recorded is treated like an unreachable ordering and the acceptance is marked ORDER_FAILED."
+  },
+  {
+   "id": "replay-skips-the-status-and-deadline-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": " || p.Status != pendingPaymentStatus || !res.PaymentDeadline.After(w.Now()) {",
+   "new": " {",
+   "test": "internal/modules/procurement ^TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore$",
+   "why": "A replayed order that was cancelled or paid, or whose deadline passed, is adopted as long as buyer and store match."
+  },
+  {
+   "id": "terminal-mark-retry-recalls-ordering",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/procurement/internal/provisioning/provisioning.go",
+   "old": "\tif errors.As(cause, &terminal) {\n\t\tfresh, cancel := detached(ctx)",
+   "new": "\tif false && errors.As(cause, &terminal) {\n\t\tfresh, cancel := detached(ctx)",
+   "test": "internal/modules/procurement ^TestTerminalAnswerWithFailingMarkRetriesOnlyTheMarkWithTheTerminalReason$",
+   "why": "After a terminal answer whose mark failed, the retry calls ordering again and overwrites the reason with RETRY_EXHAUSTED."
   }
  ]
 }

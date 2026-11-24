@@ -151,3 +151,8 @@ ORDER BY id LIMIT @batch;
 -- name: LockCreatingAcceptance :one
 SELECT id, order_job_id FROM procurement.buyer_quote_acceptances
 WHERE id = @id AND order_provisioning_state = 'CREATING_ORDER' FOR UPDATE;
+
+-- name: TryLockOrderProvisioning :one
+-- 建單對帳在 transaction 內、呼叫 ordering 之前取得的接受單層級鎖（transaction 結束時釋放）：拿不到表示另一個對帳正在處理同一筆，這一筆略過。
+-- 呼叫 ordering 與記下結果都在持鎖的同一個 transaction 內，兩個重疊的對帳不會一個記下訂單、另一個標成失敗。
+SELECT pg_try_advisory_xact_lock(hashtextextended('procurement.order_provisioning:' || sqlc.arg(id)::uuid::text, 0))::boolean AS locked;

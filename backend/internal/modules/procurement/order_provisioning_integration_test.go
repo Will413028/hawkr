@@ -8,7 +8,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -80,7 +82,7 @@ func newOrderFixture(t *testing.T) *orderFixture {
 		id(), c.sellerResponse, epoch.Add(time.Hour), id(), epoch); err != nil {
 		t.Fatal(err)
 	}
-	f := &orderFixture{t: t, d: d, c: c, orders: &scriptedOrders{parties: provisioning.Parties{BuyerID: 21, StoreID: storeID}}, logs: &bytes.Buffer{}}
+	f := &orderFixture{t: t, d: d, c: c, orders: &scriptedOrders{parties: provisioning.Parties{BuyerID: 21, StoreID: storeID, Status: "0"}}, logs: &bytes.Buffer{}}
 	f.m = New(Deps{
 		DB: d, Now: func() time.Time { return epoch }, Logger: slog.New(slog.NewTextHandler(f.logs, nil)), Jobs: &fakeJobs{},
 		Events: events.NewBus(), Orders: f.orders,
@@ -274,11 +276,13 @@ func TestLastAttemptRecallRecoversAnOrderWhoseResponseWasLost(t *testing.T) {
 	}
 }
 
-// R1-1：order_ref 命中的既有訂單不是這張接受單的買家與店家（舊 order-service 的 acceptance_id 撞號）時不採用。
+// order_ref 命中的既有訂單不是這張接受單的買家與店家，或不是待付款的單（舊 order-service 的 acceptance_id 撞號、舊的已取消單）時不採用。
 func TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore(t *testing.T) {
 	for name, parties := range map[string]provisioning.Parties{
-		"別的買家": {BuyerID: 22, StoreID: storeID},
-		"別的店家": {BuyerID: 21, StoreID: storeID + 1},
+		"別的買家":      {BuyerID: 22, StoreID: storeID, Status: "0"},
+		"別的店家":      {BuyerID: 21, StoreID: storeID + 1, Status: "0"},
+		"同方但已取消的舊單": {BuyerID: 21, StoreID: storeID, Status: "80"},
+		"同方但已付款的單":  {BuyerID: 21, StoreID: storeID, Status: "10"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newOrderFixture(t)
@@ -295,6 +299,19 @@ func TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore(t *testing.T) {
 			}
 		})
 	}
+}
+
+// 命中的既有訂單付款期限已過（以舊 ordering 回的 PaymentDeadline 判斷）也不採用。
+func TestProvisionRejectsAReplayedOrderWhoseDeadlineHasPassed(t *testing.T) {
+	f := newOrderFixture(t)
+	replayed := okResult()
+	replayed.Replayed = true
+	replayed.PaymentDeadline = epoch.Add(-time.Hour)
+	f.orders.results = []provisioning.Result{replayed}
+	if err := f.m.orders.Provision(context.Background(), f.c.acceptance, false); err != nil {
+		t.Fatal(err)
+	}
+	f.wantFailed(provisioning.ReasonRejected)
 }
 
 func TestProvisionAcceptsAReplayedOrderOfTheSameBuyerAndStore(t *testing.T) {
@@ -322,7 +339,7 @@ func TestProvisionRetriesWhenTheReplayedOrderCannotBeVerified(t *testing.T) {
 	f.wantCreating()
 }
 
-// R1-4：job 因逾時（不是關機）結束時，最後一次嘗試仍要用新的 context 標成建單失敗。
+// job 因逾時（不是關機）結束時，最後一次嘗試仍要用新的 context 標成建單失敗。
 func TestLastAttemptAfterTheJobTimedOutStillMarksOrderFailed(t *testing.T) {
 	f := newOrderFixture(t)
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
@@ -333,7 +350,7 @@ func TestLastAttemptAfterTheJobTimedOutStillMarksOrderFailed(t *testing.T) {
 	f.wantFailed(provisioning.ReasonRetryExhausted)
 }
 
-// R1-2：ordering 已建單但接受單已不在 CREATING_ORDER 時，訂單號不能無聲消失。
+// ordering 已建單但接受單已不在 CREATING_ORDER 時，訂單號不能無聲消失。
 func TestProvisionLogsAnErrorWhenTheOrderNumberCannotBeRecorded(t *testing.T) {
 	f := newOrderFixture(t)
 	f.orders.results = []provisioning.Result{okResult()}
@@ -484,4 +501,198 @@ func TestAddOrderWorkersRequiresTheOrdersPort(t *testing.T) {
 		}
 	}()
 	m.AddOrderWorkers(river.NewWorkers())
+}
+
+// failOnce 在接受單轉成 provisioning 狀態 state 的更新上裝一個觸發器：前 n 次擲出錯誤，之後放行（序列不隨 rollback 還原）。
+func (f *orderFixture) failUpdatesTo(state string, n int) {
+	f.t.Helper()
+	ctx := context.Background()
+	for _, q := range []string{
+		`CREATE SEQUENCE public.order_update_guard`,
+		`CREATE FUNCTION public.order_update_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+			BEGIN
+				IF nextval('public.order_update_guard') <= ` + strconv.Itoa(n) + ` THEN RAISE EXCEPTION 'guarded update'; END IF;
+				RETURN NEW;
+			END $$`,
+		`CREATE TRIGGER order_update_guard BEFORE UPDATE ON procurement.buyer_quote_acceptances FOR EACH ROW
+			WHEN (NEW.order_provisioning_state = '` + state + `') EXECUTE FUNCTION public.order_update_guard()`,
+	} {
+		if _, err := f.d.Pool().Exec(ctx, q); err != nil {
+			f.t.Fatal(err)
+		}
+	}
+}
+
+// 訂單號拿到了、但記不進去（確認既有訂單失敗、寫入暫時失敗）：最後一次嘗試也不得標成失敗，留在 CREATING_ORDER 等重試或 reconciler。
+func TestLastAttemptNeverMarksFailedWhenTheOrderWasObtainedButNotRecorded(t *testing.T) {
+	t.Run("確認既有訂單失敗", func(t *testing.T) {
+		f := newOrderFixture(t)
+		replayed := okResult()
+		replayed.Replayed = true
+		f.orders.results = []provisioning.Result{replayed, replayed}
+		f.orders.partiesErr = errors.New("查不到")
+		if err := f.workJob(quote.OrderMaxAttempts, quote.OrderMaxAttempts); err == nil {
+			t.Fatal("要回 error")
+		}
+		f.wantCreating()
+	})
+	t.Run("寫入訂單號暫時失敗", func(t *testing.T) {
+		f := newOrderFixture(t)
+		f.failUpdatesTo("ORDER_CREATED", 100)
+		f.orders.results = []provisioning.Result{okResult(), okResult()}
+		if err := f.workJob(quote.OrderMaxAttempts, quote.OrderMaxAttempts); err == nil {
+			t.Fatal("要回 error")
+		}
+		f.wantCreating()
+	})
+	t.Run("reconciler", func(t *testing.T) {
+		f := newOrderFixture(t)
+		f.setJob(nil)
+		f.failUpdatesTo("ORDER_CREATED", 100)
+		f.orders.results = []provisioning.Result{okResult()}
+		n, err := f.m.ordersRec.Reconcile(context.Background(), fakeStates{})
+		if err != nil || n != 0 {
+			t.Fatalf("n=%d err=%v", n, err)
+		}
+		f.wantCreating()
+	})
+}
+
+// 終態答案已知、標記失敗沒寫成：之後只重試標記並保留那個原因，不再呼叫 ordering，也不被 RETRY_EXHAUSTED 覆蓋。
+func TestTerminalAnswerWithFailingMarkRetriesOnlyTheMarkWithTheTerminalReason(t *testing.T) {
+	f := newOrderFixture(t)
+	f.failUpdatesTo("ORDER_FAILED", 1)
+	f.orders.results = []provisioning.Result{{Code: 9504, Message: "拒絕"}}
+	if err := f.workJob(quote.OrderMaxAttempts, quote.OrderMaxAttempts); err != nil {
+		t.Fatal(err)
+	}
+	f.wantFailed(provisioning.ReasonRejected)
+	if len(f.orders.got) != 1 {
+		t.Fatalf("ordering 被呼叫 %d 次，要 1 次", len(f.orders.got))
+	}
+}
+
+// reconciler 遇到終態答案但標記失敗沒寫成，不用 ORDER_JOB_LOST 覆蓋原因；下一輪才記成 ORDER_SERVICE_REJECTED。
+func TestReconcilerKeepsTheTerminalReasonWhenTheMarkFailsOnce(t *testing.T) {
+	f := newOrderFixture(t)
+	f.setJob(nil)
+	f.failUpdatesTo("ORDER_FAILED", 1)
+	f.orders.results = []provisioning.Result{{Code: 9504, Message: "拒絕"}, {Code: 9504, Message: "拒絕"}}
+	f.m.ordersRec.Reconcile(context.Background(), fakeStates{})
+	f.wantCreating()
+	if n, err := f.m.ordersRec.Reconcile(context.Background(), fakeStates{}); err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	f.wantFailed(provisioning.ReasonRejected)
+}
+
+// 再呼叫與標記都失敗：回傳的錯誤保留三個原因。
+func TestLastAttemptErrorKeepsTheRecallError(t *testing.T) {
+	f := newOrderFixture(t)
+	f.failUpdatesTo("ORDER_FAILED", 100)
+	f.orders.errs = []error{errors.New("first-cause"), errors.New("recall-cause")}
+	err := f.workJob(quote.OrderMaxAttempts, quote.OrderMaxAttempts)
+	if err == nil {
+		t.Fatal("要回 error")
+	}
+	for _, want := range []string{"first-cause", "recall-cause", "guarded update"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("錯誤要含 %q：%v", want, err)
+		}
+	}
+}
+
+// 最後一次的再呼叫期間關機（父 context 被取消）：不標成失敗，留給下一輪。
+func TestShutdownDuringTheLastAttemptRecallDoesNotMarkOrderFailed(t *testing.T) {
+	f := newOrderFixture(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f.orders.errs = []error{errors.New("回應遺失"), errors.New("關機中")}
+	f.orders.onCreate = func() {
+		if len(f.orders.got) == 2 {
+			cancel()
+		}
+	}
+	if err := f.m.orders.Provision(ctx, f.c.acceptance, true); err == nil {
+		t.Fatal("要回 error")
+	}
+	f.wantCreating()
+}
+
+// 標記沒有更新任何列（接受單已被別處改掉）不算對帳轉換。
+func TestReconcilerCountsOnlyRealTransitions(t *testing.T) {
+	f := newOrderFixture(t)
+	f.setJob(nil)
+	f.orders.results = []provisioning.Result{{Code: 9504, Message: "拒絕"}}
+	f.orders.onCreate = func() {
+		if _, err := f.d.Pool().Exec(context.Background(), `UPDATE procurement.buyer_quote_acceptances SET order_provisioning_state = 'ORDER_CREATED', order_no = 'HK9' WHERE id = $1`, f.c.acceptance); err != nil {
+			t.Error(err)
+		}
+	}
+	if n, err := f.m.ordersRec.Reconcile(context.Background(), fakeStates{}); err != nil || n != 0 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+}
+
+// gateOrders 的第一次 CreateOrder 停在 release 之前（模擬進行中的外部呼叫），之後的呼叫立刻回傳輸錯誤。
+type gateOrders struct {
+	mu      sync.Mutex
+	calls   int
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (g *gateOrders) OrderParties(context.Context, string) (provisioning.Parties, error) {
+	return provisioning.Parties{}, errors.New("不該呼叫")
+}
+
+func (g *gateOrders) CreateOrder(context.Context, provisioning.Command) (provisioning.Result, error) {
+	g.mu.Lock()
+	g.calls++
+	first := g.calls == 1
+	g.mu.Unlock()
+	if !first {
+		return provisioning.Result{}, errors.New("連不上 ordering")
+	}
+	close(g.entered)
+	<-g.release
+	return okResult(), nil
+}
+
+// 兩個重疊的對帳處理同一筆：第二個拿不到接受單的鎖就略過，只有一次轉換，不會「已建單卻被標成失敗」。
+func TestOverlappingReconcilersTransitionTheAcceptanceExactlyOnce(t *testing.T) {
+	f := newOrderFixture(t)
+	f.setJob(nil)
+	gate := &gateOrders{entered: make(chan struct{}), release: make(chan struct{})}
+	rec := f.m.ordersRec
+	rec.Orders = gate
+	first := make(chan int, 1)
+	go func() {
+		n, err := rec.Reconcile(context.Background(), fakeStates{})
+		if err != nil {
+			t.Error(err)
+		}
+		first <- n
+	}()
+	<-gate.entered
+	if n, err := rec.Reconcile(context.Background(), fakeStates{}); err != nil || n != 0 {
+		t.Fatalf("重疊的對帳要略過：n=%d err=%v", n, err)
+	}
+	close(gate.release)
+	if n := <-first; n != 0 {
+		t.Fatalf("第一個對帳記下訂單，不算失敗：%d", n)
+	}
+	if _, prov, _, orderNo := f.state(); prov != "ORDER_CREATED" || orderNo == nil || *orderNo != "HK1" {
+		t.Fatalf("provisioning %s %v", prov, orderNo)
+	}
+	if gate.calls != 1 {
+		t.Fatalf("ordering 被呼叫 %d 次，要 1 次", gate.calls)
+	}
+}
+
+func TestOrderReconcileJobIsUniqueWhileUnfinished(t *testing.T) {
+	opts := provisioning.ReconcileArgs{}.InsertOpts()
+	if !opts.UniqueOpts.ByArgs || len(opts.UniqueOpts.ByState) == 0 {
+		t.Fatalf("對帳 job 要在未結束時唯一：%+v", opts.UniqueOpts)
+	}
 }

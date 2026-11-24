@@ -275,3 +275,20 @@ func TestNewPanicsWhenLLMIsGivenWithoutTaxonomy(t *testing.T) {
 		}()
 	}
 }
+
+// 裝著 nil 指標的 Sellers 不等於 nil 介面：要當成沒給（發布回組裝錯誤），不能接上後在第一次呼叫時 nil dereference。
+func TestNewTreatsATypedNilSellersAsMissing(t *testing.T) {
+	var typedNil *fakeSellers
+	if procurement.New(newDeps(func(d *procurement.Deps) { d.Sellers = typedNil })).RfqStorePortsWired() {
+		t.Error("typed-nil Sellers 不得接上發布的店家檢查")
+	}
+	if !procurement.New(newDeps(func(d *procurement.Deps) { d.Sellers = &fakeSellers{} })).RfqStorePortsWired() {
+		t.Error("給了 Sellers 要接上發布的店家檢查")
+	}
+	defer func() {
+		if msg, _ := recover().(string); !strings.Contains(msg, "Deps.Sellers") {
+			t.Errorf("搜尋搭 typed-nil Sellers：panic 訊息 %q 要指名 Deps.Sellers", msg)
+		}
+	}()
+	procurement.New(newDeps(func(d *procurement.Deps) { d.Taxonomy, d.Sellers, d.Search = noTaxonomy{}, typedNil, fakeSearch{} }))
+}
