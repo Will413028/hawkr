@@ -193,8 +193,8 @@
    "id": "serve-no-entitlements",
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
-   "old": "newProcurement(d, jc, buyerModule, sellerModule, sellerModule, bus, log)",
-   "new": "newProcurement(d, jc, nil, sellerModule, sellerModule, bus, log)",
+   "old": "newProcurement(d, jc, buyerModule, sellerModule, bus, log)",
+   "new": "newProcurement(d, jc, nil, sellerModule, bus, log)",
    "test": "cmd/hawkr ^TestProcurementModuleIsBuiltWithTheBuyerModuleAsEntitlementsInBothRoles$",
    "why": "serve 組採購模組不給 Entitlements：SubmitTurn 每次都回組裝錯誤"
   },

@@ -19,15 +19,15 @@ import (
 // subscribeProcurement 讓買家關閉在同一個 transaction 刪除買家的採購資料、匿名保留賣家看得到的紀錄（A9-D19 S10；單體規則 4 的原子狀態變更）。
 // serve 與 worker 都要訂：BuyerDeleted 在哪個程序的 transaction 內發布，訂閱者就要在那個程序裡。
 func subscribeProcurement(bus *events.Bus, d *db.DB, log *slog.Logger) {
-	events.Subscribe(bus, newProcurement(d, nil, nil, nil, nil, bus, log).OnBuyerDeleted)
+	events.Subscribe(bus, newProcurement(d, nil, nil, nil, bus, log).OnBuyerDeleted)
 }
 
 // newProcurement 組出採購模組；jobs 是送出與取消 run 的 River client、entitlements 是 SubmitTurn 讀額度的買家模組（只訂閱事件的呼叫端兩者都給 nil）、
-// sellers 是發布詢價時檢查封鎖與營業中的 seller 模組、stores 是賣家端方法（SellerProcurementAppService）檢查賣家能力的 seller 模組（只訂閱事件的呼叫端兩者都給 nil），
+// sellers 是 seller 模組：發布詢價時檢查封鎖與營業中、賣家端方法（SellerProcurementAppService）檢查賣家能力都用它（只訂閱事件的呼叫端給 nil），
 // bus 是 ExecuteRfqPublication 在同 transaction 發布 RfqPublished 的事件匯流排（必給，與訂閱者同一條）。
 // 沒有 LLM 與分類樹時不登記 TURN 的 executor（serve 角色不執行 run）：領到 run 的 worker 把它標為該類型的 pipeline 失敗並退額度。
-func newProcurement(d *db.DB, jobs procurement.JobQueue, entitlements procurement.EntitlementReader, sellers procurement.SellerStores, stores procurement.SellerStoreGuard, bus *events.Bus, log *slog.Logger) *procurement.Module {
-	return procurement.New(procurement.Deps{DB: d, Now: time.Now, Logger: log, Jobs: jobs, Entitlements: entitlements, Sellers: sellers, Stores: stores, Events: bus})
+func newProcurement(d *db.DB, jobs procurement.JobQueue, entitlements procurement.EntitlementReader, sellers procurement.SellerModule, bus *events.Bus, log *slog.Logger) *procurement.Module {
+	return procurement.New(procurement.Deps{DB: d, Now: time.Now, Logger: log, Jobs: jobs, Entitlements: entitlements, Sellers: sellers, Stores: sellers, Events: bus})
 }
 
 // newProcurementWorker 組出會執行 run 的採購模組（worker 角色）：登記 TURN 的 executor，模型是採購用的 llm 角色，分類樹經舊 product-service 轉接。
