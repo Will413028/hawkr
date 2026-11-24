@@ -30,7 +30,7 @@ Java product-service 改寫成單體的 catalog 模組。每個沿用的機制�
 | D7 | 商品可見性＝賣家狀態 ∧ 無有效 seller 措施 ∧ 店家可曝光（`seller.pub_exposable_stores`）；措施不寫進商品；`seller_deleted_at` 與停權快照不帶 | 把他模組狀態複製進商品欄：雙寫與漂移 |
 | D8 | 平台擁有固定分類法：我們自己的兩層使用者分組（初版 10 個頂層、52 個葉節點，`backend/docs/plans/2026-11-24-b4-catalog/taxonomy-draft.md`），每個葉節點對照一個 Shopify Standard Product Taxonomy 節點（`shopify_taxonomy_id` 字串；Shopify 各分類深度不一，無法直接照搬結構）；以版本化種子資料定義；內部 UUIDv7；名稱 `LocalizedText`（多語 ADR）；商品掛葉節點；不做即時 CRUD 與審核頁；初版不放受管制品類（食品、彩妝保養、保健醫療、菸酒，範圍裁切 ADR 的重評條件）。基準：蝦皮、momo 前台類目自訂並對照 Google 類目；Amazon gated categories | 照搬 CRUD＋審核：沒有營運人員，且現有審核頁送錯路徑（CD11）。照 Shopify 結構：深度 2–4 層不一，使用者分組不一致。自編不對照：沒有對外穩定 ID |
 | D9 | 代行商品路由在 B4 以 catalog 的 `CatalogDelegatedService` 實作，A10 只剩訂單 | 等 A10：B4 無法收尾。gateway 改打轉接：A10 就丟 |
-| D10 | 商品只存啟用的配送方式代碼集合；運費規則、免運門檻、試算歸 fulfillment。基準：Shopify shipping profiles | catalog 存運費規則：兩處擁有 |
+| D10 | catalog 不存配送方式、不依賴運費設定；SKU 的 `shipping_method` JSONB（`freeThreshold`、`feePayer`）與重量、長寬高不帶；`CalculateShippingOptions` 不搬（B3 刪）。同日修訂：原為「存啟用的配送方式代碼、經 fulfillment 驗證」，B3 前提重審改成出貨歸 ordering、運費設定每賣家一份歸 seller、不建 fulfillment（ADR `2026-11-15-fulfillment-seller-managed-shipping` 2026-11-24 修訂），只剩賣家自寄，代碼集合沒有內容。基準：Etsy、Shopify 的 shipping profile 屬於商店 | catalog 存配送代碼或運費規則：沒有內容、兩處擁有。保留重量尺寸：運費不依重量，沒有使用者 |
 | D11 | 溫層從值域來源刪除，`shipping_ambient.go` 整檔由 B4 刪；動 shipping 部分前與 B3 對齊 | gateway 繼續過濾：補丁留在錯的層 |
 | D12 | ai-service 的 4 支呼叫不寫轉接，B4 刪 Java 前等 A9 刪 ai-service | `catalogserver` 加 4 支：A9 完成就丟 |
 | D14 | hashtag 是商品上的值集合（`catalog.product_hashtags`），以明確欄位 `hashtag_inputs` 輸入、不從描述抽；正規化與 social 共用一份；建議與熱門由 catalog、social 各自聚合，跨兩者的頁面在呈現層組合。基準：Shopify product tags、蝦皮商品 hashtag 導向商品搜尋 | 實體表：違反 row-identity ADR。合併成平台排行：要跨模組讀取模型，沒有量測觸發（單體規則 2）。從描述抽：兩套輸入模型與兩份抽取規則 |
@@ -59,12 +59,12 @@ D13 併入 D8。D8、D14、D17 依追加簡報 `backend/docs/plans/2026-11-24-b4
 - 賣家需要行內樣式或連結 → D17 段落改成 span＋marks。
 - 產品要跨貼文與商品的單一熱門排行 → D14 由 discovery 擁有讀取模型。
 - 營運要不經部署改分類 → D8 加管理畫面。
+- 賣家要讓大件、小件收不同運費 → D10 改成多份運費設定、商品引用其中一份（Etsy）。
 - 要賣受管制品類 → D8 加對應葉節點與品類資格審核。
 - 搜尋 p95 超標 → D15 換搜尋引擎。
 
 ## Followup
 
-- D10、D11 與 B3 session 對齊。
 - B6、B8 完成時刪 `catalogserver`、`catalogconsumer`。
 
 ## 相關
