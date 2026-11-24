@@ -8,7 +8,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 )
 
-// 事件裁決表（docs/plans/2026-11-23-a8-notification/event-adjudication.md）裡每個沒標「不做」的單體事件，與它登記的型別。
+// 事件裁決表（backend/docs/plans/2026-11-23-a8-notification/event-adjudication.md）裡每個沒標「不做」的單體事件，與它登記的型別。
 // 覆蓋測試以這份清單對照 subscriptions() 這張表：表少一列、多一列、或某列的型別不同，都會紅。
 var adjudicatedEvents = map[string][]string{
 	"accountsuspension.Suspended":             {"account_suspended"},
