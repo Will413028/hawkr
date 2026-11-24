@@ -2,6 +2,7 @@ import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { StoreCardSchema } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import {
+	ActivitySchema,
 	BlockKind,
 	CandidateSchema,
 	ClarifyQuestionSchema,
@@ -17,10 +18,12 @@ import {
 	RunStatus,
 	SlotKey,
 	SlotsSchema,
+	StepStatus,
 	TurnResultSchema,
 } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { describe, expect, it } from "vitest";
 import {
+	activityFromProto,
 	candidateFromProto,
 	candidateSearchFromProto,
 	slotKeyCode,
@@ -226,5 +229,45 @@ describe("candidates", () => {
 		expect(ok.failureReason).toBe("");
 		expect(ok.candidates.platform).toHaveLength(1);
 		expect(ok.candidates.external).toEqual([]);
+	});
+});
+
+describe("activityFromProto", () => {
+	it("狀態名稱對到畫面代碼，count 與 parent_row_id 缺席時是 undefined（缺席不等於 0）", () => {
+		const row = activityFromProto(
+			create(ActivitySchema, {
+				rowId: "9001",
+				code: "SEARCH_CANDIDATES",
+				label: "搜尋候選供應商",
+				status: StepStatus.RUNNING,
+			}),
+		);
+		expect(row).toEqual({
+			rowId: "9001",
+			code: "SEARCH_CANDIDATES",
+			label: "搜尋候選供應商",
+			status: "RUNNING",
+			parentRowId: undefined,
+			count: undefined,
+			text: "",
+		});
+	});
+
+	it("帶 count 0 時保留為字串 0；沒有 row_id 或 code 的事件丟棄；未指定狀態當 PENDING", () => {
+		const row = activityFromProto(
+			create(ActivitySchema, {
+				rowId: "9002",
+				code: "SEARCH_PLATFORM",
+				label: "翻平台上的賣家",
+				parentRowId: "9001",
+				count: 0,
+			}),
+		);
+		expect(row?.count).toBe("0");
+		expect(row?.parentRowId).toBe("9001");
+		expect(row?.status).toBe("PENDING");
+		expect(
+			activityFromProto(create(ActivitySchema, { code: "X" })),
+		).toBeNull();
 	});
 });

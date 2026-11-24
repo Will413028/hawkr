@@ -18,10 +18,13 @@ test("submitTurn re-fetches snapshot for the authoritative status instead of inf
 	assert.doesNotMatch(hook, /missingRequired\.length === 0/);
 });
 
-test("submitTurn 的 HTTP/SSE 409 都 fail closed，不換 key 自動建立第二個 operation", () => {
-	assert.match(hook, /err instanceof ApiClientError && err\.status === 409/);
-	assert.match(hook, /err\.code === 409/);
-	assert.match(hook, /error: TURN_IDEMPOTENCY_CONFLICT/);
+test("submitTurn 的失敗一律走 procurementFailureFrom 顯示，不換 key 自動建立第二個 operation", () => {
+	const submitTurn = hook.slice(
+		hook.indexOf("const submitTurn"),
+		hook.indexOf("const submitAnswer"),
+	);
+	assert.match(submitTurn, /procurementFailureFrom\(err, defaults\)/);
+	assert.match(submitTurn, /failure\.code === "APPROVAL_PENDING"/);
 	assert.doesNotMatch(
 		hook,
 		/await (?:attempt|execute)\(crypto\.randomUUID\(\)/,
@@ -45,7 +48,7 @@ test("turn transport captures one immutable operation identity and never re-read
 	assert.match(submitTurn, /const operation = operationGuard\.begin\(\{/);
 	assert.match(submitTurn, /requestId: current\.requestId,/);
 	assert.doesNotMatch(submitTurn, /stateRef\.current\.requestId/);
-	assert.match(submitTurn, /requestId: operation\.requestId \?\? undefined/);
+	assert.match(submitTurn, /requestId: operation\.requestId \?\? ""/);
 	assert.match(submitTurn, /clientRequestId: operation\.clientRequestId/);
 	assert.match(submitTurn, /signal: operation\.signal/);
 	assert.match(
@@ -115,22 +118,22 @@ test("polling backs off through 1.5s/3s/6s and stops after exhausting retries", 
 });
 
 test("polling stops on terminal status and switches to the candidates stage", () => {
-	assert.match(hook, /isTerminalCandidateStatus\(env\.data\.status\)/);
-	assert.match(hook, /stage: "candidates",\s*candidateSet: env\.data/);
+	assert.match(hook, /isTerminalCandidateStatus\(/);
+	assert.match(hook, /stage: "candidates"/);
 });
 
 test("toggleSelection applies the flip optimistically before the request resolves", () => {
 	// toggleSelection 已改為三個分支（樂觀套用／成功覆寫／失敗回滾）共用同一個
 	// applySelectedValue helper，差別只在傳入的 selected 值。這裡驗證「樂觀套用」
-	// 那次呼叫（傳 nextSelected）確實發生在送出 POST /selections 之前。
+	// 那次呼叫（傳 nextSelected）確實發生在送出 ToggleSelection 之前。
 	const optimisticSetIndex = hook.indexOf(
 		"applySelectedValue(s.candidateSet, nextSelected)",
 	);
-	const postIndex = hook.indexOf("/selections`,");
-	assert.ok(optimisticSetIndex > -1 && postIndex > -1);
+	const callIndex = hook.indexOf("buyerProcurementClient().toggleSelection(");
+	assert.ok(optimisticSetIndex > -1 && callIndex > -1);
 	assert.ok(
-		optimisticSetIndex < postIndex,
-		"optimistic update must run before the POST call",
+		optimisticSetIndex < callIndex,
+		"optimistic update must run before the ToggleSelection call",
 	);
 });
 
@@ -149,44 +152,41 @@ test("toggleSelection rolls back only the toggled candidate to its captured pre-
 test("toggleSelection overwrites the optimistic value with the server response on success (does not trust the local flip blindly)", () => {
 	assert.match(
 		hook,
-		/applySelectedValue\(\s*s\.candidateSet,\s*response\.selected,?\s*\)/,
+		/applySelectedValue\(\s*s\.candidateSet,\s*res\.selected,?\s*\)/,
 	);
 });
 
-test("toggleSelection serializes one candidate and validates the untrusted response before applying it", () => {
+test("toggleSelection serializes one candidate and checks the response names the toggled candidate before applying it", () => {
 	assert.match(hook, /selectionGuard\.begin\(/);
 	assert.match(hook, /if \(!selectionIdentity\) return;/);
-	assert.match(hook, /apiClient\.authed\.post<unknown>\(/);
-	assert.match(hook, /normalizeCandidateSelectionResult\(/);
+	assert.match(hook, /buyerProcurementClient\(\)\.toggleSelection\(/);
+	assert.match(hook, /res\.candidateId !== currentCandidate\.candidateId/);
 	assert.match(hook, /selectionGuard\.finish\(selectionIdentity\)/);
 	assert.match(hook, /CANDIDATE_SELECTION_UNCONFIRMED/);
 	assert.match(
 		hook,
-		/selectionUnconfirmed\s*=\s*invalidResponse \|\| !\(err instanceof ApiClientError\)/,
+		/selectionUnconfirmed =\s*invalidResponse \|\| failure\.code === "NETWORK_ERROR"/,
 	);
 });
 
-test("every turn result passes the runtime normalizer before identity, slots, or transcript mutation", () => {
+test("every turn result comes from a proto mapping and passes the identity check before slots or transcript mutation", () => {
 	const applyTurnResult = hook.slice(
 		hook.indexOf("const applyTurnResult"),
-		hook.indexOf("const submitTurn"),
-	);
-	const normalizeIndex = applyTurnResult.indexOf(
-		"normalizeProcurementTurnResult(rawData)",
+		hook.indexOf("const settleTurnWatch"),
 	);
 	const identityIndex = applyTurnResult.indexOf(
 		"operationGuard.acceptsResult(operation, data.requestId)",
 	);
-	const slotsIndex = applyTurnResult.indexOf("mapSlots(data.slots)");
-	assert.ok(normalizeIndex > -1);
-	assert.ok(identityIndex > normalizeIndex);
-	assert.ok(slotsIndex > normalizeIndex);
-	assert.match(hook, /post<unknown>\(/);
-	assert.doesNotMatch(hook, /result as RawTurnResult/);
+	const mutationIndex = applyTurnResult.indexOf("slots: data.slots");
+	assert.ok(identityIndex > -1);
+	assert.ok(mutationIndex > identityIndex);
+	assert.match(hook, /turnResultFromProto\(/);
+	assert.doesNotMatch(hook, /post<unknown>\(/);
+	assert.doesNotMatch(hook, /RawTurnResult/);
 });
 
 test("toggleSelection locks further toggles once CANDIDATE_FACTS_STALE is seen", () => {
-	assert.match(hook, /candidatesStale: true, error: parsed/);
+	assert.match(hook, /candidatesStale: true, error: failure/);
 	assert.match(hook, /current\.candidatesStale\s*\)\s*return;/);
 });
 
@@ -225,9 +225,11 @@ test("candidate search keeps the previous candidate canvas until the replacement
 		hook.indexOf("const startSearch"),
 		hook.indexOf("const requestId = state.requestId;"),
 	);
-	const postIndex = startSearch.indexOf("apiClient.authed.post<");
+	const postIndex = startSearch.indexOf(
+		"buyerProcurementClient().startCandidateSearch(",
+	);
 	const acceptedIndex = startSearch.indexOf(
-		"if (!isCurrentSession() || env.data.requestId !== requestId) return;",
+		"if (!isCurrentSession() || res.requestId !== requestId) return;",
 	);
 	const invalidateIndex = startSearch.indexOf(
 		"invalidateCandidateSelections();",
@@ -275,7 +277,7 @@ test("submitAnswer 帶 expectedRevisionId，STALE_REVISION 時整段同步最新
 
 test("submitAnswer 接受 skip:true，request body 帶上 skip 欄位（與 optionId/freeText 同一個 json 物件）", () => {
 	assert.match(hook, /skip\?: boolean;/);
-	assert.match(hook, /skip: answer\.skip,/);
+	assert.match(hook, /skip: answer\.skip \?\? false,/);
 });
 
 test("submitAnswer 的 skip:true 繞過『沒有文字就不送』的空字串 guard，樂觀泡泡顯示「略過」", () => {
@@ -284,25 +286,23 @@ test("submitAnswer 的 skip:true 繞過『沒有文字就不送』的空字串 g
 	assert.match(hook, /if \(!buyerText\) return;/);
 });
 
-test("executeRfqPublication 打 execute 端點而不是 preview，body 由契約層產生", () => {
+test("executeRfqPublication 打 ExecuteRfqPublication 而不是 preview，請求由核准與命令組出", () => {
 	const start = hook.indexOf("const executeRfqPublication");
 	assert.notEqual(start, -1);
 	const body = hook.slice(start, start + 3000);
 
-	assert.match(
-		body,
-		/rfq-publications`,\n\s*\{ json: publicationExecuteBody\(command\) \}/,
-	);
-	assert.doesNotMatch(body, /rfq-publications\/preview/);
+	assert.match(body, /buyerProcurementClient\(\)\.executeRfqPublication\(/);
+	assert.doesNotMatch(body, /previewRfqPublication/);
+	assert.match(body, /clientRequestId: command\.clientRequestId/);
 });
 
 test("executeRfqPublication 對回傳 fail closed，不把無法解析當成已發布", () => {
 	const start = hook.indexOf("const executeRfqPublication");
 	const body = hook.slice(start, start + 3000);
 
-	assert.match(body, /rfqPublicationResultSchema\.safeParse\(env\.data\)/);
-	assert.match(body, /INVALID_RESPONSE/);
-	assert.match(body, /if \(!parsed\.success\) \{[\s\S]*?ok: false/);
+	assert.match(body, /publicationResultFromProto\(res\)/);
+	assert.match(body, /invalidResponseFailure\(defaults\)/);
+	assert.match(body, /if \(!result\)[\s\S]*?ok: false/);
 });
 
 test("executeRfqPublication 沿用 preview 的 STALE_CONTEXT 守衛", () => {
