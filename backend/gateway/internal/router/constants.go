@@ -12,28 +12,6 @@ const (
 	AdminPath  = "/admin"  // 管理員專用
 )
 
-// ==================== Payment（/app/payments）====================
-
-const (
-	PaymentsPath         = "/payments"
-	PaymentsTradeNo      = "/:trade_no"
-	PaymentsTradeHistory = "/orders/:order_id/history"
-	PaymentsStatusSyncs  = "/:trade_no/status_syncs"
-	PaymentsRefundNo     = "/refunds/:refund_no"
-	PaymentsTradeRefunds = "/:trade_no/refunds"
-	// Apple Pay on Web merchant validation（05 號設計書 §5.11）
-	PaymentsApplePayValidateMerchant = "/apple_pay/validate_merchant"
-)
-
-// ==================== PayUni Webhook / 付款回調（頂層路由，不在 /api/v1 下）====================
-
-const (
-	WebhookPayUniNotify  = "/webhook/payuni/notify"
-	ServicePayuniWebhook = "payuni-webhook"
-	PaymentReturnPath    = "/payment/return"
-	PaymentRedirectPath  = "/payment/redirect"
-)
-
 // ==================== 超商門市地圖（/app/store_map_sessions + 頂層回調）====================
 
 const (
@@ -207,16 +185,6 @@ const (
 	// issue #1327 Admin 配送異常處置（static prefix，必須在 /shipments/:id 之前註冊）
 	AdminShipmentsAnomalyAcknowledge = "/shipments/anomalies/:shipment_id/:anomaly_type/acknowledge"
 	AdminShipmentsAnomalyIgnore      = "/shipments/anomalies/:shipment_id/:anomaly_type/ignore"
-)
-
-// ==================== Admin Payment（§29）====================
-
-const (
-	AdminPaymentTransactionsPath  = "/payment_transactions"
-	AdminPaymentTransactionDetail = "/payment_transactions/:trade_no"
-	AdminPaymentRefundsPath       = "/payment_refunds"
-	AdminPaymentRefundDetail      = "/payment_refunds/:refund_no"
-	AdminGrantsPath               = "/grants"
 )
 
 // ==================== 搜尋相關 ====================
@@ -452,14 +420,6 @@ const (
 	CachesFlushService = "/flush/:service"
 )
 
-// ==================== Webhook 模擬器（/dev/webhook-simulator）====================
-
-const (
-	WebhookSimulatorPath       = "/dev/webhook-simulator"
-	WebhookSimulatorSendPath   = "/dev/webhook-simulator/send"
-	WebhookSimulatorLookupPath = "/dev/webhook-simulator/lookup"
-)
-
 // ==================== 聊天相關 ====================
 
 const (
@@ -467,7 +427,6 @@ const (
 	// Service names
 	ServiceProduct    = "product"
 	ServiceOrder      = "order"
-	ServicePayment    = "payment"
 	ServiceShipping   = "shipping"
 	ServiceAftersales = "aftersales"
 	ServiceCart       = "cart"

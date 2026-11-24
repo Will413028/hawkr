@@ -9,7 +9,6 @@ import (
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	"github.com/Will413028/hawkr/go-pkg/payuni"
-	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
 	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -28,15 +27,6 @@ import (
 
 // ---- mock clients（只覆寫本檔需要的 RPC；其餘靠內嵌 interface）----
 
-type mockPaymentRedirectFormClient struct {
-	paymentpb.PaymentServiceClient
-	fn func(context.Context, *paymentpb.GetPaymentRedirectFormRequest, ...grpc.CallOption) (*paymentpb.GetPaymentRedirectFormResponse, error)
-}
-
-func (m *mockPaymentRedirectFormClient) GetPaymentRedirectForm(ctx context.Context, in *paymentpb.GetPaymentRedirectFormRequest, opts ...grpc.CallOption) (*paymentpb.GetPaymentRedirectFormResponse, error) {
-	return m.fn(ctx, in, opts...)
-}
-
 type mockStoreMapRedirectFormClient struct {
 	shippingpb.ShippingServiceClient
 	fn func(context.Context, *shippingpb.GetStoreMapRedirectFormRequest, ...grpc.CallOption) (*shippingpb.GetStoreMapRedirectFormResponse, error)
@@ -48,7 +38,6 @@ func (m *mockStoreMapRedirectFormClient) GetStoreMapRedirectForm(ctx context.Con
 
 func setupPayUniRedirectRouter(h *Holder) *gin.Engine {
 	r := gin.New()
-	r.GET("/payment/redirect", h.RedirectToPayUni)
 	r.GET("/store_map/redirect", h.StoreMapRedirect)
 	return r
 }
@@ -65,138 +54,6 @@ func assertNoActiveInjection(t *testing.T, body string) {
 	// 屬性 context 的 " 必被 escape 成 &#34;，否則可跳出 value="..." 破框
 	if strings.Contains(body, `value="">`) {
 		t.Fatalf("output contains attribute-breaking un-escaped quote:\n%s", body)
-	}
-}
-
-// ==================== payment /payment/redirect ====================
-
-func TestRedirectToPayUni_EscapesAllFields(t *testing.T) {
-	mock := &mockPaymentRedirectFormClient{
-		fn: func(_ context.Context, in *paymentpb.GetPaymentRedirectFormRequest, _ ...grpc.CallOption) (*paymentpb.GetPaymentRedirectFormResponse, error) {
-			if in.RedirectId != "abc123" {
-				t.Errorf("RedirectId = %q, want abc123", in.RedirectId)
-			}
-			return &paymentpb.GetPaymentRedirectFormResponse{
-				ActionUrl:   payuni.SandboxBaseURL + "/api/upp",
-				MerId:       xssProbe,
-				Version:     xssProbe,
-				EncryptInfo: xssProbe,
-				HashInfo:    xssProbe,
-				IsPlatform:  true,
-			}, nil
-		},
-	}
-	h := &Holder{Payment: grpcclient.NewPaymentClientForTest(mock)}
-	r := setupPayUniRedirectRouter(h)
-
-	req := httptest.NewRequest(http.MethodGet, "/payment/redirect?id=abc123", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", w.Code)
-	}
-	body := w.Body.String()
-	assertNoActiveInjection(t, body)
-	// 合法 action host 仍應正常出現在 form action
-	if !strings.Contains(body, `action="`+payuni.SandboxBaseURL+"/api/upp") {
-		t.Errorf("valid PayUni action URL missing from output:\n%s", body)
-	}
-	// escaped 形式應存在（證明欄位有被輸出、只是被中和）
-	if !strings.Contains(body, "&lt;script&gt;") {
-		t.Errorf("expected escaped <script> entity in output:\n%s", body)
-	}
-}
-
-func TestRedirectToPayUni_RejectsDisallowedActionHost(t *testing.T) {
-	cases := []struct {
-		name   string
-		action string
-	}{
-		{"http scheme", "http://sandbox-api.payuni.com.tw/api/upp"},
-		{"evil https host", "https://evil.com/api/upp"},
-		{"lookalike host", "https://payuni.com.tw.evil.com/upp"},
-		{"javascript scheme", "javascript:alert(1)"},
-		{"empty action", ""},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			mock := &mockPaymentRedirectFormClient{
-				fn: func(_ context.Context, _ *paymentpb.GetPaymentRedirectFormRequest, _ ...grpc.CallOption) (*paymentpb.GetPaymentRedirectFormResponse, error) {
-					return &paymentpb.GetPaymentRedirectFormResponse{
-						ActionUrl: tc.action,
-						MerId:     "HAWK123",
-					}, nil
-				},
-			}
-			h := &Holder{Payment: grpcclient.NewPaymentClientForTest(mock)}
-			r := setupPayUniRedirectRouter(h)
-
-			req := httptest.NewRequest(http.MethodGet, "/payment/redirect?id=x", nil)
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, req)
-
-			if w.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400 (rejected action host)", w.Code)
-			}
-			if strings.Contains(w.Body.String(), "<form") {
-				t.Errorf("rejected request must not render auto-submit form:\n%s", w.Body.String())
-			}
-		})
-	}
-}
-
-func TestRedirectToPayUni_NotFound(t *testing.T) {
-	mock := &mockPaymentRedirectFormClient{
-		fn: func(_ context.Context, _ *paymentpb.GetPaymentRedirectFormRequest, _ ...grpc.CallOption) (*paymentpb.GetPaymentRedirectFormResponse, error) {
-			return nil, grpcstatus.Error(codes.NotFound, "redirect record not found")
-		},
-	}
-	h := &Holder{Payment: grpcclient.NewPaymentClientForTest(mock)}
-	r := setupPayUniRedirectRouter(h)
-
-	req := httptest.NewRequest(http.MethodGet, "/payment/redirect?id=gone", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", w.Code)
-	}
-	if strings.Contains(w.Body.String(), "<form") {
-		t.Errorf("NOT_FOUND must not render form:\n%s", w.Body.String())
-	}
-	if strings.TrimSpace(w.Body.String()) == "" {
-		t.Error("NOT_FOUND must render a controlled error page, not blank")
-	}
-}
-
-func TestRedirectToPayUni_MissingID(t *testing.T) {
-	h := &Holder{}
-	r := setupPayUniRedirectRouter(h)
-	req := httptest.NewRequest(http.MethodGet, "/payment/redirect", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400 (missing id)", w.Code)
-	}
-}
-
-func TestRedirectToPayUni_ServiceError(t *testing.T) {
-	mock := &mockPaymentRedirectFormClient{
-		fn: func(_ context.Context, _ *paymentpb.GetPaymentRedirectFormRequest, _ ...grpc.CallOption) (*paymentpb.GetPaymentRedirectFormResponse, error) {
-			return nil, grpcstatus.Error(codes.Unavailable, "connection refused")
-		},
-	}
-	h := &Holder{Payment: grpcclient.NewPaymentClientForTest(mock)}
-	r := setupPayUniRedirectRouter(h)
-
-	req := httptest.NewRequest(http.MethodGet, "/payment/redirect?id=x", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want 503", w.Code)
 	}
 }
 

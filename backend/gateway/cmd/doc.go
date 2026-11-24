@@ -38,9 +38,6 @@
 // @tag.name 優惠券 (Coupon)
 // @tag.description 優惠券領取與管理
 //
-// @tag.name 支付 (Payment)
-// @tag.description 支付相關功能
-//
 // @tag.name 媒體 (Media)
 // @tag.description 檔案上傳與下載
 //
