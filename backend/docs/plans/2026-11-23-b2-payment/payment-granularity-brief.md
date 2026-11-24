@@ -34,13 +34,13 @@ v2 依獨立審查 `b2-design-brief-review.md` 修訂：B7 coupon 的事實、�
   - **A. 一筆付款對 N 張訂單應收（建議）**。`payments`（群組，記總額，掛 `payment_attempts`）＋新表 `payment_orders(payment_id, order_no UNIQUE, store_id, amount)`；`transfers`、`refunds`、`refund_reversals` 改以 `payment_order_id` 為鍵。唯一索引改成「一張訂單最多一筆有效轉帳」；退款上限＝訂單應收金額−該訂單非失敗退款的總和；鎖順序是付款列→訂單應收列。D11（先退款再收回、補差額）和 D5（自動退款）的範圍從付款縮到訂單應收。失敗條件：產品永遠不做多店結帳，那 `payment_orders` 永遠只有一列，等於多一層沒用的間接（成本是一張表）。
   - **B. 維持一張訂單一筆付款，多店就付 N 次**。失敗條件：只要產品支援多店結帳就會出問題，買家要做 N 次 3DS 驗證或錢包確認，中途失敗就只付了一部分【推論】。
   - **C. 一張訂單一個 PaymentIntent，由 client 依序串起來**。失敗條件同 B，而且多了跨 PaymentIntent 的部分成功狀態。
-- **群組鍵與分攤（審查第 7 點）**
+- **群組鍵與分攤**
   - 群組鍵：B8 之前由 payment 擁有。Java 不產生結帳群組 ID，所以 `CreatePayment(order_no)` 在 payment 內建一個群組（`payment_id`）掛 1 筆訂單應收。B8 改成 ordering 傳入 N 張訂單（或 checkout ID），payment 仍產生 `payment_id`。
   - N=1 時的對應：`GrantPayment(order_no)`、`CreateRefund(order_no)`（AutoRefund 和售後都走它）、`GetActivePaymentStatusByOrderNo` 等 legacy RPC 都以 `order_no` 找到唯一的訂單應收，proto 不改【推論】。
   - 每張單的金額以訂單方為準：現在經 `GetOrderForPayment` 讀 Java 的應付金額（計畫步驟 4 表），B8 換成 in-process。payment 不自己算。
   - 優惠分攤由 ordering 負責：賣家券天生只屬於一張單（`campaigns_seller_scope_check`，`coupon/db/schema.sql:60`）【實測】。平台券（`issuer_type='ADMIN'`）跨店時，要由 ordering 依比例把折扣分攤到各張單，分攤後的應付金額就是 payment 的「訂單應收」，也就是退款上限。Shopee 的平台券是按比例分攤到各店訂單【推論】。
   - coupon 介面：只要平台券仍限「一次結帳只套在一張單」，現在的 `Lock(order_no)` 就能用；要讓平台券跨多張單，就要改成鎖在結帳群組上再分攤。這是 B8 的產品決定，不需要在 B7 先改（改了也沒有呼叫者）。
-- **可能推翻 D-A 的 Stripe 限制（審查第 6 點）**：(1) 一個 charge 的退款跨多筆 transfer：退款本來就不碰 transfer，逐筆撤回正好就是 A 的模型，不推翻【文件】。(2) 部分退款之後，`source_transaction` 的轉帳總額上限會不會跟著下降：文件沒寫【文件，未載明】。A 的轉帳金額在送出時已經扣掉該單的退款（D69），所以加總≤charge−已退款，兩種解讀都成立【推論】；要在 sandbox 驗一次（3d 的樣本）。
+- **可能推翻 D-A 的 Stripe 限制**：(1) 一個 charge 的退款跨多筆 transfer：退款本來就不碰 transfer，逐筆撤回正好就是 A 的模型，不推翻【文件】。(2) 部分退款之後，`source_transaction` 的轉帳總額上限會不會跟著下降：文件沒寫【文件，未載明】。A 的轉帳金額在送出時已經扣掉該單的退款（D69），所以加總≤charge−已退款，兩種解讀都成立【推論】；要在 sandbox 驗一次（3d 的樣本）。
 - **推翻建議的事實**：Will 決定產品永遠一次結帳只能一家店；或 sandbox 發現多筆 `source_transaction` 轉帳加上部分退款時會被拒。
 - **可逆性與成本**：合併前改，就是分支內壓平 migration（單體規則 6 允許）【文件，backend/AGENTS.md】；合併後再改，要多一個往前的 migration 加第二輪審查；拖到 B8 才改，transfer、refund、reversal 的鍵全部要搬【推論】。
 - **限制帳本**：PayUni 一付款一商店：已退場，不是限制。Java 只建單店訂單：讓 Java 改成多店是 SELF-IMPOSED，否決；Go 版要等 B6、B3，是 REAL。recipient 帳戶只能收 transfer：REAL，SCT 符合【文件】。幣別：單一幣別 USD，訂單整數照搬成 cent（D9／ADR D67），不是 TWD；多張單同一幣別，沒有換匯問題【文件，計畫 D9】。手續費：B10 已退場，不在範圍。部分請款（partial capture）：用的是自動請款，不適用【推論】。
