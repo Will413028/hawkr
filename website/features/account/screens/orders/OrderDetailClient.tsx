@@ -553,7 +553,6 @@ function normalizePaymentMethod(raw?: string): PaymentMethodValue | undefined {
 	if (upper === "CREDIT" || upper === "CREDIT_CARD" || upper === "CARD") {
 		return PaymentMethod.CREDIT_CARD;
 	}
-	if (upper === "ATM") return PaymentMethod.ATM;
 	if (upper === "APPLE_PAY" || upper === "APPLEPAY") {
 		return PaymentMethod.APPLE_PAY;
 	}

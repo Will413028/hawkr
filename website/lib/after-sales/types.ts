@@ -36,16 +36,10 @@ export const AFTER_SALE_STATUS = {
 export type AfterSaleStatus =
 	(typeof AFTER_SALE_STATUS)[keyof typeof AFTER_SALE_STATUS];
 
-/**
- * `refundTaskStatus` (PayUni WorkerTaskStatus) on the case detail. The
- * crucial one is `AWAITING_BUYER_REFUND_PAGE` ("5") — that, not a boolean,
- * is what tells the buyer to fill in ATM refund bank details.
- */
+/** `refundTaskStatus` (CodeMeta WorkerTaskStatus) on the case detail. */
 export const REFUND_TASK_STATUS = {
 	PENDING: "0",
-	AWAITING_BUYER_REFUND_PAGE: "5",
 	PROCESSING: "10",
-	AWAITING_WEBHOOK: "15",
 	DONE: "20",
 	FAILED: "30",
 	MANUAL_INTERVENTION: "40",
@@ -157,14 +151,10 @@ export interface AfterSaleReturnLogistics {
 	shipmentStatus?: string;
 }
 
-/** Refund execution progress (original-route or ATM). */
+/** Refund execution progress (original-route refund). */
 export interface AfterSaleRefundProgress {
 	refundTaskStatus?: string;
-	estimatedRefundDate?: string;
-	bankDate?: string;
 	refundFailureMessage?: string;
-	/** True when the buyer must submit bank/ATM details before refund runs. */
-	needRefundPage?: boolean;
 }
 
 /** Full case detail — superset of the list row. */

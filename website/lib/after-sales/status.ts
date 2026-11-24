@@ -8,7 +8,7 @@
  *   20 待退貨      returning info     買家寄回
  *   25 退貨運送中  returning info     等物流
  *   30 已收退貨    pending   warning  賣家確認收貨
- *   40 退款處理中  refunding warning  等退款 / ATM 填寫
+ *   40 退款處理中  refunding warning  等退款
  *   50 已結案      closed    success  查看詳情
  *   60 已拒絕      closed    danger   買家申訴
  *   70 已取消      closed    muted    查看詳情
@@ -21,7 +21,6 @@ import {
 	type AfterSaleGroup,
 	type AfterSaleReturnLogistics,
 	type AfterSaleTone,
-	REFUND_TASK_STATUS,
 } from "./types";
 
 /** codemeta `AfterSaleCaseStatus` display labels. */
@@ -43,18 +42,11 @@ export const AFTER_SALE_STATUS_LABEL: Record<string, string> = {
 /** PayUni WorkerTaskStatus (`refundTaskStatus`) display labels. */
 export const REFUND_TASK_STATUS_LABEL: Record<string, string> = {
 	"0": "待處理",
-	"5": "等待買家填寫退款資訊",
 	"10": "退款處理中",
-	"15": "等待金流確認",
 	"20": "退款完成",
 	"30": "退款失敗",
 	"40": "需人工處理",
 };
-
-/** True when the buyer must submit ATM bank details for the refund to run. */
-export function refundNeedsBuyerPage(refundTaskStatus?: string): boolean {
-	return refundTaskStatus === REFUND_TASK_STATUS.AWAITING_BUYER_REFUND_PAGE;
-}
 
 /** Platform arbitration outcome label. Accepts the codemeta name
  * (FULL_REFUND…) or the numeric ordinal ("1"/"2"/"3") the wire may send. */

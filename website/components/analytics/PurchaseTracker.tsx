@@ -11,9 +11,8 @@ import { fetchOrder } from "@/lib/orders/repo";
 
 /**
  * Fires one GA4 purchase per order. Arrival at /checkout/success ⇒ paid
- * (payment resolution routes paid→success, failed→fail, ATM→submitted), so no
- * status re-check is needed. Order numbers come from sessionStorage (set at
- * confirm, survives the PayUni round-trip); falls back to the URL order param.
+ * (the payment step routes only paid orders there), so no status re-check
+ * is needed. Order numbers come from sessionStorage (set at confirm); falls back to the URL order param.
  * Dedup is per-orderNo so a refresh does not re-fire.
  */
 export default function PurchaseTracker({

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	CHECKOUT_AWAITING_INVOICE_NOTICE,
 	checkoutInvoiceCarrier,
 	checkoutPaidInvoiceNotice,
 } from "./checkoutInvoiceNotice";
@@ -49,11 +48,6 @@ describe("付款完成頁的 invoiceMode 狀態句", () => {
 		for (const mode of ["AMEGO_AUTO", "PLATFORM_RECEIPT"]) {
 			expect(checkoutPaidInvoiceNotice(mode)).not.toContain("賣家");
 		}
-	});
-
-	it("ATM 待轉帳的墊底句不說「付款完成」——那一頁的錢還沒到", () => {
-		expect(CHECKOUT_AWAITING_INVOICE_NOTICE).not.toContain("付款完成");
-		expect(CHECKOUT_AWAITING_INVOICE_NOTICE).not.toBe("");
 	});
 });
 

@@ -43,15 +43,6 @@ export function checkoutPaidInvoiceNotice(invoiceMode: string): string {
 }
 
 /**
- * ATM 待轉帳頁在 `stateNotice` 為空時的墊底句。
- *
- * 正常路徑一律**逐字顯示後端的 `stateNotice`**（58A §B03）——那句話由後端依實際
- * 狀態產生，前端自組會和訂單詳情頁講的不一樣。這句只在後端沒給時出現，且刻意不寫
- * 「付款完成」：這一頁的錢還沒到。
- */
-export const CHECKOUT_AWAITING_INVOICE_NOTICE = "完成付款後開始處理發票。";
-
-/**
  * 「發票方式」列要顯示的載具摘要；沒有可顯示的值時回空字串（呼叫端整列不渲染）。
  *
  * ⚠️ 端點 8 的回應**沒有訂單層級的載具欄位**，唯一的來源是 `documents[].carrierSummary`

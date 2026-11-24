@@ -38,13 +38,11 @@ import {
 	arbitrationEventLabel,
 	arbitrationOutcomeLabel,
 	buildAfterSaleLookup,
-	refundNeedsBuyerPage,
 	returnLogisticsStatusLabel,
 } from "../lib/after-sales/status";
 import {
 	AFTER_SALE_STATUS,
 	type AfterSaleCase,
-	REFUND_TASK_STATUS,
 } from "../lib/after-sales/types";
 import { AfterSaleAppealState } from "../lib/codemeta/generated";
 
@@ -471,17 +469,6 @@ test("afterSaleSteps treats an unknown status as freshly applied", () => {
 });
 
 /* ===== refund task / arbitration labels ===== */
-
-test("refundNeedsBuyerPage flags only WorkerTaskStatus 5 (ATM bank details)", () => {
-	assert.equal(
-		refundNeedsBuyerPage(REFUND_TASK_STATUS.AWAITING_BUYER_REFUND_PAGE),
-		true,
-	);
-	assert.equal(refundNeedsBuyerPage(REFUND_TASK_STATUS.PENDING), false);
-	assert.equal(refundNeedsBuyerPage(REFUND_TASK_STATUS.PROCESSING), false);
-	assert.equal(refundNeedsBuyerPage(REFUND_TASK_STATUS.DONE), false);
-	assert.equal(refundNeedsBuyerPage(undefined), false);
-});
 
 test("arbitrationOutcomeLabel accepts codemeta names, ordinals and passes unknowns through", () => {
 	assert.equal(arbitrationOutcomeLabel("FULL_REFUND"), "全額退款");

@@ -600,8 +600,7 @@ export function AfterSaleDecisionDrawer({
 									{selected ===
 									AfterSaleResolutionType.FULL_REFUND_NO_RETURN ? (
 										<p className="text-sm text-hk-body bg-content2 rounded-hkui-md px-3 py-2">
-											將全額退款 {money(String(refundable))}
-											。信用卡原路退回；ATM 付款需買家於退款頁填寫銀行帳號。
+											將全額退款 {money(String(refundable))}。
 										</p>
 									) : null}
 
@@ -779,12 +778,6 @@ function AfterSaleActionStateCard({
 		returnShipmentNo ? { label: "退貨單號", value: returnShipmentNo } : null,
 		refundAmount ? { label: "退款金額", value: money(refundAmount) } : null,
 		refundStatusLabel ? { label: "退款進度", value: refundStatusLabel } : null,
-		detail?.refundProgress?.estimatedRefundDate
-			? {
-					label: "預估退款",
-					value: detail.refundProgress.estimatedRefundDate,
-				}
-			: null,
 	].filter((row): row is { label: string; value: string } =>
 		Boolean(row?.value),
 	);
@@ -808,11 +801,6 @@ function AfterSaleActionStateCard({
 						</React.Fragment>
 					))}
 				</dl>
-			) : null}
-			{detail?.refundProgress?.needRefundPage ? (
-				<p className="m-0 mt-3 rounded-hkui-md bg-warning-50 px-3 py-2 text-xs font-semibold text-warning-800">
-					等待買家填寫退款帳戶後，退款才會繼續執行。
-				</p>
 			) : null}
 			{failureGuidance ? (
 				<div className="mt-3 border-t border-danger-200 pt-3 text-danger-700">
