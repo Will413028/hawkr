@@ -4,7 +4,7 @@ package imageai_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
@@ -54,13 +53,9 @@ func setupAdmin(t *testing.T) *adminFixture {
 	t.Parallel()
 	d := pg.NewDB(t, testdb.Jobs(),
 		testdb.Migrations(migrate.Module{Name: "imageai", Dir: imageai.Migrations()}, migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()}))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	f := &adminFixture{d: d, media: media.NewFake(), stores: stubStores{missing: map[int64]bool{404: true}}}
 	f.m = imageai.New(imageai.Deps{
-		DB: d, Now: func() time.Time { return wednesday }, Seller: f.stores, Stores: f.stores, Media: f.media, Jobs: jc, NewID: uuid.NewV7,
+		DB: d, Now: func() time.Time { return wednesday }, Seller: f.stores, Stores: f.stores, Media: f.media, NewID: uuid.NewV7,
 		Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return f
@@ -79,15 +74,13 @@ func (f *adminFixture) auditRows(t *testing.T, targetType, targetID string) int 
 	return f.count(t, `SELECT count(*) FROM adminaudit.records WHERE admin_id = 9 AND action = '/test/Admin' AND target_type = $1 AND target_id = $2`, targetType, targetID)
 }
 
-func (f *adminFixture) sync(t *testing.T, id uuid.UUID) {
+func (f *adminFixture) thumbnailAsset(t *testing.T, id uuid.UUID) *uuid.UUID {
 	t.Helper()
-	if _, err := f.m.SyncMedia(context.Background(), media.Ref{Type: media.RefTypeAiStyle, ID: id.String()}); err != nil {
+	var asset *uuid.UUID
+	if err := f.d.Pool().QueryRow(context.Background(), `SELECT thumbnail_asset_id FROM imageai.styles WHERE id = $1`, id).Scan(&asset); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func (f *adminFixture) referenced(id uuid.UUID) string {
-	return fmt.Sprint(f.media.Referenced(media.Ref{Type: media.RefTypeAiStyle, ID: id.String()}))
+	return asset
 }
 
 func newStyle(token string) imageai.CreateStyleInput {
@@ -154,9 +147,6 @@ func TestAuditRowRollsBackWithTheBusinessWrite(t *testing.T) {
 	if n := f.count(t, `SELECT count(*) FROM adminaudit.records WHERE action = '/test/Admin'`); n != 0 {
 		t.Fatalf("稽核列 = %d，預期隨業務寫入回滾", n)
 	}
-	if n := f.count(t, `SELECT count(*) FROM imageai.media_ref_sync`); n != 0 {
-		t.Fatalf("media_ref_sync = %d，預期回滾", n)
-	}
 }
 
 func TestStaleStyleUpdateLeavesNoAuditRowAndKeepsTheVersion(t *testing.T) {
@@ -175,46 +165,62 @@ func TestStaleStyleUpdateLeavesNoAuditRowAndKeepsTheVersion(t *testing.T) {
 	}
 }
 
-func TestThumbnailIsFinalizedAndLinkedByTheSyncJobAndReleasedOnReplaceAndDelete(t *testing.T) {
+func TestThumbnailIsConfirmedInTheWriteAndTheReplacedOrDeletedAssetIsMarkedDeleted(t *testing.T) {
+	f := setupAdmin(t)
+	ctx := context.Background()
+	t1, t2 := media.AssetFor("t1"), media.AssetFor("t2")
+	s, err := f.m.CreateStyle(ctx, newStyle("t1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.thumbnailAsset(t, s.ID); got == nil || *got != t1 || !f.media.IsConfirmed(t1) || f.media.IsDeleted(t1) {
+		t.Fatalf("新增後 asset = %v，t1 確認 = %v、刪除 = %v", got, f.media.IsConfirmed(t1), f.media.IsDeleted(t1))
+	}
+	s, err = f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: s.ID, Version: s.Version, Label: "新", Prompt: "p", Enabled: true, ThumbnailToken: "t2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.thumbnailAsset(t, s.ID); got == nil || *got != t2 || !f.media.IsDeleted(t1) || f.media.IsDeleted(t2) {
+		t.Fatalf("換圖後 asset = %v，t1 刪除 = %v、t2 刪除 = %v", got, f.media.IsDeleted(t1), f.media.IsDeleted(t2))
+	}
+	s, err = f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: s.ID, Version: s.Version, Label: "再改", Prompt: "p", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.thumbnailAsset(t, s.ID); got == nil || *got != t2 || f.media.IsDeleted(t2) {
+		t.Fatalf("沿用縮圖後 asset = %v，t2 刪除 = %v", got, f.media.IsDeleted(t2))
+	}
+	if err := f.m.DeleteStyle(ctx, admin, s.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !f.media.IsDeleted(t2) {
+		t.Fatal("刪除風格後縮圖沒有標記刪除")
+	}
+}
+
+func TestFailedMarkDeletedRollsBackTheStyleWrite(t *testing.T) {
 	f := setupAdmin(t)
 	ctx := context.Background()
 	s, err := f.m.CreateStyle(ctx, newStyle("t1"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := f.count(t, `SELECT count(*) FROM river.river_job WHERE kind = 'imageai.media_sync' AND args->>'ref_id' = $1`, s.ID.String()); n != 1 {
-		t.Fatalf("同步 job = %d，預期 1（與寫入同 transaction 排入）", n)
+	f.media.FailMarkDeleted = errors.New("media 失敗")
+	_, err = f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: s.ID, Version: s.Version, Label: "新", Prompt: "p", Enabled: true, ThumbnailToken: "t2"})
+	if err == nil {
+		t.Fatal("MarkDeleted 失敗卻成功")
 	}
-	f.sync(t, s.ID)
-	if got := f.referenced(s.ID); got != "[asset-t1]" {
-		t.Fatalf("references = %s", got)
+	if got := f.thumbnailAsset(t, s.ID); got == nil || *got != media.AssetFor("t1") {
+		t.Fatalf("回滾後 asset = %v，預期仍是 t1", got)
 	}
-	s, err = f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: s.ID, Version: s.Version, Label: "新", Prompt: "p", Enabled: true, ThumbnailToken: "t2"})
-	if err != nil {
-		t.Fatal(err)
+	if err := f.m.DeleteStyle(ctx, admin, s.ID, 0); err == nil {
+		t.Fatal("MarkDeleted 失敗卻刪除成功")
 	}
-	f.sync(t, s.ID)
-	if got := f.referenced(s.ID); got != "[asset-t2]" {
-		t.Fatalf("換圖後 references = %s，預期只剩 asset-t2", got)
+	if n := f.count(t, `SELECT count(*) FROM imageai.styles WHERE id = $1`, s.ID); n != 1 {
+		t.Fatalf("回滾後風格列 = %d，預期 1", n)
 	}
-	if n := f.count(t, `SELECT count(*) FROM imageai.retired_assets WHERE asset_id = 'asset-t1'`); n != 1 {
-		t.Fatalf("舊縮圖退場紀錄 = %d", n)
-	}
-	// 沒帶 token 沿用目前的圖：不轉正、引用不變。
-	s, err = f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: s.ID, Version: s.Version, Label: "再改", Prompt: "p", Enabled: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.sync(t, s.ID)
-	if got := f.referenced(s.ID); got != "[asset-t2]" {
-		t.Fatalf("沿用 references = %s", got)
-	}
-	if err := f.m.DeleteStyle(ctx, admin, s.ID, 0); err != nil {
-		t.Fatal(err)
-	}
-	f.sync(t, s.ID)
-	if got := f.referenced(s.ID); got != "[]" {
-		t.Fatalf("刪除後 references = %s，預期釋放", got)
+	if n := f.auditRows(t, "ai_style", s.ID.String()); n != 1 {
+		t.Fatalf("稽核列 = %d，只該有新增那一筆", n)
 	}
 }
 
@@ -232,16 +238,15 @@ func TestSeededDefaultStylesHaveNoThumbnailAndCanBeEditedWithANewOne(t *testing.
 			def = s
 		}
 	}
-	if def.ID == (uuid.UUID{}) || def.ThumbnailKey != "" {
+	if def.ID == (uuid.UUID{}) || def.ThumbnailKey != "" || f.thumbnailAsset(t, def.ID) != nil {
 		t.Fatalf("seed 的預設風格 = %+v", def)
 	}
 	got, err := f.m.UpdateStyle(ctx, imageai.UpdateStyleInput{Actor: admin, ID: def.ID, Version: def.Version, Label: def.Label, Prompt: def.Prompt, Enabled: true, ThumbnailToken: "d1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.sync(t, got.ID)
-	if f.referenced(got.ID) != "[asset-d1]" || got.ThumbnailKey == "" {
-		t.Fatalf("got = %+v refs = %s", got, f.referenced(got.ID))
+	if asset := f.thumbnailAsset(t, got.ID); asset == nil || *asset != media.AssetFor("d1") || got.ThumbnailKey == "" {
+		t.Fatalf("got = %+v asset = %v", got, asset)
 	}
 }
 

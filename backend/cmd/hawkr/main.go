@@ -44,7 +44,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/seller/sellerconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/imrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/invoiceservice"
-	"github.com/Will413028/hawkr/backend/internal/legacy/mediaservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
@@ -59,6 +58,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/bizcalendar"
@@ -137,8 +137,6 @@ func runServe(ctx context.Context) error {
 	dbc := dbConfig(e)
 	// 舊服務的 gRPC 以服務間簽章認證；沒設定時不簽章，只有對方的 INTERNAL_AUTH_MODE 不是 enforcing 時能用。
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
-	// media 在遷移計畫 B1 之前還是 Java 的 media-service（gRPC）。
-	mediaCfg := mediaservice.Config{Addr: e.String("MEDIA_SERVICE_ADDR"), Secret: internalSecret}
 	// 對外圖片的網域（image gateway），client 不持有它（ADR 2026-09-25-api-image-uri-template）。
 	mediaOrigin := e.String("MEDIA_ORIGIN")
 	// 網站的網域：API 回給 client 的網站網址（入駐文件）一律是絕對網址，由 internal/httpapi 以它組成。
@@ -166,6 +164,7 @@ func runServe(ctx context.Context) error {
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
+	mediaCfg := readMedia(e)
 	llmConfig := llm.ReadConfig(e)
 	imageAIConfig := imageai.ReadConfig(e)
 	if err := e.Err(); err != nil {
@@ -188,7 +187,7 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	med, err := mediaservice.New(mediaCfg)
+	med, err := newMedia(mediaCfg, d, jc, log)
 	if err != nil {
 		return err
 	}
@@ -220,7 +219,7 @@ func runServe(ctx context.Context) error {
 		return err
 	}
 	buyerModule := buyer.New(buyer.Deps{
-		DB: d, Events: bus, Jobs: jc,
+		DB: d, Events: bus,
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
@@ -249,9 +248,9 @@ func runServe(ctx context.Context) error {
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, jc, log)
+	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, log)
 	subscribeProcurement(bus, d, log)
-	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), med, jc, log)
+	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
 	procurementModule := newProcurement(d, jc, buyerModule, bus, log)
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
@@ -299,11 +298,11 @@ func runServe(ctx context.Context) error {
 			DB:     d,
 			Social: socialModule,
 			Media:  med,
-			Jobs:   jc,
 			NewID:  uuid.NewV7,
 			Now:    time.Now,
 			Logger: log,
 		}),
+		Media:           med,
 		Identity:        id,
 		WebLogin:        webLogin,
 		AppLogin:        appLogin,
@@ -372,7 +371,6 @@ func runWorker(ctx context.Context) error {
 	// 工作日行事曆推給還在舊服務的 invoice-service 當鏡像（bizcalendarrelay；A5 搬進單體後刪除）。
 	invoiceAddr := e.String("INVOICE_SERVICE_ADDR")
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
-	mediaCfg := mediaservice.Config{Addr: e.String("MEDIA_SERVICE_ADDR"), Secret: internalSecret}
 	log := newLogger()
 	verifierCtx, stopVerifiers := context.WithCancel(context.WithoutCancel(ctx))
 	defer stopVerifiers()
@@ -381,6 +379,7 @@ func runWorker(ctx context.Context) error {
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
 	registry := readGCIS(e)
+	mediaCfg := readMedia(e)
 	llmConfig := llm.ReadConfig(e)
 	imageAIConfig := imageai.ReadConfig(e)
 	if err := e.Err(); err != nil {
@@ -426,12 +425,12 @@ func runWorker(ctx context.Context) error {
 	subscribeBuyerEvents(bus, jc)
 	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
 	id := newIdentity(d, bus, idc, log)
-	med, err := mediaservice.New(mediaCfg)
+	med, err := newMedia(mediaCfg, d, jc, log)
 	if err != nil {
 		return err
 	}
 	buyerModule := buyer.New(buyer.Deps{
-		DB: d, Events: bus, Jobs: jc,
+		DB: d, Events: bus,
 		Media: med, Now: time.Now, Logger: log,
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
@@ -474,18 +473,16 @@ func runWorker(ctx context.Context) error {
 		AdvanceStore: sellerModule.AdvanceTerminations,
 		Jobs:         jc,
 	}
-	moderationModule := newModerationRetention(d, buyerModule, med, jc, log)
+	moderationModule := newModerationRetention(d, buyerModule, med, log)
 	subscribeProcurement(bus, d, log)
-	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), med, jc, log)
+	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
 	notificationModule := newNotification(d, id, buyerModule, sellerModule, jc, log)
 	subscribeNotification(bus, notificationModule)
-	contentModule := content.New(content.Deps{DB: d, Social: socialModule, Media: med, Jobs: jc, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
-	contentModule.AddWorkers(workers)
-	imageAIModule.AddWorkers(workers)
+	med.AddWorkers(workers)
 	procurementModule := newProcurementWorker(d, jc, buyerModule, bus, llm.New(llm.Procurement, llmConfig, log), categories, products, sellerModule, log)
 	addProcurementWorkers(workers, procurementModule)
 	buyerModule.AddWorkers(workers)
@@ -522,11 +519,14 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, moderationModule.PeriodicJobs()...)
 	periodic = append(periodic, notificationModule.PeriodicJobs()...)
 	periodic = append(periodic, discoveryModule.PeriodicJobs()...)
-	periodic = append(periodic, contentModule.PeriodicJobs()...)
-	periodic = append(periodic, imageAIModule.PeriodicJobs()...)
+	periodic = append(periodic, med.PeriodicJobs()...)
 	periodic = append(periodic, procurementModule.PeriodicJobs()...)
 	periodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)
-	c, err := jobs.NewWorker(d, workers, map[string]int{river.QueueDefault: workerConcurrency}, periodic)
+	queues, err := workerQueues(workerConcurrency, media.Queues())
+	if err != nil {
+		return err
+	}
+	c, err := jobs.NewWorker(d, workers, queues, periodic)
 	if err != nil {
 		return err
 	}

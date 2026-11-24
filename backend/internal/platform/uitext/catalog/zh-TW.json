@@ -220,6 +220,26 @@
       "message": "VIP",
       "description": "CustomerType 是店家對買家的分類。（值 CUSTOMER_TYPE_VIP）"
     },
+    "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH": {
+      "message": "檔案在上傳過程中損毀，請重新上傳。",
+      "description": "實際內容與宣告的 MD5 不符。"
+    },
+    "media.RejectReason.REJECT_REASON_EXPIRED": {
+      "message": "上傳已逾時，請重新上傳。",
+      "description": "暫存在處理完成前過期。"
+    },
+    "media.RejectReason.REJECT_REASON_PROCESSING_FAILED": {
+      "message": "檔案處理失敗，請換一張圖片再試。",
+      "description": "處理失敗（例如圖片損毀或超過像素上限），重試不會成功。"
+    },
+    "media.RejectReason.REJECT_REASON_SIZE_MISMATCH": {
+      "message": "檔案大小與宣告的不一致，請重新上傳。",
+      "description": "實際大小與宣告的不符。"
+    },
+    "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT": {
+      "message": "無法辨識檔案格式，請改用 JPEG、PNG、WebP 或 GIF 圖片。",
+      "description": "辨認不出是支援的圖片格式。"
+    },
     "moderation.CommunityReport.outcome_unset": {
       "message": "審核中",
       "description": "檢舉還沒有結果（outcome 沒有設值）時，結果欄位顯示的文字。"

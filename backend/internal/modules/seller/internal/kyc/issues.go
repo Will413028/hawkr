@@ -41,6 +41,13 @@ func validateIssues(in []model.KYCIssue) ([]model.KYCIssue, error) {
 			return nil, apperr.InvalidInputOn([]string{issueField(i, "Message")}, "說明必填，最多 %d 字", model.MaxKYCIssueMessage)
 		}
 		asset := strings.TrimSpace(issue.DocumentAssetID)
+		if asset != "" {
+			id, err := uuid.Parse(asset)
+			if err != nil {
+				return nil, apperr.InvalidInputOn([]string{issueField(i, "DocumentAssetID")}, "文件 ID 格式不正確")
+			}
+			asset = id.String()
+		}
 		isDocument := model.IsDocumentField(issue.Field)
 		switch {
 		case asset != "" && !isDocument:
@@ -65,7 +72,7 @@ func checkIssuesAgainstApplication(issues []model.KYCIssue, sellerType model.KYC
 		if issue.DocumentAssetID == "" {
 			continue
 		}
-		onApplication := slices.ContainsFunc(docs, func(d store.SellerKycDocument) bool { return d.AssetID == issue.DocumentAssetID })
+		onApplication := slices.ContainsFunc(docs, func(d store.SellerKycDocument) bool { return d.AssetID.String() == issue.DocumentAssetID })
 		if !onApplication {
 			return apperr.InvalidInputOn([]string{issueField(i, "DocumentAssetID")}, "指定的文件不是這份申請在這個欄位目前的文件")
 		}
@@ -81,7 +88,11 @@ func insertIssues(ctx context.Context, q *store.Queries, reviewID uuid.UUID, iss
 			Field: issue.Field, Code: string(issue.Code), Message: issue.Message,
 		}
 		if issue.DocumentAssetID != "" {
-			params.DocumentAssetID = &issue.DocumentAssetID
+			id, err := uuid.Parse(issue.DocumentAssetID)
+			if err != nil {
+				return err
+			}
+			params.DocumentAssetID = &id
 		}
 		if err := q.InsertKYCReviewIssue(ctx, params); err != nil {
 			return err
@@ -91,7 +102,7 @@ func insertIssues(ctx context.Context, q *store.Queries, reviewID uuid.UUID, iss
 }
 
 func toIssue(row store.SellerKycReviewIssue) model.KYCIssue {
-	return model.KYCIssue{Field: row.Field, DocumentAssetID: model.Deref(row.DocumentAssetID), Code: model.KYCIssueCode(row.Code), Message: row.Message}
+	return model.KYCIssue{Field: row.Field, DocumentAssetID: assetText(row.DocumentAssetID), Code: model.KYCIssueCode(row.Code), Message: row.Message}
 }
 
 // issuesByReview 把整份申請的問題依審核紀錄分組（保持 position 的順序）。
@@ -128,11 +139,19 @@ func outstandingIssues(reviews []store.SellerKycReview, rows []store.SellerKycRe
 	return out
 }
 
-// assetIDs 回傳文件的 asset ID（排序，順序不算）。
-func assetIDs(docs []store.SellerKycDocument) []string {
+// assetText 是可為 NULL 的 asset ID 的文字；沒有值是空字串。
+func assetText(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
+}
+
+// sortedAssetTexts 回傳文件的 asset ID 文字（排序，順序不算）。
+func sortedAssetTexts(docs []store.SellerKycDocument) []string {
 	out := make([]string, 0, len(docs))
 	for _, d := range docs {
-		out = append(out, d.AssetID)
+		out = append(out, d.AssetID.String())
 	}
 	slices.Sort(out)
 	return out
@@ -145,9 +164,9 @@ func issueResolved(field, assetID string, changed map[string]bool, before, after
 	case !model.IsDocumentField(field):
 		return changed[field]
 	case assetID != "":
-		return !slices.ContainsFunc(after, func(d store.SellerKycDocument) bool { return d.AssetID == assetID })
+		return !slices.ContainsFunc(after, func(d store.SellerKycDocument) bool { return d.AssetID.String() == assetID })
 	default:
-		return !slices.Equal(assetIDs(before), assetIDs(after))
+		return !slices.Equal(sortedAssetTexts(before), sortedAssetTexts(after))
 	}
 }
 
@@ -160,7 +179,7 @@ func resolveIssues(ctx context.Context, q *store.Queries, applicationID uuid.UUI
 	}
 	var resolved []uuid.UUID
 	for _, issue := range open {
-		if issueResolved(issue.Field, model.Deref(issue.DocumentAssetID), diff.fields, docsBefore, docsAfter) {
+		if issueResolved(issue.Field, assetText(issue.DocumentAssetID), diff.fields, docsBefore, docsAfter) {
 			resolved = append(resolved, issue.IssueID)
 		}
 	}

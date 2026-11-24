@@ -9,6 +9,7 @@ import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.pbenum.dart' as hawkr_b
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/policy_category.pbenum.dart' as hawkr_common_v1alpha1_policy_category;
 import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as hawkr_common_v1alpha1_store_card;
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart' as hawkr_media_v1alpha1_media;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart' as hawkr_notification_v1alpha1_notification;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
@@ -56,6 +57,12 @@ const _enumNumber = <String, int>{
 	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_NORMAL': 1,
 	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_UNSPECIFIED': 0,
 	'hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_VIP': 2,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH': 3,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_EXPIRED': 5,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_PROCESSING_FAILED': 4,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_SIZE_MISMATCH': 2,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT': 1,
+	'hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION': 3,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED': 0,
 	'hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION': 2,
@@ -291,6 +298,8 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_crm_v1alpha1_crm.CustomerSort.valueOf(_n('hawkr.crm.v1alpha1.CustomerSort', value))!.uiText(l);
     case 'crm.CustomerType':
       return hawkr_crm_v1alpha1_crm.CustomerType.valueOf(_n('hawkr.crm.v1alpha1.CustomerType', value))!.uiText(l);
+    case 'media.RejectReason':
+      return hawkr_media_v1alpha1_media.RejectReason.valueOf(_n('hawkr.media.v1alpha1.RejectReason', value))!.uiText(l);
     case 'moderation.CommunityReport.outcome_unset':
       return moderationCommunityReportOutcomeUnset(l);
     case 'moderation.ReportOutcome':

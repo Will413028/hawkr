@@ -1,3 +1,4 @@
+import type { DescService } from "@bufbuild/protobuf";
 import type { Client } from "@connectrpc/connect";
 import type { SocialDelegatedService } from "@hawkr/api/gen/hawkr/social/v1alpha1/social_pb";
 import {
@@ -12,6 +13,7 @@ import {
 } from "./_csrf";
 import {
 	callDelegatedConnect,
+	callDelegatedFile,
 	callDelegatedUpstream,
 	type DelegatedUpstreamResult,
 	type DelegatedUpstreamTimeout,
@@ -47,8 +49,13 @@ const POST_ID_PATTERN =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 const ORDER_NO_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
-/** 媒體 upload session（UUID 或 TSID，兩種都可能）。 */
-const MEDIA_SESSION_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+/** 公開圖片上傳的 staged token（不透明字串，路徑段只放安全字元）。 */
+const STAGED_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{1,1024}$/;
+
+const SECURE_UPLOAD_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+const CHUNK_INDEX_PATTERN = /^(?:0|[1-9]\d{0,5})$/;
+/** 單體的段大小（`model.SecureChunkSize`）；超過的 body 不讀、不轉送。 */
+const SECURE_CHUNK_MAX_BYTES = 4 << 20;
 
 function segment(value: string, pattern: RegExp): string {
 	if (!pattern.test(value)) {
@@ -75,8 +82,18 @@ export function orderNoSegment(value: string): string {
 	return segment(value, ORDER_NO_PATTERN);
 }
 
-export function mediaSessionSegment(value: string): string {
-	return segment(value, MEDIA_SESSION_PATTERN);
+export function stagedTokenSegment(value: string): string {
+	return segment(value, STAGED_TOKEN_PATTERN);
+}
+
+/** 機敏上傳暫存 token（單體以 base64url 產生）。 */
+export function secureUploadTokenSegment(value: string): string {
+	return segment(value, SECURE_UPLOAD_TOKEN_PATTERN);
+}
+
+/** 段序號：十進位、無前導零（單體只認標準形）。 */
+export function chunkIndexSegment(value: string): string {
+	return segment(value, CHUNK_INDEX_PATTERN);
 }
 
 /**
@@ -246,23 +263,29 @@ export interface DelegatedConnectInput {
 }
 
 /** 一次 Connect 呼叫：送出請求並把回應整形成瀏覽器看到的 `data`。 */
-type DelegatedConnectCall = (
-	client: Client<typeof SocialDelegatedService>,
+type DelegatedConnectCall<
+	S extends DescService = typeof SocialDelegatedService,
+> = (
+	client: Client<S>,
 	options: { headers: Headers; timeoutMs: number },
 ) => Promise<unknown>;
 
-export interface DelegatedConnectSpec {
+export interface DelegatedConnectSpec<
+	S extends DescService = typeof SocialDelegatedService,
+> {
+	/** 要呼叫的代行 service；預設是 `SocialDelegatedService`。 */
+	service?: S;
 	method: "GET" | "POST" | "PATCH";
 	timeout: DelegatedUpstreamTimeout;
 	/** 路由的 `:storeId`（已過 `numericSegment`）；轉送點在送出前驗它就是 session 綁定的店。 */
-	storeId: string;
+	storeId?: string;
 	/** 與 REST 版相同：未列入的 query key 一律 400。 */
 	query?: readonly string[];
 	/**
 	 * 依輸入組出 Connect 呼叫；輸入不合法就丟 `DelegatedRequestRejectedError`（在送出之前，回 400）。
 	 * 呼叫的 `headers`／`timeoutMs` 由轉送點給。
 	 */
-	build: (input: DelegatedConnectInput) => DelegatedConnectCall;
+	build: (input: DelegatedConnectInput) => DelegatedConnectCall<S>;
 }
 
 const IDEMPOTENCY_HEX = /^(?:adm-)?([0-9a-f]{32})$/;
@@ -286,13 +309,15 @@ function requestIdFromIdempotencyKey(key: string | null): string | null {
  * 之後經 `_upstream.ts` 的 `callDelegatedConnect` 打單體的 `SocialDelegatedService`，憑證放
  * `X-HK-Operation-Session`。一支 route 對一個 Connect 方法，不做 catch-all。
  */
-export async function forwardDelegatedConnect(
+export async function forwardDelegatedConnect<
+	S extends DescService = typeof SocialDelegatedService,
+>(
 	request: Request,
-	source: DelegatedConnectSpec | (() => DelegatedConnectSpec),
+	source: DelegatedConnectSpec<S> | (() => DelegatedConnectSpec<S>),
 ): Promise<Response> {
-	let spec: DelegatedConnectSpec;
+	let spec: DelegatedConnectSpec<S>;
 	let credential: string | null;
-	let call: DelegatedConnectCall;
+	let call: DelegatedConnectCall<S>;
 	try {
 		spec = typeof source === "function" ? source() : source;
 		assertDelegatedBrowserRequest(request);
@@ -317,7 +342,8 @@ export async function forwardDelegatedConnect(
 	}
 
 	try {
-		const result = await callDelegatedConnect({
+		const result = await callDelegatedConnect<S>({
+			service: spec.service,
 			call,
 			timeout: spec.timeout,
 			credential,
@@ -325,6 +351,101 @@ export async function forwardDelegatedConnect(
 			visitorIp: getVisitorIp(request),
 		});
 		return respond(result);
+	} catch (error) {
+		if (error instanceof DelegatedUpstreamUnavailableError) {
+			return delegatedJson(
+				{ code: UPSTREAM_FAILURE },
+				error.timedOut ? 504 : 502,
+			);
+		}
+		throw error;
+	}
+}
+
+export interface DelegatedFileSpec {
+	method: "GET" | "PUT";
+	/** 單體根目錄之後的路徑。**每支 route 自己寫死**，不從請求推導。 */
+	path: string;
+}
+
+/** 單體回應裡放行給瀏覽器的標頭：其餘一律不轉（含 Set-Cookie 與任何上游自訂標頭）。 */
+const FILE_RESPONSE_HEADERS = [
+	"content-type",
+	"content-disposition",
+	"hawkr-next-index",
+	"retry-after",
+] as const;
+
+function fileResponse(upstream: Response): Response {
+	const headers = new Headers({
+		"Cache-Control": "private, no-store",
+		"X-Content-Type-Options": "nosniff",
+	});
+	const ok = upstream.status >= 200 && upstream.status <= 299;
+	for (const name of FILE_RESPONSE_HEADERS) {
+		// 失敗回應的 body 不轉（只轉狀態與重試所需的標頭），所以 content-type 也不帶。
+		if (!ok && (name === "content-type" || name === "content-disposition")) {
+			continue;
+		}
+		const value = upstream.headers.get(name);
+		if (value !== null) headers.set(name, value);
+	}
+	if (upstream.status >= 300 && upstream.status <= 399) {
+		return delegatedJson({ code: UPSTREAM_FAILURE }, 502);
+	}
+	return new Response(ok && upstream.status !== 204 ? upstream.body : null, {
+		status: upstream.status,
+		headers,
+	});
+}
+
+/**
+ * 代行 BFF 轉送單體檔案端點（機敏檔的段上傳與暫存預覽）：與 `forwardDelegated` 同一個檢查順序
+ * （path 值域、保留標頭與 CSRF、憑證、body），差別是 body 與回應都是原始位元組。PUT 要有 `Content-Length`
+ * （411）且不超過段大小（413），body 整段讀進記憶體後原樣送出（上限 4 MiB）。
+ */
+export async function forwardDelegatedFile(
+	request: Request,
+	source: DelegatedFileSpec | (() => DelegatedFileSpec),
+): Promise<Response> {
+	let spec: DelegatedFileSpec;
+	let credential: string | null;
+	let body: ArrayBuffer | undefined;
+	try {
+		spec = typeof source === "function" ? source() : source;
+		assertDelegatedBrowserRequest(request);
+		credential = readOperationCredential(request);
+		if (!credential) {
+			throw new DelegatedRequestRejectedError("CREDENTIAL_MISSING", 401);
+		}
+		if (spec.method === "PUT") {
+			const declared = request.headers.get("content-length");
+			if (declared === null || !/^\d{1,10}$/.test(declared)) {
+				throw new DelegatedRequestRejectedError("INVALID_BODY", 411);
+			}
+			if (Number(declared) > SECURE_CHUNK_MAX_BYTES) {
+				throw new DelegatedRequestRejectedError("INVALID_BODY", 413);
+			}
+			body = await request.arrayBuffer();
+			if (body.byteLength !== Number(declared)) {
+				throw new DelegatedRequestRejectedError("INVALID_BODY", 400);
+			}
+		}
+	} catch (error) {
+		if (error instanceof DelegatedRequestRejectedError) return rejection(error);
+		throw error;
+	}
+	try {
+		return fileResponse(
+			await callDelegatedFile({
+				method: spec.method,
+				path: spec.path,
+				timeout: "file",
+				credential,
+				visitorIp: getVisitorIp(request),
+				body,
+			}),
+		);
 	} catch (error) {
 		if (error instanceof DelegatedUpstreamUnavailableError) {
 			return delegatedJson(

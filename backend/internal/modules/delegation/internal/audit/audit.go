@@ -199,7 +199,7 @@ func validateIntent(in model.AuditIntentInput) error {
 		return model.Deny(model.DenialInvalidCommand, "origin 不正確")
 	case in.Capability == "":
 		return model.Deny(model.DenialInvalidCommand, "capability 不得為空")
-	case in.OperationReason == "" && !in.Action.ReadDenial() && in.Origin != model.AuditScheduled:
+	case in.OperationReason == "" && !in.Action.DenialOnly() && in.Origin != model.AuditScheduled:
 		// 空字串存成 NULL 之後，理由就再也補不回來。
 		return model.Deny(model.DenialInvalidCommand, "operationReason 為必填")
 	case utf8.RuneCountInString(in.OperationReason) > 100:

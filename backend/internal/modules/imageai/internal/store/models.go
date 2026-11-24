@@ -10,14 +10,6 @@ import (
 	"uuid"
 )
 
-type ImageaiMediaRefSync struct {
-	RefType   string
-	RefID     string
-	Seq       int64
-	SyncedSeq int64
-	UpdatedAt time.Time
-}
-
 type ImageaiQuota struct {
 	StoreID     int64
 	WeeklyLimit int32
@@ -28,14 +20,6 @@ type ImageaiQuota struct {
 	UpdatedAt time.Time
 }
 
-type ImageaiRetiredAsset struct {
-	RefType    string
-	RefID      string
-	AssetID    string
-	RetiredAt  time.Time
-	UnlinkedAt *time.Time
-}
-
 type ImageaiStyle struct {
 	ID    uuid.UUID
 	Name  string
@@ -44,7 +28,7 @@ type ImageaiStyle struct {
 	Prompt           string
 	Category         string
 	ThumbnailKey     string
-	ThumbnailAssetID string
+	ThumbnailAssetID *uuid.UUID
 	DisplayOrder     int32
 	IsDefault        bool
 	Enabled          bool

@@ -51,7 +51,8 @@ function upstreamParts(apiBaseUrl: string): UpstreamParts {
  * 同源反代的路徑對照，只在這裡定義：瀏覽器打的前綴（`source`）對到單體上的路徑前綴（`upstream`）。
  * route handler 的上游網址（`*ProxyTarget`）與 `next.config.ts` 的 rewrites（`apiProxyRewrites`）都由此推出。
  * Connect 不在 /api/v1 底下（lib/connect/transport.ts 的 FIRST_PARTY_CONNECT_PATH），登入流程在單體根目錄的
- * `/api/auth/*`（lib/auth/oauth-start.ts）。
+ * `/api/auth/*`（lib/auth/oauth-start.ts），檔案端點（機敏檔分段上傳與暫存預覽）在單體根目錄的 `/api/files/*`，
+ * 不是 `/api/v1/files`。
  */
 const PROXY_ROUTES = {
 	connect: {
@@ -59,6 +60,7 @@ const PROXY_ROUTES = {
 		upstream: (p: UpstreamParts) => p.rootPath,
 	},
 	auth: { source: "/api/auth", upstream: () => "/api/auth" },
+	files: { source: "/api/files", upstream: () => "/api/files" },
 	api: { source: "/api/v1", upstream: (p: UpstreamParts) => p.apiPath },
 } as const;
 
@@ -98,10 +100,18 @@ export function authProxyTarget(
 	return proxyTarget(PROXY_ROUTES.auth, requestUrl, apiBaseUrl);
 }
 
+/** `/api/files/…`（機敏檔分段上傳、暫存預覽）原路徑，轉到單體根目錄的 `/api/files/…`。 */
+export function filesProxyTarget(
+	requestUrl: string,
+	apiBaseUrl = process.env.API_BASE_URL || DEV_GATEWAY_BASE,
+): string {
+	return proxyTarget(PROXY_ROUTES.files, requestUrl, apiBaseUrl);
+}
+
 /**
  * 本機的 route handler 是不是這個 build 的反代：與 `isLocalApiProxyEnabled` 同一條規則的 build 期版本
  * （`next dev`，或帶 `PLAYWRIGHT_E2E_API_PROXY=1` 的 e2e build；後者執行期再限 loopback）。
- * 是的話 rewrites 不啟用，請求進 `app/api/{connect,auth,v1}`。
+ * 是的話 rewrites 不啟用，請求進 `app/api/{connect,auth,files,v1}`。
  */
 export function isLocalApiProxyBuild(
 	env: Pick<
@@ -113,7 +123,7 @@ export function isLocalApiProxyBuild(
 }
 
 /**
- * 部署環境的同源反代：`rewrites().beforeFiles` 把 `/api/{connect,auth,v1}/*` 轉給單體，單體位址由
+ * 部署環境的同源反代：`rewrites().beforeFiles` 把 `/api/{connect,auth,files,v1}/*` 轉給單體，單體位址由
  * `API_BASE_URL` 推得。本機反代的 build（`isLocalApiProxyBuild`）回空陣列。啟用時 `API_BASE_URL`
  * 必須是絕對的 http(s) 網址，否則丟錯讓 build 失敗。
  */

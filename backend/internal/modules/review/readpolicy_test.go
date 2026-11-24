@@ -98,8 +98,7 @@ var nonPublicReads = map[string]bool{
 	// 內容下架訂閱者（takedowns.sql）：seller 措施同 transaction 鎖評價列核對歸屬，不回內容。
 	"LockReviewsForTakedown": true,
 	// review.review_images 的非公開讀寫：附圖只經已過可讀述詞的評價列取（ListReviewImages 的呼叫端傳入的 ID 來自公開或作者本人的列），
-	// ReviewAssets 是媒體同步 job 讀業務列現況，不對外。
-	"InsertReviewImage": true, "ListReviewImages": true, "ReviewAssets": true,
+	"InsertReviewImage": true, "ListReviewImages": true,
 	// 刪帳清除與 relay（purge.sql）：作者已不是營運中，公開述詞必定排除他的評價；清除要鎖與刪他的全部列，relay 要讀原始列。
 	"LockBuyerReviewBatch": true, "DeleteReviewsByID": true, "ListInactiveBuyersWithReviews": true, "GetReviewByID": true, "IsReviewPublic": true,
 }

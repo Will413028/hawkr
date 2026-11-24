@@ -45,6 +45,11 @@ test("script-src and frame-src allow the Stripe Connect embedded component hosts
 	}
 });
 
+test("script-src allows WebAssembly compile for hash-wasm without unsafe-eval", () => {
+	assert.match(directive("script-src"), / 'wasm-unsafe-eval'(?=[\s;]|$)/);
+	assert.doesNotMatch(directive("script-src"), /'unsafe-eval'/);
+});
+
 test("the Stripe additions do not weaken the policy: no wildcard script host, unsafe-inline stays, no nonce", () => {
 	assert.doesNotMatch(directive("script-src"), /\*\.stripe\.com|nonce-/);
 	assert.match(directive("script-src"), /'unsafe-inline'/);

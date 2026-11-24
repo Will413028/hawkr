@@ -70,6 +70,8 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.CrmCustomerSort(goldenEnum(c.Value, "CUSTOMER_SORT_"))
 	case "crm.CustomerType":
 		return t.CrmCustomerType(goldenEnum(c.Value, "CUSTOMER_TYPE_"))
+	case "media.RejectReason":
+		return t.MediaRejectReason(goldenEnum(c.Value, "REJECT_REASON_"))
 	case "moderation.CommunityReport.outcome_unset":
 		return t.ModerationCommunityReportOutcomeUnset(), true
 	case "moderation.ReportOutcome":

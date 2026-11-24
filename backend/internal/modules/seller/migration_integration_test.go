@@ -1296,7 +1296,7 @@ func TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest(t *
 		must(t, rows.Err())
 		return out
 	}
-	if got := column(`SELECT asset_id FROM seller.kyc_documents`); !slices.Equal(got, []string{"asset-COMPANY_DOCUMENT"}) {
+	if got := column(`SELECT (asset_id = md5('asset-COMPANY_DOCUMENT')::uuid)::text FROM seller.kyc_documents`); !slices.Equal(got, []string{"true"}) {
 		t.Errorf("只剩公司文件：%v", got)
 	}
 	if got := column(`SELECT field FROM seller.kyc_review_issues ORDER BY position`); !slices.Equal(got, []string{"product_type", "business.tax_id"}) {
@@ -1327,10 +1327,10 @@ func TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest(t *
 		t.Errorf("被刪的欄位：%d", n)
 	}
 	// 新形狀：同一申請同一位置只能一張；讀取紀錄帶管理員。
-	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ('0199dddd-0000-7000-8000-000000000001', 0, 'dup', 'secure/d')`); err == nil {
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ('0199dddd-0000-7000-8000-000000000001', 0, uuidv7(), 'secure/d')`); err == nil {
 		t.Error("主鍵是 (申請, 位置)，同位置第二張應該被擋下")
 	}
-	exec(`INSERT INTO seller.kyc_document_accesses (access_id, application_id, admin_id, position, asset_id, accessed_at) VALUES (uuidv7(), '0199dddd-0000-7000-8000-000000000001', 9, 0, 'asset-COMPANY_DOCUMENT', now())`)
+	exec(`INSERT INTO seller.kyc_document_accesses (access_id, application_id, admin_id, position, asset_id, accessed_at) VALUES (uuidv7(), '0199dddd-0000-7000-8000-000000000001', 9, 0, uuidv7(), now())`)
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.kyc_review_issues (issue_id, review_id, position, field, code, message) VALUES (uuidv7(), '0199dddd-0000-7000-8000-000000000002', 9, 'real_name', 'MISSING', 'x')`); err == nil {
 		t.Error("被刪的欄位不能再當退回的欄位")
 	}

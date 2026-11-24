@@ -1,0 +1,211 @@
+{
+ "mutants": [
+  {
+   "id": "no-format-allowlist",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "\tf, err := Detect(d)\n\tif err != nil {\n\t\treturn Result{}, err\n\t}\n\tif f == PNG",
+   "new": "\tf, _ := Detect(d)\n\tvar err error\n\tif f == PNG",
+   "test": "internal/modules/media/internal/image ^TestDecodableButDisallowedFormatIsUnrecognized$",
+   "why": "an unrecognised payload is no longer rejected by the magic-byte allowlist before decoding"
+  },
+  {
+   "id": "no-pixel-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if frame > lim.FramePixels {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestPixelCapIsRejectedFromTheHeader$",
+   "why": "a header declaring more than the pixel cap is not rejected before decoding"
+  },
+  {
+   "id": "no-animated-pixel-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if pages > 1 && frame*int64(pages) > lim.AnimatedPixels {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestAnimatedFramePixelCapIsRejected$",
+   "why": "an animation whose frames x pixels exceeds the cap is accepted"
+  },
+  {
+   "id": "jpeg-keeps-metadata",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "JpegsaveBufferOptions{Q: jpegQuality, Keep: vips.KeepNone}",
+   "new": "JpegsaveBufferOptions{Q: jpegQuality, Keep: vips.KeepAll}",
+   "test": "internal/modules/media/internal/image ^TestSanitizeStripsAllMetadataAndAppliesOrientation$",
+   "why": "re-encoded JPEG keeps EXIF, GPS and ICC metadata"
+  },
+  {
+   "id": "no-autorotate",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "return img.Autorot(nil)",
+   "new": "return error(nil)",
+   "test": "internal/modules/media/internal/image ^TestSanitizeStripsAllMetadataAndAppliesOrientation$",
+   "why": "pixels are not rotated by EXIF orientation although the orientation tag is dropped"
+  },
+  {
+   "id": "no-icc-transform",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if img.HasICCProfile() {\n\t\t\tif err := img.IccTransform",
+   "new": "if false && img.HasICCProfile() {\n\t\t\tif err := img.IccTransform",
+   "test": "internal/modules/media/internal/image ^TestSanitizeConvertsWideGamutToSRGB$",
+   "why": "a wide-gamut image keeps its raw P3 pixel values while the profile is dropped"
+  },
+  {
+   "id": "process-skips-md5-check",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_process.go",
+   "old": "if subtle.ConstantTimeCompare(sum[:], want) != 1 {",
+   "new": "if false && subtle.ConstantTimeCompare(sum[:], want) != 1 {",
+   "test": "internal/modules/media/internal/upload ^TestPublicProcess_RejectsAndWritesNothing$",
+   "why": "the public processor accepts an object whose MD5 differs from the declared one"
+  },
+  {
+   "id": "process-skips-size-check",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_process.go",
+   "old": "if int64(len(data)) != in.DeclaredSize {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/upload ^TestPublicProcess_RejectsAndWritesNothing$",
+   "why": "the public processor accepts an object whose actual size differs from the declared one"
+  },
+  {
+   "id": "process-writes-original-bytes",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/public_process.go",
+   "old": "Body: bytes.NewReader(res.Data), Size: int64(len(res.Data)),",
+   "new": "Body: bytes.NewReader(data), Size: int64(len(data)),",
+   "test": "internal/modules/media ^TestPublicProcess_StripsGPSAppliesOrientationAndCanBeConfirmed$",
+   "why": "public/ receives the original bytes, so GPS metadata is published"
+  },
+  {
+   "id": "upload-size-cap-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_process.go",
+   "old": "if in.DeclaredSize > model.MaxPublicUploadSize {",
+   "new": "if false && in.DeclaredSize > model.MaxPublicUploadSize {",
+   "test": "internal/modules/media/internal/upload ^TestPublicProcess_RefusesDeclaredSizeAboveLimitWithoutReading$",
+   "why": "the public processor reads an object of any declared size into memory"
+  },
+  {
+   "id": "begin-upload-size-cap-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if in.Size > model.MaxPublicUploadSize {",
+   "new": "if false && in.Size > model.MaxPublicUploadSize {",
+   "test": "internal/modules/media/internal/upload ^TestValidateRejectsSizeAboveModuleLimit$",
+   "why": "BeginUpload accepts a declared size above the module limit"
+  },
+  {
+   "id": "encode-failure-is-permanent",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "\tif err != nil {\n\t\treturn fmt.Errorf(\"image: %s: %w\", stage, err)",
+   "new": "\tif err != nil {\n\t\terr = fmt.Errorf(\"%w: %w\", ErrMalformed, err)\n\t\treturn fmt.Errorf(\"image: %s: %w\", stage, err)",
+   "test": "internal/modules/media/internal/image ^TestNonInputFailuresAreNotInputErrors$",
+   "why": "a colour, autorotate or encode failure is classified as a malformed input and rejected permanently instead of retried"
+  },
+  {
+   "id": "decode-failure-not-checked-up-front",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if _, err := img.Avg(); err != nil {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestTruncatedPixelDataIsMalformed$",
+   "why": "truncated pixel data surfaces later as a retryable encode error instead of a permanent malformed input"
+  },
+  {
+   "id": "no-apng-check",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if f == PNG && isAPNG(d) {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestAPNGIsRejectedAsUnrecognized$",
+   "why": "an animated PNG passes as a still image and silently loses its animation"
+  },
+  {
+   "id": "context-ignored",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if err := ctx.Err(); err != nil {",
+   "new": "if err := ctx.Err(); err != nil && false {",
+   "test": "internal/modules/media/internal/image ^TestCancelledContextReturnsContextErrorBeforeWork$",
+   "why": "a cancelled context no longer stops the sanitizer"
+  },
+  {
+   "id": "opaque-alpha-stays-png",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "return m < opaque, nil",
+   "new": "return m < opaque || true, nil",
+   "test": "internal/modules/media/internal/image ^TestOpaqueAlphaChannelBecomesJPEG$",
+   "why": "an opaque image with an alpha band is emitted as a larger PNG instead of JPEG"
+  },
+  {
+   "id": "png-keeps-metadata",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "PngsaveBufferOptions{Keep: vips.KeepNone",
+   "new": "PngsaveBufferOptions{Keep: vips.KeepAll",
+   "test": "internal/modules/media/internal/image ^TestTransparentPNGOutputCarriesNoMetadata$",
+   "why": "re-encoded transparent PNG keeps EXIF and XMP"
+  },
+  {
+   "id": "webp-keeps-metadata",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "WebpsaveBufferOptions{Q: webpQuality, Keep: vips.KeepNone",
+   "new": "WebpsaveBufferOptions{Q: webpQuality, Keep: vips.KeepAll",
+   "test": "internal/modules/media/internal/image ^TestAnimatedWebPOutputCarriesNoMetadata$",
+   "why": "re-encoded animated WebP keeps EXIF and XMP"
+  },
+  {
+   "id": "process-queue-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "opts.Queue = model.ProcessQueue",
+   "new": "opts.Queue = \"\"",
+   "test": "internal/modules/media/internal/upload ^TestProcessJobRunsOnItsOwnQueue$",
+   "why": "the process job falls back to the shared default queue and its concurrency"
+  },
+  {
+   "id": "no-dimension-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if w > lim.MaxDimension || h > lim.MaxDimension {",
+   "new": "if false {",
+   "test": "internal/modules/media/internal/image ^TestDimensionOverJPEGLimitIsRejectedFromTheHeader$",
+   "why": "an image over the JPEG per-side limit is no longer rejected permanently from the header"
+  },
+  {
+   "id": "alpha-unknown-format-guessed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "\treturn 0, fmt.Errorf(\"%w: unsupported alpha band format %d\", ErrProcessing, a.BandFormat())",
+   "new": "\treturn 65535, nil",
+   "test": "internal/modules/media/internal/image ^TestAlphaOpaqueRejectsUnknownBandFormat$",
+   "why": "an unknown alpha band format is silently treated as 16-bit"
+  },
+  {
+   "id": "flatten-stage-merged",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "s.step(stageFlatten, func() error { return img.Flatten(nil) })",
+   "new": "func() error { return img.Flatten(nil) }()",
+   "test": "internal/modules/media/internal/image ^TestNonInputFailuresAreNotInputErrors$",
+   "why": "the flatten step loses its own stage and failure-injection point"
+  },
+  {
+   "id": "queues-drop-process",
+   "stack": "go",
+   "file": "backend/internal/modules/media/module.go",
+   "old": "map[string]int{ProcessQueue: ProcessQueueWorkers}",
+   "new": "map[string]int{}",
+   "test": "internal/modules/media ^TestQueuesIncludesTheProcessQueue$",
+   "why": "the worker role no longer configures the media process queue"
+  }
+ ]
+}

@@ -99,7 +99,7 @@ func build(t *testing.T, withSocial bool) *fixture {
 	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Now: func() time.Time { return f.now }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if withSocial {
 		f.media = media.NewFake()
-		f.media.Key = func(_, token string) string { return "post/" + token + ".jpg" }
+		f.media.Key = func(token string) string { return "post/" + token + ".jpg" }
 		f.sellers = seller.NewReader(d, func() time.Time { return f.now })
 		f.realSocial = social.New(social.Deps{
 			DB: d, Events: f.bus, Media: f.media, Jobs: &queue{}, Stores: f.sellers, StoreBlocks: noStoreBlocks{},

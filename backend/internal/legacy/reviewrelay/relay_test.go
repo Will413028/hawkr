@@ -114,7 +114,7 @@ func newFixture() (*Worker, *fakeReviews, *fakeBuyers, *fakeStores) {
 	r := &fakeReviews{
 		review: review.Review{
 			ID: reviewID, OrderNo: "O1", OrderItemID: 11, BuyerID: 301, StoreID: 91, ProductID: 700, Rating: 5, Content: "很甜",
-			Images: []review.Image{{AssetID: "a1", ObjectKey: "review/1.jpg"}, {AssetID: "a2", ObjectKey: "review/2.jpg"}}, CreatedAt: createdAt,
+			Images: []review.Image{{AssetID: uuid.MustParse("01990000-0000-7000-8000-0000000000b1"), ObjectKey: "review/1.jpg"}, {AssetID: uuid.MustParse("01990000-0000-7000-8000-0000000000b2"), ObjectKey: "review/2.jpg"}}, CreatedAt: createdAt,
 		},
 		product: map[int64]review.ProductStats{700: {Count: 30, Average: 4.9}},
 		store:   map[int64]review.StoreStats{91: {Count: 120, Average: 4.8}},

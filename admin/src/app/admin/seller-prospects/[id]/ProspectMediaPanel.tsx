@@ -14,6 +14,7 @@ import {
 	prospectImageUpdate,
 	SOURCE_URL_MAX_LENGTH,
 } from "@/lib/seller-prospect-media";
+import { uploadFailureText } from "@/services/media-upload";
 import { stageProspectImage } from "@/services/seller-prospect-media";
 import ProspectBrandImage from "../ProspectBrandImage";
 import { prepareProspectImage } from "./prepareProspectImage";
@@ -118,9 +119,9 @@ export default function ProspectMediaPanel({
 			let stagedToken: string;
 			try {
 				stagedToken = await stageProspectImage(selection.file);
-			} catch {
+			} catch (caught) {
 				setMessage("");
-				setError(UPLOAD_FAILED_TEXT);
+				setError(uploadFailureText(caught, UPLOAD_FAILED_TEXT));
 				return;
 			}
 			setMessage("正在儲存品牌圖片…");

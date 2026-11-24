@@ -3,9 +3,13 @@
 package review_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	goimage "image"
+	"image/png"
 	"log/slog"
 	"slices"
 	"strings"
@@ -105,7 +109,7 @@ type fixture struct {
 	sellers *seller.Reader
 	bus     *events.Bus
 	jobs    *queue
-	media   *media.Fake
+	media   *media.Module
 	orders  *orders
 
 	mu      sync.Mutex
@@ -130,17 +134,22 @@ func (f *fixture) advance(d time.Duration) {
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	database := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "review", Dir: review.Migrations()},
 	))
 	f := &fixture{
-		db: database, bus: events.NewBus(), jobs: &queue{}, media: media.NewFake(), orders: &orders{byNo: map[string]review.OrderForReview{}},
+		db: database, bus: events.NewBus(), jobs: &queue{}, orders: &orders{byNo: map[string]review.OrderForReview{}},
 		now: time.Date(2026, 11, 19, 12, 0, 0, 0, time.UTC),
 	}
-	f.media.Key = func(_, token string) string { return "review/" + token + ".jpg" }
 	logger := slog.New(slog.NewTextHandler(&strings.Builder{}, nil))
-	f.buyers = buyer.New(buyer.Deps{DB: database, Events: f.bus, Jobs: f.jobs, Media: f.media, Now: f.clock, Logger: logger})
+	ring, err := media.ParseKeyring("k1:" + base64.StdEncoding.EncodeToString(make([]byte, 32)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.media = media.New(media.Deps{DB: database, Jobs: f.jobs, Store: media.NewMemoryStore(), Keyring: ring, NewID: uuid.NewV7, Now: f.clock, Logger: logger})
+	f.buyers = buyer.New(buyer.Deps{DB: database, Events: f.bus, Media: f.media, Now: f.clock, Logger: logger})
 	f.sellers = seller.NewReader(database, f.clock)
 	f.module = review.New(review.Deps{
 		DB: database, Events: f.bus, Media: f.media, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, Orders: f.orders,
@@ -163,6 +172,37 @@ func setup(t *testing.T) *fixture {
 		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
 		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
+}
+
+// stage 以 b 的帳號為上傳者放 n 張公開 PNG，回傳可 Confirm 的 token 與資產 ID（同順序）。
+func (f *fixture) stage(t *testing.T, b buyer.Profile, n int) ([]string, []uuid.UUID) {
+	t.Helper()
+	var body bytes.Buffer
+	if err := png.Encode(&body, goimage.NewNRGBA(goimage.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	tokens, assets := make([]string, n), make([]uuid.UUID, n)
+	for i := range n {
+		put, err := f.media.PutPublic(context.Background(), media.Uploader{ID: b.AccountID}, bytes.NewReader(body.Bytes()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		tokens[i] = put.Token
+		if err := f.db.Conn(context.Background()).QueryRow(context.Background(),
+			"SELECT asset_id FROM media.staged_uploads WHERE token_hash = sha256($1::bytea)", put.Token).Scan(&assets[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return tokens, assets
+}
+
+func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
+	t.Helper()
+	st, err := media.AssetStateOf(context.Background(), f.db, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(st)
 }
 
 func (f *fixture) exec(t *testing.T, sql string, args ...any) {
@@ -188,7 +228,7 @@ func (f *fixture) exposableStore(t *testing.T) int64 {
 	t.Helper()
 	accountID := f.next()
 	f.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $2, '測試店', 'logo/k', 'logo-asset', '63000010', $3, $3)`, accountID, accountID, f.clock())
+		VALUES ($1, $2, '測試店', 'logo/k', $4, '63000010', $3, $3)`, accountID, accountID, f.clock(), uuid.NewV7())
 	storeID := f.scalar(t, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID)
 	f.exec(t, `INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, f.clock(), uuid.NewV7())

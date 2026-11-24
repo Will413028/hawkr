@@ -1,0 +1,112 @@
+{
+  "mutants": [
+    {
+      "id": "chunk-no-read-deadline",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "time.Now().Add(h.readTimeout)",
+      "new": "time.Time{}",
+      "test": "internal/httpapi/media ^TestChunkSlowBodyTimesOut$",
+      "why": "拿掉每個段請求讀 body 的時限：慢速 body 不會被切斷，不再回 408"
+    },
+    {
+      "id": "chunk-no-max-bytes-reader",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "body := &originReader{r: http.MaxBytesReader(w, r.Body, media.SecureChunkSize)}",
+      "new": "body := &originReader{r: r.Body}",
+      "test": "internal/httpapi/media ^TestChunkOverSegmentSizeIsRejected$",
+      "why": "拿掉段大小的 body 上限：超過段大小的請求被模組整份讀完，不回 413"
+    },
+    {
+      "id": "chunk-no-content-length-limit",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "if r.ContentLength > media.SecureChunkSize {",
+      "new": "if false {",
+      "test": "internal/httpapi/media ^TestChunkDeclaredLengthOverSegmentSizeIs413$",
+      "why": "拿掉宣告長度的上限檢查：超過段大小的請求進了模組才被讀取上限擋下，模組已被呼叫"
+    },
+    {
+      "id": "chunk-no-next-index-header",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "w.Header().Set(NextIndexHeader, next)\n",
+      "new": "_ = next\n",
+      "test": "internal/httpapi/media ^TestChunkIndexMismatchIs409WithNextIndex$",
+      "why": "index 不符的 409 不帶 Hawkr-Next-Index：client 無法依下一個序號續傳"
+    },
+    {
+      "id": "proxy-no-files-route",
+      "stack": "website",
+      "file": "website/lib/api/local-proxy.ts",
+      "old": "\tfiles: { source: \"/api/files\", upstream: () => \"/api/files\" },\n",
+      "new": "",
+      "test": "lib/api/local-proxy.unit.test.ts targets the monolith root /api/files, not /api/v1/files",
+      "why": "PROXY_ROUTES 拿掉 files：/api/files 不再轉到單體根目錄，段上傳打不到單體"
+    },
+    {
+      "id": "chunk-index-non-canonical",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": " || strconv.Itoa(index) != rawIndex",
+      "new": "",
+      "test": "internal/httpapi/media ^TestChunkNonCanonicalIndexIs404$",
+      "why": "index 不要求標準十進位寫法：+1、01 被當成合法序號"
+    },
+    {
+      "id": "chunk-client-abort-is-500",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "case isClientAbort(r, err):",
+      "new": "case false:",
+      "test": "internal/httpapi/media ^TestChunkClientAbortIs400WithoutErrorLog$",
+      "why": "client 中途斷線不再回 400：變成 500 並記 error log"
+    },
+    {
+      "id": "preview-ignore-peek-error",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "if err != nil && !errors.Is(err, io.EOF) {",
+      "new": "if false {",
+      "test": "internal/httpapi/media ^TestPreviewFirstSegmentFailureIsNot200$",
+      "why": "預覽讀第一段失敗被忽略：回 200 而不是錯誤狀態"
+    },
+    {
+      "id": "preview-no-abort-on-copy-error",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "\t\tpanic(http.ErrAbortHandler)\n",
+      "new": "",
+      "test": "internal/httpapi/media ^TestPreviewMidStreamFailureAbortsResponse$",
+      "why": "預覽送出中途失敗後不中止連線：client 收到被截斷的 200 當成完整檔案"
+    },
+    {
+      "id": "begin-secure-no-keyring-internal",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/app.go",
+      "old": "if errors.Is(err, media.ErrNoKeyring) {",
+      "new": "if errors.Is(err, media.ErrNoKeyring) && false {",
+      "test": "internal/httpapi/media ^TestBeginSecureUploadWithoutKeyringIsUnavailable$",
+      "why": "BeginSecureUpload 的 ErrNoKeyring 不轉成 unavailable：變成 internal"
+    },
+    {
+      "id": "chunk-abort-ignores-body-origin",
+      "stack": "go",
+      "file": "backend/internal/httpapi/media/secure_files.go",
+      "old": "return r.Context().Err() != nil || errors.As(err, &be)",
+      "new": "return errors.As(err, &be) || true",
+      "test": "internal/httpapi/media ^(TestChunkStorageWriteErrorIs500WithErrorLog|TestPreviewStorageResetIs500WithErrorLog)$",
+      "why": "client 斷線的判斷不看錯誤來源：儲存寫入或讀取的錯誤被當成 client 斷線，回 400 且不記 error"
+    },
+    {
+      "id": "tracing-token-not-redacted",
+      "stack": "go",
+      "file": "backend/internal/httpapi/server.go",
+      "old": "if red, ok := redactedTokenPath(r.URL.Path); ok {",
+      "new": "if red, ok := \"\", false; ok {",
+      "test": "internal/httpapi ^TestTracingRedactsSecureUploadToken$",
+      "why": "span 不遮 token：暫存 token 出現在 url.path 屬性"
+    }
+  ]
+}

@@ -60,8 +60,8 @@
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
    "old": "\tif cur.Version != in.Version {\n\t\treturn model.AdminStyle{}, styleStale(ctx)\n\t}\n",
    "new": "",
-   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleStaleVersionIsRejectedBeforeFinalizingTheThumbnail$",
-   "why": "拿掉修改前的 etag 比對：過期的 etag 仍先轉正縮圖"
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleStaleVersionIsRejectedBeforeConfirmingTheThumbnail$",
+   "why": "拿掉修改前的 etag 比對：過期的 etag 仍先 Confirm 縮圖"
   },
   {
    "id": "no-delete-etag-check",
@@ -76,28 +76,28 @@
    "id": "no-replace-sync",
    "stack": "go",
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
-   "old": "\t\t\tif err := s.d.Thumbs.Changed(ctx, now, in.ID, retired...); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
-   "new": "\t\t\t_ = retired\n",
-   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleReplacingTheThumbnailRetiresTheOldAsset$",
-   "why": "換縮圖不記退場也不排同步：舊縮圖的引用不會釋放"
+   "old": "\t\t\tif err := s.d.Media.MarkDeleted(ctx, media.RetiredAssets(media.AssetIDs(old.ThumbnailAssetID), media.AssetIDs(newAsset))); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestUpdateStyleReplacingTheThumbnailMarksTheOldAssetDeleted$",
+   "why": "換縮圖不把舊縮圖標記刪除：舊資產永遠留著"
   },
   {
    "id": "no-replace-sync-db",
    "stack": "go-integration",
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
-   "old": "\t\t\tif err := s.d.Thumbs.Changed(ctx, now, in.ID, retired...); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
-   "new": "\t\t\t_ = retired\n",
-   "test": "internal/modules/imageai ^TestThumbnailIsFinalizedAndLinkedByTheSyncJobAndReleasedOnReplaceAndDelete$",
-   "why": "換縮圖不排同步：新圖不會 Link、舊圖不會 Unlink"
+   "old": "\t\t\tif err := s.d.Media.MarkDeleted(ctx, media.RetiredAssets(media.AssetIDs(old.ThumbnailAssetID), media.AssetIDs(newAsset))); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai ^TestThumbnailIsConfirmedInTheWriteAndTheReplacedOrDeletedAssetIsMarkedDeleted$",
+   "why": "換縮圖不在同一個 transaction 標記舊資產刪除"
   },
   {
    "id": "no-delete-release",
    "stack": "go",
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
-   "old": "\t\tif err := s.d.Thumbs.Changed(ctx, now, id, retired...); err != nil {\n\t\t\treturn err\n\t\t}\n",
-   "new": "\t\t_, _ = now, retired\n",
-   "test": "internal/modules/imageai/internal/admin ^TestDeleteStyleReleasesTheThumbnailAndAudits$",
-   "why": "刪除風格不釋放縮圖引用"
+   "old": "\t\tif err := s.d.Media.MarkDeleted(ctx, media.RetiredAssets(media.AssetIDs(old.ThumbnailAssetID), nil)); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/imageai/internal/admin ^TestDeleteStyleMarksTheThumbnailDeletedAndAudits$",
+   "why": "刪除風格不把縮圖標記刪除"
   },
   {
    "id": "prompt-limit-removed",
@@ -105,7 +105,7 @@
    "file": "backend/internal/modules/imageai/internal/admin/style.go",
    "old": "n == 0 || n > model.MaxPromptRunes {",
    "new": "n == 0 || n > model.MaxPromptRunes+1000 {",
-   "test": "internal/modules/imageai/internal/admin ^TestCreateStyleRejectsInvalidInputWithoutFinalizingTheThumbnail$",
+   "test": "internal/modules/imageai/internal/admin ^TestCreateStyleRejectsInvalidInputWithoutConfirmingTheThumbnail$",
    "why": "放寬提示詞的 500 字元上限"
   },
   {

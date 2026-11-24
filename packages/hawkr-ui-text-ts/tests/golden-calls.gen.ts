@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, notificationNotificationCategory, notificationNotificationChannel, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, mediaRejectReason, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, notificationNotificationCategory, notificationNotificationChannel, paymentPaymentAccountStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -52,6 +52,12 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_NORMAL": 1,
 	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_UNSPECIFIED": 0,
 	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_VIP": 2,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH": 3,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_EXPIRED": 5,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_PROCESSING_FAILED": 4,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_SIZE_MISMATCH": 2,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT": 1,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNSPECIFIED": 0,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": 3,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED": 0,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION": 2,
@@ -307,6 +313,9 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "crm.CustomerType": {
 		return crmCustomerType(num("hawkr.crm.v1alpha1.CustomerType", c.value));
+	}
+	case "media.RejectReason": {
+		return mediaRejectReason(num("hawkr.media.v1alpha1.RejectReason", c.value));
 	}
 	case "moderation.CommunityReport.outcome_unset": {
 		return moderationCommunityReportOutcomeUnset();

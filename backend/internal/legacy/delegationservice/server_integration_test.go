@@ -179,7 +179,7 @@ func TestPreflightCreateAndTheWorkspace(t *testing.T) {
 	// 還沒開通：allowed=false 加業務碼，回應本身成功（code 0）；選項與能力仍然非空。
 	pre, err := f.client.Preflight(ctx, connect.NewRequest(&pb.PreflightRequest{ActorAdminId: admin, TargetStoreId: store}))
 	if err != nil || pre.Msg.GetCode() != 0 || pre.Msg.GetData().GetAllowed() || pre.Msg.GetData().GetDeniedCode() != 9286 ||
-		len(pre.Msg.GetData().GetReasonOptions()) != 3 || len(pre.Msg.GetData().GetCapabilities()) != 9 {
+		len(pre.Msg.GetData().GetReasonOptions()) != 3 || len(pre.Msg.GetData().GetCapabilities()) != 10 {
 		t.Fatalf("preflight = %v, %v", pre, err)
 	}
 	g, err := f.client.GrantDelegationAuthorization(ctx, connect.NewRequest(&pb.GrantDelegationAuthorizationRequest{

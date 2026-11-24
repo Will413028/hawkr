@@ -190,7 +190,7 @@ func (s *Service) Snapshot(ctx context.Context, t model.Target) (model.ContentSn
 		}
 		out.Body, out.AuthoredAt, out.PostID = r.Body, r.AuthoredAt, t.ID
 		if r.ImageAssetID != nil {
-			out.MediaRefs = append(out.MediaRefs, *r.ImageAssetID)
+			out.MediaRefs = append(out.MediaRefs, r.ImageAssetID.String())
 		}
 	default:
 		return model.ContentSnapshot{}, apperr.InvalidInputOn([]string{"Target"}, "%s", text.HideTargetKindInvalid())

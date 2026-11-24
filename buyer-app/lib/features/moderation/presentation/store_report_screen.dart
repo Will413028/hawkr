@@ -13,6 +13,7 @@ import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../../../core/exceptions/app_exception.dart';
 import '../../../core/l10n/ui_locale.dart';
 import '../../../core/networking/suspension_signal.dart';
 import '../../../shared/widgets/common_snackbar.dart';
@@ -100,7 +101,9 @@ class _StoreReportScreenState extends ConsumerState<StoreReportScreen> {
       if (isAccountSuspendedError(e)) return;
       showFloatingToast(
         context,
-        errorText(e, defaults: ref.read(defaultErrorTextProvider)),
+        e is AppException
+            ? e.message
+            : errorText(e, defaults: ref.read(defaultErrorTextProvider)),
         isSuccess: false,
       );
     }

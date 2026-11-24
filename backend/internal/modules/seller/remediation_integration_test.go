@@ -13,6 +13,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -49,17 +50,19 @@ func (f *fixture) sellerView(t *testing.T, accountID int64, id uuid.UUID) Measur
 	return m
 }
 
-func (f *fixture) remediationInput(t *testing.T, accountID int64, id uuid.UUID, reason string, tokens ...string) RequestRemediationInput {
+// remediationInput 是請求解除的輸入；每個 name 放一份機敏佐證（內容是 evidencePDF(name)，上傳者是這個帳號）。
+func (f *fixture) remediationInput(t *testing.T, accountID int64, id uuid.UUID, reason string, names ...string) RequestRemediationInput {
 	t.Helper()
 	return RequestRemediationInput{
-		AccountID: accountID, MeasureID: id, ExpectedVersion: f.sellerView(t, accountID, id).SellerVersion(), Reason: reason, EvidenceTokens: tokens,
+		AccountID: accountID, MeasureID: id, ExpectedVersion: f.sellerView(t, accountID, id).SellerVersion(), Reason: reason,
+		EvidenceTokens: f.evidence(t, media.Uploader{ID: accountID}, names...),
 	}
 }
 
 // remediate 以賣家讀到的版本請求解除，回傳後台看到的措施。
-func (f *fixture) remediate(t *testing.T, accountID int64, id uuid.UUID, reason string, tokens ...string) Measure {
+func (f *fixture) remediate(t *testing.T, accountID int64, id uuid.UUID, reason string, names ...string) Measure {
 	t.Helper()
-	_, err := f.module.RequestRemediation(context.Background(), f.remediationInput(t, accountID, id, reason, tokens...))
+	_, err := f.module.RequestRemediation(context.Background(), f.remediationInput(t, accountID, id, reason, names...))
 	must(t, err)
 	return f.measureOf(t, id)
 }

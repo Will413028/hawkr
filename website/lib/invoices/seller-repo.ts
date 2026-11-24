@@ -423,22 +423,6 @@ function normalizeExtensionRequest(
 	return { requestedAt, reason: str(raw.reason) };
 }
 
-/**
- * 稅籍證明文件的下載連結。
- *
- * ⚠️ 58A §S02 的欄位表寫的是 DTO 上的 `fileDownloadPath`，但 gateway 的
- * `TaxDocumentInfo` 給的是 `fileAssetId`——路徑由前端組，形狀與
- * `gateway/internal/handler/certification.go` 的 `secure_download` 完全一致
- * （帶既有 cookie 直開）。已回報衝突，未自行改規格。
- *
- * `fileAssetId` 為空（草稿剛上傳、後端尚未換發）時回空字串 ⇒ 那一列不渲染連結，
- * 點下去必定 404（S02 的「已上傳未存草稿」態）。
- */
-export function sellerTaxDocumentHref(document: SellerTaxDocument): string {
-	if (!document.fileAssetId) return "";
-	return `/api/v1/app/media/secure_download/${encodeURIComponent(document.fileAssetId)}`;
-}
-
 /* ===== 端點 30 ===== */
 
 /** 端點 30 的 query。全部走 URL query，值域見 §S06 的表。 */
@@ -1052,20 +1036,6 @@ export async function confirmSellerReceiptAuthorization(args: {
 		},
 	);
 	return normalizeReceiptAuthorization(env.data);
-}
-
-/**
- * 核定依據文件的下載路徑（我方**授權下載通道**，瀏覽器帶既有 cookie）。
- *
- * 🔴 **不是公開 CDN URL**：核定文件是該賣家的國稅局文件，屬機敏檔。
- * 形狀與 `sellerTaxDocumentHref` 一致，兩者是同一條通道。
- *
- * ⚠️ 呼叫端必須先看 `approvalBasisAvailable`：這支函式只負責組字串，它組得出
- * 一個賣家其實無權下載的路徑。
- */
-export function receiptApprovalBasisHref(assetId: string): string {
-	if (!assetId) return "";
-	return `/api/v1/app/media/secure_download/${encodeURIComponent(assetId)}`;
 }
 
 function normalizeReceiptAuthorization(

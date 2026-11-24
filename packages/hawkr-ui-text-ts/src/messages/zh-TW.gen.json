@@ -92,6 +92,15 @@
       "CUSTOMER_TYPE_VIP": "VIP"
     }
   },
+  "media": {
+    "RejectReason": {
+      "REJECT_REASON_CHECKSUM_MISMATCH": "檔案在上傳過程中損毀，請重新上傳。",
+      "REJECT_REASON_EXPIRED": "上傳已逾時，請重新上傳。",
+      "REJECT_REASON_PROCESSING_FAILED": "檔案處理失敗，請換一張圖片再試。",
+      "REJECT_REASON_SIZE_MISMATCH": "檔案大小與宣告的不一致，請重新上傳。",
+      "REJECT_REASON_UNRECOGNIZED_FORMAT": "無法辨識檔案格式，請改用 JPEG、PNG、WebP 或 GIF 圖片。"
+    }
+  },
   "moderation": {
     "CommunityReport": {
       "outcome_unset": "審核中"

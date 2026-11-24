@@ -73,8 +73,6 @@ services:
       PAYMENT_SERVICE_PORT: 9924
       SHIPPING_SERVICE_HOST: shipping-service
       SHIPPING_SERVICE_GRPC_PORT: 9931
-      MEDIA_SERVICE_HOST: media-service
-      MEDIA_SERVICE_PORT: 9936
       # 圖片 objectKey → 顯示 URL 的域名唯一來源（49 號 §6.1）；Gateway 組 {語意}Url 欄位
       MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
       AI_SERVICE_HOST: ai-service
@@ -180,8 +178,7 @@ services:
         order-service=http://order-service:9914/actuator/health,
         aftersales-service=http://aftersales-service:9922/actuator/health,
         payment-service=http://payment-service:9924/actuator/health,
-        shipping-service=http://shipping-service:9930/actuator/health,
-        media-service=http://media-service:9936/health
+        shipping-service=http://shipping-service:9930/actuator/health
 
     volumes:
       - ./gateway:/app/gateway

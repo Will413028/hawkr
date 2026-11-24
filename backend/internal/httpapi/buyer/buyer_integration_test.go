@@ -188,7 +188,7 @@ func setup(t *testing.T) *fixture {
 	if _, err := d.Pool().Exec(ctx, `ALTER TABLE buyer.buyers ALTER COLUMN buyer_id RESTART WITH 5000`); err != nil {
 		t.Fatal(err)
 	}
-	m := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	m := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	events.Subscribe(bus, m.OnAccountCreated)
 	_, buyerToken, err := id.DevNewSession(ctx)
 	if err != nil {
@@ -209,7 +209,7 @@ func setup(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	kycMAC := sealtest.MAC(t)
-	sellerModule := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: noMedia{}, Orders: s, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
+	sellerModule := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: media.NewFake(), Orders: s, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
 	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, ImageAI: &imageai.Module{}, Social: &social.Module{}, Ready: d.Ping, Buyer: m, Seller: sellerModule, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, BuyerPorts: httpbuyer.Ports{Products: s, Stores: stores, Orders: s, CRM: s}, Deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: m, Seller: sellerModule, Identity: id, Orders: s, Now: time.Now}), Identity: id, Delegation: delegation.New(delegation.Deps{DB: d, Identity: id, Seller: sellerModule, Social: &social.Module{}, Now: time.Now, Logger: log}), Images: images, Logger: log})
 	if err != nil {
 		t.Fatal(err)
@@ -235,14 +235,6 @@ func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, erro
 type noProducts struct{}
 
 func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
-
-type noMedia struct{}
-
-func (noMedia) Finalize(context.Context, media.Uploader, string, string) (media.Asset, error) {
-	return media.Asset{}, errors.New("not used")
-}
-func (noMedia) Link(context.Context, media.Ref, []string) error   { return nil }
-func (noMedia) Unlink(context.Context, media.Ref, []string) error { return nil }
 
 func wantCode(t *testing.T, err error, code connect.Code, reason string) string {
 	t.Helper()
@@ -757,9 +749,4 @@ func TestFollowStoreRejectsAStoreThatIsNotPubliclyExposable(t *testing.T) {
 	if err != nil || len(follows.Msg.GetFollows()) != 0 {
 		t.Fatalf("follows=%v err=%v", follows, err)
 	}
-}
-
-// ReadSecure 實作 media.Media；這些測試不讀機敏資產。
-func (noMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
 }

@@ -18,7 +18,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
@@ -35,7 +34,7 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
-	Media  media.Media
+	Media  model.Media
 	// Identity 只在登記主管機關來函時驗證被指名的帳號存在。
 	Identity Accounts
 	Now      func() time.Time

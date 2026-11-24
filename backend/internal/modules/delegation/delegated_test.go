@@ -553,3 +553,42 @@ func TestPostWriteSubscribersMapEachEventKindToItsAuditActionAndCapability(t *te
 		})
 	}
 }
+
+var mediaUploadMethod = DelegatedMethod{Capability: CapabilityMediaUpload, Action: AuditMediaUpload, Resource: ResourceMedia}
+
+// 缺 media.upload 的代行被拒絕並寫一列 FAILED（動作 MEDIA_UPLOAD、資源 MEDIA）；上傳不執行。有能力時放行、成功的上傳不寫任何稽核（B1-D16）。
+func TestMediaUploadNeedsItsCapabilityAndLeavesNoSuccessAudit(t *testing.T) {
+	for name, caps := range map[string][]Capability{
+		"只有貼文與店面能力": {CapabilityPostsWrite, CapabilityStorefrontWrite},
+		"只有讀取":      {CapabilityPostsRead, CapabilityStorefrontRead, CapabilityProductsRead},
+	} {
+		rec := &recorder{}
+		err := newTestModule(rec, fixedSeller{store: openStore()}).AuthorizeDelegated(t.Context(), caller(DelegationActive, mediaUploadMethod, caps...))
+		if denialOf(t, err) != DenialCapabilityDenied {
+			t.Errorf("%s：%v，預期 DenialCapabilityDenied", name, err)
+		}
+		if len(rec.got) != 1 || rec.got[0].Action != AuditMediaUpload || rec.got[0].ResourceType != ResourceMedia || rec.got[0].Capability != CapabilityMediaUpload {
+			t.Errorf("%s：FAILED 紀錄 = %+v", name, rec.got)
+		}
+		rec = &recorder{}
+		ran := false
+		err = newTestModule(rec, fixedSeller{store: openStore()}).DelegatedRead(t.Context(), caller(DelegationActive, mediaUploadMethod, caps...),
+			func(context.Context, seller.Store) error { ran = true; return nil })
+		if denialOf(t, err) != DenialCapabilityDenied || ran || len(rec.got) != 1 {
+			t.Errorf("%s：DelegatedRead err=%v 執行=%v FAILED=%d，預期被拒、不執行、1 列 FAILED", name, err, ran, len(rec.got))
+		}
+	}
+	rec := &recorder{}
+	m := newTestModule(rec, fixedSeller{store: openStore()})
+	c := caller(DelegationActive, mediaUploadMethod, CapabilityMediaUpload)
+	ran := false
+	if err := m.AuthorizeDelegated(t.Context(), c); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.DelegatedRead(t.Context(), c, func(_ context.Context, st seller.Store) error { ran = st.StoreID == 5; return nil }); err != nil || !ran {
+		t.Fatalf("有能力的上傳：err=%v 執行=%v", err, ran)
+	}
+	if len(rec.got) != 0 || len(rec.recorded) != 0 {
+		t.Fatalf("成功的上傳不該有稽核：FAILED=%d 成功=%d", len(rec.got), len(rec.recorded))
+	}
+}

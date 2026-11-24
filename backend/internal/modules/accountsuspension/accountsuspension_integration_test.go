@@ -51,17 +51,6 @@ type noProducts struct{}
 
 func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
 
-type testMedia struct{}
-
-func (testMedia) Finalize(context.Context, media.Uploader, string, string) (media.Asset, error) {
-	return media.Asset{}, errors.New("not used")
-}
-func (testMedia) Link(context.Context, media.Ref, []string) error   { return nil }
-func (testMedia) Unlink(context.Context, media.Ref, []string) error { return nil }
-func (testMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
-}
-
 type noOrders struct{}
 
 func (noOrders) HasOpenOrders(context.Context, int64) (bool, error)      { return false, nil }
@@ -92,9 +81,9 @@ func setup(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	q := testQueue{}
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Now: time.Now, Logger: log})
+	b := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	kycMAC := sealtest.MAC(t)
-	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: q, Identity: id, Media: testMedia{}, Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: q, Now: time.Now, Logger: log})})
+	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: q, Now: time.Now, Logger: log})})
 	f := &fixture{
 		db: d, identity: id, buyer: b, seller: sl,
 		deletion: accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: b, Seller: sl, Orders: noOrders{}, Now: time.Now}),

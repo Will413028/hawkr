@@ -14,8 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$UploadResult {
 
-/// 可讀的圖片預覽 URL
- String get previewUrl;/// 暫存 Token，用於後端建立/更新資源時傳遞
+/// 暫存 Token，用於後端建立/更新資源時傳遞
  String get stagedToken;
 /// Create a copy of UploadResult
 /// with the given fields replaced by the non-null parameter values.
@@ -27,16 +26,16 @@ $UploadResultCopyWith<UploadResult> get copyWith => _$UploadResultCopyWithImpl<U
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UploadResult&&(identical(other.previewUrl, previewUrl) || other.previewUrl == previewUrl)&&(identical(other.stagedToken, stagedToken) || other.stagedToken == stagedToken));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UploadResult&&(identical(other.stagedToken, stagedToken) || other.stagedToken == stagedToken));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,previewUrl,stagedToken);
+int get hashCode => Object.hash(runtimeType,stagedToken);
 
 @override
 String toString() {
-  return 'UploadResult(previewUrl: $previewUrl, stagedToken: $stagedToken)';
+  return 'UploadResult(stagedToken: $stagedToken)';
 }
 
 
@@ -47,7 +46,7 @@ abstract mixin class $UploadResultCopyWith<$Res>  {
   factory $UploadResultCopyWith(UploadResult value, $Res Function(UploadResult) _then) = _$UploadResultCopyWithImpl;
 @useResult
 $Res call({
- String previewUrl, String stagedToken
+ String stagedToken
 });
 
 
@@ -64,10 +63,9 @@ class _$UploadResultCopyWithImpl<$Res>
 
 /// Create a copy of UploadResult
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? previewUrl = null,Object? stagedToken = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? stagedToken = null,}) {
   return _then(_self.copyWith(
-previewUrl: null == previewUrl ? _self.previewUrl : previewUrl // ignore: cast_nullable_to_non_nullable
-as String,stagedToken: null == stagedToken ? _self.stagedToken : stagedToken // ignore: cast_nullable_to_non_nullable
+stagedToken: null == stagedToken ? _self.stagedToken : stagedToken // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }
@@ -153,10 +151,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String previewUrl,  String stagedToken)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String stagedToken)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UploadResult() when $default != null:
-return $default(_that.previewUrl,_that.stagedToken);case _:
+return $default(_that.stagedToken);case _:
   return orElse();
 
 }
@@ -174,10 +172,10 @@ return $default(_that.previewUrl,_that.stagedToken);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String previewUrl,  String stagedToken)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String stagedToken)  $default,) {final _that = this;
 switch (_that) {
 case _UploadResult():
-return $default(_that.previewUrl,_that.stagedToken);case _:
+return $default(_that.stagedToken);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -194,10 +192,10 @@ return $default(_that.previewUrl,_that.stagedToken);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String previewUrl,  String stagedToken)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String stagedToken)?  $default,) {final _that = this;
 switch (_that) {
 case _UploadResult() when $default != null:
-return $default(_that.previewUrl,_that.stagedToken);case _:
+return $default(_that.stagedToken);case _:
   return null;
 
 }
@@ -209,11 +207,9 @@ return $default(_that.previewUrl,_that.stagedToken);case _:
 
 
 class _UploadResult implements UploadResult {
-  const _UploadResult({required this.previewUrl, required this.stagedToken});
+  const _UploadResult({required this.stagedToken});
   
 
-/// 可讀的圖片預覽 URL
-@override final  String previewUrl;
 /// 暫存 Token，用於後端建立/更新資源時傳遞
 @override final  String stagedToken;
 
@@ -227,16 +223,16 @@ _$UploadResultCopyWith<_UploadResult> get copyWith => __$UploadResultCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UploadResult&&(identical(other.previewUrl, previewUrl) || other.previewUrl == previewUrl)&&(identical(other.stagedToken, stagedToken) || other.stagedToken == stagedToken));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UploadResult&&(identical(other.stagedToken, stagedToken) || other.stagedToken == stagedToken));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,previewUrl,stagedToken);
+int get hashCode => Object.hash(runtimeType,stagedToken);
 
 @override
 String toString() {
-  return 'UploadResult(previewUrl: $previewUrl, stagedToken: $stagedToken)';
+  return 'UploadResult(stagedToken: $stagedToken)';
 }
 
 
@@ -247,7 +243,7 @@ abstract mixin class _$UploadResultCopyWith<$Res> implements $UploadResultCopyWi
   factory _$UploadResultCopyWith(_UploadResult value, $Res Function(_UploadResult) _then) = __$UploadResultCopyWithImpl;
 @override @useResult
 $Res call({
- String previewUrl, String stagedToken
+ String stagedToken
 });
 
 
@@ -264,10 +260,9 @@ class __$UploadResultCopyWithImpl<$Res>
 
 /// Create a copy of UploadResult
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? previewUrl = null,Object? stagedToken = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? stagedToken = null,}) {
   return _then(_UploadResult(
-previewUrl: null == previewUrl ? _self.previewUrl : previewUrl // ignore: cast_nullable_to_non_nullable
-as String,stagedToken: null == stagedToken ? _self.stagedToken : stagedToken // ignore: cast_nullable_to_non_nullable
+stagedToken: null == stagedToken ? _self.stagedToken : stagedToken // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }

@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_seller/features/chat/presentation/chat_send_error_dispatch.dart';
 
+import 'package:hawkr_seller/core/exceptions/app_exception.dart';
+
 import '../../support/connect_errors.dart';
 
 String _defaults(Code c) => 'default:${c.name}';
@@ -34,5 +36,14 @@ void main() {
     );
     expect(f.readOnly, isFalse);
     expect(f.message, '內容未通過');
+  });
+
+  test('an upload rejection keeps its own text without read-only', () {
+    final f = classifyChatSendError(
+      const UploadRejectedException(message: '圖片不符規定'),
+      defaults: _defaults,
+    );
+    expect(f.readOnly, isFalse);
+    expect(f.message, '圖片不符規定');
   });
 }

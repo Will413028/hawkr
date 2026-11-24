@@ -262,8 +262,8 @@ func TestListDelegationCapabilities_Catalog(t *testing.T) {
 	if err := json.Unmarshal(data, &out); err != nil {
 		t.Fatalf("data 解析失敗：%v", err)
 	}
-	if len(out.Capabilities) != 9 {
-		t.Fatalf("目錄應有 9 個能力，實得 %d", len(out.Capabilities))
+	if len(out.Capabilities) != 10 {
+		t.Fatalf("目錄應有 10 個能力，實得 %d", len(out.Capabilities))
 	}
 
 	byValue := map[string]DelegationCapabilityDescriptor{}
@@ -278,6 +278,9 @@ func TestListDelegationCapabilities_Catalog(t *testing.T) {
 	}
 	if got := byValue["orders.read"]; got.Risk != "high" {
 		t.Errorf("orders.read 必須是 high（唯讀但每次揭露都落 PII 稽核），實際 %q", got.Risk)
+	}
+	if got := byValue["media.upload"]; got.Risk != "low" || len(got.DependsOn) != 0 {
+		t.Errorf("media.upload 必須是 low 且無依賴，實際 %+v", got)
 	}
 	// 無依賴者序列化成 []，不是 null。
 	if !strings.Contains(string(data), `"value":"orders.read","risk":"high","dependsOn":[]`) {

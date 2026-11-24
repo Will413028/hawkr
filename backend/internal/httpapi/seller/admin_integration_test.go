@@ -50,7 +50,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -119,8 +118,8 @@ type adminFixture struct {
 	customerToken     string
 	// otherAdminToken 是另一位管理員的 token（授權是一位管理員的，不能互相借用）。
 	otherAdminToken string
-	// media 是證件圖片的替身（機敏讀取只有 (object_key, ref_type, ref_id) 全等讀得到）。
-	media *media.Fake
+	// media 是 seller 模組的 media 替身（機敏讀取只讀 put 放進來的內容）。
+	media *stagedMedia
 	// registry 是模組的登記資料來源（公司型申請送件時的查詢快照）的替身：回應照順序消耗，沒有排定的是查無。
 	registry *moduleRegistry
 	// skew 讓模組的時鐘往前走（不 sleep）：授權過期的測試用。
@@ -149,23 +148,21 @@ func setupAdmin(t *testing.T) *adminFixture {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	// 與正式組裝相同：買家在建帳的 transaction 內由 AccountCreated 建立。
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	orders := &adminOrders{}
 	kycMAC := sealtest.MAC(t)
-	// 轉正回以 token 命名的資產（asset-<token>），object key 是 <ref_type>/<token>。
-	mediaFake := media.NewFake()
-	mediaFake.Key = func(refType, token string) string { return refType + "/" + token }
+	sellerMedia := newStagedMedia()
 	m := seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: queue, Identity: id, Media: mediaFake, Orders: orders, KYCMAC: kycMAC,
+		DB: d, Events: bus, Jobs: queue, Identity: id, Media: sellerMedia, Orders: orders, KYCMAC: kycMAC,
 		ProductStores: noProducts{}, Registry: f.registry, Now: f.now, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: f.now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: m, Orders: orders, Now: time.Now, Logger: log})
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: m, Now: time.Now, Logger: log}
 	socialModule := social.New(social.Deps{
-		DB: d, Events: bus, Media: mediaFake, Jobs: queue, Buyers: buyers, Stores: m, StoreBlocks: m, NewID: uuid.NewV7, Now: f.now, Logger: log,
+		DB: d, Events: bus, Media: sellerMedia, Jobs: queue, Buyers: buyers, Stores: m, StoreBlocks: m, NewID: uuid.NewV7, Now: f.now, Logger: log,
 		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: delegation.NewScheduleAuthorizer(delegationDeps)},
 	})
 	delegationDeps.Social = socialModule
@@ -206,7 +203,7 @@ func setupAdmin(t *testing.T) *adminFixture {
 	}
 	characterize.GrantAdminOwner(t, id, adminToken)
 	characterize.GrantAdminOwner(t, id, otherAdminToken)
-	f.server, f.adminToken, f.customerToken, f.otherAdminToken, f.media = server, adminToken, customerToken, otherAdminToken, mediaFake
+	f.server, f.adminToken, f.customerToken, f.otherAdminToken, f.media = server, adminToken, customerToken, otherAdminToken, sellerMedia
 	f.admin = adminsellerconnect.NewSellerAdminServiceClient(server.Client(), server.URL, clientOptions(adminToken)...)
 	f.governance = adminsellerconnect.NewSellerGovernanceAdminServiceClient(server.Client(), server.URL, clientOptions(adminToken)...)
 	f.customer = adminsellerconnect.NewSellerAdminServiceClient(server.Client(), server.URL, clientOptions(customerToken)...)

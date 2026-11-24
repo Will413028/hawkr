@@ -5,6 +5,7 @@ import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import type { CustomerSort, CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
+import type { RejectReason } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { NotificationCategory, NotificationChannel } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
@@ -72,6 +73,11 @@ export type UiTextKey =
 	| "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT"
 	| "crm.CustomerType.CUSTOMER_TYPE_NORMAL"
 	| "crm.CustomerType.CUSTOMER_TYPE_VIP"
+	| "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH"
+	| "media.RejectReason.REJECT_REASON_EXPIRED"
+	| "media.RejectReason.REJECT_REASON_PROCESSING_FAILED"
+	| "media.RejectReason.REJECT_REASON_SIZE_MISMATCH"
+	| "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT"
 	| "moderation.CommunityReport.outcome_unset"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
@@ -433,6 +439,21 @@ const CRM_CUSTOMER_TYPE: Readonly<Partial<Record<number, UiTextKey>>> = {
 /** crm.CustomerType 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function crmCustomerType(v: CustomerType): UiMessage | undefined {
 	const key = CRM_CUSTOMER_TYPE[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const MEDIA_REJECT_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT",
+	2: "media.RejectReason.REJECT_REASON_SIZE_MISMATCH",
+	3: "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH",
+	4: "media.RejectReason.REJECT_REASON_PROCESSING_FAILED",
+	5: "media.RejectReason.REJECT_REASON_EXPIRED",
+};
+
+/** media.RejectReason 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function mediaRejectReason(v: RejectReason): UiMessage | undefined {
+	const key = MEDIA_REJECT_REASON[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

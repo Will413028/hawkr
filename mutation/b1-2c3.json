@@ -1,0 +1,202 @@
+{
+ "mutants": [
+  {
+   "id": "limits-not-validated",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "\tif err := lim.validate(); err != nil {\n\t\treturn Result{}, err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/media/internal/image ^TestNonPositiveLimitsAreRejected$",
+   "why": "Sanitize no longer rejects non-positive Limits"
+  },
+  {
+   "id": "limits-zero-dimension-allowed",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "l.FramePixels <= 0 || l.AnimatedPixels <= 0 || l.MaxDimension <= 0",
+   "new": "l.FramePixels <= 0 || l.AnimatedPixels <= 0",
+   "test": "internal/modules/media/internal/image ^TestNonPositiveLimitsAreRejected$",
+   "why": "a zero per-side limit is accepted"
+  },
+  {
+   "id": "no-height-limit",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if w > lim.MaxDimension || h > lim.MaxDimension {",
+   "new": "if w > lim.MaxDimension {",
+   "test": "internal/modules/media/internal/image ^TestHeightOverDimensionLimitIsRejectedFromTheHeader$",
+   "why": "a header taller than the per-side limit is not rejected"
+  },
+  {
+   "id": "no-width-limit",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if w > lim.MaxDimension || h > lim.MaxDimension {",
+   "new": "if h > lim.MaxDimension {",
+   "test": "internal/modules/media/internal/image ^TestWidthOverDimensionLimitIsRejectedFromTheHeaderWithoutPixelData$",
+   "why": "a header wider than the per-side limit is not rejected"
+  },
+  {
+   "id": "dimension-limit-off-by-one",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "if w > lim.MaxDimension || h > lim.MaxDimension {",
+   "new": "if w >= lim.MaxDimension || h >= lim.MaxDimension {",
+   "test": "internal/modules/media/internal/image ^TestDimensionLimitAllowsTheLimitItself$",
+   "why": "a side exactly at the limit is rejected"
+  },
+  {
+   "id": "unknown-alpha-format-retried",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/image/image.go",
+   "old": "return 0, fmt.Errorf(\"%w: unsupported alpha band format %d\", ErrProcessing, a.BandFormat())",
+   "new": "return 0, fmt.Errorf(\"unsupported alpha band format %d\", a.BandFormat())",
+   "test": "internal/modules/media/internal/image ^TestAlphaOpaqueRejectsUnknownBandFormat$",
+   "why": "an unknown alpha format becomes a retried transient failure instead of a permanent rejection"
+  },
+  {
+   "id": "queue-duplicate-allowed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/worker_queues.go",
+   "old": "if _, dup := queues[name]; dup {",
+   "new": "if _, dup := queues[name]; dup && false {",
+   "test": "cmd/hawkr ^TestWorkerQueuesRejectsADuplicateKey$",
+   "why": "a duplicate queue key silently overwrites the earlier concurrency"
+  },
+  {
+   "id": "queue-non-positive-allowed",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/worker_queues.go",
+   "old": "if n <= 0 {",
+   "new": "if n < 0 {",
+   "test": "cmd/hawkr ^TestWorkerQueuesRejectsNonPositiveConcurrency$",
+   "why": "a zero-concurrency queue is accepted"
+  },
+  {
+   "id": "put-public-no-format-rejection",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "\tcase isImageRejection(err):\n\t\treturn apperr.InvalidInputOn",
+   "new": "\tcase false && isImageRejection(err):\n\t\treturn apperr.InvalidInputOn",
+   "test": "internal/modules/media/internal/upload ^TestPreparePublic_RejectsNonImagesAsInvalidInput$",
+   "why": "PutPublic no longer turns an unrecognized or undecodable input (PDF, fake image) into a rejection"
+  },
+  {
+   "id": "put-public-no-size-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "max: model.MaxPublicUploadSize}",
+   "new": "max: model.MaxPublicUploadSize * 1000}",
+   "test": "internal/modules/media/internal/upload ^TestPreparePublic_EnforcesTheSizeLimitOnActualBytes$",
+   "why": "PutPublic reads far beyond the public upload size limit"
+  },
+  {
+   "id": "put-secure-skips-encryption",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "plainSize, err := secure.EncryptChunk(&cipherText, br, dek, secure.Chunk{Asset: *row.PlannedAssetID, Index: u32(index), Count: u32(count)})",
+   "new": "_ = dek\n\tplainSize, err := io.Copy(&cipherText, br)",
+   "test": "internal/modules/media ^TestPutSecure_PDFIsEncryptedAndReadsBackAfterConfirm$",
+   "why": "the direct secure write stores the plaintext instead of the envelope-encrypted object"
+  },
+  {
+   "id": "put-public-allows-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "\tif err := model.RequireNoTx(ctx); err != nil {\n\t\treturn PublicPutResult{}, err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/media ^TestPutPublic_RefusedInsideATransaction$",
+   "why": "PutPublic no longer refuses to run inside a transaction"
+  },
+  {
+   "id": "put-public-uploader-unchecked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "if uploader.ID <= 0 {",
+   "new": "if false {",
+   "test": "internal/modules/media ^TestPutPublic_InvalidUploaderIsRejectedWithoutWrites$",
+   "why": "PutPublic accepts an uploader with no valid ID"
+  },
+  {
+   "id": "worker-default-concurrency-unchecked",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/worker_queues.go",
+   "old": "add(river.QueueDefault, defaultWorkers)",
+   "new": "add(river.QueueDefault, max(defaultWorkers, 1))",
+   "test": "cmd/hawkr ^TestWorkerQueuesRejectsNonPositiveConcurrency$",
+   "why": "a zero default-queue concurrency is silently replaced instead of failing startup"
+  },
+  {
+   "id": "put-public-no-decode-slot",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "\trelease, err := acquire(ctx, s.publicSlots, true, nil)\n\tif err != nil {\n\t\treturn image.Result{}, err\n\t}\n\tdefer release()\n",
+   "new": "",
+   "test": "internal/modules/media/internal/upload ^TestPreparePublic_WaitsForADecodeSlotAndReturnsTheCtxErrorWhenCancelled$",
+   "why": "PutPublic decodes without taking a slot, so decode concurrency is unbounded"
+  },
+  {
+   "id": "public-slots-oversized",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "make(chan struct{}, model.PublicPutConcurrency)",
+   "new": "make(chan struct{}, model.PublicPutConcurrency*100)",
+   "test": "internal/modules/media/internal/upload ^TestPreparePublic_DecodesNoMoreThanTheSlotBound$",
+   "why": "the decode slot bound is no longer the model constant"
+  },
+  {
+   "id": "put-secure-fails-fast",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "last, err = s.putChunk(ctx, uploader, begin.Token, i, io.LimitReader(src, n), n, true)",
+   "new": "last, err = s.putChunk(ctx, uploader, begin.Token, i, io.LimitReader(src, n), n, false)",
+   "test": "internal/modules/media ^TestPutSecure_WaitsForASlotInsteadOfFailingFast$",
+   "why": "PutSecure returns ResourceExhausted to a server caller instead of waiting for a slot"
+  },
+  {
+   "id": "acquire-wait-ignores-ctx",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "\tcase <-ctx.Done():\n\t\treturn nil, ctx.Err()\n",
+   "new": "\tcase <-ctx.Done():\n\t\treturn release, nil\n",
+   "test": "internal/modules/media/internal/upload ^TestAcquire_FailFastWhenFullAndWaitsWhenAsked$",
+   "why": "a waiting acquire proceeds without a slot when ctx ends instead of returning the ctx error"
+  },
+  {
+   "id": "acquire-failfast-succeeds-when-full",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "\t\tdefault:\n\t\t\treturn nil, busy\n",
+   "new": "\t\tdefault:\n\t\t\treturn release, nil\n",
+   "test": "internal/modules/media/internal/upload ^TestAcquire_FailFastWhenFullAndWaitsWhenAsked$",
+   "why": "a fail-fast acquire succeeds without a slot when full instead of returning the busy error"
+  },
+  {
+   "id": "processing-failure-recorded-as-format",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_process.go",
+   "old": "\tcase isProcessingFailure(err):\n\t\treturn model.RejectProcessingFailed, true",
+   "new": "\tcase isProcessingFailure(err):\n\t\treturn model.RejectUnrecognizedFormat, true",
+   "test": "internal/modules/media/internal/upload ^TestRejectionReason_SeparatesInputFromPipelineFailures$",
+   "why": "a pipeline failure is stored as an unrecognized-format rejection"
+  },
+  {
+   "id": "put-public-processing-failure-is-invalid-input",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "\tcase isImageRejection(err):\n\t\treturn apperr.InvalidInputOn",
+   "new": "\tcase isImageRejection(err) || isProcessingFailure(err):\n\t\treturn apperr.InvalidInputOn",
+   "test": "internal/modules/media/internal/upload ^TestPublicErr_ClassifiesInputProblemsAndPipelineFailures$",
+   "why": "PutPublic tells the caller a valid image has the wrong format when the pipeline failed"
+  },
+  {
+   "id": "put-public-md5-of-input-not-output",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/public_put.go",
+   "old": "sum := md5.Sum(data)",
+   "new": "sum := md5.Sum(nil)",
+   "test": "internal/modules/media ^TestPutPublic_StagedRowDescribesTheStoredObject$",
+   "why": "the staged row declares an MD5 that is not the stored object's"
+  }
+ ]
+}

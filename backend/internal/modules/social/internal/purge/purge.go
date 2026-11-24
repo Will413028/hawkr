@@ -13,7 +13,6 @@ import (
 
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/schedule"
@@ -37,6 +36,7 @@ const SweepInterval = 15 * time.Minute
 type Deps struct {
 	DB    *db.DB
 	Jobs  jobs.Enqueuer
+	Media model.Media
 	Stats *stats.Service
 	Cache readcache.Cache
 	// Cancel 取消店家貼文的待發布排程（貼文被清除軟刪的同一個 transaction）。
@@ -286,7 +286,7 @@ func (s *Service) PurgeBuyer(ctx context.Context, buyerID int64) error {
 // scrubBodies 把買家全部已刪除的留言與討論區留言的內文設為 NULL，每批一個 transaction，直到沒有剩下的（DR-A4，計畫 P2：實體刪除由 job 執行）。
 // 軟刪只設 deleted_at，內文還在資料庫裡；買家刪帳之後他的文字不該留著。列保留（deleted_at 已設）：討論串的結構與頂層的佔位項目要靠它們，
 // 而讀取本來就不回已刪除內容的內文。這一步也處理買家在申請刪除之前自己刪掉的留言（內文還在）。留言與討論區留言沒有圖片欄位，
-// 所以沒有媒體引用要釋放（貼文才有，mediaref.PostRef）；計數不受影響（只改 body，不碰 deleted_at 與 stats 的 trigger）。
+// 所以沒有圖片資產要標記刪除（只有貼文有）；計數不受影響（只改 body，不碰 deleted_at 與 stats 的 trigger）。
 func (s *Service) scrubBodies(ctx context.Context, buyerID int64) error {
 	for {
 		var n int64
@@ -313,7 +313,7 @@ func (s *Service) scrubBodies(ctx context.Context, buyerID int64) error {
 }
 
 // 店面頁的失效：整店已不可曝光，退場時 seller 自己送店面頁的 tag（seller 的清除與 stint 退場），這裡只送貼文的 tag。
-// PurgeStore 清除退場店家的內容：軟刪它的貼文並釋放圖片引用（引用由同步 job 解除）、軟刪它的討論區留言（含買家寫的）與店家身分的留言、
+// PurgeStore 清除退場店家的內容：軟刪它的貼文並把圖片標記刪除、軟刪它的討論區留言（含買家寫的）與店家身分的留言、
 // 刪它身分的留言讚。重跑只處理剩下的。計數由內容的 trigger 維護。
 func (s *Service) PurgeStore(ctx context.Context, storeID int64) error {
 	for {
@@ -373,14 +373,14 @@ func (s *Service) PurgeStore(ctx context.Context, storeID int64) error {
 			if _, err := s.d.Cancel.FromLockedPosts(ctx, postIDs, model.CancelDeleted, now, schedule.CallerBumps); err != nil {
 				return err
 			}
+			var assets []uuid.UUID
 			for _, p := range posts {
-				var retired []string
 				if p.ImageAssetID != nil {
-					retired = append(retired, *p.ImageAssetID)
+					assets = append(assets, *p.ImageAssetID)
 				}
-				if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.PostRef(p.ID), retired...); err != nil {
-					return err
-				}
+			}
+			if err := s.d.Media.MarkDeleted(ctx, assets); err != nil {
+				return err
 			}
 			if len(postIDs) > 0 {
 				if err := q.PurgePostBatch(ctx, store.PurgePostBatchParams{Ids: postIDs, Now: now}); err != nil {

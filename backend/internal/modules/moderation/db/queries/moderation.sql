@@ -38,7 +38,7 @@ WHERE c.target_kind = sqlc.arg(target_kind) AND c.closed_at IS NULL
 -- name: InsertSnapshot :execrows
 -- 同一案同一份內容已有快照時什麼都不寫（0 列）。
 INSERT INTO moderation.case_snapshots (id, case_id, content_sha256, content, asset_ids, captured_at)
-VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(content_sha256), sqlc.arg(content), sqlc.arg(asset_ids)::text[], sqlc.arg(captured_at))
+VALUES (sqlc.arg(id), sqlc.arg(case_id), sqlc.arg(content_sha256), sqlc.arg(content), sqlc.arg(asset_ids)::uuid[], sqlc.arg(captured_at))
 ON CONFLICT (case_id, content_sha256) DO NOTHING;
 
 -- name: SnapshotIDByHash :one
@@ -139,17 +139,17 @@ SET reversed_at = sqlc.arg(reversed_at), reversed_by_admin_id = sqlc.arg(admin_i
 WHERE id = sqlc.arg(id) AND closed_at IS NOT NULL AND decision_action = 'HIDE' AND reversed_at IS NULL;
 
 -- name: ExpiredSnapshotsBatch :many
--- 結案早於 cutoff 的案件的快照（與它們引用的資產）：鎖住這些列，同一個 transaction 內釋放資產引用再刪除。
-SELECT s.id, s.asset_ids FROM moderation.case_snapshots s
+-- 結案早於 cutoff 的案件的快照：鎖住這些列，同一個 transaction 內刪除。
+SELECT s.id FROM moderation.case_snapshots s
 JOIN moderation.cases c ON c.id = s.case_id
 WHERE c.closed_at IS NOT NULL AND c.closed_at < sqlc.arg(cutoff)
 ORDER BY s.id
 LIMIT sqlc.arg(max_rows)::int
 FOR UPDATE OF s SKIP LOCKED;
 
--- name: DeleteSnapshots :execrows
--- 刪快照，檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
-DELETE FROM moderation.case_snapshots WHERE id = ANY(sqlc.arg(ids)::uuid[]);
+-- name: DeleteSnapshots :many
+-- 刪快照並回傳各自擁有的圖片資產（呼叫方在同一個 transaction 內 MarkDeleted）；檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列留著。
+DELETE FROM moderation.case_snapshots WHERE id = ANY(sqlc.arg(ids)::uuid[]) RETURNING asset_ids;
 
 -- name: ClearExpiredDescriptionsBatch :execrows
 -- 結案早於 cutoff 的案件的檢舉說明（同快照的保留期，A7-D21）。
@@ -198,65 +198,6 @@ DELETE FROM moderation.reporter_daily_counts WHERE reporter_store_id = sqlc.arg(
 
 -- name: SnapshotContent :one
 SELECT content FROM moderation.case_snapshots WHERE id = sqlc.arg(id);
-
--- name: SnapshotAssets :one
--- 快照目前引用的資產（同步 job 以它為這個 ref 目前的資產）；快照已刪除沒有列。
-SELECT asset_ids FROM moderation.case_snapshots WHERE id = sqlc.arg(id);
-
--- name: RetireAsset :exec
--- 記下被釋放的資產；已經記過的不變。
-INSERT INTO moderation.retired_assets (ref_type, ref_id, asset_id, retired_at)
-VALUES (sqlc.arg(ref_type), sqlc.arg(ref_id), sqlc.arg(asset_id), sqlc.arg(now))
-ON CONFLICT (ref_type, ref_id, asset_id) DO NOTHING;
-
--- name: BumpRefSeq :exec
--- ref 的資產改變了：遞增版本（沒有列時建立）並記下變動時間。與同步 job 的結算比對同一列，互相等待。
-INSERT INTO moderation.media_ref_sync (ref_type, ref_id, updated_at)
-VALUES (sqlc.arg(ref_type), sqlc.arg(ref_id), sqlc.arg(now))
-ON CONFLICT (ref_type, ref_id) DO UPDATE SET seq = moderation.media_ref_sync.seq + 1, updated_at = EXCLUDED.updated_at;
-
--- name: RefSeq :one
-SELECT seq FROM moderation.media_ref_sync WHERE ref_type = sqlc.arg(ref_type) AND ref_id = sqlc.arg(ref_id);
-
--- name: RetiredAssetIDs :many
-SELECT asset_id FROM moderation.retired_assets
-WHERE ref_type = sqlc.arg(ref_type) AND ref_id = sqlc.arg(ref_id)
-ORDER BY asset_id;
-
--- name: RetiredAmong :many
-SELECT asset_id FROM moderation.retired_assets
-WHERE ref_type = sqlc.arg(ref_type) AND ref_id = sqlc.arg(ref_id) AND asset_id = ANY(sqlc.arg(asset_ids)::text[])
-ORDER BY asset_id;
-
--- name: MarkUnlinked :exec
-UPDATE moderation.retired_assets
-SET unlinked_at = COALESCE(unlinked_at, sqlc.arg(now))
-WHERE ref_type = sqlc.arg(ref_type) AND ref_id = sqlc.arg(ref_id) AND asset_id = ANY(sqlc.arg(asset_ids)::text[]);
-
--- name: PurgeRetired :exec
--- 清掉已經過第二次解除、而且超過 staged token 有效期的退場紀錄（整個模組）。
-DELETE FROM moderation.retired_assets
-WHERE unlinked_at < sqlc.arg(heal_before) AND retired_at < sqlc.arg(retire_before);
-
--- name: SettleRefSeq :execrows
--- 只在版本還是同步讀到的那個時記下已同步；0 列表示讀取之後 ref 又改變了。
-UPDATE moderation.media_ref_sync
-SET synced_seq = sqlc.arg(seq)
-WHERE ref_type = sqlc.arg(ref_type) AND ref_id = sqlc.arg(ref_id) AND seq = sqlc.arg(seq);
-
--- name: HealingRetired :one
-SELECT EXISTS (
-    SELECT 1 FROM moderation.retired_assets
-    WHERE ref_type = sqlc.arg(ref_type) AND ref_id = sqlc.arg(ref_id) AND unlinked_at >= sqlc.arg(heal_before)
-);
-
--- name: UnsyncedRefs :many
--- 版本比已同步的新、而且最後變動早於 idle_before 的 ref，最舊的先（保底掃描補排用）。
-SELECT ref_type, ref_id, updated_at
-FROM moderation.media_ref_sync
-WHERE synced_seq < seq AND updated_at < sqlc.arg(idle_before)
-ORDER BY updated_at
-LIMIT sqlc.arg(max_rows);
 
 -- 列案件依狀態分三個查詢：狀態是述詞的常數而不是參數，OPEN 才證明得出 partial index cases_open_by_time 適用（參數化的 catch-all 述詞在 generic plan 下證明不了）。
 -- name: ListOpenCases :many

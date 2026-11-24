@@ -9,6 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/exceptions/app_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/media/data/media_repository.dart';
 import '../../features/product/data/hashtag_extractor.dart';
@@ -654,14 +655,7 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
 
       setState(() {
         _blocks[idx].isUploading = false;
-        _blocks[idx].imageUrl = result.url.isNotEmpty
-            ? result.url
-            : result.fileUrl;
-        _blocks[idx].objectKey = result.objectKey;
         _blocks[idx].stagedToken = result.stagedToken;
-        debugPrint(
-          '[Editor] Image uploaded: ${result.objectKey}, stagedToken=${result.stagedToken != null}',
-        );
       });
     } catch (e) {
       debugPrint('[Editor] Image upload failed: $e');
@@ -679,7 +673,7 @@ class _RichTextEditorState extends ConsumerState<RichTextEditor> {
           }
         });
       }
-      _snack('圖片上傳失敗，請確認網路後再試');
+      _snack(e is UploadRejectedException ? e.message : '圖片上傳失敗，請確認網路後再試');
     }
   }
 

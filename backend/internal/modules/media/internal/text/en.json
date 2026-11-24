@@ -1,0 +1,91 @@
+{
+  "default": {
+    "media.asset_not_found": {
+      "message": "Asset not found"
+    },
+    "media.asset_unavailable": {
+      "message": "The asset of this upload is no longer available"
+    },
+    "media.confirm_some_unusable": {
+      "message": "Some images cannot be used; please upload them again"
+    },
+    "media.image_required": {
+      "message": "Please upload an image"
+    },
+    "media.image_unusable": {
+      "message": "The image cannot be used; please upload it again"
+    },
+    "media.public_content_empty": {
+      "message": "The uploaded content is empty"
+    },
+    "media.public_content_unsupported": {
+      "message": "Public uploads only accept JPEG, PNG, WebP and GIF images"
+    },
+    "media.public_upload_too_large": {
+      "message": "The upload exceeds the {max}-byte limit"
+    },
+    "media.secure_busy": {
+      "message": "Too many secure uploads are being processed; please try again shortly"
+    },
+    "media.secure_chunk_index_mismatch": {
+      "message": "Chunk index mismatch; the next chunk is {next}"
+    },
+    "media.secure_chunk_length_mismatch": {
+      "message": "This chunk must be exactly {expected} bytes"
+    },
+    "media.secure_content_empty": {
+      "message": "The uploaded content is empty"
+    },
+    "media.secure_content_unsupported": {
+      "message": "Secure uploads accept only PDF and JPEG, PNG, WebP or GIF images"
+    },
+    "media.secure_preview_unavailable": {
+      "message": "This upload cannot be previewed right now"
+    },
+    "media.secure_size_mismatch": {
+      "message": "The uploaded byte count does not match the declared {size} bytes"
+    },
+    "media.secure_size_out_of_range": {
+      "message": "The secure upload size must be between 1 and {max} bytes"
+    },
+    "media.upload_already_used": {
+      "message": "This upload has already been used; please upload it again"
+    },
+    "media.upload_content_type_unsupported": {
+      "message": "Unsupported image type; only JPEG, PNG, WebP and GIF are accepted"
+    },
+    "media.upload_expired": {
+      "message": "This upload has expired"
+    },
+    "media.upload_md5_invalid": {
+      "message": "The upload MD5 must be base64 of 16 bytes"
+    },
+    "media.upload_not_found": {
+      "message": "Upload not found"
+    },
+    "media.upload_not_ready": {
+      "message": "This upload has not finished processing"
+    },
+    "media.upload_processing": {
+      "message": "This upload is still being processed"
+    },
+    "media.upload_rejected": {
+      "message": "This upload was rejected and cannot be confirmed"
+    },
+    "media.upload_size_too_large": {
+      "message": "The upload exceeds the limit of {max} bytes"
+    },
+    "media.upload_size_zero": {
+      "message": "The upload size must be greater than zero"
+    },
+    "media.uploader_invalid": {
+      "message": "The uploader is not valid"
+    },
+    "media.visibility_public_required": {
+      "message": "This image must be a public image"
+    },
+    "media.visibility_secure_required": {
+      "message": "This file must be uploaded as a secure file; please upload it again"
+    }
+  }
+}

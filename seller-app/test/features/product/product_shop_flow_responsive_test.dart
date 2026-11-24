@@ -9,7 +9,6 @@ import 'package:hawkr_seller/features/product/presentation/product_setup_picker/
 import 'package:hawkr_seller/features/product/presentation/product_setup_picker/picker_category_search_row.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_info_screen.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_image_screen.dart';
-import 'package:hawkr_seller/features/seller/data/seller_repository.dart';
 import 'package:hawkr_seller/features/product/presentation/product_setup_spec_screen.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -20,11 +19,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _longName = '範例生鮮友善耕作當季水果綜合家庭分享禮盒';
-
-class _FixtureSellerRepository implements SellerRepository {
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
 
 class _FixtureReviews implements ReviewRepository {
   @override
@@ -120,7 +114,6 @@ Future<void> _pump(
       overrides: [
         productRepositoryProvider.overrideWithValue(_FixtureRepository()),
         reviewRepositoryProvider.overrideWithValue(_FixtureReviews()),
-        sellerRepositoryProvider.overrideWithValue(_FixtureSellerRepository()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(390, 844),

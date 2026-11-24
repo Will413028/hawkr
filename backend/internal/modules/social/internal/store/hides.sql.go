@@ -106,7 +106,7 @@ WHERE id = $1
 type GetPostSnapshotRow struct {
 	StoreID      int64
 	Body         string
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 	AuthoredAt   time.Time
 	ExistsNow    bool
 }

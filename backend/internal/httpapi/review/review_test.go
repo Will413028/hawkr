@@ -242,7 +242,7 @@ func sampleReview(id byte) review.Review {
 	key := "items/sku.jpg"
 	return review.Review{
 		ID: uuid.UUID{id}, OrderNo: "ORD-1", OrderItemID: 501, BuyerID: 80, StoreID: 11, ProductID: 31, Rating: 4, Content: "好吃",
-		Images:  []review.Image{{AssetID: "a1", ObjectKey: "reviews/a1.jpg"}, {AssetID: "a2", ObjectKey: "reviews/a2.jpg"}},
+		Images:  []review.Image{{AssetID: uuid.UUID{0xa1}, ObjectKey: "reviews/a1.jpg"}, {AssetID: uuid.UUID{0xa2}, ObjectKey: "reviews/a2.jpg"}},
 		SkuName: "大份", ItemImageKey: &key, Price: 250, CreatedAt: at,
 		Reply: &review.Reply{Content: "謝謝", RepliedAt: at.Add(time.Hour)},
 	}

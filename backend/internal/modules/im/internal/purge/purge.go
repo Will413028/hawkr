@@ -13,7 +13,6 @@ import (
 
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -33,6 +32,7 @@ const SweepInterval = 15 * time.Minute
 type Deps struct {
 	DB     *db.DB
 	Jobs   jobs.Enqueuer
+	Media  model.Media
 	NewID  func() uuid.UUID
 	Now    func() time.Time
 	Logger *slog.Logger
@@ -128,7 +128,7 @@ func (s *Service) Erase(ctx context.Context, kind model.PartyKind, id int64) err
 
 type locked struct {
 	id    uuid.UUID
-	asset *string
+	asset *uuid.UUID
 }
 
 func (s *Service) eraseBatch(ctx context.Context, kind model.PartyKind, id int64) (int, error) {
@@ -164,13 +164,14 @@ func (s *Service) eraseBatch(ctx context.Context, kind model.PartyKind, id int64
 		if _, err := q.EraseMessages(ctx, store.EraseMessagesParams{Ids: ids, Now: &now}); err != nil {
 			return fmt.Errorf("im：抹除訊息：%w", err)
 		}
+		var assets []uuid.UUID
 		for _, m := range batch {
-			if m.asset == nil {
-				continue
+			if m.asset != nil {
+				assets = append(assets, *m.asset)
 			}
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.MessageRef(m.id), *m.asset); err != nil {
-				return err
-			}
+		}
+		if err := s.d.Media.MarkDeleted(ctx, assets); err != nil {
+			return err
 		}
 		n = len(batch)
 		return nil

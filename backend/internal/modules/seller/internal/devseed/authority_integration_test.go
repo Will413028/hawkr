@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/devseed"
@@ -187,7 +188,7 @@ func TestCheckRefusesMixedAuthorityOrdersAndListsTheirIDs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stores := []devseed.Store{{StoreID: seedStore, StoreCode: 1, AccountID: 100, Name: "店", TownCode: "x", LogoKey: "k", LogoAssetID: "a"}}
+	stores := []devseed.Store{{StoreID: seedStore, StoreCode: 1, AccountID: 100, Name: "店", TownCode: "x", LogoKey: "k", LogoAssetID: uuid.NewV7()}}
 	err = devseed.CheckForTest(ctx, d.Pool(), stores, []int64{100}, now)
 	if err == nil {
 		t.Fatal("混合的來函必須讓前提檢查拒絕")

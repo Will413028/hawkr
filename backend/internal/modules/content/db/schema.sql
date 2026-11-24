@@ -7,17 +7,16 @@ CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA content;
 
--- 首頁 banner。id 是 UUIDv7，由應用層產生、不設 DEFAULT：轉正圖片時就要用 id
--- 登記引用，所以在寫入前產生（ADR 2026-09-25-row-identity-by-data-kind）。
+-- 首頁 banner。id 是 UUIDv7，由應用層產生、不設 DEFAULT：寫入前就產生（ADR 2026-09-25-row-identity-by-data-kind）。
 CREATE TABLE content.banners (
     id                UUID         PRIMARY KEY,
     title             TEXT         NOT NULL,
     button_text       TEXT         NOT NULL DEFAULT '',
     preview_image_key TEXT         NOT NULL,
     popup_image_key   TEXT         NOT NULL,
-    -- 兩張圖的 media asset ID：同步 job 以它們為業務列目前的資產；與 key 成對，圖片必填所以不可為 NULL。
-    preview_image_asset_id TEXT         NOT NULL,
-    popup_image_asset_id   TEXT         NOT NULL,
+    -- 兩張圖的 media asset ID（UUID v7）：與 key 成對，圖片必填所以不可為 NULL；寫入在同一個 transaction 內 Confirm 新資產、MarkDeleted 被換掉的資產。
+    preview_image_asset_id UUID         NOT NULL,
+    popup_image_asset_id   UUID         NOT NULL,
     canvas_json       TEXT         NOT NULL DEFAULT '',
     action_type       TEXT         NOT NULL,
     action_target     TEXT         NOT NULL DEFAULT '',
@@ -62,28 +61,3 @@ CREATE TABLE content.app_version_gates (
 
 COMMENT ON COLUMN content.app_version_gates.app_type IS 'App 類型 - AppType（BUYER、SELLER）';
 COMMENT ON COLUMN content.app_version_gates.version IS '樂觀鎖的版本，對外是 etag。沒有刪除，所以不必區分同一組 key 的不同建立（ADR D4）';
-
--- media 引用的同步版本：業務列改變 ref 的資產時在同一個 transaction 遞增 seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變
--- 才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。ref 的列不刪除：
--- 刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。
-CREATE TABLE content.media_ref_sync (
-    ref_type   TEXT   NOT NULL,
-    ref_id     TEXT   NOT NULL,
-    seq        BIGINT NOT NULL DEFAULT 1,
-    synced_seq BIGINT NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
--- 保底掃描只看還沒同步完的 ref。
-CREATE INDEX media_ref_sync_unsynced ON content.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
--- 被業務列換掉或終態釋放的資產：同步 job 精確解除它們的引用，寫入端拒絕把它們寫回同一個 ref。unlinked_at 是第一次解除成功的時間。
-CREATE TABLE content.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON content.retired_assets (retired_at);

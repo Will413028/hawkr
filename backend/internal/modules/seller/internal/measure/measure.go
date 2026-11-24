@@ -14,7 +14,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/closing"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
@@ -43,7 +42,7 @@ type Deps struct {
 	DB       *db.DB
 	Events   *events.Bus
 	Jobs     jobs.Enqueuer
-	Media    media.Media
+	Media    model.Media
 	Identity Identity
 	Linked   LinkedIdentities
 	Closing  *closing.Service

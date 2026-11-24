@@ -28,7 +28,7 @@ func TestMessageTombstones(t *testing.T) {
 	if m := Message(erased); m.Text != nil || !m.Erased {
 		t.Fatalf("抹除的訊息不帶內容：%+v", m)
 	}
-	img := MessageRow{MessageType: "IMAGE", ImageAssetID: ptr("a"), ImageObjectKey: ptr("k")}
+	img := MessageRow{MessageType: "IMAGE", ImageAssetID: ptr(uuid.UUID{2}), ImageObjectKey: ptr("k")}
 	if m := Message(img); m.Image == nil || m.Image.ObjectKey != "k" {
 		t.Fatalf("圖片訊息：%+v", m)
 	}

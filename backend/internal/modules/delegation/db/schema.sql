@@ -19,8 +19,8 @@ CREATE TABLE delegation.admin_eligibilities (
 -- session、授權與稽核資料。管理員的 ID 是 BIGINT（過渡規則同 admins），店家與賣家的 ID 是 seller 的
 -- BIGINT（seller 還是舊服務），跨模組不下 FK。模組內的 FK 不寫 ON DELETE：稽核列不得被連坐刪除。
 --
--- 能力（capability）是封閉的九個值，沒有任何履約或金流的能力：「本次代行沒有出貨或財務操作」由 CHECK
--- 保證，不是統計出來的。去重以九個 CASE 相加（值域已由 <@ 封閉，「沒有重複」等於元素數等於相異值數；
+-- 能力（capability）是封閉的十個值（第十個 media.upload，B1-D16），沒有任何履約或金流的能力：「本次代行沒有出貨或財務操作」由 CHECK
+-- 保證，不是統計出來的。去重以十個 CASE 相加（值域已由 <@ 封閉，「沒有重複」等於元素數等於相異值數；
 -- CHECK 不能用子查詢）；下界用 cardinality 而不是 array_length（後者對空陣列回 NULL，CHECK 視為通過）。
 -- ============================================================================
 
@@ -101,12 +101,12 @@ CREATE TABLE delegation.delegated_operation_sessions (
     ),
     CONSTRAINT delegated_operation_sessions_display_code_check CHECK (display_code ~ '^OPS-[0-9A-Z]{13}$'),
     CONSTRAINT delegated_operation_sessions_capabilities_check CHECK (
-        cardinality(capabilities) >= 1 AND cardinality(capabilities) <= 9
+        cardinality(capabilities) >= 1 AND cardinality(capabilities) <= 10
         AND capabilities <@ ARRAY[
               'storefront.read', 'storefront.write',
               'products.read', 'products.write', 'products.publish',
               'posts.read', 'posts.write', 'posts.publish',
-              'orders.read'
+              'orders.read', 'media.upload'
             ]::text[]
         AND cardinality(capabilities) =
               (CASE WHEN 'storefront.read'  = ANY (capabilities) THEN 1 ELSE 0 END)
@@ -118,6 +118,7 @@ CREATE TABLE delegation.delegated_operation_sessions (
             + (CASE WHEN 'posts.write'      = ANY (capabilities) THEN 1 ELSE 0 END)
             + (CASE WHEN 'posts.publish'    = ANY (capabilities) THEN 1 ELSE 0 END)
             + (CASE WHEN 'orders.read'      = ANY (capabilities) THEN 1 ELSE 0 END)
+            + (CASE WHEN 'media.upload'     = ANY (capabilities) THEN 1 ELSE 0 END)
     )
 );
 
@@ -183,12 +184,12 @@ CREATE TABLE delegation.seller_delegation_authorizations (
         revoke_reason IS NULL OR char_length(revoke_reason) BETWEEN 1 AND 200
     ),
     CONSTRAINT seller_delegation_authorizations_capabilities_check CHECK (
-        cardinality(granted_capabilities) >= 1 AND cardinality(granted_capabilities) <= 9
+        cardinality(granted_capabilities) >= 1 AND cardinality(granted_capabilities) <= 10
         AND granted_capabilities <@ ARRAY[
               'storefront.read', 'storefront.write',
               'products.read', 'products.write', 'products.publish',
               'posts.read', 'posts.write', 'posts.publish',
-              'orders.read'
+              'orders.read', 'media.upload'
             ]::text[]
         AND cardinality(granted_capabilities) =
               (CASE WHEN 'storefront.read'  = ANY (granted_capabilities) THEN 1 ELSE 0 END)
@@ -200,6 +201,7 @@ CREATE TABLE delegation.seller_delegation_authorizations (
             + (CASE WHEN 'posts.write'      = ANY (granted_capabilities) THEN 1 ELSE 0 END)
             + (CASE WHEN 'posts.publish'    = ANY (granted_capabilities) THEN 1 ELSE 0 END)
             + (CASE WHEN 'orders.read'      = ANY (granted_capabilities) THEN 1 ELSE 0 END)
+            + (CASE WHEN 'media.upload'     = ANY (granted_capabilities) THEN 1 ELSE 0 END)
     )
 );
 
@@ -265,7 +267,7 @@ CREATE TABLE delegation.admin_operation_audit_logs (
     ),
     CONSTRAINT admin_operation_audit_logs_risk_level_check CHECK (risk_level::text IN ('LOW', 'MEDIUM', 'HIGH')),
     CONSTRAINT admin_operation_audit_logs_resource_type_check CHECK (
-        resource_type::text IN ('STOREFRONT', 'PRODUCT', 'POST', 'ORDER')
+        resource_type::text IN ('STOREFRONT', 'PRODUCT', 'POST', 'ORDER', 'MEDIA')
     ),
     CONSTRAINT admin_operation_audit_logs_origin_check CHECK (origin::text IN ('INTERACTIVE', 'SCHEDULED')),
     -- 操作理由是產品規則（1–100 字）。
@@ -277,7 +279,7 @@ CREATE TABLE delegation.admin_operation_audit_logs (
             'STOREFRONT_UPDATE', 'STOREFRONT_LOGO_UPDATE', 'STOREFRONT_COVER_UPDATE',
             'PRODUCT_CREATE', 'PRODUCT_UPDATE', 'PRODUCT_PUBLISH', 'PRODUCT_UNPUBLISH', 'PRODUCT_BATCH_UNPUBLISH',
             'POST_CREATE', 'POST_UPDATE', 'POST_PUBLISH', 'POST_UNPUBLISH', 'POST_SCHEDULE',
-            'ORDER_PII_REVEAL', 'STOREFRONT_READ', 'PRODUCT_READ', 'POST_READ', 'ORDER_READ', 'AUDIT_CORRECTION'
+            'ORDER_PII_REVEAL', 'STOREFRONT_READ', 'PRODUCT_READ', 'POST_READ', 'ORDER_READ', 'AUDIT_CORRECTION', 'MEDIA_UPLOAD'
         )
     ),
     -- 授權層的機械兜底：稽核 intent 是每個代行操作的前置，封閉值域外的能力連 intent 都寫不進去。
@@ -286,7 +288,7 @@ CREATE TABLE delegation.admin_operation_audit_logs (
             'storefront.read', 'storefront.write',
             'products.read', 'products.write', 'products.publish',
             'posts.read', 'posts.write', 'posts.publish',
-            'orders.read'
+            'orders.read', 'media.upload'
         )
     )
 );

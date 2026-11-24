@@ -14,7 +14,7 @@ import (
 // DelegationMaxBatch 是稽核批次的筆數上限（設計書 56 §7.2.8）。
 const DelegationMaxBatch = delegationMaxBatch
 
-// AuditAction 是稽核的動作（原本是 CodeMeta 的 DelegationAuditAction）。DB 以 CHECK 限定這 19 個值（設計書 56
+// AuditAction 是稽核的動作（原本是 CodeMeta 的 DelegationAuditAction）。DB 以 CHECK 限定這 20 個值（設計書 56
 // §6.5.3），所以 Label、RiskLevel 的退路走不到，只是 fail closed 的保險；結束摘要照 §6.1.11 以子字串數履約、金流類的
 // 動作，結構上恆為 0。
 type AuditAction string
@@ -39,6 +39,7 @@ const (
 	AuditPostRead              AuditAction = "POST_READ"
 	AuditOrderRead             AuditAction = "ORDER_READ"
 	AuditCorrection            AuditAction = "AUDIT_CORRECTION"
+	AuditMediaUpload           AuditAction = "MEDIA_UPLOAD"
 )
 
 // RiskLevel 是稽核列的風險等級，由動作決定（同一個 orders.read 底下，看訂單清單與揭露收件人個資風險不同）。
@@ -55,7 +56,7 @@ type auditActionRule struct {
 	risk  RiskLevel
 }
 
-// auditActions 是 19 個登錄的動作：中文標籤（原本在 CodeMeta）與風險等級（CodeMeta 的 DelegationAuditAction）。
+// auditActions 是 20 個登錄的動作：中文標籤（原本在 CodeMeta）與風險等級（CodeMeta 的 DelegationAuditAction）。
 var auditActions = map[AuditAction]auditActionRule{
 	AuditStorefrontUpdate:      {"更新店面資料", RiskMedium},
 	AuditStorefrontLogoUpdate:  {"更新商店 Logo", RiskMedium},
@@ -76,9 +77,10 @@ var auditActions = map[AuditAction]auditActionRule{
 	AuditPostRead:              {"查看貼文（被拒絕）", RiskLow},
 	AuditOrderRead:             {"查看訂單（被拒絕）", RiskLow},
 	AuditCorrection:            {"稽核補正（維運）", RiskLow},
+	AuditMediaUpload:           {"上傳檔案（被拒絕）", RiskLow},
 }
 
-// AuditActions 回傳 19 個登錄的動作。
+// AuditActions 回傳 20 個登錄的動作。
 func AuditActions() []AuditAction {
 	out := make([]AuditAction, 0, len(auditActions))
 	for a := range auditActions {
@@ -109,15 +111,21 @@ func (a AuditAction) RiskLevel() RiskLevel {
 	return RiskHigh
 }
 
-// ReadDenial 是四個只為了讓「被拒絕的讀取」有合法動作值的動作：它們不會成功，也不通知任何人。
+// ReadDenial 是四個只為了讓「被拒絕的讀取」有合法動作值的讀取動作；它們不會成功，也不通知任何人。
 func (a AuditAction) ReadDenial() bool {
 	return a == AuditStorefrontRead || a == AuditProductRead || a == AuditPostRead || a == AuditOrderRead
 }
 
-// MayNotifySeller 回傳這個動作的稽核列能不能通知賣家：被拒絕的讀取、PII 揭露與稽核補正恆為 false（機械保證，
+// DenialOnly 是只會出現在被拒絕（FAILED）列的動作：ReadDenial 的四個讀取，加上上傳（B1-D16：上傳不寫成功的稽核，稽核留在擁有者確認時）。
+// 它們不是寫入動作、不需要操作原因、不通知任何人。
+func (a AuditAction) DenialOnly() bool {
+	return a.ReadDenial() || a == AuditMediaUpload
+}
+
+// MayNotifySeller 回傳這個動作的稽核列能不能通知賣家：被拒絕的讀取與上傳、PII 揭露與稽核補正恆為 false（機械保證，
 // 不靠 gateway 記得）。寫入類不強制任何方向：強制成 true 會藏起 gateway 漏填的情況。
 func (a AuditAction) MayNotifySeller() bool {
-	return !a.ReadDenial() && a != AuditOrderPIIReveal && a != AuditCorrection
+	return !a.DenialOnly() && a != AuditOrderPIIReveal && a != AuditCorrection
 }
 
 // AuditResult 是稽核列的結果。PENDING 是合法的終態：嘗試過、結果沒有確認。
@@ -145,10 +153,11 @@ const (
 	ResourceProduct    AuditResourceType = "PRODUCT"
 	ResourcePost       AuditResourceType = "POST"
 	ResourceOrder      AuditResourceType = "ORDER"
+	ResourceMedia      AuditResourceType = "MEDIA"
 )
 
 func (t AuditResourceType) Valid() bool {
-	return t == ResourceStorefront || t == ResourceProduct || t == ResourcePost || t == ResourceOrder
+	return t == ResourceStorefront || t == ResourceProduct || t == ResourcePost || t == ResourceOrder || t == ResourceMedia
 }
 
 // ChangedField 是一個欄位的變更（已遮罩、已經過 allow-list 的顯示值）。

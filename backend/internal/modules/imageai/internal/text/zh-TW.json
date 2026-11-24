@@ -57,10 +57,6 @@
       "message": "新增風格必須上傳縮圖",
       "description": "CreateAiStyle 沒有 thumbnail_staged_token。"
     },
-    "admin.style_thumbnail_unusable": {
-      "message": "縮圖無法使用，請重新上傳",
-      "description": "staged token 無效、過期或不屬於上傳者。"
-    },
     "style.category_invalid": {
       "message": "風格用途不合法",
       "description": "風格用途不是 PRODUCT 或 POST。"

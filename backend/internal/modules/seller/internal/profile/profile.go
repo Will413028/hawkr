@@ -15,7 +15,6 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -32,7 +31,7 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
-	Media  media.Media
+	Media  model.Media
 	// Exposure 是可曝光規則的套用與公告（classify 與每個寫入的公告都經它）；必填。
 	Exposure *exposure.Service
 	Now      func() time.Time
@@ -310,9 +309,8 @@ func (s *Service) StoreCards(ctx context.Context, storeIDs []int64) ([]model.Sto
 // 等待刪除時拒絕）。合併後沒有任何欄位改變、也沒有換圖時不寫入：回傳目前的店家，版本與 etag 不變、不發事件（重送同樣的
 // 修改是冪等的；版本仍要相符，過期的版本照樣回 VersionConflict）。
 //
-// LogoToken、CoverToken 非空時換圖：先在 transaction 外轉正（不建立引用；轉正前先做所有不需寫入的判斷：能力、版本、合併後的
-// 驗證、店名鎖，被拒絕的請求不消耗 token），再於同一個版本條件的 transaction 內寫入文字欄位與圖片的 key 與 asset ID、把被換掉的
-// 圖記成退場並排入引用的同步（mediaref）；已退場的圖不能寫回。換圖時必須在 transaction 外呼叫。
+// LogoToken、CoverToken 非空時換圖：在同一個版本條件的 transaction 內，通過能力、版本與合併後的驗證後 Confirm 新資產，寫入文字欄位與
+// 圖片的 key 與 asset ID，並把被換掉的資產 MarkDeleted；任何一步失敗整筆回滾，新資產仍是暫存，被拒絕的請求不消耗 token。
 func (s *Service) UpdateProfile(ctx context.Context, in model.UpdateProfileInput) (model.Store, error) {
 	if err := model.Positive(in.StoreID); err != nil {
 		return model.Store{}, err
@@ -328,7 +326,7 @@ func (s *Service) UpdateProfile(ctx context.Context, in model.UpdateProfileInput
 		}
 	}
 	if len(changes) > 0 {
-		if err := s.finalizeImages(ctx, in, changes); err != nil {
+		if err := model.Positive(in.UploaderID); err != nil {
 			return model.Store{}, err
 		}
 	}
@@ -339,29 +337,11 @@ func (s *Service) UpdateProfile(ctx context.Context, in model.UpdateProfileInput
 	return updated, nil
 }
 
-// imageChange 是一次換圖：轉正之後 asset 才有值。
+// imageChange 是一次換圖。
 type imageChange struct {
 	kind  image
 	field string
 	token string
-	asset media.Asset
-}
-
-// preflight 在轉正圖片之前做所有不需要寫入就能判斷的拒絕（能力、版本、合併後的文字驗證）：被拒絕的請求
-// 不消耗 staged token，client 修正之後可以用同一個 token 重送。transaction 內會再判斷一次（以列鎖內的資料為準）。
-func (s *Service) preflight(ctx context.Context, in model.UpdateProfileInput) error {
-	current, err := s.Store(ctx, in.StoreID)
-	if err != nil {
-		return err
-	}
-	if err := model.Authorize(current, model.CapStorefrontWrite); err != nil {
-		return err
-	}
-	if current.Version != in.ExpectedVersion {
-		return errVersionConflict()
-	}
-	_, err = s.mergeChecked(ctx, store.New(s.d.DB.Conn(ctx)), current, in)
-	return err
 }
 
 // mergeChecked 把輸入疊到 before 的 profile 並驗證；店名與介紹沒有鎖，審核中與核准之後都能改。
@@ -406,27 +386,6 @@ func checkRequiredNotCleared(ctx context.Context, q *store.Queries, before model
 		}
 	}
 	return apperr.InvalidInputOn([]string{field}, "%s", requiredFieldMessages[cleared[0]])
-}
-
-// finalizeImages 轉正每一張新圖，結果寫回 changes（呼叫前先 preflight）。轉正不建立引用，所以中途失敗不需要補償。
-func (s *Service) finalizeImages(ctx context.Context, in model.UpdateProfileInput, changes []imageChange) error {
-	if _, ok := db.TxFrom(ctx); ok {
-		return apperr.FailedPrecondition("換圖必須在 transaction 外開始")
-	}
-	if err := model.Positive(in.UploaderID); err != nil {
-		return err
-	}
-	if err := s.preflight(ctx, in); err != nil {
-		return err
-	}
-	for i := range changes {
-		asset, err := media.FinalizeField(ctx, s.d.Media, media.Uploader{ID: in.UploaderID}, media.Field{Name: changes[i].field}, changes[i].token, changes[i].kind.refType)
-		if err != nil {
-			return err
-		}
-		changes[i].asset = asset
-	}
-	return nil
 }
 
 // writeProfile 是 UpdateProfile 的資料庫部分：文字欄位與圖片在同一個 transaction，每一次寫入以前一次寫入的版本為條件。
@@ -477,11 +436,12 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 			version = row.Version
 		}
 		for _, c := range changes {
-			ref := mediaref.StoreRef(c.kind.refType, in.StoreID)
-			if err := mediaref.Reject(ctx, q, ref, media.SyncCandidate{Field: c.field, AssetID: c.asset.ID}); err != nil {
+			assets, err := model.ConfirmAll(ctx, s.d.Media, media.Uploader{ID: in.UploaderID}, []model.ConfirmItem{{Field: c.field, Token: c.token}}, media.VisibilityPublic)
+			if err != nil {
 				return err
 			}
-			row, err = c.kind.write(ctx, q, in.StoreID, version, c.asset, now)
+			asset := assets[0]
+			row, err = c.kind.write(ctx, q, in.StoreID, version, asset, now)
 			if errors.Is(err, pgx.ErrNoRows) {
 				return errVersionConflict()
 			}
@@ -489,12 +449,15 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 				return err
 			}
 			version = row.Version
-			var retired []string
-			if old := c.kind.assetOf(current); old != nil && *old != c.asset.ID {
-				retired = append(retired, *old)
-			}
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, ref, retired...); err != nil {
-				return err
+		}
+		if len(changes) > 0 {
+			retired := media.RetiredAssets(
+				media.AssetIDs(logo.assetOf(current), cover.assetOf(current)),
+				media.AssetIDs(logo.assetOf(row), cover.assetOf(row)))
+			if len(retired) > 0 {
+				if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {
+					return err
+				}
 			}
 		}
 		if err := s.changed(ctx, row); err != nil {
@@ -528,18 +491,17 @@ func merge(p model.Profile, in model.UpdateProfileInput) model.Profile {
 	return p
 }
 
-// image 描述 logo 或封面：media 的引用類型與寫入的查詢。
+// image 描述 logo 或封面：目前的資產與寫入的查詢。
 type image struct {
-	refType string
-	assetOf func(store.SellerStore) *string
-	write   func(ctx context.Context, q *store.Queries, storeID, version int64, asset media.Asset, now time.Time) (store.SellerStore, error)
+	assetOf func(store.SellerStore) *uuid.UUID
+	write   func(ctx context.Context, q *store.Queries, storeID, version int64, asset media.ConfirmedAsset, now time.Time) (store.SellerStore, error)
 }
 
 var (
-	logo = image{refType: media.RefTypeSellerLogo, assetOf: func(r store.SellerStore) *string { return r.LogoAssetID }, write: func(ctx context.Context, q *store.Queries, storeID, version int64, asset media.Asset, now time.Time) (store.SellerStore, error) {
+	logo = image{assetOf: func(r store.SellerStore) *uuid.UUID { return r.LogoAssetID }, write: func(ctx context.Context, q *store.Queries, storeID, version int64, asset media.ConfirmedAsset, now time.Time) (store.SellerStore, error) {
 		return q.UpdateLogo(ctx, store.UpdateLogoParams{StoreID: storeID, ExpectedVersion: version, LogoKey: &asset.ObjectKey, LogoAssetID: &asset.ID, Now: now})
 	}}
-	cover = image{refType: media.RefTypeSellerCover, assetOf: func(r store.SellerStore) *string { return r.CoverAssetID }, write: func(ctx context.Context, q *store.Queries, storeID, version int64, asset media.Asset, now time.Time) (store.SellerStore, error) {
+	cover = image{assetOf: func(r store.SellerStore) *uuid.UUID { return r.CoverAssetID }, write: func(ctx context.Context, q *store.Queries, storeID, version int64, asset media.ConfirmedAsset, now time.Time) (store.SellerStore, error) {
 		return q.UpdateCover(ctx, store.UpdateCoverParams{StoreID: storeID, ExpectedVersion: version, CoverKey: &asset.ObjectKey, CoverAssetID: &asset.ID, Now: now})
 	}}
 )

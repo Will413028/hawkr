@@ -57,7 +57,7 @@ class ImageProcessingService {
 
       // 2. 壓縮並調整大小為正方形
       // flutter_image_compress 的 minWidth/minHeight 會保持比例縮放
-      // 對於非正方形圖片，後端 /media/upload/avatar 會自動裁切為 512x512
+      // 對於非正方形圖片，後端媒體模組只重新編碼、不裁切，比例由前端決定
       // 如果需要前端精確裁切，可使用 image_cropper 套件
       final result = await FlutterImageCompress.compressWithList(
         imageBytes,

@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/hashtag"
-	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/readcache"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/reads"
@@ -53,7 +52,7 @@ var (
 // Deps 是貼文服務的依賴。
 type Deps struct {
 	DB       *db.DB
-	Media    media.Media
+	Media    model.Media
 	Jobs     jobs.Enqueuer
 	Events   *events.Bus
 	Products ProductVerifier
@@ -125,25 +124,20 @@ func (s *Service) verifyProduct(ctx context.Context, productID *int64, storeID i
 	}
 }
 
-// finalizeImage 把新上傳的圖轉正（不建立引用；上傳者是店家所屬的帳號）。沒有 token 回 nil。
-func (s *Service) finalizeImage(ctx context.Context, st seller.Store, token string) (*media.Asset, error) {
+// confirmImage 在寫入貼文的 transaction 內確認新上傳的圖（上傳者是店家所屬的帳號）。沒有 token 回 nil。
+func (s *Service) confirmImage(ctx context.Context, st seller.Store, token string) (*media.ConfirmedAsset, error) {
 	if token == "" {
 		return nil, nil
 	}
-	a, err := media.FinalizeField(ctx, s.d.Media, media.Uploader{ID: st.AccountID},
-		media.Field{Name: "ImageToken", Message: text.PostImageUnusable(uitext.LocaleFrom(ctx)).Text}, token, media.RefTypePost)
+	a, err := media.ConfirmField(ctx, s.d.Media, media.Uploader{ID: st.AccountID}, "ImageToken", token, media.VisibilityPublic)
 	if err != nil {
-		return nil, fmt.Errorf("social：轉正貼文圖片：%w", err)
+		return nil, err
 	}
 	return &a, nil
 }
 
-func candidates(a *media.Asset) []media.SyncCandidate {
-	if a == nil {
-		return nil
-	}
-	return []media.SyncCandidate{{Field: "ImageToken", AssetID: a.ID}}
-}
+// errReplayed 讓重送（同一個 request_id 並行寫入、輸家）的 transaction 回滾：Confirm 已經做過，沒有貼文列指著那張圖，不能提交。
+var errReplayed = errors.New("social：貼文的重送沿用原本那一篇")
 
 func (s *Service) writeTags(ctx context.Context, q *store.Queries, postID uuid.UUID, tags []hashtag.Tag) error {
 	if err := q.DeletePostHashtags(ctx, postID); err != nil {
@@ -242,29 +236,26 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	if err := s.verifyProduct(ctx, in.ProductID, st.StoreID); err != nil {
 		return model.Post{}, err
 	}
-	asset, err := s.finalizeImage(ctx, st, in.ImageToken)
-	if err != nil {
-		return model.Post{}, err
-	}
 	id := s.d.NewID()
-	ref := mediaref.PostRef(id)
 	now := s.d.Now().UTC()
 	params := store.InsertPostParams{ID: id, StoreID: st.StoreID, Body: body, ProductID: in.ProductID, Status: string(model.StatusDraft), Now: now, RequestID: in.RequestID, RequestHash: hash}
 	if in.Publish {
 		params.Status, params.PublishedAt = string(model.StatusPublished), &now
 	}
-	if asset != nil {
-		params.ImageKey, params.ImageAssetID = &asset.ObjectKey, &asset.ID
-	}
 	var out model.Post
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
+		asset, err := s.confirmImage(ctx, st, in.ImageToken)
+		if err != nil {
 			return err
+		}
+		if asset != nil {
+			params.ImageKey, params.ImageAssetID = &asset.ObjectKey, &asset.ID
 		}
 		row, err := q.InsertPost(ctx, params)
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 同一家店的同一個 request_id 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它；不發事件、不動圖片引用。
+			// 同一家店的同一個 request_id 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它；不發事件，
+			// 圖片已 Confirm 過，所以以 errReplayed 回滾這個 transaction。
 			existing, ok, rerr := s.replay(ctx, q, st.StoreID, in.RequestID, hash)
 			if rerr != nil {
 				return rerr
@@ -272,19 +263,16 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 			if !ok {
 				return fmt.Errorf("social：貼文的 request_id %s 衝突，卻查不到原本那一篇", in.RequestID)
 			}
-			out, err = s.Own(ctx, st.StoreID, existing.ID)
-			return err
+			if out, err = s.Own(ctx, st.StoreID, existing.ID); err != nil {
+				return err
+			}
+			return errReplayed
 		}
 		if err != nil {
 			return fmt.Errorf("social：新增貼文：%w", err)
 		}
 		if err := s.writeTags(ctx, q, id, tags); err != nil {
 			return err
-		}
-		if asset != nil {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, ref); err != nil {
-				return err
-			}
 		}
 		if in.Publish {
 			if err := s.publishedEvent(ctx, row, now, model.OriginDirect, store.SocialPostSchedule{}, nil); err != nil {
@@ -299,7 +287,18 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 		}
 		return emit(ctx, s.d.Events, model.PostCreated{PostWritten: s.postWritten(out.ID, out.StoreID, out.Body, out.Version, actor)}, actor)
 	})
-	if err != nil {
+	if err != nil && in.RequestID != nil && errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+		// 並行的重送輸家：同一個圖片 token 已被贏家的 transaction 確認並提交（B1-D23），這時贏家的貼文讀得到；回滾後再 replay 一次，不加鎖。
+		row, ok, rerr := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash)
+		if rerr != nil {
+			return model.Post{}, rerr
+		}
+		if ok {
+			return s.Own(ctx, st.StoreID, row.ID)
+		}
+		return model.Post{}, err
+	}
+	if err != nil && !errors.Is(err, errReplayed) {
 		return model.Post{}, err
 	}
 	return out, nil
@@ -404,11 +403,6 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 			return model.Post{}, err
 		}
 	}
-	asset, err := s.finalizeImage(ctx, st, in.ImageToken)
-	if err != nil {
-		return model.Post{}, err
-	}
-	ref := mediaref.PostRef(in.PostID)
 	now := s.d.Now().UTC()
 	var out model.Post
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -418,9 +412,6 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 			return err
 		}
 		if err := rejectIfTakenDown(ctx, q, row.ID, text.PostUpdateTakenDown(uitext.LocaleFrom(ctx))); err != nil {
-			return err
-		}
-		if err := mediaref.Reject(ctx, q, ref, candidates(asset)...); err != nil {
 			return err
 		}
 		if row.Version != in.Version {
@@ -433,7 +424,7 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 		if in.SetProduct {
 			productID = in.ProductID
 		}
-		hasImage := row.ImageKey != nil && !in.ClearImage || asset != nil
+		hasImage := row.ImageKey != nil && !in.ClearImage || in.ImageToken != ""
 		scheduled, err := s.hasPendingSchedule(ctx, q, in.PostID)
 		if err != nil {
 			return err
@@ -444,6 +435,10 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 			}
 		}
 		params := store.UpdatePostParams{ID: in.PostID, Body: body, ProductID: productID, ClearImage: in.ClearImage, Now: now, ExpectedVersion: in.Version}
+		asset, err := s.confirmImage(ctx, st, in.ImageToken)
+		if err != nil {
+			return err
+		}
 		if asset != nil {
 			params.NewImageKey, params.NewImageAssetID = &asset.ObjectKey, &asset.ID
 		}
@@ -459,12 +454,15 @@ func (s *Service) Update(ctx context.Context, st seller.Store, in model.UpdatePo
 				return err
 			}
 		}
-		if (asset != nil || in.ClearImage) && row.ImageAssetID != nil {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, ref, *row.ImageAssetID); err != nil {
-				return err
-			}
-		} else if asset != nil {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, ref); err != nil {
+		kept := row.ImageAssetID
+		if in.ClearImage {
+			kept = nil
+		}
+		if asset != nil {
+			kept = &asset.ID
+		}
+		if retired := media.RetiredAssets(media.AssetIDs(row.ImageAssetID), media.AssetIDs(kept)); len(retired) > 0 {
+			if err := s.d.Media.MarkDeleted(ctx, retired); err != nil {
 				return err
 			}
 		}
@@ -569,7 +567,7 @@ func (s *Service) Unpublish(ctx context.Context, st seller.Store, postID uuid.UU
 }
 
 // DeleteOwn 軟刪貼文。不存在、已刪除與別家未公開的貼文回 NotFound（AIP-135），別家已公開的貼文回 PermissionDenied（lockOwned 的規則）；
-// 沒刪到不做副作用。version 為 0 表示不檢查版本。軟刪保留內容與圖片引用（保留期還沒訂，見 CARRYOVER）。
+// 沒刪到不做副作用。version 為 0 表示不檢查版本。軟刪保留內容與圖片（資產不標記刪除；保留期還沒訂，見 CARRYOVER）。
 func (s *Service) DeleteOwn(ctx context.Context, st seller.Store, postID uuid.UUID, version int64) error {
 	if err := seller.Authorize(st, seller.CapContentContract); err != nil {
 		return err
