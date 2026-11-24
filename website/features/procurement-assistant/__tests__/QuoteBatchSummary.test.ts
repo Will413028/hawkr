@@ -9,10 +9,12 @@ import {
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementSlots } from "@/features/procurement-assistant/types";
+import type {
+	ProcurementSlots,
+	PublishedRfqPublication,
+} from "@/features/procurement-assistant/types";
 import type { BuyerQuoteAcceptanceResponse } from "../buyer-quote-contract";
 import QuoteBatchSummary from "../QuoteBatchSummary";
-import type { PublishedRfqPublication } from "@/features/procurement-assistant/types";
 import type { RfqDealTruthCounts } from "../useRfqRuntimeSnapshot";
 
 /**

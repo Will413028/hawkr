@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 import {
 	applyOptimisticSelection,
 	deriveStageFromStatus,
@@ -9,7 +10,6 @@ import {
 	shouldAutofocusHandoff,
 	slotLabel,
 } from "../features/procurement-assistant/session-logic";
-import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 
 test("exact retry 沿用 clientRequestId；只要使用者改過文字就建立新 key", () => {
 	let sequence = 0;

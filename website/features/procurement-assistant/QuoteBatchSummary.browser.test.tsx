@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
+import type { PublishedRfqPublication } from "@/features/procurement-assistant/types";
 import { renderWithIntl } from "@/tests/browser/render";
 import type { BuyerQuoteAcceptanceResponse } from "./buyer-quote-contract";
 import QuoteBatchSummary from "./QuoteBatchSummary";
-import type { PublishedRfqPublication } from "@/features/procurement-assistant/types";
 
 function publicationWith(
 	counts: Partial<{

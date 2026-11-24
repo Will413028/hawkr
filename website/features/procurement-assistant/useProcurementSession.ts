@@ -84,7 +84,6 @@ import {
 import { fetchProcurementSnapshot } from "./snapshot";
 import { type AgentStep, mergeLiveStep } from "./steps";
 import { monotonicNow, trackHawkrAgentFirstStepLatency } from "./telemetry";
-import { type WatchOutcome, watchRun } from "./watch-run";
 import type {
 	ClarifyQuestion,
 	ProcurementCandidate,
@@ -97,6 +96,7 @@ import type {
 	ProcurementTurnResult,
 	PublishedRfqPublication,
 } from "./types";
+import { type WatchOutcome, watchRun } from "./watch-run";
 
 const MAX_MESSAGE_RUNES = 2000;
 const POLL_INTERVAL_MS = 1500;
