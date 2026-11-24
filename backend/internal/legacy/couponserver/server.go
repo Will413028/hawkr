@@ -8,7 +8,6 @@
 //   - 補償券的 GrantSellerCompensationCoupon 多一個必填的 source_id（售後單 id，D4），與 AFTERSALES_CASE 組成冪等鍵。
 //   - Consume、Release 以 order_no 為鍵（D3），instance_id 不讀；Java 在鎖券回應遺失時沒有 instance_id 也能釋放。
 //   - GrantSellerCompensationCoupon 的 message 欄位不讀：補償券模組沒有對應欄位，標題由「售後補償券 」加 ref_case_no 組成。
-//   - GrantSellerCompensationCoupon 的 message 欄位不讀：補償券模組沒有對應欄位，標題由「售後補償券 」加 ref_case_no 組成。
 //
 // Java 送的 couponTemplateId 是活動 id；每位買家在同一個活動至多持有一張券，所以對應是 (活動, 買家) → 券（D1）。沒有領過的
 // 回「未領取」，不當場發券。
