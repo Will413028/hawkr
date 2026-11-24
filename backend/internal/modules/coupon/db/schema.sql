@@ -71,6 +71,8 @@ CREATE TABLE coupon.coupon_campaigns (
 );
 -- 賣家的活動列表與配額計數（ACTIVE 且非補償）。
 CREATE INDEX campaigns_by_issuer_store ON coupon.coupon_campaigns (issuer_store_id, status) WHERE issuer_store_id IS NOT NULL;
+-- 後台列表（ListAdminCampaigns）：不含補償活動，新到舊的 keyset 分頁。
+CREATE INDEX campaigns_admin_list ON coupon.coupon_campaigns (created_at DESC, id DESC) WHERE target_type <> 'COMPENSATION';
 
 -- 買家持有的券（錢包）。領券、admin 發券、補償都只是建立一張 voucher；到期從活動的 end_at 推導。
 -- order_no 是持有（鎖定或核銷）這張券的訂單；一張訂單同時只持有一張券（vouchers_order_no_key）。

@@ -15,9 +15,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
+	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1"
+	admincouponconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1/couponv1alpha1connect"
-	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -34,23 +35,24 @@ type who struct{ Account, Buyer, Store string }
 //   - 舊的買家「我的券」是可領模板加已使用的券；單體是可領的活動（ListClaimableCampaigns）加持有的券（ListMyVouchers）。
 //   - 發行張數與上限不在買家的契約裡，driver 直接讀資料庫（只用在驗證計數）。
 //
-// 還沒有 admin 的 Connect API：Admin* 直接呼叫 coupon 模組準備資料，錯誤依同一套對應分類。
+// Admin* 經單體的 CouponAdminService（每個呼叫者一個 client，帶管理員 token 的是 ch.Admin）；Connect 的錯誤分類同上，
+// 沒有 coupon 原因的 failed_precondition 在 admin 方法上對應 ErrWrongStatus。
 type connectDriver struct {
 	clients map[ch.Caller]couponv1alpha1connect.CouponAppServiceClient
+	admins  map[ch.Caller]admincouponconnect.CouponAdminServiceClient
 	ids     map[ch.Caller]who
 	// buyerOf 是帳號 ID 對買家 ID（情境以帳號 ID 指定買家）。
 	buyerOf map[string]string
-	module  *coupon.Module
 	crm     *crm.Module
 	db      *db.DB
-	adminID int64
 }
 
 var _ Driver = (*connectDriver)(nil)
 
-func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller]string, ids map[ch.Caller]who, m *coupon.Module, customers *crm.Module, d *db.DB) *connectDriver {
+func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller]string, ids map[ch.Caller]who, customers *crm.Module, d *db.DB) *connectDriver {
 	drv := &connectDriver{
-		clients: map[ch.Caller]couponv1alpha1connect.CouponAppServiceClient{}, ids: ids, buyerOf: map[string]string{}, module: m, crm: customers, db: d, adminID: 7,
+		clients: map[ch.Caller]couponv1alpha1connect.CouponAppServiceClient{}, admins: map[ch.Caller]admincouponconnect.CouponAdminServiceClient{},
+		ids: ids, buyerOf: map[string]string{}, crm: customers, db: d,
 	}
 	for _, w := range ids {
 		drv.buyerOf[w.Account] = w.Buyer
@@ -66,12 +68,13 @@ func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller
 			}
 		}))
 		drv.clients[c] = couponv1alpha1connect.NewCouponAppServiceClient(httpClient, base, auth)
+		drv.admins[c] = admincouponconnect.NewCouponAdminServiceClient(httpClient, base, auth)
 	}
 	return drv
 }
 
 func (d *connectDriver) Legacy() bool   { return false }
-func (d *connectDriver) AdminRPC() bool { return false }
+func (d *connectDriver) AdminRPC() bool { return true }
 
 func (d *connectDriver) StoreOf(c ch.Caller) string      { return d.ids[c].Store }
 func (d *connectDriver) BuyerAccount(c ch.Caller) string { return d.ids[c].Account }
@@ -88,48 +91,46 @@ var reasonErrors = map[string]error{
 	"COUPON_NOT_ELIGIBLE":        ErrNotEligible,
 }
 
+// reasonKind 回傳 Connect 錯誤帶的 coupon ErrorInfo.reason 對應的 coupon 錯誤；沒有時 ok 為 false。
+func reasonKind(err error) (error, bool) {
+	var ce *connect.Error
+	if !errors.As(err, &ce) {
+		return nil, false
+	}
+	for _, detail := range ce.Details() {
+		v, e := detail.Value()
+		if e != nil {
+			continue
+		}
+		if info, ok := v.(*errdetails.ErrorInfo); ok {
+			if kind, ok := reasonErrors[info.GetReason()]; ok {
+				return apperr.WithCause(kind, err), true
+			}
+		}
+	}
+	return nil, false
+}
+
 // kindOf 把 Connect 錯誤分類：有 coupon 的 ErrorInfo.reason 就是對應的 coupon 錯誤，否則依 code。
 func kindOf(err error) error {
 	if err == nil {
 		return nil
 	}
-	var ce *connect.Error
-	if errors.As(err, &ce) {
-		for _, detail := range ce.Details() {
-			v, e := detail.Value()
-			if e != nil {
-				continue
-			}
-			if info, ok := v.(*errdetails.ErrorInfo); ok {
-				if kind, ok := reasonErrors[info.GetReason()]; ok {
-					return apperr.WithCause(kind, err)
-				}
-			}
-		}
+	if kind, ok := reasonKind(err); ok {
+		return kind
 	}
 	return ch.ConnectKind(err)
 }
 
-// moduleKind 對應 coupon 模組直接回的錯誤（Admin* 的準備動作）：業務原因先，其次分類。
-func moduleKind(err error) error {
+// adminKind 是 admin 方法的錯誤分類：coupon 的原因先，沒有原因的 failed_precondition 是「狀態不允許」。
+func adminKind(err error) error {
 	if err == nil {
 		return nil
 	}
-	reasons := map[coupon.Reason]error{
-		coupon.ReasonQuotaExceeded:     ErrQuotaExceeded,
-		coupon.ReasonIssueLimitReached: ErrSoldOut,
-		coupon.ReasonInvalidStatus:     ErrWrongStatus,
-		coupon.ReasonCampaignNotActive: ErrNotActive,
-		coupon.ReasonOutsideWindow:     ErrOutOfWindow,
-		coupon.ReasonNotEligible:       ErrNotEligible,
+	if _, ok := reasonKind(err); !ok && connect.CodeOf(err) == connect.CodeFailedPrecondition {
+		return apperr.WithCause(ErrWrongStatus, err)
 	}
-	if kind, ok := reasons[coupon.ReasonOf(err)]; ok {
-		return apperr.WithCause(kind, err)
-	}
-	if kind, ok := map[apperr.Kind]error{apperr.KindNotFound: ch.ErrNotFound, apperr.KindInvalidInput: ch.ErrInvalid}[apperr.KindOf(err)]; ok {
-		return apperr.WithCause(kind, err)
-	}
-	return err
+	return kindOf(err)
 }
 
 var (
@@ -411,103 +412,68 @@ func (d *connectDriver) SellerRevoke(ctx context.Context, c ch.Caller, id, _ str
 	return kindOf(err)
 }
 
-// 以下是 admin 的準備動作：沒有 admin 的 Connect API，直接呼叫 coupon 模組。
+// 以下是 admin 的方法：經 CouponAdminService。
 
-func parseID(id string) (uuid.UUID, error) {
-	u, err := uuid.Parse(id)
-	if err != nil {
-		return uuid.UUID{}, apperr.WithCause(ch.ErrInvalid, err)
+func (d *connectDriver) AdminCreate(ctx context.Context, c ch.Caller, in TemplateInput) (Template, error) {
+	campaign := &adminpb.AdminCampaignInput{
+		Title: in.Title, ThresholdAmount: in.Threshold, TargetType: targetOf(in.Target),
+		StartTime: timestamppb.New(in.StartAt), EndTime: timestamppb.New(in.EndAt), DesignatedBuyerIds: d.buyerIDs(in.BuyerAccounts),
 	}
-	return u, nil
-}
-
-func (d *connectDriver) AdminCreate(ctx context.Context, _ ch.Caller, in TemplateInput) (Template, error) {
-	spec := coupon.CampaignSpec{Title: in.Title, ThresholdAmount: in.Threshold, StartAt: in.StartAt, EndAt: in.EndAt}
 	switch in.Type {
 	case TypeCash:
-		spec.DiscountType, spec.DiscountAmount = coupon.DiscountCash, in.DiscountAmount
+		campaign.Discount = &adminpb.AdminCampaignInput_Cash{Cash: &pb.CashDiscount{Amount: in.DiscountAmount}}
 	case TypePercent:
-		spec.DiscountType, spec.DiscountPercent, spec.MaxDiscountAmount = coupon.DiscountPercent, int32(in.DiscountPercent), in.MaxDiscount //nolint:gosec // 情境的百分比很小
+		campaign.Discount = &adminpb.AdminCampaignInput_Percent{Percent: &pb.PercentDiscount{Percent: int32(in.DiscountPercent), MaxAmount: in.MaxDiscount}} //nolint:gosec // 情境的百分比很小
 	}
-	create := coupon.CreateCampaignInput{CampaignSpec: spec, TargetType: coupon.TargetType(in.Target), Issuer: coupon.Issuer{AdminID: d.adminID}, TotalLimit: int32(in.TotalIssueLimit)} //nolint:gosec // 情境的上限很小
 	if in.StoreID != "" {
-		store, err := strconv.ParseInt(in.StoreID, 10, 64)
-		if err != nil {
-			return Template{}, apperr.WithCause(ch.ErrInvalid, err)
-		}
-		create.StoreID = store
+		campaign.StoreId = &in.StoreID
 	}
-	for _, b := range d.buyerIDs(in.BuyerAccounts) {
-		id, err := strconv.ParseInt(b, 10, 64)
-		if err != nil {
-			return Template{}, apperr.WithCause(ch.ErrInvalid, err)
-		}
-		create.TargetBuyers = append(create.TargetBuyers, id)
+	if in.TotalIssueLimit > 0 {
+		limit := int32(in.TotalIssueLimit) //nolint:gosec // 情境的上限很小
+		campaign.TotalIssueLimit = &limit
 	}
-	camp, err := d.module.CreateCampaign(ctx, create)
+	res, err := d.admins[c].CreateCampaign(ctx, connect.NewRequest(&adminpb.CreateCampaignRequest{Campaign: campaign}))
 	if err != nil {
-		return Template{}, moduleKind(err)
+		return Template{}, adminKind(err)
 	}
-	t := Template{
-		ID: camp.ID.String(), Title: camp.Title, Type: CouponType(camp.DiscountType), Target: Target(camp.TargetType), Status: Status(camp.Status), Issuer: IssuerAdmin,
-		Threshold: camp.ThresholdAmount, DiscountAmount: camp.DiscountAmount, DiscountPercent: int(camp.DiscountPercent), MaxDiscount: camp.MaxDiscountAmount,
-		TotalIssueLimit: -1, IssuedCount: int(camp.IssuedCount),
-	}
-	if camp.TotalLimit != nil {
-		t.TotalIssueLimit = int(*camp.TotalLimit)
-	}
-	if camp.StoreID != nil {
-		t.StoreID = strconv.FormatInt(*camp.StoreID, 10)
-	}
-	return t, nil
+	return d.adminTemplate(ctx, res.Msg.GetCampaign()), nil
 }
 
-func (d *connectDriver) AdminPublish(ctx context.Context, _ ch.Caller, id string) error {
-	u, err := parseID(id)
-	if err != nil {
-		return err
+// adminTemplate 把後台看到的活動轉成情境的 Template：發行者看 oneof，名單與券數由 GetCampaign 補（這裡只轉規則與數量）。
+func (d *connectDriver) adminTemplate(ctx context.Context, c *adminpb.AdminCampaign) Template {
+	t := d.sellerTemplate(ctx, c.GetCampaign())
+	t.Issuer, t.IssuerStoreID = IssuerAdmin, ""
+	if c.GetIssuerStoreId() != "" {
+		t.Issuer, t.IssuerStoreID = IssuerSeller, c.GetIssuerStoreId()
 	}
-	return moduleKind(d.module.PublishCampaign(ctx, u))
+	return t
 }
 
-func (d *connectDriver) AdminDisable(ctx context.Context, _ ch.Caller, id string) error {
-	u, err := parseID(id)
-	if err != nil {
-		return err
-	}
-	_, err = d.module.EndCampaign(ctx, coupon.EndCampaignInput{CampaignID: u, AdminID: d.adminID})
-	return moduleKind(err)
+func (d *connectDriver) AdminPublish(ctx context.Context, c ch.Caller, id string) error {
+	_, err := d.admins[c].PublishCampaign(ctx, connect.NewRequest(&adminpb.PublishCampaignRequest{CampaignId: id}))
+	return adminKind(err)
 }
 
-func (d *connectDriver) AdminIssue(ctx context.Context, _ ch.Caller, id string, accounts []string, _ bool) (IssueResult, error) {
-	u, err := parseID(id)
-	if err != nil {
-		return IssueResult{}, err
-	}
-	var buyers []int64
-	for _, b := range d.buyerIDs(accounts) {
-		n, err := strconv.ParseInt(b, 10, 64)
-		if err != nil {
-			return IssueResult{}, apperr.WithCause(ch.ErrInvalid, err)
-		}
-		buyers = append(buyers, n)
-	}
-	res, err := d.module.Issue(ctx, coupon.IssueInput{CampaignID: u, BuyerIDs: buyers, AdminID: d.adminID})
-	return IssueResult{Issued: res.Issued, Distributed: res.Issued}, moduleKind(err)
+func (d *connectDriver) AdminDisable(ctx context.Context, c ch.Caller, id string) error {
+	_, err := d.admins[c].EndCampaign(ctx, connect.NewRequest(&adminpb.EndCampaignRequest{CampaignId: id}))
+	return adminKind(err)
 }
 
-func (d *connectDriver) AdminVoid(ctx context.Context, _ ch.Caller, id, reason string) error {
-	u, err := parseID(id)
+// AdminIssue 是 GrantVouchers；immediate（舊的代領）不再保留（D6），Distributed 恆為 0。
+func (d *connectDriver) AdminIssue(ctx context.Context, c ch.Caller, id string, accounts []string, _ bool) (IssueResult, error) {
+	res, err := d.admins[c].GrantVouchers(ctx, connect.NewRequest(&adminpb.GrantVouchersRequest{CampaignId: id, BuyerIds: d.buyerIDs(accounts)}))
 	if err != nil {
-		return err
+		return IssueResult{}, adminKind(err)
 	}
-	return moduleKind(d.module.VoidVoucher(ctx, coupon.VoidVoucherInput{VoucherID: u, AdminID: d.adminID, Reason: reason}))
+	return IssueResult{Issued: int(res.Msg.GetIssued())}, nil
 }
 
-func (d *connectDriver) AdminSetQuota(ctx context.Context, _ ch.Caller, storeID string, maxCount int) error {
-	id, err := strconv.ParseInt(storeID, 10, 64)
-	if err != nil {
-		return apperr.WithCause(ch.ErrInvalid, err)
-	}
-	return moduleKind(d.module.SetSellerQuota(ctx, id, int32(maxCount))) //nolint:gosec // 情境的配額很小
+func (d *connectDriver) AdminVoid(ctx context.Context, c ch.Caller, id, reason string) error {
+	_, err := d.admins[c].VoidVoucher(ctx, connect.NewRequest(&adminpb.VoidVoucherRequest{VoucherId: id, Reason: reason}))
+	return adminKind(err)
+}
+
+func (d *connectDriver) AdminSetQuota(ctx context.Context, c ch.Caller, storeID string, maxCount int) error {
+	_, err := d.admins[c].SetSellerQuota(ctx, connect.NewRequest(&adminpb.SetSellerQuotaRequest{StoreId: storeID, MaxActiveCampaigns: int32(maxCount)})) //nolint:gosec // 情境的配額很小
+	return adminKind(err)
 }

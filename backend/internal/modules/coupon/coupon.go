@@ -10,11 +10,13 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/admin"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/campaign"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/qualify"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/voucher"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
@@ -35,6 +37,9 @@ type Deps struct {
 	DB      *db.DB
 	Stores  Stores
 	Members Members
+	// Buyers 與 StoreDirectory 是後台寫入前的存在檢查（admin 建立限店活動與指定發放）。
+	Buyers         Buyers
+	StoreDirectory StoreDirectory
 	// NewID 產生活動與券的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
@@ -53,6 +58,7 @@ type (
 	Issuer         = model.Issuer
 	CampaignSpec   = model.CampaignSpec
 	Reason         = model.Reason
+	StoreState     = admin.StoreState
 
 	CreateCampaignInput = campaign.CreateInput
 	EndCampaignInput    = campaign.EndInput
@@ -80,6 +86,8 @@ type (
 	SellerCampaignPage = read.SellerCampaignPage
 	SellerCampaign     = read.SellerCampaign
 	CampaignDetail     = read.CampaignDetail
+	AdminListInput     = read.AdminListInput
+	AdminCampaignPage  = read.AdminCampaignPage
 )
 
 const (
@@ -110,11 +118,12 @@ const (
 	DefaultPageSize = read.DefaultPageSize
 	MaxPageSize     = read.MaxPageSize
 
-	MaxIssueBatch      = model.MaxIssueBatch
-	MaxTargetBuyers    = model.MaxTargetBuyers
-	MaxOrderNoLen      = model.MaxOrderNoLen
-	MaxOrderAmount     = model.MaxOrderAmount
-	DefaultSellerQuota = model.DefaultSellerQuota
+	MaxIssueBatch         = model.MaxIssueBatch
+	MaxIssueRequestBuyers = model.MaxIssueRequestBuyers
+	MaxTargetBuyers       = model.MaxTargetBuyers
+	MaxOrderNoLen         = model.MaxOrderNoLen
+	MaxOrderAmount        = model.MaxOrderAmount
+	DefaultSellerQuota    = model.DefaultSellerQuota
 
 	ReasonCampaignNotFound          = model.ReasonCampaignNotFound
 	ReasonVoucherNotFound           = model.ReasonVoucherNotFound
@@ -140,6 +149,7 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 
 // Module 是 coupon 模組。
 type Module struct {
+	admin    *admin.Service
 	campaign *campaign.Service
 	voucher  *voucher.Service
 	read     *read.Service
@@ -147,13 +157,16 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Stores == nil || d.Members == nil || d.NewID == nil || d.Now == nil {
-		panic("coupon：DB、Stores、Members、NewID 與 Now 是必要的")
+	if d.DB == nil || d.Stores == nil || d.Members == nil || d.Buyers == nil || d.StoreDirectory == nil || d.NewID == nil || d.Now == nil {
+		panic("coupon：DB、Stores、Members、Buyers、StoreDirectory、NewID 與 Now 是必要的")
 	}
 	q := qualify.New(qualify.Deps{DB: d.DB, Stores: d.Stores, Members: d.Members})
+	camp := campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now})
+	vouch := voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now})
 	return &Module{
-		campaign: campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
-		voucher:  voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now}),
+		admin:    admin.New(admin.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Campaign: camp, Voucher: vouch, Buyers: d.Buyers, Directory: d.StoreDirectory}),
+		campaign: camp,
+		voucher:  vouch,
 		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
 	}
 }

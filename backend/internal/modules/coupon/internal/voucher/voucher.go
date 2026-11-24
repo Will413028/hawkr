@@ -135,7 +135,7 @@ func (s *Service) create(ctx context.Context, q *store.Queries, campaignID uuid.
 	return rows.Voucher(row), nil
 }
 
-// IssueInput 是 admin 指定發放的輸入。
+// IssueInput 是 admin 指定發放的輸入；只能發放平台發的非補償活動，店家發的與補償活動回 NotFound。
 type IssueInput struct {
 	CampaignID uuid.UUID
 	BuyerIDs   []int64
@@ -155,12 +155,15 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 	if in.AdminID <= 0 {
 		return IssueResult{}, model.Invalid(ctx, "AdminID", model.InvalidAdminIDInvalid)
 	}
-	if len(in.BuyerIDs) == 0 || len(in.BuyerIDs) > model.MaxIssueBatch {
+	if len(in.BuyerIDs) > model.MaxIssueRequestBuyers {
 		return IssueResult{}, model.Invalid(ctx, "BuyerIDs", model.InvalidBuyerCountInvalid)
 	}
 	buyers, err := model.PositiveUnique(ctx, "BuyerIDs", in.BuyerIDs)
 	if err != nil {
 		return IssueResult{}, err
+	}
+	if len(buyers) == 0 || len(buyers) > model.MaxIssueBatch {
+		return IssueResult{}, model.Invalid(ctx, "BuyerIDs", model.InvalidBuyerCountInvalid)
 	}
 	var res IssueResult
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -173,6 +176,9 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 			return err
 		}
 		c := rows.Campaign(crow)
+		if c.IssuerStoreID != nil || c.TargetType == model.TargetCompensation {
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
+		}
 		if c.TargetType != model.TargetDesignated {
 			return model.Precondition(ctx, model.ReasonNotDesignated)
 		}

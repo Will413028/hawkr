@@ -79,6 +79,17 @@ WHERE issuer_store_id = sqlc.arg(store_id) AND target_type <> 'COMPENSATION'
 ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(max_rows);
 
+-- name: ListAdminCampaigns :many
+-- 後台的活動列表：平台與店家發的活動，不含系統建立的補償活動；status、issuer_type（ADMIN 或 SELLER）、issuer_store_id 為 NULL 是不篩選。
+SELECT * FROM coupon.coupon_campaigns
+WHERE target_type <> 'COMPENSATION'
+  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+  AND (sqlc.narg(issuer_type)::text IS NULL OR issuer_type = sqlc.narg(issuer_type)::text)
+  AND (sqlc.narg(issuer_store_id)::bigint IS NULL OR issuer_store_id = sqlc.narg(issuer_store_id)::bigint)
+  AND (sqlc.narg(after_created_at)::timestamptz IS NULL OR (created_at, id) < (sqlc.narg(after_created_at)::timestamptz, sqlc.narg(after_id)::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(max_rows);
+
 -- name: ListClaimCandidates :many
 -- 買家可能領得到的活動：ACTIVE、時間窗涵蓋 now、不是補償、還有名額、買家還沒有這個活動的券、DESIGNATED 的名單有這位買家；store_id 有值時只留該店與全平台的活動。
 -- 店家停權與 MEMBER 資格不在這裡：由 qualify.Check 判定（唯一的判定函式，這裡只是不讓明顯不可能的列進來）。

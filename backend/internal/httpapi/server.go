@@ -38,6 +38,7 @@ import (
 	adminbizcalendarconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
+	admincouponconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
 	adminimageaiconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	adminmoderationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
@@ -468,6 +469,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(couponv1alpha1connect.NewCouponAppServiceHandler(couponApp, opts...))
+	add(admincouponconnect.NewCouponAdminServiceHandler(httpcoupon.NewAdmin(deps.Coupon), opts...))
 	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
 	if err != nil {
 		return nil, err
