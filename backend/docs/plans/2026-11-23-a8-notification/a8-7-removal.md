@@ -85,3 +85,4 @@ Java 與舊 Go 服務送出、只有 `notification.*` 綁定的 key 會變成無
 - 留下的死碼：`backend/pkg/mail`（`MAIL_*` 的讀取者）已沒有 importer；`MqConstants.java` 的 `EXCHANGE_ACCOUNT`、`EXCHANGE_CONTENT`、`EXCHANGE_IM` 等指向已不存在 exchange 的常數。兩者屬還沒搬的舊服務，隨各自搬遷退場（§5）；`pkg/mail` 在 A8-8 收尾時確認並刪。
 - CodeMeta 重新生成時帶出的 `registry.go`、`InvoiceInboxDisposition.java`、`ReportTargetType.java` 說明文字，來源 `.md` 早已改過，只是生成物同步。
 - 本機沒跑：Java 測試、integration、docker、`promtool`（未安裝）。
+- 與 `origin/dev` 合併時（a9-6 已刪 ai-service 與 gateway 的 AI 代理）：`ProdOtlpServiceAbsent` 告警兩個目標服務都已不在，整條刪除；`ai_assistant_stream.go` 隨 dev 刪除；`maxRESTOperations` 改 246（合併後實數）。
