@@ -167,6 +167,23 @@ func (service *Service) AccountIDByBuyerID(ctx context.Context, id int64) (int64
 	return row.AccountID, nil
 }
 
+// ListLiveAccounts 回傳 buyer_id 大於 afterBuyerID、尚未關閉（營運中與刪除中）的買家與其帳號，依 buyer_id 由小到大，最多 limit 筆
+// （1 到 MaxLiveAccountsPage）；回傳不足 limit 筆即沒有更多。不加鎖：讀到的買家之後可能被關閉，寫入端要自己用 ShareLockByAccount 守門。
+func (service *Service) ListLiveAccounts(ctx context.Context, afterBuyerID int64, limit int) ([]model.AccountRef, error) {
+	if afterBuyerID < 0 || limit < 1 || limit > model.MaxLiveAccountsPage {
+		return nil, apperr.InvalidInput("買家分頁參數不合法")
+	}
+	rows, err := store.New(service.deps.DB.Conn(ctx)).ListLiveAccounts(ctx, store.ListLiveAccountsParams{AfterBuyerID: afterBuyerID, PageSize: int32(limit)}) //nolint:gosec // 上面已限制在 1 到 1000
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.AccountRef, len(rows))
+	for i, r := range rows {
+		out[i] = model.AccountRef{BuyerID: r.BuyerID, AccountID: r.AccountID}
+	}
+	return out, nil
+}
+
 // BatchDisplay 批次讀取顯示資料，CLOSED stint 回 Deleted 且不回個資。
 func (service *Service) BatchDisplay(ctx context.Context, ids []int64) ([]model.Display, error) {
 	if err := model.BatchIDs(ids); err != nil {

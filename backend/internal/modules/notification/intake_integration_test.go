@@ -98,7 +98,7 @@ type pushParams struct {
 }
 
 var testPush = registry.Define(registry.Definition[pushParams]{
-	Name: "test_push", Audience: model.AudienceBuyer, Category: model.CategoryLike, Presentation: model.PresentationSocial,
+	Name: "test_push", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelPush, model.ChannelEmail},
 	IdempotencySource: "test.Push.EventID",
 	IdempotencyKey:    func(p pushParams) string { return p.EventID },
@@ -111,7 +111,7 @@ var testPush = registry.Define(registry.Definition[pushParams]{
 })
 
 var testLike = registry.Define(registry.Definition[likeParams]{
-	Name: "test_like", Audience: model.AudienceBuyer, Category: model.CategoryLike, Presentation: model.PresentationSocial,
+	Name: "test_like", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox},
 	IdempotencySource: "test.Like.EventID",
 	IdempotencyKey:    func(p likeParams) string { return p.EventID },
@@ -133,7 +133,7 @@ var testLike = registry.Define(registry.Definition[likeParams]{
 
 // testTwin 與 testLike 的原始聚合鍵相同，驗證聚合鍵以型別名稱為前綴。
 var testTwin = registry.Define(registry.Definition[likeParams]{
-	Name: "test_agg_twin", Audience: model.AudienceBuyer, Category: model.CategoryLike, Presentation: model.PresentationSocial,
+	Name: "test_agg_twin", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox},
 	IdempotencySource: "test.Twin.EventID",
 	IdempotencyKey:    func(p likeParams) string { return p.EventID },
@@ -156,7 +156,7 @@ type storeNoteParams struct {
 
 // testStoreNote 是 STORE 受眾、有收件匣與推播的測試型別；testStorePushOnly 只有推播（意圖只經投遞紀錄找得到）。
 var testStoreNote = registry.Define(registry.Definition[storeNoteParams]{
-	Name: "test_store_note", Audience: model.AudienceStore, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
+	Name: "test_store_note", Audiences: []model.Audience{model.AudienceStore}, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelPush},
 	IdempotencySource: "test.StoreNote.EventID",
 	IdempotencyKey:    func(p storeNoteParams) string { return p.EventID },
@@ -171,7 +171,7 @@ var testStoreNote = registry.Define(registry.Definition[storeNoteParams]{
 })
 
 var testStorePushOnly = registry.Define(registry.Definition[storeNoteParams]{
-	Name: "test_store_push_only", Audience: model.AudienceStore, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
+	Name: "test_store_push_only", Audiences: []model.Audience{model.AudienceStore}, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
 	Channels:          []model.Channel{model.ChannelPush},
 	IdempotencySource: "test.StorePushOnly.EventID",
 	IdempotencyKey:    func(p storeNoteParams) string { return p.EventID },
@@ -201,6 +201,10 @@ func (testRegistry) Lookup(name string) (registry.Entry, bool) {
 		return testStorePushOnly, true
 	}
 	return registry.Lookup(name)
+}
+
+func (testRegistry) All() []registry.Entry {
+	return append(registry.All(), testLike, testPush, testTwin, testStoreNote, testStorePushOnly)
 }
 
 // fakeStores 取代 seller：測試只需要「店家是否已退場」。沒登記的店視為存在、營運中。
@@ -677,5 +681,41 @@ func TestSkippedIntentsAreLogged(t *testing.T) {
 	}
 	if !warned {
 		t.Fatalf("買家列不存在的略過沒有以 Warn 記錄：%q", f.logs.String())
+	}
+}
+
+// 收件匣列表用注入的註冊表：intake 寫進來的測試型別（只在測試註冊表裡）列得出來。
+func TestListInboxUsesTheInjectedRegistry(t *testing.T) {
+	f := setupIntake(t)
+	acct := f.newAccount(t)
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "e1", PostID: "p", ActorID: acct + 1})
+	f.run(t)
+	page, err := f.module.ListInbox(context.Background(), Recipient{AccountID: acct, Audience: AudienceBuyer}, nil, uitext.ZhTW, nil, 10)
+	if err != nil || len(page.Items) != 1 || page.Total != 1 {
+		t.Fatalf("測試型別的列沒列出來：%v %+v", err, page)
+	}
+}
+
+// 一列組不出文字（參數快照壞掉）只被記錄並略過，其他列照常列出；Total 仍計入它（只依型別篩選）。
+func TestListInboxSkipsARowThatCannotRender(t *testing.T) {
+	f := setupIntake(t)
+	acct := f.newAccount(t)
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "e1", PostID: "p", ActorID: acct + 1})
+	f.accept(t, "test_push", pushParams{AccountID: acct, EventID: "e2"})
+	f.run(t)
+	var badID uuid.UUID
+	if err := f.db.Pool().QueryRow(context.Background(),
+		`UPDATE notification.inbox_items SET params = '"broken"'::jsonb WHERE account_id = $1 AND type = 'test_like' RETURNING id`, acct).Scan(&badID); err != nil {
+		t.Fatal(err)
+	}
+	page, err := f.module.ListInbox(context.Background(), Recipient{AccountID: acct, Audience: AudienceBuyer}, nil, uitext.ZhTW, nil, 10)
+	if err != nil {
+		t.Fatalf("一列壞掉不該讓整份收件匣失敗：%v", err)
+	}
+	if len(page.Items) != 1 || page.Total != 2 {
+		t.Fatalf("items = %d、total = %d，預期 1 與 2", len(page.Items), page.Total)
+	}
+	if out := f.logs.String(); !strings.Contains(out, badID.String()) || !strings.Contains(out, "test_like") {
+		t.Fatalf("沒有記下壞掉的列：%s", out)
 	}
 }

@@ -27,7 +27,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/imageai/v1alpha1/imageai.proto.
  */
 export const file_hawkr_admin_imageai_v1alpha1_imageai: GenFile = /*@__PURE__*/
-  fileDesc("CipoYXdrci9hZG1pbi9pbWFnZWFpL3YxYWxwaGExL2ltYWdlYWkucHJvdG8SHGhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEisAMKB0FpU3R5bGUSDwoCaWQYASABKAlCA+BBCBIUCgRuYW1lGAIgASgJQgbgQQLgQQUSEgoFbGFiZWwYAyABKAlCA+BBAhITCgZwcm9tcHQYBCABKAlCA+BBAhI0Cgl0aHVtYm5haWwYBSABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBAxIjChZ0aHVtYm5haWxfc3RhZ2VkX3Rva2VuGAYgASgJQgPgQQQSFQoNZGlzcGxheV9vcmRlchgHIAEoBRIVCg1kZWZhdWx0X3N0eWxlGAggASgIEg8KB2VuYWJsZWQYCSABKAgSQQoIY2F0ZWdvcnkYCiABKA4yJy5oYXdrci5pbWFnZWFpLnYxYWxwaGExLkFpU3R5bGVDYXRlZ29yeUIG4EEC4EEFEjQKC2NyZWF0ZV90aW1lGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKC3VwZGF0ZV90aW1lGAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEgwKBGV0YWcYDSABKAkiwAEKB0FpUXVvdGESGAoIc3RvcmVfaWQYASABKAlCBuBBCOBBBRIZCgx3ZWVrbHlfbGltaXQYAiABKAVCA+BBAhIZCgx3ZWVrbHlfdXNhZ2UYAyABKAVCA+BBAxIMCgRtZW1vGAQgASgJEhMKBmN1c3RvbRgFIAEoCEID4EEDEjQKC3VwZGF0ZV90aW1lGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEgwKBGV0YWcYByABKAkiagobTGlzdEFpU3R5bGVzRm9yQWRtaW5SZXF1ZXN0Ej4KCGNhdGVnb3J5GAEgASgOMicuaGF3a3IuaW1hZ2VhaS52MWFscGhhMS5BaVN0eWxlQ2F0ZWdvcnlIAIgBAUILCglfY2F0ZWdvcnkiWAocTGlzdEFpU3R5bGVzRm9yQWRtaW5SZXNwb25zZRI4CglhaV9zdHlsZXMYASADKAsyJS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkFpU3R5bGUiVAoUQ3JlYXRlQWlTdHlsZVJlcXVlc3QSPAoIYWlfc3R5bGUYASABKAsyJS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkFpU3R5bGVCA+BBAiJQChVDcmVhdGVBaVN0eWxlUmVzcG9uc2USNwoIYWlfc3R5bGUYASABKAsyJS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkFpU3R5bGUihQEKFFVwZGF0ZUFpU3R5bGVSZXF1ZXN0EjwKCGFpX3N0eWxlGAEgASgLMiUuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5BaVN0eWxlQgPgQQISLwoLdXBkYXRlX21hc2sYAiABKAsyGi5nb29nbGUucHJvdG9idWYuRmllbGRNYXNrIlAKFVVwZGF0ZUFpU3R5bGVSZXNwb25zZRI3CghhaV9zdHlsZRgBIAEoCzIlLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuQWlTdHlsZSI1ChREZWxldGVBaVN0eWxlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EECEgwKBGV0YWcYAiABKAkiFwoVRGVsZXRlQWlTdHlsZVJlc3BvbnNlIioKEUdldEFpUXVvdGFSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQIiTQoSR2V0QWlRdW90YVJlc3BvbnNlEjcKCGFpX3F1b3RhGAEgASgLMiUuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5BaVF1b3RhIoUBChRVcGRhdGVBaVF1b3RhUmVxdWVzdBI8CghhaV9xdW90YRgBIAEoCzIlLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuQWlRdW90YUID4EECEi8KC3VwZGF0ZV9tYXNrGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFzayJQChVVcGRhdGVBaVF1b3RhUmVzcG9uc2USNwoIYWlfcXVvdGEYASABKAsyJS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkFpUXVvdGEiOwoURGVsZXRlQWlRdW90YVJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIMCgRldGFnGAIgASgJIhcKFURlbGV0ZUFpUXVvdGFSZXNwb25zZTKCBwoTSW1hZ2VBaUFkbWluU2VydmljZRKSAQoUTGlzdEFpU3R5bGVzRm9yQWRtaW4SOS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkxpc3RBaVN0eWxlc0ZvckFkbWluUmVxdWVzdBo6Lmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuTGlzdEFpU3R5bGVzRm9yQWRtaW5SZXNwb25zZSIDkAIBEngKDUNyZWF0ZUFpU3R5bGUSMi5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkNyZWF0ZUFpU3R5bGVSZXF1ZXN0GjMuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5DcmVhdGVBaVN0eWxlUmVzcG9uc2USeAoNVXBkYXRlQWlTdHlsZRIyLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuVXBkYXRlQWlTdHlsZVJlcXVlc3QaMy5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLlVwZGF0ZUFpU3R5bGVSZXNwb25zZRJ4Cg1EZWxldGVBaVN0eWxlEjIuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5EZWxldGVBaVN0eWxlUmVxdWVzdBozLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuRGVsZXRlQWlTdHlsZVJlc3BvbnNlEnQKCkdldEFpUXVvdGESLy5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkdldEFpUXVvdGFSZXF1ZXN0GjAuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5HZXRBaVF1b3RhUmVzcG9uc2UiA5ACARJ4Cg1VcGRhdGVBaVF1b3RhEjIuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5VcGRhdGVBaVF1b3RhUmVxdWVzdBozLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuVXBkYXRlQWlRdW90YVJlc3BvbnNlEngKDURlbGV0ZUFpUXVvdGESMi5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkRlbGV0ZUFpUXVvdGFSZXF1ZXN0GjMuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5EZWxldGVBaVF1b3RhUmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_imageai_v1alpha1_imageai]);
+  fileDesc("CipoYXdrci9hZG1pbi9pbWFnZWFpL3YxYWxwaGExL2ltYWdlYWkucHJvdG8SHGhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEitQMKB0FpU3R5bGUSDwoCaWQYASABKAlCA+BBCBIUCgRuYW1lGAIgASgJQgbgQQLgQQUSEgoFbGFiZWwYAyABKAlCA+BBAhITCgZwcm9tcHQYBCABKAlCA+BBAhI0Cgl0aHVtYm5haWwYBSABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBAxIjChZ0aHVtYm5haWxfc3RhZ2VkX3Rva2VuGAYgASgJQgPgQQQSFQoNZGlzcGxheV9vcmRlchgHIAEoBRIaCg1kZWZhdWx0X3N0eWxlGAggASgIQgPgQQMSDwoHZW5hYmxlZBgJIAEoCBJBCghjYXRlZ29yeRgKIAEoDjInLmhhd2tyLmltYWdlYWkudjFhbHBoYTEuQWlTdHlsZUNhdGVnb3J5QgbgQQLgQQUSNAoLY3JlYXRlX3RpbWUYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSNAoLdXBkYXRlX3RpbWUYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSDAoEZXRhZxgNIAEoCSLAAQoHQWlRdW90YRIYCghzdG9yZV9pZBgBIAEoCUIG4EEI4EEFEhkKDHdlZWtseV9saW1pdBgCIAEoBUID4EECEhkKDHdlZWtseV91c2FnZRgDIAEoBUID4EEDEgwKBG1lbW8YBCABKAkSEwoGY3VzdG9tGAUgASgIQgPgQQMSNAoLdXBkYXRlX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSDAoEZXRhZxgHIAEoCSJqChtMaXN0QWlTdHlsZXNGb3JBZG1pblJlcXVlc3QSPgoIY2F0ZWdvcnkYASABKA4yJy5oYXdrci5pbWFnZWFpLnYxYWxwaGExLkFpU3R5bGVDYXRlZ29yeUgAiAEBQgsKCV9jYXRlZ29yeSJYChxMaXN0QWlTdHlsZXNGb3JBZG1pblJlc3BvbnNlEjgKCWFpX3N0eWxlcxgBIAMoCzIlLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuQWlTdHlsZSJUChRDcmVhdGVBaVN0eWxlUmVxdWVzdBI8CghhaV9zdHlsZRgBIAEoCzIlLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuQWlTdHlsZUID4EECIlAKFUNyZWF0ZUFpU3R5bGVSZXNwb25zZRI3CghhaV9zdHlsZRgBIAEoCzIlLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuQWlTdHlsZSKFAQoUVXBkYXRlQWlTdHlsZVJlcXVlc3QSPAoIYWlfc3R5bGUYASABKAsyJS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkFpU3R5bGVCA+BBAhIvCgt1cGRhdGVfbWFzaxgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2siUAoVVXBkYXRlQWlTdHlsZVJlc3BvbnNlEjcKCGFpX3N0eWxlGAEgASgLMiUuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5BaVN0eWxlIjkKGFNldERlZmF1bHRBaVN0eWxlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EECEgwKBGV0YWcYAiABKAkiVAoZU2V0RGVmYXVsdEFpU3R5bGVSZXNwb25zZRI3CghhaV9zdHlsZRgBIAEoCzIlLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuQWlTdHlsZSI1ChREZWxldGVBaVN0eWxlUmVxdWVzdBIPCgJpZBgBIAEoCUID4EECEgwKBGV0YWcYAiABKAkiFwoVRGVsZXRlQWlTdHlsZVJlc3BvbnNlIioKEUdldEFpUXVvdGFSZXF1ZXN0EhUKCHN0b3JlX2lkGAEgASgJQgPgQQIiTQoSR2V0QWlRdW90YVJlc3BvbnNlEjcKCGFpX3F1b3RhGAEgASgLMiUuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5BaVF1b3RhIoUBChRVcGRhdGVBaVF1b3RhUmVxdWVzdBI8CghhaV9xdW90YRgBIAEoCzIlLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuQWlRdW90YUID4EECEi8KC3VwZGF0ZV9tYXNrGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFzayJQChVVcGRhdGVBaVF1b3RhUmVzcG9uc2USNwoIYWlfcXVvdGEYASABKAsyJS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkFpUXVvdGEiOwoURGVsZXRlQWlRdW90YVJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAhIMCgRldGFnGAIgASgJIhcKFURlbGV0ZUFpUXVvdGFSZXNwb25zZTKJCAoTSW1hZ2VBaUFkbWluU2VydmljZRKSAQoUTGlzdEFpU3R5bGVzRm9yQWRtaW4SOS5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkxpc3RBaVN0eWxlc0ZvckFkbWluUmVxdWVzdBo6Lmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuTGlzdEFpU3R5bGVzRm9yQWRtaW5SZXNwb25zZSIDkAIBEngKDUNyZWF0ZUFpU3R5bGUSMi5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkNyZWF0ZUFpU3R5bGVSZXF1ZXN0GjMuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5DcmVhdGVBaVN0eWxlUmVzcG9uc2USeAoNVXBkYXRlQWlTdHlsZRIyLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuVXBkYXRlQWlTdHlsZVJlcXVlc3QaMy5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLlVwZGF0ZUFpU3R5bGVSZXNwb25zZRKEAQoRU2V0RGVmYXVsdEFpU3R5bGUSNi5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLlNldERlZmF1bHRBaVN0eWxlUmVxdWVzdBo3Lmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuU2V0RGVmYXVsdEFpU3R5bGVSZXNwb25zZRJ4Cg1EZWxldGVBaVN0eWxlEjIuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5EZWxldGVBaVN0eWxlUmVxdWVzdBozLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuRGVsZXRlQWlTdHlsZVJlc3BvbnNlEnQKCkdldEFpUXVvdGESLy5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkdldEFpUXVvdGFSZXF1ZXN0GjAuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5HZXRBaVF1b3RhUmVzcG9uc2UiA5ACARJ4Cg1VcGRhdGVBaVF1b3RhEjIuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5VcGRhdGVBaVF1b3RhUmVxdWVzdBozLmhhd2tyLmFkbWluLmltYWdlYWkudjFhbHBoYTEuVXBkYXRlQWlRdW90YVJlc3BvbnNlEngKDURlbGV0ZUFpUXVvdGESMi5oYXdrci5hZG1pbi5pbWFnZWFpLnYxYWxwaGExLkRlbGV0ZUFpUXVvdGFSZXF1ZXN0GjMuaGF3a3IuYWRtaW4uaW1hZ2VhaS52MWFscGhhMS5EZWxldGVBaVF1b3RhUmVzcG9uc2ViBnByb3RvMw", [file_google_api_field_behavior, file_google_protobuf_field_mask, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_imageai_v1alpha1_imageai]);
 
 /**
  * AiStyle 是後台看到的修圖風格。
@@ -81,8 +81,8 @@ export type AiStyle = Message<"hawkr.admin.imageai.v1alpha1.AiStyle"> & {
   displayOrder: number;
 
   /**
-   * 是否為該用途的預設風格；同一個用途只有一個預設。只能設成 true（原本的預設自動取消）；
-   * 設成 false 回 invalid_argument，換預設只能把另一個風格設成 true。
+   * 是否為該用途的預設風格；同一個用途只有一個預設。唯讀：新增的風格都不是預設，修改時 update_mask 內的這個欄位會被忽略，
+   * 換預設用 SetDefaultAiStyle。目前的預設風格不能刪除，也不能停用（failed_precondition）。
    *
    * @generated from field: bool default_style = 8;
    */
@@ -302,6 +302,47 @@ export const UpdateAiStyleResponseSchema: GenMessage<UpdateAiStyleResponse> = /*
   messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 7);
 
 /**
+ * @generated from message hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleRequest
+ */
+export type SetDefaultAiStyleRequest = Message<"hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * 選填；帶了就必須與目前的版本相符。
+   *
+   * @generated from field: string etag = 2;
+   */
+  etag: string;
+};
+
+/**
+ * Describes the message hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleRequest.
+ * Use `create(SetDefaultAiStyleRequestSchema)` to create a new message.
+ */
+export const SetDefaultAiStyleRequestSchema: GenMessage<SetDefaultAiStyleRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 8);
+
+/**
+ * @generated from message hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleResponse
+ */
+export type SetDefaultAiStyleResponse = Message<"hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleResponse"> & {
+  /**
+   * @generated from field: hawkr.admin.imageai.v1alpha1.AiStyle ai_style = 1;
+   */
+  aiStyle?: AiStyle | undefined;
+};
+
+/**
+ * Describes the message hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleResponse.
+ * Use `create(SetDefaultAiStyleResponseSchema)` to create a new message.
+ */
+export const SetDefaultAiStyleResponseSchema: GenMessage<SetDefaultAiStyleResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 9);
+
+/**
  * @generated from message hawkr.admin.imageai.v1alpha1.DeleteAiStyleRequest
  */
 export type DeleteAiStyleRequest = Message<"hawkr.admin.imageai.v1alpha1.DeleteAiStyleRequest"> & {
@@ -323,7 +364,7 @@ export type DeleteAiStyleRequest = Message<"hawkr.admin.imageai.v1alpha1.DeleteA
  * Use `create(DeleteAiStyleRequestSchema)` to create a new message.
  */
 export const DeleteAiStyleRequestSchema: GenMessage<DeleteAiStyleRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 8);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 10);
 
 /**
  * @generated from message hawkr.admin.imageai.v1alpha1.DeleteAiStyleResponse
@@ -336,7 +377,7 @@ export type DeleteAiStyleResponse = Message<"hawkr.admin.imageai.v1alpha1.Delete
  * Use `create(DeleteAiStyleResponseSchema)` to create a new message.
  */
 export const DeleteAiStyleResponseSchema: GenMessage<DeleteAiStyleResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 9);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 11);
 
 /**
  * @generated from message hawkr.admin.imageai.v1alpha1.GetAiQuotaRequest
@@ -353,7 +394,7 @@ export type GetAiQuotaRequest = Message<"hawkr.admin.imageai.v1alpha1.GetAiQuota
  * Use `create(GetAiQuotaRequestSchema)` to create a new message.
  */
 export const GetAiQuotaRequestSchema: GenMessage<GetAiQuotaRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 10);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 12);
 
 /**
  * @generated from message hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse
@@ -370,7 +411,7 @@ export type GetAiQuotaResponse = Message<"hawkr.admin.imageai.v1alpha1.GetAiQuot
  * Use `create(GetAiQuotaResponseSchema)` to create a new message.
  */
 export const GetAiQuotaResponseSchema: GenMessage<GetAiQuotaResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 11);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 13);
 
 /**
  * @generated from message hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest
@@ -394,7 +435,7 @@ export type UpdateAiQuotaRequest = Message<"hawkr.admin.imageai.v1alpha1.UpdateA
  * Use `create(UpdateAiQuotaRequestSchema)` to create a new message.
  */
 export const UpdateAiQuotaRequestSchema: GenMessage<UpdateAiQuotaRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 12);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 14);
 
 /**
  * @generated from message hawkr.admin.imageai.v1alpha1.UpdateAiQuotaResponse
@@ -411,7 +452,7 @@ export type UpdateAiQuotaResponse = Message<"hawkr.admin.imageai.v1alpha1.Update
  * Use `create(UpdateAiQuotaResponseSchema)` to create a new message.
  */
 export const UpdateAiQuotaResponseSchema: GenMessage<UpdateAiQuotaResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 13);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 15);
 
 /**
  * @generated from message hawkr.admin.imageai.v1alpha1.DeleteAiQuotaRequest
@@ -435,7 +476,7 @@ export type DeleteAiQuotaRequest = Message<"hawkr.admin.imageai.v1alpha1.DeleteA
  * Use `create(DeleteAiQuotaRequestSchema)` to create a new message.
  */
 export const DeleteAiQuotaRequestSchema: GenMessage<DeleteAiQuotaRequest> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 14);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 16);
 
 /**
  * @generated from message hawkr.admin.imageai.v1alpha1.DeleteAiQuotaResponse
@@ -448,7 +489,7 @@ export type DeleteAiQuotaResponse = Message<"hawkr.admin.imageai.v1alpha1.Delete
  * Use `create(DeleteAiQuotaResponseSchema)` to create a new message.
  */
 export const DeleteAiQuotaResponseSchema: GenMessage<DeleteAiQuotaResponse> = /*@__PURE__*/
-  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 15);
+  messageDesc(file_hawkr_admin_imageai_v1alpha1_imageai, 17);
 
 /**
  * ImageAiAdminService 只有管理員能呼叫。
@@ -485,8 +526,20 @@ export const ImageAiAdminService: GenService<{
     output: typeof UpdateAiStyleResponseSchema;
   },
   /**
+   * SetDefaultAiStyle（自訂方法，AIP-136）把風格設成它用途的預設風格：同一個 transaction 內取消同用途原本的預設，
+   * 回傳更新後的風格。目標是停用的回 failed_precondition，不存在回 not_found；已經是預設時成功且不改任何東西（仍回傳該風格）。
+   * 帶了 etag 就必須與目前的版本相符，不符回 ABORTED（VERSION_CONFLICT）。
+   *
+   * @generated from rpc hawkr.admin.imageai.v1alpha1.ImageAiAdminService.SetDefaultAiStyle
+   */
+  setDefaultAiStyle: {
+    methodKind: "unary";
+    input: typeof SetDefaultAiStyleRequestSchema;
+    output: typeof SetDefaultAiStyleResponseSchema;
+  },
+  /**
    * DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
-   * 先把另一個風格的 default_style 設成 true。
+   * 先對另一個風格呼叫 SetDefaultAiStyle。
    *
    * @generated from rpc hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiStyle
    */

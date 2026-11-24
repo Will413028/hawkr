@@ -80,6 +80,23 @@ func (s *Service) LockNotRetired(ctx context.Context, storeID int64) error {
 	return stint.RequireNotRetiredShared(ctx, store.New(s.d.DB.Conn(ctx)), storeID)
 }
 
+// ListLiveStoreAccounts 回傳 store_id 大於 afterStoreID、尚未退場的店家與其帳號，依 store_id 由小到大，最多 limit 筆（1 到 MaxLiveStoresPage）。
+// 不加鎖：讀到的店家之後可能退場，寫入端要自己用 LockNotRetired 守門。
+func (s *Service) ListLiveStoreAccounts(ctx context.Context, afterStoreID int64, limit int) ([]model.StoreAccount, error) {
+	if afterStoreID < 0 || limit < 1 || limit > model.MaxLiveStoresPage {
+		return nil, apperr.InvalidInput("店家分頁參數不合法")
+	}
+	rows, err := store.New(s.d.DB.Conn(ctx)).ListLiveStoreAccounts(ctx, store.ListLiveStoreAccountsParams{AfterStoreID: afterStoreID, PageSize: int32(limit)}) //nolint:gosec // 上面已限制在 1 到 1000
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.StoreAccount, len(rows))
+	for i, r := range rows {
+		out[i] = model.StoreAccount{StoreID: r.StoreID, AccountID: r.AccountID}
+	}
+	return out, nil
+}
+
 // BeginDeletion 讓目前的 stint 隨帳號刪除進入等待，同一個 transaction 發出 StorePendingDeletion 並排入快取失效；已在
 // 等待時不做任何事（不重發），已關閉時成功（重送安全）。
 //

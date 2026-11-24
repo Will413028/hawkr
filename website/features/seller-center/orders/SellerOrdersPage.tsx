@@ -52,9 +52,9 @@ import {
 	useSellerShipmentAnomalies,
 	useSellerShipmentAnomalyStats,
 } from "@/lib/hooks/useSellerShipmentAnomalies";
+import { useSellerWorkspaceRealtimeStatus } from "@/lib/hooks/useSellerWorkspaceRealtime";
 import { uploadImageFile } from "@/lib/media/upload";
 import { LOCATION_CHANGE_EVENT } from "@/lib/navigation/location-change";
-import { useNotificationStreamStatus } from "@/lib/notifications/unread-context";
 import { fetchOrder } from "@/lib/orders/repo";
 import type { Order } from "@/lib/orders/types";
 import { STATUS_LABEL } from "@/lib/orders/types";
@@ -526,7 +526,7 @@ export default function SellerOrdersPage() {
 	// （統計卡 / 訂單列 / 售後列 / drawer），由外框的 `useSellerWorkspaceRealtime` 讓快取失效。
 	// 連線狀態必須接出來：連線被 429 回絕或重連預算耗盡時串流會停止供應更新且不報錯，
 	// 丟掉它等於讓賣家在毫無提示的情況下失去即時同步——畫面照常，只是新訂單再也不會自己出現。
-	const realtimeStatus = useNotificationStreamStatus();
+	const realtimeStatus = useSellerWorkspaceRealtimeStatus();
 	// The 配送異常 quick-filter badge must mirror the backend rollup exactly.
 	// Do not derive this number from currently loaded order rows: pagination,
 	// order visibility, or orderNo de-dupe can make the row count differ from

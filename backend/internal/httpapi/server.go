@@ -38,7 +38,9 @@ import (
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
+	adminimageaiconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	adminmoderationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
+	adminnotificationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/notification/v1alpha1/notificationv1alpha1connect"
 	adminpaymentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
 	adminreviewqueueconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/reviewqueue/v1alpha1/reviewqueuev1alpha1connect"
 	adminsellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1/sellerv1alpha1connect"
@@ -53,6 +55,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/imageai/v1alpha1/imageaiv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/review/v1alpha1/reviewv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
@@ -61,6 +64,7 @@ import (
 	httpimageai "github.com/Will413028/hawkr/backend/internal/httpapi/imageai"
 	httpmedia "github.com/Will413028/hawkr/backend/internal/httpapi/media"
 	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
+	httpnotification "github.com/Will413028/hawkr/backend/internal/httpapi/notification"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
 	httpreview "github.com/Will413028/hawkr/backend/internal/httpapi/review"
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
@@ -79,6 +83,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -126,11 +131,13 @@ type Deps struct {
 	Moderation *moderation.Module
 	// Media 是公開圖片的暫存上傳（MediaAppService）；nil 時每個方法回 unavailable。
 	Media *media.Module
+	// Notification 是通知：登入帳號的收件匣、偏好、裝置 token 與訊號串流（NotificationAppService）與後台公告（NotificationAdminService）。
+	Notification *notification.Module
 	// Assistant 是買家助理（AssistantAppService）。
 	Assistant *assistant.Module
 	// Procurement 是買家採購（BuyerProcurementAppService）。
 	Procurement *procurement.Module
-	// ImageAI 是賣家修圖（ImageAiAppService）。
+	// ImageAI 是賣家修圖（ImageAiAppService）與營運後台的風格、額度管理（ImageAiAdminService）。
 	ImageAI *imageai.Module
 	// Stats 是店家統計與卡片評分的組裝（粉絲、評價；review 還在舊服務），必填：店面頁、賣家自己的店與所有店家卡片共用同一份，由組裝點以
 	// httpseller.NewStatsSource 建立。
@@ -223,6 +230,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Moderation == nil {
 		return nil, fmt.Errorf("httpapi：ModerationAppService、ModerationAdminService 與 SocialAdminService 需要 Moderation")
+	}
+	if deps.Notification == nil {
+		return nil, fmt.Errorf("httpapi：NotificationAppService 與 NotificationAdminService 需要 Notification")
 	}
 	if deps.Assistant == nil {
 		return nil, fmt.Errorf("httpapi：AssistantAppService 需要 Assistant")
@@ -441,7 +451,13 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(moderationv1alpha1connect.NewModerationAppServiceHandler(moderationApp, opts...))
+	notificationApp, err := httpnotification.NewApp(deps.Notification, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(notificationv1alpha1connect.NewNotificationAppServiceHandler(notificationApp, opts...))
 	add(adminmoderationconnect.NewModerationAdminServiceHandler(httpmoderation.NewAdmin(deps.Moderation), opts...))
+	add(adminnotificationconnect.NewNotificationAdminServiceHandler(httpnotification.NewAdmin(deps.Notification), opts...))
 	socialAdmin, err := httpsocial.NewAdmin(deps.Social, deps.Moderation, deps.Images)
 	if err != nil {
 		return nil, err
@@ -513,6 +529,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
 	add(procurementv1alpha1connect.NewBuyerProcurementAppServiceHandler(httpbuyerprocurement.NewApp(deps.Procurement, deps.Buyer, deps.Seller, deps.Images, deps.Logger), opts...))
 	add(imageaiv1alpha1connect.NewImageAiAppServiceHandler(httpimageai.NewApp(deps.ImageAI, deps.Seller, deps.Images, deps.Logger), append(slices.Clone(opts), connect.WithReadMaxBytes(imageAIMaxRequestBytes))...))
+	add(adminimageaiconnect.NewImageAiAdminServiceHandler(httpimageai.NewAdmin(deps.ImageAI, deps.Images), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
 	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
 	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)

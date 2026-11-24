@@ -51,12 +51,24 @@ type InternalGraph struct {
 
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
+	"coupon": {Packages: map[string][]string{
+		"campaign": {"model", "rows", "store"},
+		"model":    {"text"},
+		"qualify":  {"model", "store"},
+		"rows":     {"model", "store"},
+		"store":    {},
+		"text":     {},
+		"voucher":  {"model", "qualify", "rows", "store"},
+	}},
 	"notification": {Packages: map[string][]string{
+		"announce": {"intake", "model", "store"},
+		"app":      {"model", "registry", "store", "text"},
 		"intake":   {"model", "registry", "store"},
 		"model":    {},
 		"purge":    {"model", "store"},
 		"registry": {"model", "text"},
 		"store":    {},
+		"stream":   {"model", "store"},
 		"text":     {},
 	}},
 	"crm": {Packages: map[string][]string{
@@ -88,7 +100,9 @@ var InternalDependencies = map[string]InternalGraph{
 		"write": {"model", "rows", "store", "text"},
 	}},
 	"imageai": {Packages: map[string][]string{
+		"admin":     {"model", "store", "text"}, // 後台的風格與額度維護（7 支）；縮圖與 seller 經介面，由根套件組裝
 		"limit":     {},
+		"mediaref":  {"store"},
 		"model":     {},
 		"quota":     {"model", "store"},
 		"store":     {},

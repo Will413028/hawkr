@@ -53,3 +53,66 @@ func AccountUnsuspendedTitle(l uitext.Locale) uitext.Message {
 	}
 	return uitext.Message{Text: "帳號已解除停權", Locale: uitext.ZhTW}
 }
+
+// AudienceInvalid 是模組句子 audience.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func AudienceInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The notification audience is not valid.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "通知的受眾不正確。", Locale: uitext.ZhTW}
+}
+
+// DeviceAppInvalid 是模組句子 device_app.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DeviceAppInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The app for the push token must be the buyer app or the seller app.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "推播 token 所屬的 App 必須是買家 App 或賣家 App。", Locale: uitext.ZhTW}
+}
+
+// DeviceTokenInvalid 是模組句子 device_token.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func DeviceTokenInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The push token must be 1 to 4096 characters.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "推播 token 必須是 1 到 4096 個字元。", Locale: uitext.ZhTW}
+}
+
+// InboxItemBatchInvalid 是模組句子 inbox_item.batch_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InboxItemBatchInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Delete between 1 and 100 distinct notifications at a time.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "一次要刪除 1 到 100 則不重複的通知。", Locale: uitext.ZhTW}
+}
+
+// InboxItemNotFound 是模組句子 inbox_item.not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InboxItemNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Notification not found.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "找不到這則通知。", Locale: uitext.ZhTW}
+}
+
+// PreferenceCannotDisable 是模組句子 preference.cannot_disable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PreferenceCannotDisable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This notification cannot be turned off.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "這個通知無法關閉。", Locale: uitext.ZhTW}
+}
+
+// PreferenceNotAvailable 是模組句子 preference.not_available；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PreferenceNotAvailable(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "This notification setting is not available.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "沒有這個通知設定。", Locale: uitext.ZhTW}
+}

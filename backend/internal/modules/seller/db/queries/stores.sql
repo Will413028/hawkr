@@ -237,3 +237,11 @@ SELECT
 FROM seller.stores st
 LEFT JOIN seller.kyc_applications k ON k.store_id = st.store_id AND k.status <> 'CANCELLED'
 WHERE st.status <> 'CLOSED';
+
+-- name: ListLiveStoreAccounts :many
+-- 尚未退場（retired_at 為空；營運中、關店、等待刪除都算）的店家 (store_id, account_id)，依 store_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知公告）。
+SELECT store_id, account_id
+FROM seller.stores
+WHERE retired_at IS NULL AND store_id > sqlc.arg(after_store_id)
+ORDER BY store_id
+LIMIT sqlc.arg(page_size);

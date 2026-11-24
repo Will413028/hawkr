@@ -93,7 +93,7 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 | §5.4 #51 `chat.message.sent`（seller，chat，visible） | 這個事件要通知 | 成立（需求）；模板資料、字串欄位取值、`reference_id_template` 不成立 | 型別註冊表的 typed 型別：typed 參數、受眾、偏好分類、呈現分類、冪等鍵來源、zh-TW／en 文案（D1、D4、D6） | 改寫成 型別 `chat_message`（STORE 受眾，只推播不寫收件匣；D3；A8-3） |
 | §5.4 #67 `merchant.verification.approved`（seller，system，visible） | 這個事件要通知 | 成立（需求）；模板資料、字串欄位取值、`reference_id_template` 不成立 | 型別註冊表的 typed 型別：typed 參數、受眾、偏好分類、呈現分類、冪等鍵來源、zh-TW／en 文案（D1、D4、D6） | 改寫成 型別 `kyc_approved`（STORE、交易必要、`ACCOUNT`；A8-3） |
 | §5.4 #70 `merchant.verification.rejected`（seller，system，visible） | 這個事件要通知 | 成立（需求）；模板資料、字串欄位取值、`reference_id_template` 不成立 | 型別註冊表的 typed 型別：typed 參數、受眾、偏好分類、呈現分類、冪等鍵來源、zh-TW／en 文案（D1、D4、D6） | 改寫成 型別 `kyc_rejected`（STORE、交易必要、`ACCOUNT`，帶退回理由；A8-3） |
-| §5.4 #72 `notification.announcement`（seller，system，visible） | 後台對全體發公告 | 不成立：模板是標記列（disabled）、`hawkr.notification` 不被消費；公告是資料不是事件型別 | 公告是資料，收件匣與推播分開 job（A8-2、A8-3） | 改寫成 後台公告資料（非事件型別，收件匣與推播分開 job；A8-2、A8-3） |
+| §5.4 #72 `notification.announcement`（seller，system，visible） | 後台對全體發公告 | 不成立：模板是標記列（disabled）、`hawkr.notification` 不被消費；公告是資料、派送是 Fanout 型別 | 公告是資料，收件匣與推播分開 job（A8-2、A8-3） | 改寫成 後台公告資料（註冊表的 Fanout 型別 `announcement`，不走意圖管線；收件匣與推播分開 job；A8-2c 建，推播渠道 A8-3） |
 | §5.4 #83 `product.restock.target`（buyer，restock，visible） | 這個事件要通知 | 成立（需求）；模板資料、字串欄位取值、`reference_id_template` 不成立 | 型別註冊表的 typed 型別：typed 參數、受眾、偏好分類、呈現分類、冪等鍵來源、zh-TW／en 文案（D1、D4、D6） | 改寫成 型別 `product_restocked`（BUYER、行銷、`PROMOTION`；D4；A8-3） |
 | §5.4 #84 `review.created`（seller，order_update，visible） | 這個事件要通知 | 成立（需求）；模板資料、字串欄位取值、`reference_id_template` 不成立 | 型別註冊表的 typed 型別：typed 參數、受眾、偏好分類、呈現分類、冪等鍵來源、zh-TW／en 文案（D1、D4、D6） | 改寫成 型別 `review_created`（STORE、互動、`REVIEW`；A8-3） |
 | §5.4 #85 `seller.suspended.notice`（seller，seller_account，visible） | 這個事件要通知 | 成立（需求）；模板資料、字串欄位取值、`reference_id_template` 不成立 | 型別註冊表的 typed 型別：typed 參數、受眾、偏好分類、呈現分類、冪等鍵來源、zh-TW／en 文案（D1、D4、D6） | 改寫成 型別 `store_suspended`（STORE、交易必要、`ACCOUNT`；A8-3） |
@@ -107,6 +107,8 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 | 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
 |---|---|---|---|---|
 | gateway 對 notification-service 的 16 支 gRPC 與一條 SSE（`inventory.md` §1，含錯誤吞掉的呼叫與跨身分的串流） | 四個 client 要讀寫收件匣、偏好、token 與公告 | 不成立：舊 REST、手寫 client 與 gRPC 呼叫隨 A8-7 刪除；缺陷 #8、#11、#17、#18、#19 在舊傳輸層 | Connect service 加生成的 client，錯誤用 `ErrorReason`，分頁 cursor，串流只傳失效訊號 | 全部在 A8-2 重新設計，本步驟不新增對外方法；`inventory.md` §1 的去向欄為準 |
+
+- 收件匣列表依 `updated_at` 排序分頁：聚合列合併新事件會更新 `updated_at`（依最後活動排，是有意的），所以翻頁途中被合併的列可能跳過或重複；client 收到串流失效訊號時從第一頁重新整理，不接著用舊的 page token。
 
 ## 意圖管線（A8-1b）
 
@@ -128,3 +130,4 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 - 裝置 token 以 token 為主鍵、綁一個帳號與一支 App，沒有 `platform`、`is_active`，記 `last_registered_at`。
 - 偏好是 `(account_id, 受眾, 分類, 渠道, enabled)` 覆寫列；分類是 D4 的 14 個，渠道含收件匣與 email，不可關的規則在 `internal/model`。
 - 通知型別、文案、深連結、聚合鍵、冪等鍵來源與渠道在 `internal/registry` 與 `internal/text`，沒有模板表；兩個型別 `account_suspended`、`account_unsuspended` 是舊模板沒有的新型別（舊模板只有店家版）。
+- 已刪除的公告可能被派送期間重試的頁 job 重新建出收件匣或投遞紀錄（窗口只在派送進行中的重試）；接受，不記帳。

@@ -1,16 +1,16 @@
 # imageai 模組行為規格
 
-本文是單體 `imageai` 模組行為的唯一來源：賣家的 AI 修圖、修圖配額與後台風格管理。A9-4a 完成資料表、圖片模型、配額與併發上限；A9-4b 完成賣家的 `TransformImage`、`ListAiStyles`（use case、handler 與掛載）；後台 7 支隨 A9-4c。
+本文是單體 `imageai` 模組行為的唯一來源：賣家的 AI 修圖、修圖配額與後台風格管理。A9-4a 完成資料表、圖片模型、配額與併發上限；A9-4b 完成賣家的 `TransformImage`、`ListAiStyles`（use case、handler 與掛載）；A9-4c 完成後台 8 支（`ImageAiAdminService`：權限與稽核宣告、同 transaction 稽核、縮圖 media 引用、etag 與 update_mask、掛載）。
 
 ## 1. 範圍與公開介面
 
 - 來源是 ai-service；搬遷計畫與決定見 `backend/docs/plans/2026-11-19-a9-agent.md`（邊界 A9-D3）。
 - 依賴：seller、media。
-- 目前的公開方法：`Transform`、`ListStyles`、`CurrentUsage`（唯讀，不扣額度）、`ConsumeQuota`、`RefundQuota`、`AcquireTransformSlot`、`OnStoreRetired`；`ReadConfig` 讀設定。`Deps` 帶 `Seller`（確認店家未退場）與 `Images`（`llm.ImageGenerator`）。
+- 目前的公開方法：`Transform`、`ListStyles`、`CurrentUsage`（唯讀，不扣額度）、`ConsumeQuota`、`RefundQuota`、`AcquireTransformSlot`、`OnStoreRetired`；後台的 `ListStylesForAdmin`、`ReadStyleForAdmin`、`CreateStyle`、`UpdateStyle`、`DeleteStyle`、`GetQuota`、`UpdateQuota`、`DeleteQuota`（§7）與縮圖引用的 `SyncMedia`、`SweepMedia`、`AddWorkers`、`PeriodicJobs`；`ReadConfig` 讀設定。`Deps` 帶 `Seller`（確認店家未退場）、`Images`（`llm.ImageGenerator`）；後台另需 `Stores`（`seller.Store`，確認店家存在）、`Media`、`Jobs`、`NewID`。
 
 ## 2. 資料
 
-schema `imageai`，三張表，沒有預約表（A9-D9）：
+schema `imageai`，三張業務表，沒有預約表（A9-D9），另有縮圖引用的同步狀態 `media_ref_sync`、`retired_assets`（做法同 `content`，ADR `2026-10-03-media-references-owner-side`）：
 
 | 表 | 內容 |
 |---|---|
@@ -18,7 +18,7 @@ schema `imageai`，三張表，沒有預約表（A9-D9）：
 | `quotas` | 個別設定的每週額度，`store_id` 為主鍵，`weekly_limit >= 0`，`version` 是 etag |
 | `usage` | 每店一列（主鍵 `store_id`）：`period_start` 是計數所屬的週，`used` 計數器 `>= 0`；新的一週由扣額度的 UPSERT 重設 |
 
-- migration seed 每個用途（`PRODUCT`、`POST`）一筆中性預設風格（A9-D39）；伺服器沒有寫死的後備提示詞。預設風格不可刪（`failed_precondition`，不新增 ErrorReason），`default_style` 只能設成 true、設成 false 回 `invalid_argument`，換預設只能把另一筆設成 true。
+- migration seed 每個用途（`PRODUCT`、`POST`）一筆中性預設風格（A9-D39）；伺服器沒有寫死的後備提示詞。預設風格不可刪（`failed_precondition`，不新增 ErrorReason）；`default_style` 是 OUTPUT_ONLY，換預設只有自訂方法 `SetDefaultAiStyle`（AIP-136）。
 - `store_id` 是 bigint 外部鍵，沒有跨 schema FK。店家退場（`seller.StoreRetired`）時，同 transaction 刪該店的 `quotas` 與 `usage` 列，冪等。
 
 ## 3. 額度
@@ -54,3 +54,13 @@ schema `imageai`，三張表，沒有預約表（A9-D9）：
 `ListAiStyles`：用途沒設是 `PRODUCT`，`UNSPECIFIED` 回 `invalid_argument`（`category`）。一個查詢取該用途啟用中的風格，依 `display_order`、`name` 排序；預設風格只提供 `default_prompt`、不在清單；用途沒有啟用中的預設風格是不變量被破壞（內部錯誤）。不快取。本週用量走唯讀的 `CurrentUsage`，資料庫錯誤往上回。縮圖是 `hawkr.common.v1alpha1.Image`，`thumbnail_key` 空字串時不設。
 
 `ImageAiAppService` 單獨把 Connect 讀取上限設成 3 MiB（A9-D42，〈API 設計規範（Connect）〉§十），其他 service 維持 2 MiB。
+
+## 7. 後台（`ImageAiAdminService`）
+
+8 支方法在 `internal/modules/imageai/internal/admin`，handler 在 `internal/httpapi/imageai/admin.go`。權限：`imageai.ai_styles.{list,create,update,set_default,delete}`、`imageai.ai_quotas.{get,update,delete}`（`adminperm`）；讀 2 支宣告 `readOnly`，寫 6 支宣告 `audited`，每個寫入在同一個 transaction 內呼叫 `adminaudit.Record`（目標種類 `ai_style`、`ai_quota`；detail 不放提示詞與備註）。
+
+- 風格：etag 是 `version`。`UpdateAiStyle` 必須帶 etag（沒帶 `invalid_argument` 指向 `ai_style.etag`），不符 `aborted` 與 `VERSION_CONFLICT`；`DeleteAiStyle` 的 etag 選填，帶了就檢查。handler 以 `update_mask` 把欄位套在目前的風格上（規則同 content 後台：沒帶 mask 是有設值的欄位，`name`、`category` 是 IMMUTABLE，與目前不同回 `invalid_argument`）再交給模組。名稱在用途內重複回 `already_exists`。
+- 縮圖：只收 staged token（新增必填，修改空字串沿用）。轉正在 transaction 外，業務列寫入、`media.SyncReject`、`SyncChanged`（記退場並排同步 job）與稽核同一個 transaction；引用只由 `imageai.media_sync` job 寫入。刪除風格把縮圖記成退場。沒有縮圖的風格（migration seed 的預設風格）沒有資產，同步時不 Link。
+- 預設風格（A9-D39，改由 A9-D43 取代）：`AiStyle.default_style` 是 OUTPUT_ONLY：`CreateAiStyle` 忽略它（新增的風格都不是預設），`UpdateAiStyle` 的 `update_mask` 列了它也略過、不回錯。換預設只有 `SetDefaultAiStyle(id, etag?)`：先鎖住該用途的全部風格列（依 id 排序，同用途的 SetDefault 因此串行，不會撞部分唯一索引），同 transaction 取消原本的預設再標記目標，目標的 etag 加一、原預設的 etag 也加一；只寫目標的一筆稽核，detail 的 `previous_default` 是原預設的 id。目標停用 `failed_precondition`、不存在 `not_found`、帶了 etag 不符 `aborted`（`VERSION_CONFLICT`）；目標已經是預設時成功、什麼都不改、不寫稽核，仍回傳該風格。刪除預設風格、經 `UpdateAiStyle` 停用目前的預設風格都是 `failed_precondition`。DB 的 `styles_default_per_category`、`styles_default_enabled_check` 照舊。
+- 提示詞：去頭尾空白（`trimtext.Trim`）後 1 到 500 個 rune（A9-D40，與修圖同一條規則）；`label`、`name` 去空白後不可空白。
+- 額度：`GetAiQuota` 先經 `seller.Store` 確認店存在（A9-D41），不存在 `not_found`；沒有個別設定回預設額度、`custom=false`、沒有 etag。`UpdateAiQuota`、`DeleteAiQuota` 在 transaction 內經 `seller.LockNotRetired` 確認店家存在且未退場（不為已退場的店重建額度列，與修圖的守門同理），不存在或已退場 `not_found`。`UpdateAiQuota`：沒有個別設定且沒帶 etag 建立；有個別設定卻沒帶 etag `already_exists`（`VERSION_CONFLICT`）；etag 過期、或帶了 etag 但個別設定已被刪除 `aborted`；`weekly_limit` 0 到 1000，超出 `invalid_argument`；建立（目前沒有個別設定）時 `weekly_limit` 必填：在 `update_mask` 內，沒有 mask 時要非零，否則 `invalid_argument` 指向 `ai_quota.weekly_limit`（handler 檢查）；`memo` 去頭尾空白。沒帶 mask 的更新只套有設值的欄位，所以要把上限改成 0 必須在 mask 列 `weekly_limit`。`DeleteAiQuota` 沒有個別設定 `not_found`。

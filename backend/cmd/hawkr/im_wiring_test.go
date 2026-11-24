@@ -8,6 +8,7 @@ import (
 	"go/token"
 	"net"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 )
@@ -28,24 +29,79 @@ func funcBody(t *testing.T, name string) *ast.BlockStmt {
 	return nil
 }
 
-// runsIMThrough 回報函式本體是否把 imModule.Run 交給 serveWithRun。
+// runsIMThrough 回報函式本體是否把 imModule.Run 交給 serveWithRun（直接，或經 joinRuns）。
 func runsIMThrough(body *ast.BlockStmt) (servesWithRun, referencesRun bool) {
+	return runsModuleThrough(body, "imModule")
+}
+
+// runsModuleThrough 回報函式本體是否把 <module>.Run 交給 serveWithRun（直接，或在 joinRuns 的參數裡），以及是否引用了它。
+func runsModuleThrough(body *ast.BlockStmt, module string) (servesWithRun, referencesRun bool) {
+	isRun := func(e ast.Expr) bool {
+		sel, ok := e.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "Run" {
+			return false
+		}
+		id, ok := sel.X.(*ast.Ident)
+		return ok && id.Name == module
+	}
 	ast.Inspect(body, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.SelectorExpr:
-			if id, ok := x.X.(*ast.Ident); ok && id.Name == "imModule" && x.Sel.Name == "Run" {
+			if isRun(x) {
 				referencesRun = true
 			}
 		case *ast.CallExpr:
 			if id, ok := x.Fun.(*ast.Ident); ok && id.Name == "serveWithRun" && len(x.Args) >= 2 {
-				if sel, ok := x.Args[1].(*ast.SelectorExpr); ok && sel.Sel.Name == "Run" {
+				if isRun(x.Args[1]) {
 					servesWithRun = true
+				}
+				if call, ok := x.Args[1].(*ast.CallExpr); ok {
+					if fn, ok := call.Fun.(*ast.Ident); ok && fn.Name == "joinRuns" && slices.ContainsFunc(call.Args, isRun) {
+						servesWithRun = true
+					}
 				}
 			}
 		}
 		return true
 	})
 	return servesWithRun, referencesRun
+}
+
+// notification 的串流 hub 在 serve 與 server 同一個生命週期（拿掉就沒有 LISTEN 連線，worker 發的通知永遠到不了訂閱者）；worker 沒有串流 handler，不跑 Run。
+func TestServeRunsTheNotificationHubAndWorkerDoesNot(t *testing.T) {
+	if served, _ := runsModuleThrough(funcBody(t, "runServe"), "notificationModule"); !served {
+		t.Error("runServe 沒有以 serveWithRun 跑 notificationModule.Run")
+	}
+	if served, referenced := runsModuleThrough(funcBody(t, "runWorker"), "notificationModule"); served || referenced {
+		t.Error("runWorker 不得跑 notificationModule.Run：worker 沒有串流 handler")
+	}
+}
+
+func TestJoinRunsCancelsTheRestWhenOneFails(t *testing.T) {
+	boom := errors.New("listen 失敗")
+	stopped := make(chan struct{})
+	waiting := func(ctx context.Context) error { <-ctx.Done(); close(stopped); return ctx.Err() }
+	err := joinRuns(waiting, func(context.Context) error { return boom })(t.Context())
+	if !errors.Is(err, boom) {
+		t.Fatalf("失敗要回傳：%v", err)
+	}
+	select {
+	case <-stopped:
+	default:
+		t.Fatal("另一個元件沒有被取消")
+	}
+}
+
+func TestJoinRunsReturnsNilWhenCtxEnds(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	waitingA := func(ctx context.Context) error { <-ctx.Done(); return nil }
+	waitingB := func(ctx context.Context) error { <-ctx.Done(); return nil }
+	done := make(chan error, 1)
+	go func() { done <- joinRuns(waitingA, waitingB)(ctx) }()
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("ctx 結束應回 nil：%v", err)
+	}
 }
 
 // serve 的 im.Module.Run 與 server 同一個生命週期（拿掉就沒有 LISTEN 連線，串流的事件永遠到不了）；worker 沒有串流 handler，不跑 Run。

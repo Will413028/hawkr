@@ -24,27 +24,3 @@ export interface NotificationNewEventDetail {
 	item: NotificationItem;
 	unreadCount: number;
 }
-
-/**
- * Window-level event for seller-workspace changes (`seller.order.updated`,
- * `seller.after_sale.updated`). They ride the same `/app/notifications/stream`
- * connection that `NotificationUnreadProvider` owns; the provider re-publishes
- * them here so the workspace shell can subscribe without opening a second
- * connection (same reason as `NOTIFICATION_NEW_EVENT`).
- */
-export const SELLER_WORKSPACE_EVENT = "hk:seller:workspace";
-
-export interface SellerWorkspaceEventDetail {
-	kind: "order" | "after_sale";
-	orderNo: string;
-	afterSaleCaseNo?: string;
-	status?: string;
-}
-
-/**
- * Window-level event published once when the stream may have missed events:
- * the server reported a buffer miss on reconnect, or the reconnect budget ran
- * out (`unavailable`). Subscribers re-read everything they cache instead of
- * trusting incremental events.
- */
-export const NOTIFICATION_STREAM_RESYNC_EVENT = "hk:notification:resync";

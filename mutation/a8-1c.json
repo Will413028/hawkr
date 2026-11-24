@@ -31,8 +31,8 @@
    "id": "worker-recipient-gone-check-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/intake/intake.go",
-   "old": "\t\tif gone {\n\t\t\treturn s.scrubSkipped",
-   "new": "\t\tif gone && false {\n\t\t\treturn s.scrubSkipped",
+   "old": "\t\tif gone != GoneNone {\n\t\t\ts.logGone",
+   "new": "\t\tif gone != GoneNone && false {\n\t\t\ts.logGone",
    "test": "internal/modules/notification ^TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing$",
    "why": "The worker no longer skips an intent whose buyer is closed or whose store is retired, so it rebuilds rows for a purged recipient."
   },
@@ -49,8 +49,8 @@
    "id": "worker-skip-keeps-intent-params",
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/intake/intake.go",
-   "old": "\t\tif gone {\n\t\t\treturn s.scrubSkipped(ctx, intent.ID)\n\t\t}",
-   "new": "\t\tif gone {\n\t\t\treturn nil\n\t\t}",
+   "old": "\t\t\ts.logGone(ctx, intent, gone)\n\t\t\treturn s.scrubSkipped(ctx, intent.ID)",
+   "new": "\t\t\ts.logGone(ctx, intent, gone)\n\t\t\treturn nil",
    "test": "internal/modules/notification ^TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing$",
    "why": "Process skips an intent for a closed buyer or retired store without clearing its params, so the personal data stays for the 180-day retention."
   },
@@ -66,11 +66,11 @@
   {
    "id": "worker-account-missing-keeps-intent-params",
    "stack": "go-integration",
-   "file": "backend/internal/modules/notification/internal/intake/intake.go",
-   "old": "\"收件帳號不存在，略過通知\", \"intent_id\", intent.ID, \"type\", intent.Type)\n\t\t\t\treturn s.scrubSkipped(ctx, intent.ID)",
-   "new": "\"收件帳號不存在，略過通知\", \"intent_id\", intent.ID, \"type\", intent.Type)\n\t\t\t\treturn nil",
+   "file": "backend/internal/modules/notification/internal/intake/locks.go",
+   "old": "if apperr.KindOf(err) == apperr.KindNotFound {\n\t\t\treturn GoneNoAccount, nil",
+   "new": "if apperr.KindOf(err) == apperr.KindNotFound && false {\n\t\t\treturn GoneNoAccount, nil",
    "test": "internal/modules/notification ^TestIntentForAMissingAccountWritesNothingAndScrubsParams$",
-   "why": "Process skips an intent whose recipient account does not exist without clearing its params, so the personal data stays for the 180-day retention."
+   "why": "A recipient account that does not exist is no longer classified as gone, so Process fails with a lock error instead of skipping the intent and clearing its params."
   }
  ]
 }

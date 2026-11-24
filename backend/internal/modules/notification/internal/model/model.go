@@ -156,7 +156,7 @@ func ClassOf(c PrefCategory) (CategoryClass, bool) {
 	return d.class, ok
 }
 
-// Delivers 回報受眾 a 的分類 c 會不會送達渠道 ch；偏好 API 只列送達的組合。目前只有公告不寄 email，其餘分類全部渠道都送達。
+// Delivers 回報受眾 a 的分類 c 允許送達渠道 ch（分類本身的上限：目前只有公告不寄 email）。實際送達的組合再由註冊表推導（registry.Delivered），偏好 API 以它為準。
 func Delivers(a Audience, c PrefCategory, ch Channel) bool {
 	d, ok := lookupCategory(c)
 	return ok && slices.Contains(d.audiences, a) && slices.Contains(Channels(), ch) && !slices.Contains(d.undelivered, ch)

@@ -51,6 +51,9 @@ const (
 	// ImageAiAdminServiceUpdateAiStyleProcedure is the fully-qualified name of the
 	// ImageAiAdminService's UpdateAiStyle RPC.
 	ImageAiAdminServiceUpdateAiStyleProcedure = "/hawkr.admin.imageai.v1alpha1.ImageAiAdminService/UpdateAiStyle"
+	// ImageAiAdminServiceSetDefaultAiStyleProcedure is the fully-qualified name of the
+	// ImageAiAdminService's SetDefaultAiStyle RPC.
+	ImageAiAdminServiceSetDefaultAiStyleProcedure = "/hawkr.admin.imageai.v1alpha1.ImageAiAdminService/SetDefaultAiStyle"
 	// ImageAiAdminServiceDeleteAiStyleProcedure is the fully-qualified name of the
 	// ImageAiAdminService's DeleteAiStyle RPC.
 	ImageAiAdminServiceDeleteAiStyleProcedure = "/hawkr.admin.imageai.v1alpha1.ImageAiAdminService/DeleteAiStyle"
@@ -73,8 +76,12 @@ type ImageAiAdminServiceClient interface {
 	// CreateAiStyle 新增風格；縮圖必須是新上傳的圖。
 	CreateAiStyle(context.Context, *connect.Request[v1alpha1.CreateAiStyleRequest]) (*connect.Response[v1alpha1.CreateAiStyleResponse], error)
 	UpdateAiStyle(context.Context, *connect.Request[v1alpha1.UpdateAiStyleRequest]) (*connect.Response[v1alpha1.UpdateAiStyleResponse], error)
+	// SetDefaultAiStyle（自訂方法，AIP-136）把風格設成它用途的預設風格：同一個 transaction 內取消同用途原本的預設，
+	// 回傳更新後的風格。目標是停用的回 failed_precondition，不存在回 not_found；已經是預設時成功且不改任何東西（仍回傳該風格）。
+	// 帶了 etag 就必須與目前的版本相符，不符回 ABORTED（VERSION_CONFLICT）。
+	SetDefaultAiStyle(context.Context, *connect.Request[v1alpha1.SetDefaultAiStyleRequest]) (*connect.Response[v1alpha1.SetDefaultAiStyleResponse], error)
 	// DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
-	// 先把另一個風格的 default_style 設成 true。
+	// 先對另一個風格呼叫 SetDefaultAiStyle。
 	DeleteAiStyle(context.Context, *connect.Request[v1alpha1.DeleteAiStyleRequest]) (*connect.Response[v1alpha1.DeleteAiStyleResponse], error)
 	// GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
 	// 店家不存在回 not_found。
@@ -118,6 +125,12 @@ func NewImageAiAdminServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(imageAiAdminServiceMethods.ByName("UpdateAiStyle")),
 			connect.WithClientOptions(opts...),
 		),
+		setDefaultAiStyle: connect.NewClient[v1alpha1.SetDefaultAiStyleRequest, v1alpha1.SetDefaultAiStyleResponse](
+			httpClient,
+			baseURL+ImageAiAdminServiceSetDefaultAiStyleProcedure,
+			connect.WithSchema(imageAiAdminServiceMethods.ByName("SetDefaultAiStyle")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteAiStyle: connect.NewClient[v1alpha1.DeleteAiStyleRequest, v1alpha1.DeleteAiStyleResponse](
 			httpClient,
 			baseURL+ImageAiAdminServiceDeleteAiStyleProcedure,
@@ -151,6 +164,7 @@ type imageAiAdminServiceClient struct {
 	listAiStylesForAdmin *connect.Client[v1alpha1.ListAiStylesForAdminRequest, v1alpha1.ListAiStylesForAdminResponse]
 	createAiStyle        *connect.Client[v1alpha1.CreateAiStyleRequest, v1alpha1.CreateAiStyleResponse]
 	updateAiStyle        *connect.Client[v1alpha1.UpdateAiStyleRequest, v1alpha1.UpdateAiStyleResponse]
+	setDefaultAiStyle    *connect.Client[v1alpha1.SetDefaultAiStyleRequest, v1alpha1.SetDefaultAiStyleResponse]
 	deleteAiStyle        *connect.Client[v1alpha1.DeleteAiStyleRequest, v1alpha1.DeleteAiStyleResponse]
 	getAiQuota           *connect.Client[v1alpha1.GetAiQuotaRequest, v1alpha1.GetAiQuotaResponse]
 	updateAiQuota        *connect.Client[v1alpha1.UpdateAiQuotaRequest, v1alpha1.UpdateAiQuotaResponse]
@@ -170,6 +184,11 @@ func (c *imageAiAdminServiceClient) CreateAiStyle(ctx context.Context, req *conn
 // UpdateAiStyle calls hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiStyle.
 func (c *imageAiAdminServiceClient) UpdateAiStyle(ctx context.Context, req *connect.Request[v1alpha1.UpdateAiStyleRequest]) (*connect.Response[v1alpha1.UpdateAiStyleResponse], error) {
 	return c.updateAiStyle.CallUnary(ctx, req)
+}
+
+// SetDefaultAiStyle calls hawkr.admin.imageai.v1alpha1.ImageAiAdminService.SetDefaultAiStyle.
+func (c *imageAiAdminServiceClient) SetDefaultAiStyle(ctx context.Context, req *connect.Request[v1alpha1.SetDefaultAiStyleRequest]) (*connect.Response[v1alpha1.SetDefaultAiStyleResponse], error) {
+	return c.setDefaultAiStyle.CallUnary(ctx, req)
 }
 
 // DeleteAiStyle calls hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiStyle.
@@ -200,8 +219,12 @@ type ImageAiAdminServiceHandler interface {
 	// CreateAiStyle 新增風格；縮圖必須是新上傳的圖。
 	CreateAiStyle(context.Context, *connect.Request[v1alpha1.CreateAiStyleRequest]) (*connect.Response[v1alpha1.CreateAiStyleResponse], error)
 	UpdateAiStyle(context.Context, *connect.Request[v1alpha1.UpdateAiStyleRequest]) (*connect.Response[v1alpha1.UpdateAiStyleResponse], error)
+	// SetDefaultAiStyle（自訂方法，AIP-136）把風格設成它用途的預設風格：同一個 transaction 內取消同用途原本的預設，
+	// 回傳更新後的風格。目標是停用的回 failed_precondition，不存在回 not_found；已經是預設時成功且不改任何東西（仍回傳該風格）。
+	// 帶了 etag 就必須與目前的版本相符，不符回 ABORTED（VERSION_CONFLICT）。
+	SetDefaultAiStyle(context.Context, *connect.Request[v1alpha1.SetDefaultAiStyleRequest]) (*connect.Response[v1alpha1.SetDefaultAiStyleResponse], error)
 	// DeleteAiStyle 刪除風格，並釋放它的縮圖。刪除用途的預設風格回 failed_precondition；要換預設，
-	// 先把另一個風格的 default_style 設成 true。
+	// 先對另一個風格呼叫 SetDefaultAiStyle。
 	DeleteAiStyle(context.Context, *connect.Request[v1alpha1.DeleteAiStyleRequest]) (*connect.Response[v1alpha1.DeleteAiStyleResponse], error)
 	// GetAiQuota 回傳一家店目前的每週額度與本週使用量；沒有為這家店個別設定時回預設額度（custom 為 false）。
 	// 店家不存在回 not_found。
@@ -240,6 +263,12 @@ func NewImageAiAdminServiceHandler(svc ImageAiAdminServiceHandler, opts ...conne
 		connect.WithSchema(imageAiAdminServiceMethods.ByName("UpdateAiStyle")),
 		connect.WithHandlerOptions(opts...),
 	)
+	imageAiAdminServiceSetDefaultAiStyleHandler := connect.NewUnaryHandler(
+		ImageAiAdminServiceSetDefaultAiStyleProcedure,
+		svc.SetDefaultAiStyle,
+		connect.WithSchema(imageAiAdminServiceMethods.ByName("SetDefaultAiStyle")),
+		connect.WithHandlerOptions(opts...),
+	)
 	imageAiAdminServiceDeleteAiStyleHandler := connect.NewUnaryHandler(
 		ImageAiAdminServiceDeleteAiStyleProcedure,
 		svc.DeleteAiStyle,
@@ -273,6 +302,8 @@ func NewImageAiAdminServiceHandler(svc ImageAiAdminServiceHandler, opts ...conne
 			imageAiAdminServiceCreateAiStyleHandler.ServeHTTP(w, r)
 		case ImageAiAdminServiceUpdateAiStyleProcedure:
 			imageAiAdminServiceUpdateAiStyleHandler.ServeHTTP(w, r)
+		case ImageAiAdminServiceSetDefaultAiStyleProcedure:
+			imageAiAdminServiceSetDefaultAiStyleHandler.ServeHTTP(w, r)
 		case ImageAiAdminServiceDeleteAiStyleProcedure:
 			imageAiAdminServiceDeleteAiStyleHandler.ServeHTTP(w, r)
 		case ImageAiAdminServiceGetAiQuotaProcedure:
@@ -300,6 +331,10 @@ func (UnimplementedImageAiAdminServiceHandler) CreateAiStyle(context.Context, *c
 
 func (UnimplementedImageAiAdminServiceHandler) UpdateAiStyle(context.Context, *connect.Request[v1alpha1.UpdateAiStyleRequest]) (*connect.Response[v1alpha1.UpdateAiStyleResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiStyle is not implemented"))
+}
+
+func (UnimplementedImageAiAdminServiceHandler) SetDefaultAiStyle(context.Context, *connect.Request[v1alpha1.SetDefaultAiStyleRequest]) (*connect.Response[v1alpha1.SetDefaultAiStyleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.imageai.v1alpha1.ImageAiAdminService.SetDefaultAiStyle is not implemented"))
 }
 
 func (UnimplementedImageAiAdminServiceHandler) DeleteAiStyle(context.Context, *connect.Request[v1alpha1.DeleteAiStyleRequest]) (*connect.Response[v1alpha1.DeleteAiStyleResponse], error) {

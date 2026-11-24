@@ -9,7 +9,7 @@ import { RealtimeSyncNotice } from "../features/seller-center/orders/RealtimeSyn
  * 訂單頁丟掉串流的連線狀態，SSE 被
  * 429 回絕 / 重連預算耗盡時賣家沒有任何提示，只會看到一個安靜地不再更新的訂單
  * 列。以下兩層釘住修復：狀態列本身在「收不到更新」時真的渲染得出來，以及頁面
- * 確實有把連線狀態（`useNotificationStreamStatus`）接出來並渲染（丟掉它時，
+ * 確實有把連線狀態（`useSellerWorkspaceRealtimeStatus`）接出來並渲染（丟掉它時，
  * 第二個測試會紅）。
  */
 
@@ -50,7 +50,7 @@ test("SellerOrdersPage 消費 realtime 狀態並渲染狀態列", () => {
 	);
 	assert.match(
 		source,
-		/realtimeStatus\s*=\s*useNotificationStreamStatus\(\)/,
+		/realtimeStatus\s*=\s*useSellerWorkspaceRealtimeStatus\(\)/,
 		"串流連線狀態必須被接出來，不能丟棄",
 	);
 	assert.match(

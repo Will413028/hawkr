@@ -1,11 +1,11 @@
 package model
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
-
-	notificationv1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1"
 )
 
 // D4：交易必要的收件匣與 email 不可關；推播可關，只有店家的 SHIPMENT_ANOMALY 推播不可關；互動與行銷全部可關。
@@ -113,22 +113,30 @@ func TestPresentationsAreTheTenOfD6(t *testing.T) {
 	}
 }
 
-// 契約的分類 enum 與註冊表的分類一一對應：多一個或少一個都會讓偏好 API 與收件匣篩選不一致。
-func TestCategoryEnumMatchesRegistry(t *testing.T) {
-	fromProto := map[PrefCategory]bool{}
-	for num, name := range notificationv1.NotificationCategory_name {
-		if num == int32(notificationv1.NotificationCategory_NOTIFICATION_CATEGORY_UNSPECIFIED) {
-			continue
-		}
-		fromProto[PrefCategory(strings.TrimPrefix(name, "NOTIFICATION_CATEGORY_"))] = true
-	}
+// 註冊表的分類釘成 golden：模組不能 import httpapi/gen，所以 internal/httpapi 的 TestNotificationCategoryGoldenMatchesProto
+// 讀這個檔案與 proto 的 NotificationCategory 雙向比對。這裡守住「註冊表 = golden」，那邊守住「golden = proto」，兩邊合起來擋分類漂移。
+// 刻意增減分類時以 UPDATE_GOLDEN=1 重寫。
+func TestCategoryGoldenMatchesRegistry(t *testing.T) {
+	var names []string
 	for _, c := range Categories() {
-		if !fromProto[c] {
-			t.Errorf("註冊表的分類 %s 不在 proto 的 NotificationCategory", c)
-		}
-		delete(fromProto, c)
+		names = append(names, string(c))
 	}
-	for c := range fromProto {
-		t.Errorf("proto 的分類 %s 不在註冊表", c)
+	got := strings.Join(names, "\n") + "\n"
+	path := filepath.Join("testdata", "categories.golden")
+	if os.Getenv("UPDATE_GOLDEN") != "" {
+		if err := os.MkdirAll("testdata", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(want) != got {
+		t.Errorf("categories.golden 與註冊表不同（刻意增減分類時 UPDATE_GOLDEN=1 重寫）：\n%s", got)
 	}
 }

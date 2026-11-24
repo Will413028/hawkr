@@ -1,5 +1,47 @@
 {
   "default": {
+    "admin.quota_exists": {
+      "message": "This store already has a custom quota. Please reload and try again"
+    },
+    "admin.quota_limit_range": {
+      "message": "The weekly limit must be an integer from 0 to {max}"
+    },
+    "admin.quota_not_found": {
+      "message": "This store has no custom quota"
+    },
+    "admin.quota_stale": {
+      "message": "The quota was changed by someone else. Please reload and try again"
+    },
+    "admin.quota_store_not_found": {
+      "message": "The store was not found"
+    },
+    "admin.style_default_cannot_delete": {
+      "message": "A default style cannot be deleted. Set another style as the default first"
+    },
+    "admin.style_default_must_be_enabled": {
+      "message": "The default style must be enabled"
+    },
+    "admin.style_label_required": {
+      "message": "The style label must not be blank"
+    },
+    "admin.style_name_required": {
+      "message": "The style name must not be blank"
+    },
+    "admin.style_name_taken": {
+      "message": "A style with this name already exists for this category"
+    },
+    "admin.style_not_found": {
+      "message": "The style was not found"
+    },
+    "admin.style_stale": {
+      "message": "The style was changed by someone else. Please reload and try again"
+    },
+    "admin.style_thumbnail_required": {
+      "message": "A thumbnail is required for a new style"
+    },
+    "admin.style_thumbnail_unusable": {
+      "message": "The thumbnail cannot be used. Please upload it again"
+    },
     "style.category_invalid": {
       "message": "The style category is not valid"
     },

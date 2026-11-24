@@ -1,0 +1,121 @@
+{
+ "mutants": [
+  {
+   "id": "inbox-only-for-token-holders",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/announce/fanout.go",
+   "old": "\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tn, err := q.InsertAnnouncementInbox(ctx,",
+   "new": "\t\tq := store.New(s.d.DB.Conn(ctx))\n\t\tvar hasToken bool\n\t\tif err := s.d.DB.Conn(ctx).QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notification.device_tokens WHERE account_id = $1)`, r.AccountID).Scan(&hasToken); err != nil || !hasToken {\n\t\t\treturn err\n\t\t}\n\t\tn, err := q.InsertAnnouncementInbox(ctx,",
+   "test": "internal/modules/notification ^TestAccountWithoutDeviceTokenStillGetsTheInboxItem$",
+   "why": "收件匣只寫給有 device token 的帳號（舊系統只送有 token 的人）：沒有 token 的帳號沒有收件匣列"
+  },
+  {
+   "id": "drop-request-id-dedupe",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/announce/announce.go",
+   "old": "AdminID: in.Actor.AdminID, RequestID: in.RequestID, CreatedAt: now,",
+   "new": "AdminID: in.Actor.AdminID, RequestID: nil, CreatedAt: now,",
+   "test": "internal/modules/notification ^TestCreateWithTheSameRequestIDMakesOneAnnouncement$",
+   "why": "建立時不記 request_id：同一個 request_id 重送建出第二則公告，冪等失效"
+  },
+  {
+   "id": "announcement-type-not-registered",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/registry/registry.go",
+   "old": "var all = []Entry{accountSuspended, accountUnsuspended, announcement}",
+   "new": "var all = []Entry{accountSuspended, accountUnsuspended}",
+   "test": "internal/modules/notification ^TestAnnouncementShowsInTheInboxAndIsRenderedInEnglish$",
+   "why": "公告型別不在註冊表：收件匣的型別篩選把公告列藏起來，列表、total、未讀數都看不到"
+  },
+  {
+   "id": "fanout-permanent-error-stops-the-page",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/announce/fanout.go",
+   "old": "\t\tcase permanent(err):",
+   "new": "\t\tcase false:",
+   "test": "internal/modules/notification ^TestOneRecipientThatCanNeverBeWrittenDoesNotStopTheAnnouncement$",
+   "why": "One recipient whose write can never succeed fails the whole page, so the announcement never finishes and later recipients get nothing"
+  },
+  {
+   "id": "fanout-extra-empty-page",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/announce/fanout.go",
+   "old": "if len(recipients) >= s.d.Chunk {",
+   "new": "if len(recipients) > 0 {",
+   "test": "internal/modules/notification ^TestLastPartialPageFinishesWithoutAnExtraEmptyPage$",
+   "why": "A last page shorter than Chunk still enqueues one more empty page"
+  },
+  {
+   "id": "fanout-transient-treated-as-permanent",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/announce/fanout.go",
+   "old": "\treturn errors.As(err, &pgErr) && (strings.HasPrefix(pgErr.Code, \"22\") || strings.HasPrefix(pgErr.Code, \"23\"))",
+   "new": "\treturn (errors.As(err, &pgErr) && (strings.HasPrefix(pgErr.Code, \"22\") || strings.HasPrefix(pgErr.Code, \"23\"))) || true",
+   "test": "internal/modules/notification/internal/announce ^TestPermanentOnlyCoversErrorsThatRetryingCannotFix$",
+   "why": "Every write error is treated as permanent, so transient errors silently drop recipients instead of retrying the page"
+  },
+  {
+   "id": "announce-chunk-not-clamped",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/announce/announce.go",
+   "old": "\tcase d.Chunk > MaxChunk:\n\t\td.Chunk = MaxChunk\n",
+   "new": "\tcase d.Chunk > MaxChunk:\n",
+   "test": "internal/modules/notification/internal/announce ^TestNewClampsChunk$",
+   "why": "A Chunk above the directory page limit is kept, so every directory call is rejected and the announcement never dispatches"
+  },
+  {
+   "id": "purge-scrubs-shared-announcement-intent",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/retention.sql.go",
+   "old": "      AND NOT EXISTS (SELECT 1 FROM notification.announcements an WHERE an.id = s.id)\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestPurgingOneRecipientKeepsTheSharedAnnouncementIntent$",
+   "why": "Purging one recipient wipes the params of the announcement intent shared by every push recipient"
+  },
+  {
+   "id": "inbox-hides-load-errors",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "\t\t\treturn nil, fmt.Errorf(\"解析收件匣型別 %s 的內容：%w\", typ, err)",
+   "new": "\t\t\ts.d.Logger.ErrorContext(ctx, \"x\", \"error\", err)\n\t\t\tcontinue",
+   "test": "internal/modules/notification ^TestInboxSkipsABrokenRowButFailsOnALoadError$",
+   "why": "A database error while loading announcement content is logged and skipped, so the inbox silently omits the items"
+  },
+  {
+   "id": "registry-load-undecodable-row-not-reported",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/registry.go",
+   "old": "\t\t\trowErrs[i] = err\n\t\t\tcontinue",
+   "new": "\t\t\tcontinue",
+   "test": "internal/modules/notification/internal/registry ^TestLoadResolvesTheAnnouncementsInOneCall$",
+   "why": "A row whose params snapshot cannot be decoded is no longer reported as a row error"
+  },
+  {
+   "id": "directory-buyer-cursor-is-account-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/announcement.go",
+   "old": "announce.Recipient{AccountID: r.AccountID, Cursor: r.BuyerID}",
+   "new": "announce.Recipient{AccountID: r.AccountID, Cursor: r.AccountID}",
+   "test": "internal/modules/notification ^TestNewDirectoryListsBuyersAndStoresWithTheirOwnCursors$",
+   "why": "The buyer directory pages by account id instead of buyer id, so keyset paging skips or repeats buyers"
+  },
+  {
+   "id": "buyer-live-list-includes-closed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/store/buyers.sql.go",
+   "old": "WHERE status <> 'CLOSED' AND buyer_id >",
+   "new": "WHERE true AND buyer_id >",
+   "test": "internal/modules/buyer ^TestListLiveAccountsPagesByBuyerIDAndExcludesClosed$",
+   "why": "Closed buyers are listed for bulk delivery"
+  },
+  {
+   "id": "seller-live-list-includes-retired",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/seller/internal/store/stores.sql.go",
+   "old": "WHERE retired_at IS NULL AND store_id >",
+   "new": "WHERE true AND store_id >",
+   "test": "internal/modules/seller ^TestListLiveStoreAccountsPagesByStoreIDAndExcludesRetired$",
+   "why": "Retired stores are listed for bulk delivery"
+  }
+ ]
+}

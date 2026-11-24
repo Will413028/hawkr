@@ -27,7 +27,7 @@ import { normalizeNotificationStreamItem } from "@/lib/notifications/stream-item
 import type { NotificationItem } from "@/lib/notifications/types";
 import { SseClient, type SseConnectionStatus } from "./client";
 import { getLastEventId, setLastEventId } from "./lastEventIdCache";
-import { asNum, asStr, unpackBatch } from "./utils";
+import { asNum, unpackBatch } from "./utils";
 
 export interface NotificationNewPayload {
 	item: NotificationItem;
@@ -40,36 +40,9 @@ export interface NotificationUnreadChangedPayload {
 	eventId: string;
 }
 
-/**
- * Seller workspace realtime payloads — ride the same `/app/notifications/stream`
- * connection on topic `notification:user:{sellerId}` (gateway
- * SellerWorkspaceChannel).
- */
-export interface SellerOrderUpdatedPayload {
-	eventId: string;
-	orderNo: string;
-	source: string;
-	previousStatus?: string;
-	status?: string;
-	shipmentStatus?: string;
-	changedAt?: string;
-}
-
-export interface SellerAfterSaleUpdatedPayload {
-	eventId: string;
-	orderNo: string;
-	afterSaleCaseNo: string;
-	source: string;
-	status?: string;
-	changedAt?: string;
-}
-
 export interface UseNotificationStreamHandlers {
 	onNew?: (payload: NotificationNewPayload) => void;
 	onUnreadChanged?: (payload: NotificationUnreadChangedPayload) => void;
-	/** Seller workspace realtime handlers (seller role topics only). */
-	onSellerOrderUpdated?: (payload: SellerOrderUpdatedPayload) => void;
-	onSellerAfterSaleUpdated?: (payload: SellerAfterSaleUpdatedPayload) => void;
 	/** Fired when server `ready` carried bufferMiss=true — caller should re-fetch REST list/count. */
 	onBufferMiss?: () => void;
 }
@@ -127,35 +100,6 @@ export function useNotificationStream({
 					handlersRef.current.onUnreadChanged?.({
 						unreadCount: asNum(o.unreadCount),
 						eventId: id ?? "",
-					});
-					break;
-				}
-				case "seller.order.updated": {
-					// 賣家工作區訂單狀態變更（gateway 已將 sellerId 序列化為 string）
-					const o = (data ?? {}) as Record<string, unknown>;
-					handlersRef.current.onSellerOrderUpdated?.({
-						eventId: id ?? asStr(o.eventId),
-						orderNo: asStr(o.orderNo),
-						source: asStr(o.source),
-						previousStatus:
-							o.previousStatus != null ? asStr(o.previousStatus) : undefined,
-						status: o.status != null ? asStr(o.status) : undefined,
-						shipmentStatus:
-							o.shipmentStatus != null ? asStr(o.shipmentStatus) : undefined,
-						changedAt: o.changedAt != null ? asStr(o.changedAt) : undefined,
-					});
-					break;
-				}
-				case "seller.after_sale.updated": {
-					// 賣家工作區售後案件狀態變更
-					const o = (data ?? {}) as Record<string, unknown>;
-					handlersRef.current.onSellerAfterSaleUpdated?.({
-						eventId: id ?? asStr(o.eventId),
-						orderNo: asStr(o.orderNo),
-						afterSaleCaseNo: asStr(o.afterSaleCaseNo),
-						source: asStr(o.source),
-						status: o.status != null ? asStr(o.status) : undefined,
-						changedAt: o.changedAt != null ? asStr(o.changedAt) : undefined,
 					});
 					break;
 				}

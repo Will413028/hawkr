@@ -20,7 +20,10 @@ import { useSellerInvoiceOverview } from "@/lib/hooks/useSellerInvoices";
 import { useSellerPosts } from "@/lib/hooks/useSellerPosts";
 import { useSellerProducts } from "@/lib/hooks/useSellerProducts";
 import { useInvalidateSellerSelf } from "@/lib/hooks/useSellerSelf";
-import { useSellerWorkspaceRealtime } from "@/lib/hooks/useSellerWorkspaceRealtime";
+import {
+	SellerWorkspaceRealtimeStatusContext,
+	useSellerWorkspaceRealtime,
+} from "@/lib/hooks/useSellerWorkspaceRealtime";
 import { usePathname } from "@/lib/intl/navigation";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 import { useNotificationUnread } from "@/lib/notifications/unread-context";
@@ -73,8 +76,8 @@ export default function SellerCenterShell({
 	const receiptOnly = isReceiptOnlySeller(overview);
 	const { count: unreadMessageCount } = useChatUnread();
 	const { count: unreadNotificationCount } = useNotificationUnread();
-	// 賣家事件與串流漏事件的訊號來自根 layout 唯一的那條串流；這裡只訂閱，不開連線。
-	useSellerWorkspaceRealtime();
+	// 賣家中心自己的一條 WatchNotifications（STORE 受眾）串流：賣家工作區訊號讓快取失效；連線狀態經 context 給訂單頁。
+	const realtimeStatus = useSellerWorkspaceRealtime(!setupIncomplete);
 	const pathname = usePathname() ?? "";
 	const isMessagesRoute =
 		pathname === "/seller-center/messages" ||
@@ -243,165 +246,169 @@ export default function SellerCenterShell({
 	}
 
 	return (
-		<div
-			className="seller-shell"
-			data-hk-seller-workspace-ready
-			data-sidebar-open={open}
-		>
-			{/* Mobile-only top bar with hamburger + the active section name.
+		<SellerWorkspaceRealtimeStatusContext.Provider value={realtimeStatus}>
+			<div
+				className="seller-shell"
+				data-hk-seller-workspace-ready
+				data-sidebar-open={open}
+			>
+				{/* Mobile-only top bar with hamburger + the active section name.
 			    Hidden on desktop via CSS (display: none) — the sticky
 			    sidebar makes this redundant on wider viewports. */}
-			<header className="seller-shell__mobile-bar">
-				<button
-					type="button"
-					className="seller-shell__menu-btn"
-					aria-label={open ? "關閉選單" : "開啟選單"}
-					aria-expanded={open}
-					onClick={() => setOpen((v) => !v)}
-				>
-					<span className="seller-shell__menu-icon" aria-hidden="true" />
-				</button>
-				<strong className="seller-shell__mobile-title">賣家中心</strong>
-				<nav
-					className="seller-shell__mobile-quick-tabs"
-					aria-label="賣家中心快速入口"
-				>
-					<Link
-						href="/seller-center/messages"
-						className={`seller-shell__mobile-quick-tab seller-shell__mobile-message-tab${isMessagesRoute ? " is-active" : ""}`}
-						aria-label={
-							unreadMessageCount > 0
-								? `訊息中心（${unreadMessageCount > 99 ? "99+" : unreadMessageCount} 則未讀）`
-								: "訊息中心"
-						}
-						aria-current={isMessagesRoute ? "page" : undefined}
-						data-hkui-button
-					>
-						<span
-							className="seller-shell__mobile-quick-icon seller-shell__mobile-message-icon"
-							aria-hidden="true"
-						>
-							<SellerSidebarIcon name="chat" />
-						</span>
-						<span className="seller-shell__mobile-quick-label">訊息</span>
-						{unreadMessageCount > 0 ? (
-							<span className="seller-shell__mobile-quick-badge seller-shell__mobile-message-badge">
-								{unreadMessageCount > 99 ? "99+" : unreadMessageCount}
-							</span>
-						) : null}
-					</Link>
-					<Link
-						href="/seller-center/notifications"
-						className={`seller-shell__mobile-quick-tab seller-shell__mobile-notification-tab${isNotificationsRoute ? " is-active" : ""}`}
-						aria-label={
-							unreadNotificationCount > 0
-								? `通知中心（${unreadNotificationCount > 99 ? "99+" : unreadNotificationCount} 則未讀）`
-								: "通知中心"
-						}
-						aria-current={isNotificationsRoute ? "page" : undefined}
-						data-hkui-button
-					>
-						<span
-							className="seller-shell__mobile-quick-icon seller-shell__mobile-notification-icon"
-							aria-hidden="true"
-						>
-							<SellerSidebarIcon name="notification" />
-						</span>
-						<span className="seller-shell__mobile-quick-label">通知</span>
-						{unreadNotificationCount > 0 ? (
-							<span className="seller-shell__mobile-quick-badge seller-shell__mobile-notification-badge">
-								{unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
-							</span>
-						) : null}
-					</Link>
-				</nav>
-				<ThemeToggle className="max-[960px]:ml-auto max-[960px]:size-11" />
-				<div className="seller-shell__mobile-avatar" aria-hidden="true">
-					<SellerAvatarImage src={avatar} alt="" variant="identity" />
-				</div>
-			</header>
-
-			{/* Backdrop — only paints on mobile while the drawer is open. */}
-			<button
-				type="button"
-				className="seller-shell__backdrop"
-				aria-label="關閉側邊選單"
-				aria-hidden={!open}
-				tabIndex={open ? 0 : -1}
-				onClick={() => setOpen(false)}
-			/>
-
-			<aside
-				className="seller-sidebar"
-				aria-hidden={false}
-				aria-label="賣家中心側邊欄"
-			>
-				<div className="seller-sidebar__profile">
-					<div className="seller-sidebar__avatar" aria-hidden="true">
-						<SellerAvatarImage src={avatar} alt="" variant="identity" />
-					</div>
-					<div className="seller-sidebar__profile-meta">
-						<strong title={displayName}>{displayName}</strong>
-						<small title={identitySubtitle}>{identitySubtitle}</small>
-					</div>
+				<header className="seller-shell__mobile-bar">
 					<button
 						type="button"
-						className="seller-sidebar__close"
-						aria-label="關閉選單"
-						onClick={() => setOpen(false)}
+						className="seller-shell__menu-btn"
+						aria-label={open ? "關閉選單" : "開啟選單"}
+						aria-expanded={open}
+						onClick={() => setOpen((v) => !v)}
 					>
-						<IconClose />
+						<span className="seller-shell__menu-icon" aria-hidden="true" />
 					</button>
-				</div>
-
-				<nav className="seller-sidebar__nav" aria-label="賣家中心導覽">
-					{NAV_GROUPS.map((group) => (
-						<div key={group.heading} className="seller-sidebar__group">
-							<div className="seller-sidebar__heading">{group.heading}</div>
-							{group.items.map((item) => (
-								<NavLink
-									key={item.href}
-									item={framedNavItem(item, receiptOnly)}
-									pathname={pathname}
-									badges={navBadges}
-								/>
-							))}
-						</div>
-					))}
-				</nav>
-
-				<div className="seller-sidebar__footer">
-					{FOOTER_ITEMS.map((item) => (
-						<NavLink
-							key={item.href}
-							item={item}
-							pathname={pathname}
-							badges={navBadges}
-						/>
-					))}
-					<Button
-						type="button"
-						variant="light"
-						color="danger"
-						className="seller-sidebar__item seller-sidebar__item--signout h-auto justify-start"
-						disabled={signingOut}
-						isLoading={signingOut}
-						loadingLabel="登出賣家中心中…"
-						onClick={() => void handleSignOut()}
+					<strong className="seller-shell__mobile-title">賣家中心</strong>
+					<nav
+						className="seller-shell__mobile-quick-tabs"
+						aria-label="賣家中心快速入口"
 					>
-						<span className="seller-sidebar__icon" aria-hidden="true">
-							<SellerSidebarIcon name="logout" />
-						</span>
-						<span className="seller-sidebar__label">登出</span>
-					</Button>
-				</div>
-			</aside>
+						<Link
+							href="/seller-center/messages"
+							className={`seller-shell__mobile-quick-tab seller-shell__mobile-message-tab${isMessagesRoute ? " is-active" : ""}`}
+							aria-label={
+								unreadMessageCount > 0
+									? `訊息中心（${unreadMessageCount > 99 ? "99+" : unreadMessageCount} 則未讀）`
+									: "訊息中心"
+							}
+							aria-current={isMessagesRoute ? "page" : undefined}
+							data-hkui-button
+						>
+							<span
+								className="seller-shell__mobile-quick-icon seller-shell__mobile-message-icon"
+								aria-hidden="true"
+							>
+								<SellerSidebarIcon name="chat" />
+							</span>
+							<span className="seller-shell__mobile-quick-label">訊息</span>
+							{unreadMessageCount > 0 ? (
+								<span className="seller-shell__mobile-quick-badge seller-shell__mobile-message-badge">
+									{unreadMessageCount > 99 ? "99+" : unreadMessageCount}
+								</span>
+							) : null}
+						</Link>
+						<Link
+							href="/seller-center/notifications"
+							className={`seller-shell__mobile-quick-tab seller-shell__mobile-notification-tab${isNotificationsRoute ? " is-active" : ""}`}
+							aria-label={
+								unreadNotificationCount > 0
+									? `通知中心（${unreadNotificationCount > 99 ? "99+" : unreadNotificationCount} 則未讀）`
+									: "通知中心"
+							}
+							aria-current={isNotificationsRoute ? "page" : undefined}
+							data-hkui-button
+						>
+							<span
+								className="seller-shell__mobile-quick-icon seller-shell__mobile-notification-icon"
+								aria-hidden="true"
+							>
+								<SellerSidebarIcon name="notification" />
+							</span>
+							<span className="seller-shell__mobile-quick-label">通知</span>
+							{unreadNotificationCount > 0 ? (
+								<span className="seller-shell__mobile-quick-badge seller-shell__mobile-notification-badge">
+									{unreadNotificationCount > 99
+										? "99+"
+										: unreadNotificationCount}
+								</span>
+							) : null}
+						</Link>
+					</nav>
+					<ThemeToggle className="max-[960px]:ml-auto max-[960px]:size-11" />
+					<div className="seller-shell__mobile-avatar" aria-hidden="true">
+						<SellerAvatarImage src={avatar} alt="" variant="identity" />
+					</div>
+				</header>
 
-			<div className="seller-main">
-				<TerminationNoticeBanner />
-				{children}
+				{/* Backdrop — only paints on mobile while the drawer is open. */}
+				<button
+					type="button"
+					className="seller-shell__backdrop"
+					aria-label="關閉側邊選單"
+					aria-hidden={!open}
+					tabIndex={open ? 0 : -1}
+					onClick={() => setOpen(false)}
+				/>
+
+				<aside
+					className="seller-sidebar"
+					aria-hidden={false}
+					aria-label="賣家中心側邊欄"
+				>
+					<div className="seller-sidebar__profile">
+						<div className="seller-sidebar__avatar" aria-hidden="true">
+							<SellerAvatarImage src={avatar} alt="" variant="identity" />
+						</div>
+						<div className="seller-sidebar__profile-meta">
+							<strong title={displayName}>{displayName}</strong>
+							<small title={identitySubtitle}>{identitySubtitle}</small>
+						</div>
+						<button
+							type="button"
+							className="seller-sidebar__close"
+							aria-label="關閉選單"
+							onClick={() => setOpen(false)}
+						>
+							<IconClose />
+						</button>
+					</div>
+
+					<nav className="seller-sidebar__nav" aria-label="賣家中心導覽">
+						{NAV_GROUPS.map((group) => (
+							<div key={group.heading} className="seller-sidebar__group">
+								<div className="seller-sidebar__heading">{group.heading}</div>
+								{group.items.map((item) => (
+									<NavLink
+										key={item.href}
+										item={framedNavItem(item, receiptOnly)}
+										pathname={pathname}
+										badges={navBadges}
+									/>
+								))}
+							</div>
+						))}
+					</nav>
+
+					<div className="seller-sidebar__footer">
+						{FOOTER_ITEMS.map((item) => (
+							<NavLink
+								key={item.href}
+								item={item}
+								pathname={pathname}
+								badges={navBadges}
+							/>
+						))}
+						<Button
+							type="button"
+							variant="light"
+							color="danger"
+							className="seller-sidebar__item seller-sidebar__item--signout h-auto justify-start"
+							disabled={signingOut}
+							isLoading={signingOut}
+							loadingLabel="登出賣家中心中…"
+							onClick={() => void handleSignOut()}
+						>
+							<span className="seller-sidebar__icon" aria-hidden="true">
+								<SellerSidebarIcon name="logout" />
+							</span>
+							<span className="seller-sidebar__label">登出</span>
+						</Button>
+					</div>
+				</aside>
+
+				<div className="seller-main">
+					<TerminationNoticeBanner />
+					{children}
+				</div>
 			</div>
-		</div>
+		</SellerWorkspaceRealtimeStatusContext.Provider>
 	);
 }
 

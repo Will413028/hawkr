@@ -1,9 +1,11 @@
 package registry
 
 import (
+	"context"
 	"encoding/json"
 	"regexp"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
@@ -134,9 +136,82 @@ func TestEveryRenderableValueHasEnglishText(t *testing.T) {
 	}
 	for _, e := range All() {
 		raw, _, _ := e.ExampleParams()
-		got, err := e.Render(uitext.EN, raw)
+		got, err := e.RenderLoaded(uitext.EN, raw, e.ExampleLoaded())
 		if err != nil || got.Locale != uitext.EN || han.MatchString(got.Title+got.Body) {
 			t.Errorf("%s 的 en 範例：%+v（%v）", e.Spec().Name, got, err)
 		}
+	}
+}
+
+// 公告：參數只有公告 ID，標題與內文來自 Load 解析出來的公告；任何請求語系都是同一份英文，Locale 是 EN。
+func TestGoldenAnnouncementRendering(t *testing.T) {
+	e, ok := Lookup("announcement")
+	if !ok {
+		t.Fatal("沒有型別 announcement")
+	}
+	raw := []byte(`{"announcement_id":"0190a000-0000-7000-8000-0000000000a1"}`)
+	loaded := Loaded{Announcement: &AnnouncementText{Title: "Scheduled maintenance", Body: "Down on Sunday."}}
+	for _, l := range []uitext.Locale{uitext.ZhTW, uitext.EN, uitext.Locale("ja")} {
+		got, err := e.RenderLoaded(l, raw, loaded)
+		if err != nil {
+			t.Fatalf("%s：%v", l, err)
+		}
+		if got.Title != "Scheduled maintenance" || got.Body != "Down on Sunday." || got.Locale != uitext.EN ||
+			got.Presentation != model.PresentationSystem || got.DeepLink != "" || got.AggregationKey != "" || len(got.ActorAccounts) != 0 {
+			t.Errorf("%s 的輸出 %+v", l, got)
+		}
+	}
+	if _, err := e.Render(uitext.EN, raw); err == nil {
+		t.Error("沒有 Load 的結果就組字應該失敗，不該組出空文字")
+	}
+}
+
+type announcementSource struct {
+	texts map[uuid.UUID]AnnouncementText
+	calls int
+}
+
+func (s *announcementSource) Announcements(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]AnnouncementText, error) {
+	s.calls++
+	out := map[uuid.UUID]AnnouncementText{}
+	for _, id := range ids {
+		if t, ok := s.texts[id]; ok {
+			out[id] = t
+		}
+	}
+	return out, nil
+}
+
+// Load 以一批參數裡的公告 ID 一次向 Sources 取文字：一次呼叫、結果同序、查不到的是零值、壞掉的快照只影響那一列；沒有 Load 的型別回零值。
+func TestLoadResolvesTheAnnouncementsInOneCall(t *testing.T) {
+	e, _ := Lookup("announcement")
+	known := uuid.MustParse("0190a000-0000-7000-8000-0000000000a1")
+	missing := uuid.MustParse("0190a000-0000-7000-8000-0000000000a2")
+	src := &announcementSource{texts: map[uuid.UUID]AnnouncementText{known: {Title: "t", Body: "b"}}}
+	raws := []json.RawMessage{
+		[]byte(`{"announcement_id":"` + known.String() + `"}`),
+		[]byte(`{"announcement_id":"` + missing.String() + `"}`),
+		[]byte(`not json`),
+	}
+	ld, rowErrs, err := e.Load(context.Background(), src, raws)
+	if err != nil || len(ld) != 3 || len(rowErrs) != 3 {
+		t.Fatalf("Load = %+v %v（%v）", ld, rowErrs, err)
+	}
+	if src.calls != 1 {
+		t.Errorf("Sources 被呼叫 %d 次，一批只該一次", src.calls)
+	}
+	if ld[0].Announcement == nil || ld[0].Announcement.Title != "t" || rowErrs[0] != nil {
+		t.Errorf("第 0 筆 = %+v（%v）", ld[0], rowErrs[0])
+	}
+	if ld[1].Announcement != nil || rowErrs[1] != nil {
+		t.Errorf("查不到的公告應是零值且不是列錯誤：%+v（%v）", ld[1], rowErrs[1])
+	}
+	if rowErrs[2] == nil {
+		t.Error("壞掉的快照應是列錯誤")
+	}
+	plain, _ := Lookup("account_unsuspended")
+	pl, pe, err := plain.Load(context.Background(), nil, []json.RawMessage{[]byte(`{}`)})
+	if err != nil || len(pl) != 1 || pl[0] != (Loaded{}) || pe[0] != nil {
+		t.Errorf("沒有 Load 的型別應回零值：%+v %v（%v）", pl, pe, err)
 	}
 }

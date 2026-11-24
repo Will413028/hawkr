@@ -1,0 +1,283 @@
+{
+ "mutants": [
+  {
+   "id": "seller-workspace-forwarding-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/notification.go",
+   "old": "\treturn stream.NotifyWorkspace(ctx, m.pool, storeID, change)",
+   "new": "\t_, _, _ = ctx, storeID, change\n\treturn nil",
+   "test": "internal/modules/notification ^TestSellerWorkspaceChangeReachesTheStoresStreamOnly$",
+   "why": "PublishSellerWorkspace no longer pg_notifies, so no serve process's subscriber ever receives the seller workspace change."
+  },
+  {
+   "id": "seller-workspace-hub-drops-change",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\t\t\t\ts.changes = append(s.changes, change)",
+   "new": "\t\t\t\t_ = change",
+   "test": "internal/modules/notification/internal/stream ^TestSellerWorkspaceReachesOnlyThatStoresSubscribers$",
+   "why": "The hub accepts a seller workspace change but never queues it for the store's subscribers."
+  },
+  {
+   "id": "stream-key-without-audience",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\tfor s := range h.byKey[key] {\n\t\tif s.storeID == storeID {\n\t\t\tsubs = append(subs, s)\n\t\t}\n\t}",
+   "new": "\tfor k, set := range h.byKey {\n\t\tif k.AccountID != key.AccountID {\n\t\t\tcontinue\n\t\t}\n\t\tfor s := range set {\n\t\t\tsubs = append(subs, s)\n\t\t}\n\t}",
+   "test": "internal/modules/notification/internal/stream ^TestInboxSignalReachesOnlyTheSameAccountAndAudience$",
+   "why": "Inbox signals are matched on the account alone, so a BUYER signal also reaches the same account's STORE stream."
+  },
+  {
+   "id": "stream-key-without-audience-integration",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\tfor s := range h.byKey[key] {\n\t\tif s.storeID == storeID {\n\t\t\tsubs = append(subs, s)\n\t\t}\n\t}",
+   "new": "\tfor k, set := range h.byKey {\n\t\tif k.AccountID != key.AccountID {\n\t\t\tcontinue\n\t\t}\n\t\tfor s := range set {\n\t\t\tsubs = append(subs, s)\n\t\t}\n\t}",
+   "test": "internal/modules/notification ^TestInboxWriteSignalsTheRecipientsStreamOnly$",
+   "why": "Inbox signals are matched on the account alone, so the worker's BUYER inbox write also wakes the same account's STORE stream."
+  },
+  {
+   "id": "stream-cap-check-dropped",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\tif h.byAccount[key.AccountID] >= h.limit {",
+   "new": "\tif false && h.byAccount[key.AccountID] >= h.limit {",
+   "test": "internal/modules/notification/internal/stream ^TestStreamCapPerAccountRejectsWithResourceExhausted$",
+   "why": "The per-account stream cap is never enforced, so an account can open unlimited streams."
+  },
+  {
+   "id": "stream-cap-check-dropped-integration",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\tif h.byAccount[key.AccountID] >= h.limit {",
+   "new": "\tif false && h.byAccount[key.AccountID] >= h.limit {",
+   "test": "internal/modules/notification ^TestStreamCapPerAccountIsEnforcedByWatch$",
+   "why": "Module.Watch no longer rejects the stream that exceeds MaxStreamsPerAccount."
+  },
+  {
+   "id": "inbox-signal-notify-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "\t\tif wroteInbox && s.d.Signals != nil {",
+   "new": "\t\tif false && wroteInbox && s.d.Signals != nil {",
+   "test": "internal/modules/notification ^TestInboxSignalCrossesTheProcessBoundaryThroughTheDatabase$",
+   "why": "The intent worker writes the inbox row but never pg_notifies in its transaction, so a subscriber on another process gets no signal."
+  },
+  {
+   "id": "push-only-intent-signals-inbox",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "\ttouchedInbox := false",
+   "new": "\ttouchedInbox := true",
+   "test": "internal/modules/notification ^TestPushOnlyIntentDoesNotSignalTheStream$",
+   "why": "Every processed intent signals the inbox stream, even ones that wrote no inbox row."
+  },
+  {
+   "id": "notify-outside-the-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/stream/signal.go",
+   "old": "store.New(d.Conn(ctx)).NotifySignal(",
+   "new": "store.New(d.Pool()).NotifySignal(",
+   "test": "internal/modules/notification ^TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers$",
+   "why": "The pg_notify goes through the pool instead of the caller's transaction, so a rolled back change still wakes subscribers."
+  },
+  {
+   "id": "run-nil-clock-not-defaulted",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "\tif now == nil {\n\t\tnow = func() time.Time { return time.Time{} }\n\t}\n",
+   "new": "",
+   "test": "internal/modules/notification/internal/stream ^TestRunWithoutInjectedClockDoesNotPanic$",
+   "why": "Run keeps a nil clock and panics on the first connection."
+  },
+  {
+   "id": "inbox-signal-notify-dropped-same-hub",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "\t\tif wroteInbox && s.d.Signals != nil {",
+   "new": "\t\tif false && wroteInbox && s.d.Signals != nil {",
+   "test": "internal/modules/notification ^TestInboxWriteSignalsTheRecipientsStreamOnly$",
+   "why": "The worker path's pg_notify is gone, so the recipient's LISTEN-fed stream gets no inbox signal."
+  },
+  {
+   "id": "dispatch-workspace-notification-dropped",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "\t\th.workspaceChanged(p.Store, SellerChange(p.Change))",
+   "new": "\t\t_ = p",
+   "test": "internal/modules/notification/internal/stream ^TestDispatchRoutesByAccountAudienceAndStore$",
+   "why": "A seller workspace notification received on the LISTEN connection is not fanned out to the store's subscribers."
+  },
+  {
+   "id": "listen-reconnect-resync-dropped",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "\t\t\th.resync()\n",
+   "new": "",
+   "test": "internal/modules/notification/internal/stream ^TestRunDeliversNotificationsAndResyncsOnReconnect$",
+   "why": "After the LISTEN connection is re-established, local subscribers are not told to re-read, so notifies lost during the outage stay lost."
+  },
+  {
+   "id": "listen-reconnect-resync-dropped-integration",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "\t\t\th.resync()\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestListenReconnectEmitsAFullRereadSignal$",
+   "why": "A terminated LISTEN backend is reopened but subscribers get no re-read signal."
+  },
+  {
+   "id": "listen-shutdown-keeps-subscriptions",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "\tfor _, s := range subs {\n\t\ts.Close()\n\t}\n}",
+   "new": "\t_ = subs\n}",
+   "test": "internal/modules/notification/internal/stream ^TestRunDeliversNotificationsAndResyncsOnReconnect$",
+   "why": "When Run ends, open streams are not closed, so server Shutdown waits on them until its timeout."
+  },
+  {
+   "id": "workspace-notify-ignores-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/stream/signal.go",
+   "old": "store.New(d.Conn(ctx)).NotifySignal(ctx,",
+   "new": "store.New(d.Pool()).NotifySignal(context.WithoutCancel(ctx),",
+   "test": "internal/modules/notification ^TestSellerWorkspaceNotifyFollowsTheCallersTransaction$",
+   "why": "The notify runs on a separate pool connection instead of the caller's transaction, so a rolled-back change is still signalled."
+  },
+  {
+   "id": "stream-latest-ignores-type-registry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "store.LatestInboxItemIDParams{\n\t\tAccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil),",
+   "new": "store.LatestInboxItemIDParams{\n\t\tAccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: append(registry.TypeNames(s.d.Registry.All(), r.Audience, nil), \"retired_type\"),",
+   "test": "internal/modules/notification ^TestStreamSignalCountsOnlyRegisteredTypesLikeUnreadCount$",
+   "why": "The stream signal names a retired-type inbox row as the latest item, which the inbox list never shows."
+  },
+  {
+   "id": "stream-unread-ignores-type-registry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "store.CountUnreadInboxItemsParams{\n\t\tAccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil),",
+   "new": "store.CountUnreadInboxItemsParams{\n\t\tAccountID: r.AccountID, Audience: string(r.Audience), StoreID: r.storeID(), Types: append(registry.TypeNames(s.d.Registry.All(), r.Audience, nil), \"retired_type\"),",
+   "test": "internal/modules/notification ^TestStreamSignalCountsOnlyRegisteredTypesLikeUnreadCount$",
+   "why": "The unread count (shared by GetUnreadCount and the stream signal) counts retired-type rows."
+  },
+  {
+   "id": "announcement-fanout-notify-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/announce/fanout.go",
+   "old": "\t\tif s.d.Signals != nil {\n\t\t\t// 與收件匣列同一個 transaction",
+   "new": "\t\tif false && s.d.Signals != nil {\n\t\t\t// 與收件匣列同一個 transaction",
+   "test": "internal/modules/notification ^TestAnnouncementFanOutSignalsTheRecipientsStream$",
+   "why": "The announcement fan-out writes inbox rows without pg_notify, so stream subscribers never learn about announcements."
+  },
+  {
+   "id": "watch-uses-default-tier",
+   "stack": "go",
+   "file": "backend/internal/httpapi/ratelimit.go",
+   "old": "\tnotificationconnect.NotificationAppServiceWatchNotificationsProcedure: tierWatch,",
+   "new": "\tnotificationconnect.NotificationAppServiceWatchNotificationsProcedure: tierDefault,",
+   "test": "internal/httpapi ^TestWatchNotificationsHasItsOwnGenerousLimit$",
+   "why": "WatchNotifications falls back to the default tier, so the stream shares the account's general counter and the burst is not throttled at its own limit."
+  },
+  {
+   "id": "mark-read-sends-no-signal",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "\t\treturn s.inboxChanged(ctx, accountID, row.Audience, row.StoreID)",
+   "new": "\t\t_ = row\n\t\treturn nil",
+   "test": "internal/modules/notification ^TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers$",
+   "why": "MarkRead changes the unread count but the recipient's other stream subscribers get no signal."
+  },
+  {
+   "id": "mark-all-read-sends-no-signal",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "\t\treturn s.inboxChanged(ctx, r.AccountID, string(r.Audience), r.storeID())",
+   "new": "\t\treturn nil",
+   "test": "internal/modules/notification ^TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers$",
+   "why": "MarkAllRead changes the unread count but sends no stream signal."
+  },
+  {
+   "id": "batch-delete-sends-no-signal",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "\t\t\tif err := s.inboxChanged(ctx, accountID, row.Audience, row.StoreID); err != nil {\n\t\t\t\treturn err\n\t\t\t}",
+   "new": "",
+   "test": "internal/modules/notification ^TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers$",
+   "why": "BatchDelete changes the unread count and latest item but sends no stream signal."
+  },
+  {
+   "id": "watch-shutdown-not-unavailable",
+   "stack": "go",
+   "file": "backend/internal/httpapi/notification/stream.go",
+   "old": "\tif errors.Is(err, notification.ErrClosed) {",
+   "new": "\tif errors.Is(err, notification.ErrClosed) && err == nil {",
+   "test": "internal/httpapi/notification ^TestWatchMapsHubShutdownToUnavailable$",
+   "why": "Hub shutdown ends the stream as an internal error instead of unavailable, so clients treat a restart as a bug."
+  },
+  {
+   "id": "listen-backoff-always-resets",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "if now().Sub(upSince) >= stableAfter {",
+   "new": "if true {",
+   "test": "internal/modules/notification/internal/stream ^TestRunBackoffKeepsGrowingWhileTheConnectionFlaps$",
+   "why": "A flapping LISTEN connection resets the backoff every time, so resync runs about twice a second."
+  },
+  {
+   "id": "listen-backoff-never-resets",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "if now().Sub(upSince) >= stableAfter {",
+   "new": "if false {",
+   "test": "internal/modules/notification/internal/stream ^TestRunBackoffResetsAfterAStableConnection$",
+   "why": "A connection that stayed up still keeps the grown backoff, so recovery after a long outage is slow forever."
+  },
+  {
+   "id": "read-error-loses-dirty-mark",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\t\t\t\ts.restoreInbox(hints)",
+   "new": "\t\t\t\t_ = hints",
+   "test": "internal/modules/notification/internal/stream ^TestFailedReadKeepsTheDirtyMarkAndHints$",
+   "why": "A failed content read drops the dirty mark and merged hints, so the change is never signalled."
+  },
+  {
+   "id": "watch-resource-exhausted-terminal",
+   "stack": "website",
+   "file": "website/lib/notifications/watch.ts",
+   "old": "\t\tcode === Code.NotFound ||\n\t\tcode === Code.FailedPrecondition",
+   "new": "\t\tcode === Code.NotFound ||\n\t\tcode === Code.ResourceExhausted ||\n\t\tcode === Code.FailedPrecondition",
+   "test": "lib/notifications/watch.unit.test.ts resource_exhausted 可重試",
+   "why": "The tab stops reconnecting for good after one resource_exhausted."
+  },
+  {
+   "id": "watch-ignores-retry-info",
+   "stack": "website",
+   "file": "website/lib/notifications/watch.ts",
+   "old": "serverDelay ?? Math.floor(random() * ceiling)",
+   "new": "Math.floor(random() * ceiling)",
+   "test": "lib/notifications/watch.unit.test.ts resource_exhausted 可重試",
+   "why": "The reconnect ignores the server RetryInfo delay."
+  },
+  {
+   "id": "watch-normal-end-flagged-abnormal",
+   "stack": "website",
+   "file": "website/lib/notifications/watch.ts",
+   "old": "lastEndAbnormal = !(outcome.kind === \"ended\" && outcome.gotFrame);",
+   "new": "lastEndAbnormal = true;",
+   "test": "lib/notifications/watch.unit.test.ts 伺服器到壽命正常結束",
+   "why": "A normal lifetime end is reported as abnormal, so the workspace is fully invalidated every 15 minutes."
+  },
+  {
+   "id": "workspace-invalidates-on-any-reconnect",
+   "stack": "website",
+   "file": "website/lib/hooks/useSellerWorkspaceRealtime.ts",
+   "old": "signal.type === \"reconnected\" && signal.afterAbnormalEnd",
+   "new": "signal.type === \"reconnected\"",
+   "test": "lib/hooks/useSellerWorkspaceRealtime.unit.test.ts 壽命到期的正常結束後重連不失效",
+   "why": "Every reconnect fully invalidates the workspace, even after a normal lifetime end."
+  }
+ ]
+}

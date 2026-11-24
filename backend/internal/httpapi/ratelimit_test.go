@@ -12,7 +12,9 @@ import (
 
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	mediaconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
+	notificationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
 	sellerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 )
 
@@ -206,5 +208,34 @@ func TestBeginUploadHasALowerTierThanTheDefault(t *testing.T) {
 	}
 	if got := tierOf(mediaconnect.MediaAppServiceGetUploadProcedure); got != tierDefault {
 		t.Errorf("GetUpload 的級別 = %v，預期 tierDefault", got)
+	}
+}
+
+// WatchNotifications 有自己的額度與計數器：一般的重連不受影響，開了就中止的迴圈在 tierWatch.visitor 次後被擋，且不擠掉同帳號其他呼叫的額度。
+// mutation：WatchNotifications 從 procedureTiers 拿掉 → 落回 tierDefault（300），串流在 121 次時不會被擋，失敗。
+func TestWatchNotificationsHasItsOwnGenerousLimit(t *testing.T) {
+	t.Parallel()
+	watch := notificationconnect.NotificationAppServiceWatchNotificationsProcedure
+	other := notificationconnect.NotificationAppServiceGetUnreadCountProcedure
+	call := func(h http.Handler, procedure, subject string) int {
+		r := httptest.NewRequestWithContext(rpc.WithSubject(t.Context(), subject), http.MethodPost, procedure, nil)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec.Code
+	}
+	h := withRateLimit(newRateLimiter(func() time.Time { return entryNow }), http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for i := range tierWatch.visitor {
+		if got := call(h, watch, "a:7"); got != http.StatusOK {
+			t.Fatalf("第 %d 次開串流 = %d，額度內要放行", i+1, got)
+		}
+	}
+	if got := call(h, watch, "a:7"); got != http.StatusTooManyRequests {
+		t.Fatalf("第 %d 次開串流 = %d，要被擋", tierWatch.visitor+1, got)
+	}
+	if got := call(h, other, "a:7"); got != http.StatusOK {
+		t.Fatalf("串流額度用完後同帳號的其他呼叫 = %d，不該被擠掉", got)
+	}
+	if got := call(h, watch, "a:8"); got != http.StatusOK {
+		t.Fatalf("別的帳號的串流 = %d，不該被擋", got)
 	}
 }

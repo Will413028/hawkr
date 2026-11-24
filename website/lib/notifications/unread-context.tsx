@@ -6,20 +6,13 @@ import type { RoleSlot } from "@/lib/auth/active-role";
 import { useAuth } from "@/lib/auth/context";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
 import { invalidateNotificationLists } from "@/lib/notifications/cache";
-import {
-	NOTIFICATION_NEW_EVENT,
-	NOTIFICATION_STREAM_RESYNC_EVENT,
-	SELLER_WORKSPACE_EVENT,
-	type SellerWorkspaceEventDetail,
-} from "@/lib/notifications/events";
+import { NOTIFICATION_NEW_EVENT } from "@/lib/notifications/events";
 import {
 	type UnreadCountState,
 	useUnreadCount,
 } from "@/lib/notifications/useUnreadCount";
 import type { SseConnectionStatus } from "@/lib/sse/client";
 import {
-	type SellerAfterSaleUpdatedPayload,
-	type SellerOrderUpdatedPayload,
 	type UseNotificationStreamHandlers,
 	useNotificationStream,
 } from "@/lib/sse/useNotificationStream";
@@ -41,13 +34,11 @@ import {
  * role-switch and as the buffer-miss recovery path. No 30s polling
  * fallback — design book §4.7.
  *
- * The provider owns the tab's ONLY `/app/notifications/stream` connection and
- * dispatches every event type from it: inbox and unread events go to
- * `useUnreadCount`; seller-workspace events and "events may have been missed"
- * (buffer miss, reconnect budget exhausted) are re-published as window events
- * (`SELLER_WORKSPACE_EVENT`, `NOTIFICATION_STREAM_RESYNC_EVENT`) for lazily
- * mounted subscribers. Connection status is read with
- * `useNotificationStreamStatus`.
+ * The provider owns the tab's `/app/notifications/stream` connection: inbox
+ * and unread events go to `useUnreadCount`, and a buffer miss or an exhausted
+ * reconnect budget re-reads the unread baseline. Connection status is read
+ * with `useNotificationStreamStatus`. The seller workspace has its own
+ * connection (`useSellerWorkspaceRealtime`).
  */
 
 const NotificationUnreadContext = React.createContext<UnreadCountState | null>(
@@ -58,14 +49,6 @@ const NotificationUnreadContext = React.createContext<UnreadCountState | null>(
 // count's consumers and a count change does not re-render the status's.
 const NotificationStreamStatusContext =
 	React.createContext<SseConnectionStatus>("idle");
-
-function dispatchSellerWorkspaceEvent(detail: SellerWorkspaceEventDetail) {
-	window.dispatchEvent(new CustomEvent(SELLER_WORKSPACE_EVENT, { detail }));
-}
-
-function dispatchStreamResync() {
-	window.dispatchEvent(new CustomEvent(NOTIFICATION_STREAM_RESYNC_EVENT));
-}
 
 export function NotificationUnreadProvider({
 	children,
@@ -115,23 +98,7 @@ export function NotificationUnreadProvider({
 		() => ({
 			onNew: handlers.onNew,
 			onUnreadChanged: handlers.onUnreadChanged,
-			onSellerOrderUpdated: (payload: SellerOrderUpdatedPayload) =>
-				dispatchSellerWorkspaceEvent({
-					kind: "order",
-					orderNo: payload.orderNo,
-					status: payload.status,
-				}),
-			onSellerAfterSaleUpdated: (payload: SellerAfterSaleUpdatedPayload) =>
-				dispatchSellerWorkspaceEvent({
-					kind: "after_sale",
-					orderNo: payload.orderNo,
-					afterSaleCaseNo: payload.afterSaleCaseNo,
-					status: payload.status,
-				}),
-			onBufferMiss: () => {
-				recover();
-				dispatchStreamResync();
-			},
+			onBufferMiss: recover,
 		}),
 		[handlers, recover],
 	);
@@ -150,7 +117,6 @@ export function NotificationUnreadProvider({
 		unavailableRecoveryRef.current = resetSignal;
 		// One recovery per terminal stream failure; this is not polling.
 		recover();
-		dispatchStreamResync();
 	}, [resetSignal, recover, streamStatus]);
 
 	React.useEffect(() => {

@@ -5,8 +5,8 @@
    "test": "internal/modules/notification/internal/model ^TestDisableableFollowsD4$",
    "why": "交易必要分類的收件匣變成可關：D4 要求不可關的分類被關掉後會漏掉必要通知"},
   {"id": "shipment-anomaly-push-disableable", "stack": "go", "file": "backend/internal/modules/notification/internal/model/model.go",
-   "old": "{CategoryShipmentAnomaly, ClassTransactional, storeOnly, []Channel{ChannelInbox, ChannelPush, ChannelEmail}},",
-   "new": "{CategoryShipmentAnomaly, ClassTransactional, storeOnly, transactionalLocked},",
+   "old": "{CategoryShipmentAnomaly, ClassTransactional, storeOnly, []Channel{ChannelInbox, ChannelPush, ChannelEmail}, nil},",
+   "new": "{CategoryShipmentAnomaly, ClassTransactional, storeOnly, transactionalLocked, nil},",
    "test": "internal/modules/notification/internal/model ^TestDisableableFollowsD4$",
    "why": "賣家 SHIPMENT_ANOMALY 的推播變成可關：D4 指定它是唯一不可關的推播"}
 ]}

@@ -1,0 +1,121 @@
+{
+ "mutants": [
+  {
+   "id": "claim-increment-condition",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "\n  AND (total_limit IS NULL OR issued_count + $1::int <= total_limit)",
+   "new": "",
+   "test": "internal/modules/coupon ^TestConcurrentClaimNeverOverIssues$",
+   "why": "IncrementIssued 拿掉「不超過總量」的條件：超出上限的領取不再回 ISSUE_LIMIT_REACHED，改撞 DB 的 issued_count CHECK（或超發），超發測試要紅。"
+  },
+  {
+   "id": "lock-status-condition",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/vouchers.sql.go",
+   "old": "WHERE id = $3 AND buyer_id = $4 AND status = 'AVAILABLE'",
+   "new": "WHERE id = $3 AND buyer_id = $4",
+   "test": "internal/modules/coupon ^TestConcurrentLockSucceedsOnce$",
+   "why": "LockVoucher 拿掉 status = 'AVAILABLE'：後面的訂單覆寫前一筆的鎖，同時鎖同一張券不再只成功一次，重複鎖測試要紅。"
+  },
+  {
+   "id": "lock-eligibility-call",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\tif err := s.d.Qualify.Check(ctx, c, in.BuyerID, now); err != nil {\n\t\treturn LockResult{}, err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/coupon ^TestLockRechecksEligibility$",
+   "why": "Lock 拿掉資格判定的呼叫（BD1）：買家被移出名單後仍鎖得到券，回歸測試要紅。"
+  },
+  {
+   "id": "end-campaign-voids-locked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/vouchers.sql.go",
+   "old": "UPDATE coupon.coupon_vouchers SET status = 'VOIDED', voided_at = $1, updated_at = $1\nWHERE campaign_id = $2 AND status = 'AVAILABLE'",
+   "new": "UPDATE coupon.coupon_vouchers SET status = 'VOIDED', voided_at = $1, updated_at = $1, order_no = NULL, locked_at = NULL\nWHERE campaign_id = $2 AND status IN ('AVAILABLE', 'LOCKED')",
+   "test": "internal/modules/coupon ^TestEndCampaignKeepsLockedVouchersRedeemable$",
+   "why": "結束活動連 LOCKED 的券一起作廢（BD8）：進行中訂單的券被收回、無法核銷，D5 回歸測試要紅。"
+  },
+  {
+   "id": "release-ignores-ended-campaign",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\t\tif model.CampaignStatus(crow.Status) == model.StatusEnded {",
+   "new": "\t\tif false && model.CampaignStatus(crow.Status) == model.StatusEnded {",
+   "test": "internal/modules/coupon ^TestReleaseAfterEndVoidsInsteadOfRestoring$",
+   "why": "Release 不看活動是否已結束：已結束活動的券回到 AVAILABLE，留下無人作廢的可用券，測試要紅。"
+  },
+  {
+   "id": "compensation-no-dedupe",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "\nON CONFLICT (source_type, source_id) DO NOTHING",
+   "new": "",
+   "test": "internal/modules/coupon ^TestCompensationResendCreatesOneVoucher$",
+   "why": "補償活動的 INSERT 拿掉 ON CONFLICT：重送撞唯一鍵失敗（或重複建立），補償重送只建一張的測試要紅。"
+  },
+  {
+   "id": "drop-suspension-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/qualify/qualify.go",
+   "old": "\t\tif suspended {\n\t\t\treturn model.Precondition(ctx, model.ReasonStoreSuspended)\n\t\t}\n",
+   "new": "\t\t_ = suspended\n",
+   "test": "internal/modules/coupon ^TestSuspendedStoreBlocksClaimAndLockButNotRedeem$",
+   "why": "資格判定拿掉停權檢查（D8 修訂）：停權店家的活動仍可領、可鎖，停權測試要紅。"
+  },
+  {
+   "id": "lock-order-conflict-mapping",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\tif isOrderNoConflict(err) {",
+   "new": "\tif false && isOrderNoConflict(err) {",
+   "test": "internal/modules/coupon ^TestConcurrentLockOfTwoVouchersForOneOrder$",
+   "why": "拿掉 vouchers_order_no_key 唯一鍵衝突的對應：後到的 transaction 在 pg_locks 確認卡住、先到的 commit 後撞上唯一鍵，回 Internal 而不是 ORDER_HOLDS_ANOTHER_VOUCHER，時序是決定性的，測試每次都要紅。"
+  },
+  {
+   "id": "quota-counts-expired",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/campaigns.sql.go",
+   "old": "AND end_at >= $2 AND target_type",
+   "new": "AND $2::timestamptz IS NOT NULL AND target_type",
+   "test": "internal/modules/coupon ^TestExpiredCampaignsDoNotCountTowardTheQuota$",
+   "why": "配額計數拿掉 end_at 條件：已到期的 ACTIVE 活動永遠佔配額，到期後建立的測試要紅。"
+  },
+  {
+   "id": "fit-allows-zero-discount",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/qualify/qualify.go",
+   "old": "\tif discount <= 0 {",
+   "new": "\tif false && discount <= 0 {",
+   "test": "internal/modules/coupon ^TestLockRejectsAPercentDiscountThatRoundsToZero$",
+   "why": "RequireDiscount 拿掉折抵為 0 的檢查：算出 0 元的百分比券在新鎖定時仍被鎖定而消耗，測試要紅。"
+  },
+  {
+   "id": "lock-no-savepoint",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\ttx, ok := db.TxFrom(ctx)\n\tif !ok {\n\t\treturn store.New(s.d.DB.Conn(ctx)).LockVoucher(ctx, p)",
+   "new": "\ttx, ok := db.TxFrom(ctx)\n\tif true || !ok {\n\t\treturn store.New(s.d.DB.Conn(ctx)).LockVoucher(ctx, p)",
+   "test": "internal/modules/coupon ^TestConcurrentLockOfTwoVouchersForOneOrder$",
+   "why": "鎖定的 UPDATE 不再包在 savepoint 內：唯一鍵衝突讓呼叫方的 transaction 被 Postgres 中止，衝突之後的 SELECT 1 與 commit 失敗，測試要紅。"
+  },
+  {
+   "id": "lock-replay-rejects-zero-discount",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\t\treturn LockResult{Voucher: rows.Voucher(vrow), Discount: discount, Replayed: true}, nil\n\t}\n\tnow := s.d.Now()",
+   "new": "\t\tif err := qualify.RequireDiscount(ctx, discount); err != nil {\n\t\t\treturn LockResult{}, err\n\t\t}\n\t\treturn LockResult{Voucher: rows.Voucher(vrow), Discount: discount, Replayed: true}, nil\n\t}\n\tnow := s.d.Now()",
+   "test": "internal/modules/coupon ^TestReplayOfHeldVoucherIgnoresZeroDiscount$",
+   "why": "零折抵檢查移回 Lock 的重送路徑：已由同一筆訂單持有的券以 0 元折抵重送 Lock 被拒絕（NO_DISCOUNT），重送測試要紅。"
+  },
+  {
+   "id": "quote-replay-rejects-zero-discount",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "\t\tif !heldBy(vrow, in.OrderNo) {\n\t\t\tif err := qualify.RequireDiscount(ctx, discount); err != nil {",
+   "new": "\t\tif true {\n\t\t\tif err := qualify.RequireDiscount(ctx, discount); err != nil {",
+   "test": "internal/modules/coupon ^TestReplayOfHeldVoucherIgnoresZeroDiscount$",
+   "why": "Quote 對已持有的券也套用零折抵檢查：以 0 元折抵 Quote 被拒絕（NO_DISCOUNT），重送測試要紅。"
+  }
+ ]
+}

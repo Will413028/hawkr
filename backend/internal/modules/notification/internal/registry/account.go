@@ -34,7 +34,7 @@ var (
 
 var accountSuspended = Define(Definition[AccountSuspendedParams]{
 	Name:              "account_suspended",
-	Audience:          model.AudienceBuyer,
+	Audiences:         []model.Audience{model.AudienceBuyer},
 	Category:          model.CategoryAccount,
 	Presentation:      model.PresentationAccount,
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelEmail},
@@ -58,7 +58,7 @@ var accountSuspended = Define(Definition[AccountSuspendedParams]{
 
 var accountUnsuspended = Define(Definition[AccountUnsuspendedParams]{
 	Name:              "account_unsuspended",
-	Audience:          model.AudienceBuyer,
+	Audiences:         []model.Audience{model.AudienceBuyer},
 	Category:          model.CategoryAccount,
 	Presentation:      model.PresentationAccount,
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelEmail},

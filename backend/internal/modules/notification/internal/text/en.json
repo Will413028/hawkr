@@ -11,6 +11,27 @@
     },
     "account_unsuspended.title": {
       "message": "Your account suspension has been lifted"
+    },
+    "audience.invalid": {
+      "message": "The notification audience is not valid."
+    },
+    "device_app.invalid": {
+      "message": "The app for the push token must be the buyer app or the seller app."
+    },
+    "device_token.invalid": {
+      "message": "The push token must be 1 to 4096 characters."
+    },
+    "inbox_item.batch_invalid": {
+      "message": "Delete between 1 and 100 distinct notifications at a time."
+    },
+    "inbox_item.not_found": {
+      "message": "Notification not found."
+    },
+    "preference.cannot_disable": {
+      "message": "This notification cannot be turned off."
+    },
+    "preference.not_available": {
+      "message": "This notification setting is not available."
     }
   }
 }

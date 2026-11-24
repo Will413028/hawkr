@@ -51,8 +51,8 @@ type AiStyle struct {
 	ThumbnailStagedToken string `protobuf:"bytes,6,opt,name=thumbnail_staged_token,json=thumbnailStagedToken,proto3" json:"thumbnail_staged_token,omitempty"`
 	// 顯示順序，小的在前。
 	DisplayOrder int32 `protobuf:"varint,7,opt,name=display_order,json=displayOrder,proto3" json:"display_order,omitempty"`
-	// 是否為該用途的預設風格；同一個用途只有一個預設。只能設成 true（原本的預設自動取消）；
-	// 設成 false 回 invalid_argument，換預設只能把另一個風格設成 true。
+	// 是否為該用途的預設風格；同一個用途只有一個預設。唯讀：新增的風格都不是預設，修改時 update_mask 內的這個欄位會被忽略，
+	// 換預設用 SetDefaultAiStyle。目前的預設風格不能刪除，也不能停用（failed_precondition）。
 	DefaultStyle bool `protobuf:"varint,8,opt,name=default_style,json=defaultStyle,proto3" json:"default_style,omitempty"`
 	// 停用的風格前台看不到。
 	Enabled bool `protobuf:"varint,9,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -561,6 +561,103 @@ func (x *UpdateAiStyleResponse) GetAiStyle() *AiStyle {
 	return nil
 }
 
+type SetDefaultAiStyleRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 選填；帶了就必須與目前的版本相符。
+	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDefaultAiStyleRequest) Reset() {
+	*x = SetDefaultAiStyleRequest{}
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDefaultAiStyleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDefaultAiStyleRequest) ProtoMessage() {}
+
+func (x *SetDefaultAiStyleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDefaultAiStyleRequest.ProtoReflect.Descriptor instead.
+func (*SetDefaultAiStyleRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SetDefaultAiStyleRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SetDefaultAiStyleRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+type SetDefaultAiStyleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AiStyle       *AiStyle               `protobuf:"bytes,1,opt,name=ai_style,json=aiStyle,proto3" json:"ai_style,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDefaultAiStyleResponse) Reset() {
+	*x = SetDefaultAiStyleResponse{}
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDefaultAiStyleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDefaultAiStyleResponse) ProtoMessage() {}
+
+func (x *SetDefaultAiStyleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDefaultAiStyleResponse.ProtoReflect.Descriptor instead.
+func (*SetDefaultAiStyleResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SetDefaultAiStyleResponse) GetAiStyle() *AiStyle {
+	if x != nil {
+		return x.AiStyle
+	}
+	return nil
+}
+
 type DeleteAiStyleRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -572,7 +669,7 @@ type DeleteAiStyleRequest struct {
 
 func (x *DeleteAiStyleRequest) Reset() {
 	*x = DeleteAiStyleRequest{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[8]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -584,7 +681,7 @@ func (x *DeleteAiStyleRequest) String() string {
 func (*DeleteAiStyleRequest) ProtoMessage() {}
 
 func (x *DeleteAiStyleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[8]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -597,7 +694,7 @@ func (x *DeleteAiStyleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAiStyleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAiStyleRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{8}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DeleteAiStyleRequest) GetId() string {
@@ -622,7 +719,7 @@ type DeleteAiStyleResponse struct {
 
 func (x *DeleteAiStyleResponse) Reset() {
 	*x = DeleteAiStyleResponse{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[9]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -634,7 +731,7 @@ func (x *DeleteAiStyleResponse) String() string {
 func (*DeleteAiStyleResponse) ProtoMessage() {}
 
 func (x *DeleteAiStyleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[9]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -647,7 +744,7 @@ func (x *DeleteAiStyleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAiStyleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAiStyleResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{9}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{11}
 }
 
 type GetAiQuotaRequest struct {
@@ -659,7 +756,7 @@ type GetAiQuotaRequest struct {
 
 func (x *GetAiQuotaRequest) Reset() {
 	*x = GetAiQuotaRequest{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[10]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -671,7 +768,7 @@ func (x *GetAiQuotaRequest) String() string {
 func (*GetAiQuotaRequest) ProtoMessage() {}
 
 func (x *GetAiQuotaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[10]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -684,7 +781,7 @@ func (x *GetAiQuotaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAiQuotaRequest.ProtoReflect.Descriptor instead.
 func (*GetAiQuotaRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{10}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetAiQuotaRequest) GetStoreId() string {
@@ -703,7 +800,7 @@ type GetAiQuotaResponse struct {
 
 func (x *GetAiQuotaResponse) Reset() {
 	*x = GetAiQuotaResponse{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[11]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -715,7 +812,7 @@ func (x *GetAiQuotaResponse) String() string {
 func (*GetAiQuotaResponse) ProtoMessage() {}
 
 func (x *GetAiQuotaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[11]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -728,7 +825,7 @@ func (x *GetAiQuotaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAiQuotaResponse.ProtoReflect.Descriptor instead.
 func (*GetAiQuotaResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{11}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetAiQuotaResponse) GetAiQuota() *AiQuota {
@@ -749,7 +846,7 @@ type UpdateAiQuotaRequest struct {
 
 func (x *UpdateAiQuotaRequest) Reset() {
 	*x = UpdateAiQuotaRequest{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[12]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -761,7 +858,7 @@ func (x *UpdateAiQuotaRequest) String() string {
 func (*UpdateAiQuotaRequest) ProtoMessage() {}
 
 func (x *UpdateAiQuotaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[12]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -774,7 +871,7 @@ func (x *UpdateAiQuotaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAiQuotaRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAiQuotaRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{12}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UpdateAiQuotaRequest) GetAiQuota() *AiQuota {
@@ -800,7 +897,7 @@ type UpdateAiQuotaResponse struct {
 
 func (x *UpdateAiQuotaResponse) Reset() {
 	*x = UpdateAiQuotaResponse{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[13]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -812,7 +909,7 @@ func (x *UpdateAiQuotaResponse) String() string {
 func (*UpdateAiQuotaResponse) ProtoMessage() {}
 
 func (x *UpdateAiQuotaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[13]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -825,7 +922,7 @@ func (x *UpdateAiQuotaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAiQuotaResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAiQuotaResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{13}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UpdateAiQuotaResponse) GetAiQuota() *AiQuota {
@@ -846,7 +943,7 @@ type DeleteAiQuotaRequest struct {
 
 func (x *DeleteAiQuotaRequest) Reset() {
 	*x = DeleteAiQuotaRequest{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[14]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -858,7 +955,7 @@ func (x *DeleteAiQuotaRequest) String() string {
 func (*DeleteAiQuotaRequest) ProtoMessage() {}
 
 func (x *DeleteAiQuotaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[14]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -871,7 +968,7 @@ func (x *DeleteAiQuotaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAiQuotaRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAiQuotaRequest) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{14}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DeleteAiQuotaRequest) GetStoreId() string {
@@ -896,7 +993,7 @@ type DeleteAiQuotaResponse struct {
 
 func (x *DeleteAiQuotaResponse) Reset() {
 	*x = DeleteAiQuotaResponse{}
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[15]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -908,7 +1005,7 @@ func (x *DeleteAiQuotaResponse) String() string {
 func (*DeleteAiQuotaResponse) ProtoMessage() {}
 
 func (x *DeleteAiQuotaResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[15]
+	mi := &file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -921,14 +1018,14 @@ func (x *DeleteAiQuotaResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAiQuotaResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAiQuotaResponse) Descriptor() ([]byte, []int) {
-	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{15}
+	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP(), []int{17}
 }
 
 var File_hawkr_admin_imageai_v1alpha1_imageai_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/admin/imageai/v1alpha1/imageai.proto\x12\x1chawkr.admin.imageai.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a$hawkr/imageai/v1alpha1/imageai.proto\"\xb7\x04\n" +
+	"*hawkr/admin/imageai/v1alpha1/imageai.proto\x12\x1chawkr.admin.imageai.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a$hawkr/imageai/v1alpha1/imageai.proto\"\xbc\x04\n" +
 	"\aAiStyle\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1a\n" +
 	"\x04name\x18\x02 \x01(\tB\x06\xe0A\x02\xe0A\x05R\x04name\x12\x19\n" +
@@ -936,8 +1033,8 @@ const file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDesc = "" +
 	"\x06prompt\x18\x04 \x01(\tB\x03\xe0A\x02R\x06prompt\x12?\n" +
 	"\tthumbnail\x18\x05 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\tthumbnail\x129\n" +
 	"\x16thumbnail_staged_token\x18\x06 \x01(\tB\x03\xe0A\x04R\x14thumbnailStagedToken\x12#\n" +
-	"\rdisplay_order\x18\a \x01(\x05R\fdisplayOrder\x12#\n" +
-	"\rdefault_style\x18\b \x01(\bR\fdefaultStyle\x12\x18\n" +
+	"\rdisplay_order\x18\a \x01(\x05R\fdisplayOrder\x12(\n" +
+	"\rdefault_style\x18\b \x01(\bB\x03\xe0A\x03R\fdefaultStyle\x12\x18\n" +
 	"\aenabled\x18\t \x01(\bR\aenabled\x12K\n" +
 	"\bcategory\x18\n" +
 	" \x01(\x0e2'.hawkr.imageai.v1alpha1.AiStyleCategoryB\x06\xe0A\x02\xe0A\x05R\bcategory\x12@\n" +
@@ -969,6 +1066,11 @@ const file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
 	"updateMask\"Y\n" +
 	"\x15UpdateAiStyleResponse\x12@\n" +
+	"\bai_style\x18\x01 \x01(\v2%.hawkr.admin.imageai.v1alpha1.AiStyleR\aaiStyle\"C\n" +
+	"\x18SetDefaultAiStyleRequest\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12\x12\n" +
+	"\x04etag\x18\x02 \x01(\tR\x04etag\"]\n" +
+	"\x19SetDefaultAiStyleResponse\x12@\n" +
 	"\bai_style\x18\x01 \x01(\v2%.hawkr.admin.imageai.v1alpha1.AiStyleR\aaiStyle\"?\n" +
 	"\x14DeleteAiStyleRequest\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\x02R\x02id\x12\x12\n" +
@@ -987,11 +1089,12 @@ const file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDesc = "" +
 	"\x14DeleteAiQuotaRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\x12\x12\n" +
 	"\x04etag\x18\x02 \x01(\tR\x04etag\"\x17\n" +
-	"\x15DeleteAiQuotaResponse2\x82\a\n" +
+	"\x15DeleteAiQuotaResponse2\x89\b\n" +
 	"\x13ImageAiAdminService\x12\x92\x01\n" +
 	"\x14ListAiStylesForAdmin\x129.hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminRequest\x1a:.hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminResponse\"\x03\x90\x02\x01\x12x\n" +
 	"\rCreateAiStyle\x122.hawkr.admin.imageai.v1alpha1.CreateAiStyleRequest\x1a3.hawkr.admin.imageai.v1alpha1.CreateAiStyleResponse\x12x\n" +
-	"\rUpdateAiStyle\x122.hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest\x1a3.hawkr.admin.imageai.v1alpha1.UpdateAiStyleResponse\x12x\n" +
+	"\rUpdateAiStyle\x122.hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest\x1a3.hawkr.admin.imageai.v1alpha1.UpdateAiStyleResponse\x12\x84\x01\n" +
+	"\x11SetDefaultAiStyle\x126.hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleRequest\x1a7.hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleResponse\x12x\n" +
 	"\rDeleteAiStyle\x122.hawkr.admin.imageai.v1alpha1.DeleteAiStyleRequest\x1a3.hawkr.admin.imageai.v1alpha1.DeleteAiStyleResponse\x12t\n" +
 	"\n" +
 	"GetAiQuota\x12/.hawkr.admin.imageai.v1alpha1.GetAiQuotaRequest\x1a0.hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse\"\x03\x90\x02\x01\x12x\n" +
@@ -1011,7 +1114,7 @@ func file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescGZIP() []byte {
 	return file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDescData
 }
 
-var file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_hawkr_admin_imageai_v1alpha1_imageai_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_hawkr_admin_imageai_v1alpha1_imageai_proto_goTypes = []any{
 	(*AiStyle)(nil),                      // 0: hawkr.admin.imageai.v1alpha1.AiStyle
 	(*AiQuota)(nil),                      // 1: hawkr.admin.imageai.v1alpha1.AiQuota
@@ -1021,55 +1124,60 @@ var file_hawkr_admin_imageai_v1alpha1_imageai_proto_goTypes = []any{
 	(*CreateAiStyleResponse)(nil),        // 5: hawkr.admin.imageai.v1alpha1.CreateAiStyleResponse
 	(*UpdateAiStyleRequest)(nil),         // 6: hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest
 	(*UpdateAiStyleResponse)(nil),        // 7: hawkr.admin.imageai.v1alpha1.UpdateAiStyleResponse
-	(*DeleteAiStyleRequest)(nil),         // 8: hawkr.admin.imageai.v1alpha1.DeleteAiStyleRequest
-	(*DeleteAiStyleResponse)(nil),        // 9: hawkr.admin.imageai.v1alpha1.DeleteAiStyleResponse
-	(*GetAiQuotaRequest)(nil),            // 10: hawkr.admin.imageai.v1alpha1.GetAiQuotaRequest
-	(*GetAiQuotaResponse)(nil),           // 11: hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse
-	(*UpdateAiQuotaRequest)(nil),         // 12: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest
-	(*UpdateAiQuotaResponse)(nil),        // 13: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaResponse
-	(*DeleteAiQuotaRequest)(nil),         // 14: hawkr.admin.imageai.v1alpha1.DeleteAiQuotaRequest
-	(*DeleteAiQuotaResponse)(nil),        // 15: hawkr.admin.imageai.v1alpha1.DeleteAiQuotaResponse
-	(*v1alpha1.Image)(nil),               // 16: hawkr.common.v1alpha1.Image
-	(v1alpha11.AiStyleCategory)(0),       // 17: hawkr.imageai.v1alpha1.AiStyleCategory
-	(*timestamppb.Timestamp)(nil),        // 18: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),        // 19: google.protobuf.FieldMask
+	(*SetDefaultAiStyleRequest)(nil),     // 8: hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleRequest
+	(*SetDefaultAiStyleResponse)(nil),    // 9: hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleResponse
+	(*DeleteAiStyleRequest)(nil),         // 10: hawkr.admin.imageai.v1alpha1.DeleteAiStyleRequest
+	(*DeleteAiStyleResponse)(nil),        // 11: hawkr.admin.imageai.v1alpha1.DeleteAiStyleResponse
+	(*GetAiQuotaRequest)(nil),            // 12: hawkr.admin.imageai.v1alpha1.GetAiQuotaRequest
+	(*GetAiQuotaResponse)(nil),           // 13: hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse
+	(*UpdateAiQuotaRequest)(nil),         // 14: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest
+	(*UpdateAiQuotaResponse)(nil),        // 15: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaResponse
+	(*DeleteAiQuotaRequest)(nil),         // 16: hawkr.admin.imageai.v1alpha1.DeleteAiQuotaRequest
+	(*DeleteAiQuotaResponse)(nil),        // 17: hawkr.admin.imageai.v1alpha1.DeleteAiQuotaResponse
+	(*v1alpha1.Image)(nil),               // 18: hawkr.common.v1alpha1.Image
+	(v1alpha11.AiStyleCategory)(0),       // 19: hawkr.imageai.v1alpha1.AiStyleCategory
+	(*timestamppb.Timestamp)(nil),        // 20: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),        // 21: google.protobuf.FieldMask
 }
 var file_hawkr_admin_imageai_v1alpha1_imageai_proto_depIdxs = []int32{
-	16, // 0: hawkr.admin.imageai.v1alpha1.AiStyle.thumbnail:type_name -> hawkr.common.v1alpha1.Image
-	17, // 1: hawkr.admin.imageai.v1alpha1.AiStyle.category:type_name -> hawkr.imageai.v1alpha1.AiStyleCategory
-	18, // 2: hawkr.admin.imageai.v1alpha1.AiStyle.create_time:type_name -> google.protobuf.Timestamp
-	18, // 3: hawkr.admin.imageai.v1alpha1.AiStyle.update_time:type_name -> google.protobuf.Timestamp
-	18, // 4: hawkr.admin.imageai.v1alpha1.AiQuota.update_time:type_name -> google.protobuf.Timestamp
-	17, // 5: hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminRequest.category:type_name -> hawkr.imageai.v1alpha1.AiStyleCategory
+	18, // 0: hawkr.admin.imageai.v1alpha1.AiStyle.thumbnail:type_name -> hawkr.common.v1alpha1.Image
+	19, // 1: hawkr.admin.imageai.v1alpha1.AiStyle.category:type_name -> hawkr.imageai.v1alpha1.AiStyleCategory
+	20, // 2: hawkr.admin.imageai.v1alpha1.AiStyle.create_time:type_name -> google.protobuf.Timestamp
+	20, // 3: hawkr.admin.imageai.v1alpha1.AiStyle.update_time:type_name -> google.protobuf.Timestamp
+	20, // 4: hawkr.admin.imageai.v1alpha1.AiQuota.update_time:type_name -> google.protobuf.Timestamp
+	19, // 5: hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminRequest.category:type_name -> hawkr.imageai.v1alpha1.AiStyleCategory
 	0,  // 6: hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminResponse.ai_styles:type_name -> hawkr.admin.imageai.v1alpha1.AiStyle
 	0,  // 7: hawkr.admin.imageai.v1alpha1.CreateAiStyleRequest.ai_style:type_name -> hawkr.admin.imageai.v1alpha1.AiStyle
 	0,  // 8: hawkr.admin.imageai.v1alpha1.CreateAiStyleResponse.ai_style:type_name -> hawkr.admin.imageai.v1alpha1.AiStyle
 	0,  // 9: hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest.ai_style:type_name -> hawkr.admin.imageai.v1alpha1.AiStyle
-	19, // 10: hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest.update_mask:type_name -> google.protobuf.FieldMask
+	21, // 10: hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest.update_mask:type_name -> google.protobuf.FieldMask
 	0,  // 11: hawkr.admin.imageai.v1alpha1.UpdateAiStyleResponse.ai_style:type_name -> hawkr.admin.imageai.v1alpha1.AiStyle
-	1,  // 12: hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse.ai_quota:type_name -> hawkr.admin.imageai.v1alpha1.AiQuota
-	1,  // 13: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest.ai_quota:type_name -> hawkr.admin.imageai.v1alpha1.AiQuota
-	19, // 14: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest.update_mask:type_name -> google.protobuf.FieldMask
-	1,  // 15: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaResponse.ai_quota:type_name -> hawkr.admin.imageai.v1alpha1.AiQuota
-	2,  // 16: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.ListAiStylesForAdmin:input_type -> hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminRequest
-	4,  // 17: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.CreateAiStyle:input_type -> hawkr.admin.imageai.v1alpha1.CreateAiStyleRequest
-	6,  // 18: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiStyle:input_type -> hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest
-	8,  // 19: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiStyle:input_type -> hawkr.admin.imageai.v1alpha1.DeleteAiStyleRequest
-	10, // 20: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.GetAiQuota:input_type -> hawkr.admin.imageai.v1alpha1.GetAiQuotaRequest
-	12, // 21: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiQuota:input_type -> hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest
-	14, // 22: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiQuota:input_type -> hawkr.admin.imageai.v1alpha1.DeleteAiQuotaRequest
-	3,  // 23: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.ListAiStylesForAdmin:output_type -> hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminResponse
-	5,  // 24: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.CreateAiStyle:output_type -> hawkr.admin.imageai.v1alpha1.CreateAiStyleResponse
-	7,  // 25: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiStyle:output_type -> hawkr.admin.imageai.v1alpha1.UpdateAiStyleResponse
-	9,  // 26: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiStyle:output_type -> hawkr.admin.imageai.v1alpha1.DeleteAiStyleResponse
-	11, // 27: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.GetAiQuota:output_type -> hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse
-	13, // 28: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiQuota:output_type -> hawkr.admin.imageai.v1alpha1.UpdateAiQuotaResponse
-	15, // 29: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiQuota:output_type -> hawkr.admin.imageai.v1alpha1.DeleteAiQuotaResponse
-	23, // [23:30] is the sub-list for method output_type
-	16, // [16:23] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	0,  // 12: hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleResponse.ai_style:type_name -> hawkr.admin.imageai.v1alpha1.AiStyle
+	1,  // 13: hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse.ai_quota:type_name -> hawkr.admin.imageai.v1alpha1.AiQuota
+	1,  // 14: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest.ai_quota:type_name -> hawkr.admin.imageai.v1alpha1.AiQuota
+	21, // 15: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest.update_mask:type_name -> google.protobuf.FieldMask
+	1,  // 16: hawkr.admin.imageai.v1alpha1.UpdateAiQuotaResponse.ai_quota:type_name -> hawkr.admin.imageai.v1alpha1.AiQuota
+	2,  // 17: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.ListAiStylesForAdmin:input_type -> hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminRequest
+	4,  // 18: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.CreateAiStyle:input_type -> hawkr.admin.imageai.v1alpha1.CreateAiStyleRequest
+	6,  // 19: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiStyle:input_type -> hawkr.admin.imageai.v1alpha1.UpdateAiStyleRequest
+	8,  // 20: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.SetDefaultAiStyle:input_type -> hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleRequest
+	10, // 21: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiStyle:input_type -> hawkr.admin.imageai.v1alpha1.DeleteAiStyleRequest
+	12, // 22: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.GetAiQuota:input_type -> hawkr.admin.imageai.v1alpha1.GetAiQuotaRequest
+	14, // 23: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiQuota:input_type -> hawkr.admin.imageai.v1alpha1.UpdateAiQuotaRequest
+	16, // 24: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiQuota:input_type -> hawkr.admin.imageai.v1alpha1.DeleteAiQuotaRequest
+	3,  // 25: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.ListAiStylesForAdmin:output_type -> hawkr.admin.imageai.v1alpha1.ListAiStylesForAdminResponse
+	5,  // 26: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.CreateAiStyle:output_type -> hawkr.admin.imageai.v1alpha1.CreateAiStyleResponse
+	7,  // 27: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiStyle:output_type -> hawkr.admin.imageai.v1alpha1.UpdateAiStyleResponse
+	9,  // 28: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.SetDefaultAiStyle:output_type -> hawkr.admin.imageai.v1alpha1.SetDefaultAiStyleResponse
+	11, // 29: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiStyle:output_type -> hawkr.admin.imageai.v1alpha1.DeleteAiStyleResponse
+	13, // 30: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.GetAiQuota:output_type -> hawkr.admin.imageai.v1alpha1.GetAiQuotaResponse
+	15, // 31: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.UpdateAiQuota:output_type -> hawkr.admin.imageai.v1alpha1.UpdateAiQuotaResponse
+	17, // 32: hawkr.admin.imageai.v1alpha1.ImageAiAdminService.DeleteAiQuota:output_type -> hawkr.admin.imageai.v1alpha1.DeleteAiQuotaResponse
+	25, // [25:33] is the sub-list for method output_type
+	17, // [17:25] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_imageai_v1alpha1_imageai_proto_init() }
@@ -1084,7 +1192,7 @@ func file_hawkr_admin_imageai_v1alpha1_imageai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDesc), len(file_hawkr_admin_imageai_v1alpha1_imageai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

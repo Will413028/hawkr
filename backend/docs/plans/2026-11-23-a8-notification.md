@@ -28,7 +28,7 @@
 - **沒有 Apple 登入**：通知 ADR 決策 8 的 Apple 私密轉寄網域登記不做。已確認。
 - **取貨簡訊的前提已消失**：B3 改賣家自寄、刪超商取貨（主計畫 B3 段）；通知 ADR 決策 9 的取貨簡訊候選失效。已確認。
 - **外部前置（只有 Will 能做）**：新的 Firebase 專案（擋 A8-3 的真實推播與 A8-6 的真機驗收）；Resend 新帳號（不得用舊公司的）與交易信子網域（SPF、DKIM、DMARC）。Will 目前沒有網域（2026-11-23），真實寄信延後到買網域；其他步驟用替身。未完成。
-- **單體是單一行程**（ADR `2026-11-19-ai-service-monolith-scope.md`）：串流 hub 用記憶體即可。已確認。
+- **單體是同一份程式、不是單一行程**（2026-11-24 更正，證據 `cmd/hawkr/main.go` 的 `runServe` 與 `runWorker`；原寫「單一行程：串流 hub 用記憶體即可」不成立）：`serve`（Connect 串流、可多個副本）與 `worker`（River，含意圖 worker）是不同行程，記憶體內的發布到不了別的行程。串流訊號改走 Postgres LISTEN/NOTIFY（先例 `modules/im` 的 `internal/live`、procurement 的共用 LISTEN）：寫入端在自己的 transaction 內 `pg_notify`（payload 只有業務鍵），每個 serve 行程一條專用 LISTEN 連線（`Deps.ListenConnConfig`，直連或 session 模式，不經 transaction pooling）扇出給本行程的 `(account_id, 受眾)` 訂閱者，內容由 serve 端讀取。每帳號串流上限是每個 serve 行程各自的，不跨副本。已確認。
 - **一個帳號最多一家現行店、沒有店員**（ADR `2026-06-29-identity-defer-store-entity.md`）：店家受眾的收件人解析集中一處。仍成立。
 - **工具鏈**（預設，可推翻）：照根目錄 `AGENTS.md`。
 
@@ -71,6 +71,7 @@
   - `product.viewed`（每次瀏覽通知賣家）的型別。
   - 舊資料搬移（不在線）。
 - 延後：
+  - 接上 order、aftersales 的賣家工作區發布者（呼叫 `PublishSellerWorkspace`，D19）。觸發：order、aftersales 模組搬進單體。
   - 還沒搬的服務的通知型別。觸發：各發送端搬進單體（B2–B10、A5、A9），由「模組完成的定義」新增條目承接。
   - 真實寄信驗收（Resend 帳號、交易信子網域的 SPF、DKIM、DMARC，寄一封到測試信箱）。觸發：Will 買網域。
   - 食安事件通知近 6 個月購買者。觸發：B8。
@@ -109,11 +110,11 @@
     - A8-2a 契約：`api/` 的 notification service 全部方法（含串流與後台公告）、D6 的呈現分類與狀態重讀提示 enum、`ErrorReason`；`seller.proto:306` 白名單註解；backend `make connect`、TS、Dart 生成。`ErrorReason`：不需新增（標準 code 足夠）。驗收：`buf lint`、`buf breaking`、三端生成無 drift；handler 未掛時 `TestEveryServiceInTheContractIsMounted` 的紅是預期，在 A8-2b 消除。
     - A8-2b 收件匣、偏好、token 的 unary handler：`model.Delivers` 改由型別註冊表推導每個分類實際送出的渠道（現只排除公告的 email，例：互動類沒有 email），偏好列表與更新依它過濾與拒絕；D9 代行者拒絕、`httpapi` 停權放行與限流豁免、掛載。驗收：每支方法的 Connect 特性測試；mutation：`MarkAsRead` 非本人成功、`total` 不套篩選。
     - A8-2c 後台公告：公告表、建立與列表、收件匣與推播分開的 job。驗收：沒有 token 的帳號也收到；特性測試。
-    - A8-2d 串流與賣家工作區：hub、`(account_id, 受眾)` 訂閱與上限、`seller_workspace` 事件與發布端搬遷、website `useSellerWorkspaceRealtime` 改接。驗收：原文的串流 integration 與三個串流 mutation。
+    - A8-2d 串流與賣家工作區：hub、`(account_id, 受眾)` 訂閱與上限、LISTEN/NOTIFY 跨行程扇出（意圖 worker 在寫收件匣的同一 transaction `pg_notify`；serve 以 `serveWithRun` 跑 `notificationModule.Run`，worker 不跑；LISTEN 重連後對所有本地訂閱者發完整重讀訊號）、`seller_workspace` 事件的單體內發布介面（D19，發布端隨 order、aftersales 搬遷，在自己的 transaction 內呼叫）、website `useSellerWorkspaceRealtime` 改接。驗收：串流 integration（worker 路徑寫入後另一個 hub 的訂閱者經 LISTEN 收到訊號、賣家工作區發布後訂閱者收到事件且 rollback 不送、另一受眾收不到、超過上限被拒、LISTEN 連線被終止後重連發重讀訊號）；mutation 作用在 `pg_notify` 路徑（拿掉意圖 worker 的 notify、拿掉工作區 notify、串流鍵拿掉受眾、拿掉上限、拿掉重連重讀、notify 不在呼叫端 transaction）。
   - 範圍：`api/` 新增 notification service：收件匣列表（cursor 分頁、分類篩選，`total` 跟著篩選）、未讀數、已讀（不存在或非本人回 NotFound）、全部已讀、刪除、偏好讀寫（受眾與分類只來自註冊表）、裝置 token 註冊與刪除（不帶 `platform`：兩支 App 只有 iOS，Android 已於 2026-09-26 移除，FCM 也不需要；App 每次啟動呼叫註冊，更新 `last_registered_at`）、串流（server streaming，`(account_id, 受眾)` 訂閱，只送未讀數與最新收件匣 ID，保留每帳號串流上限）、後台公告（建立、列表；收件匣與推播分開，沒有 token 的人也收得到；公告表在本步建）。收件匣回應帶伺服器依請求語系組好的標題、內文、深連結與呈現分類 enum。代行者不能呼叫（D9），`api/hawkr/seller/v1alpha1/seller.proto:306` 的白名單註解一起改。BFF 代理、`httpapi` 的停權放行與限流豁免一起改（§8.4 #4）。推播 payload 與串流訊號帶 D6 的狀態重讀提示 enum。賣家工作區即時通道與通知串流共用路徑、SSE 連線與 topic `notification:user:{storeId}`（A8-0 U10，`fact-checks.md`；`seller_workspace_channel.go:14-34`），一起搬：同一個串流與 hub 承載 `seller_workspace` 事件、其發布端（`ResolveTopic` 讀 `payload.sellerId`）與批次事件名，website `useSellerWorkspaceRealtime` 改接新串流。
   - 消費端：`rg -n "notifications|notification-preferences|device-token" website/ admin/ buyer-app/lib seller-app/lib backend/gateway backend/internal/httpapi`。
   - 不能動：舊 REST 在 A8-7 前仍可用。
-  - 驗收：`buf lint`、`buf breaking`、TS／Dart 生成無 drift；Connect 特性測試涵蓋每支方法；串流 integration：建立通知後收到訊號、另一受眾收不到、超過上限被拒、發 `seller.order.updated` 後賣家工作區訂閱者收到事件。mutation：拿掉 `seller_workspace` 事件的轉送 → 賣家工作區測試紅；串流鍵拿掉受眾 → 跨受眾測試紅；`MarkAsRead` 改回非本人也成功 → NotFound 測試紅；`total` 不套分類篩選 → 篩選計數測試紅；拿掉串流上限檢查 → 上限測試紅。
+  - 驗收：`buf lint`、`buf breaking`、TS／Dart 生成無 drift；Connect 特性測試涵蓋每支方法；串流 integration：建立通知後收到訊號、另一受眾收不到、超過上限被拒、呼叫賣家工作區發布介面（D19）後賣家工作區訂閱者收到事件。mutation：拿掉發布介面到 hub 的轉送 → 賣家工作區測試紅；串流鍵拿掉受眾 → 跨受眾測試紅；`MarkAsRead` 改回非本人也成功 → NotFound 測試紅；`total` 不套分類篩選 → 篩選計數測試紅；拿掉串流上限檢查 → 上限測試紅。
 
 - [ ] **A8-3 渠道與單體事件訂閱**（被擋於：A8-1；真實 provider 驗收另擋於 Will 的帳號）
   - 範圍：
@@ -196,6 +197,7 @@
 | D13 legacy 通知轉接 | 不做；通知型別隨發送端搬遷 | 已決 2026-11-23，Will |
 | D17 後台公告語系 | 一律只寫英文：單一 `title`／`body`，不分語系、不依請求語系選擇（偏離多語系 ADR 的 zh-TW／en，限公告） | 已決 2026-11-24，Will |
 | D18 公告的偏好分類 | 新增偏好分類 `ANNOUNCEMENT`（受眾 BUYER 與 STORE）：收件匣不可關，推播可在偏好關閉，不寄 email（註冊表 `model.Delivers` 不列公告的 EMAIL）；proto 的 `NOTIFICATION_CATEGORY_ANNOUNCEMENT` 與註冊表（`internal/model`）同步，偏好分類由 D4 的 14 個變成 15 個。原問題：公告沒有分類會是 UNSPECIFIED，不能篩選也不能設偏好 | 已決 2026-11-24，Will |
+| D19 賣家工作區事件的發布端 | notification 公開單體內的發布介面 `PublishSellerWorkspace(storeID, change)`，給之後搬進單體的 order、aftersales 模組在自己的 transaction 內呼叫（`pg_notify` 隨 commit 送出、rollback 不送；簽名 `PublishSellerWorkspace(ctx, storeID, change)`）；不寫 RabbitMQ 轉接（`seller.order.updated`、`seller.after_sale.updated` 的發布端是還沒搬的 Java order-service、aftersales-service，與 D13 同理）；website `useSellerWorkspaceRealtime` 現在就改接 `WatchNotifications`（STORE 受眾），order、aftersales 搬進單體之前賣家中心沒有即時同步（系統未上線，接受）。原問題：發布端在還沒搬的服務，單體內沒有可掛鉤的事件 | 已決 2026-11-24，Will |
 | D16 投遞紀錄「實際送出文字」裡的第三方名稱 | (a) 接受：送出文字是送出時的事實紀錄，受 D15 的 180 天硬刪約束；只有收件人自己刪帳號時提前清。原問題：actor 刪帳號後，別人投遞紀錄的送出文字仍含其名稱，最長 180 天。選項：(a) 接受，送出文字是「送了什麼」的事實紀錄，期限受 D15 約束；(b) 不存送出文字，只存型別＋參數（ID）＋locale，需要時重組，代價是重組結果可能與當時不同、客訴時無法證明送了什麼；(c) actor 刪帳號時也掃描清除。建議 (a)：業界（SendGrid、Postmark 的 message activity）保留送出內容到保留期，GDPR 以有限保留期滿足最小化。 | 已決 2026-11-23，Will |
 
 ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地址改 identity 登入同步、刪 Apple 私密轉寄），由 A8-4 寫。
@@ -210,10 +212,10 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | A8-1a 骨架、schema、註冊表 | 完成 | 本機：gofmt、lint-monolith（0 issues）、vet integration、notification／arch／cmd／uitext unit -race、mutation --validate；開工與完成前設計審查、code-review＋合約審查兩輪（findings 13，blocking 1 已修） ；CI `d049c19ab`：notification integration ok、ui-text generated diff、mutation、其餘 16 個 workflow 綠 | backend monolith 紅只因既有的 `httpapi TestEveryServiceInTheContractIsMounted`（imageai、procurement 未掛，A9 範圍；`6298a02b1` 起已紅） | `fe89c9128`..`9075c1bc1` |
 | A8-1b 意圖管線 | 完成 | 本機：gofmt、lint（0 issues）、vet integration、notification／identity／arch／lockorder／cmd unit -race、mutation --validate；code-review＋合約審查兩輪（findings 10，blocking 0；fixed 8、rejected 1 nit：同時間戳由處理順序決定，機率可忽略） ；CI：mutation 綠（`f62fa160e`）；integration 在 run 45195973731（`52498bd7b`，含本步）notification、notification/internal/intake、identity ok | backend monolith 紅只因既有的 `httpapi TestEveryServiceInTheContractIsMounted`（A9）；repo hygiene 紅是 B2 的 PayUni 殘留（`payment/CARRYOVER.md`），推送前已紅 | `1d3383a9b`..`c213cfec3` |
 | A8-1c 保留期與個資清除 | 完成 | 本機：gofmt、lint-monolith（0 issues）、vet integration、notification／buyer／seller／arch／lockorder／cmd unit -race、mutation --validate（8 個）；合約審查 NO DEFECTS；code-review＋第 2 輪審查（findings 10，blocking 0；fixed 8：R1-1/2/3/5/6、D1–D3，recorded 1：R1-4 寫進 A8-3，accepted 1：D4 店家鎖順序由 seller 自己的測試涵蓋）；CI run 45204116577（`8e72287e2`）：notification、intake、purge、buyer、seller integration ok；mutation 綠（8 個） | backend monolith 紅只因既有的 `httpapi TestEveryServiceInTheContractIsMounted`（A9）；repo hygiene 紅是既有的 B2 PayUni 殘留（`payment/CARRYOVER.md`） | `90d5530ca`..`f23cac6ef` |
-| A8-2a 契約 | 進行中 | | | |
-| A8-2b unary handler | 未開始 | | | |
-| A8-2c 後台公告 | 未開始 | | | |
-| A8-2d 串流與賣家工作區 | 未開始 | | | |
+| A8-2a 契約 | 完成 | 本機：buf lint、buf breaking、gofmt、lint-monolith（0 issues）、vet integration、notification unit；契約審查＋code-review 兩輪（findings 14，blocking 0；fixed 13、rejected 1 nit）；CI `37664db6d`：API contract、TS／Dart packages、website、admin、兩支 App 綠；ui-text generated diff 紅，後續 `a4640c3c9` 起綠；arch 與 mutation validate 的回歸由 `2b207ba9f` 修 | backend monolith 那輪被後續推送取消，以 A8-2b 的 CI 為準 | `47e131815`..`37664db6d`、`2b207ba9f` |
+| A8-2b unary handler | 程式完成待驗收 | 本機：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／notification／cmd unit -race（只剩預期的 `TestEveryServiceInTheContractIsMounted`：NotificationAdminService 屬 A8-2c、SellerProcurementAppService 屬 A9）、mutation --validate；契約審查＋code-review 兩輪（findings 13，blocking 1 屬跨步：公告列被收件匣隱藏，於 A8-2c 註冊公告型別解決；fixed 8、recorded 2、rejected 3） | integration 與 mutation（`mutation/a8-2b.json`）待 CI；recorded：分頁依最後活動時間（CARRYOVER）、BUYER 查詢在 generic plan 下可能不走索引排序（未量測，觸發：收件匣查詢變慢或可跑 EXPLAIN 時；根治是依受眾拆查詢）；A8-1 留在 dev 的註解計畫標籤於 A8-8 清 | 本次 |
+| A8-2c 後台公告 | 程式完成待驗收 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok；跨步 blocking（A8-2b 收件匣隱藏公告列）以註冊 Fanout 型別 `announcement` 解決；契約審查＋code-review 兩輪（findings 13，blocking 0；fixed 11、recorded 1：派送中重試可能重建使用者剛刪的公告（CARRYOVER）、rejected 1 nit：FailedPrecondition／PermissionDenied 視為永久略過） | integration 與 mutation（`mutation/a8-2c.json`）待 CI | 本次 |
+| A8-2d 串流與賣家工作區 | 程式完成待驗收 | 本機（主 session 重跑）：gofmt、lint-monolith（0 issues）、vet integration、arch／httpapi／modules／cmd unit -race（只剩 A9 的 SellerProcurementAppService 未掛）、mutation --validate 全 ok、website lint 與 test:unit；前提更正（serve／worker 分開，改 LISTEN/NOTIFY，2026-11-24）；契約審查＋code-review 兩輪（findings 15，blocking 0；fixed 11、rejected 4：S3 依 D19 接受、3 nit） | integration、mutation（`mutation/a8-2d.json`）與 sqlc drift 待 CI（`internal/store/app.sql.go` 因 Docker 停擺手改，審查核對與 SQL 一致，CI 的 sqlc drift 會驗）；限流每分鐘 120 次是估計值 | 本次 |
 | A8-3 渠道與事件訂閱 | 未開始 | | | |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |
 | A8-5 website、admin | 未開始 | | | |

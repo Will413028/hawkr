@@ -1,0 +1,148 @@
+{
+ "mutants": [
+  {
+   "id": "mark-read-non-owner",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/app.sql.go",
+   "old": "WHERE id = $2 AND account_id = $3\nRETURNING id",
+   "new": "WHERE id = $2 AND $3::bigint > 0\nRETURNING id",
+   "test": "internal/httpapi/notification ^TestMarkInboxItemReadIsOwnerOnlyAndIdempotent$",
+   "why": "MarkInboxItemRead 不比對擁有者：別人的通知也能標已讀、不回 not_found"
+  },
+  {
+   "id": "total-ignores-category-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "StoreID: r.storeID(), Types: types}); err != nil {\n\t\t\treturn fmt.Errorf(\"計算收件匣筆數",
+   "new": "StoreID: r.storeID(), Types: registry.TypeNames(s.d.Registry.All(), r.Audience, nil)}); err != nil {\n\t\t\treturn fmt.Errorf(\"計算收件匣筆數",
+   "test": "internal/httpapi/notification ^TestListInboxItemsPaginatesNewestFirstAndTotalFollowsTheFilter$",
+   "why": "total_size 不套分類篩選（回整個收件匣的筆數）"
+  },
+  {
+   "id": "preferences-list-drops-delivers-filter",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/preferences.go",
+   "old": "\t\t\tif !registry.Delivered(entries, r.Audience, c, ch) {\n\t\t\t\tcontinue\n\t\t\t}\n",
+   "new": "\t\t\tif false && !registry.Delivered(entries, r.Audience, c, ch) {\n\t\t\t\tcontinue\n\t\t\t}\n",
+   "test": "internal/httpapi/notification ^TestPreferencesListOnlyTheDeliveredPairs$",
+   "why": "偏好列表不依註冊表的送達組合過濾，列出分類與渠道的笛卡兒積"
+  },
+  {
+   "id": "preferences-update-accepts-undelivered-pair",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/preferences.go",
+   "old": "if !registry.Delivered(s.d.Registry.All(), r.Audience, c, ch) {",
+   "new": "if false && !registry.Delivered(s.d.Registry.All(), r.Audience, c, ch) {",
+   "test": "internal/httpapi/notification ^TestPreferencesListOnlyTheDeliveredPairs$",
+   "why": "更新偏好接受註冊表不會送達的 (分類, 渠道)"
+  },
+  {
+   "id": "delivered-ignores-registered-channels",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/delivery.go",
+   "old": "s.Reaches(a) && s.Category == c && slices.Contains(s.Channels, ch)",
+   "new": "s.Reaches(a) && s.Category == c",
+   "test": "internal/modules/notification/internal/registry ^TestDeliveredFollowsTheRegisteredTypes$",
+   "why": "Delivers 的推導不看型別宣告的渠道：有型別的分類就視為所有渠道都送達"
+  },
+  {
+   "id": "preferences-lets-locked-pair-be-disabled",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/preferences.go",
+   "old": "\tif !model.Disableable(r.Audience, c, ch) {\n\t\tif !enabled {",
+   "new": "\tif false && !model.Disableable(r.Audience, c, ch) {\n\t\tif !enabled {",
+   "test": "internal/httpapi/notification ^TestPreferencesListOnlyTheDeliveredPairs$",
+   "why": "不可關閉的 (分類, 渠道) 可以被關掉"
+  },
+  {
+   "id": "delegated-class-reaches-app-service",
+   "stack": "go-integration",
+   "file": "backend/internal/httpapi/rpc/rpc.go",
+   "old": "\tcase strings.HasSuffix(svc, \"AppService\"):\n\t\treturn AudienceApp, true",
+   "new": "\tcase strings.HasSuffix(svc, \"AppService\"):\n\t\treturn AudienceDelegated, true",
+   "test": "internal/httpapi/notification ^TestOnlyCustomerAccountsReachTheService$",
+   "why": "AppService 被當成代行類別：interceptor 不再要求顧客登入，只帶代行憑證的請求進得了 handler"
+  },
+  {
+   "id": "store-audience-without-store",
+   "stack": "go-integration",
+   "file": "backend/internal/httpapi/notification/app.go",
+   "old": "\t\ts, err := h.stores.ActingStore(ctx, p.ID, seller.CapNotification)\n\t\tif err != nil {\n\t\t\treturn notification.Recipient{}, err\n\t\t}\n",
+   "new": "\t\ts, _ := h.stores.ActingStore(ctx, p.ID, seller.CapNotification)\n",
+   "test": "internal/httpapi/notification ^TestStoreAudienceNeedsACurrentStoreAndIsIsolated$",
+   "why": "STORE 受眾沒有現任店家時不回 not_found"
+  },
+  {
+   "id": "batch-delete-partial",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "if len(rows) != len(ids) {",
+   "new": "if len(rows) == 0 {",
+   "test": "internal/httpapi/notification ^TestBatchDeleteInboxItemsIsAllOrNothing$",
+   "why": "刪除不是全有或全無：混了別人的或不存在的 ID 時其餘的照刪"
+  },
+  {
+   "id": "device-token-no-rebind",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/app.sql.go",
+   "old": "DO UPDATE SET account_id = EXCLUDED.account_id, app = EXCLUDED.app, last_registered_at",
+   "new": "DO UPDATE SET last_registered_at",
+   "test": "internal/httpapi/notification ^TestDeviceTokensRebindToTheCallerAndDeleteOnlyOwn$",
+   "why": "同一個 token 換帳號登入時不改綁給呼叫者"
+  },
+  {
+   "id": "device-token-delete-any-owner",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/app.sql.go",
+   "old": "WHERE token = $1 AND account_id = $2\n",
+   "new": "WHERE token = $1 AND $2::bigint > 0\n",
+   "test": "internal/httpapi/notification ^TestDeviceTokensRebindToTheCallerAndDeleteOnlyOwn$",
+   "why": "註銷 token 不比對擁有者：能刪別人的 token"
+  },
+  {
+   "id": "suspended-cannot-drop-device-token",
+   "stack": "go",
+   "file": "backend/internal/httpapi/effects.go",
+   "old": "NotificationAppService/DeleteDeviceToken\":            EffectSelfService,",
+   "new": "NotificationAppService/DeleteDeviceToken\":            EffectWrite,",
+   "test": "internal/httpapi ^TestSuspendedAccountReadsNotificationsMarksReadAndDropsItsDeviceToken$",
+   "why": "停權的帳號不能註銷裝置 token"
+  },
+  {
+   "id": "suspended-cannot-mark-read",
+   "stack": "go",
+   "file": "backend/internal/httpapi/effects.go",
+   "old": "NotificationAppService/MarkInboxItemRead\":            EffectSelfService,",
+   "new": "NotificationAppService/MarkInboxItemRead\":            EffectWrite,",
+   "test": "internal/httpapi ^TestSuspendedAccountReadsNotificationsMarksReadAndDropsItsDeviceToken$",
+   "why": "停權的帳號不能把通知標成已讀"
+  },
+  {
+   "id": "list-fails-on-unrenderable-row",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/inbox.go",
+   "old": "\"error\", err)\n\t\t\tcontinue",
+   "new": "\"error\", err)\n\t\t\treturn Page{}, err",
+   "test": "internal/modules/notification ^TestListInboxSkipsARowThatCannotRender$",
+   "why": "一列組不出文字就讓整份收件匣失敗"
+  },
+  {
+   "id": "app-ignores-injected-registry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/notification.go",
+   "old": "Registry: reg, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger}",
+   "new": "Registry: registry.Registry{}, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger}",
+   "test": "internal/modules/notification ^TestListInboxUsesTheInjectedRegistry$",
+   "why": "收件匣用寫死的正式註冊表，不用注入的"
+  },
+  {
+   "id": "audience-not-validated-by-module",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/app.go",
+   "old": "if a != model.AudienceBuyer && a != model.AudienceStore {",
+   "new": "if false {",
+   "test": "internal/httpapi/notification ^TestValidationSentencesFollowTheRequestLocale$",
+   "why": "模組不檢查受眾，沒給受眾不再是依語系的 invalid_argument"
+  }
+ ]
+}

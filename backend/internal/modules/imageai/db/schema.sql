@@ -11,7 +11,7 @@ CREATE SCHEMA IF NOT EXISTS public;
 CREATE SCHEMA imageai;
 
 -- 修圖風格（後台維護）。category 是 AiStyleCategory 的儲存碼（Go 型別加 CHECK）；每個用途有且只有一個預設風格（A9-D39：migration 為每個用途 seed 一筆，
--- 預設風格不可刪、default_style 不能設成 false，所以每個用途恆有預設）。thumbnail_key 與 thumbnail_asset_id 成對，空字串表示沒有縮圖（seed 的預設風格）。
+-- 預設風格不可刪、不可停用、換預設只有 SetDefaultAiStyle，所以每個用途恆有預設）。thumbnail_key 與 thumbnail_asset_id 成對，空字串表示沒有縮圖（seed 的預設風格）。
 CREATE TABLE imageai.styles (
     id                 UUID        PRIMARY KEY,
     name               TEXT        NOT NULL,
@@ -64,3 +64,28 @@ CREATE TABLE imageai.usage (
     CONSTRAINT usage_store_check CHECK (store_id > 0),
     CONSTRAINT usage_used_check CHECK (used >= 0)
 );
+
+-- 風格縮圖在 media 的引用同步狀態（做法同 content.banners，ADR 2026-10-03-media-references-owner-side）：業務列改變 ref 的資產時在同一個 transaction 遞增
+-- seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。
+-- ref 的列不刪除：刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。
+CREATE TABLE imageai.media_ref_sync (
+    ref_type   TEXT   NOT NULL,
+    ref_id     TEXT   NOT NULL,
+    seq        BIGINT NOT NULL DEFAULT 1,
+    synced_seq BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (ref_type, ref_id)
+);
+-- 保底掃描只看還沒同步完的 ref。
+CREATE INDEX media_ref_sync_unsynced ON imageai.media_ref_sync (updated_at) WHERE synced_seq < seq;
+
+-- 被業務列換掉或終態釋放的資產：同步 job 精確解除它們的引用，寫入端拒絕把它們寫回同一個 ref。unlinked_at 是第一次解除成功的時間。
+CREATE TABLE imageai.retired_assets (
+    ref_type    TEXT        NOT NULL,
+    ref_id      TEXT        NOT NULL,
+    asset_id    TEXT        NOT NULL,
+    retired_at  TIMESTAMPTZ NOT NULL,
+    unlinked_at TIMESTAMPTZ,
+    PRIMARY KEY (ref_type, ref_id, asset_id)
+);
+CREATE INDEX retired_assets_retired_at ON imageai.retired_assets (retired_at);
