@@ -55,7 +55,7 @@ func TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt(t *testing.T) 
 			prepare: func(f *chargeFixture) {},
 			finish: func(t *testing.T, f *chargeFixture, r PaymentRefund) {
 				f.exec(t, `UPDATE payment.refunds SET status = 'ANOMALY', failure_reason = 'x' WHERE id = $1`, r.ID)
-				must(t, f.module.ResolveAnomaly(context.Background(), f.admin(), AnomalyRefund, r.ID, AnomalyFailed, ""))
+				must(t, f.module.ResolveAnomaly(context.Background(), f.admin(), AnomalyRefund, r.ID, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 			},
 			paid:     true,
 			previous: "ANOMALY",

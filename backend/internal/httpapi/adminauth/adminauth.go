@@ -105,8 +105,10 @@ var declarations = map[string]declaration{
 	moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure:  requires(adminperm.ModerationCasesDecide, auditAudited),
 	moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure: requires(adminperm.ModerationCasesReverse, auditAudited),
 
-	notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure: requires(adminperm.NotificationAnnouncementsCreate, auditAudited),
-	notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:  requires(adminperm.NotificationAnnouncementsList, auditReadOnly),
+	notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure:         requires(adminperm.NotificationAnnouncementsCreate, auditAudited),
+	notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:          requires(adminperm.NotificationAnnouncementsList, auditReadOnly),
+	notificationv1alpha1connect.NotificationAdminServiceResendDeliveriesProcedure:           requires(adminperm.NotificationDeliveriesResend, auditAudited),
+	notificationv1alpha1connect.NotificationAdminServiceListUnreachedNotificationsProcedure: requires(adminperm.NotificationUnreachedNotificationsList, auditReadOnly),
 
 	socialv1alpha1connect.SocialAdminServiceListPostsProcedure: requires(adminperm.SocialPostsList, auditReadOnly),
 
@@ -115,6 +117,10 @@ var declarations = map[string]declaration{
 	paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure:   requires(adminperm.PaymentAccountsRetryCreate, auditAudited),
 	paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure:    requires(adminperm.PaymentAccountsRetryPurge, auditAudited),
 	paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure: requires(adminperm.PaymentAccountsDeleteMapping, auditAudited),
+	paymentv1alpha1connect.PaymentAdminServiceListPaymentsProcedure:                requires(adminperm.PaymentPaymentsList, auditReadOnly),
+	paymentv1alpha1connect.PaymentAdminServiceListPaymentTransfersProcedure:        requires(adminperm.PaymentTransfersList, auditReadOnly),
+	paymentv1alpha1connect.PaymentAdminServiceListPaymentRefundsProcedure:          requires(adminperm.PaymentRefundsList, auditReadOnly),
+	paymentv1alpha1connect.PaymentAdminServiceResolvePaymentAnomalyProcedure:       requires(adminperm.PaymentAnomaliesResolve, auditAudited),
 	identityv1alpha1connect.IdentityAdminServiceGetSessionProcedure:                exempt(sessionReason, auditReadOnly),
 	identityv1alpha1connect.IdentityAdminServiceListAccountsProcedure:              requires(adminperm.IdentityAccountsList, auditReadOnly),
 	identityv1alpha1connect.IdentityAdminServiceGetAccountProcedure:                requires(adminperm.IdentityAccountsGet, auditReadOnly),

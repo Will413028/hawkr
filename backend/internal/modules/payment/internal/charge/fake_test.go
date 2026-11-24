@@ -17,7 +17,7 @@ func deadline(t *testing.T) context.Context {
 }
 
 func input(key string) CreateInput {
-	return CreateInput{OrderNo: "O1", StoreID: 1, Amount: 100, TransferGroup: "O1", IdempotencyKey: key, Description: "d"}
+	return CreateInput{OrderNos: []string{"O1"}, Amount: 100, TransferGroup: "O1", IdempotencyKey: key, Description: "d"}
 }
 
 // 同一把冪等鍵回同一個 PaymentIntent；同一把鍵送了不同內容是永久失敗（Stripe 的 idempotency_error）。
@@ -115,14 +115,14 @@ func TestFakeTransferReversalsAccumulateAndCannotExceedTheTransfer(t *testing.T)
 func TestFakeLookupsFindByAttemptIDAndReportNotFoundWithoutAnError(t *testing.T) {
 	t.Parallel()
 	f, ctx := NewFake(), deadline(t)
-	if _, found, err := f.FindPayment(ctx, "k1"); found || err != nil {
+	if _, found, err := f.FindPayment(ctx, "k1", time.Time{}); found || err != nil {
 		t.Fatalf("沒建立過：found=%v err=%v", found, err)
 	}
 	created, err := f.CreatePayment(ctx, input("k1"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	snap, found, err := f.FindPayment(ctx, "k1")
+	snap, found, err := f.FindPayment(ctx, "k1", time.Time{})
 	if !found || err != nil || snap.ExternalID != created.ExternalID {
 		t.Fatalf("建立過：%+v found=%v err=%v", snap, found, err)
 	}
@@ -130,13 +130,13 @@ func TestFakeLookupsFindByAttemptIDAndReportNotFoundWithoutAnError(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, found, err := f.FindTransfer(ctx, "O1", "t1"); !found || err != nil || got.ExternalID != tr.ExternalID {
+	if got, found, err := f.FindTransfer(ctx, "O1", "t1", time.Time{}); !found || err != nil || got.ExternalID != tr.ExternalID {
 		t.Fatalf("轉帳查回：%+v found=%v err=%v", got, found, err)
 	}
-	if _, found, _ := f.FindTransfer(ctx, "OTHER", "t1"); found {
+	if _, found, _ := f.FindTransfer(ctx, "OTHER", "t1", time.Time{}); found {
 		t.Fatal("transfer_group 不同卻找到")
 	}
-	if _, found, _ := f.FindTransfer(ctx, "O1", "t2"); found {
+	if _, found, _ := f.FindTransfer(ctx, "O1", "t2", time.Time{}); found {
 		t.Fatal("嘗試 ID 不同卻找到")
 	}
 	rev, err := f.ReverseTransfer(ctx, ReversalInput{ExternalTransferID: tr.ExternalID, Amount: 4, IdempotencyKey: "r1"})
@@ -151,10 +151,10 @@ func TestFakeLookupsFindByAttemptIDAndReportNotFoundWithoutAnError(t *testing.T)
 	}
 	boom := errors.New("查回逾時")
 	f.FailLookup(boom)
-	if _, found, err := f.FindPayment(ctx, "k1"); found || !errors.Is(err, boom) {
+	if _, found, err := f.FindPayment(ctx, "k1", time.Time{}); found || !errors.Is(err, boom) {
 		t.Fatalf("注入的查回失敗：found=%v err=%v", found, err)
 	}
-	if _, found, err := f.FindPayment(ctx, "k1"); !found || err != nil {
+	if _, found, err := f.FindPayment(ctx, "k1", time.Time{}); !found || err != nil {
 		t.Fatalf("失敗只注入一次：found=%v err=%v", found, err)
 	}
 	if f.LookupCalls() != 9 {

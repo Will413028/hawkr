@@ -20,6 +20,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
 // Accounts 是 worker 對 identity 的需求：以共享鎖鎖住存活的帳號列（commit 前不會被刪），並回報帳號是否已刪除。identity.Module 實作它。
@@ -82,8 +83,10 @@ type ProcessArgs struct {
 func (ProcessArgs) Kind() string { return "notification.process_intent" }
 
 // DeliverArgs 是一筆投遞紀錄（推播或 email）的渠道 job；以投遞紀錄 ID 唯一，由 deliver 套件的 worker 執行。
+// RequeuedAt 只有重送排的 job 帶（重排的時間，微秒）：River 的唯一鍵預設連已完成的 job 也算，沒有它，24 小時內完成過的 job 會讓重送的 job 被略過。
 type DeliverArgs struct {
 	DeliveryID uuid.UUID `json:"delivery_id"`
+	RequeuedAt int64     `json:"requeued_at,omitempty"`
 }
 
 // Kind 是 River 的 job 種類。
@@ -273,7 +276,8 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 			if err != nil {
 				return false, uuid.Nil(), fmt.Errorf("寫入投遞紀錄：%w", err)
 			}
-			if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {
+			opts := &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}
+			if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, opts); err != nil {
 				return false, uuid.Nil(), fmt.Errorf("排入渠道 job：%w", err)
 			}
 			continue
@@ -316,3 +320,22 @@ func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store
 	}
 	return itemID, nil
 }
+
+// QuietHoursEnd 回傳行銷類推播的靜音時段結束時間（D26）：台北時間 22:00（含）到隔天 09:00（不含）之間的送出延到下一個 09:00，其餘時間回零值（立即送出）。
+func QuietHoursEnd(now time.Time) time.Time {
+	local := now.In(twtime.Taipei)
+	y, m, d := local.Date()
+	switch h := local.Hour(); {
+	case h >= quietFromHour:
+		return time.Date(y, m, d+1, quietUntilHour, 0, 0, 0, twtime.Taipei)
+	case h < quietUntilHour:
+		return time.Date(y, m, d, quietUntilHour, 0, 0, 0, twtime.Taipei)
+	default:
+		return time.Time{}
+	}
+}
+
+const (
+	quietFromHour  = 22
+	quietUntilHour = 9
+)

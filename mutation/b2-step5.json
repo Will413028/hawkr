@@ -1,0 +1,166 @@
+{
+ "mutants": [
+  {
+   "id": "pay-uses-request-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "p, err := h.m.CreatePayment(ctx, buyerID, []string{req.Msg.GetOrderNo()})",
+   "new": "p, err := h.m.CreatePayment(ctx, buyerID*0, []string{req.Msg.GetOrderNo()})",
+   "test": "internal/httpapi/payment ^TestPaymentAppUsesTheCallersBuyerIDNotAnythingFromTheRequest$",
+   "why": "CreatePayment 不再用呼叫者的買家 ID：付款歸屬檢查失效"
+  },
+  {
+   "id": "pay-session-without-secret",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "\tif p.ClientSecret == \"\" {\n\t\treturn out, nil",
+   "new": "\tif false {\n\t\treturn out, nil",
+   "test": "internal/httpapi/payment ^TestPaymentAppReturnsTheStripeSessionOnlyWhenTheModuleReturnedASecret$",
+   "why": "沒有 secret 也回 session：provider 已往前的付款會給 client 空的 client secret"
+  },
+  {
+   "id": "pay-status-hardcoded",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "Status:  rpc.EnumToProto[paymentpb.PaymentStatus](p.Status),",
+   "new": "Status:  paymentpb.PaymentStatus_PAYMENT_STATUS_SUCCEEDED,",
+   "test": "internal/httpapi/payment ^TestPaymentAppReturnsTheStripeSessionOnlyWhenTheModuleReturnedASecret$",
+   "why": "狀態一律回已付款：client 會把未付款當成功"
+  },
+  {
+   "id": "pay-no-publishable-key-check",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "\t\tif h.publishableKey == \"\" {\n\t\t\treturn nil, errNoPublishableKey\n\t\t}\n",
+   "new": "",
+   "test": "internal/httpapi/payment ^TestPaymentAppFailsInsteadOfReturningASessionTheClientCannotUse$",
+   "why": "沒有公開金鑰仍回 session：client 無法初始化 Stripe"
+  },
+  {
+   "id": "resolve-wrong-actor",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "h.m.ResolveAnomaly(ctx, actor, kind, id, outcome, reason, note, req.Msg.GetEvidence())",
+   "new": "h.m.ResolveAnomaly(ctx, payment.AdminActor{}, kind, id, outcome, reason, note, req.Msg.GetEvidence())",
+   "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyPassesKindIDOutcomeReasonNoteAndTheCallingAdmin$",
+   "why": "人工結案不記操作的管理員：後台紀錄失去操作者"
+  },
+  {
+   "id": "resolve-kind-swapped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TRANSFER: payment.AnomalyTransfer,",
+   "new": "paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TRANSFER: payment.AnomalyRefund,",
+   "test": "internal/httpapi/payment ^TestPaymentEnumsMatchTheModuleValues$",
+   "why": "轉帳的結案打到退款：人工結案改錯物件"
+  },
+  {
+   "id": "list-ignores-status-filter",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "f := payment.PaymentFilter{OrderNo: req.Msg.GetOrderNo()}\n\tif req.Msg.Status != nil {",
+   "new": "f := payment.PaymentFilter{OrderNo: req.Msg.GetOrderNo()}\n\tif false {",
+   "test": "internal/httpapi/payment ^TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken$",
+   "why": "狀態篩選被丟掉：營運查 ANOMALY 會看到全部"
+  },
+  {
+   "id": "list-token-not-bound-to-filter",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "scope := rpc.FilterScope(paymentv1alpha1connect.PaymentAdminServiceListPaymentsProcedure, string(f.Status), f.OrderNo)",
+   "new": "scope := rpc.FilterScope(paymentv1alpha1connect.PaymentAdminServiceListPaymentsProcedure)",
+   "test": "internal/httpapi/payment ^TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken$",
+   "why": "page token 不綁篩選：換篩選後翻頁會漏或重複"
+  },
+  {
+   "id": "admin-anomaly-only-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/payment-lists.ts",
+   "old": "anomalyOnly: filters.anomalyOnly,",
+   "new": "anomalyOnly: false,",
+   "test": "tests/anomaly-payment-lists.test.ts refund anomaly_only follows the checkbox",
+   "why": "退款清單的只看異常勾選不送到後端：營運看不到待結案的退款"
+  },
+  {
+   "id": "admin-status-all-sends-unspecified",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/payment-lists.ts",
+   "old": "return status === 0 ? undefined : status;",
+   "new": "return status;",
+   "test": "tests/anomaly-payment-lists.test.ts selecting ANOMALY sends that status; all sends none",
+   "why": "選「全部」時送出 UNSPECIFIED：後端回 invalid_argument，清單打不開"
+  },
+  {
+   "id": "admin-resolve-outcome-not-sent",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "outcome: OUTCOME_OF_KEY[draft.outcome],",
+   "new": "outcome: PaymentAnomalyOutcome.UNSPECIFIED,",
+   "test": "tests/resolve-anomaly.test.ts the request carries kind, id, outcome and the trimmed evidence",
+   "why": "結案請求不帶結果：後端回 invalid_argument，異常結不掉"
+  },
+  {
+   "id": "admin-resolve-evidence-leaks-on-failed",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "evidence: draft.outcome === \"succeeded\" ? draft.evidence.trim() : \"\",",
+   "new": "evidence: draft.evidence.trim(),",
+   "test": "tests/resolve-anomaly.test.ts a failed resolution never sends leftover evidence",
+   "why": "失敗結案帶出先前輸入的證據：把沒有執行的物件記成有證據"
+  },
+  {
+   "id": "admin-resolve-success-evidence-optional",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "if (draft.outcome === \"succeeded\" && draft.evidence.trim() === \"\") {",
+   "new": "if (false) {",
+   "test": "tests/resolve-anomaly.test.ts succeeded needs a non-blank evidence id; failed does not",
+   "why": "成功結案不要求證據：沒核對金流商就能把異常結成成功"
+  },
+  {
+   "id": "admin-resolve-reversal-uses-refund-id",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "targets.push({ slot: \"reversal\", id: reversal.id });",
+   "new": "targets.push({ slot: \"reversal\", id: r.id });",
+   "test": "tests/resolve-anomaly.test.ts a refund targets itself, each ANOMALY reversal row by its own id",
+   "why": "收回結案送退款 ID：後端找不到撤回列，收回的異常結不掉"
+  },
+  {
+   "id": "admin-resolve-lists-not-refreshed",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/ResolveAnomalyAction.tsx",
+   "old": "void queryClient.invalidateQueries({ queryKey });",
+   "new": "void queryKey;",
+   "test": "tests/resolve-anomaly-action.test.ts 成功結案",
+   "why": "結案成功後列表不重讀：已結案的異常還留在待辦裡"
+  },
+  {
+   "id": "admin-resolve-reason-not-sent",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "\t\treason: draft.reason,\n",
+   "new": "\t\treason: PaymentAnomalyResolutionReason.UNSPECIFIED,\n",
+   "test": "tests/resolve-anomaly.test.ts the request carries kind, id, outcome and the trimmed evidence",
+   "why": "結案請求不帶原因：後端以 invalid_argument 拒絕，所有結案都送不出去"
+  },
+  {
+   "id": "admin-resolve-note-not-trimmed",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/resolve-anomaly.ts",
+   "old": "note: trimGoSpace(draft.note),",
+   "new": "note: draft.note,",
+   "test": "tests/resolve-anomaly.test.ts the request carries kind, id, outcome and the trimmed evidence",
+   "why": "備註沒有去除首尾空白就送出：後動作紀錄寫進前後空白，且與伺服器的字數規則不一致"
+  },
+  {
+   "id": "admin-payment-orders-not-rendered",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/payment-lists.ts",
+   "old": "\t\torders: p.orders.map((o) => ({",
+   "new": "\t\torders: p.orders.slice(0, 1).map((o) => ({",
+   "test": "tests/anomaly-payment-lists.test.ts payment row shows int64 amount",
+   "why": "付款列只顯示第一張訂單：一筆付款含多張訂單時，後面的訂單與店家在後台看不到"
+  }
+ ]
+}

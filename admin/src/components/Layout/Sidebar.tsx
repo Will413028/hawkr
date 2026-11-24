@@ -177,6 +177,11 @@ const navGroups: Array<{ section: string; items: NavItem[] }> = [
 				label: "系統公告",
 				icon: "campaign",
 			},
+			{
+				href: "/admin/unreached-notifications",
+				label: "未觸達通知",
+				icon: "notifications",
+			},
 			{ href: "/admin/ai-styles", label: "AI 修圖管理", icon: "wand_stars" },
 			{
 				href: "/admin/app-versions",

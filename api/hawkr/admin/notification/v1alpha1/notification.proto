@@ -6,6 +6,8 @@ syntax = "proto3";
 // 公告一律只寫英文：單一 title 與 body，不分語系、不依收件人的語系選擇，所有使用者看到同一份
 // （限公告，是多語系 ADR 的例外；其餘後台文字仍是 zh-TW）。公告在使用者端的分類是 NOTIFICATION_CATEGORY_ANNOUNCEMENT：
 // 收件匣一定收到，推播可在偏好關閉。
+//
+// 投遞紀錄是推播與 email 觸達與否的唯一來源（收件匣不是渠道；收件匣列本身就是「已進收件匣」的紀錄），重送與未觸達查詢都只讀它。
 package hawkr.admin.notification.v1alpha1;
 
 import "google/api/field_behavior.proto";
@@ -21,6 +23,23 @@ service NotificationAdminService {
 
   // ListAnnouncements 列出公告，新到舊（建立時間，再依 id 新到舊）。page_token 不透明。
   rpc ListAnnouncements(ListAnnouncementsRequest) returns (ListAnnouncementsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ResendDeliveries 把符合條件、永久失敗且失敗原因可重送的推播與 email 投遞改回待送並重新排入渠道 job，一次最多 max_count 筆（依失敗時間由舊到新）。
+  // 冪等：只動狀態是永久失敗的列，已送出或已重排（待送）的投遞不會再被選中，所以重複呼叫不會讓同一筆送出兩次；投遞冪等鍵（意圖、收件人、渠道）不變。
+  // 永遠不重送：失敗原因是來源事實已不成立（NO_LONGER_VALID）、位址在停寄名單（EMAIL_SUPPRESSED）、收件人已刪除或退場（RECIPIENT_GONE）、
+  // 意圖或型別已不存在、組字失敗的投遞。重排後的投遞仍由渠道 job 在送出時重新檢查這些條件與行銷類推播的靜音時段，所以重送不會繞過它們。
+  // 失敗時間窗必須給兩端（fail_time_end 不可在未來）：已重送又再失敗的投遞失敗時間會晚於窗的終點，依 has_more 連續呼叫不會重複選到它們。
+  // 寫稽核紀錄；dry_run 為 true 時只回會重排的筆數，不改資料也不寫稽核紀錄。
+  rpc ResendDeliveries(ResendDeliveriesRequest) returns (ResendDeliveriesResponse);
+
+  // ListUnreachedNotifications 列出近 days 天內「交易必要」分類（訂單、出貨、售後、撥款、帳號；使用者不能關閉的分類）的通知中，
+  // 某個收件人在所有渠道都沒有觸達的筆數與明細，新到舊（意圖建立時間，再依投遞參考 id 新到舊）。
+  // 觸達只看投遞紀錄：推播或 email 任一筆已送出（SENT）就算觸達；收件匣不是渠道，寫進收件匣不算觸達。
+  // 未觸達＝該收件人這則通知的所有投遞都已終結為永久失敗：還在待送的不算（尚未失敗），失敗原因是 NO_LONGER_VALID（刻意不送）或
+  // RECIPIENT_GONE（收件人已刪除）的也不算。沒有投遞紀錄的意圖（沒有收件人）不算。回應只帶參考 ID，不帶文字、位址與 token。
+  rpc ListUnreachedNotifications(ListUnreachedNotificationsRequest) returns (ListUnreachedNotificationsResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
 }
@@ -59,4 +78,98 @@ message ListAnnouncementsRequest {
 message ListAnnouncementsResponse {
   repeated Announcement announcements = 1;
   string next_page_token = 2;
+}
+
+// DeliveryFailureReason 是投遞紀錄的永久失敗原因。
+enum DeliveryFailureReason {
+  DELIVERY_FAILURE_REASON_UNSPECIFIED = 0;
+  // 收件人已刪除或退場。不重送。
+  DELIVERY_FAILURE_REASON_RECIPIENT_GONE = 1;
+  // 通知意圖已被保留期清除。不重送。
+  DELIVERY_FAILURE_REASON_INTENT_MISSING = 2;
+  // 通知型別已不在註冊表。不重送。
+  DELIVERY_FAILURE_REASON_TYPE_UNREGISTERED = 3;
+  // 組字失敗或參數快照無法解析。不重送。
+  DELIVERY_FAILURE_REASON_RENDER_FAILED = 4;
+  // 收件人沒有可推播的裝置 token。可重送。
+  DELIVERY_FAILURE_REASON_NO_DEVICE_TOKEN = 5;
+  // 推播服務回報 token 已失效。可重送。
+  DELIVERY_FAILURE_REASON_TOKEN_UNREGISTERED = 6;
+  // 推播服務拒絕這則推播。可重送。
+  DELIVERY_FAILURE_REASON_PUSH_REJECTED = 7;
+  // 收件人沒有已驗證的信箱。可重送。
+  DELIVERY_FAILURE_REASON_NO_EMAIL_ADDRESS = 8;
+  // 位址在停寄名單。不重送。
+  DELIVERY_FAILURE_REASON_EMAIL_SUPPRESSED = 9;
+  // 寄信服務拒絕這封信。可重送。
+  DELIVERY_FAILURE_REASON_EMAIL_REJECTED = 10;
+  // 暫時性失敗用盡重試次數。可重送。
+  DELIVERY_FAILURE_REASON_RETRIES_EXHAUSTED = 11;
+  // 送出前重查發現來源事實已不成立，刻意不送。不重送。
+  DELIVERY_FAILURE_REASON_NO_LONGER_VALID = 12;
+  // 投遞紀錄的渠道不是推播或 email。不重送。
+  DELIVERY_FAILURE_REASON_CHANNEL_UNSUPPORTED = 13;
+}
+
+message ResendDeliveriesRequest {
+  // 失敗時間窗 [fail_time_start, fail_time_end)：兩端必填，start 必須早於 end，end 不可在未來，窗長上限 90 天。
+  google.protobuf.Timestamp fail_time_start = 1 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.Timestamp fail_time_end = 2 [(google.api.field_behavior) = REQUIRED];
+  // 通知分類；UNSPECIFIED 表示不限。
+  hawkr.notification.v1alpha1.NotificationCategory category = 3;
+  // 渠道，只能是 PUSH 或 EMAIL；UNSPECIFIED 表示不限，INBOX 回 invalid_argument。
+  hawkr.notification.v1alpha1.NotificationChannel channel = 4;
+  // 失敗原因；空表示全部可重送的原因，含不可重送的原因回 invalid_argument。
+  repeated DeliveryFailureReason reasons = 5;
+  // 收件人帳號；0 表示不限。
+  int64 account_id = 6;
+  // 一次最多重排的筆數，預設 100，上限 500。
+  int32 max_count = 7;
+  // 為 true 只計算不改資料。
+  bool dry_run = 8;
+}
+
+message ResendDeliveriesResponse {
+  // 重排的筆數（dry_run 時是會重排的筆數）。
+  int32 resend_count = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 還有符合條件、因 max_count 而沒處理的投遞。
+  bool has_more = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ListUnreachedNotificationsRequest {
+  // 往回看的天數，預設 7，上限 90。
+  int32 days = 1;
+  // 預設 20，上限 50。
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// UnreachedChannel 是一個渠道的失敗結果。
+message UnreachedChannel {
+  hawkr.notification.v1alpha1.NotificationChannel channel = 1;
+  DeliveryFailureReason failure_reason = 2;
+}
+
+// UnreachedNotification 是一個收件人沒有觸達的一則通知。
+message UnreachedNotification {
+  // 這個收件人這則通知的投遞參考（其中一筆投遞的 id），也是分頁排序的次要鍵。
+  string delivery_id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string intent_id = 2;
+  // 通知型別的名稱（註冊表的 type）。
+  string type = 3;
+  hawkr.notification.v1alpha1.NotificationCategory category = 4;
+  hawkr.notification.v1alpha1.NotificationAudience audience = 5;
+  int64 account_id = 6;
+  // STORE 受眾的店家 ID；BUYER 受眾為 0。
+  int64 store_id = 7;
+  // 通知意圖建立的時間。
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated UnreachedChannel channels = 9;
+}
+
+message ListUnreachedNotificationsResponse {
+  // 窗內未觸達的總筆數（不只這一頁）。
+  int64 unreached_count = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated UnreachedNotification notifications = 2;
+  string next_page_token = 3;
 }

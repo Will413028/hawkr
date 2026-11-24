@@ -75,7 +75,7 @@ func setup(t *testing.T) *stack {
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "notification", Dir: notification.Migrations()}))
 	s := &stack{db: d, now: epoch}
 	log := slog.New(slog.DiscardHandler)
-	m := notification.New(notification.Deps{DB: d, Identity: aliveAccounts{}, Now: func() time.Time { return s.now }, NewID: uuid.NewV7, Logger: log})
+	m := notification.New(notification.Deps{DB: d, Identity: aliveAccounts{}, Validity: noVouchers{}, Now: func() time.Time { return s.now }, NewID: uuid.NewV7, Logger: log})
 	images, err := rpc.NewImages("https://media.example.com")
 	if err != nil {
 		t.Fatal(err)

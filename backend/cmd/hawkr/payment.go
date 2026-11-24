@@ -100,18 +100,28 @@ func readStripe(e *config.Env, log *slog.Logger) payment.Provider {
 // readCharge 讀付款（PaymentIntent、退款、轉帳）的 provider：PAYMENT_CHARGE_PROVIDER 為空表示沒有設定（付款的呼叫回 failed_precondition，付款 webhook 回 503，與收款開通同一規則）；
 // stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider）與 STRIPE_PAYMENT_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）。付款事件走自己的 Stripe event destination
 // （snapshot，路由 POST /webhooks/stripe-payments），一個 destination 一把簽章密鑰，所以密鑰與收款帳戶的 STRIPE_WEBHOOK_SECRET 分開，兩者相同啟動失敗。
-// Stripe 的付款 adapter 在 B2 步驟 3d 接上（步驟 4 也才有訂單 port）：在那之前設了 stripe 啟動失敗，不靜默忽略。
+// 還要 STRIPE_ACCOUNT_NAMESPACE（與收款開通同一個變數與規則：client 建立時驗證它）。付款的 client 與收款開通的是兩個實例（各自的 webhook 密鑰），共用金鑰。
 func readCharge(e *config.Env, log *slog.Logger) payment.ChargeProvider {
 	switch name := e.StringOr("PAYMENT_CHARGE_PROVIDER", ""); name {
 	case "":
 		log.Warn("付款沒有設定：付款的呼叫會回 failed_precondition，付款 webhook 回 503")
 		return nil
 	case "stripe":
-		if _, ok := readChargeStripeConfig(e, log); !ok {
+		cfg, ok := readChargeStripeConfig(e, log)
+		if !ok {
 			return nil
 		}
-		e.Fail("PAYMENT_CHARGE_PROVIDER=stripe：Stripe 付款 adapter 在 B2 步驟 3d 實作，目前還不能啟用")
-		return nil
+		client, err := stripe.New(stripe.Config{SecretKey: cfg.SecretKey, WebhookSecret: cfg.WebhookSecret, AccountNamespace: cfg.Namespace, Logger: log})
+		if err != nil {
+			e.Fail("Stripe：%v", err)
+			return nil
+		}
+		provider, err := payment.NewChargeStripe(client)
+		if err != nil {
+			e.Fail("Stripe：%v", err)
+			return nil
+		}
+		return provider
 	default:
 		e.Fail("PAYMENT_CHARGE_PROVIDER：不認得的值 %q（可用：stripe）", name)
 		return nil
@@ -122,6 +132,7 @@ func readCharge(e *config.Env, log *slog.Logger) payment.ChargeProvider {
 type chargeStripeConfig struct {
 	SecretKey     string
 	WebhookSecret string
+	Namespace     string
 }
 
 // readChargeStripeConfig 讀並驗證 Stripe 付款的設定；沒有 STRIPE_SECRET_KEY 時 ok 是 false 且不算錯誤（等於沒有 provider）。
@@ -138,6 +149,15 @@ func readChargeStripeConfig(e *config.Env, log *slog.Logger) (cfg chargeStripeCo
 	}
 	if cfg.WebhookSecret == e.StringOr("STRIPE_WEBHOOK_SECRET", "") {
 		e.Fail("STRIPE_PAYMENT_WEBHOOK_SECRET 不能與 STRIPE_WEBHOOK_SECRET 相同：兩個 event destination 各有自己的簽章密鑰")
+		return cfg, false
+	}
+	cfg.Namespace = e.StringOr("STRIPE_ACCOUNT_NAMESPACE", "")
+	if cfg.Namespace == "" {
+		e.Fail("STRIPE_ACCOUNT_NAMESPACE：付款設了 STRIPE_SECRET_KEY 就必填")
+		return cfg, false
+	}
+	if err := stripe.ValidateNamespace(cfg.Namespace); err != nil {
+		e.Fail("STRIPE_ACCOUNT_NAMESPACE：%v", err)
 		return cfg, false
 	}
 	return cfg, true
@@ -173,9 +193,9 @@ func newInbox(d *db.DB, jc jobs.Enqueuer, log *slog.Logger) *inbox.Inbox {
 
 // newPayment 組裝 payment 模組（收款開通 ADR D28）。回傳的 sellerOwners 要在 seller 組裝之後 bind；PayoutAccountChanged 的訂閱者由
 // subscribeSellerPayout 接上（serve 與 worker 都要：同步 job 在 worker 發布，seller 的種子在子命令發布）。
-func newPayment(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, box *inbox.Inbox, provider payment.Provider, charge payment.ChargeProvider, log *slog.Logger) (*payment.Module, *sellerOwners) {
+func newPayment(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, box *inbox.Inbox, provider payment.Provider, charge payment.ChargeProvider, orders payment.PaymentOrders, log *slog.Logger) (*payment.Module, *sellerOwners) {
 	owners := &sellerOwners{}
-	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Audit: adminaudit.New(d, time.Now), Provider: provider, Charge: charge, Owners: owners, Now: time.Now, Logger: log}), owners
+	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Audit: adminaudit.New(d, time.Now), Provider: provider, Charge: charge, PaymentOrders: orders, Owners: owners, Now: time.Now, Logger: log}), owners
 }
 
 // subscribeSellerPayout 讓 seller 在 payment 同步的 transaction 內更新開通閘門的副本與防詐 hash（收款開通 ADR D12、D28）。seller 依賴 payment，

@@ -150,7 +150,7 @@ func TestSellerWorkspaceChangeReachesTheStoresStreamOnly(t *testing.T) {
 // worker 與 serve 是不同行程：寫入收件匣的 module（worker）自己沒有 LISTEN，訂閱者在另一個 module（另一個 serve 行程，自己的 hub）上，訊號只能經資料庫到達。
 func TestInboxSignalCrossesTheProcessBoundaryThroughTheDatabase(t *testing.T) {
 	f := setupIntake(t)
-	serve := newModule(Deps{DB: f.db, Identity: f.identity, Buyer: f.buyer, Seller: f.stores, Jobs: f.jobs, Now: time.Now, NewID: uuid.NewV7}, testRegistry{})
+	serve := newModule(Deps{DB: f.db, Identity: f.identity, Buyer: f.buyer, Seller: f.stores, Validity: noVouchers{}, Jobs: f.jobs, Now: time.Now, NewID: uuid.NewV7}, testRegistry{})
 	listen(t, serve)
 	acct := f.newAccount(t)
 	other := f.newAccount(t)

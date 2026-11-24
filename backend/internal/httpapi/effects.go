@@ -61,6 +61,10 @@ var customerEffects = map[string]Effect{
 	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedBuyers": EffectRead,
 	"/hawkr.buyer.v1alpha1.BuyerAppService/ListBlockedStores": EffectRead,
 
+	// PaymentAppService：建立付款寫入付款列並排補做 job，停權的帳號不能；讀付款（向金流商讀 client secret）只讀自己的資料。
+	"/hawkr.payment.v1alpha1.PaymentAppService/CreatePayment": EffectWrite,
+	"/hawkr.payment.v1alpha1.PaymentAppService/GetPayment":    EffectRead,
+
 	// AssistantAppService：送出會開一輪助理回覆（花 LLM 成本、寫對話），停權的帳號不能；訂閱與讀歷史只讀自己的資料。
 	"/hawkr.assistant.v1alpha1.AssistantAppService/SendAssistantMessage":      EffectWrite,
 	"/hawkr.assistant.v1alpha1.AssistantAppService/WatchAssistantTurn":        EffectRead,

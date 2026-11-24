@@ -118,6 +118,12 @@ export function connectRequestMessage(route: Route): Record<string, unknown> {
 	}
 	return (request.postDataJSON() as Record<string, unknown> | null) ?? {};
 }
+/** PaymentAppService 的 Connect 方法（`/api/connect/hawkr.payment.v1alpha1.PaymentAppService/{Method}`，都是 POST）。 */
+export function paymentMethod(method: "CreatePayment" | "GetPayment"): RegExp {
+	return new RegExp(
+		`/api/connect/hawkr\\.payment\\.v1alpha1\\.PaymentAppService/${method}(?:\\?|$)`,
+	);
+}
 export const GET_MY_KYC_URL = sellerMethod("GetMyKYC");
 export const GET_MY_PAYMENT_ACCOUNT_URL = sellerMethod("GetMyPaymentAccount");
 export const GET_MY_ONBOARDING_URL = sellerMethod("GetMyOnboarding");

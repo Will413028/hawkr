@@ -141,5 +141,37 @@
   "chatStoreFallbackName": "店家",
   "@chatStoreFallbackName": {
     "description": "Conversation title when the store profile is missing."
+  },
+  "paymentProcessing": "處理中...",
+  "@paymentProcessing": {
+    "description": "Loading overlay text while a payment is being created or confirmed."
+  },
+  "paymentSucceededTitle": "付款成功",
+  "@paymentSucceededTitle": {
+    "description": "Dialog title after the payment is confirmed as succeeded."
+  },
+  "paymentNotCompletedTitle": "付款未完成",
+  "@paymentNotCompletedTitle": {
+    "description": "Dialog title when a payment is canceled, failed, pending or needs support."
+  },
+  "paymentSucceededMessage": "付款已完成，感謝你的購買。",
+  "@paymentSucceededMessage": {
+    "description": "Message after the payment is confirmed as succeeded."
+  },
+  "paymentPendingMessage": "付款處理中，請稍後到「我的訂單」確認結果。",
+  "@paymentPendingMessage": {
+    "description": "Message when the payment result is not final after the capped re-reads."
+  },
+  "paymentCanceledMessage": "你已取消付款，訂單仍待付款，可到「我的訂單」重新付款。",
+  "@paymentCanceledMessage": {
+    "description": "Message when the buyer closes the payment sheet."
+  },
+  "paymentFailedMessage": "付款沒有完成，訂單仍待付款，可到「我的訂單」重新付款。",
+  "@paymentFailedMessage": {
+    "description": "Message when the payment attempt failed or was canceled by the provider."
+  },
+  "paymentAnomalyMessage": "這筆付款需要客服協助處理，暫時無法重新付款，請聯絡客服。",
+  "@paymentAnomalyMessage": {
+    "description": "Message when the payment is in ANOMALY; the buyer cannot retry."
   }
 }

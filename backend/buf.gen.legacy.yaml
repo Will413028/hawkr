@@ -30,4 +30,5 @@ inputs:
       - api/proto/order/order.proto
       - api/proto/seller/seller.proto
       - api/proto/invoice/invoice.proto
+      - api/proto/payment/payment.proto
       - api/proto/coupon/coupon.proto

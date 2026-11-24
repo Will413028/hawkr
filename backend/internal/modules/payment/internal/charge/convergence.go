@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
@@ -25,6 +26,16 @@ const (
 	// callUnknown 其餘的錯誤：provider 那邊可能已執行，只能同鍵重送或查回。
 	callUnknown
 )
+
+// classify 是 classifyCall 加上 D-F 的告警：401／403 仍是「不明」，但金鑰或權限壞了需要人修，所以每次發生都記一筆錯誤等級的 log（操作名稱、HTTP 狀態、provider 的錯誤代碼；不含金鑰與回應內容）。
+func (s *Service) classify(ctx context.Context, op string, err error) callOutcome {
+	var rejected *AuthRejectedError
+	if errors.As(err, &rejected) {
+		s.d.Logger.ErrorContext(ctx, "payment：provider 拒絕認證或權限（金鑰或權限壞了，需要人修；結果視為不明，同鍵重送或查回）",
+			"op", op, "provider", s.d.Provider.Name(), "http_status", rejected.Status, "provider_error_code", rejected.Code)
+	}
+	return classifyCall(err)
+}
 
 func classifyCall(err error) callOutcome {
 	switch {
@@ -77,7 +88,66 @@ func withDetail(reason, detail string) string {
 	return reason + ":" + detail
 }
 
-// publishAnomaly 在呼叫方的 transaction 內發布 MoneyAnomaly。
+// publishAnomaly 在呼叫方的 transaction 內發布付款本身的 MoneyAnomaly（沒有訂單應收）。
 func (s *Service) publishAnomaly(ctx context.Context, kind model.AnomalyKind, objectID, paymentID uuid.UUID, reason string) error {
 	return events.Publish(ctx, s.d.Events, model.MoneyAnomaly{OccurredAt: s.d.Now().UTC(), Kind: kind, ObjectID: objectID, PaymentID: paymentID, Reason: reason})
+}
+
+// publishOrderAnomaly 在呼叫方的 transaction 內發布屬於一張訂單應收的物件（轉帳、退款、撤回、補差額）的 MoneyAnomaly，帶上訂單應收與所屬付款。
+func (s *Service) publishOrderAnomaly(ctx context.Context, kind model.AnomalyKind, objectID, paymentOrderID uuid.UUID, reason string) error {
+	order, err := store.New(s.d.DB.Conn(ctx)).PaymentOrderByID(ctx, paymentOrderID)
+	if err != nil {
+		return err
+	}
+	return events.Publish(ctx, s.d.Events, model.MoneyAnomaly{
+		OccurredAt: s.d.Now().UTC(), Kind: kind, ObjectID: objectID, PaymentID: order.PaymentID, PaymentOrderID: order.ID, Reason: reason,
+	})
+}
+
+// TransferGroupOf 是付款的 transfer_group（一個 charge、N 筆轉帳都帶它）：付款群組的 ID。
+func TransferGroupOf(paymentID uuid.UUID) string { return paymentID.String() }
+
+// ListClockSkew 是查回的 created 下限對時鐘誤差的餘裕：下限取「這把鍵第一次呼叫的記錄時刻」往前推它，本機時鐘比 provider 慢也不會把剛建好的物件排除在列表之外。
+const ListClockSkew = 5 * time.Minute
+
+// createdLowerBound 是查回列表的 created 下限：呼叫 provider 之前記下的時刻（第一次呼叫）減時鐘誤差。物件一定是在記下時刻之後才建立的，所以列出 created 不早於下限的全部物件，
+// 看完整份列表沒有找到，才證明這把鍵底下沒有物件（D-E）。
+func createdLowerBound(calledAt time.Time) time.Time { return calledAt.Add(-ListClockSkew).UTC() }
+
+// lookupLowerBound 是查回的 created 下限：這把鍵第一次呼叫前記下的時刻（沒有記錄時用列的建立時刻，一定更早）減時鐘誤差。
+func lookupLowerBound(calledAt *time.Time, createdAt time.Time) time.Time {
+	if calledAt != nil {
+		return createdLowerBound(*calledAt)
+	}
+	return createdLowerBound(createdAt)
+}
+
+// paymentOfOrder 讀（不鎖）訂單應收與它所屬的付款；轉帳、退款、撤回與補差額的 job 在 transaction 外取 provider 呼叫需要的外部 ID 與 transfer_group 用。
+func paymentOfOrder(ctx context.Context, q *store.Queries, paymentOrderID uuid.UUID) (store.PaymentPayment, store.PaymentPaymentOrder, error) {
+	order, err := q.PaymentOrderByID(ctx, paymentOrderID)
+	if err != nil {
+		return store.PaymentPayment{}, store.PaymentPaymentOrder{}, err
+	}
+	pay, err := q.PaymentByID(ctx, order.PaymentID)
+	if err != nil {
+		return store.PaymentPayment{}, store.PaymentPaymentOrder{}, err
+	}
+	return pay, order, nil
+}
+
+// lockOrder 依鎖順序鎖付款列、再鎖訂單應收列（付款列先於訂單應收列、轉帳列、退款列與撤回列）並回傳兩者；寫退款、轉帳、撤回與補差額的 transaction 都先呼叫它。
+func lockOrder(ctx context.Context, q *store.Queries, paymentOrderID uuid.UUID) (store.PaymentPayment, store.PaymentPaymentOrder, error) {
+	order, err := q.PaymentOrderByID(ctx, paymentOrderID)
+	if err != nil {
+		return store.PaymentPayment{}, store.PaymentPaymentOrder{}, err
+	}
+	pay, err := q.LockPayment(ctx, order.PaymentID)
+	if err != nil {
+		return store.PaymentPayment{}, store.PaymentPaymentOrder{}, err
+	}
+	locked, err := q.LockPaymentOrder(ctx, paymentOrderID)
+	if err != nil {
+		return store.PaymentPayment{}, store.PaymentPaymentOrder{}, err
+	}
+	return pay, locked, nil
 }

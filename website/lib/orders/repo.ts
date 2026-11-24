@@ -1,5 +1,5 @@
 /**
- * Orders + Payments HTTP repository.
+ * Orders HTTP repository.
  *
  * Endpoints (matching hawkr_buyer order_repository.dart):
  *   GET  /app/orders?status=&page=&page_size=
@@ -8,9 +8,6 @@
  *   POST /app/orders/{order_no}/cancellations
  *   POST /app/orders/{order_no}/refund          { orderItemId, reason }
  *   POST /app/orders/{order_no}/refund/method   { method, requestNo }
- *   POST /app/payments                          create payment
- *   GET  /app/payments/{trade_no}               poll status
- *   POST /app/payments/{trade_no}/status_syncs  force gateway sync
  */
 
 import { authedFetch } from "../api/client";
@@ -24,7 +21,6 @@ import type {
 	CreateOrderResult,
 	Order,
 	OrderListResult,
-	PaymentClientType,
 } from "./types";
 
 interface ServerListShape {
@@ -921,18 +917,6 @@ export function normalizeOrder(raw: Record<string, unknown>): Order {
 		canRefund: raw.canRefund === true,
 		isReviewed: raw.isReviewed === true,
 		review,
-		paymentMerId:
-			typeof raw.paymentMerId === "string" ? raw.paymentMerId : undefined,
-		availablePaymentMethods: Array.isArray(raw.availablePaymentMethods)
-			? raw.availablePaymentMethods.map((m) => {
-					const o = (m ?? {}) as Record<string, unknown>;
-					return {
-						paymentType: String(o.paymentType ?? ""),
-						eligible: Boolean(o.eligible),
-						ineligibleReason: String(o.ineligibleReason ?? ""),
-					};
-				})
-			: undefined,
 	};
 }
 
@@ -1240,95 +1224,4 @@ export async function confirmOrderReceipt(orderNo: string): Promise<boolean> {
 		{ method: "POST", throwOnHttpError: false },
 	);
 	return env.data?.success === true || env.code === 0;
-}
-
-/* ===== Payments ===== */
-
-export interface CreatePaymentInput {
-	orderNo: string;
-	amount: number;
-	productName: string;
-	paymentType: string; // CREDIT | ATM | LINEPAY | …
-	userEmail?: string;
-	bankType?: string;
-	expireDays?: number;
-	merId?: string;
-	clientType?: PaymentClientType;
-	/** Native Apple Pay token (base64-encoded `PKPaymentToken` JSON). When
-	 * supplied the backend processes the payment synchronously without
-	 * issuing a PayUni redirect — same contract as the App. */
-	applePayToken?: string;
-	/** Native Google Pay token (base64-encoded
-	 * `PaymentData.paymentMethodData.tokenizationData.token`). */
-	googlePayToken?: string;
-}
-
-export interface CreatePaymentResult {
-	tradeNo: string;
-	redirectUrl?: string;
-	uppFormData?: Record<string, string>;
-	status?: string;
-}
-
-export async function createPayment(
-	input: CreatePaymentInput,
-): Promise<CreatePaymentResult> {
-	const env = await authedFetch<Record<string, unknown>>("/app/payments", {
-		method: "POST",
-		json: input,
-	});
-	const data = env.data ?? {};
-	return {
-		tradeNo: String(
-			pickFirst(data, [
-				"tradeNo",
-				"trade_no",
-				"paymentTradeNo",
-				"payment_trade_no",
-				"providerTradeNo",
-				"provider_trade_no",
-			]) ?? "",
-		),
-		redirectUrl: pickFirst<string>(data, [
-			"redirectUrl",
-			"redirect_url",
-			"paymentUrl",
-			"payment_url",
-		]),
-		uppFormData: pickFirst<Record<string, string>>(data, [
-			"uppFormData",
-			"upp_form_data",
-		]),
-		status: pickFirst<string>(data, [
-			"status",
-			"paymentStatus",
-			"payment_status",
-		]),
-	};
-}
-
-export async function fetchPayment(tradeNo: string): Promise<{
-	status: string;
-	paidAt?: number | null;
-	amount?: string;
-}> {
-	const env = await authedFetch<Record<string, unknown>>(
-		`/app/payments/${encodeURIComponent(tradeNo)}`,
-	);
-	const data = env.data ?? {};
-	return {
-		status: String(data.status ?? "unknown"),
-		paidAt: data.paidAt as number | null | undefined,
-		amount: data.amount as string | undefined,
-	};
-}
-
-export async function syncPayment(
-	tradeNo: string,
-): Promise<{ status: string }> {
-	const env = await authedFetch<Record<string, unknown>>(
-		`/app/payments/${encodeURIComponent(tradeNo)}/status_syncs`,
-		{ method: "POST" },
-	);
-	return { status: String(env.data?.status ?? "unknown") };
 }

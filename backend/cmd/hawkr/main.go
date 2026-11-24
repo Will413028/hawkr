@@ -41,16 +41,16 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/buyer/buyerconnect"
+	"github.com/Will413028/hawkr/backend/internal/legacy/gen/payment/paymentconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/seller/sellerconnect"
-	"github.com/Will413028/hawkr/backend/internal/legacy/imrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/invoiceservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
+	"github.com/Will413028/hawkr/backend/internal/legacy/paymentserver"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
-	"github.com/Will413028/hawkr/backend/internal/legacy/socialrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
@@ -164,6 +164,8 @@ func runServe(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
+	// 買家付款的 client 初始化用的公開金鑰（不是 secret）；與收款開通的 STRIPE_PUBLISHABLE_KEY 是同一把平台金鑰。
+	paymentPublishableKey := e.StringOr("STRIPE_PUBLISHABLE_KEY", "")
 	notificationConfig := readNotificationProviders(ctx, e, log)
 	registry := readGCIS(e)
 	mediaCfg := readMedia(e)
@@ -203,13 +205,11 @@ func runServe(ctx context.Context) error {
 	}
 	bus := events.NewBus()
 	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
-	// 刪除帳號、確認代行的寫入時，以同一個 transaction 排入送給舊服務的事件（RabbitMQ 的 account.deleted、
-	// delegation.operation.completed），由 worker 送出。
+	// 刪除帳號的寫入時，以同一個 transaction 排入送給舊服務的事件（RabbitMQ 的 account.deleted），由 worker 送出。
 	enqueueLegacy := func(ctx context.Context, a rabbitmq.PublishArgs) error {
 		return jc.Enqueue(ctx, a, rabbitmq.InsertOpts())
 	}
 	events.Subscribe(bus, accountservice.OnAccountDeleted(enqueueLegacy))
-	events.Subscribe(bus, delegationservice.OnDelegationOperationCompleted(enqueueLegacy))
 	subscribeBuyerEvents(bus, jc)
 	id := newIdentity(d, bus, idc, log)
 	webLogin, err := newWebLogin(verifierCtx, id, web, idc, log)
@@ -226,7 +226,7 @@ func runServe(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -241,10 +241,10 @@ func runServe(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribePaymentRelay(bus, jc)
 	subscribeBizCalendarRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
-	subscribeSocialRelay(bus, jc)
 	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
@@ -258,7 +258,8 @@ func runServe(ctx context.Context) error {
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, moderationModule, jc, box, notificationConfig, images, log)
+	couponModule := newCoupon(d, sellerModule, buyerModule)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, couponModule, moderationModule, jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
@@ -294,7 +295,7 @@ func runServe(ctx context.Context) error {
 		Review:       reviewModule,
 		IM:           imModule,
 		CRM:          crmModule,
-		Coupon:       newCoupon(d, sellerModule, buyerModule),
+		Coupon:       couponModule,
 		Moderation:   moderationModule,
 		Notification: notificationModule,
 		Content: content.New(content.Deps{
@@ -305,31 +306,32 @@ func runServe(ctx context.Context) error {
 			Now:    time.Now,
 			Logger: log,
 		}),
-		Media:           med,
-		Identity:        id,
-		WebLogin:        webLogin,
-		AppLogin:        appLogin,
-		Buyer:           buyerModule,
-		Seller:          sellerModule,
-		Payment:         payments,
-		BizCalendar:     calendar,
-		Discovery:       discoveryModule,
-		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
-		Stats:           stats,
-		DashboardOrders: sellerDashboardOrders{orders},
-		SocialProducts:  socialCards{products},
-		BuyerPorts:      httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
-		Deletion:        deletion,
-		Delegation:      del,
-		Images:          images,
-		WebOrigin:       web,
-		Origins:         origins,
-		OriginAuth:      originAuth,
-		ClientIP:        clientIP,
-		Legacy:          gateway,
-		LegacyPrefixes:  gatewayproxy.Prefixes,
-		Now:             time.Now,
-		Logger:          log,
+		Media:                 med,
+		Identity:              id,
+		WebLogin:              webLogin,
+		AppLogin:              appLogin,
+		Buyer:                 buyerModule,
+		Seller:                sellerModule,
+		Payment:               payments,
+		PaymentPublishableKey: paymentPublishableKey,
+		BizCalendar:           calendar,
+		Discovery:             discoveryModule,
+		ReviewQueue:           reviewqueue.New(reviewqueue.Deps{DB: d}),
+		Stats:                 stats,
+		DashboardOrders:       sellerDashboardOrders{orders},
+		SocialProducts:        socialCards{products},
+		BuyerPorts:            httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
+		Deletion:              deletion,
+		Delegation:            del,
+		Images:                images,
+		WebOrigin:             web,
+		Origins:               origins,
+		OriginAuth:            originAuth,
+		ClientIP:              clientIP,
+		Legacy:                gateway,
+		LegacyPrefixes:        gatewayproxy.Prefixes,
+		Now:                   time.Now,
+		Logger:                log,
 	})
 	if err != nil {
 		return err
@@ -345,6 +347,7 @@ func runServe(ctx context.Context) error {
 	legacyMux := http.NewServeMux()
 	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, log)))
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
+	legacyMux.Handle(paymentconnect.NewPaymentServiceHandler(paymentserver.New(payments)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviewModule}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
 	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
@@ -445,7 +448,7 @@ func runWorker(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -460,9 +463,9 @@ func runWorker(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribePaymentRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
-	subscribeSocialRelay(bus, jc)
 	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
@@ -488,7 +491,7 @@ func runWorker(ctx context.Context) error {
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
-	notificationModule := newNotification(d, id, buyerModule, sellerModule, moderation.NewCaseReader(d), jc, box, notificationConfig, images, log)
+	notificationModule := newNotification(d, id, buyerModule, sellerModule, newCoupon(d, sellerModule, buyerModule), moderation.NewCaseReader(d), jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
@@ -513,9 +516,7 @@ func runWorker(ctx context.Context) error {
 	river.AddWorker(workers, rabbitmq.NewWorker(pub))
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
-	socialrelay.NewWorker(buyerModule, sellerModule, socialModule, jc, log).AddWorkers(workers)
 	reviewrelay.NewWorker(reviewModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)
-	imrelay.NewWorker(imModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)
 	bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)

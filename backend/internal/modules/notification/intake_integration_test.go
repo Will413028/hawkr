@@ -23,6 +23,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -312,6 +313,7 @@ func setupIntake(t *testing.T) *fixture {
 	t.Helper()
 	t.Parallel()
 	d := pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "notification", Dir: Migrations()},
@@ -326,7 +328,7 @@ func setupIntake(t *testing.T) *fixture {
 	rec := &recorder{}
 	push, mail, contacts := fcm.NewFake(nil), resend.NewFake(nil), &fakeContacts{m: map[int64]identity.ContactEmail{}}
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: stores, Validity: noVouchers{}, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
 	}, testRegistry{})
 	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)

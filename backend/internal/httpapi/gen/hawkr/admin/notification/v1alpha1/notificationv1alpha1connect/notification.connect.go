@@ -8,6 +8,8 @@
 // 公告一律只寫英文：單一 title 與 body，不分語系、不依收件人的語系選擇，所有使用者看到同一份
 // （限公告，是多語系 ADR 的例外；其餘後台文字仍是 zh-TW）。公告在使用者端的分類是 NOTIFICATION_CATEGORY_ANNOUNCEMENT：
 // 收件匣一定收到，推播可在偏好關閉。
+//
+// 投遞紀錄是推播與 email 觸達與否的唯一來源（收件匣不是渠道；收件匣列本身就是「已進收件匣」的紀錄），重送與未觸達查詢都只讀它。
 package notificationv1alpha1connect
 
 import (
@@ -45,6 +47,12 @@ const (
 	// NotificationAdminServiceListAnnouncementsProcedure is the fully-qualified name of the
 	// NotificationAdminService's ListAnnouncements RPC.
 	NotificationAdminServiceListAnnouncementsProcedure = "/hawkr.admin.notification.v1alpha1.NotificationAdminService/ListAnnouncements"
+	// NotificationAdminServiceResendDeliveriesProcedure is the fully-qualified name of the
+	// NotificationAdminService's ResendDeliveries RPC.
+	NotificationAdminServiceResendDeliveriesProcedure = "/hawkr.admin.notification.v1alpha1.NotificationAdminService/ResendDeliveries"
+	// NotificationAdminServiceListUnreachedNotificationsProcedure is the fully-qualified name of the
+	// NotificationAdminService's ListUnreachedNotifications RPC.
+	NotificationAdminServiceListUnreachedNotificationsProcedure = "/hawkr.admin.notification.v1alpha1.NotificationAdminService/ListUnreachedNotifications"
 )
 
 // NotificationAdminServiceClient is a client for the
@@ -55,6 +63,19 @@ type NotificationAdminServiceClient interface {
 	CreateAnnouncement(context.Context, *connect.Request[v1alpha1.CreateAnnouncementRequest]) (*connect.Response[v1alpha1.CreateAnnouncementResponse], error)
 	// ListAnnouncements 列出公告，新到舊（建立時間，再依 id 新到舊）。page_token 不透明。
 	ListAnnouncements(context.Context, *connect.Request[v1alpha1.ListAnnouncementsRequest]) (*connect.Response[v1alpha1.ListAnnouncementsResponse], error)
+	// ResendDeliveries 把符合條件、永久失敗且失敗原因可重送的推播與 email 投遞改回待送並重新排入渠道 job，一次最多 max_count 筆（依失敗時間由舊到新）。
+	// 冪等：只動狀態是永久失敗的列，已送出或已重排（待送）的投遞不會再被選中，所以重複呼叫不會讓同一筆送出兩次；投遞冪等鍵（意圖、收件人、渠道）不變。
+	// 永遠不重送：失敗原因是來源事實已不成立（NO_LONGER_VALID）、位址在停寄名單（EMAIL_SUPPRESSED）、收件人已刪除或退場（RECIPIENT_GONE）、
+	// 意圖或型別已不存在、組字失敗的投遞。重排後的投遞仍由渠道 job 在送出時重新檢查這些條件與行銷類推播的靜音時段，所以重送不會繞過它們。
+	// 失敗時間窗必須給兩端（fail_time_end 不可在未來）：已重送又再失敗的投遞失敗時間會晚於窗的終點，依 has_more 連續呼叫不會重複選到它們。
+	// 寫稽核紀錄；dry_run 為 true 時只回會重排的筆數，不改資料也不寫稽核紀錄。
+	ResendDeliveries(context.Context, *connect.Request[v1alpha1.ResendDeliveriesRequest]) (*connect.Response[v1alpha1.ResendDeliveriesResponse], error)
+	// ListUnreachedNotifications 列出近 days 天內「交易必要」分類（訂單、出貨、售後、撥款、帳號；使用者不能關閉的分類）的通知中，
+	// 某個收件人在所有渠道都沒有觸達的筆數與明細，新到舊（意圖建立時間，再依投遞參考 id 新到舊）。
+	// 觸達只看投遞紀錄：推播或 email 任一筆已送出（SENT）就算觸達；收件匣不是渠道，寫進收件匣不算觸達。
+	// 未觸達＝該收件人這則通知的所有投遞都已終結為永久失敗：還在待送的不算（尚未失敗），失敗原因是 NO_LONGER_VALID（刻意不送）或
+	// RECIPIENT_GONE（收件人已刪除）的也不算。沒有投遞紀錄的意圖（沒有收件人）不算。回應只帶參考 ID，不帶文字、位址與 token。
+	ListUnreachedNotifications(context.Context, *connect.Request[v1alpha1.ListUnreachedNotificationsRequest]) (*connect.Response[v1alpha1.ListUnreachedNotificationsResponse], error)
 }
 
 // NewNotificationAdminServiceClient constructs a client for the
@@ -82,13 +103,28 @@ func NewNotificationAdminServiceClient(httpClient connect.HTTPClient, baseURL st
 			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
+		resendDeliveries: connect.NewClient[v1alpha1.ResendDeliveriesRequest, v1alpha1.ResendDeliveriesResponse](
+			httpClient,
+			baseURL+NotificationAdminServiceResendDeliveriesProcedure,
+			connect.WithSchema(notificationAdminServiceMethods.ByName("ResendDeliveries")),
+			connect.WithClientOptions(opts...),
+		),
+		listUnreachedNotifications: connect.NewClient[v1alpha1.ListUnreachedNotificationsRequest, v1alpha1.ListUnreachedNotificationsResponse](
+			httpClient,
+			baseURL+NotificationAdminServiceListUnreachedNotificationsProcedure,
+			connect.WithSchema(notificationAdminServiceMethods.ByName("ListUnreachedNotifications")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // notificationAdminServiceClient implements NotificationAdminServiceClient.
 type notificationAdminServiceClient struct {
-	createAnnouncement *connect.Client[v1alpha1.CreateAnnouncementRequest, v1alpha1.CreateAnnouncementResponse]
-	listAnnouncements  *connect.Client[v1alpha1.ListAnnouncementsRequest, v1alpha1.ListAnnouncementsResponse]
+	createAnnouncement         *connect.Client[v1alpha1.CreateAnnouncementRequest, v1alpha1.CreateAnnouncementResponse]
+	listAnnouncements          *connect.Client[v1alpha1.ListAnnouncementsRequest, v1alpha1.ListAnnouncementsResponse]
+	resendDeliveries           *connect.Client[v1alpha1.ResendDeliveriesRequest, v1alpha1.ResendDeliveriesResponse]
+	listUnreachedNotifications *connect.Client[v1alpha1.ListUnreachedNotificationsRequest, v1alpha1.ListUnreachedNotificationsResponse]
 }
 
 // CreateAnnouncement calls
@@ -103,6 +139,18 @@ func (c *notificationAdminServiceClient) ListAnnouncements(ctx context.Context, 
 	return c.listAnnouncements.CallUnary(ctx, req)
 }
 
+// ResendDeliveries calls
+// hawkr.admin.notification.v1alpha1.NotificationAdminService.ResendDeliveries.
+func (c *notificationAdminServiceClient) ResendDeliveries(ctx context.Context, req *connect.Request[v1alpha1.ResendDeliveriesRequest]) (*connect.Response[v1alpha1.ResendDeliveriesResponse], error) {
+	return c.resendDeliveries.CallUnary(ctx, req)
+}
+
+// ListUnreachedNotifications calls
+// hawkr.admin.notification.v1alpha1.NotificationAdminService.ListUnreachedNotifications.
+func (c *notificationAdminServiceClient) ListUnreachedNotifications(ctx context.Context, req *connect.Request[v1alpha1.ListUnreachedNotificationsRequest]) (*connect.Response[v1alpha1.ListUnreachedNotificationsResponse], error) {
+	return c.listUnreachedNotifications.CallUnary(ctx, req)
+}
+
 // NotificationAdminServiceHandler is an implementation of the
 // hawkr.admin.notification.v1alpha1.NotificationAdminService service.
 type NotificationAdminServiceHandler interface {
@@ -111,6 +159,19 @@ type NotificationAdminServiceHandler interface {
 	CreateAnnouncement(context.Context, *connect.Request[v1alpha1.CreateAnnouncementRequest]) (*connect.Response[v1alpha1.CreateAnnouncementResponse], error)
 	// ListAnnouncements 列出公告，新到舊（建立時間，再依 id 新到舊）。page_token 不透明。
 	ListAnnouncements(context.Context, *connect.Request[v1alpha1.ListAnnouncementsRequest]) (*connect.Response[v1alpha1.ListAnnouncementsResponse], error)
+	// ResendDeliveries 把符合條件、永久失敗且失敗原因可重送的推播與 email 投遞改回待送並重新排入渠道 job，一次最多 max_count 筆（依失敗時間由舊到新）。
+	// 冪等：只動狀態是永久失敗的列，已送出或已重排（待送）的投遞不會再被選中，所以重複呼叫不會讓同一筆送出兩次；投遞冪等鍵（意圖、收件人、渠道）不變。
+	// 永遠不重送：失敗原因是來源事實已不成立（NO_LONGER_VALID）、位址在停寄名單（EMAIL_SUPPRESSED）、收件人已刪除或退場（RECIPIENT_GONE）、
+	// 意圖或型別已不存在、組字失敗的投遞。重排後的投遞仍由渠道 job 在送出時重新檢查這些條件與行銷類推播的靜音時段，所以重送不會繞過它們。
+	// 失敗時間窗必須給兩端（fail_time_end 不可在未來）：已重送又再失敗的投遞失敗時間會晚於窗的終點，依 has_more 連續呼叫不會重複選到它們。
+	// 寫稽核紀錄；dry_run 為 true 時只回會重排的筆數，不改資料也不寫稽核紀錄。
+	ResendDeliveries(context.Context, *connect.Request[v1alpha1.ResendDeliveriesRequest]) (*connect.Response[v1alpha1.ResendDeliveriesResponse], error)
+	// ListUnreachedNotifications 列出近 days 天內「交易必要」分類（訂單、出貨、售後、撥款、帳號；使用者不能關閉的分類）的通知中，
+	// 某個收件人在所有渠道都沒有觸達的筆數與明細，新到舊（意圖建立時間，再依投遞參考 id 新到舊）。
+	// 觸達只看投遞紀錄：推播或 email 任一筆已送出（SENT）就算觸達；收件匣不是渠道，寫進收件匣不算觸達。
+	// 未觸達＝該收件人這則通知的所有投遞都已終結為永久失敗：還在待送的不算（尚未失敗），失敗原因是 NO_LONGER_VALID（刻意不送）或
+	// RECIPIENT_GONE（收件人已刪除）的也不算。沒有投遞紀錄的意圖（沒有收件人）不算。回應只帶參考 ID，不帶文字、位址與 token。
+	ListUnreachedNotifications(context.Context, *connect.Request[v1alpha1.ListUnreachedNotificationsRequest]) (*connect.Response[v1alpha1.ListUnreachedNotificationsResponse], error)
 }
 
 // NewNotificationAdminServiceHandler builds an HTTP handler from the service implementation. It
@@ -133,12 +194,29 @@ func NewNotificationAdminServiceHandler(svc NotificationAdminServiceHandler, opt
 		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
+	notificationAdminServiceResendDeliveriesHandler := connect.NewUnaryHandler(
+		NotificationAdminServiceResendDeliveriesProcedure,
+		svc.ResendDeliveries,
+		connect.WithSchema(notificationAdminServiceMethods.ByName("ResendDeliveries")),
+		connect.WithHandlerOptions(opts...),
+	)
+	notificationAdminServiceListUnreachedNotificationsHandler := connect.NewUnaryHandler(
+		NotificationAdminServiceListUnreachedNotificationsProcedure,
+		svc.ListUnreachedNotifications,
+		connect.WithSchema(notificationAdminServiceMethods.ByName("ListUnreachedNotifications")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.admin.notification.v1alpha1.NotificationAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case NotificationAdminServiceCreateAnnouncementProcedure:
 			notificationAdminServiceCreateAnnouncementHandler.ServeHTTP(w, r)
 		case NotificationAdminServiceListAnnouncementsProcedure:
 			notificationAdminServiceListAnnouncementsHandler.ServeHTTP(w, r)
+		case NotificationAdminServiceResendDeliveriesProcedure:
+			notificationAdminServiceResendDeliveriesHandler.ServeHTTP(w, r)
+		case NotificationAdminServiceListUnreachedNotificationsProcedure:
+			notificationAdminServiceListUnreachedNotificationsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -154,4 +232,12 @@ func (UnimplementedNotificationAdminServiceHandler) CreateAnnouncement(context.C
 
 func (UnimplementedNotificationAdminServiceHandler) ListAnnouncements(context.Context, *connect.Request[v1alpha1.ListAnnouncementsRequest]) (*connect.Response[v1alpha1.ListAnnouncementsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.notification.v1alpha1.NotificationAdminService.ListAnnouncements is not implemented"))
+}
+
+func (UnimplementedNotificationAdminServiceHandler) ResendDeliveries(context.Context, *connect.Request[v1alpha1.ResendDeliveriesRequest]) (*connect.Response[v1alpha1.ResendDeliveriesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.notification.v1alpha1.NotificationAdminService.ResendDeliveries is not implemented"))
+}
+
+func (UnimplementedNotificationAdminServiceHandler) ListUnreachedNotifications(context.Context, *connect.Request[v1alpha1.ListUnreachedNotificationsRequest]) (*connect.Response[v1alpha1.ListUnreachedNotificationsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.notification.v1alpha1.NotificationAdminService.ListUnreachedNotifications is not implemented"))
 }

@@ -17,6 +17,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/riverqueue/river"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/notification/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/notification/v1alpha1/notificationv1alpha1connect"
@@ -45,6 +46,10 @@ func (c *steppingClock) Now() time.Time {
 	c.now = c.now.Add(time.Millisecond)
 	return c.now
 }
+
+type noVouchers struct{}
+
+func (noVouchers) VoucherAvailable(context.Context, int64, uuid.UUID) (bool, error) { return true, nil }
 
 type nopJobs struct{}
 
@@ -80,7 +85,7 @@ func TestAnnouncementAdminRPCs(t *testing.T) {
 		migrate.Module{Name: "notification", Dir: notification.Migrations()},
 	))
 	clock := newSteppingClock()
-	m := notification.New(notification.Deps{DB: d, Jobs: nopJobs{}, Now: clock.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler)})
+	m := notification.New(notification.Deps{DB: d, Validity: noVouchers{}, Jobs: nopJobs{}, Now: clock.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler)})
 	path, handler := notificationv1alpha1connect.NewNotificationAdminServiceHandler(NewAdmin(m), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
 	mux := http.NewServeMux()
 	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -158,5 +163,109 @@ func TestAnnouncementAdminRPCs(t *testing.T) {
 	_, err = client.ListAnnouncements(ctx, connect.NewRequest(&adminpb.ListAnnouncementsRequest{PageSize: -1}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fieldsOf(t, err), []string{"page_size"}) {
 		t.Errorf("負的 page_size：%v", err)
+	}
+}
+
+// 重送與未觸達查詢經真的 Connect handler 與資料庫：重送改回待送並寫稽核紀錄（dry run 不寫）、欄位錯誤是 invalid_argument 指向請求欄位；
+// 未觸達回總筆數與只有參考 ID 的明細，列舉轉成契約值並可分頁。
+func TestDeliveryAdminRPCs(t *testing.T) {
+	t.Parallel()
+	d := pg.NewDB(t, testdb.Migrations(
+		migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()},
+		migrate.Module{Name: "notification", Dir: notification.Migrations()},
+	))
+	clock := newSteppingClock()
+	m := notification.New(notification.Deps{DB: d, Validity: noVouchers{}, Jobs: nopJobs{}, Now: clock.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler)})
+	path, handler := notificationv1alpha1connect.NewNotificationAdminServiceHandler(NewAdmin(m), connect.WithInterceptors(rpc.NewInterceptor(slog.New(slog.DiscardHandler))))
+	mux := http.NewServeMux()
+	mux.Handle(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler.ServeHTTP(w, r.WithContext(rpc.WithPrincipal(r.Context(), identity.Principal{Kind: identity.PrincipalAdmin, ID: 77})))
+	}))
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	client := notificationv1alpha1connect.NewNotificationAdminServiceClient(srv.Client(), srv.URL)
+	ctx := context.Background()
+	failedAt := time.Date(2026, 11, 24, 2, 0, 0, 0, time.UTC)
+
+	intent := uuid.NewV7()
+	if _, err := d.Pool().Exec(ctx, `INSERT INTO notification.intents (id, type, idempotency_key, params, occurred_at, created_at) VALUES ($1, 'account_suspended', 'k1', '{}', $2, $2)`, intent, failedAt.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	seed := func(account int64, channel, status, reason string) {
+		t.Helper()
+		var r *string
+		if reason != "" {
+			r = &reason
+		}
+		if _, err := d.Pool().Exec(ctx, `INSERT INTO notification.deliveries (id, intent_id, account_id, audience, channel, status, failure_reason, created_at, updated_at, sent_at)
+			VALUES ($1, $2, $3, 'BUYER', $4, $5, $6, $7, $7, CASE WHEN $5 = 'SENT' THEN $7::timestamptz END)`, uuid.NewV7(), intent, account, channel, status, r, failedAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seed(1, "EMAIL", "FAILED_PERMANENT", "email_rejected")
+	seed(2, "EMAIL", "FAILED_PERMANENT", "no_longer_valid")
+	seed(3, "EMAIL", "SENT", "")
+
+	unreached, err := client.ListUnreachedNotifications(ctx, connect.NewRequest(&adminpb.ListUnreachedNotificationsRequest{Days: 30}))
+	if err != nil || unreached.Msg.GetUnreachedCount() != 1 || len(unreached.Msg.GetNotifications()) != 1 {
+		t.Fatalf("未觸達 = %v, %v，預期只有收件人 1（刻意不送與已送出的不算）", unreached, err)
+	}
+	n := unreached.Msg.GetNotifications()[0]
+	if n.GetType() != "account_suspended" || n.GetCategory() != pb.NotificationCategory_NOTIFICATION_CATEGORY_ACCOUNT || n.GetAudience() != pb.NotificationAudience_NOTIFICATION_AUDIENCE_BUYER ||
+		n.GetAccountId() != 1 || n.GetStoreId() != 0 || n.GetIntentId() != intent.String() || n.GetDeliveryId() == "" || n.GetCreateTime() == nil {
+		t.Errorf("明細 = %v", n)
+	}
+	if ch := n.GetChannels(); len(ch) != 1 || ch[0].GetChannel() != pb.NotificationChannel_NOTIFICATION_CHANNEL_EMAIL || ch[0].GetFailureReason() != adminpb.DeliveryFailureReason_DELIVERY_FAILURE_REASON_EMAIL_REJECTED {
+		t.Errorf("渠道 = %v", ch)
+	}
+	if _, err := client.ListUnreachedNotifications(ctx, connect.NewRequest(&adminpb.ListUnreachedNotificationsRequest{Days: -1})); connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fieldsOf(t, err), []string{"days"}) {
+		t.Errorf("負的 days：%v", err)
+	}
+	if _, err := client.ListUnreachedNotifications(ctx, connect.NewRequest(&adminpb.ListUnreachedNotificationsRequest{PageToken: "garbage"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Errorf("壞的 page_token：%v", err)
+	}
+
+	window := func(r *adminpb.ResendDeliveriesRequest) *connect.Request[adminpb.ResendDeliveriesRequest] {
+		r.FailTimeStart, r.FailTimeEnd = timestamppb.New(failedAt.Add(-time.Hour)), timestamppb.New(failedAt.Add(time.Hour))
+		return connect.NewRequest(r)
+	}
+	dry, err := client.ResendDeliveries(ctx, window(&adminpb.ResendDeliveriesRequest{DryRun: true}))
+	if err != nil || dry.Msg.GetResendCount() != 1 || dry.Msg.GetHasMore() {
+		t.Fatalf("dry run = %v, %v", dry, err)
+	}
+	audit := adminaudit.New(d, clock.Now)
+	if recs, _ := audit.List(ctx, adminaudit.Filter{Action: notificationv1alpha1connect.NotificationAdminServiceResendDeliveriesProcedure}); len(recs) != 0 {
+		t.Fatalf("dry run 寫了稽核紀錄：%+v", recs)
+	}
+	res, err := client.ResendDeliveries(ctx, window(&adminpb.ResendDeliveriesRequest{Reasons: []adminpb.DeliveryFailureReason{adminpb.DeliveryFailureReason_DELIVERY_FAILURE_REASON_EMAIL_REJECTED}}))
+	if err != nil || res.Msg.GetResendCount() != 1 {
+		t.Fatalf("resend = %v, %v", res, err)
+	}
+	recs, err := audit.List(ctx, adminaudit.Filter{Action: notificationv1alpha1connect.NotificationAdminServiceResendDeliveriesProcedure})
+	if err != nil || len(recs) != 1 || recs[0].AdminID != 77 || recs[0].TargetType != "delivery_resend" {
+		t.Fatalf("稽核紀錄 = %+v, %v", recs, err)
+	}
+	again, err := client.ResendDeliveries(ctx, window(&adminpb.ResendDeliveriesRequest{}))
+	if err != nil || again.Msg.GetResendCount() != 0 {
+		t.Fatalf("第二次 = %v, %v", again, err)
+	}
+
+	for name, c := range map[string]struct {
+		req   *adminpb.ResendDeliveriesRequest
+		field string
+	}{
+		"沒有時間窗":          {&adminpb.ResendDeliveriesRequest{}, "fail_time_start"},
+		"不可重送的原因":        {&adminpb.ResendDeliveriesRequest{Reasons: []adminpb.DeliveryFailureReason{adminpb.DeliveryFailureReason_DELIVERY_FAILURE_REASON_NO_LONGER_VALID}}, "reasons"},
+		"UNSPECIFIED 原因": {&adminpb.ResendDeliveriesRequest{Reasons: []adminpb.DeliveryFailureReason{adminpb.DeliveryFailureReason_DELIVERY_FAILURE_REASON_UNSPECIFIED}}, "reasons"},
+		"收件匣渠道":          {&adminpb.ResendDeliveriesRequest{Channel: pb.NotificationChannel_NOTIFICATION_CHANNEL_INBOX}, "channel"},
+		"負的筆數":           {&adminpb.ResendDeliveriesRequest{MaxCount: -1}, "max_count"},
+	} {
+		req := connect.NewRequest(c.req)
+		if c.field != "fail_time_start" {
+			req = window(c.req)
+		}
+		if _, err := client.ResendDeliveries(ctx, req); connect.CodeOf(err) != connect.CodeInvalidArgument || !slices.Contains(fieldsOf(t, err), c.field) {
+			t.Errorf("%s：%v（欄位 %v），預期 invalid_argument（%s）", name, err, fieldsOf(t, err), c.field)
+		}
 	}
 }

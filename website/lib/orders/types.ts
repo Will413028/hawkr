@@ -95,13 +95,6 @@ export interface OrderReview {
 	createdAt?: string;
 }
 
-/** 付款方式可用性（再次付款依此 gating）。後端 OrderDetailView.availablePaymentMethods（§3.4.1） */
-export interface AvailablePaymentMethod {
-	paymentType: string; // PaymentMethod value（2001/2002/2003/2004）
-	eligible: boolean;
-	ineligibleReason: string; // PaymentMethodIneligibleReason value；eligible=true 時空字串
-}
-
 export interface Order {
 	orderNo: string;
 	/** 賣家營運鍵（store surrogate）。wire `storeId`。 */
@@ -173,10 +166,6 @@ export interface Order {
 	isReviewed?: boolean;
 	/** 訂單評論快照（訂單層級單一，取最近一筆商品評論；未評論為 null）。後端 B-145。 */
 	review?: OrderReview | null;
-	/** 訂單對應 PayUni MerID（= orders.mer_id）。Google Pay 重試 tokenization 用。 */
-	paymentMerId?: string;
-	/** 再次付款可用付款方式（依 totalActualAmount 算；僅 pending_payment 時非空）。§3.4.1 */
-	availablePaymentMethods?: AvailablePaymentMethod[];
 }
 
 export function canWriteOrderReview(order: Order): boolean {

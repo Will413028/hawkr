@@ -99,7 +99,7 @@ func fields(eventID string) eventFields {
 }
 
 func TestEachBuyerEventHasItsOwnJobKind(t *testing.T) {
-	args := []river.JobArgs{FavoriteAddedArgs{}, FavoriteRemovedArgs{}, SellerFollowedArgs{}, ProductViewedArgs{}, RestockTargetedArgs{}, BuyerDeletedArgs{}}
+	args := []river.JobArgs{FavoriteAddedArgs{}, FavoriteRemovedArgs{}, BuyerDeletedArgs{}}
 	kinds := map[string]bool{}
 	for _, a := range args {
 		if kinds[a.Kind()] {
@@ -141,17 +141,6 @@ func TestLegacyEventsEnrichProductAndSellerFields(t *testing.T) {
 		{"favorite", "hawkr.buyer", "buyer.favorite.added", "product.favorited", func(w *Worker) error {
 			return w.favoriteAdded(t.Context(), FavoriteAddedArgs{eventFields: fields("event-1"), ProductID: 11})
 		}, map[string]any{"product_name": "蘋果", "seller_account_id": "88", "store_id": "91", "buyer_name": "買家甲"}},
-		{"view", "hawkr.content", "product.viewed", "product.viewed", func(w *Worker) error {
-			return w.productViewed(t.Context(), ProductViewedArgs{eventFields: fields("event-1"), ProductID: 11})
-		}, map[string]any{"product_name": "蘋果", "seller_id": float64(88), "store_id": float64(91)}},
-		// follow.added 的通知 template 登記在 hawkr.content（notification-service 依 exchange 與 routing key 找 template，
-		// 見 12 號設計書 §4 與 13 號設計書）；送到別的 exchange 會被 notification.buyer 的 handler 找不到 template 而丟棄。
-		{"follow", "hawkr.content", "follow.added", "follow.added", func(w *Worker) error {
-			return w.sellerFollowed(t.Context(), SellerFollowedArgs{eventFields: fields("event-1"), StoreID: 91})
-		}, map[string]any{"merchant_id": float64(88), "store_id": float64(91), "follower_id": float64(99), "follower_name": "買家甲"}},
-		{"restock", "hawkr.product", "product.restock.target", "product.restock.target", func(w *Worker) error {
-			return w.restockTargeted(t.Context(), RestockTargetedArgs{eventFields: fields("event-1"), ProductID: 11, ProductName: "蘋果", ImageKey: "public/apple"})
-		}, map[string]any{"product_name": "蘋果", "image_key": "public/apple", "subscription_id": "event-1"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			emitted := goldenKeys(t, tc.golden, tc.key)
@@ -178,30 +167,7 @@ func TestLegacyEventsEnrichProductAndSellerFields(t *testing.T) {
 					t.Errorf("golden %s 宣稱送出 %q，payload 沒有：%v", tc.golden, key, payload)
 				}
 			}
-			if tc.name == "restock" && products.calls != 0 {
-				t.Fatalf("restock product calls=%d", products.calls)
-			}
 		})
-	}
-}
-
-func TestRepeatedRestockUsesDistinctNotificationReferences(t *testing.T) {
-	w := NewWorker(nil, nil, nil, nil, nil)
-	var references []string
-	for _, eventID := range []string{"restock-1", "restock-2"} {
-		q := &recordingJobs{}
-		w.Jobs = q
-		if err := w.restockTargeted(t.Context(), RestockTargetedArgs{eventFields: fields(eventID), ProductID: 11, ProductName: "蘋果", ImageKey: "public/apple"}); err != nil {
-			t.Fatal(err)
-		}
-		_, payload := q.published(t)
-		references = append(references, payload["subscription_id"].(string))
-		if payload["occurred_at"] != "2026-09-30T00:00:00Z" {
-			t.Fatalf("occurred_at=%v", payload["occurred_at"])
-		}
-	}
-	if references[0] == references[1] {
-		t.Fatalf("repeat restock deduplicated: %v", references)
 	}
 }
 
@@ -210,8 +176,7 @@ type storeFunc func(context.Context, int64) (Store, error)
 
 func (f storeFunc) Store(ctx context.Context, id int64) (Store, error) { return f(ctx, id) }
 
-// 店家已不存在是永久狀態：不回錯誤讓 job 重試到上限。收藏與瀏覽缺店家欄位照送（計數依 product_id）；追蹤只為了通知
-// 被追蹤的店家，沒有收件人就不送。店家沒有帳號時送空字串，不送 "0"（舊 buyer-service 的 publisher）。暫時錯誤照樣重試。
+// 店家已不存在是永久狀態：不回錯誤讓 job 重試到上限。收藏缺店家欄位照送（計數依 product_id）。店家沒有帳號時送空字串，不送 "0"（舊 buyer-service 的 publisher）。暫時錯誤照樣重試。
 func TestRelayTreatsMissingStoreAsPermanent(t *testing.T) {
 	missing := storeFunc(func(context.Context, int64) (Store, error) { return Store{}, apperr.NotFound("店家不存在") })
 	closed := storeFunc(func(context.Context, int64) (Store, error) {
@@ -222,12 +187,6 @@ func TestRelayTreatsMissingStoreAsPermanent(t *testing.T) {
 	favorite := func(w *Worker) error {
 		return w.favoriteAdded(t.Context(), FavoriteAddedArgs{eventFields: fields("event-1"), ProductID: 11})
 	}
-	view := func(w *Worker) error {
-		return w.productViewed(t.Context(), ProductViewedArgs{eventFields: fields("event-1"), ProductID: 11})
-	}
-	follow := func(w *Worker) error {
-		return w.sellerFollowed(t.Context(), SellerFollowedArgs{eventFields: fields("event-1"), StoreID: 91})
-	}
 	for _, tc := range []struct {
 		name    string
 		stores  Stores
@@ -237,13 +196,8 @@ func TestRelayTreatsMissingStoreAsPermanent(t *testing.T) {
 	}{
 		{"favorite 店家不存在", missing, favorite, false, map[string]any{"seller_account_id": "", "store_id": "91", "product_id": "11"}},
 		{"favorite 店家沒有帳號", noAccount, favorite, false, map[string]any{"seller_account_id": "", "store_id": "91"}},
-		{"view 店家不存在", missing, view, false, map[string]any{"seller_id": float64(0), "store_id": float64(91), "product_id": float64(11)}},
-		{"follow 店家不存在", missing, follow, false, nil},
 		{"favorite 店家已關閉", closed, favorite, false, map[string]any{"seller_account_id": "", "store_id": "91"}},
-		{"view 店家已關閉", closed, view, false, map[string]any{"seller_id": float64(0), "store_id": float64(91)}},
-		{"follow 店家已關閉", closed, follow, false, nil},
 		{"favorite 暫時錯誤", down, favorite, true, nil},
-		{"follow 暫時錯誤", down, follow, true, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q := &recordingJobs{}

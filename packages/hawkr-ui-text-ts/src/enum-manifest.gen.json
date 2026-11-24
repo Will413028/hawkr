@@ -22,6 +22,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.admin.notification.v1alpha1.DeliveryFailureReason",
+      "tsName": "DeliveryFailureReason",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind",
       "tsName": "ReviewQueueItemKind",
       "tsModule": "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb",
@@ -500,6 +507,62 @@
     {
       "name": "hawkr.payment.v1alpha1.PaymentAccountStatus",
       "tsName": "PaymentAccountStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyKind",
+      "tsName": "PaymentAnomalyKind",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyOutcome",
+      "tsName": "PaymentAnomalyOutcome",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason",
+      "tsName": "PaymentAnomalyResolutionReason",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentRefundStatus",
+      "tsName": "PaymentRefundStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentReversalStatus",
+      "tsName": "PaymentReversalStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentStatus",
+      "tsName": "PaymentStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentTopupStatus",
+      "tsName": "PaymentTopupStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentTransferStatus",
+      "tsName": "PaymentTransferStatus",
       "tsModule": "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb",
       "inCatalog": true,
       "serverOwned": false

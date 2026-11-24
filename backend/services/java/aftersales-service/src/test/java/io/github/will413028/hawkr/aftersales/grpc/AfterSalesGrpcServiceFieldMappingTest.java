@@ -18,7 +18,6 @@ import io.github.will413028.hawkr.aftersales.service.AfterSaleCaseService;
 import io.github.will413028.hawkr.aftersales.service.AfterSaleLabelRetryService;
 import io.github.will413028.hawkr.aftersales.service.AfterSaleResolutionService;
 import io.github.will413028.hawkr.aftersales.service.PlatformDecisionService;
-import io.github.will413028.hawkr.aftersales.service.RefundPageService;
 import io.github.will413028.hawkr.aftersales.service.ReturnReceiptService;
 import io.github.will413028.hawkr.aftersales.service.SellerCancelService;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +54,6 @@ class AfterSalesGrpcServiceFieldMappingTest {
 
     @Mock private AfterSaleCaseService caseService;
     @Mock private AfterSaleResolutionService resolutionService;
-    @Mock private RefundPageService refundPageService;
     @Mock private ReturnReceiptService returnReceiptService;
     @Mock private SellerCancelService sellerCancelService;
     @Mock private AfterSaleLabelRetryService labelRetryService;
@@ -95,7 +93,7 @@ class AfterSalesGrpcServiceFieldMappingTest {
                 .thenThrow(new RuntimeException("test stub: skip shipment photos"));
 
         service = new AfterSalesGrpcService(
-                caseService, resolutionService, refundPageService, returnReceiptService,
+                caseService, resolutionService, returnReceiptService,
                 sellerCancelService, labelRetryService, appealService, platformDecisionService,
                 org.mockito.Mockito.mock(io.github.will413028.hawkr.aftersales.service.AfterSalePayoutHoldService.class),
                 caseMapper, caseItemMapper, evidenceMapper, resolutionMapper, refundTaskMapper,

@@ -18,7 +18,7 @@ type Party struct {
 	ID   int64          `json:"id"`
 }
 
-func (p Party) principal() Principal { return Principal{Side: p.Side, ID: p.ID} }
+func (p Party) principal() Principal { return Principal(p) }
 
 // CommentCreatedParams 是 comment_created 的參數快照，欄位取自 social.CommentCreated（Preview 是留言內文，不存）。
 type CommentCreatedParams struct {

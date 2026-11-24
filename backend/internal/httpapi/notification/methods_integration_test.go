@@ -347,7 +347,7 @@ func TestStoreAudienceNeedsACurrentStoreAndIsIsolated(t *testing.T) {
 	}
 }
 
-// 偏好：entries 只有註冊表實際送達的組合（現有的兩個型別都是買家的 ACCOUNT，收件匣與 email；公告是收件匣與推播）；
+// 偏好：entries 只有註冊表實際送達的組合（各受眾的型別所走的分類與渠道，公告是收件匣與推播）；
 // 沒有型別走的分類與渠道不列、也不能設定。
 func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 	t.Parallel()
@@ -362,7 +362,25 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 		email = pb.NotificationChannel_NOTIFICATION_CHANNEL_EMAIL
 		acct  = pb.NotificationCategory_NOTIFICATION_CATEGORY_ACCOUNT
 		ann   = pb.NotificationCategory_NOTIFICATION_CATEGORY_ANNOUNCEMENT
+		chatC = pb.NotificationCategory_NOTIFICATION_CATEGORY_CHAT
+		payC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_PAYOUT
+		cmtC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_COMMENT
+		likeC = pb.NotificationCategory_NOTIFICATION_CATEGORY_LIKE
+		folC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_FOLLOW
+		revC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_REVIEW
+		procC = pb.NotificationCategory_NOTIFICATION_CATEGORY_PROCUREMENT
+		fspC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST
+		rstC  = pb.NotificationCategory_NOTIFICATION_CATEGORY_RESTOCK
+		coupC = pb.NotificationCategory_NOTIFICATION_CATEGORY_COUPON
 	)
+	both := func(c pb.NotificationCategory) []pair { return []pair{{c, inbox}, {c, push}} }
+	join := func(parts ...[]pair) []pair {
+		var out []pair
+		for _, p := range parts {
+			out = append(out, p...)
+		}
+		return out
+	}
 	get := func(account int64, aud pb.NotificationAudience) map[pair]*pb.PreferenceEntry {
 		resp, err := s.client.GetNotificationPreferences(t.Context(), as(connect.NewRequest(&pb.GetNotificationPreferencesRequest{Audience: aud}), account))
 		if err != nil {
@@ -377,24 +395,27 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 		}
 		return out
 	}
+	check := func(name string, got map[pair]*pb.PreferenceEntry, want []pair, locked map[pair]bool) {
+		t.Helper()
+		if len(got) != len(want) {
+			t.Fatalf("%s的 entries = %v，預期 %v", name, got, want)
+		}
+		for _, p := range want {
+			e := got[p]
+			if e == nil {
+				t.Fatalf("%s缺 %v：%v", name, p, got)
+			}
+			if e.GetCanDisable() == locked[p] || !e.GetEnabled() {
+				t.Errorf("%s %v：can_disable=%v enabled=%v，預期 can_disable=%v、預設開", name, p, e.GetCanDisable(), e.GetEnabled(), !locked[p])
+			}
+		}
+	}
 	b := get(9, buyer)
-	wantBuyer := []pair{{acct, inbox}, {acct, email}, {ann, inbox}, {ann, push}}
-	if len(b) != len(wantBuyer) {
-		t.Fatalf("買家的 entries = %v，預期 %v", b, wantBuyer)
-	}
-	for _, p := range wantBuyer {
-		if b[p] == nil {
-			t.Fatalf("缺 %v：%v", p, b)
-		}
-	}
-	if st := get(9, store); len(st) != 2 || st[pair{ann, inbox}] == nil || st[pair{ann, push}] == nil {
-		t.Fatalf("店家的 entries（只有公告）= %v", st)
-	}
-	for p, can := range map[pair]bool{{acct, inbox}: false, {acct, email}: false, {ann, inbox}: false, {ann, push}: true} {
-		if e := b[p]; e.GetCanDisable() != can || !e.GetEnabled() {
-			t.Errorf("%v：can_disable=%v enabled=%v，預期 can_disable=%v、預設開", p, e.GetCanDisable(), e.GetEnabled(), can)
-		}
-	}
+	check("買家", b, join([]pair{{acct, inbox}, {acct, push}, {acct, email}, {chatC, push}}, both(cmtC), both(likeC), both(fspC), both(rstC), both(coupC), both(ann)),
+		map[pair]bool{{acct, inbox}: true, {acct, email}: true, {ann, inbox}: true})
+	check("店家", get(9, store), join([]pair{{acct, inbox}, {acct, push}, {acct, email}, {payC, inbox}, {payC, push}, {payC, email}, {chatC, push}},
+		both(revC), both(cmtC), both(likeC), both(folC), both(procC), both(ann)),
+		map[pair]bool{{acct, inbox}: true, {acct, email}: true, {payC, inbox}: true, {payC, email}: true, {ann, inbox}: true})
 
 	update := func(aud pb.NotificationAudience, c pb.NotificationCategory, ch pb.NotificationChannel, enabled bool) (*pb.PreferenceEntry, error) {
 		resp, err := s.client.UpdateNotificationPreference(t.Context(), as(connect.NewRequest(&pb.UpdateNotificationPreferenceRequest{Audience: aud, Category: c, Channel: ch, Enabled: enabled}), 9))
@@ -434,18 +455,18 @@ func TestPreferencesListOnlyTheDeliveredPairs(t *testing.T) {
 	if e, err := update(buyer, acct, email, true); err != nil || !e.GetEnabled() || e.GetCanDisable() {
 		t.Fatalf("不可關閉的組合打開：%v %v", e, err)
 	}
-	// 註冊表不會送達的組合：公告沒有 email、買家的 CHAT 沒有型別、店家的 ACCOUNT 沒有型別；受眾沒有的分類。
-	chat, payout := pb.NotificationCategory_NOTIFICATION_CATEGORY_CHAT, pb.NotificationCategory_NOTIFICATION_CATEGORY_PAYOUT
+	// 註冊表不會送達的組合：公告沒有 email、CHAT 只有推播；受眾沒有的分類。
+	chat, payout := chatC, payC
 	for name, c := range map[string]struct {
 		aud pb.NotificationAudience
 		cat pb.NotificationCategory
 		ch  pb.NotificationChannel
 		f   string
 	}{
-		"公告沒有 email":       {buyer, ann, email, "channel"},
-		"沒有型別的分類":          {buyer, chat, inbox, "channel"},
-		"店家的 ACCOUNT 沒有型別": {store, acct, inbox, "channel"},
-		"買家沒有撥款":           {buyer, payout, inbox, "category"},
+		"公告沒有 email":     {buyer, ann, email, "channel"},
+		"沒有型別的分類":        {buyer, chat, inbox, "channel"},
+		"店家的 CHAT 沒有收件匣": {store, chat, inbox, "channel"},
+		"買家沒有撥款":         {buyer, payout, inbox, "category"},
 	} {
 		if got := invalidField(t, func() error { _, err := update(c.aud, c.cat, c.ch, false); return err }()); got != c.f {
 			t.Errorf("%s：欄位 = %q，預期 %q", name, got, c.f)

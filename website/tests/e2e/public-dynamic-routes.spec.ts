@@ -298,7 +298,7 @@ test.describe("public dynamic route browser health", () => {
 		});
 	}
 
-	test("payment callback without a trade number reaches the protected canonical order", {
+	test("payment step for a guest reaches the protected canonical order", {
 		tag: ["@ui", "@live"],
 	}, async ({ page }) => {
 		const entry = DYNAMIC_ROUTE_CATALOG.find(

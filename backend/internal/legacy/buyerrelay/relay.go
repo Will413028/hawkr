@@ -1,4 +1,5 @@
-// Package buyerrelay 將 buyer 模組事件轉成尚未搬遷的 RabbitMQ 消費者所需訊息。
+// Package buyerrelay 將 buyer 模組事件轉成尚未搬遷的 RabbitMQ 消費者（Java product 的收藏數與買家刪除）所需訊息：只有 buyer.favorite.added、buyer.favorite.removed、buyer.deleted。
+// 追蹤、商品瀏覽與補貨的轉送已隨 A8-3d1 刪除，通知由 notification 模組訂閱 buyer 事件。
 package buyerrelay
 
 import (
@@ -32,20 +33,6 @@ type FavoriteRemovedArgs struct {
 	eventFields
 	ProductID int64 `json:"product_id"`
 }
-type SellerFollowedArgs struct {
-	eventFields
-	StoreID int64 `json:"store_id"`
-}
-type ProductViewedArgs struct {
-	eventFields
-	ProductID int64 `json:"product_id"`
-}
-type RestockTargetedArgs struct {
-	eventFields
-	ProductID   int64  `json:"product_id"`
-	ProductName string `json:"product_name"`
-	ImageKey    string `json:"image_key"`
-}
 type BuyerDeletedArgs struct {
 	eventFields
 	AccountID int64 `json:"account_id"`
@@ -53,9 +40,6 @@ type BuyerDeletedArgs struct {
 
 func (FavoriteAddedArgs) Kind() string   { return "legacy.buyer_favorite_added" }
 func (FavoriteRemovedArgs) Kind() string { return "legacy.buyer_favorite_removed" }
-func (SellerFollowedArgs) Kind() string  { return "legacy.buyer_seller_followed" }
-func (ProductViewedArgs) Kind() string   { return "legacy.buyer_product_viewed" }
-func (RestockTargetedArgs) Kind() string { return "legacy.buyer_restock_targeted" }
 func (BuyerDeletedArgs) Kind() string    { return "legacy.buyer_deleted" }
 
 type Enqueue func(context.Context, river.JobArgs) error
@@ -72,21 +56,6 @@ func OnFavoriteAdded(enqueue Enqueue) func(context.Context, buyer.FavoriteAdded)
 func OnFavoriteRemoved(enqueue Enqueue) func(context.Context, buyer.FavoriteRemoved) error {
 	return func(ctx context.Context, e buyer.FavoriteRemoved) error {
 		return enqueue(ctx, FavoriteRemovedArgs{eventFields: eventFields{e.EventID.String(), e.OccurredAt, e.BuyerID}, ProductID: e.ProductID})
-	}
-}
-func OnSellerFollowed(enqueue Enqueue) func(context.Context, buyer.SellerFollowed) error {
-	return func(ctx context.Context, e buyer.SellerFollowed) error {
-		return enqueue(ctx, SellerFollowedArgs{eventFields: eventFields{e.EventID.String(), e.OccurredAt, e.BuyerID}, StoreID: e.StoreID})
-	}
-}
-func OnProductViewed(enqueue Enqueue) func(context.Context, buyer.ProductViewed) error {
-	return func(ctx context.Context, e buyer.ProductViewed) error {
-		return enqueue(ctx, ProductViewedArgs{eventFields: eventFields{e.EventID.String(), e.OccurredAt, e.BuyerID}, ProductID: e.ProductID})
-	}
-}
-func OnRestockTargeted(enqueue Enqueue) func(context.Context, buyer.RestockTargeted) error {
-	return func(ctx context.Context, e buyer.RestockTargeted) error {
-		return enqueue(ctx, RestockTargetedArgs{eventFields: eventFields{e.EventID.String(), e.OccurredAt, e.BuyerID}, ProductID: e.ProductID, ProductName: e.ProductName, ImageKey: e.ImageKey})
 	}
 }
 func OnBuyerDeleted(enqueue Enqueue) func(context.Context, buyer.BuyerDeleted) error {
@@ -160,9 +129,6 @@ func (w *typedWorker[T]) Work(ctx context.Context, job *river.Job[T]) error {
 func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &typedWorker[FavoriteAddedArgs]{work: w.favoriteAdded})
 	river.AddWorker(workers, &typedWorker[FavoriteRemovedArgs]{work: w.favoriteRemoved})
-	river.AddWorker(workers, &typedWorker[SellerFollowedArgs]{work: w.sellerFollowed})
-	river.AddWorker(workers, &typedWorker[ProductViewedArgs]{work: w.productViewed})
-	river.AddWorker(workers, &typedWorker[RestockTargetedArgs]{work: w.restockTargeted})
 	river.AddWorker(workers, &typedWorker[BuyerDeletedArgs]{work: w.buyerDeleted})
 }
 
@@ -245,60 +211,6 @@ func (w *Worker) favoriteRemoved(ctx context.Context, a FavoriteRemovedArgs) err
 	payload["seller_account_id"], payload["store_id"] = "", ""
 	payload["buyer_name"], payload["product_name"] = "", ""
 	return w.enqueuePublish(ctx, a.eventFields, "hawkr.buyer", "buyer.favorite.removed", payload)
-}
-
-func (w *Worker) sellerFollowed(ctx context.Context, a SellerFollowedArgs) error {
-	accountID, err := w.accountID(ctx, a.BuyerID)
-	if err != nil {
-		return err
-	}
-	store, ok, err := w.store(ctx, "follow.added", a.StoreID)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		// follow.added 唯一的用途是通知被追蹤的賣家（merchant_id）；店家已不存在就沒有收件人。舊 buyer-service 在這裡
-		// 把 store_id 當成帳號送出（#2789，通知送錯人），不沿用。
-		return nil
-	}
-	name, err := w.name(ctx, a.BuyerID)
-	if err != nil {
-		return err
-	}
-	payload := base(a.eventFields, "FOLLOW_ADDED")
-	payload["follower_id"], payload["follower_name"] = accountID, name
-	payload["merchant_id"], payload["store_id"] = store.AccountID, a.StoreID
-	payload["occurred_at"] = a.Occurred.UTC().Format(time.RFC3339Nano)
-	return w.enqueuePublish(ctx, a.eventFields, "hawkr.content", "follow.added", payload)
-}
-
-func (w *Worker) productViewed(ctx context.Context, a ProductViewedArgs) error {
-	product, err := w.product(ctx, a.ProductID)
-	if err != nil {
-		return err
-	}
-	var store Store
-	if product.StoreID > 0 {
-		// 店家不存在時仍送：瀏覽數依 product_id 計，seller_id 與沒有店家的商品一樣是 0。
-		store, _, err = w.store(ctx, "product.viewed", product.StoreID)
-		if err != nil {
-			return err
-		}
-	}
-	payload := base(a.eventFields, "PRODUCT_VIEWED")
-	payload["seller_id"], payload["store_id"] = store.AccountID, product.StoreID
-	payload["product_name"], payload["product_id"] = product.Name, a.ProductID
-	return w.enqueuePublish(ctx, a.eventFields, "hawkr.content", "product.viewed", payload)
-}
-
-func (w *Worker) restockTargeted(ctx context.Context, a RestockTargetedArgs) error {
-	payload := base(a.eventFields, "PRODUCT_RESTOCK_TARGET")
-	payload["subscription_id"], payload["buyer_id"] = a.EventID, a.BuyerID
-	payload["product_id"] = strconv.FormatInt(a.ProductID, 10)
-	payload["product_name"], payload["image_key"] = a.ProductName, a.ImageKey
-	payload["deep_link"] = "hawkr://products/" + strconv.FormatInt(a.ProductID, 10)
-	payload["occurred_at"] = a.Occurred.UTC().Format(time.RFC3339Nano)
-	return w.enqueuePublish(ctx, a.eventFields, "hawkr.product", "product.restock.target", payload)
 }
 
 func (w *Worker) buyerDeleted(ctx context.Context, a BuyerDeletedArgs) error {

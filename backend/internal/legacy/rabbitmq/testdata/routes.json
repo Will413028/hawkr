@@ -20,61 +20,6 @@
     "package": "internal/legacy/buyerrelay"
   },
   {
-    "exchange": "hawkr.content",
-    "routing_key": "comment.created",
-    "package": "internal/legacy/socialrelay"
-  },
-  {
-    "exchange": "hawkr.content",
-    "routing_key": "comment.like_changed",
-    "package": "internal/legacy/socialrelay"
-  },
-  {
-    "exchange": "hawkr.content",
-    "routing_key": "comment.replied",
-    "package": "internal/legacy/socialrelay"
-  },
-  {
-    "exchange": "hawkr.content",
-    "routing_key": "follow.added",
-    "package": "internal/legacy/buyerrelay"
-  },
-  {
-    "exchange": "hawkr.content",
-    "routing_key": "post.created",
-    "package": "internal/legacy/socialrelay"
-  },
-  {
-    "exchange": "hawkr.content",
-    "routing_key": "post.hidden_by_platform",
-    "package": "internal/legacy/socialrelay"
-  },
-  {
-    "exchange": "hawkr.content",
-    "routing_key": "post.liked",
-    "package": "internal/legacy/socialrelay"
-  },
-  {
-    "exchange": "hawkr.content",
-    "routing_key": "product.viewed",
-    "package": "internal/legacy/buyerrelay"
-  },
-  {
-    "exchange": "hawkr.delegation",
-    "routing_key": "delegation.operation.completed",
-    "package": "internal/legacy/delegationservice"
-  },
-  {
-    "exchange": "hawkr.im",
-    "routing_key": "chat.message.sent",
-    "package": "internal/legacy/imrelay"
-  },
-  {
-    "exchange": "hawkr.product",
-    "routing_key": "product.restock.target",
-    "package": "internal/legacy/buyerrelay"
-  },
-  {
     "exchange": "hawkr.review",
     "routing_key": "review.created",
     "package": "internal/legacy/reviewrelay"
@@ -108,6 +53,31 @@
     "exchange": "hawkr.seller",
     "routing_key": "seller.unsuspended",
     "package": "internal/legacy/sellerrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "payment.closed",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "payment.failed",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "payment.success",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "refund.failed",
+    "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "payment.events",
+    "routing_key": "refund.succeeded",
+    "package": "internal/legacy/paymentrelay"
   },
   {
     "exchange": "procurement.events",

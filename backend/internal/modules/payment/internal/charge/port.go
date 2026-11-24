@@ -61,11 +61,10 @@ type Snapshot struct {
 
 // CreateInput 是建立 PaymentIntent 的輸入。IdempotencyKey 是付款列上保存的 UUID：每次重送都用它，期限內得到同一個 PaymentIntent；它同時是這次嘗試的 ID，
 // adapter 在建立的物件寫入 metadata（attempt_id），FindPayment 依它比對（換新鍵就是新的嘗試）。
-// TransferGroup 是訂單號（一筆付款只對一家店，之後的轉帳以它關聯）；StoreID 與 PaymentID 只作 metadata 對帳；Amount 是整數，幣別由 adapter 的設定決定（D9）。
+// TransferGroup 是付款群組的 ID（一個 charge、N 筆轉帳，之後的轉帳以它關聯，D13）；OrderNos 與 PaymentID 只作 metadata 對帳；Amount 是各訂單應收的總額，整數，幣別由 adapter 的設定決定（D9）。
 type CreateInput struct {
 	PaymentID      uuid.UUID
-	OrderNo        string
-	StoreID        int64
+	OrderNos       []string
 	Amount         int64
 	Description    string
 	TransferGroup  string
@@ -114,7 +113,7 @@ type RefundSnapshot struct {
 	FailureReason string
 }
 
-// TransferInput 是建立轉帳的輸入：付款的入帳（SourceChargeID）與賣家的外部帳戶（DestinationAccountID），TransferGroup 同付款；IdempotencyKey 同時是嘗試 ID（見 CreateInput）。
+// TransferInput 是建立轉帳的輸入：付款的入帳（SourceChargeID）與賣家的外部帳戶（DestinationAccountID），TransferGroup 是付款群組的 ID（TransferGroupOf）；IdempotencyKey 同時是嘗試 ID（見 CreateInput）。
 type TransferInput struct {
 	Amount               int64
 	SourceChargeID       string
@@ -168,7 +167,8 @@ type Event struct {
 //
 // 實作不得把不明轉成業務結果，也不得把「可能已執行」的錯誤歸類成可重試拒絕。每個呼叫都有 deadline，而且不得在 DB transaction 內呼叫（規則 5）。
 // Find* 是強一致的查回（不用最終一致的 Search）：依建立時寫入 provider 物件 metadata 的嘗試 ID 比對，回傳（找到的快照、是否找到、錯誤）；
-// 找不到是 found=false 且 err=nil，查回本身失敗回 err。
+// 找不到是 found=false 且 err=nil，查回本身失敗回 err。列出 provider 物件的查回（FindPayment、FindTransfer、FindRefund）帶 createdAfter：只列 created 不早於它的物件，
+// 一直翻到列表結束（沒有頁數上限，deadline 到了回錯誤）；「找不到」只在看完整份列表之後才成立（D16、D-E）。createdAfter 由呼叫方取這把鍵第一次呼叫前記下的時刻減 ListClockSkew。
 type Provider interface {
 	// Name 是 provider 的代碼（小寫英數與底線），存在付款列的 provider 欄，也是 inbox 的 provider 名稱：必須與收款帳戶的 provider 名稱不同
 	// （inbox 同名登記會 panic；一個事件 destination 一個 endpoint 一把簽章密鑰）。
@@ -176,7 +176,7 @@ type Provider interface {
 	// CreatePayment 以 IdempotencyKey 冪等地建立 PaymentIntent 並回傳它的快照（含 ClientSecret）。同一把鍵在保存期內重送得到同一個 PaymentIntent。
 	CreatePayment(ctx context.Context, in CreateInput) (Snapshot, error)
 	// FindPayment 依嘗試 ID（建立時的冪等鍵）查回 PaymentIntent。
-	FindPayment(ctx context.Context, attemptID string) (Snapshot, bool, error)
+	FindPayment(ctx context.Context, attemptID string, createdAfter time.Time) (Snapshot, bool, error)
 	// GetPayment 讀 PaymentIntent 目前的狀態（含 ClientSecret，讀得到時）；不存在是永久失敗。
 	GetPayment(ctx context.Context, externalID string) (Snapshot, error)
 	// CancelPayment 取消尚未入帳的 PaymentIntent 並回傳取消後的快照；冪等：已取消視為成功。已入帳的回傳入帳的快照（State 是 StateSucceeded，不是錯誤），
@@ -185,16 +185,16 @@ type Provider interface {
 	// CreateRefund 以 IdempotencyKey 冪等地建立退款。
 	CreateRefund(ctx context.Context, in RefundInput) (RefundSnapshot, error)
 	// FindRefund 依嘗試 ID 查回付款（externalPaymentID）底下的退款。
-	FindRefund(ctx context.Context, externalPaymentID, attemptID string) (RefundSnapshot, bool, error)
+	FindRefund(ctx context.Context, externalPaymentID, attemptID string, createdAfter time.Time) (RefundSnapshot, bool, error)
 	// GetRefund 讀退款目前的狀態。
 	GetRefund(ctx context.Context, externalID string) (RefundSnapshot, error)
 	// CreateTransfer 以 IdempotencyKey 冪等地建立帶 source_transaction 的轉帳；平台餘額不足是 ErrRetryableRefusal，不是 ErrPermanent。
 	CreateTransfer(ctx context.Context, in TransferInput) (TransferSnapshot, error)
 	// FindTransfer 以 transfer_group 列出轉帳後依嘗試 ID 比對。
-	FindTransfer(ctx context.Context, transferGroup, attemptID string) (TransferSnapshot, bool, error)
+	FindTransfer(ctx context.Context, transferGroup, attemptID string, createdAfter time.Time) (TransferSnapshot, bool, error)
 	// ReverseTransfer 以 IdempotencyKey 冪等地撤回轉帳的一部分或全部；賣家餘額不足不是錯誤。
 	ReverseTransfer(ctx context.Context, in ReversalInput) (ReversalSnapshot, error)
-	// FindReversal 列出該轉帳的撤回後依嘗試 ID 比對。
+	// FindReversal 列出該轉帳的撤回後依嘗試 ID 比對（列表本身就以轉帳為範圍，Stripe 的撤回列表沒有 created 篩選，不帶下限；整份列表看完才算查無）。
 	FindReversal(ctx context.Context, externalTransferID, attemptID string) (ReversalSnapshot, bool, error)
 	// ParseEvent 驗簽並取出事件 ID 與物件；簽章不符或格式不合回 ErrInvalidEvent，驗過簽章但不是要處理的事件回 ErrIgnoredEvent。
 	ParseEvent(header http.Header, body []byte) (Event, error)
@@ -210,6 +210,21 @@ var (
 	// ErrIgnoredEvent 標示驗過簽章、但不是要處理的事件：回應 2xx，不寫 inbox、不排 job。
 	ErrIgnoredEvent = errors.New("charge: ignored event")
 )
+
+// AuthRejectedError 標示 provider 以認證或權限失敗（401、403）拒絕呼叫：金鑰或權限壞了，需要人修。結果仍是「不明」（金鑰輪替設計，D60；D-F 不改分類）：同一把鍵重送、之後查回，
+// 這個型別只讓呼叫方發告警（錯誤等級的 log，帶 HTTP 狀態與 provider 的錯誤代碼，不含金鑰或回應內容）。classifyCall 不認得它，所以走 callUnknown。
+type AuthRejectedError struct {
+	Status int
+	Code   string
+	Err    error
+}
+
+func (e *AuthRejectedError) Error() string {
+	return "charge: provider 拒絕認證或權限：" + e.Err.Error()
+}
+
+// Unwrap 回傳 provider 的原始錯誤。
+func (e *AuthRejectedError) Unwrap() error { return e.Err }
 
 // Order 是建立付款當下訂單一方回的事實：付款依它寫成快照。
 type Order struct {

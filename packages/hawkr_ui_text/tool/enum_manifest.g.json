@@ -260,6 +260,62 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyKind",
+      "dartClass": "PaymentAnomalyKind",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyOutcome",
+      "dartClass": "PaymentAnomalyOutcome",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason",
+      "dartClass": "PaymentAnomalyResolutionReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentRefundStatus",
+      "dartClass": "PaymentRefundStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentReversalStatus",
+      "dartClass": "PaymentReversalStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentStatus",
+      "dartClass": "PaymentStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentTopupStatus",
+      "dartClass": "PaymentTopupStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.PaymentTransferStatus",
+      "dartClass": "PaymentTransferStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.RequirementCollection",
       "dartClass": "RequirementCollection",
       "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",

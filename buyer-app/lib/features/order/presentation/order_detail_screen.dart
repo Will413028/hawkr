@@ -29,10 +29,8 @@ import '../data/after_sale_repository.dart';
 import '../data/after_sale_status_notifier.dart';
 import '../data/order_model.dart';
 import '../order_color_tokens.dart';
-import '../data/payment_repository.dart';
 import '../../../core/analytics/analytics_providers.dart';
 import '../../../core/analytics/purchase_dedup.dart';
-import '../../../core/payment/pay_token_service.dart';
 import '../data/order_status_notifier.dart';
 import 'package:hawkr_api/images.dart' as pb_image;
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.pb.dart'
@@ -44,7 +42,7 @@ import '../../../shared/widgets/oss_image.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
 import '../../../shared/widgets/product_card_hero.dart';
 import 'confirm_receipt_dialog.dart';
-import 'order_card_widgets/retry_payment_sheet.dart';
+import 'pay_order.dart';
 import 'order_list_controller.dart';
 import 'order_status_presentation.dart';
 import 'widgets/order_logistics_section.dart';
@@ -362,7 +360,6 @@ class _OrderDetailBody extends ConsumerWidget {
                   OrderLogisticsSection(order: order),
                   const SizedBox(height: HkSpace.lg),
                   _PaymentDetailsCard(order: order),
-                  _PaymentHistoryCard(order: order),
                   _RefundTaskSummaryCard(
                     order: order,
                     afterSaleAsync: afterSaleAsync,
@@ -407,121 +404,17 @@ class _OrderDetailBottomBarState extends ConsumerState<_OrderDetailBottomBar> {
 
   Order get order => widget.order;
 
-  Future<void> _executeRetryPayment(
-    BuildContext context,
-    String payType,
-  ) async {
+  Future<void> _handleRetryPayment(BuildContext context) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      // Apple Pay 須先彈原生面板取得付款憑證，否則後端會回「付款憑證為必填」。
-      String? applePayToken;
-      if (payType == PaymentMethod.applePay.value) {
-        applePayToken = await _requestApplePayToken(context);
-        if (applePayToken == null) return;
-      }
-
-      final payRepo = ref.read(paymentRepositoryProvider);
-      final result = await payRepo.createPayment(
-        orderNo: order.orderSn,
-        paymentType: payType,
-        applePayToken: applePayToken,
-      );
-      if (!context.mounted) return;
-      if (payType == PaymentMethod.atm.value) {
-        ref
-            .read(orderDetailControllerProvider(order.orderSn).notifier)
-            .refresh();
-        ref.read(orderListControllerProvider.notifier).refresh();
-        showFloatingToast(context, '已切換為 ATM 轉帳，請查看匯款資訊', isSuccess: true);
-        return;
-      }
-      final redirectUrl = result['redirectUrl']?.toString() ?? '';
-      final tradeNo = result['tradeNo']?.toString() ?? '';
-      final amount = result['amount']?.toString() ?? order.totalActualAmount;
-      if (redirectUrl.isNotEmpty) {
-        await context.push(
-          '/payment/webview',
-          extra: {
-            'redirectUrl': redirectUrl,
-            'tradeNo': tradeNo,
-            'orderNo': order.orderSn,
-            'amount': amount,
-          },
-        );
-        if (context.mounted) {
-          ref
-              .read(orderDetailControllerProvider(order.orderSn).notifier)
-              .refresh();
-          ref.read(orderListControllerProvider.notifier).refresh();
-        }
-      } else {
-        showFloatingToast(context, '無法取得付款頁面', isSuccess: false);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showFloatingToast(
-          context,
-          '付款失敗：${e.toString().replaceAll('Exception: ', '')}',
-          isSuccess: false,
-        );
-      }
+      await payOrder(context, ref, order.orderSn);
+      if (!mounted) return;
+      ref.read(orderDetailControllerProvider(order.orderSn).notifier).refresh();
+      ref.read(orderListControllerProvider.notifier).refresh();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  /// 彈出 Apple Pay 原生面板取得付款憑證（與 OrderCard 行為一致）。
-  /// 使用者取消 / 裝置不支援 / 取得失敗 → 回傳 null。
-  Future<String?> _requestApplePayToken(BuildContext context) async {
-    final payTokenService = PayTokenService();
-    try {
-      await payTokenService.init();
-      if (!context.mounted) return null;
-      if (!payTokenService.isApplePayAvailable) {
-        showFloatingToast(
-          context,
-          '此裝置尚未啟用 Apple Pay，請選擇其他付款方式',
-          isSuccess: false,
-        );
-        return null;
-      }
-      final amount = order.totalActualAmount.isNotEmpty
-          ? order.totalActualAmount
-          : '0';
-      return await payTokenService.requestToken(
-        amount: amount,
-        label: 'Hawkr 訂單',
-      );
-    } on PaymentCancelledException {
-      if (context.mounted) {
-        showFloatingToast(context, 'Apple Pay 付款已取消', isSuccess: false);
-      }
-      return null;
-    } on PaymentTokenUnavailableException catch (e) {
-      if (context.mounted) {
-        showFloatingToast(context, '付款失敗：$e', isSuccess: false);
-      }
-      return null;
-    } catch (e, stackTrace) {
-      debugPrint('[OrderDetail] Apple Pay request failed: $e');
-      debugPrintStack(stackTrace: stackTrace);
-      if (context.mounted) {
-        showFloatingToast(context, 'Apple Pay 授權失敗，請稍後再試', isSuccess: false);
-      }
-      return null;
-    } finally {
-      payTokenService.dispose();
-    }
-  }
-
-  void _handleRetryPayment(BuildContext context) {
-    showRetryPaymentSheet(
-      context,
-      order: order,
-      currentPayType: order.paymentMethod,
-      onPaymentSelected: (payType) => _executeRetryPayment(context, payType),
-    );
   }
 
   Future<void> _handleConfirmReceipt(BuildContext context) async {
@@ -2066,285 +1959,10 @@ class _NoteCard extends StatelessWidget {
   }
 }
 
-class _PaymentHistoryCard extends ConsumerStatefulWidget {
-  const _PaymentHistoryCard({required this.order});
-  final Order order;
-
-  @override
-  ConsumerState<_PaymentHistoryCard> createState() =>
-      _PaymentHistoryCardState();
-}
-
-class _PaymentHistoryCardState extends ConsumerState<_PaymentHistoryCard> {
-  late final Future<List<Map<String, dynamic>>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = widget.order.orderSn.isEmpty
-        ? Future.value(const <Map<String, dynamic>>[])
-        : ref
-              .read(paymentRepositoryProvider)
-              .getPaymentHistory(widget.order.orderSn);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const SizedBox.shrink();
-        }
-        final records = snapshot.data ?? const <Map<String, dynamic>>[];
-        final hasMultipleAttempts = records.length > 1;
-        final hasAttentionRecord = records.any(_paymentRecordNeedsAttention);
-        if (!hasMultipleAttempts && !hasAttentionRecord) {
-          return const SizedBox.shrink();
-        }
-
-        return Padding(
-          padding: const EdgeInsets.only(top: HkSpace.lg),
-          child: Container(
-            decoration: _cardDecoration(),
-            padding: const EdgeInsets.all(HkSpace.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _CardSectionTitle(
-                  icon: hasAttentionRecord
-                      ? HkIconName.warning
-                      : HkIconName.history,
-                  title: hasAttentionRecord ? '付款需要確認' : '付款紀錄',
-                  iconColor: hasAttentionRecord
-                      ? OrderColorTokens.attention
-                      : null,
-                ),
-                const SizedBox(height: HkSpace.md),
-                ...records.asMap().entries.map((entry) {
-                  final isLast = entry.key == records.length - 1;
-                  return Column(
-                    children: [
-                      _PaymentHistoryRow(
-                        record: entry.value,
-                        order: widget.order,
-                      ),
-                      if (!isLast) ...[
-                        SizedBox(height: 10.h),
-                        Divider(
-                          height: 1,
-                          color: AppColors.textPrimary.withValues(alpha: 0.1),
-                        ),
-                        SizedBox(height: 10.h),
-                      ],
-                    ],
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-bool _paymentRecordNeedsAttention(Map<String, dynamic> record) {
-  final status = _read(
-    record,
-    'status',
-    'paymentStatus',
-    'payment_status',
-  ).toUpperCase();
-  final isDuplicate =
-      record['isDuplicate'] == true ||
-      _read(record, 'duplicateSequence').isNotEmpty;
-  return isDuplicate ||
-      status == '2' ||
-      status == 'FAILED' ||
-      status == '3' ||
-      status == 'EXPIRED' ||
-      status == '4' ||
-      status == 'CONFLICT';
-}
-
-class _PaymentHistoryRow extends StatelessWidget {
-  const _PaymentHistoryRow({required this.record, required this.order});
-  final Map<String, dynamic> record;
-  final Order order;
-
-  @override
-  Widget build(BuildContext context) {
-    final paymentType = _read(record, 'paymentType');
-    final status = _read(record, 'status');
-    final tradeNo = _read(record, 'displayTradeNo').isNotEmpty
-        ? _read(record, 'displayTradeNo')
-        : _read(record, 'tradeNo');
-    final amount = _read(record, 'amount');
-    final createdAt = _read(record, 'createdAt');
-    final payTime = _read(record, 'payTime');
-    final isDuplicate =
-        record['isDuplicate'] == true ||
-        _read(record, 'duplicateSequence').isNotEmpty;
-    final badge = _paymentAttemptBadge(status, isDuplicate: isDuplicate);
-    // ATM 待付款 row：用「匯款帳號」取代「建立 timestamp」位置（買家更需要的是帳號）。
-    // record 自帶 virtualAccount 優先，否則 fallback 到 order.atmVirtualAccount。
-    final recordVirtualAccount = _read(
-      record,
-      'virtualAccount',
-      'atmVirtualAccount',
-    );
-    final isAtm =
-        paymentType == PaymentMethod.atm.value ||
-        paymentType.toUpperCase() == 'ATM';
-    final isPaid = payTime.isNotEmpty;
-    final showAtmAccount =
-        isAtm &&
-        !isPaid &&
-        (recordVirtualAccount.isNotEmpty || order.atmVirtualAccount.isNotEmpty);
-    final atmVirtualAccount = recordVirtualAccount.isNotEmpty
-        ? recordVirtualAccount
-        : order.atmVirtualAccount;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 8.w,
-          height: 8.w,
-          margin: EdgeInsets.only(top: 8.h),
-          decoration: BoxDecoration(color: badge.color, shape: BoxShape.circle),
-        ),
-        SizedBox(width: 10.w),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _paymentMethodText(paymentType),
-                      style: _valueStyle().copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badge.color,
-                      borderRadius: BorderRadius.circular(16.r),
-                    ),
-                    child: Text(
-                      badge.label,
-                      style: AppTypography.caption.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: OrderColorTokens.foregroundFor(badge.color),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 4.h),
-              if (tradeNo.isNotEmpty)
-                Text('交易編號 $tradeNo', style: _smallStyle()),
-              Text(
-                [
-                  if (amount.isNotEmpty) '金額 NT\$ $amount',
-                  if (showAtmAccount) '匯款帳號 $atmVirtualAccount',
-                  if (!showAtmAccount && payTime.isNotEmpty)
-                    '付款 ${_formatDateTime(payTime, context.taipeiDisplay)}',
-                  if (!showAtmAccount &&
-                      payTime.isEmpty &&
-                      createdAt.isNotEmpty)
-                    '建立 ${_formatDateTime(createdAt, context.taipeiDisplay)}',
-                ].join('｜'),
-                style: _smallStyle().copyWith(
-                  // ATM 帳號要凸顯方便買家識別
-                  color: showAtmAccount ? AppColors.textEmphasis : null,
-                  fontWeight: showAtmAccount
-                      ? FontWeight.w700
-                      : FontWeight.w400,
-                ),
-              ),
-              if (isDuplicate) ...[
-                SizedBox(height: 4.h),
-                Text(
-                  '此筆為重複付款紀錄，請以退款進度為準。',
-                  style: _smallStyle().copyWith(
-                    color: OrderColorTokens.attention,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-String _read(
-  Map<String, dynamic> map,
-  String key, [
-  String? alt1,
-  String? alt2,
-]) {
-  final value =
-      map[key] ??
-      (alt1 == null ? null : map[alt1]) ??
-      (alt2 == null ? null : map[alt2]);
-  final text = value?.toString().trim() ?? '';
-  return text == 'null' ? '' : text;
-}
-
 String _paymentMethodText(String value) =>
     PaymentMethod.fromValue(value)?.label ??
     PaymentMethod.fromCode(value.toUpperCase())?.label ??
     (value.isEmpty ? '付款方式未指定' : value);
-
-({String label, Color color}) _paymentAttemptBadge(
-  String status, {
-  required bool isDuplicate,
-}) {
-  if (isDuplicate) {
-    return (label: '重複付款', color: OrderColorTokens.attentionFill);
-  }
-  switch (status.toUpperCase()) {
-    case '0':
-    case 'INIT':
-      return (label: '待付款', color: OrderColorTokens.attentionFill);
-    case '1':
-    case 'PAID':
-    case 'SUCCESS':
-      return (label: '付款完成', color: OrderColorTokens.primary);
-    case '2':
-    case 'FAILED':
-      return (label: '付款失敗', color: OrderColorTokens.attention);
-    case '3':
-    case 'EXPIRED':
-      return (label: '已逾期', color: OrderColorTokens.neutral);
-    case '4':
-    case 'CONFLICT':
-      return (label: '狀態衝突', color: OrderColorTokens.attention);
-    case '5':
-    case 'CLOSED':
-      return (label: '已關閉', color: OrderColorTokens.neutral);
-    case '6':
-    case 'CLOSED_BY_SWITCH':
-      return (label: '已切換', color: OrderColorTokens.neutral);
-    default:
-      return (
-        label: status.isEmpty ? '未知' : status,
-        color: OrderColorTokens.neutral,
-      );
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════
 //  Card 4.6: 商品評價（買家評價過此訂單後顯示自己的評分 + 評論）

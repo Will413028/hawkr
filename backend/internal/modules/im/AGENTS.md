@@ -36,7 +36,7 @@ schema `im`（`db/schema.sql`）：`conversations`（`UNIQUE (buyer_id, store_id
 
 ## 不負責
 
-停權時強制斷線；串流傳輸 helper（heartbeat、最長壽命、寫入 deadline、重驗節奏）；Connect handler 與對外契約；隱藏的決定與審核（moderation）；買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；舊 im-service 已刪除，`legacy/imrelay` 已接進 `cmd/hawkr`（A6-6e）。
+停權時強制斷線；串流傳輸 helper（heartbeat、最長壽命、寫入 deadline、重驗節奏）；Connect handler 與對外契約；隱藏的決定與審核（moderation）；買家名稱與頭像（httpapi 以 `buyer.BatchDisplay` 補）；舊 im-service、`legacy/imrelay` 已刪除（A8-3d1）。
 
 ## 決策紀錄
 

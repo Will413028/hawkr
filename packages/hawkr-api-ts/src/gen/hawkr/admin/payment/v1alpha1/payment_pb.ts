@@ -2,13 +2,13 @@
 // @generated from file hawkr/admin/payment/v1alpha1/payment.proto (package hawkr.admin.payment.v1alpha1, syntax proto3)
 /* eslint-disable */
 
-// payment 模組給後台的 API（收款開通 ADR D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應。收款帳戶由 payment 模組擁有，擁有者現階段是店家
+// payment 模組給後台的 API（收款開通 ADR D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應；付款、轉帳與退款的查詢，以及 ANOMALY 的人工結案。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
 // hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { PaymentAccountStatus, RequirementCollection } from "../../../payment/v1alpha1/payment_pb";
+import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentAnomalyResolutionReason, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "../../../payment/v1alpha1/payment_pb";
 import { file_hawkr_payment_v1alpha1_payment } from "../../../payment/v1alpha1/payment_pb";
 import { file_google_api_field_behavior } from "../../../../google/api/field_behavior_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
@@ -19,7 +19,7 @@ import type { JsonObject, Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/admin/payment/v1alpha1/payment.proto.
  */
 export const file_hawkr_admin_payment_v1alpha1_payment: GenFile = /*@__PURE__*/
-  fileDesc("CipoYXdrci9hZG1pbi9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SHGhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEi5wUKDlBheW1lbnRBY2NvdW50EhAKCHN0b3JlX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhsKE2V4dGVybmFsX2FjY291bnRfaWQYAyABKAkSPAoGc3RhdHVzGAQgASgOMiwuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudFN0YXR1cxJNChZyZXF1aXJlbWVudF9jb2xsZWN0aW9uGAUgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5SZXF1aXJlbWVudENvbGxlY3Rpb24SGAoQdHJhbnNmZXJzX2FjdGl2ZRgGIAEoCBIWCg5wYXlvdXRzX2FjdGl2ZRgHIAEoCBItCgxyZXF1aXJlbWVudHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhUKDXN0YXR1c19yZWFzb24YCSABKAkSLgoKZmV0Y2hfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoSY3JlYXRlX2ZhaWxlZF90aW1lGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtjcmVhdGVfdGltZRgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKEnB1cmdlX2Jsb2NrZWRfdGltZRgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcHVyZ2VfYmxvY2tlZF9yZWFzb24YDyABKAkSGQoRY3JlYXRlX3VucmVzb2x2ZWQYECABKAgSNgoScHVyZ2VfcGVuZGluZ190aW1lGBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIcChRwdXJnZV9yZXBsYXlfcGVuZGluZxgSIAEoCCIxChhHZXRQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJaChlHZXRQYXltZW50QWNjb3VudFJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjUKHFJlZnJlc2hQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJeCh1SZWZyZXNoUGF5bWVudEFjY291bnRSZXNwb25zZRI9CgdhY2NvdW50GAEgASgLMiwuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudCJnCiBSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECEiwKH2Fja25vd2xlZGdlX25vX3Byb3ZpZGVyX2FjY291bnQYAiABKAhCA+BBASJiCiFSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVzcG9uc2USPQoHYWNjb3VudBgBIAEoCzIsLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFjY291bnQiOAofUmV0cnlQYXltZW50QWNjb3VudFB1cmdlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECImEKIFJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjsKIkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiIlCiNEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmdSZXNwb25zZTKUBgoTUGF5bWVudEFkbWluU2VydmljZRKJAQoRR2V0UGF5bWVudEFjY291bnQSNi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkdldFBheW1lbnRBY2NvdW50UmVxdWVzdBo3Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuR2V0UGF5bWVudEFjY291bnRSZXNwb25zZSIDkAIBEpABChVSZWZyZXNoUGF5bWVudEFjY291bnQSOi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlZnJlc2hQYXltZW50QWNjb3VudFJlcXVlc3QaOy5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJlZnJlc2hQYXltZW50QWNjb3VudFJlc3BvbnNlEpwBChlSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlEj4uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVxdWVzdBo/Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmV0cnlQYXltZW50QWNjb3VudENyZWF0ZVJlc3BvbnNlEpkBChhSZXRyeVBheW1lbnRBY2NvdW50UHVyZ2USPS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlcXVlc3QaPi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEqIBChtEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmcSQC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QaQS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1Jlc3BvbnNlYgZwcm90bzM", [file_hawkr_payment_v1alpha1_payment, file_google_api_field_behavior, file_google_protobuf_struct, file_google_protobuf_timestamp]);
+  fileDesc("CipoYXdrci9hZG1pbi9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SHGhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEi5wUKDlBheW1lbnRBY2NvdW50EhAKCHN0b3JlX2lkGAEgASgJEhAKCHByb3ZpZGVyGAIgASgJEhsKE2V4dGVybmFsX2FjY291bnRfaWQYAyABKAkSPAoGc3RhdHVzGAQgASgOMiwuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudFN0YXR1cxJNChZyZXF1aXJlbWVudF9jb2xsZWN0aW9uGAUgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5SZXF1aXJlbWVudENvbGxlY3Rpb24SGAoQdHJhbnNmZXJzX2FjdGl2ZRgGIAEoCBIWCg5wYXlvdXRzX2FjdGl2ZRgHIAEoCBItCgxyZXF1aXJlbWVudHMYCCABKAsyFy5nb29nbGUucHJvdG9idWYuU3RydWN0EhUKDXN0YXR1c19yZWFzb24YCSABKAkSLgoKZmV0Y2hfdGltZRgKIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASNgoSY3JlYXRlX2ZhaWxlZF90aW1lGAsgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgtjcmVhdGVfdGltZRgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLdXBkYXRlX3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKEnB1cmdlX2Jsb2NrZWRfdGltZRgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcHVyZ2VfYmxvY2tlZF9yZWFzb24YDyABKAkSGQoRY3JlYXRlX3VucmVzb2x2ZWQYECABKAgSNgoScHVyZ2VfcGVuZGluZ190aW1lGBEgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIcChRwdXJnZV9yZXBsYXlfcGVuZGluZxgSIAEoCCIxChhHZXRQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJaChlHZXRQYXltZW50QWNjb3VudFJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjUKHFJlZnJlc2hQYXltZW50QWNjb3VudFJlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiJeCh1SZWZyZXNoUGF5bWVudEFjY291bnRSZXNwb25zZRI9CgdhY2NvdW50GAEgASgLMiwuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50QWNjb3VudCJnCiBSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECEiwKH2Fja25vd2xlZGdlX25vX3Byb3ZpZGVyX2FjY291bnQYAiABKAhCA+BBASJiCiFSZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVzcG9uc2USPQoHYWNjb3VudBgBIAEoCzIsLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFjY291bnQiOAofUmV0cnlQYXltZW50QWNjb3VudFB1cmdlUmVxdWVzdBIVCghzdG9yZV9pZBgBIAEoCUID4EECImEKIFJldHJ5UGF5bWVudEFjY291bnRQdXJnZVJlc3BvbnNlEj0KB2FjY291bnQYASABKAsyLC5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRBY2NvdW50IjsKIkRlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZ1JlcXVlc3QSFQoIc3RvcmVfaWQYASABKAlCA+BBAiIlCiNEZWxldGVQYXltZW50QWNjb3VudE1hcHBpbmdSZXNwb25zZSJTCgxQYXltZW50T3JkZXISDwoCaWQYASABKAlCA+BBCBIQCghvcmRlcl9ubxgCIAEoCRIQCghzdG9yZV9pZBgDIAEoCRIOCgZhbW91bnQYBCABKAMiuwMKB1BheW1lbnQSDwoCaWQYASABKAlCA+BBCBIQCghidXllcl9pZBgEIAEoCRIOCgZhbW91bnQYBSABKAMSEAoIcHJvdmlkZXIYBiABKAkSNQoGc3RhdHVzGAcgASgOMiUuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50U3RhdHVzEhsKE2V4dGVybmFsX3BheW1lbnRfaWQYCCABKAkSLQoJcGFpZF90aW1lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpsYXN0X2Vycm9yGAogASgJEhYKDmZhaWx1cmVfcmVhc29uGAsgASgJEi8KC2NyZWF0ZV90aW1lGAwgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIvCgt1cGRhdGVfdGltZRgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOgoGb3JkZXJzGA4gAygLMiouaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50T3JkZXJKBAgCEANKBAgDEARSCG9yZGVyX25vUghzdG9yZV9pZCLDAgoPUGF5bWVudFRyYW5zZmVyEg8KAmlkGAEgASgJQgPgQQgSEgoKcGF5bWVudF9pZBgCIAEoCRIQCghvcmRlcl9ubxgDIAEoCRIQCghzdG9yZV9pZBgEIAEoCRIOCgZhbW91bnQYBSABKAMSFwoPcmV2ZXJzZWRfYW1vdW50GAYgASgDEj0KBnN0YXR1cxgHIAEoDjItLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFRyYW5zZmVyU3RhdHVzEhwKFGV4dGVybmFsX3RyYW5zZmVyX2lkGAggASgJEhYKDmZhaWx1cmVfcmVhc29uGAkgASgJEi8KC2NyZWF0ZV90aW1lGAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIYChBwYXltZW50X29yZGVyX2lkGAsgASgJIscBCg9QYXltZW50UmV2ZXJzYWwSDwoCaWQYASABKAlCA+BBCBIOCgZhbW91bnQYAiABKAMSPQoGc3RhdHVzGAMgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50UmV2ZXJzYWxTdGF0dXMSDgoGcmVhc29uGAQgASgJEhMKC2V4dGVybmFsX2lkGAUgASgJEi8KC2NyZWF0ZV90aW1lGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKaBAoNUGF5bWVudFJlZnVuZBIPCgJpZBgBIAEoCUID4EEIEhIKCnBheW1lbnRfaWQYAiABKAkSEAoIb3JkZXJfbm8YAyABKAkSDgoGYW1vdW50GAQgASgDEgwKBGF1dG8YBSABKAgSOwoGc3RhdHVzGAYgASgOMisuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50UmVmdW5kU3RhdHVzEhcKD3JldmVyc2FsX2Ftb3VudBgHIAEoAxJGCg9yZXZlcnNhbF9zdGF0dXMYCCABKA4yLS5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRSZXZlcnNhbFN0YXR1cxJACgx0b3B1cF9zdGF0dXMYCSABKA4yKi5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRUb3B1cFN0YXR1cxIaChJleHRlcm5hbF9yZWZ1bmRfaWQYCiABKAkSFgoOZmFpbHVyZV9yZWFzb24YCyABKAkSEwoLcmVxdWVzdF9rZXkYDCABKAkSQAoJcmV2ZXJzYWxzGA0gAygLMi0uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5QYXltZW50UmV2ZXJzYWwSLwoLY3JlYXRlX3RpbWUYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhgKEHBheW1lbnRfb3JkZXJfaWQYDyABKAkilQEKE0xpc3RQYXltZW50c1JlcXVlc3QSOgoGc3RhdHVzGAEgASgOMiUuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50U3RhdHVzSACIAQESEAoIb3JkZXJfbm8YAiABKAkSEQoJcGFnZV9zaXplGAMgASgFEhIKCnBhZ2VfdG9rZW4YBCABKAlCCQoHX3N0YXR1cyJoChRMaXN0UGF5bWVudHNSZXNwb25zZRI3CghwYXltZW50cxgBIAMoCzIlLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudBIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkipQEKG0xpc3RQYXltZW50VHJhbnNmZXJzUmVxdWVzdBJCCgZzdGF0dXMYASABKA4yLS5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRUcmFuc2ZlclN0YXR1c0gAiAEBEhAKCG9yZGVyX25vGAIgASgJEhEKCXBhZ2Vfc2l6ZRgDIAEoBRISCgpwYWdlX3Rva2VuGAQgASgJQgkKB19zdGF0dXMieQocTGlzdFBheW1lbnRUcmFuc2ZlcnNSZXNwb25zZRJACgl0cmFuc2ZlcnMYASADKAsyLS5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlBheW1lbnRUcmFuc2ZlchIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkitwEKGUxpc3RQYXltZW50UmVmdW5kc1JlcXVlc3QSQAoGc3RhdHVzGAEgASgOMisuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50UmVmdW5kU3RhdHVzSACIAQESEAoIb3JkZXJfbm8YAiABKAkSFAoMYW5vbWFseV9vbmx5GAMgASgIEhEKCXBhZ2Vfc2l6ZRgEIAEoBRISCgpwYWdlX3Rva2VuGAUgASgJQgkKB19zdGF0dXMicwoaTGlzdFBheW1lbnRSZWZ1bmRzUmVzcG9uc2USPAoHcmVmdW5kcxgBIAMoCzIrLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudFJlZnVuZBIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiqgIKHFJlc29sdmVQYXltZW50QW5vbWFseVJlcXVlc3QSPQoEa2luZBgBIAEoDjIqLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFub21hbHlLaW5kQgPgQQISDwoCaWQYAiABKAlCA+BBAhJDCgdvdXRjb21lGAMgASgOMi0uaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50QW5vbWFseU91dGNvbWVCA+BBAhIVCghldmlkZW5jZRgEIAEoCUID4EEBEksKBnJlYXNvbhgFIAEoDjI2Lmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudEFub21hbHlSZXNvbHV0aW9uUmVhc29uQgPgQQISEQoEbm90ZRgGIAEoCUID4EECIh8KHVJlc29sdmVQYXltZW50QW5vbWFseVJlc3BvbnNlMscKChNQYXltZW50QWRtaW5TZXJ2aWNlEokBChFHZXRQYXltZW50QWNjb3VudBI2Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuR2V0UGF5bWVudEFjY291bnRSZXF1ZXN0GjcuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5HZXRQYXltZW50QWNjb3VudFJlc3BvbnNlIgOQAgESkAEKFVJlZnJlc2hQYXltZW50QWNjb3VudBI6Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmVmcmVzaFBheW1lbnRBY2NvdW50UmVxdWVzdBo7Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmVmcmVzaFBheW1lbnRBY2NvdW50UmVzcG9uc2USnAEKGVJldHJ5UGF5bWVudEFjY291bnRDcmVhdGUSPi5oYXdrci5hZG1pbi5wYXltZW50LnYxYWxwaGExLlJldHJ5UGF5bWVudEFjY291bnRDcmVhdGVSZXF1ZXN0Gj8uaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXRyeVBheW1lbnRBY2NvdW50Q3JlYXRlUmVzcG9uc2USmQEKGFJldHJ5UGF5bWVudEFjY291bnRQdXJnZRI9Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmV0cnlQYXltZW50QWNjb3VudFB1cmdlUmVxdWVzdBo+Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuUmV0cnlQYXltZW50QWNjb3VudFB1cmdlUmVzcG9uc2USogEKG0RlbGV0ZVBheW1lbnRBY2NvdW50TWFwcGluZxJALmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuRGVsZXRlUGF5bWVudEFjY291bnRNYXBwaW5nUmVxdWVzdBpBLmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuRGVsZXRlUGF5bWVudEFjY291bnRNYXBwaW5nUmVzcG9uc2USegoMTGlzdFBheW1lbnRzEjEuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5MaXN0UGF5bWVudHNSZXF1ZXN0GjIuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5MaXN0UGF5bWVudHNSZXNwb25zZSIDkAIBEpIBChRMaXN0UGF5bWVudFRyYW5zZmVycxI5Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuTGlzdFBheW1lbnRUcmFuc2ZlcnNSZXF1ZXN0GjouaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5MaXN0UGF5bWVudFRyYW5zZmVyc1Jlc3BvbnNlIgOQAgESjAEKEkxpc3RQYXltZW50UmVmdW5kcxI3Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuTGlzdFBheW1lbnRSZWZ1bmRzUmVxdWVzdBo4Lmhhd2tyLmFkbWluLnBheW1lbnQudjFhbHBoYTEuTGlzdFBheW1lbnRSZWZ1bmRzUmVzcG9uc2UiA5ACARKQAQoVUmVzb2x2ZVBheW1lbnRBbm9tYWx5EjouaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXNvbHZlUGF5bWVudEFub21hbHlSZXF1ZXN0GjsuaGF3a3IuYWRtaW4ucGF5bWVudC52MWFscGhhMS5SZXNvbHZlUGF5bWVudEFub21hbHlSZXNwb25zZWIGcHJvdG8z", [file_hawkr_payment_v1alpha1_payment, file_google_api_field_behavior, file_google_protobuf_struct, file_google_protobuf_timestamp]);
 
 /**
  * PaymentAccount 是後台看到的店家收款帳戶（payment 模組擁有，擁有者是店家）。
@@ -325,6 +325,605 @@ export const DeletePaymentAccountMappingResponseSchema: GenMessage<DeletePayment
   messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 10);
 
 /**
+ * PaymentOrder 是付款底下一張訂單的應收：退款上限與轉帳都以它為單位。
+ *
+ * @generated from message hawkr.admin.payment.v1alpha1.PaymentOrder
+ */
+export type PaymentOrder = Message<"hawkr.admin.payment.v1alpha1.PaymentOrder"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string order_no = 2;
+   */
+  orderNo: string;
+
+  /**
+   * @generated from field: string store_id = 3;
+   */
+  storeId: string;
+
+  /**
+   * 這張訂單的應收金額（訂單的整數金額，不帶幣別）。
+   *
+   * @generated from field: int64 amount = 4;
+   */
+  amount: bigint;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.PaymentOrder.
+ * Use `create(PaymentOrderSchema)` to create a new message.
+ */
+export const PaymentOrderSchema: GenMessage<PaymentOrder> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 11);
+
+/**
+ * Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）：一筆付款（一個金流商付款物件）對 orders 底下 N 張訂單應收（過渡期 N 是 1）。
+ *
+ * @generated from message hawkr.admin.payment.v1alpha1.Payment
+ */
+export type Payment = Message<"hawkr.admin.payment.v1alpha1.Payment"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string buyer_id = 4;
+   */
+  buyerId: string;
+
+  /**
+   * 付款金額（各訂單應收的總額，不帶幣別）。
+   *
+   * @generated from field: int64 amount = 5;
+   */
+  amount: bigint;
+
+  /**
+   * 金流商的代碼（例如 stripe）。
+   *
+   * @generated from field: string provider = 6;
+   */
+  provider: string;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentStatus status = 7;
+   */
+  status: PaymentStatus;
+
+  /**
+   * 金流商的付款物件 ID；還沒建立時是空字串。
+   *
+   * @generated from field: string external_payment_id = 8;
+   */
+  externalPaymentId: string;
+
+  /**
+   * 入帳時間；沒有入帳時不設。
+   *
+   * @generated from field: google.protobuf.Timestamp paid_time = 9;
+   */
+  paidTime?: Timestamp | undefined;
+
+  /**
+   * 最近一次嘗試失敗的金流商原因碼（只給後台）；沒有時是空字串。
+   *
+   * @generated from field: string last_error = 10;
+   */
+  lastError: string;
+
+  /**
+   * 進入 CREATE_FAILED 或 ANOMALY 的原因；其餘狀態是空字串。
+   *
+   * @generated from field: string failure_reason = 11;
+   */
+  failureReason: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 12;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp update_time = 13;
+   */
+  updateTime?: Timestamp | undefined;
+
+  /**
+   * 付款底下的訂單應收，依建立順序，至少一張。
+   *
+   * @generated from field: repeated hawkr.admin.payment.v1alpha1.PaymentOrder orders = 14;
+   */
+  orders: PaymentOrder[];
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.Payment.
+ * Use `create(PaymentSchema)` to create a new message.
+ */
+export const PaymentSchema: GenMessage<Payment> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 12);
+
+/**
+ * PaymentTransfer 是後台看到的轉帳（付款轉給賣家）。
+ *
+ * @generated from message hawkr.admin.payment.v1alpha1.PaymentTransfer
+ */
+export type PaymentTransfer = Message<"hawkr.admin.payment.v1alpha1.PaymentTransfer"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string payment_id = 2;
+   */
+  paymentId: string;
+
+  /**
+   * @generated from field: string order_no = 3;
+   */
+  orderNo: string;
+
+  /**
+   * @generated from field: string store_id = 4;
+   */
+  storeId: string;
+
+  /**
+   * @generated from field: int64 amount = 5;
+   */
+  amount: bigint;
+
+  /**
+   * 已向賣家收回（撤回）的金額。
+   *
+   * @generated from field: int64 reversed_amount = 6;
+   */
+  reversedAmount: bigint;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentTransferStatus status = 7;
+   */
+  status: PaymentTransferStatus;
+
+  /**
+   * 金流商的轉帳物件 ID；還沒有時是空字串。
+   *
+   * @generated from field: string external_transfer_id = 8;
+   */
+  externalTransferId: string;
+
+  /**
+   * 失敗或 ANOMALY 的原因；其餘狀態是空字串。
+   *
+   * @generated from field: string failure_reason = 9;
+   */
+  failureReason: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 10;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * 這筆轉帳所屬的訂單應收（一張訂單應收最多一筆有效轉帳）。
+   *
+   * @generated from field: string payment_order_id = 11;
+   */
+  paymentOrderId: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.PaymentTransfer.
+ * Use `create(PaymentTransferSchema)` to create a new message.
+ */
+export const PaymentTransferSchema: GenMessage<PaymentTransfer> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 13);
+
+/**
+ * PaymentReversal 是退款向賣家收回款項的一次金流商撤回呼叫。
+ *
+ * @generated from message hawkr.admin.payment.v1alpha1.PaymentReversal
+ */
+export type PaymentReversal = Message<"hawkr.admin.payment.v1alpha1.PaymentReversal"> & {
+  /**
+   * 撤回列 ID（人工結案撤回用）。
+   *
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: int64 amount = 2;
+   */
+  amount: bigint;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentReversalStatus status = 3;
+   */
+  status: PaymentReversalStatus;
+
+  /**
+   * RELEASED 或 ANOMALY 的原因；其餘狀態是空字串。
+   *
+   * @generated from field: string reason = 4;
+   */
+  reason: string;
+
+  /**
+   * 金流商的撤回物件 ID；還沒有時是空字串。
+   *
+   * @generated from field: string external_id = 5;
+   */
+  externalId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 6;
+   */
+  createTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.PaymentReversal.
+ * Use `create(PaymentReversalSchema)` to create a new message.
+ */
+export const PaymentReversalSchema: GenMessage<PaymentReversal> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 14);
+
+/**
+ * PaymentRefund 是後台看到的退款。
+ *
+ * @generated from message hawkr.admin.payment.v1alpha1.PaymentRefund
+ */
+export type PaymentRefund = Message<"hawkr.admin.payment.v1alpha1.PaymentRefund"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string payment_id = 2;
+   */
+  paymentId: string;
+
+  /**
+   * @generated from field: string order_no = 3;
+   */
+  orderNo: string;
+
+  /**
+   * @generated from field: int64 amount = 4;
+   */
+  amount: bigint;
+
+  /**
+   * 是否為自動退款（訂單已不可付時由系統發起）。
+   *
+   * @generated from field: bool auto = 5;
+   */
+  auto: boolean;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentRefundStatus status = 6;
+   */
+  status: PaymentRefundStatus;
+
+  /**
+   * 這筆退款要向賣家收回的金額。
+   *
+   * @generated from field: int64 reversal_amount = 7;
+   */
+  reversalAmount: bigint;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentReversalStatus reversal_status = 8;
+   */
+  reversalStatus: PaymentReversalStatus;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentTopupStatus topup_status = 9;
+   */
+  topupStatus: PaymentTopupStatus;
+
+  /**
+   * 金流商的退款物件 ID；還沒有時是空字串。
+   *
+   * @generated from field: string external_refund_id = 10;
+   */
+  externalRefundId: string;
+
+  /**
+   * 失敗或 ANOMALY 的原因；其餘狀態是空字串。
+   *
+   * @generated from field: string failure_reason = 11;
+   */
+  failureReason: string;
+
+  /**
+   * 呼叫端（售後或自動退款）建立退款時給的冪等鍵。
+   *
+   * @generated from field: string request_key = 12;
+   */
+  requestKey: string;
+
+  /**
+   * @generated from field: repeated hawkr.admin.payment.v1alpha1.PaymentReversal reversals = 13;
+   */
+  reversals: PaymentReversal[];
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 14;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * 這筆退款所屬的訂單應收（退款上限以它的應收金額計）。
+   *
+   * @generated from field: string payment_order_id = 15;
+   */
+  paymentOrderId: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.PaymentRefund.
+ * Use `create(PaymentRefundSchema)` to create a new message.
+ */
+export const PaymentRefundSchema: GenMessage<PaymentRefund> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 15);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentsRequest
+ */
+export type ListPaymentsRequest = Message<"hawkr.admin.payment.v1alpha1.ListPaymentsRequest"> & {
+  /**
+   * 只列這個狀態的付款；不設是不篩。
+   *
+   * @generated from field: optional hawkr.payment.v1alpha1.PaymentStatus status = 1;
+   */
+  status?: PaymentStatus | undefined;
+
+  /**
+   * 只列含這張訂單的付款（付款底下任一張訂單的訂單編號完全比對）；空字串是不篩。
+   *
+   * @generated from field: string order_no = 2;
+   */
+  orderNo: string;
+
+  /**
+   * 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
+   *
+   * @generated from field: int32 page_size = 3;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 4;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ListPaymentsRequest.
+ * Use `create(ListPaymentsRequestSchema)` to create a new message.
+ */
+export const ListPaymentsRequestSchema: GenMessage<ListPaymentsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 16);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentsResponse
+ */
+export type ListPaymentsResponse = Message<"hawkr.admin.payment.v1alpha1.ListPaymentsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.admin.payment.v1alpha1.Payment payments = 1;
+   */
+  payments: Payment[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ListPaymentsResponse.
+ * Use `create(ListPaymentsResponseSchema)` to create a new message.
+ */
+export const ListPaymentsResponseSchema: GenMessage<ListPaymentsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 17);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest
+ */
+export type ListPaymentTransfersRequest = Message<"hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest"> & {
+  /**
+   * @generated from field: optional hawkr.payment.v1alpha1.PaymentTransferStatus status = 1;
+   */
+  status?: PaymentTransferStatus | undefined;
+
+  /**
+   * 只列這張訂單的轉帳（完全比對）；空字串是不篩。
+   *
+   * @generated from field: string order_no = 2;
+   */
+  orderNo: string;
+
+  /**
+   * 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
+   *
+   * @generated from field: int32 page_size = 3;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 4;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest.
+ * Use `create(ListPaymentTransfersRequestSchema)` to create a new message.
+ */
+export const ListPaymentTransfersRequestSchema: GenMessage<ListPaymentTransfersRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 18);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse
+ */
+export type ListPaymentTransfersResponse = Message<"hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.admin.payment.v1alpha1.PaymentTransfer transfers = 1;
+   */
+  transfers: PaymentTransfer[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse.
+ * Use `create(ListPaymentTransfersResponseSchema)` to create a new message.
+ */
+export const ListPaymentTransfersResponseSchema: GenMessage<ListPaymentTransfersResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 19);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest
+ */
+export type ListPaymentRefundsRequest = Message<"hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest"> & {
+  /**
+   * @generated from field: optional hawkr.payment.v1alpha1.PaymentRefundStatus status = 1;
+   */
+  status?: PaymentRefundStatus | undefined;
+
+  /**
+   * 只列這張訂單的退款（完全比對）；空字串是不篩。
+   *
+   * @generated from field: string order_no = 2;
+   */
+  orderNo: string;
+
+  /**
+   * 為真時只列退款、收回或補差額任一個在 ANOMALY 的退款（人工結案的待辦）。
+   *
+   * @generated from field: bool anomaly_only = 3;
+   */
+  anomalyOnly: boolean;
+
+  /**
+   * 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
+   *
+   * @generated from field: int32 page_size = 4;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 5;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest.
+ * Use `create(ListPaymentRefundsRequestSchema)` to create a new message.
+ */
+export const ListPaymentRefundsRequestSchema: GenMessage<ListPaymentRefundsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 20);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse
+ */
+export type ListPaymentRefundsResponse = Message<"hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.admin.payment.v1alpha1.PaymentRefund refunds = 1;
+   */
+  refunds: PaymentRefund[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse.
+ * Use `create(ListPaymentRefundsResponseSchema)` to create a new message.
+ */
+export const ListPaymentRefundsResponseSchema: GenMessage<ListPaymentRefundsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 21);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest
+ */
+export type ResolvePaymentAnomalyRequest = Message<"hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest"> & {
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentAnomalyKind kind = 1;
+   */
+  kind: PaymentAnomalyKind;
+
+  /**
+   * 物件 ID：付款、轉帳、退款的 ID；撤回是撤回列 ID；補差額轉帳是退款 ID。
+   *
+   * @generated from field: string id = 2;
+   */
+  id: string;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentAnomalyOutcome outcome = 3;
+   */
+  outcome: PaymentAnomalyOutcome;
+
+  /**
+   * 結案成功時必填：核對到的金流商物件 ID；結案成失敗時可省略。
+   *
+   * @generated from field: string evidence = 4;
+   */
+  evidence: string;
+
+  /**
+   * 結案原因代碼，必填（不得是 UNSPECIFIED）。PROVIDER_EXECUTED_NOT_RECORDED 只搭配結果 SUCCEEDED，PROVIDER_NOT_EXECUTED 只搭配 FAILED；
+   * DUPLICATE 與 OTHER 搭配任一結果。
+   *
+   * @generated from field: hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason reason = 5;
+   */
+  reason: PaymentAnomalyResolutionReason;
+
+  /**
+   * 結案備註，必填：去除首尾空白後 1 到 255 個字元（以 Unicode 字元計）；與原因代碼一起寫進後台動作紀錄。
+   *
+   * @generated from field: string note = 6;
+   */
+  note: string;
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest.
+ * Use `create(ResolvePaymentAnomalyRequestSchema)` to create a new message.
+ */
+export const ResolvePaymentAnomalyRequestSchema: GenMessage<ResolvePaymentAnomalyRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 22);
+
+/**
+ * @generated from message hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyResponse
+ */
+export type ResolvePaymentAnomalyResponse = Message<"hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyResponse"> & {
+};
+
+/**
+ * Describes the message hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyResponse.
+ * Use `create(ResolvePaymentAnomalyResponseSchema)` to create a new message.
+ */
+export const ResolvePaymentAnomalyResponseSchema: GenMessage<ResolvePaymentAnomalyResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_admin_payment_v1alpha1_payment, 23);
+
+/**
  * PaymentAdminService 只有管理員能呼叫。
  *
  * @generated from service hawkr.admin.payment.v1alpha1.PaymentAdminService
@@ -390,6 +989,47 @@ export const PaymentAdminService: GenService<{
     methodKind: "unary";
     input: typeof DeletePaymentAccountMappingRequestSchema;
     output: typeof DeletePaymentAccountMappingResponseSchema;
+  },
+  /**
+   * ListPayments 列付款，建立時間新的在前（營運查詢；取代舊後台的付款交易列表）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.payments.list。
+   *
+   * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPayments
+   */
+  listPayments: {
+    methodKind: "unary";
+    input: typeof ListPaymentsRequestSchema;
+    output: typeof ListPaymentsResponseSchema;
+  },
+  /**
+   * ListPaymentTransfers 列付款轉給賣家的轉帳，建立時間新的在前（取代舊後台的撥款列表）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.transfers.list。
+   *
+   * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentTransfers
+   */
+  listPaymentTransfers: {
+    methodKind: "unary";
+    input: typeof ListPaymentTransfersRequestSchema;
+    output: typeof ListPaymentTransfersResponseSchema;
+  },
+  /**
+   * ListPaymentRefunds 列退款，建立時間新的在前，每筆附撤回列（人工結案撤回要用撤回列 ID）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.refunds.list。
+   *
+   * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentRefunds
+   */
+  listPaymentRefunds: {
+    methodKind: "unary";
+    input: typeof ListPaymentRefundsRequestSchema;
+    output: typeof ListPaymentRefundsResponseSchema;
+  },
+  /**
+   * ResolvePaymentAnomaly 是對 ANOMALY 的付款、轉帳、退款、撤回或補差額轉帳的人工結案：管理員核對金流商之後結案成成功（附金流商物件 ID 為證據）或失敗。
+   * 必填結案原因代碼（reason）與備註（note，去除首尾空白後 1 到 255 個字元），連同領域變更寫進同一個交易的一筆後台紀錄。物件不存在回 not_found；缺原因、原因與結果不相容、備註空白或過長回 invalid_argument（指到出錯的欄位）；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
+   *
+   * @generated from rpc hawkr.admin.payment.v1alpha1.PaymentAdminService.ResolvePaymentAnomaly
+   */
+  resolvePaymentAnomaly: {
+    methodKind: "unary";
+    input: typeof ResolvePaymentAnomalyRequestSchema;
+    output: typeof ResolvePaymentAnomalyResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_hawkr_admin_payment_v1alpha1_payment, 0);

@@ -23,10 +23,12 @@ func measureCreatedIntent(e seller.MeasureCreated) (name string, params any, ok 
 		return "store_content_taken_down", registry.StoreContentTakenDownParams{
 			StoreID: e.StoreID, MeasureID: e.MeasureID, ItemCount: len(e.Contents), OccurredAt: e.OccurredAt,
 		}, true
+	case seller.MeasureWarning, seller.MeasureTermination:
+		return "store_measure_issued", registry.StoreMeasureIssuedParams{
+			StoreID: e.StoreID, MeasureID: e.MeasureID, Kind: string(e.Kind), OccurredAt: e.OccurredAt,
+		}, true
 	}
-	return "store_measure_issued", registry.StoreMeasureIssuedParams{
-		StoreID: e.StoreID, MeasureID: e.MeasureID, Kind: string(e.Kind), OccurredAt: e.OccurredAt,
-	}, true
+	return "", nil, false
 }
 
 // requestDecidedIntent 決定請求裁定事件的參數：接受與駁回都是 store_measure_request_decided（文案依裁定，D3）；接受申覆接著的撤銷、

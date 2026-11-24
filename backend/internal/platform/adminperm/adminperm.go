@@ -62,11 +62,17 @@ const (
 	ModerationCasesReverse                 Permission = "moderation.cases.reverse"
 	NotificationAnnouncementsList          Permission = "notification.announcements.list"
 	NotificationAnnouncementsCreate        Permission = "notification.announcements.create"
+	NotificationDeliveriesResend           Permission = "notification.deliveries.resend"
+	NotificationUnreachedNotificationsList Permission = "notification.unreached_notifications.list"
 	PaymentAccountsGet                     Permission = "payment.accounts.get"
 	PaymentAccountsRefresh                 Permission = "payment.accounts.refresh"
 	PaymentAccountsRetryCreate             Permission = "payment.accounts.retry_create"
 	PaymentAccountsRetryPurge              Permission = "payment.accounts.retry_purge"
 	PaymentAccountsDeleteMapping           Permission = "payment.accounts.delete_mapping"
+	PaymentPaymentsList                    Permission = "payment.payments.list"
+	PaymentTransfersList                   Permission = "payment.transfers.list"
+	PaymentRefundsList                     Permission = "payment.refunds.list"
+	PaymentAnomaliesResolve                Permission = "payment.anomalies.resolve"
 	ReviewQueueItemsList                   Permission = "reviewqueue.items.list"
 	SellerStoresList                       Permission = "seller.stores.list"
 	SellerStoresGet                        Permission = "seller.stores.get"
@@ -149,8 +155,9 @@ func Catalog() []Permission {
 		ImageaiAiQuotasGet, ImageaiAiQuotasUpdate, ImageaiAiQuotasDelete,
 		LegacyGatewayForward,
 		ModerationCasesList, ModerationCasesGet, ModerationCasesDecide, ModerationCasesReverse,
-		NotificationAnnouncementsList, NotificationAnnouncementsCreate,
+		NotificationAnnouncementsList, NotificationAnnouncementsCreate, NotificationDeliveriesResend, NotificationUnreachedNotificationsList,
 		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,
+		PaymentPaymentsList, PaymentTransfersList, PaymentRefundsList, PaymentAnomaliesResolve,
 		ReviewQueueItemsList,
 		SellerStoresList, SellerStoresGet,
 		SellerStoreStatsGet, SellerStoreOnboardingGet,

@@ -123,4 +123,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatStoreFallbackName => 'Store';
+
+  @override
+  String get paymentProcessing => 'Processing...';
+
+  @override
+  String get paymentSucceededTitle => 'Payment successful';
+
+  @override
+  String get paymentNotCompletedTitle => 'Payment not completed';
+
+  @override
+  String get paymentSucceededMessage =>
+      'Your payment is complete. Thank you for your purchase.';
+
+  @override
+  String get paymentPendingMessage =>
+      'Your payment is still being processed. Check My Orders in a moment for the result.';
+
+  @override
+  String get paymentCanceledMessage =>
+      'You canceled the payment. The order is still unpaid; you can pay again from My Orders.';
+
+  @override
+  String get paymentFailedMessage =>
+      'The payment did not go through. The order is still unpaid; you can pay again from My Orders.';
+
+  @override
+  String get paymentAnomalyMessage =>
+      'This payment needs help from support and cannot be retried right now. Please contact support.';
 }

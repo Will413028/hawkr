@@ -1,14 +1,9 @@
 import PaymentLandingClient from "@/features/payments/screens/PaymentLandingClient";
 
 /**
- * PayUni Web redirect landing for /orders/{orderNo}?status=&trade_no=&code=
- * (issue #760).
- *
- * The page itself is intentionally minimal — all polling, status
- * classification, and routing decisions live in the client component
- * via `usePaymentResolution`. When a buyer reaches this route without
- * any PayUni query params (typed URL, bookmark), the client redirects
- * them to the canonical `/account/orders/{orderNo}` detail surface.
+ * 付款步驟 `/orders/{orderNo}`：結帳確認訂單後（或訂單詳情的「再次付款」）進來，
+ * 由 client 元件 CreatePayment、以 Stripe Payment Element 收款，結果以 GetPayment 為準。
+ * 訪客導向 `/account/orders/{orderNo}`，由受保護區帶去登入。
  */
 export const metadata = { title: "付款處理中" };
 
