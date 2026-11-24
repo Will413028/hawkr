@@ -135,7 +135,7 @@ const (
 	ErrorReason_RUN_NOT_ACTIVE ErrorReason = 30
 	// 被接受的賣家回價版本已過有效期（搭配 failed_precondition）：AcceptSellerQuote。不可接受，也不自動改接受別版。
 	ErrorReason_RFQ_RESPONSE_EXPIRED ErrorReason = 31
-	// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
+	// 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒、這張需求已有進行中的成交、買家已刪除，或回價期限已過。
 	// SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
 	ErrorReason_RFQ_RECIPIENT_CLOSED ErrorReason = 32
 	// 同一張需求已經有進行中的成交（搭配 failed_precondition）：AcceptSellerQuote。ErrorInfo.metadata 的 orderNo 是既有訂單，

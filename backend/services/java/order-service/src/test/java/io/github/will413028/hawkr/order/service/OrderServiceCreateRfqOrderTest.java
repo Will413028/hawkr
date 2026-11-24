@@ -105,6 +105,7 @@ class OrderServiceCreateRfqOrderTest {
                 mock(io.github.will413028.hawkr.order.repository.OrderOutboxMapper.class),
                 new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
                 mock(io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.class),
+                mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new SimpleMeterRegistry());
 
         OrderEntity created = new OrderEntity();

@@ -108,7 +108,8 @@ class CheckoutUberQuoteWiringTest {
                 checkoutValidator,
                 mock(OrderService.class),
                 new OrderPolicyResolver(),
-                mock(StringRedisTemplate.class));
+                mock(StringRedisTemplate.class),
+                null);
     }
 
     private static List<CheckoutItem> items() {

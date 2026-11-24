@@ -17,7 +17,7 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、`Migrations`、五個訂閱者入口（`On*`）、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建並訂閱）。
-- `internal/intake`：意圖管線。`subscribers.go` 的同步訂閱者只呼叫 `Accept`（插 `intents` 列並排 `notification.process_intent` job）；`Process`（worker）在 transaction 外讀意圖、解析收件人、略過 actor 是收件人自己的意圖，再開 transaction：先 `identity.ShareLockAccount` 鎖收件帳號列、確認未刪除（已刪除或不存在就不寫），再依受眾以 `FOR KEY SHARE` 鎖買家列或店家列、已關閉或已退場就略過；略過時同 transaction 把該意圖參數換成 `'{}'`（D16），最後套偏好、寫收件匣與投遞紀錄並 `pg_notify`。
+- `internal/intake`：意圖管線與 fan-out；`subscribers.go` 的同步訂閱者只呼叫 `Accept`（插 `intents` 列並排 `notification.process_intent` job），`Process`（worker）解析收件人、鎖收件人、略過封鎖與自己、套偏好、寫收件匣與投遞紀錄；不變量見 `internal/intake/AGENTS.md`。
 - `internal/stream`：串流 hub；不變量見 `internal/stream/AGENTS.md`。
 - `internal/purge`：保留期清除與個資清除；不變量見 `internal/purge/AGENTS.md`。
 - `internal/announce`：後台公告與派送 job 鏈；見其 `AGENTS.md`。

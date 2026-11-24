@@ -105,10 +105,10 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | `SubmitSellerResponse` | 建立型（回價版本） | `seller_response_versions (seller_response_id, client_request_id)` |
 | `RenameConversation` | 目標狀態（標題設為指定值） | 不建收據 |
 | `DeleteConversation` | 目標狀態（已刪除再刪不再更新，`deleted_at IS NULL` 條件） | 不建收據 |
-| `WithdrawSellerResponse` | 目標狀態（撤回的版本是指定值，已撤回再撤回結果相同） | 不建收據 |
-| `DeclineRfqPublication` | 目標狀態（`write_closed_reason = 'DECLINED'`） | 不建收據 |
+| `WithdrawSellerResponse` | 目標狀態（撤回的版本是指定值，已撤回再撤回結果相同）；proto 已刪 `client_request_id`（A9-D45(2)） | 不建收據；`reason_code` 存 `seller_responses.withdrawn_reason_code` |
+| `DeclineRfqPublication` | 目標狀態（`write_closed_reason = 'DECLINED'`，已婉拒回第一次的結案）；proto 已刪 `client_request_id`（A9-D45(2)） | 不建收據；`reason_code` 存 `seller_responses.write_closed_reason_code` |
 
-目標狀態那四支，契約仍要求「內容不同回 `INVALID_ARGUMENT`」：請求除 ID 之外只有 `client_request_id`，沒有可以不同的內容；若 A9-3c 的請求加了內容欄位，要回頭為它補鍵。
+目標狀態那四支沒有冪等鍵：撤回與婉拒的請求有內容欄位（版本、`reason_code`），A9-D45(2) 的決定是刪 `client_request_id` 而不補收據表，重送以目標狀態回應（已撤回的版本、已婉拒的詢價回第一次的結案，不改動第一次的時間與原因）。
 
 ## 傳輸層的沿用盤點
 
@@ -180,6 +180,21 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 
 
 整合測試（`-tags integration`）只寫、沒有在本機跑，待 CI。
+
+## 賣家端的沿用盤點（A9-3c-1、A9-3c-2，A9-D44、A9-D45）
+
+| 機制 | 必要條件 | 今天是否成立 | 從零設計 | 結論 |
+|---|---|---|---|---|
+| 讀取詳情時建回價身分列（舊 `ensureIdentity`） | 之後的寫入需要列 | 否：契約標 NO_SIDE_EFFECTS，列只有寫入需要 | 第一次寫入才建（`EnsureSellerResponse` 從邀請列 SELECT，只有被邀請的店插得進去） | 讀取不建列（`TestReadsCreateNoRows`）；Decline 也走同一條 |
+| 回價身分列的列版本 CAS（舊 `seller_responses.version`） | 串行賣家與買家的寫入 | 否：新 schema 沒有該欄 | `SELECT … FOR UPDATE` 鎖身分列，與 `AcceptSellerQuote` 的 `LockSellerResponseForBuyer` 鎖同一列 | 寫入先鎖店家列（`LockNotRetired`）再鎖身分列（seller 在 procurement 之下）；`TestSubmitAndAcceptSerializeOnTheResponseRow` |
+| 「已停止寫入」的儲存狀態（舊 `PUBLICATION_CLOSED`、`OTHER_WON`） | 有寫入者 | 否（S6 只留 `DECLINED`） | 由列推導，不存 | 已婉拒、需求有 ACTIVE 接受單、買家已刪（發布列 `buyer_id` 為 NULL）、`response_deadline` 已過（台北時區當日結束）；婉拒本身不受後三者限制；建單失敗解除 live 鎖後重新可寫（A9-D45(3)）。已知：不同店之間沒有互鎖，另一家店在接受提交的同時改價，改價版本會成為沒有讀取者的版本，無害 |
+| 撤回與婉拒的 command 表（`reason_code` 存在 command 列） | 冪等與稽核 | 否（S4） | 目標狀態的方法，`reason_code` 存在身分列 | `withdrawn_reason_code`、`write_closed_reason_code`（去頭尾空白、最多 64 字、空字串存 NULL，登記在 `trimmedColumns`）；`withdrawn_version` 是單值：版本 1 撤回後送出版本 2 再撤回，版本 1 顯示 SUPERSEDED，買家端只看目前版本，不處理 |
+| 版本表的 `outside_buyer_requested_range` 欄 | 讀取時用 | 否：買家端與賣家端都對核准區間現算（A9-D35(2)） | 不存 | 欄位刪除（migration `procurement_seller_side`）；賣家回應的 `outside_buyer_requested_range` 由 `quote.OutsideRange` 算 |
+| 草稿 JSONB 無上限 | 形狀不固定 | 部分：形狀不固定，但大小必須有界 | 文字欄沿用正式回價的字數上限，整份 jsonb 文字 ≤ 16 KiB（只有 DB CHECK 量，違規對成 INVALID_ARGUMENT／`Draft`；Go 序列化與 jsonb 文字的位元組數不同，不在 Go 重算） | `NormalizeDraft` 去頭尾空白、驗列舉與負數；`lead_time_days` 改 `optional`，0 是當天出貨 |
+| 冪等重送的比對 | 重送不被判成已提交 | 成立 | 先於出版本、停止寫入與版本檢查 | 比對 `quote.PayloadHash`（`rfqhash.SellerResponse`，A9-D36）；數量正規化成三位小數、時間取 UTC 微秒，送出時算的 hash 才等於讀回來算的 |
+| `publication_version`、`expected_publication_version` | 重發 | 否：沒有重發，版本恆為 1 | 日後有重發才有意義 | 先留（契約欄位）；目前只有 `expected_seller_facing_payload_hash` 實際有效，版本檢查只是形式 |
+| 賣家可見內容的 hash 取法 | 與買家端同一份 | 成立 | `rfq.SellerFacingOf`（純函式，不載入受眾名單） | 賣家端與 `compile` 共用，不另寫一份 |
+| 賣家能力檢查 | 停權的店不能回價 | 成立 | 模組內 `seller.Authorize`（`CAP_MARKETING`），handler 只推導店家 | 讀取在查詢前，寫入在 transaction 內鎖店家列後讀店家此刻狀態；宣告表 `httpapi/sellerprocurement/declaration.go` |
 
 ## 與 ai-service 的差異
 

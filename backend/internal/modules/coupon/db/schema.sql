@@ -71,6 +71,8 @@ CREATE TABLE coupon.coupon_campaigns (
 );
 -- 賣家的活動列表與配額計數（ACTIVE 且非補償）。
 CREATE INDEX campaigns_by_issuer_store ON coupon.coupon_campaigns (issuer_store_id, status) WHERE issuer_store_id IS NOT NULL;
+-- 後台列表（ListAdminCampaigns）：不含補償活動，新到舊的 keyset 分頁。
+CREATE INDEX campaigns_admin_list ON coupon.coupon_campaigns (created_at DESC, id DESC) WHERE target_type <> 'COMPENSATION';
 
 -- 買家持有的券（錢包）。領券、admin 發券、補償都只是建立一張 voucher；到期從活動的 end_at 推導。
 -- order_no 是持有（鎖定或核銷）這張券的訂單；一張訂單同時只持有一張券（vouchers_order_no_key）。
@@ -120,6 +122,19 @@ CREATE TABLE coupon.coupon_target_accounts (
 );
 -- 必要條件：買家刪帳時依 buyer_id 清掉名單。
 CREATE INDEX target_accounts_by_buyer ON coupon.coupon_target_accounts (buyer_id);
+
+-- MEMBER 資格的消費紀錄投影（D3）：買家在該店有完成的訂單。由訂單完成事件餵入，(store_id, buyer_id) 一列、upsert 冪等；
+-- 只記「有」不記次數與金額（資格只問有沒有）。
+CREATE TABLE coupon.store_buyer_membership (
+    store_id   BIGINT      NOT NULL,
+    buyer_id   BIGINT      NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (store_id, buyer_id),
+    CONSTRAINT membership_store_check CHECK (store_id > 0),
+    CONSTRAINT membership_buyer_check CHECK (buyer_id > 0)
+);
+-- 必要條件：買家刪帳時依 buyer_id 清掉投影。
+CREATE INDEX membership_by_buyer ON coupon.store_buyer_membership (buyer_id);
 
 -- 賣家的活動數配額（ACTIVE 且非補償的活動數上限）。沒有列等於預設 5；建立活動時鎖這一列使配額檢查與插入串行。
 CREATE TABLE coupon.seller_coupon_quotas (

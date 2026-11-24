@@ -91,6 +91,9 @@ type Deps struct {
 	ResendWebhookSecret string
 	// Directory 列出公告的收件人（*buyer.Module 與 *seller.Module 經 NewDirectory 組成）；只有公告派送用，沒有公告的測試可以不給。
 	Directory announce.Directory
+	// Resolver 是 worker 端解析收件人、封鎖檢查與追蹤者展開要問的地方（*buyer.Module 與 *seller.Module 經 NewResolver 組成）；
+	// 只有宣告 Expand 或 Broadcast 的型別用到，沒有這類型別的測試可以不給。
+	Resolver Resolver
 	// ListenConnConfig 是串流 LISTEN 專用連線的設定，必須指向直連或 session 模式的 Postgres，不能經 transaction pooling；nil 時以主連線池的設定另開（不從池借）。
 	ListenConnConfig *pgx.ConnConfig
 }
@@ -119,7 +122,7 @@ func newModule(d Deps, reg app.Registry) *Module {
 	hasher := suppress.NewHasher(d.SuppressionKeys)
 	return &Module{
 		intake: intake.New(intake.Deps{
-			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Signals: dbSignals{d.DB}, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
+			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Resolver: d.Resolver, Signals: dbSignals{d.DB}, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
 		}),
 		purge: purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Logger: d.Logger}),
 		app:   appSvc,

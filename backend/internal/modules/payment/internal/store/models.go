@@ -72,23 +72,49 @@ type PaymentPaymentAttempt struct {
 }
 
 type PaymentRefund struct {
-	ID                     uuid.UUID
-	PaymentID              uuid.UUID
-	RequestKey             string
-	Amount                 int64
-	Auto                   bool
-	Status                 string
-	ReversalAmount         int64
-	ReversalIdempotencyKey uuid.UUID
-	ReversalCalledAt       *time.Time
-	ReversalExternalID     *string
-	ReversalLookupFailures int32
-	IdempotencyKey         uuid.UUID
-	RefundCalledAt         *time.Time
-	ExternalRefundID       *string
-	FailureReason          *string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                   uuid.UUID
+	PaymentID            uuid.UUID
+	RequestKey           string
+	Amount               int64
+	Auto                 bool
+	Status               string
+	ReversalStatus       string
+	ReversalAmount       int64
+	ReversalRecovered    int64
+	ReversalReason       *string
+	TransferDeducted     bool
+	TopupStatus          string
+	TopupReason          *string
+	TopupIdempotencyKey  uuid.UUID
+	TopupCalledAt        *time.Time
+	TopupExternalID      *string
+	TopupLookupFailures  int32
+	TopupReversedAmount  int64
+	IdempotencyKey       uuid.UUID
+	RefundCalledAt       *time.Time
+	RefundLookupFailures int32
+	ExternalRefundID     *string
+	FailureReason        *string
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}
+
+type PaymentRefundReversal struct {
+	ID               uuid.UUID
+	RefundID         uuid.UUID
+	PaymentID        uuid.UUID
+	Seq              int32
+	TargetRefundID   *uuid.UUID
+	TargetExternalID string
+	Amount           int64
+	Status           string
+	Reason           *string
+	IdempotencyKey   uuid.UUID
+	CalledAt         *time.Time
+	ExternalID       *string
+	LookupFailures   int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type PaymentTransfer struct {

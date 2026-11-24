@@ -15,7 +15,8 @@
 //
 // 冪等：會改變狀態的方法帶 client_request_id（UUIDv4，AIP-155）：同一位呼叫者以同一個值重送回第一次的結果，
 // 內容不同回 INVALID_ARGUMENT。例外是本身可以安全重送的方法：ToggleSelection、PutShortlistEntry、
-// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；UpsertSellerResponseDraft 以 expected_draft_version
+// DeleteShortlistEntry 的請求指明目標狀態，重送結果相同；WithdrawSellerResponse、DeclineRfqPublication 同樣是目標狀態的方法
+// （撤回指定的版本、婉拒這筆詢價），重送結果相同、不帶 client_request_id；UpsertSellerResponseDraft 以 expected_draft_version
 // 把關，重送時版本已前進，回 ABORTED 而不重複生效；CancelRun 依語意冪等（非終態的 run 被取消，終態的 run 回 OK 並以
 // cancel_disposition 說明結果），不帶版本。request_id 在本檔指採購需求（一張詢價單從釐清到發布的整段對話），不是冪等鍵。
 //
@@ -5020,8 +5021,9 @@ type SellerQuote struct {
 	TaxAmount         int64             `protobuf:"varint,9,opt,name=tax_amount,json=taxAmount,proto3" json:"tax_amount,omitempty"`
 	TaxInclusionBasis TaxInclusionBasis `protobuf:"varint,10,opt,name=tax_inclusion_basis,json=taxInclusionBasis,proto3,enum=hawkr.procurement.v1alpha1.TaxInclusionBasis" json:"tax_inclusion_basis,omitempty"`
 	// 伺服器驗證等於 goods_amount + shipping_amount + tax_amount，不符回 INVALID_ARGUMENT。
-	TotalAmount          int64                  `protobuf:"varint,11,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"`
-	LeadTimeDays         int32                  `protobuf:"varint,12,opt,name=lead_time_days,json=leadTimeDays,proto3" json:"lead_time_days,omitempty"`
+	TotalAmount int64 `protobuf:"varint,11,opt,name=total_amount,json=totalAmount,proto3" json:"total_amount,omitempty"`
+	// 未填表示不承諾交期；0 是當天出貨。
+	LeadTimeDays         *int32                 `protobuf:"varint,12,opt,name=lead_time_days,json=leadTimeDays,proto3,oneof" json:"lead_time_days,omitempty"`
 	PromisedDeliveryTime *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=promised_delivery_time,json=promisedDeliveryTime,proto3" json:"promised_delivery_time,omitempty"`
 	ValidUntilTime       *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=valid_until_time,json=validUntilTime,proto3" json:"valid_until_time,omitempty"`
 	TermsNote            string                 `protobuf:"bytes,15,opt,name=terms_note,json=termsNote,proto3" json:"terms_note,omitempty"`
@@ -5138,8 +5140,8 @@ func (x *SellerQuote) GetTotalAmount() int64 {
 }
 
 func (x *SellerQuote) GetLeadTimeDays() int32 {
-	if x != nil {
-		return x.LeadTimeDays
+	if x != nil && x.LeadTimeDays != nil {
+		return *x.LeadTimeDays
 	}
 	return 0
 }
@@ -7737,9 +7739,8 @@ type WithdrawSellerResponseRequest struct {
 	state                         protoimpl.MessageState `protogen:"open.v1"`
 	PublicationId                 string                 `protobuf:"bytes,1,opt,name=publication_id,json=publicationId,proto3" json:"publication_id,omitempty"`
 	SellerResponseId              string                 `protobuf:"bytes,2,opt,name=seller_response_id,json=sellerResponseId,proto3" json:"seller_response_id,omitempty"`
-	ClientRequestId               string                 `protobuf:"bytes,3,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
 	ExpectedSellerResponseVersion string                 `protobuf:"bytes,4,opt,name=expected_seller_response_version,json=expectedSellerResponseVersion,proto3" json:"expected_seller_response_version,omitempty"`
-	// 賣家填的撤回原因代碼，伺服器原樣記錄、不解析。
+	// 賣家填的撤回原因代碼，伺服器記錄、不解析；頭尾空白由伺服器去除，最多 64 字（以 rune 計），超過回 INVALID_ARGUMENT。空字串表示沒有填。
 	ReasonCode    string `protobuf:"bytes,5,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -7785,13 +7786,6 @@ func (x *WithdrawSellerResponseRequest) GetPublicationId() string {
 func (x *WithdrawSellerResponseRequest) GetSellerResponseId() string {
 	if x != nil {
 		return x.SellerResponseId
-	}
-	return ""
-}
-
-func (x *WithdrawSellerResponseRequest) GetClientRequestId() string {
-	if x != nil {
-		return x.ClientRequestId
 	}
 	return ""
 }
@@ -7855,10 +7849,9 @@ func (x *WithdrawSellerResponseResponse) GetClosure() *SellerResponseClosure {
 }
 
 type DeclineRfqPublicationRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	PublicationId   string                 `protobuf:"bytes,1,opt,name=publication_id,json=publicationId,proto3" json:"publication_id,omitempty"`
-	ClientRequestId string                 `protobuf:"bytes,2,opt,name=client_request_id,json=clientRequestId,proto3" json:"client_request_id,omitempty"`
-	// 賣家填的婉拒原因代碼，伺服器原樣記錄、不解析。
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PublicationId string                 `protobuf:"bytes,1,opt,name=publication_id,json=publicationId,proto3" json:"publication_id,omitempty"`
+	// 賣家填的婉拒原因代碼，伺服器記錄、不解析；頭尾空白由伺服器去除，最多 64 字（以 rune 計），超過回 INVALID_ARGUMENT。空字串表示沒有填。
 	ReasonCode    string `protobuf:"bytes,3,opt,name=reason_code,json=reasonCode,proto3" json:"reason_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -7897,13 +7890,6 @@ func (*DeclineRfqPublicationRequest) Descriptor() ([]byte, []int) {
 func (x *DeclineRfqPublicationRequest) GetPublicationId() string {
 	if x != nil {
 		return x.PublicationId
-	}
-	return ""
-}
-
-func (x *DeclineRfqPublicationRequest) GetClientRequestId() string {
-	if x != nil {
-		return x.ClientRequestId
 	}
 	return ""
 }
@@ -8318,7 +8304,7 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"\x19DeleteConversationRequest\x12,\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x0econversationId\x127\n" +
 	"\x11client_request_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\"\x1c\n" +
-	"\x1aDeleteConversationResponse\"\xd1\x06\n" +
+	"\x1aDeleteConversationResponse\"\xe9\x06\n" +
 	"\vSellerQuote\x12X\n" +
 	"\rresponse_type\x18\x01 \x01(\x0e2..hawkr.procurement.v1alpha1.SellerResponseTypeB\x03\xe0A\x02R\fresponseType\x12\x1b\n" +
 	"\tspec_note\x18\x02 \x01(\tR\bspecNote\x12D\n" +
@@ -8333,13 +8319,14 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	"tax_amount\x18\t \x01(\x03R\ttaxAmount\x12]\n" +
 	"\x13tax_inclusion_basis\x18\n" +
 	" \x01(\x0e2-.hawkr.procurement.v1alpha1.TaxInclusionBasisR\x11taxInclusionBasis\x12!\n" +
-	"\ftotal_amount\x18\v \x01(\x03R\vtotalAmount\x12$\n" +
-	"\x0elead_time_days\x18\f \x01(\x05R\fleadTimeDays\x12P\n" +
+	"\ftotal_amount\x18\v \x01(\x03R\vtotalAmount\x12)\n" +
+	"\x0elead_time_days\x18\f \x01(\x05H\x00R\fleadTimeDays\x88\x01\x01\x12P\n" +
 	"\x16promised_delivery_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x14promisedDeliveryTime\x12D\n" +
 	"\x10valid_until_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0evalidUntilTime\x12\x1d\n" +
 	"\n" +
 	"terms_note\x18\x0f \x01(\tR\ttermsNote\x121\n" +
-	"\x14deviation_disclosure\x18\x10 \x01(\tR\x13deviationDisclosure\";\n" +
+	"\x14deviation_disclosure\x18\x10 \x01(\tR\x13deviationDisclosureB\x11\n" +
+	"\x0f_lead_time_days\";\n" +
 	"\tUnitBasis\x12\x1a\n" +
 	"\bquantity\x18\x01 \x01(\tR\bquantity\x12\x12\n" +
 	"\x04unit\x18\x02 \x01(\tR\x04unit\"\xe2\x04\n" +
@@ -8541,21 +8528,19 @@ const file_hawkr_procurement_v1alpha1_procurement_proto_rawDesc = "" +
 	" expected_seller_response_version\x18\x05 \x01(\tR\x1dexpectedSellerResponseVersion\x12B\n" +
 	"\x05quote\x18\x06 \x01(\v2'.hawkr.procurement.v1alpha1.SellerQuoteB\x03\xe0A\x02R\x05quote\"z\n" +
 	"\x1cSubmitSellerResponseResponse\x12Z\n" +
-	"\x0fseller_response\x18\x01 \x01(\v21.hawkr.procurement.v1alpha1.SellerResponseVersionR\x0esellerResponse\"\xa6\x02\n" +
+	"\x0fseller_response\x18\x01 \x01(\v21.hawkr.procurement.v1alpha1.SellerResponseVersionR\x0esellerResponse\"\x86\x02\n" +
 	"\x1dWithdrawSellerResponseRequest\x12*\n" +
 	"\x0epublication_id\x18\x01 \x01(\tB\x03\xe0A\x02R\rpublicationId\x121\n" +
-	"\x12seller_response_id\x18\x02 \x01(\tB\x03\xe0A\x02R\x10sellerResponseId\x127\n" +
-	"\x11client_request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\x12L\n" +
+	"\x12seller_response_id\x18\x02 \x01(\tB\x03\xe0A\x02R\x10sellerResponseId\x12L\n" +
 	" expected_seller_response_version\x18\x04 \x01(\tB\x03\xe0A\x02R\x1dexpectedSellerResponseVersion\x12\x1f\n" +
 	"\vreason_code\x18\x05 \x01(\tR\n" +
-	"reasonCode\"m\n" +
+	"reasonCodeJ\x04\b\x03\x10\x04R\x11client_request_id\"m\n" +
 	"\x1eWithdrawSellerResponseResponse\x12K\n" +
-	"\aclosure\x18\x01 \x01(\v21.hawkr.procurement.v1alpha1.SellerResponseClosureR\aclosure\"\xa4\x01\n" +
+	"\aclosure\x18\x01 \x01(\v21.hawkr.procurement.v1alpha1.SellerResponseClosureR\aclosure\"\x84\x01\n" +
 	"\x1cDeclineRfqPublicationRequest\x12*\n" +
-	"\x0epublication_id\x18\x01 \x01(\tB\x03\xe0A\x02R\rpublicationId\x127\n" +
-	"\x11client_request_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\x0fclientRequestId\x12\x1f\n" +
+	"\x0epublication_id\x18\x01 \x01(\tB\x03\xe0A\x02R\rpublicationId\x12\x1f\n" +
 	"\vreason_code\x18\x03 \x01(\tR\n" +
-	"reasonCode\"l\n" +
+	"reasonCodeJ\x04\b\x02\x10\x03R\x11client_request_id\"l\n" +
 	"\x1dDeclineRfqPublicationResponse\x12K\n" +
 	"\aclosure\x18\x01 \x01(\v21.hawkr.procurement.v1alpha1.SellerResponseClosureR\aclosure*\xb1\x02\n" +
 	"\aSlotKey\x12\x18\n" +
@@ -9055,6 +9040,7 @@ func file_hawkr_procurement_v1alpha1_procurement_proto_init() {
 	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[39].OneofWrappers = []any{}
 	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[40].OneofWrappers = []any{}
 	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[49].OneofWrappers = []any{}
+	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[54].OneofWrappers = []any{}
 	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[64].OneofWrappers = []any{}
 	file_hawkr_procurement_v1alpha1_procurement_proto_msgTypes[66].OneofWrappers = []any{
 		(*WatchRunResponse_RunAccepted)(nil),

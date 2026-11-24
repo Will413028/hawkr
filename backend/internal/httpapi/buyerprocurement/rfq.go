@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/procurementwire"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -115,7 +116,7 @@ func (h *App) PreviewRfqPublication(ctx context.Context, req *connect.Request[pb
 	}
 	return connect.NewResponse(&pb.PreviewRfqPublicationResponse{
 		ApprovalId: p.ApprovalID.String(), ApprovalVersion: strconv.FormatInt(int64(p.ApprovalVersion), 10), AudienceHash: p.AudienceHash,
-		SellerFacingPayloadHash: p.SellerFacingHash, SellerFacingPayload: sellerFacingToProto(p.Payload), ExpireTime: timestamppb.New(p.ExpiresAt),
+		SellerFacingPayloadHash: p.SellerFacingHash, SellerFacingPayload: procurementwire.SellerFacing(p.Payload, ""), ExpireTime: timestamppb.New(p.ExpiresAt),
 		RecipientCount: p.RecipientCount,
 	}), nil
 }
@@ -185,21 +186,4 @@ func dateFromProto(path string, d *date.Date) (*time.Time, error) {
 		return nil, rpc.RequiredField(path, path+" 不是合法的日期")
 	}
 	return &t, nil
-}
-
-func dateToProto(t *time.Time) *date.Date {
-	if t == nil {
-		return nil
-	}
-	return &date.Date{Year: int32(t.Year()), Month: int32(t.Month()), Day: int32(t.Day())} //nolint:gosec // time.Time 的日曆欄位在 Date 的範圍內
-}
-
-func sellerFacingToProto(p procurement.SellerFacing) *pb.SellerFacingRfq {
-	return &pb.SellerFacingRfq{
-		Item: p.Item, ItemLabel: p.ItemLabel, Quantity: p.Quantity, Unit: p.Unit, Packaging: p.Packaging, DeliveryCity: p.DeliveryCity,
-		DeliveryDate: dateToProto(p.DeliveryDate), ResponseDeadline: dateToProto(p.ResponseDate), BuyerNote: p.BuyerNote,
-		BuyerRequestedRange: &pb.SellerFacingRequestedRange{
-			BasisQuantity: p.BasisQuantity, BasisUnit: p.BasisUnit, LowerBoundAmount: p.LowerBoundAmount, UpperBoundAmount: p.UpperBoundAmount,
-		},
-	}
 }

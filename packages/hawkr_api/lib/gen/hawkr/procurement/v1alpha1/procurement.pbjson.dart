@@ -2377,7 +2377,15 @@ const SellerQuote$json = {
       '10': 'taxInclusionBasis'
     },
     {'1': 'total_amount', '3': 11, '4': 1, '5': 3, '10': 'totalAmount'},
-    {'1': 'lead_time_days', '3': 12, '4': 1, '5': 5, '10': 'leadTimeDays'},
+    {
+      '1': 'lead_time_days',
+      '3': 12,
+      '4': 1,
+      '5': 5,
+      '9': 0,
+      '10': 'leadTimeDays',
+      '17': true
+    },
     {
       '1': 'promised_delivery_time',
       '3': 13,
@@ -2403,6 +2411,9 @@ const SellerQuote$json = {
       '10': 'deviationDisclosure'
     },
   ],
+  '8': [
+    {'1': '_lead_time_days'},
+  ],
 };
 
 /// Descriptor for `SellerQuote`. Decode as a `google.protobuf.DescriptorProto`.
@@ -2417,12 +2428,12 @@ final $typed_data.Uint8List sellerQuoteDescriptor = $convert.base64Decode(
     'Ftb3VudBgIIAEoA1IOc2hpcHBpbmdBbW91bnQSHQoKdGF4X2Ftb3VudBgJIAEoA1IJdGF4QW1v'
     'dW50El0KE3RheF9pbmNsdXNpb25fYmFzaXMYCiABKA4yLS5oYXdrci5wcm9jdXJlbWVudC52MW'
     'FscGhhMS5UYXhJbmNsdXNpb25CYXNpc1IRdGF4SW5jbHVzaW9uQmFzaXMSIQoMdG90YWxfYW1v'
-    'dW50GAsgASgDUgt0b3RhbEFtb3VudBIkCg5sZWFkX3RpbWVfZGF5cxgMIAEoBVIMbGVhZFRpbW'
-    'VEYXlzElAKFnByb21pc2VkX2RlbGl2ZXJ5X3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYu'
-    'VGltZXN0YW1wUhRwcm9taXNlZERlbGl2ZXJ5VGltZRJEChB2YWxpZF91bnRpbF90aW1lGA4gAS'
-    'gLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIOdmFsaWRVbnRpbFRpbWUSHQoKdGVybXNf'
-    'bm90ZRgPIAEoCVIJdGVybXNOb3RlEjEKFGRldmlhdGlvbl9kaXNjbG9zdXJlGBAgASgJUhNkZX'
-    'ZpYXRpb25EaXNjbG9zdXJl');
+    'dW50GAsgASgDUgt0b3RhbEFtb3VudBIpCg5sZWFkX3RpbWVfZGF5cxgMIAEoBUgAUgxsZWFkVG'
+    'ltZURheXOIAQESUAoWcHJvbWlzZWRfZGVsaXZlcnlfdGltZRgNIAEoCzIaLmdvb2dsZS5wcm90'
+    'b2J1Zi5UaW1lc3RhbXBSFHByb21pc2VkRGVsaXZlcnlUaW1lEkQKEHZhbGlkX3VudGlsX3RpbW'
+    'UYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUg52YWxpZFVudGlsVGltZRIdCgp0'
+    'ZXJtc19ub3RlGA8gASgJUgl0ZXJtc05vdGUSMQoUZGV2aWF0aW9uX2Rpc2Nsb3N1cmUYECABKA'
+    'lSE2RldmlhdGlvbkRpc2Nsb3N1cmVCEQoPX2xlYWRfdGltZV9kYXlz');
 
 @$core.Deprecated('Use unitBasisDescriptor instead')
 const UnitBasis$json = {
@@ -3770,14 +3781,6 @@ const WithdrawSellerResponseRequest$json = {
       '10': 'sellerResponseId'
     },
     {
-      '1': 'client_request_id',
-      '3': 3,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'clientRequestId'
-    },
-    {
       '1': 'expected_seller_response_version',
       '3': 4,
       '4': 1,
@@ -3787,16 +3790,19 @@ const WithdrawSellerResponseRequest$json = {
     },
     {'1': 'reason_code', '3': 5, '4': 1, '5': 9, '10': 'reasonCode'},
   ],
+  '9': [
+    {'1': 3, '2': 4},
+  ],
+  '10': ['client_request_id'],
 };
 
 /// Descriptor for `WithdrawSellerResponseRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List withdrawSellerResponseRequestDescriptor = $convert.base64Decode(
     'Ch1XaXRoZHJhd1NlbGxlclJlc3BvbnNlUmVxdWVzdBIqCg5wdWJsaWNhdGlvbl9pZBgBIAEoCU'
     'ID4EECUg1wdWJsaWNhdGlvbklkEjEKEnNlbGxlcl9yZXNwb25zZV9pZBgCIAEoCUID4EECUhBz'
-    'ZWxsZXJSZXNwb25zZUlkEjcKEWNsaWVudF9yZXF1ZXN0X2lkGAMgASgJQgvgQQLijM/XCAIIAV'
-    'IPY2xpZW50UmVxdWVzdElkEkwKIGV4cGVjdGVkX3NlbGxlcl9yZXNwb25zZV92ZXJzaW9uGAQg'
-    'ASgJQgPgQQJSHWV4cGVjdGVkU2VsbGVyUmVzcG9uc2VWZXJzaW9uEh8KC3JlYXNvbl9jb2RlGA'
-    'UgASgJUgpyZWFzb25Db2Rl');
+    'ZWxsZXJSZXNwb25zZUlkEkwKIGV4cGVjdGVkX3NlbGxlcl9yZXNwb25zZV92ZXJzaW9uGAQgAS'
+    'gJQgPgQQJSHWV4cGVjdGVkU2VsbGVyUmVzcG9uc2VWZXJzaW9uEh8KC3JlYXNvbl9jb2RlGAUg'
+    'ASgJUgpyZWFzb25Db2RlSgQIAxAEUhFjbGllbnRfcmVxdWVzdF9pZA==');
 
 @$core.Deprecated('Use withdrawSellerResponseResponseDescriptor instead')
 const WithdrawSellerResponseResponse$json = {
@@ -3831,23 +3837,20 @@ const DeclineRfqPublicationRequest$json = {
       '8': {},
       '10': 'publicationId'
     },
-    {
-      '1': 'client_request_id',
-      '3': 2,
-      '4': 1,
-      '5': 9,
-      '8': {},
-      '10': 'clientRequestId'
-    },
     {'1': 'reason_code', '3': 3, '4': 1, '5': 9, '10': 'reasonCode'},
   ],
+  '9': [
+    {'1': 2, '2': 3},
+  ],
+  '10': ['client_request_id'],
 };
 
 /// Descriptor for `DeclineRfqPublicationRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List declineRfqPublicationRequestDescriptor = $convert.base64Decode(
-    'ChxEZWNsaW5lUmZxUHVibGljYXRpb25SZXF1ZXN0EioKDnB1YmxpY2F0aW9uX2lkGAEgASgJQg'
-    'PgQQJSDXB1YmxpY2F0aW9uSWQSNwoRY2xpZW50X3JlcXVlc3RfaWQYAiABKAlCC+BBAuKMz9cI'
-    'AggBUg9jbGllbnRSZXF1ZXN0SWQSHwoLcmVhc29uX2NvZGUYAyABKAlSCnJlYXNvbkNvZGU=');
+final $typed_data.Uint8List declineRfqPublicationRequestDescriptor =
+    $convert.base64Decode(
+        'ChxEZWNsaW5lUmZxUHVibGljYXRpb25SZXF1ZXN0EioKDnB1YmxpY2F0aW9uX2lkGAEgASgJQg'
+        'PgQQJSDXB1YmxpY2F0aW9uSWQSHwoLcmVhc29uX2NvZGUYAyABKAlSCnJlYXNvbkNvZGVKBAgC'
+        'EANSEWNsaWVudF9yZXF1ZXN0X2lk');
 
 @$core.Deprecated('Use declineRfqPublicationResponseDescriptor instead')
 const DeclineRfqPublicationResponse$json = {

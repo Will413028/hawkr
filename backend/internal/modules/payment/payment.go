@@ -421,11 +421,13 @@ const (
 	AnomalyPayment   = model.AnomalyPayment
 	AnomalyTransfer  = model.AnomalyTransfer
 	AnomalyRefund    = model.AnomalyRefund
+	AnomalyReversal  = model.AnomalyReversal
+	AnomalyTopup     = model.AnomalyTopup
 	AnomalySucceeded = model.AnomalySucceeded
 	AnomalyFailed    = model.AnomalyFailed
 )
 
-// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳或退款的人工結案：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
+// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳、退款、撤回（AnomalyReversal）或補差額轉帳（AnomalyTopup）的人工結案；撤回的 id 是撤回列 ID，補差額轉帳的 id 是退款 ID：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
 // 領域變更與一筆 adminaudit 在同一個 transaction。語意與鎖順序見 charge.Service.ResolveAnomaly。
 func (m *Module) ResolveAnomaly(ctx context.Context, actor AdminActor, kind AnomalyKind, id uuid.UUID, outcome AnomalyOutcome, evidence string) error {
 	return m.charges.ResolveAnomaly(ctx, actor, kind, id, outcome, evidence)
@@ -511,13 +513,95 @@ func (m *Module) CreatePaymentTransfer(ctx context.Context, transferID uuid.UUID
 	return m.charges.Transfer(ctx, transferID, finalAttempt)
 }
 
-// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：撤回 REVERSING 退款的 reversal_amount，
-// 成功後同一個 transaction 累加轉帳的 reversed_amount 並把退款推進到 REVERSED。
+// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：逐列收斂退款進行中的撤回列，
+// 每一列成功後同一個 transaction 累加目標（原轉帳或補差額轉帳）的累計撤回額並把該列推進到 REVERSED、重算退款的彙總。
 func (m *Module) ReversePaymentTransfer(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
 	return m.charges.Reverse(ctx, refundID, finalAttempt)
 }
 
-// EnqueueRefundReversal 排入退款的撤回 job：退款 use case 在寫下 REVERSING 退款列的同一個 transaction 內呼叫。
+// TopUpPaymentTransfer 是補差額轉帳 job（payment.transfer_topup）的內容，給 worker 與測試呼叫：補差額狀態是 SENDING 的退款列（已失敗、金額已算進轉帳）的退款額，
+// 以新的冪等鍵轉給賣家，成功後進 DONE。
+func (m *Module) TopUpPaymentTransfer(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
+	return m.charges.TopUp(ctx, refundID, finalAttempt)
+}
+
+// EnqueueRefundReversal 排入退款的撤回 job：只在退款列的撤回狀態已是 REVERSING 的同一個 transaction 內呼叫（正常路徑由退款被接受與轉帳成立的 transaction 排入，這裡給測試與補排）。
 func (m *Module) EnqueueRefundReversal(ctx context.Context, refundID uuid.UUID) error {
 	return m.charges.EnqueueReversal(ctx, refundID)
+}
+
+// RefundRequest 是建立退款的輸入（OrderNo、Amount、呼叫端的冪等鍵 RequestKey、是否自動退款 Auto）；Refund 是退款的對外視圖。
+type (
+	RefundRequest = model.RefundRequest
+	PaymentRefund = model.Refund
+)
+
+// PaymentRefundStatus 是退款的狀態。
+type PaymentRefundStatus = model.RefundStatus
+
+// 退款的狀態。
+const (
+	RefundPending   = model.RefundPending
+	RefundRefunding = model.RefundRefunding
+	RefundSucceeded = model.RefundSucceeded
+	RefundFailed    = model.RefundFailed
+	RefundAnomaly   = model.RefundAnomaly
+)
+
+// PaymentReversalStatus 是退款列上向賣家收回（撤回轉帳）的狀態，與退款狀態並行。
+type PaymentReversalStatus = model.ReversalStatus
+
+// 向賣家收回的狀態。
+const (
+	ReversalNone      = model.ReversalNone
+	ReversalWaiting   = model.ReversalWaiting
+	ReversalReversing = model.ReversalReversing
+	ReversalReversed  = model.ReversalReversed
+	ReversalReleased  = model.ReversalReleased
+	ReversalAnomaly   = model.ReversalAnomaly
+)
+
+// PaymentTopupStatus 是退款列上補差額轉帳給賣家的狀態（已算進轉帳金額的退款失敗之後，D11 補充），與退款狀態並行。
+type PaymentTopupStatus = model.TopupStatus
+
+// 補差額的狀態。
+const (
+	TopupNone     = model.TopupNone
+	TopupWaiting  = model.TopupWaiting
+	TopupSending  = model.TopupSending
+	TopupDone     = model.TopupDone
+	TopupReleased = model.TopupReleased
+	TopupAnomaly  = model.TopupAnomaly
+)
+
+// ChargeRefundInput、ChargeRefundSnapshot 與 ChargeRefundState 是退款的 port 型別（測試包裝 provider 用）。
+type (
+	ChargeRefundInput    = charge.RefundInput
+	ChargeRefundSnapshot = charge.RefundSnapshot
+	ChargeRefundState    = charge.RefundState
+)
+
+// 退款的中立狀態。
+const (
+	ChargeRefundPending   = charge.RefundPending
+	ChargeRefundSucceeded = charge.RefundSucceeded
+	ChargeRefundFailed    = charge.RefundFailed
+	ChargeRefundUnknown   = charge.RefundUnknown
+)
+
+// CreatePaymentRefund 是建立退款的入口（計畫 D4、D5 修訂；步驟 4 的 legacy CreateRefund 與 Java order 的 AutoRefundWorker 呼叫）：一個 transaction 內鎖付款列、
+// 以 (付款, RequestKey) 冪等、加總非失敗退款守累計上限，寫 PENDING 退款列並排退款 job（轉帳的任何狀態都可以退款，向賣家收回在 provider 接受之後才開始，D11）；provider 在 transaction 外由 job 呼叫。
+// 語意與錯誤見 charge.Service.CreateRefund。呼叫方不能在 transaction 內呼叫。
+func (m *Module) CreatePaymentRefund(ctx context.Context, in RefundRequest) (PaymentRefund, error) {
+	return m.charges.CreateRefund(ctx, in)
+}
+
+// RefundPayment 是退款 job（payment.refund_create）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時暫時性失敗只記警示 log，留給週期掃描。
+func (m *Module) RefundPayment(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Refund(ctx, refundID, finalAttempt)
+}
+
+// SyncPaymentRefund 是退款同步 job（payment.refund_sync）的內容，給 worker 與測試呼叫：REFUNDING 的退款重讀 provider 後進 SUCCEEDED 或 FAILED。外部呼叫在 transaction 外；again 為 true 表示讀取期間又收到事件，呼叫方稍後再跑一輪。
+func (m *Module) SyncPaymentRefund(ctx context.Context, refundID uuid.UUID) (again bool, err error) {
+	return m.charges.SyncRefund(ctx, refundID)
 }

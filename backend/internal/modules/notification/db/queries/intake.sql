@@ -19,6 +19,14 @@ SELECT EXISTS (
     SELECT 1 FROM notification.inbox_item_intents WHERE intent_id = sqlc.arg(intent_id)
 ) AS linked;
 
+-- name: IntentHasRecipientRows :one
+-- 這個意圖已經有收件匣連結或投遞紀錄（先前的嘗試寫過）：它的參數還有人要讀（收件匣列、渠道 job），重試時因為略過條件才成立而清參數會讓它們組不出字。
+SELECT (EXISTS (
+    SELECT 1 FROM notification.inbox_item_intents l WHERE l.intent_id = sqlc.arg(intent_id)
+) OR EXISTS (
+    SELECT 1 FROM notification.deliveries d WHERE d.intent_id = sqlc.arg(intent_id)
+)) ::boolean AS has_rows;
+
 -- name: UpsertInboxItem :one
 -- 寫收件匣列並回傳實際落地的列 ID（新列或合併進去的既有列）。有聚合鍵時，同一個收件人（含 store_id）已有未讀的同鍵列就合併進去：
 -- 只有來源事件不早於該列目前事件（occurred_at >=）時參數才換成新的，所以 job 的處理順序不影響結果；actor 一律取聯集、updated_at 往前推。
