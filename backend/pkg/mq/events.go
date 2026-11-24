@@ -44,8 +44,6 @@ const (
 
 	EventTypeBuyerDeleted EventType = "BUYER_DELETED"
 
-	EventTypeDelegationOperationCompleted EventType = "DELEGATION_OPERATION_COMPLETED"
-
 	EventTypeInvoiceIssued                       EventType = "INVOICE_ISSUED"
 	EventTypeInvoiceIssueFailed                  EventType = "INVOICE_ISSUE_FAILED"
 	EventTypeInvoiceVoided                       EventType = "INVOICE_VOIDED"

@@ -69,8 +69,6 @@ const (
 
 	RoutingKeyAccountDeleted = "account.deleted"
 
-	RoutingKeyDelegationOperationCompleted = "delegation.operation.completed"
-
 	RoutingKeySellerDeleted        = "seller.deleted"
 	RoutingKeySellerOnboarded      = "seller.onboarded"
 	RoutingKeySellerProfileChanged = "seller.profile.changed"
