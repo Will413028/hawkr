@@ -18,16 +18,17 @@ func TestDecodeRejectsMalformedPayloads(t *testing.T) {
 		t.Fatalf("合法的通知被拒絕：%v", err)
 	}
 	for name, p := range map[string]payload{
-		"版本不認得":       {V: 9, Kind: kindInbox, Account: 1, Audience: "BUYER"},
-		"種類不認得":       {V: payloadVersion, Kind: "x"},
-		"沒有帳號":        {V: payloadVersion, Kind: kindInbox, Audience: "BUYER"},
-		"BUYER 帶了店":   {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Store: 3},
-		"STORE 沒有店":   {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "STORE"},
-		"受眾不認得":       {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "X"},
-		"提示不認得":       {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Hint: "NOPE"},
-		"收件匣列 ID 不合法": {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Item: "not-a-uuid"},
-		"工作區沒有店":      {V: payloadVersion, Kind: kindWorkspace, Change: int(SellerOrder)},
-		"工作區變更不認得":    {V: payloadVersion, Kind: kindWorkspace, Store: 7, Change: 99},
+		"版本不認得":        {V: 9, Kind: kindInbox, Account: 1, Audience: "BUYER"},
+		"種類不認得":        {V: payloadVersion, Kind: "x"},
+		"沒有帳號":         {V: payloadVersion, Kind: kindInbox, Audience: "BUYER"},
+		"BUYER 帶了店":    {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Store: 3},
+		"STORE 沒有店":    {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "STORE"},
+		"受眾不認得":        {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "X"},
+		"提示不認得":        {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Hint: "NOPE"},
+		"收件匣列 ID 不合法":  {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Item: "not-a-uuid"},
+		"工作區沒有店":       {V: payloadVersion, Kind: kindWorkspace, Change: int(SellerOrder)},
+		"工作區變更不認得":     {V: payloadVersion, Kind: kindWorkspace, Store: 7, Change: 99},
+		"工作區帶了收件匣列 ID": {V: payloadVersion, Kind: kindWorkspace, Store: 7, Change: int(SellerOrder), Item: "0190a0a0-0000-7000-8000-000000000000"},
 	} {
 		if _, err := decode(p.encode()); !errors.Is(err, errPayload) {
 			t.Errorf("%s：應回 errPayload：%v", name, err)

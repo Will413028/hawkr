@@ -38,11 +38,11 @@
   },
   {
    "id": "notify-inbox-omits-item",
-   "stack": "go",
+   "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/stream/signal.go",
    "old": "\t\tp.Item = itemID.String()",
    "new": "\t\t_ = itemID",
-   "test": "internal/modules/notification TestInboxWriteSignalsTheRecipientsStreamOnly|TestAggregatedBumpRepeatsTheSameItemID",
+   "test": "internal/modules/notification ^(TestInboxWriteSignalsTheRecipientsStreamOnly|TestAggregatedBumpRepeatsTheSameItemID)$",
    "why": "pg_notify no longer carries the created or bumped item id, so serve processes cannot toast it."
   },
   {

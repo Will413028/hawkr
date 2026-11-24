@@ -1653,7 +1653,7 @@ type InboxSignal struct {
 	StateRefreshHints []StateRefreshHint `protobuf:"varint,3,rep,packed,name=state_refresh_hints,json=stateRefreshHints,proto3,enum=hawkr.notification.v1alpha1.StateRefreshHint" json:"state_refresh_hints,omitempty"`
 	// 上一則訊號之後在這條串流上新建的通知、或被聚合更新（合併進同一則未讀通知）的收件匣項目 ID，依到達順序、不重複；
 	// client 只對這些 ID 做 toast，不比對列表。聚合更新會讓同一個 ID 再出現，client 以 ID 去重並更新既有的 toast。
-	// 連線建立與重連的第一則、只有已讀或刪除變化時為空。每個 ID 在一條串流上至多送達一次：斷線期間的缺口不補送，收件匣與未讀數仍以列表為準。
+	// 連線建立與重連的第一則、只有已讀或刪除變化時為空。每次新建或聚合更新在一條串流上至多送達一次：斷線期間的缺口不補送，收件匣與未讀數仍以列表為準。
 	NewInboxItemIds []string `protobuf:"bytes,4,rep,name=new_inbox_item_ids,json=newInboxItemIds,proto3" json:"new_inbox_item_ids,omitempty"`
 	// 為 true 表示累積的新通知超過上限（20 則）：new_inbox_item_ids 為空，client 重讀列表、不 toast。
 	NewItemsTruncated bool `protobuf:"varint,5,opt,name=new_items_truncated,json=newItemsTruncated,proto3" json:"new_items_truncated,omitempty"`

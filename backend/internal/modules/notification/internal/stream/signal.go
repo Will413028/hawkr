@@ -84,6 +84,9 @@ func decode(s string) (payload, error) {
 		if p.Store <= 0 || !SellerChange(p.Change).valid() {
 			return payload{}, fmt.Errorf("%w：賣家工作區通知缺欄位", errPayload)
 		}
+		if p.Item != "" {
+			return payload{}, fmt.Errorf("%w：賣家工作區通知不帶收件匣列 ID", errPayload)
+		}
 	default:
 		return payload{}, fmt.Errorf("%w：種類 %q", errPayload, p.Kind)
 	}
