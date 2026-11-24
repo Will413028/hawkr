@@ -1321,6 +1321,7 @@ async function mockNotificationDefaults(page: Page): Promise<void> {
 		["MarkInboxItemRead", {}],
 		["MarkAllInboxItemsRead", { updatedCount: 0 }],
 		["BatchDeleteInboxItems", {}],
+		["GetNotificationPreferences", { entries: [] }],
 	];
 	for (const [method, body] of unary) {
 		await page.route(
