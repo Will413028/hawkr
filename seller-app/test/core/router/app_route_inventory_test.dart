@@ -66,10 +66,6 @@ void main() {
     (symbol: 'CouponRoutes.detail', path: CouponRoutes.detail),
     (symbol: 'SettingsRoutes.profile', path: SettingsRoutes.profile),
     (symbol: 'SettingsRoutes.chat', path: SettingsRoutes.chat),
-    (
-      symbol: 'SettingsRoutes.chatAiAssistant',
-      path: SettingsRoutes.chatAiAssistant,
-    ),
     (symbol: 'SettingsRoutes.chatThread', path: SettingsRoutes.chatThread),
     (symbol: 'SettingsRoutes.shipping', path: SettingsRoutes.shipping),
     (

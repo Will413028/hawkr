@@ -108,7 +108,7 @@ final class SellerQuoteFormProvider
   }
 }
 
-String _$sellerQuoteFormHash() => r'422fa7bc17050cf1c40e76c74f30d32554812169';
+String _$sellerQuoteFormHash() => r'23b40c268255c3302e9b21ec9f0c335602dc1002';
 
 /// 平台賣家回價表單的狀態機。
 ///

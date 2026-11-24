@@ -48,4 +48,4 @@ final class AiImageServiceProvider
   }
 }
 
-String _$aiImageServiceHash() => r'c7932d2d52fc16ee00623cdda4de6d3230b2e417';
+String _$aiImageServiceHash() => r'00653ce7bc27a221bae6c7106618d691dc3d0d2a';

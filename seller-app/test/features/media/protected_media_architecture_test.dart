@@ -60,19 +60,6 @@ void main() {
     expect(certification, isNot(contains('dioProvider')));
     expect(productImage, isNot(contains('package:dio/dio.dart')));
     expect(productImage, isNot(contains('dioProvider')));
-    expect(
-      File(
-        'lib/features/product/data/product_listing_chat_repository.dart',
-      ).existsSync(),
-      isTrue,
-    );
-    expect(
-      File(
-        'lib/features/product/presentation/product_listing_chat/'
-        'product_listing_chat_repository.dart',
-      ).existsSync(),
-      isFalse,
-    );
   });
 }
 

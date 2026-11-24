@@ -11,28 +11,6 @@ void main() {
     expect(bubble, contains('HkIconName.chat'));
   });
 
-  test('seller AI and buyer conversations share one chat chrome system', () {
-    final assistant = File(
-      'lib/features/ai_assistant/presentation/ai_assistant_screen.dart',
-    ).readAsStringSync();
-    final thread = File(
-      'lib/features/chat/presentation/chat_thread_screen.dart',
-    ).readAsStringSync();
-    final assistantAvatar = File(
-      'lib/features/ai_assistant/presentation/widgets/'
-      'ai_assistant_avatar.dart',
-    ).readAsStringSync();
-
-    for (final source in [assistant, thread]) {
-      expect(source, contains('ChatConversationTopBar'));
-      expect(source, contains('ChatConversationDotPattern'));
-      expect(source, contains('ChatInputBar'));
-      expect(source, isNot(contains('_ChatBgPainter')));
-    }
-    expect(assistant, contains('AiAssistantAvatar'));
-    expect(assistantAvatar, contains('AppIcons.autoAwesome'));
-  });
-
   test('settings status contrast belongs to the visible cover surface', () {
     final router = File('lib/core/router/app_router.dart').readAsStringSync();
     final store = File(

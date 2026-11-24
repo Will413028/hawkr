@@ -259,11 +259,9 @@ class ImageEditorAiTabState extends State<ImageEditorAiTab> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8.r),
-                        child: style.thumbnailKey.isNotEmpty
+                        child: style.thumbnailUrl.isNotEmpty
                             ? OptimizedNetworkImage(
-                                // 裸 objectKey；OptimizedNetworkImage 帶 scene
-                                // 會過 buildImageUrl（dual-mode）套縮圖 preset。
-                                imageUrl: style.thumbnailKey,
+                                imageUrl: style.thumbnailUrl,
                                 scene: ImageScene.shareThumbnail,
                                 fit: BoxFit.cover,
                                 width: 100.w,

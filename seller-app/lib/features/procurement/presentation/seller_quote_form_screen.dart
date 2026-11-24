@@ -1,10 +1,12 @@
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart';
 import 'package:hawkr_api/taipei_time.dart';
 import 'package:flutter/material.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../../../core/codemeta/code_meta.dart';
+import '../../../core/l10n/ui_locale.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/theme/hk_tokens.dart';
@@ -24,8 +26,7 @@ import '../../../shared/time/taipei_display.dart';
 /// 買家發 RFQ publication → 賣家在這裡回一個 immutable 報價版本 → 買家接受
 /// exact version。三條不得違反的產品規則都落在這支畫面上：
 ///
-/// 1. ⛔ 實際品相（[OfferedQuality]）只能由賣家自己填，沒有「帶入上次報價」的
-///    捷徑，未填就擋在送出之前。
+/// 1. ⛔ 規格說明（`spec_note`）只能由賣家自己填，平台與 LLM 不代填，也沒有「帶入上次報價」的捷徑。
 /// 2. ⛔ 兩個 `responseType` 的必填欄位完全相同；選了
 ///    `ACCEPT_NON_PRICE_TERMS_WITH_QUOTE` 也不會隱藏或跳過任何金額欄位。
 /// 3. ⛔ 畫面只顯示 [SellerFacingPublication.visibleContextFields] 白名單內的
@@ -49,7 +50,10 @@ class SellerQuoteFormScreen extends ConsumerWidget {
         child: asyncState.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => _LoadFailure(
-            message: error is Exception ? '$error' : '載入詢價內容失敗',
+            message: errorText(
+              error,
+              defaults: ref.read(defaultErrorTextProvider),
+            ),
             onRetry: () =>
                 ref.invalidate(sellerQuoteFormProvider(publicationId)),
           ),
@@ -137,23 +141,13 @@ class _SellerQuoteFormBody extends HookConsumerWidget {
           selected: quote.responseTypeValue,
           error: errorFor(SellerQuoteField.responseType),
           onChanged: (value) =>
-              notifier.updateQuote((q) => q.copyWith(responseType: value.code)),
+              notifier.updateQuote((q) => q.copyWith(responseType: value)),
         ),
         const SizedBox(height: HkSpace.lg),
-        _QualityCard(
-          quality: quote.offeredQuality,
-          gradeError: errorFor(SellerQuoteField.qualityGrade),
-          notesError: errorFor(SellerQuoteField.qualityInspectionNotes),
-          onGrade: (value) => notifier.updateQuote(
-            (q) => q.copyWith(
-              offeredQuality: q.offeredQuality.copyWith(grade: value),
-            ),
-          ),
-          onNotes: (value) => notifier.updateQuote(
-            (q) => q.copyWith(
-              offeredQuality: q.offeredQuality.copyWith(inspectionNotes: value),
-            ),
-          ),
+        _SpecNoteCard(
+          value: quote.specNote,
+          onChanged: (value) =>
+              notifier.updateQuote((q) => q.copyWith(specNote: value)),
         ),
         const SizedBox(height: HkSpace.lg),
         _QuantityCard(
@@ -327,9 +321,9 @@ class _ResponseTypeCard extends StatelessWidget {
     required this.onChanged,
   });
 
-  final ProcurementSellerResponseType? selected;
+  final SellerResponseType? selected;
   final String? error;
-  final ValueChanged<ProcurementSellerResponseType> onChanged;
+  final ValueChanged<SellerResponseType> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -341,14 +335,14 @@ class _ResponseTypeCard extends StatelessWidget {
           const SizedBox(height: HkSpace.xs),
           // ⛔ 兩個值的必填欄位完全相同，UI 不得在選了第二個之後少問任何金額。
           Text(
-            '兩種回應都要填完整的品相、計價基準與金額——「接受非價格條款」不是少填金額的捷徑。',
+            '兩種回應都要填完整的計價基準與金額——「接受非價格條款」不是少填金額的捷徑。',
             style: AppTypography.metaMuted,
           ),
           const SizedBox(height: HkSpace.md),
-          ...ProcurementSellerResponseType.values.map(
+          ...kSelectableResponseTypes.map(
             (type) => _RadioTile(
               label: type.formLabel,
-              value: type.code,
+              value: type.name,
               selected: selected == type,
               onTap: () => onChanged(type),
             ),
@@ -404,20 +398,11 @@ class _RadioTile extends StatelessWidget {
 // 實際品相
 // -----------------------------------------------------------------------------
 
-class _QualityCard extends StatelessWidget {
-  const _QualityCard({
-    required this.quality,
-    required this.gradeError,
-    required this.notesError,
-    required this.onGrade,
-    required this.onNotes,
-  });
+class _SpecNoteCard extends StatelessWidget {
+  const _SpecNoteCard({required this.value, required this.onChanged});
 
-  final OfferedQuality quality;
-  final String? gradeError;
-  final String? notesError;
-  final ValueChanged<String> onGrade;
-  final ValueChanged<String> onNotes;
+  final String value;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -425,25 +410,17 @@ class _QualityCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('實際品相與驗收（必填）', style: AppTypography.sectionTitle),
+          Text('規格說明（選填）', style: AppTypography.sectionTitle),
           const SizedBox(height: HkSpace.xs),
           // ⛔ 不得由平台或 LLM 代填，也沒有「帶入上次報價」。
-          Text('這兩欄只能由你自己填寫，平台不會替你帶入上一次報價的品相。', style: AppTypography.metaMuted),
+          Text('這一欄只能由你自己填寫，最多 1000 字。', style: AppTypography.metaMuted),
           const SizedBox(height: HkSpace.md),
           _QuoteTextField(
-            label: '品相等級',
-            hint: '例如：特級、A 級、次級可用',
-            initialValue: quality.grade,
-            error: gradeError,
-            onChanged: onGrade,
-          ),
-          _QuoteTextField(
-            label: '驗收說明',
-            hint: '例如：外觀無壓傷，糖度 11 以上，到貨後 24 小時內驗收',
-            initialValue: quality.inspectionNotes,
-            error: notesError,
+            label: '規格說明',
+            hint: '例如：產地、等級、包裝方式、驗收條件',
+            initialValue: value,
             maxLines: 3,
-            onChanged: onNotes,
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -555,7 +532,7 @@ class _AmountCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text('金額', style: AppTypography.sectionTitle)),
-              Text('幣別 ${quote.currency}', style: AppTypography.metaMuted),
+              Text('幣別 TWD', style: AppTypography.metaMuted),
             ],
           ),
           const SizedBox(height: HkSpace.md),
@@ -563,7 +540,7 @@ class _AmountCard extends StatelessWidget {
             label: '貨款',
             initialValue: quote.goodsAmount,
             error: errorFor(SellerQuoteField.goodsAmount),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
             onChanged: (value) =>
                 onChanged((q) => q.copyWith(goodsAmount: value)),
           ),
@@ -571,7 +548,7 @@ class _AmountCard extends StatelessWidget {
             label: '運費',
             initialValue: quote.shippingAmount,
             error: errorFor(SellerQuoteField.shippingAmount),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
             onChanged: (value) =>
                 onChanged((q) => q.copyWith(shippingAmount: value)),
           ),
@@ -579,7 +556,7 @@ class _AmountCard extends StatelessWidget {
             label: '稅額',
             initialValue: quote.taxAmount,
             error: errorFor(SellerQuoteField.taxAmount),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
             onChanged: (value) =>
                 onChanged((q) => q.copyWith(taxAmount: value)),
           ),
@@ -588,14 +565,13 @@ class _AmountCard extends StatelessWidget {
           const SizedBox(height: HkSpace.sm),
           Wrap(
             spacing: HkSpace.sm,
-            children: ProcurementTaxInclusionBasis.values
+            children: kSelectableTaxBases
                 .map(
                   (basis) => HkChoiceChip(
                     label: basis.formLabel,
                     selected: quote.taxInclusionBasisValue == basis,
-                    onTap: () => onChanged(
-                      (q) => q.copyWith(taxInclusionBasis: basis.code),
-                    ),
+                    onTap: () =>
+                        onChanged((q) => q.copyWith(taxInclusionBasis: basis)),
                   ),
                 )
                 .toList(),
@@ -607,7 +583,7 @@ class _AmountCard extends StatelessWidget {
             label: '總金額',
             initialValue: quote.totalAmount,
             error: errorFor(SellerQuoteField.totalAmount),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: TextInputType.number,
             onChanged: (value) =>
                 onChanged((q) => q.copyWith(totalAmount: value)),
           ),
@@ -741,7 +717,7 @@ class _ActionBar extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: HkSpace.md),
             child: Text(
               '目前是第 ${response.sellerResponseVersion} 版'
-              '（${response.statusValue?.label ?? response.status}）'
+              '（${response.statusValue?.label ?? ''}）'
               '${response.isLatestVersion ? '' : '，已被第 ${response.supersededByVersion} 版取代'}',
               style: AppTypography.metaMuted,
             ),
@@ -757,7 +733,8 @@ class _ActionBar extends StatelessWidget {
         ),
         const SizedBox(height: HkSpace.md),
         if (response != null &&
-            response.statusValue == ProcurementSellerResponseStatus.active)
+            response.statusValue ==
+                SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE)
           OutlinedButton(
             onPressed: blocked
                 ? null

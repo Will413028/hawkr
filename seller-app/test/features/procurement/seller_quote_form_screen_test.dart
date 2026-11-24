@@ -1,6 +1,7 @@
-import 'package:hawkr_seller/core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_seller/core/l10n/ui_locale.dart';
 import 'package:hawkr_seller/l10n/l10n.dart';
-import 'package:hawkr_seller/features/procurement/data/procurement_error.dart';
 import 'package:hawkr_seller/features/procurement/data/seller_quote_model.dart';
 import 'package:hawkr_seller/features/procurement/data/seller_quote_repository.dart';
 import 'package:hawkr_seller/features/procurement/presentation/seller_quote_controller.dart';
@@ -13,6 +14,9 @@ import 'package:hawkr_api/taipei_time.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../../support/connect_errors.dart';
+import '../../support/default_error_text.dart';
+
 class _MockRepo extends Mock implements SellerQuoteRepository {}
 
 const _publicationId = 'p-1';
@@ -20,15 +24,11 @@ const _publicationId = 'p-1';
 const _publication = SellerFacingPublication(
   publicationId: _publicationId,
   publicationVersion: '4',
-  inviteId: 'inv-1',
-  lane: 'PLATFORM',
   sellerFacingPayloadHash: 'hash-4',
-  deliveryState: 'SENT',
-  publishedAt: '2026-09-13T02:00:00Z',
 );
 
 /// 需求內容的九欄。型別本身就是 deny-by-default：買家預算、可接受區間、
-/// 候選排序連進到 model 的路都沒有（那一層在 procurement_error_test 驗）。
+/// 候選排序連進到 model 的路都沒有。
 const _payload = SellerFacingPayload(
   item: '高麗菜',
   itemLabel: '梨山高麗菜',
@@ -57,6 +57,7 @@ Future<void> _pumpScreen(
     ProviderScope(
       overrides: [
         sellerQuoteRepositoryProvider.overrideWithValue(repo),
+        defaultErrorTextProvider.overrideWithValue(zhDefaultErrorText),
         if (keys != null)
           quoteIdempotencyKeyBookProvider.overrideWithValue(keys),
       ],
@@ -93,15 +94,15 @@ _MockRepo _repoWith({
 }
 
 SellerQuotePayload _validQuote() => SellerQuotePayload(
-  responseType: ProcurementSellerResponseType.manualQuote.code,
-  offeredQuality: const OfferedQuality(grade: '特級', inspectionNotes: '無壓傷'),
-  unitBasis: const UnitBasis(quantity: '1', unit: '公斤'),
+  responseType: SellerResponseType.SELLER_RESPONSE_TYPE_MANUAL_QUOTE,
+  specNote: '無壓傷',
+  unitBasis: const QuoteUnitBasis(quantity: '1', unit: '公斤'),
   offeredQuantity: '500',
   offeredQuantityUnit: '公斤',
   goodsAmount: '10000',
   shippingAmount: '500',
   taxAmount: '525',
-  taxInclusionBasis: ProcurementTaxInclusionBasis.taxExcluded.code,
+  taxInclusionBasis: TaxInclusionBasis.TAX_INCLUSION_BASIS_TAX_EXCLUDED,
   totalAmount: '11025',
   validUntil: '2099-12-31T15:00:00Z',
 );
@@ -173,7 +174,9 @@ void main() {
 
     await tester.tap(
       find.text(
-        ProcurementSellerResponseType.acceptNonPriceTermsWithQuote.formLabel,
+        SellerResponseType
+            .SELLER_RESPONSE_TYPE_ACCEPT_NON_PRICE_TERMS_WITH_QUOTE
+            .formLabel,
       ),
     );
     await tester.pump();
@@ -187,21 +190,19 @@ void main() {
     }
     expect(find.text('報價有效期限'), findsOneWidget);
     expect(find.text('計價基準數量'), findsOneWidget);
-    expect(find.text('實際品相與驗收（必填）'), findsOneWidget);
+    expect(find.text('規格說明（選填）'), findsOneWidget);
   });
 
-  testWidgets('產品規則 1：品相沒填就擋在送出之前，畫面說清楚只能自己填', (tester) async {
+  testWidgets('規格說明選填、說清楚只能自己填；必填欄位沒填就擋在送出之前', (tester) async {
     final repo = _repoWith();
     await _pumpScreen(tester, repo);
 
-    expect(find.textContaining('平台不會替你帶入上一次報價的品相'), findsOneWidget);
+    expect(find.textContaining('只能由你自己填寫'), findsOneWidget);
 
     await tester.tap(find.text('送出正式回價'));
     await tester.pump();
 
-    expect(find.textContaining('只能由你自己填'), findsWidgets);
-    expect(find.text('請填寫這批貨的實際品相等級'), findsOneWidget);
-    expect(find.text('請填寫驗收說明'), findsOneWidget);
+    expect(find.textContaining('必填欄位沒完成'), findsOneWidget);
     verifyNever(
       () => repo.submitResponse(
         publicationId: any(named: 'publicationId'),
@@ -213,7 +214,7 @@ void main() {
         expectedSellerResponseVersion: any(
           named: 'expectedSellerResponseVersion',
         ),
-        idempotencyKey: any(named: 'idempotencyKey'),
+        clientRequestId: any(named: 'clientRequestId'),
       ),
     );
   });
@@ -246,12 +247,12 @@ void main() {
     expect(find.textContaining('與總金額一致'), findsOneWidget);
   });
 
-  testWidgets('STALE_SELLER_RESPONSE 明確告知並只給「重新載入」一條路', (tester) async {
+  testWidgets('VERSION_CONFLICT 明確告知並只給「重新載入」一條路', (tester) async {
     final repo = _repoWith(
       latestResponse: const SellerResponseVersionResponse(
         sellerResponseId: 'r-1',
         sellerResponseVersion: '3',
-        status: 'ACTIVE',
+        status: SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE,
       ),
       draft: SellerResponseDraftResponse(
         draftVersion: '1',
@@ -270,14 +271,14 @@ void main() {
         expectedSellerResponseVersion: any(
           named: 'expectedSellerResponseVersion',
         ),
-        idempotencyKey: any(named: 'idempotencyKey'),
+        clientRequestId: any(named: 'clientRequestId'),
       ),
     ).thenAnswer((_) async {
       submitCalls++;
-      throw ProcurementException(
-        message: procurementErrorPresentation('STALE_SELLER_RESPONSE')!.message,
-        code: 'STALE_SELLER_RESPONSE',
-        presentation: procurementErrorPresentation('STALE_SELLER_RESPONSE'),
+      throw reasonError(
+        Code.aborted,
+        'VERSION_CONFLICT',
+        message: '你的報價已經變動，請重新載入',
       );
     });
 
@@ -308,7 +309,7 @@ void main() {
     final repo = _MockRepo();
     when(
       () => repo.getPublicationDetail(_publicationId),
-    ).thenThrow(const ProcurementException(message: '找不到這則詢價'));
+    ).thenThrow(ConnectException(Code.notFound, 'gone'));
 
     await _pumpScreen(tester, repo);
     expect(find.text('重新載入'), findsOneWidget);

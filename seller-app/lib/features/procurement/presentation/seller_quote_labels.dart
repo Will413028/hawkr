@@ -1,28 +1,48 @@
-import '../../../core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart';
 
 /// 回價表單上的選項文案。
 ///
-/// 值域本身是 CodeMeta 登記的 [ProcurementSellerResponseType] 與
-/// [ProcurementTaxInclusionBasis]（backend #2538），本檔**不重新定義值域**，也不
-/// 出現任何 wire 字面值——只提供這張表單要顯示的字串。
-///
-/// 為什麼不直接用生成物的 `label`：CodeMeta 的 label 是跨端共用的短名
-/// （「自行報價」「含稅」「未稅」），而本表單沿用 #200 落地時的說明式文案
-/// （「提出我的條件與報價」「報價含稅」「報價未稅」）。文案是 UI，不是契約；
-/// 換掉它是 UX 改動，要另外提案，不該當作值域同步的副作用。
-///
-/// switch 刻意寫成窮盡（不留 default）：backend 之後若往這兩組值域加值，這裡會
-/// **編譯失敗**，逼人決定新選項在表單上叫什麼，而不是靜默落到某個 fallback 字串。
-extension SellerQuoteResponseTypeLabel on ProcurementSellerResponseType {
-  String get formLabel => switch (this) {
-    ProcurementSellerResponseType.manualQuote => '提出我的條件與報價',
-    ProcurementSellerResponseType.acceptNonPriceTermsWithQuote => '接受非價格條款並報價',
-  };
+/// 值域是契約的 [SellerResponseType]、[TaxInclusionBasis] 與 [SellerResponseStatus]；本檔只提供這張表單要顯示的
+/// 字串，三個 enum 都是單端（只有賣家 App 顯示）的文案。UNSPECIFIED 與不認得的值回空字串，呼叫端只對可選的值
+/// （`kSelectableResponseTypes`、`kSelectableTaxBases`）取文字。
+extension SellerQuoteResponseTypeLabel on SellerResponseType {
+  String get formLabel {
+    if (this == SellerResponseType.SELLER_RESPONSE_TYPE_MANUAL_QUOTE) {
+      return '提出我的條件與報價';
+    }
+    if (this ==
+        SellerResponseType
+            .SELLER_RESPONSE_TYPE_ACCEPT_NON_PRICE_TERMS_WITH_QUOTE) {
+      return '接受非價格條款並報價';
+    }
+    return '';
+  }
 }
 
-extension SellerQuoteTaxInclusionBasisLabel on ProcurementTaxInclusionBasis {
-  String get formLabel => switch (this) {
-    ProcurementTaxInclusionBasis.taxIncluded => '報價含稅',
-    ProcurementTaxInclusionBasis.taxExcluded => '報價未稅',
-  };
+extension SellerQuoteTaxInclusionBasisLabel on TaxInclusionBasis {
+  String get formLabel {
+    if (this == TaxInclusionBasis.TAX_INCLUSION_BASIS_TAX_INCLUDED) {
+      return '報價含稅';
+    }
+    if (this == TaxInclusionBasis.TAX_INCLUSION_BASIS_TAX_EXCLUDED) {
+      return '報價未稅';
+    }
+    return '';
+  }
+}
+
+extension SellerResponseStatusLabel on SellerResponseStatus {
+  String get label {
+    if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_ACTIVE) return '有效';
+    if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_SUPERSEDED) {
+      return '已被改版取代';
+    }
+    if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_WITHDRAWN) {
+      return '已撤回';
+    }
+    if (this == SellerResponseStatus.SELLER_RESPONSE_STATUS_EXPIRED) {
+      return '已逾有效期';
+    }
+    return '';
+  }
 }

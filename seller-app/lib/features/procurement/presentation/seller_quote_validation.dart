@@ -3,13 +3,10 @@ import '../data/seller_quote_model.dart';
 /// 回價表單的欄位鍵；[SellerQuoteValidation.fieldErrors] 用它定位錯誤。
 enum SellerQuoteField {
   responseType,
-  qualityGrade,
-  qualityInspectionNotes,
   unitBasisQuantity,
   unitBasisUnit,
   offeredQuantity,
   offeredQuantityUnit,
-  currency,
   goodsAmount,
   shippingAmount,
   taxAmount,
@@ -141,13 +138,11 @@ class SellerQuoteValidation {
 /// 正式提交的必填欄位。
 ///
 /// ⛔ 這份清單**不看 `responseType`**：v6.0 逐字要求，不論接受非價格條款或提出
-/// 不同條件，都必須建立含實際品相、unit basis、goods／shipping／tax／total 與
+/// 不同條件，都必須建立含 unit basis、goods／shipping／tax／total 與
 /// validUntil 的 immutable sellerResponseVersion。
 /// `ACCEPT_NON_PRICE_TERMS_WITH_QUOTE` 不是「少填金額的捷徑」。
 const List<SellerQuoteField> kRequiredQuoteFields = <SellerQuoteField>[
   SellerQuoteField.responseType,
-  SellerQuoteField.qualityGrade,
-  SellerQuoteField.qualityInspectionNotes,
   SellerQuoteField.unitBasisQuantity,
   SellerQuoteField.unitBasisUnit,
   SellerQuoteField.offeredQuantity,
@@ -173,14 +168,6 @@ SellerQuoteValidation validateSellerQuote(
     errors[SellerQuoteField.responseType] = '請選擇回應方式';
   }
 
-  // ⛔ 產品規則 1：實際品相不得由平台或 LLM 代填。
-  if (quote.offeredQuality.grade.trim().isEmpty) {
-    errors[SellerQuoteField.qualityGrade] = '請填寫這批貨的實際品相等級';
-  }
-  if (quote.offeredQuality.inspectionNotes.trim().isEmpty) {
-    errors[SellerQuoteField.qualityInspectionNotes] = '請填寫驗收說明';
-  }
-
   if (quote.unitBasis.quantity.trim().isEmpty) {
     errors[SellerQuoteField.unitBasisQuantity] = '請填寫計價基準數量';
   } else if (QuoteDecimal.tryParse(quote.unitBasis.quantity) == null) {
@@ -199,10 +186,6 @@ SellerQuoteValidation validateSellerQuote(
     errors[SellerQuoteField.offeredQuantityUnit] = '請填寫供應數量的單位';
   }
 
-  if (quote.currency != kQuoteCurrencyTwd) {
-    errors[SellerQuoteField.currency] = '目前只支援 $kQuoteCurrencyTwd';
-  }
-
   const amountFields = <SellerQuoteField, String>{
     SellerQuoteField.goodsAmount: '貨款',
     SellerQuoteField.shippingAmount: '運費',
@@ -219,8 +202,8 @@ SellerQuoteValidation validateSellerQuote(
     final raw = amountValues[field]!;
     if (raw.trim().isEmpty) {
       errors[field] = '請填寫$label';
-    } else if (QuoteDecimal.tryParse(raw) == null) {
-      errors[field] = '$label只能是非負數字，例如 1200 或 1200.50';
+    } else if (!RegExp(r'^\d{1,15}$').hasMatch(raw.trim())) {
+      errors[field] = '$label只能是非負整數（新台幣元），例如 1200';
     }
   });
 
