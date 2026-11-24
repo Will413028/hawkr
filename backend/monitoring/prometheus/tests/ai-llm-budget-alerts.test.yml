@@ -37,7 +37,7 @@ tests:
           - exp_labels: {env: dev, severity: warning}
             exp_annotations:
               summary: "env=dev：採購助手 LLM token 用量達自訂預算的 60%"
-              description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
+              description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（單體的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
       # 60% 沒有到 100%：Exceeded 不得觸發，即使 High 已經在同一筆資料上觸發。
       - eval_time: 20m
         alertname: AIProcurementLLMTokenBudgetExceeded
@@ -60,14 +60,14 @@ tests:
           - exp_labels: {env: dev, severity: warning}
             exp_annotations:
               summary: "env=dev：採購助手 LLM token 用量已超過自訂預算（120%）"
-              description: "近 5 分鐘 procurement_llm_tokens_total（不含 cached，理由同 AIProcurementLLMTokenBudgetHigh）換算成的每分鐘 token 用量已達到或超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 100%——不是逼近，是已經超過我們自己定的線。⚠️ 與 AIProcurementLLMTokenBudgetHigh 的差別只在門檻與 for，兩者會同時 fire、不是重複告警。⚠️ 本條**不是**硬上限依賴接入治理規範 §2②要求的「已觸上限副作用」告警——那個角色由 AIProcurementLLMExtractionDegraded（procurement_degraded_total）擔任，本條只是同一顆比值換一個更高門檻。⚠️ 與 AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 的差別同上面那條——LLM 仍在正常回應，這不是 provider 掛了。這是我方自訂、非強制性的治理數字，沒有任何程式路徑會因此拒絕或降級呼叫，所以本條不代表任何請求失敗；但持續超過代表容量帳已經跟不上真實用量。處置：立刻查是否有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
+              description: "近 5 分鐘 procurement_llm_tokens_total（不含 cached，理由同 AIProcurementLLMTokenBudgetHigh）換算成的每分鐘 token 用量已達到或超過 LLM_TOKEN_BUDGET_PER_MINUTE（單體的環境變數）宣告值的 100%——不是逼近，是已經超過我們自己定的線。⚠️ 與 AIProcurementLLMTokenBudgetHigh 的差別只在門檻與 for，兩者會同時 fire、不是重複告警。⚠️ 本條**不是**硬上限依賴接入治理規範 §2②要求的「已觸上限副作用」告警——那個角色由 AIProcurementLLMExtractionDegraded（procurement_degraded_total）擔任，本條只是同一顆比值換一個更高門檻。⚠️ 與 AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 的差別同上面那條——LLM 仍在正常回應，這不是 provider 掛了。這是我方自訂、非強制性的治理數字，沒有任何程式路徑會因此拒絕或降級呼叫，所以本條不代表任何請求失敗；但持續超過代表容量帳已經跟不上真實用量。處置：立刻查是否有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
       - eval_time: 20m
         alertname: AIProcurementLLMTokenBudgetHigh
         exp_alerts:
           - exp_labels: {env: dev, severity: warning}
             exp_annotations:
               summary: "env=dev：採購助手 LLM token 用量達自訂預算的 120%"
-              description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
+              description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（單體的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
 
   # ai_procurement_llm_budget_limit 完全缺席（未設定 LLM_TOKEN_BUDGET_PER_MINUTE）：即使用量
   # 很高，expr 的分母沒有任何序列，PromQL 算不出結果，不得觸發。這是 R2 的
@@ -121,14 +121,14 @@ tests:
           - exp_labels: {env: dev, severity: warning}
             exp_annotations:
               summary: "env=dev：採購助手 LLM token 用量達自訂預算的 +Inf%"
-              description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
+              description: "近 5 分鐘 procurement_llm_tokens_total（extract／narrate／realize／crop_suggest 四條角色的 prompt／completion／thoughts 合計，不含 cached——cached 是 prompt 的子集，算進去會重複計入且對不上 provider 實際計費）換算成的每分鐘 token 用量，已超過 LLM_TOKEN_BUDGET_PER_MINUTE（單體的環境變數）宣告值的 40%。⚠️ 這不是 provider 掛了——LLM 仍在正常回應，AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 才回答『通不通』。處置：先查是不是有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
       - eval_time: 20m
         alertname: AIProcurementLLMTokenBudgetExceeded
         exp_alerts:
           - exp_labels: {env: dev, severity: warning}
             exp_annotations:
               summary: "env=dev：採購助手 LLM token 用量已超過自訂預算（+Inf%）"
-              description: "近 5 分鐘 procurement_llm_tokens_total（不含 cached，理由同 AIProcurementLLMTokenBudgetHigh）換算成的每分鐘 token 用量已達到或超過 LLM_TOKEN_BUDGET_PER_MINUTE（ai-service 的環境變數）宣告值的 100%——不是逼近，是已經超過我們自己定的線。⚠️ 與 AIProcurementLLMTokenBudgetHigh 的差別只在門檻與 for，兩者會同時 fire、不是重複告警。⚠️ 本條**不是**硬上限依賴接入治理規範 §2②要求的「已觸上限副作用」告警——那個角色由 AIProcurementLLMExtractionDegraded（procurement_degraded_total）擔任，本條只是同一顆比值換一個更高門檻。⚠️ 與 AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 的差別同上面那條——LLM 仍在正常回應，這不是 provider 掛了。這是我方自訂、非強制性的治理數字，沒有任何程式路徑會因此拒絕或降級呼叫，所以本條不代表任何請求失敗；但持續超過代表容量帳已經跟不上真實用量。處置：立刻查是否有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
+              description: "近 5 分鐘 procurement_llm_tokens_total（不含 cached，理由同 AIProcurementLLMTokenBudgetHigh）換算成的每分鐘 token 用量已達到或超過 LLM_TOKEN_BUDGET_PER_MINUTE（單體的環境變數）宣告值的 100%——不是逼近，是已經超過我們自己定的線。⚠️ 與 AIProcurementLLMTokenBudgetHigh 的差別只在門檻與 for，兩者會同時 fire、不是重複告警。⚠️ 本條**不是**硬上限依賴接入治理規範 §2②要求的「已觸上限副作用」告警——那個角色由 AIProcurementLLMExtractionDegraded（procurement_degraded_total）擔任，本條只是同一顆比值換一個更高門檻。⚠️ 與 AIProcurementLLMDisabled／AIProcurementLLMConfigIncomplete 的差別同上面那條——LLM 仍在正常回應，這不是 provider 掛了。這是我方自訂、非強制性的治理數字，沒有任何程式路徑會因此拒絕或降級呼叫，所以本條不代表任何請求失敗；但持續超過代表容量帳已經跟不上真實用量。處置：立刻查是否有失控的扇出（同一買家對話異常重複觸發 extract/narrate/realize，或候選排序邏輯在迴圈裡重複呼叫 LLM）；排除後若是真實用量成長，調高 LLM_TOKEN_BUDGET_PER_MINUTE 並重新評估容量帳（硬上限依賴接入治理規範 §5 R7）。"
 
   # AIProcurementLLMExtractionDegraded（硬上限依賴接入治理規範 §2②「已觸
   # 上限的副作用」真正落地的那一條）。
@@ -163,7 +163,7 @@ tests:
           - exp_labels: {env: dev, severity: warning}
             exp_annotations:
               summary: "env=dev：採購助手 LLM 抽取持續失敗，買家已經在收到降級回應"
-              description: "extractor.Extract 持續回 error（timeout／provider 錯誤／額度用盡等），抽取器退回固定問法而非真正理解買家需求——這不是『快超出預算』，是**現在就在發生**的使用者體驗劣化，且 LLM 本身處於已開通狀態（ai_procurement_llm_enabled==1，排除了由 AIProcurementLLMDisabled 覆蓋、刻意未開通的那個狀態，避免同一件事被兩條告警重複計）。處置：查 EXTRACTOR_MODEL 所屬 provider（gemini／deepseek／gemma）當下的狀態頁與額度儀表板，確認是不是撞到 #1979 那類配額問題；同時看 ai-service log 的『procurement: graph extract_slots degraded』一行，裡面的 timeout 欄位可以分辨是逾時還是 provider 直接拒絕。"
+              description: "extractor.Extract 持續回 error（timeout／provider 錯誤／額度用盡等），抽取器退回固定問法而非真正理解買家需求——這不是『快超出預算』，是**現在就在發生**的使用者體驗劣化，且 LLM 本身處於已開通狀態（ai_procurement_llm_enabled==1，排除了由 AIProcurementLLMDisabled 覆蓋、刻意未開通的那個狀態，避免同一件事被兩條告警重複計）。處置：查 EXTRACTOR_MODEL 所屬 provider（gemini／deepseek／gemma）當下的狀態頁與額度儀表板，確認是不是撞到 #1979 那類配額問題；同時看 單體 log 的『procurement: graph extract_slots degraded』一行，裡面的 timeout 欄位可以分辨是逾時還是 provider 直接拒絕。"
 
   # 方向三（基準線）：LLM 已開通但沒有任何 degraded turn：不得觸發。
   - interval: 1m
