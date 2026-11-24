@@ -47,8 +47,12 @@ var scenarios = []ch.Scenario[Driver]{
 				t.Errorf("分類 %s 的上層 %s 不在樹裡", c.ID, c.ParentID)
 			}
 		}
-		if leafOf(t, cats) == "" {
-			t.Fatalf("分類樹沒有葉節點：%+v", cats)
+		second := false
+		for _, c := range cats {
+			second = second || (c.Leaf && c.ParentID != "")
+		}
+		if !second {
+			t.Fatalf("分類樹沒有第二層的葉節點（商品掛第二層，D8）：%+v", cats)
 		}
 	}},
 	{Name: "seller reads back what was created", Run: func(ctx context.Context, t ch.T, d Driver) {
