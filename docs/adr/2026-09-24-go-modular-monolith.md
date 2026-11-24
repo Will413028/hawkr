@@ -420,3 +420,5 @@
 - 本機與 CI 使用本機服務或測試替身的規定不變。
 
 理由：端點只會從設定進來，設定項刪除或不給預設值後，沒有路徑能在沒有人明確填入時連到舊公司；為此再維護一份 denylist 與 baseline，成本高於它防住的風險。
+
+物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

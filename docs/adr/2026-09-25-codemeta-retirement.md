@@ -104,3 +104,5 @@ CodeMeta 凍結，只服務還沒搬走的舊契約，隨模組搬遷逐項退�
 - 脈絡的約束「繼承：只有 zh-TW 一個語系。仍成立」不再成立：買家與賣家介面有 `zh-TW`、`en` 兩個語系，英文介面在該介面沒有未翻譯文字時才發佈；admin 仍只有 zh-TW。
 - 後果的重新評估條件「顯示文字改成共用的翻譯目錄或翻譯管理工具」：採用共用目錄（TS 生成 next-intl namespace、Dart 與 Go 直接生成程式碼），key 用不帶版本的 descriptor 路徑，說明取自 proto 註解；現在不用 TMS，觸發條件見新 ADR。
 - D5「顯示文字：client 的呈現層，以生成的 enum 為 key」的歸屬不變，只是「只由契約值決定、兩個以上 client 用到」的文字從各 client 手寫的對照表移到共用目錄（`step10e-labels-brief.md`）；伺服器產生的文字仍由產生它的模組擁有，依請求或帳號語系組字。
+
+物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

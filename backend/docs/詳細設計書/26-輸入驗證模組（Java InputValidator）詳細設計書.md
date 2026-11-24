@@ -185,24 +185,7 @@
 | 回傳 | 截斷後字串（未超長則原值回傳，null/空字串原樣回傳） |
 | 備註 | 截斷屬「資料適配」非「驗證」，不拋例外 |
 
-> **PayUni 物流欄位約束常數**（避免硬編碼，見 [Java 微服務開發規範](../開發規範/Java%20微服務開發規範.md) §6）：位置 `services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/validation/PayUniShippingConstraints.java`，與 `InputValidator` 同套件，供 order（結帳驗證）／ shipping（建單截斷）兩端引用。
->
-> | 常數 | 值（顯示長度） | 來源 | 處理方式 |
-> |---|---|---|---|
-> | `CVS_RECIPIENT_NAME_MIN` | 4（2 中文 / 4 英文） | 超商 7-11 Consignee（官方下限） | R10 驗證（前端可控） |
-> | `CVS_RECIPIENT_NAME_MAX` | 10（5 中文） | 超商 7-11 Consignee | R10 驗證 |
-> | `HOME_RECIPIENT_NAME_MAX` | 30 | 黑貓 Consignee | R10 驗證（min=1，僅上限） |
-> | `CVS_SENDER_NAME_MAX` | 10 | 超商建店 ContactName（賣家寄件人） | R10 驗證（min=1，賣家開通物流設定） |
-> | `HOME_SENDER_NAME_MAX` | 30 | 黑貓建店 SenderName（賣家寄件人/退貨收件人） | R10 驗證（min=1） |
-> | `RECIPIENT_ADDRESS_MAX` | 120 | 黑貓 ConsigneeAddress | R10 驗證 |
-> | `HOME_GOODS_NAME_MAX` | 20 | 黑貓 ProdDesc | R11 截斷（背景填寫） |
-> | `CVS_GOODS_NAME_MAX` | 500 | 超商 ProdDesc | R11 截斷（背景填寫，寬鬆保險） |
->
-> **約束來源**：PayUni 官方文件明定超商取件人姓名「最長 5 個中文字、最短至少 2 個中文字或 4 個英文字（限制長度 10）」、黑貓收件人姓名「限制長度 30（中文/全形算 2、英文算 1）」、商品名稱「最長 20 位」。`CVS_RECIPIENT_NAME_MIN=4` 為官方下限；低於此下限時 PayUni 回 `SHIP02114` 拒絕建單。
->
-> **單字中文姓名邊界**：依官方「最短 2 個中文字」，單名（如「王」= 顯示長度 2）會被本驗證拒絕——此為 PayUni 規格要求（超商取件需核對身分，不接受單字姓名），非過度限制。買家結帳會在源頭收到明確提示要求補足。
->
-> PayUni 約束細節見 [PayUni 物流官方 API 總覽](../第三方整合/PayUni%20物流官方%20API%20總覽.md) §4（建立超商物流單，Consignee/ProdDesc）/ §5（建立宅配單（黑貓），Consignee/ConsigneeAddress/ProdDesc）。
+> **PayUni 物流欄位約束常數**（`PayUniShippingConstraints`，收件人姓名、地址與商品名稱長度的物流商限制）已隨物流商退場刪除（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）；收件人姓名與地址的驗證規則由 B8 ordering 重新決定；下列 3.1 的收件人欄位列描述 B3 之前 Java 的現況。
 
 ---
 
@@ -212,13 +195,10 @@
 
 | 驗證位置 | 欄位 | 驗證方法 | fieldName |
 |---------|------|---------|-----------|
-| CheckoutService.confirm | recipientName（超商取貨） | `requireDisplayLengthBetween(name, CVS_RECIPIENT_NAME_MIN, CVS_RECIPIENT_NAME_MAX, ...)` = `[4, 10]` | 收件人姓名 |
-| CheckoutService.confirm | recipientName（宅配） | `requireDisplayLengthBetween(name, 1, HOME_RECIPIENT_NAME_MAX, ...)` = `[1, 30]`（先 `requireNotEmpty`） | 收件人姓名 |
+| CheckoutService.confirm | recipientName | `requireDisplayLengthBetween(name, 1, HOME_RECIPIENT_NAME_MAX, ...)` = `[1, 30]`（先 `requireNotEmpty`） | 收件人姓名 |
 | CheckoutService.confirm | recipientPhone | `requireMobile` | 收件人電話 |
-| CheckoutService.confirm | shippingAddress（宅配時） | `requireAddress` + `requireDisplayLengthBetween(addr, 1, RECIPIENT_ADDRESS_MAX, ...)` = 上限 120 | 收件地址 |
-| **OrderService.createOrder（建單收斂點最後防線）** | recipientName（依 shippingMethod）+ shippingAddress | 同 confirm 規則（超商 [4,10] / 宅配 ≤30；地址 ≤120）。**縱深防禦**：所有「帶收件人建單」路徑共同收斂點，防繞過 confirm 的入口（06 §2.5） | 收件人姓名 / 收件地址 |
-| CheckoutService.confirm | shippingMethod | `requireNotEmpty` | 配送方式 |
-| CheckoutService.confirm | deliveryTemp | `requireNotEmpty` | 配送溫層 |
+| CheckoutService.confirm | shippingAddress | `requireAddress` + `requireDisplayLengthBetween(addr, 1, RECIPIENT_ADDRESS_MAX, ...)` = 上限 120 | 收件地址 |
+| **OrderService.createOrder（建單收斂點最後防線）** | recipientName + shippingAddress | 同 confirm 規則（姓名 ≤30；地址 ≤120）。**縱深防禦**：所有「帶收件人建單」路徑共同收斂點，防繞過 confirm 的入口 | 收件人姓名 / 收件地址 |
 | CheckoutService.resolveItems | quantity | `requirePositiveInt` | 購買數量 |
 | CheckoutService.resolveItems | price | `requirePositiveAmount` | 商品價格 |
 | CheckoutService.preview/confirm | discountAmount | `requireNonNegativeAmount` | 折扣金額 |
@@ -233,29 +213,13 @@
 | ProductService.createProduct/updateProduct | stockQty | `!= null && < 0` → 拒絕 | 庫存數量 |
 | ProductService.createProduct/updateProduct | weight | `!= null && <= 0` → 拒絕 | 商品重量 |
 | ProductService.createProduct/updateProduct | lengthCm/widthCm/heightCm | `!= null && <= 0` → 拒絕 | 包裝長度/寬度/高度 |
-| ProductGrpcService.calculateShippingOptions | length/width/height | `requirePositiveCm` | length/width/height |
 | ProductService | unit | `CodeMetaValidator.requireValidCode` | unit |
 | ProductService.createProduct/updateProduct | description.blocks[?type=text].content | `requireNoHtmlTags`（逐 block 套用） | 商品描述 |
 | ProductService.createProduct/updateProduct | hashtags | `requireHashtagSet` | 商品 hashtag |
 
-### 3.3 Shipping Service（物流建店 + 出貨 Strategy）
+### 3.3 Shipping Service（已退場）
 
-| 驗證位置 | 欄位 | 驗證方法 | fieldName |
-|---------|------|---------|-----------|
-| OnboardingService.onboardCvsShipping | senderName | `requireDisplayLengthBetween(1, CVS_SENDER_NAME_MAX)` = 上限 10 | 寄件人姓名 |
-| OnboardingService.onboardCvsShipping | senderPhone | `requireMobile` | 寄件人電話 |
-| OnboardingService.onboardHomeDelivery | senderName | `requireDisplayLengthBetween(1, HOME_SENDER_NAME_MAX)` = 上限 30 | 寄件人姓名 |
-| OnboardingService.onboardHomeDelivery | returnName（選填） | `requireDisplayLengthBetween(1, HOME_SENDER_NAME_MAX)`（有值才驗） | 退貨收件人姓名 |
-| OnboardingService.onboardHomeDelivery | senderPhone | `requireMobile` | 寄件人電話 |
-| OnboardingService.onboardHomeDelivery | senderAddressDetail | `requireAddress` | 寄件詳細地址 |
-| OnboardingService.onboardHomeDelivery | returnPhone（選填） | `requireMobile` | 退貨聯絡人電話 |
-| OnboardingService.onboardHomeDelivery | returnAddressDetail（選填） | `requireAddress` | 退貨詳細地址 |
-| Home/Cvs/UberShipmentStrategy | sellerAccountId/buyerAccountId/totalActualAmount | `ProtoConversionUtils.parseLongRequired` | — |
-| HomeShipmentStrategy | goodsName（送 PayUni 前） | `truncateByDisplayLength(name, HOME_GOODS_NAME_MAX)` = 截斷至 20 | — |
-| CvsShipmentStrategy | goodsName（送 PayUni 前） | `truncateByDisplayLength(name, CVS_GOODS_NAME_MAX)` = 截斷至 500 | — |
-| ShipmentLabelService | assetId | `ProtoConversionUtils.parseLongRequired` | — |
-
-> **背景填寫截斷說明**：商品名稱來自訂單商品（系統撈取，非前端可控、無法回頭要使用者改），故採 R11 截斷而非 R10 驗證拒絕。收件人姓名 / 地址為前端可控，採 R10 源頭驗證拒絕，讓使用者在結帳時即修正。送往 PayUni 的 goodsName 一律套 `truncateByDisplayLength`，不論來源是固定字串或動態商品名稱。
+Java shipping 的物流建店與出貨 Strategy 驗證隨 Java shipping 刪除（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）。
 
 ### 3.4 Payment Service
 

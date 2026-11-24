@@ -379,7 +379,7 @@ EXTERNAL lane 的語意因此是「**平台結算 store 這個賣家自己賣**�
 
 #### 6.4.6 配送方式 ＝ `3005`
 
-`MERCHANT_DELIVERY`（賣家自行配送，無外部 provider API）：站外業者自己出貨，平台不安排物流。連帶好處是 Uber Direct 資格閘門只在 `shippingMethod = 3003` 時 applicable ⇒ RFQ 不受影響。
+`MERCHANT_DELIVERY`（賣家自行配送，無外部 provider API）：站外業者自己出貨，平台不安排物流。
 
 #### 6.4.7 冪等鍵 ＝ `buyerAcceptanceId`
 

@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted；Java 的 Uber 程式刪除時（主計畫 B3）標 superseded by `2026-10-27-general-ecommerce-scope-cut.md`（D4）；在那之前 Java 仍依本檔運作 |
+| 狀態 | superseded by `2026-11-15-fulfillment-seller-managed-shipping.md`（出貨改賣家自寄，物流商與其帳務、Uber 程式已於 B3 退場；本檔保留歷史）；原為 accepted |
 | 日期 | 2026-09-11 |
 | 影響範圍 | payment-service 物流服務費收費時點 |
 

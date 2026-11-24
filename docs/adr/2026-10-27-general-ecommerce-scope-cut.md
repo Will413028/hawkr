@@ -77,3 +77,5 @@
 - 刪除：`services/java/product-import-service`；gateway 的 `/api/v1/app/product_import_jobs` 全部 18 個端點與 OpenAPI operation；product-service 與 media-service 只服務匯入的 RPC（`ValidateLeafCategoryInternal`、`CreateProductFromImportInternal`、`BatchCheckSellerProductNames`、`ValidateProductDraft`、`GetProductsBriefInternal`、`ImportDownloadAsset`、`FinalizeImportAsset`、`BindStagedAsset`）、media 的 `import_asset` 表與下載 worker、`product.import_job_id`／`import_item_id` 與 `media_asset.import_store_id` 欄位；匯入專用的 MQ exchange 與 queue；CodeMeta 的匯入值域（`ImportJobStatus` 等）、錯誤碼 1100–1199、`AssetReferenceType` 的 7116、7117 與 `ProductCertificationSource` 的 `PRODUCT_IMPORT`。
 - D9 中與匯入有關的部分作廢：匯入預覽、CSV 匯入的溫層欄位都不再存在；B4 不必再決定匯入端的溫層處理。
 - 主計畫：B5 標為已移除；模組表的 `productimport` 列取消（見 `2026-09-24-go-modular-monolith` 的對應修訂）。
+
+物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

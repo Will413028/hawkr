@@ -59,12 +59,13 @@
 | D 文件 | 1 + 7（同一個 session） | 現在 | `backend/docs`（不含 `plans/`）、`docs/adr` |
 
 - 撞檔點：步驟 4 刪 notification 分類與步驟 6 刪 client 開關要同一批合進 dev（步驟 4 已寫）；步驟 3 與步驟 6 都改 seller-app 上手清單，6 只刪「物流設定」步驟、3 加「運費設定」步驟，後到者 rebase；主計畫檔只由 D 軌道改。
+- 步驟 7 刪的 `第三方整合/PayUni 物流官方 API 總覽.md`、`Uber Direct API 總覽.md` 仍被 Java shipping 與 payuni-webhook 的原始碼與測試讀取（`UberWebhookParserTest` 等），D 軌道不得早於 A 軌道的步驟 4 合進 dev。
 - 步驟 8 在四條軌道都完成後做。
 
 - [ ] **0. 基線**（軌道 A 第一件事；被擋於：無）
   - 範圍：在當下 dev 重跑三份盤點 §0 的計數指令，差異補進附件；跑 backend 的 CI 等價檢查，記既有失敗。B、C、D 軌道開工時各自跑自己會碰到的檢查當基線，記在進度表。
   - 驗收：進度表記錄基線與計數差異。
-- [ ] **1. 文件前置**（被擋於：R4）
+- [x] **1. 文件前置**（被擋於：R4）
   - 範圍：主計畫 B1、B3、B6、B8、B9 條目依 ADR 2026-11-24 修訂改寫（B8 加出貨、B6 報價來源、B9 退貨物流、B1 的託運單觸發作廢）；對設計書 69 的引用改指 ADR 修訂；假日段修正。
   - 驗收：`rg -n '設計書 ?69' backend/docs docs` 只剩歷史紀錄；`python3 scripts/check-doc-paths.py` 綠。
 - [ ] **2. seller 運費設定與報價**（被擋於：R2、R6）
@@ -136,3 +137,5 @@ R1–R6 已決 2026-11-24 Will（照建議；R6 選「改成運費設定已填�
 |---|---|---|---|---|
 | 盤點與前提重審 | 完成 | 三份盤點（快照 `496b048e2`）；v1 計畫審查 2 輪；前提重審批判 1 輪 | v2 計畫審查 1 輪，修正後未再審（只改驗收文字與補範圍） | `3d8ef0bc0`、`b1bb27a92` |
 | 0 基線 | 未開始 | | | |
+| 1 文件前置 | 完成 | 基線：`check-doc-paths.py` 綠；完成後 `rg -n '設計書 ?69' backend/docs docs` 只剩本計畫與附件 | 無 | 分支 `b3-d-docs` |
+| 7 文件 | 程式完成待驗收 | 基線：`check-doc-paths.py`、`check-payuni-residue.py` 綠，物流商字眼 45 檔（不含 plans、ADR）；完成後兩支腳本綠，剩 16 檔，皆非物流商：`Kubernetes`、`Uber Fx` 子字串，PayUni 金流付款類型（7-ELEVEN ibon），CodeMeta 來源 md 與 `generate.sh`（物流值域歸步驟 4） | CodeMeta 4 份 md 與 `generate.sh` 的物流值等步驟 4；`PayUni 金流官方 API 總覽` 的貨到付款段待 Will 決定 | 分支 `b3-d-docs` |
