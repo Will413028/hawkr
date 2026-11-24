@@ -98,7 +98,7 @@ func (s *Service) startReversals(ctx context.Context, q *store.Queries, paymentI
 			legs = append(legs, leg{seq: int32(i), target: targets[i], amount: take})
 		}
 		if left > 0 {
-			if err := s.publishAnomaly(ctx, model.AnomalyReversal, r.ID, r.PaymentID, reversalExceedsRemaining); err != nil {
+			if err := s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, reversalExceedsRemaining); err != nil {
 				return err
 			}
 			if len(legs) == 0 {

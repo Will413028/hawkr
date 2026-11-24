@@ -214,13 +214,13 @@ func TestRequestTransferRefusesWhatCannotBeTransferred(t *testing.T) {
 	must(t, f.fake.Settle(f.externalOf(t, "T-3c"), PaymentStateSucceeded, f.now))
 	f.sync(t, f.idOf(t, "T-3c"))
 	f.enableAccount(t, 8, "acct_8", false)
-	// T-3d：已入帳、帳戶開通，但已全額退款（進行中的退款也算）。
+	// T-3d：已入帳、帳戶開通，但已全額退款（退款全部成功；還有進行中的退款時不拒絕，見 TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail）。
 	f.order("T-3d", 11, 9, 100)
 	f.create(t, 11, "T-3d")
 	must(t, f.fake.Settle(f.externalOf(t, "T-3d"), PaymentStateSucceeded, f.now))
 	f.sync(t, f.idOf(t, "T-3d"))
 	f.enableAccount(t, 9, "acct_9", true)
-	f.insertRefund(t, f.idOf(t, "T-3d"), "PENDING", 100, 0)
+	f.insertReversal(t, f.idOf(t, "T-3d"), "SUCCEEDED", "NONE", 100, 0)
 	for _, c := range []struct {
 		no   string
 		kind apperr.Kind

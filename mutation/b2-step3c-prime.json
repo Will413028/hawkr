@@ -94,8 +94,8 @@
    "id": "anomalous-reversal-does-not-hold-the-reservation",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "WHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY')",
-   "new": "WHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING')",
+   "old": "v.status IN ('REVERSING', 'ANOMALY')), 0)",
+   "new": "v.status IN ('REVERSING')), 0)",
    "test": "internal/modules/payment ^(TestAnAnomalousReversalKeepsHoldingItsReservationAndAPermanentFailureReleasesIt)$",
    "why": "撤回的 ANOMALY 不佔預留：新退款的收回額沒有扣掉待核對的那一筆，超過轉帳剩餘額度。"
   },
@@ -141,15 +141,15 @@
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
    "old": "\t\tpay, err := q.LockPayment(ctx, cur.PaymentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tlocked, err := q.LockTransfer(ctx, transferID)",
    "new": "\t\tpay, err := q.PaymentByID(ctx, cur.PaymentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tlocked, err := q.LockTransfer(ctx, transferID)",
-   "test": "internal/modules/payment ^(TestAConcurrentRefundAndTheTransferSendNeverOverpay)$",
-   "why": "claim 不鎖付款列：併發的退款與轉帳送出不再排成先後，轉帳看不到未提交的退款而多付。"
+   "test": "internal/modules/payment ^(TestTheTransferClaimWaitsOnThePaymentRowLockAloneAndSeesTheRefundCommittedUnderIt)$",
+   "why": "claim 不鎖付款列：只持有付款列鎖、尚未提交退款的 transaction 不再擋住 claim，轉帳看不到未提交的退款而多付（退款走 CreateRefund 時轉帳列的鎖也會擋住 claim，所以由直接持付款列鎖的測試守）。"
   },
   {
    "id": "claim-zero-amount-still-calls-the-provider",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\tif amount <= 0 {",
-   "new": "\t\t\tif amount < 0 {",
+   "old": "\t\t\tif amount <= 0 {\n\t\t\t\treason := failedFullyRefunded",
+   "new": "\t\t\tif amount < 0 {\n\t\t\t\treason := failedFullyRefunded",
    "test": "internal/modules/payment ^(TestARefundBeforeTheTransferIsSentMakesTheTransferPayLessAndNeedsNoReversal)$",
    "why": "算出 0 不終局：全額退款的轉帳仍往下 claim 與呼叫 provider。"
   },
@@ -377,6 +377,60 @@
    "new": "",
    "test": "internal/modules/payment ^TestASegmentAnomalyHoldsTheReservationAndIsResolvedPerSegment$",
    "why": "人工結案成功不累加目標的累計撤回額：補差額轉帳的撤回額仍是 0，之後可重複撤回。"
+  },
+  {
+   "id": "transfer-evidence-drops-the-provider-amounts",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "evidenceProof{key: t.IdempotencyKey, amount: snap.Amount, reversed: snap.ReversedAmount}",
+   "new": "evidenceProof{key: t.IdempotencyKey}",
+   "test": "internal/modules/payment ^(TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifiedTransfer)$",
+   "why": "轉帳核對證據不帶 provider 的金額與已撤回額：結案成成功時等待中的預留從 0 重算被全部釋出、reversed_amount 記成 0。"
+  },
+  {
+   "id": "refund-anomaly-resolved-failed-is-silent",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "\t\tif err := s.afterRefundFailed(ctx, written); err != nil {\n\t\t\treturn reason, err\n\t\t}\n",
+   "new": "\t\t_ = written\n",
+   "test": "internal/modules/payment ^(TestResolvingARefundAnomalyAsFailedAfterAReversalLandedAlertsTheMoneyAnomaly)$",
+   "why": "退款的 ANOMALY 人工結案成失敗時不呼叫 afterRefundFailed：撤回已落地卻沒有發 refund_failed_after_reversal 的 MoneyAnomaly。"
+  },
+  {
+   "id": "reversal-exceeds-remaining-alert-on-the-reversal-kind",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "model.AnomalyRefund, r.ID, r.PaymentID, reversalExceedsRemaining",
+   "new": "model.AnomalyReversal, r.ID, r.PaymentID, reversalExceedsRemaining",
+   "test": "internal/modules/payment ^(TestAReservationLargerThanTheTargetsRemainingIsCappedAndAlertsOnTheRefund)$",
+   "why": "預留超過目標剩餘額的 MoneyAnomaly 種類改回撤回、物件卻是退款 ID：與 AnomalyReversal 的 ObjectID 是撤回列 ID 的契約衝突。"
+  },
+  {
+   "id": "pending-reversal-total-aggregate-formula",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "SELECT (\n    COALESCE((SELECT SUM(w.reversal_amount) FROM payment.refunds AS w WHERE w.payment_id = $1 AND w.reversal_status = 'WAITING'), 0)\n    + COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.payment_id = $1 AND v.status IN ('REVERSING', 'ANOMALY')), 0)\n)::bigint AS total\n",
+   "new": "SELECT COALESCE(SUM(reversal_amount - reversal_recovered), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY')\n",
+   "test": "internal/modules/payment ^(TestAReleasedReversalRowOfAFailedRefundNoLongerReservesCapacity)$",
+   "why": "預留改回以退款彙總的 reversal_amount − reversal_recovered 算：已 RELEASED 的撤回列仍佔預留，新退款預留不足。"
+  },
+  {
+   "id": "claim-ignores-in-flight-refunds-when-nothing-is-left",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\t\t\tif inFlight > 0 {\n\t\t\t\t\treturn fmt.Errorf(\"%w：轉帳 %s\", errRefundsInFlight, transferID)\n\t\t\t\t}\n",
+   "new": "\t\t\t\t_ = inFlight\n",
+   "test": "internal/modules/payment ^(TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail|TestARefundBeforeTheTransferIsSentMakesTheTransferPayLessAndNeedsNoReversal)$",
+   "why": "退款涵蓋整筆但還有進行中的退款時轉帳仍直接 FAILED（fully_refunded）：那些退款之後失敗，賣家永遠收不到錢。"
+  },
+  {
+   "id": "request-refuses-while-in-flight-refunds-cover-the-payment",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\tif inFlight <= 0 {\n\t\t\treturn terms, apperr.FailedPrecondition(\"付款已全額退款，沒有可轉的金額\"), nil\n\t\t}\n",
+   "new": "\t\tif inFlight >= 0 {\n\t\t\treturn terms, apperr.FailedPrecondition(\"付款已全額退款，沒有可轉的金額\"), nil\n\t\t}\n",
+   "test": "internal/modules/payment ^(TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail)$",
+   "why": "進行中的退款涵蓋整筆付款時 RequestTransfer 仍拒絕：退款之後失敗沒有轉帳列，賣家永遠收不到錢。"
   }
  ]
 }

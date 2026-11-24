@@ -40,6 +40,10 @@ func classifyCall(err error) callOutcome {
 // errNotFoundYet 標示查回查無、但從第一次呼叫起還不到 NotFoundAfter：不能當成確定不存在，稍後再查。
 var errNotFoundYet = errors.New("charge: 查回查無，但還沒過最短等待時間")
 
+// errRefundsInFlight 標示退款已涵蓋整筆付款、但其中還有沒終局的退款（PENDING、REFUNDING、ANOMALY）：轉帳不能先當成全額退款終結，它們失敗時賣家要收到這筆錢。
+// 轉帳保持 PENDING、金額不承諾，稍後（River 重試、週期掃描）重新 claim。
+var errRefundsInFlight = errors.New("charge: 退款涵蓋整筆付款但還有進行中的，轉帳等它們終局")
+
 // inResendWindow 回傳這把鍵是否還可以重送：沒呼叫過，或第一次呼叫起還在 ResendWindow 內。
 func inResendWindow(calledAt *time.Time, now time.Time) bool {
 	return calledAt == nil || now.Sub(*calledAt) < ResendWindow

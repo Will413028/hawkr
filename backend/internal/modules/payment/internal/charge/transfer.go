@@ -19,7 +19,7 @@ import (
 // RequestTransfer 是訂單完成後把這筆付款的款項轉給賣家的入口（D6；訂單一方的 GrantPayment 呼叫）：在一個 transaction 內鎖付款列、確認已入帳，
 // 寫一筆 PENDING 轉帳（金額是付款金額扣掉非失敗退款，賣家收款帳戶的外部 ID 寫成快照；帳戶必須已開通轉帳）並排入轉帳 job；provider 在 transaction 外由 job 呼叫（規則 5）。
 // 冪等：已有有效（PENDING、SUCCEEDED 或 ANOMALY）轉帳時回傳它，由唯一索引 transfers_active_payment 守，不寫第二筆；只有沒有有效轉帳時，付款未入帳、賣家帳戶未開通
-// 或沒有可轉的金額才是 FailedPrecondition（FAILED 的轉帳不佔位，之後再呼叫會建新的一筆、換新鍵）。付款不存在回 NotFound。呼叫方不能在 transaction 內呼叫。
+// 或沒有可轉的金額（退款全部 SUCCEEDED 而涵蓋整筆付款；涵蓋整筆但還有進行中的退款時仍寫列，暫定金額是進行中退款的加總，claim 會重算）才是 FailedPrecondition（FAILED 的轉帳不佔位，之後再呼叫會建新的一筆、換新鍵）。付款不存在回 NotFound。呼叫方不能在 transaction 內呼叫。
 func (s *Service) RequestTransfer(ctx context.Context, orderNo string) (model.Transfer, error) {
 	if err := s.requireProvider(); err != nil {
 		return model.Transfer{}, err
@@ -95,10 +95,18 @@ func (s *Service) transferTerms(ctx context.Context, q *store.Queries, pay store
 	if err != nil {
 		return terms, nil, err
 	}
-	if pay.Amount-refunded <= 0 {
-		return terms, apperr.FailedPrecondition("付款已全額退款，沒有可轉的金額"), nil
+	amount := pay.Amount - refunded
+	if amount <= 0 {
+		inFlight, err := q.InFlightRefundTotal(ctx, pay.ID)
+		if err != nil {
+			return terms, nil, err
+		}
+		if inFlight <= 0 {
+			return terms, apperr.FailedPrecondition("付款已全額退款，沒有可轉的金額"), nil
+		}
+		amount = inFlight
 	}
-	return transferTermsResult{amount: pay.Amount - refunded, destination: *acct.ExternalAccountID}, nil, nil
+	return transferTermsResult{amount: amount, destination: *acct.ExternalAccountID}, nil, nil
 }
 
 func toTransfer(r store.PaymentTransfer) model.Transfer {
@@ -252,8 +260,8 @@ func (s *Service) acceptTransfer(ctx context.Context, row store.PaymentTransfer,
 }
 
 // claimTransfer 是這把冪等鍵第一次送出前的承諾（D11、ADR D69）：在獨立的 transaction 內依序鎖付款列、轉帳列，called_at 為空時（這把鍵還沒送過）以「付款金額減非失敗退款」算定金額，
-// 與 called_at 一起寫入；called_at 已有值（同一把鍵的重送）金額不變。算定金額時等待中的預留都釋出（退款已從金額扣掉，不必再撤回）；算出不大於 0 時不呼叫 provider，
-// 轉帳直接進 FAILED（fully_refunded，回 nil）。列已不是 PENDING 時回 nil。呼叫 provider 之前提交，之後進來的退款看得到「金額已承諾」。
+// 與 called_at 一起寫入；called_at 已有值（同一把鍵的重送）金額不變。算定金額時等待中的預留都釋出（退款已從金額扣掉，不必再撤回）；算出不大於 0 時不呼叫 provider：退款全部終局（SUCCEEDED）才進 FAILED（fully_refunded，回 nil）；
+// 還有進行中的退款（PENDING、REFUNDING、ANOMALY）時回 errRefundsInFlight、什麼都不寫，轉帳保持 PENDING 等它們終局，它們之後失敗金額就大於 0、賣家照常收到。列已不是 PENDING 時回 nil。呼叫 provider 之前提交，之後進來的退款看得到「金額已承諾」。
 func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now time.Time) (*store.PaymentTransfer, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -288,6 +296,15 @@ func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now t
 				return err
 			}
 			amount = pay.Amount - refunded
+			if amount <= 0 {
+				inFlight, err := q.InFlightRefundTotal(ctx, pay.ID)
+				if err != nil {
+					return err
+				}
+				if inFlight > 0 {
+					return fmt.Errorf("%w：轉帳 %s", errRefundsInFlight, transferID)
+				}
+			}
 			if err := s.releaseWaitingReversals(ctx, q, pay.ID, reversalDeducted); err != nil {
 				return err
 			}

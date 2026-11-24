@@ -31,7 +31,7 @@
    "id": "transfer-amount-ignores-refunds",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "transferTermsResult{amount: pay.Amount - refunded, destination:",
+   "old": "transferTermsResult{amount: amount, destination:",
    "new": "transferTermsResult{amount: pay.Amount, destination:",
    "test": "internal/modules/payment ^TestRequestTransferWritesThePendingRowAndTheJobWithoutCallingTheProvider$",
    "why": "轉帳金額不扣非失敗退款：付款 100、退款 30 時轉帳是 100，不是 70。"
@@ -40,8 +40,8 @@
    "id": "transfer-fully-refunded-not-refused",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\tif pay.Amount-refunded <= 0 {",
-   "new": "\tif pay.Amount-refunded < 0 {",
+   "old": "\tamount := pay.Amount - refunded\n\tif amount <= 0 {",
+   "new": "\tamount := pay.Amount - refunded\n\tif amount < 0 {",
    "test": "internal/modules/payment ^TestRequestTransferRefusesWhatCannotBeTransferred$",
    "why": "全額退款的付款可轉金額為 0：不再被拒絕，寫轉帳列違反 amount > 0 的 CHECK，回的不是 FailedPrecondition。"
   },

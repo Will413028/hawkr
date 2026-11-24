@@ -11,6 +11,12 @@ SELECT COALESCE(SUM(amount), 0)::bigint AS total
 FROM payment.refunds
 WHERE payment_id = $1 AND status <> 'FAILED';
 
+-- name: InFlightRefundTotal :one
+-- 付款還沒終局的退款加總（PENDING、REFUNDING、ANOMALY）：它們失敗時賣家要收到這筆錢，轉帳不能先當成全額退款終結。
+SELECT COALESCE(SUM(amount), 0)::bigint AS total
+FROM payment.refunds
+WHERE payment_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY');
+
 -- name: InsertTransfer :execrows
 -- 一筆付款最多一筆有效（不是 FAILED 的）轉帳，只由唯一索引 transfers_active_payment 守（哪些狀態佔位只寫在索引的條件裡）：已有有效轉帳時不寫（ON CONFLICT DO NOTHING，不指定索引），呼叫端再讀既有的那筆。
 INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, created_at, updated_at)
@@ -194,10 +200,12 @@ FROM payment.refunds
 WHERE payment_id = sqlc.arg(payment_id) AND request_key = sqlc.arg(request_key);
 
 -- name: PendingReversalTotal :one
--- 已預留、還沒成立的撤回額度（預留額減已成立的）：WAITING、REVERSING 與 ANOMALY 的預留。
-SELECT COALESCE(SUM(reversal_amount - reversal_recovered), 0)::bigint AS total
-FROM payment.refunds
-WHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY');
+-- 已預留、還沒成立的撤回額度，逐列算：WAITING 的退款還沒分成撤回列，以預留額計；其餘以撤回列計（REVERSING 與 ANOMALY 的撤回列佔住額度，REVERSED、RELEASED 的不佔），
+-- 與撤回目標的剩餘額（OpenReversalTotalOnTransfer、ReversibleTopups）同一個口徑。
+SELECT (
+    COALESCE((SELECT SUM(w.reversal_amount) FROM payment.refunds AS w WHERE w.payment_id = $1 AND w.reversal_status = 'WAITING'), 0)
+    + COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.payment_id = $1 AND v.status IN ('REVERSING', 'ANOMALY')), 0)
+)::bigint AS total;
 
 -- name: InsertRefund :one
 INSERT INTO payment.refunds (id, payment_id, request_key, amount, auto, reversal_status, reversal_amount, created_at, updated_at)

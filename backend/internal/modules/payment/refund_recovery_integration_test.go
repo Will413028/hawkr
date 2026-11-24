@@ -39,6 +39,7 @@ func (f *chargeFixture) reversalOf(t *testing.T, refundID interface{ String() st
 // 轉帳送出前的退款：轉帳在第一次送出時才算定金額（付款減非失敗退款），這筆退款已在其中，所以轉帳少付、沒有預留也沒有撤回；全額退款讓轉帳不呼叫 provider 直接終局。
 // mutation：claimTransfer 的金額改回寫列時的 locked.Amount（不重算）→ provider 收到 100，失敗。
 // mutation：claimTransfer 算出不大於 0 時仍呼叫 provider → 全額退款的轉帳呼叫了 provider，失敗。
+// 全額退款還在進行中時轉帳等退款終局，退款成功才進 FAILED（fully_refunded）。
 func TestARefundBeforeTheTransferIsSentMakesTheTransferPayLessAndNeedsNoReversal(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
@@ -66,7 +67,11 @@ func TestARefundBeforeTheTransferIsSentMakesTheTransferPayLessAndNeedsNoReversal
 
 	f.paidPayment(t, "RR-1b", 100)
 	all := f.requestTransfer(t, "RR-1b")
-	f.createRefund(t, "RR-1b", "all", 100, false)
+	allRefund := f.createRefund(t, "RR-1b", "all", 100, false)
+	if err := f.runTransfer(all.ID, false); err == nil || f.transferText(t, "status", all.ID) != "PENDING" || f.transferText(t, "called_at", all.ID) != "" {
+		t.Fatalf("退款還在進行中，轉帳不該終局：%v，%s", err, f.transferText(t, "status", all.ID))
+	}
+	must(t, f.runRefund(allRefund.ID, false))
 	must(t, f.runTransfer(all.ID, false))
 	if f.transferText(t, "status", all.ID) != "FAILED" || f.transferText(t, "failure_reason", all.ID) != "fully_refunded" || f.fake.TransferCalls() != 1 {
 		t.Fatalf("全額退款的轉帳：%s %s，provider 呼叫 %d 次", f.transferText(t, "status", all.ID), f.transferText(t, "failure_reason", all.ID), f.fake.TransferCalls())
@@ -122,7 +127,7 @@ func TestAKeyRotationRecomputesTheTransferAmountAndReleasesTheReservationsItAlre
 
 // 併發：退款與轉帳送出同時進來，只會排成先後，不會多付。證明競態真的形成：退款停在「已持有付款列鎖、列已寫入、尚未提交」（job 排入時阻塞），
 // 轉帳的 claim 必須等在付款列的鎖上（pg_stat_activity 看得到 Lock 等待）；放行之後 claim 看得到這筆退款，轉帳只付 60、沒有撤回。
-// mutation：claimTransfer 拿掉 LockPayment → claim 不等鎖、在退款提交前就算完（金額 100），下面「claim 在退款持有鎖時就結束」失敗。
+// 付款列的鎖本身由 TestTheTransferClaimWaitsOnThePaymentRowLockAloneAndSeesTheRefundCommittedUnderIt 守（這裡退款同時持有轉帳列的鎖，拿掉 LockPayment 也會被擋住）。
 func TestAConcurrentRefundAndTheTransferSendNeverOverpay(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
@@ -438,6 +443,10 @@ func TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifie
 		t.Fatalf("撤回之後：%s，reversed %d", f.reversalOf(t, r.ID), f.reversedOf(t, tr.ID))
 	}
 
+	if f.count(t, "SELECT amount FROM payment.refund_reversals WHERE refund_id = $1", r.ID) != 30 || f.count(t, "SELECT count(*) FROM payment.refund_reversals WHERE refund_id = $1", r.ID) != 1 {
+		t.Fatalf("撤回列沒有依核實的額度建立：%d 列", f.count(t, "SELECT count(*) FROM payment.refund_reversals WHERE refund_id = $1", r.ID))
+	}
+
 	// 結案成失敗：等待中的預留釋出。
 	f.paidPayment(t, "RR-8b", 100)
 	tr2 := f.requestTransfer(t, "RR-8b")
@@ -457,6 +466,173 @@ func TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifie
 	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr2.ID, AnomalyFailed, ""))
 	if f.transferText(t, "status", tr2.ID) != "FAILED" || f.reversalOf(t, r2.ID) != "RELEASED" || f.refundText(t, "reversal_reason", r2.ID) != "transfer_failed" {
 		t.Fatalf("結案成失敗：%s %s", f.transferText(t, "status", tr2.ID), f.reversalOf(t, r2.ID))
+	}
+	f.noViolations(t)
+}
+
+// 退款已涵蓋整筆付款、其中還有進行中的退款：轉帳等它們終局，不先終結成 fully_refunded（那樣退款失敗之後賣家永遠收不到）。
+// 兩種時序：轉帳列在先、退款在後（claim 時才發現，轉帳保持 PENDING、不承諾金額）；退款在先、之後才請求轉帳（RequestTransfer 不拒絕，暫定金額是進行中退款的加總）。
+// 退款失敗之後轉帳照常以 100 送出，賣家恰好收到一次。
+// mutation：claimTransfer 拿掉 errRefundsInFlight 的判斷（算出不大於 0 就終結）→ 轉帳直接 FAILED（fully_refunded），退款失敗之後賣家沒有收到 100，失敗。
+// mutation：transferTerms 在進行中的退款涵蓋整筆付款時仍拒絕（拿掉 InFlightRefundTotal 的判斷）→ 請求被拒、沒有轉帳列，失敗。
+func TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.enableAccount(t, 7, "acct_seller_7", true)
+
+	f.paidPayment(t, "RR-10a", 100)
+	early := f.requestTransfer(t, "RR-10a")
+	a := f.createRefund(t, "RR-10a", "all", 100, false)
+	if err := f.runTransfer(early.ID, false); err == nil || f.transferText(t, "status", early.ID) != "PENDING" || f.transferText(t, "called_at", early.ID) != "" || f.fake.TransferCalls() != 0 {
+		t.Fatalf("退款進行中，轉帳該等：%v，%s，provider 呼叫 %d 次", err, f.transferText(t, "status", early.ID), f.fake.TransferCalls())
+	}
+	f.fake.FailRefund(errRefundDeclined)
+	must(t, f.runRefund(a.ID, false))
+	if f.refundText(t, "status", a.ID) != "FAILED" {
+		t.Fatalf("前置：退款 %s", f.refundText(t, "status", a.ID))
+	}
+	must(t, f.runTransfer(early.ID, false))
+	if got := f.fake.TransferAmounts(); len(got) != 1 || got[0] != 100 || f.transferText(t, "status", early.ID) != "SUCCEEDED" || f.transferText(t, "amount", early.ID) != "100" {
+		t.Fatalf("退款失敗之後賣家該收到 100：%v，%s", got, f.transferText(t, "status", early.ID))
+	}
+
+	f.paidPayment(t, "RR-10b", 100)
+	b := f.createRefund(t, "RR-10b", "all", 100, false)
+	late := f.requestTransfer(t, "RR-10b")
+	if late.Amount != 100 || f.transferText(t, "status", late.ID) != "PENDING" {
+		t.Fatalf("進行中的退款涵蓋整筆時請求轉帳：金額 %d，%s", late.Amount, f.transferText(t, "status", late.ID))
+	}
+	if err := f.runTransfer(late.ID, false); err == nil || f.transferText(t, "status", late.ID) != "PENDING" || f.fake.TransferCalls() != 1 {
+		t.Fatalf("退款進行中，轉帳該等：%v，provider 呼叫 %d 次", err, f.fake.TransferCalls())
+	}
+	f.fake.FailRefund(errRefundDeclined)
+	must(t, f.runRefund(b.ID, false))
+	must(t, f.runTransfer(late.ID, false))
+	if got := f.fake.TransferAmounts(); len(got) != 2 || got[1] != 100 || f.fake.Transfers() != 2 || f.transferText(t, "status", late.ID) != "SUCCEEDED" {
+		t.Fatalf("退款失敗之後賣家該收到 100 恰好一次：%v，%s", got, f.transferText(t, "status", late.ID))
+	}
+	f.noViolations(t)
+}
+
+// 退款呼叫的 ANOMALY 人工結案成失敗：先前已有撤回成立（reversal_recovered 大於 0）時，和退款自己失敗一樣發 MoneyAnomaly（refund_failed_after_reversal，撤回已落地、錢留在平台）。
+// mutation：resolveRefund 的失敗分支不呼叫 afterRefundFailed → 沒有事件，失敗。
+func TestResolvingARefundAnomalyAsFailedAfterAReversalLandedAlertsTheMoneyAnomaly(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	ctx := context.Background()
+	p, _ := f.transferred(t, "RR-11")
+	id := f.insertReversal(t, p.ID, "REFUNDING", "REVERSED", 40, 40)
+	f.exec(t, `UPDATE payment.refunds SET status = 'ANOMALY', failure_reason = 'x' WHERE id = $1`, id)
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyRefund, id, AnomalyFailed, ""))
+	if f.refundText(t, "status", id) != "FAILED" {
+		t.Fatalf("結案之後：%s", f.refundText(t, "status", id))
+	}
+	if len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyRefund || f.anomalies[0].ObjectID != id || !strings.Contains(f.anomalies[0].Reason, "refund_failed_after_reversal") || !f.anomalyInTx[0] {
+		t.Fatalf("事件=%+v", f.anomalies)
+	}
+	f.noViolations(t)
+}
+
+// 開始收回時各目標的剩餘額度不夠預留額（預留的不變量被破壞）：預留縮到分得到的額度、發 MoneyAnomaly，事件的物件是退款（ObjectID 是退款 ID）；
+// 造法：預留之後轉帳的 reversed_amount 被推到 30，剩餘只有 70，預留 100 的退款被接受時只分得 70。
+// mutation：startReversals 的 MoneyAnomaly 改回 AnomalyReversal → 事件種類不是 AnomalyRefund，失敗。
+func TestAReservationLargerThanTheTargetsRemainingIsCappedAndAlertsOnTheRefund(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	_, tr := f.transferred(t, "RR-12")
+	r := f.createRefund(t, "RR-12", "k", 100, false)
+	if r.ReversalStatus != ReversalWaiting || r.ReversalAmount != 100 {
+		t.Fatalf("前置：%+v", r)
+	}
+	f.exec(t, `UPDATE payment.transfers SET reversed_amount = 30 WHERE id = $1`, tr.ID)
+	must(t, f.runRefund(r.ID, false))
+	if f.reversalOf(t, r.ID) != "REVERSING" || f.refundText(t, "reversal_amount", r.ID) != "70" {
+		t.Fatalf("預留沒有縮到 70：%s %s", f.reversalOf(t, r.ID), f.refundText(t, "reversal_amount", r.ID))
+	}
+	if len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyRefund || f.anomalies[0].ObjectID != r.ID || !strings.Contains(f.anomalies[0].Reason, "reversal_exceeds_remaining") || !f.anomalyInTx[0] {
+		t.Fatalf("事件=%+v", f.anomalies)
+	}
+	f.noViolations(t)
+}
+
+// 預留額度逐列算：已失敗的退款還有一列撤回在 REVERSING、另一列已 RELEASED（錢留在平台，不再佔額度）時，只有 REVERSING 的那一列佔預留；
+// 新退款的預留 = min(退款額, 轉帳金額 − 已撤回 − 其他預留) = 90，不是把 RELEASED 那列也算進去的 40。
+// mutation：PendingReversalTotal 改回彙總的 reversal_amount − reversal_recovered（WAITING、REVERSING、ANOMALY 的退款）→ 預留 40，失敗。
+func TestAReleasedReversalRowOfAFailedRefundNoLongerReservesCapacity(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	p, _ := f.transferred(t, "RR-13")
+	a := f.insertReversal(t, p.ID, "FAILED", "REVERSING", 60, 60)
+	f.exec(t, `UPDATE payment.refund_reversals SET amount = 10 WHERE refund_id = $1`, a)
+	f.exec(t, `INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, created_at, updated_at)
+VALUES (gen_random_uuid(), $1, $2, 1, $1, 'tr_topup', 50, 'RELEASED', 'x', $3, $3)`, a, p.ID, f.now)
+	b := f.createRefund(t, "RR-13", "b", 100, false)
+	if b.ReversalStatus != ReversalWaiting || b.ReversalAmount != 90 {
+		t.Fatalf("預留應是 100 − 10 = 90：%+v", b)
+	}
+	f.noViolations(t)
+}
+
+// 轉帳的 claim 等付款列的鎖：另一個 transaction 只持有付款列的鎖（不碰轉帳列）寫入退款、尚未提交時，claim 必須等它，提交之後才看得到這筆退款（轉帳只付 60）。
+// 與 TestAConcurrentRefundAndTheTransferSendNeverOverpay（退款走 CreateRefund，同時鎖了轉帳列，轉帳列的鎖也會擋住 claim）不同，這裡只有付款列的鎖能把兩者排成先後。
+// mutation：claimTransfer 的 LockPayment 改成不鎖的讀取（PaymentByID）→ claim 不等這個 transaction、以 100 送出，下面「claim 在付款列被鎖時就結束」失敗。
+func TestTheTransferClaimWaitsOnThePaymentRowLockAloneAndSeesTheRefundCommittedUnderIt(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.paidPayment(t, "RR-14", 100)
+	f.enableAccount(t, 7, "acct_seller_7", true)
+	tr := f.requestTransfer(t, "RR-14")
+	payID := f.idOf(t, "RR-14")
+	ctx := context.Background()
+	reached, release := make(chan struct{}), make(chan struct{})
+	unblock := func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	}
+	defer unblock()
+	holderDone := make(chan error, 1)
+	go func() {
+		holderDone <- f.db.InTx(ctx, func(ctx context.Context) error {
+			conn := f.db.Conn(ctx)
+			if _, err := conn.Exec(ctx, `SELECT id FROM payment.payments WHERE id = $1 FOR UPDATE`, payID); err != nil {
+				return err
+			}
+			if _, err := conn.Exec(ctx, `INSERT INTO payment.refunds (id, payment_id, request_key, amount, created_at, updated_at) VALUES (gen_random_uuid(), $1, 'k', 40, $2, $2)`, payID, f.now); err != nil {
+				return err
+			}
+			close(reached)
+			<-release
+			return nil
+		})
+	}()
+	select {
+	case <-reached:
+	case err := <-holderDone:
+		t.Fatalf("持有付款列鎖的 transaction 提早結束：%v", err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("持有付款列鎖的 transaction 沒有走到寫入退款")
+	}
+	transferDone := make(chan error, 1)
+	go func() { transferDone <- f.runTransfer(tr.ID, false) }()
+	deadline := time.After(30 * time.Second)
+	for blocked := false; !blocked; {
+		select {
+		case err := <-transferDone:
+			t.Fatalf("claim 在付款列被鎖時就結束了：%v", err)
+		case <-deadline:
+			t.Fatal("轉帳的 claim 一直沒有等在付款列的鎖上")
+		case <-time.After(10 * time.Millisecond):
+			blocked = f.count(t, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%FOR UPDATE%'") > 0
+		}
+	}
+	unblock()
+	must(t, <-holderDone)
+	must(t, <-transferDone)
+	if got := f.fake.TransferAmounts(); len(got) != 1 || got[0] != 60 {
+		t.Fatalf("provider 收到的轉帳金額=%v", got)
 	}
 	f.noViolations(t)
 }

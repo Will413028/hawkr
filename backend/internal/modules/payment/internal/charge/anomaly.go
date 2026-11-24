@@ -154,7 +154,7 @@ func (s *Service) verifyEvidence(ctx context.Context, kind model.AnomalyKind, id
 		if !found || snap.ExternalID != evidence || snap.Amount != t.Amount {
 			return evidenceProof{}, errEvidenceMismatch
 		}
-		return evidenceProof{key: t.IdempotencyKey}, nil
+		return evidenceProof{key: t.IdempotencyKey, amount: snap.Amount, reversed: snap.ReversedAmount}, nil
 	case model.AnomalyRefund:
 		r, err := q.RefundByID(ctx, id)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -386,7 +386,11 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 	now := s.d.Now().UTC()
 	if outcome == model.AnomalyFailed {
 		failed := failedResolved
-		if _, err = q.ResolveRefundCallFailed(ctx, store.ResolveRefundCallFailedParams{ID: id, FailureReason: &failed, Now: now}); err != nil {
+		written, err := q.ResolveRefundCallFailed(ctx, store.ResolveRefundCallFailedParams{ID: id, FailureReason: &failed, Now: now})
+		if err != nil {
+			return reason, err
+		}
+		if err := s.afterRefundFailed(ctx, written); err != nil {
 			return reason, err
 		}
 		if transferSucceeded {

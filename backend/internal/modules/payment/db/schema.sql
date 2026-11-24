@@ -175,8 +175,8 @@ CREATE INDEX payment_attempts_excess ON payment.payment_attempts (excess_paid_at
 -- 轉帳：訂單完成後平台把這筆付款的款項轉給賣家（separate charges and transfers，D1、D6）。
 -- 一筆付款最多一筆有效轉帳：唯一索引 transfers_active_payment 涵蓋 PENDING、SUCCEEDED 與 ANOMALY（FAILED 不佔，失敗後可以重建；ANOMALY 與 provider 對不起來，不能確定沒有搬錢，所以佔位）。
 -- amount 是轉給賣家的整數金額，在 job 每把冪等鍵第一次送出前（claim）鎖付款列、以「付款金額減非失敗退款」算定，與 called_at 同一個 transaction 寫入（D11、ADR D69）；
--- 寫列時的 amount 只是暫定值，called_at 為空時不當成已承諾的金額（退款據此判斷要不要撤回），called_at 不為空時同一把鍵的 amount 不再改。算出來不大於 0 時不呼叫 provider，
--- 轉帳直接進 FAILED（fully_refunded）。destination_account_id 是寫列當下賣家收款帳戶的外部 ID 快照（帳戶列日後被清理刪除時，轉帳仍查得到去向）。
+-- 寫列時的 amount 只是暫定值，called_at 為空時不當成已承諾的金額（退款據此判斷要不要撤回），called_at 不為空時同一把鍵的 amount 不再改。算出來不大於 0 時不呼叫 provider：退款全部終局才進 FAILED（fully_refunded），
+-- 還有進行中的退款（PENDING、REFUNDING、ANOMALY）時轉帳保持 PENDING、不承諾金額，等它們終局（失敗的退款不在金額裡，賣家照常收到）。destination_account_id 是寫列當下賣家收款帳戶的外部 ID 快照（帳戶列日後被清理刪除時，轉帳仍查得到去向）。
 -- status：PENDING 已寫列、尚未呼叫或結果不明；SUCCEEDED provider 已建立轉帳（external_transfer_id）；FAILED 終局失敗（failure_reason）；ANOMALY 待人工結案（failure_reason 記原因，補掃不再重試）。
 -- called_at 是這把鍵第一次呼叫 provider 之前寫入的時刻，語意同 payments.create_called_at；idempotency_key 是呼叫 provider 的冪等鍵，結果不明時每次重送沿用，
 -- provider 已知拒絕（可重試）時換新鍵並清掉 called_at（下一次送出重新 claim、重算 amount）；它也是寫進 provider 物件的嘗試 ID，查回依它比對。lookup_failures 是連續查回失敗的次數。
@@ -219,7 +219,7 @@ CREATE INDEX transfers_pending ON payment.transfers (updated_at, id) WHERE statu
 -- （跨列加總，單列 CHECK 守不住；鎖順序：付款列、轉帳列、退款列，同層多列依 ID 升序）。request_key 是呼叫端給的冪等鍵，(payment_id, request_key) 唯一：同一把鍵重送得到同一列。
 -- auto 標示自動退款（D5 修訂：由訂單一方發起，payment 只標記原因，完成時發 AutoRefundCompleted）。
 -- 退款狀態機（D11、ADR D69）：PENDING 已寫列、尚未呼叫 provider；REFUNDING 已呼叫（refund_called_at，冪等鍵 idempotency_key，同時是嘗試 ID）、provider 回了物件（external_refund_id）而還沒終局；
--- SUCCEEDED；FAILED（failure_reason，不佔額度）；ANOMALY 待人工結案（failure_reason 記原因，佔額度，補掃不再重試）。退款不再有撤回的前置狀態：轉帳的任何狀態都可以退款。
+-- SUCCEEDED；FAILED（failure_reason，不佔額度）；ANOMALY 待人工結案（failure_reason 記原因，佔額度，補掃不再重試）。轉帳的任何狀態都可以退款。
 -- 向賣家收回是退款列上並行的另一條狀態 reversal_status，只存彙總：reversal_amount 是預留要收回的總額，reversal_recovered 是已成立的撤回加總。
 -- 一次收回可以跨多個 provider 轉帳（原轉帳與成功的補差額轉帳，各自有 provider 上的剩餘可撤額），每一次 provider 撤回呼叫是一列 payment.refund_reversals，各自收斂（D10、D68）。
 -- NONE 不需要收回（reversal_amount = 0）；WAITING 已預留 reversal_amount、尚未開始（等「provider 接受退款（REFUNDING 或 SUCCEEDED）且轉帳 SUCCEEDED」，兩個事件誰後到誰開始）；

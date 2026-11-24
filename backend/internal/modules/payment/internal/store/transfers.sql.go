@@ -455,6 +455,20 @@ func (q *Queries) FailTransfer(ctx context.Context, arg FailTransferParams) (Pay
 	return i, err
 }
 
+const inFlightRefundTotal = `-- name: InFlightRefundTotal :one
+SELECT COALESCE(SUM(amount), 0)::bigint AS total
+FROM payment.refunds
+WHERE payment_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY')
+`
+
+// 付款還沒終局的退款加總（PENDING、REFUNDING、ANOMALY）：它們失敗時賣家要收到這筆錢，轉帳不能先當成全額退款終結。
+func (q *Queries) InFlightRefundTotal(ctx context.Context, paymentID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, inFlightRefundTotal, paymentID)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const insertRefund = `-- name: InsertRefund :one
 INSERT INTO payment.refunds (id, payment_id, request_key, amount, auto, reversal_status, reversal_amount, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
@@ -712,12 +726,14 @@ func (q *Queries) NonFailedRefundTotal(ctx context.Context, paymentID uuid.UUID)
 }
 
 const pendingReversalTotal = `-- name: PendingReversalTotal :one
-SELECT COALESCE(SUM(reversal_amount - reversal_recovered), 0)::bigint AS total
-FROM payment.refunds
-WHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY')
+SELECT (
+    COALESCE((SELECT SUM(w.reversal_amount) FROM payment.refunds AS w WHERE w.payment_id = $1 AND w.reversal_status = 'WAITING'), 0)
+    + COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.payment_id = $1 AND v.status IN ('REVERSING', 'ANOMALY')), 0)
+)::bigint AS total
 `
 
-// 已預留、還沒成立的撤回額度（預留額減已成立的）：WAITING、REVERSING 與 ANOMALY 的預留。
+// 已預留、還沒成立的撤回額度，逐列算：WAITING 的退款還沒分成撤回列，以預留額計；其餘以撤回列計（REVERSING 與 ANOMALY 的撤回列佔住額度，REVERSED、RELEASED 的不佔），
+// 與撤回目標的剩餘額（OpenReversalTotalOnTransfer、ReversibleTopups）同一個口徑。
 func (q *Queries) PendingReversalTotal(ctx context.Context, paymentID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, pendingReversalTotal, paymentID)
 	var total int64
