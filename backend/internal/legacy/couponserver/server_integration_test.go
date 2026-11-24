@@ -6,6 +6,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -20,6 +21,16 @@ import (
 )
 
 var pg *testdb.Server
+
+// 買家看得到的原因不可以帶分類前綴（"failed_precondition: …"）。
+func requireNoKindPrefix(t *testing.T, msg string) {
+	t.Helper()
+	for _, k := range []string{"failed_precondition", "not_found", "invalid_input", "already_exists", "internal"} {
+		if strings.Contains(msg, k+":") {
+			t.Fatalf("訊息帶了分類前綴 %q：%q", k, msg)
+		}
+	}
+}
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
@@ -205,6 +216,7 @@ func TestReserveLocksTheBuyersVoucherForTheOrder(t *testing.T) {
 	if other.GetSuccess() || other.GetCode() != 7008 || other.GetMessage() == "" {
 		t.Fatalf("別的訂單鎖已鎖住的券要失敗並說明原因：%+v", other)
 	}
+	requireNoKindPrefix(t, other.GetMessage())
 	if n := f.count("SELECT count(*) FROM coupon.coupon_vouchers WHERE order_no = 'ORDER-2'"); n != 0 {
 		t.Fatalf("別的訂單不可以持有這張券")
 	}
@@ -234,6 +246,7 @@ func TestReserveRechecksStoreScopeAndThreshold(t *testing.T) {
 		if r.GetSuccess() || r.GetCode() != 7008 || r.GetMessage() == "" {
 			t.Fatalf("%s：要失敗並說明原因：%+v", name, r)
 		}
+		requireNoKindPrefix(t, r.GetMessage())
 		if st := f.status(v.ID); st != "AVAILABLE" {
 			t.Fatalf("%s：券狀態 = %s，要維持 AVAILABLE", name, st)
 		}
@@ -295,10 +308,14 @@ func TestValidateReportsUnusableVouchersAsInvalid(t *testing.T) {
 
 	if r := f.validate(c.ID.String(), buyer1, "501", "100"); r.GetCode() != 0 || r.GetData().GetValid() || r.GetData().GetDescription() == "" {
 		t.Fatalf("低於門檻要 valid=false 並說明原因：%+v", r)
+	} else {
+		requireNoKindPrefix(t, r.GetData().GetDescription())
 	}
 	f.lock(v, "ORDER-1")
 	if r := f.validate(c.ID.String(), buyer1, "501", "1000"); r.GetCode() != 0 || r.GetData().GetValid() || r.GetData().GetDescription() == "" {
 		t.Fatalf("被鎖住的券要 valid=false 並說明原因：%+v", r)
+	} else {
+		requireNoKindPrefix(t, r.GetData().GetDescription())
 	}
 	if got := f.status(v.ID); got != "LOCKED" {
 		t.Fatalf("驗券不可以改狀態：%s", got)

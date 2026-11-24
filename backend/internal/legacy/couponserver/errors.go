@@ -37,3 +37,13 @@ func connectError(err error) error {
 	}
 	return connect.NewError(code, err)
 }
+
+// userMessage 是回給買家看的原因：apperr 的 Message；不是 apperr 的錯誤（參數解析）用它自己的文字。
+// 不用 err.Error()，它會帶分類前綴（"failed_precondition: …"）。
+func userMessage(err error) string {
+	var ae *apperr.Error
+	if errors.As(err, &ae) {
+		return ae.Message
+	}
+	return err.Error()
+}

@@ -2,11 +2,13 @@
 // coupon 模組：order 的驗券、核銷、釋放，aftersales 的補償券。其餘 CouponService 方法一律 Unimplemented：買家、賣家、admin 的
 // 入口已經是 Connect（B7-3）。B8、B9 隨 Java 的呼叫端刪除。
 //
-// 契約與舊 coupon-service 相同（業務失敗用 code／message 的 envelope、gRPC 狀態是 OK），只有三處不同：
+// 契約與舊 coupon-service 相同（業務失敗用 code／message 的 envelope、gRPC 狀態是 OK），只有四處不同：
 //   - ReserveCoupon 多兩個必填欄位 store_id 與 order_amount（D10），讓模組的 Lock 照常重驗店家範圍與門檻（BD1、BD2）；
 //     缺值是 gRPC InvalidArgument，不略過檢查。
 //   - 補償券的 GrantSellerCompensationCoupon 多一個必填的 source_id（售後單 id，D4），與 AFTERSALES_CASE 組成冪等鍵。
 //   - Consume、Release 以 order_no 為鍵（D3），instance_id 不讀；Java 在鎖券回應遺失時沒有 instance_id 也能釋放。
+//   - GrantSellerCompensationCoupon 的 message 欄位不讀：補償券模組沒有對應欄位，標題由「售後補償券 」加 ref_case_no 組成。
+//   - GrantSellerCompensationCoupon 的 message 欄位不讀：補償券模組沒有對應欄位，標題由「售後補償券 」加 ref_case_no 組成。
 //
 // Java 送的 couponTemplateId 是活動 id；每位買家在同一個活動至多持有一張券，所以對應是 (活動, 買家) → 券（D1）。沒有領過的
 // 回「未領取」，不當場發券。
@@ -92,15 +94,15 @@ func (s *Server) ValidateCoupon(ctx context.Context, req *connect.Request[pb.Val
 	}
 	campaignID, err := parseTemplate(m.GetTemplateId())
 	if err != nil {
-		return reply(codeInvalidParam, err.Error(), nil)
+		return reply(codeInvalidParam, userMessage(err), nil)
 	}
 	storeID, err := parsePositive("store_id", m.GetStoreId())
 	if err != nil {
-		return reply(codeInvalidParam, err.Error(), nil)
+		return reply(codeInvalidParam, userMessage(err), nil)
 	}
 	amount, err := parsePositive("order_amount", m.GetOrderAmount())
 	if err != nil {
-		return reply(codeInvalidParam, err.Error(), nil)
+		return reply(codeInvalidParam, userMessage(err), nil)
 	}
 	v, err := s.coupon.VoucherForCampaign(ctx, m.GetBuyerId(), campaignID)
 	if err != nil {
@@ -123,9 +125,9 @@ func (s *Server) validateFailure(err error, reply func(int32, string, *pb.Coupon
 	}
 	switch apperr.KindOf(err) {
 	case apperr.KindInvalidInput:
-		return reply(codeInvalidParam, err.Error(), nil)
+		return reply(codeInvalidParam, userMessage(err), nil)
 	case apperr.KindNotFound, apperr.KindFailedPrecondition:
-		return reply(codeOK, "success", &pb.CouponValidateResult{Valid: false, Description: err.Error()})
+		return reply(codeOK, "success", &pb.CouponValidateResult{Valid: false, Description: userMessage(err)})
 	case apperr.KindInternal, apperr.KindVersionConflict, apperr.KindAlreadyExists, apperr.KindUnauthenticated,
 		apperr.KindPermissionDenied, apperr.KindUnavailable, apperr.KindResourceExhausted:
 		return nil, connectError(err)
@@ -176,7 +178,7 @@ func (s *Server) ReserveCoupon(ctx context.Context, req *connect.Request[pb.Rese
 	case apperr.KindInvalidInput:
 		return invalid(err)
 	case apperr.KindNotFound, apperr.KindFailedPrecondition:
-		return fail(codeReserveFailed, err.Error())
+		return fail(codeReserveFailed, userMessage(err))
 	case apperr.KindInternal, apperr.KindVersionConflict, apperr.KindAlreadyExists, apperr.KindUnauthenticated,
 		apperr.KindPermissionDenied, apperr.KindUnavailable, apperr.KindResourceExhausted:
 		return nil, connectError(err)
@@ -193,7 +195,7 @@ func (s *Server) ConsumeCoupon(ctx context.Context, req *connect.Request[pb.Cons
 	case err == nil:
 		return connect.NewResponse(&pb.ConsumeCouponResponse{Code: codeOK, Message: "success", Success: true}), nil
 	case apperr.KindOf(err) == apperr.KindInvalidInput:
-		return connect.NewResponse(&pb.ConsumeCouponResponse{Code: codeInvalidParam, Message: err.Error()}), nil
+		return connect.NewResponse(&pb.ConsumeCouponResponse{Code: codeInvalidParam, Message: userMessage(err)}), nil
 	case coupon.ReasonOf(err) == coupon.ReasonNoVoucherForOrder:
 		return connect.NewResponse(&pb.ConsumeCouponResponse{Code: codeInvalidStatus, Message: "消耗失敗"}), nil
 	default:
@@ -209,7 +211,7 @@ func (s *Server) ReleaseCoupon(ctx context.Context, req *connect.Request[pb.Rele
 	case err == nil:
 		return connect.NewResponse(&pb.ReleaseCouponResponse{Code: codeOK, Message: "success", Success: true}), nil
 	case apperr.KindOf(err) == apperr.KindInvalidInput:
-		return connect.NewResponse(&pb.ReleaseCouponResponse{Code: codeInvalidParam, Message: err.Error()}), nil
+		return connect.NewResponse(&pb.ReleaseCouponResponse{Code: codeInvalidParam, Message: userMessage(err)}), nil
 	default:
 		return nil, connectError(err)
 	}
@@ -225,19 +227,19 @@ func (s *Server) GrantSellerCompensationCoupon(ctx context.Context, req *connect
 	}
 	storeID, err := parsePositive("store_id", m.GetStoreId())
 	if err != nil {
-		return bad(err.Error())
+		return bad(userMessage(err))
 	}
 	buyerID, err := parsePositive("buyer_id", m.GetBuyerId())
 	if err != nil {
-		return bad(err.Error())
+		return bad(userMessage(err))
 	}
 	amount, err := parsePositive("amount", m.GetAmount())
 	if err != nil {
-		return bad(err.Error())
+		return bad(userMessage(err))
 	}
 	minOrder, err := parsePositive("min_order_amount", m.GetMinOrderAmount())
 	if err != nil {
-		return bad(err.Error())
+		return bad(userMessage(err))
 	}
 	sourceID := strings.TrimSpace(m.GetSourceId())
 	if sourceID == "" {
@@ -251,7 +253,7 @@ func (s *Server) GrantSellerCompensationCoupon(ctx context.Context, req *connect
 	})
 	if err != nil {
 		if apperr.KindOf(err) == apperr.KindInvalidInput {
-			return bad(err.Error())
+			return bad(userMessage(err))
 		}
 		return nil, connectError(err)
 	}

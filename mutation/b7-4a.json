@@ -53,6 +53,15 @@
    "new": "OrderNo: m.GetOrderNo(), StoreID: storeID, OrderAmount: 1000000 + 0*amount})",
    "test": "internal/legacy/couponserver ^TestReserveRechecksStoreScopeAndThreshold$",
    "why": "ReserveCoupon 不把請求的 order_amount 傳給 Lock（寫死大金額）：低於門檻也鎖得到，BD2 的重驗被繞過，測試要紅。"
+  },
+  {
+   "id": "user-message-keeps-kind-prefix",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/couponserver/errors.go",
+   "old": "\t\treturn ae.Message\n",
+   "new": "\t\treturn ae.Error()\n",
+   "test": "internal/legacy/couponserver ^TestReserveLocksTheBuyersVoucherForTheOrder$",
+   "why": "買家看的原因改回 err.Error()，帶「failed_precondition: 」前綴：鎖不到券的訊息含分類前綴，測試要紅。"
   }
  ]
 }
