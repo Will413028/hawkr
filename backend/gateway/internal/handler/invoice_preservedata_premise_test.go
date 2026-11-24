@@ -348,11 +348,8 @@ func collectInvoiceEmitSites(t *testing.T) []emitSite {
 
 // 期望值 pin。改了要有人解釋為什麼（新增／刪除端點都會動它）。
 // 2026-08-31 實測：57 支 OK ＋ 14 支 Page ＝ 71 個成功出口；71 支 Biz 守門。
-//
-// 2026-09-02（#3019）：端點 30／47 的分頁 data 多帶一個 shipmentStatusDegraded，
-// 而 response.Page 只組四個欄位 ⇒ 兩支改用 response.OK ＋ 內嵌 response.PageData 的
-// InvoiceDocumentsPageData。**成功出口總數不變（71）、Biz 守門不變（71）**，
-// 只是兩個位點從 Page 那一格移到 OK 那一格：57+2=59、14−2=12。
+// 端點 30／47 的分頁 data 以 response.OK ＋ response.PageData 輸出，所以它們落在 OK 那一格，
+// 不在 Page 那一格。
 const (
 	wantOKSites   = 60
 	wantPageSites = 12

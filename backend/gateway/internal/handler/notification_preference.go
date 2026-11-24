@@ -25,7 +25,7 @@ import (
 
 // GetNotificationPreferences
 // @Summary      取得通知偏好設定
-// @Description  取得賣家的 7 個通知類別開關狀態。回傳中的 `forced=true` 表示後端強制 `enabled=true`，前端應 disable 該 toggle（賣家的 `shipment_anomaly` 永遠 forced）。
+// @Description  取得賣家的通知類別開關狀態。回傳中的 `forced=true` 表示後端強制 `enabled=true`，前端應 disable 該 toggle。
 // @Tags         通知 (Notification)
 // @Accept       json
 // @Produce      json
@@ -87,9 +87,6 @@ func (h *Holder) UpdateNotificationPreference(c *gin.Context) {
 	validCategories := map[string]bool{
 		"order_update": true, "refund_update": true, "system": true,
 		"chat": true, "follower": true, "post": true,
-		// shipment_anomaly: 賣家 forced=true。允許進入 backend 由 usecase 層拒絕（回 400）
-		// — 不在 gateway 攔以保持 forced 邏輯的單一決策點。
-		"shipment_anomaly": true,
 	}
 	if !validCategories[req.Category] {
 		response.BadRequest(c, "invalid category: "+req.Category)
@@ -112,7 +109,7 @@ func (h *Holder) UpdateNotificationPreference(c *gin.Context) {
 
 // GetBuyerNotificationPreferences
 // @Summary      取得買家通知偏好設定
-// @Description  取得買家的 7 個通知類別開關狀態（不含 `shipment_anomaly` — 賣家專屬）。`forced` 欄位對買家恆為 false。
+// @Description  取得買家的通知類別開關狀態。`forced` 欄位對買家恆為 false。
 // @Tags         通知 (Notification)
 // @Accept       json
 // @Produce      json

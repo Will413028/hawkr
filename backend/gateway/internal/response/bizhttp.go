@@ -164,12 +164,7 @@ var bizHTTPStatus = map[int32]int{
 	bizcode.FeatureAddressLookupDisabled: http.StatusFailedDependency, // 424
 	bizcode.FeatureAiAssistantDisabled:   http.StatusFailedDependency, // 424
 
-	// 🔴 9705 與 9503 FulfillmentProviderNotEnabled 刻意不同 status：9503 是 403
-	// 「這個賣家沒開通這個配送方式」（賣家自己建店就能解），9705 是 424「我方的 PayUni
-	// 代理商憑證沒設定」（賣家做什麼都沒用）。都寫成 403 會把後者顯示成前者，
-	// 賣家被導去重複申請建店，而真正要動的是維運。
-	bizcode.FeaturePayuniMerchantDisabled:   http.StatusFailedDependency, // 424
-	bizcode.FeatureShippingProviderDisabled: http.StatusFailedDependency, // 424
+	bizcode.FeaturePayuniMerchantDisabled: http.StatusFailedDependency, // 424
 }
 
 // StatusForBizCode 回傳業務碼對應的 HTTP status，未登錄者塌縮成 409。

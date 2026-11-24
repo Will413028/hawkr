@@ -595,7 +595,7 @@ func (h *Holder) ListProviderCutoversForAdmin(c *gin.Context) {
 // @Param        date_to  query  string  false  "結束日期 YYYY-MM-DD"
 // @Param        page  query  string  false  "頁碼，數字字串 ≥ 1，預設 1"
 // @Param        page_size  query  string  false  "每頁筆數，數字字串 1–50，預設 20（逾越一律 400，不夾住）"
-// @Success      200  {object}  object{code=int,message=string,data=object{records=[]SellerInvoiceDocumentItem,total=string,page=string,pageSize=string,shipmentStatusDegraded=bool}}
+// @Success      200  {object}  object{code=int,message=string,data=object{records=[]SellerInvoiceDocumentItem,total=string,page=string,pageSize=string}}
 // @Failure      400  {object}  object{code=int,message=string}  "日期格式"
 // @Failure      401  {object}  object{code=int,message=string}  "未登入或 JWT 無效"
 // @Failure      403  {object}  object{code=int,message=string}  "非 admin 身分"

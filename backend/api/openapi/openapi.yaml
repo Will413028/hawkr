@@ -7859,7 +7859,7 @@ paths:
     get:
       operationId: getBuyerNotificationPreferences
       summary: 取得買家通知偏好設定
-      description: 取得買家的 7 個通知類別開關狀態（不含 `shipment_anomaly` — 賣家專屬）。`forced` 欄位對買家恆為 false。
+      description: 取得買家的通知類別開關狀態。`forced` 欄位對買家恆為 false。
       tags:
       - Notification
       security:
@@ -16323,7 +16323,7 @@ paths:
     get:
       operationId: getNotificationPreferences
       summary: 取得通知偏好設定
-      description: 取得賣家的 7 個通知類別開關狀態。回傳中的 `forced=true` 表示後端強制 `enabled=true`，前端應 disable 該 toggle（賣家的 `shipment_anomaly` 永遠 forced）。
+      description: 取得賣家的通知類別開關狀態。回傳中的 `forced=true` 表示後端強制 `enabled=true`，前端應 disable 該 toggle。
       tags:
       - Notification
       security:
