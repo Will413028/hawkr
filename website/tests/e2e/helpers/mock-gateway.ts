@@ -1308,12 +1308,30 @@ async function mockChatDefaults(page: Page): Promise<void> {
 }
 
 /**
- * 通知訊號串流（NotificationAppService/WatchNotifications）：賣家殼層開頁就會連。第一條連線回一個 inbox 訊號 frame
+ * 通知的預設回應：收件匣空、未讀 0；訊號串流（NotificationAppService/WatchNotifications）賣家殼層開頁就會連。
+ * 第一條連線回一個 inbox 訊號 frame
  * 再以正常的 end-stream 訊框（沒有錯誤）結束，lib/notifications/watch.ts 因此進入 connected 並立刻重連；
  * 之後的連線不回應（保持 connecting，不顯示「即時更新已暫停」），避免熱迴圈，也不會有 502 的網路失敗。
  * 頁面或 context 關閉時，未回應的請求由 Playwright 一併中止。
  */
 async function mockNotificationDefaults(page: Page): Promise<void> {
+	const unary: Array<[string, unknown]> = [
+		["ListInboxItems", { items: [], nextPageToken: "", totalSize: 0 }],
+		["GetUnreadCount", { unreadCount: 0 }],
+		["MarkInboxItemRead", {}],
+		["MarkAllInboxItemsRead", { updatedCount: 0 }],
+		["BatchDeleteInboxItems", {}],
+	];
+	for (const [method, body] of unary) {
+		await page.route(
+			new RegExp(
+				`/api/connect/hawkr\\.notification\\.v1alpha1\\.NotificationAppService/${method}(?:\\?|$)`,
+			),
+			(route) => {
+				void fulfillConnect(route, body);
+			},
+		);
+	}
 	let served = false;
 	await page.route(
 		/\/api\/connect\/hawkr\.notification\.v1alpha1\.NotificationAppService\/WatchNotifications(?:\?|$)/,

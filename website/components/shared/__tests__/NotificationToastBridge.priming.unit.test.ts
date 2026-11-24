@@ -13,10 +13,10 @@ const router = vi.hoisted(() => ({
 }));
 const repo = vi.hoisted(() => ({
 	fetchUnreadCount: vi.fn(),
-	fetchNotifications: vi.fn(),
+	listInboxItems: vi.fn(),
 }));
 const toast = vi.hoisted(() => ({ show: vi.fn() }));
-const stream = vi.hoisted(() => ({ ready: vi.fn() }));
+const stream = vi.hoisted(() => ({ onSignal: vi.fn() }));
 
 vi.mock("@/lib/navigation/use-observed-router", () => ({
 	useObservedRouter: () => router,
@@ -29,9 +29,10 @@ vi.mock("@sentry/nextjs", () => ({ captureMessage: vi.fn() }));
 vi.mock("@/lib/navigation/document-location", () => ({
 	commitDocumentNavigation: vi.fn(),
 }));
-vi.mock("@/lib/notifications/repo", () => ({
+vi.mock("@/lib/notifications/inbox", async (importOriginal) => ({
+	...(await importOriginal<typeof import("@/lib/notifications/inbox")>()),
 	fetchUnreadCount: repo.fetchUnreadCount,
-	fetchNotifications: repo.fetchNotifications,
+	listInboxItems: repo.listInboxItems,
 }));
 vi.mock("@/lib/notifications/toast-context", () => ({
 	useNotificationToast: () => ({ show: toast.show, dismiss: vi.fn() }),
@@ -41,10 +42,10 @@ vi.mock("@/lib/chat/useChatStream", () => ({
 }));
 vi.mock("@/lib/chat/repo", () => ({ listConversations: vi.fn() }));
 vi.mock("@/lib/i18n/ui-text", () => ({ useUiText: () => () => "" }));
-vi.mock("@/lib/sse/useNotificationStream", () => ({
-	useNotificationStream: (options: { handlers: unknown }) => {
-		stream.ready(options.handlers);
-		return { status: "open" };
+vi.mock("@/lib/notifications/watch", () => ({
+	watchNotifications: (_audience: unknown, onSignal: unknown) => {
+		stream.onSignal(onSignal);
+		return { stop: vi.fn(), resume: vi.fn() };
 	},
 }));
 
@@ -123,12 +124,20 @@ function mountBridge(session: Promise<SessionState>, zone: boolean): void {
 
 describe("NotificationToastBridge priming when the unread count settles without an observable loading render", () => {
 	for (const zone of [false, true]) {
-		it(`sends the pageSize=1 probe and toasts a later row (zone=${zone})`, async () => {
+		it(`reads the baseline page and toasts a later row (zone=${zone})`, async () => {
 			vi.stubGlobal("localStorage", memoryStorage());
 			vi.stubGlobal("sessionStorage", memoryStorage());
 			repo.fetchUnreadCount.mockResolvedValue(1);
-			repo.fetchNotifications.mockResolvedValue({
-				records: [{ id: "10000000000000000001", type: "order" }],
+			const row = (id: string) => ({
+				id,
+				title: "訂單成立通知",
+				body: "",
+				deepLink: "",
+				read: false,
+				presentation: 1,
+			});
+			repo.listInboxItems.mockResolvedValue({
+				items: [row("old-1")],
 			});
 			const session = deferred<SessionState>();
 			mountBridge(session.promise, zone);
@@ -143,23 +152,21 @@ describe("NotificationToastBridge priming when the unread count settles without 
 				globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 			).IS_REACT_ACT_ENVIRONMENT = true;
 
-			expect(repo.fetchNotifications).toHaveBeenCalledWith({ pageSize: 1 });
+			expect(repo.listInboxItems).toHaveBeenCalledWith({
+				audience: 1,
+				pageSize: 10,
+			});
 
-			const handlers = stream.ready.mock.lastCall?.[0] as {
-				onNew: (payload: unknown) => void;
-			};
+			const onSignal = stream.onSignal.mock.lastCall?.[0] as (
+				signal: unknown,
+			) => void;
+			repo.listInboxItems.mockResolvedValue({
+				items: [row("new-2"), row("old-1")],
+			});
 			await act(async () =>
-				handlers.onNew({
-					item: {
-						id: "10000000000000000002",
-						type: "order",
-						title: "訂單成立通知",
-						isRead: false,
-						userType: "buyer",
-					},
-					unreadCount: 2,
-				}),
+				onSignal({ type: "inbox", unreadCount: 2, hints: [] }),
 			);
+			await flush();
 			expect(toast.show).toHaveBeenCalledTimes(1);
 		});
 	}

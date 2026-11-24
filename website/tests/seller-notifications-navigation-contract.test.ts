@@ -96,7 +96,7 @@ test("賣家通知頁使用通知中心標題與共用權威未讀數", () => {
 	assert.match(notificationsClient, /streamStatus/);
 	assert.doesNotMatch(
 		notificationsClient,
-		/list\.items\.filter\([^)]*!\s*[^)]*\.isRead/,
+		/list\.items\.filter\([^)]*!\s*[^)]*\.read/,
 	);
 });
 
@@ -110,13 +110,9 @@ test("通知 unread provider 以帳號與角色 fail closed 並隔離快取", ()
 		unreadContext,
 		/const streamEnabled\s*=\s*signedIn\s*&&\s*identity\.accountId !== null\s*&&\s*activeRole !== null/s,
 	);
-	assert.equal(unreadContext.match(/enabled:\s*streamEnabled/g)?.length, 2);
-	assert.match(
-		unreadContext,
-		/accountId:\s*identity\.accountId \?\? undefined/,
-	);
-	assert.match(unreadContext, /role:\s*activeRole/);
-	assert.match(unreadContext, /onOtherWorkspaceNotification/);
+	assert.equal(unreadContext.match(/enabled:\s*streamEnabled/g)?.length, 1);
+	assert.match(unreadContext, /if \(!streamEnabled\)/);
+	assert.match(unreadContext, /audienceForRole\(activeRole \?\? "buyer"\)/);
 	assert.match(unreadContext, /invalidateNotificationLists/);
 });
 

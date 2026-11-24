@@ -9640,13 +9640,6 @@
 	"lib/notifications/filters.ts": {
 		"全部": 1
 	},
-	"lib/notifications/resolve.ts": {
-		"新訂單": 1,
-		"新通知": 1,
-		"買家": 1,
-		"買家 ID：${}": 1,
-		"買家：${}": 1
-	},
 	"lib/orders/types.ts": {
 		"已付款": 1,
 		"已取消": 1,

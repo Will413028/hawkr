@@ -1,51 +1,4 @@
-/**
- * Notification feature types.
- *
- * Shapes mirror the unified gateway contract under
- * `/api/v1/app/notifications` (see gateway `notification_inbox.go`
- * `inboxItemDTO`). Gateway emits camelCase per project API spec, and
- * `createdAt` is an RFC3339 string (not unix seconds).
- */
-
-import type { RoleSlot } from "@/lib/auth/active-role";
-
-export type NotificationType =
-	| "order"
-	| "promotion"
-	| "system"
-	| "message"
-	| "review"
-	| "follow"
-	| "restock" // 02 §5.13b / backend issue #942：補貨通知
-	| string;
-
-export interface NotificationItem {
-	id: number | string;
-	accountId?: string;
-	/** Present on notification.new SSE items; REST rows are already role-scoped. */
-	userType?: RoleSlot;
-	type: NotificationType;
-	title: string;
-	body?: string;
-	imageUrl?: string;
-	actionUrl?: string;
-	refType?: string;
-	refId?: string | number;
-	isRead: boolean;
-	readAt?: string;
-	createdAt: string;
-	data?: Record<string, string>;
-}
-
-/** Shape returned by GET /app/notifications (cursor-paginated). */
-export interface NotificationListResult {
-	records: NotificationItem[];
-	total: number;
-	pageSize: number;
-	hasMore: boolean;
-	/** Opaque TSID cursor. Keep as text so 64-bit ids never lose precision. */
-	nextCursorId: string | null;
-}
+/** Notification preference types (legacy REST, pending the preferences migration). */
 
 /**
  * Per-category preference toggle. Backend (`GET/PUT
@@ -67,9 +20,4 @@ export interface NotificationPreferenceItem {
 	description?: string;
 	enabled: boolean;
 	forced?: boolean;
-}
-
-/** Body for DELETE /app/notifications */
-export interface DeleteNotificationsBody {
-	ids: Array<string | number>;
 }

@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "inbox-signal-no-list-refetch",
+   "stack": "website",
+   "file": "website/lib/notifications/unread-context.tsx",
+   "old": "\t\t\t\t\tunreadRef.current.setCount(signal.unreadCount);\n\t\t\t\t\tinvalidateRef.current();\n",
+   "new": "\t\t\t\t\tunreadRef.current.setCount(signal.unreadCount);\n",
+   "test": "lib/notifications/unread-context.unit.test.ts 收到收件匣訊號後重拉作用中的列表",
+   "why": "收到收件匣訊號時不重拉列表"
+  },
+  {
+   "id": "reconnect-no-list-refetch",
+   "stack": "website",
+   "file": "website/lib/notifications/unread-context.tsx",
+   "old": "\t\t\t\t\tvoid unreadRef.current.refresh();\n\t\t\t\t\tinvalidateRef.current();\n",
+   "new": "\t\t\t\t\tvoid unreadRef.current.refresh();\n",
+   "test": "lib/notifications/unread-context.unit.test.ts 異常斷線後重連，補讀一次列表",
+   "why": "異常斷線重連後不補拉列表"
+  }
+ ]
+}

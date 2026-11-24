@@ -1,5 +1,7 @@
 "use client";
 
+import { timestampMs } from "@bufbuild/protobuf/wkt";
+import { InboxPresentation } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import { gsap } from "gsap";
 import * as React from "react";
 import AppIcon, { type AppIconName } from "@/components/shared/AppIcon";
@@ -20,14 +22,7 @@ import { useNotificationPreferences } from "@/lib/hooks/useNotificationPreferenc
 import { useNotificationList } from "@/lib/hooks/useNotifications";
 import { usePathname } from "@/lib/intl/navigation";
 import { buildNotificationFilters } from "@/lib/notifications/filters";
-import {
-	isChatNotification,
-	resolveNotification,
-} from "@/lib/notifications/resolve";
-import type {
-	NotificationItem,
-	NotificationType,
-} from "@/lib/notifications/types";
+import type { InboxItem } from "@/lib/notifications/inbox";
 import {
 	useNotificationStreamStatus,
 	useNotificationUnread,
@@ -35,73 +30,33 @@ import {
 import { notificationWorkspaceRole } from "@/lib/notifications/workspace";
 
 /**
- * Per-type icon copied verbatim from the buyer Flutter app's
- * `assets/notification/*.svg` (see
- * `lib/features/notification/presentation/notifications_screen.dart`
- * `_iconConfig`). Each SVG is a self-contained 32×32 badge (colored
- * rounded-square fill + white glyph), so the row's icon slot just
- * needs to size it — no surrounding circle / tint required, which is
- * the visual the App ships. Mapping mirrors the App's `type` switch
- * collapsed to the web's 6 coarse categories.
+ * Per-presentation icon. The server decides the presentation category of each
+ * row (`InboxItem.presentation`); the client only picks the glyph.
  */
-const TYPE_ICON: Record<NotificationType | "post", AppIconName> = {
-	order: "box",
-	promotion: "discount",
-	message: "chat",
-	system: "notification",
-	review: "message",
-	follow: "users",
-	post: "paper",
+const PRESENTATION_ICON: Record<InboxPresentation, AppIconName> = {
+	[InboxPresentation.UNSPECIFIED]: "notification",
+	[InboxPresentation.ORDER]: "box",
+	[InboxPresentation.REFUND]: "shield-fail",
+	[InboxPresentation.PAYOUT]: "wallet",
+	[InboxPresentation.MESSAGE]: "chat",
+	[InboxPresentation.SOCIAL]: "users",
+	[InboxPresentation.REVIEW]: "message",
+	[InboxPresentation.PROMOTION]: "discount",
+	[InboxPresentation.PROCUREMENT]: "box",
+	[InboxPresentation.ACCOUNT]: "notification",
+	[InboxPresentation.SYSTEM]: "notification",
 };
 
-function iconForType(type: NotificationType): AppIconName {
-	const upper = String(type).toUpperCase();
-	// 聊天私訊：後端 inbox 通知 type 是裸 "chat"（domain category），App 端另有
-	// CHAT_MESSAGE / CHAT_GROUP_INVITE 細分；一律用聊天泡泡 icon，別落到系統鈴鐺。
-	if (upper === "MESSAGE" || upper.startsWith("CHAT")) return TYPE_ICON.message;
-	if (upper.startsWith("ORDER_") || upper === "ORDER") return TYPE_ICON.order;
-	if (
-		upper === "AFTER_SALE_STATUS" ||
-		upper.startsWith("REFUND_") ||
-		upper === "RETURN_SHIPPED"
-	)
-		return "shield-fail";
-	if (
-		upper === "PROMOTION" ||
-		upper.startsWith("COUPON_") ||
-		upper.startsWith("POINT_")
-	)
-		return TYPE_ICON.promotion;
-	if (
-		upper === "POST_LIKE" ||
-		upper === "SELLER_POST" ||
-		upper === "POST_CREATED" ||
-		upper === "PRODUCT_RESTOCK" ||
-		upper === "PRODUCT_PRICE_DROP" ||
-		upper === "FAVORITE_UPDATE"
-	)
-		return TYPE_ICON.post;
-	if (
-		upper === "SELLER_COMMENT" ||
-		upper === "POST_COMMENT" ||
-		upper === "COMMENT_REPLY" ||
-		upper === "MESSAGE_REPLY" ||
-		upper === "REVIEW"
-	)
-		return TYPE_ICON.review;
-	if (
-		upper === "SELLER_FOLLOW" ||
-		upper === "MERCHANT_UPDATE" ||
-		upper === "FOLLOW"
-	)
-		return TYPE_ICON.follow;
-	return TYPE_ICON[type as keyof typeof TYPE_ICON] ?? TYPE_ICON.system;
+function iconForPresentation(presentation: InboxPresentation): AppIconName {
+	return (
+		PRESENTATION_ICON[presentation] ??
+		PRESENTATION_ICON[InboxPresentation.SYSTEM]
+	);
 }
 
-function formatTime(createdAt: string | undefined): string {
-	if (!createdAt) return "";
-	const ms = Date.parse(createdAt);
-	if (Number.isNaN(ms)) return "";
+function formatTime(item: InboxItem): string {
+	if (!item.createTime) return "";
+	const ms = timestampMs(item.createTime);
 	const diff = Date.now() - ms;
 	const min = Math.floor(diff / 60_000);
 	if (min < 1) return "剛剛";
@@ -117,21 +72,19 @@ function formatTime(createdAt: string | undefined): string {
  *  notification title (chat sender name / notification kind), matching the
  *  in-app toast's `groupKey`. Only consecutive items merge, so the time order
  *  is preserved and distant同類 rows don't fold together. */
-function groupNotifications(items: NotificationItem[]): NotificationItem[][] {
-	const groups: NotificationItem[][] = [];
+function groupNotifications(items: InboxItem[]): InboxItem[][] {
+	const groups: InboxItem[][] = [];
 	for (const item of items) {
-		const key = (item.title || String(item.type)).trim();
+		const key = item.title.trim();
 		const last = groups[groups.length - 1];
-		const lastKey = last
-			? (last[0].title || String(last[0].type)).trim()
-			: null;
+		const lastKey = last ? last[0].title.trim() : null;
 		if (last && lastKey === key) last.push(item);
 		else groups.push([item]);
 	}
 	return groups;
 }
 
-function notificationGroupKey(items: NotificationItem[]): string {
+function notificationGroupKey(items: InboxItem[]): string {
 	return String(items[0]?.id ?? "");
 }
 
@@ -171,7 +124,7 @@ function NotificationsContent({
 	const [filter, setFilter] = React.useState("");
 	const [pendingAction, setPendingAction] = React.useState<string | null>(null);
 	const pendingActionRef = React.useRef<string | null>(null);
-	const list = useNotificationList({ category: filter || undefined, role });
+	const list = useNotificationList({ role });
 	const { count: unreadCount, loading: unreadCountLoading } =
 		useNotificationUnread();
 	const streamStatus = useNotificationStreamStatus();
@@ -191,8 +144,8 @@ function NotificationsContent({
 		setFilter("");
 	}, [role]);
 
-	const handleItemClick = (item: NotificationItem) => {
-		if (!item.isRead) void list.markRead(item.id);
+	const handleItemClick = (item: InboxItem) => {
+		if (!item.read) void list.markRead(item.id);
 	};
 
 	const runPendingAction = async (
@@ -212,7 +165,7 @@ function NotificationsContent({
 		}
 	};
 
-	const handleDelete = (id: NotificationItem["id"]) =>
+	const handleDelete = (id: InboxItem["id"]) =>
 		runPendingAction(`delete:${id}`, () => list.remove([id]));
 	const deletingId = pendingAction?.startsWith("delete:")
 		? pendingAction.slice("delete:".length)
@@ -324,7 +277,6 @@ function NotificationsContent({
 										<NotificationRow
 											item={group[0]}
 											index={baseIndex}
-											role={role}
 											onClick={handleItemClick}
 											onDelete={() => void handleDelete(group[0].id)}
 											deletePending={deletingId === String(group[0].id)}
@@ -336,7 +288,6 @@ function NotificationsContent({
 										key={String(group[0].id)}
 										items={group}
 										baseIndex={baseIndex}
-										role={role}
 										onItemClick={handleItemClick}
 										onDelete={(id) => void handleDelete(id)}
 										pendingDeleteId={deletingId}
@@ -353,22 +304,17 @@ function NotificationsContent({
 							className="seller-notifications__mobile-list"
 							getSummary={(group) => {
 								const top = group[0];
-								const resolved = resolveNotification(top, role);
-								const unread = group.filter((item) => !item.isRead).length;
+								const unread = group.filter((item) => !item.read).length;
 								return {
-									label: `通知：${resolved.title}`,
+									label: `通知：${top.title}`,
 									leading: (
 										<AppIcon
-											name={
-												isChatNotification(top)
-													? TYPE_ICON.message
-													: iconForType(top.type)
-											}
+											name={iconForPresentation(top.presentation)}
 											size={22}
 										/>
 									),
-									title: resolved.title,
-									meta: formatTime(top.createdAt),
+									title: top.title,
+									meta: formatTime(top),
 									status:
 										unread > 0
 											? `${unread} 未讀`
@@ -388,7 +334,6 @@ function NotificationsContent({
 												key={String(item.id)}
 												item={item}
 												index={baseIndex + index}
-												role={role}
 												onClick={handleItemClick}
 												onDelete={() => void handleDelete(item.id)}
 												deletePending={deletingId === String(item.id)}
@@ -424,17 +369,15 @@ function NotificationsContent({
 function NotificationRow({
 	item,
 	index,
-	role,
 	onClick,
 	onDelete,
 	deletePending = false,
 	deleteDisabled = false,
 	asPreview = false,
 }: {
-	item: NotificationItem;
+	item: InboxItem;
 	index: number;
-	role: "buyer" | "seller";
-	onClick: (i: NotificationItem) => void;
+	onClick: (i: InboxItem) => void;
 	onDelete: () => void;
 	deletePending?: boolean;
 	deleteDisabled?: boolean;
@@ -442,13 +385,8 @@ function NotificationRow({
 	 *  of a collapsed stack, where the surrounding pile owns the tap-to-expand. */
 	asPreview?: boolean;
 }) {
-	// 聊天私訊一律用聊天泡泡 icon，依 type 或 refType 判定（與點擊跳轉同一個判定，
-	// 避免 icon 與導向不一致）；其餘走 type 對應表。
-	const iconPath = isChatNotification(item)
-		? TYPE_ICON.message
-		: iconForType(item.type);
-	const resolved = resolveNotification(item, role);
-	const href = resolved.href;
+	const iconPath = iconForPresentation(item.presentation);
+	const href = item.deepLink || undefined;
 
 	const body = (
 		<>
@@ -460,18 +398,18 @@ function NotificationRow({
 			</span>
 			<span className="flex-1 min-w-0 flex flex-col gap-[2px]">
 				<span className="text-sm font-semibold text-foreground leading-snug">
-					{resolved.title}
+					{item.title}
 				</span>
-				{resolved.body ? (
+				{item.body ? (
 					<span className="text-xs text-foreground-muted leading-relaxed line-clamp-2 overflow-hidden whitespace-pre-line">
-						{resolved.body}
+						{item.body}
 					</span>
 				) : null}
 				<span className="text-[0.6875rem] text-foreground-soft mt-1">
-					{formatTime(item.createdAt)}
+					{formatTime(item)}
 				</span>
 			</span>
-			{!item.isRead && (
+			{!item.read && (
 				<span
 					className="w-2 h-2 rounded-full bg-danger self-center mr-3 shrink-0"
 					role="status"
@@ -483,8 +421,8 @@ function NotificationRow({
 
 	return (
 		<div
-			className={`relative flex items-stretch bg-content1 border border-divider rounded-2xl shadow-sm overflow-hidden transition-[transform,background,border-color,box-shadow] duration-200 ease-out animate-[notif-row-pop_520ms_cubic-bezier(0.34,1.56,0.64,1)_var(--notif-row-delay,0ms)_both] hover:-translate-y-px hover:border-hkui-primary-200 hover:shadow-md ${!item.isRead ? "bg-hkui-primary-50/40 border-hkui-primary-200" : ""}`}
-			data-type={item.type}
+			className={`relative flex items-stretch bg-content1 border border-divider rounded-2xl shadow-sm overflow-hidden transition-[transform,background,border-color,box-shadow] duration-200 ease-out animate-[notif-row-pop_520ms_cubic-bezier(0.34,1.56,0.64,1)_var(--notif-row-delay,0ms)_both] hover:-translate-y-px hover:border-hkui-primary-200 hover:shadow-md ${!item.read ? "bg-hkui-primary-50/40 border-hkui-primary-200" : ""}`}
+			data-presentation={item.presentation}
 			style={{
 				["--notif-row-delay" as string]: `${Math.min(index, 12) * 32}ms`,
 			}}
@@ -540,17 +478,15 @@ function NotificationRow({
 function NotificationGroup({
 	items,
 	baseIndex,
-	role,
 	onItemClick,
 	onDelete,
 	pendingDeleteId,
 	deleteDisabled,
 }: {
-	items: NotificationItem[];
+	items: InboxItem[];
 	baseIndex: number;
-	role: "buyer" | "seller";
-	onItemClick: (i: NotificationItem) => void;
-	onDelete: (id: NotificationItem["id"]) => void;
+	onItemClick: (i: InboxItem) => void;
+	onDelete: (id: InboxItem["id"]) => void;
 	pendingDeleteId: string | null;
 	deleteDisabled: boolean;
 }) {
@@ -559,7 +495,7 @@ function NotificationGroup({
 	const collapseBtnRef = React.useRef<HTMLButtonElement>(null);
 	const top = items[0];
 	const rest = items.slice(1);
-	const unreadInRest = rest.filter((n) => !n.isRead).length;
+	const unreadInRest = rest.filter((n) => !n.read).length;
 	const peekLayers = Math.min(rest.length, 2);
 
 	// Fan the revealed cards out when the pile opens — they drop in from behind
@@ -622,7 +558,6 @@ function NotificationGroup({
 						<NotificationRow
 							item={top}
 							index={baseIndex}
-							role={role}
 							onClick={onItemClick}
 							onDelete={() => {}}
 							asPreview
@@ -649,7 +584,6 @@ function NotificationGroup({
 						key={String(it.id)}
 						item={it}
 						index={baseIndex + i}
-						role={role}
 						onClick={onItemClick}
 						onDelete={() => onDelete(it.id)}
 						deletePending={pendingDeleteId === String(it.id)}

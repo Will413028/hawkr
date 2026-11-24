@@ -4,7 +4,7 @@ import { act, cleanup, render } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const repo = vi.hoisted(() => ({ fetchNotifications: vi.fn() }));
+const repo = vi.hoisted(() => ({ listInboxItems: vi.fn() }));
 const auth = vi.hoisted(() => ({
 	value: {
 		activeRole: "buyer",
@@ -14,8 +14,9 @@ const auth = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/context", () => ({ useAuth: () => auth.value }));
-vi.mock("@/lib/notifications/repo", () => ({
-	fetchNotifications: repo.fetchNotifications,
+vi.mock("@/lib/notifications/inbox", () => ({
+	audienceForRole: () => 1,
+	listInboxItems: repo.listInboxItems,
 }));
 vi.mock("@/lib/chat/useChatStream", () => ({
 	useChatStream: () => ({ state: "connected", stream: null }),
@@ -36,7 +37,7 @@ vi.mock("@/lib/notifications/toast-context", () => ({
 }));
 
 import NotificationToastBridge from "@/components/shared/NotificationToastBridge";
-import { NOTIFICATION_NEW_EVENT } from "@/lib/notifications/events";
+import { NOTIFICATION_SIGNAL_EVENT } from "@/lib/notifications/events";
 
 afterEach(() => {
 	cleanup();
@@ -65,17 +66,29 @@ function setToast(): ReturnType<typeof vi.fn> {
 	return show;
 }
 
-function pushNew(id: string, show: ReturnType<typeof vi.fn>): number {
+const row = (id: string) => ({
+	id,
+	title: "t",
+	body: "",
+	deepLink: "",
+	read: false,
+	presentation: 1,
+});
+
+/** One inbox signal; the signal handler reads the newest page, which holds `ids`. */
+async function pushNew(
+	ids: string[],
+	show: ReturnType<typeof vi.fn>,
+): Promise<number> {
+	repo.listInboxItems.mockResolvedValueOnce({ items: ids.map(row) });
 	const before = show.mock.calls.length;
-	act(() => {
+	await act(async () => {
 		window.dispatchEvent(
-			new CustomEvent(NOTIFICATION_NEW_EVENT, {
-				detail: {
-					item: { id, type: "order", title: "t", isRead: false },
-					unreadCount: 2,
-				},
+			new CustomEvent(NOTIFICATION_SIGNAL_EVENT, {
+				detail: { unreadCount: 2, hints: [] },
 			}),
 		);
+		await Promise.resolve();
 	});
 	return show.mock.calls.length - before;
 }
@@ -85,43 +98,43 @@ const h = React.createElement as unknown as (
 	props: unknown,
 ) => React.ReactElement;
 
-describe("NotificationToastBridge priming high-water mark", () => {
-	it("records the mark when an unrelated dependency changes mid-request", async () => {
+describe("NotificationToastBridge priming baseline", () => {
+	it("records the baseline when an unrelated dependency changes mid-request", async () => {
 		setAuth("1");
 		let show = setToast();
-		const probe = deferred<{ records: Array<{ id: string }> }>();
-		repo.fetchNotifications.mockReturnValueOnce(probe.promise);
+		const probe = deferred<{ items: Array<{ id: string }> }>();
+		repo.listInboxItems.mockReturnValueOnce(probe.promise);
 		const view = render(h(NotificationToastBridge, null));
-		expect(repo.fetchNotifications).toHaveBeenCalledTimes(1);
+		expect(repo.listInboxItems).toHaveBeenCalledTimes(1);
 
 		show = setToast();
 		view.rerender(h(NotificationToastBridge, null));
 		await act(async () => {
-			probe.resolve({ records: [{ id: "10" }] });
+			probe.resolve({ items: [{ id: "10" }] });
 			await Promise.resolve();
 		});
 
-		expect(pushNew("5", show)).toBe(0);
-		expect(pushNew("11", show)).toBe(1);
+		expect(await pushNew(["10"], show)).toBe(0);
+		expect(await pushNew(["11", "10"], show)).toBe(1);
 	});
 
 	it("discards the result when the account switches mid-request", async () => {
 		setAuth("1");
 		let show = setToast();
-		const probe = deferred<{ records: Array<{ id: string }> }>();
-		repo.fetchNotifications
+		const probe = deferred<{ items: Array<{ id: string }> }>();
+		repo.listInboxItems
 			.mockReturnValueOnce(probe.promise)
-			.mockResolvedValue({ records: [] });
+			.mockResolvedValue({ items: [] });
 		const view = render(h(NotificationToastBridge, null));
 
 		setAuth("2");
 		show = setToast();
 		view.rerender(h(NotificationToastBridge, null));
 		await act(async () => {
-			probe.resolve({ records: [{ id: "10" }] });
+			probe.resolve({ items: [{ id: "10" }] });
 			await Promise.resolve();
 		});
 
-		expect(pushNew("5", show)).toBe(1);
+		expect(await pushNew(["10"], show)).toBe(1);
 	});
 });
