@@ -44,6 +44,7 @@ import io.github.will413028.hawkr.shipping.grpc.SellerShippingConfigItem;
 import io.github.will413028.hawkr.order.exception.CheckoutExpiredException;
 import io.github.will413028.hawkr.order.exception.CheckoutPriceChangedException;
 import io.github.will413028.hawkr.order.exception.UnavailableItemsException;
+import io.github.will413028.hawkr.order.mq.PaymentEventHandler;
 import io.github.will413028.hawkr.order.service.OrderService;
 import io.github.will413028.hawkr.product.grpc.BatchGetProductForCheckoutResponse;
 import io.github.will413028.hawkr.product.grpc.GetProductResponse;
@@ -81,6 +82,7 @@ public class CheckoutService {
     private final ShippingGrpcClient shippingGrpcClient;
     private final CheckoutCouponGrpcClient couponGrpcClient;
     private final CouponReleaseService couponReleaseService;
+    private final PaymentEventHandler paymentEventHandler;
     private final InvoiceGrpcClient invoiceGrpcClient;
     private final CheckoutValidator checkoutValidator;
     private final OrderService orderService;
@@ -105,7 +107,8 @@ public class CheckoutService {
                            OrderService orderService,
                            OrderPolicyResolver orderPolicyResolver,
                            StringRedisTemplate redisTemplate,
-                           CouponReleaseService couponReleaseService) {
+                           CouponReleaseService couponReleaseService,
+                           PaymentEventHandler paymentEventHandler) {
         this.productGrpcClient = productGrpcClient;
         this.sellerGrpcClient = sellerGrpcClient;
         this.buyerGrpcClient = buyerGrpcClient;
@@ -117,6 +120,7 @@ public class CheckoutService {
         this.orderPolicyResolver = orderPolicyResolver;
         this.redisTemplate = redisTemplate;
         this.couponReleaseService = couponReleaseService;
+        this.paymentEventHandler = paymentEventHandler;
     }
 
     // ==================== 自買防護 ====================
@@ -1096,6 +1100,12 @@ public class CheckoutService {
                 couponReleaseService.releaseWithLateLockRecheck(orderNo);
                 throw new OrderBusinessException(GrpcResponseCode.COUPON_LOCK_FAILED, e.getMessage());
             }
+        }
+
+        // 零元訂單沒有可收的款：不經 payment，由訂單方直接確認為已付款（放在優惠券鎖定之後，
+        // 核銷任務才讀得到 coupon_instance_id）。
+        if (totalActualAmount == 0) {
+            paymentEventHandler.completeZeroAmountOrder(orderNo);
         }
 
         log.info("CheckoutService.confirm.done", "確認結帳完成",

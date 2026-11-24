@@ -17,12 +17,14 @@ import io.github.will413028.hawkr.order.entity.CouponConsumptionTaskEntity;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.entity.OrderOutboxEntity;
 import io.github.will413028.hawkr.order.mq.dto.OrderPaidPayload;
+import io.github.will413028.hawkr.order.util.HashUtil;
 import io.github.will413028.hawkr.order.mq.dto.OrderSalesAccumulatedPayload;
 import io.github.will413028.hawkr.order.mq.dto.OrderSalesAccumulatedPayload.ProductSalesItem;
 import io.github.will413028.hawkr.order.entity.OrderInvoiceSnapshotEntity;
 import io.github.will413028.hawkr.order.repository.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,7 @@ public class PaymentEventHandler {
 
     private static final ObsLogger log = ObsLogger.forClass(PaymentEventHandler.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String ZERO_AMOUNT_TRADE_NO_PREFIX = "ZERO-";
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -144,6 +147,23 @@ public class PaymentEventHandler {
             log.info("PaymentEventHandler.paymentSuccess.unexpected",
                     "非預期訂單狀態: orderNo=" + orderId + ", status=" + currentStatus);
         }
+    }
+
+    /**
+     * 零元訂單：不經 payment，由訂單方直接確認為已付款（payment 的 CreatePayment 對零元回
+     * FailedPrecondition）。走與 payment.success 相同的處理（狀態轉移、財務日誌、優惠券核銷任務、
+     * order.paid 與銷量事件），付款方式固定 ZERO_AMOUNT；trade_no 由訂單編號決定，重複呼叫被 dedup 擋下。
+     */
+    @Transactional
+    public void completeZeroAmountOrder(String orderNo) {
+        ObjectNode payload = MAPPER.createObjectNode();
+        payload.put("trade_no", ZERO_AMOUNT_TRADE_NO_PREFIX + orderNo);
+        payload.put("order_id", orderNo);
+        payload.put("amount", 0L);
+        payload.put("payment_type", PaymentMethod.ZERO_AMOUNT.value());
+        payload.put("pay_time", DateTimeUtils.nowUtc().toString());
+        String body = payload.toString();
+        handlePaymentSuccess(payload, body, HashUtil.sha256Hex(body));
     }
 
     /**

@@ -201,7 +201,7 @@ class OrderPolicySnapshotChainContractTest {
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
-                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
+                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null, null);
     }
 
 

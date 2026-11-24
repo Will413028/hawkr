@@ -169,7 +169,7 @@ class UberCheckoutProbeWiringTest {
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
                 shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService,
-                new OrderPolicyResolver(), redisTemplate, null);
+                new OrderPolicyResolver(), redisTemplate, null, null);
 
         OrderPolicySnapshot policy = new OrderPolicyResolver().resolve(UBER);
         when(valueOperations.getAndDelete(anyString())).thenReturn(
