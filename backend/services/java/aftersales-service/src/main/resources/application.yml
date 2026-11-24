@@ -67,10 +67,6 @@ hawkr:
           host: ${LEGACY_PAYMENT_GRPC_HOST:127.0.0.1}
           port: ${LEGACY_PAYMENT_GRPC_PORT:9941}
           plaintext: true
-        shipping:
-          host: ${SHIPPING_SERVICE_HOST:127.0.0.1}
-          port: ${SHIPPING_SERVICE_GRPC_PORT:9931}
-          plaintext: true
         coupon:
           host: ${COUPON_SERVICE_HOST:127.0.0.1}
           port: ${COUPON_SERVICE_GRPC_PORT:9951}

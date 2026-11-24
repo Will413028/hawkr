@@ -15,10 +15,9 @@ set -e
 #      - hawkr（單體；identity.accounts、account_roles、buyer.buyers、shipping_addresses 與 seller.stores，先跑 backend 的 make migrate）
 #      - hawkr_product (category, product, product_sku, store_exposure)
 #      - hawkr_coupon (coupon_templates, coupon_instances, seller_coupon_quotas)
-#      - hawkr_shipping (seller_shipment_settings)
 #
 # 順序: 前提檢查（dev-seed-check，種子帳號（9、4、2001、2002、3001）擁有種子以外的未關閉店家、或有刪帳申請就中止）→ 01 帳號與買家（冪等 upsert，不刪任何資料；有下游消費者的生命週期狀態不還原，遇到就中止）→ 賣家（backend 的 make dev-seed-stores：seller 模組把種子店家還原成 fixture（upsert，不碰種子以外的店家），KYC 識別欄位以執行中的金鑰加密）
-#       → 04 商品 → 05 優惠券 → 06 配送設定 → 全量重新公告可曝光（make reannounce-exposures）。
+#       → 04 商品 → 05 優惠券 → 全量重新公告可曝光（make reannounce-exposures）。
 #       事件由 make worker 送到 RabbitMQ；沒有跑 worker 時事件留在資料庫，worker 啟動後送出。
 #       dev-seed-stores 與 reannounce-exposures 要連單體的資料庫：預設是 backend/Makefile 的 DATABASE_URL；要覆寫（例如本機的 Homebrew
 #       postgres 蓋過 docker 的 5432）時設定 MONOLITH_DATABASE_URL。
@@ -67,7 +66,6 @@ declare -a SEEDS=(
   "@dev-seed-stores:hawkr:賣家（seller 模組）"
   "04-product.sql:hawkr_product:商品"
   "05-coupon.sql:hawkr_coupon:優惠券"
-  "06-shipping.sql:hawkr_shipping:配送設定"
   "@reannounce-exposures:hawkr:全量重新公告可曝光"
 )
 

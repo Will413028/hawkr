@@ -91,10 +91,6 @@ hawkr:
           host: ${LEGACY_SELLER_GRPC_HOST:127.0.0.1}
           port: ${LEGACY_SELLER_GRPC_PORT:9941}
           plaintext: true
-        shipping:
-          host: ${SHIPPING_SERVICE_HOST:127.0.0.1}
-          port: ${SHIPPING_SERVICE_GRPC_PORT:9931}
-          plaintext: true
         # 02 §4.2.4 — /public/products?followed_product_only / followed_seller_only 透過 ListFavoritedProductIds / ListSubscribedSellerIds 取 ID 列表
         buyer:
           host: ${LEGACY_BUYER_GRPC_HOST:127.0.0.1}

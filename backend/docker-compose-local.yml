@@ -71,8 +71,6 @@ services:
       AFTERSALES_SERVICE_GRPC_PORT: 9923
       PAYMENT_SERVICE_HOST: payment-service
       PAYMENT_SERVICE_PORT: 9924
-      SHIPPING_SERVICE_HOST: shipping-service
-      SHIPPING_SERVICE_GRPC_PORT: 9931
       # 圖片 objectKey → 顯示 URL 的域名唯一來源（49 號 §6.1）；Gateway 組 {語意}Url 欄位
       MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
       AI_SERVICE_HOST: ai-service
@@ -81,8 +79,6 @@ services:
       # /app/buyers/me/procurement/runs/:runId/events（run ledger 事件重播／
       # 即時訂閱 SSE）。預設 false。
       PROCUREMENT_REPLAY_SSE_ENABLED: ${PROCUREMENT_REPLAY_SSE_ENABLED:-false}
-      PAYUNI_WEBHOOK_SERVICE_HOST: payuni-webhook-service
-      PAYUNI_WEBHOOK_SERVICE_PORT: 9946
       NOTIFICATION_SERVICE_HOST: notification-service
       NOTIFICATION_SERVICE_GRPC_PORT: 10037
       # invoice-service（58 號設計書 §12.1.2 F）。三個 INVOICE_SERVICE_* 必須一起加：
@@ -177,8 +173,7 @@ services:
         product-service=http://product-service:9912/actuator/health,
         order-service=http://order-service:9914/actuator/health,
         aftersales-service=http://aftersales-service:9922/actuator/health,
-        payment-service=http://payment-service:9924/actuator/health,
-        shipping-service=http://shipping-service:9930/actuator/health
+        payment-service=http://payment-service:9924/actuator/health
 
     volumes:
       - ./gateway:/app/gateway
@@ -256,9 +251,6 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
 
-      # Shipping Service gRPC（運費計算）
-      SHIPPING_SERVICE_HOST: shipping-service
-      SHIPPING_SERVICE_GRPC_PORT: 9931
 
       # Seller Service gRPC（賣家元資料）
       LEGACY_SELLER_GRPC_HOST: host.docker.internal
@@ -328,8 +320,6 @@ services:
       LEGACY_SELLER_GRPC_PORT: 9941
       COUPON_SERVICE_HOST: coupon-service
       COUPON_SERVICE_GRPC_PORT: 9951
-      SHIPPING_SERVICE_HOST: shipping-service
-      SHIPPING_SERVICE_GRPC_PORT: 9931
       AFTERSALES_SERVICE_HOST: aftersales-service
       AFTERSALES_SERVICE_GRPC_PORT: 9923
 
@@ -456,8 +446,6 @@ services:
       ORDER_SERVICE_GRPC_PORT: 9915
       LEGACY_PAYMENT_GRPC_HOST: host.docker.internal
       LEGACY_PAYMENT_GRPC_PORT: 9941
-      SHIPPING_SERVICE_HOST: shipping-service
-      SHIPPING_SERVICE_GRPC_PORT: 9931
       COUPON_SERVICE_HOST: coupon-service
       COUPON_SERVICE_GRPC_PORT: 9951
       LEGACY_BUYER_GRPC_HOST: host.docker.internal
@@ -594,7 +582,6 @@ services:
       PAYUNI_NOTIFY_URL: ${PAYUNI_NOTIFY_URL:-}
       PAYUNI_RETURN_URL: ${PAYUNI_RETURN_URL:-}
       PAYUNI_API_URL: ${PAYUNI_API_URL:-https://sandbox-api.payuni.com.tw}
-      PAYUNI_STORE_MAP_RETURN_URL: ${PAYUNI_STORE_MAP_RETURN_URL:-}
 
       # Web 前端 base URL（client_type=WEB_BROWSER 時組 redirect_url 用，§5.9）
       WEB_FRONTEND_URL: ${WEB_FRONTEND_URL:-}
@@ -632,202 +619,6 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:9924/actuator/health"]
       interval: 60s
       timeout: 5s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Shipping Service (9930/9931) — Java/Spring Boot
-  # Host ports 9930/9931 避免與 inventory-service(9928/9929) 衝突
-  # 本地開發不走 Docker 時使用 application.yml 預設 9928/9929
-  # ==========================================
-
-  shipping-service:
-    build:
-      context: .
-      dockerfile: services/java/shipping-service/Dockerfile
-    image: hawkr/shipping-service:latest
-    container_name: shipping-service
-    restart: unless-stopped
-    ports:
-      - "9930:9930"
-      - "9931:9931"
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      SERVER_PORT: 9930
-      GRPC_PORT: 9931
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_shipping
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-
-      # gRPC clients
-      ORDER_SERVICE_HOST: order-service
-      ORDER_SERVICE_GRPC_PORT: 9915
-      LEGACY_SELLER_GRPC_HOST: host.docker.internal
-      LEGACY_SELLER_GRPC_PORT: 9941
-      LEGACY_BUYER_GRPC_HOST: host.docker.internal
-      LEGACY_BUYER_GRPC_PORT: 9941
-
-      # PayUni
-      PAYUNI_AGENT_KEY: ${PAYUNI_AGENT_KEY}
-      PAYUNI_AGENT_IV: ${PAYUNI_AGENT_IV}
-      # ── Uber Direct（66 §8.5）──
-      # 🔴 UBER_ENABLED 本地也維持 false：切成 true 而程式還在上一階段 ＝ 陷阱 A1
-      #    （買家付錢、建出沒人送的單、零告警）。
-      UBER_ENABLED: ${UBER_ENABLED:-false}
-      UBER_BASE_URL: ${UBER_BASE_URL:-https://api.uber.com/v1}
-      UBER_AUTH_URL: ${UBER_AUTH_URL:-https://auth.uber.com/oauth/v2/token}
-      UBER_SCOPE: ${UBER_SCOPE:-eats.deliveries}
-      # 機敏值一律 ${VAR:-}，禁止寫死明文。留空 ＝ Uber 未啟用（fail-closed）。
-      UBER_CLIENT_ID: ${UBER_CLIENT_ID:-}
-      UBER_CLIENT_SECRET: ${UBER_CLIENT_SECRET:-}
-      # 🔴 一組不是一個：JSON map {webhookId: key}
-      UBER_WEBHOOK_SIGNING_KEYS: ${UBER_WEBHOOK_SIGNING_KEYS:-}
-      PAYUNI_API_URL: ${PAYUNI_API_URL:-https://sandbox-api.payuni.com.tw}
-      # 空值 = 使用 PayUni 後台設定；帶值 = 覆蓋後台設定
-      PAYUNI_SHIPPING_NOTIFY_URL: ${PAYUNI_SHIPPING_NOTIFY_URL:-}
-      # 門市地圖
-      PAYUNI_STORE_MAP_MER_ID: ${PAYUNI_STORE_MAP_MER_ID:-HAWK9}
-      PAYUNI_STORE_MAP_RETURN_URL: ${PAYUNI_STORE_MAP_RETURN_URL:-}
-      GATEWAY_URL: ${GATEWAY_URL:-}
-      # §5.14 store_map appType=web 路徑最終 302 出口（與 payment / aftersales 共用同一環境變數值）
-      WEB_FRONTEND_URL: ${WEB_FRONTEND_URL:-}
-
-      # CDN
-      # shipping-service 是 MediaUrlProperties 的四個消費端之一（ShippingAdminQueryService /
-      # BuyerGrpcClient），本機也要有域名才組得出圖片 URL（backend#2283）。
-      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
-
-      # §5.19 物流貨態補收排程（L2 補救路徑）
-      SHIPPING_RECONCILE_ENABLED: ${SHIPPING_RECONCILE_ENABLED:-true}
-      SHIPPING_RECONCILE_INTERVAL_MS: ${SHIPPING_RECONCILE_INTERVAL_MS:-600000}
-      SHIPPING_RECONCILE_BATCH_SIZE: ${SHIPPING_RECONCILE_BATCH_SIZE:-100}
-      SHIPPING_RECONCILE_MAX_AGE_DAYS: ${SHIPPING_RECONCILE_MAX_AGE_DAYS:-7}
-      SHIPPING_RECONCILE_BACKOFF_MINUTES: ${SHIPPING_RECONCILE_BACKOFF_MINUTES:-15}
-      # §5.2.2 / §5.3.2 批次列印參數
-      SHIPPING_BATCH_MAX_SIZE: ${SHIPPING_BATCH_MAX_SIZE:-50}
-      SHIPPING_HOME_LABEL_CONCURRENCY: ${SHIPPING_HOME_LABEL_CONCURRENCY:-10}
-      # §5.19.3.C 黑貓叫件 REQUESTED 卡死 ops 告警
-      SHIPPING_ALERT_TCAT_STUCK_ENABLED: ${SHIPPING_ALERT_TCAT_STUCK_ENABLED:-true}
-      SHIPPING_ALERT_TCAT_STUCK_INTERVAL_MS: ${SHIPPING_ALERT_TCAT_STUCK_INTERVAL_MS:-600000}
-      SHIPPING_ALERT_TCAT_STUCK_BATCH_SIZE: ${SHIPPING_ALERT_TCAT_STUCK_BATCH_SIZE:-30}
-      SHIPPING_ALERT_TCAT_STUCK_GRACE_MINUTES: ${SHIPPING_ALERT_TCAT_STUCK_GRACE_MINUTES:-3}
-      SHIPPING_ALERT_TCAT_STUCK_MAX_AGE_HOURS: ${SHIPPING_ALERT_TCAT_STUCK_MAX_AGE_HOURS:-24}
-      # §5.19.3.D 建店送審 REQUESTED 卡死 ops 告警
-      SHIPPING_ALERT_SUBMIT_STUCK_ENABLED: ${SHIPPING_ALERT_SUBMIT_STUCK_ENABLED:-true}
-      SHIPPING_ALERT_SUBMIT_STUCK_INTERVAL_MS: ${SHIPPING_ALERT_SUBMIT_STUCK_INTERVAL_MS:-600000}
-      SHIPPING_ALERT_SUBMIT_STUCK_BATCH_SIZE: ${SHIPPING_ALERT_SUBMIT_STUCK_BATCH_SIZE:-20}
-      SHIPPING_ALERT_SUBMIT_STUCK_GRACE_MINUTES: ${SHIPPING_ALERT_SUBMIT_STUCK_GRACE_MINUTES:-5}
-      SHIPPING_ALERT_SUBMIT_STUCK_MAX_AGE_HOURS: ${SHIPPING_ALERT_SUBMIT_STUCK_MAX_AGE_HOURS:-24}
-
-      # Dev Configs
-      NACOS_ENABLED: "false"
-      FLYWAY_ENABLED: "true"
-      JAVA_OPTS: ${JAVA_OPTS}
-      SKIP_ACCOUNT_TYPE_CHECK: ${SKIP_ACCOUNT_TYPE_CHECK:-true}
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9930/actuator/health"]
-      interval: 60s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # PayUni Webhook Service (9946)
-  # ==========================================
-
-  payuni-webhook-service:
-    build:
-      context: .
-      dockerfile: services/java/payuni-webhook-service/Dockerfile
-    image: hawkr/payuni-webhook-service:latest
-    container_name: payuni-webhook-service
-    restart: unless-stopped
-    ports:
-      - "9946:9946"
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      SERVER_PORT: 9946
-      GRPC_PORT: 9947
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_webhook
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis（application.yml 的 spring.data.redis 有引用；缺這些會 fallback 連
-      # 容器內 127.0.0.1 空密碼，連不到 redis 容器。值對齊其他 Java 服務）
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-
-      # PayUni SDK
-      PAYUNI_AGENT_KEY: ${PAYUNI_AGENT_KEY}
-      PAYUNI_AGENT_IV: ${PAYUNI_AGENT_IV}
-      # 🔴 Uber webhook 驗簽金鑰。ingress 這一側必須有它：驗簽要發生在寫進
-      #    webhook_inbox **之前**，否則未驗簽的偽造事件會先佔住 uq_inbox_event 的鍵位，
-      #    讓真正的 Uber 事件被判為重複而丟棄。
-      UBER_WEBHOOK_SIGNING_KEYS: ${UBER_WEBHOOK_SIGNING_KEYS:-}
-
-      # Shipping gRPC（模擬器查詢 ShipTradeNo 用）
-      SHIPPING_SERVICE_HOST: shipping-service
-      SHIPPING_SERVICE_GRPC_PORT: 9931
-
-      # 環境識別（webhook 模擬器白名單）
-      APP_ENV: ${APP_ENV:-dev}
-
-      # Dev Configs
-      NACOS_ENABLED: "false"
-      FLYWAY_ENABLED: "true"
-      JAVA_OPTS: ${JAVA_OPTS}
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9946/actuator/health"]
-      interval: 60s
-      timeout: 10s
       retries: 3
       start_period: 60s
     networks:
@@ -1174,7 +965,6 @@ services:
       LEGACY_SELLER_GRPC_ADDR: host.docker.internal:9941
       PAYMENT_SERVICE_ADDR: host.docker.internal:9941
       BUYER_SERVICE_ADDR: host.docker.internal:9941
-      SHIPPING_SERVICE_ADDR: shipping-service:9931
       MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
 
       # ── A. 加密與憑證 ──

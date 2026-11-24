@@ -15,7 +15,7 @@ INFRA_SERVICES=(postgres redis rabbitmq otel-collector)
 GO_SERVICES=(gateway ai-service notification-service invoice-service)
 
 # Java 服務（需 rebuild image 才能更新）
-JAVA_SERVICES=(payment-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
+JAVA_SERVICES=(payment-service product-service order-service cart-service coupon-service aftersales-service)
 
 # 全部應用服務
 ALL_APP_SERVICES=("${GO_SERVICES[@]}" "${JAVA_SERVICES[@]}")
@@ -246,7 +246,7 @@ start_ngrok() {
 }
 
 # ─── 注入 GATEWAY_URL 到 Java 服務 ────────────────────────────────────────────
-# payment-service、shipping-service 需要 GATEWAY_URL 來組裝外部回調 URL
+# payment-service 需要 GATEWAY_URL 來組裝外部回調 URL
 # 同步更新 .env 中所有 ngrok URL（GATEWAY_URL、PAYUNI_*_URL）
 inject_gateway_url() {
   local ngrok_url="$1"
@@ -262,13 +262,13 @@ inject_gateway_url() {
 
   # 檢查服務是否正在運行
   local running
-  running=$(docker ps --format '{{.Names}}' | grep -E '^(payment-service|shipping-service|aftersales-service)$' || true)
+  running=$(docker ps --format '{{.Names}}' | grep -E '^(payment-service|aftersales-service)$' || true)
   if [[ -z "$running" ]]; then
     return
   fi
 
-  info "重啟 payment-service、shipping-service、aftersales-service 套用新 URL..."
-  $COMPOSE up -d --no-deps payment-service shipping-service aftersales-service 2>/dev/null
+  info "重啟 payment-service、aftersales-service 套用新 URL..."
+  $COMPOSE up -d --no-deps payment-service aftersales-service 2>/dev/null
   ok "GATEWAY_URL 已更新：$ngrok_url"
 }
 
@@ -341,7 +341,7 @@ cmd_rebuild() {
 
     if [[ ${#services_to_rebuild[@]} -eq 0 ]]; then
       ok "沒有偵測到 Java 服務程式碼變更"
-      info "提示：可手動指定 → ./dev.sh rebuild payment shipping"
+      info "提示：可手動指定 → ./dev.sh rebuild payment order"
       return 0
     fi
   fi
@@ -498,7 +498,7 @@ cmd_logs() {
     cmd+=" ${services[*]}"
   else
     # 預設只看我們負責的服務 + gateway
-    cmd+=" gateway payment-service product-service order-service cart-service coupon-service shipping-service"
+    cmd+=" gateway payment-service product-service order-service cart-service coupon-service"
   fi
 
   title "查看日誌"
@@ -690,7 +690,7 @@ cmd_seed() {
 # ─── 指令：restart ───────────────────────────────────────────────────────────
 cmd_restart() {
   if [[ $# -eq 0 ]]; then
-    warn "請指定服務名稱，例如：./dev.sh restart shipping payment"
+    warn "請指定服務名稱，例如：./dev.sh restart order payment"
     return 1
   fi
 
@@ -728,7 +728,7 @@ cmd_help() {
     down            停止全部服務
 
     restart <服務>  重啟指定服務（支援簡寫：payment = payment-service）
-                    例：./dev.sh restart shipping gateway
+                    例：./dev.sh restart order gateway
 
   ─── Java 服務更新 ──────────────────────────────────────────
 
@@ -738,7 +738,7 @@ cmd_help() {
                     • 不自動偵測 Go 服務（改 code 由 Air 自動生效，不需 rebuild）
 
     rebuild <服務>  手動指定要 rebuild 的服務（Java 或 Go 皆可）
-                    例：./dev.sh rebuild payment shipping
+                    例：./dev.sh rebuild payment order
                     例：./dev.sh rebuild order  (自動補 -service)
                     例：./dev.sh rebuild ai-service    (Go：重建 dev image)
 
@@ -750,7 +750,7 @@ cmd_help() {
 
     logs            即時追蹤我們負責的微服務日誌
     logs <服務>     即時追蹤指定服務日誌
-                    例：./dev.sh logs shipping gateway
+                    例：./dev.sh logs order gateway
 
     logs 選項：
       -e, --error     只顯示 ERROR/FATAL 等級
@@ -761,7 +761,7 @@ cmd_help() {
 
     常用範例：
       ./dev.sh logs -e                    # 只看錯誤
-      ./dev.sh logs shipping -g "PayUni"  # 看 shipping 中含 PayUni 的日誌
+      ./dev.sh logs payment -g "PayUni"   # 看 payment 中含 PayUni 的日誌
       ./dev.sh logs gateway -w            # 看 gateway 的警告和錯誤
       ./dev.sh logs -n -t 200             # 顯示最近 200 行（不追蹤）
 
@@ -790,7 +790,7 @@ cmd_help() {
 
     Java 服務（改完需 ./dev.sh rebuild）：
       payment, product, order, cart, coupon,
-      shipping, aftersales, payuni-webhook
+      aftersales
 
     基礎設施：
       postgres (5432), redis (6379), rabbitmq (5672/15672),
