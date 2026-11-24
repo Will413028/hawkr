@@ -7,7 +7,6 @@ import (
 	buyerpb "github.com/Will413028/hawkr/go-pkg/proto/buyer"
 	cartpb "github.com/Will413028/hawkr/go-pkg/proto/cart"
 	couponpb "github.com/Will413028/hawkr/go-pkg/proto/coupon"
-	notificationpb "github.com/Will413028/hawkr/go-pkg/proto/notification"
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
@@ -135,13 +134,6 @@ func NewCartClientForTest(c cartpb.CartServiceClient) *CartClient {
 // NewProductClientForTest creates a ProductClient with the given mock proto client.
 func NewProductClientForTest(c productpb.ProductServiceClient) *ProductClient {
 	return &ProductClient{client: c}
-}
-
-// ==================== Notification ====================
-
-// NewNotificationClientForTest creates a NotificationClient with the given mock proto client.
-func NewNotificationClientForTest(c notificationpb.NotificationServiceClient) *NotificationClient {
-	return &NotificationClient{client: c}
 }
 
 // ==================== Aftersales ====================

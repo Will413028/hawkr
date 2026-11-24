@@ -15,11 +15,11 @@ import (
 var (
 	suspendedCaps = []authz.Capability{
 		authz.CapAccountSelfRead, authz.CapOrderFulfill, authz.CapOrderContract, authz.CapChatSend,
-		authz.CapChatRead, authz.CapNotification, authz.CapContentContract, authz.CapAccountClose, authz.CapInvoiceTaxRemedy,
+		authz.CapChatRead, authz.CapContentContract, authz.CapAccountClose, authz.CapInvoiceTaxRemedy,
 	}
 	pendingDeletionCaps = []authz.Capability{
 		authz.CapAccountSelfRead, authz.CapOrderFulfill, authz.CapOrderContract, authz.CapChatSend,
-		authz.CapChatRead, authz.CapNotification, authz.CapContentContract, authz.CapInvoiceTaxRemedy,
+		authz.CapChatRead, authz.CapContentContract, authz.CapInvoiceTaxRemedy,
 	}
 )
 

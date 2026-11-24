@@ -43,7 +43,7 @@ func TestMonolithBusinessIdentity(t *testing.T) {
 			{"不認得的能力", "", "82", "", "2", "CAP_PRODUCT_MANAGE,CAP_UNKNOWN", false},
 			{"空的能力 token", "", "82", "", "2", "CAP_PRODUCT_MANAGE,", false},
 			{"沒有店家卻有能力", "", "", "", "2", "CAP_PRODUCT_MANAGE", false},
-			{"等待刪除只有履約類", "", "82", "", "2", "CAP_ORDER_FULFILL,CAP_NOTIFICATION", true},
+			{"等待刪除只有履約類", "", "82", "", "2", "CAP_ORDER_FULFILL,CAP_CHAT_READ", true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				r := gin.New()

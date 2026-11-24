@@ -12,6 +12,4 @@ func registerBuyerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
 	public.GET(RecommendationsPath, h.GetRecommendations)
 	buyers := app.Group("/buyers/me")
 	buyers.Use(middleware.JWTAuth())
-	buyers.GET("/notification-preferences", h.GetBuyerNotificationPreferences)
-	buyers.PUT("/notification-preferences", h.UpdateBuyerNotificationPreference)
 }

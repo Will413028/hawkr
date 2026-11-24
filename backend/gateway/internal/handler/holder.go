@@ -4,8 +4,6 @@ import (
 	"github.com/Will413028/hawkr/gateway/internal/buyerid"
 	"github.com/Will413028/hawkr/gateway/internal/config"
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
-	"github.com/Will413028/hawkr/gateway/internal/realtime"
-	"github.com/Will413028/hawkr/gateway/internal/sse"
 	"github.com/Will413028/hawkr/gateway/internal/storeid"
 )
 
@@ -19,7 +17,6 @@ type Holder struct {
 	Order         *grpcclient.OrderClient
 	Payment       *grpcclient.PaymentClient
 	Cart          *grpcclient.CartClient
-	Notification  *grpcclient.NotificationClient
 	Shipping      *grpcclient.ShippingClient
 	Coupon        *grpcclient.CouponClient
 	AI            *grpcclient.AIClient
@@ -42,11 +39,4 @@ type Holder struct {
 	// copy-through（同 MediaBaseURL／WebBaseURL／Delegation 既有慣例），gate
 	// ProxyProcurementRunEvents（見 ai.go）。
 	ProcurementReplaySseEnabled bool
-	SSEHub                      *sse.Hub
-	RealtimeReg                 *realtime.Registry
-	// NotifChannel 以介面型別持有（fx 仍注入 *realtime.NotificationChannel）：
-	// serveSSE 本來就吃 realtime.Channel，介面化後測試才注入得了 spy channel 去
-	// 斷言「訂閱時真正送進 Hub 的 topic 字串」——那正是身分空間錯了會壞掉的地方，
-	// 而具體型別會逼測試起一整個 SSE Hub 才驗得到。
-	NotifChannel realtime.Channel
 }
