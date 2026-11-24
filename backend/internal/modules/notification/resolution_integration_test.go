@@ -409,11 +409,25 @@ func TestProcessCancelsAnIntentWithAnInvalidBuyerID(t *testing.T) {
 	if len(jobs) != 1 {
 		t.Fatalf("排了 %d 個 job", len(jobs))
 	}
-	err := f.module.intake.Process(context.Background(), jobs[0].IntentID)
+	svc := intake.New(intake.Deps{
+		DB: f.db, Accounts: f.identity, Buyers: f.buyer, Stores: f.sellerMod, Registry: testRegistry{}, Resolver: noBuyersResolver{Resolver: f.resolver}, Jobs: f.jobs,
+		Now: time.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler),
+	})
+	err := svc.Process(context.Background(), jobs[0].IntentID)
 	var cancel *rivertype.JobCancelError
 	if !errors.As(err, &cancel) {
-		t.Fatalf("Process = %v，預期 JobCancel", err)
+		t.Fatalf("Process = %v，預期 JobCancel（買家號碼的檢查要在 Expand 自己擋，不能靠買家模組拒絕）", err)
 	}
+	if !errors.Is(err, registry.ErrBadParams) {
+		t.Fatalf("Process = %v，預期原因是 ErrBadParams", err)
+	}
+}
+
+// noBuyersResolver 對任何買家號碼都回「查不到」而不報錯，讓 Expand 自己的號碼檢查成為唯一擋下不合法買家號碼的地方（正式的買家模組自己也會拒絕）。
+type noBuyersResolver struct{ registry.Resolver }
+
+func (noBuyersResolver) BuyerAccounts(context.Context, []int64) (map[int64]int64, error) {
+	return map[int64]int64{}, nil
 }
 
 // 追蹤者 fan-out：母意圖分頁展開，每位追蹤者一個子意圖與收件匣列；封鎖店的追蹤者被略過；重跑（包含從頭整條鏈）不重複，

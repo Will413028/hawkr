@@ -37,7 +37,8 @@ type PreviewPublicationInput struct {
 // 欄位不合（沒帶候選集或沒選候選、候選重複）、回價期限不是合法日期，都回 INVALID_ARGUMENT 並指出欄位。
 // 重送同一個 ClientRequestID 回第一次的核准（先於其餘需要讀取的檢查），內容（需求、讀到的版本、區間、補充說明、期限、候選集、受眾）不同回 INVALID_ARGUMENT（欄位 client_request_id）。
 // 其後：回價期限早於今天（台北時區）回 INVALID_ARGUMENT（欄位 ResponseDeadline）；需求、候選集不屬於買家回 NOT_FOUND；讀到的版本不是現行版本回 ABORTED／VERSION_CONFLICT（request_revision）；
-// 需求狀態不是 REQUIREMENT_READY 或 MATCHING、或沒有單位回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；候選集不是有效的候選集（A9-D29(4)）回 ABORTED／VERSION_CONFLICT（candidate_set）；候選不在候選集裡回 INVALID_ARGUMENT。
+// 需求狀態不是 REQUIREMENT_READY 或 MATCHING、或沒有單位回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；候選集不是有效的候選集（A9-D29(4)），或選到封鎖這位買家、不是營業中的店（A9-D45(4)，訊息相同、不透露是哪一家）回 ABORTED／VERSION_CONFLICT（candidate_set）；
+// 查封鎖與營業中失敗回一般錯誤（fail-closed）；候選不在候選集裡回 INVALID_ARGUMENT。
 func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationInput) (model.PublicationPreview, error) {
 	note, err := checkInput(in)
 	if err != nil {
@@ -51,7 +52,7 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 			return err
 		}
 		now := s.Now()
-		if in.ResponseDeadline != nil && deadlinePassed(*in.ResponseDeadline, now) {
+		if in.ResponseDeadline != nil && DeadlinePassed(*in.ResponseDeadline, now) {
 			return apperr.InvalidInputOn([]string{"ResponseDeadline"}, "回價期限不得早於今天")
 		}
 		req, rev, err := lockRequest(ctx, q, in.BuyerID, in.RequestID, in.ExpectedRevisionID)
@@ -73,10 +74,13 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 			return err
 		}
 		if !effective {
-			return versionConflict("這個候選集已不是有效的候選集，請重新載入", TargetCandidateSet)
+			return versionConflict(msgCandidateSetStalePreview, TargetCandidateSet)
 		}
 		stores, err := resolveStores(ctx, q, in)
 		if err != nil {
+			return err
+		}
+		if err := s.checkStores(ctx, in.BuyerID, stores); err != nil {
 			return err
 		}
 		a := store.InsertApprovalParams{
@@ -125,8 +129,8 @@ func checkInput(in PreviewPublicationInput) (string, error) {
 	return note, checkAudienceShape(in)
 }
 
-// deadlinePassed 回傳回價期限（當日）是否早於 now 在營業時區（台北）的今天；期限就是今天不算過。
-func deadlinePassed(deadline, now time.Time) bool { return dateOnly(deadline).Before(twtime.Day(now)) }
+// DeadlinePassed 回傳回價期限（當日）是否早於 now 在營業時區（台北）的今天；期限就是今天不算過。
+func DeadlinePassed(deadline, now time.Time) bool { return dateOnly(deadline).Before(twtime.Day(now)) }
 
 // checkAudienceShape 檢查受眾欄位，不讀資料庫：要有候選集與至少一個候選，且不重複；回價期限要是合法日期（零值不是）。
 func checkAudienceShape(in PreviewPublicationInput) error {

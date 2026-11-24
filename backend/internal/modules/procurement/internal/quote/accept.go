@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
@@ -49,7 +50,7 @@ func (s Service) Accept(ctx context.Context, in AcceptInput) (model.Acceptance, 
 			return owned(err, "則回價")
 		}
 		if resp.LatestVersion != in.ExpectedVersion || (resp.WithdrawnVersion != nil && *resp.WithdrawnVersion == in.ExpectedVersion) {
-			return versionConflict("這份報價已經改版或撤回，請重新載入", TargetSellerResponse)
+			return VersionConflict("這份報價已經改版或撤回，請重新載入", TargetSellerResponse)
 		}
 		if resp.WriteClosedAt != nil {
 			return apperr.FailedPrecondition("賣家已停止這筆詢價的回價").WithReason(apperr.ReasonRfqRecipientClosed)
@@ -71,7 +72,7 @@ func (s Service) Accept(ctx context.Context, in AcceptInput) (model.Acceptance, 
 			return err
 		}
 		if in.ExpectedSellerFacingHash != sellerHash {
-			return versionConflict("賣家報價時依據的詢價內容與你看到的不同，請重新載入", TargetPublication)
+			return VersionConflict("賣家報價時依據的詢價內容與你看到的不同，請重新載入", TargetPublication)
 		}
 		qt, err := QuoteOf(version)
 		if err != nil {
@@ -96,8 +97,12 @@ func (s Service) Accept(ctx context.Context, in AcceptInput) (model.Acceptance, 
 			}
 			return liveCollision(ctx, q, in)
 		}
-		if _, err := s.Jobs.EnqueueJob(ctx, OrderProvisioningArgs{AcceptanceID: acceptance.ID}, nil); err != nil {
+		jobID, err := s.Jobs.EnqueueJob(ctx, OrderProvisioningArgs{AcceptanceID: acceptance.ID}, &river.InsertOpts{MaxAttempts: OrderMaxAttempts})
+		if err != nil {
 			return err
+		}
+		if err := q.SetAcceptanceOrderJob(ctx, store.SetAcceptanceOrderJobParams{ID: acceptance.ID, JobID: &jobID}); err != nil {
+			return fmt.Errorf("quote：記下建單 job：%w", err)
 		}
 		out = model.Acceptance{
 			ID: acceptance.ID, SellerResponseID: resp.ID, Version: version.Version, AcceptedDealPrice: version.TotalAmount, AcceptedAt: now,
@@ -118,7 +123,7 @@ func replay(ctx context.Context, q *store.Queries, in AcceptInput) (model.Accept
 		return model.Acceptance{}, false, fmt.Errorf("quote：讀取接受單的冪等鍵：%w", err)
 	}
 	if a.RequestID != in.RequestID || a.SellerResponseID != in.ResponseID || a.SellerResponseVersion != in.ExpectedVersion || a.SellerFacingHash != in.ExpectedSellerFacingHash {
-		return model.Acceptance{}, false, idempotencyMismatch()
+		return model.Acceptance{}, false, IdempotencyMismatch()
 	}
 	return model.Acceptance{
 		ID: a.ID, SellerResponseID: a.SellerResponseID, Version: a.SellerResponseVersion, AcceptedDealPrice: a.AcceptedDealPrice, AcceptedAt: a.AcceptedAt,

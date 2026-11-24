@@ -58,7 +58,7 @@ func (q *Queries) ClaimApprovalForExecute(ctx context.Context, arg ClaimApproval
 }
 
 const getAcceptanceByClientRequest = `-- name: GetAcceptanceByClientRequest :one
-SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE buyer_id = $1 AND client_request_id = $2
+SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, order_ref, order_job_id, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE buyer_id = $1 AND client_request_id = $2
 `
 
 type GetAcceptanceByClientRequestParams struct {
@@ -89,6 +89,8 @@ func (q *Queries) GetAcceptanceByClientRequest(ctx context.Context, arg GetAccep
 		&i.OrderFailureReason,
 		&i.OrderNo,
 		&i.PaymentDeadline,
+		&i.OrderRef,
+		&i.OrderJobID,
 		&i.ClientRequestID,
 		&i.AcceptedAt,
 		&i.CreatedAt,
@@ -282,7 +284,7 @@ func (q *Queries) GetLatestPublicationByRequest(ctx context.Context, arg GetLate
 }
 
 const getLiveAcceptance = `-- name: GetLiveAcceptance :one
-SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND buyer_id = $2 AND state = 'ACTIVE'
+SELECT id, buyer_id, request_id, publication_id, seller_response_id, seller_response_version, seller_response_payload_hash, seller_facing_hash, store_id, currency, goods_amount, shipping_amount, tax_amount, accepted_deal_price, state, order_provisioning_state, order_failure_reason, order_no, payment_deadline, order_ref, order_job_id, client_request_id, accepted_at, created_at, updated_at FROM procurement.buyer_quote_acceptances WHERE request_id = $1 AND buyer_id = $2 AND state = 'ACTIVE'
 `
 
 type GetLiveAcceptanceParams struct {
@@ -313,10 +315,64 @@ func (q *Queries) GetLiveAcceptance(ctx context.Context, arg GetLiveAcceptancePa
 		&i.OrderFailureReason,
 		&i.OrderNo,
 		&i.PaymentDeadline,
+		&i.OrderRef,
+		&i.OrderJobID,
 		&i.ClientRequestID,
 		&i.AcceptedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getOrderBasis = `-- name: GetOrderBasis :one
+SELECT a.id, a.buyer_id, a.store_id, a.goods_amount, a.shipping_amount, a.tax_amount, a.accepted_deal_price,
+    a.order_provisioning_state, a.order_ref,
+    rev.item, rev.item_resolution_label,
+    trim_scale(v.offered_quantity)::text AS offered_quantity, v.offered_quantity_unit
+FROM procurement.buyer_quote_acceptances a
+JOIN procurement.rfq_publications p ON p.id = a.publication_id
+JOIN procurement.rfq_publication_approvals ap ON ap.id = p.approval_id
+JOIN procurement.request_revisions rev ON rev.id = ap.request_revision_id
+JOIN procurement.seller_response_versions v ON v.seller_response_id = a.seller_response_id AND v.version = a.seller_response_version
+WHERE a.id = $1
+`
+
+type GetOrderBasisRow struct {
+	ID                     uuid.UUID
+	BuyerID                *int64
+	StoreID                int64
+	GoodsAmount            int64
+	ShippingAmount         int64
+	TaxAmount              int64
+	AcceptedDealPrice      int64
+	OrderProvisioningState string
+	OrderRef               int64
+	Item                   *string
+	ItemResolutionLabel    *string
+	OfferedQuantity        string
+	OfferedQuantityUnit    string
+}
+
+// 建單 worker 用（系統內部，免 buyer_id；買家關閉後 buyer_id 為 NULL）：接受單、被接受的版本與當時的需求版本。
+// 品名由需求版本的品項（解析後的標籤優先）加被接受版本的報價數量與單位組成；數量去尾零。
+func (q *Queries) GetOrderBasis(ctx context.Context, id uuid.UUID) (GetOrderBasisRow, error) {
+	row := q.db.QueryRow(ctx, getOrderBasis, id)
+	var i GetOrderBasisRow
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.StoreID,
+		&i.GoodsAmount,
+		&i.ShippingAmount,
+		&i.TaxAmount,
+		&i.AcceptedDealPrice,
+		&i.OrderProvisioningState,
+		&i.OrderRef,
+		&i.Item,
+		&i.ItemResolutionLabel,
+		&i.OfferedQuantity,
+		&i.OfferedQuantityUnit,
 	)
 	return i, err
 }
@@ -382,7 +438,7 @@ func (q *Queries) GetPublicationByClientRequest(ctx context.Context, arg GetPubl
 }
 
 const getSellerResponse = `-- name: GetSellerResponse :one
-SELECT id, publication_id, request_id, store_id, latest_version, withdrawn_version, withdrawn_at, write_closed_at, write_closed_reason, created_at, updated_at FROM procurement.seller_responses WHERE publication_id = $1 AND store_id = $2
+SELECT id, publication_id, request_id, store_id, latest_version, withdrawn_version, withdrawn_at, write_closed_at, write_closed_reason, withdrawn_reason_code, write_closed_reason_code, created_at, updated_at FROM procurement.seller_responses WHERE publication_id = $1 AND store_id = $2
 `
 
 type GetSellerResponseParams struct {
@@ -403,6 +459,8 @@ func (q *Queries) GetSellerResponse(ctx context.Context, arg GetSellerResponsePa
 		&i.WithdrawnAt,
 		&i.WriteClosedAt,
 		&i.WriteClosedReason,
+		&i.WithdrawnReasonCode,
+		&i.WriteClosedReasonCode,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -648,6 +706,37 @@ func (q *Queries) ListApprovalRecipients(ctx context.Context, arg ListApprovalRe
 	return items, nil
 }
 
+const listCreatingOrderIDsAfter = `-- name: ListCreatingOrderIDsAfter :many
+SELECT id FROM procurement.buyer_quote_acceptances
+WHERE order_provisioning_state = 'CREATING_ORDER' AND id > $1
+ORDER BY id LIMIT $2
+`
+
+type ListCreatingOrderIDsAfterParams struct {
+	After uuid.UUID
+	Batch int32
+}
+
+func (q *Queries) ListCreatingOrderIDsAfter(ctx context.Context, arg ListCreatingOrderIDsAfterParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listCreatingOrderIDsAfter, arg.After, arg.Batch)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInvites = `-- name: ListInvites :many
 SELECT i.id, i.publication_id, i.position, i.store_id, i.delivery_state, i.delivery_state_at, i.created_at, i.updated_at FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
@@ -687,6 +776,67 @@ func (q *Queries) ListInvites(ctx context.Context, arg ListInvitesParams) ([]Pro
 		return nil, err
 	}
 	return items, nil
+}
+
+const listStaleQueuedInvites = `-- name: ListStaleQueuedInvites :many
+SELECT id, created_at FROM procurement.rfq_publication_invites
+WHERE delivery_state = 'QUEUED' AND created_at < $1 AND (created_at, id) > ($2::timestamptz, $3::uuid)
+ORDER BY created_at, id
+LIMIT $4
+`
+
+type ListStaleQueuedInvitesParams struct {
+	Before         time.Time
+	AfterCreatedAt time.Time
+	AfterID        uuid.UUID
+	MaxRows        int32
+}
+
+type ListStaleQueuedInvitesRow struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+func (q *Queries) ListStaleQueuedInvites(ctx context.Context, arg ListStaleQueuedInvitesParams) ([]ListStaleQueuedInvitesRow, error) {
+	rows, err := q.db.Query(ctx, listStaleQueuedInvites,
+		arg.Before,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaleQueuedInvitesRow{}
+	for rows.Next() {
+		var i ListStaleQueuedInvitesRow
+		if err := rows.Scan(&i.ID, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockCreatingAcceptance = `-- name: LockCreatingAcceptance :one
+SELECT id, order_job_id FROM procurement.buyer_quote_acceptances
+WHERE id = $1 AND order_provisioning_state = 'CREATING_ORDER' FOR UPDATE
+`
+
+type LockCreatingAcceptanceRow struct {
+	ID         uuid.UUID
+	OrderJobID *int64
+}
+
+func (q *Queries) LockCreatingAcceptance(ctx context.Context, id uuid.UUID) (LockCreatingAcceptanceRow, error) {
+	row := q.db.QueryRow(ctx, lockCreatingAcceptance, id)
+	var i LockCreatingAcceptanceRow
+	err := row.Scan(&i.ID, &i.OrderJobID)
+	return i, err
 }
 
 const markApprovalSucceeded = `-- name: MarkApprovalSucceeded :execrows
@@ -792,4 +942,32 @@ func (q *Queries) MarkOrderFailed(ctx context.Context, arg MarkOrderFailedParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setAcceptanceOrderJob = `-- name: SetAcceptanceOrderJob :exec
+UPDATE procurement.buyer_quote_acceptances SET order_job_id = $1 WHERE id = $2
+`
+
+type SetAcceptanceOrderJobParams struct {
+	JobID *int64
+	ID    uuid.UUID
+}
+
+// 接受單寫入後、同 transaction 記下排入的建單 job，reconciler 以它判斷 job 是否已死。
+func (q *Queries) SetAcceptanceOrderJob(ctx context.Context, arg SetAcceptanceOrderJobParams) error {
+	_, err := q.db.Exec(ctx, setAcceptanceOrderJob, arg.JobID, arg.ID)
+	return err
+}
+
+const tryLockOrderProvisioning = `-- name: TryLockOrderProvisioning :one
+SELECT pg_try_advisory_xact_lock(hashtextextended('procurement.order_provisioning:' || $1::uuid::text, 0))::boolean AS locked
+`
+
+// 建單對帳在 transaction 內、呼叫 ordering 之前取得的接受單層級鎖（transaction 結束時釋放）：拿不到表示另一個對帳正在處理同一筆，這一筆略過。
+// 呼叫 ordering 與記下結果都在持鎖的同一個 transaction 內，兩個重疊的對帳不會一個記下訂單、另一個標成失敗。
+func (q *Queries) TryLockOrderProvisioning(ctx context.Context, id uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, tryLockOrderProvisioning, id)
+	var locked bool
+	err := row.Scan(&locked)
+	return locked, err
 }

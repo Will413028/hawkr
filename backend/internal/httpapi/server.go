@@ -74,6 +74,7 @@ import (
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
+	httpsellerprocurement "github.com/Will413028/hawkr/backend/internal/httpapi/sellerprocurement"
 	httpsocial "github.com/Will413028/hawkr/backend/internal/httpapi/social"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
@@ -556,6 +557,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
 	add(procurementv1alpha1connect.NewBuyerProcurementAppServiceHandler(httpbuyerprocurement.NewApp(deps.Procurement, deps.Buyer, deps.Seller, deps.Images, deps.Logger), opts...))
+	sellerProcurementApp, err := httpsellerprocurement.NewApp(deps.Procurement, deps.Seller, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(procurementv1alpha1connect.NewSellerProcurementAppServiceHandler(sellerProcurementApp, opts...))
 	add(imageaiv1alpha1connect.NewImageAiAppServiceHandler(httpimageai.NewApp(deps.ImageAI, deps.Seller, deps.Images, deps.Logger), append(slices.Clone(opts), connect.WithReadMaxBytes(imageAIMaxRequestBytes))...))
 	add(adminimageaiconnect.NewImageAiAdminServiceHandler(httpimageai.NewAdmin(deps.ImageAI, deps.Images), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、

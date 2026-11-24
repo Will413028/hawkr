@@ -177,10 +177,10 @@ func TestListPaginationSurvivesASellerRevisingBetweenPages(t *testing.T) {
 	f.exec(`INSERT INTO procurement.seller_response_versions (
 			id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 			offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
-			valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
+			valid_until, publication_version, client_request_id, submitted_at, created_at)
 		SELECT $2, seller_response_id, 2, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 			offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
-			valid_until, outside_buyer_requested_range, publication_version, $3, $4, $4
+			valid_until, publication_version, $3, $4, $4
 		FROM procurement.seller_response_versions WHERE seller_response_id = $1 AND version = 1`, ids[0], uuid.NewV7(), uuid.NewV7(), start.Add(time.Hour))
 	in.PageToken = first.NextPageToken
 	second, err := f.service().List(t.Context(), in)

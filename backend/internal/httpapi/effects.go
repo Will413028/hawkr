@@ -95,6 +95,13 @@ var customerEffects = map[string]Effect{
 	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/PutShortlistEntry":       EffectWrite,
 	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/DeleteShortlistEntry":    EffectWrite,
 	"/hawkr.procurement.v1alpha1.BuyerProcurementAppService/AcceptSellerQuote":       EffectWrite,
+	// SellerProcurementAppService：草稿、送出、撤回與婉拒是店家的寫入，停權的帳號不能（店家的停權另由賣家能力宣告處理）；清單與詳情是讀取。
+	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/ListSellerPublications":    EffectRead,
+	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/GetSellerPublication":      EffectRead,
+	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/UpsertSellerResponseDraft": EffectWrite,
+	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/SubmitSellerResponse":      EffectWrite,
+	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/WithdrawSellerResponse":    EffectWrite,
+	"/hawkr.procurement.v1alpha1.SellerProcurementAppService/DeclineRfqPublication":     EffectWrite,
 
 	// IdentityAppService
 	"/hawkr.identity.v1alpha1.IdentityAppService/GetSession":           EffectRead,

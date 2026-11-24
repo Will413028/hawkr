@@ -43,18 +43,27 @@ func compile(ctx context.Context, q *store.Queries, buyerID int64, a store.Procu
 
 // assemble 由核准、它的需求版本與受眾名單組出賣家看得到的內容並重算兩個 hash（純函式，沒有 I/O）：賣家可見的每個欄位不是來自核准凍結的欄位就是來自不可變的需求版本。
 func assemble(a store.ProcurementRfqPublicationApproval, rev store.ProcurementRequestRevision, c compiled) (compiled, error) {
-	basisQty, basisUnit := Basis(*rev.Unit)
-	c.payload = model.SellerFacing{
-		Item: deref(rev.Item), ItemLabel: deref(rev.ItemResolutionLabel), Quantity: rev.Quantity, Unit: rev.Unit, Packaging: rev.Packaging,
-		DeliveryCity: deref(rev.DeliveryCity), DeliveryDate: rev.DeliveryDate, ResponseDate: a.ResponseDeadline, BuyerNote: a.BuyerNote,
-		BasisQuantity: basisQty, BasisUnit: basisUnit, LowerBoundAmount: a.RangeLowerAmount, UpperBoundAmount: a.RangeUpperAmount,
-	}
 	var err error
-	if c.sellerHash, err = rfqhash.SellerFacing(sellerInput(a.SchemaVersion, c.payload)); err != nil {
+	if c.payload, c.sellerHash, err = SellerFacingOf(a, rev); err != nil {
 		return compiled{}, err
 	}
 	c.audienceHash, err = rfqhash.Audience(audienceInput(a, c.storeIDs))
 	return c, err
+}
+
+// SellerFacingOf 由核准與它的需求版本組出賣家看得到的內容與它的 hash（純函式，沒有 I/O；不需要受眾名單，賣家端也用它）。需求版本沒有單位回錯誤（資料不一致）。
+func SellerFacingOf(a store.ProcurementRfqPublicationApproval, rev store.ProcurementRequestRevision) (model.SellerFacing, string, error) {
+	if rev.Unit == nil {
+		return model.SellerFacing{}, "", fmt.Errorf("rfq：核准 %s 的需求版本沒有單位", a.ID)
+	}
+	basisQty, basisUnit := Basis(*rev.Unit)
+	payload := model.SellerFacing{
+		Item: deref(rev.Item), ItemLabel: deref(rev.ItemResolutionLabel), Quantity: rev.Quantity, Unit: rev.Unit, Packaging: rev.Packaging,
+		DeliveryCity: deref(rev.DeliveryCity), DeliveryDate: rev.DeliveryDate, ResponseDate: a.ResponseDeadline, BuyerNote: a.BuyerNote,
+		BasisQuantity: basisQty, BasisUnit: basisUnit, LowerBoundAmount: a.RangeLowerAmount, UpperBoundAmount: a.RangeUpperAmount,
+	}
+	hash, err := rfqhash.SellerFacing(sellerInput(a.SchemaVersion, payload))
+	return payload, hash, err
 }
 
 // SellerFacingHash 回傳核准對應的賣家可見內容的 hash（由核准與它的需求版本重算）；讀取模型的 PublishedRfq 用它，與預覽、執行回的是同一個值。

@@ -133,5 +133,10 @@
     "exchange": "payment.events",
     "routing_key": "refund.succeeded",
     "package": "internal/legacy/paymentrelay"
+  },
+  {
+    "exchange": "procurement.events",
+    "routing_key": "procurement.rfq_publication_invite.created",
+    "package": "internal/legacy/procurementrelay"
   }
 ]

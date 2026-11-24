@@ -108,7 +108,7 @@ func (f *fixture) revise() {
 func (f *fixture) publish() (uuid.UUID, string) {
 	f.t.Helper()
 	ctx := context.Background()
-	svc := rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus}
+	svc := rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus, Blocks: allStores{}, Open: allStores{}}
 	q := store.New(f.d.Conn(ctx))
 	set := uuid.NewV7()
 	must(f.t, q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: set, RequestID: f.request, RequestRevisionID: f.revision, BuyerID: f.buyer, Now: f.now}))
@@ -135,6 +135,21 @@ func (f *fixture) publish() (uuid.UUID, string) {
 }
 
 const inviteFirstStore, inviteLastStore = 10, 21
+
+// allStores 是替身的 seller：沒有店封鎖買家，每家店都營業中。
+type allStores struct{}
+
+func (allStores) StoreIDsBlockingBuyer(context.Context, int64, []int64) (map[int64]struct{}, error) {
+	return map[int64]struct{}{}, nil
+}
+
+func (allStores) OpenStoreIDs(_ context.Context, ids []int64) (map[int64]struct{}, error) {
+	out := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		out[id] = struct{}{}
+	}
+	return out, nil
+}
 
 // version 是賣家回價的一個版本（測試直接寫表）。
 type version struct {
@@ -184,8 +199,8 @@ func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID in
 		f.exec(`INSERT INTO procurement.seller_response_versions (
 				id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 				offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
-				valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
+				valid_until, publication_version, client_request_id, submitted_at, created_at)
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, 1, $9, $10, $10)`,
 			uuid.NewV7(), id, int32(i+1), v.unitBasis, v.quantity, v.goods, v.goods+15, v.validUntil, uuid.NewV7(), v.submitted, v.unit)
 	}
 	f.exec(`UPDATE procurement.seller_responses SET latest_version = $2 WHERE id = $1`, id, int32(len(versions)))

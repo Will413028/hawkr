@@ -52,15 +52,18 @@ type InternalGraph struct {
 // InternalDependencies 是已建立模組的內部 package 依賴圖。
 var InternalDependencies = map[string]InternalGraph{
 	"coupon": {Packages: map[string][]string{
-		"admin":    {"campaign", "model", "voucher"},
-		"campaign": {"model", "rows", "store"},
-		"model":    {"text"},
-		"qualify":  {"model", "store"},
-		"read":     {"model", "qualify", "rows", "store"},
-		"rows":     {"model", "store"},
-		"store":    {},
-		"text":     {},
-		"voucher":  {"model", "qualify", "rows", "store"},
+		"admin":      {"campaign", "model", "voucher"},
+		"campaign":   {"model", "rows", "store"},
+		"expiry":     {"model", "store"},
+		"membership": {"model", "store"},
+		"model":      {"text"},
+		"purge":      {"model", "store"},
+		"qualify":    {"model", "store"},
+		"read":       {"model", "qualify", "rows", "store"},
+		"rows":       {"model", "store"},
+		"store":      {},
+		"text":       {},
+		"voucher":    {"model", "qualify", "rows", "store"},
 	}},
 	"notification": {Packages: map[string][]string{
 		"announce": {"intake", "model", "store"},
@@ -130,11 +133,13 @@ var InternalDependencies = map[string]InternalGraph{
 		"planner":      {"model", "slots"},                                                   // 一輪釐清要問什麼、說哪一類話：問題挑選、act 優先序（A9-3b-2a）
 		"reply":        {"model", "planner", "slots", "text"},                                // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
 		"resolver":     {},                                                                   // 品項用詞對分類樹，人工同義詞（A9-D7）
-		"rfq":          {"model", "rfqhash", "search", "store"},                              // 詢價發布鏈：價格預覽、確認快照、發布核准、執行發布，hash 由不可變的列重算（A9-3b-3c、A9-D31）
+		"rfq":          {"candidate", "model", "rfqhash", "search", "store", "text"},         // 詢價發布鏈：價格預覽、確認快照、發布核准、執行發布，hash 由不可變的列重算（A9-3b-3c、A9-D31）
+		"provisioning": {"quote", "run", "store"},                                            // 接受報價後的建單 worker 與 reconciler：經 port 呼叫舊 ordering、用盡或拒絕標建單失敗並解除 live 鎖（A9-3c-4、A9-D45(1)）
 		"quote":        {"model", "rfq", "rfqhash", "run", "store"},                          // 買家對賣家回價的使用：列出目前版本、入圍清單、接受報價並同 transaction 排入建單 job（A9-3b-3d）
 		"rfqhash":      {},                                                                   // 價格預覽、確認快照、受眾與賣家可見內容的 hash（SHA-256 對固定欄位順序的 JSON，A9-D31 Q5）
 		"retention":    {"store"},                                                            // 買家關閉後刪除與匿名（S10）
 		"run":          {"store"},                                                            // run 帳本：送出與配額、受守衛的狀態轉換與事件續傳、取消、reconciler、事件保留期、WatchRun 的共用 listener（A9-D6、A9-D20）
+		"sellerside":   {"model", "quote", "rfq", "store"},                                   // 賣家的詢價清單與詳情、回價草稿、送出、撤回與婉拒：邀請列定可見性、冪等重送先於版本檢查、hash 重用 quote.PayloadHash
 		"search":       {"candidate", "model", "reply", "resolver", "run", "slots", "store"}, // CANDIDATE_SEARCH 的 executor 與開始搜尋的 use case：品項解析定輸入、單一 transaction 提交（A9-3b-2d、A9-D29）
 		"slots":        {"model", "store"},                                                   // 需求欄位的驗證與套用、本輪記下的欄位（A9-3b-2a）
 		"snapshot":     {"model", "rfq", "run", "slots", "store", "turn"},                    // GetRuntimeSnapshot 的讀取模型：對話、訊息、run、待回答的中斷、發布結果在同一份快照內讀齊（A9-D30(4)）

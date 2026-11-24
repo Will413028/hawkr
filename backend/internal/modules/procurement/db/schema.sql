@@ -241,9 +241,11 @@ CREATE TABLE procurement.rfq_publication_invites (
 );
 CREATE UNIQUE INDEX rfq_publication_invites_store ON procurement.rfq_publication_invites (publication_id, store_id);
 CREATE UNIQUE INDEX rfq_publication_invites_position ON procurement.rfq_publication_invites (publication_id, position);
+-- 補掃只掃還沒有結果的邀請，終態的列不進索引。
+CREATE INDEX rfq_publication_invites_queued ON procurement.rfq_publication_invites (created_at, id) WHERE delivery_state = 'QUEUED';
 
 -- 一家店對一次發布的回價（身分列）。只有被邀請的店能有回價列：(publication_id, store_id) 參照邀請列，邀請列是賣家可見性的唯一依據（A9-D44）。沒有 buyer_id（由 request 推出）、沒有列版本（回價版次是 latest_version）。
--- write_closed_reason 只收有寫入者的 DECLINED（S6）。
+-- write_closed_reason 只收有寫入者的 DECLINED（S6）。withdrawn_reason_code、write_closed_reason_code 是賣家填的原因代碼，伺服器記錄、不解析（A9-D45(2)；撤回與婉拒是目標狀態的方法，不建收據）。
 CREATE TABLE procurement.seller_responses (
     id UUID PRIMARY KEY,
     publication_id UUID NOT NULL REFERENCES procurement.rfq_publications (id) ON DELETE CASCADE,
@@ -254,6 +256,8 @@ CREATE TABLE procurement.seller_responses (
     withdrawn_at TIMESTAMPTZ,
     write_closed_at TIMESTAMPTZ,
     write_closed_reason TEXT,
+    withdrawn_reason_code TEXT,
+    write_closed_reason_code TEXT,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT seller_responses_invite_fk FOREIGN KEY (publication_id, store_id) REFERENCES procurement.rfq_publication_invites (publication_id, store_id),
@@ -261,7 +265,11 @@ CREATE TABLE procurement.seller_responses (
     CONSTRAINT seller_responses_latest_check CHECK (latest_version >= 0),
     CONSTRAINT seller_responses_withdrawn_pair CHECK ((withdrawn_version IS NULL) = (withdrawn_at IS NULL)),
     CONSTRAINT seller_responses_write_closed_pair CHECK ((write_closed_at IS NULL) = (write_closed_reason IS NULL)),
-    CONSTRAINT seller_responses_write_closed_reason CHECK (write_closed_reason IS NULL OR write_closed_reason IN ('DECLINED'))
+    CONSTRAINT seller_responses_write_closed_reason CHECK (write_closed_reason IS NULL OR write_closed_reason IN ('DECLINED')),
+    CONSTRAINT seller_responses_withdrawn_reason_pair CHECK (withdrawn_reason_code IS NULL OR withdrawn_version IS NOT NULL),
+    CONSTRAINT seller_responses_write_closed_reason_pair CHECK (write_closed_reason_code IS NULL OR write_closed_reason IS NOT NULL),
+    CONSTRAINT seller_responses_withdrawn_reason_code_check CHECK (withdrawn_reason_code IS NULL OR (char_length(withdrawn_reason_code) >= 1 AND char_length(withdrawn_reason_code) <= 64 AND withdrawn_reason_code !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$')),
+    CONSTRAINT seller_responses_write_closed_reason_code_check CHECK (write_closed_reason_code IS NULL OR (char_length(write_closed_reason_code) >= 1 AND char_length(write_closed_reason_code) <= 64 AND write_closed_reason_code !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'))
 );
 CREATE UNIQUE INDEX seller_responses_publication_store ON procurement.seller_responses (publication_id, store_id);
 CREATE INDEX seller_responses_request_submitted ON procurement.seller_responses (request_id, created_at DESC) WHERE latest_version > 0;
@@ -290,7 +298,6 @@ CREATE TABLE procurement.seller_response_versions (
     valid_until TIMESTAMPTZ NOT NULL,
     terms_note TEXT NOT NULL DEFAULT '',
     deviation_disclosure TEXT NOT NULL DEFAULT '',
-    outside_buyer_requested_range BOOLEAN NOT NULL,
     publication_version INT NOT NULL,
     client_request_id UUID NOT NULL,
     submitted_at TIMESTAMPTZ NOT NULL,
@@ -320,6 +327,7 @@ CREATE TABLE procurement.seller_response_drafts (
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT seller_response_drafts_payload_check CHECK (jsonb_typeof(payload) = 'object'),
+    CONSTRAINT seller_response_drafts_payload_size_check CHECK (octet_length(payload::text) <= 16384),
     CONSTRAINT seller_response_drafts_version_check CHECK (version >= 1)
 );
 
@@ -335,6 +343,8 @@ CREATE TABLE procurement.buyer_shortlist_entries (
 );
 CREATE UNIQUE INDEX buyer_shortlist_entries_response ON procurement.buyer_shortlist_entries (request_id, seller_response_id);
 
+-- order_ref 只當呼叫舊 ordering 的 CreateRfqOrder 的冪等鍵（Java orders.acceptance_id 是 BIGINT，A9-D45(1)），ordering 搬進單體時刪；
+-- order_job_id 是建單的 River job，對帳（reconciler）用它判斷 job 是否已死。
 -- 買家接受一份報價。state 只收有寫入者的值（S6，A9-D19 修訂）：ACTIVE，與建單重試用盡後的 ORDER_FAILED；live 鎖只擋 ACTIVE，
 -- 所以建單失敗後買家可以再接受（同家或別家）。成交價（三金額）凍結在這裡；接受當下賣家可見內容的 hash 與回價 hash 是買家 CAS 的對象，留作稽核（S5 的 (c)）。
 CREATE TABLE procurement.buyer_quote_acceptances (
@@ -357,6 +367,8 @@ CREATE TABLE procurement.buyer_quote_acceptances (
     order_failure_reason TEXT,
     order_no TEXT,
     payment_deadline TIMESTAMPTZ,
+    order_ref BIGINT NOT NULL GENERATED ALWAYS AS IDENTITY UNIQUE,
+    order_job_id BIGINT,
     client_request_id UUID NOT NULL,
     accepted_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
@@ -375,6 +387,7 @@ CREATE UNIQUE INDEX buyer_quote_acceptances_idempotency ON procurement.buyer_quo
 CREATE UNIQUE INDEX buyer_quote_acceptances_live ON procurement.buyer_quote_acceptances (request_id) WHERE state = 'ACTIVE';
 CREATE UNIQUE INDEX buyer_quote_acceptances_order_no ON procurement.buyer_quote_acceptances (order_no) WHERE order_no IS NOT NULL;
 CREATE INDEX buyer_quote_acceptances_response ON procurement.buyer_quote_acceptances (seller_response_id, seller_response_version);
+CREATE INDEX buyer_quote_acceptances_creating ON procurement.buyer_quote_acceptances (id) WHERE order_provisioning_state = 'CREATING_ORDER';
 
 -- run 帳本：job_id 是執行它的 River job（WAITING_FOR_INPUT 的 run 沒有進行中的 job），quota_period_start 是扣額度的期間（失敗退款用；只有 TURN 扣額度，其餘 run 類型為 NULL，退款只在非 NULL 時做）；沒有 controller_kind（AD12）、列版本（契約沒有 run_version）、domain_ref 字串多型（S1：typed 可空外鍵）。
 -- 建 run 的方法（SubmitTurn、StartCandidateSearch、ResumeRun）的冪等鍵放在這裡（S4，舊 agent_run_commands 刪除）。

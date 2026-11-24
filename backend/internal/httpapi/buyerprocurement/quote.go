@@ -2,7 +2,6 @@ package buyerprocurement
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"connectrpc.com/connect"
@@ -11,6 +10,7 @@ import (
 
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/procurementwire"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 )
@@ -151,7 +151,7 @@ func (h *App) AcceptSellerQuote(ctx context.Context, req *connect.Request[pb.Acc
 	if err != nil {
 		return nil, rpc.WithFieldPaths(err, quotePaths)
 	}
-	state, err := enumToProto[pb.OrderProvisioningState](pb.OrderProvisioningState_value, "ORDER_PROVISIONING_STATE_", "建單狀態", a.Provisioning)
+	state, err := procurementwire.Enum[pb.OrderProvisioningState](pb.OrderProvisioningState_value, "ORDER_PROVISIONING_STATE_", "建單狀態", a.Provisioning)
 	if err != nil {
 		return nil, err
 	}
@@ -168,25 +168,16 @@ func (h *App) AcceptSellerQuote(ctx context.Context, req *connect.Request[pb.Acc
 	return connect.NewResponse(out), nil
 }
 
-// enumToProto 把模組的代碼（proto 列舉值名去掉前綴）轉成列舉；UNSPECIFIED 與不認得的代碼是不變量被破壞，回沒有分類的錯誤。
-func enumToProto[E ~int32](values map[string]int32, prefix, kind, code string) (E, error) {
-	v, ok := values[prefix+code]
-	if !ok || v == 0 {
-		return 0, fmt.Errorf("buyerprocurement：%s %q 沒有對應的列舉", kind, code)
-	}
-	return E(v), nil
-}
-
 func sellerResponseToProto(r procurement.SellerResponse, card *commonpb.StoreCard) (*pb.BuyerFacingSellerResponse, error) {
-	status, err := enumToProto[pb.SellerResponseStatus](pb.SellerResponseStatus_value, "SELLER_RESPONSE_STATUS_", "回價狀態", r.Status)
+	status, err := procurementwire.Enum[pb.SellerResponseStatus](pb.SellerResponseStatus_value, "SELLER_RESPONSE_STATUS_", "回價狀態", r.Status)
 	if err != nil {
 		return nil, err
 	}
-	acceptability, err := enumToProto[pb.QuoteAcceptability](pb.QuoteAcceptability_value, "QUOTE_ACCEPTABILITY_", "可否接受", r.Acceptability)
+	acceptability, err := procurementwire.Enum[pb.QuoteAcceptability](pb.QuoteAcceptability_value, "QUOTE_ACCEPTABILITY_", "可否接受", r.Acceptability)
 	if err != nil {
 		return nil, err
 	}
-	quote, err := sellerQuoteToProto(r.Quote)
+	quote, err := procurementwire.SellerQuote(r.Quote)
 	if err != nil {
 		return nil, err
 	}
@@ -195,28 +186,4 @@ func sellerResponseToProto(r procurement.SellerResponse, card *commonpb.StoreCar
 		SubmitTime: timestamppb.New(r.SubmittedAt), Store: card, Quote: quote, OutsideBuyerRequestedRange: r.OutsideBuyerRequestedRange,
 		Shortlisted: r.Shortlisted, Acceptability: acceptability,
 	}, nil
-}
-
-func sellerQuoteToProto(q procurement.SellerQuote) (*pb.SellerQuote, error) {
-	typ, err := enumToProto[pb.SellerResponseType](pb.SellerResponseType_value, "SELLER_RESPONSE_TYPE_", "回價方式", q.ResponseType)
-	if err != nil {
-		return nil, err
-	}
-	tax, err := enumToProto[pb.TaxInclusionBasis](pb.TaxInclusionBasis_value, "TAX_INCLUSION_BASIS_", "稅別", q.TaxInclusionBasis)
-	if err != nil {
-		return nil, err
-	}
-	out := &pb.SellerQuote{
-		ResponseType: typ, SpecNote: q.SpecNote,
-		UnitBasis: &pb.UnitBasis{Quantity: q.UnitBasisQuantity, Unit: q.UnitBasisUnit}, OfferedQuantity: q.OfferedQuantity, OfferedQuantityUnit: q.OfferedQuantityUnit,
-		ConversionBasis: q.ConversionBasis, GoodsAmount: q.GoodsAmount, ShippingAmount: q.ShippingAmount, TaxAmount: q.TaxAmount, TaxInclusionBasis: tax,
-		TotalAmount: q.TotalAmount, ValidUntilTime: timestamppb.New(q.ValidUntil), TermsNote: q.TermsNote, DeviationDisclosure: q.DeviationDisclosure,
-	}
-	if q.LeadTimeDays != nil {
-		out.LeadTimeDays = *q.LeadTimeDays
-	}
-	if q.PromisedDelivery != nil {
-		out.PromisedDeliveryTime = timestamppb.New(*q.PromisedDelivery)
-	}
-	return out, nil
 }
