@@ -226,6 +226,36 @@ func (s *Service) GetCustomer(ctx context.Context, storeID, buyerID int64) (mode
 	return c, nil
 }
 
+// CustomersAmong 回傳 buyerIDs 裡是店家客戶的集合：一次授權、一次 SQL。店家已關閉或不存在與 GetCustomer 一致回 NotFound。
+func (s *Service) CustomersAmong(ctx context.Context, storeID int64, buyerIDs []int64) (map[int64]bool, error) {
+	if storeID <= 0 {
+		return nil, fmt.Errorf("crm：店家 %d 不是正整數", storeID)
+	}
+	if len(buyerIDs) > model.MaxBuyerIDs {
+		return nil, fmt.Errorf("crm：買家 %d 位超過上限 %d", len(buyerIDs), model.MaxBuyerIDs)
+	}
+	for _, id := range buyerIDs {
+		if id <= 0 {
+			return nil, fmt.Errorf("crm：買家 %d 不是正整數", id)
+		}
+	}
+	if err := s.authorize(ctx, storeID, customerNotFound); err != nil {
+		return nil, err
+	}
+	out := make(map[int64]bool, len(buyerIDs))
+	if len(buyerIDs) == 0 {
+		return out, nil
+	}
+	ids, err := s.q(ctx).ListCustomerBuyerIDs(ctx, store.ListCustomerBuyerIDsParams{StoreID: storeID, BuyerIds: buyerIDs})
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
 // ListTags 是店家全部的標籤（名稱升序）；數量受 MaxTagsPerStore 約束，所以不分頁。
 func (s *Service) ListTags(ctx context.Context, storeID int64) ([]model.Tag, error) {
 	if storeID <= 0 {

@@ -13,6 +13,35 @@ import (
 	"uuid"
 )
 
+const countCampaignVouchers = `-- name: CountCampaignVouchers :many
+SELECT status, count(*)::int AS n FROM coupon.coupon_vouchers WHERE campaign_id = $1 GROUP BY status
+`
+
+type CountCampaignVouchersRow struct {
+	Status string
+	N      int32
+}
+
+func (q *Queries) CountCampaignVouchers(ctx context.Context, campaignID uuid.UUID) ([]CountCampaignVouchersRow, error) {
+	rows, err := q.db.Query(ctx, countCampaignVouchers, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountCampaignVouchersRow{}
+	for rows.Next() {
+		var i CountCampaignVouchersRow
+		if err := rows.Scan(&i.Status, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getVoucher = `-- name: GetVoucher :one
 SELECT id, campaign_id, buyer_id, origin, source_type, source_id, status, order_no, locked_at, redeemed_at, voided_at, created_at, updated_at FROM coupon.coupon_vouchers WHERE id = $1
 `
@@ -189,6 +218,64 @@ func (q *Queries) InsertVoucher(ctx context.Context, arg InsertVoucherParams) (i
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const listBuyerVouchers = `-- name: ListBuyerVouchers :many
+SELECT id, campaign_id, buyer_id, origin, source_type, source_id, status, order_no, locked_at, redeemed_at, voided_at, created_at, updated_at FROM coupon.coupon_vouchers
+WHERE buyer_id = $1
+  AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
+  AND ($3::timestamptz IS NULL OR (created_at, id) < ($3::timestamptz, $4::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $5
+`
+
+type ListBuyerVouchersParams struct {
+	BuyerID        int64
+	Statuses       []string
+	AfterCreatedAt *time.Time
+	AfterID        pgtype.UUID
+	MaxRows        int32
+}
+
+// 買家的券（錢包）；statuses 為空陣列是全部狀態。
+func (q *Queries) ListBuyerVouchers(ctx context.Context, arg ListBuyerVouchersParams) ([]CouponCouponVoucher, error) {
+	rows, err := q.db.Query(ctx, listBuyerVouchers,
+		arg.BuyerID,
+		arg.Statuses,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CouponCouponVoucher{}
+	for rows.Next() {
+		var i CouponCouponVoucher
+		if err := rows.Scan(
+			&i.ID,
+			&i.CampaignID,
+			&i.BuyerID,
+			&i.Origin,
+			&i.SourceType,
+			&i.SourceID,
+			&i.Status,
+			&i.OrderNo,
+			&i.LockedAt,
+			&i.RedeemedAt,
+			&i.VoidedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listHeldBuyers = `-- name: ListHeldBuyers :many

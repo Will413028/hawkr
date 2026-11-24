@@ -221,6 +221,7 @@ type EndResult struct {
 }
 
 // End 提前結束活動（D5）：擋新的領取與鎖定、作廢 AVAILABLE 的券，LOCKED 的券照常核銷或釋放（BD8）。
+// 店家（StoreID）只能結束自己發的非補償活動：補償活動是系統替買家建立的，其他情形一律 NotFound（防枚舉）。
 // 先鎖活動列：與領券、發券排隊，結束之後進來的都看到 ENDED。已結束的活動重送是成功（Voided = 0）。
 func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
 	reason, err := model.NormalizeReason(ctx, in.Reason)
@@ -237,7 +238,7 @@ func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
 		if err != nil {
 			return err
 		}
-		if in.StoreID > 0 && (row.IssuerStoreID == nil || *row.IssuerStoreID != in.StoreID) {
+		if in.StoreID > 0 && (row.IssuerStoreID == nil || *row.IssuerStoreID != in.StoreID || model.TargetType(row.TargetType) == model.TargetCompensation) {
 			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		if model.CampaignStatus(row.Status) == model.StatusEnded {

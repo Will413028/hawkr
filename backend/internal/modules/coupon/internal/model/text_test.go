@@ -1,12 +1,15 @@
 package model
 
 import (
+	"context"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"strconv"
 	"testing"
 
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -91,5 +94,27 @@ func TestEveryInvalidKeyHasTextInBothLocales(t *testing.T) {
 	}
 	if len(invalidText) != len(keys) {
 		t.Errorf("invalidText 有 %d 筆，InvalidKey 常數有 %d 個", len(invalidText), len(keys))
+	}
+}
+
+// 模組的句子依 ctx 的請求語系產生，錯誤帶的語系是實際使用的語系（傳輸層的 LocalizedMessage.locale 取它，不寫死 zh-TW）。
+func TestErrorsCarryTheLocaleTheSentenceWasProducedIn(t *testing.T) {
+	for _, l := range []uitext.Locale{uitext.ZhTW, uitext.EN} {
+		ctx := uitext.WithLocale(context.Background(), l)
+		for name, err := range map[string]error{
+			"precondition": Precondition(ctx, ReasonIssueLimitReached),
+			"not found":    NotFound(ctx, ReasonCampaignNotFound),
+			"invalid":      Invalid(ctx, "Title", InvalidTitleLength),
+		} {
+			var ae *apperr.Error
+			if !errors.As(err, &ae) || ae.Locale() != l {
+				t.Errorf("%s（%s）：錯誤的語系 = %v", name, l, err)
+			}
+		}
+	}
+	zh := Precondition(uitext.WithLocale(context.Background(), uitext.ZhTW), ReasonIssueLimitReached).Error()
+	en := Precondition(uitext.WithLocale(context.Background(), uitext.EN), ReasonIssueLimitReached).Error()
+	if zh == en {
+		t.Errorf("en 的請求應拿到不同於 zh-TW 的句子：%q", en)
 	}
 }

@@ -31,6 +31,7 @@ import (
 	httpbuyerprocurement "github.com/Will413028/hawkr/backend/internal/httpapi/buyerprocurement"
 	httpchat "github.com/Will413028/hawkr/backend/internal/httpapi/chat"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
+	httpcoupon "github.com/Will413028/hawkr/backend/internal/httpapi/coupon"
 	httpcrm "github.com/Will413028/hawkr/backend/internal/httpapi/crm"
 	httpdelegation "github.com/Will413028/hawkr/backend/internal/httpapi/delegation"
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
@@ -49,6 +50,7 @@ import (
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/chat/v1alpha1/chatv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1/couponv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/crm/v1alpha1/crmv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
@@ -75,6 +77,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
@@ -125,6 +128,8 @@ type Deps struct {
 	Review *review.Module
 	// IM 是買家與店家之間的聊天（ChatAppService）。
 	IM *im.Module
+	// Coupon 是優惠券：買家的券與可領的活動、店家發的活動（CouponAppService）。
+	Coupon *coupon.Module
 	// CRM 是店家的客戶與標籤（CrmAppService）。
 	CRM *crm.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
@@ -224,6 +229,9 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	}
 	if deps.Identity == nil {
 		return nil, fmt.Errorf("httpapi：ChatAppService 串流的重新驗證需要 Identity")
+	}
+	if deps.Coupon == nil {
+		return nil, fmt.Errorf("httpapi：CouponAppService 需要 Coupon")
 	}
 	if deps.CRM == nil {
 		return nil, fmt.Errorf("httpapi：CrmAppService 需要 CRM")
@@ -455,6 +463,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(crmv1alpha1connect.NewCrmAppServiceHandler(crmApp, opts...))
+	couponApp, err := httpcoupon.NewApp(deps.Coupon, deps.Buyer, deps.CRM, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(couponv1alpha1connect.NewCouponAppServiceHandler(couponApp, opts...))
 	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
 	if err != nil {
 		return nil, err

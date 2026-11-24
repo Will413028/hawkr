@@ -323,6 +323,41 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.coupon.v1alpha1.CampaignStatus",
+      "tsName": "CampaignStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/coupon/v1alpha1/coupon_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.DiscountType",
+      "tsName": "DiscountType",
+      "tsModule": "@hawkr/api/gen/hawkr/coupon/v1alpha1/coupon_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.TargetType",
+      "tsName": "TargetType",
+      "tsModule": "@hawkr/api/gen/hawkr/coupon/v1alpha1/coupon_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.VoucherOrigin",
+      "tsName": "VoucherOrigin",
+      "tsModule": "@hawkr/api/gen/hawkr/coupon/v1alpha1/coupon_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.VoucherStatus",
+      "tsName": "VoucherStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/coupon/v1alpha1/coupon_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.crm.v1alpha1.CustomerSort",
       "tsName": "CustomerSort",
       "tsModule": "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb",

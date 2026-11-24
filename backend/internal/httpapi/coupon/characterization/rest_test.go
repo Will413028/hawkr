@@ -51,6 +51,33 @@ func restBusinessKind(code int32) error {
 
 func (d *restDriver) Legacy() bool { return true }
 
+func (d *restDriver) AdminRPC() bool { return true }
+
+func (d *restDriver) StoreOf(c ch.Caller) string {
+	if c == ch.Seller2 {
+		return StoreSeller2
+	}
+	return StoreSeller
+}
+
+func (d *restDriver) BuyerAccount(c ch.Caller) string {
+	if c == ch.Buyer2 {
+		return AccountBuyer2
+	}
+	return AccountBuyer
+}
+
+func (d *restDriver) BuyerID(c ch.Caller) string {
+	if c == ch.Buyer2 {
+		return BuyerID2
+	}
+	return "52001"
+}
+
+func (d *restDriver) Unknown() string { return "1" }
+
+func (d *restDriver) Malformed() string { return "not-a-number" }
+
 const (
 	appCoupons    = "/api/v1/app/coupons"
 	appTemplates  = "/api/v1/app/coupon_templates"
@@ -62,7 +89,7 @@ const (
 var (
 	typeWire   = map[CouponType]string{TypeCash: "1", TypePercent: "2"}
 	targetWire = map[Target]string{TargetAll: "1", TargetMember: "2", TargetDesignated: "3", TargetCompensation: "4"}
-	statusWire = map[Status]string{StatusDraft: "0", StatusActive: "1", StatusInactive: "2", StatusExpired: "3", StatusRevoked: "4"}
+	statusWire = map[Status]string{StatusDraft: "0", StatusActive: "1", StatusInactive: "2", StatusExpired: "3", StatusEnded: "4"}
 )
 
 // enumWire 取列舉的 wire 值；不認得的值原樣送出，讓情境能送非法值。

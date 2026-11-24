@@ -78,6 +78,41 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.coupon.v1alpha1.CampaignStatus",
+      "dartClass": "CampaignStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.DiscountType",
+      "dartClass": "DiscountType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.TargetType",
+      "dartClass": "TargetType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.VoucherOrigin",
+      "dartClass": "VoucherOrigin",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.VoucherStatus",
+      "dartClass": "VoucherStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.crm.v1alpha1.CustomerSort",
       "dartClass": "CustomerSort",
       "dartLibrary": "package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart",
