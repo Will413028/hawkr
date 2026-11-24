@@ -173,7 +173,7 @@ func TestASegmentAnomalyHoldsTheReservationAndIsResolvedPerSegment(t *testing.T)
 	}
 }
 
-// 併發：兩筆退款合計 100 同時開始收回，不管誰先，原轉帳與補差額轉帳各自的累計撤回額不超過各自的額度（70、30），總額恰好 100，provider 收到恰好 3 次撤回；
+// 併發：兩筆退款合計 100 同時開始收回，不管誰先，原轉帳與補差額轉帳各自的累計撤回額不超過各自的額度（70、30），總額恰好 100，provider 端恰好建立 3 筆撤回（同一個撤回列被兩個 worker 同時處理時以同一把冪等鍵重送，provider 回同一筆，所以數建立的撤回而不是呼叫次數）；
 // 目標累計撤回額由 CHECK 守，超過額度的寫入被擋下。
 // mutation：startReversals 不扣進行中撤回列佔走的額度（OpenReversalTotalOnTransfer 回 0）→ 兩筆退款都從原轉帳分 70，超過原轉帳額度，失敗。
 // mutation：拿掉 refunds_topup_reversed_check → 超過額度的寫入沒被擋下，失敗。
@@ -214,8 +214,8 @@ func TestConcurrentRefundsNeverReverseMoreThanEachTransferOrTheTotal(t *testing.
 		func() error { return f.module.ReversePaymentTransfer(ctx, a.ID, false) },
 		func() error { return f.module.ReversePaymentTransfer(ctx, b.ID, false) },
 	)
-	if f.reversedOf(t, tr.ID) != 70 || f.refundText(t, "topup_reversed_amount", topup.ID) != "30" || f.reversalOf(t, a.ID) != "REVERSED" || f.reversalOf(t, b.ID) != "REVERSED" || f.fake.ReversalCalls() != 3 {
-		t.Fatalf("併發之後：原轉帳 %d，補差額 %s，彙總 %s %s，呼叫 %d", f.reversedOf(t, tr.ID), f.refundText(t, "topup_reversed_amount", topup.ID), f.reversalOf(t, a.ID), f.reversalOf(t, b.ID), f.fake.ReversalCalls())
+	if f.reversedOf(t, tr.ID) != 70 || f.refundText(t, "topup_reversed_amount", topup.ID) != "30" || f.reversalOf(t, a.ID) != "REVERSED" || f.reversalOf(t, b.ID) != "REVERSED" || len(f.fake.ReversalIDs()) != 3 {
+		t.Fatalf("併發之後：原轉帳 %d，補差額 %s，彙總 %s %s，provider 撤回 %d", f.reversedOf(t, tr.ID), f.refundText(t, "topup_reversed_amount", topup.ID), f.reversalOf(t, a.ID), f.reversalOf(t, b.ID), len(f.fake.ReversalIDs()))
 	}
 	if f.count(t, "SELECT COALESCE(SUM(amount), 0) FROM payment.refund_reversals WHERE payment_id = $1 AND status = 'REVERSED'", tr.PaymentID) != 100 {
 		t.Fatal("撤回列的總額不是 100")

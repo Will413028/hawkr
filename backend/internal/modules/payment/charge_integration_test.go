@@ -792,7 +792,7 @@ VALUES ($1, $2, $3, 50, $4::text, $5::text, $6, $7::text, CASE WHEN $8::text IS 
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM payment.refunds WHERE request_key = 'k5b'").Scan(&k5b))
 	insertSeg := func(seq int, target *uuid.UUID, amount int64, status string) error {
 		return exec(`INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, 'tr_1', $6, $7::text, CASE WHEN $7::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $7::text = 'REVERSED' THEN now() END, CASE WHEN $7::text = 'REVERSED' THEN 'trr_' || $1::text END, now(), now())`,
+VALUES ($1, $2, $3, $4, $5, 'tr_1', $6, $7::text, CASE WHEN $7::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $7::text = 'REVERSED' THEN now() END, CASE WHEN $7::text = 'REVERSED' THEN 'trr_' || $1::uuid::text END, now(), now())`,
 			uuid.NewV7(), k5b, p.ID, seq, target, amount, status)
 	}
 	must(t, insertSeg(0, nil, 20, "REVERSING"))

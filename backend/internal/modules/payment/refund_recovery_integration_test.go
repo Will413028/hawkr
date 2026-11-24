@@ -423,7 +423,7 @@ func TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifie
 		t.Fatalf("轉帳 ANOMALY 時的退款：%+v", r)
 	}
 	ext := f.fake.TransferIDs()[0]
-	if _, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: ext, Amount: 70, IdempotencyKey: "dashboard-1"}); err != nil {
+	if _, err := f.fake.ReverseTransfer(callDeadline(t, ctx), ChargeReversalInput{ExternalTransferID: ext, Amount: 70, IdempotencyKey: "dashboard-1"}); err != nil {
 		t.Fatal(err)
 	}
 	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTransfer, tr.ID, AnomalySucceeded, ext))

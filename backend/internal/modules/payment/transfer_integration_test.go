@@ -61,6 +61,14 @@ VALUES ($1, $2, $3, $4, $5::text, $6, CASE WHEN $5::text IN ('FAILED', 'ANOMALY'
 // insertReversal 寫一筆退款列並指定向賣家收回的彙總狀態：refundStatus 是 REFUNDING、SUCCEEDED 或 FAILED 時 provider 已接受（寫 external_refund_id 與呼叫時刻），
 // reversalAmount 大於 0 才是有預留的列；彙總狀態是 REVERSING、REVERSED、RELEASED 或 ANOMALY 時再寫一列對原轉帳的撤回列（狀態同彙總，REVERSED 補撤回 ID 與呼叫時刻，
 // RELEASED 與 ANOMALY 補原因），REVERSED 的退款 reversal_recovered 等於預留額。
+// callDeadline 給測試直接呼叫 provider 用：provider 的呼叫規則要求帶 deadline。
+func callDeadline(t *testing.T, ctx context.Context) context.Context {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	t.Cleanup(cancel)
+	return ctx
+}
+
 func (f *chargeFixture) insertReversal(t *testing.T, paymentID uuid.UUID, refundStatus, reversalStatus string, amount, reversalAmount int64) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
@@ -75,7 +83,7 @@ VALUES ($1, $2, $3, $4, $5::text, $6::text, $7, CASE WHEN $6::text = 'REVERSED' 
 	case "REVERSING", "REVERSED", "RELEASED", "ANOMALY":
 		_, err = f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
 VALUES ($1, $2, $3, 0, NULL, COALESCE((SELECT external_transfer_id FROM payment.transfers WHERE payment_id = $3 AND status = 'SUCCEEDED'), 'tr_none'), $4, $5::text,
-	CASE WHEN $5::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $5::text = 'REVERSED' THEN $6::timestamptz END, CASE WHEN $5::text = 'REVERSED' THEN 'trr_' || $2::text END, $6, $6)`,
+	CASE WHEN $5::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $5::text = 'REVERSED' THEN $6::timestamptz END, CASE WHEN $5::text = 'REVERSED' THEN 'trr_' || $2::uuid::text END, $6, $6)`,
 			uuid.NewV7(), id, paymentID, reversalAmount, reversalStatus, f.now)
 		must(t, err)
 	}

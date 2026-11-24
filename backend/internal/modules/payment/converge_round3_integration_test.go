@@ -226,7 +226,7 @@ func TestResolvingAReversalAnomalyAsSucceededRequiresTheProviderToConfirmTheEvid
 	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, "trr_typo"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("亂貼的 ID：%v", err)
 	}
-	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", refund)})
+	rev, err := f.fake.ReverseTransfer(callDeadline(t, ctx), ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", refund)})
 	must(t, err)
 	must(t, f.fake.SetReversalAmount(rev.ExternalID, 5))
 	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, rev.ExternalID); apperr.KindOf(err) != apperr.KindFailedPrecondition {

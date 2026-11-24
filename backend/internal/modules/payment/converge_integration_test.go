@@ -388,7 +388,7 @@ func TestResolvingARefundReversalAnomalyAccruesTheReversalOnSuccess(t *testing.T
 	ok := f.insertReversal(t, p.ID, "REFUNDING", "ANOMALY", 30, 30)
 	bad := f.insertReversal(t, p.ID, "REFUNDING", "ANOMALY", 20, 20)
 	f.exec(t, "UPDATE payment.refund_reversals SET reason = 'lookup_failed' WHERE status = 'ANOMALY'")
-	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", ok)})
+	rev, err := f.fake.ReverseTransfer(callDeadline(t, ctx), ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", ok)})
 	must(t, err)
 	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, ok), AnomalySucceeded, rev.ExternalID))
 	if f.refundText(t, "reversal_status", ok) != "REVERSED" || f.segText(t, "external_id", ok) != rev.ExternalID || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 1 {
@@ -555,7 +555,7 @@ func TestRequestTransferReturnsADatabaseErrorImmediately(t *testing.T) {
 func TestSweepQueriesHavePartialIndexes(t *testing.T) {
 	t.Parallel()
 	f := setupCharge(t)
-	for name, want := range map[string]string{"transfers_pending": "PENDING", "refunds_reversing": "REVERSING"} {
+	for name, want := range map[string]string{"transfers_pending": "PENDING", "refund_reversals_reversing": "REVERSING"} {
 		def := f.text(t, "SELECT indexdef FROM pg_indexes WHERE schemaname = 'payment' AND indexname = $1", name)
 		if !strings.Contains(def, "updated_at") || !strings.Contains(def, "'"+want+"'") {
 			t.Errorf("%s：%q", name, def)
