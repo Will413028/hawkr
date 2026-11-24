@@ -118,8 +118,9 @@ func TestListClaimableUsesTheClaimQualification(t *testing.T) {
 		in.TargetType, in.TargetBuyers = coupon.TargetDesignated, []int64{buyer2}
 	})
 	f.campaign(func(in *coupon.CreateCampaignInput) {
-		in.StartAt, in.EndAt = base.Add(-3*windowLen), base.Add(-2*windowLen)
+		in.StartAt, in.EndAt = base.Add(-time.Hour), base.Add(time.Minute)
 	})
+	f.advance(2 * time.Minute)
 	f.sellerCampaign(storeB)
 	f.stores.set(storeB, true)
 	p, err := f.m.ListClaimable(context.Background(), coupon.ClaimableInput{BuyerID: buyer1})

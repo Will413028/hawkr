@@ -230,7 +230,7 @@
    "stack": "go",
    "file": "backend/internal/httpapi/coupon/convert.go",
    "old": "if !ok {\n\t\t\treturn nil, fmt.Errorf(\"httpapi/coupon：名單裡的買家 %d 在 buyer 模組沒有資料\", id)\n\t\t}\n",
-   "new": "_ = ok\n",
+   "new": "_ = ok\n\t\t_ = fmt.Sprint\n",
    "test": "internal/httpapi/coupon ^TestDesignatedBuyersDeletedIsEmptyNameAndMissingFailsTheRequest$",
    "why": "buyer 沒回的名單買家被補成空名稱，與已刪除無法分辨，測試要紅。"
   },
@@ -282,9 +282,9 @@
   {
    "id": "crm-customers-among-ignores-store",
    "stack": "go-integration",
-   "file": "backend/internal/modules/crm/db/queries/customers.sql",
-   "old": "WHERE c.store_id = sqlc.arg(store_id) AND c.buyer_id = ANY(sqlc.arg(buyer_ids)::bigint[])",
-   "new": "WHERE c.buyer_id = ANY(sqlc.arg(buyer_ids)::bigint[])",
+   "file": "backend/internal/modules/crm/internal/store/customers.sql.go",
+   "old": "WHERE c.store_id = $1 AND c.buyer_id = ANY($2::bigint[])",
+   "new": "WHERE c.buyer_id = ANY($2::bigint[])",
    "test": "internal/modules/crm ^TestCustomersAmong$",
    "why": "批次成員查詢不限店家：別家店的客戶也算這家的客戶，測試要紅。"
   }
