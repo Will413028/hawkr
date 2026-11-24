@@ -7,6 +7,7 @@ import 'package:hawkr_buyer/core/theme/app_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_buyer/shared/icons/app_icons.dart';
 import 'package:flutter/material.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -15,7 +16,6 @@ import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/hk_button_label.dart';
 import '../../../shared/widgets/floating_toast.dart';
 import '../../../shared/widgets/truck_loading_overlay.dart';
-import 'preference_labels.dart';
 import 'notification_controller.dart';
 import 'widgets/notification_type_icon.dart';
 
@@ -115,6 +115,7 @@ class NotificationSettingsScreen extends HookConsumerWidget {
             Padding(
               padding: EdgeInsets.only(bottom: 12.h),
               child: NotificationPreferenceCard(
+                locale: ref.watch(uiLocaleProvider),
                 category: group.key,
                 entries: group.value,
                 iconKind:
@@ -150,12 +151,14 @@ class NotificationSettingsScreen extends HookConsumerWidget {
 class NotificationPreferenceCard extends StatelessWidget {
   const NotificationPreferenceCard({
     super.key,
+    required this.locale,
     required this.category,
     required this.entries,
     required this.iconKind,
     required this.onChanged,
   });
 
+  final UiLocale locale;
   final NotificationCategory category;
   final List<pb.PreferenceEntry> entries;
   final NotificationIconKind iconKind;
@@ -190,7 +193,7 @@ class NotificationPreferenceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    notificationCategoryLabel(category),
+                    category.uiText(locale) ?? '',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w400,
@@ -206,7 +209,7 @@ class NotificationPreferenceCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            notificationChannelLabel(entry.channel),
+                            entry.channel.uiText(locale) ?? '',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w400,

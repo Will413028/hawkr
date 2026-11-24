@@ -2,7 +2,7 @@ import 'package:hawkr_buyer/core/layout/app_text_size.dart';
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
     as pb;
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart';
-import 'package:hawkr_buyer/features/notification/presentation/preference_labels.dart';
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notification_settings_screen.dart';
 import 'package:hawkr_buyer/features/notification/presentation/widgets/notification_type_icon.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +46,7 @@ void main() {
             body: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: NotificationPreferenceCard(
+                locale: UiLocale.zhTW,
                 category: category,
                 entries: entries,
                 iconKind: NotificationIconKind.system,
@@ -57,7 +58,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        final title = notificationCategoryLabel(category);
+        final title = category.uiText(UiLocale.zhTW)!;
         expect(find.text(title), findsOneWidget);
 
         final card = tester.getRect(
